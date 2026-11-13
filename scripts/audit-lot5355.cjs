@@ -56,18 +56,39 @@ const MUTATIONS = {
 };
 
 if (process.argv.includes('--prouve')) {
+  // node_modules : celui du dépôt, ou d'un dossier parent (un worktree n'en a pas).
+  let nm = ICI; while (!fs.existsSync(path.join(nm, 'node_modules')) && path.dirname(nm) !== nm) nm = path.dirname(nm);
+  nm = fs.realpathSync(path.join(nm, 'node_modules'));
+  const lancer = (t) => { const r = cp.spawnSync(process.execPath, [__filename], { env: { ...process.env, AUDIT_RACINE: t }, encoding: 'utf8', timeout: 300000 }); return { r, rouges: ((r.stdout || '').match(/^❌/gm) || []).length }; };
+  const base0 = process.env.AUDIT_DEPART || 'origin/main';
   const t = fs.mkdtempSync(path.join(os.tmpdir(), 'vrm-lot5355-'));
-  cp.execSync(`git -C "${ICI}" archive origin/main api src scripts/_source-app.cjs scripts/_horloge-notif.cjs scripts/_mutations-audit.cjs package.json | tar -x -C "${t}"`);
-  fs.mkdirSync(path.join(t, 'scripts'), { recursive: true });
-  fs.symlinkSync(fs.realpathSync(path.join(ICI, 'node_modules')), path.join(t, 'node_modules'));
-  const r = cp.spawnSync(process.execPath, [__filename], { env: { ...process.env, AUDIT_RACINE: t }, encoding: 'utf8', timeout: 300000 });
-  const rouges = ((r.stdout || '').match(/^❌/gm) || []).length;
-  console.log(`${r.status && rouges ? '✅' : '❌'} sur origin/main : ${rouges} rouge(s)`);
-  for (const l of (r.stdout || '').split('\n').filter((x) => x.startsWith('❌')).slice(0, 40)) console.log('     ' + l.slice(0, 170));
-  fs.rmSync(t, { recursive: true, force: true });
-  if (!(r.status && rouges)) process.exit(1);
-  require('./_mutations-audit.cjs').prouver(__filename, ICI, MUTATIONS);
-  return;
+  try {
+    cp.execSync(`git -C "${ICI}" archive ${base0} api src package.json | tar -x -C "${t}"`);
+    fs.symlinkSync(nm, path.join(t, 'node_modules'));
+    const { r, rouges } = lancer(t);
+    console.log(`${r.status && rouges ? '✅' : '❌'} sur ${base0} : ${rouges} rouge(s)`);
+    for (const l of (r.stdout || '').split('\n').filter((x) => x.startsWith('❌')).slice(0, 40)) console.log('     ' + l.slice(0, 170));
+    if (!(r.status && rouges)) process.exitCode = 1;
+  } finally { fs.rmSync(t, { recursive: true, force: true }); }
+  // Chaque mutation dans une COPIE de l'arbre (api, src, package.json), une à la fois.
+  let attrapees = 0;
+  for (const [nom, edits] of Object.entries(MUTATIONS)) {
+    const m = fs.mkdtempSync(path.join(os.tmpdir(), 'vrm-lot5355-mut-'));
+    try {
+      for (const x of ['api', 'src', 'package.json']) fs.cpSync(path.join(ICI, x), path.join(m, x), { recursive: true });
+      fs.symlinkSync(nm, path.join(m, 'node_modules'));
+      let ancre = true;
+      for (const [f, de, vers] of edits) { const p = path.join(m, f); const s = fs.readFileSync(p, 'utf8'); if (!s.includes(de)) { ancre = false; break; } fs.writeFileSync(p, s.replace(de, vers)); }
+      if (!ancre) { console.log(`❌ mutation « ${nom} » : ancre introuvable`); continue; }
+      const { r, rouges } = lancer(m);
+      const tombe = r.status !== 0 && rouges > 0;
+      if (tombe) attrapees++;
+      console.log(`${tombe ? '✅' : '❌'} mutation « ${nom} » ⇒ ${tombe ? rouges + ' rouge(s)' : 'VERTE (le contrôle ne la voit pas)'}`);
+    } finally { fs.rmSync(m, { recursive: true, force: true }); }
+  }
+  const n = Object.keys(MUTATIONS).length;
+  console.log(attrapees === n ? `\n✅ ${attrapees}/${n} mutations attrapées` : `\n❌ ${n - attrapees} mutation(s) non attrapée(s)`);
+  process.exit(attrapees === n && !process.exitCode ? 0 : 1);
 }
 
 let ok = 0, ko = 0;
