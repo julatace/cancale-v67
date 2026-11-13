@@ -29,7 +29,7 @@ import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
 import { suiteProduction, SIGNAUX as SIGNAUX_PROD, SERIE_503, FENETRE_503_MS } from './_lib/alertes-production.js';
 import { proprietaireInstallation } from './_lib/signalement.js';
 import { texteArrivee } from './_lib/notif-textes.js';
-import { colisPerdu } from './_lib/etat-colis-email.js';
+import { colisPerdu, normaliserSuivi } from './_lib/etat-colis-email.js';
 import { DESTINATIONS, conversationDeLEmail } from './_lib/lien-notif.js';
 import { estSuppressionLbc, lireSuppressionLbc, texteSuppressionLbc, jourParis, CAT_LBC_SUPPRESSION, FAMILLE_LBC_SUPPRESSION } from './_lib/lbc-suppression.js';
 // (5 nov.) Les textes des notifications : fabriqués là où l'aperçu de Paramètres → Notifications les lit.
@@ -60,7 +60,8 @@ import { completerParLignePrecedente } from './_lib/rappel-colis.js';
 import { codeRetraitTournure, nombreSurSaLigne, codeImpossible } from './_lib/code-retrait-email.js';
 import { decoderEntitesHtml } from './_lib/entites-html.js';
 import { transactionDuRecu } from './_lib/recu-achat.js';
-import { suiviDuSujet, finsDesLignes, sortiParSuivis, SELECT_TRANSP_META, ligneTranspDeMeta } from './_lib/suivi-colis.js';
+import { suiviDuSujet, finsDesLignes, sortiParSuivis, SELECT_TRANSP_META, ligneTranspDeMeta, liensDesLignes } from './_lib/suivi-colis.js';
+import { commandeDuColisRegle, achatsDesLignes, indexDesLiens, txParCodeDe, titreDuColis, codeColisNorm } from './_lib/commande-colis.js';   // (13 nov.) le nom de la paire
 import { modifierCas } from './_lib/suivi-vinted.js';
 import { estEmailVestiaire, lireEmailVenteVc, fusionnerVenteEmailVc } from './_lib/vestiaire-email.js';
 // (9 nov.) Les autres e-mails Vestiaire (rappel d'envoi, annonce en attente / en ligne, offres, marketing).
@@ -2076,6 +2077,40 @@ function cleValide(req) {
 //    serveur ils refusent (503), ils ne s'ouvrent jamais « par défaut ».
 // Le vendeur est celui de l'installation (`VRM_OWNER_UID`) : un script Gmail
 // appartient à UNE boîte, donc à un vendeur.
+// (13 nov.) LE NOM DE LA PAIRE D'UN COLIS QUI ARRIVE, PAR IDENTITÉ (api/_lib/commande-colis.js, la
+// jonction de l'écran) : son n° de suivi (lignes de suivi Vinted relevées par l'extension, n° reliés
+// à la main) ou son code de retrait (`panel_colis_relais`). Lectures PROJETÉES : les liens en
+// scalaires, puis les SEULES lignes d'achats qui contiennent une transaction candidate (filtre `cs`,
+// jamais `select=data`). Rien relié, ou une lecture ratée ⇒ '' (l'article de l'e-mail, sinon
+// « Ton colis {transporteur} ») : un nom n'est jamais deviné.
+async function titreAchatDuColis(track) {
+  try {
+    const suivi = String((track && track.suivi) || ''), code = codeColisNorm(track && track.code);
+    if (!suivi && !code) return '';
+    const [sv, sm, rel] = await Promise.all([
+      suivi ? lireLignes('id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi') : [],
+      suivi ? lireLignes('id=like.colis_suivi_*&select=id,suivi:meta->>suivi,tx:meta->>tx,uid:meta->>uid') : [],
+      code ? supabaseLireRow('panel_colis_relais') : { lu: true, data: {} },
+    ]);
+    const liens = liensDesLignes(sv, sm);
+    if (!liens || !rel || !rel.lu) return '';
+    const relais = (rel.data && typeof rel.data === 'object') ? rel.data : {};
+    const index = indexDesLiens(liens), txParCode = txParCodeDe(relais);
+    const k = normaliserSuivi(suivi);
+    const txs = new Set(liens.filter((l) => l.suivi === k).map((l) => String(l.tx)));
+    if (code && txParCode.get(code)) txs.add(txParCode.get(code));
+    const candidats = [...txs].filter((t) => /^\d{3,20}$/.test(t)).slice(0, 4);
+    if (!candidats.length) return '';
+    const rows = [];
+    for (const tx of candidats) {
+      const r = await lireLignes(`id=like.harvest_*_orders_purchased&data->payload->my_orders=cs.${encodeURIComponent(JSON.stringify([{ transaction_id: Number(tx) }]))}&select=id,orders:data->payload->my_orders`);
+      if (!Array.isArray(r)) return '';
+      for (const x of r) if (!rows.some((y) => y.id === x.id)) rows.push(x);
+    }
+    const achats = achatsDesLignes(rows);
+    return titreDuColis(commandeDuColisRegle({ suivi, code }, { achats, index, txParCode }), '');
+  } catch (_) { return ''; }
+}
 async function lireLignes(requete) {
   try {
     const r = await fetchAvecDelai(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?${requete}`), { headers: { ...sbCle(SUPABASE_KEY) } });
@@ -2758,8 +2793,10 @@ export async function traiterEmail(req, res) {
       // rien (famille « suivi » retirée — api/_lib/notif-textes.js).
       // (23 oct.) Un colis reparti chez l'expéditeur ne sonne JAMAIS « 📍 à retirer ».
       const arriveeIci = track.status === 'available' && !garde.conserve && sensLigne !== 'sortant';
+      // (13 nov.) Le nom de la paire : l'achat relié par identité d'abord (la jonction de l'écran).
+      const artLie = arriveeIci && !sortiAilleurs ? await titreAchatDuColis(track) : '';
       const notifColis = arriveeIci
-        ? texteArrivee({ article: track.artTitle, transporteur: nomTransporteur(carrier), lieu: track.lieu, code: codeNotif(track.code), code2: codeNotif(track.code2), limite: track.limite })
+        ? texteArrivee({ article: artLie || track.artTitle, transporteur: nomTransporteur(carrier), lieu: track.lieu, code: codeNotif(track.code), code2: codeNotif(track.code2), limite: track.limite })
         : (track.status === 'retour' ? { title: '↩️ Colis reparti chez l’expéditeur', body: bodyNotifColis(track, carrier) } : null);
       if (!sortiAilleurs && notifColis) try { await pushOnce({
         title: notifColis.title, body: notifColis.body,

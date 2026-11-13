@@ -463,6 +463,7 @@ import {marcheDuCompte as marcheEbayDuCompte, MARCHE_DEFAUT as MARCHE_EBAY_DEFAU
 import {arriveeColisEmail, arriveeColisVinted, jourLocal, texteArrivee} from '../api/_lib/arrivee-colis.js';
 import {transactionDeLaLigne, indexRecusParTransaction, recuDeLAchat, bilanRecusAchat} from '../api/_lib/recu-achat.js';
 import {codeRetraitTournure} from '../api/_lib/code-retrait-email.js';
+import {commandeDuColisRegle} from '../api/_lib/commande-colis.js';
 import {etatRetrait, estAVerifier, urgenceTri, lieuDepuisExtrait, limiteRetraitDepuisTexte, LIEU_AU_FUTUR, GARDE_MAX_J, gardeDe, limiteEstimee} from '../api/_lib/retrait-colis.js';
 import {aConfirmerVisibles, texteLimite, motAConfirmer} from './aConfirmer.js';
 // ⟦→ ecrans/Ebay.jsx #5⟧
@@ -33820,14 +33821,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const txParCode = new Map();
     for (const [tx, r] of Object.entries(colisRelais || {})) { const c = r ? normCode(r.code) : ''; if (c) txParCode.set(c, txParCode.has(c) ? null : String(tx)); }
     const achatParTx = new Map((buysBase || []).map(o => [String(o.transaction_id), o]));
-    const commandeDuColis = (t) => {
-      // (3 nov.) Le colis annoncé par Vinted (« Commande mise à jour ») porte la
-      // CONVERSATION de sa commande : une identité (api/_lib/achat-arrive-relais.js).
-      if (t && t.conv) { const ac = achatParConversation(t.conv, buysBase); if (ac) return ac; }
-      const a = achatDuColis(t, buysBase, indexColis); if (a) return a;
-      const c = normCode(t && t.code); const tx = c ? txParCode.get(c) : null;
-      return tx ? (achatParTx.get(tx) || null) : null;
-    };
+    // (13 nov.) La jonction vit dans api/_lib/commande-colis.js : le serveur l'appelle aussi
+    // (le nom de la paire dans les rappels de retrait) — une règle, deux lecteurs (§11).
+    // (3 nov.) Conversation de la commande, puis n° de suivi, puis code de retrait.
+    const commandeDuColis = (t) => commandeDuColisRegle(t, { achats: buysBase, index: indexColis, txParCode, achatParTx });
     // ── TROIS LISTES, UNE RÈGLE (api/_lib/retrait-colis.js, §11) ─────────────
     // `emailList` : à retirer (ce qui compte) · `aVerifier` : délai dépassé ou
     // trop long au point relais — visible, jamais compté · `repartis` : un
