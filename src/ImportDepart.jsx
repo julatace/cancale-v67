@@ -161,7 +161,7 @@ export default function ImportDepart({ comptes = [], variante = 'journee' }) {
   };
   return (
     <div className="vrm-imp vrm-imp-reglages" data-import-reglages={uids.length} data-import-sait={sait}>
-      <p className="vrm-imp-note">Tes 12 derniers mois de ventes, d’achats et d’annonces, lus une fois par l’extension. « Tout récupérer » lit aussi plus ancien.</p>
+      <p className="vrm-imp-note">Tes 12 derniers mois, lus une fois par l’extension. « Tout récupérer » lit plus ancien.</p>
       {rx ? <p className="vrm-imp-note vrm-imp-geste" role="status" data-import-ext={rx.code || ''}>{rx.texte}</p> : null}
       {!rx && extSait('importpasse') !== 'ok' ? <p className="vrm-imp-note vrm-imp-geste" role="status" data-import-ext="passe">Mets l’extension à jour (5.373.0) pour les 12 mois et les annonces.</p> : null}
       {etats === null ? <p className="vrm-imp-note" role="status" data-import-passu="">Pas su pour l’instant : la base n’a pas répondu.</p> : null}
