@@ -3211,6 +3211,7 @@ function _installerRetourFeuilles() {
   window.addEventListener('popstate', (e) => {
     const notreRetour = window.__vrmRetourFeuille === true;
     window.__vrmRetourFeuille = false;
+    if (notreRetour) window.__vrmPopFeuille = e;   // la coque reconnaît CE retour (13 nov., voir onPop)
     const id = e && e.state && e.state.vrmFeuille;
     const i = id ? _feuillesOuvertes.findIndex(f => f.id === id) : -1;
     if (id && i < 0) return;   // entrée d'une feuille déjà fermée : rien à fermer
@@ -56694,6 +56695,13 @@ function AppCoeur() {
   },[tab,platSub]);
   React.useEffect(()=>{
     const onPop=(e)=>{
+      // (13 nov., integration-13nov-ci) Le retour qu'une feuille fermée fait ELLE-MÊME (FermeAuRetour retire
+      // son entrée) n'est pas un geste « retour » : il ne change pas d'écran. Sous Safari (WebKit), toucher
+      // « Ventes » avec « Plus » ouvert fermait le panneau AVANT que le nouvel écran soit posé (changement
+      // d'écran en tâche interruptible) : le panneau retirait son entrée par un retour, ce retour ramenait
+      // Ma journée — le toucher ne menait nulle part (banc iphone-reprise B5, rouge sous WebKit). L'écran
+      // touché est empilé ensuite par `pousser` (qui attend la fin de ce retour).
+      if(window.__vrmRetourFeuille===true || (e && window.__vrmPopFeuille===e)) return;
       const st=(e && e.state) || {};
       const t=st.vrmTab || 'journee';
       const sub=st.vrmSub || 'ventes';
