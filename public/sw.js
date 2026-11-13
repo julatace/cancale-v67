@@ -339,6 +339,8 @@ self.addEventListener('fetch', event => {
   // l'app (comme les pages légales). Elle va au réseau, sans cache : un état
   // gardé en cache dirait « Tout fonctionne » d'hier.
   if (url.pathname === '/etat' || url.pathname.startsWith('/etat.') || url.pathname === '/etat-version.json') return;
+  // (13 nov., lot 50) La page publique /confiance : statique, au réseau (comme /etat).
+  if (url.pathname === '/confiance' || url.pathname.startsWith('/confiance.')) return;
   // (8 nov.) Le centre d'aide (/aide, public/aide/) : des pages statiques, au réseau —
   // sinon la navigation les rangerait sous « / » et ouvrirait l'app à leur place.
   if (url.pathname === '/aide' || url.pathname.startsWith('/aide/')) return;
