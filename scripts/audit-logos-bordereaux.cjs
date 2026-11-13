@@ -36,6 +36,28 @@ const imp = (rel) => import('file://' + path.join(R, rel));
     dit(V.TRANSPORTEURS.inpost.nom === 'Mondial Relay' && V.TRANSPORTEURS.shop2shop.nom === 'Chronopost Shop2Shop', 'A les noms : « InPost » ⇒ Mondial Relay, « Shop2Shop » ⇒ Chronopost Shop2Shop', V.TRANSPORTEURS.inpost.nom + ' / ' + V.TRANSPORTEURS.shop2shop.nom);
     for (const k of ['mondialrelay', 'chronopost', 'colissimo', 'relaiscolis', 'ups', 'dpd', 'gls', 'colisprive', 'inpost', 'vinted', 'shop2shop', 'laposte']) dit(!!(V.DESSINS_TRANSPORTEURS[k] && V.DESSINS_TRANSPORTEURS[k].svg), `A un dessin SVG pour ${k} (planche)`);
     dit(!/https?:\/\//.test(JSON.stringify(V.DESSINS_TRANSPORTEURS).replace(/http:\/\/www\.w3\.org\/2000\/svg/g, '')), 'A aucun dessin ne charge quoi que ce soit (aucune adresse)');
+    // (13 nov., Julien : « les logos Chronopost ne sont pas bons, ils ne doivent pas être jaunes ») On juge les COULEURS
+    // (teinte calculée), pas l'orthographe : la tuile Chronopost (et Shop2Shop, le même cube) n'est pas jaune, son cube est
+    // bleu ; aucun dessin ne porte un rouge (réservé au doublon de N°, §7) ni un violet (refusé, §3) — les mêmes définitions
+    // que `audit-rouge-doublon` et `audit-violet` ; la tuile `marque` et le dessin ont le même fond (une seule vérité).
+    const hslDe = (h) => { h = h.replace('#', ''); if (h.length === 3) h = h.split('').map((c) => c + c).join(''); let [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255); const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2; let t = 0, s = 0; if (mx !== mn) { const d = mx - mn; s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn); t = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; t *= 60; } return { t, s, l, c: mx - mn }; };
+    const jaune = (h) => { const x = hslDe(h); return x.t >= 40 && x.t <= 65 && x.s >= 0.5 && x.l >= 0.3 && x.l <= 0.85; };
+    const rouge = (h) => { const x = hslDe(h); return (x.t >= 345 || x.t <= 12) && x.s >= 0.45 && x.l >= 0.25 && x.l <= 0.75; };
+    const violet = (h) => { const x = hslDe(h); return x.t >= 260 && x.t <= 320 && x.s >= 0.25 && x.c >= 0.12 && x.l >= 0.12 && x.l <= 0.92; };
+    const couleurs = (d) => [d.fond, ...((d.svg || '').match(/#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b/g) || [])];
+    for (const k of ['chronopost', 'shop2shop']) {
+      const d = V.DESSINS_TRANSPORTEURS[k], m = V.marqueDuTransporteur(k);
+      const cs = couleurs(d).filter((c) => !/^#(f{3}|f{6})$/i.test(c));
+      dit(!couleurs(d).some(jaune) && !jaune(m.fond), `A ${k} : aucune couleur jaune (ni la tuile, ni le dessin)`, couleurs(d).join(' '));
+      const t = hslDe((/<path fill="(#[0-9a-fA-F]{6})" d="M20 0L40 11/.exec(d.svg) || [])[1] || '#000000');
+      dit(t.t >= 190 && t.t <= 215 && t.s >= 0.6, `A ${k} : le cube est BLEU (teinte 190–215°, la couleur de la marque)`, `${Math.round(t.t)}° · ${cs.join(' ')}`);
+    }
+    for (const [k, d] of Object.entries(V.DESSINS_TRANSPORTEURS)) {
+      const cs = couleurs(d);
+      dit(!cs.some(rouge), `A ${k} : aucun rouge (§7 : le rouge est au doublon de N°)`, cs.filter(rouge).join(' '));
+      dit(!cs.some(violet), `A ${k} : aucun violet (§3 : refusé)`, cs.filter(violet).join(' '));
+      dit(!V.TRANSPORTEURS[k] || V.TRANSPORTEURS[k].marque.fond.toUpperCase() === d.fond.toUpperCase(), `A ${k} : la tuile \`marque\` et le dessin ont le même fond`, V.TRANSPORTEURS[k] && `${V.TRANSPORTEURS[k].marque.fond} ≠ ${d.fond}`);
+    }
   });
   await essaie('B bordereau', async () => {
     const B = await imp('api/_lib/transporteur-bordereau.js');

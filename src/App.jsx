@@ -7824,20 +7824,22 @@ const trackUrl = (carrier, suivi, codePostal = '') => { const l = lienSuivi(carr
 //            présente le CODE. (Julien : « il n'y a pas de QR MR, c'est que Chrono ».)
 //   'auto' → QR si le transporteur en fournit un, sinon le code (Vinted Go, UPS).
 //   'home' → livraison à domicile : rien à présenter au comptoir (Colissimo).
+// (13 nov., logos des transporteurs) `bg`/`fg` = les couleurs des tuiles de src/transporteursVisuels.js (Chronopost bleu,
+// jamais jaune ; DPD, DHL, FedEx, Relais Colis en variante neutre : ni rouge ni violet, §3 et §7).
 const CARRIERS = {
-  mondialrelay: { name: 'Mondial Relay', short: 'MR', bg: '#E2001A', fg: '#fff', retrait: 'code' },
-  chronopost:   { name: 'Chronopost',    short: 'CH', bg: '#00A0E3', fg: '#fff', retrait: 'qr'   },
+  mondialrelay: { name: 'Mondial Relay', short: 'MR', bg: '#C8105F', fg: '#fff', retrait: 'code' },
+  chronopost:   { name: 'Chronopost',    short: 'CH', bg: '#009BDE', fg: '#fff', retrait: 'qr'   },
   ups:          { name: 'UPS',           short: 'UPS', bg: '#2C2C2E', fg: '#FFB500', retrait: 'auto' },
   vinted:       { name: 'Vinted Go',     short: 'V',  bg: '#007782', fg: '#fff', retrait: 'auto' },
-  relaiscolis:  { name: 'Relais Colis',  short: 'RC', bg: '#E30613', fg: '#fff', retrait: 'code' },
+  relaiscolis:  { name: 'Relais Colis',  short: 'RC', bg: '#1D1D1F', fg: '#fff', retrait: 'code' },
   colissimo:    { name: 'La Poste',      short: 'LP', bg: '#FFCD00', fg: '#111', retrait: 'home' },
   amazon:       { name: 'Amazon',        short: 'AZ', bg: '#2C2C2E', fg: '#FF9900', retrait: 'code' },
-  shop2shop:    { name: 'Shop2Shop',     short: 'S2S', bg: '#00B2A9', fg: '#fff', retrait: 'code' },
-  inpost:       { name: 'InPost',        short: 'IP', bg: '#FFCD00', fg: '#111', retrait: 'code' },
-  dpd:          { name: 'DPD',           short: 'DPD', bg: '#DC0032', fg: '#fff', retrait: 'auto' },
+  shop2shop:    { name: 'Shop2Shop',     short: 'S2S', bg: '#009BDE', fg: '#fff', retrait: 'code' },
+  inpost:       { name: 'InPost',        short: 'IP', bg: '#C8105F', fg: '#fff', retrait: 'code' },
+  dpd:          { name: 'DPD',           short: 'DPD', bg: '#414042', fg: '#fff', retrait: 'auto' },
   gls:          { name: 'GLS',           short: 'GLS', bg: '#0071E3', fg: '#FFD200', retrait: 'code' },
-  dhl:          { name: 'DHL',           short: 'DHL', bg: '#FFCC00', fg: '#D40511', retrait: 'auto' },
-  fedex:        { name: 'FedEx',         short: 'FX', bg: '#4D148C', fg: '#FF6600', retrait: 'auto' },
+  dhl:          { name: 'DHL',           short: 'DHL', bg: '#FFCC00', fg: '#1D1D1B', retrait: 'auto' },
+  fedex:        { name: 'FedEx',         short: 'FX', bg: '#1D1D1F', fg: '#FFFFFF', retrait: 'auto' },
   // ⚠️ `autre` = le filet du serveur : un email de colis d'un transporteur non
   // listé est quand même traité (api/email-inbound.js). Sans cette entrée, sa
   // carte s'affichait sans nom ni couleur, et `retraitMode` n'avait pas de
