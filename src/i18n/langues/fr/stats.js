@@ -142,7 +142,6 @@ export default {
   "stats.caDepuisDebut": "CA depuis le début",
   "stats.toutesVentesToutes": "Toutes tes ventes, toutes plateformes, à la date de la vente (comme « Vendu »), depuis la première que VRM a lue.",
   "stats.beneficeBrutVente": "Bénéfice brut : vente − prix d’achat, ventes finalisées de la semaine, sur les seules ventes au prix d’achat connu. Dépenses et URSSAF se comptent au mois.",
-  "stats.beneficeVentesFinalisees": "Bénéfice : tes ventes finalisées moins le prix d’achat des paires, les frais de vente, tes dépenses et l’URSSAF — la même règle que Comptabilité et Ma journée.",
   "stats.tempsVendre": "Temps pour vendre",
   "stats.vintedSeulementLeboncoin": "Vinted seulement : Leboncoin et eBay ne donnent pas la date de mise en ligne.",
   "stats.aujourdHuiQuelle": "Aujourd’hui, quelle que soit la période choisie.",

@@ -142,7 +142,6 @@ export default {
   "stats.caDepuisDebut": "Fatturato dall’inizio",
   "stats.toutesVentesToutes": "Tutte le tue vendite, tutte le piattaforme, alla data di vendita (come «Venduto»), dalla prima letta da VRM.",
   "stats.beneficeBrutVente": "Profitto lordo: vendita − prezzo d’acquisto, vendite concluse della settimana, solo quelle con prezzo d’acquisto noto. Spese e URSSAF si contano al mese.",
-  "stats.beneficeVentesFinalisees": "Profitto: le vendite concluse meno il prezzo d’acquisto delle paia, le commissioni, le spese e l’URSSAF — la stessa regola di Contabilità e La mia giornata.",
   "stats.tempsVendre": "Tempo per vendere",
   "stats.vintedSeulementLeboncoin": "Solo Vinted: Leboncoin ed eBay non danno la data di pubblicazione.",
   "stats.aujourdHuiQuelle": "Oggi, qualunque sia il periodo scelto.",

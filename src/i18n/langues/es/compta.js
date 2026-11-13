@@ -560,7 +560,6 @@ export default {
   "compta.seulesDepensesComptent": " : solo cuentan tus gastos",
   "compta.reste": "Lo que te queda",
   "compta.avantDepenses": " antes de tus gastos",
-  "compta.ventesFinaliseesMoins": ": tus ventas finalizadas, menos el precio de compra de los pares",
   "compta.fraisVente": ", los gastos de venta",
   "compta.depenses": ", tus gastos",
   "compta.urssaf": " y la URSSAF",

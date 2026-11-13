@@ -142,7 +142,6 @@ export default {
   "stats.caDepuisDebut": "Umsatz seit Beginn",
   "stats.toutesVentesToutes": "Alle deine Verkäufe, alle Plattformen, am Verkaufsdatum (wie „Verkauft“), seit dem ersten von VRM gelesenen.",
   "stats.beneficeBrutVente": "Bruttogewinn: Verkauf − Einkaufspreis, abgeschlossene Verkäufe der Woche, nur mit bekanntem Einkaufspreis. Ausgaben und URSSAF zählen pro Monat.",
-  "stats.beneficeVentesFinalisees": "Gewinn: deine abgeschlossenen Verkäufe minus Einkaufspreis der Paare, Verkaufsgebühren, deine Ausgaben und URSSAF — dieselbe Regel wie Buchhaltung und Mein Tag.",
   "stats.tempsVendre": "Verkaufsdauer",
   "stats.vintedSeulementLeboncoin": "Nur Vinted: Leboncoin und eBay nennen kein Einstelldatum.",
   "stats.aujourdHuiQuelle": "Heute, unabhängig vom gewählten Zeitraum.",

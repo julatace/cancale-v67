@@ -142,7 +142,6 @@ export default {
   "stats.caDepuisDebut": "Turnover since the start",
   "stats.toutesVentesToutes": "All your sales, all platforms, on the sale date (like “Sold”), since the first one VRM read.",
   "stats.beneficeBrutVente": "Gross profit: sale − purchase price, the week’s completed sales, only those with a known purchase price. Expenses and URSSAF are counted per month.",
-  "stats.beneficeVentesFinalisees": "Profit: your completed sales minus the pairs’ purchase price, selling fees, your expenses and URSSAF — the same rule as Accounting and My day.",
   "stats.tempsVendre": "Time to sell",
   "stats.vintedSeulementLeboncoin": "Vinted only: Leboncoin and eBay don’t give the listing date.",
   "stats.aujourdHuiQuelle": "Today, whatever period is chosen.",
@@ -280,6 +279,6 @@ export default {
   "stats.ventes5": { one: "sale", other: "sales" },
   "stats.negatifs": { one: " · {n} negative", other: "· {n} negative" },
   "stats.neutres": { one: " · {n} neutral", other: "· {n} neutral" },
-  "stats.periodeComptesSelectionnes2": "Over the period, selected accounts · only accounts with at least one sale · profit: completed sales with a known purchase price · time to sell: median, Vinted only · rate: sold ÷ (sold + live today), Vinted only · basket: from {MIN_DONNEES} sales.",
+  "stats.periodeComptesSelectionnes2": "Over the period, selected accounts · only accounts with at least one sale · profit: completed sales with a known purchase price · time to sell: median, Vinted only · rate: sold ÷ (sold + live today), Vinted only · average cart: from {MIN_DONNEES} sales.",
   "stats.nonComptees": { one: " · {n} not counted", other: "· {n} not counted" },
 };

@@ -55,7 +55,9 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? 'OK  ' : 'KO
   dit(egal(G.appliquerOp(G.appliquerOp(sansPrix, op2, 'apres'), op2, 'avant'), sansPrix), 'B3 relier puis « Annuler » ⇒ aucun champ posé ne reste');
 
   // C. Remplacées : plus de confirmation, un geste annulable
-  const app = lire('src/App.jsx'), lbc = lire('src/ecrans/Leboncoin.jsx');
+  // (13 nov., traduction) App.jsx passe ses textes par tr() : le français est RECOLLÉ (_source-app, enFrancais) avant
+  // de juger la règle — la clé doit exister et sa phrase être celle attendue (VRM_SOURCE_BRUTE=1 rend le code tel quel).
+  const app = require('./_source-app.cjs').enFrancais(lire('src/App.jsx'), R), lbc = lire('src/ecrans/Leboncoin.jsx');
   const sans = (s) => s.replace(/\/\/[^\n]*/g, '');
   const A = sans(app), L = sans(lbc);
   dit(!/askConfirm\(\s*['"]Masquer ce bordereau/.test(A) && /gesteVrm\('Bordereau masqué'/.test(A), 'C1 masquer un bordereau : plus de confirmation, gesteVrm');

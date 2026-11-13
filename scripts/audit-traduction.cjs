@@ -136,7 +136,11 @@ async function principal() {
   try {
     const PE = await import(pathToFileURL(path.join(R, 'src', 'phrasesEcran.js')).href + '?v=' + Math.random());
     const attendu = { ...Object.fromEntries(Object.entries(PE.PHRASES_ECRAN).map(([k, v]) => ['phrase.' + k, v])), ...Object.fromEntries(Object.entries(PE.PHRASES_ECRAN_ARTICLES).map(([k, v]) => ['phrase.' + k + '.articles', v])) };
-    const ecarts = Object.keys(attendu).filter((k) => fr[k] !== attendu[k]).concat(Object.keys(fr).filter((k) => /^phrase\./.test(k) && !(k in attendu)));
+    // (13 nov., intégration) Depuis la fusion avec main, la phrase d'écran n'est plus copiée dans le dictionnaire
+    // (PhraseEcran de main la tire de phrasesEcran.js, mots du vendeur compris) : la copie de la branche était morte
+    // et retirée. La règle tient pour toute copie qui reviendrait : une clé `phrase.*` présente doit valoir la phrase.
+    const presentes = Object.keys(fr).some((k) => /^phrase\./.test(k));
+    const ecarts = (presentes ? Object.keys(attendu).filter((k) => fr[k] !== attendu[k]) : []).concat(Object.keys(fr).filter((k) => /^phrase\./.test(k) && !(k in attendu)));
     dit(!ecarts.length, `D10 les ${Object.keys(attendu).length} phrases d'écran en français sont celles de src/phrasesEcran.js`, ecarts);
   } catch (e) { dit(false, 'D10 src/phrasesEcran.js se lit', e.message); }
 

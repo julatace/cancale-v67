@@ -142,7 +142,6 @@ export default {
   "stats.caDepuisDebut": "Facturación desde el principio",
   "stats.toutesVentesToutes": "Todas tus ventas, todas las plataformas, en la fecha de venta (como «Vendido»), desde la primera que VRM leyó.",
   "stats.beneficeBrutVente": "Beneficio bruto: venta − precio de compra, ventas finalizadas de la semana, solo las de precio de compra conocido. Gastos y URSSAF se cuentan por mes.",
-  "stats.beneficeVentesFinalisees": "Beneficio: tus ventas finalizadas menos el precio de compra de los pares, los gastos de venta, tus gastos y la URSSAF — la misma regla que Contabilidad y Mi día.",
   "stats.tempsVendre": "Tiempo para vender",
   "stats.vintedSeulementLeboncoin": "Solo Vinted: Leboncoin y eBay no dan la fecha de publicación.",
   "stats.aujourdHuiQuelle": "Hoy, sea cual sea el periodo elegido.",
