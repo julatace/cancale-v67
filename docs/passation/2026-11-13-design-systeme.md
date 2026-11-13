@@ -85,6 +85,15 @@ pointeur (44 au doigt, 36 à la souris ; filtres 44/32) ; un seul gris de texte.
 - **`DESIGN.md`** (racine) renvoie à `docs/design/DESIGN.md` ; ses jetons de rayon et de
   graisse suivent le système.
 - `src/App.jsx` : une ligne (l'import).
+- « Quoi de neuf » : `design-systeme` (« Un VRM plus calme et plus net »). `audit-quoi-de-neuf`
+  jugeait une LISTE figée au 11 nov. (« inscrit le 11 nov. : aucune nouveauté », vrai seulement
+  tant que personne n'ajoutait de ligne — la règle §9 l'exige pourtant) : il juge maintenant la
+  RÈGLE (rien d'avant l'inscription ; inscrit le 10 nov. ⇒ le 11 nov. et après). Rouge si
+  `nouveautesDuCompte` rend l'historique.
+- Fusion : vrai `git merge origin/main` (c03957dd, lots 1 et 2 du 13 nov.) ; le seul conflit
+  (CLAUDE.md §9) réglé en gardant les lignes de main ; CLAUDE.md repassé sous 59 000 octets en
+  déplaçant TELLES QUELLES ses deux lignes de §9 les plus anciennes dans
+  `etat-detaille-2026-11.md` ; la feuille arrivée de main (`favoris-clair.css`) ramenée à l'échelle.
 
 ## 4. Après (mesuré de la même façon)
 
