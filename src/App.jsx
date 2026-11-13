@@ -42427,7 +42427,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // que ses retours n'ont pas été lus (rien n'est publié d'un compte partiel présenté complet).
       res: litigesSuivis, sites: only === 'litiges' ? (sitesPresents || null) : new Set(['vinted', 'ebay']),
       ebay: only === 'litiges' ? retoursEbayLus : (RETOURS_EBAY_CACHE.v === undefined ? undefined : RETOURS_EBAY_CACHE.v),
-      retourDe: (tx) => (retoursSuivis && retoursSuivis.etat === 'lu' ? retoursSuivis.lignes.find((x) => x.tx === tx) || null : null),
+      retourDe: (tx) => (retoursSuivis && retoursSuivis.etat === 'lu' ? retoursSuivis.lignes.find((x) => x.tx === tx) || (retoursSuivis.remises || []).find((x) => x.tx === tx) || null : null),   // (13 nov.) un retour revenu en stock garde son étape (« Remboursé »)
       preuves: (l) => {
         const o = l.commande; if (!o || o.transaction_id == null) return null;
         const tx = String(o.transaction_id);
