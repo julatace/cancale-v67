@@ -530,8 +530,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **13 nov. · Lot 7 : le nom de la paire sur chaque colis à retirer** : une jonction par IDENTITÉ (`commandeRetrait` ; `commandeUnique` dans `api/_lib/commande-colis.js`, deux commandes ⇒ personne) pour Colis (nom + photo), mode relais, Ma journée (les noms dans la case), hors ligne, codes, et le widget (`pickupColis`, nom publié en [7]) ; mesuré 8/12 reliables, les 4 autres n'ont aucune identité en base (attendent la 5.372). `docs/passation/2026-11-13-lot7-nom-paire.md`. Geste : installer la 5.372 ; le script du widget lit `pickupColis`.
 - **13 nov. · Traduction lot 2 (intégration, étape 2)** : Ma journée, Ventes, Achats, Annonces, Stock, Argent, Statistiques, Messages, E-mails en 5 langues sur le main du jour (migration rejouée par `i18n-migrer`, 150 clés neuves) ; français identique mot pour mot (18 relevés). `2026-11-13-integration-traduction.md`. Geste : aucun.
-- **13 nov. · Rappels de colis au nom de la paire (second agent)** : « Demain dernier jour », « Dernier jour », « t'attend » portent le titre de l'achat relié par IDENTITÉ (n° de suivi, code, conversation : jonction de l'écran dans `api/_lib/commande-colis.js`, app et serveur), jamais par ressemblance ; le résumé du soir saute un colis déjà rappelé le matin (une notification par colis et par jour) ; banc `ventes-colis-premium` à la règle « Colis dans Ventes ». `docs/passation/2026-11-13-rappels-paire.md`. Geste : aucun.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
