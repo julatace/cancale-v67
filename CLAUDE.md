@@ -530,6 +530,9 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **13 nov. · Lot 51 (données du compte)** : « Supprimer mon compte » = 30 jours de grâce (demande neutre `vrm_effacement_prevu_*`, abonnement résilié, « Annuler » en un geste, bandeau ; cron du matin efface par `effacerCompte` ; compte vide : tout de suite) ; export RGPD inchangé. `2026-11-13-lot51.md`. Geste : aucun.
+- **13 nov. · Traduction lot 2 (intégration, étape 2)** : Ma journée, Ventes, Achats, Annonces, Stock, Argent, Statistiques, Messages, E-mails en 5 langues sur le main du jour (migration rejouée par `i18n-migrer`, 150 clés neuves) ; français identique mot pour mot (18 relevés). `2026-11-13-integration-traduction.md`. Geste : aucun.
+
 - **13 nov. · Très aimées, pas vendues (lot 31)** : Favoris, par compte, ≥ N favoris lus, ≥ 14 j ; « Proposer » pré-remplit le flux (pas recontacté, −x %, jamais sous achat + 10 %). `2026-11-13-lot31.md`. Geste : aucun.
 
 - **13 nov. · Lot 45 : le Stock et l'Inventaire sans réseau (garage)** : hors réseau le Stock se dessine avec sa DERNIÈRE lecture gardée par vendeur (`src/stockHorsLigne.js`, `vrm_hl_stock_{uid}`, effacée à la déconnexion), « Hors connexion — dernier état du … », N°, case, photos déjà vues (service worker `/hl-photo`, réserve `vrm-hl-photos`, 120), recherche par N°, inventaire par la feuille du Stock ; changer un N° / publier dit une fois ; aucune lecture ni N° écrit hors réseau. `docs/passation/2026-11-13-lot45.md`. Geste : ouvrir le Stock une fois en ligne.
