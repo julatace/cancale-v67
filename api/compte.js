@@ -43,6 +43,10 @@ import {verifierConfidentialite} from './_lib/confidentialite.js';
 //                                 l'installation, 5/h/compte, notifié) ; GET la
 //                                 liste et POST {action:'traite'} au PROPRIÉTAIRE
 //                                 seul — voir api/_lib/signalement.js
+//   /api/compte?mode=aide         (GET/POST, session) « ÉCRIRE AU SUPPORT » (13 nov.) :
+//                                 POST envoyer (rangé chez LUI, 5/h, scellé) ; GET la
+//                                 liste et POST {action:'traitee'} au PROPRIÉTAIRE seul —
+//                                 api/_lib/demande-aide.js, règle src/demandeAide.js
 //   /api/compte?mode=rapport-extension (GET/POST, session) « ENVOYER UN RAPPORT » de
 //                                 l'extension (5.371) : POST l'état technique (liste
 //                                 blanche, 6/h, une ligne par vendeur) ; GET sa ligne,
@@ -99,6 +103,8 @@ import { compteOAuthAnnulable } from '../src/auth/compteNeuf.js';   // (11 nov.,
 import { envoyerSmtp } from './_lib/smtp.js';
 import { contactEmail } from '../src/contact.js';
 import { envoyerSignalement, listerSignalements, marquerTraite, proprietaireInstallation as proprioAlertes } from './_lib/signalement.js';
+// (13 nov., lot 55) « Écrire au support » : la question, cinq faits techniques, rangée chez LUI (api/_lib/demande-aide.js).
+import { envoyerDemandeAide, listerDemandesAide, marquerDemandeTraitee } from './_lib/demande-aide.js';
 import { recevoirRapportExt, listerRapportsExt } from './_lib/rapport-extension.js';   // (12 nov., ext. 5.371) « Envoyer un rapport »
 import { routeAlertes } from './_lib/alertes-production.js';
 import { routePilotage } from './_lib/pilotage.js';
@@ -1792,6 +1798,21 @@ async function signalement(req, res) {
   return repondre(res, r.code, r.corps);
 }
 
+// ── « ÉCRIRE AU SUPPORT » (13 nov., lot 55, api/_lib/demande-aide.js) ────────
+// POST (session) : envoyer — rangé chez LUI (owner = sa session), 5/h, scellé.
+// GET et POST {action:'traitee'} : le PROPRIÉTAIRE de l'installation seul (403).
+async function demandeAide(req, res) {
+  const utilisateur = await vendeurExige(req, res);
+  if (!utilisateur) return;
+  res.setHeader('Cache-Control', 'no-store');
+  if (req.method === 'GET') { const r = await listerDemandesAide({ utilisateur }); return repondre(res, r.code, r.corps); }
+  const corps = await lireCorpsJson(req);
+  if (!corps || typeof corps !== 'object') return repondre(res, 400, { ok: false, raison: 'corps' });
+  if (corps.action === 'traitee') { const r = await marquerDemandeTraitee({ utilisateur, corps }); return repondre(res, r.code, r.corps); }
+  const r = await envoyerDemandeAide({ utilisateur, corps, pousser: (notif, proprio) => contexteVendeur.run({ owner: proprio }, () => sendPushToAll(notif)) });
+  return repondre(res, r.code, r.corps);
+}
+
 // ── « ENVOYER UN RAPPORT » DE L'EXTENSION (12 nov., ext. 5.371, api/_lib/rapport-extension.js) ──
 // POST : la session de l'extension ; l'état technique seulement (liste blanche
 // rejouée ici). GET : le vendeur sa ligne ; le PROPRIÉTAIRE tous les vendeurs.
@@ -1925,6 +1946,7 @@ export default async function handler(req, res) {
   // (6 nov.) « Signaler un problème » : envoyer (tous), lire et « Traité » (le propriétaire).
   if (mode === 'mes-donnees') return m === 'GET' ? mesDonnees(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'signalement') return (m === 'GET' || m === 'POST') ? signalement(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
+  if (mode === 'aide') return (m === 'GET' || m === 'POST') ? demandeAide(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'rapport-extension') return (m === 'GET' || m === 'POST') ? rapportExtension(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   // (6 nov., v36) Les temps réels (anonymes, agrégés) : recevoir un lot, lire les agrégats (propriétaire).
   // (9 nov.) Le tableau de bord du PROPRIÉTAIRE de l'installation (api/_lib/pilotage.js) :
