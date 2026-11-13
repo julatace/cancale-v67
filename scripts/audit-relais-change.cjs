@@ -32,7 +32,7 @@ const MUTATIONS = {
   'arrivee-ignoree': ['src/relaisChange.js', "if (!n || finis.has(n) || vus.has(n)) continue;", "if (!n || vus.has(n)) continue;"],
   // (11 nov., intégration colis — arbitrage d) un code d'avant le changement montré comme le bon.
   'code-ancien-montre': ['src/relaisChange.js', "const apres = avecCode.filter((x) => at != null && dateDe(x) != null && dateDe(x) > at);", "const apres = avecCode;"],
-  'alerte-pas-rendue': ['src/App.jsx', "<AlerteRelaisChange lignes={tracking} C={C} transp={transpMap}/>", "null"],
+  'alerte-pas-rendue': ['src/App.jsx', "redirige={(colisRelaisChange(tracking, { transp: transpMap }) || [])", "redirige={([] || [])"],
 };
 if (process.argv.includes('--prouve')) {
   let ok = 0;
@@ -174,7 +174,10 @@ const CORPS = [
     const app = fs.readFileSync(path.join(R, 'src/App.jsx'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
     // (11 nov., lot DJ3) « À retirer » est la section de tête d'Achats : sur Achats, l'alerte n'est rendue qu'une
     // fois (par la section), plus dans « En route » de la liste du même écran.
-    dit(/\(aFilter==='attente' \|\| \(aFilter==='route' && !modeListeAchats\)\) && <AlerteRelaisChange lignes=\{tracking\} C=\{C\} transp=\{transpMap\}(?: headers=\{sbAuth\})?\/>/.test(app), 'l’alerte est rendue sur À retirer (une fois sur Achats), sur les lignes RELUES (`tracking`) et ce que dit le transporteur (10 nov.)');
+    // (13 nov., Julien : « ici ça doit être dans les Mondial Relay » — « un colis = une fois ») Plus de carte à part : la
+    // liste lue (`colisRelaisChange`, lignes RELUES + transporteur) est rendue ligne par ligne sous chaque nouveau point,
+    // dans « En route » (src/CarteRelais.jsx, `redirige`) — banc retirer-points-changes.
+    dit(!/<AlerteRelaisChange\b/.test(app) && /redirige=\{\(colisRelaisChange\(tracking, \{ transp: transpMap \}\)/.test(app), 'les colis redirigés sont des lignes sous leur point (En route), lus sur les lignes RELUES (`tracking`) et ce que dit le transporteur — plus de carte à part (13 nov.)');
     const comp = fs.readFileSync(path.join(R, 'src/AlerteRelaisChange.jsx'), 'utf8');
     // (12 nov.) Une carte par nouveau point, NEUTRE (§7), titre ambre seulement quand le point est lu (le geste).
     dit(!/pas écrit dans l.e-mail/.test(comp.replace(/\/\/.*$/gm, '')) && /nouveau point pas encore lu/.test(comp) && /<VoirEmailColis /.test(comp), 'point pas lu ⇒ « nouveau point pas encore lu » + « Voir l’e-mail », jamais « pas écrit dans l’e-mail » sans preuve');

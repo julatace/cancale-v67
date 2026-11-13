@@ -29,7 +29,7 @@ import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
 import { suiteProduction, SIGNAUX as SIGNAUX_PROD, SERIE_503, FENETRE_503_MS } from './_lib/alertes-production.js';
 import { proprietaireInstallation } from './_lib/signalement.js';
 import { texteArrivee } from './_lib/notif-textes.js';
-import { colisPerdu } from './_lib/etat-colis-email.js';
+import { colisPerdu, normaliserSuivi } from './_lib/etat-colis-email.js';
 import { DESTINATIONS, conversationDeLEmail } from './_lib/lien-notif.js';
 import { estSuppressionLbc, lireSuppressionLbc, texteSuppressionLbc, jourParis, CAT_LBC_SUPPRESSION, FAMILLE_LBC_SUPPRESSION } from './_lib/lbc-suppression.js';
 // (5 nov.) Les textes des notifications : fabriqués là où l'aperçu de Paramètres → Notifications les lit.
@@ -55,10 +55,13 @@ import { numVcVente, numerosVcAvecLiens } from './_lib/vestiaire-regle.js';
 import { normaliserRegistre, comptesActifs } from './_lib/ebay.js';
 import { arriveLeAuRangement } from './_lib/arrivee-colis.js';
 import { limiteRetraitDepuisTexte, lieuDepuisExtrait, lieuSousEnTete, LIEU_AU_FUTUR, nouveauPointDansTexte, lieuGenerique } from './_lib/retrait-colis.js';
+import { horairesDepuisTexte } from './_lib/horaires-relais.js';
+import { completerParLignePrecedente } from './_lib/rappel-colis.js';
 import { codeRetraitTournure, nombreSurSaLigne, codeImpossible } from './_lib/code-retrait-email.js';
 import { decoderEntitesHtml } from './_lib/entites-html.js';
 import { transactionDuRecu } from './_lib/recu-achat.js';
-import { suiviDuSujet, finsDesLignes, sortiParSuivis, SELECT_TRANSP_META, ligneTranspDeMeta } from './_lib/suivi-colis.js';
+import { suiviDuSujet, finsDesLignes, sortiParSuivis, SELECT_TRANSP_META, ligneTranspDeMeta, liensDesLignes } from './_lib/suivi-colis.js';
+import { commandeDuColisRegle, achatsDesLignes, indexDesLiens, txParCodeDe, titreDuColis, codeColisNorm } from './_lib/commande-colis.js';   // (13 nov.) le nom de la paire
 import { modifierCas } from './_lib/suivi-vinted.js';
 import { estEmailVestiaire, lireEmailVenteVc, fusionnerVenteEmailVc } from './_lib/vestiaire-email.js';
 // (9 nov.) Les autres e-mails Vestiaire (rappel d'envoi, annonce en attente / en ligne, offres, marketing).
@@ -1390,9 +1393,12 @@ export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString
     if (bouts.length) extraitCode = [...new Set(bouts)].join(' | ').slice(0, 400);
   }
 
+  // (13 nov.) Les HORAIRES D'OUVERTURE du point où le colis attend (api/_lib/horaires-relais.js) : lus dans le
+  // texte ENTIER (le texte gardé est borné), seulement pour un colis arrivé ; forme inconnue ⇒ rien.
+  const horaires = status === 'available' ? horairesDepuisTexte(txt) : null;
   // Le drapeau ne tient que si un code (ou un QR, vu par la route) prouve le colis.
   if (sansSuivi && !code) sansSuivi = false;
-  return { suivi, status, label, code, code2, artTitle, lieu, limite, consigne, extraitLieu, extraitCode, ...(sansSuivi ? { sansSuivi: true } : {}), ...(relaisChange ? { relaisChange: true } : {}), ...(sortant ? { sens: 'sortant' } : {}), ...(suiviDuSujetSeul ? { suiviDuSujetSeul: true } : {}) };
+  return { suivi, status, label, code, code2, artTitle, lieu, limite, consigne, extraitLieu, extraitCode, ...(horaires ? { horaires } : {}), ...(sansSuivi ? { sansSuivi: true } : {}), ...(relaisChange ? { relaisChange: true } : {}), ...(sortant ? { sens: 'sortant' } : {}), ...(suiviDuSujetSeul ? { suiviDuSujetSeul: true } : {}) };
 }
 
 // Dimensions d'une image PNG/GIF depuis son en-tête (sans la décoder en entier).
@@ -2071,6 +2077,40 @@ function cleValide(req) {
 //    serveur ils refusent (503), ils ne s'ouvrent jamais « par défaut ».
 // Le vendeur est celui de l'installation (`VRM_OWNER_UID`) : un script Gmail
 // appartient à UNE boîte, donc à un vendeur.
+// (13 nov.) LE NOM DE LA PAIRE D'UN COLIS QUI ARRIVE, PAR IDENTITÉ (api/_lib/commande-colis.js, la
+// jonction de l'écran) : son n° de suivi (lignes de suivi Vinted relevées par l'extension, n° reliés
+// à la main) ou son code de retrait (`panel_colis_relais`). Lectures PROJETÉES : les liens en
+// scalaires, puis les SEULES lignes d'achats qui contiennent une transaction candidate (filtre `cs`,
+// jamais `select=data`). Rien relié, ou une lecture ratée ⇒ '' (l'article de l'e-mail, sinon
+// « Ton colis {transporteur} ») : un nom n'est jamais deviné.
+async function titreAchatDuColis(track) {
+  try {
+    const suivi = String((track && track.suivi) || ''), code = codeColisNorm(track && track.code);
+    if (!suivi && !code) return '';
+    const [sv, sm, rel] = await Promise.all([
+      suivi ? lireLignes('id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi') : [],
+      suivi ? lireLignes('id=like.colis_suivi_*&select=id,suivi:meta->>suivi,tx:meta->>tx,uid:meta->>uid') : [],
+      code ? supabaseLireRow('panel_colis_relais') : { lu: true, data: {} },
+    ]);
+    const liens = liensDesLignes(sv, sm);
+    if (!liens || !rel || !rel.lu) return '';
+    const relais = (rel.data && typeof rel.data === 'object') ? rel.data : {};
+    const index = indexDesLiens(liens), txParCode = txParCodeDe(relais);
+    const k = normaliserSuivi(suivi);
+    const txs = new Set(liens.filter((l) => l.suivi === k).map((l) => String(l.tx)));
+    if (code && txParCode.get(code)) txs.add(txParCode.get(code));
+    const candidats = [...txs].filter((t) => /^\d{3,20}$/.test(t)).slice(0, 4);
+    if (!candidats.length) return '';
+    const rows = [];
+    for (const tx of candidats) {
+      const r = await lireLignes(`id=like.harvest_*_orders_purchased&data->payload->my_orders=cs.${encodeURIComponent(JSON.stringify([{ transaction_id: Number(tx) }]))}&select=id,orders:data->payload->my_orders`);
+      if (!Array.isArray(r)) return '';
+      for (const x of r) if (!rows.some((y) => y.id === x.id)) rows.push(x);
+    }
+    const achats = achatsDesLignes(rows);
+    return titreDuColis(commandeDuColisRegle({ suivi, code }, { achats, index, txParCode }), '');
+  } catch (_) { return ''; }
+}
 async function lireLignes(requete) {
   try {
     const r = await fetchAvecDelai(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?${requete}`), { headers: { ...sbCle(SUPABASE_KEY) } });
@@ -2641,26 +2681,11 @@ export async function traiterEmail(req, res) {
       {
         const emailAtNouveau = dateDeLEmail(corpsBrut);
         const plusAncien = !!(emailAtNouveau && prevLigne && Number.isFinite(Date.parse(prevLigne.emailAt || '')) && Date.parse(emailAtNouveau) < Date.parse(prevLigne.emailAt));
-        if (plusAncien && prevLigne.status === 'available' && track.status === 'available') {
-          if (prevLigne.code) { track.code = prevLigne.code; track.code2 = prevLigne.code2 || null; }
-          if (prevLigne.qrB64 || prevLigne.qrUrl) { qr.qrB64 = prevLigne.qrB64 || null; qr.qrType = prevLigne.qrType || null; qr.qrUrl = prevLigne.qrUrl || null; }
-          if (prevLigne.lieu) track.lieu = prevLigne.lieu;
-          if (prevLigne.limite) track.limite = prevLigne.limite;
-        }
-      }
-      if (track.status === 'available' || !qr.qrB64 || !qr.qrUrl || !track.code || !track.code2 || !track.lieu || !track.artTitle || !track.limite) {
-        const prev = prevLigne;
-        prevLigne = prev || null;
-        if (prev) {
-          if (!qr.qrB64 && prev.qrB64) { qr.qrB64 = prev.qrB64; qr.qrType = prev.qrType; }
-          if (!qr.qrUrl && prev.qrUrl) qr.qrUrl = prev.qrUrl;
-          if (!track.code && prev.code) track.code = prev.code;
-          if (!track.code2 && prev.code2) track.code2 = prev.code2;
-          if (!track.lieu && prev.lieu && !track.relaisChange) track.lieu = prev.lieu;   // (10 nov.) un colis redirigé ne garde pas l'ancien point
-          if (!track.limite && prev.limite) track.limite = prev.limite;
-          if (!track.consigne && prev.consigne) track.consigne = true;
-          if (!track.artTitle && prev.artTitle) track.artTitle = prev.artTitle;
-        }
+        // (13 nov., rappels) LA règle vit dans api/_lib/rappel-colis.js : un e-mail suivant du MÊME colis (rappel,
+        // « toujours au point », rejeu) complète la ligne et n'efface jamais ce qu'elle sait (code, QR, point,
+        // date limite, horaires, titre) ; un plus ancien ne remplace rien.
+        const fus = completerParLignePrecedente(track, qr, prevLigne, { plusAncien });
+        Object.assign(track, fus.track); Object.assign(qr, fus.qr);
       }
       // (revue du 23 oct.) LA DATE DE L'E-MAIL (`sourceDate`, la date Gmail) : le
       // script traite sa boîte du plus récent au plus ancien, et un e-mail plus
@@ -2714,6 +2739,7 @@ export async function traiterEmail(req, res) {
         ...(track.relaisChange && track.status === 'transit' ? { relaisChange: true, ...(prevLigne && prevLigne.lieu && prevLigne.lieu !== track.lieu ? { ancienLieu: String(prevLigne.lieu).slice(0, 200) } : {}) } : {}),
         ...(track.extraitLieu && !track.lieu ? { extraitLieu: track.extraitLieu } : {}),
         ...(track.extraitCode && !track.code ? { extraitCode: track.extraitCode } : {}),
+        ...(track.horaires ? { horaires: track.horaires } : {}),
         qrB64: qr.qrB64, qrType: qr.qrType, qrUrl: qr.qrUrl || null,
         // (12 nov.) L'E-MAIL SOURCE (« Voir l'e-mail » dans Colis) : l'id de SA ligne `email_reception_*`
         // (api/_lib/accuse-email.js). Pas su pour cet e-mail ⇒ celui de la ligne d'avant, sinon rien.
@@ -2767,8 +2793,10 @@ export async function traiterEmail(req, res) {
       // rien (famille « suivi » retirée — api/_lib/notif-textes.js).
       // (23 oct.) Un colis reparti chez l'expéditeur ne sonne JAMAIS « 📍 à retirer ».
       const arriveeIci = track.status === 'available' && !garde.conserve && sensLigne !== 'sortant';
+      // (13 nov.) Le nom de la paire : l'achat relié par identité d'abord (la jonction de l'écran).
+      const artLie = arriveeIci && !sortiAilleurs ? await titreAchatDuColis(track) : '';
       const notifColis = arriveeIci
-        ? texteArrivee({ article: track.artTitle, transporteur: nomTransporteur(carrier), lieu: track.lieu, code: codeNotif(track.code), code2: codeNotif(track.code2), limite: track.limite })
+        ? texteArrivee({ article: artLie || track.artTitle, transporteur: nomTransporteur(carrier), lieu: track.lieu, code: codeNotif(track.code), code2: codeNotif(track.code2), limite: track.limite })
         : (track.status === 'retour' ? { title: '↩️ Colis reparti chez l’expéditeur', body: bodyNotifColis(track, carrier) } : null);
       if (!sortiAilleurs && notifColis) try { await pushOnce({
         title: notifColis.title, body: notifColis.body,

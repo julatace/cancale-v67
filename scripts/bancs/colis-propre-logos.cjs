@@ -124,18 +124,21 @@ const ouvrir = async (b, vp, sombre) => {
         await pg.locator('[data-colis-section]').first().waitFor({ timeout: 30000 });
         await pg.waitForFunction(() => { try { return !!JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) { return false; } }, null, { timeout: 20000 }).catch(() => {});
         await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
-        await pg.waitForSelector('[data-relais-change-suivi]', { timeout: 12000 }).catch(() => {});
+        await pg.waitForSelector('[data-rp-redirige="1"]', { state: 'attached', timeout: 12000 }).catch(() => {});
+        await pg.evaluate(() => { document.querySelectorAll('.vrm-rpf details[data-rp-section="route"]').forEach((d) => { d.open = true; }); });
         await pg.waitForTimeout(1500);
         const m = await pg.evaluate(() => {
           const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
           const main = document.querySelector('.vrm-main');
-          const a = document.querySelector('[data-relais-change-suivi="87654321"]');
-          const it = a && a.querySelector('[data-relais-change-itineraire]');
+          // (13 nov.) Le colis « point changé » : UNE ligne sous son nouveau point, dans « En route » (plus de carte à part).
+          const ligne = document.querySelector('[data-rp-redirige="1"][data-cc-carte="r:rc:87654321"]');
+          const a = ligne && ligne.closest('.vrm-rpf-point');
+          const it = a && a.querySelector('[data-relais-itineraire]');
           const mr = [...document.querySelectorAll('[data-marque="mondialrelay"]')].filter(vis);
           const ch = [...document.querySelectorAll('[data-marque="chronopost"]')].filter(vis);
           return {
             pub: JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'),
-            alerte: a ? { vis: vis(a), txt: a.innerText, lieu: (a.querySelector('[data-relais-change-lieu]') || {}).textContent || '', href: it ? it.getAttribute('href') : '', h: it ? Math.round(it.getBoundingClientRect().height) : 0, bord: getComputedStyle(a).borderTopColor } : null,
+            alerte: a ? { vis: vis(ligne), txt: ligne.innerText, lieu: ((a.querySelector('.vrm-rpf-nom') || {}).textContent || '') + ', ' + ((a.querySelector('[data-relais-adresse]') || {}).textContent || ''), href: it ? it.getAttribute('href') : '', h: it ? Math.round(it.getBoundingClientRect().height) : 0, bord: getComputedStyle(a).borderTopColor } : null,
             mr: mr.length, mrTrace: mr.some((x) => !!x.querySelector('path') && !/^\s*MR\s*$/.test(x.textContent || '')),
             ch: ch.length,
             prochain: document.querySelectorAll('[data-colis-prochain]').length,
@@ -147,16 +150,16 @@ const ouvrir = async (b, vp, sombre) => {
         });
         const N = m.pub && Number.isFinite(m.pub.total) ? m.pub.total : null;
         dit(N === 2, 'P1 le colis redirigé n’est PAS compté à retirer (2 colis, pas 3)', JSON.stringify(m.pub));
-        dit(!!(m.alerte && m.alerte.vis && /Point relais changé/.test(m.alerte.txt)), 'P2 l’alerte « Point relais changé » est visible', JSON.stringify(m.alerte));
-        dit(!!(m.alerte && /INTERMARCHE EXEMPLE/.test(m.alerte.lieu) && /35350/.test(m.alerte.lieu)), 'P2 le nouveau point LU (nom + adresse)', m.alerte && m.alerte.lieu);
-        dit(!!(m.alerte && /maps/.test(m.alerte.href) && m.alerte.href.includes(encodeURIComponent('INTERMARCHE EXEMPLE')) && m.alerte.h >= 44), 'P2 « Itinéraire » vers l’adresse lue, 44 px au doigt', m.alerte && `${m.alerte.href} · ${m.alerte.h}px`);
+        dit(!!(m.alerte && m.alerte.vis && /point changé/.test(m.alerte.txt)), 'P2 le colis redirigé est une ligne « En route · point changé » (plus de carte à part)', JSON.stringify(m.alerte));
+        dit(!!(m.alerte && /Intermarché Exemple|INTERMARCHE EXEMPLE/i.test(m.alerte.lieu) && /35350/.test(m.alerte.lieu)), 'P2 sous son nouveau point LU (nom + adresse)', m.alerte && m.alerte.lieu);
+        dit(!!(m.alerte && /maps/.test(m.alerte.href) && /intermarch/i.test(decodeURIComponent(m.alerte.href))), 'P2 « Itinéraire » vers l’adresse lue', m.alerte && `${m.alerte.href} · ${m.alerte.h}px`);
         dit(m.mr > 0 && m.mrTrace, 'P3 le logo Mondial Relay est le vrai dessin (tracé, plus le sigle « MR »)', `${m.mr} / ${m.mrTrace}`);
         dit(m.ch > 0, 'P3 le logo Chronopost est montré pour le colis Chronopost', String(m.ch));
         dit(m.prochain === 0 && m.muets === 0 && m.arelier === 0, 'P4 plus de ligne « prochain geste » ni de bandeau e-mails doublon', JSON.stringify({ p: m.prochain, mu: m.muets, ar: m.arelier }));
         dit(!m.inconnu, 'P5 le mot « inconnu » n’est écrit nulle part dans l’écran');
         dit(m.deb <= 0, 'P5 aucun débordement horizontal', String(m.deb));
         if (SHOTS) {
-          const el = pg.locator('[data-relais-change]').first();
+          const el = pg.locator('[data-rp-redirige="1"]').first();
           if (await el.count()) await el.scrollIntoViewIfNeeded().catch(() => {});
           await pg.screenshot({ path: path.join(SHOTS, `colis-propre-${nom}.png`) });
           await pg.locator('[data-colis-onglet-choix="envoyer"]').first().click().catch(() => {});

@@ -1780,3 +1780,9 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **12 nov. · G2 (5.368), 12nov-a (5.369), 12nov-b, vert-vitesse, vitesse-volume, extension 5.372 (discrétion, boutique, favoris par compte, une prudence par compte) en ligne** : `2026-11-12-*.md`. Geste : installer 5.372.0 ; migration 042 (facultative).
 
 - **12 nov. · G2 (5.368), 12nov-a (5.369), 12nov-b, vert-vitesse, vitesse-volume, extension 5.372 (discrétion, boutique, favoris par compte, une prudence par compte) en ligne** : `2026-11-12-*.md`. Geste : installer 5.372.0 ; migration 042 (facultative).
+
+- **13 nov. · Moteur-compta (second agent)** : moins de calculs refaits, chiffres 35/35 ; < 2 s non atteint (2–3 `Comptabilite` par écran). `2026-11-13-moteur-compta.md`. Geste : aucun.
+
+- **13 nov. · Source unique (second agent)** : ventes, achats, suivis et dates de versement en UNE copie pour tous les `Comptabilite` montés (`src/magasinPartage.js`) ; chiffres 35/35, lectures en baisse (budget abaissé), lecture KO sans perte (banc `source-unique`) ; une date de versement lue ne redevient jamais vide (banc `versements-course`) ; pas de gain de vitesse prouvé, publieur pas fait. `2026-11-13-source-unique.md`. Geste : aucun.
+
+- **13 nov. · CI (intégration, étape 1)** : sous WebKit le service worker échappait aux routes des bancs (la vraie base répondait) ⇒ bancs sans service worker ; Safari : toucher un onglet avec « Plus » ouvert y mène enfin (B5) ; e2e-extension 39/41. `2026-11-13-integration-ci.md`. Geste : aucun.
