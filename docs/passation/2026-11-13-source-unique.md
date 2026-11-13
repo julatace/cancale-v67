@@ -122,13 +122,34 @@ cessent d'être des `Comptabilite` (ce sont elles qui calculent ce qu'elles mont
 - Le vrai levier de vitesse : moins de moteurs montés (Achats en monte 3 : la liste par point, ses outils,
   la liste), ou sortir les calculs dérivés lourds (`cartesColis`, `totals`, `propositionsPrix`) dans des
   modules qui mémorisent par IDENTITÉ des données partagées (désormais les mêmes objets pour tous).
-- La course `vrm_stats_ventes` [9] (§3) : publier seulement quand les dates de versement sont lues, ou
-  fusionner les dates déjà lues — décision de règle, pas faite ici.
+- La course `vrm_stats_ventes` [9] (§3) : corrigée, voir §7.
 
 ## 6. Balayage des audits
 Tous les `scripts/audit-*.cjs` (583) passés sur ce lot : **0 rouge**. Le même balayage sur l'arbre d'avant
 (`git archive`, sans `.git`) : 7 rouges, tous propres à l'arbre sans dépôt git ; aucun audit vert avant
 et rouge après.
 
-## 7. Gestes de Julien
+## 7. Corrigé ensuite (demande du coordinateur) : une date de versement connue ne redevient jamais vide
+**Cause mesurée** (journal posé dans un build local) : à l'ouverture de Ventes, l'écran publiait le relevé
+(`vrm_stats_ventes`) avec les dates de versement EN COURS de lecture (`undefined` ⇒ « »), la sauvegarde attend
+500 ms ; les dates arrivaient dans cette demi-seconde, l'écran comparait au navigateur PAS ENCORE réécrit (qui
+portait encore la date de Ma journée) ⇒ « identique », rien republié ⇒ la sauvegarde sans dates l'emportait.
+Et une relecture ratée (`null`) effaçait les dates déjà publiées. Défaut d'avant ce lot.
+**Correction** (§5 : capture partielle n'écrase pas une complète, « rien lu » ≠ « rien », CA daté au versement) :
+- `src/versementsConnus.js` : `fusionnerVersements` (une relecture ne remplace jamais une date par du vide ;
+  pas su ⇒ ce qu'on savait reste) et `garderDatesConnues` (une date déjà publiée pour la même vente remplace « ») ;
+- relevé des ventes : rien publié tant que les dates sont `undefined` ; `null` ⇒ « » (pas lue) sauf date déjà publiée ;
+- `chargerPublie(k)` (App.jsx, à côté de `save`) : la valeur EN ATTENTE d'une clé ; les publications
+  `vrm_stats_ventes`, `vinted_urssaf_mois` et `vrm_benefice_jours` comparent à elle. Le CA déclaré / URSSAF du
+  mois attendaient déjà les dates (`declarables` vaut `undefined` tant qu'elles sont en cours).
+**Preuves** :
+- banc `scripts/bancs/versements-course.cjs` (5 passes) : Ma journée (référence), puis Ventes avec les lectures
+  des dates TENUES jusqu'à la requête qui suit l'arrivée des ventes (`harvest_{uid}_label_%`, §6.5), puis
+  Achats avec les dates en 500. Build d'avant : **10 rouges** (Ventes et Achats, chaque passe : 0/210 dates) ;
+  après : **26 verts**, 5 passes identiques. Mutation (fusion et garde neutralisées) : rouge sur Achats (0/210).
+- `chiffres-volume` (même heure) : 20 000 ventes 35/35 ; base par défaut 34/35 — la seule différence est
+  CETTE date (avant « », après la date), et le build d'après est stable (deux passes 35/35 entre elles).
+- `audit-urssaf` vert ; tdz, variables, coherence, identite, une-regle, bilan-semaine verts ; source-unique vert.
+
+## 8. Gestes de Julien
 Aucun.
