@@ -90,7 +90,7 @@
       titre.textContent = 'État inconnu';
       phrase.textContent = j.raison === 'perime'
         ? 'La dernière vérification reçue date de plus de 10 minutes : elle ne dit rien de maintenant. Nouvel essai dans une minute.'
-        : 'VRM n’a pas répondu à cette page. Ça peut venir de ta connexion comme de VRM : impossible de dire que tout va bien. Nouvel essai dans une minute.';
+        : 'VRM n’a pas répondu à cette page. Ça peut venir de ta connexion comme de VRM : on ne sait pas. Nouvel essai dans une minute.';
       poserHeures(j.raison !== 'perime');
       return;
     }
