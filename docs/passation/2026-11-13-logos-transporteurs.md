@@ -72,9 +72,19 @@ Chronopost est **bleue**.
 
 ## Preuves
 
-Planches regardées : `scratchpad/logos/` de la session (avant.png, apres2.png ; captures du banc `logos-bordereaux-*`),
-captures Colis → À retirer et Ventes → À expédier (bancs `colis-retirer-propre`, `colis-propre-logos`). Voir le rapport de
-la session pour les chiffres.
+Planches regardées (scratchpad de la session, hors dépôt) : avant / après à 390 px, 20, 44 et 110 px, clair et sombre ;
+captures Colis → À retirer (Chronopost Pickup : cube bleu sur blanc, clair et sombre) et Ventes → À expédier (390 et 1512).
+
+- Audits : `audit-violet` vert (et `--mutation` 8/8), `audit-rouge-doublon` vert (et `--mutation`), `audit-icones` vert,
+  `audit-logos-bordereaux` 87 verts (10 rouges de règle sur `origin/main`).
+- Bancs (build de la branche) : `logos-bordereaux` 32 verts ; `colis-retirer-propre` 132 verts ; `colis-propre-logos`
+  40 verts ; `retirer-ligne-unique` 88 verts (4 rouges sur le build de `origin/main` : `rgb(255, 210, 0)`, cube
+  `rgb(29, 29, 27)`).
+- `transporteurs-logos` : 8 rouges « E2 la puce à gauche du bouton bordereau » — **les mêmes 8 sur le build de
+  `origin/main`** (la liste À expédier porte désormais le logo en badge de vignette, le banc attend l'ancienne puce) ;
+  rien à voir avec les couleurs, laissé au chantier qui a changé la rangée.
+- Vu en passant, hors logos : dans À retirer à 390 px, « Code pas encore reçu » passe sur deux lignes et chevauche le
+  n° de suivi (ligne « Colis Mondial Relay », code à venir) — déjà sur `main`.
 
 ## Ce qui reste
 
