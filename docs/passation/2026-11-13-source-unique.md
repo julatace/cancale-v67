@@ -126,7 +126,9 @@ cessent d'être des `Comptabilite` (ce sont elles qui calculent ce qu'elles mont
   fusionner les dates déjà lues — décision de règle, pas faite ici.
 
 ## 6. Balayage des audits
-(voir plus bas)
+Tous les `scripts/audit-*.cjs` (583) passés sur ce lot : **0 rouge**. Le même balayage sur l'arbre d'avant
+(`git archive`, sans `.git`) : 7 rouges, tous propres à l'arbre sans dépôt git ; aucun audit vert avant
+et rouge après.
 
-## 5. Gestes de Julien
+## 7. Gestes de Julien
 Aucun.
