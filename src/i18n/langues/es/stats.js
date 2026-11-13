@@ -299,7 +299,7 @@ export default {
   "stats.cv.delaiSansDate": "Días «—»: fecha de publicación no leída.",
   "stats.cv.delaiReleve": "Días «—»: abre Ventas una vez.",
   "stats.cv.delaiPasLu": "Días «—»: anuncios no leídos.",
-  "stats.cv.offresJusqua": "Ofertas «—»: conversaciones leídas hasta el {x}.",
+  "stats.cv.offresJusqua": "Ofertas «—»: conversaciones leídas hasta el {x}",
   "stats.cv.offresPasLu": "Ofertas «—»: conversaciones no leídas.",
   "stats.cv.offresDes": "Ofertas aceptadas a partir de {n} ofertas recibidas.",
   "stats.cv.nonComptees": {"one": "{n} venta con precio no leído, fuera de la tabla.", "other": "{n} ventas con precio no leído, fuera de la tabla."},

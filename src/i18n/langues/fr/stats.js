@@ -299,7 +299,7 @@ export default {
   "stats.cv.delaiSansDate": "Jours « — » : date de mise en ligne pas lue.",
   "stats.cv.delaiReleve": "Jours « — » : ouvre Ventes une fois.",
   "stats.cv.delaiPasLu": "Jours « — » : annonces pas lues.",
-  "stats.cv.offresJusqua": "Offres « — » : conversations lues jusqu’au {x}.",
+  "stats.cv.offresJusqua": "Offres « — » : conversations lues jusqu’au {x}",
   "stats.cv.offresPasLu": "Offres « — » : conversations pas lues.",
   "stats.cv.offresDes": "Offres acceptées dès {n} offres reçues.",
   "stats.cv.nonComptees": {"one": "{n} vente au prix pas lu, hors tableau.", "other": "{n} ventes au prix pas lu, hors tableau."},

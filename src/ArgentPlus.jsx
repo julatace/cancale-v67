@@ -94,7 +94,7 @@ export function PrevisionLigne({ liveStats, onOuvrir = null }) {
   const court = P.manques.length ? ` (${P.manques.length === 1 ? T.manque : 'partiel'})` : '';
   return (
     <button type="button" className="vrm-ap-ligne" data-argent-plus="prevision-ligne" {...attrsPrev(P)} onClick={onOuvrir || undefined} disabled={!onOuvrir}>
-      <span className="vrm-ap-ligne-t">{T.ligne}{court} <span className="vrm-ap-ligne-est" data-prev-estimation="">· estimation</span></span>
+      <span className="vrm-ap-ligne-t">{T.ligne}{court}<span className="vrm-ap-ligne-est" data-prev-estimation="">estimation</span></span>
       {onOuvrir ? <span aria-hidden="true" className="vrm-ap-ligne-f">›</span> : null}
     </button>
   );
