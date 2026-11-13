@@ -78,6 +78,8 @@
   --d-remplir-fort: rgba(118,118,128,.20);
   --d-filet: rgba(60,60,67,.18);
   --d-filet-fort: rgba(60,60,67,.29);   /* le bord d'un champ */
+  --d-survol: color-mix(in srgb, var(--d-carte) 94%, #7F7F86);   /* une rangée sous la souris */
+  --d-segment: #FFFFFF;            /* le segment choisi */
   /* Texte — deux tons, pas trois : l'encre et UN gris (5,1:1 sur blanc, 4,6:1 sur le fond). */
   --d-encre: #1D1D1F;
   --d-gris: #6E6E73;
@@ -147,6 +149,7 @@
   --d-remplir-fort: rgba(118,118,128,.32);
   --d-filet: rgba(84,84,88,.6);
   --d-filet-fort: rgba(84,84,88,.9);
+  --d-segment: #636366;
   --d-encre: #F5F5F7;
   --d-gris: #98989D;
   --d-glyphe: #5A5A5E;
@@ -209,7 +212,7 @@
 :root:root body .vrm-main .vrm-argent-w {
   background-color: var(--d-carte) !important; border-radius: var(--d-r-carte) !important; box-shadow: var(--d-ombre-carte) !important; border: 0 !important;
 }
-@media (hover: hover) and (pointer: fine) { :root:root body .vrm-main .vrm-argent-w:hover { background-color: color-mix(in srgb, var(--d-carte) 94%, #7F7F86) !important; } }
+@media (hover: hover) and (pointer: fine) { :root:root body .vrm-main .vrm-argent-w:hover { background-color: var(--d-survol) !important; } }
 :root:root body .vrm-main .vrm-argent-w-n { font-weight: 700 !important; }
 /* L'AMBRE n'est jamais un encadré (règle 2 de la revue du 11 nov.) : les fonds et cadres
    ambre écrits en ligne (`${C.warn}14`, `${C.warn}44`) s'effacent ; le TEXTE reste ambre. */
@@ -290,7 +293,7 @@
   box-shadow: 0 0 0 .5px rgba(0,0,0,.04), 0 2px 6px rgba(0,0,0,.10) !important;
 }
 :root:root[data-theme="dark"] body .vrm-main :is(.vrm-seg > button[aria-pressed="true"], .vrm-seg > button.is-actif, .vrm-seg > button[aria-current="page"], .vrm-sel-sites > button[aria-pressed="true"], .vrm-messages-sections > button[aria-pressed="true"]) {
-  background: #636366 !important; box-shadow: none !important;
+  background: var(--d-segment) !important; box-shadow: none !important;
 }
 /* Les filtres (pilules) : 44 au doigt, 32 à la souris ; l'actif à l'encre pleine. */
 :root:root body .vrm-main :is(.vrm-filtres:not(.vrm-filtre-site) button, .vrm-stock-views > button, .vrm-inbox-filters > button, .vrm-compte-puce, .vrm-pop-chip) {
@@ -325,9 +328,9 @@
 :root:root body .vrm-main .vrm-inbox-row.vrm-inbox-row.is-current { box-shadow: none !important; background-color: var(--d-remplir) !important; }
 :root:root body .vrm-main .vrm-inbox-row.vrm-inbox-row::after { content: none !important; display: none !important; }
 :root:root body .vrm-main .vrm-inbox-row.vrm-inbox-row { padding-right: 16px !important; }
-@media (hover: hover) and (pointer: fine) { :root:root body .vrm-main .vrm-inbox-row.vrm-inbox-row:not(.is-current):hover { background-color: color-mix(in srgb, var(--d-carte) 94%, #7F7F86) !important; } }
-/* Les tuiles d'icône des Réglages : neutres, rayon 8 (un tiers de 30 ≈ la courbe d'iOS). */
-:root:root body .vrm-main .vrm-ios-icone { border-radius: 8px !important; }
+@media (hover: hover) and (pointer: fine) { :root:root body .vrm-main .vrm-inbox-row.vrm-inbox-row:not(.is-current):hover { background-color: var(--d-survol) !important; } }
+/* Les tuiles d'icône des Réglages : neutres, rayon 6 (celui du N°, la courbe d'une icône de Réglages). */
+:root:root body .vrm-main .vrm-ios-icone { border-radius: var(--d-r-num) !important; }
 
 /* Paramètres à l'ordinateur : la même colonne que les autres écrans (bord gauche), plus une
    colonne centrée qui faisait sauter le titre de 200 px d'un écran à l'autre (revue, n° 23). */

@@ -20,7 +20,7 @@ un geste à faire ; **rouge** = deux paires sous un même N°, nulle part ailleu
 |---|---|
 | il **contient** (carte, groupe de rangées, carte sombre, tuile, feuille) | rayon **20** |
 | il **se touche** (bouton, bouton d'icône, filtre, segmenté, recherche, pastille) | **capsule** (999) |
-| il **montre** (photo, case dans une carte, champ de saisie, tuile d'icône 30 px → 8) | rayon **12** |
+| il **montre** (photo, case dans une carte, champ de saisie, tuile d’icône 30 px → 6) | rayon **12** |
 | le **N° de rangement** | rayon **6** |
 
 Rien d'autre : pas de 10, 14, 16, 18, 22, 24, 26. Un rayon écrit à la main hors de
@@ -148,7 +148,7 @@ case (pas d'ombre, rayon 12). `prefers-contrast: more` rend un cadre net.
 - **Rangée** : 44 de haut au moins (au doigt) ; photo 56 rayon 12 (44 ronde pour une
   personne) ; titre 15/600 sur deux lignes au plus ; une note 13 grise ; le montant à
   droite 15/600 tabulaire ; un chevron `--d-glyphe` si la rangée s'ouvre.
-- **Rangée de Réglages** (`RangeeIos`) : tuile d'icône neutre 30 px rayon 8
+- **Rangée de Réglages** (`RangeeIos`) : tuile d'icône neutre 30 px rayon 6
   (`--d-remplir-fort`, jamais colorée) · libellé 17 · valeur grise · chevron ou interrupteur.
 - **Tuile** (chiffres sous la carte sombre) : une carte, libellé 13/600 gris au-dessus,
   chiffre 28/700, une note 13 grise en bas.
