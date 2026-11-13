@@ -117,7 +117,7 @@ async function controles(SRC, APP, parler) {
   dit(/from "\.\/dormantes\.js"/.test(APP) && /classerDormantes\(l\)/.test(A) && /gesteDormante\(\{ conseil/.test(A), 'E1 « Qui dorment » est rangée et reçoit son geste par src/dormantes.js');
   dit(/const conseil = conseilsPrix\.get\(String\(it\.id\)\) \|\| null;/.test(A), 'E2 la baisse proposée vient de la MÊME carte que la fiche et le repricing (`conseilsPrix`)');
   dit(/liste=\{listings\.items==null \? null : listeDormantes\}/.test(A) && /onGeste=\{/.test(A) && /onPrixAchat=\{\(a\)=>saisirPrixAnnonce\(a\.it\)\}/.test(A), 'E3 la vue reçoit la liste, le geste et « Prix d’achat ? » (la saisie existante)');
-  dit(/onPrixAchat=\{\(pp\)=>\{ if \(pp && pp\.idFiche\) setAchatFiche/.test(A) && /<FeuillePrixAchat ventes=\{\[achatFiche\]\} onEnregistrer=\{poserPrixAchatVente\}/.test(A), 'E4 la fiche : « Saisir » ouvre « Combien tu l’avais payée ? » sur SA fiche (même écriture que la saisie rapide)');
+  dit(/onPrixAchat=\{\(pp\)=>\{ if \(pp && pp\.idFiche\) setAchatFiche/.test(A) && /<FeuillePrixAchat ventes=\{\[achatFiche\]\} onEnregistrer=\{poserPrixAchatVente\} onFermer=\{\(\)=>setAchatFiche\(null\)\} Feuille=\{SheetShellSurFiche\}/.test(A), 'E4 la fiche : « Saisir » ouvre « Combien tu l’avais payée ? » sur SA fiche (même écriture que la saisie rapide)');
   dit(/baisseInitiale=\{baisseSelInit\} varierDefaut=\{!baisseSelInit\}/.test(A), 'E5 « Baisser à X € » ouvre la feuille de baisse pré-remplie, sans « Varier » (bornes gardées)');
   dit(/fusionEntreeVente\(e, null, buyByNum\)/.test(A.slice(A.indexOf('const listeDormantes'), A.indexOf('const listeDormantes') + 3000)), 'E6 le prix d’achat de la liste est lu comme partout (`fusionEntreeVente`)');
   return ko;

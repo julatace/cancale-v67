@@ -4673,6 +4673,9 @@ function gesteChezToi(carte, reponse, raison, apres = null) {
 }
 // (11 nov., saisie rapide) La feuille « Combien tu l'avais payée ? » : les ventes publiées
 // par la coque (`poserDemandesPrix`), celles de la notification d'abord (`txs`, vide = toutes).
+// (13 nov., point 14) La même feuille, ouverte PAR-DESSUS la fiche « Tout sur le N° » (z 9000) : un relais stable
+// (défini une fois : un composant recréé à chaque rendu viderait le champ tapé).
+const SheetShellSurFiche = (props) => <SheetShell {...props} z={Z_CONFIRMATION}/>;
 function PrixAchatCoque({ txs, onPoser, onFermer }) {
   const l = React.useSyncExternalStore(abonnerDemandesPrix, lireDemandesPrix);
   if (l === undefined) return null;
@@ -60316,7 +60319,7 @@ function AppCoeur() {
             onDupliquer={async()=>{ const r=await dupliquerNumero(rn, ex); if(!r.ok){ toast(`Pas dupliqué : ${r.raison}`); return; } toast(`N°${r.numero} créé`); setNeuveRecente(r.fiche); setFicheNum(String(r.numero)); }}
             Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>} Icon={Icon} Retour={FermeAuRetour}/>;
         }}/></GardeEcran>}
-        {achatFiche && <GardeEcran nom="prixachat-fiche" feuille onFermer={()=>setAchatFiche(null)}><FeuillePrixAchat ventes={[achatFiche]} onEnregistrer={poserPrixAchatVente} onFermer={()=>setAchatFiche(null)} Feuille={SheetShell} Bouton={Bouton}/></GardeEcran>}
+        {achatFiche && <GardeEcran nom="prixachat-fiche" feuille onFermer={()=>setAchatFiche(null)}><FeuillePrixAchat ventes={[achatFiche]} onEnregistrer={poserPrixAchatVente} onFermer={()=>setAchatFiche(null)} Feuille={SheetShellSurFiche} Bouton={Bouton}/></GardeEcran>}
         {prixFeuille && <GardeEcran nom="prixachat" feuille onFermer={()=>setPrixFeuille(null)}><PrixAchatCoque txs={prixFeuille} onPoser={poserPrixAchatVente} onFermer={()=>setPrixFeuille(null)}/></GardeEcran>}
         <GardeEcran nom="lienvc" feuille><HoteLienVc comptes={vintedAccounts}/></GardeEcran>
         {visuels && <GardeEcran nom="visuels" feuille onFermer={()=>setVisuels(null)}>
