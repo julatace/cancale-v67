@@ -195,10 +195,10 @@ export async function poserNom(owner, brut) {
 // { ok:true, ouvert, connu, nom } · { ok:false } pas su.
 export async function apercuCode(code) {
   const c = String(code || '').trim().toUpperCase();
-  if (!CODE_RE.test(c)) return { ok: true, ouvert: null, connu: false, nom: null };
   const ouvert = await parrainageOuvert();
   if (ouvert === null) return { ok: false };
-  if (!ouvert) return { ok: true, ouvert: false, connu: false, nom: null };
+  // Sans code (la ligne du menu « Plus » demande seulement si le programme est ouvert) ou code mal formé.
+  if (!ouvert || !CODE_RE.test(c)) return { ok: true, ouvert, connu: false, nom: null };
   const proprio = await lireJson(`${SUPABASE_URL}/rest/v1/parrainage_codes?code=eq.${encodeURIComponent(c)}&select=owner`);
   if (!proprio) return { ok: false };
   const parrain = proprio[0] && proprio[0].owner;
