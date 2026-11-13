@@ -55241,7 +55241,10 @@ function AbonnementRequis({ info }) {
 // ⚠️ UN VENDEUR QUI EST AUSSI MEMBRE D'UNE AUTRE ÉQUIPE GARDE SA PROPRE APP : les
 //    lignes de l'autre ne lui sont visibles que dans une requête qui le DEMANDE
 //    (en-tête `x-vrm-equipe`), et l'écran de l'équipe ne s'ouvre que sur son clic.
-const EQUIPE_NON_INSTALLE_TXT = "Le mode équipe n'est pas encore activé sur ta base.";
+// (13 nov., lot 58) Au VENDEUR : « sur ton installation » (la base de VRM, pas la sienne) ;
+// à l'AIDE : chez le vendeur (EQUIPE_NON_INSTALLE_AIDE). Même fait, chacun son geste.
+const EQUIPE_NON_INSTALLE_TXT = "Mode équipe pas encore activé sur ton installation.";
+const EQUIPE_NON_INSTALLE_AIDE = "Le mode équipe n'est pas encore activé chez ce vendeur.";
 async function lireEquipe() {
   try {
     const r = await fetch('/api/compte?mode=equipe', { headers: enTeteSession(), cache: 'no-store' });
@@ -55361,7 +55364,7 @@ function EquipeSansAcces({ nonInstalle, onPropre }) {
       <div style={boiteEquipe()}>
         <TeteEquipe titre="Colis de l'équipe" onPropre={onPropre}/>
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '16px 18px', fontSize: 15, color: C.text, lineHeight: 1.55 }}>
-          {nonInstalle ? <>{EQUIPE_NON_INSTALLE_TXT}<div data-equipe-geste="aide" style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>{EQUIPE_NON_INSTALLE_GESTE_AIDE}</div></> : "Plus d'accès aux colis de cette équipe. Invitation retirée ou quittée."}
+          {nonInstalle ? <>{EQUIPE_NON_INSTALLE_AIDE}<div data-equipe-geste="aide" style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>{EQUIPE_NON_INSTALLE_GESTE_AIDE}</div></> : "Plus d'accès aux colis de cette équipe. Invitation retirée ou quittée."}
         </div>
       </div>
     </div>
@@ -55471,7 +55474,7 @@ function ColisEquipe({ vendeur, de, onPropre }) {
   let corps;
   if (d === undefined) corps = <div data-equipe-etat="chargement" style={{ fontSize: 15, color: C.muted }}>Lecture des colis…</div>;
   else if (d === null) corps = <div data-equipe-etat="pas-su"><LignePanne>Je n'ai pas pu lire les colis — la base n'a pas répondu. Rien n'est perdu. <button type="button" onClick={charger} style={{ border: 'none', background: 'transparent', color: C.accentTexte, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Réessayer</button></LignePanne></div>;
-  else if (d.nonInstalle) corps = <div data-equipe-etat="non-installe" style={{ ...carte, fontSize: 15, color: C.text }}>{EQUIPE_NON_INSTALLE_TXT}<div data-equipe-geste="aide" style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>{EQUIPE_NON_INSTALLE_GESTE_AIDE}</div></div>;
+  else if (d.nonInstalle) corps = <div data-equipe-etat="non-installe" style={{ ...carte, fontSize: 15, color: C.text }}>{EQUIPE_NON_INSTALLE_AIDE}<div data-equipe-geste="aide" style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>{EQUIPE_NON_INSTALLE_GESTE_AIDE}</div></div>;
   else if (d.sansAcces) corps = <div data-equipe-etat="sans-acces" style={{ ...carte, fontSize: 15, color: C.text, lineHeight: 1.55 }}>Plus d'accès aux colis de cette équipe. Invitation retirée, ou abonnement du vendeur fini.</div>;
   else {
     const ventes = d.ventes.filter((o) => aExpedier(o) && !d.postes.has(String(o.transaction_id)));

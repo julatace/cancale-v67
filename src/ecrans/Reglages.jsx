@@ -3608,6 +3608,8 @@ function EquipeSetting() {
   const [occupe, setOccupe] = React.useState('');
   const [msg, setMsg] = React.useState('');
   const [montre, setMontre] = React.useState('');
+  // (13 nov., lot 58) La dernière personne retirée (pour « Réinviter » : une nouvelle invitation).
+  const [retiree, setRetiree] = React.useState('');
   const relire = React.useCallback(() => { lireEquipe().then(setLu); }, []);
   React.useEffect(() => { relire(); }, [relire]);
   const agir = async (cle, action, extra, ok) => {
@@ -3633,8 +3635,13 @@ function EquipeSetting() {
     <div data-equipe-reglage="non-installe" style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>
       <div>{EQUIPE_NON_INSTALLE_TXT}</div>
       <div data-equipe-attente-geste={proprio ? 'proprietaire' : 'vendeur'} style={{ color: C.muted, marginTop: 6 }}>
+        {/* (13 nov., lot 58) Au propriétaire : les TROIS gestes exacts (docs/passation/2026-11-13-lot5658.md). */}
         {proprio
-          ? <>S’active avec la mise à jour <b style={{ color: C.text }}>016</b> de la base.<br/>Supabase → SQL Editor → colle <b style={{ color: C.text }}>016-equipe.sql</b> → Run.</>
+          ? <ol data-equipe-gestes="3" style={{ margin: '4px 0 0', paddingLeft: 20 }}>
+              <li>Supabase → SQL Editor → colle <b style={{ color: C.text }}>scripts/equipe-sql/016-1-essai-annule.sql</b> → Run (essai, rien ne reste).</li>
+              <li>Colle <b style={{ color: C.text }}>supabase/migrations/016-equipe.sql</b> → Run.</li>
+              <li>Vérifie : <b style={{ color: C.text }}>016-3-verifier.sql</b> → Run, ou <b style={{ color: C.text }}>node scripts/equipe-sql/essai-annule.cjs --verifier</b> (« ok » : true).</li>
+            </ol>
           : <>Rien à faire : bientôt, tu inviteras ici ton aide par e-mail.</>}
       </div>
       <div data-equipe-ce-qui-viendra="" style={{ color: C.muted, marginTop: 8 }}>{CE_QUE_VOIT_UN_MEMBRE}</div>
@@ -3656,13 +3663,19 @@ function EquipeSetting() {
       </div>
       <div style={{ color: C.muted, fontSize: 12, marginTop: 6, lineHeight: 1.45 }}>VRM n'envoie aucun e-mail. Touche « Envoyer l'invitation ».</div>
       {msg && <div data-equipe-msg="" style={{ color: C.warn, marginTop: 8 }}>{msg}</div>}
+      {retiree && <div data-equipe-retiree={retiree} role="status" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 10, color: C.text }}>
+        <span style={{ flex: '1 1 200px', minWidth: 0, overflowWrap: 'anywhere' }}><b>{retiree}</b> ne voit plus tes colis, depuis maintenant.</span>
+        <button type="button" data-equipe-reinviter="" disabled={!!occupe} onClick={() => agir('inviter', 'inviter', { email: retiree }, () => { setRetiree(''); setMsg('Invitée à nouveau. Envoie-lui le message.'); })} className="vrm-b vrm-b-secondaire">Réinviter</button>
+      </div>}
       {vivants.length > 0 && <div style={{ marginTop: 12 }}>
         {vivants.map((x) => (
           <div key={x.id} data-equipe-membre={x.statut} style={ligne}>
             <span style={{ flex: '1 1 180px', minWidth: 0, overflowWrap: 'anywhere' }}><b>{x.email}</b> <span style={{ color: C.muted }}>· {x.statut === 'actif' ? 'membre' : 'invitée'}</span></span>
             <span style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 'auto' }}>
             {x.statut !== 'actif' && <button type="button" data-equipe-partager={x.id} onClick={async () => { const r = await partagerInvitationEquipe(x.email); setMontre(r === 'montre' ? x.id : ''); setMsg(r === 'copie' ? 'Message copié. Colle-le-lui.' : ''); }} className="vrm-b vrm-b-secondaire">Envoyer l'invitation</button>}
-            <button type="button" data-equipe-revoquer={x.id} disabled={!!occupe} onClick={async () => { if (await askConfirm({ title: 'Retirer cette personne ?', desc: `${x.email} ne verra plus tes colis, tout de suite.`, ok: 'Retirer', cancel: 'Annuler', danger: true })) agir(x.id, 'revoquer', { id: x.id }); }} className="vrm-b vrm-b-discret">Retirer</button>
+            {/* (13 nov., lot 58) RÉVOCATION EN UN GESTE : un toucher, effet immédiat (la base coupe la lecture tout de suite).
+                Revenir en arrière = « Réinviter » (une NOUVELLE invitation, qu'il devra accepter) — jamais un accès rendu en silence. */}
+            <button type="button" data-equipe-revoquer={x.id} disabled={!!occupe} aria-label={`Retirer l'accès de ${x.email}`} onClick={() => agir(x.id, 'revoquer', { id: x.id }, () => { setRetiree(x.email); setMsg(''); })} className="vrm-b vrm-b-discret">{occupe === x.id ? 'Retrait…' : 'Retirer'}</button>
             </span>
             {montre === x.id && <div data-equipe-message={x.id} style={{ flex: '1 1 100%', whiteSpace: 'pre-line', userSelect: 'text', WebkitUserSelect: 'text', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', color: C.text }}>{texteInvitationEquipe(x.email)}</div>}
           </div>
