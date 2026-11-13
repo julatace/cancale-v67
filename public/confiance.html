@@ -39,8 +39,8 @@ ul{list-style:none;margin:0;padding:0;background:var(--carte);border-radius:14px
 li{padding:14px 16px;border-top:1px solid var(--filet)}
 li:first-child{border-top:0}
 li b{display:block;font-weight:600;font-size:17px;line-height:1.35}
-li span{display:block;color:var(--gris);font-size:15px;line-height:1.45;margin-top:3px}
-.chiffre{font-variant-numeric:tabular-nums}
+li>span{display:block;color:var(--gris);font-size:15px;line-height:1.45;margin-top:3px}
+.chiffre{display:inline;font-variant-numeric:tabular-nums}
 li.jamais b::before{content:"Jamais\00a0: ";color:var(--gris);font-weight:500}
 .chemin{color:var(--encre);font-weight:500}
 .pied{margin:40px 4px 0;color:var(--gris);font-size:13px;line-height:1.5}
@@ -96,7 +96,7 @@ li a{color:var(--lien);text-decoration:none}
 
   <section data-section="limites" aria-labelledby="t-limites">
     <h2 id="t-limites">Les limites</h2>
-    <p class="sous">Elles tiennent pour tes clics comme pour l’automatique.</p>
+    <p class="sous">Ce que VRM s’interdit de dépasser, sur chacun de tes comptes.</p>
     <ul>
       <li data-affirmation="limite-heure"><b><span class="chiffre" data-chiffre="actions-heure">50</span> actions par heure et par compte, au plus.</b><span>Tous tes ordinateurs confondus. Un compte Vinted neuf monte en douceur : <span class="chiffre" data-chiffre="montee">10, 20 puis 35</span> par heure les premières semaines.</span></li>
       <li data-affirmation="limite-jour"><b><span class="chiffre" data-chiffre="actions-jour">200</span> actions par jour et par compte Vinted.</b><span>C’est le réglage de départ. Tu peux le baisser.</span></li>

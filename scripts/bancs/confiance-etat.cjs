@@ -71,12 +71,15 @@ async function confiance(nav, theme, tel) {
     liens: [...document.querySelectorAll('a')].map((a) => ({ h: a.getAttribute('href'), haut: Math.round(a.getBoundingClientRect().height) })),
     theme: document.documentElement.getAttribute('data-theme'), fond: getComputedStyle(document.body).backgroundColor,
     texte: document.body.innerText,
+    // Un nombre reste DANS sa phrase (mesuré le 13 nov. : une règle `li span{display:block}` le posait seul sur sa ligne).
+    seuls: [...document.querySelectorAll('[data-chiffre]')].filter((x) => getComputedStyle(x).display !== 'inline').map((x) => x.getAttribute('data-chiffre')),
   }));
   dit(rep && rep.status() === 200 && l.present && /ne fait jamais/.test(l.h1), `${T} — la page répond, son titre dit ce qu’elle est`, { s: rep && rep.status(), h1: l.h1 });
   dit(['lu', 'clic', 'auto', 'limites', 'jamais', 'donnees'].every((s) => l.sections.includes(s)) && l.affs >= 25, `${T} — les six parties (${l.affs} affirmations)`, l.sections);
   const ecarts = Object.entries(DU_CODE).filter(([k, v]) => !v || l.chiffres[k] !== v).map(([k, v]) => `${k} : page ${l.chiffres[k]} / code ${v}`);
   dit(!ecarts.length, `${T} — chaque nombre rendu est celui du code (${Object.keys(DU_CODE).length})`, ecarts);
   dit(/\b50 actions par heure et par compte\b/.test(l.texte.replace(/\s+/g, ' ')) || DU_CODE['actions-heure'] !== '50', `${T} — « ${DU_CODE['actions-heure']} actions par heure et par compte » se lit tel quel`);
+  dit(!l.seuls.length, `${T} — chaque nombre reste dans sa phrase (en ligne, jamais seul sur sa ligne)`, l.seuls);
   dit(l.theme === (theme === 'sombre' ? 'dark' : 'light') && (theme === 'sombre' ? l.fond === 'rgb(0, 0, 0)' : l.fond === 'rgb(242, 242, 247)'), `${T} — le thème suit le système (${theme})`, l.fond);
   dit(l.liens.some((a) => a.h === '/etat') && l.liens.some((a) => a.h === '/legal/confidentialite.html'), `${T} — liée à /etat et à la politique de confidentialité`);
   if (tel) dit(l.liens.every((a) => a.haut >= 44), `${T} — chaque lien fait au moins 44 px de haut`, l.liens.filter((a) => a.haut < 44));
