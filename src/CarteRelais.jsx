@@ -711,7 +711,7 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
             {(() => { const h = horairesDuPoint(rows.map((c) => (c && c.src && c.src.t ? { horaires: c.src.t.horaires, ms: Date.parse(c.src.t.emailAt || c.src.t.receivedAt || '') } : null)).filter(Boolean), (c) => c.ms);
               const txt = texteHoraires(h); if (!txt) return null;
               const e = etatOuverture(h, Date.now()); const ph = phraseOuverture(e);
-              return <span className="vrm-rpf-horaires" data-relais-horaires={txt} data-relais-ouvert={e ? (e.ouvert ? '1' : '0') : ''}>{txt}{ph ? <span className="vrm-rpf-horaires-etat" data-relais-ouverture={ph}> · {ph}</span> : null}</span>; })()}
+              return <span className="vrm-rpf-horaires" data-relais-horaires={txt} data-relais-ouvert={e ? (e.ouvert ? '1' : '0') : ''}>{txt}{ph ? <> · <span className="vrm-rpf-horaires-etat" data-relais-ouverture={ph}>{ph}</span></> : null}</span>; })()}
           </span>
           <span className="vrm-rpf-meta">
             {/* (12 nov., finitions) Le logo du transporteur est sur CHAQUE ligne, au coin de la vignette : plus ici.

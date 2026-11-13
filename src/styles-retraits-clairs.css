@@ -104,7 +104,10 @@
 /* (13 nov.) Les horaires du point, sous l'adresse : discrets, neutres (jamais ambre). Au téléphone, après le compte. */
 :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete .vrm-rpf-horaires {
   grid-row: 3; grid-column: 1 / -1; min-width: 0; font-size: var(--vrm-t13); font-weight: 400; color: var(--vrm-muted); font-variant-numeric: tabular-nums;
+  white-space: normal !important; overflow: visible; text-overflow: clip;
 }
+/* « ouvert maintenant · ferme à 19 h 30 » ne se coupe jamais au milieu : au téléphone il passe entier à la ligne. */
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete .vrm-rpf-horaires-etat { white-space: nowrap; }
 @media (max-width: 599px) {
   :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-point:not(.vrm-rpf-verifier) > .vrm-rpf-tete .vrm-rpf-horaires { grid-row: 4 !important; }
 }
