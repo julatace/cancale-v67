@@ -1794,10 +1794,11 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 - **13 nov. · Un colis = une fois, rappels, horaires (second agent)** : plus de carte « N colis changent de point relais » (chaque redirigé = une ligne sous son point, En route) ; rappels des transporteurs = le même colis, rien d'effacé (`api/_lib/rappel-colis.js`) ; date limite Vinted Go en gras lue ; rappel de retrait la veille et le jour J au nom de l'article ; horaires des points (`api/_lib/horaires-relais.js`). `2026-11-13-horaires-relais.md`. Geste : aucun.
 
-<<<<<<< HEAD
 - **13 nov. · Traduction lot 2 (intégration, étape 2)** : Ma journée, Ventes, Achats, Annonces, Stock, Argent, Statistiques, Messages, E-mails en 5 langues sur le main du jour (migration rejouée par `i18n-migrer`, 150 clés neuves) ; français identique mot pour mot (18 relevés). `2026-11-13-integration-traduction.md`. Geste : aucun.
 
 - **13 nov. · Horaires Mondial Relay** : lus par le serveur dans le suivi du colis (n° de point), 7 j, même code postal, sans requête de plus. `2026-11-13-lot11-horaires-mr.md`. Geste : aucun.
-=======
 - **13 nov. · Rappels de colis au nom de la paire (second agent)** : « Demain dernier jour », « Dernier jour », « t'attend » portent le titre de l'achat relié par IDENTITÉ (n° de suivi, code, conversation : jonction de l'écran dans `api/_lib/commande-colis.js`, app et serveur), jamais par ressemblance ; le résumé du soir saute un colis déjà rappelé le matin (une notification par colis et par jour) ; banc `ventes-colis-premium` à la règle « Colis dans Ventes ». `docs/passation/2026-11-13-rappels-paire.md`. Geste : aucun.
->>>>>>> origin/claude/lot45-stock-hors-reseau
+
+- **13 nov. · Récap 1 page + URSSAF la veille** : « Récap de <mois> » → Imprimer (A4, noir et blanc, données du Rapport du mois) ; la veille « Demain : déclaration URSSAF · X € à déclarer » (règle de « Copier », une fois). `2026-11-13-lot1617.md`. Geste : aucun.
+
+- **13 nov. · Prévision lissée, « Tes comptes Vinted » (lot 36-27)** : du 1er au 4, rythme des 4 dernières semaines ; tableau par compte (30 j/90 j/année : ventes, jours, prix moyen, offres). `2026-11-13-lot3627.md`. Geste : aucun.

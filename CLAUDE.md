@@ -533,15 +533,12 @@ sans la fonction.
 - **13 nov. · Très aimées, pas vendues (lot 31)** : Favoris, par compte, ≥ N favoris lus, ≥ 14 j ; « Proposer » pré-remplit le flux (pas recontacté, −x %, jamais sous achat + 10 %). `2026-11-13-lot31.md`. Geste : aucun.
 
 - **13 nov. · Lot 45 : le Stock et l'Inventaire sans réseau (garage)** : hors réseau le Stock se dessine avec sa DERNIÈRE lecture gardée par vendeur (`src/stockHorsLigne.js`, `vrm_hl_stock_{uid}`, effacée à la déconnexion), « Hors connexion — dernier état du … », N°, case, photos déjà vues (service worker `/hl-photo`, réserve `vrm-hl-photos`, 120), recherche par N°, inventaire par la feuille du Stock ; changer un N° / publier dit une fois ; aucune lecture ni N° écrit hors réseau. `docs/passation/2026-11-13-lot45.md`. Geste : ouvrir le Stock une fois en ligne.
-- **13 nov. · Traduction lot 2 (intégration, étape 2)** : Ma journée, Ventes, Achats, Annonces, Stock, Argent, Statistiques, Messages, E-mails en 5 langues sur le main du jour (migration rejouée par `i18n-migrer`, 150 clés neuves) ; français identique mot pour mot (18 relevés). `2026-11-13-integration-traduction.md`. Geste : aucun.
 
 - **13 nov. · Lot 89** : Colissimo et UPS lus par le serveur dès leur clé (sinon rien d'appelé, « lu par e-mail seulement ») ; DPD/GLS non mesurés. `2026-11-13-lot89-suivi-transporteurs.md`. Geste : `…-guide-cles-transporteurs.md`.
 
 - **13 nov. · Bénéfice « si vendue » et paires qui dorment (points 14-15)** : fiche « En ligne à · Si vendue » (`beneficePaire`, au plus, achat pas saisi ⇒ « — » + « Saisir ») ; Qui dorment rangées par ce qui rapporte, UN geste chacune (baisse mesurée, favoris, Republier, Leboncoin ; « … » le reste), `src/dormantes.js`. `docs/passation/2026-11-13-lot1415.md`. Geste : aucun.
 
-- **13 nov. · Prévision lissée, « Tes comptes Vinted » (lot 36-27)** : du 1er au 4, rythme des 4 dernières semaines ; tableau par compte (30 j/90 j/année : ventes, jours, prix moyen, offres). `2026-11-13-lot3627.md`. Geste : aucun.
 
-- **13 nov. · Récap 1 page + URSSAF la veille** : « Récap de <mois> » → Imprimer (A4, noir et blanc, données du Rapport du mois) ; la veille « Demain : déclaration URSSAF · X € à déclarer » (règle de « Copier », une fois). `2026-11-13-lot1617.md`. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
