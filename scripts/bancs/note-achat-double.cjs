@@ -83,7 +83,7 @@ async function preparer(b, vp, sombre) {
     localStorage.setItem('vinted_dark', JSON.stringify(s)); localStorage.setItem('vrm_apparence', JSON.stringify(s ? 'sombre' : 'clair'));
     localStorage.setItem('vinted_annonce_numeros', JSON.stringify(f));
   } catch (_) {} }, [sombre, FICHES]);
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   // Toute requête qui porterait le texte d'une note HORS de la ligne `main` est une fuite.
   pg.on('request', (q) => { const d = q.postData() || ''; if (/taille petit|petite tache/.test(d + q.url()) && !/\/rest\/v1\/app_data/.test(q.url())) fuites.push(q.url()); });
   await pg.route('**/rest/v1/**', (route) => {

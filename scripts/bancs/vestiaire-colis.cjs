@@ -70,7 +70,7 @@ async function preparer(b, vp, mode) {
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   const ROWS = ROWS_BASE.concat(mode === 'lu' ? VC : []);
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
@@ -150,11 +150,12 @@ const jobs = (pg) => pg.evaluate(() => ({ env: (document.querySelector('[data-jo
             // produit (900002), du plus haut + 1 (401 et 403, références lues, sont pris) — jamais un titre deviné.
             dit(v2.num === '404' && v2.bord === 'pas-su', 'V2 : sans référence ⇒ le N° neuf de son produit (404), bordereau « pas su »', `${v2.num} · ${v2.bord}`);
             dit(c.route === null && !c.achats.length, '« À envoyer » : aucun achat en route (ce qui arrive n’est pas à envoyer)', JSON.stringify(c.achats));
-            await pg.click('[data-colis-onglet-choix="retirer"]'); await pg.waitForTimeout(800);
+            await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 }); await pg.waitForTimeout(800);
             const r = await lire(pg);
             dit(r.route === '1' && r.achats.join() === 'A1', 'Colis → « À retirer » : l’achat en route, pas celui livré', JSON.stringify(r.achats));
             dit(/chronopost\.fr/.test(r.suivre) && r.h >= 44, 'Suivre l’achat sur Chronopost (44 px)', r.suivre);
-            await pg.click('[data-colis-onglet-choix="envoyer"]'); await pg.waitForTimeout(500);
+            // (11 nov., intégration colis) Retour aux colis à envoyer : ils sont en tête de Ventes (lot DJ3).
+            await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=cat_bord' }))); await pg.locator('[data-colis-section="ventes"]').first().waitFor({ timeout: 30000 }); await pg.waitForTimeout(1500);
             const vide = await pg.evaluate(() => /Aucun colis à envoyer\./.test(document.body.innerText));
             dit(!vide, 'jamais « Aucun colis à envoyer » sous deux colis Vestiaire à envoyer (« Aucun colis Vinted à envoyer »)', String(vide));
           } else if (mode === 'panne') {

@@ -106,6 +106,7 @@ if (arg.includes('--prouve')) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-en-ligne-deux-fois-'));
     fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"module"}');
     fs.writeFileSync(path.join(dir, 'enLigneDeuxFois.js'), regleSrc);
+    fs.copyFileSync(path.join(__dirname, '..', 'src', 'profilVendeur.js'), path.join(dir, 'profilVendeur.js'));   // (lot vocabulaire-article) le mot du vendeur, importé par la règle
     try { R = await import(pathToFileURL(path.join(dir, 'enLigneDeuxFois.js')).href); } catch (e) { dit(false, 'la règle ne se charge pas : ' + e.message); }
   } else dit(false, 'src/enLigneDeuxFois.js absent : aucune règle « en ligne deux fois »');
 
@@ -239,7 +240,7 @@ if (arg.includes('--prouve')) {
   await essaie('J · Ma journée et la feuille', () => {
     const sans = (s) => s.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
     const app = sans(appSrc);
-    const comp = app.slice(app.indexOf('function Comptabilite('), app.indexOf('function Comptabilite(') + 700000);   // (9 nov., lot AC) fenêtre élargie : Comptabilite a grandi
+    const comp = app.slice(app.indexOf('function Comptabilite('), app.indexOf('function Comptabilite(') + 1200000);   // (9 nov., lot AC ; 12 nov., intégration g1) fenêtre élargie : Comptabilite a grandi
     const dMemo = comp.indexOf('const enLigneDeux = useMemo(');
     const memo = dMemo >= 0 ? comp.slice(dMemo, comp.indexOf('}, [listings, numeros', dMemo)) : '';
     dit(/enLigneDeuxFois\(\{ vinted, fiches: numeros, clePhoto: photoKey, cle: cleNum(?: \}\)|, dateDe: )/.test(memo), 'Ma journée passe par la règle avec la VRAIE clé de photo et cleNum');

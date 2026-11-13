@@ -43,6 +43,7 @@ import { cleVente } from './statsCategories.js';
 import { eurosStock } from './coutVente.js';
 import { periodesExport } from './exportComptable.js';
 import { periodeBouclee } from './exportComptableZip.js';
+import { jourParis } from './dateParis.js';
 
 const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 export const libelleMoisRapport = (ym) => { const [y, m] = String(ym || '').split('-').map(Number); return y && m ? `${MOIS[m - 1]} ${y}` : String(ym || ''); };
@@ -55,7 +56,7 @@ export const moisRapportChoix = (maintenant = Date.now()) => periodesExport('moi
 const cts = (x) => (x == null || String(x).trim() === '' || !Number.isFinite(Number(x)) ? null : Math.round(Number(x) * 100));
 const pl = (n, s, p) => `${n} ${n > 1 ? (p || s + 's') : s}`;
 const pct = (x) => `${String(Math.round(x * 10) / 10).replace('.', ',')} %`;
-const jourCle = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const jourCle = (t) => jourParis(t);   // (11 nov.) jour de PARIS
 
 // Les bornes LOCALES d'un mois [de, a) ; un mois en cours s'arrête à maintenant.
 export function bornesMois(ym, maintenant = Date.now()) {

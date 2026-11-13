@@ -214,10 +214,10 @@ const MUTATIONS = [
     // la règle courante de l'app. Exécutée app = serveur : audit-bilan-semaine, audit-suites-serveur.
     dit(/const compteEcarteRegle = \(uid, masques, panneau, regle\) => compteEcarteChoix\(uid, masques, panneau\) \|\| venteHorsPlan\(regle, uid\);/.test(app)
       && /const compteEcarte = \(uid, masques, panneau\) => compteEcarteRegle\(uid, masques, panneau, reglePlanCourante\(\)\);/.test(app), 'les totaux des ventes (`compteEcarte`) écartent les comptes hors offre');
-    dit(/return compteEcarteChoix\(uid, hiddenAccts, panelAcctOff\);/.test(app) && /const buysBase = useMemo\(\(\) => \(buys\.items \|\| \[\]\)\.filter\(o => !acctOffOf\(o\)\)/.test(app),
+    dit(/return compteEcarteChoix\(uid, hiddenAccts, panelAcctOff\);/.test(app) && /const buysBase = useMemo\(\(\) => (?:avecRemboursementsProuves\()?\(buys\.items \|\| \[\]\)\.filter\(o => !acctOffOf\(o\)\)/.test(app),
       'les ACHATS d’un compte d’achat restent (acctOff = le choix seul, sans l’offre)');
     dit(/exclu: \(o\) => compteEcarteChoix\(o && o\._uid/.test(compta), 'Compta → registre des achats : les achats des comptes d’achat comptent');
-    dit(/const isHidden = \(o\) => hiddenSales\.has\(String\(o\.transaction_id\)\) \|\| venteOffOf\(o\);/.test(app) && /const venteOffOf = \(o\) => acctOffOf\(o\) \|\| horsPlanOf\(o\);/.test(app),
+    dit((/const isHidden = \(o\) => hiddenSales\.has\(String\(o\.transaction_id\)\) \|\| venteOffOf\(o\);/.test(app) || (/const isHiddenCalcul = \(o\) => hiddenSales\.has\(String\(o\.transaction_id\)\) \|\| venteOffOf\(o\);/.test(app) && /const isHidden = \(o\) => \{[^\n]*isHiddenCalcul\(o\)[^\n]*\};/.test(app))) && /const venteOffOf = \(o\) => acctOffOf\(o\) \|\| horsPlanOf\(o\);/.test(app),
       'listes de ventes, colis à envoyer, CA : hors offre écarté (`isHidden`)');
     dit(/exclu: venteOffOf, excluAutre, versements, declare: declUrssaf/.test(app), 'CA déclaré (URSSAF) : les ventes hors offre n’y entrent pas');
     dit(/<VentesHorsPlan /.test(app) && /<BandeauCompteVendeur /.test(app), 'Ventes : l’aperçu des ventes hors offre est rendu ; la coque porte la feuille « Quel compte vend ? »');
@@ -256,6 +256,15 @@ const MUTATIONS = [
         if (!colonne030 && lignes.some((l) => 'comptes_vendeurs' in l)) return rep({ code: 'PGRST204', message: "Could not find the 'comptes_vendeurs' column of 'abonnements' in the schema cache" }, 400);
         if (!colonne028 && lignes.some((l) => 'plan' in l || 'compte_vendeur' in l)) return rep({ code: 'PGRST204', message: "Could not find the 'plan' column of 'abonnements' in the schema cache" }, 400);
         for (const l of lignes) abos[l.owner] = { ...(abos[l.owner] || {}), ...l }; return rep('', 201);
+      }
+      if (m === 'PATCH') {   // (11 nov., H18) l'écriture conditionnelle de ecrireStatut
+        const c = JSON.parse(opts.body);
+        if (!colonne030 && 'comptes_vendeurs' in c) return rep({ code: 'PGRST204', message: "Could not find the 'comptes_vendeurs' column of 'abonnements' in the schema cache" }, 400);
+        if (!colonne028 && ('plan' in c || 'compte_vendeur' in c)) return rep({ code: 'PGRST204', message: "Could not find the 'plan' column of 'abonnements' in the schema cache" }, 400);
+        const o = decodeURIComponent((/owner=eq\.([^&]+)/.exec(u) || [])[1] || ''), l = abos[o];
+        const cond = [...u.matchAll(/[?&](evenement_ts|maj)=(eq\.[^&]*|is\.null)/g)].every(([, k, v]) => (v === 'is.null' ? !l || l[k] == null : String(l[k]) === decodeURIComponent(v.slice(3))));
+        if (!l || !cond) return rep([]);
+        abos[o] = { ...l, ...c }; return rep([{ owner: o }]);
       }
       if (qui) return rep(abos[qui.id] ? [abos[qui.id]] : []);
       const o = (/owner=eq\.([^&]+)/.exec(u) || [])[1], c = (/client_stripe=eq\.([^&]+)/.exec(u) || [])[1];

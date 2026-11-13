@@ -179,6 +179,8 @@ html body .vrm-ann-avis > button.vrm-ann-avis-neufs:active { background: var(--v
 }
 :root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-gestes > .vrm-fiche-geste > svg { flex: none; }
 .vrm-fiche-geste-sous { display: block; font-size: 11px; font-weight: 500; color: var(--vrm-muted); white-space: nowrap; }
+/* (12 nov.) « Baisser à 92 € ? · en ligne depuis 45 j · 3 favoris » : la question reste entière, la raison s'efface au bord. */
+.vrm-fiche-geste-sous[data-conseil-raison] { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 
 /* La feuille « … » d'une carte : des lignes de 44 px, pleine largeur. */
 .vrm-fiche-menu { display: flex; flex-direction: column; gap: 2px; }
@@ -281,3 +283,7 @@ html body .vrm-ann-avis > button.vrm-ann-avis-neufs > svg { display: none; flex:
 }
 .vrm-ann-geste-texte { flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.4; color: var(--vrm-muted, #6E6E73); }
 .vrm-ann-geste-texte b { font-size: 14px; font-weight: 700; color: var(--vrm-ink, #1D1D1F); }
+
+/* (11 nov., lot accessibilité) « Vérifier » sur le remplissage gris : #0066CC = 4,36:1 ⇒ en
+   clair un bleu un cran plus sombre (#005BB8 : 5,1:1), même teinte d’accent. */
+:root:not([data-theme="dark"]) body .vrm-ann-avis-voir { color: #005BB8; }

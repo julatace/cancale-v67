@@ -22,6 +22,7 @@
 import { plat, AUTHENTIFICATION } from './sms-commun.js';
 import { conserverRetrait, normaliserSuivi } from './etat-colis-email.js';
 import { FORME_CHRONOPOST_PROPRE } from './suivi-colis.js';
+import { limiteRetraitDepuisTexte } from './retrait-colis.js';
 
 export const MARQUE_CHRONO = /chronopost|chrono\s*relais|pickup\s+station/i;
 const N_CHRONO = /\b([XZ]W\s?\d{3}\s?\d{3}\s?\d{3}\s?(?:TS|SP))\b/i;
@@ -36,7 +37,19 @@ export function dispoConstatee(t) {
   return !CONDITION.test(t.slice(debut, m.index));
 }
 
-export function lireSmsChronopost({ texte = '', expediteur = '' } = {}) {
+// (12 nov., Julien : « aucune erreur ») LE POINT et LA DATE LIMITE quand le SMS les écrit, sur le modèle des
+// formes publiques Chronopost (« … est disponible dans votre Relais Pickup TABAC DU PORT, 12 rue du Port
+// 35260 CANCALE jusqu'au 20/11. Code de retrait : 123456 », « … vous attend en Pickup Station GARE TEST … ») :
+// le nom (et l'adresse) après « Relais Pickup / Pickup Station / point relais / relais », jusqu'au point ou à
+// « jusqu'au / avant le / code ». Pas lu ⇒ rien (le colis reste « à retirer » avec son code, lieu « — »).
+const LIEU_CHRONO = /\b(?:dans\s+(?:votre|le|la)\s+|en\s+|au\s+|à\s+la\s+)?(?:relais\s+pickup|pickup\s+station|point\s+relais|relais|consigne\s+pickup)\s+(?!pickup\b)([A-ZÀ-Ý0-9][^.\n]{1,118}?)\s*(?=\.\s|\.$|,?\s+jusqu|,?\s+avant\s+le|,?\s+code\b|$)/i;
+const lieuChrono = (t) => {
+  const m = LIEU_CHRONO.exec(t);
+  if (!m) return '';
+  const l = plat(m[1]).replace(/[®™©*_]+/g, ' ').replace(/[\s,;:–-]+$/, '').replace(/\s+/g, ' ').trim();
+  return l.length >= 2 && l.length <= 120 && !/https?:|www\.|@|\bcode\b/i.test(l) && /[A-Za-zÀ-ÿ]{2}/.test(l) ? l : '';
+};
+export function lireSmsChronopost({ texte = '', expediteur = '', date = '' } = {}) {
   const t = plat(texte);
   if (!t) return { type: 'ignore', raison: 'vide' };
   if (AUTHENTIFICATION.test(t)) return { type: 'ignore', raison: 'authentification' };
@@ -46,7 +59,11 @@ export function lireSmsChronopost({ texte = '', expediteur = '' } = {}) {
   if (!suivi || !FORME_CHRONOPOST_PROPRE.test(suivi)) return { type: 'inconnu', suivi: '' };
   const c = CODE.exec(t);
   const code = c && /\d/.test(c[1]) && normaliserSuivi(c[1]) !== suivi ? c[1].toUpperCase() : '';
-  if (code && dispoConstatee(t)) return { type: 'disponible', suivi, code };
+  if (code && dispoConstatee(t)) {
+    const lieu = lieuChrono(t);
+    const limite = limiteRetraitDepuisTexte(t, Number.isFinite(Date.parse(String(date || ''))) ? String(date) : new Date().toISOString());
+    return { type: 'disponible', suivi, code, ...(lieu ? { lieu, consigne: /consigne|station|casier|locker/i.test(t) } : {}), ...(limite ? { limite } : {}) };
+  }
   return { type: 'inconnu', suivi };
 }
 
@@ -65,14 +82,14 @@ export function ligneSmsChronopost(lu, prev, { smsAt, maintenant } = {}) {
       // Forme pas mesurée : jamais d'arrivée datée (`arriveLe` absent ⇒ une borne, pas l'arrivée).
       return { action: 'range', data: { ...base, status: 'available', statusLabel: 'Disponible au point de retrait (SMS Chronopost)',
         subject: `SMS Chronopost : colis ${lu.suivi} disponible`, receivedAt: now, emailAt: at, arriveLe: null,
-        code: lu.code, code2: null, artTitle: null, lieu: null, limite: null, consigne: false,
+        code: lu.code, code2: null, artTitle: null, lieu: lu.lieu || null, limite: lu.limite || null, consigne: !!lu.consigne,
         qrB64: null, qrType: null, qrUrl: null, account: '', source: 'sms', sms: smsTrace } };
     }
     const plusRecent = !!(isoOk(p.emailAt) && Date.parse(at) > Date.parse(p.emailAt));
     const garde = conserverRetrait(p, { status: 'available', label: 'Disponible au point de retrait (SMS Chronopost)' }, plusRecent);
     const data = { ...p, ...base, status: garde.status, statusLabel: garde.status === p.status ? (p.statusLabel || garde.label) : garde.label,
       receivedAt: now, emailAt: [at, p.emailAt].filter(isoOk).sort().pop() || at,
-      code: p.code || lu.code, sms: smsTrace, aussiSms: true };
+      code: p.code || lu.code, lieu: p.lieu || lu.lieu || null, limite: p.limite || lu.limite || null, sms: smsTrace, aussiSms: true };
     if (p.code && String(p.code) !== lu.code) data.codeSms = lu.code;
     if (p.smsAVerifier) delete data.smsAVerifier;
     return { action: 'fusionne', data };

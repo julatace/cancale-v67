@@ -106,7 +106,7 @@ export function trierFavorisAuto({lignes,d,owner,maintenant,resoudre}){
 }
 // Dans le comparer-et-échanger : revérifie sur l'état RELU et pose au plus un
 // message. `choisi` = { l, cible } (ou null), `sauts` = à noter au journal.
-export function ajouterAuto(d,{owner,maintenant,choisi,sauts=[],message,offre,prochainFavori=null,extension=null,demande=null}){
+export function ajouterAuto(d,{owner,maintenant,choisi,sauts=[],message,variantes=null,offre,prochainFavori=null,extension=null,demande=null}){
   d=initialiserFile(d);const g=d.groupes[owner];
   const e=etatAuto(d,owner,maintenant);
   if(!g?.auto)return {valeur:{...e,vue:vueFile(d,owner)}};
@@ -125,7 +125,7 @@ export function ajouterAuto(d,{owner,maintenant,choisi,sauts=[],message,offre,pr
   else if(pret){
     const t=choisi.cible,id=t.itemId+':'+t.recipientId,ancien=g.jobs.find(x=>x.id===id);
     const essais=(ancien&&ancien.etat==='refuse'?Number(ancien.essais)||1:0)+1;
-    g.jobs=[...g.jobs.filter(x=>x.id!==id),{id,notificationId:t.notificationId,itemId:t.itemId,recipientId:t.recipientId,initiator:t.initiator,etat:'attente',auto:true,essais,message,intervalleMinutes:0,...(offre?{offre}:{}),lot:'auto',...(choisi.l.nom?{nom:String(choisi.l.nom).slice(0,80)}:{})}];
+    g.jobs=[...g.jobs.filter(x=>x.id!==id),{id,notificationId:t.notificationId,itemId:t.itemId,recipientId:t.recipientId,initiator:t.initiator,etat:'attente',auto:true,essais,message,...(Array.isArray(variantes)&&variantes.length?{variantes:[...variantes]}:{}),intervalleMinutes:0,...(offre?{offre}:{}),lot:'auto',...(choisi.l.nom?{nom:String(choisi.l.nom).slice(0,80)}:{})}];
     if(g.jobs.length>500){const sansAuto=g.jobs.filter(x=>!(x.auto&&['annule','refuse'].includes(x.etat)&&x.ecrits===0));if(sansAuto.length>500)throw new RefusFavoris('La file a atteint sa capacité. Aucun historique de dédoublonnage n’a été effacé.');g.jobs=sansAuto;}
     g.active=true;g.raison='';ajoute=true;change=true;etat='pret';
   }else if(e.etat==='libre')etat=prochainFavori?'attente_favori':'veille';

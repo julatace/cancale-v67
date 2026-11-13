@@ -125,7 +125,17 @@ if (ARG_PROUVE) {
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? '✅ ' : '❌ ') + m + (d ? ' — ' + d : '')); };
 const essaie = async (m, f) => { try { await f(); } catch (e) { dit(false, m + ' — le contrôle a pu s’exécuter', String((e && e.stack) || e).split('\n').slice(0, 2).join(' ').slice(0, 260)); } };
-const importer = (p) => import('file://' + path.join(R, p));
+const importer = async (p) => {
+  const m = await import('file://' + path.join(R, p));
+  // (12 nov., limites-client) le widget borne les appels d'un vendeur (12/min) : ce banc l'appelle
+  // bien plus souvent pour UN vendeur fictif — chaque appel repart d'un compteur vide (la règle de
+  // débit a son propre audit, audit-limites-client).
+  if (p === 'api/widget.js') {
+    let D = null; try { D = await import('file://' + path.join(R, 'api/_lib/debit-vendeur.js')); } catch (_) { D = null; }
+    if (D && D._viderDebits) { const f = m.default; return { ...m, default: (...a) => { D._viderDebits(); return f(...a); } }; }
+  }
+  return m;
+};
 
 // ── L'environnement des routes ──────────────────────────────────────────────
 const A = '11111111-2222-3333-4444-555555555555';
@@ -752,6 +762,28 @@ const MVC_INTROUVABLE = JSON.stringify({ Success: false, ModelState: [], Message
     const g2 = S.leverGarde({ etat: 'trop_long', age: 6, garde: 5 }, { transpDispoLu: NOW - H, limiteVers: T.jourParis(NOW + 48 * H) }, NOW);
     dit(g1.etat === 'trop_long' && g2.etat === 'a_retirer', 'n° 3 : une limite DÉDUITE (« vers le ») déjà passée ne lève jamais la garde (à venir : levée)', `${g1.etat} · ${g2.etat}`);
   });
+  // (12 nov., capture de Julien, Mondial Relay 80380675) « Sollicitation Client pour replace colis » : le colis
+  // est REPLACÉ vers un autre point ⇒ en route, changement de point — jamais « disponible », jamais ambre.
+  await essaie('12 nov. : tous les libellés tombent dans un état connu ; l’inconnu est neutre', async () => {
+    const t1 = NOW - 3 * 24 * H, t2 = NOW - 2 * 24 * H, t3 = NOW - 20 * H;
+    const evs = [{ ms: t1, libelle: 'Colis remis &#224; Mondial Relay' }, { ms: t2, libelle: '5 jours restants pour retirer le colis en Point Relais' }, { ms: t3, libelle: 'Sollicitation Client pour replace colis' }];
+    const mvc = T.lireReponse('mondialrelay', 200, 'application/json; charset=utf-8', mvcJson('12345678', '99999', 4, evs), { suivi: '12345678', cp: '99999', voie: 'mr-fr-mvc' });
+    dit(mvc.res === 'ok' && mvc.etat === 'en_route' && mvc.detail === 'changement_point', '« Sollicitation Client pour replace colis » ⇒ en route, changement de point en cours (route _mvc)', `${mvc.etat}/${mvc.detail}`);
+    const be = T.lireReponseMondialRelay(200, 'application/json', mrBe('12345678', '99999', 4, evs.map((e) => ({ ...e, libelle: e.libelle.replace('&#224;', 'à'), dpr: /restants/.test(e.libelle) }))), { suivi: '12345678', cp: '99999' });
+    dit(be.res === 'ok' && be.etat === 'en_route' && be.detail === 'changement_point', '…la même règle pour l’API .be', `${be.etat}/${be.detail}`);
+    const lt = T.ligneTransporteur({ ...mvc, carrier: 'mondialrelay', suivi: '12345678', lu: iso(NOW - H) }, 'mondialrelay', NOW);
+    dit(lt.ambre === false && /changement de point en cours/.test(lt.consequence), 'la carte dit « en route — changement de point en cours », sans ambre', JSON.stringify(lt));
+    const inc = T.lireReponse('mondialrelay', 200, 'application/json; charset=utf-8', mvcJson('12345678', '99999', 4, [...evs.slice(0, 2), { ms: t3, libelle: 'Libell&#233; jamais vu ZORGLUB' }]), { suivi: '12345678', cp: '99999', voie: 'mr-fr-mvc' });
+    const li = T.ligneTransporteur({ ...inc, carrier: 'mondialrelay', suivi: '12345678', lu: iso(NOW - H) }, 'mondialrelay', NOW);
+    dit(inc.etat === 'inconnu' && li.ambre === false && !/vérifie avant de te déplacer/.test(li.consequence), 'un libellé vraiment inconnu reste NEUTRE (pas ambre, rien à faire)', JSON.stringify(li));
+    dit(T.changementANotifier({ etat: 'disponible', essaiRes: 'ok' }, { ...inc, suivi: '12345678', essaiRes: 'ok', etatAt: iso(NOW - H) }, { maintenant: NOW }) === null, '…et ne notifie pas');
+    const S2 = await import('file://' + path.join(R, 'api/_lib/suivi-colis.js'));
+    const ligne = { suivi: '12345678', carrier: 'mondialrelay', status: 'available', code: '123456', lieu: 'TABAC TEST, 1 rue Test, 99999 TESTVILLE' };
+    dit(S2.fusionTransporteur(ligne, { ...inc, lu: iso(NOW - H) }, NOW).status === 'available', '…le colis garde l’état prouvé par les autres preuves (e-mail « disponible »)');
+    const CONNUS = new Set(['prepare', 'route', 'disponible', 'livre', 'retour', 'retarde', 'message', 'replace', 'incident', 'retire']);
+    const tous = [...T.MR_LIBELLES.map(([, c]) => c), ...Object.values(T.CP_CODES), ...Object.values(T.VG_GROUPES)];
+    dit(tous.every((c) => CONNUS.has(c)), 'chaque libellé appris (Mondial Relay, Chronopost/Shop2Shop, Vinted Go) a une classe connue', tous.filter((c) => !CONNUS.has(c)).join(','));
+  });
   await essaie('n° 7 : un code postal saisi faux ne ferme jamais le n°', async () => {
     resetBase(); await oublis();
     base.set(`${A}|colis_suivi_mondialrelay_12345678`, { suivi: '12345678', transporteur: 'mondialrelay', codePostal: '35000', at: iso(NOW - 24 * H) });
@@ -1001,6 +1033,58 @@ const MVC_INTROUVABLE = JSON.stringify({ Success: false, ModelState: [], Message
     const w2 = await widget();
     dit(w2.ship && w2.ship.vestiaire && w2.ship.vestiaire.total === 4, 'départs illisibles ⇒ rien ne change : les 4 restent « à envoyer » (« pas su » ne vaut pas « oui »)', JSON.stringify(w2.ship && w2.ship.vestiaire));
     pannes.delete('lire:depart_');
+  });
+
+  // (11 nov., lot suivi-commandes) Un colis VENDU pris en charge reste suivi jusqu'à la fin, plus lentement,
+  // APRÈS ceux qui ne sont pas encore partis (ils ont une date limite d'envoi). Réponses SIMULÉES.
+  await essaie('(11 nov.) colis vendus : suivis jusqu\'à la livraison, les « pas encore partis » d\'abord', async () => {
+    resetBase(); await oublis();
+    const ROUTE = 'XW000000301TS', NEUF = 'XW000000302TS', VG = 'VGS1000000000301';
+    base.set(`${A}|main`, mainRetrait({}));
+    base.set(`${A}|vc_ventes`, { ventes: {
+      // Vestiaire dit « envoyée » (plus dans « à expédier ») : son suivi se lit encore.
+      r1: { aExpedier: false, etat: 'shipped', suivi: ROUTE, transporteur: 'Chronopost', date: iso(NOW - 72 * H), titre: 'Nike Dunk Low' },
+      n1: { aExpedier: true, suivi: NEUF, transporteur: 'Chronopost', date: iso(NOW - 24 * H), titre: 'Nike Dunk Low' },
+      g1: { aExpedier: false, etat: 'shipped', suivi: VG, transporteur: 'Vinted Go', date: iso(NOW - 72 * H), titre: 'Nike Dunk Low' },
+    } });
+    base.set(`${A}|vc_listings`, { liens: {} });
+    // Déjà pris en charge il y a 2 jours, relu il y a 7 h (le rythme de suivi est de 6 h).
+    base.set(`${A}|depart_chronopost_${ROUTE}`, { v: 1, sens: 'sortant', suivi: ROUTE, carrier: 'chronopost', etat: 'en_route', priseAt: iso(NOW - 48 * H), lu: iso(NOW - 7 * H), essai: iso(NOW - 7 * H), essaiRes: 'ok', essais: 0, fini: true });
+    base.set(`${A}|depart_vinted_${VG}`, { v: 1, sens: 'sortant', suivi: VG, carrier: 'vinted', etat: 'en_route', priseAt: iso(NOW - 48 * H), lu: iso(NOW - 7 * H), essai: iso(NOW - 7 * H), essaiRes: 'ok', essais: 0, fini: true });
+    let etape = 'route';
+    transporteur = (u) => {
+      if (u.hostname === 'ws.chronopost.fr') {
+        const n = u.searchParams.get('skybillNumber');
+        if (n === NEUF) return { status: 200, ctype: 'text/xml', body: cpXml(NEUF, [cpEv('DC', NOW - 20 * H, 'Envoi en cours de préparation')]) };
+        if (n === ROUTE) return { status: 200, ctype: 'text/xml', body: cpXml(ROUTE, etape === 'route'
+          ? [cpEv('DB', NOW - 48 * H, 'Pris en charge'), cpEv('TT', NOW - 3 * H, 'Envoi en cours d\'acheminement')]
+          : [cpEv('DB', NOW - 48 * H, 'Pris en charge'), cpEv('TT', NOW - 3 * H, 'Acheminement'), cpEv('D', NOW - H, 'Livré', { infos: { 'Type de retrait': 'Destinataire' } })]) };
+      }
+      if (u.hostname === 'carrier.vintedgo.com' && u.pathname.endsWith('/' + VG)) return { status: 200, ctype: 'application/json', body: vgJson([{ group: 'in_transit', ms: NOW - 2 * H, address: 'Plateforme 69000 LYON' }, { group: 'shipped', ms: NOW - 48 * H }, { group: 'created', ms: NOW - 60 * H }]) };
+      return null;
+    };
+    const dep = (c, n) => base.get(`${A}|depart_${c}_${n}`) || null;
+    // max 1 : la vente PAS ENCORE partie passe d'abord.
+    const r1 = await passage({ maxDeparts: 1 });
+    dit(Array.isArray(r1.departs) && r1.departs.length === 1 && r1.departs[0].suivi === NEUF, 'une seule place : le colis pas encore pris en charge (limite d\'envoi) passe avant le suivi des partis', JSON.stringify(r1.departs));
+    const r2 = await passage({ maxDeparts: 6 });
+    const lus2 = (r2.departs || []).map((x) => x.suivi);
+    dit(lus2.includes(ROUTE) && lus2.includes(VG), 'pris en charge, relu après 6 h : Chronopost et Vinted Go (Vestiaire « envoyée » compris)', JSON.stringify(lus2));
+    dit(dep('chronopost', ROUTE) && dep('chronopost', ROUTE).derLib && /achemin/i.test(dep('chronopost', ROUTE).derLib) && dep('chronopost', ROUTE).derAt === iso(NOW - 3 * H) && dep('chronopost', ROUTE).priseAt === iso(NOW - 48 * H), 'le DERNIER évènement est rangé (libellé, date), la prise en charge ne bouge pas', JSON.stringify(dep('chronopost', ROUTE)));
+    dit(dep('vinted', VG) && /LYON/i.test(dep('vinted', VG).derLieu || ''), 'Vinted Go : le lieu du dernier évènement est rangé', JSON.stringify(dep('vinted', VG)));
+    dit(!base.has(`${A}|transp_chronopost_${ROUTE}`) && !base.has(`${A}|transp_vinted_${VG}`), 'toujours aucune ligne `transp_` (le chemin de « à retirer »)');
+    const n0 = appels.length;
+    await passage({ maxDeparts: 6 });
+    dit(!appels.slice(n0).some((x) => x.host === 'ws.chronopost.fr' && new URL(x.url).searchParams.get('skybillNumber') === ROUTE), 'relancé tout de suite : pas relu avant 6 h (rythme borné)');
+    etape = 'livre';
+    const r3 = await passage({ maxDeparts: 6, maintenant: NOW + 7 * H });
+    dit((r3.departs || []).some((x) => x.suivi === ROUTE && x.change), 'livré : le passage le dit changé (l\'app relit)', JSON.stringify(r3.departs));
+    dit(dep('chronopost', ROUTE) && dep('chronopost', ROUTE).clos === true && dep('chronopost', ROUTE).etat === 'retire', 'livré à l\'acheteur ⇒ suivi clos', JSON.stringify(dep('chronopost', ROUTE)));
+    const n1 = appels.length;
+    await passage({ maxDeparts: 6, maintenant: NOW + 20 * H });
+    dit(!appels.slice(n1).some((x) => x.host === 'ws.chronopost.fr' && new URL(x.url).searchParams.get('skybillNumber') === ROUTE), 'clos ⇒ plus jamais relu');
+    dit(!pushes.some((p) => new RegExp(`${ROUTE}|${VG}`).test(JSON.stringify(p))), 'aucune notification pour un colis vendu');
+    dit(appels.every((x) => /^VRM-suivi\//.test(x.ua) && x.redirect === 'error'), 'mêmes garde-fous : User-Agent honnête, aucune redirection');
   });
 
   console.log(ko ? `\n❌ ${ko} contrôle(s) rouge(s).` : '\n✅ Le statut lu chez les transporteurs suit la règle (serveur, secours, pause, échos, fins, notifications).');

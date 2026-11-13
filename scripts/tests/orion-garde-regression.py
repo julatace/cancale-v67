@@ -30,6 +30,16 @@ def elargir_infos(f):
     for c in m['content_scripts']:
         if 'vinted-infos.js' in c['js']:c['matches']=['https://*/*']
     f['manifest.json']=json.dumps(m).encode()
+def mots_bloc_en_plus(f):
+    m=json.loads(f['manifest.json'])
+    for c in m['content_scripts']:
+        if 'vrm-mots.js' not in c['js'] and 'bridge.js' in c['js']:c['js']=['compat-orion.js','vrm-mots.js',*c['js'][1:]];break
+    f['manifest.json']=json.dumps(m).encode()
+def mots_retire(f):
+    m=json.loads(f['manifest.json'])
+    for c in m['content_scripts']:
+        if 'vrm-mots.js' in c['js']:c['js']=[x for x in c['js'] if x!='vrm-mots.js'];break
+    f['manifest.json']=json.dumps(m).encode()
 assert essai().returncode==0,'La livraison actuelle doit être reconnue'
 cas={
  'fichier inattendu':lambda f:f.update({'inattendu.js':b'inattendu'}),
@@ -42,6 +52,8 @@ cas={
  'base commune modifiée':lambda f:f.update({'background.js':b'alteration'}),
  'hôte ajouté':ajouter_hote,
  'infos Vinted élargies à tous les sites':elargir_infos,
+ 'vrm-mots.js dans un bloc non approuvé':mots_bloc_en_plus,
+ 'vrm-mots.js retiré d’un bloc':mots_retire,
 }
 for nom,modifier in cas.items():
     r=essai(modifier);assert r.returncode!=0,nom+' accepté à tort';print('REFUS confirmé : '+nom)

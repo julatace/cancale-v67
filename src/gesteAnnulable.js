@@ -47,6 +47,9 @@ export const PAUSE_MAX = 60000;            // ms
 export function natureEchec(statut, raison) {
   if (statut === 'refus') return 'definitif';
   const t = String(raison || '');
+  // (11 nov., réseau instable) Une limite de débit ou un délai (408, 425, 429)
+  // dit « plus tard », jamais « non » : le geste reste (src/reseauBorne.js).
+  if (/\b(408|425|429)\b/.test(t) && !/refus/i.test(t)) return 'passager';
   if (/refus/i.test(t)) return 'definitif';                   // « a refusé l'envoi (401/403) », « lettre … refusée »
   if (/r[ée]pondu\s+4\d\d/i.test(t)) return 'definitif';       // « la base a répondu 400 »
   if (/stockage/i.test(t)) return 'definitif';                 // « le stockage de cet appareil a refusé »

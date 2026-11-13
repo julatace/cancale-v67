@@ -14,6 +14,7 @@
 // d'écrire (montant, état, taux) ; une coupure ou un 5xx après l'envoi rend
 // « incertain » (504), jamais « refusé » ni « fait ». Rien n'est automatique.
 import {lireXmlEbay} from './ebay-gestion.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const liste=v=>v==null?[]:Array.isArray(v)?v:[v];
 const texte=v=>v==null?'':typeof v==='object'?String(v['#text'] ?? ''):String(v);
@@ -114,7 +115,7 @@ export function annulerCommandeRangee(d,orderId,at=new Date().toISOString()){
   const orders=d.orders.map(o=>{if(o && (o.orderId===orderId || o.legacyOrderId===orderId)){vu=true;return {...o,cancelStatus:{...(o.cancelStatus || {}),cancelState:'CANCELED'},_annuleeParVrm:at};}return o;});
   return vu?{...d,orders}:undefined;
 }
-export function creerApresVenteEbay({accessToken,tradingCall,apiOrigin,fetcher=(...a)=>fetch(...a),marketplace:marche='EBAY_FR',lireAnnonces,marquerCommandeAnnulee}){
+export function creerApresVenteEbay({accessToken,tradingCall,apiOrigin,fetcher=(...a)=>fetchAvecDelai(...a),marketplace:marche='EBAY_FR',lireAnnonces,marquerCommandeAnnulee}){
   // (26 oct.) Le marché peut être une FONCTION : celui du compte de la requête.
   const mk=()=>typeof marche==='function'?marche():marche;
   const jeton=async ctx=>{const r=await accessToken(ctx);return r.ok && r.token?r:echec(r.error || 'Compte eBay indisponible.',r.status || 502,r.reason);};

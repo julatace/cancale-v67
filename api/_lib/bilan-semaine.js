@@ -39,7 +39,10 @@
 //      · des ventes Leboncoin sans date captées pendant la semaine ;
 //      · pour le reçu : des ventes finalisées sans date de versement (elles
 //        peuvent avoir été payées cette semaine — le dire, pas les deviner).
-import { ventesFaites, ventesDeclarables, compteEcarte } from './ventes-regle.js';
+import { motsArticle } from '../../src/profilVendeur.js';
+import { ventesFaites, ventesDeclarables, compteEcarte, classifyOrderStatus } from './ventes-regle.js';
+// (11 nov., saisie rapide) « Vendu ailleurs » : LA règle de l'app (src/venteAilleurs.js), importée telle quelle.
+import { ventesAilleursPour } from '../../src/venteAilleurs.js';
 import { excluAutreDe } from './comptes-exclus.js';
 
 const JOUR = 86400000;
@@ -172,7 +175,10 @@ export function calculerBilan(e) {
   // (9 nov., Solo par plateforme) + l'offre : en Solo, une vente Leboncoin / eBay / Vestiaire
   // d'un compte d'achat sort des totaux (le même prédicat que l'app, api/_lib/comptes-exclus.js).
   const excluAutre = excluAutreDe(e.exclusAutres, e.regle);
-  const vf = ventesFaites({ vinted, lbc, ebay, vestiaire, cachee, excluAutre });
+  // (11 nov., saisie rapide) Les ventes « vendu ailleurs » (main propre…) : `decisions` = `vrm_cycle_decisions`,
+  // `txItem` = transaction → annonce lue (une paire vendue AUSSI sur Vinted n'entre qu'une fois). Absent ⇒ aucune.
+  const main = e.decisions ? ventesAilleursPour(e.decisions, vinted, e.txItem || {}, classifyOrderStatus) : [];
+  const vf = ventesFaites({ vinted, lbc, ebay, vestiaire, cachee, excluAutre, main });
   let n = 0, eur = 0, meilleure = null;
   // (8 nov.) La plus haute vente de la fenêtre (le bilan du MOIS la cite : son
   // montant, son site, son n° de transaction — jamais dans la réponse du cron).
@@ -186,7 +192,7 @@ export function calculerBilan(e) {
   if (e.versements == null && vintedLisible) {
     out.recu = { etat: 'pas-su', eur: 0, manque: ['dates de versement illisibles'] };
   } else {
-    const vd = ventesDeclarables({ vinted, lbc, ebay, vestiaire, exclu: vintedLisible ? (o) => compteEcarte(o && o._acc && o._acc.vinted_user_id, e.masquesComptes, e.panneau, e.regle) : undefined, excluAutre, versements: e.versements || {} });
+    const vd = ventesDeclarables({ vinted, lbc, ebay, vestiaire, exclu: vintedLisible ? (o) => compteEcarte(o && o._acc && o._acc.vinted_user_id, e.masquesComptes, e.panneau, e.regle) : undefined, excluAutre, versements: e.versements || {}, main });
     let r = 0;
     for (const l of vd.lignes) if (dansSemaine(l.ts, debut, fin)) r += l.eur;
     const manqueRecu = [...manque];
@@ -229,7 +235,9 @@ const euros = (x) => `${Number(x).toLocaleString('fr-FR', { minimumFractionDigit
 const jourMois = (ymd) => new Date(minuitParis(ymd) + 12 * 3600000).toLocaleDateString('fr-FR', { timeZone: PARIS, day: 'numeric', month: 'short' });
 const liste = (xs, max = 2) => xs.length <= max ? xs.join(', ') : `${xs.slice(0, max).join(', ')} et ${xs.length - max} autre${xs.length - max > 1 ? 's' : ''}`;
 
-export function texteBilan(b, sem) {
+// (11 nov., lot vocabulaire-article) `mots` : « paire » / « article » du vendeur (api/_lib/mots-vendeur.js) ;
+// absent ⇒ les mots de Sneakers, le texte d'avant mot pour mot.
+export function texteBilan(b, sem, mots = motsArticle('sneakers')) {
   const titre = `📊 Ta semaine du ${jourMois(sem.lundi)} au ${jourMois(sem.dimanche)}`;
   const l = [];
   const v = b.vendu;
@@ -248,8 +256,8 @@ export function texteBilan(b, sem) {
   else l.push("À expédier : à voir dans l'app.");
   if (b.dorment.etat === 'su' && (b.dorment.n > 0 || !b.dorment.auMoins)) {
     l.push(b.dorment.n
-      ? `${b.dorment.auMoins ? 'Au moins ' : ''}${b.dorment.n} paire${b.dorment.n > 1 ? 's' : ''} en ligne depuis plus de 30 jours.`
-      : 'Aucune paire ne dort.');
+      ? `${b.dorment.auMoins ? 'Au moins ' : ''}${b.dorment.n} ${b.dorment.n > 1 ? mots.noms : mots.nom} en ligne depuis plus de 30 jours.`
+      : `${mots.Aucune} ne dort.`);
   }
   return { titre, corps: l.join('\n') };
 }

@@ -223,4 +223,16 @@ export default {
   "stock.titre2": "Title",
   "stock.statut": "Status",
   "stock.venteCours2": "⏳ Sale in progress",
+  // ── ecrans/Stock.jsx
+  "stock.rienDit": "(nothing says",
+  "stock.texte2": "which one)",
+  "stock.annoncesVestiaireEtat": { one: " · {n} Vestiaire listing with no known status (neither live nor sold) not counted", other: "· {n} Vestiaire listings with no known status (neither live nor sold) not counted" },
+  "stock.verifiees": { one: "{n} not checked", other: "{n} not checked" },
+  "stock.range3": "stored",
+  "stock.verifie": "not checked",
+  "stock.dansListe": "in the list",
+  "stock.aucuneVenteReporter2": "No sale to carry over ({scanned} orders checked).",
+  "stock.memeTitreSans": "Same title, no proof: you link it",
+  "stock.vendue2": " · sold",
+  "stock.texte3": "It's No. {numero}",
 };

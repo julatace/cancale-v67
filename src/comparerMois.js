@@ -1,3 +1,4 @@
+import { moisParis } from './dateParis.js';
 // ═══════════════════════════════════════════════════════════════════════════
 // COMPARER DEUX MOIS (4 novembre)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -19,7 +20,8 @@
 // sont complets : un écart contre un minimum serait un faux (« — »).
 // Exécuté par scripts/audit-comparer-mois.cjs.
 
-export const ymDe = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+import { motsVendeur } from './profilVendeur.js';
+export const ymDe = (t) => moisParis(t);   // (11 nov.) mois de PARIS
 export const ymDecale = (ym, k) => {
   const [y, m] = String(ym).split('-').map(Number);
   const d = new Date(y, m - 1 + k, 1);
@@ -40,7 +42,7 @@ const LIGNES = [
   { cle: 'ventes', nom: 'Ventes', type: 'n' },
   // (11 nov., décision C5 — Julien : « tranche ») Les PAIRES achetées (pièces), pas les achats :
   // un lot de 3 compte 3. Le nombre d'achats s'écrit en petit à côté (`achats`).
-  { cle: 'paires', nom: 'Paires', type: 'n' },
+  { cle: 'paires', get nom() { return motsVendeur().Noms; }, type: 'n' },   // (lot vocabulaire-article) « Articles » hors Sneakers
 ];
 
 const pasSu = (raison) => ({ valeur: null, partiel: false, manque: [], raison });

@@ -45,7 +45,7 @@ const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').split(
 if (MUT) {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'achsrc-'));
   fs.mkdirSync(path.join(d, 'src'));
-  for (const f of ['achatsSourcing.js', 'prixAchatPropose.js', 'registres.js']) fs.copyFileSync(path.join(R, 'src', f), path.join(d, 'src', f));
+  for (const f of ['achatsSourcing.js', 'prixAchatPropose.js', 'registres.js', 'modePaiement.js']) fs.copyFileSync(path.join(R, 'src', f), path.join(d, 'src', f));
   const f = path.join(d, 'src', MUTS[MUT] ? 'achatsSourcing.js' : 'prixAchatPropose.js');
   const [de, vers] = TOUTES[MUT]; const s = fs.readFileSync(f, 'utf8');
   if (!s.includes(de)) { console.log('motif introuvable : ' + MUT); process.exit(2); }

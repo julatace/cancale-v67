@@ -27,7 +27,7 @@ const RACINE = path.join(__dirname, '..');
 // Les parts et les durées : docs/passation/2026-11-06-filets-anti-bug.md (§1).
 const LOT = ['nouveau-vendeur', 'navigation-tache', 'ventes-e2', 'colis-retirer-propre', 'statut-colis',
   'annonces-actions', 'journee-coherence', 'iphone-reprise', 'argent-mois', 'garde-ecrans', 'morceau-perime',
-  'chiffres-coherents', 'retraits-suivi'];
+  'chiffres-coherents', 'retraits-suivi', 'budget-vitesse', 'accessibilite', 'accessibilite-clavier'];
 const noms = process.argv.slice(2).length ? process.argv.slice(2) : LOT;
 const BASE = Number(process.env.BANCS_PORT_BASE) || 10000;
 const TIMEOUT_MS = (Number(process.env.BANCS_TIMEOUT_S) || 1200) * 1000;

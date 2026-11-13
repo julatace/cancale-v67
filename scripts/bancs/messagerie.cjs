@@ -216,7 +216,7 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
   await pg.exposeFunction('__exec', (s) => execs.push(JSON.parse(s)));
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify({ '444': { numero: '7', min: '40' }, '555': { numero: '12' } })); } catch (_) {} });
   await pg.addInitScript(PONT, { version, filExt: FIL_EXT, fils: { 301: FIL_OFFRE, 303: FIL_VENTE, 402: FIL_EXT, ...filsEnPlus } });
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
@@ -315,10 +315,14 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       //    répond agit ICI — la même priorité vaut donc aux deux tailles (le
       //    téléphone SANS extension est jugé par `pont.cjs`). (L'ancien contrôle
       //    « non lues d'abord » était rouge depuis longtemps : l'app trie par date.)
-      //    (19 octobre) Dans chaque groupe, une offre en attente passe devant (301).
-      const attendu = ['301', '303', '402'];
-      dit(JSON.stringify(liste.map((x) => x.id)) === JSON.stringify(attendu), 'le compte de Chrome d’abord (s’il peut agir), puis les offres en attente, puis les plus récentes', JSON.stringify(liste.map((x) => x.id)));
-      dit(liste.some((x) => /compte_a/.test(x.txt)) && liste.some((x) => /compte_b/.test(x.txt)), 'le compte est nommé sur chaque ligne (la liste mélange les comptes)');
+      //    (19 octobre) Dans chaque groupe, une offre en attente passait devant (301).
+      //    ⚠️ (11 nov., décision de Julien : « du plus récent au plus vieux ») Plus rien ne
+      //    passe devant dans un groupe : 303 (plus récente) avant 301 (offre). Voir messages-naturel.cjs.
+      const attendu = ['303', '301', '402'];
+      dit(JSON.stringify(liste.map((x) => x.id)) === JSON.stringify(attendu), 'le compte de Chrome d’abord (s’il peut agir), puis le plus récent en haut (une offre ne passe plus devant)', JSON.stringify(liste.map((x) => x.id)));
+      // (11 nov.) Le compte de l'onglet est nommé UNE fois par l'en-tête de son groupe (§7) ; les autres comptes, sur leur ligne.
+      const teteGroupe = await r.pg.evaluate(() => (document.querySelector('[data-msg-groupe-actif]') || {}).innerText || '');
+      dit(/compte_a/.test(teteGroupe) && liste.some((x) => x.id === '402' && /compte_b/.test(x.txt)), 'chaque compte est nommé : celui de l’onglet par l’en-tête, l’autre sur sa ligne', teteGroupe);
       // 7. (19 oct.) la paire, l'état, le dernier auteur, l'heure — sur chaque ligne.
       await r.pg.waitForTimeout(900);
       const rich = await r.pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-messagerie] [data-conv]')].map((x) => [x.getAttribute('data-conv'), {
@@ -330,7 +334,7 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       dit(/N°12/.test(r303.txt || '') && /40/.test(r303.txt || '') && /Vendue/.test(r303.txt || '') && /Gazelle/.test(r303.txt || ''), 'et c’est écrit sur la ligne (N°, titre, prix, état)', (r303.txt || '').replace(/\n/g, ' | '));
       dit(r303.auteur === 'toi' && /Toi :/.test(r303.txt || '') && r301.auteur === 'eux' && !/Toi :/.test(r301.txt || ''), 'qui a écrit en dernier : « Toi : » sur la sienne, rien sur celle de l’acheteuse', JSON.stringify({ a303: r303.auteur, a301: r301.auteur }));
       dit(!r402.num && !r402.prix && !r402.etat && !r402.auteur, 'un résumé sans transaction ET plus ancien que la boîte : rien d’inventé (ni N°, ni prix, ni état, ni l’auteur d’un AUTRE message)', JSON.stringify(r402));
-      dit(!!r301.quand && Math.abs(Date.parse(r301.quand) - (auj - 30 * 3600e3)) < 2000 && /\d{1,2}:\d{2}/.test(r301.txt || ''), 'la date ET l’heure du dernier message', JSON.stringify({ q: r301.quand, t: (r301.txt || '').slice(0, 60) }));
+      dit(!!r301.quand && Math.abs(Date.parse(r301.quand) - (auj - 30 * 3600e3)) < 2000 && /\bhier\b|\n\d{1,2} [a-zéû]+\.?\n/.test(r301.txt || ''), 'le moment du dernier message, comme une messagerie (« hier » ; l’heure exacte reste dans data-conv-quand et l’infobulle)', JSON.stringify({ q: r301.quand, t: (r301.txt || '').slice(0, 60) }));
       dit(r301.compte === '111' && r402.compte === '222', 'le compte de chaque conversation est porté par la ligne', JSON.stringify({ c301: r301.compte, c402: r402.compte }));
       // 8. l'offre en attente, sur la LIGNE (elle n'est pas le dernier message du fil)
       const offL = await r.pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-messagerie] [data-conv]')].map((x) => [x.getAttribute('data-conv'), { o: x.getAttribute('data-conv-offre'), p: (x.querySelector('[data-offre-liste]') || {}).innerText || null }])));
@@ -339,7 +343,7 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       // (19 oct.) l'offre en attente passe DEVANT une conversation plus récente du même compte.
       const ordre = await r.pg.evaluate(() => [...document.querySelectorAll('[data-messagerie] [data-conv]')].map((x) => ({ id: x.getAttribute('data-conv'), c: x.getAttribute('data-conv-compte'), q: x.getAttribute('data-conv-quand') })));
       const i301 = ordre.findIndex((x) => x.id === '301'), i303 = ordre.findIndex((x) => x.id === '303');
-      dit(i301 >= 0 && i303 >= 0 && i301 < i303, 'une conversation avec une offre en attente passe devant une plus récente sans offre', JSON.stringify(ordre));
+      dit(i301 >= 0 && i303 >= 0 && i303 < i301, '(11 nov.) une offre en attente ne passe plus devant une conversation plus récente', JSON.stringify(ordre));
       // (27 oct.) Bandeau « N offres au-dessus de ton prix mini » dans la liste
       // (7 nov., finition : « en 1 tap » est devenu « d'un geste » — la règle jugée est la même : un geste, rien tout seul) :
       // l'offre 45 € de la 301 est ≥ au mini 40 € posé sur l'annonce 444.
@@ -409,7 +413,8 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       await r.pg.waitForTimeout(850);
       dit(r.execs.filter(x=>/\/replies$/.test(x.endpoint)).length===avantReponses+1,'double clic : une seule réponse envoyée');
       dit(await champ.inputValue()==='Brouillon suivant conservé','le texte modifié pendant l’envoi n’est pas effacé');
-      dit((await r.pg.locator('[role=status]').allTextContents()).some(t=>t.includes('Message envoyé sur Vinted')),'une réponse confirmée a un retour visible');
+      // (11 nov.) Le retour est sous la bulle : « Envoyé ✓ » (data-envoi="ok"), plus une phrase au-dessus du champ.
+      dit((await r.pg.locator('[data-envoi="ok"][role=status]').allTextContents()).some(t=>t.includes('Envoyé ✓')),'une réponse confirmée a un retour visible');
       dit(await r.pg.locator('[data-a-repondre]').getAttribute('data-a-repondre')==='0','la capture déjà traitée ne reste pas dans À répondre après un envoi confirmé');
       await r.pg.evaluate(()=>window.__reponseMode='panne');
       await r.pg.locator('.vrm-chat-send').click();await r.pg.waitForTimeout(850);
@@ -605,7 +610,7 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       const point = () => r.pg.evaluate(() => document.querySelectorAll('.vrm-mobile-nav [data-badge-nav="plus"][data-badge-n="point"]').length);
       await r.pg.click('.vrm-mobile-nav [data-nav-entree="ventes"]'); await r.pg.waitForTimeout(1500);
       const avant = await point();
-      await r.pg.click('.vrm-mobile-nav button[aria-label="Plus"]'); await r.pg.waitForTimeout(500);
+      await r.pg.click('.vrm-mobile-nav button[aria-label^="Plus"]'); await r.pg.waitForTimeout(500);
       await r.pg.click('.vrm-sheet [data-nav-entree="messages"]'); await r.pg.waitForTimeout(900);
       for (const id of ['301', '402']) {
         if (!(await r.pg.$(`[data-conv="${id}"]`))) continue;

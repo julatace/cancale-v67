@@ -9,6 +9,8 @@ test('un rappel tardif ne réactive pas un colis retiré ; un email non compris 
 test('photos par suivi ou transaction, jamais par titre ; ambiguïté et suivi absent ne choisissent aucune paire',()=>{const a={transaction_id:'1',_acc:'A',title:'Même article',photo:'un.jpg'},b={transaction_id:'2',_acc:'A',title:'Même article',photo:'deux.jpg'};const idx={'1':{suivi:'AB 123-456789 FR'},'2':{suivi:'ZZ987654321FR'}};assert.equal(achatDuColis({suivi:'AB123456789FR'},[a,b],idx),a);assert.equal(achatDuColis({transaction:'2'},[a,b],idx),b);assert.equal(achatDuColis({artTitle:'Même article'},[a,b],idx),null);assert.equal(achatDuColis({suivi:'AB123456789FR'},[a,b],{'1':idx['1'],'2':idx['1']}),null);assert.equal(normaliserSuivi('AB 123-456789 FR'),'AB123456789FR');});
 test('la vraie réception conserve la confirmation et refuse d’écraser un suivi illisible',async()=>{
  process.env.EMAIL_INBOUND_SECRET='test-retrait-secret';process.env.VRM_OWNER_UID='11111111-1111-4111-8111-111111111111';
+ // (intégration g1) depuis le 7 nov. une route sans clé de service répond 503 (api/_lib/cle-service.js) : la clé du banc (inventée).
+ const sansCle=!process.env.SUPABASE_SERVICE_KEY;if(sansCle)process.env.SUPABASE_SERVICE_KEY='cle-de-banc';
  const original=global.fetch;let precedent={status:'delivered',subject:'Votre colis a été retiré',receivedAt:'2026-10-20T10:00:00Z',code:'123456'},panne=false;let ecrites=[];
  global.fetch=async(url,opt={})=>{
   const u=new URL(url),id=u.searchParams.get('id')||'';
@@ -22,7 +24,7 @@ test('la vraie réception conserve la confirmation et refuse d’écraser un sui
   const r=await appel('Votre colis est disponible');assert.equal(r.code,200);const tr=ecrites.find(x=>x.id==='email_track_mondialrelay_12345678');assert.equal(tr.data.status,'delivered');assert.equal(tr.data.subject,precedent.subject);
   precedent={status:'available',code:'123456'};const c=await appel('Votre colis a été retiré par l’acheteur');assert.equal(c.code,200);assert.equal(ecrites.find(x=>x.id==='email_track_mondialrelay_12345678').data.status,'delivered');
   panne=true;const ko=await appel('Votre colis est disponible');assert.equal(ko.code,503);assert.equal(ko.body.reception,undefined);assert.ok(!ecrites.some(x=>x.id.startsWith('email_track_')));
- }finally{global.fetch=original;delete process.env.EMAIL_INBOUND_SECRET;delete process.env.VRM_OWNER_UID;}
+ }finally{global.fetch=original;delete process.env.EMAIL_INBOUND_SECRET;delete process.env.VRM_OWNER_UID;if(sansCle)delete process.env.SUPABASE_SERVICE_KEY;}
 });
 test('prise en charge et livraison future ne confirment pas le retrait',()=>{
  for(const sujet of ['Votre colis sera livré demain','Nous avons bien reçu votre colis','Colis réceptionné par le transporteur'])assert.equal(etatColisDepuisTexte(sujet),'transit');

@@ -46,7 +46,7 @@ const ensembleDe = (v) => (v instanceof Set ? v : new Set(Array.isArray(v) ? v.m
 // Rend { txs: [n°…], ventes: { tx → vente e-mail } } — chaque vente porte sa date
 // (l'arrivée de l'e-mail : la limite estimée en part, comme dans l'app).
 export function colisVentesEmailServeur({ mails = null, comptes = null, masques = null, panneau = null, connues = [], lectures = {}, ko = [],
-  bordsParTx = {}, shipDone = {}, bordsShipped = {}, panelBordsDone = {}, lignesEmail = null, departs = null, entrants = null } = {}) {
+  bordsParTx = {}, shipDone = {}, bordsShipped = {}, panelBordsDone = {}, lignesEmail = null, departs = null, entrants = null, etiquettes = null } = {}) {
   const vide = { txs: [], ventes: {} };
   if (!Array.isArray(mails) || !Array.isArray(comptes)) return vide;
   const m = ensembleDe(masques);
@@ -57,7 +57,7 @@ export function colisVentesEmailServeur({ mails = null, comptes = null, masques 
   });
   if (!fraiches.length) return vide;
   const sur = new Set(ventes.map((o) => String(o.transaction_id)));
-  const partis = ventesPartiesParPreuve({ txs: fraiches.map((o) => String(o.transaction_id)), bordsParTx, shipDone, bordsShipped, panelBordsDone, lignesEmail, departs, entrants });
+  const partis = ventesPartiesParPreuve({ txs: fraiches.map((o) => String(o.transaction_id)), bordsParTx, shipDone, bordsShipped, panelBordsDone, lignesEmail, departs, entrants, etiquettes });
   const out = colisVentesEmail({
     ventesEmail: fraiches, bordsParTx,
     connues: (tx) => sur.has(String(tx)),

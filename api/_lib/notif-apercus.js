@@ -25,9 +25,14 @@ import { heureCourte } from './limite-envoi.js';
 import { texteRappelRetrait } from './suivi-colis.js';
 import { notificationUrssaf } from './rappel-urssaf.js';
 import { texteBilan } from './bilan-semaine.js';
+// (11 nov., lot vocabulaire-article) Les aperçus sont lus par l'app (Paramètres) : le mot du vendeur connecté.
+import { motsVendeur } from '../../src/profilVendeur.js';
 import { notificationDoubleVente } from './double-vente.js';
 import { texteComptesARelire } from './comptes-a-relire.js';
 import { texteCompteRelie } from '../../src/compteRelie.js';
+import { texteNotifModeration } from '../../src/moderationVinted.js';
+import { texteAvisBas } from '../../src/avisNegatif.js';
+import { notifAlertes } from './ebay-alertes-texte.js';
 
 const court = (t, n) => { const x = String(t || ''); return x.length > n ? x.slice(0, n - 1).trimEnd() + '…' : x; };
 
@@ -101,10 +106,10 @@ export function texteSoir({ colis = null, retraits = null, offres = null, manque
   const am = manques.length ? 'au moins ' : '';
   const sortes = [nColis, nRetraits, nOffres].filter((x) => x > 0).length;
   const title = sortes > 1
-    ? 'Demain : ' + [nColis ? `${am}${nColis} colis` : '', nRetraits ? `${nRetraits} ${pl(nRetraits, 'retrait', 'retraits')}` : '', nOffres ? `${nOffres} ${pl(nOffres, 'offre', 'offres')}` : ''].filter(Boolean).join(', ')
+    ? 'Demain : ' + [nColis ? `${am}${nColis} colis` : '', nRetraits ? `${nRetraits} ${pl(nRetraits, 'retrait', 'retraits')}` : '', nOffres ? `${nOffres} ${pl(nOffres, 'offre Vestiaire', 'offres Vestiaire')}` : ''].filter(Boolean).join(', ')
     : nColis ? `Demain : ${am}${nColis} colis à déposer`
       : nRetraits ? `Demain : ${nRetraits} colis à retirer`
-        : `Demain : ${nOffres} ${pl(nOffres, 'offre expire', 'offres expirent')}`;
+        : `Demain : ${nOffres} ${pl(nOffres, 'offre Vestiaire expire', 'offres Vestiaire expirent')}`;
   const H = c.heure ? heureCourte(c.heure) : '';
   const phrases = [];
   if (nDemain) phrases.push(nDemain === 1 ? `1 colis à déposer${H ? ` avant ${H}` : ''} demain.` : `${nDemain} colis à déposer demain${H ? `, le premier avant ${H}` : ''}.`);
@@ -125,12 +130,12 @@ const EX = { compte: 'mon_compte', article: 'Nike Air Max 90 taille 42' };
 const deux = (o) => ({ title: o.title || o.titre, body: o.body || o.corps });
 const DV = notificationDoubleVente([{ numero: '124', plateforme: 'leboncoin', annonces: [{ id: '1' }] }], EX.article, { venduSur: 'vinted' });
 const URSSAF = notificationUrssaf({ today: '2026-11-02', main: { vinted_regime: 'micro', vinted_urssaf_freq: 'mensuel', vinted_urssaf_mois: { at: '2026-11-01T12:00:00Z', mois: [{ ym: '2026-10', ca: 1240 }] } } });
-const BILAN = texteBilan({ vendu: { etat: 'su', n: 9, eur: 412 }, recu: { etat: 'su', eur: 380 }, colis: { etat: 'su', n: 2 }, dorment: { etat: 'su', n: 4, auMoins: false } }, { lundi: '2026-10-26', dimanche: '2026-11-01' });
+const BILAN = () => texteBilan({ vendu: { etat: 'su', n: 9, eur: 412 }, recu: { etat: 'su', eur: 380 }, colis: { etat: 'su', n: 2 }, dorment: { etat: 'su', n: 4, auMoins: false } }, { lundi: '2026-10-26', dimanche: '2026-11-01' }, motsVendeur());
 export const APERCUS_NOTIF = {
   // (intégration lot 1) Les familles de api/_lib/notif-textes.js depuis le 5 nov. :
   // la double vente a la sienne, la veille au soir est un « rappel ».
   ventes: {
-    quoi: 'Une paire vendue, l’argent qui arrive.',
+    get quoi() { return `${motsVendeur().Un} vendu${motsVendeur().e}, l’argent qui arrive.`; },
     exemples: [
       { ...texteVendu({ article: EX.article, prix: '65', compte: EX.compte }), mene: 'Ventes · la vente, ouverte' },
       { ...texteArgentRecu({ montant: '61,20', article: EX.article, compte: EX.compte }), mene: 'Ventes' },
@@ -138,7 +143,7 @@ export const APERCUS_NOTIF = {
     ],
   },
   doublevente: {
-    quoi: 'Une paire vendue sur un site et encore en ligne sur un autre.',
+    get quoi() { return `${motsVendeur().Un} vendu${motsVendeur().e} sur un site et encore en ligne sur un autre.`; },
     exemples: [
       ...(DV ? [{ ...deux(DV), mene: 'Annonces · Leboncoin · la ligne « à retirer »' }] : []),
     ],
@@ -172,18 +177,39 @@ export const APERCUS_NOTIF = {
   },
   rappels: {
     quoi: 'Le soir, ce qu’il y a à faire demain (colis, retraits, offres), la déclaration URSSAF à faire, le bilan de la semaine, un compte Vinted pas relu depuis plus de 24 h.',
-    exemples: [
+    get exemples() { return [
       { ...texteSoir({ colis: { demain: 2, heure: '12:00', retard: 0, aVerifier: 0 }, retraits: { n: 1, lieu: 'Tabac des Halles, 8 Rue des Lilas, 44000 Nantes' }, offres: { n: 0 } }), mene: 'Colis · À envoyer (le premier geste de demain)' },
       ...(URSSAF && URSSAF.envoyer ? [{ ...deux(URSSAF), mene: 'Comptabilité · ta déclaration' }] : []),
-      { ...deux(BILAN), mene: 'Ma journée' },
+      { ...deux(BILAN()), mene: 'Ma journée' },
       { ...texteComptesARelire([{ nom: EX.compte, age: 'il y a 2 j' }]), mene: 'Paramètres · Comptes liés' },
-    ],
+    ]; },
   },
   // (8 nov.) Un compte relié pour la première fois (src/compteRelie.js, le vrai texte).
   comptes: {
     quoi: 'Un compte Vinted, Leboncoin, Vestiaire ou eBay relié pour la première fois.',
     exemples: [
       { ...texteCompteRelie([{ plateforme: 'vinted', id: '123', nom: EX.compte }]), mene: 'Paramètres · Comptes liés' },
+    ],
+  },
+  // (11 nov., ext. 5.350) Vinted a masqué / fait disparaître / limite (src/moderationVinted.js, le vrai texte).
+  moderation: {
+    quoi: 'Vinted a masqué une de tes annonces, en a fait disparaître une, limite ou ferme un de tes comptes — vu par l’extension en relisant ce qu’elle lit déjà. Une fois par événement, regroupé.',
+    exemples: [
+      { ...texteNotifModeration([{ s: 'masquee', compte: '1', t: 2, cle: 'a', a: '1000001' }, { s: 'disparue', compte: '1', t: 1, cle: 'b', a: '1000002' }], { nomCompte: () => EX.compte }), mene: 'Ma journée (en tête)' },
+      { ...texteNotifModeration([{ s: 'restreint', compte: '1', t: 1, cle: 'c' }], { nomCompte: () => EX.compte }), mene: 'Ma journée (en tête)' },
+    ],
+  },
+  // (11 nov., lot avis-negatif) Un avis de 3★ ou moins (seuil réglable) : le vrai texte (src/avisNegatif.js).
+  avis: {
+    quoi: 'Un avis Vinted de 3★ ou moins (seuil réglable) vient d’arriver : une fois par avis.',
+    exemples: [
+      { ...texteAvisBas({ nom: EX.compte, avis: [{ note: 2 }] }), mene: 'Vinted · tes avis (pour répondre)' },
+    ],
+  },
+  alertesebay: {
+    quoi: 'Une nouvelle annonce eBay pour une recherche dont tu as allumé l’alerte. VRM n’achète rien.',
+    exemples: [
+      (() => { const n = notifAlertes([{ itemId: 'v1|1|0', recherche: 'Samba 42', titre: 'Adidas Samba OG 42', prix: 6500, port: 500, total: 7000 }]); return { title: n.title, body: n.body, mene: 'eBay · Achats' }; })(),
     ],
   },
 };

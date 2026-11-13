@@ -20,13 +20,14 @@
 //   · Le repère de revente est celui du MODÈLE (ses ventes Vinted, la règle
 //     `moyennesParModele`), dit comme tel — jamais le prix de cette paire.
 import React,{useEffect,useRef,useState} from 'react';
+import { motsVendeur } from './profilVendeur.js';
 import {appelerEbay} from './ebayRequetes.js';
 import Pourquoi from './composants/PourquoiReplie.jsx';
-import {veillesDuFil,MAX_VEILLES_ACTIVES} from './operations/metier.js';
+import {veillesDuFil,MAX_VEILLES_ACTIVES,criteresDeVeille} from './operations/metier.js';
 
 export const RELIRE_MS = 15 * 60 * 1000;
 // Le jour de Paris (le plafond du serveur repart à minuit, heure de Paris).
-export const jourParis = (t = Date.now()) => { try { return (globalThis.__vrmFmtJourEbay || (globalThis.__vrmFmtJourEbay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }))).format(new Date(t)); } catch (_) { return new Date(t).toISOString().slice(0, 10); } };
+export const jourParis = (t = Date.now()) => { try { return (globalThis.__vrmFmtJourEbay || (globalThis.__vrmFmtJourEbay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }))).format(new Date(t)); } catch (_) { return jourParisRegle(t); } };
 export const MAX_FIL = MAX_VEILLES_ACTIVES;
 const ENDPOINT_OPS = '/api/compte?mode=operations';
 
@@ -81,11 +82,10 @@ export function raisonEchec(res) {
 // (6 nov., vitesse 2) `repereAdmis` vit dans repereEbay.js (l'app s'en sert sans
 // charger cet écran) ; ré-exporté ici, ses lecteurs ne changent pas.
 import { repereAdmis } from './repereEbay.js';
+import { jourParis as jourParisRegle } from './dateParis.js';
 export { repereAdmis };
-export const criteresDeVeille = (v) => ({
-  mots: v.mots, exclus: v.exclus || '', pointure: v.pointure || '', minimum: v.minimum ?? null, maximum: v.maximum ?? null,
-  etat: v.etatArticle || 'tous', pays: v.pays || 'tous', categorie: v.categorie || '', achatImmediat: v.achatImmediat !== false, livraisonFR: v.livraisonFR !== false,
-});
+// (11 nov.) La forme vit dans metier.js : le serveur des alertes la lit aussi (§11).
+export { criteresDeVeille };
 
 // « Nouveau » depuis la dernière visite : une annonce absente de ce qui était
 // connu AVANT cette visite. Première lecture d'une recherche ⇒ rien n'est
@@ -114,7 +114,7 @@ const eur = (c) => (Number.isFinite(c) ? (c / 100).toLocaleString('fr-FR', { min
 const ko = (n) => (Number.isFinite(n) ? (Math.max(1, Math.round(n / 102.4)) / 10).toLocaleString('fr-FR') + ' Ko' : '—');
 const heure = (iso) => { const t = Date.parse(iso || ''); return Number.isFinite(t) ? new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''; };
 
-const phraseRepere = (rp) => <>Repère du modèle « {rp.modele} »{rp.partiel ? ' (pour les paires de ce modèle)' : ''} : {eur(Math.round(rp.moyenne * 100))} en moyenne sur {rp.n} de tes ventes — le modèle, pas cette paire.</>;
+const phraseRepere = (rp) => <>Repère du modèle « {rp.modele} »{rp.partiel ? ` (pour les ${motsVendeur().noms} de ce modèle)` : ''} : {eur(Math.round(rp.moyenne * 100))} en moyenne sur {rp.n} de tes ventes — le modèle, pas {motsVendeur().ce}.</>;
 function Resultat({ x, nouveau, rp, C }) {
   return <div className="vrm-buy-row vrm-ebay-res" data-ebay-resultat={x.itemId} data-nouveau={nouveau ? 'oui' : 'non'}>
     <div className="vrm-buy-ph" style={{ background: C.card2 || C.bg }}>{x.photo ? <img src={x.photo} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}</div>
@@ -372,7 +372,7 @@ export default function RechercheEbay({ headers, theme: C, owner, repere, sessio
       <div style={{ margin: '0 0 10px', fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Tes recherches, relues ici. « Nouveau » = pas vue depuis ta visite. <Pourquoi>Tes recherches enregistrées, relues à l’ouverture de cet onglet puis au plus toutes les 15 minutes tant que VRM est ouvert et visible. « Nouveau » = pas vue depuis ta dernière visite.</Pourquoi></div>
       {veilles === undefined && <p style={{ fontSize: 13, color: C.muted }}>Lecture de tes recherches enregistrées…</p>}
       {veilles === null && <p data-ebay-fil-etat="pas-su" style={{ fontSize: 13, color: C.muted }}>Je n’ai pas pu lire tes recherches enregistrées — rien n’est perdu. <button type="button" onClick={() => { lireVeilles(); try { window.dispatchEvent(new Event('vrm:operations-relire')); } catch (_) {} }} style={{ ...S.bouton, marginLeft: 6 }}>Réessayer</button></p>}
-      {veilles && !dansFil.length && <p data-ebay-fil-vide="" style={{ fontSize: 13, color: C.muted }}>Fil vide : cherche une paire, puis « Ajouter au fil ».</p>}
+      {veilles && !dansFil.length && <p data-ebay-fil-vide="" style={{ fontSize: 13, color: C.muted }}>Fil vide : cherche {motsVendeur().un}, puis « Ajouter au fil ».</p>}
       {horsFil > 0 && <p data-ebay-hors-fil={horsFil} style={{ fontSize: 12, color: C.muted }}>{horsFil > 1 ? `${horsFil} autres recherches actives ne sont pas relues` : '1 autre recherche active n’est pas relue'} : {MAX_FIL} au plus, les plus récentes d’abord — archive celles qui ne servent plus.</p>}
       {plafondAuj && <p data-ebay-plafond="" style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>Tes recherches eBay du jour sont faites : le fil s’arrête jusqu’à minuit (heure de Paris).</p>}
       {plafondFilAuj && <div data-ebay-plafond-fil="" style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>Fil arrêté jusqu’à minuit : {(ap && ap.plafondFil) || 150} relectures du jour faites. <Pourquoi>Ton fil a fait ses {(ap && ap.plafondFil) || 150} relectures du jour : il s’arrête jusqu’à minuit (heure de Paris). Les recherches restantes sont gardées pour chercher à la main, ci-dessus.</Pourquoi></div>}

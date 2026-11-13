@@ -1,3 +1,4 @@
+import { centimes } from './beneficePaire.js';
 // Annonces déjà filtrées par compte et état par l'écran. Le montant reste
 // explicitement limité aux prix d'achat renseignés, jamais une valeur estimée.
 const cleNumStock=(n)=>{const s=String(n==null?'':n).toUpperCase().replace(/[\s\-_.]/g,'');return /^\d+$/.test(s)?String(parseInt(s,10)):s;};
@@ -13,9 +14,12 @@ export function resumerStockJournee(annonces, numeros={}) {
   if(vus.has(cle))continue;vus.add(cle);total++;
   const brut=numeros[it.id]?.buyPrice;
   if(typeof brut!=='number' && typeof brut!=='string' || typeof brut==='string' && !brut.trim())continue;
-  const prix=Number(brut);
-  if(!Number.isFinite(prix) || prix<0)continue;
-  renseignes++;cout+=Math.round(prix*100);
+  // (11 nov., revue robustesse) Les prix sont rangés avec une VIRGULE (« 25,50 »,
+  // `prixAchatSaisi`) : `Number` les lisait NaN ⇒ « sans prix ». La règle du Stock
+  // (`centimes`, src/beneficePaire.js) les lit en centimes exacts.
+  const c=typeof brut==='number'?(Number.isFinite(brut)&&brut>=0?Math.round(brut*100):null):centimes(String(brut).replace(/[\s\u00a0€]/g,''));
+  if(c==null)continue;
+  renseignes++;cout+=c;
  }
  return {total,renseignes,manquants:total-renseignes,cout:cout/100};
 }

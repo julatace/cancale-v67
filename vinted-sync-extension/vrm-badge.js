@@ -43,6 +43,7 @@
   // site ne peut pas écrire dans le monde de l'extension) : le formulaire seul,
   // sans logo ni état (la carte du site les montre).
   const CADRE = (() => { try { return globalThis.__vrmCadre === true && window.top !== window; } catch (_) { return false; } })();
+  const MDP_PERMIS = CADRE;   // 5.362 (moyenne 69) : le mot de passe seulement dans l'iframe de l'extension
   if (window.top !== window && !CADRE) return;       // une seule carte par onglet
   if (document.getElementById('vrm-badge')) return;  // déjà posée (SPA, double injection)
   const vivant = () => { try { return !!(chrome.runtime && chrome.runtime.id); } catch (_) { return false; } };
@@ -80,12 +81,19 @@
     --accent: #0A84FF; --ambre: #FF9F0A; --survol: rgba(118,118,128,.24); --remplir: rgba(118,118,128,.24); --verre: rgba(28,28,30,.92);
     --champ: rgba(118,118,128,.24); --anneau: rgba(10,132,255,.35);
     --ombre: 0 0 0 .5px rgba(255,255,255,.08), 0 24px 56px rgba(0,0,0,.6); }
+  /* 5.351 : la teinte CHOISIE dans VRM (Réglages → Apparence, recopiée par le pont
+     de vrm.center : data-theme sur l'hôte) passe avant celle du système ; sans
+     choix connu, le système décide, comme avant. */
   @media (prefers-color-scheme: light) {
-    :host { --carte: #FFFFFF; --bord: rgba(60,60,67,.18); --filet: rgba(60,60,67,.14); --texte: #1D1D1F; --doux: #6E6E73; --pale: #8E8E93;
+    :host(:not([data-theme="sombre"])) { --carte: #FFFFFF; --bord: rgba(60,60,67,.18); --filet: rgba(60,60,67,.14); --texte: #1D1D1F; --doux: #6E6E73; --pale: #8E8E93;
       --accent: #0071E3; --ambre: #B25000; --survol: rgba(118,118,128,.12); --remplir: rgba(118,118,128,.12); --verre: rgba(255,255,255,.88);
       --champ: #FFFFFF; --anneau: rgba(0,113,227,.25);
       --ombre: 0 6px 16px rgba(0,0,0,.08), 0 24px 56px rgba(0,0,0,.14); }
   }
+  :host([data-theme="clair"]) { --carte: #FFFFFF; --bord: rgba(60,60,67,.18); --filet: rgba(60,60,67,.14); --texte: #1D1D1F; --doux: #6E6E73; --pale: #8E8E93;
+      --accent: #0071E3; --ambre: #B25000; --survol: rgba(118,118,128,.12); --remplir: rgba(118,118,128,.12); --verre: rgba(255,255,255,.88);
+      --champ: #FFFFFF; --anneau: rgba(0,113,227,.25);
+      --ombre: 0 6px 16px rgba(0,0,0,.08), 0 24px 56px rgba(0,0,0,.14); }
   * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
   .btn { position: relative; width: 44px; height: 44px; padding: 0; border: .5px solid rgba(255,255,255,.14); border-radius: 12px;
     background: #000; cursor: pointer; display: block;
@@ -93,7 +101,7 @@
   .btn:active { transform: scale(.94); }
   .btn:hover { transform: translateY(-1px); box-shadow: 0 1px 2px rgba(0,0,0,.35), 0 12px 30px rgba(0,0,0,.34); }
   .btn:focus-visible, .b:focus-visible, .fermer:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .btn img { width: 100%; height: 100%; border-radius: 10px; display: block; }
+  .btn img { width: 100%; height: 100%; border-radius: 10px; display: block; -webkit-user-drag: none; user-select: none; pointer-events: none; }
   .btn .txt { color: #E8ECF2; font-weight: 800; font-size: 12px; letter-spacing: .04em; line-height: 42px; text-align: center; display: block; }
   .pt { position: absolute; top: -3px; right: -3px; width: 11px; height: 11px; border-radius: 999px; background: var(--ambre); border: 2px solid #000; display: none; }
   .pt.on { display: block; }
@@ -167,7 +175,70 @@
   .cx .lien { display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; background: transparent; color: var(--accent); font-size: 13px; cursor: pointer; }
   .cx .lien:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
   .cx [hidden] { display: none; }
+  /* 5.351 (lot extension-visuel) — UN message principal en tête, le détail replié.
+     Le point dit l'état sans couleur quand tout va bien (§7) : gris ; ambre = un geste. */
+  .resume { display: flex; align-items: center; gap: 8px; min-height: 28px; font-size: 14px; font-weight: 600; letter-spacing: -.006em; margin: 0 0 2px; }
+  .resume .t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .resume .d { width: 8px; height: 8px; border-radius: 999px; background: var(--pale); flex-shrink: 0; }
+  .resume[data-resume="geste"] .d { background: var(--ambre); }
+  .resume[data-resume="geste"] .t { color: var(--ambre); }
+  .resume[data-resume="pause"] .d { background: transparent; box-shadow: inset 0 0 0 2px var(--doux); }
+  .resume .coche { color: var(--doux); font-weight: 600; }
+  .progres { font-size: 12px; margin: 0 0 4px 16px; }
+  .raccourcis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 6px; }
+  .raccourcis .b { margin-top: 0; padding: 0 6px; font-size: 13px; }
+  .detail { margin-top: 8px; border-top: 1px solid var(--filet); }
+  .detail > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; min-height: 44px; font-size: 13px; color: var(--doux); font-weight: 500; }
+  .detail > summary::-webkit-details-marker { display: none; }
+  .detail > summary::after { content: ''; width: 7px; height: 7px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg) translate(-2px, -2px); transition: transform .2s cubic-bezier(.23,1,.32,1); }
+  .detail[open] > summary::after { transform: rotate(-135deg) translate(-2px, -2px); }
+  .detail > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+  .detail .ligne:first-of-type { border-top: 0; padding-top: 0; }
+  .lbc-tete { border-top: 0; padding-top: 2px; }
+  .outils { display: flex; flex-wrap: wrap; gap: 0 14px; margin-top: 4px; }
+  /* 5.354 : le mini-résumé du mois, replié sous une ligne discrète (les styles de « Détails »). */
+  .mois .mois-l { margin-top: 0; line-height: 1.45; }
+  .mois .mois-l b { font-weight: 600; color: var(--texte); }
+  .mois .mois-l .seg { white-space: nowrap; }   /* coupé aux « · », jamais « 3 à / expédier » */
+  .mois .outils { margin-top: 0; }
+  .outils .lien { display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; background: transparent; color: var(--accent); font-size: 13px; cursor: pointer; }
+  .outils .lien:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+  /* Le logo se DÉPLACE (glisser) et se RÉDUIT en pastille ; la carte s'ouvre du
+     côté où il y a la place (haut/bas, gauche/droite). */
+  .btn { touch-action: none; }
+  .btn.glisse { cursor: grabbing; transform: scale(1.04); }
+  /* 5.371 : au téléphone (doigt, écran étroit), le logo est plus petit. */
+  @media (max-width: 480px) and (pointer: coarse) { .btn { width: 38px; height: 38px; border-radius: 11px; } .btn .txt { line-height: 36px; font-size: 11px; } .carte, .question { bottom: 48px; } }
+  :host([data-mini]) .btn { width: 30px; height: 30px; border-radius: 9px; opacity: .78; }
+  :host([data-mini]) .btn:hover, :host([data-mini]) .btn:focus-visible { opacity: 1; }
+  :host([data-mini]) .btn img { border-radius: 8px; }
+  :host([data-mini]) .btn .txt { font-size: 9px; line-height: 28px; }
+  :host([data-mini]) .carte, :host([data-mini]) .question { bottom: 40px; }
+  :host([data-haut]) .carte, :host([data-haut]) .question { bottom: auto; top: 54px; }
+  :host([data-haut][data-mini]) .carte, :host([data-haut][data-mini]) .question { top: 40px; }
+  :host([data-gauche]) .carte, :host([data-gauche]) .question { right: auto; left: 0; }
+  .carte.on, .question.on { animation: vrm-entree .18s cubic-bezier(.23,1,.32,1); transform-origin: bottom right; }
+  :host([data-haut]) .carte.on, :host([data-haut]) .question.on { transform-origin: top right; }
+  @keyframes vrm-entree { from { opacity: 0; transform: translateY(4px) scale(.98); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .carte.on, .question.on { animation: none; } .detail > summary::after { transition: none; } .btn.glisse { transform: none; } }
   @media (prefers-reduced-motion: reduce) { .b, .btn { transition: none; } }
+  /* 5.371 : la carte en 4 lignes (compte · lu · jauge · état) — neutre, l'ambre seulement pour un geste. */
+  .q4 { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; margin: 0 0 2px; font-size: 13px; line-height: 1.4; }
+  .q4 .k { color: var(--doux); font-size: 11px; font-weight: 500; align-self: baseline; }
+  .q4 [data-q4="jauge"] { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .carte:has(.q4) { width: min(352px, calc(100vw - 32px)); }
+  .q4 .v { min-width: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; align-self: baseline; }
+  .q4 .v.nom { font-weight: 600; }
+  .q4 .v.gris { color: var(--doux); }
+  .q4 [data-q4-etat="geste"] { color: var(--ambre); font-weight: 600; }
+  .q4 .coche { color: var(--doux); margin-left: 4px; }
+  .maj { margin-top: 8px; padding: 10px 12px; border-radius: 12px; background: var(--remplir); }
+  .maj-t { font-weight: 600; font-size: 13px; }
+  .maj a.b { text-decoration: none; display: flex; align-items: center; justify-content: center; }
+  .maj ol { margin: 8px 0 0; padding-left: 18px; font-size: 12px; color: var(--doux); }
+  .maj li { margin: 2px 0; }
+  .rep { margin-top: 4px; font-size: 12px; color: var(--doux); }
+  .rep[data-rep="reste"], .rep[data-rep="refus"] { color: var(--ambre); }
   .fermer { position: absolute; top: 2px; right: 2px; width: 44px; height: 44px; border: 0; border-radius: 8px; background: transparent;
     color: var(--doux); font-size: 18px; cursor: pointer; line-height: 44px; padding: 0; }
   .fermer:hover { background: var(--survol); color: var(--texte); }
@@ -176,6 +247,8 @@
   /* 19 octobre : au doigt (Firefox pour Android, Orion) — pas de survol, pas
      de surlignage gris du navigateur, et aucun double-tap qui zoome. */
   .btn, .b, .fermer { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  /* 5.351 : le logo se glisse au doigt aussi (sans faire défiler la page). */
+  .btn { touch-action: none; }
 </style>
 <div class="carte" part="carte"><div class="contenu"></div><div class="connexion" hidden></div></div>
 <div class="question" role="dialog" aria-label="Confirmer le compte Vinted"></div>
@@ -199,7 +272,8 @@
     st.textContent = `.btn, .question, .contenu { display: none !important; }
   .carte, .carte.on { position: static; display: block; width: auto; max-height: none; overflow: visible; background: transparent; border: 0;
     box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; padding: 0; border-radius: 0; }
-  .connexion { margin: 0; border-top: 0; padding: 0 0 2px; }`;
+  .connexion { margin: 0; border-top: 0; padding: 0 0 2px; }
+  .carte.on { animation: none; }`;
     ombre.appendChild(st);
     carte.classList.add('on');
     // Le cadre part (navigation, quelle qu'elle soit) : la carte le cache AVANT
@@ -212,6 +286,10 @@
   // charge pas : « VRM » en texte, jamais une image cassée.
   const img = document.createElement('img');
   img.alt = 'VRM';
+  // 5.351 : l'image ne se « tire » pas comme un fichier (sinon le navigateur annule
+  // le glisser du logo par un `pointercancel`).
+  img.draggable = false;
+  img.addEventListener('dragstart', (ev) => ev.preventDefault());
   img.addEventListener('error', () => { img.remove(); const t = document.createElement('span'); t.className = 'txt'; t.textContent = 'VRM'; btn.appendChild(t); });
   try { img.src = chrome.runtime.getURL('logo-vrm-96.png'); } catch (_) {}
   btn.appendChild(img);
@@ -245,12 +323,15 @@
   const auMoins = (v, ref) => { const a = vNum(v), b = vNum(ref); for (let i = 0; i < 3; i++) { if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0); } return true; };
   const jugeable = /^\d+\.\d+\.\d+$/.test(versionManif) && auMoins(versionManif, '5.171.0');
   let reparationPosee = false;
-  function reparer() {
+  // 5.371 : `force` — « Réparer » touché alors que le service worker ne répond plus :
+  //    la page de réparation relance l'extension si rien ne répond en 6 s (jamais
+  //    pendant une republication, une fois par 10 min au plus — voir popup.js).
+  function reparer(force) {
     if (reparationPosee || CADRE) return;
     reparationPosee = true;
     try {
       const f = document.createElement('iframe');
-      f.src = chrome.runtime.getURL('popup.html') + '?mode=reparer';
+      f.src = chrome.runtime.getURL('popup.html') + '?mode=reparer' + (force === true ? '&force=1' : '');
       f.setAttribute('aria-hidden', 'true');
       f.tabIndex = -1;
       f.style.cssText = 'position:fixed;width:1px;height:1px;left:-10px;top:-10px;border:0;opacity:0;pointer-events:none;';
@@ -288,6 +369,7 @@
     if (f && f.koAt && (!f.okAt || f.koAt > f.okAt) && f.koStatut !== 'sans_session' && !refusAvantConnexion(f, v)) return true;            // dernier envoi refusé
     if (e.plateforme === 'leboncoin' && e.aRetirer && Array.isArray(e.aRetirer.liste) && e.aRetirer.liste.length) return true;   // une paire vendue ailleurs, encore en ligne ici
     if (e.plateforme === 'leboncoin' && e.lbc && e.lbc.compte && e.lbc.compte.ok === false) return true;   // 5.335 : le compte Leboncoin attend un geste (recharger, se connecter)
+    if (e.secu && e.secu.niveau === 'robot') return true;                     // 5.366 : le site vérifie le compte (le geste : la vérification, à lui)
     return false;
   };
 
@@ -346,6 +428,162 @@
     return `<div class="val" data-secours="envoi">vrm.center ne répond pas : envoyé par la voie directe ${esc(depuis(s.at))} (${esc(tailleLisible(s.octets))}).</div>`;
   }
 
+  // ══ 5.351 (lot extension-visuel) : UN MESSAGE PRINCIPAL ═══════════════════
+  // Julien : « l'extension aussi belle et pratique que l'app ». En tête de la carte,
+  // une ligne qui dit l'état (« angeled92 · à jour à 14:05 ✓ »), puis les gestes ;
+  // le détail (comptes, envois, refus) est replié — OUVERT dès qu'il y a un geste
+  // à faire. Tout vient de l'état que la carte avait déjà (aucune lecture de plus) :
+  // la ligne ne dit jamais plus que les lignes du détail. `geste` = ambre, `pause` =
+  // Vinted freine (gris), `ok` (gris, ✓), `attente` (gris, pas su ou rien encore).
+  const heureCourte = (t) => { try { const n = Number(t); if (!(n > 0)) return ''; if (Date.now() - n > 20 * 3600000) return depuis(n); return 'à ' + new Date(n).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
+  const heureFin = (t) => { try { return new Date(Number(t)).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
+  const envoiRefuse = (f, v) => !!(f && f.koAt && (!f.okAt || f.koAt > f.okAt) && f.koStatut !== 'sans_session' && !refusAvantConnexion(f, v));
+  function resumeEtat(e) {
+    if (perime) return { etat: 'geste', texte: 'Extension à redémarrer — voir ci-dessous' };
+    if (!e) return { etat: 'attente', texte: pasSu ? 'L’extension ne répond pas' : 'Vérification…' };
+    const v = e.vrm;
+    if (!v) return { etat: 'attente', texte: 'Connexion à VRM pas sue pour l’instant' };
+    if (v.connecte === false) return { etat: 'geste', texte: v.expiree ? 'Session VRM expirée : reconnecte-toi' : 'À connecter à VRM' };
+    if (e.bascule) return { etat: 'geste', texte: 'Compte VRM changé : vérifie ci-dessous' };
+    const site = e.site || {};
+    const nom = site.nom || '';
+    if (e.plateforme === 'vinted') {
+      if (!site.id) return { etat: 'attente', texte: 'Aucun compte Vinted connecté ici' };
+      if (site.choix === 'non') return { etat: 'attente', texte: (nom || 'Ce compte') + ' ignoré : ton choix' };
+      const maint = Date.now();
+      if (site.pause && Number(site.pause.jusqua) > maint) return { etat: 'pause', texte: 'Pause : Vinted freine · reprise à ' + heureFin(site.pause.jusqua) };
+      if (site.frein && Number(site.frein.jusqua) > maint) return { etat: 'pause', texte: (site.frein.restreint ? 'Mises en ligne bloquées 24 h' : 'Mises en ligne en pause') + ' · reprise à ' + heureFin(site.frein.jusqua) };
+    }
+    const f = e.flux || {};
+    if (e.capte && envoiRefuse(f, v) && !(site.choix === 'non' && e.plateforme === 'vinted')) return { etat: 'geste', texte: 'Dernier envoi refusé : voir ci-dessous' };
+    if (e.plateforme === 'leboncoin') {
+      const n = e.aRetirer && Array.isArray(e.aRetirer.liste) ? e.aRetirer.liste.length : 0;
+      if (n) return { etat: 'geste', texte: (() => { const m = (globalThis.VRM_MOTS ? globalThis.VRM_MOTS.mots() : null) || { nom: 'paire', noms: 'paires' }; return n > 1 ? `${n} ${m.noms} à retirer de Leboncoin` : `1 ${m.nom} à retirer de Leboncoin`; })() };
+      const l = e.lbc;
+      if (l && l.compte && l.compte.ok === false) return { etat: 'geste', texte: 'Leboncoin attend un geste : voir ci-dessous' };
+      if (!site.id && !(l && l.compte && l.compte.ok === true)) return { etat: 'attente', texte: 'Compte Leboncoin pas encore reconnu' };
+      if (l && l.annonces && l.annonces.ok === true) return { etat: 'ok', texte: (nom || 'Leboncoin') + ' · annonces lues', coche: true };
+      return { etat: 'attente', texte: (nom || 'Leboncoin') + ' · annonces pas encore lues' };
+    }
+    if (e.plateforme === 'vestiaire') {
+      const c = e.vcCapte || {};
+      const ats = Object.keys(c).map((k) => Number(c[k] && c[k].at) || 0).filter((x) => x > 0);
+      if (Object.keys(c).some((k) => c[k] && c[k].inconnu)) return { etat: 'attente', texte: 'Vestiaire : une page pas encore lue' };
+      return ats.length ? { etat: 'ok', texte: 'Vestiaire lu ' + depuis(Math.max(...ats)), coche: true } : { etat: 'attente', texte: 'Vestiaire pas encore lu' };
+    }
+    if (!e.capte) return { etat: 'attente', texte: `VRM ne lit pas encore ${NOM_SITE[e.plateforme] || 'ce site'}` };
+    if (f.okAt) return { etat: 'ok', texte: (nom || 'Compte ' + (NOM_SITE[e.plateforme] || '')) + ' · à jour ' + heureCourte(f.okAt), coche: true };
+    return { etat: 'attente', texte: (nom || 'Ce compte') + ' · rien envoyé pour l’instant' };
+  }
+  // 5.354 : le mini-résumé du mois. Chaque nombre est celui de VRM, ou « — ».
+  let moisOuvert = false;
+  const euros = (n) => Number(n).toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' €';
+  function ligneMois(m) {
+    const ca = m.ca == null || (m.caAuMoins && !(m.ca > 0)) ? '—' : (m.caAuMoins ? 'au moins ' : '') + euros(m.ca);
+    const nv = m.ventes == null ? '—' : Number(m.ventes).toLocaleString('fr-FR');
+    const ae = m.aExpedier == null ? '—' : (m.aExpedierAuMoins ? 'au moins ' : '') + Number(m.aExpedier).toLocaleString('fr-FR');
+    const ventesMot = m.ventes != null && m.ventes <= 1 ? 'vente' : 'ventes';   // « 0 vente », « 1 vente », « 42 ventes »
+    const note = m.raison === 'mois' ? 'VRM n’a pas encore publié les chiffres de ce mois : ouvre VRM une fois.'
+      : m.raison === 'jamais' ? 'Pas encore de chiffres publiés : ouvre VRM une fois.'
+      : m.maj ? `Chiffres de VRM, publiés ${depuis(m.maj)}${m.aExpedier == null ? ' · colis : ouvre VRM pour les recompter' : ''}.` : '';
+    return `<details class="detail mois" data-mois${moisOuvert ? ' open' : ''}><summary>Ce mois dans VRM</summary>
+      <div class="val mois-l" data-mois-ca="${m.ca == null ? '' : esc(m.ca)}" data-mois-ventes="${m.ventes == null ? '' : esc(m.ventes)}" data-mois-expedier="${m.aExpedier == null ? '' : esc(m.aExpedier)}"><span class="seg">Ce mois : <b>${esc(ca)}</b> vendus</span> · <span class="seg"><b>${esc(nv)}</b> ${ventesMot}</span> · <span class="seg"><b>${esc(ae)}</b> à expédier</span></div>
+      ${note ? `<div class="val gris" data-mois-note="${esc(m.raison || 'ok')}">${esc(note)}</div>` : ''}
+      <div class="outils"><button class="lien" data-mois-voir>Voir dans VRM</button><button class="lien" data-mois-masquer>Masquer ce résumé</button></div>
+    </details>`;
+  }
+  const resumeHtml = (r) => `<div class="resume" data-resume="${esc(r.etat)}" role="status"><span class="d" aria-hidden="true"></span><span class="t">${esc(r.texte)}${r.coche ? ' <span class="coche" aria-label="vérifié">✓</span>' : ''}</span></div>`;
+
+  // ══ 5.371 (Julien, 12 nov.) : LA CARTE EN 4 LIGNES AU PLUS ══════════════════
+  // Compte (pseudo) · Lu (« il y a 3 min ») · Jauge (« 23/50 cette heure · 112/200
+  // aujourd'hui », Vinted) · État (normal / prudence jusqu'à … / pause / Tout arrêté).
+  // Tout vient de l'état du service worker ; pas su ⇒ « — » ; jauge pas complète
+  // (ligne partagée pas lue) ⇒ « au moins ». `data-resume` reste porté par le bloc.
+  const nbFr = (n) => Number(n || 0).toLocaleString('fr-FR');
+  function etatQuatre(e, r) {
+    const site = e.site || {}, maint = Date.now();
+    if (r.etat === 'geste') return { k: 'geste', t: r.texte };
+    if (e.toutArrete) return { k: 'arrete', t: 'Tout arrêté' };
+    if (site.arret) return { k: 'geste', t: site.arret.quoi === 'moderation' ? 'Arrêté : message de Vinted à lire' : site.arret.quoi === 'deconnecte' ? 'Arrêté : Vinted t’a déconnecté' : 'Arrêté : Vinted demande une vérification' };
+    if (r.etat === 'pause') return { k: 'pause', t: r.texte };
+    const pr = site.jauge && Number(site.jauge.prudence);
+    if (pr > maint) return { k: 'prudence', t: 'Prudence jusqu’à ' + heureFin(pr) };
+    const n = Number(e.enAttenteReseau) || 0;
+    if (n > 0) return { k: 'reseau', t: n > 1 ? `${n} gestes en attente de réseau` : '1 geste en attente de réseau' };
+    if (r.etat === 'attente') return { k: 'attente', t: r.texte };
+    return { k: 'normal', t: 'Normal', coche: true };
+  }
+  function quatreLignes(e, r) {
+    const site = e.site || {}, f = e.flux || {};
+    let compte = site.nom || (site.id && e.plateforme !== 'leboncoin' ? 'compte n° ' + site.id : '');
+    if (!compte && e.plateforme === 'vinted') compte = '';
+    let lu = 0;
+    if (e.plateforme === 'vestiaire' && e.vcCapte) { for (const k of Object.keys(e.vcCapte)) lu = Math.max(lu, Number(e.vcCapte[k] && e.vcCapte[k].at) || 0); }
+    else lu = Number(f.okAt) || 0;
+    const j = e.plateforme === 'vinted' ? site.jauge : null;
+    const jauge = j ? `${j.complet ? '' : 'au moins '}${nbFr(j.h)}/${nbFr(j.maxH)} cette heure · ${nbFr(j.j)}/${j.maxJ ? nbFr(j.maxJ) : '—'} aujourd’hui` : '';
+    const et = etatQuatre(e, r);
+    const ligne = (k, cle, v, cls, attrs) => `<span class="k">${k}</span><span class="v${cls ? ' ' + cls : ''}" data-q4="${cle}"${attrs || ''}>${v}</span>`;
+    return `<div class="q4 resume" data-resume="${esc(r.etat)}" data-q4-bloc role="status">`
+      + ligne('Compte', 'compte', compte ? esc(compte) : (e.plateforme === 'vinted' ? 'aucun compte connecté' : '—'), compte ? 'nom' : 'gris')
+      + ligne('Lu', 'lu', lu ? esc(depuis(lu)) : '—', lu ? '' : 'gris', ` data-q4-at="${lu || ''}"`)
+      + (jauge ? ligne('Jauge', 'jauge', esc(jauge), '', ` data-q4-h="${Number(j.h) || 0}" data-q4-maxh="${Number(j.maxH) || 0}" data-q4-j="${Number(j.j) || 0}" data-q4-maxj="${Number(j.maxJ) || ''}" data-q4-complet="${j.complet ? '1' : '0'}"`) : '')
+      + ligne('État', 'etat', esc(et.t) + (et.coche ? '<span class="coche" aria-label="vérifié">✓</span>' : ''), et.k === 'geste' ? '' : (et.k === 'normal' ? '' : 'gris'), ` data-q4-etat="${esc(et.k)}"`)
+      + '</div>';
+  }
+  // « Nouvelle version disponible » : seulement installée À LA MAIN (zip, fichier
+  // Orion) et plus ancienne que celle servie. Boutique ⇒ rien (elle se met à jour).
+  const LIENS_PAQUET = ['https://vrm.center/VRM-extension.zip', 'https://vrm.center/VRM-Orion.xpi'];
+  function majHtml(m) {
+    if (!m || m.nouvelle !== true || m.origine === 'boutique' || !LIENS_PAQUET.includes(String(m.lien || ''))) return '';
+    const orion = m.moteur === 'firefox';
+    const etapes = orion
+      ? ['Touche « Télécharger ».', 'Orion → Extensions → + → ce fichier.', 'Recharge cette page.']
+      : ['Ouvre le fichier téléchargé : il se dézippe.', 'Remplace l’ancien dossier VRM par le nouveau.', 'chrome://extensions → ⟳ sur VRM.'];
+    return `<div class="maj" data-maj="${esc(m.servie)}"><div class="maj-t">Nouvelle version disponible · ${esc(m.servie)}</div>`
+      + `<a class="b sec" data-maj-telecharger href="${esc(m.lien)}" target="_blank" rel="noopener" download>Télécharger</a>`
+      + `<ol data-maj-etapes="${etapes.length}">${etapes.map((x) => `<li>${esc(x)}</li>`).join('')}</ol></div>`;
+  }
+  // « Réparer » : seulement quand l'extension a MESURÉ un état cassé (session perdue,
+  // commande bloquée, canal de la page absent) — ou ne répond plus du tout.
+  let repTexte = '', repEtat = '';
+  const repHtml = () => (repTexte ? `<div class="rep" data-rep="${esc(repEtat)}" role="status">${esc(repTexte)}</div>` : '');
+  const NOMS_REP = { session: 'session VRM', file: 'commande bloquée', canal: 'page Vinted' };
+  function brancherReparer() {
+    const b = carte.querySelector('[data-reparer]');
+    if (!b) return;
+    b.addEventListener('click', () => {
+      b.disabled = true; b.textContent = 'Réparation…';
+      if (!etat) { reparationPosee = false; reparer(true); repEtat = 'attente'; repTexte = 'L’extension redémarre si elle ne répond toujours pas.'; setTimeout(() => { rafraichir(); }, 7000); rendre(); return; }
+      try {
+        chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'reparer' }, (r) => {
+          void chrome.runtime.lastError;
+          if (r && r.ok) {
+            const reste = Array.isArray(r.reste) ? r.reste : [];
+            repEtat = reste.length ? 'reste' : 'ok';
+            repTexte = reste.length ? 'Pas réparé : ' + reste.map((x) => NOMS_REP[x] || x).join(', ') + '. Envoie un rapport.' : 'Réparé ✓';
+          } else { repEtat = 'refus'; repTexte = (r && r.raison) || 'L’extension n’a pas répondu. Réessaie.'; }
+          rafraichir();
+        });
+      } catch (_) { repEtat = 'refus'; repTexte = 'L’extension n’a pas répondu. Réessaie.'; rendre(); }
+    });
+  }
+  let rapTexte = '';
+  function brancherRapport() {
+    const b = carte.querySelector('[data-rapport]');
+    if (!b) return;
+    b.addEventListener('click', () => {
+      b.disabled = true; b.textContent = 'Envoi…';
+      try {
+        chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'rapport' }, (r) => {
+          void chrome.runtime.lastError;
+          rapTexte = r && r.ok ? 'Rapport envoyé ✓ (sans tes données)' : ((r && r.raison) || 'Rapport pas envoyé. Réessaie.');
+          rendre();
+        });
+      } catch (_) { rapTexte = 'Rapport pas envoyé. Réessaie.'; rendre(); }
+    });
+  }
+
   function rendre() {
     rendreCarte();
     if (CADRE) { if (!cadreDitPrete) { cadreDitPrete = true; direAuSite({ __vrmCarte: 'hauteur', h: Math.ceil(hote.getBoundingClientRect().height) + 6 }); direAuSite({ __vrmCarte: 'prete' }); } return; }
@@ -369,7 +607,10 @@
     if (!e) {
       carte.classList.toggle('doigt', doigt);
       poserHtml(contenu, `${doigt ? '<button class="fermer" data-fermer-carte title="Fermer" aria-label="Fermer">×</button>' : ''}<div class="tete"><b>VRM</b></div>
-        ${lignePerime || `<div class="ligne"><div class="val gris">${pasSu ? SI_MUETTE : 'Vérification…'}</div></div>`}`);
+        ${resumeHtml(resumeEtat(null))}
+        ${lignePerime || `<div class="ligne"><div class="val gris">${pasSu ? SI_MUETTE : 'Vérification…'}</div></div>`}
+        ${pasSu && !perime ? '<button class="b sec" data-reparer>Réparer</button>' : ''}${repHtml()}`);
+      brancherReparer();
       const fermerV = carte.querySelector('[data-fermer-carte]');
       if (fermerV) fermerV.addEventListener('click', fermerCarte);
       poserFormulaire(formulaireDemande);
@@ -449,10 +690,13 @@
       } else if (f.okAt) flux = e.plateforme === 'leboncoin' ? `<div class="val">Dernier échange enregistré ${esc(depuis(f.okAt))}</div><div class="val gris">Cet échange ne confirme pas la récupération des annonces et des photos.</div>` : `<div class="val" data-flux-ok>Tes données sont à jour · ${esc(depuis(f.okAt))}</div>`;
       else flux = '<div class="val gris">Rien envoyé depuis ce navigateur pour l\'instant</div>';
       flux += ligneSecours(f);
-      // 5.341 : les dates de versement encore à lire sur CE compte (pas su ⇒ rien).
-      const dt = e.plateforme === 'vinted' && e.site && e.site.dates;
-      if (dt && Number(dt.reste) > 0) flux += `<div class="val gris" data-dates-versement="${Number(dt.reste)}">Dates de versement en cours de lecture · ${Number(dt.reste).toLocaleString('fr-FR')} restantes · environ ${Number(dt.jours)} jour${Number(dt.jours) > 1 ? 's' : ''}, Vinted ouvert</div>`;
     }
+    // 5.341 : les dates de versement encore à lire sur CE compte (pas su ⇒ rien).
+    // 5.351 : une carte de PROGRESSION, visible sous le message principal (jamais
+    // repliée : c'est ce qui avance pendant qu'il laisse Vinted ouvert).
+    const dt = e.capte && !ignore && e.plateforme === 'vinted' && e.site && e.site.dates;
+    const progression = dt && Number(dt.reste) > 0
+      ? `<div class="progres val gris" data-dates-versement="${Number(dt.reste)}">Dates de versement en cours de lecture · ${Number(dt.reste).toLocaleString('fr-FR')} restantes · environ ${Number(dt.jours)} jour${Number(dt.jours) > 1 ? 's' : ''}, Vinted ouvert</div>` : '';
 
     // 5.243 : sur Vestiaire, ce qui est capté, famille par famille.
     if (e.plateforme === 'vestiaire' && e.vcCapte) {
@@ -481,13 +725,18 @@
       const ici = String(location.pathname || '');
       const lignes = e.aRetirer.liste.slice(0, 6).map((r) => {
         const cette = r.lbcId && ici.includes(String(r.lbcId));
-        const nom = (r.numero ? 'N°' + r.numero + ' · ' : '') + (r.titre || 'une paire');
+        const nom = (r.numero ? 'N°' + r.numero + ' · ' : '') + (r.titre || (globalThis.VRM_MOTS ? globalThis.VRM_MOTS.mots() : {}).un || 'une paire');
         return `<div class="val alerte" data-a-retirer="${esc(r.lbcId || r.numero || '')}">${cette ? '<b>C’est cette annonce</b> — ' : ''}${esc(nom)} — vendue sur Vinted, encore en ligne ici${r.lu ? ' (vu ' + esc(depuis(r.lu)) + ')' : ''}${r.url && !cette ? ` · <a href="${esc(r.url)}" target="_top">voir l’annonce</a>` : ''}</div>`;
       }).join('');
       const plus = e.aRetirer.liste.length > 6 ? `<div class="val gris">et ${e.aRetirer.liste.length - 6} autre(s) — la liste complète est dans VRM → Leboncoin → Annonces</div>` : '';
       const n = e.aRetirer.liste.length;
       aRetirerLbc = `<div class="ligne"><div class="lib">À retirer de Leboncoin</div>${lignes}${plus}<div class="val gris">Supprime-la${n > 1 ? 's' : ''} dans « Mes annonces », ou depuis VRM → Leboncoin → Annonces.</div></div>`;
     }
+    // 5.366 (Julien : « faire comme Vintex, pour ne pas se faire bannir ») : l'état du compte
+    // en UNE phrase (calculée par le fond, la même que dans VRM) et « Tout arrêter ».
+    const ligneSecu = e.secu && e.secu.texte && v && v.connecte
+      ? `<div class="ligne" data-secu="${esc(e.secu.niveau || '')}"><div class="lib">Sécurité du compte</div><div class="val${e.secu.niveau === 'robot' ? ' alerte' : (e.secu.niveau === 'ok' ? '' : ' gris')}">${esc(e.secu.texte)}</div><button class="b sec" data-secu-arret="${e.secu.arrete ? 'relancer' : 'arreter'}">${e.secu.arrete ? 'Relancer' : 'Tout arrêter'}</button></div>`
+      : '';
     let bascule = '';
     if (e.bascule) {
       const b = e.bascule;
@@ -497,30 +746,101 @@
 
     // 5.328 : pas connecté ⇒ le formulaire est juste en dessous, rien à dire de plus.
     const formulaire = CADRE ? (!(v && v.connecte) || changerCompte) : (!!(v && v.connecte === false) || (!v && formulaireDemande) || changerCompte);
-    const pied = (doigt || !(v && v.connecte)) ? '' : 'Clique sur le logo pour <b>ouvrir VRM</b>.';
     // Julien, 27 oct. : « je veux pouvoir me connecter à mon compte VRM depuis
     // Vestiaire et Leboncoin aussi ». Les gestes sont dans la carte sur TOUS
-    // les sites et à la souris comme au doigt ; « Changer de compte VRM » ouvre
-    // VRM, qui relie l'extension au compte connecté DANS l'app (la session est
-    // celle du navigateur : elle vaut pour Vinted, Leboncoin et Vestiaire).
-    const gesteDoigt = v && v.connecte && changerCompte ? ''
-      : v && v.connecte
-      ? `<div class="gestes">${doigt ? '<button class="b" data-ouvrir-vrm>Ouvrir VRM</button>' : ''}<button class="b sec" data-changer-vrm>Changer de compte VRM</button></div>`
-      : formulaire ? '' : `<button class="b" data-montrer-connexion>Me connecter</button>`;
+    // les sites et à la souris comme au doigt (la session est celle du
+    // navigateur : elle vaut pour Vinted, Leboncoin et Vestiaire).
+    // 5.351 : connecté ⇒ « Ouvrir VRM » en premier (souris et doigt), puis les
+    // trois écrans les plus demandés à un clic (Colis · Messages · Offres) ;
+    // « Changer de compte VRM » passe dans le détail (geste rare).
+    const connecte = !!(v && v.connecte) && !changerCompte;
+    const gestes = connecte
+      ? `<div class="gestes"><button class="b" data-ouvrir-vrm>Ouvrir VRM</button><div class="raccourcis" data-raccourcis><button class="b sec" data-ouvrir-ecran="colis" title="Ouvrir VRM sur les colis">Colis</button><button class="b sec" data-ouvrir-ecran="messages" title="Ouvrir VRM sur les messages">Messages</button><button class="b sec" data-ouvrir-ecran="offres" title="Ouvrir VRM sur les favoris et offres">Offres</button></div></div>`
+      : (v && v.connecte) || formulaire ? '' : `<button class="b" data-montrer-connexion>Me connecter</button>`;
+    const resume = resumeEtat(e);
+    // Leboncoin (5.335, sa décision du 9 nov.) : les trois lignes Compte · Annonces ·
+    // Ventes SONT le message principal — visibles, jamais repliées, pas doublées.
+    const lbcVisible = !!lbcLignes;
+    // 5.344 + 5.351 : l'historique de départ est une carte de PROGRESSION — toujours
+    // visible, « Tout est récupéré ✓ » compris (c'est le signal promis : il laisse
+    // vinted.fr ouvert jusque-là).
+    // Le détail s'OUVRE tout seul dès qu'il y a un geste à faire (ou rien de sûr).
+    // (Un compte ignoré garde « Capter ce compte » sous les yeux : le moyen de revenir.)
+    // (« Connecté à VRM : x — C’est fait » se lit sans rien ouvrir, une fois.)
+    const ouvert = resume.etat === 'geste' || ignore || justeConnecte || detailOuvert || !!rapTexte;
+    // 5.354 (lot extension-resume) : « Ce mois : 1 340 € vendus · 42 ventes · 3 à
+    // expédier » — les chiffres PUBLIÉS par VRM (widget_stats), rien recalculé ici ;
+    // « pas su » ⇒ « — », jamais 0. Absent (compte de l'onglet pas prouvé à ce compte
+    // VRM, eBay, pas connecté) ⇒ rien du tout. Masqué ⇒ « Afficher » dans le détail.
+    const mois = connecte && e.mois && !e.mois.masque ? e.mois : null;
+    const moisMasque = connecte && !!(e.mois && e.mois.masque);
+    const moisHtml = mois ? ligneMois(mois) : '';
+    const outils = [
+      moisMasque ? '<button class="lien" data-mois-afficher>Afficher le résumé du mois</button>' : '',
+      // 5.370 : « Tout arrêter » — les gestes automatiques de TOUS les comptes, jusqu'à « Reprendre ».
+      connecte ? (e.toutArrete ? '<button class="lien" data-tout-reprendre>Reprendre les gestes automatiques</button>' : '<button class="lien" data-tout-arreter>Tout arrêter</button>') : '',
+      v && v.connecte && !changerCompte ? '<button class="lien" data-changer-vrm>Changer de compte VRM</button>' : '',
+      // 5.371 : « Envoyer un rapport » — l'état technique seulement, jamais tes données.
+      v && v.connecte ? '<button class="lien" data-rapport>Envoyer un rapport</button>' : '',
+      `<button class="lien" data-mini-logo>${mini ? 'Agrandir le logo' : 'Réduire le logo'}</button>`,
+      posPerso ? '<button class="lien" data-replacer-logo>Logo en bas à droite</button>' : '',
+    ].filter(Boolean).join('');
     carte.classList.toggle('doigt', doigt || formulaire);
     poserHtml(contenu, `${doigt || formulaire ? '<button class="fermer" data-fermer-carte title="Fermer" aria-label="Fermer">×</button>' : ''}<div class="tete"><b>VRM</b><span class="ver">${e.version ? 'extension ' + esc(e.version) : ''}</span></div>
-      ${lignePerime}
-      <div class="ligne"><div class="lib">Compte VRM utilisé</div>${compteVrm}</div>
-      <div class="ligne"><div class="lib">Compte ${esc(nomSite)}</div>${compteSite}</div>
-      ${e.capte && !(e.plateforme === 'leboncoin' && e.lbc) ? `<div class="ligne"><div class="lib">Tes données</div>${flux}</div>` : ''}
+      ${lbcVisible ? `<div class="ligne lbc-tete"><div class="lib">Compte ${esc(nomSite)}</div>${compteSite}</div>${lbcLignes}` : quatreLignes(e, resume)}
+      ${majHtml(e.maj)}
+      ${Array.isArray(e.aReparer) && e.aReparer.length && v && v.connecte !== false ? `<button class="b sec" data-reparer data-a-reparer="${esc(e.aReparer.join(' '))}">Réparer</button>` : ''}${repHtml()}
+      ${progression}
       ${historique}
-      ${lbcLignes}
-      ${e.mesure ? `<div class="ligne"><div class="lib">Mesure</div><div class="val gris">VRM apprend à lire ${esc(nomSite)} : il relève la forme des pages, jamais leur contenu. Aucune vente ni annonce n'est encore captée.</div>${(() => { const f = e.flux || {}; return f.koAt && (!f.okAt || f.koAt > f.okAt) ? `<div class="val alerte">Dernier relevé refusé ${esc(depuis(f.koAt))}</div>` : f.okAt ? `<div class="val gris">Relevé envoyé ${esc(depuis(f.okAt))}</div>` : ''; })()}</div>` : ''}
+      ${lignePerime}
+      ${ligneSecu}
       ${aRetirerLbc}
       ${diagnosticLbc}
       ${bascule}
-      ${pied ? `<div class="pied">${pied}</div>` : ''}
-      ${gesteDoigt}`);
+      ${gestes}
+      ${moisHtml}
+      <details class="detail" data-detail${ouvert ? ' open' : ''}><summary>Détails</summary>
+      <div class="ligne"><div class="lib">Compte VRM utilisé</div>${compteVrm}</div>
+      ${lbcVisible ? '' : `<div class="ligne"><div class="lib">Compte ${esc(nomSite)}</div>${compteSite}</div>`}
+      ${e.capte && !(e.plateforme === 'leboncoin' && e.lbc) ? `<div class="ligne"><div class="lib">Tes données</div>${flux}</div>` : ''}
+      ${e.mesure ? `<div class="ligne"><div class="lib">Mesure</div><div class="val gris">VRM apprend à lire ${esc(nomSite)} : il relève la forme des pages, jamais leur contenu. Aucune vente ni annonce n'est encore captée.</div>${(() => { const f = e.flux || {}; return f.koAt && (!f.okAt || f.koAt > f.okAt) ? `<div class="val alerte">Dernier relevé refusé ${esc(depuis(f.koAt))}</div>` : f.okAt ? `<div class="val gris">Relevé envoyé ${esc(depuis(f.okAt))}</div>` : ''; })()}</div>` : ''}
+      ${outils ? `<div class="outils">${outils}</div>` : ''}${rapTexte ? `<div class="rep" data-rapport-etat role="status">${esc(rapTexte)}</div>` : ''}
+      </details>`);
+    brancherReparer();
+    brancherRapport();
+    const det = carte.querySelector('[data-detail]');
+    if (det) det.addEventListener('toggle', () => { if (resume.etat !== 'geste') detailOuvert = det.open; });
+    carte.querySelectorAll('[data-ouvrir-ecran]').forEach((el) => el.addEventListener('click', () => { carte.classList.remove('on'); ouvrirEcran(el.getAttribute('data-ouvrir-ecran')); }));
+    const moisD = carte.querySelector('[data-mois]');
+    if (moisD) moisD.addEventListener('toggle', () => { moisOuvert = moisD.open; });
+    const moisVoir = carte.querySelector('[data-mois-voir]');
+    if (moisVoir) moisVoir.addEventListener('click', () => { carte.classList.remove('on'); ouvrirEcran('journee'); });
+    carte.querySelectorAll('[data-mois-masquer],[data-mois-afficher]').forEach((el) => el.addEventListener('click', () => {
+      const masquer = el.hasAttribute('data-mois-masquer');
+      el.disabled = true;
+      try {
+        chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'resumeMasque', masque: masquer }, (r) => {
+          void chrome.runtime.lastError;
+          if (r && r.ok) { if (masquer) { e.mois = { masque: true }; moisOuvert = false; rendre(); } else { e.mois = null; rafraichir(); } return; }
+          el.disabled = false;
+        });
+      } catch (_) { el.disabled = false; }
+    }));
+    carte.querySelectorAll('[data-tout-arreter],[data-tout-reprendre]').forEach((el) => el.addEventListener('click', () => {
+      const on = el.hasAttribute('data-tout-arreter');
+      el.disabled = true;
+      try {
+        chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'toutArreter', on }, (r) => {
+          void chrome.runtime.lastError;
+          if (r && r.ok) { e.toutArrete = on; rendre(); return; }
+          el.disabled = false;
+        });
+      } catch (_) { el.disabled = false; }
+    }));
+    const miniB = carte.querySelector('[data-mini-logo]');
+    if (miniB) miniB.addEventListener('click', () => { poserMini(!mini); rendre(); });
+    const replacer = carte.querySelector('[data-replacer-logo]');
+    if (replacer) replacer.addEventListener('click', () => { remettreEnPlace(); rendre(); });
     const changer = carte.querySelector('[data-changer-vrm]');
     // 5.329 : changer de compte se fait ICI (le formulaire), jamais en ouvrant VRM.
     if (changer) changer.addEventListener('click', () => { changerCompte = true; formulaireDemande = true; doigt = true; rendre(); focaliser(); });
@@ -536,6 +856,18 @@
     const capter = carte.querySelector('[data-capter]');
     if (capter) capter.addEventListener('click', () => { capter.disabled = true; envoyerChoix('oui'); });
     // 5.344 : « Tout récupérer » — l'historique du compte de l'onglet, depuis la page 1.
+    const secuB = carte.querySelector('[data-secu-arret]');
+    if (secuB) secuB.addEventListener('click', () => {
+      const arreter = secuB.getAttribute('data-secu-arret') === 'arreter';
+      secuB.disabled = true;
+      try {
+        chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'secuArret', arret: arreter }, (r) => {
+          void chrome.runtime.lastError;
+          if (r && r.accepte && e.secu) { e.secu.arrete = !!r.arrete; if (r.arrete) { e.secu.niveau = 'arret'; e.secu.texte = 'Tout est arrêté · rien d’automatique ne part'; } else { e.secu.niveau = 'ok'; e.secu.texte = 'Relancé'; } rendre(); return; }
+          secuB.disabled = false;
+        });
+      } catch (_) { secuB.disabled = false; }
+    });
     const impTout = carte.querySelector('[data-import-tout]');
     if (impTout) impTout.addEventListener('click', () => {
       impTout.disabled = true; impTout.textContent = 'C’est parti…';
@@ -710,6 +1042,13 @@
   // chargement : une page qui ferait naviguer l'iframe vers SA page (une fausse
   // connexion) n'est jamais montrée — la carte retombe sur son formulaire.
   const CADRE_DELAI_MS = 1500;
+  // ⚠️ 5.362 (revue, moyenne 69) — JAMAIS LE MOT DE PASSE DANS LA CARTE DESSINÉE.
+  //    Dessinée (Orion, ou cadre muet), la carte vit dans le DOM de la page du site :
+  //    un écouteur de touches posé par la page AVANT le nôtre recevait chaque lettre.
+  //    Le mot de passe n'est donc proposé QUE dans l'iframe de l'extension (`CADRE`,
+  //    origine de l'extension) ; dessinée, la carte connecte par CODE reçu par e-mail
+  //    (tout compte VRM) — un code à usage unique, sans valeur une fois utilisé.
+  //    (`MDP_PERMIS` est posé en tête, juste après `CADRE`.)
   const ORIGINE_EXT = (() => { try { return new URL(chrome.runtime.getURL('popup.html')).origin; } catch (_) { return ''; } })();
   let cadreH = 0, cadreEl = null, cadreChanger = false, cadreMuet = false, cadreMinuteur = null, cadreChargements = 0, cadrePret = false;
   function cadreVoulu() {
@@ -827,7 +1166,7 @@
       ${pied}
       <button type="button" class="b sec" data-code-renvoyer disabled>Renvoyer le code</button>
       <button type="button" class="lien" data-code-changer>Changer d’e-mail</button>`;
-    } else if (modeCx === 'mdp') {
+    } else if (modeCx === 'mdp' && MDP_PERMIS) {
       corps = `${mail}
       <label class="lab" for="vrm-cx-mdp">Mot de passe VRM</label>
       <input id="vrm-cx-mdp" name="vrm-carte-secret" type="password" autocomplete="off" enterkeyhint="go" placeholder="Mot de passe VRM" data-1p-ignore data-lpignore="true">
@@ -841,7 +1180,7 @@
       <button type="submit" class="b" data-principal data-code-demander>Me connecter avec un code</button>
       <div class="aide">Un code à 6 chiffres arrive sur cet e-mail. Marche aussi si tu as créé ton compte avec Google ou Discord.</div>
       ${pied}
-      <button type="button" class="b sec" data-basculer-mode>J’ai un mot de passe</button>`;
+      ${MDP_PERMIS ? '<button type="button" class="b sec" data-basculer-mode>J’ai un mot de passe</button>' : ''}`;
     }
     poserHtml(connexion, `<form class="cx" data-connexion-carte data-mode="${modeCx}" novalidate autocomplete="off">${corps}
       <div data-fournisseurs-carte hidden></div></form>`);
@@ -852,7 +1191,7 @@
     });
     formulaireEl.querySelector('[data-annuler-changer]').addEventListener('click', () => { if (CADRE) { direAuSite({ __vrmCarte: 'annuler' }); return; } changerCompte = false; formulaireDemande = false; modeCx = 'code'; rendre(); });
     const bascule = formulaireEl.querySelector('[data-basculer-mode]');
-    if (bascule) bascule.addEventListener('click', () => { modeCx = modeCx === 'mdp' ? 'code' : 'mdp'; poserFormulaire(true, true); focaliser(); });
+    if (bascule) bascule.addEventListener('click', () => { modeCx = (modeCx === 'mdp' || !MDP_PERMIS) ? 'code' : 'mdp'; poserFormulaire(true, true); focaliser(); });
     if (modeCx === 'saisie') brancherCases();
     if (erreurAuRetour) { direErreur(erreurAuRetour); erreurAuRetour = ''; }
     rendreFournisseurs(); majAnnuler();
@@ -1041,7 +1380,174 @@
   function ouvrirConnexion() { doigt = true; formulaireDemande = true; carte.classList.add('on'); rendre(); }
   function fermerCarte() { doigt = false; justeConnecte = false; if (changerCompte) { changerCompte = false; formulaireDemande = false; rendre(); } carte.classList.remove('on'); }
 
+  // ══ 5.351 (lot extension-visuel) : OUVRIR VRM SUR UN ÉCRAN, DÉPLACER, RÉDUIRE, TEINTE ══
+  // « Colis · Messages · Offres » : le service worker ouvre VRM sur l'écran nommé
+  // (une liste blanche chez lui, `ECRANS_CARTE`) — jamais une adresse d'ici.
+  function ouvrirEcran(ecran) {
+    try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'ouvrirVRM', ecran: String(ecran || '') }, () => { void chrome.runtime.lastError; }); } catch (_) {}
+  }
+  // Le logo se GLISSE où il gêne le moins (souris ou doigt) et retient sa place
+  // PAR SITE (`vrmBadgePos`, ce navigateur) ; il se RÉDUIT en pastille
+  // (`vrmBadgeMini`). La carte s'ouvre du côté où il y a la place. Rien n'est
+  // envoyé nulle part : le stockage local de l'extension.
+  let detailOuvert = false, mini = false, posPerso = null, modeApparence = null, vientDeGlisser = false, glisse = null;
+  const CLE_SITE = (() => { const h = String(location.hostname || ''); return /vinted\./.test(h) ? 'vinted' : /leboncoin\./.test(h) ? 'leboncoin' : /ebay\./.test(h) ? 'ebay' : /vestiairecollective\./.test(h) ? 'vestiaire' : 'autre'; })();
+  // 5.371 : au téléphone le logo est plus petit (38 px) — la taille LUE, jamais supposée.
+  const taille = () => { const w = btn && btn.offsetWidth; return w > 0 ? w : (mini ? 30 : 44); };
+  const borne = (x, min, max) => Math.max(min, Math.min(max, x));
+  // ══ 5.371 (Julien, 12 nov., capture Orion sur Vestiaire : le logo cachait
+  //    l'onglet « Moi » de la barre du bas) : LE LOGO NE RECOUVRE JAMAIS UNE BARRE
+  //    FIXE DU SITE. Les éléments `position: fixed/sticky` larges (> 30 % de
+  //    l'écran, < 40 % de sa hauteur) présents dans la zone du logo (+ 12 px) le
+  //    repoussent : au-dessus d'une barre du bas, sous une barre du haut (marge
+  //    12 px), et jamais sous la zone sûre de l'iPhone (`safe-area-inset-bottom`).
+  //    La place CHOISIE (glissée) reste rangée telle quelle ; seul l'affichage se
+  //    décale. Recalculé au redimensionnement, au défilement et quand la page
+  //    change (une mesure par image au plus, jamais en boucle : nos propres
+  //    changements de style ne sont pas observés).
+  const MARGE_BARRE = 12;
+  const sonde = document.createElement('i');
+  sonde.setAttribute('aria-hidden', 'true');
+  sonde.style.cssText = 'position:fixed;left:0;bottom:0;width:0;height:0;visibility:hidden;pointer-events:none;padding-bottom:env(safe-area-inset-bottom, 0px);padding-top:env(safe-area-inset-top, 0px);';
+  ombre.appendChild(sonde);
+  const zoneSure = () => { try { const c = getComputedStyle(sonde); return { bas: parseFloat(c.paddingBottom) || 0, haut: parseFloat(c.paddingTop) || 0 }; } catch (_) { return { bas: 0, haut: 0 }; } };
+  function barresDans(x0, y0, x1, y1) {
+    const W = window.innerWidth || 1024, H = window.innerHeight || 768;
+    const pts = [];
+    for (const fx of [0.05, 0.5, 0.95]) for (const fy of [0.05, 0.5, 0.95]) pts.push([x0 + (x1 - x0) * fx, y0 + (y1 - y0) * fy]);
+    const vus = new Set(), barres = [];
+    for (const [x, y] of pts) {
+      if (x < 0 || y < 0 || x >= W || y >= H) continue;
+      let els = []; try { els = document.elementsFromPoint(x, y); } catch (_) { els = []; }
+      for (const el of els) {
+        if (el === hote || el === document.documentElement || el === document.body) continue;
+        for (let n = el, i = 0; n && n !== document.documentElement && n !== document.body && i < 15; n = n.parentElement, i++) {
+          if (n === hote) break;
+          if (vus.has(n)) break;
+          let cs = null; try { cs = getComputedStyle(n); } catch (_) { cs = null; }
+          if (!cs || (cs.position !== 'fixed' && cs.position !== 'sticky')) continue;
+          vus.add(n);
+          const r = n.getBoundingClientRect();
+          if (cs.visibility !== 'hidden' && cs.display !== 'none' && (parseFloat(cs.opacity) || 0) > 0.05 && r.width >= W * 0.3 && r.height > 0 && r.height < H * 0.4) barres.push(r);
+          break;
+        }
+      }
+    }
+    return barres;
+  }
+  let decalBarre = 0;   // ce que les barres ont ajouté au `bottom` (mesuré)
+  function eviterBarres(rr, bb) {
+    const W = window.innerWidth || 1024, H = window.innerHeight || 768, t = taille();
+    const sur = zoneSure();
+    let b = Math.max(bb, 8 + sur.bas);
+    for (let i = 0; i < 4; i++) {
+      const gauche = W - rr - t, haut = H - b - t;
+      const barres = barresDans(gauche - MARGE_BARRE, haut - MARGE_BARRE, gauche + t + MARGE_BARRE, haut + t + MARGE_BARRE);
+      if (!barres.length) break;
+      let nb = b;
+      for (const r of barres) {
+        const centreBarre = (r.top + r.bottom) / 2, centreLogo = haut + t / 2;
+        if (centreBarre >= centreLogo || r.bottom >= H - 2) nb = Math.max(nb, Math.ceil(H - r.top + MARGE_BARRE));   // barre du bas : au-dessus
+        else nb = Math.min(nb, Math.floor(H - (r.bottom + MARGE_BARRE) - t));                                         // barre du haut : en dessous
+      }
+      nb = borne(nb, 8 + sur.bas, Math.max(8, H - t - 8 - sur.haut));
+      if (nb === b) break;
+      b = nb;
+    }
+    return b;
+  }
+  function placer(r, b) {
+    if (CADRE) return;
+    const W = window.innerWidth || 1024, H = window.innerHeight || 768, t = taille();
+    const rr = borne(Math.round(r), 8, Math.max(8, W - t - 8)), bb = borne(Math.round(b), 8, Math.max(8, H - t - 8));
+    // Pendant un glisser, le logo suit le doigt ; il s'écarte des barres une fois posé.
+    const affiche = glisse ? bb : eviterBarres(rr, bb);
+    decalBarre = affiche - bb;
+    hote.style.setProperty('right', rr + 'px'); hote.style.setProperty('bottom', affiche + 'px');
+    if (decalBarre) hote.setAttribute('data-evite-barre', String(decalBarre)); else hote.removeAttribute('data-evite-barre');
+    // La carte s'ouvre vers le bas si le logo est dans la moitié haute, vers la droite s'il est à gauche.
+    if (H - affiche - t < H / 2) hote.setAttribute('data-haut', ''); else hote.removeAttribute('data-haut');
+    if (W - rr - t / 2 < W / 2) hote.setAttribute('data-gauche', ''); else hote.removeAttribute('data-gauche');
+    return { r: rr, b: bb };
+  }
+  const ranger = (o) => { try { chrome.storage.local.set(o); } catch (_) {} };
+  function enregistrerPlace(p) {
+    posPerso = p;
+    try { chrome.storage.local.get('vrmBadgePos', (g) => { let m = {}; try { m = Object.assign({}, (g && g.vrmBadgePos) || {}); } catch (_) {} if (p) m[CLE_SITE] = p; else delete m[CLE_SITE]; ranger({ vrmBadgePos: m }); }); } catch (_) {}
+  }
+  function remettreEnPlace() { placer(16, 16); enregistrerPlace(null); }
+  function poserMini(oui) {
+    mini = !!oui;
+    if (mini) hote.setAttribute('data-mini', ''); else hote.removeAttribute('data-mini');
+    placer(posPerso ? posPerso.r : 16, posPerso ? posPerso.b : 16);
+    ranger({ vrmBadgeMini: mini });
+  }
+  // La teinte : celle choisie dans VRM (clair, sombre, le soir) ; « automatique »
+  // ou pas su ⇒ le système, comme avant.
+  function appliquerTeinte() {
+    const m = modeApparence;
+    let t = '';
+    if (m === 'sombre' || m === 'clair') t = m;
+    else if (m === 'soir') { const h = new Date().getHours(); t = h >= 19 || h < 7 ? 'sombre' : 'clair'; }
+    if (t) hote.setAttribute('data-theme', t); else hote.removeAttribute('data-theme');
+  }
+  try {
+    chrome.storage.local.get(['vrmApparence', 'vrmBadgePos', 'vrmBadgeMini'], (g) => {
+      try { if (chrome.runtime.lastError) return; } catch (_) { return; }
+      g = g || {};
+      if (['clair', 'sombre', 'auto', 'soir'].includes(g.vrmApparence)) { modeApparence = g.vrmApparence; appliquerTeinte(); }
+      if (g.vrmBadgeMini === true) { mini = true; hote.setAttribute('data-mini', ''); }
+      const p = g.vrmBadgePos && g.vrmBadgePos[CLE_SITE];
+      if (p && Number.isFinite(Number(p.r)) && Number.isFinite(Number(p.b))) posPerso = placer(Number(p.r), Number(p.b));
+      else placer(16, 16);
+      if (etat) rendre();
+    });
+  } catch (_) {}
+  // 5.371 : une mesure par image au plus (redimensionnement, défilement, page qui change).
+  let replacerDemande = false;
+  const replacerLogo = () => {
+    if (CADRE || replacerDemande || glisse) return;
+    replacerDemande = true;
+    const go = () => { replacerDemande = false; if (glisse) return; if (posPerso) placer(posPerso.r, posPerso.b); else placer(16, 16); };
+    try { requestAnimationFrame(go); } catch (_) { setTimeout(go, 16); }
+  };
+  try { window.addEventListener('resize', replacerLogo); } catch (_) {}
+  try { window.addEventListener('scroll', replacerLogo, { passive: true }); } catch (_) {}
+  try { if (window.visualViewport) window.visualViewport.addEventListener('resize', replacerLogo); } catch (_) {}
+  try {
+    let minut = null;
+    const mo = new MutationObserver(() => { if (minut) return; minut = setTimeout(() => { minut = null; replacerLogo(); }, 300); });
+    mo.observe(document.documentElement, { childList: true, subtree: true });
+  } catch (_) {}
+  setTimeout(replacerLogo, 600); setTimeout(replacerLogo, 2000);   // les barres posées après le premier rendu du site
+  // Glisser : au-delà de 6 px, c'est un déplacement (le clic qui suit est mangé) ;
+  // en deçà, c'est un clic comme avant.
+  btn.addEventListener('pointerdown', (ev) => {
+    if (CADRE || (ev.button != null && ev.button > 0)) return;
+    const r = hote.getBoundingClientRect();
+    glisse = { id: ev.pointerId, x: ev.clientX, y: ev.clientY, r0: (window.innerWidth || 0) - r.right, b0: (window.innerHeight || 0) - r.bottom, bouge: false };
+    try { btn.setPointerCapture(ev.pointerId); } catch (_) {}
+  });
+  btn.addEventListener('pointermove', (ev) => {
+    if (!glisse || ev.pointerId !== glisse.id) return;
+    const dx = ev.clientX - glisse.x, dy = ev.clientY - glisse.y;
+    if (!glisse.bouge && Math.hypot(dx, dy) < 6) return;
+    if (!glisse.bouge) { glisse.bouge = true; btn.classList.add('glisse'); clearTimeout(minuteur); carte.classList.remove('on'); }
+    glisse.p = placer(glisse.r0 - dx, glisse.b0 - dy);
+  });
+  const finGlisse = (ev) => {
+    if (!glisse || (ev && ev.pointerId !== glisse.id)) return;
+    const g = glisse; glisse = null;
+    btn.classList.remove('glisse');
+    try { btn.releasePointerCapture(g.id); } catch (_) {}
+    if (g.bouge && g.p) { vientDeGlisser = true; enregistrerPlace(g.p); setTimeout(() => { vientDeGlisser = false; }, 350); }
+    replacerLogo();   // 5.371 : posé sur une barre du site ⇒ il s'écarte (sa place choisie reste rangée)
+  };
+  btn.addEventListener('pointerup', finGlisse);
+  btn.addEventListener('pointercancel', finGlisse);
+
   btn.addEventListener('click', async () => {
+    if (vientDeGlisser) { vientDeGlisser = false; return; }   // c'était un déplacement, pas un clic
     // Au doigt : toucher le logo ouvre (ou referme) la carte — c'est elle qui
     // porte le geste « Ouvrir VRM », et le moyen de revenir sur un « Non ».
     if (auDoigt()) {
@@ -1104,10 +1610,11 @@
       // 5.329 : Google / Discord dans la petite fenêtre — un refus est dit dans la carte.
       const o = ch.vrmOAuthEtat && ch.vrmOAuthEtat.newValue;
       if (o && o.etat === 'erreur' && formulaireEl) { direEtat(''); direErreur(o.message || 'La connexion n’a pas abouti.'); }
-      if (ch.vrmSession || ch.vrmFlux || ch.vrmVcCapte || ch.vrmBascule || ch.vrmLbcCompte || ch.vrmChoixComptes || ch.vrmLoginsVus || ch.vrmLogins) rafraichir();
+      if (ch.vrmApparence) { const m = ch.vrmApparence.newValue; modeApparence = ['clair', 'sombre', 'auto', 'soir'].includes(m) ? m : null; appliquerTeinte(); }
+      if (ch.vrmPauseVinted || ch.vrmFreinRepub || ch.vrmSession || ch.vrmFlux || ch.vrmVcCapte || ch.vrmBascule || ch.vrmLbcCompte || ch.vrmChoixComptes || ch.vrmLoginsVus || ch.vrmLogins) rafraichir();
     });
   } catch (_) {}
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') rafraichir(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { appliquerTeinte(); rafraichir(); } });
 
   (CADRE ? (document.body || document.documentElement) : (document.documentElement || document.body)).appendChild(hote);
   rafraichir();

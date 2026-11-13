@@ -31,6 +31,7 @@
 // l'exécute, l'app (src/mesuresCollecte.js) et le serveur
 // (api/_lib/mesures-terrain.js) l'importent.
 import { ECRANS } from '../api/_lib/signalement.js';
+import { jourParis as jourParisRegle } from './dateParis.js';
 
 export { ECRANS };
 export const VERSION_LOT = 1;
@@ -185,8 +186,8 @@ export function resumeJour(h) {
 export function jourParis(ms) {
   try {
     const p = new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
-    return /^\d{4}-\d{2}-\d{2}$/.test(p) ? p : new Date(ms).toISOString().slice(0, 10);
-  } catch (_) { return new Date(ms).toISOString().slice(0, 10); }
+    return /^\d{4}-\d{2}-\d{2}$/.test(p) ? p : jourParisRegle(ms);
+  } catch (_) { return jourParisRegle(ms); }
 }
 
 // Les écrans qui se DÉGRADENT d'un jour à l'autre : le p75 d'hier dépasse de

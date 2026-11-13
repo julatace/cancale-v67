@@ -28,6 +28,7 @@
 // par scripts/audit-import-achats.cjs.
 // ═══════════════════════════════════════════════════════════════════════════
 import { refAchat } from './achatsDoubles.js';
+import { motsVendeur } from './profilVendeur.js';
 import { prixAchatSaisi } from './prixAuNumerotage.js';
 
 export const TAILLE_MAX = 5 * 1024 * 1024;   // 5 Mo
@@ -279,7 +280,7 @@ export function apercuImport({ rows, colonnes, existants = {}, numeroDe = null, 
     if (numero && prix.prix && etatNumero) {
       const e = etatNumero(numero);
       if (e === 'libre' && !numsPoses.has(numero)) { coutPose = true; numsPoses.add(numero); }
-      else noteNumero = e === 'prix' ? 'a déjà un prix' : e === 'deux' ? 'sur deux paires' : e === 'absent' ? '' : 'déjà posé plus haut';
+      else noteNumero = e === 'prix' ? 'a déjà un prix' : e === 'deux' ? `sur deux ${motsVendeur().noms}` : e === 'absent' ? '' : 'déjà posé plus haut';
     }
     const rec = { title: titre, price: prix.prix, date, source: texte(val(iO), 40), numero, ref: refBrute || undefined };
     return { ...ligne, rec, numero, coutPose, noteNumero, sansRef: !ref };

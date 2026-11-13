@@ -119,7 +119,8 @@ const remplacer = (src, a, b) => { if (!src.includes(a)) { console.error('ancre 
     dit(kl && kl.n === 0 && kl.nAd === 1, 'A5 · DAC7 Leboncoin : la vente sans date reste « peut-être »', kl && JSON.stringify([kl.n, kl.nAd]));
 
     // ── A6. LES ÉCRANS LISENT LA RÈGLE (app) ──────────────────────────────────
-    const app = sans(require("./_source-app.cjs").sourceApp());
+    // (11 nov., traduction) les libellés passent par tr() : jugés dans le français (fr.js, la source).
+    const app = require('./_tr-fr.cjs').enFrancais(sans(require("./_source-app.cjs").sourceApp()));
     dit(/ad\.annees = R\.annees/.test(app) && /aDaterParAnnee\(aDater\)/.test(app), 'A6 · Ventes PUBLIE les ventes à dater par année de vente (`aDater.annees`, `de`, `a`)');
     dit(/anneeSureDeVente\(tsVenteADater\(l\), Date\.now\(\)\)/.test(app), 'A6 · la case « CA de l’année » de Ventes applique la MÊME règle (même nombre partout)');
     dit(/data-micro-adater-sur=/.test(app), 'A6 · Compta DIT la part prouvée (« Dont N ventes vendues en … »)');
@@ -160,6 +161,10 @@ const remplacer = (src, a, b) => { if (!src.includes(a)) { console.error('ancre 
       dit(g2 && g2.cle === 'sansnum', 'D1 · puis une annonce en ligne sans N°', g2 && g2.cle);
       const g3 = G.prochainGesteAnnonces({ aVerifier: 0, sansNum: 0, prixConnus: 3, prixTotal: 49, dorment: 3 });
       dit(g3 && g3.cle === 'prix' && /3\/49/.test(g3.texte), 'D1 · puis les prix d’achat (la couverture dite : 3/49)', g3 && g3.texte);
+      // (12 nov., finitions) §5 : 0 prix connu ⇒ « — » (jamais « au moins », jamais « minimum ») ; k connus ⇒ « au moins » + couverture.
+      const g0 = G.prochainGesteAnnonces({ aVerifier: 0, sansNum: 0, prixConnus: 0, prixTotal: 36, dorment: 3 });
+      dit(g0 && g0.cle === 'prix' && /—/.test(g0.texte) && /0\/36/.test(g0.texte) && !/au moins|minimum/i.test(g0.texte), 'D5 · 0 prix connu : bénéfice « — », la couverture 0/36, jamais « au moins »', g0 && g0.texte);
+      dit(g3 && /au moins/i.test(g3.texte) && !/minimum/i.test(g3.texte), 'D5 · 3 prix connus : bénéfice « au moins », avec 3/49', g3 && g3.texte);
       const g4 = G.prochainGesteAnnonces({ aVerifier: 0, sansNum: 0, prixConnus: 49, prixTotal: 49, dorment: 3 });
       dit(g4 && g4.cle === 'dorment', 'D1 · puis les annonces qui dorment', g4 && g4.cle);
       dit(G.prochainGesteAnnonces({}) === null && G.prochainGesteAnnonces({ aVerifier: null, sansNum: undefined, prixConnus: null, prixTotal: null, dorment: NaN }) === null, 'D2 · des compteurs pas sus ne déclenchent AUCUN geste (jamais inventé)');

@@ -1,3 +1,6 @@
+// (11 nov., famille « N° par cleNum ») l'identité d'un N° : la règle `cleNum` (api/_lib/numerotation.js),
+// recopiée ici car des audits chargent ce module SEUL ; scripts/audit-numeros-clenum.cjs vérifie qu'elle rend la même chose.
+const cleNum = (v) => { let s = String(v == null ? '' : v).trim().toUpperCase().replace(/[\s\-_.]/g, ''); if (/^\d+$/.test(s)) s = String(parseInt(s, 10)); return s; };
 // ── UN SEUL FIL PAR ACHETEUR ET PAR PAIRE, TOUTES PLATEFORMES (10 nov., lot AB) ──
 // Julien a validé (propositions du 9 nov., n° 42) : « Messages des quatre
 // plateformes dans un seul fil par acheteur et par paire, avec la plateforme
@@ -82,6 +85,16 @@ export function convVestiaire(v) {
     at: v.date, apercu: v.apercu, deMoi: v.deMoi, nonLu: v.nonLu, titre: v.titre, photo: v.photo, nom: '' });
 }
 
+// (11 nov., ebay-complet) eBay : un échange `GetMemberMessages` lu en direct (VRM ne
+// le range pas). L'annonce eBay (ItemID) et l'acheteur eBay sont des IDENTITÉS de
+// SA plateforme (préfixées) : jamais confondues avec une annonce Vinted.
+export function convEbay(m, compte) {
+  if (!m || !txt(m.id)) return null;
+  const rep = Array.isArray(m.responses) ? m.responses.filter(Boolean) : [];
+  return entree({ plateforme: 'ebay', compte: compte || 'principal', conv: m.id, annonce: m.itemId, interlocuteur: m.sender,
+    at: m.date, apercu: rep.length ? rep[rep.length - 1] : (m.body || m.subject || ''), deMoi: rep.length > 0,
+    nonLu: /^unanswered$/i.test(String(m.status || '')) ? true : rep.length ? false : null, titre: m.titre, nom: '' });
+}
 // Les identités de paire d'une conversation (vide ⇒ aucune).
 export const identitesPaire = (e) => [e.annonce && 'a:' + e.annonce, e.tx && 't:' + e.tx, e.num && 'n:' + e.num].filter(Boolean);
 // La clé d'un lien posé par lui : les deux conversations, dans l'ordre.
@@ -140,21 +153,31 @@ export function regrouperFils(entrees, liens) {
 // Deux fils dont les paires sont prouvées DIFFÉRENTES ne sont jamais proposés.
 // `refus` : { [cleLien]: at } — un « Non » ne revient pas.
 export function suggestionsFils(fils, liens, refus) {
-  const out = [], deja = new Set();
+  const out = [];
   const l = liens && typeof liens === 'object' ? liens : {}, r = refus && typeof refus === 'object' ? refus : {};
   const liste = Array.isArray(fils) ? fils : [];
-  const idsDe = (f) => new Set(f.convs.flatMap(identitesPaire));
-  const quiDe = (f) => new Set(f.convs.map((c) => c.interlocuteur).filter(Boolean));
-  const platDe = (f) => new Set(f.convs.map((c) => c.plateforme));
-  for (let i = 0; i < liste.length; i++) for (let j = i + 1; j < liste.length; j++) {
+  // (11 nov., pire cas) Avant : chaque paire de fils comparée, ses ensembles refaits à chaque
+  // tour — 2 000 conversations ⇒ 2 millions de tours, 1,9 s de gel à chaque rendu de Messages.
+  // Les deux règles ne rapprochent QUE deux fils qui partagent un interlocuteur ou un N° : on
+  // ne compare que ceux-là (index), dans le même ordre (i < j), avec la même règle.
+  const ids = liste.map((f) => new Set(f.convs.flatMap(identitesPaire)));
+  const qui = liste.map((f) => new Set(f.convs.map((c) => c.interlocuteur).filter(Boolean)));
+  const plat = liste.map((f) => new Set(f.convs.map((c) => c.plateforme)));
+  const index = new Map();
+  const range = (cle, i) => { if (!index.has(cle)) index.set(cle, []); const t = index.get(cle); if (t[t.length - 1] !== i) t.push(i); };
+  liste.forEach((f, i) => { for (const q of qui[i]) range('q:' + q, i); if (f.num) range('n:' + f.num, i); });
+  const paires = new Set();
+  for (const t of index.values()) for (let a = 0; a < t.length; a++) for (let b = a + 1; b < t.length; b++) paires.add(t[a] * liste.length + t[b]);
+  const deja = new Set();
+  for (const p of [...paires].sort((x, y) => x - y)) {
+    const i = Math.floor(p / liste.length), j = p % liste.length;
     const A = liste[i], B = liste[j];
     const k = cleLien(A.cle, B.cle);
     if (deja.has(k) || l[k] || r[k]) continue;
-    const ia = idsDe(A), ib = idsDe(B);
-    const memeQui = [...quiDe(A)].some((q) => quiDe(B).has(q));
+    const memeQui = [...qui[i]].some((q) => qui[j].has(q));
     let sorte = null;
-    if (memeQui && (!ia.size || !ib.size)) sorte = 'paire';
-    else if (A.num && A.num === B.num && ![...platDe(A)].some((p) => platDe(B).has(p))) sorte = 'acheteur';
+    if (memeQui && (!ids[i].size || !ids[j].size)) sorte = 'paire';
+    else if (A.num && cleNum(A.num) === cleNum(B.num) && ![...plat[i]].some((x) => plat[j].has(x))) sorte = 'acheteur';
     if (!sorte) continue;
     deja.add(k);
     out.push({ cle: k, a: A.cle, b: B.cle, sorte });

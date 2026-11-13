@@ -32,7 +32,8 @@ import { jeuExemple, UID_EXEMPLE, EMAIL_EXEMPLE } from './exempleDonnees.js';
 
 export const CLE_EXEMPLE = 'vrm_mode_exemple';
 export { UID_EXEMPLE };
-const HOTE_BASE = 'lgonxzrzjcqthjtbdpzo.supabase.co';
+// (12 nov.) La base d’essai (Preview, VITE_SUPABASE_URL) est aussi tenue à l’écart en mode exemple.
+const HOTE_BASE = (() => { try { const u = import.meta.env && import.meta.env.VITE_SUPABASE_URL; return u ? new URL(u).host : 'lgonxzrzjcqthjtbdpzo.supabase.co'; } catch (_) { return 'lgonxzrzjcqthjtbdpzo.supabase.co'; } })();
 // Les réglages d'AFFICHAGE de l'appareil que l'exemple reprend (thème, zoom) :
 // ce ne sont pas des données, et l'exemple doit ressembler à SON écran.
 const AFFICHAGE = ['vinted_dark', 'vrm_apparence', 'vrm_zoom', 'vrm_densite'];

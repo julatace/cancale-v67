@@ -146,7 +146,7 @@ const lire = (pg) => pg.evaluate(() => {
     bouton2: !!l.querySelector('[data-rp-code-desaccord]'),
   }));
   const onglet = document.querySelector('[data-colis-onglet-choix="retirer"]');
-  return { pub, lignes, ongletN: onglet ? onglet.getAttribute('data-colis-onglet-n') : null, deb: document.documentElement.scrollWidth - window.innerWidth };
+  return { pub, lignes, ongletN: (() => { /* (11 nov., lot DJ3) « À retirer » n'a plus d'onglet : le nombre de SA liste (`data-cc-n`) */ const c = document.querySelector('[data-cc-colonne="retirer"]'); return c ? c.getAttribute('data-cc-n') : (onglet ? onglet.getAttribute('data-colis-onglet-n') : null); })(), deb: document.documentElement.scrollWidth - window.innerWidth };
 });
 
 (async () => {
@@ -158,20 +158,20 @@ const lire = (pg) => pg.evaluate(() => {
       console.log(`\n— Colis → À retirer, d'où vient chaque information · ${nom}`);
       const { ctx, pg, errs } = await ouvrir(b, vp, sombre);
       await essaie('retirer', async () => {
-        await pg.locator('[data-colis-onglet-choix="retirer"]').first().waitFor({ timeout: 40000 });
+        await pg.locator('[data-colis-section]').first().waitFor({ timeout: 40000 });
         await pg.waitForFunction(() => { try { return !!JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) { return false; } }, null, { timeout: 30000 }).catch(() => {});
         await pg.waitForTimeout(1500);
-        await pg.locator('[data-colis-onglet-choix="retirer"]').first().click();
+        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
         await pg.waitForSelector('.vrm-rpf-ligne[data-cc-carte]', { timeout: 20000 }).catch(() => {});
         await pg.waitForTimeout(600);
         const m = await lire(pg);
         const L = (k) => m.lignes.find((l) => l.cle.includes(k)) || null;
         const J = (o) => JSON.stringify(o);
-        dit(m.ongletN === '5' && m.pub && m.pub.total === 5, 'les cinq colis sont À RETIRER (onglet = publication)', J({ onglet: m.ongletN, pub: m.pub && m.pub.total }));
+        dit(m.ongletN === '5' && m.pub && m.pub.total === 5, 'les cinq colis sont À RETIRER (liste = publication)', J({ onglet: m.ongletN, pub: m.pub && m.pub.total }));
         const r1 = L('87660001');
         dit(!!r1 && r1.code === '700001' && r1.sur, 'R1 e-mail + conversation de SA commande au même code ⇒ « sûr »', J(r1 && { code: r1.code, sur: r1.sur }));
-        dit(!!r1 && r1.sources === 'vinted,email,message,transporteur' && r1.marques.join('·') === 'Vinted·e-mail·message·transporteur', 'R1 les marques : Vinted · e-mail · message · transporteur', r1 && r1.sources);
-        dit(!!r1 && Number(r1.verifie) === Date.parse('2026-11-12T08:40:00.000Z') && /^vérifié à 09:40$/.test(r1.verifieTexte), 'R1 « vérifié à 09:40 » (la lecture chez le transporteur, la plus récente)', r1 && `${r1.verifie} · ${r1.verifieTexte}`);
+        dit(!!r1 && r1.sources === 'vinted,email,message,transporteur' && r1.marques.join('·') === 'Vinted·e-mail·message', 'R1 les marques : Vinted · e-mail · message (11 nov. : « transporteur » est dit par « vérifié par Mondial Relay », pas deux fois)', r1 && r1.sources);
+        dit(!!r1 && Number(r1.verifie) === Date.parse('2026-11-12T08:40:00.000Z') && /^vérifié par Mondial Relay à 09:40$/.test(r1.verifieTexte), 'R1 « vérifié par Mondial Relay à 09:40 » (la lecture chez le transporteur, la plus récente ; 11 nov. : la source est dite)', r1 && `${r1.verifie} · ${r1.verifieTexte}`);
         const r2 = L('1790000000000062');
         dit(!!r2 && !r2.code && r2.bouton2 && /email:B12345/.test(r2.desaccord) && /message:C99999/.test(r2.desaccord), 'R2 e-mail B12345 et conversation C99999 ⇒ « 2 codes » ambre, AUCUN code choisi', J(r2 && { code: r2.code, d: r2.desaccord }));
         const r3 = L('87660003');

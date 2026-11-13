@@ -24,6 +24,7 @@ import './_lib/sans-bruit.js';
 import crypto from 'node:crypto';
 import { sendPushToAll, pushCategorieActive, prefsDuVendeur, vidangerResume, instantNotif, instantCalme } from './_lib/push.js';
 import { CLE_RAPPELS, MEMO_RAPPELS, lireRappels, rappelsDus, memoApres, texteRappel, texteRappels, lienRappel, TAG_RAPPEL } from './_lib/rappels-perso.js';
+import { CLE_REMISES, MEMO_REMISES, lireRemises, remisesDues, memoRemisesApres, texteRappelRemise, texteRappelsRemise, TAG_REMISE, instantRemise } from './_lib/remises-main-propre.js';
 import { resumeReveil, ID_REVEIL } from './_lib/reveil-calme.js';
 import { reglageCalme, reglageSoir, soirALHeure, reglageJours, dansHeuresCalmes } from './_lib/notif-textes.js';
 import { lireJournal, lireLu } from './_lib/journal-notifs.js';
@@ -40,10 +41,12 @@ import { aExpedier } from './widget.js';
 import { bordsParTransaction, compterEcheances, heureCourte } from './_lib/limite-envoi.js';
 
 import { withOwnerAll, conflictTarget, contexteVendeur, proprietaireCourant } from './_lib/owner.js';
+import { MAIN_MOTS, motsServeur } from './_lib/mots-vendeur.js';
 import { sbCle } from './_lib/cle.js';
-import { ordreStable } from './_lib/ordre-stable.js';
+import { ordreStable, finALaFrontiere } from './_lib/ordre-stable.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
-import { comptesActifs, normaliserRegistre } from './_lib/ebay.js';
+import { comptesActifs, normaliserRegistre, lireDonnee as lireDonneeEbay, modifierDonnee as modifierDonneeEbay, jetonApplication, oublierJetonApplication } from './_lib/ebay.js';
+import { passageAlertesEbay, notifAlertes } from './_lib/ebay-alertes.js';
 import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/ebay-a-expedier.js';
 // (1er nov., audit A4) Les colis Leboncoin et Vestiaire à poster, et les ventes
 // Vestiaire du bilan : les règles de l'app (un propriétaire, importé).
@@ -57,6 +60,7 @@ import { avecSuiviDuSujet, relireLigneMeta } from './_lib/suivi-colis.js';
 import { rappelsRetraitDuJour, texteRappelRetrait, SELECT_SUIVI_META, txDuColis, liensDesLignes, finDesTransactions, SELECT_TRANSP_META, ligneTranspDeMeta } from './_lib/suivi-colis.js';
 // (24 oct.) Le statut des colis lu chez leur transporteur (C1, C5).
 import { passageTransporteurs, MAX_CRON, BUDGET_CRON_MS, MAX_DEPARTS_CRON } from './_lib/transporteurs-lecture.js';
+import { passageSauvegarde, stockageSupabase, sourceCle } from './_lib/sauvegarde-quotidienne.js';   // (12 nov., agent2-fiabilite-prod)
 import { accesVendeur } from './_lib/abonnement.js';
 import { passageRelances, configurationRelances, adresseDuCompte } from './_lib/relances-essai.js';
 import { passageClientsPartis } from './_lib/clients-partis.js';
@@ -67,6 +71,9 @@ import { lireMentions } from './_lib/mentions-legales.js';
 // (5 nov.) « Compte Vinted pas relu » : la règle (api/_lib/comptes-a-relire.js).
 // (8 nov.) Un compte qui n'arrive plus ALORS QUE l'extension travaille : la règle (api/_lib/garde-capture.js).
 import { notifierComptesRelies } from './_lib/compte-relie.js';
+import { notifierModeration } from './_lib/moderation-notif.js';
+import { notifierAvisBas } from './_lib/avis-negatif.js';   // (11 nov.) le filet des avis négatifs
+import { demandesDuCron as demandesPrixAchat } from './_lib/prix-achat-demande.js';   // (11 nov., saisie rapide)
 // (9 nov.) Le transporteur des anciens bordereaux, relu dans le texte de leur e-mail.
 import { passeTransporteursAnciens, passeTransporteursPdf, reqPdf, avecRelus, REQ_RELUS, MAX_PDF_MATIN, BUDGET_PDF_MATIN_MS } from './_lib/transporteur-anciens.js';
 import { pannesCapture, lireAppareils, decisionPannes, textePannes, CAT_CAPTURE, ID_MEMO_CAPTURE, SELECT_APPAREILS, PREFIXE_APPAREIL } from './_lib/garde-capture.js';
@@ -89,12 +96,20 @@ import { purgerHtml } from './_lib/email-html.js';
 import { histosDesJours, purgerMesuresAnciennes } from './_lib/mesures-terrain.js';
 import { proprietaireInstallation } from './_lib/signalement.js';
 import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
-import { passerVendeurs, BUDGET_VENDEURS_MS } from './_lib/cron-lots.js';
+import { reserverMemo } from './_lib/cas.js';   // (11 nov.) mémos par comparer-et-échanger
+import { passerVendeurs, BUDGET_VENDEURS_MS, TEMPS_VENDEUR_MS, prendreBail, rendreBail } from './_lib/cron-lots.js';
+import { modifierNeutre } from './_lib/neutre-cas.js';   // (11 nov., H14) le bail du passage
 import { passageColisFrequent, MAX_LECTURES_VENDEUR, MAX_DEPARTS_VENDEUR, BUDGET_VENDEUR_MS, passageEtiquettes, MAX_PDF_VENDEUR_FREQUENT, BUDGET_ETIQUETTES_MS } from './_lib/colis-frequent.js';
 // (9 nov.) Les sondes de vrm.center/statut et leurs incidents automatiques (api/_lib/statut-sondes.js).
 import { passageSondes } from './_lib/statut-sondes.js';
 import { groupeProduction, SIGNAUX as SIGNAUX_PROD, ECHECS_COLIS, refusEnSerie, purgerErreursAnciennes } from './_lib/alertes-production.js';
 import { pushConfigure } from './_lib/push.js';
+import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
+// (11 nov., lot agent2-veille) Le contrôle de nuit (lecture seule) et la veille des chiffres.
+import { controleVendeur, controleInstallation } from './_lib/controle-nuit.js';
+import { notifierAlertesChiffres } from './_lib/veille-chiffres.js';
+import { CAT_VEILLE } from '../src/veilleChiffres.js';
+import { stripeApi, stripePret } from './_lib/stripe.js';
 // (7 nov.) Les e-mails de l'essai passent AVANT les vendeurs : après 60 s, aucun
 // ne COMMENCE (le reste part le lendemain ; les vendeurs gardent leur temps).
 const RELANCES_JUSQUA_MS = 60000;
@@ -120,7 +135,7 @@ function parisDate(offsetDays = 0) {
 // `undefined` = la base n'a pas répondu (« rien lu » ne vaut pas « rien »).
 async function getRow(id) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${scoped(`app_data?id=eq.${encodeURIComponent(id)}&select=data`)}`, { headers: HEADERS });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${scoped(`app_data?id=eq.${encodeURIComponent(id)}&select=data`)}`, { headers: HEADERS });
     if (!r.ok) return undefined;
     const rows = await r.json();
     if (!Array.isArray(rows)) return undefined;
@@ -149,7 +164,7 @@ function scoped(path) {
 // défaut, corrigé le 4 octobre.)
 async function cloisonnee() {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: HEADERS });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: HEADERS });
     if (r.ok) return true;
     if (r.status === 400) return false;
     return null;
@@ -168,6 +183,8 @@ async function ownersActifs() {
 // Écrit un mémo de dédoublonnage POUR LE VENDEUR DU TOUR (clé (owner,id) quand on
 // est cloisonné, `id` seul sinon). Sans ça, deux vendeurs partageraient le même
 // `ship_reminder_dedup` et l'un ferait taire l'autre.
+// (11 nov.) Les mémos qui décident d'un ENVOI se RÉSERVENT par comparer-et-échanger
+// (`reserverDedup` ci-dessous) ; celui-ci reste l'écriture simple (lignes de travail).
 async function ecrireDedup(id, data) {
   const o = proprietaireCourant();
   const row = o ? { owner: o, id, data } : withOwnerAll([{ id, data }])[0];
@@ -175,13 +192,25 @@ async function ecrireDedup(id, data) {
   // Rend VRAI seulement si la base a confirmé : le bilan de la semaine ne part
   // QUE si son mémo est rangé (sinon il repartirait le lendemain — deux bilans).
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflict}`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflict}`, {
       method: 'POST',
       headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify([row]),
     });
     return !!(r && r.ok);
   } catch (_) { return false; /* un mémo raté n'empêche pas le rappel suivant */ }
+}
+// (11 nov., M80/M81/B130) RÉSERVER le mémo AVANT d'envoyer (comparer-et-échanger) :
+// deux passages simultanés ⇒ un seul envoie ; un mémo illisible ⇒ RIEN n'est
+// envoyé (« pas su » ne vaut jamais « jamais envoyé »). Base pas cloisonnée
+// (installation d'avant) : la lecture puis l'écriture d'avant, « pas su » compris.
+async function reserverDedup(id, deja, nouveau) {
+  const o = proprietaireCourant();
+  if (o) return reserverMemo({ url: SUPABASE_URL, entetes: HEADERS, owner: o, id, deja, nouveau });
+  const d = await getRow(id);
+  if (d === undefined) return { reserve: false, raison: 'pas-su' };
+  if (deja(d)) return { reserve: false, raison: 'deja' };
+  return (await ecrireDedup(id, nouveau(d))) ? { reserve: true } : { reserve: false, raison: 'pas-su' };
 }
 // ⚠️ §4.5 — Supabase tronque à 1000 lignes SANS LE DIRE. Ce cron balaie
 // `email_bord_*` et `harvest_%25_orders_sold` de TOUS les utilisateurs : à
@@ -190,11 +219,13 @@ async function ecrireDedup(id, data) {
 // demi-liste prise pour complète — même règle que `sbGetTout` côté app).
 async function fetchPaginated(path) {
   const out = []; const page = 1000;
-  for (let from = 0; from < 500000; from += page) {
+  for (let from = 0; ; from += page) {
+    if (from >= 500000) return null;   // (11 nov., familles-serveur) au plafond : « pas su », jamais une demi-liste — cron
     let r;
     // (7 nov.) Un ordre TOTAL : sans `order=`, une ligne peut sauter ou revenir d'une page à l'autre.
-    try { r = await fetch(`${SUPABASE_URL}/rest/v1/${ordreStable(path)}`, { headers: { ...HEADERS, 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } }); }
+    try { r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${ordreStable(path)}`, { headers: { ...HEADERS, 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } }); }
     catch (_) { return null; }
+    if (finALaFrontiere(r, from)) break;   // (11 nov.) 416 à une frontière exacte = fin de liste
     if (!r.ok) return null;
     let j; try { j = await r.json(); } catch (_) { return null; }
     if (!Array.isArray(j)) return null;
@@ -210,7 +241,7 @@ async function fetchPaginated(path) {
 async function getRowProjete(id, cles) {
   try {
     const sel = cles.map((k) => `${k}:data->${k}`).join(',');
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${scoped(`app_data?id=eq.${encodeURIComponent(id)}&select=${sel}`)}`, { headers: HEADERS });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${scoped(`app_data?id=eq.${encodeURIComponent(id)}&select=${sel}`)}`, { headers: HEADERS });
     if (!r.ok) return undefined;
     const rows = await r.json();
     if (!Array.isArray(rows)) return undefined;
@@ -228,7 +259,7 @@ async function lireCommandesEbay() {
   });
 }
 // (2 nov., soir) + Vestiaire : « Colis fait » et les N° donnés aux annonces (src/numerosVestiaire.js).
-const MAIN_BILAN = ['vinted_accounts_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vrm_paires_dorment', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros', 'vrm_vc_liens', 'vrm_comptes_exclus'];
+const MAIN_BILAN = [MAIN_MOTS, 'vinted_accounts_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vrm_paires_dorment', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros', 'vrm_vc_liens', 'vrm_comptes_exclus', 'vrm_cycle_decisions'];
 const ensemble = (v) => new Set(Array.isArray(v) ? v.map(String) : []);
 const objet = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 
@@ -245,7 +276,7 @@ async function lireDonneesBilan() {
     getRowProjete('lbc_ventes', ['ventes']),
     lireCommandesEbay(),
     // Les dates de versement : trois scalaires par transaction (§4.4), paginé (§4.5).
-    fetchPaginated(scoped('app_data?id=like.harvest_%25_txn_%25&select=tx:meta->>id,s:meta->>status,su:meta->>status_updated_at')),
+    fetchPaginated(scoped('app_data?id=like.harvest_%25_txn_%25&select=tx:meta->>id,s:meta->>status,su:meta->>status_updated_at,it:meta->>item_id')),
     // (1er nov.) Les ventes Vestiaire et les liens de ses annonces (identité).
     getRowProjete('vc_ventes', ['ventes']),
     getRowProjete('vc_listings', ['liens']),
@@ -291,6 +322,9 @@ async function lireDonneesBilan() {
     mailsVentes: Array.isArray(mailsVentes) ? mailsVentes : null,
     ebay: ebayL,
     versements: versementsDeLignes(txn),
+    // (11 nov., saisie rapide) « Vendu ailleurs » et la table transaction → annonce (jamais un titre).
+    decisions: mm && Array.isArray(txn) ? objet(mm.vrm_cycle_decisions) : null,   // table illisible ⇒ pas de dédoublonnage sûr ⇒ rien
+    txItem: Array.isArray(txn) ? Object.fromEntries(txn.filter((r) => r && r.tx && r.it).map((r) => [String(r.tx), String(r.it)])) : {},
     // `null` = illisible (le bilan le NOMME) ; ligne absente = aucune vente.
     vestiaire: (vcV === undefined || vcL === undefined) ? null : ventesVcDe({ ventes: (vcV && vcV.ventes) || null, liens: (vcL && vcL.liens) || {}, auto: numerosVcAvecLiens((mm && mm.vrm_vc_numeros) || {}, mm && mm.vrm_vc_liens) }),
     main: mm,
@@ -323,7 +357,7 @@ function txsAExpedier(d) {
   // l'extension. Une preuve illisible (`null`) manque, rien d'autre : le colis reste compté.
   const pr = d.preuves || {};
   const partisVinted = ventesPartiesParPreuve({ bordsParTx: Array.isArray(d.bords) ? bordsDuVendeur(d) : {}, shipDone, bordsShipped,
-    panelBordsDone: pr.panelBordsDone || {}, lignesEmail: pr.lignesEmail || null, departs: d.departs, entrants: pr.entrants || null });
+    panelBordsDone: pr.panelBordsDone || {}, lignesEmail: pr.lignesEmail || null, departs: d.departs, entrants: pr.entrants || null, etiquettes: pr.etiquettes || null });
   const pasPartie = (t) => !masquees.has(t) && !partisVinted.has(String(t));
   const resume = new Set(); let resumeTrouve = false;
   const parTx = {};
@@ -362,7 +396,7 @@ function ventesEmailColis(d) {
   const pr = d.preuves || {};
   return colisVentesEmailServeur({ mails: d.mailsVentes, comptes: [...vivants], masques: d.main.vinted_accounts_hidden, panneau: d.panneau, connues, lectures,
     bordsParTx: Array.isArray(d.bords) ? bordsDuVendeur(d) : {}, shipDone: objet(d.main.vinted_ship_done), bordsShipped: objet(d.main.vinted_bords_shipped),
-    panelBordsDone: pr.panelBordsDone || {}, lignesEmail: pr.lignesEmail || null, departs: d.departs, entrants: pr.entrants || null });
+    panelBordsDone: pr.panelBordsDone || {}, lignesEmail: pr.lignesEmail || null, departs: d.departs, entrants: pr.entrants || null, etiquettes: pr.etiquettes || null });
 }
 
 // `soir` : le bilan du DIMANCHE SOIR (26 oct.). Il porte la semaine EN COURS
@@ -386,7 +420,7 @@ async function bilanDeLaSemaine(maintenant = Date.now(), soir = false) {
   if (!bilanAEnvoyer(b)) return 'données illisibles — réessai demain';
   // Le mémo AVANT l'envoi, et CONFIRMÉ : un bilan par semaine, jamais deux.
   if (!(await ecrireDedup('bilan_semaine_dedup', { semaine: sem.lundi, at: new Date(maintenant).toISOString() }))) return 'mémo non écrit — rien envoyé';
-  const t = texteBilan(b, sem);
+  const t = texteBilan(b, sem, motsServeur(d.main && d.main[MAIN_MOTS], proprietaireCourant()));   // (11 nov.) « paire » / « article »
   const envoi = await sendPushToAll({ cat: 'bilan', title: t.titre, body: t.corps, tag: 'bilan-' + sem.lundi, url: DESTINATIONS.semaine({ lundi: sem.lundi }) });   // (10 nov., lot BC) l'écran « Ma semaine », sur CETTE semaine
   // Le bilan rendu ne porte AUCUN montant (la réponse d'un cron se lit dans un
   // tableau de bord) : seulement les états, et le nombre de colis.
@@ -762,14 +796,19 @@ async function lireTransporteursDuVendeur({ max = MAX_CRON, maxDeparts = MAX_DEP
 // (`bilan_mois_choix`, écrit par le serveur seul). Les lectures sont celles du
 // bilan de la semaine (projetées, paginées) + la publication du bénéfice. Le
 // canal : le serveur SMTP des e-mails de l'essai (RELANCES_SMTP_*). La part du
-// jour (`COMPTEUR_BILAN_MOIS`) est posée par le handler, partagée par les lots.
-let COMPTEUR_BILAN_MOIS = { reste: 0 };
+// jour est posée par le handler, partagée par les lots DE CE PASSAGE.
+// (12 nov., M79) Elle voyage dans le contexte du vendeur (`contexteVendeur`,
+// `compteurBilan`), plus dans une variable de module : deux passages simultanés
+// sur la même instance ne se volent plus le plafond. Sans compteur : rien.
 async function bilanDuMoisVendeur(maintenant = Date.now()) {
   const owner = proprietaireCourant();
   if (!owner) return null;
+  const store = contexteVendeur.getStore && contexteVendeur.getStore();
+  const compteur = store && store.compteurBilan;
+  if (!compteur) return null;
   const cfg = configurationRelances();
   return bilanMoisVendeur({
-    owner, maintenant, compteur: COMPTEUR_BILAN_MOIS, config: cfg, service: process.env.SUPABASE_SERVICE_KEY || '',
+    owner, maintenant, compteur, config: cfg, service: process.env.SUPABASE_SERVICE_KEY || '',
     lireChoix: () => getRow(ID_CHOIX_BILAN_MOIS), lireEnvois: () => getRow(ID_ENVOIS_BILAN_MOIS),
     ecrireEnvois: (data) => ecrireDedup(ID_ENVOIS_BILAN_MOIS, data),
     lireDonnees: lireDonneesBilan,
@@ -807,9 +846,18 @@ async function traiterVendeur() {
   let transporteursPdf = null;
   try { transporteursPdf = await etiquettesCron({ max: MAX_PDF_MATIN, budgetMs: BUDGET_PDF_MATIN_MS }); }
   catch (e) { transporteursPdf = { fait: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
+  // (11 nov., lot agent2-veille) Le contrôle de nuit, en LECTURE SEULE (api/_lib/controle-nuit.js) :
+  // une seule écriture, SA ligne `vrm_controle_nuit` ; un échec n'empêche aucun rappel.
+  let controle = null;
+  try { controle = await controleVendeur({ lireTout: (p) => fetchPaginated(scoped(p)), ecrire: ecrireDedup }); }
+  catch (e) { controle = { ecrit: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
+  // Un chiffre qui a chuté sans raison et n'a pas encore sonné (le filet de `/api/push` action `veille`).
+  let veilleChiffres = null;
+  try { veilleChiffres = await notifierAlertesChiffres({ getRow, ecrire: ecrireDedup, pousser: sendPushToAll, active: () => pushCategorieActive(CAT_VEILLE) }); }
+  catch (e) { veilleChiffres = { envoye: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
   const out = await traiterVendeurApresRelecture();
   const rappels = await rappelsPersoSur();
-  return { ...out, rappels, ...(bilanMois ? { bilanMois } : {}), ebayRelu: resumeRelecture(relu), transporteurs: transp, transporteursAnciens, transporteursPdf };
+  return { ...out, rappels, ...(bilanMois ? { bilanMois } : {}), ebayRelu: resumeRelecture(relu), transporteurs: transp, transporteursAnciens, transporteursPdf, controle, veilleChiffres: { envoye: veilleChiffres.envoye, n: veilleChiffres.n || 0, raison: veilleChiffres.raison || null } };
 }
 async function traiterVendeurApresRelecture() {
     const today = parisDate(0);
@@ -828,14 +876,16 @@ async function traiterVendeurApresRelecture() {
     try {
       const mois = today.slice(0, 7);
       if (today.endsWith('-01')) {
-        const deja = (await getRow('urssaf_reminder_dedup')) || {};
-        if (deja.mois !== mois && await pushCategorieActive('urssaf')) {
+        const deja = await getRow('urssaf_reminder_dedup');
+        if (deja === undefined) urssaf = 'mémo illisible — rien';
+        else if ((deja || {}).mois !== mois && await pushCategorieActive('urssaf')) {
           const n = notificationUrssaf({ today, main: await getRowProjete('main', MAIN_URSSAF) });
+          let res = { reserve: false, raison: '' };
           if (n.envoyer) {
-            await sendPushToAll({ cat: 'urssaf', title: n.titre, body: n.corps, tag: 'urssaf-' + mois, url: n.url });
-            await ecrireDedup('urssaf_reminder_dedup', { mois });
+            res = await reserverDedup('urssaf_reminder_dedup', (d) => !!d && d.mois === mois, (d) => ({ ...(d || {}), mois }));
+            if (res.reserve) await sendPushToAll({ cat: 'urssaf', title: n.titre, body: n.corps, tag: 'urssaf-' + mois, url: n.url });
           }
-          urssaf = n.envoyer ? 'envoyé · ' + n.raison : n.raison;
+          urssaf = !n.envoyer ? n.raison : res.reserve ? 'envoyé · ' + n.raison : res.raison === 'deja' ? 'déjà rappelé ce mois' : 'mémo illisible — rien';
         }
       } else {
         // (29 oct.) Le rappel avant l'échéance : une fois par échéance (`veille`
@@ -846,9 +896,9 @@ async function traiterVendeurApresRelecture() {
           if (deja && deja.veille === n.cle) urssaf = 'déjà rappelé avant l\'échéance';
           else if (deja === undefined) urssaf = 'mémo illisible — rien';
           else if (await pushCategorieActive('urssaf')) {
-            await sendPushToAll({ cat: 'urssaf', title: n.titre, body: n.corps, tag: 'urssaf-veille-' + n.cle, url: n.url });
-            await ecrireDedup('urssaf_reminder_dedup', { ...(deja || {}), veille: n.cle });
-            urssaf = 'envoyé · ' + n.raison;
+            const res = await reserverDedup('urssaf_reminder_dedup', (d) => !!d && d.veille === n.cle, (d) => ({ ...(d || {}), veille: n.cle }));
+            if (res.reserve) await sendPushToAll({ cat: 'urssaf', title: n.titre, body: n.corps, tag: 'urssaf-veille-' + n.cle, url: n.url });
+            urssaf = res.reserve ? 'envoyé · ' + n.raison : res.raison === 'deja' ? 'déjà rappelé avant l\'échéance' : 'mémo illisible — rien';
           }
         }
       }
@@ -882,6 +932,17 @@ async function traiterVendeurApresRelecture() {
     // (l'app ouverte prévient tout de suite, api/push.js action `comptes`). Une fois par compte.
     let comptesRelies = null;
     try { const r = await notifierComptesRelies(); comptesRelies = { envoye: r.envoye, n: r.n, raison: r.raison }; } catch (e) { comptesRelies = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
+    // (11 nov., ext. 5.350) VINTED A MASQUÉ / FAIT DISPARAÎTRE / LIMITE, envoi de l'extension raté :
+    // le filet (une fois par événement, la mémoire du serveur décide).
+    let moderation = null;
+    try { const r = await notifierModeration(); moderation = { envoye: r.envoye, n: r.n, raison: r.raison }; } catch (e) { moderation = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
+    // (11 nov., lot avis-negatif) UN AVIS ≤ SEUIL, extension sans réseau au moment de sa lecture : le filet.
+    let avisBas = null;
+    try { const r = await notifierAvisBas(); avisBas = { envoye: r.envoye, n: r.n, raison: r.raison }; } catch (e) { avisBas = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
+    // (11 nov., saisie rapide) « Vendu 80 € · N°124 : combien tu l'avais payée ? », app fermée partout :
+    // le filet (l'app ouverte prévient tout de suite). Mêmes règles : vente relue, une fois, jamais la nuit.
+    let prixAchat = null;
+    try { const r = await demandesPrixAchat(); prixAchat = { envoye: r.envoye, n: r.n, raison: r.raison }; } catch (e) { prixAchat = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
     let relecture = null;
     try { relecture = await rappelComptesARelire(Date.now(), enPanne); } catch (e) { relecture = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
 
@@ -921,7 +982,7 @@ async function traiterVendeurApresRelecture() {
     // (1er nov., audit A4) Les ventes Vestiaire : leur date limite, la règle de Colis.
     const vcR = t ? t.vestiaire : resumeColisSites({ vc: d.vc }).vestiaire;
     const vcDus = vcR ? vcR.overdue + vcR.today + vcR.tomorrow : 0;
-    if (vintedSkip && !vcDus && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, skipped: vintedSkip + ' — aucune notification envoyée' };
+    if (vintedSkip && !vcDus && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, avisBas, prixAchat, skipped: vintedSkip + ' — aucune notification envoyée' };
 
     const c = vintedSkip ? null : compterEcheances({ txs: [...t.vinted], ventes: ventesParTx(d), bords: bordsDuVendeur(d), maintenant: Date.now() });
     // ⚠️ (revue du 22 oct.) `overdue` = une limite LUE (email du bordereau, ou
@@ -938,16 +999,21 @@ async function traiterVendeurApresRelecture() {
     const nePasPoster = eb ? eb.nePasPoster : 0;
 
     // Anti-doublon : une seule notification par jour pour un même total.
-    const dedup = (await getRow('ship_reminder_dedup')) || {};
-    if (dedup.date === today && dedup.total === total && (dedup.nePasPoster || 0) === nePasPoster) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, skipped: 'déjà notifié', total };
+    const dedupLu = await getRow('ship_reminder_dedup');
+    // (11 nov., M81) un mémo illisible n'est pas « jamais notifié » : rien ne part.
+    if (dedupLu === undefined) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, avisBas, prixAchat, skipped: 'mémo illisible — rien', total };
+    const memeJour = (d) => !!d && d.date === today && d.total === total && (d.nePasPoster || 0) === nePasPoster;
+    if (memeJour(dedupLu)) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, avisBas, prixAchat, skipped: 'déjà notifié', total };
 
     if ((total > 0 || nePasPoster > 0) && await pushCategorieActive('expedier')) {
+      // (11 nov., B130) réservé AVANT l'envoi : deux passages ⇒ une seule notification.
+      const res = await reserverDedup('ship_reminder_dedup', memeJour, () => ({ date: today, total, nePasPoster }));
+      if (!res.reserve) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, avisBas, prixAchat, skipped: res.raison === 'deja' ? 'déjà notifié' : 'mémo illisible — rien', total };
       const txt = texteMatin({ overdue, aVerifier, dueToday, dueTomorrow, ebayDus, vestiaireDus: vcDus, nePasPoster, vinted: c });
       // (11 nov.) Des colis dus aujourd'hui (ou en retard) : urgent — il passe un jour calme.
       await sendPushToAll({ cat: 'expedier', ...txt, tag: 'ship-reminder', url: DESTINATIONS.colis({}), ...(overdue + dueToday > 0 ? { urgent: true } : {}) });
-    }
-    await ecrireDedup('ship_reminder_dedup', { date: today, total, nePasPoster });
-    return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, overdue, aVerifier, dueToday, dueTomorrow, total,
+    } else await ecrireDedup('ship_reminder_dedup', { date: today, total, nePasPoster });
+    return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, avisBas, prixAchat, overdue, aVerifier, dueToday, dueTomorrow, total,
       ...(c ? { heures: { aujourdhui: c.premier.aujourdhui ? c.premier.aujourdhui.heure : null, demain: c.premier.demain ? c.premier.demain.heure : null }, estimees: c.estimees, sansLimite: c.sansLimite } : {}),
       ebay: eb ? { aPoster: eb.total, dus: ebayDus, nePasPoster } : null, vestiaire: vcR ? { aPoster: vcR.total, dus: vcDus } : null, ...(vintedSkip ? { vintedSkip } : {}) };
 }
@@ -1299,6 +1365,49 @@ async function passageGroupe(maintenant = Date.now()) {
   }
   return { fait: true, fenetres: aVider.length, resumes: envoyes, echecs, budgetAtteint, bilans: bilans.slice(0, 50) };
 }
+// (11 nov., lot lbc-plus) LES REMISES EN MAIN PROPRE (api/_lib/remises-main-propre.js) :
+// UNE notification une heure avant le rendez-vous qu'IL a posé (jamais proposé par VRM).
+// Seuls les vendeurs dont `main.data->>vrm_remise_fin` est à venir sont visités (une
+// projection filtrée par la base, §4.4) ; `main` lu PROJETÉ sur `vrm_remises` seule ; le
+// mémo `remises_rappel_dedup` lu en trois états (illisible ⇒ rien) et écrit AVANT l'envoi,
+// confirmé (sinon rien ne part, et rien ne part deux fois). Famille « Rappels » coupée ⇒
+// rien. L'échéance (l'heure du rendez-vous) accompagne la notification : la porte commune
+// la laisse passer tout de suite (< 24 h), heures calmes selon sa règle. La réponse ne
+// porte que des nombres : jamais un lieu, un N° ou un titre.
+async function rappelsRemisesSur(maintenant = instantNotif()) {
+  try {
+    const main = await getRowProjete('main', [CLE_REMISES]);
+    if (main === undefined) return { etat: 'pas-su' };
+    const remises = lireRemises(main && main[CLE_REMISES]);
+    if (!remises.some((r) => r.etat === 'prevue')) return { etat: 'aucune' };
+    const memo = await getRow(MEMO_REMISES);
+    if (memo === undefined) return { etat: 'memo-illisible' };
+    const envoyes = memo && memo.envoyes;
+    const dus = remisesDues(remises, envoyes, maintenant);
+    if (!dus.length) return { etat: 'rien-de-du' };
+    if (!(await pushCategorieActive('rappel'))) return { etat: 'coupe', n: dus.length };
+    if (!(await ecrireDedup(MEMO_REMISES, { envoyes: memoRemisesApres(envoyes, dus, maintenant), at: new Date(maintenant).toISOString() }))) return { etat: 'memo-non-ecrit', n: dus.length };
+    const t = dus.length === 1 ? texteRappelRemise(dus[0]) : texteRappelsRemise(dus);
+    const premier = dus.slice().sort((a, b) => instantRemise(a.jour, a.heure) - instantRemise(b.jour, b.heure))[0];
+    const envoi = await sendPushToAll({ cat: 'rappel', title: t.title, body: t.body, tag: TAG_REMISE(dus.length === 1 ? dus[0].id : 'lot-' + premier.id), cle: 'remise-' + dus.map((r) => r.id).sort().join('-'),
+      echeance: instantRemise(premier.jour, premier.heure), url: lienNotif('ventes', { site: 'leboncoin', cible: 'vente', tx: premier.tx }) });
+    return { etat: 'envoye', n: dus.length, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
+  } catch (e) { return { etat: 'echec' }; }
+}
+async function passageRemises(maintenant = instantNotif()) {
+  const debut = Date.now();
+  const iso = new Date(maintenant).toISOString();
+  const lignes = await fetchPaginated(`app_data?id=eq.main&data->>vrm_remise_fin=gte.${encodeURIComponent(iso)}&select=owner`);
+  if (!lignes) return { fait: false, raison: 'pas su' };
+  const owners = [...new Set(lignes.map((x) => x && x.owner && String(x.owner)).filter(Boolean))];
+  let envoyees = 0, echecs = 0, budgetAtteint = false;
+  for (let i = 0; i < owners.length; i += VENDEURS_EN_PARALLELE) {
+    if (Date.now() - debut > 120000) { budgetAtteint = true; break; }
+    const out = await Promise.all(owners.slice(i, i + VENDEURS_EN_PARALLELE).map((o) => contexteVendeur.run({ owner: o }, () => rappelsRemisesSur(maintenant)).catch(() => ({ etat: 'echec' }))));
+    out.forEach((r) => { if (r && r.etat === 'envoye') envoyees += 1; if (r && r.etat === 'echec') echecs += 1; });
+  }
+  return { fait: true, vendeurs: owners.length, envoyees, echecs, budgetAtteint };
+}
 // (11 nov., décision C8) Le passage horaire : le résumé seul (ni eBay relu, ni bilan de la semaine).
 async function traiterVendeurSoirHeure() {
   const out = await rappelDuSoir(Date.now(), { horaire: true });
@@ -1394,11 +1503,24 @@ async function alerterColis(r) {
   } catch (e) { return { fait: false, erreur: String((e && e.message) || e).slice(0, 120) }; }
 }
 
+// ── (12 nov., agent2-fiabilite-prod) L'EXPORT QUOTIDIEN DES LIGNES DE CHAQUE VENDEUR ──
+// api/_lib/sauvegarde-quotidienne.js : un fichier chiffré par vendeur et par jour,
+// seau Storage PRIVÉ `sauvegardes`, 14 jours. Au cron du SOIR (avant les vendeurs,
+// borné) et `?moment=sauvegarde` (GitHub, .github/workflows/sauvegarde.yml) ; une
+// relance le même jour ne refait que ce qui manque. Vendeurs pas sus ⇒ rien.
+async function sauvegardeDuJour(budgetMs) {
+  const cle = sourceCle(process.env);
+  const mains = await ownersActifs();
+  const comptes = mains ? await fetchPaginated('vinted_accounts?select=owner') : null;
+  const owners = mains && comptes ? [...new Set([...mains, ...comptes.map((c) => c && c.owner).filter(Boolean).map(String)])] : null;
+  return passageSauvegarde({ owners, lire: fetchPaginated, stockage: stockageSupabase({ url: SUPABASE_URL, entetes: HEADERS }), cle, budgetMs });
+}
+
 // ── LES LIGNES DU PROPRIÉTAIRE NEUTRE (le curseur du cron) ─────────────────
 // Trois états : objet · `null` (absente) · `undefined` (pas su).
 async function lireNeutre(id) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=eq.${encodeURIComponent(id)}&select=data&limit=1`, { headers: HEADERS });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=eq.${encodeURIComponent(id)}&select=data&limit=1`, { headers: HEADERS });
     if (!r.ok) return undefined;
     const j = await r.json();
     if (!Array.isArray(j)) return undefined;
@@ -1407,7 +1529,7 @@ async function lireNeutre(id) {
 }
 async function ecrireNeutre(id, data) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
       method: 'POST',
       headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify([{ owner: PROPRIETAIRE_NEUTRE, id, data, updated_at: new Date().toISOString() }]),
@@ -1417,7 +1539,7 @@ async function ecrireNeutre(id, data) {
 }
 async function retirerNeutre(id) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: { ...HEADERS, Prefer: 'return=minimal' } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: { ...HEADERS, Prefer: 'return=minimal' } });
     return !!(r && r.ok);
   } catch (_) { return false; }
 }
@@ -1448,6 +1570,26 @@ export default async function handler(req, res) {
     res.status(s && s.fait ? 200 : 503).json({ ok: !!(s && s.fait), moment: 'sondes', sondes: s });
     return;
   }
+  // (12 nov., agent2-fiabilite-prod) `?moment=sauvegarde` : l'export du jour, RIEN d'autre.
+  // La réponse ne porte que des NOMBRES ; pas fait ⇒ 503 (le workflow échoue, GitHub prévient).
+  if (moment === 'sauvegarde') {
+    let r = null;
+    try { r = await sauvegardeDuJour(200000); } catch (e) { r = { fait: false, raison: String((e && e.message) || e).slice(0, 200) }; }
+    res.status(r && r.fait && !r.echecs ? 200 : 503).json({ ok: !!(r && r.fait) && !r.echecs, moment: 'sauvegarde', ...r });
+    return;
+  }
+  // (11 nov., H14) UN SEUL PASSAGE À LA FOIS par moment (api/_lib/cron-lots.js `prendreBail`) :
+  // un second appel simultané (cron Vercel + GitHub, rejeu) ne fait rien et le dit (200).
+  // Bail pas su (base muette) ⇒ le passage se fait comme avant, la réponse le dit.
+  const momentBail = moment === 'soir' && String((req.query && req.query.passage) || '') === 'heure' ? 'soir_heure' : (moment || 'matin');
+  const jetonBail = crypto.randomUUID();
+  const bail = await prendreBail({ moment: momentBail, jeton: jetonBail, modifier: modifierNeutre, maintenant: Date.now() });
+  if (bail.pris === false) { res.status(200).json({ ok: true, moment: momentBail, saute: 'passage-en-cours', jusqua: new Date(bail.jusqua).toISOString() }); return; }
+  try { await passageDuCron(req, res, moment, bail.pris === true ? 'pris' : 'pas-su'); }
+  finally { if (bail.pris === true) await rendreBail({ moment: momentBail, jeton: jetonBail, modifier: modifierNeutre, maintenant: Date.now() }); }
+}
+
+async function passageDuCron(req, res, moment, bailEtat) {
   // (9 nov., retraits frais) `?moment=colis` : le statut des colis ACTIFS chez le transporteur, et RIEN
   // d'autre (ni rappel, ni bilan, ni sonde) — GitHub toutes les 15 min (.github/workflows/colis-frais.yml).
   // Seuls les vendeurs qui ont une ligne due sont visités (api/_lib/colis-frequent.js) ; sélection pas
@@ -1509,7 +1651,30 @@ export default async function handler(req, res) {
       if (!cl) { res.status(503).json({ ok: false, moment: 'groupe', raison: cl === null ? 'base injoignable' : 'cloisonnement-requis' }); return; }
       r = await passageGroupe(instantNotif());
     } catch (e) { r = { fait: false, raison: String((e && e.message) || e).slice(0, 200) }; }
-    res.status(r && r.fait ? (r.echecs ? 500 : 200) : 503).json({ ok: !!(r && r.fait) && !r.echecs, moment: 'groupe', ...r });
+    // (11 nov., lot lbc-plus) Le même passage de 15 min sert le rappel « une heure avant »
+    // des remises en main propre. Un échec de l'un n'empêche pas l'autre.
+    let remises = null;
+    try { remises = await passageRemises(instantNotif()); } catch (e) { remises = { fait: false, raison: String((e && e.message) || e).slice(0, 120) }; }
+    res.status(r && r.fait ? (r.echecs ? 500 : 200) : 503).json({ ok: !!(r && r.fait) && !r.echecs, moment: 'groupe', ...r, remises });
+    return;
+  }
+  // (11 nov., lot alertes-ebay) `?moment=alertes` : les ALERTES D'ACHAT eBAY, et RIEN d'autre —
+  // GitHub chaque heure (.github/workflows/alertes-ebay.yml). Seuls les vendeurs qui ont allumé
+  // l'alerte d'une recherche sont visités (api/_lib/ebay-alertes.js) ; sélection pas lue ⇒ 503.
+  // La réponse ne porte que des NOMBRES (aucun vendeur, aucune annonce).
+  if (moment === 'alertes') {
+    let r = null;
+    try {
+      const cl = await cloisonnee();
+      if (!cl) { res.status(503).json({ ok: false, moment: 'alertes', raison: cl === null ? 'base injoignable' : 'cloisonnement-requis' }); return; }
+      r = await passageAlertesEbay({
+        lire: fetchPaginated, lireDonnee: lireDonneeEbay, modifierDonnee: modifierDonneeEbay, jetonApplication, oublierJetonApplication,
+        notifier: (o, nv) => contexteVendeur.run({ owner: o }, () => sendPushToAll(notifAlertes(nv))),
+        exclus: [PROPRIETAIRE_NEUTRE], maintenant: Date.now(), budgetMs: 100000,
+      });
+    } catch (e) { r = { fait: false, raison: String((e && e.message) || e).slice(0, 200) }; }
+    const { fait, ...nombres } = r || {};
+    res.status(fait ? (r.echecs || r.panne ? 500 : 200) : 503).json({ ok: !!fait && !r.echecs && !r.panne, moment: 'alertes', ...nombres });
     return;
   }
   const soir = moment === 'soir';
@@ -1542,14 +1707,17 @@ export default async function handler(req, res) {
     // (9 nov.) Les sondes de /statut, aussi au matin et au soir (si GitHub ne passe pas).
     let sondes = null;
     if (!reveil && !horaire) { try { sondes = await sondesStatut(debutCron); } catch (e) { sondes = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
+    // (12 nov., agent2-fiabilite-prod) L'export du jour, au cron du SOIR seulement (le matin est chargé), borné à 90 s.
+    let sauvegarde = null;
+    if (soir && !horaire) { try { sauvegarde = await sauvegardeDuJour(90000); } catch (e) { sauvegarde = { fait: false, raison: String((e && e.message) || e).slice(0, 200) }; } }
     let relances = null;
     if (!soir && !reveil) { try { relances = await passageRelances({ jusqua: debutCron + RELANCES_JUSQUA_MS }); } catch (e) { relances = { erreur: String((e && e.message) || e).slice(0, 200) }; } }
     // (8 nov.) La part du plafond d'e-mails laissée au bilan du mois : 300 par jour
     // pour tout VRM (Brevo gratuit, `VRM_EMAILS_PAR_JOUR`), moins les e-mails de
     // l'essai déjà partis, 150 au plus (api/_lib/bilan-mois.js `partBilan`).
-    COMPTEUR_BILAN_MOIS = { reste: !soir && !reveil ? partBilan({ dejaEnvoyes: relances && relances.envoyes }) : 0 };
+    const compteurBilan = { reste: !soir && !reveil ? partBilan({ dejaEnvoyes: relances && relances.envoyes }) : 0 };
     // (8 nov.) L'identité de l'éditeur au pied du bilan (public/legal/editeur.js), lue une fois.
-    if (COMPTEUR_BILAN_MOIS.reste > 0) { try { await lireMentions(); } catch (_) {} }
+    if (compteurBilan.reste > 0) { try { await lireMentions(); } catch (_) {} }
     // (6 nov., filet 4) La veille des plantages.
     let veille = null;
     if (!soir && !reveil) { try { veille = await veilleDesPlantages(debutCron); } catch (e) { veille = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
@@ -1581,6 +1749,18 @@ export default async function handler(req, res) {
     // bornés par passage ; une lecture ratée ne fait rien (dit dans la réponse).
     let clientsPartis = null;
     if (!soir && !reveil) { try { clientsPartis = await passageClientsPartis({ maintenant: debutCron }); } catch (e) { clientsPartis = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
+    // (11 nov., lot agent2-veille) Le contrôle de nuit de l'INSTALLATION (lecture seule) : e-mails en
+    // quarantaine sans vendeur, abonnements Stripe incohérents — rangé chez le propriétaire seul.
+    let controleInst = null;
+    if (!soir && !reveil) {
+      try {
+        controleInst = await controleInstallation({
+          lire: fetchPaginated, proprio: await proprietaireInstallation(), maintenant: debutCron,
+          stripe: { pret: stripePret, api: stripeApi },
+          ecrire: (owner, id, data) => contexteVendeur.run({ owner }, () => ecrireDedup(id, data)),
+        });
+      } catch (e) { controleInst = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; }
+    }
 
     // ── LES VENDEURS, PAR LOTS (api/_lib/cron-lots.js) ─────────────────────────
     //    UNE passe PAR vendeur, chacun dans SON contexte (AsyncLocalStorage : deux
@@ -1603,21 +1783,22 @@ export default async function handler(req, res) {
     const budget = Number(process.env.VRM_CRON_BUDGET_MS) > 0 ? Number(process.env.VRM_CRON_BUDGET_MS) : BUDGET_VENDEURS_MS;
     const lot = await passerVendeurs({
       owners, moment: momentCurseur, jour: parisDate(0), debut: debutCron, budgetMs: budget, parallele: VENDEURS_EN_PARALLELE,
-      traiter: (o) => contexteVendeur.run({ owner: o }, () => traiter()),
+      tempsVendeurMs: Number(process.env.VRM_CRON_VENDEUR_MS) > 0 ? Number(process.env.VRM_CRON_VENDEUR_MS) : TEMPS_VENDEUR_MS,   // (11 nov.) un vendeur énorme ne garde pas sa place
+      traiter: (o) => contexteVendeur.run({ owner: o, compteurBilan }, () => traiter()),
       lireCurseur: lireNeutre, ecrireCurseur: ecrireNeutre, retirerCurseur: retirerNeutre,
     });
     const { bilans, echecs } = lot;
-    res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(soir ? { moment: 'soir', ...(horaire ? { passage: 'heure' } : {}) } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs,
-      lot: { traites: lot.traites, dejaFaits: lot.dejaFaits, restants: lot.restants, prioritaires: lot.prioritaires, budgetAtteint: lot.budgetAtteint, curseur: lot.curseur },
-      bilans, ...(sondes ? { sondes } : {}), ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(purgeErreurs ? { purgeErreurs } : {}), ...(pilotage ? { pilotage } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}), ...(clientsPartis ? { clientsPartis } : {}) });
+    res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(bailEtat === 'pas-su' ? { bail: 'pas-su' } : {}), ...(soir ? { moment: 'soir', ...(horaire ? { passage: 'heure' } : {}) } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs,
+      lot: { traites: lot.traites, dejaFaits: lot.dejaFaits, restants: lot.restants, prioritaires: lot.prioritaires, budgetAtteint: lot.budgetAtteint, reportes: lot.reportes, curseur: lot.curseur },
+      bilans, ...(sondes ? { sondes } : {}), ...(sauvegarde ? { sauvegarde } : {}), ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(purgeErreurs ? { purgeErreurs } : {}), ...(pilotage ? { pilotage } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}), ...(clientsPartis ? { clientsPartis } : {}), ...(controleInst ? { controleInstallation: controleInst } : {}) });
   } catch (e) {
     // Une tâche planifiée qui répond 200 sur une panne n'apparaît nulle part :
     // le tableau de bord la compte réussie, et les rappels d'expédition
     // cessent en silence. 500 = visible.
-    res.status(500).json({ ok: false, erreur: 'panne', message: String(e) });
+    res.status(500).json({ ok: false, erreur: 'panne', message: String((e && e.name) || 'erreur') + ' : ' + String((e && e.message) || '').slice(0, 160) });   // (11 nov., B127) borné, sans pile
   }
 }
 
 // (8 nov., « à envoyer » prouvé) Pour le banc seulement (scripts/audit-a-envoyer-preuves.cjs) : la
 // composition « à expédier » du soir, du bilan et du matin, exécutée sur une fausse base.
-export const _banc = { txsAExpedier, lireDonneesColis, lireDonneesBilan };
+export const _banc = { txsAExpedier, lireDonneesColis, lireDonneesBilan, bilanDuMoisVendeur };   // (12 nov.) + le bilan du mois (M79, audit-revue-fin)

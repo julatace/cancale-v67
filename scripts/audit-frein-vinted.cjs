@@ -20,8 +20,8 @@
 //      après 6 h calmes, et deux freins à la suite ne montent pas deux paliers ;
 //   6. l'autre sens : un 404/500 ne met pas en pause, et la pause finie, tout
 //      repart ;
-//   7. la moisson faite DANS LA PAGE (`inject.js`) s'arrête au premier 429,
-//      prévient le fond, et ne démarre pas pendant une pause.
+//   7. la page (`inject.js`) ne lance plus aucune moisson (5.356) : rien ne
+//      part hors de la file du fond, pause ou pas.
 //  Données inventées. Usage : node scripts/audit-frein-vinted.cjs [--src f]
 //  (`--inject f` : une autre copie d'`inject.js`, pour la preuve sur l'avant.)
 // ════════════════════════════════════════════════════════════════════════════
@@ -191,14 +191,14 @@ function pageInject({ repondre, avantChargement } = {}) {
   });
 
   console.log('── 7. la moisson faite dans la page (inject.js)');
-  await essaie('inject : arrêt au premier 429', async () => {
+  // 5.356 (revue de robustesse, hautes 7-9) : la page ne moissonne PLUS du tout —
+  // sa moisson partait hors de la file du fond (deux requêtes en vol), ne relisait
+  // la pause qu'au départ et continuait sans content.js. La même lecture se fait
+  // dans le fond (`pageActiveFetch`), dans la file, arrêtée net au 429 (§2 ci-dessus).
+  await essaie('inject : aucune moisson lancée par la page', async () => {
     const pg = pageInject({ repondre: (u) => (/wardrobe/.test(u) ? { status: 429 } : /users\/current/.test(u) ? { status: 200, body: { user: { id: PID } } } : { status: 200, body: { my_orders: [], conversations: [] } }) });
     await attendre(250);
-    const i = pg.appels.findIndex((u) => /wardrobe/.test(u));
-    dit(i >= 0, 'la moisson de la page a démarré et reçu le 429', JSON.stringify(pg.appels));
-    const apres = i >= 0 ? pg.appels.slice(i + 1) : [];
-    dit(i >= 0 && apres.length === 0, 'après le 429, la page n’envoie PLUS RIEN (ni ventes, ni achats, ni boîte)', `${apres.length} requête(s) : ${apres.join(' · ')}`);
-    dit(pg.posts.some((m) => m && m.kind === 'vintedFrein' && m.statut === 429), 'et elle prévient le fond (`vintedFrein`)', JSON.stringify(pg.posts.filter((m) => m && m.kind !== 'seen_urls').map((m) => m.kind)));
+    dit(pg.appels.length === 0, 'la page ne lance AUCUNE requête Vinted d’elle-même (tout passe par la file du fond)', JSON.stringify(pg.appels));
   });
   await essaie('inject : pas de moisson pendant une pause', async () => {
     const pg = pageInject({ repondre: () => ({ status: 200, body: {} }), avantChargement: { __tag: 'CANCALE_VINTED_PAUSE', jusqua: Date.now() + 600000 } });

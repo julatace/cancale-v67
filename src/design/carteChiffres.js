@@ -29,6 +29,7 @@ import { aVenirPour } from '../argentAVenir.js';
 import { dateLocale } from '../formatsDate.js';   // (9 nov., vitesse) un format créé une fois
 
 export const CLE_CARTE_STATS = 'vrm_carte_stats';
+import { motsVendeur } from '../profilVendeur.js';
 
 export const SITES = ['toutes', 'vinted', 'vestiaire', 'leboncoin', 'ebay'];
 export const NOM_SITE = { toutes: 'Tous les sites', vinted: 'Vinted', vestiaire: 'Vestiaire', leboncoin: 'Leboncoin', ebay: 'eBay' };
@@ -61,7 +62,7 @@ export const CHIFFRES = {
   // (5 nov., chantier E1, revue 1.2) Le mot de l'app : « À envoyer » (src/libelles.js). L'id reste
   // `aposter` (les réglages rangés le gardent).
   aposter:    { nom: 'À envoyer', court: 'à envoyer', type: 'n', periodes: null, sites: SITES, compte: false, aller: 'cat_bord' },
-  retirer:    { nom: 'À retirer', court: 'à retirer', type: 'n', periodes: null, sites: ['toutes'], compte: false, aller: 'cat_bord' },
+  retirer:    { nom: 'À retirer', court: 'à retirer', type: 'n', periodes: null, sites: ['toutes'], compte: false, aller: 'retraits' }, // (11 nov., lot DJ3) « À retirer » vit en tête d'Achats
   // (4 nov.) « Argent à venir » : ce que TES SITES te doivent encore (src/argentAVenir.js,
   // `liveStats.aVenir`) — toutes plateformes, par compte Vinted. L'id reste `attente`
   // (les réglages rangés le gardent) ; il ne lit plus le seul porte-monnaie Vinted.
@@ -91,14 +92,14 @@ export const AIDE_CHIFFRES = {
   declarer: 'Le chiffre d’affaires à déclarer à l’URSSAF : l’argent reçu (le calcul de Compta).',
   urssaf: CHIFFRES.urssaf.titre,
   finalisees: 'Tes ventes finalisées sur la période (Compta).',
-  aposter: 'Les colis à envoyer, comptés par l’écran Colis (tous tes sites). Ouvre Colis pour les imprimer.',
-  retirer: 'Les colis à aller chercher, comptés par l’écran Colis (e-mails des transporteurs et suivis Vinted).',
+  aposter: 'Les colis à envoyer (tous tes sites), en tête de Ventes : touche pour les imprimer.',
+  retirer: 'Les colis à aller chercher, en tête d’Achats (e-mails des transporteurs et suivis Vinted).',
   attente: 'L’argent que tes sites te doivent encore : les ventes en cours, pas encore versées.',
   dispo: 'Le solde disponible de ton porte-monnaie Vinted, relu par l’extension.',
   enligne: 'Tes annonces en ligne, d’après la dernière lecture complète de ton dressing (de moins de 24 h).',
   masquees: CHIFFRES.masquees.titre,
   dorment: 'Tes annonces en ligne depuis plus de 30 jours (l’écran Annonces).',
-  stock: 'Le prix d’achat de tes paires encore chez toi, calculé par l’écran Annonces. Une paire sans prix d’achat n’y est pas : le montant est alors un minimum.',
+  get stock() { const m = motsVendeur(); return `Le prix d’achat de ${m.tes} encore chez toi, calculé par l’écran Annonces. ${m.Un} sans prix d’achat n’y est pas : le montant est alors un minimum.`; },
   objectif: 'Où tu en es de ton objectif du mois (la barre de la carte) : la part atteinte, en pourcentage.',
   urssafapayer: 'Les cotisations de ta prochaine échéance URSSAF, sur l’argent reçu (le rappel de Ma journée). Période pas finie ⇒ « au moins ».',
 };
@@ -326,6 +327,12 @@ export const recuPublieEntre = (publie, { de, a, ym, complet }, maintenant = Dat
 // (6 nov., onglets A) UNE règle de fraîcheur pour `vrm_colis_aposter` : la carte et le badge de Colis.
 export const PUB_COLIS_MAX_MS = 12 * 3600000;
 export const publicationColisFraiche = (pub, maintenant = Date.now()) => !!pub && (!Number.isFinite(Number(pub.at)) || pub.at == null || maintenant - Number(pub.at) < PUB_COLIS_MAX_MS);
+// (11 nov., états vides) Aucun compte relié, PROUVÉ par la coque (`sources.sansCompte`) : un chiffre
+// qu'on attend ou qu'on n'a pas lu ne le sera jamais ⇒ « aucun compte relié », pas « lecture… ».
+// Toujours « — » (jamais 0) ; une valeur connue (saisie à la main) reste telle quelle.
+export const sansCompteSur = (v, sources) => (sources && sources.sansCompte && v && v.valeur == null && !v.hors
+  && (v.raison === 'encours' || v.raison === 'pasSu' || v.raison === 'publication' || v.raison === 'colis')
+  ? { ...v, raison: 'sansCompte' } : v);
 export const valeurChiffre = (id, place, sources, sel, regles, maintenant = Date.now()) => {
   const S = sources || {};
   const locaux = S.locaux || null;
@@ -506,6 +513,8 @@ export const RAISON_COURTE = {
   statut: 'statut à choisir', absente: 'ouvre Ventes', ancienne: 'à relire', 'ancienne-app': 'à relire', illisible: 'pas lu',
   // (6 nov., onglets A) des envois sans geste « Colis fait » : le nombre n'est pas su.
   nonNotes: 'envois pas notés',
+  // (11 nov., états vides) aucun compte relié, prouvé : rien ne sera lu tant qu'il n'y en a pas.
+  sansCompte: 'aucun compte relié',
   // (6 nov., onglets A) « À envoyer » pas encore compté sur cet appareil (ou plus de 12 h) : le geste.
   colis: 'ouvre Colis',
   // (11 nov., lot stats-plus) La valeur du stock pas encore publiée : le geste.
@@ -517,9 +526,12 @@ export const raisonCourte = (x) => {
   if (!x) return '';
   // (9 nov., capture de Julien : « + 1756 » sans unité, € ou ventes ?) Le manque dit son UNITÉ :
   // un nombre de VENTES sans date de versement, jamais un montant.
-  if (x.valeur != null) return x.aDater > 0 ? `+ ${nFr(x.aDater)} vente${x.aDater > 1 ? 's' : ''} à dater` : '';
+  // (12 nov., revue fin) Un montant PARTIEL le dit sous son libellé (« au moins ») : sur une case, le titre
+  // (survol) ne se voit pas au doigt — « Vendu · mois 30 € » se lisait complet avec une vente au prix inconnu.
+  if (x.valeur != null) return x.aDater > 0 ? `+ ${nFr(x.aDater)} vente${x.aDater > 1 ? 's' : ''} à dater` : x.partiel ? 'au moins' : '';
   if (x.hors) return x.hors;
   // Une case PROPRE à la page dit sa raison elle-même (Compta : « À déclarer » sans statut).
+  if (x.raison === 'sansCompte') return RAISON_COURTE.sansCompte;
   if (x.def && x.def.local && x.def.raisonCourte) return x.def.raisonCourte;
   if (x.raison === 'a-dater') return `${nFr(x.aDater)} vente${x.aDater > 1 ? 's' : ''} à dater`;
   if (x.raison === 'partiel') return x.manque && x.manque.length ? `sans ${x.manque[0]}` : 'pas tout lu';
@@ -533,7 +545,7 @@ export const valeursCarte = (page, reglage, sources, sel, regles, maintenant = D
   if (!R) return null;
   const un = (place) => {
     const def = defDe(place.id, locaux);
-    const v = valeurChiffre(place.id, place, sources, sel, regles, maintenant);
+    const v = sansCompteSur(valeurChiffre(place.id, place, sources, sel, regles, maintenant), sources);
     return { place, def, ...v };
   };
   const g = un(R.g);

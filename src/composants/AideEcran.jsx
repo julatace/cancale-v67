@@ -15,7 +15,9 @@ import { SheetShell as SheetShellBase } from './SheetShell.jsx';
 import { BoutonBase } from './Bouton.jsx';
 import { AIDE_ECRANS, ARTICLES_AIDE } from '../aideEcrans.js';
 import { ETAPES_ECRANS } from '../aideEtapes.js';
-import { fichesPour, fichesEcran, chercherAide, pourVendeur, emmener, FICHES_AIDE } from '../aideFiches.js';
+import { fichesPour, fichesEcran, chercherAide, pourVendeur, emmener, faqAide, FICHES_AIDE } from '../aideFiches.js';
+// (lot vocabulaire-article) d'abord la phrase « article » écrite en entier (PHRASES_ARTICLE), sinon pourVendeur.
+import { phraseVendeur } from '../profilVendeur.js';
 import { AideAnimation } from './AideAnimation.jsx';
 import './aide-ecran.css';
 
@@ -62,7 +64,7 @@ export function AideEcranFeuille({ cle, onClose, onSignaler, Feuille = SheetShel
   React.useEffect(() => { if (!ficheOuverte) return; try { const el = document.querySelector(`[data-aide-fiche="${ficheOuverte}"]`); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center' }); } catch (_) {} }, [ficheOuverte]);
   if (!a) return null;
   const article = ARTICLES_AIDE[a.article];
-  const etapes = (Array.isArray(ETAPES_ECRANS[cle]) ? ETAPES_ECRANS[cle] : []).map((e) => pourVendeur(e, vend));
+  const etapes = (Array.isArray(ETAPES_ECRANS[cle]) ? ETAPES_ECRANS[cle] : []).map((e) => pourVendeur(phraseVendeur(e, vend), vend));
   // L'écran : ses fiches ; la fiche demandée par la loupe passe en tête.
   let liste = trouvees || fichesEcran(fiches, cle);
   if (!trouvees && ficheOuverte && !liste.some((f) => f.id === ficheOuverte)) { const f = fiches.find((x) => x.id === ficheOuverte); if (f) liste = [f, ...liste]; }
@@ -88,13 +90,20 @@ export function AideEcranFeuille({ cle, onClose, onSignaler, Feuille = SheetShel
           {liste.map((f, i) => <FicheAide key={f.id} f={f} ouverte={f.id === ficheOuverte || (trouvees && i === 0)} avecEcran={!!trouvees && f.ecran !== cle} onEmmener={allerA} Bouton={Bouton}/>)}
         </ul>
       ) : <p className="vrm-aide-rien" data-aide-rien="">Essaie un autre mot : « bordereau », « URSSAF », « vacances ».</p>}
+      {/* (12 nov.) Les 10 questions les plus probables d'un nouveau client, dans chaque « ? ». */}
+      {!trouvees ? <>
+        <h3 className="vrm-aide-tete">Les questions les plus posées</h3>
+        <ul className="vrm-aide-groupe" data-aide-faq={faqAide(fiches).length}>
+          {faqAide(fiches).map((f) => <FicheAide key={'faq-' + f.id} f={f} ouverte={false} avecEcran={false} onEmmener={allerA} Bouton={Bouton}/>)}
+        </ul>
+      </> : null}
       <h3 className="vrm-aide-tete">Questions fréquentes</h3>
       <ul className="vrm-aide-groupe" data-aide-questions={a.questions.length}>
         {a.questions.map(([qq, r], i) => (
           <li key={i}>
             <details className="vrm-aide-q" data-aide-question={i}>
-              <summary><span>{pourVendeur(qq, vend)}</span><Chevron/></summary>
-              <p>{pourVendeur(r, vend)}</p>
+              <summary><span>{pourVendeur(phraseVendeur(qq, vend), vend)}</span><Chevron/></summary>
+              <p>{pourVendeur(phraseVendeur(r, vend), vend)}</p>
             </details>
           </li>
         ))}

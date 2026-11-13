@@ -103,7 +103,7 @@ const appareil = async (b, mode, local = {}) => {
   const vp = mode === 'se' ? { width: 375, height: 667 } : tel ? { width: 390, height: 844 } : { width: 1512, height: 950 };
   const ctx = await b.newContext(tel ? { viewport: vp, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : { viewport: vp });
   await ctx.addInitScript((loc) => { try { if (!localStorage.getItem('__banc_pose__')) { localStorage.setItem('__banc_pose__', '1'); localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_prenom', JSON.stringify('Julien')); localStorage.setItem('vrm_bascule_mineral_v1', '1'); localStorage.setItem('vrm_bienvenue_vue', JSON.stringify({ at: '2026-10-01T00:00:00Z' })); for (const [k, v] of Object.entries(loc || {})) localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v)); } } catch (_) {} }, local);
-  await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await ctx.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     if (route.request().method() !== 'GET') return route.fulfill({ status: 201, contentType: 'application/json', body: '[]' });
@@ -204,7 +204,7 @@ const toucher = async (pg, sel) => { const l = pg.locator(sel).first(); if (!(aw
   // (`data-en-cours` de la barre, 4 s au plus), jamais un délai fixe seul (CLAUDE.md §6.5).
   await pg.waitForFunction(() => !document.querySelector('.vrm-tabbar[data-en-cours]'), null, { timeout: 4000 }).catch(() => {});
   return true; };
-const PLUS = '.vrm-tabbar button[aria-label="Plus"]';
+const PLUS = '.vrm-tabbar button[aria-label^="Plus"]';
 // Ce que « Plus » porte (App.jsx, GROUPES_PLUS sans les groupes `ordi`) : lu dans la source, pas recopié.
 const PLUS_ATTENDUES = (() => {
   try {
@@ -212,9 +212,11 @@ const PLUS_ATTENDUES = (() => {
     const i = src.indexOf('const GROUPES_PLUS=['); if (i < 0) return [];
     const bloc = src.slice(i, src.indexOf('\n];', i));
     const ids = [];
-    for (const g of bloc.split(/\n\s*\{\s*titre:/).slice(1)) {
+    // (11 nov., traduction) les groupes s'écrivent `groupeNav({ cle:'…', nom:'…', items:[ entreeNav({id:'…'}) ] })`
+    // (titre lu par tr()) ; l'ancienne forme `{ titre:'…', items:[ {id:'…'} ] }` reste lue.
+    for (const g of bloc.split(/\n\s*(?:\{\s*titre:|groupeNav\(\{)/).slice(1)) {
       if (/^[^\n]*\bordi\s*:\s*true/.test(g)) continue;
-      for (const l of g.split('\n')) { if (/^\s*\/\//.test(l)) continue; if (/\.\.\.ONGLET_MESSAGES/.test(l)) ids.push('messages'); const m = /\{\s*id:\s*'([a-z_]+)'/.exec(l); if (m) ids.push(m[1]); }
+      for (const l of g.split('\n')) { if (/^\s*\/\//.test(l)) continue; if (/\.\.\.ONGLET_MESSAGES/.test(l)) ids.push('messages'); const m = /(?:\{|entreeNav\(\{)\s*id:\s*'([a-z_]+)'/.exec(l); if (m) ids.push(m[1]); }
     }
     return [...new Set(ids)];
   } catch (_) { return []; }
@@ -239,7 +241,7 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
   const m = document.querySelector('.vrm-sheet'); if (!m) return null;
   const q = m.getBoundingClientRect(); const nav = document.querySelector('.vrm-tabbar').getBoundingClientRect();
   const entrees = [...m.querySelectorAll('[data-nav-entree]')].map((e) => { const r = e.getBoundingClientRect(); const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); const lib = e.querySelector('.vrm-sheet-lib'); return { id: e.getAttribute('data-nav-entree'), h: Math.round(r.height), visible: r.top >= 0 && r.bottom <= Math.min(innerHeight, nav.top) + 1, touche: !!hit && e.contains(hit), coupe: lib ? lib.scrollWidth > lib.clientWidth + 1 : false }; });
-  return { bas: Math.round(q.bottom), navHaut: Math.round(nav.top), defile: m.scrollHeight > m.clientHeight + 1, entrees, plusOuvert: document.querySelector('.vrm-tabbar button[aria-label="Plus"]').getAttribute('aria-expanded') };
+  return { bas: Math.round(q.bottom), navHaut: Math.round(nav.top), defile: m.scrollHeight > m.clientHeight + 1, entrees, plusOuvert: document.querySelector('.vrm-tabbar button[aria-label^="Plus"]').getAttribute('aria-expanded') };
 });
 
 (async () => {
@@ -290,7 +292,7 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         dit(e5.ecran === 'ventes' && !(await pg.locator('.vrm-sheet').count()), `B5 ${qui} : panneau ouvert, toucher Ventes y va et le ferme`, JSON.stringify(e5));
         // B6 · un écran de « Plus »
         await toucher(pg, PLUS); await toucher(pg, '.vrm-sheet [data-nav-entree="compta"]');
-        const e6 = await pg.evaluate(() => { const x = document.querySelector('.vrm-tabbar button[aria-label="Plus"]'); return { ecran: document.querySelector('.vrm-main').getAttribute('data-ecran'), plusEcran: x.getAttribute('data-plus-ecran') || '', courant: x.getAttribute('aria-current') || '' }; });
+        const e6 = await pg.evaluate(() => { const x = document.querySelector('.vrm-tabbar button[aria-label^="Plus"]'); return { ecran: document.querySelector('.vrm-main').getAttribute('data-ecran'), plusEcran: x.getAttribute('data-plus-ecran') || '', courant: x.getAttribute('aria-current') || '' }; });
         await capture(pg, `compta-${mode}-${sombre ? 'sombre' : 'clair'}`);
         dit(e6.ecran === 'compta' && e6.plusEcran === 'compta' && e6.courant === 'page', `B6 ${qui} : sur Compta, la 5ᵉ place dit Compta`, JSON.stringify(e6));
         const m6 = await mesureBarre(pg);
@@ -299,7 +301,7 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         const vus = [];
         for (const id of PLUS_ATTENDUES) {
           await toucher(pg, PLUS); await toucher(pg, `.vrm-sheet [data-nav-entree="${id}"]`);
-          const x = await pg.evaluate(() => { const b = document.querySelector('.vrm-tabbar button[aria-label="Plus"]'); const l = b.querySelector('.vrm-nav-label'); return { e: b.getAttribute('data-plus-ecran'), coupe: l.scrollWidth > l.clientWidth + 1, lib: l.innerText }; });
+          const x = await pg.evaluate(() => { const b = document.querySelector('.vrm-tabbar button[aria-label^="Plus"]'); const l = b.querySelector('.vrm-nav-label'); return { e: b.getAttribute('data-plus-ecran'), coupe: l.scrollWidth > l.clientWidth + 1, lib: l.innerText }; });
           vus.push({ id, ...x });
         }
         dit(vus.every((v) => v.e === v.id && !v.coupe), `B6 ${qui} : chaque écran de « Plus » (lu dans GROUPES_PLUS) — la 5ᵉ place dit l'écran, libellé entier`, JSON.stringify(vus));
@@ -343,10 +345,11 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         // B9 · le retour entre écrans
         await toucher(pg, '.vrm-tabbar [data-nav-entree="journee"]');
         await toucher(pg, '.vrm-tabbar [data-nav-entree="ventes"]');
-        await toucher(pg, '.vrm-tabbar [data-nav-entree="cat_bord"]');
+        // (11 nov., intégration colis) Colis n'est plus dans la barre : Achats (« À retirer » en tête) a pris sa place (lot DJ3).
+        await toucher(pg, '.vrm-tabbar [data-nav-entree="achats"]');
         await pg.goBack().catch(() => {}); await pg.waitForTimeout(700); const r1 = (await ecran(pg)).ecran;
         await pg.goBack().catch(() => {}); await pg.waitForTimeout(700); const r2 = (await ecran(pg)).ecran;
-        dit(r1 === 'ventes' && r2 === 'journee', `B9 ${qui} : retour Colis → Ventes → Journée`, `${r1} puis ${r2}`);
+        dit(r1 === 'ventes' && r2 === 'journee', `B9 ${qui} : retour Achats → Ventes → Journée`, `${r1} puis ${r2}`);
         dit(errs.length === 0, `B ${qui} : aucune erreur de page`, errs.join(' | '));
         await ctx.close();
       });
@@ -373,14 +376,14 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         const r1b = await ecran(pg);
         dit(r1b.ecran === 'ventes' && r1b.site === 'vinted' && r1b.puce === '222', `R1 ${qui} : rechargé, même compte choisi`, JSON.stringify(r1b));
         // R2 · Colis · À retirer, app rouverte
-        await toucher(pg, '.vrm-tabbar [data-nav-entree="cat_bord"]');
-        await toucher(pg, '[data-colis-onglet-choix="retirer"]');
+        await toucher(pg, '.vrm-tabbar [data-nav-entree="achats"]');
+        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
         const r2avant = await ecran(pg);
         await pg.close();
         ({ pg } = await ouvrirPage(ctx));
         const r2 = await ecran(pg);
         await capture(pg, `reprise-colis-${sombre ? 'sombre' : 'clair'}`);
-        dit(r2avant.colis === 'retirer' && r2.ecran === 'cat_bord' && r2.colis === 'retirer', `R2 ${qui} : rouverte, même écran (Colis) et même onglet (À retirer)`, JSON.stringify({ avant: r2avant.colis, apres: r2 }));
+        dit(r2avant.colis === 'retirer' && r2.ecran === 'achats' && r2.colis === 'retirer', `R2 ${qui} : rouverte, même écran (Achats, « À retirer » en tête — lot DJ3) et même liste (À retirer)`, JSON.stringify({ avant: r2avant.colis, apres: r2 }));
         // R3 · Annonces : recherche + défilement, app rouverte
         await toucher(pg, '.vrm-tabbar [data-nav-entree="annonces"]');
         await toucher(pg, '[data-filtre-site] button[data-site="vinted"]');

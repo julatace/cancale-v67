@@ -1,5 +1,7 @@
 import {formaterMontantEbay as montant} from './montantsEbay.js';
+import { motsVendeur } from './profilVendeur.js';
 import {appelerEbay} from './ebayRequetes.js';
+import { AlerteArnaque } from './AlerteArnaque.jsx';
 import {useReponseIncertaine} from './ebayEtatIncertain.js';
 import {lireBrouillon,sauverBrouillon,effacerBrouillonSiIdentique} from './brouillonsMessages.js';
 import {bilanCommandeEbay,codesRetraitEbay} from './ebayParcours.js';
@@ -10,6 +12,9 @@ import {offresAffichees} from './ebayOffresVue.js';
 import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import {messageEbayNonLu} from '../api/_lib/ebay-messages-nonlus.js';
 import {estQuestion,questionsParAnnonce} from './questionsEbay.js';
+import {trierRecents,sansDoublons} from './ordreConversations.js';
+import {etatEnvoiEbay} from './envoiFil.js';
+import {EnvoiDansFil,FilPasLu,FilIllisible} from './composants/EnvoiDansFil.jsx';
 import {useBrouillonCommande} from './brouillonsCommandesEbay.js';
 import {useConversationFocus} from './conversationFocus.js';
 import {createPortal} from 'react-dom';
@@ -87,10 +92,12 @@ export function EbayMessages({compte='principal',owner,cible,onClearCible,header
  // d'abord (src/questionsEbay.js) ; « Tout » : la liste des échanges d'avant.
  const [vue,setVue]=useState('questions');
  const S=styleUI(C),[rows,setRows]=useState(null),[selected,setSelected]=useState(null),[body,setBody]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[page,setPage]=useState(1),[pages,setPages]=useState(null),[search,setSearch]=useState(''),[historySearch,setHistorySearch]=useState(''),[draftOK,setDraftOK]=useState(true),[codeCopie,setCodeCopie]=useState('');
+ // (12 nov.) L'envoi se voit DANS le fil (src/envoiFil.js) : { id, etat, texte } ; la lecture de la liste ratée est gardée à part (≠ vide).
+ const [envoiFil,setEnvoiFil]=useState(null),[lectureKo,setLectureKo]=useState(false);
  const fermerConversation=()=>{selection.current=null;setSelected(null);};
  const chatPanel=useConversationFocus(selected?.id,fermerConversation);
  const resultatIncertain=useReponseIncertaine(owner,compte,selected?.id);
- const selectMessage=m=>{selection.current=m.id;setSelected(m);setBody(lireBrouillon(owner,compte,m.id));setDraftOK(true);setHistorySearch('');setCodeCopie('');setMessage('');};
+ const selectMessage=m=>{selection.current=m.id;setSelected(m);setEnvoiFil(e=>e && e.id===m.id?e:null);setBody(lireBrouillon(owner,compte,m.id));setDraftOK(true);setHistorySearch('');setCodeCopie('');setMessage('');};
  const modifierBody=v=>{setBody(v);if(selected)setDraftOK(sauverBrouillon(owner,compte,selected.id,v));};
  const cibleOuverte=useRef(null);
  useEffect(()=>{
@@ -101,7 +108,7 @@ export function EbayMessages({compte='principal',owner,cible,onClearCible,header
   if(cible.itemId)call('message',{messageId:cible.id,itemId:cible.itemId},headers).then(j=>{if(!stop && j.message && String(j.message.id)===cible.id && String(j.message.itemId)===cible.itemId){selectMessage(j.message);setRows(p=>[...(p || []),j.message]);}}).catch(e=>{if(!stop)setMessage(e.message);});
   return()=>{stop=true;};
  },[cible?.id,rows]);
- async function charger(next=1){setBusy(true);setMessage('');try{const j=await call('messages',{page:next},headers);if(!Array.isArray(j.messages))throw new Error('Les messages ne sont pas lisibles.');setRows(p=>next===1?j.messages:[...new Map([...(p || []),...j.messages].map(m=>[m.id,m])).values()]);setPage(next);setPages(j.totalPages);setSelected(p=>p?(j.messages.find(m=>m.id===p.id && m.itemId===p.itemId) || p):p);}catch(e){setMessage(e.message);}finally{setBusy(false);}}
+ async function charger(next=1){setBusy(true);setMessage('');setLectureKo(false);try{const j=await call('messages',{page:next},headers);if(!Array.isArray(j.messages))throw new Error('Les messages ne sont pas lisibles.');setRows(p=>next===1?j.messages:[...new Map([...(p || []),...j.messages].map(m=>[m.id,m])).values()]);setPage(next);setPages(j.totalPages);setSelected(p=>p?(j.messages.find(m=>m.id===p.id && m.itemId===p.itemId) || p):p);}catch(e){setMessage(e.message);setLectureKo(true);}finally{setBusy(false);}}
  useEffect(()=>{charger();},[]);
  async function relireEchange(){
   const m=selected;if(!m?.itemId)return;
@@ -115,7 +122,8 @@ export function EbayMessages({compte='principal',owner,cible,onClearCible,header
   }catch(e){if(selection.current===m.id)setMessage(e.message);}
   finally{setBusy(false);}
  }
- const affiches=(rows || []).filter(m=>`${m.sender} ${m.subject} ${m.titre} ${m.body} ${(m.responses || []).join(' ')}`.toLowerCase().includes(search.toLowerCase()));
+ // (12 nov.) Le même échange rendu deux fois par eBay (même n° de message) : une ligne, la copie la plus fraîche.
+ const affiches=trierRecents(sansDoublons(rows || [],m=>m && m.id!=null?String(m.id):'',m=>m && m.date).filter(m=>`${m.sender} ${m.subject} ${m.titre} ${m.body} ${(m.responses || []).join(' ')}`.toLowerCase().includes(search.toLowerCase())),m=>m&&m.date); // (11 nov.) le plus récent en haut, par horodatage
  const groupes=questionsParAnnonce(affiches);
  const groupeSel=selected && estQuestion(selected)?questionsParAnnonce(rows || []).find(g=>g.itemId===String(selected.itemId)) || null:null;
  const nVus=vue==='questions'?groupes.length:affiches.length;
@@ -129,16 +137,18 @@ export function EbayMessages({compte='principal',owner,cible,onClearCible,header
  async function envoyer(){
   const m=selected,texte=body;if(!m || !m.itemId || !estQuestion(m) || busy || resultatIncertain.value || !texte.trim())return;
   if(!await confirm({title:`Répondre à ${m.sender || 'cet acheteur'} ?`,desc:`${m.titre || m.subject}\n\n${texte}`,ok:'Envoyer la réponse',cancel:'Annuler'}))return;
-  setBusy(true);setMessage('');try{await call('repondre',{itemId:m.itemId,messageId:m.id,body:texte,confirme:true},headers,{write:true});effacerBrouillonSiIdentique(owner,compte,m.id,texte);setRows(p=>p?.map(x=>x.id===m.id?{...x,responses:[...(x.responses || []),texte]}:x));setSelected(p=>p?.id===m.id?{...p,responses:[...(p.responses || []),texte]}:p);if(selection.current===m.id){setBody(current=>current===texte?'':current);setMessage('Réponse acceptée par eBay.');}}catch(e){if(e.reason==='incertain')resultatIncertain.marquer(true);if(selection.current===m.id)setMessage(e.message);}finally{setBusy(false);}
+  setBusy(true);setMessage('');setEnvoiFil({id:m.id,etat:'envoi',texte});try{await call('repondre',{itemId:m.itemId,messageId:m.id,body:texte,confirme:true},headers,{write:true});effacerBrouillonSiIdentique(owner,compte,m.id,texte);setRows(p=>p?.map(x=>x.id===m.id?{...x,responses:[...(x.responses || []),texte]}:x));setSelected(p=>p?.id===m.id?{...p,responses:[...(p.responses || []),texte]}:p);setEnvoiFil({id:m.id,etat:'ok',texte,dejaLu:true});if(selection.current===m.id){setBody(current=>current===texte?'':current);}}catch(e){setEnvoiFil({id:m.id,etat:etatEnvoiEbay(e),texte});if(e.reason==='incertain')resultatIncertain.marquer(true);if(selection.current===m.id)setMessage(e.message);}finally{setBusy(false);}
  }
  const paireSel=selected && paireDe?paireDe(selected):null;
  const codes=selected?codesRetraitEbay([selected.body,...(selected.responses || [])]):[];
  const q=historySearch.toLowerCase();
- return <section data-messagerie-site="ebay"><div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}><h2 className="vrm-ebay-titre-onglet" style={{margin:0,fontSize:22,color:C.text}}>Messages eBay</h2><BoutonBase variante="secondaire" taille="petit" occupe={busy} onClick={()=>{cibleOuverte.current=null;charger();}} style={{marginLeft:'auto'}}>Actualiser</BoutonBase></div><Erreur message={message}/>
+ return <section data-messagerie-site="ebay"><div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}><h2 className="vrm-ebay-titre-onglet" style={{margin:0,fontSize:22,color:C.text}}>Messages eBay</h2><BoutonBase variante="secondaire" taille="petit" occupe={busy} onClick={()=>{cibleOuverte.current=null;charger();}} style={{marginLeft:'auto'}}>Actualiser</BoutonBase></div><Erreur message={(rows===null && lectureKo) || selected?'':message}/>{/* (12 nov.) Échange ouvert : la phrase est dite au pied du fil, une seule fois. */}
   {cible && <p style={{fontSize:12}}>Message sélectionné <button type="button" onClick={onClearCible}>Voir tous les échanges</button>{rows && !rows.some(m=>String(m.id)===cible.id) && <span role="status"> · Cet échange n’est pas dans la page lue. Charge la suite ou actualise.</span>}</p>}
   <div className="vrm-message-workspace"><div className="vrm-inbox-column">{Array.isArray(rows) && rows.length>0 && <input type="search" aria-label="Rechercher un message eBay" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher un échange…" style={{...S.input,marginBottom:10}}/>}
    <div className="vrm-seg vrm-ebay-q-vue" role="group" aria-label="Échanges eBay" style={{marginBottom:10}}>{[['questions','Questions'],['tout','Tout']].map(([v,l])=><button key={v} type="button" className="vrm-seg-btn" aria-pressed={vue===v} data-ebay-vue={v} onClick={()=>setVue(v)}>{l}</button>)}</div>
    {busy && rows===null && <p style={{fontSize:12,color:C.muted}}>Lecture des messages…</p>}
+   {/* (12 nov.) Lecture ratée ≠ vide : jamais « Aucune question » sur une liste qu'eBay n'a pas rendue. */}
+   {!busy && rows===null && lectureKo && <FilIllisible attrs={{'data-ebay-lecture':'pas-su'}} texte="Messages eBay pas lus pour l’instant." onRelire={()=>{cibleOuverte.current=null;charger();}}/>}
    {rows && !nVus && <p style={{fontSize:12,color:C.muted}} data-ebay-vide={vue}>{vue==='questions'?'Aucune question.':'Aucun échange dans cette sélection.'}</p>}
    {vue==='questions' && <div className="vrm-msg-list" data-ebay-questions={groupes.length} style={{display:groupes.length?undefined:'none'}}>{groupes.map(g=>{const m=g.aTraiter;const p=paireDe?paireDe(m):null;const t=Date.parse(m.date || '');const apercu=corpsLisible(m.body || '').replace(/\s+/g,' ').trim();
     return <LigneConv key={g.itemId} actif={!!selected && estQuestion(selected) && String(selected.itemId)===g.itemId} onClick={()=>selectMessage(m)} style={{color:C.text}}
@@ -163,20 +173,25 @@ export function EbayMessages({compte='principal',owner,cible,onClearCible,header
     <div style={{padding:'0 16px 8px',flexShrink:0}}><input type="search" aria-label="Rechercher dans la conversation eBay" placeholder="Rechercher un message ou un code…" value={historySearch} onChange={e=>setHistorySearch(e.target.value)} style={S.input}/></div>
     {groupeSel && groupeSel.questions.length>1 && <div className="vrm-seg vrm-ebay-q-nav" role="group" aria-label="Questions de cette annonce" data-q-nav={groupeSel.questions.length} style={{margin:'0 16px 8px'}}>{groupeSel.questions.map((q,i)=><button key={q.id} type="button" className="vrm-seg-btn" aria-pressed={q.id===selected.id} data-q-aller={q.id} data-q-sans-reponse={messageEbayNonLu(q)?'1':undefined} onClick={()=>selectMessage(q)}>{i+1}</button>)}</div>}
     <div className="vrm-chat-history" style={{flex:1,overflow:'auto',padding:16,display:'flex',flexDirection:'column',gap:8}}>
+     {/* (11 nov., anti-arnaque) Le message lu n'est PROUVÉ de l'acheteur que pour une question d'acheteur ; ses réponses ne sont jamais lues. */}
+     <AlerteArnaque site="ebay" lien={selected.itemId?`https://www.ebay.fr/itm/${encodeURIComponent(selected.itemId)}`:''} messages={[{t:corpsLisible(selected.body),deMoi:estQuestion(selected)?false:null},...(selected.responses || []).map(r=>({t:corpsLisible(r),deMoi:true}))]}/>
      {corpsLisible(selected.body).toLowerCase().includes(q) && <BulleConv moi={false} qui="L’acheteur" texte={corpsLisible(selected.body)} quand={Date.parse(selected.date || '') || null} avecDate traduire={corpsLisible(selected.body)}/>}
      {historySearch && ![selected.body,...(selected.responses || [])].some(r=>corpsLisible(r).toLowerCase().includes(q)) && <p style={{fontSize:12,color:C.muted}}>Aucun message ne correspond à cette recherche.</p>}
      {(selected.responses || []).filter(r=>corpsLisible(r).toLowerCase().includes(q)).map((r,i)=><BulleConv key={i} moi qui="Toi" texte={corpsLisible(r)}/>)}
+     {/* (12 nov.) Un échange listé dont le texte n'est pas arrivé : « pas encore lu · Relire », jamais un fil vide. */}
+     {!historySearch && !corpsLisible(selected.body).trim() && !(selected.responses || []).length && (selected.itemId ? <FilPasLu onRelire={relireEchange}/> : <FilIllisible texte="eBay n’a pas donné le texte de cet échange." onRelire={()=>{cibleOuverte.current=null;charger();}}/>)}
+     {envoiFil && envoiFil.id===selected.id && <EnvoiDansFil envoi={envoiFil} Bulle={BulleConv} site="eBay" onReessayer={envoyer} reessayerDesactive={busy || !body.trim()} dejaLu={envoiFil.dejaLu===true}/>}
     </div>
     {selected.itemId && estQuestion(selected) ? <div className="vrm-chat-foot" style={{borderTop:`1px solid ${C.border}`,background:C.card}}>
      <Erreur message={message}/>{body && <small style={{display:'block',color:C.muted,marginBottom:6}}>{draftOK?'Brouillon conservé dans cet onglet.':'Brouillon non sauvegardé : garde cet échange ouvert.'}</small>}
      <RapidesConv liste={rapides()} onChoisir={modifierBody} desactive={busy}/>
-     <ComposeConv valeur={body} onChange={v=>modifierBody(String(v).slice(0,2000))} onEnvoyer={envoyer} etiquette="Réponse au message eBay" libelleEnvoyer="Envoyer la réponse" placeholder="Écris ta réponse…"
+     <ComposeConv site="ebay" valeur={body} onChange={v=>modifierBody(String(v).slice(0,2000))} onEnvoyer={envoyer} etiquette="Réponse au message eBay" libelleEnvoyer="Envoyer la réponse" placeholder="Écris ta réponse…"
       envoiBloque={busy || resultatIncertain.value || !body.trim() || !selected.itemId || !estQuestion(selected)} enCours={busy} attrsChamp={{maxLength:2000}}/>
      {resultatIncertain.value && <div style={{fontSize:12,color:C.muted}}><p>Dernier envoi pas confirmé : relis l’échange avant de répondre.</p><button type="button" style={S.button} disabled={busy || !selected.itemId} onClick={relireEchange}>Relire l’échange</button></div>}
     </div> : selected.itemId ? <PiedSansEnvoi attrs={{'data-ebay-pas-question':selected.type || 'inconnu'}} lien={`https://www.ebay.fr/itm/${encodeURIComponent(selected.itemId)}`} texteLien="Ouvrir sur eBay ↗" raison="Pas une question d’acheteur : la réponse se fait sur eBay."><Erreur message={message}/></PiedSansEnvoi>
     : <PiedSansEnvoi lien="https://www.ebay.fr/" texteLien="Ouvrir eBay ↗" raison="Cet échange n’a pas d’annonce identifiée : VRM ne peut pas y répondre d’ici. Le contact des acheteurs d’une commande reste disponible dans Ventes."><Erreur message={message}/></PiedSansEnvoi>}
    </CadreFil>:<div className="vrm-chat-empty"><span>Choisis un échange</span><small>Lis les réponses et réponds depuis VRM.</small></div>}
-  </div>{!selected ? <FicheConvVolet site="ebay" etat="aucune"/> : <FicheConvVolet site="ebay" etat={paireSel?'reliee':'non-reliee'} fc={paireSel} raison="eBay ne rattache aucune annonce à cet échange : VRM ne devine pas la paire d’après le titre."/>}</div>
+  </div>{!selected ? <FicheConvVolet site="ebay" etat="aucune"/> : <FicheConvVolet site="ebay" etat={paireSel?'reliee':'non-reliee'} fc={paireSel} raison={`eBay ne rattache aucune annonce à cet échange : VRM ne devine pas ${motsVendeur().le} d’après le titre.`}/>}</div>
  </section>;
 }
 
@@ -299,8 +314,8 @@ export function EbayRetours({compte='principal',headers,confirm,theme:C,onComman
     <b style={{fontSize:13}}>Annulation demandée · commande {c.orderId}</b>
     <div style={{fontSize:12,color:C.muted,marginTop:3}}>{c.acheteur?`Acheteur : ${c.acheteur}`:''}{c.montant?` · ${euros(c.montant)} à rembourser`:''}{c.date?` · ${heureCourte(c.date)}`:''}</div>
     {issueTexte(f,C) || <div style={{display:'flex',gap:8,marginTop:8,flexWrap:'wrap'}}>
-     <button type="button" disabled={busy} data-geste="annulation-accepter" style={{...S.button,minHeight:44}} onClick={()=>agir(k,'decannulation',{cancelId:c.cancelId,orderId:c.orderId,decision:'accepter'},{title:'Accepter l’annulation ?',desc:`Commande ${c.orderId}${c.acheteur?' · '+c.acheteur:''}\n\neBay rembourse l’acheteur${c.montant?' ('+euros(c.montant)+')':''} et la vente est annulée : n’expédie pas la paire. Elle sort de tes colis à faire.`,ok:'Accepter l’annulation',cancel:'Annuler'})}>Accepter l’annulation</button>
-     <button type="button" disabled={busy} data-geste="annulation-refuser" style={{...S.button,minHeight:44}} onClick={()=>agir(k,'decannulation',{cancelId:c.cancelId,orderId:c.orderId,decision:'refuser'},{title:'Refuser l’annulation ?',desc:`Commande ${c.orderId}\n\nLa vente est maintenue : tu dois expédier la paire.`,ok:'Refuser',cancel:'Annuler'})}>Refuser</button>
+     <button type="button" disabled={busy} data-geste="annulation-accepter" style={{...S.button,minHeight:44}} onClick={()=>agir(k,'decannulation',{cancelId:c.cancelId,orderId:c.orderId,decision:'accepter'},{title:'Accepter l’annulation ?',desc:`Commande ${c.orderId}${c.acheteur?' · '+c.acheteur:''}\n\neBay rembourse l’acheteur${c.montant?' ('+euros(c.montant)+')':''} et la vente est annulée : n’expédie pas ${motsVendeur().le}. Elle sort de tes colis à faire.`,ok:'Accepter l’annulation',cancel:'Annuler'})}>Accepter l’annulation</button>
+     <button type="button" disabled={busy} data-geste="annulation-refuser" style={{...S.button,minHeight:44}} onClick={()=>agir(k,'decannulation',{cancelId:c.cancelId,orderId:c.orderId,decision:'refuser'},{title:'Refuser l’annulation ?',desc:`Commande ${c.orderId}\n\nLa vente est maintenue : tu dois expédier ${motsVendeur().le}.`,ok:'Refuser',cancel:'Annuler'})}>Refuser</button>
     </div>}
    </article>;})}
    {(ouverts||[]).map(r=>{const k='r:'+r.returnId,f=faits[k],attend=String(r.etat).toUpperCase()==='RETURN_REQUESTED';return <article key={k} data-ebay-retour={r.returnId} style={carte}>
@@ -309,7 +324,7 @@ export function EbayRetours({compte='principal',headers,confirm,theme:C,onComman
     {r.commentaire && <p style={{fontSize:12,margin:'6px 0 0',overflowWrap:'anywhere'}}>« {r.commentaire} »</p>}
     {issueTexte(f,C) || (attend ? <div style={{display:'grid',gap:8,marginTop:8}}>
      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-      <button type="button" disabled={busy} data-geste="retour-accepter" style={{...S.button,minHeight:44}} onClick={()=>agir(k,'deciderretour',{returnId:r.returnId,decision:'ACCEPT'},{title:'Accepter le retour ?',desc:`${r.titre || r.itemId}\n\nL’acheteur renvoie la paire. Tu devras le rembourser${r.remboursementPrevu?' ('+euros(r.remboursementPrevu)+')':''} à réception.`,ok:'Accepter le retour',cancel:'Annuler'})}>Accepter le retour</button>
+      <button type="button" disabled={busy} data-geste="retour-accepter" style={{...S.button,minHeight:44}} onClick={()=>agir(k,'deciderretour',{returnId:r.returnId,decision:'ACCEPT'},{title:'Accepter le retour ?',desc:`${r.titre || r.itemId}\n\nL’acheteur renvoie ${motsVendeur().le}. Tu devras le rembourser${r.remboursementPrevu?' ('+euros(r.remboursementPrevu)+')':''} à réception.`,ok:'Accepter le retour',cancel:'Annuler'})}>Accepter le retour</button>
       <button type="button" disabled={busy} data-geste="retour-refuser" style={{...S.button,minHeight:44}} onClick={()=>{const t=String(motifs[k]||'').trim();if(!t){setMessage('Écris pourquoi tu refuses : eBay le transmet à l’acheteur.');return;}agir(k,'deciderretour',{returnId:r.returnId,decision:'DECLINE',commentaire:t},{title:'Refuser le retour ?',desc:`${r.titre || r.itemId}\nMotif : « ${t} »\n\nL’acheteur peut demander à eBay d’intervenir.`,ok:'Refuser le retour',cancel:'Annuler'});}}>Refuser</button>
      </div>
      <input aria-label="Motif du refus" maxLength={1000} placeholder="Motif si tu refuses" value={motifs[k]||''} onChange={e=>setMotifs(m=>({...m,[k]:e.target.value}))} style={{...S.input,fontSize:17}}/>
@@ -331,7 +346,7 @@ export function EbayPromotion({compte='principal',headers,confirm,theme:C}){
   catch(x){setMessage(x.reason==='incertain'?'Je ne sais pas si c’est parti : regarde sur eBay avant de recommencer.':x.message);setBusy(false);}}
  const promues=new Map((data?.promues||[]).map(p=>[p.listingId,p]));
  const lignes=data?(Array.isArray(data.annonces)?data.annonces:[...promues.keys()].map(id=>({itemId:id,titre:''}))):[];
- const FRAIS='Des frais prélevés par eBay UNIQUEMENT si la paire se vend par la promotion : ce pourcentage du prix de vente, en plus des frais habituels.';
+ const FRAIS=`Des frais prélevés par eBay UNIQUEMENT si ${motsVendeur().le} se vend par la promotion : ce pourcentage du prix de vente, en plus des frais habituels.`;
  return <section data-ebay-promotion={data===undefined?'en-cours':data===null?'pas-su':promues.size}>
   <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 0 10px'}}><h3 className="vrm-ebay-titre-onglet" style={{margin:0,fontSize:15,color:C.text}}>Promotion des annonces</h3><button type="button" onClick={charger} disabled={busy} style={{...S.button,marginLeft:'auto'}}>Actualiser</button></div>
   <p style={{fontSize:12,color:C.muted,margin:'0 0 10px',lineHeight:1.5}}>{FRAIS}</p>

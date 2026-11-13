@@ -263,6 +263,35 @@
   setTimeout(announce, 800);
   setTimeout(announce, 2500);
 
+  // 5.351 (lot extension-visuel) — L'APPARENCE CHOISIE DANS VRM. La fenêtre et la
+  // carte du logo prennent la teinte de l'app (Réglages → Apparence : clair,
+  // sombre, automatique, le soir — `vrm_apparence`, sinon l'ancien `vinted_dark`).
+  // On recopie le MODE seul (un mot de la liste), jamais autre chose de la page ;
+  // aucune requête : le stockage local de l'extension, rien d'autre.
+  const MODES_APPARENCE = ['clair', 'sombre', 'auto', 'soir'];
+  function recopierApparence() {
+    if (!vivant()) return;
+    let mode = null;
+    try {
+      const brut = localStorage.getItem('vrm_apparence');
+      const m = brut ? JSON.parse(brut) : null;
+      if (MODES_APPARENCE.includes(m)) mode = m;
+      else { const d = localStorage.getItem('vinted_dark'); if (d != null) mode = JSON.parse(d) === true ? 'sombre' : 'clair'; }
+    } catch (_) { mode = null; }
+    if (!mode) return;                      // pas su ⇒ rien n'est écrit (l'extension suit le système)
+    try {
+      chrome.storage.local.get('vrmApparence', (g) => {
+        try { if (chrome.runtime.lastError) return; } catch (_) { return; }
+        if (g && g.vrmApparence === mode) return;
+        try { chrome.storage.local.set({ vrmApparence: mode }); } catch (_) {}
+      });
+    } catch (_) {}
+  }
+  recopierApparence();
+  setTimeout(recopierApparence, 2500);
+  try { window.addEventListener('storage', (ev) => { if (!ev || ev.key === 'vrm_apparence' || ev.key === 'vinted_dark') recopierApparence(); }); } catch (_) {}
+  try { document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') recopierApparence(); }); } catch (_) {}
+
   // L'EXTENSION PRÉVIENT L'APP (5.129) : une étape de commande, un bordereau
   // rangé, des ventes rafraîchies. Sans ça, l'app ne verrait rien avant de
   // relire la base d'elle-même.

@@ -108,6 +108,8 @@ const ouvrir = async (b, vp, sombre, tab) => {
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
     const u = r.request().url();
     if (/api-adresse\.data\.gouv\.fr/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ features: [] }) });
+    // (12 nov.) le géocodage de l'app retombe sur Nominatim quand l'API Adresse ne trouve rien : servi vide aussi (garde réseau).
+    if (/nominatim\.openstreetmap\.org/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' });
     return ['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue();
   });
   await pg.route('**/rest/v1/**', (route) => {
@@ -174,10 +176,10 @@ const detail = async (pg, sousCle) => {
       console.log(`\n— Colis → À retirer, le suivi lu · ${nom}`);
       const { ctx, pg, errs } = await ouvrir(b, vp, sombre, 'cat_bord');
       await essaie('retirer', async () => {
-        await pg.locator('[data-colis-onglet-choix="retirer"]').first().waitFor({ timeout: 40000 });
+        await pg.locator('[data-colis-section]').first().waitFor({ timeout: 40000 });
         await pg.waitForFunction(() => { try { return !!JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) { return false; } }, null, { timeout: 30000 }).catch(() => {});
         await pg.waitForTimeout(1500);
-        await pg.locator('[data-colis-onglet-choix="retirer"]').first().click();
+        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
         await pg.waitForTimeout(2500);
         await pg.evaluate(() => { for (const d of document.querySelectorAll('details[data-retraits-sortis]')) d.open = true; });
         await pg.waitForTimeout(200);
@@ -204,7 +206,9 @@ const detail = async (pg, sousCle) => {
           await pg.evaluate(() => { const e = document.querySelector('[data-retraits-sortis]'); if (e) e.scrollIntoView({ block: 'center' }); }); await pg.waitForTimeout(300);
           await pg.screenshot({ path: path.join(SHOTS, `retraits-suivi-sortis-${nom}.png`) }); }
         { const d = await detail(pg, '6A20000000005'); dit(!!d && d.pasLu === 'non-lu' && /Colissimo/.test(d.pasLuTexte) && /site/.test(d.pasLuTexte), 'R5 Colissimo ⇒ « VRM ne lit pas ce transporteur » + le geste', J(d && { pasLu: d.pasLu, t: d.pasLuTexte })); }
-        { const d = await detail(pg, '82000006'); dit(!!d && d.pasLu === 'jamais' && /Mondial Relay/.test(d.pasLuTexte), 'R6 n° de 8 chiffres d’un e-mail « vinted » ⇒ Mondial Relay nommé, « pas encore lu »', J(d && { pasLu: d.pasLu, t: d.pasLuTexte, tr: d.transp }));
+        { const d = await detail(pg, '82000006'); // (12 nov., finitions) « pas encore lu — VRM le lit tant que l'app est ouverte » ne demande rien à Julien : la ligne ne
+        // l'écrit plus (seules les raisons qui ont un geste restent, `RaisonPasLu`).
+        dit(!!d && d.pasLu == null, 'R6 n° de 8 chiffres d’un e-mail « vinted » : « pas encore lu » (rien à faire) n’est plus écrit sur la ligne', J(d && { pasLu: d.pasLu, t: d.pasLuTexte, tr: d.transp }));
           if (SHOTS && d) await pg.screenshot({ path: path.join(SHOTS, `retraits-suivi-detail-r6-${nom}.png`) }); }
         { const d = await detail(pg, 'XW200000007TS'); dit(!!d && d.transp === 'lu' && d.transpEtat === 'disponible' && /Chronopost/.test(d.transpTexte), 'R7 deux lignes du transporteur ⇒ la lue (Chronopost), jamais « Vinted Go n’a pas répondu »', J(d && { transp: d.transp, t: d.transpTexte })); }
         { const d = await detail(pg, 'XW200000008TS'); dit(!!d && d.pasLu === 'abandonne' && /ne le relit plus/.test(d.pasLuTexte), 'R8 introuvable 3 fois ⇒ « VRM ne le relit plus » + le geste', J(d && { pasLu: d.pasLu, t: d.pasLuTexte }));

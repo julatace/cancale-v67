@@ -15,7 +15,7 @@ export default function PorteMonnaie({ pm }) {
   if (!pm || pm.etat === 'encours') return <div className="vrm-pm" data-pm="encours"><div className="vrm-pm-vide">…</div></div>;
   if (pm.etat === 'passu') return <div className="vrm-pm" data-pm="passu"><div className="vrm-pm-vide">—</div></div>;
   const T = pm.total;
-  const dedans = pm.lignes.filter((l) => !l.exclu);
+  const dedans = pm.lignes.filter((l) => !l.exclu && !l.devise);   // autre devise : nommée en note, hors liste et hors total
   const partiel = T.manque.length > 0;
   return (
     <div className="vrm-pm" data-pm="lu" data-pm-dispo={T.dispo == null ? '' : String(T.dispo)} data-pm-attente={T.attente == null ? '' : String(T.attente)} data-pm-manque={T.manque.join(',')}>
@@ -33,6 +33,7 @@ export default function PorteMonnaie({ pm }) {
         ))}
       </ul>
       {T.exclus.length > 0 && <div className="vrm-pm-note" data-pm-exclus={T.exclus.join(',')}>Hors total : {T.exclus.join(', ')}</div>}
+      {(T.autreDevise || []).length > 0 && <div className="vrm-pm-note" data-pm-devise={T.autreDevise.join(',')}>Autre devise, hors total : {T.autreDevise.join(', ')}</div>}
       {pm.virements.length > 0 && (
         <details className="vrm-pm-virements" data-pm-virements={pm.virements.length}>
           <summary>Virements vers ta banque<span className="vrm-pm-n">{pm.virements.length}</span></summary>

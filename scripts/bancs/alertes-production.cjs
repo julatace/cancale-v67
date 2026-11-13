@@ -82,7 +82,7 @@ async function ouvrir(nav, { largeur, sombre, jeton, uid, proprio }) {
     // Le lot part par sendBeacon : rejoué en fetch pour que la route du banc le voie.
     try { navigator.sendBeacon = (u, b) => { fetch(u, { method: 'POST', body: b, headers: { 'Content-Type': 'text/plain;charset=UTF-8' } }).catch(() => {}); return true; }; } catch (_) {}
   }, [session, sombre]);
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: jeton, refresh_token: 'r', expires_in: 3600, user: session.user }) }));
   await pg.route('**/rest/v1/**', (r) => {
     const u = r.request().url();

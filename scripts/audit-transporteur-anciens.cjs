@@ -98,6 +98,14 @@ global.fetch = async (url, opts = {}) => {
   if (!/\/rest\/v1\//.test(u)) return J({});
   if (/\/rpc\/vrm_acces_pour/.test(u)) return J(true);
   if (PANNE(meth, u)) return new Response('<html>522</html>', { status: 522, headers: { 'content-type': 'text/html' } });
+  if (meth === 'PATCH') {   // (11 nov., H14) le bail du passage : PATCH conditionnel sur data->>rev (la forme de modifierNeutre)
+    const q = new URL(brut).searchParams, own = (q.get('owner') || '').slice(3), idp = (q.get('id') || '').slice(3), rev = q.get('data->>rev');
+    const i = LIGNES.findIndex((l) => l.owner === own && l.id === idp);
+    const d = i >= 0 ? LIGNES[i].data : null;
+    if (i < 0 || (rev === 'is.null' ? d && d.rev != null : String(d && d.rev) !== String(rev || '').slice(3))) return J([]);
+    LIGNES[i] = { owner: own, id: idp, data: JSON.parse(opts.body).data };
+    return J([{ id: idp }]);
+  }
   if (meth !== 'GET') {
     let corps = []; try { corps = JSON.parse(opts.body || '[]'); } catch (_) {}
     for (const r of [].concat(corps)) {
@@ -318,6 +326,27 @@ function base() {
     dit(lusPdf.length === 2 && lusPdf.every((a) => /id=eq\./.test(a.u) && /select=pdf:data->>pdfB64/.test(a.u) && /owner=eq\./.test(a.u)), 'T8 un PDF par requête, au nom du vendeur, rien d’autre que le PDF', lusPdf.map((a) => a.u).join(' | '));
     await lancer();
     dit(APPELS.filter((a) => a.meth === 'GET' && /pdfB64/.test(a.u)).length === 2, 'T8 passage suivant : aucun PDF relu (idempotent)');
+  });
+
+  // (11 nov., lot DJ3 — « InPost appartient à Mondial Relay ») T9 — une étiquette rangée « inpost » (sans n° : la
+  // règle d'avant ne lisait pas son n° Mondial Relay) ou « plusieurs » (Mondial Relay + InPost) est relue UNE fois.
+  await essaie('T9', async () => {
+    if (!mod) throw new Error('route absente');
+    const { PDFDocument, StandardFonts } = require(path.join(R, 'node_modules', 'pdf-lib'));
+    const fab = async (lignes) => { const d = await PDFDocument.create(); const f = await d.embedFont(StandardFonts.Helvetica); const p = d.addPage([283, 425]); lignes.forEach((l, i) => p.drawText(l, { x: 10, y: 400 - 16 * i, font: f, size: 10 })); return Buffer.from(await d.save()).toString('base64'); };
+    const mr = await fab(['Mondial Relay by InPost', 'InPost', 'N° de suivi : 87696698']);
+    LIGNES = [{ owner: OWNER, id: 'main', data: {} },
+      { owner: OWNER, id: 'vrm_bord_transporteurs', data: { v: 1, pdf: { '34000000011': { t: 'inpost' } }, pdfVus: { '34000000012': { r: 'plusieurs', at: '2026-11-01T00:00:00Z' } } } },
+      { owner: OWNER, id: 'harvest_77_label_34000000011', data: { uid: '77', tx: '34000000011', capturedAt: '2026-11-05T10:00:00Z', pdfB64: mr } },
+      { owner: OWNER, id: 'harvest_77_label_34000000012', data: { uid: '77', tx: '34000000012', capturedAt: '2026-11-05T11:00:00Z', pdfB64: mr } }];
+    APPELS = []; ECRITS = []; PANNE = () => false;
+    await lancer();
+    const r = rangement();
+    dit(r && r.pdf && r.pdf['34000000011'] && r.pdf['34000000011'].t === 'mondialrelay' && r.pdf['34000000011'].s === '87696698', 'T9 « inpost » rangé avant le 11 nov. ⇒ relu : Mondial Relay + son n°', JSON.stringify(r && r.pdf));
+    dit(r && r.pdf && r.pdf['34000000012'] && r.pdf['34000000012'].s === '87696698' && !(r.pdfVus && r.pdfVus['34000000012']), 'T9 « plusieurs » (Mondial Relay + InPost) ⇒ relu : un seul transporteur', JSON.stringify(r && r.pdfVus));
+    const n1 = APPELS.filter((a) => a.meth === 'GET' && /pdfB64/.test(a.u)).length;
+    await lancer();
+    dit(n1 === 2 && APPELS.filter((a) => a.meth === 'GET' && /pdfB64/.test(a.u)).length === 2, 'T9 relu une seule fois (idempotent)', n1);
   });
 
   console.log(`\n${ko ? '❌' : '✅'} transporteur des anciens bordereaux : ${ok} vert(s), ${ko} rouge(s)`);

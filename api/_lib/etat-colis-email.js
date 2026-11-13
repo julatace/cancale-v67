@@ -141,6 +141,10 @@ function lire(texte){
 export function etatColisDepuisTexte(sujet,texte='') {
  const s=normaliser(sujet);
  if(colisPerdu(sujet))return null;
+ // (12 nov., mesuré : Mondial Relay 80380675, 80459659) « Où vous livrer en cas de point indisponible ? » est envoyé
+ // AVANT l'arrivée (choisir un point de secours) : le colis ROULE. Rangé « disponible », il tombait dans « Lieu à
+ // confirmer » avec une date estimée. Le SMS « Au cas où le point de retrait… » suit déjà cette règle.
+ if(/ou vous livrer en cas de point indisponible|au cas ou le point (?:de retrait|relais)/.test(s))return 'transit';
  // (10 nov.) Un changement de point relais : le colis ROULE vers le nouveau point. Un
  // sujet qui constate l'arrivée ou le retrait (« … est disponible ») garde la main.
  if(SUJET_CHANGEMENT_RELAIS.test(s)){const l=lire(sujet);return l==='available'||l==='delivered'||l==='retour'?l:'transit';}

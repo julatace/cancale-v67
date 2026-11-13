@@ -15,8 +15,9 @@
 // ════════════════════════════════════════════════════════════════════════════
 import { proprietaireCourant } from './owner.js';
 import { sbCle } from './cle.js';
-import { ordreStable } from './ordre-stable.js';
+import { ordreStable, finALaFrontiere } from './ordre-stable.js';
 import { passeTransporteursPdf, reqPdf } from './transporteur-anciens.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const cle = () => process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || '';
@@ -27,10 +28,12 @@ async function lireTout(chemin) {
   const owner = proprietaireCourant();
   if (!owner) return null;
   const out = []; const page = 1000;
-  for (let from = 0; from < 200000; from += page) {
+  for (let from = 0; ; from += page) {
+    if (from >= 200000) return null;   // (11 nov., familles-serveur) au plafond : « pas su », jamais une demi-liste
     let r;
-    try { r = await fetch(ordreStable(`${SUPABASE_URL}/rest/v1/${avecOwner(chemin, owner)}`), { headers: { ...entetes(), 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } }); }
+    try { r = await fetchAvecDelai(ordreStable(`${SUPABASE_URL}/rest/v1/${avecOwner(chemin, owner)}`), { headers: { ...entetes(), 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } }); }
     catch (_) { return null; }
+    if (finALaFrontiere(r, from)) break;   // (11 nov.) 416 à une frontière exacte = fin de liste
     if (!r.ok) return null;
     let j; try { j = await r.json(); } catch (_) { return null; }
     if (!Array.isArray(j)) return null;
@@ -44,7 +47,7 @@ async function getRow(id) {
   const owner = proprietaireCourant();
   if (!owner) return undefined;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${avecOwner(`app_data?id=eq.${encodeURIComponent(id)}&select=data`, owner)}`, { headers: entetes() });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${avecOwner(`app_data?id=eq.${encodeURIComponent(id)}&select=data`, owner)}`, { headers: entetes() });
     if (!r.ok) return undefined;
     const rows = await r.json();
     if (!Array.isArray(rows)) return undefined;
@@ -55,7 +58,7 @@ async function ecrire(id, data) {
   const owner = proprietaireCourant();
   if (!owner) return false;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
       method: 'POST',
       headers: { ...entetes(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify([{ owner, id, data, updated_at: new Date().toISOString() }]),

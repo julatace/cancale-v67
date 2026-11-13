@@ -41,6 +41,8 @@ function fetchServeur(lignes) {
     if (/\/auth\/v1\/user/.test(u)) return R(200, { id: OWNER, email: 'banc@vrm.test', email_confirmed_at: '2026-01-01' });
     if (/app_data\?select=owner&limit=1/.test(u)) return R(200, []);
     if (!/\/rest\/v1\//.test(u)) return R(404, {});
+    // (12 nov.) la migration 042 (vrm_commandes_lire/_ecrire) n'est pas passée sur cette fausse base : fonction inconnue (404) ⇒ le chemin d'avant.
+    if (/\/rest\/v1\/rpc\//.test(u)) return R(404, { code: 'PGRST202' });
     const id = (/[?&]id=eq\.([^&]+)/.exec(u) || [])[1];
     if (m === 'GET') { const sel = (/[?&]select=([^&]+)/.exec(u) || [])[1] || ''; return R(200, id && lignes[id] !== undefined ? [projette({ id, data: lignes[id] }, sel)] : []); }
     if (m === 'PATCH') { if (!id || lignes[id] === undefined) return R(200, []); lignes[id] = JSON.parse(o.body).data; return R(200, [{ id }]); }

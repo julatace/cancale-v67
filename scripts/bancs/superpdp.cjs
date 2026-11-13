@@ -155,7 +155,7 @@ const attendre = async (pg, f, ms = 9000) => { const t0 = Date.now(); for (;;) {
       pg.setDefaultTimeout(5000);
       const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
       await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_regime', JSON.stringify('micro')); } catch (_) {} });
-      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
       await brancher(pg, lignes({ profil: PROFIL_OK }));
       await pg.goto(`http://localhost:${PORT}/?tab=compta`, { waitUntil: 'domcontentloaded' });
       await ouvrirAvanceCompta(pg); // (29 oct.) ces cartes vivent dans « Avancé », replié

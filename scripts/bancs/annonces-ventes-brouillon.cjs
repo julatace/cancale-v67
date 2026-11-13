@@ -56,6 +56,7 @@ const plan=(process.env.VUES||'ventes:ventes,annonces:annonces,achats:achats,mes
 for(const vp of [{width:390,height:844},{width:1512,height:950}]){for(const sombre of (process.env.SOMBRE?[false,true]:[false])){
 const ctx=await b.newContext({viewport:vp,colorScheme:sombre?'dark':'light',...(vp.width<600?{isMobile:true,hasTouch:true}:{})});const pg=await ctx.newPage();const errs=[];pg.on('pageerror',e=>errs.push(e.message));
 await pg.addInitScript((s)=>{try{localStorage.setItem('vrm_acces_direct','1');if(s)localStorage.setItem('vinted_dark','true');}catch(_){}},sombre);
+if(process.env.AVB_MUTATION==='ellipse')await pg.addInitScript(()=>{document.addEventListener('DOMContentLoaded',()=>{const st=document.createElement('style');st.textContent='[data-colis-limite-texte]{display:inline-block!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;max-width:100%!important}';document.head.appendChild(st);});});
 await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i,r=>r.abort());
 await pg.route('**/rest/v1/**',route=>{const u=decodeURIComponent(metaVersData(route.request().url()));const j=d=>route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(d)});
 if(/select=owner/.test(u))return route.fulfill({status:400,contentType:'application/json',body:'{}'});if(/\/rest\/v1\/vinted_accounts/.test(u))return j(ACCS);if(route.request().method()!=='GET')return j([]);
@@ -80,12 +81,12 @@ const m=await pg.evaluate(()=>{const top=(e)=>e?Math.round(e.getBoundingClientRe
     lignesComptes:vis(document.querySelector('[data-comptes-annonces]')),
     titreAch:[...document.querySelectorAll('.vrm-main h1,.vrm-main h2')].some(h=>/^Achats$/.test(h.textContent.trim())&&vis(h)),
     titreMsg:[...document.querySelectorAll('.vrm-main h1,.vrm-main h2')].some(h=>/^Messages$/.test(h.textContent.trim())&&vis(h)),
-    recusTop:top(document.querySelector('[data-recus-email]')),ongletsTop:top(document.querySelector('[data-achats-onglet]')),
+    recusTop:top(document.querySelector('[data-recus-email]')),colisVentes:!!document.querySelector('[data-colis-section="ventes"]'),navColis:[...document.querySelectorAll('[data-nav-entree="cat_bord"],[data-nav-entree="colis"]')].length,sourcesTop:top(document.querySelector('[data-achats-sources]')),ongletsTop:top(document.querySelector('[data-achats-onglet]')),
     colis0:top(document.querySelector('[data-achats-onglet]')),convTop:top(document.querySelector('.vrm-msg-search')),convEcart:(()=>{const a=document.querySelector('.vrm-messages-sections'),b=document.querySelector('.vrm-msg-search');return a&&b?Math.round(b.getBoundingClientRect().top-a.getBoundingClientRect().bottom):null;})(),
     chev:(()=>{const a=document.querySelector('.vrm-day-money [data-recu-mois]'),c=document.querySelector('.vrm-day-money [data-ca-annee]');if(!a||!c)return null;const r1=a.getBoundingClientRect(),r2=c.getBoundingClientRect();return !(r1.bottom<=r2.top+1||r2.bottom<=r1.top+1||r1.right<=r2.left+1||r2.right<=r1.left+1);})(),
     dateCap:(()=>{const d=document.querySelector('.vrm-day-greeting .vrm-day-date');return d&&d.getBoundingClientRect().height>0?getComputedStyle(d).textTransform:null;})(),
     tete:(()=>{const h=document.querySelector('.vrm-day-greeting .vrm-day-hello'),t=document.querySelector('.vrm-day-greeting .vrm-day-todo');if(!h||!t)return null;const a=h.getBoundingClientRect(),b=t.getBoundingClientRect();const mil=(b.top+b.bottom)/2;return mil>=a.top&&mil<=a.bottom?0:Math.round(Math.min(Math.abs(mil-a.top),Math.abs(mil-a.bottom)));})(),
-    limites:[...document.querySelectorAll('[data-bord-card]')].map(c=>{const s=c.querySelector('[data-colis-limite-texte]');if(!s)return null;const rc=c.getBoundingClientRect(),rs=s.getBoundingClientRect();const m=/rgba?\((\d+), ?(\d+), ?(\d+)/.exec(getComputedStyle(s).color)||[];return {deborde:rs.right>rc.right+1,rouge:+m[1]>170&&+m[2]<80&&+m[3]<80,t:s.textContent.trim().slice(0,40)};}).filter(Boolean),
+    limites:[...document.querySelectorAll('[data-bord-card]')].map(c=>{const s=c.querySelector('[data-colis-limite-texte]');if(!s)return null;const rc=c.getBoundingClientRect(),rs=s.getBoundingClientRect();const m=/rgba?\((\d+), ?(\d+), ?(\d+)/.exec(getComputedStyle(s).color)||[];const coupe=(e)=>{for(let x=s;x&&x!==c;x=x.parentElement){const cs=getComputedStyle(x);if(x.scrollWidth>x.clientWidth+1&&(cs.textOverflow==='ellipsis'||cs.overflow==='hidden'||cs.overflowX==='hidden'))return true;}const rg=document.createRange();rg.selectNodeContents(s);const rt=[...rg.getClientRects()];for(let x=s;x&&x!==c.parentElement;x=x.parentElement){const cs=getComputedStyle(x);if(cs.textOverflow==='ellipsis'&&cs.whiteSpace.startsWith('nowrap')&&cs.overflowX!=='visible')return true;if(cs.overflowX!=='visible'||cs.overflowY!=='visible'){const bx=x.getBoundingClientRect();if(rt.some(r=>r.width>0&&(r.left<bx.left-1||r.right>bx.right+1||r.top<bx.top-1||r.bottom>bx.bottom+1)))return true;}if(+cs.webkitLineClamp>0)return true;}return false;};return {coupe:coupe(),deborde:rs.right>rc.right+1,rouge:+m[1]>170&&+m[2]<80&&+m[3]<80,t:s.textContent.trim().slice(0,40)};}).filter(Boolean),
     fraiche:vis(document.querySelector('[data-fraicheur-ventes]')),
     titreEcran:(()=>{const b=document.querySelector('.vrm-mobile-titre,[data-titre-barre]');const t=[...document.querySelectorAll('.vrm-main h1,.vrm-main h2')].filter(h=>vis(h)&&/^(Statistiques|Comptabilité|Argent|Colis|Paramètres|Organisation)$/.test(h.textContent.trim()));return t.map(h=>h.textContent.trim());})(),
     courbeDoublons:(()=>{const c=document.querySelector('[data-stats-courbe]');return c?c.querySelectorAll('[data-chart-caption],[data-chart-compare]').length:null;})(),
@@ -123,6 +124,8 @@ if(sub==='ventes'){
   else console.log(`    [${W}] mesuré : 1re vente à ${T.top} px (écran ${vp.height})`);
 } else if(sub==='achats'){
   dit(m.titres.filter(t=>/^Achats$/.test(t)).length<=1,`[${W}] un seul titre « Achats »`,JSON.stringify(m.titres));
+  // (11 nov., intégration colis — demande g) « Tes meilleures sources » vient APRÈS la liste d'Achats (jamais au-dessus des étapes et de leurs colis).
+  dit(m.sourcesTop==null||(m.ongletsTop!=null&&m.sourcesTop>m.ongletsTop&&(m.recusTop==null||m.sourcesTop<=m.recusTop)),`[${W}] « Tes meilleures sources » après la liste d'Achats`,`${m.sourcesTop} / ${m.ongletsTop} / ${m.recusTop}`);
   dit(m.recusTop!=null&&m.ongletsTop!=null&&m.recusTop>m.ongletsTop,`[${W}] les reçus par email passent sous la liste, plus en tête`,`${m.recusTop} / ${m.ongletsTop}`);
   // (11 nov., restes) Sous la carte « Dépensé » (maquette du 2 nov.) : sur ordinateur dans le premier écran ; téléphone rapporté.
   if(W>=600) dit(m.colis0!=null&&m.colis0+44<=950,`[${W}] les étapes des achats sont dans le premier écran`,String(m.colis0));
@@ -153,9 +156,13 @@ if(sub==='ventes'){
   dit(W<600?m.titreEcran.length===0:m.titreEcran.includes(t),`[${W}] « ${t} » : une fois sur téléphone, présent sur ordinateur`,JSON.stringify(m.titreEcran));
 } else if(v==='cat_bord'){
   // (11 nov., restes) Chaque écran porte son h1 au téléphone aussi (ScreenHead, 2 nov.) : une fois, jamais deux.
-  dit(W<600?m.titreEcran.length<=1:m.titreEcran.includes('Colis'),`[${W}] « Colis » : une fois sur téléphone, présent sur ordinateur`,JSON.stringify(m.titreEcran));
+  // (11 nov., lot DJ3 intégré) Plus d'écran ni d'entrée « Colis » : l'ancien lien `?tab=cat_bord` mène à Ventes · À expédier,
+  // et aucune entrée de navigation (barre, rail) ne s'appelle plus « Colis ».
+  dit(m.colisVentes&&m.navColis===0&&m.titreEcran.length<=1,`[${W}] l'ancien « Colis » mène à Ventes · À expédier ; aucune entrée « Colis » dans la navigation`,JSON.stringify({v:m.colisVentes,nav:m.navColis,t:m.titreEcran}));
   dit(m.limites.length>=3,`[${W}] les cartes de Colis portent leur date limite`,String(m.limites.length));
   dit(m.limites.every(x=>!x.deborde),`[${W}] la date limite ne déborde pas de sa carte`,JSON.stringify(m.limites.filter(x=>x.deborde)));
+  // (11 nov., intégration colis — défaut f, session restes) La date limite se lit EN ENTIER : ni coupée par l'ellipse, ni masquée par son conteneur.
+  dit(m.limites.every(x=>!x.coupe),`[${W}] la date limite se lit en entier (aucune ellipse)`,JSON.stringify(m.limites.filter(x=>x.coupe)));
   dit(m.limites.every(x=>!x.rouge),`[${W}] un retard est ambre, pas rouge (§7)`,JSON.stringify(m.limites.filter(x=>x.rouge)));
   dit(!m.fraiche,`[${W}] pas de « Ventes Vinted à jour » quand tout est à jour`);
 } else {

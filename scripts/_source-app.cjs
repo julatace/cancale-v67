@@ -203,6 +203,10 @@ function sourceAppCode(racine) {
 // et ordre intacts ; une ligne vidée disparaît).
 function sansDoublonsImport(texte) {
   const vus = new Set();
+  // (12 nov.) Un nom DÉCLARÉ au niveau du module (`const MeilleuresSources = aLaDemande(…)` dans
+  // App.jsx) vaut un import : l'import du même nom par un morceau recollé (Stats.jsx) disparaît,
+  // sinon Babel : « MeilleuresSources has already been declared » (audit-benefice rouge sur main).
+  for (const m of texte.matchAll(/^(?:export\s+)?(?:const|let|var|class|function\*?|async\s+function)\s+([A-Za-z_$][\w$]*)/gm)) vus.add(m[1]);
   // (11 nov.) Une ligne suivie d'un commentaire (`; // (10 nov., lot H)`) compte aussi : sans
   // cela DEMANDE_APPAREIL (App.jsx ET Réglages) était déclaré deux fois (Babel).
   return texte.replace(/^import\s+([^'";]*?)\s+from\s+(["'])([^"'\n]+)\2;[ \t]*(?:\/\/[^\n]*)?$/gm, (ligne, specs, q, chemin) => {

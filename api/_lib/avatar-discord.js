@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import {identiteDiscord,urlAvatarDiscord,avatarDiscordPermis} from '../../src/communaute/avatarDiscord.js';
 import {sbCle} from './cle.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 const secret=()=>String(process.env.DISCORD_CLIENT_SECRET||'');
 const mac=(genre,...v)=>crypto.createHmac('sha256','vrm-discord-avatar|'+genre+'|'+secret()).update(v.map(String).join('|')).digest('hex');
 const egal=(a,b)=>{const x=Buffer.from(String(a)),y=Buffer.from(String(b));return x.length===y.length&&crypto.timingSafeEqual(x,y);};
@@ -23,7 +24,7 @@ export function avatarPublicVerifie(owner,d){
 }
 // Données projetées seulement, bornées par les PID déjà autorisés par la RPC.
 // Une ligne écrite par un client ne devient jamais une preuve d'identité.
-export async function ajouterAvatars(profils,f=fetch){
+export async function ajouterAvatars(profils,f=fetchAvecDelai){
  const cle=process.env.SUPABASE_SERVICE_KEY;if(!cle||!secret()||!Array.isArray(profils))return profils;
  const pids=[...new Set(profils.map(p=>String(p.pid||'')).filter(p=>/^[0-9a-f-]{36}$/i.test(p)))];
  const cartes=new Map();const url=process.env.SUPABASE_URL||'https://lgonxzrzjcqthjtbdpzo.supabase.co';

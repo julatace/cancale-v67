@@ -189,3 +189,6 @@
 }
 
 } /* fin @layer vrm-premium */
+/* (11 nov., lot accessibilité) La lettre du jour dessinée (data-lettre) : le nom du bouton
+   (« Mercredi 11 novembre · … ») contient alors tout le texte visible (WCAG 2.5.3). */
+.vrm-jv2-jour > span[data-lettre]::before { content: attr(data-lettre); }

@@ -37,6 +37,7 @@
 //    carte : quand l'une se vend, « Vendus ailleurs » (l'anti double vente) la
 //    fait retirer des autres.
 
+import { motsVendeur } from './profilVendeur.js';
 const arr = (a) => (Array.isArray(a) ? a : []);
 const cleDefaut = (n) => {
   const s = String(n == null ? '' : n).toUpperCase().replace(/[\s\-_.]/g, '');
@@ -189,14 +190,14 @@ export function texteCarte(groupes) {
   if (!g.length) return null;
   if (g.length === 1) {
     const x = g[0];
-    const titre = x.numeros.length ? `N°${x.numeros[0]} en ligne deux fois` : 'Une paire en ligne deux fois';
+    const titre = x.numeros.length ? `N°${x.numeros[0]} en ligne deux fois` : `${motsVendeur().Un} en ligne deux fois`;
     const ou = x.memeCompte ? 'Même compte' : `${x.comptes.length} comptes`;
     const noms = [...new Set(x.annonces.map((a) => a.nom).filter(Boolean))];
-    const complet = `${x.numeros.length > 1 ? `N°${x.numeros.join(' et N°')} : la même paire` : titre}, en ligne deux fois sur Vinted (${x.memeCompte ? `deux annonces sur ${noms[0] || 'le même compte'}` : `sur ${noms.join(' et ')}`}) — supprime celle en trop sur Vinted.`;
+    const complet = `${x.numeros.length > 1 ? `N°${x.numeros.join(' et N°')} : ${motsVendeur().meme}` : titre}, en ligne deux fois sur Vinted (${x.memeCompte ? `deux annonces sur ${noms[0] || 'le même compte'}` : `sur ${noms.join(' et ')}`}) — supprime celle en trop sur Vinted.`;
     return { titre, detail: `${ou} · supprimes-en une`, complet };
   }
   const nums = g.map((x) => (x.numeros[0] ? `N°${x.numeros[0]}` : 'sans N°'));
-  const titre = `${g.length} paires en ligne deux fois`;
+  const titre = `${g.length} ${motsVendeur().noms} en ligne deux fois`;
   return { titre, detail: `${nums.slice(0, 3).join(', ')}${nums.length > 3 ? '…' : ''} · supprime celles en trop`,
     complet: `${titre} sur Vinted : ${nums.join(', ')} — supprime celles en trop sur Vinted.` };
 }

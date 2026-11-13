@@ -27,6 +27,7 @@
 //     éléments viennent de la doc d'eBay (Trading API) ; la relecture APRÈS la
 //     remise en vente dit ce qu'eBay a gardé (`verifie`).
 // ════════════════════════════════════════════════════════════════════════════
+import { motsCourants as MV } from './mots-vendeur.js';   // (11 nov.) « paire » / « article » du vendeur de la requête
 import { cleNum, numeroExterne } from './numerotation.js';
 
 const NUM_OK = /^([A-Z]{1,3})?\d{1,6}$/;
@@ -107,7 +108,7 @@ export function jugerRelance(lu, demande, { mk = null, devise = 'EUR' } = {}) {
   const itemId = String((demande && demande.itemId) || '');
   if (!lu || !lu.itemId) return refus(503, 'pas-su', "eBay n'a pas rendu cette annonce — rien n'a été remis en vente.");
   if (lu.itemId !== itemId) return refus(409, 'autre-annonce', "eBay a rendu une autre annonce que celle demandée — rien n'a été remis en vente.");
-  if (lu.variantes) return refus(409, 'variantes', "Une annonce à variantes porte plusieurs paires : VRM ne la remet pas en vente — fais-le sur eBay.");
+  if (lu.variantes) return refus(409, 'variantes', `Une annonce à variantes porte plusieurs ${MV().noms} : VRM ne la remet pas en vente — fais-le sur eBay.`);
   if (!/^(Completed|Ended)$/i.test(lu.statut || '')) {
     if (/^Active$/i.test(lu.statut || '')) return refus(409, 'en-ligne', "Elle est déjà en vente sur eBay — rien n'a été envoyé.");
     return refus(503, 'pas-su', "eBay ne dit pas que cette annonce est terminée — rien n'a été remis en vente.");
@@ -118,9 +119,9 @@ export function jugerRelance(lu, demande, { mk = null, devise = 'EUR' } = {}) {
   // L'IDENTITÉ : le SKU de l'annonce, lu chez eBay, traduit par la numérotation
   // (date de PUBLICATION), doit désigner la paire demandée.
   const voulu = cleNum(demande && demande.numero);
-  if (!voulu || !NUM_OK.test(voulu)) return refus(400, 'numero', "Numéro de paire illisible — rien n'a été envoyé à eBay.");
+  if (!voulu || !NUM_OK.test(voulu)) return refus(400, 'numero', `Numéro ${MV().deNom} illisible — rien n'a été envoyé à eBay.`);
   const k = numDeSkuRelance(lu.sku);
-  if (!k) return refus(409, 'sans-identite', "Cette annonce ne porte pas de référence VRM-n° : VRM ne sait pas quelle paire elle vend, il ne la remet pas en vente.");
+  if (!k) return refus(409, 'sans-identite', `Cette annonce ne porte pas de référence VRM-n° : VRM ne sait pas ${MV().quelle} elle vend, il ne la remet pas en vente.`);
   const t = Date.parse(lu.debut || '');
   const num = numeroExterne(k, itemId, 'ebayAnnonces', Number.isFinite(t) ? t : null, mk);
   if (num !== voulu) return refus(409, 'identite', `Cette annonce est celle du N°${num || '?'}, pas du N°${voulu} — rien n'a été envoyé.`);

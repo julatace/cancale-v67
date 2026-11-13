@@ -1,0 +1,47 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   SAISIE RAPIDE (11 nov.) — src/SaisieRapide.jsx
+   « Vendu ailleurs » sur la fiche d'une paire, et la feuille « Combien tu l'avais
+   payée ? ». Langue de la direction artistique 6 (src/styles-widgets-ios.css) :
+   tuiles grises, gros chiffres, cibles de 44 px. Aucune couleur : l'action
+   principale prend le bouton primaire de l'app (§7, l'accent est rare).
+   ════════════════════════════════════════════════════════════════════════════ */
+:root {
+  --sr-tuile: var(--w-remplir, rgba(118,118,128,.12));
+  --sr-encre: var(--w-encre, #1D1D1F);
+  --sr-gris: var(--w-gris, #6E6E73);
+  --sr-trait: rgba(60,60,67,.18);
+  --sr-faux: #A35200;
+}
+:root[data-theme="dark"] {
+  --sr-tuile: rgba(118,118,128,.24);
+  --sr-encre: #F5F5F7;
+  --sr-gris: #98989D;
+  --sr-trait: rgba(235,235,245,.18);
+  --sr-faux: #FFB340;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --sr-tuile: rgba(118,118,128,.24); --sr-encre: #F5F5F7; --sr-gris: #98989D; --sr-trait: rgba(235,235,245,.18); --sr-faux: #FFB340; }
+}
+
+.vrm-sr-bloc { display: flex; flex-direction: column; gap: 10px; margin: 10px 0 4px; min-width: 0; }
+.vrm-sr-bloc .vrm-sr-ouvrir { align-self: flex-start; min-height: 44px; }
+.vrm-sr-fait { margin: 0; font: 600 15px/1.3 var(--vrm-police, system-ui, sans-serif); color: var(--sr-gris); font-variant-numeric: tabular-nums; }
+.vrm-sr-ligne { display: flex; flex-wrap: wrap; gap: 10px; min-width: 0; }
+.vrm-sr-champ { display: flex; align-items: center; gap: 8px; min-height: 52px; padding: 0 14px; border-radius: 14px; background: var(--sr-tuile); color: var(--sr-encre); box-sizing: border-box; min-width: 0; }
+.vrm-sr-champ > span { font: 600 14px/1.2 var(--vrm-police, system-ui, sans-serif); color: var(--sr-gris); white-space: nowrap; }
+.vrm-sr-champ input { flex: 1 1 auto; min-width: 0; width: 100%; border: 0; background: transparent; color: var(--sr-encre); outline: none; font: 700 22px/1.2 var(--vrm-police, system-ui, sans-serif); font-variant-numeric: tabular-nums; padding: 8px 0; }
+.vrm-sr-champ input[type="date"] { font-size: 17px; font-weight: 600; min-height: 44px; }
+.vrm-sr-champ b { font: 700 20px/1 var(--vrm-police, system-ui, sans-serif); color: var(--sr-gris); }
+.vrm-sr-champ:focus-within { box-shadow: 0 0 0 2px var(--sr-trait) inset; }
+.vrm-sr-champ:has(input[aria-invalid="true"]) { box-shadow: 0 0 0 2px var(--sr-faux) inset; }
+.vrm-sr-prix { flex: 1 1 150px; }
+.vrm-sr-date { flex: 1 1 170px; }
+.vrm-sr-note { margin: 0; font: 500 14px/1.35 var(--vrm-police, system-ui, sans-serif); color: var(--sr-gris); }
+.vrm-sr-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.vrm-sr-actions > * { flex: 1 1 120px; min-height: 44px; }
+.vrm-sr-feuille { display: flex; flex-direction: column; gap: 12px; padding: 4px 0 8px; }
+.vrm-sr-achat { flex-direction: column; align-items: stretch; gap: 2px; padding: 10px 14px; }
+.vrm-sr-achat .vrm-sr-qui { font-size: 15px; color: var(--sr-gris); white-space: normal; overflow-wrap: anywhere; }
+.vrm-sr-achat .vrm-sr-qui b { color: var(--sr-encre); font-weight: 700; }
+.vrm-sr-saisie { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+.vrm-sr-feuille .vrm-sr-valider { min-height: 48px; width: 100%; }

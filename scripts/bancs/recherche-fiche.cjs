@@ -117,7 +117,7 @@ async function preparer(b, vp, { sombre = false } = {}) {
   const errs = [], lectures = [];
   pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(({ s, n, sd }) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(n)); localStorage.setItem('vinted_ship_done', JSON.stringify(sd)); if (s) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, { s: sombre, n: FICHES, sd: { 22999990226: Date.parse('2026-11-05T09:00:00Z') } });
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const req = route.request();
     const u = decodeURIComponent(metaVersData(req.url()));

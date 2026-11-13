@@ -121,7 +121,8 @@ async function verifier(R, { silencieux = false } = {}) {
   const paires = corpsSante ? corpsSante.split('\n').map((l) => l.trim()).filter(Boolean) : [];
   // (9 nov.) `statut` : la projection publique des sondes (api/_lib/statut-sondes.js `statutPublic`,
   // mots fixes et dates seulement — jugée par scripts/audit-statut-auto.cjs).
-  const valeurOk = (l) => /^ok: true,$/.test(l) || /^etat,$/.test(l) || /^statut,$/.test(l) || /^\w+: !!process\.env\.[A-Z_]+,$/.test(l) || /^stripe: stripePret\(\),$/.test(l) || /^relancesEssai: configurationRelances\(\)\.pret,$/.test(l);
+  // (12 nov., agent2-fiabilite-prod) `config` : les oui/non de configuration, au SEUL propriétaire connecté (absent sinon).
+  const valeurOk = (l) => /^ok: true,$/.test(l) || /^etat,$/.test(l) || /^statut,$/.test(l) || /^config,$/.test(l) || /^\w+: !!process\.env\.[A-Z_]+,$/.test(l) || /^stripe: stripePret\(\),$/.test(l) || /^relancesEssai: configurationRelances\(\)\.pret,$/.test(l);
   dit(paires.length >= 3 && paires.every(valeurOk), 'A12 /api/sante ne rend que des oui/non et `etat` (aucune valeur de variable, aucune donnée)', paires.filter((l) => !valeurOk(l)));
   const ETAT = await imp('api/_lib/etat-public.js');
   if (ETAT.__erreur || typeof ETAT.sonderEtat !== 'function') dit(false, 'A13 etat-public exécutable', ETAT.__erreur);
@@ -238,7 +239,7 @@ async function verifier(R, { silencieux = false } = {}) {
       'C9 « Exporter » = l’export existant ; « Supprimer mon compte » ouvre la suppression (export proposé d’abord) ; « Ce que l’extension a fait » ouvre le journal');
     dit(/href="\/statut"/.test(td) && /window\.open\('\/statut'/.test(regl) && /data-aide-statut/.test(regl), 'C10 /statut joignable depuis « Tes données », l’Aide et « Résoudre un problème »');
     const fermer = (/function FermerCompte\(\{ onExporter \}\) \{[\s\S]*?\n\}\n/.exec(regl) || [''])[0];
-    dit(/const pareil = tape\.trim\(\) === MOT_SUPPRIMER/.test(fermer) && /disabled=\{!pareil \|\| occupe\}/.test(fermer) && /info\.proprietaire/.test(fermer) && /type="password"/.test(fermer), 'C11 supprimer le compte : taper « SUPPRIMER » (+ mot de passe, jugé par le serveur), bouton éteint sinon ; jamais pour le propriétaire de l’installation');
+    dit(/const pareil = tape\.trim\(\) === MOT_SUPPRIMER/.test(fermer) && (/disabled=\{!pareil \|\| occupe\}/.test(fermer) || (/const peutEnvoyer = pareil &&/.test(fermer) && /disabled=\{!peutEnvoyer \|\| occupe\}/.test(fermer))) && /info\.proprietaire/.test(fermer) && /type="password"/.test(fermer), 'C11 supprimer le compte : taper « SUPPRIMER » (+ mot de passe, jugé par le serveur), bouton éteint sinon ; jamais pour le propriétaire de l’installation');
   }
   return res;
 }

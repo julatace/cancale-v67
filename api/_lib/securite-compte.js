@@ -21,6 +21,8 @@
 //    ligne de la base qui le note. Une ligne sans preuve ne sort pas d'ici.
 
 import { createHash } from 'node:crypto';
+import { evenementsJournalModeration, SELECT_MODERATION } from '../../src/moderationVinted.js';   // (11 nov., 5.350)
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -92,7 +94,7 @@ async function rpc(base, cle, nom, corps, f) {
 // `deps` : { base, cle, user:{id}, jeton, methode, corps, fetch }.
 export async function traiterAppareils(deps) {
   const { base, cle, user, jeton, methode, corps } = deps;
-  const f = deps.fetch || fetch;
+  const f = deps.fetch || fetchAvecDelai;
   if (!user || !UUID.test(String(user.id || ''))) return { status: 401, body: { erreur: 'session' } };
   if (!cle) return { status: 503, body: { erreur: 'non-configure', message: "La liste des appareils n'est pas branchée sur le serveur." } };
   const ici = sessionDuJeton(jeton);
@@ -136,6 +138,11 @@ export const TYPES_JOURNAL = {
   offre_refusee: 'Offre refusée',
   offre_faite: 'Offre envoyée',
   message_envoye: 'Message envoyé',
+  // (11 nov., 5.350) constatés chez Vinted (src/moderationVinted.js)
+  moderation_masquee: 'Annonce masquée par Vinted',
+  moderation_disparue: 'Annonce disparue · peut-être retirée par Vinted',
+  moderation_banni: 'Compte fermé par Vinted',
+  moderation_restreint: 'Compte limité par Vinted',
 };
 // (8 nov.) LA PREUVE de chaque ligne : la ligne de SA base qui la note. Une
 // source absente d'ici ⇒ l'événement n'est pas rendu (audit-confiance).
@@ -147,6 +154,8 @@ export const PREUVES_JOURNAL = {
   bordereaux: 'Le bordereau est rangé dans ta base',
   relais: 'Résultat écrit par l’extension dans la commande',
   extension: 'Noté par l’extension au moment du geste',
+  // (11 nov., 5.350) Ce que VINTED a fait, constaté par l'extension (jamais un geste de VRM).
+  moderation: 'Constaté par l’extension en relisant ton dressing ou ton profil Vinted',
 };
 // Ce qu'aucune ligne de la base ne note — dit tel quel à l'écran.
 export const NON_JOURNALISE = [
@@ -184,7 +193,9 @@ export function evenementsJournal(sources) {
     if (!resultat) continue;          // en attente, annulé, ignoré : rien n'est parti
     const at = ms(j.envoyeLe) || ms(j.traiteLe);
     if (!at && resultat !== 'en_cours') continue;
-    out.push({ at, type: j.offre || j.pourcentage ? 'favori_offre' : 'favori', site: 'vinted', compte: f.compte || null, cle: { item: j.itemId ? String(j.itemId) : null }, resultat, source: 'favoris' });
+    const ev = { at, type: j.offre || j.pourcentage ? 'favori_offre' : 'favori', site: 'vinted', compte: f.compte || null, cle: { item: j.itemId ? String(j.itemId) : null }, resultat, source: 'favoris' };
+    if (Number.isInteger(j.variante) && j.variante >= 1 && j.variante <= 5) ev.variante = j.variante;   // (5.369) n° de version, jamais le texte
+    out.push(ev);
   }
   for (const b of s.brouillons || []) {
     if (!b || b.parVRM !== true) continue;
@@ -219,6 +230,8 @@ export function evenementsJournal(sources) {
     if (duTelephone.some((r) => r.type === ev.type && String(r.compte || '') === String(ev.compte || '') && (r.cle.tx || null) === (ev.cle.tx || null) && Math.abs((r.at || 0) - ev.at) <= 15 * 60000)) continue;
     out.push(ev);
   }
+  // (11 nov., 5.350) Ce que Vinted a masqué, fait disparaître ou limité (`moderation_vinted_{uid}`).
+  for (const ev of evenementsJournalModeration(s.moderation)) out.push(ev);
   // La preuve, posée ici pour TOUS : une source sans preuve connue ne sort pas.
   return out.filter((e) => PREUVES_JOURNAL[e.source]).map((e) => ({ ...e, preuve: PREUVES_JOURNAL[e.source] }))
     .sort((a, b) => (b.at || Infinity) - (a.at || Infinity));
@@ -250,6 +263,8 @@ export function evenementsExtension(lignes) {
       vus.add(k);
       const ev = { at, type, site: 'vinted', compte: m[1], cle, resultat: 'ok', source: 'extension' };
       if (e.auto === true) ev.auto = true;
+      // (5.369) Le n° de la version du message envoyée (1 à 5), jamais le texte.
+      if (Number.isInteger(e.v) && e.v >= 1 && e.v <= 5) ev.variante = e.v;
       const de = prixOk(e.de), vers = prixOk(e.vers), p = prixOk(e.p);
       if (de != null && vers != null) ev.prix = { de, vers };
       else if (p != null) ev.prix = { p };
@@ -300,7 +315,7 @@ export async function lireJournal({ userId, lireVendeur, lireService, neutre }) 
   // Favoris
   if (lireService && neutre) {
     const rows = await lireService(`app_data?owner=eq.${neutre}&id=like.favoris_file_*&data->proprietaires=cs.${encodeURIComponent(JSON.stringify([userId]))}&select=id,groupe:data->groupes->${encodeURIComponent('"' + userId + '"')}&limit=100`);
-    if (Array.isArray(rows)) sources.favoris = rows.filter((r) => /^favoris_file_[a-f0-9]{64}$/.test(String(r && r.id || ''))).map((r) => ({ compte: parHache.get(String(r.id).slice(13)) || null, jobs: r.groupe && Array.isArray(r.groupe.jobs) ? r.groupe.jobs.map((j) => ({ etat: j.etat, envoyeLe: j.envoyeLe, traiteLe: j.traiteLe, itemId: j.itemId, offre: j.offre ? true : undefined, pourcentage: j.pourcentage })) : [] }));
+    if (Array.isArray(rows)) sources.favoris = rows.filter((r) => /^favoris_file_[a-f0-9]{64}$/.test(String(r && r.id || ''))).map((r) => ({ compte: parHache.get(String(r.id).slice(13)) || null, jobs: r.groupe && Array.isArray(r.groupe.jobs) ? r.groupe.jobs.map((j) => ({ etat: j.etat, envoyeLe: j.envoyeLe, traiteLe: j.traiteLe, itemId: j.itemId, offre: j.offre ? true : undefined, pourcentage: j.pourcentage, variante: j.variante })) : [] }));
     else { sources.favoris = null; pasLu.push('favoris'); }
   } else { sources.favoris = null; pasLu.push('favoris'); }
   const lignes = async (nom, chemin, map) => {
@@ -321,5 +336,7 @@ export async function lireJournal({ userId, lireVendeur, lireService, neutre }) 
   await lignes('relais', 'app_data?id=like.cmd_relais_*&select=cmd:data->>cmd,etat:data->>etat,demandeLe:data->>demandeLe,prisLe:data->>prisLe,finiLe:data->>finiLe,uid:data->args->>uid,tx:data->args->>tx,lbc:data->args->>id,methode:data->args->>method,endpoint:data->args->>endpoint&order=id.desc&limit=300', (r) => r);
   // (10 nov., lot G) Les gestes notés par l'extension 5.337 : `e` seulement (jamais `data`).
   await lignes('extension', 'app_data?id=like.journal_vrm_*&select=id,e:data->e&limit=200', (r) => r);
+  // (11 nov., 5.350) Les alertes de modération : `e` seulement.
+  await lignes('moderation', `app_data?id=like.moderation_vinted_*&select=${SELECT_MODERATION}&limit=100`, (r) => r);
   return { evenements: evenementsJournal(sources), pasLu, nonJournalise: NON_JOURNALISE.map(([id, texte]) => ({ id, texte })) };
 }

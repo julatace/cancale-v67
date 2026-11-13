@@ -22,6 +22,7 @@
 //   9. un journal visible et un bouton Stop immédiat ;
 //  10. messages variés ({username}, {a|b} — src/favorisMessage.js).
 
+import { motsVendeur } from './profilVendeur.js';
 export const AUTO_DEFAUT = Object.freeze({ actif: false, attenteMin: 10, attenteMax: 60, heureDebut: 9, heureFin: 21, jours: [1, 2, 3, 4, 5, 6, 7], parJour: 30, parHeure: 12 });
 export const AUTO_JOUR_MS = 24 * 3600 * 1000;
 export const AUTO_HEURE_MS = 3600 * 1000;
@@ -143,8 +144,8 @@ export const RAISONS_AUTO = {
   conversation_existante: 'Une conversation existe déjà avec cette personne : VRM n’écrit pas.',
   contacte_30j: 'Personne déjà contactée ces 30 derniers jours : VRM n’écrit pas.',
   deja_contacte: 'Déjà contactée pour cet article : un seul message, pour toujours.',
-  vendue: 'Paire vendue (ici ou ailleurs) : aucun message.',
-  reservee: 'Paire réservée : aucun message.',
+  get vendue() { return `${motsVendeur().Nom} vendu${motsVendeur().e} (ici ou ailleurs) : aucun message.`; },
+  get reservee() { return `${motsVendeur().Nom} réservé${motsVendeur().e} : aucun message.`; },
   en_pause: 'Annonce en pause ou masquée : aucun message.',
   fermee: 'Annonce plus en ligne : aucun message.',
   annonce_absente: 'Annonce absente de ton dressing lu : aucun message.',
@@ -177,14 +178,16 @@ export const DEMANDES_AUTO = {
   extension_indisponible: 'L’extension ne répond pas : recharge-la dans le navigateur où elle est installée, puis recharge VRM.',
   extension_version: 'Installe l’extension 5.309 (Paramètres → Extension), puis recharge-la (⟳) : le mode automatique en a besoin.',
   session_extension: 'Reconnecte l’extension à ton compte VRM (ouvre l’extension → Connecter).',
-  garde_absente: 'VRM n’a pas pu vérifier tes paires vendues ailleurs : ouvre l’écran Annonces de VRM une fois.',
-  dressing_absent: 'Ouvre ton dressing sur vinted.fr avec ce compte : VRM doit voir quelles paires sont en vente.',
+  get garde_absente() { return `VRM n’a pas pu vérifier ${motsVendeur().tes} vendu${motsVendeur().e}s ailleurs : ouvre l’écran Annonces de VRM une fois.`; },
+  get dressing_absent() { return `Ouvre ton dressing sur vinted.fr avec ce compte : VRM doit voir ${motsVendeur().quelles} sont en vente.`; },
   dressing_ancien: 'Ouvre ton dressing sur vinted.fr avec ce compte : sa dernière lecture a plus de 24 h.',
   dressing_partiel: 'Ouvre ton dressing sur vinted.fr et fais-le défiler jusqu’au bout : VRM n’en a lu qu’une partie.',
   boite_ancienne: 'Ouvre ta messagerie sur vinted.fr avec ce compte : VRM vérifie que personne n’est déjà en conversation avec toi.',
   capture: 'Ouvre la cloche de Vinted avec ce compte : VRM n’a pas encore vu ses favoris.',
   reglages: 'Enregistre ton message : Envoyer un message aux favoris → 2. Message → Enregistrer sans envoyer.',
   a_verifier: 'Un message est « à vérifier » : regarde la conversation sur Vinted, puis « J’ai vérifié » dans la file des favoris. Le mode auto attend.',
+  // (12 nov., sécurité des comptes) src/messageSur.js : un numéro, PayPal, « hors Vinted »…
+  message_risque: 'Ton message contient un mot que Vinted bannit : change-le (Envoyer un message aux favoris → 2. Message). Rien n’est parti.',
 };
 // Les états de la file qui DEMANDENT un geste (les autres attendent seuls).
 export const ETATS_DEMANDE = ['destinataire_non_prouve', 'garde_absente', 'dressing_absent', 'dressing_ancien', 'dressing_partiel', 'boite_ancienne', 'capture', 'reglages', 'a_verifier'];
@@ -203,7 +206,7 @@ export const ETATS_AUTO = {
   pret: 'Un message part dans un instant.',
   veille: 'Allumé : en attente d’un nouveau favori.',
   attente_favori: 'Allumé : un favori attend son délai avant le message.',
-  garde_absente: 'Rien ne part : VRM n’a pas pu vérifier tes paires vendues ailleurs. Ouvre l’écran Annonces de VRM (il refait la vérification).',
+  get garde_absente() { return `Rien ne part : VRM n’a pas pu vérifier ${motsVendeur().tes} vendu${motsVendeur().e}s ailleurs. Ouvre l’écran Annonces de VRM (il refait la vérification).`; },
   dressing_absent: 'Rien ne part : ton dressing Vinted n’a pas été lu. Ouvre ton dressing sur vinted.fr avec ce compte.',
   dressing_ancien: 'Rien ne part : ton dressing a été lu il y a plus de 24 h. Ouvre ton dressing sur vinted.fr avec ce compte.',
   dressing_partiel: 'Rien ne part : ton dressing lu n’est pas complet. Ouvre ton dressing sur vinted.fr et fais-le défiler jusqu’au bout.',
@@ -213,4 +216,5 @@ export const ETATS_AUTO = {
   extension: 'Un message est prêt, mais l’extension ne peut pas l’envoyer maintenant (voir le geste demandé).',
   reglages: 'Rien ne part : enregistre d’abord ton message (Envoyer un message aux favoris → 2. Message → Enregistrer).',
   lecture: 'La base VRM n’a pas répondu : rien n’est parti, nouvel essai dans quelques minutes.',
+  message_risque: 'Rien ne part : ton message contient un mot que Vinted bannit (numéro, PayPal, « hors Vinted »…). Change-le.',
 };

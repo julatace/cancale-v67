@@ -20,8 +20,10 @@ if (mut === 'cases-devinees') muter("cases: CASES_IMPOT[liberatoire] || ['5KO', 
 if (mut === 'annee-courante') muter('const annee = now.getMonth() < 6 ? now.getFullYear() - 1 : now.getFullYear();', 'const annee = now.getFullYear();');
 if (mut === 'case-vl') muter("oui: ['5TA']", "oui: ['5KO']");
 if (mut === 'projection-partielle') muter('(!cur.partiel && jours >= 60', '(jours >= 60');
-const tmp = path.join(os.tmpdir(), `micro-${process.pid}.mjs`);
+// (11 nov.) servie depuis src/ (elle importe sommeConnue.js) ; retirée à la sortie.
+const tmp = path.join(ICI, 'src', `.micro-${process.pid}.mjs`);
 fs.writeFileSync(tmp, src);
+process.on('exit', () => { try { fs.unlinkSync(tmp); } catch (_) {} });
 let ko = 0, n = 0;
 const dit = (ok, l, d) => { n++; if (!ok) ko++; console.log(`${ok ? '✅' : '❌'} ${l}${!ok && d !== undefined ? ' — ' + d : ''}`); };
 (async () => {

@@ -272,4 +272,14 @@ export default {
   "stats.texte9": "· from",
   "stats.stock": " · {stock} in stock",
   "stats.prixMedian": "Median price",
+  // ── ecrans/Stats.jsx
+  "stats.ventes": { one: "{nomComplet} — {n} sale", other: "{nomComplet} — {n} sales" },
+  "stats.ventes2": { one: " on {n} sale out of {x}", other: "on {n} sales out of {x}" },
+  "stats.ventesFinaliseesPrix": { one: "{n} completed sale with unread price: not in this amount.", other: "{n} completed sales with unread price: not in this amount." },
+  "stats.ventes3": { one: "{x} · {n} sale", other: "{x} · {n} sales" },
+  "stats.ventes5": { one: "sale", other: "sales" },
+  "stats.negatifs": { one: " · {n} negative", other: "· {n} negative" },
+  "stats.neutres": { one: " · {n} neutral", other: "· {n} neutral" },
+  "stats.periodeComptesSelectionnes2": "Over the period, selected accounts · only accounts with at least one sale · profit: completed sales with a known purchase price · time to sell: median, Vinted only · rate: sold ÷ (sold + live today), Vinted only · basket: from {MIN_DONNEES} sales.",
+  "stats.nonComptees": { one: " · {n} not counted", other: "· {n} not counted" },
 };

@@ -109,7 +109,7 @@ async function ouvrir(b, { largeur, sombre }) {
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   const onglets = []; ctx.on('page', (p) => onglets.push(p));
   await pg.addInitScript((s) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_dark', JSON.stringify(s)); } catch (_) {} }, !!sombre);
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   // Les photos inventées : une image locale (la visionneuse ne s'ouvre que sur une image chargée).
   await pg.route(/images1\.vinted\.net/, (r) => r.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: PNG }));
   await pg.route('**/rest/v1/**', (route) => {

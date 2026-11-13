@@ -180,7 +180,7 @@ const carte = (pg, suivi) => pg.evaluate((k) => {
       console.log(`\n— Colis → À retirer · code et QR · ${tag}`);
       const { ctx, pg, errs } = await ouvrir(b, vp, sombre);
       try {
-        await pg.locator('[data-colis-onglet-choix="retirer"]').first().waitFor({ timeout: 30000 });
+        await pg.locator('[data-colis-section]').first().waitFor({ timeout: 30000 });
         await pg.waitForFunction(() => { try { return !!JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) { return false; } }, null, { timeout: 20000 }).catch(() => {});
         // « À envoyer » d'abord : le QR de dépôt Leboncoin.
         await pg.locator('[data-colis-onglet-choix="envoyer"]').first().click();
@@ -188,7 +188,7 @@ const carte = (pg, suivi) => pg.evaluate((k) => {
         const lbc = await pg.evaluate(() => { const c = document.querySelector('[data-lbc-colis="9001"]'); return c ? { qr: !!c.querySelector('[data-lbc-qr-depot]') } : null; });
         dit(lbc && lbc.qr, '« À envoyer » : la vente Leboncoin porte son QR de dépôt', JSON.stringify(lbc));
         if (SHOTS && lbc) { fs.mkdirSync(SHOTS, { recursive: true }); await pg.locator('[data-lbc-colis="9001"]').first().scrollIntoViewIfNeeded().catch(() => {}); await pg.screenshot({ path: path.join(SHOTS, `qr-lbc-${tag}.png`) }); }
-        await pg.locator('[data-colis-onglet-choix="retirer"]').first().click();
+        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
         await pg.waitForFunction((n) => document.querySelectorAll('.vrm-colis-retirer [data-cc-carte]').length >= n, TOTAL, { timeout: 10000 }).catch(() => {});
         await pg.waitForTimeout(400);
         const base = await pg.evaluate(() => ({
@@ -208,17 +208,17 @@ const carte = (pg, suivi) => pg.evaluate((k) => {
         await pg.waitForTimeout(300);
         const c1 = await carte(pg, '81000001'), c2 = await carte(pg, '81000002'), c3 = await carte(pg, '81000003'), c4 = await carte(pg, '81000004'), c5 = await carte(pg, '81000005'), ch = await carte(pg, 'XW100000001JB');
         const MR_APP = /^QR dans l’app Mondial Relay/;
-        dit(c1 && c1.qrSource == null && c1.qrAbsent === 'mondialrelay' && MR_APP.test(c1.qrAbsentTxt || '') && c1.ajouter && c1.accord === 'confirme' && c1.compteMr === 'compte-mr-1' && c1.code === '100001',
-          '81000001 : le « QR » de la ligne du compte est IGNORÉ ⇒ « QR dans l’app Mondial Relay », « Ajouter le QR » ; code « confirmé », compte nommé', JSON.stringify(c1));
+        dit(c1 && c1.qrSource == null && c1.qrAbsent == null && c1.ajouter && c1.accord === 'confirme' && c1.compteMr === 'compte-mr-1' && c1.code === '100001',
+          '81000001 : le « QR » de la ligne du compte est IGNORÉ (aucun QR montré ni commenté, règle du 11 nov.), « Ajouter le QR » ; code « confirmé », compte nommé', JSON.stringify(c1));
         dit(c1 && c1.compteVinted === 'compte_a' && c1 && c1.arriveSur === 'oui' && c1.arriveLe === jourDans(-1.2).slice(0, 10), '81000001 : la ligne fusionnée garde le compte Vinted et la date d’arrivée de l’e-mail', JSON.stringify({ compte: c1 && c1.compteVinted, sur: c1 && c1.arriveSur, le: c1 && c1.arriveLe }));
         const c6 = await carte(pg, '81000006'), c7 = await carte(pg, '81000007');
         dit(c6 && c6.horsComptes == null && c6.compteSource === 'email', '81000006 : e-mail reçu après la dernière lecture des comptes ⇒ jamais « dans aucun de tes comptes »', JSON.stringify(c6));
         dit(c7 && c7.code === '200007' && c7.accordFoi === 'email' && !/compte Mondial Relay[^:]*fait foi/.test(c7.accordTxt || '') , '81000007 : code de l’e-mail plus récent montré, et la phrase dit que c’est lui qui fait foi', JSON.stringify(c7));
-        dit(c2 && c2.qrAbsent === 'mondialrelay' && MR_APP.test(c2.qrAbsentTxt || '') && !/compte|site|mondialrelay\.fr/i.test(c2.qrAbsentTxt || '') && c2.horsComptes === '1' && c2.plein && c2.ajouter, '81000002 : « QR dans l’app Mondial Relay » (ni compte ni site), « dans aucun de tes comptes », le code en grand, « Ajouter le QR »', JSON.stringify(c2));
-        dit(c3 && c3.qrSource == null && MR_APP.test(c3.qrAbsentTxt || '') && c3.compteMr === 'compte-mr-1' && c3.code === '100003', '81000003 (compte seul) : son code, et aucun QR (le compte n’en a pas)', JSON.stringify(c3));
+        dit(c2 && c2.qrSource == null && c2.qrAbsent == null && c2.horsComptes === '1' && c2.plein && c2.ajouter, '81000002 : aucun QR inventé ni commenté (règle du 11 nov.), « dans aucun de tes comptes », le code en grand, « Ajouter le QR »', JSON.stringify(c2));
+        dit(c3 && c3.qrSource == null && c3.qrAbsent == null && c3.compteMr === 'compte-mr-1' && c3.code === '100003', '81000003 (compte seul) : son code, et aucun QR (le compte n’en a pas)', JSON.stringify(c3));
         dit(c4 && c4.compteMr === 'compte-mr-2', '81000004 : le second compte Mondial Relay nommé', JSON.stringify(c4));
         dit(c5 && c5.site === 'leboncoin' && c5.achatSite === 'leboncoin', '81000005 : l’achat Leboncoin, relié par le n° de suivi', JSON.stringify(c5));
-        dit(ch && ch.qrAbsent === 'chronopost' && /^QR pas reçu/.test(ch.qrAbsentTxt || '') && /Chronopost/.test(ch.qrAbsentTxt || '') && !ch.ajouter, 'Chronopost sans QR : « QR pas reçu » + l’e-mail Pickup Pass (pas de capture proposée)', JSON.stringify(ch));
+        dit(ch && ch.qrSource == null && ch.qrAbsent == null && !ch.ajouter && !!ch.code, 'Chronopost sans QR : rien d’inventé ni de commenté (règle du 11 nov. : « un QR qu’on n’a pas ne se commente plus »), son code, pas de capture proposée', JSON.stringify(ch));
         if (SHOTS) { await pg.locator('[data-cc-carte="r:e:81000001"]').first().scrollIntoViewIfNeeded().catch(() => {}); await pg.screenshot({ path: path.join(SHOTS, `qr-cartes-${tag}.png`) }); }
         // L'explication, ouverte : le seul chemin du QR (une capture de l'app).
         await pg.locator('[data-mr-explique] > summary').first().click().catch(() => {});
@@ -272,7 +272,8 @@ const carte = (pg, suivi) => pg.evaluate((k) => {
         const c2b = await carte(pg, '81000002');
         dit(c2b && c2b.ajout === 'aucun' && c2b.qrSource == null, 'une capture sans QR lisible ⇒ rien n’est posé, et c’est dit', JSON.stringify(c2b && { e: c2b.ajout, t: c2b.ajoutTxt }));
         // « Retirer ce QR » (81000001) ⇒ la pose part, la carte redit « QR dans l’app Mondial Relay ».
-        await pg.locator('[data-cc-carte="r:e:81000001"] [data-colis-plein-ecran]').first().click();
+        // (12 nov., finitions) Avec un QR, « QR en grand » (`data-colis-qr`) remplace « En grand » (un seul geste, plus de doublon).
+        await pg.locator('[data-cc-carte="r:e:81000001"] :is([data-colis-plein-ecran], [data-colis-qr])').first().click();
         await pg.waitForSelector('[data-qr-plein-retirer]', { timeout: 5000 }).catch(() => {});
         await pg.locator('[data-qr-plein-retirer]').first().click().catch(() => {});
         // `save` range la clé après 500 ms (anti-rebond) : on attend l'écriture, pas un délai fixe.

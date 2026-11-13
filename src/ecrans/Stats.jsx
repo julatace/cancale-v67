@@ -1,5 +1,6 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
+import { motsVendeur } from '../profilVendeur.js';
 import { GraphiqueSemaines } from '../GraphiqueSemaines.jsx';   // (8 nov., « beauté ») le vendu par semaine façon Santé
 import { annulationsParCompte } from '../annulationsCompte.js';
 import { modeleSur, classementRapporte, eclaterReleveLots } from '../ceQuiRapporte.js';
@@ -7,7 +8,7 @@ import { classerSansConclureTropVite, compteQuiVendLeMieux, brutParCompte, cleBr
 import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation, PERIODES, bornesPeriode, dansBornes, venduPeriode, barresPeriode, ventesPar } from '../statsVentes.js';
 import React, { useState, useMemo } from 'react';
 import { L } from '../libelles.js';
-import { etapeMotVc, vcVenteAnnulee, montantRecuVc, dateVenteVc } from '../../api/_lib/vestiaire-regle.js';
+import { etapeMotVc, vcVenteAnnulee, montantRecuVc, dateVenteVc, fraisVc } from '../../api/_lib/vestiaire-regle.js';
 import { caAutresParJour, sommePlage } from '../caAutresParJour.js';   // (11 nov., parité) le finalisé des autres plateformes par jour
 import { phrasePlage } from '../periodeCalendrier.js';
 import { lireSupprimes, CLE_SUPPRIMES } from '../comptesSupprimes.js';
@@ -15,7 +16,7 @@ import { recuPublieEntre, valeurObjectif, valeurObjectifMois } from '../design/c
 import { TYPES_OBJECTIF, estEuros, lireSaisieObjectif, objectifAEnregistrer, progressionObjectif, phraseResteObjectif, rythmeObjectif, phraseRythme, moisPleinsAvant, objectifDuMoisYm } from '../objectifMois.js';
 import { PropositionObjectif, BilanObjectif, bilanObjectif } from '../design/CarteStats.jsx';
 import { NOM_BENEFICE, NOM_BENEFICE_BRUT, chiffreBenefice, chiffreBrut } from '../beneficeNoms.js';
-import { AUTH, FermeAuRetour, Bouton, SheetShell, save, C, Card, DEMANDE_SAISIE_PRIX, FraicheurAnnonces, Icon, LAYOUT, LiveStatsCarte, MOIS_COURTS, PeriodePicker, Pourquoi, REGLES_CARTE, RepartitionsVentes, SUPABASE_URL, ScreenHead, Segmente, StatBox, aPayerUrssaf, beneficeDesJours, beneficeDuMoisPub, bilanLignes, caEbayPayees, classifyOrderStatus, clesVenteStats, commandeEbayEngagee, compteEcarte, dateLocaleISO, dateMiseEnLigneMs, demanderVue, fmt, isCloudReady, lbcAnnulee, lbcFinalisee, lireBeneficeJours, lireComptaSynchro, lireExtrasRepartition, lireReleveVentes, lireTout, load, montantCommande, netApresUrssafDe, nonCompteesDe, onCloudReady, phraseNonComptees, recuAvecADater, sbAuth, tauxUrssaf, useBeneficeCalcul, useExcluAutre, useLigneSynchro, useLigneUrssaf, useObjectifMois, useRegimeFiscal, useSourcesCarte, useVentesCoque, ymCourant, lireDatesLbc, avecDatesLbc, montantRecuEbay } from '../App.jsx';
+import { AUTH, FermeAuRetour, Bouton, SheetShell, save, C, Card, DEMANDE_SAISIE_PRIX, FraicheurAnnonces, Icon, LAYOUT, LiveStatsCarte, MOIS_COURTS, PeriodePicker, Pourquoi, REGLES_CARTE, RepartitionsVentes, SUPABASE_URL, ScreenHead, Segmente, StatBox, aPayerUrssaf, beneficeDesJours, beneficeDuMoisPub, bilanLignes, caEbayPayees, classifyOrderStatus, clesVenteStats, commandeEbayEngagee, compteEcarte, dateLocaleISO, dateMiseEnLigneMs, demanderVue, fmt, isCloudReady, lbcAnnulee, lbcFinalisee, lireBeneficeJours, lireComptaSynchro, lireExtrasRepartition, lireReleveVentes, lireTout, load, montantCommande, netApresUrssafDe, nonCompteesDe, onCloudReady, phraseNonComptees, recuAvecADater, sbAuth, tauxUrssaf, useBeneficeCalcul, useExcluAutre, useLigneSynchro, useLigneUrssaf, useObjectifMois, useRegimeFiscal, useSourcesCarte, useVentesCoque, ymCourant, lireDatesLbc, avecDatesLbc, montantRecuEbay, useSansCompte, chargeAbonnement } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import { notesParCompte } from '../notesRecues.js';
@@ -25,6 +26,7 @@ import { texteValeurStock } from '../coutVente.js';
 import {comparerDeuxMois,ymEnFace,bornesMois} from '../comparerMois.js';
 import { estLot as estLotAchat, nombreLot } from '../achatsSourcing.js';   // (11 nov., C5) la règle des lots de l'écran Achats
 import '../styles-mois-boucle.css';
+import { PrevisionMoisCarte, CoutPlateformes } from '../ArgentPlus.jsx';
 import {fraisParPlateforme,texteCouverture} from '../fraisPlateformes.js';
 // ⟦← App.jsx #3⟧
 import { boostRentable, SEUIL_BOOST } from "../boostRentable.js";
@@ -33,10 +35,12 @@ import CeQuiRapporte from "../design/CeQuiRapporte.jsx";
 import SourcesAchats from "../SourcesAchats.jsx";
 import MeilleuresSources from "../MeilleuresSources.jsx";
 import MargePlateforme from "../MargePlateforme.jsx";   // (10 nov., lot I) marge par plateforme — un bloc isolé
-import VitesseEnvoi from "../VitesseEnvoi.jsx";   // (10 nov., lot BM) vitesse d'envoi — un bloc isolé
+import VitesseEnvoi from "../VitesseEnvoi.jsx";
+import SanteComptes from "../SanteComptes.jsx";   // (11 nov., lot sante-comptes)   // (10 nov., lot BM) vitesse d'envoi — un bloc isolé
 import AvisLus from "../AvisVinted.jsx";   // (10 nov., lot BN) les avis Vinted lus   // (10 nov., lot BG) d'où viennent mes achats — un bloc isolé
 // ⟦← App.jsx #5⟧
 import CarteOffres from "../design/CarteOffres.jsx";
+import { GrandChiffre } from "../design/CarteMois.jsx";   // (11 nov., pire cas) un montant long tient dans sa tuile
 import { statsOffres } from "../statsOffres.js";
 import { statsParCategorie, stockParFamille, familleDeVente, cleVente, tableFamilles, ecritureCategoriesMain, afficherCategories, FAMILLES_STATS, titreFamille, CLE_CATEGORIES_MAIN } from '../statsCategories.js';   // (11 nov., lot stats-categories)
 import { CLE_JE_VENDS, lireReglageJeVends } from '../profilVendeur.js';
@@ -44,6 +48,9 @@ import '../stats-categories.css';
 import { resumePeriode, margeConnue, meilleuresVentes, ageDuStock, venduEtRecu, MIN_DONNEES, recordsDe, colonneCompte } from '../statsPlus.js';   // (11 nov., lot stats-plus)
 import '../stats-plus.css';
 import { lireTableFamilles, lireCategoriesFiches, fabriqueFamDe } from '../categoriesLecture.js';   // (11 nov., lot rapport-mois) lectures partagées
+import { valeurSue } from '../sommeConnue.js';   // (11 nov.) « pas su » ≠ 0
+import { totauxVentesManuelles, beneficeVenteManuelle } from '../venteManuelle.js';
+import { ecrireLocal } from '../stockageSur.js';   // (11 nov.) Safari privé / quota : le bouton ferme quand même
 import { tr } from '../i18n/index.js';
 import { trj } from '../i18n/react.js';
 
@@ -118,7 +125,10 @@ function CourbeMois({ mois, presentation = 'barres', valeur = (m) => m.eur, form
   const n=mois.length;
   if(!n)return null;
   const H=compact?124:Math.max(hauteur,196), left=18,right=18,top=14,bottom=28;
-  const vals=mois.map(m=>Math.max(0,Number(valeur(m))||0));
+  // (11 nov., famille « pas su ≠ 0 ») un mois au chiffre pas su : aucune barre, « — » (jamais 0 €).
+  const brut=mois.map(m=>valeurSue(valeur(m)));
+  const vals=brut.map(v=>v==null?0:Math.max(0,v));
+  const ecrire=i=>brut[i]==null?'—':format(vals[i]);
   const max=Math.max(1,...vals),base=H-bottom;
   const col=(W-left-right)/n;
   const X=i=>left+(i+.5)*col;
@@ -133,11 +143,11 @@ function CourbeMois({ mois, presentation = 'barres', valeur = (m) => m.eur, form
   const choisir=(m,i)=>{setLecture(cleDe(m));if(onChoisir)onChoisir(i===externe?null:cleDe(m));};
   return <div ref={ref} className="vrm-chart-months" style={{width:'100%',minWidth:0}}>
     <svg {...{[attr]:''}} width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="group"
-      aria-label={mois.map((m,i)=>`${m.long||m.nomComplet||cleDe(m)} ${format(vals[i])}`).join(' · ')} style={{display:'block',maxWidth:'100%'}}>
+      aria-label={mois.map((m,i)=>`${m.long||m.nomComplet||cleDe(m)} ${ecrire(i)}`).join(' · ')} style={{display:'block',maxWidth:'100%'}}>
       <defs><linearGradient id={`area${uid}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={C.accent} stopOpacity=".20"/><stop offset="1" stopColor={C.accent} stopOpacity=".01"/></linearGradient><linearGradient id={`bars${uid}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={C.accent}/><stop offset="1" stopColor={C.accent} stopOpacity=".65"/></linearGradient></defs>
       {[0,.5,1].map(f=><line key={f} x1={left} x2={W-right} y1={Y(max*f)} y2={Y(max*f)} stroke={C.border} strokeWidth="1" strokeDasharray={f?'3 5':undefined}/>)}
       {presentation==='ligne'&&<g aria-hidden="true" pointerEvents="none"><path d={`M ${X(0)} ${base} L ${vals.map((v,i)=>`${X(i)} ${Y(v)}`).join(' L ')} L ${X(n-1)} ${base} Z`} fill={`url(#area${uid})`}/><path d={`M ${vals.map((v,i)=>`${X(i)} ${Y(v)}`).join(' L ')}`} fill="none" stroke={C.accent} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/></g>}
-      {mois.map((m,i)=>{const cle=cleDe(m),actif=i===lu,bar=Math.max(2,Math.min(compact?22:34,col*.55));const label=`${m.long||m.nomComplet||cle} · ${format(vals[i])}${m.enCours?' (en cours)':''}`;return <g key={cle} data-mois={cle} data-valeur={Math.round(vals[i]*100)} role="button" tabIndex="0" aria-label={label} aria-pressed={actif} className="vrm-chart-month" onClick={()=>choisir(m,i)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choisir(m,i);}}}>
+      {mois.map((m,i)=>{const cle=cleDe(m),actif=i===lu,bar=Math.max(2,Math.min(compact?22:34,col*.55));const label=`${m.long||m.nomComplet||cle} · ${ecrire(i)}${m.enCours?' (en cours)':''}`;return <g key={cle} data-mois={cle} data-valeur={brut[i]==null?'':Math.round(vals[i]*100)} role="button" tabIndex="0" aria-label={label} aria-pressed={actif} className="vrm-chart-month" onClick={()=>choisir(m,i)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choisir(m,i);}}}>
         <title>{label}</title>
         {actif&&presentation!=='ligne'&&<rect x={X(i)-col/2+2} y="2" width={Math.max(1,col-4)} height={H-2} rx="6" fill={C.bg}/>}
         <rect x={X(i)-col/2} y="0" width={col} height={H} fill="transparent"/>
@@ -145,8 +155,8 @@ function CourbeMois({ mois, presentation = 'barres', valeur = (m) => m.eur, form
         {(i%pas===0||i===n-1)&&<text x={X(i)} y={H-8} textAnchor="middle" fontSize="11" fontWeight={actif?600:400} fill={actif?C.text:C.muted}>{court(m)}</text>}
       </g>;})}
     </svg>
-    {legende && <div className="vrm-chart-caption" data-chart-caption=""><span>{mois[lu].long||mois[lu].nomComplet||cleDe(mois[lu])}{mois[lu].enCours?tr('stats.cours'):''}</span><strong>{format(vals[lu])}</strong></div>}
-    {legende && lu>0 && <div className="vrm-chart-compare" data-chart-compare=""><span>{tr('stats.precedent')} {mois[lu-1].long||mois[lu-1].nomComplet||cleDe(mois[lu-1])}{mois[lu].enCours?tr('stats.moisComplet'):''}</span><strong>{format(vals[lu-1])}</strong></div>}
+    {legende && <div className="vrm-chart-caption" data-chart-caption=""><span>{mois[lu].long||mois[lu].nomComplet||cleDe(mois[lu])}{mois[lu].enCours?tr('stats.cours'):''}</span><strong>{ecrire(lu)}</strong></div>}
+    {legende && lu>0 && <div className="vrm-chart-compare" data-chart-compare=""><span>{tr('stats.precedent')} {mois[lu-1].long||mois[lu-1].nomComplet||cleDe(mois[lu-1])}{mois[lu].enCours?tr('stats.moisComplet'):''}</span><strong>{ecrire(lu-1)}</strong></div>}
   </div>;
 }
 // ⟦← App.jsx #11⟧
@@ -164,8 +174,9 @@ function MonthDetail({mois,type,C,fmt,catMap,catalog,onClose}){
     const db=(type==='encaisse'?b.receiveDate:b.saleDate)||'';
     return db.localeCompare(da);
   });
-  const totalCA=ventes.reduce((s,v)=>s+(+v.sellPrice||0),0);
-  const totalProfit=ventes.reduce((s,v)=>s+((+v.sellPrice||0)-(+v.buyPrice||0)),0);
+  // (11 nov., famille « pas su ≠ 0 ») un achat inconnu ne vaut pas 0 € : bénéfice des ventes au coût connu, « sur N ».
+  const tot=totauxVentesManuelles(ventes);
+  const totalCA=tot.ca, totalProfit=tot.benefice;
   return (
     <div style={{marginTop:16,padding:14,background:C.bg,borderRadius:12,border:`1px solid ${C.border}`}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
@@ -174,22 +185,22 @@ function MonthDetail({mois,type,C,fmt,catMap,catalog,onClose}){
       </div>
       <div style={{display:'flex',gap:16,marginBottom:12,fontSize:12}}>
         <span style={{color:C.text}}>{tr('stats.ca')} <b>{fmt(totalCA)}</b></span>
-        <span style={{color:C.accentTexte}}>{tr('stats.benefice')} <b>{fmt(totalProfit)}</b></span>
+        <span style={{color:C.accentTexte}} data-benefice-mois={totalProfit==null?'':Math.round(totalProfit*100)}>{tr('stats.benefice')} <b>{totalProfit==null?'—':fmt(totalProfit)}</b>{totalProfit!=null&&tot.nConnus<tot.n?tr('stats.ventes2', { n: String(tot.nConnus), x: String(tot.n) }):''}</span>
       </div>
       <div style={{maxHeight:260,overflowY:'auto'}}>
         {ventes.map((v,i)=>{
-          const nom=catName[v.productId]||(v.productId?('Paire '+v.productId):'—');
+          const nom=catName[v.productId]||(v.productId?(motsVendeur().Nom+' '+v.productId):'—');
           const dateAff=(type==='encaisse'?v.receiveDate:v.saleDate)||'';
-          const benef=(+v.sellPrice||0)-(+v.buyPrice||0);
+          const benef=beneficeVenteManuelle(v);
           return (
-            <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderBottom:`1px solid ${C.border}`,fontSize:12}}>
+            <div key={v.id||i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderBottom:`1px solid ${C.border}`,fontSize:12}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{color:C.text,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{nom}</div>
                 <div style={{color:C.muted,fontSize:11}}>{dateAff}{v.productId?` · n°${v.productId}`:''}</div>
               </div>
               <div style={{textAlign:'right',marginLeft:10}}>
-                <div style={{color:C.text,fontWeight:500}}>{fmt(+v.sellPrice||0)}</div>
-                <div style={{color:benef>=0?C.accent:C.warn,fontSize:11}}>{benef>=0?'+':''}{fmt(benef)}</div>
+                <div style={{color:C.text,fontWeight:500}}>{fmt(valeurSue(v.sellPrice))}</div>
+                <div style={{color:C.muted,fontSize:11}}>{benef==null?'—':`${benef>=0?'+':''}${fmt(benef)}`}</div>
               </div>
             </div>
           );
@@ -660,13 +671,16 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       {/* 🎯 OBJECTIF DU MOIS (4 nov.) — le MÊME réglage et la MÊME règle que la barre de la carte sombre.
           (11 nov., lot objectifs-mois) Sorti du volet replié : c'est LE détail de l'objectif dans Argent. */}
       <div className="vrm-objectif-argent" data-objectif-argent=""><Card><ObjectifDuMois liveStats={liveStats}/></Card></div>
+      {/* (11 nov., agent2-argent-parrainage) « Fin de novembre, à ce rythme » : le vendu prouvé du mois prolongé (src/previsionMois.js). */}
+      <PrevisionMoisCarte liveStats={liveStats} onSaisirPrix={versSaisiePrix}/>
       {/* (8 nov., « beauté ») Le vendu par semaine façon Santé : les 12 semaines de `rythmeVendu`
           (`ventesFaites`), une semaine touchée = son détail. Sorti du volet replié (il n'y est plus redit). */}
       <VenduParSemaineSante liveStats={liveStats}/>
       {/* (10 nov., lot BC) L'écran « Ma semaine » (le bilan de la semaine) : un lien, rien de recalculé ici. */}
       {onGo ? <button type="button" className="vrm-lien-action" data-ouvre-ma-semaine="" onClick={() => onGo('semaine')} style={{alignSelf:'flex-start',minHeight:44,padding:'0 4px',border:0,background:'transparent',font:'inherit',fontSize:15,fontWeight:600,color:C.accentTexte||C.text,cursor:'pointer'}}>{tr('ecran.semaine')} <span aria-hidden="true">›</span></button> : null}
       <ComparerMoisCarte liveStats={liveStats} panelOff={panelOff}/>
-      <FraisParSiteCarte periode={periodeStats} ebayCommandes={ebayCommandes}/>
+      {/* (11 nov., agent2-argent-parrainage) « Frais par site » sur la période OU mois par mois, une vue à la fois (src/ArgentPlus.jsx). */}
+      <CoutSitesCarte periode={periodeStats} ebayCommandes={ebayCommandes} parPeriode={<FraisParSiteCarte periode={periodeStats} ebayCommandes={ebayCommandes} ventesVc={ventesVc}/>}/>
       {/* (2 nov., « beaucoup d'incompréhension » — Julien) En haut, les chiffres qui
           comptent pour la période ; tout le reste est rangé en deux volets repliés,
           ouverts d'un geste et gardés ouverts sur cet appareil. Aucune règle ne change. */}
@@ -938,7 +952,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             <div style={{minWidth:0,padding:'12px 0',borderTop:`1px solid ${C.border}`}}>
               <div style={sLib}>{tr('stats.meilleurJour')}</div>
               <div className="vrm-display" style={{...sHero,fontSize:20,letterSpacing:-0.4,marginTop:4}}>{fmt(bestDayCA[1].ca)}</div>
-              <div style={{...sNote,fontSize:11,marginTop:2}}>{trj('stats.ventes2', { n: bestDayCA[1].count, x: bestDayCA[0] })}</div>
+              <div style={{...sNote,fontSize:11,marginTop:2}}>{trj('stats.ventes3', { n: bestDayCA[1].count, x: bestDayCA[0] })}</div>
             </div>
           )}
           {bestDayProfit&&(
@@ -1020,7 +1034,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       {/* (31 oct.) Rythme, marges par groupe, temps de vente, jours et heures,
           stock qui dort, rotation, annulations — chacun avec sa couverture. */}
       </RepliStats>
-      <RepliStats id="vente" titre={tr('stats.vendRythmeStock')} phrase="Marges par marque, temps de vente, jours et heures où tu vends, paires en ligne depuis longtemps, boost.">
+      <RepliStats id="vente" titre={tr('stats.vendRythmeStock')} phrase={`Marges par marque, temps de vente, jours et heures où tu vends, ${motsVendeur().noms} en ligne depuis longtemps, boost.`}>
       <StatsDetaillees liveStats={liveStats} panelOff={panelOff} onVoirDorment={onGo ? () => { demanderVue('dorment'); onGo('vinted_annonces'); } : null}/>
       <AnalysesStatistiques panelOff={panelOff}/>
 
@@ -1074,7 +1088,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             <div>
               <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>{trj('stats.semaineDerniere', { from: weeklyRecapData.from, to: weeklyRecapData.to })}</div>
               <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:13}}>
-                <span><b style={{color:C.text}}>{weeklyRecapData.count}</b> <span style={{color:C.muted}}>{trj('stats.ventes3', { n: weeklyRecapData.count })}</span></span>
+                <span><b style={{color:C.text}}>{weeklyRecapData.count}</b> <span style={{color:C.muted}}>{trj('stats.ventes5', { n: weeklyRecapData.count })}</span></span>
                 <span><b style={{color:C.accentTexte}}>{fmt(weeklyRecapData.ca)}</b> <span style={{color:C.muted}}>{tr('stats.vendu')}</span></span>
                 <span><b style={{color:C.accentTexte}}>{fmt(weeklyRecapData.profit)}</b> <span style={{color:C.muted}} data-benef-notion="brut">{NOM_BENEFICE_BRUT.toLowerCase()}</span></span>
               </div>
@@ -1082,7 +1096,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                 <div style={{fontSize:11,color:up?C.accent:C.muted,fontWeight:600,marginTop:6}}>{up?'▲':'▼'} {up?'+':''}{fmt(diff)} {tr('stats.vsSemainePrecedente')}{pct!=null?` (${up?'+':''}${pct}\u00a0%)`:''} <span style={{color:C.muted,fontWeight:600}}>{trj('stats.vendus', { fmt: fmt(pc) })}</span></div>
               ); })()}
             </div>
-            <button className="vrm-icon-control" aria-label={tr('stats.fermerBilanSemaine')} type="button" onClick={()=>{localStorage.setItem('vinted_last_weekly_recap',isoWeek);setShowWeekly(false);}}
+            <button className="vrm-icon-control" aria-label={tr('stats.fermerBilanSemaine')} type="button" onClick={()=>{ecrireLocal('vinted_last_weekly_recap',isoWeek);setShowWeekly(false);}}
               style={{background:'transparent',border:'none',cursor:'pointer',color:C.muted,fontSize:15,lineHeight:1,padding:'2px 4px'}}><Icon name="close" size={15}/></button>
           </div>
         </Card>
@@ -1096,12 +1110,12 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             <div>
               <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>{trj('stats.recap', { nom: monthlyRecapData.nom })}</div>
               <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:13}}>
-                <span><b style={{color:C.text}}>{monthlyRecapData.count}</b> <span style={{color:C.muted}}>{trj('stats.ventes3', { n: monthlyRecapData.count })}</span></span>
+                <span><b style={{color:C.text}}>{monthlyRecapData.count}</b> <span style={{color:C.muted}}>{trj('stats.ventes5', { n: monthlyRecapData.count })}</span></span>
                 <span><b style={{color:C.accentTexte}}>{fmt(monthlyRecapData.ca)}</b> <span style={{color:C.muted}}>{tr('stats.vendu')}</span></span>
                 <span><b style={{color:C.accentTexte}}>{fmt(monthlyRecapData.profit)}</b> <span style={{color:C.muted}} data-benef-notion="brut">{NOM_BENEFICE_BRUT.toLowerCase()}</span></span>
               </div>
             </div>
-            <button className="vrm-icon-control" aria-label={tr('stats.fermerBilanMois')} type="button" onClick={()=>{localStorage.setItem('vinted_last_monthly_recap',monthKey);setShowMonthly(false);}}
+            <button className="vrm-icon-control" aria-label={tr('stats.fermerBilanMois')} type="button" onClick={()=>{ecrireLocal('vinted_last_monthly_recap',monthKey);setShowMonthly(false);}}
               style={{background:'transparent',border:'none',cursor:'pointer',color:C.muted,fontSize:15,lineHeight:1,padding:'2px 4px'}}><Icon name="close" size={15}/></button>
           </div>
         </Card>
@@ -1318,7 +1332,7 @@ function AnnulationsEtNotes({ b, panelOff }) {
           {A.comptes.map((g) => (
             <details key={g.cle} className="vrm-sv-annul-compte" data-sv-annul-compte={g.uid} data-n={g.n} data-annulees={g.annulees} data-taux={g.taux == null ? '' : g.taux}>
               <summary className="vrm-sv-annul-ligne">
-                <span className="vrm-sv-nom">{g.compte}</span>
+                <span className="vrm-sv-nom" title={g.compte || undefined}>{g.compte}</span>
                 <span className="vrm-sv-piste"><span style={{ width: `${g.taux ? Math.max(3, g.taux / maxT * 100) : 0}%` }}/></span>
                 <span className="vrm-sv-chiffre">{g.annulees}/{g.n} · {pctTxt(g.taux)}</span>
               </summary>
@@ -1347,7 +1361,7 @@ function AnnulationsEtNotes({ b, panelOff }) {
         : (<div className="vrm-sv-lignes" data-sv-notes={N.etat}>
           {N.comptes.map((c) => (
             <div key={c.uid} className="vrm-sv-note-ligne" data-sv-notes-compte={c.uid} data-etat={c.etat} data-note={c.note == null ? '' : c.note} data-n={c.n == null ? '' : c.n} data-neg={c.neg == null ? '' : c.neg} data-vieux={c.vieux ? '1' : ''}>
-              <span className="vrm-sv-nom">{c.nom}</span>
+              <span className="vrm-sv-nom" title={c.nom || undefined}>{c.nom}</span>
               <span className="vrm-sv-chiffre vrm-sv-note-detail">{c.etat !== 'lu' ? tr('journee.lu') : <>{pl(c.n, 'avis', 'avis')}{c.neg > 0 ? tr('stats.negatifs', { n: String(c.neg) }) : ''}{c.neu > 0 ? tr('stats.neutres', { n: String(c.neu) }) : ''}{c.vieux && c.at ? tr('stats.lu2', { jour: String(jour(c.at)) }) : ''}</>}</span>
               <span className="vrm-display vrm-sv-note-val">{c.etat !== 'lu' ? '—' : note(c.note)}</span>
             </div>
@@ -1425,7 +1439,7 @@ function ParCategorie({ vendu, lp, extras, stock, b }) {
         <div className="vrm-sv-lignes vrm-sv-cats" data-sv-etat="lu">
           {S.groupes.map((g) => (
             <div key={g.v} className="vrm-sv-ligne-cat" data-sv-cat={g.v} data-n={g.n} data-eur={Math.round(g.eur * 100)} data-brut={g.brut == null ? '' : Math.round(g.brut * 100)} data-couv={`${g.nCout}/${g.fin}`} data-mediane={g.mediane == null ? '' : g.mediane} data-stock={g.stock == null ? '' : g.stock}>
-              <span className="vrm-sv-nom">{g.titre}</span>
+              <span className="vrm-sv-nom" title={g.titre || undefined}>{g.titre}</span>
               <span className="vrm-sv-piste"><span style={{ width: g.n ? `${Math.max(3, g.n / maxN * 100)}%` : 0 }}/></span>
               <span className="vrm-sv-chiffre vrm-sv-cat-chiffre">{g.n ? `${pl(g.n, 'vente')} · ${fmt(g.eur)}` : tr('stats.aucuneVente')}</span>
               <span className="vrm-sv-cat-detail">
@@ -1671,7 +1685,7 @@ function ComparerComptes({ comptes, brutComptes, enLigneDe }) {
           ))}
         </tbody>
       </table>
-      <p className="vrm-sv-note">{trj('stats.periodeComptesSelectionnes', { MIN_DONNEES: MIN_DONNEES })}</p>
+      <p className="vrm-sv-note">{trj('stats.periodeComptesSelectionnes2', { MIN_DONNEES: MIN_DONNEES })}</p>
     </div>
   );
 }
@@ -1772,6 +1786,7 @@ function StatsPlus({ b, V, partielVendu, lp, stock, barres, ligneUrssaf, lib, no
   );
 }
 function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo = null }) {
+  const sansCompteStats = useSansCompte();   // (11 nov., états vides) aucun compte relié, prouvé par la coque
   const maintenant = React.useMemo(() => Date.now(), [periode, liveStats]); // eslint-disable-line react-hooks/exhaustive-deps
   const b = React.useMemo(() => bornesPeriode(periode, maintenant), [periode, maintenant]);
   const { releve, stock, benef, extras, lignes } = useReleveStats();
@@ -1897,7 +1912,7 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
   const tuile = (k, lib, val, sous, attrs, titre) => (
     <div className="vrm-sv-tuile" data-sv-tuile={k} title={titre || undefined} {...(attrs || {})}>
       <div className="vrm-sv-tuile-lib">{lib}</div>
-      <div className="vrm-display vrm-sv-tuile-val" data-vide={val === '—' ? '1' : undefined}>{val}</div>
+      <GrandChiffre className="vrm-display vrm-sv-tuile-val" plancher={16} data-vide={val === '—' ? '1' : undefined}>{typeof val === 'string' ? val.replace(/ (€|%)/g, '\u00a0$1') : val}</GrandChiffre>
       <div className="vrm-sv-tuile-sous">{sous}</div>
     </div>
   );
@@ -1944,7 +1959,7 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
       : `${BP.n === 0 ? 'aucune vente finalisée · ' : ''}après prix d’achat, frais${BP.depenses === 'jamais' ? '' : ', dépenses'}${BP.sansCotis ? '' : ' et URSSAF'}${BP.depenses === 'jamais' ? ' · avant tes dépenses' : ''}`;
     return tuile('benefice', NOM_BENEFICE, CB.valeur == null ? '—' : fmt(CB.valeur), sous,
       { 'data-sv-etat': BP ? 'lu' : etatBP, 'data-sv-n': BP ? BP.n : undefined, 'data-sv-ncout': BP ? BP.nCout : undefined, 'data-sv-brut': BP && BP.nCout > 0 ? cents(BP.brut) : '', ...CB.attrs },
-      tr('stats.beneficeVentesFinalisees'));
+      `Bénéfice : tes ventes finalisées moins le prix d’achat des ${motsVendeur().noms}, les frais de vente, tes dépenses et l’URSSAF — la même règle que Comptabilité et Ma journée.`);
   })();
   const tDelai = !releve
     ? tuile('delai', tr('stats.tempsVendre'), '—', 'pas encore calculé', { 'data-sv-etat': 'passu' })
@@ -2033,7 +2048,7 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
                   return comptes.length > 1 ? <p className="vrm-sv-note" data-sv-pas-conclu-compte="">{trj('stats.moinsVentesEgalite', { SEUIL_CONCLUSION: SEUIL_CONCLUSION })}</p> : null; })()}
                 {comptes.slice(0, 6).map((c) => (
                   <div key={c.k} className="vrm-sv-ligne-compte" data-sv-compte={c.k} data-n={c.n} data-mediane={c.mediane == null ? '' : c.mediane}>
-                    <span className="vrm-sv-nom">{c.nom}{c.site && c.site !== c.nom ? <span className="vrm-sv-site"> ({c.site})</span> : null}</span>
+                    <span className="vrm-sv-nom" title={c.nom || undefined}>{c.nom}{c.site && c.site !== c.nom ? <span className="vrm-sv-site"> ({c.site})</span> : null}</span>
                     <span className="vrm-sv-n">{pl(c.n, 'vente')}{(() => {
                       // Un site à plusieurs comptes (deux Leboncoin) n'a qu'un brut commun : rien n'est
                       // attribué à un compte qui ne le porte pas (aucune ligne plutôt qu'un faux).
@@ -2056,8 +2071,10 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
       <MeilleuresSources owner={(AUTH.user && AUTH.user.id) || ''} Retour={FermeAuRetour} ici="argent"/>
       {/* (10 nov., lot BM) « Vitesse d'envoi » : lu dans `vrm_vitesse_envoi` (src/vitesseEnvoi.js), 30 jours. */}
       <VitesseEnvoi owner={(AUTH.user && AUTH.user.id) || ''}/>
+      {/* (11 nov., lot sante-comptes) « Santé des comptes » : chaque compte Vinted, en forme ou à surveiller (src/SanteComptes.jsx). */}
+      <SanteComptes variante="stats"/>
       {/* (10 nov., lot I) « Marge par plateforme » : vendu de `venduLignes`, bénéfice du relevé de Ventes (src/margePlateforme.js). */}
-      <MargePlateforme liveStats={liveStats} releve={lp} de={b.de} a={b.a} onSaisirPrix={onSaisirPrix} lireLignesSites={lireLignesSitesMarge}/>
+      <MargePlateforme liveStats={liveStats} releve={lp} de={b.de} a={b.a} onSaisirPrix={onSaisirPrix} lireLignesSites={lireLignesSitesMarge} sansCompte={sansCompteStats}/>
       {/* (11 nov., lot stats-categories) « Par catégorie » : seulement si DEUX familles sont connues (src/statsCategories.js). */}
       <ParCategorie vendu={Array.isArray(vendu) ? vendu.filter(dansP) : vendu} lp={lp} extras={extras} stock={stock} b={b}/>
       {/* (4 nov.) Les offres de la période, par compte (src/statsOffres.js). */}
@@ -2312,13 +2329,24 @@ function ComparerMoisCarte({ liveStats, panelOff = null }) {
 // (`vrm_stats_ventes`, frais saisis sur les fiches), les commandes eBay
 // (`totalMarketplaceFee`), les packs et options de Comptabilité. La couverture
 // est dite là où le site a une commission à lire.
+// (11 nov., agent2-argent-parrainage) La même carte, ou mois par mois côte à côte (src/coutPlateformes.js) :
+// le relevé de Ventes, les Dépenses (packs, abonnements) et les commandes eBay arrivent en props.
+function CoutSitesCarte({ periode, ebayCommandes, parPeriode }) {
+  const [releve] = useLigneSynchro('vrm_stats_ventes', lireReleveFrais);
+  const [compta] = useLigneSynchro('vrm_compta', lireComptaSynchro);
+  const excluAutre = useExcluAutre();
+  const R = React.useMemo(() => ({ commandeEbayEngagee }), []);
+  const chargeAbo = React.useCallback((a, ym) => chargeAbonnement(a, (m) => m === ym, ym), []);
+  return <CoutPlateformes parPeriode={parPeriode} releve={releve ? releve.l : null} ebay={Array.isArray(ebayCommandes) ? ebayCommandes : null}
+    compta={compta} excluAutre={excluAutre} R={R} chargeAbo={chargeAbo} Segmente={Segmente}/>;
+}
 const lireReleveFrais = () => { try { const v = load('vrm_stats_ventes', null); return v && Array.isArray(v.l) ? v : null; } catch (_) { return null; } };
-function FraisParSiteCarte({ periode, ebayCommandes }) {
+function FraisParSiteCarte({ periode, ebayCommandes, ventesVc }) {
   const [releve] = useLigneSynchro('vrm_stats_ventes', lireReleveFrais);
   const [compta] = useLigneSynchro('vrm_compta', lireComptaSynchro);
   const excluAutre = useExcluAutre();
   const b = bornesPeriode(periode, Date.now());
-  const F = fraisParPlateforme({ releve: releve ? releve.l : null, ebay: Array.isArray(ebayCommandes) ? ebayCommandes : null, packs: compta && compta.packs, de: b.de, a: b.a, excluAutre, R: { commandeEbayEngagee } });
+  const F = fraisParPlateforme({ releve: releve ? releve.l : null, ebay: Array.isArray(ebayCommandes) ? ebayCommandes : null, packs: compta && compta.packs, de: b.de, a: b.a, excluAutre, R: { commandeEbayEngagee, fraisVc }, vestiaire: Array.isArray(ventesVc) ? ventesVc : null });   // (11 nov. soir) + les frais Vestiaire LUS
   if (!F.sites.length) return null;
   // (6 nov.) Aucun site lu : une ligne, pas trois rangées de « pas lu — — » (moins de cartes,
   // celles qui servent). Le geste qui la remplit est dit.
@@ -2469,7 +2497,7 @@ function StatsDetaillees({ liveStats, panelOff, onVoirDorment = null }) {
         {M.groupes.length === 0 ? <div style={{ ...sNote, marginTop: 10 }}>{tr('stats.aucuneVenteFinalisee3')}</div> : (
           <div role="table" aria-label={tr('stats.texte6', { NOM_BENEFICE_BRUT: String(NOM_BENEFICE_BRUT), toLowerCase: String(AXES_MARGE[axeMarge].toLowerCase()) })} style={{ marginTop: 12, display: 'flex', flexDirection: 'column' }}>
             <div role="row" style={{ ...ligneTab, fontSize: 11, color: C.muted, paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
-              <span role="columnheader">{AXES_MARGE[axeMarge]}</span><span role="columnheader" style={{ textAlign: 'right' }}>{tr('nav.ventes')}</span><span role="columnheader" style={{ textAlign: 'right' }}>{tr('stats.brut2')}</span><span role="columnheader" style={{ textAlign: 'right' }}>{tr('annonces.marge')}</span><span role="columnheader" style={{ textAlign: 'right' }}>{tr('stats.article')}</span>
+              <span role="columnheader">{AXES_MARGE[axeMarge]}</span><span role="columnheader" style={{ textAlign: 'right' }}>{tr('historiqueSites.type.ventes')}</span><span role="columnheader" style={{ textAlign: 'right' }}>{tr('stats.brut2')}</span><span role="columnheader" style={{ textAlign: 'right' }}>{tr('annonces.marge')}</span><span role="columnheader" style={{ textAlign: 'right' }}>{tr('stats.article')}</span>
             </div>
             {M.groupes.slice(0, 8).map((g) => (
               <div role="row" key={g.k} data-stats-marge-ligne={g.k} data-n={g.n} data-ncout={g.nCout} data-brut={g.brut == null ? '' : Math.round(g.brut * 100)} data-marge={g.marge == null ? '' : g.marge}

@@ -73,7 +73,8 @@ async function audit(src, bavard) {
   const code = APP.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map((l) => l.replace(/(^|[^:'"`])\/\/.*$/, '$1')).join('\n');
   const dit = (c, m) => { if (!c) ko++; console.log((c ? '✅ ' : '❌ ') + m); };
   const MOTEUR = fs.readFileSync(path.join(R, 'src', 'dicteeNavigateur.js'), 'utf8');
-  dit(/const dicterRecherche = \(t\) => \{ const r = requeteDeLaVoix\(t\);[\s\S]{0,700}?setGsQ\(r\.requete\)/.test(code), 'la barre de recherche pose la requête lue par `requeteDeLaVoix`');
+  // (11 nov., saisie rapide) « vendues en octobre » passe d'abord par `ventesDuMois` (Ventes sur ce mois).
+  dit(/const dicterRecherche = \(t\) => \{ (?:\{ const vm = ventesDuMois\(t\);[^\n]*\n\s*)?const r = requeteDeLaVoix\(t\);[\s\S]{0,700}?setGsQ\(r\.requete\)/.test(code),'la barre de recherche pose la requête lue par `requeteDeLaVoix`');
   dit(/const micLoupe = <MicDictee nu canal="loupe"[^>]*onText=\{dicterRecherche\}/.test(code) && (code.match(/\{micLoupe\}/g) || []).length === 2, 'le micro est dans la barre, sur ordinateur ET au téléphone');
   dit(/if \(!DICTEE_OK \|\| refus\) return null;/.test(code) && /typeof \(window\.SpeechRecognition \|\| window\.webkitSpeechRecognition\) === 'function'/.test(code), 'sans l’API, ou micro refusé : pas de bouton');
   dit(/rec\.lang = 'fr-FR'/.test(MOTEUR), 'reconnaissance en fr-FR (le moteur commun)');

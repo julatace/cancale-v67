@@ -140,6 +140,13 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
     // La liste FERMÉE des <img> qui ne peuvent PAS montrer une photo Vinted.
     // Clé : « fonction englobante :: source » ; une source inconnue est rouge.
     const PERMIS = {
+      // (intégration g1) sources nées des lots alertes-ebay, gros-lot, pas-en-ligne :
+      // (intégration 11nov-g2) lot annonce-vinted :
+      'CreerSurVinted :: u': 'photos de « Créer sur Vinted » : choisies par le vendeur et réduites dans la page en data:image/jpeg (photoReduite), ou les photos de SA fiche ; aucune photo Vinted lue par l’<img>',
+      'LigneAlerte :: x.photo': 'photo d’une annonce eBay renvoyée par l’API Browse d’eBay (alertes d’achat, api/_lib/ebay-alertes.js) : image eBay, jamais Vinted, referrerPolicy posé',
+      'BlocGrosLot :: a.photo': 'photo choisie par le vendeur, compressée en data:image/jpeg dans le navigateur (compresser) ; aucune URL distante',
+      'Vignette :: src': 'Achetés pas en ligne : une photo VINTED passe par <Photo> (PhotoVinted) ; l’<img> ne reçoit que la photo d’un achat HORS plateforme, data:image lue dans sa ligne (lirePhotosHorsPasEnLigne)',
+      'AchatsParEmail :: a.photo': 'photo LUE dans l’e-mail d’achat par photoProduit (api/_lib/achats-email.js) : CDN fermé par site (Leboncoin, i.ebayimg.com, images.vestiairecollective.com), une seule image sinon rien ; jamais une photo Vinted, no-referrer',
       'PhotoOffreVc :: url': 'URL filtrée par urlPhotoVc : HTTPS images.vestiairecollective.com seulement, aucun identifiant dans l’URL ; ce n’est pas une photo Vinted',
       'ComptaPro :: ticketVu.src': 'ticket photographié puis compressé en data:image/jpeg dans choisirTicket, ou lu comme octets du ticket ; aucune URL d’annonce',
       'ComptaPro :: dPhoto': 'aperçu du fichier choisi, compressé en data:image/jpeg par le navigateur ; aucune URL distante',
@@ -201,6 +208,7 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
       'ReglagesStream :: STREAM_PHOTO_EXEMPLE': 'dessin d’exemple du mode stream : constante data:image/svg+xml écrite dans Reglages.jsx, aucune URL distante',
       'RecherchePhoto :: apercu': 'aperçu de SA photo choisie sur l’appareil : URL.createObjectURL(fichier) (blob: local, jamais envoyée), jamais une adresse Vinted',
       'Comptabilite :: qi': 'QR de retrait (transporteur)',
+      'QrRetraitImage :: local || src': 'QR de retrait (12 nov.) : la copie locale (data:image gardée après une lecture) ou `qrImage` (data:image du QR lu, ou l’adresse de QR du transporteur) — jamais une photo d’annonce',
       'Comptabilite :: qrView.img': 'QR de retrait (transporteur)',
       'SettingsScreen :: customLogo': 'logo choisi sur l’appareil (data:)',
       'DoubleVerification :: cours.qr': 'QR de la double vérification : data:image/svg+xml rendu par GoTrue (qrEnSrc refuse toute autre forme)',

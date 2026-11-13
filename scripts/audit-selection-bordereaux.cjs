@@ -72,10 +72,10 @@ const dit = (c, m, d) => { n++; if (!c) ko++; console.log(`${c ? '✅' : '❌'} 
   dit(/ligneLotAutre\(/.test(lotBloc) && !/__autre === 'vc' && x\.v && x\.v\.bordereau/.test(lotBloc) && !/lbcPdf && x\.o && x\.o\.label/.test(lotBloc), '5a App : le lot prend les lignes de `ligneLotAutre` (plus de filtre « PDF déjà là »)');
   dit(/coches:cochesParDefaut\(L\)/.test(app) && /const aImprimer = selectionImprimable\(lignesLotTous\(\), choisis\);/.test(app), '5b App : cochées d’office et sélection imprimable par la règle');
   const merge = app.slice(app.indexOf('const mergeAndDownloadBordereauxBrut'), app.indexOf('const mergeAndDownloadBordereaux = '));
-  dit(/const dejaLot = \{\};/.test(merge) && /deja: dejaLot \}/.test(merge), '5c la place choisie vaut pour TOUS les bordereaux de la même forme du lot (une question par forme)');
+  dit(/const dejaLot = \{\};/.test(merge) && /deja: dejaLot\s*[,}]/.test(merge), '5c la place choisie vaut pour TOUS les bordereaux de la même forme du lot (une question par forme)');
   dit(/if \(estTamponAnnule\(e\)\) throw e;/.test(merge), '5d « Annuler » dans la feuille arrête le lot (rien n’est imprimé)');
   dit(/apercu: placer \? 'force' : true/.test(app) && /data-lot-placer=/.test(app), '5e « Placer le tampon » rouvre la feuille de chaque forme ; sinon seulement les formes sans place gardée');
-  dit(/const choisirTampon = \(\{ PL, src, numero, titre, apercu = true, deja = \{\} \}\)/.test(app), '5f `choisirTampon` accepte une mémoire partagée (`deja`)');
+  dit(/const choisirTampon = \(\{ PL, src, numero, titre, apercu = true, deja = \{\}(?:, [\w ={}]+)? \}\)/.test(app), '5f `choisirTampon` accepte une mémoire partagée (`deja`)');
   console.log(`\n${ko ? '❌' : '✅'} audit-selection-bordereaux : ${n - ko}/${n}`);
   fs.rmSync(tmp, { recursive: true, force: true });
   process.exit(ko ? 1 : 0);

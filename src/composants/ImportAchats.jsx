@@ -6,6 +6,7 @@
 // dans le navigateur ; il ne part nulle part.
 // ═══════════════════════════════════════════════════════════════════════════
 import React from 'react';
+import { motsVendeur } from '../profilVendeur.js';
 import { lireFichierAchats, reconnaitreColonnes, colonnesSuffisantes, apercuImport, resumeImport, ecrituresImport, NOMS_CHAMPS, CHAMPS } from '../importAchats.js';
 import './import-achats.css';
 
@@ -78,7 +79,7 @@ export function ImportAchatsFeuille({ onClose, onImporter, existants, numeroDe, 
                   <span className="vrm-imp-pastille"><b>{res.ok}</b> à importer</span>
                   {res.doubles > 0 && <span className="vrm-imp-pastille"><b>{res.doubles}</b> déjà là</span>}
                   {res.ecartees > 0 && <span className="vrm-imp-pastille vrm-imp-ambre"><b>{res.ecartees}</b> écartée{res.ecartees > 1 ? 's' : ''}</span>}
-                  {res.couts > 0 && <span className="vrm-imp-pastille"><b>{res.couts}</b> coût{res.couts > 1 ? 's' : ''} de paire</span>}
+                  {res.couts > 0 && <span className="vrm-imp-pastille"><b>{res.couts}</b> coût{res.couts > 1 ? 's' : ''} {motsVendeur().deNom}</span>}
                 </div>
                 {res.sansRef > 0 && <p className="vrm-imp-note" data-imp-sans-ref={res.sansRef}>{res.sansRef} sans référence : un doublon ne s’y voit pas.</p>}
                 <ul className="vrm-imp-lignes" data-imp-lignes={lignes.length}>

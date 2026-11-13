@@ -23,6 +23,13 @@
   window.__vrmInfosLoaded = true;
   const R = globalThis.__vrmReglesAchat || null;
   const vivant = () => { try { return !!(chrome.runtime && chrome.runtime.id); } catch (_) { return false; } };
+  // 5.361 (revue, 110-115 — famille « minuteries et écouteurs orphelins ») :
+  // une minuterie permanente de la page s'ARRÊTE quand l'extension a été mise à
+  // jour ou retirée (`chrome.runtime.id` disparu) — sinon elle tournait pour
+  // rien jusqu'à la fermeture de l'onglet, à côté de la nouvelle copie.
+  const extVivante = () => { try { return !!(chrome.runtime && chrome.runtime.id); } catch (_) { return false; } };
+  const minuterieVivante = (fn, ms) => { const id = setInterval(() => { if (!extVivante()) { clearInterval(id); return; } try { const r = fn(); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch (_) {} }, ms); return id; };
+
   const demander = (msg) => new Promise((res) => {
     if (!vivant()) return res(null);
     try { chrome.runtime.sendMessage(Object.assign({ from: 'cancale-vinfos' }, msg), (r) => { void chrome.runtime.lastError; res(r || null); }); } catch (_) { res(null); }
@@ -253,8 +260,8 @@
       if (!(R.extractBrand(a.marque) || a.marque) && !R.extractBrand(a.titre)) { hote.setAttribute('data-vrm-stock', 'marque'); stock.appendChild(el('p', 'petit', 'Marque pas lue : je ne compare pas.')); return; }
       const p = R.pairesDuModele({ cible, stock: r.stock, marqueDe: R.extractBrand, modeleDe: R.extractModel, couleursDe: R.extractColors });
       hote.setAttribute('data-vrm-stock', String(p.n));
-      if (!p.n) { stock.appendChild(el('p', 'petit', r.aConfirmer ? 'Aucune paire proche en ligne. Des comptes sont à relire.' : 'Aucune paire proche en ligne chez toi.')); return; }
-      stock.appendChild(el('p', '', `Peut-être ${p.n} paire${p.n > 1 ? 's' : ''} proche${p.n > 1 ? 's' : ''} en ligne chez toi`));
+      if (!p.n) { stock.appendChild(el('p', 'petit', r.aConfirmer ? `${(globalThis.VRM_MOTS ? globalThis.VRM_MOTS.mots() : {}).Aucune || 'Aucune paire'} proche en ligne. Des comptes sont à relire.` : `${(globalThis.VRM_MOTS ? globalThis.VRM_MOTS.mots() : {}).Aucune || 'Aucune paire'} proche en ligne chez toi.`)); return; }
+      stock.appendChild(el('p', '', `Peut-être ${p.n} ${p.n > 1 ? ((globalThis.VRM_MOTS ? globalThis.VRM_MOTS.mots() : {}).noms || 'paires') : ((globalThis.VRM_MOTS ? globalThis.VRM_MOTS.mots() : {}).nom || 'paire')} proche${p.n > 1 ? 's' : ''} en ligne chez toi`));
       const ul = el('ul');
       for (const x of p.paires.slice(0, 3)) ul.appendChild(el('li', '', x.titre + (x.taille ? ' · ' + x.taille : '')));
       stock.appendChild(ul);
@@ -262,7 +269,7 @@
     tete.addEventListener('click', () => { const o = tete.getAttribute('aria-expanded') !== 'true'; tete.setAttribute('aria-expanded', String(o)); corps.hidden = !o; if (o) montrerStock(); });
   }
 
-  setInterval(async () => {
+  minuterieVivante(async () => {
     if (!vivant()) return;
     try { await demanderInfos(); poserLignesInfos(); poserEncartAchat(); } catch (_) {}
   }, 1200);

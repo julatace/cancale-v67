@@ -100,16 +100,20 @@ const OWNER_V2 = `${API}/adfinder/v2/owner_listing`;
 const URL_PAUSE = `${API}/pintad/v1/public/manual/pause/ads`;
 
 // ── La page leboncoin.fr : le capteur (MAIN) et le relais (isolé) sur la MÊME fenêtre ──
+// 5.362 : un MessageChannel de banc (deux ports, messages copiés, livrés au tour suivant).
+class CanalBanc { constructor() { const a = {}, b = {}; const livre = (vers) => (m) => setTimeout(() => { if (typeof vers.onmessage === 'function') vers.onmessage({ data: JSON.parse(JSON.stringify(m)) }); }, 0); a.postMessage = livre(b); b.postMessage = livre(a); this.port1 = a; this.port2 = b; } }
+const manu = (x) => x.appels.filter((y) => y.url.indexOf('/manual/') > 0);
 function page({ reseau = () => null, top = true, hote = 'www.leboncoin.fr', fond = null } = {}) {
   const ecouteurs = [], posts = [], appels = [], envoyes = [], onMsg = [];
   const win = {};
-  win.postMessage = (m) => { const d = JSON.parse(JSON.stringify(m)); posts.push(d); setTimeout(() => { for (const f of ecouteurs.slice()) { try { f({ source: win, data: d }); } catch (_) {} } }, 0); };
+  // 5.362 : `postMessage(m, origine, [port])` comme un navigateur (le canal privé des ordres passe un port).
+  win.postMessage = (m, origine, transfert) => { const d = JSON.parse(JSON.stringify(m)); posts.push(d); setTimeout(() => { for (const f of ecouteurs.slice()) { try { f({ source: win, origin: 'https://' + hote, data: d, ports: transfert || [] }); } catch (_) {} } }, 0); };
   win.addEventListener = (t, f) => { if (t === 'message') ecouteurs.push(f); };
   win.fetch = async (u, init) => {
     const url = typeof u === 'string' ? u : u.url;
     appels.push({ url, methode: (init && init.method) || 'GET', corps: init && init.body, entetes: init && init.headers ? JSON.parse(JSON.stringify(init.headers)) : null, credentials: init && init.credentials });
     await attendre(3);
-    const r = reseau(url, init) || { status: 404, body: '{}' };
+    const r = (/\/api\/account\/v1\/members\/me\/account$/.test(url) ? { status: 200, body: { account: { account_id: MON, type: 'private' }, member: { account_id: MON, nickname: { value: 'Moi' } } } } : null) || reseau(url, init) || { status: 404, body: '{}' };
     const body = typeof r.body === 'string' ? r.body : JSON.stringify(r.body);
     const res = { ok: r.status >= 200 && r.status < 300, status: r.status, headers: { get: () => 'application/json' }, text: async () => body, json: async () => JSON.parse(body) };
     res.clone = () => res;
@@ -124,7 +128,7 @@ function page({ reseau = () => null, top = true, hote = 'www.leboncoin.fr', fond
     // page (`currentScript` présent), il ne se réinjecte pas.
     document: { currentScript: {}, readyState: 'complete', getElementById: () => null, addEventListener() {}, createElement: () => ({}), head: { appendChild() {} } },
     localStorage: { getItem: (k) => (k in ls ? ls[k] : null), setItem: (k, v) => { ls[k] = String(v); }, removeItem: (k) => { delete ls[k]; } },
-    URL, FormData: class {}, TextEncoder, console: silence, setTimeout, clearTimeout, setInterval: () => 0, clearInterval() {},
+    URL, MessageChannel: CanalBanc, FormData: class {}, TextEncoder, console: silence, setTimeout, clearTimeout, setInterval: () => 0, clearInterval() {},
     Headers: class { constructor(o) { this.o = o || {}; } entries() { return Object.entries(this.o); } },
   });
   const ctxI = commun(); vm.createContext(ctxI); vm.runInContext(INJ, ctxI, { filename: 'lbc-inject.js' });
@@ -133,7 +137,12 @@ function page({ reseau = () => null, top = true, hote = 'www.leboncoin.fr', fond
     onMessage: { addListener: (f) => onMsg.push(f) } } };
   const ctxR = Object.assign(commun(), { chrome: chromeR, crypto: win.crypto }); vm.createContext(ctxR); vm.runInContext(REL, ctxR, { filename: 'lbc-relay.js' });
   // Le fond envoie un ordre à CET onglet (chrome.tabs.sendMessage).
-  const ordre = (msg, sender = { id: 'ext' }) => new Promise((res) => {
+  // 5.362 (moyenne 58) : l'ordre porte le compte attendu ; la page doit l'avoir lu
+  // (la réponse `members/me/account` que le site charge lui-même) — MON par défaut.
+  let compteLu = false;
+  const lireCompte = async () => { if (compteLu) return; compteLu = true; await win.fetch('https://api.leboncoin.fr/api/account/v1/members/me/account', { method: 'GET' }); await attendre(10); };
+  const ordre = async (msg, sender = { id: 'ext' }) => { await lireCompte(); return ordreBrut(/^lbc(Pause|Supprime)Annonce$/.test(String(msg && msg.action)) && !('compte' in msg) ? Object.assign({ compte: MON }, msg) : msg, sender); };
+  const ordreBrut = (msg, sender = { id: 'ext' }) => new Promise((res) => {
     let garde = false;
     for (const f of onMsg) { try { if (f(msg, sender, (r) => res(r)) === true) garde = true; } catch (_) {} }
     if (!garde) setTimeout(() => res(undefined), 40);
@@ -428,7 +437,7 @@ const listes = (p) => p.envoyes.filter((m) => m.action === 'lbcListeComplete');
     const h = page({ reseau: sitePause(200, '{}'), hote: 'www.exemple.fr' });
     h.win.postMessage({ __tag: 'CANCALE_LBC_ORDRE', kind: 'pause', id: '3290168823', jeton: 'abcdefgh-2' });
     await attendre(60);
-    dit(!q.appels.length && !h.appels.length, 'un cadre secondaire, une page hors leboncoin.fr : rien ne part', `${q.appels.length} · ${h.appels.length}`);
+    dit(!manu(q).length && !manu(h).length, 'un cadre secondaire, une page hors leboncoin.fr : rien ne part', `${q.appels.length} · ${h.appels.length}`);
   });
 
   console.log('\n── 5. METTRE EN PAUSE : LE FOND (compte connecté, une à la fois, plafond, réponse)');
@@ -443,7 +452,7 @@ const listes = (p) => p.envoyes.filter((m) => m.action === 'lbcListeComplete');
     const r = await f.ctx.pauseLbcDepuisApp({ cmd: 'lbcPause', id: ID });
     await attendre(40);
     dit(r && r.accepte === true && r.etape === 'fait' && r.statut === 200 && r.reponse === '{"ok":true}', 'Leboncoin répond 200 ⇒ « fait », avec la réponse telle quelle', JSON.stringify(r));
-    dit(f.messagesOnglet.length === 1 && f.messagesOnglet[0].frameId === 0 && f.messagesOnglet[0].msg.id === ID && Object.keys(f.messagesOnglet[0].msg).sort().join() === 'action,from,id', 'un seul ordre, au cadre principal de l’onglet connecté, avec l’identifiant seul', JSON.stringify(f.messagesOnglet));
+    dit(f.messagesOnglet.length === 1 && f.messagesOnglet[0].frameId === 0 && f.messagesOnglet[0].msg.id === ID && Object.keys(f.messagesOnglet[0].msg).sort().join() === 'action,compte,from,id' && f.messagesOnglet[0].msg.compte === MON, 'un seul ordre, au cadre principal de l’onglet connecté, avec l’identifiant et le compte attendu (revérifié dans la page)', JSON.stringify(f.messagesOnglet));
     const it = ((f.base.lbc_listings || {}).items || {})[ID] || {};
     dit(!!it.pauseAt && it.pauseStatut === 200 && it.status === 'active', 'l’annonce porte « mise en pause » (un état ; rien n’est effacé)', JSON.stringify(it));
     dit(((f.local.vrmLbcPauses || []).length) === 1, 'la pause compte dans le plafond horaire');
@@ -514,7 +523,7 @@ const listes = (p) => p.envoyes.filter((m) => m.action === 'lbcListeComplete');
   // d’App.jsx, extraite par Babel, exécutée sur des annonces INVENTÉES.
   await essaie('numerosLbcSortis', async () => {
     const parser = require(path.join(racine, 'node_modules', '@babel', 'parser'));
-    const ast = parser.parse(APP, { sourceType: 'module', plugins: ['jsx'] });
+    const ast = parser.parse(APP, { sourceType: 'module', plugins: ['jsx'], errorRecovery: true });   // (11 nov., lot lbc-plus) la source réunie (App.jsx + écrans) déclare deux fois un même import paresseux : on lit quand même
     const decl = new Map();
     for (const n of ast.program.body) {
       const d = n.type === 'ExportNamedDeclaration' ? n.declaration : n;

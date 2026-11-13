@@ -36,6 +36,14 @@ export const FAMILLES = [
   // (8 nov., Julien : « quand de nouveaux comptes sont liés, je veux des notifications »)
   // Un compte Vinted, Leboncoin, Vestiaire ou eBay relié pour la première fois (src/compteRelie.js).
   { id: 'comptes', titre: 'Nouveau compte relié', def: true },
+  // (11 nov., ext. 5.350) Vinted a masqué une annonce, en a fait disparaître une, limite ou ferme un compte
+  // (src/moderationVinted.js) : une fois par événement, regroupé.
+  { id: 'moderation', titre: 'Vinted cache ou limite', def: true },
+  // (11 nov., lot avis-negatif) Un avis Vinted de 3★ ou moins (seuil réglable) vient d'arriver (src/avisNegatif.js).
+  { id: 'avis', titre: 'Avis négatif reçu', def: true },
+  // (11 nov., lot alertes-ebay) Une nouvelle annonce eBay pour une recherche dont IL a
+  // allumé l'alerte (api/_lib/ebay-alertes.js) : une notification par passage, groupée.
+  { id: 'alertesebay', titre: 'Alertes d’achat eBay', def: true },
 ];
 
 // Catégorie (le mot que chaque route passe à `pushCategorieActive` et à
@@ -60,10 +68,18 @@ export const FAMILLE_DE = {
   // (6 nov.) Leboncoin « Suppression de vos annonces » : ouvrir « Mes annonces »
   // (api/_lib/lbc-suppression.js), une fois par jour au plus.
   lbcsuppression: 'rappels',
+  // (11 nov., lot agent2-veille) Un chiffre qui a chuté d'un coup sans raison (src/veilleChiffres.js).
+  veille: 'rappels',
   // (11 nov.) « Me le rappeler » : un rappel que le vendeur a posé LUI-MÊME (api/_lib/rappels-perso.js).
   rappel: 'rappels',
   // (8 nov.) Un compte relié pour la première fois (api/_lib/compte-relie.js) : une fois par compte.
   compte: 'comptes',
+  // (11 nov.) Vinted a masqué / fait disparaître / limite (api/_lib/moderation-notif.js).
+  moderation: 'moderation',
+  // (11 nov.) Un avis ≤ seuil reçu sur Vinted (api/_lib/avis-negatif.js) : une fois par avis.
+  avis: 'avis',
+  // (11 nov.) Les alertes d'achat eBay (api/_lib/ebay-alertes.js).
+  alerteebay: 'alertesebay',
 };
 // Un type NEUF hérite du réglage de la famille d'où il sort tant qu'il n'est pas
 // posé lui-même : il avait coupé « Ventes », la double vente reste coupée ; il

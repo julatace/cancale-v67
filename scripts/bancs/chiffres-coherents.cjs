@@ -265,17 +265,19 @@ async function widget() {
         await ctx.close(); }
       // Colis
       { const { ctx, pg, errs } = await ouvrir(b, vp, 'cat_bord');
-        await attendre(pg, () => { const e = document.querySelector('[data-fu-colis-envoyer]'); return e && e.getAttribute('data-fu-colis-envoyer') !== ''; }, null, 40000);
+        // (intégration g1) DJ3 : `cat_bord` ouvre Ventes · À expédier ; la grande carte de Colis n'y est plus redite
+        // (Ventes porte SA carte, « à envoyer » = `aposter`), ses autres cases sont la ligne `data-colis-resume`.
+        await attendre(pg, () => { const e = document.querySelector('[data-fu-colis-envoyer]') || document.querySelector('[data-carte-chiffre="aposter"]'); return !!e && !!document.querySelector('[data-colis-onglet-choix="envoyer"]'); }, null, 40000);
         await pg.click('[data-colis-onglet-choix="envoyer"]').catch(() => {});
         await attendre(pg, () => !!document.querySelector('[data-colis-recap]') && !!document.querySelector('[data-tournee-ouvrir]'), null, 20000);
         await pg.waitForTimeout(800);
-        const carte = await attr(pg, '[data-fu-colis-envoyer]', 'data-fu-colis-envoyer');
+        const carte = (await attr(pg, '[data-fu-colis-envoyer]', 'data-fu-colis-envoyer')) ?? (await attr(pg, '[data-carte-chiffre="aposter"]', 'data-carte-valeur'));
         const ong = await attr(pg, '[data-colis-onglet-choix="envoyer"]', 'data-colis-onglet-n');
         const rec = await attr(pg, '[data-colis-recap]', 'data-colis-recap');
         const badge = await pg.evaluate(() => { const e = [...document.querySelectorAll('[data-badge-n]')].map((x) => x.getAttribute('data-badge-n')); return e; });
         dit(carte === String(ATT.envoyer) && ong === String(ATT.envoyer) && rec === String(ATT.envoyer), `${T} E Colis : carte, onglet et récapitulatif disent ${ATT.envoyer}`, `carte ${carte} · onglet ${ong} · récap ${rec}`);
         dit(badge.includes(String(ATT.envoyer)), `${T} E la barre (badge de Colis) dit ${ATT.envoyer}`, JSON.stringify(badge));
-        const imp = await pg.evaluate(() => { const e = document.querySelector('[data-carte-chiffre="imprimer"]'); return e ? e.getAttribute('data-carte-valeur') : null; });
+        const imp = await pg.evaluate(() => { const e = document.querySelector('[data-carte-chiffre="imprimer"]'); if (e) return e.getAttribute('data-carte-valeur'); const r = document.querySelector('[data-colis-resume="ventes"] [data-colis-resume-case="imprimer"]'); if (r) return r.getAttribute('data-n'); const b = document.querySelector('[data-colis-barre-btn="imprimer"][data-imprimer-prets]'); return b ? b.getAttribute('data-imprimer-prets') : null; });
         dit(imp === String(ATT.imprimer), `${T} I Colis : la case « À imprimer » dit ${ATT.imprimer}`, imp);
         const recTxt = await pg.evaluate(() => { const e = document.querySelector('[data-colis-recap-texte]'); return e ? e.textContent : ''; });
         const mImp = /(\d+)\s+bordereaux?\s+à imprimer/.exec(recTxt);

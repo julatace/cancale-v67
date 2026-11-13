@@ -119,7 +119,10 @@ const lireLocal = (stock, k) => { let t; try { t = stock.getItem(k); } catch (_)
 // elles partent avec la file comme le reste, mais ne sont pas des « changements »
 // qu'il a faits — on ne les compte pas à l'écran (« 1 changement » quand il a
 // tapé un prix, pas « 41 »).
-export const CLES_PUBLIEES = ['vinted_urssaf_mois', 'vrm_colis_retirer', 'vrm_benefice_jours', 'vrm_paires_dorment', 'vinted_annonces_email_sold', 'vrm_widget_token', 'vrm_agent_ebay_resume', 'vrm_agent_ebay_jour', 'vrm_agenda_envoi'];
+export const CLES_PUBLIEES = ['vinted_urssaf_mois', 'vrm_colis_retirer', 'vrm_benefice_jours', 'vrm_paires_dorment', 'vinted_annonces_email_sold', 'vrm_widget_token', 'vrm_agent_ebay_resume', 'vrm_agent_ebay_jour', 'vrm_agenda_envoi',
+  // (11 nov., réseau instable) Le journal des prix LUS (src/historiquePrix.js), écrit par l'écran
+  // Annonces à chaque lecture : « 10 changements » s'affichait pour UNE note tapée sous un 429.
+  'vrm_prix_lus'];
 const vide = (v) => v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length) || (estObjet(v) && !Object.keys(v).length);
 const memeValeur = (a, b) => (vide(a) && vide(b)) || egal(a, b);
 // Un élément de liste : un nombre et sa chaîne sont le même (« 12 » = 12, le pool).
@@ -133,6 +136,13 @@ export const compterEnAttente = (stock, owner) => {
   let n = 0;
   for (const k in f.cles) {
     if (CLES_PUBLIEES.includes(k)) continue;
+    // (12 nov.) Le prix par N° (`vinted_buyprice_by_num`) est le MIROIR du prix de la fiche :
+    // un prix tapé écrit les deux. Quand la fiche attend aussi, ce n'est qu'UN changement
+    // (« 1 changement » pour un prix, banc file-envoi). Seul (Stock, Vestiaire), il compte.
+    if (k === 'vinted_buyprice_by_num' && f.cles.vinted_annonce_numeros) continue;
+    // La reprise des écrans (dernier écran, filtres, recherche) voyage avec la ligne mais n'est
+    // pas une saisie : elle part avec le reste, on ne la compte pas (« 1 changement » = un prix).
+    if (k === 'vrm_reprise_ecrans') continue;
     const b = baseDe(f.cles[k]), l = lireLocal(stock, k);
     if (memeValeur(b, l)) continue;
     if (estObjet(b) || estObjet(l)) {

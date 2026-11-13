@@ -9,7 +9,7 @@ const auth=()=>({user:{id:A},session:{access_token:'token-a'}});
 test('liste des comptes : filtre obligatoire, rejet d’un propriétaire étranger et réponse périmée',async()=>{
  const code=extraire(app,'const fetchVintedAccounts =','// Retire un compte de');
  for(const mode of ['bon','etranger','sans-owner','bascule']){
-  const c=vm.createContext({AUTH:auth(),SUPABASE_URL:'https://base.test',encodeURIComponent,sbAuth:()=>({Authorization:'Bearer token-a'}),memoriserComptesLies:()=>{},CLE_SUPPRIMES:'k',localStorage:{setItem(){},getItem(){return null;}},fetch:async(url)=>{
+  const c=vm.createContext({AUTH:auth(),SUPABASE_URL:'https://base.test',encodeURIComponent,sbAuth:()=>({Authorization:'Bearer token-a'}),memoriserComptesLies:()=>{},horsLigneMaintenant:()=>false,comptesCopieHorsLigne:()=>null,garderComptesCopie:()=>{},CLE_SUPPRIMES:'k',localStorage:{setItem(){},getItem(){return null;}},fetch:async(url)=>{
    assert.equal(new URL(url).searchParams.get('owner'),'eq.'+A);
    if(url.includes('/vinted_accounts')){if(mode==='bascule')c.AUTH=authB();return Response.json([{owner:mode==='etranger'?B:mode==='sans-owner'?undefined:A,vinted_user_id:'42'}]);}return Response.json([]);
   }});vm.runInContext(code+';globalThis.lire=fetchVintedAccounts;',c);
@@ -31,7 +31,7 @@ test('extension : aucune lecture anonyme ni retour des comptes d’une session r
  const code=extraire(ext,'async function getStoredAccounts(opts)','// ── FETCH ACTIF');
  for(const mode of ['absente','bon','etranger','bascule']){
   let lectures=0;
-  const c=vm.createContext({authToken:async()=>mode==='absente'?null:{user_id:A,access_token:'token-a'},loadSession:async()=>({user_id:mode==='bascule'?B:A}),SUPABASE_URL:'https://base.test',SUPABASE_KEY:'anon',encodeURIComponent,fetch:async(url,{headers})=>{lectures++;assert.equal(new URL(url).searchParams.get('owner'),'eq.'+A);assert.equal(headers.Authorization,'Bearer token-a');return Response.json([{owner:mode==='etranger'?B:A}]);}});
+  const c=vm.createContext({authToken:async()=>mode==='absente'?null:{user_id:A,access_token:'token-a'},loadSession:async()=>({user_id:mode==='bascule'?B:A}),SUPABASE_URL:'https://base.test',SUPABASE_KEY:'anon',signalDelai:()=>undefined,SB_DELAI_LECTURE_MS:8000,encodeURIComponent,fetch:async(url,{headers})=>{lectures++;assert.equal(new URL(url).searchParams.get('owner'),'eq.'+A);assert.equal(headers.Authorization,'Bearer token-a');return Response.json([{owner:mode==='etranger'?B:A}]);}});
   vm.runInContext(code,c);const r=await c.getStoredAccounts({ouNull:true});assert.equal(mode==='bon'?r.length:r,mode==='bon'?1:null);if(mode==='absente')assert.equal(lectures,0);
  }
 });

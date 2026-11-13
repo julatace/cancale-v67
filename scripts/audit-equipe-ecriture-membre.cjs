@@ -41,7 +41,7 @@ const arg = (n) => (process.argv.find((a) => a.startsWith(`--${n}=`)) || '').sli
 const MUT = arg('mutation');
 const PROUVE = process.argv.includes('--prouve');
 
-const FICHIERS = ['api/_lib/operations.js', 'api/_lib/session.js', 'api/_lib/cle.js', 'src/operations/metier.js', 'src/operations/atelier.js',
+const FICHIERS = ['src/profilVendeur.js', 'api/_lib/operations.js', 'api/_lib/session.js', 'api/_lib/cle.js', 'api/_lib/fetch-delai.js', 'src/operations/metier.js', 'src/operations/atelier.js',
   'supabase/migrations/016-equipe.sql', 'CLAUDE.md'];
 
 // Chaque mutation réaffaiblit UNE garde ; elle doit faire tomber au moins un contrôle.

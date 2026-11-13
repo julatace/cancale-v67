@@ -20,9 +20,10 @@
 import crypto from 'crypto';
 import { sbCle } from './cle.js';
 import { lireLigne, prendreNumero } from './facture-pro.js';
-import { manquantsVendeur, manquantsVente, contenuFacture, numeroFacture, anneeParis } from '../../src/facturePro/regle.js';
+import { manquantsVendeur, manquantsVente, contenuFacture, numeroFacture, anneeParis, refusMarge } from '../../src/facturePro/regle.js';
 import { PLATEFORMES, refValide, idFactureAutre, cleNumeroAutre, venteAutre, manquantsAcheteurSaisi, venteFacture } from '../../src/facturePro/sources.js';
 import { compteFacturable, compteDeVente } from '../../src/facturePro/comptes.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const sbKey = () => process.env.SUPABASE_SERVICE_KEY || '';
@@ -35,7 +36,7 @@ const PAS_SU = "La base n'a pas répondu : aucune facture n'a été numérotée.
 async function lireListe(requete, owner) {
   if (!sbKey() || !UUID.test(String(owner || ''))) return undefined;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${encodeURIComponent(owner)}&${requete}`, { headers: enTetes() });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${encodeURIComponent(owner)}&${requete}`, { headers: enTetes() });
     if (!r.ok) return undefined;
     const rows = await r.json();
     return Array.isArray(rows) ? rows : undefined;
@@ -43,7 +44,7 @@ async function lireListe(requete, owner) {
 }
 async function creer(id, owner, data) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data`, { method: 'POST', headers: enTetes({ 'content-type': 'application/json', Prefer: 'return=minimal' }), body: JSON.stringify([{ owner, id, data }]) });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data`, { method: 'POST', headers: enTetes({ 'content-type': 'application/json', Prefer: 'return=minimal' }), body: JSON.stringify([{ owner, id, data }]) });
     if (r.ok) return 'ok';
     return r.status === 409 ? 'conflit' : 'ko';
   } catch (_) { return 'ko'; }
@@ -111,6 +112,9 @@ async function emettre(owner, corps, res) {
   const vente = venteFacture(v, corps.acheteur, corps.designation);
   const mvt = manquantsVente(vente);
   if (mv.length || ma.length || mvt.length) return repondre(res, 409, { erreur: 'incomplet', manquants: [...mv, ...ma, ...mvt] });
+  // (11 nov., lot tva-marge) TVA sur marge : aucune TVA apparente (art. 297 E) — refusé AVANT le numéro.
+  const rm = refusMarge(cfg, vente);
+  if (rm) return repondre(res, 409, { erreur: 'tva-apparente', message: `Pas de facture : ${rm}` });
   const p = await prendreNumero(owner, 'vrm_invoice_counter', cleNumeroAutre(plateforme, ref));
   if (p.erreur) return repondre(res, 503, { erreur: 'pas-su', message: "Le compteur de factures n'a pas pu être lu : aucune facture n'a été numérotée. Réessaie." });
   const numero = numeroFacture(cfg.prefixe, anneeParis(Date.now()), p.n);

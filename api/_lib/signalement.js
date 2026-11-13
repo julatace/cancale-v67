@@ -36,6 +36,7 @@ import { sbCle } from './cle.js';
 // (8 nov.) Les messages d'erreur passent AUSSI par le nettoyage du journal des
 // plantages (valeur citée, prix, suites de chiffres) : un module sans Node.
 import { nettoyer } from '../../src/plantages.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 // ⚠️ Aucun import de module Node ici : l'app importe ce fichier (l'aperçu).
 // La route passe `pousser(notif, proprio)`, qui ouvre le contexte du vendeur.
 
@@ -79,7 +80,7 @@ export function masquer(texte) {
 // Les écrans de l'app (les `tab` d'App.jsx : `ONGLETS_LIENS` et chaque `tab==='…'`).
 // Un nom hors de cette liste n'est pas un écran — il pourrait être une donnée
 // (un pseudo) : il devient « ». audit-signalement tient la liste à jour.
-export const ECRANS = ['ventes', 'annonces', 'messages', 'achats', 'retraits', 'journee', 'collectif', 'plat_vinted', 'plat_leboncoin', 'plat_ebay', 'plat_vestiaire', 'prixmarche', 'dashboard', 'compta', 'comptabilite', 'cat_annonces', 'cat_ventes', 'cat_achats', 'cat_bord', 'cat_msg', 'cat_expedition', 'garage', 'organisation', 'communaute', 'emails', 'invoices', 'masques', 'settings', 'vintedaccounts', 'catalog', 'sales', 'stockvinted', 'leboncoin', 'ebay_annonces', 'ebay_ventes', 'ebay_agent', 'ebay_messages', 'vinted_annonces', 'inventory', 'trancher', 'semaine', 'litiges', 'republier', 'favoris'];   // (11 nov.) + litiges, republier, favoris : des écrans de l'app (audit-signalement)
+export const ECRANS = ['ventes', 'annonces', 'messages', 'achats', 'retraits', 'journee', 'collectif', 'plat_vinted', 'plat_leboncoin', 'plat_ebay', 'plat_vestiaire', 'prixmarche', 'dashboard', 'compta', 'comptabilite', 'cat_annonces', 'cat_ventes', 'cat_achats', 'cat_bord', 'colis', 'cat_msg', 'cat_expedition', 'garage', 'organisation', 'communaute', 'emails', 'invoices', 'masques', 'settings', 'vintedaccounts', 'catalog', 'sales', 'stockvinted', 'leboncoin', 'ebay_annonces', 'ebay_ventes', 'ebay_agent', 'ebay_messages', 'vinted_annonces', 'inventory', 'trancher', 'semaine', 'litiges', 'republier', 'favoris'];   // (11 nov.) + litiges, republier, favoris : des écrans de l'app (audit-signalement)
 // La version de l'app telle que l'app l'écrit (`BUILD_ID` : « 6 novembre à 14:32 »).
 const VERSION_APP = /^(\d{1,2} (janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre) à \d{2}:\d{2}|inconnue)$/;
 const ORIGINES = ['ecran', 'feuille', 'page', 'promesse', 'csp', 'retour'];
@@ -214,7 +215,7 @@ const heureDe = (t) => new Date(t).toISOString().slice(0, 13).replace(/\D/g, '')
 export const idSignalement = (t, uid, k) => `${PREFIXE}${heureDe(t)}_${String(uid).replace(/-/g, '').slice(0, 12)}_${k}`;
 
 // Le propriétaire de l'installation : `null` = pas su.
-export async function proprietaireInstallation({ env = process.env, fetcher = fetch } = {}) {
+export async function proprietaireInstallation({ env = process.env, fetcher = fetchAvecDelai } = {}) {
   const e = String(env.VRM_OWNER_UID || '').trim().toLowerCase();
   if (UUID.test(e) && e !== NEUTRE) return e;
   const { url, service } = cfg(env);
@@ -283,10 +284,16 @@ const resumeValide = (r) => {
   return { plantages: n(o.plantages), lectures: n(o.lectures), echecs: n(o.echecs), plan: n(o.plan), gardeFou: o.gardeFou === true };
 };
 // Ce que la liste projette : des scalaires et le résumé, jamais `data` entier.
-const SELECT_LISTE = ['id', 'texte:data->>texte', 'ecran:data->>ecran', 'ecranAvant:data->>ecranAvant', 'version:data->>version', 'extension:data->>extension', 'navigateur:data->>navigateur', 'appareil:data->>appareil', 'systeme:data->>systeme', 'largeur:data->ecranTaille->>largeur', 'hauteur:data->ecranTaille->>hauteur', 'de:data->>de', 'at:data->>at', 'traite:data->>traite', 'traiteLe:data->>traiteLe', 'resume:data->resume'].join(',');
+const SELECT_LISTE = ['id', 'texte:data->>texte', 'ecran:data->>ecran', 'ecranAvant:data->>ecranAvant', 'version:data->>version', 'extension:data->>extension', 'navigateur:data->>navigateur', 'appareil:data->>appareil', 'systeme:data->>systeme', 'largeur:data->ecranTaille->>largeur', 'hauteur:data->ecranTaille->>hauteur', 'de:data->>de', 'at:data->>at', 'traite:data->>traite', 'traiteLe:data->>traiteLe', 'resume:data->resume', 'repondre:data->>repondre'].join(',');
+// (12 nov., « J'ai un problème ») « Réponds-moi par e-mail » : SEULEMENT si la personne
+// l'a coché (`repondreA: true`), et l'adresse vient de SA SESSION (jamais du corps).
+// Sans la case, rien ne change : ni e-mail, ni pseudo (audit-aide-client).
+const FORME_EMAIL = /^[^@\s<>"']+@[^@\s<>"']+\.[^@\s<>"']+$/;
+export const adresseReponse = (corps, utilisateur) => (corps && corps.repondreA === true && utilisateur && FORME_EMAIL.test(String(utilisateur.email || '').trim()) ? String(utilisateur.email).trim().toLowerCase() : null);
+const reponseLue = (x) => (FORME_EMAIL.test(String(x || '')) ? String(x) : null);
 
 // POST (session) : envoyer. `utilisateur` = SA session (api/_lib/session.js).
-export async function envoyerSignalement({ utilisateur, corps, env = process.env, fetcher = fetch, pousser = null, maintenant = Date.now() }) {
+export async function envoyerSignalement({ utilisateur, corps, env = process.env, fetcher = fetchAvecDelai, pousser = null, maintenant = Date.now() }) {
   if (!cfg(env).service) return { code: 503, corps: { ok: false, raison: 'non-configure' } };
   const s = normaliserSignalement(corps);
   if (!s) return { code: 400, corps: { ok: false, raison: 'texte' } };
@@ -296,6 +303,8 @@ export async function envoyerSignalement({ utilisateur, corps, env = process.env
   // `resume` : les nombres que la LISTE lit (projetée, §4.4) — les champs lourds
   // (capture, erreurs, lectures) ne se lisent qu'à l'ouverture d'UN signalement.
   const data = { ...s, de: String(utilisateur.id), at, traite: false, resume: resumeDe(s) };
+  const reponse = adresseReponse(corps, utilisateur);
+  if (reponse) data.repondre = reponse;
   const id = await reserver({ env, fetcher, proprio, uid: utilisateur.id, t: maintenant, data });
   if (id === null) return { code: 503, corps: { ok: false, raison: 'base' } };
   if (id === 'plein') return { code: 429, corps: { ok: false, raison: 'trop', max: SIGNALEMENTS_PAR_HEURE, reessayerDans: 60 - new Date(maintenant).getUTCMinutes() } };
@@ -315,7 +324,7 @@ export async function envoyerSignalement({ utilisateur, corps, env = process.env
 
 // GET (session, PROPRIÉTAIRE seulement) : la liste. Les lignes sont légères
 // (un texte borné, 5 plantages au plus) : on lit `data`, projeté champ par champ.
-export async function listerSignalements({ utilisateur, unId = null, env = process.env, fetcher = fetch }) {
+export async function listerSignalements({ utilisateur, unId = null, env = process.env, fetcher = fetchAvecDelai }) {
   if (!cfg(env).service) return { code: 503, corps: { ok: false, raison: 'non-configure' } };
   const proprio = await proprietaireInstallation({ env, fetcher });
   if (!proprio) return { code: 503, corps: { ok: false, raison: 'destinataire-inconnu' } };
@@ -328,7 +337,7 @@ export async function listerSignalements({ utilisateur, unId = null, env = proce
     if (!r1[0]) return { code: 404, corps: { ok: false, raison: 'absent' } };
     const d = r1[0].data || {};
     const s = normaliserSignalement({ ...d, texte: d.texte || '…' });
-    return { code: 200, corps: { ok: true, signalement: { id: r1[0].id, ...s, de: UUID.test(String(d.de)) ? String(d.de) : null, at: dateIso(d.at), traite: d.traite === true, traiteLe: dateIso(d.traiteLe) } } };
+    return { code: 200, corps: { ok: true, signalement: { id: r1[0].id, ...s, de: UUID.test(String(d.de)) ? String(d.de) : null, repondre: reponseLue(d.repondre), at: dateIso(d.at), traite: d.traite === true, traiteLe: dateIso(d.traiteLe) } } };
   }
   // La LISTE : projetée (§4.4) — 200 signalements à 30 Ko chacun ne se lisent pas d'un coup.
   const rows = await lire(env, fetcher, `app_data?owner=eq.${proprio}&id=like.${PREFIXE}*&select=${SELECT_LISTE}&order=data->>at.desc&limit=200`);
@@ -337,14 +346,14 @@ export async function listerSignalements({ utilisateur, unId = null, env = proce
     const s = normaliserSignalement({ texte: x.texte, ecran: x.ecran, ecranAvant: x.ecranAvant, version: x.version, extension: x.extension, navigateur: x.navigateur, appareil: x.appareil, systeme: x.systeme, ecranTaille: { largeur: x.largeur, hauteur: x.hauteur } })
       || { texte: '', ecran: '', ecranAvant: '', version: '', extension: null, navigateur: 'inconnu', ecranTaille: null, appareil: null, systeme: null };
     const { plantages, lectures, plan, etatEcran, enLigne, theme, ...leger } = s;   // eslint-disable-line no-unused-vars
-    return { id: x.id, ...leger, resume: resumeValide(x.resume), de: UUID.test(String(x.de)) ? String(x.de) : null, at: dateIso(x.at), traite: String(x.traite) === 'true', traiteLe: dateIso(x.traiteLe) };
+    return { id: x.id, ...leger, resume: resumeValide(x.resume), de: UUID.test(String(x.de)) ? String(x.de) : null, repondre: reponseLue(x.repondre), at: dateIso(x.at), traite: String(x.traite) === 'true', traiteLe: dateIso(x.traiteLe) };
   });
   return { code: 200, corps: { ok: true, signalements, nonTraites: signalements.filter((x) => !x.traite).length } };
 }
 
 // POST {action:'traite', id, traite} (PROPRIÉTAIRE seulement) : lire, puis
 // réécrire la MÊME ligne — une lecture ratée n'écrit rien.
-export async function marquerTraite({ utilisateur, corps, env = process.env, fetcher = fetch, maintenant = Date.now() }) {
+export async function marquerTraite({ utilisateur, corps, env = process.env, fetcher = fetchAvecDelai, maintenant = Date.now() }) {
   if (!cfg(env).service) return { code: 503, corps: { ok: false, raison: 'non-configure' } };
   const proprio = await proprietaireInstallation({ env, fetcher });
   if (!proprio) return { code: 503, corps: { ok: false, raison: 'destinataire-inconnu' } };
@@ -373,9 +382,9 @@ export async function marquerTraite({ utilisateur, corps, env = process.env, fet
 // ── CÔTÉ APP : l'envoi, et ce qu'il dit ─────────────────────────────────────
 // `envoye: true` SEULEMENT sur une réponse `ok:true` du serveur qui porte l'id
 // rangé ; tout le reste (réseau, 5xx, réponse illisible) est « pas envoyé ».
-export async function posterSignalement(signalement, { entetes = {}, fetcher = (typeof fetch === 'function' ? fetch : null) } = {}) {
+export async function posterSignalement(signalement, { entetes = {}, fetcher = (typeof fetchAvecDelai === 'function' ? fetchAvecDelai : null), repondreA = false } = {}) {
   try {
-    const r = await fetcher('/api/compte?mode=signalement', { method: 'POST', headers: { 'Content-Type': 'application/json', ...entetes }, body: JSON.stringify(signalement) });
+    const r = await fetcher('/api/compte?mode=signalement', { method: 'POST', headers: { 'Content-Type': 'application/json', ...entetes }, body: JSON.stringify(repondreA === true ? { ...signalement, repondreA: true } : signalement) });
     const j = await r.json().catch(() => null);
     if (r.ok && j && j.ok === true && typeof j.id === 'string' && j.id.startsWith(PREFIXE)) return { envoye: true, id: j.id, notifie: j.notifie === true };
     return { envoye: false, raison: (j && j.raison) || (r.status === 401 ? 'session' : 'serveur'), reessayerDans: j && j.reessayerDans };

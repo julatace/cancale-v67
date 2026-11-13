@@ -6,25 +6,41 @@
 // <favoris-message-regle>) : le test `favoris-message.test.mjs` exige les deux
 // copies identiques. Changer l'une sans l'autre le rend rouge.
 // <favoris-message-regle>
+// (12 nov., 5.370 — sa demande) {pseudo} (= {username}), {article} (le titre de l'annonce
+// lu dans CE fil, sinon « cet article ») et {prix} (le prix de l'offre faite, sinon celui de
+// l'annonce ; inconnu ⇒ le message ne part pas : `prixRequisFavori`).
+const VARIABLES_FAVORI = ['username', 'pseudo', 'article', 'prix'];
 function erreurVariablesFavori(modele) {
   const texte = String(modele || '');
   const reste = texte.replace(/\{([^{}]*)\}/g, (tout, dedans) => {
-    if (dedans === 'username') return '';
+    if (VARIABLES_FAVORI.includes(dedans)) return '';
     const options = dedans.split('|');
     if (options.length >= 2 && options.every((o) => o.length <= 200)) return '';
     return '\u0000' + tout + '\u0000';
   });
   const inconnue = /\u0000(\{[^{}]*\})\u0000/.exec(reste);
-  if (inconnue) return 'Variable inconnue : ' + inconnue[1].slice(0, 40) + '. Utilise {username} ou {a|b} (au moins deux choix séparés par |).';
-  if (/[{}]/.test(reste)) return 'Une accolade n’est pas fermée. Utilise {username} ou {a|b}.';
+  if (inconnue) return 'Variable inconnue : ' + inconnue[1].slice(0, 40) + '. Utilise {pseudo}, {article}, {prix} ou {a|b} (au moins deux choix séparés par |).';
+  if (/[{}]/.test(reste)) return 'Une accolade n’est pas fermée. Utilise {pseudo}, {article}, {prix} ou {a|b}.';
   return '';
 }
-function personnaliserMessageFavori(modele, pseudo, hasard) {
+function prixRequisFavori(modele) { return /\{prix\}/.test(String(modele || '')); }
+function prixTexteFavori(v) {
+  const n = Number(v);
+  if (!(isFinite(n) && n > 0)) return '';
+  const c = Math.round(n * 100);
+  return (c % 100 ? (c / 100).toFixed(2).replace('.', ',') : String(c / 100)) + ' €';
+}
+function personnaliserMessageFavori(modele, pseudo, hasard, infos) {
   const tirer = typeof hasard === 'function' ? hasard : Math.random;
   const nom = typeof pseudo === 'string' ? pseudo.replace(/[{}\s]+/g, ' ').trim().slice(0, 80) : '';
+  const x = infos && typeof infos === 'object' ? infos : {};
+  const article = typeof x.article === 'string' && x.article.replace(/[{}\s]+/g, ' ').trim() ? x.article.replace(/[{}\s]+/g, ' ').trim().slice(0, 80) : 'cet article';
+  const prix = prixTexteFavori(x.prix);
   return String(modele || '')
     .replace(/\{([^{}]*)\}/g, (tout, dedans) => {
-      if (dedans === 'username') return nom;
+      if (dedans === 'username' || dedans === 'pseudo') return nom;
+      if (dedans === 'article') return article;
+      if (dedans === 'prix') return prix;
       const options = dedans.split('|');
       if (options.length < 2) return tout;
       return options[Math.min(options.length - 1, Math.floor(tirer() * options.length))];
@@ -48,5 +64,5 @@ function prixOffreFavori(montant, offre) {
   return (c / 100).toFixed(2);
 }
 // </favoris-message-regle>
-export { erreurVariablesFavori, personnaliserMessageFavori, prixOffreFavori };
+export { erreurVariablesFavori, personnaliserMessageFavori, prixOffreFavori, prixRequisFavori, prixTexteFavori, VARIABLES_FAVORI };
 export const aDesVariablesFavori = (m) => /[{}]/.test(String(m || ''));

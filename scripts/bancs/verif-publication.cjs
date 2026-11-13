@@ -13,6 +13,10 @@
 //   C. « Corriger » ferme sans rien envoyer ;
 //   D. « Publier quand même » envoie `lbcPublier` (une fois, pour CET article) ;
 //   E. un article propre (8002) : aucune feuille, l'envoi part directement ;
+//   G. (11 nov., lot verif-publication) chaque sorte d'alerte a « Ne plus me le
+//      dire » et le pourquoi (prix, photos) ; un clic retire la ligne, écrit
+//      `vrm_verif_coupees` (synchronisé), et l'alerte ne revient plus à la
+//      publication suivante ; « Publier quand même » reste ;
 //   F. aucun débordement, aucune erreur ; captures regardées
 //      (<tmp>/verif-publication-*.png).
 require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
@@ -33,7 +37,7 @@ const PH = [1, 2, 3].map((i) => `https://images1.vinted.net/t/0${i}_banc/f800/${
 // L'article 8001 a TOUS les défauts : 2 photos, ni taille, ni marque, un titre
 // qui ne dit pas le type (catégorie Leboncoin introuvable), 30 € pour un prix
 // d'achat saisi de 45 €. Le 8002 est propre (le contrôle « rien à dire »).
-const MAIN = { vinted_annonce_numeros: {
+const MAIN = { vrm_plateformes_affichees: { sites: ['vinted', 'leboncoin'] }, vrm_je_vends: { choix: 'sneakers', categories: ['sneakers'], at: '2026-11-01T00:00:00Z' }, vinted_annonce_numeros: {
   '8001': { numero: '27', title: 'Article vintage rare', mp: { lbc: true }, buyPrice: '45' },
   '8002': { numero: '28', title: 'Salomon XT-6 blanc taille 40', mp: { lbc: true }, buyPrice: '40' } } };
 const LISTINGS = { capturedAt: auj, payload: { items: [
@@ -46,6 +50,9 @@ const rows = [
   { id: 'harvest_111_listings', data: LISTINGS },
   { id: 'vinted_item_details', data: DETAILS },
   { id: 'vinted_lbc_posted', data: { ids: [] } },
+  // (11 nov.) Une lecture Leboncoin (vide) : sans elle, l'écran dit « pas encore lues » et ne propose rien.
+  { id: 'lbc_listings', data: { items: {}, capturedAt: auj } },
+  { id: 'lbc_ventes', data: { ventes: {}, capturedAt: auj } },
   { id: 'lbc_accounts', data: { accounts: { a1: { id: 'a1', name: 'Boutique test', seenAt: auj } } } },
 ];
 const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj }];
@@ -64,6 +71,7 @@ const PH_B = [1, 2].map((i) => `https://images1.vinted.net/t/0${i}_banc/f800/aut
 const IMAGES = [png(222, 226, 232), png(190, 200, 214), png(160, 172, 190)];
 
 let ko = 0;
+const ECRITS = [];
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { dit(false, quoi, 'a levé : ' + String((e && e.message) || e).split('\n')[0].slice(0, 180)); return null; } };
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2' };
@@ -121,7 +129,7 @@ async function ouvrir(b, vp, pont) {
   const ctx = await b.newContext({ viewport: { width: vp.width, height: vp.height }, ...(vp.width < 600 ? { deviceScaleFactor: 2 } : {}), ...(vp.tactile ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-  await pg.addInitScript((sombre) => { try { localStorage.setItem('vrm_acces_direct', '1'); if (sombre) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, !!vp.sombre);
+  await pg.addInitScript((sombre) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_plateformes_affichees', JSON.stringify({ sites: ['vinted', 'leboncoin'], at: '2026-11-01T00:00:00Z' })); localStorage.setItem('vrm_je_vends', JSON.stringify({ choix: 'sneakers', categories: ['sneakers'], at: '2026-11-01T00:00:00Z' })); if (sombre) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, !!vp.sombre);
   if (pont) await pg.addInitScript(PONT, Object.assign({}, pont, { etatCode: auMoins(pont.version, CODE_DANS_ETAT) ? { code: pont.version, ext: 'banc-ext' } : {} }));
   else await pg.addInitScript(() => { window.__cmds = []; });   // aucune extension ici (un iPhone)
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (rt) => {
@@ -133,12 +141,15 @@ async function ouvrir(b, vp, pont) {
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
-    if (route.request().method() !== 'GET') return j([]);
+    if (route.request().method() !== 'GET') { ECRITS.push(String(route.request().postData() || '')); return j([]); }
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
     const eq = /id=eq\.([^&]*)/.exec(u);
     if (eq) return j(rows.filter((r) => r.id === eq[1]).map((r) => projette(r, sel)));
+    // (11 nov.) `id=in.(a,b)` : la coque lit ainsi quels sites ont une ligne (`sitesPresents`).
+    const dans = /id=in\.\(([^)]*)\)/.exec(u);
+    if (dans) { const ids = dans[1].split(','); return j(rows.filter((r) => ids.includes(r.id)).map((r) => projette(r, sel))); }
     const lk = /id=like\.([^&]*)/.exec(u);
     if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map((r) => projette(r, sel))); }
     return j([]);
@@ -191,6 +202,35 @@ const ouvrirFiche = async (pg, num) => {
         dit(montants.length === 2 && montants.includes('30') && montants.includes('45'), 'B · aucun prix conseillé : seuls le prix (30 €) et SON prix d’achat (45 €) sont écrits', JSON.stringify(montants));
         dit(f && f.sw <= f.cw + 1, 'F · aucun débordement horizontal', f && `${f.sw}/${f.cw}`);
         await pg.screenshot({ path: path.join(os.tmpdir(), `verif-publication-${vp.width}.png`) });
+        // G — « Ne plus me le dire » (11 nov.).
+        const g = await pg.evaluate(() => ({ couper: [...document.querySelectorAll('[data-verif-couper]')].map((e) => e.getAttribute('data-verif-couper')),
+          pourquoi: [...document.querySelectorAll('[data-verif-pourquoi]')].map((e) => e.getAttribute('data-verif-pourquoi')),
+          h: Math.min(...[...document.querySelectorAll('[data-verif-couper]')].map((e) => e.getBoundingClientRect().height)) }));
+        dit(attendu.every((c) => g.couper.includes(c)) && g.couper.length === attendu.length, 'G · chaque alerte a « Ne plus me le dire »', JSON.stringify(g.couper));
+        dit(g.pourquoi.includes('prix') && g.pourquoi.includes('photos'), 'G · le pourquoi est dit (prix, photos)', JSON.stringify(g.pourquoi));
+        dit(g.h >= 44, 'G · « Ne plus me le dire » : cible de 44 px au doigt', String(g.h));
+        const avant = ECRITS.length;
+        await pg.click('[data-verif-couper="photos"]');
+        await pg.waitForTimeout(400);
+        f = await feuille(pg);
+        dit(f && !f.codes.includes('photos') && f.codes.length === attendu.length - 1 && f.publier, 'G · un clic retire CETTE alerte, les autres et « Publier quand même » restent', JSON.stringify(f && f.codes));
+        const tt = await pg.evaluate(() => { const e = document.querySelector('[data-verif-titre]'); const b = document.querySelector('[data-verif-couper]'); return { t: e ? e.innerText : '', fond: b ? getComputedStyle(b).backgroundColor : '' }; });
+        dit(/^4 points à vérifier$/.test(tt.t), 'G · le titre suit ce qui reste (4 points)', tt.t);
+        dit(/rgba\(0, 0, 0, 0\)|transparent/.test(tt.fond), 'G · « Ne plus me le dire » est un lien (aucun fond)', tt.fond);
+        await pg.waitForFunction(() => { try { return /photos/.test(localStorage.getItem('vrm_verif_coupees') || ''); } catch (_) { return false; } }, null, { timeout: 4000 }).catch(() => {});
+        await pg.waitForTimeout(2500);
+        // Le banc entre sans compte VRM (`vrm_acces_direct`) : `save` ne pousse rien au nuage
+        // sans propriétaire. On vérifie la copie de l'appareil ET que la clé est synchronisée.
+        const cop = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_verif_coupees') || 'null'); } catch (_) { return null; } });
+        dit(cop && Array.isArray(cop.codes) && cop.codes.join() === 'photos' && /'vrm_verif_coupees'/.test(APP.slice(APP.indexOf('const SYNC_KEYS = ['), APP.indexOf('];', APP.indexOf('const SYNC_KEYS = [')))), 'G · la coupure est enregistrée (clé synchronisée `vrm_verif_coupees`)', JSON.stringify(cop) + ' · ' + (ECRITS.length - avant) + ' écriture(s) réseau');
+        await pg.screenshot({ path: path.join(os.tmpdir(), `verif-publication-coupee-${vp.width}.png`) });
+        await pg.click('[data-verif-corriger]');
+        await pg.waitForTimeout(300);
+        await pg.click('[data-fiche-publier]');
+        await pg.waitForSelector('[data-verif-sheet]', { timeout: 5000 }).catch(() => {});
+        await pg.waitForTimeout(300);
+        f = await feuille(pg);
+        dit(f && !f.codes.includes('photos') && f.codes.length === attendu.length - 1, 'G · l’alerte coupée ne revient pas à la publication suivante', JSON.stringify(f && f.codes));
         // C — Corriger.
         await pg.click('[data-verif-corriger]');
         await pg.waitForTimeout(300);

@@ -58,6 +58,7 @@ const MODE={
   capture:{texte:'Rien ne part : VRM n’a pas encore vu les favoris de ce compte.',geste:'Ouvre la cloche de Vinted avec ce compte.'},
   destinataire_non_prouve:{texte:'Rien ne part : VRM ne sait pas encore à qui écrire.',geste:'Touche « Ouvrir » sur un favori plus bas : VRM apprend à qui écrire.'},
   reglages:{texte:'Rien ne part : aucun message enregistré.',geste:'Écris ton message ci-dessous, puis Enregistrer.'},
+  message_risque:{texte:'Rien ne part : ton message contient un mot que Vinted bannit.',geste:'Retire le numéro, le lien ou le moyen de paiement, puis Enregistrer.'},
   extension:{texte:'Un message est prêt, mais l’extension ne peut pas l’envoyer.',geste:`Ouvre vinted.fr ${NAV.dansNu} sur ce compte, avec l’extension à jour.`},
   onglet_vinted:{texte:'Un message attend : aucun onglet vinted.fr n’est ouvert sur ce compte.',geste:`Ouvre vinted.fr ${NAV.dansNu}, connecté sur ce compte, et laisse l’onglet ouvert.`},
   compte_vinted_absent:{texte:`Un message attend : ${NAV.ce} n’est pas connecté à Vinted.`,geste:`Connecte-toi à Vinted avec ce compte ${NAV.dansNu}.`},
@@ -112,6 +113,7 @@ export const RAISONS_ECRAN={
   limite_heure:{texte:'limite d’actions de l’heure atteinte',geste:'Tu pourras les renvoyer dans une heure.'},
   vinted_frein:{texte:'Vinted a demandé de ralentir'},
   vinted_robot:{texte:'Vinted a parlé d’activité automatisée'},
+  tout_arrete:{texte:'« Tout arrêter » : offre faite, message pas parti'},
   vinted_refus:{texte:'Vinted a refusé l’envoi'},
   historique:{texte:'VRM n’a pas pu relire la conversation avant d’écrire'},
   ecran_quitte:{texte:'l’écran a été quitté avant l’envoi',geste:'Renvoie-les en gardant cet écran ouvert.'},
@@ -132,7 +134,7 @@ const CODE_RAISON={
   vendue:'vendue',article_vendu:'vendue',reservee:'reservee',en_pause:'en_pause',fermee:'fermee',annonce_absente:'annonce_absente',
   destinataire_non_prouve:'destinataire',identite_non_confirmee:'destinataire',
   expire:'expire',essais_epuises:'essais_epuises',offre_refusee:'offre_refusee',offre_prix_inconnu:'offre_prix_inconnu',offre_incertaine:'offre_incertaine',creation_non_confirmee:'ouverture',
-  quota_extension:'limite_heure',pause_vinted:'vinted_frein',vinted_frein:'vinted_frein',vinted_robot:'vinted_robot',vinted_refus:'vinted_refus',
+  quota_extension:'limite_heure',pause_vinted:'vinted_frein',tout_arrete:'tout_arrete',trop_tard:'interrompu',vinted_frein:'vinted_frein',vinted_robot:'vinted_robot',vinted_refus:'vinted_refus',
   historique_non_verifie:'historique',ecran_inactif:'ecran_quitte',onglet_vinted:'onglet_vinted',
   compte_vinted_absent:'compte_vinted_absent',compte_vinted_different:'compte_vinted_different',
   extension_indisponible:'extension',session_extension:'session_extension',autorisation_expiree:'arrete',
@@ -316,7 +318,7 @@ export function articlesFavoris({lignes=[],statut=()=>null,journal=[],vendue=()=
     const e=etatFavori({job:statut(ligne),journal:parNotif.get(String(ligne.id))||[],vendue:estVendue});
     const pseudo=pseudoFavori(ligne);
     const dateEnvoi=e.code==='envoye'&&Number.isFinite(new Date(Number(e.date)||Date.parse(e.date)).getTime())?new Date(Number(e.date)||Date.parse(e.date)).toISOString():null;
-    c.personnes.push({id:ligne.id,pseudo,initiale:initialePseudo(pseudo),etat:e.code,raison:e.raison||null,offre:e.offre===true,
+    c.personnes.push({id:ligne.id,pseudo,initiale:initialePseudo(pseudo),date:Number.isFinite(t)?t:null,etat:e.code,raison:e.raison||null,offre:e.offre===true,
       detail:e.code==='envoye'?(e.date?heureParis(e.date):'date non lue'):ageFavori(ligne.date,maintenant),dateEnvoi,
       ouvrir:e.code==='pas_envoye'&&RAISONS_ECRAN[e.raison]?.ouvrir===true});
     if(!c.photo&&ligne.photo)c.photo=ligne.photo;
@@ -361,7 +363,9 @@ export function filtrerArticles(cartes,filtre){
 // et l'offre sur le prix d'un article réel quand VRM le connaît.
 //   personnaliser, prixOffre : les fonctions de src/favorisMessage.js (règle unique).
 export function apercuMessageFavori({message='',offre=null,exemple=null,personnaliser,prixOffre}={}){
-  const texte=message?personnaliser(message,exemple?.pseudo||'',()=>0):'';
+  // (5.370) {article} et {prix} aussi : le titre de l'exemple et le prix de l'offre (sinon de l'article).
+  const pxEx=Number(exemple?.prix);const pxOffre=offre&&offre.mode&&Number.isFinite(pxEx)&&pxEx>0?prixOffre(pxEx,offre):null;
+  const texte=message?personnaliser(message,exemple?.pseudo||'',()=>0,{article:exemple?.titre||'',prix:pxOffre!=null?pxOffre:(Number.isFinite(pxEx)&&pxEx>0?pxEx:null)}):'';
   let offreTxt='';
   if(offre&&offre.mode){
     const prix=Number(exemple?.prix);

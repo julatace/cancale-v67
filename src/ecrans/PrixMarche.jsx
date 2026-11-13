@@ -26,7 +26,7 @@ function PrixMarche({ data, baseKO, sousNav = null }) {
             <div className="vrm-display" style={{ fontSize: 28, fontWeight: 700, color: C.text }}>≈ {eur2(valo.marche)}&nbsp;€</div>
             <div style={{ fontSize: 12, color: C.muted, marginTop: 4, lineHeight: 1.5 }}>
               {tr('ventes.texte3')} <b>{valo.reconnu}</b> {tr('annonces.annonce')}{valo.reconnu > 1 ? 's' : ''} {tr('stats.ligneDontConnait')}{valo.total > valo.reconnu ? <> {tr('stats.texte7')} {valo.total} {tr('stats.autresOntEncore')}</> : null}.
-              {valo.affiche > 0 && (() => { const ec = Math.round((valo.affiche / valo.marche - 1) * 100);
+              {valo.affiche > 0 && (() => { const ec = Math.round((valo.affiche / (valo.marcheAffiche || valo.marche) - 1) * 100);   // (12 nov.) mêmes annonces des deux côtés
                 return <> {tr('stats.affiches')} <b>{eur2(valo.affiche)}&nbsp;€</b>{Math.abs(ec) >= 5 ? <> {tr('stats.soit')} <b style={{ color: C.text }}>{ec > 0 ? '+' : ''}{ec}%</b> {ec > 0 ? 'au-dessus' : tr('stats.dessous')} {tr('stats.marche')}</> : tr('stats.ligneAvecMarche')}.</>; })()}
             </div>
           </Card>

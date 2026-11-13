@@ -137,8 +137,10 @@ async function verifier(mod) {
   const memo = /const fetchMemo = \(url, init = \{\}\) => \{[\s\S]*?\n\};/.exec(app);
   dit(!!memo && /const idSeul = idLigneData\(url, SUPABASE_URL, h\);\s*promesse = idSeul \? _groupeLignesData\.charger\(idSeul, String\(h\.Authorization \|\| h\.authorization \|\| ''\)\)/.test(memo[0]) && /if \(!Array\.isArray\(rows\)\) \{ _memoLectures\.delete\(cle\); return \{ ok: false/.test(memo[0]), 'App.jsx : fetchMemo groupe les petites lignes ; pas su ⇒ ok:false, rien gardé');
   dit(/app_data\?id=in\.\(\$\{ids\.join\(','\)\}\)&select=id,data`/.test(app), 'App.jsx : le lot des petites lignes porte l\'id (attribution)');
-  const brut = /const fetchHarvestBrut = async[\s\S]{0,1200}/.exec(app);
-  dit(!!brut && /const rows = await lireMoissonGroupee\(`harvest_\$\{uid\}_\$\{type\}`\);\s*if \(!Array\.isArray\(rows\)\) return null;/.test(brut[0]), 'App.jsx : fetchHarvestBrut lit par la lecture groupée ; pas su ⇒ null');
+  // (11 nov., robustesse des données) « pas su » = `undefined` (comme fetchHarvestOrders) :
+  // `null` reste « pas de ligne » ; le relais serveur ne part plus sur un hoquet de la base.
+  const brut = /const fetchHarvestBrut = async[\s\S]{0,2400}/.exec(app);
+  dit(!!brut && /const rows = await lireMoissonGroupee\(`harvest_\$\{uid\}_\$\{type\}`\);(?:\s*\/\/[^\n]*)*\s*if \(!Array\.isArray\(rows\)\) return undefined;/.test(brut[0]), 'App.jsx : fetchHarvestBrut lit par la lecture groupée ; pas su ⇒ undefined (jamais confondu avec « pas de ligne »)');
   dit(/app_data\?id=in\.\(\$\{ids\.join\(','\)\}\)&select=\$\{SEL_MOISSON\}/.test(app) && /app_data\?id=eq\.\$\{id\}&select=\$\{SEL_MOISSON\}/.test(app), 'App.jsx : lot `id=in.(…)` et lecture seule, tous deux projetés `SEL_MOISSON`');
   dit(/idGroupable\(id\) \? _groupeMoisson\.charger\(id, `\$\{auth\}\|\$\{famille\}`\) : _lireLigneMoissonSeule\(id, auth\)/.test(app), 'App.jsx : la session ET la famille sont la clé du lot ; un id pas sûr part seul');
   return ko;

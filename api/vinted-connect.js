@@ -21,6 +21,7 @@ import { vendeurExige } from './_lib/session.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
 import { corsExtension } from './_lib/cors-extension.js';
 import { accesVendeur } from './_lib/abonnement.js';
+import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 // ⚠️⚠️ (9 nov., défaut #5, décision de Julien) C'EST ICI, ET SEULEMENT ICI,
 //    QU'UN COMPTE VINTED NEUF SE RELIE. La migration 029 interdit à l'API de la
 //    base (rôle `authenticated`) de créer une ligne `vinted_accounts` ou d'en
@@ -43,7 +44,7 @@ import { accesVendeur } from './_lib/abonnement.js';
 //    chez lui. Elle exige la session et range le compte chez CE vendeur
 //    (audit de sécurité, 4 octobre — banc routes-ecriture.cjs).
 
-const SUPABASE_URL = 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';   // (12 nov.) la base d’essai sur « Preview »
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
 // vendeur connecté : à la seconde où la base est cloisonnée (RLS), la clé
 // publique ne peut plus rien lire ni écrire et l'endpoint devient muet — c'est
@@ -83,7 +84,7 @@ async function refresh({ host, accessToken, refreshToken, anonId, csrfToken }) {
     `refresh_token_web=${refreshToken}`,
     anonId ? `anon_id=${anonId}` : '',
   ].filter(Boolean).join('; ');
-  const res = await fetch(`https://${host}/web/api/auth/refresh`, {
+  const res = await fetchAvecDelai(`https://${host}/web/api/auth/refresh`, {
     method: 'POST',
     headers: {
       'Cookie': cookie,
@@ -115,7 +116,7 @@ async function fetchProfile({ host, accessToken, anonId, csrfToken }) {
   const ctrl = new AbortController();
   const minuteur = setTimeout(() => ctrl.abort(), 8000);
   try {
-    const res = await fetch(`https://${host}/api/v2/users/current`, {
+    const res = await fetchAvecDelai(`https://${host}/api/v2/users/current`, {
       signal: ctrl.signal,
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -139,7 +140,7 @@ async function fetchProfile({ host, accessToken, anonId, csrfToken }) {
 // seul champ lu). `null` = pas su ⇒ rien n'est écrit.
 async function autresProprietaires(vintedUserId, owner) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(vintedUserId)}&select=owner`, { headers: { ...sbCle(SUPABASE_KEY) } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(vintedUserId)}&select=owner`, { headers: { ...sbCle(SUPABASE_KEY) } });
     if (!r.ok) return null;
     const j = await r.json().catch(() => null);
     if (!Array.isArray(j)) return null;
@@ -151,7 +152,7 @@ async function autresProprietaires(vintedUserId, owner) {
 // jamais l'autre propriétaire, aucun jeton) : le support le retrouve.
 async function noterLitige(owner, vintedUserId, source) {
   try {
-    await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+    await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
       method: 'POST',
       headers: { ...sbCle(SUPABASE_KEY), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify([{ id: `vrm_vinted_litige_${vintedUserId}`, owner, data: { vinted_user_id: vintedUserId, at: new Date().toISOString(), source: source === 'extension' ? 'extension' : 'app' } }]),
@@ -165,7 +166,7 @@ async function upsertAccount(row, owner) {
   // Multi-vendeurs : la clé d'unicité devient (owner, vinted_user_id) — deux
   // vendeurs peuvent très bien avoir lié le même compte Vinted.
   const lignes = Array.isArray(row) ? row : [row];
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?on_conflict=owner,vinted_user_id`, {
+  const res = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/vinted_accounts?on_conflict=owner,vinted_user_id`, {
     method: 'POST',
     headers: {
       ...sbCle(SUPABASE_KEY),
@@ -174,7 +175,30 @@ async function upsertAccount(row, owner) {
     },
     body: JSON.stringify(lignes.map((l) => ({ ...l, owner }))),
   });
-  return res.ok;
+  if (res.ok) return 'ok';
+  // (11 nov., M50) 409 + 23505 : l'unicité globale de la 023 vient de voir un
+  // AUTRE propriétaire (deux liaisons au même instant) — rien n'est écrasé.
+  const t = res.status === 409 ? await res.text().catch(() => '') : '';
+  return /23505/.test(t) ? 'deja_relie' : 'echec';
+}
+
+// (11 nov., M50 de la revue serveur, migration 042) « Déjà relié ailleurs ? »
+// puis l'écriture SOUS UN MÊME VERROU, dans la base (`vrm_vinted_relier`) :
+// deux vendeurs qui relient le même compte Vinted au même instant passaient tous
+// les deux (contrôle puis upsert, pas atomiques). Rend 'ok' · 'deja_relie' ·
+// 'echec' · `null` = fonction absente (042 pas passée) ⇒ le chemin d'avant.
+async function relierAtomique(row, owner) {
+  try {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/rpc/vrm_vinted_relier`, {
+      method: 'POST',
+      headers: { ...sbCle(SUPABASE_KEY), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_owner: owner, p_ligne: row }),
+    });
+    if (r.status === 404) return null;
+    if (!r.ok) return 'echec';
+    const v = await r.json().catch(() => null);
+    return v === 'ok' || v === 'deja_relie' ? v : 'echec';
+  } catch { return 'echec'; }
 }
 
 export default async function handler(req, res) {
@@ -286,20 +310,22 @@ export default async function handler(req, res) {
     if (login) row.login = login;
     if (anonId) row.anon_id = anonId;
     if (csrfToken) row.csrf_token = csrfToken;
-    const ok = await upsertAccount(row, u.id);
-    // 409 ici = la 023 (unicité globale) vient de voir un autre propriétaire.
-    if (!ok) { res.status(502).json({ ok: false, raison: 'ecriture', error: 'Compte vérifié mais enregistrement Supabase impossible.' }); return; }
+    let ecrit = await relierAtomique(row, u.id);
+    if (ecrit === null) ecrit = await upsertAccount(row, u.id);
+    if (ecrit === 'deja_relie') {
+      await noterLitige(u.id, vintedUserId, depuisExtension ? 'extension' : 'app');
+      res.status(409).json({ ok: false, raison: 'deja_relie', error: MESSAGE_DEJA_RELIE });
+      return;
+    }
+    if (ecrit !== 'ok') { res.status(502).json({ ok: false, raison: 'ecriture', error: 'Compte vérifié mais enregistrement Supabase impossible.' }); return; }
 
     const account = { vinted_user_id: vintedUserId, login, photo: profile?.photo?.url || null, domain: host };
-    // L'extension a déjà ses jetons : on ne les renvoie pas.
-    if (depuisExtension) { res.status(200).json({ ok: true, account }); return; }
-    res.status(200).json({
-      ok: true,
-      account,
-      // Le client persiste ces tokens en state (déjà fait côté Supabase ci-dessus).
-      tokens: { access_token: tokens.access_token, refresh_token: tokens.refresh_token || refreshToken || '' },
-    });
+    // ⚠️⚠️ (12 nov., sécurité des comptes) AUCUN JETON VINTED NE REPART VERS LE
+    //    NAVIGATEUR, extension ou page (revue de robustesse, H2) : ils sont rangés
+    //    en base ci-dessus, la page n'a besoin que du compte (pseudo, photo, domaine).
+    //    `scripts/audit-jetons-vinted.cjs` exécute la route et cherche les jetons.
+    res.status(200).json({ ok: true, account });
   } catch (err) {
-    res.status(500).json({ error: 'Échec de la connexion à Vinted', detail: String(err) });
+    res.status(500).json({ error: 'Échec de la connexion à Vinted' });
   }
 }

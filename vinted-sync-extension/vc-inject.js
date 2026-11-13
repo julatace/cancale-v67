@@ -362,6 +362,7 @@
       const forme = arr.length ? cheminsDeCles(arr[0]).map(sansId).filter((c) => !PAS_ACHETEUR.test(c.split(':')[0])).slice(0, 120) : [];
       if (!listeConnue(obj, arr)) { post({ kind: 'vcannonces', items: [], offset, total: null, lus: 0, forme: [], inconnu: formeInconnue(obj), moi: moiId }); return; }
       post({ kind: 'vcannonces', items, offset, total, lus: arr.length, forme, complet: lotComplet('annonces', u, total, items.map((x) => x.id)), moi: moiId });
+      retenirPrixVus(url, items);
     } catch (_) {}
   }
   // La CRÉATION d'une annonce : son identifiant, rendu par Vestiaire, relie
@@ -514,17 +515,29 @@
         paiementEstime: d.header && typeof d.header.date === 'string' ? d.header.date.slice(0, 40) : '', moi: moiId });
     } catch (_) {}
   }
+  // 5.365 : la source d'une liste de ventes d'après son CHEMIN ('' = pas une liste de ventes).
+  function sourceVentes(u) {
+    const ch = u.pathname;
+    if (/current|cart|basket|purchase|bought|achat/i.test(ch)) return '';
+    return /\/users\/me\/awaiting-shipping-items\/?$/i.test(ch) ? 'a-expedier'
+      : (/\/users\/me\/[\w-]*(sales|sold|transactions)[\w-]*\/?$/i.test(ch) || /\/sales\/?$/i.test(ch)) ? 'ventes' : '';
+  }
   function noteVentes(url, texte) {
     try {
       let u; try { u = new URL(url, location.origin); } catch (_) { return; }
       if (!DE_VC(url)) return;
-      const ch = u.pathname;
-      if (/current|cart|basket|purchase|bought|achat/i.test(ch)) return;
-      const source = /\/users\/me\/awaiting-shipping-items\/?$/i.test(ch) ? 'a-expedier'
-        : (/\/users\/me\/[\w-]*(sales|sold|transactions)[\w-]*\/?$/i.test(ch) || /\/sales\/?$/i.test(ch)) ? 'ventes' : '';
+      const source = sourceVentes(u);
       if (!source) return;
       let obj; try { obj = JSON.parse(texte); } catch (_) { return; }
       if (!obj || typeof obj !== 'object') return;
+      if (source === 'ventes') noterModeleImport('ventes', u);
+      const pq = paquetVentes(u, obj, source);
+      post(Object.assign({ kind: 'vcventes' }, pq, pq.inconnu ? {} : { complet: lotComplet('ventes-' + source, u, pq.total, pq.ventes.map((x) => x.id)) }));
+    } catch (_) {}
+  }
+  // 5.365 : la lecture d'UNE page de ventes, sans rien envoyer (la visite ET l'import la partagent).
+  function paquetVentes(u, obj, source) {
+    {
       const arr = tableauAnnonces(obj) || [];
       const offset = Number(u.searchParams.get('offset') || (obj.meta && obj.meta.offset) || 0) || 0;
       const total = obj.meta && typeof obj.meta.count === 'number' && sansFiltre(u) ? obj.meta.count : null;
@@ -539,9 +552,9 @@
       }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
       // La FORME d'une vente (noms de clés et types, jamais une valeur) : pour viser juste ensuite.
       const forme = arr.length ? cheminsDeCles(arr[0]).map(sansId).filter((c) => !PAS_ACHETEUR.test(c.split(':')[0])).slice(0, 120) : [];
-      if (!listeConnue(obj, arr)) { post({ kind: 'vcventes', source, ventes: [], offset, total: null, lus: 0, forme: [], inconnu: formeInconnue(obj), moi: moiId }); return; }
-      post({ kind: 'vcventes', source, ventes, offset, total, lus: arr.length, forme, complet: lotComplet('ventes-' + source, u, total, ventes.map((x) => x.id)), moi: moiId });
-    } catch (_) {}
+      if (!listeConnue(obj, arr)) return { source, ventes: [], offset, total: null, lus: 0, forme: [], inconnu: formeInconnue(obj), moi: moiId };
+      return { source, ventes, offset, total, lus: arr.length, forme, moi: moiId };
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -651,15 +664,24 @@
     for (const k of Object.keys(e || {}).slice(0, 80)) if (!PAS_ACHAT.test(k)) propre[k] = e[k];
     return scalairesVente(propre);
   }
+  // 5.365 : une liste d'ACHATS d'après son CHEMIN.
+  function estListeAchats(u) {
+    const ch = u.pathname;
+    if (/current|cart|basket|checkout|sales|sold|awaiting-shipping|selling/i.test(ch)) return false;
+    return /\/users\/me\/[\w-]*(orders|purchases|bought|buyings?)[\w-]*\/?$/i.test(ch) || /\/purchases\/?$/i.test(ch);
+  }
   function noteAchats(url, texte) {
     try {
       let u; try { u = new URL(url, location.origin); } catch (_) { return; }
-      if (!DE_VC(url)) return;
-      const ch = u.pathname;
-      if (/current|cart|basket|checkout|sales|sold|awaiting-shipping|selling/i.test(ch)) return;
-      if (!(/\/users\/me\/[\w-]*(orders|purchases|bought|buyings?)[\w-]*\/?$/i.test(ch) || /\/purchases\/?$/i.test(ch))) return;
+      if (!DE_VC(url) || !estListeAchats(u)) return;
       let obj; try { obj = JSON.parse(texte); } catch (_) { return; }
       if (!obj || typeof obj !== 'object') return;
+      noterModeleImport('achats', u);
+      post(Object.assign({ kind: 'vcachats' }, paquetAchats(u, obj)));
+    } catch (_) {}
+  }
+  function paquetAchats(u, obj) {
+    {
       const arr = tableauAnnonces(obj) || [];
       const offset = Number(u.searchParams.get('offset') || (obj.meta && obj.meta.offset) || 0) || 0;
       const total = obj.meta && typeof obj.meta.count === 'number' && sansFiltre(u) ? obj.meta.count : null;
@@ -670,10 +692,66 @@
         return { id: String(e.id != null ? e.id : '').slice(0, 40), productId: /^[\w-]{1,40}$/.test(pid) ? pid : '', nom: nomArticle(prod), etat: sc.etat, date: sc.date, montant: sc.montant, suivi: sv.suivi, transporteur: sv.transporteur };
       }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
       const forme = arr.length ? cheminsDeCles(arr[0]).map(sansId).filter((c) => !PAS_ACHAT.test(c.split(':')[0])).slice(0, 120) : [];
-      if (!listeConnue(obj, arr)) { post({ kind: 'vcachats', achats: [], offset, total: null, lus: 0, forme: [], inconnu: formeInconnue(obj), page: normChemin(sansId(location.pathname)), moi: moiId }); return; }
-      post({ kind: 'vcachats', achats, offset, total, lus: arr.length, forme, page: normChemin(sansId(location.pathname)), moi: moiId });
+      if (!listeConnue(obj, arr)) return { achats: [], offset, total: null, lus: 0, forme: [], inconnu: formeInconnue(obj), page: normChemin(sansId(location.pathname)), moi: moiId };
+      return { achats, offset, total, lus: arr.length, forme, page: normChemin(sansId(location.pathname)), moi: moiId };
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // L'HISTORIQUE VESTIAIRE (11 nov., 5.365) — « tout l'historique, comme Vinted »
+  // ══════════════════════════════════════════════════════════════════════════
+  // Le MODÈLE : l'adresse EXACTE d'une page de « Mes ventes » / « Mes achats » que
+  // la page a elle-même demandée, sans filtre (`sansFiltre`), et qui porte un
+  // paramètre de pagination que VESTIAIRE a mis (`offset` + `limit`, ou `page`).
+  // Jamais une adresse devinée, jamais un paramètre ajouté : sans pagination vue,
+  // rien n'est importé (le fond dit « va à la page 2 une fois »).
+  // L'ORDRE `importpage` vient du fond seulement (vc.js) : une page du modèle,
+  // au nom du compte de CETTE page (`moiId`), lue par `origFetch` (pas la
+  // capture : la lecture est rendue au fond, qui la range et SAIT si la base l'a
+  // prise). Des GET seulement.
+  const PAGINE = (u) => { const p = u.searchParams; const n = (k) => p.has(k) && /^\d{1,6}$/.test(p.get(k)); return (n('offset') && (n('limit') || n('per_page') || n('perPage') || n('pageSize'))) || n('page'); };
+  const modelesVus = new Set();
+  function noterModeleImport(quoi, u) {
+    try {
+      if (!sansFiltre(u) || !PAGINE(u) || !/^apiv2\./i.test(u.hostname) && !/(^|\.)vestiairecollective\.com$/i.test(u.hostname)) return;
+      if (!moiId) return;
+      const cle = quoi + '|' + moiId + '|' + u.href;
+      if (modelesVus.has(cle)) return; modelesVus.add(cle);
+      post({ kind: 'vcimportmodele', quoi, url: u.href.slice(0, 600), moi: moiId });
     } catch (_) {}
   }
+  let importEnCours = false;
+  try { window.addEventListener('message', async (event) => {
+    const d = event && event.data;
+    if (event.source !== window || !d || d.__tag !== 'CANCALE_VC_ORDRE' || d.kind !== 'importpage') return;
+    const jeton = String(d.jeton || '');
+    if (!/^[a-z0-9-]{8,64}$/i.test(jeton)) return;
+    const fin = (o) => post(Object.assign({ kind: 'vcimportresultat', jeton }, o));
+    if (window.top !== window || !/(^|\.)vestiairecollective\.com$/i.test(location.hostname)) return fin({ statut: 0, erreur: 'pas-vestiaire' });
+    let u; try { u = new URL(String(d.url || '')); } catch (_) { return fin({ statut: 0, erreur: 'adresse' }); }
+    const quoi = d.quoi === 'achats' ? 'achats' : (d.quoi === 'ventes' ? 'ventes' : '');
+    if (u.protocol !== 'https:' || u.username || u.password || !DE_VC(u.href) || !sansFiltre(u) || !PAGINE(u)
+      || !quoi || (quoi === 'ventes' ? sourceVentes(u) !== 'ventes' : !estListeAchats(u))) return fin({ statut: 0, erreur: 'adresse' });
+    if (!moiId || String(d.compte || '') !== moiId) return fin({ statut: 0, erreur: moiId ? 'autre-compte' : 'compte-pas-su' });
+    if (importEnCours) return fin({ statut: 0, erreur: 'en-cours' });
+    importEnCours = true;
+    try {
+      const h = {};
+      for (const [k, v] of Object.entries(entetesApi || {})) if (!ENTETES_INTERDITS.test(k)) h[k] = v;
+      h.accept = h.accept || 'application/json';
+      let statut = 0, texte = '';
+      try {
+        const res = await origFetch.call(window, u.href, { method: 'GET', credentials: 'include', headers: h });
+        statut = Number(res.status) || 0;
+        if (statut >= 200 && statut < 300) texte = String(await res.text());
+      } catch (e) { return fin({ statut: 0, erreur: 'reseau' }); }
+      if (!(statut >= 200 && statut < 300)) return fin({ statut });
+      let obj = null; try { obj = JSON.parse(texte); } catch (_) {}
+      if (!obj || typeof obj !== 'object') return fin({ statut, paquet: { inconnu: ['(pas du json)'] }, moi: moiId });
+      const paquet = quoi === 'ventes' ? paquetVentes(u, obj, 'ventes') : paquetAchats(u, obj);
+      fin({ statut, quoi, paquet, moi: moiId });
+    } finally { importEnCours = false; }
+  }); } catch (_) {}
 
   // ══════════════════════════════════════════════════════════════════════════
   // LE COMPTE OUVERT, TES CONVERSATIONS EN CLAIR, ET RÉPONDRE SUR SON CLIC
@@ -1104,19 +1182,30 @@
     const adresse = 'https://' + r.hote + r.modele.replace('{conv}', encodeURIComponent(conv)) + (/^\?[\w=&.%-]*$/.test(String(r.recherche || '')) ? r.recherche : '');
     envoiEnCours = true;
     try {
-      let statut = 0, rep = '', erreur = '';
+      let statut = 0, rep = '', erreur = '', defi = false, ra = '';
       try {
         const res = await origFetch.call(window, adresse, { method: r.methode, credentials: 'include', headers: h, body: JSON.stringify(corps) });
         statut = Number(res.status) || 0;
         try { rep = String(await res.text()).slice(0, 4000); } catch (_) {}
+        defi = defiDe(res, rep); ra = raDe(res);
       } catch (e) { erreur = String((e && e.message) || e).slice(0, 80) || 'reseau'; }
       let cles = [], idMsg = '';
       try { const j = JSON.parse(rep); cles = cheminsDeCles(j).map(sansId).slice(0, 60); const dd = j && (j.data && typeof j.data === 'object' ? j.data : j); if (dd && (typeof dd.id === 'string' || typeof dd.id === 'number') && /^[\w-]{1,40}$/.test(String(dd.id))) idMsg = String(dd.id); } catch (_) {}
-      fin({ statut, cles, idMsg, erreur });
+      fin({ statut, cles, idMsg, erreur, defi, ra });
     } finally { envoiEnCours = false; }
   }); } catch (_) {}
 
 
+  // (5.366) Un CONTRÔLE ANTI-ROBOT de Vestiaire (DataDome, captcha) se reconnaît à ses
+  // en-têtes ou au début du texte : seul le OUI/NON sort (et le Retry-After), jamais le texte.
+  const defiDe = (res, txt) => {
+    const st = Number(res && res.status) || 0;
+    // `x-datadome: protected` accompagne aussi les réponses normales : seulement sur un refus (≥ 400).
+    try { if (res && res.headers && st >= 400 && (/protected|blocked/i.test(String(res.headers.get('x-datadome') || '')) || /^\d+$/.test(String(res.headers.get('x-dd-b') || '').trim()))) return true; } catch (_) {}
+    try { if (res && res.headers && /^challenge$/i.test(String(res.headers.get('cf-mitigated') || '').trim())) return true; } catch (_) {}
+    return st >= 400 && /captcha-delivery\.com|geo\.captcha|\bdatadome\b|\bcaptcha\b|cf-chl|challenge-platform|hcaptcha|recaptcha|turnstile|just a moment/i.test(String(txt || '').slice(0, 6000));
+  };
+  const raDe = (res) => { try { const v = res && res.headers && res.headers.get('retry-after'); return v ? String(v).slice(0, 40) : ''; } catch (_) { return ''; } };
   // ── 5.319 (4 nov., Julien : « voir les offres reçues sur Vestiaire et y répondre
   //    depuis VRM ») — LES OFFRES (« négociations »). MESURÉ sur sa base (lecture
   //    seule, 4 nov.) : la page charge `GET apiv2…/negotiations?role=seller&withEvents=true`
@@ -1334,11 +1423,12 @@
     const adresse = 'https://' + r.hote + chemin + (/^\?[\w=&.%:-]*$/.test(String(r.recherche || '')) ? r.recherche : '');
     offreEnCours = true;
     try {
-      let statut = 0, rep = '', erreur = '';
+      let statut = 0, rep = '', erreur = '', defi = false, ra = '';
       try {
         const res = await origFetch.call(window, adresse, Object.assign({ method: r.methode, credentials: 'include', headers: h }, corps ? { body: JSON.stringify(corps) } : {}));
         statut = Number(res.status) || 0;
         try { rep = String(await res.text()).slice(0, 400000); } catch (_) {}
+        defi = defiDe(res, rep); ra = raDe(res);
       } catch (e) { erreur = String((e && e.message) || e).slice(0, 80) || 'reseau'; }
       // La réponse dit-elle TON geste en dernier ? (sinon : « fait » n'est pas dit)
       let confirme = null;
@@ -1352,8 +1442,188 @@
           }
         } catch (_) {}
       }
-      fin({ statut, confirme, erreur });
+      fin({ statut, confirme, erreur, defi, ra });
     } finally { offreEnCours = false; }
+  }); } catch (_) {}
+
+  // ── 5.364 (11 nov., Julien : « baisser le prix en série sur Vestiaire, sur mon
+  //    clic ») — LE PRIX D'UNE ANNONCE. La requête qui change un prix n'a JAMAIS été
+  //    vue chez lui (mesuré le 11 nov. : `vc_recon.chemins` ne porte aucune
+  //    écriture sur un article publié). Elle s'APPREND, comme les offres, de SON
+  //    geste fait à la main sur vestiairecollective.com : une écriture 2xx dont le
+  //    chemin ou le corps porte un article que CETTE page a montré dans « Mes
+  //    articles », et dont le corps porte UN prix différent de celui lu. La recette
+  //    n'est « apprise » qu'une fois le NOUVEAU prix RELU (dans la réponse, ou dans
+  //    « Mes articles » relu ensuite) : un prix mal compris (euros pris pour des
+  //    centimes) ne devient jamais rejouable. Jamais une valeur d'en-tête.
+  const annoncesVuesPrix = new Map();   // productId → { cents, url } — mémoire de la page
+  const prixEnAttente = new Map();      // productId → { cents, recette, at }
+  const PAS_PRIX = /negotiation|deposit|draft|like|favorite|favourite|notification|chat|search|recommend|cart|basket|order|session|reconciliation|photo|picture|message|conversation|follow|report/i;
+  const CLE_PRIX_ECRIT = /price|prix|amount|cents/i;
+  const centsFiche = (fi) => (fi && fi.prix && typeof fi.prix.valeur === 'number' && isFinite(fi.prix.valeur) && /price/i.test(String(fi.prix.cle || '')) && (!fi.prix.devise || fi.prix.devise === 'EUR') ? Math.round(fi.prix.valeur * 100) : null);
+  function retenirPrixVus(url, items) {
+    for (const x of items) {
+      if (!x || !/^\d{3,15}$/.test(String(x.id || ''))) continue;
+      const c = centsFiche({ prix: x.prix });
+      if (c == null) continue;
+      annoncesVuesPrix.set(String(x.id), { cents: c, url: String(url).slice(0, 600) });
+      if (annoncesVuesPrix.size > 600) annoncesVuesPrix.delete(annoncesVuesPrix.keys().next().value);
+      // Le nouveau prix RELU dans « Mes articles » ⇒ la recette en attente est apprise.
+      const att = prixEnAttente.get(String(x.id));
+      if (att && att.cents === c && Date.now() - att.at < 15 * 60000) { prixEnAttente.delete(String(x.id)); post({ kind: 'vcprixappris', recette: Object.assign({}, att.recette, { relu: 'liste' }) }); }
+    }
+  }
+  // Le prix d'un article dans une réponse (l'article lui-même, ou une liste qui le porte).
+  function centsDansReponse(obj, pid) {
+    try {
+      const cand = [];
+      const d = obj && obj.data !== undefined ? obj.data : obj;
+      if (Array.isArray(d)) cand.push(...d.map(deplier)); else if (d && typeof d === 'object') cand.push(deplier(d));
+      for (const e of cand) {
+        if (!e || typeof e !== 'object') continue;
+        const id = String(e.id != null ? e.id : (e.productId != null ? e.productId : (e.product && e.product.id != null ? e.product.id : '')));
+        if (id !== pid) continue;
+        const c = centsFiche(ficheAnnonce(e));
+        if (c != null) return c;
+      }
+    } catch (_) {}
+    return null;
+  }
+  function recettePrix(url, methode, corps, entetes) {
+    let u; try { u = new URL(url, location.origin); } catch (_) { return null; }
+    if (!DE_VC(url) || !/^(POST|PUT|PATCH)$/i.test(String(methode || '')) || PAS_PRIX.test(u.pathname)) return null;
+    if (typeof corps !== 'string' || !corps) return null;
+    let c; try { c = JSON.parse(corps); } catch (_) { return null; }
+    if (!c || typeof c !== 'object' || Array.isArray(c)) return null;
+    // L'article : un segment du chemin, sinon une valeur du corps, que CETTE page a montré.
+    const segs = u.pathname.split('/');
+    let pid = segs.find((s) => /^\d{3,15}$/.test(s) && annoncesVuesPrix.has(s)) || '';
+    const feuilles = []; let tableau = false;
+    const marche = (v, ch) => {
+      if (ch.length > 4 || Array.isArray(v)) { tableau = true; return; }
+      if (v && typeof v === 'object') { for (const k of Object.keys(v).slice(0, 30)) marche(v[k], ch.concat(k)); return; }
+      feuilles.push([ch, v]);
+    };
+    marche(c, []);
+    if (!pid) { const f = feuilles.find(([, v]) => (typeof v === 'string' || typeof v === 'number') && annoncesVuesPrix.has(String(v))); if (f) pid = String(f[1]); }
+    if (!pid) return null;                               // pas une annonce que la page a montrée : rien à apprendre
+    const avant = annoncesVuesPrix.get(pid).cents;
+    const base = { methode: String(methode).toUpperCase(), hote: u.hostname, chemin: normChemin(sansId(u.pathname)) };
+    const non = (raison) => ({ recette: { ...base, rejouable: false, raison }, pid, cents: null });
+    if (tableau) return non('corps-tableau');
+    const modeleSegs = [];
+    for (const s of segs) {
+      if (s === pid) { modeleSegs.push('{produit}'); continue; }
+      if (/\d{3,}/.test(s)) return non('chemin-ambigu');
+      modeleSegs.push(s);
+    }
+    if (u.search && /\d{3,}|@/.test(u.search)) return non('adresse-a-parametres');
+    const fixes = []; let cents = null, nPrix = 0;
+    for (const [ch, v] of feuilles) {
+      const cles = ch.map((k) => cleSure(k));
+      if (cles.includes('{k}')) return non('cle-illisible');
+      if ((typeof v === 'string' || typeof v === 'number') && String(v) === pid) { fixes.push([cles, '{produit}', typeof v]); continue; }
+      const chemin = ch.join('.');
+      const nombre = typeof v === 'number' ? v : (typeof v === 'string' && /^\d{1,7}([.,]\d{1,2})?$/.test(v) ? Number(v.replace(',', '.')) : null);
+      if (nombre != null && isFinite(nombre) && CLE_PRIX_ECRIT.test(chemin)) {
+        const enCents = /cents/i.test(chemin) ? (Number.isInteger(nombre) ? nombre : null) : Math.round(nombre * 100);
+        if (enCents == null || !(enCents > 0)) return non('prix-illisible');
+        nPrix++; cents = enCents;
+        fixes.push([cles, /cents/i.test(chemin) ? '{prixCents}' : '{prix}', typeof v]);
+        continue;
+      }
+      if (typeof v === 'boolean' || v === null) { fixes.push([cles, v, typeof v]); continue; }
+      if (typeof v === 'string' && /^[A-Za-z_.:-]{1,40}$/.test(v)) { fixes.push([cles, v, 'string']); continue; }
+      return non('valeur-inconnue');
+    }
+    if (nPrix !== 1) return nPrix ? non('plusieurs-prix') : null;
+    if (cents === avant) return null;                     // pas un changement de prix
+    const noms = Object.keys(nomsEntetes(entetes)).filter((k) => !ENTETES_INTERDITS.test(k)).slice(0, 20);
+    return { recette: { ...base, rejouable: true, raison: '', modele: modeleSegs.join('/'), recherche: u.search || '', fixes, entetes: noms }, pid, cents };
+  }
+  function notePrixManuel(url, methode, statut, corps, entetes, texte) {
+    try {
+      if (!(statut >= 200 && statut < 300) || prixVcEnCours) return;
+      const r = recettePrix(url, methode, corps, entetes);
+      if (!r) return;
+      if (!r.recette.rejouable) { post({ kind: 'vcprixappris', recette: r.recette }); return; }
+      // Le nouveau prix relu dans la RÉPONSE ⇒ appris tout de suite ; sinon en attente de « Mes articles ».
+      let lu = null; try { lu = texte ? centsDansReponse(JSON.parse(texte), r.pid) : null; } catch (_) { lu = null; }
+      if (lu === r.cents) { post({ kind: 'vcprixappris', recette: Object.assign({}, r.recette, { relu: 'reponse' }) }); return; }
+      prixEnAttente.set(r.pid, { cents: r.cents, recette: r.recette, at: Date.now() });
+      post({ kind: 'vcprixappris', recette: Object.assign({}, r.recette, { rejouable: false, raison: 'pas-encore-relu' }) });
+    } catch (_) {}
+  }
+  // ── BAISSER UN PRIX, SUR SON CLIC (l'ordre vient du fond par vc.js) ──
+  let prixVcEnCours = false;
+  try { window.addEventListener('message', async (event) => {
+    const d = event && event.data;
+    if (event.source !== window || !d || d.__tag !== 'CANCALE_VC_ORDRE' || d.kind !== 'prix') return;
+    const jeton = String(d.jeton || ''), produit = String(d.produit || '');
+    const r = d.recette;
+    if (!/^[a-z0-9-]{8,64}$/i.test(jeton)) return;
+    const fin = (o) => post(Object.assign({ kind: 'vcprixresultat', jeton }, o));
+    if (window.top !== window || !/(^|\.)vestiairecollective\.com$/i.test(location.hostname)) return fin({ statut: 0, erreur: 'pas-vestiaire' });
+    const avant = Number(d.avantCents), apres = Number(d.apresCents);
+    if (!/^\d{3,15}$/.test(produit) || !Number.isInteger(avant) || !Number.isInteger(apres) || !(apres >= 100) || !(apres < avant)) return fin({ statut: 0, erreur: 'invalide' });
+    if (!r || r.rejouable !== true || !/^(POST|PUT|PATCH)$/.test(String(r.methode)) || !/(^|\.)vestiairecollective\.com$/i.test(String(r.hote || ''))
+      || typeof r.modele !== 'string' || !/^\/[\w\-/{}.]*$/.test(r.modele) || !Array.isArray(r.fixes)) return fin({ statut: 0, erreur: 'recette' });
+    if (prixVcEnCours) return fin({ statut: 0, erreur: 'en-cours' });
+    if (d.compte !== undefined && (!moiId || String(d.compte) !== moiId)) return fin({ statut: 0, erreur: moiId ? 'autre-compte' : 'compte-pas-su' });
+    // Le prix LU AVANT, dans cette page : celui que tu as vu dans l'aperçu, sinon rien ne part.
+    const vu = annoncesVuesPrix.get(produit);
+    if (!vu) return fin({ statut: 0, erreur: 'annonce-non-vue' });
+    if (vu.cents !== avant) return fin({ statut: 0, erreur: 'prix-change', prixVuCents: vu.cents });
+    const h = {};
+    for (const n of (Array.isArray(r.entetes) ? r.entetes : [])) {
+      const k = String(n).toLowerCase();
+      if (ENTETES_INTERDITS.test(k)) continue;
+      if (!entetesApi || entetesApi[k] == null) return fin({ statut: 0, erreur: 'entetes' });
+      h[k] = entetesApi[k];
+    }
+    h.accept = h.accept || 'application/json';
+    const corps = {};
+    try {
+      for (const [ch, v, t] of r.fixes) {
+        let x = v;
+        if (v === '{prixCents}') x = t === 'string' ? String(apres) : apres;
+        else if (v === '{prix}') x = t === 'number' ? apres / 100 : (apres % 100 ? (apres / 100).toFixed(2) : String(apres / 100));
+        else if (v === '{produit}') x = t === 'number' ? Number(produit) : produit;
+        poser(corps, ch.map(String), x);
+      }
+    } catch (_) { return fin({ statut: 0, erreur: 'recette' }); }
+    h['content-type'] = 'application/json';
+    const adresse = 'https://' + r.hote + r.modele.split('{produit}').join(encodeURIComponent(produit)) + (/^\?[\w=&.%:-]*$/.test(String(r.recherche || '')) ? r.recherche : '');
+    prixVcEnCours = true;
+    try {
+      let statut = 0, rep = '', erreur = '', defi = false, ra = '';
+      try {
+        const res = await origFetch.call(window, adresse, { method: r.methode, credentials: 'include', headers: h, body: JSON.stringify(corps) });
+        statut = Number(res.status) || 0;
+        try { rep = String(await res.text()).slice(0, 400000); } catch (_) {}
+        // (intégration 11nov-g2) La sécurité des comptes (5.366) voit aussi la baisse de prix : défi anti-robot (oui/non) et Retry-After.
+        defi = defiDe(res, rep); ra = raDe(res);
+      } catch (e) { erreur = String((e && e.message) || e).slice(0, 80) || 'reseau'; }
+      // RELIRE APRÈS : la réponse si elle porte l'article, sinon « Mes articles » relu (la même adresse que la page).
+      let prixVuCents = null, relu = '';
+      if (statut >= 200 && statut < 300) {
+        try { prixVuCents = rep ? centsDansReponse(JSON.parse(rep), produit) : null; if (prixVuCents != null) relu = 'reponse'; } catch (_) {}
+        if (prixVuCents == null && vu.url) {
+          try {
+            const hl = Object.assign({}, h); delete hl['content-type'];
+            const res2 = await origFetch.call(window, vu.url, { method: 'GET', credentials: 'include', headers: hl });
+            if (res2.status >= 200 && res2.status < 300) {
+              const t2 = String(await res2.text());
+              noteAnnonces(vu.url, t2);
+              prixVuCents = centsDansReponse(JSON.parse(t2), produit);
+              if (prixVuCents != null) relu = 'liste';
+            }
+          } catch (_) {}
+        }
+        if (prixVuCents != null) annoncesVuesPrix.set(produit, { cents: prixVuCents, url: vu.url });
+      }
+      fin({ statut, prixVuCents, relu, erreur, defi, ra });
+    } finally { prixVcEnCours = false; }
   }); } catch (_) {}
 
   // ⛔ 5.323 (6 nov., Julien : « coupe la capture Vestiaire ») — LA CAPTURE BRUTE
@@ -1383,7 +1653,9 @@
             if ((DE_VC(url) || DE_STREAM(url)) && /^(POST|PUT)$/i.test(String(meth))) noteEnvoi(url, meth, res.status, corpsEnvoye, ent);
             if (DE_STREAM(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => noteStream(url, meth, res.status, t)).catch(() => {});
             // 5.299 : une réponse d'ERREUR (401, 404, 500…) n'est ni une liste, ni un compte, ni un schéma.
-            if (DE_VC(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { if (/^(POST|PUT|PATCH)$/i.test(String(meth))) noteReponseOffre(url, meth, res.status, corpsEnvoye, ent, t); else noteOffres(url, meth, t); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteCanal(url, meth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
+            // 5.364 : TON changement de prix à la main (réponse JSON ou non) ⇒ la recette du prix.
+            if (DE_VC(url) && res.status >= 200 && res.status < 300 && /^(POST|PUT|PATCH)$/i.test(String(meth)) && !/json/i.test(String(ct || ''))) notePrixManuel(url, meth, res.status, corpsEnvoye, ent, '');
+            if (DE_VC(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { if (/^(POST|PUT|PATCH)$/i.test(String(meth))) { notePrixManuel(url, meth, res.status, corpsEnvoye, ent, t); noteReponseOffre(url, meth, res.status, corpsEnvoye, ent, t); } else noteOffres(url, meth, t); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteCanal(url, meth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
           } catch (_) {}
         }).catch(() => {});
       } catch (_) {}
@@ -1408,6 +1680,7 @@
             try { t = this.responseType === 'json' ? (this.response == null ? null : JSON.stringify(this.response)) : (this.responseType === '' || this.responseType === 'text') ? this.responseText : null; } catch (_) { t = null; }
             if ((DE_VC(url) || DE_STREAM(url)) && /^(POST|PUT)$/i.test(String(this.__vcMeth || ''))) noteEnvoi(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH);
             if (t && DE_STREAM(url) && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) noteStream(url, this.__vcMeth, this.status, t);
+            if (DE_VC(url) && this.status >= 200 && this.status < 300 && /^(POST|PUT|PATCH)$/i.test(String(this.__vcMeth || ''))) notePrixManuel(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH, t && /json/i.test(String(ct || '')) ? t : '');
             if (t && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) { if (DE_VC(url) && /^(POST|PUT|PATCH)$/i.test(String(this.__vcMeth || ''))) noteReponseOffre(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH, t); else if (DE_VC(url)) noteOffres(url, this.__vcMeth, t); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteCanal(url, this.__vcMeth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
           } catch (_) {}
         });

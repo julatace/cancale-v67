@@ -103,7 +103,7 @@ async function ouvrir(b, tel, site, { appris = true } = {}) {
   const ecritures = [];
   await pg.addInitScript(({ n, m, s }) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(n)); localStorage.setItem('vrm_meubles', JSON.stringify(m)); localStorage.setItem('vrm_slots', JSON.stringify(s)); } catch (_) {} }, { n: NUMEROS, m: MEUBLES, s: SLOTS });
   await pg.addInitScript(PONT, { version: '5.295.0' });
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   const L = LIGNES(appris);
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
@@ -165,7 +165,8 @@ const piedHonnete = (p, re) => p && p.impossible && !p.champ && re.test(p.ouvrir
       dit(/Salomon XT-6/.test(l1) && /N°80/.test(l1) && !/N°81/.test(l1), 'la ligne dit « modèle · N° » — le N° du SKU de SON annonce (ItemID 2001), jamais l’autre au même titre', l1.replace(/\n/g, ' | '));
       dit(!(await boite(r.pg, '.vrm-message-workspace .vrm-chat-panel')), 'rien n’est ouvert tout seul');
       const f0 = await fiche(r.pg);
-      dit(f0 && f0.etat === 'aucune' && f0.site === 'ebay', 'la fiche attend une conversation', JSON.stringify(f0));
+      // (11 nov., Julien : pas de grand vide) Sans conversation ouverte, aucun volet de fiche : il arrive avec le fil.
+      dit(f0 === null, 'aucun volet de fiche tant qu’aucune conversation n’est ouverte', JSON.stringify(f0));
       await r.pg.click('[data-ebay-message="e1"]');
       await r.pg.waitForSelector('.vrm-chat-panel .vrm-chat-foot', { timeout: 8000 }).catch(() => {});
       await r.pg.waitForTimeout(500);

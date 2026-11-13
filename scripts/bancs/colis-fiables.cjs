@@ -160,7 +160,7 @@ async function preparer(b, vp, quand, sombre, opts = {}) {
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(([s, dark]) => { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', s.user.id); localStorage.setItem('schema_cloisonne', '1'); localStorage.setItem('vinted_dark', dark ? 'true' : 'false'); }, [SESSION, !!sombre]);
   await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: SESSION.access_token, refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const rep = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
@@ -348,14 +348,14 @@ async function main() {
         const c10 = L.cartes.find((c) => c.suivi === '30000010');
         // défaut 5
         dit(!!c10 && /30000010/.test(c10.t), `${T} [défaut 5] un « disponible » sans code, lieu ni QR lus (seulement son n° de suivi) EST montré`, c10 ? '' : 'absent');
-        const D5 = await pg.evaluate(() => { const c = [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte]')].find((x) => x.querySelector('[data-rp-suivi="30000010"]')); return c ? { pasLu: !!c.querySelector('[data-colis-sans-code]'), suivre: !!c.querySelector('[data-colis-suivre]'), haut: (c.querySelector('[data-colis-suivre]') || { getBoundingClientRect: () => ({ height: 0 }) }).getBoundingClientRect().height } : null; });
-        dit(D5 && D5.pasLu && D5.suivre && D5.haut >= 44, `${T} … « code pas lu — ouvre l'e-mail du transporteur », avec « Suivi ↗ » (44 px)`, JSON.stringify(D5));
+        const D5 = await pg.evaluate(() => { const c = [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte]')].find((x) => x.querySelector('[data-rp-suivi="30000010"]')); return c ? { pasLu: !!c.querySelector('[data-colis-sans-code], [data-rp-code-a-venir]'), suivre: !!c.querySelector('[data-colis-suivre]'), haut: (c.querySelector('[data-colis-suivre]') || { getBoundingClientRect: () => ({ height: 0 }) }).getBoundingClientRect().height } : null; });
+        dit(D5 && D5.pasLu && D5.suivre && D5.haut >= 44, `${T} … code pas lu dit sur la ligne (« Code à venir », 11 nov.), avec « Suivi ↗ » (44 px)`, JSON.stringify(D5));
         dit(L.total === '6', `${T} … et il compte : « à retirer » 6 (1, 2, 8, 10, Asics, Samba)`, `total=${L.total}`);
         // défaut 10
         // (9 nov.) Depuis la ligne par colis (4 nov.), la phrase « N ont encore leur code »
         // n'existe plus : chaque ligne « à vérifier » qui a encore son code le MONTRE (« Code »).
         // La règle jugée reste la même : e-mails ET colis vus par Vinted, 4 lignes.
-        const D10 = await pg.evaluate(() => { const l = [...document.querySelectorAll('[data-hors-compte][data-a-verifier-code]')]; return { oui: l.filter((x) => x.getAttribute('data-a-verifier-code') === 'oui').length, ouiSansCode: l.filter((x) => x.getAttribute('data-a-verifier-code') === 'oui' && !x.querySelector('[data-rp-code]')).length, nonAvecCode: l.filter((x) => x.getAttribute('data-a-verifier-code') === 'non' && x.querySelector('[data-rp-code]')).length, vinted: l.filter((x) => x.getAttribute('data-a-verifier-code') === 'oui' && !x.querySelector('[data-rp-suivi]:not([data-rp-suivi=""])')).length }; });
+        const D10 = await pg.evaluate(() => { const l = [...document.querySelectorAll('[data-hors-compte][data-a-verifier-code]')]; return { oui: l.filter((x) => x.getAttribute('data-a-verifier-code') === 'oui').length, ouiSansCode: l.filter((x) => x.getAttribute('data-a-verifier-code') === 'oui' && !x.querySelector('[data-rp-code], [data-rp-code-visible]')).length, nonAvecCode: l.filter((x) => x.getAttribute('data-a-verifier-code') === 'non' && x.querySelector('[data-rp-code], [data-rp-code-visible]')).length, vinted: l.filter((x) => x.getAttribute('data-a-verifier-code') === 'oui' && !x.querySelector('[data-rp-suivi]:not([data-rp-suivi=""])')).length }; });
         dit(D10.oui === 4 && D10.ouiSansCode === 0 && D10.nonAvecCode === 0 && D10.vinted >= 1, `${T} [défaut 10] 4 « à vérifier » ont encore leur code, et chacune le montre : la même règle sur chaque ligne (e-mails ET colis vus par Vinted)`, JSON.stringify(D10));
         // défaut 11
         const D11 = await pg.evaluate(() => ({ noms: (document.querySelector('[data-fraicheur-a-relire]') || { getAttribute: () => null }).getAttribute('data-fraicheur-a-relire-noms'), n: document.querySelectorAll('[data-fraicheur-unique]').length, samba: ([...document.querySelectorAll('[data-cc-carte]')].find((c) => /Samba/.test(c.innerText)) || { innerText: '' }).innerText, ages: [...document.querySelectorAll('[data-capture-age]')].map((x) => x.getAttribute('data-capture-age')) }));

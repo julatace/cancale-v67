@@ -9,6 +9,12 @@
 //   · ouvrir le fil ne fait rien partir ; un envoi = UNE commande
 //     `lbcRepondre { conv, texte }`, sur SON clic, résultat dit (fait · refusé) ;
 //   · 390 px tactile et 1512 px, clair ET sombre : rien ne déborde, 44 px au doigt.
+// 5.362 (revue extension, moyennes 60 et 63) : sur leboncoin.fr, l'ordre « répondre »
+// passe du relais à la page par un CANAL PRIVÉ (MessageChannel lbc-relay ⇄ lbc-inject),
+// plus jamais par `window` — jugé par `audit-lbc-repondre` (le relais qui prend le port).
+// CE banc juge l'autre bout : l'APP ⇄ le pont de l'extension sur vrm.center
+// (`__vmr`, bridge.js), que 5.362 n'a pas changé ; l'app n'envoie jamais rien à
+// leboncoin.fr elle-même. Relancé sur 5.362 : 31 verts (12 nov.).
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
@@ -59,7 +65,7 @@ async function ouvrir(b, vp, { version = '5.318.0', suite = 'fait', appris = tru
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript((s) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_dark', s ? 'true' : 'false'); } catch (_) {} }, sombre);
   await pg.addInitScript(PONT, { version, suite });
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
@@ -101,11 +107,12 @@ async function ouvrir(b, vp, { version = '5.318.0', suite = 'fait', appris = tru
       await pg.fill('[data-lbc-repondre] textarea', 'Oui, Mondial Relay, envoi demain.');
       await pg.screenshot({ path: path.join(CAP, `lbc-repondre-${vp.width}-${sombre ? 'sombre' : 'clair'}.png`), fullPage: false });
       await pg.click('[data-lbc-envoyer]');
-      await pg.waitForSelector('[data-lbc-resultat]', { timeout: 8000 }).catch(() => {});
-      const apres = await pg.evaluate(() => ({ cmds: window.__cmds, res: document.querySelector('[data-lbc-resultat]') ? document.querySelector('[data-lbc-resultat]').getAttribute('data-lbc-resultat') : null, t: (document.querySelector('[data-lbc-resultat]') || {}).textContent || '' }));
+      // (12 nov.) « Envoyé ✓ » est dit SOUS la bulle, dans le fil (data-envoi="ok"), plus au-dessus du champ.
+      await pg.waitForSelector('.vrm-chat-panel [data-envoi="ok"]', { timeout: 8000 }).catch(() => {});
+      const apres = await pg.evaluate(() => ({ cmds: window.__cmds, res: document.querySelector('.vrm-chat-panel [data-envoi="ok"]') ? 'ok' : null, t: (document.querySelector('.vrm-chat-panel [data-envoi]') || {}).textContent || '', dessus: !!document.querySelector('[data-lbc-resultat]') }));
       const cmds = apres.cmds.map((x) => JSON.parse(x)).filter((x) => x.cmd === 'lbcRepondre');
       dit(cmds.length === 1 && cmds[0].conv === CONV && cmds[0].texte === 'Oui, Mondial Relay, envoi demain.', `${L} : UNE commande \`lbcRepondre { conv, texte }\`, sur SON clic`, JSON.stringify(cmds));
-      dit(apres.res === 'ok' && /Envoyé sur Leboncoin/.test(apres.t), `${L} : le résultat est dit`, apres.t);
+      dit(apres.res === 'ok' && /Envoyé ✓/.test(apres.t) && !apres.dessus, `${L} : le résultat est dit sous la bulle, une seule fois`, apres.t);
       const r = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
       dit(r.sw <= r.cw + 1, `${L} : aucun débordement horizontal`, `${r.sw} > ${r.cw}`);
       dit(errs.length === 0, `${L} : aucune erreur d’app`, errs.join(' | ').slice(0, 160));

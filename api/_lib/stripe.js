@@ -4,6 +4,7 @@
 // qui décide de la forme des objets (où vit `current_period_end`, par exemple),
 // et le webhook enregistré chez Stripe envoie la même.
 import crypto from 'crypto';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 export const STRIPE_VERSION = '2026-08-26.dahlia';
 export const stripeCle = () => process.env.STRIPE_SECRET_KEY || '';
@@ -35,7 +36,7 @@ export async function stripeApi(methode, chemin, params, idempotence) {
   if (idempotence && !get) headers['Idempotency-Key'] = idempotence;
   try {
     // (11 nov., robustesse) Un Stripe lent ne bloque plus la route jusqu'à la coupure.
-    const r = await fetch(url, { method: methode, headers, body: get ? undefined : corps, signal: AbortSignal.timeout(DELAI_STRIPE_MS) });
+    const r = await fetchAvecDelai(url, { method: methode, headers, body: get ? undefined : corps, signal: AbortSignal.timeout(DELAI_STRIPE_MS) });
     let data = null; try { data = await r.json(); } catch (_) {}
     return { ok: r.ok, status: r.status, data: data || {} };
   } catch (e) { return { ok: false, status: 0, data: { error: { message: String(e && e.message || e) } } }; }

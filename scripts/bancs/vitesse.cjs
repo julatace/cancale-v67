@@ -74,7 +74,11 @@ const srv = http.createServer((q, r) => {
   if (/^\.(js|css|html|json|webmanifest|svg)$/.test(ext) && /gzip/.test(q.headers['accept-encoding'] || '')) {
     if (!_gz.has(p)) _gz.set(p, zlib.gzipSync(fs.readFileSync(p), { level: 9 }));
     const b = _gz.get(p);
-    servis.push({ f, octets: b.length });
+    // (intégration g1) Le service worker qui RANGE les morceaux pour le hors-ligne (public/sw.js,
+    // `rechaufferMorceaux`, lot hors-ligne : un par un, après l'ouverture) n'est pas le chargement
+    // de l'écran : `Sec-Fetch-Dest: empty` (un `fetch()`, pas un <script>, un import ou un <link>).
+    // Noté à part (`rechauffe`), jamais compté dans le JS de l'ouverture.
+    servis.push({ f, octets: b.length, ...(q.headers['sec-fetch-dest'] === 'empty' && /\.(js|css)$/.test(f) ? { rechauffe: true } : {}) });
     r.writeHead(200, { 'content-type': types[ext] || 'application/octet-stream', 'content-encoding': 'gzip', 'content-length': b.length, 'cache-control': 'no-store' }); return r.end(b);
   }
   servis.push({ f, octets: fs.statSync(p).size });
@@ -87,7 +91,10 @@ const srv = http.createServer((q, r) => {
 const RESEAU = process.env.VITESSE_RESEAU === '4g' ? { offline: false, latency: 150, downloadThroughput: 1.6e6 / 8, uploadThroughput: 750e3 / 8 } : null;
 const LARGEURS = process.env.VITESSE_LARGEURS ? process.env.VITESSE_LARGEURS.split(',').map(Number) : [390, 1512];
 srv.on('error', (e) => { console.log('❌ le port ' + PORT + ' est pris (' + e.code + ')'); process.exit(1); });
-srv.listen(PORT);
+// (11 nov., budget-vitesse) Requis par `budget-vitesse.cjs` : le serveur n'écoute
+// qu'à la demande (`demarrer()`), lancé directement il écoute tout de suite.
+const demarrer = () => new Promise((ok) => { if (srv.listening) return ok(); srv.once('listening', ok); srv.listen(PORT); });
+if (require.main === module) srv.listen(PORT);
 
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
@@ -128,13 +135,23 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
   // retenus (`vrm_comptes_lies`). Ignoré par un build qui ne le connaît pas.
   if (opts.memoire !== false && MEMOIRE) await pg.addInitScript(([qui, uids]) => { try { localStorage.setItem('vrm_comptes_lies', JSON.stringify({ qui, uids })); } catch (_) {} }, [UID_BANC, [...UIDS_LIES]]);
   if (opts.rendus) await pg.addInitScript(crochetRendus, opts.rendus);
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
-  if (vp.width < 600 && (CPU > 1 || RESEAU)) { const cdp = await ctx.newCDPSession(pg); if (CPU > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU }); if (RESEAU) { await cdp.send('Network.enable'); await cdp.send('Network.emulateNetworkConditions', RESEAU); } }
+  if (opts.initScript) await pg.addInitScript(opts.initScript);
+  // (12 nov.) une photo Vinted qui échoue fait SONDER le CDN par l'app (`essaiSonde`, fetch no-cors,
+  // src/photosVinted.js) : coupée comme l'image elle-même — rien ne sort du banc (garde réseau).
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
+  // (11 nov.) `opts.cpu` : le ralentissement de CETTE ouverture (budget-vitesse relève à ×1 et ×4).
+  const cpu = opts.cpu != null ? opts.cpu : CPU;
+  if (vp.width < 600 && (cpu > 1 || RESEAU)) { const cdp = await ctx.newCDPSession(pg); if (cpu > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: cpu }); if (RESEAU) { await cdp.send('Network.enable'); await cdp.send('Network.emulateNetworkConditions', RESEAU); } }
   servis = [];
   const req = [];
   let fige = false;   // après la mesure d'ouverture : les lectures du signal ne comptent pas dans le bilan
-  const noter = (e) => { if (!fige) req.push(e); };
-  const t0 = Date.now();
+  // (11 nov., budget-vitesse) `fenetre` : {auMoins, auPlus} en ms depuis le chargement.
+  // Le calme seul (3 s sans lecture) coupe tantôt avant, tantôt après le rafraîchissement
+  // qui part ~15 s après l'ouverture (mesuré : Annonces 95 OU 111 lectures) ; le budget
+  // observe donc au moins `auMoins`, et ne compte rien de ce qui part après `auPlus`
+  // (avant les relectures à la minute).
+  const noter = (e) => { if (!fige && !(opts.fenetre && e.debut > opts.fenetre.auPlus)) req.push(e); };
+  let t0 = Date.now();
   // L'histoire du héros de Ma journée : à quel moment il apparaît, avec quelle
   // valeur (un héros qui apparaît tôt avec un FAUX chiffre ne compte pas).
   await pg.addInitScript((t0) => {
@@ -179,12 +196,16 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
   try { await pg.waitForFunction(attendre, null, { timeout: RESEAU ? 120000 : 30000, polling: 50 }); utile = Date.now() - t0; } catch (_) {}
   // (6 nov., vitesse 2) La coque dessinée (le morceau `App` téléchargé, compilé, rendu) : mesurée dans la page.
   const coque = await pg.evaluate(() => window.__vrmCoque || null).catch(() => null);
-  // Le calme : plus aucune requête GET pendant 3 s.
-  for (let i = 0; i < 120; i++) {
-    await pg.waitForTimeout(500);
-    const dern = req.length ? Math.max(...req.map((x) => x.fin)) : 0;
-    if (Date.now() - t0 - dern > 3000) break;
+  // Le calme : plus aucune requête GET pendant 3 s (et, avec `fenetre`, au moins `auMoins`).
+  async function calme() {
+    for (let i = 0; i < 120; i++) {
+      await pg.waitForTimeout(500);
+      const dern = req.length ? Math.max(...req.map((x) => x.fin)) : 0;
+      if (Date.now() - t0 - dern > 3000 && !(opts.fenetre && Date.now() - t0 < opts.fenetre.auMoins)) break;
+      if (opts.fenetre && Date.now() - t0 > opts.fenetre.auPlus) break;
+    }
   }
+  await calme();
   // ⚠️ Sauf la phrase des photos (`data-photos-bloquees`) : le banc coupe les
   // images, et elle apparaît au bout d'un délai — elle dit le temps écoulé.
   const lu = await pg.evaluate(() => { let t = document.body.innerText; for (const x of document.querySelectorAll('[data-photos-bloquees]')) t = t.replace(x.innerText, ''); return { tombe: /pas pu s'afficher|Cannot access|is not defined/.test(document.body.innerText), texte: t, rendus: window.__vrmRendus ? window.__vrmRendus.rendus : null }; });
@@ -242,8 +263,28 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
   const fichiers = servis.slice(); servis = [];
   const heros = await pg.evaluate(() => window.__heros || []).catch(() => []);
   if (DETAIL) console.log('    héros :', JSON.stringify(heros));
+  // (11 nov., budget-vitesse) `deuxieme` : la 2ᵉ OUVERTURE sur le même appareil — la
+  // page rechargée dans le même onglet (ce que l'app a rangé elle-même, localStorage,
+  // sessionStorage, est là). Mesurée à part, jusqu'au calme, avec ses fichiers.
+  let deuxieme = null, reqPremier = req;
+  if (opts.deuxieme) {
+    reqPremier = req.slice();
+    fige = false; req.length = 0; servis = []; t0 = Date.now();
+    const errs2 = []; pg.on('pageerror', (e) => errs2.push(e.message));
+    await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
+    let utile2 = null;
+    try { await pg.waitForFunction(attendre, null, { timeout: RESEAU ? 120000 : 30000, polling: 50 }); utile2 = Date.now() - t0; } catch (_) {}
+    for (let i = 0; i < 120; i++) {
+      await pg.waitForTimeout(500);
+      const dern = req.length ? Math.max(...req.map((x) => x.fin)) : 0;
+      if (Date.now() - t0 - dern > 3000 && !(opts.fenetre && Date.now() - t0 < opts.fenetre.auMoins)) break;
+      if (opts.fenetre && Date.now() - t0 > opts.fenetre.auPlus) break;
+    }
+    const lu2 = await pg.evaluate(() => ({ tombe: /pas pu s'afficher|Cannot access|is not defined/.test(document.body.innerText), texte: document.body.innerText })).catch(() => ({ tombe: true, texte: '' }));
+    deuxieme = { req: req.slice(), utile: utile2, errs: errs2, lu: lu2, fichiers: servis.slice(), heros: [] };
+  }
   await ctx.close();
-  return { req, utile, errs, lu, frappes, heros, rendusSignal, fichiers, coque };
+  return { req: reqPremier, utile, errs, lu, frappes, heros, rendusSignal, fichiers, coque, deuxieme };
 }
 
 function bilan(nom, r) {
@@ -276,7 +317,9 @@ function bilan(nom, r) {
   const entieres = gets.filter((x) => x.entier), octHors = gets.reduce((a, x) => a + (x.hors || 0), 0);
   const dressings = gets.filter((x) => x.poids === 'dressings'), octDressings = dressings.reduce((a, x) => a + x.octets, 0);
   const octAchatsHors = gets.reduce((a, x) => a + (x.achatsHors || 0), 0);
-  const js = (r.fichiers || []).filter((x) => /\.(js|css)$/.test(x.f)), octJs = js.reduce((a, x) => a + x.octets, 0);
+  const js = (r.fichiers || []).filter((x) => /\.(js|css)$/.test(x.f) && !x.rechauffe), octJs = js.reduce((a, x) => a + x.octets, 0);
+  const octRechauffe = (r.fichiers || []).filter((x) => x.rechauffe).reduce((a, x) => a + x.octets, 0);
+  if (octRechauffe) console.log(`     (hors-ligne) ${Math.round(octRechauffe / 1024)} Ko rangés en fond par le service worker — pas comptés dans l'ouverture`);
   // Les lignes jamais montrées que rapporte la lecture des COMMANDES de l'écran
   // (le préchargement, puis la lecture par compte) — celle que ce chantier juge.
   const octHorsCommandes = gets.filter(estVentes).reduce((a, x) => a + (x.hors || 0), 0);
@@ -289,7 +332,7 @@ function bilan(nom, r) {
   console.log(`     dressings ${Math.round(octDressings / 1024)} Ko en ${dressings.length} lecture(s) · achats d'anciens comptes lus ${Math.round(octAchatsHors / 1024)} Ko · fichiers de l'app ${Math.round(octJs / 1024)} Ko compressés en ${js.length} fichier(s)`);
   if (DETAIL) for (const x of js) console.log(`      ${String(Math.round(x.octets / 1024)).padStart(6)} Ko ${x.f}`);
   if (profVentes) console.log(`     ventes lues au ${profVentes}ᵉ aller-retour à la suite · héros ${JSON.stringify(r.heros || [])}`);
-  return { utile: r.utile, fin, n: gets.length, octets, pdf, enDouble, profondeur, txn, supprParCompte, profVentes, octFiches, nFiches: fiches.length, octCommandes, nCommandes: commandes.length, entieres: entieres.map((x) => decodeURIComponent(x.url).replace(/^.*\/rest\/v1\//, '').slice(0, 120)), octHors, octHorsCommandes, octDressings, nDressings: dressings.length, octAchatsHors, octJs, fichiersJs: js.map((x) => x.f.replace(/-[\w-]{8}\.(js|css)$/, '.$1')) };
+  return { utile: r.utile, fin, n: gets.length, octets, pdf, enDouble, profondeur, txn, supprParCompte, profVentes, octFiches, nFiches: fiches.length, octCommandes, nCommandes: commandes.length, entieres: entieres.map((x) => decodeURIComponent(x.url).replace(/^.*\/rest\/v1\//, '').slice(0, 120)), octHors, octHorsCommandes, octDressings, nDressings: dressings.length, octAchatsHors, octJs, doublonsCles: doublons.map(([k, n]) => [decodeURIComponent(k).replace(/^\/rest\/v1\//, ''), n]), fichiersJs: js.map((x) => x.f.replace(/-[\w-]{8}\.(js|css)$/, '.$1')) };
 }
 
 // ⚠️ PLAFONDS MESURÉS le 16 octobre (base inventée, 7 comptes). Avant les
@@ -344,7 +387,9 @@ const ECRANS = [
 
 // (6 nov., vitesse 2) `VITESSE_PREMIER=n` : seulement le PREMIER CHARGEMENT de Ma journée, n fois
 // (avec `VITESSE_RESEAU=4g` : le téléphone en 4G) — coque dessinée, premier écran utile, fichiers.
-if (process.env.VITESSE_PREMIER) {
+module.exports = { ouvrir, bilan, demarrer, fermer: () => new Promise((ok) => srv.close(() => ok())), ECRANS, PORT, chromium, base };
+if (require.main !== module) { /* requis : rien ne se lance */ }
+else if (process.env.VITESSE_PREMIER) {
   (async () => {
     const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server', '--explicitly-allowed-ports=' + PORT] });
     const sortie = [];

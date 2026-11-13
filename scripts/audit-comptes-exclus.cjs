@@ -46,6 +46,7 @@ async function charger(mut) {
     if (mut && mut.fichier === f) t = mut.fn(t);
     fs.writeFileSync(path.join(lib, f), t);
   }
+  fs.mkdirSync(path.join(dir, 'src'), { recursive: true }); fs.copyFileSync(path.join(R, 'src', 'profilVendeur.js'), path.join(dir, 'src', 'profilVendeur.js')); fs.copyFileSync(path.join(R, 'src', 'venteAilleurs.js'), path.join(dir, 'src', 'venteAilleurs.js'));   // (12 nov., saisie rapide) importé par bilan-semaine.js   // (lot vocabulaire-article) importé par bilan-semaine
   fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"module"}');
   fs.writeFileSync(path.join(dir, 'api', 'package.json'), '{"type":"module"}');
   const imp = (f) => import('file://' + path.join(lib, f));

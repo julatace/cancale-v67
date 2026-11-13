@@ -13,7 +13,7 @@
 // gestion : attributs « @_ », texte « #text », préfixes retirés, valeurs brutes).
 // Vérifie :
 //   1. la lecture : `type` rendu, l'adresse e-mail de l'acheteur JAMAIS rendue ;
-//   2. une ligne par annonce, la plus ancienne question sans réponse d'abord,
+//   2. une ligne par annonce (la plus récente en haut, 11 nov.), la plus ancienne question sans réponse d'abord,
 //      un message qui n'est pas une question n'entre pas ;
 //   3. répondre : sans `confirme:true` ⇒ 400 AVANT le jeton, rien chez eBay ;
 //      la question RELUE chez eBay comme « AskSellerQuestion » avant l'envoi ;
@@ -28,7 +28,7 @@ const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').split(
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; if (!c || process.env.BAVARD) console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
 const lire = (f) => { try { return fs.readFileSync(path.join(R, f), 'utf8'); } catch (_) { return ''; } };
-let GESTION = lire('api/_lib/ebay-gestion.js');
+let GESTION = lire('api/_lib/ebay-gestion.js').replace("'./fetch-delai.js'", JSON.stringify(require('url').pathToFileURL(path.join(R, 'api/_lib/fetch-delai.js')).href));   // (11 nov.) la copie importe le vrai fetch à délai
 let Q = lire('src/questionsEbay.js');
 let ECRAN = lire('src/ebayGestion.jsx');
 const muter = (quoi, avant, apres) => {
@@ -154,7 +154,8 @@ export const XMLValidator = { validate: (x) => (typeof x === 'string' && /^\s*(<
     const g1 = Gs.find((g) => g.itemId === '110000000001');
     dit(g1 && g1.questions.length === 3 && g1.nSans === 2 && g1.aTraiter.id === '9001', 'annonce 1 : 3 questions, 2 sans réponse, la plus ANCIENNE sans réponse d’abord', g1 && `${g1.questions.map((q) => q.id)} · ${g1.aTraiter.id}`);
     dit(g1 && g1.questions.map((q) => q.id).join(',') === '9002,9001,9003', 'les questions d’une annonce, de la plus ancienne à la plus récente');
-    dit(Gs[0].itemId === '110000000002' && Gs[1].itemId === '110000000001' && Gs[2].itemId === '110000000003', 'en tête : la plus vieille attente (2), puis (1) ; la répondue (3) après', Gs.map((g) => g.itemId).join(','));
+    // (11 nov., décision de Julien : « du plus récent au plus vieux », partout dans Messages.)
+    dit(Gs[0].itemId === '110000000003' && Gs[1].itemId === '110000000001' && Gs[2].itemId === '110000000002', 'le plus récent en haut : (3) le 3 à 20 h, (1) le 3 à 9 h, (2) le 1er — une attente ne passe plus devant', Gs.map((g) => g.itemId).join(','));
     dit(!QE.estQuestion({ type: 'AskSellerQuestion', itemId: '' }) && !QE.estQuestion({ type: '', itemId: '1' }) && !QE.estQuestion({ type: 'ContactEbayMember', itemId: '1' }), 'sans annonce identifiée, ou type absent / autre ⇒ pas une question (VRM ne promet pas d’y répondre)');
 
     console.log('── 3. Répondre, sur SON clic');

@@ -26,9 +26,11 @@ import crypto from 'crypto';
 import { gabaritMail, SITE } from './mail-gabarit.js';
 import { sbCle } from './cle.js';
 import { PROPRIETAIRE_NEUTRE } from './proprietaire-email.js';
+import { derniereConnexion, connexionRecente, fournisseursDu, aMotDePasseSelon, nomFournisseur, FOURNISSEURS_RECONNEXION, FENETRE_RECENTE_MS as FENETRE } from './preuve-connexion.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 export const MOT_CONFIRMATION = 'SUPPRIMER';
-export const FENETRE_RECENTE_MS = 10 * 60 * 1000;
+export const FENETRE_RECENTE_MS = FENETRE;
 export const JOURNAL_ANS = 3;
 export const PREFIXE_JOURNAL = 'vrm_suppression_';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -37,19 +39,12 @@ const NON_TOUCHE = "Rien n'a été effacé.";
 // La dernière preuve d'identité de la session, en millisecondes, lue dans le
 // jeton (`amr` : [{ method, timestamp }]). Le jeton a DÉJÀ été validé par
 // Supabase (utilisateurDe) avant que cette lecture compte. `null` = pas dit.
-export function derniereConnexion(jeton) {
-  try {
-    const p = String(jeton || '').split('.');
-    if (p.length !== 3) return null;
-    const j = JSON.parse(Buffer.from(p[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'));
-    const ts = (Array.isArray(j && j.amr) ? j.amr : []).map((x) => Number(x && x.timestamp)).filter((t) => Number.isFinite(t) && t > 0);
-    return ts.length ? Math.max(...ts) * 1000 : null;
-  } catch (_) { return null; }
-}
+// (11 nov.) Le calcul vit dans ./preuve-connexion.js : l'écran fait le MÊME.
+export { derniereConnexion };
 
 // Le mot de passe du compte DU JETON, vérifié par Supabase : true · false (faux)
 // · undefined (pas su : service muet, captcha, trop d'essais).
-export async function verifierMotDePasse({ url, anon, email, motDePasse, id, fetcher = fetch }) {
+export async function verifierMotDePasse({ url, anon, email, motDePasse, id, fetcher = fetchAvecDelai }) {
   if (!email || !motDePasse) return false;
   try {
     const r = await fetcher(`${url}/auth/v1/token?grant_type=password`, {
@@ -85,7 +80,13 @@ export async function verifierConfirmation({ corps, utilisateur, jeton, maintena
     return { ok: false, code: 503, erreur: 'mot-de-passe-pas-su', message: `Je n'ai pas pu vérifier ton mot de passe. ${NON_TOUCHE} Réessaie dans un instant, ou reconnecte-toi et reviens ici dans les 10 minutes.` };
   }
   const t = derniereConnexion(jeton);
-  if (t != null && t <= maintenant + 60e3 && maintenant - t <= FENETRE_RECENTE_MS) return { ok: true, par: 'connexion-recente' };
+  if (connexionRecente(t, maintenant)) return { ok: true, par: 'connexion-recente' };
+  // (11 nov.) Un compte SANS mot de passe : la phrase nomme le seul geste possible.
+  const f = fournisseursDu({ jeton });
+  const oauth = (f || []).filter((p) => FOURNISSEURS_RECONNEXION.includes(p)).map(nomFournisseur);
+  if (aMotDePasseSelon(f) === false && oauth.length) {
+    return { ok: false, code: 403, erreur: 'reconnexion', message: `Ta connexion date de plus de 10 minutes. Reconnecte-toi avec ${oauth.join(' ou ')}, puis reviens ici. ${NON_TOUCHE}` };
+  }
   return { ok: false, code: 403, erreur: 'reconnexion', message: `Confirme que c'est toi : entre ton mot de passe, ou déconnecte-toi, reconnecte-toi, puis reviens ici dans les 10 minutes. ${NON_TOUCHE}` };
 }
 
@@ -120,7 +121,7 @@ export function requetes(owner, proprio) {
 }
 
 // Tout compter. `null` si UNE lecture rate (rien ne sera effacé).
-export async function inventaire({ url, service, owner, proprio, fetcher = fetch }) {
+export async function inventaire({ url, service, owner, proprio, fetcher = fetchAvecDelai }) {
   if (!UUID.test(String(owner || ''))) return null;
   const q = requetes(owner, proprio);
   const sel = { donnees: 'select=id', facturesPro: 'select=id', comptesVinted: 'select=owner', preuvesAdresse: 'select=id', indexJetons: 'select=id', signalements: 'select=id' };
@@ -135,7 +136,7 @@ export async function inventaire({ url, service, owner, proprio, fetcher = fetch
 }
 
 // Le propriétaire de l'installation : son UUID · '' (aucun déclaré) · undefined (pas su).
-export async function lireProprietaire({ url, service, env = process.env, fetcher = fetch }) {
+export async function lireProprietaire({ url, service, env = process.env, fetcher = fetchAvecDelai }) {
   const e = String(env.VRM_OWNER_UID || '').trim().toLowerCase();
   if (UUID.test(e) && e !== PROPRIETAIRE_NEUTRE) return e;
   try {
@@ -157,7 +158,7 @@ export function ligneJournal({ ok, nombres, maintenant = Date.now() }) {
   for (const [k, v] of Object.entries(nombres || {})) if (Number.isInteger(v) && v >= 0) n[k] = v;
   return { at: new Date(maintenant).toISOString(), issue: ok ? 'supprime' : 'incomplet', nombres: n };
 }
-export async function noterJournal({ url, service, owner, ok, nombres, maintenant = Date.now(), fetcher = fetch }) {
+export async function noterJournal({ url, service, owner, ok, nombres, maintenant = Date.now(), fetcher = fetchAvecDelai }) {
   const at = new Date(maintenant).toISOString();
   let ecrit = false;
   try {

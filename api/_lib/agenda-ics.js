@@ -34,6 +34,7 @@ import { nextUrssafDeadline, moisPeriodeUrssaf, moisDeclare } from './urssaf-reg
 import { heureCourte } from './limite-envoi.js';
 import { evenementsRappels } from './rappels-perso.js';
 import { vendeurParIndex, ecrireIndexJeton, retirerIndexJeton, memeJeton } from './jeton-index.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 export const LIGNE_AGENDA = 'vrm_agenda';
 export const RE_JETON_AGENDA = /^[A-Za-z0-9_-]{40,64}$/;
@@ -169,7 +170,7 @@ export function fichierIcs(evenements, maintenant = Date.now()) {
 // Rend { status, type: 'ics'|'json'|'texte', body }.
 export async function traiterAgenda(deps) {
   const { base, cle, methode } = deps;
-  const f = deps.fetch || fetch;
+  const f = deps.fetch || fetchAvecDelai;
   const origine = deps.origine || 'https://vrm.center';
   if (!cle) return { status: 503, type: 'json', body: { erreur: 'non-configure', message: "L'agenda n'est pas encore branché sur le serveur." } };
   const headers = { apikey: cle, Authorization: `Bearer ${cle}` };

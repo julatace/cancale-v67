@@ -20,8 +20,13 @@
 //     donc « à retirer » avec son bouton ;
 //   · (revue du 22 oct.) la ligne venue de `vinted_lbc_posted` ne part que sur
 //     une PREUVE (liste complète de chacun de ses comptes postérieure à la marque
-//     « publiée ») : sans elle, la N°14 reste « à retirer », avec le doute dit
-//     une fois — ici et dans Ma journée ;
+//     « publiée ») : sans elle, la N°14 restait « à retirer », avec le doute ;
+//     ⚠️ (11 nov., lbc-rouges) PORTÉ sur la décision du 9 nov. (Julien : « elle
+//     propose de supprimer des annonces vendues sur Vinted qui ne sont plus sur
+//     Leboncoin », `lbcIdentiteSortie`, docs/passation/2026-11-09-leboncoin-clair.md) :
+//     « à retirer » exige l'annonce Leboncoin EN LIGNE dans une lecture complète
+//     < 24 h ; une paire dont la SEULE annonce connue est sortie n'est ni « à
+//     retirer » ni « à confirmer » — ici comme dans Ma journée (§11) ;
 //   · aucun débordement, aucune erreur.
 const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
@@ -121,7 +126,7 @@ async function ouvrir(b, vp, pont) {
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
   await pg.addInitScript(PONT, pont);
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
@@ -158,10 +163,23 @@ const lire = (pg) => pg.evaluate(() => ({
   doute: [...document.querySelectorAll('[data-lbc-retirer-doute]')].map((e) => e.getAttribute('data-lbc-retirer-doute')),
   douteTxt: (document.querySelector('[data-lbc-retirer-doute]') || {}).innerText || '',
   resultats: [...document.querySelectorAll('[data-lbc-pause-resultat]')].map((e) => ({ id: e.getAttribute('data-lbc-pause-resultat'), etape: e.getAttribute('data-etape'), t: e.innerText })),
-  deborde: [...document.querySelectorAll('button,input')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.right > document.documentElement.clientWidth + 1; }).map((e) => e.textContent.trim().slice(0, 20) || e.tagName),
+  // (11 nov., lbc-rouges) Un bouton d'une RANGÉE DÉFILANTE (§7 : `overflow-x` auto/scroll,
+  // la rangée elle-même dans l'écran) n'est pas rogné : on le fait défiler. Seul compte
+  // un bouton qui sort de l'écran sans conteneur qui défile.
+  deborde: [...document.querySelectorAll('button,input')].filter((e) => { const r = e.getBoundingClientRect(); if (!(r.width > 0 && r.height > 0 && r.right > document.documentElement.clientWidth + 1)) return false;
+    for (let p = e.parentElement; p && p !== document.body; p = p.parentElement) { const ox = getComputedStyle(p).overflowX; if ((ox === 'auto' || ox === 'scroll') && p.scrollWidth > p.clientWidth && p.getBoundingClientRect().right <= document.documentElement.clientWidth + 1) return false; }
+    return true; }).map((e) => e.textContent.trim().slice(0, 20) || e.tagName),
+  aConfirmer: [...document.querySelectorAll('[data-lbc-retirer-aconfirmer-num]')].map((e) => e.getAttribute('data-lbc-retirer-aconfirmer-num')),
   sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
 }));
 const feuille = (pg) => pg.evaluate(() => { const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === 'Mettre en pause'); const s = b ? b.closest('div[role="dialog"], form, div') : null; let t = ''; let n = b; for (let i = 0; i < 6 && n; i++) { n = n.parentElement; if (n && n.innerText && n.innerText.length > t.length && n.innerText.length < 900) t = n.innerText; } return { ok: !!b, t }; });
+// (11 nov., lbc-rouges) Ma journée : la carte « à retirer de Leboncoin (vendue sur Vinted) »
+// se juge par son nombre RENDU (`data-n`) — le libellé est devenu « 1 annonce à retirer… »
+// (Ma journée v2, 9 nov.) ; le texte ne sert qu'à choisir la carte parmi les doubles ventes.
+const journeeLbc = async (pg) => {
+  await pg.waitForFunction(() => [...document.querySelectorAll('[data-job="double-vente"]')].some((e) => /à retirer de Leboncoin/.test(e.innerText)), null, { timeout: 15000 }).catch(() => {});
+  return pg.evaluate(() => { const e = [...document.querySelectorAll('[data-job="double-vente"]')].find((x) => /à retirer de Leboncoin/.test(x.innerText) && !/sur (eBay|Vestiaire)/.test(x.innerText)); return e ? { n: e.getAttribute('data-n'), t: e.innerText.replace(/\s+/g, ' ') } : null; });
+};
 const cliquer = (pg, texte) => pg.evaluate((tx) => { const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === tx); if (b) b.click(); return !!b; }, texte);
 
 (async () => {
@@ -178,7 +196,7 @@ const cliquer = (pg, texte) => pg.evaluate((tx) => { const b = [...document.quer
       dit(v.boutons.join() === '3290000001', '« Mettre en pause sur Leboncoin » sur CETTE annonce, et elle seule', JSON.stringify(v.boutons));
       dit(v.liens.length >= 1, 'le lien « voir sur Leboncoin » reste à côté');
       dit(!v.retirer.includes('14') && !v.retirer.some((x) => x === '3270000004'), 'la N°14 (annonce « plus vue » dans une liste complète POSTÉRIEURE à la marque « publiée ») n’est plus « à retirer »', JSON.stringify(v.retirer));
-      dit(v.sortie.length === 0 && v.doute.length === 0, '… et aucun doute n’est dit quand la preuve est là', JSON.stringify({ sortie: v.sortie, doute: v.doute }));
+      dit(v.sortie.length === 0 && v.doute.length === 0 && !v.aConfirmer.includes('14'), '… et aucun doute n’est dit quand la preuve est là (ni « à confirmer »)', JSON.stringify({ sortie: v.sortie, doute: v.doute, aConfirmer: v.aConfirmer }));
       dit(v.plusVues === '1' && /Rien n'est effacé/.test(v.plusVuesTxt) && /je ne sais pas laquelle/.test(v.plusVuesTxt), 'la ligne « plus comptée en ligne » le dit, une fois, sans dire vendue ni supprimée', v.plusVuesTxt.slice(0, 160));
       dit(v.pasRevues === '1' && !v.relier.includes('3270000003'), 'l’annonce pas revue depuis 32 jours ne demande pas « quelle paire ? » — comptée dans « pas revues »', JSON.stringify({ pasRevues: v.pasRevues, relier: v.relier }));
       dit(v.relier.includes('3290000005'), '… et l’annonce fraîche non reliée, elle, le demande toujours (l’autre sens)', JSON.stringify(v.relier));
@@ -238,10 +256,8 @@ const cliquer = (pg, texte) => pg.evaluate((tx) => { const b = [...document.quer
       // Annonces publie sur l'appareil (`vinted_annonces_vendues`) : on le pose.
       await o4.pg.evaluate(() => { try { localStorage.setItem('vinted_annonces_vendues', JSON.stringify(['5001', '5003'])); } catch (_) {} });
       await o4.pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
-      await o4.pg.waitForFunction(() => /à retirer de Leboncoin/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
-      const txt = await o4.pg.evaluate(() => document.body.innerText);
-      const m = /(\d+) à retirer de Leboncoin/.exec(txt);
-      dit(m && m[1] === '1', 'Ma journée : 1 à retirer de Leboncoin (la N°18) — pas la N°14 dont l’annonce n’est plus vue', m ? m[0] : 'absent');
+      const m = await journeeLbc(o4.pg);
+      dit(m && m.n === '1' && /N°18/.test(m.t) && !/N°14/.test(m.t), 'Ma journée : 1 à retirer de Leboncoin (la N°18) — pas la N°14 dont l’annonce n’est plus vue', m ? JSON.stringify(m) : 'absent');
       await o4.ctx.close();
 
       // (revue du 22 oct.) SANS PREUVE : la marque « publiée » est postérieure à la
@@ -251,18 +267,18 @@ const cliquer = (pg, texte) => pg.evaluate((tx) => { const b = [...document.quer
       posted.data.updatedAt = auj.toISOString();
       try {
         const o5 = await ouvrir(b, vp, { mode: 'ok', suite: 'fait' });
-        await o5.pg.waitForSelector('[data-lbc-retirer-doute]', { timeout: 10000 }).catch(() => {});
+        await o5.pg.waitForSelector('[data-lbc-pause]', { timeout: 10000 }).catch(() => {});
         const v6 = await lire(o5.pg);
-        dit(v6.retirer.includes('14') && v6.sortie.join() === '14:plusvue', 'la N°14 RESTE « à retirer » (l’annonce reliée n’est plus vue, mais rien ne prouve qu’aucune autre ne l’est)', JSON.stringify({ retirer: v6.retirer, sortie: v6.sortie }));
-        dit(v6.doute.length === 1 && v6.doute[0] === '1' && /aucune autre/.test(v6.douteTxt) && /profil Leboncoin/.test(v6.douteTxt), 'le doute et le geste sont dits UNE fois', v6.douteTxt.slice(0, 160));
+        // (9 nov.) Sa seule annonce Leboncoin connue est sortie d'une lecture complète :
+        // jamais proposée à la suppression (« à retirer »), ni redemandée (« à confirmer »).
+        dit(!v6.retirer.includes('14') && !v6.retirer.includes('3270000004') && v6.sortie.length === 0, 'la N°14 (sa seule annonce Leboncoin est sortie) n’est pas « à retirer » — décision du 9 nov.', JSON.stringify({ retirer: v6.retirer, sortie: v6.sortie }));
+        dit(!v6.aConfirmer.includes('14') && v6.doute.length === 0, '… ni « à confirmer » : rien à redemander, aucun doute dit', JSON.stringify({ aConfirmer: v6.aConfirmer, doute: v6.doute }));
         dit(v6.retirer.includes('3290000001') && v6.boutons.join() === '3290000001', 'la N°18 (revue active après sa marque) reste « à retirer », avec son bouton', JSON.stringify({ r: v6.retirer, b: v6.boutons }));
         dit(o5.errs.length === 0 && v6.sw <= v6.cw + 1, 'aucune erreur, aucun débordement', o5.errs.join(' | ').slice(0, 120));
         await o5.pg.evaluate(() => { try { localStorage.setItem('vinted_annonces_vendues', JSON.stringify(['5001', '5003'])); } catch (_) {} });
         await o5.pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
-        await o5.pg.waitForFunction(() => /à retirer de Leboncoin/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
-        const t6 = await o5.pg.evaluate(() => document.body.innerText);
-        const m6 = /(\d+) à retirer de Leboncoin/.exec(t6);
-        dit(m6 && m6[1] === '2', 'Ma journée : 2 à retirer de Leboncoin (la N°14 aussi, sans preuve) — la MÊME règle (§11)', m6 ? m6[0] : 'absent');
+        const m6 = await journeeLbc(o5.pg);
+        dit(m6 && m6.n === '1' && /N°18/.test(m6.t) && !/N°14/.test(m6.t), 'Ma journée : 1 à retirer de Leboncoin (la N°18), pas la N°14 — la MÊME règle que l’écran (§11)', m6 ? JSON.stringify(m6) : 'absent');
         await o5.ctx.close();
       } finally { posted.data.updatedAt = ilYa(3); }
 
@@ -279,10 +295,8 @@ const cliquer = (pg, texte) => pg.evaluate((tx) => { const b = [...document.quer
         const v7 = await lire(o6.pg);
         dit(v7.retirer.includes('3290000001'), 'écran Leboncoin : la N°18 « à retirer » même si Vinted la montre encore ouverte', JSON.stringify(v7.retirer));
         await o6.pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
-        await o6.pg.waitForFunction(() => /à retirer de Leboncoin/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
-        const t7 = await o6.pg.evaluate(() => document.body.innerText);
-        const m7 = /(\d+) à retirer de Leboncoin[^\n]*/.exec(t7);
-        dit(m7 && m7[1] === '1' && /N°18/.test(m7[0]), 'Ma journée : « 1 à retirer de Leboncoin — N°18 … » sans aucune marque à la main', m7 ? m7[0] : 'absent');
+        const m7 = await journeeLbc(o6.pg);
+        dit(m7 && m7.n === '1' && /N°18/.test(m7.t), 'Ma journée : « 1 à retirer de Leboncoin — N°18 … » sans aucune marque à la main', m7 ? JSON.stringify(m7) : 'absent');
         await o6.pg.waitForTimeout(800);
         const pub = ECRITS.filter((e) => /"id":"lbc_a_retirer"/.test(e.corps)).map((e) => { try { const d = JSON.parse(e.corps); return (Array.isArray(d) ? d[0] : d).data; } catch (_) { return null; } }).filter(Boolean).pop();
         dit(!!pub && Array.isArray(pub.liste) && pub.liste.length === 1 && pub.liste[0].numero === '18' && pub.liste[0].lbcId === '3290000001', 'le résumé pour le logo VRM sur leboncoin.fr est publié (N°18, son annonce)', JSON.stringify(pub && pub.liste));

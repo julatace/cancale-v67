@@ -23,9 +23,12 @@ import { nomPlateforme } from './plateformes.js';
 import { ageLecture } from './comptesLies.js';
 import { SELECT_APPAREILS, PREFIXE_APPAREIL, ACTIF_MS, lireAppareils, pannesCapture, etatVersion, versionCourte, gestesMiseAJour, LIENS_PAQUET } from '../api/_lib/garde-capture.js';
 import { SUPABASE_URL, sbAuth, lireTout, lireCapturesDetail, fetchVintedAccounts, useComptesAutresSites, EXT_ATTENDUE, load, DEMANDE_REGLAGE_SOUS, useEstProprietaire, enTeteSession } from './App.jsx';
+import { lireEtatsComptes } from './etatsComptesLecture.js';
 import { AlertesProduction } from './composants/AlertesProduction.jsx';
 import { aVoirCapture } from './santeDonnees.js';
 import { LigneSante } from './SanteDonnees.jsx';
+import { useAlertesForme, LignesForme } from './AlerteFormeVinted.jsx';   // (11 nov., ext. 5.357) Vinted a changé une page
+import { BoutonRapportExtension, RapportsExtensionProprio } from './RapportExtension.jsx';   // (12 nov., ext. 5.371)
 import './styles-tout-va-bien.css';
 
 // La dernière version qui a écrit, n'importe où (les extensions d'avant la 5.327
@@ -40,14 +43,8 @@ async function lireDerniereVersion() {
     return { ver: d.ver ? String(d.ver) : '', code: d.code ? String(d.code) : '', at: Date.parse(d.at || '') || 0 };
   } catch (_) { return null; }
 }
-async function lireEtatsVinted() {
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_comptes_etat&select=c:data->comptes`, { headers: sbAuth() });
-    if (!r.ok) return null;
-    const rows = await r.json();
-    return Array.isArray(rows) ? ((rows[0] && rows[0].c && typeof rows[0].c === 'object') ? rows[0].c : {}) : null;
-  } catch (_) { return null; }
-}
+// (11 nov., intégration) La lecture partagée avec « Santé des comptes » (une seule requête en vol).
+const lireEtatsVinted = () => lireEtatsComptes();
 // Un appareil actif qui porte une preuve (un refus courant, un compte vu) : seul
 // cas où la ligne ambre a besoin de lire les comptes.
 const aUnePreuve = (apps, maintenant) => (apps || []).some((a) => maintenant - a.at <= ACTIF_MS && Object.values(a.flux).some((f) => f && f.koAt && !(f.okAt > f.koAt))
@@ -157,6 +154,8 @@ function LigneAppareil({ a, maintenant, ouvert, onOuvrir }) {
 export function ToutVaBien({ onComptes }) {
   const { etat, relire } = useEtatCapture({ complet: true });
   const [ouvert, setOuvert] = React.useState(null);
+  // (11 nov., ext. 5.357) Une page de Vinted lue d'une forme inconnue : rien n'est rangé, on le dit.
+  const formes = useAlertesForme();
   // (11 nov.) Les alertes de production : au propriétaire seul (la route le revérifie).
   const proprio = useEstProprietaire();
   if (etat === undefined || !etat.comptesPrets) return <div className="vrm-tvb" data-tout-va-bien="lecture"><div className="vrm-tvb-tete"><Pastille ton="passu"/><div><b className="vrm-tvb-resume">Je vérifie…</b></div></div></div>;
@@ -169,14 +168,17 @@ export function ToutVaBien({ onComptes }) {
   const ancienInconnu = av.ancienInconnu;
   const aFaire = (av.comptes || 0) + (av.extensions || 0);
   const sansAppareil = Array.isArray(appareils) && !appareils.length;
+  const nFormes = formes ? formes.length : 0;
   const resume = aFaire ? (aFaire === 1 ? '1 chose à voir' : `${aFaire} choses à voir`)
+    : nFormes ? 'Vinted a changé une page'
     : passu.length ? 'Je n’ai pas pu tout vérifier'
     : !lignes.length ? 'Aucun compte relié'
     : sansAppareil ? 'Tes comptes sont à jour' : 'Tout est à jour';
   const sous = aFaire ? 'Le geste est écrit sous chaque ligne ambre.'
+    : nFormes ? 'Rien à faire de ton côté : VRM corrige sa lecture.'
     : passu.length ? `Pas lu : ${passu.join(', ')}. Rien n’est affirmé pour eux.`
     : sansAppareil ? 'Aucune extension 5.327 ou plus récente n’a encore donné son appareil.' : `Vérifié ${quandRelu(maintenant)}.`;
-  const ton = aFaire ? 'geste' : passu.length ? 'passu' : 'ok';
+  const ton = aFaire || nFormes ? 'geste' : passu.length ? 'passu' : 'ok';
   const parSite = ['vinted', 'leboncoin', 'vestiaire', 'ebay'].map((p) => [p, lignes.filter((l) => l.plateforme === p)]).filter(([, l]) => l.length);
   return (
     <div className="vrm-tvb" data-tout-va-bien={ton} data-tvb-a-faire={aFaire}>
@@ -188,6 +190,7 @@ export function ToutVaBien({ onComptes }) {
         </div>
         <button type="button" className="vrm-lien-action vrm-tvb-revoir" data-tvb-relire="" onClick={relire}>Revérifier</button>
       </div>
+      <LignesForme alertes={formes} lieu="tvb"/>
       {parSite.map(([p, l]) => (
         <GroupeIos key={p} titre={nomPlateforme(p)} data-tvb-site={p}>
           {l.map((x) => <LigneCompte key={x.id} l={x} panne={panneDe.get(`${x.plateforme}:${x.id}`)}/>)}
@@ -216,7 +219,10 @@ export function ToutVaBien({ onComptes }) {
       </GroupeIos>
       {/* (11 nov., lot sante-donnees) La ligne compacte : le nombre de choses à corriger dans tes données, et la porte. */}
       <LigneSante capture={etat}/>
+      {/* (12 nov., ext. 5.371) « Envoyer un rapport » : l'état technique de l'extension, sans tes données. */}
+      <BoutonRapportExtension/>
       {proprio ? <AlertesProduction entetes={enTeteSession}/> : null}
+      {proprio ? <RapportsExtensionProprio/> : null}
       {onComptes ? <div className="vrm-tvb-pied"><button type="button" className="vrm-lien-action" onClick={onComptes}>Gérer mes comptes liés</button></div> : null}
     </div>
   );

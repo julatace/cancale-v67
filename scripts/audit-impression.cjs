@@ -61,6 +61,24 @@ const parts = [
   'const tamponnerBordereau = async () => ({ mode: \'blanc\', raison: \'\' });',
 ];
 
+// (11 nov., lot thermique) Le code d'impression appelle maintenant les règles de
+// src/impression/ (papier, placement, tampon) : on prend le VRAI bloc entier
+// (`_code-impression.cjs`, celui des bancs), les règles, `typeBordereau`, et seulement
+// ce qui touche au navigateur reste neutre (pdf.js, canvas : le banc `thermique.cjs`).
+{
+  const CI = require('./bancs/_code-impression.cjs');
+  const imp = CI.impression(APP);
+  if (imp) {
+    parts.length = 0;
+    parts.push(CI.regles(), imp, bloc('typeBordereau'),
+      'const load = (k, d) => d;',
+      'const elargir = (z, m) => ({ x: z.x - m, y: z.y - m, w: z.w + 2 * m, h: z.h + 2 * m });',
+      'const MENTION = { codes: 5 * 72 / 25.4 };',
+      'const rendrePremierePage = async () => { throw Error(\'pas de pdf.js ici\'); };',
+      'const zonesCodesTampon = () => [];',
+      'const tamponnerBordereau = async () => ({ mode: \'blanc\', raison: \'\' });');
+  }
+}
 let R = null;
 if (parts.every(Boolean)) {
   let src = parts.join('\n');
@@ -75,6 +93,8 @@ if (parts.every(Boolean)) {
     src = src.replace(/\{ etiquettes\.length = 0; break; \}/, '{}');
     // (3) la page thermique garde la taille de la zone (l'ancien rendu).
     src = src.replace(/const p = out\.addPage\(\[ETIQ_TH\.w, ETIQ_TH\.h\]\);/, 'const p = out.addPage([r.w, r.h]);');
+    // (3 bis, 11 nov.) la page du papier choisi garde la taille de l'étiquette (`composerEtiquette`).
+    src = src.replace('d.addPage([pl.W, pl.H]).drawPage(emb', 'd.addPage([e.w, e.h]).drawPage(emb');
   }
   try {
     // ⚠️ `new Function`, pas `vm` : pdf-lib vérifie `instanceof Array`, et un

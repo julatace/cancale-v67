@@ -235,6 +235,12 @@ const mime = (o = {}) => [`From: ${FROM}`, `To: ${ADR}`, `Subject: =?UTF-8?Q?Com
     dit(r2.liste.length === 0 && r2.probables.length === 1, 'Q2 (témoin) un achat sans preuve d’attente reste apparié à son témoin fini, comme avant', JSON.stringify({ liste: r2.liste.length, probables: r2.probables.length }));
     const r3 = A.regrouperArrivees([moitie], { commandeDe: () => cmdAttend, temoins: [fini], sansIdentite: () => true, temoinActif: () => true, attendEncore });
     dit(r3.doutes.length === 1 && r3.liste.length === 0, 'Q3 avec un témoin ENCORE montré : compté avec lui, une fois (jamais deux cartons)', JSON.stringify({ doutes: r3.doutes.length, liste: r3.liste.length }));
+    // Q4 L'ORDRE : une moitié SANS commande, arrivée plus tôt, ne prend pas le seul témoin encore montré à l'achat
+    // prouvé en attente (sinon l'achat serait compté une seconde fois, et la moitié perdue).
+    const inconnue = { source: 'vinted-commande', conv: 'c-2', lieu: LIEU, account: 'compte_x', emailAt: '2026-11-09T10:00:00Z', status: 'available' };
+    const actif = { carrier: 'mondialrelay', suivi: '33334444', lieu: LIEU, account: 'compte_x', emailAt: '2026-11-09T09:00:00Z', status: 'available' };
+    const r4 = A.regrouperArrivees([inconnue, moitie], { commandeDe: (t) => (t === moitie ? cmdAttend : null), temoins: [actif, fini], sansIdentite: () => true, temoinActif: (w) => w === actif, attendEncore });
+    dit(r4.liste.length === 0 && r4.doutes.length === 1 && r4.doutes[0] === moitie && r4.probables.length === 1 && r4.probables[0].t === inconnue, 'Q4 l’achat prouvé en attente prend le témoin encore montré en premier (aucun colis compté deux fois)', JSON.stringify({ liste: r4.liste.length, doutes: r4.doutes.length, probables: r4.probables.length }));
   });
 
   console.log(`\n${ok} vert(s), ${ko} rouge(s)`);

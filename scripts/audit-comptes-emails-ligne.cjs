@@ -85,7 +85,7 @@ function chargeApp(noms) {
     dit(/emails = null/.test(carte) && /\{emails\}/.test(carte), 'E4 `CarteCompteLie` rend la ligne « E-mails »');
     const ecran = (/function VintedAccounts\([\s\S]*?\n\}\n/.exec(APP) || [''])[0];
     dit(/const etatEmails = useEtatEmailsComptes\(accounts\);/.test(ecran), 'E4 Comptes liés lit la MÊME règle que Notifications et Achats (`useEtatEmailsComptes`)');
-    dit(/emails=\{<LigneEmailsCompte ligne=\{emailsDe\(uid\)\} uid=\{uid\}[^>]*\/>\}/.test(ecran) && /ligneEmailsCompte\(etatEmails\.etat,/.test(ecran), 'E4 chaque carte Vinted porte SA ligne (par uid)');
+    dit(/emails=\{(?:<>[^\n]*?)?<LigneEmailsCompte ligne=\{emailsDe\(uid\)\} uid=\{uid\}[^>]*\/>(?:<\/>)?\}/.test(ecran) && /ligneEmailsCompte\(etatEmails\.etat,/.test(ecran), 'E4 chaque carte Vinted porte SA ligne (par uid)');
     const ligne = (/function LigneEmailsCompte\([\s\S]*?\n\}/.exec(APP) || [''])[0];
     // (6 nov., onglets C) Le geste ouvre E-mails → Relier ma boîte sur le pas-à-pas DE CE compte (`relierBoiteDe`).
     const relierDe = (/function relierBoiteDe\([^\n]*\n/.exec(APP) || [''])[0];

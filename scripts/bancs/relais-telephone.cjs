@@ -96,7 +96,7 @@ async function rendre(b, { tel = true, relais = null, plan = () => [], tab = 'ca
   }, SESSION);
   const cmds = {}, journal = { posts: [], patchs: [], lecturesRelais: 0 };
   const sert = (route, status, d) => route.fulfill({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/auth/v1/**', (r) => sert(r, 200, { access_token: 'jeton-de-banc', refresh_token: 'r', expires_in: 3600, user: SESSION.user }));
   await pg.route('**/rest/v1/**', (route) => {
     const req = route.request(), m = req.method();

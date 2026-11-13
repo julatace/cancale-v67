@@ -69,6 +69,9 @@ let code = [m(/const PAS_L_ETIQUETTE = \/[^\n]*\n/, 'PAS_L_ETIQUETTE'), m(/const
   ligne('MM_PT'), ligne('ETIQ_TH'), ligne('TAILLES_ETIQUETTE'), ligne('TH_MARGE'),
   bloc('relevePage'), bloc('_couperSelon'), bloc('estTailleEtiquette'), bloc('avecSens'), bloc('zoneEtiquette'),
   bloc('placementThermique'), bloc('poserEtiquettesThermiques'), bloc('poserBordereau')].join('\n');
+// (11 nov., lot thermique) Le papier choisi, la découpe par l'encre et les règles de
+// src/impression/ : le morceau d'App.jsx entier et le module, quand ils existent.
+{ const CI = require('./_code-impression.cjs'); const imp = CI.impression(APP); if (imp) code = CI.regles() + '\n' + imp; }
 // Réaffaiblissements (chacun doit faire virer au rouge au moins un contrôle).
 const muter = (s, a, b, quoi) => { if (!s.includes(a)) { dit(false, `mutation « ${quoi} » applicable`, 'motif absent'); return s; } return s.split(a).join(b); };
 if (MUT === 'marges0') tampon = muter(tampon, 'mx: 14, my: 10', 'mx: 0, my: 0', MUT);
@@ -219,7 +222,8 @@ window.__libreImprimer = async (b64, thermique, numero, titre, o) => {
     const pg = await d.getPage(1), v = pg.getViewport({ scale: 1 });
     const items = (await pg.getTextContent()).items.map(it => { const m = pdfjsLib.Util.transform(v.transform, it.transform); return { s: it.str, x: m[4], y: m[5], l: it.width, t: Math.hypot(m[2], m[3]), droit: m[0] > 0 && Math.abs(m[1]) < 0.01 * m[0] && Math.abs(m[2]) < 0.01 * m[0] && m[3] < 0 }; });
     // La largeur du cartouche de la variante, pour l'échelle attendue.
-    const dd = await PL.PDFDocument.create(), c = __libre.cartoucheLibre(await dd.embedFont(PL.StandardFonts.HelveticaBold), await dd.embedFont(PL.StandardFonts.Helvetica), numero, titre, (o.choix && o.choix.v) || 0);
+    // (11 nov., lot thermique) En thermique le cartouche porte le N° seul (réglage par défaut).
+    const dd = await PL.PDFDocument.create(), c = __libre.cartoucheLibre(await dd.embedFont(PL.StandardFonts.HelveticaBold), await dd.embedFont(PL.StandardFonts.Helvetica), numero, thermique ? '' : titre, (o.choix && o.choix.v) || 0);
     return { b64: btoa(s), r0, pages: d.numPages, W: v.width, H: v.height, items, cw: c.w, ch: c.h, intact };
   } finally { await d.destroy(); }
 };
@@ -347,7 +351,11 @@ async function juger(pg, nom, b64, thermique, attendu) {
   const tout = z.pages.map((p) => p.texte).join(' ');
   const items = z.pages.flatMap((p) => p.items);
   dit(/N°\s*B125/.test(tout), `${t} : « N° B125 » est dans le PDF`, issue);
-  dit(/Nike Air Max 1/.test(tout), `${t} : le titre est dans le PDF`);
+  // (11 nov., lot thermique) En thermique, le tampon écrit le N° SEUL par défaut (`tamponTh`) :
+  // l'étiquette se colle sur le colis, le titre serait lu par le transporteur. La fiche
+  // (page 2, à mettre DANS le colis) peut, elle, porter le titre.
+  if (thermique) dit(!/Nike Air Max 1/.test(z.pages[0].texte), `${t} : le titre n'est PAS sur l'étiquette (N° seul par défaut en thermique)`);
+  else dit(/Nike Air Max 1/.test(tout), `${t} : le titre est dans le PDF`);
   const num = items.filter((x) => /B125/.test(x.s));
   dit(num.length > 0 && num.every((x) => x.droit), `${t} : le N° se lit à l'endroit`);
   if (attendu) dit(issue === attendu, `${t} : issue attendue « ${attendu} »`, `obtenu « ${issue} »`);
@@ -375,16 +383,21 @@ async function juger(pg, nom, b64, thermique, attendu) {
     if (att === true) dit(men.length === 1, `${t} : la mention « Créé par vrm.center » est posée (place sûre)`, `${men.length} mention(s)`);
     if (att === false) dit(men.length === 0, `${t} : pas de place sûre ⇒ aucune mention`, `${men.length} mention(s)`);
     dit(men.length <= 1 && men.every((m) => m.page === 0 && issue === 'blanc'), `${t} : la mention n'existe qu'en zone libre, page 1, une fois`, men.map((m) => `p${m.page + 1}`).join(' ') || 'aucune');
-    dit(men.every((m) => !(Math.abs(m.pw - 283.46) < 2 && Math.abs(m.ph - 425.2) < 2)), `${t} : jamais de mention sur une page-étiquette 100×150`);
+    // (11 nov., lot thermique) Sur une page-étiquette thermique, la mention n'est permise que dans
+    // le blanc AUTOUR de l'étiquette posée (contrôle 3 : jamais sur l'encre ni une zone gardée),
+    // en noir fin 5,5 pt ; en A4, jamais sur une page-étiquette 100×150.
+    if (!thermique) dit(men.every((m) => !(Math.abs(m.pw - 283.46) < 2 && Math.abs(m.ph - 425.2) < 2)), `${t} : jamais de mention sur une page-étiquette 100×150`);
     for (const m of men) {
-      dit(m.t >= 6 && m.t <= 7 && m.droit, `${t} : mention en tout petit (6–7 pt), à l'endroit`, `${m.t.toFixed(2)} pt`);
+      if (thermique) dit(m.t >= 5 && m.t <= 6 && m.droit, `${t} : mention en tout petit (5–6 pt, noir fin), à l'endroit`, `${m.t.toFixed(2)} pt`);
+      else dit(m.t >= 6 && m.t <= 7 && m.droit, `${t} : mention en tout petit (6–7 pt), à l'endroit`, `${m.t.toFixed(2)} pt`);
       const boite = { x: m.x, y: m.y - m.t, w: m.l, h: m.t * 1.25 };
       const nn = items.filter((x) => /B125|Nike Air Max 1/.test(x.s) && z.pages[0].items.includes(x));
       const loin = nn.every((x) => { const dx = Math.max(0, x.x - (boite.x + boite.w), boite.x - (x.x + x.l)), dy = Math.max(0, (x.y - x.t) - (boite.y + boite.h), boite.y - x.y); return Math.hypot(dx, dy) >= 20 * 72 / 25.4; });
       dit(nn.length > 0 && loin, `${t} : mention PAS à côté du N°/titre (≥ 20 mm)`, `mention à (${m.x.toFixed(0)}, ${m.y.toFixed(0)})`);
       const e = !thermique && ETIQUETTE_AFFICHEE[nom];
       if (e) dit(!(boite.x < e.x + e.w + 3 && boite.x + boite.w > e.x - 3 && boite.y < e.y + e.h + 3 && boite.y + boite.h > e.y - 3), `${t} : mention hors de l'étiquette à découper`, `mention (${boite.x.toFixed(0)}, ${boite.y.toFixed(0)}) · étiquette (${e.x}, ${e.y.toFixed(0)}, ${e.w}×${e.h})`);
-      dit(boite.x >= 14 && boite.y >= 14 && boite.x + boite.w <= m.pw - 14 && boite.y + boite.h <= m.ph - 14, `${t} : mention hors de la marge non imprimable (≥ 5 mm du bord)`);
+      const bord = thermique ? 7 : 14;   // thermique : la marge du papier (2,5 mm) ; A4 : 5 mm
+      dit(boite.x >= bord && boite.y >= bord && boite.x + boite.w <= m.pw - bord && boite.y + boite.h <= m.ph - bord, `${t} : mention hors de la marge non imprimable (≥ ${thermique ? '2,5' : '5'} mm du bord)`);
     }
   }
   if (thermique) {

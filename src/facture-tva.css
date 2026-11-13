@@ -27,3 +27,25 @@
 .vrm-fp-anglais span { display: grid; gap: 2px; }
 .vrm-fp-anglais b { font-size: 15px; font-weight: 600; color: var(--vrm-ink, #1d1d1f); }
 .vrm-fp-anglais small { font-size: 13px; color: var(--vrm-muted, #6e6e73); }
+
+/* ── (11 nov., lot tva-marge) « TVA sur marge » : la déclaration d'une période.
+   Même widget que le seuil ; ambre seulement pour les ventes à compléter (§7). */
+.vrm-tvm { display: grid; gap: 10px; padding: 16px 18px; border-radius: 24px; background: var(--vrm-surface, #fff); border: 1px solid var(--vrm-line, #e5e5ea); color: var(--vrm-ink, #1d1d1f); min-width: 0; }
+.vrm-tvm-tete { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.vrm-tvm-titre { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+.vrm-tvm-periode { display: flex; align-items: center; gap: 4px; }
+.vrm-tvm-fleche { min-width: 44px; min-height: 44px; font-size: 20px; line-height: 1; }
+.vrm-tvm-libelle { font-size: 15px; font-weight: 600; text-transform: capitalize; min-width: 0; }
+.vrm-tvm-chiffres { display: flex; gap: 24px; flex-wrap: wrap; align-items: baseline; }
+.vrm-tvm-chiffres > div { display: grid; gap: 2px; min-width: 0; }
+.vrm-tvm-chiffres small { font-size: 12px; color: var(--vrm-muted, #6e6e73); }
+.vrm-tvm-chiffres b { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.vrm-tvm-chiffres span { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.vrm-tvm-muet { margin: 0; font-size: 13px; line-height: 1.45; color: var(--vrm-muted, #6e6e73); }
+.vrm-tvm-manque { display: grid; gap: 6px; padding: 12px 14px; border-radius: 16px; background: var(--vrm-warn-soft, #fff4e5); border: 1px solid color-mix(in srgb, var(--vrm-warn, #b25000) 35%, transparent); min-width: 0; }
+.vrm-tvm-manque b { font-size: 15px; color: var(--vrm-warn, #b25000); }
+.vrm-tvm-manque ul { margin: 0; padding-left: 18px; display: grid; gap: 2px; }
+.vrm-tvm-manque li { font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
+.vrm-tvm-porte { justify-self: start; min-height: 44px; }
+.vrm-tvm-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.vrm-tvm-actions .vrm-b { min-height: 44px; }

@@ -272,4 +272,14 @@ export default {
   "stats.texte9": "· von",
   "stats.stock": " · {stock} im Bestand",
   "stats.prixMedian": "Medianpreis",
+  // ── ecrans/Stats.jsx
+  "stats.ventes": { one: "{nomComplet} — {n} Verkauf", other: "{nomComplet} — {n} Verkäufe" },
+  "stats.ventes2": { one: " bei {n} von {x} Verkäufen", other: "bei {n} von {x} Verkäufen" },
+  "stats.ventesFinaliseesPrix": { one: "{n} abgeschlossener Verkauf mit ungelesenem Preis: nicht in diesem Betrag.", other: "{n} abgeschlossene Verkäufe mit ungelesenem Preis: nicht in diesem Betrag." },
+  "stats.ventes3": { one: "{x} · {n} Verkauf", other: "{x} · {n} Verkäufe" },
+  "stats.ventes5": { one: "Verkauf", other: "Verkäufe" },
+  "stats.negatifs": { one: " · {n} negativ", other: "· {n} negativ" },
+  "stats.neutres": { one: " · {n} neutral", other: "· {n} neutral" },
+  "stats.periodeComptesSelectionnes2": "Im Zeitraum, ausgewählte Konten · nur Konten mit mindestens einem Verkauf · Gewinn: abgeschlossene Verkäufe mit bekanntem Einkaufspreis · Verkaufsdauer: Median, nur Vinted · Quote: verkauft ÷ (verkauft + heute online), nur Vinted · Warenkorb: ab {MIN_DONNEES} Verkäufen.",
+  "stats.nonComptees": { one: " · {n} nicht gezählt", other: "· {n} nicht gezählt" },
 };

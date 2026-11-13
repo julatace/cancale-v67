@@ -28,7 +28,7 @@ console.log('OK : zone libre et marges respectées, gris clair libre, bruit isol
 // (11 nov.) LA MENTION « Créé par VRM » : la même recherche, partie du coin
 // bas-droit, hors de l'encre + marges, des zones interdites et d'une bordure.
 assert.ok(placeMentionVrm&&MENTION,'placeMentionVrm existe');
-assert.equal(MENTION.texte,'Créé par VRM');assert.ok(MENTION.taille>=6&&MENTION.taille<=7,'6–7 pt');
+assert.equal(MENTION.texte,'Créé par vrm.center');   // (11 nov.) le texte retenu (Quoi de neuf « cree-par-vrm »)assert.ok(MENTION.taille>=6&&MENTION.taille<=7,'6–7 pt');
 {
  const W2=600,H2=800,page=new Uint8ClampedArray(W2*H2*4).fill(255),bw=40,bh=9;
  const encre=(x0,y0,x1,y1)=>{for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){const i=(y*W2+x)*4;page[i]=page[i+1]=page[i+2]=0;}};

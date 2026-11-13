@@ -1,5 +1,6 @@
 // Montants en centimes, quantités entières, aucun appel à une plateforme.
 import {atelierDe,etapesProposees,ID_PAIRE} from './atelier.js';
+import { motsVendeur } from '../profilVendeur.js';
 export const VIDE = () => ({version:1,revision:0,missions:[],reservations:[],lots:[],consommables:[],veilles:[],receptions:[],dossiers:[],journal:[],commandes:[]});
 export class Refus extends Error { constructor(message,status=400){super(message);this.status=status;} }
 const exige=(v,m)=>{if(!v)throw new Refus(m);};
@@ -43,6 +44,18 @@ export function veillesDuFil(veilles){
  actives.sort((a,b)=>String(b.cree||'').localeCompare(String(a.cree||'')));
  return {fil:actives.slice(0,MAX_VEILLES_ACTIVES),horsFil:Math.max(0,actives.length-MAX_VEILLES_ACTIVES)};
 }
+// Les critères qu'une recherche enregistrée envoie à eBay — UNE forme pour le fil
+// (src/ebayRecherche.jsx) et pour les alertes du serveur (api/_lib/ebay-alertes.js).
+export const criteresDeVeille=(v)=>({
+ mots:v.mots,exclus:v.exclus||'',pointure:v.pointure||'',minimum:v.minimum??null,maximum:v.maximum??null,
+ etat:v.etatArticle||'tous',pays:v.pays||'tous',categorie:v.categorie||'',achatImmediat:v.achatImmediat!==false,livraisonFR:v.livraisonFR!==false,
+});
+// (11 nov., lot alertes-ebay — validé par Julien, eBay SEULEMENT) Les ALERTES :
+// une recherche active dans le fil, allumée par SON clic (`veille.alerte`), que
+// le SERVEUR relit sans l'app ouverte. Jamais un achat : une notification et une
+// liste dans eBay → Achats.
+export const SITES_REVENTE=['vinted','leboncoin','ebay','vestiaire'];
+export function veillesEnAlerte(veilles){return veillesDuFil(veilles).fil.filter(v=>v&&v.alerte===true);}
 export function criteresVeille(p){
  const minimum=p.minimum===null||p.minimum===undefined?null:entier(p.minimum),maximum=entier(p.maximum,1);
  exige(minimum===null||minimum<=maximum,'Le minimum dépasse le budget.');
@@ -150,6 +163,17 @@ export function appliquer(source,commande,{acteur,maintenant,equipe=[],membre=nu
   exige((x.evenements||[]).length<100,'Historique de cette recherche plein.');
   (x.evenements??=[]).push({...commun,nature:archiver?'archivage':'restauration'});x.etat=archiver?'archivee':'preparee';break;
  }
+ case 'veille.alerte':{
+  // Allumer ou éteindre l'alerte d'une recherche, et le prix de revente qu'IL indique
+  // (facultatif : sans lui, l'écran prend la médiane de SES ventes du modèle si elle est connue).
+  const x=trouve(d.veilles,p.cible);exige(typeof p.alerte==='boolean','Choix invalide.');
+  if(p.alerte)exige(x.etat==='preparee','Restaure cette recherche avant d’allumer son alerte.');
+  exige((x.evenements||[]).length<100,'Historique de cette recherche plein.');
+  const revente=p.revente===null||p.revente===undefined||p.revente===''?null:entier(p.revente,1,100000000);
+  const site=choix(p.site||'vinted',SITES_REVENTE);
+  (x.evenements??=[]).push({...commun,nature:p.alerte?'alerte':'alerte-arretee'});
+  x.alerte=p.alerte;x.revente=revente;x.reventeSite=site;break;
+ }
  case 'dossier.creer':{
   d.dossiers??=[];ajoute(d.dossiers,{...commun,reference:texte(p.reference),titre:texte(p.titre),nature:choix(p.nature,['retour','litige','manquant','autre']),echeance:p.echeance?date(p.echeance):null,note:texte(p.note||'',1500,true),etat:'ouvert',evenements:[]});break;
  }
@@ -172,14 +196,14 @@ export function appliquer(source,commande,{acteur,maintenant,equipe=[],membre=nu
  case 'atelier.etapes':{
   const a=atelierDe(d),r=etapesProposees(p.etapes,a.etapes,commande.id);exige(!r.erreur,r.erreur);
   const gardes=new Set(r.etapes.map(e=>e.id)),perdue=a.etapes.find(e=>!gardes.has(e.id)&&a.paires.some(x=>x.etape===e.id));
-  exige(!perdue,`Des paires sont encore à « ${perdue&&perdue.nom} » : avance-les d’abord.`);
+  exige(!perdue,`Des ${motsVendeur().noms} sont encore à « ${perdue&&perdue.nom} » : avance-les d’abord.`);
   d.atelier={etapes:r.etapes,paires:a.paires};break;
  }
  case 'atelier.placer':{
-  const a=atelierDe(d),id=texte(p.cible,60);exige(ID_PAIRE.test(id),'Paire non reconnue.');
+  const a=atelierDe(d),id=texte(p.cible,60);exige(ID_PAIRE.test(id),`${motsVendeur().Nom} non reconnu${motsVendeur().e}.`);
   const etape=texte(p.etape,80);exige(a.etapes.some(e=>e.id===etape),'Étape inconnue : actualise.');
   const x=a.paires.find(y=>y.id===id);
-  if(x){exige(x.etape!==etape,'Cette paire est déjà à cette étape.');(x.evenements??=[]).push({le:maintenant,auteur:acteur,de:x.etape,vers:etape});if(x.evenements.length>50)x.evenements.splice(0,x.evenements.length-50);x.etape=etape;x.depuis=maintenant;}
+  if(x){exige(x.etape!==etape,`${motsVendeur().Ce} est déjà à cette étape.`);(x.evenements??=[]).push({le:maintenant,auteur:acteur,de:x.etape,vers:etape});if(x.evenements.length>50)x.evenements.splice(0,x.evenements.length-50);x.etape=etape;x.depuis=maintenant;}
   else{const photo=texte(p.photo||'',500,true);exige(!photo||/^https:\/\//.test(photo),'Photo invalide.');ajoute(a.paires,{id,titre:texte(p.titre||'',160,true),photo,etape,depuis:maintenant,ajoute:maintenant,evenements:[{le:maintenant,auteur:acteur,de:null,vers:etape}]});}
   d.atelier={etapes:a.etapes,paires:a.paires};break;
  }

@@ -87,12 +87,14 @@ async function scenario(b, nom, vue, LIGNES) {
   const mainData = LIGNES.find((r) => r.id === 'main').data;
   await pg.addInitScript((m) => {
     try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_visite_vue', 'true');
+      // (11 nov., arbitrage c) Le N°21 est rangé : Garage · Étagère du fond (le plan du Stock, sur l'appareil).
+      localStorage.setItem('vrm_room_plan', JSON.stringify({ rooms: [{ id: 'r1', name: 'Garage', room: { w: 8, h: 6, wallH: 3 }, items: [{ id: 'm1', type: 'metal', name: 'Étagère du fond', x: 1, y: 0, w: 1.2, h: 0.5, rows: 5, cols: 2, h3d: 1.25, slots: { '4_0': ['21'] } }] }], active: 'r1' }));
       if (!sessionStorage.getItem('banc_init')) { sessionStorage.setItem('banc_init', '1'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(m.vinted_annonce_numeros)); localStorage.setItem('vinted_used_numeros', JSON.stringify(m.vinted_used_numeros)); } } catch (_) {}
     window.__pdfs = [];
     const o = URL.createObjectURL.bind(URL);
     URL.createObjectURL = (blob) => { try { if (blob && blob.type === 'application/pdf') window.__pdfs.push(blob); } catch (_) {} return o(blob); };
   }, mainData);
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**://cdn.jsdelivr.net/npm/pdfjs-dist@*/**', (r) => {
     const n = path.basename(new URL(r.request().url()).pathname);
     const f = path.join(PDFJS, 'build', n.replace(/\.js$/, '.mjs'));
@@ -124,7 +126,9 @@ async function scenario(b, nom, vue, LIGNES) {
   await srvPret;
   await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
   await pg.waitForSelector('button[data-lot-ouvrir="1"]', { timeout: 20000 }).catch(() => {});
-  await pg.waitForFunction(() => document.querySelectorAll('[data-groupe-transp]').length >= 3, null, { timeout: 15000 }).catch(() => {});
+  // (11 nov., lot suivi-commandes) L'écran n'a plus de groupes par transporteur (9 nov., lot AJ : le plus récent en
+  // haut, le transporteur en pastille) : on attend les cartes.
+  await pg.waitForFunction(() => document.querySelectorAll('[data-bord-card][data-tx-colis], [data-vc-colis]').length >= 6, null, { timeout: 15000 }).catch(() => {});
   // Les N° arrivent avec les transactions (identité tx → annonce → fiche) : on attend qu'ils soient écrits.
   // (Et le N° de la vente Vestiaire, donné à son passage : un N° qui change entre l'aperçu et l'impression
   // ARRÊTE le lot — « Un article, son numéro ou son état a changé », le garde-fou `verifierContexte`.)
@@ -138,28 +142,28 @@ async function scenario(b, nom, vue, LIGNES) {
   const vis = btn ? await btn.isVisible() : false;
   dit(vis, `${nom} : A « Tout imprimer » est VISIBLE dans À envoyer`);
   if (!vis) { await ctx.close(); return; }
-  // L'ordre des groupes de l'écran, et les colis de chaque groupe.
-  const ecran = await pg.evaluate(() => {
-    const out = []; let g = null;
-    for (const el of document.querySelectorAll('[data-groupe-transp], [data-bord-card][data-tx-colis], [data-vc-colis]')) {
-      if (el.hasAttribute('data-groupe-transp')) { g = el.getAttribute('data-groupe-transp'); if (!out.includes(g)) out.push(g); }
-    }
-    return out;
-  });
+  // (11 nov., lot suivi-commandes) L'ORDRE DE L'ÉCRAN (décision du 9 nov., lot AJ : la vente la plus récente en haut,
+  // tous transporteurs mélangés ; « Tout imprimer » garde ses groupes par transporteur, CHACUN dans cet ordre).
+  const ecran = await pg.evaluate(() => [...document.querySelectorAll('[data-bord-card][data-tx-colis], [data-vc-colis]')]
+    .map((el) => (el.hasAttribute('data-vc-colis') ? 'vc:' + el.getAttribute('data-vc-colis') : el.getAttribute('data-tx-colis')))
+    .filter((k, i, a) => k && a.indexOf(k) === i));
   await btn.click();
   await pg.waitForSelector('[data-lot-ligne]', { timeout: 8000 }).catch(() => {});
   const ap = await pg.evaluate(() => [...document.querySelectorAll('[data-lot-ligne]')].map((e) => ({ cle: e.getAttribute('data-lot-ligne'), site: e.getAttribute('data-lot-site'), num: e.getAttribute('data-lot-num'), tr: e.getAttribute('data-lot-transp'), coche: e.getAttribute('data-coche') === '1' })));
   const grAp = ap.map((x) => x.tr).filter((x, i, a) => a.indexOf(x) === i);
+  // (11 nov., arbitrage c) L'emplacement de chaque paire, en petit sous sa ligne : lu par SON N° (jamais deviné).
+  const emp = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-lot-ligne]')].map((e) => { const p = e.querySelector('[data-lot-emplacement]'); return [e.getAttribute('data-lot-ligne'), p ? p.getAttribute('data-lot-emplacement') : null]; })));
+  dit(/Garage/.test(emp['9201'] || '') && /Étagère du fond/.test(emp['9201'] || '') && emp['9202'] === null, `${nom} : C l'emplacement est sous la paire (N°21 : Garage · Étagère du fond) ; dit seulement quand il est connu (N°22 : rien)`, JSON.stringify(emp));
   dit(ap.length === 6 && ap.some((x) => x.site === 'vestiaire'), `${nom} : B l'aperçu porte les 6 bordereaux, Vestiaire compris`, JSON.stringify(ap.map((x) => x.cle + ':' + x.site)));
-  // (11 nov., webkit-fiable) Depuis le lot AJ (« Colis À envoyer : une liste, transporteur en
-  // pastilles »), l'écran n'a PLUS de groupes par transporteur : l'aperçu regroupe seul (D le
-  // vérifie : chaque transporteur d'un seul tenant, l'ordre du PDF = celui de l'aperçu). S'il en
-  // revient, leur ordre doit être celui de l'aperçu, comme avant.
-  dit(grAp.length === 3 && (ecran.length === 0 || JSON.stringify(grAp) === JSON.stringify(ecran.filter((g) => grAp.includes(g)))), `${nom} : B l'aperçu regroupe les 3 transporteurs (et suit les groupes de l'écran s'il en a)`, JSON.stringify({ apercu: grAp, ecran }));
+  // (11 nov., lot suivi-commandes, gardé à l'intégration) L'aperçu : trois groupes par transporteur, CHACUN dans l'ordre
+  // de l'écran (les clés de colis lues ci-dessus ; la version « groupes de l'écran » comparait des transporteurs à des clés).
+  const dansOrdre = grAp.every((g) => { const l = ap.filter((x) => x.tr === g).map((x) => ecran.indexOf(x.cle)); return l.every((v) => v >= 0) && l.every((v, i) => i === 0 || v > l[i - 1]); });
+  dit(grAp.length === 3 && dansOrdre, `${nom} : B l'aperçu : trois groupes par transporteur, chacun dans l'ordre de l'écran (le plus récent d'abord)`, JSON.stringify({ apercu: ap.map((x) => x.tr + ':' + x.cle), ecran }));
   const contigu = ap.every((x, i) => i === 0 || x.tr === ap[i - 1].tr || !ap.slice(0, i - 1).some((y) => y.tr === x.tr));
   dit(contigu, `${nom} : B chaque transporteur d'un seul tenant`, JSON.stringify(ap.map((x) => x.tr)));
   if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `tout-imprimer-${nom}-apercu.png`) });
-  // Tout cocher, puis imprimer. (11 nov.) Plus de case « Contrôlé » : la sélection seule.
+  // Tout cocher et contrôler, puis imprimer.
+  // (11 nov., lot DJ3) Une case par colis (la case « Contrôlé » est remplacée par l'aperçu A4 de la feuille).
   for (const x of ap) { if (!x.coche) await pg.locator(`[data-lot-ligne="${x.cle}"] input`).first().check(); }
   await pg.click('button[data-lot-imprimer]');
   // C : le N° à vérifier DEMANDE.

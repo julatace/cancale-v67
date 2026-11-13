@@ -264,7 +264,7 @@ async function vue(b, nom, vp, sombre) {
   });
   // ════════════ ACHATS (Colis → À retirer) ════════════
   await essaie(`${nom} achats`, async () => {
-    await pg.locator('[data-colis-onglet-choix="retirer"]').first().click();
+    await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
     await pg.waitForTimeout(1500);
     dit((await pg.getAttribute('[data-colis-scanner]', 'data-scan-mode-bouton')) === 'retrait', `${nom} : sur « À retirer », Scanner lit un colis à retirer`);
     await pg.click('[data-colis-scanner]');

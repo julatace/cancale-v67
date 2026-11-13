@@ -19,6 +19,13 @@ const montant = (x) => {
   const f = parseFloat(String(v).replace(',', '.'));
   return isFinite(f) ? f : null;
 };
+// (12 nov., revue de robustesse, point 50) Un solde dans une AUTRE devise que l'euro
+// (compte vinted.co.uk : GBP) n'est jamais additionné aux euros, ni converti : le
+// compte est écarté du total et NOMMÉ (CLAUDE.md §3 International).
+export const deviseAutre = (x) => {
+  const c = x && typeof x === 'object' ? (x.currency_code || x.currency) : null;
+  return c && String(c).toUpperCase() !== 'EUR' ? String(c).toUpperCase() : null;
+};
 const uidDe = (id, re) => { const m = re.exec(String(id || '')); return m ? m[1] : ''; };
 
 // billing : [{ id, cap, main, escrow, balance, pending, lignes }] (projection) | null (pas su) | undefined (en cours)
@@ -34,21 +41,23 @@ export function porteMonnaieParCompte({ billing, releves, comptes = [], ecarte =
     const attente = montant(r.escrow) != null ? montant(r.escrow) : montant(r.pending);
     if (dispo == null && attente == null) continue;         // pas un porte-monnaie (« pas lu »)
     const at = Date.parse(r.cap || '') || null;
-    parUid[uid] = { dispo, attente, at, lignesMois: Array.isArray(r.lignes) ? r.lignes : [] };
+    const devise = deviseAutre(r.main) || deviseAutre(r.balance) || deviseAutre(r.escrow) || deviseAutre(r.pending);
+    parUid[uid] = devise ? { dispo: null, attente: null, at, devise, lignesMois: [] } : { dispo, attente, at, lignesMois: Array.isArray(r.lignes) ? r.lignes : [] };
   }
   const lignes = comptes.map((c) => {
     const uid = String(c.uid);
     const p = parUid[uid];
     const exclu = !!ecarte(uid);
     if (!p) return { uid, nom: c.nom || uid, dispo: null, attente: null, at: null, vieux: false, jamais: true, exclu };
-    return { uid, nom: c.nom || uid, dispo: p.dispo, attente: p.attente, at: p.at, vieux: !(p.at && maintenant - p.at <= PM_FRAIS_MS), jamais: false, exclu };
+    return { uid, nom: c.nom || uid, dispo: p.dispo, attente: p.attente, at: p.at, vieux: !(p.at && maintenant - p.at <= PM_FRAIS_MS), jamais: false, exclu, ...(p.devise ? { devise: p.devise } : {}) };
   });
-  const dedans = lignes.filter((l) => !l.exclu);
+  const dedans = lignes.filter((l) => !l.exclu && !l.devise);
   const lus = dedans.filter((l) => !l.jamais);
   const somme = (k) => (lus.some((l) => l[k] != null) ? Math.round(lus.reduce((s, l) => s + (l[k] || 0), 0) * 100) / 100 : null);
   const total = { dispo: somme('dispo'), attente: somme('attente'), lus: lus.length, sur: dedans.length,
     manque: dedans.filter((l) => l.jamais).map((l) => l.nom), vieux: lus.filter((l) => l.vieux).map((l) => l.nom),
-    exclus: lignes.filter((l) => l.exclu).map((l) => l.nom) };
+    exclus: lignes.filter((l) => l.exclu).map((l) => l.nom),
+    autreDevise: lignes.filter((l) => !l.exclu && l.devise).map((l) => `${l.nom} (${l.devise})`) };
   // Les virements : par compte, dédoublonnés par identifiant de ligne.
   const nomDe = Object.fromEntries(comptes.map((c) => [String(c.uid), c.nom || String(c.uid)]));
   const vus = new Set(), virements = [];
@@ -56,7 +65,7 @@ export function porteMonnaieParCompte({ billing, releves, comptes = [], ecarte =
     if (!l || typeof l !== 'object' || !(uid in nomDe)) return;
     const estVirement = quoi === 'releve' ? l.quoi === 'payout' : l.entity_type === 'payout';
     if (!estVirement) return;
-    const m = quoi === 'releve' ? (typeof l.montant === 'number' ? l.montant : null) : montant(l.amount);
+    const m = quoi === 'releve' ? (typeof l.montant === 'number' ? l.montant : null) : (deviseAutre(l.amount) ? null : montant(l.amount));
     const d = Date.parse(l.date || '');
     if (m == null || !isFinite(d)) return;
     const k = uid + '|' + (l.id != null ? String(l.id) : d + '|' + m);

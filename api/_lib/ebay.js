@@ -4,6 +4,7 @@ import { MARCHES, siteDeEbay } from './ebay-marches.js';
 // Base cloisonnée : sans propriétaire ni cible (owner,id), l'écriture est refusée.
 // La base sait-elle séparer les vendeurs ? (trois états, voir session.js)
 import { baseCloisonnee } from './session.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 // api/_lib/ebay.js — la logique OAuth eBay, en UN seul endroit (§11).
 // Utilisée par api/ebay.js (l'app pilote, et `?mode=callback`, le retour de
 // consentement d'eBay). Une seule règle : les clés vivent dans les variables
@@ -67,7 +68,7 @@ function authUrl(state, opts) {
 
 // Jeton applicatif (client_credentials) : sert à TESTER que les clés marchent.
 async function appToken() {
-  const r = await fetch(EBAY_TOKEN_URL, {
+  const r = await fetchAvecDelai(EBAY_TOKEN_URL, {
     method: 'POST',
     headers: { Authorization: basicAuth(), 'content-type': 'application/x-www-form-urlencoded' },
     body: `grant_type=client_credentials&scope=${encodeURIComponent('https://api.ebay.com/oauth/api_scope')}`,
@@ -87,7 +88,7 @@ function oublierJetonApplication() { _jetonApp = null; }
 async function jetonApplication(maintenant = Date.now()) {
   if (_jetonApp && _jetonApp.expire > maintenant + 5 * 60 * 1000) return _jetonApp.jeton;
   try {
-    const r = await fetch(EBAY_TOKEN_URL, {
+    const r = await fetchAvecDelai(EBAY_TOKEN_URL, {
       method: 'POST',
       headers: { Authorization: basicAuth(), 'content-type': 'application/x-www-form-urlencoded' },
       body: `grant_type=client_credentials&scope=${encodeURIComponent('https://api.ebay.com/oauth/api_scope')}`,
@@ -131,7 +132,7 @@ async function ecrireLignes(rows, owner) {
   const p = await portee(owner);
   if (!p) return false;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${p.conflit}`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${p.conflit}`, {
       method: 'POST',
       headers: { ...sbCle(sbKey()), 'content-type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify(p.lignes(rows)),
@@ -176,7 +177,7 @@ const pseudoPropre = (s) => String(s == null ? '' : s).replace(/&lt;|&gt;|&quot;
 async function identiteEbay(token) {
   if (!token) return null;
   try {
-    const r = await fetch('https://api.ebay.com/ws/api.dll', {
+    const r = await fetchAvecDelai('https://api.ebay.com/ws/api.dll', {
       method: 'POST',
       headers: { 'X-EBAY-API-CALL-NAME': 'GetUser', 'X-EBAY-API-SITEID': '71', 'X-EBAY-API-COMPATIBILITY-LEVEL': '1149', 'X-EBAY-API-IAF-TOKEN': token, 'Content-Type': 'text/xml' },
       body: '<?xml version="1.0" encoding="utf-8"?><GetUserRequest xmlns="urn:ebay:apis:eBLBaseComponents"></GetUserRequest>',
@@ -269,7 +270,7 @@ async function storeRefresh(refresh, expiresInDays, owner, suffixe = '') {
 async function echangerCode(code) {
   if (!code) return { ok: false, status: 400, error: 'code manquant' };
   if (!ruName()) return { ok: false, status: 503, reason: 'no-runame', error: 'RuName non configuré (EBAY_RUNAME).' };
-  const r = await fetch(EBAY_TOKEN_URL, {
+  const r = await fetchAvecDelai(EBAY_TOKEN_URL, {
     method: 'POST',
     headers: { Authorization: basicAuth(), 'content-type': 'application/x-www-form-urlencoded' },
     body: `grant_type=authorization_code&code=${encodeURIComponent(code)}&redirect_uri=${encodeURIComponent(ruName())}`,
@@ -433,7 +434,9 @@ async function resoudreCompte(brut, owner) {
     const regP = await lireComptes(owner);
     if (regP === undefined) return { ok: true, compte: { ...PRINCIPAL, siteInconnu: true } };
     const p = (regP.comptes || []).find((e) => e.principal);
-    return { ok: true, compte: { ...PRINCIPAL, ...(p && p.site !== undefined ? { site: p.site } : {}) } };
+    // (11 nov., ebay-complet) Le TYPE (pro / particulier) tel qu'eBay l'a dit :
+    // la TVA et l'obligation d'accepter les retours en dépendent (jamais deviné).
+    return { ok: true, compte: { ...PRINCIPAL, ...(p && p.site !== undefined ? { site: p.site } : {}), ...(p && p.type ? { type: p.type } : {}) } };
   }
   if (!CLE_COMPTE.test(v)) return { ok: false, status: 400, body: { ok: false, reason: 'compte', error: 'Compte eBay mal désigné — rien n\'a été envoyé à eBay.' } };
   if (!(await baseCloisonnee())) return { ok: false, status: 404, body: { ok: false, reason: 'compte-inconnu', error: 'Un seul compte eBay tant que la base n\'est pas cloisonnée — rien n\'a été envoyé à eBay.' } };
@@ -442,7 +445,7 @@ async function resoudreCompte(brut, owner) {
   const e = reg.comptes.find((x) => x.cle === v);
   if (!e) return { ok: false, status: 404, body: { ok: false, reason: 'compte-inconnu', error: 'Ce compte eBay n\'est pas relié à ton compte VRM — rien n\'a été envoyé à eBay.' } };
   if (e.deconnecteLe) return { ok: false, status: 409, body: { ok: false, reason: 'compte-deconnecte', error: `Le compte eBay « ${e.pseudo || 'sans nom'} » est déconnecté — reconnecte-le d'abord. Rien n'a été envoyé à eBay.` } };
-  return { ok: true, compte: { cle: e.cle, pseudo: e.pseudo, principal: e.principal, suffixe: suffixeCompte(e), ...(e.site !== undefined ? { site: e.site } : {}) } };
+  return { ok: true, compte: { cle: e.cle, pseudo: e.pseudo, principal: e.principal, suffixe: suffixeCompte(e), ...(e.site !== undefined ? { site: e.site } : {}), ...(e.type ? { type: e.type } : {}) } };
 }
 
 // Déconnecter UN compte : ses jetons sont vidés, il est marqué déconnecté dans
@@ -475,13 +478,30 @@ async function lireRefresh(owner, suffixe = '') {
   if (!p) return undefined;
   if (suffixe && !/^_[0-9a-f]{16}$/.test(suffixe)) return undefined;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${TOKENS_ID}${suffixe}${p.filtre}&select=refresh_token:data->>refresh_token`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${TOKENS_ID}${suffixe}${p.filtre}&select=refresh_token:data->>refresh_token`, {
       headers: { ...sbCle(sbKey()) },
     });
     if (!r.ok) return undefined;
     const rows = await r.json();
     if (!Array.isArray(rows)) return undefined;
     return (rows[0] && rows[0].refresh_token) || '';
+  } catch (_) { return undefined; }
+}
+// (11 nov., ebay-complet) QUAND le jeton de renouvellement a été rangé, et pour
+// combien de jours eBay l'a donné — deux scalaires, jamais le jeton (§4.4).
+// `undefined` pas su · `null` aucune ligne · { savedAt, jours }.
+async function lireEtatJeton(owner, suffixe = '') {
+  if (!sbKey()) return undefined;
+  const p = await portee(owner);
+  if (!p) return undefined;
+  if (suffixe && !/^_[0-9a-f]{16}$/.test(suffixe)) return undefined;
+  try {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${TOKENS_ID}${suffixe}${p.filtre}&select=saved_at:data->>saved_at,jours:data->>refresh_expires_days`, { headers: { ...sbCle(sbKey()) } });
+    if (!r.ok) return undefined;
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return undefined;
+    if (!rows[0]) return null;
+    return { savedAt: Number(rows[0].saved_at) || null, jours: Number(rows[0].jours) || null };
   } catch (_) { return undefined; }
 }
 // Un compte est-il relié ? true / false / null (« pas su »).
@@ -535,7 +555,7 @@ async function accessToken(owner, suffixe = '', opts = {}) {
   // droit (comme `sell.finances`) que le jeton actuel n'a pas encore : eBay
   // répond `invalid_scope` et plus RIEN ne se lit. Le nouveau droit s'obtient
   // en se reconnectant (nouveau consentement), pas en le réclamant au refresh.
-  const r = await fetch(EBAY_TOKEN_URL, {
+  const r = await fetchAvecDelai(EBAY_TOKEN_URL, {
     method: 'POST',
     headers: { Authorization: basicAuth(), 'content-type': 'application/x-www-form-urlencoded' },
     body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refresh)}`,
@@ -566,7 +586,7 @@ async function lireReglageVendeur(cle, owner) {
   const p = await portee(owner);
   if (!p) return undefined;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main${p.filtre}&select=v:data->>${cle}`, { headers: { ...sbCle(sbKey()) } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main${p.filtre}&select=v:data->>${cle}`, { headers: { ...sbCle(sbKey()) } });
     if (!r.ok) return undefined;
     const rows = await r.json();
     if (!Array.isArray(rows)) return undefined;
@@ -579,7 +599,7 @@ async function lireDonnee(id, owner) {
   const p = await portee(owner);
   if (!p) return undefined;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${p.filtre}&select=data`, { headers: { ...sbCle(sbKey()) } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${p.filtre}&select=data`, { headers: { ...sbCle(sbKey()) } });
     if (!r.ok) return undefined;
     const rows = await r.json();
     if (!Array.isArray(rows)) return undefined;
@@ -595,7 +615,7 @@ async function lireResumeCommandes(id, owner) {
   if (!p) return undefined;
   const projection = 'rev:data->rev,capturedAt:data->capturedAt,generation:data->pagination->generation,nextOffset:data->pagination->nextOffset,complete:data->pagination->complete,lues:data->pagination->lues,total:data->pagination->total';
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${p.filtre}&select=${projection}`, { headers: { ...sbCle(sbKey()) } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${p.filtre}&select=${projection}`, { headers: { ...sbCle(sbKey()) } });
     if (!r.ok) return undefined;
     const rows = await r.json();
     if (!Array.isArray(rows)) return undefined;
@@ -626,15 +646,34 @@ async function lireResumeCommandes(id, owner) {
 // Trois issues, comme `storeData` + `lireDonnee` : true écrit · false écriture
 // ratée (ou toujours devancée) · null pas su (la LECTURE a échoué ⇒ rien
 // n'est écrit — repartir de vide effacerait la ligne).
+// ⚠️ (11 nov., H28 de la revue serveur) Les lignes eBay sont LOURDES
+//    (`ebay_orders`, `ebay_listings`) : devancé, on ne relit plus la ligne entière
+//    à chaque essai (jusqu'à 6 fois l'égress). On relit la VERSION seule
+//    (`data->>rev`, quelques octets) jusqu'à ce qu'elle ne bouge plus (l'autre
+//    écrivain a fini), puis la ligne entière UNE fois. Au plus `PLEINES_MAX`
+//    lectures entières par appel ; au-delà ⇒ false (toujours devancé), comme avant.
+const PLEINES_MAX = 3;
 async function modifierDonnee(id, owner, modifier, essais = 6) {
   if (!sbKey() || !/^[a-z0-9_]+$/i.test(String(id || ''))) return null;
   const p = await portee(owner);
   if (!p) return null;
   const json = { ...sbCle(sbKey()), 'content-type': 'application/json' };
-  for (let n = 0; n < essais; n++) {
+  // La version seule : null (ligne sans version ou absente) · texte · undefined (pas su).
+  const lireRev = async () => {
+    try {
+      const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${p.filtre}&select=rev:data->>rev`, { headers: { ...sbCle(sbKey()) } });
+      if (!r.ok) return undefined;
+      const rows = await r.json();
+      if (!Array.isArray(rows)) return undefined;
+      return rows[0] && rows[0].rev != null ? String(rows[0].rev) : null;
+    } catch (_) { return undefined; }
+  };
+  let pleines = 0;
+  for (let n = 0; n < essais && pleines < PLEINES_MAX; n++) {
+    pleines++;
     let rows;
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${p.filtre}&select=data`, { headers: { ...sbCle(sbKey()) } });
+      const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${p.filtre}&select=data`, { headers: { ...sbCle(sbKey()) } });
       if (!r.ok) return null;
       rows = await r.json();
     } catch (_) { return null; }
@@ -647,7 +686,7 @@ async function modifierDonnee(id, owner, modifier, essais = 6) {
     const data = { ...nouveau, rev: (Number.isSafeInteger(rev0) && rev0 >= 0 ? rev0 : 0) + 1 };
     try {
       if (!present) {
-        const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data`, {
+        const w = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data`, {
           method: 'POST', headers: { ...json, Prefer: 'return=minimal' }, body: JSON.stringify(p.lignes([{ id, data }])),
         });
         if (w.ok) return true;
@@ -655,7 +694,7 @@ async function modifierDonnee(id, owner, modifier, essais = 6) {
         return false;
       }
       const cond = rev0 == null ? 'data->>rev=is.null' : `data->>rev=eq.${encodeURIComponent(typeof rev0 === 'object' ? JSON.stringify(rev0) : String(rev0))}`;
-      const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${p.filtre}&${cond}&select=id`, {
+      const w = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${p.filtre}&${cond}&select=id`, {
         method: 'PATCH', headers: { ...json, Prefer: 'return=representation' }, body: JSON.stringify({ data }),
       });
       if (!w.ok) return false;
@@ -664,8 +703,14 @@ async function modifierDonnee(id, owner, modifier, essais = 6) {
       if (out.length >= 1) return true;
       // 0 ligne : un autre a écrit (ou supprimé) entre la lecture et l'écriture.
       // Une attente FIXE et courte (nos propres lectures, pas Vinted — §3 ne
-      // s'applique pas) laisse l'autre finir.
-      await new Promise((ok) => setTimeout(ok, 30 * (n + 1)));
+      // s'applique pas) laisse l'autre finir ; sa fin se voit à la VERSION seule.
+      let v = await lireRev();
+      for (let k = 0; k < 4 && v !== undefined; k++) {
+        await new Promise((ok) => setTimeout(ok, 30 * (k + 1)));
+        const v2 = await lireRev();
+        if (v2 === v) break;
+        v = v2;
+      }
     } catch (_) { return false; }
   }
   return false;
@@ -711,6 +756,6 @@ function seuilTropBas(accepte, prix) {
   return 2 * Math.round(accepte * 100) < Math.round(prix * 100);
 }
 
-export { oublierAcces, SCOPES, appId, certId, ruName, keysReady, canConsent, authUrl, appToken, jetonApplication, oublierJetonApplication, exchangeCode, hasRefresh, readRefresh, lireRefresh, accessToken, storeData, portee, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
+export { lireEtatJeton, oublierAcces, SCOPES, appId, certId, ruName, keysReady, canConsent, authUrl, appToken, jetonApplication, oublierJetonApplication, exchangeCode, hasRefresh, readRefresh, lireRefresh, accessToken, storeData, portee, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
   COMPTES_ID, CLE_COMPTE, suffixeCompte, cleCompteDe, identiteEbay, lireComptes, normaliserRegistre, modifierComptes, comptesActifs, rangerConnexion, apprendrePrincipal, apprendreTypes, resoudreCompte, deconnecterCompte,
   MONTANT_MAX, montantOk, valideRegleOffre, seuilTropBas };

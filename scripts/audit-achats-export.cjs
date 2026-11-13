@@ -97,8 +97,11 @@ const NM = (() => { try { return fs.realpathSync(path.join(R0, 'node_modules'));
   let REGM = null, PRM = null, EXM = null, V = null;
   try {
     fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"module"}');
-    fs.writeFileSync(path.join(dir, 'prixAchatPropose.js'), PRIX);
+    fs.writeFileSync(path.join(dir, 'prixAchatPropose.js'), PRIX); fs.copyFileSync(path.join(R0, 'src', 'modePaiement.js'), path.join(dir, 'modePaiement.js'));   // (11 nov.) importé par registres.js
+    fs.writeFileSync(path.join(dir, 'dateParis.js'), lire('src/dateParis.js'));
+    fs.writeFileSync(path.join(dir, 'sommeConnue.js'), lire('src/sommeConnue.js'));   // (11 nov.) importé par exportComptable.js   // (11 nov.) jour/mois de Paris, importé par registres.js
     fs.writeFileSync(path.join(dir, 'registres.js'), REG);
+    fs.writeFileSync(path.join(dir, 'profilVendeur.js'), lire('src/profilVendeur.js'));   // (11 nov., 5.355) importé par registres.js (« paire » / « article »)
     fs.writeFileSync(path.join(dir, 'exportComptable.js'), EXP);
     fs.writeFileSync(path.join(dir, 'factureAchat.js'), lire('src/factureAchat.js'));   // (11 nov.) importé par exportComptable.js (mentionFacture)
     fs.writeFileSync(path.join(dir, 'vestiaire-regle.js'), VC.replace(/from '\.\/([^']+)\.js'/g, (x, n) => `from '${path.join(R0, 'api', '_lib', n + '.js').replace(/\\/g, '/')}'`));

@@ -230,7 +230,8 @@ const V_COMMANDE = (titre, phrase, conv) => mail(FROM_V, `Commande mise à jour 
     dit(T.decisionNotif({ message: false }, 'message') === false && T.decisionNotif({}, 'message') === true && T.decisionNotif({ familles: { messages: true }, message: false }, 'message') === true, 'F4 sans famille posée, l’ancien réglage décide ; la famille posée l’emporte');
     const fams = new Set(Object.values(T.FAMILLE_DE));
     // (5 nov.) Sept types : la double vente a le sien, « Compta » devient « Rappels » (héritage de l’ancien réglage).
-    dit(['ventes', 'offres', 'messages', 'poster', 'arrives', 'doublevente', 'rappels', 'comptes'].every((f) => fams.has(f)) && T.FAMILLES.length === 8, 'F5 huit types : Ventes, Offres, Messages, Colis à poster, Codes de retrait, Double vente, Rappels, Nouveau compte relié');
+    // (11 nov., lot avis-negatif ; intégration g1 + alertes-ebay) Onze : « Vinted cache ou limite », « Avis négatif reçu », « Alertes d’achat eBay ».
+    dit(['ventes', 'offres', 'messages', 'poster', 'arrives', 'doublevente', 'rappels', 'comptes', 'moderation', 'avis', 'alertesebay'].every((f) => fams.has(f)) && T.FAMILLES.length === 11, 'F5 onze types : Ventes, Offres, Messages, Colis à poster, Codes de retrait, Double vente, Rappels, Nouveau compte relié, Vinted cache ou limite, Avis négatif reçu, Alertes d’achat eBay');
     dit(T.decisionNotif({ familles: { ventes: false } }, 'doublevente') === false && T.decisionNotif({ familles: { ventes: false, doublevente: true } }, 'doublevente') === true && T.decisionNotif({ familles: { compta: false } }, 'urssaf') === false && T.decisionNotif({ familles: { poster: false } }, 'soir') === false, 'F6 un type neuf hérite de l’ancien réglage tant qu’il n’est pas posé');
   });
 

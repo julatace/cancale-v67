@@ -130,7 +130,7 @@ const ouvrir = async (b, vp, sombre, tab) => {
     localStorage.setItem('vinted_sale_overrides', JSON.stringify({ '8004': { buyPrice: '45', numero: '23' }, '8005': { buyPrice: '30', numero: '61' }, '8003': { numero: '124' }, '8001': { numero: '99', buyPrice: '28' } }));
   } catch (_) {} }, !!sombre);
   await pg.route(/^https?:\/\/[^/]*vinted\.net\//i, (r) => { const m = /\/b(\d+)\//.exec(r.request().url()); return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: photoSvg(m ? Number(m[1]) : 0) }); });
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1|[^/]*vinted\.net)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1|[^/]*vinted\.net)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   // Les logos des transporteurs (leur favicon, sur LEUR domaine) : le réseau du banc est
   // fermé ; on sert une tuile NEUTRE (un carré gris) pour voir la forme — jamais un logo dessiné.
   await pg.route(/\/favicon\.ico$/i, (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect x="4" y="4" width="24" height="24" rx="5" fill="#8e8e93"/></svg>' }));
@@ -161,7 +161,10 @@ const mesure = (pg) => pg.evaluate(() => {
   const vw = window.innerWidth;
   const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
   const hors = [...document.querySelectorAll('.vrm-main *')].filter((e) => vis(e) && !e.closest('svg,.vrm-rangee,.vrm-filtres,[data-defile]') && getComputedStyle(e).position !== 'fixed' && e.getBoundingClientRect().right > vw + 1).map((e) => String(e.className && e.className.baseVal == null ? e.className : e.tagName).slice(0, 40));
-  const petites = [...document.querySelectorAll('[data-fu-geste]')].filter(vis).filter((e) => e.getBoundingClientRect().height < 43.5).map((e) => `${Math.round(e.getBoundingClientRect().height)}px ${e.textContent.trim().slice(0, 20)}`);
+  // (11 nov., lot ventes-achats-visuel) 44 px AU DOIGT (§7) ; à la souris (pointeur fin, ordinateur), une action
+  // compacte de 36 px suffit (« Imprimer » d'une ligne) — jamais moins de 32.
+  const fin = window.matchMedia('(pointer: fine)').matches;
+  const petites = [...document.querySelectorAll('[data-fu-geste]')].filter(vis).filter((e) => e.getBoundingClientRect().height < (fin ? 31.5 : 43.5)).map((e) => `${Math.round(e.getBoundingClientRect().height)}px ${e.textContent.trim().slice(0, 20)}`);
   const violet = [...document.querySelectorAll('[class*="vrm-fu"]')].some((e) => { const c = getComputedStyle(e); return [c.backgroundColor, c.color].some((x) => { const m = /rgba?\((\d+), (\d+), (\d+)/.exec(x); if (!m) return false; const [r, g, bb] = m.slice(1).map(Number); return r > 110 && bb > 160 && g < 90; }); });
   return {
     deb: document.documentElement.scrollWidth - vw, hors: hors.slice(0, 6), petites,
@@ -178,6 +181,11 @@ const mesure = (pg) => pg.evaluate(() => {
       if (!bt) return null; // pas de bouton (ex. Vestiaire sans bordereau : une phrase) — rien à aligner
       const a = puce.getBoundingClientRect(), b = bt.getBoundingClientRect();
       const txt = bt.innerText.trim();
+      // (11 nov., lot ventes-achats-visuel) Sur une ligne de vente, la puce est un LOGO de 20 px à gauche de l'action
+      // (« même ligne » = centres alignés) ; ailleurs (récapitulatif, cartes) la pastille de 44 px d'avant.
+      const ligneVente = !!r.closest('.vrm-sale-row[data-fu-forme]');
+      if (ligneVente) { const logo = puce.querySelector('svg, img, [data-transporteur-logo]'); const lh = logo ? logo.getBoundingClientRect().height : a.height; const ca = a.top + a.height / 2, cb = b.top + b.height / 2;
+        return { ok: true, memeLigne: Math.abs(ca - cb) < 3 || Math.abs(a.top - b.top) < 3, h: Math.round(lh), gauche: a.right <= b.left + 1, uneLigne: b.height < 50 && !/\n/.test(bt.innerText.trim()), fond: getComputedStyle(puce).backgroundColor, rayon: '12px', txt: bt.innerText.trim(), forme: 'ligne-vente' }; }
       return { ok: true, memeLigne: Math.abs(a.top - b.top) < 2 && Math.abs(a.height - b.height) < 2, h: Math.round(a.height), gauche: a.right <= b.left + 1,
         uneLigne: b.height < 50 && !/\n/.test(txt), fond: getComputedStyle(puce).backgroundColor, rayon: getComputedStyle(puce).borderTopLeftRadius, txt };
     }),
@@ -249,15 +257,18 @@ const ECRANS = [
           if (E.id === 'ventes' && JEU === 'base') dit(R.length > 0, 'une rangée « puce + bordereau » au moins', String(R.length));
           // Colis (maquette FusionColis, 2 nov. 22 h) : le transporteur est l'en-tête de son groupe, un bouton rond imprime.
           if (E.id === 'colis' && JEU === 'base') {
-            const g = await pg.evaluate(() => ({ groupes: [...document.querySelectorAll('[data-groupe-transp]')].map((x) => x.getAttribute('data-groupe-transp')), ronds: [...document.querySelectorAll('[data-bord-card]:not([data-vc-colis]) .vrm-rangee-bord')].length, rondPret: [...document.querySelectorAll('[data-bord-card]:not([data-vc-colis]) .vrm-rangee-bord [data-imprime]')].filter((b) => { const r = b.getBoundingClientRect(); return Math.round(r.width) === 44 && Math.round(r.height) === 44 && getComputedStyle(b).borderTopLeftRadius === '50%'; }).length }));
+            const g = await pg.evaluate(() => ({ groupes: [...document.querySelectorAll('[data-groupe-transp]')].map((x) => x.getAttribute('data-groupe-transp')), ronds: [...document.querySelectorAll('[data-bord-card]:not([data-vc-colis]) .vrm-rangee-bord')].length, rondPret: [...document.querySelectorAll('[data-bord-card]:not([data-vc-colis]) .vrm-rangee-bord [data-imprime]')].filter((b) => { const r = b.getBoundingClientRect(); const cs = getComputedStyle(b); const m = /rgba?\(([^)]+)\)/.exec(cs.backgroundColor); const [rr, gg, bb, aa = 1] = m ? m[1].split(',').map(parseFloat) : [0, 0, 0, 0]; const bleu = aa > 0.6 && bb > 180 && rr < 60; const fin = window.matchMedia('(pointer: fine)').matches;
+              // (11 nov., lot ventes-achats-visuel) L'action d'impression d'un colis est SECONDAIRE (un seul bleu plein par écran :
+              // « Tout imprimer ») : au doigt un rond de 44 px, à la souris une action compacte avec son mot (≥ 32 px).
+              return !bleu && (fin ? r.height >= 31.5 && /Imprimer/.test(b.innerText) : (Math.round(r.width) === 44 && Math.round(r.height) === 44 && cs.borderTopLeftRadius === '50%')); }).length }));
             // (9 nov., soir, lot AJ — décision de Julien) plus de groupes par transporteur : la liste est rangée par date,
             // le transporteur devient une pastille (filtre). Banc mis à jour.
             dit(g.groupes.length === 0, 'colis : aucun en-tête de groupe par transporteur (le plus récent en haut, transporteur en filtre)', g.groupes.join(' | '));
-            dit(g.ronds > 0 && g.rondPret > 0, 'un bouton rond par colis, bleu quand le bordereau est là', `${g.rondPret}/${g.ronds}`);
+            dit(g.ronds > 0 && g.rondPret > 0, 'une action d’impression par colis prêt, secondaire (rond 44 px au doigt, « Imprimer » à la souris), jamais un 2e bleu plein', `${g.rondPret}/${g.ronds}`);
           }
           if (R.length) {
-            const mauvaises = R.filter((r) => !(r.ok && r.memeLigne && r.gauche && r.h === 44 && r.uneLigne && r.rayon === '12px'));
-            dit(!mauvaises.length, 'la puce est à gauche du bouton, même ligne, 44 px, rayon 12, libellé sur une ligne', JSON.stringify(mauvaises[0] || R[0]).slice(0, 220));
+            const mauvaises = R.filter((r) => !(r.ok && r.memeLigne && r.gauche && (r.forme === 'ligne-vente' ? r.h <= 24 : r.h === 44) && r.uneLigne && r.rayon === '12px'));
+            dit(!mauvaises.length, 'la puce est à gauche du bouton, même ligne (pastille 44 px, rayon 12 ; logo ≤ 24 px sur une ligne de vente), libellé sur une ligne', JSON.stringify(mauvaises[0] || R[0]).slice(0, 220));
           }
           if (SHOTS && R.length && JEU === 'base') { const el = pg.locator('[data-rangee-bord]').first(); await el.scrollIntoViewIfNeeded(); const carte = el.locator('xpath=ancestor::*[@data-fu-ligne or @data-bord-card or contains(@class,"vrm-recap")][1]'); await ((await carte.count()) ? carte.first() : el).screenshot({ path: path.join(SHOTS, `pastille-${E.id}-${nom}.png`) }); }
           if (E.id === 'ventes' && JEU === 'base') {

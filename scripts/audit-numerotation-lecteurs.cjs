@@ -147,7 +147,8 @@ if (MUTATION && !M) { console.log('❌ mutation inconnue : ' + MUTATION); proces
 
 // ── LES SOURCES (éventuellement mutées) ─────────────────────────────────────
 let APP = require("./_source-app.cjs").sourceAppDe(path.join(RACINE, 'src/App.jsx'));
-let LIB = fs.readFileSync(path.join(RACINE, 'api/_lib/numerotation.js'), 'utf8');
+let LIB = fs.readFileSync(path.join(RACINE, 'api/_lib/numerotation.js'), 'utf8')
+  .replace("'./fetch-delai.js'", JSON.stringify(require('url').pathToFileURL(path.join(RACINE, 'api/_lib/fetch-delai.js')).href));   // (11 nov.) la copie importe le vrai fetch à délai
 let ROUTE = fs.readFileSync(path.join(RACINE, 'api/email-inbound.js'), 'utf8');
 let EXT = fs.readFileSync(path.join(RACINE, 'vinted-sync-extension/background.js'), 'utf8');
 try { if (M && M.app) APP = M.app(APP); if (M && M.lib) LIB = M.lib(LIB); if (M && M.route) ROUTE = M.route(ROUTE); if (M && M.ext) EXT = M.ext(EXT); }
@@ -384,7 +385,7 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
     dit(/for \(const k in numeros\) \{\s*const e = numeros\[k\];[^}]*?\n\s*\/\/[^\n]*\n\s*if \(!numeroReprenable\(e\.numero\)\) continue;/.test(auto), 'sa réutilisation par PHOTO écarte les fiches d\'archive');
     dit(/let num = numeroReprenable\(numVentesParIdentite\.parItem/.test(auto) && /numeroReprenable\(pk && numVentesParIdentite\.parPhoto\[pk\]\)/.test(auto), 'sa réutilisation par VENTE écarte les numéros d\'archive');
     dit(/sort\(\(a, b\) => \(dateMiseEnLigneMs\(a, listingDates\)/.test(auto), 'elle numérote dans l\'ORDRE DE MISE EN LIGNE (1, 2, 3… comme il reposte)');
-    const photo = corps('const entryKeyByPhoto = memoRendu((o) => {', '});');
+    const photo = corps("const entryKeyByPhoto = memoVersion('photo', (o) => {", '}, () => [');   // (12 nov.) mémoire par version des données
     dit(/venteApresCoupure\(o\) && !numeroReprenable/.test(photo), 'la photo ne relie jamais une vente d\'après la coupure à une fiche d\'archive');
     const ban = corps("if (!e || !String(e.numero || '').trim()) continue;", 'pairsLost[String(e.numero)]');
     dit(/if \(!numeroReprenable\(e\.numero\)\) continue;/.test(ban), 'la bannière ♻️ ne propose jamais un numéro d\'archive');
@@ -394,7 +395,7 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
     dit(/repriseDe: String\(r\.orphan\.key\)/.test(A) && /repriseDe: String\(autres\[0\]\)/.test(A), 'une reprise dit QUELLE fiche elle remplace (`repriseDe`) : la base ne la prend pas pour une fiche perdue');
     dit(/if \(code\) \{ _pushBloque = true; _emitSync\('refus'(?:, '[^']*')?\); signalerNumerosPerimes\(code\);/.test(A), 'un refus nommé de la base (numéros périmés) arrête les envois et ouvre le bloc « recharger »');
     dit(/<BlocNumerosPerimes\/>/.test(A) && /function BlocNumerosPerimes\(/.test(A), 'le bloc « écran périmé » est monté sur la coque (tous les écrans)');
-    dit(/numerotation: v \}/.test(corps('const saveRoomPlan = async (data) => {', '\n};')), 'le garage 3D estampille la version de la numérotation');
+    dit(/numerotation: v \}/.test(corps('const saveRoomPlan = async (', '\n};')), 'le garage 3D estampille la version de la numérotation');
     dit(/'vrm_numerotation'/.test(corps('const SYNC_KEYS = [', '];')), 'le marqueur est synchronisé (lu par l\'app, écrit par le serveur seul)');
     const reglage = corps('function NumerosSetting(', '\n}\n');
     dit(/if \(n && arch && n === arch\) \{ setRefusee\(n\);[^}]*return; \}/.test(reglage) && /arch === 'B' \? 'C' : 'B'/.test(reglage), 'Réglages n\'enregistre jamais la lettre des anciens numéros pour les nouveaux (et ne la propose pas par défaut)');

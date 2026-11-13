@@ -22,6 +22,7 @@ import { decisionNotif, CATEGORIES_RETIREES, dansHeuresCalmes, regrouper, famill
 import { rangerNotifGroupe, vidangerAttente, corrigerEtat, lireLu, nonLuesDeGenre } from './journal-notifs.js';
 import { fenetreGroupe, estUrgent, cleDuJour, resumeDeGroupe } from './notif-groupe.js';
 import { embellir, genreDe, etiquette, etiquetteGroupe, texteGroupe, imageSure, actionDe, ICONE_NOTIF, BADGE_NOTIF } from './notif-belle.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 // La base sait-elle séparer les vendeurs ? Trois réponses, jamais deux :
 // 200 → oui · 400 (colonne inconnue) → non · le reste (522, délai) → PAS SU.
@@ -34,7 +35,7 @@ let _cl = null;
 export const cloisonnee = async () => {
   if (_cl !== null) return _cl;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: HEADERS });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: HEADERS });
     if (r.ok) _cl = true;
     else if (r.status === 400) _cl = false;
     else return true;
@@ -110,10 +111,12 @@ export const PUSH_DEFAUT = {
   bilan:    true,   // bilan de la semaine, le lundi matin (api/_lib/bilan-semaine.js)
   rappel:   true,   // « Me le rappeler » : un rappel posé par LUI (api/_lib/rappels-perso.js)
   lbcsuppression: true, // Leboncoin a supprimé une annonce : ouvrir « Mes annonces » (api/_lib/lbc-suppression.js)
+  veille:   true,   // un chiffre (stock, CA d'un mois passé) a chuté d'un coup sans raison (api/_lib/veille-chiffres.js)
   relecture: true,  // un compte Vinted gardé dans les totaux pas relu depuis plus de 24 h (api/_lib/comptes-a-relire.js)
   doublevente: true, // vendue sur Vinted, N° PROUVÉ encore en vente sur eBay/Leboncoin (api/_lib/double-vente.js)
   action:   true,
   favoris:  true,   // la file des messages aux favoris est finie ou interrompue (api/_lib/favoris.js)   // Vinted attend une réponse avant une échéance : annulation demandée, achat livré à vérifier
+  alerteebay: true, // une nouvelle annonce eBay pour une recherche en alerte (api/_lib/ebay-alertes.js)
   suivi:    false,  // « en transit », « livré » : rien à faire
   achat:    false,  // tu viens de l'acheter, tu le sais
   message:  false,  // le badge de l'app suffit
@@ -156,7 +159,7 @@ async function lirePrefs() {
     //    préférences de notification étaient ignorées (le défaut s'appliquait).
     const url = await pourCeVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.push_prefs&select=data`);
     if (!url) return null;
-    const res = await fetch(url, { headers: HEADERS });
+    const res = await fetchAvecDelai(url, { headers: HEADERS });
     if (!res.ok) return null;
     const rows = await res.json();
     if (!Array.isArray(rows)) return null;          // 522 : c'est du HTML, pas du JSON
@@ -211,7 +214,7 @@ export async function loadSubs() {
     // ferait sonner le téléphone de Marie.
     const url = await pourCeVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.push_subs&select=data`);
     if (!url) return null;                              // aucun vendeur : on ne lit pas ceux des autres
-    const res = await fetch(url, { headers: HEADERS });
+    const res = await fetchAvecDelai(url, { headers: HEADERS });
     // ⚠️⚠️ `[]` VOULAIT DIRE DEUX CHOSES, ET LA SECONDE EFFAÇAIT SES TÉLÉPHONES.
     // « aucun appareil abonné » et « je n'ai pas pu lire la liste » rendaient la
     // MÊME valeur. Or `subscribe` fait lire-ajouter-réécrire : une lecture
@@ -257,7 +260,7 @@ async function lireSubsVersion() {
   try {
     const url = await pourCeVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.push_subs&select=data`);
     if (!url) return null;
-    const res = await fetch(url, { headers: HEADERS });
+    const res = await fetchAvecDelai(url, { headers: HEADERS });
     if (!res.ok) return null;
     const rows = await res.json();
     if (!Array.isArray(rows)) return null;
@@ -278,7 +281,7 @@ async function ecrireSubsSi(lu, subs, prefs) {
       const filtre = lu.rev == null ? 'data->>rev=is.null' : `data->>rev=eq.${encodeURIComponent(lu.rev)}`;
       const url = await pourCeVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.push_subs&${filtre}`);
       if (!url) return 'ko';
-      const r = await fetch(url, { method: 'PATCH', headers: enTetes, body: JSON.stringify({ data }) });
+      const r = await fetchAvecDelai(url, { method: 'PATCH', headers: enTetes, body: JSON.stringify({ data }) });
       if (!r || !r.ok) return 'ko';
       const j = await r.json().catch(() => null);
       if (!Array.isArray(j)) return 'ko';
@@ -287,7 +290,7 @@ async function ecrireSubsSi(lu, subs, prefs) {
     const o = vendeurDuPush();
     if (!o) return 'ko';
     const row = { owner: o, id: 'push_subs', data }, conflit = 'owner,id';
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflit}`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflit}`, {
       method: 'POST',
       headers: { ...HEADERS, Prefer: 'resolution=ignore-duplicates,return=representation' },
       body: JSON.stringify([row]),
@@ -496,14 +499,19 @@ function aEnvoyerResume(r, seq) {
 }
 
 // Envoie une charge à la liste d'appareils LUE ; purge les morts. Rend { sent, total, perimes }.
+export const PUSH_PARALLELE = 5;
+export const PUSH_MAX_APPAREILS = 20;
 async function pousserAuxAppareils(subs, aEnvoyer) {
   const body = JSON.stringify(aEnvoyer);
   const alive = [];
   let sent = 0, perimes = 0;
-  for (const s of subs) {
+  // (11 nov., M48) Les appareils par paquets de PUSH_PARALLELE (jamais N × 10 s en
+  // série dans le cron du matin), et au plus PUSH_MAX_APPAREILS (les plus récents :
+  // l'abonnement le plus neuf est en fin de liste).
+  const un = async (s) => {
     // Ne pas contacter une URL interne ou un service arbitraire, même si
     // un ancien abonnement a été écrit directement dans la base.
-    if(!endpointPushPermis(s?.endpoint)){alive.push(s);continue;}
+    if(!endpointPushPermis(s?.endpoint)){alive.push(s);return;}
     try {
       await webpush.sendNotification(s, body, {timeout:10000});
       alive.push(s); sent += 1;
@@ -514,7 +522,10 @@ async function pousserAuxAppareils(subs, aEnvoyer) {
       if (perime) perimes += 1;
       if (!mort && !perime) alive.push(s);            // erreur passagère : on garde
     }
-  }
+  };
+  const vises = subs.slice(-PUSH_MAX_APPAREILS);
+  for (const s of subs.slice(0, subs.length - vises.length)) alive.push(s);   // pas visés : gardés tels quels
+  for (let i = 0; i < vises.length; i += PUSH_PARALLELE) await Promise.all(vises.slice(i, i + PUSH_PARALLELE).map(un));
   // ⚠️ On ne retire QUE les appareils morts, de la liste TELLE QU'ELLE EST
   //    MAINTENANT (écriture conditionnelle) : réécrire `alive` effaçait un
   //    appareil qui venait de s'abonner pendant l'envoi.

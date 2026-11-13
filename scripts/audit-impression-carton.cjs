@@ -31,7 +31,9 @@ const code = [
 
 (async () => {
   let fiches = {}, demandes = [], reponse = false;
-  const ctx = { load: () => fiches, askConfirm: async (o) => { demandes.push(o); return reponse; }, String, Number, Object, Set, Array };
+  // (lot vocabulaire-article) la question dit « paire » / « article » : la vraie règle, sans source ⇒ Sneakers (les textes d'avant).
+  const { motsVendeur } = await import(require('url').pathToFileURL(path.join(__dirname, '..', 'src', 'profilVendeur.js')).href);
+  const ctx = { load: () => fiches, askConfirm: async (o) => { demandes.push(o); return reponse; }, motsVendeur, String, Number, Object, Set, Array };
   let f;
   try { f = vm.runInNewContext(code, ctx).confirmerNumerosAVerifier; } catch (e) { dit(false, 'la fonction se charge', e.message); }
   if (f) {

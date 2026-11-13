@@ -223,7 +223,8 @@ const somme=(l,i)=>String(l.reduce((s,x)=>s+Math.round(x[i]*100),0));
               const E=type==='recettes'?R:A;
               const csv=await telecharge(pg,`[data-registre-csv="${type}"]`);
               const pdf=await telecharge(pg,`[data-registre-pdf="${type}"]`);
-              dit(new RegExp(`^(Livre-des-recettes|Registre-des-achats)-${p}\\.csv$`).test(csv.nom)&&new RegExp(`-${p}\\.pdf$`).test(pdf.nom),`${type} : fichiers nommés de la période`,`${csv.nom} · ${pdf.nom}`);
+              // (11 nov., lot livre-registre) Les fichiers sont HORODATÉS : « …-AAAA-MM-etabli-AAAAMMJJ-HHMM ».
+              dit(new RegExp(`^(Livre-des-recettes|Registre-des-achats)-${p}-etabli-\\d{8}-\\d{4}\\.csv$`).test(csv.nom)&&new RegExp(`-${p}-etabli-\\d{8}-\\d{4}\\.pdf$`).test(pdf.nom),`${type} : fichiers nommés de la période, horodatés`,`${csv.nom} · ${pdf.nom}`);
               const c=csvTot(csv.octets.toString('utf8'));
               dit(c&&c.n===Number(E.n)&&c.total===E.total&&c.somme===E.total,`${type} : le tableur = l’écran (lignes et total)`,JSON.stringify(c));
               const L=await lirePdf(pdf.octets); const t=L.map(l=>l.join(' ')).join('\n');

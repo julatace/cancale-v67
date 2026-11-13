@@ -100,7 +100,7 @@ async function ouvrir(b, vp, { ext = true, sessionA = 10 / 60 } = {}, url = '?ta
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
   if (ext) await pg.addInitScript(PONT);
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
@@ -123,8 +123,26 @@ async function ouvrir(b, vp, { ext = true, sessionA = 10 / 60 } = {}, url = '?ta
   return { ctx, pg, errs };
 }
 // Le flou d'une ligne : son `data-flou` ET son style calculé (le flou se voit).
-const etatLigne = (pg, sel) => pg.evaluate((s) => {
-  const e = document.querySelector(s);
+// (11 nov., lbc-rouges) Le style se lit À LA FIN de ses transitions et animations (entrée
+// de la liste, passage net ⇄ estompé) : lu au milieu, l'opacité valait 0,56 ou 0,99 et le
+// banc jugeait un instant de l'animation, pas la règle. Les animations sans fin ne sont pas
+// attendues ; au plus 3 s.
+const etatLigne = (pg, sel) => pg.evaluate(async (s) => {
+  // La ligne peut être RE-MONTÉE pendant l'attente (les données arrivent) : elle est relue
+  // à chaque tour — un nœud détaché rend une opacité vide (« 0 »).
+  let e = document.querySelector(s);
+  if (!e) return null;
+  const finies = () => (e = document.querySelector(s) || e).getAnimations().filter((a) => { const t = a.effect && a.effect.getComputedTiming ? a.effect.getComputedTiming() : null; return a.playState !== 'finished' && t && isFinite(t.endTime); });
+  const fin = Date.now() + 4000; let avant = null, stables = 0;
+  while (Date.now() < fin && stables < 3) {
+    const f = finies();
+    if (f.length) { stables = 0; await Promise.race([Promise.all(f.map((a) => a.finished.catch(() => {}))), new Promise((r) => setTimeout(r, fin - Date.now()))]); continue; }
+    await new Promise((r) => setTimeout(r, 120));
+    e = document.querySelector(s) || e;
+    const op = getComputedStyle(e).opacity + '|' + getComputedStyle(e).filter;
+    stables = op === avant ? stables + 1 : 0; avant = op;
+  }
+  e = document.querySelector(s);
   if (!e) return null;
   const cs = getComputedStyle(e);
   return { attr: e.getAttribute('data-flou'), flou: /blur/.test(cs.filter), op: Number(cs.opacity) };
@@ -137,8 +155,13 @@ const section = async (pg, k, attendre) => {
   // sur Leboncoin ; Achats reste dans l'espace Leboncoin (« Plateformes »).
   const url = k === 'achats' ? '?tab=plat_leboncoin&section=achats' : `?tab=${k}&site=leboncoin`;
   await pg.goto(pg.url().split('?')[0] + url, { waitUntil: 'domcontentloaded' }).catch(() => {});
-  await pg.waitForSelector(attendre, { timeout: 12000 }).catch(() => {});
+  await pg.waitForSelector(`${attendre}, [data-groupe-compte="compte"]`, { timeout: 12000 }).catch(() => {});
   await pg.waitForTimeout(700);   // la lecture du compte ouvert (lbc_accounts) arrive à côté
+  // (11 nov., agent2-regroupe-comptes) Les lignes d'un autre compte sont dans un groupe REPLIÉ : on le
+  // déplie (estompées, jamais masquées, à un toucher) ; rend le nombre de groupes dépliés.
+  const n = await pg.evaluate(() => { const bs = [...document.querySelectorAll('[data-groupe-compte="compte"][aria-expanded="false"]')]; bs.forEach((x) => x.click()); return bs.length; });
+  if (n) await pg.waitForTimeout(300);
+  return n;
 };
 const SECTIONS = [
   ['annonces', 'Annonces', '[data-lbc-catalog-id="4100000001"]', '[data-lbc-catalog-id="4100000002"]'],
@@ -155,7 +178,8 @@ const SECTIONS = [
       console.log(`── ${vp.width} px · extension connectée, Compte_A ouvert sur leboncoin.fr (il y a 10 min)`);
       const o = await ouvrir(b, vp);
       for (const [k, nom, selA, selB] of SECTIONS) {
-        await section(o.pg, k, selB);
+        const replies = await section(o.pg, k, selB);
+        if (k !== 'messages') dit(replies === 1, `${nom} : Compte_B regroupé à part, replié (11 nov.)`, String(replies));
         const a = await etatLigne(o.pg, selA), bb = await etatLigne(o.pg, selB);
         dit(net(a) && floue(bb), `${nom} : la ligne de Compte_A est nette, celle de Compte_B est là mais estompée`, JSON.stringify({ a, b: bb }));
         if (k === 'ventes' || k === 'annonces') await o.pg.screenshot({ path: path.join(os.tmpdir(), `lbc-flou-${k}-${vp.width}.png`), fullPage: true }).catch(() => {});

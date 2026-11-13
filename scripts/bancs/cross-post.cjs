@@ -68,7 +68,7 @@ async function page(b, l, vp, { sombre = false } = {}) {
   const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-  await pg.addInitScript(([nums, sombre]) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(nums)); localStorage.setItem('vinted_nums_physiques', JSON.stringify({ nums: ['80', '81', '82'], at: Date.now() })); if (sombre) { localStorage.setItem('vinted_dark', 'true'); localStorage.setItem('vrm_bascule_mineral_v1', '1'); } } catch (_) {} }, [NUMS, sombre]);
+  await pg.addInitScript(([nums, sombre]) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_ebay_guide_vu', 'true'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(nums)); localStorage.setItem('vinted_nums_physiques', JSON.stringify({ nums: ['80', '81', '82'], at: Date.now() })); if (sombre) { localStorage.setItem('vinted_dark', 'true'); localStorage.setItem('vrm_bascule_mineral_v1', '1'); } } catch (_) {} }, [NUMS, sombre]);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => { const t = r.request().resourceType(); if (t === 'image') return r.fulfill({ status: 200, contentType: 'image/png', body: PNG }); if (t === 'media' || t === 'font') return r.abort(); return r.fulfill({ status: 200, contentType: 'text/plain', body: '' }); });
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));

@@ -12,9 +12,9 @@
 //    fait défiler la page (`touch-action` pan-y, gestes coopératifs) ; Vannes choisie ⇒ cadrée sur Vannes ;
 //    toucher une épingle amène son point ; fond indisponible ⇒ la carte se tait, la liste reste ;
 //    hors réseau ⇒ pas de carte ;
-//  · la barre : Cancale en TÊTE du point (une fois), « encore 3 j », neutre, % juste ; Vannes « dernier jour »
-//    ambre ; Vinted Go « encore 1 j » ambre (< 24 h) ; Brest « estimée » ; Saint-Malo et « à vérifier » sans
-//    barre ; `role=progressbar` + aria-valuenow = % ; jamais rouge ;
+//  · la barre (12 nov. : UNE par ligne, la ligne unique) : Cancale sur chacune de ses 2 lignes, jamais en tête du
+//    point ni redite en puce, « encore 3 j », neutre, % juste ; Vannes « dernier jour » ambre ; Vinted Go « encore
+//    1 j » ambre (< 24 h) ; Brest « estimée » ; Saint-Malo (sans arrivée) : barre vide « Date limite inconnue » ; `role=progressbar` + aria-valuenow = % ; jamais rouge ;
 //  · maplibre n'est pas chargé au démarrage de Ma journée.
 // 390 tactile clair/sombre + 1512. `SHOTS=dossier` garde les captures. `BANC_PORT` change le port.
 const path = require('path'), fs = require('fs'), http = require('http'), zlib = require('zlib');
@@ -73,7 +73,15 @@ const ATTENDU_BARRES = {
   '93000005': { code: 'date', txt: /^encore 4 j · estimée$/, ambre: '0', pct: pct(MS - 1 * J, finJour(4)), estimee: true },
 };
 let ko = 0, ok = 0;
-const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
+const ditBrut = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
+// (11 nov., Julien : « tu peux enlever la carte pour les points relais, ça sert à rien ») LA CARTE EST RETIRÉE.
+// Ses contrôles (épingles, cadrage, hauteur, gestes, « Agrandir ») ne s'appliquent plus : ils sont tus ici, et
+// UN contrôle les remplace dans chaque vue — « aucune carte n'est rendue » (rouge sur le code d'avant). Tout le
+// reste du banc (listes, villes, délais, comptes) est inchangé.
+const CONTROLE_CARTE = /carte (est|ne porte|se cadre|se tait)|épingle|Agrandir|hauteur raisonnable|centre de la carte|un doigt fait défiler|sur la carte|se cadre|trente : les 30 points|non géocodable/;
+let carteTus = 0;
+const dit = (c, m, d) => { if (CONTROLE_CARTE.test(String(m))) { carteTus++; return; } ditBrut(c, m, d); };
+const pasDeCarte = async (pg, nom) => { const n = await pg.evaluate(() => document.querySelectorAll('.vrm-rpf-carte, [data-retirer-carte-etat], .maplibregl-map').length); ditBrut(n === 0, `${nom} plus de carte des points relais (décision du 11 nov.)`, String(n)); };
 const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom, String(e.message || e).split('\n')[0].slice(0, 200)); } };
 
 // ── Le fond servi (style raster quadrillé, comme carte-stable.cjs) ──────────
@@ -169,11 +177,12 @@ const ouvrir = async (b, vp, { sombre = false, fondKo = false, tab = 'cat_bord',
   return { ctx, pg, errs, requetes };
 };
 const allerRetirer = async (pg) => {
-  await pg.locator('[data-colis-onglet-choix="retirer"]').first().waitFor({ timeout: 30000 });
+  await pg.locator('[data-colis-section]').first().waitFor({ timeout: 30000 });
   await pg.waitForFunction(() => { try { return !!JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) { return false; } }, null, { timeout: 20000 }).catch(() => {});
-  await pg.locator('[data-colis-onglet-choix="retirer"]').first().click();
+  await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
   await pg.locator('.vrm-rpf').first().waitFor({ timeout: 15000 });
   await pg.waitForTimeout(1500);
+  await pasDeCarte(pg, 'À retirer');
 };
 // Une couleur rouge (teinte < 15° ou > 345°, saturée) : jamais sur une barre.
 const teinte = (rgb) => { const m = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/.exec(rgb || ''); if (!m) return null; const [r, g, b] = [m[1], m[2], m[3]].map((x) => Number(x) / 255); const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; const s = mx === 0 ? 0 : d / mx; let h = 0; if (d) { if (mx === r) h = 60 * (((g - b) / d) % 6); else if (mx === g) h = 60 * ((b - r) / d + 2); else h = 60 * ((r - g) / d + 4); } if (h < 0) h += 360; return { h, s }; };
@@ -228,7 +237,7 @@ const teinte = (rgb) => { const m = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/.ex
         const [w, s0, e0, n0] = String(cv.cadre).split(',').map(Number);
         dit(cv.ep.length === 2 && w >= -2.77 && e0 <= -2.75 && s0 >= 47.65 && n0 <= 47.66, 'Vannes choisie : la carte ne porte que les 2 points de Vannes, cadrée sur eux', JSON.stringify(cv));
         dit(!!cv.centre && Math.abs(cv.centre[0] + 2.7585) < 0.02 && Math.abs(cv.centre[1] - 47.6555) < 0.02, 'le centre de la carte est à Vannes', JSON.stringify(cv.centre));
-        if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await pg.evaluate(() => window.scrollTo(0, 0)); await pg.locator('.vrm-rpf-carte').first().scrollIntoViewIfNeeded(); await pg.screenshot({ path: path.join(SHOTS, `retirer-carte-vannes-${nom}.png`) }); }
+        if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await pg.evaluate(() => window.scrollTo(0, 0)); if (await pg.$('.vrm-rpf-carte')) await pg.locator('.vrm-rpf-carte').first().scrollIntoViewIfNeeded(); /* (intégration) plus de carte : capture du haut de la liste */ await pg.screenshot({ path: path.join(SHOTS, `retirer-carte-vannes-${nom}.png`) }); }
         await pg.locator('[data-retirer-villes] [data-ville=""]').first().click();
         await pg.waitForFunction(() => document.querySelectorAll('.vrm-rpf-carte [data-relais-epingle]').length >= 6, null, { timeout: 15000 }).catch(() => {});
         await pg.waitForTimeout(800);
@@ -248,25 +257,31 @@ const teinte = (rgb) => { const m = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/.ex
           return { ligne: ligne ? ligne.getAttribute('data-cc-carte') : '', point: point ? (point.getAttribute('data-relais-point') || point.getAttribute('data-relais-point-suite')) : '', tete: d.getAttribute('data-rp-delai-tete') === '1', code: d.getAttribute('data-rp-delai'), pct: Number(d.getAttribute('data-rp-delai-pct')), ambre: d.getAttribute('data-rp-delai-ambre'), estimee: d.getAttribute('data-rp-delai-estimee') === '1', txt: txt ? txt.textContent.trim() : '', now: pb ? Number(pb.getAttribute('aria-valuenow')) : null, vt: pb ? pb.getAttribute('aria-valuetext') : '', w: plein ? Math.round(plein.getBoundingClientRect().width) : 0, wp: pb ? Math.round(pb.getBoundingClientRect().width) : 0, fond: plein ? getComputedStyle(plein).backgroundColor : '', couleurTxt: txt ? getComputedStyle(txt).color : '', h: pb ? pb.getBoundingClientRect().height : 0 };
         }));
         const lignesSans = await pg.evaluate(() => [...document.querySelectorAll('.vrm-rpf [data-cc-carte]')].filter((l) => !l.querySelector('[data-rp-delai]')).map((l) => ({ id: l.getAttribute('data-cc-carte'), hors: l.hasAttribute('data-hors-compte'), point: (l.closest('[data-relais-point], [data-relais-point-suite]') || { getAttribute: () => '' }).getAttribute('data-relais-point'), puce: (l.querySelector('[data-rp-echeance]') || { getAttribute: () => null }).getAttribute('data-rp-echeance') })));
+        // (12 nov., finitions — Julien : « rien n'est cohérent ») UNE FORME DE LIGNE : chaque colis porte SA barre (la
+        // barre unique en tête de point est retirée). La limite du point n'est donc jamais dite deux fois : aucune barre
+        // en tête, aucune puce d'échéance en plus de la barre sur une ligne.
         const deCancale = barres.filter((x) => /maisonduquai/i.test(x.point));
-        const tC = deCancale.find((x) => x.tete);
-        dit(deCancale.length === 1 && !!tC, 'Cancale (2 colis, même arrivée, même limite) : UNE barre, en tête du point', JSON.stringify(deCancale));
-        const lignesC = lignesSans.filter((l) => /maisonduquai/i.test(l.point || ''));
-        dit(lignesC.length === 2 && lignesC.every((l) => l.puce === null), '… et ses lignes ne redisent pas l’échéance', JSON.stringify(lignesC));
+        const tC = deCancale.find((x) => !x.tete && x.ligne);
+        dit(deCancale.length === 2 && deCancale.every((x) => !x.tete && x.ligne), 'Cancale (2 colis, même arrivée, même limite) : une barre sur CHAQUE ligne, aucune en tête du point', JSON.stringify(deCancale));
+        const enTete = await pg.evaluate(() => document.querySelectorAll('.vrm-rpf-tete-delai, [data-rp-delai-tete="1"]').length);
+        const puces = await pg.evaluate(() => [...document.querySelectorAll('.vrm-rpf [data-cc-carte]')].filter((l) => l.querySelector('[data-rp-delai]') && l.querySelector('.vrm-rpf-puce[data-rp-echeance]')).map((l) => l.getAttribute('data-cc-carte')));
+        dit(enTete === 0 && !puces.length, '… la limite n’est jamais dite deux fois (ni barre en tête du point, ni puce d’échéance à côté d’une barre)', JSON.stringify({ enTete, puces }));
         const juge = (nomB, x, a) => {
           dit(!!x && x.code === a.code && a.txt.test(x.txt) && x.ambre === a.ambre && x.estimee === a.estimee, `${nomB} : « ${x && x.txt} », ${a.ambre === '1' ? 'AMBRE' : 'neutre'}${a.estimee ? ', estimée' : ''}`, JSON.stringify(x));
           dit(!!x && Math.abs(x.pct - a.pct) <= 1 && x.now === x.pct && !!x.vt && Math.abs(x.w - (x.wp * x.pct) / 100) <= 2, `${nomB} : ${a.pct} % écoulé (aria-valuenow, largeur), aria-valuetext dit`, x ? `${x.pct}/${a.pct} · ${x.w}/${x.wp} · ${x.vt}` : '');
         };
         juge('Cancale', tC, ATTENDU_BARRES.cancale);
         for (const k of ['93000003', 'VGS0000000000301', '93000005']) juge(k, barres.find((x) => x.ligne.includes(k)), ATTENDU_BARRES[k]);
-        const sm = lignesSans.find((l) => /9601/.test(l.id));
-        dit(!!sm, 'Saint-Malo (date d’arrivée inconnue) : PAS de barre', JSON.stringify(sm));
-        dit(!barres.some((x) => /93000006|93000007/.test(x.ligne)) || !barres.some((x) => /93000006/.test(x.ligne)), '« à vérifier » (Quimper) : pas de barre', JSON.stringify(barres.filter((x) => /93000006/.test(x.ligne))));
+        // Sans date d'arrivée, aucune progression inventée : la barre est là, VIDE, avec ce qu'on sait (« Date limite inconnue »).
+        const sm = barres.find((x) => /9601/.test(x.ligne));
+        dit(!lignesSans.length && !!sm && sm.pct === 0 && sm.w === 0 && /^Date limite inconnue$/.test(sm.txt), 'Saint-Malo (date d’arrivée inconnue) : la barre vide, « Date limite inconnue » (aucune progression inventée)', JSON.stringify({ sm, lignesSans }));
+        const qp = barres.find((x) => /93000006/.test(x.ligne));
+        dit(!qp || (qp.pct === 0 && qp.w === 0), '« à vérifier » (Quimper) : aucune progression inventée sur sa barre', JSON.stringify(qp));
         const rouges = barres.filter((x) => [x.fond, x.couleurTxt].some((cc) => { const t = teinte(cc); return t && t.s > 0.45 && (t.h < 15 || t.h > 345); }));
         dit(!rouges.length, 'jamais rouge (remplissage ni texte)', JSON.stringify(rouges));
         const ambres = barres.filter((x) => x.ambre === '1'), neutres = barres.filter((x) => x.ambre === '0');
         dit(ambres.every((x) => { const t = teinte(x.fond); return t && t.s > 0.5 && t.h >= 18 && t.h <= 50; }) && neutres.every((x) => { const t = teinte(x.fond); return t && t.s < 0.2; }), 'ambre dans les dernières 24 h, neutre sinon (couleur rendue)', JSON.stringify(barres.map((x) => [x.ambre, x.fond])));
-        dit(barres.every((x) => x.h >= 3 && x.h <= 6), 'barre fine (3–6 px)', JSON.stringify(barres.map((x) => x.h)));
+        dit(barres.filter((x) => x.h > 0).every((x) => x.h >= 3 && x.h <= 6), 'barre fine (3–6 px)', JSON.stringify(barres.map((x) => x.h)));
         const deb = await pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
         dit(deb <= 1, 'rien ne déborde', String(deb));
         if (SHOTS) {

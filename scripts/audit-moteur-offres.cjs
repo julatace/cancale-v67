@@ -10,7 +10,8 @@
 //    · offre ≥ mini  ⇒ UNE acceptation part (PUT …/accept), et elle est mémorisée ;
 //    · offre < mini · interrupteur éteint · « pas su » · autre compte connecté ·
 //      pause Vinted · offre déjà traitée  ⇒ RIEN ne part ;
-//    · volume borné (OFFRES_MAX_PAR_VISITE) : 4 offres éligibles ⇒ 3 acceptées.
+//    · volume borné (OFFRES_MAX_PAR_VISITE) : 4 offres éligibles ⇒ 3 au plus ; depuis la 5.366
+//      (pas de rafale) une seule par passage.
 //
 //  §6.1 — `--prouve` rejoue la scène « offre ≥ mini » sur le background.js de
 //  `origin/main` (où le moteur n'existe pas) : 0 acceptation ⇒ la preuve est
@@ -53,7 +54,7 @@ function monter({ offres, actif = true, msgRefus = '', store = {}, lectureKO, co
     nums[String(o.item)] = { num: String(o.item), min: o.min, refuse: o.refuse };
     lignes[`harvest_${UID}_conv_${o.oid}`] = conv(o);
   }
-  lignes.main = { capturedAt: nowISO(), vinted_offres_auto: actif, vinted_annonce_numeros: nums, vinted_offre_refus_msg: msgRefus };
+  lignes.main = { capturedAt: nowISO(), vinted_offres_auto: actif, vinted_annonce_numeros: nums, vinted_offre_refus_msg: msgRefus, vrm_securite_comptes: { plateformes: { vinted: { repos: { actif: false } } } } };
   if (garde !== undefined) lignes.main.vinted_offres_garde = garde;
   return faireFond({
     src, lignes, connecte, store, lectureKO,
@@ -106,7 +107,14 @@ const OFFRE = { item: 444, tx: 9001, oid: 7001, price: 45, min: 40 };   // 45 �
     await f.ctx.autoAccepterOffres(UID);
     const pv = (f.store.vrmOffresPrevues || {})[String(OFFRE.oid)];
     dit(accepts(f.j) === 0, "délai aléatoire : à la première vue de l'offre, RIEN n'est accepté", `accepts=${accepts(f.j)}`);
-    dit(pv && pv.at - t0 >= 3 * 60000 - 50 && pv.at - t0 <= 20 * 60000 + 1000, "l'acceptation est prévue entre 3 et 20 min plus tard (tiré au hasard)", JSON.stringify(pv));
+    // 5.370 (discrétion, validé par Julien) : la nuit (0 h-7 h, heure de Paris), la fourchette est 30-120 min.
+    const nuitA2 = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', hour: 'numeric', hourCycle: 'h23' }).formatToParts(new Date(t0)).find((x) => x.type === 'hour').value) < 7;
+    const [mnA2, mxA2] = nuitA2 ? [30, 120] : [3, 20];
+    dit(pv && pv.at - t0 >= mnA2 * 60000 - 50 && pv.at - t0 <= mxA2 * 60000 + 1000, `l'acceptation est prévue entre ${mnA2} et ${mxA2} min plus tard (tiré au hasard${nuitA2 ? ', nuit' : ''})`, JSON.stringify(pv));
+    // Les deux fourchettes, quelle que soit l'heure du banc (midi et 3 h du matin à Paris).
+    const midi = Date.UTC(2026, 10, 12, 11, 0), trois = Date.UTC(2026, 10, 12, 2, 0);
+    const jour = Array.from({ length: 40 }, () => f.ctx.delaiOffreMs(midi)), nuit = Array.from({ length: 40 }, () => f.ctx.delaiOffreMs(trois));
+    dit(jour.every((d) => d >= 3 * 60000 && d <= 20 * 60000) && nuit.every((d) => d >= 30 * 60000 && d <= 120 * 60000), 'délai : 3-20 min le jour, 30-120 min la nuit (heure de Paris)', JSON.stringify({ jour: [Math.min(...jour), Math.max(...jour)], nuit: [Math.min(...nuit), Math.max(...nuit)] }));
     await f.ctx.offresTick();
     dit(accepts(f.j) === 0, "l'alarme d'1 min ne relance rien tant que l'heure prévue n'est pas passée", `accepts=${accepts(f.j)}`);
     const tires = new Set(); for (let i = 0; i < 40; i++) tires.add(f.ctx.delaiOffreMs());
@@ -139,7 +147,10 @@ const OFFRE = { item: 444, tx: 9001, oid: 7001, price: 45, min: 40 };   // 45 �
   // H — volume borné : 4 offres éligibles, OFFRES_MAX_PAR_VISITE plafonne à 3.
   { const quatre = [0, 1, 2, 3].map((i) => ({ item: 500 + i, tx: 9100 + i, oid: 7100 + i, price: 60, min: 40 }));
     const { f } = await run({ offres: quatre });
-    dit(accepts(f.j) === 3, "volume borné : 4 offres éligibles ⇒ 3 acceptées au plus (OFFRES_MAX_PAR_VISITE)", `accepts=${accepts(f.j)}`); }
+    // (11 nov., 5.366, Julien : « jamais de rafale ») 40 s au moins (+ tirage) entre deux gestes
+    // AUTOMATIQUES d'un même compte : un passage n'en accepte plus qu'UNE, les suivantes au
+    // passage suivant (chaque minute) — et jamais plus de 3 par visite (OFFRES_MAX_PAR_VISITE).
+    dit(accepts(f.j) === 1, "volume borné : 4 offres éligibles ⇒ 1 par passage (pas de rafale), jamais plus de 3", `accepts=${accepts(f.j)}`); }
 
   // I — offre SOUS le seuil de refus : UN refus part ; pas de message si aucun texte.
   { const { f } = await run({ offres: [{ item: 444, tx: 9001, oid: 7001, price: 20, refuse: 30 }] });  // 20 < 30

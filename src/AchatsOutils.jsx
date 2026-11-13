@@ -8,9 +8,13 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { etatRepartition, partsEgales } from './achatsSourcing.js';
+import { motsVendeur } from './profilVendeur.js';
 import { etatSaisieGros, baseRepartition, eurosC, texteDepense, texteMoyen, texteBeneficeFournisseur, texteCouverture, texteRelies } from './fournisseurs.js';
+import ChoixPaiement from './composants/ChoixPaiement.jsx';   // (11 nov., lot livre-registre) « Payé en »
+import { modePaiementLu } from './modePaiement.js';
 import './styles-annonces-outils.css';
 import './styles-achats-outils.css';
+import { jourParis } from './dateParis.js';
 
 const eurC = (c) => {
   if (c == null || !Number.isFinite(c)) return '—';
@@ -66,7 +70,7 @@ function Vignette({ src, Photo }) {
 // depuis la fiche du fournisseur ; ses paires se relient à leurs N° par SON tap ;
 // leur prix vient de SA répartition, et un prix saisi à la main n'est remplacé
 // que s'il dit oui (la question est posée par l'app).
-const jourLocal = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+const jourLocal = () => jourParis();   // (11 nov.) jour de Paris
 const dateCourte = (d) => { const t = Date.parse(String(d || '') + 'T12:00:00'); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : 'date inconnue'; };
 const enSaisie = (c) => (c == null ? '' : (c / 100).toFixed(2).replace('.', ','));
 
@@ -101,7 +105,7 @@ function FormFournisseur({ depart, onEnregistrer, onAnnuler }) {
 }
 
 function FormAchatGros({ depart, onEnregistrer, onAnnuler }) {
-  const [c, setC] = React.useState(() => ({ date: (depart && depart.date) || jourLocal(), paires: depart ? String(depart.paires) : '', total: depart ? enSaisie(depart.total) : '', frais: depart && depart.frais ? enSaisie(depart.frais) : '' }));
+  const [c, setC] = React.useState(() => ({ date: (depart && depart.date) || jourLocal(), paires: depart ? String(depart.paires) : '', total: depart ? enSaisie(depart.total) : '', frais: depart && depart.frais ? enSaisie(depart.frais) : '', paiement: modePaiementLu(depart && depart.paiement) }));
   const [err, setErr] = React.useState('');
   const [envoi, setEnvoi] = React.useState(false);
   const champ = (k) => (v) => { setErr(''); setC((x) => ({ ...x, [k]: v })); };
@@ -109,9 +113,10 @@ function FormAchatGros({ depart, onEnregistrer, onAnnuler }) {
   return (
     <div className="vrm-fo-form" data-fo-form="achat">
       <Champ label="Date" type="date" value={c.date} onChange={champ('date')} data={{ 'data-fo-champ': 'date' }}/>
-      <Champ label="Nombre de paires" inputMode="numeric" value={c.paires} onChange={champ('paires')} data={{ 'data-fo-champ': 'paires' }}/>
+      <Champ label={`Nombre ${motsVendeur().deNoms}`} inputMode="numeric" value={c.paires} onChange={champ('paires')} data={{ 'data-fo-champ': 'paires' }}/>
       <Champ label="Montant total (€)" inputMode="decimal" value={c.total} onChange={champ('total')} data={{ 'data-fo-champ': 'total' }}/>
       <Champ label="Frais, transport… (si tu veux, €)" inputMode="decimal" value={c.frais} onChange={champ('frais')} data={{ 'data-fo-champ': 'frais' }}/>
+      <ChoixPaiement value={c.paiement} onChange={champ('paiement')} />
       {err ? <p className="vrm-aso-reste" data-fo-erreur="">{err}</p> : null}
       <button type="button" className="vrm-ao-principal" data-fo-enregistrer="achat" disabled={envoi} onClick={envoyer}>Enregistrer</button>
       <button type="button" className="vrm-ao-second vrm-aso-annuler" data-fo-annuler="" onClick={onAnnuler}>Annuler</button>
@@ -146,7 +151,7 @@ function FicheAchatGros({ a, fichesLibres, actions, Photo }) {
   return (
     <div data-fo-fiche-achat={a.id} data-fo-relies={n} data-fo-sur={a.paires} data-fo-mode={r.mode} data-fo-base={r.base}>
       <section className="vrm-aso-carte vrm-fo-resume">
-        <div className="vrm-aso-grand"><b data-fo-total={a.total}>{eurosC(a.total)}</b><span>{a.paires} paires · {dateCourte(a.date)}</span></div>
+        <div className="vrm-aso-grand"><b data-fo-total={a.total}>{eurosC(a.total)}</b><span>{a.paires} {motsVendeur().noms} · {dateCourte(a.date)}</span></div>
         <p className="vrm-aso-couv">
           {a.frais ? <><span className="vrm-aso-bloc" data-fo-frais={a.frais}>+ {eurosC(a.frais)} de frais</span> · </> : null}
           <span className="vrm-aso-bloc" data-fo-relies-txt="">{texteRelies({ relies: n, sur: a.paires })}</span>
@@ -156,10 +161,10 @@ function FicheAchatGros({ a, fichesLibres, actions, Photo }) {
         <Choix label="Montant à répartir" value={r.base} onChange={(v) => actions.regler(a.id, { base: v })} data={{ 'data-fo-base-seg': r.base }}
           options={[{ v: 'prix', l: `Prix seul ${eurosC(a.total)}`, data: { 'data-fo-base-choix': 'prix' } }, { v: 'frais', l: `Avec les frais ${eurosC(a.total + a.frais)}`, data: { 'data-fo-base-choix': 'frais' } }]}/>
       ) : null}
-      <Choix label="Prix de chaque paire" value={r.mode} onChange={(v) => actions.regler(a.id, { mode: v })} data={{ 'data-fo-mode-seg': r.mode }}
-        options={[{ v: 'egal', l: 'Part égale', data: { 'data-fo-mode-choix': 'egal' } }, { v: 'main', l: 'Paire par paire', data: { 'data-fo-mode-choix': 'main' } }]}/>
+      <Choix label={`Prix de ${motsVendeur().chaque.toLowerCase()}`} value={r.mode} onChange={(v) => actions.regler(a.id, { mode: v })} data={{ 'data-fo-mode-seg': r.mode }}
+        options={[{ v: 'egal', l: 'Part égale', data: { 'data-fo-mode-choix': 'egal' } }, { v: 'main', l: `${motsVendeur().Nom} par ${motsVendeur().nom}`, data: { 'data-fo-mode-choix': 'main' } }]}/>
       {base == null ? <p className="vrm-aso-reste" data-fo-base-manque="">Choisis le montant à répartir</p>
-        : r.mode === 'egal' ? <p className="vrm-aso-couv" data-fo-part-egale={egales[0]}>{unePart} par paire</p> : null}
+        : r.mode === 'egal' ? <p className="vrm-aso-couv" data-fo-part-egale={egales[0]}>{unePart} par {motsVendeur().nom}</p> : null}
       {n ? (
         <ul className="vrm-aso-liste" data-fo-liste-relies={n}>
           {a.relies.map((x, i) => (
@@ -183,21 +188,21 @@ function FicheAchatGros({ a, fichesLibres, actions, Photo }) {
             </li>
           ))}
         </ul>
-      ) : <p className="vrm-ao-vide" data-fo-aucun-relie="">Relie les paires de cet achat à leurs N°.</p>}
+      ) : <p className="vrm-ao-vide" data-fo-aucun-relie="">Relie les {motsVendeur().noms} de cet achat à leurs N°.</p>}
       {r.mode === 'main' && n ? (
         <>
           <p className={'vrm-aso-reste' + (etat.ok ? ' is-juste' : '')} data-fo-reste={etat.reste == null ? '' : etat.reste} data-fo-saisie-ok={etat.ok ? '1' : ''}>
             {base == null ? '—' : etat.illisibles ? `${etat.illisibles} case${etat.illisibles > 1 ? 's' : ''} à remplir`
               : etat.depasse ? `${eurosC(-etat.reste)} de trop`
               : etat.reste === 0 ? 'Juste'
-              : etat.toutes ? `Reste ${eurosC(etat.reste)}` : `Reste ${eurosC(etat.reste)} pour les ${a.paires - n} paires pas encore reliées`}
+              : etat.toutes ? `Reste ${eurosC(etat.reste)}` : `Reste ${eurosC(etat.reste)} pour les ${a.paires - n} ${motsVendeur().noms} pas encore relié${motsVendeur().e}s`}
           </p>
           <button type="button" className="vrm-ao-second vrm-aso-plus" data-fo-garder-parts="" disabled={!etat.ok}
             onClick={() => actions.regler(a.id, { parts: Object.fromEntries(a.relies.map((x, i) => [x.cle, etat.parts[i]])) })}>Garder ces prix</button>
         </>
       ) : null}
       {relier ? <ChoixNumero fiches={fichesLibres} Photo={Photo} onAnnuler={() => setRelier(false)} onChoisir={(fi) => { actions.relier(a.id, fi); setRelier(false); }}/>
-        : <button type="button" className="vrm-ao-second vrm-aso-plus" data-fo-relier="" disabled={plein} onClick={() => setRelier(true)}>{plein ? 'Toutes les paires sont reliées' : 'Relier un N°'}</button>}
+        : <button type="button" className="vrm-ao-second vrm-aso-plus" data-fo-relier="" disabled={plein} onClick={() => setRelier(true)}>{plein ? `${motsVendeur().Toutes} les ${motsVendeur().noms} sont relié${motsVendeur().e}s` : 'Relier un N°'}</button>}
       <button type="button" className="vrm-ao-principal" data-fo-poser-prix={aPoser} disabled={!aPoser} onClick={() => actions.poserPrix(a.id)}>
         {aPoser ? `Poser le prix d’achat (${aPoser})` : 'Prix d’achat à jour'}
       </button>
@@ -249,7 +254,7 @@ function FeuilleFournisseurs({ f, fichesLibres, onFermer, Retour, Photo }) {
                       <button type="button" className="vrm-aso-choisir vrm-fo-ouvrir" data-fo-ouvrir={l.id} onClick={() => setVue({ v: 'fiche', id: l.id })}>
                         <span className="vrm-aso-centre">
                           <span className="vrm-aso-nom">{l.nom}</span>
-                          <span className="vrm-aso-sous"><span className="vrm-aso-bloc">{l.paires} paire{l.paires > 1 ? 's' : ''}</span> · <span className="vrm-aso-bloc">{texteDepense(l)}</span></span>
+                          <span className="vrm-aso-sous"><span className="vrm-aso-bloc">{l.paires} {l.paires > 1 ? motsVendeur().noms : motsVendeur().nom}</span> · <span className="vrm-aso-bloc">{texteDepense(l)}</span></span>
                         </span>
                         <span className="vrm-fo-chevron" aria-hidden="true">›</span>
                       </button>
@@ -275,8 +280,8 @@ function FeuilleFournisseurs({ f, fichesLibres, onFermer, Retour, Photo }) {
               ) : null}
               <section className="vrm-aso-carte vrm-fo-stats">
                 <Stat nom="Dépensé" valeur={texteDepense(ligne)} sous={ligne.sansPrix ? `${ligne.sansPrix} prix illisible${ligne.sansPrix > 1 ? 's' : ''}` : ''} data={{ 'data-fo-stat': 'depense' }}/>
-                <Stat nom="Paires achetées" valeur={String(ligne.paires)} sous={ligne.paires ? `${ligne.relies} reliée${ligne.relies > 1 ? 's' : ''} à un N°` : ''} data={{ 'data-fo-stat': 'paires' }}/>
-                <Stat nom="Prix moyen" valeur={texteMoyen(ligne)} sous="par paire" data={{ 'data-fo-stat': 'moyen' }}/>
+                <Stat nom={`${motsVendeur().Noms} acheté${motsVendeur().e}s`} valeur={String(ligne.paires)} sous={ligne.paires ? `${ligne.relies} relié${motsVendeur().e}${ligne.relies > 1 ? 's' : ''} à un N°` : ''} data={{ 'data-fo-stat': 'paires' }}/>
+                <Stat nom="Prix moyen" valeur={texteMoyen(ligne)} sous={`par ${motsVendeur().nom}`} data={{ 'data-fo-stat': 'moyen' }}/>
                 <Stat nom="Revendues" valeur={venteTxt(String(ligne.revendues))} data={{ 'data-fo-stat': 'revendues' }}/>
                 <Stat nom="Bénéfice" valeur={venteTxt(texteBeneficeFournisseur(ligne))} sous={ventesLues === true ? [texteCouverture(ligne), f.partielSites && ligne.revendues ? 'ventes Vinted seulement' : ''].filter(Boolean).join(' · ') : ''} data={{ 'data-fo-stat': 'benefice' }}/>
               </section>
@@ -287,7 +292,7 @@ function FeuilleFournisseurs({ f, fichesLibres, onFermer, Retour, Photo }) {
                     <li key={x.id} className="vrm-aso-ligne is-choix" data-fo-achat={x.id} data-fo-achat-relies={x.relies.length} data-fo-achat-sur={x.paires}>
                       <button type="button" className="vrm-aso-choisir vrm-fo-ouvrir" data-fo-ouvrir-achat={x.id} onClick={() => setVue({ v: 'achat', id: ligne.id, aid: x.id })}>
                         <span className="vrm-aso-centre">
-                          <span className="vrm-aso-nom">{dateCourte(x.date)} · {x.paires} paires</span>
+                          <span className="vrm-aso-nom">{dateCourte(x.date)} · {x.paires} {motsVendeur().noms}</span>
                           <span className="vrm-aso-sous"><span className="vrm-aso-bloc">{eurosC(x.total + (x.frais || 0))}</span> · <span className="vrm-aso-bloc">{texteRelies({ relies: x.relies.length, sur: x.paires })}</span></span>
                         </span>
                         <span className="vrm-fo-chevron" aria-hidden="true">›</span>

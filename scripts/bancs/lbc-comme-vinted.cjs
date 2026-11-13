@@ -123,12 +123,12 @@ const PONT = ({ suppr }) => {
 };
 
 async function ouvrir(b, vp, pont, url) {
-  const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
+  const ctx = await b.newContext({ viewport: vp, locale: 'fr-FR', /* (lot lbc-plus) les textes traduits suivent la langue du navigateur : le banc parle français */ ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
   await pg.addInitScript(PONT, pont);
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
@@ -194,7 +194,11 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
       // l'extension l'a pris, jamais un « relevé » en l'air.
       const l1 = await o2.pg.evaluate(() => { const e = document.querySelector('[data-favoris-lbc-annonce="3290000001"]'); return e ? e.innerText.replace(/\s+/g, ' ') : ''; });
       dit(/relevé il y a/.test(l1) && !/relevé(?!\s+(?:le|il y a))/.test(l1), 'Favoris reçus : un relevé sans date de fin est daté (« relevé il y a … »)', l1);
-      dit(f && /jamais qui/i.test(f.t) && /écrire à personne/.test(f.t), '… la phrase dit que Leboncoin ne donne pas QUI, et que VRM n’écrit à personne', f && f.t.slice(0, 160));
+      // (11 nov., lbc-rouges) La RÈGLE, pas l'orthographe (§6.4) : la phrase est posée UNE fois
+      // (`data-favoris-lbc-qui`, « VRM n'écrit à personne » — le banc attendait « écrire à
+      // personne »), et aucun geste d'écriture n'existe dans le bloc (ni bouton, ni champ).
+      const qui = await o2.pg.evaluate(() => { const e = document.querySelector('[data-favoris-lbc]'); return e ? { n: e.querySelectorAll('[data-favoris-lbc-qui="jamais"]').length, ecrire: [...e.querySelectorAll('button, textarea, input')].filter((x) => /écri|envo|message|répond/i.test((x.innerText || '') + ' ' + (x.getAttribute('aria-label') || '') + ' ' + (x.placeholder || ''))).length } : null; });
+      dit(qui && qui.n === 1 && qui.ecrire === 0, '… la phrase dit que Leboncoin ne donne pas QUI, et que VRM n’écrit à personne (et rien pour écrire)', JSON.stringify(qui));
       dit(f && !/\b0 ♡/.test(f.t) && /—/.test(f.t), '… un nombre jamais relevé s’écrit « — », pas 0', f && f.t.replace(/\n/g, ' · ').slice(0, 200));
       dit(f && (f.t.match(/ouvre (?:ses|les) statistiques/gi) || []).length === 1, '… le geste « ouvre ses statistiques » est dit UNE fois (pas sur chaque annonce pas relevée)', f && String((f.t.match(/ouvre (?:ses|les) statistiques/gi) || []).length));
       const d2 = await deborde(o2.pg);

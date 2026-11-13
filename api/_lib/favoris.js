@@ -9,10 +9,32 @@ import {sendPushToAll,pushCategorieActive} from './push.js';
 import {contexteVendeur} from './owner.js';
 import {DESTINATIONS} from './lien-notif.js';
 import {preparerMessageFavori} from '../../src/favorisVinted.js';
+import {messageAutoPermis} from '../../src/messageSur.js';
 import {AUTO_FAVORI_MAX_MS} from '../../src/favorisAuto.js';
 import {DEMANDES_AUTO} from '../../src/favorisAuto.js';
 import {demanderAuto,etatAuto,reglerAuto,stopAuto,trierFavorisAuto,ajouterAuto,notificationsCompletes,favorisDepuisNotifications,etatDressingAuto,etatAnnonceAuto,gardeRefuse} from './favoris-auto.js';
 
+// (11 nov., M82 de la revue serveur) Jamais `select=data` sur une capture : les
+// lignes `harvest_{uid}_notifications`, `…_favoris_archive` et la trace
+// `…_wreq_api_v2_conversations` sont lues PROJETÉES sur les seuls champs que la
+// résolution des cibles et la file lisent (favoris-cibles.js, favoris-auto.js) :
+// la liste des notifications, l'identité de la capture, les traces natives.
+// Les réglages (`vrm_favoris_reglages_{uid}`, une petite ligne) restent lus entiers.
+export const SEL_FAVORIS='id,owner,type:data->type,uid:data->uid,domain:data->domain,notifs:data->payload->notifications,archiveVersion:data->archiveVersion,creations:data->creations,lecturesLiees:data->lecturesLiees,method:data->method,path:data->path,body:data->body,contexteFavori:data->contexteFavori';
+const CHAMPS_FAVORIS=['type','uid','domain','archiveVersion','creations','lecturesLiees','method','path','body','contexteFavori'];
+export function ligneFavorisProjetee(x){
+  const d={};for(const k of CHAMPS_FAVORIS)if(x[k]!=null)d[k]=x[k];
+  if(x.notifs!=null)d.payload={notifications:x.notifs};
+  return {id:x.id,owner:x.owner,data:Object.keys(d).length?d:null};
+}
+// `lire(chemin)` rend un tableau ou null (pas su) ; les réglages à part, entiers.
+async function lireLignesFavoris(lire,owner,lourdes,reglages){
+  const a=await lire(`app_data?owner=eq.${owner}&id=in.(${lourdes.join(',')})&select=${SEL_FAVORIS}`);
+  if(!Array.isArray(a))return null;
+  const b=reglages?await lire(`app_data?owner=eq.${owner}&id=eq.${reglages}&select=id,owner,data`):[];
+  if(!Array.isArray(b))return null;
+  return [...a.map(ligneFavorisProjetee),...b];
+}
 // The neutral row cannot be edited by the browser (RLS). One row per Vinted
 // UID, including the rolling quota shared across all devices and VRM owners.
 // This endpoint NEVER calls Vinted. Only the seller's extension dispatches.
@@ -20,8 +42,9 @@ import {demanderAuto,etatAuto,reglerAuto,stopAuto,trierFavorisAuto,ajouterAuto,n
 // ouvertures natives des AUTRES comptes de ce vendeur (jamais d'un autre
 // vendeur : owner filtré, RLS). Lecture ratée ⇒ [] (rien n'est envoyé).
 async function parametresDesAutresComptes(req,{owner,uid}){
-  const rows=await lireCommeVendeur(req,`app_data?owner=eq.${owner}&or=(id.like.harvest_*_favoris_archive,id.like.harvest_*_wreq_api_v2_conversations)&select=id,owner,data`);
-  if(!Array.isArray(rows))return [];
+  const lues=await lireCommeVendeur(req,`app_data?owner=eq.${owner}&or=(id.like.harvest_*_favoris_archive,id.like.harvest_*_wreq_api_v2_conversations)&select=${SEL_FAVORIS}`);
+  if(!Array.isArray(lues))return [];
+  const rows=lues.map(ligneFavorisProjetee);
   const vus=new Map();
   for(const r of rows){
     const m=/^harvest_([1-9]\d{0,19})_favoris_archive$/.exec(String(r.id||''));if(!m||m[1]===uid||r.owner!==owner)continue;
@@ -87,10 +110,12 @@ export async function tourAuto(req,{owner,uid,cle,maintenant,extension=null}){
   };
   try{
     const ids=[`harvest_${uid}_notifications`,`harvest_${uid}_wreq_api_v2_conversations`,`vrm_favoris_reglages_${uid}`,`harvest_${uid}_favoris_archive`];
-    const rows=await lecture(req,`app_data?owner=eq.${owner}&id=in.(${ids.join(',')})&select=id,owner,data`);
+    const rows=await lireLignesFavoris(c=>lecture(req,c),owner,[ids[0],ids[1],ids[3]],ids[2]);
     if(rows.some(x=>x.owner!==owner))return await stop('lecture');
     const lire=id=>rows.find(x=>x.id===id)?.data;
     const prefs=lire(ids[2]);if(prefs?.version!==1||prefs.envoisActifs!==false)return await stop('reglages');
+    // (12 nov.) Un mot qui fait bannir dans le message enregistré : rien ne part, le geste est demandé.
+    if(typeof prefs.message==='string'&&!messageAutoPermis(prefs.message,'vinted'))return await stop('message_risque');
     let p;try{p=validerReglagesFavoris(prefs);}catch{return await stop('reglages');}
     const message=preparerMessageFavori(p.message,p.pourcentage).message;if(!message)return await stop('reglages');
     const offre=p.offreMode?{mode:p.offreMode,valeur:p.offreMode==='pct'?p.pourcentage:p.offreValeur,arrondi:p.arrondi===true}:null;
@@ -145,7 +170,7 @@ export async function tourAuto(req,{owner,uid,cle,maintenant,extension=null}){
     // Aucun favori prêt, et au moins un sauté faute d'identité prouvée : un geste de
     // Julien (ouvrir un favori depuis la cloche) le réglera — VRM le demande.
     const demande=!choisi&&sauts.some(x=>x.raison==='destinataire_non_prouve')?'destinataire_non_prouve':null;
-    const r=await modifierNeutre(cle,d=>ajouterAuto(d,{owner,maintenant,choisi,sauts,message,offre,prochainFavori:tri.prochainFavori,extension,demande}));
+    const r=await modifierNeutre(cle,d=>ajouterAuto(d,{owner,maintenant,choisi,sauts,message,variantes:p.variantes||null,offre,prochainFavori:tri.prochainFavori,extension,demande}));
     if(!r)return await stop('lecture');
     return r.valeur;
   }catch(e){if(e?.auto)return await stop(e.auto);if(e instanceof RefusFavoris)throw e;return await stop('lecture');}
@@ -165,11 +190,12 @@ export async function routeFavoris(req,res){
     if(req.method==='GET')decision=d=>({valeur:vueFile(initialiserFile(d),owner)});
     else{
       const c=req.body;
-      if(!c||typeof c!=='object'||Array.isArray(c)||JSON.stringify(c).length>5000)throw new RefusFavoris('Commande invalide.',400);
+      // (5.369) 5 versions du message (2 000 caractères chacune) peuvent voyager dans les réglages.
+      if(!c||typeof c!=='object'||Array.isArray(c)||JSON.stringify(c).length>(c&&c.action==='lancer'?100000:16000))throw new RefusFavoris('Commande invalide.',400);
       if(c.action==='lancer'){
         const ids=[`harvest_${uid}_notifications`,`harvest_${uid}_wreq_api_v2_conversations`,`vrm_favoris_reglages_${uid}`];
         const archiveId=`harvest_${uid}_favoris_archive`;
-        const rows=await lireCommeVendeur(req,`app_data?owner=eq.${owner}&id=in.(${[...ids,archiveId].join(',')})&select=id,owner,data`);
+        const rows=await lireLignesFavoris(c=>lireCommeVendeur(req,c),owner,[ids[0],ids[1],archiveId],ids[2]);
         if(!Array.isArray(rows)||rows.some(x=>x.owner!==owner)||ids.slice(1).some(id=>rows.filter(x=>x.id===id).length!==1))throw new RefusFavoris('Capture ou réglages indisponibles. Actualise et enregistre tes réglages avant de lancer.');
         const lire=id=>rows.find(x=>x.id===id)?.data;
         const prefs=lire(ids[2]);if(prefs?.version!==1||prefs.envoisActifs!==false)throw new RefusFavoris('Relis et enregistre les réglages de ce compte.');
@@ -198,7 +224,7 @@ export async function routeFavoris(req,res){
           }
         }
         const lot=randomUUID();const offre=p.offreMode?{mode:p.offreMode,valeur:p.offreMode==='pct'?p.pourcentage:p.offreValeur,arrondi:p.arrondi===true}:null;
-        decision=d=>lancerFile(d,{owner,targets,message,intervalleMinutes:p.intervalleMinutes,intervalleMax:p.intervalleMaxMinutes,maintenant,lot,pourcentage:p.pourcentage,offre});
+        decision=d=>lancerFile(d,{owner,targets,message,variantes:p.variantes||null,intervalleMinutes:p.intervalleMinutes,intervalleMax:p.intervalleMaxMinutes,maintenant,lot,pourcentage:p.pourcentage,offre});
       }else if(c.action==='auto_regler'){
         decision=d=>reglerAuto(d,{owner,reglages:c.reglages,confirme:c.confirme===true,maintenant});
       }else if(c.action==='auto_stop'){
@@ -216,7 +242,7 @@ export async function routeFavoris(req,res){
         const jeton=randomUUID(),suivi=randomUUID();decision=d=>reserverFile(d,{owner,maintenant,jeton,suivi});
       }else if(c.action==='terminer'){
         if(typeof c.jeton!=='string'||!/^[0-9a-f-]{36}$/.test(c.jeton))throw new RefusFavoris('Tentative invalide.',400);
-        decision=d=>terminerFile(d,{owner,jeton:c.jeton,resultat:c.resultat,raison:c.raison,maintenant,ecrits:Number.isInteger(c.ecrits)?c.ecrits:null});
+        decision=d=>terminerFile(d,{owner,jeton:c.jeton,resultat:c.resultat,raison:c.raison,maintenant,ecrits:Number.isInteger(c.ecrits)?c.ecrits:null,variante:Number.isInteger(c.variante)?c.variante:null});
       }else if(c.action==='consommer'){
         const v=typeof c.version==='string'&&c.version.length<32?/^(\d+)\.(\d+)\.(\d+)$/.exec(c.version):null;
         if(!v||!(Number(v[1])>5||Number(v[1])===5&&Number(v[2])>=217))throw new RefusFavoris('Recharge l’extension 5.217 pour vérifier l’historique avant tout envoi.');

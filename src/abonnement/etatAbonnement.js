@@ -50,6 +50,11 @@ export function etatAbonnement(x, maintenant = Date.now()) {
   }
   if (statut === 'active') return { ...base, etat: x.annuleFinPeriode ? 'resilie' : 'actif', finLe: x.finPeriode ? dateCourte(x.finPeriode) : '' };
   if (statut === 'past_due' || statut === 'unpaid') return { ...base, etat: x.acces === false ? 'expire' : 'impaye', impaye: true };
+  // (12 nov., ouverture aux clients) JAMAIS ABONNÉ (aucun statut, aucun client
+  // Stripe) et la base ferme : c'est un NOUVEAU client, pas un abonnement « qui a
+  // pris fin ». Il voit l'offre (l'essai gratuit s'il y a droit), et l'aperçu
+  // garde sa carte, avec les mots d'un début (banc paiement-bout-en-bout).
+  if (x.acces === false && !statut && !x.peutGerer) return { ...base, etat: 'sans', nouveau: true };
   // Plus d'abonnement vivant : expiré seulement si la BASE le dit (obligatoire).
   if (x.acces === false) return { ...base, etat: 'expire', ancien: STATUTS_TERMINES.has(statut) || !!x.peutGerer };
   if (x.configure === false) return { ...base, etat: 'non-branche' };
@@ -129,4 +134,11 @@ export function codeParrainDe(search) {
     return CODE_PARRAIN_RE.test(c) ? c : '';
   } catch (_) { return ''; }
 }
-export const lienParrainage = (code) => (CODE_PARRAIN_RE.test(String(code || '')) ? `https://vrm.center/?parrain=${code}` : '');
+// (11 nov.) Le lien court `vrm.center/r/CODE` (redirigé vers `/?parrain=CODE` par vercel.json).
+export const lienParrainage = (code) => (CODE_PARRAIN_RE.test(String(code || '')) ? `https://vrm.center/r/${code}` : '');
+// Le code d'un chemin `/r/CODE` (si la redirection n'a pas eu lieu : aperçu local, autre hôte).
+export function codeParrainDuChemin(chemin) {
+  const m = /^\/r\/([A-Za-z0-9]{8})\/?$/.exec(String(chemin || ''));
+  const c = m ? m[1].toUpperCase() : '';
+  return CODE_PARRAIN_RE.test(c) ? c : '';
+}

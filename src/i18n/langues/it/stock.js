@@ -223,4 +223,16 @@ export default {
   "stock.titre2": "Titolo",
   "stock.statut": "Stato",
   "stock.venteCours2": "⏳ Vendita in corso",
+  // ── ecrans/Stock.jsx
+  "stock.rienDit": "(niente dice",
+  "stock.texte2": "qual è)",
+  "stock.annoncesVestiaireEtat": { one: " · {n} annuncio Vestiaire senza stato noto (né online né venduto) non contato", other: "· {n} annunci Vestiaire senza stato noto (né online né venduti) non contati" },
+  "stock.verifiees": { one: "{n} non verificato", other: "{n} non verificati" },
+  "stock.range3": "sistemato",
+  "stock.verifie": "non verificato",
+  "stock.dansListe": "nella lista",
+  "stock.aucuneVenteReporter2": "Nessuna vendita da riportare ({scanned} ordini analizzati).",
+  "stock.memeTitreSans": "Stesso titolo, nessuna prova: collegalo tu",
+  "stock.vendue2": " · venduto",
+  "stock.texte3": "È il N° {numero}",
 };

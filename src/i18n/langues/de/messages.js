@@ -162,4 +162,9 @@ export default {
   "messages.compteNonIdentifie": "Konto nicht erkannt",
   "messages.verifieAdresseReception": "Prüfe die Empfangsadresse, bevor du diese E-Mail zuordnest.",
   "messages.verifierAdresses": "Adressen prüfen",
+  // ── ecrans/MessagesLeboncoin.jsx
+  "messages.messagesNonLus": { one: "{n} ungelesene Nachricht", other: "{n} ungelesene Nachrichten" },
+  "messages.favoris": { one: "{n} Favorit", other: "{n} Favoriten" },
+  "messages.annoncesReleveesVente": { one: " bei {n} gelesenen Anzeige ({adsN} im Verkauf)", other: "bei {n} gelesenen Anzeigen ({adsN} im Verkauf)" },
+  "messages.annoncesVente": { one: " — {n} Anzeige im Verkauf", other: "— {n} Anzeigen im Verkauf" },
 };

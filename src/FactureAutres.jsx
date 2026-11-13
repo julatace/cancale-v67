@@ -11,9 +11,10 @@
 //     « Émettre la facture » (confirmé) — numéro de la MÊME suite que Vinted.
 // VRM n'envoie pas ces factures par e-mail (aucune adresse prouvée) : PDF.
 // Le serveur (api/_lib/facture-autres.js) relit la vente lui-même et refait la règle.
+import { fetchBorne, DELAI_ROUTE_MS, NOM_DELAI } from './reseauBorne.js';
 import React from 'react';
 import { SheetShell } from './composants/SheetShell.jsx';
-import { ApercuFacture, useFicheFacturation, FicheFacturation, relireFactures, ecrireChampsFiche } from './FacturePro.jsx';
+import { ApercuFacture, MiniatureFacture, apercuEnGrand, useFicheFacturation, FicheFacturation, relireFactures, ecrireChampsFiche } from './FacturePro.jsx';
 import { compteFacturable, avecCompte, compteDeVente } from './facturePro/comptes.js';
 import { verifierSiret, manquantsVendeur, manquantsVente, contenuFacture, euros, jourParis, nomFichier } from './facturePro/regle.js';
 import { PLATEFORMES, venteAutre, idFactureAutre, manquantsAcheteurSaisi, venteFacture, ID_FACTURE_AUTRE_RE } from './facturePro/sources.js';
@@ -56,10 +57,11 @@ async function ouvrirPdf(contenu, deps, partager = false) {
 }
 async function route(deps, corps) {
   try {
-    const r = await fetch('/api/compte?mode=facture-autre', { method: 'POST', headers: { 'Content-Type': 'application/json', ...deps.enTeteSession() }, body: JSON.stringify(corps) });
+    // (11 nov., réseau instable) Bornée, comme src/FacturePro.jsx (rejeu = même facture).
+    const r = await fetchBorne(fetch, '/api/compte?mode=facture-autre', { method: 'POST', headers: { 'Content-Type': 'application/json', ...deps.enTeteSession() }, body: JSON.stringify(corps) }, DELAI_ROUTE_MS);
     const j = await r.json().catch(() => null);
     return { code: r.status, j: j || {} };
-  } catch (_) { return { code: 0, j: { message: "Pas de réseau : rien n'a été fait." } }; }
+  } catch (e) { return { code: 0, j: { message: typeof navigator !== 'undefined' && navigator.onLine === false && !(e && e.name === NOM_DELAI) ? "Pas de réseau : rien n'a été fait." : "La réponse n'est pas arrivée (réseau trop faible). Réessaie : si elle était partie, tu retrouveras la même facture, jamais une deuxième." } }; }
 }
 // Pro = sa fiche « Ma facture » porte un SIRET valide. `undefined` = pas su encore.
 const estPro = (cfg) => (cfg === undefined ? undefined : !!(cfg && verifierSiret(cfg.siret).etat === 'ok'));
@@ -173,7 +175,7 @@ function FeuilleFactureAutre({ v, cfg, deps, fermer, deja = null }) {
             <label className="vrm-fp-champ is-large"><span>Désignation</span><input value={designation} onChange={(e) => setDesignation(e.target.value)}/></label>
             <p className="vrm-fp-muet" data-fa-prix={v.centimes}>Prix : <b className="vrm-fp-chiffre">{euros(v.centimes)}</b> — celui de la vente {L} n° {v.ref}, du {jourParis(v.venteLe)}.</p>
           </section>
-          {apercu ? <section className="vrm-fp-section"><h3>Aperçu de la facture</h3><ApercuFacture contenu={apercu} provisoire sensible numeroLibelle="N° donné à l'émission"/></section> : null}
+          {apercu ? <section className="vrm-fp-section"><h3>Aperçu de la facture</h3><MiniatureFacture ouvrir={() => ouvrirPdf(apercuEnGrand(apercu), deps)}><ApercuFacture contenu={apercu} provisoire sensible numeroLibelle="N° donné à l'émission"/></MiniatureFacture></section> : null}
           {!mv.length && (ma.length || mvt.length) ? <p className="vrm-fp-muet" data-fa-manque="">Il manque {[...ma, ...mvt].map((m) => m.l).filter((x, i, t) => t.indexOf(x) === i).join(', ')}.</p> : null}
           <div className="vrm-fp-gestes is-bas">
             <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" data-fa-emettre="" disabled={occupe || !cfg || !!mv.length || !!ma.length || !!mvt.length} onClick={emettre}>{occupe ? 'Un instant…' : 'Émettre la facture'}</button>

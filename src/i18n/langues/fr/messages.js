@@ -162,4 +162,9 @@ export default {
   "messages.compteNonIdentifie": "Compte non identifié",
   "messages.verifieAdresseReception": "Vérifie l’adresse de réception avant de rattacher cet e-mail.",
   "messages.verifierAdresses": "Vérifier les adresses",
+  // ── ecrans/MessagesLeboncoin.jsx
+  "messages.messagesNonLus": { one: "{n} message non lu", other: "{n} messages non lus" },
+  "messages.favoris": { one: "{n} favori", other: "{n} favoris" },
+  "messages.annoncesReleveesVente": { one: " sur {n} annonce relevée ({adsN} en vente)", other: " sur {n} annonces relevées ({adsN} en vente)" },
+  "messages.annoncesVente": { one: " — {n} annonce en vente", other: " — {n} annonces en vente" },
 };

@@ -110,6 +110,9 @@ async function ouvrir(b, vp, { panne = false, tab = 'cat_bord' } = {}) {
   return { ctx, pg, errs, tel };
 }
 const onglet = async (pg, v) => {
+  // (11 nov., revue colis) « À retirer » n'est plus un onglet de Colis : c'est la section de tête d'Achats (lot DJ3).
+  // Sans ce passage, le contrôle R lisait l'écran Ventes resté ouvert (ses colis ENVOYÉS) et rougissait à tort.
+  if (v === 'retirer') { await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 }).catch(() => {}); await pg.waitForTimeout(1500); return; }
   await pg.click(`[data-colis-onglet-choix="${v}"]`).catch(() => {});
   await pg.waitForFunction((x) => { const e = document.querySelector('[data-colis-onglet]'); return e && e.getAttribute('data-colis-onglet') === x; }, v, { timeout: 8000 }).catch(() => {});
   await pg.waitForTimeout(700);

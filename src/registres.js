@@ -46,7 +46,10 @@
 // « au moins ») — jamais un total partiel présenté comme complet (§5). Jamais
 // « encaissé » (§5).
 // ─────────────────────────────────────────────────────────────────────────────
+import { motsVendeur } from './profilVendeur.js';
 import { montantPropose } from './prixAchatPropose.js';
+import { modePaiementLu, libellePaiement } from './modePaiement.js';
+import { jourParis, moisParis } from './dateParis.js';
 
 const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 // (9 nov.) + le TRIMESTRE (« AAAA-T1 » … « AAAA-T4 ») pour « Exporter pour mon
@@ -73,8 +76,8 @@ export const moisDePeriode = (periode) => {
   return out;
 };
 export const dansPeriode = (ym, periode) => !!ym && !!periode && moisDePeriode(periode).includes(String(ym));
-const ymLocal = (t) => { const d = new Date(t); return isNaN(d) ? '' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
-export const jourFr = (t) => { const d = new Date(t); return t == null || isNaN(d) ? '' : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`; };
+const ymLocal = (t) => moisParis(t);   // (11 nov.) mois de PARIS (même règle que le CA déclaré)
+export const jourFr = (t) => { const j = t == null ? '' : jourParis(t); return j ? `${j.slice(8, 10)}/${j.slice(5, 7)}/${j.slice(0, 4)}` : ''; };
 const cts = (x) => (x == null || x === '' || !Number.isFinite(Number(x)) ? null : Math.round(Number(x) * 100));
 const centimesTexte = (v) => {
   if (v == null) return null;
@@ -103,6 +106,8 @@ export function livreDesRecettes({ decl, periode, numDe = () => '', compteDe = (
     frais: Number.isFinite(l.frais) ? l.frais : null,
     reglement: `Versement ${l.plateforme}`, reference: referenceDe(l.id), num: String(numDe(String(l.id)) || ''),
     compte: String(compteDe(String(l.id)) || ''), titre: String(l.titre || ''), raison: raison || '',
+    // (11 nov., lot livre-registre) Le mois que la règle donne (`l.ym`) et le compte Vinted (uid) : par identité.
+    ym: String(l.ym || ''), uid: l.o && l.o._acc && l.o._acc.vinted_user_id != null ? String(l.o._acc.vinted_user_id) : '',
     // (9 nov.) Ce que la date de la ligne EST, selon la règle de `ventesDeclarables` :
     // le versement (Vinted, Vestiaire) ; la vente (Leboncoin) ; la commande (eBay).
     // La date de vente d'une ligne Vinted est celle de SA commande (`dateVente`).
@@ -192,7 +197,7 @@ export function registreDesAchats({ achats = null, hors = [], fiches = null, ven
     }
     const ts = Date.parse(o.date || '');
     const l = { id, ts: Number.isFinite(ts) ? ts : null, date: jourFr(ts), plateforme: 'Vinted', fournisseur: 'Vinted', montant, source, raison, saisi,
-      reglement: 'Paiement Vinted', reference: tx, num: nums.join(' + '), compte: String(o.compte || ''), titre: String(o.title || '') };
+      reglement: 'Paiement Vinted', reference: tx, num: nums.join(' + '), compte: String(o.compte || ''), titre: String(o.title || ''), uid: String(o._uid || '') };
     if (l.ts == null) { sansDate.push(l); continue; }
     if (dansPeriode(ymLocal(l.ts), periode)) lignes.push(l);
   }
@@ -211,7 +216,7 @@ export function registreDesAchats({ achats = null, hors = [], fiches = null, ven
     const doublon = !!num && numsGros.has(cleNum(num));
     const l = { id: 'hors:' + hid, ts: Number.isFinite(ts) ? ts : null, date: jourFr(ts), plateforme: 'Hors plateforme',
       fournisseur: rat || String((typeof sourceHors === 'function' ? sourceHors(b.source) : b.source) || ''), montant: p == null ? null : p, source: p == null ? '' : 'saisi', saisi: p == null ? null : p,
-      raison: p == null ? 'prix pas saisi' : (doublon ? 'N° aussi dans un achat en gros : à vérifier' : ''), reglement: '', reference: '', num, compte: '', titre: String(b.title || ''),
+      raison: p == null ? 'prix pas saisi' : (doublon ? 'N° aussi dans un achat en gros : à vérifier' : ''), reglement: libellePaiement(b.paiement), paiement: modePaiementLu(b.paiement), reference: '', num, compte: '', titre: String(b.title || ''),
       paires: '', frais: null, rattache: !!rat, aVerifier: doublon };
     if (l.ts == null) { sansDate.push(l); continue; }
     if (dansPeriode(ymLocal(l.ts), periode)) { lignes.push(l); if (doublon) aVerifier += 1; }
@@ -225,8 +230,8 @@ export function registreDesAchats({ achats = null, hors = [], fiches = null, ven
     const ts = /^\d{4}-\d{2}-\d{2}$/.test(String(a.date || '')) ? Date.parse(a.date + 'T12:00:00') : NaN;
     const reliees = (parGros.get(gid) || []).map((e) => String(e.numero == null ? '' : e.numero).trim()).filter(Boolean).sort((x, y) => x.localeCompare(y, 'fr', { numeric: true }));
     const l = { id: 'gros:' + gid, ts: Number.isFinite(ts) ? ts : null, date: jourFr(ts), plateforme: 'Achat en gros', fournisseur: nom,
-      montant: (a.total + frais) / 100, source: 'saisi', saisi: (a.total + frais) / 100, raison: '', reglement: '', reference: '', num: reliees.join(' + '), compte: '',
-      titre: `En gros · ${a.paires} paire${a.paires > 1 ? 's' : ''}${reliees.length ? ` · ${reliees.length} reliée${reliees.length > 1 ? 's' : ''}` : ''}`,
+      montant: (a.total + frais) / 100, source: 'saisi', saisi: (a.total + frais) / 100, raison: '', reglement: libellePaiement(a.paiement), paiement: modePaiementLu(a.paiement), reference: '', num: reliees.join(' + '), compte: '',
+      titre: `En gros · ${a.paires} ${a.paires > 1 ? motsVendeur().noms : motsVendeur().nom}${reliees.length ? ` · ${reliees.length} relié${motsVendeur().e}${reliees.length > 1 ? 's' : ''}` : ''}`,
       paires: String(a.paires), frais: frais ? frais / 100 : null, gros: true };
     if (l.ts == null) { sansDate.push(l); continue; }
     if (dansPeriode(ymLocal(l.ts), periode)) { lignes.push(l); nGros += 1; }
@@ -265,7 +270,7 @@ export function resumeRegistre(R) {
 }
 const COLONNES = {
   recettes: [['date', 'Date'], ['montant', 'Montant', 1], ['plateforme', 'Plateforme'], ['reglement', 'Règlement'], ['reference', 'Référence'], ['num', 'N°'], ['compte', 'Compte']],
-  achats: [['date', 'Date'], ['fournisseur', 'Fournisseur'], ['paires', 'Paires', 1], ['montant', 'Montant', 1], ['frais', 'Dont frais', 1], ['source', 'Montant lu'], ['reglement', 'Règlement'], ['reference', 'Référence'], ['num', 'N°'], ['titre', 'Article']],
+  get achats() { return [['date', 'Date'], ['fournisseur', 'Fournisseur'], ['paires', motsVendeur().Noms, 1], ['montant', 'Montant', 1], ['frais', 'Dont frais', 1], ['source', 'Montant lu'], ['reglement', 'Règlement'], ['reference', 'Référence'], ['num', 'N°'], ['titre', 'Article']]; },
 };
 const cellule = (l, k, tableur) => {
   if (k === 'montant') return l.montant == null ? (tableur ? '' : '—') : (tableur ? tableurNb(l.montant) : eurosTexte(l.montant));

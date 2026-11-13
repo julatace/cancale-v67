@@ -84,7 +84,8 @@ async function auditer() {
   const iPh = form.indexOf('data-achat-hors-photo'), iTi = form.indexOf('data-champ="titre"'), iPx = form.indexOf('data-champ="prix"'), iOu = form.indexOf('data-champ="lieu"'), iDa = form.indexOf('data-champ="date"'), iNu = form.indexOf('data-champ="numero"');
   dit(iPh > 0 && iPh < iTi && iTi < iPx && iPx < iOu && iOu < iDa && iDa < iNu, '5 · « Nouvel achat » : photo, nom, prix, où, date, N° (dans cet ordre)', JSON.stringify([iPh, iTi, iPx, iOu, iDa, iNu]));
   dit(/data-achat-hors-num-propose/.test(form) && /onClick=\{\(\) => setForm\(d => \(\{ \.\.\.d, numero: numPropose \}\)\)\}/.test(form) && !/numero: numPropose[^}]*BROUILLON0/.test(form) && /BROUILLON0 = \(\) => \(\{[^}]*numero: ''/.test(form), '5 · le N° proposé n’est posé que par SON toucher (brouillon vide)');
-  dit(/rec\.numero === String\(prochainNumero\) && onReserverNumero/.test(form) && /onReserverNumero=\{recordUsed\}/.test(appS), '5 · le N° proposé pris est réservé dans le pool (recordUsed, append-only)');
+  // (11 nov., revue robustesse) TOUT N° posé — proposé OU tapé à la main — est réservé.
+  dit(/if \(rec\.numero && onReserverNumero\) onReserverNumero\(rec\.numero\)/.test(form) && /onReserverNumero=\{recordUsed\}/.test(appS), '5 · le N° posé (proposé ou tapé) est réservé dans le pool (recordUsed, append-only)');
   dit(/BROUILLON0 = \(\) => \(\{[^}]*price: ''/.test(form), '5 · le prix n’est jamais pré-rempli (§2.5)');
   // 6
   const bloc = (/const ICON_PATHS = \{([\s\S]*?)\n\};/.exec(app) || ['', ''])[1];

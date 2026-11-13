@@ -52,7 +52,7 @@
 // même égalité exacte, une lecture ratée ⇒ 503 (eBay renvoie).
 // ────────────────────────────────────────────────────────────────────────────
 import crypto from 'crypto';
-import { ordreStable } from './ordre-stable.js';
+import { ordreStable, finALaFrontiere } from './ordre-stable.js';
 
 export const MARQUE_SUPPRIME = 'compte eBay supprimé';
 const URL_CLE = 'https://api.ebay.com/commerce/notification/v1/public_key/';
@@ -225,10 +225,7 @@ async function lireToutesLignes(base, cle, sbCle, requete, fetcher) {
     let r;
     try { r = await fetcher(ordreStable(`${base}/rest/v1/app_data?${requete}`), { headers: { ...sbCle(cle), 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } }); }
     catch (_) { return null; }
-    if (r.status === 416) {
-      const fin = /^\*\/(\d+)$/.exec((r.headers && r.headers.get && r.headers.get('content-range')) || '');
-      return fin && Number(fin[1]) === from ? out : null;
-    }
+    if (finALaFrontiere(r, from)) return out;   // (11 nov.) 416 à une frontière exacte = fin de liste
     if (!r.ok) return null;
     let j; try { j = await r.json(); } catch (_) { return null; }
     if (!Array.isArray(j)) return null;
@@ -322,7 +319,9 @@ export async function traiterSuppressionEbay(req, dep) {
     const owners = [...new Set(cibles.filter((l) => l.id === 'ebay_comptes').map((l) => String(l.owner)))];
     requeteRegistres = owners.length ? `${requeteRegistres}&owner=in.(${owners.join(',')})` : '';
   } else if (!u || PSEUDO_SUR.test(u)) {
-    const motifs = [u, cleEias].filter(Boolean).map((x) => `data->>comptes.ilike.*${x}*`);
+    // (11 nov., B142) chaque motif ENTRE GUILLEMETS : une virgule ou une parenthèse dans la
+    // clé eBay ne casse plus le filtre `or=()` (400 ⇒ 503 ⇒ eBay rejouait sans fin).
+    const motifs = [u, cleEias].filter(Boolean).map((x) => `data->>comptes.ilike."*${String(x).replace(/["\\]/g, '')}*"`);
     requeteRegistres = motifs.length ? `${requeteRegistres}&or=(${encodeURIComponent(motifs.join(','))})` : '';
   }
   const registres = requeteRegistres ? await lireToutesLignes(supabaseUrl, cleService, sbCle, requeteRegistres, fetcher) : [];

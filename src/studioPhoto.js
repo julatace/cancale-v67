@@ -28,6 +28,7 @@
 // détoure correctement ; ses bords restent doux. L'écran le dit et garde
 // TOUJOURS la photo d'origine à côté : jamais un remplacement silencieux.
 
+import { modifierLigneCas } from './ligneCas.js';
 export const ORT_VERSION = '1.22.0';
 export const ORT_BASE = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VERSION}/dist/`;
 export const ORT_SCRIPT = `${ORT_BASE}ort.wasm.min.js`;
@@ -89,20 +90,22 @@ export const lireStudio = async (base, cle) => {
 
 // Lire-fusionner-réécrire, GARDÉ : une lecture ratée n'écrit rien (sinon la
 // ligne repartirait avec la seule photo du moment — la famille §5 qui détruit).
+// (12 nov., revue de robustesse, point 40) Par COMPARER-ET-ÉCHANGER sur `data.rev`
+// (src/ligneCas.js) : deux photos ajoutées vite à la suite, ou depuis deux appareils,
+// restent toutes les deux — la seconde écriture repart de la ligne RELUE, plus de
+// la liste lue avant la première. `changer` peut être rejoué (devancé ⇒ relu).
 export const modifierStudio = async (base, cle, numero, changer) => {
-  const lu = await lireStudio(base, cle);
-  if (lu === null) return { ok: false, raison: 'lecture' };
-  const photos = changer(lu.photos.slice());
-  if (photos === false) return { ok: true, photos: lu.photos, rien: true };
-  try {
-    const r = await fetch(`${base.url}/rest/v1/app_data?on_conflict=${base.conflit()}`, {
-      method: 'POST',
-      headers: base.auth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
-      body: JSON.stringify(base.withOwner({ id: ID_STUDIO(cle), data: { numero, cle, photos, majAt: new Date().toISOString() } })),
-    });
-    if (!r.ok) return { ok: false, raison: 'ecriture', statut: r.status };
-    return { ok: true, photos };
-  } catch (_) { return { ok: false, raison: 'ecriture' }; }
+  let photos = null, rien = false;
+  const res = await modifierLigneCas({ base: base.url, id: ID_STUDIO(cle), entetes: (x) => base.auth(x), estampille: (o) => base.withOwner(o),
+    modifier: (actuel) => {
+      const lues = (actuel && Array.isArray(actuel.photos)) ? actuel.photos : [];
+      const p = changer(lues.slice());
+      if (p === false) { photos = lues; rien = true; return undefined; }
+      photos = p; rien = false;
+      return { ...(actuel || {}), numero, cle, photos: p, majAt: new Date().toISOString() };
+    } });
+  if (!res.ok) return { ok: false, raison: res.raison === 'lecture' ? 'lecture' : 'ecriture', statut: res.statut };
+  return rien ? { ok: true, photos, rien: true } : { ok: true, photos };
 };
 
 // ── Détourage local ──────────────────────────────────────────────────────────

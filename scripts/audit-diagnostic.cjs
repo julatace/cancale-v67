@@ -77,8 +77,9 @@ const attendre = () => new Promise((r) => setTimeout(r, 30));
       const c = demarrerWorker(bloc, {}, journal);
       await c.noterDiag('label_url_introuvable'); await attendre();
       const e = journal.base;
-      (e.rates && e.rates.item && e.rates.item.tete === '<!DOCTYPE html>')
-        ? ok("noterDiag n'efface pas les échantillons (`rates`)")
+      // 5.362 (revue, moyenne 49) : l'échantillon est GARDÉ, mais son `tete` (un morceau du corps) est effacé.
+      (e.rates && e.rates.item && typeof e.rates.item === 'object' && !('tete' in e.rates.item))
+        ? ok("noterDiag n'efface pas les échantillons (`rates`) — sans morceau de corps (5.362)")
         : nok("noterDiag n'efface pas les échantillons", '`rates` a disparu');
       e.autre === 'à garder'
         ? ok('noterDiag garde les autres champs de la ligne')
