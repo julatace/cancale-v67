@@ -20,11 +20,11 @@ export const TEXTE_PARTAGE = 'Je t’offre 1 mois de VRM, l’outil qui gère me
 // Les états rendus par la route (`etatsFilleuls`) : un mot court (à droite) et sa phrase (dessous).
 export const ETATS_FILLEUL = {
   inscrit: { court: 'Inscrit', detail: 'pas encore payé son 1er mois' },
-  paye: { court: 'A payé', detail: 'a payé son 1er mois · ton mois offert arrive' },
-  'attente-toi': { court: 'A payé', detail: 'a payé son 1er mois · ton mois offert t’attend, déduit de ton 1er paiement' },
-  offert: { court: 'Mois offert', detail: 'a payé son 1er mois · mois offert crédité' },
-  plafond: { court: 'A payé', detail: 'a payé son 1er mois · plafond de 12 mois offerts cette année atteint' },
-  refuse: { court: 'Pas retenu', detail: 'règle anti-abus : même personne, ou compte Vinted déjà connu de VRM' },
+  paye: { court: 'A payé', detail: 'a payé son 1er mois · ton mois arrive' },
+  'attente-toi': { court: 'A payé', detail: 'a payé · ton mois t’attend (ton 1er paiement)' },
+  offert: { court: 'Mois offert', detail: 'a payé son 1er mois' },
+  plafond: { court: 'A payé', detail: 'a payé · plafond de 12 mois atteint' },
+  refuse: { court: 'Pas retenu', detail: 'règle anti-abus' },
 };
 export function texteEtatFilleul(etat) {
   return ETATS_FILLEUL[etat] || ETATS_FILLEUL.inscrit;

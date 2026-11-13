@@ -144,7 +144,7 @@ const attendre = (pg, sel, ms = 12000) => pg.waitForSelector(sel, { timeout: ms 
         dit(!!r && r.partager === partage, partage ? '  téléphone : « Partager » (partage natif)' : '  sans partage natif : pas de bouton « Partager » qui ne mènerait nulle part', JSON.stringify(r && r.partager));
         dit(!!r && r.mois === '2' && r.gagnes === '2', '  « Mois gagnés : 2 » (1 comme parrain + le sien comme filleul)', JSON.stringify(r && r.mois));
         const etats = r ? r.filleuls.map((x) => x.e).join(',') : '';
-        dit(etats === 'offert,paye,inscrit' && /^Filleul 1 inscrit le 2 nov\. · a payé son 1er mois · mois offert crédité Mois offert$/.test(r.filleuls[0].t) && /a payé son 1er mois/.test(r.filleuls[1].t) && /A payé$/.test(r.filleuls[1].t) && /pas encore payé son 1er mois Inscrit$/.test(r.filleuls[2].t), '  une ligne par filleul : inscrit · a payé son 1er mois · mois offert', JSON.stringify(r && r.filleuls));
+        dit(etats === 'offert,paye,inscrit' && /^Filleul 1 inscrit le 2 nov\. · a payé son 1er mois Mois offert$/.test(r.filleuls[0].t) && /a payé son 1er mois/.test(r.filleuls[1].t) && /A payé$/.test(r.filleuls[1].t) && /pas encore payé son 1er mois Inscrit$/.test(r.filleuls[2].t), '  une ligne par filleul : inscrit · a payé son 1er mois · mois offert', JSON.stringify(r && r.filleuls));
         dit(!!r && !/@|[0-9a-f]{8}-[0-9a-f]{4}-/.test(r.texte), '  aucune adresse ni identifiant à l’écran');
         dit(!!r && r.nom === 'Julie' && /Offert par Marc/.test(r.parraine), '  « Ton nom chez tes filleuls : Julie » ; son propre parrainage « Offert par Marc »', JSON.stringify(r && { n: r.nom, p: r.parraine }));
         dit(appels.every((a) => a.m === 'GET'), '  ouvrir l’écran n’écrit rien');
