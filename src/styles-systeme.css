@@ -67,6 +67,7 @@
 
   /* Hauteur d'un contrôle : 44 au doigt ; 36 à la souris (plus bas). */
   --d-h-ctrl: 44px;
+  --d-h-filtre: 44px;              /* une pilule de filtre, une puce : 44 au doigt, 32 à la souris */
   --d-t-ctrl: 15px;
 
   /* Surfaces — le « groupé » d'iOS. */
@@ -161,7 +162,7 @@
 /* À la souris (ordinateur), les contrôles sont plus bas : un écran d'ordinateur n'est pas
    un téléphone agrandi (règle 4 de la revue du 11 nov.). Au doigt (iPad compris), 44. */
 @media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  :root:root { --d-h-ctrl: 36px; --d-t-ctrl: 13px; --d-t-44: 44px; }
+  :root:root { --d-h-ctrl: 36px; --d-h-filtre: 32px; --d-t-ctrl: 13px; --d-t-44: 44px; }
 }
 
 /* ══ 2. LES FORMES ═══════════════════════════════════════════════════════════ */
@@ -291,10 +292,12 @@
 :root:root[data-theme="dark"] body .vrm-main :is(.vrm-seg > button[aria-pressed="true"], .vrm-seg > button.is-actif, .vrm-seg > button[aria-current="page"], .vrm-sel-sites > button[aria-pressed="true"], .vrm-messages-sections > button[aria-pressed="true"]) {
   background: #636366 !important; box-shadow: none !important;
 }
-/* Les filtres (pilules) : 36 / 32, l'actif à l'encre pleine. */
-:root:root body .vrm-main :is(.vrm-filtres > button, .vrm-stock-views > button, .vrm-inbox-filters > button, .vrm-compte-puce) {
-  border-radius: var(--d-r-pilule) !important; font-weight: 600 !important;
+/* Les filtres (pilules) : 44 au doigt, 32 à la souris ; l'actif à l'encre pleine. */
+:root:root body .vrm-main :is(.vrm-filtres:not(.vrm-filtre-site) button, .vrm-stock-views > button, .vrm-inbox-filters > button, .vrm-compte-puce, .vrm-pop-chip) {
+  border-radius: var(--d-r-pilule) !important; font-weight: 600 !important; min-height: var(--d-h-filtre) !important;
 }
+/* Les gestes de rangée écrits à part (« J'ai retiré », un geste de fiche) : la hauteur d'un contrôle. */
+:root:root body .vrm-main :is(.vrm-rpf-retire, .vrm-d7-btn, .vrm-fiche-geste) { min-height: var(--d-h-ctrl) !important; }
 /* Les pastilles d'état et les badges : capsule, 12/600. */
 :root:root body .vrm-main .vrm-badge { border-radius: var(--d-r-pilule) !important; font-weight: 600 !important; }
 /* Le N° de rangement : rayon 6, 700 (jamais 800). */
