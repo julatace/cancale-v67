@@ -136,6 +136,14 @@ export function suiteDans(ms, maintenant = Date.now()) {
   return m >= 60 ? `suite dans ${Math.round(m / 60)} h` : `suite dans ${m} min`;
 }
 const NOMS_TYPES = { ventes: 'ventes', achats: 'achats', annonces: 'annonces' };
+// Le type dont la tête dit le chiffre (celui en cours, s'il a un chiffre), ou null.
+export function typeEnTete(l) {
+  if (!l || l.etat === 'fini') return null;
+  const k = l.enCours || (!l.ventes.fini ? 'ventes' : !l.achats.fini ? 'achats' : 'annonces');
+  if (k === 'annonces') return null;
+  const t = l[k];
+  return t && (chiffreEstime(t) || (t.total !== null && t.total > 0)) ? k : null;
+}
 // 5.373 : la ligne de tête d'un compte — « Import de ton passé · 340 / ~1 200 ventes · compte X ».
 export function titreImport(l, nomCompte) {
   if (!l) return '';
@@ -143,7 +151,7 @@ export function titreImport(l, nomCompte) {
   if (l.etat === 'fini') bouts.push(l.horizonMois ? `importé (${l.horizonMois} mois)` : 'tout est là');
   else {
     const k = l.enCours || (!l.ventes.fini ? 'ventes' : !l.achats.fini ? 'achats' : 'annonces');
-    const t = k === 'annonces' ? null : l[k];
+    const t = typeEnTete(l) ? l[k] : null;
     const c = t ? (chiffreEstime(t) || (t.total !== null && t.total > 0 ? `${fr(Math.min(t.lus, t.total))} / ${fr(t.total)}` : null)) : null;
     if (c) bouts.push(`${c} ${NOMS_TYPES[k]}`);
     else if (k === 'annonces') bouts.push('annonces');

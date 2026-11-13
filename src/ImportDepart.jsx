@@ -14,7 +14,7 @@
 // UNE fois sur Ma journée (marqué vu, synchronisé).
 // ═══════════════════════════════════════════════════════════════════════════
 import React from 'react';
-import { lireImportDepart, importsAMontrer, phraseImport, texteType, pctType, butType, pagesType, titreImport, texteAnnonces, marquerImportsVus, CLE_IMPORT_VU } from './importDepart.js';
+import { typeEnTete, lireImportDepart, importsAMontrer, phraseImport, texteType, pctType, butType, pagesType, titreImport, texteAnnonces, marquerImportsVus, CLE_IMPORT_VU } from './importDepart.js';
 import { lireTout, load, save, vintedDeChrome, raisonExtGlobale, onVmrExt, vmrCmd, vmrExtPresent, extSait, Bouton } from './App.jsx';
 import './styles-import-depart.css';
 
@@ -49,7 +49,9 @@ function useImportDepart(uids) {
   return [etats, () => setTour((t) => t + 1)];
 }
 
-function Barre({ t, nom }) {
+// 5.373 : `dejaDit` — le chiffre est déjà dans la tête (« 340 / ~1 200 ventes ») : la ligne ne
+// le redit pas (§7, un nombre une fois), elle dit les pages à sa place.
+function Barre({ t, nom, dejaDit = false }) {
   const pc = pctType(t);
   const but = butType(t);
   const pages = pagesType(t);
@@ -58,14 +60,16 @@ function Barre({ t, nom }) {
       data-import-pages={t ? t.pages : ''} data-import-pages-estimees={t && t.pagesEstimees ? t.pagesEstimees : ''} data-import-fini={t && t.fini ? '1' : '0'}>
       <div className="vrm-imp-type-l">
         <span>{nom === 'ventes' ? 'Ventes' : 'Achats'}</span>
-        <span className="vrm-imp-chiffre">{texteType(t, { suivant: nom === 'achats' })}</span>
+        {dejaDit
+          ? <span className="vrm-imp-chiffre" data-import-pages-texte="">{pages || ''}</span>
+          : <span className="vrm-imp-chiffre">{texteType(t, { suivant: nom === 'achats' })}</span>}
       </div>
       {pc !== null && !(t && t.fini) ? (
         <div className="vrm-imp-barre" role="progressbar" aria-label={nom === 'ventes' ? 'Ventes récupérées' : 'Achats récupérés'} aria-valuemin={0} aria-valuemax={but} aria-valuenow={Math.min(t.lus, but)}>
           <i style={{ width: `${Math.max(2, pc)}%` }} />
         </div>
       ) : null}
-      {pages ? <span className="vrm-imp-pages" data-import-pages-texte="">{pages}</span> : null}
+      {pages && !dejaDit ? <span className="vrm-imp-pages" data-import-pages-texte="">{pages}</span> : null}
     </div>
   );
 }
@@ -87,15 +91,18 @@ function LigneAnnonces({ a }) {
 function Compte({ l, nom, montrerNom }) {
   const passe = !!(l.horizonMois || l.annonces);
   const geste = l.etat === 'arrete' || l.souci === 'deconnecte';
+  // La tête dit le chiffre du type en cours ; fini, la phrase dit tout (un texte une fois, §7).
+  const titre = passe && l.etat !== 'fini';
+  const enTete = titre ? typeEnTete(l) : null;
   return (
     <div className="vrm-imp-compte" data-import-compte={l.uid} data-import-etat={l.etat} data-import-souci={l.souci || ''} data-import-horizon={l.horizonMois || ''}>
-      {passe ? <div className="vrm-imp-titre-compte" data-import-titre="">{titreImport(l, montrerNom ? nom : '')}</div> : null}
+      {titre ? <div className="vrm-imp-titre-compte" data-import-titre="">{titreImport(l, montrerNom ? nom : '')}</div> : null}
       <div className="vrm-imp-tete">
-        {montrerNom && !passe ? <span className="vrm-imp-nom">{nom}</span> : null}
+        {montrerNom && !titre ? <span className="vrm-imp-nom">{nom}</span> : null}
         <span className="vrm-imp-phrase" data-ton={geste ? 'geste' : undefined}>{phraseImport(l)}</span>
       </div>
-      <Barre t={l.ventes} nom="ventes" />
-      <Barre t={l.achats} nom="achats" />
+      <Barre t={l.ventes} nom="ventes" dejaDit={enTete === 'ventes'} />
+      <Barre t={l.achats} nom="achats" dejaDit={enTete === 'achats'} />
       <LigneAnnonces a={l.annonces} />
     </div>
   );
