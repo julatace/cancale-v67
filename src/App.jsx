@@ -24851,7 +24851,7 @@ function HotePublierPartout({ comptes, nums, numData, onFermer }) {
   // Les listes Leboncoin et Vestiaire (pour « déjà en ligne ») : trois états.
   const [autres, setAutres] = React.useState(undefined);
   const relire = React.useCallback(async () => {
-    try { _lbcAnnoncesSession = null; } catch (_) {}
+    try { _lbcAnnoncesSession = null; _lbcListingsEnCours = null; } catch (_) {}
     const [lbc, vc] = await Promise.all([lbcListingsSession().catch(() => null),
       lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens`).catch(() => null)]);
     const vcL = Array.isArray(vc) ? (vc[0] || {}) : null;
@@ -53922,7 +53922,7 @@ function aRetirerDeLbcEbay({ soldEbay, posted, numeros, itemsLbc, liens, vendusL
 let _lbcAnnoncesSession = null;
 // (1er nov.) Une capture rangée par l'extension (« maj lbc ») périme ce mémo :
 // sans ça, Favoris reçus montraient pendant 10 min la lecture d'avant.
-try { window.addEventListener('vrm:ext', (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'lbc') _lbcAnnoncesSession = null; }); } catch (_) {}
+try { window.addEventListener('vrm:ext', (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'lbc') { _lbcAnnoncesSession = null; _lbcListingsEnCours = null; } }); } catch (_) {}
 async function lbcAnnoncesSession() {
   const l = await lbcListingsSession();
   return l ? l.items : null;
@@ -53930,8 +53930,17 @@ async function lbcAnnoncesSession() {
 // La même lecture, avec les dates des listes COMPLÈTES de ses comptes
 // (`lectures`, 22 oct.) : le tableau de bord en a besoin pour la même preuve que
 // l'écran Leboncoin (`numerosLbcSortis`, §11). `null` = pas su.
-async function lbcListingsSession() {
-  if (_lbcAnnoncesSession && Date.now() - _lbcAnnoncesSession.t < 10 * 60000) return _lbcAnnoncesSession;
+// (13 nov., intégration) Deux écrans qui la demandent EN MÊME TEMPS (Stock : annonces actuelles + notifications)
+// partagent la lecture en cours (budget-vitesse : lbc_listings lue deux fois à la 2ᵉ ouverture du Stock).
+let _lbcListingsEnCours = null;
+function lbcListingsSession() {
+  if (_lbcAnnoncesSession && Date.now() - _lbcAnnoncesSession.t < 10 * 60000) return Promise.resolve(_lbcAnnoncesSession);
+  if (_lbcListingsEnCours) return _lbcListingsEnCours;
+  const p = lbcListingsLire().finally(() => { if (_lbcListingsEnCours === p) _lbcListingsEnCours = null; });
+  _lbcListingsEnCours = p;
+  return p;
+}
+async function lbcListingsLire() {
   try {
     // (31 oct.) Projetée (§4.4) : les deux champs lus, jamais `select=data`.
     const rows = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_listings&select=items:data->items,lectures:data->lectures`);
