@@ -531,7 +531,6 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 - **13 nov. · Lot 49 (vidéos du « ? »)** : 10 vidéos 720p tournées dans la vraie app, données inventées (`scripts/films/aide-videos.cjs`), ≤ 0,8 Mo, demandées au toucher seulement. `docs/passation/2026-11-13-lot49.md`. Geste : les regarder sur l’iPhone.
-- **13 nov. · Logos des transporteurs** : Chronopost et Pickup = cube bleu sur blanc, jamais jaune ; DPD, DHL, FedEx, Relais Colis en variante neutre ; gabarit commun mesuré. `2026-11-13-logos-transporteurs.md`. Geste : aucun.
 
 - **13 nov. · Lot 56/58** : Solo + comptes Vinted vendeurs payés (`PRIX_COMPTE_SUP_CENTIMES` 3 € à confirmer, prix `vrm_compte_sup`, quantité bornée serveur, « Bientôt » sans prix) ; équipe : « pas encore activé sur ton installation », retrait en un geste. `2026-11-13-lot5658.md`. Geste : 016 (3 gestes), prix Stripe.
 
