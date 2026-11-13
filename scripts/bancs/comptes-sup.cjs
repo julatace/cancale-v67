@@ -198,7 +198,7 @@ const lireReglage = (pg) => pg.evaluate(() => {
         const pg = await ctx.newPage();
         await pg.goto(`http://localhost:${PORT}/`, { waitUntil: 'domcontentloaded' });
         await pg.waitForSelector('[data-offre="solo"]', { timeout: 15000 }).catch(() => {});
-        const a = await pg.evaluate(() => ({ s: (document.querySelector('[data-offre="solo"] [data-solo-supplement]') || {}).innerText || '', deborde: document.documentElement.scrollWidth - window.innerWidth }));
+        const a = await pg.evaluate(() => ({ s: ((document.querySelector('[data-offre="solo"] [data-solo-supplement]') || {}).innerText || '').replace(/\s+/g, ' '), deborde: document.documentElement.scrollWidth - window.innerWidth }));
         dit(/1 compte Vinted vendeur inclus · \+3 €\/mois par compte de plus/.test(a.s), `accueil ${largeur}${sombre ? ' sombre' : ''} : l’offre Solo dit le supplément`, JSON.stringify(a));
         await pg.locator('[data-offre="solo"]').scrollIntoViewIfNeeded().catch(() => {});
         await pg.waitForTimeout(1200);

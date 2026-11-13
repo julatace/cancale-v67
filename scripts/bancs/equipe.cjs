@@ -378,6 +378,8 @@ const MONTANTS = /€|\b42[.,]00\b|\b55[.,]00\b|\b99[.,]00\b|\b25[.,]00\b|281|2\
         dit(await bouton.count() === 1, 'le bouton « Imprimer le bordereau » est là');
         if (await bouton.count()) {
           await bouton.click(); await pg.waitForTimeout(2500);
+          // (13 nov.) Machine chargée : attendre que « Préparation… » ait fini (jamais un délai seul).
+          await pg.waitForFunction(() => { const e = document.querySelector('[data-equipe-msg="9001"]'); return !e || !/Préparation|Ouverture/.test(e.innerText); }, null, { timeout: 20000 }).catch(() => {});
           const pdf = B.journal.slice(avant).filter((j) => /pdfB64/.test(j.u));
           dit(pdf.length === 1 && pdf[0].entete === V, 'imprimer lit le PDF avec x-vrm-equipe', pdf.map((j) => j.entete).join(','));
           const m = await pg.evaluate(() => { const e = document.querySelector('[data-equipe-msg="9001"]'); return e ? e.innerText : ''; });
@@ -517,12 +519,16 @@ const MONTANTS = /€|\b42[.,]00\b|\b55[.,]00\b|\b99[.,]00\b|\b25[.,]00\b|281|2\
 })();
 
 async function ouvrirEquipe(pg, L) {
+  // (13 nov., lot 58) Attendre ce qui est RENDU, jamais un délai seul (§6.5) : sur une machine
+  // chargée, les délais fixes laissaient le banc lire un écran pas encore monté.
+  await pg.waitForSelector('[data-onglets-reglages]', { timeout: 20000 }).catch(() => {});
   const onglet = pg.locator('[data-onglets-reglages] [data-vue="compte"]');
-  if (await onglet.count()) { await onglet.first().click(); await pg.waitForTimeout(1500); }
+  if (await onglet.count()) { await onglet.first().click(); await pg.waitForSelector('[data-sous-ouvrir="equipe"], [data-equipe-reglage]', { timeout: 15000 }).catch(() => {}); }
   // Depuis le 28 oct. le panneau s'ouvre dans un sous-écran à toutes les tailles.
   {
     const l = pg.locator('[data-sous-ouvrir="equipe"]');
-    if (await l.count()) { await l.first().click(); await pg.waitForTimeout(800); }
+    if (await l.count()) { await l.first().click(); }
   }
-  await pg.waitForTimeout(800);
+  await pg.waitForFunction(() => { const x = document.querySelector('[data-equipe-reglage]'); return x && x.getAttribute('data-equipe-reglage') !== 'chargement'; }, null, { timeout: 15000 }).catch(() => {});
+  await pg.waitForTimeout(300);
 }
