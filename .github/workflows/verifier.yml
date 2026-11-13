@@ -141,7 +141,10 @@ jobs:
     # `continue-on-error: true` ci-dessous (après trois passages verts sans changement).
     name: Bancs sous WebKit (Safari, non bloquant)
     needs: construire
-    runs-on: ubuntu-latest
+    # (13 nov., integration-13nov-ci) Épinglé comme les audits : `ubuntu-latest` est passé à Ubuntu 26
+    # le 13 nov. vers 4 h UTC ; le WebKit de Playwright est construit pour 24.04. Sa vraie panne était
+    # ailleurs (service worker hors des routes sous WebKit : scripts/bancs/_garde-reseau.cjs).
+    runs-on: ubuntu-24.04
     timeout-minutes: 75
     continue-on-error: true
     steps:

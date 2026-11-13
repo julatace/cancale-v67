@@ -1781,3 +1781,5 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **12 nov. · G2 (5.368), 12nov-a (5.369), 12nov-b, vert-vitesse, vitesse-volume en ligne** : 20 000 ventes −20 %. `2026-11-12-*.md`. Geste : migration 042 (facultative).
 
 - **12 nov. · G2 (5.368), 12nov-a (5.369), 12nov-b, vert-vitesse, vitesse-volume, extension 5.372 (discrétion, boutique, favoris par compte, une prudence par compte) en ligne** : `2026-11-12-*.md`. Geste : installer 5.372.0 ; migration 042 (facultative).
+
+- **12 nov. · G2 (5.368), 12nov-a (5.369), 12nov-b, vert-vitesse, vitesse-volume, extension 5.372 (discrétion, boutique, favoris par compte, une prudence par compte) en ligne** : `2026-11-12-*.md`. Geste : installer 5.372.0 ; migration 042 (facultative).
