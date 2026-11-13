@@ -646,13 +646,16 @@
       const unType = (t, nom, attente) => {
         if (!t) return '';
         if (t.fini) return `<div class="imp" data-import-type="${nom}" data-import-lus="${Number(t.lus) || 0}"><div class="imp-l"><span>${nom === 'ventes' ? 'Ventes' : 'Achats'}</span><span>${nb(t.lus)} ✓</span></div></div>`;
-        const tot = Number(t.total) || 0;
+        // 5.373 : sur 12 mois, l'estimation (« 340 / ~1 200 ») ; sinon le total de Vinted.
+        const est = im.horizonMois && Number(t.estime) > 0 ? Number(t.estime) : 0;
+        const tot = est || Number(t.total) || 0;
         const pc = tot > 0 ? Math.max(2, Math.min(100, Math.round((Number(t.lus) || 0) / tot * 100))) : 0;
-        const droite = tot > 0 ? `${nb(Math.min(t.lus, tot))} sur ${nb(tot)}` : (Number(t.pages) > 0 ? `${nb(t.pages)} page${t.pages > 1 ? 's' : ''} lue${t.pages > 1 ? 's' : ''} · encore…` : (attente ? 'ensuite' : 'bientôt'));
+        const droite = est ? `${nb(Math.min(t.lus, tot))} / ~${nb(tot)}` : tot > 0 ? `${nb(Math.min(t.lus, tot))} sur ${nb(tot)}` : (Number(t.pages) > 0 ? `${nb(t.pages)} page${t.pages > 1 ? 's' : ''} lue${t.pages > 1 ? 's' : ''} · encore…` : (attente ? 'ensuite' : 'bientôt'));
         return `<div class="imp" data-import-type="${nom}" data-import-lus="${Number(t.lus) || 0}" data-import-total="${tot || ''}"><div class="imp-l"><span>${nom === 'ventes' ? 'Ventes' : 'Achats'}</span><span>${droite}</span></div>${tot > 0 ? `<div class="barre" role="progressbar" aria-valuemin="0" aria-valuemax="${tot}" aria-valuenow="${Math.min(Number(t.lus) || 0, tot)}"><i style="width:${pc}%"></i></div>` : ''}</div>`;
       };
       let tete;
-      if (im.etat === 'fini') tete = `<div class="val" data-import-etat="fini">Tout est récupéré<span class="coche" aria-label="vérifié">✓</span></div>`;
+      if (im.etat === 'fini') tete = `<div class="val" data-import-etat="fini">${im.horizonMois ? 'Ton passé est importé (12 mois)' : 'Tout est récupéré'}<span class="coche" aria-label="vérifié">✓</span></div>`;
+      else if (im.etat === 'pause' && im.horizonMois) { const mn = Math.max(1, Math.ceil((Number(im.repriseA) - Date.now()) / 60000)); tete = `<div class="val gris" data-import-etat="pause">${im.cause === 'vinted' ? 'Vinted freine' : 'Pour ménager ton compte'} : suite dans ${mn >= 60 ? Math.ceil(mn / 60) + ' h' : mn + ' min'}.</div>`; }
       else if (im.etat === 'pause') tete = `<div class="val gris" data-import-etat="pause">${im.cause === 'vinted' ? 'En pause : Vinted freine.' : 'En pause pour ménager ton compte.'} Reprise à ${esc(heure(im.repriseA))}.</div>`;
       else {
         const m = Number(im.resteMin) || 0;
@@ -660,7 +663,7 @@
         tete = `<div class="val gris" data-import-etat="${im.etat === 'encours' ? 'encours' : 'attente'}">${im.etat === 'encours' ? 'Lecture de ton historique' : 'Ton historique arrive'} · ${duree}, Vinted ouvert.</div>`;
       }
       const bouton = im.etat === 'encours' ? '' : '<button class="b sec" data-import-tout>Tout récupérer</button>';
-      return `<div class="ligne" data-import="${esc(im.etat)}"><div class="lib">Ton historique Vinted</div>${tete}${unType(im.ventes, 'ventes', false)}${unType(im.achats, 'achats', !(im.ventes && im.ventes.fini))}${bouton}</div>`;
+      return `<div class="ligne" data-import="${esc(im.etat)}"><div class="lib">${im.horizonMois ? 'Import de ton passé' : 'Ton historique Vinted'}</div>${tete}${unType(im.ventes, 'ventes', false)}${unType(im.achats, 'achats', !(im.ventes && im.ventes.fini))}${bouton}</div>`;
     };
     const historique = e.plateforme === 'vinted' && e.capte && e.site && e.site.id && e.site.choix !== 'non' && v && v.connecte ? ligneImport(e.site.import) : '';
 

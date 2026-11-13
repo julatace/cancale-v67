@@ -25,3 +25,6 @@
 .vrm-imp-ligne { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 12px; background: var(--d-carte, #FFFFFF);
   border: 0.5px solid var(--d-filet, rgba(60,60,67,.14)); }
 .vrm-imp-ligne > .vrm-b { min-height: 44px; margin-top: 4px; }
+/* 5.373 (lot 47) : « Import de ton passé · 340 / ~1 200 ventes · compte X » et « 4 pages sur ~12 ». Neutre (§7). */
+.vrm-imp-titre-compte { font-size: 15px; font-weight: 600; line-height: 1.35; color: var(--d-encre, #1D1D1F); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.vrm-imp-pages { font-size: 13px; line-height: 1.35; color: var(--d-gris, #6E6E73); font-variant-numeric: tabular-nums; }

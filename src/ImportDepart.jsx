@@ -7,10 +7,15 @@
 //     son état, et « Tout récupérer » pour le compte ouvert sur vinted.fr.
 // Une lecture projetée (jamais `select=data`), relue quand l'extension le dit
 // (`vrm:ext` quoi='import'), au retour sur l'écran, et chaque minute en cours.
+// 5.373 (13 nov., lot 47) — « Import de ton passé » : la tête dit
+// « Import de ton passé · 340 / ~1 200 ventes · compte X », chaque type sa barre
+// (sur l'estimation) et « 4 pages sur ~12 », les annonces une ligne, le souci
+// ou la pause « suite dans 40 min ». Fini ⇒ « Ton passé est importé (12 mois) »
+// UNE fois sur Ma journée (marqué vu, synchronisé).
 // ═══════════════════════════════════════════════════════════════════════════
 import React from 'react';
-import { lireImportDepart, importsAMontrer, phraseImport, texteType, pctType } from './importDepart.js';
-import { lireTout, load, vintedDeChrome, raisonExtGlobale, onVmrExt, vmrCmd, vmrExtPresent, extSait, Bouton } from './App.jsx';
+import { lireImportDepart, importsAMontrer, phraseImport, texteType, pctType, butType, pagesType, titreImport, texteAnnonces, marquerImportsVus, CLE_IMPORT_VU } from './importDepart.js';
+import { lireTout, load, save, vintedDeChrome, raisonExtGlobale, onVmrExt, vmrCmd, vmrExtPresent, extSait, Bouton } from './App.jsx';
 import './styles-import-depart.css';
 
 function useImportDepart(uids) {
@@ -46,30 +51,52 @@ function useImportDepart(uids) {
 
 function Barre({ t, nom }) {
   const pc = pctType(t);
+  const but = butType(t);
+  const pages = pagesType(t);
   return (
-    <div className="vrm-imp-type" data-import-type={nom} data-import-lus={t ? t.lus : ''} data-import-total={t && t.total !== null ? t.total : ''} data-import-fini={t && t.fini ? '1' : '0'}>
+    <div className="vrm-imp-type" data-import-type={nom} data-import-lus={t ? t.lus : ''} data-import-total={t && t.total !== null ? t.total : ''} data-import-estime={t && t.estime ? t.estime : ''}
+      data-import-pages={t ? t.pages : ''} data-import-pages-estimees={t && t.pagesEstimees ? t.pagesEstimees : ''} data-import-fini={t && t.fini ? '1' : '0'}>
       <div className="vrm-imp-type-l">
         <span>{nom === 'ventes' ? 'Ventes' : 'Achats'}</span>
         <span className="vrm-imp-chiffre">{texteType(t, { suivant: nom === 'achats' })}</span>
       </div>
       {pc !== null && !(t && t.fini) ? (
-        <div className="vrm-imp-barre" role="progressbar" aria-label={nom === 'ventes' ? 'Ventes récupérées' : 'Achats récupérés'} aria-valuemin={0} aria-valuemax={t.total} aria-valuenow={Math.min(t.lus, t.total)}>
+        <div className="vrm-imp-barre" role="progressbar" aria-label={nom === 'ventes' ? 'Ventes récupérées' : 'Achats récupérés'} aria-valuemin={0} aria-valuemax={but} aria-valuenow={Math.min(t.lus, but)}>
           <i style={{ width: `${Math.max(2, pc)}%` }} />
         </div>
       ) : null}
+      {pages ? <span className="vrm-imp-pages" data-import-pages-texte="">{pages}</span> : null}
+    </div>
+  );
+}
+
+// 5.373 : les annonces (lecture complète du dressing, d'un trait).
+function LigneAnnonces({ a }) {
+  if (!a) return null;
+  return (
+    <div className="vrm-imp-type" data-import-type="annonces" data-import-lus={a.lus} data-import-total={a.total !== null ? a.total : ''} data-import-fini={a.fini ? '1' : '0'} data-import-partiel={a.partiel ? '1' : '0'}>
+      <div className="vrm-imp-type-l">
+        <span>Annonces</span>
+        <span className="vrm-imp-chiffre">{texteAnnonces(a)}</span>
+      </div>
+      {a.partiel ? <span className="vrm-imp-pages">Trop d’annonces pour une lecture d’un trait : la visite lit les 1 000 premières.</span> : null}
     </div>
   );
 }
 
 function Compte({ l, nom, montrerNom }) {
+  const passe = !!(l.horizonMois || l.annonces);
+  const geste = l.etat === 'arrete' || l.souci === 'deconnecte';
   return (
-    <div className="vrm-imp-compte" data-import-compte={l.uid} data-import-etat={l.etat}>
+    <div className="vrm-imp-compte" data-import-compte={l.uid} data-import-etat={l.etat} data-import-souci={l.souci || ''} data-import-horizon={l.horizonMois || ''}>
+      {passe ? <div className="vrm-imp-titre-compte" data-import-titre="">{titreImport(l, montrerNom ? nom : '')}</div> : null}
       <div className="vrm-imp-tete">
-        {montrerNom ? <span className="vrm-imp-nom">{nom}</span> : null}
-        <span className="vrm-imp-phrase" data-ton={l.etat === 'arrete' ? 'geste' : undefined}>{phraseImport(l)}</span>
+        {montrerNom && !passe ? <span className="vrm-imp-nom">{nom}</span> : null}
+        <span className="vrm-imp-phrase" data-ton={geste ? 'geste' : undefined}>{phraseImport(l)}</span>
       </div>
       <Barre t={l.ventes} nom="ventes" />
       <Barre t={l.achats} nom="achats" />
+      <LigneAnnonces a={l.annonces} />
     </div>
   );
 }
@@ -88,13 +115,24 @@ export default function ImportDepart({ comptes = [], variante = 'journee' }) {
   const [issue, setIssue] = React.useState(null);
   const labels = load('vinted_account_labels', {}) || {};
 
+  // 5.373 : ce qui était déjà VU à l'ouverture de l'écran (le message de fin reste
+  // sous les yeux pendant cette visite, puis ne revient plus).
+  const [vusOuverture] = React.useState(() => load(CLE_IMPORT_VU, {}) || {});
+  const montres = variante === 'journee' ? importsAMontrer(etats, Date.now(), vusOuverture) : [];
+  const cleMontres = montres.map((l) => `${l.uid}:${l.etat}:${l.fin || ''}`).join(',');
+  React.useEffect(() => {
+    if (variante !== 'journee' || !montres.length) return;
+    const neuf = marquerImportsVus(load(CLE_IMPORT_VU, {}) || {}, montres);
+    if (neuf) save(CLE_IMPORT_VU, neuf);
+  }, [cleMontres]);   // eslint-disable-line react-hooks/exhaustive-deps
+
   if (variante === 'journee') {
-    const vus = importsAMontrer(etats);
-    if (!vus.length) return null;
+    if (!montres.length) return null;
+    const passe = montres.some((l) => l.horizonMois || l.annonces);
     return (
-      <section className="vrm-imp vrm-imp-journee" data-import-journee={vus.length} aria-label="Ton historique Vinted">
-        <div className="vrm-imp-titre">Ton historique Vinted</div>
-        {vus.map((l) => <Compte key={l.uid} l={l} nom={nomDe(comptes, labels, l.uid)} montrerNom={uids.length > 1} />)}
+      <section className="vrm-imp vrm-imp-journee" data-import-journee={montres.length} aria-label={passe ? 'Import de ton passé' : 'Ton historique Vinted'}>
+        {passe ? null : <div className="vrm-imp-titre">Ton historique Vinted</div>}
+        {montres.map((l) => <Compte key={l.uid} l={l} nom={nomDe(comptes, labels, l.uid)} montrerNom={uids.length > 1} />)}
       </section>
     );
   }
@@ -116,8 +154,9 @@ export default function ImportDepart({ comptes = [], variante = 'journee' }) {
   };
   return (
     <div className="vrm-imp vrm-imp-reglages" data-import-reglages={uids.length} data-import-sait={sait}>
-      <p className="vrm-imp-note">Tes anciennes ventes et achats, lus une fois par l’extension.</p>
+      <p className="vrm-imp-note">Tes 12 derniers mois de ventes, d’achats et d’annonces, lus une fois par l’extension. « Tout récupérer » lit aussi plus ancien.</p>
       {rx ? <p className="vrm-imp-note vrm-imp-geste" role="status" data-import-ext={rx.code || ''}>{rx.texte}</p> : null}
+      {!rx && extSait('importpasse') !== 'ok' ? <p className="vrm-imp-note vrm-imp-geste" role="status" data-import-ext="passe">Mets l’extension à jour (5.373.0) pour les 12 mois et les annonces.</p> : null}
       {etats === null ? <p className="vrm-imp-note" role="status" data-import-passu="">Pas su pour l’instant : la base n’a pas répondu.</p> : null}
       {!uids.length ? <p className="vrm-imp-note">Aucun compte Vinted relié.</p> : null}
       {uids.map((uid) => {

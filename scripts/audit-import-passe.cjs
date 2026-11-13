@@ -106,6 +106,9 @@ async function controles(SRC, dit) {
     dit(!!v && Math.abs(v.estime - DANS_12) <= DANS_12 * 0.25, `B. l’estimation tombe près du vrai (${DANS_12})`, String(v && v.estime));
     dit(!!v && v.pages === 4 && v.pagesEstimees === Math.ceil(v.estime / 100), 'B. pages lues / estimées', JSON.stringify(v && { p: v.pages, pe: v.pagesEstimees }));
     dit(!!l && l.enCours === 'ventes' && Number(l.resteMin) > 0, 'B. le type en cours et la durée restante', JSON.stringify(l && { c: l.enCours, m: l.resteMin }));
+    // Un total de Vinted qui a baissé sous ce qui est déjà lu (ventes retirées de sa liste) : jamais « 500 / ~300 ».
+    const e = f.ctx.estimeTypeImport({ lus: 500, total: 300, plusVieux: Date.now() - 10 * JOUR, fini: false }, false);
+    dit(e === 500, 'B. un total qui baisse sous le lu : l’estimation reste au lu', String(e));
   });
 
   await essaie('C. étalé', async () => {
