@@ -1069,3 +1069,12 @@ Récit : `historique-interface-stock.md` (« LES QUATRE OUTILS DES ANNONCES »).
 | `liaison` | `demanderLiaison` | **5.171.0** (11 oct. — la 5.170 de production ne la porte pas) | « je connecte l'extension à ton compte VRM — rien à taper » (session adressée) |
 | `etatcompte` | `noterEtatCompte` | **5.181.0** (16 oct.) | « compte actif / banni par Vinted » relevé par l'extension (`panel_comptes_etat`) |
 | `lbcfiche` | `appliquerAnnonceLbc` | **5.182.0** (16 oct.) | publier sur Leboncoin l'annonce CORRIGÉE dans la fiche de VRM (titre, prix, état, photos, description) |
+
+## Lignes du tableau §8 de CLAUDE.md déplacées telles quelles le 13 nov. (lot 47, sous 59 000 octets)
+
+| capacité | fonction de l'extension | arrivée en | ce que l'app promet |
+|---|---|---|---|
+| `confirmer` | `capterConfirmations` | **5.206.0** (le code fait foi ; arrivée 5.204.0 le 21 oct.) | « relever les colis à confirmer (« Tout est OK ») avant leur date limite » |
+| `retraitnotif` | `envoyerNotifsRetrait` | **5.206.0** (le code fait foi ; arrivée 5.204.0 le 21 oct.) | « te prévenir quand elle lit un code de retrait dans une conversation » |
+| `suivivinted` | `capterSuivisAchats` | **5.217.0** (24 oct. — ni la 5.214.0, ni la 5.215.0, ni la 5.216.0 publiées par `main` ne l'ont ; la table disait 5.216.0, le code dit 5.217.0) | « l'extension relève le suivi Vinted de tes achats » — seulement connectée à CE compte VRM, seule, au code à jour (revue du 24 oct.) |
+| `transp` | `transpTick` | **5.291.0** (30 oct. — aucune version publiée ne l'a ; 5.290 était un numéro de branche) | « l'extension lit le statut chez le transporteur à la place du serveur quand celui-ci est refusé » |
