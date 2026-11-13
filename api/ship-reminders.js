@@ -453,7 +453,12 @@ async function rappelsColisRetrait(maintenant = Date.now()) {
   if (!(await pushCategorieActive('colis'))) return 'désactivé par le vendeur';
   const r = await retraitsDuJour(maintenant, 0);
   if (typeof r === 'string') return r;
-  const { liste, txsPar } = r;
+  // (13 nov.) + LA VEILLE : les colis dont la date limite LUE est demain (« 📍 Demain dernier jour · … »), une fois
+  // par colis (clé `demain-{n°}`, par identité). Lecture ratée ⇒ rien de plus (le jour même reste).
+  const r1 = await retraitsDuJour(maintenant, 1);
+  const veille = typeof r1 === 'string' ? [] : r1.liste.filter((x) => x.etat === 'demain');
+  const liste = [...r.liste, ...veille];
+  const txsPar = new Map([...(typeof r1 === 'string' ? [] : r1.txsPar), ...r.txsPar]);
   const today = parisDate(0);
   const envoyes = objet(deja && deja.envoyes);
   const nouveaux = liste.filter((x) => !envoyes[x.cle]);
@@ -468,12 +473,12 @@ async function rappelsColisRetrait(maintenant = Date.now()) {
   // (3 nov.) « Colis à vérifier » ne sonne plus : un délai dépassé ne dit pas où
   // est le colis (mesuré le 29 oct. : 5 sur 5 avaient été retirés) — ce n'est
   // pas un fait. Il reste dans Colis → « à vérifier ». Seul « dernier jour » sonne.
-  for (const x of nouveaux.filter((y) => y.etat === 'dernier')) {
+  for (const x of nouveaux.filter((y) => y.etat === 'dernier' || y.etat === 'demain')) {
     const t = texteRappelRetrait(x);
     envoi = await sendPushToAll({ cat: 'colis', title: t.title, body: t.body, echeance: x.limiteAt || null, tag: 'retrait-' + x.cle, url: DESTINATIONS.retrait({ suivi: x.suivi, tx: txUniqueDe(txsPar, x.suivi) }) });
   }
   // Aucun n° de suivi ni lieu dans la réponse d'un cron : des nombres.
-  return { retrait: 'envoyé', dernier: nouveaux.filter((x) => x.etat === 'dernier').length, aVerifier: nouveaux.filter((x) => x.etat === 'a_verifier').length,
+  return { retrait: 'envoyé', dernier: nouveaux.filter((x) => x.etat === 'dernier').length, veille: nouveaux.filter((x) => x.etat === 'demain').length, aVerifier: nouveaux.filter((x) => x.etat === 'a_verifier').length,
     envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
 }
 // La transaction d'un colis quand elle est UNIQUE (sinon '' : l'écran s'ouvre sur la colonne).

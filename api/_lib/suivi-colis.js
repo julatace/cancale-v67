@@ -101,13 +101,13 @@ export function relireLigneSuivi(d) {
 }
 // Les scalaires de `meta` lus par le cron et le widget (alias courts) sous les
 // noms de la ligne — les alias restent (les règles d'ici lisent les deux).
-export const SELECT_SUIVI_META = 'id,s:meta->>status,r:meta->>receivedAt,ea:meta->>emailAt,l:meta->>limite,a:meta->>arriveLe,su:meta->>suivi,sj:meta->>subject,se:meta->>sens,c:meta->>carrier,lab:meta->>statusLabel,lieu:meta->>lieu,co:meta->>code,qt:meta->>qrType,qu:meta->>qrUrl,el:meta->>extraitLieu,ec:meta->>extraitCode,rl:meta->>retireLe';
+export const SELECT_SUIVI_META = 'id,s:meta->>status,r:meta->>receivedAt,ea:meta->>emailAt,l:meta->>limite,a:meta->>arriveLe,su:meta->>suivi,sj:meta->>subject,se:meta->>sens,c:meta->>carrier,lab:meta->>statusLabel,lieu:meta->>lieu,co:meta->>code,qt:meta->>qrType,qu:meta->>qrUrl,el:meta->>extraitLieu,ec:meta->>extraitCode,rl:meta->>retireLe,art:meta->>artTitle';
 export function ligneDeMeta(x) {
   if (!x || typeof x !== 'object') return x;
   const v = (a, b) => (x[a] != null ? x[a] : (x[b] != null ? x[b] : null));
   return { ...x, status: v('status', 's'), receivedAt: v('receivedAt', 'r'), emailAt: v('emailAt', 'ea'), limite: v('limite', 'l'), arriveLe: v('arriveLe', 'a'),
     suivi: v('suivi', 'su') || '', subject: v('subject', 'sj') || '', sens: v('sens', 'se'), carrier: v('carrier', 'c'), statusLabel: v('statusLabel', 'lab') || '',
-    code: v('code', 'co'), qrType: v('qrType', 'qt'), qrUrl: v('qrUrl', 'qu'), extraitLieu: v('extraitLieu', 'el'), extraitCode: v('extraitCode', 'ec'), retireLe: v('retireLe', 'rl') };
+    code: v('code', 'co'), qrType: v('qrType', 'qt'), qrUrl: v('qrUrl', 'qu'), extraitLieu: v('extraitLieu', 'el'), extraitCode: v('extraitCode', 'ec'), retireLe: v('retireLe', 'rl'), artTitle: v('artTitle', 'art') };
 }
 // La ligne relue, depuis ses scalaires : une forme pour le cron et le widget.
 // Les alias courts suivent la relecture (statut, lieu, date limite).
@@ -644,7 +644,7 @@ export function rappelsRetraitDuJour({ lignes = [], collectes = [], envoyes = []
     else if (e.etat === 'trop_long' && Number.isFinite(e.age) && e.age <= e.garde + 1 + RATTRAPAGE_J) etat = 'a_verifier';
     if (!etat) continue;
     vus.add(k);
-    out.push({ cle: `${etat}-${k}`, etat, suivi: k, transporteur, limite, limiteAt: e.limiteAt || null, heurePassee: !!e.heurePassee, lieu: (l.lieu != null ? l.lieu : '') || '', raison: e.etat, garde: e.garde, code: (l.code != null ? l.code : l.co) || '', synthetique: !!l.synthetique });
+    out.push({ cle: `${etat}-${k}`, etat, suivi: k, transporteur, limite, limiteAt: e.limiteAt || null, heurePassee: !!e.heurePassee, lieu: (l.lieu != null ? l.lieu : '') || '', raison: e.etat, garde: e.garde, code: (l.code != null ? l.code : l.co) || '', synthetique: !!l.synthetique, article: String(l.artTitle || '').trim().slice(0, 60) });
   }
   return out;
 }
@@ -661,10 +661,16 @@ export function texteRappelRetrait(x) {
   // « à retirer aujourd'hui avant 11 h 34 » — un colis qui expire à 11 h 34 ne
   // se dit pas « aujourd'hui » sans l'heure.
   const heure = x.limiteAt ? heureParis(x.limiteAt) : '';
-  if (x.etat === 'dernier') {
+  // (13 nov., Julien : « tu peux peut-être faire des rappels ») La veille ET le jour même, UN rappel par colis :
+  // le titre porte le NOM DE L'ARTICLE quand l'e-mail de CE colis le donne (identité : sa ligne), sinon « Colis
+  // {transporteur} » ; le corps : le point, le code, le n°. La date limite est toujours LUE (jamais estimée).
+  if (x.etat === 'dernier' || x.etat === 'demain') {
+    const quoi = x.article || `Colis ${nom}`;
+    const code = String(x.code || '').trim();
+    const quand = x.etat === 'demain' ? `À retirer demain${heure ? ` avant ${heure}` : ''}` : `À retirer aujourd'hui${heure ? ` avant ${heure}` : ''}`;
     return {
-      title: `📍 Dernier jour · ${lieu || `${nom} n°${x.suivi}`}`,
-      body: `À retirer aujourd'hui${heure ? ` avant ${heure}` : ''} · ${nom} n°${x.suivi}`,
+      title: `📍 ${x.etat === 'demain' ? 'Demain dernier jour' : 'Dernier jour'} · ${quoi}`,
+      body: [quand, lieu, code ? `code ${code}` : '', `${nom} n°${x.suivi}`].filter(Boolean).join(' · '),
     };
   }
   // ⚠️ (29 oct.) « Sans doute reparti » ne s'écrit plus : un délai dépassé ne
