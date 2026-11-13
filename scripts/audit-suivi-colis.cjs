@@ -45,6 +45,9 @@ const MUTATIONS = {
   'notif-ailleurs-ignoree': ['api/email-inbound.js', 'if (!sortiAilleurs) try { await pushOnce({', 'try { await pushOnce({'],
   'sujet-pas-range': ['api/email-inbound.js', "  if (!suivi) { suivi = suiviDuSujet(mail.subject) || null; suiviDuSujetSeul = !!suivi; }", ''],
   'rappel-sans-memo': ['api/ship-reminders.js', 'const nouveaux = liste.filter((x) => !envoyes[x.cle]);', 'const nouveaux = liste;'],
+  // (13 nov.) la veille muette ; la veille qui rappelle un colis RETIRÉ (fins ignorées pour « demain »)
+  'veille-muette': ['api/ship-reminders.js', "const veille = typeof r1 === 'string' ? [] : r1.liste.filter((x) => x.etat === 'demain');", 'const veille = [];'],
+  'veille-retire': ['api/_lib/suivi-colis.js', "    if (sortiParSuivis([k], fins, arr && arr.sur === 'oui' ? arr.ms : null, { borne: arriveeMs })) continue;", "    if (cible !== 1 && sortiParSuivis([k], fins, arr && arr.sur === 'oui' ? arr.ms : null, { borne: arriveeMs })) continue;"],
   'rappel-memo-passu': ['api/ship-reminders.js', "  const deja = await getRow('colis_retrait_dedup');\n  if (deja === undefined) return 'mémo illisible — rien envoyé';", "  const deja = await getRow('colis_retrait_dedup');"],
   'rappel-memo-non-ecrit': ['api/ship-reminders.js', "  if (!(await ecrireDedup('colis_retrait_dedup', { envoyes: memo, at: new Date(maintenant).toISOString() }))) return 'mémo non écrit — rien envoyé';", "  await ecrireDedup('colis_retrait_dedup', { envoyes: memo, at: new Date(maintenant).toISOString() });"],
   'rappel-pref-ignoree': ['api/ship-reminders.js', "  if (!(await pushCategorieActive('colis'))) return 'désactivé par le vendeur';", ''],
@@ -378,6 +381,12 @@ function chargeApp(noms, injecte) {
       base.set(`${A}|email_track_vinted_aa`, { status: 'delivered', suivi: '', subject: 'Ton colis a été retiré #30000023', receivedAt: '2026-10-26T10:00:00Z', carrier: 'vinted' });
       tr('mondialrelay_30000024', { suivi: '30000024', limite: '2026-10-27' });
       tr('mondialrelay_30000025', { suivi: '30000025', limite: '2026-10-27' });
+      // (13 nov.) LA VEILLE : date limite LUE demain ⇒ « Demain dernier jour · <article> », une fois ; retiré ⇒ rien ;
+      // une date seulement estimée (aucune limite lue) ⇒ rien.
+      tr('mondialrelay_30000026', { suivi: '30000026', limite: '2026-10-28', artTitle: 'Baskets cuir camel 42', code: '512345' });
+      tr('mondialrelay_30000027', { suivi: '30000027', limite: '2026-10-28' });
+      base.set(`${A}|email_track_vinted_bb27`, { status: 'delivered', suivi: '', subject: 'Ton colis a été retiré #30000027', receivedAt: '2026-10-26T11:00:00Z', carrier: 'vinted' });
+      tr('mondialrelay_30000028', { suivi: '30000028', receivedAt: '2026-10-26T08:00:00Z', arriveLe: '2026-10-26T08:00:00Z' });
       tr('vinted_bb', { suivi: '', subject: 'Ton colis est arrivé à la consigne #VGS12345678027', carrier: 'vinted', limite: '2026-10-27' });
     };
     const retraitDe = () => pushes.filter((p) => /^retrait-/.test(p.tag || ''));
@@ -385,7 +394,10 @@ function chargeApp(noms, injecte) {
     const r1 = await lancer();
     const p1 = retraitDe();
     const tags = p1.map((p) => p.tag).sort();
-    dit(JSON.stringify(tags) === JSON.stringify(['retrait-dernier-30000021', 'retrait-dernier-VGS12345678027']),
+    const dm = p1.find((p) => p.tag === 'retrait-demain-30000026') || {};
+    dit(/^(📍 )?Demain dernier jour\b/.test(dm.title || '') && /Baskets cuir camel 42/.test(`${dm.title} ${dm.body}`) && /À retirer demain · Bar Test · code 512345 · Mondial Relay n°30000026/.test(dm.body || '') && !p1.some((p) => /3000002[78]/.test(p.tag || '')),
+      'cron : la VEILLE (date limite lue demain) — « Demain dernier jour · <article> », point, code, n° ; jamais pour un retiré ni sans date limite lue (13 nov.)', `${dm.title} | ${dm.body} | ${tags.join(' · ')}`);
+    dit(JSON.stringify(tags.filter((t) => !/demain/.test(t))) === JSON.stringify(['retrait-dernier-30000021', 'retrait-dernier-VGS12345678027']),
       'cron : « dernier jour » (dont le n° lu dans le sujet) — « à vérifier » ne sonne plus (3 nov. : un délai passé n\'est pas un fait) — jamais le colis retiré ailleurs, coché, ni fini pour l\'app', `HTTP ${r1.code} · ${tags.join(' · ')}`);
     const d = p1.find((p) => p.tag === 'retrait-dernier-30000021') || {};
     dit(/^Dernier jour · /.test(d.title || '') && /30000021/.test(d.body || '') && /Bar Test/.test(`${d.title} ${d.body}`) && /^\/\?tab=achats&cible=retrait(&tx=\d+)?&suivi=30000021$/.test(d.url || ''), '« 📍 Dernier jour · <lieu> », le n° dans le texte, ouvre Achats → « À retirer », SA carte (31 oct. ; Achats depuis le 11 nov.)', `${d.title} | ${d.body}`);

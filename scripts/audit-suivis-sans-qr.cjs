@@ -148,8 +148,8 @@ async function verifier(mod) {
     ['panne = liste vide', texte.replace("if (!Array.isArray(a) || !Array.isArray(b) || !Array.isArray(c)) return null;", "if (!Array.isArray(a)) return [];")],
     ['sans meta : ligne oubliée', texte.replace('if (!d) { sansMeta.push(r.id); continue; }', 'if (!d) continue;')],
     ['retiré remis en jeu : QR pas relu', texte.replace('const aRelire = lignes.filter(', 'const aRelire = [].filter(')],
-    ['`recuSur` oublié', texte.replace("['recuSur', 'sms', 'extraitLieu', 'extraitCode']", "['sms', 'extraitLieu', 'extraitCode']")],
-    ['extraits longs oubliés', texte.replace("['recuSur', 'sms', 'extraitLieu', 'extraitCode']", "['recuSur', 'sms']")],
+    ['`recuSur` oublié', texte.replace("['recuSur', 'sms', 'extraitLieu', 'extraitCode', 'horaires']", "['sms', 'extraitLieu', 'extraitCode', 'horaires']")],
+    ['extraits longs oubliés', texte.replace("['recuSur', 'sms', 'extraitLieu', 'extraitCode', 'horaires']", "['recuSur', 'sms', 'horaires']")],
     ['E ratée ignorée', texte.replace("const e = await parIds(lire, sansMeta, 'id,data');\n    if (!Array.isArray(e)) return null;", "const e = (await parIds(lire, sansMeta, 'id,data')) || [];")],
     ['D ratée ignorée', texte.replace("const d = await parIds(lire, aRelire, 'id,qrB64:data->>qrB64,qrType:data->>qrType');\n    if (!Array.isArray(d)) return null;", "const d = (await parIds(lire, aRelire, 'id,qrB64:data->>qrB64,qrType:data->>qrType')) || [];")],
   ];

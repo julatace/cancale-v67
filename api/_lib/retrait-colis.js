@@ -44,6 +44,10 @@ const MOIS = { janvier: 1, fevrier: 2, février: 2, mars: 3, avril: 4, mai: 5, j
   aout: 8, août: 8, septembre: 9, octobre: 10, novembre: 11, decembre: 12, décembre: 12 };
 const JOURS = '(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)?';
 // « jusqu'au », « avant le », « à retirer avant le », « à récupérer avant le ».
+// (13 nov., rappels) Vinted Go écrit « À retirer avant le » puis, À LA LIGNE, « *12/11/2026* » (gras) : mesuré,
+// aucune date limite lue sur ses e-mails (19 lignes « Libère de la place… » sans limite). Espaces, retours et
+// marques de gras (`*`, `_`) entre les mots et la date.
+const DECO = String.raw`[\s*_]`;
 const AV = "(?:jusqu['’]au|(?:[àa]\\s+retirer\\s+)?avant\\s+le|[àa]\\s+r[ée]cup[ée]rer\\s+avant\\s+le)";
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -110,18 +114,18 @@ export function limiteRetraitDepuisTexte(texte, recuLe) {
   };
   // 1) Avec l'année (formes d'avant : « jusqu'au vendredi 21 août 2026 »,
   //    « jusqu'au 21/08/2026 », « À retirer avant le 29/09/2026 »).
-  for (const m of all.matchAll(new RegExp(`${AV}\\s+${JOURS}\\s*(\\d{1,2})\\s+([a-zà-ÿ]+)\\s+(\\d{4})`, 'gi'))) {
+  for (const m of all.matchAll(new RegExp(`${AV}${DECO}+${JOURS}${DECO}*(\\d{1,2})\\s+([a-zà-ÿ]+)\\s+(\\d{4})`, 'gi'))) {
     const mo = MOIS[m[2].toLowerCase()];
     if (mo && dateValide(+m[3], mo, +m[1]) != null) note(`${m[3]}-${pad(mo)}-${pad(+m[1])}`, m);
   }
-  for (const m of all.matchAll(new RegExp(`${AV}\\s+${JOURS}\\s*(\\d{1,2})[\\/.](\\d{1,2})[\\/.](\\d{4})`, 'gi'))) {
+  for (const m of all.matchAll(new RegExp(`${AV}${DECO}+${JOURS}${DECO}*(\\d{1,2})[\\/.](\\d{1,2})[\\/.](\\d{4})`, 'gi'))) {
     if (dateValide(+m[3], +m[2], +m[1]) != null) note(`${m[3]}-${pad(+m[2])}-${pad(+m[1])}`, m);
   }
   // 2) SANS l'année (23 oct., mesuré : Mondial Relay « RETRAIT JUSQU'AU 26/10 »).
-  for (const m of all.matchAll(new RegExp(`${AV}\\s+${JOURS}\\s*(\\d{1,2})[\\/.](\\d{1,2})(?![\\/.]?\\d)`, 'gi'))) {
+  for (const m of all.matchAll(new RegExp(`${AV}${DECO}+${JOURS}${DECO}*(\\d{1,2})[\\/.](\\d{1,2})(?![\\/.]?\\d)`, 'gi'))) {
     note(avecAnnee(+m[1], +m[2], recuLe), m);
   }
-  for (const m of all.matchAll(new RegExp(`${AV}\\s+${JOURS}\\s*(\\d{1,2})\\s+([a-zà-ÿ]+)(?!\\s+\\d{4})`, 'gi'))) {
+  for (const m of all.matchAll(new RegExp(`${AV}${DECO}+${JOURS}${DECO}*(\\d{1,2})\\s+([a-zà-ÿ]+)(?!\\s+\\d{4})`, 'gi'))) {
     const mo = MOIS[m[2].toLowerCase()];
     if (mo) note(avecAnnee(+m[1], mo, recuLe), m);
   }

@@ -40,7 +40,8 @@
 // la forme JSON gardée). Le sujet, le lieu, le titre et le libellé sont lus dans
 // `meta` — la source que lisent déjà le widget et le rappel du matin
 // (`SELECT_SUIVI_META`, api/_lib/suivi-colis.js) : une règle, une source (§11).
-export const CHAMPS_HORS_META = ['recuSur', 'sms', 'extraitLieu', 'extraitCode'];
+// (13 nov.) + `horaires` (un tableau, api/_lib/horaires-relais.js).
+export const CHAMPS_HORS_META = ['recuSur', 'sms', 'extraitLieu', 'extraitCode', 'horaires'];
 export const SEL_SUIVI_SANS_QR = 'id,meta,' + CHAMPS_HORS_META.map((k) => `${k}:data->${k}`).join(',');
 const FAMILLE = 'id=like.email_track_*';
 export const Q_SUIVIS = `${FAMILLE}&select=${SEL_SUIVI_SANS_QR}`;

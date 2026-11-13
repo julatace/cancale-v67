@@ -183,7 +183,8 @@ const lire = (pg) => pg.evaluate(() => {
         dit(!!r5 && r5.code === '700005' && !r5.aVenir && r5.sources.includes('message'), 'R5 e-mail sans code lisible, conversation de SA commande avec le code ⇒ montré (plus « Code à venir »)', J(r5 && { code: r5.code, aVenir: r5.aVenir }));
         const sec2 = await pg.evaluate(() => { const l = [...document.querySelectorAll('.vrm-rpf-ligne[data-cc-carte]')].find((e) => /1790000000000062/.test(e.getAttribute('data-cc-carte'))); const s = l && l.closest('[data-rp-section]'); return s ? s.getAttribute('data-rp-section') : ''; });
         dit(sec2 !== 'avenir', 'R2 deux codes : jamais rangé sous « Code à venir »', sec2);
-        const alerte = await pg.evaluate(() => [...document.querySelectorAll('[data-relais-change-suivi]')].map((e) => e.getAttribute('data-relais-change-suivi')));
+        // (13 nov.) Les colis « point changé » sont des lignes sous leur point (En route), plus une carte à part.
+        const alerte = await pg.evaluate(() => [...document.querySelectorAll('[data-rp-redirige="1"]')].map((e) => String(e.getAttribute('data-cc-carte') || '').replace(/^r:rc:/, '')));
         dit(!alerte.includes('87660003'), 'R3 arrivé (transporteur) : plus annoncé « point changé · pas encore arrivé »', JSON.stringify(alerte));
         dit(m.deb <= 1, 'rien ne déborde', `${m.deb}px`);
         if (SHOTS) {
