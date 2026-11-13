@@ -120,7 +120,7 @@ import { lireJetonBilan, lireChoixBilan, ecrireChoixBilan, lireEnvoisBilan, choi
 import { envoyerMailEssai } from './_lib/mail-essai.js';
 import { configurationRelances, lireJeton as lireJetonRelance, ecrireChoix as ecrireChoixRelance, lireChoix as lireChoixRelance, lireEnvois as lireEnvoisRelance } from './_lib/relances-essai.js';
 import { corsExtension } from './_lib/cors-extension.js';
-import { codeDe, suiviDe, filleulDe, parrainageOuvert, rattacher, factureFilleulPayee } from './_lib/parrainage.js';
+import { codeDe, suiviDe, parrainageOuvert, rattacher, factureFilleulPayee, apercuCode, poserNom, nomDe, filleulsDe, filleulDetail } from './_lib/parrainage.js';
 // (9 nov.) Solo et Pro : la règle (api/_lib/plan-regle.js, la même que l'app).
 import { planDeLAbonnement, prochainChangement, uidValide, PLAN_PRO, PLAN_SOLO, CLE_PRIX_SOLO, PLATEFORMES_SOLO, NOMS_PLATEFORMES_SOLO, META_VENDEUR, idCompteVendeur } from './_lib/plan-regle.js';
 import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
@@ -1027,12 +1027,26 @@ async function changerPlan(req, res) {
 // POST { action: 'rattacher', code } : le vendeur connecté devient filleul du
 // code (règles dans api/_lib/parrainage.js). Tout ce qui le concerne vient de
 // SA session (jamais du corps, sauf le code lui-même).
+// (13 nov., lot 54) GET `?code=XXXXXXXX` SANS session : ce que voit la personne
+// qui ouvre le lien (« Offert par <nom choisi> ») — le nom seul, jamais un
+// identifiant, un e-mail ni un pseudo Vinted. POST { action: 'nom', nom } : le
+// parrain choisit ce nom (règle `nomAffichable`, revalidée à chaque lecture).
 async function parrainage(req, res) {
+  if (req.method === 'GET' && req.query && req.query.code != null) {
+    if (!process.env.SUPABASE_SERVICE_KEY) return repondre(res, 200, { ok: true, ouvert: null, connu: false, nom: null });
+    const a = await apercuCode(String(req.query.code));
+    return repondre(res, a.ok ? 200 : 503, a.ok ? { ok: true, ouvert: a.ouvert, connu: a.connu, nom: a.nom } : { ok: false });
+  }
   const u = await utilisateurDe(req);
   if (!u) return repondre(res, 401, { erreur: 'session' });
   if (!process.env.SUPABASE_SERVICE_KEY) return repondre(res, 200, { ok: true, installe: false });
   if (req.method === 'POST') {
     const corps = await lireCorpsJson(req);
+    if (corps && corps.action === 'nom') {
+      if (typeof corps.nom !== 'string' || corps.nom.length > 200) return repondre(res, 400, { ok: false, raison: 'nom' });
+      const r = await poserNom(u.id, corps.nom);
+      return repondre(res, r.http || (r.ok ? 200 : 400), { ok: r.ok, nom: r.ok ? r.nom : undefined, raison: r.raison, message: r.message });
+    }
     if (!corps || corps.action !== 'rattacher') return repondre(res, 400, { ok: false, raison: 'action' });
     const [ligne, idsVinted] = await Promise.all([ligneDe(req), lireVintedIds(u.id)]);
     if (idsVinted === null) return repondre(res, 503, { ok: false, raison: 'pas-su', message: 'Parrainage pas vérifié. Réessaie dans un instant.' });   // (11 nov., M51)
@@ -1040,11 +1054,13 @@ async function parrainage(req, res) {
     const r = await rattacher(corps.code, { u, ligne, idsVinted, essaiDeja });
     return repondre(res, r.http || (r.ok ? 200 : 400), { ok: r.ok, raison: r.raison, message: r.message });
   }
-  const [ouvert, code, suivi, filleul] = await Promise.all([parrainageOuvert(), codeDe(u.id), suiviDe(u.id), filleulDe(u.id)]);
+  const [ouvert, code, suivi, filleul, ligne, nom] = await Promise.all([parrainageOuvert(), codeDe(u.id), suiviDe(u.id), filleulDetail(u.id), ligneDe(req), nomDe(u.id)]);
   // Tables absentes (027 pas passée) ou base muette : on ne promet rien.
   if (code === undefined || suivi === undefined) return repondre(res, 200, { ok: true, installe: false, ouvert });
+  // (13 nov., lot 54) L'état de CHAQUE filleul, sans identité (rang, jour d'inscription, état).
+  const filleuls = await filleulsDe(u.id, ligne === undefined ? null : !!(ligne && ligne.client_stripe));
   // (11 nov.) `modeTest` : Stripe en clé de test (ou pas encore branché) — l'écran le DIT.
-  return repondre(res, 200, { ok: true, installe: true, ouvert, code, suivi, filleul: filleul || null, moisCentimes: PRIX_CGV.centimes, modeTest: !stripePret() || stripeModeTest() });
+  return repondre(res, 200, { ok: true, installe: true, ouvert, code, suivi, filleuls: filleuls || null, nom: nom === undefined ? undefined : nom, filleul: filleul || null, moisCentimes: PRIX_CGV.centimes, modeTest: !stripePret() || stripeModeTest() });
 }
 
 // ── MES FACTURES ET MA CARTE (onglet « Mon compte », 4 octobre) ─────────────

@@ -529,7 +529,9 @@ import { lireSuivisSansQr, lireQrDeLigne } from "./suivisSansQr.js";
 import { rythme } from "./rythmeLectures.js";
 import { comptesARelire } from "./sondeVentes.js";
 import { installerFiltreSupprimes, sansComptesSupprimes, lireSupprimes, CLE_SUPPRIMES } from "./comptesSupprimes.js";
-import { etatAbonnement, rappelEssai, publierAbonnement, abonnementPublie, suivreAbonnement, installerGardeEcriture, CLE_PARRAIN, codeParrainDe, codeParrainDuChemin } from "./abonnement/etatAbonnement.js";
+import { etatAbonnement, rappelEssai, publierAbonnement, abonnementPublie, suivreAbonnement, installerGardeEcriture, CLE_PARRAIN, CODE_PARRAIN_RE, codeParrainDe, codeParrainDuChemin } from "./abonnement/etatAbonnement.js";
+// (13 nov., lot 54) Le parrainage clair et visible : « Offert par … » à l'inscription, la ligne du menu « Plus ».
+import { lireApercuParrain, lireParrainageOuvert, parrainageOuvertConnu, suivreParrainageOuvert, demanderParrainage } from "./parrainage/parrainage.js";
 import { marquerApercu, effacerApercu, bloquerGestes } from "./abonnement/apercu.js";
 // (9 nov.) Solo / Pro : la règle des ventes par offre (api/_lib/plan-regle.js) et son état (src/abonnement/planVentes.js).
 import { venteHorsPlanUid, demarrerPlan, signaturePlan, suivrePlan, reglePlanCourante } from "./abonnement/planVentes.js";
@@ -1443,7 +1445,11 @@ installerGardeEcriture(SUPABASE_URL);
 installerGardeHorsLigne(SUPABASE_URL);
 // (8 nov.) Le lien de parrainage (`?parrain=CODE`) est gardé jusqu'à ce qu'un
 // compte connecté le présente au serveur (une fois, `BandeauAbonnement`).
-try { const c = codeParrainDe(window.location.search) || codeParrainDuChemin(window.location.pathname); if (c) localStorage.setItem(CLE_PARRAIN, c); } catch (_) {}   // (11 nov.) + le lien court `/r/CODE`
+// (13 nov., lot 54) `PARRAIN_DU_LIEN` : le code arrivé PAR CE CHARGEMENT — l'écran de connexion
+// s'ouvre alors sur l'INSCRIPTION, avec « Offert par <nom choisi> ».
+let PARRAIN_DU_LIEN = '';
+try { const c = codeParrainDe(window.location.search) || codeParrainDuChemin(window.location.pathname); if (c) { localStorage.setItem(CLE_PARRAIN, c); PARRAIN_DU_LIEN = c; } } catch (_) {}   // (11 nov.) + le lien court `/r/CODE`
+const codeParrainGarde = () => { try { const c = String(localStorage.getItem(CLE_PARRAIN) || ''); return CODE_PARRAIN_RE.test(c) ? c : ''; } catch (_) { return ''; } };
 
 // ════════════════════════════════════════════════════════════════════════════
 //  COMPTES VENDEURS (multi-utilisateurs)
@@ -2092,7 +2098,10 @@ const authSignUp  = async (email, password) => {
   // (8 nov.) `data.langue` : la langue des e-mails de compte (modèles Supabase).
   // (11 nov., sécurité) Le lien de confirmation ne s'ouvrira QUE dans ce navigateur (src/lienEmail.js).
   noterLienDemande(localStorage);
-  const r = await authCall(avecRetour('signup'), { email: String(email).trim().toLowerCase(), password, data: { langue: langueNavigateur() } });
+  // (13 nov., lot 54) Le code de parrainage suit le COMPTE (`user_metadata.parrain`) : le lien de
+  // confirmation ouvert sur un autre appareil ne le perd plus. Le serveur décide toujours tout.
+  const parrain = codeParrainGarde();
+  const r = await authCall(avecRetour('signup'), { email: String(email).trim().toLowerCase(), password, data: { langue: langueNavigateur(), ...(parrain ? { parrain } : {}) } });
   if (!r.ok) {
     if(r.captcha)return {ok:false,error:r.error};
     // On traduit les erreurs techniques de Supabase : « email rate limit
@@ -16091,6 +16100,8 @@ const ICON_PATHS = {
   // le cas de `pin` et `nav` juste en dessous depuis leur ajout — les deux
   // repères des points relais ne se dessinaient pas.
   menu: <><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></>,
+  // (13 nov., lot 54) Le parrainage : un paquet noué, au trait.
+  cadeau: <><rect x="3.5" y="8" width="17" height="4" rx="1"/><path d="M5 12v7.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V12"/><path d="M12 8v12.5"/><path d="M12 8c-1.6-3.2-5.5-3.6-5.5-1.2C6.5 8 9 8 12 8Z"/><path d="M12 8c1.6-3.2 5.5-3.6 5.5-1.2C17.5 8 15 8 12 8Z"/></>,
   // (11 nov., lot traduction) La langue (Paramètres → Langue) : un globe au trait.
   langue: <><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></>,
   // Masquer une ligne : l'œil barré. C'était un « 🚫 » nu — un emoji dessiné par
@@ -16604,6 +16615,9 @@ const GROUPES_PLUS=[
   // (src/profil/MenuProfil.jsx). « g p », ⌘K et `?tab=settings` y mènent toujours.
   groupeNav({ cle:'moi', nom:'Moi', items:[
     entreeNav({id:'communaute', icon:'pin',  label:'Communauté'}),
+    // (13 nov., lot 54) UNE ligne discrète « Parrainer » (téléphone) : ouvre Réglages → Mon abonnement,
+    // groupe Parrainage. Montrée seulement quand le programme est OUVERT (`siParrainage`), jamais une pop-up.
+    entreeNav({id:'parrainage', icon:'cadeau', label:'Parrainer', tel:true, siParrainage:true}),
   ]}),
 ];
 // ⚠️ (2 nov., Julien : « il ne doit pas y avoir des écritures partout à côté des
@@ -16658,7 +16672,7 @@ function titreEcran(tab) {
 // onglets : un ancien chemin vers elles (lien `?tab=`, `vrm:aller`, `setTab`) ouvre l'écran
 // qui les porte, sur la bonne vue — [onglet, vue demandée] (`setTab`).
 const VUES_DEPLACEES = { republier: ['cat_annonces', 'republier'], favoris: ['cat_msg', 'favoris'] };
-const ONGLETS_LIENS=[...Object.keys(CHEMINS_ARGENT),'litiges','republier','favoris','ventes','annonces','messages','achats','retraits','journee','trancher','semaine','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','colis','cat_msg','cat_expedition','garage','organisation','communaute','emails','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
+const ONGLETS_LIENS=[...Object.keys(CHEMINS_ARGENT),'litiges','republier','favoris','ventes','annonces','messages','achats','retraits','journee','trancher','semaine','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','colis','cat_msg','cat_expedition','garage','organisation','communaute','parrainage','emails','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
 const ONGLETS_DEPLACES = {
   prixmarche: ['dashboard', 'prix'], invoices: ['compta', 'factures'], collectif: ['dashboard', null],
   cat_ventes: ['ventes', 'vinted'], cat_annonces: ['annonces', 'vinted'], vinted_annonces: ['annonces', 'vinted'],
@@ -17946,7 +17960,7 @@ function entreeActive(t, tab) {
 // « Complet » (Paramètres → Affichage) remet tout d'un geste.
 function groupesVisibles(sites, filtre, ordi = false, profil = PROFIL_VENDEUR) {
   const ctx = { mode: profil.mode, usage: profil.usage, relies: profil.relies };
-  return GROUPES_PLUS.filter(g => ordi || !g.ordi).map(g => ({ ...g, items: g.items.filter(t => (!t.site || !sites || sites.has(t.site)) && entreeMontree(t, ctx) && filtre(t)) })).filter(g => g.items.length > 0);
+  return GROUPES_PLUS.filter(g => ordi || !g.ordi).map(g => ({ ...g, items: g.items.filter(t => (!t.site || !sites || sites.has(t.site)) && (!t.siParrainage || parrainageOuvertConnu() === true) && entreeMontree(t, ctx) && filtre(t)) })).filter(g => g.items.length > 0);
 }
 // Badge d'une entrée : un NOMBRE quand il y a un geste à faire et que le nombre
 // est CONNU (publié par l'écran propriétaire, §11 : `vrm_colis_aposter`,
@@ -18177,6 +18191,9 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false, sites = null, b
     };
   }, [open]);
   useProfilVendeur();   // (8 nov.) Simple / Complet
+  // (13 nov., lot 54) La ligne « Parrainer » : seulement quand le programme est ouvert (lu une fois).
+  const [, majParrain] = React.useState(0);
+  React.useEffect(() => { const off = suivreParrainageOuvert(() => majParrain((n) => n + 1)); lireParrainageOuvert(); return off; }, []);
   const groupes = groupesVisibles(sites, () => true);
   const dansBarre = BOTTOM_TABS.some(t => t.id === (BAR_GROUPE[tab] || tab));
   const pointPlus = !!(badges && badges.messages === true);
@@ -18729,7 +18746,7 @@ function AuthScreen() {
   // ouvre directement le bon formulaire (un clic de plus pour s'inscrire, c'est
   // des inscriptions en moins).
   const [mode, setMode] = React.useState(() => (RECOVERY_PENDING || (AUTH_REDIRECT && AUTH_REDIRECT.recovery)) ? 'newpw'
-    : (/[?&]inscription(=|&|$)/.test(window.location.search || '') ? 'up'
+    : ((/[?&]inscription(=|&|$)/.test(window.location.search || '') || PARRAIN_DU_LIEN) ? 'up'
     // 5.328 : « Mot de passe oublié ? » dans la carte de l'extension.
     : /[?&]mot-de-passe-oublie(=|&|$)/.test(window.location.search || '') ? 'reset' : 'in')); // in · up · reset · newpw
   const [email, setEmail] = React.useState('');
@@ -18745,6 +18762,10 @@ function AuthScreen() {
   const demandeEnCours=React.useRef(false);
   const [err, setErr] = React.useState(() => (AUTH_REDIRECT && AUTH_REDIRECT.error) || '');
   const [info, setInfo] = React.useState('');
+  // (13 nov., lot 54) « Offert par <nom choisi> » : lu SANS session par le code du lien (le nom seul).
+  // `undefined` en cours · `null` pas su (rien n'est dit) · { ouvert, connu, nom }.
+  const [apercuParrain, setApercuParrain] = React.useState(undefined);
+  React.useEffect(() => { const c = codeParrainGarde(); if (!c) { setApercuParrain(null); return; } let stop = false; lireApercuParrain(c).then((x) => { if (!stop) setApercuParrain(x); }); return () => { stop = true; }; }, []);
   const [needConfirm, setNeedConfirm] = React.useState(false);   // compte créé, email pas encore confirmé
   const [confirmLink, setConfirmLink] = React.useState('');      // lien du mail, collé à la main
   const [resetEnvoye, setResetEnvoye] = React.useState('');      // (8 nov.) adresse à qui le lien vient de partir
@@ -18904,6 +18925,10 @@ function AuthScreen() {
 .vrm-cx-aide-confirmation summary{min-height:32px;cursor:pointer;font-weight:600;color:${C.accent}}
 .vrm-cx-form button:disabled{cursor:default}
 .vrm-cx-champ{display:block;margin-bottom:12px;font-size:13px;font-weight:600;color:${C.text}}
+.vrm-cx-parrain{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.45;color:${C.text};background:${C.accent}0D;border:1px solid ${C.accent}40;border-radius:12px;padding:10px 12px;margin-bottom:14px}
+.vrm-cx-parrain-ic{display:flex;flex:none;color:${C.accentTexte||C.accent};margin-top:1px}
+.vrm-cx-parrain b{display:block;font-weight:600;overflow-wrap:anywhere}
+.vrm-cx-parrain-texte{display:block;color:${C.muted};font-size:13px}
 .vrm-cx-champ>span:first-child{display:block;margin-bottom:6px}
 .vrm-cx-secret{position:relative;display:block}
 .vrm-cx-secret button{position:absolute;right:4px;top:3px;min-height:44px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:${C.accent};font-size:12px;font-weight:600;font-family:inherit;cursor:pointer}
@@ -19002,6 +19027,16 @@ function AuthScreen() {
              : mode==='newpw' ? tr('auth.sous.newpw')
              : null /* « Ta boutique t'attend » est déjà dit au-dessus (§7) */}
           </div>
+          {/* (13 nov., lot 54) Arrivé par un lien de parrainage : « Offert par <nom choisi> » — le nom que
+              le parrain a CHOISI (jamais son pseudo Vinted), sinon « un vendeur VRM ». Programme fermé,
+              code inconnu ou pas su : rien n'est promis. */}
+          {(mode==='up'||mode==='in') && apercuParrain && apercuParrain.ouvert && apercuParrain.connu && (
+            <div role="note" data-parrain-offert={apercuParrain.nom||''} className="vrm-cx-parrain">
+              <span className="vrm-cx-parrain-ic" aria-hidden="true"><Icon name="cadeau" size={20}/></span>
+              <span><b>{apercuParrain.nom ? tr('auth.parrain.offertPar', { nom: apercuParrain.nom }) : tr('auth.parrain.offertVendeur')}</b>
+                <span className="vrm-cx-parrain-texte">{mode==='up' ? tr('auth.parrain.texte') : tr('auth.parrain.texteConnexion')}</span></span>
+            </div>
+          )}
           {/* 11 octobre : on arrive ici depuis « Se connecter » dans l'extension.
               UNE connexion pour les deux : l'app connecte l'extension juste après. */}
           {__lier && (mode==='in' || mode==='up') && (
@@ -19425,13 +19460,21 @@ function BandeauAbonnement({ setTab }) {
   // décide tout). Un refus définitif l'efface ; « pas su » (503) le garde.
   React.useEffect(() => {
     let code = ''; try { code = localStorage.getItem(CLE_PARRAIN) || ''; } catch (_) {}
+    // (13 nov., lot 54) Le code posé à l'inscription sur le compte (`user_metadata.parrain`) : présenté
+    // UNE fois par appareil (`vrm_parrain_tente_<uid>`), le serveur décide (une fois par filleul).
+    const uidP = (AUTH.user && AUTH.user.id) || '';
+    const duCompte = String((AUTH.user && AUTH.user.user_metadata && AUTH.user.user_metadata.parrain) || '').toUpperCase();
+    let deja = false; try { deja = !!uidP && localStorage.getItem('vrm_parrain_tente_' + uidP) === '1'; } catch (_) {}
+    if (!code && CODE_PARRAIN_RE.test(duCompte) && !deja) code = duCompte;
     if (!code || !(AUTH.session && AUTH.session.access_token)) return;
     fetch('/api/compte?mode=parrainage', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'rattacher', code }) })
       .then(async (r) => {
         const j = await r.json().catch(() => null);
         if (r.status >= 500 || r.status === 401) return;
-        try { localStorage.removeItem(CLE_PARRAIN); } catch (_) {}
+        try { localStorage.removeItem(CLE_PARRAIN); if (uidP) localStorage.setItem('vrm_parrain_tente_' + uidP, '1'); } catch (_) {}
         if (r.ok && j && j.ok) toast('✓ Parrainage enregistré : un mois offert à ton premier paiement');
+        // (13 nov., lot 54) Un refus définitif est DIT une fois (« Tu ne peux pas être ton propre parrain. »…).
+        else if (j && typeof j.message === 'string' && j.message) toast(j.message);
       }).catch(() => {});
   }, []);
   const uid = (AUTH.user && AUTH.user.id) || '';
@@ -56986,6 +57029,8 @@ function AppCoeur() {
   React.useEffect(()=>{ if(tab==='cat_msg'){ subVoulue.current='messages'; setTab('plat_vinted'); } },[tab]);
   // (11 nov., lot DJ4) « À trancher » n'est plus un écran : un ancien lien (`?tab=trancher`, raccourci,
   // notification) ouvre Ma journée, sa carte ouverte en place.
+  // (13 nov., lot 54) « Parrainer » (menu « Plus ») et `?tab=parrainage` : Réglages → Mon abonnement → Parrainage.
+  React.useEffect(()=>{ if(tab==='parrainage'){ demanderParrainage(); setTab('settings'); } },[tab]);
   React.useEffect(()=>{ if(tab==='trancher'){ try{ sessionStorage.setItem('vrm_trancher_ouvrir','1'); window.dispatchEvent(new Event('vrm:trancher-ouvrir')); }catch(_){} setTab('journee'); } },[tab]);
   React.useEffect(()=>{ if(tab==='leboncoin'){ subVoulue.current='annonces'; setTab('plat_leboncoin'); } },[tab]);
   // L'anti double vente eBay (cloche, notification) mène à eBay → Annonces, là
