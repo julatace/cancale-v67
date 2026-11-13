@@ -783,6 +783,8 @@ import AutresVersions from "./AutresVersions.jsx";
 import { jourParis } from "./dateParis.js";   // (11 nov.) jour/mois métier à l'heure de Paris
 import { sommeConnue, texteSomme, medianeSue, valeurSue } from "./sommeConnue.js";   // (11 nov.) « pas su » ≠ 0
 import { lireLocal, lireJSON, stockageDispo } from "./stockageSur.js";   // (11 nov.) stockage protégé (Safari privé, quota)
+import { creerMagasinPartage } from "./magasinPartage.js";
+import { fusionnerVersements, garderDatesConnues } from "./versementsConnus.js";   // (13 nov.) une date de versement connue ne redevient jamais « pas lue »   // (13 nov., source unique) une copie des données lues pour tous les moteurs
 // ⟦→ ecrans/Reglages.jsx #16⟧
 
 // Version visible, pour vérifier d'un coup d'œil si l'app a bien chargé la
@@ -4415,6 +4417,10 @@ if (typeof window !== 'undefined') {
 // Sauvegarde : localStorage immediat (differe 500ms) PUIS push cloud
 let _saveTimers = {};
 const _saveRun = {};   // (11 nov.) la sauvegarde en attente de chaque clé (`viderSave`)
+// (13 nov., source unique) La VALEUR en attente de chaque clé (500 ms) : une publication qui compare à « ce qui
+// est publié » doit comparer à elle, pas au navigateur pas encore réécrit (src/versementsConnus.js).
+const _saveEnAttente = {};
+const chargerPublie = (k, def) => (Object.prototype.hasOwnProperty.call(_saveEnAttente, k) ? _saveEnAttente[k] : load(k, def));
 const _failedLocalSaves = new Map();
 // (1er nov.) LA SAUVEGARDE NE RÉÉCRIT PLUS UNE CARTE PÉRIMÉE. Un écran calcule
 // la valeur à garder depuis SON état (`{ ...prev, [n°]: prix }`) ; si cette clé a
@@ -4497,7 +4503,7 @@ const save = (k,v,quand) => {
   if (_saveTimers[k]) clearTimeout(_saveTimers[k]);
   else if (SYNC_KEYS.includes(k)) { try { const t = (k in _avantCopieLocale) ? _avantCopieLocale[k] : localStorage.getItem(k); _saveAvant[k] = t == null ? undefined : t; } catch (_) { delete _saveAvant[k]; } }
   const executer = () => {
-    delete _saveRun[k];
+    delete _saveRun[k]; delete _saveEnAttente[k];
     if (AUTH.user?.id !== owner || (owner && readSession()?.user?.id !== owner)) { delete _saveTimers[k]; delete _saveAvant[k]; delete _avantCopieLocale[k]; _rendreQuand(k, false, 'le compte VRM a changé'); return; }
     // (2 nov.) Ce que le navigateur portait AVANT ce geste : la base de la file
     // d'envoi tant que cet onglet n'a pas encore lu le nuage.
@@ -4540,6 +4546,7 @@ const save = (k,v,quand) => {
     if (SYNC_KEYS.includes(k)) cloudPush(); // declenche la synchro cloud
   };
   _saveRun[k] = executer;
+  _saveEnAttente[k] = v;
   _saveTimers[k] = setTimeout(executer, 500);
 };
 // (11 nov., reprise-ecrans) La sauvegarde EN ATTENTE d'une clé, faite tout de suite (même
@@ -6427,11 +6434,18 @@ const cachedRow = (cle, chercher, ttl = ROW_TTL_MS) => {
   _rowCache.set(cle, { at: Date.now(), promesse });
   return promesse;
 };
-const viderCacheLignes = () => { _rowCache.clear(); try { viderLecturesMemo(); } catch (_) {} };   // bouton « Synchroniser »
+// (13 nov., source unique) Chaque oubli fait monter la génération : une lecture partagée en cours (`partager`) n'est
+// rejointe que si rien n'a été oublié depuis son départ (sinon elle porterait l'état d'avant).
+let _genLectures = 0;
+const viderCacheLignes = () => { _genLectures++; _rowCache.clear(); try { viderLecturesMemo(); } catch (_) {} };   // bouton « Synchroniser »
 // (12 nov.) Oublier les commandes d'UN compte (une vente vient d'arriver) — une fois par signal : un
 // second écran monté qui reçoit le même signal dans les 4 s reprend la lecture déjà partie.
 const _oubliCommandes = new Map();
-const oublierCommandesCompte = (uid) => { const k = String(uid), t = _oubliCommandes.get(k); if (t && Date.now() - t < 4000) return; _oubliCommandes.set(k, Date.now()); _rowCache.delete(`o:${k}`); };
+// (13 nov., source unique) Le même signal SANS compte (« ventes rangées ») reçu par chaque moteur monté :
+// le premier vide la mémoire des lignes, les suivants (dans les 4 s) rejoignent sa relecture.
+let _oubliToutA = 0;
+const oublierLignesUneFois = () => { if (Date.now() - _oubliToutA < 4000) return; _oubliToutA = Date.now(); viderCacheLignes(); };
+const oublierCommandesCompte = (uid) => { const k = String(uid), t = _oubliCommandes.get(k); if (t && Date.now() - t < 4000) return; _oubliCommandes.set(k, Date.now()); _genLectures++; _rowCache.delete(`o:${k}`); };
 
 // ── (7 nov., vitesse) LES PETITES LIGNES RELUES À CHAQUE ÉCRAN ─────────────
 // Mesuré au téléphone : chaque changement d'onglet relisait 26 à 44 lignes, presque
@@ -24851,7 +24865,7 @@ function HotePublierPartout({ comptes, nums, numData, onFermer }) {
   // Les listes Leboncoin et Vestiaire (pour « déjà en ligne ») : trois états.
   const [autres, setAutres] = React.useState(undefined);
   const relire = React.useCallback(async () => {
-    try { _lbcAnnoncesSession = null; } catch (_) {}
+    try { _lbcAnnoncesSession = null; _lbcListingsEnCours = null; } catch (_) {}
     const [lbc, vc] = await Promise.all([lbcListingsSession().catch(() => null),
       lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens`).catch(() => null)]);
     const vcL = Array.isArray(vc) ? (vc[0] || {}) : null;
@@ -31364,6 +31378,25 @@ const _acctCache = (()=>{ try{ const raw=sessionStorage.getItem('vrm_acct_cache'
 // (6 nov.) L'état de départ d'une liste de commandes, depuis ce cache — EXACTEMENT ce que
 // `loadOrders` poserait (même entrée : même version, moins de 3 min, mêmes comptes), sinon
 // « pas encore lu ». Rien n'est lu ni écrit ici.
+// ── (13 nov., source unique) LES COMMANDES LUES : UNE COPIE POUR TOUS LES MOTEURS ──
+// src/magasinPartage.js. Avant, chaque `Comptabilite` montée (Ventes en monte 2, Achats 3)
+// lisait, fusionnait, triait et gardait SES 20 000 ventes. Une valeur par vendeur et par sorte
+// (`sold`, `purchased`), servie à toutes les instances ; partie la dernière instance, la valeur
+// est oubliée (un écran remonté repart de `etatOrdersDuCache`, comme un `useState` neuf).
+// Les règles de `loadOrders` ne changent pas (échecs nommés, relecture discrète qui garde ce
+// qu'on montrait d'un compte raté, seule la lecture la plus récente écrit — désormais pour TOUS
+// les moteurs). `_commandesLuesA` : l'heure de la dernière lecture finie, par sorte.
+const _magasinCommandes = creerMagasinPartage();
+const _commandesLuesA = {};
+const cleMagasinCommandes = (type) => `${type}|${(AUTH.user && AUTH.user.id) || ''}`;
+const useEtatPartage = (magasin, cle, init) => {
+  const initRef = useRef(init); initRef.current = init;
+  const abonner = React.useCallback((f) => magasin.abonner(cle, f, () => initRef.current()), [magasin, cle]);
+  const lire = React.useCallback(() => magasin.lire(cle, () => initRef.current()), [magasin, cle]);
+  const v = React.useSyncExternalStore(abonner, lire, lire);
+  const poser = React.useCallback((suite) => magasin.poser(cle, suite), [magasin, cle]);
+  return [v, poser];
+};
 const etatOrdersDuCache = (type, accounts) => {
   try {
     const c = _acctCache[type];
@@ -31867,7 +31900,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const ventesVc = ventesVcDeMemo(vcBrut);
   // Les dates de VERSEMENT des ventes Vinted — trois états (undefined en
   // cours · null pas su · map lue). Relues quand l'extension annonce des ventes.
-  const [versements, setVersements] = useState(undefined);
+  // (13 nov., source unique) UNE copie pour tous les moteurs : chaque instance publie le relevé des ventes
+  // (`vrm_stats_ventes`, [9] la date de versement) ; avec des copies séparées, la dernière à publier pouvait
+  // être celle dont les dates n'étaient pas encore lues (mesuré : le même build, deux passes de
+  // chiffres-volume, « date » puis « » sur une vente).
+  const [versements, setVersements] = useEtatPartage(_magasinCommandes, cleMagasinCommandes('versements'), () => undefined);
   const relireVersements = useRef(null);            // « Relire mes ventes » relit aussi des dates illisibles
   // Le registre de ses déclarations URSSAF (« J'ai déclaré ce mois »). Réglage
   // synchronisé lu au montage : `null` tant que le nuage n'est pas arrivé
@@ -31885,7 +31922,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, []);
   useEffect(() => {
     let mort = false;
-    const lire = () => fetchVersementsVinted().then((m) => { if (!mort) setVersements(m); });
+    const lire = () => fetchVersementsVinted().then((m) => { if (!mort) setVersements((avant) => fusionnerVersements(avant, m)); });   // (13 nov.) une date lue ne redevient jamais vide
     relireVersements.current = lire;
     lire();
     const f = (e) => { if (cache()) return; const d = e && e.detail; if (d && d.type === 'maj' && (d.quoi === 'ventes' || d.quoi === 'versements')) lire(); };
@@ -33274,9 +33311,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (les deux tests vivent au niveau module — une seule définition, cf. plus haut)
   // (6 nov.) Revenir sur l'écran : la liste en cache (la même entrée que `loadOrders` servirait
   // une milliseconde plus tard) est là DÈS le premier rendu — plus de squelette d'une image.
-  const [sales, setSales] = useState(() => etatOrdersDuCache('sold', accounts));
+  const [sales, setSales] = useEtatPartage(_magasinCommandes, cleMagasinCommandes('sold'), () => etatOrdersDuCache('sold', accounts));   // (13 nov.) une copie pour tous les moteurs
   const salesCourant = useRef(sales); salesCourant.current = sales;   // (12 nov.) la liste montrée, pour relire UN compte (`relire`)
-  const [buys, setBuys] = useState(() => etatOrdersDuCache('purchased', accounts));
+  const [buys, setBuys] = useEtatPartage(_magasinCommandes, cleMagasinCommandes('purchased'), () => etatOrdersDuCache('purchased', accounts));
   // (6 nov.) LES VENTES VUES PAR E-MAIL, PAS ENCORE RELUES SUR VINTED
   // (src/venteEmailFraiche.js) : la liste de l'écran et VENDU les lisent ; tout
   // le reste (Colis, numéros, bordereaux, verrous) lit `sales.items`, la liste
@@ -33354,8 +33391,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // et la date de l'envoi (« Commande livrée » = 400). En mémoire seulement : le
   // pseudo d'un tiers n'est rangé nulle part. undefined en cours · lu.
   const [infosTxAchats,setInfosTxAchats]=useState(undefined);
-  const [suivisVinted,setSuivisVinted]=useState(undefined);
-  const [suivisManuels,setSuivisManuels]=useState(undefined);
+  // (13 nov., source unique) Une copie partagée par tous les moteurs montés (Achats en monte 3).
+  const [suivisVinted,setSuivisVinted]=useEtatPartage(_magasinCommandes,cleMagasinCommandes('suivisVinted'),()=>undefined);
+  const [suivisManuels,setSuivisManuels]=useEtatPartage(_magasinCommandes,cleMagasinCommandes('suivisManuels'),()=>undefined);
   const indexSuivisAchats = useMemo(() => {
     const out = {};
     // La photo, par transaction (lue dans la transaction de SON compte).
@@ -35475,7 +35513,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const recuJours = {};
       const j0 = new Date(); j0.setDate(1); j0.setMonth(j0.getMonth() - 14); const t0 = j0.getTime();
       for (const l of lignes) if (l && l.ts && l.ts >= t0) { const k = jourClef(new Date(l.ts)); recuJours[k] = r2((recuJours[k] || 0) + l.eur); }
-      const avant = load('vinted_urssaf_mois', null);
+      const avant = chargerPublie('vinted_urssaf_mois', null);   // (13 nov.) une publication en attente compte
       const charge = { mois: liste, aDater: ad, ecartees: ecartees.length, sources, declare: declarables.declare, recu, recuJours, nonComptees };
       const memeChose = avant && JSON.stringify({ mois: avant.mois, aDater: avant.aDater, ecartees: avant.ecartees, sources: avant.sources, declare: avant.declare, recu: avant.recu, recuJours: avant.recuJours, nonComptees: avant.nonComptees }) === JSON.stringify(charge);
       // ⚠️ (1er nov., audit A8) `at` = l'heure d'une LECTURE complète, pas d'un
@@ -37785,13 +37823,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const gardesLectures = useRef(null);
   if(!gardesLectures.current)gardesLectures.current={annonces:creerGardeLectures(()=>AUTH.user?.id||'',()=>comptesLectures.current),messages:creerGardeLectures(()=>AUTH.user?.id||'',()=>comptesLectures.current)};
   useEffect(()=>{gardesLectures.current.annonces.reprendre();gardesLectures.current.messages.reprendre();return()=>{gardesLectures.current.annonces.arreter();gardesLectures.current.messages.arreter();};},[]);
-  const lectureOrders = React.useRef({ sold: 0, purchased: 0 });
   const ventesPerimees = React.useRef(false);       // un signal « ventes » reçu hors des écrans qui les montrent
   const vusSonde = React.useRef({});                // horodatages vus par la sonde de 60 s (survit au changement d'écran)
   const buysCharges = React.useRef(false);          // les achats sont-ils déjà affichés quelque part ?
-  const loadOrders = async (type, setter, force, opts) => {
-    const silencieux = !!(opts && opts.silencieux);
-    const n = (lectureOrders.current[type] = (lectureOrders.current[type] || 0) + 1);
+  // (13 nov., source unique) Les commandes sont UNE copie partagée par tous les moteurs montés
+  // (`_magasinCommandes`) : une lecture identique déjà en cours (même sorte, mêmes comptes, même
+  // mode, rien oublié depuis — `_genLectures`) est REJOINTE au lieu d'être refaite par chaque
+  // instance. Une lecture forcée (« Réessayer », « Synchroniser ») part toujours.
+  const loadOrders = (type, setter, force, opts) => {
+    if (force) return loadOrdersLecture(type, setter, force, opts);
+    const seul = opts && Array.isArray(opts.seulement) ? opts.seulement.map(String).sort().join(',') : '';
+    const sig = [type, cleComptesVinted(accounts), opts && opts.silencieux ? 's' : '', seul, _genLectures].join('|');
+    return _magasinCommandes.partager(cleMagasinCommandes(type), sig, () => loadOrdersLecture(type, setter, force, opts));
+  };
+  const loadOrdersLecture = async (type, setter, force, opts) => {
+    const cleM = cleMagasinCommandes(type);
+    // Une liste DÉJÀ montrée (par ce moteur ou un autre) pour ces mêmes comptes ne repasse jamais
+    // par le squelette : la relecture est discrète (un compte raté garde ce qu'on montrait, nommé).
+    const montre = _magasinCommandes.lire(cleM, () => etatOrdersDuCache(type, accounts));
+    const silencieux = !!(opts && opts.silencieux) || !!(montre && Array.isArray(montre.items) && montre.comptes === cleComptesVinted(accounts));
+    const n = _magasinCommandes.numero(cleM);
     // Le cache rend AUSSI ses échecs : un compte pas lu reste « pas su » (§4).
     // `demandes` : les comptes que CETTE lecture interroge — rangés avec le
     // résultat (état ET cache), pour qu'un lecteur sache ce qu'elle couvre.
@@ -37807,7 +37858,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const k = `${u}_orders_${type}`;
       if (Number.isFinite(t) && !Number.isFinite(_harvestSeen[k])) _harvestSeen[k] = t;
     }
-    if (cached) { setter({ loading:false, items:cached.items, failed:cached.failed, failedUids:cached.failedUids, comptes:cached.comptes }); return; }
+    // (13 nov.) Déjà montrée telle quelle (un autre moteur l'a posée) : rien ne change, aucun rendu.
+    if (cached) { _commandesLuesA[type] = cached.ts; setter(prev => (prev && !prev.loading && !prev.error && prev.items === cached.items && prev.failed === cached.failed && prev.failedUids === cached.failedUids && prev.comptes === cached.comptes) ? prev : { loading:false, items:cached.items, failed:cached.failed, failedUids:cached.failedUids, comptes:cached.comptes }); return; }
     // (12 nov., vitesse) UNE VENTE ARRIVE SUR UN COMPTE : on ne relit QUE lui. Avant, `relire(uid)`
     // relançait la lecture de CHAQUE compte : passé la minute de mémoire des lignes, ~1,2 Mo repartaient
     // (banc ventes-relecture-compte). Les autres comptes gardent EXACTEMENT ce que l'écran montre (leurs
@@ -37819,7 +37871,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const cibles = accounts.filter(a => seul.has(String(a.vinted_user_id)));
       if (cibles.length) {
         const results = await Promise.all(cibles.map(async acc => { const res = await fetchVintedOrders(acc, type, 1, 'all', { force }); noteAcctLive(acc.vinted_user_id, res, force); return { acc, res }; }));
-        if (n !== lectureOrders.current[type]) return;
+        try { performance.mark(`vrm:commandes:${type}`); } catch (_) {}
+        if (!_magasinCommandes.estCourant(cleM, n)) return;
         const lus = results.filter(r => r.res && r.res.ok);
         if (!lus.length) return;                                 // lecture ratée : rien n'est changé
         const okUids = new Set(lus.map(r => String(r.acc.vinted_user_id)));
@@ -37845,6 +37898,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       noteAcctLive(acc.vinted_user_id, res, force);
       return { acc, res };
     }));
+    // (13 nov., source unique) Un compteur d'exécutions pour les bancs (source-unique, RENDUS) :
+    // une fusion des commandes par lecture, quel que soit le nombre de moteurs montés.
+    try { performance.mark(`vrm:commandes:${type}`); } catch (_) {}
     // ⚠️ TRANSFERTS ENTRE TES PROPRES COMPTES (vérifié en base) : tu vends une
     // paire depuis un compte et tu la rachètes avec un autre. Vinted la compte
     // comme un ACHAT, mais c'est TA paire (elle porte ton numéro « nXXXX » et/ou
@@ -37886,7 +37942,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     out.sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
     // Erreur seulement si RIEN n'a pu être chargé et qu'au moins un appel a échoué.
     const error = out.length===0 && anyErr && !anyOk;
-    if (n !== lectureOrders.current[type]) return;          // une lecture plus récente est partie après celle-ci
+    if (!_magasinCommandes.estCourant(cleM, n)) return;     // une lecture plus récente est partie après celle-ci (tous moteurs)
+    _commandesLuesA[type] = Date.now();
     // Une lecture partielle se met en cache AVEC ses échecs (jamais comme une
     // liste complète) ; un échec total, pas du tout.
     const caps = {};
@@ -37967,7 +38024,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => { if (accounts.length) loadOrders('sold', setSales); /* eslint-disable-next-line */ }, [cleComptes]);
   useEffect(() => { buysCharges.current = Array.isArray(buys.items); }, [buys.items]);
   // (31 oct.) Colis lit aussi les achats : sa colonne « À retirer » est la liste de `pickupUnion`.
-  useEffect(() => { if ((curSub==='achats'||curSub==='journee'||curSub==='bordereaux') && accounts.length && (buys.items===null || (buys.comptes && buys.comptes!==cleComptes))) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [sub, cleComptes]);
+  useEffect(() => { if ((curSub==='achats'||curSub==='journee'||curSub==='bordereaux') && accounts.length && (buys.items===null || (buys.comptes && buys.comptes!==cleComptes) || !(Date.now() - (_commandesLuesA.purchased || 0) < _CACHE_TTL))) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [sub, cleComptes]);   // (13 nov.) copie partagée : relue (discrètement) si sa lecture a plus de 3 min, comme un écran neuf
 
   // AUTO-LOCK : dès qu'une vente finalisée correspond à UNE SEULE annonce
   // numérotée (titre non ambigu), on verrouille le lien vente↔paire par n° de
@@ -38440,7 +38497,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => {
     if (curSub !== 'achats' && curSub !== 'journee' && curSub !== 'bordereaux') return;   // (1er nov.) + Colis : sans eux, « À retirer » n'y comptait pas comme Ma journée
     let stop = false;
-    Promise.all([lireSuivisVintedVal(), lireSuivisManuelsVal()]).then(([v, m]) => { if (stop) return; poserSuivisVinted(v); poserSuivisManuels(m); });
+    // (13 nov., source unique) La lecture d'ouverture déjà partie pour un autre moteur est rejointe (rien oublié
+    // depuis : `_genLectures`) ; une relecture voulue (`maj suivi`, un n° ajouté) relit toujours.
+    const sig = 'ouverture|' + _genLectures;
+    Promise.all([_magasinCommandes.partager(cleMagasinCommandes('suivisVinted'), sig, lireSuivisVintedVal), _magasinCommandes.partager(cleMagasinCommandes('suivisManuels'), sig, lireSuivisManuelsVal)]).then(([v, m]) => { if (stop) return; poserSuivisVinted(v); poserSuivisManuels(m); });
     return () => { stop = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [curSub]);
@@ -38560,7 +38620,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (cache()) { hiddenAt = 0; return; }   // écran gardé caché : il sera remonté à son retour (src/ecransGardes.jsx)
       if (!hiddenAt || Date.now() - hiddenAt < 20000 || !accounts.length) { hiddenAt = 0; return; }
       hiddenAt = 0;
-      viderCacheLignes();                                          // vide le cache de lignes (relit la moisson fraîche)
+      oublierLignesUneFois();                                        // vide le cache de lignes (relit la moisson fraîche)
       try { Object.keys(_acctCache).forEach(k => delete _acctCache[k]); _persistAcctCache(); } catch (_) {}
       if (curSub === 'ventes' || curSub === 'journee' || curSub === 'messages') loadOrders('sold', setSales, false, { silencieux: true });
       if (curSub === 'achats' || curSub === 'journee' || curSub === 'bordereaux') { loadOrders('purchased', setBuys, false, { silencieux: true }); lireSuivis(); }
@@ -38576,7 +38636,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => {
     const auRetour = () => {
       if (cache() || !accounts.length || !etatCopies()) return;
-      viderCacheLignes();
+      oublierLignesUneFois();   // (13 nov.) une fois pour tous les moteurs montés
       if (curSub === 'ventes' || curSub === 'journee' || curSub === 'messages') loadOrders('sold', setSales, false, { silencieux: true });
       if (curSub === 'achats' || curSub === 'journee' || curSub === 'bordereaux') { loadOrders('purchased', setBuys, false, { silencieux: true }); lireSuivis(); }
       if (curSub === 'annonces' || curSub === 'journee' || curSub === 'messages') loadListings();
@@ -38603,7 +38663,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const relire = (uid) => {
       // (12 nov.) Ventes monte DEUX moteurs (la liste et « À expédier ») : le second ne réoublie pas la ligne
       // que le premier vient de relire (`oublierCommandesCompte`, 4 s) — une seule relecture du compte.
-      if (uid) oublierCommandesCompte(uid); else viderCacheLignes();
+      if (uid) oublierCommandesCompte(uid); else oublierLignesUneFois();
       try { delete _acctCache.sold; _persistAcctCache(); } catch (_) {}
       // ⚠️ Hors de ces écrans, le signal était JETÉ : revenir sur Colis montrait
       //    l'ancien état jusqu'au cycle suivant. On le retient, et l'entrée sur
@@ -38621,7 +38681,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // Achats rangés par l'extension (5.155) : on relit les achats s'ils sont
       // déjà affichés quelque part — sans squelette, sans perdre l'écran.
       else if (ev.quoi === 'achats') {
-        if (ev.uid) _rowCache.delete(`o:${ev.uid}`); else viderCacheLignes();
+        if (ev.uid) _rowCache.delete(`o:${ev.uid}`); else oublierLignesUneFois();
         try { delete _acctCache.purchased; _persistAcctCache(); } catch (_) {}
         if (buysCharges.current) loadOrders('purchased', setBuys, false, { silencieux: true });
       }
@@ -39611,7 +39671,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     lbcAnnoncesSession().then((it) => { if (!mort) setLbcItemsLus(it == null ? null : it); });
     return () => { mort = true; };
   }, [lbcBesoinAnnonces, lbcVentes]);
-  const lbcItemsBenef = lbcLu === undefined ? undefined : lbcLu === null ? null : !lbcBesoinAnnonces ? {} : lbcItemsLus;
+  // (13 nov., moteur-compta) Le `{}` « aucune annonce à lire » est UN objet pour la vie du module (lu seulement :
+  // `numeroLbcIdentite` ne fait que `items[iid]`) : neuf à chaque rendu, il relançait `autresBenefice` et tout ce
+  // qui en dépend (bénéfice par jour, relevé des ventes, sources, meilleures) à CHAQUE rendu — mesuré à 20 000
+  // ventes : ~0,3 à 0,6 s de calcul (×4) refait à chacun des ~25 rendus du chargement de Ma journée.
+  const lbcItemsBenef = lbcLu === undefined ? undefined : lbcLu === null ? null : !lbcBesoinAnnonces ? LBC_AUCUNE_ANNONCE : lbcItemsLus;
   // `null` tant qu'une source n'est pas lue (ou a raté) : jamais un bénéfice
   // partiel présenté comme complet. Une liste sinon.
   const autresBenefice = useMemo(() => {
@@ -39795,7 +39859,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       }
       const charge = {};
       for (const k of Object.keys(jours).sort()) charge[k] = jourBeneficeEnTableau(jours[k]);
-      const avant = load('vrm_benefice_jours', null);
+      const avant = chargerPublie('vrm_benefice_jours', null);   // (13 nov.) une publication en attente compte
       // (1er nov.) + Vestiaire (montant reçu sûr) ; les ventes Vestiaire au montant
       // pas sûr sont hors du bénéfice et publiées en NOMBRE (`horsVestiaire`) :
       // la case Bénéfice le dit (« sans N vente Vestiaire »), jamais tues.
@@ -39827,8 +39891,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         compte: (o) => (o._acc && (o._acc.login || o._acc.vinted_user_id)) || '', autres: autresBenefice, titreDe,
         numero: (o) => { const e = effEntry(o); return (e && e.numero) || ''; },
         versement: (o) => (versements && o.transaction_id != null ? (versements[String(o.transaction_id)] || '') : '') });
-      const r0 = load('vrm_stats_ventes', null);
-      if (!(r0 && JSON.stringify(r0.l) === JSON.stringify(releve))) save('vrm_stats_ventes', { v: 1, l: releve, at: Date.now() });
+      // (13 nov., source unique) Les dates de versement EN COURS de lecture (`undefined`) : rien n'est publié, la
+      // publication d'avant reste (src/versementsConnus.js). Pas sues (`null`) : « » — sauf une date déjà publiée
+      // pour la même vente, gardée. Comparé à la publication EN ATTENTE s'il y en a une (`chargerPublie`).
+      if (versements === undefined) return;
+      const r0 = chargerPublie('vrm_stats_ventes', null);
+      const releveSur = garderDatesConnues(releve, r0 && Array.isArray(r0.l) ? r0.l : null);
+      if (!(r0 && JSON.stringify(r0.l) === JSON.stringify(releveSur))) save('vrm_stats_ventes', { v: 1, l: releveSur, at: Date.now() });
     } catch (_) {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, autresBenefice, ventesVc, versements, excluAutre, lotsTx, lotLiens]);
@@ -39987,7 +40056,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    un détail par étape (livrée = imminent > en transit > à expédier).
   //  • DÉBLOQUÉ = ventes finalisées → Vinted a libéré les fonds sur ton solde.
   // Source = statut Vinted moissonné (fiable, se met à jour tout seul).
+  // (13 nov., moteur-compta) Les trois feuilles « Trésorerie », « Courbes par marque », « Sourcing » ne
+  // s'ouvrent plus (aucun bouton ne pose leur drapeau) : leurs calculs, refaits à chaque rendu sur toutes les
+  // ventes, ne tournent que feuille ouverte. `perf` n'est lu que par l'écran Ventes.
+  const [showTreasury, setShowTreasury] = useState(false);
   const treasury = useMemo(() => {
+    if (!showTreasury) return null;
     // (11 nov., famille « une règle par notion ») « En attente » n'est PLUS calculé ici : c'est l'argent à
     //    venir (src/argentAVenir.js, `liveStats.aVenir`), la règle du 4 nov. qui a remplacé cette somme des
     //    statuts « en cours » (220 € de trop mesurés). « Reçu » : prix illisible compté à part (« au moins »).
@@ -40002,8 +40076,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const spent = spentS.total, nSpent = spentS.n;
     return { recu, recuS, nRecu, spent, spentS, nSpent };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, buysBase, offBuys, hiddenSales, hiddenAccts]);
-  const [showTreasury, setShowTreasury] = useState(false);
+  }, [showTreasury, sales.items, buysBase, offBuys, hiddenSales, hiddenAccts]);
   const [detailAttente, setDetailAttente] = useState(false); // décompte compte par compte de l'argent en attente
   const [walletEscrow, setWalletEscrow] = useState(null); // { total, accounts } réel des porte-monnaie, ou null
   // Le solde réel des porte-monnaie sert AUSSI à la carte « argent en route »
@@ -40059,6 +40132,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // la vente), taux d'écoulement (vendues / (vendues + en ligne)), meilleure
   // marque (bénéfice moyen par paire), et CA du mois en cours.
   const perf = useMemo(() => {
+    if (curSub !== 'ventes') return null;
     const items = sales.items || [];
     let daysSum=0, daysNb=0, caMois=0;
     const now = new Date(); const ym = now.getFullYear()*100 + now.getMonth();
@@ -40104,7 +40178,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const bestAccount = comptesVendeurs.length>=2 ? comptesVendeurs[0] : null;
     return { joursMoy: daysNb?daysSum/daysNb:null, joursNb:daysNb, bestBrand, caMois, ecoul, online, vendues, bestAccount, comptesVendeurs };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, annBase, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff]);
+  }, [curSub, sales.items, annBase, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff]);
 
   // ── REPÈRE D'ACHAT PAR MODÈLE (proposition 10, 6 octobre) ────────────────
   // « Combien je gagne en moyenne sur une Samba ? » : le prix moyen de REVENTE
@@ -40192,6 +40266,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [showBrandCurves, setShowBrandCurves] = useState(false);
   const [curveBrand, setCurveBrand] = useState('');
   const brandCurves = useMemo(() => {
+    if (!showBrandCurves) return null;
     const now = new Date(); const months = [];
     for (let i=11;i>=0;i--){ const d=new Date(now.getFullYear(), now.getMonth()-i, 1); months.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`); }
     const idx = {}; months.forEach((ym,i)=>{ idx[ym]=i; });
@@ -40210,7 +40285,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const brandList = Object.keys(data).filter(b=>b!=='__ALL__').sort((a,b)=>data[b].total-data[a].total);
     return { months, series, brandList, hasData: brandList.length>0 };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
+  }, [showBrandCurves, sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
 
   // ── Wrapped du vendeur : rétrospective annuelle façon Spotify Wrapped ──
   const [showWrapped, setShowWrapped] = useState(false);
@@ -40262,6 +40337,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [showSourcing, setShowSourcing] = useState(false);
   const [boostsDetected, setBoostsDetected] = useState(null); // boosts captés (facturation Vinted)
   const sourcing = useMemo(() => {
+    if (!showSourcing) return null;
     const items = sales.items || [];
     const mk = () => ({ nb:0, ca:0, pasLu:0, benef:0, benefNb:0, daysSum:0, daysNb:0 });
     const brands={}, sizes={}; let total=0;
@@ -40291,7 +40367,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     })).sort((a,b)=> b.nb-a.nb || (b.benefMoy||-1e9)-(a.benefMoy||-1e9));
     return { brands:finalize(brands), sizes:finalize(sizes), total };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
+  }, [showSourcing, sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
 
   // ── Saisonnalité : tes meilleurs mois de vente (pour acheter au bon moment) ─
   const seasonality = useMemo(() => {
@@ -40837,7 +40913,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const estLotPropose = (a) => estLotApp(a) || !!(a && a.lot === true);
   const achatsIdentite = fillBuyAchats.items || buys.items || null;
   const ventilationDeTx = (tx) => { const r = indexRecusAchat.get(String(tx)); return r ? ventilationRecuAchat(r.texte) : null; };
+  // (12 nov., vitesse-volume) Les propositions de prix d'achat ne servent qu'à la liste des Ventes et à la saisie
+  // en série (« Prix d'achat ») : ailleurs (Ma journée, Achats, Colis…) elles ne sont pas calculées — 1,5 s au
+  // téléphone à 20 000 ventes. Même règle là où elles s'affichent (chiffres-volume 35/35).
+  const besoinPropositions = curSub === 'ventes' || fillBuyOpen;
   const propositionsPrix = useMemo(() => {
+    if (!besoinPropositions) return { m: new Map(), numero: () => '' };
     const lignes = [];
     // (7 nov., vitesse) Les clés photo des achats sont calculées UNE fois et
     // rangées par clé : chaque vente ne regarde plus que les achats de SA photo
@@ -40875,7 +40956,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const nums = new Map(lignes.map((l) => [l.cle, l.numero]));
     return { m, numero: (c) => nums.get(c) || '' };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, saleOv, buyByNum, achatsIdentite, indexRecusAchat, linkedBuyIds, nArticlesTx, lotsDeclares]);
+  }, [besoinPropositions, sales.items, numeros, saleOv, buyByNum, achatsIdentite, indexRecusAchat, linkedBuyIds, nArticlesTx, lotsDeclares]);
   const propositionVente = (tx) => propositionsPrix.m.get('v:' + tx) || null;
   // ── (6 nov., vague 2 · point 1) LES VENTES ANNULÉES AVANT L'ENVOI, PAIRE CHEZ LUI ──
   // src/annuleesChezToi.js : annulée PROUVÉE par la transaction (`txnAnnuleeAvantEnvoi`,
@@ -42697,10 +42778,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (Array.isArray(sales.items)) {
       const ordre = { 'Retournée': 0, 'Retour en cours': 0, 'Au relais': 1, 'En transit': 2, 'Livrée': 3 };
       const TXT = { 'Retournée': 'Retour à vérifier', 'Retour en cours': 'Retour en cours', 'Au relais': 'Au relais de l’acheteur', 'En transit': 'En transit', 'Livrée': 'Livré' };
+      // (13 nov., moteur-compta) La fenêtre des 45 jours est jugée AVANT `aExpedier` et `venteStage` (la même règle,
+      // dans un autre ordre : trois filtres purs) — à 20 000 ventes, l'étape n'est plus calculée pour les vieilles.
       sales.items
-        .filter(o => o && !hiddenSales.has(String(o.transaction_id)) && !aExpedier(o))
-        .map(o => ({ o, st: venteStage(o), j: o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null }))
-        .filter(x => ordre[x.st.label] != null && (x.j == null || x.j <= 45))
+        .filter(o => o && !hiddenSales.has(String(o.transaction_id)))
+        .map(o => ({ o, j: o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null }))
+        .filter(x => (x.j == null || x.j <= 45) && !aExpedier(x.o))
+        .map(x => ({ o: x.o, st: venteStage(x.o), j: x.j }))
+        .filter(x => ordre[x.st.label] != null)
         .sort((a, b) => (ordre[a.st.label] - ordre[b.st.label]) || ((b.j ?? 0) - (a.j ?? 0)))
         .forEach(({ o, st }) => L.push({ cle: 'p:' + o.transaction_id, groupe: 'parti', site: 'vinted', nom: nomAvecTaille(o.title || 'Vente', o), photo: orderPhoto(o), num: effEntry(o)?.numero || '', etat: TXT[st.label] || st.label, ambre: ordre[st.label] === 0, ouvrir: false }));
     }
@@ -43367,10 +43452,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             lues: { imprime: !!((e.txn && bordsPrinted[e.txn]) || (b && isBordPrinted(b))), depose: true, enroute: !!(pv && pv.bougeLu), livre: !!(pv && pv.livreeLue) } });
         }
         for (const o of sales.items) {
-          if (!o || hiddenSales.has(String(o.transaction_id)) || aExpedier(o)) continue;
-          const st = venteStage(o); if (ordre[st.label] == null) continue;
+          // (13 nov., moteur-compta) La fenêtre des 45 jours d'abord (même règle, autre ordre) : à 20 000 ventes,
+          // `aExpedier` et `venteStage` ne tournent plus sur les vieilles.
+          if (!o || hiddenSales.has(String(o.transaction_id))) continue;
           const j = o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null;
           if (j != null && j > LIMITE_ENVOYES_J) continue;
+          if (aExpedier(o)) continue;
+          const st = venteStage(o); if (ordre[st.label] == null) continue;
           const b = bordsParTxn[String(o.transaction_id)] || null;
           const pv = preuvesFriseDe(o);
           out.push({ cle: 'v:' + o.transaction_id, site: 'vinted', type: 'parti', o, b, st, j, rang: ordre[st.label],
@@ -53479,6 +53567,8 @@ function clesAnnonceLbc(ad, liens) {
 // Le lien posé à la main gagne (c'est sa correction) ; sinon la référence VRM
 // (CustomRef, réf lue sur l'annonce), traduite par la remise à zéro 013. Deux
 // références qui se contredisent ⇒ personne. `items` absent ⇒ seul le lien.
+// (13 nov., moteur-compta) « Aucune annonce Leboncoin à lire » : un seul objet vide, stable d'un rendu à l'autre (jamais modifié).
+const LBC_AUCUNE_ANNONCE = {};
 const numeroLbcIdentite = (v, items, liens) => {
   if (!v || v.itemId == null) return '';
   const iid = String(v.itemId);
@@ -53897,7 +53987,7 @@ function aRetirerDeLbcEbay({ soldEbay, posted, numeros, itemsLbc, liens, vendusL
 let _lbcAnnoncesSession = null;
 // (1er nov.) Une capture rangée par l'extension (« maj lbc ») périme ce mémo :
 // sans ça, Favoris reçus montraient pendant 10 min la lecture d'avant.
-try { window.addEventListener('vrm:ext', (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'lbc') _lbcAnnoncesSession = null; }); } catch (_) {}
+try { window.addEventListener('vrm:ext', (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'lbc') { _lbcAnnoncesSession = null; _lbcListingsEnCours = null; } }); } catch (_) {}
 async function lbcAnnoncesSession() {
   const l = await lbcListingsSession();
   return l ? l.items : null;
@@ -53905,8 +53995,17 @@ async function lbcAnnoncesSession() {
 // La même lecture, avec les dates des listes COMPLÈTES de ses comptes
 // (`lectures`, 22 oct.) : le tableau de bord en a besoin pour la même preuve que
 // l'écran Leboncoin (`numerosLbcSortis`, §11). `null` = pas su.
-async function lbcListingsSession() {
-  if (_lbcAnnoncesSession && Date.now() - _lbcAnnoncesSession.t < 10 * 60000) return _lbcAnnoncesSession;
+// (13 nov., intégration) Deux écrans qui la demandent EN MÊME TEMPS (Stock : annonces actuelles + notifications)
+// partagent la lecture en cours (budget-vitesse : lbc_listings lue deux fois à la 2ᵉ ouverture du Stock).
+let _lbcListingsEnCours = null;
+function lbcListingsSession() {
+  if (_lbcAnnoncesSession && Date.now() - _lbcAnnoncesSession.t < 10 * 60000) return Promise.resolve(_lbcAnnoncesSession);
+  if (_lbcListingsEnCours) return _lbcListingsEnCours;
+  const p = lbcListingsLire().finally(() => { if (_lbcListingsEnCours === p) _lbcListingsEnCours = null; });
+  _lbcListingsEnCours = p;
+  return p;
+}
+async function lbcListingsLire() {
   try {
     // (31 oct.) Projetée (§4.4) : les deux champs lus, jamais `select=data`.
     const rows = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_listings&select=items:data->items,lectures:data->lectures`);

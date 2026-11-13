@@ -40,7 +40,9 @@ jobs:
   audits:
     name: Audits (part ${{ matrix.part }}/3)
     needs: construire
-    runs-on: ubuntu-latest
+    # (13 nov.) Épinglé comme base-essai.yml et sauvegarde.yml : le 13 nov. vers 4 h UTC, `ubuntu-latest` est passé
+    # à Ubuntu 26 (autre Postgres) et les audits SQL (base-essai, socle 018-020) sont tombés sur toutes les PR.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false

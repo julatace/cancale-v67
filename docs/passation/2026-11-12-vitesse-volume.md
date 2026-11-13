@@ -54,6 +54,28 @@ Partie de `claude/agent2-vert-vitesse` (à intégrer avec elle ou après elle).
   `cartesColis`, ou calculer Argent seulement à son ouverture — toujours sous `chiffres-volume`.
 - `scripts/budget-vitesse.json` (lectures, octets, JS) : non touché par ce lot (rien relevé).
 
+## 3 bis. Deuxième passe (demande : ne monter les calculs d'Argent que là où ils servent)
+- **Fait** : `propositionsPrix` (les prix d'achat proposés par identité) n'est calculé que sur la liste
+  des Ventes et dans la saisie « Prix d'achat » (`besoinPropositions`). Ailleurs : une carte vide, que
+  personne n'y lit. `audit-prix-achat-propose` 27/0.
+- **Chiffres** : `chiffres-volume` 20 000, build d'avant et build d'après passés À LA MÊME HEURE : 35/35.
+  ⚠️ Comparer à un relevé de plusieurs heures plus tôt montre une fausse différence : la prévision du mois
+  (`data-prev-bas`) dépend de l'heure (6 600 € → 6 500 €, identique au même moment sur les deux builds).
+- **Vitesse** (médiane de 5, ×4, alterné ; machine partagée) : Ma journée 13,1 → 12,3 s (tâches longues
+  12,1 → 11,8 s), Ventes 15,8 → 14,4 s (15,3 → 12,9 s), Achats 8,4 → 9,2 s (dispersé, 7,6 à 20,9 s).
+  Gain petit et proche du bruit, sauf les tâches longues de Ventes.
+- **Pas fait (et pourquoi)** :
+  - `cartesColis` mémorisé : il lit `expeditions()`, les preuves de départ, eBay, Vestiaire, les retraits,
+    `venteStage`… — une clé incomplète ferait mentir Colis ; à faire avec la liste exacte de ce qu'il lit
+    et `chiffres-volume` sur Colis.
+  - `totals`, `ajusterChiffre` : Ma journée affiche des chiffres d'Argent (cartes) ; les en sortir demande
+    qu'elle lise ce que l'écran Argent PUBLIE (§5) — or Argent n'est pas monté au démarrage de Ma journée :
+    il faut d'abord un publieur qui tourne sans l'écran (ou un calcul léger dédié), chantier à part.
+  - Regrouper les arrivées des données (≈19 rendus de Comptabilite avant « prêt ») : changer l'ordre des
+    lectures du moteur, à mesurer écran par écran ; pas commencé.
+- L'objectif < 2 s reste loin : la cause est le moteur Comptabilite monté par chaque écran, avec tout ce
+  qu'il calcule ; le gagner demande de découper ce moteur, pas de mémoriser davantage.
+
 ## 4. Preuves
 - `npm run build` ; audits tdz, variables, identite, coherence, plans-solo-pro, bordereau-des-email,
   numerotation-lecteurs, bilan-semaine (54/0), annulations-compte, doublons-historique,

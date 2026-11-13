@@ -3,6 +3,11 @@
 const fs = require('fs');
 const [A, B] = process.argv.slice(2).map((f) => JSON.parse(fs.readFileSync(f, 'utf8')));
 // Un attribut qui porte une HEURE (ms depuis 1970 : « vérifié à … ») n'est pas un chiffre de l'écran.
+// (13 nov., moteur-compta) `data-photos-perdues` (le bandeau « les photos de Vinted ne s'affichent pas ») compte les
+// IMAGES que le navigateur du banc n'a pas pu charger (il coupe tout hôte extérieur) : il apparaît sur l'écran ouvert à
+// ce moment-là. Mesuré : le MÊME build, passé deux fois, le porte sur Ventes (3) puis sur Ma journée (12). Pas un chiffre
+// de VRM : il est retiré des deux relevés.
+for (const R of [A, B]) for (const e of Object.values(R.ecrans)) e.attrs = (e.attrs || []).filter((x) => !/^data-photos-perdues=/.test(x));
 for (const R of [A, B]) for (const e of Object.values(R.ecrans)) e.attrs = (e.attrs || []).map((x) => { const v = Number(x.split('=')[1]); return v > 1.6e12 && v < 2.2e12 ? x.split('=')[0] + '=·ms·' : x; });
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '✅ ' : '❌ ') + m + (d ? ' — ' + d : '')); };

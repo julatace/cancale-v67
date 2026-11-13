@@ -1774,3 +1774,7 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **12 nov. · Vert et vitesse** : CI de main au vert ; « Tout imprimer (N) » = « Imprimer (N) » ; une vente ne relit que son compte (1 350 → 268 Ko). Reste : 20 000 ventes. `docs/passation/2026-11-12-vert-vitesse.md`. Geste : aucun.
 
 - **12 nov. · Paquets G2 (ext. 5.368), 12nov-a (ext. 5.369) et 12nov-b, mis en ligne par le second agent** : `2026-11-12-integration-11nov-g2.md`, `-12nov-a.md`, `-12nov-b.md`. Geste : installer 5.369.0 ; migration 042 (facultative).
+
+- **12 nov. · G2 (5.368), 12nov-a (5.369), 12nov-b, vert-vitesse, vitesse-volume en ligne** : 20 000 ventes −20 %. `2026-11-12-*.md`. Geste : migration 042 (facultative).
+
+- **12 nov. · G2 (5.368), 12nov-a (5.369), 12nov-b, vert-vitesse, vitesse-volume, extension 5.372 (discrétion, boutique, favoris par compte, une prudence par compte) en ligne** : `2026-11-12-*.md`. Geste : installer 5.372.0 ; migration 042 (facultative).
