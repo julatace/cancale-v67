@@ -68,8 +68,9 @@ export async function lieuxRelusDansTextes(lignes, lire) {
       if (n.length === 1) nouveaux.set(s, n[0]);   // deux nouveaux points différents ⇒ on ne choisit pas
       // (13 nov.) Les horaires du point, lus dans les textes gardés de CE n° (api/_lib/horaires-relais.js) :
       // deux e-mails qui en disent deux différents ⇒ rien ; un texte coupé ⇒ rien.
-      const hs = [...new Set(cl.map((c) => horairesDepuisTexte(texteDe.get(c) || '')).filter(Boolean).map((h) => JSON.stringify(h)))];
-      if (hs.length === 1) horairesLus.set(s, JSON.parse(hs[0]));
+      const lusH = cl.map((c) => horairesDepuisTexte(texteDe.get(c) || '')).filter(Boolean);
+      const hs = [...new Set(lusH.map((h) => JSON.stringify(h)))];
+      if (hs.length === 1) horairesLus.set(s, lusH[0]);   // tous les mêmes : le premier lu (pas de JSON.parse nu, audit-stockage-sur)
       // (13 nov., rappels) La date limite Vinted Go (« À retirer avant le » / « *12/11/2026* » à la ligne) n'était pas lue
       // avant ce jour : relue ici, DATÉE avec son année seulement (aucune année devinée) ; deux dates différentes ⇒ rien.
       const ls = [...new Set(cl.map((c) => limiteRetraitDepuisTexte(texteDe.get(c) || '', null)).filter(Boolean))];
