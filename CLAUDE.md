@@ -539,7 +539,6 @@ sans la fonction.
 - **13 nov. · Récap 1 page + URSSAF la veille** : « Récap de <mois> » → Imprimer (A4, noir et blanc, données du Rapport du mois) ; la veille « Demain : déclaration URSSAF · X € à déclarer » (règle de « Copier », une fois). `2026-11-13-lot1617.md`. Geste : aucun.
 
 - **13 nov. · Horaires Mondial Relay** : lus par le serveur dans le suivi du colis (n° de point), 7 j, même code postal, sans requête de plus. `2026-11-13-lot11-horaires-mr.md`. Geste : aucun.
-- **13 nov. · Traduction lot 2 (intégration, étape 2)** : Ma journée, Ventes, Achats, Annonces, Stock, Argent, Statistiques, Messages, E-mails en 5 langues sur le main du jour (migration rejouée par `i18n-migrer`, 150 clés neuves) ; français identique mot pour mot (18 relevés). `2026-11-13-integration-traduction.md`. Geste : aucun.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
