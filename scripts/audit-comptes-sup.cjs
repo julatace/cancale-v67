@@ -315,6 +315,7 @@ const MUTATIONS_ROUTE = [
       fs.writeFileSync(path.join(dir, 'plan-regle.mjs'), m);
       let rouges = 0;
       try { const RM = await import('file://' + path.join(dir, 'plan-regle.mjs')); await controlesRegle(RM, (c) => { if (!c) rouges++; }); } catch (_) { rouges++; }
+      finally { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {} }
       dit(rouges > 0, `mutation « ${nom} » ⇒ rouge`, `${rouges} rouge(s)`);
     }
     const srcC = lire('api/compte.js');

@@ -3638,9 +3638,10 @@ function EquipeSetting() {
         {/* (13 nov., lot 58) Au propriétaire : les TROIS gestes exacts (docs/passation/2026-11-13-lot5658.md). */}
         {proprio
           ? <ol data-equipe-gestes="3" style={{ margin: '4px 0 0', paddingLeft: 20 }}>
-              <li>Supabase → SQL Editor → colle <b style={{ color: C.text }}>scripts/equipe-sql/016-1-essai-annule.sql</b> → Run (essai, rien ne reste).</li>
-              <li>Colle <b style={{ color: C.text }}>supabase/migrations/016-equipe.sql</b> → Run.</li>
-              <li>Vérifie : <b style={{ color: C.text }}>016-3-verifier.sql</b> → Run, ou <b style={{ color: C.text }}>node scripts/equipe-sql/essai-annule.cjs --verifier</b> (« ok » : true).</li>
+              <li>Essai : SQL Editor → <b style={{ color: C.text }}>016-1-essai-annule.sql</b> → Run.</li>
+              <li>Active : <b style={{ color: C.text }}>016-equipe.sql</b> → Run.</li>
+              <li>Vérifie : <b style={{ color: C.text }}>016-3-verifier.sql</b> → Run.<br/>
+                Ou : <b style={{ color: C.text }}>essai-annule.cjs --verifier</b>.</li>
             </ol>
           : <>Rien à faire : bientôt, tu inviteras ici ton aide par e-mail.</>}
       </div>
