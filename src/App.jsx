@@ -783,7 +783,8 @@ import AutresVersions from "./AutresVersions.jsx";
 import { jourParis } from "./dateParis.js";   // (11 nov.) jour/mois métier à l'heure de Paris
 import { sommeConnue, texteSomme, medianeSue, valeurSue } from "./sommeConnue.js";   // (11 nov.) « pas su » ≠ 0
 import { lireLocal, lireJSON, stockageDispo } from "./stockageSur.js";   // (11 nov.) stockage protégé (Safari privé, quota)
-import { creerMagasinPartage } from "./magasinPartage.js";   // (13 nov., source unique) une copie des données lues pour tous les moteurs
+import { creerMagasinPartage } from "./magasinPartage.js";
+import { fusionnerVersements, garderDatesConnues } from "./versementsConnus.js";   // (13 nov.) une date de versement connue ne redevient jamais « pas lue »   // (13 nov., source unique) une copie des données lues pour tous les moteurs
 // ⟦→ ecrans/Reglages.jsx #16⟧
 
 // Version visible, pour vérifier d'un coup d'œil si l'app a bien chargé la
@@ -4416,6 +4417,10 @@ if (typeof window !== 'undefined') {
 // Sauvegarde : localStorage immediat (differe 500ms) PUIS push cloud
 let _saveTimers = {};
 const _saveRun = {};   // (11 nov.) la sauvegarde en attente de chaque clé (`viderSave`)
+// (13 nov., source unique) La VALEUR en attente de chaque clé (500 ms) : une publication qui compare à « ce qui
+// est publié » doit comparer à elle, pas au navigateur pas encore réécrit (src/versementsConnus.js).
+const _saveEnAttente = {};
+const chargerPublie = (k, def) => (Object.prototype.hasOwnProperty.call(_saveEnAttente, k) ? _saveEnAttente[k] : load(k, def));
 const _failedLocalSaves = new Map();
 // (1er nov.) LA SAUVEGARDE NE RÉÉCRIT PLUS UNE CARTE PÉRIMÉE. Un écran calcule
 // la valeur à garder depuis SON état (`{ ...prev, [n°]: prix }`) ; si cette clé a
@@ -4498,7 +4503,7 @@ const save = (k,v,quand) => {
   if (_saveTimers[k]) clearTimeout(_saveTimers[k]);
   else if (SYNC_KEYS.includes(k)) { try { const t = (k in _avantCopieLocale) ? _avantCopieLocale[k] : localStorage.getItem(k); _saveAvant[k] = t == null ? undefined : t; } catch (_) { delete _saveAvant[k]; } }
   const executer = () => {
-    delete _saveRun[k];
+    delete _saveRun[k]; delete _saveEnAttente[k];
     if (AUTH.user?.id !== owner || (owner && readSession()?.user?.id !== owner)) { delete _saveTimers[k]; delete _saveAvant[k]; delete _avantCopieLocale[k]; _rendreQuand(k, false, 'le compte VRM a changé'); return; }
     // (2 nov.) Ce que le navigateur portait AVANT ce geste : la base de la file
     // d'envoi tant que cet onglet n'a pas encore lu le nuage.
@@ -4541,6 +4546,7 @@ const save = (k,v,quand) => {
     if (SYNC_KEYS.includes(k)) cloudPush(); // declenche la synchro cloud
   };
   _saveRun[k] = executer;
+  _saveEnAttente[k] = v;
   _saveTimers[k] = setTimeout(executer, 500);
 };
 // (11 nov., reprise-ecrans) La sauvegarde EN ATTENTE d'une clé, faite tout de suite (même
@@ -31916,7 +31922,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, []);
   useEffect(() => {
     let mort = false;
-    const lire = () => fetchVersementsVinted().then((m) => { if (!mort) setVersements(m); });
+    const lire = () => fetchVersementsVinted().then((m) => { if (!mort) setVersements((avant) => fusionnerVersements(avant, m)); });   // (13 nov.) une date lue ne redevient jamais vide
     relireVersements.current = lire;
     lire();
     const f = (e) => { if (cache()) return; const d = e && e.detail; if (d && d.type === 'maj' && (d.quoi === 'ventes' || d.quoi === 'versements')) lire(); };
@@ -35507,7 +35513,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const recuJours = {};
       const j0 = new Date(); j0.setDate(1); j0.setMonth(j0.getMonth() - 14); const t0 = j0.getTime();
       for (const l of lignes) if (l && l.ts && l.ts >= t0) { const k = jourClef(new Date(l.ts)); recuJours[k] = r2((recuJours[k] || 0) + l.eur); }
-      const avant = load('vinted_urssaf_mois', null);
+      const avant = chargerPublie('vinted_urssaf_mois', null);   // (13 nov.) une publication en attente compte
       const charge = { mois: liste, aDater: ad, ecartees: ecartees.length, sources, declare: declarables.declare, recu, recuJours, nonComptees };
       const memeChose = avant && JSON.stringify({ mois: avant.mois, aDater: avant.aDater, ecartees: avant.ecartees, sources: avant.sources, declare: avant.declare, recu: avant.recu, recuJours: avant.recuJours, nonComptees: avant.nonComptees }) === JSON.stringify(charge);
       // ⚠️ (1er nov., audit A8) `at` = l'heure d'une LECTURE complète, pas d'un
@@ -39853,7 +39859,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       }
       const charge = {};
       for (const k of Object.keys(jours).sort()) charge[k] = jourBeneficeEnTableau(jours[k]);
-      const avant = load('vrm_benefice_jours', null);
+      const avant = chargerPublie('vrm_benefice_jours', null);   // (13 nov.) une publication en attente compte
       // (1er nov.) + Vestiaire (montant reçu sûr) ; les ventes Vestiaire au montant
       // pas sûr sont hors du bénéfice et publiées en NOMBRE (`horsVestiaire`) :
       // la case Bénéfice le dit (« sans N vente Vestiaire »), jamais tues.
@@ -39885,8 +39891,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         compte: (o) => (o._acc && (o._acc.login || o._acc.vinted_user_id)) || '', autres: autresBenefice, titreDe,
         numero: (o) => { const e = effEntry(o); return (e && e.numero) || ''; },
         versement: (o) => (versements && o.transaction_id != null ? (versements[String(o.transaction_id)] || '') : '') });
-      const r0 = load('vrm_stats_ventes', null);
-      if (!(r0 && JSON.stringify(r0.l) === JSON.stringify(releve))) save('vrm_stats_ventes', { v: 1, l: releve, at: Date.now() });
+      // (13 nov., source unique) Les dates de versement EN COURS de lecture (`undefined`) : rien n'est publié, la
+      // publication d'avant reste (src/versementsConnus.js). Pas sues (`null`) : « » — sauf une date déjà publiée
+      // pour la même vente, gardée. Comparé à la publication EN ATTENTE s'il y en a une (`chargerPublie`).
+      if (versements === undefined) return;
+      const r0 = chargerPublie('vrm_stats_ventes', null);
+      const releveSur = garderDatesConnues(releve, r0 && Array.isArray(r0.l) ? r0.l : null);
+      if (!(r0 && JSON.stringify(r0.l) === JSON.stringify(releveSur))) save('vrm_stats_ventes', { v: 1, l: releveSur, at: Date.now() });
     } catch (_) {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, autresBenefice, ventesVc, versements, excluAutre, lotsTx, lotLiens]);
