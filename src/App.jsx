@@ -21667,8 +21667,17 @@ function reporterEtapeIci(cle) {
   __plusTardIci = n; save(CLE_PLUS_TARD, n);
   try { window.dispatchEvent(new Event('vrm:parcours')); } catch (_) {}
 }
-function useParcoursArrivee({ comptes: comptesCoque, actif = true, tour = 0 }) {
+function useParcoursArrivee({ comptes: comptesCoque, actif = true, tour: tourDemande = 0 }) {
   const [, maj] = React.useReducer((n) => n + 1, 0);
+  // (13 nov.) Une position écrite (l'écran plein avance, se ferme) fait RELIRE les preuves
+  // ici aussi : la carte de Ma journée ne reste pas sur l'état de son montage.
+  const [relu, setRelu] = React.useState(0);
+  const tour = tourDemande + relu;
+  React.useEffect(() => {
+    const relire = () => setRelu((n) => n + 1);
+    window.addEventListener('vrm:parcours', relire);
+    return () => window.removeEventListener('vrm:parcours', relire);
+  }, []);
   React.useEffect(() => {
     const cles = [CLE_PARCOURS, CLE_PLUS_TARD, CLE_GUIDE_MASQUE];
     const f = (e) => {
