@@ -530,6 +530,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **13 nov. · /confiance + /etat** : page publique « ce que VRM fait et ne fait jamais » (preuves : `audit-confiance-publique`) ; /etat sans réponse ⇒ « État inconnu ». `docs/passation/2026-11-13-lot5052.md`. Geste : aucun.
+
 - **13 nov. · Lot 51 (données du compte)** : « Supprimer mon compte » = 30 jours de grâce (demande neutre `vrm_effacement_prevu_*`, abonnement résilié, « Annuler » en un geste, bandeau ; cron du matin efface par `effacerCompte` ; compte vide : tout de suite) ; export RGPD inchangé. `2026-11-13-lot51.md`. Geste : aucun.
 - **13 nov. · Traduction lot 2 (intégration, étape 2)** : Ma journée, Ventes, Achats, Annonces, Stock, Argent, Statistiques, Messages, E-mails en 5 langues sur le main du jour (migration rejouée par `i18n-migrer`, 150 clés neuves) ; français identique mot pour mot (18 relevés). `2026-11-13-integration-traduction.md`. Geste : aucun.
 

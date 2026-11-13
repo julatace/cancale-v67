@@ -18468,6 +18468,8 @@ const DOCS_LEGAUX = [
   docLegal('/legal/cgv.html', 'legal.cgv'),
   docLegal('/legal/confidentialite.html', 'legal.confidentialite'),
   docLegal('/legal/cookies.html', 'legal.cookies'),
+  // (13 nov., lot 50) Ce que VRM fait — et ne fait jamais (public/confiance.html), lisible sans compte.
+  docLegal('/confiance', 'legal.confiance'),
 ];
 function LiensLegaux() {
   return (

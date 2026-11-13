@@ -125,6 +125,7 @@ export default {
   "legal.cgv": "Condiciones de venta",
   "legal.confidentialite": "Privacidad",
   "legal.cookies": "Cookies",
+  "legal.confiance": "Lo que VRM hace — y nunca hace",
   "legal.documents": "Documentos legales",
   "legal.mentions": "Aviso legal",
   "accueil.moment.messages.alt": "La pantalla Mensajes de VRM: tres conversaciones de dos cuentas en una lista — «¿Lo dejarías en 50 €?», «¿Sigue disponible en M?», «¡Gracias, recibido!». Datos de ejemplo.",
