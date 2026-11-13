@@ -59,8 +59,10 @@ Police : `--vrm-police` (SF Pro sur Apple, aucune police téléchargée).
 | légende (sous un chiffre) | **12 / 400** ou **12 / 600** | 0 |
 | pastille, compteur | **11 / 600** — jamais une phrase | 0 |
 
-- **Trois graisses : 400 · 600 · 700.** Jamais 800 ni 900 : `styles-systeme.css` §2.1
-  ramène à 700 toute graisse plus lourde, styles en ligne compris.
+- **Trois graisses : 400 · 600 · 700.** Jamais 800 ni 900 : les feuilles ont été ramenées
+  à 700 (13 nov.) et `styles-systeme.css` §2.1 ramène les styles en ligne. Le 500 qui
+  reste (≈ 40 textes par écran, surtout des notes) est un reste à résorber : un neuf
+  s'écrit 400 ou 600.
 - **Chiffres** : `tabular-nums` partout où ils se comparent (colonnes, tuiles, montants).
 - Un **chiffre pas su** (« — ») s'écrit à la taille du texte (20 / 400 dans une tuile),
   jamais en grand ; un zéro s'écrit « 0 », jamais à la taille d'un héros.
@@ -85,8 +87,9 @@ Police : `--vrm-police` (SF Pro sur Apple, aucune police téléchargée).
 | `--d-ambre` / `--d-point-ambre` / `--d-ambre-fond` | `#B25000` / `#FF9F0A` / `#FFF4E5` | `#FFB340` / `#FF9F0A` / `#2E2412` | un geste à faire : un point de 7 px devant la phrase, ou le mot |
 | `--vrm-doublon` (themeMineral.js, seule source) | `#D70015` | `#FF6961` | deux paires présentes sous un même N° — **nulle part ailleurs** |
 
-- **Un gris de texte, pas trois.** Les `#8E8E93`, `#86868B`, `#8A8A8E` d'avant
-  tombaient sous 4,5:1 : ils lisent `--d-gris`.
+- **Un gris de texte, pas trois.** Toutes les familles de jetons (`--w-gris`, `--p-gris`,
+  `--p-gris-2`, `--fu-gris`, `--fu-gris2`…) lisent `--d-gris` ; un gris écrit en dur dans
+  une feuille (`#8E8E93`, `#86868B`…) est une dette : jamais pour un texte neuf.
 - **Le bleu est rare** : un aplat bleu par écran (l'action groupée de l'en-tête), jamais
   par ligne ; un texte bleu = un lien.
 - **La carte sombre** (dégradé radial bleu nuit, `--vrm-carte-sombre`) est la seule
@@ -115,7 +118,8 @@ case (pas d'ombre, rayon 12). `prefers-contrast: more` rend un cadre net.
 - **Forme** : capsule. Un bouton d'icône seule est un **rond** de la même hauteur,
   remplissage gris.
 - **Hauteur** : **44 au doigt** (téléphone, iPad), **36 à la souris** (ordinateur) —
-  `--d-h-ctrl`. Texte 15/600 au doigt, 13/600 à la souris. Icône 17 px.
+  `--d-h-ctrl`. Texte 15/600 au doigt, 13/600 à la souris ; la taille `petit` (rangée
+  serrée) garde la hauteur et passe le texte à 13. Icône 17 px (15 en `petit`).
 - **États** : survol (souris seulement, `hover: hover`) = remplissage plus fort ;
   appui = `scale(.97)` en 100 ms ; désactivé = 40 % ; focus clavier = anneau bleu 2 px
   décollé de 2 px ; occupé = l'indicateur à la place de l'icône (`aria-busy`).
@@ -127,11 +131,12 @@ case (pas d'ombre, rayon 12). `prefers-contrast: more` rend un cadre net.
 - **Segmenté** (`Segmente`, `.vrm-seg`) : une piste capsule `--d-remplir`, 2 px
   d'intérieur ; le segment choisi = capsule blanche (nuit `#636366`) à ombre fine ; un
   seul niveau par écran ; le compte après « · ».
-- **Filtres** (`.vrm-filtres`) : capsules ; l'actif à l'encre pleine, texte fond.
+- **Filtres** (`.vrm-filtres`, puces de compte) : capsules, **44 au doigt, 32 à la souris**
+  (`--d-h-filtre`) ; l'actif à l'encre pleine, texte fond.
 - **Recherche** (`ChampRecherche`) : la capsule remplie d'iOS, sans cadre ; l'anneau
   bleu au focus seulement.
-- **Champ de saisie** : rayon 12, fond carte, bord `--d-filet-fort` ; l'erreur se dit
-  sous le champ, en ambre, après un essai.
+- **Champ de saisie** : rayon 12 (`--d-r-case`) ; un champ neuf prend le bord
+  `--d-filet-fort` ; l'erreur se dit sous le champ, en ambre, après un essai.
 - **Interrupteur** (`Interrupteur`, `src/composants/Ios.jsx`) : celui d'iOS. Jamais une
   case à cocher, un `<select>` ou un `<details>` natif nus (règle 3 de la revue du 11 nov.).
 
