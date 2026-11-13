@@ -128,7 +128,30 @@ export function fraisVc(v) {
 // La date de versement : seulement une clé qui la PORTE (jamais la date de la
 // vente, jamais l'heure de lecture). 0 = pas su.
 export const dateVersementVc = (v) => { const t = Date.parse((v && v.verseLe) || ''); return Number.isFinite(t) && t > 0 ? t : 0; };
-export const dateVenteVc = (v) => { const t = Date.parse((v && v.date) || ''); return Number.isFinite(t) && t > 0 ? t : 0; };
+// (13 nov., 5.374) Une date que Vestiaire écrit SANS fuseau (« 2026-11-02 14:17:41 », mesuré sur
+// `/ots/sales`) est l'heure de PARIS : lue comme telle partout — le serveur (UTC) la lisait une heure
+// trop tard (deux en été), Safari pouvait ne pas la lire du tout. Une date avec son fuseau, ou un jour
+// seul, comme avant. Autre forme ⇒ 0 (« pas su »).
+const decalageParisMin = (ms) => {
+  try {
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(new Date(ms)).map((x) => [x.type, x.value]));
+    return Math.round((Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second) - Math.floor(ms / 1000) * 1000) / 60000);
+  } catch (_) { return null; }
+};
+export function tempsVc(texte) {
+  const s = String(texte == null ? '' : texte).trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d{1,6})?$/.exec(s);
+  if (m) {
+    const naif = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0));
+    let off = decalageParisMin(naif); if (off == null) return 0;
+    off = decalageParisMin(naif - off * 60000); if (off == null) return 0;
+    const t = naif - off * 60000;
+    return Number.isFinite(t) && t > 0 ? t : 0;
+  }
+  const t = Date.parse(s);
+  return Number.isFinite(t) && t > 0 ? t : 0;
+}
+export const dateVenteVc = (v) => tempsVc(v && v.date);
 
 // Les ventes rangées, en liste, avec leur N° (identité seule). `null` = pas su.
 export function ventesVcDe(d) {
