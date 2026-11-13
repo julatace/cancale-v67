@@ -530,8 +530,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **13 nov. · Retour → stock sans rien saisir (lot 29)** : un retour Vinted PROUVÉ (transaction 440 / non réclamée) puis REMBOURSÉ (ou noté reçu) revient en stock sous SON N° (n° de transaction → annonce → N°) : « Retour du <date lue> — à vérifier et remettre en ligne », « Remettre en ligne » (son clic, Republier à la main) ; en route ⇒ « Retour en route » ; sans N° ⇒ « à numéroter » ; N° déjà porté en ligne ⇒ rien ; ancien (> 45 j) et eBay inchangés (`retourRevenuSeul`). `docs/passation/2026-11-13-lot29.md`. Geste : aucun.
 - **13 nov. · Traduction lot 2 (intégration, étape 2)** : Ma journée, Ventes, Achats, Annonces, Stock, Argent, Statistiques, Messages, E-mails en 5 langues sur le main du jour (migration rejouée par `i18n-migrer`, 150 clés neuves) ; français identique mot pour mot (18 relevés). `2026-11-13-integration-traduction.md`. Geste : aucun.
-- **13 nov. · Rappels de colis au nom de la paire (second agent)** : « Demain dernier jour », « Dernier jour », « t'attend » portent le titre de l'achat relié par IDENTITÉ (n° de suivi, code, conversation : jonction de l'écran dans `api/_lib/commande-colis.js`, app et serveur), jamais par ressemblance ; le résumé du soir saute un colis déjà rappelé le matin (une notification par colis et par jour) ; banc `ventes-colis-premium` à la règle « Colis dans Ventes ». `docs/passation/2026-11-13-rappels-paire.md`. Geste : aucun.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
