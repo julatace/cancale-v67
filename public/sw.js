@@ -333,19 +333,24 @@ self.addEventListener('fetch', event => {
         if (!estPhotoGardable(u)) return new Response('', { status: 404 });
         const c = await caches.open(CACHE_PHOTOS);
         const cle = '/hl-photo?u=' + encodeURIComponent(u);
+        // La mise en réserve demandée par la page (`retenirPhoto`, requête `cors` à en-tête) : une
+        // réponse opaque ne peut pas lui être rendue (le navigateur la refuserait) — on répond 204
+        // (rangée) ou 404. Une IMAGE reçoit la photo elle-même.
+        const mise = req.headers.get('x-vrm-hl-photo') === '1';
         const hit = await c.match(cle);
-        if (hit) return hit;
-        const demandeDeVrm = req.destination === 'image' || req.headers.get('x-vrm-hl-photo') === '1';
-        if (demandeDeVrm) {
+        if (hit) return mise ? new Response(null, { status: 204 }) : hit;
+        if (mise || req.destination === 'image') {
           const res = await fetch(u, { mode: 'no-cors', credentials: 'omit', referrerPolicy: 'no-referrer' });
+          let range = false;
           if (res && (res.ok || res.type === 'opaque')) {
             try {
               await c.put(cle, res.clone());
+              range = true;
               const cles = await c.keys();
               for (const k of cles.slice(0, Math.max(0, cles.length - PHOTOS_MAX))) await c.delete(k);
             } catch (_) {}
           }
-          return res;
+          return mise ? new Response(null, { status: range ? 204 : 404 }) : res;
         }
       } catch (_) {}
       return new Response('', { status: 404 });

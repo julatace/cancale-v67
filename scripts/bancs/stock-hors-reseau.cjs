@@ -182,6 +182,10 @@ const vue = (pg) => pg.evaluate(() => {
     horsConnexion: /Hors connexion[^.]*dernier état du \d{1,2}/i.test(corps), refus: [...document.querySelectorAll('[data-hl-refuse]')].filter((e) => e.getClientRects().length).map((e) => (e.innerText || '').replace(/\s+/g, ' ').slice(0, 160)),
     vide: /Aucune? (paire|annonce|article)|Je n'ai pas pu lire|pas lu/i.test(corps.slice(0, 2500)), extrait: corps.replace(/\s+/g, ' ').slice(0, 400) };
 }).catch((e) => ({ erreur: String(e) }));
+// L'écran est OUVERT (plus son squelette d'attente, src/AttenteEcran.jsx — 2,5 s au plus).
+const ouvert = (pg) => attendre(async () => (await pg.getAttribute('[data-attente-ecran="garage"]', 'data-attente').catch(() => 'attente')) !== 'attente', 15000);
+// Les photos que le service worker a gardées pour le hors réseau (réserve `vrm-hl-photos`).
+const photosGardees = (pg) => pg.evaluate(async () => { try { if (!(await caches.has('vrm-hl-photos'))) return []; const c = await caches.open('vrm-hl-photos'); return (await c.keys()).map((r) => decodeURIComponent(new URL(r.url).search)); } catch (_) { return []; } }).catch(() => []);
 const lireRetour = (pg) => pg.evaluate(() => {
   const el = document.querySelector('[data-inv-retour]'); if (!el) return null;
   const t = el.querySelector('.vrm-inv-retour-t');
@@ -235,7 +239,14 @@ async function main() {
       await attendre(async () => { const r = await rang(); return r.sur > 0 && r.n === r.sur; }, 120000, 500);
       const rr = await rang();
       dit(rr.sur > 10 && rr.n === rr.sur, `${T} O : les morceaux de l'app sont rangés pour le hors ligne`, `${rr.n}/${rr.sur}`);
-      await pg.waitForTimeout(2500);   // le temps de garder le dernier état (et ses photos)
+      // Il fait défiler son Stock une fois (les vignettes sont chargées à la vue : « déjà vue » = vue ici).
+      for (let y = 0; y < 8; y++) { await pg.mouse.wheel(0, 500).catch(() => {}); await pg.evaluate(() => window.scrollBy(0, 500)).catch(() => {}); await pg.waitForTimeout(250); }
+      await attendre(async () => (await photosGardees(pg)).length >= N, 15000);
+      const pgard = await photosGardees(pg);
+      dit(pgard.length >= N && pgard.every((u) => /images1\.vinted\.net/.test(u)), `${T} O : les photos AFFICHÉES sont gardées par le service worker (rien d'autre)`, `${pgard.length} : ` + pgard.slice(0, 2).join(' '));
+      const garde = await pg.evaluate((uid) => { try { const f = JSON.parse(localStorage.getItem('vrm_hl_stock_' + uid) || 'null'); return f ? { uid: f.uid, n: (f.lecture.vinted[0] || {}).enLigne ? f.lecture.vinted[0].enLigne.length : -1, octets: JSON.stringify(f).length } : null; } catch (_) { return null; } }, UID).catch(() => null);
+      dit(!!garde && garde.uid === UID && garde.n === N, `${T} O : le dernier état du Stock est gardé sur l'appareil, au nom de CE vendeur`, JSON.stringify(garde));
+      await pg.waitForTimeout(1200);
       await pg.screenshot({ path: path.join(CAPT, `O-en-ligne-${T}.png`) });
 
       // ── A. rouvert SANS réseau ────────────────────────────────────────────
@@ -244,8 +255,9 @@ async function main() {
         await A.couper();
         await pg.close(); pg = await A.page();
         await pg.goto(URL0() + '/?tab=garage', { waitUntil: 'domcontentloaded' }).catch(() => {});
+        await ouvert(pg);
         await attendre(async () => Object.keys((await vue(pg)).parNum || {}).length >= N, 15000);
-        await pg.waitForTimeout(1500);
+        await attendre(async () => Object.values((await vue(pg)).parNum || {}).filter((x) => x.photo).length >= N, 6000);
         const v = await vue(pg);
         const nums = Object.keys(v.parNum || {}).map(cleNum);
         const manquent = ['1', '2', '3', '4', '5', '6'].filter((k) => !nums.includes(k));
@@ -256,7 +268,9 @@ async function main() {
         dit(/^Étagère du garage\|/.test(p1.place) && /^Étagère du garage\|/.test(p3.place), `${T} A : l'emplacement de chaque paire rangée (Étagère du garage)`, JSON.stringify([p1.place, p3.place]));
         dit(/Étagère du garage/.test(p1.texte || ''), `${T} A : l'emplacement est écrit sur la ligne`, p1.texte);
         const avecPhoto = Object.entries(v.parNum || {}).filter(([, x]) => x.photo).map(([k]) => k);
-        dit(avecPhoto.length >= 3, `${T} A : les photos déjà vues s'affichent hors réseau`, avecPhoto.join(','));
+        dit(avecPhoto.length >= N, `${T} A : les photos déjà vues s'affichent hors réseau`, avecPhoto.join(','));
+        const autres = await pg.evaluate(() => [...document.querySelectorAll('main img')].filter((i) => /^https?:\/\/[^/]*vinted\.net\//.test(i.getAttribute('src') || '')).length).catch(() => -1);
+        dit(autres === 0, `${T} A : hors réseau, aucune vignette ne demande le CDN (rien de cassé)`, String(autres));
         dit(!v.vide, `${T} A : jamais « aucune paire » ni « pas lu » à la place du dernier état`, v.vide ? v.extrait.slice(0, 200) : '');
         await pg.screenshot({ path: path.join(CAPT, `A-stock-hors-reseau-${T}.png`) });
         await pg.screenshot({ path: path.join(CAPT, `A-stock-hors-reseau-plein-${T}.png`), fullPage: true }).catch(() => {});
@@ -320,6 +334,7 @@ async function main() {
         console.log(`\n── ${T} · E. fermée puis rouverte hors réseau`);
         await pg.close(); pg = await A.page();
         await pg.goto(URL0() + '/?tab=garage', { waitUntil: 'domcontentloaded' }).catch(() => {});
+        await ouvert(pg);
         await attendre(async () => Object.keys((await vue(pg)).parNum || {}).length >= N, 15000);
         const l = await saisiesLocales(pg);
         dit(Array.isArray(l) && ['1', '60', '7', '2'].every((n) => l.includes(n)), `${T} E : les saisies attendent toujours sur l'appareil`, JSON.stringify(l));
@@ -333,11 +348,15 @@ async function main() {
         const r = await lireRetour(pg);
         dit(r && r.etat === 'attendu', `${T} E : la saisie reprend (« 4 » ⇒ attendu)`, JSON.stringify(r));
         // « Terminer » ⇒ le bilan, hors réseau.
-        const fin = pg.locator('[data-inv-terminer]');
-        if (await fin.count()) { await fin.first().click().catch(() => {}); await pg.waitForTimeout(600); const conf = pg.locator('.vrm-confirm button, [data-confirm-ok]'); if (await conf.count()) await conf.last().click().catch(() => {}); }
-        await pg.waitForTimeout(800);
-        const bilan = await pg.evaluate(() => { const el = document.querySelector('[data-inv-bilan]'); return el ? (el.innerText || '').replace(/\s+/g, ' ').slice(0, 300) : null; }).catch(() => null);
-        dit(!!bilan, `${T} E : « Terminer » donne le bilan hors réseau`, bilan);
+        await toucher(pg, tel, '[data-inv-terminer]');
+        await pg.waitForSelector('button:has-text("Voir le bilan")', { timeout: 8000 });
+        await pg.waitForTimeout(400);
+        await toucher(pg, tel, 'button:has-text("Voir le bilan")');
+        await pg.waitForSelector('[data-inv-bilan]', { timeout: 8000 }).catch(() => {});
+        const bilan = await pg.evaluate(() => [...document.querySelectorAll('[data-inv-bilan]')].map((e) => e.getAttribute('data-inv-bilan') + ':' + e.getAttribute('data-inv-etat'))).catch(() => []);
+        // À chercher : N°3, N°5, N°6 (attendues, pas vues) ; à vérifier : N°60 ; vendue rangée : N°7 ; deux paires : N°2.
+        const etatDe = (k) => (bilan.find((x) => x.startsWith(k + ':')) || '').split(':')[1] || '';
+        dit(['3', '5', '6'].every((k) => etatDe(k) === 'manque') && etatDe('60') === 'trop' && etatDe('7') === 'vendu' && etatDe('2') === 'doublon' && !etatDe('1') && !etatDe('4'), `${T} E : « Terminer » donne le bilan hors réseau (à chercher 3, 5, 6 · à vérifier 60 · vendue 7 · deux paires sous le 2)`, JSON.stringify(bilan));
         await pg.screenshot({ path: path.join(CAPT, `E-bilan-${T}.png`) });
       });
 
