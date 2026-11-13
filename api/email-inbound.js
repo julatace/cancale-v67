@@ -55,6 +55,7 @@ import { numVcVente, numerosVcAvecLiens } from './_lib/vestiaire-regle.js';
 import { normaliserRegistre, comptesActifs } from './_lib/ebay.js';
 import { arriveLeAuRangement } from './_lib/arrivee-colis.js';
 import { limiteRetraitDepuisTexte, lieuDepuisExtrait, lieuSousEnTete, LIEU_AU_FUTUR, nouveauPointDansTexte, lieuGenerique } from './_lib/retrait-colis.js';
+import { horairesDepuisTexte } from './_lib/horaires-relais.js';
 import { codeRetraitTournure, nombreSurSaLigne, codeImpossible } from './_lib/code-retrait-email.js';
 import { decoderEntitesHtml } from './_lib/entites-html.js';
 import { transactionDuRecu } from './_lib/recu-achat.js';
@@ -1390,9 +1391,12 @@ export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString
     if (bouts.length) extraitCode = [...new Set(bouts)].join(' | ').slice(0, 400);
   }
 
+  // (13 nov.) Les HORAIRES D'OUVERTURE du point où le colis attend (api/_lib/horaires-relais.js) : lus dans le
+  // texte ENTIER (le texte gardé est borné), seulement pour un colis arrivé ; forme inconnue ⇒ rien.
+  const horaires = status === 'available' ? horairesDepuisTexte(txt) : null;
   // Le drapeau ne tient que si un code (ou un QR, vu par la route) prouve le colis.
   if (sansSuivi && !code) sansSuivi = false;
-  return { suivi, status, label, code, code2, artTitle, lieu, limite, consigne, extraitLieu, extraitCode, ...(sansSuivi ? { sansSuivi: true } : {}), ...(relaisChange ? { relaisChange: true } : {}), ...(sortant ? { sens: 'sortant' } : {}), ...(suiviDuSujetSeul ? { suiviDuSujetSeul: true } : {}) };
+  return { suivi, status, label, code, code2, artTitle, lieu, limite, consigne, extraitLieu, extraitCode, ...(horaires ? { horaires } : {}), ...(sansSuivi ? { sansSuivi: true } : {}), ...(relaisChange ? { relaisChange: true } : {}), ...(sortant ? { sens: 'sortant' } : {}), ...(suiviDuSujetSeul ? { suiviDuSujetSeul: true } : {}) };
 }
 
 // Dimensions d'une image PNG/GIF depuis son en-tête (sans la décoder en entier).
@@ -2714,6 +2718,7 @@ export async function traiterEmail(req, res) {
         ...(track.relaisChange && track.status === 'transit' ? { relaisChange: true, ...(prevLigne && prevLigne.lieu && prevLigne.lieu !== track.lieu ? { ancienLieu: String(prevLigne.lieu).slice(0, 200) } : {}) } : {}),
         ...(track.extraitLieu && !track.lieu ? { extraitLieu: track.extraitLieu } : {}),
         ...(track.extraitCode && !track.code ? { extraitCode: track.extraitCode } : {}),
+        ...(track.horaires ? { horaires: track.horaires } : {}),
         qrB64: qr.qrB64, qrType: qr.qrType, qrUrl: qr.qrUrl || null,
         // (12 nov.) L'E-MAIL SOURCE (« Voir l'e-mail » dans Colis) : l'id de SA ligne `email_reception_*`
         // (api/_lib/accuse-email.js). Pas su pour cet e-mail ⇒ celui de la ligne d'avant, sinon rien.
