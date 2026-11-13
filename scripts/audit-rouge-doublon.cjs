@@ -29,10 +29,10 @@ const fs = require('fs'), path = require('path');
 const RACINE = path.join(__dirname, '..');
 const SRC = path.join(RACINE, 'src');
 
-// Les couleurs de MARQUE : celles des logos (Mondial Relay, Relais Colis, DPD, DHL, Google).
-const MARQUES = ['#e2001a', '#e30613', '#dc0032', '#d40511', '#ea4335',
-  '#c8102e',   // (11 nov.) Mondial Relay : la tuile de sa marque (src/transporteursVisuels.js, `TRANSPORTEURS.mondialrelay.marque`), pas la palette
-];
+// Les couleurs de MARQUE : celles des logos. (13 nov., logos des transporteurs) Plus AUCUN transporteur rouge : DPD, DHL et
+// Relais Colis sont dessinés dans leur variante neutre (src/transporteursVisuels.js), Mondial Relay est framboise (334°, hors du
+// rouge). Il ne reste que le « G » de Google (bouton de connexion).
+const MARQUES = ['#ea4335'];
 // La DETTE : les rouges écrits en dur qui restent HORS de la zone du chantier A (fichier : plafond).
 // Le plafond ne monte jamais ; un fichier qui n'est pas ici n'a droit à aucun rouge.
 const DETTE = {

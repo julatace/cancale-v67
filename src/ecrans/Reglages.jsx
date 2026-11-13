@@ -2924,10 +2924,24 @@ async function supprimerMonCompte({ confirmation, motDePasse }) {
   try {
     const r = await fetch('/api/compte?mode=supprimer', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ confirmation, motDePasse }) });
     const j = await r.json().catch(() => null);
-    if (j && typeof j.message === 'string') return { ok: r.ok && j.ok === true, message: j.message };
-    return { ok: false, message: "Le serveur n'a pas répondu clairement : je ne sais pas si la suppression a eu lieu. Reconnecte-toi — si ton compte existe encore, relance-la." };
-  } catch (_) { return { ok: false, message: "Pas de réponse (connexion coupée) : je ne sais pas si la suppression a eu lieu. Reconnecte-toi — si ton compte existe encore, relance-la." }; }
+    // (13 nov., lot 51) `prevue` : la suppression est PROGRAMMÉE (30 jours de grâce) ; `immediat` : compte vide, parti.
+    if (j && typeof j.message === 'string') return { ok: r.ok && j.ok === true, message: j.message, prevue: (j.ok && j.prevue) || null, immediat: j.immediat === true };
+    return { ok: false, message: "Le serveur n'a pas répondu clairement : je ne sais pas si la suppression a été enregistrée. Rouvre cette page pour voir où elle en est." };
+  } catch (_) { return { ok: false, message: "Pas de réponse (connexion coupée) : je ne sais pas si la suppression a été enregistrée. Rouvre cette page pour voir où elle en est." }; }
 }
+// (13 nov., lot 51) Annuler SA suppression programmée (sa session suffit : annuler ne détruit rien).
+async function annulerSuppressionCompte() {
+  try {
+    const r = await fetch('/api/compte?mode=supprimer-annuler', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: '{}' });
+    const j = await r.json().catch(() => null);
+    if (j && typeof j.message === 'string') return { ok: r.ok && j.ok === true, message: j.message };
+    return { ok: false, message: "Pas de réponse claire : rouvre cette page pour voir si la suppression est toujours prévue." };
+  } catch (_) { return { ok: false, message: "Pas de réponse (connexion coupée) : la suppression n'est pas annulée. Réessaie quand tu as du réseau." }; }
+}
+const dateLongue = (iso) => { const t = Date.parse(iso || ''); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', day: 'numeric', month: 'long', year: 'numeric' }) : ''; };
+const joursAvant = (iso) => { const t = Date.parse(iso || ''); return Number.isFinite(t) ? Math.max(0, Math.ceil((t - Date.now()) / 864e5)) : null; };
+// Le bandeau de la coque relit l'état quand il change ici.
+const signalerSuppression = () => { try { window.dispatchEvent(new Event('vrm:suppression-prevue')); } catch (_) {} };
 async function lireInventaireSuppression() {
   try {
     const r = await fetch('/api/compte?mode=supprimer', { headers: { ...enTeteSession() }, cache: 'no-store' });
@@ -2954,6 +2968,7 @@ function FermerCompte({ onExporter }) {
   const [mdp, setMdp] = React.useState('');
   const [occupe, setOccupe] = React.useState(false);
   const [fin, setFin] = React.useState(null);
+  const [annonce, setAnnonce] = React.useState(null);   // (13 nov.) la phrase du serveur après demande / annulation
   // (9 octobre) Ses RÈGLES D'OFFRE eBay restent posées chez eBay après la
   // suppression : eBay continuera d'accepter (`compterReglesEbay`).
   const [reglesEbayN, setReglesEbayN] = React.useState(undefined);
@@ -2966,6 +2981,8 @@ function FermerCompte({ onExporter }) {
     compterReglesEbay().then((n) => { if (!mort) setReglesEbayN(n); }).catch(() => { if (!mort) setReglesEbayN(null); });
     return () => { mort = true; };
   }, [ouvert, essai]);
+  // (13 nov., lot 51) Annulée depuis le bandeau de la coque : le panneau relit.
+  React.useEffect(() => { const f = () => setEssai((x) => x + 1); window.addEventListener('vrm:suppression-annulee', f); return () => window.removeEventListener('vrm:suppression-annulee', f); }, []);
   const pareil = tape.trim() === MOT_SUPPRIMER;
   const preuve = preuveSuppression({ jeton: AUTH.session && AUTH.session.access_token, identites: Array.isArray(identites) ? identites : undefined });
   const recente = preuve.recente, champMdp = !recente && (preuve.cas === 'mdp' || preuve.cas === 'pas-su');
@@ -2986,8 +3003,18 @@ function FermerCompte({ onExporter }) {
     setOccupe(true);
     const r = await supprimerMonCompte({ confirmation: tape.trim(), motDePasse: mdp });
     setOccupe(false); setMdp('');
+    // (13 nov., lot 51) Programmée : il reste connecté, le panneau montre la date et « Annuler ».
+    if (r.ok && r.prevue) { setTape(''); setAnnonce({ ok: true, message: r.message }); setInfo((x) => (x && !x.proprietaire ? { ...x, prevue: r.prevue, prevueSu: true } : x)); signalerSuppression(); return; }
     setFin(r);
     if (r.ok) setTimeout(() => { try { authSignOut(); } catch (_) {} location.assign('/'); }, 6000);
+  };
+  const annuler = async () => {
+    if (occupe) return;
+    setOccupe(true);
+    const r = await annulerSuppressionCompte();
+    setOccupe(false);
+    setAnnonce(r);
+    if (r.ok) { setInfo((x) => (x && !x.proprietaire ? { ...x, prevue: null } : x)); signalerSuppression(); }
   };
   const txt = { fontSize: 13, color: C.muted, lineHeight: 1.55 };
   const champ = { width: '100%', boxSizing: 'border-box', marginTop: 6, border: `1px solid ${C.border}`, borderRadius: 12, padding: '11px 12px', fontSize: 16, minHeight: 44, background: C.bg, color: C.text, outline: 'none', fontFamily: 'inherit' };
@@ -3000,7 +3027,7 @@ function FermerCompte({ onExporter }) {
         style={{ display: 'flex', width: '100%', minHeight: 44, alignItems: 'center', gap: 10, border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
         <span style={{ flex: 1, minWidth: 0 }}>
           <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.danger }}>Supprimer mon compte</span>
-          <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2 }}>Efface ton compte VRM et tes données, définitivement.</span>
+          <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2 }}>30 jours pour changer d’avis, puis ton compte et tes données sont effacés.</span>
         </span>
         <span aria-hidden="true" style={{ color: C.muted, fontSize: 13 }}>{ouvert ? '▴' : '▾'}</span>
       </button>
@@ -3023,8 +3050,25 @@ function FermerCompte({ onExporter }) {
             <div data-fermer-etat="proprietaire" style={txt}>
               <b style={{ color: C.text }}>Compte propriétaire : suppression désactivée ici.</b> <Pourquoi>Tu es le propriétaire de cette installation VRM. Supprimer ce compte effacerait toute la boutique : désactivé ici, exprès.</Pourquoi>
             </div>
+          ) : info.prevue ? (
+            // (13 nov., lot 51) La suppression est PROGRAMMÉE : la date, et « Annuler » en un geste.
+            // La date s'écrit UNE fois ici (§7) : la phrase du serveur ne se montre que sur un échec.
+            <div data-fermer-etat="prevue" data-supprimer-prevue={info.prevue.effaceLe}>
+              {annonce && !annonce.ok && <div role="status" data-supprimer-annonce="echec" style={{ ...txt, color: C.warn, marginBottom: 8 }}>{annonce.message}</div>}
+              <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>Suppression prévue le {dateLongue(info.prevue.effaceLe)}</div>
+              <div style={{ ...txt, marginTop: 4 }}>
+                {joursAvant(info.prevue.effaceLe) ? `Dans ${joursAvant(info.prevue.effaceLe)} jour${joursAvant(info.prevue.effaceLe) > 1 ? 's' : ''}. ` : 'Elle a lieu au prochain passage du matin. '}
+                D’ici là, rien n’est effacé : ton compte et tes données restent là.
+                {['resilie', 'deja-resilie'].includes(info.prevue.abonnement) && <span data-supprimer-abonnement-prevue=""> Ton abonnement est résilié : aucun nouveau prélèvement.</span>}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+                <Bouton variante="primaire" onClick={annuler} disabled={occupe} data-supprimer-annuler="">{occupe ? 'Annulation…' : 'Annuler la suppression'}</Bouton>
+                {onExporter && <Bouton variante="secondaire" onClick={onExporter} data-supprimer-exporter="">Exporter mes données</Bouton>}
+              </div>
+            </div>
           ) : (
             <div data-fermer-etat="possible">
+              {annonce && <div role="status" data-supprimer-annonce={annonce.ok ? 'ok' : 'echec'} style={{ ...txt, color: annonce.ok ? C.text : C.warn, marginBottom: 8 }}>{annonce.message}</div>}
               <div style={{ ...titreBloc, marginTop: 0 }}>1. D’abord, garde une copie</div>
               <div style={txt}>Un fichier sur ton appareil : ventes, achats, stock, compta, factures.</div>
               {onExporter && <div style={{ marginTop: 8 }}><Bouton variante="secondaire" onClick={onExporter} data-supprimer-exporter="">Exporter mes données</Bouton></div>}
@@ -3047,7 +3091,15 @@ function FermerCompte({ onExporter }) {
               {reglesEbayN === null && <div data-fermer-regles-ebay="pas-su" style={{ ...txt, marginTop: 8, color: C.warn }}>{texteReglesQuiRestent(null, 'fermer')}</div>}
               {reglesEbayN && (reglesEbayN.oui > 0 || reglesEbayN.peutEtre > 0) && <div data-fermer-regles-ebay={reglesEbayN.oui + reglesEbayN.peutEtre} data-fermer-regles-ebay-peut-etre={reglesEbayN.peutEtre} style={{ ...txt, marginTop: 8, color: C.warn }}>Après la suppression, sur eBay : {texteReglesQuiRestent(reglesEbayN, 'fermer')}</div>}
 
-              <div style={titreBloc}>4. Confirme que c’est toi</div>
+              <div style={titreBloc}>4. Quand</div>
+              <div data-supprimer-quand={info.vide ? 'tout-de-suite' : 'dans-30-jours'} style={txt}>
+                {info.vide
+                  ? 'Ton compte est vide (aucune donnée, aucun compte de revente) : il est supprimé tout de suite.'
+                  : <>Rien n’est effacé tout de suite : la suppression a lieu dans <b style={{ color: C.text }}>{info.graceJours || 30} jours</b>. D’ici là, tu peux l’annuler ici, en un geste. Un e-mail te le confirme (si l’envoi est en place).</>}
+              </div>
+              {info.prevueSu === false && <div data-supprimer-prevue="pas-su" style={{ ...txt, marginTop: 6, color: C.warn }}>Je n’ai pas pu lire si une suppression est déjà prévue : rien ne sera enregistré tant que ce n’est pas su.</div>}
+
+              <div style={titreBloc}>5. Confirme que c’est toi</div>
               {recoErreur && <div role="alert" data-supprimer-reco-erreur="" style={{ ...txt, color: C.warn, marginTop: 4 }}>{recoErreur}</div>}
               <div data-supprimer-preuve={preuve.cas}>
                 {recente && (
@@ -3089,7 +3141,7 @@ function FermerCompte({ onExporter }) {
                 )}
                 {(recente || champMdp) && (
                   <Bouton variante="danger" onClick={valider} disabled={!peutEnvoyer || occupe} data-fermer-bouton="" style={{ marginTop: 12 }}>
-                    {occupe ? 'Suppression en cours…' : 'Supprimer définitivement mon compte'}
+                    {occupe ? 'Envoi…' : info.vide ? 'Supprimer mon compte maintenant' : `Supprimer mon compte dans ${info.graceJours || 30} jours`}
                   </Bouton>
                 )}
               </div>

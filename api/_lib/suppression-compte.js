@@ -186,7 +186,9 @@ export function mailSuppression({ fait = [], contact = '', motif = 'demande', ma
     paras: [
       motif === 'depart'
         ? `Ton abonnement VRM s’est terminé il y a 12 mois : comme annoncé, ton compte et tes données ont été effacés le ${jour}. Ce qui a été fait :`
-        : `Tu as supprimé ton compte VRM le ${jour}. Ce qui a été fait :`,
+        : motif === 'differee'
+          ? `Tu as demandé la suppression de ton compte VRM il y a 30 jours : comme annoncé, ton compte et tes données ont été effacés le ${jour}. Ce qui a été fait :`
+          : `Tu as supprimé ton compte VRM le ${jour}. Ce qui a été fait :`,
     ],
     liste: fait.slice(0, 12),
     suite: [

@@ -53,6 +53,7 @@ import { totauxVentesManuelles, beneficeVenteManuelle } from '../venteManuelle.j
 import { ecrireLocal } from '../stockageSur.js';   // (11 nov.) Safari privé / quota : le bouton ferme quand même
 import { tr } from '../i18n/index.js';
 import { trj } from '../i18n/react.js';
+import ComptesVinted from '../ComptesVinted.jsx';   // (13 nov., lot 36-27) « Tes comptes Vinted » sur 30 j / 90 j / année
 
 // ⟦← App.jsx #6⟧
 // « Annonces en ligne » : UNE règle d'écriture pour chaque écran qui la montre
@@ -1872,6 +1873,7 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
   // (4 nov.) LES OFFRES (src/statsOffres.js) : lues quand la carte paraît
   // (lecture projetée, ~1,2 Mo de messages, une fois par dix minutes).
   const refOffres = React.useRef(null);
+  const refComptesV = React.useRef(null);   // (13 nov., lot 36-27) « Tes comptes Vinted » lit les mêmes offres
   const [offresBrut, setOffresBrut] = React.useState(undefined);
   React.useEffect(() => {
     let mort = false;
@@ -1880,8 +1882,17 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
     if (!el || typeof IntersectionObserver === 'undefined') { go(); return () => { mort = true; }; }
     const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { io.disconnect(); go(); } }, { rootMargin: '300px' });
     io.observe(el);
+    if (refComptesV.current) io.observe(refComptesV.current);
     return () => { mort = true; io.disconnect(); };
   }, []);
+  // (13 nov., lot 36-27) Les comptes Vinted SÉLECTIONNÉS (ceux de l'appareil, moins les exclus) : la règle d'« Annulations ».
+  const comptesVinted = React.useMemo(() => {
+    let lies = [];
+    try { const x = JSON.parse(localStorage.getItem('vinted_accounts') || 'null'); if (Array.isArray(x)) lies = x; } catch (_) {}
+    const out = new Map();
+    for (const x of lies) { const u = String((x && x.vinted_user_id) || ''); if (u && !ecarteStats(u)) out.set(u, { uid: u, nom: x.login || u }); }
+    return [...out.values()];
+  }, [ecarteStats, vendu]); // eslint-disable-line react-hooks/exhaustive-deps
   const offres = React.useMemo(() => {
     if (offresBrut === undefined || vendu === undefined) return null;
     const ecarte = ecarteStats;
@@ -2063,6 +2074,10 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
               </div>
             ), { 'data-sv-carte': 'comptes' })}
       </div>
+      {/* (13 nov., lot 36-27) « Tes comptes Vinted » : un compte = une ligne, sur 30 j / 90 j / année (src/comptesVinted.js). */}
+      <ComptesVinted refCarte={refComptesV} vendu={vendu} manque={manque} nonComptees={(liveStats && liveStats.venduNonComptees) || []}
+        releve={!lignes ? (releve ? undefined : null) : lignes} annonces={extras === undefined ? 'encours' : datesPasSu ? 'passu' : 'lu'}
+        offresBrut={offresBrut} comptes={comptesVinted} ecarte={ecarteStats} Segmente={Segmente} fmt={fmt}/>
       {/* (3 nov.) « Ce qui rapporte le plus » : le relevé de la période, classé (src/ceQuiRapporte.js). */}
       <CeQuiRapporte lignes={lp} Segmente={Segmente} fmt={fmt} etat={!releve ? 'passu' : 'encours'}/>
       {/* (10 nov., lot BG) « D'où viennent mes achats » : lu dans `vrm_sources_ventes` (src/sourceAchats.js), sur la période. */}

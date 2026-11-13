@@ -57,6 +57,10 @@
       "destination": "/etat.html"
     },
     {
+      "source": "/confiance",
+      "destination": "/confiance.html"
+    },
+    {
       "source": "/aide",
       "destination": "/aide/index.html"
     },

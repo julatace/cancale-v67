@@ -14,11 +14,16 @@ import React from 'react';
 import { SEUILS_QUI_DORMENT } from '../quiDorment.js';
 import { SEUILS_FAVORIS, texteCompteur } from '../vendrePlus.js';
 import LigneGlissable from '../LigneGlissable.jsx';
+import { texteBeneficeSiVendue } from '../dormantes.js';
 
 // (10 nov., lot C) `selection` (Set d'identifiants) + `onSelection` + `onBaisser` : une case
 // par ligne et « Baisser le prix (N) » — la feuille de baisse en série (src/BaissePrixSerie.jsx).
 // Absents ⇒ la vue d'avant, sans case. Cocher n'envoie rien : c'est la feuille qui demande.
-export default function QuiDorment({ liste, seuil, onSeuil, onAgir, Segmente, fmt, attrs, mode = 'dort', onMode, seuilFavoris = 5, onSeuilFavoris, nDort, nFavoris, pasLus, selection, onSelection, onBaisser }) {
+// (13 nov., point 15) `onGeste(a)` : le geste PROPOSÉ de la ligne (`a.geste`, src/dormantes.js — UN
+// parmi ceux qui existent, chacun ouvre l'écran existant, rien ne part sans SON clic) ; « … » garde le
+// choix complet (`onAgir`). `a.valeur` : le bénéfice si elle se vend (`beneficeSiVendue`) ; achat pas
+// saisi ⇒ « Prix d'achat ? » ouvre la saisie (`onPrixAchat`), jamais un 0 (§5).
+export default function QuiDorment({ liste, seuil, onSeuil, onAgir, onGeste, onPrixAchat, Segmente, fmt, attrs, mode = 'dort', onMode, seuilFavoris = 5, onSeuilFavoris, nDort, nFavoris, pasLus, selection, onSelection, onBaisser }) {
   const fav = mode === 'favoris';
   const avecCases = !!(onBaisser && onSelection && selection);
   const ids = liste ? liste.map((a) => a.id) : [];
@@ -74,9 +79,22 @@ export default function QuiDorment({ liste, seuil, onSeuil, onAgir, Segmente, fm
                       {' · '}<span className="vrm-qd-bloc" data-qd-vues-txt="">{texteCompteur(a.vues, 'vue', 'vues', 'vues pas lues')}</span>
                       {' · '}<span className="vrm-qd-bloc" data-qd-favoris-txt="">{texteCompteur(a.favoris, 'favori', 'favoris', 'favoris pas lus')}</span>
                     </span>
+                    {a.valeur ? (
+                      <span className="vrm-qd-sous vrm-qd-benef" data-qd-benef={a.valeur.benefice == null ? '' : a.valeur.benefice} data-qd-benef-etat={a.valeur.etat}>
+                        {a.valeur.benefice != null ? <span className="vrm-qd-bloc">{texteBeneficeSiVendue(a.valeur)} si vendue</span>
+                          : a.valeur.etat === 'achat' && onPrixAchat ? <button type="button" className="vrm-qd-saisir" data-qd-saisir={a.id} onClick={() => onPrixAchat(a)}>Prix d’achat ?</button>
+                            : <span className="vrm-qd-bloc">bénéfice —</span>}
+                      </span>
+                    ) : null}
                     {a.compte ? <span className="vrm-qd-sous">{a.compte}</span> : null}
+                    {a.geste && onGeste ? (
+                      <button type="button" className="vrm-qd-geste" data-qd-geste={a.geste.k} data-qd-geste-id={a.id} data-qd-geste-sugg={a.geste.sugg == null ? undefined : a.geste.sugg}
+                        aria-disabled={a.geste.bloque ? 'true' : undefined} title={a.geste.bloque || undefined} onClick={() => onGeste(a)}>{a.geste.t}</button>
+                    ) : null}
                   </span>
-                  <button type="button" className="vrm-qd-agir" data-qd-agir={a.id} aria-haspopup="dialog" onClick={() => onAgir(a)}>Agir</button>
+                  {a.geste && onGeste
+                    ? <button type="button" className="vrm-qd-agir vrm-qd-plus" data-qd-agir={a.id} aria-haspopup="dialog" aria-label="Autres gestes" onClick={() => onAgir(a)}><IconePlus/></button>
+                    : <button type="button" className="vrm-qd-agir" data-qd-agir={a.id} aria-haspopup="dialog" onClick={() => onAgir(a)}>Agir</button>}
                   {tiroirG}
                 </li>
                 )}</LigneGlissable>
