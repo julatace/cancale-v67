@@ -223,9 +223,12 @@ export async function adresseDuCompte(owner) {
     if (!r.ok) return { etat: 'passu' };
     const u = await r.json();
     const email = String((u && u.email) || '').trim();
-    if (!emailSur(email)) return { etat: 'absent' };
-    if (!(u.email_confirmed_at || u.confirmed_at)) return { etat: 'non-confirmee' };
-    return { etat: 'ok', email };
+    // (13 nov., lot 53) + la date de création du compte (le bilan mensuel est activé
+    // par défaut pour les comptes créés depuis le 13 nov.) ; illisible ⇒ absente.
+    const creeLe = u && typeof u.created_at === 'string' && Number.isFinite(Date.parse(u.created_at)) ? u.created_at : null;
+    if (!emailSur(email)) return { etat: 'absent', creeLe };
+    if (!(u.email_confirmed_at || u.confirmed_at)) return { etat: 'non-confirmee', creeLe };
+    return { etat: 'ok', email, creeLe };
   } catch (_) { return { etat: 'passu' }; }
 }
 const ligneDe = async (owner, id) => {

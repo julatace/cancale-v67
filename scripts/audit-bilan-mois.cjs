@@ -163,8 +163,10 @@ async function controler(lib, { taire = false } = {}) {
     const t = M.texteBilanMois(b, {});
     dit(b.vendu.etat === 'partiel' && b.vendu.manque.some((x) => /vendeuse_inventee_b/.test(x)), 'un compte lu avant la fin du mois rend le vendu PARTIEL et le NOMME', JSON.stringify(b.vendu.manque));
     dit(/Vendu : au moins /.test(t.texte) && /vendeuse_inventee_b/.test(t.texte), '… et l’e-mail dit « au moins » et le compte qui manque');
-    dit(b.benefice.etat === 'partiel' && b.benefice.brut === 125.5 && /2 prix d’achat manquent/.test(b.benefice.manque.join(' ')), 'des prix d’achat manquent ⇒ bénéfice « au moins », le manque compté', JSON.stringify(b.benefice));
-    dit(/Bénéfice brut : au moins /.test(t.texte), '… « Bénéfice brut : au moins … » dans l’e-mail');
+    dit(b.benefice.etat === 'partiel' && b.benefice.brut === 125.5 && /2 prix d’achat manquent/.test(b.benefice.manque.join(' ')), 'des prix d’achat manquent ⇒ bénéfice PARTIEL, le manque compté', JSON.stringify(b.benefice));
+    // (13 nov., lot 53) Jamais « au moins » devant un bénéfice (src/beneficeNoms.js) : le brut
+    // connu, sa couverture et le manque nommé.
+    dit(!/Bénéfice brut : au moins/.test(t.texte) && /Bénéfice brut : 125,50\s€ \(sur 2 ventes de 4 · 2 prix d’achat manquent/.test(t.texte), '… « Bénéfice brut : 125,50 € (sur 2 ventes de 4 · 2 prix d’achat manquent) » — jamais « au moins » devant un bénéfice', t.texte.split('\n').find((l) => /Bénéfice/.test(l)));
   });
   await essaie('pas su', async () => {
     const d = { ...base(), versements: null };
@@ -181,7 +183,7 @@ async function controler(lib, { taire = false } = {}) {
     dit(!/encaiss/i.test(t.texte + t.html), 'jamais « encaissé »');
   });
 
-  titre('4. Éteint par défaut : aucun envoi, aucune lecture');
+  titre('4. Le défaut (13 nov., lot 53) : activé pour un compte créé depuis le 13 nov., éteint avant ; éteint ⇒ aucune lecture');
   const faux = (o = {}) => {
     const j = { lectures: 0, envois: [], memo: o.memo === undefined ? null : o.memo, ecrituresOk: o.ecrituresOk !== false };
     return { j, p: {
@@ -189,17 +191,25 @@ async function controler(lib, { taire = false } = {}) {
       lireChoix: async () => (o.choix === undefined ? null : o.choix), lireEnvois: async () => j.memo,
       ecrireEnvois: async (data) => { if (!j.ecrituresOk) return false; j.memo = data; return true; },
       lireDonnees: async () => { j.lectures++; return base(); }, lirePub: async () => pubDe({ 101: 50 }, Date.parse('2026-11-01T05:00:00+01:00')),
-      adresse: async () => ({ etat: 'ok', email: 'vendeur@exemple.invalid' }),
+      adresse: async () => ({ etat: 'ok', email: 'vendeur@exemple.invalid', ...(o.creeLe !== undefined ? { creeLe: o.creeLe } : {}) }),
       envoyer: async (m) => { j.envois.push(m); return { issue: o.issue || 'envoye' }; },
       compteur: o.compteur || { reste: 10 }, config: o.config === undefined ? { pret: true } : o.config, service: 'cle-de-service-inventee',
     } };
   };
-  for (const [nom, choix] of [['absent (le défaut)', undefined], ['éteint', { actif: false }], ['valeur douteuse « oui »', { actif: 'oui' }]]) {
+  for (const [nom, choix, creeLe] of [['absent, date de création pas sue', undefined], ['absent, compte d’avant le 13 nov.', undefined, '2026-10-01T10:00:00Z'], ['éteint', { actif: false }], ['valeur douteuse « oui », compte d’avant', { actif: 'oui' }, '2026-09-01T10:00:00Z']]) {
     await essaie(nom, async () => {
-      const { j, p } = faux({ choix }); const r = await M.bilanMoisVendeur(p);
+      const { j, p } = faux({ choix, creeLe }); const r = await M.bilanMoisVendeur(p);
       dit(j.envois.length === 0 && j.lectures === 0, `réglage ${nom} ⇒ aucun e-mail, aucune lecture des ventes`, `${r} · ${j.envois.length} envoi(s) · ${j.lectures} lecture(s)`);
     });
   }
+  await essaie('défaut neuf', async () => {
+    const { j, p } = faux({ creeLe: '2026-11-20T10:00:00Z', maintenant: Date.parse('2026-12-01T06:00:00+01:00') });
+    const r = await M.bilanMoisVendeur(p);
+    dit(j.envois.length === 1 && r && r.parDefaut === true, 'absent, compte créé depuis le 13 nov. ⇒ UN e-mail (activé par défaut)', JSON.stringify(r));
+    const { j: j2, p: p2 } = faux({ choix: { actif: false }, creeLe: '2026-11-20T10:00:00Z', maintenant: Date.parse('2026-12-01T06:00:00+01:00') });
+    await M.bilanMoisVendeur(p2);
+    dit(j2.envois.length === 0 && j2.lectures === 0, 'compte neuf qui l’a coupé ⇒ rien (un choix posé gagne)');
+  });
   await essaie('illisible', async () => {
     const { j, p } = faux({}); p.lireChoix = async () => undefined;
     const r = await M.bilanMoisVendeur(p);

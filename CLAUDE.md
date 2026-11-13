@@ -530,6 +530,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **13 nov. · Bilan mensuel + support (lot 53/55)** : bilan activé par défaut si compte créé ≥ 13 nov., bénéfice sans « au moins », temps gagné si mesuré ; « Écrire au support » (5 faits techniques, rangé chez lui, scellé). `docs/passation/2026-11-13-lot5355.md`. Geste : `RELANCES_SMTP_*`.
+
 - **13 nov. · Retour → stock sans rien saisir (lot 29)** : un retour Vinted PROUVÉ (transaction 440 / non réclamée) puis REMBOURSÉ (ou noté reçu) revient en stock sous SON N° (n° de transaction → annonce → N°) : « Retour du <date lue> — à vérifier et remettre en ligne », « Remettre en ligne » (son clic, Republier à la main) ; en route ⇒ « Retour en route » ; sans N° ⇒ « à numéroter » ; N° déjà porté en ligne ⇒ rien ; ancien (> 45 j) et eBay inchangés (`retourRevenuSeul`). `docs/passation/2026-11-13-lot29.md`. Geste : aucun.
 
 - **13 nov. · Vente Vestiaire sur Orion (5.374)** : capteur en ligne + rattrapage, compte lu dans la page, date = `soldDate` de « Mes ventes » (Paris), jamais l'heure de lecture. `docs/passation/2026-11-13-vestiaire-vente-orion.md`. Geste : 5.374 dans Orion, ouvrir Mes ventes.

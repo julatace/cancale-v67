@@ -43,6 +43,10 @@ import {verifierConfidentialite} from './_lib/confidentialite.js';
 //                                 l'installation, 5/h/compte, notifié) ; GET la
 //                                 liste et POST {action:'traite'} au PROPRIÉTAIRE
 //                                 seul — voir api/_lib/signalement.js
+//   /api/compte?mode=aide         (GET/POST, session) « ÉCRIRE AU SUPPORT » (13 nov.) :
+//                                 POST envoyer (rangé chez LUI, 5/h, scellé) ; GET la
+//                                 liste et POST {action:'traitee'} au PROPRIÉTAIRE seul —
+//                                 api/_lib/demande-aide.js, règle src/demandeAide.js
 //   /api/compte?mode=rapport-extension (GET/POST, session) « ENVOYER UN RAPPORT » de
 //                                 l'extension (5.371) : POST l'état technique (liste
 //                                 blanche, 6/h, une ligne par vendeur) ; GET sa ligne,
@@ -100,6 +104,8 @@ import { compteOAuthAnnulable } from '../src/auth/compteNeuf.js';   // (11 nov.,
 import { envoyerSmtp } from './_lib/smtp.js';
 import { contactEmail } from '../src/contact.js';
 import { envoyerSignalement, listerSignalements, marquerTraite, proprietaireInstallation as proprioAlertes } from './_lib/signalement.js';
+// (13 nov., lot 55) « Écrire au support » : la question, cinq faits techniques, rangée chez LUI (api/_lib/demande-aide.js).
+import { envoyerDemandeAide, listerDemandesAide, marquerDemandeTraitee } from './_lib/demande-aide.js';
 import { recevoirRapportExt, listerRapportsExt } from './_lib/rapport-extension.js';   // (12 nov., ext. 5.371) « Envoyer un rapport »
 import { routeAlertes } from './_lib/alertes-production.js';
 import { routePilotage } from './_lib/pilotage.js';
@@ -110,7 +116,7 @@ import { statutPourSante } from './_lib/statut-sondes.js';
 import { sendPushToAll, pushConfigure } from './_lib/push.js';
 import { contexteVendeur } from './_lib/owner.js';
 import { freinFork } from './_lib/frein-fork.js';   // (12 nov., M54)
-import { lireJetonBilan, lireChoixBilan, ecrireChoixBilan, lireEnvoisBilan } from './_lib/bilan-mois.js';
+import { lireJetonBilan, lireChoixBilan, ecrireChoixBilan, lireEnvoisBilan, choixEffectif } from './_lib/bilan-mois.js';
 import { envoyerMailEssai } from './_lib/mail-essai.js';
 import { configurationRelances, lireJeton as lireJetonRelance, ecrireChoix as ecrireChoixRelance, lireChoix as lireChoixRelance, lireEnvois as lireEnvoisRelance } from './_lib/relances-essai.js';
 import { corsExtension } from './_lib/cors-extension.js';
@@ -1798,8 +1804,10 @@ async function relances(req, res) {
 //                          une page avec UN bouton (un antivirus ouvre les liens) ;
 //   POST ?d=<jeton>&page=1 ce bouton : éteint le bilan de CE compte ;
 //   POST ?d=<jeton>        le « un clic » du logiciel de messagerie (RFC 8058) ;
-//   GET  (session)         { actif: true|false|null, configure, envois } — Réglages ;
-//   POST (session) {actif} son choix depuis Réglages. ÉTEINT par défaut.
+//   GET  (session)         { actif: true|false|null, defaut, configure, envois } — Réglages ;
+//   POST (session) {actif} son choix depuis Réglages.
+// (13 nov., lot 53) Le défaut : ACTIVÉ pour un compte créé depuis le 13 nov.
+// (`choixEffectif`, la date de création de SA session), éteint avant.
 async function bilanMois(req, res) {
   const m = req.method;
   const d = String((req.query && req.query.d) || '');
@@ -1828,8 +1836,10 @@ async function bilanMois(req, res) {
   return repondre(res, 200, {
     ok: true,
     configure: configurationRelances().pret,
-    // Trois états : true allumé · false éteint (le défaut : jamais choisi) · null pas su.
-    actif: choix === undefined ? null : !!(choix && choix.actif === true),
+    // Trois états : true allumé · false éteint · null pas su — la MÊME règle que le cron
+    // (`choixEffectif`) ; `defaut` : il n'a rien choisi, c'est le défaut de son compte.
+    actif: choixEffectif(choix, u.created_at),
+    defaut: !(choix && typeof choix === 'object' && typeof choix.actif === 'boolean'),
     envois: envois && envois.mois && typeof envois.mois === 'object'
       ? Object.fromEntries(Object.entries(envois.mois).slice(-6).map(([k, v]) => [k, { at: v && v.at, issue: v && v.issue }]))
       : (envois === undefined ? null : {}),
@@ -1858,6 +1868,21 @@ async function signalement(req, res) {
   if (!corps || typeof corps !== 'object') return repondre(res, 400, { ok: false, raison: 'corps' });
   if (corps.action === 'traite') { const r = await marquerTraite({ utilisateur, corps }); return repondre(res, r.code, r.corps); }
   const r = await envoyerSignalement({ utilisateur, corps, pousser: (notif, proprio) => contexteVendeur.run({ owner: proprio }, () => sendPushToAll(notif)) });
+  return repondre(res, r.code, r.corps);
+}
+
+// ── « ÉCRIRE AU SUPPORT » (13 nov., lot 55, api/_lib/demande-aide.js) ────────
+// POST (session) : envoyer — rangé chez LUI (owner = sa session), 5/h, scellé.
+// GET et POST {action:'traitee'} : le PROPRIÉTAIRE de l'installation seul (403).
+async function demandeAide(req, res) {
+  const utilisateur = await vendeurExige(req, res);
+  if (!utilisateur) return;
+  res.setHeader('Cache-Control', 'no-store');
+  if (req.method === 'GET') { const r = await listerDemandesAide({ utilisateur }); return repondre(res, r.code, r.corps); }
+  const corps = await lireCorpsJson(req);
+  if (!corps || typeof corps !== 'object') return repondre(res, 400, { ok: false, raison: 'corps' });
+  if (corps.action === 'traitee') { const r = await marquerDemandeTraitee({ utilisateur, corps }); return repondre(res, r.code, r.corps); }
+  const r = await envoyerDemandeAide({ utilisateur, corps, pousser: (notif, proprio) => contexteVendeur.run({ owner: proprio }, () => sendPushToAll(notif)) });
   return repondre(res, r.code, r.corps);
 }
 
@@ -1996,6 +2021,7 @@ export default async function handler(req, res) {
   if (mode === 'suppression-prevue') return m === 'GET' ? suppressionPrevue(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'mes-donnees') return m === 'GET' ? mesDonnees(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'signalement') return (m === 'GET' || m === 'POST') ? signalement(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
+  if (mode === 'aide') return (m === 'GET' || m === 'POST') ? demandeAide(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'rapport-extension') return (m === 'GET' || m === 'POST') ? rapportExtension(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   // (6 nov., v36) Les temps réels (anonymes, agrégés) : recevoir un lot, lire les agrégats (propriétaire).
   // (9 nov.) Le tableau de bord du PROPRIÉTAIRE de l'installation (api/_lib/pilotage.js) :
