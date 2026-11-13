@@ -83,7 +83,7 @@ Police : `--vrm-police` (SF Pro sur Apple, aucune police téléchargée).
 | `--d-accent` | `#0071E3` | `#0071E3` | l'aplat du bouton principal (texte blanc 4,7:1) |
 | `--d-accent-texte` | `#0066CC` | `#409CFF` | tout TEXTE bleu (lien, bouton discret) |
 | `--d-ambre` / `--d-point-ambre` / `--d-ambre-fond` | `#B25000` / `#FF9F0A` / `#FFF4E5` | `#FFB340` / `#FF9F0A` / `#2E2412` | un geste à faire : un point de 7 px devant la phrase, ou le mot |
-| `--d-doublon` | `#D70015` | `#FF6961` | deux paires présentes sous un même N° — **nulle part ailleurs** |
+| `--vrm-doublon` (themeMineral.js, seule source) | `#D70015` | `#FF6961` | deux paires présentes sous un même N° — **nulle part ailleurs** |
 
 - **Un gris de texte, pas trois.** Les `#8E8E93`, `#86868B`, `#8A8A8E` d'avant
   tombaient sous 4,5:1 : ils lisent `--d-gris`.

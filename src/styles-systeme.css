@@ -86,7 +86,6 @@
   --d-ambre: #B25000;
   --d-point-ambre: #FF9F0A;
   --d-ambre-fond: #FFF4E5;
-  --d-doublon: #D70015;
 
   /* Ombres — deux niveaux. */
   --d-ombre-carte: 0 0 0 .5px rgba(0,0,0,.035), 0 1px 3px rgba(0,0,0,.05);
@@ -154,7 +153,6 @@
   --d-accent-texte: #409CFF;
   --d-ambre: #FFB340;
   --d-ambre-fond: #2E2412;
-  --d-doublon: #FF6961;
   /* La nuit, une surface posée n'a pas d'ombre : #1C1C1E sur #000 suffit (iOS). */
   --d-ombre-carte: none;
   --d-ombre-flottant: 0 0 0 .5px rgba(255,255,255,.09), 0 24px 56px rgba(0,0,0,.6);
