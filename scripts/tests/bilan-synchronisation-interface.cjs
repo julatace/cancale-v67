@@ -9,7 +9,8 @@ const { build } = require("esbuild"),
     stdin: {
       resolveDir: root,
       loader: "jsx",
-      contents: `
+      contents: `import __vrmFrApp from'./src/i18n/langues/fr.js';import{ajouterSourceApp as __vrmSource}from'./src/i18n/index.js';__vrmSource(__vrmFrApp);/* (13 nov.) le français de l'app, comme App.jsx le pose (traduction) */
+
 import React from'react';import{createRoot}from'react-dom/client';import Bilan from'./src/BilanSynchronisation.jsx';import Retraits from'./src/VendusAilleurs.jsx';
 window.sourceVisible=true;window.owner='a';window.rev=0;window.montage=0;window.mode='ok';window.prix=20;window.n=1;window.ko=false;window.nav='';window.lectures=0;const root=createRoot(document.getElementById('root'));
 const annonce={id:'555',numero:'7',plateforme:'eBay',compte:'Compte Alice',titre:'Ordinateur',active:true,capture:'2026-10-01T00:00:00Z',onglet:'ebay_annonces'};

@@ -2,7 +2,8 @@
 const {build}=require('esbuild'),{chromium}=require('playwright');const path=require('path'),assert=require('assert/strict'),fs=require('fs');
 const racine=process.env.VRM_UI_ROOT||path.join(__dirname,'../..');
 (async()=>{
- const bundle=await build({stdin:{resolveDir:racine,loader:'jsx',contents:`
+ const bundle=await build({stdin:{resolveDir:racine,loader:'jsx',contents:`import __vrmFrApp from'./src/i18n/langues/fr.js';import{ajouterSourceApp as __vrmSource}from'./src/i18n/index.js';__vrmSource(__vrmFrApp);/* (13 nov.) le français de l'app, comme App.jsx le pose (traduction) */
+
  import React from 'react';import{createRoot}from'react-dom/client';import Reception from './src/ReceptionEmails.jsx';
  window.owner='A';window.version=7;window.appels=[];window.attendre=false;window.reponses=[];window.retour=[];
  window.IntersectionObserver=class{constructor(fn){window.observer=fn;}observe(){}disconnect(){}};

@@ -1,7 +1,8 @@
 const fs=require('fs'),path=require('path'),assert=require('assert/strict');
 const{build}=require('esbuild'),{chromium}=require('playwright');
 (async()=>{
- const root=path.resolve(__dirname,'../..');const js=await build({stdin:{resolveDir:root,loader:'jsx',contents:`
+ const root=path.resolve(__dirname,'../..');const js=await build({stdin:{resolveDir:root,loader:'jsx',contents:`import __vrmFrApp from'./src/i18n/langues/fr.js';import{ajouterSourceApp as __vrmSource}from'./src/i18n/index.js';__vrmSource(__vrmFrApp);/* (13 nov.) le français de l'app, comme App.jsx le pose (traduction) */
+
  import React from'react';import{createRoot}from'react-dom/client';import{ChampRecherche}from'./src/composants/ChampRecherche.jsx';
  window.recs=[];window.changements=0;window.validations=0;window.echappements=0;
  window.SpeechRecognition=class{constructor(){window.recs.push(this)}start(){}stop(){}abort(){this.annule=true}};

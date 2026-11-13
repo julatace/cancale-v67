@@ -1,7 +1,8 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {build}=require('esbuild'),{chromium}=require('playwright');
 (async()=>{
- const root=path.resolve(__dirname,'../..');const bundle=await build({stdin:{resolveDir:root,loader:'jsx',contents:`
+ const root=path.resolve(__dirname,'../..');const bundle=await build({stdin:{resolveDir:root,loader:'jsx',contents:`import __vrmFrApp from'./src/i18n/langues/fr.js';import{ajouterSourceApp as __vrmSource}from'./src/i18n/index.js';__vrmSource(__vrmFrApp);/* (13 nov.) le français de l'app, comme App.jsx le pose (traduction) */
+
  import React from'react';import{createRoot}from'react-dom/client';import Sync from'./src/SynchronisationVinted.jsx';
  const root=createRoot(document.getElementById('root'));window.owner='a';window.mode='ok';window.lectures=0;
  const cap=new Date(Date.now()-3600000).toISOString();
