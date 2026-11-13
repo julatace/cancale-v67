@@ -102,6 +102,7 @@ const INVENTAIRE = { ok: true, proprietaire: false, nombres: { donnees: 128, fac
       await pg.evaluate(() => { const b = [...document.querySelectorAll('[data-tab="journee"], [data-nav="journee"], a[href*="tab=journee"]')].find((e) => e.getClientRects().length); if (b) b.click(); });
       await attendre(900);
       if (!(await pg.locator('[data-attente-ecran="journee"], [data-bandeau-suppression]').count())) { await pg.goto(`http://localhost:${NV.PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' }); await attendre(1800); }
+      await pg.locator('[data-bandeau-suppression]').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {}); await attendre(800);
       const bandeau = await pg.evaluate(() => (document.querySelector('[data-bandeau-suppression]') || { getAttribute: () => null }).getAttribute('data-bandeau-suppression'));
       dit(bandeau === EFFACE_LE, `${tag} : sur Ma journée, la coque porte le bandeau « ton compte sera supprimé le … »`, bandeau);
       await pg.screenshot({ path: path.join(SHOTS, `bandeau-${tag}.png`) });
