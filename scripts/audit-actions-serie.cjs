@@ -10,6 +10,7 @@
 //  `--prouve` : chaque mutation réaffaiblit une règle ⇒ l'audit doit passer au rouge.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+if (!process.argv.includes('--prouve') && !process.env.MUT) require('./_source-app.cjs').brancher();   // (11 nov., découpe 2) lit l'app RECOLLÉE (scripts/brancher-audits.cjs)
 const fs = require('fs'), path = require('path'), os = require('os');
 const args = process.argv.slice(2);
 const PROUVE = args.includes('--prouve');

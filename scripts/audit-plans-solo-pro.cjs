@@ -1,3 +1,4 @@
+if (!process.argv.includes('--prouve') && !process.env.MUT) require('./_source-app.cjs').brancher();   // (11 nov., découpe 2) lit l'app RECOLLÉE (scripts/brancher-audits.cjs)
 // Audit « Solo et Pro » (9 nov.) — Julien : « Ça peut être 1 compte vendeur et
 // plein de comptes achat, donc sur ces comptes on prend que les achats ; pour
 // avoir toutes ses ventes de tous ses comptes il prend l'abonnement du dessus. »

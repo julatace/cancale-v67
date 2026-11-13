@@ -10,7 +10,16 @@
 //  Bornes : PDF ≤ 3 Mo, 4 pages, 2 Mo de contenu décodé, 20 000 caractères rendus.
 //  Rend une chaîne ('' = aucun texte lisible) ou null (PDF illisible).
 // ════════════════════════════════════════════════════════════════════════════
-import { PDFDocument, PDFName, PDFDict, PDFArray, PDFRawStream, PDFRef, decodePDFRawStream } from 'pdf-lib';
+// (11 nov., découpe d'App.jsx) pdf-lib chargé À LA DEMANDE, au premier texteDuPdf : l'app importe
+// api/_lib/transporteur-anciens.js (→ transporteur-pdf.js → ici) pour trois petites règles, et cet
+// import STATIQUE mettait tout pdf-lib (~410 Ko minifiés) dans le PREMIER chargement de l'app,
+// alors qu'elle ne lit un PDF que sur un clic. Seules les fonctions appelées depuis texteDuPdf
+// (lookup, fluxOctets, nom, decodeurPolice, lireContenu) touchent ces classes : elles sont posées avant.
+let PDFDocument, PDFName, PDFDict, PDFArray, PDFRawStream, PDFRef, decodePDFRawStream;
+const chargerPdfLib = async () => {
+  if (PDFDocument) return;
+  ({ PDFDocument, PDFName, PDFDict, PDFArray, PDFRawStream, PDFRef, decodePDFRawStream } = await import('pdf-lib'));
+};
 
 export const PDF_MAX_OCTETS = 3_000_000;
 const PAGES_MAX = 4;
@@ -247,6 +256,7 @@ function lireContenu(ctx, octets, ressources, sortie, prof, budget) {
 export async function texteDuPdf(src) {
   const u = octetsDe(src);
   if (!u || !estPdf(u) || u.length > PDF_MAX_OCTETS) return null;
+  try { await chargerPdfLib(); } catch (_) { return null; }
   let doc;
   try { doc = await PDFDocument.load(u, { ignoreEncryption: true, updateMetadata: false, throwOnInvalidObject: false }); } catch (_) { return null; }
   try {

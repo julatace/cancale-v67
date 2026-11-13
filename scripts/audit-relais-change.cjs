@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+if (!process.argv.includes('--prouve') && !process.env.MUT) require('./_source-app.cjs').brancher();   // (11 nov., découpe 2) lit l'app RECOLLÉE (scripts/brancher-audits.cjs)
 // AUDIT (10 nov.) — « VOTRE COLIS A CHANGÉ DE PLAN » : UN CHANGEMENT DE POINT RELAIS N'EST NI
 // UNE ARRIVÉE NI UNE LIVRAISON.
 // Julien (capture iPhone du 10 nov.) : l'e-mail Mondial Relay « Votre colis a changé de plan »

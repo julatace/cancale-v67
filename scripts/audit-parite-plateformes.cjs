@@ -70,7 +70,7 @@ const essaie = async (m, f) => { try { await f(); } catch (e) { dit(false, m, St
 const imp = async (f) => { try { return await import('file://' + path.join(R, f)); } catch (e) { return { __erreur: e.message }; } };
 const lire = (f) => { try { return fs.readFileSync(path.join(R, f), 'utf8'); } catch (_) { return ''; } };
 // La source d'App.jsx et de ses écrans découpés, lue dans l'arbre jugé (VRM_RACINE).
-const APP = [path.join(R, 'src', 'App.jsx'), ...(() => { try { return fs.readdirSync(path.join(R, 'src', 'ecrans')).filter((f) => /\.jsx?$/.test(f)).sort().map((f) => path.join(R, 'src', 'ecrans', f)); } catch (_) { return []; } })()]
+const APP = [path.join(R, 'src', 'App.jsx'), ...['ecrans', 'coeur'].flatMap((d) => { try { return fs.readdirSync(path.join(R, 'src', d)).filter((f) => /\.jsx?$/.test(f)).sort().map((f) => path.join(R, 'src', d, f)); } catch (_) { return []; } })]   // (11 nov.) + src/coeur/
   .map((f) => { try { return fs.readFileSync(f, 'utf8'); } catch (_) { return ''; } }).join('\n');
 const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
 const APPc = sansCommentaires(APP);
