@@ -3990,7 +3990,12 @@ const quelDemande = (ymA) => {
 };
 function BilanMoisCarte({ liveStats, compta }) {
   const [quel, setQuel] = React.useState(() => quelDemande(ymCourant(Date.now())) || 'courant');
-  React.useEffect(() => { const f = () => { const q = quelDemande(ymCourant(Date.now())); if (q) setQuel(q); }; window.addEventListener('vrm:bilan-mois', f); return () => window.removeEventListener('vrm:bilan-mois', f); }, []);
+  // La carte vit dans un repli (« Bilan du mois ») : un repli fermé garde ses boîtes dans Chrome
+  // (`content-visibility`), la cible le croirait visible — la demande l'OUVRE, puis est consommée.
+  React.useEffect(() => {
+    const f = () => { const q = quelDemande(ymCourant(Date.now())); if (!q) return; setQuel(q); DEMANDE_BILAN_MOIS.ym = null; setTimeout(() => ouvrirRepliCompta('compta-bilan'), 0); };
+    f(); window.addEventListener('vrm:bilan-mois', f); return () => window.removeEventListener('vrm:bilan-mois', f);
+  }, []);
   const [pub] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
   const ligneUrssaf = useLigneUrssaf();
   const regime = useRegimeFiscal();

@@ -80,6 +80,8 @@ const MOIS_DERNIER = (() => { const d = new Date(); return ymDe(new Date(d.getFu
         return proprio ? json(200, { ok: true, demandes: DEMANDES, nonTraitees: 2, ecartees: 0 }) : json(403, { ok: false, raison: 'proprietaire' });
       }
       if (u.pathname === '/api/compte' && mode === 'bilan-mois') return json(200, bilan);
+      // Le propriétaire de l'installation : l'app le lit dans la réponse de l'abonnement (`lireProprietaire`).
+      if (u.pathname === '/api/compte' && mode === 'abonnement') return json(200, { ok: true, proprietaire: proprio });
       return json(200, { ok: true });
     });
     await pg.goto(`http://localhost:${PORT}${url}`, { waitUntil: 'domcontentloaded' });
@@ -109,7 +111,8 @@ const MOIS_DERNIER = (() => { const d = new Date(); return ymDe(new Date(d.getFu
         }));
         const L = Object.fromEntries(x.lignes);
         dit(x.lignes.map((l) => l[0]).join('|') === 'Ton message|Version de l’app|Version de l’extension|Écran|Navigateur|Heure', `${T} · l’aperçu : exactement 6 lignes (message + 5 faits techniques)`, x.lignes.map((l) => l[0]).join('|'));
-        dit(/\{montant\}/.test(L['Ton message']) && /\{email\}/.test(L['Ton message']) && !/87,50|acheteuse/.test(L['Ton message']), `${T} · ce qu’il tape est masqué AVANT l’envoi (montant, e-mail)`, L['Ton message']);
+        // Masqué par la règle ({montant}, {email}) ou, avant, par le programme du mode stream (•••) : jamais le montant ni l'adresse.
+        dit(!/87,50|acheteuse|exemple\.test/.test(L['Ton message']) && /(\{montant\}|•••)/.test(L['Ton message']), `${T} · ce qu’il tape est masqué AVANT l’envoi (montant, e-mail)`, L['Ton message']);
         dit(L['Écran'] === 'settings' && /posée à l’envoi/.test(L['Heure']), `${T} · l’écran ouvert, l’heure posée par le serveur`, JSON.stringify(L));
         dit(/ni pseudo, ni montant, ni e-mail d’acheteur/.test(x.rien), `${T} · la feuille DIT que rien d’autre ne part`, x.rien);
         dit(Math.min(...x.cibles) >= 44, `${T} · cibles ≥ 44 px`, x.cibles.join(','));
@@ -163,6 +166,7 @@ const MOIS_DERNIER = (() => { const d = new Date(); return ymDe(new Date(d.getFu
     for (const [largeur, sombre] of [[1512, false], [390, true]]) {
       await essaie(`P ${largeur}`, async () => {
         const { ctx, pg, postes } = await ouvrir({ largeur, sombre });
+        if (process.env.BANC_DEBUG) console.log(await pg.evaluate(() => ({ n: document.querySelectorAll('[data-reglage-demandes-aide]').length, sig: document.querySelectorAll('[data-reglage-signalements]').length, pay: document.querySelectorAll('[data-reglage-paiements]').length, sup: document.querySelectorAll('[data-reglage-support]').length, vis: [...document.querySelectorAll('[data-reglage-demandes-aide]')].map((e) => e.getClientRects().length) })));
         await tap(pg, '[data-reglage-demandes-aide]', largeur < 600);
         await pg.locator('[data-demandes-aide="2"]').first().waitFor({ timeout: 10000 });
         const x = await pg.evaluate(() => ({ cartes: document.querySelectorAll('[data-demande-aide]').length, mailto: (document.querySelector('[data-demande-repondre]') || {}).href || '', sans: document.querySelectorAll('[data-demande-sans-adresse]').length, texte: (document.querySelector('[data-demandes-aide]') || {}).innerText || '' }));
@@ -201,7 +205,8 @@ const MOIS_DERNIER = (() => { const d = new Date(); return ymDe(new Date(d.getFu
     for (const [largeur, sombre] of [[390, false], [1512, true]]) {
       await essaie(`C ${largeur}`, async () => {
         const { ctx, pg, erreurs } = await ouvrir({ largeur, sombre, url: `/?tab=compta&cible=bilanmois&mois=${MOIS_DERNIER}` });
-        await pg.locator(`.vrm-bilan-mois[data-bilan-mois="${MOIS_DERNIER}"]`).first().waitFor({ timeout: 15000 });
+        if (process.env.BANC_DEBUG) { await pg.waitForTimeout(3000); console.log(await pg.evaluate(() => ({ url: location.href, cartes: [...document.querySelectorAll('.vrm-bilan-mois')].map((e) => [e.getAttribute('data-bilan-mois'), e.getAttribute('data-cible'), e.getClientRects().length]), garde: [...document.querySelectorAll('[data-garde-ecran]')].map((e) => e.getAttribute('data-garde-ecran')), abs: (document.querySelector('[data-cible-absente]') || {}).innerText }))); }
+        await pg.locator(`.vrm-bilan-mois[data-bilan-mois="${MOIS_DERNIER}"]`).first().waitFor({ timeout: 15000, state: 'attached' });
         await pg.waitForTimeout(1500);
         const x = await pg.evaluate((ym) => { const c = document.querySelector(`.vrm-bilan-mois[data-bilan-mois="${ym}"]`); const d = c && c.closest('details'); const r = c ? c.getBoundingClientRect() : null; return { visible: !!(r && r.height > 0 && r.top < window.innerHeight && r.bottom > 0), ouvert: !d || d.open, marque: !!(c && (c.hasAttribute('data-cible-notif') || c.hasAttribute('data-cible-eclaire'))), choix: (document.querySelector('[data-bilan-choix="precedent"]') || {}).getAttribute ? document.querySelector('[data-bilan-choix="precedent"]').getAttribute('aria-pressed') || document.querySelector('[data-bilan-choix="precedent"]').getAttribute('aria-checked') : null }; }, MOIS_DERNIER);
         dit(x.visible && x.ouvert && x.marque && !erreurs.length, `${largeur} · « Bilan du mois » de ${MOIS_DERNIER} (mois dernier) choisi, déplié, à l’écran, mis en évidence`, JSON.stringify(x) + ' ' + erreurs.join('|'));
