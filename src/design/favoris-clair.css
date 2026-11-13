@@ -171,9 +171,9 @@
 /* (13 nov., lot 31) Très aimées, pas vendues : une annonce = photo · N° · prix · favoris · jours, la remise, le geste. */
 .vrm-sv-seuil { align-self: flex-start; }
 .vrm-sv-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.vrm-sv-ligne { display: flex; flex-direction: column; gap: 8px; padding: 10px 8px; border-radius: 14px; min-width: 0; }
+.vrm-sv-ligne { display: flex; flex-direction: column; gap: 8px; padding: 10px 8px; border-radius: 12px; min-width: 0; }
 .vrm-sv-ligne + .vrm-sv-ligne { border-top: 1px solid var(--fu-piste); border-radius: 0; }
-.vrm-sv-ligne.is-choisie { background: var(--fu-case); border-radius: 14px; }
+.vrm-sv-ligne.is-choisie { background: var(--fu-case); border-radius: 12px; }
 .vrm-sv-haut { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .vrm-sv-num { font-weight: 700; margin-right: 6px; font-variant-numeric: tabular-nums; }
 .vrm-sv-offre { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-width: 0; }
