@@ -22,8 +22,10 @@
 // N° (`numeros[itemId].numero`). JAMAIS le titre : deux paires au même titre
 // ne se confondent pas. Sans identité, la ligne dit « paire pas reliée » et
 // n'a pas de geste de remise en stock.
-// « Reçu chez toi » n'est jamais déduit : c'est SON clic (`recus`). Rien ne
-// change tout seul. Le CA ne se touche pas ici : une vente remboursée sort
+// « Reçu chez toi » n'est jamais déduit d'une absence ni de « Vinted dit livrée » :
+// c'est SON clic (`recus`) — ou (13 nov., point 29 de Julien, `retourRevenuSeul`)
+// le remboursement LU d'un retour prouvé, qui remet l'article en stock sous SON N°
+// sans rien saisir. Le CA ne se touche pas ici : une vente remboursée sort
 // déjà du CA déclaré par les règles existantes (§11, une seule règle).
 
 export const ETAPES_RETOUR = ['initie', 'en-route', 'recu', 'rembourse'];
@@ -101,7 +103,21 @@ export function numeroDuRetourVinted(vente, { txnItem, numeros, numeroVente }) {
 // `ancien` : remboursé, pas noté reçu, vente de plus de 45 jours — montré replié
 // (il a sans doute récupéré la paire depuis longtemps), jamais caché.
 export const RETOUR_ANCIEN_J = 45;
-export function retoursEnCours({ ventes, etats, txnItem, numeros, numeroVente, recus, remis, masques, republiee, ebay, maintenant }) {
+// ── (13 nov., point 29 de Julien) UNE VENTE RETOURNÉE REVIENT EN STOCK SOUS SON N°, SANS RIEN SAISIR ──
+// « Revenue » se PROUVE par l'état lu, jamais par une absence : une vente Vinted
+// en retour (transaction 440 / « Retour initié », ou non réclamée) que Vinted a
+// REMBOURSÉE (`Remboursement effectué`, `failed` — Vinted ne rembourse un retour
+// qu'après la réception du colis par le vendeur), ou que SON clic a notée reçue.
+// Un retour seulement initié ou en route n'est PAS en stock (« retour en route »).
+// Un « ancien » (remboursé il y a plus de 45 j, jamais noté reçu) ne revient pas
+// tout seul : il a pu être republié sous un N° neuf depuis — il garde son geste.
+// eBay : un remboursement eBay peut se faire sans retour — jamais automatique.
+export function retourRevenuSeul(l) {
+  if (!l || l.plateforme !== 'vinted') return false;
+  if (l.ancien) return false;
+  return l.etape === 'rembourse' || !!l.recu;
+}
+export function retoursEnCours({ ventes, etats, txnItem, numeros, numeroVente, recus, remis, masques, republiee, ebay, maintenant, presentes, cleNum, estArchive }) {
   const now = isFinite(maintenant) ? maintenant : Date.now();
   if (ventes === undefined) return { etat: 'encours', lignes: [], remises: [], manques: [] };
   if (ventes === null) return { etat: 'passu', lignes: [], remises: [], manques: ['tes ventes Vinted'] };
@@ -115,18 +131,34 @@ export function retoursEnCours({ ventes, etats, txnItem, numeros, numeroVente, r
     const tx = o && o.transaction_id != null ? String(o.transaction_id) : '';
     if (!tx || vus.has(tx)) continue;
     vus.add(tx);
-    const et = etapeRetourVinted(o, etats ? etats(tx) : null);
+    const etTx = etats ? etats(tx) : null;
+    const et = etapeRetourVinted(o, etTx);
     if (!et) continue;
     if (X[tx]) continue;
     const { num, itemId } = numeroDuRetourVinted(o, { txnItem, numeros, numeroVente });
     const cle = tx;
+    // La date du retour : celle que Vinted a posée sur la transaction de retour (lue), sinon rien.
+    const su = etTx && etTx.su && isFinite(Date.parse(etTx.su)) ? String(etTx.su) : null;
     const ligne = { cle, plateforme: 'vinted', tx, itemId, num, vente: o, compte: o._acc || '', titre: String(o.title || ''),
-      ...et, recu: !!R[cle], recuLe: R[cle] || null };
+      ...et, recu: !!R[cle], recuLe: R[cle] || null, retourLe: su };
     const d = Date.parse(o.date || '');
     ligne.ancien = et.etape === 'rembourse' && !ligne.recu && isFinite(d) && (now - d) > RETOUR_ANCIEN_J * 864e5;
     if (M[cle]) {
       if (republiee && republiee(ligne)) continue;
       remises.push({ ...ligne, remis: M[cle] });
+      continue;
+    }
+    // (13 nov., point 29) Revenue PROUVÉE ⇒ en stock, sous SON N° (identité), sans rien saisir.
+    // N° porté par un autre article PRÉSENT ⇒ rien n'est deviné : en stock SANS N° (dit).
+    // Sans N° connu ⇒ « à numéroter » (il en recevra un à sa remise en ligne, §5 cas a).
+    if (retourRevenuSeul(ligne)) {
+      if (republiee && republiee(ligne)) continue;
+      const r = remiseEnStock({ ...ligne, recu: true }, { numeros, presentes, cleNum, estArchive });
+      const at = ligne.recuLe || su;
+      const auto = r.ok
+        ? { at, num: r.conflit ? null : r.num, archive: r.archive, conflit: r.conflit ? r.conflit.id : null, auto: true }
+        : { at, num: null, archive: false, conflit: null, auto: true, aNumeroter: true };
+      remises.push({ ...ligne, remis: auto });
       continue;
     }
     lignes.push(ligne);
@@ -216,6 +248,26 @@ export function numsRemisEnStock(res) {
   for (const l of res.remises) {
     const n = l && l.remis && l.remis.num != null ? String(l.remis.num).trim() : '';
     if (n && !out.includes(n)) out.push(n);
+  }
+  return out;
+}
+
+// ── (13 nov., point 29) LES RETOURS EN STOCK, POUR LE STOCK ──────────────────
+// Ce que le Stock montre de chaque article revenu (remis à la main OU revenu tout
+// seul) : SON N°, son titre, la date du retour LUE (`retourLe`, sinon celle de son
+// clic), « à vérifier et remettre en ligne ». Un article sans N° (« à numéroter »)
+// n'a pas de case : il est compté à part (`aNumeroter`), jamais affublé d'un N°.
+export function retoursPourStock(res) {
+  const out = { articles: [], aNumeroter: 0 };
+  if (!res || res.etat !== 'lu' || !Array.isArray(res.remises)) return out;
+  const vus = new Set();
+  for (const l of res.remises) {
+    const n = l && l.remis && l.remis.num != null ? String(l.remis.num).trim() : '';
+    if (!n) { if (l && l.remis && l.remis.aNumeroter) out.aNumeroter++; continue; }
+    if (vus.has(n)) continue; vus.add(n);
+    const d = l.retourLe || (l.remis && l.remis.at) || null;
+    const uid = l.compte && typeof l.compte === 'object' && l.compte.vinted_user_id != null ? String(l.compte.vinted_user_id) : '';
+    out.articles.push({ numero: n, titre: String(l.titre || ''), date: d && isFinite(Date.parse(d)) ? String(d) : null, auto: !!(l.remis && l.remis.auto), uid });
   }
   return out;
 }

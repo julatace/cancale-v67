@@ -355,7 +355,14 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   // (11 nov., lot rangement-guide) Les achats rangés à leur arrivée (fiche à publier, son achat par n° de transaction).
   const neuvesArrivee = {};
   for (const f of Object.values(load('vrm_fiches_neuves', {}) || {})) { if (f && f.origine === 'arrivee' && !f.retireeAt) { const k = cleNum(f.numero); if (k && !neuvesArrivee[k]) neuvesArrivee[k] = f; } }
-  const etatsRangees = classerRangees({ slots, actuelles: actuellesCles, vendus, garder, jugeable, arrivees: new Set(Object.keys(neuvesArrivee)), cle: cleNum });
+  // (13 nov., point 29) Les articles revenus d'un retour PROUVÉ (remis à la main ou revenus tout seuls),
+  // publiés avec les paires présentes par la règle `retoursEnCours` (src/retoursStock.js) : SON N°, la date
+  // du retour lue. « À vérifier et remettre en ligne » ; aucun N° n'est changé ici.
+  const physRetours = load('vinted_nums_physiques', null);
+  const retoursStock = {};
+  for (const a of (physRetours && Array.isArray(physRetours.retours) ? physRetours.retours : [])) { const k = cleNum(a && a.numero); if (k && !retoursStock[k]) retoursStock[k] = a; }
+  const retoursANumeroter = physRetours ? (Number(physRetours.retoursANumeroter) || 0) : 0;
+  const etatsRangees = classerRangees({ slots, actuelles: actuellesCles, vendus, garder, jugeable, arrivees: new Set(Object.keys(neuvesArrivee)), retours: new Set(Object.keys(retoursStock)), cle: cleNum });
   const correspondFiltre = (f) => (!filtrePlat || (f.plateformes || []).includes(filtrePlat)) && (!filtreCompte || (f.comptes || []).includes(filtreCompte));
   const filtreActif = !!(filtrePlat || filtreCompte);
   // Les articles montrés : les annonces actuelles (avec un N°), puis les paires
@@ -377,7 +384,15 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     const f = tout.find((x) => !horsCompte(x)) || null; const j = (journal || {})[k];
     vus.add(k);
     const na = neuvesArrivee[k] || null;
-    fiches.push({ id: f ? f.id : (na ? 'neuve:' + na.id : 'n:' + k), numero: f ? f.numero : (na && na.numero) || (j && j.num) || k, title: (f && f.title) || (na && na.titre) || (j && j.titre) || '', photo: (f && f.photo) || (na && na.photoAchat) || null, plateformes: [], comptes: f && f.accountId ? [String(f.accountId)] : [], aussi: [], actuelle: false, rangee: etatsRangees[k] });
+    fiches.push({ id: f ? f.id : (na ? 'neuve:' + na.id : 'n:' + k), numero: f ? f.numero : (na && na.numero) || (j && j.num) || k, title: (f && f.title) || (na && na.titre) || (j && j.titre) || '', photo: (f && f.photo) || (na && na.photoAchat) || null, plateformes: [], comptes: f && f.accountId ? [String(f.accountId)] : [], aussi: [], actuelle: false, rangee: etatsRangees[k], retour: retoursStock[k] || null });
+  }
+  // (13 nov., point 29) Un article REVENU d'un retour, sans case : il attend dans « À ranger », sous SON N°.
+  for (const k of Object.keys(retoursStock)) {
+    if (vus.has(k) || slots[k]) continue;
+    const tout = fichesParCle[k] || [];
+    if (tout.length && tout.every((x) => horsCompte(x))) continue;
+    const f = tout.find((x) => !horsCompte(x)) || null; const a = retoursStock[k];
+    vus.add(k); fiches.push({ id: f ? f.id : 'retour:' + k, numero: f ? f.numero : a.numero, title: (f && f.title) || a.titre || '', photo: (f && f.photo) || null, plateformes: [], comptes: f && f.accountId ? [String(f.accountId)] : [], aussi: [], actuelle: false, remise: true, retour: a });
   }
   // Une paire REMISE à la main (« Remettre », sa case prise) attend dans « À
   // ranger », même hors des annonces actuelles : il a dit qu'elle est chez lui.
@@ -402,6 +417,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   const posee = (f) => !!slots[cleDeFiche(f)] || (f.aussi || []).some((n) => !!slots[cleNum(n)]);
   const occupant = (mid, i) => { const k = Object.keys(slots).find((c) => slots[c] && slots[c].m === mid && slots[c].i === i && ficheParCle[c]); return k ? ficheParCle[k] : null; };
   // « À ranger » : les annonces actuelles SANS case (et les paires remises à la main).
+  // (13 nov., point 29) « Retour du 2 oct. — à vérifier et remettre en ligne » : la date LUE, sinon rien.
+  const libelleRetour = (a) => { const t = Date.parse((a && a.date) || ''); const d = isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' }) : ''; return `${d ? `Retour du ${d}` : 'Retour'} — à vérifier et remettre en ligne`; };
   const aRanger = unParArticle(fiches.filter((f) => ((f.actuelle && f.etatAnnonce === 'enligne') || f.remise) && !f.doublure && correspondFiltre(f)).sort((a, b) => triNum(a.numero, b.numero)), { cle: cleNum, clePhoto: photoKey, estRangee: posee })
     .map((f) => ({ ...f, aussi: [...new Set([...((ficheParCle[cleNum(f.numero)] || {}).aussi || []), ...(f.aussi || [])])] }));
   const filtre = q.trim().toLowerCase();
@@ -650,7 +667,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       corps = (<>
         <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 10 }}>
           <span style={{ position: 'relative', width: 72, height: 72, borderRadius: 12, overflow: 'hidden', flex: 'none', background: C.card2 }}><Vignette f={f} sold={sold} hors={hors} /></span>
-          <div><div style={{ fontSize: 17, fontWeight: 800, color: C.text, lineHeight: 1.25 }}>{f.title || '—'}</div><div data-fiche-statut={sold ? 'vendue' : (hors ? 'plusenligne' : (f.actuelle ? 'actuelle' : (rangeeEtat(f) === 'arrivee' ? 'arrivee' : 'autre')))} style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>{sold ? tr('stock.venduSortirStock') : (hors ? tr('stock.plusLignePlus') : (!f.actuelle && rangeeEtat(f) === 'arrivee' ? tr('ranger.stock.arrivee') : f.actuelle ? `En ligne${(f.plateformes || []).length ? ' sur ' + f.plateformes.map((x) => NOM_PLAT_FILTRE[x] || x).join(' et ') : ''}` : tr('stock.stock')))} · N°{f.numero}</div></div>
+          <div><div style={{ fontSize: 17, fontWeight: 800, color: C.text, lineHeight: 1.25 }}>{f.title || '—'}</div><div data-fiche-statut={sold ? 'vendue' : (hors ? 'plusenligne' : (f.actuelle ? 'actuelle' : (rangeeEtat(f) === 'arrivee' ? 'arrivee' : (f.retour ? 'retour' : 'autre'))))} style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>{sold ? tr('stock.venduSortirStock') : (hors ? tr('stock.plusLignePlus') : (!f.actuelle && rangeeEtat(f) === 'arrivee' ? tr('ranger.stock.arrivee') : f.actuelle ? `En ligne${(f.plateformes || []).length ? ' sur ' + f.plateformes.map((x) => NOM_PLAT_FILTRE[x] || x).join(' et ') : ''}` : (f.retour ? libelleRetour(f.retour) : tr('stock.stock'))))} · N°{f.numero}</div></div>
         </div>
         <div style={{ textAlign: 'center', background: C.card2, border: `1px solid ${sold ? C.accent : C.line}`, borderRadius: 14, padding: 14, margin: '12px 0' }}>
           <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>{sold ? tr('stock.vaChercher') : tr('stock.rangeDans')}</div>
@@ -808,13 +825,26 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     ];
   };
   // ── Vendues à sortir · Plus en ligne : rangées, plus des annonces actuelles ──
-  const ligneRangee = (f, gestes) => { const ou = ouEst(f); const sold = estVendu(f); return (
+  const ligneRangee = (f, gestes, sous = null) => { const ou = ouEst(f); const sold = estVendu(f); return (
     <div key={f.id} {...serieStock.ligne(cleDeFiche(f))} className="vrm-s2d-liste-ligne" data-stock-rangee={cleDeFiche(f)} style={{ flexWrap: 'wrap' }}>
       <span className="vrm-s2d-vig"><CaseSerie serie={serieStock} cle={cleDeFiche(f)} etiquette={'N°' + f.numero} surPhoto/><Vignette f={f} sold={sold} hors={!sold && rangeeEtat(f) === 'plusenligne'} mini /></span>
       <span className="vrm-s2d-txt"><span className="vrm-s2d-txt-t"><b>N°{f.numero}</b> · {f.title || '—'}</span>
-        <span className="vrm-s2d-txt-s">{ou ? <><b>{ou.meuble.name}</b> {tr('stock.rangee4')} {ou.rangee}{tr('stock.colonne')} {ou.colonne}</> : tr('stock.caseIntrouvable')}</span></span>
+        {sous ? <span className="vrm-s2d-txt-s" data-stock-retour-libelle="">{sous}</span> : null}
+        <span className="vrm-s2d-txt-s">{ou ? <><b>{ou.meuble.name}</b> {tr('stock.rangee4')} {ou.rangee}{tr('stock.colonne')} {ou.colonne}</> : (f.retour && !slots[cleDeFiche(f)] ? 'pas encore rangé — à mettre dans une case' : tr('stock.caseIntrouvable'))}</span></span>
       <div className="vrm-s2d-gestes">{ou && <button className="vrm-b vrm-b-secondaire" type="button" onClick={() => montrer(f)}>{tr('stock.voirCase')}</button>}{gestes}</div>
     </div>); };
+  // (13 nov., point 29) LES ARTICLES REVENUS D'UN RETOUR : sous SON N°, « Retour du <date lue> — à vérifier
+  // et remettre en ligne ». « Remettre en ligne » mène aux Retours (Colis → Envoyés), où SON clic ouvre
+  // « Republier à la main ». Sans N° connu : comptés, « à numéroter » (un N° viendra à la remise en ligne).
+  const revenus = fiches.filter((f) => f.retour && !f.actuelle && !f.doublure);
+  const blocRetours = (revenus.length || retoursANumeroter) ? (
+    <Card style={{ padding: '12px 13px' }}>
+      <div data-stock-retours={revenus.length} data-stock-retours-a-numeroter={retoursANumeroter || undefined}>
+        <div style={{ fontSize: 15, fontWeight: 800, color: C.text, marginBottom: 4 }}>{revenus.length + retoursANumeroter > 1 ? `${revenus.length + retoursANumeroter} articles revenus d’un retour` : 'Un article revenu d’un retour'}</div>
+        {revenus.map((f) => ligneRangee(f, <button className="vrm-b vrm-b-secondaire" type="button" data-stock-remettre-en-ligne={cleDeFiche(f)} onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=cat_bord' })); } catch (_) {} }}>Remettre en ligne</button>, libelleRetour(f.retour)))}
+        {retoursANumeroter > 0 && <p data-stock-retours-sans-num="" style={{ fontSize: 13, color: C.muted, margin: '6px 0 0', lineHeight: 1.45 }}>{retoursANumeroter > 1 ? `${retoursANumeroter} sans N° connu : à numéroter` : 'Un sans N° connu : à numéroter'} — {retoursANumeroter > 1 ? 'ils recevront' : 'il recevra'} un N° à la remise en ligne.</p>}
+      </div>
+    </Card>) : null;
   const blocVendues = vendSortir.length ? (
     <Card style={{ padding: '12px 13px' }}>
       <div data-stock-vendues-sortir={vendSortir.length}>
@@ -1089,6 +1119,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     {blocCherche}
     {meubles.length === 0 && <StockExplication sneakers={motsStock.nom === 'paire'} />}
     {blocVendues}
+    {blocRetours}
     {blocPlusEnLigne}
     {barreSerieStock}
     {blocPasSu}
@@ -1112,6 +1143,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
                     même paire sous deux N° (même photo) dit l'autre N° (`unParArticle`). */}
                 {(f.plateformes || []).length && !f.plateformes.includes('vinted') ? <span className="vrm-s2d-plat">{f.plateformes.map((x) => NOM_PLAT_STOCK[x] || x).join(' · ')}</span> : null}
                 {(f.aussi || []).length ? <span className="vrm-s2d-aussi">+N°{f.aussi.join(', ')}</span> : null}
+                {f.retour ? <span className="vrm-s2d-plat" data-a-ranger-retour="">Retour</span> : null}
               </button>
             );
           })}
