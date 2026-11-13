@@ -36,15 +36,11 @@ const NOM_JS = new RegExp('\\b(color|background|backgroundColor|fill|stroke|bord
 // LIBRE ne sont pas la palette de l'app. Rien d'autre.
 const EXCEPTIONS = {
   'src/App.jsx': [
-    ["bg: '#4D148C'", 'couleur de marque du logo FedEx (pastille de transporteur)'],
     ['conic-gradient(red,orange,yellow,lime,cyan,blue,magenta', "roue des teintes du sélecteur de couleur LIBRE (Stock 3D, murs) : c'est lui qui choisit"],
   ],
-  // (11 nov.) Les marques des transporteurs ont déménagé ici (« Transporteurs parfaits », 1f50b04b, fa5edfac) :
-  // la même exception (logo d'un transporteur), nommée ligne par ligne.
+  // (13 nov., logos des transporteurs) Plus aucune exception de transporteur : FedEx (violet) et Relais Colis (prune) sont
+  // dessinés dans leur variante neutre (src/transporteursVisuels.js) — un violet qui revient dans ce fichier rougit.
   'src/transporteursVisuels.js': [
-    ["fedex: { fond: '#FFFFFF', svg: `<svg", 'logo FedEx (dessin de la tuile, son violet de marque)'],
-    ["fedex:        { nom: 'FedEx',         logos: [], marque: { fond: '#4D148C'", 'couleur de marque FedEx (tuile maison)'],
-    ["relaiscolis:  { nom: 'Relais Colis',  logos: [], marque: { fond: '#7A1F6B'", 'couleur de marque Relais Colis (tuile maison)'],
   ],
   'src/facturePro/regle.js': [
   ],
