@@ -530,8 +530,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **13 nov. · Lot 45 : le Stock et l'Inventaire sans réseau (garage)** : hors réseau le Stock se dessine avec sa DERNIÈRE lecture gardée par vendeur (`src/stockHorsLigne.js`, `vrm_hl_stock_{uid}`, effacée à la déconnexion), « Hors connexion — dernier état du … », N°, case, photos déjà vues (service worker `/hl-photo`, réserve `vrm-hl-photos`, 120), recherche par N°, inventaire par la feuille du Stock ; changer un N° / publier dit une fois ; aucune lecture ni N° écrit hors réseau. `docs/passation/2026-11-13-lot45.md`. Geste : ouvrir le Stock une fois en ligne.
 - **13 nov. · Traduction lot 2 (intégration, étape 2)** : Ma journée, Ventes, Achats, Annonces, Stock, Argent, Statistiques, Messages, E-mails en 5 langues sur le main du jour (migration rejouée par `i18n-migrer`, 150 clés neuves) ; français identique mot pour mot (18 relevés). `2026-11-13-integration-traduction.md`. Geste : aucun.
-- **13 nov. · Rappels de colis au nom de la paire (second agent)** : « Demain dernier jour », « Dernier jour », « t'attend » portent le titre de l'achat relié par IDENTITÉ (n° de suivi, code, conversation : jonction de l'écran dans `api/_lib/commande-colis.js`, app et serveur), jamais par ressemblance ; le résumé du soir saute un colis déjà rappelé le matin (une notification par colis et par jour) ; banc `ventes-colis-premium` à la règle « Colis dans Ventes ». `docs/passation/2026-11-13-rappels-paire.md`. Geste : aucun.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
