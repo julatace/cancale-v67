@@ -255,6 +255,7 @@ const capture = async (pg, sel, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, 
           await pg.waitForFunction(() => { const e = document.querySelector('[data-fiche-paire] [data-fiche-resume-achat]'); return e && e.getAttribute('data-fiche-resume-achat') === '2500'; }, null, { timeout: 10000 }).catch(() => {});
           f = await lireFiche(pg);
           dit(f && f.achat === '2500' && f.si === '4500', 'D4 enregistré ⇒ la fiche relue : achat 25 €, si vendue +45 €', f && JSON.stringify([f.achat, f.si]));
+          await pg.waitForFunction(() => { try { return JSON.parse(localStorage.getItem('vinted_buyprice_by_num') || '{}')['62'] != null; } catch (_) { return false; } }, null, { timeout: 8000 }).catch(() => {});
           const ecrit = await pg.evaluate(() => { try { return [JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}')['800002'].buyPrice, (JSON.parse(localStorage.getItem('vinted_buyprice_by_num') || '{}'))['62']]; } catch (_) { return null; } });
           const eu = (v) => Number(String(v == null ? '' : v).replace(',', '.'));
           dit(ecrit && eu(ecrit[0]) === 25 && eu(ecrit[1]) === 25, 'D5 écrit sur LA fiche de l’annonce 800002 et le miroir du N°62 (rien ailleurs)', JSON.stringify(ecrit));
