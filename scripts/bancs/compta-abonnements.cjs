@@ -80,6 +80,16 @@ const brancher = async (pg) => {
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || '';
     const forme = (r) => {
       if (/^[a-z]+:data->[a-z]+$/i.test(sel)) { const [al, src] = sel.split(':'); return { [al]: (r.data || {})[src.split('->')[1]] }; }
+      // (13 nov.) Projection mêlée « id,updated_at,alias:data->… » (la lecture partagée des commandes, source unique) :
+      // chaque champ lu comme PostgREST (colonne nue, ou chemin JSON).
+      if (/(^|,)[a-z_]+:data->/i.test(sel) && /^(id|updated_at)(,|$)/.test(sel)) {
+        const o = {};
+        for (const champ of sel.split(',')) {
+          if (champ === 'id') o.id = r.id; else if (champ === 'updated_at') o.updated_at = auj.toISOString();
+          else { const m = /^([a-z_]+):(data->.+)$/i.exec(champ); if (m) o[m[1]] = getPath(r, m[2]); }
+        }
+        return o;
+      }
       if (/^[a-z]+:data->/i.test(sel)) {
         const o = {};
         // (6 nov.) chemin JSON lu comme PostgREST (getPath : `->>` = texte, absent ⇒ null) ; `alias:data->>x` était lu comme la clé « >x », toujours absente (§6.3).
@@ -90,6 +100,8 @@ const brancher = async (pg) => {
     };
     const eq = /id=eq\.([^&]*)/.exec(u);
     if (eq) return j(rows.filter((r) => r.id === eq[1]).map(forme));
+    const dans = /id=in\.\(([^)]*)\)/.exec(u);   // (13 nov.) lecture groupée par ids (source unique)
+    if (dans) { const ids = dans[1].split(','); return j(rows.filter((r) => ids.includes(r.id)).map(forme)); }
     const lk = /id=like\.([^&]*)/.exec(u);
     if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map(forme)); }
     return j([]);

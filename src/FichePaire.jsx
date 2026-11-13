@@ -108,7 +108,7 @@ const dateCourte = (iso) => {
   return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', ...(d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) });
 };
 
-export default function FichePaire({ owner = '', p, etat = null, histoNum = null, lecture = false, num, onFermer, onRetour, onBordereau, onEmballer, onPrix, onDupliquer, onPublierAilleurs, onSource, neuve = null, onCopier, Photo, Icon, Retour, note = null }) {
+export default function FichePaire({ owner = '', p, etat = null, histoNum = null, lecture = false, num, onFermer, onRetour, onBordereau, onEmballer, onPrix, onPrixAchat = null, onDupliquer, onPublierAilleurs, onSource, neuve = null, onCopier, Photo, Icon, Retour, note = null }) {
   React.useEffect(() => {
     const k = (e) => { if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); onFermer(); } };
     window.addEventListener('keydown', k, true);
@@ -117,6 +117,9 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
   if (typeof document === 'undefined') return null;
   const I = (n, s = 18) => (Icon ? <Icon name={n} size={s}/> : null);
   const r = p && p.resume;
+  // (13 nov., point 14) « Saisir le prix d'achat » : seulement sur une fiche connue (l'écriture va sur ELLE).
+  const saisir = p && onPrixAchat && p.idFiche && !p.ancienNumero && r && r.achat == null ? () => onPrixAchat(p) : null;
+  const sv = r && r.siVendue ? r.siVendue : null;
   const corps = !p ? (
     <p className="vrm-fp-vide" data-fiche-vide="">{lecture ? `Je lis l’histoire de ${motsVendeur().ce}…` : `Le N°${num} n’est pas un numéro.`}</p>
   ) : (
@@ -137,13 +140,27 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
         {/* (5 nov.) Le prix d'achat de « Voir l'état » est CE nombre (jamais écrit deux fois, §7) : sa source dessous. */}
         <div className="vrm-fp-tuile" data-fiche-resume-achat={r.achat == null ? '' : r.achat} {...(etat ? { 'data-etat-ligne': 'prix-achat', 'data-etat-val': etat.prixAchat.cents == null ? '' : etat.prixAchat.cents, 'data-etat-source': etat.prixAchat.source || '' } : {})}>
           <span>Achat</span><b>{eur(r.achat)}</b>
-          {etat ? <small>{etat.prixAchat.cents == null ? etat.prixAchat.raison : LIB_SOURCE[etat.prixAchat.source]}</small> : null}
+          {/* (13 nov., point 14) Le chiffre qui manque est la porte pour le corriger (§5) : « Saisir » ; la tuile
+              du bénéfice, à côté, NOMME le manque (« prix d'achat pas saisi ») — une porte, pas deux. */}
+          {r.achat == null && saisir ? <button type="button" className="vrm-lien-action vrm-fp-saisir" data-fiche-saisir-achat={p.idFiche} onClick={saisir}>Saisir</button>
+            : etat ? <small>{etat.prixAchat.cents == null ? etat.prixAchat.raison : LIB_SOURCE[etat.prixAchat.source]}</small> : null}
         </div>
-        <div className="vrm-fp-tuile" data-fiche-resume-vente={r.vente == null ? '' : r.vente}><span>Vente</span><b>{eur(r.vente)}</b></div>
-        <div className="vrm-fp-tuile" data-fiche-resume-benefice={r.benefice == null ? '' : r.benefice} data-fiche-benefice-partiel={r.benefPartiel ? '1' : undefined}>
-          <span>Bénéfice</span><b>{signe(r.benefice)}</b>
-          {r.benefice == null && r.raisonBenef ? <small>{r.raisonBenef}</small> : r.benefPartiel ? <small>frais pas tous confirmés</small> : null}
-        </div>
+        {sv ? (<>
+          {/* (13 nov., point 14) PAS ENCORE VENDUE : le prix affiché, et le bénéfice SI elle se vend à ce prix
+              (la même règle que la vente, src/dormantes.js). Ce n'est pas un bénéfice : aucun « Bénéfice » écrit. */}
+          <div className="vrm-fp-tuile" data-fiche-resume-vente="" data-fiche-prix-affiche={sv.prix == null ? '' : sv.prix}><span>En ligne à</span><b>{eur(sv.prix)}</b></div>
+          <div className="vrm-fp-tuile" data-fiche-resume-benefice="" data-fiche-si-vendue={sv.benefice == null ? '' : sv.benefice} data-fiche-si-vendue-etat={sv.etat} data-fiche-benefice-partiel={sv.etat === 'partiel' ? '1' : undefined}>
+            <span>Si vendue</span><b>{signe(sv.benefice)}</b>
+            {sv.benefice == null ? <small data-fiche-raison-benef="">{sv.raison}</small>
+              : <small>{sv.etat === 'partiel' ? 'au plus : frais à confirmer' : 'tous frais comptés'}</small>}
+          </div>
+        </>) : (<>
+          <div className="vrm-fp-tuile" data-fiche-resume-vente={r.vente == null ? '' : r.vente}><span>{r.venteLib || 'Vente'}</span><b>{eur(r.vente)}</b></div>
+          <div className="vrm-fp-tuile" data-fiche-resume-benefice={r.benefice == null ? '' : r.benefice} data-fiche-benefice-partiel={r.benefPartiel ? '1' : undefined}>
+            <span>Bénéfice</span><b>{signe(r.benefice)}</b>
+            {r.benefice == null && r.raisonBenef ? <small data-fiche-raison-benef="">{r.raisonBenef}</small> : r.benefPartiel ? <small>frais pas tous confirmés</small> : null}
+          </div>
+        </>)}
       </div>
       {etat ? <EtatArticle etat={etat}/> : null}
       {(onPrix || onDupliquer || onPublierAilleurs) && !p.ancienNumero ? (

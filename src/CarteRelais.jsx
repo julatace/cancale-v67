@@ -716,8 +716,9 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
               return (adr || href) ? <span className="vrm-rpf-adr" data-relais-adresse="">{adr}{href ? <>{adr ? ' · ' : ''}<a className="vrm-rpf-itineraire" href={href} target="_blank" rel="noreferrer" data-relais-itineraire="" aria-label={`Itinéraire vers ${p.nom || 'ce point'}`}>Itinéraire</a></> : null}</span> : null; })()}
             {p.adressePasLue ? <span className="vrm-rpf-adr" data-relais-adresse-pas-lue="">Adresse pas lue</span> : null}
             {/* (13 nov.) Les HORAIRES du point, lus dans l'e-mail de retrait (api/_lib/horaires-relais.js), et s'il est
-                ouvert à l'heure de Paris. Neutres, jamais ambre. Pas sus ⇒ rien. */}
-            {(() => { const h = horairesDuPoint(rows.map((c) => (c && c.src && c.src.t ? { horaires: c.src.t.horaires, ms: Date.parse(c.src.t.emailAt || c.src.t.receivedAt || '') } : null)).filter(Boolean), (c) => c.ms);
+                ouvert à l'heure de Paris. Neutres, jamais ambre. Pas sus ⇒ rien. (13 nov., lot 11) Mondial Relay : lus chez
+                le transporteur par le serveur (`horairesDuTransporteur`), datés de leur lecture. */}
+            {(() => { const h = horairesDuPoint(rows.map((c) => (c && c.src && c.src.t ? { horaires: c.src.t.horaires, ms: Date.parse((c.src.t.horairesDuTransporteur && c.src.t.horairesAt) || c.src.t.emailAt || c.src.t.receivedAt || '') } : null)).filter(Boolean), (c) => c.ms);
               const txt = texteHoraires(h); if (!txt) return null;
               const e = etatOuverture(h, Date.now()); const ph = phraseOuverture(e);
               return <span className="vrm-rpf-horaires" data-relais-horaires={txt} data-relais-ouvert={e ? (e.ouvert ? '1' : '0') : ''}>{txt}{ph ? <> · <span className="vrm-rpf-horaires-etat" data-relais-ouverture={ph}>{ph}</span></> : null}</span>; })()}

@@ -18,7 +18,8 @@ import { normaliserSuivi } from './etat-colis-email.js';
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 const propre = (v) => { const s = String(v == null ? '' : v).trim(); return ID.test(s) ? s : ''; };
 // (10 nov., lot BC) `lundi` : la semaine (AAAA-MM-JJ, un lundi) de l'écran « Ma semaine ».
-const ORDRE = ['tab', 'site', 'section', 'vue', 'cible', 'conv', 'compte', 'tx', 'suivi', 'num', 'vc', 'plat', 'colonne', 'lundi', 'session', 'rappel'];
+const ORDRE = ['tab', 'site', 'section', 'vue', 'cible', 'conv', 'compte', 'tx', 'suivi', 'num', 'vc', 'plat', 'colonne', 'lundi', 'session', 'rappel', 'mois'];
+// (13 nov., lot 53) `mois` : AAAA-MM, le mois du « Bilan du mois » (cible `bilanmois`, l'e-mail du bilan mensuel).
 // (11 nov., rappels perso) `rappel` : l'identifiant d'un rappel posé par le vendeur (api/_lib/rappels-perso.js).
 
 export function lienNotif(tab, o = {}) {
@@ -62,6 +63,9 @@ export const DESTINATIONS = {
   achat: ({ tx } = {}) => lienNotif('achats', { vue: 'achats', ...(tx ? { cible: 'achat', tx } : {}) }),
   // Comptabilité · « Ta déclaration URSSAF ».
   urssaf: () => lienNotif('compta', { cible: 'urssaf' }),
+  // (13 nov., point 17) La veille de l'échéance : Argent → « Déclarer », la section URSSAF
+  // en évidence, où la carte de la période porte « Copier » (`PrevisionUrssafCarte`).
+  urssafDeclarer: () => lienNotif('compta', { section: 'declarer', cible: 'urssaf' }),
   // L'écran où se règle une double vente : eBay → Annonces (« Retirer d'eBay »)
   // ou Leboncoin → Annonces (« à retirer de Leboncoin »).
   doublon: ({ plat, num } = {}) => lienNotif('annonces', { site: plat === 'ebay' ? 'ebay' : 'leboncoin', cible: 'doublon', plat: plat === 'ebay' ? 'ebay' : 'leboncoin', num }),

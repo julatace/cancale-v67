@@ -260,18 +260,23 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
       });
       await essaie('A. les autres pages', async () => {
         console.log('── A. Les autres pages montent leur carte (défaut gardé)');
-        await aller(pg, 'cat_bord', '[data-carte-stats="colis"]');
-        const c = await carte(pg, 'colis');
-        dit(c && c.defaut === '1' && c.grand.id === 'aposter', 'Colis : sa carte, au défaut (le réglage de Ventes ne la touche pas)', JSON.stringify(c && { d: c.defaut, g: c.grand }));
-        await shot('[data-carte-stats="colis"]', 'carte-colis');
+        // (13 nov.) Depuis le 11-12 nov., Colis vit DANS Ventes (« À expédier ») : sa carte à part n'est montée que
+        // si Colis est ouvert seul. Ventes garde alors UNE carte (la sienne) — jamais deux cartes empilées.
+        await aller(pg, 'cat_bord', '[data-carte-stats="colis"], [data-carte-stats="ventes"], [data-bord-card]');
+        const nColis = await pg.locator('[data-carte-stats="colis"]').count(), nVentes = await pg.locator('[data-carte-stats="ventes"]').count();
+        if (nColis) {
+          const c = await carte(pg, 'colis');
+          dit(c && c.defaut === '1' && c.grand.id === 'aposter', 'Colis : sa carte, au défaut (le réglage de Ventes ne la touche pas)', JSON.stringify(c && { d: c.defaut, g: c.grand }));
+          await shot('[data-carte-stats="colis"]', 'carte-colis');
+        } else dit(nVentes <= 1, 'Colis dans Ventes (« À expédier ») : au plus une carte, jamais deux empilées', `colis=${nColis} ventes=${nVentes}`);
         await aller(pg, 'journee', '[data-carte-stats="journee"]');
         const j = await carte(pg, 'journee');
-        dit(j && j.grand.id === 'vendu' && j.grand.p === 'jour' && j.grand.v === '11000', 'Ma journée : vendu aujourd’hui en grand, tous les sites (70 € Vinted + 40 € Leboncoin)', JSON.stringify(j && j.grand));
+        dit(j && j.grand && j.grand.id === 'vendu' && j.grand.p === 'jour' && j.grand.v === '11000', 'Ma journée : vendu aujourd’hui en grand, tous les sites (70 € Vinted + 40 € Leboncoin)', JSON.stringify(j && j.grand));
         dit(await pg.locator('[data-carte-stats="journee"] [data-journee-benef][data-benef-notion="benefice"]').count() === 1, 'Ma journée : la case bénéfice porte la règle unique (`chiffreBenefice`)');
         await shot('.vrm-fu-tete', 'carte-journee');
         await aller(pg, 'compta', '[data-carte-stats="compta"]');
         const k = await carte(pg, 'compta');
-        dit(k && k.grand.id === 'benefice' && k.cases.map((x) => x.id).join() === 'declarer,urssaf,finalisees', 'Compta : bénéfice en grand, à déclarer · URSSAF · finalisées', JSON.stringify(k && { g: k.grand, c: k.cases.map((x) => x.id) }));
+        dit(k && k.grand && k.grand.id === 'benefice' && k.cases.map((x) => x.id).join() === 'declarer,urssaf,finalisees', 'Compta : bénéfice en grand, à déclarer · URSSAF · finalisées', JSON.stringify(k && { g: k.grand, c: k.cases.map((x) => x.id) }));
         dit(await pg.locator('[data-carte-stats="compta"] [data-compta-chiffre="gagne"]').count() === 1, 'Compta : le grand chiffre garde `data-compta-chiffre="gagne"`');
         await shot('[data-compta-q="gagne"] .vrm-compta-carte', 'carte-compta');
         await aller(pg, 'annonces', '[data-carte-stats="annonces"]');

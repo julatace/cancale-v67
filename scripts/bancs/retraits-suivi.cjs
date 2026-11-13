@@ -9,7 +9,7 @@
 //   R2  la ligne d'e-mail réécrite « retiré » (arrivée gardée) ⇒ dite sortie (source e-mail)
 //   R3  achat Vinted « déposé » dont le n° est retiré chez Vinted Go ⇒ dit sorti (achat)
 //   R4  un n° de SES bordereaux que le transporteur dit « disponible » ⇒ JAMAIS à retirer
-//   R5  Colissimo ⇒ à retirer, « Colissimo : VRM ne lit pas ce transporteur » + le geste
+//   R5  Colissimo (sans clé La Poste) ⇒ à retirer, « Colissimo : suivi lu par e-mail seulement » + le geste
 //   R6  e-mail rangé « vinted » (expéditeur par défaut) à n° de 8 chiffres ⇒ Mondial Relay nommé, « pas encore lu »
 //   R7  deux lignes `transp_` (Vinted Go jamais lue servie d'abord, Chronopost lue) ⇒ la carte dit Chronopost lu
 //   R8  Chronopost abandonné (introuvable 3 fois) ⇒ « VRM ne le relit plus » + le geste
@@ -205,7 +205,7 @@ const detail = async (pg, sousCle) => {
         if (SHOTS) { await pg.screenshot({ path: path.join(SHOTS, `retraits-suivi-${nom}.png`) });
           await pg.evaluate(() => { const e = document.querySelector('[data-retraits-sortis]'); if (e) e.scrollIntoView({ block: 'center' }); }); await pg.waitForTimeout(300);
           await pg.screenshot({ path: path.join(SHOTS, `retraits-suivi-sortis-${nom}.png`) }); }
-        { const d = await detail(pg, '6A20000000005'); dit(!!d && d.pasLu === 'non-lu' && /Colissimo/.test(d.pasLuTexte) && /site/.test(d.pasLuTexte), 'R5 Colissimo ⇒ « VRM ne lit pas ce transporteur » + le geste', J(d && { pasLu: d.pasLu, t: d.pasLuTexte })); }
+        { const d = await detail(pg, '6A20000000005'); dit(!!d && d.pasLu === 'non-lu' && /Colissimo/.test(d.pasLuTexte) && /site/.test(d.pasLuTexte), 'R5 Colissimo ⇒ « suivi lu par e-mail seulement » + le geste', J(d && { pasLu: d.pasLu, t: d.pasLuTexte })); }
         { const d = await detail(pg, '82000006'); // (12 nov., finitions) « pas encore lu — VRM le lit tant que l'app est ouverte » ne demande rien à Julien : la ligne ne
         // l'écrit plus (seules les raisons qui ont un geste restent, `RaisonPasLu`).
         dit(!!d && d.pasLu == null, 'R6 n° de 8 chiffres d’un e-mail « vinted » : « pas encore lu » (rien à faire) n’est plus écrit sur la ligne', J(d && { pasLu: d.pasLu, t: d.pasLuTexte, tr: d.transp }));

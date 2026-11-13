@@ -224,18 +224,21 @@ export function partagerParEtat(articles) {
 //   garder    { [cle]: ts } — « Remettre » (sortie toute seule) ou « Elle est encore là »
 //   jugeable  (cle) => bool — toutes les lectures qui pourraient la porter ont
 //             répondu (sinon « pas su » : elle n'est dite ni présente ni partie)
-// Rend { [cle]: 'actuelle' | 'vendue' | 'arrivee' | 'gardee' | 'plusenligne' | 'passu' }.
+// Rend { [cle]: 'actuelle' | 'vendue' | 'retour' | 'arrivee' | 'gardee' | 'plusenligne' | 'passu' }.
 // Une vendue l'emporte sur tout (sa case s'allume jusqu'à ce qu'il la sorte ou
 // que le colis parte, `libererCasesPartis`).
 // (11 nov., lot rangement-guide) `arrivees` : les N° rangés à l'arrivée d'un achat (fiche à publier,
 // `vrm_fiches_neuves` origine 'arrivee') ⇒ 'arrivee' — chez lui, pas encore en ligne : ni « plus en ligne », ni « pas su ».
-export function classerRangees({ slots, actuelles, vendus, garder, jugeable, arrivees = null, cle = cleDefaut } = {}) {
+// (13 nov., point 29) `retours` : les N° revenus d'un retour PROUVÉ (`vinted_nums_physiques.retours`) ⇒
+// 'retour' — chez lui, à vérifier et remettre en ligne : ni « plus en ligne », ni « pas su ».
+export function classerRangees({ slots, actuelles, vendus, garder, jugeable, arrivees = null, retours = null, cle = cleDefaut } = {}) {
   const out = {};
   for (const k0 of Object.keys(slots || {})) {
     if (!slots[k0]) continue;
     const k = cle(k0); if (!k) continue;
     if (vendus && vendus.has(k)) out[k] = 'vendue';
     else if (actuelles && actuelles.has(k)) out[k] = 'actuelle';
+    else if (retours && retours.has(k)) out[k] = 'retour';
     else if (arrivees && arrivees.has(k)) out[k] = 'arrivee';
     else if (garder && garder[k]) out[k] = 'gardee';
     else if (actuelles && jugeable && jugeable(k)) out[k] = 'plusenligne';

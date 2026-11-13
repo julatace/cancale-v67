@@ -26,7 +26,7 @@ const fs = require('fs'), path = require('path'), os = require('os');
 const { execFileSync } = require('child_process');
 const R = process.env.VRM_RACINE || path.join(__dirname, '..');
 const MUTS = {
-  'jours-min': ['if (jours < PREVISION_JOURS_MIN) return', 'if (jours < 1) return'],
+  'jours-min': ['if (jours < PREVISION_JOURS_MIN) {', 'if (jours < 1) {'],
   'bas-sous-vendu': ['const bas = Math.max(rond(cumul, -1), rond(centreBrut - PREVISION_Z * sd));', 'const bas = rond(centreBrut - PREVISION_Z * sd);'],
   'sans-fourchette': ['const sd = Math.sqrt(', 'const sd = 0 * Math.sqrt('],
   'manque-tu': ['partiel: manques.length > 0, manques };', 'partiel: false, manques: [] };'],

@@ -15,7 +15,8 @@
 //     réécriture /etat → /etat.html, en-têtes, CSP) avec un faux /api/sante :
 //      · tout ok ⇒ « Tout fonctionne » ; e-mails en panne ⇒ « Panne en cours sur
 //        la réception des e-mails » ; pas vérifié ⇒ ni panne ni « Tout
-//        fonctionne » ; /api/sante muet ⇒ « VRM ne répond pas » ;
+//        fonctionne » ; /api/sante muet ⇒ « État inconnu » (13 nov., lot 52 : jamais
+//        « tout va bien », et plus de « nous sommes prévenus » — banc confiance-etat.cjs) ;
 //      · la version servie (etat-version.json) ; l'heure de la vérification ;
 //      · rafraîchie après 60 s si visible, PAS si l'onglet est caché (horloge
 //        tenue : `page.clock`) ; zéro violation de CSP ; 390 et 1512, clair/sombre.
@@ -186,7 +187,7 @@ async function etat(nav, theme, tel, port) {
   await pg.clock.runFor(61000);
   await attendre('panne');
   const b = await lire();
-  dit(appels > n0 && b.g === 'panne' && b.titre === 'Panne en cours sur la réception des e-mails' && b.m.emails === 'panne · En panne' && b.m.base === 'ok · Fonctionne' && /prévenus/.test(b.phrase), `${T} — 60 s plus tard (visible) : relue, « Panne en cours sur la réception des e-mails »`, b);
+  dit(appels > n0 && b.g === 'panne' && b.titre === 'Panne en cours sur la réception des e-mails' && b.m.emails === 'panne · En panne' && b.m.base === 'ok · Fonctionne' && !/prévenus/.test(b.phrase), `${T} — 60 s plus tard (visible) : relue, « Panne en cours sur la réception des e-mails »`, b);
   const ambre = await pg.evaluate(() => getComputedStyle(document.querySelector('[data-etat-morceau="emails"] .mot')).color);
   dit(ambre === (theme === 'sombre' ? 'rgb(255, 179, 64)' : 'rgb(178, 80, 0)'), `${T} — la panne en ambre (jamais rouge)`, ambre);
   await pg.screenshot({ path: path.join(SHOTS, `etat-panne-${F}.png`), fullPage: true });
@@ -204,14 +205,14 @@ async function etat(nav, theme, tel, port) {
   // /api/sante muet.
   reponse = 'muet';
   await pg.clock.runFor(61000);
-  await attendre('injoignable');
+  await attendre('inconnu');
   const d = await lire();
-  dit(d.g === 'injoignable' && d.titre === 'VRM ne répond pas' && /prévenus/.test(d.phrase) && d.m.base === 'inconnu · Pas vérifié', `${T} — /api/sante muet : « VRM ne répond pas — nous sommes prévenus »`, d);
+  dit(d.g === 'inconnu' && d.titre === 'État inconnu' && !/prévenus|Tout fonctionne/.test(d.phrase + d.titre) && d.m.base === 'inconnu · Pas vérifié', `${T} — /api/sante muet : « État inconnu » (jamais « tout va bien »)`, d);
   await pg.screenshot({ path: path.join(SHOTS, `etat-muet-${F}.png`), fullPage: true });
   reponse = '502';
   await pg.clock.runFor(61000);
   const e = await lire();
-  dit(e.g === 'injoignable', `${T} — /api/sante en 502 : pareil`, e.g);
+  dit(e.g === 'inconnu', `${T} — /api/sante en 502 : pareil`, e.g);
   const deb = await debordement(pg);
   dit(deb <= 0 && !errs.length, `${T} — aucun débordement horizontal, aucune erreur`, { deb, errs });
   dit(!vues.length, `${T} — aucune violation de la CSP de vercel.json`, vues.map((x) => x.texte));

@@ -77,6 +77,9 @@ export class GardeEcran extends React.Component {
           {/* (6 nov.) « Signaler un problème » en un bouton : l'écran tombé part avec.
               Posé par l'app (`GardeEcran.Signaler`), pour ne pas tirer ici la session. */}
           {GardeEcran.Signaler ? <GardeEcran.Signaler ecran={String(nom || '')} taille="petit"/> : null}
+          {/* (13 nov., lot 55) « Écrire au support » : sa question, cinq faits techniques
+              (src/demandeAide.js) — posé par l'app (`GardeEcran.Support`). */}
+          {GardeEcran.Support ? <GardeEcran.Support ecran={String(nom || '').split(':')[0]} taille="petit"/> : null}
         </div>
       </div>
     );
@@ -92,6 +95,7 @@ export class GardeEcran extends React.Component {
 }
 
 GardeEcran.Signaler = null;
+GardeEcran.Support = null;
 
 export default GardeEcran;
 

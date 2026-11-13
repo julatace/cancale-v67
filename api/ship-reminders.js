@@ -33,7 +33,7 @@ import { passageFacturesAuto } from './_lib/factures-auto.js';
 // (revue du 5 nov.) Les textes des rappels soir et « offres au mini » : un propriétaire, celui de l'aperçu.
 import { texteSoir, texteOffresMini } from './_lib/notif-apercus.js';
 import { semainePassee, semaineCourante, calculerBilan, bilanAEnvoyer, texteBilan, versementsDeLignes } from './_lib/bilan-semaine.js';
-import { notificationUrssaf, rappelAvantEcheance, MAIN_URSSAF } from './_lib/rappel-urssaf.js';
+import { notificationUrssaf, rappelVeilleUrssaf, MAIN_URSSAF } from './_lib/rappel-urssaf.js';
 // « À expédier » : la règle du widget (elle-même jugée identique à celle de
 // l'app et de l'extension par audit-statuts.cjs). Importée, jamais recopiée.
 import { aExpedier } from './widget.js';
@@ -65,6 +65,7 @@ import { passageSauvegarde, stockageSupabase, sourceCle } from './_lib/sauvegard
 import { accesVendeur } from './_lib/abonnement.js';
 import { passageRelances, configurationRelances, adresseDuCompte } from './_lib/relances-essai.js';
 import { passageClientsPartis } from './_lib/clients-partis.js';
+import { passageSuppressionsPrevues } from './_lib/suppression-differee.js';   // (13 nov., lot 51) « Supprimer mon compte » : 30 jours de grâce
 // (8 nov.) Le bilan du mois par e-mail, pour qui l'a ACTIVÉ (api/_lib/bilan-mois.js).
 import { bilanMoisVendeur, partBilan, ID_CHOIX as ID_CHOIX_BILAN_MOIS, ID_ENVOIS as ID_ENVOIS_BILAN_MOIS } from './_lib/bilan-mois.js';
 import { envoyerSmtp } from './_lib/smtp.js';
@@ -906,17 +907,23 @@ async function traiterVendeurApresRelecture() {
           urssaf = !n.envoyer ? n.raison : res.reserve ? 'envoyé · ' + n.raison : res.raison === 'deja' ? 'déjà rappelé ce mois' : 'mémo illisible — rien';
         }
       } else {
-        // (29 oct.) Le rappel avant l'échéance : une fois par échéance (`veille`
-        // dans le même mémo), écrit APRÈS l'envoi comme celui du 1er.
-        const n = rappelAvantEcheance({ today, main: await getRowProjete('main', MAIN_URSSAF) });
-        if (n.envoyer) {
+        // (13 nov., point 17) LA VEILLE DE L'ÉCHÉANCE (api/_lib/rappel-urssaf.js,
+        // `rappelVeilleUrssaf`) — remplace le rappel « 3 jours ou moins » du 29 oct. :
+        // « Demain : déclaration URSSAF · X € à déclarer », la règle et le montant de la
+        // carte « Déclarer » (où vit « Copier »). Une fois par échéance : son identité
+        // (`veilleEcheance` dans le même mémo), réservée AVANT l'envoi. Famille
+        // « Rappels » ; heures calmes ⇒ rangée dans la cloche, dite au réveil (`sendPushToAll`).
+        const n = rappelVeilleUrssaf({ today, main: await getRowProjete('main', MAIN_URSSAF) });
+        if (!n.envoyer) urssaf = n.raison;
+        else {
           const deja = await getRow('urssaf_reminder_dedup');
-          if (deja && deja.veille === n.cle) urssaf = 'déjà rappelé avant l\'échéance';
+          if (deja && deja.veilleEcheance === n.cle) urssaf = 'déjà rappelé la veille de l\'échéance';
           else if (deja === undefined) urssaf = 'mémo illisible — rien';
-          else if (await pushCategorieActive('urssaf')) {
-            const res = await reserverDedup('urssaf_reminder_dedup', (d) => !!d && d.veille === n.cle, (d) => ({ ...(d || {}), veille: n.cle }));
-            if (res.reserve) await sendPushToAll({ cat: 'urssaf', title: n.titre, body: n.corps, tag: 'urssaf-veille-' + n.cle, url: n.url });
-            urssaf = res.reserve ? 'envoyé · ' + n.raison : res.raison === 'deja' ? 'déjà rappelé avant l\'échéance' : 'mémo illisible — rien';
+          else if (!(await pushCategorieActive('urssaf'))) urssaf = 'rappels coupés par le vendeur';
+          else {
+            const res = await reserverDedup('urssaf_reminder_dedup', (d) => !!d && d.veilleEcheance === n.cle, (d) => ({ ...(d || {}), veilleEcheance: n.cle }));
+            if (res.reserve) await sendPushToAll({ cat: 'urssaf', title: n.titre, body: n.corps, tag: 'urssaf-veille-' + n.cle, cle: 'urssaf-veille:' + n.cle, url: n.url });
+            urssaf = res.reserve ? 'envoyé · ' + n.raison : res.raison === 'deja' ? 'déjà rappelé la veille de l\'échéance' : 'mémo illisible — rien';
           }
         }
       }
@@ -1776,6 +1783,10 @@ async function passageDuCron(req, res, moment, bailEtat) {
     // bornés par passage ; une lecture ratée ne fait rien (dit dans la réponse).
     let clientsPartis = null;
     if (!soir && !reveil) { try { clientsPartis = await passageClientsPartis({ maintenant: debutCron }); } catch (e) { clientsPartis = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
+    // (13 nov., lot 51) Les suppressions DEMANDÉES il y a 30 jours (api/_lib/suppression-differee.js) :
+    // relues une à une (une annulation gagne), la même fonction d'effacement, bornées par passage.
+    let suppressionsPrevues = null;
+    if (!soir && !reveil) { try { suppressionsPrevues = await passageSuppressionsPrevues({ maintenant: debutCron }); } catch (e) { suppressionsPrevues = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
     // (11 nov., lot agent2-veille) Le contrôle de nuit de l'INSTALLATION (lecture seule) : e-mails en
     // quarantaine sans vendeur, abonnements Stripe incohérents — rangé chez le propriétaire seul.
     let controleInst = null;
@@ -1817,7 +1828,7 @@ async function passageDuCron(req, res, moment, bailEtat) {
     const { bilans, echecs } = lot;
     res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(bailEtat === 'pas-su' ? { bail: 'pas-su' } : {}), ...(soir ? { moment: 'soir', ...(horaire ? { passage: 'heure' } : {}) } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs,
       lot: { traites: lot.traites, dejaFaits: lot.dejaFaits, restants: lot.restants, prioritaires: lot.prioritaires, budgetAtteint: lot.budgetAtteint, reportes: lot.reportes, curseur: lot.curseur },
-      bilans, ...(sondes ? { sondes } : {}), ...(sauvegarde ? { sauvegarde } : {}), ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(purgeErreurs ? { purgeErreurs } : {}), ...(pilotage ? { pilotage } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}), ...(clientsPartis ? { clientsPartis } : {}), ...(controleInst ? { controleInstallation: controleInst } : {}) });
+      bilans, ...(sondes ? { sondes } : {}), ...(sauvegarde ? { sauvegarde } : {}), ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(purgeErreurs ? { purgeErreurs } : {}), ...(pilotage ? { pilotage } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}), ...(clientsPartis ? { clientsPartis } : {}), ...(suppressionsPrevues ? { suppressionsPrevues } : {}), ...(controleInst ? { controleInstallation: controleInst } : {}) });
   } catch (e) {
     // Une tâche planifiée qui répond 200 sur une panne n'apparaît nulle part :
     // le tableau de bord la compte réussie, et les rappels d'expédition

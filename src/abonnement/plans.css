@@ -32,3 +32,9 @@
 .vrm-plan-offre-prix { font-size: var(--d-t-15, 15px); font-weight: 600; font-variant-numeric: tabular-nums; }
 .vrm-plan-pastille { font-size: var(--d-t-11, 11px); font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--d-remplir, rgba(0,0,0,.06)); color: var(--d-gris, #6e6e73); }
 .vrm-plan-offre .vrm-b { margin-top: auto; }
+
+/* (13 nov., lot 56) Le supplément Solo et la case CGV de la feuille « compte de plus ». */
+.vrm-plan-supplement { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.vrm-plan-supplement b { color: var(--d-encre, #1d1d1f); font-weight: 600; }
+.vrm-plan-case { display: flex; gap: 10px; align-items: flex-start; min-height: 44px; margin: 0 0 10px; }
+.vrm-plan-case input { width: 22px; height: 22px; flex: none; margin: 1px 0 0; }

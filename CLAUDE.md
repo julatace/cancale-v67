@@ -531,8 +531,12 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 - **13 nov. · Design système** : jetons `--d-*` (`src/styles-systeme.css`) lus par toutes les familles ; contient 20 · se touche capsule · montre 12 · N° 6 ; 400/600/700 ; 44 doigt / 36 souris. `docs/design/DESIGN.md`, `2026-11-13-design-systeme.md`. Geste : aucun.
-- **13 nov. · Traduction lot 2 (intégration, étape 2)** : Ma journée, Ventes, Achats, Annonces, Stock, Argent, Statistiques, Messages, E-mails en 5 langues sur le main du jour (migration rejouée par `i18n-migrer`, 150 clés neuves) ; français identique mot pour mot (18 relevés). `2026-11-13-integration-traduction.md`. Geste : aucun.
-- **13 nov. · Rappels de colis au nom de la paire (second agent)** : « Demain dernier jour », « Dernier jour », « t'attend » portent le titre de l'achat relié par IDENTITÉ (n° de suivi, code, conversation : jonction de l'écran dans `api/_lib/commande-colis.js`, app et serveur), jamais par ressemblance ; le résumé du soir saute un colis déjà rappelé le matin (une notification par colis et par jour) ; banc `ventes-colis-premium` à la règle « Colis dans Ventes ». `docs/passation/2026-11-13-rappels-paire.md`. Geste : aucun.
+- **13 nov. · Lot 56/58** : Solo + comptes Vinted vendeurs payés (`PRIX_COMPTE_SUP_CENTIMES` 3 € à confirmer, prix `vrm_compte_sup`, quantité bornée serveur, « Bientôt » sans prix) ; équipe : « pas encore activé sur ton installation », retrait en un geste. `2026-11-13-lot5658.md`. Geste : 016 (3 gestes), prix Stripe.
+
+- **13 nov. · Parrainage (lot 54)** : lien copier/partager, mois gagnés, état par filleul, « Offert par <nom choisi> » à l'inscription, « Parrainer » dans Plus ; mois offert si compte Vinted jamais vu. `docs/passation/2026-11-13-lot54.md`. Geste : appliquer la 029.
+
+- **13 nov. · Bilan mensuel + support (lot 53/55)** : bilan activé par défaut si compte créé ≥ 13 nov., bénéfice sans « au moins », temps gagné si mesuré ; « Écrire au support » (5 faits techniques, rangé chez lui, scellé). `docs/passation/2026-11-13-lot5355.md`. Geste : `RELANCES_SMTP_*`.
+
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 

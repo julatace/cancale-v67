@@ -30,6 +30,7 @@ import { arriveeColisEmail } from './arrivee-colis.js';
 import { etatRetrait, lieuDepuisExtrait, lieuLisibleDepuisExtrait, limiteRetraitDepuisTexte, LIEU_AU_FUTUR, joursAvantLimite, jourParis } from './retrait-colis.js';
 import { codeRetraitTournure, codeImpossible } from './code-retrait-email.js';
 import { preuveDeLigne, preuveDeTransp, contredit, lectureEnRetard, etatProuve } from './etat-colis.js';
+import { horairesValides, HORAIRES_TRANSP_VALIDES_MS } from './horaires-relais.js';
 // (24 oct.) LE STATUT LU CHEZ LE TRANSPORTEUR (api/_lib/transporteurs.js) : une
 // ligne `transp_{transporteur}_{n°}` par n°, écrite par le SERVEUR seul. Elle se
 // joint aux e-mails PAR LE N° — jamais réécrite dans une ligne `email_track_*`.
@@ -297,6 +298,23 @@ const dernierEmailMs = (l) => msDe(l.emailAt != null ? l.emailAt : l.ea) ?? msDe
 // (1er nov.) + la RUE quand le transporteur la donne (Vinted Go : « 24 Rue Hoche,
 // Vannes ») ; Chronopost et Mondial Relay n'en donnent pas : inchangés.
 export const lieuTransp = (t) => (t ? [t.lieuNom, t.lieuRue, [t.lieuCp, t.lieuVille].filter(Boolean).join(' ')].filter(Boolean).join(', ') : '');
+// (13 nov., lot 11) LES HORAIRES DU POINT LUS CHEZ LE TRANSPORTEUR (Mondial Relay : son e-mail n'en écrit pas) posés
+// sur une ligne « à retirer » qui n'en a pas. L'identité : le n° de suivi (la ligne `transp_` de CE colis) ET le code
+// postal que Mondial Relay a confirmé pour ce colis (`cp`, écho exigé), qui doit être le SEUL code postal du point
+// affiché (son lieu). Lus il y a plus de 7 jours, d'un colis qui n'attend plus, ou un autre code postal ⇒ rien.
+export function horairesDuTransporteur(lieu, t, maintenant = Date.now()) {
+  if (!t || t.etat !== 'disponible' || !t.horairesPoint || !horairesValides(t.horaires)) return null;
+  const at = msDe(t.horairesAt);
+  if (at == null || maintenant - at >= HORAIRES_TRANSP_VALIDES_MS || at - maintenant > 10 * 60000) return null;
+  const cp = /^\d{5}$/.test(String(t.cp || '')) ? String(t.cp) : '';
+  const cps = codesPostauxDe(typeof lieu === 'string' ? lieu : '');
+  return cp && cps.length === 1 && cps[0] === cp ? t.horaires : null;
+}
+const avecHorairesDuTransporteur = (out, t, maintenant) => {
+  if (horairesValides(out.horaires)) return out;
+  const h = horairesDuTransporteur(out.lieu, t, maintenant);
+  return h ? { ...out, horaires: h, horairesAt: t.horairesAt, horairesDuTransporteur: true } : out;
+};
 export function fusionTransporteur(l, t, maintenant = Date.now()) {
   if (!l || !t || !t.etat) return l;
   const st = l.status != null ? l.status : l.s;
@@ -328,8 +346,8 @@ export function fusionTransporteur(l, t, maintenant = Date.now()) {
   // DISPONIBLE) La contradiction est tranchée par le transporteur quelle que soit l'heure de sa lecture : le colis
   // attend au point (celui du transporteur, sinon celui de l'e-mail du changement), avec le code déjà lu.
   if (t.etat === 'disponible' && l.aVerifierTransporteur && st !== 'delivered' && st !== 'available' && luMs != null) {
-    return { ...l, status: 'available', statusLabel: 'Disponible (lu chez le transporteur)', lieu: lieuTransp(t) || l.lieu || null, relaisChange: false,
-      viaTransporteur: true, transp: t, aVerifierTransporteur: null, arriveLe: l.arriveLe || t.etatAt || null };
+    return avecHorairesDuTransporteur({ ...l, status: 'available', statusLabel: 'Disponible (lu chez le transporteur)', lieu: lieuTransp(t) || l.lieu || null, relaisChange: false,
+      viaTransporteur: true, transp: t, aVerifierTransporteur: null, arriveLe: l.arriveLe || t.etatAt || null }, t, maintenant);
   }
   if (t.etat !== 'disponible') return l;
   const em = dernierEmailMs(l);
@@ -343,7 +361,7 @@ export function fusionTransporteur(l, t, maintenant = Date.now()) {
     if (t.limiteSure && t.limiteAt && out.limite && out.limite === t.limite) out.limiteAt = t.limiteAt;
     if (!out.limite && t.limite && !t.limiteSure) out.limiteVers = t.limite;
     if (recent != null) out.transpDispoLu = recent;
-    return out;
+    return avecHorairesDuTransporteur(out, t, maintenant);
   }
   if ((st === 'transit' || st === 'info' || !st) && at != null && (em == null || at > em)) {
     // (10 nov., retraits irréprochables) Un colis REDIRIGÉ (« Votre colis a changé de plan ») : le nouveau
@@ -351,10 +369,10 @@ export function fusionTransporteur(l, t, maintenant = Date.now()) {
     // point (Mondial Relay : `lieuNom` vide, mesuré) ne l'efface plus — sans lui, la carte disait « point
     // pas encore connu » pour un colis dont l'e-mail donnait l'adresse.
     const lieuF = lieuTransp(t) || (l.relaisChange && l.lieu ? l.lieu : null);
-    return { ...l, status: 'available', statusLabel: 'Disponible (lu chez le transporteur)', lieu: lieuF, relaisChange: false, ...(l.relaisChange ? { redirige: true } : {}),
+    return avecHorairesDuTransporteur({ ...l, status: 'available', statusLabel: 'Disponible (lu chez le transporteur)', lieu: lieuF, relaisChange: false, ...(l.relaisChange ? { redirige: true } : {}),
       limite: (t.limiteSure && t.limite) || null, limiteVers: (!t.limiteSure && t.limite) || null, limiteDuTransporteur: !!(t.limiteSure && t.limite),
       limiteAt: (t.limiteSure && t.limite && t.limiteAt) || null,
-      arriveLe: t.etatAt, viaTransporteur: true, transp: t, ...(recent != null ? { transpDispoLu: recent } : {}) };
+      arriveLe: t.etatAt, viaTransporteur: true, transp: t, ...(recent != null ? { transpDispoLu: recent } : {}) }, t, maintenant);
   }
   if (st === 'retour' && at != null && em != null && at > em) return { ...l, transp: t, transpContradiction: true };
   return l;

@@ -54,8 +54,11 @@ with zipfile.ZipFile(root/'public/VRM-Orion-reference-5.319.0.xpi') as ancien, z
     # (scripts/zip-extension.cjs, sourcesEnLigne) — exactement celle-là, rien d'autre ne change.
     _marque = 'null;/*__VRM_SOURCES_PAGE__*/'
     _depot = (adapt/'orion-main.js').read_text('utf8')
-    _attendu = _depot.replace(_marque, json.dumps({'inject.js': nouveau.read('inject.js').decode('utf8')}, ensure_ascii=False, separators=(',', ':')) + ';') if _marque in _depot else _depot
-    assert nouveau.read('orion-main.js').decode('utf8') == _attendu, 'orion-main.js ne vient pas du dépôt (ou ses sources en ligne ne sont pas inject.js du paquet)'
+    # 5.374 (vente Vestiaire mal captée sur Orion iPhone) : la source de vc-inject.js du paquet aussi, en ligne
+    # (approuvé nommément : le capteur Vestiaire posé par `src` arrivait après la liste des ventes) — rien d'autre.
+    _sources = {'inject.js': nouveau.read('inject.js').decode('utf8'), 'vc-inject.js': nouveau.read('vc-inject.js').decode('utf8')}
+    _attendu = _depot.replace(_marque, json.dumps(_sources, ensure_ascii=False, separators=(',', ':')) + ';') if _marque in _depot else _depot
+    assert nouveau.read('orion-main.js').decode('utf8') == _attendu, 'orion-main.js ne vient pas du dépôt (ou ses sources en ligne ne sont pas inject.js + vc-inject.js du paquet)'
     m_ancien = json.loads(ancien.read('manifest.json')); m_nouveau = json.loads(nouveau.read('manifest.json'))
     m_ancien.pop('version'); m_nouveau.pop('version')
     commun = json.loads((ext/'manifest.json').read_text('utf8'))

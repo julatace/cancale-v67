@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.372.0';
+const CODE_VERSION = '5.374.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -4149,6 +4149,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       })();
       return true;
     }
+    // 5.374 : une liste de ventes demandée par la page AVANT le capteur (Orion), relue sans succès : dit, rien d'écrit.
+    if (msg && msg.from === 'cancale-vc' && msg.action === 'vcRattrapage') {
+      noterDiag('vc_rattrapage_' + (msg.source === 'a-expedier' ? 'a-expedier' : 'ventes') + '_' + (Number(msg.statut) || 0));
+      try { sendResponse({ ok: true }); } catch (_) {}
+      return false;
+    }
     // 5.237 : tes VENTES Vestiaire (vc-inject.js, réponses que la page charge déjà).
     if (msg && msg.from === 'cancale-vc' && msg.action === 'vcVentes') {
       (async () => {
@@ -4214,7 +4220,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
           const tabId = sender && sender.tab ? sender.tab.id : null;
           let ok = false;
-          if (msg.action === 'vcMoi') ok = await noterSessionVc(msg.id, tabId, msg.forme, msg.source === 'stream' ? 'stream' : 'users/me');
+          if (msg.action === 'vcMoi') ok = await noterSessionVc(msg.id, tabId, msg.forme, msg.source === 'stream' || msg.source === 'page' ? msg.source : 'users/me');   // 5.374 : 'page' (`__NEXT_DATA__`)
           else if (msg.action === 'vcFil') { ok = await rangerVcFil(msg, await compteVcCapture(tabId, msg.moi)); await noterVcCapte('fils', ok === true, Array.isArray(msg.messages) ? msg.messages.length : 0); }
           else ok = await noterRecetteVc(msg.recette);
           sendResponse({ ok: ok === true });
@@ -22435,6 +22441,48 @@ function prixVenteVc(p) {
   if (!Number.isFinite(v) || v <= 0 || v >= 1e6 || Math.abs(Math.round(v * 100) - v * 100) > 1e-6) return null;
   return { valeur: Math.round(v * 100) / 100, devise: 'EUR', cle: 'sellerPrice' };
 }
+// 5.374 (13 nov.) — LA DATE D'UNE VENTE VESTIAIRE, À L'HEURE DE PARIS. Vestiaire écrit
+// « 2026-11-02 14:17:41 » (mesuré sur `/ots/sales`, 2 nov.) : l'heure de Paris, SANS fuseau.
+// Rangée telle quelle, le serveur (UTC) la lisait une heure trop tard (deux en été) et Safari
+// pouvait ne pas la lire du tout. ⇒ `AAAA-MM-JJTHH:MM:SS+01:00` (le décalage de Paris À CETTE
+// DATE, heure d'été comprise) ; un jour seul reste un jour seul ; une date qui porte déjà son
+// fuseau est gardée ; toute autre forme ⇒ '' (« pas su », jamais devinée).
+function decalageParisMin(ms) {
+  try {
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(new Date(ms)).map((x) => [x.type, x.value]));
+    return Math.round((Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second) - Math.floor(ms / 1000) * 1000) / 60000);
+  } catch (_) { return null; }
+}
+function dateVcIso(t) {
+  const s = String(t == null ? '' : t).trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d{1,6})?(Z|[+-]\d{2}:?\d{2})?)?$/.exec(s);
+  if (!m) return '';
+  const a = +m[1], mo = +m[2], j = +m[3];
+  if (a < 2000 || a > 2100 || mo < 1 || mo > 12 || j < 1 || j > new Date(Date.UTC(a, mo, 0)).getUTCDate()) return '';
+  if (m[4] == null) return `${m[1]}-${m[2]}-${m[3]}`;
+  if (+m[4] > 23 || +m[5] > 59 || +(m[6] || 0) > 59) return '';
+  const base = `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6] || '00'}`;
+  if (m[7]) return base + (m[7] === 'Z' ? 'Z' : m[7].replace(/^([+-]\d{2})(\d{2})$/, '$1:$2'));
+  const naif = Date.UTC(a, mo - 1, j, +m[4], +m[5], +(m[6] || 0));
+  let off = decalageParisMin(naif); if (off == null) return '';
+  off = decalageParisMin(naif - off * 60000); if (off == null) return '';
+  const z = Math.abs(off), deux = (n) => String(n).padStart(2, '0');
+  return `${base}${off < 0 ? '-' : '+'}${deux(Math.floor(z / 60))}:${deux(z % 60)}`;
+}
+// La date d'une vente lue : « Mes ventes » (`soldDate`…) fait foi ; « à expédier » ne donne que le
+// JOUR de `orderConfirmationDate` (son `soldDate` est l'HEURE DE LA LECTURE, mesuré), et seulement
+// tant qu'aucune date de « Mes ventes » n'est rangée ; une date rangée avant la 5.374 (sans
+// `dateDe`, peut-être l'heure d'une visite) cède à toute date sûre. Une extension d'avant qui
+// enverrait encore ce `soldDate` de « à expédier » (sans `dateCle`) ne change rien.
+function dateVenteVcRangee(prev, x, source) {
+  const d = dateVcIso(x && x.date);
+  const de = !d ? '' : (source === 'ventes' ? 'ventes'
+    : (source === 'a-expedier' && /^(orderConfirmationDate|createdAt|created_at)$/.test(String(x.dateCle || '')) && /^\d{4}-\d{2}-\d{2}$/.test(d) ? 'a-expedier' : ''));
+  const p = { date: (prev && prev.date) || '', dateDe: (prev && prev.dateDe) || '' };
+  if (de === 'ventes') return { date: d, dateDe: 'ventes' };
+  if (de === 'a-expedier' && p.dateDe !== 'ventes') return { date: d, dateDe: 'a-expedier' };
+  return p;
+}
 let _vcVentesChaine = Promise.resolve();
 function rangerVcVentes(m) {
   const run = _vcVentesChaine.then(() => rangerVcVentesMaintenant(m)).catch(() => false);
@@ -22455,9 +22503,10 @@ async function rangerVcVentesMaintenant(m) {
     lus.add(id);
     const prev = ventes[id] || {};
     const sources = Array.from(new Set([...(prev.sources || []), source]));
+    const dv = dateVenteVcRangee(prev, x, source);
     ventes[id] = {
       productId: x.productId || prev.productId || '', ref: x.ref || prev.ref || '',
-      etat: x.etat || prev.etat || '', date: x.date || prev.date || '',
+      etat: x.etat || prev.etat || '', date: dv.date, ...(dv.dateDe ? { dateDe: dv.dateDe } : {}),
       montant: x.montant || prev.montant || null,
       // 5.340 : le prix de vente (`sellerPrice`) pour la facture Pro — seulement s'il est lu
       // en euros (`prixVenteVc`) ; absent ⇒ rien (jamais le montant versé à sa place).
@@ -22476,7 +22525,7 @@ async function rangerVcVentesMaintenant(m) {
   const offset = Number(m.offset) || 0; const total = typeof m.total === 'number' ? m.total : null;
   // 5.299 : une liste lue en entier sur PLUSIEURS pages (`complet` = ses identifiants) fait foi aussi.
   const complets = idsCompletsVc(m.complet, total);
-  const entier = (offset === 0 && total != null && lus.size >= total && Number(m.lus || 0) >= total) || !!complets;
+  const entier = m.origine !== 'page' && ((offset === 0 && total != null && lus.size >= total && Number(m.lus || 0) >= total) || !!complets);
   const dansListe = complets || lus;
   // (5.296) La liste « à expédier » d'UN compte ne dit rien des ventes d'un autre
   // compte (compte connu et différent) : elles restent à expédier (un colis
@@ -22485,10 +22534,22 @@ async function rangerVcVentesMaintenant(m) {
   const compteM = (m.compte && /^[\w-]{1,40}$/.test(String(m.compte))) ? String(m.compte) : '';
   if (source === 'a-expedier' && entier) for (const [id, v] of Object.entries(ventes)) if (v.aExpedier && !dansListe.has(id) && !autreCompteVc(v.compte, compteM)) ventes[id] = { ...v, aExpedier: false, plusAExpedierDepuis: now };
   // 5.299 : une réponse au format inconnu ne date AUCUNE lecture (« rien lu » ne vaut pas « lu, vide »).
+  // 5.374 : d'où vient la lecture — '' (vue au vol), 'page' (portée par la page : PARTIELLE, jamais
+  // « entière »), 'relue' (rattrapée : la page l'avait demandée avant le capteur, Orion).
+  const origine = m.origine === 'page' || m.origine === 'relue' ? m.origine : '';
   if (Array.isArray(m.inconnu)) {
-    if (!lus.size) { const forme0 = Object.assign({}, cur.forme || {}, { ['inconnu-' + source]: m.inconnu.slice(0, 60) }); const ok0 = await supabaseUpsert('app_data', [{ id: 'vc_ventes', data: Object.assign({}, cur, { forme: forme0 }) }], 'id'); return ok0 === true; }
+    if (!lus.size) {
+      const cleForme = 'inconnu-' + (origine === 'page' ? 'page-' : '') + source;
+      const forme0 = Object.assign({}, cur.forme || {}, { [cleForme]: m.inconnu.slice(0, 60) }, origine === 'page' && /^[\w .:{}\/-]{1,80}$/.test(String(m.cleRequete || '')) ? { ['requete-page-' + source]: String(m.cleRequete) } : {});
+      const ok0 = await supabaseUpsert('app_data', [{ id: 'vc_ventes', data: Object.assign({}, cur, { forme: forme0 }) }], 'id'); return ok0 === true;
+    }
   }
-  const lectures = Object.assign({}, cur.lectures || {}, { [source]: { at: now, total, complet: entier } });
+  // 5.374 — une lecture PARTIELLE n'écrase jamais une lecture ENTIÈRE (`listePlusRiche`, §4.2) :
+  // la lecture entière garde sa date et son « complet », la partielle est datée à côté.
+  const prevL = (cur.lectures || {})[source];
+  const lecture = (prevL && prevL.complet === true && !entier) ? Object.assign({}, prevL, { partielleAt: now })
+    : Object.assign({ at: now, total, complet: entier }, origine ? { origine } : {});
+  const lectures = Object.assign({}, cur.lectures || {}, { [source]: lecture });
   const forme = Object.assign({}, cur.forme || {});
   if (Array.isArray(m.forme) && m.forme.length) forme[source] = m.forme.slice(0, 120);
   const ok = await supabaseUpsert('app_data', [{ id: 'vc_ventes', data: { ventes, lectures, forme, capturedAt: now } }], 'id');
@@ -22821,7 +22882,7 @@ async function noterSessionVcMaintenant(id, tabId, forme, source) {
   if (cur.id === String(id) && cur.at && now - Date.parse(cur.at) < VC_SESSION_REECRIRE_MS) return true;
   const comptes = Object.assign({}, cur.comptes || {});
   comptes[String(id)] = new Date(now).toISOString();
-  const data = { id: String(id), at: new Date(now).toISOString(), source: source === 'stream' ? 'stream' : 'users/me', forme: (Array.isArray(forme) ? forme : []).slice(0, 80).map(String), comptes: Object.fromEntries(Object.entries(comptes).slice(-10)) };
+  const data = { id: String(id), at: new Date(now).toISOString(), source: source === 'stream' || source === 'page' ? source : 'users/me', forme: (Array.isArray(forme) ? forme : []).slice(0, 80).map(String), comptes: Object.fromEntries(Object.entries(comptes).slice(-10)) };
   // 5.331 : un compte Vestiaire jamais rangé dans `vc_session` = sa première écriture.
   const premiereVc = !(cur.comptes && cur.comptes[String(id)]) && String(cur.id || '') !== String(id);
   const ok = await supabaseUpsert('app_data', [{ id: 'vc_session', data }], 'id');

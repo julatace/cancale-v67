@@ -17,7 +17,10 @@ require('./_porte-banc.cjs');
 //    · un vendeur qui est AUSSI membre garde sa propre app, et ouvre l'écran de
 //      l'équipe sur son clic ;
 //    · invitation retirée ⇒ plus rien de la boutique du vendeur ;
-//    · base sans la 016 ⇒ « Le mode équipe n'est pas encore activé sur ta base ».
+//    · base sans la 016 ⇒ au vendeur « Mode équipe pas encore activé sur ton
+//      installation » (et au propriétaire : les 3 gestes) ; à l'aide « … chez ce
+//      vendeur » (13 nov., lot 58) ;
+//    · retirer l'aide : UN geste, effet immédiat, « Réinviter » (13 nov., lot 58).
 //  Le faux PostgREST applique la RÈGLE de la 016 (liste blanche, en-tête,
 //  adhésion active) — sinon le banc mesurerait une fiction (§6.3). Le VRAI
 //  api/compte.js est exécuté pour `?mode=equipe` (et `abonnement`).
@@ -78,9 +81,9 @@ const metaDe = (id, data) => {
 };
 const ligne = (owner, id, data) => ({ owner, id, data, meta: metaDe(id, data) });
 let B;   // l'état de la base, refait à chaque scénario
-const reset = ({ installe = true, statutM = 'actif', W_membre = true } = {}) => {
+const reset = ({ installe = true, statutM = 'actif', W_membre = true, proprioV = false } = {}) => {
   B = {
-    installe,
+    installe, proprioV,
     equipe: [
       { id: 'e0000000-0000-4000-8000-000000000001', vendeur: V, email: 'aide@exemple.test', membre: statutM === 'invitee' ? null : M, statut: statutM, role: 'colis', invite_le: '2026-10-15T10:00:00Z' },
       ...(W_membre ? [{ id: 'e0000000-0000-4000-8000-000000000002', vendeur: V, email: 'vendeuse.w@exemple.test', membre: W, statut: 'actif', role: 'colis', invite_le: '2026-10-15T11:00:00Z' }] : []),
@@ -196,7 +199,7 @@ function fauxSupabase(urlBrut, methode, entetes, corps) {
   const args = (() => { try { return typeof corps === 'string' ? JSON.parse(corps || '{}') : (corps && corps.json) || {}; } catch (_) { return {}; } })();
   if (cible.startsWith('rpc/')) {
     const fn = cible.slice(4);
-    if (fn === 'vrm_acces') return json({ obligatoire: false, proprietaire: false, acces: true });
+    if (fn === 'vrm_acces') return json({ obligatoire: false, proprietaire: !!(B.proprioV && uid === V), acces: true });
     if (/^vrm_equipe_/.test(fn) && !B.installe) return json({ code: 'PGRST202', message: `Could not find the function public.${fn}` }, 404);
     if (!uid) return json({ message: 'JWT' }, 401);
     if (fn === 'vrm_equipe_lister') return json(listerPour(uid));
@@ -375,6 +378,8 @@ const MONTANTS = /€|\b42[.,]00\b|\b55[.,]00\b|\b99[.,]00\b|\b25[.,]00\b|281|2\
         dit(await bouton.count() === 1, 'le bouton « Imprimer le bordereau » est là');
         if (await bouton.count()) {
           await bouton.click(); await pg.waitForTimeout(2500);
+          // (13 nov.) Machine chargée : attendre que « Préparation… » ait fini (jamais un délai seul).
+          await pg.waitForFunction(() => { const e = document.querySelector('[data-equipe-msg="9001"]'); return !e || !/Préparation|Ouverture/.test(e.innerText); }, null, { timeout: 20000 }).catch(() => {});
           const pdf = B.journal.slice(avant).filter((j) => /pdfB64/.test(j.u));
           dit(pdf.length === 1 && pdf[0].entete === V, 'imprimer lit le PDF avec x-vrm-equipe', pdf.map((j) => j.entete).join(','));
           const m = await pg.evaluate(() => { const e = document.querySelector('[data-equipe-msg="9001"]'); return e ? e.innerText : ''; });
@@ -405,7 +410,7 @@ const MONTANTS = /€|\b42[.,]00\b|\b55[.,]00\b|\b99[.,]00\b|\b25[.,]00\b|281|2\
         reset({ installe: false });
         const { ctx, pg, erreurs } = await ouvrir(nav, { qui: M, largeur: L, vue: V });
         const t = await texte(pg);
-        dit(/Le mode équipe n'est pas encore activé sur ta base\./.test(t), 'l’écran de l’équipe dit « le mode équipe n’est pas encore activé sur ta base »', t.replace(/\n/g, ' ').slice(0, 120));
+        dit(/Le mode équipe n'est pas encore activé chez ce vendeur\./.test(t), 'l’écran de l’aide dit « le mode équipe n’est pas encore activé chez ce vendeur »', t.replace(/\n/g, ' ').slice(0, 120));
         await pg.screenshot({ path: path.join(SORTIE, `equipe-non-installe-${L}.png`) }).catch(() => {});
         dit(/Le vendeur doit l'activer\. Rien à faire de ton côté\./.test(t), 'et le geste : c’est au vendeur, rien à faire pour l’aide', t.replace(/\n/g, ' ').slice(0, 160));
         dit(!/PGRST|404|Could not find/i.test(t), 'jamais une erreur brute');
@@ -417,7 +422,18 @@ const MONTANTS = /€|\b42[.,]00\b|\b55[.,]00\b|\b99[.,]00\b|\b25[.,]00\b|281|2\
         const { ctx, pg } = await ouvrir(nav, { qui: V, largeur: L, tab: 'settings' });
         await ouvrirEquipe(pg, L);
         const e = await pg.evaluate(() => { const x = document.querySelector('[data-equipe-reglage]'); return x ? [x.getAttribute('data-equipe-reglage'), x.innerText] : [null, '']; });
-        dit(e[0] === 'non-installe' && /pas encore activé sur ta base/.test(e[1]), 'Réglages → Équipe : la même phrase, aucun bouton « Inviter »', `${e[0]} · ${e[1].slice(0, 80)}`);
+        dit(e[0] === 'non-installe' && /Mode équipe pas encore activé sur ton installation\./.test(e[1]), 'Réglages → Équipe (vendeur) : « Mode équipe pas encore activé sur ton installation. », aucun bouton « Inviter »', `${e[0]} · ${e[1].slice(0, 80)}`);
+        dit(await pg.locator('[data-equipe-inviter]').count() === 0 && await pg.locator('[data-equipe-gestes]').count() === 0, '  … un vendeur qui n’est pas le propriétaire ne lit aucun geste SQL');
+        await ctx.close();
+      });
+      await essaie(`non installe proprietaire ${L}`, async () => {
+        reset({ installe: false, proprioV: true });
+        const { ctx, pg } = await ouvrir(nav, { qui: V, largeur: L, tab: 'settings' });
+        await ouvrirEquipe(pg, L);
+        await pg.waitForSelector('[data-equipe-gestes]', { timeout: 4000 }).catch(() => {});
+        const g = await pg.evaluate(() => { const x = document.querySelector('[data-equipe-gestes]'); return x ? [...x.querySelectorAll('li')].map((l) => l.innerText) : []; });
+        dit(g.length === 3 && /016-1-essai-annule\.sql/.test(g[0]) && /016-equipe\.sql/.test(g[1]) && /essai-annule\.cjs --verifier/.test(g[2]), 'propriétaire : les 3 gestes exacts (essai annulé, 016, vérifier)', g.join(' ¦ ').slice(0, 200));
+        await pg.screenshot({ path: path.join(SORTIE, `equipe-non-installe-proprio-${L}.png`) }).catch(() => {});
         await ctx.close();
       });
 
@@ -447,12 +463,17 @@ const MONTANTS = /€|\b42[.,]00\b|\b55[.,]00\b|\b99[.,]00\b|\b25[.,]00\b|281|2\
           'le message partagé dit l’adresse, vrm.center et « Accepter » — aucun identifiant secret', String(part).replace(/\n/g, ' ¦ ').slice(0, 160));
         dit(await pg.locator('[data-equipe-partager="e0000000-0000-4000-8000-000000000001"]').count() === 0, 'pas de « Envoyer l’invitation » pour un membre déjà actif');
         await pg.screenshot({ path: path.join(SORTIE, `equipe-reglage-${L}.png`) }).catch(() => {});
-        // Retirer l'aide (confirmation dans la feuille de l'app).
-        await pg.click('[data-equipe-revoquer="e0000000-0000-4000-8000-000000000001"]'); await pg.waitForTimeout(700);
-        // Le bouton de confirmation a le focus (feuille de l'app) : Entrée confirme.
-        await pg.keyboard.press('Enter');
-        await pg.waitForTimeout(1500);
-        dit(B.equipe.find((x) => x.membre === M).statut === 'revoquee', 'retirer l’aide passe son invitation à « retirée » (après confirmation)');
+        // (13 nov., lot 58) Retirer l'aide : UN geste, effet immédiat (aucune feuille de confirmation).
+        await pg.click('[data-equipe-revoquer="e0000000-0000-4000-8000-000000000001"]');
+        await pg.waitForSelector('[data-equipe-retiree]', { timeout: 4000 }).catch(() => {});
+        const feuille = await pg.evaluate(() => !!document.querySelector('[role="alertdialog"], [data-confirmation], .vrm-confirm'));
+        dit(B.equipe.find((x) => x.membre === M).statut === 'revoquee' && !feuille, 'retirer l’aide : UN toucher, son invitation passe à « retirée » tout de suite (aucune confirmation)', `feuille : ${feuille}`);
+        const rt = await pg.evaluate(() => { const x = document.querySelector('[data-equipe-retiree]'); return x ? x.innerText : ''; });
+        dit(/aide@exemple\.test/.test(rt) && /ne voit plus tes colis/.test(rt) && await pg.locator('[data-equipe-reinviter]').count() === 1, 'l’écran le dit (« ne voit plus tes colis ») et propose « Réinviter »', rt.replace(/\n/g, ' ').slice(0, 120));
+        await pg.screenshot({ path: path.join(SORTIE, `equipe-retiree-${L}.png`) }).catch(() => {});
+        await pg.click('[data-equipe-reinviter]'); await pg.waitForTimeout(1500);
+        const re = B.equipe.filter((x) => x.email === 'aide@exemple.test' && x.vendeur === V);
+        dit(re.some((x) => x.statut === 'invitee') && re.every((x) => x.statut !== 'actif'), '« Réinviter » crée une NOUVELLE invitation (à accepter) — jamais l’accès rendu en silence', re.map((x) => x.statut).join(','));
         dit(erreurs.length === 0, 'aucune erreur de page', erreurs.join(' | ').slice(0, 160));
         await ctx.close();
       });
@@ -498,12 +519,16 @@ const MONTANTS = /€|\b42[.,]00\b|\b55[.,]00\b|\b99[.,]00\b|\b25[.,]00\b|281|2\
 })();
 
 async function ouvrirEquipe(pg, L) {
+  // (13 nov., lot 58) Attendre ce qui est RENDU, jamais un délai seul (§6.5) : sur une machine
+  // chargée, les délais fixes laissaient le banc lire un écran pas encore monté.
+  await pg.waitForSelector('[data-onglets-reglages]', { timeout: 20000 }).catch(() => {});
   const onglet = pg.locator('[data-onglets-reglages] [data-vue="compte"]');
-  if (await onglet.count()) { await onglet.first().click(); await pg.waitForTimeout(1500); }
+  if (await onglet.count()) { await onglet.first().click(); await pg.waitForSelector('[data-sous-ouvrir="equipe"], [data-equipe-reglage]', { timeout: 15000 }).catch(() => {}); }
   // Depuis le 28 oct. le panneau s'ouvre dans un sous-écran à toutes les tailles.
   {
     const l = pg.locator('[data-sous-ouvrir="equipe"]');
-    if (await l.count()) { await l.first().click(); await pg.waitForTimeout(800); }
+    if (await l.count()) { await l.first().click(); }
   }
-  await pg.waitForTimeout(800);
+  await pg.waitForFunction(() => { const x = document.querySelector('[data-equipe-reglage]'); return x && x.getAttribute('data-equipe-reglage') !== 'chargement'; }, null, { timeout: 15000 }).catch(() => {});
+  await pg.waitForTimeout(300);
 }
