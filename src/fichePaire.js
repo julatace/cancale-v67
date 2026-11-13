@@ -186,8 +186,8 @@ export function parcoursPaire(rn, d = {}, o = {}) {
 
   // (13 nov., point 14) PAS ENCORE VENDUE : le bénéfice si elle se vend au prix AFFICHÉ
   // (`beneficeSiVendue`, src/dormantes.js — la même règle `beneficePaire`). Le prix est
-  // celui de SON annonce en ligne (par identité : celle de la fiche, sinon la seule en
-  // ligne) ; deux annonces en ligne à deux prix ⇒ rien de deviné, la raison dite.
+  // celui de SON annonce en ligne (par identité : la seule en ligne, ou plusieurs au MÊME
+  // prix) ; deux annonces en ligne à deux prix ⇒ rien de deviné, la raison dite.
   let siVendue = null;
   if (!siteVendu && !ventesInconnues) {
     const enL = rn.annonces.filter((a) => a.etat === 'en-ligne');
@@ -195,7 +195,7 @@ export function parcoursPaire(rn, d = {}, o = {}) {
     const brut = (a) => { const st = a && d.stats ? d.stats[a.id] : null; return st && st.prix != null && st.prix !== '' ? st.prix : (a ? a.price : null); };
     const prixA = (a) => { const p = brut(a); return p != null && p !== '' ? (typeof p === 'object' ? p.amount : p) : null; };
     const devA = (a) => { const p = brut(a); return p && typeof p === 'object' ? String(p.currency_code || p.currency || 'EUR').toUpperCase() : 'EUR'; };
-    const laSienne = enL.find((a) => a.id === idFiche) || (enL.length === 1 ? enL[0] : null) || (enL.length > 1 && enL.every((a) => String(prixA(a)) === String(prixA(enL[0]))) ? enL[0] : null);
+    const laSienne = enL.length === 1 ? enL[0] : (enL.length > 1 && enL.every((a) => String(prixA(a)) === String(prixA(enL[0]))) ? (enL.find((a) => a.id === idFiche) || enL[0]) : null);
     if (laSienne && devA(laSienne) === 'EUR') { const v = beneficeSiVendue(prixA(laSienne), entree || {}); siVendue = { ...v, raison: v.benefice == null ? (RAISON_SI_VENDUE[v.etat] || '') : '' }; }
     else if (laSienne) siVendue = { etat: 'prix', prix: null, benefice: null, raison: `annonce en ${devA(laSienne)}` };
     else if (enL.length > 1) siVendue = { etat: 'prix', prix: null, benefice: null, raison: 'en ligne deux fois, à deux prix' };
