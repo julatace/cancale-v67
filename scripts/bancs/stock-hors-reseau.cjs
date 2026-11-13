@@ -274,6 +274,13 @@ async function main() {
         dit(!v.vide, `${T} A : jamais « aucune paire » ni « pas lu » à la place du dernier état`, v.vide ? v.extrait.slice(0, 200) : '');
         await pg.screenshot({ path: path.join(CAPT, `A-stock-hors-reseau-${T}.png`) });
         await pg.screenshot({ path: path.join(CAPT, `A-stock-hors-reseau-plein-${T}.png`), fullPage: true }).catch(() => {});
+        // Les meubles (les cases, leurs photos) et la liste des annonces, regardés hors réseau.
+        for (const [sel, nom] of [['[data-meuble]', 'meubles'], ['[data-stock-liste]', 'liste']]) {
+          await pg.locator(sel).first().scrollIntoViewIfNeeded().catch(() => {});
+          await pg.waitForTimeout(500);
+          await pg.screenshot({ path: path.join(CAPT, `A-${nom}-hors-reseau-${T}.png`) }).catch(() => {});
+        }
+        await pg.evaluate(() => window.scrollTo(0, 0)).catch(() => {});
       });
 
       // ── B. recherche par N° ───────────────────────────────────────────────
