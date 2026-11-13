@@ -99,6 +99,7 @@ export default {
   "journee.dontAujourdHui": "incl. {nAuj} today",
   "journee.dontDemain": "incl. {x} tomorrow",
   "journee.verifier2": "+ {aVerifier} to check",
+  "journee.nomsEtAutres": { one: "{noms} and {n} other", other: "{noms} and {n} others" },
   "journee.emballer": "Pack",
   "journee.faire": "To do",
   "journee.vendu": "Sold in",

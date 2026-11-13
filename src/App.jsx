@@ -463,7 +463,7 @@ import {marcheDuCompte as marcheEbayDuCompte, MARCHE_DEFAUT as MARCHE_EBAY_DEFAU
 import {arriveeColisEmail, arriveeColisVinted, jourLocal, texteArrivee} from '../api/_lib/arrivee-colis.js';
 import {transactionDeLaLigne, indexRecusParTransaction, recuDeLAchat, bilanRecusAchat} from '../api/_lib/recu-achat.js';
 import {codeRetraitTournure} from '../api/_lib/code-retrait-email.js';
-import {commandeDuColisRegle} from '../api/_lib/commande-colis.js';
+import {commandeDuColisRegle,commandeUnique,titreDuColis} from '../api/_lib/commande-colis.js';
 import {etatRetrait, estAVerifier, urgenceTri, lieuDepuisExtrait, limiteRetraitDepuisTexte, LIEU_AU_FUTUR, GARDE_MAX_J, gardeDe, limiteEstimee} from '../api/_lib/retrait-colis.js';
 import {aConfirmerVisibles, texteLimite, motAConfirmer} from './aConfirmer.js';
 // ⟦→ ecrans/Ebay.jsx #5⟧
@@ -34261,6 +34261,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
              total: emailList.length + extra.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trackingRetrait, transp, collected, collectedAt, vintedToPickup, buysBase, pickupDone, colisRelais, indexSuivisAchats, suivisVinted, suivisEnvoyes, txSuivisColis, suivisManuels]);
+  // (13 nov., lot 7 — Julien : « chaque colis à retirer porte le nom de la paire qui est dedans ») L'ACHAT D'UNE
+  // LIGNE « À RETIRER », LE MÊME PARTOUT : la jonction de `pickupUnion` (conversation de SA commande, n° de suivi,
+  // code de retrait — `cmdParColis`) et le n° de suivi seul (`achatDuColis`) doivent dire la même commande
+  // (`commandeUnique`, api/_lib/commande-colis.js) ; deux commandes ⇒ personne. Colis → À retirer, le mode relais,
+  // Ma journée (en ligne et hors ligne), les codes hors ligne et la liste publiée pour le widget le lisent ici.
+  // Jamais le titre, le lieu ou la date (§5) : sans identité, la ligne reste « Colis {transporteur} ».
+  const commandeRetrait = (t) => {
+    if (!t) return null;
+    let a = null; try { a = achatDuColis(t, buysBase, indexSuivisAchats); } catch (_) { a = null; }
+    const c = pickupUnion.cmdParColis ? (pickupUnion.cmdParColis.get(colisKey(t)) || null) : null;
+    return commandeUnique(a, c);
+  };
   // ── (31 oct.) LES COLIS À ALLER CHERCHER, PAR POINT RELAIS ───────────────
   // Julien : « une carte avec les colis à aller chercher par point relais, et
   // des prévisions ». Les colis DÉJÀ là : les listes de `pickupUnion` (§11 : le
@@ -34350,10 +34362,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // limite (Vinted Go). La limite et l'arrivée lues chez le transporteur
       // pour un achat vu par Vinted (`etatColisVinted`, `transpMap`).
       const tupleEmail = t => { const a = arriveeColisEmail(t);
-          return [t.limite || '', a ? a.ms : 0, t.carrier || '', identRetraitEmail(t), a && a.sur === 'oui' ? 1 : 0, '', t.limiteAt || '']; };
+          // (13 nov., lot 7) + [7] le NOM de la paire (l'achat relié par identité, sinon l'article de l'e-mail de CE
+          // colis, sinon '') : le widget de l'iPhone le montre ; '' ⇒ il écrit « Colis {transporteur} ».
+          return [t.limite || '', a ? a.ms : 0, t.carrier || '', identRetraitEmail(t), a && a.sur === 'oui' ? 1 : 0, '', t.limiteAt || '', titreDuColis(commandeRetrait(t), t.artTitle)]; };
       const tupleVinted = o => { const e = etatColisVinted(o, Date.now(), transpMap);
           const nums = suivisAchat(o, indexSuivisAchats).map(normaliserSuivi).filter(Boolean).join(',');
-          return [e.limite || '', e.arriveeMs || 0, e.carrier || '', identRetraitVinted(o), e.arriveeSure != null ? 1 : 0, nums, e.limiteAt || '']; };
+          return [e.limite || '', e.arriveeMs || 0, e.carrier || '', identRetraitVinted(o), e.arriveeSure != null ? 1 : 0, nums, e.limiteAt || '', titreDuColis(o, '')]; };
       const colis = pickupUnion.emailList.map(tupleEmail).concat(pickupUnion.extra.map(tupleVinted));
       // (tour 2 n° 7) Les « à vérifier » avec leur IDENTITÉ (même forme) : le
       // widget les relit chez le transporteur (`retirerPublie`, `verif`).
@@ -34412,7 +34426,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const qr = !!(t && (t.qr || t.qrUrl || t.qrB64));
         // (9 nov., lot AD) + `id` (l'identité publiée) et `compte` (dans « à retirer » = `vrm_colis_retirer`, ou
         // seulement « à vérifier ») : le mode relais hors ligne ne montre QUE les colis comptés.
-        if (code || qr || desaccord) codes.push({ code: code || '', ...(desaccord ? { desaccord } : {}), lieu, carrier: t.carrier || '', suivi: t.suivi || '', titre: String(t.artTitle || '').slice(0, 60), qr, id: identRetraitEmail(t), compte: comptesE.has(t) });
+        if (code || qr || desaccord) codes.push({ code: code || '', ...(desaccord ? { desaccord } : {}), lieu, carrier: t.carrier || '', suivi: t.suivi || '', titre: titreDuColis(commandeRetrait(t), t.artTitle), qr, id: identRetraitEmail(t), compte: comptesE.has(t) });
       }
       for (const o of pickupUnion.extra) {
         const r = colisRelais[String((o && o.transaction_id) || '')] || null;
@@ -40574,7 +40588,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const verdictE = (t) => { try { const oV = pickupUnion.cmdParColis ? pickupUnion.cmdParColis.get(colisKey(t)) : null; const rV = oV ? colisRelais[String(oV.transaction_id)] : null;
         return verdictCode({ lignes: codesDesLignes(t, codeRetrait), message: rV ? codeRetrait(rV.code) : '' }); } catch (_) { return { code: '', desaccord: null }; } };
       const ligneEmail = (t) => { const vC = verdictE(t); return {
-        titre: t.artTitle || '', lieu: (cleanLieu(t.lieu).nom || '').trim(), code: vC.desaccord ? '' : (codeRetrait(vC.code) || codeRetrait(t.code)), ...(vC.desaccord ? { desaccord: vC.desaccord } : {}), id: identRetraitEmail(t), qr: qrImage(t) || '',
+        titre: titreDuColis(commandeRetrait(t), t.artTitle), lieu: (cleanLieu(t.lieu).nom || '').trim(), code: vC.desaccord ? '' : (codeRetrait(vC.code) || codeRetrait(t.code)), ...(vC.desaccord ? { desaccord: vC.desaccord } : {}), id: identRetraitEmail(t), qr: qrImage(t) || '',
         transporteur: t.carrier ? carrierName(t.carrier) : '', suivi: t.suivi || '', limite: t.limite || '', compte: compteDuColisEmail(t) || '',
         cle: colisKey(t),   // (6 nov., v36) « J'ai retiré » hors réseau : la clé de `vrm_colis_collected`
       }; };
@@ -42735,8 +42749,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for (const t of (pickupUnion.emailList || [])) {
       const a = achatDuColis(t, buysBase, indexSuivisAchats); const lu = lieuDeLigne(t, a); const eE = etatColisEmail(t, maintenant); const ej = eE.jours;
       const scE = sourcesCarte({ t, o: a || (pickupUnion.cmdParColis && pickupUnion.cmdParColis.get(colisKey(t))) || null }); const code = codeDesSources(scE, scE && scE.code && scE.code.desaccord ? '' : codeDeLigne(t));
-      const aa = a ? null : (achatsAutres.get(suiviDeLigne(t)) || null);
-      L.push({ cle: 'r:e:' + (suiviDeLigne(t) || t.id || t.cleLigne || colisKey(t) || ''), groupe: 'retirer', site: aa ? aa.site : 'vinted', achatAutre: aa, nom: nomAvecTaille(a ? a.title : ((aa && aa.titre) || t.artTitle || (nomTr(t.carrier) ? `Colis ${nomTr(t.carrier)}` : 'Colis à retirer')), a), photo: a ? photoAchat(a) : ((aa && aa.photo) || t.photo || null),
+      // (13 nov., lot 7) Le NOM et la PHOTO : l'achat relié par identité (`commandeRetrait` : conversation de SA
+      // commande, n° de suivi ou code — avant, le n° seul : un Vinted Go relié par son code restait « Colis Vinted Go »).
+      const cmdN = commandeRetrait(t);
+      const aa = (a || cmdN) ? null : (achatsAutres.get(suiviDeLigne(t)) || null);
+      L.push({ cle: 'r:e:' + (suiviDeLigne(t) || t.id || t.cleLigne || colisKey(t) || ''), groupe: 'retirer', site: aa ? aa.site : 'vinted', achatAutre: aa, nom: nomAvecTaille(cmdN && cmdN.title ? cmdN.title : ((aa && aa.titre) || t.artTitle || (nomTr(t.carrier) ? `Colis ${nomTr(t.carrier)}` : 'Colis à retirer')), cmdN), photo: cmdN ? photoAchat(cmdN) : ((aa && aa.photo) || t.photo || null),
         etat: [lu.lieuNom || nomTr(t.carrier), dernierJour(ej) || (code ? code : (qrImage(t) ? 'QR code' : 'code pas encore lu'))].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
         ...lu, lieuType: typeCasier(t.lieu), transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code && !(scE && scE.code && scE.code.desaccord), jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), arrivee: arriveeLueRetrait({ t }), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), ...champsSources(scE), src: { t } });
     }
@@ -44537,7 +44554,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                      // dans Achats) ; l'auto-capture ne couvre les casiers Vinted Go
                      // qu'avec une version récente — ne pas la promettre seule.
                      return `Ouvre la conversation Vinted de chaque colis (bouton dans Achats) : le code y est. L'extension la lit aussi toute seule quand tu passes sur Vinted connecté ${qui}`; })();
-          tuiles.retirer = { n: pickupCount, sub, alerte: hd>0 };
+          // (13 nov., lot 7) LE NOM DES PAIRES qui attendent (l'achat relié par IDENTITÉ, `commandeRetrait`, ou
+          // l'article que l'e-mail de CE colis nomme) : la ligne de la case les dit, deux au plus. Sans identité,
+          // un colis n'a pas de nom ici (« Colis Mondial Relay » se lit dans Colis) — jamais un nom deviné (§5).
+          const nomsRet = [...(pickupUnion.emailList||[]).map(t=>titreDuColis(commandeRetrait(t), t.artTitle)), ...(pickupUnion.extra||[]).map(o=>titreDuColis(o, ''))];
+          tuiles.retirer = { n: pickupCount, sub, alerte: hd>0, noms: nomsRet.filter(Boolean) };
         }
         // (29 oct.) Les achats « au point relais » en cours de vérification (peut-
         // être le même colis qu'un e-mail) : ni comptés ni cachés — dits.
@@ -44960,7 +44981,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               ...((colisAutres.leboncoin) || []).map((x) => { const o = lbcParTx.get(String(x.txId)); return { p: photoArticle(o), t: quandLeboncoin(o || x) }; }),
             ], (x) => x.t).map((x) => x.p);
             out.retirer = [
-              ...(pickupUnion.emailList || []).map((t) => { const o = pickupUnion.cmdParColis && pickupUnion.cmdParColis.get(colisKey(t)); return o ? orderPhoto(o) : null; }),
+              ...(pickupUnion.emailList || []).map((t) => { const o = commandeRetrait(t); return o ? orderPhoto(o) : null; }),
               ...(pickupUnion.extra || []).map((o) => orderPhoto(o)),
             ];
             out.messages = (convs.items || []).filter(c => !acctOffOf(c) && conversationNonLue(c) && !conversationRetiree(convRetirees, String((c._acc&&c._acc.vinted_user_id)||''), c))
@@ -45202,6 +45223,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return p.nAuj > 0 ? { texte: tr('journee.dontAujourdHui', { nAuj: String(p.nAuj) }), ambre: true, cle: 'presses' } : { texte: tr('journee.dontDemain', { x: String(p.n) }), ambre: false, cle: 'presses' };
           }
           if (x.id === 'retirer' && x.t.aVerifier > 0) return { texte: tr('journee.verifier2', { aVerifier: String(x.t.aVerifier) }), ambre: true, cle: 'a-verifier' };
+          // (13 nov., lot 7) Les paires qui attendent, par leur nom (deux au plus, le reste compté) — neutre.
+          if (x.id === 'retirer' && Array.isArray(x.t.noms) && x.t.noms.length) {
+            const vus = x.t.noms.slice(0, 2), reste = Math.max(0, (Number(x.t.n) || 0) - vus.length);
+            return { texte: reste ? tr('journee.nomsEtAutres', { noms: vus.join(' · '), n: String(reste) }) : vus.join(' · '), ambre: false, cle: 'noms' };
+          }
           return null;
         };
         const titreCase = (x) => x.pasSu ? (x.titrePasSu || 'Pas encore lu') : [x.t && x.t.sub, x.t && x.t.presses && !x.t.presses.urgent ? x.t.presses.phrase : ''].filter(Boolean).join(' · ');
@@ -50206,7 +50232,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // (3 nov.) Le titre d'une ligne : l'achat RELIÉ par identité (sa commande, ou celle du même n° de suivi /
           // code — `cmdParColis`), sinon le titre que l'e-mail porte (`artTitle`, dont les « Ton achat t'attend… »
           // `source:'vinted-commande'`), sinon le n° court (« n°…8456 ») — le transporteur est déjà en tête du point.
-          const titreRetrait = (x) => { const t = (x.src && x.src.t) || null; const o = (x.src && x.src.o) || (t && pickupUnion.cmdParColis ? pickupUnion.cmdParColis.get(colisKey(t)) : null);
+          const titreRetrait = (x) => { const t = (x.src && x.src.t) || null; const o = (x.src && x.src.o) || (t ? commandeRetrait(t) : null);
             if (o && o.title) return o.title; if (t && t.artTitle) return String(t.artTitle);
             const su = t ? String(suiviDeLigne(t) || '') : ''; if (/^colis\b/i.test(String(x.titre || '')) && su) return `n°…${su.slice(-4)}`; return x.titre; };
           const retirerColis = (x) => { const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null; if (t) markCollected(t); else if (o) markPickupDone(o); };

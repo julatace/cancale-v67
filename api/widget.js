@@ -17,7 +17,7 @@ import { bordsParTransaction, compterEcheances, lireDateLimite } from './_lib/li
 import { retirerPublie, etatRetrait } from './_lib/retrait-colis.js';
 // (6 nov.) Les SMS de Mondial Relay (POST ?mode=sms, jeton `vrm_sms_token`) : api/_lib/sms-mondialrelay.js.
 import { routeSms } from './_lib/sms-mondialrelay.js';
-import { avecSuiviDuSujet, suiviDeLigne, finDeLigne, finsDesLignes, sortiParSuivis, arriveesDeLigne, relireLigneMeta, SELECT_SUIVI_META, SELECT_TRANSP_META, ligneTranspDeMeta, leverGarde } from './_lib/suivi-colis.js';
+import { avecSuiviDuSujet, suiviDeLigne, finDeLigne, finsDesLignes, sortiParSuivis, arriveesDeLigne, relireLigneMeta, SELECT_SUIVI_META, SELECT_TRANSP_META, ligneTranspDeMeta, leverGarde, nomTransporteurSuivi } from './_lib/suivi-colis.js';
 import { preuveDeTransp, contredit } from './_lib/etat-colis.js';
 import { ordreStable, finALaFrontiere } from './_lib/ordre-stable.js';
 import { prendreDebit, refuserTropVite } from './_lib/debit-vendeur.js';   // (11 nov.) un vendeur ne mange pas l'égress des autres
@@ -497,6 +497,20 @@ function leveDepuisTransp(lu) {
     return leverGarde(e, { transpDispoLu: Number.isFinite(luMs) ? luMs : null, limiteVers: (!t.limiteSure && t.limite) || null }, Date.now());
   };
 }
+// (13 nov., lot 7) Le nom d'un colis du widget : celui que l'app a publié (l'achat relié par identité), sinon
+// « Colis {transporteur} » (« Colis » seul si le transporteur n'est pas connu). Le plus pressé d'abord.
+const nomColisWidget = (x) => {
+  if (x && x.nom) return x.nom;
+  const t = nomTransporteurSuivi(x && x.transporteur);
+  return t !== 'Colis' ? `Colis ${t}` : 'Colis';
+};
+function colisNommes(liste) {
+  if (!Array.isArray(liste)) return null;
+  const jours = (x) => (Number.isFinite(x.jours) ? x.jours : 9999);
+  return liste.slice().sort((a, b) => jours(a) - jours(b)).slice(0, 20)
+    .map((x) => ({ nom: nomColisWidget(x), paire: !!(x && x.nom), transporteur: (x && x.transporteur) || '', jours: Number.isFinite(x && x.jours) ? x.jours : null, limite: (x && x.limite) || null }));
+}
+
 // (29 oct.) L'issue d'un colis devant les fins connues, pour `retirerPublie` :
 // retiré ou reparti ⇒ sorti (true) · incident ou statut inconnu ⇒ 'a_verifier'
 // (compté « à vérifier », jamais « sorti » : rien ne dit qu'il a été retiré) ·
@@ -966,6 +980,12 @@ export default async function handler(req, res) {
       pickupAVerifier: pubRetirer ? pubRetirer.aVerifier : null,
       pickupUrgents: pubRetirer ? pubRetirer.urgents : null,
       pickupAt: pubRetirer && pubRetirer.at ? new Date(pubRetirer.at).toISOString() : null,
+      // (13 nov., lot 7 — Julien : « chaque colis à retirer porte le nom de la paire qui est dedans ») Les colis
+      // de la liste de l'app encore comptés, chacun par SON nom : le titre de l'achat relié par identité (n° de
+      // suivi, code, conversation de sa commande — publié par l'app), sinon « Colis {transporteur} ». Jamais
+      // deviné ici (le widget ne relie rien). Les colis arrivés après la publication sont comptés dans `pickup`,
+      // pas nommés (`pickupNouveaux`). Le plus pressé d'abord ; 20 au plus.
+      pickupColis: pubRetirer ? colisNommes(pubRetirer.liste) : null,
       // (revue du 23 oct.) Les colis de la photo SORTIS depuis (retirés, repartis,
       // plus au point relais) : retirés du compte. `pickupPhoto` : certains n'ont
       // pas pu être relus (lecture ratée, publication d'avant) — leur part du
