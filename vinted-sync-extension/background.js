@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.374.0';
+const CODE_VERSION = '5.375.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -19977,6 +19977,29 @@ async function datesPourCarte(uid) {
 //   haut). Une page que la base n'a pas prise n'avance PAS : relue au passage suivant.
 // · PROGRESSION vraie, publiée dans SA ligne `import_vinted_{uid}` (jamais `main`) :
 //   lues / total quand Vinted donne le total, sinon pages lues ; reprise à hh:mm.
+// ── 5.375 (13 nov., lot 47) : L'IMPORT DE TON PASSÉ — 12 MOIS, ANNONCES COMPRISES ──
+// Julien : « au premier jour, l'import des 12 derniers mois (ventes, achats,
+// annonces) de chaque compte Vinted relié, avec une barre de progression ».
+// Récit : `docs/passation/2026-11-13-lot47.md`.
+// · 12 MOIS (`IMPORT_HORIZON_MS`) : `my_orders` est trié du plus récent au plus
+//   ancien ; dès qu'une page RANGÉE porte une commande datée d'avant l'horizon, ce
+//   type est fini (`horizon`), et `lus` = les commandes jusqu'à la dernière du
+//   bon côté. Une date illisible n'arrête rien (« pas su » ne vaut pas « fini »).
+//   « Tout récupérer » (SON clic) lit tout, sans horizon (`tout`).
+// · ESTIMATION (« 340 / ~1 200 ») : position lue × 12 mois ÷ l'âge de la plus
+//   vieille commande lue, bornée par le total de Vinted — jamais sous ce qui est lu.
+// · ANNONCES : la lecture COMPLÈTE du dressing. Déjà rangée en entier (compteur
+//   scalaire ≥ total, §4.2) ⇒ ✓, AUCUNE lecture. Sinon UNE lecture d'un trait
+//   (jamais en morceaux étalés sur des heures : une lecture en ligne fait foi
+//   seulement prise d'un coup, `dressingCompletFaitFoi`), et seulement quand les
+//   pages tiennent dans l'heure (import ET budget de lecture) ; au-delà de
+//   `IMPORT_MAX_HEURE` pages ⇒ `partiel`, dit (la visite en lit 1 000).
+// · JAMAIS DEUX FOIS LA MÊME PAGE : l'état est noté après CHAQUE page rangée
+//   (un navigateur fermé en route reprend à la page suivante, pas au début du passage).
+// · SOUCI DIT, REPRISE SEULE : compte déconnecté / autre compte dans l'onglet
+//   (`deconnecte`), Vinted qui répond mal (`echec`), base qui refuse (`base`),
+//   compte en prudence (`prudence`) ⇒ publié, et le passage de fond (5 min)
+//   reprend tout seul dès que c'est possible. La page suivante réussie l'efface.
 const IMPORT_STORE = 'vrmImport';                 // { [uid]: état } (§4.9)
 const IMPORT_LUS = 'vrmImportLus';                // { [uid]: [ms, …] } — les pages lues dans l'heure
 const IMPORT_PER_PAGE = 100;
@@ -19984,6 +20007,8 @@ const IMPORT_PAGES_PAR_PASSAGE = 4;
 const IMPORT_MAX_HEURE = 12;                      // DANS les 20 lectures/h, jamais en plus
 const IMPORT_PAUSE_MS = [3000, 8000];
 const IMPORT_PAGES_MAX = 300;                     // garde-fou : 30 000 commandes par type
+const IMPORT_HORIZON_MOIS = 12;                   // 5.375 : « les 12 derniers mois »
+const IMPORT_HORIZON_MS = 365 * 86400000;
 const IMPORT_TYPES = [['sold', 'orders_sold', 'ventes'], ['purchased', 'orders_purchased', 'achats']];
 function pauseImport() {
   const p = IMPORT_PAUSE_MS;
@@ -20001,6 +20026,13 @@ async function poserImport(uid, st) {
     await chrome.storage.local.set({ [IMPORT_STORE]: cur });
     return true;
   } catch (_) { return false; }
+}
+// 5.375 : noter l'état APRÈS CHAQUE PAGE — sauf si « Tout récupérer » a relancé
+// entre-temps (sa reprise gagne : `false`, le passage s'arrête sans rien réécrire).
+async function poserImportSiMeme(uid, st) {
+  const cur = await lireImport(uid);
+  if (cur && Number(cur.debut) !== Number(st.debut)) return false;
+  return poserImport(uid, st);
 }
 // Les pages lues dans l'heure : `null` = stockage muet (⇒ on ne lit pas).
 async function importLusHeure(uid) {
@@ -20025,8 +20057,19 @@ async function repriseLectures(uid) {
     return l.length ? Math.min(...l) + 3600000 : Date.now() + 5 * 60000;
   } catch (_) { return Date.now() + 5 * 60000; }
 }
+// 5.375 : la place de lecture qui reste à l'import dans l'heure (sous la réserve
+// de l'argent et des colis), `null` = pas su. Une estimation de CE Chrome : la
+// garde (`gardeLecture`) tranche page par page, elle.
+async function placeLecturesImport(uid) {
+  try {
+    const l = (((await chrome.storage.local.get('vrmLectures')).vrmLectures || {})[String(uid)] || []).filter((x) => x > Date.now() - 3600000);
+    return LECTURES_MAX_HEURE - (await reserveLectures(uid, 'enligne')) - l.length;
+  } catch (_) { return null; }
+}
 const typeImportFini = (t) => !!(t && t.fini);
-const importFini = (st) => !!(st && IMPORT_TYPES.every(([k]) => typeImportFini(st[k])));
+// 5.375 : fini = ventes ET achats ET annonces (un état d'avant la 5.375, sans
+// annonces, n'est PAS fini : le passage suivant regarde les annonces, en scalaires).
+const importFini = (st) => !!(st && IMPORT_TYPES.every(([k]) => typeImportFini(st[k])) && typeImportFini(st.annonces));
 // Le point de départ d'UN type, d'après ce que la base porte déjà (scalaires).
 function departTypeImport(n, total) {
   // `null` / '' (champ absent) n'est PAS 0 : « pas su » ne vaut jamais « complet ».
@@ -20036,6 +20079,16 @@ function departTypeImport(n, total) {
   const page = Number.isFinite(nb) && nb >= IMPORT_PER_PAGE ? Math.max(1, Math.floor(nb / IMPORT_PER_PAGE)) : 1;
   return { page, lus: (page - 1) * IMPORT_PER_PAGE, total: Number.isFinite(tot) && tot > 0 ? tot : null, pagesTotal: null, fini: false };
 }
+// 5.375 : les annonces, d'après le dressing déjà rangé (scalaires). Rangé en
+// entier (compteur ≥ total donné par Vinted) ⇒ fini, aucune lecture. Un total
+// absent n'est jamais « complet » (§4.1).
+function departAnnoncesImport(n, total) {
+  const num = (v) => (v === null || v === undefined || String(v).trim() === '' ? NaN : Number(v));
+  const nb = num(n), tot = num(total);
+  if (Number.isFinite(nb) && Number.isFinite(tot) && tot >= 0 && nb >= tot) return { lus: tot, total: tot, fini: true, deja: true };
+  return { lus: Number.isFinite(nb) && nb > 0 ? nb : 0, total: Number.isFinite(tot) && tot > 0 ? tot : null, fini: false };
+}
+const SELECT_DEPART_IMPORT = 'select=id,n:data->>nItems,t:data->payload->pagination->>total_entries';
 // L'état de l'import de ce compte ; le crée à la 1re visite (ou sur `force`).
 // Rend `null` quand on ne peut pas savoir (base muette, stockage muet).
 async function departImport(uid, opts = {}) {
@@ -20045,52 +20098,99 @@ async function departImport(uid, opts = {}) {
   const t = Date.now();
   let neuf;
   if (opts.force) {
-    neuf = { v: 1, debut: t, demande: true, at: t };
+    // « Tout récupérer » : TOUT l'historique, sans horizon (SON clic).
+    neuf = { v: 2, debut: t, demande: true, tout: true, at: t };
     for (const [k] of IMPORT_TYPES) neuf[k] = { page: 1, lus: 0, total: null, pagesTotal: null, fini: false };
+    neuf.annonces = { lus: 0, total: null, fini: false };
   } else {
-    const rows = await sbGet(`app_data?id=in.(harvest_${uid}_orders_sold,harvest_${uid}_orders_purchased)&select=id,n:data->>nItems,t:data->payload->pagination->>total_entries`);
+    const rows = await sbGet(`app_data?id=in.(harvest_${uid}_orders_sold,harvest_${uid}_orders_purchased,harvest_${uid}_listings)&${SELECT_DEPART_IMPORT}`);
     if (rows === null || !Array.isArray(rows)) { noterDiag('import_base_muette'); return null; }   // pas su ⇒ rien
-    neuf = { v: 1, debut: t, demande: false, at: t };
+    neuf = { v: 2, debut: t, demande: false, tout: false, at: t };
     for (const [k, type] of IMPORT_TYPES) {
       const r = rows.find((x) => x && x.id === `harvest_${uid}_${type}`) || {};
       neuf[k] = departTypeImport(r.n, r.t);
     }
+    const ra = rows.find((x) => x && x.id === `harvest_${uid}_listings`) || {};
+    neuf.annonces = departAnnoncesImport(ra.n, ra.t);
   }
   if (importFini(neuf)) neuf.fin = t;
   if (!(await poserImport(uid, neuf))) return null;
   noterDiag(opts.force ? 'import_demande' : (importFini(neuf) ? 'import_deja_complet' : 'import_depart'));
   return neuf;
 }
+// 5.375 : un état d'AVANT (5.344, sans annonces) reçoit ses annonces, en
+// scalaires. `false` = la base n'a pas répondu (on réessaie au passage suivant).
+async function completerAnnoncesImport(uid, st) {
+  if (st.annonces) return true;
+  const rows = await sbGet(`app_data?id=eq.harvest_${uid}_listings&${SELECT_DEPART_IMPORT}`);
+  if (rows === null || !Array.isArray(rows)) { noterDiag('import_annonces_base_muette'); return false; }
+  st.annonces = departAnnoncesImport(rows[0] && rows[0].n, rows[0] && rows[0].t);
+  st.publie = false;   // la ligne change de forme (v 2) : republiée une fois
+  return true;
+}
+// 5.375 : l'estimation des commandes d'un type sur l'horizon (12 mois).
+// Fini ⇒ ce qui est lu. « Tout » ⇒ le total de Vinted. Sinon : la position lue ×
+// 12 mois ÷ l'âge de la plus vieille commande lue, bornée par le total — jamais
+// sous ce qui est déjà lu. Rien de daté encore ⇒ le total (ou `null`, pas su).
+function estimeTypeImport(t, tout, maintenant = Date.now()) {
+  if (!t) return null;
+  const lus = Math.max(0, Number(t.lus) || 0);
+  if (t.fini) return lus;
+  const total = Number(t.total) > 0 ? Number(t.total) : null;
+  if (tout) return total;
+  const pv = Number(t.plusVieux);
+  if (Number.isFinite(pv) && pv > 0 && lus > 0) {
+    const age = Math.max(86400000, maintenant - pv);
+    let e = age >= IMPORT_HORIZON_MS ? lus : Math.round(lus * IMPORT_HORIZON_MS / age);
+    if (total !== null) e = Math.min(e, total);
+    return Math.max(e, lus);
+  }
+  return total;
+}
 // Pages encore à lire (au mieux connu) — pour l'estimation et la réserve des photos.
-function pagesRestantesImport(st) {
+function pagesRestantesImport(st, maintenant = Date.now()) {
   let n = 0;
   for (const [k] of IMPORT_TYPES) {
     const t = st && st[k];
     if (!t || t.fini) continue;
-    const tp = Number(t.pagesTotal) || (Number(t.total) > 0 ? Math.ceil(Number(t.total) / IMPORT_PER_PAGE) : 0);
+    const e = estimeTypeImport(t, !!(st && st.tout), maintenant);
+    const tp = Number(t.pagesTotal) && st.tout ? Number(t.pagesTotal) : (Number(e) > 0 ? Math.ceil(Number(e) / IMPORT_PER_PAGE) : 0);
     n += tp ? Math.max(1, tp - Number(t.page || 1) + 1) : 1;
   }
+  const a = st && st.annonces;
+  if (!a || !a.fini) n += a && Number(a.total) > 0 ? Math.min(IMPORT_MAX_HEURE, Math.ceil(Number(a.total) / IMPORT_PER_PAGE)) : 1;
   return n;
 }
 // L'état SIMPLE que lisent la carte du logo et l'app (`src/importDepart.js`) :
-//   etat ∈ attente · encours · pause · fini ; par type : lus, total, pages, fini.
+//   etat ∈ attente · encours · pause · fini ; par type : lus, total, estime,
+//   pages (lues), pagesEstimees, fini, horizon ; annonces : lus, total, fini, partiel ;
+//   souci (deconnecte · echec · base · prudence) ; horizonMois (12, ou null = tout).
 function resumeImport(st, maintenant = Date.now()) {
   if (!st) return null;
+  const tout = !!st.tout;
   const types = {};
   for (const [k, , nom] of IMPORT_TYPES) {
     const t = st[k] || {};
-    types[nom] = { lus: Math.max(0, Number(t.lus) || 0), total: Number(t.total) > 0 ? Number(t.total) : (t.fini ? Math.max(0, Number(t.lus) || 0) : null),
-      pages: Math.max(0, Number(t.page || 1) - 1), fini: !!t.fini };
+    const total = Number(t.total) > 0 ? Number(t.total) : (t.fini ? Math.max(0, Number(t.lus) || 0) : null);
+    const est = estimeTypeImport(t, tout, maintenant);
+    types[nom] = { lus: Math.max(0, Number(t.lus) || 0), total, estime: est, pages: Math.max(0, Number(t.page || 1) - 1),
+      pagesEstimees: est !== null && est !== undefined ? Math.max(1, Math.ceil(est / IMPORT_PER_PAGE)) : null, fini: !!t.fini, horizon: !!t.horizon };
   }
+  const a = st.annonces;
+  const annonces = a ? { lus: Math.max(0, Number(a.lus) || 0), total: Number(a.total) >= 0 && a.total !== null && a.total !== undefined ? Number(a.total) : null, fini: !!a.fini, partiel: !!a.partiel } : null;
   const fini = importFini(st);
   const pause = st.pause && Number(st.pause.jusqua) > maintenant ? st.pause : null;
   const etat = fini ? 'fini' : pause ? 'pause' : (Object.values(types).some((x) => x.lus > 0 || x.pages > 0) ? 'encours' : 'attente');
-  const reste = fini ? 0 : pagesRestantesImport(st);
-  return { v: 1, etat, ventes: types.ventes, achats: types.achats, debut: Number(st.debut) || null, fin: fini ? (Number(st.fin) || null) : null,
+  const reste = fini ? 0 : pagesRestantesImport(st, maintenant);
+  const enCours = fini ? null : (IMPORT_TYPES.map(([k, , nom]) => (!typeImportFini(st[k]) ? nom : null)).find(Boolean) || (annonces && !annonces.fini ? 'annonces' : null));
+  const souci = !fini && st.souci && st.souci.cause ? st.souci : null;
+  return { v: 2, etat, horizonMois: tout ? null : IMPORT_HORIZON_MOIS, ventes: types.ventes, achats: types.achats, annonces, enCours,
+    debut: Number(st.debut) || null, fin: fini ? (Number(st.fin) || null) : null,
     repriseA: pause ? Number(pause.jusqua) : null, cause: pause ? String(pause.cause || '') : null,
+    souci: souci ? String(souci.cause) : null, souciA: souci ? Number(souci.at) || null : null,
     resteMin: fini ? 0 : Math.max(5, Math.ceil(reste / IMPORT_MAX_HEURE * 60)), at: Number(st.at) || null, demande: !!st.demande };
 }
-// SA ligne, petite (≈ 400 o), au plus une fois par passage. Jamais `main`.
+// SA ligne, petite (≈ 600 o), au plus une fois par passage. Jamais `main`.
 async function publierImport(uid, st) {
   const r = resumeImport(st);
   if (!r) return false;
@@ -20109,6 +20209,16 @@ function importerHistorique(uid, opts = {}) {
   _importEnCours = importerHistoriqueUn(uid, opts).catch(() => 0).finally(() => { _importEnCours = null; });
   return _importEnCours;
 }
+// 5.375 : ce que dit un refus de la garde, dans l'état (pause ou souci).
+async function refusImport(st, uid, refus) {
+  if (refus.code === 'vinted-pause') { const pv = await pauseVinted(); st.pause = { jusqua: pv ? Date.now() + pv.resteMs : Date.now() + 15 * 60000, cause: 'vinted' }; }
+  else if (refus.code === 'trop-de-lectures' || refus.code === 'lectures-reservees') { st.pause = { jusqua: await repriseLectures(uid), cause: 'budget' }; noterDiag('import_laisse_la_place'); }
+  else {
+    noterDiag(`import_refus_${refus.code}`);
+    const cause = refus.code === 'vinted-absent' || refus.code === 'autre-compte' ? 'deconnecte' : refus.code === 'prudence' ? 'prudence' : 'echec';
+    st.souci = { cause, at: Date.now() };
+  }
+}
 async function importerHistoriqueUn(uid, opts) {
   if (!uid) return 0;
   if (await compteNonCapte(uid)) return 0;
@@ -20118,13 +20228,16 @@ async function importerHistoriqueUn(uid, opts) {
   if (!acc) return 0;
   const st = await departImport(uid, { force: !!opts.force });
   if (!st) return 0;
+  if (!st.annonces && !(await completerAnnoncesImport(uid, st))) return 0;
   if (importFini(st)) {
     await noterLecturesDues(uid, 'import', 0);
+    if (!st.fin) st.fin = Date.now();
     if (!st.publie) { if (await publierImport(uid, st)) { st.publie = true; await poserImport(uid, st); } }
     return 0;
   }
   const domain = acc.domain || 'www.vinted.fr';
-  let n = 0;
+  const horizon = st.tout ? null : Date.now() - IMPORT_HORIZON_MS;
+  let n = 0, relance = false;
   delete st.pause;
   while (n < IMPORT_PAGES_PAR_PASSAGE) {
     const ent = IMPORT_TYPES.find(([k]) => !typeImportFini(st[k]));
@@ -20138,12 +20251,7 @@ async function importerHistoriqueUn(uid, opts) {
     if (lus.length >= IMPORT_MAX_HEURE) { st.pause = { jusqua: Math.min(...lus) + 3600000, cause: 'rythme' }; noterDiag('import_plafond_heure'); break; }
     if (n > 0) await pauseImport();
     const refus = await gardeLecture(uid, acc, 'import');
-    if (refus) {
-      if (refus.code === 'vinted-pause') { const pv = await pauseVinted(); st.pause = { jusqua: pv ? Date.now() + pv.resteMs : Date.now() + 15 * 60000, cause: 'vinted' }; }
-      else if (refus.code === 'trop-de-lectures' || refus.code === 'lectures-reservees') { st.pause = { jusqua: await repriseLectures(uid), cause: 'budget' }; noterDiag('import_laisse_la_place'); }
-      else noterDiag(`import_refus_${refus.code}`);
-      break;
-    }
+    if (refus) { await refusImport(st, uid, refus); break; }
     await noterImportLu(uid);
     n++;
     const rep = await vintedGet(acc, `/api/v2/my_orders?type=${k}&page=${p}&per_page=${IMPORT_PER_PAGE}`);
@@ -20151,34 +20259,56 @@ async function importerHistoriqueUn(uid, opts) {
     if (!lot) {
       noterDiag(`import_refuse_${(rep && rep.status) || 0}`);
       if (rep && (rep.pause || freinVinted(Number(rep.status) || 0))) { const pv = await pauseVinted(); st.pause = { jusqua: pv ? Date.now() + pv.resteMs : Date.now() + 15 * 60000, cause: 'vinted' }; }
+      else st.souci = { cause: 'echec', at: Date.now() };
       break;
     }
     // Le compte de l'onglet a changé pendant la lecture ⇒ la page est jetée (§5).
     const actif = await compteConnecte(domain);
-    if (!actif || String(actif) !== String(uid)) { noterDiag('import_compte_change'); break; }
+    if (!actif || String(actif) !== String(uid)) { noterDiag('import_compte_change'); st.souci = { cause: 'deconnecte', at: Date.now() }; break; }
     const pg = (rep.json.pagination && typeof rep.json.pagination === 'object') ? rep.json.pagination : {};
     if (lot.length) {
       const issue = await storeHarvestRow(uid, type, { my_orders: lot, pagination: Object.assign({}, pg, { current_page: p }) }, domain);
       // La base n'a pas pris la page : elle n'avance PAS (relue au passage suivant).
-      if (issue !== 'ecrit' && issue !== 'inchange') { noterDiag(`import_page_pas_rangee_${nom}`); break; }
+      if (issue !== 'ecrit' && issue !== 'inchange') { noterDiag(`import_page_pas_rangee_${nom}`); st.souci = { cause: 'base', at: Date.now() }; break; }
     }
+    delete st.souci;
     const tot = Number(pg.total_entries), tp = Number(pg.total_pages);
     if (Number.isFinite(tot) && tot >= 0) ty.total = tot;
     if (Number.isFinite(tp) && tp > 0) ty.pagesTotal = tp;
-    ty.lus = Math.max(0, Number(ty.lus) || 0) + lot.length;
+    const avant = Math.max(0, Number(ty.lus) || 0);
+    ty.lus = avant + lot.length;
     ty.page = p + 1;
+    // 5.375 : les dates de la page (illisible ⇒ ignorée : elle n'arrête rien).
+    const dates = lot.map((o) => Date.parse((o && o.date) || '')).filter(Number.isFinite);
+    if (dates.length) ty.plusVieux = Math.min(Number(ty.plusVieux) || Infinity, ...dates);
+    const passeHorizon = horizon !== null && dates.length && Math.min(...dates) < horizon;
     // La DERNIÈRE page : vide, ou celle que Vinted annonce comme la dernière.
     if (!lot.length || (Number.isFinite(tp) && tp > 0 && p >= tp)) {
       ty.fini = true;
       if (Number.isFinite(Number(ty.total)) && Number(ty.total) >= 0) ty.lus = Number(ty.total);
       noterDiag(`import_fini_${nom}`);
     } else if (Number(ty.total) > 0) ty.lus = Math.min(Number(ty.total), ty.lus);
+    // 5.375 : l'horizon passé (12 mois) ⇒ ce type est fini ; `lus` = jusqu'à la dernière du bon côté.
+    if (passeHorizon) {
+      const dedans = lot.filter((o) => !(Date.parse((o && o.date) || '') < horizon)).length;
+      ty.lus = Math.min(ty.lus, avant + dedans);
+      ty.fini = true; ty.horizon = true;
+      noterDiag(`import_horizon_${nom}`);
+    }
+    st.at = Date.now();
+    // 5.375 : noté APRÈS CHAQUE PAGE — jamais deux fois la même page, même navigateur fermé en route.
+    if (!(await poserImportSiMeme(uid, st))) { relance = true; break; }
   }
+  // 5.375 : les annonces, d'un trait, dans un passage à elles (aucune page de commandes lue ici).
+  if (!relance && n === 0 && !st.pause && !st.souci && IMPORT_TYPES.every(([k]) => typeImportFini(st[k])) && st.annonces && !st.annonces.fini) {
+    n += await importerAnnonces(uid, acc, st);
+  }
+  if (relance) { noterDiag('import_relance_pendant'); return n; }
   st.at = Date.now();
   if (importFini(st) && !st.fin) {
     st.fin = st.at;
     const r = resumeImport(st);
-    logActivity(`📥 Historique Vinted récupéré : ${r.ventes.lus} vente${r.ventes.lus > 1 ? 's' : ''}, ${r.achats.lus} achat${r.achats.lus > 1 ? 's' : ''}`);
+    logActivity(`📥 ${st.tout ? 'Historique Vinted récupéré' : 'Ton passé Vinted importé (12 mois)'} : ${r.ventes.lus} vente${r.ventes.lus > 1 ? 's' : ''}, ${r.achats.lus} achat${r.achats.lus > 1 ? 's' : ''}${r.annonces ? `, ${r.annonces.lus} annonce${r.annonces.lus > 1 ? 's' : ''}` : ''}`);
   }
   await noterLecturesDues(uid, 'import', importFini(st) ? 0 : Math.min(IMPORT_PAGES_PAR_PASSAGE, pagesRestantesImport(st)));
   // « Tout récupérer » cliqué PENDANT ce passage : sa reprise gagne, rien n'est réécrit par-dessus.
@@ -20186,6 +20316,57 @@ async function importerHistoriqueUn(uid, opts) {
   if (cur && Number(cur.debut) !== Number(st.debut)) { noterDiag('import_relance_pendant'); return n; }
   st.publie = await publierImport(uid, st);
   await poserImport(uid, st);
+  return n;
+}
+// 5.375 : le dressing ENTIER, d'un trait (une lecture qui fait foi ne se prend
+// pas en morceaux étalés sur des heures). Seulement quand toutes ses pages
+// tiennent dans l'heure — import (12) ET budget de lecture (sous la réserve de
+// l'argent et des colis) ; sinon pause, reprise quand la place revient. Rangé
+// par la même porte que la visite (`storeHarvestRow`, `complet`). Rend les pages lues.
+async function importerAnnonces(uid, acc, st) {
+  const an = st.annonces;
+  const domain = acc.domain || 'www.vinted.fr';
+  const besoin = Number(an.total) > 0 ? Math.ceil(Number(an.total) / IMPORT_PER_PAGE) : 1;
+  if (besoin > IMPORT_MAX_HEURE) { an.fini = true; an.partiel = true; noterDiag('import_annonces_trop'); return 0; }
+  const lus = await importLusHeure(uid);
+  if (lus === null) { noterDiag('import_compteur_muet'); return 0; }
+  if (lus.length + besoin > IMPORT_MAX_HEURE) { const tri = lus.slice().sort((x, y) => x - y); st.pause = { jusqua: tri[Math.min(tri.length - 1, lus.length + besoin - IMPORT_MAX_HEURE - 1)] + 3600000, cause: 'rythme' }; return 0; }
+  const place = await placeLecturesImport(uid);
+  if (place === null || place < besoin) { st.pause = { jusqua: await repriseLectures(uid), cause: 'budget' }; noterDiag('import_annonces_attend_la_place'); return 0; }
+  const pid = (await lastProfileId(uid)) || uid;
+  let out = null, n = 0, complet = false;
+  for (let p = 1; p <= IMPORT_MAX_HEURE; p++) {
+    const l2 = await importLusHeure(uid);
+    if (l2 === null || l2.length >= IMPORT_MAX_HEURE) { st.pause = { jusqua: l2 && l2.length ? Math.min(...l2) + 3600000 : Date.now() + 15 * 60000, cause: 'rythme' }; return n; }
+    if (n > 0) await pauseImport();
+    const refus = await gardeLecture(uid, acc, 'import');
+    if (refus) { await refusImport(st, uid, refus); return n; }
+    await noterImportLu(uid);
+    n++;
+    const rep = await vintedGet(acc, `/api/v2/wardrobe/${encodeURIComponent(pid)}/items?page=${p}&per_page=${IMPORT_PER_PAGE}`);
+    const lot = rep && rep.ok && rep.json && Array.isArray(rep.json.items) ? rep.json.items : null;
+    if (!lot) {
+      noterDiag(`import_annonces_refuse_${(rep && rep.status) || 0}`);
+      if (rep && (rep.pause || freinVinted(Number(rep.status) || 0))) { const pv = await pauseVinted(); st.pause = { jusqua: pv ? Date.now() + pv.resteMs : Date.now() + 15 * 60000, cause: 'vinted' }; }
+      else st.souci = { cause: 'echec', at: Date.now() };
+      return n;
+    }
+    const actif = await compteConnecte(domain);
+    if (!actif || String(actif) !== String(uid)) { noterDiag('import_compte_change'); st.souci = { cause: 'deconnecte', at: Date.now() }; return n; }
+    if (!out) out = Object.assign({}, rep.json, { items: lot.slice() }); else out.items = out.items.concat(lot);
+    const pg = rep.json.pagination || {};
+    const tot = Number(pg.total_entries), tp = Number(pg.total_pages);
+    if (pg.total_entries != null && Number.isFinite(tot) && tot >= 0) an.total = tot;
+    if (Number(an.total) > IMPORT_MAX_HEURE * IMPORT_PER_PAGE) { an.fini = true; an.partiel = true; noterDiag('import_annonces_trop'); return n; }
+    if (!lot.length || (Number.isFinite(tp) && tp > 0 && p >= tp)) { complet = true; break; }
+  }
+  if (!complet) { an.fini = true; an.partiel = true; noterDiag('import_annonces_sans_fin'); return n; }
+  const issue = await storeHarvestRow(uid, 'listings', out, domain, { complet: true });
+  if (issue !== 'ecrit' && issue !== 'inchange') { noterDiag('import_annonces_pas_rangees'); st.souci = { cause: 'base', at: Date.now() }; return n; }
+  delete st.souci;
+  an.lus = out.items.length; an.fini = true;
+  if (an.total === null || an.total === undefined) an.total = an.lus;
+  noterDiag('import_fini_annonces');
   return n;
 }
 // Après une visite : un passage 1 min plus tard (la rafale de la visite est
