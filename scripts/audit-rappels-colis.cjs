@@ -22,6 +22,7 @@ const MUTATIONS = {
   // un rappel qui réveille un retiré
   'rappel-reveille-retire': ['api/_lib/etat-colis-email.js', " if(retraitTenu(precedent))return {...nouveau,status:'delivered',label:precedent.statusLabel||'Livré / retiré'};", ''],
   'rappel-efface-horaires': ['api/_lib/rappel-colis.js', "const GARDES = ['code', 'code2', 'lieu', 'limite', 'artTitle', 'horaires'];", "const GARDES = ['code', 'code2', 'lieu', 'limite', 'artTitle'];"],
+  'relecture-limite-muette': ['src/lieuxRetrait.js', "      if (ls.length === 1) limitesLues.set(s, ls[0]);", ''],
   'date-en-gras-ignoree': ['api/_lib/retrait-colis.js', "const DECO = String.raw`[\\s*_]`;", "const DECO = String.raw`\\s`;"],
 };
 if (process.argv.includes('--prouve')) {
@@ -130,6 +131,24 @@ const Jw = '11111111-1111-1111-1111-111111111111';
     await envoyer(f.rappel, date);
     const l = lignes();
     dit(l.length === 1 && l[0][1].status === 'delivered', `retiré + rappel ${quand} : il reste RETIRÉ, une seule ligne`, J(l.map(([k, v]) => [k, v.status])));
+  }
+
+  // Les lignes rangées AVANT la lecture de la date en gras (mesuré : 19 Vinted Go sans date limite) : relues dans le
+  // texte gardé de LEUR e-mail (src/lieuxRetrait.js), par le n° — jamais une année devinée, deux dates ⇒ rien.
+  {
+    const { lieuxRelusDansTextes } = await import('file://' + path.join(R, 'src/lieuxRetrait.js'));
+    const k = 'e'.repeat(32), k2 = 'f'.repeat(32);
+    const textes = { [k]: FORMES[2].arrivee.text, [k2]: 'À retirer avant le\n*19/11/2026*\n— puis —\nÀ retirer avant le\n*22/11/2026*' };
+    const lire = async (q) => {
+      if (/email_reception_/.test(q)) return [{ id: 'email_reception_' + k, s: 'VGS0000000000042' }, { id: 'email_reception_' + k2, s: 'VGS0000000000077' }];
+      if (/email_texte_/.test(q)) return Object.entries(textes).filter(([c]) => q.includes('email_texte_' + c)).map(([c, v]) => ({ id: 'email_texte_' + c, texte: v }));
+      return [];
+    };
+    const L = [{ suivi: 'VGS0000000000042', status: 'available', lieu: 'Laverie du Banc, 2 Rue Imaginaire, 35000 Rennes', limite: null },
+      { suivi: 'VGS0000000000077', status: 'available', lieu: 'Laverie du Banc, 2 Rue Imaginaire, 35000 Rennes', limite: null }];
+    const out = await lieuxRelusDansTextes(L, lire);
+    dit(out && out[0].limite === '2026-11-20', 'ligne d’avant : la date limite Vinted Go relue dans le texte gardé de son e-mail', out && out[0].limite);
+    dit(out && !out[1].limite, 'deux dates différentes dans le même texte : rien (on ne choisit pas)', out && out[1].limite);
   }
 
   console.log(ko ? `\n${ko} CONTRÔLE(S) EN ÉCHEC sur ${ok + ko}` : `\nTOUS VERTS (${ok}) — un rappel est le même colis : une ligne, rien d'effacé, un retiré reste retiré.`);

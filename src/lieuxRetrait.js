@@ -14,7 +14,7 @@
 //  complète ; deux lieux différents, rien de lu, une lecture ratée ⇒ la ligne
 //  reste telle quelle (jamais un lieu deviné, jamais un colis écarté).
 // ════════════════════════════════════════════════════════════════════════════
-import { lieuSousEnTete, sansSuggestions, nouveauPointDansTexte } from '../api/_lib/retrait-colis.js';
+import { lieuSousEnTete, sansSuggestions, nouveauPointDansTexte, limiteRetraitDepuisTexte } from '../api/_lib/retrait-colis.js';
 import { horairesDepuisTexte, horairesValides } from '../api/_lib/horaires-relais.js';
 
 const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '');
@@ -59,7 +59,7 @@ export async function lieuxRelusDansTextes(lignes, lire) {
     const textes = await lire(`id=in.(${cles.map((c) => `email_texte_${c}`).join(',')})&select=id,texte:data->>texte&limit=${cles.length}`);
     if (!Array.isArray(textes)) return lignes;
     const texteDe = new Map(textes.map((x) => [String(x && x.id || '').replace(/^email_texte_/, ''), typeof (x && x.texte) === 'string' ? x.texte : '']));
-    const lus = new Map(), nouveaux = new Map(); const suggeres = new Map(); const horairesLus = new Map();
+    const lus = new Map(), nouveaux = new Map(); const suggeres = new Map(); const horairesLus = new Map(); const limitesLues = new Map();
     for (const [s, cl] of parSuivi) {
       const l = [...new Set(cl.map((c) => lieuSousEnTete(texteDe.get(c) || '')).filter((x) => x && /\b\d{5}\b/.test(x)))];
       if (l.length === 1) lus.set(s, l[0]);
@@ -70,9 +70,16 @@ export async function lieuxRelusDansTextes(lignes, lire) {
       // deux e-mails qui en disent deux différents ⇒ rien ; un texte coupé ⇒ rien.
       const hs = [...new Set(cl.map((c) => horairesDepuisTexte(texteDe.get(c) || '')).filter(Boolean).map((h) => JSON.stringify(h)))];
       if (hs.length === 1) horairesLus.set(s, JSON.parse(hs[0]));
+      // (13 nov., rappels) La date limite Vinted Go (« À retirer avant le » / « *12/11/2026* » à la ligne) n'était pas lue
+      // avant ce jour : relue ici, DATÉE avec son année seulement (aucune année devinée) ; deux dates différentes ⇒ rien.
+      const ls = [...new Set(cl.map((c) => limiteRetraitDepuisTexte(texteDe.get(c) || '', null)).filter(Boolean))];
+      if (ls.length === 1) limitesLues.set(s, ls[0]);
     }
-    if (!lus.size && !nouveaux.size && !horairesLus.size) return lignes;
-    const avecHoraires = (t) => { if (!disponibleAvecSuivi(t) || horairesValides(t.horaires)) return t; const h = horairesLus.get(String(t.suivi).trim()); return h ? { ...t, horaires: h, horairesLusDansTexte: true } : t; };
+    if (!lus.size && !nouveaux.size && !horairesLus.size && !limitesLues.size) return lignes;
+    const avecHoraires = (t0) => { if (!disponibleAvecSuivi(t0)) return t0; const su = String(t0.suivi).trim(); let t = t0;
+      if (!horairesValides(t.horaires)) { const h = horairesLus.get(su); if (h) t = { ...t, horaires: h, horairesLusDansTexte: true }; }
+      if (!t.limite) { const l = limitesLues.get(su); if (l) t = { ...t, limite: l, limiteLueDansTexte: true }; }
+      return t; };
     return lignes.map((t0) => avecHoraires(t0)).map((t) => {
       if (pointChangeIncomplet(t)) { const n = nouveaux.get(String(t.suivi).trim()); return n ? { ...t, lieu: n, lieuLuDansTexte: true } : t; }
       if (!lieuIncomplet(t)) {
