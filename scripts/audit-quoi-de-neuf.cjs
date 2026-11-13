@@ -62,9 +62,9 @@ async function verifier(racine, { muet = false } = {}) {
   const tous = N.nouveautesDuCompte(base);
   dit(tous.length > 0 && tous.every((n) => n.date > '2026-11-01'), 'inscrit le 1er nov. : il voit ce qui est arrivé après');
   const neuf = N.nouveautesDuCompte({ ...base, inscritLe: '2026-11-11T08:00:00Z' });
-  dit(neuf.length === 0, 'inscrit le 11 nov. : aucune nouveauté du 11 nov. ni d’avant (pas l’historique)', neuf.map((n) => n.id));
+  dit(neuf.every((n) => n.date > '2026-11-11'), 'inscrit le 11 nov. : aucune nouveauté du 11 nov. ni d’avant (pas l’historique)', neuf.map((n) => n.id));   // (13 nov.) la RÈGLE, pas la liste : un lot plus récent y a sa place
   const veille = N.nouveautesDuCompte({ ...base, inscritLe: '2026-11-10T12:00:00' });
-  dit(veille.length > 0 && veille.every((n) => n.date === '2026-11-11'), 'inscrit le 10 nov. : seulement le 11 nov.');
+  dit(veille.some((n) => n.date === '2026-11-11') && veille.every((n) => n.date >= '2026-11-11'), 'inscrit le 10 nov. : le 11 nov. et après seulement');
   dit(N.nouveautesDuCompte({ ...base, inscritLe: '' }).length === 0 && N.nouveautesDuCompte({ ...base, inscritLe: 'n’importe' }).length === 0, 'date d’inscription pas sue ⇒ rien');
   const comp = L.filter((n) => n.mode === 'complet');
   dit(comp.length > 0 && N.nouveautesDuCompte({ ...base, mode: 'simple' }).every((n) => n.mode !== 'complet'), 'Simple : rien qui vise un écran de Complet');
