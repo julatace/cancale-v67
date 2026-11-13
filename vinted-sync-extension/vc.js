@@ -35,6 +35,8 @@
         const ventes = (Array.isArray(d.ventes) ? d.ventes : []).slice(0, 200).map((x) => ({
           id: String((x && x.id) || '').slice(0, 40), productId: String((x && x.productId) || '').slice(0, 40), ref: String((x && x.ref) || '').slice(0, 12),
           etat: String((x && x.etat) || '').slice(0, 40), date: String((x && x.date) || '').slice(0, 30),
+          // 5.374 : la clé d'où vient la date (`soldDate`… — jamais le `soldDate` de « à expédier », l'heure de la lecture).
+          dateCle: /^[A-Za-z_]{1,40}$/.test(String((x && x.dateCle) || '')) ? String(x.dateCle) : '',
           montant: x && x.montant && isFinite(Number(x.montant.valeur)) ? { valeur: Number(x.montant.valeur), devise: String(x.montant.devise || '').slice(0, 3), cle: String(x.montant.cle || '').slice(0, 60) } : null,
           // 5.364 (11 nov.) — le PRIX DE VENTE (`sellerPrice`, 5.340) n'était pas relayé : le fond ne le
           // recevait jamais, la facture Pro Vestiaire non plus. Relayé tel quel ; le fond le rebâtit (`prixVenteVc`).
@@ -44,7 +46,8 @@
           // 5.316 : le titre affiché (marque + nom) et la photo de Vestiaire.
           titre: String((x && x.titre) || '').slice(0, 140),
           photo: /^https:\/\/images\.vestiairecollective\.com\/produit\/[\w.-]{1,60}$/i.test(String((x && x.photo) || '')) ? String(x.photo) : '' }));
-    return Object.assign({ source: d.source === 'a-expedier' ? 'a-expedier' : 'ventes', ventes, offset: Number(d.offset) || 0, total: typeof d.total === 'number' ? d.total : null, lus: Number(d.lus) || 0, forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 120).map((c) => String(c).slice(0, 120)) }, suite(d));
+    // 5.374 : `origine` — '' (vue au vol) · 'page' (portée par la page, toujours PARTIELLE) · 'relue' (rattrapée).
+    return Object.assign({ source: d.source === 'a-expedier' ? 'a-expedier' : 'ventes', origine: d.origine === 'page' || d.origine === 'relue' ? d.origine : '', ventes, cleRequete: /^[\w .:{}\/-]{0,80}$/.test(String(d.cleRequete || '')) ? String(d.cleRequete || '') : '', offset: Number(d.offset) || 0, total: typeof d.total === 'number' ? d.total : null, lus: Number(d.lus) || 0, forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 120).map((c) => String(c).slice(0, 120)) }, suite(d));
   };
   const achatsNets = (d) => {
         const achats = (Array.isArray(d.achats) ? d.achats : []).slice(0, 200).map((x) => ({
@@ -85,6 +88,11 @@
         chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcTimeline', productId: String(d.productId), transporteur: String(d.transporteur || '').slice(0, 40), suivi: /^[A-Z0-9]{6,40}$/i.test(String(d.suivi || '')) ? String(d.suivi) : '', bordereau: /^https:\/\/[\w.-]+\.amazonaws\.com\//i.test(String(d.bordereau || '')) ? String(d.bordereau).slice(0, 2000) : '', typeBordereau: String(d.typeBordereau || '').slice(0, 30), statut: String(d.statut || '').slice(0, 40), etapes: et, paiementEstime: String(d.paiementEstime || '').slice(0, 40), moi: moiDe(d) }, () => { void chrome.runtime.lastError; });
         return;
       }
+      // 5.374 : une liste de ventes demandée par la page AVANT le capteur, relue sans succès (code seul).
+      if (d.kind === 'vcrattrapage') {
+        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcRattrapage', source: d.source === 'a-expedier' ? 'a-expedier' : 'ventes', statut: Math.max(0, Math.min(999, Number(d.statut) || 0)) }, () => { void chrome.runtime.lastError; });
+        return;
+      }
       if (d.kind === 'vcventes') {
         chrome.runtime.sendMessage(Object.assign({ from: 'cancale-vc', action: 'vcVentes' }, ventesNettes(d)), () => { void chrome.runtime.lastError; });
         return;
@@ -114,7 +122,8 @@
       if (d.kind === 'vcmoi') {
         const id = String(d.id || '');
         if (!/^[\w-]{1,40}$/.test(id)) return;
-        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcMoi', id, source: d.source === 'stream' ? 'stream' : 'users/me', forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 80).map((c) => String(c).slice(0, 120)) }, () => { void chrome.runtime.lastError; });
+        // 5.374 : 'page' = le compte que la page porte elle-même (`__NEXT_DATA__`, requête « user.user »).
+        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcMoi', id, source: d.source === 'stream' || d.source === 'page' ? d.source : 'users/me', forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 80).map((c) => String(c).slice(0, 120)) }, () => { void chrome.runtime.lastError; });
         return;
       }
       // 5.295 : UN fil de conversation — le texte des messages, leur date, « de toi » ; jamais un nom.

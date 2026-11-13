@@ -130,6 +130,11 @@ function sourcesEnLigne(fichierMain,dossier){
  const t=fs.readFileSync(fichierMain,'utf8');const marque='null;/*__VRM_SOURCES_PAGE__*/';
  if(!t.includes(marque))throw new Error('orion-main.js : marqueur des sources en ligne introuvable');
  const sources={'inject.js':fs.readFileSync(path.join(dossier,'inject.js'),'utf8')};
+ // 5.374 (13 nov., « la vente Vestiaire mal captée sur Orion iPhone ») : le capteur Vestiaire
+ // aussi, EN LIGNE — posé par une balise `src`, il arrivait après les premières requêtes de la
+ // page et ne voyait jamais la liste des ventes. Présent dans l'extension ⇒ obligatoire ici.
+ const vc=path.join(dossier,'vc-inject.js');
+ if(fs.existsSync(vc))sources['vc-inject.js']=fs.readFileSync(vc,'utf8');
  fs.writeFileSync(fichierMain,t.replace(marque,()=>JSON.stringify(sources)+';'));
 }
 // La fenêtre de l'icône charge ses scripts elle-même : la compatibilité d'abord.
@@ -207,8 +212,9 @@ try {
   if(orion){
     const o=path.join(tmp,'orion');fs.cpSync(dossier,o,{recursive:true});fs.rmSync(path.join(o,'README.md'),{force:true});
     for(const nom of ['compat-orion.js','orion-main.js'])fs.copyFileSync(path.join(__dirname,'extension-orion',nom),path.join(o,nom));
-    // 5.361 : le capteur Vinted EN LIGNE (canal privé sûr sur Orion, voir orion-main.js).
+    // 5.361 : le capteur Vinted EN LIGNE (canal privé sûr sur Orion, voir orion-main.js) ; 5.374 : et Vestiaire.
     sourcesEnLigne(path.join(o,'orion-main.js'),o);
+    if(!fs.readFileSync(path.join(o,'orion-main.js'),'utf8').includes('CANCALE_VC'))throw new Error('paquet Orion : le capteur Vestiaire n’est pas posé en ligne');
     const m=JSON.parse(fs.readFileSync(path.join(o,'manifest.json'),'utf8'));
     fs.writeFileSync(path.join(o,'manifest.json'),JSON.stringify(manifesteOrion(m),null,2)+'\n');
     const ph=path.join(o,'popup.html');fs.writeFileSync(ph,fs.readFileSync(ph,'utf8').replace(/<script\b/i,'<script src="compat-orion.js"></script>\n<script'));
