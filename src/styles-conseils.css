@@ -18,7 +18,7 @@
 
 /* Le halo : un anneau autour du vrai bouton, une respiration à l'entrée, puis calme. */
 .vrm-conseil-halo {
-  position: absolute; border-radius: 14px; pointer-events: none;
+  position: absolute; border-radius: 12px; pointer-events: none;
   box-shadow: 0 0 0 2px var(--c-anneau), 0 0 0 7px var(--c-lueur);
   animation: vrm-conseil-halo .6s cubic-bezier(.23, 1, .32, 1) both;
 }
@@ -27,7 +27,7 @@
 .vrm-conseil-bulle {
   position: absolute; pointer-events: auto; box-sizing: border-box;
   width: min(320px, calc(var(--vrm-vw100, 100vw) - 32px));
-  padding: 16px 16px 8px; border-radius: 18px;
+  padding: 16px 16px 8px; border-radius: 20px;
   background: var(--c-carte); color: var(--c-encre);
   border: 1px solid var(--c-filet);
   box-shadow: 0 1px 2px rgba(0, 0, 0, .06), 0 14px 36px rgba(0, 0, 0, .18);

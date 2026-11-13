@@ -8,7 +8,7 @@
 .vrm-rp-bouton {
   font-family: inherit; -webkit-tap-highlight-color: transparent; cursor: pointer;
   display: flex; align-items: center; gap: 8px; box-sizing: border-box; width: 100%;
-  min-height: 44px; padding: 0 14px; border: 0; border-radius: 14px; margin: 0;
+  min-height: 44px; padding: 0 14px; border: 0; border-radius: 12px; margin: 0;
   background: var(--w-remplir, rgba(118,118,128,.12)); color: var(--w-encre, #1D1D1F);
   font-size: 15px; font-weight: 500; text-align: left;
 }
@@ -26,7 +26,7 @@
 .vrm-rp-choix {
   font-family: inherit; -webkit-tap-highlight-color: transparent; cursor: pointer; box-sizing: border-box;
   display: flex; flex-direction: column; justify-content: center; gap: 2px; min-height: 58px; min-width: 0;
-  padding: 8px 12px; border-radius: 14px; border: 1.5px solid transparent; margin: 0; text-align: left;
+  padding: 8px 12px; border-radius: 12px; border: 1.5px solid transparent; margin: 0; text-align: left;
   background: var(--w-remplir, rgba(118,118,128,.12)); color: var(--w-encre, #1D1D1F);
 }
 .vrm-rp-choix b { font-size: 15px; font-weight: 600; }
@@ -50,14 +50,14 @@
 .vrm-rp-quand-dit { margin: 0; font-size: 13px; color: var(--w-gris, #6E6E73); line-height: 1.4; }
 .vrm-rp-quand-dit b { color: var(--w-encre, #1D1D1F); font-weight: 600; }
 .vrm-rp-enregistrer {
-  font-family: inherit; cursor: pointer; width: 100%; min-height: 50px; border: 0; border-radius: 14px; margin: 0;
+  font-family: inherit; cursor: pointer; width: 100%; min-height: 50px; border: 0; border-radius: 12px; margin: 0;
   background: var(--w-accent, #0071E3); color: #fff; font-size: 17px; font-weight: 600;
 }
 .vrm-rp-enregistrer:disabled { opacity: .4; cursor: default; }
 
 /* ── La carte (Ma journée) et la liste (Paramètres) ─────────────────────────── */
 .vrm-rp-carte {
-  background: var(--w-carte, #fff); color: var(--w-encre, #1D1D1F); border-radius: var(--w-r, 24px);
+  background: var(--w-carte, #fff); color: var(--w-encre, #1D1D1F); border-radius: var(--w-r, 20px);
   box-shadow: var(--w-ombre, none); padding: 14px 16px 6px; margin: 16px 0; box-sizing: border-box; max-width: 100%;
 }
 .vrm-rp-carte h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; font-size: 17px; font-weight: 600; }
@@ -89,7 +89,7 @@
 .vrm-rp-bandeau {
   position: fixed; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); z-index: 19000;
   margin: 0 auto; max-width: 560px; box-sizing: border-box; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px;
-  padding: 10px 10px 10px 14px; border-radius: 18px; background: var(--w-carte, #fff); color: var(--w-encre, #1D1D1F);
+  padding: 10px 10px 10px 14px; border-radius: 20px; background: var(--w-carte, #fff); color: var(--w-encre, #1D1D1F);
   box-shadow: 0 8px 30px -6px rgba(0,0,0,.25), 0 0 0 .5px var(--w-filet, rgba(60,60,67,.18));
 }
 .vrm-rp-bandeau > .vrm-rp-icone { color: var(--w-gris, #6E6E73); }

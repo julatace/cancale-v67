@@ -18,7 +18,7 @@
 .vrm-note .vrm-note-icone { flex-shrink: 0; color: var(--w-gris, #6E6E73); }
 .vrm-note .vrm-note-texte { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vrm-note.is-bloc {
-  display: flex; width: 100%; align-items: flex-start; border-radius: 14px; padding: 11px 13px; min-height: 44px;
+  display: flex; width: 100%; align-items: flex-start; border-radius: 12px; padding: 11px 13px; min-height: 44px;
   font-size: 15px; gap: 9px;
 }
 .vrm-note.is-bloc .vrm-note-texte { white-space: normal; overflow-wrap: anywhere; }

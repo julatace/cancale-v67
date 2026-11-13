@@ -18,7 +18,7 @@
 }
 .vrm-jp-liste {
   list-style: none; margin: 0; padding: 0;
-  background: var(--p-carte, #fff); border-radius: var(--p-r-carte, 18px); overflow: hidden;
+  background: var(--p-carte, #fff); border-radius: var(--p-r-carte, 20px); overflow: hidden;
   box-shadow: 0 0 0 .5px var(--p-filet, rgba(60,60,67,.14));
 }
 .vrm-jp-ligne {
@@ -37,7 +37,7 @@
 .vrm-jp-poignee {
   flex: 0 0 44px; width: 44px !important; height: 44px !important; min-width: 44px !important; min-height: 44px !important;
   display: grid; place-items: center; padding: 0 !important; margin: 0 !important;
-  border: 0 !important; border-radius: 10px !important; background: transparent !important;
+  border: 0 !important; border-radius: 12px !important; background: transparent !important;
   color: var(--p-gris, #6E6E73) !important; cursor: grab; touch-action: none; -webkit-user-select: none; user-select: none;
   -webkit-tap-highlight-color: transparent;
 }

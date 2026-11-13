@@ -3,7 +3,7 @@
    Téléphone : les mêmes groupes empilés, cartes au doigt (44 px).
    Couleur rare (§7) : l'ambre seulement sur la ligne d'un geste dû. */
 .vrm-cc { display: grid; grid-template-columns: 1fr; gap: 14px; margin: 4px 0 22px; }
-.vrm-cc-col { background: var(--vrm-surface, #FFFFFF); border-radius: 14px; padding: 14px; min-width: 0; display: flex; flex-direction: column; }
+.vrm-cc-col { background: var(--vrm-surface, #FFFFFF); border-radius: 12px; padding: 14px; min-width: 0; display: flex; flex-direction: column; }
 .vrm-cc-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
 .vrm-cc-tete h2 { margin: 0; font-size: 17px !important; font-weight: 700 !important; letter-spacing: -.01em; line-height: 1.2; color: var(--vrm-ink, #1D1D1F); }
 .vrm-cc-compte { font-family: var(--vrm-police-mono, ui-monospace, monospace); font-weight: 500; font-size: 15px; color: var(--vrm-muted, #6E6E73); font-variant-numeric: tabular-nums; }
@@ -58,7 +58,7 @@ button.vrm-cc-carte:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3)
 .vrm-rp-point { display: flex; flex-direction: column; gap: 6px; scroll-margin-top: 72px; border-radius: 12px; }
 .vrm-rp-point.is-choisi { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 3px; }
 .vrm-rp-tete { display: flex; align-items: flex-start; gap: 10px; padding: 2px 2px 0; }
-.vrm-rp-numero { flex: none; width: 26px; height: 26px; border-radius: 14px; background: var(--vrm-ink, #1D1D1F); color: var(--vrm-bg, #FFFFFF);
+.vrm-rp-numero { flex: none; width: 26px; height: 26px; border-radius: 12px; background: var(--vrm-ink, #1D1D1F); color: var(--vrm-bg, #FFFFFF);
   font: 600 13px/26px var(--vrm-police-mono, ui-monospace, monospace); text-align: center; font-variant-numeric: tabular-nums; margin-top: 1px; }
 /* (1er nov.) La pastille porte le NOMBRE de colis — la même que l'épingle (même couleur). */
 .vrm-rp-compte { width: auto; min-width: 26px; padding: 0 6px; box-sizing: border-box; background: var(--vrm-bg, #FFFFFF); color: var(--vrm-ink, #1D1D1F); box-shadow: inset 0 0 0 1.5px var(--vrm-line, #E5E5EA); }
@@ -103,7 +103,7 @@ button.vrm-cc-carte:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3)
 
 /* À retirer : une carte = ce que c'est, puis SES gestes (code nommé et copiable,
    QR, Suivre, J'ai retiré) qui passent à la ligne — jamais un texte écrasé. */
-.vrm-colis-retirer .vrm-rp-point { background: var(--vrm-surface, #FFFFFF); border-radius: 14px; padding: 12px; }
+.vrm-colis-retirer .vrm-rp-point { background: var(--vrm-surface, #FFFFFF); border-radius: 12px; padding: 12px; }
 .vrm-colis-retirer .vrm-rp-carte { padding: 12px; }
 .vrm-rp-quoi { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .vrm-rp-quoi .vrm-cc-nom { flex: none; }
@@ -203,12 +203,12 @@ html body .vrm-eg-corps > .vrm-b { align-self: stretch; }
 .vrm-tournee-note { flex: 1 1 220px; margin: 0; font-size: 13px; line-height: 1.45; color: var(--vrm-muted, #6E6E73); }
 .vrm-tournee-groupe { display: flex; flex-direction: column; gap: 6px; }
 .vrm-tournee-groupe > .vrm-fu-groupe-transp { margin: 0 !important; }
-.vrm-tournee-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border-radius: 14px; background: var(--vrm-surface, #FFFFFF);
+.vrm-tournee-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border-radius: 12px; background: var(--vrm-surface, #FFFFFF);
   box-shadow: inset 0 0 0 1px var(--vrm-line, #E5E5EA); overflow: hidden; }
 .vrm-tournee-colis { display: flex; align-items: center; gap: 12px; padding: 8px 10px 8px 12px; min-height: 60px; box-sizing: border-box; transition: background-color .2s ease; }
 .vrm-tournee-colis + .vrm-tournee-colis { box-shadow: inset 0 1px 0 var(--vrm-line, #E5E5EA); }
 .vrm-tournee-colis.is-attente { background: var(--vrm-card2, #F2F2F7); }
-.vrm-tournee-photo { flex: none; width: 44px; height: 44px; border-radius: 10px; overflow: hidden; display: block; position: relative; }
+.vrm-tournee-photo { flex: none; width: 44px; height: 44px; border-radius: 12px; overflow: hidden; display: block; position: relative; }
 .vrm-tournee-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .vrm-tournee-quoi { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .vrm-tournee-titre { font-size: 15px; font-weight: 600; line-height: 1.3; color: var(--vrm-ink, #1D1D1F); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -265,7 +265,7 @@ html body .vrm-main .vrm-colis-titre .vrm-num, html body .vrm-tournee .vrm-num, 
 html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete-delai { padding: 10px 16px 2px !important; margin: 0 !important; }
 /* La carte en haut de la liste (téléphone compris) ; « Agrandir » posé dans son coin, 44 px au doigt. */
 :root:root body .vrm-rpf-carte[hidden] { display: none !important; }
-:root:root body .vrm-rpf-agrandir { position: absolute; left: 8px; bottom: 8px; z-index: 3; min-height: 44px; min-width: 44px; padding: 0 14px; border: 0; border-radius: 22px; font: 600 13px/44px var(--vrm-police, system-ui); color: #1d1d1f; background: rgba(255,255,255,.88); box-shadow: 0 1px 4px rgba(0,0,0,.18); cursor: pointer; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+:root:root body .vrm-rpf-agrandir { position: absolute; left: 8px; bottom: 8px; z-index: 3; min-height: 44px; min-width: 44px; padding: 0 14px; border: 0; border-radius: 20px; font: 600 13px/44px var(--vrm-police, system-ui); color: #1d1d1f; background: rgba(255,255,255,.88); box-shadow: 0 1px 4px rgba(0,0,0,.18); cursor: pointer; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
 :root:root body .vrm-rpf-agrandir:focus-visible { outline: 2px solid var(--d-accent, #0071E3); outline-offset: 2px; }
 :root:root body .vrm-rpf-ligne-delai { padding: 0 0 12px calc(56px + 12px); margin-top: -4px; }
 :root:root body .vrm-rpf-ligne-delai .vrm-rpf-delai { margin-top: 0; }

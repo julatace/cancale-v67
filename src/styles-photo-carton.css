@@ -1,7 +1,7 @@
 /* (10 nov., lot AZ + M) « Photo du carton » : le geste (scanner, Préparer mes colis), la ligne de la fiche de
    la vente et la photo en grand. Facultatif : un bouton secondaire, jamais l'accent. */
 .vrm-pc { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.vrm-pc-b { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 52px; width: 100%; padding: 0 16px; border-radius: 14px; border: 0;
+.vrm-pc-b { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 52px; width: 100%; padding: 0 16px; border-radius: 12px; border: 0;
   font-family: inherit; font-size: 17px; font-weight: 600; cursor: pointer; box-sizing: border-box; }
 .vrm-pc-b em { font-style: normal; font-weight: 500; font-size: 13px; opacity: .62; }
 .vrm-pc-b:disabled { opacity: .6; cursor: progress; }
@@ -11,9 +11,9 @@
 .vrm-pc.is-clair .vrm-pc-b { background: transparent; color: var(--d-encre, #1D1D1F); box-shadow: inset 0 0 0 1px var(--d-filet, rgba(60,60,67,.18)); }
 .vrm-pc.is-clair .vrm-pc-b.is-discret { color: var(--vrm-accent-texte, #0066CC); }
 .vrm-pc.is-compact .vrm-pc-b { width: auto; min-height: 44px; font-size: 15px; padding: 0 14px; }
-.vrm-pc-range { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 6px; border-radius: 14px; }
+.vrm-pc-range { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 6px; border-radius: 12px; }
 .vrm-pc.is-sombre .vrm-pc-range { background: #1c1c1e; color: #fff; }
-.vrm-pc-vignette { flex: 0 0 auto; width: 52px; height: 52px; border-radius: 10px; border: 0; padding: 0; overflow: hidden; display: grid; place-items: center; cursor: zoom-in; background: #2c2c2e; color: #fff; }
+.vrm-pc-vignette { flex: 0 0 auto; width: 52px; height: 52px; border-radius: 12px; border: 0; padding: 0; overflow: hidden; display: grid; place-items: center; cursor: zoom-in; background: #2c2c2e; color: #fff; }
 .vrm-pc-vignette img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .vrm-pc-range-txt { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .vrm-pc-range-txt b { font-size: 15px; font-weight: 600; }

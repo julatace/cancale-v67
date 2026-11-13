@@ -17,7 +17,7 @@ html body .vrm-app-shell .vrm-day-layout .vrm-jc {
   display: flex !important; flex-direction: column !important; align-items: stretch !important;
   gap: 0 !important; padding: 20px 24px !important; margin: 0;
   background: var(--vrm-surface) !important; background-image: none !important;
-  border: 0 !important; border-radius: 14px !important; box-shadow: none !important;
+  border: 0 !important; border-radius: 12px !important; box-shadow: none !important;
   color: var(--vrm-ink) !important; container-type: inline-size; min-width: 0; box-sizing: border-box;
 }
 @media (max-width: 767px) {
@@ -130,7 +130,7 @@ html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-tendance { cursor: poin
 }
 
 /* Le bénéfice seul (la carte « Vendu » retirée) : une case dans sa carte. */
-html body .vrm-app-shell .vrm-day-layout .vrm-jc-carte { padding: 16px 20px !important; border: 0 !important; border-radius: 14px !important; }
+html body .vrm-app-shell .vrm-day-layout .vrm-jc-carte { padding: 16px 20px !important; border: 0 !important; border-radius: 12px !important; }
 html body .vrm-app-shell .vrm-day-layout .vrm-jc-carte .vrm-jc-cell { display: flex; flex-direction: column; align-items: flex-start; }
 html body .vrm-app-shell .vrm-day-layout .vrm-jc-carte .vrm-jc-l { font-size: 13px; color: var(--vrm-muted); text-decoration: none; }
 html body .vrm-app-shell .vrm-day-layout .vrm-jc-carte .vrm-jc-v { margin-top: 4px; font-size: 22px; }

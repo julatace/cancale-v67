@@ -21,15 +21,15 @@
 }
 .vrm-fp-num.is-double { color: var(--vrm-danger, #B42318); }
 .vrm-fp-quoi { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.vrm-fp-titre { font-size: 20px; font-weight: 800; letter-spacing: -.02em; line-height: 1.2; overflow-wrap: anywhere; }
+.vrm-fp-titre { font-size: 20px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2; overflow-wrap: anywhere; }
 .vrm-fp-sous { font-size: 15px; color: var(--vrm-muted, #6E6E73); }
-.vrm-fp-photo { flex: none; width: 64px; height: 64px; border-radius: 14px; overflow: hidden; background: var(--vrm-card2, #F2F2F7); display: block; }
+.vrm-fp-photo { flex: none; width: 64px; height: 64px; border-radius: 12px; overflow: hidden; background: var(--vrm-card2, #F2F2F7); display: block; }
 .vrm-fp-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.vrm-fp-double { margin: -4px 0 14px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--vrm-danger, #B42318); color: var(--vrm-danger, #B42318); font-weight: 600; font-size: 15px; line-height: 1.4; }
+.vrm-fp-double { margin: -4px 0 14px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--vrm-danger, #B42318); color: var(--vrm-danger, #B42318); font-weight: 600; font-size: 15px; line-height: 1.4; }
 .vrm-fp-tuiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
-.vrm-fp-tuile { background: var(--vrm-surface, #FFFFFF); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.vrm-fp-tuile { background: var(--vrm-surface, #FFFFFF); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .vrm-fp-tuile > span { font-size: 13px; color: var(--vrm-muted, #6E6E73); }
-.vrm-fp-tuile > b { font-size: 22px; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-fp-tuile > b { font-size: 22px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .vrm-fp-tuile > small { font-size: 12px; color: var(--vrm-muted, #6E6E73); line-height: 1.3; }
 .vrm-fp-parcours { list-style: none; margin: 0; padding: 0; }
 .vrm-fp-etape { position: relative; display: flex; gap: 14px; padding: 0 0 16px; }
@@ -47,7 +47,7 @@
 .vrm-fp-vide { font-size: 17px; color: var(--vrm-muted, #6E6E73); margin: 24px 2px; }
 .vrm-fp-actions { display: flex; gap: 10px; margin-top: 6px; }
 .vrm-fp-b {
-  flex: 1 1 0; min-height: 56px; border-radius: 14px; padding: 0 14px; display: flex; align-items: center; justify-content: center; gap: 10px;
+  flex: 1 1 0; min-height: 56px; border-radius: 12px; padding: 0 14px; display: flex; align-items: center; justify-content: center; gap: 10px;
   border: 1px solid var(--vrm-line, #D1D1D6); background: var(--vrm-bg, #FFFFFF); color: var(--vrm-ink, #1D1D1F); font: inherit; font-size: 17px; font-weight: 700; cursor: pointer;
 }
 .vrm-fp-b-plein { background: var(--vrm-ink, #1D1D1F); border-color: var(--vrm-ink, #1D1D1F); color: var(--vrm-bg, #FFFFFF); }
@@ -60,7 +60,7 @@
 .vrm-fp-etat { margin: 0 0 18px; }
 .vrm-fp-etat-titre { font-size: 15px; font-weight: 700; margin: 0 2px 8px; color: var(--vrm-ink, inherit); }
 .vrm-fp-etat-grille { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; }
-.vrm-fp-etat-l { background: var(--vrm-surface, #FFFFFF); border-radius: 14px; padding: 10px 12px; min-width: 0; }
+.vrm-fp-etat-l { background: var(--vrm-surface, #FFFFFF); border-radius: 12px; padding: 10px 12px; min-width: 0; }
 .vrm-fp-etat-l dt { font-size: 12px; color: var(--vrm-muted, #6E6E73); margin: 0 0 4px; }
 .vrm-fp-etat-l dd { margin: 0; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .vrm-fp-etat-l dd b { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
@@ -74,6 +74,6 @@
 
 /* (9 nov., lot AF) « L’histoire du N° » : lecture seule, un groupe blanc rayon 24 (DA6), neutre — aucune couleur. */
 .vrm-fp-histo-num { margin: 0 0 18px; }
-.vrm-fp-histo-num .vrm-fp-evs { background: var(--vrm-surface, #FFFFFF); border-radius: 24px; padding: 12px 14px; margin: 0; gap: 10px; }
+.vrm-fp-histo-num .vrm-fp-evs { background: var(--vrm-surface, #FFFFFF); border-radius: 20px; padding: 12px 14px; margin: 0; gap: 10px; }
 .vrm-fp-histo-num .vrm-fp-ev time, .vrm-fp-histo-num .vrm-fp-ev .vrm-fp-ev-sansdate { min-width: 76px; }
 .vrm-fp-histo-num .vrm-fp-note { margin: 8px 2px 0; }

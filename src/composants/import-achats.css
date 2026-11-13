@@ -19,10 +19,10 @@
 .vrm-imp-col select[data-imp-champ=""] { color: var(--vrm-muted, #6E6E73); }
 .vrm-imp-resume { display: flex; flex-wrap: wrap; gap: 8px; }
 .vrm-imp-pastille { padding: 7px 12px; border-radius: 999px; background: var(--vrm-surface, #fff); box-shadow: 0 0 0 .5px var(--vrm-line, rgba(60,60,67,.18)); font-size: 14px; color: var(--vrm-ink, #1D1D1F); font-variant-numeric: tabular-nums; }
-.vrm-imp-pastille b { font-weight: 800; }
+.vrm-imp-pastille b { font-weight: 700; }
 .vrm-imp-pastille.vrm-imp-ambre { background: var(--vrm-warn-soft, rgba(255,159,10,.16)); color: var(--vrm-warn, #B25E00); }
 .vrm-imp-lignes {
-  list-style: none; margin: 0; padding: 0; border-radius: 14px; overflow: hidden;
+  list-style: none; margin: 0; padding: 0; border-radius: 12px; overflow: hidden;
   background: var(--vrm-surface, #fff); box-shadow: 0 0 0 .5px var(--vrm-line, rgba(60,60,67,.18));
 }
 .vrm-imp-ligne { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 8px 14px; box-sizing: border-box; position: relative; }

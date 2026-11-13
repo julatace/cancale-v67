@@ -20,7 +20,7 @@
     position: relative; overflow: hidden; isolation: isolate;
     margin: -24px -24px 14px !important; /* annule les marges de la zone (14+10 px, 16+8 px) */
     padding: 14px 20px 22px !important;
-    border-radius: 0 0 26px 26px;
+    border-radius: 0 0 20px 20px;
     background: none;
     color: var(--vrm-ink);
   }
@@ -47,13 +47,13 @@
 
   /* Les choses à faire : des cartes qu'on lit, pas une liste tassée. */
   .vrm-app-shell .vrm-day-layout .vrm-day-task-list { gap: 8px !important; }
-  .vrm-app-shell .vrm-day-layout .vrm-day-task { padding: 12px 14px !important; gap: 12px !important; border-radius: 14px !important; }
+  .vrm-app-shell .vrm-day-layout .vrm-day-task { padding: 12px 14px !important; gap: 12px !important; border-radius: 12px !important; }
   .vrm-app-shell .vrm-day-layout .vrm-day-task-title { font-size: 15px !important; }
   .vrm-app-shell .vrm-day-layout .vrm-day-task-note { font-size: 12px !important; }
   .vrm-app-shell .vrm-day-layout .vrm-day-task .vrm-day-task-action { font-size: 12px !important; }
 
   /* Les tuiles : le chiffre en grand. */
-  .vrm-app-shell .vrm-day-layout .vrm-day-bar > button { border-radius: 14px !important; }
+  .vrm-app-shell .vrm-day-layout .vrm-day-bar > button { border-radius: 12px !important; }
   .vrm-app-shell .vrm-day-layout .vrm-day-bar-n { font-size: 22px !important; }
   .vrm-app-shell .vrm-day-layout .vrm-day-bar-l { font-size: 11px !important; }
 

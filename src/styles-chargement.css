@@ -1,6 +1,6 @@
 .vrm-demarrage { min-height: 100dvh; display: grid; place-items: center; box-sizing: border-box; padding: 24px; background: var(--vrm-bg, #f2f2f7); color: var(--vrm-ink, #1d1d1f); }
 .vrm-demarrage-carte { width: min(280px, 100%); text-align: center; }
-.vrm-demarrage-carte img { display: block; margin: 0 auto 18px; border-radius: 14px; }
+.vrm-demarrage-carte img { display: block; margin: 0 auto 18px; border-radius: 12px; }
 .vrm-demarrage-carte h1 { margin: 0; font-size: 24px; letter-spacing: -.04em; }
 .vrm-demarrage-carte p { margin: 8px 0 24px; font-size: 14px; color: var(--vrm-muted, #6e6e73); }
 .vrm-demarrage-rail { display: block; height: 3px; overflow: hidden; border-radius: 99px; background: var(--vrm-line, #e5e5ea); }

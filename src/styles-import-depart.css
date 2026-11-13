@@ -4,7 +4,7 @@
    l'ambre seulement pour un geste à faire (« ouvre vinted.fr sur ce compte »).
    ═══════════════════════════════════════════════════════════════════════════ */
 .vrm-imp { display: flex; flex-direction: column; gap: 10px; }
-.vrm-imp-journee { margin: 0 0 16px; padding: 12px 14px; border-radius: 14px; background: var(--d-carte, #FFFFFF);
+.vrm-imp-journee { margin: 0 0 16px; padding: 12px 14px; border-radius: 12px; background: var(--d-carte, #FFFFFF);
   border: 0.5px solid var(--d-filet, rgba(60,60,67,.14)); }
 .vrm-imp-titre { font-size: 13px; font-weight: 600; color: var(--d-gris, #6E6E73); }
 .vrm-imp-compte { display: flex; flex-direction: column; gap: 6px; }

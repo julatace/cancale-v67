@@ -51,8 +51,8 @@ html body .vrm-chat-panel .vrm-chat-negociation-etat small { display: inline !im
 html body .vrm-chat-panel .vrm-chat-negociation-etat small::before { content: '· '; }
 
 /* Les bulles : arrondies comme une messagerie, la petite pointe côté auteur. */
-html body .vrm-chat-panel .vrm-bulle-l > .vrm-bulle.vrm-bulle { border-radius: 18px 18px 18px 6px !important; padding: 10px 14px !important; }
-html body .vrm-chat-panel .vrm-bulle-l.vrm-bulle-moi > .vrm-bulle.vrm-bulle { border-radius: 18px 18px 6px 18px !important; }
+html body .vrm-chat-panel .vrm-bulle-l > .vrm-bulle.vrm-bulle { border-radius: 20px 20px 20px 6px !important; padding: 10px 14px !important; }
+html body .vrm-chat-panel .vrm-bulle-l.vrm-bulle-moi > .vrm-bulle.vrm-bulle { border-radius: 20px 20px 6px 20px !important; }
 html body .vrm-chat-panel .vrm-bulle-l.vrm-bulle-moi { align-self: flex-end; }
 /* L'envoi en cours / refusé : la bulle en attente, plus pâle. */
 html body .vrm-chat-panel .vrm-bulle-envoi > .vrm-bulle.vrm-bulle { opacity: .55; }

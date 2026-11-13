@@ -15,7 +15,7 @@ html body .vrm-app-shell .vrm-main .vrm-toutes-photo > .vrm-photo-vide { width: 
 /* Le toucher répond tout de suite (pas d'attente du relâcher). */
 html body .vrm-app-shell .vrm-main .vrm-toutes-ligne { -webkit-tap-highlight-color: transparent; transition: background-color .12s ease-out; }
 html body .vrm-app-shell .vrm-main .vrm-toutes-ligne:active { background: var(--vrm-surface) !important; }
-html body .vrm-app-shell .vrm-main .vrm-toutes-ligne:focus-visible { outline: 2px solid var(--vrm-accent); outline-offset: -2px; border-radius: 10px; }
+html body .vrm-app-shell .vrm-main .vrm-toutes-ligne:focus-visible { outline: 2px solid var(--vrm-accent); outline-offset: -2px; border-radius: 12px; }
 html body .vrm-app-shell .vrm-main .vrm-toutes-montant [data-toutes-prix] { font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* ── « Pas encore lus » : UNE ligne repliée (revue 2.14) ──────────────────── */

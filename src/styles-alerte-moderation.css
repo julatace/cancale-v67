@@ -4,7 +4,7 @@
    paires sous un N°, §7). Cibles au doigt 44 px.
    ════════════════════════════════════════════════════════════════════════════ */
 .vrm-moderation {
-  margin: 0 0 16px; padding: 12px 16px 6px; border-radius: var(--w-r, 24px);
+  margin: 0 0 16px; padding: 12px 16px 6px; border-radius: var(--w-r, 20px);
   background: var(--w-carte, #fff); box-shadow: var(--w-ombre, none);
   border-left: 3px solid var(--vrm-warn, #B25000);
 }

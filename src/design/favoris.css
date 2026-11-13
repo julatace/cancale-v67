@@ -33,7 +33,7 @@
 .vrm-fa .vrm-fa-unite { font-size: .5em; font-weight: 600; letter-spacing: -.01em; color: rgba(255,255,255,.72); }
 
 /* Segmenté iOS : piste, pastille levée sur le choix. */
-.vrm-fa-seg { display: flex; gap: 2px; padding: 2px; border-radius: 10px; background: var(--fu-piste); min-width: 0; }
+.vrm-fa-seg { display: flex; gap: 2px; padding: 2px; border-radius: 12px; background: var(--fu-piste); min-width: 0; }
 .vrm-fa .vrm-fa-seg > button, .vrm-app-shell .vrm-main .vrm-fa .vrm-fa-seg > button {
   flex: 1 1 auto; min-width: 0; min-height: 40px; padding: 0 8px; border-radius: 8px !important;
   background: transparent !important; color: var(--fu-encre) !important;
@@ -83,7 +83,7 @@
   min-height: 44px; margin: -8px -8px -8px 0; padding: 0 8px; background: none !important; color: var(--vrm-accent-texte) !important; font: 600 15px/1 var(--vrm-police) !important;
 }
 .vrm-fa-bulle {
-  margin: 0; align-self: flex-start; max-width: 100%; padding: 10px 14px; border-radius: 18px 18px 18px 6px;
+  margin: 0; align-self: flex-start; max-width: 100%; padding: 10px 14px; border-radius: 20px 20px 20px 6px;
   background: var(--fu-case); color: var(--fu-encre); font: 400 15px/1.4 var(--vrm-police);
   white-space: pre-wrap; overflow-wrap: anywhere;
 }
@@ -109,7 +109,7 @@
 .vrm-fa-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .vrm-fa-article { display: flex; align-items: center; gap: 8px; padding: 10px 12px 10px 10px; min-width: 0; }
 .vrm-fa .vrm-fa-article-corps, .vrm-app-shell .vrm-main .vrm-fa .vrm-fa-article-corps {
-  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 0; background: none !important; color: inherit !important; text-align: left; border-radius: 14px !important;
+  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 0; background: none !important; color: inherit !important; text-align: left; border-radius: 12px !important;
 }
 .vrm-fa-photo { flex: none; width: var(--t, 56px); height: var(--t, 56px); border-radius: var(--fu-r-photo); overflow: hidden; background: var(--fu-case); display: grid; place-items: center; color: var(--fu-gris3); }
 .vrm-fa-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -129,17 +129,17 @@
 }
 .vrm-fa-pile > i + i { margin-left: -6px; }
 .vrm-fa-pile > i.is-vide, .vrm-fa-avatar.is-vide { background: var(--fu-case); }
-.vrm-fa-pile > i.is-plus { width: auto; min-width: 22px; padding: 0 6px; border-radius: 11px; background: var(--fu-case); color: var(--fu-gris); font-weight: 600; }
+.vrm-fa-pile > i.is-plus { width: auto; min-width: 22px; padding: 0 6px; border-radius: 12px; background: var(--fu-case); color: var(--fu-gris); font-weight: 600; }
 
 .vrm-fa-puce { display: inline-flex; align-items: center; min-height: 22px; padding: 0 8px; border-radius: 7px; background: var(--fu-case); color: var(--fu-gris); font: 600 12px/1 var(--vrm-police); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .vrm-fa-puce.is-geste { background: var(--fu-ambre-fond); color: var(--fu-ambre-txt); }
 
 .vrm-fa .vrm-fa-envoyer, .vrm-fa-feuille .vrm-fa-envoyer, .vrm-app-shell .vrm-main .vrm-fa .vrm-fa-envoyer {
-  flex: none; min-height: 36px; padding: 0 16px; border-radius: 18px !important; background: var(--fu-bleu) !important; color: #fff !important;
+  flex: none; min-height: 36px; padding: 0 16px; border-radius: 20px !important; background: var(--fu-bleu) !important; color: #fff !important;
   font: 600 14px/1 var(--vrm-police) !important; white-space: nowrap; position: relative; transition: transform .12s ease, opacity .12s ease;
 }
 .vrm-fa .vrm-fa-second, .vrm-fa-feuille .vrm-fa-second, .vrm-app-shell .vrm-main .vrm-fa .vrm-fa-second {
-  flex: none; min-height: 36px; padding: 0 14px; border-radius: 18px !important; background: var(--fu-case) !important; color: var(--vrm-accent-texte) !important;
+  flex: none; min-height: 36px; padding: 0 14px; border-radius: 20px !important; background: var(--fu-case) !important; color: var(--vrm-accent-texte) !important;
   font: 600 14px/1 var(--vrm-police) !important; white-space: nowrap; position: relative; transition: transform .12s ease;
 }
 /* 36 px visibles, 44 px au doigt. */
@@ -149,7 +149,7 @@
 @media (hover: hover) { .vrm-fa .vrm-fa-envoyer:hover:not(:disabled) { opacity: .88; } }
 
 .vrm-fa .vrm-fa-plus, .vrm-app-shell .vrm-main .vrm-fa .vrm-fa-plus {
-  align-self: center; min-height: 44px; padding: 0 18px; border-radius: 22px !important; background: var(--fu-carte) !important; color: var(--vrm-accent-texte) !important; font: 600 15px/1 var(--vrm-police) !important; box-shadow: var(--fu-ombre) !important;
+  align-self: center; min-height: 44px; padding: 0 18px; border-radius: 20px !important; background: var(--fu-carte) !important; color: var(--vrm-accent-texte) !important; font: 600 15px/1 var(--vrm-police) !important; box-shadow: var(--fu-ombre) !important;
 }
 .vrm-fa-ligne { margin: 4px 2px; font: 500 15px/1.4 var(--vrm-police); color: var(--fu-gris); }
 .vrm-fa-ligne.is-geste { color: var(--fu-ambre-txt); }
@@ -194,7 +194,7 @@
 .vrm-fa-personne-texte b { font: 600 15px/1.3 var(--vrm-police); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vrm-fa-personne-texte small { font: 500 13px/1.3 var(--vrm-police); color: var(--fu-gris); }
 .vrm-fa-feuille-pied { flex: none; padding: 12px 16px 16px; border-top: 1px solid var(--fu-filet); }
-.vrm-fa-feuille .vrm-fa-envoyer.is-large { width: 100%; min-height: 50px; border-radius: 14px !important; font-size: 17px !important; }
+.vrm-fa-feuille .vrm-fa-envoyer.is-large { width: 100%; min-height: 50px; border-radius: 12px !important; font-size: 17px !important; }
 .vrm-fa-feuille > [role="alert"], .vrm-fa-feuille > [role="status"] { margin: 0 16px 8px; font: 500 14px/1.4 var(--vrm-police); }
 
 /* Le mode auto dans sa feuille : les réglages existants, à l'encre de la feuille. */
@@ -205,12 +205,12 @@
 .vrm-fa-feuille .vrm-favoris-auto-boutons > button { flex: 1 1 0; min-height: 48px; border-radius: 12px !important; background: var(--fu-case) !important; color: var(--fu-encre) !important; font: 600 15px/1 var(--vrm-police) !important; padding: 0 12px; }
 .vrm-fa-feuille .vrm-favoris-auto-boutons > button.is-principal { background: var(--fu-bleu) !important; color: #fff !important; }
 .vrm-fa-feuille .vrm-favoris-auto-reglages { display: flex; flex-direction: column; gap: 12px; }
-.vrm-fa-feuille .vrm-favoris-auto-reglages input { width: 3.4em; min-height: 40px; margin: 0 6px; padding: 0 8px; border-radius: 10px; border: 1px solid var(--fu-piste); background: var(--fu-case); color: var(--fu-encre); font: 600 15px/1 var(--vrm-police); text-align: center; }
+.vrm-fa-feuille .vrm-favoris-auto-reglages input { width: 3.4em; min-height: 40px; margin: 0 6px; padding: 0 8px; border-radius: 12px; border: 1px solid var(--fu-piste); background: var(--fu-case); color: var(--fu-encre); font: 600 15px/1 var(--vrm-police); text-align: center; }
 .vrm-fa-feuille .vrm-favoris-auto-reglages small { color: var(--fu-gris); font-size: 13px; }
-.vrm-fa-feuille .vrm-favoris-auto-jours { display: flex; gap: 4px; padding: 2px; border-radius: 10px; background: var(--fu-piste); }
+.vrm-fa-feuille .vrm-favoris-auto-jours { display: flex; gap: 4px; padding: 2px; border-radius: 12px; background: var(--fu-piste); }
 .vrm-fa-feuille .vrm-favoris-auto-jours > button { flex: 1; min-height: 40px; border-radius: 8px !important; background: transparent !important; color: var(--fu-encre) !important; font: 600 13px/1 var(--vrm-police) !important; }
 .vrm-fa-feuille .vrm-favoris-auto-jours > button[aria-pressed="true"] { background: var(--fu-carte) !important; box-shadow: 0 1px 3px rgba(0,0,0,.1) !important; }
-.vrm-fa-feuille .vrm-favoris-auto-confirmer { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 14px; background: var(--fu-ambre-fond); }
+.vrm-fa-feuille .vrm-favoris-auto-confirmer { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 12px; background: var(--fu-ambre-fond); }
 .vrm-fa-feuille .vrm-favoris-auto-confirmer p { margin: 0; font-size: 14px; }
 .vrm-fa-feuille [role="alert"] { color: var(--fu-ambre-txt); margin: 0; }
 

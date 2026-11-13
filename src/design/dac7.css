@@ -10,9 +10,9 @@
 .vrm-d7-annee { min-height: 44px; border-radius: 12px; border: 1px solid var(--fu-piste); background: var(--fu-carte); color: var(--fu-encre); font: inherit; font-size: 15px; font-weight: 600; padding: 0 12px; }
 .vrm-d7-vide { font-size: 15px; color: var(--fu-gris); }
 .vrm-d7-plateforme { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.vrm-d7-p-titre { margin: 0; font-size: 17px; font-weight: 800; letter-spacing: -.02em; display: flex; align-items: baseline; gap: 8px; }
+.vrm-d7-p-titre { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -.02em; display: flex; align-items: baseline; gap: 8px; }
 .vrm-d7-p-n { font-size: 13px; font-weight: 600; color: var(--fu-gris); }
-.vrm-d7-rapport { background: var(--fu-case); border-radius: 14px; padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.vrm-d7-rapport { background: var(--fu-case); border-radius: 12px; padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .vrm-d7-rapport-l { display: flex; flex-direction: column; gap: 2px; font-size: 13px; min-width: 0; }
 .vrm-d7-rapport-l b { font-weight: 700; font-size: 13px; }
 .vrm-d7-rapport-l.is-fiscal { color: var(--fu-gris); border-top: 1px solid var(--fu-filet); padding-top: 6px; }
@@ -20,11 +20,11 @@
 .vrm-d7-lien { display: inline-flex; align-items: center; min-height: 44px; color: var(--vrm-accent-texte); font-weight: 600; text-decoration: none; }
 .vrm-d7-lien:focus-visible, .vrm-d7-btn:focus-visible, .vrm-d7-annee:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: 2px; }
 .vrm-d7-liste { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 10px; }
-.vrm-d7-carte { background: var(--fu-carte); border: 1px solid var(--fu-filet); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.vrm-d7-carte { background: var(--fu-carte); border: 1px solid var(--fu-filet); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .vrm-d7-carte-tete { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .vrm-d7-nom { font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vrm-d7-verdict { font-size: 13px; color: var(--fu-gris); font-weight: 500; }
-.vrm-d7-verdict.is-atteint { color: var(--fu-encre); font-weight: 800; }
+.vrm-d7-verdict.is-atteint { color: var(--fu-encre); font-weight: 700; }
 .vrm-d7-mesures { display: flex; flex-direction: column; gap: 8px; }
 .vrm-d7-mesure { display: flex; flex-direction: column; gap: 5px; }
 .vrm-d7-mesure-l { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 13px; color: var(--fu-gris); }

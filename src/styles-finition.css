@@ -97,7 +97,7 @@ html body .vrm-chat-panel .vrm-bulle-pied [data-traduire]:not(#_):not(#_) { min-
 html body .vrm-chat-panel .vrm-chat-jour { align-self: center; font-size: 12px; font-weight: 500; padding: 4px 10px; border-radius: 999px; margin: 8px 0 4px; }
 /* Une offre dans le fil : un encart à filet, du même rayon que la carte d'offre,
    sans dégradé (« acceptée » portait un dégradé vert). */
-html body .vrm-chat-panel .vrm-chat-offer-event { border-radius: 14px !important; padding: 10px 14px !important; margin: 6px 0 !important; background: var(--vrm-bg) !important; border: 1px solid var(--vrm-line) !important; }
+html body .vrm-chat-panel .vrm-chat-offer-event { border-radius: 12px !important; padding: 10px 14px !important; margin: 6px 0 !important; background: var(--vrm-bg) !important; border: 1px solid var(--vrm-line) !important; }
 html body .vrm-chat-panel .vrm-chat-offer-event[data-offer-status] { background: var(--vrm-bg) !important; background-image: none !important; }
 html body .vrm-chat-panel .vrm-chat-offer-event span { font-size: 13px; font-weight: 600; }
 html body .vrm-chat-panel .vrm-chat-offer-event strong { font-size: 17px; font-weight: 700; }
@@ -118,7 +118,7 @@ html body .vrm-chat-panel .vrm-chat-rapides > button:not(:disabled):active { tra
 }
 html body .vrm-chat-panel .vrm-chat-compose { gap: 8px !important; align-items: flex-end !important; }
 html body .vrm-chat-panel .vrm-chat-compose > textarea {
-  border: 1px solid var(--vrm-line) !important; background: var(--vrm-bg) !important; border-radius: 24px !important;
+  border: 1px solid var(--vrm-line) !important; background: var(--vrm-bg) !important; border-radius: 20px !important;
   min-height: 46px !important; padding: 12px 18px !important; line-height: 20px !important; box-sizing: border-box; outline: none;
   transition: border-color .12s ease;
 }
@@ -183,7 +183,7 @@ html .vrm-app-shell .vrm-main .vrm-day-bar-l { font-size: 12px !important; }
 html .vrm-app-shell :is(.vrm-msg-time, .vrm-bulle-h, .vrm-chat-offer-event strong, .vrm-seg-n) { font-variant-numeric: tabular-nums; }
 
 /* ── 8. LES ÉTATS VIDES : un disque neutre, une icône au trait ──────────────── */
-html .vrm-app-shell .vrm-empty-state { border-radius: var(--vrm-r-md, 14px) !important; box-shadow: none !important; padding: 32px 20px !important; }
+html .vrm-app-shell .vrm-empty-state { border-radius: var(--vrm-r-md, 12px) !important; box-shadow: none !important; padding: 32px 20px !important; }
 html .vrm-app-shell .vrm-empty-state > div:nth-child(2) { font-size: 17px !important; font-weight: 600 !important; letter-spacing: -.01em !important; }
 html .vrm-app-shell .vrm-empty-state > div:nth-child(3) { font-size: 13px !important; color: var(--vrm-muted) !important; margin-top: 6px !important; }
 

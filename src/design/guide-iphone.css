@@ -7,7 +7,7 @@
    Échelle fermée (scripts/fusion-echelle.mjs) : 13 · 15 · 17 ; 400 · 600 · 700 ;
    rayons 12 · 14 · 999.
    ════════════════════════════════════════════════════════════════════════════ */
-.vrm-gi { background: var(--fu-case, #f2f2f7); border-radius: 14px; padding: 14px 14px 16px; margin: 0 0 12px; color: var(--fu-encre, #1d1d1f); min-width: 0; }
+.vrm-gi { background: var(--fu-case, #f2f2f7); border-radius: 12px; padding: 14px 14px 16px; margin: 0 0 12px; color: var(--fu-encre, #1d1d1f); min-width: 0; }
 .vrm-gi-tete { display: flex; align-items: flex-start; gap: 8px; }
 .vrm-gi-titres { flex: 1; min-width: 0; }
 .vrm-gi-titre { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; color: var(--fu-encre, #1d1d1f); }

@@ -44,7 +44,7 @@
 
 /* ── 2. LE GRAND TITRE : 34/800, -0,03 em, sur CHAQUE écran (#2, #9) ───────── */
 :root:root body .vrm-app-shell .vrm-main :is(.vrm-screen-head h1, .vrm-screen-head h2.vrm-display, .vrm-tache-tete h1, .vrm-market-heading h1, h2.vrm-set-h1) {
-  font: 800 34px/1.1 var(--vrm-police) !important; letter-spacing: -.03em !important; color: var(--fu-encre) !important; margin: 0 !important;
+  font: 700 34px/1.1 var(--vrm-police) !important; letter-spacing: -.03em !important; color: var(--fu-encre) !important; margin: 0 !important;
 }
 :root:root body .vrm-app-shell .vrm-main .vrm-set-tete { display: flex !important; margin: 4px 0 16px !important; }
 @media (max-width: 767px) {
@@ -124,7 +124,7 @@
 }
 
 /* ── 7. MENUS ET FEUILLES : une ombre, un rayon ───────────────────────────── */
-:root:root body .vrm-app-shell .vrm-menu-flottant { border: 0 !important; border-radius: 14px !important; box-shadow: var(--o-flottant) !important; background: var(--fu-carte) !important; }
+:root:root body .vrm-app-shell .vrm-menu-flottant { border: 0 !important; border-radius: 12px !important; box-shadow: var(--o-flottant) !important; background: var(--fu-carte) !important; }
 :root:root body .vrm-app-shell .vrm-menu-flottant[data-outils-annonces] { width: min(340px, calc(var(--vrm-vw100, 100vw) - 32px)) !important; padding: 8px !important; box-sizing: border-box; }
 :root:root body .vrm-app-shell .vrm-menu-flottant[data-outils-annonces] > button:not(#fu) { min-height: 44px; width: 100%; }
 :root body .vrm-outils-annonces-haut { display: flex; flex-direction: column; gap: 8px; padding: 0 0 8px; margin: 0 0 6px; border-bottom: 1px solid var(--fu-filet); }

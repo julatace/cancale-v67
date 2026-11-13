@@ -27,7 +27,7 @@
 .vrm-boite :focus-visible,.vrm-boite-feuille :focus-visible{outline:2px solid var(--vrm-focus,var(--bx-accent));outline-offset:2px}
 .vrm-boite ::selection,.vrm-boite-feuille ::selection{background:color-mix(in srgb,var(--bx-accent) 24%,transparent)}
 .vrm-boite-sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
-.vrm-boite-vues{display:flex;gap:4px;padding:4px;border-radius:14px;background:var(--bx-fin);margin:4px 0 14px;max-width:440px}
+.vrm-boite-vues{display:flex;gap:4px;padding:4px;border-radius:12px;background:var(--bx-fin);margin:4px 0 14px;max-width:440px}
 .vrm-boite-vues button{flex:1 1 0;border:0;background:transparent;font-weight:600;min-width:0;white-space:nowrap}
 .vrm-boite-vues button[aria-selected=true]{background:var(--bx-carte);box-shadow:0 1px 2px rgba(0,0,0,.10)}
 
@@ -239,7 +239,7 @@
 /* La carte d'une vente, d'une offre, d'un achat : le montant en grand, la photo. */
 .vrm-boite-heros{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center;padding:16px 18px;border-radius:20px;background:var(--bx-carte);box-shadow:0 0 0 .5px var(--bx-filet),var(--bx-ombre)}
 .vrm-boite-heros:not(:has(.vrm-boite-heros-photo)){grid-template-columns:minmax(0,1fr)}
-.vrm-boite-heros-photo{width:76px;height:76px;border-radius:14px;object-fit:cover;background:var(--bx-gris)}
+.vrm-boite-heros-photo{width:76px;height:76px;border-radius:12px;object-fit:cover;background:var(--bx-gris)}
 .vrm-boite-heros-txt{display:grid;gap:2px;min-width:0}
 .vrm-boite-heros-txt p{margin:0}
 .vrm-boite-heros-montant{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px}
@@ -249,12 +249,12 @@
 .vrm-boite-heros-num{justify-self:start;margin-top:4px!important;padding:2px 10px;border-radius:999px;background:var(--bx-gris);font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
 .vrm-boite-heros-limite{font-size:15px;color:var(--bx-doux)}
 .vrm-boite-heros-limite[data-ambre="1"]{color:var(--bx-ambre);font-weight:600}
-.vrm-boite-averif{width:100%;padding:12px 14px;border-radius:14px;background:var(--bx-ambre-doux);color:var(--bx-encre)}
+.vrm-boite-averif{width:100%;padding:12px 14px;border-radius:12px;background:var(--bx-ambre-doux);color:var(--bx-encre)}
 .vrm-boite-averif p{margin:0}
 .vrm-boite-averif p+p{margin-top:4px}
 .vrm-boite-averif b{color:var(--bx-ambre)}
 .vrm-boite-gestes{display:flex;flex-wrap:wrap;gap:8px}
-.vrm-boite .vrm-boite-gestes button,.vrm-boite-feuille .vrm-boite-gestes button{font-size:17px;padding:0 20px;min-height:48px;border-radius:14px}
+.vrm-boite .vrm-boite-gestes button,.vrm-boite-feuille .vrm-boite-gestes button{font-size:17px;padding:0 20px;min-height:48px;border-radius:12px}
 .vrm-boite-fait{margin:0;font-size:13px;color:var(--bx-doux)}
 .vrm-boite-sous{margin:0 0 8px;font-size:13px;font-weight:600;color:var(--bx-doux)}
 .vrm-boite-sujet{margin:0 0 12px;font-size:17px;font-weight:600;line-height:1.35;letter-spacing:-.01em}
@@ -281,7 +281,7 @@
 .vrm-boite-msg-pied p{margin:0}
 .vrm-boite-pieces{margin:0 0 20px}
 .vrm-boite-pieces ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
-.vrm-boite-pieces li{display:grid;grid-template-columns:40px minmax(0,1fr);gap:0 10px;align-items:center;padding:10px 12px;border-radius:14px;background:var(--bx-gris)}
+.vrm-boite-pieces li{display:grid;grid-template-columns:40px minmax(0,1fr);gap:0 10px;align-items:center;padding:10px 12px;border-radius:12px;background:var(--bx-gris)}
 .vrm-boite-piece-ic{grid-row:span 2;display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:var(--bx-carte);font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--bx-doux)}
 .vrm-boite-pieces li small{grid-column:2;color:var(--bx-doux);font-size:13px}
 .vrm-boite-pieces>.vrm-boite-doux:first-child{margin-top:0}
@@ -324,7 +324,7 @@
 .vrm-boite .vrm-relier-choix button{display:grid;gap:0;text-align:left;padding:8px 12px;min-height:56px}
 .vrm-relier-choix button small{color:var(--bx-doux);font-size:12px}
 .vrm-boite .vrm-relier-choix button[aria-pressed=true]{border-color:var(--bx-encre);box-shadow:inset 0 0 0 1px var(--bx-encre)}
-.vrm-relier-scene-bloc{display:grid;gap:14px;padding:14px;border-radius:14px;background:var(--bx-carte);min-width:0}
+.vrm-relier-scene-bloc{display:grid;gap:14px;padding:14px;border-radius:12px;background:var(--bx-carte);min-width:0}
 @media(min-width:900px){.vrm-relier-scene-bloc{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);align-items:center;padding:20px}}
 .vrm-relier-legende{min-width:0}
 .vrm-relier-legende h3{margin:2px 0 6px;font-size:20px;font-weight:700}
@@ -335,7 +335,7 @@
 .vrm-boite .vrm-relier-points button{border:0;background:transparent;min-width:44px;padding:0;display:grid;place-items:center}
 .vrm-relier-points span{width:8px;height:8px;border-radius:999px;background:var(--bx-filet);transition:width .25s,background .25s}
 .vrm-relier-points button[aria-current=step] span{width:22px;background:var(--bx-accent)}
-.vrm-relier-bloc{padding:14px;border-radius:14px;background:var(--bx-carte);min-width:0}
+.vrm-relier-bloc{padding:14px;border-radius:12px;background:var(--bx-carte);min-width:0}
 .vrm-relier-bloc h3{margin:0 0 4px;font-size:17px;font-weight:700}
 .vrm-relier-doux{margin:4px 0 0;font-size:13px;color:var(--bx-doux)}
 .vrm-relier-exp{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:6px}
@@ -354,7 +354,7 @@
 
 /* La scène : une fenêtre INVENTÉE, neutre, sans marque. */
 .vrm-relier-scene{min-width:0}
-.vrm-relier-fenetre{border-radius:14px;border:1px solid var(--bx-filet);background:var(--bx-carte);overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.06),0 10px 28px rgba(0,0,0,.08);font-size:12px}
+.vrm-relier-fenetre{border-radius:12px;border:1px solid var(--bx-filet);background:var(--bx-carte);overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.06),0 10px 28px rgba(0,0,0,.08);font-size:12px}
 .vrm-relier-barre{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--bx-fin);background:var(--bx-sol)}
 .vrm-relier-pastilles{display:flex;gap:4px}
 .vrm-relier-pastilles i{width:8px;height:8px;border-radius:999px;background:var(--bx-filet)}
@@ -399,7 +399,7 @@
 @keyframes vrm-relier-arrive{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:none}}
 .vrm-relier-vol{position:absolute;left:40%;top:6px;color:var(--bx-encre);animation:vrm-relier-vole 1.4s 1.1s cubic-bezier(.4,0,.2,1) both}
 @keyframes vrm-relier-vole{0%{opacity:0;transform:none}15%{opacity:1}85%{opacity:1}100%{opacity:0;transform:translate(min(28vw,180px),40px) scale(.7)}}
-.vrm-relier-vrm{display:grid;place-items:center;align-content:center;height:64px;border-radius:14px;background:var(--bx-encre);color:var(--bx-carte);font-size:15px;animation:vrm-relier-recoit .4s 2.4s both}
+.vrm-relier-vrm{display:grid;place-items:center;align-content:center;height:64px;border-radius:12px;background:var(--bx-encre);color:var(--bx-carte);font-size:15px;animation:vrm-relier-recoit .4s 2.4s both}
 .vrm-relier-vrm small{font-size:12px;animation:vrm-relier-chiffre .3s 2.5s both}
 @keyframes vrm-relier-recoit{50%{transform:scale(1.08)}100%{transform:none}}
 @media(prefers-reduced-motion:reduce){
@@ -434,7 +434,7 @@
    et « Relier la boîte de <compte> » (un pas-à-pas avec sa vérification). Ambre
    seulement pour le bandeau (un geste à faire) ; le coché de la vérification est
    à l'encre (pas de vert, pas de rouge). */
-.vrm-boite-arelier{margin:12px 16px 4px;padding:12px 14px;border-radius:14px;background:var(--bx-ambre-doux)}
+.vrm-boite-arelier{margin:12px 16px 4px;padding:12px 14px;border-radius:12px;background:var(--bx-ambre-doux)}
 .vrm-boite-relier .vrm-boite-arelier{margin:0 0 14px}
 .vrm-boite-arelier-titre{margin:0 0 8px;font-size:15px;line-height:1.45}
 .vrm-boite-arelier-titre b{color:var(--bx-ambre)}
@@ -443,7 +443,7 @@
 .vrm-boite-arelier-qui{flex:1 1 200px;min-width:0;font-size:13px;color:var(--bx-doux);overflow-wrap:anywhere}
 .vrm-boite-arelier-qui b{color:var(--bx-encre)}
 .vrm-boite .vrm-boite-arelier button{flex:0 0 auto;max-width:100%;white-space:normal;text-align:center}
-.vrm-rc{display:grid;gap:12px;padding:16px;border-radius:14px;background:var(--bx-carte);margin:0 0 14px;min-width:0}
+.vrm-rc{display:grid;gap:12px;padding:16px;border-radius:12px;background:var(--bx-carte);margin:0 0 14px;min-width:0}
 .vrm-rc-tete{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;justify-content:space-between}
 .vrm-rc-titre{margin:0;font-size:20px;line-height:1.25;font-weight:700;overflow-wrap:anywhere}
 .vrm-rc-preuve{margin:0;color:var(--bx-doux);font-size:15px}
@@ -491,7 +491,7 @@
 /* ── Le panneau à deux colonnes (ordinateur, ≥ 900 px) ──────────────────────── */
 @media(min-width:900px){
   .vrm-boite:has(> .vrm-boite-corps-ecran[data-boite-large="1"]),.vrm-boite[data-vue="boite"]{padding-left:0;padding-right:0}
-  .vrm-boite .vrm-boite-corps-ecran[data-boite-large="1"]{grid-template-columns:clamp(340px,26.5vw,400px) minmax(0,1fr);gap:0;align-items:stretch;height:var(--bx-panneau-h,calc(100vh - 170px));min-height:460px;border-radius:14px;background:var(--bx-carte);box-shadow:var(--bx-ombre);overflow:hidden}
+  .vrm-boite .vrm-boite-corps-ecran[data-boite-large="1"]{grid-template-columns:clamp(340px,26.5vw,400px) minmax(0,1fr);gap:0;align-items:stretch;height:var(--bx-panneau-h,calc(100vh - 170px));min-height:460px;border-radius:12px;background:var(--bx-carte);box-shadow:var(--bx-ombre);overflow:hidden}
   .vrm-boite .vrm-boite-corps-ecran[data-boite-large="1"]>.vrm-boite-liste-col{height:100%;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;border-radius:0;box-shadow:none;border-right:.5px solid var(--bx-filet);scrollbar-width:thin}
   .vrm-boite .vrm-boite-corps-ecran[data-boite-large="1"]>.vrm-boite-lecture-col{position:static;top:auto;height:100%;max-height:none;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;border-radius:0;scrollbar-width:thin}
   .vrm-boite .vrm-boite-corps-ecran[data-boite-large="1"] .vrm-boite-jour-titre{top:0}
@@ -523,7 +523,7 @@
   html .vrm-boite{font-size:13px;line-height:1.4}
   /* `:where` : cette règle de base ne doit jamais battre celles des lignes, puces et pastilles ci-dessous. */
   html .vrm-boite:where([data-vue="boite"]) button,html .vrm-boite:where([data-vue="boite"]) select{min-height:30px;border-radius:8px;padding:0 12px;font-size:13px}
-  html .vrm-boite .vrm-boite-vues{max-width:300px;margin:0 0 10px;padding:2px;border-radius:9px}
+  html .vrm-boite .vrm-boite-vues{max-width:300px;margin:0 0 10px;padding:2px;border-radius:12px}
   html .vrm-boite .vrm-boite-vues button{min-height:26px;border-radius:7px;font-size:13px}
   /* Les outils de la liste : recherche 30 px, pastilles 26 px, compte 26 px. */
   html .vrm-boite .vrm-boite-filtres{padding:10px 12px 6px}
@@ -538,7 +538,7 @@
   html .vrm-boite .vrm-boite-compte-chevron{right:10px}
   html .vrm-boite .vrm-boite-lien,html .vrm-boite .vrm-boite-actualiser{min-height:26px;font-size:12px}
   html .vrm-boite .vrm-boite-couverture,html .vrm-boite .vrm-boite-aide-recherche{font-size:12px}
-  html .vrm-boite .vrm-boite-arelier{margin:8px 12px 2px;padding:10px 12px;border-radius:10px}
+  html .vrm-boite .vrm-boite-arelier{margin:8px 12px 2px;padding:10px 12px;border-radius:12px}
   html .vrm-boite .vrm-boite-arelier-titre{font-size:13px}
   html .vrm-boite .vrm-boite-arelier-qui{font-size:12px}
   /* Les jours : une petite étiquette, pas un titre. */
@@ -588,13 +588,13 @@
   html .vrm-boite .vrm-boite-billet-bas dd span,html .vrm-boite .vrm-boite-billet-sans{font-size:13px}
   html .vrm-boite .vrm-boite-puce-code.is-grande{min-width:30px;min-height:30px;padding:0 8px}
   html .vrm-boite .vrm-boite-heros{padding:12px 14px;border-radius:12px;gap:12px}
-  html .vrm-boite .vrm-boite-heros-photo{width:56px;height:56px;border-radius:10px}
+  html .vrm-boite .vrm-boite-heros-photo{width:56px;height:56px;border-radius:12px}
   html .vrm-boite .vrm-boite-heros-montant b{font-size:24px}
   html .vrm-boite .vrm-boite-heros-montant span,html .vrm-boite .vrm-boite-heros-limite{font-size:13px}
   html .vrm-boite .vrm-boite-heros-article{font-size:14px}
   html .vrm-boite .vrm-boite-heros-num{font-size:12px}
   html .vrm-boite .vrm-boite-details{font-size:13px}
-  html .vrm-boite .vrm-boite-averif{padding:10px 12px;border-radius:10px;font-size:13px}
+  html .vrm-boite .vrm-boite-averif{padding:10px 12px;border-radius:12px;font-size:13px}
   html .vrm-boite .vrm-boite-gestes{gap:6px}
   html .vrm-boite .vrm-boite-gestes button{min-height:30px;padding:0 14px;border-radius:8px;font-size:13px}
   html .vrm-boite .vrm-boite-fait,html .vrm-boite .vrm-boite-doux,html .vrm-boite .vrm-boite-sous{font-size:12px}
@@ -603,7 +603,7 @@
   html .vrm-boite .vrm-boite-msg{max-width:34em;font-size:14px;line-height:1.5}
   html .vrm-boite .vrm-boite-msg .vrm-boite-msg-etiq{font-size:11px}
   html .vrm-boite .vrm-boite-msg .vrm-boite-msg-note{font-size:12px}
-  html .vrm-boite .vrm-boite-pieces li{grid-template-columns:32px minmax(0,1fr);padding:7px 10px;border-radius:10px;font-size:13px}
+  html .vrm-boite .vrm-boite-pieces li{grid-template-columns:32px minmax(0,1fr);padding:7px 10px;border-radius:12px;font-size:13px}
   html .vrm-boite .vrm-boite-pieces li small{font-size:12px}
   html .vrm-boite .vrm-boite-meta{font-size:11px}
   html .vrm-boite .vrm-boite-cadre-images{font-size:12px}

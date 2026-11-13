@@ -223,7 +223,7 @@
 .vrm-favoris-voile{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center;}
 .vrm-favoris-voile[hidden]{display:none;}
 .vrm-favoris-feuille .vrm-favoris-rows{max-height:none;overflow:visible;}
-.vrm-favoris-feuille{background:var(--vrm-surface,#fff);margin:0;width:100%;max-width:640px;max-height:94dvh;display:flex;flex-direction:column;padding:0;border-radius:14px 14px 0 0;overflow:hidden;padding-bottom:env(safe-area-inset-bottom);font-size:13px;}
+.vrm-favoris-feuille{background:var(--vrm-surface,#fff);margin:0;width:100%;max-width:640px;max-height:94dvh;display:flex;flex-direction:column;padding:0;border-radius:12px 12px 0 0;overflow:hidden;padding-bottom:env(safe-area-inset-bottom);font-size:13px;}
 .vrm-favoris-feuille-tete{display:flex;gap:10px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--vrm-line);flex-shrink:0;}
 .vrm-favoris-feuille-tete>div{flex:1;min-width:0;}.vrm-favoris-feuille-tete strong{display:block;font-size:17px;}
 .vrm-favoris-feuille-tete small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}

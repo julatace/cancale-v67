@@ -180,8 +180,8 @@
  .vrm-main .vrm-ann-toolbar{padding:12px!important;border-radius:12px!important;background:var(--gestion-surface)!important;}
 }
 @media(max-width:767px){
- .vrm-ledger-drawer{width:100%;top:auto;max-height:82dvh;border-left:0;border-top:1px solid var(--gestion-line);border-radius:14px 14px 0 0;box-shadow:0 -12px 40px #1D1D1F30;padding-bottom:env(safe-area-inset-bottom);}
- .vrm-ledger-drawer-head{padding:14px 14px 12px;border-radius:14px 14px 0 0;}
+ .vrm-ledger-drawer{width:100%;top:auto;max-height:82dvh;border-left:0;border-top:1px solid var(--gestion-line);border-radius:12px 12px 0 0;box-shadow:0 -12px 40px #1D1D1F30;padding-bottom:env(safe-area-inset-bottom);}
+ .vrm-ledger-drawer-head{padding:14px 14px 12px;border-radius:12px 12px 0 0;}
  .vrm-ledger-drawer-head h2{font-size:15px;margin:5px 0;}
  .vrm-ledger-drawer .vrm-main.vrm-ledger-drawer-body{padding:14px!important;}
  .vrm-ledger-drawer-body .vrm-sale-overview{grid-template-columns:60px minmax(0,1fr) auto!important;}
@@ -394,8 +394,8 @@
 .vrm-message-workspace .vrm-chat-inline .vrm-chat-panel{border:0;border-radius:0!important;}
 .vrm-chat-panel .vrm-chat-head{padding:12px 14px;min-height:64px;background:var(--gestion-surface);border-bottom:1px solid var(--gestion-line);}
 .vrm-chat-panel .vrm-chat-history{background:var(--gestion-soft);padding:16px;}
-.vrm-chat-panel .vrm-bulle{font-size:13px;line-height:1.6;padding:10px 13px;border-radius:10px 10px 10px 3px!important;}
-.vrm-chat-panel .vrm-bulle-moi>.vrm-bulle{border-radius:10px 10px 3px 10px!important;}
+.vrm-chat-panel .vrm-bulle{font-size:13px;line-height:1.6;padding:10px 13px;border-radius:12px 12px 12px 3px!important;}
+.vrm-chat-panel .vrm-bulle-moi>.vrm-bulle{border-radius:12px 12px 3px 12px!important;}
 .vrm-chat-panel .vrm-chat-foot{padding:12px!important;}
 .vrm-chat-panel .vrm-chat-compose{border:1px solid var(--gestion-line);border-radius:12px;background:var(--gestion-surface);padding:5px;gap:8px;}
 .vrm-chat-panel .vrm-chat-compose textarea{border:0!important;background:transparent!important;resize:vertical;min-width:0;}

@@ -16,7 +16,7 @@
 }
 .vrm-bp-champ span, .vrm-bp-champ b { font-size: 26px; font-weight: 700; color: var(--fu-gris, #6e6e73); }
 .vrm-bp-champ input {
-  flex: 1; min-width: 0; width: 100%; border: 0; background: transparent; color: inherit; font: inherit; font-size: 28px; font-weight: 800;
+  flex: 1; min-width: 0; width: 100%; border: 0; background: transparent; color: inherit; font: inherit; font-size: 28px; font-weight: 700;
   font-variant-numeric: tabular-nums; outline: none; padding: 4px 0;
 }
 .vrm-bp-champ input[aria-invalid="true"] { text-decoration: underline wavy var(--fu-ambre, #ff9f0a); }
@@ -35,7 +35,7 @@
 .vrm-bp-titre { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; color: var(--fu-gris, #6e6e73); }
 .vrm-bp-prix { font-size: 17px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .vrm-bp-prix s { color: var(--fu-gris, #6e6e73); text-decoration-thickness: 1px; }
-.vrm-bp-prix b { font-weight: 800; }
+.vrm-bp-prix b { font-weight: 700; }
 .vrm-bp-prix small { font-size: 12px; color: var(--fu-gris, #6e6e73); font-weight: 500; }
 .vrm-bp-raison { font-size: 13px; color: var(--fu-gris, #6e6e73); overflow-wrap: anywhere; }
 .vrm-bp-ambre { font-size: 13px; font-weight: 700; color: var(--fu-ambre-txt, #b25000); }

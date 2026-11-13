@@ -95,7 +95,7 @@ html body .vrm-app-shell:has(.vrm-main .vrm-fu-ecran) { background-color: var(--
    bonjour de Ma journée — une phrase (jamais de capitales), 13/600, blanc à 62 %. */
 .vrm-fu-surtitre { display: block; font: 600 13px/1.3 var(--vrm-police); color: var(--fu-sur-sombre-2); text-transform: none; letter-spacing: normal; }
 .vrm-fu-grand {
-  margin-top: 4px; font: 800 38px/1.08 var(--vrm-police); letter-spacing: -.03em; color: #fff;
+  margin-top: 4px; font: 700 38px/1.08 var(--vrm-police); letter-spacing: -.03em; color: #fff;
   font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden;
 }
 .vrm-fu-grand.is-vide { color: var(--fu-sur-sombre-2); }
@@ -108,7 +108,7 @@ html body .vrm-app-shell:has(.vrm-main .vrm-fu-ecran) { background-color: var(--
 .vrm-fu-cases { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 8px; }
 .vrm-fu-case {
   all: unset; box-sizing: border-box; min-width: 0; min-height: 56px;
-  padding: 10px 12px; border-radius: 14px; background: var(--fu-case-sombre);
+  padding: 10px 12px; border-radius: 12px; background: var(--fu-case-sombre);
   display: flex; flex-direction: column; justify-content: center; gap: 2px; color: #fff;
 }
 button.vrm-fu-case { cursor: pointer; transition: background-color .15s ease; }
@@ -187,7 +187,7 @@ html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-t
   display: block !important; flex: none !important; margin: 0 !important; white-space: normal !important; color: inherit !important;
 }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-tete .vrm-day-date { font: 600 13px/1.3 var(--vrm-police) !important; color: var(--fu-sur-sombre-2) !important; }
-html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-tete .vrm-day-hello { margin-top: 2px !important; font: 800 34px/1.1 var(--vrm-police) !important; letter-spacing: -.03em !important; color: #fff !important; }
+html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-tete .vrm-day-hello { margin-top: 2px !important; font: 700 34px/1.1 var(--vrm-police) !important; letter-spacing: -.03em !important; color: #fff !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-tete :is(.vrm-day-todo, .vrm-phrase-ecran) { margin-top: 6px !important; font: 500 15px/1.35 var(--vrm-police) !important; color: var(--fu-sur-sombre-2) !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-tete .vrm-day-date + .vrm-day-todo::before { content: none !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-tete .vrm-day-todo b { color: #fff !important; font-weight: 600 !important; }
@@ -211,7 +211,7 @@ html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-t
   html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-tete .vrm-day-hello { font-size: 28px !important; }
 }
 .vrm-fu-tete .vrm-fu-bonjour { font: 600 13px/1.3 var(--vrm-police); color: var(--fu-sur-sombre-2); }
-.vrm-fu-tete .vrm-fu-titre-tete { margin: 2px 0 0; font: 800 34px/1.1 var(--vrm-police); letter-spacing: -.03em; color: #fff; }
+.vrm-fu-tete .vrm-fu-titre-tete { margin: 2px 0 0; font: 700 34px/1.1 var(--vrm-police); letter-spacing: -.03em; color: #fff; }
 .vrm-fu-tete .vrm-fu-date { margin-top: 4px; font: 500 13px/1.35 var(--vrm-police); color: var(--fu-sur-sombre-2); }
 .vrm-fu-tete .vrm-fu-date b { color: #fff; font-weight: 600; }
 .vrm-fu-tete .vrm-w-modifier { position: absolute !important; top: 14px !important; right: 14px !important; min-height: 44px; padding: 0 12px; color: var(--fu-sur-sombre-2) !important; background: transparent; border: 0; font: 600 15px var(--vrm-police) !important; cursor: pointer; transform: none !important; }
@@ -227,15 +227,15 @@ html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-t
 /* La case « Bénéfice » de Ma journée (le composant de toujours, sur fond sombre) */
 .vrm-fu-tete .vrm-fu-cases .vrm-jc-cell {
   box-sizing: border-box; min-width: 0; min-height: 64px; padding: 12px 14px !important; margin: 0 !important; border: 0 !important;
-  border-radius: 14px !important; background: rgba(255,255,255,.1) !important; color: #fff !important; display: flex; flex-direction: column; gap: 2px;
+  border-radius: 12px !important; background: rgba(255,255,255,.1) !important; color: #fff !important; display: flex; flex-direction: column; gap: 2px;
 }
 .vrm-fu-tete .vrm-fu-cases .vrm-jc-cell :is(.vrm-jc-l, .vrm-jc-l-lien) { order: 0; font: 500 12px/1.3 var(--vrm-police) !important; color: var(--fu-sur-sombre-2) !important; text-decoration: none !important; text-transform: none !important; letter-spacing: 0 !important; }
-.vrm-fu-tete .vrm-fu-cases .vrm-jc-cell .vrm-jc-v { order: 1; font: 800 28px/1.15 var(--vrm-police) !important; color: #fff !important; letter-spacing: -.03em; }
+.vrm-fu-tete .vrm-fu-cases .vrm-jc-cell .vrm-jc-v { order: 1; font: 700 28px/1.15 var(--vrm-police) !important; color: #fff !important; letter-spacing: -.03em; }
 .vrm-fu-tete .vrm-fu-cases .vrm-jc-cell .vrm-jc-v :is(.vrm-jc-montant, .vrm-jc-eur) { color: inherit !important; font: inherit !important; letter-spacing: inherit !important; }
 .vrm-fu-tete .vrm-fu-cases .vrm-jc-cell .vrm-jc-sous { order: 2; font: 500 12px/1.35 var(--vrm-police) !important; color: var(--fu-sur-sombre-2) !important; }
 .vrm-fu-tete .vrm-fu-cases .vrm-jc-cell .vrm-jc-sous :is(button, a) { color: #fff !important; font-weight: 600 !important; background: none !important; border: 0 !important; padding: 0 !important; min-height: 0 !important; text-decoration: underline; text-underline-offset: 2px; }
 .vrm-fu-tete .vrm-fu-cases .vrm-jc-cell .vrm-jc-choix { order: 3; }
-.vrm-fu-tete .vrm-fu-case.is-jour b { font-size: 28px; font-weight: 800; letter-spacing: -.03em; }
+.vrm-fu-tete .vrm-fu-case.is-jour b { font-size: 28px; font-weight: 700; letter-spacing: -.03em; }
 .vrm-fu-tete .vrm-fu-case.is-jour > span { font-size: 12px; }
 .vrm-fu-tete .vrm-fu-case.is-jour { min-height: 64px; padding: 12px 14px; }
 .vrm-fu-tete .vrm-fu-case.is-jour .vrm-fu-case-sous { font: 500 12px/1.35 var(--vrm-police); color: var(--fu-sur-sombre-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -301,7 +301,7 @@ html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-bar { gap: 10px !
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-bar > .vrm-day-case { border: 0 !important; background: var(--fu-carte) !important; border-radius: 20px !important; box-shadow: var(--fu-ombre) !important; overflow: hidden; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-bar > .vrm-day-case > button[data-tuile] { padding: 14px 16px !important; min-height: 72px !important; flex-direction: column !important; gap: 4px !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-bar .vrm-day-bar-ic { display: none !important; }
-html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-bar .vrm-day-bar-n { font-family: var(--vrm-police) !important; font-weight: 800 !important; font-size: 28px !important; letter-spacing: -.03em !important; }
+html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-bar .vrm-day-bar-n { font-family: var(--vrm-police) !important; font-weight: 700 !important; font-size: 28px !important; letter-spacing: -.03em !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-bar .vrm-day-bar-l { font-size: 13px !important; color: var(--fu-gris) !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-case-geste { margin: 0 12px 12px 12px !important; max-width: calc(100% - 24px) !important; box-sizing: border-box !important; white-space: normal !important; text-align: left !important; padding: 6px 14px !important; height: auto !important; border-radius: 999px !important; background: var(--fu-case) !important; border: 0 !important; color: var(--fu-encre) !important; }
 @media (hover: hover) and (pointer: fine) { html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-bar > .vrm-day-case > button[data-tuile]:hover { background: transparent !important; } }
@@ -360,7 +360,7 @@ html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-
 .vrm-fu-panneau-tete span { font: 500 13px/1.2 var(--vrm-police); color: var(--fu-gris2); }
 .vrm-fu-anneau { display: flex; align-items: center; gap: 20px; }
 .vrm-fu-anneau svg { flex: none; }
-.vrm-fu-anneau-centre { font: 800 28px/1 var(--vrm-police); letter-spacing: -.03em; fill: var(--fu-encre); font-variant-numeric: tabular-nums; }
+.vrm-fu-anneau-centre { font: 700 28px/1 var(--vrm-police); letter-spacing: -.03em; fill: var(--fu-encre); font-variant-numeric: tabular-nums; }
 .vrm-fu-anneau-sous { font: 500 11px/1 var(--vrm-police); fill: var(--fu-gris); }
 .vrm-fu-legende { list-style: none; margin: 0; padding: 0; flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
 .vrm-fu-legende li { display: flex; align-items: center; gap: 10px; min-width: 0; font: 500 15px/1.25 var(--vrm-police); }
@@ -522,7 +522,7 @@ html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-compta-re
 }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-compta-question { font-size: 22px !important; font-weight: 700 !important; letter-spacing: -.02em !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-compta-q-n { border: 0 !important; background: var(--fu-encre) !important; color: var(--fu-carte) !important; font-weight: 700 !important; }
-html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-compta-hero { font-weight: 800 !important; letter-spacing: -.03em !important; }
+html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-compta-hero { font-weight: 700 !important; letter-spacing: -.03em !important; }
 /* La carte sombre */
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte {
   background: var(--fu-sombre) !important; box-shadow: var(--fu-ombre-sombre) !important; border-radius: var(--fu-r-sombre) !important;
@@ -561,7 +561,7 @@ html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-greeting.vrm-fu
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-greeting.vrm-fu-tete .vrm-day-hello {
   font: 600 13px/1.25 var(--vrm-police) !important; letter-spacing: 0 !important; color: var(--fu-sur-sombre-2) !important; margin: 0 !important; padding: 0 !important;
 }
-html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-titre-tete { margin: 2px 0 14px !important; font: 800 34px/1.12 var(--vrm-police) !important; letter-spacing: -.03em !important; color: #fff !important; }
+html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-titre-tete { margin: 2px 0 14px !important; font: 700 34px/1.12 var(--vrm-police) !important; letter-spacing: -.03em !important; color: #fff !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-semaine { display: flex !important; gap: 4px !important; margin: 0 !important; max-width: none !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-jour { flex: 1 1 0; gap: 6px; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-jour > span { font: 600 11px/1.2 var(--vrm-police) !important; color: var(--fu-sur-sombre-2) !important; text-transform: none !important; letter-spacing: 0 !important; }
@@ -571,10 +571,10 @@ html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-jour[data-auj] >
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-jour > b::after { content: none !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete > .vrm-fu-cases { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 8px !important; margin-top: 16px !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-case.is-jour {
-  all: unset; box-sizing: border-box; display: block !important; min-height: 0 !important; padding: 12px !important; border-radius: 14px !important; background: rgba(255,255,255,.1) !important; color: #fff; cursor: pointer; min-width: 0;
+  all: unset; box-sizing: border-box; display: block !important; min-height: 0 !important; padding: 12px !important; border-radius: 12px !important; background: rgba(255,255,255,.1) !important; color: #fff; cursor: pointer; min-width: 0;
 }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-case.is-jour > span { display: block; font: 500 12px/1.3 var(--vrm-police) !important; color: var(--fu-sur-sombre-2) !important; }
-html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-case.is-jour > b { display: block; font: 800 28px/1.2 var(--vrm-police) !important; letter-spacing: -.02em !important; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-case.is-jour > b { display: block; font: 700 28px/1.2 var(--vrm-police) !important; letter-spacing: -.02em !important; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-case.is-jour > b.is-vide { color: var(--fu-sur-sombre-2); }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-case.is-jour .vrm-fu-borne { font-size: 17px; margin-right: 3px; vertical-align: .2em; color: var(--fu-sur-sombre-2); }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-case.is-jour:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: 2px; }
@@ -587,7 +587,7 @@ html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list > :is
   box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 6px 20px rgba(0,0,0,.05) !important; background: var(--fu-carte) !important;
 }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee [data-alertes-argent] > .vrm-day-task { display: flex !important; align-items: center !important; width: 100% !important; box-sizing: border-box !important; border: 0 !important; text-align: left !important; }
-html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-pastille { width: 42px; height: 42px; border-radius: 14px; font: 800 17px/1 var(--vrm-police); background: #1d1d1f; color: #fff; }
+html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-pastille { width: 42px; height: 42px; border-radius: 12px; font: 700 17px/1 var(--vrm-police); background: #1d1d1f; color: #fff; }
 :root[data-theme="dark"] html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-pastille, :root[data-theme="dark"] .vrm-fu-journee .vrm-fu-pastille { background: #f5f5f7; color: #1d1d1f; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-pastille.is-urgent { background: #ff9f0a; color: #fff; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-pastille.is-icone { background: #8e8e93; color: #fff; }
@@ -615,7 +615,7 @@ html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task-
   html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-fu-titre-section { padding-left: 0 !important; }
 }
 @media (min-width: 768px) {
-  html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-greeting.vrm-fu-tete { border-radius: 24px !important; padding: 26px 28px 24px !important; margin-bottom: 20px !important; }
+  html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-greeting.vrm-fu-tete { border-radius: 20px !important; padding: 26px 28px 24px !important; margin-bottom: 20px !important; }
 }
 /* (5 nov., chantier E1, revue 2.3) La nuit, la tête finissait en #1d1d1f sur des cartes #1c1c1e :
    fondue. Elle descend vers le bleu nuit des cartes sombres ; son HAUT reste celui de la barre du
@@ -634,7 +634,7 @@ html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > button.vrm-led
 html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > :is(.vrm-ledger-sale-title, .vrm-ledger-sale-state, .vrm-ledger-sale-amount, .vrm-ledger-sale-achat, .vrm-ledger-sale-benef, .vrm-ledger-sale-plus) {
   position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; white-space: nowrap !important; margin: 0 !important; padding: 0 !important;
 }
-html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-photo-empty { width: 60px !important; height: 60px !important; border-radius: 14px !important; flex: none !important; grid-row: auto !important; }
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-photo-empty { width: 60px !important; height: 60px !important; border-radius: 12px !important; flex: none !important; grid-row: auto !important; }
 .vrm-fu-vente-txt { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
 .vrm-fu-vente-l1 { display: flex; justify-content: space-between; gap: 8px; min-width: 0; }
 .vrm-fu-vente-nom { font: 600 15px/1.3 var(--vrm-police); color: var(--fu-encre); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
@@ -670,7 +670,7 @@ html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-vinted-majournee] {
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) div:has(> [data-vinted-majournee]) { display: none !important; }
 html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) :is([data-raison-bord], .vrm-aide, .vrm-colis-groupe .vrm-aide) { display: none !important; }
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) .vrm-tache-tete h1, html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-screen-head h1, html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-screen-head h1 {
-  font: 800 34px/1.1 var(--vrm-police) !important; letter-spacing: -.03em !important; margin: 0 !important;
+  font: 700 34px/1.1 var(--vrm-police) !important; letter-spacing: -.03em !important; margin: 0 !important;
 }
 /* La barre de travail de Ventes : les filtres et « Outils » restent (des boutons) ; ni recherche ni période. */
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) .vrm-sales-workbar > :not(.vrm-filtres-et-outils):not([class*="outils"]):not(.vrm-menu-flottant):not(.vrm-menu-voile) { display: none !important; }
@@ -745,7 +745,7 @@ html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran > .vrm-screen-
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran :is(.vrm-compta-q-tete, [data-stats-carte="mois"], .vrm-compta-calcul, .vrm-compta-geste, .vrm-compta-repli-resume) { display: none !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte { padding: 18px 18px 18px !important; display: flex !important; flex-direction: column !important; gap: 0 !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-compta-libelle { margin: 0 !important; }
-html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-compta-hero { font: 800 38px/1.08 var(--vrm-police) !important; letter-spacing: -.03em !important; margin-top: 4px; }
+html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-compta-hero { font: 700 38px/1.08 var(--vrm-police) !important; letter-spacing: -.03em !important; margin-top: 4px; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-fu-compta-sous { margin: 6px 0 0 !important; font: 500 13px/1.4 var(--vrm-police) !important; color: var(--fu-sur-sombre-2) !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-fu-compta-sous button { all: unset; cursor: pointer; color: var(--fu-sur-sombre-2) !important; font: inherit !important; text-decoration: none !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-fu-compta-cases { margin-top: 12px; }
@@ -808,7 +808,7 @@ html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-bilan-syn
 }
 html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-bilan-sync[data-vendus-ailleurs] > summary::-webkit-details-marker { display: none; }
 html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-bilan-sync[data-vendus-ailleurs] > summary::before {
-  content: ''; flex: none; width: 42px; height: 42px; border-radius: 14px; background: #8e8e93 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z'/%3E%3Ccircle cx='7.5' cy='7.5' r='1.5'/%3E%3C/svg%3E") center / 20px no-repeat;
+  content: ''; flex: none; width: 42px; height: 42px; border-radius: 12px; background: #8e8e93 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z'/%3E%3Ccircle cx='7.5' cy='7.5' r='1.5'/%3E%3C/svg%3E") center / 20px no-repeat;
 }
 html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-bilan-sync[data-vendus-ailleurs] > summary::after { content: none !important; }
 html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-bilan-sync[data-vendus-ailleurs] > summary > span {
@@ -848,7 +848,7 @@ html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] >
 }
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > h3 + details { border-top: 0 !important; border-radius: 16px 16px 0 0 !important; }
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > details:last-child { border-radius: 0 0 16px 16px !important; padding-bottom: 0 !important; }
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > h3 + details:last-child { border-radius: 14px !important; }
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > h3 + details:last-child { border-radius: 12px !important; }
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > details > summary {
   display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: flex-start !important; gap: 2px !important;
   min-height: 56px !important; padding: 10px 28px 10px 0 !important; margin: 0 !important;
@@ -1157,7 +1157,7 @@ html:not([data-colis-outils]) body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-coli
 .vrm-carte-ok { all: unset; box-sizing: border-box; min-height: 44px; padding: 0 16px; border-radius: 12px; display: grid; place-items: center; background: var(--fu-bleu); color: #fff; font: 600 15px/1 var(--vrm-police); cursor: pointer; }
 .vrm-carte-places { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 @media (min-width: 560px) { .vrm-carte-places { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.vrm-carte-place { all: unset; box-sizing: border-box; min-height: 56px; min-width: 0; padding: 8px 12px; border-radius: 14px; background: var(--fu-carte, #fff); display: flex; flex-direction: column; justify-content: center; gap: 2px; cursor: pointer; box-shadow: inset 0 0 0 1px var(--fu-filet, rgba(0,0,0,.08)); }
+.vrm-carte-place { all: unset; box-sizing: border-box; min-height: 56px; min-width: 0; padding: 8px 12px; border-radius: 12px; background: var(--fu-carte, #fff); display: flex; flex-direction: column; justify-content: center; gap: 2px; cursor: pointer; box-shadow: inset 0 0 0 1px var(--fu-filet, rgba(0,0,0,.08)); }
 .vrm-carte-place > span { font: 500 12px/1.2 var(--vrm-police); color: var(--fu-gris, #6e6e73); }
 .vrm-carte-place > b { font: 600 15px/1.25 var(--vrm-police); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-carte-place[aria-pressed="true"] { background: var(--fu-sombre, #1d1d1f); color: #fff; box-shadow: none; }
@@ -1165,9 +1165,9 @@ html:not([data-colis-outils]) body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-coli
 .vrm-carte-periodes { display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-top: 4px; padding-bottom: 2px; }
 .vrm-carte-periodes::-webkit-scrollbar { display: none; }
 .vrm-carte-periodes > button { flex: none; }
-.vrm-carte-periodes > button { all: unset; box-sizing: border-box; min-height: 44px; padding: 0 14px; border-radius: 24px; display: grid; place-items: center; background: var(--fu-carte, #fff); box-shadow: inset 0 0 0 1px var(--fu-filet, rgba(0,0,0,.08)); font: 600 13px/1 var(--vrm-police); cursor: pointer; }
+.vrm-carte-periodes > button { all: unset; box-sizing: border-box; min-height: 44px; padding: 0 14px; border-radius: 20px; display: grid; place-items: center; background: var(--fu-carte, #fff); box-shadow: inset 0 0 0 1px var(--fu-filet, rgba(0,0,0,.08)); font: 600 13px/1 var(--vrm-police); cursor: pointer; }
 .vrm-carte-periodes > button[aria-pressed="true"] { background: var(--fu-encre, #1d1d1f); color: var(--fu-carte, #fff); box-shadow: none; }
-.vrm-carte-liste { list-style: none; margin: 6px 0 0; padding: 0; border-radius: 14px; overflow: hidden; background: var(--fu-carte, #fff); }
+.vrm-carte-liste { list-style: none; margin: 6px 0 0; padding: 0; border-radius: 12px; overflow: hidden; background: var(--fu-carte, #fff); }
 .vrm-carte-liste > li + li { border-top: 1px solid var(--fu-filet, rgba(0,0,0,.08)); }
 .vrm-carte-choix { all: unset; box-sizing: border-box; width: 100%; min-height: 48px; padding: 8px 14px; display: flex; align-items: center; gap: 10px; cursor: pointer; }
 .vrm-carte-choix-nom { flex: 1; min-width: 0; font: 500 15px/1.3 var(--vrm-police); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1176,8 +1176,8 @@ html:not([data-colis-outils]) body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-coli
 .vrm-carte-choix:focus-visible, .vrm-carte-place:focus-visible, .vrm-carte-periodes > button:focus-visible, .vrm-carte-ok:focus-visible, .vrm-carte-defaut:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: 2px; }
 .vrm-carte-defaut { all: unset; box-sizing: border-box; align-self: center; min-height: 44px; padding: 0 14px; display: grid; place-items: center; font: 600 15px/1 var(--vrm-police); color: var(--fu-encre, #1d1d1f); cursor: pointer; margin-top: 6px; }
 /* (4 nov.) « Objectif » dans la feuille */
-.vrm-carte-objectif { margin-top: 6px; border-radius: 14px; background: var(--fu-carte, #fff); overflow: hidden; flex-shrink: 0; }
-.vrm-carte-objectif-types { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border-radius: 14px; background: var(--fu-fond, #f2f2f7); }
+.vrm-carte-objectif { margin-top: 6px; border-radius: 12px; background: var(--fu-carte, #fff); overflow: hidden; flex-shrink: 0; }
+.vrm-carte-objectif-types { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border-radius: 12px; background: var(--fu-fond, #f2f2f7); }
 .vrm-carte-objectif-types > button { all: unset; box-sizing: border-box; min-height: 44px; padding: 0 10px; border-radius: 12px; display: grid; place-items: center; text-align: center; font: 600 13px/1.2 var(--vrm-police); color: var(--fu-gris, #6e6e73); cursor: pointer; }
 .vrm-carte-objectif-types > button[aria-pressed="true"] { background: var(--fu-carte, #fff); color: var(--fu-encre, #1d1d1f); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
 .vrm-carte-objectif-types > button:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: 2px; }
@@ -1358,7 +1358,7 @@ html body .vrm-va-feuille.vrm-bilan-sync > button { margin: 0 0 12px; }
 .vrm-tip-pas li.is-la { color: var(--fu-encre); }
 .vrm-tip-pas li.is-la::before { background: var(--fu-encre); color: var(--fu-carte); }
 .vrm-tip-pas li.is-fait::before { content: '✓'; background: var(--fu-case); color: var(--fu-encre); }
-.vrm-tip-groupe { display: flex; flex-direction: column; background: var(--fu-carte); border-radius: 14px; overflow: hidden; }
+.vrm-tip-groupe { display: flex; flex-direction: column; background: var(--fu-carte); border-radius: 12px; overflow: hidden; }
 .vrm-tip-groupe > h3 { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0; padding: 12px 14px 6px; font: 700 15px/1.25 var(--vrm-police); letter-spacing: -.01em; color: var(--fu-encre); }
 .vrm-tip-groupe > h3 > span { font: 500 13px/1.2 var(--vrm-police); color: var(--fu-gris); font-variant-numeric: tabular-nums; }
 .vrm-tip-groupe.is-verifier > h3 { color: var(--fu-ambre-txt, #B25000); }
@@ -1385,7 +1385,7 @@ html body .vrm-va-feuille.vrm-bilan-sync > button { margin: 0 0 12px; }
 .vrm-tip-a4-etiquette > i { display: block; height: 3px; border-radius: 2px; background: #d2d2d7; width: 100%; }
 .vrm-tip-a4-etiquette > i:nth-of-type(2) { width: 70%; } .vrm-tip-a4-etiquette > i:nth-of-type(3) { width: 85%; }
 .vrm-tip-a4-tampon { align-self: end; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.vrm-tip-a4-tampon b { font: 800 13px/1.1 var(--vrm-police); letter-spacing: -.01em; }
+.vrm-tip-a4-tampon b { font: 700 13px/1.1 var(--vrm-police); letter-spacing: -.01em; }
 .vrm-tip-a4-tampon span { font: 500 7px/1.25 var(--vrm-police); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; overflow-wrap: anywhere; }
 .vrm-tip-plus { flex: none; align-self: center; font: 600 15px/1 var(--vrm-police); color: var(--fu-gris); padding: 0 6px; }
 .vrm-tip-pied { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 12px 0 calc(4px + env(safe-area-inset-bottom)); background: linear-gradient(to top, var(--fu-fond) 70%, transparent); }
@@ -1393,7 +1393,7 @@ html body .vrm-va-feuille.vrm-bilan-sync > button { margin: 0 0 12px; }
 .vrm-tip-lien { margin-right: auto; min-height: 44px; padding: 0 4px; border: 0; background: none; font: 600 14px/1 var(--vrm-police); color: var(--vrm-accent-texte, #0066CC); cursor: pointer; }   /* (intégration g1) texte bleu = accentTexte (contraste ≥ 4,5:1, axe) */
 .vrm-tip-lien:disabled { color: var(--fu-gris); cursor: default; }
 .vrm-tip-grand { margin: 8px 0 0; font: 500 17px/1.35 var(--vrm-police); color: var(--fu-gris); text-align: center; }
-.vrm-tip-grand b { display: block; font: 800 44px/1.05 var(--vrm-police); letter-spacing: -.03em; color: var(--fu-encre); font-variant-numeric: tabular-nums; }
+.vrm-tip-grand b { display: block; font: 700 44px/1.05 var(--vrm-police); letter-spacing: -.03em; color: var(--fu-encre); font-variant-numeric: tabular-nums; }
 .vrm-tip-fin .vrm-tip-pied { justify-content: stretch; } .vrm-tip-fin .vrm-tip-pied > * { flex: 1 1 0; }
 .vrm-tip-alerte { margin: 0; padding: 10px 14px; border-radius: 12px; background: var(--fu-ambre-fond); color: var(--fu-ambre-txt, #B25000); font: 600 14px/1.35 var(--vrm-police); }
 .vrm-tip-progression { display: flex; align-items: center; gap: 10px; font: 600 13px/1.2 var(--vrm-police); color: var(--fu-gris); }

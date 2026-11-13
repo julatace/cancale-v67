@@ -92,7 +92,7 @@ html .vrm-app-shell .vrm-atelier-rail .vrm-rail-section-label {
 }
 html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button {
   width: 100%; min-height: 44px; justify-content: flex-start; gap: 10px; padding: 4px 12px;
-  border: 0; border-radius: 14px; background: transparent; color: var(--vrm-muted);
+  border: 0; border-radius: 12px; background: transparent; color: var(--vrm-muted);
   font-size: 15px; font-weight: 500; letter-spacing: -.005em; text-align: left;
 }
 html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button > :first-child { flex-shrink: 0; width: 22px; display: flex; justify-content: center; }
@@ -151,7 +151,7 @@ html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button:focus-visible { outline: 
   }
   html .vrm-app-shell .vrm-day-layout .vrm-day-greeting::before { display: none !important; }
   html .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-hello {
-    font-size: 34px !important; font-weight: 800 !important; letter-spacing: -.025em !important; line-height: 1.05 !important; color: var(--vrm-ink) !important;
+    font-size: 34px !important; font-weight: 700 !important; letter-spacing: -.025em !important; line-height: 1.05 !important; color: var(--vrm-ink) !important;
   }
   html .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-date { color: var(--vrm-muted) !important; font-weight: 500; font-size: 15px !important; }
   html .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-todo { color: var(--vrm-muted) !important; font-size: 15px !important; }
@@ -198,15 +198,15 @@ html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button:focus-visible { outline: 
   html .vrm-app-shell .vrm-main .vrm-colis-num[title] { font-size: 15px !important; }
   /* Les vignettes de colis : 64 px. */
   html .vrm-app-shell .vrm-main .vrm-colis-carte :is(img, [data-photo-vide]):first-child,
-  html .vrm-app-shell .vrm-main .vrm-colis-carte .vrm-colis-photo { width: 64px !important; height: 64px !important; border-radius: 14px !important; }
+  html .vrm-app-shell .vrm-main .vrm-colis-carte .vrm-colis-photo { width: 64px !important; height: 64px !important; border-radius: 12px !important; }
 }
 
 /* ── 4. LES TITRES D'ÉCRAN : grands, serrés ──────────────────────────────── */
-html .vrm-screen-head :is(h1, h2) { font-size: var(--vrm-t-title) !important; font-weight: 800 !important; letter-spacing: -.025em !important; line-height: 1.04 !important; }
+html .vrm-screen-head :is(h1, h2) { font-size: var(--vrm-t-title) !important; font-weight: 700 !important; letter-spacing: -.025em !important; line-height: 1.04 !important; }
 html .vrm-market-space .vrm-screen-head :is(h1, h2) { font-size: var(--vrm-t-section) !important; font-weight: 700 !important; letter-spacing: -.018em !important; }
-html .vrm-market-heading h1 { font-weight: 800 !important; letter-spacing: -.025em !important; }
+html .vrm-market-heading h1 { font-weight: 700 !important; letter-spacing: -.025em !important; }
 @media (min-width: 768px) {
-  html .vrm-app-shell .vrm-day-layout .vrm-day-hello { font-size: 44px !important; font-weight: 800 !important; letter-spacing: -.025em !important; line-height: 1.02 !important; }
+  html .vrm-app-shell .vrm-day-layout .vrm-day-hello { font-size: 44px !important; font-weight: 700 !important; letter-spacing: -.025em !important; line-height: 1.02 !important; }
 }
 
 /* ── 5. LES SURFACES : des aplats, sans cadre, sans ombre, sans dégradé ──── */
@@ -217,7 +217,7 @@ html .vrm-app-shell :is(
   .vrm-ann-search, .vrm-list-search, .vrm-chat-panel, .vrm-chat-empty
 ) { box-shadow: none !important; background-image: none !important; }
 html .vrm-app-shell .vrm-main :is(.vrm-surface, .vrm-day-card, .vrm-day-task, .vrm-w-tuile, .vrm-day-money, .vrm-day-week, .vrm-day-wallet, .vrm-day-stock) {
-  border-radius: 14px !important; border-color: transparent !important;
+  border-radius: 12px !important; border-color: transparent !important;
 }
 html .vrm-app-shell .vrm-main .vrm-day-layout .vrm-day-card { background-color: var(--vrm-surface) !important; }
 html .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-photo,
@@ -225,18 +225,18 @@ html .vrm-app-shell .vrm-main .vrm-shared-sale .vrm-sale-photo { background-imag
 /* La bande « à faire » (À envoyer, à retirer…) : des tuiles « surface ». */
 html .vrm-app-shell .vrm-day-layout .vrm-day-bar { background: transparent !important; border: 0 !important; }
 html .vrm-app-shell .vrm-day-layout .vrm-day-bar > button {
-  background: var(--vrm-surface) !important; border: 0 !important; border-radius: 14px !important; animation: none !important;
+  background: var(--vrm-surface) !important; border: 0 !important; border-radius: 12px !important; animation: none !important;
 }
 html .vrm-app-shell .vrm-day-layout .vrm-day-bar :is(.vrm-day-bar-n),
 html .vrm-app-shell .vrm-day-layout .vrm-day-bar > button { color: var(--vrm-ink) !important; }
-html .vrm-app-shell .vrm-day-layout .vrm-day-bar .vrm-day-bar-n { font-weight: 800 !important; }
+html .vrm-app-shell .vrm-day-layout .vrm-day-bar .vrm-day-bar-n { font-weight: 700 !important; }
 html .vrm-app-shell .vrm-day-layout .vrm-day-bar .vrm-day-bar-l { color: var(--vrm-muted) !important; }
 @media (hover: hover) and (pointer: fine) {
   html .vrm-app-shell .vrm-day-layout .vrm-day-bar > button:hover { transform: none !important; background: var(--vrm-card2) !important; }
   html .vrm-app-shell .vrm-day-task:hover { background: var(--vrm-card2) !important; }
 }
 html .vrm-app-shell .vrm-day-layout .vrm-day-hero-n,
-html .vrm-app-shell .vrm-day-layout .vrm-day-recu-n { font-weight: 800 !important; letter-spacing: -.025em !important; }
+html .vrm-app-shell .vrm-day-layout .vrm-day-recu-n { font-weight: 700 !important; letter-spacing: -.025em !important; }
 
 /* La carte d'annonce : la PHOTO porte la carte — plus de cadre ni de fond
    autour ; titre et prix (800) dessous, l'état en atténué. (Sélecteurs plus
@@ -245,12 +245,12 @@ html .vrm-app-shell .vrm-day-layout .vrm-day-recu-n { font-weight: 800 !importan
   background: transparent !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; overflow: visible !important;
 }
 :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-overview > a.vrm-fiche-photo {
-  background: var(--vrm-photo, var(--vrm-card2)) !important; border-radius: 14px !important; overflow: hidden;
+  background: var(--vrm-photo, var(--vrm-card2)) !important; border-radius: 12px !important; overflow: hidden;
 }
 :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-ledger-info { padding: 12px 0 8px !important; }
 :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-plus { padding: 10px 0 4px !important; border-top: 0 !important; }
 :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-titre] { font-weight: 700 !important; letter-spacing: -.01em; }
-:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-prix] { font-weight: 800 !important; letter-spacing: -.02em; }
+:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-prix] { font-weight: 700 !important; letter-spacing: -.02em; }
 :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-cell { background: var(--vrm-surface) !important; border-color: transparent !important; border-radius: 12px !important; }
 :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-actions { border-top: 0 !important; padding-inline: 0 !important; background: transparent !important; }
 /* Le N° de la fiche : une pastille blanche à chasse fixe POSÉE SUR LA PHOTO, en
@@ -276,7 +276,7 @@ html .vrm-app-shell .vrm-day-layout .vrm-day-recu-n { font-weight: 800 !importan
    posaient sur le DERNIER élément de la ligne (le N°, styles-annonces-pro) ne
    doit pas habiller le prix. */
 :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-price-line > span[data-prix][data-prix] {
-  font-size: 22px !important; font-weight: 800 !important;
+  font-size: 22px !important; font-weight: 700 !important;
   border: 0 !important; background: transparent !important; padding: 0 !important; margin: 0 !important; border-radius: 0 !important;
 }
 :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-num [data-edition] > span { border-bottom: 0 !important; }
@@ -346,7 +346,7 @@ html .vrm-app-shell .vrm-chart-months svg text { font-size: 11px; }
 
 /* ── 8. LES BOUTONS : à plat, 14 px ; les pastilles rondes ─────────────────── */
 html .vrm-app-shell :is(.vrm-b, .vrm-button, .vrm-btn-primary, .vrm-w-btn) { box-shadow: none !important; background-image: none !important; }
-html .vrm-b, html .vrm-app-shell .vrm-main .vrm-b.vrm-b { border-radius: 14px !important; }
+html .vrm-b, html .vrm-app-shell .vrm-main .vrm-b.vrm-b { border-radius: 12px !important; }
 html .vrm-app-shell .vrm-main .vrm-b.vrm-b-primaire { font-weight: 700 !important; }
 html .vrm-app-shell .vrm-main .vrm-sales-workbar > .vrm-rangee > button { box-shadow: none !important; }
 /* Une rangée de filtres (et la rangée des comptes) : des pastilles ; la
@@ -358,7 +358,7 @@ html .vrm-app-shell .vrm-main .vrm-sales-workbar > .vrm-rangee > button[aria-pre
 }
 
 /* Les champs : un aplat surface, 14 px. */
-html .vrm-app-shell .vrm-main :is(.vrm-ann-search, .vrm-list-search) { border-radius: 14px !important; background: var(--vrm-surface) !important; }
+html .vrm-app-shell .vrm-main :is(.vrm-ann-search, .vrm-list-search) { border-radius: 12px !important; background: var(--vrm-surface) !important; }
 
 /* ── 9. RIEN NE FAIT SON ENTRÉE ──────────────────────────────────────────── */
 html .vrm-app-shell .vrm-stagger > * { animation: none !important; }
@@ -407,7 +407,7 @@ html body .vrm-app-shell .vrm-colis-carte button.vrm-colis-primaire.vrm-colis-pr
    reste à sa place (en tête de Colis) : un bouton FIXÉ au-dessus de la barre du
    bas couvrirait la dernière ligne (banc coque-mobile) — choix laissé à Julien. */
 @media (max-width: 767px) {
-  html .vrm-app-shell .vrm-main .vrm-colis-lot { width: 100% !important; min-height: 52px !important; border-radius: 14px !important; font-size: 17px !important; font-weight: 700 !important; }
+  html .vrm-app-shell .vrm-main .vrm-colis-lot { width: 100% !important; min-height: 52px !important; border-radius: 12px !important; font-size: 17px !important; font-weight: 700 !important; }
 }
 :root[data-theme] body { background: var(--vrm-bg, #FFFFFF); }
 
@@ -427,7 +427,7 @@ html body .vrm-app-shell .vrm-main :is(.vrm-sales-workbar > .vrm-rangee, .vrm-sa
 /* Les icônes des cases « à faire » : à l'encre atténuée — le cobalt reste rare. */
 html .vrm-app-shell .vrm-day-layout .vrm-day-bar .vrm-day-bar-ic { color: var(--vrm-muted) !important; }
 /* Les dernières ventes de Ma journée : des aplats, sans cadre. */
-html .vrm-app-shell .vrm-day-recent .vrm-carrousel > button { border: 0 !important; background: var(--vrm-surface) !important; border-radius: 14px !important; box-shadow: none !important; overflow: hidden; }
+html .vrm-app-shell .vrm-day-recent .vrm-carrousel > button { border: 0 !important; background: var(--vrm-surface) !important; border-radius: 12px !important; box-shadow: none !important; overflow: hidden; }
 /* La bande pétrole dessinée DERRIÈRE l'en-tête d'une plateforme (téléphone). */
 html .vrm-app-shell .vrm-main .vrm-market-space::before { display: none !important; }
 /* « Imprimer » d'une ligne de vente ou de colis au téléphone : l'aplat neutre
@@ -486,7 +486,7 @@ html body .vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-sous {
 }
 html body .vrm-app-shell .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-amount {
   grid-column: 3; grid-row: 1; align-self: end; text-align: right; white-space: nowrap;
-  font-size: 17px !important; font-weight: 800 !important; letter-spacing: -.015em; color: var(--vrm-ink) !important;
+  font-size: 17px !important; font-weight: 700 !important; letter-spacing: -.015em; color: var(--vrm-ink) !important;
 }
 html body .vrm-app-shell .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-state {
   grid-column: 3; grid-row: 2; align-self: start; text-align: right; display: block !important;
@@ -543,7 +543,7 @@ html body .vrm-app-shell .vrm-lbc-catalog {
   background: transparent; border: 0; border-radius: 0; color: var(--vrm-ink); font-size: 13px;
 }
 html body .vrm-app-shell .vrm-lbc-catalog header, html body .vrm-app-shell .vrm-lbc-catalog-filtres { padding-inline: 0; }
-html body .vrm-app-shell .vrm-lbc-catalog > input { margin-inline: 0; width: 100%; background: var(--vrm-surface); border-color: transparent; border-radius: 14px; }
+html body .vrm-app-shell .vrm-lbc-catalog > input { margin-inline: 0; width: 100%; background: var(--vrm-surface); border-color: transparent; border-radius: 12px; }
 html body .vrm-app-shell .vrm-lbc-catalog-filtres button { border-radius: 999px; }
 html body .vrm-app-shell .vrm-lbc-catalog-filtres button[aria-pressed=true] { background: var(--vrm-ink); border-color: var(--vrm-ink); color: var(--vrm-bg); }
 :root[data-theme="dark"] body .vrm-app-shell .vrm-lbc-catalog-filtres button[aria-pressed=true] { background: var(--vrm-card2); border-color: var(--vrm-ink); color: var(--vrm-ink); }
@@ -556,7 +556,7 @@ html body .vrm-app-shell .vrm-lbc-catalog li {
 }
 html body .vrm-app-shell .vrm-lbc-catalog li > img,
 html body .vrm-app-shell .vrm-lbc-catalog li > .vrm-lbc-catalog-photo-empty {
-  grid-column: 1 / -1; width: 100%; height: auto; aspect-ratio: 4 / 5; border-radius: 14px; background: var(--vrm-photo, var(--vrm-card2)); object-fit: cover;
+  grid-column: 1 / -1; width: 100%; height: auto; aspect-ratio: 4 / 5; border-radius: 12px; background: var(--vrm-photo, var(--vrm-card2)); object-fit: cover;
 }
 html body .vrm-app-shell .vrm-lbc-catalog-info { grid-column: 1; }
 html body .vrm-app-shell .vrm-lbc-catalog-info > strong {
@@ -565,7 +565,7 @@ html body .vrm-app-shell .vrm-lbc-catalog-info > strong {
 html body .vrm-app-shell .vrm-lbc-catalog-info small { font-size: 13px; color: var(--vrm-muted); }
 html body .vrm-app-shell .vrm-lbc-catalog-info [data-etat] { font-size: 12px; background: transparent; padding: 0; color: var(--vrm-muted); font-weight: 600; }
 html body .vrm-app-shell .vrm-lbc-catalog-info [data-etat=active]::before { background: var(--vrm-ink); }
-html body .vrm-app-shell .vrm-lbc-catalog li > b { grid-column: 2; grid-row: 2; font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
+html body .vrm-app-shell .vrm-lbc-catalog li > b { grid-column: 2; grid-row: 2; font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
 html body .vrm-app-shell .vrm-lbc-catalog-gestes { grid-column: 1 / -1; flex-wrap: wrap; gap: 6px; }
 html body .vrm-app-shell .vrm-lbc-catalog-gestes :is(a, button) { background: var(--vrm-b-teinte); border-radius: 12px; padding: 0 12px; font-size: 13px; font-weight: 600; }
 @media (max-width: 600px) {
@@ -613,7 +613,7 @@ html .vrm-app-shell .vrm-main .vrm-filtre-site > button[aria-pressed="true"] { b
    groupes tiennent sans défiler dans 900 px de haut. */
 html .vrm-app-shell .vrm-atelier-rail { padding: 18px 12px 10px; }
 html .vrm-app-shell .vrm-atelier-rail .vrm-sidebar-brand { padding: 0 12px 12px; gap: 10px; align-items: baseline; }
-html .vrm-app-shell .vrm-atelier-rail .vrm-sidebar-mot { font-family: var(--vrm-police); font-size: 20px; font-weight: 800; letter-spacing: -.02em; line-height: 1; color: var(--vrm-ink); }
+html .vrm-app-shell .vrm-atelier-rail .vrm-sidebar-mot { font-family: var(--vrm-police); font-size: 20px; font-weight: 700; letter-spacing: -.02em; line-height: 1; color: var(--vrm-ink); }
 html .vrm-app-shell .vrm-atelier-rail :is(.vrm-rail-platforms, .vrm-rail-management) { gap: 0; padding-top: 0; }
 html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button { min-height: 38px; font-size: 15px; padding-top: 2px; padding-bottom: 2px; border-radius: 12px; }
 html .vrm-app-shell .vrm-atelier-rail [data-nav-groupe].vrm-rail-management-group { margin-top: 9px; }

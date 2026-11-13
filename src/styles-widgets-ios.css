@@ -72,13 +72,13 @@ html body, .vrm-app-shell, :root:root body .vrm-app-shell .vrm-main { background
 
 /* ── 2. LE TITRE D'ÉCRAN : 34/800 serré ───────────────────────────────────── */
 :root:root body .vrm-main :is(.vrm-screen-head .vrm-display, .vrm-tache-tete h1, .vrm-market-heading h1, .vrm-fu-titre-tete) {
-  font-size: 34px !important; font-weight: 800 !important; letter-spacing: -.028em !important; line-height: 1.08 !important;
+  font-size: 34px !important; font-weight: 700 !important; letter-spacing: -.028em !important; line-height: 1.08 !important;
 }
 @media (min-width: 1024px) {
   :root:root body .vrm-main :is(.vrm-screen-head .vrm-display, .vrm-tache-tete h1, .vrm-market-heading h1, .vrm-fu-titre-tete) { font-size: 40px !important; letter-spacing: -.03em !important; }
 }
 :root:root body .vrm-main .vrm-fu-groupe-transp h3 { font-size: 20px !important; font-weight: 700 !important; letter-spacing: -.018em !important; }
-:root:root body .vrm-main :is(.vrm-day-titre-section) { font-size: 22px !important; font-weight: 800 !important; letter-spacing: -.022em !important; }
+:root:root body .vrm-main :is(.vrm-day-titre-section) { font-size: 22px !important; font-weight: 700 !important; letter-spacing: -.022em !important; }
 
 /* ── 3. LA CARTE SOMBRE + SES WIDGETS (« bento ») ──────────────────────────────
    Le composant reste UN (CarteMois : le même DOM, les mêmes attributs) : la carte
@@ -138,7 +138,7 @@ html body, .vrm-app-shell, :root:root body .vrm-app-shell .vrm-main { background
   order: -1 !important; font: 600 13px/1.25 var(--vrm-police) !important; letter-spacing: 0 !important; color: var(--w-gris) !important; margin: 0 !important;
 }
 :root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) .vrm-fu-cases > .vrm-fu-case > b {
-  order: 0 !important; font-size: 34px !important; font-weight: 800 !important; letter-spacing: -.03em !important; line-height: 1.05 !important;
+  order: 0 !important; font-size: 34px !important; font-weight: 700 !important; letter-spacing: -.03em !important; line-height: 1.05 !important;
   font-variant-numeric: tabular-nums !important; color: var(--w-encre) !important; margin: 6px 0 0 !important;
 }
 :root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) .vrm-fu-cases > .vrm-fu-case > b.is-vide { font-weight: 300 !important; color: var(--w-gris) !important; }
@@ -164,7 +164,7 @@ html body, .vrm-app-shell, :root:root body .vrm-app-shell .vrm-main { background
   :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete::after { height: 14px !important; }
   :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete::before { border-radius: 0 0 var(--w-r-tete) var(--w-r-tete) !important; }
   :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete .vrm-fu-cases { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 8px !important; margin: 10px 16px 0 !important; }
-  :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete .vrm-fu-cases > .vrm-fu-case:nth-child(n):nth-last-child(n) { grid-column: auto !important; min-height: 0 !important; padding: 10px 10px 10px 11px !important; border-radius: 22px !important; gap: 2px !important; }
+  :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete .vrm-fu-cases > .vrm-fu-case:nth-child(n):nth-last-child(n) { grid-column: auto !important; min-height: 0 !important; padding: 10px 10px 10px 11px !important; border-radius: 20px !important; gap: 2px !important; }
   :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete .vrm-fu-cases > .vrm-fu-case:nth-child(n):nth-last-child(n) { container-type: inline-size; }
   /* (10 nov., Julien : « l'euro dépasse ») Le chiffre se resserre selon sa longueur (--nc, posé par le widget) :
      « 3 » garde 28 px, « 669,40 € » tient sur la largeur du widget, jamais coupé. */
@@ -176,7 +176,7 @@ html body, .vrm-app-shell, :root:root body .vrm-app-shell .vrm-main { background
 }
 /* Le grand chiffre de la carte sombre : 44/800 (52 à l'ordinateur). */
 :root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) :is(.vrm-fu-grand, .vrm-jv2-grand:not(.is-zero)) {
-  font-size: 44px !important; font-weight: 800 !important; letter-spacing: -.035em !important; line-height: 1.02 !important; font-variant-numeric: tabular-nums !important;
+  font-size: 44px !important; font-weight: 700 !important; letter-spacing: -.035em !important; line-height: 1.02 !important; font-variant-numeric: tabular-nums !important;
 }
 @media (min-width: 1024px) { :root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) :is(.vrm-fu-grand, .vrm-jv2-grand:not(.is-zero)) { font-size: 52px !important; } }
 /* Ma journée : la tête n'est plus bord à bord, c'est un widget comme les autres. */
@@ -260,9 +260,9 @@ html body, .vrm-app-shell, :root:root body .vrm-app-shell .vrm-main { background
 
 /* ── 7. LE CONTRÔLE SEGMENTÉ (iOS plein) ───────────────────────────────────── */
 :root:root body .vrm-main :is(.vrm-seg, .vrm-sel-sites, .vrm-messages-sections) {
-  background: var(--w-remplir) !important; border-radius: 14px !important; padding: 3px !important; border: 0 !important; box-shadow: none !important;
+  background: var(--w-remplir) !important; border-radius: 12px !important; padding: 3px !important; border: 0 !important; box-shadow: none !important;
 }
-:root:root body .vrm-main :is(.vrm-seg > button, .vrm-sel-sites > button, .vrm-messages-sections > button) { border-radius: 11px !important; font-weight: 600 !important; }
+:root:root body .vrm-main :is(.vrm-seg > button, .vrm-sel-sites > button, .vrm-messages-sections > button) { border-radius: 12px !important; font-weight: 600 !important; }
 :root:root body .vrm-main :is(.vrm-seg > button[aria-pressed="true"], .vrm-seg > button.is-actif, .vrm-seg > button[aria-current="page"], .vrm-sel-sites > button[aria-pressed="true"], .vrm-messages-sections > button[aria-pressed="true"]) {
   background: var(--w-carte) !important; color: var(--w-encre) !important;
   box-shadow: 0 3px 8px rgba(0,0,0,.12), 0 3px 1px rgba(0,0,0,.04), 0 0 0 .5px rgba(0,0,0,.04) !important;

@@ -16,7 +16,7 @@ p.vrm-rm-muet { margin: 0; }
 
 /* La paire, en tête : photo, N°, titre, compte. */
 .vrm-rm-paire { display: flex; align-items: center; gap: 12px; }
-.vrm-rm-paire-photo { width: 48px; height: 60px; border-radius: 10px; overflow: hidden; flex: none; display: block; background: var(--vrm-photo, #F2F2F7); }
+.vrm-rm-paire-photo { width: 48px; height: 60px; border-radius: 12px; overflow: hidden; flex: none; display: block; background: var(--vrm-photo, #F2F2F7); }
 .vrm-rm-cadre { display: block; overflow: hidden; }
 .vrm-rm-paire-texte { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
 .vrm-rm-paire-nom { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 15px; font-weight: 600; color: var(--vrm-ink, #1D1D1F); }
@@ -52,11 +52,11 @@ html body button.vrm-rm-etape[aria-current="step"] .vrm-rm-pastille { background
 .vrm-repub-memes b { color: var(--vrm-ink, #1D1D1F); font-weight: 600; }
 
 /* Un bloc de réglage : carte de la feuille. */
-.vrm-rm-bloc { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-radius: 14px; background: var(--vrm-surface, #fff); border: 1px solid var(--vrm-line, rgba(0,0,0,.08)); }
+.vrm-rm-bloc { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--vrm-surface, #fff); border: 1px solid var(--vrm-line, rgba(0,0,0,.08)); }
 .vrm-rm-bloc-tete { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; font-size: 13px; color: var(--vrm-muted, #6E6E73); }
 .vrm-rm-bloc-tete b { font-size: 15px; font-weight: 700; color: var(--vrm-ink, #1D1D1F); }
 .vrm-rm-bande { display: flex; gap: 6px; }
-.vrm-rm-vignette { width: 56px; height: 70px; border-radius: 10px; overflow: hidden; background: var(--vrm-photo, #F2F2F7); flex: none; }
+.vrm-rm-vignette { width: 56px; height: 70px; border-radius: 12px; overflow: hidden; background: var(--vrm-photo, #F2F2F7); flex: none; }
 .vrm-rm-plus { display: grid; place-items: center; font-size: 13px; font-weight: 600; color: var(--vrm-muted, #6E6E73); }
 .vrm-rm-puces { display: flex; flex-wrap: wrap; gap: 6px; }
 .vrm-rm-puces.vrm-filtres > button { min-height: 44px; padding: 0 14px; font-size: 15px; cursor: pointer; font-family: inherit; }
@@ -77,8 +77,8 @@ html body button.vrm-rm-etape[aria-current="step"] .vrm-rm-pastille { background
 .vrm-rm-resultat { font-size: 13px; color: var(--vrm-ink, #1D1D1F); font-variant-numeric: tabular-nums; line-height: 1.45; overflow-wrap: anywhere; }
 
 /* Le texte : l'aperçu de l'annonce telle qu'elle partira, puis les champs. */
-.vrm-rm-apercu { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; padding: 12px; border-radius: 14px; background: var(--vrm-surface, #fff); border: 1px solid var(--vrm-line, rgba(0,0,0,.08)); }
-.vrm-rm-apercu-photo { position: relative; width: 112px; aspect-ratio: 4 / 5; border-radius: 10px; overflow: hidden; background: var(--vrm-photo, #F2F2F7); }
+.vrm-rm-apercu { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; padding: 12px; border-radius: 12px; background: var(--vrm-surface, #fff); border: 1px solid var(--vrm-line, rgba(0,0,0,.08)); }
+.vrm-rm-apercu-photo { position: relative; width: 112px; aspect-ratio: 4 / 5; border-radius: 12px; overflow: hidden; background: var(--vrm-photo, #F2F2F7); }
 .vrm-rm-apercu-n { position: absolute; right: 6px; bottom: 6px; padding: 2px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; color: #fff; background: rgba(0,0,0,.55); font-variant-numeric: tabular-nums; }
 .vrm-rm-apercu-corps { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .vrm-rm-apercu-prix { font-size: 17px; font-weight: 700; color: var(--vrm-ink, #1D1D1F); font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: 8px; }
@@ -117,7 +117,7 @@ html body .vrm-fs.vrm-rm-feuille .vrm-b { min-height: 44px !important; }
 /* ═══ (10 nov., lot AP) « À la main », conseillé — le kit de plusieurs annonces ═══
    Le conseil : une carte calme (pas une alerte), l'icône au bleu rare. Les cartes du
    kit : photo, N°, titre, compte · prix, description lisible, trois gestes de 44 px. */
-.vrm-kit-conseil { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background: var(--vrm-surface, #fff); border: 1px solid var(--vrm-line, rgba(0,0,0,.08)); }
+.vrm-kit-conseil { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; background: var(--vrm-surface, #fff); border: 1px solid var(--vrm-line, rgba(0,0,0,.08)); }
 .vrm-kit-conseil > div { min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.4; color: var(--vrm-muted, #6E6E73); }
 .vrm-kit-conseil b { font-size: 15px; font-weight: 600; color: var(--vrm-ink, #1D1D1F); }
 .vrm-kit-conseil-icone { width: 40px; height: 40px; flex: none; border-radius: 12px; display: grid; place-items: center; color: var(--vrm-accent, #0071E3); background: var(--vrm-b-teinte, rgba(0,113,227,.08)); }
@@ -129,9 +129,9 @@ html body .vrm-fs.vrm-rm-feuille .vrm-b { min-height: 44px !important; }
 @media (max-width: 767px) { .vrm-sel-barre.vrm-sel-barre-deux > .vrm-b { flex: 1 1 0; min-width: 0; } }
 .vrm-kit-barre { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .vrm-kit-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.vrm-kit-carte { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 14px; background: var(--vrm-surface, #fff); border: 1px solid var(--vrm-line, rgba(0,0,0,.08)); min-width: 0; }
+.vrm-kit-carte { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 12px; background: var(--vrm-surface, #fff); border: 1px solid var(--vrm-line, rgba(0,0,0,.08)); min-width: 0; }
 .vrm-kit-tete { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 12px; }
-.vrm-kit-photo { position: relative; display: block; width: 72px; aspect-ratio: 4 / 5; border-radius: 10px; overflow: hidden; background: var(--vrm-photo, #F2F2F7); }
+.vrm-kit-photo { position: relative; display: block; width: 72px; aspect-ratio: 4 / 5; border-radius: 12px; overflow: hidden; background: var(--vrm-photo, #F2F2F7); }
 .vrm-kit-texte { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .vrm-kit-desc { font-size: 13px; line-height: 1.45; color: var(--vrm-ink, #1D1D1F); white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .vrm-kit-gestes { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -159,4 +159,4 @@ html body button.vrm-rm-photo-une:focus-visible { outline: 2px solid var(--vrm-a
   .vrm-kit-etapes > li.vrm-kit-coller { flex: 2 1 280px; }
 }
 /* Feuille « Actions » : « Republier à la main » conseillé, AVANT les tuiles. */
-.vrm-act-main.vrm-act-main-conseil { padding: 8px 10px; margin: 0 0 10px; border-radius: 14px; background: var(--vrm-b-teinte, rgba(0,113,227,.08)); gap: 4px 10px; }
+.vrm-act-main.vrm-act-main-conseil { padding: 8px 10px; margin: 0 0 10px; border-radius: 12px; background: var(--vrm-b-teinte, rgba(0,113,227,.08)); gap: 4px 10px; }

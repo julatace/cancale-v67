@@ -14,7 +14,7 @@
   letter-spacing: .01em; text-transform: uppercase; color: var(--vrm-muted, #6E6E73);
 }
 .vrm-ios-carte {
-  background: var(--vrm-surface, #fff); border-radius: 14px; overflow: hidden;
+  background: var(--vrm-surface, #fff); border-radius: 12px; overflow: hidden;
   box-shadow: 0 0 0 .5px var(--vrm-hair, rgba(0,0,0,.06));
 }
 .vrm-ios-groupe-pied { margin: 8px 16px 0; font-size: 13px; line-height: 1.38; color: var(--vrm-muted, #6E6E73); }

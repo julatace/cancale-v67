@@ -66,7 +66,7 @@ button.vrm-sp-rec:focus-visible { outline: 2px solid var(--vrm-accent); outline-
 .vrm-sp-cmp { display: flex; flex-direction: column; gap: 10px; }
 .vrm-sp-cmp-tete { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: center; }
 .vrm-sp-cmp-vs { font-size: 12px; color: var(--vrm-muted); }
-.vrm-sp-cmp-choix select { width: 100%; min-height: 44px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--vrm-line); background: var(--vrm-surface); color: var(--vrm-ink); font: inherit; font-size: 14px; font-weight: 600; }
+.vrm-sp-cmp-choix select { width: 100%; min-height: 44px; padding: 0 10px; border-radius: 12px; border: 1px solid var(--vrm-line); background: var(--vrm-surface); color: var(--vrm-ink); font: inherit; font-size: 14px; font-weight: 600; }
 .vrm-sp-cmp-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-variant-numeric: tabular-nums; }
 .vrm-sp-cmp-table th, .vrm-sp-cmp-table td { padding: 8px 6px; border-top: 1px solid var(--vrm-line); text-align: right; font-size: 14px; color: var(--vrm-ink); overflow-wrap: anywhere; vertical-align: top; }
 .vrm-sp-cmp-table thead th { border-top: 0; font-size: 12px; color: var(--vrm-muted); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

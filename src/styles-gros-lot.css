@@ -9,7 +9,7 @@
   .vrm-gl-champ { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
   .vrm-gl-suite { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; min-height: 32px; }
   .vrm-gl-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-  .vrm-gl-art { border: 1px solid; border-radius: 14px; padding: 8px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .vrm-gl-art { border: 1px solid; border-radius: 12px; padding: 8px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
   .vrm-gl-art-haut, .vrm-gl-art-bas { display: flex; align-items: center; gap: 8px; min-width: 0; }
   .vrm-gl-num { flex-shrink: 0; min-width: 64px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
   .vrm-gl-photo { flex-shrink: 0; width: 44px; height: 44px; padding: 0; border: 1px dashed; border-radius: 12px; overflow: hidden; display: flex; align-items: center; justify-content: center; cursor: pointer; }

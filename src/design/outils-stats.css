@@ -11,7 +11,7 @@
 /* ── Ce qui rapporte le plus ───────────────────────────────────────────────── */
 .vrm-cr { background: var(--fu-carte); border-radius: var(--fu-r-carte); box-shadow: var(--fu-ombre); padding: 18px 18px 10px; min-width: 0; display: flex; flex-direction: column; gap: 12px; color: var(--fu-encre); }
 .vrm-cr-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-.vrm-cr-titre { font-size: 20px; font-weight: 800; letter-spacing: -.02em; margin: 0; line-height: 1.2; color: var(--fu-encre); }
+.vrm-cr-titre { font-size: 20px; font-weight: 700; letter-spacing: -.02em; margin: 0; line-height: 1.2; color: var(--fu-encre); }
 .vrm-cr-note { font-size: 13px; color: var(--fu-gris); font-variant-numeric: var(--fu-chiffres); white-space: nowrap; }
 .vrm-cr .vrm-cr-axes { align-self: flex-start; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
 .vrm-cr .vrm-cr-axes::-webkit-scrollbar { display: none; }
@@ -28,10 +28,10 @@
 .vrm-cr-sous { font-size: 13px; color: var(--fu-gris); font-variant-numeric: var(--fu-chiffres); line-height: 1.35; overflow-wrap: anywhere; }
 .vrm-cr-sous > .vrm-cr-bloc { white-space: nowrap; }
 .vrm-cr-droite { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
-.vrm-cr-brut { font-size: 17px; font-weight: 800; letter-spacing: -.02em; color: var(--fu-encre); font-variant-numeric: var(--fu-chiffres); white-space: nowrap; }
+.vrm-cr-brut { font-size: 17px; font-weight: 700; letter-spacing: -.02em; color: var(--fu-encre); font-variant-numeric: var(--fu-chiffres); white-space: nowrap; }
 .vrm-cr-brut[data-vide] { color: var(--fu-gris3); }
 .vrm-cr-couv { font-size: 12px; color: var(--fu-gris); font-variant-numeric: var(--fu-chiffres); }
-.vrm-cr-articles { list-style: none; margin: 0 0 10px 34px; padding: 4px 12px; background: var(--fu-case); border-radius: 14px; }
+.vrm-cr-articles { list-style: none; margin: 0 0 10px 34px; padding: 4px 12px; background: var(--fu-case); border-radius: 12px; }
 .vrm-cr-article { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "t b" "s b"; column-gap: 12px; padding: 9px 0; border-top: 1px solid var(--fu-filet); }
 .vrm-cr-article:first-child { border-top: 0; }
 .vrm-cr-article-titre { grid-area: t; font-size: 13px; font-weight: 600; color: var(--fu-encre); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -49,7 +49,7 @@
 /* ── Articles qui dorment ──────────────────────────────────────────────────── */
 .vrm-qd { background: var(--fu-carte); border-radius: var(--fu-r-carte); box-shadow: var(--fu-ombre); padding: 18px 18px 8px; display: flex; flex-direction: column; gap: 12px; color: var(--fu-encre); min-width: 0; }
 .vrm-qd-tete { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-.vrm-qd-titre { font-size: 20px; font-weight: 800; letter-spacing: -.02em; margin: 0; line-height: 1.2; }
+.vrm-qd-titre { font-size: 20px; font-weight: 700; letter-spacing: -.02em; margin: 0; line-height: 1.2; }
 .vrm-qd-titre .vrm-qd-n { color: var(--fu-gris); font-weight: 700; margin-left: 6px; font-variant-numeric: var(--fu-chiffres); }
 .vrm-qd-vide { font-size: 13px; color: var(--fu-gris); padding: 2px 0 12px; }
 .vrm-qd-liste { list-style: none; margin: 0; padding: 0; }
@@ -58,7 +58,7 @@
 .vrm-qd-photo { width: 52px; height: 64px; border-radius: 12px; object-fit: cover; background: var(--fu-case); display: block; }
 .vrm-qd-centre { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .vrm-qd-nom { font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vrm-qd-num { font-weight: 800; margin-right: 6px; }
+.vrm-qd-num { font-weight: 700; margin-right: 6px; }
 .vrm-qd-sous { font-size: 13px; color: var(--fu-gris); font-variant-numeric: var(--fu-chiffres); line-height: 1.35; overflow-wrap: anywhere; }
 .vrm-qd-sous > .vrm-qd-bloc { white-space: nowrap; }
 .vrm-qd-age { font-weight: 700; color: var(--fu-encre); }
@@ -66,8 +66,8 @@
 .vrm-qd-agir:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: 2px; }
 .vrm-qd-menu { display: flex; flex-direction: column; gap: 8px; }
 .vrm-qd-menu-tete { display: flex; align-items: center; gap: 10px; }
-.vrm-qd-menu-titre { margin: 0; font-size: 17px; font-weight: 800; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fu-encre); }
-.vrm-qd-choix { all: unset; box-sizing: border-box; display: flex; align-items: center; min-height: 52px; padding: 0 16px; border-radius: 14px; background: var(--fu-case); color: var(--fu-encre); font-size: 15px; font-weight: 700; cursor: pointer; }
+.vrm-qd-menu-titre { margin: 0; font-size: 17px; font-weight: 700; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fu-encre); }
+.vrm-qd-choix { all: unset; box-sizing: border-box; display: flex; align-items: center; min-height: 52px; padding: 0 16px; border-radius: 12px; background: var(--fu-case); color: var(--fu-encre); font-size: 15px; font-weight: 700; cursor: pointer; }
 .vrm-qd-choix[aria-disabled="true"] { opacity: .45; cursor: default; }
 .vrm-qd-choix:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: 2px; }
 /* (9 nov., « vendre plus ») Un geste peut porter une ligne qui dit ce qu'il fait ;

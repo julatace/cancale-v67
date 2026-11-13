@@ -1,7 +1,7 @@
 /* (11 nov., lot avis-negatif) La feuille « Avis négatif » de Ma journée (src/AvisNegatifJournee.jsx).
    Neutre : l'étoile pleine est l'encre, la vide la ligne ; l'ambre est porté par la carte (« un geste »). */
 .vrm-avb { display: grid; gap: 14px; }
-.vrm-avb-avis { border: 1px solid var(--vrm-line); background: var(--vrm-surface); border-radius: 14px; padding: 14px 16px; display: grid; gap: 8px; }
+.vrm-avb-avis { border: 1px solid var(--vrm-line); background: var(--vrm-surface); border-radius: 12px; padding: 14px 16px; display: grid; gap: 8px; }
 .vrm-avb-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .vrm-avb-note { font-size: 18px; letter-spacing: 1px; color: var(--vrm-ink); line-height: 1; }
 .vrm-avb-note-vide { color: var(--vrm-line); }

@@ -38,7 +38,7 @@ html body button.vrm-cn-lien:active { opacity: .55; }
 .vrm-cn-jour { margin-bottom: 12px; }
 .vrm-cn-jour-titre { margin: 8px 4px 6px; letter-spacing: -.005em; font: 600 13px/1.3 var(--vrm-police); color: var(--fu-gris2); }
 .vrm-cn-jour-titre::first-letter { text-transform: uppercase; }
-.vrm-cn-jour ul { list-style: none; margin: 0; padding: 0; background: var(--fu-carte, #fff); border-radius: 14px; overflow: hidden; box-shadow: var(--o-carte); }
+.vrm-cn-jour ul { list-style: none; margin: 0; padding: 0; background: var(--fu-carte, #fff); border-radius: 12px; overflow: hidden; box-shadow: var(--o-carte); }
 .vrm-cn-jour li + li { border-top: 1px solid var(--fu-filet); }
 .vrm-cn-ligne {
   width: 100%; min-height: 60px; display: flex; align-items: flex-start; gap: 10px; padding: 12px 12px 12px 10px; box-sizing: border-box;
@@ -50,7 +50,7 @@ button.vrm-cn-ligne:active { background: var(--fu-remplir); }
 .vrm-cn-point { flex: none; width: 8px; height: 8px; margin-top: 6px; border-radius: 999px; background: transparent; }
 .vrm-cn-ligne.is-non-lue .vrm-cn-point { background: var(--fu-bleu, #0071e3); }
 /* (8 nov.) L'icône de la famille, neutre ; le point bleu du « non lu » posé dessus. */
-.vrm-cn-ic { position: relative; flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--fu-remplir); color: var(--fu-encre, #1d1d1f); }
+.vrm-cn-ic { position: relative; flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 12px; background: var(--fu-remplir); color: var(--fu-encre, #1d1d1f); }
 .vrm-cn-ic .vrm-cn-point { position: absolute; top: -3px; right: -3px; margin: 0; width: 10px; height: 10px; border: 2px solid var(--fu-carte, #fff); box-sizing: content-box; }
 .vrm-cn-ligne.is-retrait { padding-left: 54px; background: color-mix(in srgb, var(--fu-remplir) 35%, transparent); }
 .vrm-cn-ligne.is-retrait .vrm-cn-ic { display: none; }

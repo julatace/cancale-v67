@@ -16,7 +16,7 @@
 .vrm-s2d-meuble[data-replie] { margin-bottom: 10px; }
 .vrm-s2d-meuble[data-replie] .vrm-s2d-tete { opacity: .55; }
 .vrm-s2d-tete { display: flex; align-items: center; gap: 10px; margin: 0 2px 6px; min-width: 0; }
-.vrm-s2d-nom { font-size: 17px; font-weight: 800; color: var(--vrm-ink, inherit); letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.vrm-s2d-nom { font-size: 17px; font-weight: 700; color: var(--vrm-ink, inherit); letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .vrm-s2d-compte { font-size: 12px; font-weight: 600; color: var(--vrm-muted, #6E6E73); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .vrm-s2d-pastille { font-size: 12px; font-weight: 700; color: var(--vrm-on-accent, #FFFFFF); background: var(--s2d-accent); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
 .vrm-s2d-pastille[data-vide] { color: var(--vrm-muted, #6E6E73); background: transparent; }
@@ -89,19 +89,19 @@
   0%, 100% { box-shadow: 0 0 0 3px var(--s2d-accent), 0 0 0 6px color-mix(in srgb, var(--s2d-accent) 30%, transparent); }
   50% { box-shadow: 0 0 0 3px var(--s2d-accent), 0 0 0 12px color-mix(in srgb, var(--s2d-accent) 0%, transparent); }
 }
-.vrm-s2d-num { position: absolute; left: 4px; bottom: 4px; max-width: calc(100% - 8px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: rgba(0, 0, 0, .62); color: #FFFFFF; font-size: 11px; font-weight: 800; line-height: 1.35; padding: 0 6px; border-radius: 6px; font-variant-numeric: tabular-nums; }
+.vrm-s2d-num { position: absolute; left: 4px; bottom: 4px; max-width: calc(100% - 8px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: rgba(0, 0, 0, .62); color: #FFFFFF; font-size: 11px; font-weight: 700; line-height: 1.35; padding: 0 6px; border-radius: 6px; font-variant-numeric: tabular-nums; }
 .vrm-s2d-num[data-vendue] { background: var(--vrm-accent, #0071E3); color: var(--vrm-on-accent, #FFFFFF); }
-.vrm-s2d-vendue { position: absolute; right: 4px; top: 4px; background: var(--vrm-accent, #0071E3); color: var(--vrm-on-accent, #FFFFFF); font-size: 11px; font-weight: 800; line-height: 1.35; padding: 0 6px; border-radius: 999px; }
+.vrm-s2d-vendue { position: absolute; right: 4px; top: 4px; background: var(--vrm-accent, #0071E3); color: var(--vrm-on-accent, #FFFFFF); font-size: 11px; font-weight: 700; line-height: 1.35; padding: 0 6px; border-radius: 999px; }
 .vrm-s2d-etagere[data-zoom="loin"] .vrm-s2d-vendue { display: none; }   /* de loin : le halo et le N° à l'accent suffisent */
 /* (5 nov.) PLUS EN LIGNE : rangée, mais plus une annonce actuelle (retirée,
    supprimée) — un geste à faire, donc AMBRE (§7), fixe (rien ne respire). */
 .vrm-s2d-case.is-plusenligne { z-index: 1; box-shadow: 0 0 0 3px var(--vrm-warn, #B25000); }
 .vrm-s2d-num[data-hors-ligne] { background: var(--vrm-warn, #B25000); color: var(--vrm-on-warn, #FFFFFF); }
-.vrm-s2d-horsligne { position: absolute; right: 4px; top: 4px; background: var(--vrm-warn, #B25000); color: var(--vrm-on-warn, #FFFFFF); font-size: 11px; font-weight: 800; line-height: 1.35; padding: 0 6px; border-radius: 999px; }
+.vrm-s2d-horsligne { position: absolute; right: 4px; top: 4px; background: var(--vrm-warn, #B25000); color: var(--vrm-on-warn, #FFFFFF); font-size: 11px; font-weight: 700; line-height: 1.35; padding: 0 6px; border-radius: 999px; }
 .vrm-s2d-etagere[data-zoom="loin"] .vrm-s2d-horsligne { display: none; }
 /* Les annonces actuelles : chiffres en tête, liste, filtres. */
 .vrm-s2d-resume { display: flex; flex-direction: column; gap: 4px; }
-.vrm-s2d-resume-n { font-size: 28px; font-weight: 800; color: var(--vrm-ink, inherit); font-variant-numeric: tabular-nums; letter-spacing: -.02em; line-height: 1.1; }
+.vrm-s2d-resume-n { font-size: 28px; font-weight: 700; color: var(--vrm-ink, inherit); font-variant-numeric: tabular-nums; letter-spacing: -.02em; line-height: 1.1; }
 .vrm-s2d-resume-n small { font-size: 15px; font-weight: 600; color: var(--vrm-muted, #6E6E73); letter-spacing: 0; margin-left: 6px; font-variant-numeric: normal; }
 .vrm-s2d-resume-l { font-size: 13px; color: var(--vrm-muted, #6E6E73); line-height: 1.45; }
 .vrm-s2d-resume-l b { color: var(--vrm-ink, inherit); font-weight: 700; }
@@ -124,7 +124,7 @@
 .vrm-s2d-sorti { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border-top: 1px solid var(--vrm-line, rgba(0, 0, 0, .1)); padding-top: 6px; }
 
 /* ── L'EXPLICATION ANIMÉE (StockExplication.jsx) ───────────────────────────── */
-.vrm-sx { --sx-accent: var(--vrm-accent, #0071E3); background: var(--vrm-surface, #FFFFFF); border: 1px solid var(--vrm-line, rgba(0, 0, 0, .1)); border-radius: 14px; padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 10px; }
+.vrm-sx { --sx-accent: var(--vrm-accent, #0071E3); background: var(--vrm-surface, #FFFFFF); border: 1px solid var(--vrm-line, rgba(0, 0, 0, .1)); border-radius: 12px; padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 10px; }
 .vrm-sx-tete { display: flex; align-items: center; gap: 10px; }
 .vrm-sx-titre { font-size: 15px; font-weight: 700; color: var(--vrm-ink, inherit); flex: 1; }
 .vrm-sx-fermer { width: 44px; height: 44px; margin: -10px -10px -10px 0; border: 0; background: transparent; color: var(--vrm-muted, #6E6E73); font-size: 22px; cursor: pointer; border-radius: 12px; }
@@ -138,12 +138,12 @@
 .vrm-sx-photo { fill: color-mix(in srgb, var(--vrm-muted, #8E8E93) 16%, var(--vrm-surface, #FFFFFF)); }
 .vrm-sx-basket { fill: var(--vrm-ink, #1D1D1F); opacity: .82; }
 .vrm-sx-chip { fill: rgba(0, 0, 0, .7); }
-.vrm-sx-chip-txt { font-size: 11px; font-weight: 800; fill: #FFFFFF; font-family: inherit; }
+.vrm-sx-chip-txt { font-size: 11px; font-weight: 700; fill: #FFFFFF; font-family: inherit; }
 .vrm-sx-legende { font-size: 11px; font-weight: 600; fill: var(--vrm-ink, #1D1D1F); font-family: inherit; }
 .vrm-sx-halo { fill: none; stroke: var(--sx-accent); stroke-width: 3; opacity: 0; }
 .vrm-sx-tag { opacity: 0; }
 .vrm-sx-tag-fond { fill: var(--sx-accent); }
-.vrm-sx-tag-txt { font-size: 11px; font-weight: 800; fill: var(--vrm-on-accent, #FFFFFF); font-family: inherit; }
+.vrm-sx-tag-txt { font-size: 11px; font-weight: 700; fill: var(--vrm-on-accent, #FFFFFF); font-family: inherit; }
 .vrm-sx-colis { opacity: 0; }
 .vrm-sx-colis-fond { fill: color-mix(in srgb, var(--vrm-muted, #8E8E93) 40%, var(--vrm-surface, #FFFFFF)); stroke: var(--vrm-muted, #8E8E93); stroke-width: 1; }
 .vrm-sx-colis-trait { stroke: var(--vrm-muted, #8E8E93); stroke-width: 1; fill: none; }
@@ -156,7 +156,7 @@
 
 .vrm-sx-etapes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .vrm-sx-etape { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.4; color: var(--vrm-ink, inherit); }
-.vrm-sx-etape > b { flex: none; width: 20px; height: 20px; border-radius: 999px; display: grid; place-items: center; font-size: 11px; font-weight: 800; background: color-mix(in srgb, var(--vrm-muted, #8E8E93) 18%, transparent); color: var(--vrm-ink, inherit); }
+.vrm-sx-etape > b { flex: none; width: 20px; height: 20px; border-radius: 999px; display: grid; place-items: center; font-size: 11px; font-weight: 700; background: color-mix(in srgb, var(--vrm-muted, #8E8E93) 18%, transparent); color: var(--vrm-ink, inherit); }
 
 /* Le film (10 s, en boucle) : l'annonce entre dans la case (1), la case
    s'allume (2), le colis part et la case se vide (3). Chaque mouvement part
@@ -222,7 +222,7 @@
 /* (11 nov., lot DJ4) Une paire en ligne sur plusieurs sites = UNE ligne, une pastille par site.
    Neutres (aucune couleur d'accent : §7). Le « à part » (à confirmer, masquées, gardées) : replis. */
 .vrm-s2d-sites { display: flex; flex-wrap: wrap; gap: 4px; margin: 3px 0 1px; }
-.vrm-s2d-site { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 10px; font-size: 11.5px; font-weight: 650; line-height: 1; background: rgba(120, 120, 128, .14); color: var(--w-gris, #6E6E73); }
+.vrm-s2d-site { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 12px; font-size: 11.5px; font-weight: 650; line-height: 1; background: rgba(120, 120, 128, .14); color: var(--w-gris, #6E6E73); }
 .vrm-s2d-a-part { padding: 2px 0; }
 .vrm-s2d-a-part + .vrm-s2d-a-part { border-top: 1px solid rgba(120, 120, 128, .2); }
 .vrm-s2d-a-part > summary { min-height: 44px; align-items: center; justify-content: space-between; font-size: 15px; font-weight: 700; cursor: pointer; list-style: none; }

@@ -35,7 +35,7 @@
 }
 @media (min-width: 900px) { .vrm-inst { bottom: calc(24px + env(safe-area-inset-bottom, 0px)); } }
 .vrm-inst-fermer { position: absolute; top: 6px; right: 6px; }
-.vrm-inst-icone { flex: none; width: 44px; height: 44px; border-radius: 10px; }
+.vrm-inst-icone { flex: none; width: 44px; height: 44px; border-radius: 12px; }
 .vrm-inst-corps { flex: 1; min-width: 0; display: grid; gap: 8px; padding-right: 24px; }
 .vrm-inst-titre { font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
 .vrm-inst-texte { margin: 0; color: var(--vrm-muted, #6E6E73); }

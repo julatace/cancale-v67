@@ -20,11 +20,11 @@
 .vrm-inv-case-nom small { color: var(--vrm-muted); font-size: 12px; overflow-wrap: anywhere; }
 .vrm-inv-notee { margin-left: 6px; white-space: nowrap; }
 .vrm-inv-notee[data-inv-notee-vue="1"] { color: var(--vrm-ink); font-weight: 600; }
-.vrm-inv-pas { width: 44px; height: 44px; border: 0; border-radius: 10px; background: var(--vrm-card2); color: var(--vrm-ink); font: inherit; font-size: 22px; line-height: 1; cursor: pointer; }
+.vrm-inv-pas { width: 44px; height: 44px; border: 0; border-radius: 12px; background: var(--vrm-card2); color: var(--vrm-ink); font: inherit; font-size: 22px; line-height: 1; cursor: pointer; }
 .vrm-inv-pas:disabled { opacity: .35; cursor: default; }
 
 /* Le retour immédiat du dernier N° */
-.vrm-inv-retour { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; column-gap: 12px; row-gap: 2px; min-height: 92px; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--vrm-line); background: var(--vrm-surface); border-left-width: 6px; }
+.vrm-inv-retour { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; column-gap: 12px; row-gap: 2px; min-height: 92px; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--vrm-line); background: var(--vrm-surface); border-left-width: 6px; }
 .vrm-inv-retour-vide { grid-column: 1 / -1; align-self: center; color: var(--vrm-muted); font-size: 15px; }
 .vrm-inv-retour-n { grid-row: 1 / span 2; font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
 .vrm-inv-retour-t { font-size: 19px; font-weight: 700; }
@@ -81,7 +81,7 @@
    Jetons de la coque seulement : touches neutres, aucune couleur propre. */
 .vrm-inv-pave { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 /* `.vrm-inv-pave` devant : une règle générale `button[aria-label]` (30 px) l'emportait sur la classe seule. */
-.vrm-inv-pave .vrm-inv-touche { min-height: 64px; border: 1px solid var(--vrm-line); border-radius: 14px; background: var(--vrm-surface); color: var(--vrm-ink); font: inherit; font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
+.vrm-inv-pave .vrm-inv-touche { min-height: 64px; border: 1px solid var(--vrm-line); border-radius: 12px; background: var(--vrm-surface); color: var(--vrm-ink); font: inherit; font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
 .vrm-inv-touche:active { background: var(--vrm-card2); }
 .vrm-inv-pave .vrm-inv-touche-lettre, .vrm-inv-pave .vrm-inv-touche-efface { background: var(--vrm-card2); font-size: 22px; }
 .vrm-inv-touche:disabled { opacity: .4; cursor: default; }
