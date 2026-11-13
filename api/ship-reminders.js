@@ -33,7 +33,7 @@ import { passageFacturesAuto } from './_lib/factures-auto.js';
 // (revue du 5 nov.) Les textes des rappels soir et « offres au mini » : un propriétaire, celui de l'aperçu.
 import { texteSoir, texteOffresMini } from './_lib/notif-apercus.js';
 import { semainePassee, semaineCourante, calculerBilan, bilanAEnvoyer, texteBilan, versementsDeLignes } from './_lib/bilan-semaine.js';
-import { notificationUrssaf, rappelAvantEcheance, MAIN_URSSAF } from './_lib/rappel-urssaf.js';
+import { notificationUrssaf, rappelVeilleUrssaf, MAIN_URSSAF } from './_lib/rappel-urssaf.js';
 // « À expédier » : la règle du widget (elle-même jugée identique à celle de
 // l'app et de l'extension par audit-statuts.cjs). Importée, jamais recopiée.
 import { aExpedier } from './widget.js';
@@ -906,17 +906,23 @@ async function traiterVendeurApresRelecture() {
           urssaf = !n.envoyer ? n.raison : res.reserve ? 'envoyé · ' + n.raison : res.raison === 'deja' ? 'déjà rappelé ce mois' : 'mémo illisible — rien';
         }
       } else {
-        // (29 oct.) Le rappel avant l'échéance : une fois par échéance (`veille`
-        // dans le même mémo), écrit APRÈS l'envoi comme celui du 1er.
-        const n = rappelAvantEcheance({ today, main: await getRowProjete('main', MAIN_URSSAF) });
-        if (n.envoyer) {
+        // (13 nov., point 17) LA VEILLE DE L'ÉCHÉANCE (api/_lib/rappel-urssaf.js,
+        // `rappelVeilleUrssaf`) — remplace le rappel « 3 jours ou moins » du 29 oct. :
+        // « Demain : déclaration URSSAF · X € à déclarer », la règle et le montant de la
+        // carte « Déclarer » (où vit « Copier »). Une fois par échéance : son identité
+        // (`veilleEcheance` dans le même mémo), réservée AVANT l'envoi. Famille
+        // « Rappels » ; heures calmes ⇒ rangée dans la cloche, dite au réveil (`sendPushToAll`).
+        const n = rappelVeilleUrssaf({ today, main: await getRowProjete('main', MAIN_URSSAF) });
+        if (!n.envoyer) urssaf = n.raison;
+        else {
           const deja = await getRow('urssaf_reminder_dedup');
-          if (deja && deja.veille === n.cle) urssaf = 'déjà rappelé avant l\'échéance';
+          if (deja && deja.veilleEcheance === n.cle) urssaf = 'déjà rappelé la veille de l\'échéance';
           else if (deja === undefined) urssaf = 'mémo illisible — rien';
-          else if (await pushCategorieActive('urssaf')) {
-            const res = await reserverDedup('urssaf_reminder_dedup', (d) => !!d && d.veille === n.cle, (d) => ({ ...(d || {}), veille: n.cle }));
-            if (res.reserve) await sendPushToAll({ cat: 'urssaf', title: n.titre, body: n.corps, tag: 'urssaf-veille-' + n.cle, url: n.url });
-            urssaf = res.reserve ? 'envoyé · ' + n.raison : res.raison === 'deja' ? 'déjà rappelé avant l\'échéance' : 'mémo illisible — rien';
+          else if (!(await pushCategorieActive('urssaf'))) urssaf = 'rappels coupés par le vendeur';
+          else {
+            const res = await reserverDedup('urssaf_reminder_dedup', (d) => !!d && d.veilleEcheance === n.cle, (d) => ({ ...(d || {}), veilleEcheance: n.cle }));
+            if (res.reserve) await sendPushToAll({ cat: 'urssaf', title: n.titre, body: n.corps, tag: 'urssaf-veille-' + n.cle, cle: 'urssaf-veille:' + n.cle, url: n.url });
+            urssaf = res.reserve ? 'envoyé · ' + n.raison : res.raison === 'deja' ? 'déjà rappelé la veille de l\'échéance' : 'mémo illisible — rien';
           }
         }
       }
