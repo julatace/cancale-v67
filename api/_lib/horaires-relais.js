@@ -30,6 +30,7 @@
 //  `plages: []` = fermé ces jours-là.
 // ════════════════════════════════════════════════════════════════════════════
 import { sansSuggestions } from './retrait-colis.js';
+import { decoderEntitesHtml } from './entites-html.js';
 
 const JOUR = String.raw`(?:lundi|lun|mardi|mar|mercredi|mer|jeudi|jeu|vendredi|ven|samedi|sam|dimanche|dim)\.?`;
 const NUM_JOUR = { lun: 1, mar: 2, mer: 3, jeu: 4, ven: 5, sam: 6, dim: 7 };
@@ -126,6 +127,54 @@ export function horairesDepuisTexte(texte) {
   const k = JSON.stringify(trouves[0]);
   return trouves.every((b) => JSON.stringify(b) === k) ? trouves[0] : null;
 }
+
+// ── (13 nov., lot 11) MONDIAL RELAY : LES HORAIRES LUS CHEZ LE TRANSPORTEUR ───
+// L'e-mail Mondial Relay n'écrit pas les horaires : un LIEN (`notification.mondialrelay.fr/c?q=…`,
+// redirection de suivi opaque, propre au destinataire — jamais suivi). La réponse de suivi que le
+// SERVEUR lit déjà pour CE colis (`_mvc/…/RechercherJsonResponsive`, n° + code postal, écho
+// contrôlé — api/_lib/transporteurs.js) porte, mesuré le 24 oct. (api/_lib/transporteurs-lecture.js) :
+//   `<input type="hidden" id="numeroTemp" value=NNNNN />` (le n° du point relais),
+//   `<input type="hidden" id="codePaysTemp" value=FR />`,
+//   `<div class="points_relais PCL_Details hide"><div class="detail-mag">
+//      <p class="tittle-info"><strong>Horaires d'ouverture :</strong></p>
+//      <table><tbody><tr><td>lundi</td><td> 08h00 - 19h00 </td></tr>
+//      <tr><td>dimanche</td><td colspan="2">Fermé</td></tr>…`.
+// AUCUNE requête de plus : les horaires viennent avec le suivi. L'identité du point est celle que
+// Mondial Relay donne pour CE n° de colis, jamais un point « qui ressemble » (nom, ville).
+// ⚠️ Rien plutôt qu'un faux : deux n° de point différents, un pays autre que la France (ou pas dit),
+// deux tableaux différents, une ligne qui n'est pas « jour + plages | fermé » ⇒ pas d'horaires.
+// Un bloc présent mais illisible rend sa FORME (jamais son contenu : nombre de points, de blocs,
+// de lignes, de cellules), rangée sur la ligne `transp_` pour qu'on la mesure en base.
+const texteCellule = (h) => decoderEntitesHtml(String(h || '').replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, ' ')).replace(/[\s ]+/g, ' ').trim();
+const valeurInput = (tag) => { const m = /\bvalue\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s/>]+))/i.exec(tag); return m ? String(m[1] ?? m[2] ?? m[3] ?? '').trim() : ''; };
+export function pointEtHorairesMr(html) {
+  const vide = { pointId: '', pays: '', horaires: null, forme: '' };
+  if (typeof html !== 'string' || !html) return vide;
+  const inputs = [...html.matchAll(/<input\b[^>]*>/gi)].map((m) => m[0]);
+  const deId = (id) => inputs.filter((t) => new RegExp(`\\bid\\s*=\\s*["']?${id}["']?(?=[\\s/>])`, 'i').test(t)).map(valeurInput);
+  const ids = [...new Set(deId('numeroTemp').filter((v) => /^\d{1,12}$/.test(v)).map((v) => v.replace(/^0+(?=\d)/, '')))];
+  const pays = [...new Set(deId('codePaysTemp').map((v) => v.toUpperCase()).filter(Boolean))];
+  const pointId = ids.length === 1 && pays.length === 1 && pays[0] === 'FR' ? ids[0] : '';
+  const blocs = [...html.matchAll(/<div\b[^>]*class\s*=\s*["'][^"']*\bdetail-mag\b[^"']*["'][^>]*>([\s\S]*?)<\/table>/gi)].map((m) => m[1]);
+  if (!blocs.length) return { ...vide, pointId, pays: pays.length === 1 ? pays[0] : '' };
+  const lus = blocs.map((b) => {
+    if (!/horaires\s+d['’]\s*ouverture/i.test(texteCellule(b))) return { h: null, lignes: 0, cel: 0 };
+    const trs = [...b.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)].map((m) => [...m[1].matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)].map((c) => texteCellule(c[1])));
+    const lignes = trs.map((cs) => cs.filter(Boolean).join(' ')).filter(Boolean);
+    const h = lignes.length ? horairesDepuisTexte(["Horaires d'ouverture :", ...lignes].join('\n')) : null;
+    return { h, lignes: trs.length, cel: trs.reduce((n, cs) => Math.max(n, cs.length), 0) };
+  });
+  const k = lus[0].h ? JSON.stringify(lus[0].h) : '';
+  const memes = !!k && lus.every((x) => x.h && JSON.stringify(x.h) === k);
+  // Mondial Relay écrit un jour par ligne : les jours aux MÊMES plages sont regroupés (« lun.–sam. 9 h–19 h »).
+  const regroupe = (h) => { const out = []; for (const e of h) { const cle = JSON.stringify(e.plages); const x = out.find((o) => JSON.stringify(o.plages) === cle); if (x) x.jours.push(...e.jours); else out.push({ jours: [...e.jours], plages: e.plages.map((p) => ({ ...p })) }); } for (const o of out) o.jours.sort((a, b) => a - b); return out.sort((a, b) => a.jours[0] - b.jours[0]); };
+  const horaires = pointId && memes ? horairesValides(regroupe(lus[0].h)) : null;
+  const forme = horaires ? '' : `mr-horaires:points=${ids.length},pays=${pays.join('|') || '-'},blocs=${blocs.length},lignes=${lus.map((x) => x.lignes).join('|')},cellules=${lus.map((x) => x.cel).join('|')}`;
+  return { pointId, pays: pays.length === 1 ? pays[0] : '', horaires, forme };
+}
+// (13 nov., lot 11) Des horaires lus chez le transporteur valent 7 JOURS (ils changent rarement ; la
+// ligne est relue avec le suivi du colis, sans requête de plus). Plus vieux ⇒ plus dits.
+export const HORAIRES_TRANSP_VALIDES_MS = 7 * 24 * 3600 * 1000;
 
 // Une valeur rangée (ou lue) n'est crue que sous la forme exacte.
 const RE_H = /^(?:[01]\d|2[0-4]):[0-5]\d$/;

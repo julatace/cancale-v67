@@ -15,6 +15,9 @@ require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calm
 //     côté 10 ans ; le journal ne porte ni e-mail ni identifiant ;
 //   · un échec à mi-chemin garde le compte de connexion, et la suppression se
 //     REJOUE jusqu'au bout sans refaire Stripe.
+// ⚠️ (13 nov., lot 51) La demande pose 30 JOURS DE GRÂCE : l'effacement est fait
+//    par le passage du cron (api/_lib/suppression-differee.js), joué ici à J+31 ;
+//    la grâce elle-même (annuler, lecture KO…) : scripts/audit-suppression-differee.cjs.
 // `--src <arbre>` : le lancer sur un autre arbre. `--prouve` : le lance sur
 // origin/main ET sur une MUTATION (filtre propriétaire retiré) — les deux
 // doivent échouer.
@@ -76,6 +79,13 @@ const BON = (mdp = MDP[A]) => ({ confirmation: 'SUPPRIMER', motDePasse: mdp });
   try { compte = (await import('file://' + path.join(RACINE, 'api', 'compte.js'))).default; }
   catch (e) { dit(false, 'api/compte.js se charge', e.message); console.log(`\n${ko} en échec`); process.exit(1); }
   const appel = async (jeton, corps, method, mode) => { const r = faireRes(); await compte(req(jeton, corps, method, mode), r); return r; };
+  // (13 nov., lot 51) L'effacement d'une demande : le passage du cron à J+31 (le même Stripe simulé).
+  let lib = null;
+  try { lib = await import('file://' + path.join(RACINE, 'api', '_lib', 'suppression-differee.js')); } catch (_) { lib = null; }
+  const stripeFaux = async (m, chemin, params) => { const r = await F.faux('https://api.stripe.com/v1/' + chemin, { method: m, body: params ? Object.entries(params).map(([k, v]) => `${k}=${v}`).join('&') : '' }); return { ok: r.ok, status: r.status, data: await r.json().catch(() => null) }; };
+  const echeance = (j = 31) => (lib ? lib.passageSuppressionsPrevues({ maintenant: Date.now() + j * 864e5, env: { SUPABASE_SERVICE_KEY: F.SERVICE }, stripe: stripeFaux, pret: () => true }) : Promise.resolve({ fait: false }));
+  // La demande, puis son échéance : la réponse de la route, et le passage.
+  const demanderPuisEffacer = async (jeton, corps) => { const r = await appel(jeton, corps); const p = r.code === 200 && r.corps && r.corps.prevue ? await echeance() : null; return { r, p }; };
 
   console.log('── Qui peut supprimer');
   await essaie('sans session', async () => {
@@ -127,46 +137,49 @@ const BON = (mdp = MDP[A]) => ({ confirmation: 'SUPPRIMER', motDePasse: mdp });
     dit(r.code >= 500 && etat.deletes.length === 0 && etat.base.utilisateurs.has(A), 'Stripe muet : rien d’effacé', `HTTP ${r.code}`);
   });
 
-  console.log('\n── La suppression : les SIENNES, et seulement elles');
+  console.log('\n── La suppression : les SIENNES, et seulement elles (demande, puis échéance à J+31)');
   await essaie('A supprime', async () => {
-    reset(); const r = await appel(session(A), BON());
-    dit(r.code === 200 && r.corps.ok === true, 'A supprime son compte (mot de passe) : 200', `HTTP ${r.code} · ${r.corps && r.corps.message}`);
+    reset(); const { r, p } = await demanderPuisEffacer(session(A), BON());
+    dit(r.code === 200 && r.corps.ok === true && !!r.corps.prevue, 'A demande la suppression de son compte (mot de passe) : 200, prévue dans 30 jours', `HTTP ${r.code} · ${r.corps && r.corps.message}`);
+    dit(!!p && p.fait === true && p.supprimes === 1, 'à l’échéance, le passage du cron supprime son compte', JSON.stringify(p));
     const restent = lignes(A).map((l) => l.id).sort().join(',');
     dit(restent === 'email_invoice_av902,email_invoice_tx901', 'il ne reste de A QUE ses 2 factures Pro (pièces comptables)', restent);
     const g = etat.base.app_data.find((l) => l.owner === NEUTRE && l.id === 'vrm_factures_gardees_' + A.replace(/-/g, ''));
     dit(!!g && g.data.n === 2 && Date.parse(g.data.jusque) - Date.now() > 9.9 * 365 * 864e5, '… mises de côté 10 ans (une ligne neutre dit jusqu’à quand)', JSON.stringify(g && g.data));
     dit(!etat.base.vinted_accounts.some((l) => l.owner === A) && !etat.base.detourage_usage.some((l) => l.owner === A) && !etat.base.stockage.some((x) => x.startsWith(A)), 'ses comptes Vinted, compteurs et photos sont effacés');
-    dit(!etat.base.app_data.some((l) => l.data && (l.data.owner === A || l.data.de === A) && !/^vrm_factures_gardees_/.test(l.id)), 'sous le neutre et chez le propriétaire : ses preuves d’adresse, ses adresses VRM (index des jetons) et ses signalements sont effacés');
-    const eff = etat.deletes.filter((x) => !/vrm_suppression_/.test(x));
-    dit(!etat.base.utilisateurs.has(A) && eff[eff.length - 1] === 'auth:' + A, 'son compte de connexion est supprimé, EN DERNIER (seule la purge du journal vient après)', eff.slice(-2).join(' → '));
+    dit(!etat.base.app_data.some((l) => l.data && (l.data.owner === A || l.data.de === A) && !/^vrm_factures_gardees_/.test(l.id)), 'sous le neutre et chez le propriétaire : ses preuves d’adresse, ses adresses VRM (index des jetons), ses signalements et sa demande sont effacés');
+    const eff = etat.deletes.filter((x) => !/vrm_suppression_|vrm_effacement_prevu_/.test(x));
+    dit(!etat.base.utilisateurs.has(A) && eff[eff.length - 1] === 'auth:' + A, 'son compte de connexion est supprimé, EN DERNIER (seuls le journal et la demande viennent après)', eff.slice(-2).join(' → '));
     dit(intactB(), 'l’autre vendeur est INTACT (lignes, comptes, photos, compte, abonnement, preuve, adresse VRM, signalement), le propriétaire aussi');
-    dit(etat.stripe.some((x) => x.m === 'POST' && /cancel_at_period_end=true/.test(x.corps)) && etat.base.subs.sub_A.cancel_at_period_end, 'l’abonnement est résilié AVANT (aucun nouveau prélèvement)');
+    dit(etat.stripe.some((x) => x.m === 'POST' && /cancel_at_period_end=true/.test(x.corps)) && etat.base.subs.sub_A.cancel_at_period_end, 'l’abonnement est résilié AVANT (dès la demande : aucun nouveau prélèvement)');
     const j = etat.base.app_data.find((l) => l.owner === NEUTRE && /^vrm_suppression_[0-9a-f]{32}$/.test(l.id));
     const brut = JSON.stringify(j || {});
     dit(!!j && j.data.issue === 'supprime' && !brut.includes(A) && !brut.includes(A.replace(/-/g, '').slice(0, 12)) && !/@/.test(brut), 'le journal : une ligne neutre, date + nombres, NI identifiant NI e-mail', brut.slice(0, 200));
     dit(r.corps.etapes.email === 'non-configure', 'sans SMTP : aucun e-mail, et c’est dit (`etapes.email`)', r.corps.etapes.email);
   });
   await essaie('B connexion récente', async () => {
-    reset(); const r = await appel(session(B, 3 * 60e3), { confirmation: 'SUPPRIMER' });
-    dit(r.code === 200 && !etat.base.utilisateurs.has(B) && lignes(A).length === 7 && etat.base.utilisateurs.has(A), 'B, connecté il y a 3 min, sans mot de passe (compte Google/Discord) : supprimé — A intact', `HTTP ${r.code}`);
+    reset(); const { r, p } = await demanderPuisEffacer(session(B, 3 * 60e3), { confirmation: 'SUPPRIMER' });
+    dit(r.code === 200 && p && p.supprimes === 1 && !etat.base.utilisateurs.has(B) && lignes(A).length === 7 && etat.base.utilisateurs.has(A), 'B, connecté il y a 3 min, sans mot de passe (compte Google/Discord) : supprimé à l’échéance — A intact', `HTTP ${r.code}`);
   });
 
   console.log('\n── Un échec se dit, et se rejoue');
   await essaie('rejouable', async () => {
-    reset(); etat.pannes.add('auth');
+    reset();
     const j = session(A, 60e3);
-    const r1 = await appel(j, { confirmation: 'SUPPRIMER' });
-    dit(r1.code === 502 && r1.corps.ok === false && etat.base.utilisateurs.has(A) && /INCOMPL/.test(r1.corps.message) && /compte de connexion/.test(r1.corps.message), 'le compte de connexion ne part pas : INCOMPLÈTE, dite, compte gardé', r1.corps && r1.corps.message);
+    const r0 = await appel(j, { confirmation: 'SUPPRIMER' });
+    etat.pannes.add('auth');
+    const p1 = await echeance(31);
+    dit(r0.code === 200 && p1.incomplets === 1 && etat.base.utilisateurs.has(A), 'le compte de connexion ne part pas : INCOMPLÈTE, dite par le passage, compte gardé', JSON.stringify(p1));
     etat.pannes.delete('auth');
-    const r2 = await appel(j, { confirmation: 'SUPPRIMER' });
-    dit(r2.code === 200 && !etat.base.utilisateurs.has(A), 'relancée : elle va au bout', `HTTP ${r2.code} · ${r2.corps && r2.corps.message}`);
+    const p2 = await echeance(32);
+    dit(p2.supprimes === 1 && !etat.base.utilisateurs.has(A), 'relancée le lendemain : elle va au bout', JSON.stringify(p2));
     dit(etat.stripe.filter((x) => x.m === 'POST').length === 1, 'Stripe n’est résilié qu’UNE fois (le rejeu voit « déjà résilié »)', String(etat.stripe.filter((x) => x.m === 'POST').length));
     const r3 = await appel(j, { confirmation: 'SUPPRIMER' });
     dit(r3.code === 401 && intactB(), 'rejouée une fois de plus, compte parti : 401, rien d’autre touché', `HTTP ${r3.code}`);
   });
   await essaie('équipe muette', async () => {
-    reset(); etat.pannes.add('equipe'); const r = await appel(session(A), BON());
-    dit(r.code === 502 && etat.base.utilisateurs.has(A) && /équipe/.test(r.corps.message || ''), 'l’équipe ne s’efface pas : INCOMPLÈTE, compte gardé', r.corps && r.corps.message);
+    reset(); const r = await appel(session(A), BON()); etat.pannes.add('equipe'); const p = await echeance(31);
+    dit(r.code === 200 && p.incomplets === 1 && etat.base.utilisateurs.has(A), 'l’équipe ne s’efface pas : INCOMPLÈTE, compte gardé', JSON.stringify(p));
   });
 
   console.log(`\n${ok} contrôle(s) OK, ${ko} en échec`);

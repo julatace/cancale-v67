@@ -80,7 +80,8 @@ const pointsMoment = (m) => [texteMoment(m, 'point1'), texteMoment(m, 'point2')]
 const FAQ = [
   { id: 'extension', r: () => [<>{tr('accueil.faq.extension.r')}<a href="/aide/extension">{tr('accueil.faq.extension.lien')}</a>.</>] },
   { id: 'blocage', r: () => [tr('accueil.faq.blocage.r1'), tr('accueil.faq.blocage.r2')] },
-  { id: 'securite', r: () => [tr('accueil.faq.securite.r1'), <a key="c" href="/legal/confidentialite.html">{tr('accueil.faq.securite.lien')}</a>] },
+  // (13 nov., lot 50) + la page publique « Ce que VRM fait — et ne fait jamais » (public/confiance.html).
+  { id: 'securite', r: () => [tr('accueil.faq.securite.r1'), <a key="f" href="/confiance" data-lien-confiance="">{tr('legal.confiance')}</a>, <a key="c" href="/legal/confidentialite.html">{tr('accueil.faq.securite.lien')}</a>] },
   { id: 'arret', r: () => [tr('accueil.faq.arret.r1'), tr('accueil.faq.arret.r2')] },
   { id: 'telephone', r: () => [tr('accueil.faq.telephone.r1'), tr('accueil.faq.telephone.r2')] },
   { id: 'comptes', r: () => [tr('accueil.faq.comptes.r1'), tr('accueil.faq.comptes.r2'), tr('accueil.faq.comptes.r3')] },
@@ -559,6 +560,7 @@ export default function Accueil({ onEntrer }) {
           <nav aria-label={tr('accueil.pied.informations')}>
             <a href="/aide">{tr('accueil.nav.aide')}</a>
             <a href="/statut" data-statut="">{tr('accueil.pied.statut')}</a>
+            <a href="/confiance" data-lien-confiance="">{tr('legal.confiance')}</a>
             {LEGAL.map(([l, h]) => <a key={h} href={h}>{tr(l)}</a>)}
             {/* CONTACT — une seule source (src/contact.js) ; vide ⇒ on le DIT (§2.3). */}
             {contactEmail()

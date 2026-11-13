@@ -14,19 +14,19 @@
 //  `data-transporteur` porte la clé des statistiques (`cleStatTransporteur`).
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
-import { PAS_LU, marqueDuTransporteur, nomDuTransporteur, cleStatTransporteur } from './transporteursVisuels.js';
+import { PAS_LU, marqueDuTransporteur, nomDuTransporteur, cleStatTransporteur, LISERE_TUILE } from './transporteursVisuels.js';
 
 // La tuile d'une marque : LE LOGO du transporteur (10 nov., src/transporteursVisuels.js
 // `DESSINS_TRANSPORTEURS`, valeurs figées). `repli` : ce qui se montre pour une clé sans logo.
 export function LogoTransporteur({ cle, taille = 20, decale = false, repli = null }) {
   const m = marqueDuTransporteur(cle);
   if (!m) return repli;
-  const clair = /^#F/i.test(m.fond);   // fond blanc ou jaune : un fin liseré pour qu'il se détache sur un fond clair
+  // (13 nov.) Le liseré commun est DANS le dessin (`LISERE_TUILE`) : le même pour toutes les marques, en clair et en sombre.
   return (
     <span aria-hidden="true" data-transporteur-logo="charge" data-marque={cle}
-      style={{ width: taille, height: taille, borderRadius: Math.round(taille * 0.26), display: 'inline-flex', overflow: 'hidden', flexShrink: 0, marginLeft: decale ? -6 : 0, verticalAlign: 'middle', background: m.fond, boxShadow: clair ? 'inset 0 0 0 1px rgba(0,0,0,.08)' : undefined }}>
+      style={{ width: taille, height: taille, borderRadius: Math.round(taille * 0.26), display: 'inline-flex', overflow: 'hidden', flexShrink: 0, marginLeft: decale ? -6 : 0, verticalAlign: 'middle', background: m.fond }}>
       <svg viewBox="0 0 32 32" width="100%" height="100%" focusable="false" style={{ display: 'block' }}
-        dangerouslySetInnerHTML={{ __html: `<rect width="32" height="32" fill="${m.fond}"/>${m.svg || ''}` }}/>
+        dangerouslySetInnerHTML={{ __html: `<rect width="32" height="32" fill="${m.fond}"/>${m.svg || ''}${LISERE_TUILE}` }}/>
     </span>
   );
 }
