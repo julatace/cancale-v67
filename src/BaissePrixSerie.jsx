@@ -33,7 +33,7 @@ const pauseEntre = () => {
 // prix envoyés que Leboncoin a acceptés sans les montrer sont RELUS (« Mes annonces » relue par
 // l'extension) — relu égal ⇒ « Fait », autre ⇒ « Autre prix », rien de neuf ⇒ reste « Pas relu ».
 // `baisseInitiale` (proposée) l'emporte sur `modeDefaut`/`texteDefaut`.
-export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherDe, extRaison = '', onBaisser, onRelire = null, onFermer, onFini, Photo, Retour, site = 'vinted', modeDefaut = 'eur', texteDefaut = '5', baisseInitiale = null, etaleOk = false, onProgrammer = null, onAnnulerProgramme = null }) {
+export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherDe, extRaison = '', onBaisser, onRelire = null, onFermer, onFini, Photo, Retour, site = 'vinted', modeDefaut = 'eur', texteDefaut = '5', baisseInitiale = null, varierDefaut = true, etaleOk = false, onProgrammer = null, onAnnulerProgramme = null }) {
   const nomSite = site === 'leboncoin' ? 'Leboncoin' : 'Vinted';
   const [mode, setMode] = React.useState(baisseInitiale && baisseInitiale.mode ? (baisseInitiale.mode === 'pct' ? 'pct' : 'eur') : modeDefaut);
   const [texte, setTexte] = React.useState(baisseInitiale && baisseInitiale.texte ? String(baisseInitiale.texte) : texteDefaut);
@@ -45,7 +45,9 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
   const [arretDemande, setArretDemande] = React.useState(false);
   const baisse = baisseTapee(mode, texte);
   // Le facteur de chaque annonce est tiré UNE fois (l'aperçu ne bouge pas à chaque frappe).
-  const [varier, setVarier] = React.useState(true);
+  // (13 nov.) `varierDefaut` false : la baisse PROPOSÉE (≤ −10 %, src/conseilPrix.js) s'ouvre telle quelle — le hasard
+  // ne doit pas la pousser au-delà de ses bornes ; c'est LUI qui coche « Varier » s'il le veut.
+  const [varier, setVarier] = React.useState(varierDefaut);
   const facteurs = React.useMemo(() => facteursBaisse(annonces.map((a) => a && a.id)), [annonces]);
   const [quand, setQuand] = React.useState(etaleOk ? 'etale' : 'maintenant');
   const etale = quand === 'etale' && etaleOk && typeof onProgrammer === 'function';

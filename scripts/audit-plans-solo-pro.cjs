@@ -156,9 +156,9 @@ const MUTATIONS = [
   ['Vestiaire « non identifié » écarté', (s) => s.replace("return s !== '-' && /^[\\w-]{1,40}$/.test(s) ? s : null;", "return /^[\\w-]{1,40}$/.test(s) ? s : (s === '' ? null : s);")],
   ['Leboncoin : lbc-account: pas reconnu', (s) => s.replace("const id = s.replace(/^lbc-account:/i, '');", 'const id = s;')],
   ['métadonnées des autres plateformes ignorées', (s) => s.replace("const k = META_VENDEUR[pl], id = idCompteVendeur(pl, m[k]);", 'const k = META_VENDEUR[pl], id = null;')],
-  ['venteHorsPlan ignore le compte vendeur', (s) => s.replace("return uidValide(u) && u !== regle.vendeur;", 'return uidValide(u);')],
+  ['venteHorsPlan ignore le compte vendeur', (s) => s.replace("return uidValide(u) && u !== regle.vendeur && !(Array.isArray(regle.vendeursSup) && regle.vendeursSup.includes(u));", 'return uidValide(u);')],
   ['bride sans compte choisi', (s) => s.replace("bride: plan === PLAN_SOLO && !!vendeur", 'bride: plan === PLAN_SOLO')],
-  ['propriétaire bridé', (s) => s.replace("if (x.proprietaire === true) return { plan: PLAN_PRO, vendeur: null, bride: false, autres: AUTRES_LIBRES };", '')],
+  ['propriétaire bridé', (s) => s.replace("if (x.proprietaire === true) return { plan: PLAN_PRO, vendeur: null, bride: false, autres: AUTRES_LIBRES, vendeursSup: SUP_VIDE };", '')],
   ['CGV d’avant bridées', (s) => s.replace("if (plan === PLAN_SOLO && !(String(m.cgv_version || '') >= CGV_PLANS_DEPUIS)) { plan = null; raison = 'cgv-anterieures'; }", '')],
   ['pas su ⇒ Solo', (s) => s.replace("const plan = x.plan === PLAN_PRO || x.plan === PLAN_SOLO ? x.plan : null;", "const plan = x.plan === PLAN_PRO ? x.plan : PLAN_SOLO;")],
   ['Pro limité à 10 comptes Vinted', (s) => s.replace("if (!regle || regle.bride !== true || !regle.vendeur) return false;", "if (regle && regle.plan === PLAN_PRO) { const n = Number(uidDe(uid)); return Number.isFinite(n) && n >= 2010; }\n  if (!regle || regle.bride !== true || !regle.vendeur) return false;")],
@@ -523,7 +523,8 @@ const MUTATIONS = [
   await essaie('prix', async () => {
     const reg = lire('src/accueil-reglages.js'), cpt = lire('api/compte.js'), cgv = lire('public/legal/cgv.html');
     dit(/PRIX_PRO_MOIS = '19,99'/.test(reg) && /PRIX_PRO_CGV = \{ centimes: 1999, devise: 'eur', intervalle: 'month' \}/.test(cpt) && /Offre Pro : 19,99 € par mois/.test(cgv), 'Pro 19,99 € : app, serveur et CGV disent la même chose');
-    dit(/Dernière mise à jour : 10 novembre 2026/.test(cgv) && /const CGV_VERSION = '2026-11-10'/.test(cpt), 'CGV du 10 novembre (Solo et Pro illimité), version acceptée à jour');
+    // (13 nov., lot 56) CGV du 13 novembre : + l'option Solo « compte Vinted vendeur de plus » (audit-comptes-sup).
+    dit(/Dernière mise à jour : 13 novembre 2026/.test(cgv) && /const CGV_VERSION = '2026-11-13'/.test(cpt), 'CGV du 13 novembre (Solo, option comptes de plus, Pro illimité), version acceptée à jour');
     dit(/un compte vendeur/.test(cgv) && /comptes d’achat/.test(cgv) && /rien n’est supprimé/.test(cgv), 'CGV : Solo dit « un compte vendeur » et « comptes d’achat », rien supprimé');
     const R = await import('file://' + path.join(RACINE, 'api', '_lib', 'plan-regle.js'));
     dit(/un compte vendeur par plateforme<\/b> \(un compte Vinted, un compte Leboncoin, un compte eBay et un compte Vestiaire Collective\)/.test(cgv) && /plateforme par plateforme/.test(cgv) && /colis à envoyer restent affichés/.test(cgv),

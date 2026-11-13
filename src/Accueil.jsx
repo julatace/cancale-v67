@@ -37,7 +37,7 @@ import ChoixLangue from './i18n/ChoixLangue.jsx';
 import { contactEmail, CONTACT_A_VENIR } from './contact.js';
 import { ACCES_OFFERT, EXTENSION_SUR_LE_STORE, VESTIAIRE_BRANCHE, PRIX_MOIS, PRIX_PRO_MOIS, PRO_OUVERT, ESSAI_JOURS } from './accueil-reglages.js';
 // (9 nov.) Deux offres : Solo (un compte vendeur par plateforme + comptes d'achat) et Pro (les ventes de tous les comptes).
-import { OFFRES } from '../api/_lib/plan-regle.js';
+import { OFFRES, prixCompteSupTexte } from '../api/_lib/plan-regle.js';
 import { useMoinsDeMouvement, useSansSouris } from './accueil-mouvement.js';
 // (11 nov., lot temps-gagne) Le calculateur « le temps que VRM te fait gagner » : un morceau à
 // part, demandé à l'approche de sa section (le fichier d'entrée a un budget de poids).
@@ -80,7 +80,8 @@ const pointsMoment = (m) => [texteMoment(m, 'point1'), texteMoment(m, 'point2')]
 const FAQ = [
   { id: 'extension', r: () => [<>{tr('accueil.faq.extension.r')}<a href="/aide/extension">{tr('accueil.faq.extension.lien')}</a>.</>] },
   { id: 'blocage', r: () => [tr('accueil.faq.blocage.r1'), tr('accueil.faq.blocage.r2')] },
-  { id: 'securite', r: () => [tr('accueil.faq.securite.r1'), <a key="c" href="/legal/confidentialite.html">{tr('accueil.faq.securite.lien')}</a>] },
+  // (13 nov., lot 50) + la page publique « Ce que VRM fait — et ne fait jamais » (public/confiance.html).
+  { id: 'securite', r: () => [tr('accueil.faq.securite.r1'), <a key="f" href="/confiance" data-lien-confiance="">{tr('legal.confiance')}</a>, <a key="c" href="/legal/confidentialite.html">{tr('accueil.faq.securite.lien')}</a>] },
   { id: 'arret', r: () => [tr('accueil.faq.arret.r1'), tr('accueil.faq.arret.r2')] },
   { id: 'telephone', r: () => [tr('accueil.faq.telephone.r1'), tr('accueil.faq.telephone.r2')] },
   { id: 'comptes', r: () => [tr('accueil.faq.comptes.r1'), tr('accueil.faq.comptes.r2'), tr('accueil.faq.comptes.r3')] },
@@ -521,6 +522,8 @@ export default function Accueil({ onEntrer }) {
                   {/* La phrase : en français CELLE du serveur (OFFRES) ; ailleurs sa traduction
                       (audit-traduction D9 : la clé française = la phrase du serveur). */}
                   <p data-offre-phrase={cle}>{langue === 'fr' ? OFFRES[cle].phrase : tr(`accueil.offre.${cle}.phrase`)}{ouvert ? '' : tr('accueil.offres.ouverture')}</p>
+                  {/* (13 nov., lot 56) Plusieurs comptes Vinted dès Solo : le supplément (une valeur, plan-regle.js). */}
+                  {cle === 'solo' && <p className="av-supplement" data-solo-supplement="">{langue === 'fr' ? OFFRES.solo.supplement : tr('accueil.offre.solo.supplement').replace('{prix}', prixCompteSupTexte())}</p>}
                 </article>
               ))}
             </div>
@@ -568,6 +571,7 @@ export default function Accueil({ onEntrer }) {
           <nav aria-label={tr('accueil.pied.informations')}>
             <a href="/aide">{tr('accueil.nav.aide')}</a>
             <a href="/statut" data-statut="">{tr('accueil.pied.statut')}</a>
+            <a href="/confiance" data-lien-confiance="">{tr('legal.confiance')}</a>
             {LEGAL.map(([l, h]) => <a key={h} href={h}>{tr(l)}</a>)}
             {/* CONTACT — une seule source (src/contact.js) ; vide ⇒ on le DIT (§2.3). */}
             {contactEmail()

@@ -53,7 +53,7 @@ export default function PageFavoris(p) {
   const { choix, recap, PhotoVinted } = p;
   const verrou = p.fileActive || p.occupe;
   const peutOuvrir = choix.ids.length > 0 && !p.erreurMessage && !p.erreurRythme && !verrou && p.reglagesPrets;
-  const peutEnvoyer = peutOuvrir && (!(p.bloquees || []).length || p.confirmeMarge);
+  const peutEnvoyer = peutOuvrir && (!(p.bloquees || []).length || p.confirmeMarge) && !p.refus;   // (13 nov., lot 31) jamais sous l'achat + 10 %
   React.useEffect(() => { if (p.fileActive) setRecapOuvert(false); }, [p.fileActive]);
 
   // ── états vides : une phrase, un geste ─────────────────────────────────────
@@ -189,6 +189,7 @@ export default function PageFavoris(p) {
         </div>}
         <p className="vrm-fc-recap-quand">{p.rythme === 'vintex' ? tr('favoris.quand.rapidePhrase') : tr('favoris.recap.espace')}</p>
         <p className="vrm-fc-avertissement" data-fc-avertissement><b>{tr('favoris.recap.garantie')}</b> {tr('favoris.recap.onglet')}</p>
+        {p.refus && <p role="alert" className="vrm-fc-alerte" data-fc-refus-plancher>{p.refus}</p>}
         {p.erreurLancer && <p role="alert" className="vrm-fc-alerte" data-fc-erreur>{p.erreurLancer}</p>}
       </div>
       <div className="vrm-fa-feuille-pied vrm-fc-recap-pied">
@@ -201,7 +202,7 @@ export default function PageFavoris(p) {
   return <div className="vrm-fc" data-fc-page>
     {tete}
     {p.alertes}
-    {qui}{quoi}{quand}{histo}
+    {p.sansVente || null}{qui}{quoi}{quand}{histo}
     {pied}
     {feuille && (typeof document !== 'undefined' ? createPortal(feuille, document.body) : feuille)}
   </div>;

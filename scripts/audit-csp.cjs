@@ -144,7 +144,7 @@ const gardes = (recu.match(/if \(w\.__vrmRecuBoutons\) return;/g) || []).length;
 dit(secours === gardes, 'les gestes posés depuis l\'onglet de VRM ne sont qu\'un secours (gardés par `__vrmRecuBoutons` : une impression, jamais deux)', `${secours} écouteur(s), ${gardes} gardé(s)`);
 const rb = fs.existsSync(path.join(R, 'public', 'recu-boutons.js')) ? lire('public/recu-boutons.js') : '';
 dit(/vrm-recu-imprimer/.test(rb) && /vrm-recu-fermer/.test(rb) && /print\(\)/.test(rb) && /__vrmRecuBoutons\s*=/.test(rb), '`/recu-boutons.js` branche « Imprimer » et « Fermer » et le dit (`__vrmRecuBoutons`)');
-const facture = corps('function ouvrirDocumentImprimable(html) {', '\n}\n');
+const facture = corps('function ouvrirDocumentImprimable(', '\n}\n');   // (13 nov.) la signature a pris un 2e argument (fenêtre ouverte au clic, lot 16)
 for (const [nom, c, cle] of [['le reçu', recu, 'recu'], ['la facture', facture, 'facture']]) {
   const iOpen = c.indexOf('w.document.open()'), iEcoute = c.indexOf(`ecouterFenetreCsp(w, '${cle}')`), iWrite = c.indexOf('w.document.write(');
   dit(iOpen >= 0 && iEcoute > iOpen && iWrite > iEcoute, `le journal des violations écoute ${nom} (après document.open, avant d'écrire)`);

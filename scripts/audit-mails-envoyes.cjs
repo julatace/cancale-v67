@@ -162,7 +162,8 @@ async function banc(R, { silencieux = false } = {}) {
     dit(/Vendu :/.test(mb.texte) && /Reçu :/.test(mb.texte), 'bilan : vendu et reçu, l’un à côté de l’autre');
     // Un partiel : la couverture « sur N ventes de M » à côté du chiffre ; un partiel nul s'écrit « — ».
     const part = BM.texteBilanMois({ libelle: 'octobre 2026', vendu: { etat: 'su', n: 6, eur: 300 }, recu: { etat: 'partiel', eur: 0, manque: ['eBay (illisible)'] }, benefice: { etat: 'partiel', brut: 120, n: 6, nCout: 4, manque: ['2 prix d’achat manquent'] }, meilleure: null }, { lien: 'https://vrm.center/x' });
-    dit(/Bénéfice brut : au moins 120,00\s€ \(sur 4 ventes de 6 · 2 prix d’achat manquent\)/.test(part.texte), 'bilan : bénéfice partiel « au moins … » avec sa couverture « sur 4 ventes de 6 » et le manque nommé', part.texte.split('\n').find((l) => /Bénéfice/.test(l)));
+    // (13 nov., lot 53) Jamais « au moins » devant un bénéfice (src/beneficeNoms.js).
+    dit(/Bénéfice brut : 120,00\s€ \(sur 4 ventes de 6 · 2 prix d’achat manquent\)/.test(part.texte) && !/Bénéfice brut : au moins/.test(part.texte), 'bilan : bénéfice partiel avec sa couverture « sur 4 ventes de 6 » et le manque nommé, sans « au moins »', part.texte.split('\n').find((l) => /Bénéfice/.test(l)));
     dit(/Reçu : —/.test(part.texte) && !ZERO.test(part.texte + part.html), 'bilan : un reçu partiel nul s’écrit « — » (jamais « au moins 0,00 € »)');
     const nul = BM.texteBilanMois({ libelle: 'octobre 2026', vendu: { etat: 'su', n: 1, eur: 50 }, recu: { etat: 'su', eur: 50 }, benefice: { etat: 'partiel', brut: 0, n: 2, nCout: 1, manque: ['1 prix d’achat manque'] }, meilleure: null }, {});
     dit(!/au moins 0/i.test(nul.texte) && /Bénéfice brut : —/.test(nul.texte), 'bilan : un bénéfice partiel nul s’écrit « — »', nul.texte.split('\n').find((l) => /Bénéfice/.test(l)));

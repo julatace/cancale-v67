@@ -14,8 +14,8 @@
 //   9304  « Retour initié » sans transaction captée, même titre que 9301
 //                                                                 ⇒ « pas reliée »,
 //         aucun N° (jamais le 40 ni le 41 par le titre), pas de remise en stock
-//   9305  remboursée, déjà notée reçue, annonce i60 → N°60         ⇒ remise en stock
-//         garde le N°60, passe « à republier », écrite dans le nuage
+//   9305  remboursée, déjà notée reçue, annonce i60 → N°60         ⇒ (13 nov., point 29)
+//         en stock TOUT SEUL sous le N°60 (« à vérifier et remettre en ligne »), sans geste
 //   9306  transaction figée à 440, vente finalisée                ⇒ pas un retour
 //   9307  (3 nov.) retour, colis déposé, annonce i80 → N°80, aucun autre porteur
 //         ⇒ carte « Retour reçu ? » ; rien d'écrit sans son tap ; « Remettre en
@@ -180,8 +180,9 @@ const confirmer = async (pg, libelle) => {
         dit(ligne(a, '9301') && ligne(a, '9301').num === '40' && ligne(a, '9301').etape === 'initie', '9301 : N°40 par identité (pas le 41 au même titre), étape « initié »', JSON.stringify(ligne(a, '9301')));
         dit(cs.find((c) => c.cle === '9303') && cs.find((c) => c.cle === '9303').etape === 'en-route' && cs.find((c) => c.cle === '9303').num === '50', '9303 : colis déposé ⇒ « en route », N°50 (carte)', JSON.stringify(cs));
         dit(ligne(a, '9304') && ligne(a, '9304').num === '', '9304 : aucune identité ⇒ « pas reliée », aucun N° deviné par le titre', JSON.stringify(ligne(a, '9304')));
-        dit(ligne(a, '9305') && ligne(a, '9305').etape === 'rembourse' && ligne(a, '9305').recu === '1', '9305 : remboursée, déjà notée reçue', JSON.stringify(ligne(a, '9305')));
-        dit(ligne(a, '9305') && ligne(a, '9305').remise && !ligne(a, '9301').remise, '« Remise en stock » seulement sur un colis noté reçu');
+        // (13 nov., point 29) remboursée ET notée reçue ⇒ en stock tout seul, sous SON N° : plus de geste « Remise en stock ».
+        dit(ligne(a, '9305') && ligne(a, '9305').etape === 'remis' && ligne(a, '9305').num === '60' && ligne(a, '9305').recu === '1', '9305 : remboursée, notée reçue ⇒ en stock sous le N°60, sans geste', JSON.stringify(ligne(a, '9305')));
+        dit(ligne(a, '9305') && !ligne(a, '9305').remise && !ligne(a, '9301').remise, 'aucun « Remise en stock » à taper (ni sur le revenu, ni sur un retour seulement initié)');
         await pg.screenshot({ path: path.join(os.tmpdir(), 'retours-stock-' + vp.width + '.png'), fullPage: true }).catch(() => {});
         await sain(pg, 'Colis');
       });
@@ -191,16 +192,16 @@ const confirmer = async (pg, libelle) => {
         const a = await lire(pg);
         dit(ligne(a, '9304') && ligne(a, '9304').recu === '1' && !ligne(a, '9304').remise, '« Reçu chez moi » sur 9304 ⇒ reçu ; sans N°, aucune remise en stock proposée', JSON.stringify(ligne(a, '9304')));
       });
-      await essaie('remise en stock garde le N°', async () => {
-        await cliquerDans(pg, '9305', 'remise-en-stock');
-        await confirmer(pg, 'Remettre en stock');
+      await essaie('revenu en stock sans rien saisir (13 nov., point 29)', async () => {
         const a = await lire(pg);
         const l = ligne(a, '9305');
-        dit(l && l.etape === 'remis' && l.num === '60', '9305 : remise en stock ⇒ « à republier », N°60 gardé', JSON.stringify(l));
-        dit(!!(await pg.$('[data-retour="9305"] [data-geste="republier"]')), 'la republication est proposée');
+        dit(l && l.etape === 'remis' && l.num === '60', '9305 : en stock, N°60 gardé', JSON.stringify(l));
+        dit(!!(await pg.$('[data-retour="9305"] [data-geste="republier"]')), '« Remettre en ligne » est proposé');
         await pg.waitForTimeout(1800);
-        const nuage = ecrits.some((t) => /vinted_retours_remis/.test(t) && /"9305"/.test(t) && /"num":"60"/.test(t));
-        dit(nuage, 'la remise en stock part au nuage avec le N°60 (`vinted_retours_remis`)', ecrits.length + ' écriture(s)');
+        const remis = await lu(pg, 'vinted_retours_remis');
+        dit(!remis || !remis['9305'], 'rien n’est saisi ni écrit pour 9305 : la règle suffit', JSON.stringify(remis));
+        const phys = await lu(pg, 'vinted_nums_physiques');
+        dit(phys && Array.isArray(phys.nums) && phys.nums.map(String).includes('60'), 'N°60 parmi les paires présentes (`vinted_nums_physiques`)', JSON.stringify(phys && phys.nums));
       });
       await essaie('Retour reçu ? → Remettre en stock (un tap, SON N°)', async () => {
         await pg.click('[data-remettre-retour="9307"]');

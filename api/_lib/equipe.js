@@ -26,7 +26,8 @@ const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.s
 const ANON = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export const EQUIPE_NON_INSTALLE = "Le mode équipe n'est pas encore activé sur ta base.";
+// (13 nov., lot 58) La même phrase que l'écran du vendeur (src/App.jsx `EQUIPE_NON_INSTALLE_TXT`).
+export const EQUIPE_NON_INSTALLE = "Mode équipe pas encore activé sur ton installation.";
 export const EQUIPE_PAS_SU = "Je n'ai pas pu joindre la base — rien n'a changé. Réessaie dans un instant.";
 // Les refus de `vrm_equipe_inviter` (raison → phrase). Une raison inconnue se
 // dit telle quelle plutôt que d'être maquillée en succès.

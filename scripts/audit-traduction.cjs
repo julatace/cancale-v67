@@ -53,6 +53,7 @@ const MIGRES = [
   ['src/TvaMargeCarte.jsx', ['*']],
   ['src/RangerAchat.jsx', ['*']],   // (11 nov., lot rangement-guide)
   ['src/FavorisEtapes.jsx', ['*']],   // (11 nov., lot favoris-clair)
+  ['src/FavorisSansVente.jsx', ['*']],   // (13 nov., lot 31) très aimées, pas vendues
   // (11 nov., lot prix-mini) Offres auto refait, et « Prix mini manquants ».
   ['src/OffresAuto.jsx', ['*']],
   ['src/PrixMiniManquants.jsx', ['*']],

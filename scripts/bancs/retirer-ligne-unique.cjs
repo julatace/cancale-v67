@@ -7,7 +7,7 @@
 //  Données INVENTÉES (dépôt public), UN point mélangé : un achat Vinted relié (photo, code) ; un colis
 //  Mondial Relay avec code et n° ; un Mondial Relay au code à venir ; un achat « t'attend au point »
 //  (titre lu dans l'e-mail, ni code ni n°) ; un Chronopost avec code et QR (Pickup Pass) ; un Vinted Go.
-//  Le logo de chaque ligne est vérifié par sa SOURCE (la clé de la marque dessinée) ; Chronopost Pickup sur le jaune Pickup.
+//  Le logo de chaque ligne est vérifié par sa SOURCE (la clé de la marque dessinée) ; Chronopost Pickup = le cube bleu sur blanc (13 nov. : jamais jaune).
 //  Exige, sur les BOÎTES rendues (§6.4) : chaque ligne a la même géométrie — vignette 56 px au même
 //  endroit, le logo du transporteur au même coin de la vignette, 1 titre · 2 code / « Code à venir » ·
 //  3 n° de suivi ou ligne vide · 4 barre du délai, aux mêmes écarts ; « J'ai retiré » à la même place ;
@@ -175,6 +175,7 @@ const ouvrir = async (b, vp, sombre) => {
               qrAttendu: !!l.querySelector('[data-code-retrait="454545"]'),
               marque: (l.querySelector('.vrm-rpf-vignette [data-marque]') || { getAttribute: () => null }).getAttribute('data-marque'),
               fondMarque: (() => { const e = l.querySelector('.vrm-rpf-vignette [data-marque]'); return e ? getComputedStyle(e).backgroundColor : null; })(),
+              cubeMarque: (() => { const e = l.querySelector('.vrm-rpf-vignette [data-marque] path[d^="M20 0L40 11"]'); return e ? getComputedStyle(e).fill : null; })(),
               l3: (l.querySelector('.vrm-rpf-suivi-ligne') || {}).textContent || '',
               verif: (() => { const v = l.querySelector('[data-rp-verif-transporteur] [data-rp-delai]'); return v ? { txt: v.textContent.trim(), titre: (v.querySelector('[role="progressbar"]') || { getAttribute: () => '' }).getAttribute('aria-valuetext'), ambre: v.getAttribute('data-rp-delai-ambre'), couleur: getComputedStyle(v.querySelector('.vrm-rpf-delai-txt')).color } : null; })(),
             };
@@ -223,7 +224,11 @@ const ouvrir = async (b, vp, sombre) => {
         const mauvais = L.filter((l) => { const a = attendu.find(([re]) => re.test(l.titre)); return !a || l.marque !== a[1]; });
         dit(!mauvais.length && L.some((l) => /Vinted Go/.test(l.titre)), `${nom} : chaque logo est celui de SON transporteur (Chronopost, Mondial Relay, Vinted Go), aucun cube générique`, L.map((l) => `${l.titre}=${l.marque}`).join(' | '));
         const chrono = L.find((l) => l.marque === 'chronopost');
-        dit(!!chrono && chrono.fondMarque === 'rgb(255, 210, 0)', `${nom} : Chronopost Pickup sur le jaune Pickup (pas un cube noir sur blanc)`, chrono && chrono.fondMarque);
+        // (13 nov., Julien : « les logos Chronopost ne sont pas bons, ils ne doivent pas être jaunes ») Le cube BLEU de la marque
+        // sur une tuile blanche — ni le jaune Pickup du 12 nov., ni le cube noir d'avant. On juge la teinte rendue.
+        const teinteRgb = (c) => { const v = String(c || '').match(/\d+(\.\d+)?/g); if (!v) return { t: -1, s: 0 }; const [r, g, bl] = v.slice(0, 3).map((x) => +x / 255); const mx = Math.max(r, g, bl), mn = Math.min(r, g, bl), d = mx - mn; if (!d) return { t: -1, s: 0 }; let t = mx === r ? ((g - bl) / d) % 6 : mx === g ? (bl - r) / d + 2 : (r - g) / d + 4; t *= 60; if (t < 0) t += 360; return { t, s: d / (1 - Math.abs(mx + mn - 1)) }; };
+        const fondC = chrono && teinteRgb(chrono.fondMarque), cubeC = chrono && teinteRgb(chrono.cubeMarque);
+        dit(!!chrono && fondC.t === -1 && /255, 255, 255/.test(chrono.fondMarque) && cubeC.t >= 190 && cubeC.t <= 215 && cubeC.s >= 0.6, `${nom} : Chronopost Pickup = le cube BLEU de la marque sur blanc (jamais jaune)`, chrono && `${chrono.fondMarque} · cube ${chrono.cubeMarque}`);
         const vt = L.filter((l) => l.verif);
         dit(vt.length === 1 && /^Vérification en cours$/.test(vt[0].verif.txt) && /Mondial Relay/.test(vt[0].verif.titre) && vt[0].verif.ambre === '0' && !/\?/.test(vt[0].verif.txt), `${nom} : le colis que VRM vérifie chez le transporteur le dit, neutre, à la place du délai (rien à faire)`, JSON.stringify(vt.map((l) => l.verif)));
         const nike = L.find((l) => /Nike Dunk Low/.test(l.titre));

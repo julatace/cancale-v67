@@ -15,6 +15,19 @@ const QR_MAX = 60;
 // `vrm-hl-` : la purge d'activation la garde, la déconnexion la vide.
 const CACHE_PARTAGE = 'vrm-hl-partage';
 const CLE_PARTAGE = '/__vrm_partage_photo';
+// (13 nov., point 45) Les photos DÉJÀ VUES du Stock, pour le garage sans réseau
+// (src/stockHorsLigne.js). `vrm-hl-` : la purge d'activation la garde, la
+// déconnexion la vide. ⚠️ `estPhotoGardable` et `PHOTOS_MAX` ÉGAUX au module.
+const CACHE_PHOTOS = 'vrm-hl-photos';
+const PHOTOS_MAX = 120;
+const HOTES_PHOTOS = /^(?:[a-z0-9-]+\.)*(?:vinted\.net|ebayimg\.com|vestiairecollective\.com)$|^img\.leboncoin\.fr$/;
+function estPhotoGardable(u) {
+  try {
+    if (typeof u !== 'string' || u.length > 600) return false;
+    const x = new URL(u);
+    return x.protocol === 'https:' && !x.username && !x.password && !x.port && HOTES_PHOTOS.test(x.hostname.toLowerCase());
+  } catch (_) { return false; }
+}
 // Repère de la version servie : le nom du script principal de la page.
 const REPERE = '/__vrm_build';
 const pdfStore = {};
@@ -304,6 +317,47 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  // 1 bis') (13 nov., point 45) LES PHOTOS DÉJÀ VUES DU STOCK : `/hl-photo?u=<adresse>`
+  //    (src/stockHorsLigne.js). Même règle que les QR : la réserve d'abord ; sinon,
+  //    SEULEMENT ce que la page de VRM demande (une IMAGE, ou l'en-tête
+  //    `x-vrm-hl-photo` de `retenirPhoto`), SEULEMENT un hôte de photos connu
+  //    (`estPhotoGardable`, ÉGALE à celle du module — audit-stock-hors-ligne), sans
+  //    cookie ni référent ; rangée, `PHOTOS_MAX` au plus (les plus anciennes partent).
+  //    Une navigation n'est jamais une photo (404). Rien d'autre n'est rangé : ni la
+  //    base, ni `/api/`. Pas gardée et pas de réseau ⇒ 404 (la vignette sans photo).
+  if (url.pathname === '/hl-photo') {
+    event.respondWith((async () => {
+      try {
+        if (req.mode === 'navigate') return new Response('', { status: 404 });
+        const u = url.searchParams.get('u') || '';
+        if (!estPhotoGardable(u)) return new Response('', { status: 404 });
+        const c = await caches.open(CACHE_PHOTOS);
+        const cle = '/hl-photo?u=' + encodeURIComponent(u);
+        // La mise en réserve demandée par la page (`retenirPhoto`, requête `cors` à en-tête) : une
+        // réponse opaque ne peut pas lui être rendue (le navigateur la refuserait) — on répond 204
+        // (rangée) ou 404. Une IMAGE reçoit la photo elle-même.
+        const mise = req.headers.get('x-vrm-hl-photo') === '1';
+        const hit = await c.match(cle);
+        if (hit) return mise ? new Response(null, { status: 204 }) : hit;
+        if (mise || req.destination === 'image') {
+          const res = await fetch(u, { mode: 'no-cors', credentials: 'omit', referrerPolicy: 'no-referrer' });
+          let range = false;
+          if (res && (res.ok || res.type === 'opaque')) {
+            try {
+              await c.put(cle, res.clone());
+              range = true;
+              const cles = await c.keys();
+              for (const k of cles.slice(0, Math.max(0, cles.length - PHOTOS_MAX))) await c.delete(k);
+            } catch (_) {}
+          }
+          return mise ? new Response(null, { status: range ? 204 : 404 }) : res;
+        }
+      } catch (_) {}
+      return new Response('', { status: 404 });
+    })());
+    return;
+  }
+
   // 1 ter) (10 nov., lot J) PARTAGER UNE PHOTO VERS VRM (`share_target` du manifeste) :
   //    l'app Photos envoie la photo en POST ici. Rien n'est écrit en base : la photo
   //    attend dans la réserve de l'appareil (`CACHE_PARTAGE`, une seule, 15 Mo au plus,
@@ -339,6 +393,8 @@ self.addEventListener('fetch', event => {
   // l'app (comme les pages légales). Elle va au réseau, sans cache : un état
   // gardé en cache dirait « Tout fonctionne » d'hier.
   if (url.pathname === '/etat' || url.pathname.startsWith('/etat.') || url.pathname === '/etat-version.json') return;
+  // (13 nov., lot 50) La page publique /confiance : statique, au réseau (comme /etat).
+  if (url.pathname === '/confiance' || url.pathname.startsWith('/confiance.')) return;
   // (8 nov.) Le centre d'aide (/aide, public/aide/) : des pages statiques, au réseau —
   // sinon la navigation les rangerait sous « / » et ouvrirait l'app à leur place.
   if (url.pathname === '/aide' || url.pathname.startsWith('/aide/')) return;

@@ -20,6 +20,14 @@
 //       content.js marque alors chaque message « douteux » et le fond refuse
 //       tout ce qui écrirait une preuve ou un état (bordereau, suppression,
 //       recette, fiche, publication…).
+//
+// ⚠️ 5.374 (13 nov., Julien : « l'extension a mal capté la vente de Vestiaire sur Orion sur mon
+//    iPhone ») — le capteur Vestiaire (vc-inject.js) n'était PAS dans les sources en ligne : posé
+//    par la balise `src`, il arrivait après les premières requêtes de la page, et la liste des
+//    ventes demandée au chargement de « Mes ventes » passait avant lui (mesuré : depuis le 3 nov.,
+//    l'iPhone n'a rangé aucune vente). Il est maintenant posé EN LIGNE lui aussi (même chemin
+//    que inject.js ; refusé par la page ⇒ la balise `src` comme avant, et vc-inject.js rattrape
+//    la liste que la page a déjà demandée). `__vrmCanalInline` ne concerne que Vinted.
 (function(){
  'use strict';
  const SOURCES=null;/*__VRM_SOURCES_PAGE__*/
