@@ -43,7 +43,7 @@ const F = Object.assign(H.fichiers(arg), {
 
 if (process.argv.includes('--prouve')) {
   const MUT = [
-    ['injectAExpSoldDate', 'inject', "    if (source === 'a-expedier') {\n      const d = dateLue(e.orderConfirmationDate);", "    if (false) {\n      const d = dateLue(e.orderConfirmationDate);"],
+    ['injectAExpSoldDate', 'inject', "  const CLES_JOUR_A_EXPEDIER = ['orderConfirmationDate', 'createdAt', 'created_at'];", "  const CLES_JOUR_A_EXPEDIER = ['soldDate', 'orderConfirmationDate', 'createdAt', 'created_at'];"],
     ['injectDateParse', 'inject', "    for (const k of CLES_DATE_VENTES) { const d = dateLue(e[k]); if (d) return { date: d, cle: k }; }", "    for (const k of CLES_DATE_VENTES) { const d = isFinite(Date.parse(e[k])) ? dateLue(e[k]) : ''; if (d) return { date: d, cle: k }; }"],
     ['injectComptePage', 'inject', "post({ kind: 'vcmoi', id, source: 'page', forme: ['user.user.id'] });", "void ({ kind: 'vcmoi', id, source: 'page', forme: ['user.user.id'] });"],
     ['injectRattrapage', 'inject', "        if (!e || !(Number(e.startTime) < T_POSE)) continue;", '        continue;'],
@@ -56,7 +56,7 @@ if (process.argv.includes('--prouve')) {
     ['relaisOrigine', 'relais', "origine: d.origine === 'page' || d.origine === 'relue' ? d.origine : '',", "origine: '',"],
     ['relaisSourcePage', 'relais', "source: d.source === 'stream' || d.source === 'page' ? d.source : 'users/me',", "source: d.source === 'stream' ? 'stream' : 'users/me',"],
     ['fondParis', 'src', "  return `${base}${off < 0 ? '-' : '+'}${deux(Math.floor(z / 60))}:${deux(z % 60)}`;", '  return base;'],
-    ['fondAExpGarde', 'src', "(source === 'a-expedier' && x.dateCle === 'orderConfirmationDate' && /^\\d{4}-\\d{2}-\\d{2}$/.test(d) ? 'a-expedier' : ''));", "(source === 'a-expedier' ? 'a-expedier' : ''));"],
+    ['fondAExpGarde', 'src', "(source === 'a-expedier' && /^(orderConfirmationDate|createdAt|created_at)$/.test(String(x.dateCle || '')) && /^\\d{4}-\\d{2}-\\d{2}$/.test(d) ? 'a-expedier' : ''));", "(source === 'a-expedier' ? 'a-expedier' : ''));"],
     ['fondVentesGagne', 'src', "  if (de === 'a-expedier' && p.dateDe !== 'ventes') return { date: d, dateDe: 'a-expedier' };", "  if (de === 'a-expedier') return { date: d, dateDe: 'a-expedier' };"],
     ['fondPageEntiere', 'src', "  const entier = m.origine !== 'page' && ((offset === 0", "  const entier = ((offset === 0"],
     ['fondPartielleEcrase', 'src', "  const lecture = (prevL && prevL.complet === true && !entier) ? Object.assign({}, prevL, { partielleAt: now })", '  const lecture = false ? 0'],

@@ -436,12 +436,13 @@
     if (m && MOIS_EN[m[1].toLowerCase()] && jourValide(+m[3], MOIS_EN[m[1].toLowerCase()], +m[2])) return `${m[3]}-${deux(MOIS_EN[m[1].toLowerCase()])}-${deux(m[2])}`;
     return '';
   }
-  const CLES_DATE_VENTES = ['soldDate', 'sold_date', 'soldAt', 'sold_at', 'saleDate', 'sale_date', 'orderConfirmationDate', 'order_confirmation_date'];
+  const CLES_DATE_VENTES = ['soldDate', 'sold_date', 'soldAt', 'sold_at', 'saleDate', 'sale_date', 'orderConfirmationDate', 'order_confirmation_date', 'createdAt', 'created_at'];
+  const CLES_JOUR_A_EXPEDIER = ['orderConfirmationDate', 'createdAt', 'created_at'];   // JAMAIS `soldDate` ici
   function dateVenteDe(e, source) {
     if (!e || typeof e !== 'object') return { date: '', cle: '' };
     if (source === 'a-expedier') {
-      const d = dateLue(e.orderConfirmationDate);
-      return d ? { date: d.slice(0, 10), cle: 'orderConfirmationDate' } : { date: '', cle: '' };
+      for (const k of CLES_JOUR_A_EXPEDIER) { const d = dateLue(e[k]); if (d) return { date: d.slice(0, 10), cle: k }; }
+      return { date: '', cle: '' };
     }
     for (const k of CLES_DATE_VENTES) { const d = dateLue(e[k]); if (d) return { date: d, cle: k }; }
     return { date: '', cle: '' };

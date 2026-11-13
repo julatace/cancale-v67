@@ -22477,7 +22477,7 @@ function dateVcIso(t) {
 function dateVenteVcRangee(prev, x, source) {
   const d = dateVcIso(x && x.date);
   const de = !d ? '' : (source === 'ventes' ? 'ventes'
-    : (source === 'a-expedier' && x.dateCle === 'orderConfirmationDate' && /^\d{4}-\d{2}-\d{2}$/.test(d) ? 'a-expedier' : ''));
+    : (source === 'a-expedier' && /^(orderConfirmationDate|createdAt|created_at)$/.test(String(x.dateCle || '')) && /^\d{4}-\d{2}-\d{2}$/.test(d) ? 'a-expedier' : ''));
   const p = { date: (prev && prev.date) || '', dateDe: (prev && prev.dateDe) || '' };
   if (de === 'ventes') return { date: d, dateDe: 'ventes' };
   if (de === 'a-expedier' && p.dateDe !== 'ventes') return { date: d, dateDe: 'a-expedier' };
