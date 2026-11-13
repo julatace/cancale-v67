@@ -530,6 +530,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **13 nov. · Lot 89** : Colissimo et UPS lus par le serveur dès leur clé (sinon rien d'appelé, « lu par e-mail seulement ») ; DPD/GLS non mesurés. `2026-11-13-lot89-suivi-transporteurs.md`. Geste : `…-guide-cles-transporteurs.md`.
+
 - **13 nov. · Bénéfice « si vendue » et paires qui dorment (points 14-15)** : fiche « En ligne à · Si vendue » (`beneficePaire`, au plus, achat pas saisi ⇒ « — » + « Saisir ») ; Qui dorment rangées par ce qui rapporte, UN geste chacune (baisse mesurée, favoris, Republier, Leboncoin ; « … » le reste), `src/dormantes.js`. `docs/passation/2026-11-13-lot1415.md`. Geste : aucun.
 
 - **13 nov. · Prévision lissée, « Tes comptes Vinted » (lot 36-27)** : du 1er au 4, rythme des 4 dernières semaines ; tableau par compte (30 j/90 j/année : ventes, jours, prix moyen, offres). `2026-11-13-lot3627.md`. Geste : aucun.

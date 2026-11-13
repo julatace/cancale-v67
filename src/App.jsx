@@ -120,7 +120,7 @@ import { finDatee, texteSortie, sortiRecent, pourquoiPasLu, SORTIS_JOURS, jourCo
 import {arriveesRelues} from './arriveesRelues.js';
 import { preuveDeLigne } from '../api/_lib/etat-colis.js';
 import {avecSuiviDuSujet,finsDesLignes,sortiParSuivis,sortiParSuivi,suiviDeLigne,lienSuivi,codePostalLu,nouvelleVinted,transporteurDeForme,colisInternational,suiviValide,TRANSPORTEURS_SAISIE,normaliserCodePostal,idSuiviManuel,relireLigneSuivi,finDeCommandeAchat,fusionTransporteur,ligneDuTransporteur,ligneDeSuiviTransporteur,leverGarde,SELECT_TRANSP_META,ligneTranspDeMeta,sensDeLigne,incidentDeSuivis,incidentDeLigne,repartiAffichable,nomTransporteurSuivi} from '../api/_lib/suivi-colis.js';
-import {ligneTransporteur,texteCodePostalMr,carrierLisible,carrierNonLu,nomTransporteur,LECTURE_SERVEUR_TRANSP,heureParis,indexTranspParSuivi,carrierLuDeLigne} from '../api/_lib/transporteurs.js';
+import {ligneTransporteur,texteCodePostalMr,carrierLisible,carrierNonLu,nomTransporteur,LECTURE_SERVEUR_TRANSP,heureParis,indexTranspParSuivi,carrierLuDeLigne,noterLecturesServeur,lecturesCle} from '../api/_lib/transporteurs.js';
 // ⟦→ ecrans/Reglages.jsx #6⟧
 import PorteConfidentialite from './PorteConfidentialite.jsx';
 import { AlerteDejaRelie } from './AlerteDejaRelie.jsx';
@@ -23890,6 +23890,9 @@ function useRelectureEbay() {
 //     recule (10 min, 6 h) ; rien n'est vidé ;
 //   · un état CHANGÉ ⇒ `vrm:transp-maj` (les écrans relisent `transp_*`).
 const RELECTURE_TRANSP_MS = 5 * 60 * 1000;
+// (13 nov., lot 89) Ce que le serveur a dit de Colissimo / UPS (lu ou non), retenu sur l'appareil
+// (une commodité : la réponse du passage suivant le remplace) — avant toute réponse : « pas su ».
+try { const x = lireLocalJson('vrm_transp_lecture'); if (x && Object.keys(x).length) noterLecturesServeur(x); } catch (_) {}
 // (9 nov., retraits frais) La dernière lecture RÉUSSIE chez un transporteur (ms) parmi les lignes `transp_`
 // lues, ou null (rien lu, ou pas su). Et l'âge en mots, une règle pour la ligne « Suivi vérifié … ».
 function derniereLectureTransp(lignes) {
@@ -23936,6 +23939,9 @@ function relireTransporteursSiVieux({ force = false } = {}) {
         ecrireLocalJson('vrm_transp_vol', { at: maintenant, prochain: maintenant + attente });
         return { fait: false, raison: st ? `http-${st}` : 'reseau' };
       }
+      // (13 nov., lot 89) Colissimo / UPS lus par le serveur (leur clé est posée sur Vercel) : la règle
+      // partagée le sait (`carrierLisible`, `pourquoiPasLu`) — sinon « suivi lu par e-mail seulement ».
+      if (j.lecture && typeof j.lecture === 'object') { const avant = JSON.stringify(lecturesCle()); noterLecturesServeur(j.lecture); ecrireLocalJson('vrm_transp_lecture', lecturesCle()); if (JSON.stringify(lecturesCle()) !== avant) { try { window.dispatchEvent(new Event('vrm:transp-lu')); } catch (_) {} } }
       const change = Array.isArray(j.lus) && j.lus.some((x) => x && x.change);
       // (8 nov.) Un colis VENDU pris en charge chez le transporteur : Colis, Ma
       // journée et la cloche relisent les départs (jamais « à retirer »).
