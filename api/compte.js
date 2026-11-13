@@ -94,6 +94,7 @@ import { traiterAgenda } from './_lib/agenda-ics.js';                 // (10 nov
 import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
 import { verifierConfirmation, verifierMotDePasse, inventaire, lireProprietaire, noterJournal, mailSuppression, FENETRE_RECENTE_MS, MOT_CONFIRMATION } from './_lib/suppression-compte.js';
 import { effacerCompte } from './_lib/effacer-compte.js';
+import { lirePrevue, poserPrevue, retirerPrevue, arreterAbonnement, reprendreAbonnement, compteVide, mailDemande, jourLong, DELAI_GRACE_JOURS } from './_lib/suppression-differee.js';   // (13 nov., lot 51) 30 jours de grâce
 import { pageExport } from './_lib/export-rgpd.js';   // (12 nov.) RGPD : toutes ses données
 import { compteOAuthAnnulable } from '../src/auth/compteNeuf.js';   // (11 nov., lot DJ6)
 import { envoyerSmtp } from './_lib/smtp.js';
@@ -1446,8 +1447,10 @@ async function apercuSuppression(req, res) {
   if (!g) return;
   const inv = await inventaire({ url: SUPABASE_URL, service: g.SERVICE, owner: g.u.id, proprio: g.proprio });
   if (!inv) return repondre(res, 503, { erreur: 'inventaire', message: "Je n'ai pas pu compter tes données. Réessaie dans un instant." });
-  const ligne = await ligneDe(req);
+  const [ligne, prevue] = await Promise.all([ligneDe(req), lirePrevue({ url: SUPABASE_URL, service: g.SERVICE, owner: g.u.id })]);
   return repondre(res, 200, { ok: true, proprietaire: false, nombres: inv,
+    // (13 nov., lot 51) La suppression déjà demandée : `null` aucune · la demande · `prevueSu:false` pas su.
+    prevue: prevue || null, prevueSu: prevue !== undefined, graceJours: DELAI_GRACE_JOURS, vide: compteVide(inv, ligne),
     abonnement: ligne === undefined ? null : { actif: !!(ligne && abonnementActif(ligne.statut)), resilie: !!(ligne && ligne.annule_fin_periode), fin: (ligne && ligne.fin_periode) || null },
     fenetreMinutes: FENETRE_RECENTE_MS / 60000, mot: MOT_CONFIRMATION });
 }
@@ -1467,6 +1470,57 @@ async function mesDonnees(req, res) {
   return repondre(res, r.code, r.corps);
 }
 
+// (13 nov., lot 51) La phrase d'une suppression PRÉVUE (la route la donne, l'écran l'affiche telle quelle).
+function phrasePrevue(p, abonnement) {
+  const quand = jourLong(Date.parse(p.effaceLe));
+  const abo = abonnement === 'resilie' || abonnement === 'deja-resilie' ? ' Ton abonnement est résilié : aucun nouveau prélèvement.'
+    : abonnement === 'arrete' ? ' Ton abonnement est arrêté.' : '';
+  return abonnement === 'deja'
+    ? `Ta suppression est déjà prévue le ${quand}. D'ici là, rien n'est effacé et tu peux l'annuler.`
+    : `C'est noté : ton compte sera supprimé le ${quand}. D'ici là, rien n'est effacé et tu peux annuler.${abo}`;
+}
+
+// `?mode=suppression-prevue` (GET, session) : la demande en cours, pour le bandeau
+// de la coque. `null` aucune ; 503 pas su (jamais « aucune » sur une lecture ratée).
+async function suppressionPrevue(req, res) {
+  const u = await utilisateurDe(req);
+  if (u === undefined) return repondre(res, 503, { ok: false, erreur: 'session-pas-su' });
+  if (!u) return repondre(res, 401, { ok: false, erreur: 'session' });
+  const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
+  if (!SERVICE || !UUID_RE.test(u.id) || u.id === PROPRIETAIRE_NEUTRE) return repondre(res, 200, { ok: true, prevue: null });   // sans clé, aucune demande n'a pu être posée
+  const p = await lirePrevue({ url: SUPABASE_URL, service: SERVICE, owner: u.id });
+  if (p === undefined) return repondre(res, 503, { ok: false, erreur: 'pas-su' });
+  return repondre(res, 200, { ok: true, prevue: p || null });
+}
+
+// `?mode=supprimer-annuler` (POST, session) : annuler SA demande. Annuler ne
+// détruit rien : sa session suffit. L'abonnement que la demande avait résilié est
+// repris (Stripe relu) — sinon c'est DIT, avec le geste.
+async function annulerSuppression(req, res) {
+  const u = await utilisateurDe(req);
+  if (u === undefined) return repondre(res, 503, { ok: false, erreur: 'session-pas-su', message: 'Le service de connexion ne répond pas. Réessaie dans un instant.' });
+  if (!u) return repondre(res, 401, { ok: false, erreur: 'session', message: 'Connecte-toi à VRM pour annuler la suppression.' });
+  if (!UUID_RE.test(u.id) || u.id === PROPRIETAIRE_NEUTRE) return repondre(res, 400, { ok: false, erreur: 'identite' });
+  const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
+  if (!SERVICE) return repondre(res, 200, { ok: true, annule: false, rien: true, message: "Aucune suppression n'était prévue : ton compte est là." });
+  const p = await lirePrevue({ url: SUPABASE_URL, service: SERVICE, owner: u.id });
+  if (p === undefined) return repondre(res, 503, { ok: false, erreur: 'pas-su', message: "Je n'ai pas pu lire ta demande : rien n'a changé. Réessaie dans un instant." });
+  if (!p) return repondre(res, 200, { ok: true, annule: false, rien: true, message: "Aucune suppression n'était prévue : ton compte est là." });
+  const n = await retirerPrevue({ url: SUPABASE_URL, service: SERVICE, owner: u.id });
+  if (n === null) return repondre(res, 503, { ok: false, erreur: 'retrait', message: `La suppression n'est PAS annulée (le serveur n'a pas répondu) : elle est toujours prévue le ${jourLong(Date.parse(p.effaceLe))}. Réessaie dans un instant.` });
+  let abonnement = 'rien';
+  if (p.abonnement === 'resilie') {
+    const ligne = await ligneDe(req);
+    const r = ligne === undefined ? { etat: 'pas-su' } : await reprendreAbonnement({ ligne, owner: u.id, stripe: stripeApi, pret: stripePret });
+    abonnement = r.etat;
+    if (r.sub) await ecrireStatut(u.id, ligneDeLAbonnement(r.sub, !!r.sub.livemode), Math.floor(Date.now() / 1000)).catch(() => {});
+  }
+  const abo = abonnement === 'repris' ? ' Ton abonnement continue comme avant.'
+    : abonnement === 'pas-su' ? ' Ton abonnement reste résilié pour la fin de la période : reprends-le dans Paramètres → Abonnement.'
+    : abonnement === 'fini' ? ' Ton abonnement est terminé : tu peux te réabonner dans Paramètres → Abonnement.' : '';
+  return repondre(res, 200, { ok: true, annule: true, abonnement, message: `Suppression annulée : ton compte et tes données restent.${abo}` });
+}
+
 async function supprimerCompte(req, res) {
   const g = await gardesSuppression(req, res);
   if (!g) return;
@@ -1476,33 +1530,48 @@ async function supprimerCompte(req, res) {
   const conf = await verifierConfirmation({ corps, utilisateur: u, jeton: jetonDe(req),
     verifier: (email, mdp) => verifierMotDePasse({ url: SUPABASE_URL, anon: ANON, email, motDePasse: mdp, id: u.id }) });
   if (!conf.ok) return repondre(res, conf.code, { ok: false, erreur: conf.erreur, message: conf.message });
+  // (13 nov., lot 51) Déjà demandée : la même date (jamais repoussée, jamais avancée).
+  const deja = await lirePrevue({ url: SUPABASE_URL, service: SERVICE, owner: u.id });
+  if (deja === undefined) return repondre(res, 503, { ok: false, erreur: 'prevue-pas-su', message: `Je n'ai pas pu lire l'état de ton compte. ${NON_TOUCHE} Réessaie dans un instant.` });
+  if (deja) return repondre(res, 200, { ok: true, deja: true, prevue: deja, message: phrasePrevue(deja, 'deja') });
   // L'inventaire : une lecture ratée ⇒ rien n'est effacé.
   const inv = await inventaire({ url: SUPABASE_URL, service: SERVICE, owner: u.id, proprio });
   if (!inv) return repondre(res, 503, { ok: false, erreur: 'inventaire', message: `Je n'ai pas pu compter tes données. ${NON_TOUCHE} Réessaie dans un instant.` });
 
-  // 1) L'abonnement, d'abord : on n'efface jamais un compte encore prélevé.
+  // 1) L'abonnement, d'abord : on n'efface jamais un compte encore prélevé,
+  //    et une demande de suppression ne prélève plus (résilié, réversible).
   const ligne = await ligneDe(req);
   if (ligne === undefined) return repondre(res, 503, { ok: false, erreur: 'base-injoignable', message: `Je n'ai pas pu lire ton abonnement. ${NON_TOUCHE} Réessaie dans un instant.` });
   const etapes = { abonnement: 'aucun', confirmation: conf.par };
-  if (ligne && ligne.abonnement_stripe && ligne.client_stripe && abonnementActif(ligne.statut)) {
-    const STRIPE_MUET = `Je n'ai pas pu arrêter ton abonnement chez Stripe. ${NON_TOUCHE} Réessaie dans un instant.`;
-    if (!stripePret()) return repondre(res, 503, { ok: false, erreur: 'stripe', message: STRIPE_MUET });
-    const id = encodeURIComponent(ligne.abonnement_stripe);
-    const lu = await stripeApi('GET', `subscriptions/${id}`);
-    if (!lu.ok || !lu.data) return repondre(res, 502, { ok: false, erreur: 'stripe', message: STRIPE_MUET });
-    if (lu.data.customer !== ligne.client_stripe) return repondre(res, 403, { ok: false, erreur: 'pas-a-toi', message: NON_TOUCHE });
-    if (abonnementActif(lu.data.status)) {
-      const impaye = lu.data.status === 'past_due';
-      if (!impaye && lu.data.cancel_at_period_end) etapes.abonnement = 'deja-resilie';     // rejoué : rien à refaire
-      else {
-        const r = impaye
-          ? await stripeApi('DELETE', `subscriptions/${id}`, null, `vrm-fer-${u.id}`)
-          : await stripeApi('POST', `subscriptions/${id}`, { cancel_at_period_end: 'true' }, `vrm-fer-${u.id}-${Math.floor(Date.now() / 60000)}`);
-        if (!r.ok || !r.data) return repondre(res, 502, { ok: false, erreur: 'stripe', message: STRIPE_MUET });
-        etapes.abonnement = impaye ? 'arrete' : 'resilie';
-      }
-    } else etapes.abonnement = 'deja-fini';
+  const arret = await arreterAbonnement({ ligne, owner: u.id, stripe: stripeApi, pret: stripePret });
+  if (!arret.ok) return repondre(res, arret.code, { ok: false, erreur: arret.erreur, message: arret.erreur === 'pas-a-toi' ? NON_TOUCHE : `Je n'ai pas pu arrêter ton abonnement chez Stripe. ${NON_TOUCHE} Réessaie dans un instant.` });
+  etapes.abonnement = arret.etape;
+
+  // (13 nov., lot 51) 30 JOURS DE GRÂCE : la demande est posée (ligne neutre),
+  // RIEN n'est effacé ; le cron du matin efface à l'échéance
+  // (api/_lib/suppression-differee.js). Seul un compte VIDE part tout de suite.
+  if (!compteVide(inv, ligne)) {
+    const p = await poserPrevue({ url: SUPABASE_URL, service: SERVICE, owner: u.id, abonnement: arret.etape });
+    if (!p) {
+      const abo = arret.etape === 'resilie' ? " Ton abonnement est résilié pour la fin de la période : tu peux le reprendre dans Paramètres → Abonnement." : '';
+      return repondre(res, 503, { ok: false, erreur: 'prevue', etapes, message: `Ta demande n'est pas enregistrée. ${NON_TOUCHE}${abo} Réessaie dans un instant.` });
+    }
+    etapes.email = 'non-envoye';
+    if (u.email && u.emailConfirme) {
+      const cfg = configurationRelances();
+      if (cfg.pret) {
+        try {
+          try { await lireMentions(); } catch (_) {}
+          const m = mailDemande({ effaceLe: p.effaceLe, contact: contactEmail() });
+          const v = await envoyerSmtp({ hote: process.env.RELANCES_SMTP_HOTE, port: cfg.port, utilisateur: process.env.RELANCES_SMTP_UTILISATEUR, motDePasse: process.env.RELANCES_SMTP_MOT_DE_PASSE,
+            de: process.env.RELANCES_EXPEDITEUR, nomDe: 'VRM', a: u.email, sujet: m.sujet, texte: m.texte, html: m.html, entetes: { 'Auto-Submitted': 'auto-generated' } });
+          etapes.email = (v && v.issue) || 'incertain';
+        } catch (_) { etapes.email = 'incertain'; }
+      } else etapes.email = 'non-configure';
+    }
+    return repondre(res, 200, { ok: true, prevue: p, etapes, message: phrasePrevue(p, arret.etape) });
   }
+  etapes.immediat = 'compte-vide';
   // 2) Ses sessions (l'extension ne pourra plus renouveler la sienne).
   etapes.sessions = (await fermerSessions(req)) ? 'fermees' : 'non-fermees';
   // 3) Tout le reste, compte de connexion en dernier.
@@ -1532,7 +1601,7 @@ async function supprimerCompte(req, res) {
     ? `Ton compte VRM est supprimé : ${fait.join(', ')}.`
     : `Suppression INCOMPLÈTE. Fait : ${fait.length ? fait.join(', ') : 'rien'}. Pas encore effacé : ${r.pasFait.join(', ')}. Reconnecte-toi et relance « Supprimer mon compte ».`;
   if (!r.ok) console.warn('[supprimer-compte] incomplet', JSON.stringify(etapes));
-  return repondre(res, r.ok ? 200 : 502, { ok: r.ok, etapes, message });
+  return repondre(res, r.ok ? 200 : 502, { ok: r.ok, immediat: true, etapes, message });
 }
 
 // ── « CONTINUER AVEC DISCORD » SANS COMPTE VRM (11 nov., lot DJ6) ─────────────
@@ -1923,6 +1992,8 @@ export default async function handler(req, res) {
   if (mode === 'oauth-sans-compte') return m === 'POST' ? annulerCompteOAuthNeuf(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'supprimer' || mode === 'fermer') return m === 'POST' ? supprimerCompte(req, res) : (m === 'GET' && mode === 'supprimer') ? apercuSuppression(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   // (6 nov.) « Signaler un problème » : envoyer (tous), lire et « Traité » (le propriétaire).
+  if (mode === 'supprimer-annuler') return m === 'POST' ? annulerSuppression(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
+  if (mode === 'suppression-prevue') return m === 'GET' ? suppressionPrevue(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'mes-donnees') return m === 'GET' ? mesDonnees(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'signalement') return (m === 'GET' || m === 'POST') ? signalement(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'rapport-extension') return (m === 'GET' || m === 'POST') ? rapportExtension(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
