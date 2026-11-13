@@ -101,6 +101,7 @@ export default {
   "accueil.note.telephone": "Il telefono consulta; le azioni passano dal computer acceso, con il browser aperto.",
   "accueil.offre.pro.phrase": "Account venditore illimitati: tutti i tuoi account vendono, tutto entra nei tuoi totali.",
   "accueil.offre.solo.phrase": "Un account venditore per piattaforma (un Vinted, un Leboncoin, un eBay, un Vestiaire) — vendite, annunci, pacchi da spedire, offerte e contabilità di quell’account — e quanti account d’acquisto vuoi (i loro acquisti e ritiri).",
+  "accueil.offre.solo.supplement": "1 account venditore Vinted incluso · +{prix}/mese per ogni account in più",
   "accueil.offres.bientot": " · a breve",
   "accueil.offres.cgv": "Condizioni di vendita",
   "accueil.offres.essai": ", una volta per e-mail e per account Vinted. Senza vincoli: disdici dall’app.",

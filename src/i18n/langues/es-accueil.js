@@ -101,6 +101,7 @@ export default {
   "accueil.note.telephone": "El móvil consulta; las acciones pasan por el ordenador encendido, con el navegador abierto.",
   "accueil.offre.pro.phrase": "Cuentas de venta ilimitadas: todas tus cuentas venden y todo entra en tus totales.",
   "accueil.offre.solo.phrase": "Una cuenta de venta por plataforma (un Vinted, un Leboncoin, un eBay, un Vestiaire) — ventas, anuncios, paquetes que enviar, ofertas y contabilidad de esa cuenta — y tantas cuentas de compra como quieras (sus compras y sus recogidas).",
+  "accueil.offre.solo.supplement": "1 cuenta de venta de Vinted incluida · +{prix}/mes por cada cuenta más",
   "accueil.offres.bientot": " · pronto",
   "accueil.offres.cgv": "Condiciones de venta",
   "accueil.offres.essai": ", una vez por e-mail y por cuenta de Vinted. Sin permanencia: cancelas desde la app.",

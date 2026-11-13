@@ -101,6 +101,7 @@ export default {
   "accueil.note.telephone": "The phone views; actions go through the computer, on and with the browser open.",
   "accueil.offre.pro.phrase": "Unlimited seller accounts: all your accounts sell, everything counts in your totals.",
   "accueil.offre.solo.phrase": "One seller account per platform (one Vinted, one Leboncoin, one eBay, one Vestiaire) — that account’s sales, listings, parcels to send, offers and accounting — and as many buying accounts as you want (their purchases and pickups).",
+  "accueil.offre.solo.supplement": "1 Vinted seller account included · +{prix}/month per extra account",
   "accueil.offres.bientot": " · soon",
   "accueil.offres.cgv": "Terms of Sale",
   "accueil.offres.essai": ", once per email and per Vinted account. No commitment: cancel from the app.",

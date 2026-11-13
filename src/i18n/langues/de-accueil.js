@@ -101,6 +101,7 @@ export default {
   "accueil.note.telephone": "Das Handy zeigt an; Aktionen laufen über den eingeschalteten Computer mit offenem Browser.",
   "accueil.offre.pro.phrase": "Unbegrenzt Verkäuferkonten: Alle deine Konten verkaufen, alles zählt in deinen Summen.",
   "accueil.offre.solo.phrase": "Ein Verkäuferkonto pro Plattform (ein Vinted, ein Leboncoin, ein eBay, ein Vestiaire) — Verkäufe, Anzeigen, zu versendende Pakete, Angebote und Buchhaltung dieses Kontos — und so viele Käuferkonten, wie du willst (ihre Einkäufe und Abholungen).",
+  "accueil.offre.solo.supplement": "1 Vinted-Verkäuferkonto inklusive · +{prix}/Monat pro weiterem Konto",
   "accueil.offres.bientot": " · bald",
   "accueil.offres.cgv": "AGB",
   "accueil.offres.essai": ", einmal pro E-Mail und Vinted-Konto. Ohne Bindung: Du kündigst in der App.",

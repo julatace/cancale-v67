@@ -54,7 +54,7 @@ import { ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement
 // dans le texte de l'app (`_source-app.cjs`), l'import les déclarait deux fois.
 import { installerExtensionIci, boutiqueOrion } from '../navigateurExtension.js';
 // (9 nov.) Solo et Pro : les deux offres côte à côte, le compte qui vend.
-import { OffresSoloPro, ouvrirQuelCompte, choixDe } from '../abonnement/PlansSoloPro.jsx';
+import { OffresSoloPro, ouvrirQuelCompte, choixDe, ouvrirCompteSup, supDe, texteSup, changerCompteSup } from '../abonnement/PlansSoloPro.jsx';
 import { PLATEFORMES_SOLO, NOMS_PLATEFORMES_SOLO } from '../../api/_lib/plan-regle.js';
 import { PRIX_PRO_MOIS } from '../accueil-reglages.js';
 import { publierAbonnement, suivreAbonnement } from '../abonnement/etatAbonnement.js';
@@ -3168,7 +3168,7 @@ function MonAbonnement() {
   // (9 nov., Solo par plateforme) Un choix fait dans la feuille « Quel compte vend ? »
   // (publié par elle) se relit ici tout de suite ; et les comptes des autres plateformes
   // (lus seulement en Solo) disent quelles rangées montrer.
-  React.useEffect(() => suivreAbonnement((x) => { if (x && typeof x === 'object' && x.ok !== false) setE((p) => (p ? { ...p, compteVendeur: x.compteVendeur !== undefined ? x.compteVendeur : p.compteVendeur, comptesVendeurs: x.comptesVendeurs !== undefined ? x.comptesVendeurs : p.comptesVendeurs } : p)); }), []);
+  React.useEffect(() => suivreAbonnement((x) => { if (x && typeof x === 'object' && x.ok !== false) setE((p) => (p ? { ...p, compteVendeur: x.compteVendeur !== undefined ? x.compteVendeur : p.compteVendeur, comptesVendeurs: x.comptesVendeurs !== undefined ? x.comptesVendeurs : p.comptesVendeurs, comptesSup: x.comptesSup !== undefined ? x.comptesSup : p.comptesSup } : p)); }), []);
   const [autresSolo] = useComptesAutresSites(!!(e && e.plan === 'solo'));
   const resilierOuReprendre = async (reprendre) => {
     if (!reprendre) {
@@ -3222,6 +3222,29 @@ function MonAbonnement() {
           <RangeeIos titre={e.compteVendeur && e.compteVendeur.uid ? <span data-compte-vendeur={e.compteVendeur.uid}>Vinted · Compte n° {e.compteVendeur.uid}</span> : <span data-compte-vendeur="">Vinted · Pas encore choisi</span>}
             detail={e.compteVendeur && e.compteVendeur.uid ? 'Ses ventes, annonces, colis et sa compta comptent' : 'Tant que tu n’as pas choisi, tous tes comptes comptent'}
             onClick={() => ouvrirQuelCompte()} data-rangee-compte-vendeur=""/>
+          {/* (13 nov., lot 56) PLUSIEURS COMPTES VINTED DÈS SOLO : les comptes de plus (payés,
+              rendus par le serveur), puis « Ajouter » — « Bientôt » tant que le prix Stripe
+              `vrm_compte_sup` n'existe pas (rien d'achetable). La limite est celle du serveur. */}
+          {(() => {
+            const s = supDe(e);
+            if (!s) return null;
+            const retirer = async (uid) => {
+              const oui = await askConfirm({ title: 'Ce compte ne vend plus ?', desc: `Le compte n° ${uid} redevient un compte d'achat : ses ventes sortent de tes totaux, rien n'est supprimé. Stripe déduit le reste du mois de ta prochaine facture.`, ok: 'Il ne vend plus', cancel: 'Annuler' });
+              if (!oui) return;
+              setOccupe('sup'); setMsg('');
+              const r = await changerCompteSup('retirer-sup', uid, enTeteSession);
+              setOccupe('');
+              if (!r.ok) setMsg(r.message); else toast(`✓ Le compte n° ${uid} ne vend plus`);
+            };
+            const peutAjouter = !!(e.compteVendeur && e.compteVendeur.uid) && (s.ouvert || s.libres > 0) && s.liste.length < s.max;
+            return (<>
+              {s.liste.map((uid) => <RangeeIos key={uid} titre={<span data-compte-sup={uid}>Vinted · Compte n° {uid}</span>} detail={`Vend aussi · ${texteSup(s)}`} valeur="Retirer" onClick={() => retirer(uid)} data-rangee-compte-sup={uid}/>)}
+              <RangeeIos titre={<span data-sup-ajouter-rangee="">Un compte Vinted qui vend de plus</span>}
+                detail={peutAjouter ? (s.libres > 0 ? `${s.libres} place${s.libres > 1 ? 's' : ''} déjà payée${s.libres > 1 ? 's' : ''}` : `${texteSup(s)} par compte de plus`) : !(e.compteVendeur && e.compteVendeur.uid) ? 'Choisis d’abord le compte inclus' : `Bientôt · ${texteSup(s)} par compte de plus`}
+                valeur={peutAjouter ? 'Ajouter' : undefined}
+                onClick={peutAjouter ? () => ouvrirCompteSup() : undefined} data-rangee-sup-ajouter={peutAjouter ? 'ouvert' : 'bientot'}/>
+            </>);
+          })()}
           {/* (9 nov., Solo par plateforme) Un compte vendeur PAR plateforme : une rangée chacune, dès
               DEUX comptes (ou un choix déjà fait) ; le même geste, la même règle des 30 jours. */}
           {PLATEFORMES_SOLO.map((p) => {
