@@ -15,6 +15,19 @@ const QR_MAX = 60;
 // `vrm-hl-` : la purge d'activation la garde, la déconnexion la vide.
 const CACHE_PARTAGE = 'vrm-hl-partage';
 const CLE_PARTAGE = '/__vrm_partage_photo';
+// (13 nov., point 45) Les photos DÉJÀ VUES du Stock, pour le garage sans réseau
+// (src/stockHorsLigne.js). `vrm-hl-` : la purge d'activation la garde, la
+// déconnexion la vide. ⚠️ `estPhotoGardable` et `PHOTOS_MAX` ÉGAUX au module.
+const CACHE_PHOTOS = 'vrm-hl-photos';
+const PHOTOS_MAX = 120;
+const HOTES_PHOTOS = /^(?:[a-z0-9-]+\.)*(?:vinted\.net|ebayimg\.com|vestiairecollective\.com)$|^img\.leboncoin\.fr$/;
+function estPhotoGardable(u) {
+  try {
+    if (typeof u !== 'string' || u.length > 600) return false;
+    const x = new URL(u);
+    return x.protocol === 'https:' && !x.username && !x.password && !x.port && HOTES_PHOTOS.test(x.hostname.toLowerCase());
+  } catch (_) { return false; }
+}
 // Repère de la version servie : le nom du script principal de la page.
 const REPERE = '/__vrm_build';
 const pdfStore = {};
@@ -294,6 +307,42 @@ self.addEventListener('fetch', event => {
               await c.put(req, res.clone());
               const cles = await c.keys();
               for (const k of cles.slice(0, Math.max(0, cles.length - QR_MAX))) await c.delete(k);
+            } catch (_) {}
+          }
+          return res;
+        }
+      } catch (_) {}
+      return new Response('', { status: 404 });
+    })());
+    return;
+  }
+
+  // 1 bis') (13 nov., point 45) LES PHOTOS DÉJÀ VUES DU STOCK : `/hl-photo?u=<adresse>`
+  //    (src/stockHorsLigne.js). Même règle que les QR : la réserve d'abord ; sinon,
+  //    SEULEMENT ce que la page de VRM demande (une IMAGE, ou l'en-tête
+  //    `x-vrm-hl-photo` de `retenirPhoto`), SEULEMENT un hôte de photos connu
+  //    (`estPhotoGardable`, ÉGALE à celle du module — audit-stock-hors-ligne), sans
+  //    cookie ni référent ; rangée, `PHOTOS_MAX` au plus (les plus anciennes partent).
+  //    Une navigation n'est jamais une photo (404). Rien d'autre n'est rangé : ni la
+  //    base, ni `/api/`. Pas gardée et pas de réseau ⇒ 404 (la vignette sans photo).
+  if (url.pathname === '/hl-photo') {
+    event.respondWith((async () => {
+      try {
+        if (req.mode === 'navigate') return new Response('', { status: 404 });
+        const u = url.searchParams.get('u') || '';
+        if (!estPhotoGardable(u)) return new Response('', { status: 404 });
+        const c = await caches.open(CACHE_PHOTOS);
+        const cle = '/hl-photo?u=' + encodeURIComponent(u);
+        const hit = await c.match(cle);
+        if (hit) return hit;
+        const demandeDeVrm = req.destination === 'image' || req.headers.get('x-vrm-hl-photo') === '1';
+        if (demandeDeVrm) {
+          const res = await fetch(u, { mode: 'no-cors', credentials: 'omit', referrerPolicy: 'no-referrer' });
+          if (res && (res.ok || res.type === 'opaque')) {
+            try {
+              await c.put(cle, res.clone());
+              const cles = await c.keys();
+              for (const k of cles.slice(0, Math.max(0, cles.length - PHOTOS_MAX))) await c.delete(k);
             } catch (_) {}
           }
           return res;

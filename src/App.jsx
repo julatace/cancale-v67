@@ -669,6 +669,7 @@ import { DEMANDE_OUVRIR_ACHAT, candidatsPasEnLigne, jugerPasEnLigne, presentsDe 
 import './styles-inventaire.css'; // (8 nov.) style de ./InventaireStock.jsx, gardé à sa place (son écran est chargé à la demande)
 import { LIGNE_INVENTAIRE, enCours as inventaireEnCours, enregistrerInventaire, fusionnerInventaire, normaliserInventaire, saisiesVivantes as inventaireSaisies } from "./inventaire.js";
 import { lireAttendu, degelerAttendu, cleAttente as cleAttenteInventaire } from "./inventaireHorsLigne.js";
+import { lireLectureHl as lireStockHl, oublierPhotosHl } from "./stockHorsLigne.js";   // (13 nov., point 45) le Stock sans réseau
 import { CACHE_PDF, garderPdf, lirePdfGarde, lignesPdfPhoto, estLigneBordereau } from "./bordereauxHorsLigne.js";
 import { enLigneDeuxFois, texteCarte as texteEnLigneDeuxFois, raisonPasSu as raisonPasSuEnLigne } from "./enLigneDeuxFois.js";
 import { useAvisBas, AvisBasDetail, titreAvisBas, detailAvisBas } from "./AvisNegatifJournee.jsx";   // (11 nov., lot avis-negatif) la carte « Avis 2★ reçu »
@@ -2474,6 +2475,8 @@ const wipeLocalData = () => {
   try { if (typeof caches !== 'undefined') caches.delete(CACHE_QR).catch(() => {}); } catch (_) {}
   // (9 nov.) Et les bordereaux gardés pour le hors connexion (src/bordereauxHorsLigne.js).
   try { if (typeof caches !== 'undefined') caches.delete(CACHE_PDF).catch(() => {}); } catch (_) {}
+  // (13 nov., point 45) Et les photos déjà vues du Stock (src/stockHorsLigne.js).
+  try { oublierPhotosHl(); } catch (_) {}
   // (10 nov., lot K) Et les listes gardées sur l'appareil (src/copieLignes.js).
   try { effacerCopies(); } catch (_) {}
   // (11 nov., revue de sécurité) Le cache des ventes/achats de l'onglet vit dans
@@ -60350,7 +60353,9 @@ function AppCoeur() {
             La pastille dit « Hors ligne · vu à hh:mm » ou « N gestes en attente » (src/gestesHorsLigne.js). */}
         <GestesHorsLigneCoque tab={tab} ongletDedie={horsLigne && ONGLETS_HL_DEDIES.includes(tab)}/>
         {horsLigne && ONGLETS_HL_DEDIES.includes(tab) ? <JourneeHorsLigne tab={tab} uid={(authState.user && authState.user.id) || (MULTI_USER ? '' : 'local')}/> : (<>
-        {horsLigne && tab === 'garage' ? <div data-hors-ligne="stock-inventaire"><BlocInventaireHorsLigne uid={(authState.user && authState.user.id) || (MULTI_USER ? '' : 'local')}/></div> : null}
+        {/* (13 nov., point 45) Le Stock se dessine hors réseau avec son dernier état (et son propre inventaire) : ce bloc ne
+            sert plus qu'à un appareil où le Stock n'a pas encore été gardé (la liste de l'inventaire du 9 nov. suffit). */}
+        {horsLigne && tab === 'garage' && !lireStockHl((authState.user && authState.user.id) || (MULTI_USER ? '' : 'local'), localStorage) ? <div data-hors-ligne="stock-inventaire"><BlocInventaireHorsLigne uid={(authState.user && authState.user.id) || (MULTI_USER ? '' : 'local')}/></div> : null}
         {baseKO && !horsLigne && <BaseInjoignable/>}
         {!baseKO && !horsLigne && <MentionCopie/>}   {/* (11 nov.) hors ligne, la pastille dit déjà « vu à hh:mm » */}
         {/* (11 nov., temps réel) La veille des lignes écrites par l'extension (src/tempsReel.js) : ce qui
