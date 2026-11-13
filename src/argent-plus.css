@@ -23,6 +23,7 @@ html body .vrm-ap-carte button.vrm-ap-saisir { min-height: 44px; padding: 0 4px;
 html body button.vrm-ap-ligne { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; padding: 0 4px; margin: 2px 0 6px; border: 0; background: transparent; font: 500 15px/1.3 var(--vrm-police, inherit); color: var(--vrm-ink, #1D1D1F); text-align: left; cursor: pointer; }
 html body button.vrm-ap-ligne:disabled { cursor: default; opacity: 1; }
 .vrm-ap-ligne-t { min-width: 0; font-variant-numeric: tabular-nums; }
+.vrm-ap-ligne-est { color: var(--vrm-muted, #6E6E73); font-weight: 400; white-space: nowrap; }
 .vrm-ap-ligne-f { color: var(--vrm-muted, #6E6E73); font-size: 18px; }
 
 .vrm-ap-cout { display: flex; flex-direction: column; gap: 10px; min-width: 0; }

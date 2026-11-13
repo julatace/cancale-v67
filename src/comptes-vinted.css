@@ -1,0 +1,22 @@
+/* (13 nov., lot 36-27) « Tes comptes Vinted » — src/ComptesVinted.jsx. Neutre (§7) : aucune couleur. */
+.vrm-stats-vitrine .vrm-cv-carte .vrm-sv-carte-tete { align-items: center; flex-wrap: wrap; }
+.vrm-cv-periode { flex: 0 0 auto; }
+.vrm-cv-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-variant-numeric: tabular-nums; }
+.vrm-cv-table th, .vrm-cv-table td { padding: 9px 6px; border-top: 1px solid var(--vrm-line); text-align: right; font-size: 14px; color: var(--vrm-ink); vertical-align: top; overflow-wrap: anywhere; }
+.vrm-cv-table thead th { border-top: 0; font-size: 12px; font-weight: 600; color: var(--vrm-muted); line-height: 1.25; }
+.vrm-cv-table th:first-child { width: 30%; padding-left: 0; text-align: left; }
+.vrm-cv-table tbody th { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-cv-table td { font-weight: 500; }
+.vrm-cv-table td:last-child, .vrm-cv-table th:last-child { padding-right: 0; }
+.vrm-cv-notes { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
+.vrm-cv-notes .vrm-sv-note { margin: 0; }
+/* Téléphone : un compte = une ligne de quatre chiffres sous son nom (libellé au-dessus du chiffre). */
+@media (max-width: 560px) {
+  .vrm-cv-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .vrm-cv-table, .vrm-cv-table tbody { display: block; }
+  .vrm-cv-table tr { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); column-gap: 8px; padding: 10px 0; border-top: 1px solid var(--vrm-line); }
+  .vrm-cv-table tbody tr:first-child { border-top: 0; }
+  .vrm-cv-table tbody th { grid-column: 1 / -1; width: auto; padding: 0 0 4px; border: 0; font-size: 15px; }
+  .vrm-cv-table td { padding: 0; border: 0; text-align: left; font-size: 15px; font-weight: 600; }
+  .vrm-cv-table td::before { content: attr(data-lib); display: block; font-size: 11px; font-weight: 500; color: var(--vrm-muted); line-height: 1.3; margin-bottom: 2px; }
+}

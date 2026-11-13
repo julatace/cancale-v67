@@ -41,6 +41,7 @@ function usePrevision(liveStats, releveFourni) {
 const attrsPrev = (P) => ({
   'data-prev-etat': P.etat, 'data-prev-jours': String(P.jours), 'data-prev-centre': P.centre == null ? '' : String(P.centre),
   'data-prev-bas': P.bas == null ? '' : String(P.bas), 'data-prev-haut': P.haut == null ? '' : String(P.haut),
+  'data-prev-mode': P.mode || undefined, 'data-prev-cumul': P.cumul == null ? '' : String(P.cumul),
   'data-prev-partiel': P.partiel ? '1' : undefined, 'data-prev-manques': P.manques.join(' | ') || undefined,
 });
 
@@ -93,7 +94,7 @@ export function PrevisionLigne({ liveStats, onOuvrir = null }) {
   const court = P.manques.length ? ` (${P.manques.length === 1 ? T.manque : 'partiel'})` : '';
   return (
     <button type="button" className="vrm-ap-ligne" data-argent-plus="prevision-ligne" {...attrsPrev(P)} onClick={onOuvrir || undefined} disabled={!onOuvrir}>
-      <span className="vrm-ap-ligne-t">{T.ligne}{court}</span>
+      <span className="vrm-ap-ligne-t">{T.ligne}{court} <span className="vrm-ap-ligne-est" data-prev-estimation="">· estimation</span></span>
       {onOuvrir ? <span aria-hidden="true" className="vrm-ap-ligne-f">›</span> : null}
     </button>
   );
