@@ -84,9 +84,9 @@
   "ventes": {
    "nom": "Ventes",
    "neuf": {
-    "lectures": 180,
-    "octets": 3502822,
-    "doublons": 30,
+    "lectures": 179,
+    "octets": 3502820,
+    "doublons": 28,
     "entieres": 0,
     "js": 1966,
     "doublonsParAdresse": {
@@ -109,27 +109,25 @@
      "app_data?id=in.(vc_ventes,vc_messages,vc_achats,vc_listings,vc_offres)&select=id,ventes:data->ventes,compteur:data->compteur,compteurs:data->compteurs,achats:data->achats,liens:data->liens,offres:data->offres|": 2,
      "app_data?id=in.(vinted_listing_dates,vinted_lbc_posted,panel_accounts_off,panel_colis_collected,panel_colis_relais,panel_a_confirmer,panel_bords_done,panel_buyprices)&select=id,data|": 2,
      "app_data?id=like.coffre_*&meta->>recreeDe=not.is.null&select=id,r:meta->>recreeDe|": 2,
-     "app_data?id=like.colis_suivi_*&select=id,suivi:meta->>suivi,transporteur:meta->>transporteur,cp:meta->>codePostal,tx:meta->>tx,uid:meta->>uid,at:meta->>at&order=id.asc|0-999": 2,
      "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
      "app_data?id=like.email_bord_*&select=id,uid:meta->>uid,type:meta->>type,suivi:meta->>suivi,modele:meta->>modele,numero:meta->>numero,taille:meta->>taille,account:meta->>account,article:meta->>article,filename:meta->>filename,posKnown:meta->>posKnown,dateLimite:meta->>dateLimite,receivedAt:meta->>receivedAt,transaction:meta->>transaction,transporteur:meta->>transporteur,transporteurPdf:meta->>transporteurPdf,suiviPdf:meta->>suiviPdf,pdfLu:meta->>pdfLu&order=id.asc|0-999": 2,
-     "app_data?id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi,transporteur:meta->>transporteur,cap:meta->>capturedAt,dt:data->dernier->>t,dat:data->dernier->>at,de:data->etapes->0->>t,rn:meta->>relaisNom,rr:meta->>relaisRue,rc:meta->>relaisCp,rv:meta->>relaisVille,ae:meta->>arriveeEstimee&order=id.asc|0-999": 2,
      "app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId|": 2,
      "vinted_accounts?select=id,owner,vinted_user_id,login,domain,created_at,updated_at&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
     }
    },
    "neuf_mesure": {
-    "lectures": 156,
-    "octets": 3045932,
-    "doublons": 29,
+    "lectures": 155,
+    "octets": 3045930,
+    "doublons": 27,
     "entieres": 0,
     "js": 1787
    },
    "deuxieme": {
-    "lectures": 174,
-    "octets": 635895,
-    "doublons": 30,
+    "lectures": 173,
+    "octets": 629751,
+    "doublons": 28,
     "entieres": 0,
-    "js": 1688,
+    "js": 20,
     "doublonsParAdresse": {
      "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
@@ -150,18 +148,16 @@
      "app_data?id=in.(vc_ventes,vc_messages,vc_achats,vc_listings,vc_offres)&select=id,ventes:data->ventes,compteur:data->compteur,compteurs:data->compteurs,achats:data->achats,liens:data->liens,offres:data->offres|": 2,
      "app_data?id=in.(vinted_listing_dates,vinted_lbc_posted,panel_accounts_off,panel_colis_collected,panel_colis_relais,panel_a_confirmer,panel_bords_done,panel_buyprices)&select=id,data|": 2,
      "app_data?id=like.coffre_*&meta->>recreeDe=not.is.null&select=id,r:meta->>recreeDe|": 2,
-     "app_data?id=like.colis_suivi_*&select=id,suivi:meta->>suivi,transporteur:meta->>transporteur,cp:meta->>codePostal,tx:meta->>tx,uid:meta->>uid,at:meta->>at&order=id.asc|0-999": 2,
      "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
      "app_data?id=like.email_bord_*&select=id,uid:meta->>uid,type:meta->>type,suivi:meta->>suivi,modele:meta->>modele,numero:meta->>numero,taille:meta->>taille,account:meta->>account,article:meta->>article,filename:meta->>filename,posKnown:meta->>posKnown,dateLimite:meta->>dateLimite,receivedAt:meta->>receivedAt,transaction:meta->>transaction,transporteur:meta->>transporteur,transporteurPdf:meta->>transporteurPdf,suiviPdf:meta->>suiviPdf,pdfLu:meta->>pdfLu&order=id.asc|0-999": 2,
-     "app_data?id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi,transporteur:meta->>transporteur,cap:meta->>capturedAt,dt:data->dernier->>t,dat:data->dernier->>at,de:data->etapes->0->>t,rn:meta->>relaisNom,rr:meta->>relaisRue,rc:meta->>relaisCp,rv:meta->>relaisVille,ae:meta->>arriveeEstimee&order=id.asc|0-999": 2,
      "app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId|": 2,
      "vinted_accounts?select=id,owner,vinted_user_id,login,domain,created_at,updated_at&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
     }
    },
    "deuxieme_mesure": {
-    "lectures": 151,
-    "octets": 552952,
-    "doublons": 29,
+    "lectures": 150,
+    "octets": 547609,
+    "doublons": 27,
     "entieres": 0,
     "js": 18
    }
@@ -280,10 +276,8 @@
      "app_data?id=in.(vc_ventes,vc_messages,vc_achats,vc_listings,vc_offres)&select=id,ventes:data->ventes,compteur:data->compteur,compteurs:data->compteurs,achats:data->achats,liens:data->liens,offres:data->offres|": 2,
      "app_data?id=in.(vinted_listing_dates,vinted_lbc_posted,panel_accounts_off,panel_colis_collected,panel_colis_relais,panel_a_confirmer,panel_bords_done,panel_buyprices)&select=id,data|": 2,
      "app_data?id=like.coffre_*&meta->>recreeDe=not.is.null&select=id,r:meta->>recreeDe|": 2,
-     "app_data?id=like.colis_suivi_*&select=id,suivi:meta->>suivi,transporteur:meta->>transporteur,cp:meta->>codePostal,tx:meta->>tx,uid:meta->>uid,at:meta->>at&order=id.asc|0-999": 2,
      "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
      "app_data?id=like.email_bord_*&select=id,uid:meta->>uid,type:meta->>type,suivi:meta->>suivi,modele:meta->>modele,numero:meta->>numero,taille:meta->>taille,account:meta->>account,article:meta->>article,filename:meta->>filename,posKnown:meta->>posKnown,dateLimite:meta->>dateLimite,receivedAt:meta->>receivedAt,transaction:meta->>transaction,transporteur:meta->>transporteur,transporteurPdf:meta->>transporteurPdf,suiviPdf:meta->>suiviPdf,pdfLu:meta->>pdfLu&order=id.asc|0-999": 2,
-     "app_data?id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi,transporteur:meta->>transporteur,cap:meta->>capturedAt,dt:data->dernier->>t,dat:data->dernier->>at,de:data->etapes->0->>t,rn:meta->>relaisNom,rr:meta->>relaisRue,rc:meta->>relaisCp,rv:meta->>relaisVille,ae:meta->>arriveeEstimee&order=id.asc|0-999": 2,
      "app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId|": 2,
      "vinted_accounts?select=id,owner,vinted_user_id,login,domain,created_at,updated_at&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
     }
@@ -296,11 +290,11 @@
     "js": 1787
    },
    "deuxieme": {
-    "lectures": 189,
+    "lectures": 187,
     "octets": 627493,
-    "doublons": 32,
+    "doublons": 29,
     "entieres": 0,
-    "js": 1746,
+    "js": 20,
     "doublonsParAdresse": {
      "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
      "app_data?id=eq.ebay_listings&select=items:data->items,capturedAt:data->>capturedAt|": 2,
@@ -323,18 +317,16 @@
      "app_data?id=in.(vc_ventes,vc_messages,vc_achats,vc_listings,vc_offres)&select=id,ventes:data->ventes,compteur:data->compteur,compteurs:data->compteurs,achats:data->achats,liens:data->liens,offres:data->offres|": 2,
      "app_data?id=in.(vinted_listing_dates,vinted_lbc_posted,panel_accounts_off,panel_colis_collected,panel_colis_relais,panel_a_confirmer,panel_bords_done,panel_buyprices)&select=id,data|": 2,
      "app_data?id=like.coffre_*&meta->>recreeDe=not.is.null&select=id,r:meta->>recreeDe|": 2,
-     "app_data?id=like.colis_suivi_*&select=id,suivi:meta->>suivi,transporteur:meta->>transporteur,cp:meta->>codePostal,tx:meta->>tx,uid:meta->>uid,at:meta->>at&order=id.asc|0-999": 2,
      "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
      "app_data?id=like.email_bord_*&select=id,uid:meta->>uid,type:meta->>type,suivi:meta->>suivi,modele:meta->>modele,numero:meta->>numero,taille:meta->>taille,account:meta->>account,article:meta->>article,filename:meta->>filename,posKnown:meta->>posKnown,dateLimite:meta->>dateLimite,receivedAt:meta->>receivedAt,transaction:meta->>transaction,transporteur:meta->>transporteur,transporteurPdf:meta->>transporteurPdf,suiviPdf:meta->>suiviPdf,pdfLu:meta->>pdfLu&order=id.asc|0-999": 2,
-     "app_data?id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi,transporteur:meta->>transporteur,cap:meta->>capturedAt,dt:data->dernier->>t,dat:data->dernier->>at,de:data->etapes->0->>t,rn:meta->>relaisNom,rr:meta->>relaisRue,rc:meta->>relaisCp,rv:meta->>relaisVille,ae:meta->>arriveeEstimee&order=id.asc|0-999": 2,
      "app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId|": 2,
      "vinted_accounts?select=id,owner,vinted_user_id,login,domain,created_at,updated_at&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
     }
    },
    "deuxieme_mesure": {
-    "lectures": 164,
+    "lectures": 162,
     "octets": 545646,
-    "doublons": 31,
+    "doublons": 28,
     "entieres": 0,
     "js": 18
    }
@@ -680,6 +672,14 @@
     "emails"
    ],
    "raison": "intégration 12nov-a (branches du second agent) : saisie rapide lit les transactions (ventes → annonces) à chaque ouverture pour les ventes sans prix d'achat, temps réel, veille, messages, sécurité des comptes ; JS des lots"
+  },
+  {
+   "date": "2026-11-13",
+   "ecrans": [
+    "ventes",
+    "achats"
+   ],
+   "raison": "source unique : suivis lus une fois pour tous les moteurs (lot agent2-source-unique)"
   }
  ]
 }

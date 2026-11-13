@@ -530,6 +530,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **13 nov. · Source unique (second agent)** : ventes, achats, suivis et dates de versement en UNE copie pour tous les `Comptabilite` montés (`src/magasinPartage.js`) ; chiffres 35/35, lectures en baisse (budget abaissé), lecture KO sans perte (banc `source-unique`) ; une date de versement lue ne redevient jamais vide (banc `versements-course`) ; pas de gain de vitesse prouvé, publieur pas fait. `2026-11-13-source-unique.md`. Geste : aucun.
 - **13 nov. · Moteur-compta (second agent)** : moins de calculs refaits, chiffres 35/35 ; < 2 s non atteint (2–3 `Comptabilite` par écran). `2026-11-13-moteur-compta.md`. Geste : aucun.
 - **12 nov. · G2 (5.368), 12nov-a (5.369), 12nov-b, vert-vitesse, vitesse-volume, extension 5.372 (discrétion, boutique, favoris par compte, une prudence par compte) en ligne** : `2026-11-12-*.md`. Geste : installer 5.372.0 ; migration 042 (facultative).
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
