@@ -108,6 +108,8 @@ const exempleActif = (pg) => pg.evaluate(() => (typeof window.__vrmExemple === '
 const ecranRempli = (pg) => pg.evaluate(() => { const m = document.querySelector('.vrm-main'); return m ? m.textContent.replace(/\s+/g, ' ').length : 0; });
 
 async function entrerDepuis(o, sel, T, X) {
+  // Un banc ne meurt pas, il rapporte : sans le geste, on le dit et on s'arrête là.
+  if (!(await o.pg.$(sel))) { dit(false, `${T} ${X} le geste « ${sel} » existe`); return false; }
   o.journal.prochaine = 'exemple';
   await Promise.all([o.pg.waitForNavigation({ waitUntil: 'domcontentloaded' }).catch(() => {}), o.pg.click(sel)]);
   await o.pg.waitForSelector('[data-exemple-bandeau]', { timeout: 25000 }).catch(() => {});
@@ -122,6 +124,7 @@ async function entrerDepuis(o, sel, T, X) {
   const versBase = o.journal.base.filter((r) => r.phase === 'exemple');
   dit(versBase.length === 0, `${T} ${X} AUCUNE requête vers la base ni /api pendant l'exemple (lecture comprise)`, JSON.stringify(versBase.slice(0, 5)));
   dit(!(await deborde(o.pg)), `${T} ${X} rien ne déborde`);
+  return true;
 }
 
 async function depuisAccueil(nav, W, theme) {
@@ -138,7 +141,7 @@ async function depuisAccueil(nav, W, theme) {
   dit(!!(await o.pg.$('[data-section="fin"] [data-cta="exemple-fin"][href="/?exemple"]')), `${T} X1 le même geste en bas de page`);
   dit(!(await deborde(o.pg)), `${T} X1 rien ne déborde`);
   await capture(o.pg, `ex-${W}-${theme}-1-accueil`);
-  await entrerDepuis(o, '[data-cta="exemple"]', T, 'X2');
+  if (!(await entrerDepuis(o, '[data-cta="exemple"]', T, 'X2'))) { await o.ctx.close(); return; }
   await capture(o.pg, `ex-${W}-${theme}-2-exemple`);
   // X3 — « Créer mon compte » ⇒ l'inscription, l'exemple disparaît.
   o.journal.prochaine = 'apres';
