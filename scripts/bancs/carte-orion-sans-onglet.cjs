@@ -23,6 +23,10 @@
 //  Orion), le formulaire vit dans l'IFRAME de l'extension (une autre origine :
 //  la page n'entend aucune touche) ; cadre muet ⇒ cette carte en < 2 s ; cadre
 //  détourné par la page ⇒ jamais montré ; Orion ⇒ aucun iframe tenté.
+//  5.362 (revue, moyenne 69) : la carte DESSINÉE (Orion, cadre muet) vit dans le
+//  DOM du site — un écouteur de touches de la page entendrait chaque lettre. Elle
+//  ne propose donc PLUS AUCUN mot de passe : code par e-mail, Google, Discord.
+//  Le mot de passe reste proposé dans l'iframe de l'extension seulement.
 //  `--badge chemin --src chemin --retour chemin --ext dossier` : d'autres copies (preuve §6.1).
 // ════════════════════════════════════════════════════════════════════════════
 const { chromium } = require('playwright');
@@ -151,6 +155,8 @@ const lire = (pg) => pg.evaluate(() => {
     champsPage: document.querySelectorAll('input').length,
     champsCarte: r ? r.querySelectorAll('input').length : 0,
     mdpVisible: vis(q('#vrm-cx-mdp')),
+    // 5.362 : la moindre trace d'un mot de passe dans la carte dessinée (champ, bascule, libellé).
+    mdpPresent: r ? !!(r.querySelector('input[type="password"], #vrm-cx-mdp, [data-basculer-mode]') || /mot de passe/i.test((r.querySelector('.connexion') || {}).innerHTML || '')) : false,
     autocomplete: r ? [...r.querySelectorAll('input')].map((i) => i.getAttribute('autocomplete')) : [],
     hauteurs: r ? [...r.querySelectorAll('.connexion input, .connexion button')].filter(vis).map((x) => Math.round(x.getBoundingClientRect().height)) : [],
     fondPrincipal: cs(q('[data-principal]')) ? cs(q('[data-principal]')).backgroundColor : '',
@@ -293,8 +299,9 @@ const lireDansCadre = (fr) => fr.evaluate(() => {
     dit(l.iframes === 0, 'aucun iframe', 'iframes : ' + l.iframes);
     dit(l.champsPage === 1 && l.champsCarte === 1 && !l.mdpVisible, 'un seul champ (l’e-mail), dans la carte ; aucun dans le DOM du site ; le mot de passe replié', JSON.stringify({ page: l.champsPage, carte: l.champsCarte, mdp: l.mdpVisible }));
     const od = l.ordre;
-    dit(od.mail != null && od.code > od.mail && od.mdp > od.code && od.google > od.mdp && od.discord > od.google,
-      'ordre : e-mail · « Me connecter avec un code » · « J’ai un mot de passe » · Google · Discord', JSON.stringify(od));
+    dit(od.mail != null && od.code > od.mail && od.google > od.code && od.discord > od.google,
+      'ordre : e-mail · « Me connecter avec un code » · Google · Discord', JSON.stringify(od));
+    dit(od.mdp === null && !l.mdpPresent, 'carte dessinée (5.362) : AUCUN mot de passe proposé — ni champ, ni « J’ai un mot de passe »', JSON.stringify({ mdp: od.mdp, present: l.mdpPresent }));
     dit(/Me connecter avec un code/.test(l.principal), 'le bouton principal est « Me connecter avec un code »', l.principal);
     dit(l.fournisseurs === 'google,discord' && l.oauth === 'meme-onglet' && l.boutonsFourn === 2, 'Orion (sans petite fenêtre) : Google ET Discord sont là, dans le même onglet', JSON.stringify({ f: l.fournisseurs, o: l.oauth, n: l.boutonsFourn }));
     await pg.waitForTimeout(6500);
@@ -303,7 +310,7 @@ const lireDansCadre = (fr) => fr.evaluate(() => {
     for (const scheme of ['light', 'dark']) {
       await pg.emulateMedia({ colorScheme: scheme }); await pg.waitForTimeout(150);
       l = await lire(pg);
-      dit(l.hauteurs.length >= 5 && l.hauteurs.every((x) => x >= 44), `${scheme} : champ et boutons de 44 px au moins`, JSON.stringify(l.hauteurs));
+      dit(l.hauteurs.length >= 4 && l.hauteurs.every((x) => x >= 44), `${scheme} : champ et boutons de 44 px au moins`, JSON.stringify(l.hauteurs));
       dit(l.fondPrincipal === (scheme === 'dark' ? 'rgb(10, 132, 255)' : 'rgb(0, 113, 227)'), `${scheme} : le bouton principal au bleu Apple, le seul accent`, l.fondPrincipal);
       dit(l.tailleChamp === '16px' && !l.deborde && l.largeur <= 358, `${scheme} : champ en 16 px (iOS ne zoome pas), une colonne, rien ne déborde`, JSON.stringify({ t: l.tailleChamp, largeur: l.largeur, deborde: l.deborde }));
       await pg.screenshot({ path: path.join(SORTIE, `carte-orion-formulaire-${scheme}.png`) });
@@ -366,26 +373,25 @@ const lireDansCadre = (fr) => fr.evaluate(() => {
     await o.ctx.close();
   });
 
-  console.log('\n── Orion : « J’ai un mot de passe »');
-  await essaie('mot de passe', async () => {
+  console.log('\n── Orion : jamais de mot de passe dans la carte dessinée — on se connecte par code (5.362)');
+  await essaie('sans mot de passe', async () => {
     const f = fond();
     const o = await onglet(nav, f); await allerVinted(o);
     const { pg } = o;
     await pg.tap('#vrm-badge'); await pg.waitForTimeout(600);
     await taper(pg, '#vrm-cx-mail', 'julien@exemple.fr');
-    await toucher(pg, '[data-basculer-mode]'); await pg.waitForTimeout(200);
     let l = await lire(pg);
-    dit(l.mode === 'mdp' && l.mdpVisible && l.champsCarte === 2 && l.autocomplete.every((a) => a === 'off') && /julien@exemple\.fr/.test(await pg.evaluate(() => window.__racine.querySelector('#vrm-cx-mail').value)),
-      'le champ mot de passe se déplie, l’e-mail est gardé, autocomplete="off"', JSON.stringify({ mode: l.mode, ac: l.autocomplete }));
-    await taper(pg, '#vrm-cx-mdp', 'mauvais');
-    await pg.keyboard.press('Enter'); await pg.waitForTimeout(500);
+    dit(l.mode === 'code' && !l.mdpPresent && l.champsCarte === 1, 'e-mail tapé : toujours le code, aucun champ ni bouton « mot de passe » à déplier', JSON.stringify({ mode: l.mode, present: l.mdpPresent, champs: l.champsCarte }));
+    await pg.keyboard.press('Enter'); await pg.waitForTimeout(600);
     l = await lire(pg);
-    dit(/incorrect/i.test(l.erreur) && !f.store.vrmSession, 'mauvais mot de passe : « incorrect » dit dans la carte, rien rangé', l.erreur);
-    await taper(pg, '#vrm-cx-mdp', 'bon-mot-de-passe');
-    await pg.keyboard.press('Enter'); await pg.waitForTimeout(700);
+    dit(f.gt.j.otp.length === 1 && f.gt.j.otp[0].email === 'julien@exemple.fr' && f.gt.j.otp[0].create_user === false && f.gt.j.login.length === 0,
+      '« Entrée » demande un CODE (/otp, create_user:false) ; aucune connexion par mot de passe tentée', JSON.stringify({ otp: f.gt.j.otp, login: f.gt.j.login.length }));
+    dit(l.mode === 'saisie' && !l.mdpPresent, 'les cases du code, toujours aucun mot de passe', JSON.stringify({ mode: l.mode, present: l.mdpPresent }));
+    await taper(pg, '#vrm-cx-code', CODE_BON);
+    await toucher(pg, '[data-code-valider]'); await pg.waitForTimeout(800);
     l = await lire(pg);
-    dit(!!(f.store.vrmSession && f.store.vrmSession.refresh_token) && /julien@exemple\.fr/.test(l.carte) && /compte_banc/.test(l.carte) && /C’est fait/.test(l.carte), 'bon mot de passe : session rangée, la carte nomme les comptes', resume(l));
-    dit(nullePart(f, o, 'bon-mot-de-passe') && aucuneOuverture(f, o, l), 'le mot de passe n’est rangé nulle part ; aucun onglet, aucune fenêtre');
+    dit(!!(f.store.vrmSession && f.store.vrmSession.refresh_token) && /julien@exemple\.fr/.test(l.carte) && /compte_banc/.test(l.carte) && /C’est fait/.test(l.carte), 'bon code : session rangée, la carte nomme les comptes', resume(l));
+    dit(nullePart(f, o, CODE_BON) && aucuneOuverture(f, o, l), 'le code n’est rangé nulle part ; aucun onglet, aucune fenêtre');
     await pg.screenshot({ path: path.join(SORTIE, 'carte-orion-connecte-light.png') });
     await o.ctx.close();
     const o2 = await onglet(nav, f, { scheme: 'dark' }); await allerVinted(o2);
@@ -528,6 +534,8 @@ const lireDansCadre = (fr) => fr.evaluate(() => {
     const l = await lireCadre(pg);
     dit(l.formTop && l.cadre === 'repli' && l.iframes === 0 && dt < 2000, `repli en ${dt} ms (< 2 s) : le formulaire dessiné dans la carte, plus d’iframe`, JSON.stringify({ form: l.formTop, cadre: l.cadre, n: l.iframes, dt }));
     dit(aucuneOuverture(f, o, { ouverts: l.ouverts }) && !o.messages.includes('lierAvecVRM'), 'jamais d’onglet, jamais « Se connecter avec VRM »', JSON.stringify(f.ouvertures.tabs));
+    const sansMdp = await lire(pg);
+    dit(sansMdp.form && !sansMdp.mdpPresent, 'repli dessiné (5.362) : aucun mot de passe proposé, le code seulement', JSON.stringify({ form: sansMdp.form, present: sansMdp.mdpPresent }));
     await o.ctx.close();
   });
 

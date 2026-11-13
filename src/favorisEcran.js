@@ -113,6 +113,7 @@ export const RAISONS_ECRAN={
   limite_heure:{texte:'limite d’actions de l’heure atteinte',geste:'Tu pourras les renvoyer dans une heure.'},
   vinted_frein:{texte:'Vinted a demandé de ralentir'},
   vinted_robot:{texte:'Vinted a parlé d’activité automatisée'},
+  tout_arrete:{texte:'« Tout arrêter » : offre faite, message pas parti'},
   vinted_refus:{texte:'Vinted a refusé l’envoi'},
   historique:{texte:'VRM n’a pas pu relire la conversation avant d’écrire'},
   ecran_quitte:{texte:'l’écran a été quitté avant l’envoi',geste:'Renvoie-les en gardant cet écran ouvert.'},
@@ -133,7 +134,7 @@ const CODE_RAISON={
   vendue:'vendue',article_vendu:'vendue',reservee:'reservee',en_pause:'en_pause',fermee:'fermee',annonce_absente:'annonce_absente',
   destinataire_non_prouve:'destinataire',identite_non_confirmee:'destinataire',
   expire:'expire',essais_epuises:'essais_epuises',offre_refusee:'offre_refusee',offre_prix_inconnu:'offre_prix_inconnu',offre_incertaine:'offre_incertaine',creation_non_confirmee:'ouverture',
-  quota_extension:'limite_heure',pause_vinted:'vinted_frein',vinted_frein:'vinted_frein',vinted_robot:'vinted_robot',vinted_refus:'vinted_refus',
+  quota_extension:'limite_heure',pause_vinted:'vinted_frein',tout_arrete:'tout_arrete',trop_tard:'interrompu',vinted_frein:'vinted_frein',vinted_robot:'vinted_robot',vinted_refus:'vinted_refus',
   historique_non_verifie:'historique',ecran_inactif:'ecran_quitte',onglet_vinted:'onglet_vinted',
   compte_vinted_absent:'compte_vinted_absent',compte_vinted_different:'compte_vinted_different',
   extension_indisponible:'extension',session_extension:'session_extension',autorisation_expiree:'arrete',
@@ -362,7 +363,9 @@ export function filtrerArticles(cartes,filtre){
 // et l'offre sur le prix d'un article réel quand VRM le connaît.
 //   personnaliser, prixOffre : les fonctions de src/favorisMessage.js (règle unique).
 export function apercuMessageFavori({message='',offre=null,exemple=null,personnaliser,prixOffre}={}){
-  const texte=message?personnaliser(message,exemple?.pseudo||'',()=>0):'';
+  // (5.370) {article} et {prix} aussi : le titre de l'exemple et le prix de l'offre (sinon de l'article).
+  const pxEx=Number(exemple?.prix);const pxOffre=offre&&offre.mode&&Number.isFinite(pxEx)&&pxEx>0?prixOffre(pxEx,offre):null;
+  const texte=message?personnaliser(message,exemple?.pseudo||'',()=>0,{article:exemple?.titre||'',prix:pxOffre!=null?pxOffre:(Number.isFinite(pxEx)&&pxEx>0?pxEx:null)}):'';
   let offreTxt='';
   if(offre&&offre.mode){
     const prix=Number(exemple?.prix);

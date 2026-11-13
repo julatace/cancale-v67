@@ -100,6 +100,11 @@ async function controles(SRC, dit) {
     const s = fauxSites(o.sites || {});
     const f = faireFond(Object.assign({ src: SRC, onglets: ongletsDe(), lignes: Object.assign(lignesBase(), o.lignes || {}), store: storeDe(o) }, o.fond || {}));
     f.ctx.__vrmPausesVues = [];
+    // (12 nov., 5.356+) Le délai des requêtes à la base (`signalDelai`, 10–20 s par `setTimeout`) :
+    // le banc ramène tout minuteur à 2 ms, la fausse base répond en 3 ms ⇒ des lectures/écritures
+    // « coupées » au hasard. Cet audit juge les PAGES de l'historique, pas ce délai (jugé par
+    // audit-robustesse-extension F1/F2) : sans signal ici.
+    if (typeof f.ctx.signalDelai === 'function') f.ctx.signalDelai = () => undefined;
     f.ctx.chrome.tabs.sendMessage = (id, m) => (m && m.__vmrEvt ? Promise.resolve() : s.repondre(id, m));
     return { f, s };
   };

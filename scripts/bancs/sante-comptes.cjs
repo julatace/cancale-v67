@@ -175,7 +175,7 @@ const publier = async (pg) => {
           await pg.click('[data-sc-compte="222"] [data-sc-pourquoi]');
           await pg.waitForTimeout(300);
           const i = await pg.evaluate(() => [...document.querySelectorAll('[data-sc-compte="222"] [data-sc-ind]')].map((x) => ({ k: x.getAttribute('data-sc-ind'), lu: x.getAttribute('data-sc-lu'), al: x.getAttribute('data-sc-alerte'), t: x.innerText })));
-          dit(i.length === 7, 'Pourquoi ? : les 7 points se lisent', String(i.length));
+          dit(i.length === 8 && i.some((x) => x.k === 'freins'), 'Pourquoi ? : les 7 points + les freins de Vinted (5.370) se lisent', String(i.length));
           const r = i.find((x) => x.k === 'retards') || {}, an = i.find((x) => x.k === 'annulees') || {}, av = i.find((x) => x.k === 'avisBas') || {}, no = i.find((x) => x.k === 'note') || {};
           dit(r.al === '1' && /2 sur 3 colis/.test(r.t) && /date limite lue/.test(r.t), 'Pourquoi ? : retards 2 sur 3, seuil et source (« date limite lue ») écrits', r.t);
           dit(an.al === '1' && /3 sur 6/.test(an.t) && /qui a annulé/.test(an.t), 'Pourquoi ? : annulations 3 sur 6, « Vinted ne dit pas qui a annulé »', an.t);

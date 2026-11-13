@@ -102,7 +102,9 @@ export function ligneJournal(e, { numeroDeItem, nomCompte } = {}) {
   if (!article && c.tx) article = 'commande ' + c.tx;
   if (!article && c.lbc) article = 'annonce Leboncoin ' + c.lbc;
   const compte = e && e.compte ? ((nomCompte && nomCompte(e.compte)) || (e.compte === 'principal' ? 'compte eBay principal' : null)) : null;
-  const titre = ((e && e.type === 'ebay_action' && e.action) ? e.action : (LIBELLES_TYPE[e && e.type] || 'Action')) + (e && e.auto === true ? ' (auto)' : '');
+  const titre = ((e && e.type === 'ebay_action' && e.action) ? e.action : (LIBELLES_TYPE[e && e.type] || 'Action')) + (e && e.auto === true ? ' (auto)' : '')
+    // (12 nov., ext. 5.369) La version du message envoyée (n°, jamais le texte).
+    + (e && Number.isInteger(e.variante) && e.variante >= 1 && e.variante <= 5 ? ` · version ${e.variante}` : '');
   // (10 nov., lot G) Les prix notés par l'extension : « 60 € → 54 € » ou « 52 € » (jamais deviné).
   const eur = (n) => `${Number(n).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} €`;
   const px = e && e.prix && typeof e.prix === 'object' ? e.prix : null;

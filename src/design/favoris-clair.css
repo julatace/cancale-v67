@@ -148,3 +148,23 @@
 .vrm-fc-marche-ligne:last-child { border-bottom: 0; }
 .vrm-fc-marche-ligne b { color: var(--fu-encre); font-weight: 600; text-align: right; }
 .vrm-fc-geste.is-neutre { background: var(--fu-case); color: var(--fu-encre); }
+
+/* (12 nov., ext. 5.372) QUI : par compte, une liste du plus récent au plus ancien, une case par favori */
+.vrm-fpc-compte { display: flex; flex-direction: column; gap: 6px; }
+.vrm-fpc-compte + .vrm-fpc-compte, .vrm-fpc-autres { margin-top: 10px; }
+.vrm-fpc-autres { display: flex; flex-direction: column; gap: 6px; }
+.vrm-fpc-tete { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
+.vrm-fpc-tete-texte { display: flex; flex-direction: column; min-width: 0; }
+.vrm-fpc-tete-texte strong { font: 700 16px/1.25 var(--vrm-police); color: var(--fu-encre); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-fpc-tete-texte small { font: 500 13px/1.3 var(--vrm-police); color: var(--fu-gris); }
+.vrm-fpc-tout { flex: none; min-height: 44px; }
+.vrm-fpc-resume { list-style: none; cursor: pointer; }
+.vrm-fpc-resume::-webkit-details-marker { display: none; }
+.vrm-fpc-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.vrm-fpc-label { display: flex; align-items: center; gap: 10px; min-height: 64px; padding: 6px 8px 6px 0; border-radius: 14px; cursor: pointer; min-width: 0; }
+.vrm-fpc-label.is-fixe { cursor: default; padding-left: 8px; }
+.vrm-fpc-ligne.is-choisie .vrm-fpc-label { background: var(--fu-case); }
+@media (hover: hover) { .vrm-fpc-label:not(.is-fixe):hover { background: var(--fu-case); } }
+.vrm-fpc-case { flex: none; width: 44px; height: 44px; display: grid; place-items: center; }
+.vrm-fpc-case input { width: 24px; height: 24px; margin: 0; accent-color: var(--fu-bleu); cursor: pointer; }
+.vrm-fpc-case input:focus-visible { outline: 2px solid var(--fu-bleu-texte, var(--fu-bleu)); outline-offset: 2px; }

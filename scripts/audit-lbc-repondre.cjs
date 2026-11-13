@@ -75,14 +75,17 @@ const URL_FIL = `https://api.leboncoin.fr/api/messaging/proxy/api/hal/${U1}/conv
         return r.fulfill({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': 'https://www.leboncoin.fr', 'access-control-allow-credentials': 'true', 'access-control-allow-headers': '*' }, body: JSON.stringify(body) });
       });
       await p.goto('https://www.leboncoin.fr/messages/id/' + CONV);
-      await p.addScriptTag({ content: 'window.__msgs=[];window.addEventListener("message",(e)=>{if(e.data&&e.data.__tag==="CANCALE_LBC")window.__msgs.push(e.data)});' });
+      // 5.362 (moyennes 60, 63) : les ordres, leurs résultats et la recette passent par le CANAL PRIVÉ
+      // que lbc-inject.js remet au relais (ici, ce banc joue le relais : il prend le port).
+      await p.addScriptTag({ content: 'window.__msgs=[];window.__surCanal=[];window.addEventListener("message",(e)=>{if(e.data&&e.data.__tag==="CANCALE_LBC")window.__msgs.push(e.data);if(!window.__canal&&e.data&&e.data.__tag==="CANCALE_LBC_CANAL"&&e.ports&&e.ports[0]){window.__canal=e.ports[0];window.__canal.onmessage=(m)=>{if(m.data&&m.data.__tag==="CANCALE_LBC"){window.__msgs.push(Object.assign({__canal:true},m.data));for(const f of window.__surCanal)f(m.data);}};}});' });
       await p.addScriptTag({ content: inj });
       await p.evaluate(() => window.postMessage({ __tag: 'CANCALE_LBC_RELAY', kind: 'pret' }, '*'));
       return { c, p, recues, msgs: (k) => p.evaluate((kk) => window.__msgs.filter((m) => m.kind === kk), k) };
     };
     const ordre = (A, o) => A.p.evaluate(async (oo) => {
-      const p = new Promise((ok) => { window.addEventListener('message', (e) => { if (e.data && e.data.__tag === 'CANCALE_LBC' && e.data.kind === 'lbcenvoiresultat' && e.data.jeton === oo.jeton) ok(e.data); }); setTimeout(() => ok(null), 4000); });
-      window.postMessage(Object.assign({ __tag: 'CANCALE_LBC_ORDRE', kind: 'repondre' }, oo), '*');
+      const p = new Promise((ok) => { window.__surCanal.push((d) => { if (d.kind === 'lbcenvoiresultat' && d.jeton === oo.jeton) ok(d); }); setTimeout(() => ok(null), 4000); });
+      if (!window.__canal) return null;
+      window.__canal.postMessage(Object.assign({ __tag: 'CANCALE_LBC_ORDRE', kind: 'repondre' }, oo));
       return p;
     }, o);
     const A = await ouvrir(U1);

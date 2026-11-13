@@ -11,6 +11,12 @@
 // ⚠️ AUCUNE CATÉGORIE N'EST DEVINÉE : eBay la propose à partir du titre, et une
 //    catégorie fausse fait plus de mal que pas de catégorie du tout.
 (function () {
+  // 5.361 (revue, 110-115 — famille « minuteries et écouteurs orphelins ») :
+  // une minuterie permanente de la page s'ARRÊTE quand l'extension a été mise à
+  // jour ou retirée (`chrome.runtime.id` disparu) — sinon elle tournait pour
+  // rien jusqu'à la fermeture de l'onglet, à côté de la nouvelle copie.
+  const extVivante = () => { try { return !!(chrome.runtime && chrome.runtime.id); } catch (_) { return false; } };
+  const minuterieVivante = (fn, ms) => { const id = setInterval(() => { if (!extVivante()) { clearInterval(id); return; } try { const r = fn(); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch (_) {} }, ms); return id; };
   if (window.__vrmEbayLoaded) return; window.__vrmEbayLoaded = true;
   // §8 : chaque relevé porte la VERSION de l'extension qui l'a écrit, sinon une
   // étape manquante me fait deviner « défaut ou version trop ancienne ».
@@ -437,7 +443,7 @@
   auto();
   // eBay est une application à page unique : l'URL change sans rechargement.
   let derniere = location.href;
-  setInterval(() => {
+  minuterieVivante(() => {
     if (location.href === derniere) return;
     derniere = location.href; essais = 0; faits = 0; arrete = false;
     auto();

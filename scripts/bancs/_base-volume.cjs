@@ -22,7 +22,11 @@ const { metaVersData } = require('./_meta.cjs');
 // dates (un avant/après lancé à dix minutes d'écart ne doit pas voir une vente
 // changer de jour). Les dates de capture, elles, restent « il y a une minute »
 // (`frais`) : la règle « en ligne » exige une lecture de moins de 24 h.
+// (13 nov., intégration) Le DERNIER midi passé, jamais un midi à venir : avant 12 h, « midi aujourd'hui »
+// datait les ventes dans le futur et l'app relisait les commandes (budget-vitesse rouge chaque matin,
+// mesuré : main 3709 Ko au lieu de 2896 Ko à 0 h 40, vert en reculant l'horloge de 12 h).
 const midi = new Date(); midi.setHours(12, 0, 0, 0);
+if (midi.getTime() > Date.now()) midi.setDate(midi.getDate() - 1);
 const NOW = midi.getTime();
 const iso = (msAgo) => new Date(NOW - msAgo).toISOString();
 const frais = (msAgo) => new Date(Date.now() - msAgo).toISOString();

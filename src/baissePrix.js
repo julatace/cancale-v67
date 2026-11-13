@@ -50,10 +50,14 @@ export function prixBaisse(prix, baisse) {
 // chaîne. `plancherDe(a)` → le résultat de `plancherVente` (centimes) ou null.
 // Chaque ligne : { …a, nouveau, plancher, sousPlancher, bloque, coche } ;
 // `bloque` (phrase) ⇒ elle ne part JAMAIS (autre compte, prix pas lu, baisse impossible).
+// (12 nov., ext. 5.370 — discrétion, point 12) `facteurs` : { id: 0,8…1,2 } — SON choix varié
+// par annonce (src/discretion.js, `facteursBaisse`) ; la baisse VUE est dans `baisseVue`. Une
+// variation qui passerait sous le plancher est remontée AU plancher (si son choix, lui, ne
+// passait pas dessous) : jamais sous le plancher à cause du hasard.
 // (11 nov., lot lbc-plus) `site` : 'leboncoin' pour la même feuille sur Leboncoin (les
 // phrases du compte à ouvrir) ; une annonce portant `propose: false` n'est pas cochée
 // par défaut (la liste proposée vient des statistiques, src/lbcPlus.js) — il la coche s'il veut.
-export function lignesBaisse({ annonces, baisse, compteOnglet, plancherDe, site = 'vinted' } = {}) {
+export function lignesBaisse({ annonces, baisse, compteOnglet, plancherDe, facteurs = null, site = 'vinted' } = {}) {
   const lbc = site === 'leboncoin';
   const L = Array.isArray(annonces) ? annonces : [];
   return L.filter((a) => a && a.id != null).map((a) => {
@@ -65,14 +69,20 @@ export function lignesBaisse({ annonces, baisse, compteOnglet, plancherDe, site 
     else if (!compteOnglet) bloque = `Ouvre ${lbc ? 'leboncoin.fr' : 'vinted.fr'} sur ${nom}`;
     else if (String(compteOnglet) !== uid) bloque = `Ouvre ${nom} sur ${lbc ? 'Leboncoin' : 'Vinted'}`;
     const prix = cts(a.prix) > 0 ? cts(a.prix) / 100 : null;
-    const nouveau = prix == null ? null : prixBaisse(prix, baisse);
+    const f = facteurs && Number.isFinite(Number(facteurs[String(a.id)])) ? Number(facteurs[String(a.id)]) : 1;
+    const baisseL = baisse && baisse.ok && f !== 1 ? { ...baisse, valeur: Math.round(baisse.valeur * f * 100) / 100 } : baisse;
+    let nouveau = prix == null ? null : prixBaisse(prix, baisseL);
     if (!bloque && prix == null) bloque = 'Prix pas lu';
     else if (!bloque && baisse && baisse.ok && nouveau == null) bloque = 'Baisse plus grande que le prix';
     const p = plancherDe ? plancherDe(a) : null;
     const plancher = p && (p.etat === 'ok' || p.etat === 'partiel') && p.plancher != null ? { centimes: p.plancher, partiel: p.etat === 'partiel' } : null;
+    if (plancher && nouveau != null && f !== 1 && nouveau * 100 < plancher.centimes) {
+      const base = prixBaisse(prix, baisse);
+      if (base != null && base * 100 >= plancher.centimes) nouveau = Math.max(nouveau, Math.ceil(plancher.centimes / 100));
+    }
     const sousPlancher = !!(plancher && nouveau != null && nouveau * 100 < plancher.centimes);
     const achatPasSaisi = !!(p && p.etat === 'achat');
-    return { ...a, uid, prix, nouveau, plancher, sousPlancher, achatPasSaisi, bloque, coche: !bloque && nouveau != null && !sousPlancher && a.propose !== false };
+    return { ...a, uid, prix, nouveau, plancher, sousPlancher, achatPasSaisi, bloque, coche: !bloque && nouveau != null && !sousPlancher && a.propose !== false, baisseVue: baisseL && baisseL.ok ? baisseL.valeur : null };
   });
 }
 
@@ -85,7 +95,7 @@ export function comptesAOuvrir(lignes) {
 
 // Ce qui arrête TOUTE la série (le suivant serait refusé pour la même raison, ou
 // on ne sait plus ce qui se passe) — jamais « on continue quand même ».
-const ARRET_SERIE = new Set(['plafond', 'plafond-bordereaux', 'vinted-pause', 'frein-refus', 'onglet-vinted', 'vinted-absent', 'vinted-autre', 'autre-compte', 'stockage', 'perime', 'confirmation', 'absente',
+const ARRET_SERIE = new Set(['plafond', 'plafond-bordereaux', 'plafond-jour', 'verification', 'vinted-pause', 'frein-refus', 'onglet-vinted', 'vinted-absent', 'vinted-autre', 'autre-compte', 'stockage', 'perime', 'confirmation', 'absente',
   // (11 nov., lot lbc-plus) Leboncoin : la suivante serait refusée pour la même raison.
   'lbc-pause', 'lbc-absent', 'pas-appris', 'pas-rejouable', 'entetes', 'en-cours']);
 

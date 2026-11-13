@@ -55,6 +55,7 @@ export const SEUILS = Object.freeze({
   restreintJ: 7,          // une restriction de moins de 7 jours compte encore
   fraicheH: 48,           // lecture du profil de plus de 48 h ⇒ « ancienne » (dit, jamais une alerte)
   minLus: 3,              // « en forme » seulement si 3 indicateurs au moins sont lus
+  freinsRefus: 2,         // (12 nov., ext. 5.370) 2 refus 403/429 de Vinted sur 7 j, ou une vérification / un arrêt
 });
 
 // L'ORDRE des raisons (la plus grave d'abord) — LA raison de l'état est la première qui passe.
@@ -68,7 +69,21 @@ export const GESTES = Object.freeze({
   avisBas: '?tab=stats',
   note: '?tab=stats',
   delai: '?tab=ventes',
+  freins: '?tab=settings&section=discretion',
 });
+// (12 nov., ext. 5.370 — discrétion, point 14) LES FREINS DE VINTED SUR 7 JOURS : refus 403/429,
+// pauses, vérifications (captcha), prudences, notés par l'extension (champ `ev` de
+// `actions_compte_…`, réunis par `carnetDuCompte`, src/discretion.js). Un point de PLUS, rangé
+// après les autres raisons (l'ordre des sept reste celui d'avant) ; il ne compte pas dans
+// « N points lus » (le carnet n'existe qu'à partir de l'extension 5.370).
+export const FREINS = 'freins';
+function indicFreins(c) {
+  if (c === undefined) return pasLu('freins', 'encours');
+  if (!c) return pasLu('freins', 'freins');
+  const refus = (Number(c.n403) || 0) + (Number(c.n429) || 0);
+  return { k: 'freins', lu: true, valeur: Number(c.total) || 0, refus, pauses: Number(c.pauses) || 0, captchas: Number(c.captchas) || 0, prudences: Number(c.prudences) || 0, dernier: c.dernier || null,
+    tendance: null, alerte: (Number(c.captchas) || 0) > 0 || refus >= SEUILS.freinsRefus };
+}
 
 const str = (v) => String(v == null ? '' : v);
 const fini = (x) => typeof x === 'number' && Number.isFinite(x);
@@ -244,7 +259,7 @@ function indicFraicheur(c, maintenant) {
 // etats : `panel_comptes_etat.comptes` ({ uid: { etat, at } }) · moderation : { uid: { e } }
 // envois : `lireEnvois` (null = pas publié) · ventes : les ventes Vinted (`useVentesCoque`)
 // ko : comptes dont la lecture des ventes a raté (aucun chiffre de ventes pour eux)
-export function santeComptes({ comptes = [], profils, etats, moderation, envois, ventes, ko = [], estAnnulee = () => false, maintenant = Date.now() } = {}) {
+export function santeComptes({ comptes = [], profils, etats, moderation, envois, ventes, ko = [], estAnnulee = () => false, maintenant = Date.now(), freins } = {}) {
   const N = notesParCompte({ profils, comptes, maintenant, nDernieres: 20 });
   const parUid = new Map((N.comptes || []).map((c) => [c.uid, c]));
   const hist = new Map((Array.isArray(profils) ? profils : []).filter((p) => p && p.uid).map((p) => [str(p.uid), p.hist]));
@@ -264,14 +279,15 @@ export function santeComptes({ comptes = [], profils, etats, moderation, envois,
       annulees: indicAnnulees(mesVentes, estAnnulee, maintenant),
       moderation: indicModeration(etat, moderation && typeof moderation === 'object' ? moderation[uid] : null, maintenant),
       fraicheur: indicFraicheur(c, maintenant),
+      freins: indicFreins(freins === undefined ? undefined : (freins && typeof freins === 'object' ? (freins[uid] === undefined ? null : freins[uid]) : null)),
     };
     const lus = INDICATEURS.filter((k) => k !== 'fraicheur' && ind[k].lu).length;
-    const raisonK = ORDRE.find((k) => ind[k].alerte) || null;
+    const raisonK = ORDRE.find((k) => ind[k].alerte) || (ind.freins.alerte ? FREINS : null);
     const etatCompte = raisonK ? 'surveiller' : (lus >= SEUILS.minLus && (ind.note.lu || ind.delai.lu)) ? 'forme' : 'passu';
     return {
       uid, nom: cpt.nom || (c && c.nom) || uid, etat: etatCompte,
       raison: raisonK ? { k: raisonK, ...ind[raisonK], geste: GESTES[raisonK] } : null,
-      alertes: ORDRE.filter((k) => ind[k].alerte),
+      alertes: ORDRE.filter((k) => ind[k].alerte).concat(ind.freins.alerte ? [FREINS] : []),
       lus, sur: INDICATEURS.length - 1, indicateurs: ind,
     };
   });

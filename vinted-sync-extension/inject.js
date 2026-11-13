@@ -16,6 +16,33 @@
   window.__cancaleVintedInjected = true;
 
   const TAG = 'CANCALE_VINTED';
+  // ⚠️⚠️ 5.356 (revue de robustesse, critique 4) — UN CANAL PRIVÉ AVEC content.js.
+  //    Avant : tout passait par `window.postMessage(…, '*')`, que N'IMPORTE QUEL
+  //    script de la page (pub, tiers, faille) peut écouter ET imiter — un faux
+  //    `label` rangeait un faux bordereau (= preuve de vente, §5), un faux
+  //    `harvest` de fausses ventes, une fausse `suppression`, une fausse recette
+  //    « apprise », une pause forcée. Désormais : dès le chargement (document_start,
+  //    AVANT tout script de la page), un `MessageChannel` ; son second port est
+  //    remis UNE fois à content.js, qui ne croit plus que ce port. Un script de
+  //    la page n'a pas `canal` (fermeture) : il ne peut ni écrire au fond ni lire
+  //    ce qui y part. (Sans MessageChannel — bancs en vm — on retombe sur
+  //    `window.postMessage`, que content.js n'écoute plus : rien n'est relayé.)
+  let canal = null;
+  try {
+    const mc = new MessageChannel();
+    canal = mc.port1;
+    window.postMessage({ __tag: 'CANCALE_VINTED_CANAL' }, location.origin, [mc.port2]);
+  } catch (_) { canal = null; }
+  const versContent = (m, origineCible) => {
+    try { if (canal) canal.postMessage(m); else window.postMessage(m, origineCible || '*'); } catch (_) {}
+  };
+  const ecoutesCanal = [];
+  const surCanal = (fn) => { ecoutesCanal.push(fn); };
+  if (canal) {
+    try {
+      canal.onmessage = (e) => { const d = e && e.data; if (!d || typeof d !== 'object') return; for (const f of ecoutesCanal) { try { f(d); } catch (_) {} } };
+    } catch (_) {}
+  }
 
   // Endpoints dont on veut garder la reponse, avec le "type" de donnee associe.
   // ⚠️ Motifs volontairement TOLÉRANTS à la version d'API (v2, v3, …). Vinted a
@@ -139,9 +166,7 @@
     return null;
   };
 
-  const post = (payload) => {
-    try { window.postMessage(Object.assign({ __tag: TAG }, payload), '*'); } catch (_) {}
-  };
+  const post = (payload) => { versContent(Object.assign({ __tag: TAG }, payload)); };
 
   // Bind the native creation to the exact favorite link the user opened.
   // Passive observation only; no navigation and no message is initiated here.
@@ -192,12 +217,13 @@ function suivreFavoriAffiche(cible,activer=false){
  const inspection={liensFavoris:tous.filter(x=>x.url&&item(x.url)).length,memeArticle:tous.filter(x=>x.url&&item(x.url)===article).length,exacts:exacts.length,visibles:liens.length,natifsMemeArticle:natifsArticle.length,natifs:candidats.length,natifsVisibles:candidatsVisibles.length};
  if(exacts.length){
   if(liens.length!==1)return {trouve:false,inspection};
-  if(activer){liens[0].a.scrollIntoView({block:'center'});liens[0].a.click();}
+  // 5.356 : aucun clic synthétique (§3, isTrusted:false) — le lien est MONTRÉ, c'est SON clic qui l'ouvre.
+  if(activer){liens[0].a.scrollIntoView({block:'center'});liens[0].a.style.outline='3px solid #F5A623';liens[0].a.style.outlineOffset='2px';}
   return {trouve:true,inspection};
  }
  // Exactly one visible candidate; two (even same href) is refused, as above.
  if(candidatsVisibles.length!==1)return {trouve:false,inspection};
- if(activer){candidatsVisibles[0].a.scrollIntoView({block:'center'});candidatsVisibles[0].a.click();}
+ if(activer){candidatsVisibles[0].a.scrollIntoView({block:'center'});candidatsVisibles[0].a.style.outline='3px solid #F5A623';candidatsVisibles[0].a.style.outlineOffset='2px';}
  return {trouve:true,inspection,natif:candidatsVisibles[0].n};
 }
 // Semantic native controls only. No guessed CSS class, router or API call.
@@ -223,23 +249,25 @@ function clocheFavorisNative(activer=false,origine){
  if(boutons.length!==1)return {etat:boutons.length?'ambigue':'absente'};
  const b=boutons[0];if(b.disabled||b.getAttribute('aria-disabled')==='true')return {etat:'indisponible'};
  const ouverte=b.getAttribute('aria-expanded')==='true';
- if(activer&&!ouverte)b.click();
- return {etat:ouverte?'deja_ouverte':activer?'activee':'disponible'};
+ // 5.356 : jamais de clic synthétique sur la cloche (§3) — elle est entourée, c'est SON clic qui l'ouvre.
+ if(activer&&!ouverte){b.scrollIntoView({block:'center'});b.style.outline='3px solid #F5A623';b.style.outlineOffset='2px';}
+ return {etat:ouverte?'deja_ouverte':'disponible'};
 }
 
   // Navigation relay for browsers without scripting. No eval or network request.
   const navFavorisReponses=new Map();
-  window.addEventListener('message',event=>{
-    const m=event.data;if(window.top!==window||event.source!==window||!m||m.__tag!=='CANCALE_VINTED_FAVORI_REQ'||!/^f[a-f0-9]{32}$/.test(String(m.id||'')))return;
+  // 5.356 : la demande n'arrive plus que par le canal privé (jamais un message de la page).
+  surCanal(m=>{
+    if(window.top!==window||!m||m.__tag!=='CANCALE_VINTED_FAVORI_REQ'||!/^f[a-f0-9]{32}$/.test(String(m.id||'')))return;
     if(!['sonder','ouvrir','cloche_sonder','cloche_ouvrir'].includes(m.action))return;
     let u;try{u=new URL(m.cible);if(u.origin!==location.origin||!lienContexteFavori(u.href))return;}catch{return;}
     const ancien=navFavorisReponses.get(m.id);
-    if(ancien){if(ancien.action===m.action&&ancien.cible===u.href)window.postMessage(ancien.reponse,location.origin);return;}
+    if(ancien){if(ancien.action===m.action&&ancien.cible===u.href)versContent(ancien.reponse,location.origin);return;}
     let resultat;
     try{resultat=m.action.startsWith('cloche_')?clocheFavorisNative(m.action==='cloche_ouvrir',u.origin):suivreFavoriAffiche(u.href,m.action==='ouvrir');}catch{return;}
     const reponse={__tag:'CANCALE_VINTED_FAVORI_REP',id:m.id,origine:location.origin,resultat};
     navFavorisReponses.set(m.id,{action:m.action,cible:u.href,reponse});while(navFavorisReponses.size>64)navFavorisReponses.delete(navFavorisReponses.keys().next().value);
-    window.postMessage(reponse,location.origin);
+    versContent(reponse,location.origin);
   });
   let lastCsrf = null; // dernier x-csrf-token vu (réutilisé pour la moisson active)
   let lastAnon = null; // dernier x-anon-id vu
@@ -498,10 +526,16 @@ function clocheFavorisNative(activer=false,origine){
     const avecChemins = seenDirty && (seenPaths.size || Object.keys(seenRep).length);
     if (!avecChemins && !relConvDirty) return;
     seenDirty = false;
-    let conversation = relConvDirty ? JSON.parse(JSON.stringify(relConv)) : null;
-    // Trop gros pour le fond (il jette au-delà de 200 000 caractères) : on retire
-    // les formes de tête, jamais celles des messages.
-    if (conversation && JSON.stringify(conversation).length > 180000) for (const e of Object.values(conversation.req || {})) delete e.tete;
+    // 5.361 (revue, 106) : une valeur non sérialisable faisait lever à CHAQUE
+    // passage (minuterie) et `relConvDirty` ne retombait jamais ⇒ plus aucun
+    // `seen_urls`. Désormais la copie ratée est jetée et le drapeau retombe.
+    let conversation = null;
+    try {
+      conversation = relConvDirty ? JSON.parse(JSON.stringify(relConv)) : null;
+      // Trop gros pour le fond (il jette au-delà de 200 000 caractères) : on retire
+      // les formes de tête, jamais celles des messages.
+      if (conversation && JSON.stringify(conversation).length > 180000) for (const e of Object.values(conversation.req || {})) delete e.tete;
+    } catch (_) { conversation = null; }
     relConvDirty = false;
     // Les 300 chemins les PLUS RÉCENTS (l'ordre d'insertion d'un Set : le plus
     // ancien d'abord ; garder les premiers jetait ceux qu'on venait de voir).
@@ -1315,183 +1349,41 @@ function nettoyerRelaisSuivi(r) {
     };
   }
 
-  // ── MOISSON ACTIVE (v3.8) ──────────────────────────────────────────────────
-  // Vinted construit désormais le dressing et les commandes CÔTÉ SERVEUR : la
-  // page ne fait plus l'appel /wardrobe/items ni /my_orders, donc il n'y a plus
-  // rien à intercepter passivement. On rétablit la moisson en faisant l'appel
-  // NOUS-MÊMES — mais depuis TON navigateur, TON IP, TA session (cookies inclus
-  // automatiquement). C'est exactement la requête que le site faisait avant :
-  // indistinguable de toi. C'était la piste prévue de longue date (porter les
-  // appels par l'extension plutôt que par l'IP serveur de Vercel).
-  // Garde-fous « profil humain » : au plus une fois toutes les 30 min, seulement
-  // quand l'onglet est visible, un léger délai aléatoire, un seul compte (celui
-  // connecté dans cet onglet). Se rabat en silence si un endpoint a disparu.
-  const ACTIVE_TTL = 30 * 60 * 1000;
-  const jitter = (min, max) => min + Math.random() * (max - min);
-  // ⚠️ 5.162 — L'ARRÊT NET SUR 429 / 403. Cette moisson part DE LA PAGE, hors
-  // de la file du fond : quand Vinted répondait « ralentis » (429) ou « non »
-  // (403), chaque boucle cassait la sienne et la suivante repartait (ventes,
-  // achats, boîte : des dizaines de requêtes après le refus). Désormais le
-  // premier frein ARRÊTE tout ce qui reste de cette moisson, et le fond en est
-  // prévenu (`vintedFrein`) : il pose la même pause que pour ses propres
-  // requêtes. Et une moisson ne DÉMARRE pas pendant une pause : `content.js`
-  // nous transmet sa fin (`CANCALE_VINTED_PAUSE`).
-  let freinVinted = 0;
-  let pauseJusqua = 0;
-  try {
-    window.addEventListener('message', (e) => {
-      try {
-        if (e.source !== window || !e.data || e.data.__tag !== 'CANCALE_VINTED_PAUSE') return;
-        pauseJusqua = Number(e.data.jusqua) || 0;
-      } catch (_) {}
-    }, false);
-  } catch (_) {}
+  // ── MOISSON ACTIVE (v3.8 → retirée de la page en 5.356) ─────────────────
+  // ⚠️⚠️ 5.356 (revue de robustesse, hautes 7-9, 20) — PLUS AUCUNE MOISSON
+  //    LANCÉE PAR LA PAGE. Ici tournait une « moisson active » (profil, dressing
+  //    10 pages, ventes et achats 20 pages, boîte 15 pages) partie de la page HORS
+  //    de la file du fond (`requeteVinted`) : elle passait en même temps que les
+  //    gestes du fond (la règle « une requête Vinted à la fois » tombait), ne
+  //    relisait la pause 429/403 qu'au départ, continuait après une mise à jour de
+  //    l'extension (content.js orphelin, plus de pause reçue), jetait en silence
+  //    un envoi de plus de 800 000 caractères, et rangeait sous le compte lu À LA
+  //    FIN. Le fond fait exactement la même lecture (`pageActiveFetch`), DANS la
+  //    file, pause relue, compte vérifié au début et à la fin. La page ne fait
+  //    plus qu'OBSERVER ce que Vinted lui envoie déjà.
   // ── LE RELAIS DE LA PAGE (20 octobre, Orion iPhone) ──────────────────────
   // Un navigateur sans `scripting` (ou sans monde MAIN) ne peut pas injecter
   // une fonction ici : le fond demande alors UNE requête GET, relayée par
-  // content.js, et on la fait d'ici — exactement ce que la fonction injectée
-  // aurait fait sur Chrome (même page, mêmes cookies). Seulement un chemin
-  // relatif de l'API Vinted, seulement en lecture ; la réponse repart par le
-  // même relais. Sur Chrome personne ne l'appelle.
-  try {
-    window.addEventListener('message', async (e) => {
+  // content.js (par le canal privé, 5.356), et on la fait d'ici — exactement ce
+  // que la fonction injectée aurait fait sur Chrome (même page, mêmes cookies).
+  // Seulement un chemin relatif de l'API Vinted, seulement en lecture ; la
+  // réponse repart par le même canal. Sur Chrome personne ne l'appelle.
+  surCanal(async (d) => {
+    try {
+      if (!d || d.__tag !== 'CANCALE_VINTED_REQ') return;
+      const id = String(d.id || ''), p = String(d.p || '');
+      if (!id || !/^\/(api|web\/api)\//.test(p)) return;
+      const h = {};
+      const src = d.h && typeof d.h === 'object' ? d.h : {};
+      for (const k of Object.keys(src)) if (/^(accept|x-csrf-token)$/i.test(k)) h[k] = String(src[k]);
+      let out = { status: 0, ok: false, json: null };
       try {
-        if (e.source !== window || !e.data || e.data.__tag !== 'CANCALE_VINTED_REQ') return;
-        const id = String(e.data.id || ''), p = String(e.data.p || '');
-        if (!id || !/^\/(api|web\/api)\//.test(p)) return;
-        const h = {};
-        const src = e.data.h && typeof e.data.h === 'object' ? e.data.h : {};
-        for (const k of Object.keys(src)) if (/^(accept|x-csrf-token)$/i.test(k)) h[k] = String(src[k]);
-        let out = { status: 0, ok: false, json: null };
-        try {
-          const r = await window.fetch(p, { credentials: 'include', headers: h });
-          let json = null; try { json = await r.json(); } catch (_) {}
-          out = { status: r.status, ok: r.ok, json };
-        } catch (_) {}
-        window.postMessage({ __tag: 'CANCALE_VINTED_REP', id, status: out.status, ok: out.ok, json: out.json, origine: location.origin }, location.origin);
+        const r = await window.fetch(p, { credentials: 'include', headers: h });
+        let json = null; try { json = await r.json(); } catch (_) {}
+        out = { status: r.status, ok: r.ok, json };
       } catch (_) {}
-    }, false);
-  } catch (_) {}
-  const apiGet = async (path) => {
-    if (freinVinted) return null;                         // Vinted a freiné : plus rien ne part
-    try {
-      const h = { accept: 'application/json' };
-      if (lastCsrf) h['x-csrf-token'] = lastCsrf;
-      if (lastAnon) h['x-anon-id'] = lastAnon;
-      const r = await fetch(path, { credentials: 'include', headers: h });
-      if (r && (r.status === 429 || r.status === 403)) {
-        freinVinted = r.status;
-        post({ kind: 'vintedFrein', statut: r.status });
-        return null;
-      }
-      if (!r || !r.ok) return null;
-      return await r.text();
-    } catch (_) { return null; }
-  };
-  const activeHarvest = async () => {
-    try {
-      if (!/(^|\.)vinted\./i.test(location.host)) return; // uniquement sur Vinted
-      if (document.hidden) return;                        // onglet au premier plan seulement
-      if (Date.now() < pauseJusqua) return;               // Vinted a demandé de ralentir (5.162)
-      freinVinted = 0;                                    // nouvelle moisson, hors pause
-      const KEY = '__cancale_active_ts';
-      let last = 0; try { last = +(localStorage.getItem(KEY) || 0); } catch (_) {}
-      if (Date.now() - last < ACTIVE_TTL) return;
-      try { localStorage.setItem(KEY, String(Date.now())); } catch (_) {}
-      // 1) profil (donne l'ID de dressing, ≠ id de compte).
-      const who = await apiGet('/api/v2/users/current');
-      let pid = null;
-      if (who) { sendHarvest('/api/v2/users/current', who); try { pid = JSON.parse(who).user.id; } catch (_) {} }
-      // 2) annonces en ligne (dressing).
-      if (pid) {
-        await new Promise(r => setTimeout(r, jitter(600, 1500)));
-        // TOUTES les pages : Vinted plafonne per_page (~96 malgre le 200
-        // demande). Un compte de 604 articles ne rendait que sa 1re page, et
-        // l'app croyait le reste disparu.
-        let tout = null;
-        for (let page = 1; page <= 10; page++) {
-          const w = await apiGet(`/api/v2/wardrobe/${pid}/items?page=${page}&per_page=200&order=relevance`);
-          if (!w) break;
-          let j = null; try { j = JSON.parse(w); } catch (_) { break; }
-          const lot = Array.isArray(j.items) ? j.items : null;
-          if (!lot) break;
-          if (!tout) tout = j; else tout.items = tout.items.concat(lot);
-          const tp = j.pagination && j.pagination.total_pages;
-          if (!lot.length || (tp && page >= tp)) break;
-          await new Promise(r => setTimeout(r, jitter(600, 1500)));
-        }
-        if (tout) sendHarvest(`/api/v2/wardrobe/${pid}/items`, JSON.stringify(tout));
-      }
-      // 2b) ⚠️ RETIRÉ — 6 REQUÊTES PAR VISITE POUR RIEN.
-      //     On demandait ici le détail de 6 annonces par passage
-      //     (`GET /api/v2/items/{id}`), avec une pause de 0,9–2,2 s entre
-      //     chacune, en espérant récupérer la DESCRIPTION.
-      //     Le compteur de diagnostic (`panel_diag_capture`, relevé du 24 août)
-      //     est sans appel :
-      //         recu_item = 73   ·   abandon_json_item = 73   ·   ecrit_item = 0
-      //     73 tentatives, 73 échecs, ZÉRO ligne écrite. La cause est connue
-      //     depuis §5.26 : Vinted renvoie sur cette URL une PAGE D'ERREUR HTML
-      //     avec un statut 200, donc `apiGet` la laisse passer et `JSON.parse`
-      //     casse. L'endpoint ne rend plus la fiche, point.
-      //     Ce que ça coûtait à chaque visite sur Vinted : 6 appels inutiles,
-      //     6 à 13 secondes de retard sur la vraie moisson, et 6 requêtes de
-      //     plus dans l'empreinte du compte — le signal qu'on passe justement
-      //     notre temps à réduire (§5, §48).
-      //     ⚠️ Rien n'est perdu : la DESCRIPTION arrive par la lecture de la
-      //     PAGE (`readListingDetailFromPage` → `vinted_item_details`), qui
-      //     fonctionne, et c'est elle que le coffre et « Republier » lisent
-      //     (§5.10, §5.50). Le bouton manuel « 📥 Récupérer le texte »
-      //     (`capterAnnonce`) reste disponible si Vinted rétablit un jour
-      //     l'endpoint — il le dira tout seul en écrivant une ligne.
-      //     NE PAS remettre cette boucle sans avoir vu `ecrit_item > 0`.
-      // 3) ventes + achats — TOUTES les pages (comme le dressing en 2).
-      // ⚠️ Avant : seulement `page=1&per_page=100` → un vendeur de 300 ventes ne
-      // rendait QUE ses 100 dernières, le reste n'arrivait JAMAIS dans l'app.
-      // On concatène toutes les pages en UN SEUL envoi : `storeHarvest` garde la
-      // capture la plus RICHE (`listePlusRiche` compare le nombre d'items), donc
-      // une liste partielle n'écrase jamais une complète — mais il faut lui
-      // donner la liste complète d'un coup, des pages envoyées séparément
-      // s'écraseraient l'une l'autre (pas d'union côté fond). Mêmes garde-fous
-      // que le dressing : une requête à la fois, délai humain entre chacune,
-      // plafond de pages, et tout ça au plus une fois / 30 min (ACTIVE_TTL).
-      // ⚠️ « purchased » et PAS « bought » : ?type=bought renvoie chez certains
-      // comptes les ventes (vérifié en base) → des ventes dans les achats.
-      for (const t of ['sold', 'purchased']) {
-        let tout = null;
-        for (let page = 1; page <= 20; page++) {
-          await new Promise(r => setTimeout(r, jitter(600, 1500)));
-          const o = await apiGet(`/api/v2/my_orders?type=${t}&page=${page}&per_page=100`);
-          if (!o) break;
-          let j = null; try { j = JSON.parse(o); } catch (_) { break; }
-          const lot = Array.isArray(j.my_orders) ? j.my_orders : null;
-          if (!lot) break;
-          if (!tout) tout = j; else tout.my_orders = tout.my_orders.concat(lot);
-          const tp = j.pagination && j.pagination.total_pages;
-          if (lot.length < 100 || !lot.length || (tp && page >= tp)) break;
-        }
-        if (tout) sendHarvest(`/api/v2/my_orders?type=${t}`, JSON.stringify(tout));
-      }
-      // 4) boîte de réception — TOUTES les pages aussi (avant : 50 max).
-      {
-        let tout = null;
-        for (let page = 1; page <= 15; page++) {
-          await new Promise(r => setTimeout(r, jitter(600, 1500)));
-          const inb = await apiGet(`/api/v2/inbox?page=${page}&per_page=50`);
-          if (!inb) break;
-          let j = null; try { j = JSON.parse(inb); } catch (_) { break; }
-          const lot = Array.isArray(j.conversations) ? j.conversations : null;
-          if (!lot) break;
-          if (!tout) tout = j; else tout.conversations = tout.conversations.concat(lot);
-          const tp = j.pagination && j.pagination.total_pages;
-          if (lot.length < 50 || !lot.length || (tp && page >= tp)) break;
-        }
-        if (tout) sendHarvest('/api/v2/inbox', JSON.stringify(tout));
-      }
+      versContent({ __tag: 'CANCALE_VINTED_REP', id, status: out.status, ok: out.ok, json: out.json, origine: location.origin }, location.origin);
     } catch (_) {}
-  };
-  // Lancement différé (laisse la page s'installer et le csrf se capter), puis à
-  // chaque retour au premier plan (throttlé par ACTIVE_TTL).
-  setTimeout(activeHarvest, 6000);
-  try { document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(activeHarvest, 3000); }); } catch (_) {}
+  });
   post({kind:'injectReady'});
 })();

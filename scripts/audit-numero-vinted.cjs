@@ -128,7 +128,8 @@ const resaDe = (f) => f.lignes.panel_num_reserves || null;
     const c = {}; vm.runInNewContext(cn[0] + '\n' + r[0] + '\nthis.f = numerosReserves;', c);
     const now = Date.parse('2026-10-20T12:00:00Z');
     const out = c.f({ attente: { '74': { at: '2026-10-20T11:00:00Z' }, '70': { at: '2026-10-20T05:00:00Z' } }, items: { '10499999999': { numero: '75' } } }, now);
-    dit(out.cles.has('74') && !out.cles.has('70') && out.cles.has('75') && out.parItem['10499999999'] === '75', 'app : réservation de moins de 3 h prise, plus vieille ignorée, annonce liée lue', JSON.stringify([...out.cles]));
+    // 5.356 (revue de robustesse) : une réservation MONTRÉE ne redevient jamais libre avec le temps (§5) — la plus vieille est prise aussi.
+    dit(out.cles.has('74') && out.cles.has('70') && out.cles.has('75') && out.parItem['10499999999'] === '75', 'app : réservations prises quel que soit leur âge (jamais un N° montré redonné), annonce liée lue', JSON.stringify([...out.cles]));
     const vide = c.f(null, now);
     dit(vide.cles.size === 0, 'app : pas de ligne ⇒ aucune réservation');
   });

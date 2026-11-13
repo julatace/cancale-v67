@@ -1,15 +1,18 @@
 {
   "manifest_version": 3,
   "name": "VRM — outil du revendeur",
-  "version": "5.369.0",
+  "version": "5.372.0",
   "description": "Relie tes comptes Vinted, Leboncoin, eBay et Vestiaire à VRM : annonces, ventes, colis et bordereaux, depuis ton navigateur.",
+  "homepage_url": "https://vrm.center",
+  "minimum_chrome_version": "111",
   "permissions": [
     "cookies",
     "storage",
     "alarms",
     "scripting",
     "tabs",
-    "downloads"
+    "downloads",
+    "contextMenus"
   ],
   "host_permissions": [
     "https://*.vinted.fr/*",
@@ -267,7 +270,6 @@
     ]
   },
   "action": {
-    "default_popup": "popup.html",
     "default_title": "VRM",
     "default_icon": {
       "16": "icon-16.png",
@@ -281,5 +283,8 @@
     "32": "icon-32.png",
     "48": "icon-48.png",
     "128": "icon-128.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
   }
 }

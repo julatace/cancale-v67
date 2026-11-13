@@ -57,8 +57,16 @@ function faireCtx() {
       const u = metaVersData(String(url));
       const rep = (ok, body, status) => ({ ok, status: status || (ok ? 200 : 522), json: async () => JSON.parse(body), text: async () => body, headers: { get: () => 'application/json' } });
       if ((opts.method || 'GET') === 'POST') {
-        try { JSON.parse(opts.body || '[]').forEach(r => ecrits.push(r)); } catch (_) {}
-        return rep(true, '', 201);
+        let rows = []; try { rows = JSON.parse(opts.body || '[]'); rows.forEach(r => ecrits.push(r)); } catch (_) {}
+        // 5.362 : une création par comparer-et-échanger (`modifierLigneCas`) attend les lignes créées.
+        return /return=representation/.test(String((opts.headers && opts.headers.Prefer) || '')) ? rep(true, JSON.stringify(rows.map((r) => ({ id: r.id }))), 201) : rep(true, '', 201);
+      }
+      // 5.362 (moyenne 71) : PATCH conditionnel sur `data->>rev` (comparer-et-échanger) — la ligne réécrite est notée.
+      if ((opts.method || 'GET') === 'PATCH') {
+        const mm = /[?&]id=eq\.([a-zA-Z0-9_]+)/.exec(u);
+        let corps = {}; try { corps = JSON.parse(opts.body || '{}'); } catch (_) {}
+        if (mm && corps.data) { ecrits.push({ id: mm[1], data: corps.data }); ligne[mm[1]] = corps.data; }
+        return rep(true, JSON.stringify(mm ? [{ id: mm[1] }] : []));
       }
       // ⚠️ LA VRAIE FORME DE LA PANNE : Cloudflare rend du HTML avec un 522.
       if (lectureKO) return { ok: false, status: 522, json: async () => { throw new Error('HTML'); }, text: async () => '<html>522</html>', headers: { get: () => 'text/html' } };

@@ -73,7 +73,7 @@ function filtreOk(row, u) {
 // `lectureKO(u)` → vrai pour faire échouer une LECTURE de la base (522).
 function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }), lectureKO = () => false, ecritureKO = () => false, retardLecture = () => 0,
   connecte = '111', comptes = null, store = {}, cdn = null, onglets = [{ id: 7, url: 'https://www.vinted.fr/', status: 'complete' }], firefox = null, retirer = null,
-  transporteur = null, vrm = null, permis = undefined, permisAccorde = undefined } = {}) {
+  transporteur = null, vrm = null, permis = undefined, permisAccorde = undefined, vraisComptes = false, globales = null } = {}) {
   // 21 oct. : l'extension exige une session VRM pour toute lecture/écriture (main f9d3245) ; une session de banc par défaut, sauf si l'audit la règle lui-même.
   if (store.vrmSession === undefined && !store.__sansSession) store.vrmSession = { access_token: 'jeton.banc.defaut', refresh_token: 'r', user_id: 'owner-banc', email: 'banc@vrm.test', expires_at: Date.now() + 365*864e5 };
 
@@ -206,12 +206,34 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
       if (/^https:\/\/vrm\.center\/api\//.test(u0)) return appelVrm(u0, opts);
       if (HOTES_TRANSP.test(u0)) return appelTransporteur(u0, opts);
       if (!/\/rest\/v1\//.test(u0)) { j.ailleurs.push({ url: u0, methode: String(opts.method || 'GET').toUpperCase() }); return rep(404, {}); }
+      const prefer = String((opts.headers && (opts.headers.Prefer || opts.headers.prefer)) || '');
       if ((opts.method || 'GET') === 'POST') {
         let rows = []; try { rows = JSON.parse(opts.body || '[]'); } catch (_) {}
         if (rows.some((r) => r && ecritureKO(String(r.id)))) return rep(503, '{}');
+        // 5.356 : `resolution=ignore-duplicates,return=representation` (création
+        // d'une ligne par comparer-et-échanger) — une ligne déjà là n'est PAS
+        // touchée et la réponse est vide, comme PostgREST.
+        if (/ignore-duplicates/.test(prefer)) {
+          const pris = rows.filter((r) => r && r.id != null && lignes[r.id] === undefined);
+          j.posts.push(pris.map((r) => r.id));
+          for (const r of pris) lignes[r.id] = copie(r.data);
+          return /return=representation/.test(prefer) ? rep(201, pris.map((r) => ({ id: r.id }))) : rep(201, '');
+        }
         j.posts.push(rows.map((r) => r.id));
         for (const r of rows) if (r && r.id != null) lignes[r.id] = copie(r.data);
         return rep(201, '');
+      }
+      // 5.356 : PATCH conditionnel (`id=eq.X&data->>rev=eq.N`), comme PostgREST :
+      // seules les lignes qui passent le filtre sont réécrites, la réponse les nomme.
+      if ((opts.method || 'GET') === 'PATCH') {
+        const u = decodeURIComponent(metaVersData(u0));
+        const eq = /[?&]id=eq\.([^&]+)/.exec(u);
+        if (eq && ecritureKO(String(eq[1]))) return rep(503, '{}');
+        if (!eq || lignes[eq[1]] === undefined || !filtreOk({ id: eq[1], data: lignes[eq[1]] }, u)) return /return=representation/.test(prefer) ? rep(200, []) : rep(204, '');
+        let corps = {}; try { corps = JSON.parse(opts.body || '{}'); } catch (_) {}
+        if (corps && corps.data !== undefined) lignes[eq[1]] = copie(corps.data);
+        (j.patchs = j.patchs || []).push(eq[1]);
+        return /return=representation/.test(prefer) ? rep(200, [{ id: eq[1] }]) : rep(204, '');
       }
       if ((opts.method || 'GET') !== 'GET') return rep(204, '');
       const u = decodeURIComponent(metaVersData(u0));
@@ -268,6 +290,10 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
     };
   }
   ctx.self = ctx; ctx.globalThis = ctx; ctx.window = undefined;
+  // 5.361 : `self.addEventListener` du service worker (ex. `unhandledrejection`), noté dans `j.globales`.
+  j.globales = {};
+  ctx.addEventListener = (type, fn) => { (j.globales[type] = j.globales[type] || []).push(fn); };
+  if (globales) Object.assign(ctx, globales);
   // `retirer` (20 octobre) : imite un navigateur à qui il MANQUE des API
   // (Orion iPhone, Safari, Firefox pour Android) — chaque chemin pointé
   // (`alarms`, `windows.update`, `runtime.onMessageExternal`…) est SUPPRIMÉ
@@ -301,7 +327,9 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
   if (firefox && firefox.compat) vm.runInContext(firefox.compat, ctx, { filename: 'compat-firefox.js' });
   vm.runInContext(SRC, ctx, { filename: 'background.js' });
   // Les portes du monde extérieur, remplacées pour COMPTER.
-  ctx.getStoredAccounts = async () => (comptes || [{ vinted_user_id: connecte || '111', login: 'compte_banc', domain: 'www.vinted.fr', access_token: 'jeton' }]).map(a=>({...a,owner:store.vrmSession?.user_id}));
+  // 5.361 : `vraisComptes` garde le VRAI `getStoredAccounts` (lecture de `vinted_accounts`
+  // par la fausse base) — pour juger sa réponse « pas su » (null) ; sinon remplacé comme avant.
+  if (!vraisComptes) ctx.getStoredAccounts = async () => (comptes || [{ vinted_user_id: connecte || '111', login: 'compte_banc', domain: 'www.vinted.fr', access_token: 'jeton' }]).map(a=>({...a,owner:store.vrmSession?.user_id}));
   ctx.activeAccountId = async () => connecte;
   ctx.activeUidForDomain = async () => connecte;
   ctx.noterDiag = async (k) => { j.diags.push(k); };
