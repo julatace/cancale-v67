@@ -177,7 +177,8 @@ const lire = (pg) => pg.evaluate(() => {
         await pg.locator('.vrm-rpf-ligne[data-cc-carte*="41100001"] button[aria-expanded], .vrm-rpf-ligne[data-cc-carte*="41100001"] .vrm-rpf-tap').first().click().catch(() => {});
         await pg.waitForSelector('.vrm-rpf-ligne[data-cc-carte*="41100001"] [data-rp-detail] [data-rp-verifie-texte]', { timeout: 8000 }).catch(() => {});
         const verifDetail = await pg.evaluate(() => { const l = [...document.querySelectorAll('.vrm-rpf-ligne[data-cc-carte]')].find((x) => x.getAttribute('data-cc-carte').includes('41100001')); const v = l && l.querySelector('[data-rp-detail] [data-rp-verifie-texte]'); return v ? v.textContent.trim() : ''; });
-        dit(sansSources && /^vérifié par e-mail/.test(verifDetail), 'F7 la ligne fermée ne porte plus ses sources ; ouverte, son détail dit QUI a vérifié en dernier (« vérifié par e-mail … »)', JSON.stringify({ sansSources, verifDetail }));
+        // (13 nov.) Depuis les finitions du 12 nov., la fiche dit « Vérifié · e-mail, hier 10:01 » (étiquette « Vérifié » + QUI, puis quand) : on juge QUI.
+        dit(sansSources && /^(vérifié par )?e-mail\b/.test(verifDetail), 'F7 la ligne fermée ne porte plus ses sources ; ouverte, son détail dit QUI a vérifié en dernier (« vérifié par e-mail … »)', JSON.stringify({ sansSources, verifDetail }));
         const deb = await pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
         dit(deb <= 1, 'rien ne déborde', `${deb}px`);
         if (SHOTS) {
