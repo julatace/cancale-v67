@@ -13,6 +13,7 @@
 // le même que l'écran Ventes. Module PUR : l'écran et le banc `fiche-paire.cjs`.
 import { beneficePaire, centimes, champsCharges } from './beneficePaire.js';
 import { origineDuPrix } from './fournisseurs.js';
+import { beneficeSiVendue, RAISON_SI_VENDUE } from './dormantes.js';
 
 const str = (v) => String(v == null ? '' : v).trim();
 
@@ -183,10 +184,30 @@ export function parcoursPaire(rn, d = {}, o = {}) {
   } else if (ventesInconnues) { raisonBenef = 'ventes pas lues'; etapes.push({ cle: 'argent', etat: 'passu', titre: 'Argent', detail: 'tes ventes pas toutes lues' }); }
   else etapes.push({ cle: 'argent', etat: 'absent', titre: 'Argent', detail: 'rien de vendu' });
 
+  // (13 nov., point 14) PAS ENCORE VENDUE : le bénéfice si elle se vend au prix AFFICHÉ
+  // (`beneficeSiVendue`, src/dormantes.js — la même règle `beneficePaire`). Le prix est
+  // celui de SON annonce en ligne (par identité : la seule en ligne, ou plusieurs au MÊME
+  // prix) ; deux annonces en ligne à deux prix ⇒ rien de deviné, la raison dite.
+  let siVendue = null;
+  if (!siteVendu && !ventesInconnues) {
+    const enL = rn.annonces.filter((a) => a.etat === 'en-ligne');
+    // Le prix LU dans le dressing (`d.stats[id].prix`, la lecture la plus fraîche), sinon celui de la fiche.
+    const brut = (a) => { const st = a && d.stats ? d.stats[a.id] : null; return st && st.prix != null && st.prix !== '' ? st.prix : (a ? a.price : null); };
+    const prixA = (a) => { const p = brut(a); return p != null && p !== '' ? (typeof p === 'object' ? p.amount : p) : null; };
+    const devA = (a) => { const p = brut(a); return p && typeof p === 'object' ? String(p.currency_code || p.currency || 'EUR').toUpperCase() : 'EUR'; };
+    const laSienne = enL.length === 1 ? enL[0] : (enL.length > 1 && enL.every((a) => String(prixA(a)) === String(prixA(enL[0]))) ? (enL.find((a) => a.id === idFiche) || enL[0]) : null);
+    if (laSienne && devA(laSienne) === 'EUR') { const v = beneficeSiVendue(prixA(laSienne), entree || {}); siVendue = { ...v, raison: v.benefice == null ? (RAISON_SI_VENDUE[v.etat] || '') : '' }; }
+    else if (laSienne) siVendue = { etat: 'prix', prix: null, benefice: null, raison: `annonce en ${devA(laSienne)}` };
+    else if (enL.length > 1) siVendue = { etat: 'prix', prix: null, benefice: null, raison: 'en ligne deux fois, à deux prix' };
+  }
+
   return {
     num: rn.cle, titre, taille: (fiche && fiche.taille) || null, photo: (annonce && annonce.photo) || (fiche && fiche.photo) || null,
     double: !!rn.double, ancienNumero: !!rn.ancienNumero, etat: rn.etat, manques: rn.manques || [],
-    resume: { achat: achatC, vente: venteC, benefice, benefPartiel, raisonBenef },
+    resume: { achat: achatC, vente: venteC, benefice, benefPartiel, raisonBenef, siVendue, venteLib: !venteV && venteE && venteC != null ? 'Reçu' : 'Vente' },
+    // (13 nov.) La fiche qui porte le prix d'achat (l'annonce vendue, sinon celle de ce N°) :
+    // « Saisir le prix d'achat » écrit sur ELLE (identité, §5) — null : aucune fiche.
+    idFiche: idFiche != null ? String(idFiche) : null,
     aPoster, txAPoster: aPoster && venteV ? venteV._tx : null, etapes,
   };
 }

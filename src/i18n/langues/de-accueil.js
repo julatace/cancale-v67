@@ -125,6 +125,7 @@ export default {
   "legal.cgv": "AGB",
   "legal.confidentialite": "Datenschutz",
   "legal.cookies": "Cookies",
+  "legal.confiance": "Was VRM tut — und niemals tut",
   "legal.documents": "Rechtliches",
   "legal.mentions": "Impressum",
   "accueil.moment.messages.alt": "Die Seite Nachrichten in VRM: drei Unterhaltungen aus zwei Konten in einer Liste — „Würdest du 50 € machen?“, „Noch in M verfügbar?“, „Danke, angekommen!“. Beispieldaten.",

@@ -82,7 +82,9 @@ const m=await pg.evaluate(()=>{const top=(e)=>e?Math.round(e.getBoundingClientRe
     titreAch:[...document.querySelectorAll('.vrm-main h1,.vrm-main h2')].some(h=>/^Achats$/.test(h.textContent.trim())&&vis(h)),
     titreMsg:[...document.querySelectorAll('.vrm-main h1,.vrm-main h2')].some(h=>/^Messages$/.test(h.textContent.trim())&&vis(h)),
     recusTop:top(document.querySelector('[data-recus-email]')),colisVentes:!!document.querySelector('[data-colis-section="ventes"]'),navColis:[...document.querySelectorAll('[data-nav-entree="cat_bord"],[data-nav-entree="colis"]')].length,sourcesTop:top(document.querySelector('[data-achats-sources]')),ongletsTop:top(document.querySelector('[data-achats-onglet]')),
-    colis0:top(document.querySelector('[data-achats-onglet]')),convTop:top(document.querySelector('.vrm-msg-search')),convEcart:(()=>{const a=document.querySelector('.vrm-messages-sections'),b=document.querySelector('.vrm-msg-search');return a&&b?Math.round(b.getBoundingClientRect().top-a.getBoundingClientRect().bottom):null;})(),
+    colis0:top(document.querySelector('[data-achats-onglet]')),
+    // (13 nov.) Depuis le 11 nov., Ventes s'ouvre sur « À expédier » et Achats sur « À retirer » : la 1re LIGNE À TRAITER.
+    ligne0:(()=>{const v=[...document.querySelectorAll('.vrm-main [data-bord-card], .vrm-main [data-colis-ligne], .vrm-main .vrm-rpf-ligne[data-cc-carte], .vrm-main [data-toutes-vente]')].filter(e=>e.getClientRects().length&&e.getBoundingClientRect().height>0);return v.length?Math.round(Math.min(...v.map(e=>e.getBoundingClientRect().top))):null;})(),convTop:top(document.querySelector('.vrm-msg-search')),convEcart:(()=>{const a=document.querySelector('.vrm-messages-sections'),b=document.querySelector('.vrm-msg-search');return a&&b?Math.round(b.getBoundingClientRect().top-a.getBoundingClientRect().bottom):null;})(),
     chev:(()=>{const a=document.querySelector('.vrm-day-money [data-recu-mois]'),c=document.querySelector('.vrm-day-money [data-ca-annee]');if(!a||!c)return null;const r1=a.getBoundingClientRect(),r2=c.getBoundingClientRect();return !(r1.bottom<=r2.top+1||r2.bottom<=r1.top+1||r1.right<=r2.left+1||r2.right<=r1.left+1);})(),
     dateCap:(()=>{const d=document.querySelector('.vrm-day-greeting .vrm-day-date');return d&&d.getBoundingClientRect().height>0?getComputedStyle(d).textTransform:null;})(),
     tete:(()=>{const h=document.querySelector('.vrm-day-greeting .vrm-day-hello'),t=document.querySelector('.vrm-day-greeting .vrm-day-todo');if(!h||!t)return null;const a=h.getBoundingClientRect(),b=t.getBoundingClientRect();const mil=(b.top+b.bottom)/2;return mil>=a.top&&mil<=a.bottom?0:Math.round(Math.min(Math.abs(mil-a.top),Math.abs(mil-a.bottom)));})(),
@@ -120,7 +122,7 @@ if(sub==='ventes'){
   // Sous la carte du mois (maquette du 2 nov., voulue) : sur ordinateur, la 1re vente tient dans le
   // premier écran ; au téléphone, la hauteur est rapportée (pas jugée : c'est la maquette).
   dit(m.dateTexte!=null&&!/ [A-ZÉ]\S+$/.test(m.dateTexte),`[${W}] la date s'écrit « … 11 novembre », pas « … 11 Novembre »`,String(m.dateTexte));
-  if(W>=600) dit(T.top!=null&&T.top+56<=950,`[${W}] la première vente est dans le premier écran`,String(T.top));
+  if(W>=600) dit(m.ligne0!=null&&m.ligne0+56<=950,`[${W}] la première ligne à traiter (À expédier, puis les ventes) est dans le premier écran`,String(m.ligne0));
   else console.log(`    [${W}] mesuré : 1re vente à ${T.top} px (écran ${vp.height})`);
 } else if(sub==='achats'){
   dit(m.titres.filter(t=>/^Achats$/.test(t)).length<=1,`[${W}] un seul titre « Achats »`,JSON.stringify(m.titres));
@@ -128,7 +130,7 @@ if(sub==='ventes'){
   dit(m.sourcesTop==null||(m.ongletsTop!=null&&m.sourcesTop>m.ongletsTop&&(m.recusTop==null||m.sourcesTop<=m.recusTop)),`[${W}] « Tes meilleures sources » après la liste d'Achats`,`${m.sourcesTop} / ${m.ongletsTop} / ${m.recusTop}`);
   dit(m.recusTop!=null&&m.ongletsTop!=null&&m.recusTop>m.ongletsTop,`[${W}] les reçus par email passent sous la liste, plus en tête`,`${m.recusTop} / ${m.ongletsTop}`);
   // (11 nov., restes) Sous la carte « Dépensé » (maquette du 2 nov.) : sur ordinateur dans le premier écran ; téléphone rapporté.
-  if(W>=600) dit(m.colis0!=null&&m.colis0+44<=950,`[${W}] les étapes des achats sont dans le premier écran`,String(m.colis0));
+  if(W>=600) dit(m.ligne0!=null&&m.ligne0+44<=950,`[${W}] le premier colis à traiter (À retirer en tête d'Achats) est dans le premier écran`,String(m.ligne0));
   else console.log(`    [${W}] mesuré : étapes des achats à ${m.colis0} px (écran ${vp.height})`);
 } else if(sub==='messages'){
   dit(m.titres.filter(t=>/^Messages$/.test(t)).length<=1,`[${W}] un seul titre « Messages »`,JSON.stringify(m.titres));

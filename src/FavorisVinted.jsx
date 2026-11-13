@@ -12,6 +12,8 @@ import {RAISONS_FAVORIS,progressionFavoris,dureeFavoris} from './favorisProgress
 import {pseudoFavori,itemIdFavori} from './favorisEcran.js';
 import {etatArticleFavori,listeFavorisCompte,selectionEnvoyable} from './favorisParCompte.js';   // (12 nov., ext. 5.372) par compte, une liste
 import {ListeFavoris,TeteCompte,FavorisAutreCompte} from './FavorisListeCompte.jsx';
+import FavorisSansVente from './FavorisSansVente.jsx';   // (13 nov., lot 31) très aimées, pas vendues
+import {annoncesSansVente,favorisAContacter,sousPlancherAchat,lireSeuilFavoris,CLE_FAVORIS_MIN} from './favorisSansVente.js';
 import Pourquoi from './composants/PourquoiReplie.jsx';
 import PageFavoris from './FavorisEtapes.jsx';
 import {detailOffre,morceauxApercu,recapEnvoi,achatsApresMessage,dernierEnvoi,gardeMarge,ceQuiMarche,offresGroupees,prixLot} from './favorisParcours.js';
@@ -316,11 +318,16 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
   const marche=data?ceQuiMarche(jobsVue,ventesH):[];
   const groupes=data?offresGroupees(jobsVue):[];
   const [erreurLancer,setErreurLancer]=React.useState('');
+  // (13 nov., lot 31) N réglable (3 par défaut, retenu sur cet appareil) ; les annonces venues de « Très
+  // aimées » et leur prix d'achat (le plancher achat + 10 % tient jusqu'à l'envoi).
+  const [seuilSv,setSeuilSv]=React.useState(()=>{try{const v=localStorage.getItem(CLE_FAVORIS_MIN);return v?String(lireSeuilFavoris(v)):'3';}catch{return '3';}});
+  const [origines,setOrigines]=React.useState(()=>new Map()),[actifSv,setActifSv]=React.useState('');
+  React.useEffect(()=>{setOrigines(new Map());setActifSv('');},[uid,owner]);
   // (12 nov.) Le refus d'un lancement se DIT sur la page (la phrase du moteur, pas le contrôle copiable, qui
   // ne porte que code et compteurs) ; il s'efface quand le moteur le retire (une nouvelle vérification).
   // Avant : `controleEnvoi.message` n'existait pas ⇒ « Envoyer » refusé ne disait rien (test favoris-historique).
   React.useEffect(()=>{setErreurLancer(controleEnvoi?messageEnvoi:'');},[controleEnvoi,messageEnvoi]);
-  const envoyer=async()=>{if(bloquees.length&&!confirmeMarge)return;setErreurLancer('');await moteur.current?.lancer();};
+  const envoyer=async()=>{if(bloquees.length&&!confirmeMarge)return;if(sousPlancherAchat(recapAnnonces,origines).length)return;setErreurLancer('');await moteur.current?.lancer();};
   const ouvrirEnvoi=()=>{if(!data&&!etat.charge)charger();setEtape('envoi');setFeuille(true);};
   const ouvrirPersonne=id=>{const l=ligneParId.get(id);if(l)ouvrir(l);};
   const sansCompte=!uid||!owner;
@@ -344,13 +351,32 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
       {(autresComptes||[]).filter(c=>String(c.uid)!==String(uid)).map(c=><FavorisAutreCompte key={c.uid} compte={c} owner={owner} ownerActuel={ownerActuel} base={base} headers={headers} articleDe={articleDe} articleInfos={id=>id?annonceDe(id):null} PhotoVinted={PhotoVinted} maintenant={maintenant}/>)}
     </div>}
   </section>;
+  // ── (13 nov., lot 31) TRÈS AIMÉES, PAS VENDUES : par compte, ≥ N favoris LUS, ≥ 14 j en ligne, triées
+  // par favoris. Le geste PRÉ-REMPLIT ce flux (les favoris de CETTE annonce pas encore contactés, une
+  // personne une fois, et l'offre −x %) ; rien ne part sans « Envoyer » (file serveur, plafond 50/h).
+  // Règle : src/favorisSansVente.js ; dessin : src/FavorisSansVente.jsx.
+  const infosSv=id=>{const a=lireArticle(id);return a?{titre:a.titre,numero:a.numero,photo:a.photo,prix:a.prix,jours:a.jours,achat:a.achat}:null;};
+  const seuilN=lireSeuilFavoris(seuilSv);
+  const comptesSv=[{uid:String(uid||''),nom:nomCompte,selectionnable,res:annoncesSansVente({uid,listings:listingsFavoris,vendus,infosDe:infosSv,seuil:seuilN}),contactDe:itemId=>favorisAContacter(liste.lignes,itemId,id=>ligneParId.get(id)?.identiteNotification||null)}]
+    .concat((autresComptes||[]).filter(c=>String(c.uid)!==String(uid)).map(c=>({uid:String(c.uid),nom:c.nom,selectionnable:false,res:annoncesSansVente({uid:c.uid,listings:listingsFavoris,vendus,infosDe:infosSv,seuil:seuilN}),contactDe:()=>null})));
+  const changerSeuil=v=>{setSeuilSv(v);try{localStorage.setItem(CLE_FAVORIS_MIN,String(v));}catch{}};
+  const proposerSv=(a,o,ids)=>{
+    if(verrouListe||!selectionnable||!ids.length||o?.etat!=='ok')return;
+    setChoisis(ids);setOffreChoix('diminuer');setTypeDim('pct');setReduction(String(o.pct));setArrondi(false);change();
+    setOrigines(m=>{const n=new Map(m);if(a.achat!=null)n.set(String(a.itemId),a.achat);else n.delete(String(a.itemId));return n;});
+    setActifSv(String(a.itemId));setRetour(tr('favoris.sansVente.prepare',{n:ids.length,titre:a.titre||tr('favoris.qui.sansTitre')}));
+    requestAnimationFrame(()=>{try{document.querySelector('[data-fc-etape="quoi"]')?.scrollIntoView({block:'start',behavior:'smooth'});}catch{}});
+  };
+  const sousPlancher=sousPlancherAchat(recapAnnonces,origines);
+  const refusPlancher=sousPlancher.length?tr('favoris.sansVente.refusPlancher',{plancher:sousPlancher[0].plancher+'\u00a0€'}):'';
+  const sansVente=!sansCompte?<FavorisSansVente comptes={comptesSv} seuil={seuilSv} setSeuil={changerSeuil} proposer={proposerSv} verrou={verrouListe} PhotoVinted={PhotoVinted} actif={actifSv}/>:null;
   const alerteExtension=exigePerso&&!favorisPerso?tr('favoris.quoi.extension'):'';
   return <section className="vrm-fa vrm-fu-ecran" aria-label={tr('favoris.titre')} data-fav-ecran data-fav-clair>
     <PageFavoris nomCompte={nomCompte} PhotoVinted={PhotoVinted} FermeAuRetour={FermeAuRetour}
       sansCompte={sansCompte} lecture={!sansCompte&&etat.charge&&!data} absente={!!data&&data.reception==='absente'} aucun={!!data&&data.reception!=='absente'&&!lignes.length}
       lectureEnCours={!!etat.charge} actualiser={charger} ouvrirOutils={ouvrirFeuille} ouvrirEnvoi={ouvrirEnvoi} ouvrirPersonne={ouvrirFavori?ouvrirPersonne:null} ouverture={ouverture}
       alertes={!feuille?alertes:null}
-      choix={choix} quiListe={quiListe}
+      choix={choix} quiListe={quiListe} sansVente={sansVente} refus={refusPlancher}
       message={message} setMessage={v=>{setMessage(v);change();}} variantes={variantes} setVariantes={l=>{setVariantes(l);change();}} variantesOk={favorisVariantes} inserer={inserer} champMessage={champMessage}
       offreChoix={offreChoixClair} setOffreChoix={setOffreChoixClair} reduction={reduction} setReduction={v=>{setReduction(v);change();}} montantOffre={montantOffre} setMontantOffre={v=>{setMontantOffre(v);change();}} arrondi={arrondi} setArrondi={v=>{setArrondi(v);change();}}
       exemple={exemple} morceaux={morceaux} erreurMessage={apercu.erreur||(!messageAffiche?tr('favoris.quoi.ecrisMessage'):'')} alerteExtension={alerteExtension}

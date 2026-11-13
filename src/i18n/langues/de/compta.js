@@ -705,4 +705,10 @@ export default {
   "compta.prixAchatConnus": { one: "Einkaufspreis bekannt für {n} von {x} Verkäufen.", other: "Einkaufspreise bekannt für {n} von {x} Verkäufen." },
   "compta.ventesVendus": { one: "{n} Verkauf · {fmt} verkauft", other: "{n} Verkäufe · {fmt} verkauft" },
   "compta.echeancesTout": { one: " · {n} Fälligkeit, {fmt} insgesamt", other: "· {n} Fälligkeiten, {fmt} insgesamt" },
+  // (13 nov., point 16) le récap d’une page, imprimé
+  "compta.recapImprimer": "Drucken (1 Seite)",
+  "compta.recapImprimerTitre": "Eine A4-Seite: Verkäufe, Erhaltenes, Einkäufe, Ausgaben, Gewinn, URSSAF",
+  "compta.recapImprimerNote": "Eine A4-Seite, lesbar in Schwarzweiß. Für ein PDF „Als PDF speichern“ im Druckfenster wählen.",
+  "compta.recapFenetreBloquee": "Der Browser hat das Druckfenster blockiert: Fenster für VRM erlauben, dann erneut versuchen.",
+  "compta.recapPrepare": "Übersicht wird vorbereitet…",
 };

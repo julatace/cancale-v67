@@ -62,6 +62,9 @@ export const DESTINATIONS = {
   achat: ({ tx } = {}) => lienNotif('achats', { vue: 'achats', ...(tx ? { cible: 'achat', tx } : {}) }),
   // Comptabilité · « Ta déclaration URSSAF ».
   urssaf: () => lienNotif('compta', { cible: 'urssaf' }),
+  // (13 nov., point 17) La veille de l'échéance : Argent → « Déclarer », la section URSSAF
+  // en évidence, où la carte de la période porte « Copier » (`PrevisionUrssafCarte`).
+  urssafDeclarer: () => lienNotif('compta', { section: 'declarer', cible: 'urssaf' }),
   // L'écran où se règle une double vente : eBay → Annonces (« Retirer d'eBay »)
   // ou Leboncoin → Annonces (« à retirer de Leboncoin »).
   doublon: ({ plat, num } = {}) => lienNotif('annonces', { site: plat === 'ebay' ? 'ebay' : 'leboncoin', cible: 'doublon', plat: plat === 'ebay' ? 'ebay' : 'leboncoin', num }),
