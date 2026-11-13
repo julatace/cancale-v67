@@ -11,7 +11,8 @@
 //     /aide/videos/<id>.mp4 ; la requête .mp4 part (et seulement celle de cette vidéo) ;
 //     le fichier servi est un MP4 ≤ 1,5 Mo, sa piste .vtt existe ;
 //  D. le colis hors onglet : `vrm:aide` { ecran: 'colis' } ouvre la feuille sur « Retirer un colis ».
-// `BANC_PORT` (défaut : au hasard 22000-22499), `BANC_DIST` (défaut dist/), `BANC_CAPTURES=dossier`.
+// `BANC_PORT` (défaut : au hasard 22000-22499), `BANC_DIST` (défaut dist/), `BANC_CAPTURES=dossier`,
+// `BANC_ECRANS=journee,ventes` (quelques écrans seulement).
 // `BANC_MUTATION=` (le JS ou la page servis sont réécrits, la règle doit rougir) :
 //    mauvaise-video  : le « ? » de Ventes propose la vidéo de Ma journée ;
 //    demarrage       : la page précharge une vidéo au démarrage ;
@@ -86,7 +87,8 @@ const videos = (pg) => pg.evaluate(() => [...document.querySelectorAll('video')]
       dit(/url\.pathname\.startsWith\('\/aide\/'\)\) return;/.test(sw) || /startsWith\('\/aide\/'\)/.test(sw), 'sw.js : /aide/ va au réseau (rien en réserve)');
       dit(!/\.mp4|aide\/videos/.test(sw), 'sw.js ne nomme aucune vidéo');
     });
-    for (const [tab, cle, attendue] of ECRANS) {
+    const seuls = (process.env.BANC_ECRANS || '').split(',').filter(Boolean);
+    for (const [tab, cle, attendue] of ECRANS.filter(([t]) => !seuls.length || seuls.includes(t))) {
       console.log(`· ${tab}`);
       await essaie(tab, async () => {
         const { ctx, pg, requetes, erreurs } = await ouvrir(nav, tab);
@@ -102,6 +104,7 @@ const videos = (pg) => pg.evaluate(() => [...document.querySelectorAll('video')]
           dit(tuiles[0] === attendue, `${tab} : le « ? » propose d'abord SA vidéo (« ${attendue} »)`, `tuiles : ${tuiles.join(', ') || 'aucune'}`);
           if (cle === 'achats') dit(tuiles.includes('colis'), 'achats : « Retirer un colis » proposé aussi');
           await pg.waitForTimeout(800);
+          if (CAPTURES) { fs.mkdirSync(CAPTURES, { recursive: true }); await pg.screenshot({ path: path.join(CAPTURES, `${tab}-feuille.png`) }); }
           const avant = requetes.filter((r) => /\.(mp4|vtt)$/.test(r.u));
           dit(avant.length === 0, `${tab} : feuille ouverte, aucune vidéo ni piste demandée avant le toucher`, avant.map((r) => r.u).join(', '));
           dit((await videos(pg)).length === 0, `${tab} : feuille ouverte, aucun <video> avant le toucher`);
@@ -110,6 +113,15 @@ const videos = (pg) => pg.evaluate(() => [...document.querySelectorAll('video')]
           await feuille.locator(`[data-aide-video="${tuiles[0]}"]`).first().tap();
           await pg.locator(`[data-aide-video-lecteur="${tuiles[0]}"] video`).first().waitFor({ timeout: 10000 });
           await pg.waitForTimeout(1500);
+          // Elle se LIT : des images décodées, une durée, le temps qui avance (Chromium du banc lit le H.264).
+          let lu = null;
+          for (let k = 0; k < 40; k++) {
+            lu = await pg.evaluate(() => { const x = document.querySelector('[data-aide-video-lecteur] video'); return x ? { rs: x.readyState, d: x.duration, t: x.currentTime, err: x.error ? x.error.code : 0 } : null; });
+            if (lu && (lu.err || (lu.rs >= 2 && lu.t > 0.3))) break;
+            await pg.waitForTimeout(250);
+          }
+          dit(lu && !lu.err && lu.rs >= 2 && lu.t > 0.3 && lu.d > 5 && lu.d <= 30.05, `${tab} : la vidéo se lit (durée ${lu && lu.d ? lu.d.toFixed(1) : '?'} s, lue jusqu'à ${lu ? lu.t.toFixed(1) : '?'} s)`, lu && lu.err ? 'erreur média ' + lu.err : '');
+          dit(!(await pg.locator('[data-aide-video-panne]').count()), `${tab} : aucune panne de lecture affichée`);
           const v = (await videos(pg))[0] || {};
           dit(v.src === `/aide/videos/${tuiles[0]}.mp4`, `${tab} : le lecteur lit /aide/videos/${tuiles[0]}.mp4`, v.src);
           dit(v.muted && v.inline && v.controls, `${tab} : sans son, en ligne, avec ses commandes`);

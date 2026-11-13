@@ -35,8 +35,11 @@ const hms = (t) => { const ms = Math.max(0, Math.round(t * 1000)); const h = Mat
 const sansMarques = (s) => String(s || '').replace(/\*([^*]+)\*/g, '$1');
 function vtt(titres, duree) {
   const lignes = ['WEBVTT', ''];
-  titres.filter((t) => t.t0 < duree).forEach((t, i) => {
-    lignes.push(String(i + 1), `${hms(t.t0)} --> ${hms(Math.min(t.t1, duree))}`, sansMarques(t.texte));
+  // Un sous-titre s'arrête quand le suivant commence (à l'image, le titre sortant se fond sous l'entrant).
+  const l = titres.filter((t) => t.t0 < duree).sort((a, b) => a.t0 - b.t0);
+  l.forEach((t, i) => {
+    const fin = Math.min(t.t1, duree, l[i + 1] ? l[i + 1].t0 : Infinity);
+    lignes.push(String(i + 1), `${hms(t.t0)} --> ${hms(fin)}`, sansMarques(t.texte));
     if (t.sous) lignes.push(sansMarques(t.sous));
     lignes.push('');
   });
@@ -91,4 +94,4 @@ if (require.main === module) {
     if (ko) process.exitCode = 1;
   })().catch((e) => { console.error(e); process.exit(1); });
 }
-module.exports = { SCENARIOS, PLATEAUX, vtt };
+module.exports = { SCENARIOS, PLATEAUX, vtt, hms };
