@@ -536,7 +536,6 @@ sans la fonction.
 
 - **13 nov. · Lot 89** : Colissimo et UPS lus par le serveur dès leur clé (sinon rien d'appelé, « lu par e-mail seulement ») ; DPD/GLS non mesurés. `2026-11-13-lot89-suivi-transporteurs.md`. Geste : `…-guide-cles-transporteurs.md`.
 
-- **13 nov. · Bénéfice « si vendue » et paires qui dorment (points 14-15)** : fiche « En ligne à · Si vendue » (`beneficePaire`, au plus, achat pas saisi ⇒ « — » + « Saisir ») ; Qui dorment rangées par ce qui rapporte, UN geste chacune (baisse mesurée, favoris, Republier, Leboncoin ; « … » le reste), `src/dormantes.js`. `docs/passation/2026-11-13-lot1415.md`. Geste : aucun.
 
 
 
