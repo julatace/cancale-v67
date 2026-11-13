@@ -705,4 +705,10 @@ export default {
   "compta.prixAchatConnus": { one: "Purchase price known for {n} sale out of {x}.", other: "Purchase prices known for {n} sales out of {x}." },
   "compta.ventesVendus": { one: "{n} sale · {fmt} sold", other: "{n} sales · {fmt} sold" },
   "compta.echeancesTout": { one: " · {n} due date, {fmt} in total", other: "· {n} due dates, {fmt} in total" },
+  // (13 nov., point 16) le récap d’une page, imprimé
+  "compta.recapImprimer": "Print (1 page)",
+  "compta.recapImprimerTitre": "One A4 page: sales, received, purchases, expenses, profit, URSSAF",
+  "compta.recapImprimerNote": "One A4 page, readable in black and white. For a PDF, choose “Save as PDF” in the print window.",
+  "compta.recapFenetreBloquee": "The browser blocked the print window: allow pop-ups for VRM, then try again.",
+  "compta.recapPrepare": "Preparing the recap…",
 };
