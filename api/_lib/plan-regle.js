@@ -46,6 +46,37 @@ export const CLE_PRIX_SOLO = 'vrm_mensuel';
 // La clé de recherche du prix Pro chez Stripe (geste de Julien, passation du 9 nov.).
 export const CLE_PRIX_PRO = 'vrm_pro_mensuel';
 
+// ── (13 nov., lot 56) PLUSIEURS COMPTES VINTED DÈS SOLO ─────────────────────
+// Solo inclut UN compte vendeur Vinted ; chaque compte Vinted vendeur DE PLUS
+// coûte `PRIX_COMPTE_SUP_CENTIMES` par mois (3 € par défaut, À CONFIRMER par
+// Julien : docs/passation/2026-11-13-lot5658.md). C'est la SEULE valeur : le
+// serveur (route, conformité du prix Stripe), l'écran et l'accueil la lisent ici.
+// Chez Stripe : un 2e article de l'abonnement Solo, au prix de clé de recherche
+// `vrm_compte_sup`, quantité N = le nombre de comptes de plus PAYÉS. Les comptes
+// eux-mêmes (des `vinted_user_id`, choisis par LUI) sont dans les métadonnées
+// `vrm_comptes_sup`, posées par la route `compte-vendeur` — jamais par le
+// navigateur. ⚠️ LA LIMITE EST CELLE DE LA QUANTITÉ PAYÉE : une liste plus longue
+// (quantité baissée chez Stripe) ne garde que ses N premiers comptes, dans
+// l'ordre où il les a ajoutés. Pro reste illimité (aucune liste lue en Pro).
+export const PRIX_COMPTE_SUP_CENTIMES = 300;
+export const CLE_PRIX_COMPTE_SUP = 'vrm_compte_sup';
+export const COMPTES_INCLUS_SOLO = 1;
+export const META_COMPTES_SUP = 'vrm_comptes_sup';
+// Au plus 20 comptes de plus (la métadonnée Stripe tient 500 caractères ; au-delà
+// d'un compte de plus, Pro — illimité — coûte de toute façon moins cher).
+export const MAX_COMPTES_SUP = 20;
+// « 3 € » / « 2,50 € » : le texte du supplément, écrit une fois.
+export const prixCompteSupTexte = (c = PRIX_COMPTE_SUP_CENTIMES) => (c % 100 === 0 ? String(c / 100) : (c / 100).toFixed(2).replace('.', ',')) + '\u00a0€';
+// La liste des comptes de plus, propre (uids valides, sans doublon, sans le compte inclus).
+export function listeComptesSup(brut, vendeur = null) {
+  const l = Array.isArray(brut) ? brut : String(brut == null ? '' : brut).split(',');
+  const vus = new Set(vendeur ? [String(vendeur)] : []), out = [];
+  for (const x of l) { const u = uidDe(x); if (uidValide(u) && !vus.has(u)) { vus.add(u); out.push(u); } }
+  return out;
+}
+// Le prix d'un article est-il celui des comptes de plus ?
+export const estPrixCompteSup = (p) => !!p && typeof p === 'object' && String(p.lookup_key || '') === CLE_PRIX_COMPTE_SUP;
+
 // Le PLAN d'un prix Stripe. `pro` : l'identifiant OU la clé de recherche posée
 // dans `STRIPE_PRIX_PRO` (vide ⇒ aucun prix n'est Pro). `solo` : la clé de
 // recherche du prix Solo. Autre chose ⇒ `null` (pas su — un ancien prix, par exemple).
@@ -62,10 +93,16 @@ export function planDuPrix(prix, { prixPro = '', cleSolo = CLE_PRIX_SOLO } = {})
 // quantité 1. `{ plan, vendeur, vendeurLe, cgv }` ; `plan` vaut `null` quand ce
 // n'est pas sûr (plusieurs articles, prix inconnu, Solo aux CGV d'avant).
 export function planDeLAbonnement(sub, opts = {}) {
-  const vide = { plan: null, vendeur: null, vendeurLe: null, raison: 'illisible', autres: { leboncoin: null, ebay: null, vestiaire: null } };
+  const vide = { plan: null, vendeur: null, vendeurLe: null, raison: 'illisible', autres: { leboncoin: null, ebay: null, vestiaire: null }, comptesSup: { payes: 0, liste: [], articleId: null } };
   if (!sub || typeof sub !== 'object') return vide;
-  const articles = sub.items && Array.isArray(sub.items.data) ? sub.items.data : [];
-  if (articles.length !== 1) return { ...vide, raison: 'articles' };
+  const tous = sub.items && Array.isArray(sub.items.data) ? sub.items.data : [];
+  // (13 nov., lot 56) Un 2e article au prix `vrm_compte_sup` = les comptes Vinted de
+  // plus ; tout autre article de plus ⇒ pas su (comme avant).
+  const sups = tous.filter((x) => x && estPrixCompteSup(x.price || x.plan));
+  const articles = tous.filter((x) => !sups.includes(x));
+  if (articles.length !== 1 || sups.length > 1) return { ...vide, raison: 'articles' };
+  const s0 = sups[0] || null;
+  const payes = s0 ? (Number.isInteger(s0.quantity) && s0.quantity > 0 ? s0.quantity : (s0.quantity == null ? 1 : 0)) : 0;
   const a = articles[0], p = a && (a.price || a.plan);
   if (!p || (a.quantity != null && a.quantity !== 1)) return { ...vide, raison: 'article' };
   const m = sub.metadata && typeof sub.metadata === 'object' ? sub.metadata : {};
@@ -82,7 +119,11 @@ export function planDeLAbonnement(sub, opts = {}) {
     const k = META_VENDEUR[pl], id = idCompteVendeur(pl, m[k]);
     autres[pl] = id ? { id, le: Number.isFinite(Date.parse(m[k + '_le'] || '')) ? String(m[k + '_le']) : null } : null;
   }
-  return { plan, vendeur, vendeurLe, raison, autres, prixId: String(p.id || ''), articleId: String(a.id || '') };
+  // Les comptes de plus : seulement en Solo sûr, avec un compte inclus choisi, et
+  // jamais plus que la quantité PAYÉE (les N premiers, dans l'ordre de ses ajouts).
+  const liste = plan === PLAN_SOLO && vendeur ? listeComptesSup(m[META_COMPTES_SUP], vendeur).slice(0, payes) : [];
+  const comptesSup = { payes, liste, articleId: s0 && s0.id ? String(s0.id) : null, le: Number.isFinite(Date.parse(m[META_COMPTES_SUP + '_le'] || '')) ? String(m[META_COMPTES_SUP + '_le']) : null };
+  return { plan, vendeur, vendeurLe, raison, autres, comptesSup, prixId: String(p.id || ''), articleId: String(a.id || '') };
 }
 
 // ── (9 nov., soir) SOLO PAR PLATEFORME — Julien : « fais absolument tout ».
@@ -101,6 +142,7 @@ export function planDeLAbonnement(sub, opts = {}) {
 export const PLATEFORMES_SOLO = Object.freeze(['leboncoin', 'ebay', 'vestiaire']);
 export const NOMS_PLATEFORMES_SOLO = Object.freeze({ vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire Collective' });
 const AUTRES_LIBRES = Object.freeze({ leboncoin: null, ebay: null, vestiaire: null });
+const SUP_VIDE = Object.freeze([]);
 // L'identifiant d'un compte vendeur, propre, ou `null` (illisible ⇒ pas su).
 export function idCompteVendeur(plateforme, x) {
   const s = String(x == null ? '' : x).trim();
@@ -120,8 +162,8 @@ export const META_VENDEUR = Object.freeze({
 // `proprietaire`). Sortie : `{ plan, vendeur, bride }`. `bride` n'est vrai QUE
 // pour un Solo sûr, avec un compte vendeur CHOISI, hors propriétaire.
 export function regleVentes(x) {
-  if (!x || typeof x !== 'object') return { plan: null, vendeur: null, bride: false, autres: AUTRES_LIBRES };
-  if (x.proprietaire === true) return { plan: PLAN_PRO, vendeur: null, bride: false, autres: AUTRES_LIBRES };
+  if (!x || typeof x !== 'object') return { plan: null, vendeur: null, bride: false, autres: AUTRES_LIBRES, vendeursSup: SUP_VIDE };
+  if (x.proprietaire === true) return { plan: PLAN_PRO, vendeur: null, bride: false, autres: AUTRES_LIBRES, vendeursSup: SUP_VIDE };
   const plan = x.plan === PLAN_PRO || x.plan === PLAN_SOLO ? x.plan : null;
   const cv = x.compteVendeur;
   const brut = cv && typeof cv === 'object' ? cv.uid : cv;
@@ -136,8 +178,15 @@ export function regleVentes(x) {
     const id = idCompteVendeur(p, v && typeof v === 'object' ? v.id : v);
     autres[p] = plan === PLAN_SOLO && id ? id : null;
   }
-  return { plan, vendeur, bride: plan === PLAN_SOLO && !!vendeur, autres: Object.freeze(autres) };
+  // (13 nov., lot 56) Les comptes Vinted vendeurs DE PLUS (payés), tels que le
+  // SERVEUR les rend (`comptesSup.liste`, déjà bornés à la quantité payée) ou que
+  // le webhook les a rangés (`comptes_vendeurs.vinted_sup`). Solo sûr seulement.
+  const brutSup = x.comptesSup && typeof x.comptesSup === 'object' ? x.comptesSup.liste : (cvs.vinted_sup != null ? cvs.vinted_sup : null);
+  const vendeursSup = plan === PLAN_SOLO && vendeur && brutSup != null ? Object.freeze(listeComptesSup(brutSup, vendeur)) : SUP_VIDE;
+  return { plan, vendeur, bride: plan === PLAN_SOLO && !!vendeur, autres: Object.freeze(autres), vendeursSup };
 }
+// Les comptes Vinted qui VENDENT (le compte inclus + ceux de plus), `[]` = pas bridé.
+export const vendeursVinted = (r) => (r && r.bride === true && r.vendeur ? [r.vendeur, ...(Array.isArray(r.vendeursSup) ? r.vendeursSup : [])] : []);
 
 // Une vente (ou une annonce, un colis à envoyer, une offre) de ce compte est-elle
 // HORS de l'offre ? Vrai seulement si la règle bride ET que le compte est connu
@@ -145,7 +194,7 @@ export function regleVentes(x) {
 export function venteHorsPlan(regle, uid) {
   if (!regle || regle.bride !== true || !regle.vendeur) return false;
   const u = uidDe(uid);
-  return uidValide(u) && u !== regle.vendeur;
+  return uidValide(u) && u !== regle.vendeur && !(Array.isArray(regle.vendeursSup) && regle.vendeursSup.includes(u));
 }
 
 // (9 nov., Solo par plateforme) La vente (ou l'annonce, l'offre) d'un compte
@@ -180,6 +229,7 @@ export function signatureRegle(r) {
   if (!r || r.plan !== PLAN_SOLO) return 'libre';
   const parts = [];
   if (r.bride && r.vendeur) parts.push(r.vendeur);   // Vinted seul : « solo:7 », comme avant
+  if (r.bride && Array.isArray(r.vendeursSup) && r.vendeursSup.length) parts.push('+' + r.vendeursSup.join('+'));
   for (const p of PLATEFORMES_SOLO) if (r.autres && r.autres[p]) parts.push(p + '=' + r.autres[p]);
   return parts.length ? 'solo:' + parts.join(',') : 'libre';
 }
@@ -218,6 +268,8 @@ export function prochainChangement(vendeurLe, maintenant = Date.now()) {
 // Les offres, en clair : une phrase par offre, la même dans l'app, la page
 // d'accueil et (en substance) les CGV.
 export const OFFRES = Object.freeze({
-  solo: Object.freeze({ nom: 'Solo', phrase: 'Un compte vendeur par plateforme (un Vinted, un Leboncoin, un eBay, un Vestiaire) — ventes, annonces, colis à envoyer, offres et compta de ce compte — et autant de comptes d’achat que tu veux (leurs achats et leurs retraits).' }),
+  solo: Object.freeze({ nom: 'Solo', phrase: 'Un compte vendeur par plateforme (un Vinted, un Leboncoin, un eBay, un Vestiaire) — ventes, annonces, colis à envoyer, offres et compta de ce compte — et autant de comptes d’achat que tu veux (leurs achats et leurs retraits).',
+    // (13 nov., lot 56) Le supplément, en une ligne (Paramètres, accueil) : la même valeur partout.
+    supplement: `1 compte Vinted vendeur inclus · +${prixCompteSupTexte()}/mois par compte de plus` }),
   pro: Object.freeze({ nom: 'Pro', phrase: 'Comptes vendeurs illimités : tous tes comptes vendent, tout entre dans tes totaux.' }),
 });

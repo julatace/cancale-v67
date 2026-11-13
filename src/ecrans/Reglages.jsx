@@ -55,7 +55,7 @@ import { ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement
 // dans le texte de l'app (`_source-app.cjs`), l'import les déclarait deux fois.
 import { installerExtensionIci, boutiqueOrion } from '../navigateurExtension.js';
 // (9 nov.) Solo et Pro : les deux offres côte à côte, le compte qui vend.
-import { OffresSoloPro, ouvrirQuelCompte, choixDe } from '../abonnement/PlansSoloPro.jsx';
+import { OffresSoloPro, ouvrirQuelCompte, choixDe, ouvrirCompteSup, supDe, texteSup, changerCompteSup } from '../abonnement/PlansSoloPro.jsx';
 import { PLATEFORMES_SOLO, NOMS_PLATEFORMES_SOLO } from '../../api/_lib/plan-regle.js';
 import { PRIX_PRO_MOIS } from '../accueil-reglages.js';
 import { publierAbonnement, suivreAbonnement } from '../abonnement/etatAbonnement.js';
@@ -3231,7 +3231,7 @@ function MonAbonnement() {
   // (9 nov., Solo par plateforme) Un choix fait dans la feuille « Quel compte vend ? »
   // (publié par elle) se relit ici tout de suite ; et les comptes des autres plateformes
   // (lus seulement en Solo) disent quelles rangées montrer.
-  React.useEffect(() => suivreAbonnement((x) => { if (x && typeof x === 'object' && x.ok !== false) setE((p) => (p ? { ...p, compteVendeur: x.compteVendeur !== undefined ? x.compteVendeur : p.compteVendeur, comptesVendeurs: x.comptesVendeurs !== undefined ? x.comptesVendeurs : p.comptesVendeurs } : p)); }), []);
+  React.useEffect(() => suivreAbonnement((x) => { if (x && typeof x === 'object' && x.ok !== false) setE((p) => (p ? { ...p, compteVendeur: x.compteVendeur !== undefined ? x.compteVendeur : p.compteVendeur, comptesVendeurs: x.comptesVendeurs !== undefined ? x.comptesVendeurs : p.comptesVendeurs, comptesSup: x.comptesSup !== undefined ? x.comptesSup : p.comptesSup } : p)); }), []);
   const [autresSolo] = useComptesAutresSites(!!(e && e.plan === 'solo'));
   const resilierOuReprendre = async (reprendre) => {
     if (!reprendre) {
@@ -3285,6 +3285,29 @@ function MonAbonnement() {
           <RangeeIos titre={e.compteVendeur && e.compteVendeur.uid ? <span data-compte-vendeur={e.compteVendeur.uid}>Vinted · Compte n° {e.compteVendeur.uid}</span> : <span data-compte-vendeur="">Vinted · Pas encore choisi</span>}
             detail={e.compteVendeur && e.compteVendeur.uid ? 'Ses ventes, annonces, colis et sa compta comptent' : 'Tant que tu n’as pas choisi, tous tes comptes comptent'}
             onClick={() => ouvrirQuelCompte()} data-rangee-compte-vendeur=""/>
+          {/* (13 nov., lot 56) PLUSIEURS COMPTES VINTED DÈS SOLO : les comptes de plus (payés,
+              rendus par le serveur), puis « Ajouter » — « Bientôt » tant que le prix Stripe
+              `vrm_compte_sup` n'existe pas (rien d'achetable). La limite est celle du serveur. */}
+          {(() => {
+            const s = supDe(e);
+            if (!s) return null;
+            const retirer = async (uid) => {
+              const oui = await askConfirm({ title: 'Ce compte ne vend plus ?', desc: `Le compte n° ${uid} redevient un compte d'achat : ses ventes sortent de tes totaux, rien n'est supprimé. Stripe déduit le reste du mois de ta prochaine facture.`, ok: 'Il ne vend plus', cancel: 'Annuler' });
+              if (!oui) return;
+              setOccupe('sup'); setMsg('');
+              const r = await changerCompteSup('retirer-sup', uid, enTeteSession);
+              setOccupe('');
+              if (!r.ok) setMsg(r.message); else toast(`✓ Le compte n° ${uid} ne vend plus`);
+            };
+            const peutAjouter = !!(e.compteVendeur && e.compteVendeur.uid) && (s.ouvert || s.libres > 0) && s.liste.length < s.max;
+            return (<>
+              {s.liste.map((uid) => <RangeeIos key={uid} titre={<span data-compte-sup={uid}>Vinted · Compte n° {uid}</span>} detail={`Vend aussi · ${texteSup(s)}`} valeur="Retirer" onClick={() => retirer(uid)} data-rangee-compte-sup={uid}/>)}
+              <RangeeIos titre={<span data-sup-ajouter-rangee="">Un compte Vinted qui vend de plus</span>}
+                detail={peutAjouter ? (s.libres > 0 ? `${s.libres} place${s.libres > 1 ? 's' : ''} déjà payée${s.libres > 1 ? 's' : ''}` : `${texteSup(s)} par compte de plus`) : !(e.compteVendeur && e.compteVendeur.uid) ? 'Choisis d’abord le compte inclus' : `Bientôt · ${texteSup(s)} par compte de plus`}
+                valeur={peutAjouter ? 'Ajouter' : undefined}
+                onClick={peutAjouter ? () => ouvrirCompteSup() : undefined} data-rangee-sup-ajouter={peutAjouter ? 'ouvert' : 'bientot'}/>
+            </>);
+          })()}
           {/* (9 nov., Solo par plateforme) Un compte vendeur PAR plateforme : une rangée chacune, dès
               DEUX comptes (ou un choix déjà fait) ; le même geste, la même règle des 30 jours. */}
           {PLATEFORMES_SOLO.map((p) => {
@@ -3725,6 +3748,8 @@ function EquipeSetting() {
   const [occupe, setOccupe] = React.useState('');
   const [msg, setMsg] = React.useState('');
   const [montre, setMontre] = React.useState('');
+  // (13 nov., lot 58) La dernière personne retirée (pour « Réinviter » : une nouvelle invitation).
+  const [retiree, setRetiree] = React.useState('');
   const relire = React.useCallback(() => { lireEquipe().then(setLu); }, []);
   React.useEffect(() => { relire(); }, [relire]);
   const agir = async (cle, action, extra, ok) => {
@@ -3750,8 +3775,14 @@ function EquipeSetting() {
     <div data-equipe-reglage="non-installe" style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>
       <div>{EQUIPE_NON_INSTALLE_TXT}</div>
       <div data-equipe-attente-geste={proprio ? 'proprietaire' : 'vendeur'} style={{ color: C.muted, marginTop: 6 }}>
+        {/* (13 nov., lot 58) Au propriétaire : les TROIS gestes exacts (docs/passation/2026-11-13-lot5658.md). */}
         {proprio
-          ? <>S’active avec la mise à jour <b style={{ color: C.text }}>016</b> de la base.<br/>Supabase → SQL Editor → colle <b style={{ color: C.text }}>016-equipe.sql</b> → Run.</>
+          ? <ol data-equipe-gestes="3" style={{ margin: '4px 0 0', paddingLeft: 20 }}>
+              <li>Essai : SQL Editor → <b style={{ color: C.text }}>016-1-essai-annule.sql</b> → Run.</li>
+              <li>Active : <b style={{ color: C.text }}>016-equipe.sql</b> → Run.</li>
+              <li>Vérifie : <b style={{ color: C.text }}>016-3-verifier.sql</b> → Run.<br/>
+                Ou : <b style={{ color: C.text }}>essai-annule.cjs --verifier</b>.</li>
+            </ol>
           : <>Rien à faire : bientôt, tu inviteras ici ton aide par e-mail.</>}
       </div>
       <div data-equipe-ce-qui-viendra="" style={{ color: C.muted, marginTop: 8 }}>{CE_QUE_VOIT_UN_MEMBRE}</div>
@@ -3773,13 +3804,19 @@ function EquipeSetting() {
       </div>
       <div style={{ color: C.muted, fontSize: 12, marginTop: 6, lineHeight: 1.45 }}>VRM n'envoie aucun e-mail. Touche « Envoyer l'invitation ».</div>
       {msg && <div data-equipe-msg="" style={{ color: C.warn, marginTop: 8 }}>{msg}</div>}
+      {retiree && <div data-equipe-retiree={retiree} role="status" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 10, color: C.text }}>
+        <span style={{ flex: '1 1 200px', minWidth: 0, overflowWrap: 'anywhere' }}><b>{retiree}</b> ne voit plus tes colis, depuis maintenant.</span>
+        <button type="button" data-equipe-reinviter="" disabled={!!occupe} onClick={() => agir('inviter', 'inviter', { email: retiree }, () => { setRetiree(''); setMsg('Invitée à nouveau. Envoie-lui le message.'); })} className="vrm-b vrm-b-secondaire">Réinviter</button>
+      </div>}
       {vivants.length > 0 && <div style={{ marginTop: 12 }}>
         {vivants.map((x) => (
           <div key={x.id} data-equipe-membre={x.statut} style={ligne}>
             <span style={{ flex: '1 1 180px', minWidth: 0, overflowWrap: 'anywhere' }}><b>{x.email}</b> <span style={{ color: C.muted }}>· {x.statut === 'actif' ? 'membre' : 'invitée'}</span></span>
             <span style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 'auto' }}>
             {x.statut !== 'actif' && <button type="button" data-equipe-partager={x.id} onClick={async () => { const r = await partagerInvitationEquipe(x.email); setMontre(r === 'montre' ? x.id : ''); setMsg(r === 'copie' ? 'Message copié. Colle-le-lui.' : ''); }} className="vrm-b vrm-b-secondaire">Envoyer l'invitation</button>}
-            <button type="button" data-equipe-revoquer={x.id} disabled={!!occupe} onClick={async () => { if (await askConfirm({ title: 'Retirer cette personne ?', desc: `${x.email} ne verra plus tes colis, tout de suite.`, ok: 'Retirer', cancel: 'Annuler', danger: true })) agir(x.id, 'revoquer', { id: x.id }); }} className="vrm-b vrm-b-discret">Retirer</button>
+            {/* (13 nov., lot 58) RÉVOCATION EN UN GESTE : un toucher, effet immédiat (la base coupe la lecture tout de suite).
+                Revenir en arrière = « Réinviter » (une NOUVELLE invitation, qu'il devra accepter) — jamais un accès rendu en silence. */}
+            <button type="button" data-equipe-revoquer={x.id} disabled={!!occupe} aria-label={`Retirer l'accès de ${x.email}`} onClick={() => agir(x.id, 'revoquer', { id: x.id }, () => { setRetiree(x.email); setMsg(''); })} className="vrm-b vrm-b-discret">{occupe === x.id ? 'Retrait…' : 'Retirer'}</button>
             </span>
             {montre === x.id && <div data-equipe-message={x.id} style={{ flex: '1 1 100%', whiteSpace: 'pre-line', userSelect: 'text', WebkitUserSelect: 'text', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', color: C.text }}>{texteInvitationEquipe(x.email)}</div>}
           </div>
