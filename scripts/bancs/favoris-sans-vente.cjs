@@ -202,7 +202,7 @@ const lignesSv = (pg, uid) => pg.evaluate((u) => [...document.querySelectorAll(`
         const pct = await pg.evaluate(() => ({ offre: document.querySelector('[data-fc-offre][aria-pressed="true"]')?.getAttribute('data-fc-offre'), v: document.querySelector('[data-fc-etape="quoi"] [data-favoris-offre-valeur]')?.value, apercu: document.querySelector('[data-fc-apercu-offre]')?.getAttribute('data-fc-apercu-offre') }));
         dit(pct.offre === 'pct' && pct.v === '10' && Number(pct.apercu) === 54, `${T} l’offre du flux est pré-remplie : −10 %, aperçu 54 €`, JSON.stringify(pct));
         dit(!postes.some((x) => x.action === 'lancer'), `${T} rien n’est lancé par « Proposer »`);
-        if (tel && theme === 'clair') await pg.screenshot({ path: path.join(SHOTS, `sv-${F}-prepare.png`), fullPage: true });
+        if (tel && theme === 'clair') await pg.screenshot({ path: path.join(SHOTS, `sv-${F}-prepare.png`), fullPage: true }).catch(() => {});
         // 5. retouche sous le plancher
         await pg.fill('[data-fc-etape="quoi"] [data-favoris-offre-valeur]', '50', { timeout: 4000 }).catch(() => {});
         await pg.waitForTimeout(200);
@@ -210,7 +210,7 @@ const lignesSv = (pg, uid) => pg.evaluate((u) => [...document.querySelectorAll(`
         await pg.waitForSelector('[data-fc-recap]', { timeout: 5000 }).catch(() => {});
         const refus = await pg.evaluate(() => ({ dit: !!document.querySelector('[data-fc-refus-plancher]'), ferme: document.querySelector('[data-fc-envoyer]')?.disabled === true }));
         dit(refus.dit && refus.ferme, `${T} offre retouchée à −50 % (30 € < achat + 10 %) : « Envoyer » fermé, dit`, JSON.stringify(refus));
-        if (tel && theme === 'clair') await pg.screenshot({ path: path.join(SHOTS, `sv-${F}-refus.png`) });
+        if (tel && theme === 'clair') await pg.screenshot({ path: path.join(SHOTS, `sv-${F}-refus.png`) }).catch(() => {});
         await pg.click('[data-fc-recap] .vrm-fc-recap-pied .vrm-fc-bouton:not(.is-principal)').catch(() => {});
         await pg.waitForTimeout(200);
         await pg.fill('[data-fc-etape="quoi"] [data-favoris-offre-valeur]', '10', { timeout: 4000 }).catch(() => {});
@@ -229,7 +229,7 @@ const lignesSv = (pg, uid) => pg.evaluate((u) => [...document.querySelectorAll(`
       const deb = await pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       dit(deb <= 1, `${T} aucun débordement horizontal`, deb);
       dit(!errs.length, `${T} aucune erreur pendant les gestes`, errs.join(' | '));
-      await pg.screenshot({ path: path.join(SHOTS, `sv-${F}.png`), fullPage: !tel });
+      await pg.screenshot({ path: path.join(SHOTS, `sv-${F}.png`), fullPage: !tel }).catch(() => {});
       await ctx.close();
     }
     srv.close();
