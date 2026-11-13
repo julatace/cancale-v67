@@ -148,6 +148,9 @@ const MOIS_DERNIER = (() => { const d = new Date(); return ymDe(new Date(d.getFu
         await pg.locator('[data-garde-ecran="compta"]').first().waitFor({ timeout: 10000 });
         const n = await pg.locator('[data-garde-ecran="compta"] [data-support-ouvrir]').count();
         dit(n === 1, `${largeur} · l’écran tombé porte « Écrire au support »`, n);
+        const b = await pg.evaluate(() => [...document.querySelectorAll('[data-garde-ecran="compta"] .vrm-garde-ecran-gestes > *')].filter((e) => e.getClientRects().length).map((e) => ({ t: e.innerText.trim(), h: Math.round(e.getBoundingClientRect().height), coupe: e.scrollWidth > e.clientWidth + 1 })));
+        dit(b.length >= 4 && b.every((x) => x.h >= 44 && x.h < 60 && !x.coupe), `${largeur} · les gestes du garde-fou tiennent sur une ligne chacun (44 px, rien de coupé)`, JSON.stringify(b));
+        await capture(pg, `garde-${largeur}${sombre ? '-sombre' : ''}`);
         await tap(pg, '[data-garde-ecran="compta"] [data-support-ouvrir]', largeur < 600);
         await pg.locator('[data-feuille-support]').first().waitFor({ timeout: 8000 });
         const e = await pg.locator('[data-feuille-support] [data-apercu-ligne="Écran"] dd').innerText();
