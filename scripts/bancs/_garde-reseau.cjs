@@ -44,7 +44,7 @@ function surveiller(ctx) {
     ctx.on('requestfailed', (q) => { const h = hote(q.url()); const f = (q.failure() || {}).errorText || ''; if (h && PROD.test(h) && RESEAU.test(f)) noter('production', q.url() + ' (' + f + ')'); });
     ctx.on('response', (rep) => {
       const h = hote(rep.url()); if (!h || LOCAL.test(h)) return;
-      Promise.resolve().then(() => rep.serverAddr()).then((a) => { if (a) noter(PROD.test(h) ? 'production' : 'hôte réel', rep.url()); }).catch(() => {});
+      Promise.resolve().then(() => rep.serverAddr()).then((a) => { if (a) noter((PROD.test(h) ? 'production' : 'hôte réel') + ` (réponse de ${a.ipAddress}:${a.port})`, rep.url()); }).catch(() => {});
     });
   } catch (_) {}
   return ctx;
