@@ -210,6 +210,7 @@ import QuiDorment from "./design/QuiDorment.jsx";
 import QuoiRepublier from "./design/QuoiRepublier.jsx";
 import { quoiRepublier, lireReglage as lireReglageQR, CLE_REGLAGE as CLE_REGLAGE_QR, ligneJourneeRepublier } from "./quoiRepublier.js";
 import { favorisSansVente, seuilFavorisValide, gestesDormeuse, cartePairesQuiDorment } from "./vendrePlus.js";
+import { beneficeSiVendue, gesteDormante, classerDormantes } from "./dormantes.js";   // (13 nov., points 14-15) « si vendue » et UN geste par paire qui dort
 // ⟦→ ecrans/Vestiaire.jsx #2⟧
 // ⟦→ ecrans/Compta.jsx #2⟧
 import { versementsDuReleve, completerVersementsParReleve, versementsParReleve } from "./versementReleve.js";
@@ -4672,6 +4673,9 @@ function gesteChezToi(carte, reponse, raison, apres = null) {
 }
 // (11 nov., saisie rapide) La feuille « Combien tu l'avais payée ? » : les ventes publiées
 // par la coque (`poserDemandesPrix`), celles de la notification d'abord (`txs`, vide = toutes).
+// (13 nov., point 14) La même feuille, ouverte PAR-DESSUS la fiche « Tout sur le N° » (z 9000) : un relais stable
+// (défini une fois : un composant recréé à chaque rendu viderait le champ tapé).
+const SheetShellSurFiche = (props) => <SheetShell {...props} z={Z_CONFIRMATION}/>;
 function PrixAchatCoque({ txs, onPoser, onFermer }) {
   const l = React.useSyncExternalStore(abonnerDemandesPrix, lireDemandesPrix);
   if (l === undefined) return null;
@@ -32259,6 +32263,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (10 nov., lot C) « Baisser le prix » en série : les annonces cochées (vue « Qui dorment »
   // ou Sélectionner), et les cases de la vue « Qui dorment » (confort de l'écran, rien d'écrit).
   const [baisseSel, setBaisseSel] = useState(null);
+  // (13 nov., point 15) La baisse PROPOSÉE d'une paire qui dort (« Baisser à X € ») : la feuille s'ouvre pré-remplie.
+  const [baisseSelInit, setBaisseSelInit] = useState(null);
   const [qdSel, setQdSel] = useState(() => new Set());
   const [miniSel, setMiniSel] = useState(null);   // (6 nov., vague 2) « Prix mini… » : les annonces cochées // l'annonce republiée à la main (objet de la sélection)
   const [photoEdit, setPhotoEdit] = useState(null); // { refPhoto, refTitle } → éditeur de photo (recadrer/zoomer)
@@ -32972,6 +32978,41 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [seuilDort, setSeuilDortEtat] = useState(() => { try { return seuilValide(localStorage.getItem('vrm_qd_seuil')); } catch (_) { return 30; } });
   const setSeuilDort = (v) => { const x = seuilValide(v); setSeuilDortEtat(x); try { localStorage.setItem('vrm_qd_seuil', String(x)); } catch (_) {} };
   const [dortAgir, setDortAgir] = useState(null);
+  // (13 nov., point 15) Les gestes d'une paire qui dort, sortis de la feuille « Agir » pour servir AUSSI au geste
+  // proposé sur sa ligne (`gesteDormante`, src/dormantes.js) : les MÊMES écrans, les MÊMES écritures. Appelé au clic.
+  const allerDormante = (a) => {
+    const it = a.it, e = numeros[it.id] || {};
+    const fermer = () => setDortAgir(null);
+    const versRepub = (act) => { fermer(); setRepubReprise([String(it.id)]); setRepubAction(act); };
+    // (9 nov., « vendre plus ») Les gestes viennent d'UNE règle (`gestesDormeuse`,
+    // src/vendrePlus.js) : chacun ouvre l'écran EXISTANT, sur SON clic, rien ne part
+    // tout seul et aucun prix n'est proposé. Republier : la paire pré-choisie dans
+    // l'atelier, c'est LUI qui lance.
+    const urlFiche = it.url || (/^\d+$/.test(String(it.id)) ? `https://${(it._acc && it._acc.domain) || 'www.vinted.fr'}/items/${it.id}` : '');
+    const uidIt = String((it._acc && it._acc.vinted_user_id) || '');
+    const aller = {
+      republier: ()=>versRepub('recreer'),
+      prix: ()=>versRepub('modifier'),
+      vinted: ()=>{ try { window.open(urlFiche, '_blank', 'noopener'); } catch (_) {} fermer(); },
+      // ⚠️ On change d'écran AVANT de fermer la feuille : fermée d'abord, elle
+      // retirait son entrée d'historique (history.back) avant que le nouvel
+      // écran soit rendu, et ce retour ramenait Vinted (mesuré au banc, 1 fois sur 2).
+      // Le nouvel écran démonte la feuille ; la fermeture différée ne sert qu'en secours.
+      lbc: ()=>{
+          if (!mpChoisi(e,'lbc')) updatePair(it, { mp: { ...(e.mp||{}), lbc: true } });
+          DEMANDE_LBC_FICHE.id = String(it.id); DEMANDE_LBC_FICHE.at = Date.now(); onNav && onNav('leboncoin'); setTimeout(()=>fermer(), 400); },
+      ebay: ()=>{ DEMANDE_EBAY_PAIRE.id = String(it.id); DEMANDE_EBAY_PAIRE.at = Date.now(); onNav && onNav('ebay_annonces'); setTimeout(()=>fermer(), 400); },
+      vestiaire: ()=>{ DEMANDE_VC_PAIRE.id = String(it.id); DEMANDE_VC_PAIRE.at = Date.now(); onNav && onNav('vestiaire_annonces'); setTimeout(()=>fermer(), 400); },
+      // La file « Envoyer une offre aux favoris » (Messages → Favoris reçus) du compte
+      // de l'annonce : c'est LUI qui choisit et envoie.
+      favoris: ()=>{ if (uidIt && typeof setCompteSel === 'function') setCompteSel(uidIt); demanderVue('favoris'); onNav && onNav('cat_msg'); setTimeout(()=>fermer(), 400); },
+      // « Baisser à X € » : la feuille « Baisser le prix » existante sur CETTE annonce, la baisse proposée tapée
+      // d'avance (sans « Varier ») ; rien ne part avant SA confirmation là-bas.
+      baisser: ()=>{ const g = a.geste; const pa = annonceBaisse(it); if (!g || !(g.sugg > 0) || !(pa.prix > g.sugg)) { toast(tr('annonces.prixTousSites')); return; }
+        fermer(); setBaisseSelInit({ mode: 'eur', texte: String(Math.round((pa.prix - g.sugg) * 100) / 100).replace('.', ',') }); setBaisseSel([pa]); },
+    };
+    return { aller, urlFiche };
+  };
   // (11 nov., lot quoi-republier) Les seuils de « Quelles annonces republier ? » (jours, favoris, vues) : SON réglage,
   // un confort de cet appareil (comme le seuil « qui dort ») ; illisible ⇒ le défaut (`lireReglage`).
   const [qrReglage, setQrReglageEtat] = useState(() => { try { return lireReglageQR(JSON.parse(localStorage.getItem(CLE_REGLAGE_QR) || 'null')); } catch (_) { return lireReglageQR(null); } });
@@ -37602,6 +37643,30 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [annBase, conseilsPrix]);
+  // (13 nov., point 15) LA LISTE « QUI DORMENT » : chaque paire avec SON bénéfice si elle se vend (au prix du
+  // geste : la baisse proposée, sinon le prix affiché — `beneficeSiVendue`, la règle du bénéfice) et UN geste
+  // proposé (`gesteDormante`, parmi ceux de « Agir »). Rangée par ce qui rapporte le plus à débloquer
+  // (`classerDormantes`), le compte de l'onglet gardé en tête comme partout (tri stable). « Favoris sans
+  // vente » garde son ordre (le plus de favoris d'abord). Rien n'est envoyé ici.
+  const listeDormantes = (() => {
+    if (annSort !== 'sleeping' || listings.items == null) return null;
+    const sitesAff = PROFIL_VENDEUR.uid === (AUTH.user?.id || '') && Array.isArray(PROFIL_VENDEUR.plateformes) ? PROFIL_VENDEUR.plateformes : null;
+    const l = annShown.map(it=>{ const e=numeros[it.id]||{}; const pr=(it.price&&typeof it.price==='object')?it.price.amount:it.price; const n=Number(String(pr==null?'':pr).replace(',','.'));
+      const base = { id:String(it.id), it, numero:e.numero?String(e.numero):'', titre:it.title||'', photo:photoArticle(it)||'', prix:isFinite(n)&&n>0?n:null, age:listedAgeDays(it),
+        vues:Number.isFinite(it.views)?it.views:null, favoris:Number.isFinite(it.favourites)?it.favourites:null, compte:annUnCompte?'':((it._acc&&(it._acc.login||it._acc.username))||'') };
+      if (modeDort === 'favoris') return base;
+      const conseil = conseilsPrix.get(String(it.id)) || null;
+      const urlF = it.url || (/^\d+$/.test(String(it.id)) ? `https://${(it._acc && it._acc.domain) || 'www.vinted.fr'}/items/${it.id}` : '');
+      const geste = gesteDormante({ conseil, favoris: base.favoris, vues: base.vues, surLbc: lbcAussi.has(String(it.id)), numero: base.numero, url: urlF,
+        cap: (c)=>extSait(c), version: (c)=>EXT_CAPACITES[c] || '', sites: sitesAff });
+      const entree = fusionEntreeVente(e, null, buyByNum);
+      const valeur = base.prix == null ? null : beneficeSiVendue(geste && geste.k === 'baisser' && geste.sugg > 0 ? geste.sugg : base.prix, entree);
+      return { ...base, geste, valeur };
+    });
+    if (modeDort === 'favoris') return l;
+    const c = selEff, uidL = (x) => String((x.it && x.it._acc && x.it._acc.vinted_user_id) || '');
+    return classerDormantes(l).sort((x, y) => (c ? (uidL(x) === c) === (uidL(y) === c) ? 0 : (uidL(x) === c ? -1 : 1) : 0));
+  })();
   // ── SUIVIES, PAS ENCORE VENDUES → REMISE NATIVE (G22) ─────────────────────
   // Une paire dans les favoris de plusieurs personnes mais non vendue est la
   // candidate idéale à la REMISE NATIVE de Vinted : une baisse de prix prévient
@@ -48857,12 +48922,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <AnnoncesMasquees Photo={PhotoVinted} res={listings.masquees==null ? (listings.loading ? undefined : null) : masqueesParCompte(annMasquees, { numeroDe:(id)=>(numeros[id]||{}).numero||'', nomDe:(a)=>a?accNameOf(a):'' })}/>
         ) : annSort==='sleeping' ? (
           <QuiDorment seuil={seuilDort} onSeuil={setSeuilDort} Segmente={Segmente} fmt={fmt} onAgir={(a)=>setDortAgir(a)}
+            onGeste={(a)=>{ if (!a.geste) return; if (a.geste.bloque) { toast(a.geste.bloque); return; } const go = allerDormante(a).aller[a.geste.k]; if (go) go(); }}
+            onPrixAchat={(a)=>saisirPrixAnnonce(a.it)}
             selection={qdSel} onSelection={setQdSel} onBaisser={(choisies)=>setBaisseSel(choisies.map(a=>annonceBaisse(a.it)))}
             mode={modeDort} onMode={setModeDort} seuilFavoris={seuilFav} onSeuilFavoris={setSeuilFav} nDort={vueRelancer.dort} nFavoris={vueRelancer.favoris}
             pasLus={modeDort==='favoris' && vueRelancer.favorisPasLus>0 ? `Favoris pas lus sur ${vueRelancer.favorisPasLus} annonce${vueRelancer.favorisPasLus>1?'s':''}.` : ''}
-            liste={listings.items==null ? null : annShown.map(it=>{ const e=numeros[it.id]||{}; const pr=(it.price&&typeof it.price==='object')?it.price.amount:it.price; const n=Number(String(pr==null?'':pr).replace(',','.'));
-              return { id:String(it.id), it, numero:e.numero?String(e.numero):'', titre:it.title||'', photo:photoArticle(it)||'', prix:isFinite(n)&&n>0?n:null, age:listedAgeDays(it),
-                vues:Number.isFinite(it.views)?it.views:null, favoris:Number.isFinite(it.favourites)?it.favourites:null, compte:annUnCompte?'':((it._acc&&(it._acc.login||it._acc.username))||'') }; })}/>
+            liste={listings.items==null ? null : listeDormantes}/>
         ) : (<>
         <div className="vrm-ledger-heading vrm-ann-ledger-heading" aria-hidden="true"><span>{tr('annonces.articleStock')}</span><span>{tr('partout.part.prix')}</span></div>
         {/* (10 nov., lot AM — demande 15 de Julien : « la disposition par compte de Vinted me plaît … la même pour
@@ -53106,31 +53171,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           EXISTANT : Modifier prix sur place (Republier → modifier), Republier (recréer),
           la fiche « Publier sur Leboncoin », « Publier sur eBay ». Rien ne part tout seul. */}
       {dortAgir && (()=>{
-        const a = dortAgir, it = a.it, e = numeros[it.id] || {};
-        const versRepub = (act) => { setDortAgir(null); setRepubReprise([String(it.id)]); setRepubAction(act); };
-        // (9 nov., « vendre plus ») Les gestes viennent d'UNE règle (`gestesDormeuse`,
-        // src/vendrePlus.js) : chacun ouvre l'écran EXISTANT, sur SON clic, rien ne part
-        // tout seul et aucun prix n'est proposé. Republier : la paire pré-choisie dans
-        // l'atelier, c'est LUI qui lance.
-        const urlFiche = it.url || (/^\d+$/.test(String(it.id)) ? `https://${(it._acc && it._acc.domain) || 'www.vinted.fr'}/items/${it.id}` : '');
-        const uidIt = String((it._acc && it._acc.vinted_user_id) || '');
-        const aller = {
-          republier: ()=>versRepub('recreer'),
-          prix: ()=>versRepub('modifier'),
-          vinted: ()=>{ try { window.open(urlFiche, '_blank', 'noopener'); } catch (_) {} setDortAgir(null); },
-          // ⚠️ On change d'écran AVANT de fermer la feuille : fermée d'abord, elle
-          // retirait son entrée d'historique (history.back) avant que le nouvel
-          // écran soit rendu, et ce retour ramenait Vinted (mesuré au banc, 1 fois sur 2).
-          // Le nouvel écran démonte la feuille ; la fermeture différée ne sert qu'en secours.
-          lbc: ()=>{
-              if (!mpChoisi(e,'lbc')) updatePair(it, { mp: { ...(e.mp||{}), lbc: true } });
-              DEMANDE_LBC_FICHE.id = String(it.id); DEMANDE_LBC_FICHE.at = Date.now(); onNav && onNav('leboncoin'); setTimeout(()=>setDortAgir(null), 400); },
-          ebay: ()=>{ DEMANDE_EBAY_PAIRE.id = String(it.id); DEMANDE_EBAY_PAIRE.at = Date.now(); onNav && onNav('ebay_annonces'); setTimeout(()=>setDortAgir(null), 400); },
-          vestiaire: ()=>{ DEMANDE_VC_PAIRE.id = String(it.id); DEMANDE_VC_PAIRE.at = Date.now(); onNav && onNav('vestiaire_annonces'); setTimeout(()=>setDortAgir(null), 400); },
-          // La file « Envoyer une offre aux favoris » (Messages → Favoris reçus) du compte
-          // de l'annonce : c'est LUI qui choisit et envoie.
-          favoris: ()=>{ if (uidIt && typeof setCompteSel === 'function') setCompteSel(uidIt); demanderVue('favoris'); onNav && onNav('cat_msg'); setTimeout(()=>setDortAgir(null), 400); },
-        };
+        const a = dortAgir;
+        const { aller, urlFiche } = allerDormante(a);
         // (9 nov.) Seulement les sites qu'il AFFICHE (« Mes plateformes ») : un site masqué ramenait sur Vinted, le clic ne menait nulle part.
         const sitesAffiches = PROFIL_VENDEUR.uid === (AUTH.user?.id || '') && Array.isArray(PROFIL_VENDEUR.plateformes) ? PROFIL_VENDEUR.plateformes : null;
         const choix = gestesDormeuse({ numero: a.numero, favoris: a.favoris, url: urlFiche, cap: (c)=>extSait(c), version: (c)=>EXT_CAPACITES[c] || '', sites: sitesAffiches })
@@ -53206,8 +53248,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const rx = raisonExtGlobale(false, { cap:'baisseprix', role:'baisse tes prix sur Vinted' });
         const ownerB = AUTH.user?.id;
         return <BaissePrixSerie annonces={baisseSel} compteOnglet={vc === undefined ? undefined : (vc ? String(vc.uid||'') : null)}
+          baisseInitiale={baisseSelInit} varierDefaut={!baisseSelInit}
           plancherDe={(a)=>plancherDeItem(a.id)} extRaison={rx ? rx.texte : ''} Photo={PhotoVinted} Retour={FermeAuRetour}
-          onFermer={()=>setBaisseSel(null)}
+          onFermer={()=>{ setBaisseSel(null); setBaisseSelInit(null); }}
           onBaisser={async (l)=>{
             const r = await vmrCmdSuivi({ cmd:'baisserPrixVinted', uid:l.uid, id:l.id, prix:l.nouveau, prixAvant:l.prix, confirme:true }, 120000);
             // Le prix RELU (jamais supposé) : l'historique des prix et la liste à l'écran le prennent.
@@ -57126,6 +57169,9 @@ function AppCoeur() {
   // (1er nov.) LA FICHE COMPLÈTE D'UNE PAIRE (`FichePaire`) : ouverte depuis
   // « Tout sur le N° » ou le mode emballage ; elle lit les MÊMES sources.
   const [ficheNum,setFicheNum]=useState(null);
+  // (13 nov., point 14) « Saisir le prix d'achat » depuis la fiche : la feuille « Combien tu l'avais payée ? »
+  // sur LA fiche de la paire (`p.idFiche`, identité §5) ; rien n'est écrit sans SON « Enregistrer » (§2.5).
+  const [achatFiche,setAchatFiche]=useState(null);
   // (10 nov., lot L) LA CALCULETTE D'ACHAT : ouverte par Achats (`vrm:calculette`) ou ⌘K ; elle n'écrit rien.
   const [calcOuverte,setCalcOuverte]=useState(false);
   useEffect(()=>{const ouvrir=()=>setCalcOuverte(true);window.addEventListener('vrm:calculette',ouvrir);return()=>window.removeEventListener('vrm:calculette',ouvrir);},[]);
@@ -57185,7 +57231,7 @@ function AppCoeur() {
       for(const r of lu.lignes){ const p=(r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) enLigne.add(String(it.id)); } }
       // (1er nov.) Vues et favoris de chaque annonce lue (la fiche d'une paire) :
       // un nombre seulement s'il est écrit, jamais un 0 deviné.
-      stats={}; crees={}; for(const r of lstRows){ const p=(r&&r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it||it.id==null) continue; { const c=dateMiseEnLigneMs({ createdTs: Number.isFinite(it.created_at_ts) ? it.created_at_ts : (Number.isFinite(it.createdTs) ? it.createdTs : (it.photo && it.photo.high_resolution && Number.isFinite(it.photo.high_resolution.timestamp) ? it.photo.high_resolution.timestamp : null)), id: it.id }, null); if (c != null) crees[String(it.id)] = c; } const fav=Number.isFinite(it.favourite_count)?it.favourite_count:(Number.isFinite(it.favourites_count)?it.favourites_count:null); stats[String(it.id)]={vues:(Number.isFinite(it.view_count)&&it.view_count>0)?it.view_count:null,favoris:fav}; } }
+      stats={}; crees={}; for(const r of lstRows){ const p=(r&&r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it||it.id==null) continue; { const c=dateMiseEnLigneMs({ createdTs: Number.isFinite(it.created_at_ts) ? it.created_at_ts : (Number.isFinite(it.createdTs) ? it.createdTs : (it.photo && it.photo.high_resolution && Number.isFinite(it.photo.high_resolution.timestamp) ? it.photo.high_resolution.timestamp : null)), id: it.id }, null); if (c != null) crees[String(it.id)] = c; } const fav=Number.isFinite(it.favourite_count)?it.favourite_count:(Number.isFinite(it.favourites_count)?it.favourites_count:null); stats[String(it.id)]={vues:(Number.isFinite(it.view_count)&&it.view_count>0)?it.view_count:null,favoris:fav,prix:it.price!=null?it.price:null}; } }   /* (13 nov.) `prix` : le prix LU, pour « si vendue » de la fiche */
       for(const l of lu.aConfirmer.values()) for(const it of (l||[])) aConfirmer.add(String(it.id));
       // 22 oct. : les masquées par Vinted — la même règle que l'écran Annonces (`<masquees-regle>`).
       const supp=await lireSupprimeesTous();
@@ -60262,6 +60308,7 @@ function AppCoeur() {
             onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}
             onEmballer={()=>{ fermer(); setGsOpen(false); DEMANDE_EMBALLAGE.at = Date.now(); setTab('cat_bord'); try { window.dispatchEvent(new Event('vrm:emballer')); } catch (_) {} }}
             onPrix={(n)=>setPrixNum(String(n))} onPublierAilleurs={(n)=>setPubAil({ num: String(n), site: null })} neuve={neuve}
+            onPrixAchat={(pp)=>{ if (pp && pp.idFiche) setAchatFiche({ tx: 'fiche:' + pp.idFiche, item: pp.idFiche, num: String(pp.num || ''), sous: pp.titre ? String(pp.titre).slice(0, 34) : 'prix d’achat' }); }}
             onSource={(src)=>{ fermer(); setGsOpen(false);
               // (9 nov.) « Ouvrir dans … » : l'écran d'où vient l'étape, sur SON objet (par identité).
               if (src.stock) { setGarageLocate(String(src.stock)); DEMANDE_STOCK_CHERCHE.nums=[String(src.stock)]; DEMANDE_STOCK_CHERCHE.at=Date.now(); setTab('garage'); return; }
@@ -60272,6 +60319,7 @@ function AppCoeur() {
             onDupliquer={async()=>{ const r=await dupliquerNumero(rn, ex); if(!r.ok){ toast(`Pas dupliqué : ${r.raison}`); return; } toast(`N°${r.numero} créé`); setNeuveRecente(r.fiche); setFicheNum(String(r.numero)); }}
             Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>} Icon={Icon} Retour={FermeAuRetour}/>;
         }}/></GardeEcran>}
+        {achatFiche && <GardeEcran nom="prixachat-fiche" feuille onFermer={()=>setAchatFiche(null)}><FeuillePrixAchat ventes={[achatFiche]} onEnregistrer={poserPrixAchatVente} onFermer={()=>setAchatFiche(null)} Feuille={SheetShellSurFiche} Bouton={Bouton}/></GardeEcran>}
         {prixFeuille && <GardeEcran nom="prixachat" feuille onFermer={()=>setPrixFeuille(null)}><PrixAchatCoque txs={prixFeuille} onPoser={poserPrixAchatVente} onFermer={()=>setPrixFeuille(null)}/></GardeEcran>}
         <GardeEcran nom="lienvc" feuille><HoteLienVc comptes={vintedAccounts}/></GardeEcran>
         {visuels && <GardeEcran nom="visuels" feuille onFermer={()=>setVisuels(null)}>
