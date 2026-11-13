@@ -1,21 +1,26 @@
-// ── LE PARCOURS D'ARRIVÉE (11 nov.) ─────────────────────────────────────────
+// ── LE PARCOURS D'ARRIVÉE (11 nov. ; trois étapes le 13 nov., lot 46) ───────
 // Julien, 11 nov. : un NOUVEAU vendeur démarre en 10 minutes, « un vrai
-// accompagnement ». Six étapes, UNE à la fois, dans l'ordre où elles servent :
-//   1. compte        — la session de CE compte VRM (écrans existants) ;
-//   2. configuration — « Tu vends quoi ? » : Ma configuration (src/configurationDepart.js)
-//                      terminée, ou le choix des plateformes fait avant le 9 nov. ;
-//   3. extension     — installée ET connectée à CE compte VRM (le pont dit
-//                      `connectee`), ou un compte Vinted déjà rangé dans SA base
-//                      (seule son extension en écrit) ;
-//   4. emails        — un e-mail rangé chez lui (`email_reception_*`) : l'essai
-//                      « Reçu ✓ » de « Ton adresse VRM » en crée un ;
-//   5. vinted        — un compte Vinted relié ET son dressing LU : « N annonces lues »
-//                      (le compteur `nItems` de `harvest_{uid}_listings`, un scalaire) ;
-//   6. premiere      — une vente ou un achat LU (compteurs `nItems` des commandes) ⇒
-//                      « C'est prêt ».
+// accompagnement ». (13 nov., lot 46) Le démarrage guidé tient en TROIS étapes,
+// une à la fois, dans l'ordre où elles servent :
+//   1. compte    — la session de CE compte VRM (écrans existants) ;
+//   2. extension — installée ET connectée à CE compte VRM (le pont dit
+//                  `connectee`), ou un compte Vinted déjà rangé dans SA base
+//                  (seule son extension en écrit) ;
+//   3. vinted    — Vinted ouvert une fois : un compte relié ET une première
+//                  lecture rangée de CE compte — ses ventes (`harvest_{uid}_orders_*`),
+//                  sinon son dressing (`harvest_{uid}_listings`) ; compteurs
+//                  `nItems`, des scalaires. ⚠️ Le dressing compte aussi : un compte
+//                  sans AUCUNE vente n'a jamais de ligne de ventes (l'extension ne
+//                  range pas une liste vide, background.js `plein`) — sans lui, le
+//                  guide ne finirait jamais pour un vendeur qui débute.
+// « Ma configuration » s'ouvre seule avant (src/configurationDepart.js, sa carte
+// « Reprendre » si elle est mise de côté) et les e-mails se relient depuis l'écran
+// E-mails : ce ne sont plus des étapes comptées.
 // Chaque étape se coche SEULE sur une preuve lue (jamais « j'ai fini » à cocher).
 // Trois états partout : `undefined` en cours · `null` pas su · valeur lue.
-// « Pas su » n'est jamais « fait ».
+// « Pas su » n'est jamais « fait ». Une étape bloquée dit le geste exact
+// (`ligneEtape`). Les trois faites, la carte disparaît ; un vendeur déjà installé
+// (un compte Vinted rangé sans avoir jamais ouvert le guide) ne la voit jamais.
 // La position (étape montrée, écran ouvert, fin vue) est rangée dans la ligne
 // `main` (`vrm_parcours`, synchronisée) : on reprend là où on s'est arrêté, sur
 // n'importe quel appareil. « Plus tard » : `vrm_parcours_plus_tard` (7 jours).
@@ -27,11 +32,8 @@ export const JOURS_REPORT = 7;
 
 export const ETAPES_PARCOURS = [
   { cle: 'compte', titre: 'Ton compte VRM', court: 'Compte', pourquoi: 'Tout ce que VRM range est à toi seul.' },
-  { cle: 'configuration', titre: 'Tu vends quoi ?', court: 'Configuration', geste: 'Commencer', pourquoi: 'VRM prend tes mots, tes plateformes et ton statut.' },
   { cle: 'extension', titre: 'Installe l’extension', court: 'Extension', pourquoi: 'Elle lit tes ventes et tes colis, depuis ton navigateur.' },
-  { cle: 'emails', titre: 'Relie tes e-mails', court: 'E-mails', geste: 'Relier mes e-mails', pourquoi: 'Bordereaux, codes de retrait et suivis se rangent seuls.' },
-  { cle: 'vinted', titre: 'Ouvre Vinted une fois', court: 'Vinted', geste: 'Ouvrir vinted.fr', pourquoi: 'Connecté à ton compte, l’extension lit tes annonces.' },
-  { cle: 'premiere', titre: 'Ta première vente', court: 'Première vente', attente: true, pourquoi: 'Rien à faire : elle arrive seule, avec son colis.' },
+  { cle: 'vinted', titre: 'Ouvre Vinted une fois', court: 'Vinted', geste: 'Ouvrir vinted.fr', pourquoi: 'Connecté à ton compte, l’extension lit tes ventes.' },
 ];
 const CLES = ETAPES_PARCOURS.map((e) => e.cle);
 const ETATS = new Set(['fait', 'afaire', 'attente', 'encours', 'passu']);
@@ -41,14 +43,6 @@ const ETATS = new Set(['fait', 'afaire', 'attente', 'encours', 'passu']);
 export function preuveCompte(uid) {
   if (uid === undefined) return { etat: 'encours' };
   return uid && String(uid).trim() ? { etat: 'fait' } : { etat: 'passu' };
-}
-// `pret` : le nuage est arrivé ; `etat` : 'fait' | 'plusTard' | null (vrm_configuration lue) ;
-// `plateformes` : le choix des plateformes (avant le 9 nov.) existe.
-export function preuveConfiguration({ pret, etat, plateformes } = {}) {
-  if (!pret) return { etat: 'encours' };
-  if (etat === 'fait') return { etat: 'fait' };
-  if (!etat && plateformes === true) return { etat: 'fait' };
-  return { etat: 'afaire', detail: etat === 'plusTard' ? 'reprendre' : 'commencer' };
 }
 // `pont` : 'absente' · 'demande' · 'muette' · 'pasconnectee' · 'autrecompte' · 'connectee'
 // (`useEtapePont`). Une extension qui répond mais range ailleurs n'est PAS faite.
@@ -61,51 +55,36 @@ export function preuveExtension(pont, comptes) {
   if (pont === 'autrecompte') return { etat: 'afaire', detail: 'autrecompte' };
   return { etat: 'afaire', detail: 'absente' };
 }
-// Lignes `email_reception_*` lues (`select=id`).
-export function preuveEmails(lignes) {
-  if (lignes === undefined) return { etat: 'encours' };
-  if (!Array.isArray(lignes)) return { etat: 'passu' };
-  return lignes.length > 0 ? { etat: 'fait' } : { etat: 'afaire' };
-}
 // Le nombre lu dans une ligne `{ id, n }` (`n` = `data->>nItems`) ; illisible ⇒ NaN.
 const nombreLu = (l) => (l && l.n != null && l.n !== '' && Number.isFinite(Number(l.n)) && Number(l.n) >= 0 ? Number(l.n) : NaN);
 const uidDe = (id, suffixe) => { const m = new RegExp(`^harvest_(\\d+)_${suffixe}$`).exec(String(id || '')); return m ? m[1] : null; };
-// `comptes` : la liste Vinted lue ; `lignes` : `harvest_*_listings` projetées `{ id, n }`.
-// Seuls les dressings des comptes reliés comptent (identité : le n° du compte).
-export function preuveVinted(comptes, lignes) {
+// La somme des compteurs lus des lignes `suffixe` de SES comptes : `undefined` aucune
+// ligne · `null` des lignes au compteur illisible · un nombre. Un autre compte ne compte pas.
+function somme(lignes, suffixe, uids) {
+  let n = 0, vu = false, illisible = false;
+  for (const l of lignes) {
+    if (!uids.has(uidDe(l && l.id, suffixe))) continue;
+    const v = nombreLu(l);
+    if (Number.isFinite(v)) { n += v; vu = true; } else illisible = true;
+  }
+  return vu ? n : illisible ? null : undefined;
+}
+// `comptes` : la liste Vinted lue ; `annonces` : `harvest_*_listings` projetées `{ id, n }` ;
+// `commandes` : `harvest_*_orders_*` projetées `{ id, n }`. Une lecture rangée d'un compte
+// relié suffit : ses ventes, ses achats ou son dressing.
+export function preuveVinted(comptes, annonces, commandes) {
   if (comptes === undefined) return { etat: 'encours' };
   if (!Array.isArray(comptes)) return { etat: 'passu' };
   if (!comptes.length) return { etat: 'afaire' };
-  if (lignes === undefined) return { etat: 'encours' };
-  if (!Array.isArray(lignes)) return { etat: 'passu' };
   const uids = new Set(comptes.map((c) => String((c && c.vinted_user_id) || '')).filter(Boolean));
-  const siennes = lignes.filter((l) => uids.has(uidDe(l && l.id, 'listings')));
-  if (!siennes.length) return { etat: 'attente', detail: 'lecture' };
-  const lus = siennes.map(nombreLu).filter((v) => Number.isFinite(v));
-  if (!lus.length) return { etat: 'passu' };
-  return { etat: 'fait', n: lus.reduce((a, b) => a + b, 0) };
-}
-// Ventes et achats : `harvest_*_orders_sold` / `_orders_purchased` projetées `{ id, n }`.
-// Une vente OU un achat lu suffit ; un compteur illisible n'est jamais 0.
-function compter(lignes, suffixe) {
-  if (lignes === undefined) return undefined;
-  if (!Array.isArray(lignes)) return null;
-  let n = 0, illisible = false;
-  for (const l of lignes) {
-    if (!uidDe(l && l.id, suffixe)) continue;
-    const v = nombreLu(l);
-    if (Number.isFinite(v)) n += v; else illisible = true;
-  }
-  if (n > 0) return n;
-  return illisible ? null : 0;
-}
-export function preuvePremiere(lignes) {
-  const ventes = compter(lignes, 'orders_sold');
-  const achats = compter(lignes, 'orders_purchased');
-  if ((ventes || 0) > 0 || (achats || 0) > 0) return { etat: 'fait', ventes: ventes || 0, achats: achats || 0 };
-  if (ventes === undefined) return { etat: 'encours' };
-  if (ventes === null || achats === null) return { etat: 'passu' };
-  return { etat: 'attente' };
+  const n = Array.isArray(annonces) ? somme(annonces, 'listings', uids) : annonces;
+  const ventes = Array.isArray(commandes) ? somme(commandes, 'orders_sold', uids) : commandes;
+  const achats = Array.isArray(commandes) ? somme(commandes, 'orders_purchased', uids) : commandes;
+  const lu = (v) => typeof v === 'number';
+  if (lu(n) || lu(ventes) || lu(achats)) return { etat: 'fait', ...(lu(n) ? { n } : {}), ...(lu(ventes) ? { ventes } : {}), ...(lu(achats) ? { achats } : {}) };
+  if (n === null || ventes === null || achats === null) return { etat: 'passu' };
+  if (annonces === undefined || commandes === undefined) return { etat: 'encours' };
+  return { etat: 'attente', detail: 'lecture' };
 }
 
 // ── « PLUS TARD » ───────────────────────────────────────────────────────────
@@ -117,7 +96,8 @@ export function reportee(plusTard, cle, maintenant = Date.now()) {
 const reporteeParcours = (plusTard, cle, m) => reportee(plusTard, cle, m) || (cle === 'vinted' && reportee(plusTard, 'extension', m));
 
 // ── LA POSITION RANGÉE (`vrm_parcours`) ─────────────────────────────────────
-// { v: 1, etape, ouvert, fini, at } — tout champ inconnu est ignoré.
+// { v: 1, etape, ouvert, fini, at } — tout champ inconnu est ignoré (une étape
+// d'avant le 13 nov. — configuration, e-mails, première vente — ne vaut aucune).
 export function lireParcours(brut) {
   const o = brut && typeof brut === 'object' && !Array.isArray(brut) ? brut : null;
   if (!o) return null;
@@ -170,27 +150,45 @@ export function suivanteApres(etat, cle, plusTard = null, maintenant = Date.now(
   return n ? n.cle : null;
 }
 // La carte de Ma journée : 'cachee' · 'etape' (une étape à faire) · 'reprendre'
-// (tout ce qui reste est de côté) · 'pret' (tout est fait, à dire UNE fois).
-// Un vendeur installé qui n'a jamais ouvert le parcours n'est jamais interrompu
-// par « C'est prêt » ; « pas su » ne finit rien.
-export function carteParcours(etat, parcours, { masque = false, exemple = false } = {}) {
+// (tout ce qui reste est de côté). (13 nov., lot 46) Les trois faites ⇒ elle
+// disparaît (« C'est prêt » ne se dit que dans l'écran plein, devant lui).
+// `comptes` : la liste Vinted de la coque. Un parcours JAMAIS ouvert (aucune
+// position rangée) ne s'affiche qu'à un compte SANS compte Vinted — un vendeur
+// installé n'est jamais interrompu ; liste pas lue (pas su) ⇒ rien non plus.
+export function carteParcours(etat, parcours, { masque = false, exemple = false, comptes } = {}) {
   if (!etat || exemple) return 'cachee';
   const p = lireParcours(parcours);
   if (p && p.fini) return 'cachee';
-  if (etat.fini) return p ? 'pret' : 'cachee';
+  if (etat.fini) return 'cachee';
+  if (!p && !(Array.isArray(comptes) && comptes.length === 0)) return 'cachee';
   if (masque) return 'cachee';
   return etat.courante ? 'etape' : 'reprendre';
 }
 // La phrase de réussite d'une étape (le chiffre vient de la preuve, jamais inventé).
 export function reussite(e) {
   if (!e || e.etat !== 'fait') return '';
-  if (e.cle === 'vinted') return typeof e.n === 'number' ? (e.n === 1 ? '1 annonce lue' : e.n === 0 ? 'Dressing lu · aucune annonce en ligne' : `${e.n} annonces lues`) : 'Compte relié';
-  if (e.cle === 'premiere') {
-    const v = e.ventes || 0, a = e.achats || 0;
-    return [v ? (v === 1 ? '1 vente lue' : `${v} ventes lues`) : '', a ? (a === 1 ? '1 achat lu' : `${a} achats lus`) : ''].filter(Boolean).join(' · ');
+  if (e.cle === 'vinted') {
+    const v = e.ventes, n = e.n;
+    if (typeof v === 'number' && v > 0) return v === 1 ? '1 vente lue' : `${v} ventes lues`;
+    if (typeof n === 'number') return n === 1 ? '1 annonce lue' : n === 0 ? 'Dressing lu · aucune annonce en ligne' : `${n} annonces lues`;
+    if (typeof v === 'number') return 'Ventes lues · aucune pour l’instant';
+    return typeof e.achats === 'number' ? (e.achats === 1 ? '1 achat lu' : `${e.achats} achats lus`) : 'Compte relié';
   }
-  if (e.cle === 'emails') return 'Reçu ✓';
   if (e.cle === 'extension') return 'Connectée à ton compte';
-  if (e.cle === 'configuration') return 'Enregistrée';
   return 'Créé';
+}
+// Ce qu'une étape PAS faite dit, en une ligne (≤ 12 mots) : le geste exact quand elle
+// est bloquée. `ou` : « dans Chrome » (le navigateur d'ici, `NAV.dansNu`), ou « sur ton
+// ordinateur » sur un téléphone sans extension. '' ⇒ rien à ajouter.
+export function ligneEtape(e, { ou = 'dans ton navigateur' } = {}) {
+  if (!e || e.etat === 'fait') return '';
+  if (e.etat === 'encours') return 'Je vérifie…';
+  if (e.etat === 'passu') return e.detail === 'muette' ? 'L’extension ne répond pas. Recharge la page.' : 'Pas pu vérifier.';
+  if (e.cle === 'extension') {
+    if (e.detail === 'pasconnectee') return 'Installée. Connecte-la à ce compte VRM.';
+    if (e.detail === 'autrecompte') return 'Reliée à un autre compte VRM. Reconnecte-la ici.';
+    return `Télécharge-la, puis installe-la ${ou}.`;
+  }
+  if (e.cle === 'vinted') return e.etat === 'attente' ? 'Lecture de tes ventes…' : `Ouvre vinted.fr ${ou}, connecté à ton compte.`;
+  return '';
 }

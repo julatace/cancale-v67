@@ -408,13 +408,13 @@ import { LIGNE_ACCOMPAGNEMENT } from "./accompagnement.js";
 import { estIphoneSafari, estInstallee } from "./guideIphone.js";
 // (6 nov.) VRM ouvert à des clients : le mode exemple (données inventées, en mémoire
 // seulement) et le guide de démarrage (quatre étapes cochées sur une preuve lue).
-import { exempleActif, entrerModeExemple, sortirModeExemple } from "./modeExemple.js";
+import { exempleActif, exempleSansCompte, entrerModeExemple, sortirModeExemple } from "./modeExemple.js";
 // (6 nov., v36) Les temps réels chez les vendeurs, anonymes et agrégés (src/mesuresCollecte.js).
 import { demarrerMesures, mesuresEcran } from "./mesuresCollecte.js";
 // ⟦→ ecrans/Reglages.jsx #11⟧
 import { GuideDemarrage, BandeauExemple, ChoixNumerotation, VerificationInstallation } from "./GuideDemarrage.jsx";
 import { ParcoursArrivee, CarteParcours } from "./ParcoursArrivee.jsx";
-import { CLE_PARCOURS, etatParcours, preuveCompte as preuveCompteParcours, preuveConfiguration, preuveExtension as preuveExtensionParcours, preuveEmails, preuveVinted, preuvePremiere, lireParcours as lirePositionParcours, ecritureParcours, etapeAMontrer, suivanteApres, carteParcours } from "./parcoursArrivee.js";
+import { CLE_PARCOURS, etatParcours, preuveCompte as preuveCompteParcours, preuveExtension as preuveExtensionParcours, preuveVinted, lireParcours as lirePositionParcours, ecritureParcours, etapeAMontrer, suivanteApres, carteParcours } from "./parcoursArrivee.js";
 import { etatGuide, preuveCompte, preuveExtension, preuveListe, preuveNombre, compterNumeros, compterVentes, CLE_PLUS_TARD, CHOIX_NUMEROTATION, choixNumerotation, numerotationAChoisir, reglageDuChoix, reporteeActive, verifierInstallation } from "./guideDemarrage.js";
 import { PHRASES_ECRAN, phraseEcranPour } from "./phrasesEcran.js";
 import { AIDE_ECRANS } from "./aideEcrans.js";
@@ -18869,6 +18869,10 @@ function AuthScreen() {
 .vrm-cx-form button[type=submit]{min-height:50px;transition:transform 140ms cubic-bezier(0.23,1,0.32,1),opacity 140ms ease}
 .vrm-cx-form button[type=submit]:active{transform:scale(.98)}
 .vrm-cx-liens button{min-height:44px}
+.vrm-cx-exemple{margin:14px 0 0;text-align:center}
+.vrm-cx-exemple p{margin:0 0 8px;font-size:13px;line-height:1.45;color:${C.muted}}
+.vrm-cx-exemple a{display:flex;align-items:center;justify-content:center;min-height:44px;border-radius:12px;border:1px solid ${C.border};color:${C.text};font-size:15px;font-weight:600;text-decoration:none}
+.vrm-cx-exemple a:focus-visible{outline:2px solid ${C.accent};outline-offset:3px}
 .vrm-cx-oublie{border:0;background:transparent;color:${C.accent};padding:4px 0;font:inherit;font-size:12px;font-weight:500;min-height:32px;cursor:pointer}
 .vrm-cx-aide-confirmation{margin-top:12px;border-top:1px solid ${C.border};padding-top:10px}
 .vrm-cx-aide-confirmation summary{min-height:32px;cursor:pointer;font-weight:600;color:${C.accent}}
@@ -19152,6 +19156,12 @@ function AuthScreen() {
             )}
           </div>
         </form>
+        {/* (13 nov., lot 48) VRM rempli de données INVENTÉES, sans compte (src/modeExemple.js) :
+            un vrai lien, rien n'est enregistré ni envoyé ; le bandeau propose « Créer mon compte ». */}
+        {(mode==='in'||mode==='up') && !__lier && <div className="vrm-cx-exemple" data-cx-exemple="">
+          <p>{tr('auth.exemple.note')}</p>
+          <a href="/?exemple" data-cx-exemple-entrer="">{tr('auth.exemple')}</a>
+        </div>}
         <LiensLegaux/>
         {/* (11 nov., lot traduction) La langue, avant même d'avoir un compte. */}
         <div style={{display:'flex',justifyContent:'center',color:C.muted,fontSize:12}}><ChoixLangue/></div>
@@ -21607,16 +21617,13 @@ function lienInstallerIci(sansSouris) {
 // ── LE PARCOURS D'ARRIVÉE, BRANCHÉ SUR LES PREUVES (11 nov.) ─────────────────
 // La règle : src/parcoursArrivee.js ; le dessin : src/ParcoursArrivee.jsx.
 // Ici, seulement les LECTURES (trois états, §8) et la position rangée :
-//   · configuration : `vrm_configuration` (ou le choix des plateformes d'avant le 9 nov.) ;
 //   · extension : le pont (`useEtapePont`) — connectée à CE compte — ou un compte déjà rangé ;
-//   · e-mails : une ligne `email_reception_*` (`select=id`, limit 1) ;
-//   · Vinted : les comptes lus et le compteur `nItems` de leur dressing (scalaire) ;
-//   · première vente : les compteurs `nItems` des ventes et achats (scalaires).
+//   · Vinted (13 nov., lot 46 : trois étapes) : les comptes lus et les compteurs `nItems`
+//     de leurs ventes, achats et dressing (scalaires) — une lecture rangée suffit.
 // Jamais `select=data`. Pendant qu'une étape attend, l'écran plein relit toutes les
 // 10 s (page visible) et au retour sur l'onglet : la réussite se CONSTATE, rien à cocher.
 // La position (`vrm_parcours`) et « Plus tard » (`vrm_parcours_plus_tard`) sont dans
 // SYNC_KEYS : on reprend là où on s'est arrêté, sur n'importe quel appareil.
-const ParcoursAdresseVrmPA = lazy(() => import('./AdresseReception.jsx').then((m) => ({ default: m.ParcoursAdresseVrm })));
 async function lireLignesParcours(q) {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${q}`, { headers: sbAuth(), cache: 'no-store' });
@@ -21625,7 +21632,6 @@ async function lireLignesParcours(q) {
     return Array.isArray(j) ? j : null;
   } catch (_) { return null; }
 }
-const lireEmailsParcours = () => lireLignesParcours('id=like.email_reception_*&select=id&limit=1');
 const lireAnnoncesParcours = () => lireLignesParcours('id=like.harvest_*_listings&select=id,n:data->>nItems').then((j) => (j ? j.filter((x) => ligneDeSaSession(x && x.id)) : null));
 const lireCommandesParcours = () => lireLignesParcours('id=like.harvest_*_orders_*&select=id,n:data->>nItems').then((j) => (j ? j.filter((x) => ligneDeSaSession(x && x.id)) : null));
 // Une lecture qui GARDE la dernière valeur lue pendant qu'elle relit (pas de « Je vérifie… »
@@ -21664,7 +21670,7 @@ function reporterEtapeIci(cle) {
 function useParcoursArrivee({ comptes: comptesCoque, actif = true, tour = 0 }) {
   const [, maj] = React.useReducer((n) => n + 1, 0);
   React.useEffect(() => {
-    const cles = [CLE_PARCOURS, CLE_PLUS_TARD, CLE_CONFIGURATION, CLE_PLATEFORMES, CLE_GUIDE_MASQUE];
+    const cles = [CLE_PARCOURS, CLE_PLUS_TARD, CLE_GUIDE_MASQUE];
     const f = (e) => {
       const k = e && e.detail && e.detail.k;
       if (k === CLE_PARCOURS && e.detail.distant) __parcoursIci = null;
@@ -21677,51 +21683,51 @@ function useParcoursArrivee({ comptes: comptesCoque, actif = true, tour = 0 }) {
   }, []);
   const { etape: pont, relire } = useEtapePont();
   React.useEffect(() => { if (tour > 0) relire(); }, [tour]); // eslint-disable-line react-hooks/exhaustive-deps
-  const emails = useLectureParcours(lireEmailsParcours, actif, tour, 'parcours:emails');
   const annonces = useLectureParcours(lireAnnoncesParcours, actif, tour, 'parcours:annonces');
   const commandes = useLectureParcours(lireCommandesParcours, actif, tour, 'parcours:commandes');
   const comptesLus = useLectureParcours(fetchVintedAccounts, actif && tour > 0, tour, 'parcours:comptes');
   const comptes = tour > 0 && Array.isArray(comptesLus) ? comptesLus : comptesCoque;
   const pret = isCloudReady();
-  const conf = pret ? lireConfiguration(load(CLE_CONFIGURATION, null)) : null;
   const plusTard = pret ? plusTardRange() : {};
   const etat = etatParcours({
     compte: preuveCompteParcours(AUTH.user?.id || ''),
-    configuration: preuveConfiguration({ pret, etat: conf ? conf.etat : null, plateformes: pret && !!lirePlateformes(load(CLE_PLATEFORMES, null)) }),
     extension: preuveExtensionParcours(pont, comptes),
-    emails: preuveEmails(emails),
-    vinted: preuveVinted(comptes, annonces),
-    premiere: preuvePremiere(commandes),
+    vinted: preuveVinted(comptes, annonces, commandes),
   }, { plusTard });
   return { etat, pret, parcours: pret ? lirePositionParcours(parcoursRange()) : undefined, parcoursBrut: pret ? parcoursRange() : undefined, plusTard, comptes };
 }
-// Le geste de l'étape « configuration » : Ma configuration, plein écran (au-dessus du parcours).
-const ouvrirConfiguration = () => { try { window.dispatchEvent(new Event('vrm:configuration')); } catch (_) {} };
-// La petite carte de Ma journée : l'étape courante et « Continuer » (qui ouvre l'écran plein).
+// Où faire le geste : le navigateur d'ici, ou l'ordinateur pour un téléphone sans extension
+// (Orion sur iPhone et Firefox sur Android ont la leur).
+const ouGesteParcours = (sansSouris) => (sansSouris && !['ios-orion', 'firefox-android'].includes(mobileIci()) ? 'sur ton ordinateur' : NAV.dansNu);
+// (13 nov., lot 46) Le geste exact d'une étape bloquée, porté par la carte : le lien de
+// téléchargement de CE navigateur, ou vinted.fr. Le lien fait la chose ET ouvre l'écran plein.
+function gesteCarteParcours(c, sansSouris) {
+  if (!c || c.etat !== 'afaire') return null;
+  if (c.cle === 'vinted') return ouGesteParcours(sansSouris) === NAV.dansNu ? { libelle: 'Ouvrir vinted.fr', href: 'https://www.vinted.fr' } : null;
+  if (c.cle === 'extension' && c.detail === 'absente') { const lien = lienInstallerIci(sansSouris); return lien ? { libelle: 'Télécharger l’extension', href: lien, telecharger: /\.zip(\?|$)/.test(lien) } : null; }
+  return null;
+}
+// La petite carte de Ma journée : l'étape courante, son geste exact ou « Continuer » (qui
+// ouvre l'écran plein). « Ma configuration » mise de côté garde sa carte « Reprendre ».
 function CarteParcoursApp({ comptes, plein = false }) {
+  const sansSouris = useSansSouris();
   const [masque, setMasque] = React.useState(() => !!load(CLE_GUIDE_MASQUE, null));
   React.useEffect(() => onCloudReady(() => setMasque(!!load(CLE_GUIDE_MASQUE, null))), []);
   const { etat, pret, parcours, parcoursBrut } = useParcoursArrivee({ comptes, actif: !masque || plein });
   if (!pret) return null;
-  const mode = carteParcours(etat, parcoursBrut, { masque: masque && !plein, exemple: exempleActif() });
+  const mode = carteParcours(etat, parcoursBrut, { masque: masque && !plein, exemple: exempleActif(), comptes });
   if (mode === 'cachee') return <ReprendreConfiguration/>;
-  const c = etat.courante;
   const sansCompte = Array.isArray(comptes) && comptes.length === 0;
-  const conf = c === 'configuration' ? lireConfiguration(load(CLE_CONFIGURATION, null)) : null;
-  const continuer = () => {
-    if (mode === 'etape' && c === 'configuration') { ecrireParcoursIci({ etape: 'configuration', ouvert: true }); ouvrirConfiguration(); return; }
-    ecrireParcoursIci({ etape: etapeAMontrer(etat, parcours && parcours.etape), ouvert: true });
-  };
-  return (
+  const c = etat.etapes.find((x) => x.cle === etat.courante) || null;
+  const continuer = () => ecrireParcoursIci({ etape: etapeAMontrer(etat, parcours && parcours.etape), ouvert: true });
+  return (<>
+    <ReprendreConfiguration/>
     <CarteParcours etat={etat} mode={mode} onContinuer={continuer} onPlusTard={reporterEtapeIci}
-      libelleContinuer={c === 'configuration' ? (conf ? 'Reprendre' : 'Commencer') : 'Continuer'}
-      attrsContinuer={c === 'configuration' && mode === 'etape' ? { 'data-configuration-ouvrir': '' } : {}}
-      attrsCarte={c === 'configuration' && mode === 'etape' ? { 'data-reprendre-configuration': conf ? 'plustard' : 'jamais' } : {}}
-      onOk={() => ecrireParcoursIci({ fini: new Date().toISOString(), ouvert: false })}
+      geste={mode === 'etape' ? gesteCarteParcours(c, sansSouris) : null} ou={ouGesteParcours(sansSouris)}
       onExemple={sansCompte && plein ? () => entrerModeExemple() : null}
       onImporter={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=settings&section=importer' })); } catch (_) {} }}
-      onMasquer={!plein && mode !== 'pret' ? () => { save(CLE_GUIDE_MASQUE, { at: new Date().toISOString() }); setMasque(true); } : null}/>
-  );
+      onMasquer={!plein ? () => { save(CLE_GUIDE_MASQUE, { at: new Date().toISOString() }); setMasque(true); } : null}/>
+  </>);
 }
 // L'écran plein, monté dans AppCoeur : ouvert quand la position rangée le dit
 // (`ouvert`), donc aussi après un rechargement ou sur un autre appareil.
@@ -21730,7 +21736,6 @@ function ParcoursArriveeApp({ comptes, retenu = false, onNav, onOuvert }) {
   const sansSouris = useSansSouris();
   const [tour, setTour] = React.useState(0);
   const [succes, setSucces] = React.useState('');
-  const [emailsOuverts, setEmailsOuverts] = React.useState(false);
   const { etat, pret, parcours } = useParcoursArrivee({ comptes, actif: true, tour });
   const ouvert = !!(pret && parcours && parcours.ouvert && !parcours.fini && !exempleActif());
   const voulue = ouvert ? parcours.etape : null;
@@ -21745,14 +21750,14 @@ function ParcoursArriveeApp({ comptes, retenu = false, onNav, onOuvert }) {
     if (etatVoulue !== 'fait') { vue.current[voulue] = 'pasfait'; return undefined; }
     if (vue.current[voulue] !== 'pasfait') return undefined;
     vue.current[voulue] = 'fait';
-    tenue.current = voulue; setSucces(voulue); setEmailsOuverts(false);
+    tenue.current = voulue; setSucces(voulue);
     const t = setTimeout(() => { tenue.current = ''; setSucces(''); }, 1400);
     return () => { clearTimeout(t); tenue.current = ''; setSucces(''); };
   }, [voulue, etatVoulue]); // eslint-disable-line react-hooks/exhaustive-deps
   const montree = ouvert ? (succes || etapeAMontrer(etat, voulue)) : null;
   React.useEffect(() => { onOuvert && onOuvert(ouvert && !retenu); }, [ouvert, retenu]); // eslint-disable-line react-hooks/exhaustive-deps
   // Relire pendant qu'une étape attend : toutes les 10 s, page visible, et au retour sur l'onglet.
-  const attend = ouvert && !retenu && montree && montree !== 'pret' && montree !== 'configuration';
+  const attend = ouvert && !retenu && montree && montree !== 'pret';
   React.useEffect(() => {
     if (!attend) return undefined;
     const pousse = () => { if (document.visibilityState === 'visible') setTour((t) => t + 1); };
@@ -21771,18 +21776,15 @@ function ParcoursArriveeApp({ comptes, retenu = false, onNav, onOuvert }) {
   };
   const fermer = () => ecrireParcoursIci({ ouvert: false });
   const gestes = {
-    configuration: { libelle: lireConfiguration(load(CLE_CONFIGURATION, null)) ? 'Reprendre' : 'Commencer', onClick: ouvrirConfiguration, attrs: { 'data-configuration-ouvrir': '' } },
-    emails: emailsOuverts ? null : { libelle: 'Relier mes e-mails', onClick: () => setEmailsOuverts(true) },
     vinted: { libelle: 'Ouvrir vinted.fr', href: 'https://www.vinted.fr' },
   };
   const details = {
     extension: <PremiersPas onNav={onNav} dansGuide/>,
-    emails: emailsOuverts ? <Suspense fallback={<p role="status">{PAS_SU.enCours}</p>}><ParcoursAdresseVrmPA headers={sbAuth} onBoite={() => { fermer(); onNav && onNav('emails'); }}/></Suspense> : null,
   };
   return (
     <GardeEcran nom="parcours" feuille onFermer={fermer}>
       <FermeAuRetour fermer={fermer}/>
-      <ParcoursArrivee Pop={InfoPop} etat={etat} montree={affichee} succes={succes} gestes={gestes} telephone={sansSouris}
+      <ParcoursArrivee Pop={InfoPop} etat={etat} montree={affichee} succes={succes} gestes={gestes} ou={ouGesteParcours(sansSouris)}
         details={details}
         onPlusTard={plusTard} onFermer={fermer} onReessayer={() => { setTour((t) => t + 1); sonderPonts(); }}
         onFin={() => { ecrireParcoursIci({ fini: new Date().toISOString(), ouvert: false }); onNav && onNav('journee'); }}/>
@@ -60184,7 +60186,7 @@ function AppCoeur() {
       {/* Sur ordinateur, le contenu occupe la largeur disponible après le rail.
           L'ordre des blocs et la disposition de chaque page restent conservés. */}
       {/* (6 nov.) Mode exemple : le bandeau, hors de <main> (il ne défile pas), sur TOUS les écrans. */}
-      {exempleActif() && <BandeauExemple style={ordi ? { marginLeft: NAV_LARGEUR + 36 } : undefined} onBrancher={() => sortirModeExemple()}/>}
+      {exempleActif() && <BandeauExemple sansCompte={exempleSansCompte()} style={ordi ? { marginLeft: NAV_LARGEUR + 36 } : undefined} onBrancher={() => (exempleSansCompte() ? sortirModeExemple(window, '/?inscription') : sortirModeExemple())}/>}
       <main className="vrm-main" data-ecran={tab} data-defile="1" style={{
         // ⚠️ COQUE APP-SHELL : c'est `<main>` qui défile, pas le document. La
         // barre du bas est un frère HORS de ce conteneur → elle ne bouge plus

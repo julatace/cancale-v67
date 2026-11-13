@@ -4,7 +4,7 @@
 // La règle et les scénarios : src/simulationCompte.js (comptes FICTIFS, base
 // simulée en mémoire, aucune requête, aucun e-mail, aucun compte Supabase).
 // Ici : un bouton, puis une carte par scénario — ses choix, son verdict, et ses
-// six étapes en miniatures (le VRAI écran du parcours, réduit), ✓ ou ✗ avec ce
+// trois étapes en miniatures (le VRAI écran du parcours, réduit), ✓ ou ✗ avec ce
 // qui a accroché. Toucher une miniature l'agrandit.
 import React from 'react';
 import { jouerTout, SCENARIOS } from './simulationCompte.js';
@@ -27,7 +27,7 @@ function Miniature({ apercu, grand = false }) {
 
 function CarteScenario({ r, onAgrandir }) {
   const sc = r.sc;
-  const choix = [r.mots.categories.join(', '), OFFRE[sc.offre], EXT[sc.extension], sc.emails ? null : 'Sans e-mails', sc.panne ? 'Panne de lecture' : null].filter(Boolean);
+  const choix = [r.mots.categories.join(', '), OFFRE[sc.offre], EXT[sc.extension], sc.panne ? 'Panne de lecture' : null].filter(Boolean);
   return (
     <section className="vrm-sim-carte" data-sim-scenario={sc.id} data-sim-conforme={r.conforme ? '1' : '0'}>
       <div className="vrm-sim-tete">

@@ -133,6 +133,7 @@ export default {
   "accueil.moment.messages.point1": "Du klickst; VRM sendet im Namen des Kontos, das auf deinem Computer offen ist.",
   "accueil.moment.messages.point2": "Angebote über deinem Mindestpreis automatisch annehmen: möglich, aus, bis du es einschaltest.",
   "accueil.cta.essayer": "Gratis testen",
+  "accueil.cta.exemple": "Mit Beispielen entdecken",
   "accueil.hero.pour": "Das Tool für Wiederverkäufer auf Vinted, Leboncoin und eBay. Alle Artikel.",
   "accueil.offres.chapo": "Alle Funktionen in beiden. Der einzige Unterschied: wie viele deiner Konten verkaufen.",
   "accueil.offres.gratuitLong": "Vorerst gratis: Solange kein Abo verlangt wird, kostet VRM nichts.",

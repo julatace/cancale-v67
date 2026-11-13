@@ -254,6 +254,8 @@ export default {
   "auth.confirmer.avant": "After signing up, ",
   "auth.confirmer.gras": "confirm your address",
   "auth.creerCompte": "Create an account",
+  "auth.exemple": "Explore with sample data",
+  "auth.exemple.note": "No account yet? See VRM filled in. Nothing is saved.",
   "auth.deco.bordereau": "Label printed",
   "auth.deco.colis": "Parcel ready",
   "auth.deco.retiree": "Removed from Leboncoin",

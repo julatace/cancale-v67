@@ -137,6 +137,8 @@ const CSS = `
 .av .av-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:48px;padding:0 24px;border-radius:999px;border:none;cursor:pointer;font:inherit;font-size:17px;font-weight:600;letter-spacing:-.01em;text-decoration:none;white-space:nowrap;background:var(--accent);color:#FFFFFF;transition:transform 120ms cubic-bezier(.23,1,.32,1),background-color 150ms ease}
 .av .av-btn:active{transform:scale(.97)}
 @media (hover:hover) and (pointer:fine){.av .av-btn:hover{background:#0077ED}}
+.av .av-btn.av-btn-exemple{background:var(--fond2);color:var(--encre)}
+@media (hover:hover) and (pointer:fine){.av .av-btn.av-btn-exemple:hover{background:var(--fond2);filter:brightness(.96)}}
 .av .av-lien{display:inline-flex;align-items:center;min-height:44px;padding:0 8px;font-size:17px;color:var(--accent-texte);text-decoration:none;font-weight:500}
 .av .av-lien span{transition:transform 150ms cubic-bezier(.23,1,.32,1);display:inline-block;margin-left:3px}
 @media (hover:hover) and (pointer:fine){.av .av-lien:hover{text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:1px}.av .av-lien:hover span{transform:translateX(2px)}}
@@ -360,6 +362,11 @@ export default function Accueil({ onEntrer }) {
   const creer = (extra) => (
     <a href="/?inscription" className="av-btn" data-cta="inscription" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('up')} {...extra}>{tr('accueil.cta.essayer')}</a>
   );
+  // (13 nov., lot 48) VRM rempli de données INVENTÉES, sans compte : un vrai lien
+  // (`/?exemple`, src/modeExemple.js) — rien n'est enregistré, rien n'est envoyé.
+  const exemple = (extra) => (
+    <a href="/?exemple" className="av-btn av-btn-exemple" data-cta="exemple" onPointerEnter={prepare} onFocus={prepare} {...extra}>{tr('accueil.cta.exemple')}</a>
+  );
   const connexion = (extra) => (
     <a href="/?connexion" className="av-lien" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('in')} {...extra}>{tr('auth.titre.in')}<span aria-hidden="true">›</span></a>
   );
@@ -402,6 +409,7 @@ export default function Accueil({ onEntrer }) {
             <p className="av-sous">{tr('accueil.hero.sous')}</p>
             <div className="av-actions">
               {creer({ ref: ctaHaut })}
+              {exemple()}
               {connexion({ 'data-cta': 'connexion' })}
             </div>
             <p className="av-prix-ligne" data-prix-ligne="">
@@ -544,6 +552,7 @@ export default function Accueil({ onEntrer }) {
             <p>{tr('accueil.fin')}</p>
             <div className="av-actions">
               {creer()}
+              {exemple({ 'data-cta': 'exemple-fin' })}
               {connexion()}
             </div>
           </div>

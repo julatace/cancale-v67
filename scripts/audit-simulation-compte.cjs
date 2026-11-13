@@ -29,7 +29,7 @@ if (process.argv[2] === '--prouve') {
   const MUT = [
     ['une lecture part vers la vraie base', 'src/simulationCompte.js', 'b.requetes.push(q);', 'b.requetes.push(q); try { fetch("https://exemple.supabase.co/rest/v1/app_data?" + q); } catch (_) {}'],
     ['l\'extension se coche toute seule', 'src/simulationCompte.js', "preuves.extension = preuveExtension(sc.extension, base.comptes);", "preuves.extension = { etat: 'fait' };"],
-    ['la requête des e-mails n\'est plus celle de l\'app', 'src/simulationCompte.js', "emails: 'id=like.email_reception_*&select=id&limit=1',", "emails: 'id=like.email_*&select=id&limit=1',"],
+    ['la requête du dressing n\'est plus celle de l\'app', 'src/simulationCompte.js', "annonces: 'id=like.harvest_*_listings&select=id,n:data->>nItems',", "annonces: 'id=like.harvest_*_listings&select=id,data',"],
     ['le mot est figé à « paire »', 'src/simulationCompte.js', 'const mots = motsArticle(vend);', "const mots = motsArticle('sneakers');"],
     ['une panne vaut « aucun e-mail »', 'src/simulationCompte.js', 'if (b.panne[nom]) return null;', 'if (b.panne[nom]) return [];'],
     ['l\'écran est monté pour tout le monde', 'src/ecrans/Reglages.jsx', "proprioInst && { id:'simulation-compte'", "{ id:'simulation-compte'"],
@@ -74,7 +74,7 @@ global.navigator = { sendBeacon: piege('sendBeacon') };
   // 2. Les requêtes = celles d'App.jsx ; les règles importées.
   const reqApp = (nom) => { const m = new RegExp(`const ${nom} = \\(\\) => lireLignesParcours\\('([^']+)'\\)`).exec(app); return m ? m[1] : null; };
   const sim = await import('file://' + path.join(RACINE, 'src', 'simulationCompte.js'));
-  for (const [cle, nom] of [['emails', 'lireEmailsParcours'], ['annonces', 'lireAnnoncesParcours'], ['commandes', 'lireCommandesParcours']]) {
+  for (const [cle, nom] of [['annonces', 'lireAnnoncesParcours'], ['commandes', 'lireCommandesParcours']]) {
     const a = reqApp(nom);
     dit(a && sim.REQUETES[cle] === a, `la requête « ${cle} » est celle de l'app (${nom})`, `app : ${a} · simulation : ${sim.REQUETES[cle]}`);
   }
@@ -94,9 +94,11 @@ global.navigator = { sendBeacon: piege('sendBeacon') };
   }
   const bloque = (cle, etat) => res.some((r) => r.etapes.some((e) => e.cle === cle && e.etat === etat));
   dit(bloque('extension', 'afaire'), 'un scénario bloque sur l\'extension');
-  dit(bloque('emails', 'afaire'), 'un scénario bloque sur les e-mails');
-  dit(bloque('vinted', 'attente'), 'un scénario attend la lecture du dressing');
-  dit(bloque('emails', 'passu'), 'une panne de lecture reste « pas su », jamais faite ni « aucun »');
+  dit(bloque('vinted', 'afaire'), 'un scénario bloque sur Vinted (aucun compte relié)');
+  dit(bloque('vinted', 'attente'), 'un scénario attend la première lecture de Vinted');
+  dit(bloque('vinted', 'passu'), 'une panne de lecture reste « pas su », jamais faite ni « aucun »');
+  dit(res.every((r) => r.etapes.length === 3), 'trois étapes par scénario (13 nov., lot 46)');
+  dit(res.some((r) => r.sc.vente == null && r.sc.achat == null && r.final.fini), 'un vendeur sans aucune vente finit le démarrage (dressing lu)');
   dit(res.some((r) => r.final.fini), 'au moins un scénario va jusqu\'à « C\'est prêt »');
   const parMot = (cat) => res.find((r) => r.sc.vends.length === 1 && r.sc.vends[0] === cat);
   dit(parMot('sneakers') && parMot('sneakers').mots.nom === 'paire', 'Sneakers ⇒ « paire »');

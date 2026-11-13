@@ -259,6 +259,8 @@ export default {
   "auth.confirmer.avant": "Après l’inscription, ",
   "auth.confirmer.gras": "confirme ton adresse",
   "auth.creerCompte": "Créer un compte",
+  "auth.exemple": "Découvrir avec des exemples",
+  "auth.exemple.note": "Pas encore de compte ? Regarde VRM rempli. Rien n’est enregistré.",
   "auth.deco.bordereau": "Bordereau imprimé",
   "auth.deco.colis": "Colis prêt",
   "auth.deco.retiree": "Retirée de Leboncoin",
