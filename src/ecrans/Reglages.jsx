@@ -3468,7 +3468,7 @@ function NomParrain({ nom, onChange }) {
     try {
       const r = await fetch('/api/compte?mode=parrainage', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'nom', nom: valeur }) });
       const j = await r.json().catch(() => null);
-      if (r.ok && j && j.ok) { onChange(j.nom || null); setOuvert(false); toast(j.nom ? '✓ Enregistré' : '✓ Retiré'); }
+      if (r.ok && j && j.ok) { onChange(j.nom || null); setOuvert(false); toast(j.nom ? 'Enregistré' : 'Retiré'); }
       else setMsg((j && j.message) || 'Pas enregistré. Réessaie dans un instant.');
     } catch (_) { setMsg('Pas enregistré. Réessaie dans un instant.'); }
     setOccupe(false);
@@ -3479,8 +3479,8 @@ function NomParrain({ nom, onChange }) {
   }
   return (
     <div className="vrm-ios-rangee" style={{ padding: '10px 16px', display: 'block' }} data-parrainage-nom-form="">
-      <label htmlFor="vrm-parrain-nom" style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>Ton nom chez tes filleuls</label>
-      <input id="vrm-parrain-nom" className="vrm-set-champ" style={{ width: '100%', boxSizing: 'border-box', minHeight: 44 }} value={v} maxLength={24}
+      <label htmlFor="vrm-parrain-nom" style={{ display: 'block', fontSize: 15, fontWeight: 600, marginBottom: 6 }}>Ton nom chez tes filleuls</label>
+      <input id="vrm-parrain-nom" className="vrm-set-champ" style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, textAlign: 'left' }} value={v} maxLength={24}
         onChange={(e) => { setV(e.target.value.slice(0, 24)); setMsg(''); }} placeholder="Ton prénom ou un pseudo VRM" autoComplete="given-name" disabled={occupe}/>
       <div style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.45 }}>Ton prénom ou un pseudo VRM, jamais ton pseudo Vinted. Rien d’autre ne se voit.</div>
       {msg ? <div role="alert" data-parrainage-nom-refus="" style={{ fontSize: 13, color: C.text, marginTop: 6 }}>{msg}</div> : null}
@@ -3523,7 +3523,7 @@ function Parrainage() {
   const f = p.filleul || null;
   const peutPartager = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
   const copier = async () => {
-    try { await navigator.clipboard.writeText(lien); toast('✓ Lien copié'); } catch (_) { toast('Copie impossible ici — sélectionne le lien'); }
+    try { await navigator.clipboard.writeText(lien); toast('Lien copié'); } catch (_) { toast('Copie impossible ici — sélectionne le lien'); }
   };
   const partager = async () => {
     try { await navigator.share({ title: 'VRM — 1 mois offert', text: TEXTE_PARTAGE, url: lien }); } catch (e) { if (!(e && e.name === 'AbortError')) copier(); }
