@@ -550,7 +550,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **12 nov. · G2 (5.368), 12nov-a (5.369), 12nov-b, vert-vitesse, vitesse-volume en ligne** : 20 000 ventes −20 %. `2026-11-12-*.md`. Geste : migration 042 (facultative).
+- **13 nov. · Moteur-compta (second agent)** : moins de calculs refaits, chiffres 35/35 ; < 2 s non atteint (2–3 `Comptabilite` par écran). `2026-11-13-moteur-compta.md`. Geste : aucun.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
