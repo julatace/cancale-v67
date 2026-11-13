@@ -54,12 +54,12 @@ public). `vinted-sync-extension/` pas touché. Aucune fonction `api/` ajoutée (
   `--prouve` : **10/10 mutations rouges** (deux points acceptés, tableaux différents, horaires en route, extension
   acceptée, jamais expirés, pas relus par l'app, code postal ignoré, périmés affichés, e-mail écrasé, fusion muette).
 - Banc `scripts/bancs/retirer-horaires-mr.cjs` (390 tactile, 1512, clair, sombre, vendredi 10 h 19 et 20 h 30) :
-  **64 verts** ; sur le build d'`origin/main` : voir le rapport de la session (rouges attendus sur le Tabac). Captures
+  **64 verts** ; sur le build d'`origin/main` : **24 rouges** (le Tabac sans horaires, 3 par scène). Captures
   regardées : « Ouvert lun.–sam. 9 h–12 h, 14 h–19 h · ouvert maintenant · ferme à 12 h » sous l'adresse, discrète ;
   rien pour le point à un autre code postal ni pour des horaires de 9 jours.
 - Audits verts : mondialrelay-serveur, statut-transporteurs, suivi-colis, horaires-relais, relais-change,
   rappels-colis, suivis-sans-qr, retrait-fiable, colis-retrait, transporteurs, relais-carte, retraits-irreprochables,
-  vintedgo-adresse, fonctions-api, tdz, variables, coherence. Banc `retirer-horaires` (d'avant) relancé.
+  vintedgo-adresse, fonctions-api, tdz, variables, coherence. Banc `retirer-horaires` (d'avant) relancé : 56/0.
 
 ## 4. Ce qui reste
 - **Vérifier en base après mise en ligne**, au prochain colis Mondial Relay arrivé (lecture seule) :
