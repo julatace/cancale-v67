@@ -287,7 +287,17 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         // B5 · Plus, Plus ; Plus puis Ventes
         await toucher(pg, PLUS); await toucher(pg, PLUS);
         dit(!(await pg.locator('.vrm-sheet').count()), `B5 ${qui} : toucher « Plus » une 2ᵉ fois le referme`);
-        await toucher(pg, PLUS); await toucher(pg, '.vrm-tabbar [data-nav-entree="ventes"]');
+        // (13 nov., integration-13nov-ci) LA COURSE de B5 (rouge par intermittence sous WebKit) : fermer
+        // « Plus » retire son entrée d'historique par un `history.back()` différé (FermeAuRetour), dont le
+        // `popstate` arrive quand il veut — sous WebKit en CI, parfois APRÈS le « Plus » suivant, qui se
+        // refermait alors (retour pris pour le sien) et « Ventes » touché tombait sur le panneau fermé.
+        // On attend que ce retour soit FAIT (plus d'entrée de feuille, plus de retour en vol), comme un
+        // doigt qui ne retouche qu'une fois l'écran posé ; puis que l'écran ait changé (4 s au plus).
+        await pg.waitForFunction(() => !document.querySelector('.vrm-sheet') && !(window.history.state || {}).vrmFeuille && window.__vrmRetourFeuille !== true, null, { timeout: 4000 }).catch(() => {});
+        await toucher(pg, PLUS);
+        await pg.waitForSelector('.vrm-sheet', { timeout: 4000 }).catch(() => {});
+        await toucher(pg, '.vrm-tabbar [data-nav-entree="ventes"]');
+        await pg.waitForFunction(() => { const m = document.querySelector('.vrm-main'); return m && m.getAttribute('data-ecran') === 'ventes' && !document.querySelector('.vrm-sheet'); }, null, { timeout: 4000 }).catch(() => {});
         const e5 = await ecran(pg);
         dit(e5.ecran === 'ventes' && !(await pg.locator('.vrm-sheet').count()), `B5 ${qui} : panneau ouvert, toucher Ventes y va et le ferme`, JSON.stringify(e5));
         // B6 · un écran de « Plus »

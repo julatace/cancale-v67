@@ -219,6 +219,9 @@ async function baisserDepuisApp(pg, id, { lancer: go = true } = {}) {
   await attendre(600);
   const avant = await lireBP(pg);
   if (!go || !avant || !avant.lancer || avant.lancer.off) return { avant, apres: avant, lance: false };
+  // (13 nov.) Depuis 5.370 la feuille propose « Dans les N h » (étalé, programmé par l'extension) par
+  // défaut ; ce scénario juge l'envoi IMMÉDIAT, son clic « Maintenant ».
+  if (await pg.locator('[data-bp-quand="maintenant"]').count()) await pg.locator('[data-bp-quand="maintenant"]').click().catch(() => {});
   await pg.locator('[data-bp-lancer]').click().catch(() => {});
   await pg.waitForSelector('[data-bp-confirmer]', { timeout: 6000 }).catch(() => {});
   await pg.locator('[data-bp-confirmer]').click().catch(() => {});
