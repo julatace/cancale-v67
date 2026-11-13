@@ -11,6 +11,8 @@
 //      Ventes « Toutes » = 9 ventes (l'annulée n'y est pas), leur somme rendue
 //      = 696,90 € ; « À expédier » = 4 ; Colis : 4 à envoyer, 3 prêts à
 //      imprimer (PDF reçu par email, relié par la TRANSACTION), 1 en attente.
+//   5. (13 nov.) Colis vit DANS Ventes (lot DJ3, 11 nov.) : ses colis en tête de l'écran Ventes,
+//      chacun une fois, et aucune seconde liste « À envoyer ».
 // Captures : SHOTS=<dossier> node scripts/bancs/ventes-colis-premium.cjs
 // Lancer : npm run build && BANC_PORT=50xx node scripts/bancs/ventes-colis-premium.cjs
 const path = require('path');
@@ -209,11 +211,23 @@ const communs = (m, vp, errs) => {
         communs(mV, vp, errs);
         await capture(pg, vp, 'ventes');
         // (9 nov., Ma journée v2) Plus de seconde liste « À envoyer » dans Ventes : l'état reste sur chaque vente
-        // (ATTENDU.aExpedier ventes le portent), la liste des colis vit dans Colis (un lien la nomme).
+        // (ATTENDU.aExpedier ventes le portent).
         const nA = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sale-row[data-tx]')].filter((r) => /À envoyer/.test(r.innerText)).length);
         dit(nA === ATTENDU.aExpedier, `« À envoyer » est l'état de ${ATTENDU.aExpedier} ventes de la liste`, `${nA}`);
-        const f = await pg.evaluate(() => ({ filtre: [...document.querySelectorAll('.vrm-filtres button[aria-pressed]')].some((x) => /^(À envoyer|À expédier)$/.test(x.innerText.trim())), lien: !!document.querySelector('[data-ventes-vers-colis]') }));
-        dit(!f.filtre && f.lien, 'Ventes : aucune seconde liste « À envoyer », un lien vers Colis', JSON.stringify(f));
+        // (13 nov.) Depuis le lot DJ3 (11 nov.), Colis VIT DANS Ventes : plus de lien « À envoyer : Colis › »
+        // (il n'y a plus d'écran où aller) ; la section des colis à envoyer est EN TÊTE de ce même écran.
+        // Règle jugée : aucun filtre « À envoyer » (pas de seconde liste), le récapitulatif et les cartes
+        // de colis rendus ICI, chaque colis UNE fois (une carte par transaction), au bon nombre.
+        const f = await pg.evaluate(() => {
+          const cartes = [...document.querySelectorAll('[data-bord-card]')].map((c) => c.getAttribute('data-tx-colis') || '');
+          const recap = document.querySelector('[data-colis-recap]');
+          const ventes = document.querySelector('.vrm-sale-row[data-tx]');
+          return { filtre: [...document.querySelectorAll('.vrm-filtres button[aria-pressed]')].some((x) => /^(À envoyer|À expédier)$/.test(x.innerText.trim())),
+            recap: recap ? recap.getAttribute('data-colis-recap') : null, cartes: cartes.length, uniques: new Set(cartes).size,
+            enTete: !!(recap && ventes && (recap.compareDocumentPosition(ventes) & Node.DOCUMENT_POSITION_FOLLOWING)) };
+        });
+        dit(!f.filtre && f.recap === String(ATTENDU.colis) && f.cartes === ATTENDU.colis && f.uniques === ATTENDU.colis && f.enTete,
+          `Ventes : aucune seconde liste « À envoyer » ; les ${ATTENDU.colis} colis à envoyer en tête du même écran, chacun une fois`, JSON.stringify(f));
         await ctx.close();
       });
       console.log(`\n── Colis, ${vp.width} px`);
