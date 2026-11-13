@@ -50,7 +50,12 @@ with zipfile.ZipFile(root/'public/VRM-Orion-reference-5.319.0.xpi') as ancien, z
     attendue = json.loads((ext/'manifest.json').read_text('utf8'))['version']
     assert version == attendue, f'Paquet Orion {version} ≠ extension {attendue} : paquet à régénérer (node scripts/zip-extension.cjs)'
     assert ancien.read('compat-orion.js') == nouveau.read('compat-orion.js'), "L'adaptateur Orion a changé par rapport à la référence installable"
-    assert nouveau.read('orion-main.js') == (adapt/'orion-main.js').read_bytes(), 'orion-main.js ne vient pas du dépôt'
+    # 5.361 (canal privé sur Orion) : le paquet pose la source d'inject.js EN LIGNE à la place du marqueur
+    # (scripts/zip-extension.cjs, sourcesEnLigne) — exactement celle-là, rien d'autre ne change.
+    _marque = 'null;/*__VRM_SOURCES_PAGE__*/'
+    _depot = (adapt/'orion-main.js').read_text('utf8')
+    _attendu = _depot.replace(_marque, json.dumps({'inject.js': nouveau.read('inject.js').decode('utf8')}, ensure_ascii=False, separators=(',', ':')) + ';') if _marque in _depot else _depot
+    assert nouveau.read('orion-main.js').decode('utf8') == _attendu, 'orion-main.js ne vient pas du dépôt (ou ses sources en ligne ne sont pas inject.js du paquet)'
     m_ancien = json.loads(ancien.read('manifest.json')); m_nouveau = json.loads(nouveau.read('manifest.json'))
     m_ancien.pop('version'); m_nouveau.pop('version')
     commun = json.loads((ext/'manifest.json').read_text('utf8'))
@@ -85,6 +90,10 @@ with zipfile.ZipFile(root/'public/VRM-Orion-reference-5.319.0.xpi') as ancien, z
         assert len(source) == 1, f'Bloc commun {bloc} introuvable ou en double dans la base commune'
         m_ancien['content_scripts'].append({**source[0], 'js': ['compat-orion.js', *bloc]})
     m_ancien['description'] = commun['description']
+    # 5.371 (lot ext-boutique) : la page d'accueil de l'extension, la même dans la base commune — vrm.center seulement.
+    if 'homepage_url' in commun:
+        assert commun['homepage_url'] == 'https://vrm.center', f"homepage_url commune inattendue : {commun['homepage_url']}"
+        m_ancien['homepage_url'] = commun['homepage_url']
     # L'ordre ENTRE blocs ne change pas ce qui est injecté ; le contenu de chaque bloc, si.
     cle = lambda c: json.dumps(c, sort_keys=True)
     m_ancien['content_scripts'] = sorted(m_ancien['content_scripts'], key=cle)

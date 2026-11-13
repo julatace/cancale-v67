@@ -56,6 +56,10 @@ function faireCtx({ connecte = UID } = {}) {
   vm.runInContext(src, ctx, { filename: 'background.js' });
   ctx.getStoredAccounts = async () => [{ vinted_user_id: UID, login: 'angeled92', domain: 'www.vinted.fr' }, { vinted_user_id: '999', login: 'autre', domain: 'www.vinted.fr' }];
   ctx.activeAccountId = async () => connecte;            // le compte du cookie Vinted
+  // 5.370 : la base RÉPOND (aucun autre Chrome sur ce compte) — sans elle, la base est « muette » et la 5.362
+  // (revue, moyenne 40) ne laisse à ce Chrome que la moitié du plafond (25) : règle voulue,
+  // jugée par audit-republier-plusieurs-chrome. Ici, la base répond (aucun autre Chrome).
+  ctx.actionsAutresNavigateurs = async () => ({ n: 0, toutes: [], prudence: 0, lectures: [], nJour: 0, captcha: 0, so: { favori: [], offre: [] }, ta: null });
   ctx.vintedSend = async (acc, method, endpoint) => { envois.push(method + ' ' + endpoint); return { ok: true, status: 200, json: {} }; };
   ctx.vintedGet = async (acc, endpoint) => { envois.push('GET ' + endpoint); return { ok: true, status: 200, json: { conversation: { id: 1 } } }; };
   const envoyer = (msg, origine = APP) => new Promise((res) => {
@@ -128,10 +132,15 @@ const REPONSE = { uid: UID, method: 'POST', endpoint: '/api/v2/conversations/123
   await essaie('lire une conversation', async () => {
     const { envois, envoyer } = faireCtx();
     let r = null;
-    for (let i = 0; i < 25; i++) r = await envoyer({ uid: UID, method: 'GET', endpoint: '/api/v2/conversations/987' });
-    dit(r && r.ok && r.data && r.data.conversation && envois.length === 25, 'LIRE un fil part, et ne consomme pas le plafond des actions (25 lectures)', `${envois.length} lecture(s)`);
+    // 5.356 (revue, haute 15 — règle voulue) : une LECTURE demandée par l'app passe par le budget de
+    // LECTURE (20/h), plus par le plafond des actions : 20 lectures partent, la 21e attend.
+    const lus = [];
+    for (let i = 0; i < 21; i++) { r = await envoyer({ uid: UID, method: 'GET', endpoint: '/api/v2/conversations/987' }); lus.push(r && r.ok); }
+    dit(lus.slice(0, 20).every(Boolean) && lus[20] === false && envois.length === 20, 'LIRE un fil part (20 lectures), dans le budget de LECTURE : la 21e attend', `${envois.length} lecture(s)`);
+    const act = await envoyer(REPONSE);
+    dit(act && act.ok === true, 'et les lectures ne consomment pas le plafond des actions : une réponse part encore', JSON.stringify(act));
     const g = await envoyer({ uid: UID, method: 'GET', endpoint: '/api/v2/users/1/items' });
-    dit(g && g.ok === false && envois.length === 25, 'mais une autre lecture (hors liste) ne part pas', envois.slice(25).join(','));
+    dit(g && g.ok === false && envois.length === 21, 'mais une autre lecture (hors liste) ne part pas', envois.slice(21).join(','));
   });
   await essaie('lecture sur un autre compte', async () => {
     const { envois, envoyer } = faireCtx({ connecte: '999' });

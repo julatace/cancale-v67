@@ -1,0 +1,21 @@
+/* Les autres versions d'un message (12 nov., ext. 5.369) — sous le champ existant. */
+.vrm-versions { display: flex; flex-direction: column; gap: 8px; min-width: 0; margin: 4px 0 2px; }
+.vrm-versions-ligne { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.vrm-versions-label { font-size: 12.5px; font-weight: 600; color: var(--w-gris, var(--vrm-muted)); }
+.vrm-versions-champ { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.vrm-versions-champ textarea { flex: 1 1 auto; min-width: 0; width: 100%; box-sizing: border-box; border: 0; border-radius: 12px;
+  padding: 10px 12px; font: inherit; font-size: 16px; line-height: 1.4; resize: vertical; min-height: 64px;
+  background: var(--w-remplir, var(--vrm-card2)); color: var(--w-encre, var(--vrm-ink)); }
+.vrm-versions-retirer { flex: 0 0 auto; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; font: inherit; font-size: 14px;
+  background: transparent; color: var(--w-gris, var(--vrm-muted)); cursor: pointer; }
+.vrm-versions-retirer:hover:not(:disabled) { background: var(--w-remplir, var(--vrm-card2)); }
+.vrm-versions-ajouter { align-self: flex-start; min-height: 44px; padding: 0 14px; border: 0; border-radius: 12px; font: inherit; font-size: 15px;
+  font-weight: 600; background: var(--w-remplir, var(--vrm-card2)); color: var(--w-encre, var(--vrm-ink)); cursor: pointer; }
+.vrm-versions-ajouter:disabled, .vrm-versions-retirer:disabled { opacity: .45; cursor: default; }
+.vrm-versions-note { font-size: 12.5px; line-height: 1.35; color: var(--w-gris, var(--vrm-muted)); }
+.vrm-versions-maj { font-size: 12.5px; line-height: 1.35; color: var(--vrm-warn, #B25E09); }
+/* (12 nov., ext. 5.370) Les variables {pseudo}, {article}, {prix}, un toucher pour les insérer. */
+.vrm-versions-variables { display: flex; flex-wrap: wrap; gap: 6px; }
+.vrm-versions-variable { min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; font: inherit; font-size: 14px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--w-remplir, var(--vrm-card2)); color: var(--w-encre, var(--vrm-ink)); cursor: pointer; }
+.vrm-versions-variable:disabled { opacity: .45; cursor: default; }

@@ -71,7 +71,9 @@ essaie('moteur sous garde', () => {
   dit(BG.indexOf('EXEC_PERMIS') >= 0, "l'extension garde sa liste blanche des actions permises (EXEC_PERMIS, voie manuelle)");
   const iAuto = BG.indexOf('async function autoAccepterOffres');
   dit(iAuto >= 0, "le moteur d'acceptation automatique existe (autoAccepterOffres) — il a été redemandé");
-  const finAuto = BG.indexOf('async function', iAuto + 20);
+  // 5.356 : le moteur est sous verrou (`autoAccepterOffres` → `autoAccepterOffresUnPassage`) : son corps va jusqu'à la fin du passage.
+  const iPassage = BG.indexOf('async function autoAccepterOffresUnPassage');
+  const finAuto = BG.indexOf('async function', (iPassage > iAuto ? iPassage : iAuto) + 20);
   const corps = iAuto >= 0 ? BG.slice(iAuto, finAuto > 0 ? finAuto : iAuto + 4000) : '';
   // GARDE avant d'appeler Vinted : dans `repondreOffre`, `garde` précède le /accept.
   const iRep = BG.indexOf('async function repondreOffre');

@@ -208,7 +208,7 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(
     dit(!!code && !/user-agent/i.test(code), 'aucun User-Agent fabriqué (celui du navigateur, jamais changé)');
     const fondTexte = fs.readFileSync(SRC, 'utf8');
     dit(/'vrm-transp':\s*30\b/.test(fondTexte), 'une alarme `vrm-transp` de 30 min (PERIODES)');
-    const corpsVisite = (/async function visiteVinted\(\)[\s\S]*?\n}\n/.exec(fondTexte) || [''])[0];
+    const corpsVisite = (/async function visiteVinted(?:UnPassage)?\(\)[\s\S]*?\n}\n/.exec(fondTexte) || [''])[0];
     dit(/transpTick\('visite'\)/.test(corpsVisite), 'la lecture part aussi à chaque visite Vinted');
     let v = '';
     try { v = vm.runInNewContext(`${(/const CODE_VERSION = '[^']+';/.exec(fondTexte) || [''])[0]} CODE_VERSION`); } catch (_) {}

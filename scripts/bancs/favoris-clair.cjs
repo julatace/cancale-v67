@@ -85,11 +85,14 @@ const DERNIER = MAINT - 4 * H;
 const PRIS = new Set(['n1', 'n2', 'n5', 'n6', 'n7', 'n9']);
 const aEcrire = (item, tous) => FAV.filter(([id, , it, age]) => it === item && !PRIS.has(id) && !VENDUS.includes(String(it)) && (tous || MAINT - age > DERNIER)).length;
 const CHOISISSABLES = [...new Set(FAV.map((f) => f[2]))].filter((it) => aEcrire(it, false) > 0);
-const N_TOUS = CHOISISSABLES.reduce((n, it) => n + aEcrire(it, false), 0);
+// (12 nov., ext. 5.372) La liste par compte : « Tout sélectionner » prend TOUS les favoris à écrire
+// (anciens compris : la liste est du plus récent au plus ancien), articles en ligne seulement.
+const CHOISIS_TOUS = [...new Set(FAV.map((f) => f[2]))].filter((it) => aEcrire(it, true) > 0);
+const N_TOUS = CHOISIS_TOUS.reduce((n, it) => n + aEcrire(it, true), 0);
+const LISTINGS = { items: Object.keys(TITRES).map((id) => ({ id: Number(id), _acc: { vinted_user_id: UID } })), aConfirmer: [], lues: { [UID]: MAINT - 3600000 }, complets: { [UID]: true }, ko: [], error: false };
 
 const MUTATIONS = {
-  max: ['favorisParcours.js', 'for (const id of a.aEcrire) { ids.push(id);', 'for (const id of a.aEcrire) { if (ids.length >= 3) continue; ids.push(id);'],   // un plafond fixe par envoi qui revient
-  nouveaux: ['favorisParcours.js', 'const nouveau = (p) => depuis == null ||', 'const nouveau = (p) => true ||'],
+  // (12 nov.) `max` et `nouveaux` visaient le choix par annonce, retiré : la liste par compte a son banc (favoris-compte).
   marge: ['FavorisEtapes.jsx', 'const peutEnvoyer = peutOuvrir && (!(p.bloquees || []).length || p.confirmeMarge);', 'const peutEnvoyer = peutOuvrir;'],
   histo: ['favorisParcours.js', 'x.personne === String(v.acheteur)', 'true'],
   suivi: ['AutomatisationFavoris.jsx', 'demarrerSuivi(j.vue);', ''],
@@ -125,7 +128,7 @@ function Banc(){
   return <div className="vrm-app-shell"><main className="vrm-main" style={{padding:'16px',boxSizing:'border-box'}}><FavorisVinted uid="${UID}" owner="${OWNER}" ownerActuel={()=>"${OWNER}"} base={location.origin} headers={()=>({})} nomCompte="compte_banc" chargementAutomatique={true}
     articlesVendus={new Set(${JSON.stringify(VENDUS)})} articleFavori={id=>ARTICLES[id]||null} PhotoVinted={PhotoVinted} ventesFavoris={${JSON.stringify(VENTES)}}
     extensionAuto={{disponible:true,raison:''}} favorisDisponible={true} favorisPerso={true} favorisRaison="" verifierExtension={async()=>({disponible:true})} ouvrirFavori={async x=>({ok:true,data:{ouvert:true,preuve:'confirmee'}})}
-    executerFavori={executer} FermeAuRetour={()=>null}/></main></div>;
+    executerFavori={executer} FermeAuRetour={()=>null} uidOnglet="${UID}" listingsFavoris={${JSON.stringify(LISTINGS)}}/></main></div>;
 }
 createRoot(document.getElementById('r')).render(<><Banc/><SuiviTravailHote/></>);
 `);
@@ -191,7 +194,7 @@ createRoot(document.getElementById('r')).render(<><Banc/><SuiviTravailHote/></>)
       await pg.addInitScript((t) => { const vrai = Date.now.bind(Date); const decal = t - vrai(); Date.now = () => vrai() + decal; }, MAINT);
       await pg.route(/vinted\.net\//, (r) => { const m = /\/b(\d+)\//.exec(r.request().url()); r.fulfill({ status: 200, contentType: 'image/svg+xml', body: svg(m ? Number(m[1]) : 1) }); });
       await pg.goto(`http://localhost:${PORT}/`, { waitUntil: 'domcontentloaded' });
-      await pg.waitForSelector(FAV.length ? '[data-fc-etape="qui"] [data-fc-annonce]' : '[data-fc-vide]', { timeout: 15000 }).catch(() => {});
+      await pg.waitForSelector(FAV.length ? '[data-fc-etape="qui"] [data-fav-ligne]' : '[data-fc-vide]', { timeout: 15000 }).catch(() => {});
       await pg.waitForTimeout(800);
       dit(!errs.length, `${T} la page se monte sans erreur`, errs.join(' | '));
       await pg.screenshot({ path: path.join(SHOTS, `fc-${F}.png`) });
@@ -214,20 +217,10 @@ createRoot(document.getElementById('r')).render(<><Banc/><SuiviTravailHote/></>)
         dit(commun.geste && /Vinted/.test(commun.texte), `${T} état vide : le geste qui débloque (Ouvrir Vinted)`, commun.texte);
         await ctx.close(); continue;
       }
-      // 1. QUI
-      const qui = await pg.evaluate(() => [...document.querySelectorAll('[data-fc-etape="qui"] [data-fc-liste] [data-fc-annonce]')].map((e) => ({ item: e.getAttribute('data-fc-annonce'), n: Number(e.querySelector('[data-fc-personnes]')?.getAttribute('data-fc-personnes')), a: Number(e.getAttribute('data-fc-aecrire')) })));
-      dit(JSON.stringify(qui.map((x) => Number(x.item)).sort()) === JSON.stringify(CHOISISSABLES.slice().sort()), `${T} QUI : les annonces aux NOUVEAUX favoris à écrire (${CHOISISSABLES.join(', ')})`, JSON.stringify(qui));
-      dit(qui.every((x) => x.a === aEcrire(Number(x.item), false) && x.n === FAV.filter((f) => f[2] === Number(x.item)).length), `${T} QUI : chaque annonce dit son nombre de personnes et combien à écrire`, JSON.stringify(qui));
-      const pseudosVus = PSEUDOS.filter((p) => commun.texte.includes(p));
-      dit(!pseudosVus.length, `${T} aucun pseudo à l’écran (le nombre, jamais qui)`, pseudosVus.join(','));
+      // 1. QUI (12 nov., ext. 5.372) : une liste par compte, détail jugé par le banc favoris-compte.
+      const lignesQui = await pg.evaluate(() => document.querySelectorAll('[data-fc-etape="qui"] [data-fav-ligne]').length);
+      dit(lignesQui === FAV.filter((f) => !VENDUS.includes(String(f[2]))).length, `${T} QUI : une ligne par favori (articles vendus retirés)`, lignesQui);
       dit(!/\{username\}|\{Bonjour\|Salut\}/.test(await pg.evaluate(() => document.querySelector('[data-fc-bulle]')?.innerText || '')) && await pg.locator('[data-fc-bulle] [data-fc-jeton]').count() === 1, `${T} QUOI : l’aperçu porte la pastille « son pseudo », jamais la variable brute`);
-      await pg.click('[data-fc-anciens-bascule]');
-      await pg.waitForTimeout(200);
-      const tous = await pg.evaluate(() => [...document.querySelectorAll('[data-fc-etape="qui"] [data-fc-liste] [data-fc-annonce]')].map((e) => [e.getAttribute('data-fc-annonce'), Number(e.getAttribute('data-fc-aecrire'))]));
-      const attendus = [...new Set(FAV.map((f) => f[2]))].filter((it) => aEcrire(it, true) > 0);
-      dit(tous.length === attendus.length && tous.every(([it, n]) => n === aEcrire(Number(it), true)), `${T} « Inclure les anciens » : ${attendus.length} annonces, les anciens favoris ajoutés`, JSON.stringify(tous));
-      await pg.click('[data-fc-anciens-bascule]');
-      await pg.waitForTimeout(200);
       // « Plus d'outils » : plus aucun pseudo (la liste par personne est retirée).
       await pg.click('[data-favoris-ouvrir]');
       await pg.waitForSelector('[data-favoris-feuille]', { state: 'attached', timeout: 5000 }).catch(() => {});
@@ -237,17 +230,17 @@ createRoot(document.getElementById('r')).render(<><Banc/><SuiviTravailHote/></>)
       await pg.click('[data-favoris-feuille] .vrm-favoris-fermer').catch(() => {});
       await pg.waitForTimeout(200);
       // 2. tout choisir ⇒ le compte ; aperçu de l'offre
-      await pg.click('[data-fc-tout]');
+      await pg.click('[data-fav-tout]');
       await pg.waitForTimeout(200);
       const ch = await pg.evaluate(() => Number(document.querySelector('[data-fc-choisis]')?.getAttribute('data-fc-choisis')));
-      dit(ch === N_TOUS, `${T} « Tout choisir » : ${N_TOUS} messages`, ch);
+      dit(ch === N_TOUS, `${T} « Tout sélectionner » : ${N_TOUS} messages`, ch);
       const offre = await pg.evaluate(() => ({ v: document.querySelector('[data-fc-apercu-offre]')?.getAttribute('data-fc-apercu-offre'), l: document.querySelector('[data-fc-offre-ligne]')?.innerText || '' }));
-      const ex = (qui.map((x) => Number(x.item)).find((it) => PRIX[it] != null) === Number(qui[0] && qui[0].item)) ? Number(qui[0].item) : null;   // l'aperçu montre la 1re annonce choisie
+      const ex = null;   // (12 nov.) l'offre au centime est jugée sur le récapitulatif
       if (ex) { const apres = Math.round(PRIX[ex] * 90) / 100; dit(Number(offre.v) === apres && offre.l.includes('−10 %'), `${T} QUOI : l’offre au centime (${PRIX[ex]} € → ${apres} €, −10 %)`, JSON.stringify(offre)); }
       // 3. QUAND : comme Vintex
       await pg.click('[data-fc-rythme="vintex"]');
       const phrase = await pg.evaluate(() => document.querySelector('[data-fc-rythme-phrase]')?.innerText || '');
-      dit(/6 à 10 secondes/.test(phrase), `${T} QUAND : « comme Vintex » expliqué en une phrase (6 à 10 s)`, phrase);
+      dit(/6 à 10 secondes/.test(phrase), `${T} QUAND : « Rapide » expliqué en une phrase (6 à 10 s)`, phrase);
       // 7. historique
       const h = await pg.evaluate(() => ({ achats: Number(document.querySelector('[data-fc-achats]')?.getAttribute('data-fc-achats')), envoyes: Number(document.querySelector('[data-fc-envoyes]')?.getAttribute('data-fc-envoyes')), sans: Number(document.querySelector('[data-fc-sans-acheteur]')?.getAttribute('data-fc-sans-acheteur') || 0), lignes: [...document.querySelectorAll('[data-fc-achat]')].map((e) => e.getAttribute('data-fc-achat')), lots: [...document.querySelectorAll('[data-fc-lot]')].map((e) => [e.getAttribute('data-fc-lot'), e.getAttribute('data-fc-lot-achats')]), groupes: Number(document.querySelector('[data-fc-groupes]')?.getAttribute('data-fc-groupes') || 0) }));
       dit(h.achats === 1 && JSON.stringify(h.lignes) === '["9001"]', `${T} historique : 1 achat après un message (même annonce ET même personne)`, JSON.stringify(h));
@@ -260,8 +253,8 @@ createRoot(document.getElementById('r')).render(<><Banc/><SuiviTravailHote/></>)
       await pg.waitForSelector('[data-fc-recap]', { timeout: 5000 }).catch(() => {});
       await pg.waitForTimeout(300);
       const rc = await pg.evaluate(() => { const l = document.querySelector('[data-fc-recap-ligne]'); return l ? { m: Number(l.getAttribute('data-fc-messages')), a: Number(l.getAttribute('data-fc-nannonces')), s: l.getAttribute('data-fc-secondes'), t: l.innerText, lim: document.querySelector('[data-fc-limite]')?.getAttribute('data-fc-limite'), g: Number(document.querySelector('[data-fc-limite]')?.getAttribute('data-fc-gestes')), garde: Number(document.querySelector('[data-fc-garde]')?.getAttribute('data-fc-garde') || 0), bloque: [...document.querySelectorAll('[data-fc-bloque]')].map((e) => [e.closest('[data-fc-recap-annonce]')?.getAttribute('data-fc-recap-annonce'), e.getAttribute('data-fc-bloque'), e.getAttribute('data-fc-marge')]), env: document.querySelector('[data-fc-envoyer]')?.disabled, garantie: /Aucune garantie/.test(document.querySelector('[data-fc-avertissement]')?.innerText || '') } : null; });
-      const nM = N_TOUS;
-      dit(rc && rc.m === nM && rc.a === CHOISISSABLES.length && Number(rc.s) === (nM - 1) * 8 && /environ/.test(rc.t), `${T} récap : ${nM} messages · ${CHOISISSABLES.length} annonces · environ ${(nM - 1) * 8} s`, JSON.stringify(rc));
+      const nM = N_TOUS, CHOIS_TOUS_N = CHOISIS_TOUS.length;
+      dit(rc && rc.m === nM && rc.a === CHOIS_TOUS_N && Number(rc.s) === (nM - 1) * 8 && /environ/.test(rc.t), `${T} récap : ${nM} messages · ${CHOIS_TOUS_N} annonces · environ ${(nM - 1) * 8} s`, JSON.stringify(rc));
       dit(rc && rc.g === nM * 3 && rc.lim === 'dedans', `${T} récap : ${nM * 3} gestes, dans la limite de 45/h (12 déjà pris)`, rc && rc.g + ' ' + rc.lim);
       const b9003 = rc && rc.bloque.find((x) => x[0] === '9003'), b9001 = rc && rc.bloque.find((x) => x[0] === '9001');
       dit(b9003 && b9003[1] === 'perte' && Number(b9003[2]) === 8550 - 9000, `${T} marge : 9003 achetée 90 €, offre 85,50 € ⇒ à perte (−4,50 €), bloquée`, JSON.stringify(rc && rc.bloque));

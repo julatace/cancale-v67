@@ -67,7 +67,7 @@ function AutomatisationFavoris({uid,owner,ownerActuel,headers,selection,reglages
   React.useEffect(()=>{vivant.current=true;return()=>{vivant.current=false;lecture.current++;};},[]);
   React.useEffect(()=>{if(uid&&owner&&ecranActif)lire();},[uid,owner,ecranActif]);
   React.useEffect(()=>{
-    const suivre=e=>{const d=e.detail;if(courant()&&d?.type==='favoris'&&String(d.uid)===String(uid)&&d.suivi&&d.suivi===travail.current?.suivi&&ETAPES_FAVORIS[d.etape]){setPhase(ETAPES_FAVORIS[d.etape]);const p=pilote.current,n=travail.current?.notificationId;if(p&&n!=null)p.t.etape(String(n),d.etape);}};
+    const suivre=e=>{const d=e.detail;if(courant()&&d?.type==='favoris'&&String(d.uid)===String(uid)&&d.suivi&&d.suivi===travail.current?.suivi&&ETAPES_FAVORIS[d.etape]){setPhase(d.etape==='attente_message'&&Number.isInteger(d.dans)?`Offre faite · message dans ~${d.dans} s`:ETAPES_FAVORIS[d.etape]);const p=pilote.current,n=travail.current?.notificationId;if(p&&n!=null)p.t.etape(String(n),d.etape);}};
     window.addEventListener('vrm:ext',suivre);return()=>window.removeEventListener('vrm:ext',suivre);
   },[uid,owner]);
   React.useEffect(()=>{if(!vue?.active||!ecranActif)return;setHorloge(Date.now());const t=setInterval(()=>setHorloge(Date.now()),1000);return()=>clearInterval(t);},[vue?.active,ecranActif]);
@@ -80,14 +80,14 @@ function AutomatisationFavoris({uid,owner,ownerActuel,headers,selection,reglages
       if(j.travail){
         const t=j.travail;travail.current=t;
         if(!ecran.current||document.visibilityState==='hidden'){const arret=await api('terminer',{jeton:t.jeton,resultat:'refuse',raison:'ecran_inactif'},h);if(courant())adopter(arret);return;}
-        let resultat='incertain',raison='reponse_inconnue',ecrits;
+        let resultat='incertain',raison='reponse_inconnue',ecrits,variante;
         try{
           const r=await executer(t);
-          ({resultat,raison,ecrits}=traduireResultatFavori(r));
+          ({resultat,raison,ecrits,variante}=traduireResultatFavori(r));
           if(resultat!=='envoye'&&courant()&&r?.error)setErreur(String(r.error).slice(0,240));
         }catch{}
         if(courant())setPhase('Enregistrement du résultat');
-        const fini=await api('terminer',{jeton:t.jeton,resultat,raison,...(Number.isInteger(ecrits)?{ecrits}:{})},h);if(courant())adopter(fini);
+        const fini=await api('terminer',{jeton:t.jeton,resultat,raison,...(Number.isInteger(ecrits)?{ecrits}:{}),...(Number.isInteger(variante)?{variante}:{})},h);if(courant())adopter(fini);
       }
     }catch(e){if(courant()){setErreur(e.message+' Aucun renvoi automatique.');pauseLocale.current=true;}}
     finally{busy.current=false;travail.current=null;if(courant())setPhase('');finirPause();}
@@ -132,7 +132,7 @@ function AutomatisationFavoris({uid,owner,ownerActuel,headers,selection,reglages
       {!!p.total&&<><div className="vrm-favoris-progress-head" role="status"><strong>{p.termines} / {p.total} traités</strong><span>{p.envoyes} envoyé(s) · {p.ignores} ignoré(s)</span></div><progress aria-label="Traitement des favoris" aria-valuetext={`${p.termines} sur ${p.total} traités${phase?' · '+phase:''}`} value={avancement} max={p.total}/></>}
       <p role="status" aria-live={phase?'polite':'off'}>{phase|| (vue?.active?(p.secondes>0?`Prochaine vérification dans ${dureeFavoris(p.secondes)}`:'En attente du prochain passage'):p.incertains||p.refuses?'File interrompue : vérifie le résultat ci-dessous.':'Sélection traitée ou file arrêtée.')}</p>
       {!!p.ignores&&<small>Ignorés : la conversation contient déjà des messages. Aucun nouveau message envoyé à ces favoris.</small>}
-      {vue?.active&&vue.intervalleMinutes!=null&&<small>{vue.intervalleMinutes===0?'Temps entre les messages : 6 à 10 s, tiré au hasard (comme Vintex).':vue.intervalleMaxMinutes?`Temps entre les messages : entre ${vue.intervalleMinutes} et ${vue.intervalleMaxMinutes} min, tiré au hasard.`:`Temps entre les messages : ${vue.intervalleMinutes} min.`} Le plafond horaire peut prolonger l’attente.</small>}
+      {vue?.active&&vue.intervalleMinutes!=null&&<small>{vue.intervalleMinutes===0?'Temps entre les messages : rapide, 6 à 10 s, tiré au hasard.':vue.intervalleMaxMinutes?`Temps entre les messages : entre ${vue.intervalleMinutes} et ${vue.intervalleMaxMinutes} min, tiré au hasard.`:`Temps entre les messages : ${vue.intervalleMinutes} min.`} Le plafond horaire peut prolonger l’attente.</small>}
       {!!p.total&&<p>{p.attente} en attente · {p.encours} en cours{p.incertains?` · ${p.incertains} à vérifier sur Vinted`:''}{p.refuses?` · ${p.refuses} interrompu(s)`:''}{p.annules?` · ${p.annules} annulé(s)`:''}{p.verifies?` · ${p.verifies} clôturé(s) après vérification manuelle`:''}</p>}
       {vue?.active&&!phase&&(!ecranActif||typeof document!=='undefined'&&document.visibilityState==='hidden'||!disponible)&&<p role="status">Envois suspendus : {disponible?'reviens sur cet écran pour reprendre.':'vérifie la connexion de l’extension au bon compte.'}</p>}
     </div>}

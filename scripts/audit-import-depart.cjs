@@ -141,7 +141,7 @@ async function controles(SRC, dit) {
     await f.ctx.tickImport();
     await f.ctx.importerHistorique(UID);
     dit(f.j.vinted.length === avant, '6. pendant la pause : plus rien', `${f.j.vinted.length - avant} requête(s)`);
-    delete f.store.vrmPauseVinted; uneHeurePlusTard(f);
+    delete f.store.vrmPauseVinted; delete f.store.vrmPrudence; uneHeurePlusTard(f);   // 5.357 : pause ET prudence (24 h) passées
     await f.ctx.tickImport();
     dit(pagesLues(f.j)[avant] === 'sold:3', '6. après la pause : reprise à la page 3', pagesLues(f.j).slice(avant).join(' '));
   });

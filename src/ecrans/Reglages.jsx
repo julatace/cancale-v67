@@ -75,6 +75,7 @@ import SecuriteComptes from '../SecuriteComptes.jsx';   // (11 nov., lot securit
 import CopieAnnonces from '../CopieAnnonces.jsx';   // (12 nov., sécurité des comptes) un zip d'annonces par compte
 import CarteDoubleVerif from '../CarteDoubleVerif.jsx';   // (12 nov.) « Protège ton compte VRM »
 import { JaugesComptes } from '../JaugeActions.jsx';   // (10 nov., lot G) la jauge des 50 actions/h, compte par compte
+import { PanneauDiscretion } from '../Discretion.jsx';   // (12 nov., ext. 5.370) plafond du jour, vérification, freins des 7 jours   // (10 nov., lot G) la jauge des 50 actions/h, compte par compte
 // ⟦→ ecrans/Ebay.jsx #3⟧
 import { etatExtensionAffichage, etatDerniereLecture } from '../etatConnexions.js';
 // ⟦← App.jsx #2⟧
@@ -2064,6 +2065,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (11 nov., lot securite-vinted) Julien : « faire comme Vintex, pour ne pas se faire bannir » — une phrase par compte, ses réglages, « Tout arrêter » (src/SecuriteComptes.jsx).
       { id:'securite-comptes', type:'panneau', ic:'sleep', lib:tr('reglages.securite.lib'), desc:tr('reglages.securite.desc'), data:{ 'data-reglage-securite-comptes':'' }, el:<SecuriteComptes comptes={comptes||[]}/> },
       { id:'vacances', type:'panneau', ic:'sun', lib:tr('reglages.vacances.lib'), desc:tr('reglages.vacances.desc'), data:{ 'data-reglage-vacances':'' }, el:<ModeVacances comptes={comptes||[]}/> },
+      // (12 nov., ext. 5.370) La discrétion : plafond par jour, vérification demandée par Vinted, freins des 7 jours (src/Discretion.jsx).
+      { id:'discretion', type:'panneau', ic:'pin', lib:tr('reglages.discretion.lib'), desc:tr('reglages.discretion.desc'), data:{ 'data-reglage-discretion':'' }, el:<PanneauDiscretion uids={(comptes||[]).map((a) => String((a && a.vinted_user_id) || '')).filter(Boolean)} nomCompte={(u) => { const a = (comptes||[]).find((x) => String(x && x.vinted_user_id) === String(u)); return (a && (a.label || a.login)) || null; }}/> },
       // (12 nov., sécurité des comptes) Un zip par compte Vinted, fait dans le navigateur, envoyé nulle part (src/CopieAnnonces.jsx).
       { id:'copieannonces', type:'panneau', ic:'save', lib:tr('reglages.copieannonces.lib'), desc:tr('reglages.copieannonces.desc'), data:{ 'data-reglage-copieannonces':'' }, el:<CopieAnnonces comptes={comptes||[]}/> },
       // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.

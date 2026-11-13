@@ -96,14 +96,17 @@ const URL_PRIX = `https://api.leboncoin.fr/api/adeditor/v1/classifieds/${AD}/pri
         return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': 'https://www.leboncoin.fr', 'access-control-allow-credentials': 'true', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' }, body: JSON.stringify(body) });
       });
       await p.goto('https://www.leboncoin.fr/compte/part/mes-annonces');
-      await p.addScriptTag({ content: 'window.__msgs=[];window.addEventListener("message",(e)=>{if(e.data&&e.data.__tag==="CANCALE_LBC")window.__msgs.push(e.data)});' });
+      // (5.372) Les ordres et les résultats passent par le CANAL PRIVÉ (5.362) : le banc prend le port
+      // remis au chargement, comme lbc-relay.js — `window.postMessage` ne porte plus rien.
+      await p.addScriptTag({ content: 'window.__msgs=[];window.__port=null;window.addEventListener("message",(e)=>{if(e.data&&e.data.__tag==="CANCALE_LBC_CANAL"&&e.ports&&e.ports[0]&&!window.__port){window.__port=e.ports[0];window.__port.onmessage=(m)=>{if(m.data&&m.data.__tag==="CANCALE_LBC")window.__msgs.push(m.data);};}});' });
       await p.addScriptTag({ content: inj });
       await p.evaluate(() => window.postMessage({ __tag: 'CANCALE_LBC_RELAY', kind: 'pret' }, '*'));
       return { c, p, recues, msgs: (k) => p.evaluate((kk) => window.__msgs.filter((m) => m.kind === kk), k) };
     };
     const ordre = (A, o) => A.p.evaluate(async (oo) => {
-      const p = new Promise((ok) => { window.addEventListener('message', (e) => { if (e.data && e.data.__tag === 'CANCALE_LBC' && e.data.kind === 'lbcprixresultat' && e.data.jeton === oo.jeton) ok(e.data); }); setTimeout(() => ok(null), 4000); });
-      window.postMessage(Object.assign({ __tag: 'CANCALE_LBC_ORDRE', kind: 'prix' }, oo), '*');
+      const n0 = window.__msgs.length;
+      const p = new Promise((ok) => { const t0 = Date.now(); const v = () => { const m = window.__msgs.slice(n0).find((x) => x.kind === 'lbcprixresultat' && x.jeton === oo.jeton); if (m) return ok(m); if (Date.now() - t0 > 4000) return ok(null); setTimeout(v, 20); }; v(); });
+      if (window.__port) window.__port.postMessage(Object.assign({ __tag: 'CANCALE_LBC_ORDRE', kind: 'prix' }, oo));
       return p;
     }, o);
     const A = await ouvrir(U1);

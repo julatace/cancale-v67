@@ -158,6 +158,10 @@ const PHRASES = [
   dit(/Envoyer quand même/.test(vm) && /kind: 'verif'/.test(vm), 'S3 la feuille dit « Envoyer quand même »');
   dit(!/save\('vinted_offre_refus_msg', e\.target\.value\)/.test(app) && !/save\('vinted_offre_refus_msg', v\)/.test(app) && /save\('vinted_offre_refus_msg', erreurMessageAuto\(v\) \? '' : v\)/.test(app), 'S4 le refus automatique ne range jamais un message risqué');
 
+  // (12 nov., intégration 5.372) Les AUTRES versions du refus (variantes) passent la même garde : une version
+  // risquée n'est jamais rangée (l'extension ne tire que ce qui est rangé) ; les favoris par `preparerMessageFavori`.
+  dit(/save\('vinted_offre_refus_variantes', v\.map\(\(t\) => \(t && erreurMessageAuto\(t\) \? '' : t\)\)\)/.test(app), 'S5 chaque variante du refus passe erreurMessageAuto avant d’être rangée');
+  dit(/erreurVariantes=variantes\.map\(\(t,i\)=>String\(t\|\|''\)\.trim\(\)\?preparerMessageFavori\(t,null\)\.erreur/.test(lire('src/FavorisVinted.jsx')) && /erreurMessageAuto\(base,'vinted'\)/.test(lire('src/favorisVinted.js')), 'S5 chaque variante des favoris passe la même garde (preparerMessageFavori)');
   console.log(ko ? `\n❌ ${ko} rouge(s), ${ok} vert(s)` : `\n✅ ${ok} verts, 0 rouge`);
   if (process.argv.includes('--prouve') && !ko) prouver();
   process.exit(ko ? 1 : 0);

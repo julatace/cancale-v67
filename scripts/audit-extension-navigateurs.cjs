@@ -232,7 +232,8 @@ const lire = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch (_) { ret
       f.ctx.location = new URL('https://www.vinted.fr/');
       const r = await f.ctx.fetch(m.p, { credentials: 'include', headers: m.h || {} });
       let json = null; try { json = await r.json(); } catch (_) {}
-      return { id: m.id, status: r.status, ok: r.ok, json, origine: 'https://www.vinted.fr' };
+      // 5.361 : la boîte aux lettres est ADRESSÉE — content.js répond avec SON onglet (celui visé).
+      return { id: m.id, tab: m.tab, status: r.status, ok: r.ok, json, origine: 'https://www.vinted.fr' };
     };
     if (voie === 'message') {
       f.ctx.chrome.tabs.sendMessage = (id, m, cb) => { if (m && m.vrm === 'fetchPage') { repondre(m).then((o) => cb && cb(o)); return; } if (typeof cb === 'function') cb(); };
@@ -376,12 +377,13 @@ const lire = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch (_) { ret
       // ⚠️ La « fenêtre » vue DEPUIS le vm n'est pas l'objet passé (vm la contextifie) :
       // on prend celle que chaque script voit, sinon `event.source !== window`.
       let vueI = winI, vueC = winC;
-      const poster = (data) => setTimeout(() => { for (const f of ecPage.slice()) f({ source: vueI, data }); for (const f of ecContenu.slice()) f({ source: vueC, data }); }, 0);
+      // 5.356 : inject.js remet à content.js le port d'un canal PRIVÉ (`ports`) — le banc le transporte comme le navigateur.
+      const poster = (data, ports) => setTimeout(() => { for (const f of ecPage.slice()) f({ source: vueI, origin: 'https://www.vinted.fr', data, ports: ports || [] }); for (const f of ecContenu.slice()) f({ source: vueC, origin: 'https://www.vinted.fr', data, ports: ports || [] }); }, 0);
       Object.assign(winI, { console: { log() {}, warn() {}, error() {} }, setTimeout: (fn, ms) => setTimeout(fn, Math.min(ms || 0, 2)), clearTimeout, setInterval: () => 0, clearInterval, URL, Headers: class {},
         btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
         location: { host: 'www.vinted.fr', hostname: 'www.vinted.fr', origin: 'https://www.vinted.fr', href: 'https://www.vinted.fr/' },
         document: { hidden: true, addEventListener() {} }, localStorage: { getItem: () => String(Date.now()), setItem() {} },
-        addEventListener: (t, f) => { if (t === 'message') ecPage.push(f); }, postMessage: (d) => poster(d),
+        addEventListener: (t, f) => { if (t === 'message') ecPage.push(f); }, postMessage: (d, o, ports) => poster(d, ports), MessageChannel,
         XMLHttpRequest: class { open() {} setRequestHeader() {} addEventListener() {} send() {} },
         fetch: async (url, init) => { fetchs.push({ url: String(url), credentials: init && init.credentials, headers: (init && init.headers) || {} }); return { ok: true, status: 200, headers: { get: () => 'application/json' }, clone() { return this; }, text: async () => '{"user":{"id":5}}', json: async () => ({ user: { id: 5 } }) }; } });
       winI.window = winI; winI.self = winI; winI.globalThis = winI;
@@ -389,7 +391,7 @@ const lire = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch (_) { ret
       Object.assign(winC, { console: { log() {}, warn() {}, error() {} }, setTimeout, clearTimeout, setInterval: () => 0, clearInterval,
         location: { host: 'www.vinted.fr', hostname: 'www.vinted.fr', origin: 'https://www.vinted.fr' },
         document: { cookie: cookie || '', visibilityState: 'visible', addEventListener() {}, createElement: () => ({ remove() {} }), head: { appendChild() {} }, documentElement: { appendChild() {} } },
-        addEventListener: (t, f) => { if (t === 'message') ecContenu.push(f); }, postMessage: (d) => poster(d),
+        addEventListener: (t, f) => { if (t === 'message') ecContenu.push(f); }, postMessage: (d, o, ports) => poster(d, ports),
         chrome: { runtime: { getURL: (p) => 'chrome-extension://x/' + p, lastError: null,
           sendMessage: (m, cb) => { envoyes.push(m); if (typeof cb === 'function') cb(m && m.action === 'veux' ? { ok: true, veux } : { ok: true }); },
           onMessage: { addListener: (f) => { ecouteMsg = f; } } },
@@ -399,6 +401,7 @@ const lire = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch (_) { ret
       return { envoyes, fetchs, demander: (m) => new Promise((res) => { const r = ecouteMsg && ecouteMsg(m, {}, res); if (r !== true) res(undefined); }) };
     };
     const m = faireMondes({ veux: false, cookie: 'access_token_web=AAA; refresh_token_web=RRR; v_sid=zz' });
+    await attendre(10);   // 5.356 : le port du canal privé arrive au premier tour, comme dans la page
     const rep = await m.demander({ vrm: 'fetchPage', id: 'r1', p: '/api/v2/users/current', h: { accept: 'application/json', 'x-csrf-token': 'tok', cookie: 'interdit' } });
     dit(rep && rep.id === 'r1' && rep.status === 200 && rep.json && rep.json.user && rep.json.user.id === 5 && rep.origine === 'https://www.vinted.fr', 'relais : le fond demande, inject.js (monde de la page) fait la requête, la réponse revient', JSON.stringify(rep));
     const f0 = m.fetchs[0] || {};

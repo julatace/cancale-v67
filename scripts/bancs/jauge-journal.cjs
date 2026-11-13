@@ -32,12 +32,12 @@ const N1 = 'aaaaaaaaaaaaaaaa', N2 = 'bbbbbbbbbbbbbbbb';
   await new Promise((ok) => NV.srv.listen(NV.PORT, ok));
   const nav = await chromium.launch({ executablePath: process.env.BANC_CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
   try {
-    for (const W of LARGEURS) for (const theme of THEMES) for (const cas of ['normal', 'plein']) {
+    for (const W of LARGEURS) for (const theme of THEMES) for (const cas of ['normal', 'plein', 'prudence']) {
       const tag = `${W}-${theme}-${cas}`, sombre = theme === 'sombre';
       const t = Date.now();
       const lignes = JSON.parse(JSON.stringify(NV.JEU_LIGNES));
       const ts1 = cas === 'plein' ? Array.from({ length: 45 }, (_, i) => t - 30 * 60000 - i * 1000) : Array.from({ length: 9 }, (_, i) => t - 40 * 60000 + i * 60000);
-      lignes.push({ id: `actions_compte_111_${N1}`, data: { uid: '111', nav: N1, ts: ts1.concat([t - 70 * 60000]), at: new Date(t).toISOString(), max: 50, reserve: 5, v: '5.337.0' } });
+      lignes.push({ id: `actions_compte_111_${N1}`, data: { uid: '111', nav: N1, ts: ts1.concat([t - 70 * 60000]), at: new Date(t).toISOString(), max: 50, reserve: 5, v: '5.337.0', ...(cas === 'prudence' ? { prudence: t + 5 * 3600000, maxPrudence: 20 } : {}) } });
       if (cas === 'normal') lignes.push({ id: `actions_compte_111_${N2}`, data: { uid: '111', nav: N2, ts: [t - 5 * 60000, t - 4 * 60000, t - 3 * 60000], at: new Date(t).toISOString() } });
       lignes.push({ id: `actions_compte_1110_${N1}`, data: { uid: '1110', nav: N1, ts: [t - 1000, t - 2000] } });   // le piège du LIKE
       const base = { lignes, comptes: NV.JEU_COMPTES, ecritures: 0 };
@@ -71,6 +71,9 @@ const N1 = 'aaaaaaaaaaaaaaaa', N2 = 'bbbbbbbbbbbbbbbb';
         dit(bp && /Prix baissé/.test(bp.txt) && /60 € → 54 €/.test(bp.txt) && bp.preuve === 'oui', `J ${tag} : « Prix baissé · … · 60 € → 54 € » avec sa preuve`, bp);
         dit(oa && /Offre acceptée \(auto\)/.test(oa.txt) && /52 €/.test(oa.txt) && /commande 62001/.test(oa.txt), `J ${tag} : « Offre acceptée (auto) · commande 62001 · 52 € »`, oa);
         dit(v.lignes.length === 3, `J ${tag} : les 3 gestes de l’extension`, v.lignes.map((l) => l.type));
+      } else if (cas === 'prudence') {
+        // (11 nov., ext. 5.357) Un refus de Vinted il y a peu : 24 h de prudence, publiée par l'extension.
+        dit(v.j111 && v.j111.n === '9' && /9\/20 cette heure/.test(v.j111.txt) && /Prudence jusqu’à \d{1,2} h \d{2}/.test(v.j111.txt) && v.j111.ton === 'geste', `G ${tag} : prudence ⇒ « 9/20 cette heure · Prudence jusqu’à … » en ambre`, v.j111);
       } else {
         dit(v.j111 && v.j111.n === '45' && v.j111.ton === 'geste' && /VRM attend/.test(v.j111.txt) && /^rgb\((178, 80, 0|255, 179, 64)\)$/.test(v.j111.couleur), `G ${tag} : 45/50 ⇒ ambre « VRM attend · repart à … »`, v.j111);
       }
