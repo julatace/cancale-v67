@@ -55,12 +55,51 @@ export const CARRIERS_LUS = ['mondialrelay', 'chronopost', 'vinted'];
 // Relay ne se lit que depuis ton ordinateur » ne s'écrit que si le serveur ne
 // le lit pas).
 export const LECTURE_SERVEUR_TRANSP = Object.freeze({ chronopost: true, vinted: true, mondialrelay: true });
+// ── (13 nov., lot 89) COLISSIMO / LA POSTE ET UPS : LUS PAR LE SERVEUR DÈS QUE LA CLÉ EST POSÉE ──
+// Julien (points 8 et 9) : « on ne fait pas avec l'extension » ⇒ le SERVEUR seulement, par les API
+// OFFICIELLES gratuites (une clé de l'INSTALLATION, posée sur Vercel, jamais collée dans une
+// conversation, jamais une clé personnelle de Julien prêtée aux autres vendeurs, §2.9) :
+//   · La Poste « Suivi v2 » (Colissimo, courrier suivi) : `LAPOSTE_OKAPI_KEY` (en-tête X-Okapi-Key) ;
+//   · UPS « Tracking API » : `UPS_CLIENT_ID` + `UPS_CLIENT_SECRET` (jeton OAuth client_credentials).
+// SANS CLÉ : rien n'est appelé (aucune ligne `transp_` créée, aucune requête), et l'app dit
+// « suivi lu par e-mail seulement » (`pourquoiPasLu`). Jamais l'extension (`aLireParNavigateur` ne
+// rend que `CARRIERS_LUS`, et la route C4 refuse ces transporteurs).
+// Le serveur lit l'environnement ; l'app, qui ne le voit pas, apprend l'état par la réponse du
+// passage (`lecture`, `noterLecturesServeur`). Avant ça : `null` (pas su) — jamais « lu ».
+export const CARRIERS_CLE = Object.freeze(['colissimo', 'ups']);
+export const CARRIERS_SERVEUR = Object.freeze([...CARRIERS_LUS, ...CARRIERS_CLE]);
+export const VARIABLES_CLE = Object.freeze({ colissimo: Object.freeze(['LAPOSTE_OKAPI_KEY']), ups: Object.freeze(['UPS_CLIENT_ID', 'UPS_CLIENT_SECRET']) });
+// { colissimo: bool, ups: bool } — une variable vide ou faite d'espaces ne compte pas.
+export function lecturesCleDeEnv(env) {
+  const e = env && typeof env === 'object' ? env : {};
+  const pose = (k) => typeof e[k] === 'string' && e[k].trim().length >= 8;
+  const o = {};
+  for (const c of CARRIERS_CLE) o[c] = VARIABLES_CLE[c].every(pose);
+  return o;
+}
+let _lecturesConnues = null;   // posé par l'app (réponse du passage) ou par un banc ; jamais par le serveur
+export function noterLecturesServeur(x) {
+  if (x === null) { _lecturesConnues = null; return; }
+  if (!x || typeof x !== 'object') return;
+  const o = {};
+  for (const c of CARRIERS_CLE) o[c] = x[c] === true ? true : x[c] === false ? false : null;
+  _lecturesConnues = o;
+}
+const _envProcess = () => { try { const p = globalThis.process; return p && p.env && typeof p.env === 'object' ? p.env : null; } catch (_) { return null; } };
+// true · false · null (pas su : l'app avant sa première réponse du serveur).
+export function lecturesCle() {
+  if (_lecturesConnues) return { ..._lecturesConnues };
+  const env = _envProcess();
+  if (env) return lecturesCleDeEnv(env);   // le serveur (Node) : ce que Vercel lui a posé
+  const o = {}; for (const c of CARRIERS_CLE) o[c] = null; return o;
+}
+export const lectureServeurActive = (carrier) => !!LECTURE_SERVEUR_TRANSP[carrier] || (CARRIERS_CLE.includes(carrier) && lecturesCle()[carrier] === true);
 export const VOIES = { 'mr-fr-mvc': 'mondialrelay', 'mr-be': 'mondialrelay', 'cp-ws2': 'chronopost', 'vg-v3': 'vinted' };
 // La voie que l'EXTENSION reçoit en C3 (secours, sur refus du serveur) …
 export const VOIE_DE = { mondialrelay: 'mr-fr-mvc', chronopost: 'cp-ws2', vinted: 'vg-v3' };
 // … et celle de la lecture faite par le SERVEUR (rangée dans `transp_…voie`).
-export const VOIE_SERVEUR = { mondialrelay: 'mr-fr-mvc', chronopost: 'cp-ws2', vinted: 'vg-v3' };
-export const NOM_TRANSPORTEUR = { mondialrelay: 'Mondial Relay', chronopost: 'Chronopost', vinted: 'Vinted Go' };
+export const VOIE_SERVEUR = { mondialrelay: 'mr-fr-mvc', chronopost: 'cp-ws2', vinted: 'vg-v3', colissimo: 'lp-suivi-v2', ups: 'ups-track-v1' };
+export const NOM_TRANSPORTEUR = { mondialrelay: 'Mondial Relay', chronopost: 'Chronopost', vinted: 'Vinted Go', colissimo: 'Colissimo', ups: 'UPS' };
 export const nomTransporteur = (c) => NOM_TRANSPORTEUR[String(c || '')] || 'Le transporteur';
 // La FORME d'un n° lisible par transporteur (celles mesurées chez lui). Un n°
 // hors forme n'est jamais interrogé (et n'entre dans aucune adresse).
@@ -73,7 +112,17 @@ export const FORME_SUIVI = {
   // ligne dont le transporteur rangé est Vinted (`carrierLisible`) : 12 chiffres
   // seuls ne désignent aucun transporteur (`transporteurDeFormeT`).
   vinted: /^(?:\d{16}|VGS\d{13}|[0-9A-Z]{13}|\d{12})$/,
+  // (13 nov., lot 89) Colissimo : « chiffre + lettre + 11 chiffres » (6A…, 8R…, 9V…, la forme des
+  // colis La Poste) ou un S10 français (« CB123456789FR », La Poste à l'international) ; UPS :
+  // « 1Z » + 16 lettres ou chiffres (18 en tout).
+  colissimo: /^(?:[5-9][A-Z]\d{11}|[A-Z]{2}\d{9}FR)$/,
+  ups: /^1Z[0-9A-Z]{16}$/,
 };
+// La forme PROPRE de Colissimo (le S10 « …FR » n'en est pas une : il ne désigne le transporteur que
+// quand la ligne le nomme). MESURÉ le 13 nov. sur la vraie base : les n° Vinted Go à 13 caractères
+// commencent par « chiffre + DEUX lettres » (9AA9A…) — jamais « chiffre + lettre + 11 chiffres ».
+export const FORME_COLISSIMO_PROPRE = /^[5-9][A-Z]\d{11}$/;
+export const FORME_UPS = /^1Z[0-9A-Z]{16}$/;
 export const ETATS = ['en_route', 'disponible', 'retire', 'livre', 'retour_expediteur', 'incident', 'inconnu'];
 export const RESULTATS = ['ok', 'introuvable', 'expire', 'bloque', 'forme', 'passu', 'cp-inconnu'];
 export const cleTransp = (carrier, suivi) => `transp_${carrier}_${normaliserSuivi(suivi)}`;
@@ -91,7 +140,14 @@ export function carrierLisible(carrier, suivi) {
   if (/mondial|inpost/.test(c)) k = 'mondialrelay';
   else if (/chrono|shop2shop|pickup/.test(c)) k = 'chronopost';
   else if (/vinted/.test(c)) k = 'vinted';
+  else if (/coliss|la\s*poste|laposte/.test(c)) k = 'colissimo';
+  else if (/^ups\b|\bups\b/.test(c)) k = 'ups';
   if (!k || !FORME_SUIVI[k].test(n)) return null;
+  // (13 nov., lot 89) Colissimo et UPS ne sont LISIBLES que si le serveur a leur clé (sinon rien
+  // n'est demandé, ni dit « pas encore lu ») ; un n° de forme Colissimo propre n'est jamais lu
+  // chez Vinted Go (même raison que la forme Chronopost ci-dessous).
+  if (CARRIERS_CLE.includes(k) && !lectureServeurActive(k)) return null;
+  if (k === 'vinted' && FORME_COLISSIMO_PROPRE.test(n)) return null;
   // (29 oct., tour 2 n° 19) Un n° de forme CHRONOPOST stricte (2 lettres, 9
   // chiffres, 2 lettres) n'est jamais lu chez Vinted Go : la forme Vinted Go
   // `[0-9A-Z]{13}` la couvre, et un e-mail `shipping@relay.vinted.com` est rangé
@@ -149,14 +205,16 @@ export function indexTranspParSuivi(lignes) {
 // Le transporteur d'un n° vu sur PLUSIEURS lignes : une règle, jamais l'ordre des
 // lignes (PostgREST ne le garantit pas). Un transporteur NOMMÉ (Mondial Relay,
 // Chronopost) l'emporte sur « vinted » (le défaut d'un e-mail shipping@).
-const RANG_CARRIER = { mondialrelay: 2, chronopost: 2, vinted: 1 };
+const RANG_CARRIER = { mondialrelay: 2, chronopost: 2, vinted: 1, colissimo: 2, ups: 2 };
 export const carrierPrefere = (a, b) => (!a ? b : !b ? a : ((RANG_CARRIER[b] || 0) > (RANG_CARRIER[a] || 0) ? b : a));
 // Les transporteurs qu'on ne lit pas, et qu'on NOMME une fois (§1.4).
 export function carrierNonLu(carrier) {
   const c = String(carrier || '').toLowerCase();
-  if (/coliss|la\s*poste/.test(c)) return 'Colissimo';
+  // (13 nov., lot 89) Colissimo et UPS ne sont plus « non lus » quand le serveur a leur clé.
+  if (/coliss|la\s*poste/.test(c)) return lectureServeurActive('colissimo') ? null : 'Colissimo';
   if (/dpd/.test(c)) return 'DPD';
-  if (/\bups\b|^ups/.test(c)) return 'UPS';
+  if (/\bups\b|^ups/.test(c)) return lectureServeurActive('ups') ? null : 'UPS';
+  if (/\bgls\b/.test(c)) return 'GLS';
   if (/relais\s*colis|relaiscolis/.test(c)) return 'Relais Colis';
   return null;
 }
@@ -636,6 +694,187 @@ export function lireReponseMondialRelayMvc(statut, ctype, corps, { suivi = '', c
   if (k >= 2) return rendu('ok', { ...base, etat: 'en_route' });
   return rendu('ok', { ...base, etat: 'en_route', detail: 'prepare' });
 }
+// ══ (13 nov., lot 89) COLISSIMO / LA POSTE — API officielle « Suivi v2 » ═══════
+// `GET https://api.laposte.fr/suivi/v2/idships/{n}?lang=fr_FR`, en-têtes `Accept: application/json`
+// et `X-Okapi-Key` (la clé de l'installation, `LAPOSTE_OKAPI_KEY`). FORME (documentation Okapi
+// « Suivi v2 », recoupée par deux clients publics qui la lisent — e-amzallag/laposte-suivi-api,
+// rigwild/suivi-poste) :
+//   { lang, scope, returnCode: 200, shipment: { idShip, holder, product, isFinal, entryDate,
+//     deliveryDate, url, timeline: [{ id, shortLabel, longLabel, date, status, type, country }],
+//     event: [{ code, label, date, order }]   ← du plus RÉCENT au plus ancien,
+//     contextData: { deliveryChoice, originCountry, arrivalCountry, removalPoint: { name, type } } } }
+//   erreur : { lang, scope, returnCode: 400|404…, returnMessage, idShip } (HTTP 400 / 404) ;
+//   clé refusée : HTTP 401 ; trop de requêtes : HTTP 429.
+// Les CODES d'évènement (liste officielle des 19 codes). « Pas su ne vaut pas oui » : un code qui
+// n'est pas ici ⇒ `inconnu` (le libellé recopié). Le point de retrait : `removalPoint.name` (jamais
+// d'adresse ni de code postal dans cette réponse) ; la date limite n'y est pas : aucune n'est inventée.
+export const LP_CODES = Object.freeze({
+  DR1: 'prepare',                     // Déclaratif réceptionné (étiquette créée, pas encore remis)
+  PC1: 'route', PC2: 'route',         // Pris en charge (dans le pays d'expédition)
+  ET1: 'route', ET2: 'route', ET3: 'route', ET4: 'route',   // En cours de traitement
+  EP1: 'route',                       // En attente de présentation
+  DO1: 'route', DO2: 'route',         // Entrée / sortie de douane
+  DO3: 'incident',                    // Retenu en douane
+  PB1: 'incident', PB2: 'route',      // Problème en cours / résolu
+  MD2: 'route',                       // Mis en distribution
+  ND1: 'incident',                    // Non distribuable
+  AG1: 'disponible',                  // En attente d'être retiré au guichet (au point de retrait)
+  RE1: 'retour',                      // Retourné à l'expéditeur
+  DI1: 'livre',                       // Distribué
+  DI2: 'rendu',                       // Distribué à l'expéditeur
+});
+export function lireReponseLaPoste(statut, ctype, corps, { suivi = '' } = {}) {
+  const n = normaliserSuivi(suivi);
+  const s = Number(statut) || 0;
+  // 401 : la clé n'est pas (ou plus) acceptée — c'est un REFUS (la pause), jamais une rafale.
+  if (s === 401) return rendu('bloque');
+  const r0 = refus(statut, ctype, corps);
+  if (r0) return rendu(r0);
+  const j = jsonDe(corps);
+  const rc = j && typeof j === 'object' ? Number(j.returnCode) : NaN;
+  // 404 (n° inconnu) et 400 (n° refusé par La Poste) : « introuvable » (3 fois ⇒ VRM arrête).
+  if (s === 404 || s === 400 || rc === 404 || rc === 400) return rendu('introuvable');
+  if (s !== 200 && s !== 207) return rendu('passu');
+  if (!j || typeof j !== 'object' || !j.shipment || typeof j.shipment !== 'object' || !Array.isArray(j.shipment.event)) return rendu('forme', { forme: formeDe(j) });
+  const sh = j.shipment;
+  // L'ÉCHO : la réponse doit parler de CE n° (jamais d'un autre colis).
+  const id = normaliserSuivi(sh.idShip == null ? '' : sh.idShip);
+  if (!id || id !== n) return rendu('forme', { forme: `idShip:${id ? 'autre' : 'absent'}` });
+  const evs = sh.event.filter((e) => e && typeof e === 'object')
+    .map((e, i) => ({ i, code: String(e.code == null ? '' : e.code).trim().toUpperCase(), ms: msDe(e.date), libelle: String(e.label == null ? '' : e.label) }))
+    .filter((e) => e.code && e.ms != null);
+  if (!evs.length) return rendu('introuvable');
+  // Du plus ancien au plus récent (La Poste les donne du plus récent au plus ancien : à la même
+  // seconde, celui écrit plus bas est le plus ancien).
+  evs.sort((a, b) => (a.ms - b.ms) || (b.i - a.i));
+  const evenements = garderEvenements(evs.map((e) => ({ at: isoDe(e.ms), code: e.code, libelle: e.libelle, lieu: '', cp: '' })));
+  const dernier = evs[evs.length - 1];
+  const base = { evenements, libelle: propre(dernier.libelle, 160), etatAt: isoDe(dernier.ms) };
+  const rp = sh.contextData && typeof sh.contextData === 'object' && sh.contextData.removalPoint && typeof sh.contextData.removalPoint === 'object' ? sh.contextData.removalPoint : null;
+  const pointNom = rp ? propre(rp.name, 80) : '';
+  const lieu = pointNom ? { lieuNom: pointNom } : {};
+  // 1. Un RETOUR n'importe où : le colis repart chez l'expéditeur (DI2 : il lui a été remis).
+  const iRe = evs.findIndex((e) => e.code === 'RE1' || e.code === 'DI2');
+  if (iRe >= 0) {
+    const remis = evs.slice(iRe).find((e) => e.code === 'DI2');
+    return rendu('ok', { ...base, etat: 'retour_expediteur', detail: remis ? 'rendu' : null, etatAt: isoDe((remis || evs[iRe]).ms), dernierAt: base.etatAt });
+  }
+  // 2. DI1 (distribué) : retiré au point si le colis y a attendu (AG1) ou si La Poste nomme un point
+  //    de retrait, sinon livré (boîte aux lettres, domicile).
+  const di = [...evs].reverse().find((e) => e.code === 'DI1');
+  if (di) {
+    const auPoint = evs.some((e) => e.code === 'AG1') || !!pointNom;
+    return rendu('ok', { ...base, ...lieu, etat: auPoint ? 'retire' : 'livre', etatAt: isoDe(di.ms), libelle: propre(di.libelle, 160) });
+  }
+  const sens = LP_CODES[dernier.code];
+  if (dernier.code === 'AG1') return rendu('ok', { ...base, ...lieu, etat: 'disponible' });
+  if (!sens) return rendu('ok', { ...base, etat: 'inconnu' });
+  if (sens === 'incident') return rendu('ok', { ...base, ...lieu, etat: 'incident' });
+  // 3. Un acheminement APRÈS l'attente au point : il a quitté le point sans être retiré.
+  let iAg = -1; evs.forEach((e, i) => { if (e.code === 'AG1') iAg = i; });
+  if (iAg >= 0 && sens === 'route') return rendu('ok', { ...base, ...lieu, etat: 'incident', detail: 'quitte_relais' });
+  if (sens === 'prepare') return rendu('ok', { ...base, etat: 'en_route', detail: 'prepare' });
+  return rendu('ok', { ...base, etat: 'en_route' });
+}
+
+// ══ (13 nov., lot 89) UPS — API officielle « Tracking » v1 ════════════════════
+// `GET https://onlinetools.ups.com/api/track/v1/details/{n}?locale=fr_FR` avec `Authorization:
+// Bearer <jeton>`, `transId` (unique par requête) et `transactionSrc` (le nom de l'appelant). Le
+// jeton : `POST https://onlinetools.ups.com/security/v1/oauth/token`, `grant_type=client_credentials`,
+// Basic(UPS_CLIENT_ID:UPS_CLIENT_SECRET) — mis en cache jusqu'à son `expires_in`.
+// FORME (spécification OpenAPI publiée par UPS, Tracking.yaml) :
+//   { trackResponse: { shipment: [{ inquiryNumber, warnings: [{ code, message }], package: [{
+//       trackingNumber, currentStatus, deliveryDate: [{ type: SDD|RDD|DEL, date: AAAAMMJJ }],
+//       accessPointInformation: { pickupByDate: AAAAMMJJ }, deliveryInformation: { location, receivedBy },
+//       activity: [{ date: AAAAMMJJ, time: HHMMSS, gmtDate, gmtTime, gmtOffset: '+01:00',
+//                    location: { address: { city, postalCode, country, countryCode } },
+//                    status: { type, code, statusCode, description, simplifiedTextDescription } }]
+//   }] }] } }   ← `activity` du plus RÉCENT au plus ancien ;
+//   erreur : { response: { errors: [{ code, message }] } } — 400, 401 (jeton), 403 (« Blocked
+//   Merchant »), 404 (« Tracking number information not found »), 429, 500, 503.
+// `status.type` : D livré · I en transit · P pris en charge · M étiquette créée · X exception ·
+// RS retour à l'expéditeur. Le colis au POINT D'ACCÈS UPS se lit sur son libellé (« … UPS Access
+// Point … awaiting customer pickup », traduit selon `locale`) ou ses codes (ZP, 5E) — un libellé
+// qu'on ne reconnaît pas ⇒ l'état du `type`, jamais « disponible » deviné.
+const UPS_AP = /access point|point d.acces|point relais/;
+const UPS_ATTENTE = /attente|awaiting|await|pick ?up|a retirer|retrait|collect/;
+const UPS_RETOUR = /returned to (?:the )?(?:shipper|sender)|retour(?:ne)? (?:a|vers) l'expediteur|renvoye a l'expediteur|retour a l'expediteur/;
+const ymd = (v) => { const m = /^(\d{4})(\d{2})(\d{2})$/.exec(String(v == null ? '' : v).trim()); return m ? `${m[1]}-${m[2]}-${m[3]}` : null; };
+const hms = (v) => { const m = /^(\d{2}):?(\d{2}):?(\d{2})?$/.exec(String(v == null ? '' : v).trim()); return m ? `${m[1]}:${m[2]}:${m[3] || '00'}` : null; };
+export function dateUps(a) {
+  if (!a || typeof a !== 'object') return null;
+  const gd = ymd(a.gmtDate), gt = hms(a.gmtTime);
+  if (gd && gt) return msDe(`${gd}T${gt}Z`);
+  const d = ymd(a.date), t = hms(a.time) || '00:00:00';
+  if (!d) return null;
+  const off = /^([+-])(\d{2}):?(\d{2})$/.exec(String(a.gmtOffset || '').trim());
+  if (off) return msDe(`${d}T${t}${off[1]}${off[2]}:${off[3]}`);
+  return msDe(isoParisVersUtc(`${d}T${t}`));
+}
+export function lireReponseUps(statut, ctype, corps, { suivi = '' } = {}) {
+  const n = normaliserSuivi(suivi);
+  const s = Number(statut) || 0;
+  if (s === 401) return rendu('bloque');   // le lecteur a déjà redemandé un jeton une fois
+  const r0 = refus(statut, ctype, corps);
+  if (r0) return rendu(r0);
+  if (s === 404) return rendu('introuvable');
+  if (s !== 200) return rendu('passu');
+  const j = jsonDe(corps);
+  const shs = j && typeof j === 'object' && j.trackResponse && typeof j.trackResponse === 'object' ? j.trackResponse.shipment : undefined;
+  if (!Array.isArray(shs)) return rendu('forme', { forme: formeDe(j) });
+  const sh = shs.find((x) => x && typeof x === 'object');
+  if (!sh) return rendu('introuvable');
+  const colis = Array.isArray(sh.package) ? sh.package.filter((p) => p && typeof p === 'object') : [];
+  if (!colis.length) return Array.isArray(sh.warnings) && sh.warnings.length ? rendu('introuvable') : rendu('forme', { forme: formeDe(j) });
+  // L'ÉCHO : le colis de CE n° (le n° du colis, sinon celui de la demande quand il n'y en a qu'un).
+  const pk = colis.find((p) => normaliserSuivi(p.trackingNumber) === n) || (colis.length === 1 && !colis[0].trackingNumber && normaliserSuivi(sh.inquiryNumber) === n ? colis[0] : null);
+  if (!pk) return rendu('forme', { forme: 'trackingNumber:autre' });
+  const acts = (Array.isArray(pk.activity) ? pk.activity : []).filter((a) => a && typeof a === 'object' && a.status && typeof a.status === 'object')
+    .map((a, i) => {
+      const st = a.status;
+      const adr = a.location && typeof a.location === 'object' && a.location.address && typeof a.location.address === 'object' ? a.location.address : {};
+      const pays = String(adr.countryCode || adr.country || '').toUpperCase();
+      const cp = String(adr.postalCode || '').replace(/\s+/g, '');
+      const desc = String(st.description || ''), simple = String(st.simplifiedTextDescription || '');
+      return { i, ms: dateUps(a), type: String(st.type || '').trim().toUpperCase(), code: String(st.code || '').trim().toUpperCase(), libelle: desc || simple, t: normLibelle(`${desc} ${simple}`),
+        ville: propre(adr.city, 60), cp: (!pays || pays === 'FR') && /^\d{5}$/.test(cp) ? cp : '' };
+    })
+    .filter((a) => a.ms != null);
+  if (!acts.length) return rendu('introuvable');
+  // Du plus ancien au plus récent (UPS : le plus récent d'abord ; à la même seconde, l'ordre écrit).
+  acts.sort((a, b) => (a.ms - b.ms) || (b.i - a.i));
+  const estDispo = (a) => a.code === 'ZP' || a.code === '5E' || (UPS_AP.test(a.t) && UPS_ATTENTE.test(a.t));
+  const estRetour = (a) => a.type === 'RS' || UPS_RETOUR.test(a.t);
+  const evenements = garderEvenements(acts.map((a) => ({ at: isoDe(a.ms), code: a.code || a.type, libelle: a.libelle, lieu: [a.cp, a.ville].filter(Boolean).join(' '), cp: a.cp })));
+  const dernier = acts[acts.length - 1];
+  const base = { evenements, libelle: propre(dernier.libelle, 160), etatAt: isoDe(dernier.ms) };
+  const lieuDe = (a) => (a ? { lieuVille: a.ville, lieuCp: a.cp } : {});
+  // 1. Un retour n'importe où ; un « livré » APRÈS lui = rendu à l'expéditeur.
+  const iRe = acts.findIndex(estRetour);
+  if (iRe >= 0) {
+    const dApres = acts.slice(iRe + 1).find((a) => a.type === 'D' && !estDispo(a));
+    return rendu('ok', { ...base, etat: 'retour_expediteur', detail: dApres ? 'rendu' : null, etatAt: isoDe((dApres || acts[iRe]).ms), dernierAt: base.etatAt });
+  }
+  let iDispo = -1; acts.forEach((a, i) => { if (estDispo(a)) iDispo = i; });
+  const dispo = iDispo >= 0 ? acts[iDispo] : null;
+  // 2. Livré (type D) : retiré au point d'accès s'il y a attendu, sinon livré.
+  if (dernier.type === 'D' && !estDispo(dernier)) {
+    const dl = pk.deliveryInformation && typeof pk.deliveryInformation === 'object' ? normLibelle(pk.deliveryInformation.location) : '';
+    return rendu('ok', { ...base, ...lieuDe(dispo || dernier), etat: dispo || UPS_AP.test(dl) ? 'retire' : 'livre' });
+  }
+  // 3. Au point d'accès, en attente : la date limite est celle qu'UPS écrit (`pickupByDate`).
+  if (estDispo(dernier)) {
+    const lim = ymd(pk.accessPointInformation && typeof pk.accessPointInformation === 'object' ? pk.accessPointInformation.pickupByDate : null);
+    return rendu('ok', { ...base, ...lieuDe(dernier), etat: 'disponible', limite: lim, limiteSure: !!lim, limiteAt: null });
+  }
+  if (dernier.type === 'X') return rendu('ok', { ...base, ...lieuDe(dispo), etat: 'incident' });
+  // 4. Un acheminement APRÈS l'attente au point : il a quitté le point sans être retiré.
+  if (dispo && ['I', 'P', 'O'].includes(dernier.type)) return rendu('ok', { ...base, ...lieuDe(dispo), etat: 'incident', detail: 'quitte_relais' });
+  if (dernier.type === 'M' || dernier.type === 'MV') return rendu('ok', { ...base, etat: 'en_route', detail: 'prepare' });
+  if (['I', 'P', 'O', 'DO', 'DD', 'W'].includes(dernier.type)) return rendu('ok', { ...base, etat: 'en_route' });
+  return rendu('ok', { ...base, etat: 'inconnu' });
+}
+
 // Une seule entrée pour les trois (C4 et les lectures du serveur). Mondial
 // Relay : la voie dit quelle forme juger (`mr-fr-mvc` : le fragment de la route
 // `_mvc`, lu par le serveur ou relayé par l'extension ; sinon `mr-be` : le JSON
@@ -644,6 +883,8 @@ export function lireReponse(carrier, statut, ctype, corps, opts = {}) {
   if (carrier === 'chronopost') return lireReponseChronopost(statut, ctype, corps, opts);
   if (carrier === 'vinted') return lireReponseVintedGo(statut, ctype, corps, opts);
   if (carrier === 'mondialrelay') return opts && opts.voie === 'mr-fr-mvc' ? lireReponseMondialRelayMvc(statut, ctype, corps, opts) : lireReponseMondialRelay(statut, ctype, corps, opts);
+  if (carrier === 'colissimo') return lireReponseLaPoste(statut, ctype, corps, opts);
+  if (carrier === 'ups') return lireReponseUps(statut, ctype, corps, opts);
   return rendu('forme', { forme: 'transporteur inconnu' });
 }
 
@@ -720,7 +961,7 @@ export const SELECT_TRANSP_META = 'id,suivi:meta->>suivi,carrier:meta->>carrier,
 // qu'ils lisaient déjà : la fenêtre ne s'appliquait qu'après la lecture).
 export function ligneTranspDeMeta(x) {
   if (!x || typeof x !== 'object') return null;
-  const m = /^transp_(mondialrelay|chronopost|vinted)_([A-Z0-9]+)$/.exec(String(x.id || ''));
+  const m = /^transp_(mondialrelay|chronopost|vinted|colissimo|ups)_([A-Z0-9]+)$/.exec(String(x.id || ''));
   if (!m) return null;
   const suivi = normaliserSuivi(x.suivi) || m[2];
   if (suivi !== m[2] || (x.carrier && x.carrier !== m[1])) return null;   // une ligne qui contredit son identifiant ne compte pas
@@ -1019,6 +1260,8 @@ function transporteurDeFormeT(n) {
   if (/^\d{8}$/.test(s)) return 'mondialrelay';
   if (/^[XZ]W\d{9}(?:TS|SP)$/.test(s)) return 'chronopost';
   if (/^VGS\d{8,}$/.test(s)) return 'vinted';
+  if (FORME_COLISSIMO_PROPRE.test(s)) return 'colissimo';
+  if (FORME_UPS.test(s)) return 'ups';
   return '';
 }
 
@@ -1039,6 +1282,9 @@ export function aLireParNavigateur({ lignes = [], transp = new Map(), manuels = 
   const out = [];
   for (const it of items) {
     if (out.length >= max) break;
+    // (13 nov., lot 89) Jamais un transporteur « à clé » pour l'extension (Julien : « on ne fait pas
+    // avec l'extension » pour les transporteurs) : seulement les trois voies de secours connues.
+    if (!CARRIERS_LUS.includes(it.carrier)) continue;
     const t = transp instanceof Map ? transp.get(it.suivi) : null;
     if (!(refusServeur(t) || enPause(pause, it.carrier, maintenant))) continue;
     if (it.carrier === 'mondialrelay') {
