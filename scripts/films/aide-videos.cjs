@@ -49,6 +49,9 @@ async function tournerUn(nav, cle) {
   const f = new Film({ nom: 'aide-' + cle, format: 'portrait', monde: m, tab: pl.tab, local: pl.local ? pl.local(m) : {} });
   const t0 = Date.now();
   await f.demarrer(nav);
+  // La feuille d'impression est celle du système (iOS, Chrome) : une boîte modale que la
+  // capture ne sait pas photographier. Le geste part, la boîte n'est pas filmée.
+  await f.app.evaluate(() => { window.print = () => { window.__filmImprime = (window.__filmImprime || 0) + 1; }; });
   const dossier = sortie('aide');
   const fichier = path.join(dossier, `${cle}.mp4`);
   await f.enregistrer(fichier);
@@ -78,7 +81,12 @@ if (require.main === module) {
     if (inconnus.length) throw new Error('écran sans scénario : ' + inconnus.join(', '));
     const nav = await lancerNavigateur();
     let ko = 0;
-    try { for (const c of voulus) { const r = await tournerUn(nav, c); if (!r.ok) ko++; } }
+    try {
+      for (const c of voulus) {
+        try { const r = await tournerUn(nav, c); if (!r.ok) ko++; }
+        catch (e) { ko++; console.log(`❌ ${c} : ${String(e && e.message || e).split('\n')[0]}`); }
+      }
+    }
     finally { await nav.close(); fermerServeur(); }
     if (ko) process.exitCode = 1;
   })().catch((e) => { console.error(e); process.exit(1); });

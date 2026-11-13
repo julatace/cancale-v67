@@ -138,9 +138,9 @@ window.__appliquer=(e)=>{
     if(!b){
       b=document.createElement('div');b.className='bloc '+(t.pos||'');
       const mots=(txt,cls)=>{const p=document.createElement('p');p.className=cls;
-        txt.split(/(\\s+)/).forEach(w=>{if(!w)return;if(/^\\s+$/.test(w)){p.appendChild(document.createTextNode(' '));return;}
+        txt.split(/([ \\t\\n]+)/).forEach(w=>{if(!w)return;if(/^[ \\t\\n]+$/.test(w)){p.appendChild(document.createTextNode(' '));return;}
           const s=document.createElement('span');s.className='m';
-          const mb=/^\\*(.+)\\*([.,;:!?…]*)$/.exec(w);
+          const mb=/^\\*(.+)\\*([\\u00a0.,;:!?…]*)$/.exec(w);
           if(mb){const b=document.createElement('span');b.className='bleu';b.textContent=mb[1];s.appendChild(b);if(mb[2])s.appendChild(document.createTextNode(mb[2]));}
           else s.textContent=w;p.appendChild(s);});
         return p;};
@@ -453,7 +453,7 @@ class Film {
   }
 
   // ── le toucher ── un VRAI toucher dans l'app, montré par un cercle.
-  async toucher(sel, { avant = 0.38, apres = 0.42, viser = false } = {}) {
+  async toucher(sel, { avant = 0.38, apres = 0.42, viser = false, clic = false } = {}) {
     if (viser) { await this.viser(sel, viser === true ? {} : viser); await this.jouer((this.camTween && this.camTween.dur) || 0.8); }
     const visible = () => this.app.evaluate((sel) => { const el = window.__filmQ(sel); if (!el) return null; const b = el.getBoundingClientRect(); const at = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); return !!(at && (el === at || el.contains(at) || at.contains(el) || (el.labels && [...el.labels].some((l) => l.contains(at))))); }, sel);
     const v0 = await visible();
@@ -466,7 +466,8 @@ class Film {
     // Le geste réel : un toucher (touchscreen) au point de l'élément, dans le plateau.
     const pt = await this.pg.evaluate(([x, y]) => { const f = document.getElementById('app').getBoundingClientRect(); const k = f.width / 390; return { x: f.left + (x - 12) * k, y: f.top + (y - 12 - 47) * k }; }, [x, y]);
     const cible = await visible();
-    if (cible) await this.pg.touchscreen.tap(pt.x, pt.y);
+    // `clic` (13 nov.) : un élément qui attend un vrai clic (la carte d'annonce l'ouvre au clic) le reçoit.
+    if (cible && !clic) await this.pg.touchscreen.tap(pt.x, pt.y);
     else await this.app.evaluate((sel) => window.__filmQ(sel).click(), sel);
     await this.jouer(apres);
   }
@@ -511,7 +512,8 @@ class Film {
       const ok = await this.app.evaluate((sel) => !!window.__filmQ(sel), sel).catch(() => false);
       if (ok) return true;
     }
-    console.log(`  (attendu en vain : ${sel})`); return false;
+    const ou = await this.app.evaluate(() => [...document.querySelectorAll('h1')].map((h) => h.innerText).join(' · ')).catch(() => '?');
+    console.log(`  (attendu en vain : ${sel} — écran : ${ou})`); return false;
   }
 
   // ── le temps ──
