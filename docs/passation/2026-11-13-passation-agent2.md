@@ -78,7 +78,7 @@ manifeste du zip). C'est la SEULE version que Julien doit installer.
 
 Agent « intégrateur 13 nov. » (second agent). Plan en trois étapes, chacune mise en ligne avant la suivante :
 
-1. **CI** — branche `claude/integration-13nov-ci` (43752649f), **PR #1146 ouverte**.
+1. **CI** — branche `claude/integration-13nov-ci` (43752649f) : **EN LIGNE (PR #1146, main 8353cc26a)**, récit dans CLAUDE.md §9 et `2026-11-13-integration-ci.md`. Ce qui suit décrit le but, pour mémoire.
    - But : « Bancs sous WebKit (Safari, non bloquant) » rouge depuis que `ubuntu-latest` est passé à Ubuntu 26 (13 nov. ~4 h UTC) ⇒ épingler sur `ubuntu-24.04` (le job des audits l'est déjà, commit b84c7c89c) ; « App + vraie extension (non bloquant) » rouge car l'extension n'atteint pas vrm.center en CI ; `iphone-reprise` B5 instable (course à trouver avec une requête TENUE, §6.5).
    - Une branche de sonde existe : `claude/sonde-webkit` (461e6afc7).
    - À faire : regarder la CI de #1146, merger si les jobs bloquants sont verts, vérifier Vercel READY.
