@@ -34,6 +34,7 @@
 import { texteArrivee } from './notif-textes.js';
 import { normaliserSuivi, changementDeRelais } from './etat-colis-email.js';
 import { preuveDeTransp, lectureEnRetard } from './etat-colis.js';
+import { pointEtHorairesMr, horairesValides, HORAIRES_TRANSP_VALIDES_MS } from './horaires-relais.js';
 
 // ── LES TRANSPORTEURS LUS, LEURS VOIES, LEURS NOMS ──────────────────────────
 export const CARRIERS_LUS = ['mondialrelay', 'chronopost', 'vinted'];
@@ -613,7 +614,11 @@ export function lireReponseMondialRelayMvc(statut, ctype, corps, { suivi = '', c
   evs.sort((a, b) => ((a.ms ?? 0) - (b.ms ?? 0)) || (b.i - a.i));
   const evenements = garderEvenements(evs.map((e) => ({ at: e.at, code: '', libelle: e.libelle, lieu: '', cp: '' })));
   const dernier = evs[evs.length - 1];
-  const base = { evenements, cpRendu: c, libelle: propre(dernier.libelle, 160), etatAt: dernier.at, lieuNonLu: true };
+  // (13 nov., lot 11) Le n° du point relais et ses HORAIRES, écrits dans CE fragment (api/_lib/horaires-relais.js,
+  // `pointEtHorairesMr`) : gardés seulement quand le colis y ATTEND (état « disponible », plus bas) — le point
+  // d'un colis en route peut encore changer. Un bloc illisible ne rend que sa forme (`horairesForme`).
+  const mrPoint = pointEtHorairesMr(sansScripts);
+  const base = { evenements, cpRendu: c, libelle: propre(dernier.libelle, 160), etatAt: dernier.at, lieuNonLu: true, horairesForme: mrPoint.forme };
   if (!classeMr(dernier.libelle)) return rendu('ok', { ...base, etat: 'inconnu' });
   const classe = (e) => (classeMr(e.libelle) || {}).c;
   if (classe(dernier) === 'replace') return rendu('ok', { ...base, etat: 'en_route', detail: 'changement_point' });
@@ -631,7 +636,7 @@ export function lireReponseMondialRelayMvc(statut, ctype, corps, { suivi = '', c
     // La limite est DÉDUITE (date de l'évènement + N jours), jamais affirmée.
     const jours = arr ? classeMr(arr.libelle).jours : null;
     const limite = Number.isFinite(jours) && msDe(at) ? jourParis(msDe(at) + jours * 86400000) : null;
-    return rendu('ok', { ...base, etat: 'disponible', etatAt: at, limite, limiteSure: false });
+    return rendu('ok', { ...base, etat: 'disponible', etatAt: at, limite, limiteSure: false, ...(mrPoint.pointId ? { pointMr: mrPoint.pointId } : {}), ...(mrPoint.pointId && mrPoint.horaires ? { horaires: mrPoint.horaires } : {}) });
   }
   if (k >= 2) return rendu('ok', { ...base, etat: 'en_route' });
   return rendu('ok', { ...base, etat: 'en_route', detail: 'prepare' });
@@ -675,6 +680,14 @@ export function ligneApresEssai(avant, lu, { carrier, suivi, voie, source = 'ser
     // Une voie qui ne porte pas le lieu (Mondial Relay `mr-fr-mvc`) : la ligne
     // garde celui qu'elle avait, jamais effacé par un blanc.
     if (lu.lieuNonLu) for (const k of ['lieuNom', 'lieuVille', 'lieuCp', 'lieuRue', 'pointId']) out[k] = a[k] == null ? '' : a[k];
+    // (13 nov., lot 11) LES HORAIRES DU POINT où le colis attend (Mondial Relay, `pointEtHorairesMr`), lus par le
+    // SERVEUR seulement (décision de Julien : jamais l'extension) dans la réponse de CE n°. Une lecture qui ne les
+    // donne plus garde les précédents 7 jours au plus, du MÊME point et tant que le colis y attend ; sinon effacés.
+    const hLus = source === 'serveur' && lu.etat === 'disponible' && /^\d{1,12}$/.test(String(lu.pointMr || '')) ? horairesValides(lu.horaires) : null;
+    const hAvant = horairesValides(a.horaires), hAvantMs = msDe(a.horairesAt);
+    if (hLus) { out.horaires = hLus; out.horairesPoint = String(lu.pointMr); out.horairesAt = iso; }
+    else if (!(hAvant && lu.etat === 'disponible' && hAvantMs != null && maintenant - hAvantMs < HORAIRES_TRANSP_VALIDES_MS && (!lu.pointMr || String(lu.pointMr) === String(a.horairesPoint || '')))) { delete out.horaires; delete out.horairesPoint; delete out.horairesAt; }
+    out.horairesForme = propre(lu.horairesForme || '', 200);
     out.libelle = propre(out.libelle, 160); out.lieuNom = propre(out.lieuNom, 80); out.lieuVille = propre(out.lieuVille, 60);
     out.lieuRue = propre(out.lieuRue, 80); out.pointId = /^\d{1,12}$/.test(String(out.pointId || '')) ? String(out.pointId) : '';
     if (!/^\d{5}$/.test(String(out.lieuCp || ''))) out.lieuCp = '';
@@ -711,7 +724,7 @@ export function ligneApresEssai(avant, lu, { carrier, suivi, voie, source = 'ser
 
 // ── LES SCALAIRES LUS PAR LES LECTEURS (app, cron, widget, e-mails) ──────────
 // Jamais `select=data` (§4.4) : les évènements restent dans la ligne.
-export const SELECT_TRANSP_META = 'id,suivi:meta->>suivi,carrier:meta->>carrier,etat:meta->>etat,detail:meta->>detail,etatAt:meta->>etatAt,libelle:meta->>libelle,lieuNom:meta->>lieuNom,lieuVille:meta->>lieuVille,lieuCp:meta->>lieuCp,lieuRue:meta->>lieuRue,pointId:meta->>pointId,limite:meta->>limite,limiteSure:meta->>limiteSure,limiteAt:meta->>limiteAt,lu:meta->>lu,source:meta->>source,essai:meta->>essai,essaiRes:meta->>essaiRes,essaiSource:meta->>essaiSource,essais:meta->>essais,cp:meta->>cp,cpSource:meta->>cpSource,cpEssayes:meta->>cpEssayes,cpJour:meta->>cpJour,cpRefuse:meta->>cpRefuse,cpRefuseSource:meta->>cpRefuseSource,cpCherche:meta->>cpCherche,fini:meta->>fini';
+export const SELECT_TRANSP_META = 'id,suivi:meta->>suivi,carrier:meta->>carrier,etat:meta->>etat,detail:meta->>detail,etatAt:meta->>etatAt,libelle:meta->>libelle,lieuNom:meta->>lieuNom,lieuVille:meta->>lieuVille,lieuCp:meta->>lieuCp,lieuRue:meta->>lieuRue,pointId:meta->>pointId,limite:meta->>limite,limiteSure:meta->>limiteSure,limiteAt:meta->>limiteAt,lu:meta->>lu,source:meta->>source,essai:meta->>essai,essaiRes:meta->>essaiRes,essaiSource:meta->>essaiSource,essais:meta->>essais,cp:meta->>cp,cpSource:meta->>cpSource,cpEssayes:meta->>cpEssayes,cpJour:meta->>cpJour,cpRefuse:meta->>cpRefuse,cpRefuseSource:meta->>cpRefuseSource,cpCherche:meta->>cpCherche,fini:meta->>fini,horaires:data->horaires,horairesPoint:meta->>horairesPoint,horairesAt:meta->>horairesAt';
 // (29 oct., revue n° 8) PLUS DE FENÊTRE DE 45 JOURS CHEZ LES LECTEURS. Une ligne
 // « fini » (retiré, rendu) qui sortait de la fenêtre redonnait l'état d'AVANT la
 // lecture : un colis retiré ressortait « à vérifier — trop long » au 46e jour,
@@ -734,6 +747,9 @@ export function ligneTranspDeMeta(x) {
     lu: x.lu || null, source: x.source || '', essai: x.essai || null, essaiRes: RESULTATS.includes(x.essaiRes) ? x.essaiRes : null, essaiSource: String(x.essaiSource || ''),
     essais: Number(x.essais) || 0, cp: /^\d{5}$/.test(String(x.cp || '')) ? String(x.cp) : '', cpSource: String(x.cpSource || ''),
     cpEssayes: String(x.cpEssayes || ''), cpJour: String(x.cpJour || ''), cpRefuse: /^\d{5}$/.test(String(x.cpRefuse || '')) ? String(x.cpRefuse) : '', cpRefuseSource: String(x.cpRefuseSource || ''), cpCherche: bool(x.cpCherche), fini: bool(x.fini),
+    // (13 nov., lot 11) Les horaires du point lus chez le transporteur : crus sous la forme exacte, avec leur point et leur date.
+    ...(() => { const h = horairesValides(x.horaires); const p = /^\d{1,12}$/.test(String(x.horairesPoint || '')) ? String(x.horairesPoint) : ''; const at = msDe(x.horairesAt);
+      return h && p && at != null ? { horaires: h, horairesPoint: p, horairesAt: new Date(at).toISOString() } : {}; })(),
   };
 }
 
