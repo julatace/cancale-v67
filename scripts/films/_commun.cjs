@@ -36,6 +36,11 @@ const DIST = process.env.FILMS_DIST || path.join(RACINE, 'dist');
 const PORT = Number(process.env.FILMS_PORT) || 9811;
 const IPS = Number(process.env.IPS) || 60;
 const SORTIE = process.env.FILMS_SORTIE || '/tmp/vrm-films';
+// (13 nov., lot 49) Les vidéos d'aide : 720 × 1280 (FILMS_ECHELLE = 720/540), 30 i/s,
+// débit plafonné (CRF, FILMS_DEBIT) — chacune ≤ 1,5 Mo. Les films de
+// présentation gardent leurs réglages (×2, 60 i/s, CRF 21, 4,2 Mb/s).
+const ECHELLE = Number(process.env.FILMS_ECHELLE) || 2;
+const DEBIT = process.env.FILMS_DEBIT || '4.2M';
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2', '.woff': 'font/woff', '.jpg': 'image/jpeg', '.webp': 'image/webp' };
 
 // ── LES COURBES ─────────────────────────────────────────────────────────────
@@ -261,10 +266,10 @@ async function servirBase(ctx, monde) {
     }
     return route.abort();
   });
-  await ctx.route('**/api/**', (route) => {
+  await ctx.route('**/api/**', async (route) => {
     const req = route.request(), u = req.url();
     if (/mode=confidentialite/.test(u)) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, uid: UID }) });
-    const r = monde.api ? monde.api(u, req.method(), req.postData()) : undefined;
+    const r = monde.api ? await monde.api(u, req.method(), req.postData()) : undefined;
     if (r !== undefined) return route.fulfill({ status: r.status || 200, contentType: r.type || 'application/json', body: typeof r.body === 'string' || Buffer.isBuffer(r.body) ? r.body : JSON.stringify(r.body == null ? {} : r.body) });
     return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
   });
@@ -334,7 +339,7 @@ class Film {
   get app() { return this._app || this.pg.frames().find((f) => f !== this.pg.mainFrame()); }
   async ouvrir(tab) {
     await this.pg.evaluate((src) => { document.getElementById('app').src = src; }, `/?tab=${tab}`);
-    await this.pg.waitForFunction(() => { const f = document.getElementById('app'); const d = f && f.contentDocument; return d && d.querySelector('.vrm-main'); }, null, { timeout: 30000 });
+    await this.pg.waitForFunction(() => { const f = document.getElementById('app'); const d = f && f.contentDocument; return d && d.querySelector('.vrm-main'); }, null, { timeout: 90000 });
     await this.pg.waitForTimeout(2500);
     this._app = await (await this.pg.$('#app')).contentFrame();
     await this.teinte();
@@ -465,6 +470,11 @@ class Film {
     else await this.app.evaluate((sel) => window.__filmQ(sel).click(), sel);
     await this.jouer(apres);
   }
+  // (13 nov., lot 49) Taper au clavier dans le champ qui a le focus (un toucher
+  // l'a donné), lettre par lettre : le texte s'écrit à l'image, à `cps` lettres/s.
+  async taper(texte, { cps = 14 } = {}) {
+    for (const ch of String(texte)) { await this.pg.keyboard.insertText(ch); await this.jouer(1 / cps); }
+  }
   // Défiler un conteneur de l'app (ou la page) jusqu'à y, en douceur.
   async defiler(sel, y, dur = 1, ease = 'doux') {
     const y0 = await this.app.evaluate((sel) => { const e = sel ? window.__filmQ(sel) : document.scrollingElement; return e ? e.scrollTop : 0; }, sel);
@@ -493,6 +503,13 @@ class Film {
     for (let i = 0; i < max * IPS; i++) {
       const ok = await this.app.evaluate((sel) => !!window.__filmQ(sel), sel).catch(() => false);
       if (ok) return true; await this.image();
+    }
+    // (13 nov., lot 49) Machine chargée : un morceau chargé à la demande arrive en temps
+    // RÉEL. L'image reste figée (rien n'est tourné) et l'horloge avance à petits pas.
+    for (let k = 0; k < 120; k++) {
+      await this.pg.waitForTimeout(100); await this.pg.clock.runFor(16);
+      const ok = await this.app.evaluate((sel) => !!window.__filmQ(sel), sel).catch(() => false);
+      if (ok) return true;
     }
     console.log(`  (attendu en vain : ${sel})`); return false;
   }
@@ -537,7 +554,7 @@ class Film {
     if (this.ff) {
       // ⚠️ Sans `clip.scale`, CDP rend l'image en px CSS (540 × 960) : ffmpeg l'agrandissait
       //    et le texte devenait mou. Avec scale 2, Chrome rastérise à 1080 × 1920.
-      const { data } = await this.cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: 94, optimizeForSpeed: true, clip: { x: 0, y: 0, width: this.F.w, height: this.F.h, scale: 2 } });
+      const { data } = await this.cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: 94, optimizeForSpeed: true, clip: { x: 0, y: 0, width: this.F.w, height: this.F.h, scale: ECHELLE } });
       const buf = Buffer.from(data, 'base64');
       this.derniere = buf;
       if (!this.ff.stdin.write(buf)) await new Promise((r) => this.ff.stdin.once('drain', r));
@@ -558,8 +575,8 @@ class Film {
     this.i = 0; this.t = 0;
     const { w, h } = this.F;
     this.ff = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(IPS), '-c:v', 'mjpeg', '-i', '-',
-      '-vf', `scale=${w * 2}:${h * 2},format=yuv420p`, '-c:v', 'libx264', '-preset', 'slow', '-crf', process.env.CRF || '21', '-profile:v', 'high', '-level', '4.2',
-      '-maxrate', '4.2M', '-bufsize', '8M', '-g', String(IPS * 2), '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-r', String(IPS), fichier], { stdio: ['pipe', 'inherit', 'inherit'] });
+      '-vf', `scale=${Math.round(w * ECHELLE)}:${Math.round(h * ECHELLE)},format=yuv420p`, '-c:v', 'libx264', '-preset', 'slow', '-crf', process.env.CRF || '21', '-profile:v', 'high', '-level', '4.2',
+      '-maxrate', DEBIT, '-bufsize', process.env.FILMS_DEBIT ? String(parseFloat(DEBIT) * 2) + DEBIT.replace(/[\d.]/g, '') : '8M', '-g', String(IPS * 2), '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-r', String(IPS), fichier], { stdio: ['pipe', 'inherit', 'inherit'] });
   }
   async finir() {
     await new Promise((r) => { this.ff.on('close', r); this.ff.stdin.end(); });

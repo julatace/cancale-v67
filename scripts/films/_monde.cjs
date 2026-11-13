@@ -178,6 +178,16 @@ function monde({ partis = [] } = {}) {
   // Messages.
   const conv = (id, login, desc, unread, h) => ({ id, unread, updated_at: ilYaH(h), description: desc, opposite_user: { id: 6000 + id, login } });
   lignes.push({ id: `harvest_${U[0]}_inbox`, data: { capturedAt: ilYaH(0.15), payload: { conversations: [conv(501, 'lucie_r', 'Bonjour, vous feriez 70 € ?', true, 0.6), conv(502, 'tom.vintage', 'Super, bien reçues, merci !', false, 20)] } } });
+  // (13 nov., lot 49) Le fil de lucie_r, lu par l'extension (forme `harvest_{uid}_conv_{id}`) : une question, une offre.
+  const msg = (uid, body, h, id) => ({ id, entity_type: 'message', created_at_ts: ilYaH(h), entity: { id, user_id: uid, body, created_at_ts: ilYaH(h) } });
+  lignes.push({ id: `harvest_${U[0]}_conv_501`, data: { capturedAt: ilYaH(0.15), payload: { conversation: {
+    id: 501, opposite_user: { id: 6501, login: 'lucie_r' }, transaction: { id: 94501, item_id: 7100, item_title: 'Nike Air Max 90 blanche T42' }, description: 'Nike Air Max 90 blanche T42', allow_reply: true,
+    messages: [
+      msg(6501, 'Bonjour ! Elles taillent normalement ?', 2.2, 1),
+      msg(Number(U[0]), 'Bonjour, oui, taille normale. Portées deux fois.', 2.0, 2),
+      msg(6501, 'Bonjour, vous feriez 70 € ?', 0.6, 3),
+      { id: 4, entity_type: 'offer_request_message', created_at_ts: ilYaH(0.6), entity: { id: 4, user_id: 6501, current: true, status: 10, status_title: '', price: { amount: '70.0', currency_code: 'EUR' }, transaction_id: 94501, offer_request_id: 501 } },
+    ] } } } });
   lignes.push({ id: `harvest_${U[1]}_inbox`, data: { capturedAt: ilYaH(0.2), payload: { conversations: [conv(601, 'maxime_44', 'Elle taille normalement ?', true, 1.4)] } } });
   // Leboncoin.
   const LBC = '6b1c0a00-0000-4000-8000-0000000001bc';
