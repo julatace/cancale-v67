@@ -58,6 +58,7 @@ import { colisVentesEmailServeur, reqVentesEmail, txsDeCommandes } from './_lib/
 import { relireCommandesVendeur } from './_lib/ebay-relecture.js';
 import { avecSuiviDuSujet, relireLigneMeta } from './_lib/suivi-colis.js';
 import { rappelsRetraitDuJour, texteRappelRetrait, SELECT_SUIVI_META, txDuColis, liensDesLignes, finDesTransactions, SELECT_TRANSP_META, ligneTranspDeMeta } from './_lib/suivi-colis.js';
+import { commandeDuColisRegle, achatsDesLignes, indexDesLiens, txParCodeDe, titreDuColis } from './_lib/commande-colis.js';   // (13 nov.) le nom de la paire
 // (24 oct.) Le statut des colis lu chez leur transporteur (C1, C5).
 import { passageTransporteurs, MAX_CRON, BUDGET_CRON_MS, MAX_DEPARTS_CRON } from './_lib/transporteurs-lecture.js';
 import { passageSauvegarde, stockageSupabase, sourceCle } from './_lib/sauvegarde-quotidienne.js';   // (12 nov., agent2-fiabilite-prod)
@@ -534,7 +535,9 @@ async function retraitsDuJour(maintenant = Date.now(), jourCible = 0) {
   for (const x of candidats) { const t = txDuColis({ suivi: x.suivi, code: x.code }, relais, liens); txsPar.set(x.suivi, t); }
   const tousTx = [...new Set([...txsPar.values()].flatMap((t) => (t ? [...t] : [])))].filter((t) => /^\d{3,20}$/.test(t));
   let achats = [], etats = new Map();
-  if (tousTx.length) {
+  // (13 nov.) La conversation d'une commande est aussi une identité (la jonction de l'écran) :
+  // les commandes sont lues pour elle aussi, pour le nom de la paire.
+  if (tousTx.length || candidats.some((x) => x.conv)) {
     const [a, e] = await Promise.all([
       fetchPaginated(scoped('app_data?id=like.harvest_%25_orders_purchased&select=id,orders:data->payload->my_orders,txns:data->resume->txns')),
       fetchPaginated(scoped(`app_data?id=like.harvest_%25_txn_%25&meta->>id=in.(${tousTx.join(',')})&select=tx:meta->>id,s:meta->>status,ss:meta->>ship_status_title`)),
@@ -545,6 +548,16 @@ async function retraitsDuJour(maintenant = Date.now(), jourCible = 0) {
   }
   const liste = rappelsRetraitDuJour({ ...entree, liens, jourCible,
     finParCommande: ({ suivi, code }) => finDesTransactions(txDuColis({ suivi, code }, relais, liens), achats, etats) });
+  // (13 nov., Julien : « avec le n° de suivi on va voir quelle paire est à l'intérieur ») LE NOM DE
+  // LA PAIRE : la commande reliée par IDENTITÉ — la jonction de l'écran (api/_lib/commande-colis.js :
+  // conversation, n° de suivi, code de retrait), jamais le titre, le lieu ou la date (§5). Les
+  // commandes sont celles déjà lues ci-dessus (projection `my_orders`, aucune lecture de plus).
+  // Personne ⇒ l'article de l'e-mail de CE colis, sinon « Colis {transporteur} ».
+  if (achats.length) {
+    const flat = achatsDesLignes(achats);
+    const j = { achats: flat, index: indexDesLiens(liens), txParCode: txParCodeDe(relais), achatParTx: new Map(flat.map((o) => [String(o.transaction_id), o])) };
+    for (const x of liste) x.article = titreDuColis(commandeDuColisRegle({ suivi: x.suivi, code: x.code, conv: x.conv }, j), x.article);
+  }
   return { liste, txsPar };
 }
 
@@ -1266,7 +1279,16 @@ async function rappelDuSoir(maintenant = Date.now(), { horaire = false } = {}) {
   let retraits = null;
   try {
     const rr = await retraitsDuJour(maintenant, 1);
-    if (typeof rr !== 'string') retraits = rr.liste.filter((x) => x.etat === 'demain').map((x) => ({ suivi: x.suivi, lieu: x.lieu, tx: txUniqueDe(rr.txsPar, x.suivi) }));
+    // (13 nov.) UNE NOTIFICATION PAR COLIS ET PAR JOUR : un colis qui a déjà reçu son
+    // « 📍 Demain dernier jour » ce matin (mémo `colis_retrait_dedup`, clé `demain-{n°}` datée
+    // d'aujourd'hui — son identité) n'est pas redit ce soir. Le rappel du matin n'est pas parti
+    // (cron sauté, mémo sans lui) ⇒ le résumé le dit, une fois. Mémo illisible ⇒ « pas su » :
+    // les retraits ne sont pas dits (mieux vaut rien que deux fois), le cron le rapporte.
+    const memo = typeof rr === 'string' ? undefined : await getRow('colis_retrait_dedup');
+    if (typeof rr !== 'string' && memo !== undefined) {
+      const dejaDits = objet(memo && memo.envoyes);
+      retraits = rr.liste.filter((x) => x.etat === 'demain' && dejaDits[x.cle] !== today).map((x) => ({ suivi: x.suivi, lieu: x.lieu, tx: txUniqueDe(rr.txsPar, x.suivi) }));
+    }
   } catch (_) { retraits = null; }
   // Les offres Vestiaire reçues qui expirent avant demain soir (projetées, jamais `select=data`).
   let offres = null;
