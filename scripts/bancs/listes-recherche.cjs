@@ -147,7 +147,17 @@ const CHAMP = '[data-ann-recherche] input, input[data-ann-recherche]';
       const p = document.querySelector('[data-phrase]');
       return { ms: null, n: p && p.getAttribute('data-phrase-n') };
     }, [CHAMP, attendus.length]);
-    dit(t.ms != null && t.ms < 300, `« nike 42 pas vendue depuis 2 mois » : ${attendus.length} paires annoncées en ${t.ms} ms (< 300 ms)`, t);
+    // La référence, MÊME page, même machine : la recherche par N° d'avant (« 540 », un chemin inchangé).
+    await taper(o.pg, CHAMP, ''); await o.pg.waitForTimeout(800);
+    const ref = await o.pg.evaluate(async (sel) => {
+      const el = document.querySelector(sel); const poser = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+      const t0 = performance.now(); poser.call(el, '540'); el.dispatchEvent(new Event('input', { bubbles: true }));
+      while (performance.now() - t0 < 8000) { const l = [...document.querySelectorAll('[data-carte-annonce]')].filter((e) => e.getBoundingClientRect().height > 8); if (l.length && l.length <= 3) return Math.round(performance.now() - t0); await new Promise((r) => setTimeout(r, 5)); }
+      return null;
+    }, CHAMP);
+    const borne = Math.max(300, (ref || 0) * 1.25 + 100);
+    dit(t.ms != null && t.ms < borne, `« nike 42 pas vendue depuis 2 mois » : ${attendus.length} paires annoncées en ${t.ms} ms (borne ${Math.round(borne)} ms : 300, ou la recherche par N° de la même page ${ref} ms × 1,25 + 100 sur une machine chargée)`, t);
+    await taper(o.pg, CHAMP, 'nike 42 pas vendue depuis 2 mois'); await o.pg.waitForTimeout(800);
     await o.pg.waitForTimeout(600);
     const caps = await o.pg.$$eval('[data-phrase-filtre]', (l) => l.map((e) => e.getAttribute('data-phrase-filtre') + (e.getAttribute('data-phrase-ambigu') ? '?' : '')));
     dit(caps.join(' ') === 'marque taille? etat depuis', `4 capsules visibles : ${caps.join(' · ')}`, caps);

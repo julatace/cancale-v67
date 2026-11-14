@@ -36,7 +36,7 @@ const MUTATIONS = {
   'prix-avant-taille': ['recherchePhrase.js', "  chaque(RE.prixExact, (m, de, a) => { const v = Number(String(m[1] || m[2]).replace(',', '.')); poser({ k: 'prix', min: v, max: v }, de, a); });", ''],
   'epingle-max': ['epingles.js', 'if (Object.keys(out).length >= MAX_EPINGLES)', 'if (false)'],
   'epingle-num-ambigu': ['epingles.js', 'parNum.set(c, parNum.has(c) ? null : k)', 'parNum.set(c, k)'],
-  'epingle-par-titre': ['epingles.js', '    const k = cleEpingle(uid(a), id(a)); parCle.set(k, a);', '    const k = cleEpingle(uid(a), id(a)); parCle.set(k, a); parCle.set(cleEpingle(uid(a), a.titre), a);'],
+  'epingle-sans-compte': ['epingles.js', "const k2 = parNum.get(str(e.uid) + '|' + n);", "const k2 = ([...parNum.entries()].find(([c]) => c.endsWith('|' + n)) || [])[1];"],
   'glisse-exclues': ['glisserSelection.js', 'if (exclues.has(k)) continue;', ''],
   'glisse-retour': ['glisserSelection.js', 'const out = new Set(avant || []);', 'const out = new Set([...(avant || []), ...(globalThis.__dejaGlisse || [])]); globalThis.__dejaGlisse = [...(plage || [])];'],
   'comparer-marge': ['comparerPaires.js', 'v.prix != null && v.achat != null ?', 'v.prix != null ?'],
