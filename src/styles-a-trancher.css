@@ -35,7 +35,7 @@
 /* Un groupe : un titre court, son compte en pastille grise. */
 :root:root body .vrm-at .vrm-at-groupe { display: flex !important; flex-direction: column !important; gap: 10px !important; margin: 0 !important; }
 :root:root body .vrm-at .vrm-at-groupe-titre { display: flex !important; align-items: center !important; gap: 8px !important; margin: 0 2px !important; font: 700 22px/1.15 var(--vrm-police, -apple-system, system-ui, sans-serif) !important; letter-spacing: -.022em !important; color: var(--at-encre) !important; }
-:root:root body .vrm-at .vrm-at-compte { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 26px; padding: 0 8px; border-radius: 12px; background: var(--at-fond-tuile); color: var(--at-gris); font: 700 14px/1 var(--vrm-police, system-ui, sans-serif); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+:root:root body .vrm-at .vrm-at-compte { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 26px; padding: 0 8px; border-radius: 999px; background: var(--at-fond-tuile); color: var(--at-gris); font: 700 14px/1 var(--vrm-police, system-ui, sans-serif); font-variant-numeric: tabular-nums; letter-spacing: 0; }
 
 /* Les cartes : une colonne au téléphone, une grille sur ordinateur. */
 :root:root body .vrm-at .vrm-at-grille { display: grid !important; grid-template-columns: minmax(0, 1fr) !important; gap: 12px !important; }

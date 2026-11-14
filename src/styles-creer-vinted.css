@@ -21,7 +21,7 @@
 .vrm-cv-tete { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .vrm-cv-tete h2, .vrm-cv-q h3 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
 .vrm-cv-q h3 { font-size: 17px; }
-.vrm-cv-x { min-width: 44px; min-height: 44px; border: 0; border-radius: 20px; background: transparent; color: var(--vrm-muted, #6e6e73); font-size: 26px; line-height: 1; cursor: pointer; }
+.vrm-cv-x { min-width: 44px; min-height: 44px; border: 0; border-radius: 999px; background: transparent; color: var(--vrm-muted, #6e6e73); font-size: 26px; line-height: 1; cursor: pointer; }
 .vrm-cv-doux { margin: 0; font-size: 13px; line-height: 1.45; color: var(--vrm-muted, #6e6e73); }
 .vrm-cv-compte { font-size: 14px; font-weight: 600; padding: 10px 12px; border-radius: 12px; background: var(--vrm-card2, #f2f2f7); overflow-wrap: anywhere; }
 .vrm-cv-geste { color: var(--vrm-warn, #b25000); }

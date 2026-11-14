@@ -129,17 +129,17 @@
 }
 .vrm-fa-pile > i + i { margin-left: -6px; }
 .vrm-fa-pile > i.is-vide, .vrm-fa-avatar.is-vide { background: var(--fu-case); }
-.vrm-fa-pile > i.is-plus { width: auto; min-width: 22px; padding: 0 6px; border-radius: 12px; background: var(--fu-case); color: var(--fu-gris); font-weight: 600; }
+.vrm-fa-pile > i.is-plus { width: auto; min-width: 22px; padding: 0 6px; border-radius: 999px; background: var(--fu-case); color: var(--fu-gris); font-weight: 600; }
 
 .vrm-fa-puce { display: inline-flex; align-items: center; min-height: 22px; padding: 0 8px; border-radius: 7px; background: var(--fu-case); color: var(--fu-gris); font: 600 12px/1 var(--vrm-police); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .vrm-fa-puce.is-geste { background: var(--fu-ambre-fond); color: var(--fu-ambre-txt); }
 
 .vrm-fa .vrm-fa-envoyer, .vrm-fa-feuille .vrm-fa-envoyer, .vrm-app-shell .vrm-main .vrm-fa .vrm-fa-envoyer {
-  flex: none; min-height: 36px; padding: 0 16px; border-radius: 20px !important; background: var(--fu-bleu) !important; color: #fff !important;
+  flex: none; min-height: 36px; padding: 0 16px; border-radius: 999px !important; background: var(--fu-bleu) !important; color: #fff !important;
   font: 600 14px/1 var(--vrm-police) !important; white-space: nowrap; position: relative; transition: transform .12s ease, opacity .12s ease;
 }
 .vrm-fa .vrm-fa-second, .vrm-fa-feuille .vrm-fa-second, .vrm-app-shell .vrm-main .vrm-fa .vrm-fa-second {
-  flex: none; min-height: 36px; padding: 0 14px; border-radius: 20px !important; background: var(--fu-case) !important; color: var(--vrm-accent-texte) !important;
+  flex: none; min-height: 36px; padding: 0 14px; border-radius: 999px !important; background: var(--fu-case) !important; color: var(--vrm-accent-texte) !important;
   font: 600 14px/1 var(--vrm-police) !important; white-space: nowrap; position: relative; transition: transform .12s ease;
 }
 /* 36 px visibles, 44 px au doigt. */
@@ -149,7 +149,7 @@
 @media (hover: hover) { .vrm-fa .vrm-fa-envoyer:hover:not(:disabled) { opacity: .88; } }
 
 .vrm-fa .vrm-fa-plus, .vrm-app-shell .vrm-main .vrm-fa .vrm-fa-plus {
-  align-self: center; min-height: 44px; padding: 0 18px; border-radius: 20px !important; background: var(--fu-carte) !important; color: var(--vrm-accent-texte) !important; font: 600 15px/1 var(--vrm-police) !important; box-shadow: var(--fu-ombre) !important;
+  align-self: center; min-height: 44px; padding: 0 18px; border-radius: 999px !important; background: var(--fu-carte) !important; color: var(--vrm-accent-texte) !important; font: 600 15px/1 var(--vrm-police) !important; box-shadow: var(--fu-ombre) !important;
 }
 .vrm-fa-ligne { margin: 4px 2px; font: 500 15px/1.4 var(--vrm-police); color: var(--fu-gris); }
 .vrm-fa-ligne.is-geste { color: var(--fu-ambre-txt); }

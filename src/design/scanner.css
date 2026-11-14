@@ -48,7 +48,7 @@
 .vrm-scan-kicker { font-size: 13px; font-weight: 600; color: #8e8e93; letter-spacing: .01em; }
 .vrm-scan-kicker.is-fait { color: #FFFFFF; }
 .vrm-scan-ligne1 { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.vrm-scan-num { flex: 0 0 auto; display: inline-flex; align-items: center; min-height: 26px; padding: 0 9px; border-radius: 12px; background: #fff; color: #000; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.vrm-scan-num { flex: 0 0 auto; display: inline-flex; align-items: center; min-height: 26px; padding: 0 9px; border-radius: 999px; background: #fff; color: #000; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .vrm-scan-titre { font-size: 19px; font-weight: 700; letter-spacing: -.01em; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; min-width: 0; }
 .vrm-scan-sous { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 14px; color: #aeaeb2; min-width: 0; }
 .vrm-scan-sous > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }

@@ -50,7 +50,7 @@
 .vrm-fc .vrm-fc-bouton.is-ambre { background: var(--fu-carte) !important; color: var(--fu-ambre-txt) !important; min-height: 44px; padding: 0 14px; }
 .vrm-fc .vrm-fc-lien, .vrm-app-shell .vrm-main .vrm-fc .vrm-fc-lien { min-height: 44px; padding: 0 4px; background: none !important; color: var(--vrm-accent-texte, var(--fu-bleu)) !important; font: 600 15px/1 var(--vrm-police) !important; }
 .vrm-fc .vrm-fc-pastille, .vrm-app-shell .vrm-main .vrm-fc .vrm-fc-pastille {
-  min-height: 44px; padding: 0 14px; border-radius: 20px !important; background: var(--fu-case) !important; color: var(--fu-encre) !important; font: 600 14px/1 var(--vrm-police) !important; white-space: nowrap;
+  min-height: 44px; padding: 0 14px; border-radius: 999px !important; background: var(--fu-case) !important; color: var(--fu-encre) !important; font: 600 14px/1 var(--vrm-police) !important; white-space: nowrap;
 }
 .vrm-fc .vrm-fc-pastille[aria-pressed="true"] { background: var(--fu-encre) !important; color: var(--fu-carte) !important; }
 

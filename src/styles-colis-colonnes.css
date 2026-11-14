@@ -265,7 +265,7 @@ html body .vrm-main .vrm-colis-titre .vrm-num, html body .vrm-tournee .vrm-num, 
 html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete-delai { padding: 10px 16px 2px !important; margin: 0 !important; }
 /* La carte en haut de la liste (téléphone compris) ; « Agrandir » posé dans son coin, 44 px au doigt. */
 :root:root body .vrm-rpf-carte[hidden] { display: none !important; }
-:root:root body .vrm-rpf-agrandir { position: absolute; left: 8px; bottom: 8px; z-index: 3; min-height: 44px; min-width: 44px; padding: 0 14px; border: 0; border-radius: 20px; font: 600 13px/44px var(--vrm-police, system-ui); color: #1d1d1f; background: rgba(255,255,255,.88); box-shadow: 0 1px 4px rgba(0,0,0,.18); cursor: pointer; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+:root:root body .vrm-rpf-agrandir { position: absolute; left: 8px; bottom: 8px; z-index: 3; min-height: 44px; min-width: 44px; padding: 0 14px; border: 0; border-radius: 999px; font: 600 13px/44px var(--vrm-police, system-ui); color: #1d1d1f; background: rgba(255,255,255,.88); box-shadow: 0 1px 4px rgba(0,0,0,.18); cursor: pointer; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
 :root:root body .vrm-rpf-agrandir:focus-visible { outline: 2px solid var(--d-accent, #0071E3); outline-offset: 2px; }
 :root:root body .vrm-rpf-ligne-delai { padding: 0 0 12px calc(56px + 12px); margin-top: -4px; }
 :root:root body .vrm-rpf-ligne-delai .vrm-rpf-delai { margin-top: 0; }

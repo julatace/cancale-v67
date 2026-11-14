@@ -347,9 +347,12 @@
 
 /* ── 2.8 LES RAYONS ÉCRITS À LA MAIN (styles en ligne) : ramenés à l'échelle ─
    10, 14, 16 → 12 (case) ; 18, 22, 24, 26 → 20 (carte). Le N° (6) et la capsule
-   (999) restent. Seulement dans le contenu (la coque garde les siens). */
-:root:root body :is(.vrm-main, .vrm-fs) :is([style*="border-radius: 10px"], [style*="border-radius: 14px"], [style*="border-radius: 16px"]) { border-radius: var(--d-r-case) !important; }
-:root:root body :is(.vrm-main, .vrm-fs) :is([style*="border-radius: 18px"], [style*="border-radius: 22px"], [style*="border-radius: 24px"], [style*="border-radius: 26px"]) { border-radius: var(--d-r-carte) !important; }
+   (999) restent. Seulement dans le contenu (la coque garde les siens).
+   Un rayon qu'on RÉDUIT ne touche jamais un élément qui pose sa hauteur : un rond de 28 ou
+   44 px (rayon = la moitié de sa hauteur) deviendrait un carré arrondi. */
+:root:root body :is(.vrm-main, .vrm-fs) [style*="border-radius: 10px"] { border-radius: var(--d-r-case) !important; }
+:root:root body :is(.vrm-main, .vrm-fs) :is([style*="border-radius: 14px"], [style*="border-radius: 16px"]):not([style*="height"]) { border-radius: var(--d-r-case) !important; }
+:root:root body :is(.vrm-main, .vrm-fs) :is([style*="border-radius: 18px"], [style*="border-radius: 22px"], [style*="border-radius: 24px"], [style*="border-radius: 26px"]):not([style*="height"]) { border-radius: var(--d-r-carte) !important; }
 
 /* ── 2.9 LE MOUVEMENT ──────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {

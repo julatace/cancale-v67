@@ -27,7 +27,7 @@
 
 /* Le choix de la semaine : ‹ Cette semaine › — deux ronds de 44. */
 :root:root body .vrm-ms .vrm-ms-nav { display: grid !important; grid-template-columns: 44px minmax(0,1fr) 44px !important; align-items: center !important; gap: 8px !important; margin: 0 !important; }
-:root:root body .vrm-ms .vrm-ms-nav-b { display: grid !important; place-items: center !important; width: 44px !important; height: 44px !important; min-height: 44px !important; padding: 0 !important; border: 0 !important; border-radius: 20px !important; background: var(--ms-remplir) !important; color: var(--ms-encre) !important; cursor: pointer; }
+:root:root body .vrm-ms .vrm-ms-nav-b { display: grid !important; place-items: center !important; width: 44px !important; height: 44px !important; min-height: 44px !important; padding: 0 !important; border: 0 !important; border-radius: 999px !important; background: var(--ms-remplir) !important; color: var(--ms-encre) !important; cursor: pointer; }
 :root:root body .vrm-ms .vrm-ms-nav-b:disabled { opacity: .35 !important; cursor: default; }
 :root:root body .vrm-ms .vrm-ms-quand { display: flex !important; flex-direction: column !important; align-items: center !important; gap: 2px !important; min-width: 0 !important; text-align: center !important; }
 :root:root body .vrm-ms .vrm-ms-quand b { font: 700 17px/1.2 var(--ms-police) !important; letter-spacing: -.01em !important; }
