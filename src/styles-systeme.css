@@ -139,6 +139,7 @@
   --w-ombre-tete: 0 1px 2px rgba(0,0,0,.06), 0 12px 32px -16px rgba(16,24,40,.40);
   /* La colonne de gauche (DA 5) */
   --n2-encre: var(--d-encre); --n2-accent: var(--d-accent);
+  --n2-libelle: var(--d-encre);    /* (14 nov.) le libellé de la colonne est l'ENCRE (#2C2C2E / #E5E5EA : deux gris de plus) */
   --n2-b-reflet: none;             /* plus de reflet en dégradé sur un bouton */
 }
 :root:root[data-theme="dark"] {
@@ -161,6 +162,7 @@
   --d-ombre-carte: none;
   --d-ombre-flottant: 0 0 0 .5px rgba(255,255,255,.09), 0 24px 56px rgba(0,0,0,.6);
   --w-ombre-tete: 0 0 0 .5px rgba(255,255,255,.08);
+  --n2-libelle: var(--d-encre);
 }
 /* À la souris (ordinateur), les contrôles sont plus bas : un écran d'ordinateur n'est pas
    un téléphone agrandi (règle 4 de la revue du 11 nov.). Au doigt (iPad compris), 44. */
@@ -396,6 +398,9 @@
 :root:root body .vrm-app-shell .vrm-sidebar .vrm-rail-section-label { color: var(--n2-titre) !important; opacity: 1 !important; }
 :root:root body .vrm-app-shell .vrm-barre-kbd.vrm-barre-kbd { background: var(--d-carte) !important; border: 0 !important; }
 :root:root body .vrm-app-shell .vrm-nav-offre { color: var(--d-encre) !important; background: var(--d-remplir) !important; }
+
+/* La colonne de gauche : ses libellés au texte d'un contrôle (13 à la souris, 15 au doigt), plus 14. */
+:root:root body .vrm-app-shell .vrm-sidebar .vrm-rail-lib { font-size: var(--d-t-ctrl) !important; }
 
 /* Les cibles à la souris : 36 px au moins (« Choisir la vente », la feuille du rappel). */
 :root:root body .vrm-main .vrm-colis-choisir { min-height: var(--d-h-ctrl) !important; font-size: var(--d-t-13) !important; }

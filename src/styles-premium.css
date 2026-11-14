@@ -102,7 +102,7 @@
    pas un anneau ambre de 26 px. L'ambre reste (un geste à faire), en fond doux. */
 .vrm-app-shell:has(> .vrm-main:is([data-ecran="journee"],[data-ecran="ventes"],[data-ecran="cat_bord"])) .vrm-tabbar .vrm-nav-badge-n {
   border: 0 !important; box-shadow: 0 0 0 2px var(--p-fond) !important;
-  background: var(--p-ambre-point) !important; color: #fff !important;
+  background: var(--p-ambre-point) !important; color: #1D1D1F !important; /* (14 nov.) l’encre sur l’orange : 8,3:1 (le blanc n’y tenait que 2,2:1) */
   min-width: 18px !important; height: 18px !important; padding: 0 5px !important; border-radius: 999px !important;
   font: 700 11px/18px var(--vrm-police) !important; letter-spacing: 0 !important; font-variant-numeric: tabular-nums !important;
 }
@@ -1008,7 +1008,7 @@
   .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] .vrm-tab-ic { color: var(--p-accent) !important; }
   .vrm-app-shell .vrm-tabbar .vrm-nav-badge-n {
     border: 0 !important; box-shadow: 0 0 0 2px var(--p-carte) !important;
-    background: var(--p-ambre-point) !important; color: #fff !important;
+    background: var(--p-ambre-point) !important; color: #1D1D1F !important; /* (14 nov.) l’encre sur l’orange : 8,3:1 (le blanc n’y tenait que 2,2:1) */
     min-width: 18px !important; height: 18px !important; padding: 0 5px !important; border-radius: 999px !important;
     font: 700 11px/18px var(--vrm-police) !important; letter-spacing: 0 !important; font-variant-numeric: tabular-nums !important;
   }

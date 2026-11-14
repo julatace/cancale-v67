@@ -43,7 +43,7 @@
 :root:root body .vrm-main .vrm-ann-compte-avatar {
   flex: 0 0 auto; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
   background: var(--w-remplir-fort, rgba(118,118,128,.16)); color: var(--w-encre, #1D1D1F);
-  font: 600 14px/1 var(--vrm-police, system-ui); letter-spacing: 0;
+  font: 600 var(--d-t-13, 13px)/1 var(--vrm-police, system-ui); letter-spacing: 0;
 }
 :root:root body .vrm-main .vrm-ann-compte-nom {
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;

@@ -113,9 +113,11 @@
    ligne ensemble (au téléphone, « Changer le / prix » se cassait dans un tiers de largeur). */
 .vrm-fp .vrm-fp-outils { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 24px; }
 .vrm-fp .vrm-fp-outils .vrm-ao-second {
-  flex: 1 1 auto; min-height: var(--d-h-ctrl, 44px); padding: 0 16px; border: 0; border-radius: 999px; white-space: nowrap;
+  flex: 0 0 auto; min-height: var(--d-h-ctrl, 44px); padding: 0 16px; border: 0; border-radius: 999px; white-space: nowrap;
   background: var(--d-remplir, rgba(118,118,128,.12)); color: var(--d-encre, #1D1D1F); font-size: var(--d-t-ctrl, 15px); font-weight: 600;
 }
+/* Une rangée de trois quand la place le permet ; au téléphone, chaque geste à SA largeur (pas une barre pleine largeur). */
+@media (min-width: 700px) { .vrm-fp .vrm-fp-outils .vrm-ao-second { flex: 1 1 0; } }
 /* Les raccourcis vers chaque étape : des filtres (capsules remplies, sans cadre) ; au téléphone, UNE rangée qui défile. */
 .vrm-fp .vrm-fp-raccourcis { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 24px; }
 .vrm-fp .vrm-fp-raccourcis button {
@@ -128,7 +130,11 @@
 }
 /* « Modifications enregistrées sur cet appareil » : une carte (rayon 20, sans cadre), le titre est une rangée. */
 .vrm-fp .vrm-parcours-historique { margin: 0 0 24px; padding: 0 16px; border: 0; border-radius: var(--d-r-carte, 20px); background: var(--d-carte, #FFFFFF); box-shadow: var(--d-ombre-carte, none); }
-.vrm-fp .vrm-parcours-historique summary { min-height: var(--d-h-ctrl, 44px); display: flex; align-items: center; gap: 6px; font-size: var(--d-t-15, 15px); font-weight: 600; }
+.vrm-fp .vrm-parcours-historique summary { min-height: 44px; padding: 10px 0; box-sizing: border-box; display: flex; align-items: center; gap: 8px; font-size: var(--d-t-15, 15px); font-weight: 600; list-style: none; }
+.vrm-fp .vrm-parcours-historique summary::-webkit-details-marker { display: none; }
+/* Le repli d'iOS : un chevron (le glyphe) à droite, qui tourne à l'ouverture. */
+.vrm-fp .vrm-parcours-historique summary::after { content: '›'; margin-left: auto; flex: none; font-size: 20px; line-height: 1; color: var(--d-glyphe, #AEAEB2); transition: transform var(--d-m-court, 150ms) ease; }
+.vrm-fp .vrm-parcours-historique[open] summary::after { transform: rotate(90deg); }
 .vrm-fp .vrm-parcours-historique p { font-size: var(--d-t-13, 13px); color: var(--d-gris, #6E6E73); }
 .vrm-fp .vrm-parcours-historique[open] { padding-bottom: 12px; }
 .vrm-fp .vrm-fp-ev time, .vrm-fp .vrm-fp-ev .vrm-fp-ev-sansdate { color: var(--d-gris, #6E6E73); }

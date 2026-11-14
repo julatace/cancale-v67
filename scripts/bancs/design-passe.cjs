@@ -132,7 +132,7 @@ function mesurer({ tactile, sombre, racines }) {
   const vis = (el) => {
     if (!el.isConnected) return false;
     if (el.checkVisibility && !el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })) return false;
-    if (el.closest('[aria-hidden="true"], [inert], .vrm-sr-only, .sr-only')) return false;
+    if (el.closest('[inert], .vrm-sr-only, .sr-only')) return false;
     const r = el.getBoundingClientRect();
     return r.width >= 2 && r.height >= 2;
   };
@@ -142,7 +142,12 @@ function mesurer({ tactile, sombre, racines }) {
     const t = (el.innerText || el.getAttribute('aria-label') || '').trim().replace(/\s+/g, ' ').slice(0, 34);
     return `${el.tagName.toLowerCase()}${c ? '.' + c : ''}${d} « ${t} »`;
   };
-  const rgba = (s) => { const m = String(s || '').match(/rgba?\(([^)]+)\)/); if (!m) return null; const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }; };
+  const rgba = (s) => {
+    const t = String(s || '');
+    // color-mix() se calcule en `color(srgb r g b / a)` (valeurs 0–1)
+    const c = t.match(/color\(srgb ([^)]+)\)/); if (c) { const p = c[1].split(/[ ,/]+/).filter(Boolean).map(Number); return { r: p[0] * 255, g: p[1] * 255, b: p[2] * 255, a: p.length > 3 ? p[3] : 1 }; }
+    const m = t.match(/rgba?\(([^)]+)\)/); if (!m) return null; const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 };
+  };
   const lum = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); };
   const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
   const melange = (h, bas) => ({ r: h.r * h.a + bas.r * (1 - h.a), g: h.g * h.a + bas.g * (1 - h.a), b: h.b * h.a + bas.b * (1 - h.a), a: 1 });
@@ -181,7 +186,7 @@ function mesurer({ tactile, sombre, racines }) {
   for (const root of roots) {
     // A. cibles
     for (const el of root.querySelectorAll('button, [role="button"], [role="tab"], [role="menuitem"], [role="switch"], summary, a.vrm-b, select')) {
-      if (!vis(el)) continue;
+      if (!vis(el) || el.closest('[aria-hidden="true"]')) continue;   // une cible cachée aux lecteurs n'est pas une cible
       if (el.closest('svg')) continue;
       out.nCibles++;
       const r = el.getBoundingClientRect();
@@ -213,7 +218,9 @@ function mesurer({ tactile, sombre, racines }) {
           if (neutre && !gNav && (col.a < 0.999 || !PERMIS.has(hex(col)))) out.gris.push({ c: col.a < 1 ? `rgba(${col.r},${col.g},${col.b},${col.a})` : hex(col), quoi: lib() });
           if (hs.s > 0.3 && hs.h >= 255 && hs.h <= 320 && hs.l > 0.15 && hs.l < 0.9) out.violet.push({ c: hex(col), quoi: lib() });
           const disabled = el.closest(':disabled, [aria-disabled="true"]') || enFondu(el);
-          if (!disabled) {
+          // Un chevron ou une croix seuls (« › ») sont des DESSINS (`--d-glyphe`, DESIGN.md §4), pas un texte à lire.
+          const glyphe = /^[\s›‹×✕⌄▾▸]+$/.test(el.innerText || '');
+          if (!disabled && !glyphe) {
             const f = fond(el);
             const o = opacite(el);
             const fg = melange({ ...col, a: col.a * o }, f);

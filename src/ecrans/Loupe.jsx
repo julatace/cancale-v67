@@ -17,7 +17,7 @@ function ToutSurLeNumero({ q, numData, comptes, onNav, onStock, onChercher, onFi
       style={{ width: '100%', minHeight: 44, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', margin: 0, background: 'transparent', border: 0, borderTop: '0.5px solid var(--d-filet)', borderRadius: 0, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: C.text }}>
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{ display: 'block', fontSize: 15, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{titre}</span>
-        {detail && <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2 }}>{detail}</span>}
+        {detail && <span style={{ display: 'block', fontSize: 13, fontWeight: 400, color: C.muted, marginTop: 2 }}>{detail}</span>}
       </span>
       <span aria-hidden="true" style={{ fontSize: 20, lineHeight: 1, color: 'var(--d-glyphe)' }}>›</span>
     </button>
