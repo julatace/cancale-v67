@@ -735,6 +735,18 @@
 :root:root:root:root:root body [data-espace="paires"] .vrm-onglet-manque { background: linear-gradient(180deg, var(--sbp-feuille), var(--sbp-feuille2)) !important; border: 0 !important; border-radius: 22px !important; box-shadow: var(--sbp-om-tuile) !important; color: var(--sbp-encre) !important; }
 :root:root:root:root:root body [data-espace="paires"] .vrm-onglet-manque :is(.vrm-b-secondaire, .vrm-b-discret) { min-height: 44px !important; border: 0 !important; border-radius: 13px !important; background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important; font: 600 14px/1 var(--sbp-texte) !important; }
 
+
+/* ── 18. La fiche, deuxième passe ─────────────────────────────────────────
+   « Changer le prix » : la ligne d'une annonce apporte SON geste (le même `setPrixNum`, avec le prix conseillé) ;
+   celui de la fiche se tait alors — un geste ne s'écrit jamais deux fois sur un écran. */
+:root:root:root:root:root body .vrm-fp:has(.vrm-fp-depuis-ligne [data-annonce-prix-partout]) .vrm-fp-outils [data-fiche-prix] { display: none !important; }
+/* Les cases de l'annonce posées directement sur la porcelaine (pas une carte dans la carte). */
+:root:root:root:root:root body .vrm-fp .vrm-fp-contexte { background: transparent !important; box-shadow: none !important; border: 0 !important; padding: 0 !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-contexte .vrm-fp-depuis-ligne { background: transparent !important; box-shadow: none !important; border: 0 !important; padding: 0 !important; }
+/* Les outils de la fiche (Publier ailleurs, Dupliquer…) : des liens (forme d), 44 px au doigt. */
+:root:root:root:root:root body .vrm-fp .vrm-fp-outils .vrm-ao-second { min-height: 44px !important; background: transparent !important; border: 0 !important; box-shadow: none !important; color: var(--sbp-lien) !important; font: 600 14px/1.2 var(--sbp-texte) !important; padding: 0 4px !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-outils .vrm-ao-second:active { opacity: .55 !important; }
+
 /* ── 14. Mouvement et transparence réduits ───────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   :root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] { animation: sbp-fondu 180ms both !important; }
