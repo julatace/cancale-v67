@@ -299,7 +299,7 @@ async function unCas(nav, c, W, theme) {
         await toucherSel(o, c.ligne);
         if (!(await attendreQue(o.pg, () => feuilleVisible(o.pg, c.feuille)))) break;
         await o.pg.waitForTimeout(350);
-        const gestes = o.pg.locator(`${premier} :is(button, a[href], [role="button"]):not(.vrm-ui-feuille-fermer)`).filter({ visible: true });
+        const gestes = o.pg.locator(`${premier} :is(button, a[href], [role="button"], summary):not(.vrm-ui-feuille-fermer)`).filter({ visible: true });
         const n = await gestes.count();
         if (i >= n) break;
         const g = gestes.nth(i);
@@ -336,8 +336,10 @@ const OUVREURS = Number(process.env.OUVREURS || 6);
 const SEL_OUVREURS = '.vrm-main :is(button[aria-haspopup], [data-ui-afaire], [data-pf-afaire], .vrm-ui-menu-compte, button[data-refaire-ouvrir], button[data-tournee-ouvrir], button[data-depot-ouvrir], button[data-num-neufs-ouvrir])';
 async function fermerTout(o) {
   const ouvert = () => o.pg.evaluate(() => [...document.querySelectorAll('.vrm-ui-voile, .vrm-fs-voile, [role="dialog"]')].some((x) => x.getClientRects().length && x.getBoundingClientRect().height > 1)).catch(() => false);
+  let dernier = 'deja';   // le geste qui a fermé (le précédent de celui qu'on trouve fermé)
   for (const geste of ['retour', 'echap', 'voile']) {
-    if (!(await ouvert())) return geste === 'retour' ? 'deja' : geste;
+    if (!(await ouvert())) return dernier;
+    dernier = geste;
     if (geste === 'retour') await o.pg.evaluate(() => history.back()).catch(() => {});
     else if (geste === 'echap') await o.pg.keyboard.press('Escape').catch(() => {});
     else await o.pg.touchscreen.tap(195, 60).catch(() => {});
