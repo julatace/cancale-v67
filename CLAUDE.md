@@ -523,6 +523,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **13 nov. · Lot 7 : le nom de la paire sur chaque colis à retirer** : une jonction par IDENTITÉ (`commandeRetrait` ; `commandeUnique` dans `api/_lib/commande-colis.js`, deux commandes ⇒ personne) pour Colis (nom + photo), mode relais, Ma journée (les noms dans la case), hors ligne, codes, et le widget (`pickupColis`, nom publié en [7]) ; mesuré 8/12 reliables, les 4 autres n'ont aucune identité en base (attendent la 5.372). `docs/passation/2026-11-13-lot7-nom-paire.md`. Geste : installer la 5.372 ; le script du widget lit `pickupColis`.
+
 - **13 nov. · Design système** : jetons `--d-*` (`src/styles-systeme.css`) lus par toutes les familles ; contient 20 · se touche capsule · montre 12 · N° 6 ; 400/600/700 ; 44 doigt / 36 souris. `docs/design/DESIGN.md`, `2026-11-13-design-systeme.md`. Geste : aucun.
 - **13 nov. · Import de ton passé (lot 47, ext. 5.375.0)** : 12 derniers mois (ventes, achats ; annonces = dressing complet d'un trait), dans les 20 lectures/h étalées (« suite dans 40 min »), reprise page suivante, souci dit et reprise seule ; « Ton passé est importé (12 mois) » une fois (`vrm_import_passe_vu`). `docs/passation/2026-11-13-lot47.md`. Geste : installer 5.375.0.
 
