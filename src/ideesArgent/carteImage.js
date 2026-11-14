@@ -25,7 +25,7 @@ export const POLICE_TEXTE = '"Inter", -apple-system, "SF Pro Text", system-ui, s
 
 const prixTexte = (v) => {
   const p = v && typeof v === 'object' ? v.amount : v;
-  const n = Number(String(p == null ? '' : p).replace(',', '.'));
+  const n = Number(String(p == null ? '' : p).replace(/[^\d,.]/g, '').replace(',', '.'));   // « 80 », 80, « 80 € » (déjà mis en forme)
   if (!Number.isFinite(n) || n <= 0 || n >= 100000) return '';
   return (n % 1 === 0 ? String(n) : n.toFixed(2).replace('.', ',')) + ' €';
 };
