@@ -88,7 +88,8 @@ const ROWS0 = () => [
 
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d !== undefined && !c ? ' — ' + (typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 400) : '')); };
-const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' — le contrôle a pu s’exécuter', String(e && e.message).replace(/\s+/g, ' ').slice(0, 300)); } };
+let PAGE = null, ERRS = null;
+const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' — le contrôle a pu s’exécuter', String(e && e.message).replace(/\s+/g, ' ').slice(0, 300) + (ERRS && ERRS.length ? ' · erreurs : ' + ERRS.join(' | ').slice(0, 300) : '')); if (PAGE) { await capture(PAGE, 'echec-' + nom.replace(/[^a-z0-9]+/gi, '-').slice(0, 40)); try { await PAGE.context().close(); } catch (_) {} } } };
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.onnx': 'application/octet-stream' };
 const srv = http.createServer((q, r) => {
   let f = q.url.split('?')[0]; if (f === '/' || !path.extname(f)) f = '/index.html';
@@ -117,7 +118,7 @@ async function preparer(b, vp, { sombre = false, sansVoix = false, voix = '' } =
   const tel = vp.width < 600;
   const ctx = await b.newContext({ viewport: vp, timezoneId: 'Europe/Paris', locale: 'fr-FR', ...(tel ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
-  const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+  const errs = []; pg.on('pageerror', (e) => errs.push(e.message)); PAGE = pg; ERRS = errs;
   const rows = ROWS0();
   const ecrits = [], lourdes = [];
   await pg.addInitScript(({ s, n, p, sv, vx }) => { try {
@@ -174,8 +175,12 @@ const capture = async (pg, nom) => { if (!SHOTS) return; try { fs.mkdirSync(SHOT
 // Les cibles au doigt (≥ 44 px) de l'atelier et des feuilles.
 const petites = (pg, sel) => pg.evaluate((s) => [...document.querySelectorAll(s)].filter((e) => e.getClientRects().length).map((e) => { const r = e.getBoundingClientRect(); return { t: (e.getAttribute('aria-label') || e.textContent || '').trim().slice(0, 30), h: Math.round(r.height), w: Math.round(r.width) }; }).filter((x) => x.h < 44 || x.w < 44), sel);
 const ouvrirFiche = async (pg, n) => {
-  await pg.evaluate((x) => window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: x })), n);
-  await pg.waitForSelector(`[data-fiche-paire="${n}"]`, { timeout: 15000 });
+  // L'app peut ne pas écouter encore (premier chargement sur une machine chargée) : on redemande.
+  for (let k = 0; k < 15; k++) {
+    await pg.evaluate((x) => window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: x })), n);
+    if (await pg.waitForSelector(`[data-fiche-paire="${n}"]`, { timeout: 2000 }).then(() => true, () => false)) break;
+  }
+  await pg.waitForSelector(`[data-fiche-paire="${n}"]`, { timeout: 5000 });
   await pg.waitForSelector(`[data-atelier-paire="${n}"]`, { timeout: 15000 });
 };
 
@@ -306,7 +311,7 @@ async function main() {
         const { ctx, pg, errs, dernierMain, lourdes } = await preparer(b, vp, { sombre });
         await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
         await pg.waitForTimeout(2500);
-        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:atelier', { detail: { quoi: 'seance' } })));
+        for (let k = 0; k < 15; k++) { await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:atelier', { detail: { quoi: 'seance' } }))); if (await pg.waitForSelector('[data-seance-photo]', { timeout: 2000 }).then(() => true, () => false)) break; }
         await pg.waitForSelector('[data-seance-photo="depart"] [data-seance-commencer]:not([disabled])', { timeout: 15000 });
         await capture(pg, `seance-depart-${nomC}`);
         await tap(pg, '[data-seance-commencer]');
@@ -342,8 +347,8 @@ async function main() {
         const { ctx, pg, errs, ecrits } = await preparer(b, vp, { sombre });
         await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
         await pg.waitForTimeout(2500);
-        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: 'bleu' })));
-        await pg.waitForSelector('[data-recherche-couleur="bleu"]', { timeout: 10000 });
+        for (let k = 0; k < 15; k++) { await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: 'bleu' }))); if (await pg.waitForSelector('[data-recherche-couleur="bleu"]', { timeout: 2000 }).then(() => true, () => false)) break; }
+        await pg.waitForSelector('[data-recherche-couleur="bleu"]', { timeout: 5000 });
         dit(true, `${T} 104 · la loupe « bleu » propose « Photos : bleu »`);
         await capture(pg, `loupe-bleu-${nomC}`);
         const avant = ecrits.length;
