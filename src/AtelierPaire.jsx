@@ -39,12 +39,12 @@ function PhotosPaire({ num, cle, lire, ouvrirStudio, Icon }) {
   const sous = photos === undefined ? tr('atelier.photos.lecture') : photos === null ? '— ' + tr('atelier.photos.passu')
     : !photos.length ? tr('atelier.photos.aucune') : douteuses ? tr('atelier.photos.nDouteuses', { n: photos.length, d: douteuses }) : tr('atelier.photos.n', { n: photos.length });
   return (
-    <section className="vrm-at-sec" data-atelier-photos={Array.isArray(photos) ? photos.length : photos === null ? 'passu' : 'lecture'} data-atelier-douteuses={douteuses}>
-      <h3 className="vrm-at-titre">{tr('atelier.photos.titre')}<small>{sous}</small></h3>
+    <section className="vrm-atl-sec" data-atelier-photos={Array.isArray(photos) ? photos.length : photos === null ? 'passu' : 'lecture'} data-atelier-douteuses={douteuses}>
+      <h3 className="vrm-atl-titre">{tr('atelier.photos.titre')}<small>{sous}</small></h3>
       {Array.isArray(photos) && photos.length ? (
-        <div className="vrm-at-photos">
+        <div className="vrm-atl-photos">
           {photos.slice(0, 12).map((p, i) => (
-            <figure key={p.id || i} className="vrm-at-photo" data-atelier-photo={p.id || i}>
+            <figure key={p.id || i} className="vrm-atl-photo" data-atelier-photo={p.id || i}>
               <img src={p.detoure || p.img} alt={tr('atelier.photos.alt', { i: i + 1, num })} loading="lazy" decoding="async" width="120" height="160"/>
               <AvisPhoto src={p.img} qualite={p.qualite && p.qualite.v ? p.qualite : null}/>
             </figure>
@@ -52,10 +52,10 @@ function PhotosPaire({ num, cle, lire, ouvrirStudio, Icon }) {
         </div>
       ) : null}
       {ouvrirStudio ? (
-        <div className="vrm-at-carte" style={{ marginTop: Array.isArray(photos) && photos.length ? 10 : 0 }}>
-          <button type="button" className="vrm-at-rangee" data-atelier-studio={num} onClick={ouvrirStudio}>
-            <span className="vrm-at-pastille">{Icon ? <Icon name="camera" size={18}/> : null}</span>
-            <span className="vrm-at-rangee-txt"><b className="vrm-at-lien">{tr(Array.isArray(photos) && photos.length ? 'atelier.photos.reprendre' : 'atelier.photos.prendre')}</b></span>
+        <div className="vrm-atl-carte" style={{ marginTop: Array.isArray(photos) && photos.length ? 10 : 0 }}>
+          <button type="button" className="vrm-atl-rangee" data-atelier-studio={num} onClick={ouvrirStudio}>
+            <span className="vrm-atl-pastille">{Icon ? <Icon name="camera" size={18}/> : null}</span>
+            <span className="vrm-atl-rangee-txt"><b className="vrm-atl-lien">{tr(Array.isArray(photos) && photos.length ? 'atelier.photos.reprendre' : 'atelier.photos.prendre')}</b></span>
           </button>
         </div>
       ) : null}
@@ -83,17 +83,17 @@ export function DicterNote({ num, dictee, Icon }) {
   };
   React.useEffect(() => () => { try { dictee.annuler(canal); } catch (_) {} }, [canal]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <div className="vrm-at-carte" data-atelier-dictee={raison || (ecoute ? 'ecoute' : 'pret')}>
-      <button type="button" className={'vrm-at-rangee' + (ecoute ? ' vrm-at-ecoute' : '')} data-atelier-dicter={num} aria-disabled={raison ? 'true' : undefined} aria-pressed={ecoute} onClick={lancer}>
-        <span className="vrm-at-pastille">{Icon ? <Icon name="mic" size={18}/> : null}</span>
-        <span className="vrm-at-rangee-txt">
-          <b className={raison ? undefined : 'vrm-at-lien'}>{tr(ecoute ? 'atelier.dictee.terminer' : 'atelier.dictee.bouton')}</b>
-          {ecoute ? <span className="vrm-at-direct" data-atelier-direct="">{direct || tr('atelier.dictee.parle')}</span>
+    <div className="vrm-atl-carte" data-atelier-dictee={raison || (ecoute ? 'ecoute' : 'pret')}>
+      <button type="button" className={'vrm-atl-rangee' + (ecoute ? ' vrm-atl-ecoute' : '')} data-atelier-dicter={num} aria-disabled={raison ? 'true' : undefined} aria-pressed={ecoute} onClick={lancer}>
+        <span className="vrm-atl-pastille">{Icon ? <Icon name="mic" size={18}/> : null}</span>
+        <span className="vrm-atl-rangee-txt">
+          <b className={raison ? undefined : 'vrm-atl-lien'}>{tr(ecoute ? 'atelier.dictee.terminer' : 'atelier.dictee.bouton')}</b>
+          {ecoute ? <span className="vrm-atl-direct" data-atelier-direct="">{direct || tr('atelier.dictee.parle')}</span>
             : raison ? <small data-atelier-dictee-raison={raison}>{tr('atelier.dictee.sans.' + raison)}</small>
             : <small>{tr('atelier.dictee.sous')}</small>}
         </span>
       </button>
-      {mot ? <p className="vrm-at-raison" role="status" data-atelier-dictee-mot="">{mot}</p> : null}
+      {mot ? <p className="vrm-atl-raison" role="status" data-atelier-dictee-mot="">{mot}</p> : null}
     </div>
   );
 }
@@ -174,30 +174,30 @@ function CertificatPaire({ cle, num, base, Icon, confirmer, dire }) {
   const sous = etat === undefined ? tr('atelier.photos.lecture') : etat === null ? '— ' + tr('atelier.certificat.passu') : etat === false ? tr('atelier.certificat.sous')
     : [etat.nom || (etat.type === 'pdf' ? 'PDF' : tr('atelier.certificat.photo')), etat.taille ? ko(etat.taille) : '', jour(etat.at)].filter(Boolean).join(' · ');
   return (
-    <section className="vrm-at-sec" data-atelier-certificat={etat === undefined ? 'lecture' : etat === null ? 'passu' : etat === false ? 'aucun' : etat.type}>
-      <h3 className="vrm-at-titre">{tr('atelier.certificat.titre')}</h3>
-      <div className="vrm-at-carte">
-        <div className="vrm-at-rangee">
-          <span className="vrm-at-pastille">{Icon ? <Icon name="shield" size={18}/> : null}</span>
-          <span className="vrm-at-rangee-txt"><b>{etat && etat.type ? tr('atelier.certificat.present') : tr('atelier.certificat.absent')}</b><small>{sous}</small></span>
+    <section className="vrm-atl-sec" data-atelier-certificat={etat === undefined ? 'lecture' : etat === null ? 'passu' : etat === false ? 'aucun' : etat.type}>
+      <h3 className="vrm-atl-titre">{tr('atelier.certificat.titre')}</h3>
+      <div className="vrm-atl-carte">
+        <div className="vrm-atl-rangee">
+          <span className="vrm-atl-pastille">{Icon ? <Icon name="shield" size={18}/> : null}</span>
+          <span className="vrm-atl-rangee-txt"><b>{etat && etat.type ? tr('atelier.certificat.present') : tr('atelier.certificat.absent')}</b><small>{sous}</small></span>
         </div>
         {etat && etat.type ? (
-          <div className="vrm-at-rangee" style={{ justifyContent: 'flex-end' }}>
-            <span className="vrm-at-gestes">
-              <button type="button" className="vrm-at-geste" data-atelier-certificat-voir="" onClick={voir} aria-busy={occupe === 'voir'}>{tr('atelier.certificat.voir')}</button>
-              <button type="button" className="vrm-at-geste" data-atelier-certificat-envoyer="" onClick={envoyer} aria-busy={occupe === 'envoi'}>{tr('atelier.certificat.envoyer')}</button>
-              <button type="button" className="vrm-at-geste" data-atelier-certificat-retirer="" onClick={retirer} aria-busy={occupe === 'retrait'}>{tr('atelier.certificat.retirer')}</button>
+          <div className="vrm-atl-rangee" style={{ justifyContent: 'flex-end' }}>
+            <span className="vrm-atl-gestes">
+              <button type="button" className="vrm-atl-geste" data-atelier-certificat-voir="" onClick={voir} aria-busy={occupe === 'voir'}>{tr('atelier.certificat.voir')}</button>
+              <button type="button" className="vrm-atl-geste" data-atelier-certificat-envoyer="" onClick={envoyer} aria-busy={occupe === 'envoi'}>{tr('atelier.certificat.envoyer')}</button>
+              <button type="button" className="vrm-atl-geste" data-atelier-certificat-retirer="" onClick={retirer} aria-busy={occupe === 'retrait'}>{tr('atelier.certificat.retirer')}</button>
             </span>
           </div>
         ) : etat === false ? (
-          <button type="button" className="vrm-at-rangee" data-atelier-certificat-ajouter={cle} onClick={() => entree.current && entree.current.click()} aria-busy={occupe === 'ajout'}>
-            <span className="vrm-at-pastille">{Icon ? <Icon name="doc" size={18}/> : null}</span>
-            <span className="vrm-at-rangee-txt"><b className="vrm-at-lien">{tr(occupe === 'ajout' ? 'atelier.certificat.rangement' : 'atelier.certificat.ajouter')}</b></span>
+          <button type="button" className="vrm-atl-rangee" data-atelier-certificat-ajouter={cle} onClick={() => entree.current && entree.current.click()} aria-busy={occupe === 'ajout'}>
+            <span className="vrm-atl-pastille">{Icon ? <Icon name="doc" size={18}/> : null}</span>
+            <span className="vrm-atl-rangee-txt"><b className="vrm-atl-lien">{tr(occupe === 'ajout' ? 'atelier.certificat.rangement' : 'atelier.certificat.ajouter')}</b></span>
           </button>
         ) : null}
         <input ref={entree} type="file" accept="application/pdf,image/*" hidden data-atelier-certificat-fichier="" onChange={choisir}/>
       </div>
-      {mot ? <p className="vrm-at-raison" role="status" data-atelier-certificat-mot="">{mot}</p> : null}
+      {mot ? <p className="vrm-atl-raison" role="status" data-atelier-certificat-mot="">{mot}</p> : null}
     </section>
   );
 }
@@ -219,34 +219,34 @@ export function FeuilleFusion({ idFiche, fiches, registre, vendus, caseDe, cleNu
   const res = ap && ap.ok ? opsFusion(ap, { carton, fiches, registre, cleNum }) : null;
   const libelle = (c) => tr('atelier.fusion.champ.' + c);
   const cote = (x) => (
-    <div className="vrm-at-cote" data-fusion-cote={x.id}>
-      <figure className="vrm-at-photo">{x.photo && Photo ? Photo(typeof x.photo === 'string' ? x.photo : (x.photo.url || '')) : null}</figure>
+    <div className="vrm-atl-cote" data-fusion-cote={x.id}>
+      <figure className="vrm-atl-photo">{x.photo && Photo ? Photo(typeof x.photo === 'string' ? x.photo : (x.photo.url || '')) : null}</figure>
       <b>{x.num ? `N°${x.num}` : tr('atelier.fusion.sansNum')}</b><span>{x.titre || '—'}</span>
     </div>
   );
   return (
     <Feuille onClose={onClose} titre={tr('atelier.fusion.titre')} data-fusion-feuille={autre ? 'apercu' : 'choix'}>
-      <div className="vrm-at-feuille">
+      <div className="vrm-atl-feuille">
         {!autre ? (<>
-          <input className="vrm-at-champ" inputMode="text" autoComplete="off" value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr('atelier.fusion.chercher')} aria-label={tr('atelier.fusion.chercher')} data-fusion-chercher=""/>
-          <p className="vrm-at-raison" style={{ margin: 0 }}>{tr(q ? 'atelier.fusion.resultats' : 'atelier.fusion.propositions')}</p>
-          <ul className="vrm-at-liste" data-fusion-candidats={candidats.length}>
+          <input className="vrm-atl-champ" inputMode="text" autoComplete="off" value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr('atelier.fusion.chercher')} aria-label={tr('atelier.fusion.chercher')} data-fusion-chercher=""/>
+          <p className="vrm-atl-raison" style={{ margin: 0 }}>{tr(q ? 'atelier.fusion.resultats' : 'atelier.fusion.propositions')}</p>
+          <ul className="vrm-atl-liste" data-fusion-candidats={candidats.length}>
             {candidats.map(([id, f]) => (
-              <li key={id} className="vrm-at-ligne">
-                <button type="button" className="vrm-at-ligne-btn" data-fusion-candidat={id} onClick={() => { setAutre(id); setCarton(null); }}>
-                  <span className="vrm-at-vignette">{f.photo && Photo ? Photo(typeof f.photo === 'string' ? f.photo : (f.photo.url || '')) : null}</span>
-                  <span className="vrm-at-ligne-txt"><b>N°{f.numero}</b><span>{f.title || '—'}</span></span>
+              <li key={id} className="vrm-atl-ligne">
+                <button type="button" className="vrm-atl-ligne-btn" data-fusion-candidat={id} onClick={() => { setAutre(id); setCarton(null); }}>
+                  <span className="vrm-atl-vignette">{f.photo && Photo ? Photo(typeof f.photo === 'string' ? f.photo : (f.photo.url || '')) : null}</span>
+                  <span className="vrm-atl-ligne-txt"><b>N°{f.numero}</b><span>{f.title || '—'}</span></span>
                 </button>
               </li>
             ))}
           </ul>
-          {!candidats.length ? <p className="vrm-at-raison">{tr('atelier.fusion.aucun')}</p> : null}
+          {!candidats.length ? <p className="vrm-atl-raison">{tr('atelier.fusion.aucun')}</p> : null}
         </>) : (<>
-          {ap && !ap.ok ? <p className="vrm-at-refus" role="alert" data-fusion-refus={ap.raison}>{tr('atelier.fusion.refus.' + ap.raison, { cases: ap.cases ? ap.cases.join(' / ') : '' })}</p> : null}
+          {ap && !ap.ok ? <p className="vrm-atl-refus" role="alert" data-fusion-refus={ap.raison}>{tr('atelier.fusion.refus.' + ap.raison, { cases: ap.cases ? ap.cases.join(' / ') : '' })}</p> : null}
           {ap && ap.ok ? (<>
-            <div className="vrm-at-deux">{cote(ap.a)}{cote(ap.b)}</div>
-            <h3 className="vrm-at-titre" style={{ margin: '4px 4px 0' }}>{tr('atelier.fusion.garde')}</h3>
-            <ul className="vrm-at-garde" data-fusion-champs={ap.champs.length}>
+            <div className="vrm-atl-deux">{cote(ap.a)}{cote(ap.b)}</div>
+            <h3 className="vrm-atl-titre" style={{ margin: '4px 4px 0' }}>{tr('atelier.fusion.garde')}</h3>
+            <ul className="vrm-atl-garde" data-fusion-champs={ap.champs.length}>
               <li data-fusion-nums={ap.nums.join(',')}>{ap.memeNum ? tr('atelier.fusion.numMeme', { num: ap.nums[0] }) : ap.nums.length === 2 ? tr('atelier.fusion.numDeux', { a: ap.nums[0], b: ap.nums[1] }) : tr('atelier.fusion.numUn')}<small>{tr('atelier.fusion.jamaisChange')}</small></li>
               {ap.champs.map((c) => (
                 <li key={c.champ} data-fusion-champ={c.champ} data-fusion-action={c.action}>
@@ -258,17 +258,17 @@ export function FeuilleFusion({ idFiche, fiches, registre, vendus, caseDe, cleNu
             </ul>
             {ap.choixCarton ? (
               <div data-fusion-carton-choix="">
-                <h3 className="vrm-at-titre" style={{ margin: '4px 4px 8px' }}>{tr('atelier.fusion.carton')}</h3>
+                <h3 className="vrm-atl-titre" style={{ margin: '4px 4px 8px' }}>{tr('atelier.fusion.carton')}</h3>
                 <Segmente label={tr('atelier.fusion.carton')} value={carton} onChange={setCarton} options={ap.nums.map((n) => ({ v: n, l: `N°${n}`, data: { 'data-fusion-carton': n } }))}/>
-                <p className="vrm-at-raison">{carton ? tr('atelier.fusion.alias', { carton, autre: ap.nums.find((n) => n !== carton) }) : tr('atelier.fusion.choisisCarton')}</p>
+                <p className="vrm-atl-raison">{carton ? tr('atelier.fusion.alias', { carton, autre: ap.nums.find((n) => n !== carton) }) : tr('atelier.fusion.choisisCarton')}</p>
               </div>
             ) : null}
           </>) : null}
-          <div className="vrm-at-pied">
+          <div className="vrm-atl-pied">
             {ap && ap.ok ? <Bouton variante="primaire" plein data-fusion-valider="" disabled={!res || !res.ok} onClick={() => { if (res && res.ok) onFusionner(res, ap); }}>{tr('atelier.fusion.valider')}</Bouton> : null}
             <Bouton variante="discret" plein data-fusion-autre="" onClick={() => { setAutre(null); setCarton(null); }}>{tr('atelier.fusion.autreFiche')}</Bouton>
           </div>
-          <p className="vrm-at-raison" style={{ margin: 0 }}>{tr('atelier.fusion.reversible')}</p>
+          <p className="vrm-atl-raison" style={{ margin: 0 }}>{tr('atelier.fusion.reversible')}</p>
         </>)}
       </div>
     </Feuille>
@@ -279,24 +279,24 @@ function FusionPaire({ num, fusion, Icon }) {
   if (!fusion) return null;
   const { alias, defaisable, fin, onDefaire, ouvrir, raisonSans } = fusion;
   return (
-    <section className="vrm-at-sec" data-atelier-fusion={alias ? 'fusionnee' : raisonSans ? 'sans' : 'libre'}>
-      <h3 className="vrm-at-titre">{tr('atelier.fusion.section')}</h3>
-      <div className="vrm-at-carte">
+    <section className="vrm-atl-sec" data-atelier-fusion={alias ? 'fusionnee' : raisonSans ? 'sans' : 'libre'}>
+      <h3 className="vrm-atl-titre">{tr('atelier.fusion.section')}</h3>
+      <div className="vrm-atl-carte">
         {alias ? (<>
-          <div className="vrm-at-rangee vrm-at-alias" data-atelier-alias={alias.autres.join(',')} data-atelier-carton={alias.carton || ''}>
+          <div className="vrm-atl-rangee vrm-atl-alias" data-atelier-alias={alias.autres.join(',')} data-atelier-carton={alias.carton || ''}>
             <b>{tr('atelier.fusion.memeQue', { autres: alias.autres.map((n) => 'N°' + n).join(', ') })}</b>
-            <small className="vrm-at-raison" style={{ margin: 0 }}>{alias.carton ? tr(alias.estCarton ? 'atelier.fusion.cartonIci' : 'atelier.fusion.cartonAilleurs', { carton: alias.carton, num }) : tr('atelier.fusion.cartonInconnu')} · {tr('atelier.fusion.le', { jour: jour(alias.fusion.at) })}</small>
+            <small className="vrm-atl-raison" style={{ margin: 0 }}>{alias.carton ? tr(alias.estCarton ? 'atelier.fusion.cartonIci' : 'atelier.fusion.cartonAilleurs', { carton: alias.carton, num }) : tr('atelier.fusion.cartonInconnu')} · {tr('atelier.fusion.le', { jour: jour(alias.fusion.at) })}</small>
           </div>
-          {defaisable ? <button type="button" className="vrm-at-rangee" data-atelier-defaire={alias.fusion.id} onClick={onDefaire}>
-            <span className="vrm-at-pastille">{Icon ? <Icon name="undo" size={18}/> : null}</span>
-            <span className="vrm-at-rangee-txt"><b className="vrm-at-lien">{tr('atelier.fusion.defaire')}</b><small>{tr('atelier.fusion.jusquau', { jour: jour(fin) })}</small></span>
+          {defaisable ? <button type="button" className="vrm-atl-rangee" data-atelier-defaire={alias.fusion.id} onClick={onDefaire}>
+            <span className="vrm-atl-pastille">{Icon ? <Icon name="undo" size={18}/> : null}</span>
+            <span className="vrm-atl-rangee-txt"><b className="vrm-atl-lien">{tr('atelier.fusion.defaire')}</b><small>{tr('atelier.fusion.jusquau', { jour: jour(fin) })}</small></span>
           </button> : null}
         </>) : raisonSans ? (
-          <div className="vrm-at-rangee"><span className="vrm-at-rangee-txt"><b>{tr('atelier.fusion.ouvrir')}</b><small>{tr('atelier.fusion.sans.' + raisonSans)}</small></span></div>
+          <div className="vrm-atl-rangee"><span className="vrm-atl-rangee-txt"><b>{tr('atelier.fusion.ouvrir')}</b><small>{tr('atelier.fusion.sans.' + raisonSans)}</small></span></div>
         ) : (
-          <button type="button" className="vrm-at-rangee" data-atelier-fusionner={num} onClick={ouvrir}>
-            <span className="vrm-at-pastille">{Icon ? <Icon name="link" size={18}/> : null}</span>
-            <span className="vrm-at-rangee-txt"><b className="vrm-at-lien">{tr('atelier.fusion.ouvrir')}</b><small>{tr('atelier.fusion.ouvrirSous')}</small></span>
+          <button type="button" className="vrm-atl-rangee" data-atelier-fusionner={num} onClick={ouvrir}>
+            <span className="vrm-atl-pastille">{Icon ? <Icon name="link" size={18}/> : null}</span>
+            <span className="vrm-atl-rangee-txt"><b className="vrm-atl-lien">{tr('atelier.fusion.ouvrir')}</b><small>{tr('atelier.fusion.ouvrirSous')}</small></span>
           </button>
         )}
       </div>
@@ -308,7 +308,7 @@ function FusionPaire({ num, fusion, Icon }) {
 // qu'à un endroit) ; l'atelier rend le reste.
 export default function AtelierPaire({ num, Icon, studio, certificat, fusion }) {
   return (
-    <div className="vrm-at" data-atelier-paire={num}>
+    <div className="vrm-atl" data-atelier-paire={num}>
       {studio ? <PhotosPaire num={num} cle={studio.cle} lire={studio.lire} ouvrirStudio={studio.ouvrir} Icon={Icon}/> : null}
       {certificat && certificat.cle ? <CertificatPaire cle={certificat.cle} num={num} base={certificat.base} Icon={Icon} confirmer={certificat.confirmer} dire={certificat.dire}/> : null}
       <FusionPaire num={num} fusion={fusion} Icon={Icon}/>

@@ -11,10 +11,10 @@ export default function LigneCouleurLoupe({ q, onOuvrir }) {
   const c = couleurDeRequete(q);
   if (!c) return null;
   return (
-    <div className="vrm-at-carte" style={{ margin: '8px 0 4px' }}>
-      <button type="button" className="vrm-at-rangee" data-recherche-couleur={c.famille} onClick={() => onOuvrir(c.famille)}>
-        <span className="vrm-at-pastille" style={{ background: TEINTES[c.famille] }} aria-hidden="true"/>
-        <span className="vrm-at-rangee-txt"><b className="vrm-at-lien">{tr('atelier.couleur.loupe', { couleur: nomCouleur(c.famille, langueCourante()) })}</b><small>{tr('atelier.couleur.loupeSous')}</small></span>
+    <div className="vrm-atl-carte" style={{ margin: '8px 0 4px' }}>
+      <button type="button" className="vrm-atl-rangee" data-recherche-couleur={c.famille} onClick={() => onOuvrir(c.famille)}>
+        <span className="vrm-atl-pastille" style={{ background: TEINTES[c.famille] }} aria-hidden="true"/>
+        <span className="vrm-atl-rangee-txt"><b className="vrm-atl-lien">{tr('atelier.couleur.loupe', { couleur: nomCouleur(c.famille, langueCourante()) })}</b><small>{tr('atelier.couleur.loupeSous')}</small></span>
       </button>
     </div>
   );

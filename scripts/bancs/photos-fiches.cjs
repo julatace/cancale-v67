@@ -202,6 +202,7 @@ async function main() {
         await pg.waitForTimeout(2500);
         await ouvrirFiche(pg, '205');
         await pg.waitForSelector('[data-atelier-photos="3"]', { timeout: 10000 });
+        await pg.waitForSelector('[data-atelier-photo] [data-avis-photo="flou"]', { timeout: 10000 }).catch(() => {});
         const avis = await pg.$$eval('[data-atelier-photo] [data-avis-photo]', (l) => l.map((x) => x.getAttribute('data-avis-photo')));
         dit(avis.filter((x) => x === 'flou').length === 1 && avis.length === 3, `${T} 102 · N°205 : trois photos, « Floue ? » sur UNE (la signalée)`, JSON.stringify(avis));
         dit(await pg.locator('[data-atelier-douteuses="1"]').count() === 1, `${T} 102 · l’en-tête dit « 1 à revoir »`);
@@ -363,7 +364,12 @@ async function main() {
         await tap(pg, '[data-couleur-famille="rouge"]');
         await pg.waitForFunction(() => [...document.querySelectorAll('[data-couleur-photo]')].map((x) => x.getAttribute('data-couleur-num')).sort().join() === '234,235,236', null, { timeout: 5000 });
         dit(true, `${T} 104 · « rouge » : les trois rouges`);
-        dit(ecrits.length === avant, `${T} 104 · une recherche : rien n’est écrit`, JSON.stringify(ecrits.slice(avant).map((e) => e.id)));
+        // L'app écrit ses lignes habituelles en fond (synchro `main`, diagnostic des photos) : la recherche, elle,
+        // n'écrit aucune couleur ni aucun lien (aucune ligne, aucune clé « couleur », aucune fiche changée).
+        const apresC = ecrits.slice(avant);
+        const fichesEcrites = apresC.filter((e) => e.id === 'main' && e.data && e.data.vinted_annonce_numeros).map((e) => JSON.stringify(Object.fromEntries(Object.entries(e.data.vinted_annonce_numeros).map(([id, f]) => [id, [f.numero, f.photoK || null, f.buyPrice || null]]))));
+        const ref = JSON.stringify(Object.fromEntries(Object.entries(FICHES).map(([id, f]) => [id, [f.numero, f.photoK || null, f.buyPrice || null]])));
+        dit(!apresC.some((e) => /couleur/i.test(e.id) || /couleur/i.test(JSON.stringify(e.data || {}))) && fichesEcrites.every((x) => x === ref), `${T} 104 · une recherche : aucune couleur ni aucun lien écrit, aucune fiche changée`, JSON.stringify(apresC.map((e) => e.id)));
         await tap(pg, '[data-couleur-photo][data-couleur-num="234"]');
         await pg.waitForSelector('[data-fiche-paire="234"]', { timeout: 10000 });
         dit(true, `${T} 104 · SON toucher ouvre la fiche du N°234`);

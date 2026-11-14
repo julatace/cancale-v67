@@ -42,42 +42,42 @@ export default function RechercheCouleur({ Feuille, Photo, Bouton, famille: init
   const res = Array.isArray(entrees) ? photosDeCouleur(entrees.map((e) => ({ ...e, couleurs: couleurs.get(String(e.cle)) || null })), famille) : [];
   return (
     <Feuille onClose={onClose} titre={tr('atelier.couleur.titre')} data-recherche-couleur={famille}>
-      <div className="vrm-at-feuille">
-        <div className="vrm-at-nuancier" role="group" aria-label={tr('atelier.couleur.choisir')}>
+      <div className="vrm-atl-feuille">
+        <div className="vrm-atl-nuancier" role="group" aria-label={tr('atelier.couleur.choisir')}>
           {FAMILLES.map((f) => (
-            <button key={f} type="button" className="vrm-at-teinte" aria-pressed={f === famille} data-couleur-famille={f} onClick={() => setFamille(f)}>
+            <button key={f} type="button" className="vrm-atl-teinte" aria-pressed={f === famille} data-couleur-famille={f} onClick={() => setFamille(f)}>
               <i style={{ background: TEINTES[f] }}/>{nomCouleur(f, l)}
             </button>
           ))}
         </div>
-        {entrees === undefined ? <p className="vrm-at-raison">{tr('atelier.photos.lecture')}</p> : null}
-        {entrees === null ? <p className="vrm-at-refus" role="alert" data-couleur-passu="">{tr('atelier.couleur.passu')}</p> : null}
+        {entrees === undefined ? <p className="vrm-atl-raison">{tr('atelier.photos.lecture')}</p> : null}
+        {entrees === null ? <p className="vrm-atl-refus" role="alert" data-couleur-passu="">{tr('atelier.couleur.passu')}</p> : null}
         {Array.isArray(entrees) ? (
-          <div className="vrm-at-chiffre" data-couleur-resultats={res.length}>
+          <div className="vrm-atl-chiffre" data-couleur-resultats={res.length}>
             <b>{res.length}</b><span>{tr('atelier.couleur.nPhotos', { couleur: nomCouleur(famille, l), n: Array.isArray(entrees) ? entrees.length - aLire : 0 })}</span>
           </div>
         ) : null}
         {aLire > 0 ? (
-          <div className="vrm-at-carte" data-couleur-a-lire={aLire}>
-            <div className="vrm-at-rangee">
-              <span className="vrm-at-rangee-txt"><b>{tr('atelier.couleur.aLire', { n: aLire })}</b><small>{progres ? tr('atelier.couleur.progres', { faits: progres.faits, total: progres.total }) : tr('atelier.couleur.aLireSous')}</small></span>
-              {!progres ? <span className="vrm-at-gestes"><button type="button" className="vrm-at-geste" data-couleur-lire="" onClick={lire}>{tr('atelier.couleur.lire')}</button></span> : null}
+          <div className="vrm-atl-carte" data-couleur-a-lire={aLire}>
+            <div className="vrm-atl-rangee">
+              <span className="vrm-atl-rangee-txt"><b>{tr('atelier.couleur.aLire', { n: aLire })}</b><small>{progres ? tr('atelier.couleur.progres', { faits: progres.faits, total: progres.total }) : tr('atelier.couleur.aLireSous')}</small></span>
+              {!progres ? <span className="vrm-atl-gestes"><button type="button" className="vrm-atl-geste" data-couleur-lire="" onClick={lire}>{tr('atelier.couleur.lire')}</button></span> : null}
             </div>
           </div>
         ) : null}
-        {illisibles ? <p className="vrm-at-raison" data-couleur-illisibles={illisibles}>{tr('atelier.couleur.illisibles', { n: illisibles })}</p> : null}
+        {illisibles ? <p className="vrm-atl-raison" data-couleur-illisibles={illisibles}>{tr('atelier.couleur.illisibles', { n: illisibles })}</p> : null}
         {res.length ? (
-          <div className="vrm-at-grille">
+          <div className="vrm-atl-grille">
             {res.slice(0, 120).map((e) => (
-              <button key={e.cle} type="button" className="vrm-at-tuile" data-couleur-photo={e.cle} data-couleur-num={e.num || ''} data-couleur-part={e.part}
+              <button key={e.cle} type="button" className="vrm-atl-tuile" data-couleur-photo={e.cle} data-couleur-num={e.num || ''} data-couleur-part={e.part}
                 aria-label={e.num ? tr('atelier.couleur.ouvrir', { num: e.num }) : (e.titre || tr('atelier.fusion.sansNum'))} onClick={() => { if (e.num) ouvrirNumero(e.num); }}>
                 {Photo ? Photo(e.src) : null}
                 <b>{e.num ? `N°${e.num}` : tr('atelier.fusion.sansNum')}</b>
               </button>
             ))}
           </div>
-        ) : Array.isArray(entrees) && !aLire ? <p className="vrm-at-vide" data-couleur-vide="">{tr('atelier.couleur.aucune', { couleur: nomCouleur(famille, l) })}</p> : null}
-        <p className="vrm-at-raison" style={{ margin: 0 }}>{tr('atelier.couleur.pourquoi')}</p>
+        ) : Array.isArray(entrees) && !aLire ? <p className="vrm-atl-vide" data-couleur-vide="">{tr('atelier.couleur.aucune', { couleur: nomCouleur(famille, l) })}</p> : null}
+        <p className="vrm-atl-raison" style={{ margin: 0 }}>{tr('atelier.couleur.pourquoi')}</p>
       </div>
     </Feuille>
   );

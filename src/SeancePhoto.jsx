@@ -16,43 +16,43 @@ export default function SeancePhoto({ Feuille, Bouton, Segmente, Icon, Photo, et
   const [refaire, setRefaire] = React.useState(false);
   const enCours = lignes && !refaire;
   const tete = enCours ? (
-    <div className="vrm-at-chiffre" data-seance-compte={`${lignes.faites}/${lignes.total}`}>
+    <div className="vrm-atl-chiffre" data-seance-compte={`${lignes.faites}/${lignes.total}`}>
       <b>{lignes.faites}</b><span>{tr('atelier.seance.surTotal', { n: lignes.total })}</span>
     </div>
   ) : null;
   return (
     <Feuille onClose={onClose} titre={tr('atelier.seance.titre')} data-seance-photo={enCours ? 'en-cours' : 'depart'}>
-      <div className="vrm-at-feuille">
+      <div className="vrm-atl-feuille">
         {tete}
         {!enCours ? (<>
-          <p className="vrm-at-raison" style={{ margin: 0 }}>{tr('atelier.seance.explique')}</p>
+          <p className="vrm-atl-raison" style={{ margin: 0 }}>{tr('atelier.seance.explique')}</p>
           <div>
-            <h3 className="vrm-at-titre" style={{ margin: '0 4px 8px' }}>{tr('atelier.seance.moinsDe')}</h3>
+            <h3 className="vrm-atl-titre" style={{ margin: '0 4px 8px' }}>{tr('atelier.seance.moinsDe')}</h3>
             <Segmente label={tr('atelier.seance.moinsDe')} value={n} onChange={setN} options={N_CHOIX.map((x) => ({ v: x, l: String(x), data: { 'data-seance-n': x } }))}/>
           </div>
-          {etat === null ? <p className="vrm-at-refus" role="alert" data-seance-passu="">{tr('atelier.seance.passu')}</p> : null}
+          {etat === null ? <p className="vrm-atl-refus" role="alert" data-seance-passu="">{tr('atelier.seance.passu')}</p> : null}
           <Bouton variante="primaire" plein data-seance-commencer="" disabled={etat === undefined} onClick={async () => { const ok = await onCommencer(n); if (ok) setRefaire(false); }}>{tr(etat === undefined ? 'atelier.photos.lecture' : 'atelier.seance.commencer')}</Bouton>
           {lignes && refaire ? <Bouton variante="discret" plein onClick={() => setRefaire(false)}>{tr('atelier.annuler')}</Bouton> : null}
         </>) : (<>
           {lignes.total ? (
-            <ul className="vrm-at-liste" data-seance-lignes={lignes.total}>
+            <ul className="vrm-atl-liste" data-seance-lignes={lignes.total}>
               {lignes.lignes.map((l) => (
-                <li key={l.cle} className={'vrm-at-ligne' + (l.coche ? ' is-cochee' : '')} data-seance-ligne={l.cle} data-seance-raison={l.raison} data-seance-coche={l.coche ? '1' : '0'}>
-                  <button type="button" className="vrm-at-ligne-btn" data-seance-photographier={l.cle} onClick={() => onPhotographier(l)}>
-                    <span className="vrm-at-vignette">{l.photo && Photo ? Photo(l.photo) : (Icon ? <Icon name="camera" size={20}/> : null)}</span>
-                    <span className="vrm-at-ligne-txt">
+                <li key={l.cle} className={'vrm-atl-ligne' + (l.coche ? ' is-cochee' : '')} data-seance-ligne={l.cle} data-seance-raison={l.raison} data-seance-coche={l.coche ? '1' : '0'}>
+                  <button type="button" className="vrm-atl-ligne-btn" data-seance-photographier={l.cle} onClick={() => onPhotographier(l)}>
+                    <span className="vrm-atl-vignette">{l.photo && Photo ? Photo(l.photo) : (Icon ? <Icon name="camera" size={20}/> : null)}</span>
+                    <span className="vrm-atl-ligne-txt">
                       <b>N°{l.num}</b>
                       {l.titre ? <span>{l.titre}</span> : null}
                       {l.coche ? null : <em>{tr(RAISON[l.raison] || RAISON.aucune, { n: l.nPhotos == null ? '—' : l.nPhotos, sur: lignes.n })}</em>}
                     </span>
                   </button>
-                  <button type="button" role="checkbox" aria-checked={l.coche} aria-label={tr(l.coche ? 'atelier.seance.decocher' : 'atelier.seance.cocher', { num: l.num })} className="vrm-at-coche" data-seance-cocher={l.cle} onClick={() => onCocher(l.cle, !l.coche)}>
+                  <button type="button" role="checkbox" aria-checked={l.coche} aria-label={tr(l.coche ? 'atelier.seance.decocher' : 'atelier.seance.cocher', { num: l.num })} className="vrm-atl-coche" data-seance-cocher={l.cle} onClick={() => onCocher(l.cle, !l.coche)}>
                     <span>{l.coche && Icon ? <Icon name="check" size={16}/> : null}</span>
                   </button>
                 </li>
               ))}
             </ul>
-          ) : <p className="vrm-at-vide" data-seance-vide="">{tr('atelier.seance.rien')}</p>}
+          ) : <p className="vrm-atl-vide" data-seance-vide="">{tr('atelier.seance.rien')}</p>}
           <Bouton variante="discret" plein data-seance-nouvelle="" onClick={() => setRefaire(true)}>{tr('atelier.seance.nouvelle')}</Bouton>
         </>)}
       </div>
