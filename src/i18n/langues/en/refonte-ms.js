@@ -10,7 +10,7 @@ export default {
   "ms.stock.af.pasVerifiees": { one: "{n} slot not checked", other: "{n} slots not checked" },
   "ms.stock.af.sortis": { one: "{n} slot freed", other: "{n} slots freed" },
   "ms.stock.af.aRanger": { one: "{n} to put in a slot", other: "{n} to put in a slot" },
-  "ms.msg.chercher": "Buyer, model or No.",
+  "ms.msg.chercher": "Buyer, model or No.…",
   "ms.msg.aFaire": "To link",
   "ms.msg.rien": "No thread for “{x}”",
 };

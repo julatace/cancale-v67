@@ -10,7 +10,7 @@ export default {
   "ms.stock.af.pasVerifiees": { one: "{n} rangement pas vérifié", other: "{n} rangements pas vérifiés" },
   "ms.stock.af.sortis": { one: "{n} case libérée", other: "{n} cases libérées" },
   "ms.stock.af.aRanger": { one: "{n} à ranger dans une case", other: "{n} à ranger dans une case" },
-  "ms.msg.chercher": "Acheteur, modèle ou N°",
+  "ms.msg.chercher": "Acheteur, modèle ou N°…",
   "ms.msg.aFaire": "À relier",
   "ms.msg.rien": "Aucun fil pour « {x} »",
 };

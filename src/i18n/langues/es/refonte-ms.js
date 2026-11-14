@@ -10,7 +10,7 @@ export default {
   "ms.stock.af.pasVerifiees": { one: "{n} hueco sin verificar", other: "{n} huecos sin verificar" },
   "ms.stock.af.sortis": { one: "{n} hueco liberado", other: "{n} huecos liberados" },
   "ms.stock.af.aRanger": { one: "{n} por guardar en un hueco", other: "{n} por guardar en un hueco" },
-  "ms.msg.chercher": "Comprador, modelo o N.º",
+  "ms.msg.chercher": "Comprador, modelo o N.º…",
   "ms.msg.aFaire": "Por enlazar",
   "ms.msg.rien": "Ningún hilo para «{x}»",
 };

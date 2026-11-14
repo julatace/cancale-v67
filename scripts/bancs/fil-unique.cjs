@@ -200,6 +200,7 @@ const ouvrirAFaire = async (pg) => { if (await pg.$('[data-fil-proposition]')) r
         const avant = (await lignes(r.pg)).length;
         await ouvrirAFaire(r.pg);
         const sel = '[data-fil-proposition="acheteur"]';
+        if (process.env.DEBUG) console.log("DBG E", await r.pg.evaluate(() => JSON.stringify({ p: [...document.querySelectorAll("[data-fil-proposition]")].map((x) => x.getAttribute("data-fil-proposition")), af: (document.querySelector("[data-msg-afaire]") || {}).outerHTML ? document.querySelector("[data-msg-afaire]").getAttribute("data-msg-afaire") : null, feuille: !!document.querySelector("[data-ui-afaire-feuille]"), chat: !!document.querySelector(".vrm-chat-panel") })));
         const a = await r.pg.$eval(sel, (x) => x.getAttribute('data-fil-a') + '|' + x.getAttribute('data-fil-b'));
         await r.pg.click(sel + ' [data-fil-relier]');
         await r.pg.waitForTimeout(500);

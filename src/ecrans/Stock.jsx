@@ -5,7 +5,7 @@ import { useEssentiel } from '../AttenteEcran.jsx';
 import { unParArticle, planchesCases, planchesRangees } from '../stockRegles.js';
 import { requeteDeLaVoix } from '../rechercheVocale.js';
 import React, { useState, useMemo, useEffect } from 'react';
-import { tr } from '../i18n/index.js';   // (11 nov., lot rangement-guide)
+import { tr, nombre } from '../i18n/index.js';   // (11 nov., lot rangement-guide) ; (14 nov.) `nombre` : « 1 024 » dans la langue
 import { ChiffreConseil } from '../Conseils.jsx';
 import { premiereCaseLibre as premiereCaseMeubles, caseEnMots } from '../ouRanger.js';
 import { attrCible } from '../cibleNotif.js';
@@ -818,10 +818,10 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
             puis rangées et à ranger — les mêmes nombres que la ligne d'avant, une seule fois chacun (§7). */}
         <BandeChiffres className="vrm-ms-bande" items={[
           { cle: 'enligne', garderVide: true, attrs: { className: 'vrm-ui-bande-item vrm-s2d-resume-n' },
-            n: lecture === undefined ? '…' : (aa && aa.su && !(aa.auMoins && nAffiche === 0) ? <>{aa.auMoins ? <small className="vrm-ms-au-moins">{tr('journee.moins')} </small> : null}{nAffiche}</> : null),
+            n: lecture === undefined ? '…' : (aa && aa.su && !(aa.auMoins && nAffiche === 0) ? <>{aa.auMoins ? <small className="vrm-ms-au-moins">{tr('journee.moins')} </small> : null}{nombre(nAffiche)}</> : null),
             l: <>{nAffiche === 1 && aa && aa.su ? `${motsVendeur().nom} en ligne` : `${motsVendeur().noms} en ligne`}{filtreActif ? tr('stock.filtrees') : ''}</> },
-          aa && aa.su && nAffiche > 0 ? { cle: 'rangees', n: nRangees, l: `rangé${motsStock.e}${nRangees > 1 ? 's' : ''}` } : null,
-          aa && aa.su && nAffiche > 0 ? { cle: 'aranger', n: nARanger, l: tr('ms.stock.aRanger') } : null,
+          aa && aa.su && nAffiche > 0 ? { cle: 'rangees', n: nombre(nRangees), l: `rangé${motsStock.e}${nRangees > 1 ? 's' : ''}` } : null,
+          aa && aa.su && nAffiche > 0 ? { cle: 'aranger', n: nombre(nARanger), l: tr('ms.stock.aRanger') } : null,
         ]}/>
         {/* (6 nov.) La lecture garde la place des lignes qui suivront (trois lignes) : le Stock ne saute plus quand elles arrivent. */}
         {lecture === undefined && <div className="vrm-s2d-resume-l" data-stock-resume-attente="" style={{ minHeight: 'calc(3 * 1.45em)' }}>{tr('stock.jeLisAnnonces')}</div>}

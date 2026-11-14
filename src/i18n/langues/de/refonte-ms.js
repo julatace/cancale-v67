@@ -10,7 +10,7 @@ export default {
   "ms.stock.af.pasVerifiees": { one: "{n} Fach nicht geprüft", other: "{n} Fächer nicht geprüft" },
   "ms.stock.af.sortis": { one: "{n} Fach frei geworden", other: "{n} Fächer frei geworden" },
   "ms.stock.af.aRanger": { one: "{n} in ein Fach einräumen", other: "{n} in ein Fach einräumen" },
-  "ms.msg.chercher": "Käufer, Modell oder Nr.",
+  "ms.msg.chercher": "Käufer, Modell oder Nr.…",
   "ms.msg.aFaire": "Zu verknüpfen",
   "ms.msg.rien": "Kein Verlauf für „{x}“",
 };

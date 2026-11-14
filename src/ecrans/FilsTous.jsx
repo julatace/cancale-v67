@@ -205,6 +205,9 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
   // (14 nov., refonte — AJOUT 2) Les fils se regroupent UNE fois par lecture (et par lien posé), pas à
   // chaque lettre tapée dans la recherche : à 1 000 conversations, c'était le coût de chaque frappe.
   // Même règle (src/filUnique.js), mêmes entrées : seul le moment du calcul change.
+  // La signature des conversations Vinted (la liste peut être complétée SUR PLACE — sa paire arrive après) :
+  // le regroupement se refait dès qu'une conversation, son aperçu ou sa paire change.
+  const sigVinted = Array.isArray(vinted) ? vinted.map((x) => { const c = x.c || {}; let p = ''; try { p = JSON.stringify(x.paire || null); } catch (_) {} const u = c.opposite_user || {}; return [c.id, c.updated_at, c.unread, c.description, u.id, u.login, c._acc && c._acc.vinted_user_id, x.compte, p].join("§"); }).join('¶') : String(vinted);
   const { parCle, fils, propositions } = React.useMemo(() => {
     const parCle = new Map();
     const entrees = [];
@@ -214,7 +217,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
     for (const x of ((ebayTous && ebayTous.items) || [])) { const e = convEbay(x.m, x.compte); if (e) { parCle.set(e.cle, { e }); entrees.push(e); } }
     const fils = regrouperFils(entrees, relies.liens);
     return { parCle, fils, propositions: suggestionsFils(fils, relies.liens, relies.refus) };
-  }, [vinted, autres, ebayTous, relies]);
+  }, [vinted, sigVinted, autres, ebayTous, relies]);
   const motCherche = cherche.trim().toLowerCase().replace(/^n°\s*/, '');
   const filsVus = motCherche ? fils.filter((f) => {
     const d = f.dernier || f.convs[f.convs.length - 1];
@@ -271,7 +274,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
               « À faire · N › » : la feuille montre la question du moment avec SES deux gestes (Oui / Non),
               la suivante vient après. Rien n'est relié sans son clic. */}
           {fils.length ? <BarreOutils className="vrm-ms-msg-outils" valeur={cherche} onChange={setCherche} placeholder={tr('ms.msg.chercher')} label={tr('ms.msg.chercher')}
-            data-msg-recherche="" champAttrs={{ 'data-msg-recherche': '', autoComplete: 'off' }}/> : null}
+            data-msg-recherche="" champAttrs={{ 'data-msg-recherche': '', autoComplete: 'off', spellCheck: false, name: 'recherche-messages' }}/> : null}
           <LigneAFaire n={propositions.length} titre={tr('ms.msg.aFaire')} className="vrm-ms-msg-afaire" data-msg-afaire={propositions.length}>
           {/* Une question à la fois (la liste reste au premier écran) ; « Non » ou « Oui » fait venir la suivante. */}
             {propositions.slice(0, 1).map((p) => {
