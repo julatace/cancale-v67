@@ -107,18 +107,18 @@ blanc se vérifie par les styles calculés avant d'accuser la page.
     « la paire ne monte pas ».
 - `refonte-listes` : **vert** (1re rangée 397 / 422 ; volume : 9 visibles, CLS 0, recherche 241 ms).
 - `exemple-photos` : vert (281). `garde-ecrans` : vert.
-- `annonces-grille` : **84 verts, 1 rouge** (un toucher « stable » à 1512 clair, au hasard de la charge ; le même
-  pas passe en sombre). Avant le chantier : 64 verts, **12 rouges** (G7 : la vignette ne s'ouvrait plus en place
+- `annonces-grille` : **92 verts, 0 rouge**. Avant le chantier : 64 verts, **12 rouges** (G7 : la vignette ne s'ouvrait plus en place
   depuis la fiche unique). **Adapté, et dit** : au téléphone il juge la LISTE (titre sur une ligne, prix dans sa
   colonne à droite) ; à l'ordinateur il choisit la GRILLE (le choix « Grille ») ; G7 suit les gestes à leur
   nouvelle place (la paire montée, puis la fiche et son « … ») ; « Même paire ? Oui » reste sur la rangée.
-- `annonces-coherence` : adapté (la plaque gravée du studio : « chiffre à l'encre sur un creux », au lieu de
+- `annonces-coherence` : **128 verts, 2 rouges** — adapté (la plaque gravée du studio : « chiffre à l'encre sur un creux », au lieu de
   « pastille sombre ») ; « Trier » passe en rond (les trois gestes de la barre ont une forme) ; le lien de la photo
-  à l'encre (son texte lu n'est plus « bleu »). Reste le rouge commun avec le code d'avant : « cibles ≥ 44 px dans
-  la feuille Actions » à 1512 (pas de ce chantier).
+  à l'encre (son texte lu n'est plus « bleu »). Les 2 rouges sont ceux du code d'avant : « cibles ≥ 44 px dans la
+  feuille Actions » à 1512, clair et sombre (la feuille Actions n'est pas de ce chantier).
 - `annonces-actions` : 117 verts ; les rouges sont ceux du code d'avant (« cibles ≥ 44 px dans le carré » à 1512)
   plus un parcours coupé par la charge (une attente de 4 s, une largeur différente à chaque passage).
-- `baisse-prix` : voir la dernière ligne.
+- `baisse-prix` : **59 verts, 0 rouge** (G2 rouge deux fois sous la charge — la feuille lue avant son calcul —, vert seul et
+  au passage complet suivant ; le banc dit désormais la ligne lue, plus seulement sa clé).
 
 ## Ce qui reste (dit, pas caché)
 - Leboncoin, eBay, Vestiaire : leurs rangées sont dans la matière du studio, mais toucher l'une d'elles ouvre encore
