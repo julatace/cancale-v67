@@ -143,7 +143,7 @@ async function ouvrir(b, vue, LIGNES, { sombre = false, voix = true, imprimante 
   return { ctx, pg, errs, consoleErrs };
 }
 const lire = (pg, k) => pg.evaluate((cle) => { try { return JSON.parse(localStorage.getItem(cle) || 'null'); } catch (_) { return 'illisible'; } }, k);
-const shot = async (pg, nom) => { if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `colis-plus-${nom}.png`) }); };
+const shot = async (pg, nom) => { if (SHOTS) { try { await pg.screenshot({ path: path.join(SHOTS, `colis-plus-${nom}.png`), timeout: 60000 }); } catch (e) { console.log('  (capture ' + nom + ' manquée : ' + String(e.message).slice(0, 60) + ')'); } } };
 const cliquer = (pg, s) => pg.evaluate((q) => { const e = document.querySelector(q); if (!e) return false; e.click(); return true; }, s);
 const position = (pg) => pg.evaluate(() => { const f = document.querySelector('[data-preparer]'); return f ? f.getAttribute('data-preparer-position') : null; });
 const cleColis = (pg) => pg.evaluate(() => { const e = document.querySelector('[data-preparer-cle]'); return e ? e.getAttribute('data-preparer-cle') : null; });
@@ -167,7 +167,7 @@ async function lot(b, nom, vue, LIGNES) {
     dit(ap.length === 9 && papier && papier.p === 'planche4' && /\b3\b/.test(papier.t), `${nom} : A1 l'aperçu des 9 bordereaux dit « 3 feuilles A4, 4 par page »`, JSON.stringify({ n: ap.length, papier }));
     await shot(pg, `${nom}-lot-apercu`);
     await pg.click('button[data-lot-imprimer]');
-    for (let i = 0; i < 200; i++) {
+    for (let i = 0; i < 1000; i++) {   // (thermique : chaque étiquette est rendue par pdf.js ; jusqu’à 4 min sur une machine chargée)
       const etat = await pg.evaluate(() => {
         if (window.__pdfs && window.__pdfs.length) return 'pdf';
         const clic = (l) => { const bs = [...document.querySelectorAll('button')].filter((x) => x.innerText.trim() === l && x.offsetParent); if (bs.length) { bs[bs.length - 1].click(); return true; } return false; };
