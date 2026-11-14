@@ -51758,8 +51758,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {/* (6 nov.) Le conseil « Un envoi presse » (src/accompagnement.js) : le compte du bouton, inchangé. */}
                   <ChiffreConseil cle="colis.imprimer" valeur={baseKO ? null : { nLot, presse: !!gesteEnvoi({ aImprimer: bordereauxAImprimer(lignesImpr).map((l) => ({ jours: l.e && Number.isFinite(l.e.dl) ? l.e.dl : null })) }, { urgentSeul: true }) }}/>
                 </>);
+                // (14 nov., Studio) LES TUILES-FILTRES sous le grand chiffre (« À envoyer » seulement) : « Tous », « Avant demain »
+                // (`avantDemainColis`), un transporteur par tuile (`filtresTransporteurs`) — la liste les applique (`filtrerEnvoyes`).
+                const tuilesTete = (achatsSec || onglet !== 'envoyer') ? null : (() => {
+                  const tous = colisAEnvoyerListe(); if (tous.length < 2) return null;
+                  const trDe = (x) => (x.__autre ? x.tr : transporteurVente(x.b));
+                  const nAD = tous.filter(avantDemainColis).length;
+                  const pastilles = filtresTransporteurs(tous, trDe);
+                  const eff = filtreEnvoyer === '__avantDemain' ? (nAD > 0 ? '__avantDemain' : 'tous') : filtrerEnvoyes(tous, filtreEnvoyer, trDe).filtre;
+                  const tuiles = [
+                    { v: 'tous', l: tr('sv.filtre.tous'), n: tous.length, attrs: { 'data-envoyer-filtre-choix': 'tous', 'data-envoyer-filtre-n': tous.length } },
+                    ...(nAD > 0 && nAD < tous.length ? [{ v: '__avantDemain', l: tr('sv.filtre.avantDemain'), n: nAD, unite: tr('sv.filtre.aPoster'), ambre: true, attrs: { 'data-envoyer-filtre-choix': 'avant-demain', 'data-envoyer-filtre-n': nAD } }] : []),
+                    ...(pastilles.length > 1 ? pastilles.map((p) => ({ v: p.nom, l: p.nom, n: p.n, unite: tr('sv.filtre.colis', { n: p.n }), attrs: { 'data-envoyer-filtre-choix': p.nom, 'data-envoyer-filtre-cle': p.cle || 'inconnu', 'data-envoyer-filtre-n': p.n } })) : []),
+                  ];
+                  return <TuilesFiltres tuiles={tuiles} valeur={eff} onChoix={(v) => setFiltreEnvoyer(v)} label={tr('sv.filtre.label')} attrs={{ 'data-envoyer-filtres': '', 'data-envoyer-filtre': eff }}/>;
+                })();
                 return (
-                  <div className="vrm-colis-barre sb-tete-hote" data-colis-barre="" data-sb-studio={colisDans}>
+                  <div className="sb-tete-hote" data-colis-barre="" data-sb-studio={colisDans} data-sb-tuiles={tuilesTete ? '1' : '0'}>
                     <TeteStudio section={colisDans} id={ID_SECTION_COLIS[achatsSec ? 'achats' : 'ventes']}
                       titre={achatsSec ? tr('sv.titre.retirer') : tr('sv.titre.expedier')}
                       n={nTete} auMoins={(achatsSec ? retPartiel : envPartiel) && nTete != null ? tr('sv.auMoins') : ''}
@@ -51767,6 +51782,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       enLecture={tr('sv.lib.lecture')}
                       presses={pressesTete} libellePresses={achatsSec ? tr('sv.presses.retirer', { n: pressesTete }) : tr('sv.presses.envoyer', { n: pressesTete })}
                       ronds={ronds} droite={plein}/>
+                    {tuilesTete}
                   </div>);
               }
               return <ScreenHead icon="doc" title="Colis" date={dateJourFr(new Date())} phrase="colis"
@@ -52617,7 +52633,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 ) : null;
                 return tourneeEl;
               })()}
-              <div className="vrm-colis-grille" data-cible="colonne:prets colonne:attente" data-colis-lignes="1" style={{display:'flex',flexDirection:'column',gap:6}}>
+              {/* (14 nov., Studio bleu clair) Les tuiles-filtres AU-DESSUS du plan de verre de la liste (elles étaient sa première rangée). */}
               {(()=>{
                 // (2 nov., 22 h, maquette FusionColis) LES COLIS RANGÉS PAR TRANSPORTEUR : un en-tête
                 // (la tuile du logo, son nom, « N colis »), les colis dessous dans l'ordre d'avant
@@ -52630,25 +52646,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // (9 nov., soir, lot AJ) UNE liste, la vente la plus récente en haut (tous comptes, tous sites) ;
                 // le transporteur est une PASTILLE (filtre, comme « Envoyés »), plus un groupe qui impose l'ordre.
                 const trDeColis = (x) => (x.__autre ? x.tr : transporteurVente(x.b));
-                const pastillesEnv = filtresTransporteurs(tous, trDeColis);
                 // (14 nov., Studio bleu clair) LES TUILES-FILTRES : « Tous », « Avant demain » (la règle `avantDemainColis`,
                 // celle de l'ambre du grand chiffre) et un transporteur par tuile (`filtresTransporteurs`, inchangé). Une tuile
                 // posée est ENFONCÉE avec sa diode ; une tuile qui ne filtre plus rien revient à « tous » (aucun colis caché).
                 const nAvantDemain = tous.filter(avantDemainColis).length;
-                const { liste: tousF, filtre: filtreEnvT } = (filtreEnvoyer === '__avantDemain' && nAvantDemain > 0)
+                const { liste: tousF } = (filtreEnvoyer === '__avantDemain' && nAvantDemain > 0)
                   ? { liste: tous.filter(avantDemainColis), filtre: '__avantDemain' }
                   : filtrerEnvoyes(tous, filtreEnvoyer, trDeColis);
                 const exT = rangerColisEnvoi(tousF, trNomDe);
                 const iSansDateEnv = debutSansDate(exT, quandColisAEnvoyer), nSansDateEnv = nbSansDate(exT, quandColisAEnvoyer);
-                const tuilesEnv = [
-                  { v: 'tous', l: tr('sv.filtre.tous'), n: tous.length, attrs: { 'data-envoyer-filtre-choix': 'tous', 'data-envoyer-filtre-n': tous.length } },
-                  ...(nAvantDemain > 0 && nAvantDemain < tous.length ? [{ v: '__avantDemain', l: tr('sv.filtre.avantDemain'), n: nAvantDemain, unite: tr('sv.filtre.aPoster'), ambre: true, attrs: { 'data-envoyer-filtre-choix': 'avant-demain', 'data-envoyer-filtre-n': nAvantDemain } }] : []),
-                  ...(pastillesEnv.length > 1 ? pastillesEnv.map((p) => ({ v: p.nom, l: p.nom, n: p.n, unite: tr('sv.filtre.colis', { n: p.n }), attrs: { 'data-envoyer-filtre-choix': p.nom, 'data-envoyer-filtre-cle': p.cle || 'inconnu', 'data-envoyer-filtre-n': p.n } })) : []),
-                ];
-                const pastillesEl = tuilesEnv.length > 1 ? (
-                  <TuilesFiltres key="__filtres-env" tuiles={tuilesEnv} valeur={filtreEnvT} onChoix={(v) => setFiltreEnvoyer(v)} label={tr('sv.filtre.label')}
-                    attrs={{ 'data-envoyer-filtres': '', 'data-envoyer-filtre': filtreEnvT }}/>
-                ) : null;
+                // (14 nov., Studio) Les tuiles-filtres sont rendues dans la TÊTE de « À expédier » (sous le grand chiffre) : mêmes
+                // valeurs (`filtreEnvoyer`), même règle de repli (`filtrerEnvoyes`), ici seulement la liste filtrée.
                 const primaireBleu = {flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit',textDecoration:'none',boxSizing:'border-box'};
                 const carteAutre = (e) => {
                   if (e.__autre === 'vc') return <CarteColisVc v={e.v} imprime={!!(vcCarte('vrm_vc_imprimes') || {})[e.v.id]} fait={null}/>;
@@ -52685,7 +52693,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted}}>Déposé</button>}/>;
                 };
                 // (7 nov., vitesse) Les 24 plus pressées d'abord, TOUTES les autres juste après (sans clic : aucun colis caché).
-                return [pastillesEl, ...(colisTous ? exT : exT.slice(0, 24)).map((e,ix)=>{
+                return <><div className="vrm-colis-grille" data-cible="colonne:prets colonne:attente" data-colis-lignes="1" style={{display:'flex',flexDirection:'column',gap:6}}>{(colisTous ? exT : exT.slice(0, 24)).map((e,ix)=>{
                 const ouvreSansDate = ix === iSansDateEnv ? <LigneSansDate n={nSansDateEnv}/> : null;
                 const quandE = quandColisAEnvoyer(e);
                 if (e.__autre) return (
@@ -52937,8 +52945,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                   </React.Fragment>
                 );
-              })]; })()}
-              </div>
+              })}</div></>; })()}
+              {/* (14 nov., Studio) la liste se ferme avec ses rangées (plus haut) */}
               {/* (2 nov., colis clair) Sous la liste : ce n'est pas un geste du moment. */}
               {/* (17 oct.) Julien : « un bouton dans l'onglet Colis qui met en couleur
                   les numéros que tu as vendus ». Les N° des colis À FAIRE (pas

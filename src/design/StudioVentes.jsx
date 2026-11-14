@@ -64,9 +64,9 @@ export function Rond({ icone, label, onClick, attrs = {}, titre, actif = false }
 // `auMoins` : un site pas lu ⇒ le nombre est un plancher, dit à côté (§5).
 export function TeteStudio({ section, id, titre, n, auMoins = false, libelle, presses = 0, libellePresses = '', droite = null, ronds = null, enLecture = '' }) {
   return (
-    <header className="vrm-colis-section-tete sb-tete" data-colis-section={section} id={id} data-sb-tete={section}>
+    <header className="sb-tete" data-colis-section={section} id={id} data-sb-tete={section}>
       <div className="sb-tete-haut">
-        <h2 className="vrm-colis-section-titre sb-tete-titre">{titre}</h2>
+        <h2 className="sb-tete-titre">{titre}</h2>
         {ronds ? <div className="sb-tete-ronds">{ronds}</div> : null}
       </div>
       <div className="sb-tete-corps">
