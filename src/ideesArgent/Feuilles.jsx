@@ -109,6 +109,15 @@ function FeuilleVenteMain({ num0 = '', pret = false, verdict = null, onFermer })
     const off = onCloudReady(() => setTick((t) => t + 1));
     return () => { window.removeEventListener('vrm:save', f); if (typeof off === 'function') off(); };
   }, []);
+  // « Annuler » (la pilule, 5 s) défait la vente : la feuille le voit (la décision écrite puis retirée) et
+  // revient au formulaire en le disant — jamais « vendu » affiché pour une vente qui n'existe plus.
+  React.useEffect(() => {
+    if (!fait) return;
+    const d = lireObjet(CLE_DECISIONS)[fait.carte.id];
+    const ecrite = !!(d && d.choix === 'vendu-main' && d.at === fait.at);
+    if (ecrite && !fait.vu) setFait((f) => (f ? { ...f, vu: true } : f));
+    else if (!ecrite && fait.vu) { setFait(null); setPrix(''); setFaux('annulee'); }
+  }, [tick, fait]);   // eslint-disable-line react-hooks/exhaustive-deps
   const brut = String(q || '').trim();
   const parNum = estUnNumero(brut);
   const v = React.useMemo(() => {
@@ -135,7 +144,8 @@ function FeuilleVenteMain({ num0 = '', pret = false, verdict = null, onFermer })
     setFaux(''); vibrer();
     // Le MÊME geste que « Vendu ailleurs » de la fiche (venduAilleursGeste, App.jsx) : annulable 5 s.
     gesteVrm(r.texte, r.ops, {}, () => { setTimeout(() => { try { window.dispatchEvent(new Event('vrm:stock-slots')); } catch (_) {} emettreClesRelues(['vinted_annonces_vendues', CLE_DECISIONS, 'vrm_slots']); setTick((t) => t + 1); }, 700); });
-    setFait({ carte: v2.carte, montant: m, date, paiement });
+    const at = (r.ops.find((o) => o.k === CLE_DECISIONS) || {}).apres;
+    setFait({ carte: v2.carte, montant: m, date, paiement, at: at ? at.at : null, vu: false });
   };
   const remettre = (x) => {
     const r = opsAnnulerVenteMain({ id: x.id, decisions: lireObjet(CLE_DECISIONS), vendues: load('vinted_annonces_vendues', []) || [], slots: lireObjet('vrm_slots'), cle: cleNum });
@@ -206,7 +216,7 @@ function FeuilleVenteMain({ num0 = '', pret = false, verdict = null, onFermer })
               <input className="sb-champ" type="date" data-ia-date="" value={date} max={aujourdhui()} aria-invalid={faux === 'date' ? 'true' : undefined} onChange={(e) => { setDate(e.target.value); setFaux(''); }}/>
             </label> : <button type="button" className="sb-lien" data-ia-date-ouvrir="" onClick={() => setDateOuverte(true)}>{tr('ia.vm.dateAutre', { jour: jourCourt(date) })}</button>}
             <p className={'ia-note' + (faux ? ' is-geste' : '')} data-ia-note="" role={faux ? 'alert' : undefined}>
-              {faux === 'prix' ? tr('ia.vm.fauxPrix') : faux === 'date' ? tr('ia.vm.fauxDate') : faux === 'compris' ? tr('ia.vm.fauxCompris') : faux === 'change' ? tr('ia.vm.fauxChange') : tr('ia.vm.regle', { jour: jourCourt(date) })}
+              {faux === 'prix' ? tr('ia.vm.fauxPrix') : faux === 'date' ? tr('ia.vm.fauxDate') : faux === 'compris' ? tr('ia.vm.fauxCompris') : faux === 'change' ? tr('ia.vm.fauxChange') : faux === 'annulee' ? tr('ia.vm.annulee') : tr('ia.vm.regle', { jour: jourCourt(date) })}
             </p>
             <button type="submit" className="sb-btn-plein sb-btn-plein--barre" data-ia-valider="">{m != null ? tr('ia.vm.valider', { prix: eur(m) }) : tr('ia.vm.validerVide')}</button>
           </>) : null}

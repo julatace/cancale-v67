@@ -2,9 +2,11 @@
 // Données INVENTÉES. 390 tactile et 1512, clair et sombre (BANC_TAILLES=390,1512-sombre…, BANC_PORT, BANC_DIST) :
 //   · la loupe « vendu 124 » ⇒ l'action ⇒ la feuille, le prix déjà au focus ⇒ « Vendue · 45 € » :
 //     DEUX touchers mesurés (pointerdown comptés), décision datée du jour + paiement, sortie du stock ;
-//     « vendu » de Ma journée passe à 45 € ; « Annuler » ⇒ l'état d'avant EXACT (stockage relu) et le chiffre revient ;
+//     « aujourd'hui 45 € » de Ma journée (`data-vendu-jour`) ; « Annuler » (5 s) ⇒ l'état d'avant EXACT (stockage relu),
+//     le chiffre revient, la feuille dit « Vente annulée » ; revendue en virement ⇒ le reçu PDF ;
 //   · refus clairs : N° inconnu, N° d'archive (proposé, son toucher le prend), déjà vendue sur Vinted (à envoyer) ;
-//   · N° porté par deux paires ⇒ la question, plaques rouges, aucun prix avant son toucher ;
+//   · N° porté par deux paires (l'une rangée au Stock : la règle des doublons ne renumérote pas) ⇒ la question,
+//     plaques rouges, aucun prix avant son toucher ;
 //   · le reçu PDF se télécharge ; cibles ≥ 44 px ; aucun débordement ; aucune erreur.
 // Captures : $TMPDIR/vrm-bancs/vente-main-propre/*.png (À REGARDER).
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
@@ -30,7 +32,7 @@ const NUMEROS = {
 const ITEMS = [item(9124, 'Asics Gel-Kayano 14 argent', 90), item(9881, 'Air Max 90 blanche', 70), item(9882, 'Air Max 90 noire', 75), { ...item(9125, 'Adidas Samba OG blanche', 70), id: '9b25' }];
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_a', domain: 'www.vinted.fr', updated_at: ilYaH(0) }];
 const ROWS = () => [
-  { id: 'main', data: { vinted_annonce_numeros: JSON.parse(JSON.stringify(NUMEROS)), vinted_dark: false, vrm_slots: { '124': { meuble: 'm1', i: 3 } }, vrm_numerotation: { version: 1, archive: 'B', coupure: '2026-10-09T00:00:00Z' } } },
+  { id: 'main', data: { vinted_annonce_numeros: JSON.parse(JSON.stringify(NUMEROS)), vinted_dark: false, vrm_meubles: [{ id: 'm1', name: 'Étagère', cols: 4, rows: 3 }], vrm_slots: { '124': { m: 'm1', i: 3 }, '88': { m: 'm1', i: 5 } }, vrm_numerotation: { version: 1, archive: 'B', coupure: '2026-10-09T00:00:00Z' } } },
   { id: 'harvest_111_listings', data: { capturedAt: ilYaH(0.2), payload: { items: ITEMS } } },
   { id: 'harvest_111_orders_sold', data: { capturedAt: ilYaH(0.2), nItems: 1, payload: { my_orders: [{ transaction_id: 7130, title: 'New Balance 550 blanche', price: { amount: '80.0', currency_code: 'EUR' }, date: ilYaH(30), status: 'Bordereau envoyé', transaction_user_status: 'needs_action', _acc: { vinted_user_id: '111' } }] } } },
   { id: 'harvest_111_orders_purchased', data: { capturedAt: ilYaH(0.2), nItems: 0, payload: { my_orders: [] } } },
@@ -102,7 +104,7 @@ const attendre = (pg, f, arg, ms = 10000) => pg.waitForFunction(f, arg, { timeou
 const debord = (pg) => pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 const lireLS = (pg, k) => pg.evaluate((k) => localStorage.getItem(k), k);
 const cibles = (pg) => pg.evaluate(() => { const f = document.querySelector('[data-ia-feuille]'); if (!f) return ['pas de feuille']; return [...f.querySelectorAll('button, input, summary')].filter((e) => e.getClientRects().length).map((e) => { const r = e.getBoundingClientRect(); const cs = getComputedStyle(e); return r.height >= 43.5 ? null : `${e.tagName.toLowerCase()}[${(e.textContent || e.getAttribute('aria-label') || '').trim().slice(0, 24)}] ${r.height.toFixed(1)} px (min ${cs.minHeight}, transform ${cs.transform})`; }).filter(Boolean); });
-const semaine = (pg) => pg.evaluate(() => { const e = document.querySelector('[data-ma-semaine]'); return e ? e.innerText.replace(/\s+/g, ' ') : null; });
+const venduJour = (pg) => pg.evaluate(() => { const e = document.querySelector('[data-vendu-jour]'); return e ? e.getAttribute('data-vendu-jour') : null; });
 const pret = async (pg, tel) => {
   const sel = tel ? 'button[data-recherche-loupe]' : '[data-barre-recherche]';
   for (let i = 0; i < 80; i++) { const ok = await pg.evaluate((sel) => { const e = document.querySelector(sel); if (!e) return false; const r = e.getBoundingClientRect(); if (!r.width) return false; const t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!(t && (e === t || e.contains(t))); }, sel); if (ok) return true; await pg.waitForTimeout(250); }
@@ -123,7 +125,7 @@ const pret = async (pg, tel) => {
       const taper = async (sel, t) => { const l = pg.locator(sel).first(); await l.fill(''); await l.focus(); await pg.keyboard.type(t, { delay: 15 }); };
       await essaie('vente en deux touchers', async () => {
         const avantD = await lireLS(pg, 'vrm_cycle_decisions'), avantV = await lireLS(pg, 'vinted_annonces_vendues'), avantS = await lireLS(pg, 'vrm_slots');
-        const semAvant = await semaine(pg);
+        const jourAvant = await venduJour(pg);
         await pret(pg, tel);
         if (tel) await pg.locator('button[data-recherche-loupe]').first().tap();
         else { await pg.locator('body').click({ position: { x: 5, y: 400 } }).catch(() => {}); await pg.keyboard.press('ControlOrMeta+k'); }
@@ -148,22 +150,31 @@ const pret = async (pg, tel) => {
         dit(ok, `${TT} vendue en main propre : 45 €, espèces, datée du jour, sortie du stock (case libérée, N° gardé)`, await lireLS(pg, 'vrm_cycle_decisions'));
         dit(n === 2, `${TT} DEUX touchers mesurés (l’action, « Vendue »)`, String(n));
         await attendre(pg, () => !!document.querySelector('[data-ia-vente-faite="9124"]'));
+        const jour = await attendre(pg, () => { const e = document.querySelector('[data-vendu-jour]'); return e && e.getAttribute('data-vendu-jour') === '4500'; }, null, 8000);
+        dit(jour, `${TT} Ma journée : « aujourd’hui 45 € » (vendu du jour)`, await venduJour(pg) + ' / avant : ' + jourAvant);
         await pg.screenshot({ path: path.join(SHOTS, `faite-${suf}.png`) });
+        // « Annuler » (la pilule, 5 s) : l'état d'avant EXACT, le chiffre du jour revient, la feuille le dit.
+        const annuler = pg.getByRole('button', { name: /^Annuler$/ }).first();
+        if (await annuler.count()) { if (tel) await annuler.tap(); else await annuler.click(); }
+        const revenu = await attendre(pg, ([d0, v0, s0]) => { const eg = (k, x) => JSON.stringify(JSON.parse(localStorage.getItem(k) || 'null')) === JSON.stringify(JSON.parse(x || 'null')); return eg('vrm_cycle_decisions', d0) && eg('vinted_annonces_vendues', v0) && eg('vrm_slots', s0); }, [avantD, avantV, avantS], 10000);
+        dit(revenu, `${TT} « Annuler » ⇒ décisions, marque « vendue » et case : l’état d’avant EXACT`, [avantD, await lireLS(pg, 'vrm_cycle_decisions'), avantS, await lireLS(pg, 'vrm_slots')].join(' | '));
+        const retour = await attendre(pg, (j0) => { const e = document.querySelector('[data-vendu-jour]'); return (e ? e.getAttribute('data-vendu-jour') : null) === j0; }, jourAvant, 8000);
+        dit(retour, `${TT} et le chiffre du jour revient`, String(await venduJour(pg)));
+        const dite = await attendre(pg, () => document.querySelector('[data-ia-etape]')?.getAttribute('data-ia-etape') === 'prix' && /Vente annulée/.test(document.querySelector('[data-ia-note]')?.textContent || ''), null, 8000);
+        dit(dite, `${TT} la feuille dit « Vente annulée » et revient au prix (jamais « vendu » affiché pour rien)`);
+        await pg.screenshot({ path: path.join(SHOTS, `annulee-${suf}.png`) });
+        // Revendue (virement) : le reçu PDF.
+        await taper('[data-ia-prix]', '45');
+        await toucher('[data-ia-paiement-choix="virement"]');
+        await toucher('[data-ia-valider]');
+        dit(await attendre(pg, () => { try { const d = JSON.parse(localStorage.getItem('vrm_cycle_decisions') || '{}')['9124']; return d && d.paiement === 'virement' && d.montant === 45; } catch (_) { return false; } }), `${TT} revendue : virement rangé avec la décision`);
+        await attendre(pg, () => !!document.querySelector('[data-ia-vente-faite="9124"]'));
         const dl = pg.waitForEvent('download', { timeout: 20000 }).catch(() => null);
         await toucher('[data-ia-recu]');
         const d = await dl; let entete = '';
         if (d) { const p = await d.path(); entete = p ? fs.readFileSync(p).slice(0, 5).toString() : ''; }
         dit(d && /^recu-MP-\d{8}-124\.pdf$/.test(d.suggestedFilename()) && entete === '%PDF-', `${TT} le reçu PDF se télécharge`, d ? d.suggestedFilename() : 'aucun');
-        // Le chiffre de Ma journée, puis « Annuler » : l'état d'avant, exact.
         await toucher('[data-ia-fermer]');
-        const semApres = await attendre(pg, () => { const e = document.querySelector('[data-ma-semaine]'); return e && /45\s*€/.test(e.innerText); }, null, 8000);
-        dit(semApres, `${TT} Ma journée compte la vente (45 €)`, (await semaine(pg)) + ' / avant : ' + semAvant);
-        const annuler = pg.getByRole('button', { name: /Annuler/ }).first();
-        if (await annuler.count()) { if (tel) await annuler.tap(); else await annuler.click(); }
-        const revenu = await attendre(pg, ([d0, v0, s0]) => { const eg = (k, x) => { const a = localStorage.getItem(k); return JSON.stringify(JSON.parse(a || 'null') || null) === JSON.stringify(JSON.parse(x || 'null') || null) || (!a && !x); }; return eg('vrm_cycle_decisions', d0) && eg('vinted_annonces_vendues', v0) && eg('vrm_slots', s0); }, [avantD, avantV, avantS], 10000);
-        dit(revenu, `${TT} « Annuler » ⇒ décisions, marque « vendue » et case : l’état d’avant EXACT`, [await lireLS(pg, 'vrm_cycle_decisions'), await lireLS(pg, 'vrm_slots')].join(' | '));
-        const semRetour = await attendre(pg, () => { const e = document.querySelector('[data-ma-semaine]'); return e && !/45\s*€/.test(e.innerText); }, null, 8000);
-        dit(semRetour, `${TT} et le chiffre de Ma journée revient`, await semaine(pg));
       });
       await essaie('refus et question', async () => {
         await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:idees', { detail: { quoi: 'vente-main' } })));

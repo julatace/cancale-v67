@@ -57,4 +57,5 @@ export default {
   "ia.vm.fauxChange": "Le N° vient de changer (une vente lue ou notée entre-temps) : rien n’est noté, relis la ligne.",
   "ia.vm.encoreEnLigne": "Son annonce est encore en ligne sur Vinted : retire-la, sinon elle peut se vendre une deuxième fois.",
   "ia.vm.remisSansCase": "N°{num} remis en stock — sa case est prise : range-la",
+  "ia.vm.annulee": "Vente annulée : rien n’est compté, la paire est de nouveau au stock.",
 };

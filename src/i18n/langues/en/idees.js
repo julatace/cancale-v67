@@ -57,4 +57,5 @@ export default {
   "ia.vm.fauxChange": "This N° just changed (a sale read or saved meanwhile): nothing saved, check the line again.",
   "ia.vm.encoreEnLigne": "Its listing is still online on Vinted: remove it, or it may sell a second time.",
   "ia.vm.remisSansCase": "N°{num} back in stock — its spot is taken: store it",
+  "ia.vm.annulee": "Sale undone: nothing counted, the pair is back in stock.",
 };

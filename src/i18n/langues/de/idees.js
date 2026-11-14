@@ -57,4 +57,5 @@ export default {
   "ia.vm.fauxChange": "Diese N° hat sich gerade geändert (ein Verkauf gelesen oder notiert): nichts notiert, prüfe die Zeile erneut.",
   "ia.vm.encoreEnLigne": "Die Anzeige ist noch auf Vinted online: entferne sie, sonst kann sie ein zweites Mal verkauft werden.",
   "ia.vm.remisSansCase": "N°{num} zurück im Bestand — sein Platz ist belegt: räum es ein",
+  "ia.vm.annulee": "Verkauf rückgängig: nichts gezählt, das Paar ist wieder im Bestand.",
 };

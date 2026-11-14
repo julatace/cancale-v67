@@ -57,4 +57,5 @@ export default {
   "ia.vm.fauxChange": "Este N° acaba de cambiar (una venta leída o anotada entretanto): no se anota nada, revisa la línea.",
   "ia.vm.encoreEnLigne": "Su anuncio sigue en línea en Vinted: retíralo, o podría venderse una segunda vez.",
   "ia.vm.remisSansCase": "N°{num} de vuelta al stock — su hueco está ocupado: guárdalo",
+  "ia.vm.annulee": "Venta deshecha: no se cuenta nada, el par vuelve al stock.",
 };
