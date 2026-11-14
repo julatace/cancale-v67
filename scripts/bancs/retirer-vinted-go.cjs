@@ -34,7 +34,10 @@ const QRURL = (s, c) => `http://p.vintedgo.com/public/v1/qr_codes/${s}:${c}:${SI
 const A = { tx: 5550001, suivi: '1ZZTE5TAAAAAA', code: '481516', titre: 'Baskets toile grises' };
 const B = { suivi: '1ZZTE5TBBBBBB', code: '272829', titre: 'Colis Vinted Go' };
 const C = { tx: 5550003, suivi: '1ZZTE5TCCCCCC', code: '313233', titre: 'Sweat gris chiné' };
-const NOUVEAU = 'Épicerie du Marché, 12 Rue de la Fontaine, 56000 Ville-Exemple';
+// D — (14 nov., capture de Julien : « je ne veux pas que tu affiches des colis sans code ») un achat Vinted arrivé
+// (conversation, suivi « disponible »), n° de suivi connu, mais SANS code lu : jamais « à retirer », dans « À vérifier ».
+const D = { tx: 5550004, suivi: 'CP000000001FR', titre: 'Baskets montantes noires' };
+const NOUVEAU ='Épicerie du Marché, 12 Rue de la Fontaine, 56000 Ville-Exemple';
 const ANCIEN = 'Tabac du Port, 1 Rue du Port, 35260 Ville-Avant';
 const photo = (k) => `https://images1.vinted.net/t/b${k}/f800/x${k}.jpeg?s=x`;
 const achat = (o, k) => ({ transaction_id: o.tx, conversation_id: `01a1aaaa-bbbb-7ccc-8ddd-${String(o.tx).padStart(12, '0')}`, title: o.titre, price: { amount: '20.90', currency_code: 'EUR' },
@@ -46,11 +49,12 @@ const suiviVinted = (o) => ({ id: `harvest_333_suivi_${o.tx}`, data: { n: 1, v: 
   dernier: { t: 'Disponible pour retrait', at: '2026-11-13T11:01:16.000Z', code: 'available_for_pickup' }, capturedAt: '2026-11-13T21:38:18.770Z', transporteur: null } });
 const LIGNES = [
   { id: 'main', data: { vrm_ville: 'Ville-Avant', vrm_points_relais: [{ lat: 48.67, lon: -1.85, nom: 'Tabac du Port', auto: true, full: ANCIEN }] } },
-  { id: 'harvest_333_orders_purchased', data: { capturedAt: cap, payload: { my_orders: [achat(A, 1), achat(C, 3)] } } },
+  { id: 'harvest_333_orders_purchased', data: { capturedAt: cap, payload: { my_orders: [achat(A, 1), achat(C, 3), achat(D, 4)] } } },
   { id: 'harvest_333_orders_sold', data: { capturedAt: cap, payload: { my_orders: [] } } },
   { id: 'panel_colis_relais', data: {
     [A.tx]: { at: '2026-11-13T21:38:15.861Z', qr: '', tx: String(A.tx), url: 'https://www.vinted.fr/inbox/7777', code: A.code, conv: '7777', item: '8881', lieu: NOUVEAU, photo: photo(1), titre: A.titre, arriveLe: '2026-11-13T11:01:19.000Z', transporteur: 'vinted' },
     [C.tx]: { at: '2026-11-12T20:00:00.000Z', qr: '', tx: String(C.tx), url: 'https://www.vinted.fr/inbox/7779', code: C.code, conv: '7779', item: '8883', lieu: ANCIEN, photo: photo(3), titre: C.titre, arriveLe: '2026-11-12T09:00:00.000Z', transporteur: 'vinted' },
+    [D.tx]: { at: '2026-11-11T12:08:39.664Z', qr: '', tx: String(D.tx), url: 'https://www.vinted.fr/inbox/7780', code: '', conv: '7780', item: '8884', lieu: 'MAISON DE LA PRESSE, 4 PLACE DE L’ÉGLISE, 35000 RENNES', photo: photo(4), titre: D.titre, arriveLe: '2026-11-10T14:06:20.000Z', transporteur: '' },
   } },
   // A : la forme exacte de la ligne rangée en production (« en route · point changé », aucun lieu, QR http + &amp;).
   { id: `email_track_vinted_${A.suivi}`, data: { code: A.code, lieu: null, type: 'suivi', code2: null, qrB64: null, qrUrl: QRURL(A.suivi, A.code), suivi: A.suivi, limite: '2026-11-19', qrType: null, status: 'transit', account: 'compte_v', carrier: 'vinted',
@@ -58,7 +62,7 @@ const LIGNES = [
   // B : un « disponible » dont l'adresse de QR porte un AUTRE code que le sien.
   { id: `email_track_vinted_${B.suivi}`, data: { code: B.code, lieu: NOUVEAU, type: 'suivi', qrUrl: QRURL(B.suivi, '999999'), suivi: B.suivi, limite: '2026-11-19', status: 'available', account: 'compte_v', carrier: 'vinted',
     emailAt: '2026-11-13T15:00:00.000Z', subject: `Ton colis t'attend au point Vinted Go #${B.suivi}`, receivedAt: '2026-11-13T15:00:30.000Z', statusLabel: 'Arrivé au point de retrait' } },
-  suiviVinted(A), suiviVinted(C),
+  suiviVinted(A), suiviVinted(C), suiviVinted(D),
   transp(A.suivi, '12 Rue de la Fontaine', 'Ville-Exemple', '2026-11-13T11:01:16.017Z'),
   transp(C.suivi, '12 Rue de la Fontaine', 'Ville-Exemple', '2026-11-13T10:00:00.000Z'),
 ];
@@ -174,6 +178,11 @@ const ANCIEN_RE = /Ville-Avant|Tabac du Port/;
         dit(!vue.qb && !vue.qbPasCharge && !qrDemandes.some((u) => u.includes(`${B.suivi}:999999:`)), `${nom} : B (adresse de QR à un AUTRE code) — aucun QR montré ni demandé, son code reste`, JSON.stringify({ qb: vue.qb, demandes: qrDemandes.length }));
         dit(!!vue.pa && /Épicerie du Marché/.test(vue.pa.nom) && /56000 Ville-Exemple/.test(vue.pa.adr), `${nom} : A sous « Épicerie du Marché », adresse complète (le lieu du transporteur, sans nom, ne remplace pas le point nommé)`, JSON.stringify(vue.pa));
         dit(!!vue.pc && !ANCIEN_RE.test(vue.pc.nom + vue.pc.adr) && /Fontaine/.test(vue.pc.adr), `${nom} : C (conversation à l'ANCIEN point, transporteur au nouveau, daté après) sous le NOUVEAU point`, JSON.stringify(vue.pc));
+        // D : sans code ⇒ jamais « à retirer » ni compté ; visible dans « À vérifier » avec sa raison.
+        const d = await pg.evaluate((tx) => { const l = document.querySelector(`[data-cc-carte="r:v:${tx}"]`); const sec = document.querySelector('[data-relais-compte]');
+          const comptes = [...document.querySelectorAll('.vrm-rpf-point:not(.is-redirige)')].map((p) => [...p.querySelectorAll('.vrm-rpf-ligne[data-cc-carte]')].filter((x) => !x.hasAttribute('data-a-verifier-raison')).map((x) => x.getAttribute('data-cc-carte'))).flat();
+          return { la: !!l, raison: l ? l.getAttribute('data-a-verifier-raison') : null, comptee: comptes.includes(`r:v:${tx}`), sec: !!sec }; }, D.tx);
+        dit(d.la && d.raison === 'sans_code' && !d.comptee, `${nom} : D (arrivé, n° connu, SANS code) n'est pas « à retirer » : il est dans « À vérifier » avec sa raison`, JSON.stringify(d));
         dit(!vue.points.some((p) => ANCIEN_RE.test(p)), `${nom} : l'ancien point n'est plus un lieu de retrait (aucun point ni adresse « Ville-Avant »)`, vue.points.join(' // '));
         // Le mode relais : le QR de A au comptoir, aucun ancien point.
         const bouton = pg.locator('[data-relais-ouvrir]').first();

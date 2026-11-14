@@ -22852,6 +22852,8 @@ const raisonAVerifier = (x) => {
   if (x.e.etat==='sms_inconnu') return "SMS de Mondial Relay pas reconnu : regarde le SMS ou l'app Mondial Relay";
   // (11 nov., retraits fiables) Un e-mail « disponible » avec son code mais SANS n° de suivi : un colis, pas une pub.
   if (x.e.etat==='sans_suivi') return `E-mail sans n° de suivi : code ${x.t && x.t.code ? x.t.code : ''} — vérifie le point dans l’e-mail`;
+  // (14 nov., Julien) Arrivé, mais le code n'est pas lu : il n'est pas « à retirer » tant qu'on n'a pas son code.
+  if (x.e.etat==='sans_code') return x.kind === 'email' ? tr('achats.sansCodeEmail') : tr('achats.sansCodeVinted');
   if (x.e.etat==='doute_meme_relais') return x.e.avecSuivi ? `compté avec le n°…${String(x.e.avecSuivi).slice(-4)}` : 'compté avec un autre colis de ce point';
   if (x.e.etat==='delai_depasse' && x.e.heurePassee && x.e.limiteAt) return `délai de retrait passé aujourd'hui à ${heureParis(x.e.limiteAt)}`;
   if (x.e.etat==='delai_depasse') { const lim = x.kind==='email' && x.t ? x.t.limite : (x.e.limite || null); const jj = lim ? new Date(String(lim).slice(0,10)+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'}) : ''; return `délai de retrait dépassé${jj?` le ${jj}`:''}`; }
@@ -34397,17 +34399,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       return (tb || 0) - (ta || 0);
     });
     const horsDelai = aVerifier.filter(x => x.kind === 'email' && x.e.etat === 'delai_depasse').map(x => x.t);
+    const sansCodeList = extra.filter(o => { const r = relaisDe(o); return !(r && codeRetrait(r.code)); });
+    // (14 nov., Julien : « je ne veux pas que tu affiches des colis sans code, surtout quand c'est des erreurs »)
+    // AUCUN COLIS SANS CODE DANS « À RETIRER ». Un achat Vinted sans code lu dans sa conversation, un e-mail sans
+    // code ni QR : ni comptés (Ma journée, widget, cloche), ni présentés « à retirer » — ils passent dans « À
+    // vérifier » avec la raison et le geste (§5 : jamais cachés en silence). Les fins prouvées, elles, sont déjà
+    // sorties plus haut (rien n'est montré).
+    for (const o of sansCodeList) aVerifier.push({ kind: 'vinted', o, e: { ...etatColisVinted(o, maintenant, tpm), etat: 'sans_code' } });
+    const emailSansCode = emailList.filter(t => !codeRetrait(t.code) && !qrImage(t));
+    for (const t of emailSansCode) aVerifier.push({ kind: 'email', t, o: commandeDuColis(t), e: { ...etatColisEmail(t, maintenant), etat: 'sans_code' } });
+    if (sansCodeList.length) { const sv = new Set(sansCodeList); extra.splice(0, extra.length, ...extra.filter((o) => !sv.has(o))); }
+    if (emailSansCode.length) { const se = new Set(emailSansCode); emailList.splice(0, emailList.length, ...emailList.filter((t) => !se.has(t))); }
+    const sansCode = 0;
     // Le dernier jour (ou demain) : c'est CE colis qu'il faut aller chercher.
     // (29 oct.) + les achats vus par Vinted dont le TRANSPORTEUR donne la limite
     // (Vinted Go `expiration_time`) : ils sont urgents comme un colis d'e-mail.
     const urgents = emailList.filter(t => { const e = etatColisEmail(t, maintenant); return Number.isFinite(e.jours) && e.jours <= 1; }).length
       + extra.filter(o => { const e = etatColisVinted(o, maintenant, tpm); return Number.isFinite(e.jours) && e.jours <= 1; }).length;
-    const sansCodeList = extra.filter(o => { const r = relaisDe(o); return !(r && codeRetrait(r.code)); });
-    const sansCode = sansCodeList.length;
     // (revue du 23 oct.) Les colis d'e-mail dont le code n'a pas été lu (ni code
     // ni QR) : ils ne sont pas « prêts », et ce n'est pas la conversation Vinted
     // qui les donnera — le code est dans l'e-mail du transporteur.
-    const sansCodeEmail = emailList.filter(t => !codeRetrait(t.code) && !qrImage(t)).length;
+    // (14 nov.) Ils sont désormais dans « À vérifier » (ci-dessus) : plus aucun dans la liste.
+    const sansCodeEmail = 0;
     // ⚠️ SUR QUEL COMPTE SE CONNECTER — il en a NEUF. L'extension va chercher
     // les codes toute seule, mais UNIQUEMENT pour le compte connecté dans
     // l'onglet : « passe sur Vinted avec le bon compte » sans dire lequel, c'est
