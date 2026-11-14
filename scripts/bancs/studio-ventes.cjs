@@ -254,6 +254,8 @@ async function scenario(b, vp, sombre) {
       return { imprimer: vis('[data-imprime="1"]'), depose: vis('[data-geste="fait"]'), imprime: vis('[data-geste="imprime"]'), suivre: vis('[data-geste="suivre"]'), masquer: vis('[data-geste="masquer"]'), plus: vis('[data-colis-plus]') }; });
     dit(!!fiche && fiche.imprimer && fiche.depose && fiche.imprime && fiche.suivre && fiche.masquer, `${nom} : O la rangée ouverte porte ses gestes (imprimer ce bordereau, déposé, imprimé, suivre, masquer)`, JSON.stringify(fiche));
     await shot(pg, `studio-ventes-${nom}-ouverte`);
+    if (process.env.BANC_SONDE) console.log(await pg.evaluate(() => { const b = document.querySelector('.vrm-fp-depuis-ligne [data-imprime="1"]'); if (!b) return 'pas de bouton'; const out = [];
+      for (let x = b; x && !x.classList.contains('vrm-fp-depuis-ligne'); x = x.parentElement) { const s = getComputedStyle(x); out.push(`${x.tagName}.${String(x.className).slice(0, 40)} w=${Math.round(x.getBoundingClientRect().width)} d=${s.display} fl=${s.flex} mw=${s.maxWidth} wcss=${s.width} ar=${s.aspectRatio} pr=${x.hasAttribute('data-fiche-principal')}`); } return out.join('\n'); }));
     await pg.keyboard.press('Escape').catch(() => {});
     await pg.waitForTimeout(500);
     // ── I : CHAQUE GESTE DE L'INVENTAIRE EST JOIGNABLE : Scanner, « … » (Emballer, Tout générer), Préparer mes colis,
