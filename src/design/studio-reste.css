@@ -71,6 +71,89 @@
 :root[data-theme="dark"] [data-espace="argent"] { --sb-aplat: #0D192A; }
 :root[data-theme="dark"] [data-espace="autres"] { --sb-aplat: #0D1A2C; }
 
+/* ══ 3 bis. LES JETONS D'AVANT LISENT CEUX DU STUDIO (dans ce chantier seulement) ══
+   Le système d'avant (`--d-*`, styles-systeme.css) est lu par toutes les autres familles :
+   sur les racines de ce chantier, il prend les valeurs du Studio (encre, encre 2, porcelaine,
+   creux, lien, ambre). Le gris d'avant (#6E6E73) ne tenait que 4,0:1 sur le bas du bleu. */
+:root:root :is([data-espace="argent"], [data-espace="autres"], .vrm-tache[data-tache="messages"], .vrm-chat-panel, .vrm-fs, .vrm-boite, .vrm-boite-feuille) {
+  --d-fond: var(--sb-aplat); --d-carte: var(--sb-porcelaine); --d-case: var(--sb-creux); --d-segment: var(--sb-porcelaine);
+  --d-remplir: var(--sb-creux); --d-remplir-fort: rgb(var(--sb-o) / .12); --d-filet: rgb(var(--sb-o) / .12); --d-filet-fort: rgb(var(--sb-o) / .20);
+  --d-encre: var(--sb-encre); --d-gris: var(--sb-encre-2); --d-glyphe: var(--sb-encre-2);
+  --d-accent-texte: var(--sb-lien); --d-ambre: var(--sb-ambre); --d-point-ambre: var(--sb-ambre-point);
+  --d-ombre-carte: var(--sb-ombre-plan); --d-r-carte: var(--sb-r-tuile);
+  --vrm-muted: var(--sb-encre-2); --vrm-faint: var(--sb-encre-2); --p-gris: var(--sb-encre-2); --w-gris: var(--sb-encre-2); --b-doux: var(--sb-encre-2); --acc-doux: var(--sb-encre-2);
+  --vrm-ink: var(--sb-encre); --p-encre: var(--sb-encre); --w-encre: var(--sb-encre); --n2-encre: var(--sb-encre); --b-encre: var(--sb-encre); --acc-encre: var(--sb-encre);
+  --vrm-accent-texte: var(--sb-lien); --p-accent-texte: var(--sb-lien); --vrm-b-lien: var(--sb-lien); --vrm-warn: var(--sb-ambre);
+  --vrm-surface: var(--sb-porcelaine); --vrm-card2: var(--sb-creux); --vrm-line: rgb(var(--sb-o) / .12); --vrm-hair: rgb(var(--sb-o) / .08);
+}
+/* E-mails : ses jetons (--bx-*) lisent ceux du Studio. */
+:root:root:root .vrm-boite, :root:root:root .vrm-boite-feuille, :root[data-theme="dark"]:root:root .vrm-boite, :root[data-theme="dark"]:root:root .vrm-boite-feuille {
+  --bx-encre: var(--sb-encre); --bx-doux: var(--sb-encre-2); --bx-carte: var(--sb-porcelaine); --bx-sol: var(--sb-aplat);
+  --bx-filet: rgb(var(--sb-o) / .12); --bx-fin: rgb(var(--sb-o) / .07); --bx-gris: var(--sb-creux);
+  --bx-accent: var(--sb-diode); --bx-accent-texte: var(--sb-lien); --bx-ambre: var(--sb-ambre); --bx-ombre: var(--sb-ombre-plan);
+  --seg-actif: var(--sb-creux); --seg-actif-texte: var(--sb-encre);
+}
+
+@layer vrm-premium {
+/* ══ 7 bis. E-MAILS ══ les rubriques en touches (la choisie enfoncée + diode), le code de retrait gravé. */
+:root:root:root:root:root:root body .vrm-boite .vrm-boite-rubriques button {
+  border: 0 !important; border-radius: var(--sb-r-touche) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important;
+  box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important; position: relative !important; font-weight: 600 !important;
+}
+:root:root:root:root:root:root body .vrm-boite .vrm-boite-rubriques button[aria-pressed="true"] { background: var(--sb-creux) !important; box-shadow: var(--sb-gravure) !important; color: var(--sb-encre) !important; transform: translateY(1px); }
+:root:root:root:root:root:root body .vrm-boite .vrm-boite-rubriques button[aria-pressed="true"]::after {
+  content: '' !important; position: absolute !important; top: 5px !important; right: 6px !important; width: 5px !important; height: 5px !important; border-radius: 50% !important; background: var(--sb-diode) !important; box-shadow: 0 0 6px var(--sb-diode) !important;
+}
+:root:root:root:root:root:root body .vrm-boite .vrm-boite-rubriques button[aria-pressed="true"] * { color: var(--sb-encre) !important; }
+:root:root:root:root:root:root body .vrm-boite .vrm-boite-rubriques .vrm-boite-n { color: var(--sb-encre-2) !important; }
+:root:root:root:root:root:root body :is(.vrm-boite, .vrm-boite-feuille) .vrm-boite-puce-code:not(.is-grande) {
+  border: 0 !important; border-radius: var(--sb-r-touche) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important;
+  box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important; font: 600 17px/1 var(--sb-police-texte) !important; letter-spacing: .07em !important; font-variant-numeric: tabular-nums !important;
+}
+:root:root:root:root:root:root body :is(.vrm-boite, .vrm-boite-feuille) .vrm-boite-puce-code[data-copie="1"] { background: var(--sb-creux) !important; box-shadow: var(--sb-gravure) !important; color: var(--sb-encre) !important; }
+:root:root:root:root:root:root body :is(.vrm-boite, .vrm-boite-feuille) .vrm-boite-puce-code[data-copie="1"] * { color: var(--sb-encre) !important; }
+:root:root:root:root:root:root body .vrm-boite :is(.vrm-boite-vues) { background: var(--sb-creux) !important; box-shadow: var(--sb-gravure) !important; border-radius: 16px !important; }
+:root:root:root:root:root:root body .vrm-boite .vrm-boite-cherche { background: var(--sb-creux) !important; border: 0 !important; box-shadow: var(--sb-gravure) !important; border-radius: var(--sb-r-champ) !important; }
+:root:root:root:root:root:root body .vrm-boite .vrm-boite-jour-titre { color: var(--sb-encre-2) !important; font: 600 13px/1.2 var(--sb-police-texte) !important; }
+:root:root:root:root:root:root body .vrm-boite .vrm-boite-plus { color: var(--sb-lien) !important; }
+
+/* Statistiques : les records sont des tuiles (on touche la tuile entière). */
+:root:root:root:root:root:root body [data-espace="argent"] .vrm-sp-rec {
+  border: 0 !important; border-radius: var(--sb-r-tuile) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-plan) !important;
+}
+
+/* ══ 7 ter. LA CONNEXION ══ le bleu clair éclairé du haut, le titre en Urbanist, la carte en porcelaine,
+   « Se connecter » = le plein (barre d'encre), « Découvrir avec des exemples » = un lien. */
+:root:root:root:root:root:root body .vrm-cx[data-espace="autres"] {
+  background-color: var(--sb-aplat) !important;
+  background-image: radial-gradient(90% 40% at 18% 0%, rgb(255 255 255 / .55), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 40%, var(--sb-bas) 100%) !important;
+}
+:root[data-theme="dark"]:root:root:root:root:root body .vrm-cx[data-espace="autres"] { background-image: radial-gradient(90% 40% at 18% 0%, rgb(110 160 230 / .10), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 40%, var(--sb-bas) 100%) !important; }
+:root:root:root:root:root:root body .vrm-cx .vrm-cx-marque { background: transparent !important; color: var(--sb-encre) !important; }
+:root:root:root:root:root:root body .vrm-cx .vrm-cx-aurore { display: none !important; }
+:root:root:root:root:root:root body .vrm-cx .vrm-cx-logo { min-height: 44px !important; }
+:root:root:root:root:root:root body .vrm-cx .vrm-cx-logo img { box-shadow: var(--sb-ombre-pose) !important; }
+:root:root:root:root:root:root body .vrm-cx .vrm-cx-retour { color: var(--sb-lien) !important; font-weight: 600 !important; }
+:root:root:root:root:root:root body .vrm-cx .vrm-cx-titre { font-family: var(--sb-police-affiche) !important; font-weight: 400 !important; font-size: 34px !important; line-height: 1.04 !important; letter-spacing: -.03em !important; color: var(--sb-encre) !important; }
+:root:root:root:root:root:root body .vrm-cx .vrm-cx-titre span { color: var(--sb-encre-2) !important; }
+:root:root:root:root:root:root body .vrm-cx .vrm-cx-form {
+  background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; border: 0 !important; border-radius: var(--sb-r-plan) !important; box-shadow: var(--sb-ombre-avant) !important; color: var(--sb-encre) !important;
+}
+:root:root:root:root:root:root body .vrm-cx .vrm-cx-form h2 { font-family: var(--sb-police-affiche) !important; font-weight: 500 !important; letter-spacing: -.02em !important; }
+:root:root:root:root:root:root body .vrm-cx .vrm-cx-form input { background: var(--sb-creux) !important; border: 0 !important; box-shadow: var(--sb-gravure) !important; border-radius: var(--sb-r-champ) !important; color: var(--sb-encre) !important; }
+:root:root:root:root:root:root body .vrm-cx .vrm-cx-form input::placeholder { color: var(--sb-encre-2) !important; opacity: 1 !important; }
+:root:root:root:root:root:root body .vrm-cx [data-auth-valider] {
+  min-height: 52px !important; height: 52px !important; border: 0 !important; border-radius: 26px !important; background: var(--sb-encre) !important; color: var(--sb-sur-encre) !important;
+  font: 600 15px/1.2 var(--sb-police-texte) !important; filter: none !important;
+  box-shadow: 0 1px 0 rgb(255 255 255 / .18) inset, 0 2px 4px rgb(var(--sb-o) / .18), 0 14px 26px -10px rgb(var(--sb-o) / .55) !important;
+}
+:root:root:root:root:root:root body .vrm-cx [data-auth-valider]:disabled { background: rgb(var(--sb-o) / .10) !important; color: rgb(var(--sb-o) / .45) !important; box-shadow: none !important; }
+:root:root:root:root:root:root body .vrm-cx :is(.vrm-cx-oublie, .vrm-cx-secret button, .vrm-cx-aide-confirmation summary, .vrm-cx-liens button) { color: var(--sb-lien) !important; background: transparent !important; box-shadow: none !important; border: 0 !important; }
+:root:root:root:root:root:root body .vrm-cx .vrm-cx-exemple a { background: transparent !important; color: var(--sb-lien) !important; font-weight: 600 !important; box-shadow: none !important; border: 0 !important; }
+:root:root:root:root:root:root body .vrm-cx .vrm-cx-exemple p { color: var(--sb-encre-2) !important; }
+:root:root:root:root:root:root body .vrm-cx :is(a, button):not([data-auth-valider]) { -webkit-tap-highlight-color: transparent; }
+}
+
 @layer vrm-premium {
 
 /* ══ 1. LES QUATRE FORMES DE BOUTON — provisoire : vient de studio.css ══════════
@@ -154,12 +237,12 @@
 
 /* ══ 2. LE FOND DES ÉCRANS DE CE CHANTIER — provisoire : la coque (studio.css) le posera ══
    Le bleu clair éclairé du haut : un halo blanc à gauche, l'aplat de l'espace, le bas. */
-:root:root:root:root:root:root body:has(.vrm-main :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"])) :is(.vrm-app-shell, .vrm-main) {
+:root:root:root:root:root:root body:has(.vrm-main :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel)) :is(.vrm-app-shell, .vrm-main) {
   background-color: var(--sb-aplat) !important;
   background-image: radial-gradient(90% 40% at 18% 0%, rgb(255 255 255 / .55), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 40%, var(--sb-bas) 100%) !important;
   background-attachment: fixed !important;
 }
-:root[data-theme="dark"]:root:root:root:root:root body:has(.vrm-main :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"])) :is(.vrm-app-shell, .vrm-main) {
+:root[data-theme="dark"]:root:root:root:root:root body:has(.vrm-main :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel)) :is(.vrm-app-shell, .vrm-main) {
   background-image: radial-gradient(90% 40% at 18% 0%, rgb(110 160 230 / .10), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 40%, var(--sb-bas) 100%) !important;
 }
 
@@ -167,92 +250,92 @@
    Racine : [data-espace="argent"] · [data-espace="autres"] · la tâche Messages.
    Texte à l'encre ; les gris écrits en ligne (C.muted) passent à l'encre 2 (AA
    sur le bleu ET sur la porcelaine) ; les cartes deviennent porcelaine posée. */
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) {
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) {
   color: var(--sb-encre) !important; font-family: var(--sb-police-texte) !important;
   font-feature-settings: "tnum", "lnum", "cv11", "kern";
 }
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) :is([style*="color: rgb(110, 110, 115)"], [style*="color: rgb(152, 152, 157)"], [style*="color:#6E6E73"]):not(svg *) { color: var(--sb-encre-2) !important; }
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) :is([style*="color: rgb(29, 29, 31)"], [style*="color: rgb(245, 245, 247)"]):not(svg *) { color: var(--sb-encre) !important; }
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) :is([style*="color: rgb(0, 102, 204)"], [style*="color: rgb(64, 156, 255)"]):not(svg *) { color: var(--sb-lien) !important; }
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) :is([style*="color: rgb(178, 80, 0)"], [style*="color: rgb(255, 179, 64)"]):not(svg *) { color: var(--sb-ambre) !important; }
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) :is([style*="color: rgb(110, 110, 115)"], [style*="color: rgb(152, 152, 157)"], [style*="color:#6E6E73"]):not(svg *) { color: var(--sb-encre-2) !important; }
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) :is([style*="color: rgb(29, 29, 31)"], [style*="color: rgb(245, 245, 247)"]):not(svg *) { color: var(--sb-encre) !important; }
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) :is([style*="color: rgb(0, 102, 204)"], [style*="color: rgb(64, 156, 255)"]):not(svg *) { color: var(--sb-lien) !important; }
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) :is([style*="color: rgb(178, 80, 0)"], [style*="color: rgb(255, 179, 64)"]):not(svg *) { color: var(--sb-ambre) !important; }
 
 /* Le grand titre d'écran : Urbanist 34 (38 à l'ordinateur), 400, serré. */
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) :is(.vrm-screen-head h1, .vrm-screen-head h2.vrm-display, .vrm-tache-tete h1, .vrm-market-heading h1, h2.vrm-set-h1, .vrm-cm-titre) {
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) :is(.vrm-screen-head h1, .vrm-screen-head h2.vrm-display, .vrm-tache-tete h1, .vrm-market-heading h1, h2.vrm-set-h1, .vrm-cm-titre) {
   font-family: var(--sb-police-affiche) !important; font-weight: 400 !important; font-size: 34px !important; line-height: 1 !important; letter-spacing: -.03em !important; color: var(--sb-encre) !important;
 }
 @media (min-width: 900px) {
-  :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) :is(.vrm-screen-head h1, .vrm-tache-tete h1, .vrm-market-heading h1, h2.vrm-set-h1) { font-size: 38px !important; }
+  :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) :is(.vrm-screen-head h1, .vrm-tache-tete h1, .vrm-market-heading h1, h2.vrm-set-h1) { font-size: 38px !important; }
 }
 /* Le « ? » à côté du titre : un rond. */
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) .vrm-aide-bouton {
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-aide-bouton {
   width: 44px !important; height: 44px !important; min-width: 44px !important; border-radius: 50% !important; border: 0 !important;
   background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important; box-shadow: var(--sb-ombre-plan) !important;
   display: inline-flex !important; align-items: center !important; justify-content: center !important; padding: 0 !important;
 }
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) .vrm-aide-bouton svg { width: 21px !important; height: 21px !important; }
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-aide-bouton svg { width: 21px !important; height: 21px !important; }
 
 /* Les cartes : porcelaine posée, rayon 22, sans trait. */
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) :is(.vrm-surface, .vrm-card, .vrm-fu-carte, .vrm-carte-mfa, .vrm-settings-todo, .vrm-carte, .vrm-cm-carte) {
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) :is(.vrm-surface, .vrm-card, .vrm-fu-carte, .vrm-carte-mfa, .vrm-settings-todo, .vrm-carte, .vrm-cm-carte) {
   background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; border: 0 !important; border-radius: var(--sb-r-tuile) !important; box-shadow: var(--sb-ombre-plan) !important;
 }
 
 /* Les boutons d'avant prennent l'une des quatre formes (rien ne change de place). */
 /* (a) primaire ⇒ le plein, en barre (le rond de 72 est réservé au geste du jour) */
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) .vrm-b.vrm-b-primaire:where(:not(.sb-lien, .sb-touche, .sb-rond, .sb-btn-plein)) {
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-b.vrm-b-primaire:where(:not(.sb-lien, .sb-touche, .sb-rond, .sb-btn-plein)) {
   height: 52px !important; min-height: 52px !important; padding: 0 22px !important; border: 0 !important; border-radius: 26px !important;
   background: var(--sb-encre) !important; background-color: var(--sb-encre) !important; color: var(--sb-sur-encre) !important;
   font: 600 15px/1.2 var(--sb-police-texte) !important; filter: none !important;
   box-shadow: 0 1px 0 rgb(255 255 255 / .18) inset, 0 2px 4px rgb(var(--sb-o) / .18), 0 14px 26px -10px rgb(var(--sb-o) / .55) !important;
 }
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) .vrm-b.vrm-b-primaire:not(:disabled):active { transform: translateY(1.5px) scale(.985) !important; }
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) .vrm-b.vrm-b-primaire:disabled { background: rgb(var(--sb-o) / .10) !important; color: rgb(var(--sb-o) / .45) !important; box-shadow: none !important; }
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-b.vrm-b-primaire:not(:disabled):active { transform: translateY(1.5px) scale(.985) !important; }
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-b.vrm-b-primaire:disabled { background: rgb(var(--sb-o) / .10) !important; color: rgb(var(--sb-o) / .45) !important; box-shadow: none !important; }
 /* (b) secondaire / danger / icône + mot ⇒ la touche posée */
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) .vrm-b:is(.vrm-b-secondaire, .vrm-b-danger):not(.vrm-b-icone):where(:not(.sb-lien, .sb-touche, .sb-rond, .sb-btn-plein)) {
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-b:is(.vrm-b-secondaire, .vrm-b-danger):not(.vrm-b-icone):where(:not(.sb-lien, .sb-touche, .sb-rond, .sb-btn-plein)) {
   height: 40px !important; min-height: 40px !important; padding: 0 15px !important; border: 0 !important; border-radius: var(--sb-r-touche) !important;
   background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important;
   font: 600 14px/1.2 var(--sb-police-texte) !important; box-shadow: var(--sb-ombre-plan) !important; filter: none !important;
 }
-@media (pointer: coarse) { :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) .vrm-b:is(.vrm-b-secondaire, .vrm-b-danger):not(.vrm-b-icone):where(:not(.sb-lien, .sb-touche, .sb-rond, .sb-btn-plein)) { height: 44px !important; min-height: 44px !important; } }
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) .vrm-b.vrm-b-danger { color: var(--sb-ambre) !important; }
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) .vrm-b:is(.vrm-b-secondaire, .vrm-b-danger):not(:disabled):active,
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) .vrm-b:is(.vrm-b-secondaire, .vrm-b-danger)[aria-pressed="true"] { transform: translateY(1px) !important; background: var(--sb-creux) !important; box-shadow: var(--sb-gravure) !important; }
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) .vrm-b:is(.vrm-b-secondaire, .vrm-b-danger):disabled { background: transparent !important; box-shadow: inset 0 0 0 .5px rgb(var(--sb-o) / .22) !important; color: color-mix(in srgb, var(--sb-encre-2) 70%, transparent) !important; }
+@media (pointer: coarse) { :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-b:is(.vrm-b-secondaire, .vrm-b-danger):not(.vrm-b-icone):where(:not(.sb-lien, .sb-touche, .sb-rond, .sb-btn-plein)) { height: 44px !important; min-height: 44px !important; } }
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-b.vrm-b-danger { color: var(--sb-ambre) !important; }
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-b:is(.vrm-b-secondaire, .vrm-b-danger):not(:disabled):active,
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-b:is(.vrm-b-secondaire, .vrm-b-danger)[aria-pressed="true"] { transform: translateY(1px) !important; background: var(--sb-creux) !important; box-shadow: var(--sb-gravure) !important; }
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-b:is(.vrm-b-secondaire, .vrm-b-danger):disabled { background: transparent !important; box-shadow: inset 0 0 0 .5px rgb(var(--sb-o) / .22) !important; color: color-mix(in srgb, var(--sb-encre-2) 70%, transparent) !important; }
 /* (c) icône seule ⇒ le rond de 44 */
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) .vrm-b.vrm-b-icone:where(:not(.sb-lien, .sb-touche, .sb-rond, .sb-btn-plein)) {
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-b.vrm-b-icone:where(:not(.sb-lien, .sb-touche, .sb-rond, .sb-btn-plein)) {
   width: 44px !important; height: 44px !important; min-width: 44px !important; min-height: 44px !important; padding: 0 !important; border: 0 !important; border-radius: 50% !important;
   background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important; box-shadow: var(--sb-ombre-plan) !important;
 }
 /* (d) discret / lien d'action ⇒ le lien */
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) :is(.vrm-b.vrm-b-discret, .vrm-lien-action):where(:not(.sb-lien, .sb-touche, .sb-rond, .sb-btn-plein)) {
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) :is(.vrm-b.vrm-b-discret, .vrm-lien-action):where(:not(.sb-lien, .sb-touche, .sb-rond, .sb-btn-plein)) {
   min-height: 44px !important; padding: 0 2px !important; border: 0 !important; background: transparent !important; box-shadow: none !important;
   color: var(--sb-lien) !important; font: 600 14px/1.2 var(--sb-police-texte) !important; filter: none !important;
 }
 
 /* Le segmenté : creusé ; le segment choisi est posé + diode. */
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) .vrm-seg {
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-seg {
   background: var(--sb-creux) !important; border: 0 !important; border-radius: 16px !important; padding: 3px !important; gap: 2px !important;
   box-shadow: var(--sb-gravure) !important;
 }
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) .vrm-seg .vrm-seg-btn {
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-seg .vrm-seg-btn {
   position: relative !important; min-height: 40px !important; border: 0 !important; border-radius: var(--sb-r-touche) !important; background: transparent !important; box-shadow: none !important;
   color: var(--sb-encre-2) !important; font: 600 13.5px/1.2 var(--sb-police-texte) !important; letter-spacing: -.005em !important;
   padding: 0 8px !important; flex: 1 1 auto !important; min-width: 0 !important; white-space: nowrap !important;
 }
-@media (pointer: coarse) { :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) .vrm-seg .vrm-seg-btn { min-height: 44px !important; } }
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) .vrm-seg .vrm-seg-btn:is([aria-current="page"], [aria-pressed="true"], [aria-selected="true"]) {
+@media (pointer: coarse) { :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-seg .vrm-seg-btn { min-height: 44px !important; } }
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-seg .vrm-seg-btn:is([aria-current="page"], [aria-pressed="true"], [aria-selected="true"]) {
   background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important; box-shadow: var(--sb-ombre-plan) !important;
 }
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) .vrm-seg .vrm-seg-btn:is([aria-current="page"], [aria-pressed="true"], [aria-selected="true"])::after {
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-seg .vrm-seg-btn:is([aria-current="page"], [aria-pressed="true"], [aria-selected="true"])::after {
   content: '' !important; position: absolute !important; top: 6px !important; right: 7px !important; width: 5px !important; height: 5px !important; border-radius: 50% !important;
   background: var(--sb-diode) !important; box-shadow: 0 0 6px var(--sb-diode) !important;
 }
 
 /* Le champ de recherche : creusé, rayon 14. */
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) :is(.vrm-champ-recherche, .vrm-ui-outils-champ) {
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) :is(.vrm-champ-recherche, .vrm-ui-outils-champ) {
   background: var(--sb-creux) !important; border: 0 !important; border-radius: var(--sb-r-champ) !important; box-shadow: var(--sb-gravure) !important; min-height: 44px !important;
 }
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) :is(.vrm-champ-recherche, .vrm-ui-outils-champ) input { background: transparent !important; color: var(--sb-encre) !important; font: 500 15px/1.2 var(--sb-police-texte) !important; }
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"]) :is(.vrm-champ-recherche, .vrm-ui-outils-champ) input::placeholder { color: var(--sb-encre-2) !important; opacity: 1 !important; }
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) :is(.vrm-champ-recherche, .vrm-ui-outils-champ) input { background: transparent !important; color: var(--sb-encre) !important; font: 500 15px/1.2 var(--sb-police-texte) !important; }
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) :is(.vrm-champ-recherche, .vrm-ui-outils-champ) input::placeholder { color: var(--sb-encre-2) !important; opacity: 1 !important; }
 
 /* Champs de saisie : creux. */
 :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"]) :is(input[type="text"], input[type="email"], input[type="password"], input[type="date"], input[type="number"], input:not([type]), select, textarea):not(.vrm-champ-recherche-saisie):not([data-msg-recherche]) {
@@ -364,6 +447,20 @@
   font-family: var(--sb-police-affiche) !important; font-weight: 300 !important; letter-spacing: -.03em !important; font-variant-numeric: tabular-nums lining-nums !important;
 }
 
+/* Déclarer : la carte du mois en porcelaine, l'URSSAF du mois en grand chiffre fin (data-* inchangés). */
+:root:root:root:root:root:root body [data-espace="argent"] :is(.vrm-compta-carte, .vrm-stats-carte, [data-stats-carte]) {
+  background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; border: 0 !important; border-radius: var(--sb-r-tuile) !important; box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important;
+}
+:root:root:root:root:root:root body [data-espace="argent"] .vrm-compta-hero {
+  font-family: var(--sb-police-affiche) !important; font-weight: 200 !important; font-size: 56px !important; line-height: .9 !important; letter-spacing: -.05em !important;
+  color: var(--sb-encre) !important; font-variant-numeric: tabular-nums lining-nums !important;
+}
+:root:root:root:root:root:root body [data-espace="argent"] .vrm-compta-libelle { font: 600 13px/1.2 var(--sb-police-texte) !important; color: var(--sb-encre) !important; }
+:root:root:root:root:root:root body [data-espace="argent"] .vrm-compta-phrase { color: var(--sb-encre-2) !important; }
+/* Statistiques : les cartes chiffrées en tuiles, leurs chiffres en Urbanist. */
+:root:root:root:root:root:root body [data-espace="argent"] :is(.vrm-sv-tuile, .vrm-sv-carte, .vrm-sp-carte, .vrm-fc-carte, .vrm-ac-carte) {
+  background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; border: 0 !important; border-radius: var(--sb-r-tuile) !important; box-shadow: var(--sb-ombre-plan) !important;
+}
 /* Les nombres qui se lisent (montants de rangées, kpi) : Urbanist, encre. */
 :root:root:root:root:root:root body [data-espace="argent"] :is([data-compta-kpi] > :last-child, .vrm-set-ligne > b:last-child, .vrm-set-val) { font-variant-numeric: tabular-nums !important; }
 
@@ -405,11 +502,22 @@
 :root:root:root:root:root:root body [data-tache="messages"] .vrm-msg-l1 :is(time, small, .vrm-msg-heure, span:last-child) { font: 500 12.5px/1.2 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; }
 :root:root:root:root:root:root body [data-tache="messages"] :is(.vrm-msg-article, .vrm-msg-paire) { font: 500 12.5px/1.25 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; }
 :root:root:root:root:root:root body [data-tache="messages"] .vrm-msg-l2 { font: 400 14px/1.3 var(--sb-police-texte) !important; color: var(--sb-encre) !important; }
-/* La conversation : bulles reçues en porcelaine, envoyées à l'encre (aucun bleu sur le texte). */
-:root:root:root:root:root:root body [data-tache="messages"] :is(.vrm-bulle, .vrm-msg-bulle, [data-bulle]):not([data-moi]):not(.moi):not(.vrm-bulle-moi) {
+/* La conversation : bulles reçues en porcelaine, envoyées à l'encre (aucun bleu sur le texte) ;
+   réponses rapides, négociation et offres en touches ; le fond est le bleu clair (feuille plein écran). */
+:root:root:root:root:root:root body .vrm-chat-panel { color: var(--sb-encre) !important; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-bulle-l:not(.vrm-bulle-moi) > .vrm-bulle {
   background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important; box-shadow: var(--sb-ombre-pose) !important; border: 0 !important;
 }
-:root:root:root:root:root:root body [data-tache="messages"] :is(.vrm-bulle-moi, .vrm-bulle.moi, [data-bulle][data-moi]) { background: var(--sb-encre) !important; color: var(--sb-sur-encre) !important; border: 0 !important; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-bulle-l.vrm-bulle-moi > .vrm-bulle { background: var(--sb-encre) !important; color: var(--sb-sur-encre) !important; border: 0 !important; box-shadow: var(--sb-ombre-pose) !important; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-bulle-l.vrm-bulle-moi > .vrm-bulle * { color: inherit !important; }
+:root:root:root:root:root:root body .vrm-chat-panel :is(.vrm-chat-rapides > button, .vrm-chat-negociation > summary) {
+  border: 0 !important; border-radius: var(--sb-r-touche) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important;
+  box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important; font: 600 14px/1.2 var(--sb-police-texte) !important;
+}
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-negociation[open] > summary { background: var(--sb-creux) !important; box-shadow: var(--sb-gravure) !important; transform: translateY(1px); }
+:root:root:root:root:root:root body .vrm-chat-panel :is(textarea, input[type="text"]) {
+  background: var(--sb-creux) !important; border: 0 !important; box-shadow: var(--sb-gravure) !important; border-radius: var(--sb-r-champ) !important; color: var(--sb-encre) !important;
+}
 
 /* ══ 6. PARAMÈTRES ═════════════════════════════════════════════════════════════
    Groupes de rangées sobres sur porcelaine. La carte « Protège ton compte » garde
@@ -432,6 +540,36 @@
 :root:root:root:root:root:root body [data-espace="autres"] :is(.vrm-filtres, .vrm-rangee.vrm-filtres) > button:is([aria-pressed="true"], [aria-current="page"], [aria-checked="true"]):not(.sb-touche)::after {
   content: '' !important; position: absolute !important; top: 5px !important; right: 6px !important; width: 5px !important; height: 5px !important; border-radius: 50% !important; background: var(--sb-diode) !important; box-shadow: 0 0 6px var(--sb-diode) !important;
 }
+
+/* Communauté : son écran a ses propres jetons (--cm-*) ; ils lisent ceux du Studio. */
+:root:root .vrm-communaute, :root:root .vrm-communaute[data-dark="true"] {
+  --cm-fond: var(--sb-creux); --cm-carte: var(--sb-porcelaine); --cm-encre: var(--sb-encre); --cm-doux: var(--sb-encre-2);
+  --cm-bord: rgb(var(--sb-o) / .10); --cm-accent: var(--sb-lien); --cm-accent-fond: var(--sb-creux); --cm-ombre: var(--sb-ombre-plan);
+}
+:root:root:root:root:root:root body .vrm-communaute .vrm-cm-carton { border: 0 !important; border-radius: var(--sb-r-tuile) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-plan) !important; }
+:root:root:root:root:root:root body .vrm-communaute :is(h2, .vrm-cm-entete h2) { font-family: var(--sb-police-affiche) !important; font-weight: 500 !important; letter-spacing: -.02em !important; }
+/* (b) le bouton de base de l'écran ⇒ la touche ; (a) le primaire ⇒ le plein en barre ; (d) le lien ; (c) la croix ⇒ le rond. */
+:root:root:root:root:root:root body .vrm-communaute button:not(.vrm-cm-primaire):not(.vrm-cm-lien):not(.vrm-cm-x):not(.vrm-cm-onglet):not([class*="leaflet"]):not(.vrm-aide-bouton) {
+  border: 0 !important; border-radius: var(--sb-r-touche) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important;
+  box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important; font: 600 14px/1.2 var(--sb-police-texte) !important;
+}
+:root:root:root:root:root:root body .vrm-communaute .vrm-cm-primaire {
+  min-height: 52px !important; border: 0 !important; border-radius: 26px !important; padding: 0 22px !important; background: var(--sb-encre) !important; color: var(--sb-sur-encre) !important;
+  font: 600 15px/1.2 var(--sb-police-texte) !important; filter: none !important;
+  box-shadow: 0 1px 0 rgb(255 255 255 / .18) inset, 0 2px 4px rgb(var(--sb-o) / .18), 0 14px 26px -10px rgb(var(--sb-o) / .55) !important;
+}
+:root:root:root:root:root:root body .vrm-communaute .vrm-cm-lien { background: transparent !important; box-shadow: none !important; border: 0 !important; color: var(--sb-lien) !important; font: 600 14px/1.2 var(--sb-police-texte) !important; }
+:root:root:root:root:root:root body .vrm-communaute .vrm-cm-x {
+  width: 44px !important; height: 44px !important; min-width: 44px !important; border-radius: 50% !important; padding: 0 !important; border: 0 !important;
+  background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important;
+}
+:root:root:root:root:root:root body .vrm-communaute .vrm-cm-onglets { background: var(--sb-creux) !important; border-radius: 16px !important; padding: 3px !important; box-shadow: var(--sb-gravure) !important; border: 0 !important; }
+:root:root:root:root:root:root body .vrm-communaute .vrm-cm-onglet { position: relative !important; border-radius: var(--sb-r-touche) !important; background: transparent !important; box-shadow: none !important; color: var(--sb-encre-2) !important; font: 600 14px/1.2 var(--sb-police-texte) !important; }
+:root:root:root:root:root:root body .vrm-communaute .vrm-cm-onglet[aria-pressed="true"] { background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important; box-shadow: var(--sb-ombre-plan) !important; }
+:root:root:root:root:root:root body .vrm-communaute .vrm-cm-onglet[aria-pressed="true"]::after { content: '' !important; position: absolute !important; top: 6px !important; right: 7px !important; width: 5px !important; height: 5px !important; border-radius: 50% !important; background: var(--sb-diode) !important; box-shadow: 0 0 6px var(--sb-diode) !important; }
+:root:root:root:root:root:root body .vrm-communaute :is(.vrm-cm-champ, .vrm-cm-saisie, .vrm-cm-select, input, select, textarea) { background: var(--sb-creux) !important; border: 0 !important; box-shadow: var(--sb-gravure) !important; border-radius: 12px !important; color: var(--sb-encre) !important; }
+:root:root:root:root:root:root body .vrm-communaute .vrm-cm-feuille { background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-avant) !important; border-top-left-radius: var(--sb-r-plan) !important; border-top-right-radius: var(--sb-r-plan) !important; }
+:root:root:root:root:root:root body .vrm-communaute .vrm-cm-voile { background: rgb(var(--sb-o) / .28) !important; }
 
 /* ══ 8. LES FEUILLES GÉNÉRIQUES (SheetShell, confirmations, aide « ? ») ══════════
    Porcelaine, rayon 28 en haut, ombre de premier plan ; le voile est un bleu à 60 %

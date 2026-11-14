@@ -47,6 +47,7 @@ const TempsGagne = React.lazy(() => import('./accueil/TempsGagne.jsx'));
 import { navigateursServis, NAVS_ORDINATEUR_TEXTE as NAVS_ORDI } from './navigateursServis.js';
 // (14 nov., idée d'accueil 146) « Voir VRM en 45 s » : rien n'est téléchargé avant le toucher.
 import AccueilVideo from './accueil/AccueilVideo.jsx';
+import './design/studio-reste-public.css';   // (14 nov., Studio bleu clair) la page publique : bleu clair, plein d'encre
 const SERVIS = navigateursServis();
 
 // ── Les captures (public/accueil/, scripts/accueil-captures.cjs) ────────────
