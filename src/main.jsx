@@ -60,7 +60,15 @@ if (typeof window !== 'undefined') {
     // c'est rattrapé par le rechargement. Dans la minute, l'erreur repart telle quelle
     // (vraie panne de réseau) et `noterPlantage` la compte à part elle aussi.
     compterMorceauPerime(ev && ev.payload);
-    ev.preventDefault();
+    // ⚠️ (14 nov., fiabilité prod) JAMAIS `ev.preventDefault()` ici. Vite (son
+    // `preload`) rend alors `undefined` À LA PLACE DU MODULE (`baseModule().catch(
+    // handlePreloadError)`) : `React.lazy` lit `undefined.default`, et
+    // `import(…).then((m) => ({ default: m.FactureVente }))` lève « undefined is not
+    // an object (evaluating 'e.FactureVente') » — un VRAI plantage noté, alerte
+    // « Un écran est tombé » au propriétaire (mesuré dans la base : 64 écrans tombés
+    // du 10 au 12 nov., dont 60 d'un coup sur Ventes, iOS Safari). Sans lui, l'import
+    // est REJETÉ avec sa vraie raison (« Failed to fetch dynamically imported
+    // module… », compté à part par src/plantages.js) et la page se recharge quand même.
     window.location.reload();
   });
 }

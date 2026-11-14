@@ -134,6 +134,7 @@ import PorteConfidentialite from './PorteConfidentialite.jsx';
 import { AlerteDejaRelie } from './AlerteDejaRelie.jsx';
 import { REQUETE_LITIGES, requetePseudos, litigesDeLignes, pseudosDeLignes } from './vintedDejaRelie.js';
 import { installerGardeHorsLigne, horsLigneActif, etatHorsLigne, noterAbonnement, effacerLaissezPasser, suivreHorsLigne } from './porteHorsLigne.js';
+import { installerJetonFrais } from './jetonFrais.js';   // (14 nov., fiabilité prod) jamais une requête avec un jeton déjà expiré
 // ⟦→ ecrans/Reglages.jsx #7⟧
 // (6 nov., vitesse 2) SuiviReceptionEmails (Réglages → E-mails) : à la demande ; sa feuille de style reste ICI.
 import './reception-emails.css';
@@ -1837,6 +1838,9 @@ const authRefresh = (opt) => {
   }).catch(() => null).finally(() => { _authRefreshEnVol = null; });
   return _authRefreshEnVol;
 };
+// (14 nov., fiabilité prod) Les lectures du RÉVEIL attendent ce renouvellement au lieu de partir
+// avec le jeton mort (src/jetonFrais.js : 100 à 150 refus 401 par jour mesurés, par rafales).
+installerJetonFrais({ session: () => AUTH.session, rafraichir: (o) => authRefresh(o), base: SUPABASE_URL });
 const sessionFrom = (j) => ({
   access_token: j.access_token,
   refresh_token: j.refresh_token,

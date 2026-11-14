@@ -371,6 +371,39 @@ export async function statutPourSante({ env = process.env, fetcher = fetchAvecDe
 }
 export const oublierStatutPublic = () => { memoPublic = null; };
 
+// ── (14 nov., fiabilité prod) LES SONDES RELANCÉES PAR CELUI QUI REGARDE ────────
+// Mesuré (GitHub, `gh run list --workflow sondes-statut.yml`) : le planificateur de
+// GitHub ne lance la tâche « toutes les 10 min » que 3 à 4 fois PAR JOUR (17 passages
+// du 9 au 14 nov., au lieu de ~700). Entre deux, l'état a plus de 45 min et
+// vrm.center/statut dit « pas su — sondes arrêtées » sur les six morceaux, presque
+// toute la journée (relevé le 14 nov. à 08:13 : dernier passage 05:37).
+// /api/sante (la page /statut, le bandeau de l'app) relance donc lui-même le passage
+// quand l'état rangé a plus de 15 min : un appel à la route du cron
+// (`/api/ship-reminders?moment=sondes`, PAS une 13ᵉ fonction), avec SON secret, vers
+// l'adresse FIXE du site (jamais l'en-tête Host d'une requête : le secret n'irait
+// nulle part ailleurs). Au plus une relance par 10 min et par instance ; la route
+// garde ses règles (comparer-et-échanger sur `rev`, incidents, « prévenu » écrit avant
+// d'envoyer) : deux relances simultanées n'écrivent qu'une fois. Sans CRON_SECRET ni
+// clé de service ⇒ rien n'est relancé (et rien n'est inventé : l'état reste « pas su »).
+export const RELANCE_APRES_MS = 15 * 60e3;
+export const RELANCE_ESPACE_MS = 10 * 60e3;
+export const RELANCE_DELAI_MS = 8000;
+export const ORIGINE_SITE = 'https://vrm.center';
+let _relanceAt = 0;
+export const oublierRelance = () => { _relanceAt = 0; };
+export async function relancerSondesSiVieilles({ statut, env = process.env, fetcher = fetchAvecDelai, maintenant = Date.now() } = {}) {
+  const secret = String(env.CRON_SECRET || '');
+  if (!secret || !env.SUPABASE_SERVICE_KEY) return { relance: false, raison: 'non-configure' };
+  const at = statut && typeof statut === 'object' ? ms(statut.at) : null;
+  if (at && maintenant - at < RELANCE_APRES_MS) return { relance: false, raison: 'frais' };
+  if (_relanceAt && maintenant - _relanceAt < RELANCE_ESPACE_MS) return { relance: false, raison: 'deja' };
+  _relanceAt = maintenant;
+  try {
+    const r = await fetcher(`${ORIGINE_SITE}/api/ship-reminders?moment=sondes`, { headers: { Authorization: `Bearer ${secret}` } }, RELANCE_DELAI_MS);
+    return { relance: true, ok: !!(r && r.ok), status: (r && r.status) || 0 };
+  } catch (_) { return { relance: true, ok: false, status: 0 }; }
+}
+
 // ── LE PASSAGE COMPLET (le cron le branche ; l'audit le joue sur une fausse base) ──
 //   envoyer(notif) → résultat de l'envoi (au propriétaire seul).
 // (11 nov.) `alerter(signaux)` : le journal des alertes de production
