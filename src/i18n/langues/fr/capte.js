@@ -1,0 +1,23 @@
+// fr · « L'extension a capté » (14 nov., extension 5.377) — src/capteNotif/.
+export default {
+  "capte.titre": "L’extension a capté",
+  "capte.relie": "Compte relié",
+  "capte.voir": "Voir",
+  "capte.fermer": "Fermer",
+  "capte.s.ventes": {"one": "{n} nouvelle vente", "other": "{n} nouvelles ventes"},
+  "capte.s.achats": {"one": "{n} nouvel achat", "other": "{n} nouveaux achats"},
+  "capte.s.bordereaux": {"one": "{n} bordereau", "other": "{n} bordereaux"},
+  "capte.s.codes": {"one": "{n} code de retrait", "other": "{n} codes de retrait"},
+  "capte.s.versements": {"one": "{n} date de versement", "other": "{n} dates de versement"},
+  "capte.s.messages": {"one": "{n} message", "other": "{n} messages"},
+  "capte.s.offres": {"one": "{n} offre reçue", "other": "{n} offres reçues"},
+  "capte.s.annonces": {"one": "{n} nouvelle annonce", "other": "{n} nouvelles annonces"},
+  "capte.lu.ventes": {"one": "{n} vente lue", "other": "{n} ventes lues"},
+  "capte.lu.achats": {"one": "{n} achat lu", "other": "{n} achats lus"},
+  "capte.lu.annonces": {"one": "{n} annonce lue", "other": "{n} annonces lues"},
+  "capte.lu.messages": {"one": "{n} message lu", "other": "{n} messages lus"},
+  "capte.lu.offres": {"one": "{n} offre lue", "other": "{n} offres lues"},
+  "capte.reglage.lib": "Dire ce que l’extension capte",
+  "capte.reglage.desc": "Un petit message près du logo VRM sur le site, et ici quand l’app est ouverte : nouvelles ventes, bordereaux, messages…",
+  "capte.reglage.pasSu": "L’extension n’a pas encore répondu : le réglage s’appliquera à son prochain passage.",
+};
