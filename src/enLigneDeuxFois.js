@@ -82,7 +82,7 @@ export function raisonPasSu(c, maintenant) {
 // Rend { su, manque, vinted, numeroSeul, sites, auMoins }.
 //   groupe : { cle, numeros, annonces: [{ plat, id, uid, nom, titre, photo, url, numero }],
 //              comptes, memeCompte, preuves: ['photo' | 'recree' | 'numero'] }
-export function enLigneDeuxFois({ vinted, fiches, autres = null, clePhoto = null, cle = cleDefaut, maintenant = Date.now(), dateDe = null } = {}) {
+export function enLigneDeuxFois({ vinted, fiches, autres = null, clePhoto = null, cle = cleDefaut, maintenant = Date.now(), dateDe = null, memes = null } = {}) {
   const F = fiches && typeof fiches === 'object' ? fiches : {};
   const manque = [];
   const parts = [];
@@ -127,6 +127,8 @@ export function enLigneDeuxFois({ vinted, fiches, autres = null, clePhoto = null
     for (const k of p.photos) { if (parPhoto.has(k)) lie(i, parPhoto.get(k), 'photo'); else parPhoto.set(k, i); }
   });
   parts.forEach((p, i) => { if (p.recreeDe && parId.has(p.recreeDe)) lie(i, parId.get(p.recreeDe), 'recree'); });
+  // (14 nov., proposition 107) Deux fiches qu'IL a fusionnées (src/fusionFiches.js, SON clic) : la même paire.
+  for (const m of arr(memes)) { if (Array.isArray(m) && m.length === 2 && parId.has(String(m[0])) && parId.has(String(m[1]))) lie(parId.get(String(m[0])), parId.get(String(m[1])), 'fusion'); }
 
   const sortie = (g, preuves) => {
     const nums = [...new Set(g.map((p) => p.numero).filter(Boolean))];

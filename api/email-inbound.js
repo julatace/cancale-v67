@@ -1,5 +1,6 @@
 import './_lib/sans-bruit.js';
 import {etatColisDepuisTexte,conserverRetrait,retraitTenu,annonceArriveeFuture,changementDeRelais} from './_lib/etat-colis-email.js';
+import { urlQrPropre } from './_lib/qr-retrait.js';
 import { accuseEmail, empreinteEmail, idReceptionDeLigne, ID_RECEPTION_RE } from "./_lib/accuse-email.js";
 import { resumeClassement, texteBorne } from "./_lib/resume-email.js";
 import { listePieces } from "./_lib/boite-email.js";
@@ -1466,7 +1467,13 @@ function qrUrlPlausible(url, balise, ctx) {
   return INDICE_QR_FORT.test(ctx || '');                     // sinon le HTML doit le dire
 }
 
+// (14 nov.) L'adresse lue dans un attribut HTML est DÉCODÉE (`&amp;` ⇒ `&`, api/_lib/qr-retrait.js) : mesuré, les 37
+// adresses de QR Vinted Go en base portaient `&amp;time=…`.
 function extractPickupQr(mail, status) {
+  const r = extractPickupQrBrut(mail, status);
+  return r && r.qrUrl ? { ...r, qrUrl: urlQrPropre(r.qrUrl) } : r;
+}
+function extractPickupQrBrut(mail, status) {
   const imgs = (mail.attachments || []).filter(a => /image\//i.test(a.contentType || '') && a.contentB64);
   const html = mail.html || '';
   const hint = /qr|à scanner|a scanner|scanne|code[- ]?barre|pr[ée]sente (?:ce|le) code|pickup|retrait/i
