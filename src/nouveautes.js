@@ -26,6 +26,7 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  { id: 'imprimer-un-toucher', date: '2026-11-14', titre: 'Imprimer en un toucher', phrase: 'Le PDF tamponné s’ouvre tout de suite ; le tampon se corrige après.', tab: 'cat_bord', pour: 'tous', mode: 'tous' },
   { id: 'accompagnement', date: '2026-11-14', titre: 'Chaque geste dit ce qu’il fait', phrase: 'Avant, pendant, après ; et si ça bloque, pourquoi et quoi faire.', tab: 'cat_bord', pour: 'tous', mode: 'tous' },
   { id: 'exemple-impossible-a-confondre', date: '2026-11-14', titre: 'Exemple avec photos, impossible à confondre', phrase: 'Vraies photos de paires, bandeau et cadre « Exemple » partout.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'refonte-listes', date: '2026-11-14', titre: 'Annonces et Ventes : la liste d’abord', phrase: 'Chiffres en une bande, compte en menu, alertes dans « À faire ».', tab: 'annonces', pour: 'tous', mode: 'tous' },

@@ -16,7 +16,7 @@ export default {
   "impr.papier.titre": "La tua stampante",
   "impr.papier.phrase": "Salvato per le prossime volte.",
   "impr.papier.phraseUneFois": "Una volta sola: VRM lo salva e stampa subito.",
-  "impr.feuille.titre": { one: "{n} etichetta stampata", other: "{n} etichette stampate" },
+  "impr.feuille.titre": { one: "{n} etichetta nel PDF", other: "{n} etichette nel PDF" },
   "impr.voie.partage": "Scegli «Stampa» nella condivisione.",
   "impr.voie.onglet": "Il PDF è aperto: Condividi, poi Stampa.",
   "impr.voie.visionneuse": "La stampa è partita.",

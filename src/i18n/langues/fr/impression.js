@@ -16,7 +16,7 @@ export default {
   "impr.papier.titre": "Ton imprimante",
   "impr.papier.phrase": "Gardé pour les prochaines fois.",
   "impr.papier.phraseUneFois": "Une seule fois : VRM le garde, et imprime tout de suite.",
-  "impr.feuille.titre": { one: "{n} bordereau imprimé", other: "{n} bordereaux imprimés" },
+  "impr.feuille.titre": { one: "{n} bordereau dans le PDF", other: "{n} bordereaux dans le PDF" },
   "impr.voie.partage": "Choisis « Imprimer » dans le partage.",
   "impr.voie.onglet": "Le PDF est ouvert : Partager, puis Imprimer.",
   "impr.voie.visionneuse": "L’impression est lancée.",

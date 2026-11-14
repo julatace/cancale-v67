@@ -16,7 +16,7 @@ export default {
   "impr.papier.titre": "Your printer",
   "impr.papier.phrase": "Kept for next time.",
   "impr.papier.phraseUneFois": "Just once: VRM keeps it and prints right away.",
-  "impr.feuille.titre": { one: "{n} label printed", other: "{n} labels printed" },
+  "impr.feuille.titre": { one: "{n} label in the PDF", other: "{n} labels in the PDF" },
   "impr.voie.partage": "Pick “Print” in the share sheet.",
   "impr.voie.onglet": "The PDF is open: Share, then Print.",
   "impr.voie.visionneuse": "Printing has started.",

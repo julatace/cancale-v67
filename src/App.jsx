@@ -14355,7 +14355,8 @@ const ouvrirPdfOnglet = (url, nom, titre) => {
 // Appelé DANS le gestionnaire du toucher, sans aucune attente avant (`voieOuverture`) : iPhone/Android ⇒
 // la feuille de partage (« Imprimer » y est) ou un onglet ; ordinateur ⇒ la visionneuse de VRM, qui lance
 // l'impression seule. Rend la voie prise ; 'bouton' ⇒ la feuille propose « Ouvrir le PDF » (SON toucher).
-const fichierPdf = (pret) => { try { if (!pret.file) pret.file = new File([pret.bytes], pret.filename || 'bordereaux.pdf', { type: 'application/pdf' }); return pret.file; } catch (_) { return null; } };
+// Le fichier est refait si les octets ont changé (un PDF « Il en manque » hérite des champs du lot : jamais son fichier).
+const fichierPdf = (pret) => { try { if (!pret.file || pret.fileDe !== pret.bytes) { pret.file = new File([pret.bytes], pret.filename || 'bordereaux.pdf', { type: 'application/pdf' }); pret.fileDe = pret.bytes; } return pret.file; } catch (_) { return null; } };
 const partageFichiersPossible = (f) => { try { return !!(f && navigator.canShare && navigator.share && navigator.canShare({ files: [f] })); } catch (_) { return false; } };
 const ouvrirPdfLot = (pret, { geste = true, titre = '' } = {}) => {
   if (!pret || !pret.url) return 'bouton';
@@ -44602,32 +44603,39 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return e;
   };
   const pretPour = (sig) => { const e = prepsRef.current.get(sig); return e && e.etat === 'pret' ? e.res : null; };
-  const imprIci = only === 'bordereaux' && colisDans !== 'achats';
   const formatLot = imprMode(imprimante);
-  let lotDefaut = [];
-  if (imprIci) { try { const L0 = lignesLotTous(); lotDefaut = selectionImprimable(L0, cochesParDefaut(L0)); } catch (_) { lotDefaut = []; } }
-  const sigDefaut = lotDefaut.length ? sigImpr(lotDefaut, formatLot, tamponsPerso) : '';
+  // Le lot d'office (ce qui PART) et sa signature sont posés PAR LE RENDU d'À expédier (`lotDefautRef`, à côté de
+  // `resLot`) : ici, dans le corps, la liste n'est pas encore calculable (ses sources sont déclarées plus bas — §4.6).
+  const lotDefautRef = React.useRef({ lignes: [], sig: '' });
+  const prepPlanRef = React.useRef({ sig: '', t: null });
   // LA PRÉPARATION D'AVANCE : l'écran montré, la liste lue en entier, rien en cours. Les PDF ne sont lus que pour
-  // les bordereaux qui PARTENT (pas toute la liste, §4.4) et une fois par séance (`_octetsLot`).
+  // les bordereaux qui PARTENT (pas toute la liste, §4.4) et une fois par séance (`_octetsLot`). Après chaque rendu
+  // (sans dépendances : la signature est lue dans le ref), un seul minuteur par signature.
   React.useEffect(() => {
-    if (!sigDefaut || imprBusy || !isCloudReady() || !lotLu() || cache()) return undefined;
-    const lignes = lotDefaut, format = formatLot, tampons = tamponsPerso;
-    const t = setTimeout(() => {
-      if (cache()) return;
-      preparer(sigDefaut, () => composerLot(lignes, format, tampons));
+    const { lignes, sig } = lotDefautRef.current, plan = prepPlanRef.current;
+    if (!sig || imprBusy || !isCloudReady() || !lotLu() || cache() || prepsRef.current.has(sig)) {
+      if (plan.t && plan.sig !== sig) { clearTimeout(plan.t); plan.t = null; plan.sig = ''; }
+      return;
+    }
+    if (plan.t && plan.sig === sig) return;
+    if (plan.t) clearTimeout(plan.t);
+    plan.sig = sig;
+    const format = formatLot, tampons = tamponsPerso;
+    plan.t = setTimeout(() => {
+      plan.t = null;
+      if (cache() || lotDefautRef.current.sig !== sig) { plan.sig = ''; setPrepVu((x) => x + 1); return; }
+      preparer(sig, () => composerLot(lignes, format, tampons));
       if (lignes.some((l) => l.num) && !(_verNum.etat === 'ok' && Date.now() - _verNum.at < 50000)) verifierVersionNumerotation();
     }, 600);
-    return () => clearTimeout(t);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sigDefaut, !!imprBusy, labelsPrets, sales.items !== null, Array.isArray(emailBords)]);
+  });
+  React.useEffect(() => () => { const plan = prepPlanRef.current; if (plan.t) clearTimeout(plan.t); }, []);
   // La version des numéros relue (moins d'une minute, la règle d'`assurerVersionNumerotation`) tant que l'écran
-  // est là : c'est elle qui permet d'ouvrir le PDF dans le geste.
+  // montre un lot : c'est elle qui permet d'ouvrir le PDF dans le geste.
   React.useEffect(() => {
-    if (!sigDefaut) return undefined;
-    const id = setInterval(() => { try { if (!cache() && document.visibilityState === 'visible') verifierVersionNumerotation(); } catch (_) {} }, 45000);
+    const id = setInterval(() => { try { if (lotDefautRef.current.sig && !cache() && document.visibilityState === 'visible') verifierVersionNumerotation(); } catch (_) {} }, 45000);
     return () => clearInterval(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [!!sigDefaut]);
+  }, []);
   const versionFraiche = () => _verNum.etat === 'ok' && Date.now() - _verNum.at <= 60000;
   // Marqué « imprimé » quand le PDF est OUVERT (partage, onglet, visionneuse) — jamais sur un PDF resté fermé.
   const marquerImprimes = (res, cles) => {
@@ -51596,7 +51604,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const nPrets = bordereauxAImprimer(lignesImpr).length, nDejaImpr = lignesImpr.length - nPrets;
           // (12 nov.) Le bouton compte ce qui PART (cochées d'office), comme « Imprimer (N) » de la feuille : une source
           // (`resumeLot`). Avant : toutes les lignes du lot ⇒ « Tout imprimer (15) » ouvrait « Imprimer (6) ».
-          const resLot = resumeLot(lignesLotTous()), nLot = resLot.partent;
+          const Ltous = lignesLotTous(), resLot = resumeLot(Ltous), nLot = resLot.partent;
+          // (14 nov., impression-simple) Le lot d'office et sa signature, pour la préparation d'avance (`lotDefautRef`).
+          const lotD = colisDans !== 'achats' ? selectionImprimable(Ltous, cochesParDefaut(Ltous)) : [];
+          const sigDefaut = lotD.length ? sigImpr(lotD, formatLot, tamponsPerso) : '';
+          lotDefautRef.current = { lignes: lotD, sig: sigDefaut };
           // (1er nov., capture de Julien : « Vestiaire » absent de Colis alors
           // qu'il y a un compte) Même règle que les filtres d'Annonces, Ventes,
           // Messages et que la rangée de Colis · Leboncoin : un site où il a un
