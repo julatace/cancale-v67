@@ -76,6 +76,8 @@ const capture = async (pg, nom) => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { r
       const pg = o.pg;
       try {
         await aller(pg, 'cat_ventes', 5000);
+        // (14 nov.) Attendre sur CONDITION (§6.5), pas un délai fixe : machine chargée, la publication peut tarder.
+        await pg.waitForFunction(() => { try { const p = JSON.parse(localStorage.getItem('vinted_urssaf_mois') || 'null'); return !!(p && p.aDater && p.aDater.datees); } catch (_) { return false; } }, null, { timeout: 30000 }).catch(() => {});
         const pub = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vinted_urssaf_mois') || 'null'); } catch (_) { return null; } });
         const ad = pub && pub.aDater;
         dit(!!(ad && ad.n === 46), `D1 ${T} : 46 ventes à dater (50 − la 450 − le relevé − la conversation − l’e-mail)`, JSON.stringify(ad && ad.n));
@@ -111,7 +113,8 @@ const capture = async (pg, nom) => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { r
           dit(K.raisons.join(',') === 'vinted-detail:222:45,vinted-attente::1', `D2 ${T} : une ligne par raison, le compte nommé`, K.raisons.join(','));
           dit(/vendeuse_b/.test(K.texte) && /46 ventes sans date/.test(K.texte) && /par la conversation de la vente/.test(K.texte), `D2 ${T} : le compte, le nombre et la source sont écrits`, K.texte.slice(0, 260));
           dit(K.jours === '1' && /Environ 1 jour avec vinted\.fr ouvert sur ce compte/.test(K.texte), `D2 ${T} : « environ 1 jour avec vinted.fr ouvert sur ce compte »`, `${K.jours} ${K.texte.slice(0, 260)}`);
-          dit(K.vis && K.href === 'https://www.vinted.fr/' && K.h >= 43.5, `D2 ${T} : « Ouvrir Vinted » visible, 44 px`, `${K.href} ${K.h}`);
+          // (14 nov.) La règle de la passe design : 44 px au doigt (390, tactile), 36 px à la souris.
+          dit(K.vis && K.href === 'https://www.vinted.fr/' && K.h >= (W < 600 ? 43.5 : 35.5), `D2 ${T} : « Ouvrir Vinted » visible, ${W < 600 ? 44 : 36} px`, `${K.href} ${K.h}`);
           dit(!/\bundefined\b|\bNaN\b|\bnull\b|encaiss/i.test(K.texte), `T ${T} : ni « undefined/NaN/null », ni « encaissé »`, K.texte);
         }
         await capture(pg, `declarer-${W}-${th}`);
