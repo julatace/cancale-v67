@@ -796,6 +796,8 @@ import { lireLocal, lireJSON, stockageDispo } from "./stockageSur.js";   // (11 
 import { creerMagasinPartage } from "./magasinPartage.js";
 import { fusionnerVersements, garderDatesConnues } from "./versementsConnus.js";   // (13 nov.) une date de versement connue ne redevient jamais « pas lue »   // (13 nov., source unique) une copie des données lues pour tous les moteurs
 import { trj } from './i18n/react.js';
+import { CollerPrixAchatFeuille } from "./composants/CollerPrixAchat.jsx";   // (14 nov., lot argent-choix — proposition 75)
+import { verifierAvantEcriture } from "./collerPrixAchat.js";
 // ⟦→ ecrans/Reglages.jsx #16⟧
 
 // Version visible, pour vérifier d'un coup d'œil si l'app a bien chargé la
@@ -41849,6 +41851,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (6 nov.) Avant : le texte brut (« 25 € env. » enregistré tel quel) et un champ vidé
   // écrivait '' en effaçant le lien vers l'achat. Vide ⇒ rien ; illisible ⇒ rien, dit.
   const setBuyForKey = (key, val) => { ecrirePrixTape(key, val); };
+  // ── (14 nov., lot argent-choix — proposition 75) « COLLER UN TABLEAU » (src/collerPrixAchat.js) ──
+  // Les fiches d'un N° (clé `cleNum`) et leur prix d'achat par LA règle de l'app (`prixAchatDe`).
+  // L'écriture est celle d'un prix TAPÉ (`ecriturePrixSaisi`, comme la saisie en série), en UNE
+  // fois : relue sur les fiches du moment (comparer-et-échanger), jamais sans base chargée.
+  const [collerOuvert, setCollerOuvert] = useState(false);
+  const fichesCollage = React.useCallback((cle) => Object.entries(numeros || {})
+    .filter(([, e]) => e && e.numero != null && String(e.numero).trim() && cleNum(e.numero) === cle)
+    .map(([k, e]) => ({ key: k, numero: String(e.numero).trim(), prix: prixAchatDe(e, buyByNum), titre: String(e.title || ''), photo: e.photo || '' })), [numeros, buyByNum]);
+  const enregistrerCollage = (ecritures) => {
+    if (!isCloudReady()) { toast(tr('ac.coller.pasLu')); return null; }
+    const { garder, changees } = verifierAvantEcriture(ecritures, fichesCollage);
+    const lus = garder.map((w) => ({ w, e: ecriturePrixSaisi(w.prix) })).filter((x) => x.e.etat === 'ok');
+    if (lus.length) {
+      pointAvant('collage', `Collage de ${lus.length} prix d’achat`);   // revenir en arrière (Paramètres)
+      setNumeros((prev) => { const u = { ...prev }; for (const { w, e } of lus) u[w.key] = { ...(u[w.key] || {}), ...e.patch }; save('vinted_annonce_numeros', u); return u; });
+      setBuyByNum((prev) => { const u = { ...prev }; for (const { w, e } of lus) u[w.numero] = e.patch.buyPrice; save('vinted_buyprice_by_num', u); return u; });
+    }
+    return { ecrits: lus.length, changees: changees + (garder.length - lus.length) };
+  };
   const [showReport, setShowReport] = useState(false);
   const [reportMonth, setReportMonth] = useState(() => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; });
   const [moisOuvert, setMoisOuvert] = useState(false);
@@ -52355,6 +52376,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           vendues au CA le plus élevé d'abord : ce sont elles qui faussent le
           plus la compta tant que leur coût manque. */}
       {!fillBuyOpen && fillBuyN0.current ? ((fillBuyN0.current = 0), null) : null}
+      {collerOuvert && <CollerPrixAchatFeuille Feuille={SheetShell} Bouton={Bouton} fichesDe={fichesCollage} lu={isCloudReady()} onEnregistrer={enregistrerCollage} onClose={()=>setCollerOuvert(false)}/>}
       {fillBuyOpen && (
         <div className="vrm-feuille-fond" onClick={()=>setFillBuyOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}} data-noswipe="1" data-fillbuy-feuille="">
           <FermeAuRetour fermer={()=>setFillBuyOpen(false)}/>
@@ -52366,6 +52388,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:20,fontWeight:600,color:C.text,letterSpacing:'-0.02em'}}>Prix d'achat à compléter {fillBuyRows.length>0 && <Pourquoi label="Pourquoi c'est important">Tant qu'un coût manque, la vente compte comme 100&nbsp;% de marge : ton bénéfice et ton rapport comptable sont faussés.</Pourquoi>}</div>
                 </div>
+                <Bouton variante="secondaire" className="vrm-b-petit" icone="copy" data-coller-ouvrir="" onClick={()=>setCollerOuvert(true)}>{tr('ac.coller.bouton')}</Bouton>
                 <button className="vrm-icon-control" type="button" onClick={()=>setFillBuyOpen(false)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',padding:4}}><Icon name="close" size={18}/></button>
               </div>
               {(()=>{ if (fillBuyN0.current < fillBuyRows.length) fillBuyN0.current = fillBuyRows.length;
