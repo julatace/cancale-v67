@@ -3059,14 +3059,14 @@ function FermerCompte({ onExporter }) {
         style={{ display: 'flex', width: '100%', minHeight: 44, alignItems: 'center', gap: 10, border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
         <span style={{ flex: 1, minWidth: 0 }}>
           <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.danger }}>Supprimer mon compte</span>
-          <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2 }}>30 jours pour changer d’avis, puis tout est effacé.</span>
+          <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2 }} data-acc-avant="compte.supprimer">30 jours pour changer d’avis, puis tout est effacé.</span>
         </span>
         <span aria-hidden="true" style={{ color: C.muted, fontSize: 13 }}>{ouvert ? '▴' : '▾'}</span>
       </button>
       {ouvert && (
         <div style={{ marginTop: 10, borderTop: `1px solid ${C.border}`, paddingTop: 10 }}>
           {fin ? (
-            <div role="status" data-fermer-resultat={fin.ok ? 'ferme' : 'incomplet'} style={{ ...txt, color: C.text }}>
+            <div role="status" data-fermer-resultat={fin.ok ? 'ferme' : 'incomplet'} {...(fin.ok ? { 'data-acc-apres': 'compte.supprimer' } : { 'data-acc-echec': 'compte.supprimer' })} style={{ ...txt, color: C.text }}>
               {fin.message}
               {fin.ok && <div style={{ ...txt, marginTop: 6 }}>Pense à retirer l’extension VRM de ton navigateur. Retour à l’accueil dans un instant…</div>}
               {!fin.ok && <div style={{ marginTop: 10 }}><Bouton variante="secondaire" onClick={() => setFin(null)}>Revenir</Bouton></div>}
@@ -3086,7 +3086,7 @@ function FermerCompte({ onExporter }) {
             // (13 nov., lot 51) La suppression est PROGRAMMÉE : la date, et « Annuler » en un geste.
             // La date s'écrit UNE fois ici (§7) : la phrase du serveur ne se montre que sur un échec.
             <div data-fermer-etat="prevue" data-supprimer-prevue={info.prevue.effaceLe}>
-              {annonce && !annonce.ok && <div role="status" data-supprimer-annonce="echec" style={{ ...txt, color: C.warn, marginBottom: 8 }}>{annonce.message}</div>}
+              {annonce && !annonce.ok && <div role="status" data-supprimer-annonce="echec" data-acc-echec="compte.supprimer" style={{ ...txt, color: C.warn, marginBottom: 8 }}>{annonce.message}</div>}
               <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>Suppression prévue le {dateLongue(info.prevue.effaceLe)}</div>
               <div style={{ ...txt, marginTop: 4 }}>
                 {joursAvant(info.prevue.effaceLe) ? `Dans ${joursAvant(info.prevue.effaceLe)} jour${joursAvant(info.prevue.effaceLe) > 1 ? 's' : ''}. ` : 'Elle a lieu au prochain passage du matin. '}
@@ -3100,7 +3100,7 @@ function FermerCompte({ onExporter }) {
             </div>
           ) : (
             <div data-fermer-etat="possible">
-              {annonce && <div role="status" data-supprimer-annonce={annonce.ok ? 'ok' : 'echec'} style={{ ...txt, color: annonce.ok ? C.text : C.warn, marginBottom: 8 }}>{annonce.message}</div>}
+              {annonce && <div role="status" data-supprimer-annonce={annonce.ok ? 'ok' : 'echec'} {...(annonce.ok ? { 'data-acc-apres': 'compte.supprimer' } : { 'data-acc-echec': 'compte.supprimer' })} style={{ ...txt, color: annonce.ok ? C.text : C.warn, marginBottom: 8 }}>{annonce.message}</div>}
               <div style={{ ...titreBloc, marginTop: 0 }}>1. D’abord, garde une copie</div>
               <div style={txt}>Un fichier sur ton appareil : ventes, achats, stock, compta, factures.</div>
               {onExporter && <div style={{ marginTop: 8 }}><Bouton variante="secondaire" onClick={onExporter} data-supprimer-exporter="">Exporter mes données</Bouton></div>}

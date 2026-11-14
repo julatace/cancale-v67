@@ -90,6 +90,8 @@ import { trj } from '../i18n/react.js';
 import DeclarationAnnuelle from '../composants/DeclarationAnnuelle.jsx';   // (14 nov., lot argent-choix — proposition 82)
 import { declarationAnnuelle } from '../declarationAnnuelle.js';
 // ⟦← App.jsx #4⟧
+import { accompagner } from '../accompagnement.js';   // (14 nov.) après / échec d'un geste
+import { AccAvant, AccEchec } from '../ui/Accompagne.jsx';
 const FicheFacturation = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.FicheFacturation })));
 const ListeFacturesPro = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.ListeFacturesPro })));
 const FacturesAEnvoyer = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.FacturesAEnvoyer })));
@@ -2111,7 +2113,8 @@ function ExportComptableCorps({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, 
       const d = ent && String(ent.nom || '').trim() ? { ...D, entreprise: { nom: String(ent.nom).trim(), siret: String(ent.siret || '').trim() } } : D;
       if (forme === 'csv') telechargerFichier(new Blob([csvExportComptable(d)], { type: 'text/csv;charset=utf-8' }), nomFichierExport(periode, 'csv'), 'text/csv;charset=utf-8');
       else telechargerFichier(new Blob([await pdfExportComptable(d)], { type: 'application/pdf' }), nomFichierExport(periode, 'pdf'), 'application/pdf');
-    } catch (err) { toast('Export pas créé : ' + ((err && err.message) || err)); }
+      accompagner('export.comptable', { vars: { nom: nomFichierExport(periode, forme) } }).fini();
+    } catch (err) { accompagner('export.comptable').echec(err, { reessayer: () => telecharger(forme) }); }
     setEnCours('');
   };
   // (11 nov.) LE ZIP, en un clic : justificatifs lus au clic, puis partage natif sinon téléchargement.
@@ -2156,8 +2159,9 @@ function ExportComptableCorps({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, 
       </div>
       {cv.length > 0 && <ul data-export-manque={cv.length} style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{cv.map((c) => <li key={c}>{c}</li>)}</ul>}
       <Bouton variante="primaire" icone="archive" data-export-zip="" data-export-zip-voie={partageable ? 'partage' : 'telechargement'} disabled={!D || !!enCours} onClick={preparerZip} style={{ marginTop: 12, width: '100%' }} title={tr('compta.tableurRecapPdf')}>{enCours === 'zip' ? tr('compta.jePrepareZip') : partageable ? tr('compta.partagerZip') : tr('compta.telechargerZip')}</Bouton>
-      {retourZip && <p role="status" data-export-zip-fin={retourZip.fin} data-export-zip-manque={retourZip.manque ? retourZip.manque.length : ''} style={{ margin: '8px 0 0', fontSize: 13, color: retourZip.fin === 'ko' ? C.warn : C.muted, lineHeight: 1.5 }}>
-        {retourZip.fin === 'ko' ? tr('compta.zipCree', { raison: String(retourZip.raison) })
+      {!retourZip && D ? <AccAvant geste="export.comptable"/> : null}
+      {retourZip && <p role="status" data-export-zip-fin={retourZip.fin} {...(retourZip.fin === 'ko' ? { 'data-acc-echec': 'export.comptable' } : retourZip.fin === 'annule' ? {} : { 'data-acc-apres': 'export.comptable' })} data-export-zip-manque={retourZip.manque ? retourZip.manque.length : ''} style={{ margin: '8px 0 0', fontSize: 13, color: retourZip.fin === 'ko' ? C.warn : C.muted, lineHeight: 1.5 }}>
+        {retourZip.fin === 'ko' ? <AccEchec geste="export.comptable" erreur={retourZip.raison} onReessayer={preparerZip}/>
           : retourZip.fin === 'annule' ? tr('compta.partageAnnuleRien')
           : <>{retourZip.fin === 'partage' ? tr('compta.zipPartage') : tr('compta.zipTelecharge')} : {retourZip.n} {tr('compta.fichiersDont')} {retourZip.ventes} {tr('compta.facture2')}{retourZip.ventes > 1 ? 's' : ''} {tr('compta.vente2')} {retourZip.achats} {tr('compta.achat2')}
             {retourZip.manque.length > 0 && <span data-export-zip-absents="" style={{ display: 'block', color: C.warn }}>{trj('compta.dedans', { x: retourZip.manque.join(' · ') })}</span>}</>}

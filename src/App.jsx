@@ -42494,6 +42494,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const rec = { ids, n: ids.length, ca, montant: m == null ? null : m, paye: p == null ? null : p, regle: regle === 'vente' ? 'vente' : 'versement', at: Date.now() };
     setDeclUrssaf(prev => { const u = { ...(prev || {}), [reportMonth]: rec }; save('vrm_urssaf_declare', u); return u; });
     setDeclForm(null);
+    // (14 nov., lot accompagnement) APRÈS : le mois noté, et la suite (sur cet appareil, rien n'est envoyé à l'URSSAF).
+    accompagner('urssaf.declarer', { vars: { mois: report.monthLabel } }).fini();
     allerMoisSuivantSerie(reportMonth);
   };
   // Série de rattrapage : le mois suivant s'ouvre, formulaire déplié (mêmes
@@ -53194,7 +53196,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <span style={{fontSize:12,color:C.muted}}>Cotisations payées pour ce mois (facultatif — pour ton suivi dans Comptabilité)</span>
                           <input data-decl-paye inputMode="decimal" value={declForm.paye||''} onChange={e=>setDeclForm(f=>({...f, paye:e.target.value}))} placeholder="ex. 153,20" style={{border:`1px solid ${C.border}`,borderRadius:12,padding:'7px 10px',fontSize:17,background:C.bg,color:C.text,maxWidth:200,fontFamily:'inherit'}}/>
                         </label>
-                        {(report.incomplet || (declForm.refus && !declarables)) && <RaisonDeclBloquee manque={report.incomplet || declForm.refus} refus={!!declForm.refus}/>}
+                        {(report.incomplet || (declForm.refus && !declarables)) && <div data-acc-echec="urssaf.declarer" data-acc-raison="pasSu"><RaisonDeclBloquee manque={report.incomplet || declForm.refus} refus={!!declForm.refus}/></div>}
+                        <AccAvant geste="urssaf.declarer" vars={{ mois: report.monthLabel }}/>
                         <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
                           <Bouton variante="primaire" data-decl-enregistrer onClick={()=>declarerMois(declForm.regle, declForm.montant, declForm.paye)}>Enregistrer</Bouton>
                           {serieDeclActive() && SERIE_DECLARATION.liste.includes(reportMonth) ? (<>
