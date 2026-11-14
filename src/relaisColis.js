@@ -328,8 +328,12 @@ export function lieuCompleteParTransporteur(lu, tr, emailMs = null) {
   const eRue = RUE.test(String(e.rue || '').trim()) ? String(e.rue).trim() : '';
   const trAt = Date.parse(String(tr.etatAt || ''));
   const plusRecent = tr.etat === 'disponible' && Number.isFinite(trAt) && Number.isFinite(emailMs) && trAt > emailMs;
+  // (14 nov., Vinted Go réacheminé) Le colis DÉPLACÉ ne garde pas le NOM de l'ancien point : « Tabac du Port » au-dessus
+  // de la nouvelle adresse désignait l'ancien lieu. Le nom vient du transporteur (s'il le donne), sinon le point est
+  // désigné par sa RUE lue chez le transporteur (Vinted Go ne donne ni nom ni code postal, mesuré) — jamais « point
+  // pas encore connu » pour un colis dont l'adresse est lue.
   const conflit = (quoi) => plusRecent
-    ? { lieuNom: String(tr.lieuNom || '') || base.lieuNom, lieuAdresse: `${trRue}, ${[trCp, trVille].filter(Boolean).join(' ')}`, lieuComplete: 'transporteur', lieuDeplace: { carrier: String(tr.carrier || ''), at: trAt, avant: base.lieuNom || base.lieuAdresse } }
+    ? { lieuNom: String(tr.lieuNom || '') || trRue, lieuAdresse: `${trRue}, ${[trCp, trVille].filter(Boolean).join(' ')}`, lieuComplete: 'transporteur', lieuDeplace: { carrier: String(tr.carrier || ''), at: trAt, avant: base.lieuNom || base.lieuAdresse } }
     : ({ ...base, lieuConflit: { quoi, email: [eRue, [e.cp, e.ville].filter(Boolean).join(' ')].filter(Boolean).join(', '), transporteur: [trRue, [trCp, trVille].filter(Boolean).join(' ')].filter(Boolean).join(', '), carrier: String(tr.carrier || '') } });
   if (eRue && normRue(eRue) !== normRue(trRue)) return conflit('rue');
   if (e.cp && trCp && e.cp !== trCp) return conflit('cp');

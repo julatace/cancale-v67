@@ -168,7 +168,7 @@ const MUTATIONS = {
   refus_oublie: ['moteur', "if (code === 'refus') VOIX.refus = true;", ''],
   fin_perd_entendu: ['moteur', "if (!fini && dernier) finir(dernier);", ''],
   aborted_dit: ['moteur', "if (c === 'aborted') return null;", ''],
-  langue: ['moteur', "rec.lang = 'fr-FR';", "rec.lang = 'en-US';"],
+  langue: ['moteur', "? lang : 'fr-FR'; rec.interimResults", "? 'en-US' : 'en-US'; rec.interimResults"],
   pourquoi_muet: ['moteur', "Selon le navigateur, la reconnaissance peut passer par le service de son éditeur (Google pour Chrome, Microsoft pour Edge, Apple pour Safari). ", ''],
   premiere_fiche: ['vocale', "if (fs.length !== 1) return null;", "if (!fs.length) return null;"],
   compte_ignore: ['vocale', "if (okUid && f.accountId && !okUid.has(String(f.accountId))) return null;", ''],
