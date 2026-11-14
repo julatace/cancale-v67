@@ -70,6 +70,9 @@ export function gesteUrgent(doc = typeof document !== 'undefined' ? document : n
 // La visite part-elle d'elle-même sur cet écran ? (Le rejeu, lui, part sur SON geste.)
 export function visiteAuto(reglage, ecran, { creeLe, maintenant = Date.now(), exemple = false, feuilleOuverte = false, urgent = false, arrivee = false } = {}) {
   if (!ECRANS_VISITE.includes(ecran)) return false;
+  // (14 nov.) Mode exemple : jamais seule — elle couvrirait « Créer mon compte / Me connecter » ;
+  // elle reste à la demande (« ? » → « Revoir la visite »).
+  if (exemple) return false;
   if (!aideActive(reglage, 'visite', { creeLe, maintenant, exemple })) return false;
   if (lireAides(reglage).vues[ecran]) return false;
   if (feuilleOuverte || arrivee || urgent) return false;

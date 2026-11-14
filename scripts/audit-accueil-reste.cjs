@@ -107,6 +107,7 @@ async function verifier(racine, { muet = false, mutation = null } = {}) {
   dit(V.visiteAuto(A.basculerAide(null, 'visite', false), 'annonces', { creeLe: neuf, maintenant: MAINT }) === false, 'V3 coupée dans Paramètres ⇒ rien');
   dit(V.visiteAuto(null, 'annonces', { creeLe: neuf, maintenant: MAINT, urgent: true }) === false, 'V4 JAMAIS au-dessus d’un geste urgent');
   dit(V.visiteAuto(null, 'annonces', { creeLe: neuf, maintenant: MAINT, feuilleOuverte: true }) === false && V.visiteAuto(null, 'annonces', { creeLe: neuf, maintenant: MAINT, arrivee: true }) === false, 'V5 ni sur une feuille ouverte, ni pendant la visite d’arrivée');
+  dit(V.visiteAuto(null, 'annonces', { creeLe: neuf, maintenant: MAINT, exemple: true }) === false, 'V7 mode exemple : jamais seule (« Créer mon compte » reste libre)');
   dit(V.visiteAuto(null, 'annonces', { creeLe: vieux, maintenant: MAINT }) === false && V.visiteAuto(null, 'annonces', { creeLe: 'illisible', maintenant: MAINT }) === false, 'V6 un vendeur installé (ou date illisible) n’est jamais interrompu');
   const elUrgent = { getBoundingClientRect: () => ({ width: 100, height: 20 }) };
   dit(V.gesteUrgent({ querySelectorAll: (s) => (/data-urgent="1"/.test(s) ? [elUrgent] : []) }) === true && V.gesteUrgent({ querySelectorAll: () => [] }) === false, 'V7 un onglet urgent à l’écran est vu');
