@@ -8,7 +8,7 @@ export default {
   "studio.publier": "Publicar",
   "studio.imprimer": "Imprimir",
   "studio.imprimerN": "Imprimir {n}",
-  "studio.imprimerAria": {"one": "Imprimir la etiqueta lista", "other": "Imprimir las {n} etiquetas listas"},
+  "studio.imprimerAria": {"one": "Imprimir {n} etiqueta lista", "other": "Imprimir las {n} etiquetas listas"},
   "studio.imprimerAriaPasSu": "Imprimir las etiquetas listas",
   "studio.rienAImprimer": "nada listo",
   "studio.rienAImprimerAria": "Imprimir: ninguna etiqueta lista por ahora",

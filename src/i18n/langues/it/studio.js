@@ -8,7 +8,7 @@ export default {
   "studio.publier": "Pubblica",
   "studio.imprimer": "Stampa",
   "studio.imprimerN": "Stampa {n}",
-  "studio.imprimerAria": {"one": "Stampa l’etichetta pronta", "other": "Stampa le {n} etichette pronte"},
+  "studio.imprimerAria": {"one": "Stampa {n} etichetta pronta", "other": "Stampa le {n} etichette pronte"},
   "studio.imprimerAriaPasSu": "Stampa le etichette pronte",
   "studio.rienAImprimer": "niente di pronto",
   "studio.rienAImprimerAria": "Stampa: nessuna etichetta pronta per ora",

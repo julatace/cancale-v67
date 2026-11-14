@@ -8,7 +8,7 @@ export default {
   "studio.publier": "Einstellen",
   "studio.imprimer": "Drucken",
   "studio.imprimerN": "{n} drucken",
-  "studio.imprimerAria": {"one": "Das fertige Etikett drucken", "other": "Die {n} fertigen Etiketten drucken"},
+  "studio.imprimerAria": {"one": "{n} fertiges Etikett drucken", "other": "Die {n} fertigen Etiketten drucken"},
   "studio.imprimerAriaPasSu": "Die fertigen Etiketten drucken",
   "studio.rienAImprimer": "nichts bereit",
   "studio.rienAImprimerAria": "Drucken: noch kein Etikett bereit",

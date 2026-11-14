@@ -8,7 +8,7 @@ export default {
   "studio.publier": "Publier",
   "studio.imprimer": "Imprimer",
   "studio.imprimerN": "Imprimer {n}",
-  "studio.imprimerAria": {"one": "Imprimer le bordereau prêt", "other": "Imprimer les {n} bordereaux prêts"},
+  "studio.imprimerAria": {"one": "Imprimer {n} bordereau prêt", "other": "Imprimer les {n} bordereaux prêts"},
   "studio.imprimerAriaPasSu": "Imprimer les bordereaux prêts",
   "studio.rienAImprimer": "rien de prêt",
   "studio.rienAImprimerAria": "Imprimer : aucun bordereau prêt pour l’instant",

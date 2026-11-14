@@ -112,7 +112,7 @@ export function DisqueEventail({ gestes = {}, nImprimer, Retour = null, ecran = 
               const desactive = typeof l.faire !== 'function';
               return (
                 <button key={l.id} type="button" role="menuitem" className={'sb-lame' + (vise === l.id ? ' is-vise' : '')} data-sb-lame={l.id}
-                  aria-label={l.aria || l.mot} aria-disabled={desactive || undefined}
+                  aria-label={l.aria || l.mot} aria-disabled={desactive || undefined} data-sb-n={l.plein ? (connu ? String(nImprimer) : '') : undefined}
                   style={{ left: p.x, top: p.y - h, '--i': i, '--dx': `${(centre.x - p.x).toFixed(0)}px`, '--dy': `${(centre.y - p.y + h).toFixed(0)}px` }}
                   onClick={() => lancer(l)}>
                   {l.plein

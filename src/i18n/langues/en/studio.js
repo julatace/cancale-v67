@@ -8,7 +8,7 @@ export default {
   "studio.publier": "List",
   "studio.imprimer": "Print",
   "studio.imprimerN": "Print {n}",
-  "studio.imprimerAria": {"one": "Print the ready label", "other": "Print the {n} ready labels"},
+  "studio.imprimerAria": {"one": "Print {n} ready label", "other": "Print the {n} ready labels"},
   "studio.imprimerAriaPasSu": "Print the ready labels",
   "studio.rienAImprimer": "nothing ready",
   "studio.rienAImprimerAria": "Print: no label ready yet",
