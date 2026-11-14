@@ -29,6 +29,7 @@ if (process.argv.includes('--prouve')) {
     ['compte jamais écrit', PL, '    ecrire(MORCEAUX, { n, message, at: new Date().toISOString() });\n', ''],
     ['main.jsx ne compte plus', MAIN, '    compterMorceauPerime(ev && ev.payload);\n', ''],
     ['main.jsx recharge en boucle', MAIN, '    if (Date.now() - dernier < 60000) return;\n', ''],
+    ['main.jsx empêche l’erreur (import résolu à undefined)', MAIN, '    window.location.reload();\n  });', '    ev.preventDefault();\n    window.location.reload();\n  });'],
   ];
   let rouges = 0;
   const origines = new Map();
@@ -87,7 +88,43 @@ const lireJ = (k) => { try { return JSON.parse(store.get(k) || 'null'); } catch 
   const main = fs.readFileSync(MAIN, 'utf8');
   const i = main.indexOf("window.addEventListener('vite:preloadError'");
   const bloc = i >= 0 ? main.slice(i, main.indexOf('});', i)) : '';
-  dit(/compterMorceauPerime\(ev && ev\.payload\);\s*\n\s*ev\.preventDefault\(\);\s*\n\s*window\.location\.reload\(\);/.test(bloc), 'main.jsx compte le morceau PUIS recharge (le rechargement le rattrape)', bloc.slice(0, 300));
+  dit(/compterMorceauPerime\(ev && ev\.payload\);[\s\S]*?window\.location\.reload\(\);/.test(bloc), 'main.jsx compte le morceau PUIS recharge (le rechargement le rattrape)', bloc.slice(0, 300));
+  // (14 nov., fiabilité prod) LE VRAI `preload` DE VITE, EXÉCUTÉ avec le VRAI gestionnaire de main.jsx.
+  // Mesuré dans la base (`plantage_*`, `plantages_terrain_*`) : 64 écrans tombés du 10 au 12 nov. sur
+  // « undefined is not an object (evaluating 'e.FactureVente') », « …reading 'default' » — l'import
+  // rendait `undefined` parce que main.jsx appelait `ev.preventDefault()`. Il doit être REJETÉ avec sa
+  // vraie raison (un morceau périmé, compté à part), jamais résolu à `undefined`.
+  await (async () => {
+    const VITE = path.join(R, 'node_modules', 'vite', 'dist', 'node', 'chunks');
+    let src = '';
+    try { for (const f of fs.readdirSync(VITE)) { const t = fs.readFileSync(path.join(VITE, f), 'utf8'); const a = t.indexOf('function preload(baseModule, deps, importerUrl) {'); if (a >= 0) { src = t.slice(a, t.indexOf('\nfunction buildImportAnalysisPlugin', a)); break; } } } catch (_) {}
+    dit(src.length > 200 && /vite:preloadError/.test(src) && /baseModule\(\)\.catch\(handlePreloadError\)/.test(src), 'le `preload` de Vite est trouvé dans node_modules (celui qui part dans le build)', src.slice(0, 120));
+    if (!src) return;
+    // Une fausse fenêtre : le gestionnaire de main.jsx, un rechargement compté, une CSS et un JS introuvables.
+    const ecoutes = [];
+    let recharges = 0, comptes = 0;
+    const sess = new Map();
+    const fen = { addEventListener: (t, f) => { if (t === 'vite:preloadError') ecoutes.push(f); }, dispatchEvent: (e) => { for (const f of ecoutes) f(e); return true; }, location: { reload: () => { recharges++; } } };
+    class Ev { constructor(t, o) { this.type = t; this.cancelable = !!(o && o.cancelable); this.defaultPrevented = false; } preventDefault() { if (this.cancelable) this.defaultPrevented = true; } }
+    const doc = { getElementsByTagName: () => [], querySelector: () => null, head: { appendChild: (l) => { if (/\.css$/.test(l.href)) setTimeout(() => (l._err || []).forEach((f) => f()), 1); } }, createElement: () => ({ relList: { supports: () => true }, setAttribute() {}, addEventListener(t, f) { if (t === 'error') (this._err = this._err || []).push(f); } }) };
+    const blocMain = main.slice(i, main.indexOf('});', i) + 3);
+    // eslint-disable-next-line no-new-func
+    new Function('window', 'sessionStorage', 'compterMorceauPerime', blocMain)(fen, { getItem: (k) => (sess.has(k) ? sess.get(k) : null), setItem: (k, v) => sess.set(k, String(v)) }, () => { comptes++; });
+    // eslint-disable-next-line no-new-func
+    const preload = new Function('window', 'document', 'Event', 'seen', 'assetsURL', 'scriptRel', '__VITE_IS_MODERN__', src + '\nreturn preload;')(fen, doc, Ev, {}, (d) => d, 'modulepreload', true);
+    const absent = () => Promise.reject(new TypeError('Failed to fetch dynamically imported module: https://vrm.center/assets/FacturePro-ancien.js'));
+    let issue = 'en attente';
+    try { const m = await preload(absent, ['assets/FacturePro-ancien.css'], ''); issue = m === undefined ? 'résolu à undefined' : 'résolu'; }
+    catch (e) { issue = 'rejeté : ' + String((e && e.message) || e); }
+    dit(/^rejeté/.test(issue), 'un morceau introuvable : l’import est REJETÉ, jamais résolu à `undefined` (React.lazy lirait `undefined.default`)', issue);
+    dit(/^rejeté/.test(issue) && P.estMorceauPerime(issue.replace(/^rejeté : /, '')), 'sa raison est celle d’un morceau périmé (comptée à part, jamais notée comme plantage)', issue);
+    dit(recharges === 1 && comptes >= 1, 'la page se recharge quand même, une fois, après avoir compté le morceau', `recharges=${recharges} comptes=${comptes}`);
+    // Le même chemin que FactureVente (App.jsx) : `.then((m) => ({ default: m.FactureVente }))`.
+    let lazyErr = '';
+    sess.clear();
+    try { await preload(absent, [], '').then((m) => ({ default: m.FactureVente })); } catch (e) { lazyErr = String((e && e.message) || e); }
+    dit(lazyErr && P.estMorceauPerime(lazyErr) && !/FactureVente|reading 'default'/.test(lazyErr), 'un écran nommé (`m.FactureVente`) reçoit l’erreur du morceau, pas « undefined is not an object »', lazyErr);
+  })();
   dit(/if \(Date\.now\(\) - dernier < 60000\) return;/.test(bloc), 'une fois par minute au plus (jamais une boucle de rechargements)');
   dit(!/fetch\(|rest\/v1/.test(fs.readFileSync(PL, 'utf8').slice(fs.readFileSync(PL, 'utf8').indexOf('export function compterMorceauPerime'), fs.readFileSync(PL, 'utf8').indexOf('// ⚠️ Revue adverse du 4 octobre'))), 'le compte reste sur l’appareil (aucune écriture vers la base)');
   console.log(ko ? `\n❌ ${ko} contrôle(s) rouge(s)` : '\n✅ un morceau d’un ancien déploiement est compté à part, jamais noté comme plantage');

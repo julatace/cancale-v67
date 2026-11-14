@@ -6,12 +6,16 @@ import { unParArticle, planchesCases, planchesRangees } from '../stockRegles.js'
 import { requeteDeLaVoix } from '../rechercheVocale.js';
 import React, { useState, useMemo, useEffect } from 'react';
 import { tr, nombre } from '../i18n/index.js';   // (11 nov., lot rangement-guide) ; (14 nov.) `nombre` : « 1 024 » dans la langue
+import DansFiche, { useLigneIci } from '../DansFiche.jsx';
+import { ouvrirLigne } from '../ficheLigne.js';
 import { ChiffreConseil } from '../Conseils.jsx';
 import { premiereCaseLibre as premiereCaseMeubles, caseEnMots } from '../ouRanger.js';
 import { attrCible } from '../cibleNotif.js';
 import { remettreCase, resteAuStock, etatCase } from '../stockSortie.js';
 import { annoncesActuelles, annoncesVcStock, classerRangees, partagerParEtat } from '../stockAnnonces.js';
-import { LIGNE_INVENTAIRE } from '../inventaire.js';
+import { LIGNE_INVENTAIRE, indexerAttendu } from '../inventaire.js';
+import InventaireTournant from '../InventaireTournant.jsx';   // (14 nov., lot 129) 10 N° par jour à vérifier
+import { CLE_TOURNANT } from '../inventaireTournant.js';
 import { ValeurStockCarte, useValeurStock } from '../CascadeVente.jsx';   // (10 nov., lot BF) la valeur du stock, publiée par Annonces
 import { EmballagesCarte } from '../EmballagesCarte.jsx';
 import { useSelectionSerie, CaseSerie, BarreSerie, OuvrirSerie } from '../composants/SelectionSerie.jsx';   // (11 nov., lot actions-serie)
@@ -570,7 +574,9 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     setChoisie(null);
     const occ = occupant(mid, i);
     if (place) { const p = place; setPlace(null); poser(p, mid, i); return; }
-    if (occ) setModal({ type: 'fiche', cle: cleDeFiche(occ) });
+    // (14 nov., proposition 62) La fiche de la paire s'ouvre TOUT DE SUITE (le magasin de la fiche) ; l'état du Stock
+    // (ses gestes dans la fiche) suit en transition — à 1 000 articles, redessiner le Stock ne retarde pas la fiche.
+    if (occ) { ouvrirLigne(ligneFicheCase(cleDeFiche(occ), occ)); React.startTransition(() => setModal({ type: 'fiche', cle: cleDeFiche(occ) })); }
     else setModal({ type: 'placer', m: mid, i });
   };
 
@@ -673,6 +679,22 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
 
   // ── Modale (créer/modifier un meuble · choisir un article · fiche) ──────
   const fermerModal = () => setModal(null);
+  // (14 nov., proposition 62) « La fiche » d'une case n'est plus une feuille du Stock : toucher une paire rangée
+  // ouvre LA fiche de la paire (src/FichePaire.jsx, par son N°), sa place et ses gestes (Déplacer, Retirer de la
+  // case, Je l'ai sortie, Encore là) rendus en haut (`DansFiche`). Fermer la fiche referme ce choix.
+  const cleFicheStock = modal && modal.type === 'fiche' ? 'stock:vinted:s' + modal.cle : '';
+  function ligneFicheCase(cle, f) { return { cle: 'stock:vinted:s' + cle, contexte: 'stock', site: 'vinted', nums: f && f.numero != null ? [String(f.numero)] : [], titre: (f && f.title) || '' }; }
+  const ficheIci = useLigneIci(cleFicheStock);   // seule CETTE case se redessine (pas tout le Stock à chaque fiche)
+  const ficheVue = React.useRef(false);
+  useEffect(() => {
+    if (!cleFicheStock) { ficheVue.current = false; return; }
+    const f = ficheParCle[modal.cle]; if (!f) return;
+    if (!ficheIci) {
+      if (ficheVue.current) { ficheVue.current = false; setModal(null); return; }
+      ouvrirLigne(ligneFicheCase(modal.cle, f));
+    } else ficheVue.current = true;
+    /* eslint-disable-next-line */
+  }, [cleFicheStock, ficheIci]);
   const Modale = () => {
     if (!modal) return null;
     let corps = null;
@@ -713,7 +735,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       const sold = estVendu(f); const s = slots[modal.cle]; const m = s && meubles.find((x) => x.id === s.m);
       const hors = !sold && rangeeEtat(f) === 'plusenligne';
       corps = (<>
-        <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 10 }}>
+        <div data-stock-fiche-tete="" style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 10 }}>
           <span style={{ position: 'relative', width: 72, height: 72, borderRadius: 12, overflow: 'hidden', flex: 'none', background: C.card2 }}><Vignette f={f} sold={sold} hors={hors} /></span>
           <div><div style={{ fontSize: 17, fontWeight: 700, color: C.text, lineHeight: 1.25 }}>{f.title || '—'}</div><div data-fiche-statut={sold ? 'vendue' : (hors ? 'plusenligne' : (f.actuelle ? 'actuelle' : (rangeeEtat(f) === 'arrivee' ? 'arrivee' : (f.retour ? 'retour' : 'autre'))))} style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>{sold ? tr('stock.venduSortirStock') : (hors ? tr('stock.plusLignePlus') : (!f.actuelle && rangeeEtat(f) === 'arrivee' ? tr('ranger.stock.arrivee') : f.actuelle ? `En ligne${(f.plateformes || []).length ? ' sur ' + f.plateformes.map((x) => NOM_PLAT_FILTRE[x] || x).join(' et ') : ''}` : (f.retour ? libelleRetour(f.retour) : tr('stock.stock'))))} · N°{f.numero}</div></div>
         </div>
@@ -737,6 +759,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         {hors && <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-encore-la="" onClick={() => { encoreLa(f); fermerModal(); }} style={{ width: '100%', marginTop: 9 }}>{tr('stock.encore')}</button>}
       </>);
     }
+    if (modal.type === 'fiche') return <DansFiche cle={cleFicheStock} place="contexte" seulementFiche><div className="vrm-stock-dans-fiche" data-stock-fiche={modal.cle}>{corps}</div></DansFiche>;
     return (
       <div data-stock-modale="" onClick={fermerModal} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9400, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
         <div className="vrm-feuille-surface" onClick={(e) => e.stopPropagation()} style={{ width: 'min(540px,100%)', maxHeight: '86vh', overflowY: 'auto', background: C.card, border: `1px solid ${C.line}`, borderRadius: '20px 20px 0 0', padding: '18px 18px calc(20px + env(safe-area-inset-bottom,0px))' }}>
@@ -1063,6 +1086,13 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sigAttendu, etatHl]);
+  // (14 nov., lot 129) L'INVENTAIRE TOURNANT : les unités de l'attendu (src/inventaire.js, la même règle
+  // que « Faire l'inventaire » : paires présentes, par N°), recalculées quand l'attendu change (`sigAttendu`).
+  const unitesTournant = React.useMemo(() => {
+    if (!sigAttendu) return null;
+    try { const st = fabriquerStockInv(); return st && st.su ? indexerAttendu(st, cleNum).unites : null; } catch (_) { return null; }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sigAttendu]);
   const elInventaire = inventaire ? (() => {
     const stockInv = fabriquerStockInv();
     const ficheDe = (k) => ficheParCle[k] || (fichesParCle[k] || [])[0] || null;
@@ -1289,6 +1319,9 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
 
     <section className="vrm-ms-section" data-stock-section="plus" aria-label={tr('ms.stock.plus')}>
     <h2 className="vrm-ms-h2">{tr('ms.stock.plus')}</h2>
+    {/* (14 nov., lot 129, de main) L'inventaire tournant : 10 N° par jour à vérifier — dans « Plus », sous la liste. */}
+    {unitesTournant ? <div style={{ marginBottom: 14 }}><InventaireTournant unites={unitesTournant} uid={AUTH.user?.id || ''} lire={() => load(CLE_TOURNANT, {})} ecrire={(v) => save(CLE_TOURNANT, v)}
+      onFiche={(n) => { try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(n) })); } catch (_) {} }}/></div> : null}
     <ValeurStockCarte v={valeurStk} onSaisir={saisirPrixStock} mots={motsStock}/>
     {/* (10 nov., lot L) Le stock d'emballages : écrit sur SON clic ; le reste dérive des « Colis fait ». */}
     <EmballagesCarte reglage={emballagesR} Feuille={SheetShell} exemple={exemplesStock.emballage} ecrire={(r) => { setEmballagesR(r); save(CLE_EMBALLAGES, r); }}

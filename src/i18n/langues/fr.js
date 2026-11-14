@@ -5,6 +5,7 @@
 // sans `other`. Clés : `<écran>.<élément>[.<précision>]`, jamais le texte lui-même.
 // Pluriel : { one: '…', other: '…' } choisi par `n` (Intl.PluralRules).
 import ecran_journee from './fr/journee.js';
+import ecran_confort from './fr/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_ventes from './fr/ventes.js';
 import ecran_commun from './fr/commun.js';
 import ecran_achats from './fr/achats.js';
@@ -16,10 +17,18 @@ import ecran_stats from './fr/stats.js';
 import ecran_compta from './fr/compta.js';
 import ecran_listes from './fr/listes.js';
 import ecran_refonte_ms from './fr/refonte-ms.js';
+import ecran_fiche from './fr/fiche.js';
+import ecran_tarifs from './fr/tarifs.js';
+import ecran_nouveaux from './fr/nouveaux.js';
 import ecran_argent from './fr/argent.js';
+import ecran_fraiscarte from './fr/fraiscarte.js';   // (14 nov., frais-carte)
 export default {
   ...ecran_listes,
   ...ecran_refonte_ms,
+  ...ecran_fiche,
+  ...ecran_fraiscarte,
+  ...ecran_tarifs,
+  ...ecran_nouveaux,
   ...ecran_compta,
   ...ecran_argent,
   ...ecran_stats,
@@ -2176,4 +2185,5 @@ export default {
   "rh.vuesPasSu": "vues —",
   "rh.vendue": "vendue",
   "rh.enLigne": "en ligne",
+  ...ecran_confort,
 };
