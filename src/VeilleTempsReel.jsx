@@ -7,8 +7,15 @@ import './styles-temps-reel.css';
 import { creerVeille, ouvrirCanal, noterNeuf, ecouterNeuf, oublierNeuf, EVENEMENT, PERIODE_MS, PERIODE_REALTIME_MS } from './tempsReel.js';
 import { rythme } from './rythmeLectures.js';
 import { heureVu } from './copieLignes.js';
+import { trj } from './i18n/react.js';
 
-const AFFICHAGE_MS = 6000;
+// ⚠️ (14 nov., refonte de la coque — Julien, capture : « Mis à jour à 08:19 » posé EN PERMANENCE sur la
+// liste) La veille relit toutes les 5 à 30 s ; chaque lecture qui trouvait du neuf rallumait la pastille
+// pour 6 s : elle ne quittait plus l'écran. Désormais elle se montre 2 s, puis se TAIT au moins une
+// minute (l'heure affichée change à la minute : la redire plus tôt n'apprend rien). Le neuf arrive
+// quand même à l'écran à chaque lecture : seule la pastille se tait.
+const AFFICHAGE_MS = 2000;
+const SILENCE_MS = 60000;
 // Les lignes qui ne font que compter (jauge, journal) ne disent pas « mis à jour ».
 const VISIBLES = new Set(['ventes', 'achats', 'annonces', 'suivi', 'import', 'transp']);
 
@@ -56,12 +63,17 @@ export default function VeilleTempsReel({ uid, lireDepuis, urlBase, cleApi, jeto
 function PastilleNeuf() {
   const [at, setAt] = React.useState(null);
   React.useEffect(() => {
-    let t = null;
-    const off = ecouterNeuf((x) => { setAt(x); if (t) clearTimeout(t); t = setTimeout(() => setAt(null), AFFICHAGE_MS); });
+    let t = null, dernier = 0;
+    const off = ecouterNeuf((x) => {
+      const maintenant = Date.now();
+      if (maintenant - dernier < SILENCE_MS) return;
+      dernier = maintenant;
+      setAt(x); if (t) clearTimeout(t); t = setTimeout(() => setAt(null), AFFICHAGE_MS);
+    });
     return () => { off(); if (t) clearTimeout(t); };
   }, []);
   const h = at ? heureVu(at) : null;
   return <div className="vrm-neuf-hote" role="status" aria-live="polite">
-    {h ? <div className="vrm-neuf" data-temps-reel-neuf={at}><span className="vrm-neuf-point" aria-hidden="true"/><span>Mis à jour à {h}</span></div> : null}
+    {h ? <div className="vrm-neuf" data-temps-reel-neuf={at}><span className="vrm-neuf-point" aria-hidden="true"/><span>{trj('coque.misAJour', { h })}</span></div> : null}
   </div>;
 }

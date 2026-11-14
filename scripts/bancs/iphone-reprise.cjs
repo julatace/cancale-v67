@@ -199,6 +199,8 @@ const balayer = async (ctx, pg, x0, x1, y) => {
   }, [x0, x1, y]);
   await pg.waitForTimeout(800);
 };
+// (14 nov., choix n° 61) Annonces, Stock et Achats sont dans l'onglet « Paires » : l'onglet, puis le segment.
+const allerPaire = async (pg, id) => { await toucher(pg, '.vrm-tabbar [data-nav-entree="paires"]'); return toucher(pg, `[data-paires-segment="${id}"]`); };
 const toucher = async (pg, sel) => { const l = pg.locator(sel).first(); if (!(await l.count())) { console.log(`     (absent : ${sel})`); return false; } await l.tap({ timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(800);
   // (8 nov.) L'écran se calcule en tâche interruptible (startTransition) : on attend la fin du calcul
   // (`data-en-cours` de la barre, 4 s au plus), jamais un délai fixe seul (CLAUDE.md §6.5).
@@ -336,20 +338,21 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         // (9 nov., décision de Julien) plus aucun changement d'onglet au doigt, même au milieu.
         dit(e7b.ecran === 'ventes', `B7 ${qui} : un balayage au milieu ne change plus d'onglet (décision du 9 nov.)`, JSON.stringify({ y: y7, ...e7b }));
         // B8 · retoucher l'onglet courant
-        await toucher(pg, '.vrm-tabbar [data-nav-entree="annonces"]');
+        await allerPaire(pg, 'annonces');
         await pg.evaluate(() => { document.querySelector('.vrm-main').scrollTop = 400; }); await pg.waitForTimeout(300);
         const avant8 = await ecran(pg);
-        await toucher(pg, '.vrm-tabbar [data-nav-entree="annonces"]'); await pg.waitForTimeout(600);
+        await toucher(pg, '.vrm-tabbar [data-nav-entree="paires"]'); await pg.waitForTimeout(600);
         const e8 = await ecran(pg);
         dit(avant8.defile > 100 && e8.ecran === 'annonces' && e8.defile < 5, `B8 ${qui} : toucher l'onglet courant ramène en haut, même écran`, JSON.stringify({ avant: avant8.defile, apres: e8.defile, ecran: e8.ecran }));
         // B9 · le retour entre écrans
         await toucher(pg, '.vrm-tabbar [data-nav-entree="journee"]');
         await toucher(pg, '.vrm-tabbar [data-nav-entree="ventes"]');
         // (11 nov., intégration colis) Colis n'est plus dans la barre : Achats (« À retirer » en tête) a pris sa place (lot DJ3).
-        await toucher(pg, '.vrm-tabbar [data-nav-entree="achats"]');
+        // (14 nov., n° 61) Achats est dans « Paires » : le retour se juge sur Argent, un onglet de la barre.
+        await toucher(pg, '.vrm-tabbar [data-nav-entree="compta"]');
         await pg.goBack().catch(() => {}); await pg.waitForTimeout(700); const r1 = (await ecran(pg)).ecran;
         await pg.goBack().catch(() => {}); await pg.waitForTimeout(700); const r2 = (await ecran(pg)).ecran;
-        dit(r1 === 'ventes' && r2 === 'journee', `B9 ${qui} : retour Achats → Ventes → Journée`, `${r1} puis ${r2}`);
+        dit(r1 === 'ventes' && r2 === 'journee', `B9 ${qui} : retour Argent → Ventes → Journée`, `${r1} puis ${r2}`);
         dit(errs.length === 0, `B ${qui} : aucune erreur de page`, errs.join(' | '));
         await ctx.close();
       });
@@ -376,7 +379,7 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         const r1b = await ecran(pg);
         dit(r1b.ecran === 'ventes' && r1b.site === 'vinted' && r1b.puce === '222', `R1 ${qui} : rechargé, même compte choisi`, JSON.stringify(r1b));
         // R2 · Colis · À retirer, app rouverte
-        await toucher(pg, '.vrm-tabbar [data-nav-entree="achats"]');
+        await allerPaire(pg, 'achats');
         await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
         const r2avant = await ecran(pg);
         await pg.close();
@@ -385,7 +388,7 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         await capture(pg, `reprise-colis-${sombre ? 'sombre' : 'clair'}`);
         dit(r2avant.colis === 'retirer' && r2.ecran === 'achats' && r2.colis === 'retirer', `R2 ${qui} : rouverte, même écran (Achats, « À retirer » en tête — lot DJ3) et même liste (À retirer)`, JSON.stringify({ avant: r2avant.colis, apres: r2 }));
         // R3 · Annonces : recherche + défilement, app rouverte
-        await toucher(pg, '.vrm-tabbar [data-nav-entree="annonces"]');
+        await allerPaire(pg, 'annonces');
         await toucher(pg, '[data-filtre-site] button[data-site="vinted"]');
         const champ = pg.locator(CHAMP_ANNONCES).first();
         const champLa = (await champ.count()) > 0;
