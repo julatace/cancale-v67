@@ -1,5 +1,6 @@
 // DEUTSCH — Übersetzung von fr.js (der Quelle). Gleiche Schlüssel, gleiche {Variablen}.
 import ecran_journee from './de/journee.js';
+import ecran_confort from './de/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_ventes from './de/ventes.js';
 import ecran_commun from './de/commun.js';
 import ecran_achats from './de/achats.js';
@@ -2165,4 +2166,5 @@ export default {
   "rh.vuesPasSu": "Aufrufe —",
   "rh.vendue": "verkauft",
   "rh.enLigne": "online",
+  ...ecran_confort,
 };

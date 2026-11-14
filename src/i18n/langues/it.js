@@ -1,5 +1,6 @@
 // ITALIANO — traduzione di fr.js (la fonte). Stesse chiavi, stesse {variabili}.
 import ecran_journee from './it/journee.js';
+import ecran_confort from './it/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_ventes from './it/ventes.js';
 import ecran_commun from './it/commun.js';
 import ecran_achats from './it/achats.js';
@@ -2165,4 +2166,5 @@ export default {
   "rh.vuesPasSu": "visualizzazioni —",
   "rh.vendue": "venduta",
   "rh.enLigne": "online",
+  ...ecran_confort,
 };

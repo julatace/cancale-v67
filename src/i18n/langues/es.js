@@ -1,5 +1,6 @@
 // ESPAÑOL — traducción de fr.js (la fuente). Mismas claves, mismas {variables}.
 import ecran_journee from './es/journee.js';
+import ecran_confort from './es/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_ventes from './es/ventes.js';
 import ecran_commun from './es/commun.js';
 import ecran_achats from './es/achats.js';
@@ -2165,4 +2166,5 @@ export default {
   "rh.vuesPasSu": "visitas —",
   "rh.vendue": "vendida",
   "rh.enLigne": "en línea",
+  ...ecran_confort,
 };

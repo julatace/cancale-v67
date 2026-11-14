@@ -5,6 +5,7 @@
 // sans `other`. Clés : `<écran>.<élément>[.<précision>]`, jamais le texte lui-même.
 // Pluriel : { one: '…', other: '…' } choisi par `n` (Intl.PluralRules).
 import ecran_journee from './fr/journee.js';
+import ecran_confort from './fr/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_ventes from './fr/ventes.js';
 import ecran_commun from './fr/commun.js';
 import ecran_achats from './fr/achats.js';
@@ -2170,4 +2171,5 @@ export default {
   "rh.vuesPasSu": "vues —",
   "rh.vendue": "vendue",
   "rh.enLigne": "en ligne",
+  ...ecran_confort,
 };
