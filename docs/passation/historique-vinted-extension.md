@@ -1113,3 +1113,8 @@ Récit : `historique-interface-stock.md` (« LES QUATRE OUTILS DES ANNONCES »).
 | `vcfavoris` | `rangerVcAnnonces` | **5.295.0** | le NOMBRE de favoris par annonce Vestiaire (jamais qui) |
 | `relaisdest` | `relaisDestination` | **5.295.0** | « le point relais où arrivent tes achats (quand le suivi Vinted le donne) » |
 | `vcfiche` | `ficheVcAnnonce` | **5.296.0** (1er nov.) | annonces Vestiaire en fiches (photo, titre, prix, état) et le compte de l'onglet sur annonces/ventes/achats (flou par compte) |
+| `favorisauto` | `freinFavoriAuto` | **5.309.0** (2 nov.) | mode auto des favoris |
+| `plafondcompte` | `publierActions` | **5.312.0** (2 nov.) | le plafond de 50 actions/heure est celui du COMPTE, tous Chrome confondus |
+| `freinrepub` | `poserFreinRepub` | **5.311.0** (2 nov.) | un refus de Vinted freine la republication de CE compte (30 min ; 24 h si restreint) |
+| `numeroscompte` | `numerosDuCompte` | **5.311.0** (2 nov.) | sur Vinted, seuls les N° du compte connecté dans l'onglet |
+| `republierquestion` | `reglerAvant` | **5.310.0** (2 nov.) | Republier remplit un champ manquant depuis l'annonce elle-même, sinon DEMANDE (valeurs de Vinted) ; un refus nommé n'est jamais renvoyé tel quel |

@@ -297,7 +297,9 @@ async function scenario(b, vp, sombre) {
         plaques: pl, retire: [...document.querySelectorAll('[data-colis-retire]')].some((x) => x.offsetParent), relais: [...document.querySelectorAll('[data-relais-ouvrir]')].some((x) => x.offsetParent),
         scanner: [...document.querySelectorAll('[data-sb-tete="achats"] [data-colis-barre-btn="scanner"]')].some((x) => x.offsetParent),
         pleins: [...document.querySelectorAll('.sb-btn-plein')].filter((x) => x.offsetParent).length, vh: innerHeight, listeApres: liste && t ? liste.getBoundingClientRect().top > t.getBoundingClientRect().top : null }; });
-    dit(!!ret && ret.repli === 'ouvert' && ret.ligneCachee && ret.tete != null && ret.tete < ret.vh * 0.5, `${nom} : R « À retirer » est EN TÊTE d'Achats et ouvert sans toucher`, JSON.stringify({ repli: ret && ret.repli, cachee: ret && ret.ligneCachee, tete: ret && ret.tete }));
+    // (14 nov., version studio) La règle du repli est celle de main (`etatRepliRetirer`, src/repliRetirer.js, banc
+    // achats-retirer-visible) : ouvert d'office dès qu'un colis est à retirer, la ligne RESTE pour refermer (R3).
+    dit(!!ret && ret.repli === 'ouvert' && !ret.ligneCachee && ret.tete != null && ret.tete < ret.vh * 0.5, `${nom} : R « À retirer » est EN TÊTE d'Achats et ouvert sans toucher (la ligne reste pour refermer)`, JSON.stringify({ repli: ret && ret.repli, cachee: ret && ret.ligneCachee, tete: ret && ret.tete }));
     dit(!!ret && ret.n === '1' && ret.plaques.some((p) => p.code === '100001' && p.fs >= 16 && p.h >= 30), `${nom} : R le code de retrait en grande plaque, visible sans toucher`, JSON.stringify(ret && ret.plaques));
     dit(!!ret && ret.retire && ret.relais && ret.scanner && ret.pleins === 0, `${nom} : R « J'ai retiré », Mode relais, Scanner joignables ; aucun bouton plein sur Achats`, JSON.stringify({ retire: ret && ret.retire, relais: ret && ret.relais, scanner: ret && ret.scanner, pleins: ret && ret.pleins }));
     const aaR = await contrastes(pg, ['.sb-tete-titre', '.sb-tete-lib', '.sb-chiffre-affiche', '.vrm-rpf-code-gros', '.vrm-rpf-titre', '.vrm-colis-resume'], sombre);
