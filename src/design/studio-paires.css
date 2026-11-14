@@ -747,6 +747,15 @@
 :root:root:root:root:root body .vrm-fp .vrm-fp-outils .vrm-ao-second { min-height: 44px !important; background: transparent !important; border: 0 !important; box-shadow: none !important; color: var(--sbp-lien) !important; font: 600 14px/1.2 var(--sbp-texte) !important; padding: 0 4px !important; }
 :root:root:root:root:root body .vrm-fp .vrm-fp-outils .vrm-ao-second:active { opacity: .55 !important; }
 
+
+/* Accepter dès · Refuser sous · Boost payé · Marge : deux par ligne (quatre coupaient leurs libellés). */
+:root:root:root:root:root:root body .vrm-fp .vrm-fp-depuis-ligne [data-chiffres] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+/* Ordinateur : les alertes de l'écran (« Bénéfice — : prix d'achat 0/36 connus · Compléter ») posées en tuiles de porcelaine. */
+:root:root:root:root:root body [data-espace="paires"] .vrm-ui-afaire-corps > * {
+  background: linear-gradient(180deg, var(--sbp-feuille), var(--sbp-feuille2)) !important; border: 0 !important; border-radius: 22px !important; box-shadow: var(--sbp-om-tuile) !important; color: var(--sbp-encre) !important;
+}
+:root:root:root:root:root body [data-espace="paires"] .vrm-ui-afaire-corps > * :is(b, strong, span:not([class*="point"])) { color: inherit; }
+
 /* ── 14. Mouvement et transparence réduits ───────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   :root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] { animation: sbp-fondu 180ms both !important; }
