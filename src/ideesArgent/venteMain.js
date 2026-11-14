@@ -17,7 +17,7 @@
 //       'possible'      UNE paire présente, vente lue et absente ⇒ la carte à vendre ;
 //       'plusieurs'     deux paires PRÉSENTES sous ce N° (le doublon, §5) ⇒ IL choisit ;
 //       'deux-annonces' deux annonces en ligne de la MÊME paire ⇒ refus (rien deviné) ;
-//       'vendue'        une vente lue (Vinted, Leboncoin, eBay), à envoyer, en route ou
+//       'vendue'        une vente lue (Vinted, Leboncoin, eBay, Vestiaire), à envoyer, en route ou
 //                       finie ⇒ refus clair ; 'deja-main' : déjà vendue en main propre ;
 //       'marquee'       marquée vendue dans Annonces ; 'sortie' : enlevée du stock ;
 //       'compte-ecarte' sur un compte retiré de ses totaux ⇒ refus (elle ne compterait
@@ -33,6 +33,7 @@
 // Module PUR : aucune lecture, aucune écriture. Exécuté par scripts/audit-idees-argent.cjs.
 // ═══════════════════════════════════════════════════════════════════════════
 import { opsVenduAilleurs, CLE_DECISIONS, CLE_VENDUES, CHOIX_MAIN, PAIEMENTS, aujourdhui, dateValide } from '../venteAilleurs.js';
+import { vcVenteAnnulee } from '../../api/_lib/vestiaire-regle.js';
 
 export { PAIEMENTS, aujourdhui, dateValide };
 const str = (v) => String(v == null ? '' : v).trim();
@@ -48,7 +49,7 @@ const carteDeAnnonce = (a, numero) => ({ id: String(a.id), numero: str(numero), 
 // (`histoireArticle`, son étape « vente ») ; decisions : `vrm_cycle_decisions` ;
 // vendues : `vinted_annonces_vendues` ; ecarte(uid) : le compte est-il hors des totaux ;
 // choisie : l'annonce touchée quand deux paires portent ce N°.
-export function verdictVenteMain({ rn, p = null, decisions = {}, vendues = [], ecarte = () => false, choisie = null } = {}) {
+export function verdictVenteMain({ rn, p = null, decisions = {}, vendues = [], ventesVc, ecarte = () => false, choisie = null, cle: cleDe = cleNumDefaut } = {}) {
   if (!rn || rn.etat === 'invalide' || !rn.cle) return { etat: 'invalide' };
   const cle = rn.cle;
   const annonces = Array.isArray(rn.annonces) ? rn.annonces : [];
@@ -74,6 +75,11 @@ export function verdictVenteMain({ rn, p = null, decisions = {}, vendues = [], e
   const eV = p && Array.isArray(p.etapes) ? p.etapes.find((e) => e && e.cle === 'vente') : null;
   if (!eV || eV.etat === 'passu') return { etat: 'passu', cle, manques: rn.manques || [] };
   if (eV.etat === 'fait') return { etat: 'vendue', cle, ou: str(eV.titre), lignes: (Array.isArray(eV.evenements) ? eV.evenements : Array.isArray(eV.lignes) ? eV.lignes : []).map((x) => str(x && x.texte)).filter(Boolean) };
+  // Vestiaire (pas dans « Tout sur le N° ») : ses ventes par IDENTITÉ (`ventesVcDe`, son N°), la règle de
+  // `numerosDejaVendus`. Trois états : liste · null pas su · undefined en cours ⇒ « pas su ».
+  if (!Array.isArray(ventesVc)) return { etat: 'passu', cle, manques: [...(rn.manques || []), 'tes ventes Vestiaire'] };
+  const vc = ventesVc.find((x) => x && !vcVenteAnnulee(x) && x.num != null && str(x.num) !== '' && cleDe(x.num) === cle);
+  if (vc) return { etat: 'vendue', cle, ou: 'Vendue sur Vestiaire', lignes: ['Vestiaire'] };
   const numero = (p && p.num) || cle;
   let a = encore[0];
   if (encore.length > 1) {

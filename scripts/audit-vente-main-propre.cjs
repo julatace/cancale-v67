@@ -37,6 +37,8 @@ const MUTATIONS = {
   'deux annonces de la même paire : une choisie': [[VM, "    if (!rn.double) return { etat: 'deux-annonces', cle };\n", '']],
   'compte retiré des totaux ignoré': [[VM, "  if (a.accountId != null && ecarte(String(a.accountId))) return", '  if (false) return']],
   'déjà vendue en main propre revendue': [[VM, "  if (dej) return { etat: 'deja-main',", "  if (false) return { etat: 'deja-main',"]],
+  'vente Vestiaire ignorée': [[VM, "  if (vc) return { etat: 'vendue',", "  if (false) return { etat: 'vendue',"]],
+  'Vestiaire pas lu pris pour « rien »': [[VM, "  if (!Array.isArray(ventesVc)) return", "  if (false) return"]],
   'marquée vendue ignorée': [[VM, "  if (encore.some((a) => V.has(String(a.id)))) return { etat: 'marquee', cle };\n", '']],
   'archive prise à la place': [[VM, "    if (rn.ancien) return { etat: 'archive', cle, ancien: str(rn.ancien) };", "    if (rn.ancien) return { etat: 'possible', cle, carte: { id: 'archive', numero: str(rn.ancien) } };"]],
   'remettre en stock : case écrasée': [[VM, '    if (!prise) { ops.push(', '    if (true) { ops.push(']],
@@ -44,7 +46,7 @@ const MUTATIONS = {
   'paiement jamais rangé': [['src/venteAilleurs.js', '...(paiement ? { paiement } : {})', '...{}']],
   'paire vendue restée au stock': [['src/venteAilleurs.js', '  if (!dedans) ops.push(', '  if (false) ops.push(']],
   'feuille : verdict pas relu au clic': [['src/ideesArgent/Feuilles.jsx', "    if (!v2 || v2.etat !== 'possible' || v2.carte.id !== carte.id) { setFaux('change'); setTick((t) => t + 1); return; }\n", '']],
-  'fiche : ancienne règle (sans le verdict commun)': [['src/App.jsx', "    const v=verdictVenteMain({ rn, p, decisions:lireObjet(CYCLE_DECISIONS), vendues:load('vinted_annonces_vendues',[])||[], ecarte:(uid)=>compteEcarte(uid,hAcc,panelOffCoque) });", "    const v=verdictVenteMain({ rn, p, decisions:lireObjet(CYCLE_DECISIONS) });"]],
+  'fiche : ancienne règle (sans le verdict commun)': [['src/App.jsx', "    const v=verdictVenteMain({ rn, p, decisions:lireObjet(CYCLE_DECISIONS), vendues:load('vinted_annonces_vendues',[])||[], ventesVc:ventesVcCoque, cle:cleNum, ecarte:(uid)=>compteEcarte(uid,hAcc,panelOffCoque) });", "    const v=verdictVenteMain({ rn, p, decisions:lireObjet(CYCLE_DECISIONS) });"]],
   'reçu : paiement absent': [['src/ideesArgent/recuPdf.js', '  ligne(mots.paiement, mots.modes[recu.paiement] || recu.paiement);\n', '']],
 };
 if (process.argv.includes('--prouve')) { prouver(__filename, R, MUTATIONS); return; }
@@ -78,7 +80,7 @@ function declaration(src, nom) {
     const p = rn && rn.etat !== 'invalide' ? H.histoireArticle(rn, { fiches: D.fiches }, { venteAnnulee: (v) => /annul/i.test(v.status || ''), commandeEbayEngagee: () => true, lbcAnnulee: (v) => !!v.annulee, montantRecuEbay: () => ({ eur: 50 }) }) : null;
     return { rn, p };
   };
-  const verdict = (q, d = {}, x = {}) => { const { rn, p } = lecture(q, d); return M.verdictVenteMain({ rn, p, decisions: x.decisions || {}, vendues: x.vendues || [], ecarte: x.ecarte || (() => false), choisie: x.choisie || null }); };
+  const verdict = (q, d = {}, x = {}) => { const { rn, p } = lecture(q, d); return M.verdictVenteMain({ rn, p, decisions: x.decisions || {}, vendues: x.vendues || [], ventesVc: Object.prototype.hasOwnProperty.call(x, 'vc') ? x.vc : [], cle: cleNum, ecarte: x.ecarte || (() => false), choisie: x.choisie || null }); };
   const F = {
     '9124': { numero: '124', title: 'Asics Gel-Kayano 14 argent', size: '43', price: '90', accountId: '111', buyPrice: '37', buyFrom: 'vendeur_x' },
     '9240': { numero: '1240', title: 'Nike Dunk Low Panda', price: '80', accountId: '111' },
@@ -107,7 +109,9 @@ function declaration(src, nom) {
     dit(annulee.etat === 'possible', 'R8 une vente Vinted ANNULÉE ⇒ la paire est revenue : possible', annulee.etat);
     const lbc = verdict('124', { fiches: F, lbcVentes: [{ id: 'l1', num: '124', price: 9000, date: '2026-11-12T10:00:00Z' }] });
     const ebay = verdict('124', { fiches: F, ebay: [{ orderId: 'e1', creationDate: '2026-11-12T10:00:00Z', lineItems: [{ num: '124' }] }] });
-    dit(lbc.etat === 'vendue' && ebay.etat === 'vendue', 'R9 vendue sur Leboncoin, sur eBay (par leur identité) ⇒ refus', JSON.stringify([lbc.etat, ebay.etat]));
+    const vcV = verdict('124', { fiches: F }, { vc: [{ id: 'v1', num: '124' }] }), vcAutre = verdict('124', { fiches: F }, { vc: [{ id: 'v2', num: '1240' }] });
+    dit(lbc.etat === 'vendue' && ebay.etat === 'vendue' && vcV.etat === 'vendue' && /Vestiaire/.test(vcV.ou) && vcAutre.etat === 'possible', 'R9 vendue sur Leboncoin, eBay, Vestiaire (par leur identité, N° exact) ⇒ refus', JSON.stringify([lbc.etat, ebay.etat, vcV, vcAutre.etat]));
+    dit(verdict('124', { fiches: F }, { vc: null }).etat === 'passu' && verdict('124', { fiches: F }, { vc: undefined }).etat === 'passu', 'R9b ventes Vestiaire pas lues (null) ou en cours ⇒ « pas su »');
     const passu = verdict('124', { fiches: F, ventes: null });
     dit(passu.etat === 'passu', 'R10 ventes Vinted pas lues ⇒ refus (« pas su » ne vaut pas « pas vendue »)', JSON.stringify(passu));
     const sansFiches = M.verdictVenteMain({ rn: RN.toutSurLeNumero('124', { fiches: null }, { cleNum }, []) });
@@ -204,8 +208,8 @@ function declaration(src, nom) {
   await essaie('C', async () => {
     const app = require('./_source-app.cjs').sourceApp(R);
     const f = sansCommentaires(lire('src/ideesArgent/Feuilles.jsx'));
-    dit(app.includes("const v=verdictVenteMain({ rn, p, decisions:lireObjet(CYCLE_DECISIONS), vendues:load('vinted_annonces_vendues',[])||[], ecarte:(uid)=>compteEcarte(uid,hAcc,panelOffCoque) });")
-      && app.includes("return verdictVenteMain({ rn, p, decisions:lireObjet(CYCLE_DECISIONS), vendues:load('vinted_annonces_vendues',[])||[], choisie, ecarte:(uid)=>compteEcarte(uid,hAcc,panelOffCoque) });"),
+    dit(app.includes("const v=verdictVenteMain({ rn, p, decisions:lireObjet(CYCLE_DECISIONS), vendues:load('vinted_annonces_vendues',[])||[], ventesVc:ventesVcCoque, cle:cleNum, ecarte:(uid)=>compteEcarte(uid,hAcc,panelOffCoque) });")
+      && app.includes("return verdictVenteMain({ rn, p, decisions:lireObjet(CYCLE_DECISIONS), vendues:load('vinted_annonces_vendues',[])||[], ventesVc:ventesVcCoque, cle:cleNum, choisie, ecarte:(uid)=>compteEcarte(uid,hAcc,panelOffCoque) });"),
       'C1 UNE règle : « Vendu ailleurs » de la fiche ET la feuille passent par `verdictVenteMain` (même histoire, même compte exclu)');
     dit(app.includes("const { rn, p } = histoirePaire(String(q||''), false);") && app.includes('const { rn, numeros, nomCompte, ex, p, etat, neuve } = histoirePaire(numF);'), 'C2 la feuille lit l’histoire du N° comme la fiche (`histoirePaire`)');
     const valider = f.slice(f.indexOf('const valider = '), f.indexOf('const remettre = '));

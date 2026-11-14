@@ -60745,7 +60745,7 @@ function AppCoeur() {
   const blocVenduAilleurs=(p,rn,etat)=>{
     if(!p||!p.num||p.ancienNumero||!rn||!Array.isArray(rn.annonces)||!etat) return null;
     const hAcc=new Set((load('vinted_accounts_hidden',[])||[]).map(String));
-    const v=verdictVenteMain({ rn, p, decisions:lireObjet(CYCLE_DECISIONS), vendues:load('vinted_annonces_vendues',[])||[], ecarte:(uid)=>compteEcarte(uid,hAcc,panelOffCoque) });
+    const v=verdictVenteMain({ rn, p, decisions:lireObjet(CYCLE_DECISIONS), vendues:load('vinted_annonces_vendues',[])||[], ventesVc:ventesVcCoque, cle:cleNum, ecarte:(uid)=>compteEcarte(uid,hAcc,panelOffCoque) });
     if(v.etat==='deja-main') return <VenduAilleurs carte={{ id:v.decision.id, numero:p.num }} deja={v.decision} Bouton={Bouton}/>;
     if(v.etat!=='possible'||v.double) return null;
     return <VenduAilleurs key={v.carte.id} carte={{ id:v.carte.id, numero:p.num }} Bouton={Bouton} onValider={(x)=>venduAilleursGeste({ id:v.carte.id, numero:p.num, title:v.carte.titre||'' },x)}/>;
@@ -61377,7 +61377,7 @@ function AppCoeur() {
     if(!numData) return { etat:'lecture' };
     const { rn, p } = histoirePaire(String(q||''), false);
     const hAcc=new Set((load('vinted_accounts_hidden',[])||[]).map(String));
-    return verdictVenteMain({ rn, p, decisions:lireObjet(CYCLE_DECISIONS), vendues:load('vinted_annonces_vendues',[])||[], choisie, ecarte:(uid)=>compteEcarte(uid,hAcc,panelOffCoque) });
+    return verdictVenteMain({ rn, p, decisions:lireObjet(CYCLE_DECISIONS), vendues:load('vinted_annonces_vendues',[])||[], ventesVc:ventesVcCoque, cle:cleNum, choisie, ecarte:(uid)=>compteEcarte(uid,hAcc,panelOffCoque) });
   };
   const rendreFichePaire=(numF, depuis, fermerF, ligneRes=null, choisir=null)=>{
           if (!numF) return <FichePaire owner={AUTH.user?.id||''} p={null} num={''} lecture={!!ligneRes && ligneRes.etat==='lecture'} ligne={depuis} ligneRes={ligneRes} onChoisirNum={choisir} onFermer={fermerF} onRetour={fermerF} Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>} Icon={Icon} Retour={FermeAuRetour}/>;
