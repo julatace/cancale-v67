@@ -1889,3 +1889,11 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Déplacé tel quel de CLAUDE.md §9 (14 nov., intégration de la refonte — fichier sous 59 000 octets)
 - **14 nov. · Extension 5.376.0 consolidée** : quatre branches en UNE version (carte du logo + capture, messages-achats-plus, argent-prix `remiseprix`, dates-versement `versementconv`), zips refaits une fois. `docs/passation/2026-11-14-extension-5376.md`. Geste : installer la 5.376.0 sur chaque navigateur.
+## Lignes du §9 de CLAUDE.md déplacées telles quelles le 14 nov. (refonte des listes, taille du dossier)
+
+
+## Lignes du §9 de CLAUDE.md déplacées telles quelles le 14 nov. (listes : phrase, glisser, épingles, comparer — taille du dossier)
+
+
+## Déplacé tel quel de CLAUDE.md §9 (14 nov., intégration de la refonte — fichier sous 59 000 octets)
+- **14 nov. · Accueil, le reste (133 134 136 139 140 143 145 146 147)** : « J'ai déjà mes N° sur mes cartons » (aucun N° neuf avant sa réponse, N° écrit en double ⇒ rouge, rien adopté), « Ce que VRM a trouvé », visite de 4 écrans, mots expliqués, conseil du jour 30 j, essai en chiffres prouvés, vidéo 45 s, Apple prêt et ÉTEINT, appel de bienvenue Pro ; « À trancher » ne recouvre plus Ma journée. `docs/passation/2026-11-14-accueil-reste.md`. Geste : coller son lien de réservation (Paramètres → Aide) ; Apple si voulu (99 €/an).

@@ -28,6 +28,7 @@ import ecran_accueilReste from './fr/accueilReste.js';
 import ecran_fraiscarte from './fr/fraiscarte.js';   // (14 nov., frais-carte)
 import ecran_atelier from './fr/atelier.js';
 import ecran_argentprix from './fr/argentprix.js';   // (14 nov., argent-prix)
+import ecran_rechliste from './fr/rechliste.js';
 export default {
   ...ecran_accueilReste,
   ...ecran_refonte_ms,
@@ -36,6 +37,7 @@ export default {
   ...ecran_tarifs,
   ...ecran_nouveaux,
   ...ecran_atelier,
+  ...ecran_rechliste,
   ...ecran_listes,
   ...ecran_plus,
   ...ecran_argentprix,

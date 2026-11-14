@@ -524,11 +524,10 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **14 nov. · Listes : phrase, glisser, épingles, comparer (92–95)** : « nike 42 pas vendue depuis 2 mois » ⇒ capsules modifiables sans IA (5 langues, Annonces + ⌘K, `src/recherchePhrase.js`) ; cocher en glissant depuis la case ; 20 épingles par identité (`vrm_epingles`, synchronisées) ; comparer deux cochées. `docs/passation/2026-11-14-listes-recherche.md`. Geste : aucun.
+- **14 nov. · Refonte des listes** : Annonces et Ventes « la liste d'abord » (bande de chiffres au lieu de la carte sombre, compte en menu, barre + petites capsules, alertes dans « • À faire · N », phrase sous le titre retirée), Annonces en liste groupée de 70 px, colis en rangées, Ma journée : héros atelier ; briques communes `src/ui/` ; banc `refonte-listes`. `docs/passation/2026-11-14-refonte-listes.md`. Geste : aucun.
 - **14 nov. · Refonte visible des sites et des Paramètres** : Leboncoin, eBay, Vestiaire « liste d'abord » (« À faire · N › » en feuille gardée montée, une barre, rangées denses) ; Paramètres façon iOS (recherche en haut, avancés repliés) ; connexion et accueil atmosphériques. `2026-11-14-refonte-plateformes-reglages.md`. Geste : aucun.
 - **14 nov. · Refonte Messages, E-mails, Stock** : la liste d'abord (Stock : 1re paire à 1 541 px ⇒ < 422, bande, « À faire · N › », rangées 68 px ; Messages : recherche, « À relier », rangées 72 px, fil iOS ; E-mails : rangées 72 px, code à droite), briques `src/ui` ; banc `refonte-messages-stock` (13 défauts ⇒ 0). `docs/passation/2026-11-14-refonte-messages-stock.md`. Geste : aucun.
-- **14 nov. · Refonte des listes** : Annonces et Ventes « la liste d'abord » (bande de chiffres au lieu de la carte sombre, compte en menu, barre + petites capsules, alertes dans « • À faire · N », phrase sous le titre retirée), Annonces en liste groupée de 70 px, colis en rangées, Ma journée : héros atelier ; briques communes `src/ui/` ; banc `refonte-listes`. `docs/passation/2026-11-14-refonte-listes.md`. Geste : aucun.
-- **14 nov. · Accueil, le reste (133 134 136 139 140 143 145 146 147)** : « J'ai déjà mes N° sur mes cartons » (aucun N° neuf avant sa réponse, N° écrit en double ⇒ rouge, rien adopté), « Ce que VRM a trouvé », visite de 4 écrans, mots expliqués, conseil du jour 30 j, essai en chiffres prouvés, vidéo 45 s, Apple prêt et ÉTEINT, appel de bienvenue Pro ; « À trancher » ne recouvre plus Ma journée. `docs/passation/2026-11-14-accueil-reste.md`. Geste : coller son lien de réservation (Paramètres → Aide) ; Apple si voulu (99 €/an).
-
 
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
