@@ -209,7 +209,7 @@ function mesurerForme({ tactile, sombre, liste }) {
     // Aucun bandeau flottant au-dessus de la barre du bas après 3 s (la pastille de la COQUE est dite à part).
     for (const e of document.querySelectorAll('body *')) {
       const cs = getComputedStyle(e); if (cs.position !== 'fixed' && cs.position !== 'sticky') continue;
-      if (e.closest('.vrm-app-header, .vrm-mobile-nav, nav, [role="dialog"], .vrm-ui-voile, .vrm-ann-workbar, .vrm-ann-compte-tete')) continue;
+      if (e.closest('.vrm-app-header, .vrm-barre-haut, .vrm-mobile-nav, nav, [role="dialog"], .vrm-ui-voile, .vrm-ann-workbar, .vrm-ann-compte-tete')) continue;
       const r = e.getBoundingClientRect(); if (r.height < 16 || r.height > 160 || r.bottom < 0 || r.top > H) continue;
       if (!(e.innerText || '').trim() || !vis(e)) continue;
       if (cs.position === 'sticky' && r.top > 60) continue;

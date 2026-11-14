@@ -48873,7 +48873,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {(listings.items?.length>0 || annMasquees.length>0 || (brVinted.liste||[]).length>0) && <div className="vrm-stock-views vrm-filtres" role="group" aria-label={tr('annonces.vuesRapidesAnnonces')}>
           {/* (14 nov., refonte des listes) « • À faire · N » en tête des vues : au téléphone, la feuille des alertes (src/ui/AFaire.jsx) ;
               à l'ordinateur, les alertes restent posées ensemble sous les vues (place « ordinateur » ci-dessous). */}
-          <AFaireLigne capsule className="vrm-ann-afaire"/>
+          <AFaireLigne capsule seulement="telephone" className="vrm-ann-afaire"/>
           {/* (5 nov., chantier C — revue 2.10) « Sélectionner » en DEUXIÈME : au téléphone, la
               rangée défile et le coupait au bord (« Séle… »). « Tout le stock » devient « Toutes »
               (le Stock est un autre écran). */}
@@ -48900,6 +48900,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         </div>}
         {/* (14 nov., refonte des listes) « • À faire · N › » : au téléphone, UNE ligne qui ouvre la feuille des alertes ;
             à l'ordinateur, les mêmes alertes posées ici, ensemble. */}
+        {/* À l'ordinateur, les alertes posées ensemble HORS de la barre (une carte dans une carte, sinon). */}
+        <AFaireLigne seulement="ordinateur" className="vrm-ann-afaire"/>
         {/* (5 nov., chantier C — revue 2.9) « sélection » ne nomme plus que les cases cochées :
             le filtre dit « affichées ». Dans les vues à cocher (Sélectionner, Brouillons), leur
             propre tête dit déjà quoi faire : pas de ligne de filtre en plus. */}

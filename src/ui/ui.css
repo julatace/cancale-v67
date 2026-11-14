@@ -97,24 +97,11 @@
   display: inline-flex !important; align-items: center !important; gap: 6px !important; min-height: 44px !important; padding: 0 12px !important; cursor: pointer !important;
   font: 600 15px/1 var(--vrm-police) !important; color: var(--d-encre, #1D1D1F) !important; white-space: nowrap !important; background: none !important; box-shadow: none !important; border: 0 !important; -webkit-tap-highlight-color: transparent;
 }
-:root:root:root body .vrm-ui-filtre::before {
-  content: '' !important; position: absolute !important; inset: 5px 0 !important; z-index: -1 !important; border-radius: 999px !important;
-  background: var(--d-carte, #fff) !important; box-shadow: inset 0 0 0 .5px var(--d-filet-fort, rgba(60,60,67,.29)) !important; transition: transform var(--d-m-appui, 100ms) ease-out !important;
-}
-:root:root:root body .vrm-ui-filtre[aria-pressed="true"] { color: var(--d-carte, #fff) !important; }
-:root:root:root body .vrm-ui-filtre[aria-pressed="true"]::before { background: var(--d-encre, #1D1D1F) !important; box-shadow: none !important; }
-:root:root:root body .vrm-ui-filtre:active::before { transform: var(--d-appui, scale(.97)) !important; }
+:root:root:root body .vrm-ui-filtre { border-top: 5px solid transparent !important; border-bottom: 5px solid transparent !important; background-clip: padding-box !important; background-color: var(--d-carte, #fff) !important; border-radius: 999px !important; transition: transform var(--d-m-appui, 100ms) ease-out !important; }
+:root:root:root body .vrm-ui-filtre[aria-pressed="true"] { color: var(--d-carte, #fff) !important; background-color: var(--d-encre, #1D1D1F) !important; }
+:root:root:root body .vrm-ui-filtre:active { transform: var(--d-appui, scale(.97)) !important; }
 :root:root:root body .vrm-ui-filtre-n { font-weight: 400 !important; font-variant-numeric: tabular-nums !important; opacity: .7 !important; }
-@media (hover: hover) and (pointer: fine) { :root:root:root body .vrm-ui-filtre { min-height: 36px !important; } :root:root:root body .vrm-ui-filtre::before { inset: 2px 0 !important; } }
-
-/* ── LigneAFaire : « • À faire · 5 › », une rangée, une feuille ── */
-:root:root:root body .vrm-ui-afaire {
-  all: unset; box-sizing: border-box !important; width: 100% !important; display: flex !important; align-items: center !important; gap: 10px !important;
-  min-height: 44px !important; padding: 0 12px 0 14px !important; border-radius: 12px !important; cursor: pointer !important;
-  background: var(--d-carte, #fff) !important; box-shadow: var(--d-ombre-douce, 0 1px 2px rgba(0,0,0,.04)) !important;
-  font: 600 15px/1.2 var(--vrm-police) !important; color: var(--d-encre, #1D1D1F) !important; -webkit-tap-highlight-color: transparent; transition: transform var(--d-m-appui, 100ms) ease-out !important;
-}
-:root:root:root body .vrm-ui-afaire:active { transform: var(--d-appui, scale(.97)) !important; }
+@media (hover: hover) and (pointer: fine) { :root:root:root body .vrm-ui-filtre { min-height: 36px !important; } :root:root:root body .vrm-ui-afaire:active { transform: var(--d-appui, scale(.97)) !important; }
 :root:root:root body .vrm-ui-afaire-point { flex: none !important; width: 8px !important; height: 8px !important; border-radius: 50% !important; background: var(--d-point-ambre, #FF9F0A) !important; }
 :root:root:root body .vrm-ui-afaire-mots { flex: 1 1 auto !important; min-width: 0 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
 :root:root:root body .vrm-ui-afaire-n { font-weight: 400 !important; color: var(--d-gris, #6E6E73) !important; font-variant-numeric: tabular-nums !important; }
@@ -127,14 +114,11 @@
   display: inline-flex !important; align-items: center !important; gap: 6px !important; min-height: 44px !important; padding: 0 12px !important; cursor: pointer !important;
   font: 600 15px/1 var(--vrm-police) !important; color: var(--d-encre, #1D1D1F) !important; white-space: nowrap !important; background: none !important; -webkit-tap-highlight-color: transparent;
 }
-:root:root:root body .vrm-ui-afaire-capsule::before {
-  content: '' !important; position: absolute !important; inset: 5px 0 !important; z-index: -1 !important; border-radius: 999px !important;
-  background: var(--d-ambre-fond, #FFF4E5) !important;
-}
 :root:root:root body .vrm-ui-afaire-capsule > svg { display: none !important; }
 :root:root:root body .vrm-ui-afaire-capsule .vrm-ui-afaire-mots { overflow: visible !important; }
 :root:root:root body .vrm-ui-afaire-capsule .vrm-ui-afaire-n { color: var(--d-ambre, #B25000) !important; font-weight: 600 !important; }
-:root:root:root body .vrm-ui-afaire-capsule:active::before { transform: var(--d-appui, scale(.97)) !important; }
+:root:root:root body .vrm-ui-afaire-capsule { border-top: 5px solid transparent !important; border-bottom: 5px solid transparent !important; background-clip: padding-box !important; background-color: var(--d-ambre-fond, #FFF4E5) !important; border-radius: 999px !important; }
+:root:root:root body .vrm-ui-afaire-capsule:active { transform: var(--d-appui, scale(.97)) !important; }
 
 /* ── Ligne : la rangée d'une liste longue (64–72 px, vignette 52) ── */
 :root:root:root body .vrm-ui-ligne {

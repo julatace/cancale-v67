@@ -10,6 +10,7 @@
 //   · à l'ordinateur : le conteneur est posé tel quel à la place de la ligne (la place y est).
 // N = le nombre d'alertes qui ont rendu quelque chose (une alerte qui rend `null` ne compte pas).
 //   <AFaireHote> … <AFaireLigne/> … <VersAFaire>{alerte1}</VersAFaire> … </AFaireHote>
+// `seulement` : 'telephone' ou 'ordinateur' — deux places dans l'écran, une par appareil.
 // `capsule` : la ligne prend la forme d'une capsule de filtre (posée en tête de la rangée des vues : aucune ligne de plus).
 import React, { createContext, useContext, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -42,7 +43,7 @@ export function VersAFaire({ children }) {
   return createPortal(<div data-ui-afaire-item="">{children}</div>, c.conteneur);
 }
 
-export function AFaireLigne({ titre, className = '', capsule = false }) {
+export function AFaireLigne({ titre, className = '', capsule = false, seulement = '' }) {
   const c = useContext(Ctx);
   const [tel, setTel] = useState(telephone);
   const [ouvert, setOuvert] = useState(false);
@@ -59,6 +60,8 @@ export function AFaireLigne({ titre, className = '', capsule = false }) {
     if (cible && c.conteneur.parentNode !== cible) cible.appendChild(c.conteneur);
   });
   if (!c || !c.conteneur) return null;
+  if (seulement === 'telephone' && !tel) return null;
+  if (seulement === 'ordinateur' && tel) return null;
   if (!tel) return <div ref={place} className={'vrm-ui-afaire-place' + (className ? ' ' + className : '')} data-ui-afaire-place="ordinateur"/>;
   return (
     <>
