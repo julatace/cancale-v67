@@ -12,8 +12,10 @@ import ecran_stats from './de/stats.js';
 import ecran_compta from './de/compta.js';
 import ecran_fiche from './de/fiche.js';
 import ecran_argent from './de/argent.js';
+import ecran_fraiscarte from './de/fraiscarte.js';   // (14 nov., frais-carte)
 export default {
   ...ecran_fiche,
+  ...ecran_fraiscarte,
   ...ecran_compta,
   ...ecran_argent,
   ...ecran_stats,
