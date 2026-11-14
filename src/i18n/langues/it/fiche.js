@@ -1,0 +1,23 @@
+// it · fiche (FichePaire ouverte depuis une ligne de liste, 14 nov., proposition 62).
+export default {
+  "fiche.retour": "Indietro",
+  "fiche.heros": "Il paio",
+  "fiche.actions": "Azioni",
+  "fiche.sansNum": "Senza N.",
+  "fiche.sansTitre": "Senza titolo",
+  "fiche.lotN": "{n} paia",
+  "fiche.lotTitre": "Questa riga contiene {n} paia: scegli quale vedere.",
+  "fiche.lecture": "Sto leggendo questa riga…",
+  "fiche.passu": "non so: la base non ha risposto, riprova tra un momento.",
+  "fiche.pasDePaire": "Nessun paio collegato a questa riga.",
+  "fiche.gesteRelier.vente": "Per collegarla: metti il suo N. o collega il suo acquisto, nelle azioni qui sotto.",
+  "fiche.gesteRelier.achat": "Per collegarla: metti il N. del paio sul suo annuncio, o collega questo acquisto dalla vendita.",
+  "fiche.gesteRelier.annonce": "Per collegarla: dai un N. a questo annuncio.",
+  "fiche.ctx.vente": "Vendita",
+  "fiche.ctx.colis": "Pacco da spedire",
+  "fiche.ctx.achat": "Acquisto",
+  "fiche.ctx.annonce": "Annuncio",
+  "fiche.ctx.stock": "Magazzino",
+  "fiche.ctx.retrait": "Pacco da ritirare",
+  "fiche.ctx.journee": "La mia giornata",
+};
