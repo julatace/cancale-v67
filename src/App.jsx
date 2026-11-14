@@ -506,6 +506,7 @@ import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLie
 import { lignesFraicheur, quandRelu } from './fraicheurComptes.js';
 import { FRAICHEUR_ACHATS_J } from './fraicheur.js';   // (9 nov., lot AG) le seuil des achats vit avec la ligne de fraîcheur unique
 import { ventesEmailFraiches, avecVentesEmail, requeteVentesEmail, gesteVenteEmail, STATUT_VENTE_EMAIL, groupesVentesEmailEnTete, statutVentesEmail } from './venteEmailFraiche.js';
+import { TAMPONS as TAMPONS_IMPR } from './impression/thermique.js';   // (14 nov.) le tampon par bordereau dans « Tout imprimer »
 import { CLE_IMPRESSION, reglageImpression, papierThermique, placementEtiquette, contenuTampon, carteEncre, boiteEncre, decouperFeuille, fusionnerProches, moduleDuCode, moduleImprimeMm, codeAssezGros, seuillerNoir, tramerNoir, zonesAdresse, CONTRASTES, MODULE_MIN_MM, BANDE_CONTINU_MM } from './impression/thermique.js';
 import { decisionNumeroVenteEmail, numeroEcritDansArticle, colisVentesEmail, MENTION_SANS_NUM, CLE_IMPRIMES_SANS_NUM, phraseImprimeSansNumero } from './bordereauVenteEmail.js';
 import { premiereCaseLibre as premiereCaseMeubles, achatsArrives, notifsOuRanger, caseEnMots } from './ouRanger.js';
@@ -684,7 +685,11 @@ import { CLE_PRIX_LUS, noterPrixLus } from "./historiquePrix.js";
 import { conseilBaisse, derniereBaisseLue, baisseProportion, noterConseils, fusionConseils, CLE_CONSEIL_PRIX } from "./conseilPrix.js";   // (12 nov.) le conseil de baisse, mesuré   // (10 nov., lot L) les prix lus dans le dressing
 import CalculetteAchat from "./CalculetteAchat.jsx";   // (10 nov., lot L) la calculette d'achat (Achats, ⌘K)
 import { ChoixEmballageColis } from "./EmballagesCarte.jsx";   // (10 nov., lot L) l'emballage d'un colis (facultatif)
-import { CLE_EMBALLAGES } from "./emballages.js";
+import { CLE_EMBALLAGES, colisFaits as colisFaitsEmb } from "./emballages.js";
+// (14 nov., lot colis-plus 99, 101) La douchette (un code lu ⇒ LA vente, par identité) et le bénéfice par colis.
+import { DouchetteGlobale } from "./Douchette.jsx";
+import { venteDuCode, enregistrerResolveur, prendreDemande as prendreDemandeDouchette, codeCourt, DEMANDE_DOUCHETTE } from "./douchette.js";
+import { beneficesParColis } from "./tempsColis.js";
 import { listeInventaire, publierInventaireAnnuel } from "./inventaireAnnuel.js";   // (10 nov., lot W) l'inventaire de fin d'année
 import { BarreCoutVente, PointCout, SaisieEmballage } from "./CascadeVente.jsx";
 import { etatNumeroColis } from "./emballage.js";
@@ -13426,7 +13431,10 @@ const tamponnerBordereau = async (PL, pdf, { numero, titre, thermique = false, c
 // bas. D'où les deux repères ci-dessous, et JAMAIS une position écrite en dur :
 // une zone devinée de travers, c'est un code-barres coupé, donc un colis qui ne
 // part pas. Quand on ne SAIT pas, la page part entière — et l'écran le dit.
-const IMPR_MODES = ['normale', 'thermique'];
+// (14 nov., lot colis-plus 98) 'planche4' : sans imprimante thermique, « Tout imprimer » range les
+// étiquettes isolées QUATRE par feuille A4, dans l'ordre (src/impression/planche4.js) ; ailleurs
+// (un bordereau seul) c'est l'A4 normale.
+const IMPR_MODES = ['normale', 'thermique', 'planche4'];
 const imprMode = (v) => (IMPR_MODES.includes(String(v)) ? String(v) : 'normale');
 
 // Mots qui NE SONT PAS l'étiquette : la fiche à glisser dans le colis, la notice
@@ -14299,8 +14307,13 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
   if (!(await confirmerNumerosAVerifier((items || []).map((it) => it && it.numero)))) throw new Error(NUM_A_VERIFIER_ANNULE);
   const PL = await import('pdf-lib');
   const { PDFDocument, rgb, StandardFonts } = PL;
+  const modeLot = imprMode(opts.imprimante || imprimanteChoisie());
+  // (14 nov., lot colis-plus 98) 4 PAR PAGE A4 : la MÊME isolation que la thermique (les mêmes PDF, le
+  // même tampon, la page entière quand on ne sait pas), posée dans un document à part, puis rangée
+  // quatre par feuille dans l'ordre (`imposerPlanche`). Les factures restent des pages entières.
+  const planche = modeLot === 'planche4';
+  const thermique = modeLot === 'thermique' || planche;
   const out = await PDFDocument.create();
-  const thermique = imprMode(opts.imprimante || imprimanteChoisie()) === 'thermique';
   let count = 0, nInv = 0, isoles = 0, nEtiquettes = 0, fiches = 0, bandes = 0;
   const entiers = [];   // ce qu'on n'a PAS su isoler — l'écran doit le dire
   const details = [];   // (11 nov., lot thermique) ce qui a été mesuré, étiquette par étiquette
@@ -14318,7 +14331,11 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
       // ne SAIT pas où elle est, la page part ENTIÈRE — jamais un code-barres
       // coupé au hasard (`poserBordereau`, la même règle partout).
       // La position mémorisée de la forme de CE bordereau (`positionTampon`), sinon le choix automatique.
-      const r1 = await poserBordereau(PL, out, src, { numero: it.numero, title: it.title, pos, thermique, impression: extrasImpression(it.numero, it.title, { photo: it.photo || (it.ligne && it.ligne.photo) || null }), choisir: choisirTampon({ PL, src, numero: it.numero, titre: it.title, apercu: opts.apercu === undefined ? false : opts.apercu, deja: dejaLot, thermique }) });
+      // (14 nov., Julien : « modifier un par un chaque bordereau avec le tamponnage ») le tampon choisi pour CE
+      // bordereau dans l'aperçu (`it.tampon` : N° seul, N° + titre, + taille, rien) remplace le réglage, pour lui seul.
+      const impIt = extrasImpression(it.numero, it.title, { photo: it.photo || (it.ligne && it.ligne.photo) || null });
+      if (it.tampon && TAMPONS_IMPR.includes(it.tampon)) { const rg0 = reglageImpressionChoisi(); impIt.reg = { ...rg0, tamponA4: it.tampon, tamponTh: it.tampon }; }
+      const r1 = await poserBordereau(PL, out, src, { numero: it.numero, title: it.title, pos, thermique, impression: impIt, choisir: it.tampon === 'rien' ? null : choisirTampon({ PL, src, numero: it.numero, titre: it.title, apercu: opts.apercu === undefined ? false : opts.apercu, deja: dejaLot, thermique }) });
       for (const t of r1.tampons || []) { if (t === 'fiche') fiches++; else if (t === 'bande') bandes++; }
       details.push(...(r1.details || []));
       if (r1.isole) { isoles++; nEtiquettes += r1.etiquettes; }
@@ -14331,15 +14348,23 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
     } catch (e) { if (estTamponAnnule(e)) throw e; rates.push(index); }
   }
   if (!count) throw new Error('Aucun bordereau exploitable.');
-  posePrefsImpression(PL, out);   // une feuille par bordereau (§ recto-verso)
-  const bytes = await out.save();
+  let docFinal = out, infoPlanche = null;
+  if (planche) {
+    const { imposerPlanche } = await import('./impression/planche4.js');
+    const { doc, plan } = await imposerPlanche(PL, out);
+    docFinal = doc;
+    infoPlanche = { feuilles: doc.getPageCount(), etiquettes: plan.etiquettes, entieres: plan.entieres, echelle: Math.round(plan.echelle * 100) };
+  }
+  posePrefsImpression(PL, docFinal);   // une feuille par bordereau (§ recto-verso)
+  const bytes = await docFinal.save();
   if(opts.avantOuverture)opts.avantOuverture();
   const blob = new Blob([bytes], { type:'application/pdf' });
   const url = URL.createObjectURL(blob);
-  const filename = `bordereaux-${count}${nInv?'-'+nInv+'factures':''}${thermique?'-thermique':''}-a-la-suite.pdf`;
+  const filename = `bordereaux-${count}${nInv?'-'+nInv+'factures':''}${planche?'-4-par-page':thermique?'-thermique':''}-a-la-suite.pdf`;
   // Ouvert dans un onglet (ordinateur) ; sinon la modale propose « Ouvrir ».
   const printed = ouvrirPdfOnglet(url, filename);
   signalerBordereauImprime(true, null);
+  if (planche) return { url, filename, count, nInv, printed, ouvert: printed, thermique: false, planche: infoPlanche, isoles, etiquettes: nEtiquettes, entiers: [], reussis, rates, fiches, bandes };
   return { url, filename, count, nInv, printed, ouvert: printed, thermique, isoles, etiquettes: nEtiquettes, entiers, reussis, rates, fiches, bandes, ...bilanThermique(details) };
 };
 // Un échec (annulé, PDF illisible) referme la visionneuse « préparation… ».
@@ -43256,6 +43281,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // échec se relance seul (« Réessayer les échecs »).
   const VENTE_LOT_MAX_J = 14;
   const [lot, setLot] = useState(null);   // null · { coches: Set(cle), echecs: [cle] }
+  // (14 nov.) Le tampon choisi pour chaque bordereau dans l’aperçu de « Tout imprimer » (lu par `batchBordereaux`).
+  const tamponsLotRef = React.useRef({}); tamponsLotRef.current = (lot && lot.tampons) || {};
   const ageVenteJ = (o) => { const t = Date.parse(o && o.date); return Number.isFinite(t) ? (Date.now() - t) / 864e5 : null; };
   const lignesLot = () => expeditions()
     .filter(e => ((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn])) && !(e.o && isShipDone(e.o)))
@@ -43615,6 +43642,48 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const trouverScan = (brut) => { const r = trouverParScan(brut, colisScannables());
     if (r.etat === 'trouve' && attenteScan.current && attenteScan.current.cle === String(r.colis.cle)) return { ...r, etat: 'deja' };
     return r; };
+  // ── (14 nov., lot colis-plus 99) LA DOUCHETTE : un code lu ⇒ LA vente, PAR IDENTITÉ (§5) ──────────
+  // Les identités de chaque vente : SON n° de transaction, le n° de suivi de SON bordereau (e-mail et
+  // étiquette lue), Vestiaire par son n° de suivi. Égalité exacte (`venteDuCode`) ; deux ventes ⇒ rien.
+  // Trouvée ⇒ elle s'ouvre dans Ventes (la cible `vente:{tx}`, le chemin des notifications).
+  const lignesDouchette = () => {
+    const L = [];
+    for (const o of (Array.isArray(sales.items) ? sales.items : [])) {
+      if (!o || o.transaction_id == null) continue;
+      const tx = String(o.transaction_id), b = bordsParTxn[tx];
+      L.push({ cle: 'v:' + tx, site: 'vinted', tx, suivis: [b && b.suivi, b && b.suiviPdf].filter(Boolean), num: (b ? numForBord(b) : '') || ((effEntry(o) || {}).numero || ''), titre: o.title || '' });
+    }
+    for (const c of colisScannables()) {
+      if (c.site === 'vestiaire') L.push({ cle: c.cle, site: 'vestiaire', suivis: c.suivis, num: c.num, titre: c.titre, vc: c.v && c.v.id });
+      else if (c.site === 'vinted' && !c.o) L.push({ cle: c.cle, site: 'vinted', suivis: c.suivis, num: c.num, titre: c.titre, sansVente: true });
+    }
+    return L;
+  };
+  const douchettePrete = colisDans === 'ventes' && curSub === 'bordereaux' && Array.isArray(sales.items) && emailBords !== null;
+  const resoudreDouchette = React.useRef(null);
+  resoudreDouchette.current = (code, relu = false) => {
+    if (!douchettePrete) { DEMANDE_DOUCHETTE.code = code; DEMANDE_DOUCHETTE.at = Date.now(); toast(tr('cp.douchette.pasLu'), 'info'); return; }
+    const r = venteDuCode(code, lignesDouchette());
+    if (!(r.etat === 'inconnu' && !relu)) { try { document.documentElement.setAttribute('data-douchette', r.etat + (r.ligne ? ':' + r.ligne.cle : '')); } catch (_) {} }
+    if (r.etat === 'trouve' && !r.ligne.sansVente) {
+      const l = r.ligne;
+      toast(tr('cp.douchette.trouve', { qui: [l.num ? `N°${l.num}` : '', l.titre].filter(Boolean).join(' · ') || tr('cp.douchette.sansNum') }), 'ok');
+      const q = l.site === 'vestiaire' ? `?tab=ventes&site=vestiaire&cible=vcvente&vc=${encodeURIComponent(l.vc || '')}` : `?tab=ventes&site=vinted&cible=vente&tx=${encodeURIComponent(l.tx)}`;
+      try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: q })); } catch (_) {}
+      return;
+    }
+    if (r.etat === 'trouve') { toast(tr('cp.douchette.sansVente', { code: codeCourt(code) }), 'info'); return; }
+    if (r.etat === 'ambigu') { toast(tr('cp.douchette.ambigu', { n: r.lignes.length, code: codeCourt(code) }), 'err'); return; }
+    // Les bordereaux peuvent encore arriver (lecture en cours) : on relit UNE fois 2 s plus tard avant de dire « inconnu ».
+    if (!relu) { setTimeout(() => { try { resoudreDouchette.current(code, true); } catch (_) {} }, 2000); return; }
+    toast(tr('cp.douchette.inconnu', { code: codeCourt(code) }), 'err');
+  };
+  useEffect(() => {
+    if (colisDans !== 'ventes' || curSub !== 'bordereaux') return undefined;
+    return enregistrerResolveur((code) => resoudreDouchette.current(code));
+  }, [colisDans, curSub]);
+  // Un code lu avant que Ventes soit prêt (l'app y menait) : repris une fois les ventes lues.
+  useEffect(() => { if (!douchettePrete) return; const c = prendreDemandeDouchette(); if (c) resoudreDouchette.current(c); }, [douchettePrete]);
   const [emballage, setEmballage] = useState(() => {
     if (curSub !== 'bordereaux' || !DEMANDE_EMBALLAGE.at || Date.now() - DEMANDE_EMBALLAGE.at > 60000) return false;
     DEMANDE_EMBALLAGE.at = 0; return true;
@@ -43756,6 +43825,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const retirerRelais = (x) => { const t = (x && x.src && x.src.t) || null, o = (x && x.src && x.src.o) || null; if (t) return markCollected(t); if (o) return markPickupDone(o); return null; };
   const [preparerOuvert, setPreparerOuvert] = useState(false);
+  // (14 nov., lot colis-plus 97, 101) Les « Colis fait » datés (le stock de fournitures, comme au Stock) et le
+  // bénéfice de chaque colis lu dans le relevé de Ventes, PAR SA TRANSACTION (src/tempsColis.js) — rien d'écrit.
+  const lireFaitsEmb = React.useCallback(() => colisFaitsEmb({ vinted: load('vinted_ship_done', {}), leboncoin: load('vrm_lbc_colis_done', {}), vestiaire: load('vrm_vc_colis_done', {}) }), []);
+  const beneficeColisPrep = useMemo(() => (preparerOuvert ? beneficesParColis(lireReleveVentes()) : null), [preparerOuvert]);
   const [relaisOuvert, setRelaisOuvert] = useState(false);
   // (11 nov., lot rangement-guide) Scanner ou mode relais refermé : les achats retirés au comptoir, en série.
   useEffect(() => { if (scanOuvert || relaisOuvert || !retraitsARanger.current.length) return; const l = retraitsARanger.current; retraitsARanger.current = []; ouvrirRangement(l); }, [scanOuvert, relaisOuvert]);
@@ -43870,7 +43943,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (!buf) { echecs.push(l.cle); continue; }   // pas d'octets : on saute, on n'imprime pas du vide — et on le DIT après
         faits.push(l.cle);
         // Numéro et titre : même dérivation que la carte (identité, jamais le titre — §5).
-        items.push({ numero: l.num || '', title: l.titre || '', pdfBuf: buf, invBytes, cle: l.cle, site: l.site, ligne: l });
+        items.push({ numero: l.num || '', title: l.titre || '', pdfBuf: buf, invBytes, cle: l.cle, site: l.site, ligne: l, tampon: (tamponsLotRef.current || {})[l.cle] || null });
       }
       verifierContexte();
       if (!items.length) { finSuiviB(''); if(choisis&&(AUTH.user?.id||null)===proprietaire)setLot(x=>x?{...x,coches:new Set(echecs),echecs}:x); libererOngletPdf(); toast(pasLus ? "La base n'a pas répondu — réessaie dans un instant." : (sansLignes.length ? texteSansBordereau(sansLignes) + '.' : "Ces bordereaux n'ont plus leur PDF — retélécharge-les depuis les ventes sur Vinted.")); setBatchBusy(false); return; }
@@ -43894,7 +43967,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       (r.rates || []).forEach(i => echecs.push(items[i].cle));
       const reussiesVinted = (r.reussis || []).filter(i => items[i].site === 'vinted').map(i => items[i].cle);
       const differe = parcours && !echecs.length && choisis;
-      if (differe && (AUTH.user?.id||null)===proprietaire) setLot(x => x ? { ...x, fait: { n: imprimes, url: r.url, nom: r.filename, vinted: reussiesVinted, vestiaire: (r.reussis || []).filter(i => items[i].site === 'vestiaire').map(i => items[i].ligne.v.id) } } : x);
+      if (differe && (AUTH.user?.id||null)===proprietaire) setLot(x => x ? { ...x, fait: { planche: r.planche || null, lignes: (r.reussis || []).map(i => ({ cle: items[i].cle, num: items[i].numero || '', titre: items[i].title || '' })), n: imprimes, url: r.url, nom: r.filename, vinted: reussiesVinted, vestiaire: (r.reussis || []).filter(i => items[i].site === 'vestiaire').map(i => items[i].ligne.v.id) } } : x);
       if (!differe && reussiesVinted.length) setBordsPrinted(prev => { const u = { ...prev }; const at = new Date().toISOString(); reussiesVinted.forEach(k => { u[k] = at; }); save('vinted_bords_printed', u); return u; });
       noterImprimeSansNum((r.reussis || []).filter(i => items[i].site === 'vinted' && !String(items[i].numero || '').trim()).map(i => items[i].ligne && items[i].ligne.e && items[i].ligne.e.txn));
       if (!differe) (r.reussis || []).filter(i => items[i].site === 'vestiaire').forEach(i => { try { marquerVc('vrm_vc_imprimes', items[i].ligne.v.id, true); } catch (_) {} });
@@ -51355,18 +51428,30 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const choisis = L.filter((l) => lot.coches.has(l.cle) && l.cochable !== false);
                   const fait = lot.fait || null;
                   // 3 · « C'est imprimé ? » — les colis passent « prêts à déposer » (la date d'impression), annulable.
+                  // (14 nov., Julien : « l'impression beaucoup mieux guidée ») 5 · « Tout est sorti correctement ? » : il
+                  // peut cocher ceux qui ont RATÉ ; les autres seuls passent « imprimés », les ratés repartent à l'impression.
+                  const rates = new Set((fait && fait.rates) || []);
+                  const basculerRate = (cle) => setLot((x) => { if (!x || !x.fait) return x; const s = new Set(x.fait.rates || []); if (s.has(cle)) s.delete(cle); else s.add(cle); return { ...x, fait: { ...x.fait, rates: [...s] } }; });
                   const confirmerImprime = () => {
                     const at = new Date().toISOString(), ops = [];
-                    for (const k of (fait && fait.vinted) || []) ops.push({ k: 'vinted_bords_printed', type: 'cle', id: k, apres: at, avant: bordsPrinted[k] });
+                    for (const k of (fait && fait.vinted) || []) if (!rates.has(k)) ops.push({ k: 'vinted_bords_printed', type: 'cle', id: k, apres: at, avant: bordsPrinted[k] });
                     if (ops.length) gesteVrm(`${ops.length} prêt${ops.length>1?'s':''} à déposer`, ops, { vinted_bords_printed: setBordsPrinted });
-                    for (const id of (fait && fait.vestiaire) || []) { try { marquerVc('vrm_vc_imprimes', id, true); } catch (_) {} }
+                    for (const id of (fait && fait.vestiaire) || []) { if (rates.has('vc:' + id) || rates.has(id)) continue; try { marquerVc('vrm_vc_imprimes', id, true); } catch (_) {} }
+                    if (rates.size) { const encore = [...rates]; setLot((x) => x ? { ...x, fait: null, coches: new Set(encore) } : x); setTimeout(() => batchBordereaux(new Set(encore), false, true), 0); return; }
                     setLot((x) => x ? { ...x, fait: { ...x.fait, confirme: true } } : x);
                   };
                   return (
                     <SheetShell onClose={()=>setLot(null)} maxWidth={620} z={9000} className="vrm-lot vrm-tip" data-noswipe="1" data-lot={L.length} data-lot-etape={fait ? (fait.confirme ? 'depot' : 'imprime') : 'choix'} aria-label="Tout imprimer"
-                      titre={fait ? (fait.confirme ? 'Prêts à déposer' : 'C’est imprimé ?') : lot.echecs.length ? `${lot.echecs.length} pas imprimé${lot.echecs.length>1?'s':''}` : 'Tout imprimer'}>
+                      titre={fait ? (fait.confirme ? 'Prêts à déposer' : tr('cp.guide.sortiTitre')) : lot.echecs.length ? `${lot.echecs.length} pas imprimé${lot.echecs.length>1?'s':''}` : 'Tout imprimer'}>
                       {!fait && <div className="vrm-tip-temps" key="choix">
                         <ol className="vrm-tip-pas" aria-label="Étapes"><li className="is-la">Choisir</li><li>Imprimer</li><li>Déposer</li></ol>
+                        {/* (14 nov., Julien : « l'impression beaucoup mieux guidée ») ce qui se passe, ce qu'on attend de lui. */}
+                        <p className="vrm-cp-guide" data-lot-guide="choix">{tr('cp.guide.choix')}</p>
+                        <div className="vrm-cp-imprimante" data-lot-imprimante={imprMode(imprimante)}>
+                          <Segmente label={tr('cp.lot.imprimante')} plein value={imprMode(imprimante)} onChange={(v)=>{ if (!batchBusy) choisirImprimante(v); }}
+                            options={IMPR_MODES.map((v) => ({ v, l: v === 'thermique' ? tr('cp.lot.thermique') : v === 'planche4' ? tr('cp.planche.choix') : tr('cp.lot.classique'), data: { 'data-lot-imprimante-choix': v } }))}/>
+                          <p className="vrm-cp-guide-sous" data-lot-imprimante-phrase={imprMode(imprimante)}>{tr(`cp.guide.imprimante.${imprMode(imprimante)}`)}</p>
+                        </div>
                         {lot.erreur&&<p className="vrm-tip-alerte" role="alert" data-lot-erreur="">{lot.erreur}</p>}
                         {(nSansBord || resL.dejaImprimes || resL.anciennes || resL.decoches) ? <div className="vrm-tip-pourquoi" data-lot-pourquoi="">
                           <b>Pas dans ce lot</b>
@@ -51397,17 +51482,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {/* 2 · L'APERÇU : une page A4 par colis coché — l'étiquette du transporteur, le tampon N° + titre en bas. */}
                         {/* (11 nov., lot thermique) Le papier et le tampon CHOISIS (Paramètres → Impression des bordereaux,
                             `vrm_impression`) : l'aperçu dit ce qui sortira, et « Changer » y mène. */}
-                        {choisis.length > 0 && (()=>{ const th = imprimanteChoisie() === 'thermique', rg = reglageImpressionChoisi(), pp = papierThermique(rg), mt = th ? rg.tamponTh : rg.tamponA4;
+                        {choisis.length > 0 && (()=>{ const pl4 = imprMode(imprimante) === 'planche4', th = imprMode(imprimante) === 'thermique' || pl4, rg = reglageImpressionChoisi(), pp = papierThermique(rg), mt = th ? rg.tamponTh : rg.tamponA4;
+                          // (14 nov., Julien : « laisse la possibilité de sélectionner imprimante classique ou thermique ») le choix,
+                          // visible AU MOMENT d'imprimer : le même réglage `vrm_imprimante` que Réglages (mémorisé, jamais deviné).
+                          const tampons = lot.tampons || {};
+                          const poserTampon = (cle, m) => setLot((x) => x ? { ...x, tampons: { ...(x.tampons || {}), [cle]: m } } : x);
                           const papierLot = th ? (pp.id === 'autre' ? pp.nom : tr(`impression.format.${pp.id}`)) : 'A4';
-                          return <section className="vrm-tip-groupe" data-lot-section="apercu" data-lot-papier={th ? rg.format : 'a4'} data-lot-tampon={mt} aria-label={tr('impression.lot.apercu')}>
-                          <h3>{tr('impression.lot.apercu')} <span>{tr('impression.lot.pages', { n: choisis.length, papier: papierLot })}</span></h3>
+                          // (14 nov., lot colis-plus 98) 4 par page : au plus ⌈n/4⌉ feuilles (une page pas découpable part seule).
+                          return <section className="vrm-tip-groupe" data-lot-section="apercu" data-lot-papier={pl4 ? 'planche4' : th ? rg.format : 'a4'} data-lot-tampon={mt} aria-label={tr('impression.lot.apercu')}>
+                          <h3>{tr('impression.lot.apercu')} <span>{pl4 ? tr('cp.planche.lotPages', { n: Math.ceil(choisis.length / 4) }) : tr('impression.lot.pages', { n: choisis.length, papier: papierLot })}</span></h3>
+                          <p className="vrm-cp-guide" data-lot-guide="apercu">{tr('cp.guide.apercu')}</p>
                           <button type="button" className="vrm-tip-lien" data-lot-reglage-impression="" disabled={batchBusy} onClick={()=>{ setLot(null); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=settings&reglage=imprimante' })); } catch (_) {} }}>{tr('impression.lot.changer')}</button>
                           <div className="vrm-tip-pages">
-                            {choisis.slice(0, 8).map((l) => { const c = contenuTampon(mt, { numero: l.num || '', titre: l.titre || '' }); return <figure key={l.cle} className="vrm-tip-a4" data-lot-apercu={l.cle}>
+                            {choisis.map((l) => { const m = TAMPONS_IMPR.includes(tampons[l.cle]) ? tampons[l.cle] : mt; const c = contenuTampon(m, { numero: l.num || '', titre: l.titre || '' }); return <div key={l.cle} className="vrm-cp-apercu" data-lot-apercu-carte={l.cle}><figure className="vrm-tip-a4" data-lot-apercu={l.cle} data-lot-apercu-tampon={m}>
                               <span className="vrm-tip-a4-etiquette">{logo(l)}<i/><i/><i/></span>
-                              <figcaption className="vrm-tip-a4-tampon">{mt === 'rien' ? <b>{tr('impression.lot.sansTampon')}</b> : <><b>{l.num ? `N° ${l.num}` : 'sans N°'}</b>{c.titre ? <span>{c.titre}</span> : null}</>}</figcaption>
-                            </figure>; })}
-                            {choisis.length > 8 ? <span className="vrm-tip-plus">+{choisis.length - 8}</span> : null}
+                              <figcaption className="vrm-tip-a4-tampon">{m === 'rien' ? <b>{tr('impression.lot.sansTampon')}</b> : <><b>{l.num ? `N° ${l.num}` : 'sans N°'}</b>{c.titre ? <span>{c.titre}</span> : null}</>}</figcaption>
+                              </figure>
+                              {/* (14 nov.) CE bordereau : son tampon (ou aucun), ou le retirer du lot — avant d'imprimer. */}
+                              <select className="vrm-cp-tampon" aria-label={tr('cp.lot.tamponDe', { qui: l.num ? `N°${l.num}` : (l.titre || '') })} data-lot-tampon-choix={l.cle} value={m} disabled={batchBusy} onChange={(e)=>poserTampon(l.cle, e.target.value)}>
+                                {TAMPONS_IMPR.map((t) => <option key={t} value={t}>{tr(`impression.tampon.${t}`)}</option>)}
+                              </select>
+                              <button type="button" className="vrm-tip-lien vrm-cp-retirer" data-lot-retirer={l.cle} disabled={batchBusy} onClick={()=>basculer(l.cle)}>{tr('cp.lot.retirer')}</button>
+                            </div>; })}
                           </div>
                         </section>; })()}
                         <div className="vrm-lot-pied vrm-tip-pied">
@@ -51420,10 +51516,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {fait && !fait.confirme && <div className="vrm-tip-temps vrm-tip-fin" key="imprime" data-lot-question="">
                         <ol className="vrm-tip-pas" aria-label="Étapes"><li className="is-fait">Choisir</li><li className="is-la">Imprimer</li><li>Déposer</li></ol>
                         <p className="vrm-tip-grand"><b>{fait.n}</b> bordereau{fait.n>1?'x':''} dans le PDF.</p>
+                        <p className="vrm-cp-guide" data-lot-guide="sorti">{tr('cp.guide.sorti')}</p>
+                        {fait.planche ? <p className="vrm-tip-sous" data-planche-resultat={`${fait.planche.etiquettes}/${fait.planche.feuilles}/${fait.planche.echelle}`}>{tr('cp.planche.resultat', { etiquettes: fait.planche.etiquettes, feuilles: fait.planche.feuilles, echelle: fait.planche.echelle })}{fait.planche.entieres ? <> {tr('cp.planche.entieres', { n: fait.planche.entieres })}</> : null}</p> : null}
                         {fait.url ? <a className="vrm-tip-lien vrm-tip-pdf" data-lot-ouvrir-pdf="" href={fait.url} target="_blank" rel="noopener">Ouvrir le PDF</a> : null}
+                        {(fait.lignes || []).length > 1 ? <ul className="vrm-cp-rates" data-lot-rates={rates.size}>
+                          {(fait.lignes || []).map((l) => <li key={l.cle}><label className="vrm-cp-rate" data-lot-rate={l.cle} data-lot-rate-coche={rates.has(l.cle) ? '1' : '0'}>
+                            <input type="checkbox" checked={rates.has(l.cle)} onChange={()=>basculerRate(l.cle)}/>
+                            <span>{l.num ? <b>N°{l.num}</b> : null} {l.titre}</span><small>{tr('cp.guide.rate')}</small></label></li>)}
+                        </ul> : null}
                         <div className="vrm-tip-pied">
-                          <Bouton variante="secondaire" data-lot-pas-imprime="" onClick={()=>setLot((x)=>x?{...x,fait:null}:x)}>Pas encore</Bouton>
-                          <Bouton variante="primaire" icone="check" data-lot-imprime-oui="" onClick={confirmerImprime}>Oui, imprimé</Bouton>
+                          <Bouton variante="secondaire" data-lot-pas-imprime="" onClick={()=>setLot((x)=>x?{...x,fait:null}:x)}>{tr('cp.guide.rienSorti')}</Bouton>
+                          <Bouton variante="primaire" icone="check" data-lot-imprime-oui="" onClick={confirmerImprime}>{rates.size ? tr('cp.guide.reimprimer', { n: rates.size }) : tr('cp.guide.toutSorti')}</Bouton>
                         </div>
                       </div>}
                       {fait && fait.confirme && <div className="vrm-tip-temps vrm-tip-fin" key="depot" data-lot-depot="">
@@ -52299,7 +52402,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           onFait={(c) => { if (c && c.geste) deposeScan.demander(c.cle, c.geste, c.num ? `N°${c.num}` : c.titre); }} onAnnuler={deposeScan.annuler}
           onImprimer={(c) => (c && c.site === 'vinted' && c.x ? imprimerColisVinted(c.x) : null)} onScanner={(c) => { setScanAttendu(c.cle); setScanOuvert('envoi'); }}
           onFermer={() => setPreparerOuvert(false)} Retour={FermeAuRetour} Icon={Icon} zIndex={Z_CONFIRMATION - 4}
-          emballage={(c) => <ChoixEmballageColis reglage={emballagesR} cle={c.cle} ecrire={(r) => { setEmballagesR(r); save(CLE_EMBALLAGES, r); }}/>}
+          emballage={(c) => <ChoixEmballageColis reglage={emballagesR} cle={c.cle} titre={c.titre || ''} lireFaits={lireFaitsEmb} ecrire={(r) => { setEmballagesR(r); save(CLE_EMBALLAGES, r); }}/>}
+          beneficeDe={beneficeColisPrep}
           Photo={(src) => imgMortes.has(src) ? null : <PhotoVinted src={src} alt="" decoding="async" onError={() => noterImgMorte(src)}/>}
           photoCarton={(c) => { const v = c && venteDuColis(c.geste); return v ? <BoutonPhotoCarton vente={{ ...v, num: c.num || '' }} ton="clair"/> : null; }}
           note={(c) => (c && c.num ? <NotePaireCoque numero={c.num} variante="bloc" ajout/> : null)}/> : null}
@@ -52416,7 +52520,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:12,padding:'13px 16px',fontSize:15,fontWeight:600,textDecoration:'none',marginBottom:8}}>📄 {bordResult.batch?'Ouvrir les bordereaux':bordResult.withInvoice?'Ouvrir bordereau + facture':'Ouvrir le bordereau'}</a>
             {/* (3 nov.) « Déplacer le tampon » : l'aperçu s'ouvre, la place choisie s'imprime (et se mémorise pour la forme). */}
             {bordResult.pdfBuf && !bordResult.batch && <button type="button" data-imprime="1" data-tampon-deplacer="1" onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:12,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:400,padding:'11px',marginBottom:8}}>Déplacer le tampon</button>}
-            {bordResult.batch && !bordResult.thermique && <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Ton N° est tamponné sur chaque PDF, sinon sur une fiche juste après.</div>}
+            {bordResult.batch && !bordResult.thermique && !bordResult.planche && <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Ton N° est tamponné sur chaque PDF, sinon sur une fiche juste après.</div>}
+            {/* (14 nov., lot colis-plus 98) 4 par page A4 : ce qui a VRAIMENT été posé (étiquettes, feuilles, échelle, pages entières). */}
+            {bordResult.batch && bordResult.planche ? <div className="vrm-aide" data-planche-resultat={`${bordResult.planche.etiquettes}/${bordResult.planche.feuilles}/${bordResult.planche.echelle}`} style={{fontSize:13,color:C.text,marginBottom:8,lineHeight:1.4}}>
+              {tr('cp.planche.resultat', { etiquettes: bordResult.planche.etiquettes, feuilles: bordResult.planche.feuilles, echelle: bordResult.planche.echelle })}
+              {bordResult.planche.entieres ? <> {tr('cp.planche.entieres', { n: bordResult.planche.entieres })}</> : null}</div> : null}
             {/* ── CE QUE L'IMPRESSION THERMIQUE A VRAIMENT FAIT ────────────────
                 LE CHIFFRE, JAMAIS LA PROMESSE. « Ton étiquette est prête » sur
                 un bordereau qu'on n'a pas su découper, c'est le défaut le plus
@@ -61049,6 +61157,8 @@ function AppCoeur() {
         <RepriseRetenue tab={tab} compteChoisi={!!compteSel&&compteSel!=='*'} effacerCompte={()=>setCompteSel('')}/>
         <BarreHautSlot.Provider value={ordi ? slotBarre : null}>
         <CibleNotif tab={tab} sub={platSub}/>
+        {/* (14 nov., lot colis-plus 99) La douchette : un code lu hors des champs ⇒ LA vente (par identité, src/douchette.js). */}
+        <DouchetteGlobale ouvrirVentes={()=>setTab('ventes')}/>
         {rpOuvert && <React.Suspense fallback={null}>
           <RecherchePhoto C={C} Feuille={SheetShell} Bouton={Bouton} PhotoVinted={PhotoVinted}
             lireCandidats={()=>lireCandidatsPhoto(vintedAccounts)} lireOctets={(u)=>chargerPhotoBoite(u)}

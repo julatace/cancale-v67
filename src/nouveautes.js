@@ -26,6 +26,14 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (14 nov., lot colis-plus : propositions 96 à 101, puis l'impression guidée)
+  { id: 'impression-guidee', date: '2026-11-14', titre: 'Tout imprimer, guidé pas à pas', phrase: 'Ton imprimante, le tampon de chaque bordereau, puis « Tout est sorti ? ».', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  { id: 'colis-format-modele', date: '2026-11-14', titre: 'Le bon carton proposé pour chaque modèle', phrase: 'Ton dernier choix pour ce modèle revient ; tu le prends d’un toucher.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  { id: 'colis-fournitures', date: '2026-11-14', titre: 'Scotch et cartons décomptés à chaque colis', phrase: 'Alerte au seuil que tu choisis, avant d’en manquer.', tab: 'garage', pour: 'tous', mode: 'tous' },
+  { id: 'bordereaux-4-par-page', date: '2026-11-14', titre: '4 bordereaux par feuille A4', phrase: 'Sans imprimante thermique : dans l’ordre, avec un trait de coupe.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  { id: 'douchette-ordinateur', date: '2026-11-14', titre: 'Bipe un bordereau, la vente s’ouvre', phrase: 'Une douchette USB ou Bluetooth sur ordinateur suffit.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  { id: 'mains-libres-emballage', date: '2026-11-14', titre: 'Emballe sans toucher l’écran', phrase: '« Suivant », « imprimer », « fait » à la voix dans Préparer mes colis.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  { id: 'temps-par-colis', date: '2026-11-14', titre: 'Ton temps par colis et ton gain', phrase: 'Mesuré dans Préparer mes colis : au moins, jamais deviné.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'photo-floue', date: '2026-11-14', titre: 'Photo floue ou sombre signalée', phrase: 'Mesuré sur ton téléphone, avant la mise en ligne. Jamais bloquant.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
   { id: 'seance-photo', date: '2026-11-14', titre: 'Séance photo, dans l’ordre des N°', phrase: 'Les paires sans photo ou à reprendre, cochées une à une.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
   { id: 'recherche-couleur', date: '2026-11-14', titre: 'Chercher tes paires par couleur', phrase: 'Tape « bleu » dans la loupe : la couleur vient de tes photos.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },

@@ -523,6 +523,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **14 nov. · Colis plus (96-101) + impression guidée** : carton PROPOSÉ par modèle, fournitures « à chaque colis », Tout imprimer guidé (imprimante classique / 4 par A4 / thermique, tampon par bordereau, « Tout est sorti ? »), douchette (identité exacte), mains libres, temps par colis. `2026-11-14-colis-plus.md`. Geste : aucun.
+
 - **14 nov. · Refonte d'Achats** : liste d'abord (bande de chiffres ≤ 72 px, « À retirer » rangé, sa case l'ouvre), rangées 68 px (8 achats/écran), comptes en liste groupée iOS, sources en tuiles + « Comment c'est calculé », recherche collée, le N° trouve l'achat. `docs/passation/2026-11-14-refonte-achats.md`. Geste : aucun.
 - **14 nov. · Retrait Vinted Go réacheminé** : l'e-mail « Nouveau relais : il est temps de récupérer » est une arrivée (son QR Vinted Go atteint À retirer, montré seulement s'il porte le n° et le code du colis, `api/_lib/qr-retrait.js`) ; le point lu le plus récent gagne, l'ancien nom ne reste pas ; AUCUN colis sans code dans « À retirer » (⇒ « À vérifier ») ; un retour ouvert (440) sur l'achat = retiré. `docs/passation/2026-11-14-retrait-vinted-go.md`. Geste : aucun.
 - **14 nov. · Photos et fiches (102-107)** : avis « floue ? / sombre ? » mesuré sur le téléphone (worker, jamais bloquant) ; séance photo par N° ; recherche par couleur des photos (5 langues) ; note dictée (navigateur) ; certificat rangé avec la paire ; fusion de deux fiches sur son clic (aucun N° changé, alias, 30 j). `docs/passation/2026-11-14-photos-fiches.md`. Geste : aucun.
