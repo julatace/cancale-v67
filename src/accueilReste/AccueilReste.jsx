@@ -213,13 +213,16 @@ export function CarteEssai({ bilan, appel, compact = false }) {
 }
 // Le bilan lu : l'abonnement (le serveur), les bordereaux imprimés (la ligne `main`),
 // les colis suivis (les n° lus dans les e-mails, PROJETÉS — jamais `select=data`).
+// La dernière lecture (cet onglet) : un écran qui se remonte (rechargement de Ma journée) montre
+// tout de suite ce qu'il avait lu, puis relit — la carte ne clignote pas.
+const DERNIER = { abo: undefined, suivis: undefined };
 export function useEssai() {
   const imprimes = useCle('vinted_bords_printed', null);
-  const [abo, setAbo] = React.useState(undefined);
-  const [suivis, setSuivis] = React.useState(undefined);
+  const [abo, setAbo] = React.useState(DERNIER.abo);
+  const [suivis, setSuivis] = React.useState(DERNIER.suivis);
   React.useEffect(() => {
     let vivant = true;
-    Promise.resolve(OUTILS.lireAbonnement ? OUTILS.lireAbonnement() : null).then((a) => { if (vivant) setAbo(a || null); }).catch(() => { if (vivant) setAbo(null); });
+    Promise.resolve(OUTILS.lireAbonnement ? OUTILS.lireAbonnement() : null).then((a) => { DERNIER.abo = a || null; if (vivant) setAbo(a || null); }).catch(() => { if (vivant) setAbo((x) => (x === undefined ? null : x)); });
     return () => { vivant = false; };
   }, []);
   React.useEffect(() => {
@@ -227,7 +230,7 @@ export function useEssai() {
     let vivant = true;
     const debut = new Date(Date.parse(abo.finEssai) - 7 * 86400000).toISOString();
     Promise.resolve(OUTILS.lireTout(`id=like.email_track_*&meta->>receivedAt=gte.${encodeURIComponent(debut)}&select=suivi:meta->>suivi,at:meta->>receivedAt`))
-      .then((l) => { if (vivant) setSuivis(Array.isArray(l) ? l : null); }).catch(() => { if (vivant) setSuivis(null); });
+      .then((l) => { const v = Array.isArray(l) ? l : null; DERNIER.suivis = v; if (vivant) setSuivis(v); }).catch(() => { if (vivant) setSuivis(null); });
     return () => { vivant = false; };
   }, [abo]);
   const bilan = abo && suivis !== undefined ? bilanEssai({ abo, imprimes, suivis }) : null;

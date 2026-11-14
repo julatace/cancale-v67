@@ -350,7 +350,8 @@ async function scenarioF(nav, W, sombre, suffixe) {
   const vu = await attendre(pg, () => pg.$('[data-essai="oui"]'), 15000);
   dit(vu, `F1 ${suffixe} « Ton essai » s’affiche pendant l’essai`);
   if (vu) {
-    const e = await pg.evaluate(() => { const c = document.querySelector('[data-essai="oui"]'); const g = (s, a) => { const x = c.querySelector(s); return x ? x.getAttribute(a) : null; }; return { colis: g('[data-essai-colis]', 'data-essai-colis'), bords: g('[data-essai-bordereaux]', 'data-essai-bordereaux'), min: g('[data-essai-minutes]', 'data-essai-minutes'), rest: g('[data-essai-restants]', 'data-essai-restants'), regle: !!c.querySelector('[data-essai-regle]'), appel: (c.querySelector('[data-appel-bienvenue]') || {}).href || '' }; });
+    await attendre(pg, () => pg.evaluate(() => { const c = document.querySelector('[data-essai="oui"]'); return !!(c && c.querySelector('[data-essai-colis]')); }), 8000);
+    const e = await pg.evaluate(() => { const c = document.querySelector('[data-essai="oui"]'); if (!c) return { absente: true }; const g = (s, a) => { const x = c.querySelector(s); return x ? x.getAttribute(a) : null; }; return { colis: g('[data-essai-colis]', 'data-essai-colis'), bords: g('[data-essai-bordereaux]', 'data-essai-bordereaux'), min: g('[data-essai-minutes]', 'data-essai-minutes'), rest: g('[data-essai-restants]', 'data-essai-restants'), regle: !!c.querySelector('[data-essai-regle]'), appel: (c.querySelector('[data-appel-bienvenue]') || {}).href || '' }; });
     dit(e.colis === '2' && e.bords === '1' && e.rest === '5', `F2 ${suffixe} colis suivis, bordereaux imprimés, jours restants : lus`, e);
     dit(e.min === '3' && e.regle, `F3 ${suffixe} temps gagné ESTIMÉ (règle dépliable)`, e);
     dit(e.appel === 'https://rendez-vous.exemple.test/julien/15-minutes', `F4 ${suffixe} compte Pro : « Réserver » l’appel de bienvenue`, e.appel);
