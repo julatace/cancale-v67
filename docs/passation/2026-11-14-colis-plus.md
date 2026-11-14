@@ -16,6 +16,18 @@ nouvelles sont dans des modules PURS, exécutés par `scripts/audit-colis-plus.c
 | 100 | Mains libres pendant l'emballage | Le moteur de dictée du navigateur (`dicteeNavigateur.js`, une phrase, `fr-FR`, codes d'erreur) ; « Préparer mes colis » (Imprimer, Colis fait différé 5 s + « Annuler », ‹ ›) | Une écoute continue, des commandes | `src/mainsLibres.js` : écoute CONTINUE relancée après un silence, langue de VRM ; commandes FERMÉES « suivant », « précédent », « imprimer », « fait », « stop » (5 langues), une phrase courte faite seulement de la commande et de mots admis (« ok suivant », « c'est fait ») — « il fait froid » ne fait rien. « fait » = le geste « Colis fait » (5 s, « Annuler » visible) ; chaque commande est confirmée à l'écran. Sans reconnaissance (Firefox, Safari d'iPhone selon la version) : la ligne dit pourquoi, puis disparaît (et ne revient pas). Aucune clé, aucun serveur (§2.9). |
 | 101 | Temps par colis, gain réel à l'heure | Les « Colis fait » de la séance de Préparer sont datés (`seance.faits`) ; le relevé de Ventes (`vrm_stats_ventes`) et `beneficePaire` | La mesure, la mémoire, l'affichage | `src/tempsColis.js` : sur l'appareil (`vrm_temps_colis_{uid}`), l'écart entre deux « Colis fait » de CETTE ouverture ; > 15 min = pause, < 15 s = colis déjà prêt : « pas mesuré » ; « Annuler » recalcule. Le total est un PLANCHER (« au moins »). Gain = bénéfice des colis mesurés AU PRIX D'ACHAT CONNU / leur temps, « sur N colis » ; aucun ⇒ « — ». Au récapitulatif de Préparer : tuiles « Cette séance » et « 30 derniers jours », « Comment c'est mesuré » replié. |
 
+## Ajout de midi (Julien, mot pour mot)
+
+« Je veux que tu laisses la possibilité de sélectionner imprimante classique ou imprimante thermique et je veux
+que quand je mets tout imprimer, je puisse quand même modifier un par un chaque bordereau avec le tamponnage.
+J'espère que le tamponnage pour la feuille classique est resté. »
+
+| demande | existait (mesuré) | fait |
+|---|---|---|
+| Choisir classique / thermique | Seulement dans Réglages → Imprimante ; la feuille « Tout imprimer » n'avait qu'un lien « Changer le papier ou le tampon » | Dans la feuille « Tout imprimer », un segmenté **Classique · A4 / 4 par page A4 / Thermique · 10×15** (le MÊME réglage `vrm_imprimante` que Réglages, écrit sur son toucher, gardé ; l'aperçu suit tout de suite). Réglages garde ses trois choix. |
+| Modifier un par un, avec le tampon | Le tampon était un réglage GLOBAL (`tamponA4`, `tamponTh`) ; « Placer le tampon » (la place, par forme) ; décocher une ligne | Sous CHAQUE aperçu : son tampon (**N° seul / N° + titre / + taille / Rien**) et **Retirer du lot**. Le choix vaut pour CE bordereau seulement (`it.tampon` remplace `tamponA4`/`tamponTh` dans `poserBordereau`) ; « Placer le tampon » reste. §5 : la garde `confirmerNumerosAVerifier` DEMANDE toujours avant le lot (audit C10, mutation rouge). |
+| Le tampon de la feuille classique est-il resté ? | Oui : `poserBordereau` (page entière) → `tamponnerBordereau` avec `tamponA4` (N° + titre par défaut) | **Prouvé dans la vraie app** (banc `colis-plus` F) : Tout imprimer en classique ⇒ chaque page du PDF (relu par pdf.js) porte SON « N° 31… » et son titre ; le bordereau réglé « Rien » n'a ni N° ni titre ; « N° seul » a son N° sans titre ; le bordereau retiré n'est pas dans le PDF. En 4 par page (isolation thermique) : chaque étiquette porte SON N° (A4/A5). Le thermique pur est jugé par `thermique.cjs` (inchangé). |
+
 ## Où c'est
 
 - Règles : `src/douchette.js`, `src/mainsLibres.js`, `src/tempsColis.js`, `src/impression/planche4.js`, `src/emballages.js` (étendu, les lignes que l'audit du lot L mute sont gardées mot pour mot).

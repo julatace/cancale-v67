@@ -249,10 +249,10 @@ async function lotClassiqueBrut(b, nom, vue, LIGNES) {
     const zones = []; pages.forEach((p) => { const m = /ETIQUETTE (\d+)/.exec(p.texte); if (m) zones.push({ tx: m[1], t: p.texte }); else if (zones.length) zones[zones.length - 1].t += ' ' + p.texte; });
     const txs = zones.map((z) => z.tx), attendu = ap.slice(0, -1).map((x) => x.cle.replace(/^v:/, ''));
     dit(JSON.stringify(txs) === JSON.stringify(attendu), `${nom} : F3 le bordereau retiré n'est pas dans le PDF, les autres dans l'ordre`, JSON.stringify({ txs, attendu }));
-    const num = (tx) => (ap.find((x) => x.cle === 'v:' + tx) || {}).num;
+    const nu = (c) => String(c).replace(/^v:/, ''); const num = (tx) => (ap.find((x) => nu(x.cle) === tx) || {}).num;
     const juge = zones.map((z) => ({ tx: z.tx, n: new RegExp(`N°\\s*${num(z.tx)}(\\D|$)`).test(z.t.replace(/ETIQUETTE \d+/g, '')), titre: /Nike Air Force/.test(z.t), taille: /\b42\b/.test(z.t.replace(/ETIQUETTE \d+/g, '')) }));
-    const sans = juge.find((j) => 'v:' + j.tx === sansTampon.cle), tt = juge.find((j) => 'v:' + j.tx === titreTaille.cle), autres = juge.filter((j) => j !== sans && j !== tt);
-    dit(autres.length === ap.length - 3 && autres.every((j) => j.n && j.titre), `${nom} : F4 CLASSIQUE A4 : chaque bordereau porte SON tampon (N° + titre, le réglage)`, JSON.stringify(autres.filter((j) => !j.n || !j.titre)));
+    const sans = juge.find((j) => j.tx === nu(sansTampon.cle)), tt = juge.find((j) => j.tx === nu(titreTaille.cle)), autres = juge.filter((j) => j !== sans && j !== tt);
+    dit(autres.length === ap.length - 3 && autres.every((j) => j.n && j.titre), `${nom} : F4 CLASSIQUE A4 : chaque bordereau porte SON tampon (N° + titre, le réglage)`, JSON.stringify(autres.filter((j) => !j.n || !j.titre)).slice(0, 200) + " · pages : " + JSON.stringify(pages.map((p) => p.texte.slice(0, 160))).slice(0, 900));
     dit(sans && !sans.n && !sans.titre, `${nom} : F5 le bordereau réglé « sans tampon » n'a ni N° ni titre`, JSON.stringify(sans));
     dit(tt && tt.n && !tt.titre, `${nom} : F6 le bordereau réglé « N° seul » porte son N°, sans le titre`, JSON.stringify(tt));
     dit(errs.length === 0, `${nom} : F7 aucune erreur d'app`, errs.join(' | ').slice(0, 200));
@@ -317,7 +317,7 @@ async function preparer(b, nom, vue, LIGNES, sombre) {
     const shipAnnule = await lire(pg, 'vinted_ship_done');
     dit(JSON.stringify(shipAnnule) === JSON.stringify(ship0), `${nom} : C5 « Annuler » ⇒ rien d'écrit`);
     await pg.evaluate(() => window.__dire('fait'));
-    await pg.waitForTimeout(6500);
+    await pg.waitForFunction((t) => { try { return !!(JSON.parse(localStorage.getItem("vinted_ship_done") || "{}") || {})[t]; } catch (_) { return false; } }, String(c1 || "").replace(/^v:/, ""), { timeout: 20000 }).catch(() => {});
     const ship1 = (await lire(pg, 'vinted_ship_done')) || {};
     const tx1 = String(c1 || '').replace(/^v:/, '');
     const nouveaux = Object.keys(ship1).filter((k) => !(ship0 || {})[k]);
@@ -381,6 +381,8 @@ async function douchetteBrut(b, nom, vue, LIGNES) {
   const { ctx, pg, errs } = await ouvrir(b, vue, LIGNES);
   try {
     await pg.waitForSelector('[data-preparer-ouvrir]', { timeout: 20000 }).catch(() => {});
+    // Les bordereaux lus (leur n° de suivi est une identité) : « Tout imprimer » n'apparaît qu'avec eux.
+    await pg.waitForSelector('button[data-lot-ouvrir="1"]', { timeout: 30000 }).catch(() => {});
     await pg.waitForTimeout(800);
     const etat = () => pg.evaluate(() => document.documentElement.getAttribute('data-douchette'));
     // Une douchette envoie ses touches d'un trait : elles sont posées dans la même tâche (≈ 0 ms d'écart) ;
@@ -397,6 +399,8 @@ async function douchetteBrut(b, nom, vue, LIGNES) {
     };
     const cible = V[4];
     await bip(cible.suivi);
+    // Bipé avant que les ventes soient prêtes, le code ATTEND (une minute) et la vente s'ouvre dès qu'elles le sont.
+    await pg.waitForFunction(() => document.documentElement.getAttribute('data-douchette'), null, { timeout: 15000 }).catch(() => {});
     const e1 = await etat();
     let eclaire = null;
     for (let i = 0; i < 30 && !eclaire; i++) { await pg.waitForTimeout(300); eclaire = await pg.evaluate((tx) => { const e = document.querySelector(`[data-cible~="vente:${tx}"][data-cible-notif]`); return e ? e.getAttribute('data-cible-notif') : null; }, String(cible.tx)); }
