@@ -1,7 +1,7 @@
 // (6 nov.) LE MODE EXEMPLE s'installe EN PREMIER, avant tout module de l'app : s'il
 // est demandé par cet onglet, le stockage et la base deviennent des copies en
 // mémoire (src/modeExemple.js) — rien de l'exemple n'est écrit nulle part.
-import './modeExemple.js';
+import { exempleActif } from './modeExemple.js';
 // (8 nov.) Les 30 dernières requêtes de la page (famille, code, durée — jamais une
 // adresse ni un contenu), pour « Signaler un problème » (src/lecturesRecentes.js).
 import { installerJournalLectures } from './lecturesRecentes.js';
@@ -16,6 +16,7 @@ import { tr, preparerLangue } from './i18n/index.js';
 import { useLangue } from './i18n/react.js';
 import { DemarrageVRM } from './Chargement.jsx';
 import { suivreDemarrage } from './demarrage.js';
+import { apercuOuverture } from './ouvertureInstantanee.js';
 import { ecouterPlantages, ecouterViolationsCsp, noterPlantage, compterMorceauPerime } from './plantages.js';
 // Le journal des plantages écoute dès le démarrage : une erreur AVANT que l'app
 // soit montée est justement celle qu'aucun écran ne montre (src/plantages.js).
@@ -154,9 +155,22 @@ const veutLApp = () => {
 };
 const versApp = () => aUneSession() || veutLApp();
 const filmDemande = /[?&]film(=|&|$)/.test(window.location.search || '');
+// (14 nov., ouverture instantanée) LES DERNIERS CHIFFRES DE MA JOURNÉE, PEINTS AVANT L'APP.
+// src/ouvertureInstantanee.js décide (rien que ce que la porte hors ligne laisserait voir, pour CE
+// compte, sur CET appareil) ; src/OuvertureInstantanee.jsx peint l'instantané dans l'écran de
+// démarrage. L'app (5 Mo à analyser et exécuter : une longue tâche) ne part qu'APRÈS cette image.
+// Aucun instantané ⇒ rien ne change (l'app part tout de suite, comme avant).
+let decisionApercu = null;
+try { if (!filmDemande && aUneSession() && !exempleActif()) decisionApercu = apercuOuverture({ stock: window.localStorage, search: window.location.search || '' }); } catch (_) { decisionApercu = null; }
+const apercuPeint = decisionApercu && decisionApercu.snap
+  ? import('./OuvertureInstantanee.jsx').then((m) => m.peindreApercu(decisionApercu)).catch(() => false)
+  : Promise.resolve(false);
+if (typeof window !== 'undefined') window.__vrmApercu = decisionApercu ? (decisionApercu.snap ? 'oui' : decisionApercu.raison || 'non') : 'non';
 // Une session existe : on lance le téléchargement de l'app TOUT DE SUITE, avant
-// même le premier rendu, pour ne pas ajouter un aller-retour à son ouverture.
-if (!filmDemande && versApp()) { try { import('./App.jsx'); } catch (_) {} }
+// même le premier rendu, pour ne pas ajouter un aller-retour à son ouverture
+// (après l'instantané quand il y en a un : le fichier est déjà préchargé par
+// public/demarrage-app.js, seule son exécution attend la peinture).
+if (!filmDemande && versApp()) { if (decisionApercu && decisionApercu.snap) apercuPeint.then(() => { try { import('./App.jsx'); } catch (_) {} }); else { try { import('./App.jsx'); } catch (_) {} } }
 
 const FondApp = DemarrageVRM;
 function Racine() {
@@ -186,7 +200,8 @@ const monter = () => ReactDOM.createRoot(document.getElementById('root')).render
   <React.StrictMode><DernierFilet><Racine /></DernierFilet></React.StrictMode>
 );
 // Français (la source) : aucune attente. Une autre langue : son morceau d'abord, 2 s au plus.
-preparerLangue().then(monter, monter);
+// (14 nov.) Et l'instantané d'abord peint, s'il y en a un (1,5 s au plus, src/OuvertureInstantanee.jsx).
+Promise.all([preparerLangue().catch(() => {}), apercuPeint]).then(monter, monter);
 // (6 nov.) L'écran de démarrage d'index.html part quand la page montre autre chose
 // qu'une attente (src/demarrage.js) — l'écran d'ouverture prêt, l'accueil, la connexion.
 suivreDemarrage();
@@ -206,6 +221,9 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').then((reg) => {
       try { reg.update(); } catch (_) {}
+      // (14 nov., ouverture instantanée) L'APP (pas la page d'accueil) fait ranger sa coquille dès la
+      // 1re ouverture : la 2e ne repasse plus par le réseau (public/sw.js, `VRM_RANGER_COQUILLE`).
+      if (versApp()) navigator.serviceWorker.ready.then((r) => { try { if (r && r.active) r.active.postMessage({ type: 'VRM_RANGER_COQUILLE' }); } catch (_) {} }).catch(() => {});
       // ⚠️ RAFRAÎCHIR L'ABONNEMENT PUSH À CHAQUE OUVERTURE. Le jeton d'abonnement
       // tourne (surtout iOS) et l'ancien devient muet → « je ne reçois plus de
       // notif ». Si la permission est accordée : on récupère l'abonnement

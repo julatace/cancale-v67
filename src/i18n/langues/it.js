@@ -2163,4 +2163,8 @@ export default {
   "rh.vuesPasSu": "visualizzazioni —",
   "rh.vendue": "venduta",
   "rh.enLigne": "online",
+  "instantane.geste.horsLigne": "Offline",
+  "instantane.geste.panne": "Non riletto",
+  "instantane.arret.horsLigne": "Offline: queste cifre sono quelle della tua ultima visita. Saranno rilette al ritorno della rete.",
+  "instantane.arret.panne": "Non riletto: la base non risponde. Queste cifre sono quelle della tua ultima visita.",
 };

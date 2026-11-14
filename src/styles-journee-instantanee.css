@@ -60,3 +60,16 @@ html body .vrm-app-shell .vrm-fu-objectif-reste {
 }
 html body .vrm-app-shell .vrm-fu-objectif-reste.is-atteint { color: #fff; font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { html body .vrm-app-shell button.vrm-fu-objectif:active { transform: none; } }
+
+/* (14 nov., ouverture instantanée) Hors ligne ou base injoignable : l'instantané RESTE et dit pourquoi
+   rien n'est relu, sous la phrase du jour (une ligne discrète, sans accent : rien à rattraper ici). */
+html body .vrm-app-shell .vrm-ji .vrm-ji-arret {
+  margin: 4px 0 10px; font: 400 13px/1.4 var(--vrm-police); color: var(--fu-sur-sombre-2, rgba(255,255,255,.7));
+}
+/* L'instantané peint AVANT l'app, dans l'écran de démarrage (src/OuvertureInstantanee.jsx) : le logo et
+   le rail laissent la place ; la mise en page est celle de la coque relevée à la capture. */
+#vrm-demarrage[data-apercu] { display: block; }
+#vrm-demarrage[data-apercu] > .vrm-boot-centre { display: none; }
+#vrm-apercu { position: absolute; inset: 0; overflow: hidden; text-align: left; }
+#vrm-apercu > .vrm-app-shell { position: absolute; inset: 0; overflow: hidden; display: block; height: auto; min-height: 0; }
+#vrm-apercu > .vrm-app-shell > main { position: absolute; inset: 0; overflow: hidden; display: block; padding: 0; margin: 0; }

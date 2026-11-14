@@ -2163,4 +2163,8 @@ export default {
   "rh.vuesPasSu": "views —",
   "rh.vendue": "sold",
   "rh.enLigne": "live",
+  "instantane.geste.horsLigne": "Offline",
+  "instantane.geste.panne": "Not reloaded",
+  "instantane.arret.horsLigne": "Offline: these figures are from your last visit. They will be reloaded when the network is back.",
+  "instantane.arret.panne": "Not reloaded: the database is not responding. These figures are from your last visit.",
 };

@@ -59582,7 +59582,12 @@ function AppCoeur() {
   const vueAnnoncesOuverture = tab === 'annonces' && siteDeTache('annonces', platSub) === 'vinted' && sectionDeTache('annonces', platSub) === 'annonces'
     && compteEffectif(compteSel, compteConnecte, (u) => (comptesChoisissables || []).some((a) => String(a.vinted_user_id) === u)) === '';
   const snapAnnonces = React.useMemo(() => (vueAnnoncesOuverture && uidInstantane ? lireInstantaneAnnonces(uidInstantane) : null), [vueAnnoncesOuverture, uidInstantane]);
-  const instantanePermis = !baseKO && !!uidInstantane && !(() => { try { const a = abonnementPublie(); return etatAbonnement(a === null ? undefined : a).lectureSeule; } catch (_) { return false; } })();
+  // (14 nov., ouverture instantanée) Hors ligne ou base injoignable, l'instantané de Ma journée RESTE, daté, et dit
+  // pourquoi rien n'est relu (`etat` de src/JourneeInstantanee.jsx) — jamais présenté comme frais, aucune écriture.
+  const instantaneAuMoinsPermis = !!uidInstantane && !(() => { try { const a = abonnementPublie(); return etatAbonnement(a === null ? undefined : a).lectureSeule; } catch (_) { return false; } })();
+  const instantanePermis = !baseKO && instantaneAuMoinsPermis;
+  const snapJourneeArret = instantaneAuMoinsPermis && tab === 'journee' && snapJournee && (horsLigne || baseKO)
+    ? <JourneeInstantanee snap={snapJournee} ScreenHead={ScreenHead} Icon={Icon} fmt={REGLES_CARTE.fmt} etat={horsLigne ? 'hors-ligne' : 'panne'}/> : null;
   const instantaneEcranIci = !instantanePermis ? null
     : tab === 'journee' && snapJournee ? <JourneeInstantanee snap={snapJournee} ScreenHead={ScreenHead} Icon={Icon} fmt={REGLES_CARTE.fmt}/>
     : vueColisOuverture && snapColis && (!ongletColis || ongletColis === snapColis.onglet) && (platSub !== 'retirer' || snapColis.onglet === 'retirer')
@@ -60638,11 +60643,12 @@ function AppCoeur() {
             seuls Ma journée et les outils du colis (relais, dépôt, codes) gardent leur vue hors ligne dédiée.
             La pastille dit « Hors ligne · vu à hh:mm » ou « N gestes en attente » (src/gestesHorsLigne.js). */}
         <GestesHorsLigneCoque tab={tab} ongletDedie={horsLigne && ONGLETS_HL_DEDIES.includes(tab)}/>
-        {horsLigne && ONGLETS_HL_DEDIES.includes(tab) ? <JourneeHorsLigne tab={tab} uid={(authState.user && authState.user.id) || (MULTI_USER ? '' : 'local')}/> : (<>
+        {horsLigne && ONGLETS_HL_DEDIES.includes(tab) ? <>{snapJourneeArret}<JourneeHorsLigne tab={tab} uid={(authState.user && authState.user.id) || (MULTI_USER ? '' : 'local')}/></> : (<>
         {/* (13 nov., point 45) Le Stock se dessine hors réseau avec son dernier état (et son propre inventaire) : ce bloc ne
             sert plus qu'à un appareil où le Stock n'a pas encore été gardé (la liste de l'inventaire du 9 nov. suffit). */}
         {horsLigne && tab === 'garage' && !lireStockHl((authState.user && authState.user.id) || (MULTI_USER ? '' : 'local'), localStorage) ? <div data-hors-ligne="stock-inventaire"><BlocInventaireHorsLigne uid={(authState.user && authState.user.id) || (MULTI_USER ? '' : 'local')}/></div> : null}
         {baseKO && !horsLigne && <BaseInjoignable/>}
+        {baseKO && !horsLigne && snapJourneeArret}
         {!baseKO && !horsLigne && <MentionCopie/>}   {/* (11 nov.) hors ligne, la pastille dit déjà « vu à hh:mm » */}
         {/* (11 nov., temps réel) La veille des lignes écrites par l'extension (src/tempsReel.js) : ce qui
             change chez le serveur est relu par l'écran qui le montre, sans recharger ; pastille flottante. */}
@@ -60671,10 +60677,12 @@ function AppCoeur() {
             la page, et reviennent telles quelles au toucher de la barre (src/ecransGardes.jsx). */}
         <EcransGardes ecran={tab} cle={(authState.user && authState.user.id) || ''} pret={subPose===tab}>
         <AttenteEcran key={tab} ecran={tab} memoire={((authState.user && authState.user.id) || '') + ':' + tab} ordi={ordi} attendus={ESSENTIELS_ECRAN[tab] || []} donnees={essentielsCoque} instantane={instantaneEcranIci}>
-        {tab==='journee'&&uidInstantane&&<GardeEcran nom="capture-journee"><CaptureJournee uid={uidInstantane}/></GardeEcran>}
+        {/* (14 nov., ouverture instantanée) Jamais de capture pendant une panne ou hors ligne : un écran lu à moitié
+            (« — » partout) remplacerait le dernier instantané COMPLET (§4.2). */}
+        {tab==='journee'&&uidInstantane&&!baseKO&&!horsLigne&&<GardeEcran nom="capture-journee"><CaptureJournee uid={uidInstantane}/></GardeEcran>}
         {/* (11 nov., lot DJ3) Plus d'onglet Colis : son instantané (`CaptureColis`) n'a plus d'écran à photographier. */}
-        {tab==='ventes'&&uidInstantane&&<GardeEcran nom="capture-ventes"><CaptureVentes uid={uidInstantane}/></GardeEcran>}
-        {tab==='annonces'&&uidInstantane&&<GardeEcran nom="capture-annonces"><CaptureAnnonces uid={uidInstantane}/></GardeEcran>}
+        {tab==='ventes'&&uidInstantane&&!baseKO&&!horsLigne&&<GardeEcran nom="capture-ventes"><CaptureVentes uid={uidInstantane}/></GardeEcran>}
+        {tab==='annonces'&&uidInstantane&&!baseKO&&!horsLigne&&<GardeEcran nom="capture-annonces"><CaptureAnnonces uid={uidInstantane}/></GardeEcran>}
         {tab==='settings'&&<GardeEcran nom="settings" resetKey={platSub}><SettingsScreen setTab={setTab} onPlateforme={plat=>{subVoulue.current=plat==='plat_leboncoin'?'annonces':'compte';setTab(plat);}} ebayCompte={ebayCompteReglage} ouvrir={platSub==='ebay'?'ebay':null} onOuvert={()=>setPlatSub('reglages')} comptes={vintedAccounts}
 
           notifEnabled={notifEnabled}

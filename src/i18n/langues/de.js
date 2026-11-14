@@ -2163,4 +2163,8 @@ export default {
   "rh.vuesPasSu": "Aufrufe —",
   "rh.vendue": "verkauft",
   "rh.enLigne": "online",
+  "instantane.geste.horsLigne": "Offline",
+  "instantane.geste.panne": "Nicht neu geladen",
+  "instantane.arret.horsLigne": "Offline: Diese Zahlen stammen von deinem letzten Besuch. Sie werden neu geladen, sobald das Netz zurück ist.",
+  "instantane.arret.panne": "Nicht neu geladen: Die Datenbank antwortet nicht. Diese Zahlen stammen von deinem letzten Besuch.",
 };

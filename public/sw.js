@@ -44,6 +44,18 @@ self.addEventListener('activate', event => event.waitUntil((async () => {
 })()));
 
 self.addEventListener('message', event => {
+  // (14 nov., ouverture instantanée) L'APP ouverte (jamais la page d'accueil) demande que sa coquille soit
+  // rangée tout de suite : sans ça, la 2e ouverture repassait par le réseau (mesuré : 72 fichiers, 2,4 Mo
+  // en 3G, 16 s avant les premiers chiffres). Les fichiers `/assets/` (immuables) viennent en général du
+  // cache HTTP de la 1re ouverture. Rien n'est rangé si un fichier manque (`relireCoquille`).
+  if (event.data && event.data.type === 'VRM_RANGER_COQUILLE') {
+    event.waitUntil((async () => {
+      const cache = await caches.open(CACHE);
+      if (!(await coquilleComplete(cache))) await relireCoquille(new Request('/'), cache);
+      await rechaufferPlusTard(cache);
+    })().catch(() => {}));
+    return;
+  }
   if (event.data && event.data.type === 'STORE_PDF') {
     pdfStore[event.data.id] = event.data.base64;
     if (event.ports[0]) event.ports[0].postMessage({ ok: true });
@@ -108,8 +120,25 @@ async function relireCoquille(req, cache) {
     if (!r || r.status !== 200 || r.type !== 'basic') return;
     await cache.put(n, r);
   }
+  // (14 nov., ouverture instantanée) Les scripts de démarrage que la page lit AVANT de s'afficher
+  // (`/demarrage-*.js` : thème, densité, préchargement) : rangés AVEC la coquille qui les nomme. Servis
+  // au réseau d'abord, ils coûtaient un aller-retour entier avant la première image (≈ 0,6 s en 3G).
+  for (const n of nomsDemarrage(html)) {
+    const r = await fetch(n, { cache: 'no-store', credentials: 'same-origin' }).catch(() => null);
+    if (r && r.status === 200 && r.type === 'basic') await cache.put(n, r);
+  }
   await cache.put('/', fresh);
 }
+// Les scripts classiques de démarrage nommés par la coquille (jamais plus de 6, jamais autre chose).
+const RE_DEMARRAGE = /^\/demarrage-[a-z-]{1,24}\.js$/;
+function nomsDemarrage(html) {
+  return [...new Set((String(html).match(/\/demarrage-[a-z-]{1,24}\.js/g) || []))].filter((n) => RE_DEMARRAGE.test(n)).slice(0, 6);
+}
+// (14 nov.) Le réchauffage des morceaux (un par un, jusqu'à 160) attend que l'ouverture soit passée :
+// lancé tout de suite, il prenait le réseau aux lectures du démarrage (mesuré : chaque ouverture en
+// 3G partageait son débit avec un morceau à la fois). Rien d'autre ne change : il part, plus tard.
+const ATTENTE_RECHAUFFE_MS = 15000;
+const rechaufferPlusTard = (cache) => new Promise((r) => setTimeout(r, ATTENTE_RECHAUFFE_MS)).then(() => rechaufferMorceaux(cache));
 
 // ── (11 nov., lot hors-ligne) TOUTE L'APP HORS LIGNE ────────────────────────
 // Un écran à la demande (`src/ecrans/*`) jamais ouvert en ligne n'était pas en cache :
@@ -425,7 +454,7 @@ self.addEventListener('fetch', event => {
       const voulueFraiche = req.cache === 'reload' || req.cache === 'no-cache' || req.cache === 'no-store';
       const gardee = voulueFraiche ? null : await coquilleComplete(cache);
       if (gardee) {
-        event.waitUntil(relireCoquille(req, cache).then(() => rechaufferMorceaux(cache)).catch(() => {}));
+        event.waitUntil(relireCoquille(req, cache).then(() => rechaufferPlusTard(cache)).catch(() => {}));
         event.waitUntil(purgerAncienneVersion(gardee.clone()).catch(() => {}));
         return gardee;
       }
@@ -433,7 +462,7 @@ self.addEventListener('fetch', event => {
         const fresh = await fetch(req);
         if (fresh.ok) {
           cache.put('/', fresh.clone()).catch(() => {});
-          event.waitUntil(purgerAncienneVersion(fresh.clone()).then(() => rechaufferMorceaux(cache)).catch(() => {}));
+          event.waitUntil(purgerAncienneVersion(fresh.clone()).then(() => rechaufferPlusTard(cache)).catch(() => {}));
         }
         return fresh;
       } catch (_) {
@@ -460,6 +489,24 @@ self.addEventListener('fetch', event => {
           { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
         );
       }
+    })());
+    return;
+  }
+
+  // 2 bis) (14 nov., ouverture instantanée) Les scripts de démarrage (`/demarrage-*.js`) : ils bloquent la
+  //    première image (scripts classiques du <head>). Rangés avec la coquille (`relireCoquille`), ils sont
+  //    servis DEPUIS LE CACHE — la même version que la coquille servie — et relus au réseau derrière
+  //    (la coquille relue les range de nouveau). Pas en cache ⇒ le réseau, comme avant.
+  if (RE_DEMARRAGE.test(url.pathname)) {
+    event.respondWith((async () => {
+      const cache = await caches.open(CACHE);
+      const hit = await cache.match(url.pathname);
+      if (hit) return hit;
+      try {
+        const res = await fetch(req);
+        if (res && res.status === 200 && res.type === 'basic' && !url.search) cache.put(url.pathname, res.clone()).catch(() => {});
+        return res;
+      } catch (_) { return Response.error(); }
     })());
     return;
   }

@@ -102,9 +102,42 @@ export function capturerJournee(racine, { uid, maintenant = Date.now(), largeur 
   const g = racine.querySelector('[data-fu-gestes]');
   snap.gestes = g && /^\d+$/.test(attr(g, 'data-fu-gestes') || '') ? Number(attr(g, 'data-fu-gestes')) : null;
   snap.hauteur = Math.round(tete.getBoundingClientRect ? tete.getBoundingClientRect().height : 0) || 0;
+  // (14 nov., ouverture instantanée) LA PLACE de l'écran, pour le peindre avant l'app (src/OuvertureInstantanee.jsx).
+  snap.cadre = cadreDe(racine);
   // Rien d'utile (aucun chiffre) : rien n'est rangé.
   if (!snap.cases && !snap.frise && !snap.prochain) return null;
   return snap;
+}
+
+// (14 nov., ouverture instantanée) Le CADRE où l'écran était peint : la boîte de Ma journée (haut, gauche,
+// largeur, dans le défilement de la page), la largeur de la fenêtre et le thème, et ce que la coque pose
+// autour d'elle — ses classes et les variables de couleur du thème (`--…`, sans `url(`). Rien de personnel :
+// des nombres de mise en page et des noms de VRM. Sert à peindre l'instantané À LA MÊME PLACE avant que l'app
+// soit chargée ; une autre largeur ou un autre thème ⇒ src/OuvertureInstantanee.jsx ne s'en sert pas.
+const classesDe = (el) => String((el && el.className) || '').split(/\s+/).filter((c) => /^[a-z][\w-]{0,60}$/i.test(c)).slice(0, 12).join(' ');
+export function cadreDe(racine) {
+  try {
+    const boite = racine && racine.parentElement;
+    if (!boite || !boite.getBoundingClientRect || typeof window === 'undefined') return null;
+    const r = boite.getBoundingClientRect();
+    const shell = racine.closest('.vrm-app-shell');
+    const main = racine.closest('main');
+    const vars = {};
+    if (shell && shell.style) {
+      for (let i = 0; i < shell.style.length && Object.keys(vars).length < 80; i++) {
+        const p = shell.style[i];
+        if (!/^--[\w-]{1,60}$/.test(p)) continue;
+        const v = String(shell.style.getPropertyValue(p) || '').trim();
+        if (v && v.length <= 160 && !/url\s*\(|expression|[<>{};]/i.test(v)) vars[p] = v;
+      }
+    }
+    const haut = Math.round(r.top + (main ? main.scrollTop || 0 : 0) + (window.scrollY || 0));
+    const gauche = Math.round(r.left + (window.scrollX || 0));
+    if (!Number.isFinite(haut) || !Number.isFinite(gauche) || haut < 0 || haut > 600 || gauche < 0) return null;
+    return { haut, gauche, large: Math.round(r.width), vw: Math.round(window.innerWidth || 0),
+      theme: (document.documentElement && document.documentElement.getAttribute('data-theme')) || '',
+      shell: classesDe(shell) || 'vrm-app-shell', main: classesDe(main) || 'vrm-main', vars };
+  } catch (_) { return null; }
 }
 
 // ── LECTURE ─────────────────────────────────────────────────────────────────
@@ -123,7 +156,7 @@ export function instantaneMontrable(s, maintenant = Date.now()) {
     gestes: s.gestes,
     cases: memeMois ? s.cases || null : null,
     objectif: memeMois ? s.objectif || null : null,
-    frise: null, hauteur: s.hauteur || 0, largeur: s.largeur || 0,
+    frise: null, hauteur: s.hauteur || 0, largeur: s.largeur || 0, cadre: s.cadre || null,
   };
   if (s.frise && Array.isArray(s.frise.jours)) {
     // Les sept jours d'AUJOURD'HUI : un jour connu garde son chiffre, aujourd'hui (pas encore relu) n'en a pas.
