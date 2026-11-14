@@ -105,7 +105,7 @@
   gap: 10px !important; padding: 0 8px 14px !important; margin: 0 !important;
 }
 .vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-nav-tuile {
-  flex: 0 0 auto; width: 32px; height: 32px; border-radius: 9px;
+  flex: 0 0 auto; width: 32px; height: 32px; border-radius: 12px;
   display: grid; place-items: center;
   background: var(--n2-tuile); color: #FFFFFF;
   font: 700 17px/1 var(--vrm-police); letter-spacing: -.03em;
@@ -207,7 +207,7 @@
 
 /* ── 6. LE PIED : LA CARTE DU COMPTE ──────────────────────────────────────── */
 .vrm-app-shell nav.vrm-sidebar[data-nav-v2] > .vrm-rail-pied {
-  margin: 10px 0 0 !important; padding: 4px !important; border: 0 !important; border-radius: 14px !important;
+  margin: 10px 0 0 !important; padding: 4px !important; border: 0 !important; border-radius: 12px !important;
   background: var(--n2-carte) !important; box-shadow: var(--n2-carte-ombre) !important;
 }
 .vrm-app-shell nav.vrm-sidebar[data-nav-v2] > .vrm-rail-pied [data-nav-groupe].vrm-rail-management-group { margin-top: 0 !important; }

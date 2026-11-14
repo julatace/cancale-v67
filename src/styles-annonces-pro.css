@@ -19,7 +19,7 @@
 
 :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-ann-card {
   display: flex !important; flex-direction: column !important;
-  border: 1px solid var(--vrm-line) !important; border-radius: 14px !important;
+  border: 1px solid var(--vrm-line) !important; border-radius: 12px !important;
   background: var(--vrm-surface) !important; overflow: hidden !important;
   box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px -16px rgba(0,0,0,.18) !important;
   transition: transform .22s cubic-bezier(.2,.7,.2,1), box-shadow .22s ease, border-color .22s ease;

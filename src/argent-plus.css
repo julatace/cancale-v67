@@ -1,6 +1,6 @@
 /* Argent, en plus (11 nov., agent2-argent-parrainage, src/ArgentPlus.jsx) : prévision du mois,
    coût par site et par mois. Neutre ; l'accent seulement sur le trait du centre (§7). */
-.vrm-ap-carte { background: var(--vrm-surface, var(--vrm-bg, #fff)); border: 1px solid var(--vrm-line, #E5E5EA); border-radius: 14px; padding: 16px 16px 12px; min-width: 0; color: var(--vrm-ink, #1D1D1F); }
+.vrm-ap-carte { background: var(--vrm-surface, var(--vrm-bg, #fff)); border: 1px solid var(--vrm-line, #E5E5EA); border-radius: 12px; padding: 16px 16px 12px; min-width: 0; color: var(--vrm-ink, #1D1D1F); }
 .vrm-ap-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
 .vrm-ap-titre { font-size: 20px; font-weight: 700; letter-spacing: -.02em; margin: 0; line-height: 1.2; min-width: 0; }
 .vrm-ap-note { font-size: 13px; color: var(--vrm-muted, #6E6E73); white-space: nowrap; }

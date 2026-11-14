@@ -24,7 +24,7 @@
 :root:root body .vrm-ca-cloture .vrm-ca-raisons a { min-height: 44px !important; display: flex !important; align-items: center !important; }
 :root:root body .vrm-ca-cloture .vrm-ca-pied { display: flex !important; align-items: center !important; gap: 12px !important; flex-wrap: wrap !important; padding-top: 4px !important; }
 :root:root body .vrm-ca-cloture .vrm-ca-fini {
-  min-height: 44px !important; padding: 0 22px !important; border: 0 !important; border-radius: 22px !important;
+  min-height: 44px !important; padding: 0 22px !important; border: 0 !important; border-radius: 999px !important;
   background: var(--mb-encre) !important; color: var(--mb-carte) !important; font: 600 15px/1 var(--mb-police) !important; cursor: pointer;
 }
 :root:root body .vrm-ca-cloture .vrm-ca-fini:disabled { opacity: .45 !important; cursor: default; }

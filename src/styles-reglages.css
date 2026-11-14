@@ -164,7 +164,7 @@ button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(0,0,0,.05)); 
 .vrm-tampon-poignee{position:absolute;right:-22px;bottom:-22px;width:44px;height:44px;display:grid;place-items:center;cursor:nwse-resize;}
 .vrm-tampon-poignee i{display:block;width:16px;height:16px;border-radius:50%;background:var(--vrm-accent,#0071E3);border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3);pointer-events:none;}
 .vrm-tampon-puces{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;min-height:28px;}
-.vrm-tampon-puce{display:inline-block;font-size:13px;font-weight:600;line-height:28px;padding:0 12px;border-radius:14px;}
+.vrm-tampon-puce{display:inline-block;font-size:13px;font-weight:600;line-height:28px;padding:0 12px;border-radius:999px;}
 .vrm-tampon-options{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 12px;margin-top:6px;}
 .vrm-tampon-case{display:flex;align-items:center;gap:10px;min-height:44px;font-size:15px;cursor:pointer;}
 .vrm-tampon-case input{width:22px;height:22px;margin:0;accent-color:var(--vrm-accent,#0071E3);}

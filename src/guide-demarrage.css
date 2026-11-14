@@ -78,7 +78,7 @@
 @keyframes vrmGuideOnde { 0% { opacity: .6; transform: scale(1); } 80%, 100% { opacity: 0; transform: scale(2.6); } }
 
 /* La question de la numérotation : deux choix côte à côte (empilés sur un téléphone étroit). */
-.vrm-guide-question { margin: 10px 0 6px; padding: 14px; border-radius: var(--d-r-case, 14px); background: var(--g-case); }
+.vrm-guide-question { margin: 10px 0 6px; padding: 14px; border-radius: var(--d-r-case, 12px); background: var(--g-case); }
 .vrm-guide-question-titre { margin: 0 0 10px; font-size: 15px; font-weight: 600; letter-spacing: -.008em; color: var(--g-encre); }
 .vrm-guide-choix { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .vrm-guide-choix-carte {
@@ -107,7 +107,7 @@
 .vrm-guide-detail .vrm-premiers-sans-cadre { padding: 0 !important; border: 0 !important; background: transparent !important; }
 
 /* « Vérifier mon installation » : une case dans la carte du guide, ou seule dans Paramètres. */
-.vrm-verif { box-sizing: border-box; margin: 4px 0 12px; padding: 4px 14px; border-radius: var(--d-r-case, 14px); background: var(--d-case, #F2F2F7); color: var(--d-encre, #1D1D1F); }
+.vrm-verif { box-sizing: border-box; margin: 4px 0 12px; padding: 4px 14px; border-radius: var(--d-r-case, 12px); background: var(--d-case, #F2F2F7); color: var(--d-encre, #1D1D1F); }
 .vrm-verif-cadre { display: grid; gap: 10px; justify-items: start; }
 /* Dans Paramètres, le panneau est déjà une carte : pas de carte dans la carte. */
 .vrm-verif-cadre .vrm-verif { width: 100%; margin: 0; padding: 0; background: transparent; box-shadow: none; }

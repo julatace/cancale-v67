@@ -21,7 +21,7 @@
 .vrm-cv-tete { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .vrm-cv-tete h2, .vrm-cv-q h3 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
 .vrm-cv-q h3 { font-size: 17px; }
-.vrm-cv-x { min-width: 44px; min-height: 44px; border: 0; border-radius: 22px; background: transparent; color: var(--vrm-muted, #6e6e73); font-size: 26px; line-height: 1; cursor: pointer; }
+.vrm-cv-x { min-width: 44px; min-height: 44px; border: 0; border-radius: 999px; background: transparent; color: var(--vrm-muted, #6e6e73); font-size: 26px; line-height: 1; cursor: pointer; }
 .vrm-cv-doux { margin: 0; font-size: 13px; line-height: 1.45; color: var(--vrm-muted, #6e6e73); }
 .vrm-cv-compte { font-size: 14px; font-weight: 600; padding: 10px 12px; border-radius: 12px; background: var(--vrm-card2, #f2f2f7); overflow-wrap: anywhere; }
 .vrm-cv-geste { color: var(--vrm-warn, #b25000); }
@@ -30,21 +30,21 @@ p.vrm-cv-geste { margin: 0; font-size: 13px; line-height: 1.4; }
 .vrm-cv-ligne { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; min-width: 0; }
 .vrm-cv-ligne + .vrm-cv-ligne { border-top: 1px solid var(--vrm-line, rgba(0, 0, 0, .08)); }
 .vrm-cv-ligne-tete { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.vrm-cv-num { flex: none; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; min-width: 52px; }
+.vrm-cv-num { flex: none; font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 52px; }
 .vrm-cv-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .vrm-cv-txt b { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vrm-cv-txt small { font-size: 13px; color: var(--vrm-muted, #6e6e73); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vrm-cv-photos { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
-.vrm-cv-photo { position: relative; flex: none; width: 64px; height: 64px; border-radius: 10px; overflow: hidden; background: var(--vrm-card2, #f2f2f7); }
+.vrm-cv-photo { position: relative; flex: none; width: 64px; height: 64px; border-radius: 12px; overflow: hidden; background: var(--vrm-card2, #f2f2f7); }
 .vrm-cv-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.vrm-cv-photo button { position: absolute; top: 0; right: 0; width: 28px; height: 28px; border: 0; border-radius: 0 0 0 10px; background: rgba(0, 0, 0, .55); color: #fff; font-size: 16px; cursor: pointer; }
-.vrm-cv-ajout { flex: none; min-height: 64px; min-width: 96px; padding: 0 12px; border: 1px dashed var(--vrm-line, rgba(0, 0, 0, .2)); border-radius: 10px; background: transparent; color: var(--vrm-ink, #1d1d1f); font: 600 13px/1.2 inherit; cursor: pointer; }
+.vrm-cv-photo button { position: absolute; top: 0; right: 0; width: 28px; height: 28px; border: 0; border-radius: 0 0 0 12px; background: rgba(0, 0, 0, .55); color: #fff; font-size: 16px; cursor: pointer; }
+.vrm-cv-ajout { flex: none; min-height: 64px; min-width: 96px; padding: 0 12px; border: 1px dashed var(--vrm-line, rgba(0, 0, 0, .2)); border-radius: 12px; background: transparent; color: var(--vrm-ink, #1d1d1f); font: 600 13px/1.2 inherit; cursor: pointer; }
 .vrm-cv-ajout:disabled { opacity: .5; cursor: default; }
 .vrm-cv-ok { margin: 0; font-size: 13px; font-weight: 600; }
 .vrm-cv-ok a, .vrm-cv-ok a:visited { color: var(--vrm-accent, #0071e3); margin-left: 6px; }
 .vrm-cv-ok small { font-weight: 400; color: var(--vrm-muted, #6e6e73); }
 .vrm-cv-pied { position: sticky; bottom: calc(-1 * max(16px, env(safe-area-inset-bottom))); display: flex; flex-direction: column; gap: 8px; padding: 12px 0 0; background: var(--vrm-surface, #fff); }
-.vrm-cv-primaire { min-height: 50px; border: 0; border-radius: 14px; background: var(--vrm-accent, #0071e3); color: var(--vrm-on-accent, #fff); font: 600 16px/1.2 inherit; cursor: pointer; padding: 0 16px; }
+.vrm-cv-primaire { min-height: 50px; border: 0; border-radius: 12px; background: var(--vrm-accent, #0071e3); color: var(--vrm-on-accent, #fff); font: 600 16px/1.2 inherit; cursor: pointer; padding: 0 16px; }
 .vrm-cv-primaire:disabled { opacity: .4; cursor: default; }
 .vrm-cv-primaire[data-creer-vinted-confirme="1"] { background: var(--vrm-ink, #1d1d1f); color: var(--vrm-surface, #fff); }
 .vrm-cv-second { min-height: 44px; padding: 0 14px; border: 0; border-radius: 12px; background: var(--vrm-card2, #f2f2f7); color: var(--vrm-ink, #1d1d1f); font: 600 14px/1.2 inherit; cursor: pointer; }
@@ -61,5 +61,5 @@ p.vrm-cv-geste { margin: 0; font-size: 13px; line-height: 1.4; }
 /* (intégration 11nov-g2) Les champs qu'une fiche n'a pas encore, tapés dans la feuille. */
 .vrm-cv-saisie { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .vrm-cv-champ { display: flex; flex-direction: column; gap: 4px; text-align: left; font-size: 13px; color: var(--vrm-muted, inherit); min-width: 0; }
-.vrm-cv-champ input, .vrm-cv-champ textarea { box-sizing: border-box; width: 100%; min-height: 44px; padding: 10px 12px; font: inherit; font-size: 16px; color: var(--vrm-ink, inherit); background: var(--vrm-surface, transparent); border: 1px solid var(--vrm-line, rgba(0, 0, 0, .14)); border-radius: 10px; }
+.vrm-cv-champ input, .vrm-cv-champ textarea { box-sizing: border-box; width: 100%; min-height: 44px; padding: 10px 12px; font: inherit; font-size: 16px; color: var(--vrm-ink, inherit); background: var(--vrm-surface, transparent); border: 1px solid var(--vrm-line, rgba(0, 0, 0, .14)); border-radius: 12px; }
 .vrm-cv-champ textarea { resize: vertical; }

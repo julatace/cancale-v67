@@ -1,8 +1,8 @@
 /* « Tes emails, ce que VRM en a fait » (31 oct.) — Vitrine : aplats « surface »,
    une seule couleur d'accent (rare), l'ambre pour un geste à faire, 44 px. */
-.vrm-journal{margin:0 0 16px;border-radius:14px;background:var(--vrm-surface,#fff);color:var(--vrm-ink,#111);min-width:0;overflow:hidden;font-size:15px;line-height:1.45}
+.vrm-journal{margin:0 0 16px;border-radius:12px;background:var(--vrm-surface,#fff);color:var(--vrm-ink,#111);min-width:0;overflow:hidden;font-size:15px;line-height:1.45}
 .vrm-journal-entete{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:18px 18px 10px}
-.vrm-journal-entete h3{margin:0;font-size:17px;font-weight:800;letter-spacing:-.02em}
+.vrm-journal-entete h3{margin:0;font-size:17px;font-weight:700;letter-spacing:-.02em}
 .vrm-journal-entete p{margin:4px 0 0;font-size:13px;color:var(--vrm-muted,#6E6E73)}
 .vrm-journal button,.vrm-journal select{font:inherit;min-height:44px;box-sizing:border-box;border-radius:12px;border:1px solid var(--vrm-line,#E5E5EA);background:var(--vrm-surface,#FFFFFF);color:inherit;padding:0 14px;cursor:pointer}
 .vrm-journal button:disabled{opacity:.6;cursor:wait}

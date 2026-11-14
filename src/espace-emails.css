@@ -2,8 +2,8 @@
 .vrm-emails-entete{display:flex;gap:12px;align-items:center;margin:0 0 20px;}
 .vrm-emails-entete h2{font-size:22px;letter-spacing:-.5px;line-height:1.2;margin:0 0 5px;font-weight:600;}
 .vrm-emails-entete p{font-size:12px;color:var(--email-secondaire,#6E6E73);margin:0;line-height:1.5;}
-.vrm-emails-embleme{width:44px;height:44px;display:grid;place-items:center;border-radius:14px;background:var(--email-accent,#315c60);color:var(--email-sur-accent,#fff);flex-shrink:0;}
-.vrm-emails-rubriques{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:5px;border:1px solid var(--email-ligne,#E5E5EA);border-radius:14px;background:var(--email-fond,#F2F2F7);margin-bottom:18px;}
+.vrm-emails-embleme{width:44px;height:44px;display:grid;place-items:center;border-radius:12px;background:var(--email-accent,#315c60);color:var(--email-sur-accent,#fff);flex-shrink:0;}
+.vrm-emails-rubriques{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:5px;border:1px solid var(--email-ligne,#E5E5EA);border-radius:12px;background:var(--email-fond,#F2F2F7);margin-bottom:18px;}
 .vrm-emails-rubriques>button{appearance:none;min-width:0;min-height:60px;padding:11px 12px!important;border:1px solid transparent!important;border-radius:12px!important;background:transparent!important;color:var(--email-secondaire,#6E6E73)!important;text-align:left;cursor:pointer;font-family:inherit;white-space:normal!important;}
 .vrm-emails-rubriques>button[aria-pressed=true]{background:var(--email-surface,#fff)!important;color:var(--email-encre,#38383A)!important;border-color:var(--email-ligne,#E5E5EA)!important;box-shadow:0 2px 4px #38383A06;}
 .vrm-emails-rubriques button>span{display:flex;align-items:center;gap:7px;min-width:0;}
@@ -12,7 +12,7 @@
 .vrm-emails-nombre{font-size:11px;line-height:18px;min-width:18px;text-align:center;border-radius:6px;background:#8E8E9315;flex-shrink:0;padding:0 3px;}
 .vrm-emails-espace [hidden]{display:none!important;}
 .vrm-emails-espace [data-email-panneau]{min-width:0;}
-.vrm-emails-espace .vrm-email-rattachement{border:1px solid var(--email-ligne,#E5E5EA);background:var(--email-surface,#fff);border-radius:14px;padding:18px;}
+.vrm-emails-espace .vrm-email-rattachement{border:1px solid var(--email-ligne,#E5E5EA);background:var(--email-surface,#fff);border-radius:12px;padding:18px;}
 .vrm-email-rattachement>h3{font-size:15px;margin:0 0 6px;font-weight:600;}
 .vrm-email-rattachement>p{font-size:12px;color:var(--email-secondaire,#6E6E73);line-height:1.6;margin:0 0 14px;}
 .vrm-email-vide{padding:28px 16px;border:1px dashed var(--email-ligne,#E5E5EA);border-radius:12px;text-align:center;font-size:12px;color:var(--email-secondaire,#6E6E73);}

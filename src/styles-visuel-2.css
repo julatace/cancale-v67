@@ -232,7 +232,7 @@ html body .vrm-app-shell .vrm-main .vrm-rpf-section-n { font-size: var(--vrm-t17
    à retirer), à droite du grand chiffre : 3 photos de 64 px en éventail, bord de la
    couleur de la carte, ombre douce — comme les souvenirs de Photos. */
 html body .vrm-app-shell .vrm-main .vrm-fu-pile.vrm-pile { width: 96px; height: 76px; align-self: center; margin-right: 2px; }
-html body .vrm-app-shell .vrm-main .vrm-fu-pile .vrm-pile-v { width: 64px; height: 64px; top: 6px; border-radius: 14px; border: 2px solid rgba(255,255,255,.14); box-shadow: 0 6px 16px rgba(0,0,0,.35); background: #2c2c2e; }
+html body .vrm-app-shell .vrm-main .vrm-fu-pile .vrm-pile-v { width: 64px; height: 64px; top: 6px; border-radius: 12px; border: 2px solid rgba(255,255,255,.14); box-shadow: 0 6px 16px rgba(0,0,0,.35); background: #2c2c2e; }
 html body .vrm-app-shell .vrm-main .vrm-fu-pile.is-pile .vrm-pile-v { left: calc(var(--k) * 14px); top: 6px; transform: rotate(calc((var(--k) - 1) * 6deg)); transform-origin: 50% 100%; }
 html body .vrm-app-shell .vrm-main .vrm-fu-pile .vrm-pile-plus { right: -4px; bottom: 0; background: rgba(255,255,255,.16); color: #fff; box-shadow: none; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
 @media (prefers-reduced-motion: no-preference) {
@@ -286,7 +286,7 @@ html body .vrm-app-shell .vrm-main [data-lbc-conseil] [data-lbc-conseil-go] { bo
 .vrm-lbc-conseil-icone { flex: 0 0 30px; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: var(--vrm-card2); color: var(--vrm-ink); }
 .vrm-lbc-conseil-icone[data-urgent="1"] { background: var(--vrm-warn-soft); color: var(--vrm-warn); }
 /* La raison de ne pas publier d'ici (« Depuis ton ordinateur ») : une carte, le geste en ambre — plus de barre latérale. */
-html body .vrm-app-shell .vrm-main [data-raison-publier] { border: 0 !important; box-shadow: var(--vrm-ombre-carte); border-radius: 14px !important; }
+html body .vrm-app-shell .vrm-main [data-raison-publier] { border: 0 !important; box-shadow: var(--vrm-ombre-carte); border-radius: 12px !important; }
 html body .vrm-app-shell .vrm-main [data-raison-publier] b { color: var(--vrm-ink); }
 /* « Republier sur Leboncoin » : une carte comme les autres (titre, une ligne + ⓘ, le geste). */
 html body .vrm-app-shell .vrm-main [data-repub-lbc-porte] { border: 0 !important; box-shadow: var(--vrm-ombre-carte); border-radius: var(--vrm-r-carte) !important; }

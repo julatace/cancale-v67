@@ -24,7 +24,7 @@
 .vrm-stats-vitrine .vrm-sv-rangee { display: grid; gap: 14px; align-items: stretch; }
 .vrm-stats-vitrine .vrm-sv-rangee-3 { grid-template-columns: minmax(0, 1.42fr) minmax(0, 1fr) minmax(0, 1fr); }
 .vrm-stats-vitrine .vrm-sv-rangee-2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-.vrm-stats-vitrine .vrm-sv-carte { background: var(--vrm-bg); border: 1px solid var(--vrm-line); border-radius: 14px; padding: 14px 14px 12px; min-width: 0; display: flex; flex-direction: column; }
+.vrm-stats-vitrine .vrm-sv-carte { background: var(--vrm-bg); border: 1px solid var(--vrm-line); border-radius: 12px; padding: 14px 14px 12px; min-width: 0; display: flex; flex-direction: column; }
 .vrm-stats-vitrine .vrm-sv-carte-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .vrm-stats-vitrine .vrm-sv-carte-titre { font-size: 20px; font-weight: 700; letter-spacing: -.02em; color: var(--vrm-ink); margin: 0; line-height: 1.2; }
 .vrm-stats-vitrine .vrm-sv-carte-tete .vrm-sv-note { white-space: nowrap; }

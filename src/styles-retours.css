@@ -20,13 +20,13 @@
 :root:root body .vrm-ret-h2 > span { color: var(--ret-gris); font-weight: 600; margin-left: 4px; font-variant-numeric: tabular-nums; }
 :root:root body .vrm-ret-grille { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 @media (min-width: 768px) { :root:root body .vrm-ret-grille { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; } }
-:root:root body .vrm-ret-carte { display: flex; flex-direction: column; gap: 12px; padding: 14px; min-width: 0; background: var(--ret-carte); color: var(--ret-encre); border-radius: 22px; box-shadow: var(--ret-ombre); }
+:root:root body .vrm-ret-carte { display: flex; flex-direction: column; gap: 12px; padding: 14px; min-width: 0; background: var(--ret-carte); color: var(--ret-encre); border-radius: 20px; box-shadow: var(--ret-ombre); }
 :root:root body .vrm-ret-haut { display: flex; align-items: center; gap: 14px; min-width: 0; }
 :root:root body .vrm-ret-photo { flex: 0 0 64px; width: 64px; height: 64px; object-fit: cover; border-radius: 16px; background: var(--ret-tuile); }
 :root:root body .vrm-ret-tuile { flex: 0 0 64px; width: 64px; height: 64px; border-radius: 16px; background: var(--ret-tuile); display: flex; align-items: center; justify-content: center; color: var(--ret-gris); }
 :root:root body .vrm-ret-tuile svg { width: 26px; height: 26px; }
 :root:root body .vrm-ret-textes, :root:root body .vrm-ret-tip-corps { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-:root:root body .vrm-ret-num { font: 800 19px/1.1 var(--vrm-police, system-ui, sans-serif); letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--ret-encre); }
+:root:root body .vrm-ret-num { font: 700 19px/1.1 var(--vrm-police, system-ui, sans-serif); letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--ret-encre); }
 :root:root body .vrm-ret-titre { font: 500 14px/1.3 var(--vrm-police, system-ui, sans-serif); color: var(--ret-encre); overflow-wrap: anywhere; }
 :root:root body .vrm-ret-limite { font: 600 14px/1.3 var(--vrm-police, system-ui, sans-serif); color: var(--ret-gris); }
 :root:root body .vrm-ret-limite.is-presse { color: var(--ret-ambre); }
@@ -45,7 +45,7 @@
 :root:root body .vrm-ret-tip-ligne:first-of-type { border-top: 0; }
 /* La feuille « Pas à pas ». */
 :root:root body .vrm-pap .vrm-pap-preuve { margin: 0 0 14px; font: 650 15px/1.35 var(--vrm-police, system-ui, sans-serif); color: var(--ret-encre); }
-:root:root body .vrm-pap .vrm-pap-bloc { margin: 0 0 18px; padding: 12px 14px; border-radius: 18px; background: var(--ret-tuile); }
+:root:root body .vrm-pap .vrm-pap-bloc { margin: 0 0 18px; padding: 12px 14px; border-radius: 20px; background: var(--ret-tuile); }
 :root:root body .vrm-pap .vrm-pap-bloc > h3 { margin: 0 0 8px; font: 700 13px/1.2 var(--vrm-police, system-ui, sans-serif); text-transform: uppercase; letter-spacing: .04em; color: var(--ret-gris); }
 :root:root body .vrm-pap .vrm-pap-ligne { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; min-height: 32px; font: 600 15px/1.35 var(--vrm-police, system-ui, sans-serif); color: var(--ret-encre); flex-wrap: wrap; }
 :root:root body .vrm-pap .vrm-pap-ligne small { font: 500 13px/1.3 var(--vrm-police, system-ui, sans-serif); color: var(--ret-gris); }

@@ -12,7 +12,7 @@
   --ent-remplir: var(--cfg-remplir, var(--w-remplir, var(--d-remplir, rgba(118,118,128,.12))));
   --ent-ambre: var(--d-warn, var(--vrm-warn, #B25000));
   box-sizing: border-box; min-width: 0; color: var(--ent-encre);
-  border-radius: 18px; background: var(--ent-carte); box-shadow: inset 0 0 0 .5px var(--ent-filet), var(--w-ombre, 0 1px 2px rgba(0,0,0,.04));
+  border-radius: 20px; background: var(--ent-carte); box-shadow: inset 0 0 0 .5px var(--ent-filet), var(--w-ombre, 0 1px 2px rgba(0,0,0,.04));
   padding: 16px; font-size: 15px; line-height: 1.4; text-align: left; margin: 4px 0 6px;
   animation: vrmEntApparait .28s cubic-bezier(.2,.8,.2,1) both;
 }
@@ -63,12 +63,12 @@
 .vrm-ent-trou { display: inline-block; min-width: 3.5em; padding: 0 6px; border-radius: 6px; background: var(--ent-remplir); color: var(--ent-gris); font-weight: 500; font-size: 14px; }
 .vrm-ent-aide { font-size: 13px; color: var(--ent-gris); }
 .vrm-ent-ecart { display: grid; gap: 6px; font-size: 13px; color: var(--ent-ambre); overflow-wrap: anywhere; }
-.vrm-ent-choix { display: inline-grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 2px; border-radius: 10px; background: var(--ent-remplir); justify-self: start; }
+.vrm-ent-choix { display: inline-grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 2px; border-radius: 12px; background: var(--ent-remplir); justify-self: start; }
 .vrm-ent-choix button { appearance: none; border: 0; min-height: 44px; padding: 0 14px; border-radius: 8px; background: transparent; color: var(--ent-encre); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
 .vrm-ent-choix button[aria-checked="true"] { background: var(--ent-carte); box-shadow: 0 1px 3px rgba(0,0,0,.12); font-weight: 600; }
 .vrm-ent-ville { display: grid; gap: 4px; }
 .vrm-ent-ville span { font-size: 13px; color: var(--ent-gris); }
-.vrm-ent-ville input { box-sizing: border-box; min-height: 44px; width: 100%; max-width: 280px; padding: 0 12px; border-radius: 10px; border: 0; background: var(--ent-remplir); color: var(--ent-encre); font: inherit; font-size: 16px; }
+.vrm-ent-ville input { box-sizing: border-box; min-height: 44px; width: 100%; max-width: 280px; padding: 0 12px; border-radius: 12px; border: 0; background: var(--ent-remplir); color: var(--ent-encre); font: inherit; font-size: 16px; }
 .vrm-ent-ville input:focus-visible { outline: 2px solid var(--ent-accent); outline-offset: 1px; }
 .vrm-ent-note { margin: 0; font-size: 13px; line-height: 1.45; color: var(--ent-gris); }
 

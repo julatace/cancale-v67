@@ -30,12 +30,12 @@
 
 /* Le total : un grand chiffre, deux mots. */
 :root:root body .vrm-at .vrm-at-resume { display: flex !important; align-items: baseline !important; gap: 10px !important; margin: -6px 2px 0 !important; color: var(--at-gris) !important; font: 600 17px/1.2 var(--vrm-police, -apple-system, system-ui, sans-serif) !important; }
-:root:root body .vrm-at .vrm-at-total { font: 800 44px/1 var(--vrm-police, -apple-system, system-ui, sans-serif) !important; letter-spacing: -.03em !important; color: var(--at-encre) !important; font-variant-numeric: tabular-nums !important; }
+:root:root body .vrm-at .vrm-at-total { font: 700 44px/1 var(--vrm-police, -apple-system, system-ui, sans-serif) !important; letter-spacing: -.03em !important; color: var(--at-encre) !important; font-variant-numeric: tabular-nums !important; }
 
 /* Un groupe : un titre court, son compte en pastille grise. */
 :root:root body .vrm-at .vrm-at-groupe { display: flex !important; flex-direction: column !important; gap: 10px !important; margin: 0 !important; }
-:root:root body .vrm-at .vrm-at-groupe-titre { display: flex !important; align-items: center !important; gap: 8px !important; margin: 0 2px !important; font: 800 22px/1.15 var(--vrm-police, -apple-system, system-ui, sans-serif) !important; letter-spacing: -.022em !important; color: var(--at-encre) !important; }
-:root:root body .vrm-at .vrm-at-compte { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 26px; padding: 0 8px; border-radius: 13px; background: var(--at-fond-tuile); color: var(--at-gris); font: 700 14px/1 var(--vrm-police, system-ui, sans-serif); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+:root:root body .vrm-at .vrm-at-groupe-titre { display: flex !important; align-items: center !important; gap: 8px !important; margin: 0 2px !important; font: 700 22px/1.15 var(--vrm-police, -apple-system, system-ui, sans-serif) !important; letter-spacing: -.022em !important; color: var(--at-encre) !important; }
+:root:root body .vrm-at .vrm-at-compte { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 26px; padding: 0 8px; border-radius: 999px; background: var(--at-fond-tuile); color: var(--at-gris); font: 700 14px/1 var(--vrm-police, system-ui, sans-serif); font-variant-numeric: tabular-nums; letter-spacing: 0; }
 
 /* Les cartes : une colonne au téléphone, une grille sur ordinateur. */
 :root:root body .vrm-at .vrm-at-grille { display: grid !important; grid-template-columns: minmax(0, 1fr) !important; gap: 12px !important; }
@@ -47,7 +47,7 @@
   display: flex !important; flex-direction: column !important; justify-content: space-between !important; gap: 14px !important;
   margin: 0 !important; padding: 14px !important; min-width: 0 !important;
   background: var(--at-carte) !important; color: var(--at-encre) !important;
-  border: 0 !important; border-radius: 22px !important; box-shadow: var(--at-ombre) !important;
+  border: 0 !important; border-radius: 20px !important; box-shadow: var(--at-ombre) !important;
 }
 :root:root body .vrm-at .vrm-at-haut { display: flex !important; align-items: center !important; gap: 14px !important; min-width: 0 !important; }
 
@@ -59,20 +59,20 @@
 :root:root body .vrm-at .vrm-at-tuile {
   flex: 0 0 72px; width: 72px; height: 72px; border-radius: 16px; background: var(--at-fond-tuile);
   display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
-  color: var(--at-encre); font: 800 24px/1 var(--vrm-police, system-ui, sans-serif); letter-spacing: -.02em; font-variant-numeric: tabular-nums;
+  color: var(--at-encre); font: 700 24px/1 var(--vrm-police, system-ui, sans-serif); letter-spacing: -.02em; font-variant-numeric: tabular-nums;
 }
 :root:root body .vrm-at .vrm-at-tuile small { font: 700 12px/1.2 var(--vrm-police, system-ui, sans-serif); color: var(--at-gris); letter-spacing: 0; }
-:root:root body .vrm-at .vrm-at-tuile b { font: 800 32px/1 var(--vrm-police, system-ui, sans-serif); letter-spacing: -.03em; }
+:root:root body .vrm-at .vrm-at-tuile b { font: 700 32px/1 var(--vrm-police, system-ui, sans-serif); letter-spacing: -.03em; }
 :root:root body .vrm-at .vrm-at-tuile[data-ton="rouge"] { background: var(--at-double-fond); color: var(--at-double); }
 :root:root body .vrm-at .vrm-at-tuile[data-a-trancher-sans-photo] { color: var(--at-gris); }
 
 /* Le texte : le N° en grand, une question. */
 :root:root body .vrm-at .vrm-at-textes { display: flex !important; flex-direction: column !important; gap: 3px !important; min-width: 0 !important; }
-:root:root body .vrm-at .vrm-at-num { font: 800 20px/1.1 var(--vrm-police, system-ui, sans-serif); letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--at-encre); }
+:root:root body .vrm-at .vrm-at-num { font: 700 20px/1.1 var(--vrm-police, system-ui, sans-serif); letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--at-encre); }
 :root:root body .vrm-at .vrm-at-num[data-ton="rouge"] { color: var(--at-double); }
 :root:root body .vrm-at .vrm-at-question { font: 600 16px/1.3 var(--vrm-police, system-ui, sans-serif); color: var(--at-encre); letter-spacing: -.01em; overflow-wrap: anywhere; }
 :root:root body .vrm-at .vrm-at-noms { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-:root:root body .vrm-at .vrm-at-nom { padding: 3px 9px; border-radius: 10px; background: var(--at-fond-tuile); font: 600 13px/1.3 var(--vrm-police, system-ui, sans-serif); color: var(--at-gris); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root:root body .vrm-at .vrm-at-nom { padding: 3px 9px; border-radius: 12px; background: var(--at-fond-tuile); font: 600 13px/1.3 var(--vrm-police, system-ui, sans-serif); color: var(--at-gris); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Les gestes : de gros boutons en pilule (48 px), pleine largeur. */
 :root:root body .vrm-at .vrm-at-gestes { display: flex !important; gap: 10px !important; }
@@ -96,15 +96,15 @@
 /* « + N » : la suite de la source, dans son écran. */
 :root:root body .vrm-at button.vrm-at-autres {
   display: flex !important; align-items: center !important; justify-content: center !important; gap: 8px !important;
-  min-height: 48px !important; margin: 0 !important; padding: 0 16px !important; border: 0 !important; border-radius: 22px !important; align-self: center !important;
+  min-height: 48px !important; margin: 0 !important; padding: 0 16px !important; border: 0 !important; border-radius: 20px !important; align-self: center !important;
   background: transparent !important; box-shadow: inset 0 0 0 1.5px var(--at-fond-tuile) !important; color: var(--at-gris) !important;
   font: 700 17px/1 var(--vrm-police, system-ui, sans-serif) !important; font-variant-numeric: tabular-nums; cursor: pointer;
 }
 
 /* Rien à trancher : un dessin, trois mots. */
-:root:root body .vrm-at .vrm-at-vide { display: flex !important; flex-direction: column !important; align-items: center !important; gap: 14px !important; padding: 48px 16px 40px !important; text-align: center !important; background: var(--at-carte) !important; border-radius: 24px !important; box-shadow: var(--at-ombre) !important; border: 0 !important; }
+:root:root body .vrm-at .vrm-at-vide { display: flex !important; flex-direction: column !important; align-items: center !important; gap: 14px !important; padding: 48px 16px 40px !important; text-align: center !important; background: var(--at-carte) !important; border-radius: 20px !important; box-shadow: var(--at-ombre) !important; border: 0 !important; }
 :root:root body .vrm-at .vrm-at-vide-dessin { color: var(--at-gris); }
-:root:root body .vrm-at .vrm-at-vide-titre { margin: 0 !important; font: 800 22px/1.2 var(--vrm-police, system-ui, sans-serif) !important; letter-spacing: -.02em !important; color: var(--at-encre) !important; }
+:root:root body .vrm-at .vrm-at-vide-titre { margin: 0 !important; font: 700 22px/1.2 var(--vrm-police, system-ui, sans-serif) !important; letter-spacing: -.02em !important; color: var(--at-encre) !important; }
 /* (11 nov., lot DJ4) « L’enlever du stock ? » : la réponse principale en premier, pleine largeur,
    puis « Non, je l’ai » et « Plus tard ». Toutes ≥ 44 px. */
 :root:root body .vrm-at .vrm-at-gestes.is-trois { display: grid !important; grid-template-columns: 1fr 1fr !important; }

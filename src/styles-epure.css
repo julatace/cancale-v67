@@ -41,7 +41,7 @@
   }
   /* Une alerte : une ligne teintée, pas une boîte avec une barre de couleur. */
   .vrm-app-shell .vrm-main .vrm-day-task {
-    background: var(--ep-teinte) !important; border-left-width: 0 !important; border-radius: 14px !important;
+    background: var(--ep-teinte) !important; border-left-width: 0 !important; border-radius: 12px !important;
   }
   .vrm-app-shell .vrm-main .vrm-day-task .vrm-day-task-ic,
   .vrm-app-shell .vrm-main .vrm-day-task > span:first-child { background: transparent !important; border: 0 !important; }
@@ -59,13 +59,13 @@
   .vrm-app-shell .vrm-main a[style*="solid rgb(36, 78, 84)"]:not([style*="background: rgb(36, 78, 84)"]),
   .vrm-app-shell .vrm-main button[style*="solid rgb(217, 226, 208)"] {
     background: var(--ep-teinte) !important; border-color: transparent !important; box-shadow: none !important;
-    border-radius: 24px !important; color: var(--ep-encre) !important; font-weight: 600 !important;
+    border-radius: 20px !important; color: var(--ep-encre) !important; font-weight: 600 !important;
   }
   .vrm-app-shell .vrm-main button[style*="solid rgb(220, 228, 223)"]:active,
   .vrm-app-shell .vrm-main a[style*="solid rgb(220, 228, 223)"]:active { background: var(--ep-teinte-f) !important; }
   /* Le bouton principal (plein) : pastille aussi, même famille. */
   .vrm-app-shell .vrm-main button[style*="background: rgb(36, 78, 84)"],
-  .vrm-app-shell .vrm-main a[style*="background: rgb(36, 78, 84)"] { border-radius: 24px !important; box-shadow: none !important; }
+  .vrm-app-shell .vrm-main a[style*="background: rgb(36, 78, 84)"] { border-radius: 20px !important; box-shadow: none !important; }
 
   /* Les filtres et étiquettes : même pastille, l'actif en encre (le segmenté : styles-coque.css). */
   .vrm-app-shell .vrm-main .vrm-filtres button { border: 0 !important; background: var(--ep-teinte) !important; box-shadow: none !important; border-radius: 999px !important; }
@@ -74,7 +74,7 @@
   /* Les champs : une surface teintée sans contour. */
   .vrm-app-shell .vrm-main input:not([type="checkbox"]):not([type="radio"]),
   .vrm-app-shell .vrm-main select {
-    border-color: transparent !important; background: var(--ep-teinte) !important; box-shadow: none !important; border-radius: 14px !important;
+    border-color: transparent !important; background: var(--ep-teinte) !important; box-shadow: none !important; border-radius: 12px !important;
   }
 }
 @media (max-width: 767px) {
@@ -90,13 +90,13 @@
     background: var(--ep-encre) !important; color: var(--ep-fond) !important; border-color: transparent !important; border-radius: 999px !important;
   }
   /* L'ambre (urgent) : une teinte, pas un cadre. */
-  .vrm-app-shell .vrm-main [style*="solid rgba(150, 89, 0"] { border-color: transparent !important; border-radius: 14px !important; }
-  .vrm-app-shell .vrm-main [data-raison-bord] { border: 0 !important; border-radius: 14px !important; background: rgba(150, 89, 0, .07) !important; }
+  .vrm-app-shell .vrm-main [style*="solid rgba(150, 89, 0"] { border-color: transparent !important; border-radius: 12px !important; }
+  .vrm-app-shell .vrm-main [data-raison-bord] { border: 0 !important; border-radius: 12px !important; background: rgba(150, 89, 0, .07) !important; }
 }
 @media (max-width: 767px) {
   /* Les contours teintés (ambre, accent à demi-transparence), clair comme sombre. */
   .vrm-app-shell .vrm-main [style*="solid rgba("]:not(input):not(select) { border-color: transparent !important; }
-  .vrm-app-shell .vrm-main [data-colis-urgence] { border-radius: 14px !important; }
+  .vrm-app-shell .vrm-main [data-colis-urgence] { border-radius: 12px !important; }
 }
 @media (max-width: 767px) {
   /* Ma journée : les chiffres, sans les phrases dessous (Julien, 27 oct. :

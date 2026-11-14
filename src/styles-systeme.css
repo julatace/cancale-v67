@@ -1,0 +1,363 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   VRM — LE SYSTÈME (13 nov., directeur artistique)
+   La référence : docs/design/DESIGN.md · le récit : docs/passation/2026-11-13-design-systeme.md
+
+   Julien (13 nov.) : « l'appli est pas très belle, tout doit être revu » ;
+   « je veux que tout soit beau, cohérent, simple ».
+   Le défaut de fond n'était pas une couleur : six familles de jetons (--d-, --w-,
+   --p-, --fu-, --n2-, --vrm-) disaient chacune leur rayon, leur ombre et leur
+   graisse — cartes à 18, 20, 22, 24 et 26 px, titres à 800, boutons pilule ici
+   et rectangle là. Ce fichier ne crée pas une septième famille : il FIXE les
+   valeurs de --d-* (la famille déjà documentée dans DESIGN.md) et fait LIRE
+   --d-* à toutes les autres. Un seul endroit pour changer une valeur.
+
+   Le système en une phrase :
+     · ce qui CONTIENT (carte, groupe, carte sombre, feuille)  → rayon 20 ;
+     · ce qui se TOUCHE (bouton, filtre, segmenté, recherche)  → une capsule ;
+     · ce qui MONTRE  (photo, case, champ de saisie)          → rayon 12 ;
+     · le N° de rangement                                       → rayon 6.
+     · trois graisses (400 · 600 · 700), jamais 800 ;
+     · deux ombres (posée, flottante) ; aucune ombre la nuit sur une surface posée ;
+     · une hauteur de contrôle par pointeur : 44 au doigt, 36 à la souris.
+
+   RIEN DE MÉTIER : aucun texte, aucun chiffre, aucun data-*, aucun geste ne
+   change. Rien n'est masqué. Ambre = un geste à faire ; rouge = deux paires
+   sous un même N° (§7) ; violet interdit.
+
+   OÙ IL VIT DANS LA CASCADE
+     1. les JETONS hors couche, sous `:root:root` : une déclaration hors couche
+        gagne contre toute déclaration normale en couche, et `:root:root` passe
+        devant les `:root` de toutes les feuilles d'avant ;
+     2. les FORMES dans `@layer vrm-premium` (la couche qui a le dernier mot,
+        styles-premium.css), avec `!important` : importé juste AVANT
+        styles-tablette.css, qui reste la dernière (sa règle iPad gagne).
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ══ 1. LES JETONS ═══════════════════════════════════════════════════════════ */
+:root:root {
+  /* Espaces — grille de 4 px. */
+  --d-e-1: 4px; --d-e-2: 8px; --d-e-3: 12px; --d-e-4: 16px; --d-e-5: 20px; --d-e-6: 24px; --d-e-8: 32px; --d-e-12: 48px;
+  --d-marge: 16px;                 /* bord de page, téléphone */
+  --d-marge-ordi: 32px;            /* bord de page, ordinateur */
+  --d-entre-cartes: 12px;          /* entre deux cartes d'une pile */
+  --d-entre-sections: 32px;        /* entre deux sections d'un écran */
+
+  /* Texte — 8 tailles, 3 graisses. Au-delà de 20 px, SF passe en Display. */
+  --d-t-11: 11px;   /* pastille, compteur — jamais une phrase */
+  --d-t-12: 12px;   /* légende sous un chiffre */
+  --d-t-13: 13px;   /* note : la ligne grise d'une rangée */
+  --d-t-15: 15px;   /* texte, titre d'une rangée de liste */
+  --d-t-17: 17px;   /* corps iOS : rangée de Réglages, titre de feuille */
+  --d-t-20: 20px;   /* titre de section, chiffre d'une tuile */
+  --d-t-22: 20px;   /* (ancien cran : lit le 20) */
+  --d-t-28: 28px;   /* grand titre à l'ordinateur ; grand chiffre d'une tuile large */
+  --d-t-34: 34px;   /* grand titre au téléphone */
+  --d-t-44: 40px;   /* LE chiffre de la carte sombre (44 à l'ordinateur, plus bas) */
+  --d-g-texte: 400; --d-g-moyen: 600; --d-g-fort: 700;
+  --d-il-titre: 1.12; --d-il-ligne: 1.3; --d-il-texte: 1.45;
+  --d-ap-34: -.024em; --d-ap-28: -.02em; --d-ap-22: -.016em; --d-ap-17: -.012em; --d-ap-15: -.006em; --d-ap-13: 0em;
+
+  /* Rayons — quatre. */
+  --d-r-num: 6px;                  /* le N° de rangement */
+  --d-r-case: 12px;                /* photo, case, champ de saisie, tuile d'icône */
+  --d-r-carte: 20px;               /* carte, groupe, carte sombre, feuille */
+  --d-r-pilule: 999px;             /* tout ce qui se touche : bouton, filtre, segmenté, recherche, pastille */
+  --d-r-ctrl: var(--d-r-pilule);   /* (ancien nom : un contrôle est une capsule) */
+  --d-r-sombre: var(--d-r-carte);
+
+  /* Hauteur d'un contrôle : 44 au doigt ; 36 à la souris (plus bas). */
+  --d-h-ctrl: 44px;
+  --d-h-filtre: 44px;              /* une pilule de filtre, une puce : 44 au doigt, 32 à la souris */
+  --d-t-ctrl: 15px;
+
+  /* Surfaces — le « groupé » d'iOS. */
+  --d-fond: #F2F2F7;
+  --d-carte: #FFFFFF;
+  --d-case: #F2F2F7;
+  --d-remplir: rgba(118,118,128,.12);
+  --d-remplir-fort: rgba(118,118,128,.20);
+  --d-filet: rgba(60,60,67,.18);
+  --d-filet-fort: rgba(60,60,67,.29);   /* le bord d'un champ */
+  --d-survol: color-mix(in srgb, var(--d-carte) 94%, #7F7F86);   /* une rangée sous la souris */
+  --d-segment: #FFFFFF;            /* le segment choisi */
+  /* Texte — deux tons, pas trois : l'encre et UN gris (5,1:1 sur blanc, 4,6:1 sur le fond). */
+  --d-encre: #1D1D1F;
+  --d-gris: #6E6E73;
+  --d-glyphe: #AEAEB2;             /* chevrons, poignées — un dessin, jamais un texte */
+  --d-accent: #0071E3;
+  --d-accent-texte: #0066CC;
+  --d-ambre: #B25000;
+  --d-point-ambre: #FF9F0A;
+  --d-ambre-fond: #FFF4E5;
+
+  /* Ombres — deux niveaux. */
+  --d-ombre-carte: 0 0 0 .5px rgba(0,0,0,.035), 0 1px 3px rgba(0,0,0,.05);
+  --d-ombre-flottant: 0 0 0 .5px rgba(0,0,0,.04), 0 8px 24px -6px rgba(0,0,0,.14), 0 24px 56px -12px rgba(0,0,0,.16);
+  --d-ombre-levee: var(--d-ombre-flottant);
+
+  /* Mouvement — 150 / 200 / 250 ms, une sortie franche. */
+  --d-sortie: cubic-bezier(.23,1,.32,1);
+  --d-tiroir: cubic-bezier(.32,.72,0,1);
+  --d-m-court: 150ms; --d-m-moyen: 200ms; --d-m-long: 250ms;
+
+  /* ── Les autres familles LISENT --d-* (aucune valeur à elles) ── */
+  /* design-2026, jetons.css, visuel */
+  --t-11: var(--d-t-11); --t-12: var(--d-t-12); --t-13: var(--d-t-13); --t-15: var(--d-t-15); --t-17: var(--d-t-17);
+  --t-20: var(--d-t-20); --t-22: var(--d-t-20); --t-28: var(--d-t-28); --t-34: var(--d-t-34); --t-38: var(--d-t-44); --t-44: var(--d-t-44);
+  --g-800: 700;
+  --vrm-t34: var(--d-t-34); --vrm-t28: var(--d-t-28); --vrm-t22: var(--d-t-20); --vrm-t17: var(--d-t-17); --vrm-t15: var(--d-t-15); --vrm-t13: var(--d-t-13); --vrm-t11: var(--d-t-11);
+  --r-num: var(--d-r-num); --r-ctrl: var(--d-r-pilule); --r-case: var(--d-r-case); --r-carte: var(--d-r-carte); --r-sombre: var(--d-r-carte); --r-pilule: var(--d-r-pilule);
+  --o-carte: var(--d-ombre-carte); --o-flottant: var(--d-ombre-flottant);
+  --vrm-ombre-carte: var(--d-ombre-carte); --vrm-r-carte: var(--d-r-carte);
+  --vrm-entre-sections: var(--d-entre-sections); --vrm-entre-cartes: var(--d-entre-cartes);
+  --vrm-sortie: var(--d-sortie); --vrm-ressort: var(--d-tiroir); --vrm-ease-sortie: var(--d-sortie);
+  --vrm-remplissage: var(--d-remplir);
+  --b-h: var(--d-h-ctrl); --vrm-b-h: var(--d-h-ctrl);
+  /* Fusion */
+  --fu-fond: var(--d-fond); --fu-carte: var(--d-carte); --fu-case: var(--d-case); --fu-encre: var(--d-encre);
+  --fu-gris: var(--d-gris); --fu-gris2: var(--d-gris); --fu-gris3: var(--d-glyphe);
+  --fu-remplir: var(--d-remplir); --fu-remplir-fort: var(--d-remplir-fort);
+  --fu-ombre: var(--d-ombre-carte); --fu-r-carte: var(--d-r-carte); --fu-r-sombre: var(--d-r-carte); --fu-r-photo: var(--d-r-case);
+  --fu-ambre: var(--d-point-ambre); --fu-ambre-txt: var(--d-ambre); --fu-ambre-fond: var(--d-ambre-fond);
+  /* Premium (DA 1-4) */
+  --p-marge: var(--d-marge); --p-marge-ordi: var(--d-marge-ordi);
+  --p-t-titre: var(--d-t-34); --p-g-titre: 700; --p-ap-titre: var(--d-ap-34);
+  --p-t-chiffre: var(--d-t-44); --p-g-chiffre: 700;
+  --p-t-section: var(--d-t-20); --p-g-section: 700;
+  --p-t-rangee: var(--d-t-15); --p-g-rangee: 600; --p-t-texte: var(--d-t-15); --p-t-note: var(--d-t-13); --p-g-note: 400; --p-t-legende: var(--d-t-12); --p-t-case: var(--d-t-20);
+  --p-r-vignette: var(--d-r-case); --p-r-ctrl: var(--d-r-pilule); --p-r-carte: var(--d-r-carte); --p-r-sombre: var(--d-r-carte);
+  --p-fond: var(--d-fond); --p-carte: var(--d-carte); --p-case: var(--d-case); --p-remplir: var(--d-remplir);
+  --p-encre: var(--d-encre); --p-gris: var(--d-gris); --p-gris-2: var(--d-gris); --p-filet: var(--d-filet);
+  --p-accent: var(--d-accent); --p-accent-texte: var(--d-accent-texte); --p-ambre-point: var(--d-point-ambre); --p-ambre-texte: var(--d-ambre);
+  --p-ombre: var(--d-ombre-carte); --p-sortie: var(--d-sortie);
+  /* Widgets (DA 6) */
+  --w-fond: var(--d-fond); --w-carte: var(--d-carte); --w-carte-2: var(--d-case);
+  --w-remplir: var(--d-remplir); --w-remplir-fort: var(--d-remplir-fort);
+  --w-encre: var(--d-encre); --w-gris: var(--d-gris); --w-gris-2: var(--d-glyphe); --w-filet: var(--d-filet); --w-accent: var(--d-accent);
+  --w-r: var(--d-r-carte); --w-r-tete: var(--d-r-carte); --w-r-photo: var(--d-r-carte); --w-r-vignette: var(--d-r-case);
+  --w-ecart: var(--d-entre-cartes); --w-ombre: var(--d-ombre-carte);
+  --w-ombre-tete: 0 1px 2px rgba(0,0,0,.06), 0 12px 32px -16px rgba(16,24,40,.40);
+  /* La colonne de gauche (DA 5) */
+  --n2-encre: var(--d-encre); --n2-accent: var(--d-accent);
+  --n2-b-reflet: none;             /* plus de reflet en dégradé sur un bouton */
+}
+:root:root[data-theme="dark"] {
+  --d-fond: #000000;
+  --d-carte: #1C1C1E;
+  --d-case: #2C2C2E;
+  --d-remplir: rgba(118,118,128,.24);
+  --d-remplir-fort: rgba(118,118,128,.32);
+  --d-filet: rgba(84,84,88,.6);
+  --d-filet-fort: rgba(84,84,88,.9);
+  --d-segment: #636366;
+  --d-encre: #F5F5F7;
+  --d-gris: #98989D;
+  --d-glyphe: #5A5A5E;
+  --d-accent: #0071E3;             /* l'aplat garde #0071E3 : texte blanc 4,7:1 (§3) */
+  --d-accent-texte: #409CFF;
+  --d-ambre: #FFB340;
+  --d-ambre-fond: #2E2412;
+  /* La nuit, une surface posée n'a pas d'ombre : #1C1C1E sur #000 suffit (iOS). */
+  --d-ombre-carte: none;
+  --d-ombre-flottant: 0 0 0 .5px rgba(255,255,255,.09), 0 24px 56px rgba(0,0,0,.6);
+  --w-ombre-tete: 0 0 0 .5px rgba(255,255,255,.08);
+}
+/* À la souris (ordinateur), les contrôles sont plus bas : un écran d'ordinateur n'est pas
+   un téléphone agrandi (règle 4 de la revue du 11 nov.). Au doigt (iPad compris), 44. */
+@media (hover: hover) and (pointer: fine) and (min-width: 768px) {
+  :root:root { --d-h-ctrl: 36px; --d-h-filtre: 32px; --d-t-ctrl: 13px; --d-t-44: 44px; }
+}
+
+/* ══ 2. LES FORMES ═══════════════════════════════════════════════════════════ */
+@layer vrm-premium {
+
+/* ── 2.1 LE TITRE D'ÉCRAN : 34/700 au téléphone, 28/700 à l'ordinateur ──────
+   (800 et 40 px à l'ordinateur faisaient « page d'accueil », pas « outil ».) */
+:root:root body .vrm-main :is(.vrm-screen-head .vrm-display, .vrm-tache-tete h1, .vrm-market-heading h1, .vrm-fu-titre-tete) {
+  font-size: var(--d-t-34) !important; font-weight: 700 !important; letter-spacing: var(--d-ap-34) !important; line-height: 1.1 !important;
+}
+@media (min-width: 1024px) {
+  :root:root body .vrm-main :is(.vrm-screen-head .vrm-display, .vrm-tache-tete h1, .vrm-market-heading h1, .vrm-fu-titre-tete) { font-size: var(--d-t-28) !important; letter-spacing: var(--d-ap-28) !important; }
+}
+/* Les titres de section : 20/700 (Title 3 d'iOS), un seul dessin partout. */
+:root:root body .vrm-main :is(.vrm-day-titre-section, .vrm-fu-titre-section h2, .vrm-fu-titre-section h3, .vrm-fu-groupe-transp h3, .vrm-day-section) {
+  font-size: var(--d-t-20) !important; font-weight: 700 !important; letter-spacing: var(--d-ap-22) !important; line-height: 1.2 !important;
+}
+/* Toute graisse au-delà de 700 redescend à 700 (styles en ligne compris). */
+:root:root body :is(.vrm-app-shell, .vrm-fs) :is([style*="font-weight: 800"], [style*="font-weight: 900"], [style*="font-weight: 750"]) { font-weight: 700 !important; }
+:root:root body :is(.vrm-app-shell, .vrm-fs) [style*="font-weight: 650"] { font-weight: 600 !important; }
+:root:root body .vrm-app-shell :is(h1, h2, h3, .vrm-display, b, strong) { font-synthesis: none; }
+
+/* ── 2.2 LES SURFACES : rayon 20, l'ombre posée, aucun cadre ─────────────── */
+:root:root body .vrm-main :is(.vrm-toutes-liste, .vrm-day-task-list, .vrm-buy-list, .vrm-msg-list, .vrm-colis-carte, .vrm-a-venir,
+  .vrm-colis-prochain, .vrm-ann-geste, details.vrm-quick-settings, .vrm-ann-card, .vrm-ios-groupe, .vrm-reglages-groupe,
+  .vrm-set-liste, .vrm-settings-todo, .vrm-fu-panneau, .vrm-set-groupe,
+  .vrm-sv-tuile, .vrm-sv-carte, .vrm-onglet-manque, .vrm-d7-carte, .vrm-fp-section, .vrm-boite-liste-col, .vrm-rpf-point,
+  .vrm-sx, .vrm-guide.vrm-pa-carte, .vrm-carte-mfa, .vrm-sp-rec, .vrm-compta-replis) {
+  border-radius: var(--d-r-carte) !important; border: 0 !important; box-shadow: var(--d-ombre-carte) !important;
+}
+/* Une PILE de colis devient UN groupe (Réglages, Rappels) : plus une carte flottante par colis,
+   des rangées sur une même carte, séparées par un filet qui commence après la photo. */
+:root:root body .vrm-main :has(> .vrm-colis-carte + .vrm-colis-carte) { row-gap: 0 !important; }
+:root:root body .vrm-main .vrm-colis-carte:has(+ .vrm-colis-carte) { border-bottom-left-radius: 0 !important; border-bottom-right-radius: 0 !important; margin-bottom: 0 !important; }
+:root:root body .vrm-main .vrm-colis-carte + .vrm-colis-carte {
+  border-top-left-radius: 0 !important; border-top-right-radius: 0 !important; margin-top: 0 !important;
+  background-image: linear-gradient(var(--d-filet), var(--d-filet)) !important; background-repeat: no-repeat !important;
+  background-position: right 0 top 0 !important; background-size: calc(100% - 84px) 1px !important;
+}
+:root:root body .vrm-main :is(.vrm-colis-carte:has(+ .vrm-colis-carte), .vrm-colis-carte + .vrm-colis-carte) { box-shadow: none !important; }
+/* Une bande d'information (fraîcheur, extension, panne) : une carte comme les autres. */
+:root:root body .vrm-main :is(.vrm-bandeau-abo, .vrm-etat-panne) { border-radius: var(--d-r-carte) !important; box-shadow: var(--d-ombre-carte) !important; }
+/* Argent : les tuiles étaient grises sur le fond gris (revue du 11 nov., n° 19) — des cartes blanches. */
+:root:root body .vrm-main .vrm-argent-w {
+  background-color: var(--d-carte) !important; border-radius: var(--d-r-carte) !important; box-shadow: var(--d-ombre-carte) !important; border: 0 !important;
+}
+@media (hover: hover) and (pointer: fine) { :root:root body .vrm-main .vrm-argent-w:hover { background-color: var(--d-survol) !important; } }
+:root:root body .vrm-main .vrm-argent-w-n { font-weight: 700 !important; }
+/* L'AMBRE n'est jamais un encadré (règle 2 de la revue du 11 nov.) : les fonds et cadres
+   ambre écrits en ligne (`${C.warn}14`, `${C.warn}44`) s'effacent ; le TEXTE reste ambre. */
+:root:root body :is(.vrm-main, .vrm-fs) :is([style*="background: rgba(178, 80, 0, 0.08)"], [style*="background: rgba(178, 80, 0, 0.07)"], [style*="background: rgba(178, 80, 0, 0.1)"], [style*="background: rgba(255, 179, 64, 0.08)"], [style*="background: rgba(255, 179, 64, 0.07)"], [style*="background: rgba(255, 179, 64, 0.1)"]):not(button):not([data-colis-urgence]) {
+  background: transparent !important; border-color: transparent !important; padding-left: 0 !important; padding-right: 0 !important;
+}
+:root:root body .vrm-main .vrm-surface:not(:is(.vrm-surface, .vrm-ios-groupe, .vrm-fu-panneau) .vrm-surface) {
+  border-radius: var(--d-r-carte) !important; box-shadow: var(--d-ombre-carte) !important;
+}
+/* Une carte DANS une carte devient une case (pas d'ombre, rayon 12). */
+:root:root body .vrm-main :is(.vrm-surface, .vrm-ios-groupe, .vrm-fu-panneau) .vrm-surface { box-shadow: none !important; border-radius: var(--d-r-case) !important; }
+/* Les tuiles sous la carte sombre (« widgets ») : même rayon que les cartes, chiffre 28/700. */
+:root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) .vrm-fu-cases > .vrm-fu-case {
+  border-radius: var(--d-r-carte) !important; box-shadow: var(--d-ombre-carte) !important; min-height: 96px !important;
+}
+:root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) .vrm-fu-cases > .vrm-fu-case > b {
+  font-size: var(--d-t-28) !important; font-weight: 700 !important; letter-spacing: var(--d-ap-28) !important;
+}
+:root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) .vrm-fu-cases > .vrm-fu-case:first-child:nth-last-child(odd) > b { font-size: var(--d-t-34) !important; }
+/* Un chiffre PAS SU (« — ») s'écrit à la taille du texte, jamais en grand (règle 5 de la revue). */
+:root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) .vrm-fu-cases > .vrm-fu-case > b.is-vide { font-size: var(--d-t-20) !important; font-weight: 400 !important; }
+/* La carte sombre (la signature, choix de Julien) : rayon 20 comme toute carte. */
+:root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte)::before { border-radius: var(--d-r-carte) !important; }
+:root:root body .vrm-main :is(.vrm-fu-grand, .vrm-fu-carte .vrm-fu-chiffre) { font-weight: 700 !important; }
+/* Les photos de paire : rayon 12, partout. */
+:root:root body .vrm-main :is(.vrm-toutes-photo, .vrm-buy-ph, .vrm-colis-photo, .vrm-day-task .vrm-pile-v, .vrm-rpf-photo, .vrm-photo-vide) { border-radius: var(--d-r-case) !important; }
+:root:root body .vrm-main .vrm-ann-card .vrm-fiche-photo { border-radius: var(--d-r-carte) var(--d-r-carte) 0 0 !important; }
+
+/* ── 2.3 LES BOUTONS : trois variantes, une forme (la capsule), une hauteur ─ */
+:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b {
+  min-height: var(--d-h-ctrl) !important; border-radius: var(--d-r-pilule) !important;
+  font-size: var(--d-t-ctrl) !important; font-weight: 600 !important; letter-spacing: -.008em !important;
+  padding-left: 16px !important; padding-right: 16px !important; gap: 6px !important;
+  border: 0 !important; box-shadow: none !important; background-image: none !important;
+  transition: background-color var(--d-m-court) ease, color var(--d-m-court) ease, transform 100ms var(--d-sortie), opacity var(--d-m-court) ease !important;
+}
+:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b > svg { width: 17px !important; height: 17px !important; }
+/* La taille « petit » (une rangée serrée) : la même capsule, le texte 13. */
+:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-petit { font-size: var(--d-t-13) !important; padding-left: 14px !important; padding-right: 14px !important; }
+:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-petit > svg { width: 15px !important; height: 15px !important; }
+/* Les boutons d'écran écrits à part (même rôle, même dessin). */
+:root:root body .vrm-main :is(.vrm-d7-btn, .vrm-rpf-retire) { font-weight: 600 !important; font-size: var(--d-t-13) !important; border-radius: var(--d-r-pilule) !important; }
+/* Primaire : l'aplat bleu, texte blanc. UN par écran. */
+:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-primaire { background-color: var(--d-accent) !important; color: #FFFFFF !important; }
+/* Secondaire : le remplissage gris, l'encre. */
+:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-secondaire { background-color: var(--d-remplir) !important; color: var(--d-encre) !important; }
+/* Danger (Supprimer, Délier) : la forme du secondaire, le texte ambre (§7 : jamais rouge). */
+:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-danger { background-color: var(--d-remplir) !important; color: var(--d-ambre) !important; }
+/* Discret : du texte bleu, la cible garde sa hauteur. */
+:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-discret { background-color: transparent !important; color: var(--d-accent-texte) !important; padding-left: 8px !important; padding-right: 8px !important; }
+/* Bouton d'icône seule : un rond de la hauteur d'un contrôle, remplissage gris. */
+:root:root body :is(.vrm-app-shell, .vrm-fs) :is(.vrm-b.vrm-b-icone, .vrm-icon-control, .vrm-colis-scanner, .vrm-cal-declencheur, .vrm-annbar-bouton) {
+  min-width: var(--d-h-ctrl) !important; min-height: var(--d-h-ctrl) !important; padding-left: 0 !important; padding-right: 0 !important;
+  border-radius: var(--d-r-pilule) !important; border: 0 !important; box-shadow: none !important;
+}
+:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-icone:not(.vrm-b-primaire) { background-color: var(--d-remplir) !important; color: var(--d-encre) !important; }
+/* Les gestes de rangée d'avant (pilules écrites à la main) prennent la même forme. */
+:root:root body .vrm-main :is(.vrm-day-task-action.is-principal, .vrm-fiche-geste, .vrm-b-rangee, .vrm-pop-chip) {
+  border-radius: var(--d-r-pilule) !important; font-weight: 600 !important;
+}
+/* Survol (souris seulement) et appui. */
+@media (hover: hover) and (pointer: fine) {
+  :root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-primaire:not(:disabled):hover { background-color: color-mix(in srgb, var(--d-accent) 88%, #000) !important; }
+  :root:root body :is(.vrm-app-shell, .vrm-fs) :is(.vrm-b-secondaire, .vrm-b-danger, .vrm-b-icone):not(.vrm-b-primaire):not(:disabled):hover { background-color: var(--d-remplir-fort) !important; }
+  :root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-discret:not(:disabled):hover { background-color: var(--d-remplir) !important; }
+}
+:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b:not(:disabled):active { transform: scale(.97) !important; }
+:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b:disabled { opacity: .4 !important; }
+
+/* ── 2.4 LE SEGMENTÉ, LES FILTRES, LES PASTILLES : la capsule ───────────────── */
+:root:root body .vrm-main :is(.vrm-seg, .vrm-sel-sites, .vrm-messages-sections, .vrm-filtre-site, .vrm-platform-tabs, .vrm-boite-vues) {
+  background: var(--d-remplir) !important; border-radius: var(--d-r-pilule) !important; padding: 2px !important; border: 0 !important; box-shadow: none !important;
+}
+:root:root body .vrm-main :is(.vrm-seg > button, .vrm-sel-sites > button, .vrm-messages-sections > button, .vrm-filtre-site > button, .vrm-platform-tabs > button, .vrm-boite-vues > button) {
+  border-radius: var(--d-r-pilule) !important; font-weight: 600 !important; min-height: var(--d-h-ctrl) !important;
+}
+:root:root body .vrm-main :is(.vrm-seg > button[aria-pressed="true"], .vrm-seg > button.is-actif, .vrm-seg > button[aria-current="page"], .vrm-sel-sites > button[aria-pressed="true"], .vrm-messages-sections > button[aria-pressed="true"]) {
+  box-shadow: 0 0 0 .5px rgba(0,0,0,.04), 0 2px 6px rgba(0,0,0,.10) !important;
+}
+:root:root[data-theme="dark"] body .vrm-main :is(.vrm-seg > button[aria-pressed="true"], .vrm-seg > button.is-actif, .vrm-seg > button[aria-current="page"], .vrm-sel-sites > button[aria-pressed="true"], .vrm-messages-sections > button[aria-pressed="true"]) {
+  background: var(--d-segment) !important; box-shadow: none !important;
+}
+/* Le compte d'un segment choisi, la nuit : #98989D sur #636366 ne tenait que 2,1:1 (mesuré) — l'encre (5,8:1). */
+:root:root[data-theme="dark"] body .vrm-main :is(.vrm-seg, .vrm-sel-sites, .vrm-messages-sections) > button:is([aria-pressed="true"], .is-actif, [aria-current="page"]) .vrm-seg-n { color: var(--d-encre) !important; opacity: .85 !important; }
+/* Les filtres (pilules) : 44 au doigt, 32 à la souris ; l'actif à l'encre pleine. */
+:root:root body .vrm-main :is(.vrm-filtres:not(.vrm-filtre-site) button, .vrm-stock-views > button, .vrm-inbox-filters > button, .vrm-compte-puce, .vrm-pop-chip) {
+  border-radius: var(--d-r-pilule) !important; font-weight: 600 !important; min-height: var(--d-h-filtre) !important;
+}
+/* Les gestes de rangée écrits à part (« J'ai retiré », un geste de fiche) : la hauteur d'un contrôle. */
+:root:root body .vrm-main :is(.vrm-rpf-retire, .vrm-d7-btn, .vrm-fiche-geste) { min-height: var(--d-h-ctrl) !important; }
+/* Les pastilles d'état et les badges : capsule, 12/600. */
+:root:root body .vrm-main .vrm-badge { border-radius: var(--d-r-pilule) !important; font-weight: 600 !important; }
+/* Le N° de rangement : rayon 6, 700 (jamais 800). */
+:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-num { border-radius: var(--d-r-num) !important; font-weight: 700 !important; }
+:root:root body .vrm-main .vrm-ann-card .vrm-num.vrm-num-grand { border-radius: var(--d-r-num) !important; box-shadow: none !important; background-color: color-mix(in srgb, #1D1D1F 86%, transparent) !important; }
+
+/* ── 2.5 LES CHAMPS ─────────────────────────────────────────────────────────── */
+/* La recherche : la capsule remplie d'iOS ; l'anneau bleu au focus seulement. */
+:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-champ-recherche { border-radius: var(--d-r-pilule) !important; }
+/* Un champ de saisie : rayon 12 (il CONTIENT du texte). */
+:root:root body :is(.vrm-app-shell, .vrm-fs) :is(input[type="text"], input[type="number"], input[type="email"], input[type="search"]:not(.vrm-champ-recherche-saisie), input[type="tel"], input[type="url"], input[type="password"], input[type="date"], textarea, select):not([class*="vrm-champ-recherche"]) {
+  border-radius: var(--d-r-case) !important;
+}
+
+/* ── 2.6 LES RANGÉES ───────────────────────────────────────────────────────── */
+/* Titre de rangée 15/600, note 13/400 grise : un seul dessin pour Ventes, Achats, Ma journée. */
+:root:root body .vrm-main :is(.vrm-toutes-titre > span:first-child, .vrm-buy-title, .vrm-day-task-list .vrm-day-task-title, .vrm-colis-titre) {
+  font-size: var(--d-t-15) !important; font-weight: 600 !important; letter-spacing: var(--d-ap-15) !important;
+}
+:root:root body .vrm-main :is(.vrm-day-task-note, .vrm-sv-note, .vrm-rm-muet) { font-weight: 400 !important; }
+/* Messages (revue du 11 nov., n° 16) : un fil non lu = le pseudo en 600 et le point bleu,
+   rien d'autre — plus de barre bleue à gauche ni de fond gris ; plus de chevron (Mail).
+   Le fil ouvert (ordinateur) : le remplissage gris, pas une barre. */
+:root:root body .vrm-main .vrm-inbox-row.vrm-inbox-row:is([data-nonlu="1"], :not(.is-current)) { box-shadow: none !important; background-color: var(--d-carte) !important; }
+:root:root body .vrm-main .vrm-inbox-row.vrm-inbox-row.is-current { box-shadow: none !important; background-color: var(--d-remplir) !important; }
+:root:root body .vrm-main .vrm-inbox-row.vrm-inbox-row::after { content: none !important; display: none !important; }
+:root:root body .vrm-main .vrm-inbox-row.vrm-inbox-row { padding-right: 16px !important; }
+@media (hover: hover) and (pointer: fine) { :root:root body .vrm-main .vrm-inbox-row.vrm-inbox-row:not(.is-current):hover { background-color: var(--d-survol) !important; } }
+/* Les tuiles d'icône des Réglages : neutres, rayon 6 (celui du N°, la courbe d'une icône de Réglages). */
+:root:root body .vrm-main .vrm-ios-icone { border-radius: var(--d-r-num) !important; }
+
+/* Paramètres à l'ordinateur : la même colonne que les autres écrans (bord gauche), plus une
+   colonne centrée qui faisait sauter le titre de 200 px d'un écran à l'autre (revue, n° 23). */
+@media (min-width: 1024px) {
+  :root:root body .vrm-main .vrm-set { margin-left: 0 !important; margin-right: auto !important; padding-left: 0 !important; max-width: 760px !important; }
+}
+
+/* ── 2.7 LES FEUILLES ──────────────────────────────────────────────────────── */
+:root:root body .vrm-fs .vrm-fs-cadre { box-shadow: var(--d-ombre-flottant) !important; }
+:root:root body .vrm-fs .vrm-fs-titre { font-size: var(--d-t-20) !important; font-weight: 700 !important; letter-spacing: var(--d-ap-22) !important; }
+:root:root body .vrm-fs.vrm-confirmation .vrm-b.vrm-b { min-height: 44px !important; font-size: var(--d-t-15) !important; }
+
+/* ── 2.8 LES RAYONS ÉCRITS À LA MAIN (styles en ligne) : ramenés à l'échelle ─
+   10, 14, 16 → 12 (case) ; 18, 22, 24, 26 → 20 (carte). Le N° (6) et la capsule
+   (999) restent. Seulement dans le contenu (la coque garde les siens).
+   Un rayon qu'on RÉDUIT ne touche jamais un élément qui pose sa hauteur : un rond de 28 ou
+   44 px (rayon = la moitié de sa hauteur) deviendrait un carré arrondi. */
+:root:root body :is(.vrm-main, .vrm-fs) [style*="border-radius: 10px"] { border-radius: var(--d-r-case) !important; }
+:root:root body :is(.vrm-main, .vrm-fs) :is([style*="border-radius: 14px"], [style*="border-radius: 16px"]):not([style*="height"]) { border-radius: var(--d-r-case) !important; }
+:root:root body :is(.vrm-main, .vrm-fs) :is([style*="border-radius: 18px"], [style*="border-radius: 22px"], [style*="border-radius: 24px"], [style*="border-radius: 26px"]):not([style*="height"]) { border-radius: var(--d-r-carte) !important; }
+
+/* ── 2.9 LE MOUVEMENT ──────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  :root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b:active { transform: none !important; }
+  :root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b { transition: background-color var(--d-m-court) ease, color var(--d-m-court) ease, opacity var(--d-m-court) ease !important; }
+}
+
+} /* fin @layer vrm-premium */

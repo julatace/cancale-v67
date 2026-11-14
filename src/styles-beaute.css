@@ -98,8 +98,8 @@
   display: grid; grid-template-columns: auto 1fr; grid-template-areas: "n l" "barre barre"; align-items: baseline; column-gap: 10px; row-gap: 10px;
   padding: 16px 18px; border-radius: var(--d-r-carte); background: var(--d-carte); box-shadow: var(--d-ombre-carte);
 }
-.vrm-tournee-progres-n { grid-area: n; font-size: var(--d-t-34); font-weight: 800; letter-spacing: var(--d-ap-34); line-height: 1; color: var(--d-gris); font-variant-numeric: tabular-nums; }
-.vrm-tournee-progres-n b { color: var(--d-encre); font-weight: 800; }
+.vrm-tournee-progres-n { grid-area: n; font-size: var(--d-t-34); font-weight: 700; letter-spacing: var(--d-ap-34); line-height: 1; color: var(--d-gris); font-variant-numeric: tabular-nums; }
+.vrm-tournee-progres-n b { color: var(--d-encre); font-weight: 700; }
 .vrm-tournee-progres-l { grid-area: l; font-size: var(--d-t-17); font-weight: 600; color: var(--d-gris); }
 .vrm-tournee-progres-barre { grid-area: barre; display: block; height: 6px; border-radius: 3px; background: var(--d-remplir); overflow: hidden; }
 .vrm-tournee-progres-barre > span { display: block; height: 100%; border-radius: inherit; background: var(--d-accent); transition: width 320ms var(--d-sortie); }
@@ -150,7 +150,7 @@
 .vrm-sante-periode { font-size: var(--d-t-13); color: var(--d-gris); font-weight: 500; }
 .vrm-sante-detail { display: flex; flex-direction: column; gap: 2px; margin: 12px 0 16px; min-height: 76px; }
 .vrm-sante-lib { font-size: var(--d-t-13); font-weight: 600; color: var(--d-gris); }
-.vrm-sante-chiffre { font-size: var(--d-t-34); font-weight: 800; letter-spacing: var(--d-ap-34); line-height: 1.08; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-sante-chiffre { font-size: var(--d-t-34); font-weight: 700; letter-spacing: var(--d-ap-34); line-height: 1.08; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .vrm-sante-aumoins { font-size: var(--d-t-17); font-weight: 600; letter-spacing: 0; color: var(--d-gris); }
 .vrm-sante-sous { font-size: var(--d-t-13); color: var(--d-gris); line-height: 1.35; }
 .vrm-sante-plot { position: relative; height: 168px; padding-right: 44px; touch-action: pan-y; -webkit-user-select: none; user-select: none; }

@@ -4,7 +4,7 @@
 .vrm-rp { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--vrm-line, #e5e5ea); border-radius: 12px; background: var(--vrm-surface, #fff); min-width: 0; }
 .vrm-rp-titre { margin: 0; font-size: 15px; font-weight: 600; color: var(--vrm-ink, #1d1d1f); }
 .vrm-rp-champ { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--vrm-muted, #6e6e73); }
-.vrm-rp-champ input { min-height: 44px; font-size: 16px; padding: 8px 10px; border: 1px solid var(--vrm-line, #e5e5ea); border-radius: 10px; background: var(--vrm-bg, #fff); color: var(--vrm-ink, #1d1d1f); font-family: inherit; max-width: 100%; box-sizing: border-box; }
+.vrm-rp-champ input { min-height: 44px; font-size: 16px; padding: 8px 10px; border: 1px solid var(--vrm-line, #e5e5ea); border-radius: 12px; background: var(--vrm-bg, #fff); color: var(--vrm-ink, #1d1d1f); font-family: inherit; max-width: 100%; box-sizing: border-box; }
 .vrm-rp-cond { font-size: 13px; color: var(--vrm-muted, #6e6e73); }
 .vrm-rp-cond p { margin: 0 0 4px; }
 .vrm-rp-cond ul { margin: 0 0 4px; padding-left: 18px; color: var(--vrm-ink, #1d1d1f); }

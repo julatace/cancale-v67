@@ -71,7 +71,7 @@ html body .vrm-app-shell .vrm-cl-carte a.vrm-cl-bouton { display: flex; align-it
 /* (10 nov., soir) DA6 : UN groupe arrondi, une rangée par adresse — la pastille @,
    l'adresse (une ligne), « N e-mails · date » (ambre : un geste à faire), puis deux
    pilules « Relier » · « Acheteur ». Au téléphone, les pilules passent dessous. */
-.vrm-sans-compte { display: flex; flex-direction: column; gap: 0; margin: 0 0 16px; min-width: 0; background: var(--w-carte, var(--fu-carte)); border-radius: var(--w-r, 24px); box-shadow: var(--w-ombre, var(--fu-ombre)); overflow: hidden; }
+.vrm-sans-compte { display: flex; flex-direction: column; gap: 0; margin: 0 0 16px; min-width: 0; background: var(--w-carte, var(--fu-carte)); border-radius: var(--w-r, 20px); box-shadow: var(--w-ombre, var(--fu-ombre)); overflow: hidden; }
 .vrm-sans-compte-entete { margin: 0; padding: 14px 16px 4px; font: 600 13px/1.3 var(--vrm-police); color: var(--w-gris, var(--fu-gris)); }
 .vrm-sans-compte-ligne { color: var(--w-encre, var(--fu-encre)); padding: 10px 12px 10px 16px; display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; column-gap: 12px; row-gap: 8px; min-width: 0; box-sizing: border-box; }
 .vrm-sans-compte-ligne + .vrm-sans-compte-ligne { border-top: .5px solid var(--w-filet, var(--fu-piste)); }
@@ -93,7 +93,7 @@ html body .vrm-app-shell .vrm-sans-compte .vrm-b { min-height: 44px; }
 @media (max-width: 420px) { .vrm-sans-compte-gestes > * { flex: 1 1 100%; } }
 /* (6 nov., onglets C) Colis : un compte dont les e-mails n'arrivent pas, avec des colis à
    envoyer — une ligne ambre (un geste à faire), LE geste « Relier la boîte de <compte> ». */
-.vrm-colis-arelier { display: grid; gap: 6px; margin: 0 0 12px; padding: 10px 14px; border-radius: 14px; border-left: 3px solid var(--fu-ambre-txt, #B25000); background: color-mix(in srgb, var(--fu-ambre-txt, #B25000) 8%, transparent); }
+.vrm-colis-arelier { display: grid; gap: 6px; margin: 0 0 12px; padding: 10px 14px; border-radius: 12px; border-left: 3px solid var(--fu-ambre-txt, #B25000); background: color-mix(in srgb, var(--fu-ambre-txt, #B25000) 8%, transparent); }
 .vrm-colis-arelier-ligne { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; min-width: 0; }
 .vrm-colis-arelier-txt { flex: 1 1 220px; min-width: 0; font: 500 14px/1.4 var(--vrm-police); color: var(--fu-encre, inherit); overflow-wrap: anywhere; }
 .vrm-colis-arelier-txt b { color: var(--fu-ambre-txt, #B25000); font-weight: 600; }

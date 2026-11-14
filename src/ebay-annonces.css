@@ -44,7 +44,7 @@
 }
 
 /* ── LA TÊTE DE L'ÉCRAN : « À faire », « Vendre », la vente Vinted pas reliée ── */
-.vrm-eb-afaire { border: 1px solid var(--vrm-line); background: var(--vrm-surface); border-radius: 14px; margin: 0 0 12px; overflow: hidden; }
+.vrm-eb-afaire { border: 1px solid var(--vrm-line); background: var(--vrm-surface); border-radius: 12px; margin: 0 0 12px; overflow: hidden; }
 .vrm-eb-afaire-titre { font-size: 13px; font-weight: 600; color: var(--vrm-muted); padding: 12px 16px 4px; }
 .vrm-eb-afaire-ligne {
   width: 100%; display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 8px 12px 8px 16px; box-sizing: border-box;
@@ -73,7 +73,7 @@
 /* L'ancien gros bouton encre (styles-mobile-studio, styles-mineral en !important) ne s'applique plus à l'entrée. */
 .vrm-main .vrm-ebay-annonces .vrm-eb-vendre [data-poster="ebay"] {
   background: var(--vrm-surface) !important; color: var(--vrm-ink) !important; border: 1px solid var(--vrm-line) !important;
-  border-radius: 14px !important; font-size: 15px !important; min-height: 60px !important; width: 100% !important; margin: 0 !important; padding: 8px 14px !important;
+  border-radius: 12px !important; font-size: 15px !important; min-height: 60px !important; width: 100% !important; margin: 0 !important; padding: 8px 14px !important;
   box-shadow: none !important;
 }
 .vrm-main .vrm-ebay-annonces .vrm-eb-vendre [data-poster="ebay"] small { color: var(--vrm-muted); font-weight: 400; margin-top: 1px; }

@@ -18,7 +18,7 @@
 .acc .acc-actions .acc-p{border-radius:6px;box-shadow:0 3px 8px #1D1D1F14;}
 .acc .acc-lignes{font-size:12px;line-height:1.65;gap:8px;margin-top:20px;max-width:510px;}
 .acc .acc-lignes .nw{white-space:normal;}
-.acc-preview{position:relative;min-width:0;background:#2C2C2E;border:1px solid #48484A;border-radius:14px;padding:18px;box-shadow:0 24px 64px #1D1D1F1b,0 3px 10px #1D1D1F0c;}
+.acc-preview{position:relative;min-width:0;background:#2C2C2E;border:1px solid #48484A;border-radius:12px;padding:18px;box-shadow:0 24px 64px #1D1D1F1b,0 3px 10px #1D1D1F0c;}
 .acc-preview-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:18px;color:#E5E5EA;font-size:12px;font-weight:600;letter-spacing:.06em;}
 .acc-preview-example{font-size:12px;letter-spacing:0;font-weight:400;padding:4px 6px;border:1px solid #ffffff30;border-radius:6px;color:#E5E5EA;}
 .acc .acc-preview .acc-carte-jour:before{display:none;}
@@ -131,7 +131,7 @@
 
 /* La suite de la page : trois moments lisibles, puis une décision simple. */
 .acc .acc-sec .acc-quand{display:inline-flex;align-items:center;background:#F2F2F7;border:1px solid #E5E5EA;border-radius:6px;padding:4px 8px;font-size:12px;letter-spacing:.02em;margin-bottom:14px;}
-.acc .acc-sec .acc-emplacement:before{content:"";position:absolute;inset:-12px;background:#E5E5EA;border-radius:14px;pointer-events:none;}
+.acc .acc-sec .acc-emplacement:before{content:"";position:absolute;inset:-12px;background:#E5E5EA;border-radius:12px;pointer-events:none;}
 .acc .acc-sec .acc-emplacement>.acc-ecran{position:relative;}
 .acc #ailleurs{background:#F2F2F7;border-block:1px solid #E5E5EA;}
 .acc #ailleurs .acc-emplacement:before{background:#E5E5EA;}

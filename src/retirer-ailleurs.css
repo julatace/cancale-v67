@@ -1,6 +1,6 @@
 /* (11 nov., anti double vente) « Retirer des autres sites » (src/RetirerAilleurs.jsx).
    AMBRE pour le geste (§7), jamais rouge ; le reste neutre. Liens et bouton à 44 px. */
-.vrm-ra { margin: 0 0 12px; padding: 12px 14px; border-radius: 24px; background: var(--vrm-surface, #FFFFFF);
+.vrm-ra { margin: 0 0 12px; padding: 12px 14px; border-radius: 20px; background: var(--vrm-surface, #FFFFFF);
   box-shadow: inset 3px 0 0 var(--vrm-warn, #B25000); color: var(--vrm-ink, inherit); min-width: 0; font-size: 14px; box-sizing: border-box; }
 .vrm-ra-tete { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 6px; }
 .vrm-ra-tete h3 { flex: 1 1 160px; margin: 0; font-size: 15px; font-weight: 600; color: var(--vrm-warn, #B25000); }
@@ -18,7 +18,7 @@
 .vrm-ra-site-txt small { display: block; font-size: 12px; color: var(--vrm-muted, inherit); line-height: 1.4; }
 .vrm-ra-sites li.is-ok .vrm-ra-site-txt small { color: var(--vrm-ink, inherit); }
 .vrm-ra-sites li.is-ko .vrm-ra-site-txt small { color: var(--vrm-warn, #B25000); }
-.vrm-ra-lien { flex-shrink: 0; min-height: 44px; display: flex; align-items: center; padding: 0 12px; border-radius: 10px;
+.vrm-ra-lien { flex-shrink: 0; min-height: 44px; display: flex; align-items: center; padding: 0 12px; border-radius: 12px;
   border: 1px solid var(--vrm-line, #E5E5EA); color: var(--vrm-ink, inherit); text-decoration: none; font-weight: 500; font-size: 13px; box-sizing: border-box; }
 .vrm-ra-note { margin: 8px 0 0; font-size: 12px; color: var(--vrm-muted, inherit); line-height: 1.4; }
 /* Ma journée : la carte « Vendus ailleurs » porte le geste à côté de « Voir ». */

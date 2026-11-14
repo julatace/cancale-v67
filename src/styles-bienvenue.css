@@ -32,7 +32,7 @@
 .vrm-bienvenue-univers { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 4px 0 20px; }
 .vrm-bienvenue-univers button {
   display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 12px; min-height: 44px; text-align: left;
-  border: 1.5px solid var(--b-filet); border-radius: 14px; background: var(--b-sol); color: var(--b-encre); font: inherit; cursor: pointer;
+  border: 1.5px solid var(--b-filet); border-radius: 12px; background: var(--b-sol); color: var(--b-encre); font: inherit; cursor: pointer;
   transition: border-color .2s ease, transform .15s ease;
 }
 .vrm-bienvenue-univers button[data-choisi="1"] { border-color: var(--b-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--b-accent) 18%, transparent); }
@@ -46,7 +46,7 @@
 .vrm-bienvenue-apercu.nuit i { background: #1C1C1E; box-shadow: none; }
 .vrm-bienvenue-apercu i:first-child { width: 55%; background: #0071E3; }
 .vrm-bienvenue-apercu.nuit i:first-child { background: #8DB8F2; }
-.vrm-bienvenue-demo { position: relative; margin: 6px 0 16px; padding: 14px; border-radius: 14px; background: var(--b-sol); border: 1px solid var(--b-filet); display: flex; flex-direction: column; gap: 8px; }
+.vrm-bienvenue-demo { position: relative; margin: 6px 0 16px; padding: 14px; border-radius: 12px; background: var(--b-sol); border: 1px solid var(--b-filet); display: flex; flex-direction: column; gap: 8px; }
 .vrm-bienvenue-demo > div { display: flex; justify-content: space-between; gap: 10px; padding: 11px 12px; border-radius: 12px; background: var(--b-carte); border: 1px solid var(--b-filet); font-size: 15px; animation: vrm-b-ligne .4s cubic-bezier(.2,.7,.2,1) both; }
 .vrm-bienvenue-demo > div span { color: var(--b-doux); }
 .vrm-bienvenue-demo > div b { font-weight: 600; font-variant-numeric: tabular-nums; }

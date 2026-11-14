@@ -31,13 +31,13 @@ typography:
   grand-titre:
     fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
     fontSize: "34px"
-    fontWeight: 800
+    fontWeight: 700
     lineHeight: 1.1
     letterSpacing: "-0.03em"
   grand-chiffre:
     fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif"
     fontSize: "38px"
-    fontWeight: 800
+    fontWeight: 700
     lineHeight: 1.08
     letterSpacing: "-0.03em"
     fontFeature: "tnum"
@@ -71,10 +71,10 @@ typography:
     lineHeight: 1.3
 rounded:
   num: "6px"
-  ctrl: "12px"
-  case: "14px"
+  ctrl: "999px"
+  case: "12px"
   carte: "20px"
-  sombre: "24px"
+  sombre: "20px"
   pilule: "999px"
 spacing:
   e-1: "4px"
@@ -117,7 +117,7 @@ components:
     backgroundColor: "{colors.remplir}"
     textColor: "{colors.encre}"
     rounded: "{rounded.ctrl}"
-    height: "50px"
+    height: "44px"
   numero:
     backgroundColor: "{colors.encre}"
     textColor: "{colors.carte}"
@@ -126,6 +126,8 @@ components:
 ---
 
 # Design System : VRM
+
+> **13 nov. — la référence courte est `docs/design/DESIGN.md`** (jetons `--d-*` dans `src/styles-systeme.css`, que toutes les autres familles lisent). Là où ce fichier-ci dit autre chose (rayons 14/24, graisse 800, boutons rayon 12), c'est elle qui fait foi.
 
 ## Overview
 
@@ -212,12 +214,12 @@ Hybride, très léger : les surfaces posées ont UNE ombre douce à deux couches
 
 ## Shapes
 
-Six rayons, pas un de plus : **6** (pastille de N°) · **12** (contrôle, bouton) · **14** (vignette, case) · **20** (carte) · **24** (carte sombre) · **999** (pilule). Une vignette de paire est un carré à rayon 14 ; le logo du transporteur LU s'y pose en badge (tuile blanche 24 px, rayon 6, dans le coin bas-droit) — rien lu, rien posé.
+(13 nov., système) **Quatre rayons** : **6** (pastille de N°) · **12** (vignette, case, champ de saisie) · **20** (carte, groupe, carte sombre, feuille) · **999** (tout ce qui se touche : bouton, filtre, segmenté, recherche). Référence courte : `docs/design/DESIGN.md`. Une vignette de paire est un carré à rayon 12 ; le logo du transporteur LU s'y pose en badge (tuile blanche 24 px, rayon 6, dans le coin bas-droit) — rien lu, rien posé.
 
 ## Components
 
 ### Buttons
-- **Forme :** 44 px de haut affichés, rayon 12 (pilule 999 pour un geste de rangée).
+- **Forme :** une capsule (999) ; 44 px au doigt, 36 à la souris (`--d-h-ctrl`) ; un bouton d'icône seule est un rond.
 - **Primaire** (`.vrm-b-primaire`) : aplat bleu, texte blanc. Un par écran.
 - **Secondaire** (`.vrm-b-secondaire`) : remplissage gris translucide, texte à l'encre, sans bordure.
 - **Discret** (`.vrm-b-discret`) : texte bleu seul, zone de toucher 44 px.

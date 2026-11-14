@@ -20,12 +20,12 @@
 .vrm-secu-sous { justify-content: flex-start; min-height: 0; color: var(--vrm-ink, #1D1D1F); font-size: 15px; }
 .vrm-secu-titre-sous { min-height: 0; margin-top: 4px; }
 .vrm-secu-lib { flex: 1 1 160px; min-width: 0; font-size: 15px; color: var(--vrm-ink, #1D1D1F); }
-.vrm-secu-nombre, .vrm-secu-heure { min-height: 44px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--vrm-line, rgba(0,0,0,.12)); background: var(--vrm-surface, #fff); color: var(--vrm-ink, #1D1D1F); font: inherit; font-size: 16px; font-variant-numeric: tabular-nums; }
+.vrm-secu-nombre, .vrm-secu-heure { min-height: 44px; padding: 0 10px; border-radius: 12px; border: 1px solid var(--vrm-line, rgba(0,0,0,.12)); background: var(--vrm-surface, #fff); color: var(--vrm-ink, #1D1D1F); font: inherit; font-size: 16px; font-variant-numeric: tabular-nums; }
 .vrm-secu-nombre { width: 76px; text-align: right; }
 .vrm-secu-types { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
 .vrm-secu-type { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; color: var(--vrm-ink, #1D1D1F); }
 .vrm-secu-jours { display: flex; flex-wrap: wrap; gap: 6px; }
-.vrm-secu-jour { min-width: 44px; min-height: 44px; padding: 0 8px; border-radius: 22px; border: 1px solid var(--vrm-line, rgba(0,0,0,.12)); background: transparent; color: var(--vrm-ink, #1D1D1F); font: inherit; font-size: 14px; cursor: pointer; }
+.vrm-secu-jour { min-width: 44px; min-height: 44px; padding: 0 8px; border-radius: 999px; border: 1px solid var(--vrm-line, rgba(0,0,0,.12)); background: transparent; color: var(--vrm-ink, #1D1D1F); font: inherit; font-size: 14px; cursor: pointer; }
 .vrm-secu-jour[aria-pressed="true"] { background: var(--vrm-ink, #1D1D1F); color: var(--vrm-surface, #fff); border-color: transparent; }
 .vrm-secu-conseil { color: var(--vrm-warn, #B25000); }
 .vrm-secu-conseil .vrm-secu-aide { color: var(--vrm-warn, #B25000); flex: 1 1 180px; }

@@ -27,7 +27,7 @@
   --vrm-basket-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 32' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 24c0-5 2-9 7-10l9-1 7-8c1-1 3-1 4 0l3 4c4 5 10 7 17 8 4 1 6 3 6 7v2H4z'/%3E%3Cpath d='M4 26h56M22 12l4 3M26 9l4 3M31 6l3 3'/%3E%3C/svg%3E");
 }
 :root body .vrm-main .vrm-lbc-catalog-photo-empty {
-  position: relative; font-size: 0 !important; color: transparent !important; background: var(--vrm-card2) !important; border-radius: 14px;
+  position: relative; font-size: 0 !important; color: transparent !important; background: var(--vrm-card2) !important; border-radius: 12px;
 }
 :root body .vrm-main .vrm-lbc-catalog-photo-empty::after {
   content: ''; position: absolute; inset: 0; margin: auto; width: 44%; aspect-ratio: 2 / 1; background: var(--vrm-muted); opacity: .35;
@@ -68,7 +68,7 @@
 .vrm-eb-inactives-tete { display: flex; align-items: baseline; gap: 8px; margin: 0 4px 4px; }
 .vrm-eb-inactives-titre { flex: 1 1 auto; font-size: 20px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2; color: var(--vrm-ink, #1D1D1F); }
 .vrm-eb-inactives > [data-inactives-fenetre], .vrm-eb-inactives > [data-inactives-note] { margin: 0 4px 8px !important; font-size: 13px !important; }
-.vrm-eb-ina-liste { background: var(--vrm-surface, #fff); border-radius: 14px; overflow: hidden; box-shadow: var(--vrm-ombre-carte); }
+.vrm-eb-ina-liste { background: var(--vrm-surface, #fff); border-radius: 12px; overflow: hidden; box-shadow: var(--vrm-ombre-carte); }
 .vrm-eb-ina-liste:empty { display: none; }
 .vrm-eb-ina-ligne { position: relative; display: flex; flex-wrap: wrap; align-items: center; }
 .vrm-eb-ina-ligne + .vrm-eb-ina-ligne::before { content: ''; position: absolute; top: 0; left: 76px; right: 0; height: .5px; background: var(--vrm-line, #E5E5EA); }
@@ -81,7 +81,7 @@
 .vrm-eb-ina-zone:active { background: var(--vrm-card2, #F2F2F7); transform: none; }
 @media (hover: hover) and (pointer: fine) { .vrm-eb-ina-zone:hover { background: color-mix(in srgb, var(--vrm-card2, #F2F2F7) 60%, transparent); } }
 .vrm-eb-ina-zone:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: -2px; }
-.vrm-eb-ina-zone > :first-child { border-radius: 10px; overflow: hidden; flex-shrink: 0; }
+.vrm-eb-ina-zone > :first-child { border-radius: 12px; overflow: hidden; flex-shrink: 0; }
 .vrm-eb-ina-texte { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .vrm-eb-ina-titre { font-size: 15px; font-weight: 600; line-height: 1.25; color: var(--vrm-ink, #1D1D1F); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.01em; }
 .vrm-eb-ina-sous { font-size: 13px; line-height: 1.3; color: var(--vrm-muted, #6E6E73); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -106,18 +106,18 @@
   }
   .vrm-main .vrm-platform-summary > summary {
     display: flex !important; align-items: center; justify-content: space-between; gap: 8px;
-    min-height: 48px; padding: 0 16px !important; border-radius: 14px;
+    min-height: 48px; padding: 0 16px !important; border-radius: 12px;
     background: var(--vrm-surface, #fff); box-shadow: var(--vrm-ombre-carte);
     font-size: 16px !important; font-weight: 400; color: var(--vrm-ink, #1D1D1F) !important; text-align: left;
   }
-  .vrm-main .vrm-platform-summary[open] > summary { border-radius: 14px 14px 0 0; }
+  .vrm-main .vrm-platform-summary[open] > summary { border-radius: 12px 12px 0 0; }
 }
 
 /* ══ Les alertes : UNE rangée, plus de barre latérale (§7 : la couleur est rare) ══ */
 .vrm-main .vrm-notice {
   position: relative; display: flex !important; flex-wrap: wrap; align-items: center; gap: 0 !important;
   padding: 0 !important; margin: 0 0 var(--vrm-entre-cartes) !important; overflow: hidden;
-  background: var(--vrm-surface, #fff) !important; border: 0 !important; border-radius: 14px !important;
+  background: var(--vrm-surface, #fff) !important; border: 0 !important; border-radius: 12px !important;
   box-shadow: var(--vrm-ombre-carte) !important;
 }
 .vrm-main .vrm-notice > span[aria-hidden="true"]:first-child { display: none !important; } /* l'ancien trait de 3 px */
@@ -130,7 +130,7 @@ button.vrm-notice-zone { cursor: pointer; -webkit-tap-highlight-color: transpare
 button.vrm-notice-zone:active { background: var(--vrm-card2, #F2F2F7); transform: none; }
 button.vrm-notice-zone:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: -2px; }
 .vrm-notice-icone {
-  flex: 0 0 30px; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
+  flex: 0 0 30px; width: 30px; height: 30px; border-radius: 12px; display: grid; place-items: center;
   background: color-mix(in srgb, currentColor 12%, transparent);
 }
 .vrm-notice-texte { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -166,7 +166,7 @@ button.vrm-notice-zone:focus-visible { outline: 2px solid var(--vrm-accent, #007
 .vrm-main .vrm-rpf-quoi { min-width: 0; flex: 1 1 auto; }
 .vrm-main .vrm-reparti-court .vrm-rpf-rang { gap: 12px; }
 .vrm-alerte-tete { display: flex; align-items: flex-start; gap: 12px; padding-bottom: 8px; }
-.vrm-alerte-tete .vrm-alerte-icone { flex: 0 0 30px; width: 30px; height: 30px; margin: 0; border-radius: 9px; }
+.vrm-alerte-tete .vrm-alerte-icone { flex: 0 0 30px; width: 30px; height: 30px; margin: 0; border-radius: 12px; }
 .vrm-alerte-tete .vrm-alerte-ligne-sous { display: block; padding: 0; }
 .vrm-alerte-tete .vrm-alerte-ligne-titre { display: block; }
 /* L'écran Colis finit par la carte « N° à écrire » : la section suivante suit à 24 px, pas 52 (mesuré). */

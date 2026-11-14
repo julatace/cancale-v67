@@ -81,7 +81,7 @@
 .vrm-seg-cadre { padding: 0 16px 12px; min-width: 0; }
 :root .vrm-seg:not(#vrm-seg) {
   display: flex !important; gap: 2px !important; padding: 3px !important; margin: 0; border: 0 !important;
-  box-sizing: border-box !important; min-height: 0 !important; border-radius: 14px !important;
+  box-sizing: border-box !important; min-height: 0 !important; border-radius: 12px !important;
   background: var(--seg-piste) !important; box-shadow: none !important;
   overflow-x: auto !important; scrollbar-width: none; overscroll-behavior-x: contain; scroll-padding-inline: 3px;
   -webkit-mask-image: none !important; mask-image: none !important;

@@ -50,12 +50,12 @@
 .vrm-fc .vrm-fc-bouton.is-ambre { background: var(--fu-carte) !important; color: var(--fu-ambre-txt) !important; min-height: 44px; padding: 0 14px; }
 .vrm-fc .vrm-fc-lien, .vrm-app-shell .vrm-main .vrm-fc .vrm-fc-lien { min-height: 44px; padding: 0 4px; background: none !important; color: var(--vrm-accent-texte, var(--fu-bleu)) !important; font: 600 15px/1 var(--vrm-police) !important; }
 .vrm-fc .vrm-fc-pastille, .vrm-app-shell .vrm-main .vrm-fc .vrm-fc-pastille {
-  min-height: 44px; padding: 0 14px; border-radius: 22px !important; background: var(--fu-case) !important; color: var(--fu-encre) !important; font: 600 14px/1 var(--vrm-police) !important; white-space: nowrap;
+  min-height: 44px; padding: 0 14px; border-radius: 999px !important; background: var(--fu-case) !important; color: var(--fu-encre) !important; font: 600 14px/1 var(--vrm-police) !important; white-space: nowrap;
 }
 .vrm-fc .vrm-fc-pastille[aria-pressed="true"] { background: var(--fu-encre) !important; color: var(--fu-carte) !important; }
 
 /* Segmenté iOS */
-.vrm-fc-seg { display: flex; gap: 2px; padding: 2px; border-radius: 10px; background: var(--fu-piste); min-width: 0; }
+.vrm-fc-seg { display: flex; gap: 2px; padding: 2px; border-radius: 12px; background: var(--fu-piste); min-width: 0; }
 .vrm-fc .vrm-fc-seg > button, .vrm-app-shell .vrm-main .vrm-fc .vrm-fc-seg > button {
   flex: 1 1 0; min-width: 0; min-height: 44px; padding: 0 6px; border-radius: 8px !important; background: transparent !important; color: var(--fu-encre) !important;
   font: 600 14px/1.1 var(--vrm-police) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -67,14 +67,14 @@
 .vrm-fc-choix-barre { display: flex; align-items: center; justify-content: space-between; gap: 12px; font: 600 15px/1.3 var(--vrm-police); }
 .vrm-fc-annonces { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .vrm-fc .vrm-fc-annonce, .vrm-fc-feuille .vrm-fc-annonce, .vrm-app-shell .vrm-main .vrm-fc .vrm-fc-annonce {
-  width: 100%; display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 8px; border-radius: 14px !important; background: transparent !important; color: inherit !important; text-align: left; min-width: 0;
+  width: 100%; display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 8px; border-radius: 12px !important; background: transparent !important; color: inherit !important; text-align: left; min-width: 0;
   transition: background-color .15s ease;
 }
 .vrm-fc .vrm-fc-annonce.is-choisie { background: var(--fu-case) !important; }
 @media (hover: hover) { .vrm-fc button.vrm-fc-annonce:hover:not(:disabled) { background: var(--fu-case) !important; } }
 .vrm-fc-coche { flex: none; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--fu-gris3, #c7c7cc); display: grid; place-items: center; color: #fff; }
 .vrm-fc-coche.is-on { background: var(--fu-bleu); border-color: var(--fu-bleu); }
-.vrm-fc-photo { flex: none; width: var(--t, 48px); height: var(--t, 48px); border-radius: 10px; overflow: hidden; background: var(--fu-case); display: grid; place-items: center; color: var(--fu-gris); }
+.vrm-fc-photo { flex: none; width: var(--t, 48px); height: var(--t, 48px); border-radius: 12px; overflow: hidden; background: var(--fu-case); display: grid; place-items: center; color: var(--fu-gris); }
 .vrm-fc-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .vrm-fc-photo-vide { display: grid; place-items: center; width: 100%; height: 100%; }
 .vrm-fc-annonce-texte { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -98,20 +98,20 @@
 .vrm-fc-champ textarea:focus { outline: 2px solid var(--fu-bleu); outline-offset: 0; border-color: transparent; }
 .vrm-fc-variables, .vrm-fc-rangee { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .vrm-fc-mini { display: inline-flex; align-items: center; gap: 6px; font: 600 15px/1 var(--vrm-police); color: var(--fu-encre); }
-.vrm-fc-mini input { width: 4.2em; min-height: 44px; padding: 0 8px; border-radius: 10px; border: 1px solid var(--fu-piste); background: var(--fu-case); color: var(--fu-encre); font: 600 16px/1 var(--vrm-police); text-align: center; }
+.vrm-fc-mini input { width: 4.2em; min-height: 44px; padding: 0 8px; border-radius: 12px; border: 1px solid var(--fu-piste); background: var(--fu-case); color: var(--fu-encre); font: 600 16px/1 var(--vrm-police); text-align: center; }
 .vrm-fc-case { display: flex; align-items: center; gap: 10px; min-height: 44px; font: 500 15px/1.3 var(--vrm-police); }
 .vrm-fc-case input { width: 22px; height: 22px; accent-color: var(--fu-bleu); }
 /* L'aperçu, comme une conversation Vinted */
 .vrm-fc-apercu { display: flex; flex-direction: column; gap: 8px; }
 .vrm-fc-telephone { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 16px; background: var(--fu-fond); border: 1px solid var(--fu-filet); }
 .vrm-fc-tel-article { display: flex; align-items: center; gap: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--fu-filet); min-width: 0; }
-.vrm-fc-bulle { margin: 0; align-self: flex-end; max-width: 92%; padding: 10px 14px; border-radius: 18px 18px 6px 18px; background: var(--fu-bleu); color: #fff; font: 400 15px/1.4 var(--vrm-police); white-space: pre-wrap; overflow-wrap: anywhere; }
+.vrm-fc-bulle { margin: 0; align-self: flex-end; max-width: 92%; padding: 10px 14px; border-radius: 20px 20px 6px 20px; background: var(--fu-bleu); color: #fff; font: 400 15px/1.4 var(--vrm-police); white-space: pre-wrap; overflow-wrap: anywhere; }
 .vrm-fc-jeton { display: inline-block; padding: 0 7px; border-radius: 7px; background: rgba(255,255,255,.24); font-weight: 600; }
 .vrm-fc-offre-ligne { margin: 0; font: 600 14px/1.4 var(--vrm-police); color: var(--fu-encre); }
 .vrm-fc-offre-ligne.is-geste { color: var(--fu-ambre-txt); }
 
 /* QUAND : le mode auto dans sa petite carte sombre */
-.vrm-fc-auto { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px 4px; border-radius: 14px; background: var(--fu-sombre); color: #fff; }
+.vrm-fc-auto { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px 4px; border-radius: 12px; background: var(--fu-sombre); color: #fff; }
 .vrm-fc-auto .vrm-fa-auto { border-top: 0; padding-top: 0; margin-top: 0; }
 
 /* L'historique */
@@ -120,7 +120,7 @@
 .vrm-fc-chiffres b { font: 700 24px/1.1 var(--vrm-police); color: var(--fu-encre); letter-spacing: -.01em; }
 
 /* Le pied collé en bas */
-.vrm-fc-pied { position: sticky; bottom: calc(8px + env(safe-area-inset-bottom)); z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 16px; border-radius: 18px; background: var(--fu-carte); box-shadow: 0 6px 24px rgba(0,0,0,.12), 0 0 0 1px var(--fu-filet); min-width: 0; }
+.vrm-fc-pied { position: sticky; bottom: calc(8px + env(safe-area-inset-bottom)); z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 16px; border-radius: 20px; background: var(--fu-carte); box-shadow: 0 6px 24px rgba(0,0,0,.12), 0 0 0 1px var(--fu-filet); min-width: 0; }
 .vrm-fc-pied-texte { flex: 1 1 auto; min-width: 0; font: 600 14px/1.3 var(--vrm-police); color: var(--fu-encre); }
 @supports (backdrop-filter: blur(10px)) { .vrm-fc-pied { background: color-mix(in srgb, var(--fu-carte) 86%, transparent); backdrop-filter: saturate(180%) blur(16px); } }
 
@@ -161,7 +161,7 @@
 .vrm-fpc-resume { list-style: none; cursor: pointer; }
 .vrm-fpc-resume::-webkit-details-marker { display: none; }
 .vrm-fpc-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
-.vrm-fpc-label { display: flex; align-items: center; gap: 10px; min-height: 64px; padding: 6px 8px 6px 0; border-radius: 14px; cursor: pointer; min-width: 0; }
+.vrm-fpc-label { display: flex; align-items: center; gap: 10px; min-height: 64px; padding: 6px 8px 6px 0; border-radius: 12px; cursor: pointer; min-width: 0; }
 .vrm-fpc-label.is-fixe { cursor: default; padding-left: 8px; }
 .vrm-fpc-ligne.is-choisie .vrm-fpc-label { background: var(--fu-case); }
 @media (hover: hover) { .vrm-fpc-label:not(.is-fixe):hover { background: var(--fu-case); } }
@@ -171,9 +171,9 @@
 /* (13 nov., lot 31) Très aimées, pas vendues : une annonce = photo · N° · prix · favoris · jours, la remise, le geste. */
 .vrm-sv-seuil { align-self: flex-start; }
 .vrm-sv-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.vrm-sv-ligne { display: flex; flex-direction: column; gap: 8px; padding: 10px 8px; border-radius: 14px; min-width: 0; }
+.vrm-sv-ligne { display: flex; flex-direction: column; gap: 8px; padding: 10px 8px; border-radius: 12px; min-width: 0; }
 .vrm-sv-ligne + .vrm-sv-ligne { border-top: 1px solid var(--fu-piste); border-radius: 0; }
-.vrm-sv-ligne.is-choisie { background: var(--fu-case); border-radius: 14px; }
+.vrm-sv-ligne.is-choisie { background: var(--fu-case); border-radius: 12px; }
 .vrm-sv-haut { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .vrm-sv-num { font-weight: 700; margin-right: 6px; font-variant-numeric: tabular-nums; }
 .vrm-sv-offre { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-width: 0; }

@@ -2,7 +2,7 @@
    (src/AvisVinted.jsx) — neutres (§7) : aucune couleur d'accent, aucun rouge, ni vert. */
 .vrm-ve-vide, .vrm-av-vide { margin: 4px 0 0; font-size: 15px; color: var(--vrm-muted, #6E6E73); }
 .vrm-ve-tout { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 2px 0 14px; }
-.vrm-ve-tout b { font-size: 34px; font-weight: 800; line-height: 1; color: var(--vrm-ink, #1D1D1F); font-variant-numeric: tabular-nums; }
+.vrm-ve-tout b { font-size: 34px; font-weight: 700; line-height: 1; color: var(--vrm-ink, #1D1D1F); font-variant-numeric: tabular-nums; }
 .vrm-ve-tout span { font-size: 13px; color: var(--vrm-muted, #6E6E73); }
 .vrm-ve-liste { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
 .vrm-ve-ligne { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "nom val" "piste piste" "sur sur"; column-gap: 12px; row-gap: 5px; align-items: baseline; }
@@ -17,7 +17,7 @@
 .vrm-av-compte { padding-top: 12px; border-top: 0.5px solid var(--vrm-line, rgba(60, 60, 67, .18)); }
 .vrm-av-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .vrm-av-nom { font-size: 15px; font-weight: 600; color: var(--vrm-ink, #1D1D1F); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vrm-av-moy { font-size: 24px; font-weight: 800; color: var(--vrm-ink, #1D1D1F); font-variant-numeric: tabular-nums; }
+.vrm-av-moy { font-size: 24px; font-weight: 700; color: var(--vrm-ink, #1D1D1F); font-variant-numeric: tabular-nums; }
 .vrm-av-moy small { font-size: 13px; font-weight: 600; color: var(--vrm-muted, #6E6E73); margin-left: 1px; }
 .vrm-av-sous { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; color: var(--vrm-muted, #6E6E73); margin-top: 2px; }
 .vrm-av-histo { margin: 4px 0 0; font-size: 13px; line-height: 1.45; color: var(--vrm-muted, #6E6E73); font-variant-numeric: tabular-nums; }

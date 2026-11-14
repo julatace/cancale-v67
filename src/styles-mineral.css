@@ -309,7 +309,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-sale-price .vrm-display, .vrm-ann-price-line { font-variant-numeric:tabular-nums; }
 .vrm-sale-photo { background:var(--vrm-surface); overflow:hidden; }
 .vrm-sale-title { letter-spacing:-.015em; }
-.vrm-finance-overview { gap:1px; border:1px solid var(--vrm-line); border-radius:14px; overflow:hidden; background:var(--vrm-line); }
+.vrm-finance-overview { gap:1px; border:1px solid var(--vrm-line); border-radius:12px; overflow:hidden; background:var(--vrm-line); }
 .vrm-finance-metric { border:0; border-radius:0; padding:22px; }
 .vrm-finance-metric.is-primary { background:#1C1C1E; }
 .vrm-finance-metric.is-primary .vrm-display { font-size:38px !important; letter-spacing:-1.4px; }
@@ -471,7 +471,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-setting-switch[aria-checked="true"]::before { background:var(--vrm-focus,#0071E3); border-color:var(--vrm-focus,#0071E3); }
 .vrm-setting-switch > span { top:calc(50% - 10.5px) !important; }
 .vrm-pickup-point { position:relative; overflow:visible !important; }
-.vrm-pickup-point > div:first-child { padding-right:54px !important; border-radius:10px 10px 0 0; }
+.vrm-pickup-point > div:first-child { padding-right:54px !important; border-radius:12px 12px 0 0; }
 .vrm-pickup-point > div:last-child { padding:0 !important; }
 .vrm-pickup-method { position:absolute; right:8px; top:5px; z-index:4; border:0 !important; }
 .vrm-pickup-method > summary { display:grid; place-items:center; width:40px; min-height:40px; padding:0; border-radius:12px; font-size:17px; cursor:pointer; list-style:none; }
@@ -521,17 +521,17 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-day-hello { font-size:20px; font-weight:700; letter-spacing:-.02em; line-height:1.2; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .vrm-day-date { font-size:12px; font-weight:500; text-transform:capitalize; white-space:nowrap; }
 .vrm-day-todo { grid-column:1 / -1; font-size:13px; line-height:1.35; }
-.vrm-day-bar { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); border-radius:14px; overflow:hidden; margin-bottom:16px; }
+.vrm-day-bar { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); border-radius:12px; overflow:hidden; margin-bottom:16px; }
 .vrm-day-bar > button { display:flex; flex-direction:column; align-items:center; gap:4px; padding:14px 4px 12px; min-width:0; background:transparent; border:0; border-radius:0; cursor:pointer; font-family:inherit; min-height:0; }
 .vrm-day-bar-ic { display:flex; }
 .vrm-day-bar-n { font-size:22px; font-weight:700; line-height:1.05; font-variant-numeric:tabular-nums; }
 .vrm-day-bar-l { font-size:11px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
 .vrm-day-top { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; margin-bottom:16px; }
-.vrm-day-card { border-radius:14px; padding:18px; box-sizing:border-box; min-width:0; }
+.vrm-day-card { border-radius:12px; padding:18px; box-sizing:border-box; min-width:0; }
 .vrm-day-head { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:20px; }
 .vrm-day-k { font-size:11px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; line-height:1.3; }
 .vrm-day-lien { border:0; background:transparent; padding:0; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; min-height:0; white-space:nowrap; }
-.vrm-day-hero-n { font-size:44px; font-weight:800; letter-spacing:-.035em; line-height:1; margin-top:12px; font-variant-numeric:tabular-nums; }
+.vrm-day-hero-n { font-size:44px; font-weight:700; letter-spacing:-.035em; line-height:1; margin-top:12px; font-variant-numeric:tabular-nums; }
 .vrm-day-meta { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 8px; font-size:13px; margin-top:10px; line-height:1.4; }
 .vrm-day-recu { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-top:16px; padding-top:14px; }
 .vrm-day-recu-n { font-size:22px; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; flex-shrink:0; }
@@ -615,7 +615,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
     « ⋯ » (une cible de 44 px dans le coin de la ligne). */
  .vrm-market-space:is(:has(.vrm-ann-grid),[aria-label="Leboncoin"],[aria-label="eBay"]) .vrm-screen-head:not(:has(button, a, input, select)) { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); margin:0 !important; padding:0 !important; border:0 !important; }
  .vrm-ann-workbar { background:transparent !important; border:0 !important; padding:0 !important; margin-bottom:12px !important; }
- .vrm-ann-grid { gap:0 !important; border:1px solid var(--vrm-line) !important; border-radius:14px !important; overflow:hidden !important; background:var(--vrm-surface); }
+ .vrm-ann-grid { gap:0 !important; border:1px solid var(--vrm-line) !important; border-radius:12px !important; overflow:hidden !important; background:var(--vrm-surface); }
  .vrm-ann-grid .vrm-ann-card { border:0 !important; border-bottom:1px solid var(--vrm-line) !important; border-radius:0 !important; box-shadow:none !important; position:relative; }
  .vrm-ann-card:last-child { border-bottom:0 !important; }
  .vrm-ann-grid .vrm-ann-card .vrm-ann-overview { padding:12px 14px !important; gap:12px !important; align-items:flex-start; }
@@ -655,7 +655,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 }
 
 /* 4. Leboncoin. */
-.vrm-lbc-ecran > div:not(.vrm-lbc-tete):not([data-lbc-lecture-ratee]):not(.vrm-lbc-compteur) { border-radius:14px !important; box-shadow:0 1px 2px #0000000a !important; }
+.vrm-lbc-ecran > div:not(.vrm-lbc-tete):not([data-lbc-lecture-ratee]):not(.vrm-lbc-compteur) { border-radius:12px !important; box-shadow:0 1px 2px #0000000a !important; }
 .vrm-lbc-tete h2 { font-size:20px !important; letter-spacing:-.02em; }
 .vrm-lbc-ecran .vrm-display { font-size:28px !important; font-weight:700 !important; letter-spacing:-.03em; line-height:1.1; }
 [data-lbc-relier] > div:first-child > div:nth-child(2) > div:first-child { white-space:normal !important; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; line-height:1.3; }
@@ -678,7 +678,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-ebay-annonces .vrm-screen-head { margin-bottom:8px !important; }
 .vrm-plat-intro { font-size:13px !important; line-height:1.45; }
 .vrm-plat-note { font-size:12px !important; line-height:1.5 !important; padding:8px 0 8px 12px; border-left:2px solid var(--vrm-line); margin:0 0 12px !important; }
-.vrm-ebay-liste { border-radius:14px !important; box-shadow:0 1px 2px #0000000a; }
+.vrm-ebay-liste { border-radius:12px !important; box-shadow:0 1px 2px #0000000a; }
 .vrm-ebay-carte-tete .vrm-display { font-size:17px !important; font-weight:700 !important; letter-spacing:-.02em; white-space:nowrap; }
 .vrm-ebay-carte-tete > div:first-of-type > div:first-child { font-size:15px !important; letter-spacing:-.01em; }
 .vrm-ebay-carte-tete img, .vrm-ebay-carte-tete > span:first-child { border-radius:12px !important; }
@@ -761,7 +761,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-achats .vrm-reception-sum { min-height:44px; box-sizing:border-box; padding:0 !important; font-size:12px !important; }
 
 /* ── ACHATS ──────────────────────────────────────────────────────────── */
-.vrm-achats-kpis { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); border-radius:14px; overflow:hidden; margin:0 0 16px; }
+.vrm-achats-kpis { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); border-radius:12px; overflow:hidden; margin:0 0 16px; }
 .vrm-achats-kpi { padding:14px 16px; min-width:0; border:0 solid; border-left-width:1px; }
 .vrm-achats-kpi:first-child { border-left-width:0; }
 .vrm-achats-kpi-k { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; line-height:1.3; }
@@ -776,7 +776,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 }
 
 /* Blocs d'exception (litige, colis repartis) : sobres, l'icône seule colorée. */
-.vrm-achats-bloc { border-radius:14px; padding:14px 16px; margin:0 0 16px; }
+.vrm-achats-bloc { border-radius:12px; padding:14px 16px; margin:0 0 16px; }
 .vrm-achats-bloc-t { font-size:15px; font-weight:600; line-height:1.4; }
 .vrm-achats-bloc-p { font-size:13px; line-height:1.45; margin-top:4px; }
 .vrm-achats-bloc-liste { margin-top:8px; }
@@ -786,7 +786,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 
 /* La liste des achats : vignette · titre / statut · montant · ⋯ */
 .vrm-buy-compte { display:flex; align-items:center; gap:8px; font-size:13px; margin:0 2px 8px; }
-.vrm-buy-list { border-radius:14px; overflow:hidden; }
+.vrm-buy-list { border-radius:12px; overflow:hidden; }
 .vrm-buy-row { position:relative; display:grid; grid-template-columns:64px minmax(0,1fr) auto auto; align-items:center; gap:0 12px; padding:12px 8px 12px 16px; min-height:76px; box-sizing:border-box; }
 .vrm-buy-row + .vrm-buy-row::before { content:''; position:absolute; left:80px; right:0; top:0; height:1px; background:var(--vrm-line,#E5E5EA); }
 .vrm-buy-ph { width:52px; height:52px; border-radius:12px; overflow:hidden; display:flex; align-items:center; justify-content:center; align-self:start; }
@@ -797,7 +797,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-buy-statut > i { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
 .vrm-buy-price { font-size:15px; font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; text-align:right; }
 .vrm-buy-act { position:relative; display:flex; align-items:center; gap:0; }
-.vrm-buy-act > .vrm-buy-quick, .vrm-buy-act > .vrm-buy-more { display:flex; align-items:center; justify-content:center; width:36px; height:36px; min-height:36px; min-width:36px; padding:0; border:0; border-radius:12px; background:transparent; cursor:pointer; font:800 17px/1 Inter,system-ui,sans-serif; text-decoration:none; }
+.vrm-buy-act > .vrm-buy-quick, .vrm-buy-act > .vrm-buy-more { display:flex; align-items:center; justify-content:center; width:36px; height:36px; min-height:36px; min-width:36px; padding:0; border:0; border-radius:12px; background:transparent; cursor:pointer; font:700 17px/1 Inter,system-ui,sans-serif; text-decoration:none; }
 .vrm-buy-retour { margin-top:8px; }
 /* (29 oct.) « Reçu d’achat » (le reçu Vinted reçu par email) : un lien-texte sous le statut — au doigt il garde 44 px (vrm-lien-action), sans gonfler la ligne. */
 .vrm-buy-facture { margin-top:6px; line-height:1.3; }
@@ -843,7 +843,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-pickup-title > span { font-size:13px; letter-spacing:0; }
 .vrm-achats .vrm-pickup-help { margin-top:0; }
 .vrm-achats .vrm-pickup-help > summary { display:inline-flex; align-items:center; min-height:44px; margin:-6px 0 -10px; padding:0; font-size:13px; }
-.vrm-achats .vrm-pickup-point { border-radius:14px !important; margin-bottom:16px !important; box-shadow:none; }
+.vrm-achats .vrm-pickup-point { border-radius:12px !important; margin-bottom:16px !important; box-shadow:none; }
 .vrm-pickup-dest { display:flex; align-items:center; gap:12px; padding:14px 60px 12px 16px; }
 .vrm-pickup-dest > div { flex:1 1 auto !important; }
 .vrm-pickup-dest > div > div:nth-child(2) { font-size:17px !important; letter-spacing:-.01em; }
@@ -900,7 +900,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-msg-bar > .vrm-inbox-filters button[aria-pressed="true"] { background:var(--vrm-surface,#fff) !important; color:var(--vrm-ink) !important; box-shadow:0 1px 2px rgba(0,0,0,.10), 0 0 0 .5px rgba(0,0,0,.06); }
 .vrm-msg-bar > .vrm-inbox-filters button span { font-size:12px !important; font-weight:500; }
 .vrm-msg-refresh { margin-left:auto; display:flex; align-items:center; justify-content:center; width:44px; height:44px; border:0; border-radius:12px; background:transparent; color:var(--vrm-muted); cursor:pointer; flex-shrink:0; }
-.vrm-msg-list { border-radius:14px; overflow:hidden; }
+.vrm-msg-list { border-radius:12px; overflow:hidden; }
 .vrm-msg-section { display:flex; align-items:center; gap:8px; padding:10px 16px 8px; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; }
 .vrm-msg-section-ro { display:block; padding:12px 16px 10px; }
 .vrm-msg-section-t { display:flex; align-items:center; gap:7px; }
@@ -936,17 +936,17 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-chat-history { padding:16px 14px !important; gap:4px !important; }
 .vrm-bulle-l { display:flex; flex-direction:column; align-items:flex-start; max-width:80%; align-self:flex-start; margin-top:6px; }
 .vrm-bulle-l.vrm-bulle-moi { align-items:flex-end; align-self:flex-end; }
-.vrm-bulle { padding:9px 14px; border-radius:18px 18px 18px 6px; font-size:15px; line-height:1.4; white-space:pre-wrap; word-break:break-word; box-sizing:border-box; }
-.vrm-bulle-moi > .vrm-bulle { border-radius:18px 18px 6px 18px; border:0 !important; }
+.vrm-bulle { padding:9px 14px; border-radius:20px 20px 20px 6px; font-size:15px; line-height:1.4; white-space:pre-wrap; word-break:break-word; box-sizing:border-box; }
+.vrm-bulle-moi > .vrm-bulle { border-radius:20px 20px 6px 20px; border:0 !important; }
 .vrm-bulle-pied { display:flex; align-items:center; gap:12px; margin:3px 6px 0; min-height:20px; font-size:11px; }
 .vrm-bulle-pied > button[data-traduire] { margin:-13px -8px !important; padding:13px 8px !important; font-size:12px !important; min-height:44px !important; box-sizing:border-box; }
 .vrm-chat-link { display:inline-flex; align-items:center; min-height:44px; margin:-8px 4px -10px; font-size:13px; font-weight:600; text-decoration:none; }
 .vrm-chat-event { align-self:center; max-width:88%; text-align:center; font-size:12px; line-height:1.4; margin:10px 0 4px; }
-.vrm-chat-event-colis { border-radius:14px; padding:10px 14px; }
+.vrm-chat-event-colis { border-radius:12px; padding:10px 14px; }
 .vrm-chat-event-k { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; margin-bottom:4px; }
 .vrm-chat-foot { flex-shrink:0; padding:10px 12px calc(10px + env(safe-area-inset-bottom)); box-sizing:border-box; }
 .vrm-chat-note { display:flex; gap:8px; align-items:flex-start; font-size:13px; line-height:1.45; margin:0 0 10px; }
-.vrm-chat-offre { border-radius:14px; padding:12px; margin:0 0 10px; }
+.vrm-chat-offre { border-radius:12px; padding:12px; margin:0 0 10px; }
 .vrm-chat-offre-l { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .vrm-chat-offre-l + .vrm-chat-offre-l { margin-top:10px; }
 .vrm-chat-offre-t { flex:1 1 140px; font-size:15px; line-height:1.3; }
@@ -966,8 +966,8 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-chat-vinted { display:flex; align-items:center; justify-content:center; min-height:48px; border-radius:12px; font:600 15px Inter,system-ui,sans-serif; text-decoration:none; }
 @media(max-width:767px){
   .vrm-chat-panel .vrm-chat-btn, .vrm-chat-panel .vrm-chat-send, .vrm-chat-panel .vrm-chat-rapides > button, .vrm-chat-panel .vrm-chat-prix { min-height:44px !important; }
-  .vrm-chat-panel .vrm-chat-compose > textarea { min-height:44px; border-radius:24px; padding:11px 16px; }
-  .vrm-chat-panel .vrm-chat-send { border-radius:24px; }
+  .vrm-chat-panel .vrm-chat-compose > textarea { min-height:44px; border-radius:20px; padding:11px 16px; }
+  .vrm-chat-panel .vrm-chat-send { border-radius:20px; }
   .vrm-chat-offre-l > .vrm-chat-btn { flex:1 1 0; }
   .vrm-chat-offre-l > .vrm-chat-offre-t { flex-basis:100%; }
   .vrm-chat-offre-l > .vrm-chat-prix { flex:1 1 auto; width:auto; min-width:80px; }
@@ -1105,7 +1105,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
    fenêtre centrée à partir de 768 px (elle restait collée en bas, étroite). */
 @media(min-width:768px){
   .vrm-feuille-fond { align-items:center !important; padding:24px; }
-  .vrm-feuille { border-radius:14px !important; max-height:min(80vh, 760px) !important; box-shadow:0 24px 64px rgba(0,0,0,.28); }
+  .vrm-feuille { border-radius:12px !important; max-height:min(80vh, 760px) !important; box-shadow:0 24px 64px rgba(0,0,0,.28); }
 }
 
 /* Finitions communes : aucune modification des grilles ou des logos. */

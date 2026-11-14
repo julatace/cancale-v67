@@ -22,7 +22,7 @@
 .vrm-jauge[data-ton="passu"] .vrm-jauge-valeur { color: var(--w-gris, #6E6E73); }
 
 .vrm-jauges {
-  margin: 0 0 16px; padding: 10px 16px 12px; border-radius: var(--w-r, 24px);
+  margin: 0 0 16px; padding: 10px 16px 12px; border-radius: var(--w-r, 20px);
   background: var(--w-carte, #fff); box-shadow: var(--w-ombre, none);
 }
 .vrm-jauges-titre { font-size: 13px; font-weight: 600; color: var(--w-gris, #6E6E73); margin: 0 0 4px; }

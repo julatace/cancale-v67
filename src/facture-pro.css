@@ -176,7 +176,7 @@ html body .vrm-fp-apercu .vrm-fp-a-totaux dt { min-width: 0; }
 
 /* ════ (10 nov., lot Q) À envoyer · envoi automatique · registre — DA6 : groupes rayon 24,
    rangées entières qui s'ouvrent (chevron), pilules ; l'ambre seulement pour un geste à faire. ════ */
-.vrm-fp-a-envoyer, .vrm-fp-registre { border-radius: var(--w-r, 24px); border: 0; background: var(--w-carte, var(--vrm-surface)); box-shadow: var(--w-ombre, 0 1px 3px rgba(0,0,0,.06)); padding: 16px; }
+.vrm-fp-a-envoyer, .vrm-fp-registre { border-radius: var(--w-r, 20px); border: 0; background: var(--w-carte, var(--vrm-surface)); box-shadow: var(--w-ombre, 0 1px 3px rgba(0,0,0,.06)); padding: 16px; }
 .vrm-fp-tete-ligne { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; min-width: 0; }
 .vrm-fp-tete-ligne > h3 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.02em; color: var(--vrm-ink); }
 .vrm-fp-muet.is-ambre { color: var(--vrm-warn, #b25000); }

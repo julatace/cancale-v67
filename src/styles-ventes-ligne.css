@@ -41,7 +41,7 @@ html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-l
 html body .vrm-app-shell .vrm-main .vrm-sale-row[data-depose-attente] { opacity: .55; }
 .vrm-depose-barre {
   position: fixed; left: 16px; right: 16px; bottom: calc(84px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 12px;
-  padding: 6px 6px 6px 16px; border-radius: 14px; background: var(--vrm-ink, #111); color: var(--vrm-bg, #fff);
+  padding: 6px 6px 6px 16px; border-radius: 12px; background: var(--vrm-ink, #111); color: var(--vrm-bg, #fff);
   box-shadow: var(--vrm-ombre-flottante, 0 10px 28px rgba(0,0,0,.2)); font-size: 15px;
 }
 .vrm-depose-barre-t { flex: 1; min-width: 0; overflow-wrap: anywhere; }

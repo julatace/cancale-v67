@@ -83,7 +83,7 @@
 /* La ligne d'avis : un cadre, deux cases côte à côte (prix d'achat · nouveaux N°). */
 .vrm-ann-avis {
   display: flex; align-items: stretch; box-sizing: border-box; margin: 0 0 12px; min-height: 48px;
-  border-radius: 14px; background: var(--vrm-surface, #FFFFFF); box-shadow: inset 0 0 0 1px var(--vrm-line, rgba(0,0,0,.08));
+  border-radius: 12px; background: var(--vrm-surface, #FFFFFF); box-shadow: inset 0 0 0 1px var(--vrm-line, rgba(0,0,0,.08));
 }
 .vrm-ann-avis > * + * { border-left: 1px solid var(--vrm-line, rgba(0,0,0,.08)) !important; }
 .vrm-ann-achats {
@@ -92,10 +92,10 @@
 }
 html body .vrm-ann-avis > button.vrm-ann-avis-neufs {
   flex: 0 0 auto; display: flex !important; align-items: center; gap: 8px; min-height: 48px !important; margin: 0 !important;
-  padding: 0 14px !important; border: 0 !important; border-radius: 0 14px 14px 0 !important; background: transparent !important; box-shadow: none !important;
+  padding: 0 14px !important; border: 0 !important; border-radius: 0 12px 12px 0 !important; background: transparent !important; box-shadow: none !important;
   color: var(--vrm-ink) !important; font: 400 15px/1.2 var(--vrm-police, inherit) !important; cursor: pointer; white-space: nowrap;
 }
-html body .vrm-ann-avis > button.vrm-ann-avis-neufs:only-child { flex: 1 1 auto; justify-content: space-between; border-radius: 14px !important; }
+html body .vrm-ann-avis > button.vrm-ann-avis-neufs:only-child { flex: 1 1 auto; justify-content: space-between; border-radius: 12px !important; }
 html body .vrm-ann-avis > button.vrm-ann-avis-neufs b { font-weight: 700; font-variant-numeric: tabular-nums; }
 .vrm-ann-avis-voir { font-size: 13px; font-weight: 600; color: var(--vrm-accent-texte, #0066CC); }
 html body .vrm-ann-avis > button.vrm-ann-avis-neufs[aria-expanded="true"] .vrm-ann-avis-voir { color: var(--vrm-muted); }
@@ -239,7 +239,7 @@ html body .vrm-act .vrm-act-pb a { color: var(--vrm-accent-texte, #0066CC); }
 
 /* ── 7. « N NOUVEAUX N° POSÉS PAR VRM » : la liste dépliée sous la ligne d'avis ── */
 .vrm-ann-neufs {
-  margin: -4px 0 12px; padding: 10px 14px 8px; border-radius: 14px; box-sizing: border-box;
+  margin: -4px 0 12px; padding: 10px 14px 8px; border-radius: 12px; box-sizing: border-box;
   background: var(--vrm-surface, #FFFFFF); box-shadow: inset 0 0 0 1px var(--vrm-line, rgba(0,0,0,.08));
 }
 .vrm-ann-neufs-tete { font-size: 15px; font-weight: 600; color: var(--vrm-ink); }
@@ -254,7 +254,7 @@ html body .vrm-act .vrm-act-pb a { color: var(--vrm-accent-texte, #0066CC); }
 .vrm-ann-neufs-prix { flex: 1 0 100%; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-left: 46px; box-sizing: border-box; min-width: 0; }
 .vrm-ann-neufs-prix-connu { font-size: 12px; color: var(--vrm-muted); font-variant-numeric: tabular-nums; }
 .vrm-ann-neufs-prix-champ { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--vrm-muted); min-height: 44px; }
-.vrm-ann-neufs-prix-champ input { width: 92px; height: 36px; box-sizing: border-box; border: 1px solid var(--vrm-line, rgba(0,0,0,.12)); border-radius: 10px; padding: 0 8px; background: transparent; color: var(--vrm-ink); font: inherit; font-size: 16px; outline: none; }
+.vrm-ann-neufs-prix-champ input { width: 92px; height: 36px; box-sizing: border-box; border: 1px solid var(--vrm-line, rgba(0,0,0,.12)); border-radius: 12px; padding: 0 8px; background: transparent; color: var(--vrm-ink); font: inherit; font-size: 16px; outline: none; }
 .vrm-ann-neufs-prix-champ input:focus { border-color: var(--vrm-accent, #0071E3); }
 .vrm-ann-neufs-prix .vrm-b { max-width: 100%; }
 /* Au téléphone : la phrase du prix d'achat dans l'infobulle, la ligne reste UNE ligne. */
@@ -278,7 +278,7 @@ html body .vrm-ann-avis > button.vrm-ann-avis-neufs > svg { display: none; flex:
    « Prochain geste » en encre, la phrase en gris, le bouton à droite (44 px). */
 .vrm-ann-geste {
   display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; box-sizing: border-box; margin: 0 0 12px;
-  min-height: 48px; padding: 8px 6px 8px 14px; border-radius: 14px;
+  min-height: 48px; padding: 8px 6px 8px 14px; border-radius: 12px;
   background: var(--vrm-surface, #FFFFFF); box-shadow: inset 0 0 0 1px var(--vrm-line, rgba(0,0,0,.08));
 }
 .vrm-ann-geste-texte { flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.4; color: var(--vrm-muted, #6E6E73); }

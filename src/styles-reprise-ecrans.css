@@ -4,7 +4,7 @@
    (§7 : rien à rattraper, seulement à savoir). Clair et sombre par les jetons. */
 .vrm-reprise-retenue {
   display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px;
-  margin: 6px 16px 4px; padding: 4px 4px 4px 14px; border-radius: 14px;
+  margin: 6px 16px 4px; padding: 4px 4px 4px 14px; border-radius: 12px;
   background: var(--fu-case, #f2f2f7); color: var(--fu-encre, #1d1d1f); font-size: 13px; line-height: 1.3;
 }
 .vrm-reprise-titre { color: var(--fu-gris, #6e6e73); font-weight: 600; }

@@ -227,7 +227,7 @@
   background: var(--a-ambre-fond, rgba(255,149,0,.16)) !important;
 }
 :root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-photos { display: flex !important; align-items: center; gap: 8px; }
-:root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-photos > .vrm-remise-photo:first-child { width: 56px; flex: 0 0 56px; border-radius: 10px; }
+:root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-photos > .vrm-remise-photo:first-child { width: 56px; flex: 0 0 56px; border-radius: 12px; }
 /* la nouvelle annonce EST la vignette : sa petite photo (et le « = ») ne se répètent pas */
 :root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-photos > :not(:first-child) { display: none !important; }
 :root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-photo .vrm-remise-num { left: 3px; top: 3px; padding: 1px 6px; font-size: 11px; }

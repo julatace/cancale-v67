@@ -3,7 +3,7 @@
    « Facture en anglais ». Style DA6 (widget blanc, rayon 24, ambre = geste).
    Seuls les jetons --vrm-* : le mode sombre suit tout seul.
    ════════════════════════════════════════════════════════════════════════════ */
-.vrm-stva { display: grid; gap: 10px; padding: 16px 18px; border-radius: 24px; background: var(--vrm-surface, #fff); border: 1px solid var(--vrm-line, #e5e5ea); color: var(--vrm-ink, #1d1d1f); min-width: 0; }
+.vrm-stva { display: grid; gap: 10px; padding: 16px 18px; border-radius: 20px; background: var(--vrm-surface, #fff); border: 1px solid var(--vrm-line, #e5e5ea); color: var(--vrm-ink, #1d1d1f); min-width: 0; }
 .vrm-stva-tete { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .vrm-stva-titre { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
 .vrm-stva-chiffre { font-size: 13px; color: var(--vrm-muted, #6e6e73); font-variant-numeric: tabular-nums; }
@@ -30,7 +30,7 @@
 
 /* ── (11 nov., lot tva-marge) « TVA sur marge » : la déclaration d'une période.
    Même widget que le seuil ; ambre seulement pour les ventes à compléter (§7). */
-.vrm-tvm { display: grid; gap: 10px; padding: 16px 18px; border-radius: 24px; background: var(--vrm-surface, #fff); border: 1px solid var(--vrm-line, #e5e5ea); color: var(--vrm-ink, #1d1d1f); min-width: 0; }
+.vrm-tvm { display: grid; gap: 10px; padding: 16px 18px; border-radius: 20px; background: var(--vrm-surface, #fff); border: 1px solid var(--vrm-line, #e5e5ea); color: var(--vrm-ink, #1d1d1f); min-width: 0; }
 .vrm-tvm-tete { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
 .vrm-tvm-titre { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
 .vrm-tvm-periode { display: flex; align-items: center; gap: 4px; }

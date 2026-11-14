@@ -6,7 +6,7 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 .vrm-rc { display: flex; flex-direction: column; gap: 18px; }
 .vrm-rc-titre { margin: 0 0 6px 4px; font: 600 13px/1.3 var(--vrm-police, -apple-system, system-ui, sans-serif); color: var(--vrm-muted, #6E6E73); letter-spacing: 0; }
-.vrm-rc-liste { list-style: none; margin: 0; padding: 0 14px; border-radius: 14px; background: var(--vrm-surface, #fff); box-shadow: 0 0 0 .5px var(--vrm-line, rgba(60,60,67,.18)); }
+.vrm-rc-liste { list-style: none; margin: 0; padding: 0 14px; border-radius: 12px; background: var(--vrm-surface, #fff); box-shadow: 0 0 0 .5px var(--vrm-line, rgba(60,60,67,.18)); }
 .vrm-rc-ligne { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 6px 0; }
 .vrm-rc-ligne + .vrm-rc-ligne { border-top: .5px solid var(--vrm-line, rgba(60,60,67,.18)); }
 .vrm-rc-nom { min-width: 0; font-size: 15px; line-height: 1.3; color: var(--vrm-ink, #1D1D1F); }

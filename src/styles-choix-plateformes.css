@@ -1,4 +1,4 @@
-.vrm-choix-plateformes { padding: 20px; border: 1px solid var(--vrm-line); border-radius: 18px; background: var(--vrm-surface); color: var(--vrm-ink); margin-bottom: 18px; }
+.vrm-choix-plateformes { padding: 20px; border: 1px solid var(--vrm-line); border-radius: 20px; background: var(--vrm-surface); color: var(--vrm-ink); margin-bottom: 18px; }
 .vrm-cp-tete h2 { font-size: 19px; letter-spacing: -.4px; margin: 0 0 5px; }
 .vrm-cp-tete p,.vrm-cp-note { color: var(--vrm-muted); font-size: 13px; line-height: 1.55; margin: 0 0 16px; }
 .vrm-cp-grille { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; margin-bottom: 14px; }
