@@ -229,8 +229,8 @@
 /* ── 7. La barre : une recherche CREUSÉE, puis des ronds ───────────────────── */
 :root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar {
   padding: 4px 16px 4px !important; margin: 0 -14px !important; width: auto !important; max-width: none !important; box-sizing: border-box !important;
-  background: color-mix(in srgb, var(--sbp-aplat) 88%, transparent) !important; border: 0 !important; box-shadow: none !important; border-radius: 0 !important;
-  -webkit-backdrop-filter: blur(20px) saturate(170%) !important; backdrop-filter: blur(20px) saturate(170%) !important;
+  background: transparent !important; border: 0 !important; box-shadow: none !important; border-radius: 0 !important;
+  -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
 }
 :root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar::before, :root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar::after { display: none !important; content: none !important; }
 :root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar.vrm-annbar { display: flex !important; flex-wrap: nowrap !important; grid-template-columns: none !important; gap: 8px !important; align-items: center !important; margin: 0 !important; padding: 0 !important; width: 100% !important; }
@@ -306,8 +306,14 @@
   column-gap: 12px !important; row-gap: 4px !important; align-content: center !important; align-items: center !important;
   height: 64px !important; min-height: 64px !important; padding: 0 20px 0 16px !important; margin: 0 !important;
   background: transparent !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; overflow: visible !important;
-  content-visibility: auto; contain-intrinsic-size: auto 64px; cursor: pointer; transition: opacity 240ms ease !important;
+  cursor: pointer; transition: opacity 240ms ease !important;
   -webkit-tap-highlight-color: transparent;
+}
+/* 1 000 paires : au téléphone, une rangée hors de l'écran n'est pas dessinée (sa place, 64 px, est tenue). Sur
+   ordinateur la liste vient par paquets (« suite par paquets ») : mesuré, `content-visibility:auto` y laissait les
+   rangées VISIBLES non dessinées (Chromium 1243, coque ordinateur) — on ne le pose pas. */
+@media (max-width: 767px) {
+  :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) { content-visibility: auto; contain-intrinsic-size: auto 64px; }
 }
 :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant])::before,
 :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant])::after { display: none !important; content: none !important; }
@@ -338,6 +344,7 @@
   border-radius: 11px !important; background: var(--sbp-socle) !important; box-shadow: var(--sbp-om-pose) !important; overflow: hidden !important; position: relative !important; pointer-events: none !important;
 }
 :root:root:root:root:root body [data-espace="paires"] :is([data-sb-vue="liste"], [data-sb-vue="grille"]) > .sb-rangee a.vrm-fiche-photo > img {
+  animation: none !important;
   -webkit-mask-image: radial-gradient(78% 78% at 50% 54%, #000 58%, transparent 100%); mask-image: radial-gradient(78% 78% at 50% 54%, #000 58%, transparent 100%);
   width: 100% !important; height: 100% !important; object-fit: cover !important; border-radius: 0 !important;
 }
@@ -345,15 +352,18 @@
 :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) a.vrm-fiche-photo > :is([data-ann-a-confirmer], [data-boostee], .vrm-vignette-marque, .vrm-epingle-marque) { display: none !important; }
 /* Titre (ligne 1) et méta (ligne 2), colonne 3. */
 :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-titre] {
-  grid-column: 3 !important; grid-row: 1 !important; align-self: end !important; margin: 0 !important; padding: 0 !important; height: auto !important; max-height: none !important;
-  font: 600 15px/1.2 var(--sbp-texte) !important; letter-spacing: -.008em !important; color: var(--sbp-encre) !important;
+  grid-column: 3 !important; grid-row: 1 !important; align-self: end !important; margin: 0 !important; padding: 0 !important; height: 20px !important; min-height: 0 !important; max-height: 20px !important;
+  position: static !important; top: auto !important; transform: none !important;
+  font: 600 15px/20px var(--sbp-texte) !important; letter-spacing: -.008em !important; color: var(--sbp-encre) !important;
   white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; display: block !important; -webkit-line-clamp: unset !important;
 }
 :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-titre] * { white-space: nowrap !important; font: inherit !important; color: inherit !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-titre] :is(.vrm-titre-taille-fin, [data-titre-taille]) { display: none !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-titre] > * { display: inline !important; }
 :root:root:root:root:root body [data-espace="paires"] .sb-rangee[data-sb-alerte] [data-titre]::before { content: "" !important; display: inline-block !important; width: 6px !important; height: 6px !important; border-radius: 50% !important; background: var(--sbp-point) !important; margin: 0 6px 2px 0 !important; vertical-align: middle !important; }
 :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-etat-ligne] {
   grid-column: 3 !important; grid-row: 2 !important; align-self: start !important; margin: 0 !important; padding: 0 !important; min-width: 0 !important;
-  display: flex !important; flex-wrap: nowrap !important; overflow: hidden !important; gap: 0 !important; height: 18px !important;
+  display: flex !important; flex-wrap: nowrap !important; overflow: hidden !important; gap: 0 !important; height: 18px !important; min-height: 0 !important; max-height: 18px !important;
   font: 500 12.5px/18px var(--sbp-texte) !important; color: var(--sbp-encre2) !important; white-space: nowrap !important;
 }
 :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-stats-annonce] { display: flex !important; flex-wrap: nowrap !important; gap: 0 !important; overflow: hidden !important; min-width: 0 !important; }
@@ -386,6 +396,21 @@
 :root:root:root:root:root body [data-espace="paires"] .sb-rangee .sb-avant-place:empty { display: none !important; }
 :root:root:root:root:root body [data-espace="paires"] .sb-rangee[data-sb-choisie] { background: rgb(var(--sbp-o) / .07) !important; box-shadow: inset 3px 0 0 var(--sbp-encre) !important; }
 
+/* Ordinateur : une liste dense en colonnes — N° · photo · paire (et sa méta) · sites · prix. */
+@media (min-width: 768px) {
+  :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) { grid-template-columns: 56px 44px minmax(0, 1fr) 120px 96px !important; height: 60px !important; min-height: 60px !important; padding: 0 28px 0 22px !important; column-gap: 16px !important; }
+  :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-etat-ligne] { display: contents !important; }
+  :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-stats-annonce] { grid-column: 3 !important; grid-row: 2 !important; align-self: start !important; height: 18px !important; font: 500 12.5px/18px var(--sbp-texte) !important; color: var(--sbp-encre2) !important; }
+  :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-stats-annonce] > [data-stat="vues"] { display: inline-flex !important; }
+  :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-plateformes] { display: inline-flex !important; grid-column: 4 !important; grid-row: 1 / 3 !important; align-self: center !important; justify-self: start !important; gap: 6px !important; margin: 0 !important; opacity: .85; }
+  :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-ann-price-line { grid-column: 5 !important; }
+  :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]):hover { background: rgb(var(--sbp-o) / .04) !important; }
+  :root:root:root:root:root body [data-espace="paires"] .vrm-ann-grid.sb-liste[data-sb-vue="liste"] { margin-left: 0 !important; margin-right: 0 !important; border-radius: 28px !important; padding-bottom: 12px !important; min-height: 0; }
+  /* Le choix du compte : sur la ligne du titre, à droite (les sites sont dans la barre du haut). */
+  :root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres:has(> .vrm-compte-menu-hote) { position: absolute !important; top: 0 !important; right: 16px !important; padding: 0 !important; }
+  :root:root:root:root:root body [data-espace="paires"] .vrm-tache-tete { padding-right: 260px !important; height: 52px !important; }
+}
+
 /* ── 10. LA PAIRE AU PREMIER PLAN (téléphone) : la rangée devient une carte, à sa place ── */
 :root:root:root:root:root body [data-espace="paires"] [data-sb-recul] > :is(.sb-rangee:not([data-sb-avant]), .vrm-ann-compte-tete) { opacity: .4 !important; }
 :root:root:root:root:root body [data-espace="paires"] .vrm-ann-grid.sb-liste > .sb-rangee[data-sb-avant] {
@@ -394,6 +419,7 @@
   border: 0 !important; border-radius: 22px !important; position: relative !important; z-index: 3 !important; overflow: visible !important;
   background: linear-gradient(180deg, var(--sbp-feuille), var(--sbp-feuille2)) !important; box-shadow: var(--sbp-om-haut) !important;
   content-visibility: visible !important; contain-intrinsic-size: none !important; cursor: default;
+  scroll-margin: 96px 0 calc(var(--vrm-barre-bas, 84px) + 20px) !important;
   animation: sbp-monte var(--sbp-e-avant) both;
 }
 @keyframes sbp-monte { from { transform: translateY(8px) scale(.985); opacity: .6; } to { transform: none; opacity: 1; } }
@@ -491,6 +517,24 @@
 :root:root:root:root:root body .vrm-fp .vrm-fp-depuis-ligne :is(.vrm-fiche-geste, .vrm-ao-second):active { background: var(--sbp-creux) !important; box-shadow: var(--sbp-k-in) !important; transform: translateY(1px); }
 /* Ce que la ligne d'une annonce range dans la fiche : ses cases (état, prix d'achat, accepter, refuser, boost, marge). */
 :root:root:root:root:root body .vrm-fp .vrm-fp-depuis-ligne :is([data-fiche-duo], [data-chiffres]) .vrm-fiche-cell { background: var(--sbp-creux) !important; border: 0 !important; box-shadow: var(--sbp-puits-sh) !important; border-radius: 14px !important; }
+
+/* La carte héros de la fiche, comme la paire au premier plan : photo posée 75 × 105 à gauche, plaque, titre, prix fin. */
+:root:root:root:root:root body .vrm-fp .vrm-fp-heros.a-photo {
+  display: grid !important; grid-template-columns: 75px minmax(0, 1fr) !important; column-gap: 14px !important; align-items: start !important; flex-direction: unset !important; margin: 4px 0 18px !important;
+}
+:root:root:root:root:root body .vrm-fp .vrm-fp-heros.a-photo .vrm-fp-heros-photo { width: 75px !important; height: 105px !important; aspect-ratio: auto !important; max-height: none !important; margin: 0 !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-heros-photo img { -webkit-mask-image: radial-gradient(78% 78% at 50% 54%, #000 58%, transparent 100%); mask-image: radial-gradient(78% 78% at 50% 54%, #000 58%, transparent 100%); animation: none !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-heros .vrm-fp-quoi { display: flex !important; flex-direction: column !important; align-items: flex-start !important; gap: 8px !important; min-width: 0 !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-heros-ctx { font: 550 12.5px/1.2 var(--sbp-texte) !important; color: var(--sbp-encre2) !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-heros .vrm-fp-titre { -webkit-line-clamp: 3 !important; }
+/* Les cases que la ligne d'une annonce range dans la fiche : état · prix d'achat, puis accepter · refuser · boost · marge. */
+:root:root:root:root:root body .vrm-fp .vrm-fp-depuis-ligne [data-fiche-duo] { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; margin: 0 0 8px !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-depuis-ligne [data-chiffres] { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 8px !important; margin: 0 0 8px !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-depuis-ligne :is([data-fiche-duo], [data-chiffres]) .vrm-fiche-cell { min-height: 56px !important; height: auto !important; padding: 8px 10px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; gap: 4px !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-depuis-ligne :is([data-fiche-duo], [data-chiffres]) .vrm-fiche-cell > span:first-child { font: 550 11.5px/1.2 var(--sbp-texte) !important; color: var(--sbp-encre2) !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-depuis-ligne :is([data-fiche-duo], [data-chiffres]) .vrm-fiche-cell :is(button, [data-marge]) { font: 300 20px/1.1 var(--sbp-affiche) !important; color: var(--sbp-encre) !important; min-height: 44px !important; text-align: left !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-depuis-ligne :is([data-fiche-duo], [data-chiffres]) .vrm-fiche-cell :is(button, [data-marge]) * { font: inherit !important; color: inherit !important; }
+@media (max-width: 420px) { :root:root:root:root:root body .vrm-fp .vrm-fp-depuis-ligne [data-chiffres] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
 
 /* Ordinateur : la fiche ouverte depuis une annonce (ou le Stock) se pose en PLAN À DROITE ; la liste reste là. */
 @media (min-width: 768px) {

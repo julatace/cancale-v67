@@ -37992,7 +37992,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       </div>
       <div className="sb-avant-gestes" data-sb-avant-gestes="">
         <button type="button" className="sb-touche" data-sb-avant-baisser={String(it.id)} onClick={baisser}><Icon name="tag" size={16}/>{tr('studio.paires.baisser')}</button>
-        <button type="button" className="sb-touche" data-sb-avant-republier={String(it.id)} onClick={republier}><Icon name="sync" size={16}/>{tr('annonces.republier')}</button>
+        <button type="button" className="sb-touche" data-sb-avant-republier={String(it.id)} onClick={republier}><Icon name="sync" size={16}/>{tr('annonces.republier2')}</button>
         <button type="button" className="sb-rond" data-sb-avant-plus="" aria-label={tr('studio.paires.plus')} onClick={() => { if (!ouvrirFicheDe(cle)) toast(tr('studio.paires.ficheIntrouvable')); }}><Icon name="more" size={21}/></button>
       </div>
     </>);
