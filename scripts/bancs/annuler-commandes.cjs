@@ -70,6 +70,12 @@ function fabriquer() {
       { id: `harvest_${sc.UID[1]}_orders_purchased`, data: { capturedAt: iso(NOW - 60e3), payload: { my_orders: [] } } },
       { id: `harvest_${UID}_listings`, data: { capturedAt: iso(NOW - 600e3), payload: { items: [{ id: Number(ITEM88), title: FICHES[ITEM88].title, price: { amount: '75.0', currency_code: 'EUR' }, is_closed: false, is_hidden: false, is_draft: false }], pagination: { total_entries: 1 } } } },
       sc.bordereau({ tx: TX_A }), sc.bordereau({ tx: TX_B }),
+      // (14 nov., bancs au vert) Un vendeur installé a la boîte et le dressing de CHAQUE compte lus par l'extension.
+      // Sans eux, l'écran d'arrivée (Achats, Ventes) relisait ces comptes par le relais du serveur (POST
+      // /api/vinted-proxy : inbox, users/current) — une lecture de l'écran, que K2 prenait pour un envoi du geste.
+      { id: `harvest_${UID}_inbox`, data: { capturedAt: iso(NOW - 60e3), payload: { conversations: [], pagination: { total_entries: 0 } } } },
+      { id: `harvest_${sc.UID[1]}_inbox`, data: { capturedAt: iso(NOW - 60e3), payload: { conversations: [], pagination: { total_entries: 0 } } } },
+      { id: `harvest_${sc.UID[1]}_listings`, data: { capturedAt: iso(NOW - 600e3), payload: { items: [], pagination: { total_entries: 0 } } } },
     ],
   });
 }
@@ -246,14 +252,18 @@ const revCond = (e) => { const m = /data->>rev=eq\.(\d+)/.exec(e.url); return m 
       dit(lecturesPdf() === av.pdf, 'E1 aucun PDF lu à l’ouverture', `${av.pdf} → ${lecturesPdf()}`);
       await sansEffet('E1 (ouverture)', av);
       const n0 = base.ecritures.length;
-      await pg.locator('[data-lot-imprimer]').first().click();
-      const c = await H.attendre(() => confirmation(pg), 6000);
-      dit(c, 'E1 « Imprimer » (geste extérieur) ⇒ la confirmation reste', await pg.evaluate(() => (document.querySelector('.vrm-confirmation') || { innerText: '' }).innerText.slice(0, 80)));
-      await pg.screenshot({ path: path.join(CAPT, `E1-confirmation-${nom}.png`) });
-      await pg.locator('.vrm-confirmation button', { hasText: /^Annuler$/ }).first().click().catch(async () => { await pg.keyboard.press('Escape'); });
+      // (14 nov., bancs au vert) Depuis le 11 nov. (lot DJ3, décision de Julien : « plus de confirmation N sur M
+      // contrôlés à chaque impression »), la feuille « Tout imprimer » EST la confirmation du geste extérieur :
+      // son bouton « Imprimer » est le clic de Julien, qui imprime (le banc ne le touche plus : ses PDF sont
+      // factices). Ce qui reste exigé : rien lu ni écrit à l'ouverture (plus haut), et la feuille FERMÉE sans
+      // « Imprimer » ⇒ aucun PDF lu, aucun bordereau marqué imprimé.
+      dit((await pg.locator('[data-lot-imprimer]').count()) > 0 && (await pg.evaluate(() => (document.querySelector('.vrm-lot') || { getAttribute: () => null }).getAttribute('data-lot-etape'))) === 'choix', 'E1 la feuille attend SON clic (« Imprimer », étape « choix »)');
+      await pg.locator('.vrm-lot [data-feuille-croix]').first().click().catch(async () => { await pg.keyboard.press('Escape'); });
+      await H.attendre(async () => (await pg.locator('.vrm-lot').count()) === 0, 6000);
       await pg.waitForTimeout(1200);
-      dit(!(await confirmation(pg)) && lecturesPdf() === av.pdf && egal(dataMain(base).vinted_bords_printed, MAIN0.vinted_bords_printed), 'E1 « Annuler » ⇒ aucun PDF lu, rien d’imprimé', `pdf ${lecturesPdf() - av.pdf} · imprimés ${JSON.stringify(dataMain(base).vinted_bords_printed)} · écritures +${base.ecritures.length - n0}`);
-      await pg.keyboard.press('Escape').catch(() => {});
+      dit((await pg.locator('.vrm-lot').count()) === 0 && lecturesPdf() === av.pdf && egal(dataMain(base).vinted_bords_printed, MAIN0.vinted_bords_printed), 'E1 fermer la feuille sans « Imprimer » ⇒ aucun PDF lu, rien d’imprimé', `pdf ${lecturesPdf() - av.pdf} · imprimés ${JSON.stringify(dataMain(base).vinted_bords_printed)} · écritures +${base.ecritures.length - n0}`);
+      // (Plus d'« Échap » ici : la feuille est déjà fermée, et Échap sur l'écran fait un retour en arrière dans
+      // l'historique qui ANNULAIT la navigation suivante — net::ERR_ABORTED.)
       await pg.goto(srv.url + '/?tab=journee', { waitUntil: 'domcontentloaded' }); await pg.waitForTimeout(2000);
     });
 
@@ -285,7 +295,9 @@ const revCond = (e) => { const m = /data->>rev=eq\.(\d+)/.exec(e.url); return m 
       const v = await H.attendre(async () => pg.evaluate(() => { const c = document.querySelector('[data-export-comptable]'); if (!c) return false; const r = c.getBoundingClientRect(); return r.height > 0 && r.top < window.innerHeight && r.bottom > 0; }), 12000);
       const etat = await pg.evaluate(() => (document.querySelector('[data-export-comptable]') || { getAttribute: () => null }).getAttribute('data-export-comptable'));
       dit(v && etat === 'ferme', 'K5 ⇒ Compta, la carte « Exporter pour mon comptable » montrée, PAS préparée', `visible ${v} · ${etat}`);
-      if (!tel) dit(await pg.evaluate(() => !!(document.activeElement && document.activeElement.hasAttribute('data-export-preparer'))), 'K5 (clavier) « Préparer » a le focus');
+      // (14 nov.) Le focus se pose quand la carte a une boîte à l'écran (l'app revérifie toutes les 60 ms) : le banc
+      // l'attend (borné), il ne le lit plus à l'instant même où la carte devient visible (rouge une fois sur deux en série).
+      if (!tel) dit(await H.attendre(() => pg.evaluate(() => !!(document.activeElement && document.activeElement.hasAttribute('data-export-preparer'))), 3000), 'K5 (clavier) « Préparer » a le focus');
       await pg.screenshot({ path: path.join(CAPT, `K5-export-${nom}.png`) });
       await sansEffet('K5', av);
     });

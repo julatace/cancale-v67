@@ -138,6 +138,10 @@ const carte = (pg, page) => pg.evaluate((page) => {
     zeroMenteur: [...c.querySelectorAll('[data-carte-valeur=""]')].some((x) => /(^|\s)0(,00)?\s?€?$/.test((x.querySelector('b') || x).innerText.trim())),
   };
 }, page);
+// (14 nov., bancs au vert) La hauteur d'un geste suit le POINTEUR (design système du 13 nov.,
+// docs/design/DESIGN.md « 44 au doigt, 36 à la souris ») : 44 au téléphone/iPad, 36 à la souris
+// sur un écran d'ordinateur. Le banc pose SA règle (il ne relit pas la variable de l'app).
+const GESTE_MIN = (pg) => pg.evaluate(() => (matchMedia('(hover: hover) and (pointer: fine) and (min-width: 768px)').matches ? 36 : 44));
 const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
 
 (async () => {
@@ -189,14 +193,15 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         await pg.locator('[data-carte-modifier="ventes"]').first().click();
         const f = pg.locator('[data-carte-feuille="ventes"]');
         await f.waitFor({ timeout: 8000 });
-        const fe = await pg.evaluate(() => {
+        const gmin = await GESTE_MIN(pg);
+        const fe = await pg.evaluate((gmin) => {
           const d = document.querySelector('[data-carte-feuille]');
           const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
-          return { portail: !!d && (d.closest('[data-feuille-cadre]') || d).parentElement === document.body, petits: [...d.querySelectorAll('button')].filter(vis).filter((x) => x.getBoundingClientRect().height < 43.5).map((x) => x.innerText.trim().slice(0, 20)),
+          return { portail: !!d && (d.closest('[data-feuille-cadre]') || d).parentElement === document.body, petits: [...d.querySelectorAll('button')].filter(vis).filter((x) => x.getBoundingClientRect().height < gmin - 0.5).map((x) => x.innerText.trim().slice(0, 20)),
             choix: [...d.querySelectorAll('[data-carte-choix]')].map((x) => x.getAttribute('data-carte-choix')) };
-        });
+        }, gmin);
         dit(fe.portail, 'la feuille passe par un portail (document.body)');
-        dit(!fe.petits.length, 'tous les gestes de la feuille font 44 px', fe.petits.join(' | '));
+        dit(!fe.petits.length, `tous les gestes de la feuille font ${gmin} px (${gmin === 44 ? 'au doigt' : 'à la souris'})`, fe.petits.join(' | '));
         dit(fe.choix.includes('vendu') && fe.choix.includes('enroute') && !fe.choix.includes('benefice') && !fe.choix.includes('urssaf'), 'Vinted seul : le bénéfice et l’URSSAF ne sont pas proposés (pas de sens par site)', fe.choix.join(','));
         if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `feuille-ventes-${nom}.png`) });
         await pg.locator('[data-carte-place="0"]').click();
@@ -229,7 +234,8 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         dit(await cal.count() === 1, 'la période du grand chiffre se choisit par UN bouton « calendrier » (plus de rangée qui défile)');
         dit(await pg.locator('[data-carte-feuille] .vrm-carte-periodes').count() === 0, 'plus de rangée de pilules de période pour ce chiffre');
         const h = await cal.evaluate((e) => e.getBoundingClientRect().height).catch(() => 0);
-        dit(h >= 43.5, 'le bouton de période fait 44 px', String(h));
+        const gmin2 = await GESTE_MIN(pg);
+        dit(h >= gmin2 - 0.5, `le bouton de période fait ${gmin2} px (${gmin2 === 44 ? 'au doigt' : 'à la souris'})`, String(h));
         await cal.click();
         const raccourcis = await pg.evaluate(() => [...document.querySelectorAll('[data-periode-raccourci]')].map((b) => b.getAttribute('data-periode-raccourci')).join(','));
         dit(raccourcis === 'jour,semaine,mois,dernier,trimestre,annee', 'raccourcis : Aujourd’hui · Cette semaine · Ce mois · Mois dernier · Ce trimestre · Cette année', raccourcis);
@@ -271,10 +277,22 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         } else dit(nVentes <= 1, 'Colis dans Ventes (« À expédier ») : au plus une carte, jamais deux empilées', `colis=${nColis} ventes=${nVentes}`);
         await aller(pg, 'journee', '[data-carte-stats="journee"]');
         const j = await carte(pg, 'journee');
-        dit(j && j.grand && j.grand.id === 'vendu' && j.grand.p === 'jour' && j.grand.v === '11000', 'Ma journée : vendu aujourd’hui en grand, tous les sites (70 € Vinted + 40 € Leboncoin)', JSON.stringify(j && j.grand));
+        // (9 nov., Ma journée v2) Le grand chiffre par défaut de la carte (« vendu · aujourd'hui ») EST le
+        // chiffre du jour de la frise des sept jours (`[data-jv2-argent]`) : la carte ne le redit pas (§7, le
+        // même nombre jamais deux fois). Le banc lit donc le vendu du jour LÀ où il est écrit, et exige que la
+        // carte n'ait pas de second grand chiffre ni de case « vendu · jour ».
+        const fr = await pg.evaluate(() => { const a = document.querySelector('[data-jv2-argent]'); const g = a && a.querySelector('[data-jv2-vendu]');
+          return a ? { jour: a.getAttribute('data-fu-vendu-jour'), vendu: g ? g.getAttribute('data-jv2-vendu') : null, periode: a.getAttribute('data-jv2-periode') } : null; });
+        const grandJ = j && j.grand ? { id: j.grand.id, p: j.grand.p, v: j.grand.v } : (j && fr ? { id: 'vendu', p: 'jour', v: fr.jour, frise: fr.vendu } : null);
+        dit(!!grandJ && grandJ.id === 'vendu' && grandJ.p === 'jour' && grandJ.v === '11000' && (!fr || fr.vendu === '11000'), 'Ma journée : vendu aujourd’hui en grand, tous les sites (70 € Vinted + 40 € Leboncoin)', JSON.stringify({ carte: j && j.grand, frise: fr }));
+        dit(!!j && !(j.grand && fr) && !j.cases.some((x) => x.id === 'vendu' && x.p === 'jour'), 'Ma journée : le vendu du jour écrit UNE fois (la frise ou la carte, jamais les deux)', JSON.stringify({ grand: j && j.grand, cases: j && j.cases.map((x) => x.id + '/' + x.p) }));
         dit(await pg.locator('[data-carte-stats="journee"] [data-journee-benef][data-benef-notion="benefice"]').count() === 1, 'Ma journée : la case bénéfice porte la règle unique (`chiffreBenefice`)');
         await shot('.vrm-fu-tete', 'carte-journee');
-        await aller(pg, 'compta', '[data-carte-stats="compta"]');
+        // (10 nov., Argent) La carte de Compta vit dans le repli « Ton bénéfice » du Résumé (replié par
+        // défaut, rendu quand même) : le banc fait le geste de Julien — l'ouvrir — puis la lit VISIBLE.
+        await aller(pg, 'compta', '[data-compta-repli="compta-benefice"] > summary');
+        await pg.locator('[data-compta-repli="compta-benefice"] > summary').first().click();
+        await pg.locator('[data-carte-stats="compta"]').first().waitFor({ timeout: 15000 });
         const k = await carte(pg, 'compta');
         dit(k && k.grand && k.grand.id === 'benefice' && k.cases.map((x) => x.id).join() === 'declarer,urssaf,finalisees', 'Compta : bénéfice en grand, à déclarer · URSSAF · finalisées', JSON.stringify(k && { g: k.grand, c: k.cases.map((x) => x.id) }));
         dit(await pg.locator('[data-carte-stats="compta"] [data-compta-chiffre="gagne"]').count() === 1, 'Compta : le grand chiffre garde `data-compta-chiffre="gagne"`');
@@ -289,8 +307,9 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         dit(!!h && h.grand.id === 'depense' && h.cases.map((c) => c.id).join(',') === 'enroute,retirer,recus', 'Achats : dépensé en grand, en route · à retirer · reçus', JSON.stringify(h && { g: h.grand, c: h.cases.map((c) => c.id) }));
         dit(!!h && !/vendu/i.test(JSON.stringify(h.cases.map((c) => c.t))), 'Achats : aucune case « Vendu »');
         await shot('[data-carte-stats="achats"]', 'carte-achats');
-        // (3 nov.) Rien de rogné dans une case, jamais « ≥ » sur un chiffre de case.
-        const rog = await pg.evaluate(() => [...document.querySelectorAll('.vrm-fu-case:not(.is-jour)')].flatMap((c) => [...c.querySelectorAll('b, :scope > span')].filter((e) => e.scrollWidth > e.clientWidth + 1 || /≥/.test(e.textContent)).map((e) => e.textContent)));
+        // (3 nov.) Rien de rogné dans une case, jamais « ≥ » sur un chiffre de case. (14 nov.) Sauf le texte du
+        // lecteur d'écran (`.vrm-sr-seul`, lot P du 10 nov.) : il est rogné à 1 px EXPRÈS, personne ne le voit.
+        const rog = await pg.evaluate(() => [...document.querySelectorAll('.vrm-fu-case:not(.is-jour)')].flatMap((c) => [...c.querySelectorAll('b, :scope > span')].filter((e) => !e.matches('.vrm-sr-seul')).filter((e) => e.scrollWidth > e.clientWidth + 1 || /≥/.test(e.textContent)).map((e) => e.textContent)));
         dit(!rog.length, 'cases : aucun libellé ni chiffre rogné, aucun « ≥ »', rog.join(' | '));
         const d = await deborde(pg);
         dit(d <= 1, 'aucun débordement horizontal', `${d}px`);

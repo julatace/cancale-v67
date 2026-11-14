@@ -167,6 +167,10 @@ const attendus=aEnvoyer.filter(o=>parTx[String(o.transaction_id)]).length;
     if(/\/rest\/v1\/vinted_accounts/.test(u)) return j(accounts);
     if(/id=eq\.main/.test(u)) return j(main.filter(passe).map(r=>projette(r,S)));
     if(/transaction->>id/.test(u)) return j(txn);
+    // (14 nov., bancs au vert) `id=in.(…)` servi comme PostgREST : ventes, achats et dressings se lisent par famille
+    // depuis le 8 nov. (src/lectureGroupee.js) — rendu vide, Ventes (où vit « À expédier ») attendait sans fin.
+    const inn=/[?&]id=in\.\(([^)]*)\)/.exec(decodeURIComponent(u)); if(inn){const ids=inn[1].split(',').map(x=>x.replace(/^"|"$/g,''));
+      const tous=[...main,...rows]; return j(tous.filter(r=>ids.includes(r.id)).filter(passe).map(r=>projette(r,S)));}
     const eq=/id=eq\.([^&]*)/.exec(u); if(eq){const k=decodeURIComponent(eq[1]);return j(rows.filter(r=>r.id===k).filter(passe).map(r=>projette(r,S)));}
     const m=/id=like\.([^&]*)/.exec(u); if(m){const pat=decodeURIComponent(m[1]).replace(/[*%]/g,'.*');const re=new RegExp('^'+pat+'$');
       return j(rows.filter(r=>re.test(r.id)).filter(passe).map(r=>projette(r,S)));}
@@ -186,7 +190,10 @@ const attendus=aEnvoyer.filter(o=>parTx[String(o.transaction_id)]).length;
   //    publication n'arrive jamais, on lit quand même et les contrôles qui en
   //    dépendent tombent en rouge — l'attente ne peut rien rendre vert.
   const attendPublie = async (p, ms) => {
-    try { await p.waitForFunction(() => { try { return !!localStorage.getItem('vrm_colis_prets'); } catch (_) { return false; } },
+    // (14 nov., bancs au vert) ET l'écran ouvert : depuis le 6 nov. l'écran attend ses données derrière
+    // `AttenteEcran` (squelette, `data-attente="attente"`), et depuis le 11 nov. Colis vit dans Ventes. La
+    // publication pouvait être là (2,7 s) avant que l'écran ne soit rendu : le banc lisait le squelette.
+    try { await p.waitForFunction(() => { try { const e = document.querySelector('[data-attente-ecran]'); return !!localStorage.getItem('vrm_colis_prets') && !!e && e.getAttribute('data-attente') !== 'attente'; } catch (_) { return false; } },
       null, { timeout: ms, polling: 200 }); await p.waitForTimeout(400); return true; }
     catch (_) { console.log(`    (Colis n'a rien publié en ${ms/1000} s — lecture faite quand même)`); return false; }
   };
@@ -211,8 +218,10 @@ const attendus=aEnvoyer.filter(o=>parTx[String(o.transaction_id)]).length;
   await attendPublie(pg, 30000);
   await pg.screenshot({path:SC+'/z-colis.png',fullPage:true});
   const v=await pg.evaluate(()=>({txt:document.body.innerText||'',
+    frais:[...document.querySelectorAll('[data-colis-bordereau-frais]')].map(e=>(e.innerText||'').replace(/\s*\n\s*/g,' ').trim()).join(' | '),
     imprimer:[...document.querySelectorAll('button')].filter(x=>/Imprimer/i.test(x.textContent)).length}));
-  const mPret=/(\d+) bordereaux? prêts? à imprimer/.exec(v.txt);
+  // (6 nov., audit des chiffres) « N à imprimer » = pas encore imprimés : « prêts » n'est plus écrit (même lecture que `lit` plus bas).
+  const mPret=/(\d+) bordereaux? (?:pr[êe]ts? )?à imprimer/.exec(v.txt);
   const mAtt=/(\d+) en attente de bordereau/.exec(v.txt);
   console.log('    en-tête : '+(v.txt.split('\n').find(l=>/bordereau/i.test(l))||'(rien)'));
   dit(mPret && +mPret[1]>0, 'l\'écran voit les bordereaux déjà en base',
@@ -253,7 +262,8 @@ const attendus=aEnvoyer.filter(o=>parTx[String(o.transaction_id)]).length;
   // C'est la donnée qui déclenche : deux lignes `label_latest` fraîches, une
   // seule avec son PDF.
   {
-    const ligne = v.txt.split('\n').map(x=>x.trim()).find(l=>/Bordereau téléchargé il y a/i.test(l)) || '';
+    // (14 nov.) Le bandeau entier (`data-colis-bordereau-frais`) : la phrase et le compte sont sur deux lignes depuis le 5 nov.
+    const ligne = (v.frais || v.txt.split('\n').map(x=>x.trim()).find(l=>/Bordereau téléchargé il y a/i.test(l)) || '');
     console.log(`    bandeau frais : ${ligne||'(aucun)'}`);
     // Sans deux comptes liés porteurs d'une ligne `label_latest`, la situation
     // ne peut pas être préparée : on le DIT en rouge, on ne passe pas en silence.

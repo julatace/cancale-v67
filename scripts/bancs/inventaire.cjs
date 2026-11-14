@@ -139,16 +139,25 @@ async function rendre(b, { tel, sombre, tab, base, vide = false, vib = false }) 
       { id: 1, vinted_user_id: '111', login: 'compte_banc', domain: 'www.vinted.fr', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
       { id: 2, vinted_user_id: '222', login: 'compte_pas_lu', domain: 'www.vinted.fr', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
     ]);
-    // Le compte 222 : sa lecture RATE (pas su).
-    if (/harvest_222_/.test(u)) return j({ message: 'panne' }, 500);
+    // Le compte 222 : sa lecture RATE (pas su) — sa ligne n'a jamais été captée, et la lire SEULE répond 500.
+    // (14 nov., bancs au vert) Depuis le 8 nov., les dressings se lisent par FAMILLE (`id=in.(…)`, src/lectureGroupee.js,
+    // `lireDressings`) : PostgREST rend les lignes qui existent, il ne fait pas échouer UNE ligne d'un lot. L'ancien
+    // 500 sur toute adresse qui nommait 222 faisait rater le lot ENTIER — compte_banc devenait « lecture ratée » lui
+    // aussi, et tout l'inventaire « pas su » (une fiction). Le lot est servi comme PostgREST ; 222 reste pas lu.
+    if (/harvest_222_/.test(u) && !/[?&]id=in\./.test(u)) return j({ message: 'panne' }, 500);
     const forme = (r) => (sel && !/^id,data$|^data$/.test(sel) ? projette(r, sel) : { ...r, updated_at: new Date(AUJ).toISOString() });
+    const inn = /[?&]id=in\.\(([^)]*)\)/.exec(u);
+    if (inn) { const ids = inn[1].split(',').map((x) => x.replace(/^"|"$/g, '')); return j(ROWS().filter((r) => ids.includes(r.id)).map(forme)); }
     const eq = /id=eq\.([^&]*)/.exec(u);
     if (eq) return j(ROWS().filter((r) => r.id === eq[1]).map(forme));
     const lk = /id=like\.([^&]*)/.exec(u);
     if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(ROWS().filter((r) => re.test(r.id)).map(forme)); }
     return j([]);
   });
-  await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+  // (14 nov., bancs au vert) L'abonnement servi comme la route réelle (`{ ok: true, acces: true, … }`) : sans lui l'appareil
+  // ne connaît pas l'état de l'abonnement de ce compte, et la porte hors ligne (src/porteHorsLigne.js) refuse — H « rechargé
+  // SANS réseau » ne pouvait pas se jouer.
+  await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: /mode=abonnement/.test(r.request().url()) ? JSON.stringify({ ok: true, actif: true, acces: true, statut: 'active', configure: false, obligatoire: false }) : '{"pret":true}' }));
   // (9 nov.) La vibration relevée (le banc n'a pas de moteur) : la forme de chaque appel.
   if (vib) await pg.addInitScript(() => { try { Object.defineProperty(Navigator.prototype, 'vibrate', { configurable: true, value: function (p) { (window.__vib = window.__vib || []).push(p); return true; } }); } catch (_) {} });
   await pg.addInitScript(({ m, sombre, vide }) => {
@@ -393,8 +402,8 @@ async function ouvrirInventaire(pg, tel) {
         // H — le réseau coupe PENDANT le tour.
         bh.horsLigne = true; await ctx.setOffline(true);
         await pg.waitForSelector('[data-inventaire-hl] [data-inv-vue="saisie"]', { timeout: 20000 }).catch(() => {});
-        const hl = await pg.evaluate(() => { const el = document.querySelector('[data-inventaire-hl]'); const v = el && el.querySelector('[data-inv-vue="saisie"]'); const h = el && el.querySelector('[data-inv-hors-ligne]'); return { feuille: !!el, n: v ? v.getAttribute('data-inv-n') : null, tete: h ? h.innerText : '', vue: (document.querySelector('[data-hors-ligne]') || { getAttribute: () => '' }).getAttribute('data-hors-ligne') }; });
-        dit(hl.feuille && hl.n === '2' && /^Hors connexion · liste des paires du \d{1,2} \S+ à \d{2}:\d{2}\./.test(hl.tete) && hl.vue === 'stock', `${t} : H — réseau coupé pendant le tour : la feuille revient hors connexion, au même point (2 N° vus), l'heure de la liste DITE`, JSON.stringify(hl));
+        const hl = await pg.evaluate(() => { const el = document.querySelector('[data-inventaire-hl]'); const v = el && el.querySelector('[data-inv-vue="saisie"]'); const h = el && el.querySelector('[data-inv-hors-ligne]'); return { feuille: !!el, n: v ? v.getAttribute('data-inv-n') : null, tete: h ? h.innerText : '', vue: (document.querySelector('[data-hors-ligne]') || { getAttribute: () => '' }).getAttribute('data-hors-ligne') || (document.querySelector('[data-stock-hl-etat]') ? 'stock' : '') }; });
+        dit(hl.feuille && hl.n === '2' && /^Hors connexion · liste des (paires|articles) du \d{1,2} \S+ à \d{2}:\d{2}\./.test(hl.tete) && hl.vue === 'stock', `${t} : H — réseau coupé pendant le tour : la feuille revient hors connexion, au même point (2 N° vus), l'heure de la liste DITE`, JSON.stringify(hl));
         await shot(pg, nomShot('hors-ligne'));
         for (const [n, attendu] of [['60', 'trop'], ['125', 'passu'], ['40', 'attendu']]) {
           await taper(pg, tel, n);
@@ -409,9 +418,13 @@ async function ouvrirInventaire(pg, tel) {
         const sw = await pg.evaluate(() => !!(navigator.serviceWorker && navigator.serviceWorker.controller));
         if (sw) {
           await pg.goto(`http://localhost:${PORT}/?tab=garage`, { waitUntil: 'domcontentloaded' }).catch(() => {});
-          await pg.waitForSelector('[data-hl-inventaire-ouvrir]', { timeout: 20000 }).catch(() => {});
+          // (13 nov., lot 45) Le Stock se dessine hors réseau avec son dernier état et porte SON « Faire l'inventaire »
+          // (`data-stock-inventaire-ouvrir`) ; le bloc de la coque (`data-hl-inventaire-ouvrir`) ne sert plus qu'à un
+          // appareil où le Stock n'a jamais été gardé. Un seul des deux est rendu : le banc touche celui qui est là.
+          const ouvrirHl = '[data-hl-inventaire-ouvrir], [data-stock-inventaire-ouvrir]';
+          await pg.waitForSelector(ouvrirHl, { timeout: 20000 }).catch(() => {});
           await shot(pg, nomShot('recharge-hors-ligne'));
-          await cliquer(pg, tel, '[data-hl-inventaire-ouvrir]', 10000).catch(() => {});
+          await cliquer(pg, tel, ouvrirHl, 10000).catch(() => {});
           await pg.waitForSelector('[data-inventaire-hl] [data-inv-vue="saisie"]', { timeout: 15000 }).catch(() => {});
           const n5 = await pg.getAttribute('[data-inventaire-hl] [data-inv-vue="saisie"]', 'data-inv-n').catch(() => null);
           dit(n5 === '5', `${t} : H — rechargé SANS réseau : Stock → « Faire l'inventaire » reprend au même point (5 N° vus)`, String(n5));
@@ -460,7 +473,7 @@ async function ouvrirInventaire(pg, tel) {
         if (prec[0]) await cliquer(pg, tel, `[data-inv-revoir="${prec[0].id}"]`);
         await pg.waitForSelector('[data-inv-vue="revoir"]', { timeout: 8000 }).catch(() => {});
         const rv = await pg.evaluate(() => { const el = document.querySelector('[data-inv-vue="revoir"]'); if (!el) return null; const l = (s) => [...el.querySelectorAll(`[data-inv-constat-section="${s}"] [data-inv-constat-n]`)].map((x) => x.getAttribute('data-inv-constat-n')); return { manque: l('manque'), trop: l('trop'), doublons: l('doublons'), passu: l('passu'), texte: el.innerText.replace(/\s+/g, ' ') }; });
-        dit(rv && rv.manque.join(',') === '1,B125' && rv.trop.join(',') === '60' && rv.doublons.join(',') === '2' && rv.passu.join(',') === '125' && /fait hors connexion, avec la liste des paires du/.test(rv.texte), `${t} : I — « Revoir » : le constat TEL QU'IL ÉTAIT (à chercher 1, B125 · à vérifier 60 · doublon 2), fait hors connexion`, JSON.stringify(rv && { ...rv, texte: rv.texte.slice(0, 120) }));
+        dit(rv && rv.manque.join(',') === '1,B125' && rv.trop.join(',') === '60' && rv.doublons.join(',') === '2' && rv.passu.join(',') === '125' && /fait hors connexion, avec la liste des (paires|articles) du/.test(rv.texte), `${t} : I — « Revoir » : le constat TEL QU'IL ÉTAIT (à chercher 1, B125 · à vérifier 60 · doublon 2), fait hors connexion`, JSON.stringify(rv && { ...rv, texte: rv.texte.slice(0, 120) }));
         const fautesI = await horsJetons(pg);
         dit(fautesI.length === 0, `${t} : I — aucune teinte hors des jetons dans le constat`, fautesI.slice(0, 4).join(' | '));
         await shot(pg, nomShot('constat'));
