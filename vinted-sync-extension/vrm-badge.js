@@ -284,9 +284,29 @@
   .btn, .b, .fermer, .fav-ligne, .ap-retour, .ap-aide-b, .lien-site { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
   /* 5.351 : le logo se glisse au doigt aussi (sans faire défiler la page). */
   .btn { touch-action: none; }
+  /* 5.377 : « VRM a capté » — une bulle de verre près du logo, neutre (le lien seul est bleu, §7). */
+  .capte { position: absolute; width: max-content; max-width: min(320px, calc(100vw - 72px)); min-width: 200px; padding: 9px 36px 0 14px; border-radius: 14px;
+    background: var(--verre); color: var(--texte); border: 1px solid var(--bord); box-shadow: var(--ombre); font-size: 13px; line-height: 1.35;
+    -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); cursor: default; -webkit-tap-highlight-color: transparent; }
+  .capte[hidden] { display: none; }
+  .capte.on { animation: vrm-entree .18s cubic-bezier(.23,1,.32,1); }
+  .capte-t { font-size: 12px; color: var(--doux); font-weight: 500; overflow-wrap: anywhere; }
+  .capte-nom { color: var(--texte); font-weight: 600; }
+  .capte-l .seg { white-space: nowrap; }
+  .capte-r { display: flex; align-items: center; gap: 12px; min-height: 44px; }
+  .capte-l { flex: 1; min-width: 0; padding: 4px 0 8px; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .capte-voir { flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin-right: -22px; padding: 0 8px; color: var(--accent); font-size: 14px; font-weight: 600; text-decoration: none; }
+  .capte-voir i { width: 7px; height: 7px; border-right: 1.5px solid currentColor; border-top: 1.5px solid currentColor; transform: rotate(45deg); }
+  .capte-voir:active { opacity: .55; }
+  .capte-voir:focus-visible, .capte-x:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+  .capte-x { position: absolute; top: 0; right: 0; width: 44px; height: 44px; border: 0; border-radius: 12px; background: transparent; color: var(--doux); font-size: 18px; line-height: 44px; padding: 0; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  .capte-x:hover { background: var(--survol); color: var(--texte); }
+  @media (prefers-reduced-motion: reduce) { .capte.on { animation: none; } }
+  @media (prefers-reduced-transparency: reduce) { .capte { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--carte); } }
 </style>
 <div class="carte" part="carte"><div class="contenu"></div><div class="connexion" hidden></div></div>
 <div class="question" role="dialog" aria-label="Confirmer le compte Vinted"></div>
+<div class="capte" role="status" aria-live="polite" data-capte hidden></div>
 <button class="btn" title="VRM" aria-label="VRM"><span class="pt"></span></button>`;
 
   const btn = ombre.querySelector('.btn');
@@ -988,6 +1008,8 @@
       v && v.connecte && !changerCompte ? '<button class="lien" data-changer-vrm>Changer de compte VRM</button>' : '',
       // 5.371 : « Envoyer un rapport » — l'état technique seulement, jamais tes données.
       v && v.connecte ? '<button class="lien" data-rapport>Envoyer un rapport</button>' : '',
+      // 5.377 : « VRM a capté » près du logo — le réglage (le même que dans VRM → Paramètres).
+      e.capteCoupe === true || e.capteCoupe === false ? `<button class="lien" data-capte-reglage="${e.capteCoupe ? 'allumer' : 'couper'}">${e.capteCoupe ? 'Dire ce que VRM capte' : 'Ne plus dire ce que VRM capte'}</button>` : '',
       `<button class="lien" data-mini-logo>${mini ? 'Agrandir le logo' : 'Réduire le logo'}</button>`,
       posPerso ? '<button class="lien" data-replacer-logo>Logo en bas à droite</button>' : '',
     ].filter(Boolean).join('');
@@ -1041,6 +1063,18 @@
         });
       } catch (_) { el.disabled = false; }
     }));
+    const capteB = carte.querySelector('[data-capte-reglage]');
+    if (capteB) capteB.addEventListener('click', () => {
+      const couper = capteB.getAttribute('data-capte-reglage') === 'couper';
+      capteB.disabled = true;
+      try {
+        chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'capteReglage', coupe: couper }, (r) => {
+          void chrome.runtime.lastError;
+          if (r && r.ok) { e.capteCoupe = r.coupe === true; if (couper) cacherCapte('reglage'); rendre(); return; }
+          capteB.disabled = false;
+        });
+      } catch (_) { capteB.disabled = false; }
+    });
     const miniB = carte.querySelector('[data-mini-logo]');
     if (miniB) miniB.addEventListener('click', () => { poserMini(!mini); rendre(); });
     const replacer = carte.querySelector('[data-replacer-logo]');
@@ -1746,6 +1780,7 @@
 
   btn.addEventListener('click', async () => {
     if (vientDeGlisser) { vientDeGlisser = false; return; }   // c'était un déplacement, pas un clic
+    cacherCapte('carte');   // 5.377 : la carte s'ouvre, le petit message s'efface
     // Au doigt : toucher le logo ouvre (ou referme) la carte — c'est elle qui
     // porte le geste « Ouvrir VRM », et le moyen de revenir sur un « Non ».
     if (auDoigt()) {
@@ -1786,6 +1821,9 @@
   hote.addEventListener('pointerenter', (e) => {
     if (CADRE || (e.pointerType && e.pointerType !== 'mouse')) return;
     if (question.classList.contains('on')) return;
+    // 5.377 : la souris sur le petit message n'ouvre pas la carte (elle le garderait affiché).
+    if (!capteEl.hidden) { const r = capteEl.getBoundingClientRect(); if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) return; }
+    cacherCapte('carte');
     clearTimeout(minuteur);
     doigt = false;
     rafraichir();
@@ -1817,6 +1855,146 @@
     });
   } catch (_) {}
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { appliquerTeinte(); rafraichir(); } });
+
+
+  // ══ 5.377 — « VRM A CAPTÉ » : LE PETIT MESSAGE PRÈS DU LOGO ══════════════════
+  // Julien : « on a un petit popup qui dit que l'extension a capté ça ». Le fond
+  // (background.js `annoncerCapte`) a compté, PAR IDENTITÉ, ce qu'une écriture
+  // réussie vient de ranger pour le compte de CET onglet ; ici on le dit, une fois :
+  //   · « VRM a capté · shop_x » puis « 2 nouvelles ventes · 1 bordereau » ; à la
+  //     connexion « Compte relié · shop_x » puis « 14 annonces · 3 ventes lues » ;
+  //   · « Voir » ouvre la page du SITE (Mes ventes, Messages, dressing) — jamais VRM ;
+  //   · il part seul après ~6 s, se ferme d'un toucher (× de 44 px, ou la bulle),
+  //     ne recouvre JAMAIS un bouton ni un lien du site (mesuré à l'affichage, sinon
+  //     il attend), jamais par-dessus la carte ouverte ; montré ⇒ noté vu (`capteVu`),
+  //     il ne revient pas ;
+  //   · rien de nouveau, lecture ratée, réglage coupé ⇒ rien (jamais « 0 »).
+  // Aucune requête : le stockage de l'extension seulement (Chrome, Edge, Firefox, Orion).
+  const capteEl = ombre.querySelector('.capte');
+  const CAPTE_NOMS = {
+    ventes: ['nouvelle vente', 'nouvelles ventes', 'vente', 'ventes', 'f'], achats: ['nouvel achat', 'nouveaux achats', 'achat', 'achats', 'm'],
+    bordereaux: ['bordereau', 'bordereaux', 'bordereau', 'bordereaux', 'm'], codes: ['code de retrait', 'codes de retrait', 'code de retrait', 'codes de retrait', 'm'],
+    versements: ['date de versement', 'dates de versement', 'date de versement', 'dates de versement', 'f'], messages: ['message', 'messages', 'message', 'messages', 'm'],
+    offres: ['offre reçue', 'offres reçues', 'offre', 'offres', 'f'], annonces: ['nouvelle annonce', 'nouvelles annonces', 'annonce', 'annonces', 'f'],
+  };
+  const CAPTE_ORDRE = ['ventes', 'achats', 'bordereaux', 'codes', 'versements', 'messages', 'offres', 'annonces'];
+  const CAPTE_DUREE = 6000;
+  let capteMontre = null, capteMinuteur = null, capteEssais = 0, capteDemande = false, capteSurvol = false;
+  const nbCapte = (n) => Number(n).toLocaleString('fr-FR');
+  function phrasesCapte(l) {
+    const parts = [];
+    let dernier = null;
+    for (const s of CAPTE_ORDRE) {
+      const n = Number((l.n || {})[s]) || 0;
+      if (!(n > 0) || !CAPTE_NOMS[s]) continue;     // jamais « 0 »
+      const nom = CAPTE_NOMS[s];
+      parts.push({ s, n, t: `${nbCapte(n)} ${l.relie ? (n > 1 ? nom[3] : nom[2]) : (n > 1 ? nom[1] : nom[0])}` });
+      dernier = { n, g: nom[4] };
+    }
+    if (!parts.length) return null;
+    if (l.relie && dernier) parts[parts.length - 1].t += ' ' + (dernier.g === 'f' ? (dernier.n > 1 ? 'lues' : 'lue') : (dernier.n > 1 ? 'lus' : 'lu'));
+    return { titre: l.relie ? 'Compte relié' : 'VRM a capté', ligne: parts.map((p) => p.t).join(' · '), parts };
+  }
+  const INTERACTIF = 'a[href],button,input,select,textarea,summary,label,[role="button"],[role="link"],[role="tab"],[role="menuitem"],[onclick],[tabindex]:not([tabindex="-1"])';
+  // Un bouton ou un lien du site sous ce rectangle ? (on regarde SOUS la carte : notre hôte est sauté)
+  function couvreUnBouton(r) {
+    const W = window.innerWidth || 1024, H = window.innerHeight || 768;
+    if (r.left < 0 || r.top < 0 || r.right > W || r.bottom > H) return true;
+    // Une grille serrée (tous les 10 px, bords compris) : un bouton de 24 px ne passe pas entre deux points.
+    const xs = [], ys = [];
+    for (let x = r.left + 2; x < r.right - 1; x += 10) xs.push(x); xs.push(r.right - 2);
+    for (let y = r.top + 2; y < r.bottom - 1; y += 10) ys.push(y); ys.push(r.bottom - 2);
+    for (const x of xs) for (const y of ys) {
+      let els = []; try { els = document.elementsFromPoint(x, y); } catch (_) { els = []; }
+      const sous = els.find((el) => el !== hote && el !== document.documentElement && el !== document.body);
+      if (!sous) continue;
+      let cible = null; try { cible = sous.closest(INTERACTIF); } catch (_) { cible = null; }
+      if (cible && cible !== document.body) { const cs = getComputedStyle(cible); if (cs.visibility !== 'hidden' && cs.display !== 'none' && (parseFloat(cs.opacity) || 0) > 0.05) return true; }
+    }
+    return false;
+  }
+  // Les places possibles, autour du logo (au-dessus, à côté, en dessous) : la première libre.
+  function placerCapte() {
+    const haut = hote.hasAttribute('data-haut'), gauche = hote.hasAttribute('data-gauche');
+    const t = taille() + 10;
+    const places = [
+      haut ? { top: t + 'px' } : { bottom: t + 'px' },
+      Object.assign(gauche ? { left: t + 'px' } : { right: t + 'px' }, haut ? { top: '0px' } : { bottom: '0px' }),
+      haut ? { bottom: t + 'px' } : { top: t + 'px' },
+    ];
+    capteEl.style.visibility = 'hidden'; capteEl.hidden = false;
+    for (let i = 0; i < places.length; i++) {
+      const p = places[i];
+      for (const k of ['top', 'bottom', 'left', 'right']) capteEl.style.removeProperty(k);
+      if (p.left == null && p.right == null) capteEl.style.setProperty(gauche ? 'left' : 'right', '0px');
+      for (const k of Object.keys(p)) capteEl.style.setProperty(k, p[k]);
+      if (!couvreUnBouton(capteEl.getBoundingClientRect())) { capteEl.setAttribute('data-capte-place', String(i)); capteEl.style.visibility = ''; return true; }
+    }
+    capteEl.hidden = true; capteEl.style.visibility = '';
+    return false;
+  }
+  function cacherCapte(raison) {
+    clearTimeout(capteMinuteur); capteMinuteur = null;
+    if (capteEl.hidden) { capteMontre = null; return; }
+    capteEl.setAttribute('data-capte-fin', raison || 'seul');
+    capteEl.classList.remove('on');
+    capteEl.hidden = true;
+    capteMontre = null;
+  }
+  function minuterCapte() { clearTimeout(capteMinuteur); capteMinuteur = setTimeout(() => { if (capteSurvol) { minuterCapte(); return; } cacherCapte('seul'); }, CAPTE_DUREE); }
+  function dessinerCapte(l) {
+    const ph = phrasesCapte(l);
+    if (!ph) return false;
+    let voir = '';
+    try { const u = new URL(String(l.voir || '')); if (u.protocol === 'https:' && u.origin === ORIGINE_ICI) voir = u.href; } catch (_) {}
+    const nom = l.nom ? ` · <span class="capte-nom">${esc(l.nom)}</span>` : '';
+    poserHtml(capteEl, `<div class="capte-t">${esc(ph.titre)}${nom}</div><div class="capte-r"><div class="capte-l" data-capte-ligne>${ph.parts.map((p) => `<span class="seg">${esc(p.t)}</span>`).join(' · ')}</div>${voir ? `<a class="capte-voir" data-capte-voir href="${esc(voir)}" target="_top">Voir<i aria-hidden="true"></i></a>` : ''}</div><button class="capte-x" type="button" data-capte-fermer aria-label="Fermer">×</button>`);
+    capteEl.setAttribute('data-capte-lot', String(l.lot || ''));
+    capteEl.setAttribute('data-capte-relie', l.relie ? '1' : '0');
+    for (const p of ph.parts) capteEl.setAttribute('data-capte-' + p.s, String(p.n));
+    const x = capteEl.querySelector('[data-capte-fermer]');
+    if (x) x.addEventListener('click', (ev) => { ev.stopPropagation(); cacherCapte('fermer'); });
+    const v = capteEl.querySelector('[data-capte-voir]');
+    if (v) v.addEventListener('click', (ev) => { ev.stopPropagation(); cacherCapte('voir'); });
+    return true;
+  }
+  function demanderCapte() {
+    if (CADRE || !vivant() || capteDemande || document.visibilityState !== 'visible') return;
+    if (carte.classList.contains('on') || question.classList.contains('on')) return;   // jamais par-dessus la carte
+    capteDemande = true;
+    try {
+      chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'capteLot' }, (r) => {
+        void chrome.runtime.lastError;
+        capteDemande = false;
+        const l = r && r.ok && r.lot;
+        if (!l || !l.lot || (capteMontre && capteMontre.lot === l.lot)) return;
+        if (carte.classList.contains('on') || question.classList.contains('on')) return;
+        // Un popup encore affiché pour le MÊME compte : ce qui arrive s'y ajoute.
+        const fusion = !!(capteMontre && capteMontre.compte === l.compte && capteMontre.p === l.p);
+        const vue = Object.assign({}, l, { n: Object.assign({}, fusion ? capteMontre.n : l.n) }, fusion ? { relie: !!(l.relie || capteMontre.relie), voir: capteMontre.voir || l.voir } : {});
+        if (fusion) for (const s of Object.keys(l.n || {})) vue.n[s] = (Number(vue.n[s]) || 0) + (Number(l.n[s]) || 0);
+        if (!dessinerCapte(vue)) return;
+        if (!placerCapte()) {
+          // Pas de place libre (un bouton du site partout autour) : on réessaie un peu plus tard.
+          if (capteEssais++ < 4) setTimeout(demanderCapte, 1500);
+          return;
+        }
+        capteEssais = 0;
+        capteMontre = vue;
+        capteEl.classList.add('on');
+        try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'capteVu', lot: l.lot }, () => { void chrome.runtime.lastError; }); } catch (_) {}
+        minuterCapte();
+      });
+    } catch (_) { capteDemande = false; }
+  }
+  if (!CADRE) {
+    capteEl.addEventListener('click', () => cacherCapte('toucher'));
+    capteEl.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') capteSurvol = true; });
+    capteEl.addEventListener('pointerleave', () => { capteSurvol = false; });
+    try { chrome.storage.onChanged.addListener((ch, zone) => { if (zone === 'local' && (ch.vrmCapteLots || ch.vrmCapteReglage)) setTimeout(demanderCapte, 250); }); } catch (_) {}
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(demanderCapte, 600); });
+    setTimeout(demanderCapte, 1200);
+  }
 
   (CADRE ? (document.body || document.documentElement) : (document.documentElement || document.body)).appendChild(hote);
   rafraichir();
