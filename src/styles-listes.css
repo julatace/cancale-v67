@@ -352,6 +352,10 @@
   border-radius: var(--d-r-pastille-icone, 10px) !important; background: var(--d-pastille-neutre-fond, rgba(118,118,128,.12)) !important; color: var(--d-pastille-neutre, #3A3A3C) !important; box-shadow: none !important; border: 0 !important;
 }
 :root:root body .vrm-main[data-ecran="journee"] .vrm-day-task-list .vrm-day-task:has(.is-urgent) .vrm-pile.is-vide .vrm-pile-v.is-tuile { background: var(--d-pastille-ambre-fond, rgba(255,159,10,.14)) !important; color: var(--d-pastille-ambre, #B25000) !important; }
+/* « À ce rythme, novembre finira vers … » : une rangée sur le fond de la page (son « estimation » gris lisible, ≥ 4,5:1),
+   44 px au doigt, 36 à la souris. */
+:root:root:root body .vrm-main[data-ecran="journee"] .vrm-ap-ligne { min-height: 44px !important; background: transparent !important; box-shadow: none !important; }
+@media (hover: hover) and (pointer: fine) { :root:root:root body .vrm-main[data-ecran="journee"] .vrm-ap-ligne { min-height: 36px !important; } }
 /* Une sous-ligne d'« Ensuite » : UNE ligne. */
 :root:root body .vrm-main[data-ecran="journee"] .vrm-day-task-list .vrm-day-task-note { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; -webkit-line-clamp: unset !important; display: block !important; }
 @media (max-width: 767px) {

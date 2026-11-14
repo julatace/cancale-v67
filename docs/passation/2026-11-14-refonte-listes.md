@@ -44,13 +44,18 @@ textes `listes.*` (5 langues, `src/i18n/langues/<l>/listes.js`). La carte régla
   bandeaux flottants) et volume à 1 000 annonces / 1 000 ventes (rendu, CLS des rangées, nœuds, rangées
   visibles, recherche par N°), `BANC_REF=<dist d'origin/main>` pour comparer.
   Sur origin/main : **rouge** (390 clair : journée heros 1 · murs 1 ; ventes murs 6, phrases répétées 6 ;
-  annonces débords 36… ; volume Annonces 4 rangées visibles). Après : voir le récit de fin (ci-dessous).
+  annonces débords 36… ; volume Annonces 4 rangées visibles). **Après (arbre fusionné avec origin/main)** : forme
+  12 écrans × règles : tout vert SAUF « Ventes : 1re ligne à 577 px » (390, clair et sombre — le reste ci-dessous) ;
+  Annonces : 1re paire à 419 px (≤ 422) ; volume : Annonces 8 rangées visibles (avant 4), Ventes 10 (avant 9), CLS des
+  rangées ≈ 0, nœuds égaux. ⚠️ Les TEMPS (rendu, recherche par N°) n'ont pas pu être jugés : la machine tournait à
+  une charge de 43 (autres sessions) — avant comme après > 300 ms et 20–30 s de rendu ; à remesurer au calme
+  (`BANC_REF=<dist d'origin/main> PARTIES=volume node scripts/bancs/refonte-listes.cjs`).
 - Captures avant/après : `docs/design/avant-apres/{annonces,ventes,journee}-{avant,apres}.png` (390, dsf 2).
 - Verts : `npm run build`, audits traduction, tdz, icônes, cohérence, variables, composants, violet,
   rouge-doublon, quoi-de-neuf ; `design-passe` (journée, ventes, colis, annonces).
 
 ## Restes (honnêtes)
-- **Ventes** n'atteint pas encore « 1re ligne ≤ 50 % » au téléphone (~560 px sans la ligne de la coque) : il
+- **Ventes** n'atteint pas encore « 1re ligne ≤ 50 % » au téléphone (577 px sans la ligne de la coque) : il
   faudrait ranger « 15 à imprimer », « 28 à envoyer en priorité » et la tournée dans « À faire » et le « ⋯ »
   de « À expédier » (même mécanique `AFaire`), et passer les sites en menu comme sur la maquette.
 - La maquette met le **site et le compte dans UN menu** (« Vinted · tous ▾ ») sur la rangée de la recherche,
@@ -62,3 +67,8 @@ textes `listes.*` (5 langues, `src/i18n/langues/<l>/listes.js`). La carte régla
 - `journee-premium` : « le premier geste au-dessus de la barre du bas » était déjà rouge sur origin/main
   (tête 592 px) ; inchangé.
 - La ligne « Tout est à jour » et la pastille « Mis à jour » (coque) sont décomptées par le banc, et dites.
+- Le « de ouf » (photo en vedette façon Nike, affiches façon Revolut/Oura, finition Linear — skill
+  `references-design`) n'a pas été appliqué : arrivé en fin de session, à prendre par le chantier suivant
+  sur la base posée ici (structure « liste d'abord » de la maquette, briques `src/ui/`).
+- `design-passe` sur Ma journée 1512 : « À ce rythme, novembre… » (`vrm-ap-ligne`, 34 px, et « estimation »
+  au survol) — ni touché ni ajouté ici (aucune règle de cette ligne dans ce lot) : arrivé avec la fusion de main.
