@@ -219,7 +219,7 @@
    copie ou que les bancs lisent ; le mot vient de tr() (`--vrm-exemple-mot`).
    Un code : la marque APRÈS lui. Une adresse : AVANT elle (une adresse longue finit en « … »
    et emporterait la marque avec elle). */
-:root[data-vrm-exemple] :is([data-stream-type="code"], .vrm-rp-code)::after,
+:root[data-vrm-exemple] :is([data-stream-type="code"], .vrm-rp-code, [data-rp-code-visible]:not([data-rp-code-visible="qr"], [data-rp-code-visible="desaccord"]))::after,
 :root[data-vrm-exemple] :is([data-stream-type="adresse"], [data-relais-adresse])::before {
   content: var(--vrm-exemple-mot, "exemple");
   display: inline-block; margin-left: .5em; padding: 2px 6px; border-radius: 5px; vertical-align: .15em;

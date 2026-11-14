@@ -70,7 +70,7 @@ L'environnement de la session est le « Default » (réseau limité, aucune hôt
   téléphone : deux lignes (texte + bouton, puis le lien), 44 px au doigt.
 - **Cadre** (`CadreExemple`, portail dans `<body>`) : un filet hachuré de 3 px tout autour de
   l'écran et une languette « Exemple · données inventées » qui pend du bord haut — au-dessus de
-  TOUT (z 2147483000 : feuilles, confirmations, loupe), `pointer-events: none`, `aria-hidden`
+  TOUT (z 2147483647, le plus haut : feuilles, confirmations, loupe, pastille « Ouverture… » à 2147483000), `pointer-events: none`, `aria-hidden`
   (le bandeau le dit aux lecteurs d'écran), caché à l'impression.
 - **« exemple » sur les codes et les adresses** : la racine porte `data-vrm-exemple` (posé par
   `installerModeExemple`) ; la feuille de style ajoute une petite marque grise « EXEMPLE » après

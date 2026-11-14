@@ -108,7 +108,7 @@ const rangees = (pg) => pg.evaluate(() => {
 });
 // La marque « exemple » posée sur les codes et les adresses inventés (::after).
 const marquesCodes = (pg) => pg.evaluate(() => {
-  const els = [...document.querySelectorAll('[data-stream-type="code"], [data-stream-type="adresse"], .vrm-rp-code, [data-relais-adresse]')]
+  const els = [...document.querySelectorAll('[data-stream-type="code"], [data-stream-type="adresse"], .vrm-rp-code, [data-relais-adresse], [data-rp-code-visible]:not([data-rp-code-visible="qr"], [data-rp-code-visible="desaccord"])')]
     .filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0; });
   return els.map((e) => ({ quoi: (e.getAttribute('data-stream-type') || e.className || '').toString().slice(0, 30), txt: e.textContent.trim().slice(0, 40), apres: getComputedStyle(e, (e.matches('[data-stream-type="adresse"], [data-relais-adresse]') ? '::before' : '::after')).content }));
 });
