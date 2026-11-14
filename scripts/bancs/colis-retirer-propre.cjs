@@ -257,7 +257,9 @@ const ouvrir = async (b, vp, sombre) => {
           dit(!(await pg.evaluate(() => document.querySelectorAll('.vrm-rpf-section:not(.is-repli) [data-relais-point-suite]').length)), 'chaque point UNE fois (aucune carte « suite » dans une autre section)');
           dit(sec('lieu').length === 1 && /90000008/.test(sec('lieu')[0]), '« Lieu à confirmer » : le colis sans lieu', sec('lieu').join());
           dit(m.air.every((a) => a >= 20 && a <= 40), 'de l’air entre les sections (20–40 px)', m.air.join(',') + ' · ' + (m.airIds || []).join(','));
-          dit(m.verif && m.verif.n === '3' && !m.verif.ouvert, '« À vérifier · 3 » replié', JSON.stringify(m.verif));
+          // (14 nov., Studio — Julien : « je n'ai plus les retraits d'achat ») « À vérifier » est OUVERT sous « À retirer » : ce qu'on
+          // sait de chaque colis douteux se lit sans toucher (avant : replié). Le compte reste le même.
+          dit(m.verif && m.verif.n === '3' && m.verif.ouvert, '« À vérifier · 3 » ouvert, juste sous « À retirer »', JSON.stringify(m.verif));
                     dit(m.enRoute === '13', '« En route » (13 sans point) replié à la fin', m.enRoute);
           // Les villes : lues dans l'adresse (CP + ville) ; choisir une ville filtre la liste, la carte sombre suit,
           // (3 nov., 19 h) « Lieu à confirmer » RESTE visible quand une ville est choisie (un colis caché est un

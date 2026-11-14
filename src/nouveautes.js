@@ -29,6 +29,7 @@ export const NOUVEAUTES = Object.freeze([
   // (14 nov., décision de Julien) Studio bleu clair : la fondation (coque, barre, disque, quatre formes de bouton).
   { id: 'studio-bleu-clair', date: '2026-11-14', titre: 'VRM en bleu clair, un disque en bas', phrase: 'Touche le « + » : chercher, scanner, publier, imprimer.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'studio-paires', date: '2026-11-14', titre: 'Tes paires : touche-en une, elle monte', phrase: 'Liste en rangées, prix, acheté, jours, favoris ; Baisser ou Republier.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'studio-ventes', date: '2026-11-14', titre: 'À expédier : un chiffre, un bouton Imprimer', phrase: 'Tuiles pour filtrer, À retirer en tête d’Achats avec ses codes.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'accompagnement', date: '2026-11-14', titre: 'Chaque geste dit ce qu’il fait', phrase: 'Avant, pendant, après ; et si ça bloque, pourquoi et quoi faire.', tab: 'cat_bord', pour: 'tous', mode: 'tous' },
   // (14 nov., extension 5.377) « L'extension a capté » et la carte du logo en trois onglets.
   { id: 'extension-capte', date: '2026-11-14', titre: 'L’extension dit ce qu’elle vient de capter', phrase: 'Un petit message près du logo VRM : ventes, bordereaux, messages captés.', tab: 'settings', pour: 'tous', mode: 'tous' },
