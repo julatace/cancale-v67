@@ -41,7 +41,7 @@ html body .vrm-app-shell .vrm-compte-puces .vrm-compte-puce:focus-visible { outl
 .vrm-sec-trous { margin: 16px 4px 0; display: flex; flex-direction: column; gap: 4px; }
 .vrm-sec-trous p { margin: 0; font: 400 13px/1.4 var(--vrm-police); color: var(--fu-gris2, #6e6e73); }
 .vrm-sec-vide { padding: 14px 16px; font: 600 15px/1.4 var(--vrm-police); color: var(--fu-gris, #6e6e73); }
-html body .vrm-app-shell .vrm-sec-ligne .vrm-sec-bouton { flex: none; min-height: 44px; padding: 0 14px; border-radius: 12px; border: 0; background: var(--fu-case, rgba(118,118,128,.12)); color: var(--fu-encre, inherit); font: 600 13px/1 var(--vrm-police); cursor: pointer; }
+html body .vrm-app-shell .vrm-sec-ligne .vrm-sec-bouton { flex: none; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 0; background: var(--fu-case, rgba(118,118,128,.12)); color: var(--fu-encre, inherit); font: 600 13px/1 var(--vrm-police); cursor: pointer; }
 html body .vrm-app-shell .vrm-sec-ligne .vrm-sec-bouton:disabled { opacity: .5; cursor: default; }
 
 /* (5 nov.) L'œil « cacher les montants » est remplacé par le bouton « Stream » (src/design/mode-stream.css). */

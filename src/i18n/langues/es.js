@@ -481,6 +481,8 @@ export default {
   "reglages.push.desc": "Recibir un aviso en tu móvil de una venta, una oferta o un paquete.",
   "reglages.push.lib": "Notificaciones del móvil",
   "reglages.push.muets": { one: "{n} cuenta sin e-mail: sin notificación", other: "{n} cuentas sin e-mail: sin notificación" },
+  "reglages.push.soirAuto": "Auto",
+  "reglages.push.soirAutoTitre": "19 h en invierno, 20 h en verano",
   "reglages.raccourcis-clavier.desc": "En ordenador: «g» y luego una letra, «?» para la lista.",
   "reglages.raccourcis-clavier.lib": "Atajos de teclado",
   "reglages.raccourcis-siri.desc": "Añadir una compra o encontrar un N.º hablando con Siri.",

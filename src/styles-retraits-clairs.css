@@ -80,9 +80,9 @@
 :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-gestes { display: flex !important; flex-wrap: wrap !important; align-items: center !important; gap: 8px !important; margin: 2px 0 0 !important; }
 :root:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-gestes :is(button, a):not([data-colis-retire]) {
   all: unset; box-sizing: border-box !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important;
-  height: 44px !important; min-height: 44px !important; min-width: 44px !important; padding: 0 14px !important; border-radius: 12px !important;
+  height: 44px !important; min-height: 44px !important; min-width: 44px !important; padding: 0 14px !important; border-radius: 999px !important;
   background: var(--d-remplir, rgba(118, 118, 128, .12)) !important; color: var(--p-encre, #1D1D1F) !important; border: 0 !important; box-shadow: none !important;
-  font: 600 14px/1 var(--vrm-police, -apple-system, BlinkMacSystemFont, sans-serif) !important; white-space: nowrap !important; cursor: pointer !important; text-decoration: none !important;
+  font: 600 15px/1 var(--vrm-police, -apple-system, BlinkMacSystemFont, sans-serif) !important; white-space: nowrap !important; cursor: pointer !important; text-decoration: none !important;
 }
 :root[data-theme="dark"]:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-gestes :is(button, a):not([data-colis-retire]) { background: rgba(118, 118, 128, .24) !important; color: #F5F5F7 !important; }
 :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-gestes img { width: 28px !important; height: 28px !important; }
@@ -92,9 +92,10 @@
   :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail { padding-left: 0 !important; }
   :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-fiche-l { grid-template-columns: 104px minmax(0, 1fr) !important; }
 }
-/* La forme des gestes du dépli gagne aussi sur la couche `vrm-premium` (« Suivre ↗ » y était une pilule de 999 px). */
+/* La forme des gestes du dépli gagne aussi sur la couche `vrm-premium` (« Suivre ↗ » y était une pilule de 999 px).
+   (14 nov., passe design 3) UNE forme, celle du système : la capsule (DESIGN.md §1, « ce qui se touche ») — plus le rayon 12. */
 @layer vrm-premium {
-  :root:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-gestes :is(button, a):not([data-colis-retire]) { border-radius: 12px !important; height: 44px !important; min-height: 44px !important; padding: 0 14px !important; border: 0 !important; background: var(--d-remplir, rgba(118, 118, 128, .12)) !important; }
+  :root:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-gestes :is(button, a):not([data-colis-retire]) { border-radius: 999px !important; height: 44px !important; min-height: 44px !important; padding: 0 14px !important; border: 0 !important; background: var(--d-remplir, rgba(118, 118, 128, .12)) !important; }
   :root[data-theme="dark"]:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-gestes :is(button, a):not([data-colis-retire]) { background: rgba(118, 118, 128, .24) !important; }
 }
 /* « Vérification chez … en cours » n'est pas un délai : pas de piste, le texte prend la ligne (il était rogné à 390 px). */
