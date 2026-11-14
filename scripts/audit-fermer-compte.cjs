@@ -23,7 +23,9 @@ global.fetch = F.faux;
   console.log(`${ok1 ? '✅' : '❌'} l'ancien \`?mode=fermer\` avec l'ancienne confirmation (l'e-mail) : refusé, rien touché — HTTP ${r1.code}`);
   F.reset();
   const r2 = await appel({ confirmation: 'SUPPRIMER', motDePasse: F.MDP[F.A] });
-  const ok2 = r2.code === 200 && !F.etat.base.utilisateurs.has(F.A) && F.etat.base.utilisateurs.has(F.B);
-  console.log(`${ok2 ? '✅' : '❌'} … avec la confirmation forte : la même suppression — HTTP ${r2.code}`);
+  // (13 nov., lot 51) La même DEMANDE : 30 jours de grâce, rien d'effacé tout de suite, B intact.
+  const prevue = F.etat.base.app_data.some((l) => l.owner === F.NEUTRE && l.id === 'vrm_effacement_prevu_' + F.A.replace(/-/g, ''));
+  const ok2 = r2.code === 200 && r2.corps && r2.corps.prevue && prevue && F.etat.base.utilisateurs.has(F.A) && F.etat.base.utilisateurs.has(F.B);
+  console.log(`${ok2 ? '✅' : '❌'} … avec la confirmation forte : la même demande (suppression prévue dans 30 jours) — HTTP ${r2.code}`);
   process.exit(ok1 && ok2 ? 0 : 1);
 })();

@@ -116,3 +116,33 @@
 .vrm-aide-fiche-etapes > li + li { margin-top: 4px; }
 .vrm-aide-fiche-aller { padding: 10px 16px 14px; }
 .vrm-aide-rien { margin: 4px 4px 0; font-size: 15px; line-height: 1.45; color: var(--vrm-muted, #6E6E73); }
+
+/* ── (13 nov., lot 49) La vidéo de l'écran : « Regarder » (aperçu + titre), puis le lecteur ── */
+.vrm-aide-videos { margin: 4px 0 18px; }
+:root body .vrm-aide-video-ouvrir {
+  display: flex; align-items: center; gap: 14px; width: 100%; min-height: 64px; margin: 0; padding: 10px 14px 10px 12px;
+  border: 0; border-radius: 0; background: none; box-shadow: none; text-align: left; cursor: pointer;
+  color: var(--vrm-ink, #1D1D1F); font: inherit; -webkit-tap-highlight-color: transparent; transition: background-color 120ms ease-out;
+}
+:root body .vrm-aide-video-ouvrir:active { background: var(--vrm-card2, #F2F2F7); transform: none; }
+:root body .vrm-aide-video-ouvrir:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: -2px; }
+.vrm-aide-video-apercu { position: relative; flex: 0 0 45px; height: 80px; border-radius: 8px; overflow: hidden; background: var(--vrm-card2, #F2F2F7); }
+.vrm-aide-video-apercu img { display: block; width: 45px; height: 80px; object-fit: cover; }
+.vrm-aide-video-play {
+  position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 15px;
+  display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.55); color: #fff;
+}
+.vrm-aide-video-play svg { margin-left: 2px; width: 16px; height: 16px; }
+.vrm-aide-video-texte { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.vrm-aide-video-texte b { font-size: 16px; font-weight: 600; line-height: 1.3; letter-spacing: -.01em; }
+.vrm-aide-video-texte small { font-size: 13px; line-height: 1.35; color: var(--vrm-muted, #6E6E73); text-wrap: pretty; }
+.vrm-aide-video { margin: 0 0 12px; }
+.vrm-aide-video video {
+  display: block; width: auto; height: auto; max-width: 100%; max-height: min(68vh, 560px); aspect-ratio: 9 / 16;
+  margin: 0 auto; border-radius: 14px; background: #000;
+}
+.vrm-aide-video figcaption { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; font-size: 13px; line-height: 1.35; color: var(--vrm-muted, #6E6E73); }
+.vrm-aide-video figcaption b { color: var(--vrm-ink, #1D1D1F); font-weight: 600; }
+.vrm-aide-video figcaption .vrm-lien-action { flex: 0 0 auto; min-height: 44px; }
+.vrm-aide-video-panne { margin: 8px 0 0; font-size: 13px; color: var(--vrm-muted, #6E6E73); }
+.vrm-aide-video-liste:empty { display: none; }

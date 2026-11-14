@@ -124,7 +124,7 @@ let _pauseInstance = {};
 export const _oublierPauseInstance = () => { _pauseInstance = {}; };
 const pauseConnue = (p) => {
   const out = { ...(p && typeof p === 'object' ? p : {}) };
-  for (const c of T.CARRIERS_LUS) {
+  for (const c of T.CARRIERS_SERVEUR) {
     const a = out[c], b = _pauseInstance[c];
     const ja = Date.parse(a && a.jusqua || ''), jb = Date.parse(b && b.jusqua || '');
     if (Number.isFinite(jb) && !(Number.isFinite(ja) && ja >= jb)) out[c] = b;
@@ -276,6 +276,8 @@ export const urlTransporteur = (carrier, suivi, cp = '') => {
   if (!T.FORME_SUIVI[carrier] || !T.FORME_SUIVI[carrier].test(n)) return null;
   if (carrier === 'chronopost') return `https://ws.chronopost.fr/tracking-cxf/TrackingServiceWS/trackSkybillV2?language=fr_FR&skybillNumber=${n}`;
   if (carrier === 'vinted') return `https://carrier.vintedgo.com/public/v3/tracking_events/${n}`;
+  if (carrier === 'colissimo') return `https://api.laposte.fr/suivi/v2/idships/${n}?lang=fr_FR`;
+  if (carrier === 'ups') return `https://onlinetools.ups.com/api/track/v1/details/${n}?locale=fr_FR&returnSignature=false&returnMilestones=false&returnPOD=false`;
   if (carrier === 'mondialrelay') return /^\d{5}$/.test(String(cp || '')) ? `https://www.mondialrelay.fr/_mvc/fr-FR/SuiviExpedition/RechercherJsonResponsive?NumeroExpedition=${n}&CodePostal=${cp}` : null;
   return null;
 };
@@ -285,12 +287,58 @@ const ENTETES = {
   // Les deux en-têtes de la mesure (une requête « XHR » de la page) — aucun
   // cookie, aucun jeton, le User-Agent honnête.
   mondialrelay: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+  colissimo: { Accept: 'application/json' },
+  ups: { Accept: 'application/json' },
 };
+
+// ── (13 nov., lot 89) LES CLÉS DE COLISSIMO / LA POSTE ET D'UPS ──────────────
+// Les clés de l'INSTALLATION (Vercel → Settings → Environment Variables), lues ici seulement, au
+// moment de la requête — jamais rangées en base, jamais renvoyées au navigateur, jamais écrites
+// dans un journal. Sans clé : `T.lectureServeurActive` est faux, aucun n° n'est choisi, rien ne part.
+const envCle = (k) => { const v = process.env[k]; return typeof v === 'string' ? v.trim() : ''; };
+export const UPS_JETON_URL = 'https://onlinetools.ups.com/security/v1/oauth/token';
+export const UPS_TRANSACTION_SRC = 'VRM-suivi';
+// Le jeton OAuth d'UPS (client_credentials), gardé dans l'instance jusqu'à 1 min avant sa fin
+// (`expires_in`, ~4 h). Un refus des identifiants (400/401/403) n'est pas redemandé avant 30 min.
+let _jetonUps = null, _jetonUpsRefusJusqua = 0;
+export const _oublierJetonUps = () => { _jetonUps = null; _jetonUpsRefusJusqua = 0; };
+export const JETON_UPS_REFUS_MS = 30 * 60000;
+async function jetonUps({ neuf = false, signal = null } = {}) {
+  const maintenant = Date.now();
+  if (!neuf && _jetonUps && _jetonUps.jusqua - 60000 > maintenant) return _jetonUps.jeton;
+  if (maintenant < _jetonUpsRefusJusqua) return null;
+  const id = envCle('UPS_CLIENT_ID'), secret = envCle('UPS_CLIENT_SECRET');
+  if (!id || !secret) return null;
+  try {
+    const r = await fetchAvecDelai(UPS_JETON_URL, {
+      method: 'POST', redirect: 'error', ...(signal ? { signal } : {}),
+      headers: { 'User-Agent': UA_HONNETE, Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `Basic ${Buffer.from(`${id}:${secret}`).toString('base64')}` },
+      body: 'grant_type=client_credentials',
+    }, _delaiMs);
+    if (!r.ok) { if (r.status === 400 || r.status === 401 || r.status === 403) _jetonUpsRefusJusqua = Date.now() + JETON_UPS_REFUS_MS; return null; }
+    const j = await r.json().catch(() => null);
+    const jeton = j && typeof j.access_token === 'string' ? j.access_token : '';
+    if (!jeton) return null;
+    const duree = Number(j.expires_in);
+    _jetonUps = { jeton, jusqua: Date.now() + (Number.isFinite(duree) && duree > 0 ? Math.min(duree, 24 * 3600) : 3600) * 1000 };
+    return jeton;
+  } catch (_) { return null; }
+}
+let _transId = 0;
+// Les en-têtes propres à un transporteur à clé. `null` : pas de clé (ou pas de jeton) ⇒ rien ne part.
+async function entetesCle(carrier, { neuf = false, signal = null } = {}) {
+  if (carrier === 'colissimo') { const k = envCle('LAPOSTE_OKAPI_KEY'); return k ? { 'X-Okapi-Key': k } : null; }
+  if (carrier === 'ups') {
+    const jeton = await jetonUps({ neuf, signal });
+    return jeton ? { Authorization: `Bearer ${jeton}`, transId: `vrm${Date.now().toString(36)}${(++_transId).toString(36)}`.slice(0, 32), transactionSrc: UPS_TRANSACTION_SRC } : null;
+  }
+  return {};
+}
 // Rend { statut, ctype, corps, retryAfter, defi } ou { echec: 'voie'|'suivi'|'reseau'|'pause'|'budget' }.
 // `fin` : l'heure (ms) à laquelle la lecture doit être finie (la borne du
 // passage) ; `signal` : l'arrêt du passage (le cron qui a répondu).
 export async function lireTransporteur(carrier, suivi, { cp = '', fin = null, signal = null } = {}) {
-  if (!LECTURE_SERVEUR[carrier]) return { echec: 'voie' };
+  if (!LECTURE_SERVEUR[carrier] && !T.lectureServeurActive(carrier)) return { echec: 'voie' };
   const url = urlTransporteur(carrier, suivi, cp);
   if (!url) return { echec: 'suivi' };
   return unParTransporteur(carrier, async () => {
@@ -303,11 +351,22 @@ export async function lireTransporteur(carrier, suivi, { cp = '', fin = null, si
     try {
       const signaux = [AbortSignal.timeout(Math.min(_delaiMs, reste))];
       if (signal) signaux.push(signal);
-      const r = await fetchAvecDelai(url, {
+      const sig = signaux.length > 1 && typeof AbortSignal.any === 'function' ? AbortSignal.any(signaux) : signaux[0];
+      // (13 nov., lot 89) Colissimo / UPS : la clé (ou le jeton) au moment de la requête ; sans elle, rien ne part.
+      const cle = await entetesCle(carrier, { signal: sig });
+      if (cle === null) return { echec: 'cle' };
+      let r = await fetchAvecDelai(url, {
         redirect: 'error',
-        signal: signaux.length > 1 && typeof AbortSignal.any === 'function' ? AbortSignal.any(signaux) : signaux[0],
-        headers: { 'User-Agent': UA_HONNETE, ...(ENTETES[carrier] || { Accept: 'application/json' }) },
+        signal: sig,
+        headers: { 'User-Agent': UA_HONNETE, ...(ENTETES[carrier] || { Accept: 'application/json' }), ...cle },
       });
+      // UPS : un jeton refusé (401, expiré avant l'heure) est redemandé UNE fois, puis la requête rejouée.
+      if (carrier === 'ups' && r.status === 401) {
+        try { await r.body?.cancel?.(); } catch (_) {}
+        const cle2 = await entetesCle('ups', { neuf: true, signal: sig });
+        if (cle2 === null) return { echec: 'cle' };
+        r = await fetchAvecDelai(url, { redirect: 'error', signal: sig, headers: { 'User-Agent': UA_HONNETE, ...ENTETES.ups, ...cle2 } });
+      }
       const h = (k) => { try { return r.headers.get(k) || ''; } catch (_) { return ''; } };
       const rep = { statut: r.status, ctype: h('content-type'), corps: await corpsBorne(r, carrier === 'mondialrelay' ? CORPS_MAX_MR : CORPS_MAX), retryAfter: h('retry-after'), defi: /challenge/i.test(h('cf-mitigated')) };
       // Un REFUS se note ICI, avant que la file ne laisse partir la suivante.
@@ -458,11 +517,12 @@ export async function passageTransporteurs({ max = MAX_APP, budgetMs = BUDGET_AP
   // files rapides (Chronopost, Vinted Go) prenaient les places avec de vieux n°
   // pendant que le colis urgent de Mondial Relay attendait — lu au 6e passage.
   const places = placesParTransporteur(items, max, MAX_FERMETURE);
-  const nLusC = { chronopost: 0, vinted: 0, mondialrelay: 0 };
+  const nLusC = Object.fromEntries(T.CARRIERS_SERVEUR.map((c) => [c, 0]));
   // Chaque transporteur suit SA file ; les trois se lisent en parallèle — par le
   // SERVEUR, Mondial Relay compris (voie `mr-fr-mvc`). `besoinNavigateur` ne
   // reçoit un n° que sur REFUS du transporteur (ou pendant sa pause).
-  const parC = { chronopost: [], vinted: [], mondialrelay: [] };
+  // (13 nov., lot 89) + Colissimo et UPS (seulement choisis quand leur clé est posée, `carrierLisible`).
+  const parC = Object.fromEntries(T.CARRIERS_SERVEUR.map((c) => [c, []]));
   for (const it of items) (parC[it.carrier] || []).push(it);
   const traiterServeur = async (carrier) => {
     for (const it of parC[carrier]) {
@@ -520,7 +580,7 @@ export async function passageTransporteurs({ max = MAX_APP, budgetMs = BUDGET_AP
       lus.push({ carrier, suivi: it.suivi, res: r.res, etat: r.etat, change: r.change });
     }
   };
-  await Promise.all([traiterServeur('chronopost'), traiterServeur('vinted'), traiterServeur('mondialrelay')]);
+  await Promise.all(T.CARRIERS_SERVEUR.map((c) => traiterServeur(c)));
   // (8 nov.) LES COLIS VENDUS, APRÈS les achats et avec ce qui reste du budget :
   // la preuve de départ (api/_lib/depart-colis.js). Jamais pour un n° demandé
   // seul (la page « suivi » d'un achat).
@@ -528,7 +588,9 @@ export async function passageTransporteurs({ max = MAX_APP, budgetMs = BUDGET_AP
   // Ce que le serveur n'a pas pu lire, pour l'extension : la règle de C3, sur la
   // base à jour de ce passage (un n° demandé seul : lui seul).
   const besoin = T.aLireParNavigateur({ lignes: b.lignes, transp: b.transp, manuels: b.manuels, vinted: b.vinted, envoyes: b.envoyes, relaisDe: relaisDe(b), prouves: b.prouves, pause: pauseConnue(b.pause), maintenant: Date.now(), seul: suivi, cpSeul: cpPage, max: MAX_C3 });
-  return { ok: true, lus, departs, besoinNavigateur: besoin, pause: T.pausePublique(pauseConnue(b.pause)), arrete: !!(signal && signal.aborted) };
+  // `lecture` : Colissimo / UPS lus par le serveur (leur clé est posée) — l'app le DIT (« suivi lu par
+  // e-mail seulement » sinon), sans jamais voir la clé.
+  return { ok: true, lus, departs, besoinNavigateur: besoin, pause: T.pausePublique(pauseConnue(b.pause)), lecture: T.lecturesCle(), arrete: !!(signal && signal.aborted) };
 }
 
 // ── (8 nov.) LES COLIS VENDUS : LA PREUVE DE DÉPART ─────────────────────────

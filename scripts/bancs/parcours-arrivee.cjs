@@ -1,31 +1,29 @@
 require('./_porte-banc.cjs');
 // ════════════════════════════════════════════════════════════════════════════
-//  BANC — LE PARCOURS D'ARRIVÉE (11 nov.) : un vendeur NEUF, de la configuration
-//  à « C'est prêt », une étape à la fois, avec REPRISE après rechargement à
-//  chaque étape et sur un autre appareil (état rangé dans la ligne `main`).
-//  Base INVENTÉE (aucune fixture, aucune donnée réelle), servie par _minipgrest ;
-//  l'extension est un faux pont posé dans la page (`localStorage.banc_ext`).
+//  BANC — LE PARCOURS D'ARRIVÉE (11 nov. ; TROIS étapes le 13 nov., lot 46) : un
+//  vendeur NEUF, de la configuration à « C'est prêt », une étape à la fois, avec
+//  REPRISE après rechargement à chaque étape et sur un autre appareil (état rangé
+//  dans la ligne `main`). Base INVENTÉE (aucune fixture, aucune donnée réelle),
+//  servie par _minipgrest ; l'extension est un faux pont (`localStorage.banc_ext`).
 //  A  parcours complet :
-//     A1 la configuration s'ouvre seule ; « C'est parti » ⇒ l'écran plein du
-//        parcours s'ouvre sur l'extension (2 sur 6), position écrite dans `main` ;
-//     A2 extension « installée, pas connectée » : l'étape n'est PAS faite ; puis
-//        connectée à CE compte ⇒ « ✓ » et l'étape suivante, toute seule ;
-//     A3 e-mails : UN geste « Relier mes e-mails » ouvre « Ton adresse VRM » ;
-//        un e-mail arrive ⇒ « Reçu ✓ », étape suivante ; reprise sur un AUTRE
-//        appareil (stockage vide) à la même étape ;
-//     A4 Vinted : un compte relié sans dressing lu ⇒ « Lecture de ton dressing… »
-//        (pas fait) ; dressing lu ⇒ « 12 annonces lues », étape suivante ;
-//     A5 première vente : aucun geste, « Aller à Ma journée » ferme ; la petite
-//        carte de Ma journée reste (5 sur 6, « Continuer ») ; une vente lue ⇒
-//        « C'est prêt » et le récap ; « Aller à Ma journée » ⇒ plus rien.
+//     A1 la configuration s'ouvre seule (avant) ; « C'est parti » ⇒ l'écran plein
+//        s'ouvre sur l'extension (1 sur 3), position écrite dans `main` ;
+//     A2 extension « installée, pas connectée » : PAS faite, le geste est dit ; puis
+//        connectée à CE compte ⇒ « ✓ » et Vinted, tout seul ; autre appareil ;
+//     A3 Vinted : « Ouvre vinted.fr dans <ce navigateur>, connecté à ton compte » ;
+//        compte relié sans lecture ⇒ « Lecture de tes ventes… » (pas fait) ; ventes
+//        lues ⇒ « C'est prêt », récap des 3 ; « Aller à Ma journée » ⇒ plus rien.
 //     À CHAQUE étape : rechargement ⇒ même étape, écran ouvert.
-//  B  « Plus tard » : sur l'extension ⇒ les e-mails (Vinted suit) ; ✕ ferme ; la
-//     carte garde l'étape courante ; rien n'est coché.
-//  C  vendeur installé (tout prouvé, jamais ouvert) : ni carte ni écran plein ;
-//     dressing illisible ⇒ « Vinted » jamais coché.
+//  B  « Plus tard » sur l'extension ⇒ l'écran se ferme (Vinted la suit), la carte
+//     dit « Reprendre » ; rien n'est coché.
+//  C  vendeur installé : tout prouvé ⇒ rien ; lecture ratée ⇒ rien non plus
+//     (jamais interrompu) ; parcours commencé + dressing illisible ⇒ Vinted jamais coché.
+//  D  la carte de Ma journée dit le GESTE EXACT (télécharger le zip sur ordinateur,
+//     « sur ton ordinateur » au téléphone, « Ouvrir vinted.fr ») et l'ouvre ; un
+//     débutant SANS vente finit sur son dressing lu ; les trois faites ⇒ plus de carte.
 //  Chaque fois : aucune erreur JS, rien ne déborde, gestes ≥ 44 px au doigt.
 //  `SHOTS=dossier` range les captures (à REGARDER, §6.2).
-//  `LARGEURS=390,1512` / `THEMES=clair,sombre` / `SCENARIOS=A,B,C` restreignent.
+//  `LARGEURS=390,1512` / `THEMES=clair,sombre` / `SCENARIOS=A,B,C,D` restreignent.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
 const path = require('path'), http = require('http'), fs = require('fs');
@@ -38,7 +36,7 @@ const SHOTS = process.env.SHOTS || '';
 const liste = (v, d) => String(process.env[v] || d).split(',').map((x) => x.trim()).filter(Boolean);
 const LARGEURS = liste('LARGEURS', '390,1512').map(Number);
 const THEMES = liste('THEMES', 'clair,sombre');
-const SCENARIOS = liste('SCENARIOS', 'A,B,C');
+const SCENARIOS = liste('SCENARIOS', 'A,B,C,D');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2' };
 const UID = '7a1e0c55-2b1d-4c3e-9f00-0000000000dd';
 const SESSION = { access_token: 'jeton-parcours', refresh_token: 'r', totp: [], expires_at: Date.now() + 3600e3, user: { id: UID, email: 'arrivee.vendeuse@exemple.test', totp: [] } };
@@ -140,7 +138,9 @@ const plein = (pg) => pg.evaluate(() => {
   const ph = p.querySelector('[data-parcours-phrase]');
   const pr = document.querySelectorAll('[data-parcours] .vrm-b-primaire');
   const fb = p.getBoundingClientRect();
-  return { etape: p.getAttribute('data-parcours-etape'), etat: p.getAttribute('data-parcours-etat'), faites: p.getAttribute('data-parcours-faites'),
+  const prog = (p.querySelector('[data-parcours-progres]') || { getAttribute: () => '' }).getAttribute('data-parcours-progres') || '';
+  return { etape: p.getAttribute('data-parcours-etape'), etat: p.getAttribute('data-parcours-etat'), faites: p.getAttribute('data-parcours-faites'), total: prog.split('/')[1] || '',
+    lienZip: !!p.querySelector('a[href*="VRM-extension.zip"]'), recapTexte: (p.querySelector('[data-parcours-recap]') || {}).textContent || '',
     phrase: ph ? ph.textContent.trim() : '', ton: ph ? ph.getAttribute('data-ton') : '',
     titre: (p.querySelector('.vrm-pa-titre') || {}).textContent || '',
     primaires: [...pr].filter((b) => b.getBoundingClientRect().height > 0).length,
@@ -156,7 +156,12 @@ const carte = (pg) => pg.evaluate(() => {
   const c = document.querySelector('[data-parcours-carte]');
   if (!c) return null;
   const b = c.querySelector('[data-parcours-continuer]');
+  const l = c.querySelector('[data-guide-ligne]');
+  const ligne = l ? l.textContent.trim() : '';
   return { mode: c.getAttribute('data-parcours-carte'), faites: c.getAttribute('data-guide-faites'), courante: c.getAttribute('data-guide-courante'),
+    total: ((c.querySelector('[data-guide-progres]') || { getAttribute: () => '' }).getAttribute('data-guide-progres') || '').split('/')[1] || '',
+    ligne, mots: ligne ? ligne.split(/\s+/).length : 0,
+    tag: b ? b.tagName : '', href: b ? b.getAttribute('href') || '' : '', download: !!(b && b.hasAttribute('download')), continuerTexte: b ? b.textContent.trim() : '',
     continuer: b ? b.getBoundingClientRect().height : 0, rangs: Object.fromEntries([...c.querySelectorAll('[data-parcours-rang]')].map((e) => [e.getAttribute('data-parcours-rang'), e.getAttribute('data-etat')])) };
 });
 const position = (base) => ligneMain(base).vrm_parcours || null;
@@ -165,7 +170,6 @@ async function recharger(o) { await o.pg.reload({ waitUntil: 'domcontentloaded' 
 
 const MAIN = (extra) => ({ id: 'main', owner: UID, data: { vrm_bienvenue_vue: { at: iso(0) }, vrm_visite_vue: { at: iso(0) }, ...extra } });
 const COMPTE = [{ id: 1, vinted_user_id: '9101', login: 'arrivee_banc', domain: 'www.vinted.fr', owner: UID, updated_at: iso(0), created_at: iso(0) }];
-const RECEPTION = { id: 'email_reception_aa11bb22cc33dd44', owner: UID, data: { at: iso(0), adresses: ['boite@exemple.test'] } };
 const MARQUES = ['Nike', 'Adidas', 'Asics', 'Puma'];
 const annonce = (i) => ({ id: 61000 + i, title: `${MARQUES[i % 4]} modèle ${i} taille ${38 + (i % 6)}`, price: { amount: String(40 + i * 3) + '.0', currency_code: 'EUR' }, is_closed: false, is_draft: false, is_hidden: false, photo: null, brand_title: MARQUES[i % 4], size_title: String(38 + (i % 6)), status: 'Très bon état', view_count: 10 + i, favourite_count: i % 3, created_at_ts: Math.floor(Date.now() / 1000) - i * 86400 });
 const cap = () => new Date(Date.now() - 60e3).toISOString();
@@ -184,23 +188,23 @@ async function parcoursComplet(nav, W, theme) {
   const sombre = theme === 'sombre', T = `[A ${W}px ${theme}]`;
   const base = { lignes: [MAIN({})], comptes: [] };
   const o = await ouvrir(nav, { W, sombre, base });
-  // A1 — la configuration s'ouvre seule, on la termine.
+  // A1 — la configuration s'ouvre seule (avant le parcours), on la termine.
   await o.pg.waitForSelector('[data-configuration]', { timeout: 15000 }).catch(() => {});
-  dit(!!(await o.pg.$('[data-configuration]')), `${T} A1 « Ma configuration » s'ouvre seule (étape 2)`);
+  dit(!!(await o.pg.$('[data-configuration]')), `${T} A1 « Ma configuration » s'ouvre seule, avant le parcours`);
   for (let i = 0; i < 16 && (await o.pg.$('[data-configuration]')); i++) {
     if (await o.pg.$('[data-configuration-fin]')) { await o.pg.click('[data-configuration-fin]'); break; }
     const choisi = await o.pg.$('[data-configuration-choix][data-choisi="1"]');
-    if (!choisi) { const c = await o.pg.$('[data-configuration-choix]'); if (c) await c.click(); }
+    // (Un écran qui change pendant le clic détache l'élément : on recommence au tour suivant.)
+    if (!choisi) { const c = await o.pg.$('[data-configuration-choix]'); if (c) await c.click().catch(() => {}); }
     const s = await o.pg.$('[data-configuration-suivant]:not([disabled])');
-    if (s) await s.click(); else { const c = await o.pg.$('[data-configuration-choix]'); if (c) await c.click(); }
+    if (s) await s.click().catch(() => {}); else { const c = await o.pg.$('[data-configuration-choix]'); if (c) await c.click().catch(() => {}); }
     await o.pg.waitForTimeout(350);
   }
   const ouvert = await attendre(o.pg, async () => { const p = await plein(o.pg); return p && p.etape === 'extension'; }, 12000);
   let p = await plein(o.pg);
-  dit(ouvert && p.faites === '2' && p.pleinEcran, `${T} A1 « C'est parti » ⇒ le parcours plein écran s'ouvre sur l'extension, 2 sur 6`, JSON.stringify(p));
-  dit(await attendre(o.pg, async () => (ligneMain(base).vrm_configuration || {}).etat === 'fait', 5000), `${T} A1 la configuration est faite (preuve de l'étape 2)`, JSON.stringify(ligneMain(base).vrm_configuration));
+  dit(ouvert && p.faites === '1' && p.total === '3' && p.pleinEcran, `${T} A1 « C'est parti » ⇒ le parcours plein écran s'ouvre sur l'extension, 1 sur 3 (trois étapes)`, JSON.stringify(p));
   dit(p && p.plusTard && p.pourquoi && (!o.tel || (p.hPlusTard >= 43.5 && p.hFermer >= 43.5)), `${T} A1 « Plus tard », « Pourquoi ? », fermer — 44 px au doigt`, JSON.stringify(p));
-  dit(p && p.detail === 'extension', `${T} A1 l'étape extension porte le guide d'installation de ce navigateur`, JSON.stringify(p));
+  dit(p && p.detail === 'extension' && (o.tel || p.lienZip), `${T} A1 l'étape extension porte le guide de ce navigateur${o.tel ? '' : ' et le lien de téléchargement'}`, JSON.stringify(p));
   dit(!(await deborde(o.pg)), `${T} A1 rien ne déborde`);
   await capture(o.pg, `pa-${W}-${theme}-1-extension`);
   await etapeReprise(o, base, 'extension', T, 'A1');
@@ -208,86 +212,50 @@ async function parcoursComplet(nav, W, theme) {
   await o.pg.evaluate(() => { localStorage.setItem('banc_ext', 'pasconnectee'); window.__bancExtAllume && window.__bancExtAllume(); });
   await o.pg.waitForTimeout(1500); await pousser(o.pg); await o.pg.waitForTimeout(1500);
   p = await plein(o.pg);
-  dit(p && p.etape === 'extension' && p.etat === 'afaire' && /Connecte-la/.test(p.phrase), `${T} A2 installée mais pas connectée à ce compte : l'étape n'est PAS faite`, JSON.stringify(p));
+  dit(p && p.etape === 'extension' && p.etat === 'afaire' && /Connecte-la à ce compte VRM/.test(p.phrase), `${T} A2 installée mais pas connectée à ce compte : l'étape n'est PAS faite, le geste est dit`, JSON.stringify(p));
   await capture(o.pg, `pa-${W}-${theme}-2-pas-connectee`);
   await o.pg.evaluate(() => { localStorage.setItem('banc_ext', 'connectee'); });
   await pousser(o.pg);
   const vuOk = await attendre(o.pg, async () => { const q = await plein(o.pg); return q && q.etape === 'extension' && q.ton === 'ok'; }, 12000);
   dit(vuOk, `${T} A2 connectée à CE compte : « ✓ » constaté, sans rien cocher`, JSON.stringify(await plein(o.pg)));
-  const avance = await attendre(o.pg, async () => { const q = await plein(o.pg); return q && q.etape === 'emails'; }, 6000);
-  dit(avance, `${T} A2 puis l'étape suivante (e-mails), toute seule`, JSON.stringify(await plein(o.pg)));
-  await etapeReprise(o, base, 'emails', T, 'A2');
-  // A3 — e-mails.
-  await attendre(o.pg, async () => { const q = await plein(o.pg); return q && q.etat !== 'encours'; }, 8000);
-  p = await plein(o.pg);
-  dit(p && p.geste === 'emails' && p.primaires === 1 && (!o.tel || p.hGeste >= 43.5), `${T} A3 UN geste principal : « Relier mes e-mails »`, JSON.stringify(p));
-  await capture(o.pg, `pa-${W}-${theme}-3-emails`);
-  await o.pg.click('[data-parcours-geste="emails"]');
-  await attendre(o.pg, async () => !!(await o.pg.$('[data-parcours-detail="emails"] [data-parcours-adresse]')), 8000);
-  dit(!!(await o.pg.$('[data-parcours-detail="emails"] [data-parcours-adresse]')), `${T} A3 « Ton adresse VRM » s'ouvre DANS l'étape (l'essai « Reçu ✓ »)`);
-  await capture(o.pg, `pa-${W}-${theme}-4-adresse`);
-  base.lignes.push(RECEPTION);
-  await pousser(o.pg);
-  const recu = await attendre(o.pg, async () => { const q = await plein(o.pg); return q && q.etape === 'emails' && q.ton === 'ok' && /Reçu ✓/.test(q.phrase); }, 12000);
-  dit(recu, `${T} A3 un e-mail arrive ⇒ « Reçu ✓ »`, JSON.stringify(await plein(o.pg)));
-  await capture(o.pg, `pa-${W}-${theme}-5-recu`);
-  dit(await attendre(o.pg, async () => { const q = await plein(o.pg); return q && q.etape === 'vinted'; }, 6000), `${T} A3 puis l'étape Vinted`, JSON.stringify(await plein(o.pg)));
-  await etapeReprise(o, base, 'vinted', T, 'A3');
+  const avance = await attendre(o.pg, async () => { const q = await plein(o.pg); return q && q.etape === 'vinted'; }, 6000);
+  dit(avance, `${T} A2 puis l'étape Vinted, toute seule`, JSON.stringify(await plein(o.pg)));
+  await etapeReprise(o, base, 'vinted', T, 'A2');
   // Un AUTRE appareil : stockage vide, seule la base parle.
   {
     const o2 = await ouvrir(nav, { W, sombre, base });
     const ok = await attendre(o2.pg, async () => { const q = await plein(o2.pg); return q && q.etape === 'vinted'; }, 15000);
-    dit(ok, `${T} A3 un autre appareil reprend aussi à « vinted » (état rangé côté serveur)`, JSON.stringify(await plein(o2.pg)));
-    dit(!o2.journal.erreurs.length, `${T} A3 autre appareil : aucune erreur JS`, o2.journal.erreurs.join(' ¦ '));
+    dit(ok, `${T} A2 un autre appareil reprend aussi à « vinted » (état rangé côté serveur)`, JSON.stringify(await plein(o2.pg)));
+    dit(!o2.journal.erreurs.length, `${T} A2 autre appareil : aucune erreur JS`, o2.journal.erreurs.join(' ¦ '));
     await o2.ctx.close();
   }
-  // A4 — Vinted.
+  // A3 — Vinted ouvert une fois.
   await attendre(o.pg, async () => { const q = await plein(o.pg); return q && q.etat !== 'encours'; }, 8000);
   p = await plein(o.pg);
-  dit(p && p.geste === 'vinted' && /vinted\.fr/.test(p.gesteHref) && p.primaires === 1, `${T} A4 UN geste : « Ouvrir vinted.fr »`, JSON.stringify(p));
-  await capture(o.pg, `pa-${W}-${theme}-6-vinted`);
+  dit(p && p.geste === 'vinted' && /vinted\.fr/.test(p.gesteHref) && p.primaires === 1, `${T} A3 UN geste : « Ouvrir vinted.fr »`, JSON.stringify(p));
+  dit(p && /^Ouvre vinted\.fr (dans|sur) .+, connecté à ton compte\.$/.test(p.phrase) && (!o.tel || /sur ton ordinateur/.test(p.phrase)), `${T} A3 le geste exact : « ${p && p.phrase} »`, JSON.stringify(p));
+  await capture(o.pg, `pa-${W}-${theme}-3-vinted`);
   base.comptes = COMPTE;
   await pousser(o.pg);
   await attendre(o.pg, async () => { const q = await plein(o.pg); return q && q.etat === 'attente'; }, 12000);
   p = await plein(o.pg);
-  dit(p && p.etape === 'vinted' && p.etat === 'attente' && /dressing/.test(p.phrase), `${T} A4 compte relié, dressing pas encore lu : on ATTEND la vraie lecture`, JSON.stringify(p));
-  base.lignes.push(DRESSING(12));
+  dit(p && p.etape === 'vinted' && p.etat === 'attente' && /Lecture de tes ventes/.test(p.phrase), `${T} A3 compte relié, rien encore lu : on ATTEND la vraie lecture`, JSON.stringify(p));
+  base.lignes.push(VENTES(3));
   await pousser(o.pg);
-  const lu = await attendre(o.pg, async () => { const q = await plein(o.pg); return q && q.etape === 'vinted' && q.ton === 'ok'; }, 12000);
+  const lu = await attendre(o.pg, async () => { const q = await plein(o.pg); return q && (q.etape === 'pret' || (q.etape === 'vinted' && q.ton === 'ok')); }, 12000);
   p = await plein(o.pg);
-  dit(lu && /12 annonces lues/.test(p.phrase), `${T} A4 dressing lu ⇒ « 12 annonces lues »`, JSON.stringify(p));
-  await capture(o.pg, `pa-${W}-${theme}-7-annonces`);
-  dit(await attendre(o.pg, async () => { const q = await plein(o.pg); return q && q.etape === 'premiere'; }, 6000), `${T} A4 puis la première vente`, JSON.stringify(await plein(o.pg)));
-  await etapeReprise(o, base, 'premiere', T, 'A4');
-  // A5 — première vente : attente, puis « C'est prêt ».
-  await attendre(o.pg, async () => { const q = await plein(o.pg); return q && q.faites === '5' && q.etat === 'attente'; }, 8000);
+  dit(lu, `${T} A3 premières ventes lues ⇒ ✓ constaté`, JSON.stringify(p));
+  const fin = await attendre(o.pg, async () => { const q = await plein(o.pg); return q && q.etape === 'pret'; }, 8000);
   p = await plein(o.pg);
-  dit(p && !p.geste && !p.plusTard && p.primaires === 0 && p.faites === '5', `${T} A5 rien à faire : aucun geste principal, 5 sur 6`, JSON.stringify(p));
-  await capture(o.pg, `pa-${W}-${theme}-8-attente`);
-  await o.pg.click('[data-parcours-attendre]');
-  await attendre(o.pg, async () => !(await plein(o.pg)), 4000);
-  let c = await carte(o.pg);
-  dit(!(await plein(o.pg)) && c && c.mode === 'etape' && c.courante === 'premiere' && c.faites === '5' && (!o.tel || c.continuer >= 43.5), `${T} A5 « Aller à Ma journée » : la petite carte reste (5 sur 6, Continuer)`, JSON.stringify(c));
-  await capture(o.pg, `pa-${W}-${theme}-9-carte`);
-  await recharger(o);
-  await attendre(o.pg, async () => !!(await carte(o.pg)), 15000);
-  dit(!(await plein(o.pg)) && (await carte(o.pg)), `${T} A5 rechargement : l'écran reste fermé, la carte reste`, JSON.stringify(position(base)));
-  await o.pg.click('[data-parcours-continuer]');
-  dit(await attendre(o.pg, async () => { const q = await plein(o.pg); return q && q.etape === 'premiere'; }, 6000), `${T} A5 « Continuer » rouvre à la même étape`);
-  base.lignes.push(VENTES(1));
-  await pousser(o.pg);
-  const fin = await attendre(o.pg, async () => { const q = await plein(o.pg); return q && q.etape === 'pret'; }, 14000);
-  p = await plein(o.pg);
-  dit(fin && /C’est prêt/.test(p.titre) && p.recap === 6 && p.faites === '6', `${T} A5 une vente lue ⇒ « C'est prêt » et le récap des 6 étapes`, JSON.stringify(p));
-  await capture(o.pg, `pa-${W}-${theme}-10-pret`);
-  dit(!(await deborde(o.pg)), `${T} A5 rien ne déborde`);
+  dit(fin && /C’est prêt/.test(p.titre) && p.recap === 3 && p.faites === '3' && /3 ventes lues/.test(p.recapTexte), `${T} A3 « C'est prêt » : le récap des 3 étapes, « 3 ventes lues »`, JSON.stringify(p));
+  await capture(o.pg, `pa-${W}-${theme}-4-pret`);
+  dit(!(await deborde(o.pg)), `${T} A3 rien ne déborde`);
   await o.pg.click('[data-parcours-fin]');
-  dit(await attendre(o.pg, async () => { const q = position(base); return q && q.fini && q.ouvert === false; }, 4000), `${T} A5 la fin est rangée (fini, fermé)`, JSON.stringify(position(base)));
+  dit(await attendre(o.pg, async () => { const q = position(base); return q && q.fini && q.ouvert === false; }, 4000), `${T} A3 la fin est rangée (fini, fermé)`, JSON.stringify(position(base)));
   await o.pg.waitForTimeout(600);
-  dit(!(await plein(o.pg)) && !(await carte(o.pg)), `${T} A5 puis plus rien : ni écran, ni carte`, JSON.stringify(await carte(o.pg)));
+  dit(!(await plein(o.pg)) && !(await carte(o.pg)), `${T} A3 puis plus rien : ni écran, ni carte`, JSON.stringify(await carte(o.pg)));
   await recharger(o); await o.pg.waitForTimeout(3000);
-  dit(!(await plein(o.pg)) && !(await carte(o.pg)), `${T} A5 rechargement : toujours rien`);
-  await capture(o.pg, `pa-${W}-${theme}-11-apres`);
+  dit(!(await plein(o.pg)) && !(await carte(o.pg)), `${T} A3 rechargement : toujours rien`);
   dit(!o.journal.erreurs.length, `${T} aucune erreur JS`, o.journal.erreurs.join(' ¦ '));
   await o.ctx.close();
 }
@@ -299,13 +267,12 @@ async function plusTard(nav, W, theme) {
   await attendre(o.pg, async () => { const q = await plein(o.pg); return q && q.etape === 'extension'; }, 15000);
   dit((await plein(o.pg) || {}).etape === 'extension', `${T} B l'écran rangé ouvert s'ouvre au chargement, sur l'extension`, JSON.stringify(await plein(o.pg)));
   await o.pg.click('[data-parcours-plus-tard="extension"]');
-  dit(await attendre(o.pg, async () => { const q = await plein(o.pg); return q && q.etape === 'emails'; }, 5000), `${T} B « Plus tard » ⇒ les e-mails (Vinted suit l'extension)`, JSON.stringify(await plein(o.pg)));
+  dit(await attendre(o.pg, async () => !(await plein(o.pg)), 5000), `${T} B « Plus tard » sur l'extension ⇒ l'écran se ferme (Vinted la suit)`, JSON.stringify(await plein(o.pg)));
   dit(await attendre(o.pg, async () => { const d = ligneMain(base).vrm_parcours_plus_tard; return d && d.extension; }, 4000), `${T} B « Plus tard » est rangé (synchronisé)`, JSON.stringify(ligneMain(base).vrm_parcours_plus_tard));
-  await o.pg.click('[data-parcours-fermer]');
-  await attendre(o.pg, async () => !(await plein(o.pg)), 4000);
+  await attendre(o.pg, async () => !!(await carte(o.pg)), 6000);
   const c = await carte(o.pg);
-  dit(!(await plein(o.pg)) && c && c.courante === 'emails' && c.faites === '2' && c.rangs.extension !== 'fait', `${T} B ✕ ferme : la carte garde « e-mails », rien n'est coché`, JSON.stringify(c));
-  await capture(o.pg, `pa-${W}-${theme}-12-plus-tard`);
+  dit(c && c.mode === 'reprendre' && c.faites === '1' && c.rangs.extension !== 'fait' && /Reprendre/.test(c.continuerTexte), `${T} B la carte dit « Reprendre », rien n'est coché`, JSON.stringify(c));
+  await capture(o.pg, `pa-${W}-${theme}-5-plus-tard`);
   dit(await attendre(o.pg, async () => (position(base) || {}).ouvert === false, 4000), `${T} B fermé est rangé (un rechargement ne le rouvre pas)`, JSON.stringify(position(base)));
   dit(!o.journal.erreurs.length, `${T} aucune erreur JS`, o.journal.erreurs.join(' ¦ '));
   await o.ctx.close();
@@ -313,20 +280,69 @@ async function plusTard(nav, W, theme) {
 
 async function installe(nav, W, theme) {
   const sombre = theme === 'sombre', T = `[C ${W}px ${theme}]`;
-  const base = { lignes: [MAIN({ vrm_configuration: { etat: 'fait', at: iso(9), statut: null, version: 1 } }), RECEPTION, DRESSING(12), VENTES(3)], comptes: COMPTE };
+  const CONF = { vrm_configuration: { etat: 'fait', at: iso(9), statut: null, version: 1 } };
+  const base = { lignes: [MAIN(CONF), DRESSING(12), VENTES(3)], comptes: COMPTE };
   const o = await ouvrir(nav, { W, sombre, base, proprio: true });
   await o.pg.waitForTimeout(4500);
-  dit(!(await plein(o.pg)) && !(await carte(o.pg)), `${T} C vendeur installé, tout prouvé : ni carte ni écran plein`, JSON.stringify(await carte(o.pg)));
-  dit(!position(base), `${T} C rien n'est écrit pour lui`, JSON.stringify(position(base)));
+  dit(!(await plein(o.pg)) && !(await carte(o.pg)), `${T} C1 vendeur installé, tout prouvé : ni carte ni écran plein`, JSON.stringify(await carte(o.pg)));
+  dit(!position(base), `${T} C1 rien n'est écrit pour lui`, JSON.stringify(position(base)));
   await o.ctx.close();
-  const base2 = { lignes: [MAIN({ vrm_configuration: { etat: 'fait', at: iso(9), statut: null, version: 1 } }), RECEPTION, DRESSING_ILLISIBLE, VENTES(3)], comptes: COMPTE };
+  // C2 — installé, la lecture de Vinted rate (compteur illisible, aucune vente) : jamais interrompu.
+  const base2 = { lignes: [MAIN(CONF), DRESSING_ILLISIBLE], comptes: COMPTE };
   const o2 = await ouvrir(nav, { W, sombre, base: base2, proprio: true });
-  await attendre(o2.pg, async () => !!(await carte(o2.pg)), 10000);
-  const c = await carte(o2.pg);
-  dit(c && c.rangs.vinted !== 'fait' && c.faites !== '6', `${T} C dressing illisible : « Vinted » n'est JAMAIS coché (pas su ≠ fait)`, JSON.stringify(c));
-  await capture(o2.pg, `pa-${W}-${theme}-13-passu`);
-  dit(!o.journal.erreurs.length && !o2.journal.erreurs.length, `${T} aucune erreur JS`, o.journal.erreurs.concat(o2.journal.erreurs).join(' ¦ '));
+  await o2.pg.waitForTimeout(4500);
+  dit(!(await plein(o2.pg)) && !(await carte(o2.pg)), `${T} C2 installé, lecture ratée (pas su) : toujours rien, jamais « Démarrer »`, JSON.stringify(await carte(o2.pg)));
   await o2.ctx.close();
+  // C3 — parcours commencé, dressing illisible : la carte reste, « Vinted » jamais coché.
+  const base3 = { lignes: [MAIN({ ...CONF, vrm_parcours: { v: 1, etape: 'vinted', ouvert: false, fini: null, at: iso(0) } }), DRESSING_ILLISIBLE], comptes: COMPTE };
+  const o3 = await ouvrir(nav, { W, sombre, base: base3, proprio: true });
+  await attendre(o3.pg, async () => { const q = await carte(o3.pg); return q && q.rangs.vinted && q.rangs.vinted !== 'encours'; }, 10000);
+  const c = await carte(o3.pg);
+  dit(c && c.rangs.vinted !== 'fait' && c.faites === '2' && /Pas pu vérifier/.test(c.ligne), `${T} C3 dressing illisible : « Vinted » n'est JAMAIS coché (pas su ≠ fait)`, JSON.stringify(c));
+  await capture(o3.pg, `pa-${W}-${theme}-6-passu`);
+  dit(!o.journal.erreurs.length && !o2.journal.erreurs.length && !o3.journal.erreurs.length, `${T} aucune erreur JS`, o.journal.erreurs.concat(o2.journal.erreurs, o3.journal.erreurs).join(' ¦ '));
+  await o3.ctx.close();
+}
+
+// D — la carte de Ma journée dit le GESTE EXACT de l'étape bloquée ; un débutant sans
+// aucune vente finit (son dressing lu suffit) ; les trois faites, la carte disparaît.
+async function carteGestes(nav, W, theme) {
+  const sombre = theme === 'sombre', T = `[D ${W}px ${theme}]`;
+  const base = { lignes: [MAIN({ vrm_configuration: { etat: 'fait', at: iso(0), statut: null, version: 1 } })], comptes: [] };
+  const o = await ouvrir(nav, { W, sombre, base });
+  await attendre(o.pg, async () => !!(await carte(o.pg)), 15000);
+  let c = await carte(o.pg);
+  dit(c && c.mode === 'etape' && c.courante === 'extension' && c.faites === '1' && c.total === '3', `${T} D1 compte neuf : « Démarrer avec VRM · 1 sur 3 », l'extension`, JSON.stringify(c));
+  dit(c && /^Télécharge-la, puis installe-la (dans|sur) .+\.$/.test(c.ligne) && (!o.tel || /sur ton ordinateur/.test(c.ligne)), `${T} D1 le geste exact : « ${c && c.ligne} »`, JSON.stringify(c));
+  if (o.tel) dit(c && c.tag === 'BUTTON' && /Continuer/.test(c.continuerTexte) && c.continuer >= 43.5, `${T} D1 au téléphone : « Continuer » (le guide « sur ton ordinateur »), 44 px`, JSON.stringify(c));
+  else dit(c && c.tag === 'A' && /\/VRM-extension\.zip/.test(c.href) && c.download && /Télécharger l’extension/.test(c.continuerTexte), `${T} D1 sur ordinateur : le bouton EST le téléchargement (zip)`, JSON.stringify(c));
+  dit(c && c.mots <= 12, `${T} D1 la ligne tient en 12 mots au plus (${c && c.mots})`);
+  await capture(o.pg, `pa-${W}-${theme}-7-carte-extension`);
+  await o.pg.evaluate(() => { localStorage.setItem('banc_ext', 'connectee'); window.__bancExtAllume && window.__bancExtAllume(); });
+  await attendre(o.pg, async () => { const q = await carte(o.pg); return q && q.courante === 'vinted'; }, 12000);
+  c = await carte(o.pg);
+  dit(c && c.courante === 'vinted' && c.faites === '2' && /^Ouvre vinted\.fr (dans|sur) .+, connecté à ton compte\.$/.test(c.ligne), `${T} D2 extension connectée ⇒ la carte passe seule à Vinted : « ${c && c.ligne} »`, JSON.stringify(c));
+  if (!o.tel) dit(c && c.tag === 'A' && /^https:\/\/www\.vinted\.fr/.test(c.href) && /Ouvrir vinted\.fr/.test(c.continuerTexte), `${T} D2 sur ordinateur : le bouton ouvre vinted.fr`, JSON.stringify(c));
+  await capture(o.pg, `pa-${W}-${theme}-8-carte-vinted`);
+  // Le geste de la carte ouvre AUSSI l'écran plein (le lien part dans un autre onglet).
+  const [onglet] = await Promise.all([o.pg.context().waitForEvent('page', { timeout: 3000 }).catch(() => null), o.pg.click('[data-parcours-continuer]')]);
+  if (onglet) await onglet.close().catch(() => {});
+  dit(await attendre(o.pg, async () => { const q = await plein(o.pg); return q && q.etape === 'vinted'; }, 6000), `${T} D2 le geste de la carte ouvre l'écran plein sur Vinted`, JSON.stringify(await plein(o.pg)));
+  // Un débutant : aucune vente (jamais de ligne de ventes), son dressing lu suffit.
+  base.comptes = COMPTE; base.lignes.push(DRESSING(5));
+  await pousser(o.pg);
+  const pret = await attendre(o.pg, async () => { const q = await plein(o.pg); return q && q.etape === 'pret'; }, 14000);
+  const p = await plein(o.pg);
+  dit(pret && p.faites === '3' && /5 annonces lues/.test(p.recapTexte), `${T} D3 débutant sans vente : son dressing lu finit le démarrage (« 5 annonces lues »)`, JSON.stringify(p));
+  // Fermé SANS « Aller à Ma journée » : les trois faites, la carte disparaît quand même.
+  await o.pg.click('[data-parcours-fermer]');
+  await o.pg.waitForTimeout(1200);
+  dit(!(await plein(o.pg)) && !(await carte(o.pg)), `${T} D3 les trois faites : plus de carte (sans rien cocher)`, JSON.stringify(await carte(o.pg)));
+  await recharger(o); await o.pg.waitForTimeout(3000);
+  dit(!(await carte(o.pg)), `${T} D3 rechargement : toujours rien`);
+  await capture(o.pg, `pa-${W}-${theme}-9-apres`);
+  dit(!o.journal.erreurs.length, `${T} aucune erreur JS`, o.journal.erreurs.join(' ¦ '));
+  await o.ctx.close();
 }
 
 (async () => {
@@ -337,6 +353,7 @@ async function installe(nav, W, theme) {
       if (SCENARIOS.includes('A')) await parcoursComplet(nav, W, th);
       if (SCENARIOS.includes('B')) await plusTard(nav, W, th);
       if (SCENARIOS.includes('C')) await installe(nav, W, th);
+      if (SCENARIOS.includes('D')) await carteGestes(nav, W, th);
     }
   } catch (e) { ko++; console.log('KO  le banc a planté — ' + (e && e.stack || e)); }
   await nav.close(); srv.close();

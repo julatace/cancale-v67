@@ -13,7 +13,9 @@
 //      sommes par jour) : incertitude des jours qui restent + celle du rythme lui-même
 //      (qui diminue avec le nombre de jours lus). ±1,28 écart type (≈ 8 chances sur 10).
 //      Le bas ne descend jamais sous ce qui est déjà vendu.
-//    · MOINS DE 5 JOURS PLEINS ⇒ « pas encore su » (etat 'tot'), aucun chiffre.
+//    · MOINS DE 5 JOURS PLEINS ⇒ le rythme LISSÉ des 4 dernières semaines (13 nov.,
+//      `mode: 'lisse'`, dit « rythme des 4 dernières semaines ») ; moins de 14 jours
+//      d'historique ⇒ « pas encore su » (etat 'tot'), aucun chiffre.
 //    · LE BÉNÉFICE BRUT (vente − prix d'achat, src/beneficeNoms.js) n'est prévu que si
 //      les prix d'achat couvrent assez les ventes finalisées DU MOIS (relevé
 //      `vrm_stats_ventes` de l'écran Ventes) : au moins 5 ventes ET 80 % au prix
@@ -69,7 +71,14 @@ export function previsionMois({ vendu, manque = [], nonComptees = [], releve = n
     if (j >= 0 && j < jours) parJour[j] += c;
   }
   const P = { ...base, cumul, n: n + nc, nNonComptees: nc, partiel: manques.length > 0, manques };
-  if (jours < PREVISION_JOURS_MIN) return { ...P, etat: 'tot', joursManquants: PREVISION_JOURS_MIN - jours };
+  if (jours < PREVISION_JOURS_MIN) {
+    // (13 nov., lot 36-27) Début de mois : le rythme LISSÉ des 4 dernières semaines.
+    const L = lisse(vendu, maintenant, a, joursMois, ecoule, cumul);
+    if (!L) return { ...P, etat: 'tot', joursManquants: PREVISION_JOURS_MIN - jours };
+    const out = { ...P, etat: 'ok', mode: 'lisse', joursRythme: L.joursRythme, centre: L.centre, bas: Math.min(L.bas, L.centre), haut: L.haut, rythmeJour: L.rythmeJour, sd: L.sd };
+    out.benef = beneficePrevu(releve, L.debut, a, L.brut);
+    return out;
+  }
   if (cumul <= 0) return { ...P, etat: 'rien' };
   // Le rythme : ce qui est vendu ÷ le temps écoulé (jour en cours compris, à sa fraction).
   const rythme = cumul / ecoule;
@@ -85,6 +94,49 @@ export function previsionMois({ vendu, manque = [], nonComptees = [], releve = n
   const out = { ...P, etat: 'ok', centre, bas: Math.min(bas, centre), haut, rythmeJour: Math.round(rythme), sd: Math.round(sd) };
   out.benef = beneficePrevu(releve, de, a, { centre: centreBrut, bas: centreBrut - PREVISION_Z * sd, haut: centreBrut + PREVISION_Z * sd, cumul });
   return out;
+}
+
+// (13 nov., lot 36-27) LE RYTHME LISSÉ — moins de PREVISION_JOURS_MIN jours lus ce mois-ci :
+// le vendu des 28 derniers jours (aujourd'hui compris, à sa fraction) ÷ le temps couvert,
+// prolongé sur les jours qui restent ; la fourchette = la dispersion des jours pleins de
+// cette fenêtre. Il faut au moins PREVISION_LISSE_MIN jours d'historique (la première
+// vente lue fait foi) ; sinon `null` ⇒ « pas encore su ». Le déjà-vendu du mois reste le plancher.
+export const PREVISION_LISSE_JOURS = 28;
+export const PREVISION_LISSE_MIN = 14;
+function lisse(vendu, maintenant, a, joursMois, ecoule, cumul) {
+  const d = new Date(maintenant);
+  const m0 = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const debut28 = new Date(d.getFullYear(), d.getMonth(), d.getDate() - PREVISION_LISSE_JOURS).getTime();
+  let premiere = Infinity;
+  for (const l of vendu) if (l && Number.isFinite(l.ts) && l.ts > 0 && cts(l.eur) != null && l.ts < premiere) premiere = l.ts;
+  if (!Number.isFinite(premiere)) return null;
+  const p = new Date(premiere), minuitPremiere = new Date(p.getFullYear(), p.getMonth(), p.getDate()).getTime();
+  const debut = Math.max(debut28, minuitPremiere);
+  const pleins = Math.round((m0 - debut) / J);
+  if (pleins < PREVISION_LISSE_MIN) return null;
+  const parJour = new Array(pleins).fill(0);
+  let somme = 0;
+  for (const l of vendu) {
+    if (!l || !Number.isFinite(l.ts) || l.ts < debut || l.ts > maintenant) continue;
+    const c = cts(l.eur); if (c == null) continue;
+    somme += c;
+    const dl = new Date(l.ts); const k = Math.round((new Date(dl.getFullYear(), dl.getMonth(), dl.getDate()).getTime() - debut) / J);
+    if (k >= 0 && k < pleins) parJour[k] += c;
+  }
+  const couvert = (maintenant - debut) / J;
+  if (!(somme > 0) || !(couvert > 0)) return null;
+  const rythme = somme / couvert;
+  const reste = Math.max(0, joursMois - ecoule);
+  const centreBrut = cumul + rythme * reste;
+  const moy = parJour.reduce((s, x) => s + x, 0) / pleins;
+  const v = pleins > 1 ? parJour.reduce((s, x) => s + (x - moy) * (x - moy), 0) / (pleins - 1) : 0;
+  const sd = Math.sqrt(Math.max(0, reste * v + (reste * reste * v) / pleins));
+  const centre = rond(centreBrut);
+  return {
+    debut, joursRythme: pleins, rythmeJour: Math.round(rythme), sd: Math.round(sd), centre,
+    bas: Math.max(rond(cumul, -1), rond(centreBrut - PREVISION_Z * sd)), haut: Math.max(centre, rond(centreBrut + PREVISION_Z * sd)),
+    brut: { centre: centreBrut, bas: centreBrut - PREVISION_Z * sd, haut: centreBrut + PREVISION_Z * sd, cumul },
+  };
 }
 
 // Le bénéfice BRUT prévu : la marge brute des ventes finalisées du mois AU PRIX CONNU,
@@ -122,7 +174,7 @@ export function textePrevision(P) {
   if (P.etat === 'passu') return { ligne: null, titre, grand: '—', sous: 'Tes ventes n’ont pas pu être lues.', manque: '' };
   if (P.etat === 'tot') return { ligne: null, titre, grand: '—', sous: `Pas encore su : il faut ${PREVISION_JOURS_MIN} jours de ventes.`, manque };
   if (P.etat === 'rien') return { ligne: null, titre, grand: '—', sous: 'Aucune vente lue ce mois-ci.', manque };
-  const jours = `sur ${P.jours} jour${P.jours > 1 ? 's' : ''} lus`;
+  const jours = P.mode === 'lisse' ? 'rythme des 4 dernières semaines' : `sur ${P.jours} jour${P.jours > 1 ? 's' : ''} lus`;
   const fourchette = P.bas < P.haut ? `entre ${eurosRonds(P.bas).replace(/ €$/, '')} et ${eurosRonds(P.haut)}` : '';
   return {
     titre, grand: `vers ${eurosRonds(P.centre)}`, sous: [fourchette, jours].filter(Boolean).join(' · '), manque,

@@ -406,7 +406,48 @@
   // chaîne mise en forme) — mesuré sur ta vente du 2 nov. Lu seulement s'il est
   // écrit en euros, au centime.
   const eurosEcrits = (t) => { const m = /^\s*(\d{1,3}(?:[\s\u00a0\u202f.]?\d{3})*|\d+)(?:,(\d{2}))?\s*€\s*$/.exec(String(t || '')); return m ? Number(m[1].replace(/[\s\u00a0\u202f.]/g, '')) + (m[2] ? Number(m[2]) / 100 : 0) : null; };
-  function scalairesVente(e) {
+  // 5.374 (13 nov., Julien : « l'extension a mal capté la vente de Vestiaire sur Orion sur mon
+  // iPhone ») — LA DATE DE VENTE. Mesuré sur sa vente du 2 nov. (réponses gardées par la 5.315) :
+  //   · `/ots/sales` (« Mes ventes ») : `soldDate` « 2026-11-02 14:17:41 » et
+  //     `orderConfirmationDate` « 2026-11-02 14:17:40 » — heure de Paris, SANS fuseau ;
+  //   · `/users/me/awaiting-shipping-items` (« à expédier ») : `soldDate` = l'HEURE DE LA LECTURE
+  //     (21:00:32, la seconde même de la visite), `orderConfirmationDate` « November 02, 2026 ».
+  //   La règle générale (première clé qui contient « date ») prenait ce `soldDate`-là : chaque
+  //   visite de « à expédier » redatait la vente au moment de la visite (rangé : 21:00:32, vendue
+  //   à 14:17:41). ⇒ la date ne vient que d'une clé NOMMÉE : « Mes ventes » → `soldDate` (sinon
+  //   `orderConfirmationDate`) ; « à expédier » → le JOUR de `orderConfirmationDate` seulement.
+  //   Et jamais `Date.parse` : WebKit (le moteur d'Orion et de Safari sur iPhone) ne garantit pas
+  //   la forme « AAAA-MM-JJ HH:MM:SS » — la date tombait en silence sur l'iPhone. Une forme lue
+  //   chiffre par chiffre ; le fond y pose le fuseau de Paris (`dateVcIso`).
+  const MOIS_EN = { january: 1, february: 2, march: 3, april: 4, may: 5, june: 6, july: 7, august: 8, september: 9, october: 10, november: 11, december: 12 };
+  const deux = (n) => String(n).padStart(2, '0');
+  const jourValide = (a, m, j) => a >= 2000 && a <= 2100 && m >= 1 && m <= 12 && j >= 1 && j <= new Date(Date.UTC(a, m, 0)).getUTCDate();
+  function dateLue(v) {
+    const t = String(v == null ? '' : v).trim();
+    let m = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,6})?)?(Z|[+-]\d{2}:?\d{2})?)?$/.exec(t);
+    if (m) {
+      if (!jourValide(+m[1], +m[2], +m[3])) return '';
+      if (m[4] == null) return `${m[1]}-${m[2]}-${m[3]}`;
+      if (+m[4] > 23 || +m[5] > 59 || +(m[6] || 0) > 59) return '';
+      const fz = m[7] ? (m[7] === 'Z' ? 'Z' : m[7].replace(/^([+-]\d{2})(\d{2})$/, '$1:$2')) : '';
+      return `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6] || '00'}${fz}`;
+    }
+    m = /^([A-Za-z]+)\.? (\d{1,2}),? (\d{4})$/.exec(t);
+    if (m && MOIS_EN[m[1].toLowerCase()] && jourValide(+m[3], MOIS_EN[m[1].toLowerCase()], +m[2])) return `${m[3]}-${deux(MOIS_EN[m[1].toLowerCase()])}-${deux(m[2])}`;
+    return '';
+  }
+  const CLES_DATE_VENTES = ['soldDate', 'sold_date', 'soldAt', 'sold_at', 'saleDate', 'sale_date', 'orderConfirmationDate', 'order_confirmation_date', 'createdAt', 'created_at'];
+  const CLES_JOUR_A_EXPEDIER = ['orderConfirmationDate', 'createdAt', 'created_at'];   // JAMAIS `soldDate` ici
+  function dateVenteDe(e, source) {
+    if (!e || typeof e !== 'object') return { date: '', cle: '' };
+    if (source === 'a-expedier') {
+      for (const k of CLES_JOUR_A_EXPEDIER) { const d = dateLue(e[k]); if (d) return { date: d.slice(0, 10), cle: k }; }
+      return { date: '', cle: '' };
+    }
+    for (const k of CLES_DATE_VENTES) { const d = dateLue(e[k]); if (d) return { date: d, cle: k }; }
+    return { date: '', cle: '' };
+  }
+  function scalairesVente(e, source) {
     const out = { etat: '', date: '', montant: null, prixVente: null };
     if (e && typeof e.sellerEarning === 'string' && eurosEcrits(e.sellerEarning) != null) out.montant = { valeur: eurosEcrits(e.sellerEarning), devise: 'EUR', cle: 'sellerEarning' };
     // 5.340 — LE PRIX DE VENTE de l'article (`sellerPrice`, une chaîne à côté de
@@ -419,7 +460,8 @@
         const v = x[k];
         if (PAS_ACHETEUR.test(k)) continue;
         if (!out.etat && CLE_ETAT.test(k) && (typeof v === 'string' || typeof v === 'number')) { const t = String(v); if (/^[\w .:-]{1,40}$/.test(t)) out.etat = t; }
-        if (!out.date && CLE_DATE.test(k) && typeof v === 'string' && isFinite(Date.parse(v)) && /\d{4}-\d{2}-\d{2}/.test(v)) out.date = v.slice(0, 30);
+        // (hors ventes : messages, achats) la règle d'avant — validée chiffre par chiffre (WebKit).
+        if (!source && !out.date && CLE_DATE.test(k) && typeof v === 'string' && dateLue(v.slice(0, 30))) out.date = v.slice(0, 30);
         if (!out.montant && CLE_MONTANT.test(k)) {
           if (typeof v === 'number') out.montant = { valeur: v, devise: '', cle: chemin + k };
           else if (v && typeof v === 'object') {
@@ -432,6 +474,7 @@
       }
     };
     visite(e, 0, '');
+    if (source) { const dv = dateVenteDe(e, source); out.date = dv.date; out.dateCle = dv.cle; }
     return out;
   }
   function refVente(e) {
@@ -460,7 +503,7 @@
       for (const k of Object.keys(x).slice(0, 80)) {
         const v = x[k];
         if (PAS_ACHETEUR.test(k)) continue;
-        if (!out.limite && CLE_LIMITE.test(k) && typeof v === 'string' && /\d{4}-\d{2}-\d{2}/.test(v) && isFinite(Date.parse(v))) out.limite = v.slice(0, 30);
+        if (!out.limite && CLE_LIMITE.test(k) && typeof v === 'string' && /\d{4}-\d{2}-\d{2}/.test(v) && dateLue(v.slice(0, 30))) out.limite = v.slice(0, 30);   // 5.374 : lue chiffre par chiffre (WebKit)
         if (CLE_ETIQUETTE.test(k)) { if ((typeof v === 'string' && /^https?:\/\//i.test(v)) || (v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length)) out.etiquette = true; else if (out.etiquette !== true && (v === null || v === '' || v === false)) out.etiquette = false; continue; }
         if (v && typeof v === 'object' && !Array.isArray(v)) visite(v, prof + 1);
       }
@@ -522,19 +565,145 @@
     return /\/users\/me\/awaiting-shipping-items\/?$/i.test(ch) ? 'a-expedier'
       : (/\/users\/me\/[\w-]*(sales|sold|transactions)[\w-]*\/?$/i.test(ch) || /\/sales\/?$/i.test(ch)) ? 'ventes' : '';
   }
-  function noteVentes(url, texte) {
+  // 5.374 : `origine` = '' (réponse vue au vol) · 'relue' (rattrapée, voir `rattraperVentes`).
+  function noteVentes(url, texte, origine) {
     try {
       let u; try { u = new URL(url, location.origin); } catch (_) { return; }
       if (!DE_VC(url)) return;
       const source = sourceVentes(u);
       if (!source) return;
+      ventesVuesUrls.add(u.href);
       let obj; try { obj = JSON.parse(texte); } catch (_) { return; }
       if (!obj || typeof obj !== 'object') return;
+      lirePageUneFois();   // le compte de la page (`__NEXT_DATA__`) AVANT la vente : elle part avec lui
       if (source === 'ventes') noterModeleImport('ventes', u);
       const pq = paquetVentes(u, obj, source);
-      post(Object.assign({ kind: 'vcventes' }, pq, pq.inconnu ? {} : { complet: lotComplet('ventes-' + source, u, pq.total, pq.ventes.map((x) => x.id)) }));
+      post(Object.assign({ kind: 'vcventes', origine: origine === 'relue' ? 'relue' : '' }, pq, pq.inconnu ? {} : { complet: lotComplet('ventes-' + source, u, pq.total, pq.ventes.map((x) => x.id)) }));
     } catch (_) {}
   }
+  const ventesVuesUrls = new Set();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // 5.374 (13 nov.) — LA VENTE VESTIAIRE SUR ORION (iPhone)
+  // ══════════════════════════════════════════════════════════════════════════
+  // Julien : « l'extension a mal capté la vente de Vestiaire Collective sur Orion sur mon
+  // iPhone ». Mesuré (lecture seule, 13 nov.) : depuis le 3 nov., seul l'iPhone (Orion, 5.368)
+  // passe sur Vestiaire ; il a rangé le fil des notifications et le compteur (lus au fil de
+  // l'eau), JAMAIS une vente : `vc_ventes` est resté à la lecture du 2 nov. (ordinateur).
+  //  1. Sur Orion, ce capteur était posé par une balise `<script src>` — chargée APRÈS les
+  //     premières requêtes de la page : la liste des ventes, demandée au chargement de « Mes
+  //     ventes », passait avant lui. (Le paquet Orion le pose désormais EN LIGNE, comme
+  //     inject.js sur Vinted : scripts/extension-orion/orion-main.js.) Et s'il arrive encore
+  //     tard (page qui refuse le script en ligne) : `rattraperVentes`.
+  //  2. Le COMPTE : la page ne demande jamais `/users/me` (le compte connecté est servi DANS la
+  //     page, `__NEXT_DATA__` → `dehydratedState`, requête `["user.user"]`, mesuré le 2 nov.) :
+  //     `vc_session` n'avait jamais été écrit, chaque vente rangée portait `compte: ''`. On lit
+  //     son `id` SEUL (jamais le nom, l'e-mail, l'adresse que la même requête porte).
+  //  3. Les VENTES que la page porterait elle-même (une requête de `dehydratedState` dont la CLÉ
+  //     nomme les ventes) : lues comme « Mes ventes », PARTIELLES (jamais « liste entière » ⇒
+  //     rien ne sort de « à expédier ») ; une forme inconnue ⇒ sa forme seule part, rien n'est
+  //     rangé (« pas su »). Aussi `/_next/data/…json` (changement de page sans rechargement).
+  const KEY_VENTES = /(^|[^a-z])(sales?|sold|awaiting[-_ .]?shipping)([^a-z]|$)/i;
+  const KEY_PAS_VENTES = /purchase|bought|cart|basket|checkout|achat|recap|count|status|stats|summary|order(?![-_ ]?sales)/i;
+  const PAGE_U = (() => { try { return new URL(location.origin + '/__page__'); } catch (_) { return null; } })();
+  const vusPage = new Set();
+  function requetesDePage(obj) {
+    const pp = obj && obj.props && obj.props.pageProps ? obj.props.pageProps : (obj && obj.pageProps ? obj.pageProps : null);
+    const q = pp && pp.dehydratedState && typeof pp.dehydratedState === 'object' ? pp.dehydratedState.queries : null;
+    return Array.isArray(q) ? q.slice(0, 80) : [];
+  }
+  function notePageVc(obj) {
+    try {
+      const qs = requetesDePage(obj);
+      if (!qs.length) return;
+      // Le compte d'abord : les ventes de la même page partent avec lui.
+      for (const q of qs) {
+        const k = Array.isArray(q && q.queryKey) ? q.queryKey : [];
+        const d = q && q.state && q.state.status === 'success' ? q.state.data : null;
+        if (k[0] !== 'user.user' || !d || typeof d !== 'object' || Array.isArray(d)) continue;
+        const id = (typeof d.id === 'number' || typeof d.id === 'string') ? String(d.id) : '';
+        if (!/^\d{1,15}$/.test(id)) continue;
+        if (moiId && moiSource === 'users/me') break;          // `/users/me` lu dans ce document fait foi
+        if (moiId !== id) { moiId = id; moiSource = 'page'; post({ kind: 'vcmoi', id, source: 'page', forme: ['user.user.id'] }); }
+        break;
+      }
+      for (const q of qs) {
+        const k = Array.isArray(q && q.queryKey) ? q.queryKey : [];
+        const lib = k.map((x) => (typeof x === 'string' ? x : '')).join(' ').slice(0, 200);
+        if (!KEY_VENTES.test(lib) || KEY_PAS_VENTES.test(lib) || !PAGE_U) continue;
+        if (!q.state || q.state.status !== 'success' || q.state.data == null || typeof q.state.data !== 'object') continue;
+        const source = /awaiting|to[-_ ]?ship|shipping/i.test(lib) ? 'a-expedier' : 'ventes';
+        const pq = paquetVentes(PAGE_U, q.state.data, source);
+        const sig = source + '|' + JSON.stringify(pq.inconnu ? pq.inconnu : pq.ventes);
+        if (vusPage.has(sig)) continue; vusPage.add(sig);
+        // PARTIELLE toujours : ni total, ni liste entière (la page peut n'en porter qu'une partie).
+        post(Object.assign({ kind: 'vcventes', origine: 'page', cleRequete: sansId(lib).slice(0, 80) }, pq, { total: null }));
+      }
+    } catch (_) {}
+  }
+  let pageLue = false;
+  function lirePageUneFois() {
+    if (pageLue) return;
+    try {
+      const el = document.getElementById('__NEXT_DATA__');
+      if (!el) return;
+      pageLue = true;
+      let obj = null; try { obj = JSON.parse(el.textContent || ''); } catch (_) { return; }
+      notePageVc(obj);
+    } catch (_) {}
+  }
+  function notePageData(url, texte) {
+    try {
+      let u; try { u = new URL(url, location.origin); } catch (_) { return; }
+      if (!DE_VC(url) || !/^\/_next\/data\//.test(u.pathname)) return;
+      let obj; try { obj = JSON.parse(texte); } catch (_) { return; }
+      notePageVc(obj);
+    } catch (_) {}
+  }
+  // LE CAPTEUR ARRIVÉ APRÈS LA PAGE : la liste des ventes que la page a DÉJÀ demandée avant lui
+  // (le minutage des ressources du navigateur le dit : `performance`, demandée avant la pose)
+  // est relue UNE fois, à l'adresse EXACTE que la page a demandée (sa propre lecture, sur SON
+  // compte, dans SON onglet) — GET seulement, `apiv2` de Vestiaire, deux adresses au plus par
+  // page, avec les en-têtes que la page vient d'envoyer (gardés en mémoire ici, jamais
+  // transmis). Sur Chrome (capteur posé avant la page) rien ne la déclenche.
+  const T_POSE = (() => { try { return performance.now(); } catch (_) { return 0; } })();
+  let rattrapageFait = false;
+  async function rattraperVentes() {
+    if (rattrapageFait) return; rattrapageFait = true;
+    try {
+      if (window.top !== window || !(T_POSE > 0)) return;
+      let entrees = []; try { entrees = performance.getEntriesByType('resource') || []; } catch (_) { return; }
+      const manquees = [];
+      for (const e of entrees) {
+        if (!e || !(Number(e.startTime) < T_POSE)) continue;
+        let u; try { u = new URL(String(e.name || '')); } catch (_) { continue; }
+        if (u.protocol !== 'https:' || u.username || u.password || !/^apiv2\./i.test(u.hostname) || !DE_VC(u.href)) continue;
+        if (!sourceVentes(u) || ventesVuesUrls.has(u.href) || manquees.some((x) => x.href === u.href)) continue;
+        manquees.push(u);
+        if (manquees.length >= 2) break;
+      }
+      if (!manquees.length) return;
+      for (let i = 0; i < 16 && !entetesApi; i++) await new Promise((r) => setTimeout(r, 500));
+      for (const u of manquees) {
+        if (ventesVuesUrls.has(u.href)) continue;            // la page l'a redemandée entre-temps : déjà lue
+        const h = {};
+        for (const [k, v] of Object.entries(entetesApi || {})) if (!ENTETES_INTERDITS.test(k)) h[k] = v;
+        h.accept = h.accept || 'application/json';
+        let res = null;
+        try { res = await origFetch.call(window, u.href, { method: 'GET', credentials: 'include', headers: h }); } catch (_) { res = null; }
+        const ct = res && res.headers && res.headers.get ? String(res.headers.get('content-type') || '') : '';
+        if (!res || !(res.status >= 200 && res.status < 300) || !/json/i.test(ct)) { post({ kind: 'vcrattrapage', source: sourceVentes(u), statut: res ? Number(res.status) || 0 : 0 }); continue; }
+        let t = ''; try { t = String(await res.text()); } catch (_) { continue; }
+        noteVentes(u.href, t, 'relue');
+      }
+    } catch (_) {}
+  }
+  try {
+    // Toujours APRÈS la fin de ce fichier (`moiId`, `entetesApi`, `origFetch` sont déclarés plus bas).
+    const plusTard = () => { setTimeout(() => { lirePageUneFois(); setTimeout(() => { rattraperVentes(); }, 1500); }, 0); };
+    if (document.readyState === 'complete' || document.readyState === 'interactive') plusTard();
+    else if (document.addEventListener) document.addEventListener('DOMContentLoaded', plusTard, { once: true });
+  } catch (_) {}
   // 5.365 : la lecture d'UNE page de ventes, sans rien envoyer (la visite ET l'import la partagent).
   function paquetVentes(u, obj, source) {
     {
@@ -544,11 +713,11 @@
       const ventes = arr.slice(0, 200).map((e) => {
         const prod = e.product && typeof e.product === 'object' ? e.product : (e.item && typeof e.item === 'object' ? e.item : null);
         const pid = prod && prod.id != null ? String(prod.id) : (e.productId != null ? String(e.productId) : (e.product_id != null ? String(e.product_id) : ''));
-        const sc = scalairesVente(e);
+        const sc = scalairesVente(e, source);
         const cv = colisVente(e); const sv = suiviAchat(e);
         const fi = ficheAnnonce(e);
         const titre = [typeof e.brandName === 'string' ? e.brandName.trim() : '', fi.titre].filter(Boolean).join(' ').slice(0, 140);
-        return { id: idDe(e), productId: /^[\w-]{1,40}$/.test(pid) ? pid : '', ref: refVente(e), etat: sc.etat, date: sc.date, montant: sc.montant, ...(sc.prixVente ? { prixVente: sc.prixVente } : {}), limite: cv.limite, etiquette: cv.etiquette, suivi: sv.suivi, transporteur: sv.transporteur, titre, photo: photoVc(e.imageUrl) || photoAnnonce(e) };
+        return { id: idDe(e), productId: /^[\w-]{1,40}$/.test(pid) ? pid : '', ref: refVente(e), etat: sc.etat, date: sc.date, dateCle: sc.dateCle || '', montant: sc.montant, ...(sc.prixVente ? { prixVente: sc.prixVente } : {}), limite: cv.limite, etiquette: cv.etiquette, suivi: sv.suivi, transporteur: sv.transporteur, titre, photo: photoVc(e.imageUrl) || photoAnnonce(e) };
       }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
       // La FORME d'une vente (noms de clés et types, jamais une valeur) : pour viser juste ensuite.
       const forme = arr.length ? cheminsDeCles(arr[0]).map(sansId).filter((c) => !PAS_ACHETEUR.test(c.split(':')[0])).slice(0, 120) : [];
@@ -1655,7 +1824,7 @@
             // 5.299 : une réponse d'ERREUR (401, 404, 500…) n'est ni une liste, ni un compte, ni un schéma.
             // 5.364 : TON changement de prix à la main (réponse JSON ou non) ⇒ la recette du prix.
             if (DE_VC(url) && res.status >= 200 && res.status < 300 && /^(POST|PUT|PATCH)$/i.test(String(meth)) && !/json/i.test(String(ct || ''))) notePrixManuel(url, meth, res.status, corpsEnvoye, ent, '');
-            if (DE_VC(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { if (/^(POST|PUT|PATCH)$/i.test(String(meth))) { notePrixManuel(url, meth, res.status, corpsEnvoye, ent, t); noteReponseOffre(url, meth, res.status, corpsEnvoye, ent, t); } else noteOffres(url, meth, t); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteCanal(url, meth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
+            if (DE_VC(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { if (/^(POST|PUT|PATCH)$/i.test(String(meth))) { notePrixManuel(url, meth, res.status, corpsEnvoye, ent, t); noteReponseOffre(url, meth, res.status, corpsEnvoye, ent, t); } else noteOffres(url, meth, t); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); notePageData(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteCanal(url, meth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
           } catch (_) {}
         }).catch(() => {});
       } catch (_) {}
@@ -1681,7 +1850,7 @@
             if ((DE_VC(url) || DE_STREAM(url)) && /^(POST|PUT)$/i.test(String(this.__vcMeth || ''))) noteEnvoi(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH);
             if (t && DE_STREAM(url) && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) noteStream(url, this.__vcMeth, this.status, t);
             if (DE_VC(url) && this.status >= 200 && this.status < 300 && /^(POST|PUT|PATCH)$/i.test(String(this.__vcMeth || ''))) notePrixManuel(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH, t && /json/i.test(String(ct || '')) ? t : '');
-            if (t && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) { if (DE_VC(url) && /^(POST|PUT|PATCH)$/i.test(String(this.__vcMeth || ''))) noteReponseOffre(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH, t); else if (DE_VC(url)) noteOffres(url, this.__vcMeth, t); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteCanal(url, this.__vcMeth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
+            if (t && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) { if (DE_VC(url) && /^(POST|PUT|PATCH)$/i.test(String(this.__vcMeth || ''))) noteReponseOffre(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH, t); else if (DE_VC(url)) noteOffres(url, this.__vcMeth, t); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); notePageData(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteCanal(url, this.__vcMeth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
           } catch (_) {}
         });
       } catch (_) {}

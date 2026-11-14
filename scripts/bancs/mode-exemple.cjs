@@ -4,26 +4,27 @@ require('./_porte-banc.cjs');
 //
 //  Julien : un NOUVEAU vendeur (aucun compte Vinted relié) peut « Découvrir avec
 //  des exemples » : l'app se remplit de données INVENTÉES, un bandeau permanent
-//  dit « Exemple — rien n'est à toi », « Brancher mes comptes » en sort, et RIEN
+//  dit « Exemple — rien n'est enregistré » (13 nov.), « Passer à mes vraies données » en sort, et RIEN
 //  de l'exemple n'est jamais écrit en base (§2.3) ni sur l'appareil.
-//  Et le guide de démarrage : quatre étapes, chacune dit pourquoi et se coche
+//  Et le guide de démarrage : trois étapes (13 nov., lot 46), chacune dit pourquoi et se coche
 //  TOUTE SEULE sur une preuve lue — « pas su » n'est jamais « fait » (§8).
 //
 //  Aucune donnée réelle : la base est SERVIE ici (forme réelle `app_data`,
 //  `select=` projeté, `id=like.`…) et chaque requête qui l'atteint est COMPTÉE.
-//  E1  vendeur neuf : le guide (1 sur 5 : le compte) et « Voir VRM avec des exemples » (44 px) ;
-//  E2  dans l'exemple : le bandeau « Exemple — rien n'est à toi » + « Passer à mes vraies données » (8 nov. ; avant « Brancher mes
+//  E1  vendeur neuf : le guide (1 sur 3 : le compte) et « Voir VRM avec des exemples » (44 px) ;
+//  E2  dans l'exemple : le bandeau « Exemple — rien n'est enregistré » + « Passer à mes vraies données » (8 nov. ; avant « Brancher mes
 //      comptes » sur CHAQUE écran visité, les données inventées à l'écran ;
 //  E3  dans l'exemple : 0 requête vers la base (lecture comprise) et 0 écriture,
 //      alors que l'app a bien tenté d'écrire (écritures gardées en mémoire > 0) ;
 //  E4  « Brancher mes comptes » : l'exemple a disparu (bandeau, données), la vraie
 //      session est intacte, aucune trace de l'exemple dans la base ni dans le
 //      stockage réel de l'appareil, et la clé de l'onglet est retirée ;
-//  G1  compte et e-mails prouvés, aucun compte Vinted : 2 sur 5, l'étape courante est l'extension ;
-//  G2  un compte relié, ni e-mail ni N° : le guide reste, étape courante « boîte e-mail » ;
-//      « Masquer le guide » le retire et l'écrit dans la ligne `main` ;
-//  G3  la lecture des e-mails échoue (500) : l'étape n'est NI cochée NI « à faire » ;
-//  G4  tout est prouvé (première vente comprise) : aucun guide.
+//  G1  compte et e-mails prouvés, aucun compte Vinted : 1 sur 3 (les e-mails ne comptent
+//      plus), l'étape courante est l'extension ;
+//  G2  parcours commencé, un compte relié, rien encore lu : le guide reste, étape courante
+//      Vinted ; « Masquer le guide » le retire et l'écrit dans la ligne `main` ;
+//  G3  la lecture de Vinted échoue (500) : l'étape n'est NI cochée NI « à faire » ;
+//  G4  tout est prouvé (ventes lues) : aucun guide.
 //  `SHOTS=dossier` range une capture par écran (à REGARDER, §6.2).
 //  `LARGEURS=390,1512` / `THEMES=clair,sombre` restreignent.
 // ════════════════════════════════════════════════════════════════════════════
@@ -87,7 +88,7 @@ async function ouvrir(nav, { W, sombre, base, tab = 'journee' }) {
     if (/\/rest\/v1\/rpc\//.test(u)) return json(null);
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return json(m === 'GET' ? base.comptes : []);
     if (!/\/rest\/v1\/app_data/.test(u)) return json([]);
-    if (base.panneEmails && /email_reception_/.test(u)) return json({ message: 'panne' }, 500);
+    if (base.panneLecture && /harvest_/.test(u) && /nItems/.test(u)) return json({ message: 'panne' }, 500);
     if (m === 'POST' || m === 'PATCH') {
       try {
         const b = JSON.parse(req.postData() || 'null');
@@ -117,7 +118,7 @@ const guide = (pg) => pg.evaluate(() => {
   const g = document.querySelector('[data-guide-demarrage]');
   if (!g) return null;
   return { faites: g.getAttribute('data-guide-faites'), courante: g.getAttribute('data-guide-courante'),
-    // (11 nov.) La carte du parcours d'arrivée : six étapes en repli, l'étape courante ouverte.
+    // (11 nov.) La carte du parcours d'arrivée : trois étapes en repli (13 nov.), l'étape courante ouverte.
     etats: Object.fromEntries([...g.querySelectorAll('[data-parcours-rang]')].map((e) => [e.getAttribute('data-parcours-rang'), e.getAttribute('data-etat')])),
     pourquoi: !!(g.querySelector('[data-courante="1"] .vrm-pa-carte-texte span') || {}).textContent,
     carteDansCarte: g.querySelectorAll('.vrm-card').length, exemple: !!g.querySelector('[data-exemple-entrer]') };
@@ -134,7 +135,7 @@ async function parcoursExemple(nav, W, theme) {
   // E1
   const g = await guide(o.pg);
   dit(!!g, `${T} E1 le guide de démarrage s'affiche pour un vendeur neuf`);
-  dit(g && g.faites === '1' && g.etats.compte === 'fait' && g.courante === 'configuration', `${T} E1 seul le compte est prouvé : 1 sur 6, on continue par la configuration`, JSON.stringify(g));
+  dit(g && g.faites === '1' && g.etats.compte === 'fait' && g.courante === 'extension', `${T} E1 seul le compte est prouvé : 1 sur 3, on continue par l'extension`, JSON.stringify(g));
   dit(g && g.pourquoi, `${T} E1 l'étape courante dit pourquoi`);
   dit(g && g.carteDansCarte === 0, `${T} E1 une seule carte (pas de carte dans la carte)`, g && g.carteDansCarte);
   const bt = await taille(o.pg, '[data-exemple-entrer]');
@@ -159,7 +160,7 @@ async function parcoursExemple(nav, W, theme) {
     const b = await taille(o.pg, '[data-exemple-bandeau]');
     const txt = await o.pg.evaluate(() => (document.querySelector('[data-exemple-bandeau]') || {}).innerText || '');
     dit(b && b.vis && b.top >= -1 && b.bottom <= (o.tel ? 844 : 950), `${T} E2 ${tab} : le bandeau est visible`, JSON.stringify(b));
-    dit(/Exemple — rien n’est à toi/.test(txt) && /Passer à mes vraies données/.test(txt), `${T} E2 ${tab} : « Exemple — rien n’est à toi » et « Passer à mes vraies données »`, txt);
+    dit(/Exemple — rien n’est enregistré/.test(txt) && /Passer à mes vraies données/.test(txt), `${T} E2 ${tab} : « Exemple — rien n’est enregistré » et « Passer à mes vraies données »`, txt);
     const bb = await taille(o.pg, '[data-exemple-brancher]');
     dit(bb && (!o.tel || bb.h >= 43.5), `${T} E2 ${tab} : « Brancher mes comptes » fait 44 px au doigt`, JSON.stringify(bb));
     // Rien ne le couvre (sur ordinateur, l'île flottante des actions du haut l'a couvert au premier essai).
@@ -210,14 +211,15 @@ async function parcoursGuide(nav, W, theme) {
   { const base = { lignes: [main({ vinted_annonce_numeros: NUMS }), RECEPTION], comptes: [], requetes: [], phase: 'g1' };
     const o = await ouvrir(nav, { W, sombre, base }); await o.pg.waitForSelector('[data-guide-demarrage]', { timeout: 15000 }).catch(() => {}); await o.pg.waitForTimeout(2000);
     const g = await guide(o.pg);
-    dit(g && g.faites === '3' && g.etats.emails === 'fait' && g.etats.compte === 'fait' && g.courante === 'extension', `${T} G1 compte, configuration et e-mails prouvés, aucun compte Vinted : on continue par l'extension`, JSON.stringify(g));
+    dit(g && g.faites === '1' && g.etats.compte === 'fait' && !('emails' in g.etats) && g.courante === 'extension', `${T} G1 compte et e-mails prouvés, aucun compte Vinted : 1 sur 3 (les e-mails ne comptent plus), on continue par l'extension`, JSON.stringify(g));
     await capture(o.pg, `ex-${W}-${theme}-3-guide-g1`);
     await o.ctx.close(); }
   // G2
-  { const base = { lignes: [main({})], comptes: COMPTE, requetes: [], phase: 'g2' };
+  const COMMENCE = { vrm_parcours: { v: 1, etape: 'vinted', ouvert: false, fini: null, at: iso(0) } };
+  { const base = { lignes: [main(COMMENCE)], comptes: COMPTE, requetes: [], phase: 'g2' };
     const o = await ouvrir(nav, { W, sombre, base }); await o.pg.waitForSelector('[data-guide-demarrage]', { timeout: 15000 }).catch(() => {}); await o.pg.waitForTimeout(2000);
     const g = await guide(o.pg);
-    dit(g && g.etats.extension === 'fait' && g.etats.vinted !== 'fait' && g.courante === 'emails' && !g.exemple, `${T} G2 un compte relié : extension cochée, Vinted attend la lecture du dressing, étape courante « e-mails », plus d'exemple proposé`, JSON.stringify(g));
+    dit(g && g.etats.extension === 'fait' && g.etats.vinted === 'attente' && g.courante === 'vinted' && !g.exemple, `${T} G2 un compte relié : extension cochée, Vinted attend la première lecture, plus d'exemple proposé`, JSON.stringify(g));
     const geste = await taille(o.pg, '[data-guide-demarrage] [data-parcours-continuer]');
     dit(geste && geste.vis && (!o.tel || geste.h >= 43.5), `${T} G2 le geste « Continuer » est là`, JSON.stringify(geste));
     await capture(o.pg, `ex-${W}-${theme}-4-guide-g2`);
@@ -229,10 +231,10 @@ async function parcoursGuide(nav, W, theme) {
     } else dit(false, `${T} G2 « Masquer le guide » existe`);
     await o.ctx.close(); }
   // G3
-  { const base = { lignes: [main({})], comptes: COMPTE, requetes: [], phase: 'g3', panneEmails: true };
+  { const base = { lignes: [main(COMMENCE)], comptes: COMPTE, requetes: [], phase: 'g3', panneLecture: true };
     const o = await ouvrir(nav, { W, sombre, base }); await o.pg.waitForSelector('[data-guide-demarrage]', { timeout: 15000 }).catch(() => {}); await o.pg.waitForTimeout(2000);
     const g = await guide(o.pg);
-    dit(g && g.etats.emails === 'passu' && g.courante === 'emails', `${T} G3 lecture des e-mails en panne : ni cochée ni « à faire » (pas su), l'étape reste (« pas pu vérifier »)`, JSON.stringify(g));
+    dit(g && g.etats.vinted === 'passu' && g.courante === 'vinted', `${T} G3 lecture de Vinted en panne : ni cochée ni « à faire » (pas su), l'étape reste (« pas pu vérifier »)`, JSON.stringify(g));
     await o.ctx.close(); }
   // G4
   { const base = { lignes: [main({ vinted_annonce_numeros: NUMS }), RECEPTION, DRESSING, { id: 'harvest_9001_orders_sold', owner: UID, data: { type: 'orders_sold', uid: '9001', capturedAt: iso(0), nItems: 5, payload: { my_orders: [] } } }], comptes: COMPTE, requetes: [], phase: 'g4' };

@@ -72,7 +72,9 @@ import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from
 import { CHIFFRES as CHIFFRES_CARTE } from "../design/carteChiffres.js";
 // ⟦← App.jsx #7⟧
 import { donneesRecapMois, csvRecapMois, pdfRecapMois, libelleMois, nomFichierRecap } from "../recapMois.js";
+import { pageRecapImprimable } from '../recapImprimable.js';   // (13 nov., point 16) le récap d'UNE page, imprimé par le navigateur
 import { bilanDuMois, meilleurCompte, pdfBilanMois, nomFichierBilan, texteBilan } from "../bilanMois.js";
+import { DEMANDE_BILAN_MOIS, attrCible } from "../cibleNotif.js";   // (13 nov., lot 53) le mois demandé par l'e-mail du bilan mensuel
 import { delaisPaiement, texteDelai } from "../delaiPaiement.js";
 // ⟦← App.jsx #8⟧
 import { CATEGORIES_DEPENSE, idTicket, montantDuTicket, texteMontantSaisie, texteDuTicket } from "../depensesTicket.js";
@@ -1335,8 +1337,10 @@ function Field({label,children}) {
 // Les valeurs sont AUSSI échappées (xmlEsc) : la politique couvre ce qui est
 // déjà rangé en base (factures construites avant ce correctif).
 const CSP_DOCUMENT = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: blob: https: http:; style-src 'unsafe-inline'; font-src data: https:">`;
-function ouvrirDocumentImprimable(html) {
-  const w = window.open('', '_blank'); if (!w) return null;
+// (13 nov.) `wDeja` : une fenêtre ouverte AU CLIC (avant une préparation asynchrone —
+// sinon le navigateur bloque la fenêtre), remplie ensuite par la même règle.
+function ouvrirDocumentImprimable(html, wDeja = null) {
+  const w = wDeja || window.open('', '_blank'); if (!w) return null;
   const doc = String(html || '').replace(/<script[\s\S]*?<\/script>/gi, '');
   const tete = /<head(\s[^>]*)?>/i;
   // Le journal des violations écoute ce document aussi (22 oct., revue).
@@ -3318,7 +3322,25 @@ function CarteUrssafMois({ liveStats, onNav }) {
   );
 }
 // ⟦← App.jsx #32⟧
-function RecapComptableMensuel() {
+// (13 nov., point 16) LA PÉRIODE URSSAF D'UN MOIS (pour le récap imprimé) : la déclaration qui le
+// contient, par les règles de l'app — `nextUrssafDeadline` (au 1er du mois suivant, l'échéance
+// qui le couvre), `moisPeriodeUrssaf`, `montantPeriodeUrssaf` (la ligne publiée, datée au
+// versement, « au moins » si partielle) et le registre (`moisDeclare`). Rythme jamais choisi ⇒
+// `null` (jamais « trimestriel » deviné). Rien de recalculé autrement.
+const periodeUrssafDuMois = (ym, ligne, declare, taux) => {
+  const rythme = load('vinted_urssaf_freq', null);
+  if (rythme !== 'mensuel' && rythme !== 'trimestriel') return null;
+  const [y, m] = String(ym || '').split('-').map(Number);
+  if (!y || !m) return null;
+  const due = nextUrssafDeadline(rythme, new Date(y, m, 1, 12));
+  const yms = moisPeriodeUrssaf(due);
+  if (!due || !yms.includes(ym)) return null;
+  const { ca, partiel } = montantPeriodeUrssaf(due, ligne, taux);
+  const nDeclares = yms.filter((x) => moisDeclare(declare, x)).length;
+  return { label: due.label, date: due.dueDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }),
+    declaree: nDeclares === yms.length, nDeclares, memeQueMois: yms.length === 1, ca, partiel };
+};
+function RecapComptableMensuel({ liveStats, compta: comptaEcran, panelOff, accounts }) {
   const v = useLigneUrssaf();
   const urssafMois = v ? v.mois : null;
   const TAUX_URSSAF = tauxUrssaf() / 100;
@@ -3375,6 +3397,25 @@ function RecapComptableMensuel() {
     } catch (err) { toast('Récap pas créé : ' + (err && err.message || err)); }
     setRecapEnCours('');
   };
+  // (13 nov., point 16) « Imprimer » : UNE page A4 (src/recapImprimable.js) dans la fenêtre
+  // d'impression du navigateur (imprimer, ou « Enregistrer en PDF »). Les données sont celles du
+  // « Rapport du mois » (`assembleRapportMois`, la même assemblée), sans les catégories ni le top 10
+  // que la page n'imprime pas. La fenêtre s'ouvre AU CLIC (sinon le navigateur la bloque), puis
+  // se remplit ; un échec la referme et le dit.
+  const [declareB] = useLigneSynchro('vrm_urssaf_declare', lireDeclarations);
+  const pretImprimer = regimeB !== undefined && liveStats !== undefined;
+  const imprimerRecap = async () => {
+    if (recapEnCours || !pretImprimer) return;
+    const w = window.open('', '_blank');
+    if (!w) { toast(tr('compta.recapFenetreBloquee')); return; }
+    try { w.document.write(`<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>${xmlEsc(trj('compta.recap', { libelleMois: libelleMois(ymRecap) }))}</title></head><body style="font:15px -apple-system,system-ui,sans-serif;padding:24px;color:#000;background:#fff">${xmlEsc(tr('compta.recapPrepare'))}</body></html>`); } catch (_) {}
+    setRecapEnCours('imprimer');
+    try {
+      const d = await assembleRapportMois({ ym: ymRecap, liveStats, compta: comptaEcran || comptaB, pub: pubB, ligneUrssaf: v, regime: regimeB, panelOff, accounts, complet: false });
+      ouvrirDocumentImprimable(pageRecapImprimable(d, { periode: regimeB === 'micro' ? periodeUrssafDuMois(ymRecap, v, declareB, tauxUrssaf()) : null }), w);
+    } catch (err) { try { w.close(); } catch (_) {} toast('Récap pas créé : ' + (err && err.message || err)); }
+    setRecapEnCours('');
+  };
   return (
     <>
       <Card><div className="vrm-recap-mois" data-recap-mois={ymRecap}>
@@ -3385,9 +3426,11 @@ function RecapComptableMensuel() {
           </select>
         </div>
         <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
-          <Bouton variante="primaire" icone="doc" data-recap-pdf="" disabled={!!recapEnCours} onClick={()=>exporterRecap('pdf')} style={{flex:'1 1 140px'}}>{recapEnCours==='pdf'?'…':tr('compta.telechargerPdf2')}</Bouton>
+          <Bouton variante="primaire" icone="printer" data-recap-imprimer="" disabled={!!recapEnCours || !pretImprimer} onClick={imprimerRecap} style={{flex:'1 1 140px'}} title={tr('compta.recapImprimerTitre')}>{recapEnCours==='imprimer'?'…':tr('compta.recapImprimer')}</Bouton>
+          <Bouton variante="secondaire" icone="doc" data-recap-pdf="" disabled={!!recapEnCours} onClick={()=>exporterRecap('pdf')} style={{flex:'1 1 140px'}}>{recapEnCours==='pdf'?'…':tr('compta.telechargerPdf2')}</Bouton>
           <Bouton variante="secondaire" icone="save" data-recap-csv="" disabled={!!recapEnCours} onClick={()=>exporterRecap('csv')} style={{flex:'1 1 140px'}} title={tr('compta.fichierExcelNumbers')}>{recapEnCours==='csv'?'…':tr('compta.telechargerTableur2')}</Bouton>
         </div>
+        <p data-recap-imprimer-note="" style={{margin:'8px 0 0',fontSize:13,color:C.muted,lineHeight:1.5}}>{tr('compta.recapImprimerNote')}</p>
       </div></Card>
       {/* Récap comptable mensuel */}
       {moisRecap.length>0&&(
@@ -3977,15 +4020,31 @@ const assembleBilanMois = ({ ym, enCours, liveStats, compta, pub, ligneUrssaf, r
   const D = bilanDuMois({ ym, vendu, recu, depense: charges, benefice: CB, B: Bm, meilleur, maintenant, enCours });
   return { D, vendu, recu, Bm, CB, V, de, a, nomGroupe };
 };
+// (13 nov., lot 53) Le mois que demande le bouton de l'e-mail du bilan mensuel
+// (`?tab=compta&cible=bilanmois&mois=AAAA-MM`, src/cibleNotif.js) : « Mois dernier »
+// s'il l'est, « Ce mois-ci » s'il l'est ; un autre mois ⇒ rien n'est choisi à sa place
+// (la cible ne répond pas, la ligne de `phraseAbsente` le dit).
+const ymPrecedent = (ymA) => { const [y, m] = ymA.split('-').map(Number); const d = new Date(y, m - 2, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+const quelDemande = (ymA) => {
+  const d = DEMANDE_BILAN_MOIS;
+  if (!d.ym || Date.now() - d.at > 60000) return null;
+  return d.ym === ymA ? 'courant' : d.ym === ymPrecedent(ymA) ? 'precedent' : null;
+};
 function BilanMoisCarte({ liveStats, compta }) {
-  const [quel, setQuel] = React.useState('courant');
+  const [quel, setQuel] = React.useState(() => quelDemande(ymCourant(Date.now())) || 'courant');
+  // La carte vit dans un repli (« Bilan du mois ») : un repli fermé garde ses boîtes dans Chrome
+  // (`content-visibility`), la cible le croirait visible — la demande l'OUVRE, puis est consommée.
+  React.useEffect(() => {
+    const f = () => { const q = quelDemande(ymCourant(Date.now())); if (!q) return; setQuel(q); DEMANDE_BILAN_MOIS.ym = null; setTimeout(() => ouvrirRepliCompta('compta-bilan'), 0); };
+    f(); window.addEventListener('vrm:bilan-mois', f); return () => window.removeEventListener('vrm:bilan-mois', f);
+  }, []);
   const [pub] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
   const ligneUrssaf = useLigneUrssaf();
   const regime = useRegimeFiscal();
   const [envoi, setEnvoi] = React.useState(false);
   const maintenant = Date.now();
   const ymA = ymCourant(maintenant);
-  const ym = quel === 'courant' ? ymA : (() => { const [y, m] = ymA.split('-').map(Number); const d = new Date(y, m - 2, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; })();
+  const ym = quel === 'courant' ? ymA : ymPrecedent(ymA);
   const enCours = quel === 'courant';
   const { D, vendu } = assembleBilanMois({ ym, enCours, liveStats, compta, pub, ligneUrssaf, regime, maintenant });
   const telecharger = async () => {
@@ -3996,7 +4055,7 @@ function BilanMoisCarte({ liveStats, compta }) {
     setEnvoi(false);
   };
   return (
-    <div className="vrm-bilan-mois" data-bilan-mois={ym} data-bilan-en-cours={enCours ? '1' : '0'}>
+    <div className="vrm-bilan-mois" data-bilan-mois={ym} data-bilan-en-cours={enCours ? '1' : '0'} data-cible={attrCible(['bilanmois', ym])}>
       <div className="vrm-bilan-tete">
         <Segmente label={tr('compta.moisBilan')} value={quel} onChange={setQuel}
           options={[{ v: 'courant', l: 'Ce mois-ci', data: { 'data-bilan-choix': 'courant' } }, { v: 'precedent', l: 'Mois dernier', data: { 'data-bilan-choix': 'precedent' } }]} />
@@ -4028,6 +4087,63 @@ const relevePourRapport = () => {
   const r = lireReleveVentes();
   return r ? r.l.filter(Array.isArray).map(([plateforme, compte, id, ts, eur, achat, frais, titre, num]) => ({ plateforme, compte, id, ts, eur, achat, frais, titre, num })) : null;
 };
+// (13 nov., point 16) L'ASSEMBLAGE DU RAPPORT D'UN MOIS, sorti tel quel de « Rapport du mois » :
+// le PDF de 2 à 4 pages ET le « Récap de <mois> » d'une page (src/recapImprimable.js) lisent
+// les MÊMES données (§11) — rien n'est recalculé pour l'un ou pour l'autre.
+const assembleRapportMois = async ({ ym, liveStats, compta, pub, ligneUrssaf, regime, panelOff, accounts, complet = true }) => {
+  const maintenant = Date.now();
+  const enCours = ym === ymCourant(maintenant);
+  const { D: bilan, Bm, CB, V, de, a } = assembleBilanMois({ ym, enCours, liveStats, compta, pub, ligneUrssaf, regime, maintenant });
+  const manque = [...(liveStats && liveStats.venduManque || []), ...(liveStats && liveStats.venduEnAttente ? ['lecture en cours'] : [])];
+  const nonComptees = (liveStats && liveStats.venduNonComptees) || [];
+  const releve = relevePourRapport();
+  const b = bornesMois(ym, maintenant);
+  const dansMois = (l) => l && Number.isFinite(Number(l.ts)) && l.ts >= b.de && l.ts < b.a;
+  const lignesMois = V ? V.filter(dansMois) : null;
+  const releveMois = releve ? releve.filter(dansMois) : null;
+  const plateformes = V ? margeParPlateforme({ vendu: V, manque, nonComptees, releve: releveMois, de, a }) : null;
+  // Les lectures du clic : l'annonce de chaque vente, les catégories, les achats, la fiche de facturation.
+  // (13 nov.) Le récap d'UNE page n'imprime ni les catégories ni le top 10 : il ne les lit pas (`complet: false`).
+  const [extras, table, achatsLus, recusLus, ent] = await Promise.all([
+    complet ? lireExtrasRepartition().catch(() => ({ txn: null, items: null, dates: null })) : Promise.resolve({ txn: null, items: null, dates: null }),
+    complet ? lireTableFamilles().catch(() => null) : Promise.resolve(null),
+    lireAchatsRegistre().catch(() => null),
+    fetchEmailAchats().then(recusAchatDe).catch(() => null),
+    lireReglage('vrm_pro_facture').catch(() => null),
+  ]);
+  // Titre et N° : le relevé de Ventes PAR IDENTITÉ, sinon le titre de SON annonce Vinted (reliée par SA transaction).
+  const titres = {};
+  for (const l of (releve || [])) { const k = cleVenteCat(l.plateforme, l.id); if (k && (l.titre || l.num)) titres[k] = { titre: l.titre || '', num: l.num || '' }; }
+  for (const l of (lignesMois || [])) {
+    if (l.plateforme !== 'Vinted') continue;
+    const k = cleVenteCat('Vinted', l.tx); const t = extras && extras.txn ? extras.txn[String(l.tx)] : null; const it = t && t.item && extras.items ? extras.items[t.item] : null;
+    if (k && !(titres[k] && titres[k].titre) && it && it.title) titres[k] = { titre: it.title, num: (titres[k] && titres[k].num) || '' };
+  }
+  let categories;
+  if (lignesMois && complet) {
+    const manquent = [];
+    for (const l of lignesMois) if (l.plateforme === 'Vinted') { const t = extras && extras.txn ? extras.txn[String(l.tx)] : null; const it = t && t.item ? String(t.item) : ''; if (it && !(extras.items && extras.items[it] && extras.items[it].cat)) manquent.push(it); }
+    const fiches = await lireCategoriesFiches(manquent).catch(() => null);
+    let main = {}; try { const v = load(CLE_CATEGORIES_MAIN, {}); main = v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch (_) { main = {}; }
+    const S = statsParCategorie({ vendu: lignesMois, releve: releveMois, famDe: fabriqueFamDe({ extras, fiches, table, main }), stock: null });
+    let jeVends = 'auto'; try { jeVends = lireReglageJeVends(load(CLE_JE_VENDS, null)).choix; } catch (_) { jeVends = 'auto'; }
+    categories = afficherCategories(S, jeVends) ? S : (table === null && fiches === null ? null : undefined);
+  }
+  const achats = achatsLus === null ? null : registreAchatsDe({ achats: achatsLus, recus: recusLus, periode: ym, panelOff });
+  const taux = tauxUrssaf();
+  const urssaf = regime == null ? null : { regime, regimeTexte: libelleRegime(regime), taux, raison: raisonUrssaf(regime),
+    ...(regime === 'micro' ? montantPeriodeUrssaf(bornesPeriodeExport(ym), ligneUrssaf, taux) : {}) };
+  // L'en-tête : SA fiche de facturation, sinon ses comptes vendeurs (jamais un acheteur).
+  // Un compte écarté par SON choix n'est nommé nulle part (§5 : « ne plus lui parler des comptes retirés »).
+  const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+  const comptes = [...new Set((accounts || []).filter((x) => x && !compteEcarteChoix(x.vinted_user_id, hAcc, panelOff || {})).map((x) => x.login || '').filter(Boolean))];
+  const boutique = ent && String(ent.nom || '').trim() ? { nom: String(ent.nom).trim(), sous: String(ent.siret || '').trim() ? `SIRET ${String(ent.siret).trim()}` : '' }
+    : comptes.length ? { nom: comptes.slice(0, 3).join(' · ') + (comptes.length > 3 ? ` +${comptes.length - 3}` : ''), sous: 'Comptes vendeurs' } : null;
+  const d = donneesRapportMois({ ym, maintenant, boutique, bilan, vendu: V ? { lignes: V, manque, nonComptees } : null, B: Bm, benefice: CB, brut: Bm ? chiffreBrut(Bm) : null,
+    recuJours: ligneUrssaf && ligneUrssaf.recuJours, plateformes, categories, titres, stock: lireValeurStock(AUTH.user && AUTH.user.id), achats, urssaf });
+  if (!d) throw new Error('mois invalide');
+  return d;
+};
 function RapportMoisCarte({ liveStats, compta, panelOff, accounts }) {
   const choix = React.useMemo(() => moisRapportChoix(), []);
   const [ym, setYm] = React.useState(() => moisRapportParDefaut());
@@ -4043,56 +4159,7 @@ function RapportMoisCarte({ liveStats, compta, panelOff, accounts }) {
     if (occupe || !pret) return;
     setOccupe(true); setRetour(null);
     try {
-      const maintenant = Date.now();
-      const enCours = ym === ymCourant(maintenant);
-      const { D: bilan, Bm, CB, V, de, a } = assembleBilanMois({ ym, enCours, liveStats, compta, pub, ligneUrssaf, regime, maintenant });
-      const manque = [...(liveStats && liveStats.venduManque || []), ...(liveStats && liveStats.venduEnAttente ? ['lecture en cours'] : [])];
-      const nonComptees = (liveStats && liveStats.venduNonComptees) || [];
-      const releve = relevePourRapport();
-      const b = bornesMois(ym, maintenant);
-      const dansMois = (l) => l && Number.isFinite(Number(l.ts)) && l.ts >= b.de && l.ts < b.a;
-      const lignesMois = V ? V.filter(dansMois) : null;
-      const releveMois = releve ? releve.filter(dansMois) : null;
-      const plateformes = V ? margeParPlateforme({ vendu: V, manque, nonComptees, releve: releveMois, de, a }) : null;
-      // Les lectures du clic : l'annonce de chaque vente, les catégories, les achats, la fiche de facturation.
-      const [extras, table, achatsLus, recusLus, ent] = await Promise.all([
-        lireExtrasRepartition().catch(() => ({ txn: null, items: null, dates: null })),
-        lireTableFamilles().catch(() => null),
-        lireAchatsRegistre().catch(() => null),
-        fetchEmailAchats().then(recusAchatDe).catch(() => null),
-        lireReglage('vrm_pro_facture').catch(() => null),
-      ]);
-      // Titre et N° : le relevé de Ventes PAR IDENTITÉ, sinon le titre de SON annonce Vinted (reliée par SA transaction).
-      const titres = {};
-      for (const l of (releve || [])) { const k = cleVenteCat(l.plateforme, l.id); if (k && (l.titre || l.num)) titres[k] = { titre: l.titre || '', num: l.num || '' }; }
-      for (const l of (lignesMois || [])) {
-        if (l.plateforme !== 'Vinted') continue;
-        const k = cleVenteCat('Vinted', l.tx); const t = extras && extras.txn ? extras.txn[String(l.tx)] : null; const it = t && t.item && extras.items ? extras.items[t.item] : null;
-        if (k && !(titres[k] && titres[k].titre) && it && it.title) titres[k] = { titre: it.title, num: (titres[k] && titres[k].num) || '' };
-      }
-      let categories;
-      if (lignesMois) {
-        const manquent = [];
-        for (const l of lignesMois) if (l.plateforme === 'Vinted') { const t = extras && extras.txn ? extras.txn[String(l.tx)] : null; const it = t && t.item ? String(t.item) : ''; if (it && !(extras.items && extras.items[it] && extras.items[it].cat)) manquent.push(it); }
-        const fiches = await lireCategoriesFiches(manquent).catch(() => null);
-        let main = {}; try { const v = load(CLE_CATEGORIES_MAIN, {}); main = v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch (_) { main = {}; }
-        const S = statsParCategorie({ vendu: lignesMois, releve: releveMois, famDe: fabriqueFamDe({ extras, fiches, table, main }), stock: null });
-        let jeVends = 'auto'; try { jeVends = lireReglageJeVends(load(CLE_JE_VENDS, null)).choix; } catch (_) { jeVends = 'auto'; }
-        categories = afficherCategories(S, jeVends) ? S : (table === null && fiches === null ? null : undefined);
-      }
-      const achats = achatsLus === null ? null : registreAchatsDe({ achats: achatsLus, recus: recusLus, periode: ym, panelOff });
-      const taux = tauxUrssaf();
-      const urssaf = regime == null ? null : { regime, regimeTexte: libelleRegime(regime), taux, raison: raisonUrssaf(regime),
-        ...(regime === 'micro' ? montantPeriodeUrssaf(bornesPeriodeExport(ym), ligneUrssaf, taux) : {}) };
-      // L'en-tête : SA fiche de facturation, sinon ses comptes vendeurs (jamais un acheteur).
-      // Un compte écarté par SON choix n'est nommé nulle part (§5 : « ne plus lui parler des comptes retirés »).
-      const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
-      const comptes = [...new Set((accounts || []).filter((x) => x && !compteEcarteChoix(x.vinted_user_id, hAcc, panelOff || {})).map((x) => x.login || '').filter(Boolean))];
-      const boutique = ent && String(ent.nom || '').trim() ? { nom: String(ent.nom).trim(), sous: String(ent.siret || '').trim() ? `SIRET ${String(ent.siret).trim()}` : '' }
-        : comptes.length ? { nom: comptes.slice(0, 3).join(' · ') + (comptes.length > 3 ? ` +${comptes.length - 3}` : ''), sous: 'Comptes vendeurs' } : null;
-      const d = donneesRapportMois({ ym, maintenant, boutique, bilan, vendu: V ? { lignes: V, manque, nonComptees } : null, B: Bm, benefice: CB, brut: Bm ? chiffreBrut(Bm) : null,
-        recuJours: ligneUrssaf && ligneUrssaf.recuJours, plateformes, categories, titres, stock: lireValeurStock(AUTH.user && AUTH.user.id), achats, urssaf });
-      if (!d) throw new Error('mois invalide');
+      const d = await assembleRapportMois({ ym, liveStats, compta, pub, ligneUrssaf, regime, panelOff, accounts });
       const octets = await pdfRapportMois(d);
       const fin = await partagerOuTelecharger(octets, nomFichierRapport(ym), { telecharger: telechargerFichier, type: 'application/pdf' });
       setRetour({ fin, manques: d.manques.length });
@@ -4685,7 +4752,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
           <div className="vrm-compta-q-tete"><h2 className="vrm-compta-question">{tr('compta.comptable')}</h2></div>
           {!exportDevant && <ExportComptableCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />}
           {!exportDevant && <RegistresCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />}
-          <RecapComptableMensuel />
+          <RecapComptableMensuel liveStats={liveStats} compta={data} panelOff={panelOff} accounts={accounts} />
           {/* (10 nov., lot R) Le livre de police : un bloc isolé, statut pro seulement (src/livrePolice.js). */}
           <LivrePoliceCarte lireAchats={lireAchatsRegistre} registreDe={registreAchatsDe} panelOff={panelOff} />
           {/* ── HÉRO : LE RÉSULTAT ─────────────────────────────────────────────────

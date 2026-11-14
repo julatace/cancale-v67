@@ -22,7 +22,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { compteDefaut, compteDefautAutre, comptesHorsPlan, venteHorsPlan, OFFRES, JOURS_CHANGEMENT_VENDEUR, PLATEFORMES_SOLO, NOMS_PLATEFORMES_SOLO, idCompteVendeur } from '../../api/_lib/plan-regle.js';
+import { compteDefaut, compteDefautAutre, comptesHorsPlan, venteHorsPlan, OFFRES, JOURS_CHANGEMENT_VENDEUR, PLATEFORMES_SOLO, NOMS_PLATEFORMES_SOLO, idCompteVendeur, prixCompteSupTexte, PRIX_COMPTE_SUP_CENTIMES } from '../../api/_lib/plan-regle.js';
 import { abonnementPublie, publierAbonnement, suivreAbonnement } from './etatAbonnement.js';
 import { reglePlanCourante, suivrePlan } from './planVentes.js';
 import { APERCU_LIGNES, bloquerGestes } from './apercu.js';
@@ -32,6 +32,32 @@ const dateLongue = (iso) => { try { return new Date(iso).toLocaleDateString('fr-
 const uidDe = (o) => String((o && o._acc && o._acc.vinted_user_id) || '');
 
 export const EVT_QUEL_COMPTE = 'vrm:quel-compte';
+// (13 nov., lot 56) La feuille « Un compte Vinted qui vend de plus » (Solo, +3 €/mois).
+export const EVT_COMPTE_SUP = 'vrm:compte-sup';
+export function ouvrirCompteSup(uid = '') { try { window.dispatchEvent(new CustomEvent(EVT_COMPTE_SUP, { detail: { uid: String(uid || '') } })); } catch (_) {} }
+// L'état des comptes de plus, tel que le SERVEUR l'a rendu (jamais calculé ici) :
+// `{ payes, liste, libres, ouvert, texte }`, ou `null` hors Solo / pas su.
+export function supDe(x) {
+  if (!x || typeof x !== 'object' || x.plan !== 'solo' || !x.comptesSup || typeof x.comptesSup !== 'object') return null;
+  const c = x.comptesSup, o = (x.offres && x.offres.compteSup) || {};
+  const liste = Array.isArray(c.liste) ? c.liste.map(String) : [];
+  return { payes: Number(c.payes) || 0, liste, libres: Math.max(0, Number(c.libres) || 0), max: Number(c.max) || 20, ouvert: o.ouvert === true, texte: o.ouvert && o.texte ? o.texte : null };
+}
+// Le prix d'un compte de plus, à l'écran : celui que STRIPE dit quand l'offre est
+// ouverte, sinon la valeur de VRM (« +3 €/mois », dite « bientôt »).
+export const texteSup = (s) => (s && s.texte ? `+${s.texte.replace(' / mois', '/mois')}` : `+${prixCompteSupTexte(PRIX_COMPTE_SUP_CENTIMES)}/mois`);
+export async function changerCompteSup(action, uid, enTete, extra) {
+  try {
+    const r = await fetch('/api/compte?mode=compte-vendeur', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(enTete ? enTete() : {}) }, body: JSON.stringify({ action, uid, ...(extra || {}) }) });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j && j.ok && j.comptesSup) {
+      const x = abonnementPublie();
+      if (x && typeof x === 'object') publierAbonnement({ ...x, comptesSup: j.comptesSup });
+      return { ok: true };
+    }
+    return { ok: false, message: (j && j.message) || "Rien n'a changé. Réessaie dans un instant." };
+  } catch (_) { return { ok: false, message: 'Pas de connexion : rien n’a changé. Réessaie dans un instant.' }; }
+}
 // `plateforme` : 'vinted' (défaut) · 'leboncoin' · 'ebay' · 'vestiaire'.
 export function ouvrirQuelCompte(plateforme = 'vinted') { try { window.dispatchEvent(new CustomEvent(EVT_QUEL_COMPTE, { detail: { plateforme } })); } catch (_) {} }
 // Le compte vendeur CHOISI d'une plateforme, tel que le serveur l'a rendu (`null` = pas choisi).
@@ -144,6 +170,70 @@ export function QuelCompteVend({ plateforme = 'vinted', comptes, ventes, comptes
     </div>, document.body);
 }
 
+// (13 nov., lot 56) « Un compte Vinted qui vend de plus » : ses comptes Vinted qui ne
+// vendent pas encore, un choix, une case CGV si une place doit être ACHETÉE. Offre
+// fermée et aucune place libre ⇒ « Bientôt », rien d'achetable. Le serveur vérifie
+// tout (le compte est à lui, Solo, la quantité payée) : l'écran ne décide rien.
+export function AjouterCompteVendeur({ comptes, ventes, uidPropose, enTete, onFerme }) {
+  const x = useAbonnementPublie();
+  const s = supDe(x);
+  const inclus = choixDe(x, 'vinted');
+  const vendent = new Set([inclus ? inclus.id : '', ...(s ? s.liste : [])].filter(Boolean));
+  const liste = (Array.isArray(comptes) ? comptes : []).filter((c) => c && !vendent.has(String(c.uid)));
+  const [choix, setChoix] = React.useState(() => (uidPropose && liste.some((c) => String(c.uid) === uidPropose) ? uidPropose : ''));
+  const [cgv, setCgv] = React.useState(false);
+  const [occupe, setOccupe] = React.useState(false);
+  const [msg, setMsg] = React.useState('');
+  React.useEffect(() => { const f = (e) => { if (e.key === 'Escape') onFerme(); }; window.addEventListener('keydown', f); return () => window.removeEventListener('keydown', f); }, [onFerme]);
+  const nVentes = React.useMemo(() => { const n = new Map(); if (Array.isArray(ventes)) for (const v of ventes) { const u = uidDe(v); n.set(u, (n.get(u) || 0) + 1); } return n; }, [ventes]);
+  const placeLibre = !!(s && s.libres > 0);
+  const achat = !placeLibre;
+  const ferme = achat && !(s && s.ouvert);
+  const prix = texteSup(s);
+  const valider = async () => {
+    if (!choix || ferme || (achat && !cgv)) return;
+    setOccupe(true); setMsg('');
+    const r = await changerCompteSup('ajouter-sup', choix, enTete, achat ? { cgv: true } : null);
+    setOccupe(false);
+    if (r.ok) onFerme(); else setMsg(r.message);
+  };
+  return createPortal(
+    <div className="vrm-plan-voile" role="presentation" onClick={(e) => { if (e.target === e.currentTarget) onFerme(); }}>
+      <div className="vrm-plan-feuille" role="dialog" aria-modal="true" aria-labelledby="vrm-sup-titre" data-ajouter-compte-sup="" data-sup-ferme={ferme ? '' : undefined} data-sup-place-libre={placeLibre ? '' : undefined}>
+        <div className="vrm-plan-feuille-titre" id="vrm-sup-titre">Un compte Vinted qui vend de plus</div>
+        <div className="vrm-plan-phrase" data-sup-phrase="">Solo : 1 compte Vinted vendeur inclus · <b data-sup-prix="">{prix}</b> par compte de plus. Ses ventes, annonces, colis et sa compta comptent comme celles du compte inclus.{' '}
+          {placeLibre ? 'Tu as déjà une place payée et libre : rien de plus à payer.' : 'Stripe calcule au prorata sur ta prochaine facture ; tu le retires quand tu veux.'}</div>
+        {!inclus && <div className="vrm-plan-phrase" data-sup-sans-inclus="">Choisis d’abord le compte inclus (« Quel compte vend ? »).</div>}
+        {ferme && <div className="vrm-plan-phrase" data-sup-bientot=""><b>Bientôt.</b> Pas encore ouvert au paiement : rien ne t'est demandé.</div>}
+        {!liste.length && <div className="vrm-plan-phrase" data-sup-vide="">Tous tes comptes Vinted reliés vendent déjà. Relie un autre compte, puis reviens ici.</div>}
+        <div role="radiogroup" aria-label="Le compte qui vendra" className="vrm-plan-comptes">
+          {liste.map((c) => {
+            const u = String(c.uid), n = nVentes.get(u) || 0, coche = choix === u;
+            return (
+              <button type="button" role="radio" aria-checked={coche} key={u} data-sup-uid={u} className="vrm-plan-compte" disabled={occupe || ferme || !inclus} onClick={() => setChoix(u)}>
+                <span className="vrm-plan-rond" aria-hidden="true" data-coche={coche ? '' : undefined}/>
+                <span className="vrm-plan-compte-nom">{c.nom}{c.nom !== `n° ${u}` && <span className="vrm-plan-compte-id"> · n° {u}</span>}</span>
+                <span className="vrm-plan-compte-detail">{Array.isArray(ventes) ? `${n} vente${n > 1 ? 's' : ''} lue${n > 1 ? 's' : ''}` : 'ventes pas lues'}</span>
+              </button>
+            );
+          })}
+        </div>
+        {achat && !ferme && liste.length > 0 && (
+          <label className="vrm-plan-phrase vrm-plan-case" data-sup-cgv="">
+            <input type="checkbox" checked={cgv} onChange={(e) => setCgv(e.target.checked)}/>
+            <span>J'accepte les <a href="/legal/cgv.html" target="_blank" rel="noopener noreferrer">conditions générales de vente</a> (option {prix} par compte).</span>
+          </label>
+        )}
+        {msg && <div role="alert" className="vrm-plan-alerte" data-sup-msg="">{msg}</div>}
+        <div className="vrm-plan-actions">
+          <button type="button" className="vrm-b vrm-b-secondaire" onClick={onFerme}>Plus tard</button>
+          <button type="button" className="vrm-b vrm-b-primaire" data-valider-sup="" disabled={occupe || ferme || !inclus || !choix || (achat && !cgv)} onClick={valider}>
+            {occupe ? 'Un instant…' : ferme ? 'Bientôt' : placeLibre ? 'Ce compte vend aussi' : `Ajouter · ${prix}`}</button>
+        </div>
+      </div>
+    </div>, document.body);
+}
+
 // La ligne de la coque + la feuille (ouverte aussi depuis Paramètres → Abonnement).
 // `autres` : { leboncoin|ebay|vestiaire: { comptes: [{uid, nom}], comptesDesVentes: [id]|null } }
 // (lus par la coque). La ligne nomme la PREMIÈRE plateforme qui attend son choix.
@@ -151,6 +241,8 @@ export function BandeauCompteVendeur({ comptes, ventes, autres, enTete }) {
   const x = useAbonnementPublie();
   const [ouvert, setOuvert] = React.useState('');
   React.useEffect(() => { const f = (e) => setOuvert((e && e.detail && e.detail.plateforme) || 'vinted'); window.addEventListener(EVT_QUEL_COMPTE, f); return () => window.removeEventListener(EVT_QUEL_COMPTE, f); }, []);
+  const [sup, setSup] = React.useState(null);
+  React.useEffect(() => { const f = (e) => setSup({ uid: (e && e.detail && e.detail.uid) || '' }); window.addEventListener(EVT_COMPTE_SUP, f); return () => window.removeEventListener(EVT_COMPTE_SUP, f); }, []);
   const manque = plateformesAChoisir(x, autres);
   const p = manque[0] || '';
   const nomP = NOMS_PLATEFORMES_SOLO[p] || '';
@@ -166,6 +258,7 @@ export function BandeauCompteVendeur({ comptes, ventes, autres, enTete }) {
     )}
     {ouvert === 'vinted' && <QuelCompteVend comptes={comptes} ventes={ventes} enTete={enTete} onFerme={() => setOuvert('')}/>}
     {a && <QuelCompteVend plateforme={ouvert} comptes={a.comptes} comptesDesVentes={a.comptesDesVentes} enTete={enTete} onFerme={() => setOuvert('')}/>}
+    {sup && <AjouterCompteVendeur comptes={comptes} ventes={ventes} uidPropose={sup.uid} enTete={enTete} onFerme={() => setSup(null)}/>}
   </>);
 }
 
@@ -223,6 +316,7 @@ export function VentesAutresHorsPlan({ lignes, onPro }) {
 // `aEnvoyer(o)` : la vente attend son colis (DIT, jamais caché).
 export function VentesHorsPlan({ ventes, comptes, aEnvoyer, prix, onPro }) {
   const regle = useRegle();
+  const sx = supDe(useAbonnementPublie());
   const blocs = React.useMemo(() => {
     if (!regle.bride || !Array.isArray(ventes)) return [];
     return comptesHorsPlan(regle, comptes).map((c) => {
@@ -256,7 +350,13 @@ export function VentesHorsPlan({ ventes, comptes, aEnvoyer, prix, onPro }) {
               );
             })}
           </ul>
-          <button type="button" className="vrm-b vrm-b-primaire" data-apercu-garde="" data-passer-pro="" onClick={onPro}>Passe à Pro pour gérer les ventes de {b.nom}</button>
+          <div className="vrm-plan-actions" style={{ justifyContent: 'flex-start' }}>
+            {/* (13 nov., lot 56) Ce compte peut vendre AUSSI, en Solo (feuille ; le serveur décide). Fermé ⇒ « bientôt ». */}
+            {sx && (sx.ouvert || sx.libres > 0)
+              ? <button type="button" className="vrm-b vrm-b-secondaire" data-apercu-garde="" data-sup-ajouter={b.uid} onClick={() => ouvrirCompteSup(b.uid)}>Faire vendre ce compte · {texteSup(sx)}</button>
+              : sx && <span className="vrm-plan-phrase" data-sup-bientot-bloc={b.uid}>Bientôt : faire vendre ce compte en Solo, {texteSup(sx)}.</span>}
+            <button type="button" className="vrm-b vrm-b-primaire" data-apercu-garde="" data-passer-pro="" onClick={onPro}>Passe à Pro pour gérer les ventes de {b.nom}</button>
+          </div>
         </section>
       ))}
     </div>
@@ -267,6 +367,7 @@ export function VentesHorsPlan({ ventes, comptes, aEnvoyer, prix, onPro }) {
 export function OffresSoloPro({ x, prixSolo, prixActuel, prixProAffiche, onChoisirPro, onChoisirSolo, occupe }) {
   const plan = x && x.plan;
   const pro = (x && x.offres && x.offres.pro) || { ouvert: false };
+  const supOuvert = !!(x && x.offres && x.offres.compteSup && x.offres.compteSup.ouvert);
   // Le prix de SON offre est celui de SON abonnement (lu chez Stripe), jamais celui du moment.
   const texteSolo = (plan === 'solo' && prixActuel) || (x && x.offres && x.offres.solo && x.offres.solo.texte) || prixSolo;
   const textePro = (plan === 'pro' && prixActuel) || (pro.ouvert && pro.texte ? pro.texte : prixProAffiche);
@@ -276,6 +377,8 @@ export function OffresSoloPro({ x, prixSolo, prixActuel, prixProAffiche, onChois
         <div className="vrm-plan-offre-nom">{OFFRES.solo.nom}{plan === 'solo' && <span className="vrm-plan-pastille">Ton offre</span>}</div>
         <div className="vrm-plan-offre-prix" data-prix-solo="">{texteSolo}</div>
         <div className="vrm-plan-phrase">{OFFRES.solo.phrase}</div>
+        {/* (13 nov., lot 56) Plusieurs comptes Vinted dès Solo : le supplément, une ligne. */}
+        <div className="vrm-plan-phrase vrm-plan-supplement" data-solo-supplement="" data-sup-ouvert={supOuvert ? '' : undefined}><b>{OFFRES.solo.supplement}</b>{!supOuvert && <span className="vrm-plan-pastille" data-sup-pastille-bientot="">Bientôt</span>}</div>
         {plan === 'pro' && onChoisirSolo && <button type="button" className="vrm-b vrm-b-secondaire" disabled={!!occupe} onClick={onChoisirSolo} data-passer-solo="">Revenir à Solo</button>}
       </div>
       <div className="vrm-plan-offre" data-offre="pro" data-offre-actuelle={plan === 'pro' ? '' : undefined}>

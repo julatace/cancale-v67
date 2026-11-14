@@ -116,6 +116,12 @@ const MENSONGES = [
         try { (JSON.parse(route.request().postData() || '[]') || []).forEach((r) => ecrits.push(r)); } catch (_) {}
         return route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' });
       }
+      if (route.request().method() === 'PATCH') {
+        // (13 nov.) Les réglages s'écrivent maintenant en comparer-et-échanger (`ecrireDifference`, PATCH conditionnel
+        // sur data->>rev) : une écriture elle aussi, comptée comme le POST (l'id est dans l'URL).
+        try { const id = (/id=eq\.([^&]+)/.exec(u) || [])[1]; const corps = JSON.parse(route.request().postData() || 'null'); if (id && corps) { const ligne = { id: decodeURIComponent(id), ...corps }; ecrits.push(ligne); return j([ligne]); } } catch (_) {}
+        return j([]);
+      }
       if (route.request().method() !== 'GET') return j([]);
       const cible = CIBLES.find((k) => u.includes('id=eq.' + k));
       if (cible) {
@@ -177,6 +183,10 @@ const MENSONGES = [
     // (9 nov.) Depuis le 5 nov., une ligne par FAMILLE (« Colis à poster » remplace « Suivi du colis »).
     const id = await pg.evaluate(() => { const x = document.querySelector('button[role="switch"][aria-label^="Colis à poster"]'); const s = x && x.closest('[data-sous-ecran]'); return s ? s.getAttribute('data-sous-ecran') : null; });
     if (id) { try { await pg.locator(`[data-sous-ouvrir="${id}"]`).first().click({ timeout: 2500 }); await pg.waitForTimeout(500); } catch (_) {} }
+    // (13 nov.) Les familles de notifications sont dans le repli « Ce que tu reçois sur ton téléphone » (fermé) :
+    // on le déplie comme Julien (toucher son en-tête) avant de basculer.
+    await pg.evaluate(() => { const x = document.querySelector('button[role="switch"][aria-label^="Colis à poster"]'); const d = x && x.closest('details'); if (d && !d.open) { const s = d.querySelector('summary'); if (s) s.click(); } });
+    await pg.waitForTimeout(300);
     const b2 = pg.locator('button[role="switch"][aria-label^="Colis à poster"]');
     if (await b2.count()) { try { await b2.first().click({ timeout: 2500 }); } catch (_) {} }
   };

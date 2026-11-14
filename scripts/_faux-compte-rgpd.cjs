@@ -20,7 +20,9 @@ const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64').replace(/\+
 // Un jeton à la forme d'un JWT : `amr` dit quand la personne s'est prouvée.
 const jeton = (qui, connecteIlYaMs) => `eyJhbGciOiJIUzI1NiJ9.${b64({ sub: qui, amr: [{ method: 'password', timestamp: Math.floor((Date.now() - connecteIlYaMs) / 1000) }] })}.sig${qui.slice(0, 4)}`;
 
-const etat = { base: null, deletes: [], ecritures: [], stripe: [], pannes: new Set(), proprioRpc: null, proprioReglage: null, jetons: {} };
+// (13 nov., lot 51) `pannesMotif` : [{ re, m }] — UNE requête ciblée tombe (522), les autres passent
+// (le cas « lecture KO, écriture OK » sur une seule ligne).
+const etat = { base: null, deletes: [], ecritures: [], stripe: [], pannes: new Set(), pannesMotif: [], proprioRpc: null, proprioReglage: null, jetons: {} };
 const MDP = { [A]: 'bon-mot-de-passe-A', [B]: 'bon-mot-de-passe-B', [P]: 'bon-mot-de-passe-P' };
 const EMAIL = { [A]: 'vendeuse.a@exemple.test', [B]: 'b@exemple.test', [P]: 'proprio@exemple.test' };
 
@@ -50,7 +52,7 @@ function reset() {
     communaute: [{ owner: A }, { owner: B }],
     subs: { sub_A: { id: 'sub_A', customer: 'cus_A', status: 'active' }, sub_B: { id: 'sub_B', customer: 'cus_B', status: 'active' } },
   };
-  etat.deletes = []; etat.ecritures = []; etat.stripe = []; etat.pannes = new Set(); etat.proprioRpc = null; etat.proprioReglage = P;
+  etat.deletes = []; etat.ecritures = []; etat.stripe = []; etat.pannes = new Set(); etat.pannesMotif = []; etat.proprioRpc = null; etat.proprioReglage = P;
   etat.jetons = {};
   delete process.env.VRM_OWNER_UID;
 }
@@ -87,6 +89,7 @@ async function faux(url, opts = {}) {
   const u = decodeURIComponent(String(url)), m = opts.method || 'GET', h = opts.headers || {};
   const jwt = String(h.Authorization || h.authorization || '').replace(/^Bearer\s+/, '');
   const service = String(h.apikey || '') === SERVICE;
+  if (etat.pannesMotif.some((x) => x.re.test(u) && (!x.m || x.m === m))) return rep('<html>522</html>', 522);
   if (u.includes('/auth/v1/user')) {
     if (etat.pannes.has('auth-user')) return rep('<html>522</html>', 522);
     const qui = etat.jetons[jwt];
@@ -188,6 +191,7 @@ async function faux(url, opts = {}) {
     const s = base.subs[chemin.split('/')[1]];
     if (!s) return rep({ error: { message: 'inconnu' } }, 404);
     if (m === 'POST' && /cancel_at_period_end=true/.test(String(opts.body))) s.cancel_at_period_end = true;
+    if (m === 'POST' && /cancel_at_period_end=false/.test(String(opts.body))) s.cancel_at_period_end = false;   // (13 nov.) reprendre
     if (m === 'DELETE') s.status = 'canceled';
     return rep(s);
   }

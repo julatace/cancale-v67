@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Ce que VRM fait — et ne fait jamais</title>
+<meta name="description" content="Ce que VRM lit, ce qui ne part que sur ton clic, ses limites, ce qu’il ne fera jamais, et où sont tes données.">
+<meta name="robots" content="index,follow">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="/vrm-icon-v4-192.png">
+<!-- vrm.center/confiance (13 nov., lot 50). PAS l'app, pas React : une page
+     statique, un seul script servi par VRM (le thème ; la CSP n'autorise aucun
+     script en ligne). Rien n'est lu, rien n'est envoyé.
+     ⚠️ CHAQUE AFFIRMATION EST UNE PROMESSE : chaque `data-affirmation` a sa
+     preuve dans le code, et les nombres (`data-chiffre`) sont relus dans le
+     code par l'audit de la confiance publique. Changer le code sans changer
+     la phrase ⇒ rouge. Les preuves vivent dans l'audit, JAMAIS ici (aucun nom
+     de fichier ni identifiant interne sur une page publique). -->
+<script src="/confiance.js"></script>
+<style>
+:root{--fond:#F2F2F7;--carte:#FFFFFF;--encre:#1D1D1F;--gris:#6E6E73;--filet:#E5E5EA;--bleu:#0071E3;--lien:#0066CC;color-scheme:light}
+:root[data-theme="dark"]{--fond:#000000;--carte:#1C1C1E;--encre:#F5F5F7;--gris:#98989D;--filet:#38383A;--bleu:#0A84FF;--lien:#409CFF;color-scheme:dark}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{margin:0;background:var(--fond);color:var(--encre);font:17px/1.47 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh}
+main{max-width:680px;margin:0 auto;padding:max(32px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(48px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+.tete{display:flex;align-items:center;gap:12px;margin:0 0 32px}
+.tete a{display:inline-flex;align-items:center;gap:12px;color:inherit;text-decoration:none;min-height:44px}
+.tete img{width:36px;height:36px;border-radius:9px}
+.tete span{font-size:15px;font-weight:600;letter-spacing:-.01em}
+h1{font-size:40px;line-height:1.08;font-weight:700;letter-spacing:-.03em;margin:0 0 14px}
+h1 em{font-style:normal;color:var(--gris)}
+.chapo{font-size:19px;line-height:1.45;color:var(--gris);margin:0 0 12px;max-width:34em}
+.verifie{font-size:13px;color:var(--gris);margin:0 0 40px}
+section{margin:0 0 36px}
+h2{font-size:22px;line-height:1.25;font-weight:700;letter-spacing:-.02em;margin:0 0 6px}
+.sous{font-size:15px;color:var(--gris);margin:0 0 12px}
+ul{list-style:none;margin:0;padding:0;background:var(--carte);border-radius:14px;overflow:hidden}
+li{padding:14px 16px;border-top:1px solid var(--filet)}
+li:first-child{border-top:0}
+li b{display:block;font-weight:600;font-size:17px;line-height:1.35}
+li>span{display:block;color:var(--gris);font-size:15px;line-height:1.45;margin-top:3px}
+.chiffre{display:inline;font-variant-numeric:tabular-nums}
+li.jamais b::before{content:"Jamais\00a0: ";color:var(--gris);font-weight:500}
+.chemin{color:var(--encre);font-weight:500}
+.pied{margin:40px 4px 0;color:var(--gris);font-size:13px;line-height:1.5}
+.liens{margin:20px 0 0;font-size:15px;display:flex;flex-wrap:wrap;gap:0 20px}
+.liens a{color:var(--lien);text-decoration:none;min-height:44px;display:inline-flex;align-items:center}
+.liens a:hover,li a:hover{text-decoration:underline}
+li a{color:var(--lien);text-decoration:none}
+@media (max-width:420px){h1{font-size:32px}.chapo{font-size:17px}}
+</style>
+</head>
+<body>
+<main data-confiance="">
+  <div class="tete"><a href="/"><img src="/logo-vrm-96.png" alt="" width="36" height="36"><span>VRM</span></a></div>
+
+  <h1>Ce que VRM fait — <em>et ne fait jamais.</em></h1>
+  <p class="chapo">VRM lit tes comptes de revente et agit parfois en ton nom. Voici exactement quand, et dans quelles limites.</p>
+  <p class="verifie">Chaque phrase décrit ce que fait le code de VRM aujourd’hui, avec l’extension à jour.</p>
+
+  <section data-section="lu" aria-labelledby="t-lu">
+    <h2 id="t-lu">Ce que VRM lit</h2>
+    <ul>
+      <li data-affirmation="lu-comptes"><b>Seulement les comptes que tu relies.</b><span>Vinted, Leboncoin, eBay, Vestiaire Collective : tes annonces, ventes, achats, messages et offres.</span></li>
+      <li data-affirmation="lu-navigateur"><b>Depuis ton navigateur.</b><span>L’extension VRM lit ce que le site envoie déjà à ta page, avec la session ouverte dans ton onglet. Pour un compte Vinted qu’elle n’a encore jamais lu, le serveur de VRM peut le lire lui-même, au plus <span class="chiffre" data-chiffre="relais-demi-heure">24</span> fois par demi-heure.</span></li>
+      <li data-affirmation="lu-mots-de-passe"><b>Jamais tes mots de passe.</b><span>VRM ne te demande pas le mot de passe de Vinted, Leboncoin, eBay ou Vestiaire. eBay se relie par sa propre page de connexion. La session de tes comptes est rangée dans ton espace, à part.</span></li>
+      <li data-affirmation="lu-pas-le-reste"><b>Pas le reste.</b><span>Ni ton historique de navigation, ni tes données bancaires, d’identité ou de double vérification.</span></li>
+      <li data-affirmation="lu-emails"><b>Tes e-mails, si tu les transfères.</b><span>Ventes, bordereaux, codes de retrait : seulement ceux que tu fais suivre à VRM.</span></li>
+    </ul>
+  </section>
+
+  <section data-section="clic" aria-labelledby="t-clic">
+    <h2 id="t-clic">Ce qui ne part que sur ton clic</h2>
+    <p class="sous">Rien de tout ça ne part sans toi.</p>
+    <ul>
+      <li data-affirmation="clic-repondre"><b>Répondre, faire une offre.</b><span>Répondre à un acheteur. Accepter, refuser ou proposer un prix.</span></li>
+      <li data-affirmation="clic-favoris"><b>Écrire à ceux qui ont mis ton annonce en favori.</b><span>Tu choisis le message et tu l’envoies.</span></li>
+      <li data-affirmation="clic-supprimer"><b>Supprimer une annonce.</b><span>Toujours sur ton clic, après une confirmation. Sur Leboncoin, <span class="chiffre" data-chiffre="lbc-suppressions-heure">10</span> par heure au plus.</span></li>
+      <li data-affirmation="clic-republier"><b>Republier.</b><span>Tu choisis les annonces, l’ordre et l’espacement. C’est toi qui lances.</span></li>
+      <li data-affirmation="clic-publier"><b>Publier, baisser un prix.</b><span>Une annonce sur Leboncoin, eBay ou Vestiaire part de ton clic. Une baisse de prix aussi.</span></li>
+    </ul>
+  </section>
+
+  <section data-section="auto" aria-labelledby="t-auto">
+    <h2 id="t-auto">Ce qui peut se faire seul — si tu l’allumes</h2>
+    <p class="sous">Éteint au départ. Rien ne part tant que tu ne l’allumes pas, et tu l’éteins quand tu veux.</p>
+    <ul>
+      <li data-affirmation="auto-offres"><b>Accepter une offre Vinted à partir de ton prix mini.</b><span>Et refuser sous le seuil que tu as posé, avec ton message.</span></li>
+      <li data-affirmation="auto-ebay-offres"><b>Accepter une offre eBay à partir d’un prix.</b><span>C’est eBay qui accepte, sur le prix que tu as posé.</span></li>
+      <li data-affirmation="auto-favoris"><b>Écrire aux nouveaux favoris Vinted.</b><span>Dans tes heures, <span class="chiffre" data-chiffre="favoris-jour">30</span> messages par jour et <span class="chiffre" data-chiffre="favoris-heure">12</span> par heure au plus, par défaut.</span></li>
+      <li data-affirmation="auto-ebay"><b>Retirer d’eBay une annonce vendue ailleurs.</b><span>Seulement celle qui porte le numéro VRM de l’article vendu.</span></li>
+      <li data-affirmation="auto-bordereaux"><b>Générer le bordereau d’une vente.</b><span>Celui de la plateforme, déjà payé par l’acheteur.</span></li>
+    </ul>
+  </section>
+
+  <section data-section="limites" aria-labelledby="t-limites">
+    <h2 id="t-limites">Les limites</h2>
+    <p class="sous">Ce que VRM s’interdit de dépasser, sur chacun de tes comptes.</p>
+    <ul>
+      <li data-affirmation="limite-heure"><b><span class="chiffre" data-chiffre="actions-heure">50</span> actions par heure et par compte, au plus.</b><span>Tous tes ordinateurs confondus. Un compte Vinted neuf monte en douceur : <span class="chiffre" data-chiffre="montee">10, 20 puis 35</span> par heure les premières semaines.</span></li>
+      <li data-affirmation="limite-jour"><b><span class="chiffre" data-chiffre="actions-jour">200</span> actions par jour et par compte Vinted.</b><span>C’est le réglage de départ. Tu peux le baisser.</span></li>
+      <li data-affirmation="limite-une"><b>Une seule demande à Vinted à la fois.</b><span>Jamais deux en même temps.</span></li>
+      <li data-affirmation="limite-pause"><b>Une pause dès que Vinted refuse.</b><span>Trop de demandes ou accès refusé : tout s’arrête <span class="chiffre" data-chiffre="pause-min">15</span> minutes, plus longtemps si ça recommence, jusqu’à <span class="chiffre" data-chiffre="pause-max">4</span> heures. Pendant la pause, rien ne part, même sur ton clic. Puis, pendant 24 heures, ce compte est ralenti à <span class="chiffre" data-chiffre="prudence-heure">20</span> actions par heure.</span></li>
+      <li data-affirmation="limite-verification"><b>Un arrêt net sur une vérification.</b><span>Si Vinted demande de prouver que tu n’es pas un robot, l’automatique s’arrête jusqu’à ce que tu touches « Reprendre ».</span></li>
+      <li data-affirmation="limite-compte"><b>Seulement le compte ouvert dans ton onglet.</b><span>VRM n’agit jamais au nom d’un autre compte.</span></li>
+    </ul>
+  </section>
+
+  <section data-section="jamais" aria-labelledby="t-jamais">
+    <h2 id="t-jamais">Ce que VRM ne fera jamais</h2>
+    <ul>
+      <li class="jamais" data-affirmation="jamais-souris"><b>Prendre la main sur ta souris ou ton clavier.</b><span>Sur Vinted, rien n’est simulé : VRM envoie les demandes que ta page enverrait. Sur Leboncoin, eBay et Vestiaire, l’annonce que tu lui demandes de préparer est remplie dans ton onglet, sous tes yeux.</span></li>
+      <li class="jamais" data-affirmation="jamais-supprimer"><b>Supprimer une annonce Vinted ou Leboncoin tout seul.</b><span>Une suppression part toujours de ton clic.</span></li>
+      <li class="jamais" data-affirmation="jamais-etiquette"><b>Acheter une étiquette avec ton argent.</b><span>Les bordereaux sont ceux de la plateforme, payés par l’acheteur. Sur eBay, VRM ne pose jamais « livraison gratuite ».</span></li>
+      <li class="jamais" data-affirmation="jamais-prix-achat"><b>Deviner ton prix d’achat.</b><span>C’est toi qui le saisis. VRM peut te proposer le montant lu sur ton reçu d’achat : rien n’est écrit sans ton geste. S’il manque, ton bénéfice le dit.</span></li>
+      <li class="jamais" data-affirmation="jamais-vendre"><b>Vendre tes données.</b><span>Ni publicité, ni profil marketing.</span></li>
+    </ul>
+  </section>
+
+  <section data-section="donnees" aria-labelledby="t-donnees">
+    <h2 id="t-donnees">Tes données</h2>
+    <ul>
+      <li data-affirmation="donnees-ou"><b>Rangées en Europe.</b><span>Ta base est chez Supabase, en Irlande. Elle ne rend tes données qu’à ta session : aucun autre vendeur ne les voit.</span></li>
+      <li data-affirmation="donnees-journal"><b>Ce que VRM a fait en ton nom.</b><span><span class="chemin">Paramètres → Mon compte → Ce que VRM lit et fait</span>.</span></li>
+      <li data-affirmation="donnees-exporter"><b>Tout exporter, quand tu veux.</b><span><span class="chemin">Ce que VRM lit et fait → Exporter mes données</span> : un fichier avec tes données, même sans abonnement. Ce qui n’y est pas (PDF des bordereaux, jetons de connexion) est dit dedans.</span></li>
+      <li data-affirmation="donnees-supprimer"><b>Tout supprimer.</b><span><span class="chemin">Supprimer mon compte</span>, tout en bas de Mon compte : tout est effacé tout de suite par le serveur. Les factures Pro que tu as émises sont gardées 10 ans, sans accès, parce que la loi l’exige. Pour effacer aussi les copies de sécurité de la base, écris-nous.</span></li>
+    </ul>
+  </section>
+
+  <p class="pied">VRM est un outil indépendant. Il n’est ni affilié, ni approuvé par Vinted, Leboncoin, eBay ou Vestiaire Collective.</p>
+  <nav class="liens" aria-label="Informations">
+    <a href="/">Ouvrir VRM</a>
+    <a href="/etat">État de VRM</a>
+    <a href="/legal/confidentialite.html">Confidentialité</a>
+    <a href="/legal/extension.html">L’extension en détail</a>
+    <a href="/legal/mentions-legales.html">Mentions légales</a>
+  </nav>
+</main>
+</body>
+</html>

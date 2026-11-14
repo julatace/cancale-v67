@@ -14,6 +14,8 @@
 //   cible=colonne  colonne=prets|attente|retirer|partis Colis · la colonne
 //   cible=achat    tx=<transaction>                     Achats · la ligne de l'achat
 //   cible=urssaf                                        Comptabilité · « Ta déclaration URSSAF »
+//   cible=bilanmois mois=<AAAA-MM>                      Comptabilité · « Bilan du mois » de CE mois
+//                  (13 nov., lot 53 : le bouton de l'e-mail du bilan mensuel)
 //   cible=doublon  num=<N°> plat=ebay|leboncoin         l'écran où se règle la double vente
 //
 // ⚠️ IDENTITÉS SEULEMENT (§5) : un n° de transaction, de suivi, de conversation,
@@ -43,7 +45,11 @@
 import { motsVendeur } from './profilVendeur.js';
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 const COLONNES = ['prets', 'attente', 'retirer', 'partis'];
-const TYPES = ['conv', 'offre', 'offres', 'vente', 'vcvente', 'colis', 'retrait', 'colonne', 'achat', 'urssaf', 'doublon', 'case'];
+const TYPES = ['conv', 'offre', 'offres', 'vente', 'vcvente', 'colis', 'retrait', 'colonne', 'achat', 'urssaf', 'doublon', 'case', 'bilanmois'];
+const MOIS = /^\d{4}-(0[1-9]|1[0-2])$/;
+// (13 nov., lot 53) Le mois demandé par l'e-mail du bilan mensuel : la carte « Bilan du
+// mois » (Compta) le lit à son montage pour montrer CE mois (s'il est l'un des deux qu'elle sait).
+export const DEMANDE_BILAN_MOIS = { ym: null, at: 0 };
 const propre = (v) => { const s = String(v == null ? '' : v).trim(); return ID.test(s) ? s : ''; };
 // Échappe une valeur d'attribut CSS (les identités sont déjà filtrées par `ID`).
 const q = (s) => String(s).replace(/["\\]/g, '\\$&');
@@ -61,6 +67,7 @@ export function lireCible(params) {
   const type = String(g('cible') || '');
   if (!TYPES.includes(type)) return null;
   const c = { type, tx: propre(g('tx')), suivi: propre(g('suivi')), conv: propre(g('conv')), compte: propre(g('compte')), num: propre(g('num')), vc: propre(g('vc')), colonne: COLONNES.includes(g('colonne')) ? g('colonne') : '', plat: ['ebay', 'leboncoin'].includes(g('plat')) ? g('plat') : '' };
+  if (type === 'bilanmois') { const m = String(g('mois') == null ? '' : g('mois')).trim(); c.mois = MOIS.test(m) ? m : ''; }
   if (type === 'case') { c.meuble = propre(g('meuble')); const i = String(g('i') == null ? '' : g('i')).trim(); c.i = /^\d{1,4}$/.test(i) ? String(Number(i)) : ''; if (!c.meuble || !c.i) return null; }
   if ((type === 'conv' || type === 'offre') && !c.conv) return null;
   if (type === 'vcvente' && !c.vc) return null;
@@ -103,6 +110,7 @@ export function jetonsCible(c) {
     case 'colonne': return [`colonne:${c.colonne}`];
     case 'achat': return [`achat:${c.tx}`];
     case 'urssaf': return ['urssaf'];
+    case 'bilanmois': return c.mois ? [`bilanmois:${c.mois}`] : ['bilanmois'];
     case 'doublon': { const n = c.num ? cleNumCible(c.num) : ''; return n ? [`doublon:${c.plat || 'ebay'}:${n}`] : [`doublon:${c.plat || 'ebay'}`]; }
     case 'case': return c.meuble && c.i ? [`case:${c.meuble}:${c.i}`] : [];
     case 'annonce': return c.id ? [`annonce:${c.id}`] : [];
@@ -155,6 +163,7 @@ function selecteursAnciens(c) {
     case 'colonne': return { essais: [`[data-cc-colonne="${q(c.colonne)}"]`], ouvrir: null, deplier: [] };
     case 'achat': return { essais: [`.vrm-buy-row[data-achat-tx="${q(c.tx)}"]`], ouvrir: null, deplier: [] };
     case 'urssaf': return { essais: ['[data-compta-urssaf]', '#compta-urssaf'], ouvrir: null, deplier: [] };
+    case 'bilanmois': return { essais: c.mois ? [`.vrm-bilan-mois[data-bilan-mois="${q(c.mois)}"]`] : ['.vrm-bilan-mois'], ouvrir: null, deplier: [] };
     // ⚠️ (1er nov., audit A5) Avec un N°, SEULE la ligne de ce N° répond —
     // jamais un repli sur « la première ligne » : la notification parlait du
     // N°40 et l'écran surlignait le N°12. Le N° de la notification est une
@@ -196,6 +205,7 @@ export function phraseAbsente(c) {
     case 'colonne': return 'Rien dans cette colonne pour l\u2019instant.';
     case 'achat': return "Cet achat n'est pas dans la liste affichée.";
     case 'urssaf': return 'La carte URSSAF ne s\u2019affiche pas pour ton statut.';
+    case 'bilanmois': return 'Le « Bilan du mois » montre ce mois-ci et le mois dernier : pour un mois plus ancien, « Rapport du mois » le donne en PDF.';
     // Ne promet pas « réglée » : la ligne peut manquer parce que la liste n'est
     // pas encore relue. Le geste est dit.
     case 'doublon': return `${motsVendeur().Ce} n\u2019est plus dans la liste « à retirer » : la double vente est sans doute déjà réglée. Vérifie dans tes annonces de la plateforme si tu as un doute.`;
