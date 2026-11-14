@@ -10,9 +10,11 @@ import ecran_emails from './de/emails.js';
 import ecran_stats from './de/stats.js';
 import ecran_compta from './de/compta.js';
 import ecran_fraiscarte from './de/fraiscarte.js';   // (14 nov., frais-carte)
+import ecran_argent from './de/argent.js';
 export default {
   ...ecran_fraiscarte,
   ...ecran_compta,
+  ...ecran_argent,
   ...ecran_stats,
   ...ecran_emails,
   ...ecran_messages,
