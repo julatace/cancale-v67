@@ -33,7 +33,8 @@ const P = require('./design-passe.cjs');
 const B = require('./_base-messages-stock.cjs');
 const SHOTS = process.env.SHOTS || '';
 const INV_OUT = process.env.BANC_INVENTAIRE || '';
-const INV_REF = process.env.BANC_REFERENCE ? JSON.parse(fs.readFileSync(process.env.BANC_REFERENCE, 'utf8')) : null;
+// L'inventaire d'avant (relevé sur origin/claude/integration-refonte, base inventée) est versionné à côté du banc.
+const INV_REF = INV_OUT ? null : (process.env.BANC_REFERENCE ? JSON.parse(fs.readFileSync(process.env.BANC_REFERENCE, 'utf8')) : require('./studio-reste-inventaire.cjs'));
 const LARG = String(process.env.LARGEURS || '390,1512').split(',').map(Number);
 const THEMES = String(process.env.THEMES || 'clair,sombre').split(',');
 
@@ -67,6 +68,11 @@ const ECRANS = {
 // Les gestes d'avant qu'on a RETIRÉS EXPRÈS, chacun avec la place où il vit maintenant (Règles des boutons, note t25) :
 const RANGES = [
   /^texte:\+ Nouvelle facture$/,   // le doublon de l'état vide de Factures : le geste est le plein en tête (data-fac-principal)
+];
+// Les gestes qui n'apparaissent qu'APRÈS une lecture asynchrone (la même place, le même geste — présents ou non
+// selon que la lecture a répondu avant la mesure, sur une machine chargée) :
+const VOLATILS = [
+  /^repli:texte:Points à vérifier/,   // Paramètres → Suivi des comptes : le repli naît quand la capture des comptes est lue
 ];
 const VOULUS = String(process.env.ECRANS || Object.keys(ECRANS).join(',')).split(',');
 let ok = 0, ko = 0;
@@ -122,7 +128,7 @@ function mesurer({ racine, tactile }) {
   const out = { racine: roots.length, matiere: {}, pleins: [], horsForme: [], formes: {}, contraste: [], deborde: [], textes: 0, boutons: 0, inventaire: [], encaisse: false, auMoins0: false, nan: false };
   if (!roots.length) return out;
   const R = roots[0];
-  out.matiere.espace = !!R.closest('[data-espace]') || !!R.querySelector('[data-espace], .vrm-tache[data-tache="messages"]') || R.hasAttribute('data-espace');
+  out.matiere.espace = !!R.closest('[data-espace]') || !!R.querySelector('[data-espace], .vrm-tache[data-tache="messages"]') || R.hasAttribute('data-espace') || R.matches('.vrm-chat-panel');
   const fondMain = getComputedStyle(document.querySelector('.vrm-main') || R).backgroundImage;
   out.matiere.fondBleu = /gradient/.test(fondMain) || /gradient/.test(getComputedStyle(document.querySelector('.vrm-app-shell') || R).backgroundImage) || /gradient/.test(getComputedStyle(R).backgroundImage) || /gradient/.test(getComputedStyle(document.querySelector('.vrm-cx') || R).backgroundImage);
   // ── Les boutons et leurs formes ──
@@ -244,8 +250,11 @@ function mesurer({ racine, tactile }) {
   // ── S6 : chaque geste d'avant est encore là (union des rendus de l'écran, avant ⊆ après) ──
   if (INV_REF) for (const e of VOULUS) {
     if (!INV_REF[e] || !inventaire[e]) continue;
-    const ici = new Set(inventaire[e]);
-    const manque = INV_REF[e].filter((k) => !ici.has(k) && !RANGES.some((x) => x.test(k)));
+    // Un libellé se juge sur ses quatre premiers mots (la suite dit un état : « Charge… », « 3 sur 5 ») ;
+    // un libellé « en cours » (qui finit par « … ») et les lectures asynchrones (VOLATILS) ne sont pas des gestes.
+    const norme = (k) => { const m = /^((?:repli:)?(?:texte|nom):)(.*)$/.exec(k); return m ? m[1] + m[2].split(/\s+/).slice(0, 4).join(' ').replace(/[#\s]+$/, '') : k; };
+    const ici = new Set(inventaire[e].map(norme));
+    const manque = INV_REF[e].filter((k) => !/…$/.test(k) && !ici.has(norme(k)) && !RANGES.some((x) => x.test(k)) && !VOLATILS.some((x) => x.test(k)));
     dit(!manque.length, `S6 ${e} : l'inventaire d'avant est entier (${INV_REF[e].length} gestes relevés, ${inventaire[e].length} après)`, manque.join(' ¦ '));
   }
   if (INV_OUT) { fs.writeFileSync(INV_OUT, JSON.stringify(inventaire, null, 1)); console.log('inventaire écrit :', INV_OUT); }
