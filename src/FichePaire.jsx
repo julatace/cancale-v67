@@ -209,11 +209,15 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
   const titreHeros = p ? ((neuve && neuve.titre) || p.titre || (p.etat === 'rien' ? 'N° jamais servi' : 'Sans titre')) : ((depuis && depuis.titre) || tr('fiche.sansTitre'));
   const tailleHeros = p ? ((neuve && neuve.taille) || p.taille || '') : '';
   const sousHeros = [ctx ? tr(CLE_CTX[ctx] || 'fiche.ctx.vente') : '', depuis && depuis.sous ? depuis.sous : ''].filter(Boolean).join(' · ');
+  // (14 nov.) Sur une ligne « À retirer », `sous` EST le code de retrait (src/CarteRelais.jsx) : il garde son
+  // propre élément, marqué comme un code (`data-stream-type="code"`) — masqué en direct, « exemple » dans l'exemple.
+  const ctxHeros = ctx ? tr(CLE_CTX[ctx] || 'fiche.ctx.vente') : '';
+  const codeHeros = ctx === 'retrait' && depuis && depuis.sous ? depuis.sous : '';
   const heros = (p || depuis) ? (
     <section className={'vrm-fp-heros vrm-fp-entete' + (photoHeros ? ' a-photo' : ' is-sans-photo')} data-fiche-heros={ctx || 'numero'} data-fiche-photo-vedette={photoHeros ? '1' : '0'} aria-label={tr('fiche.heros')}>
       <span className="vrm-fp-heros-photo vrm-fp-photo" data-fiche-heros-photo={photoHeros ? '1' : '0'}>{photoHeros && Photo ? Photo(photoHeros) : <Silhouette/>}</span>
       <span className="vrm-fp-quoi">
-        {sousHeros ? <span className="vrm-fp-heros-ctx" data-fiche-heros-ctx="">{sousHeros}</span> : null}
+        {sousHeros ? <span className="vrm-fp-heros-ctx" data-fiche-heros-ctx="">{codeHeros ? <>{ctxHeros ? `${ctxHeros} · ` : ''}<span className="vrm-sensible" data-stream-type="code" data-fiche-heros-code="">{codeHeros}</span></> : sousHeros}</span> : null}
         {p ? <span className={'vrm-fp-num' + (double ? ' is-double' : '')} data-fiche-grand-num="">{p.num}</span>
           : <span className="vrm-fp-num is-sans" data-fiche-grand-num="" data-fiche-sans-num="">{ligneRes && ligneRes.etat === 'lot' ? tr('fiche.lotN', { n: String(ligneRes.nums.length) }) : tr('fiche.sansNum')}</span>}
         <span className="vrm-fp-titre">{motsInsecables(titreHeros)}{tailleHeros ? ` · ${tailleHeros}` : ''}</span>

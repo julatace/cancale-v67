@@ -60,14 +60,14 @@
   "modeExemple": true
  },
  "retirer-clair.webp": {
-  "sha256": "38618ee3dcee46dac44a3c9d7d760cfc7e02d50eee6f1a75bd1ba097db27a945",
-  "ecran": "cat_bord",
+  "sha256": "fe726362a09bf6e271ecfc08fee05bc418f925b2c4467622b7edac6997054ea8",
+  "ecran": "achats",
   "largeur": 390,
   "modeExemple": true
  },
  "retirer-sombre.webp": {
-  "sha256": "20c2a153b562a52a68dff9133a73eb3f61bcb7cb8b9746a38a95c9826d736fd1",
-  "ecran": "cat_bord",
+  "sha256": "053bae092ec2d7cbf0045a4f63d60e11772c0423bfae63ebdf490aeceeb7928d",
+  "ecran": "achats",
   "largeur": 390,
   "modeExemple": true
  }
