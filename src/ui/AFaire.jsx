@@ -60,6 +60,10 @@ export function AFaireLigne({ titre, className = '', capsule = false, seulement 
     c.conteneur.addEventListener('vrm-afaire-fermer', f);
     return () => c.conteneur.removeEventListener('vrm-afaire-fermer', f);
   }, [c && c.conteneur]);
+  // (14 nov., correctif « À faire ») Plus rien à faire (la dernière alerte réglée) : la feuille ouverte se
+  // ferme, elle ne reste pas vide ; passé à l'ordinateur (rotation, fenêtre élargie), elle n'a plus lieu d'être.
+  const nIci = c ? c.n : 0;
+  React.useEffect(() => { if (ouvert && (!nIci || !tel)) setOuvert(false); }, [ouvert, nIci, tel]);
   React.useEffect(() => {
     let mq = null; const f = () => setTel(telephone());
     try { mq = window.matchMedia('(max-width: 767px)'); mq.addEventListener('change', f); } catch (_) {}

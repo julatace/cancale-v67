@@ -453,6 +453,7 @@ import { createPortal, flushSync } from "react-dom";
 // (5 nov., chantier B) Les composants partagés et l'écriture unique des euros (docs/passation/2026-11-05-chantier-b.md).
 import { montant, fmt as fmtMontant, fmtE as fmtEMontant, fmtE0 as fmtE0Montant, prixTxt as prixTxtMontant } from "./format.js";
 import { SheetShell as SheetShellBase } from "./composants/SheetShell.jsx";
+import { poserFermeAuRetour } from "./ui/retour.jsx";   // (14 nov., correctif « À faire ») les feuilles de src/ui reçoivent le vrai FermeAuRetour
 import { BoutonBase, SegmenteBase } from "./composants/Bouton.jsx";
 import { ID_PAIRES, ECRANS_PAIRES, estPaires, dernierePaire, noterPaire, groupeBarre, badgePaires } from "./navPaires.js";   // (14 nov., n° 61) l'onglet « Paires »
 // Importés ICI une fois pour les chantiers C à H (aucun n'a à retoucher cette ligne).
@@ -3447,6 +3448,9 @@ function FermeAuRetour({ fermer }) {
   }, []);
   return null;
 }
+// (14 nov., correctif « À faire ») Les feuilles de src/ui (Feuille : « À faire », comptes, AFaireSite…) se
+// ferment AUSSI au geste « retour » : elles prennent ce FermeAuRetour-ci (src/ui/retour.jsx).
+poserFermeAuRetour(FermeAuRetour);
 
 // ── L'ORDRE DES COUCHES QUI PASSENT AU-DESSUS DE TOUT (23 oct.) ─────────────
 // Une confirmation (askConfirm / askText) est posée PAR une feuille ouverte —
