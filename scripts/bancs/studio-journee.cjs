@@ -176,9 +176,8 @@ async function jouer(nav, port, W, sombre) {
     dit(env && env.vis && env.zone && env.plein, `${T} T « À envoyer » : tuile, zone qui la déplie, et le rond d'encre « Imprimer » (un bordereau prêt dans l'exemple)`, JSON.stringify(env));
     dit(ret && ret.vis && ret.codes >= 1, `${T} T « À retirer » : les codes en grandes plaques`, JSON.stringify(ret));
     dit(msg && msg.vis && msg.zone, `${T} T « Messages » : une tuile qui se déplie`, JSON.stringify(msg));
-    // « Prix à baisser » à zéro (l'exemple n'en a aucun) : pas de petite tuile à zéro, son compteur reste publié (caché).
-    const prixCache = await pg.evaluate(() => { const e = document.querySelector('[hidden] [data-tuile="prix"]'); return e ? e.getAttribute('data-n') : null; });
-    dit(prix ? (prix.vis && prix.zone) : prixCache === '0', `${T} T « Prix à baisser » : une tuile s'il y en a, sinon aucune tuile à zéro (compteur publié : ${prixCache})`, JSON.stringify(prix));
+    // « Prix à baisser » : une tuile de la grille stable, même à zéro (calme) — elle se déplie (« Aucun prix à baisser »).
+    dit(prix && prix.vis && prix.zone, `${T} T « Prix à baisser » : une tuile qui se déplie (à zéro, calme)`, JSON.stringify(prix));
     dit(mois && mois.vis && !mois.zone, `${T} T le mois : sa tuile, ses propres gestes (aucune zone par-dessus)`);
     const dbl = m.compteurs.filter((x, i, a) => a.indexOf(x) !== i);
     dit(dbl.length === 0 && ['envoyer', 'retirer', 'messages', 'prix'].every((k) => m.compteurs.includes(k)), `${T} T chaque compteur (data-tuile) est publié UNE fois`, JSON.stringify(m.compteurs));

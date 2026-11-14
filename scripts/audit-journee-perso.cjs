@@ -105,7 +105,7 @@ async function controles(T, ok) {
   // caché publie celui de chaque case qui n'est pas une tuile (cachée par lui, ou petite case à zéro).
   ok(/const cases = T\.filter\(\(x\) => !x\.pasSu && x\.t && x\.t\.n > 0 && visJ\(x\.id\)\.montree\);/.test(app)
     && (/<div hidden>\{T\.filter\(\(x\) => !cases\.includes\(x\)\)\.map\(\(x\) => <span key=\{x\.id\} data-tuile=\{x\.id\}/.test(app)
-      || (/const idsCasesTuile = new Set\(T\.filter\(\(x\) => visJ\(x\.id\)\.montree && caseEnTuileJ\(x\)\)\.map\(\(x\) => x\.id\)\);/.test(app)
+      || (/const idsCasesTuile = new Set\(T\.filter\(\(x\) => visJ\(x\.id\)\.montree\)\.map\(\(x\) => x\.id\)\);/.test(app)
         && /<div hidden>\{T\.filter\(\(x\) => !idsCasesTuile\.has\(x\.id\)\)\.map\(\(x\) => <span key=\{x\.id\} data-tuile=\{x\.id\}/.test(app)
         && /if \(xE && visT\('envoyer'\)\.montree\)/.test(app) && /if \(xR && visT\('retirer'\)\.montree\)/.test(app)
         && /const visT = \(id\) => visibiliteCarte\(id, \{ reglage: persoJ, mode: PROFIL_VENDEUR\.mode, urgent: !!urgT\[id\] \}\);/.test(app))),

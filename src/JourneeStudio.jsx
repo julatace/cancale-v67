@@ -170,38 +170,41 @@ export function BentoJournee({ tuiles, ordi = false, FermeAuRetour = null, avant
   );
 }
 
-// La place de chaque tuile, sans trou. Téléphone : trois colonnes ; « À envoyer » 2 × 2, « À retirer »
-// 2 × 1, le mois 3 × 1, les simples 1 × 1 — les simples remplissent la colonne de droite, dans l'ordre ;
-// quand il en manque, la grande tuile prend la largeur (jamais une case vide). Ordinateur : douze
-// colonnes — En haut « À envoyer » (4 × 2), « À retirer » (4) et le mois (4) ; dessous les simples.
-// Ordinateur (douze colonnes, même ordre) : « À envoyer » 4 × 2, deux simples et « À retirer » sur la
-// première rangée ; la seconde : la troisième simple, le mois, une simple ; le reste à parts égales.
-export function placerTuiles({ envoyer, retirer, mois, simples }) {
+// La place de chaque tuile, sans trou, et STABLE : la grille ne saute pas quand les lectures arrivent.
+// `simples` : les cases toujours là (Messages, Prix à baisser — à zéro, calmes) ; `tardives` : les tuiles qui
+// n'existent que s'il y a quelque chose (Offres, Sans prix d'achat) — posées APRÈS le mois, elles n'en déplacent
+// aucune autre en arrivant. Téléphone : trois colonnes ; ordinateur : douze (le même ordre de document).
+export function placerTuiles({ envoyer, retirer, mois, simples = [], tardives = [] }) {
   const out = [];
-  const S = simples.slice();
   const poser = (t, taille, c, r) => out.push({ ...t, taille, place: { c, r: r || 1 } });
+  const S = simples.slice();
+  const rangees = (liste, cOrdi) => {
+    for (let i = 0; i < liste.length; i += 3) {
+      const r = liste.slice(i, i + 3);
+      const tailles = r.length === 3 ? ['1x1', '1x1', '1x1'] : r.length === 2 ? ['2x1', '1x1'] : ['3x1'];
+      r.forEach((t, k) => poser(t, tailles[k], cOrdi));
+    }
+  };
   if (envoyer) {
-    poser(envoyer, S.length ? '2x2' : '3x2', S.length ? 4 : 12, 2);
-    if (S.length) poser(S.shift(), '1x1', 2);
-    if (S.length) poser(S.shift(), '1x1', 2);
+    if (S.length >= 2) {
+      // « À envoyer » 2 × 2, deux simples dans la colonne de droite ; « À retirer » ferme la rangée d'ordinateur.
+      poser(envoyer, '2x2', 4, 2); poser(S.shift(), '1x1', 2); poser(S.shift(), '1x1', 2);
+      if (retirer) poser(retirer, '3x1', 4);
+    } else if (S.length === 1) {
+      poser(envoyer, '3x2', 4, 2);
+      if (retirer) { poser(retirer, '2x1', 6); poser(S.shift(), '1x1', 2); } else poser(S.shift(), '3x1', 8);
+    } else {
+      poser(envoyer, '3x2', 4, 2);
+      if (retirer) poser(retirer, '3x1', 8);
+    }
+    // Sans « À retirer » (cachée par lui) et deux simples, le mois ferme la première rangée d'ordinateur.
+    if (mois) poser(mois, '3x1', !retirer && simples.length >= 2 ? 4 : 8);
+    rangees(S, 4);
+  } else {
+    if (retirer) poser(retirer, '3x1', 4);
+    rangees(S, 4);
+    if (mois) poser(mois, '3x1', 12);
   }
-  let deuxieme = 0;   // colonnes d'ordinateur prises sur la seconde rangée
-  const simplesHaut = envoyer ? out.length - 1 : 0;   // les simples posées à côté de « À envoyer » (rangée 1)
-  if (retirer) {
-    const avec = S.length > 0;
-    // Sur ordinateur, « À retirer » ferme la première rangée : ce qui reste des douze colonnes (jamais un trou).
-    poser(retirer, avec ? '2x1' : '3x1', envoyer ? Math.max(4, 8 - 2 * simplesHaut) : 4);
-    if (avec) { poser(S.shift(), '1x1', 2); deuxieme += 2; }
-  }
-  const apres = S.length ? S.shift() : null;   // la simple qui ferme la seconde rangée d'ordinateur
-  if (mois) poser(mois, '3x1', Math.max(4, 8 - deuxieme - (apres ? 2 : 0)));
-  // Le reste (téléphone : par rangées de trois ; une rangée incomplète s'élargit, 2 ⇒ 2 + 1, 1 ⇒ 3).
-  const reste = apres ? [apres, ...S] : S;
-  const cOrdi = (i) => (apres && i === 0 && mois ? 2 : Math.max(3, Math.floor(12 / Math.min(4, Math.max(1, reste.length - (apres && mois ? 1 : 0))))));
-  for (let i = 0; i < reste.length; i += 3) {
-    const r = reste.slice(i, i + 3);
-    const tailles = r.length === 3 ? ['1x1', '1x1', '1x1'] : r.length === 2 ? ['2x1', '1x1'] : ['3x1'];
-    r.forEach((t, k) => poser(t, tailles[k], cOrdi(i + k)));
-  }
+  rangees(tardives, 3);
   return out;
 }

@@ -3942,9 +3942,6 @@ let _pendingBordPrint = false;
 // (14 nov., Studio · Ma journée) Les cartes de « À faire » qui vivent dans LEUR tuile (src/JourneeStudio.jsx) :
 // le prix d'achat à saisir (« Sans prix d'achat »), les offres Vestiaire (« Offres »), les messages eBay et
 // Vestiaire (« Messages »). Même carte, même geste, ouverte dans la tuile.
-// Une case devient une TUILE : « À envoyer » et « À retirer » toujours (l'état du jour, « Rien à … »), les autres
-// seulement quand elles ont quelque chose (ou ne sont pas lues : « — ») — jamais une petite tuile à zéro.
-const caseEnTuileJ = (x) => !!x && (x.id === 'envoyer' || x.id === 'retirer' || !!x.pasSu || (!!x.t && Number(x.t.n) > 0));
 const JOBS_TUILE_JOURNEE = new Set(['prix-achat-vente', 'vestiaire-offre', 'vestiaire-offres-reste', 'messages-ebay', 'vestiaire-messages']);
 
 // Recupere TOUT le contenu du cloud (au demarrage)
@@ -47244,7 +47241,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const pasLus = T.filter((x) => x.pasSu).map((x) => x.l);
               // (14 nov., Studio) Les cases montrées (réglage « Modifier ma journée » respecté, une case cachée
               // revient quand elle est urgente) sont des TUILES : elles portent leur compteur (`data-tuile`).
-              const idsCasesTuile = new Set(T.filter((x) => visJ(x.id).montree && caseEnTuileJ(x)).map((x) => x.id));
+              const idsCasesTuile = new Set(T.filter((x) => visJ(x.id).montree).map((x) => x.id));
               // Les cases à zéro ET celles qu'il a cachées restent lisibles par les autres écrans et les bancs
               // (mêmes compteurs), sans place à l'écran — aussi quand tout ce qui reste à faire est caché.
               const compteursCaches = (<>
@@ -47433,7 +47430,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const d = t.at ? new Date(t.at) : null;
                 return { txt: d ? d.toLocaleDateString(localeCourante(), { day: 'numeric', month: 'short' }) : tr('sj.ech.jours', { n: t.daysLeft }), ambre: false };
               };
-              const out = { envoyer: null, retirer: null, mois: null, simples: [] };
+              // (Les quatre cases sont des tuiles STABLES — à zéro, calmes : la grille ne saute pas quand les lectures
+              // arrivent. « Offres » et « Sans prix d'achat » n'existent que s'il y a quelque chose : `tardives`, après le mois.)
+              const out = { envoyer: null, retirer: null, mois: null, simples: [], tardives: [] };
 
               // ── À ENVOYER : le nombre, la pile, et LE geste du jour — « Imprimer » (le parcours d'impression
               //    existant : `_pendingBordPrint` puis Colis, exactement comme la carte d'avant).
@@ -47458,7 +47457,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 })();
                 const montres = colis.slice(0, 6);
                 out.envoyer = { id: 'envoyer', lib: tr('sj.l.aEnvoyer'), aria: tr('sj.aria.aEnvoyer', { n: xE.pasSu ? '—' : n }),
-                  attrs: attrsCase(xE), vide: !xE.pasSu && n === 0,
+                  // `data-sj-titre` / `data-sj-geste` : le geste du jour tel que l'instantané d'ouverture le range (src/journeeInstantanee.js).
+                  attrs: { ...attrsCase(xE), 'data-sj-titre': `${n} colis ${Lbas.aEnvoyer}`, 'data-sj-geste': em && em.n > 0 ? VERBES.imprimer : VERBES.voir }, vide: !xE.pasSu && n === 0,
                   tasse: { n: xE.pasSu ? '—' : String(n), l: tr('sj.t.aEnvoyer') },
                   face: (<>
                     <b className="sj-n sj-n-grand">{xE.pasSu ? '—' : n}</b>
@@ -47490,7 +47490,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // ── MESSAGES (Vinted, la règle de Messages) ; les messages eBay et Vestiaire s'ouvrent dans la tuile.
               const xM = Tc('messages');
               const jobsM = jobsDe(['messages-ebay', 'vestiaire-messages']);
-              if (xM && visT('messages').montree && caseEnTuileJ(xM)) {
+              if (xM && visT('messages').montree) {
                 const n = nDe(xM), ailleurs = sommeN(jobsM);
                 const nonLues = (convs.items || []).filter((c) => !acctOffOf(c) && conversationNonLue(c) && !conversationRetiree(convRetirees, String((c._acc && c._acc.vinted_user_id) || ''), c));
                 out.simples.push({ id: 'messages', lib: tr('sj.l.messages'), aria: tr('sj.aria.messages', { n: xM.pasSu ? '—' : n }), attrs: attrsCase(xM), vide: !xM.pasSu && n === 0 && !ailleurs,
@@ -47498,7 +47498,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   face: (<><b className="sj-n">{xM.pasSu ? '—' : n}</b>{ailleurs ? <span className="sj-sous"><span className="sj-sous-l">{tr('sj.ailleurs', { n: ailleurs })}</span></span> : null}</>),
                   deplie: (<>
                     {nonLues.length ? <div className="sj-liste" role="list">{nonLues.slice(0, 6).map((c, k) => (
-                      <RangeeJ key={String(c.id || k)} photo={(c.item_photos && c.item_photos[0] && c.item_photos[0].url) || null} Photo={PhotoVinted} icone={<Icon name="chat" size={18}/>}
+                      <RangeeJ key={String(c.id || k)} photo={(photosCase.messages || [])[k] || null} Photo={PhotoVinted} icone={<Icon name="chat" size={18}/>}
                         titre={(c.opposite_user && c.opposite_user.login) || tr('sj.conversation')} meta={String(c.description || '').slice(0, 90)}
                         onClick={() => { if (onNav) onNav(xM.tab); }} attrs={{ role: 'listitem', 'data-sj-conv': String(c.id || '') }}/>
                     ))}</div> : <p className="sj-vide">{xM.pasSu ? (xM.titrePasSu || tr('sj.pasLu')) : tr('sj.aucunMessage')}</p>}
@@ -47514,7 +47514,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const jobsO = jobsDe(['vestiaire-offre', 'vestiaire-offres-reste']);
               if (jobsO.length) {
                 const n = sommeN(jobsO);
-                out.simples.push({ id: 'offres', lib: tr('sj.l.offres'), aria: tr('sj.aria.offres', { n }), attrs: { 'data-sj-offres': String(n) },
+                out.tardives.push({ id: 'offres', lib: tr('sj.l.offres'), aria: tr('sj.aria.offres', { n }), attrs: { 'data-sj-offres': String(n) },
                   tasse: { n: String(n), l: tr('sj.t.offres') },
                   face: (<><b className="sj-n">{n}</b><span className="sj-sous"><span className="sj-sous-l">Vestiaire</span></span></>),
                   deplie: <div className="vrm-day-task-list sj-taches">{jobsO.map((j, i) => tache(j, i))}</div> });
@@ -47524,7 +47524,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const jobsP = jobsDe(['prix-achat-vente']);
               if (jobsP.length) {
                 const n = sommeN(jobsP);
-                out.simples.push({ id: 'prix-achat', lib: tr('sj.l.sansPrixAchat'), aria: tr('sj.aria.sansPrixAchat', { n }), attrs: { 'data-sj-sans-prix': String(n) },
+                out.tardives.push({ id: 'prix-achat', lib: tr('sj.l.sansPrixAchat'), aria: tr('sj.aria.sansPrixAchat', { n }), attrs: { 'data-sj-sans-prix': String(n) },
                   tasse: { n: String(n), l: tr('sj.t.sansPrixAchat') },
                   face: <b className="sj-n">{urgentPt}{n}</b>,
                   deplie: <div className="vrm-day-task-list sj-taches">{jobsP.map((j, i) => tache(j, i))}</div> });
@@ -47532,7 +47532,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
               // ── PRIX À BAISSER (les conseils de prix, la liste d'Annonces).
               const xP = Tc('prix');
-              if (xP && visT('prix').montree && caseEnTuileJ(xP)) {
+              if (xP && visT('prix').montree) {
                 const n = nDe(xP);
                 out.simples.push({ id: 'prix', lib: tr('sj.l.prixBaisser'), aria: tr('sj.aria.prixBaisser', { n: xP.pasSu ? '—' : n }), attrs: attrsCase(xP), vide: !xP.pasSu && n === 0,
                   tasse: { n: xP.pasSu ? '—' : String(n), l: tr('sj.t.prixBaisser') },
@@ -47562,7 +47562,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 } catch (_) {} return m; })();
                 const plaque = (c) => c.desaccord ? <span className="sb-plaque sb-plaque--grande is-doute">{tr('sj.codesDifferents')}</span>
                   : <span className="sb-plaque sb-plaque--grande">{c.code || 'QR'}</span>;
-                out.retirer = { id: 'retirer', lib: xR.pasSu ? tr('sj.l.aRetirer') : tr('sj.l.aRetirerN', { n }), aria: tr('sj.aria.aRetirer', { n: xR.pasSu ? '—' : n }), attrs: attrsCase(xR), vide: !xR.pasSu && n === 0,
+                out.retirer = { id: 'retirer', lib: xR.pasSu ? tr('sj.l.aRetirer') : tr('sj.l.aRetirerN', { n }), aria: tr('sj.aria.aRetirer', { n: xR.pasSu ? '—' : n }), attrs: { ...attrsCase(xR), 'data-sj-titre': `${n} colis ${Lbas.aRetirer}`, 'data-sj-geste': VERBES.voir }, vide: !xR.pasSu && n === 0,
                   tasse: { n: xR.pasSu ? '—' : String(n), l: tr('sj.t.aRetirer') },
                   face: xR.pasSu ? <><b className="sj-n">—</b><span className="sj-sous">{pasSuTexte(xR)}</span></>
                     : n === 0 ? <><b className="sj-n">0</b><span className="sj-sous"><span className="sj-sous-l">{tr('sj.rienARetirer')}</span></span></>

@@ -36,15 +36,21 @@ Ventes/Colis et le reste en même temps.
     l'affiche s'efface, les autres tuiles se **tassent** en une rangée de chiffres ; sur ordinateur la
     grille reste en haut et le déplié vient dessous (sans redire son chiffre). « × » (rond 44) replie et rend
     la main à la tuile ; Échap et le retour du téléphone (`FermeAuRetour`) aussi.
-  - Pas de petite tuile à zéro : « Messages » ou « Prix à baisser » à 0 ne sont pas posées (leur compteur
-    reste publié, caché) ; « À envoyer » et « À retirer » restent toujours (« Rien à envoyer »).
+  - La grille est STABLE : les quatre cases (« À envoyer », « Messages », « Prix à baisser », « À retirer »)
+    sont toujours une tuile (à zéro, calmes : « Rien à envoyer », « 0 ») — la grille ne saute pas quand les
+    lectures arrivent (mesuré : une tuile qui apparaissait en retard déplaçait le mois de 260 px à 1512,
+    CLS 0,27). « Offres » et « Sans prix d'achat », qui n'existent que s'il y a quelque chose, se posent
+    APRÈS le mois : en arrivant, elles ne déplacent aucune autre tuile.
 - **« À faire »** sous la grille : la liste d'avant, en rangées sur une porcelaine, dans SON ordre ;
   « N » = les cartes de la liste (le nombre dit = les cartes vues). La « prochaine chose » n'est plus sortie
   en tête : c'est la première carte de la liste (`data-prochain`, réglable comme avant).
 - **Ordinateur** : une seule colonne (l'ancienne grille tête / « À faire » à droite ne s'applique plus),
   l'affiche avec la semaine à droite, la grille sur douze colonnes, le déplié dessous.
 - **L'instantané d'ouverture** porte le même habit (`sj-journee`) et lit la carte des chiffres et la
-  prochaine chose là où elles vivent maintenant (src/journeeInstantanee.js).
+  prochaine chose là où elles vivent maintenant (src/journeeInstantanee.js) ; sans carte « À faire », la
+  prochaine chose rangée est la tuile « À envoyer » (puis « À retirer ») qui porte quelque chose (son titre
+  « N colis à envoyer » et son geste, `data-sj-titre` / `data-sj-geste`) ; il garde la place de la tête ET
+  de la grille (rien ne saute au remplacement).
 
 ## L'idée 148 « Tes tuiles à toi » : NON retenue
 
@@ -107,8 +113,8 @@ l'origine »). Une tuile et une rangée se touchent entières. Les pilules des c
   deborde|contraste|petit|perdu`) : chacune rend le banc rouge. Sur le dist d'avant : rouge (pas de grille).
 - Bancs adaptés (la disposition a changé exprès, aucune règle affaiblie) : `journee-v2` (le € remonté sans
   espace ; la prochaine chose = 1re carte de la liste), `journee-perso` (ordre lu sur tout l'écran ; « N
-  gestes » = les cartes de la liste), `journee-premium` (les gestes sont les tuiles ; jamais de petite tuile à
-  zéro), `journee-photos` (la tuile « À envoyer » porte la pile ; les photos de « À retirer », « Messages »,
+  gestes » = les cartes de la liste), `journee-premium` (les gestes sont les quatre tuiles de la grille stable ;
+  jamais une carte « À faire » à zéro), `journee-photos` (la tuile « À envoyer » porte la pile ; les photos de « À retirer », « Messages »,
   « Prix à baisser » sont lues dans la tuile dépliée, par identité).
 - Résultats complets des bancs et rouges qui ne viennent pas de ce lot : voir le rapport de fin de session
   (section ci-dessous).

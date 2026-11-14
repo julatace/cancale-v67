@@ -236,6 +236,7 @@ const mesureJournee = (pg) => pg.evaluate(() => {
           await pg.waitForTimeout(2200);
           const m = await mesureJournee(pg);
           const env = m.lignes.find((l) => l.cas === 'envoyer');
+          if (process.env.JP_DEBUG) console.log('cartes :', JSON.stringify(m.lignes.map((l) => [l.cas, l.n, l.tuile])), await pg.evaluate(() => [...document.querySelectorAll('[data-tuile]')].map((e) => e.getAttribute('data-tuile') + '=' + e.getAttribute('data-n')).join(' ')));
           if (JEU === 'zero') {
             dit(!env, 'jeu « zero » : aucune carte « Colis à poster »', JSON.stringify(m.lignes.map((l) => l.cas)));
           } else {

@@ -182,9 +182,10 @@ const lire = (pg) => pg.evaluate(() => {
         // ligne de flottaison : la première carte « À faire » est ENTIÈRE au-dessus de la barre du bas,
         // sans défiler, sur un téléphone de 844 px. Une tête qui grandit encore la repousse dessous (rouge).
         if (vp.width < 600) dit(lu.hBonjour > 0 && !!lu.geste1 && lu.geste1.bas <= lu.hautBarre, 'la tête sombre laisse le premier geste entier au-dessus de la barre du bas (téléphone, 844 px)', `tête ${lu.hBonjour} px · 1er geste ${lu.geste1 ? lu.geste1.haut + '→' + lu.geste1.bas : 'absent'} · barre à ${lu.hautBarre}`);
-        // (14 nov., Studio) « À envoyer » et « À retirer » sont l'état du jour : toujours une tuile (« Rien à … » à zéro, calme) ;
-        // les autres cases ne sont une tuile que lorsqu'elles portent quelque chose — jamais une petite tuile à zéro.
-        dit(lu.tuiles.length >= 1 && lu.tuiles.every(([id, n]) => Number(n) > 0 || id === 'envoyer' || id === 'retirer'), 'les gestes du jour sont là, une tuile par geste, jamais une petite tuile à zéro', JSON.stringify(lu.tuiles));
+        // (14 nov., Studio) Les quatre cases sont la grille STABLE du jour (une tuile chacune, à zéro calme : « Rien à … »,
+        // jamais une carte « À faire » à zéro, et la grille ne saute pas quand les lectures arrivent) ; aucune carte de la
+        // liste « À faire » à zéro.
+        dit(lu.tuiles.length >= 1 && lu.tuiles.every(([id, n]) => Number(n) > 0 || ['envoyer', 'retirer', 'messages', 'prix'].includes(id)) && ['envoyer', 'retirer', 'messages', 'prix'].every((id) => lu.tuiles.some(([x]) => x === id)), 'les gestes du jour sont là : les quatre tuiles de la grille, jamais une carte à zéro', JSON.stringify(lu.tuiles));
         dit(lu.tuiles.some(([id, n]) => id === 'envoyer' && n === '2'), '« À envoyer » compte les 2 ventes à expédier', JSON.stringify(lu.tuiles));
         dit(lu.deborde.length === 0, 'aucun texte ne sort de sa boîte', lu.deborde.join(' | '));
         await ctx.close();
