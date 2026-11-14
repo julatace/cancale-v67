@@ -472,7 +472,11 @@ import {aConfirmerVisibles, texteLimite, motAConfirmer} from './aConfirmer.js';
 // ⟦→ ecrans/Ebay.jsx #5⟧
 // La date limite d'envoi AVEC son heure (22 octobre) : UNE règle pour Colis, Ma
 // journée, Ventes, le rappel du matin, le rappel du soir et le widget (§11).
-import {DELAI_EXPEDITION_J, limiteExpedition, lireDateLimite, echeanceLimite, texteLimiteEnvoi, bordsParTransaction} from '../api/_lib/limite-envoi.js';
+import {DELAI_EXPEDITION_J, limiteExpedition, lireDateLimite, echeanceLimite, texteLimiteEnvoi, bordsParTransaction, TEXTE_ESTIMEE_DEPASSEE} from '../api/_lib/limite-envoi.js';
+// (14 nov., refonte des listes) Sur la CARTE d'un colis, la date estimée dépassée se dit en trois mots ; « vérifie la
+// vraie limite sur Vinted » est UNE phrase pour tout le groupe (le bandeau « à envoyer en priorité » la porte, et le
+// survol de la carte) — 27 fois la même phrase sur 27 cartes, c'était un mur (§7). Même source, aucun mot inventé.
+const limiteCourte = (t) => (t === TEXTE_ESTIMEE_DEPASSEE ? String(t).split(' — ')[0] : t);
 import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
 import { ecrireEmailsLus } from "./emailsLusEcriture.js";
 // (6 nov., vitesse 2) Les écrans eBay (src/ebayGestion.jsx) : à la demande. Ce dont l'app
@@ -766,6 +770,7 @@ import "./styles-achats-photos.css";   // (10 nov., lot AN) Achats en rangées D
 import "./styles-pire-cas.css";   // (11 nov.) pire cas : chiffres et titres extrêmes tenus dans leur place
 import "./styles-ventes-achats-visuel.css";   // (11 nov., lot ventes-achats-visuel) Ventes et Achats sobres : frise fine, impression compacte, grille alignée
 import "./styles-systeme.css";   // (13 nov., design-systeme) LE système : un jeu de jetons (--d-*) que toutes les familles lisent, une forme par fonction — docs/design/DESIGN.md ; juste avant la tablette
+import "./styles-listes.css";   // (14 nov., refonte des listes) Ma journée, Ventes, Annonces : une carte héros, des rangées denses, rien qui déborde — après le système, avant la tablette
 import "./styles-tablette.css";   // (11 nov., iPad) la coque ordinateur AU DOIGT : 44 px, rien au survol, rail libellé — sous `data-tablette` seulement, EN DERNIER
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
@@ -51050,6 +51055,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{display:'flex',alignItems:'baseline',gap:7,flexWrap:'wrap'}}>
                 <span style={{fontSize:17,fontWeight:700,color:C.warn,letterSpacing:-0.3}}>{total}</span>
                 <span style={{fontSize:13,fontWeight:600,color:C.text}}>à envoyer en priorité{overdue?' · du retard':''}</span>
+                {/* (14 nov., refonte des listes) Au téléphone la phrase de détail est repliée (styles-telephone) : elle reste
+                    joignable derrière ⓘ — « vérifie la vraie limite sur Vinted » ne s'écrit plus sur chaque carte. */}
+                <span className="vrm-urgence-pourquoi" data-urgence-pourquoi=""><Pourquoi label={tr('listes.urgence.pourquoi')} titre={tr('listes.urgence.titre')}>{parts.join(' · ')} — {ouSontLesPresses(u)}</Pourquoi></span>
               </div>
               <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>{parts.join(' · ')} — {ouSontLesPresses(u)}</div>
             </div>
@@ -51493,7 +51501,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             onClick={() => relierBoiteDe(String(acc.vinted_user_id))} style={{flexShrink:0,border:'none',background:'transparent',padding:0,cursor:'pointer',fontFamily:'inherit',fontSize:12,color:C.muted,display:'inline-flex',alignItems:'center',verticalAlign:'-2px',marginRight:6}}>
                             <Icon name="mail" size={13}/></button> : null}
                           {(o && o.date) || urgTxt ? <span data-colis-dates="" style={{flex:'0 1 auto',minWidth:0}}>
-                            {urgTxt && <span data-colis-limite-texte="" style={{overflowWrap:'anywhere',color:urgCol,fontWeight:dl!=null&&dl<=1?600:500}}>{texteEnvoiColis(urgTxt)}</span>}
+                            {urgTxt && <span data-colis-limite-texte="" title={urgTxt !== limiteCourte(urgTxt) ? texteEnvoiColis(urgTxt) : undefined} style={{overflowWrap:'anywhere',color:urgCol,fontWeight:dl!=null&&dl<=1?600:500}}>{texteEnvoiColis(limiteCourte(urgTxt))}</span>}
                             {att != null ? <span data-colis-attente={att}>{urgTxt ? '\u00a0· ' : ''}{texteAttenteVente(att)}</span> : null}
                           </span> : null}
                           {cell
@@ -59867,10 +59875,12 @@ function AppCoeur() {
           {sous && <div className="vrm-tache-sous" data-tache-sous={t+'.'+site}><PlatSubNav sub={sec} setSub={(x)=>{ setEbayCible(null); setPlatSub(subDeTache(site,x)); }} sections={sous}/></div>}
         </div>
         {/* (11 nov., lot DJ3) En tête : les colis à expédier (Ventes, section principale du site) ou à retirer (Achats). */}
+        {/* (14 nov., refonte des listes) LA carte héros de Ventes EN HAUT (« une chose principale par écran ») : elle
+            était posée sous les 30 colis à expédier, à 5 500 px du haut. Mêmes chiffres, même carte, seulement montée. */}
+        {site==='toutes' && t==='ventes' && !baseKO && <div className="vrm-heros-hote" data-heros-hote="ventes" style={{padding:'12px 16px 0'}}><CarteStatsApp page="ventes-toutes" aide className="vrm-fu-ecran" ici="cat_ventes" onNav={setTab} sel={{ site: 'toutes', compte: null, periode: null }}/></div>}
         {(t==='achats' || (t==='ventes' && (!sous || sec==='ventes'))) ? rendreColisSection(t,site) : null}
         {/* (10 nov., lot BB) L'entrée de « Litiges en cours » : sur Ventes, quel que soit le site. */}
         {t==='ventes' && !baseKO && <div className="vrm-entree-litiges-hote" style={{padding:'12px 16px 0'}}><EntreeLitiges ligne={aTrancherEtat && Array.isArray(aTrancherEtat.lignes) ? aTrancherEtat.lignes.find((l)=>l.cle==='litiges-en-cours') : null} onOuvrir={()=>setTab('litiges')}/></div>}
-        {site==='toutes' && t==='ventes' && !baseKO && <div style={{padding:'12px 16px 0'}}><CarteStatsApp page="ventes-toutes" aide className="vrm-fu-ecran" ici="cat_ventes" onNav={setTab} sel={{ site: 'toutes', compte: null, periode: null }}/></div>}
         {site==='toutes' && t==='ventes' && !baseKO && <div className="vrm-a-venir-hote" style={{padding:'12px 16px 0'}}><ArgentAVenirCarte A={liveStatsVus && liveStatsVus.aVenir} reserve/></div>}
         {/* (6 nov., filet 2) La section d'un site tombe seule : le titre et le filtre des sites restent, on change de site. */}
         <GardeEcran nom={t+':'+site} resetKey={platSub}>

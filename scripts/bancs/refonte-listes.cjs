@@ -46,7 +46,7 @@ fs.mkdirSync(SHOTS, { recursive: true });
 const ECRANS = { journee: '/?tab=journee', ventes: '/?tab=ventes', annonces: '/?tab=annonces' };
 
 // ── A. La mesure de FORME, dans la page ─────────────────────────────────────
-function mesurerForme({ tactile, sombre }) {
+function mesurerForme({ tactile, sombre, liste }) {
   const out = { murs: [], debords: [], cartes: [], accent: [], repetes: [], heros: [] };
   const root = document.querySelector('.vrm-main');
   if (!root) { out.heros.push('pas de .vrm-main'); return out; }
@@ -137,8 +137,11 @@ function mesurerForme({ tactile, sombre }) {
     }
     if (!meilleur || meilleur.fs < 48) out.heros.push({ quoi: 'pas de chiffre d’affiche dans le premier écran', plusGrand: meilleur ? Math.round(meilleur.fs) : 0, el: meilleur ? nom(meilleur.el) : '' });
     else {
-      let carte = meilleur.el; while (carte && carte !== root && !/vrm-fu-carte|data-heros/.test((carte.className || '') + ' ' + (carte.hasAttribute && carte.hasAttribute('data-heros') ? 'data-heros' : ''))) carte = carte.parentElement;
-      if (carte && carte !== root) { const h = carte.getBoundingClientRect().height; if (h > 0.4 * H + 1) out.heros.push({ quoi: 'carte héros trop haute', h: Math.round(h), max: Math.round(0.4 * H) }); }
+      const carte = meilleur.el.closest('.vrm-fu-carte, .vrm-fu-tete, [data-heros]');
+      if (!carte) out.heros.push({ quoi: 'le chiffre d’affiche n’est dans aucune carte héros', el: nom(meilleur.el) });
+      // Sur un écran-LISTE (Ventes, Annonces) la carte laisse 60 % du premier écran à la liste. Ma journée n'est
+      // pas une liste : sa tête sombre (le choix de Julien) porte la semaine et le prochain geste — pas de plafond.
+      else if (liste) { const h = carte.getBoundingClientRect().height; if (h > 0.4 * H + 1) out.heros.push({ quoi: 'carte héros trop haute', h: Math.round(h), max: Math.round(0.4 * H) }); }
     }
   }
   return out;
@@ -266,7 +269,7 @@ const ouvrirSur = (nav, dist, opts) => ouvrir(nav, opts);
         o = await ouvrir(nav, { W, sombre: theme === 'sombre', b: base(), url: ECRANS[e] });
         if (DSF !== 1) { /* captures nettes : un second contexte au facteur voulu */ }
         await pret(o.pg); await o.pg.waitForTimeout(3500);   // la pastille « Mis à jour » a disparu
-        const m = await o.pg.evaluate(mesurerForme, { tactile: W < 600, sombre: theme === 'sombre' });
+        const m = await o.pg.evaluate(mesurerForme, { tactile: W < 600, sombre: theme === 'sombre', liste: e !== 'journee' });
         await o.pg.screenshot({ path: path.join(SHOTS, suf + '.png') });
         const n = CLES.reduce((s, k) => s + m[k].length, 0);
         console.log(`${n ? '✗' : '✓'} ${suf} : ${CLES.map((k) => `${k} ${m[k].length}`).join(' · ')}`);
