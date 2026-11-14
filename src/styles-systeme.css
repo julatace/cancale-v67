@@ -287,7 +287,7 @@
   background: var(--d-remplir) !important; border-radius: var(--d-r-pilule) !important; padding: 2px !important; border: 0 !important; box-shadow: none !important;
 }
 :root:root body .vrm-main :is(.vrm-seg > button, .vrm-sel-sites > button, .vrm-messages-sections > button, .vrm-filtre-site > button, .vrm-platform-tabs > button, .vrm-boite-vues > button) {
-  border-radius: var(--d-r-pilule) !important; font-weight: 600 !important; min-height: calc(var(--d-h-ctrl) - 4px) !important;
+  border-radius: var(--d-r-pilule) !important; font-weight: 600 !important; min-height: var(--d-h-ctrl) !important;
 }
 :root:root body .vrm-main :is(.vrm-seg > button[aria-pressed="true"], .vrm-seg > button.is-actif, .vrm-seg > button[aria-current="page"], .vrm-sel-sites > button[aria-pressed="true"], .vrm-messages-sections > button[aria-pressed="true"]) {
   box-shadow: 0 0 0 .5px rgba(0,0,0,.04), 0 2px 6px rgba(0,0,0,.10) !important;
