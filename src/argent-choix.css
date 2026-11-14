@@ -1,0 +1,79 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   ARGENT — LES QUATRE CHOIX DE JULIEN (14 nov., lot argent-choix)
+   Coller des prix · Modèle et taille · Objectif du mois · Déclaration annuelle.
+   Direction « Atelier » (chiffre d'affiche, tuiles, titre HORS de la carte, carte
+   sans bordure, explications repliées) et règle des 1 000 articles (rangées denses
+   64–72 px, sans ombre ni flou ; ombre sur la carte seulement).
+   Les jetons de l'atelier (§4, styles-systeme.css) sont LUS avec un repli sur les
+   jetons de base : rien n'est recopié, rien ne casse avant leur arrivée.
+   Un seul accent (aucun ici sur un montant) ; ambre = un geste à faire.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.vrm-ac-section { display: flex; flex-direction: column; gap: var(--d-e-3, 12px); min-width: 0; }
+.vrm-ac-tete { display: flex; flex-direction: column; gap: 2px; }
+.vrm-ac-titre { margin: 0; font-size: var(--d-t-20, 20px); font-weight: 700; letter-spacing: -.016em; line-height: 1.15; color: var(--d-encre, inherit); }
+.vrm-ac-couv { margin: 0; font-size: 13px; line-height: 1.35; color: var(--d-gris, #6E6E73); font-variant-numeric: tabular-nums; }
+.vrm-ac-carte { background: var(--d-surface-atelier, var(--d-carte, #fff)); border-radius: var(--d-r-carte, 20px); box-shadow: var(--d-ombre-douce, var(--d-ombre-carte, none)); padding: var(--d-e-4, 16px); margin: 0; min-width: 0; overflow: hidden; box-sizing: border-box; }
+.vrm-ac-note { margin: 0; font-size: 13px; line-height: 1.45; color: var(--d-gris, #6E6E73); }
+.vrm-ac-note.is-ambre, .vrm-ac-hors .is-ambre, .vrm-ac-tuile.is-ambre .vrm-ac-chiffre { color: var(--d-ambre, #B25000); }
+.vrm-ac-affiche { display: block; color: var(--d-encre, inherit); font-size: var(--d-t-affiche, clamp(44px, 12vw, 56px)); font-weight: 700; letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-ac-aumoins { font-size: 15px; font-weight: 600; letter-spacing: 0; color: var(--d-gris, #6E6E73); }
+.vrm-ac-chiffre { display: block; font-size: clamp(20px, 6vw, 28px); font-weight: 700; letter-spacing: -.02em; line-height: 1.05; font-variant-numeric: tabular-nums; color: var(--d-encre, inherit); white-space: nowrap; }
+.vrm-ac-libelle { display: block; font-size: 13px; font-weight: 600; line-height: 1.3; letter-spacing: 0; color: var(--d-gris, #6E6E73); }
+.vrm-ac-etiquette { margin-bottom: 8px; }
+.vrm-ac-lien { align-self: flex-start; min-height: 44px; }
+.vrm-ac-repli { font-size: 13px; }
+.vrm-ac-repli > .vrm-ac-note { margin-top: 6px; }
+
+/* ── Les tuiles (2 ou 3 par rangée) ── */
+.vrm-ac-tuiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: var(--d-e-2, 8px); }
+.vrm-ac-tuile { background: var(--d-surface-atelier-2, var(--d-case, #F2F2F7)); border-radius: var(--d-r-case, 12px); padding: 12px; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+
+/* ── Coller un tableau ── */
+.vrm-ac-coller { display: flex; flex-direction: column; gap: 12px; }
+.vrm-ac-zone { width: 100%; box-sizing: border-box; min-height: 132px; resize: vertical; border: 1px solid var(--d-filet-fort, rgba(60,60,67,.29)); border-radius: var(--d-r-case, 12px); background: var(--d-carte, #fff); color: var(--d-encre, inherit); padding: 12px; font: 17px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.vrm-ac-case { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 15px; color: var(--d-encre, inherit); cursor: pointer; }
+.vrm-ac-case input { width: 22px; height: 22px; flex-shrink: 0; }
+.vrm-ac-lignes { list-style: none; margin: 0; padding: 0; background: var(--d-carte, #fff); border-radius: var(--d-r-case, 12px); overflow: hidden; }
+.vrm-ac-ligne { display: flex; align-items: center; gap: 12px; padding: 8px 12px; min-height: 56px; contain-intrinsic-size: auto 56px; box-sizing: border-box; }
+.vrm-ac-ligne + .vrm-ac-ligne { box-shadow: inset 0 .5px 0 var(--d-filet-indente, var(--d-filet, rgba(60,60,67,.18))); }
+.vrm-ac-ligne.is-refuse .vrm-ac-sous { color: var(--d-ambre, #B25000); }
+.vrm-ac-ligne:not(.is-ecrit) .vrm-ac-prix { color: var(--d-gris, #6E6E73); text-decoration: none; }
+.vrm-ac-num { flex: 0 0 auto; min-width: 52px; font-size: 13px; font-weight: 700; color: var(--d-encre, inherit); background: var(--d-remplir, rgba(118,118,128,.12)); border-radius: var(--d-r-num, 6px); padding: 3px 6px; text-align: center; font-variant-numeric: tabular-nums; }
+.vrm-ac-corps { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.vrm-ac-titre, .vrm-ac-titre-ligne { font-size: 15px; color: var(--d-encre, inherit); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-ac-sous { font-size: 13px; color: var(--d-gris, #6E6E73); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.vrm-ac-prix { flex: 0 0 auto; font-size: 15px; font-weight: 600; color: var(--d-encre, inherit); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-ac-fait { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; }
+
+/* ── Modèle et taille ── */
+.vrm-ac-liste { list-style: none; padding: 0 0 0 0; }
+.vrm-ac-liste.vrm-ac-carte { padding: 0; }
+.vrm-ac-groupe { display: flex; align-items: center; gap: 12px; padding: 10px 16px; min-height: 64px; box-sizing: border-box; }
+.vrm-ac-groupe + .vrm-ac-groupe { box-shadow: inset 44px .5px 0 -44px var(--d-filet-indente, var(--d-filet, rgba(60,60,67,.18))); }
+.vrm-ac-rang { flex: 0 0 22px; font-size: 13px; font-weight: 600; color: var(--d-gris, #6E6E73); text-align: right; font-variant-numeric: tabular-nums; }
+.vrm-ac-droite { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.vrm-ac-montant { font-size: 17px; font-weight: 600; color: var(--d-encre, inherit); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-ac-liste-rachat { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.vrm-ac-rachat { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.vrm-ac-rachat + .vrm-ac-rachat { padding-top: 10px; box-shadow: inset 0 .5px 0 var(--d-filet-indente, var(--d-filet, rgba(60,60,67,.18))); }
+.vrm-ac-rachat-nom { font-size: 17px; font-weight: 600; color: var(--d-encre, inherit); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-ac-rachat-chiffres { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.vrm-ac-tris { max-width: 100%; overflow-x: auto; }
+
+/* ── Objectif du mois : les tuiles du rythme ── */
+.vrm-ac-objectif-tuiles { margin-top: 12px; }
+.vrm-ac-objectif-mesure { margin: 4px 0 0; font-size: 13px; color: var(--d-gris, #6E6E73); }
+
+/* ── Déclaration annuelle ── */
+.vrm-ac-decl { display: flex; flex-direction: column; gap: 12px; }
+.vrm-ac-montant-case { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.vrm-ac-montant-case + .vrm-ac-montant-case { padding-top: 12px; box-shadow: inset 0 .5px 0 var(--d-filet-indente, var(--d-filet, rgba(60,60,67,.18))); }
+.vrm-ac-case-pastille { align-self: flex-start; font-size: 13px; font-weight: 700; letter-spacing: .02em; color: var(--d-pastille-nuit, var(--d-encre, inherit)); background: var(--d-pastille-nuit-fond, var(--d-remplir, rgba(118,118,128,.12))); border-radius: 999px; padding: 4px 10px; }
+.vrm-ac-source { margin: 0; font-size: 15px; color: var(--d-encre, inherit); line-height: 1.4; font-variant-numeric: tabular-nums; }
+.vrm-ac-sites { list-style: none; margin: 0; padding: 0; border-radius: var(--d-r-case, 12px); background: var(--d-surface-atelier-2, var(--d-case, #F2F2F7)); }
+.vrm-ac-site { display: flex; align-items: center; gap: 8px; padding: 10px 12px; min-height: 44px; box-sizing: border-box; font-size: 15px; font-variant-numeric: tabular-nums; }
+.vrm-ac-site + .vrm-ac-site { box-shadow: inset 0 .5px 0 var(--d-filet-indente, var(--d-filet, rgba(60,60,67,.18))); }
+.vrm-ac-site-nom { flex: 1 1 auto; min-width: 0; color: var(--d-encre, inherit); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-ac-site-n { flex: 0 0 auto; color: var(--d-gris, #6E6E73); font-size: 13px; }
+.vrm-ac-site-eur { flex: 0 0 auto; font-weight: 600; color: var(--d-encre, inherit); white-space: nowrap; }
+.vrm-ac-hors { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; line-height: 1.4; }
