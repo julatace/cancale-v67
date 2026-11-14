@@ -38,12 +38,17 @@ const N_VENTES = 1250, N_ACHATS = 230;
 const FINALISEE = "Commande finalisée - l'acheteur a validé la commande";
 const VENTES = Array.from({ length: N_VENTES }, (_, i) => ({ transaction_id: 500000 - i, title: 'Paire ' + i, status: FINALISEE, date: new Date(Date.UTC(2026, 9, 30) - i * 86400000 / 4).toISOString() }));
 const ACHATS = Array.from({ length: N_ACHATS }, (_, i) => ({ transaction_id: 900000 - i, title: 'Achat ' + i, status: FINALISEE, date: new Date(Date.UTC(2026, 9, 30) - i * 86400000).toISOString() }));
+const ANNONCES = Array.from({ length: 49 }, (_, i) => ({ id: 7000 + i, title: 'Annonce ' + i, price: { amount: '50.0', currency_code: 'EUR' } }));
+// 5.375 : un dressing déjà rangé EN ENTIER (compteur ≥ total) — l'import n'y lit rien.
+const LISTINGS_COMPLET = { nItems: 49, payload: { pagination: { total_entries: 49 }, items: ANNONCES } };
 const pageDe = (liste, page, per) => {
   const p = Math.max(1, Number(page) || 1), pp = Math.min(100, Number(per) || 20);
   return { my_orders: liste.slice((p - 1) * pp, p * pp), pagination: { current_page: p, per_page: pp, total_entries: liste.length, total_pages: Math.ceil(liste.length / pp) } };
 };
 const vintedAvec = (stat) => (r) => {
   const u = new URL('https://x' + r.chemin);
+  // 5.375 : les annonces (le dressing, lu d'un trait quand la base ne l'a pas en entier).
+  if (/^\/api\/v2\/wardrobe\/[^/]+\/items$/.test(u.pathname)) { const pa = Number(u.searchParams.get('page')) || 1; return { status: 200, body: { items: ANNONCES.slice((pa - 1) * 100, pa * 100), pagination: { current_page: pa, total_entries: ANNONCES.length, total_pages: Math.ceil(ANNONCES.length / 100) } } }; }
   if (u.pathname !== '/api/v2/my_orders') return { status: 404, body: {} };
   const type = u.searchParams.get('type'), page = u.searchParams.get('page');
   const s = stat ? stat(type, Number(page)) : 200;
@@ -101,7 +106,7 @@ async function controles(SRC, dit) {
     dit(a.length === N_ACHATS, '3. les 230 achats rangés', String(a.length));
     const l = ligneImport(f);
     dit(!!l && l.etat === 'fini' && l.ventes.lus === N_VENTES && l.achats.lus === N_ACHATS && l.ventes.fini && l.achats.fini, '3. « Tout est récupéré » : 1 250 ventes, 230 achats', JSON.stringify(l && { e: l.etat, v: l.ventes, a: l.achats }));
-    dit(f.j.journal.some((t) => /Historique Vinted récupéré/.test(t)), '3. le journal le dit');
+    dit(f.j.journal.some((t) => /Historique Vinted récupéré|Ton passé Vinted importé \(12 mois\)/.test(t)), '3. le journal le dit');
     const avant = f.j.vinted.length;
     uneHeurePlusTard(f); await f.ctx.tickImport();
     dit(f.j.vinted.length === avant, '3. fini : plus aucune lecture', `${f.j.vinted.length - avant} requête(s)`);
@@ -113,6 +118,7 @@ async function controles(SRC, dit) {
     const lignes = {
       [`harvest_${UID}_orders_sold`]: { nItems: 300, payload: { pagination: { total_entries: 300 }, my_orders: VENTES.slice(0, 300) } },
       [`harvest_${UID}_orders_purchased`]: { nItems: 230, payload: { pagination: { total_entries: 230 }, my_orders: ACHATS } },
+      [`harvest_${UID}_listings`]: LISTINGS_COMPLET,
     };
     const f = fond({ store: autresRien(), lignes });
     await f.ctx.tickImport();
@@ -248,12 +254,12 @@ const MUTATIONS = [
   ['garde de lecture retirée', "const refus = await gardeLecture(uid, acc, 'import');", 'const refus = null;'],
   ['classe prioritaire (prend la place de l’argent)', "(classe === 'enligne' || classe === 'suivi' || classe === 'import') ? 'enligne' : 'photos'", "(classe === 'enligne' || classe === 'suivi') ? 'enligne' : 'photos'"],
   ['pause retirée', 'if (n > 0) await pauseImport();', ''],
-  ['compte relu après la page retiré', "if (actif && String(actif) !== String(uid)) { noterDiag('import_compte_change'); break; }", ''],
-  ['page avancée même refusée par la base', "if (issue !== 'ecrit' && issue !== 'inchange') { noterDiag(`import_page_pas_rangee_${nom}`); break; }", ''],
+  ['compte relu après la page retiré', "if (!actif || String(actif) !== String(uid)) { noterDiag('import_compte_change'); st.souci = { cause: 'deconnecte', at: Date.now() }; break; }", ''],
+  ['page avancée même refusée par la base', "if (issue !== 'ecrit' && issue !== 'inchange') { noterDiag(`import_page_pas_rangee_${nom}`); st.souci = { cause: 'base', at: Date.now() }; break; }", ''],
   ['total absent lu comme 0 (« complet »)', "(v === null || v === undefined || String(v).trim() === '' ? NaN : Number(v))", 'Number(v)'],
-  ['base muette prise pour « rien rangé »', "if (rows === null || !Array.isArray(rows)) { noterDiag('import_base_muette'); return null; }", '', "const r = rows.find(", "const r = (rows || []).find("],
+  ['base muette prise pour « rien rangé »', "if (rows === null || !Array.isArray(rows)) { noterDiag('import_base_muette'); return null; }", '', "= rows.find((x) => x && x.id === `harvest_${uid}_", "= (rows || []).find((x) => x && x.id === `harvest_${uid}_"],
   ['verrou retiré', "if (_importEnCours) { try { noterDiag('import_deja_en_cours'); } catch (_) {} return _importEnCours.then(() => 0, () => 0); }", ''],
-  ['fond sans onglet', "const tabs = await chrome.tabs.query({ url: ['https://*.vinted.fr/*'] });\n    if (!tabs || !tabs.length) return 0;\n    const uid = await activeUidForDomain('www.vinted.fr');\n    if (!uid) return 0;\n    if (await pauseVinted()) return 0;\n    if (await sansSessionPourEcrire()) return 0;\n    if (await reculBase()) return 0;\n    if (await compteNonCapte(uid)) return 0;\n    const st = await lireImport(uid);", "const uid = await activeUidForDomain('www.vinted.fr');\n    const st = await lireImport(uid);"],
+  ['fond sans onglet', "const tabs = await chrome.tabs.query({ url: ['https://*.vinted.fr/*'] });\n    if (!tabs || !tabs.length) return 0;\n    const uid = await activeUidForDomain(await domaineVintedOuvert());\n    if (!uid) return 0;\n    if (await pauseVinted()) return 0;\n    if (await sansSessionPourEcrire()) return 0;\n    if (await reculBase()) return 0;\n    if (await compteNonCapte(uid)) return 0;\n    const st = await lireImport(uid);", "const uid = await activeUidForDomain(await domaineVintedOuvert());\n    const st = await lireImport(uid);"],
   ['fin sur page courte (Vinted plafonne)', '!lot.length || (Number.isFinite(tp) && tp > 0 && p >= tp)', '!lot.length || lot.length < 100 || p >= 3'],
   ['réserve photos « pas su » entière', "(k === 'import' ? 0 : max[k])", 'max[k]'],
 ];
@@ -269,7 +275,7 @@ const MUTATIONS = [
     for (const [nom, de, vers, de2, vers2] of MUTATIONS) {
       if (!texte.includes(de) || (de2 && !texte.includes(de2))) { koMut++; console.log(`❌ mutation « ${nom} » : la ligne est introuvable — le contrôle ne prouve rien`); continue; }
       const f = path.join(dir, 'background.js');
-      let t2 = texte.replace(de, vers); if (de2) t2 = t2.replace(de2, vers2);
+      let t2 = texte.replace(de, vers); if (de2) t2 = t2.split(de2).join(vers2);   // 5.375 : la 2e paire partout (plusieurs `rows.find(`)
       fs.writeFileSync(f, t2);
       const log = console.log; console.log = () => {};
       let m; try { m = await lancer(f); } finally { console.log = log; }

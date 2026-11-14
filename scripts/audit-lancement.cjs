@@ -39,7 +39,8 @@ const ast = parser.parse(app, { sourceType: 'module', plugins: ['jsx'], errorRec
 (async () => {
   console.log('── (a) Les emails de compte ramènent sur l’app');
   await essaie('redirect_to', async () => {
-    const noms = ['retourEmail', 'avecRetour', 'authCall', 'MAIL_QUOTA', 'mapMailError', 'authResendConfirm', 'authMagicLink', 'authSignUp', 'authReset', 'authSetEmail'];
+    // (13 nov., lot 54) authSignUp joint le code de parrain gardé : `codeParrainGarde` et ses constantes sont chargés tels quels.
+    const noms = ['retourEmail', 'avecRetour', 'authCall', 'MAIL_QUOTA', 'mapMailError', 'authResendConfirm', 'authMagicLink', 'authSignUp', 'authReset', 'authSetEmail', 'CLE_PARRAIN', 'CODE_PARRAIN_RE', 'codeParrainGarde'];
     const appels = [];
     const ctx = vm.createContext({ AbortController, setTimeout, clearTimeout,
       SUPABASE_URL: 'https://base.test', SUPABASE_KEY: 'cle-publique', AUTH: { session: { access_token: 'a.b.c' } },

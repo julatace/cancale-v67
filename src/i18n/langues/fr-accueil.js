@@ -135,6 +135,7 @@ export default {
   "accueil.moment.messages.point1": "C’est toi qui cliques ; VRM envoie au nom du compte ouvert sur ton ordinateur.",
   "accueil.moment.messages.point2": "Accepter seul une offre au-dessus de ton prix mini : possible, éteint tant que tu ne l’allumes pas.",
   "accueil.cta.essayer": "Essayer gratuitement",
+  "accueil.cta.exemple": "Découvrir avec des exemples",
   "accueil.hero.pour": "L’outil des revendeurs Vinted, Leboncoin et eBay. Tous articles.",
   "accueil.offres.chapo": "Toutes les fonctions dans les deux. La seule différence : combien de tes comptes vendent.",
   "accueil.offres.gratuitLong": "Gratuit pour l’instant : tant que l’abonnement n’est pas exigé, VRM ne coûte rien.",

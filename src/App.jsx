@@ -409,13 +409,13 @@ import { LIGNE_ACCOMPAGNEMENT } from "./accompagnement.js";
 import { estIphoneSafari, estInstallee } from "./guideIphone.js";
 // (6 nov.) VRM ouvert à des clients : le mode exemple (données inventées, en mémoire
 // seulement) et le guide de démarrage (quatre étapes cochées sur une preuve lue).
-import { exempleActif, entrerModeExemple, sortirModeExemple } from "./modeExemple.js";
+import { exempleActif, exempleSansCompte, entrerModeExemple, sortirModeExemple } from "./modeExemple.js";
 // (6 nov., v36) Les temps réels chez les vendeurs, anonymes et agrégés (src/mesuresCollecte.js).
 import { demarrerMesures, mesuresEcran } from "./mesuresCollecte.js";
 // ⟦→ ecrans/Reglages.jsx #11⟧
 import { GuideDemarrage, BandeauExemple, ChoixNumerotation, VerificationInstallation } from "./GuideDemarrage.jsx";
 import { ParcoursArrivee, CarteParcours } from "./ParcoursArrivee.jsx";
-import { CLE_PARCOURS, etatParcours, preuveCompte as preuveCompteParcours, preuveConfiguration, preuveExtension as preuveExtensionParcours, preuveEmails, preuveVinted, preuvePremiere, lireParcours as lirePositionParcours, ecritureParcours, etapeAMontrer, suivanteApres, carteParcours } from "./parcoursArrivee.js";
+import { CLE_PARCOURS, etatParcours, preuveCompte as preuveCompteParcours, preuveExtension as preuveExtensionParcours, preuveVinted, lireParcours as lirePositionParcours, ecritureParcours, etapeAMontrer, suivanteApres, carteParcours } from "./parcoursArrivee.js";
 import { etatGuide, preuveCompte, preuveExtension, preuveListe, preuveNombre, compterNumeros, compterVentes, CLE_PLUS_TARD, CHOIX_NUMEROTATION, choixNumerotation, numerotationAChoisir, reglageDuChoix, reporteeActive, verifierInstallation } from "./guideDemarrage.js";
 import { PHRASES_ECRAN, phraseEcranPour } from "./phrasesEcran.js";
 import { AIDE_ECRANS } from "./aideEcrans.js";
@@ -827,7 +827,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.374.0';
+const EXT_ATTENDUE = '5.375.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -1254,7 +1254,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
+const EXT_CAPACITES = { importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -2857,6 +2857,9 @@ const SYNC_KEYS = [
   // (11 nov., ext. 5.350) Les alertes « Vinted a agi » qu'IL a marquées « C'est vu » : { [compte|clé]: ms }
   // (src/moderationVinted.js) — vue sur un appareil, rangée sur tous.
   'vrm_moderation_vu',
+  // (13 nov., lot 47, ext. 5.375) « Ton passé est importé (12 mois) » vu : { [compte]: fin } (src/importDepart.js) —
+  // montré UNE fois sur Ma journée, vu sur un appareil, vu partout.
+  'vrm_import_passe_vu',
   // (2 nov., soir) VESTIAIRE comme Vinted et Leboncoin : le N° donné à chaque
   // annonce Vestiaire qui n'en portait pas ({ [productId]: { numero, numberedAt,
   // auto } }, src/numerosVestiaire.js — fusionné comme les fiches, §5), « Colis
@@ -18921,6 +18924,10 @@ function AuthScreen() {
 .vrm-cx-form button[type=submit]{min-height:50px;transition:transform 140ms cubic-bezier(0.23,1,0.32,1),opacity 140ms ease}
 .vrm-cx-form button[type=submit]:active{transform:scale(.98)}
 .vrm-cx-liens button{min-height:44px}
+.vrm-cx-exemple{margin:14px 0 0;text-align:center}
+.vrm-cx-exemple p{margin:0 0 8px;font-size:13px;line-height:1.45;color:${C.muted}}
+.vrm-cx-exemple a{display:flex;align-items:center;justify-content:center;min-height:44px;border-radius:12px;border:1px solid ${C.border};color:${C.text};font-size:15px;font-weight:600;text-decoration:none}
+.vrm-cx-exemple a:focus-visible{outline:2px solid ${C.accent};outline-offset:3px}
 .vrm-cx-oublie{border:0;background:transparent;color:${C.accent};padding:4px 0;font:inherit;font-size:12px;font-weight:500;min-height:32px;cursor:pointer}
 .vrm-cx-aide-confirmation{margin-top:12px;border-top:1px solid ${C.border};padding-top:10px}
 .vrm-cx-aide-confirmation summary{min-height:32px;cursor:pointer;font-weight:600;color:${C.accent}}
@@ -19218,6 +19225,12 @@ function AuthScreen() {
             )}
           </div>
         </form>
+        {/* (13 nov., lot 48) VRM rempli de données INVENTÉES, sans compte (src/modeExemple.js) :
+            un vrai lien, rien n'est enregistré ni envoyé ; le bandeau propose « Créer mon compte ». */}
+        {(mode==='in'||mode==='up') && !__lier && <div className="vrm-cx-exemple" data-cx-exemple="">
+          <p>{tr('auth.exemple.note')}</p>
+          <a href="/?exemple" data-cx-exemple-entrer="">{tr('auth.exemple')}</a>
+        </div>}
         <LiensLegaux/>
         {/* (11 nov., lot traduction) La langue, avant même d'avoir un compte. */}
         <div style={{display:'flex',justifyContent:'center',color:C.muted,fontSize:12}}><ChoixLangue/></div>
@@ -21720,16 +21733,13 @@ function lienInstallerIci(sansSouris) {
 // ── LE PARCOURS D'ARRIVÉE, BRANCHÉ SUR LES PREUVES (11 nov.) ─────────────────
 // La règle : src/parcoursArrivee.js ; le dessin : src/ParcoursArrivee.jsx.
 // Ici, seulement les LECTURES (trois états, §8) et la position rangée :
-//   · configuration : `vrm_configuration` (ou le choix des plateformes d'avant le 9 nov.) ;
 //   · extension : le pont (`useEtapePont`) — connectée à CE compte — ou un compte déjà rangé ;
-//   · e-mails : une ligne `email_reception_*` (`select=id`, limit 1) ;
-//   · Vinted : les comptes lus et le compteur `nItems` de leur dressing (scalaire) ;
-//   · première vente : les compteurs `nItems` des ventes et achats (scalaires).
+//   · Vinted (13 nov., lot 46 : trois étapes) : les comptes lus et les compteurs `nItems`
+//     de leurs ventes, achats et dressing (scalaires) — une lecture rangée suffit.
 // Jamais `select=data`. Pendant qu'une étape attend, l'écran plein relit toutes les
 // 10 s (page visible) et au retour sur l'onglet : la réussite se CONSTATE, rien à cocher.
 // La position (`vrm_parcours`) et « Plus tard » (`vrm_parcours_plus_tard`) sont dans
 // SYNC_KEYS : on reprend là où on s'est arrêté, sur n'importe quel appareil.
-const ParcoursAdresseVrmPA = lazy(() => import('./AdresseReception.jsx').then((m) => ({ default: m.ParcoursAdresseVrm })));
 async function lireLignesParcours(q) {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${q}`, { headers: sbAuth(), cache: 'no-store' });
@@ -21738,7 +21748,6 @@ async function lireLignesParcours(q) {
     return Array.isArray(j) ? j : null;
   } catch (_) { return null; }
 }
-const lireEmailsParcours = () => lireLignesParcours('id=like.email_reception_*&select=id&limit=1');
 const lireAnnoncesParcours = () => lireLignesParcours('id=like.harvest_*_listings&select=id,n:data->>nItems').then((j) => (j ? j.filter((x) => ligneDeSaSession(x && x.id)) : null));
 const lireCommandesParcours = () => lireLignesParcours('id=like.harvest_*_orders_*&select=id,n:data->>nItems').then((j) => (j ? j.filter((x) => ligneDeSaSession(x && x.id)) : null));
 // Une lecture qui GARDE la dernière valeur lue pendant qu'elle relit (pas de « Je vérifie… »
@@ -21774,10 +21783,19 @@ function reporterEtapeIci(cle) {
   __plusTardIci = n; save(CLE_PLUS_TARD, n);
   try { window.dispatchEvent(new Event('vrm:parcours')); } catch (_) {}
 }
-function useParcoursArrivee({ comptes: comptesCoque, actif = true, tour = 0 }) {
+function useParcoursArrivee({ comptes: comptesCoque, actif = true, tour: tourDemande = 0 }) {
   const [, maj] = React.useReducer((n) => n + 1, 0);
+  // (13 nov.) Une position écrite (l'écran plein avance, se ferme) fait RELIRE les preuves
+  // ici aussi : la carte de Ma journée ne reste pas sur l'état de son montage.
+  const [relu, setRelu] = React.useState(0);
+  const tour = tourDemande + relu;
   React.useEffect(() => {
-    const cles = [CLE_PARCOURS, CLE_PLUS_TARD, CLE_CONFIGURATION, CLE_PLATEFORMES, CLE_GUIDE_MASQUE];
+    const relire = () => setRelu((n) => n + 1);
+    window.addEventListener('vrm:parcours', relire);
+    return () => window.removeEventListener('vrm:parcours', relire);
+  }, []);
+  React.useEffect(() => {
+    const cles = [CLE_PARCOURS, CLE_PLUS_TARD, CLE_GUIDE_MASQUE];
     const f = (e) => {
       const k = e && e.detail && e.detail.k;
       if (k === CLE_PARCOURS && e.detail.distant) __parcoursIci = null;
@@ -21790,51 +21808,51 @@ function useParcoursArrivee({ comptes: comptesCoque, actif = true, tour = 0 }) {
   }, []);
   const { etape: pont, relire } = useEtapePont();
   React.useEffect(() => { if (tour > 0) relire(); }, [tour]); // eslint-disable-line react-hooks/exhaustive-deps
-  const emails = useLectureParcours(lireEmailsParcours, actif, tour, 'parcours:emails');
   const annonces = useLectureParcours(lireAnnoncesParcours, actif, tour, 'parcours:annonces');
   const commandes = useLectureParcours(lireCommandesParcours, actif, tour, 'parcours:commandes');
   const comptesLus = useLectureParcours(fetchVintedAccounts, actif && tour > 0, tour, 'parcours:comptes');
   const comptes = tour > 0 && Array.isArray(comptesLus) ? comptesLus : comptesCoque;
   const pret = isCloudReady();
-  const conf = pret ? lireConfiguration(load(CLE_CONFIGURATION, null)) : null;
   const plusTard = pret ? plusTardRange() : {};
   const etat = etatParcours({
     compte: preuveCompteParcours(AUTH.user?.id || ''),
-    configuration: preuveConfiguration({ pret, etat: conf ? conf.etat : null, plateformes: pret && !!lirePlateformes(load(CLE_PLATEFORMES, null)) }),
     extension: preuveExtensionParcours(pont, comptes),
-    emails: preuveEmails(emails),
-    vinted: preuveVinted(comptes, annonces),
-    premiere: preuvePremiere(commandes),
+    vinted: preuveVinted(comptes, annonces, commandes),
   }, { plusTard });
   return { etat, pret, parcours: pret ? lirePositionParcours(parcoursRange()) : undefined, parcoursBrut: pret ? parcoursRange() : undefined, plusTard, comptes };
 }
-// Le geste de l'étape « configuration » : Ma configuration, plein écran (au-dessus du parcours).
-const ouvrirConfiguration = () => { try { window.dispatchEvent(new Event('vrm:configuration')); } catch (_) {} };
-// La petite carte de Ma journée : l'étape courante et « Continuer » (qui ouvre l'écran plein).
+// Où faire le geste : le navigateur d'ici, ou l'ordinateur pour un téléphone sans extension
+// (Orion sur iPhone et Firefox sur Android ont la leur).
+const ouGesteParcours = (sansSouris) => (sansSouris && !['ios-orion', 'firefox-android'].includes(mobileIci()) ? 'sur ton ordinateur' : NAV.dansNu);
+// (13 nov., lot 46) Le geste exact d'une étape bloquée, porté par la carte : le lien de
+// téléchargement de CE navigateur, ou vinted.fr. Le lien fait la chose ET ouvre l'écran plein.
+function gesteCarteParcours(c, sansSouris) {
+  if (!c || c.etat !== 'afaire') return null;
+  if (c.cle === 'vinted') return ouGesteParcours(sansSouris) === NAV.dansNu ? { libelle: 'Ouvrir vinted.fr', href: 'https://www.vinted.fr' } : null;
+  if (c.cle === 'extension' && c.detail === 'absente') { const lien = lienInstallerIci(sansSouris); return lien ? { libelle: 'Télécharger l’extension', href: lien, telecharger: /\.zip(\?|$)/.test(lien) } : null; }
+  return null;
+}
+// La petite carte de Ma journée : l'étape courante, son geste exact ou « Continuer » (qui
+// ouvre l'écran plein). « Ma configuration » mise de côté garde sa carte « Reprendre ».
 function CarteParcoursApp({ comptes, plein = false }) {
+  const sansSouris = useSansSouris();
   const [masque, setMasque] = React.useState(() => !!load(CLE_GUIDE_MASQUE, null));
   React.useEffect(() => onCloudReady(() => setMasque(!!load(CLE_GUIDE_MASQUE, null))), []);
   const { etat, pret, parcours, parcoursBrut } = useParcoursArrivee({ comptes, actif: !masque || plein });
   if (!pret) return null;
-  const mode = carteParcours(etat, parcoursBrut, { masque: masque && !plein, exemple: exempleActif() });
+  const mode = carteParcours(etat, parcoursBrut, { masque: masque && !plein, exemple: exempleActif(), comptes });
   if (mode === 'cachee') return <ReprendreConfiguration/>;
-  const c = etat.courante;
   const sansCompte = Array.isArray(comptes) && comptes.length === 0;
-  const conf = c === 'configuration' ? lireConfiguration(load(CLE_CONFIGURATION, null)) : null;
-  const continuer = () => {
-    if (mode === 'etape' && c === 'configuration') { ecrireParcoursIci({ etape: 'configuration', ouvert: true }); ouvrirConfiguration(); return; }
-    ecrireParcoursIci({ etape: etapeAMontrer(etat, parcours && parcours.etape), ouvert: true });
-  };
-  return (
+  const c = etat.etapes.find((x) => x.cle === etat.courante) || null;
+  const continuer = () => ecrireParcoursIci({ etape: etapeAMontrer(etat, parcours && parcours.etape), ouvert: true });
+  return (<>
+    <ReprendreConfiguration/>
     <CarteParcours etat={etat} mode={mode} onContinuer={continuer} onPlusTard={reporterEtapeIci}
-      libelleContinuer={c === 'configuration' ? (conf ? 'Reprendre' : 'Commencer') : 'Continuer'}
-      attrsContinuer={c === 'configuration' && mode === 'etape' ? { 'data-configuration-ouvrir': '' } : {}}
-      attrsCarte={c === 'configuration' && mode === 'etape' ? { 'data-reprendre-configuration': conf ? 'plustard' : 'jamais' } : {}}
-      onOk={() => ecrireParcoursIci({ fini: new Date().toISOString(), ouvert: false })}
+      geste={mode === 'etape' ? gesteCarteParcours(c, sansSouris) : null} ou={ouGesteParcours(sansSouris)}
       onExemple={sansCompte && plein ? () => entrerModeExemple() : null}
       onImporter={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=settings&section=importer' })); } catch (_) {} }}
-      onMasquer={!plein && mode !== 'pret' ? () => { save(CLE_GUIDE_MASQUE, { at: new Date().toISOString() }); setMasque(true); } : null}/>
-  );
+      onMasquer={!plein ? () => { save(CLE_GUIDE_MASQUE, { at: new Date().toISOString() }); setMasque(true); } : null}/>
+  </>);
 }
 // L'écran plein, monté dans AppCoeur : ouvert quand la position rangée le dit
 // (`ouvert`), donc aussi après un rechargement ou sur un autre appareil.
@@ -21843,7 +21861,6 @@ function ParcoursArriveeApp({ comptes, retenu = false, onNav, onOuvert }) {
   const sansSouris = useSansSouris();
   const [tour, setTour] = React.useState(0);
   const [succes, setSucces] = React.useState('');
-  const [emailsOuverts, setEmailsOuverts] = React.useState(false);
   const { etat, pret, parcours } = useParcoursArrivee({ comptes, actif: true, tour });
   const ouvert = !!(pret && parcours && parcours.ouvert && !parcours.fini && !exempleActif());
   const voulue = ouvert ? parcours.etape : null;
@@ -21858,14 +21875,14 @@ function ParcoursArriveeApp({ comptes, retenu = false, onNav, onOuvert }) {
     if (etatVoulue !== 'fait') { vue.current[voulue] = 'pasfait'; return undefined; }
     if (vue.current[voulue] !== 'pasfait') return undefined;
     vue.current[voulue] = 'fait';
-    tenue.current = voulue; setSucces(voulue); setEmailsOuverts(false);
+    tenue.current = voulue; setSucces(voulue);
     const t = setTimeout(() => { tenue.current = ''; setSucces(''); }, 1400);
     return () => { clearTimeout(t); tenue.current = ''; setSucces(''); };
   }, [voulue, etatVoulue]); // eslint-disable-line react-hooks/exhaustive-deps
   const montree = ouvert ? (succes || etapeAMontrer(etat, voulue)) : null;
   React.useEffect(() => { onOuvert && onOuvert(ouvert && !retenu); }, [ouvert, retenu]); // eslint-disable-line react-hooks/exhaustive-deps
   // Relire pendant qu'une étape attend : toutes les 10 s, page visible, et au retour sur l'onglet.
-  const attend = ouvert && !retenu && montree && montree !== 'pret' && montree !== 'configuration';
+  const attend = ouvert && !retenu && montree && montree !== 'pret';
   React.useEffect(() => {
     if (!attend) return undefined;
     const pousse = () => { if (document.visibilityState === 'visible') setTour((t) => t + 1); };
@@ -21884,18 +21901,15 @@ function ParcoursArriveeApp({ comptes, retenu = false, onNav, onOuvert }) {
   };
   const fermer = () => ecrireParcoursIci({ ouvert: false });
   const gestes = {
-    configuration: { libelle: lireConfiguration(load(CLE_CONFIGURATION, null)) ? 'Reprendre' : 'Commencer', onClick: ouvrirConfiguration, attrs: { 'data-configuration-ouvrir': '' } },
-    emails: emailsOuverts ? null : { libelle: 'Relier mes e-mails', onClick: () => setEmailsOuverts(true) },
     vinted: { libelle: 'Ouvrir vinted.fr', href: 'https://www.vinted.fr' },
   };
   const details = {
     extension: <PremiersPas onNav={onNav} dansGuide/>,
-    emails: emailsOuverts ? <Suspense fallback={<p role="status">{PAS_SU.enCours}</p>}><ParcoursAdresseVrmPA headers={sbAuth} onBoite={() => { fermer(); onNav && onNav('emails'); }}/></Suspense> : null,
   };
   return (
     <GardeEcran nom="parcours" feuille onFermer={fermer}>
       <FermeAuRetour fermer={fermer}/>
-      <ParcoursArrivee Pop={InfoPop} etat={etat} montree={affichee} succes={succes} gestes={gestes} telephone={sansSouris}
+      <ParcoursArrivee Pop={InfoPop} etat={etat} montree={affichee} succes={succes} gestes={gestes} ou={ouGesteParcours(sansSouris)}
         details={details}
         onPlusTard={plusTard} onFermer={fermer} onReessayer={() => { setTour((t) => t + 1); sonderPonts(); }}
         onFin={() => { ecrireParcoursIci({ fini: new Date().toISOString(), ouvert: false }); onNav && onNav('journee'); }}/>
@@ -60418,7 +60432,7 @@ function AppCoeur() {
       {/* Sur ordinateur, le contenu occupe la largeur disponible après le rail.
           L'ordre des blocs et la disposition de chaque page restent conservés. */}
       {/* (6 nov.) Mode exemple : le bandeau, hors de <main> (il ne défile pas), sur TOUS les écrans. */}
-      {exempleActif() && <BandeauExemple style={ordi ? { marginLeft: NAV_LARGEUR + 36 } : undefined} onBrancher={() => sortirModeExemple()}/>}
+      {exempleActif() && <BandeauExemple sansCompte={exempleSansCompte()} style={ordi ? { marginLeft: NAV_LARGEUR + 36 } : undefined} onBrancher={() => (exempleSansCompte() ? sortirModeExemple(window, '/?inscription') : sortirModeExemple())}/>}
       <main className="vrm-main" data-ecran={tab} data-defile="1" style={{
         // ⚠️ COQUE APP-SHELL : c'est `<main>` qui défile, pas le document. La
         // barre du bas est un frère HORS de ce conteneur → elle ne bouge plus

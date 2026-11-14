@@ -1,25 +1,22 @@
 // ════════════════════════════════════════════════════════════════════════════
-//  BANC — LES PREMIÈRES MINUTES (8 nov.) : un vendeur NEUF réussit seul.
+//  BANC — LES PREMIÈRES MINUTES (8 nov. ; démarrage en TROIS étapes le 13 nov.,
+//  lot 46) : un vendeur NEUF réussit seul.
 //  Base INVENTÉE (aucune fixture, aucune donnée réelle), servie par _minipgrest.
-//  N1  compte neuf (base vide) : « Démarrer avec VRM », 1 sur 5 (le compte),
-//      l'étape courante est l'extension, une barre en segments ; les cinq étapes
-//      sont là ; « Voir VRM avec des exemples » ; la question de la numérotation
-//      (deux choix de 44 px au moins) ;
-//  N2  « Je numérote moi-même » : écrit `vrm_numero_ecrit` { actif: true, choisi }
-//      dans la ligne `main`, et la question disparaît ;
+//  N1  compte neuf (base vide) : « Démarrer avec VRM », 1 sur 3 (le compte),
+//      l'étape courante est l'extension, une barre en trois segments ; les trois
+//      étapes sont là ; « Voir VRM avec des exemples » ; pas de question du numéro ;
 //  N3  « Vérifier mon installation » : extension, comptes, boîte e-mail — chacun
 //      « à faire » avec son geste ; jamais « OK » sans lecture ; rien n'est « tout
 //      est en place » ;
-//  N4  « Plus tard » sur l'extension : l'étape courante passe à la boîte e-mail
-//      (Vinted suit l'extension), écrit `vrm_parcours_plus_tard` ;
-//  N5  à mi-chemin (un compte relié, une boîte, aucune vente) : 4 sur 5, étape
-//      courante « première vente », sans geste à faire, pas de numérotation
-//      demandée (des N° existent) ;
+//  N4  « Plus tard » sur l'extension : Vinted la suit, la carte dit « Reprendre »,
+//      écrit `vrm_parcours_plus_tard` ;
+//  N5  à mi-chemin (parcours commencé, un compte relié, rien encore lu) : 2 sur 3,
+//      étape courante Vinted « Lecture de tes ventes… », plus d'exemple ;
 //  I1  compte INSTALLÉ (comptes, boîte, ventes, N°) : AUCUNE étape affichée, aucune
 //      question ; Paramètres → Aide → « Vérifier mon installation » dit les comptes
 //      et la boîte « OK » (lus), et la relecture du jour ;
-//  I2  la lecture des ventes en panne : l'étape n'est NI cochée NI cachée (« pas pu
-//      vérifier »), jamais un guide faussement fini.
+//  I2  installé, la lecture des ventes en panne : toujours AUCUNE carte (un vendeur
+//      installé n'est jamais interrompu ; « pas su » n'est pas « à faire »).
 //  Chaque fois : aucune erreur JS, rien ne déborde. `SHOTS=dossier` range les captures
 //  (à REGARDER, §6.2). `LARGEURS=390,1512` / `THEMES=clair,sombre` restreignent.
 // ════════════════════════════════════════════════════════════════════════════
@@ -102,8 +99,8 @@ async function capture(pg, nom, plein = false) {
   await pg.screenshot({ path: path.join(SHOTS, nom + '.png'), fullPage: plein });
 }
 // (11 nov.) Le guide est devenu la petite carte du parcours d'arrivée (src/ParcoursArrivee.jsx) :
-// six étapes (la configuration est la 2e, elle porte la question du numéro), l'étape courante
-// ouverte, les six en repli (`data-parcours-rang`).
+// trois étapes depuis le 13 nov. (lot 46), l'étape courante ouverte, les trois en repli
+// (`data-parcours-rang`).
 const guide = (pg) => pg.evaluate(() => {
   const g = document.querySelector('[data-guide-demarrage]');
   if (!g) return null;
@@ -113,7 +110,7 @@ const guide = (pg) => pg.evaluate(() => {
     segments: g.querySelectorAll('.vrm-guide-barre > span').length,
     question: !!document.querySelector('[data-guide-numerotation]'),
     exemple: r('[data-exemple-entrer]'), continuer: r('[data-parcours-continuer]'), plusTard: r('[data-guide-plus-tard]'),
-    attente: !!g.querySelector('[data-parcours-carte="etape"] [data-courante="1"]') && !g.querySelector('[data-guide-plus-tard]'),
+    mode: g.getAttribute('data-parcours-carte'), ligne: ((g.querySelector('[data-guide-ligne]') || {}).textContent || '').trim(),
     carteDansCarte: g.querySelectorAll('.vrm-card').length };
 });
 const verif = (pg) => pg.evaluate(() => {
@@ -143,12 +140,12 @@ async function neuf(nav, W, theme) {
   await attendre(o.pg, async () => { const g = await guide(o.pg); return g && g.courante; }, 5000);
   const g = await guide(o.pg);
   dit(!!g, `${T} N1 le parcours s'affiche pour un compte neuf`);
-  dit(g && g.faites === '1' && g.etats.compte === 'fait' && g.courante === 'configuration', `${T} N1 1 sur 6 : le compte est fait, on continue par « Tu vends quoi ? »`, JSON.stringify(g));
-  dit(g && Object.keys(g.etats).join(',') === 'compte,configuration,extension,emails,vinted,premiere' && g.segments === 6, `${T} N1 les six étapes, une barre en six segments`, JSON.stringify(g && g.etats));
-  dit(g && ['configuration', 'extension', 'emails', 'vinted', 'premiere'].every((k) => g.etats[k] !== 'fait'), `${T} N1 rien d'autre n'est coché sans preuve`, JSON.stringify(g && g.etats));
+  dit(g && g.faites === '1' && g.etats.compte === 'fait' && g.courante === 'extension', `${T} N1 1 sur 3 : le compte est fait, on continue par l'extension`, JSON.stringify(g));
+  dit(g && Object.keys(g.etats).join(',') === 'compte,extension,vinted' && g.segments === 3, `${T} N1 les trois étapes, une barre en trois segments`, JSON.stringify(g && g.etats));
+  dit(g && ['extension', 'vinted'].every((k) => g.etats[k] !== 'fait'), `${T} N1 rien d'autre n'est coché sans preuve`, JSON.stringify(g && g.etats));
   dit(g && g.exemple && (!o.tel || g.exemple.h >= 43.5), `${T} N1 « Voir VRM avec des exemples » (44 px au doigt)`, JSON.stringify(g && g.exemple));
   dit(g && !g.question, `${T} N1 la question du numéro n'est plus posée dans la carte (étape « Où est ton numéro ? » de Ma configuration)`);
-  dit(g && g.plusTard && g.continuer && (!o.tel || g.continuer.h >= 43.5), `${T} N1 « Commencer » et « Plus tard » sur l'étape courante`, JSON.stringify(g));
+  dit(g && g.plusTard && g.continuer && (!o.tel || g.continuer.h >= 43.5), `${T} N1 le geste et « Plus tard » sur l'étape courante`, JSON.stringify(g));
   dit(g && g.carteDansCarte === 0, `${T} N1 une seule carte`);
   dit(!(await deborde(o.pg)), `${T} N1 rien ne déborde`);
   await capture(o.pg, `pm-${W}-${theme}-1-neuf`, true);
@@ -162,17 +159,15 @@ async function neuf(nav, W, theme) {
     `${T} N3 « Vérifier mon installation » : extension, comptes, boîte e-mail à faire, avec leur geste`, JSON.stringify(v));
   dit(v && v.ok === '0' && !Object.values(v.lignes).some((l) => l.etat === 'ok') && !v.lignes.relecture, `${T} N3 jamais « OK » sans lecture, pas de relecture sans compte`, JSON.stringify(v));
   await capture(o.pg, `pm-${W}-${theme}-2-verifier`, true);
-  // N4 — « Plus tard » sur la configuration puis sur l'extension : la boîte e-mail (Vinted suit l'extension).
+  // N4 — « Plus tard » sur l'extension : Vinted la suit, la carte dit « Reprendre ».
   await o.pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
-  await o.pg.waitForSelector('[data-guide-plus-tard="configuration"]', { timeout: 15000 }).catch(() => {});
-  if (await o.pg.$('[data-guide-plus-tard="configuration"]')) {
-    await o.pg.click('[data-guide-plus-tard="configuration"]');
-    await o.pg.waitForSelector('[data-guide-plus-tard="extension"]', { timeout: 5000 }).catch(() => {});
+  await o.pg.waitForSelector('[data-guide-plus-tard="extension"]', { timeout: 15000 }).catch(() => {});
+  if (await o.pg.$('[data-guide-plus-tard="extension"]')) {
     await o.pg.click('[data-guide-plus-tard="extension"]').catch(() => {});
     await o.pg.waitForTimeout(400);
     const g4 = await guide(o.pg);
-    const ecrit = await attendre(o.pg, async () => { const d = ligneMain(base).vrm_parcours_plus_tard; return d && d.extension && d.configuration; });
-    dit(g4 && g4.courante === 'emails' && g4.etats.extension !== 'fait', `${T} N4 « Plus tard » : l'étape courante passe à la boîte e-mail, rien n'est coché`, JSON.stringify(g4));
+    const ecrit = await attendre(o.pg, async () => { const d = ligneMain(base).vrm_parcours_plus_tard; return d && d.extension; });
+    dit(g4 && g4.mode === 'reprendre' && !g4.courante && g4.etats.extension !== 'fait' && g4.etats.vinted !== 'fait', `${T} N4 « Plus tard » : Vinted suit l'extension, la carte dit « Reprendre », rien n'est coché`, JSON.stringify(g4));
     dit(ecrit, `${T} N4 « Plus tard » est enregistré (synchronisé)`, JSON.stringify(ligneMain(base)));
     await capture(o.pg, `pm-${W}-${theme}-3-plus-tard`);
   } else dit(false, `${T} N4 « Plus tard » sur l'étape courante existe`);
@@ -182,13 +177,13 @@ async function neuf(nav, W, theme) {
 
 async function miChemin(nav, W, theme) {
   const sombre = theme === 'sombre', T = `[mi-chemin ${W}px ${theme}]`;
-  const base = { lignes: [MAIN({ vinted_annonce_numeros: NUMS, vrm_configuration: CONF }), RECEPTION, DRESSING, VENTES(0)], comptes: COMPTE };
+  const base = { lignes: [MAIN({ vinted_annonce_numeros: NUMS, vrm_configuration: CONF, vrm_parcours: { v: 1, etape: 'vinted', ouvert: false, fini: null, at: iso(0) } }), RECEPTION], comptes: COMPTE };
   const o = await ouvrir(nav, { W, sombre, base });
   await o.pg.waitForSelector('[data-guide-demarrage]', { timeout: 15000 }).catch(() => {});
-  await attendre(o.pg, async () => { const g = await guide(o.pg); return g && g.courante === 'premiere'; }, 6000);
+  await attendre(o.pg, async () => { const g = await guide(o.pg); return g && g.courante === 'vinted' && g.etats.vinted === 'attente'; }, 6000);
   const g = await guide(o.pg);
-  dit(g && g.faites === '5' && g.courante === 'premiere' && g.etats.premiere === 'attente', `${T} N5 5 sur 6, on attend la première vente`, JSON.stringify(g));
-  dit(g && g.attente && !g.question && !g.exemple, `${T} N5 rien à faire (attente, pas de « Plus tard »), pas de question de numérotation, plus d'exemple`, JSON.stringify(g));
+  dit(g && g.faites === '2' && g.courante === 'vinted' && g.etats.vinted === 'attente' && /Lecture de tes ventes/.test(g.ligne), `${T} N5 2 sur 3, on attend la première lecture de Vinted`, JSON.stringify(g));
+  dit(g && !g.question && !g.exemple, `${T} N5 pas de question de numérotation, plus d'exemple`, JSON.stringify(g));
   await capture(o.pg, `pm-${W}-${theme}-4-mi-chemin`);
   dit(!o.journal.erreurs.length, `${T} aucune erreur JS`, o.journal.erreurs.join(' ¦ '));
   await o.ctx.close();
@@ -219,10 +214,9 @@ async function installe(nav, W, theme) {
   // I2
   const base2 = { lignes: [MAIN({ vinted_annonce_numeros: NUMS, vrm_configuration: CONF }), RECEPTION, DRESSING, VENTES(14)], comptes: COMPTE, panneVentes: true };
   const o2 = await ouvrir(nav, { W, sombre, base: base2 });
-  await o2.pg.waitForSelector('[data-guide-demarrage]', { timeout: 12000 }).catch(() => {});
-  await o2.pg.waitForTimeout(1500);
+  await o2.pg.waitForTimeout(5000);
   const g2 = await guide(o2.pg);
-  dit(g2 && g2.etats.premiere === 'passu' && g2.courante === 'premiere', `${T} I2 ventes illisibles : « pas pu vérifier », ni cochée ni cachée`, JSON.stringify(g2));
+  dit(!g2, `${T} I2 installé, ventes illisibles : toujours aucune carte (jamais interrompu)`, JSON.stringify(g2));
   await o2.ctx.close();
 }
 
