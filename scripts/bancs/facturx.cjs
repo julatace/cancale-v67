@@ -28,8 +28,8 @@ const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_m
 const { PDFDocument, PDFName, PDFDict, PDFArray, PDFRawStream } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'pdf-lib'));
 const zlib = require('zlib');
 const { metaVersData } = require('./_meta.cjs');
-const { getPath } = require('./_minipgrest.cjs');
-const { ouvrirAvanceCompta } = require('./_compta.cjs');
+const { servir } = require('./_minipgrest.cjs');
+const { ouvrirAvanceCompta, allerSegment } = require('./_compta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 4931;
@@ -82,22 +82,12 @@ const brancher = async (pg, rows) => {
     if (req.method() === 'POST' || req.method() === 'PATCH') return j([]);
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
-    const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || '';
-    const forme = (r) => {
-      if (/^[a-z]+:data->[a-z]+$/i.test(sel)) { const [al, src] = sel.split(':'); return { [al]: (r.data || {})[src.split('->')[1]] }; }
-      if (/^[a-z]+:data->/i.test(sel)) {
-        const o = {};
-        // (6 nov.) chemin JSON lu comme PostgREST (getPath : `->>` = texte, absent ⇒ null) ; `alias:data->>x` était lu comme la clé « >x », toujours absente (§6.3).
-        for (const champ of sel.split(',')) { const m = /^([a-z_]+):(data->.+)$/i.exec(champ); if (!m) continue; o[m[1]] = getPath(r, m[2]); }
-        return o;
-      }
-      return { ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt };
-    };
-    const eq = /id=eq\.([^&]*)/.exec(u);
-    if (eq) return j(rows.filter((r) => r.id === eq[1]).map(forme));
-    const lk = /id=like\.([^&]*)/.exec(u);
-    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map(forme)); }
-    return j([]);
+    // (14 nov., bancs au vert) La base servie comme PostgREST (`_minipgrest`) : `id=in.(…)` (ventes et achats lus par
+    // famille depuis le 8 nov.), projections mixtes (`id,updated_at,cap:data->>capturedAt,…,payload:data->payload`),
+    // filtres. L'ancien faux rendait la ligne ENTIÈRE à une projection mixte (pas de `payload`) et rien à `in.(…)` :
+    // les ventes Vinted n'arrivaient jamais (récap = eBay seul, 60 €).
+    const sv = servir(rows.map((r) => ({ ...r, updated_at: auj.toISOString() })), u.replace(/[?&]owner=eq\.[^&]*/, (m) => (m[0] === '?' ? '?' : '')).replace('?&', '?').replace(/\+/g, ' ').replace(/#/g, '%23'), req.headers());
+    return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': sv.range }, body: JSON.stringify(sv.body) }).catch(() => {});
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
 };
@@ -158,7 +148,9 @@ const telecharge = async (pg, clic, ms = 8000) => {
       await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
       await brancher(pg, lignes({ profil, sansVersement }));
       await pg.goto(`http://localhost:${PORT}/?tab=compta`, { waitUntil: 'domcontentloaded' });
-      await ouvrirAvanceCompta(pg); // (29 oct.) ces cartes vivent dans « Avancé », replié
+      // (29 oct.) ces cartes vivaient dans « Avancé », replié ; (10 nov., Argent) la facturation électronique vit
+      // dans le segment « Factures » : le banc y va comme Julien (un toucher sur le segment).
+      if (!(await allerSegment(pg, 'factures'))) await ouvrirAvanceCompta(pg);
       return { ctx, pg, errs };
     };
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
