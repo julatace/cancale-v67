@@ -53719,16 +53719,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* ── Note interne d'un achat (Actions rapides) — privée, synchronisée ── */}
       {noteEdit && (
-        <div onClick={()=>setNoteEdit(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1360,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+        <div data-note-achat-voile="" onClick={()=>setNoteEdit(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1360,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
           <FermeAuRetour fermer={()=>setNoteEdit(null)}/>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,width:'100%',maxWidth:420,padding:'18px 18px 16px',boxShadow:C.shadow||'0 12px 40px rgba(0,0,0,.3)'}}>
-            <div style={{fontSize:15,fontWeight:700,color:C.text,marginBottom:2}}>Note interne</div>
-            <div style={{fontSize:12,color:C.muted,marginBottom:10,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{noteEdit.title||'Achat'} — privée, pour toi seul</div>
+          {/* (14 nov., passe design 3) La fenêtre du système : carte 20 sans cadre, l'ombre flottante, titre 20/700,
+              note 13 grise, champ rayon 12, deux gestes du système (discret, principal) — plus des rectangles de 12. */}
+          <div className="vrm-note-achat" data-note-achat="" onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:'var(--d-r-carte)',width:'100%',maxWidth:420,padding:'20px 20px 16px',boxShadow:'var(--d-ombre-flottant)'}}>
+            <div style={{fontSize:20,fontWeight:700,color:C.text,marginBottom:4}}>Note interne</div>
+            <div style={{fontSize:13,color:C.muted,marginBottom:12,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{noteEdit.title||'Achat'} — privée, pour toi seul</div>
             <textarea autoFocus value={noteEdit.val} onChange={e=>setNoteEdit(n=>({...n,val:e.target.value}))} placeholder="ex : à retoucher · reçu demandé · pour un client…" rows={4}
-              style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',fontSize:15,background:C.bg,color:C.text,outline:'none',fontFamily:'inherit',resize:'vertical'}}/>
+              style={{width:'100%',boxSizing:'border-box',border:'1px solid var(--d-filet-fort)',borderRadius:12,padding:'10px 12px',fontSize:16,background:C.bg,color:C.text,outline:'none',fontFamily:'inherit',resize:'vertical'}}/>
             <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:12}}>
-              <button className="vrm-b vrm-b-discret" type="button" onClick={()=>setNoteEdit(null)} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:12,padding:'9px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
-              <button type="button" onClick={()=>{ saveAchatNote(noteEdit.tid, noteEdit.val); setNoteEdit(null); }} style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:12,padding:'9px 16px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>Enregistrer</button>
+              <Bouton variante="discret" onClick={()=>setNoteEdit(null)}>Annuler</Bouton>
+              <Bouton variante="primaire" onClick={()=>{ saveAchatNote(noteEdit.tid, noteEdit.val); setNoteEdit(null); }}>Enregistrer</Bouton>
             </div>
           </div>
         </div>

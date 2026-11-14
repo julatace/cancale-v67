@@ -19,7 +19,9 @@ const NOMS = { achat: 'Prix d’achat', frais: 'Frais', emballage: 'Emballage', 
 // vente (ou des coûts quand ils le dépassent : la perte se voit au-delà du trait).
 export function BarreCoutVente({ c }) {
   const s = segmentsCascade(c);
-  if (!s) return null;
+  // (14 nov., passe design 3) Sans aucun segment su, RIEN n'est dessiné : une piste grise vide se lisait comme une
+  // barre (« rien dépensé, rien gagné ») — la même règle que la barre de délai d'un retrait (CarteRelais.jsx).
+  if (!s || !s.segments.length) return null;
   const venteX = c.vente != null && s.total > 0 ? (c.vente / s.total) * 100 : 100;
   return (
     // (11 nov., lot accessibilité) Sans segment, la barre ne dit rien : décorative (un role="img" au nom vide était faux).
