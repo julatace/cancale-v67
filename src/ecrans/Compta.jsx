@@ -1043,7 +1043,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
   };
   
   return (
-    <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
+    <div data-espace="argent" data-argent-factures="" style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
       {/* ⚠️ LES BOUTONS PASSENT DANS LE `right` DE `ScreenHead`. Posés à côté
           dans une rangée à part, ils sortaient de la zone protégée et
           glissaient SOUS l'île d'actions flottante : « ⚙ Réglages » était
@@ -1136,10 +1136,8 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
                           qui remplit vraiment cet écran, ce sont les reçus
                           Vinted reçus par email, et sa propre saisie. */}
                       
-                      <span style={{display:'inline-block',marginTop:10}}>
-                        <Btn small color={C.accent} onClick={()=>setShowForm(true)}
-                          style={{display:'inline-flex',alignItems:'center',gap:5}}>{tr('compta.nouvelleFacture')}</Btn>
-                      </span>
+                      {/* (14 nov., Studio) « + Nouvelle facture » était écrit deux fois sur l'écran : le geste
+                          reste UNE fois, le plein de l'écran (en tête, `data-fac-principal` au téléphone). */}
                     </>
                   : <>{tr('compta.aucuneFactureComptabilisee')}<br/>
                       <span style={{fontSize:12}}>{tr('compta.factureArriveIci')}</span>
@@ -3644,6 +3642,9 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
     ouvrirRepliCompta(q.aller);
   };
   const somme = (x) => (Math.abs(Number(x)) < 1000 ? montant(x) : montant(x, { centimes: 'jamais' }));
+  // (14 nov., Studio) Le chiffre d'affiche : « 1 625 » puis « € » plus petit, remonté (rien d'autre ne change :
+  // le même texte, le même `aria-label`, les mêmes data-*).
+  const sommeAffiche = (t) => { const m = /^(.*?)[\s\u00a0\u202f]*€$/.exec(String(t)); return m ? <bdi className="sb-nb">{m[1]}<span className="eur">{'\u00a0'}€</span></bdi> : t; };
   return (
     <section className="vrm-argent-q" aria-label={tr('compta.argentMois')} data-argent-questions="">
       {Q.map((q) => (
@@ -3659,7 +3660,7 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
               les espaces séparent les morceaux pour le lecteur. */}
           <span className="vrm-argent-w-l">{q.libelle}</span>{' '}
           <b className="vrm-argent-w-n" data-argent-pas-su={q.valeur == null && !q.texte ? '' : undefined}>
-            {q.valeur != null ? <>{q.partiel ? <small>{tr('journee.moins')} </small> : null}{somme(q.valeur)}</> : (q.texte || '—')}
+            {q.valeur != null ? <>{q.partiel ? <small>{tr('journee.moins')} </small> : null}{sommeAffiche(somme(q.valeur))}</> : (q.texte || '—')}
           </b>
           {q.note ? <>{' '}<span className="vrm-argent-w-note">{q.note}</span></> : null}
           <span className="vrm-argent-w-chev" aria-hidden="true">›</span>
@@ -4542,7 +4543,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   // se dit UNE fois ici, avec le geste ; les cartes ne gardent que « — ».
   const ligneComptaPub = useLigneUrssaf();
   return (
-    <div className="vrm-finance-page vrm-fu-ecran vrm-argent" data-argent-ecran={vue} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="vrm-finance-page vrm-fu-ecran vrm-argent" data-espace="argent" data-argent-ecran={vue} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* (10 nov., Argent) Statistiques et Comptabilité en UN endroit (src/argent.js) : le titre
           « Argent » et ses quatre segments. Chaque segment montre SES cartes ; les autres restent
           montées (`hidden` : mêmes lectures, mêmes états, mêmes data-*), jamais supprimées. */}
@@ -4553,10 +4554,10 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
             seulement quand la liste des comptes est LUE (pas su ≠ aucun). */}
         {comptesLus && Array.isArray(accounts) && accounts.length === 0 ? (<>
           <span style={{ flex: '1 1 220px' }} data-compta-sans-compte="">{tr('compta.calculPartVentes')}</span>
-          <Bouton className="vrm-b-petit" onClick={() => onNav && onNav('vintedaccounts')}>{tr('compta.relierMonCompte')}</Bouton>
+          <Bouton variante="discret" className="sb-lien" onClick={() => onNav && onNav('vintedaccounts')}>{tr('compta.relierMonCompte')}</Bouton>
         </>) : (<>
         <span style={{ flex: '1 1 220px' }}>{tr('stats.encoreCalcule')}</span>
-        <Bouton className="vrm-b-petit" onClick={() => onNav && onNav('cat_ventes')}>{tr('compta.ouvrirVentes')}</Bouton>
+        <Bouton variante="discret" className="sb-lien" onClick={() => onNav && onNav('cat_ventes')}>{tr('compta.ouvrirVentes')}</Bouton>
         </>)}
       </div>}
       <div className="vrm-argent-partie" data-argent-vue="resume" hidden={vue !== 'resume'}>
