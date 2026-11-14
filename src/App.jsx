@@ -44,7 +44,13 @@ import {lireEntiteVinted,extraitConversation,libelleOffre,etatOffreCourt,estCode
 import { lignesRisqueMessage, phraseRisqueMessage, risquesMessage, erreurMessageAuto } from './messageSur.js';
 import { problemesAnnonce, problemesLot, champsNonJuges, CLE_VERIF_COUPEES, sansCoupees, couperAlerte, rallumerAlerte, lireCoupees, POURQUOI_ALERTE, NOMS_ALERTES, numeroEcritAttendu } from './verifAnnonce.js';
 import { CLE_JOURNEE_PERSO, lireJourneePerso, ordreJournee, visibiliteCarte, urgencesJournee } from './journeePerso.js';
-import { ordreSelonHeure, momentDuJour } from './journeeSelonHeure.js';   // (14 nov., lot 117) Ma journée selon l'heure — le seul point d'entrée : ordreJourneeHeure
+import { ordreSelonHeure, momentDuJour } from './journeeSelonHeure.js';
+import ConfortCoque from './ConfortCoque.jsx';   // (14 nov., lots 118, 119, 120, 127) atelier, QR, lien d'aide, code local
+import { QrOrdinateur, ticketDeLAdresse } from './ConnexionQr.jsx';   // (14 nov., lot 119) connexion par QR
+import { VueLienAide, jetonAideDeLAdresse } from './LienAide.jsx';   // (14 nov., lot 120) la page de l'aide
+// Lus UNE fois au chargement : le ticket du QR (retiré de la barre d'adresse) et le lien de l'aide.
+const QR_A_APPROUVER = typeof window !== 'undefined' ? ticketDeLAdresse() : '';
+const LIEN_AIDE_JETON = typeof window !== 'undefined' ? jetonAideDeLAdresse() : '';   // (14 nov., lot 117) Ma journée selon l'heure — le seul point d'entrée : ordreJourneeHeure
 const ordreJourneeHeure = (zone, r) => ordreSelonHeure(ordreJournee(zone, r), zone, { moment: momentDuJour(), sienOrdre: lireJourneePerso(r).ordre.length > 0 });
 import { JourneePersoEditeur, nCachees as nCartesCachees } from './JourneePerso.jsx';
 import { CLE_AFFICHAGE, CLE_JE_VENDS, affichageEffectif, jeVendsEffectif, entreeMontree, siteMontre, caseJourneeMontree, motsArticle, champsFacultatifs, ventesSur30j, lireReglageJeVends, poserSourceVend, motsVendeur, motArticle } from './profilVendeur.js';
@@ -2920,6 +2926,9 @@ const SYNC_KEYS = [
   // (11 nov., lot journee-perso) SA Ma journée : l'ordre et les cartes qu'il a cachées
   // (src/journeePerso.js) : { v, ordre, choix, at } — la même sur tous ses appareils.
   CLE_JOURNEE_PERSO,
+  // (14 nov., lots 129 et 130) L'inventaire tournant (« vu », « pas trouvé » : jamais un N° changé, src/inventaireTournant.js)
+  // et SA carte de remerciement (ses propres champs, src/carteMerci.js) : les mêmes sur tous ses appareils.
+  'vrm_inventaire_tournant', 'vrm_carte_merci',
   // (9 nov.) La configuration de départ (src/configurationDepart.js) : { etat: 'fait'|'plusTard', at,
   // statut: 'inconnu'|null } ; la TVA d'une société (src/profilFiscal.js). La méthode d'étiquetage
   // est `vrm_numero_ecrit` (actif + `ou`, src/numeroEcrit.js), déjà synchronisée.
@@ -19232,6 +19241,11 @@ function AuthScreen() {
         </form>
         {/* (13 nov., lot 48) VRM rempli de données INVENTÉES, sans compte (src/modeExemple.js) :
             un vrai lien, rien n'est enregistré ni envoyé ; le bandeau propose « Créer mon compte ». */}
+        {/* (14 nov., lot 119) Se connecter avec l'iPhone déjà connecté : un QR, son clic, une session neuve (api/_lib/qr-connexion.js). */}
+        {mode==='in' && !__lier && <details className="vrm-cx-qr" data-cx-qr="" style={{maxWidth:420,margin:'0 auto 16px',width:'100%'}}>
+          <summary style={{cursor:'pointer',fontSize:15,fontWeight:600,color:C.accentTexte||C.accent,minHeight:44,display:'flex',alignItems:'center',justifyContent:'center'}}>{tr('confort.qr.ouvrir')}</summary>
+          <QrOrdinateur onSession={(j)=>{ writeSession(sessionFrom(j)); }}/>
+        </details>}
         {(mode==='in'||mode==='up') && !__lier && <div className="vrm-cx-exemple" data-cx-exemple="">
           <p>{tr('auth.exemple.note')}</p>
           <a href="/?exemple" data-cx-exemple-entrer="">{tr('auth.exemple')}</a>
@@ -56185,6 +56199,8 @@ export default function App() {
   //    sur un document déjà sombre (index.html lit `vinted_dark`). Même source.
   // (8 nov.) Le mode CHOISI (Clair · Sombre · Automatique · Le soir, src/apparence.js) : la même règle.
   C = sombreEffectif(apparenceDe(load('vrm_apparence', null), load('vinted_dark', false)), { systemeSombre: systemeSombreMaintenant() }) ? THEMES.dark : THEMES.light;
+  // (14 nov., lot 120) Le lien temporaire de l'aide : sa page, SANS compte, en lecture seule (api/_lib/lien-aide.js).
+  if (LIEN_AIDE_JETON) return <VueLienAide jeton={LIEN_AIDE_JETON}/>;
   if (MULTI_USER && !authState.ready) return <div data-demarrage-attente="" style={{minHeight:'100vh',background:C.bg}}/>;
   const bypass = false; // Aucun accès direct à une boutique partagée.
   if (MULTI_USER && !bypass && (!authState.session || RECOVERY_PENDING)) return <AuthScreen/>;
@@ -56204,7 +56220,7 @@ export default function App() {
   // vendeur que la base vérifie). Sans invitation acceptée, rien ne change.
   return <>{(MULTI_USER && authState.user)
     ? <PorteConfidentialite key={authState.user.id} session={authState.session} theme={C} onDeconnexion={authSignOut} onRafraichir={()=>authRefresh()} onVerifier={uid=>{_confidentialiteUid=uid;}}><PorteEquipe key={authState.user.id} uid={authState.user.id}><PorteAbonnement uid={authState.user.id}>{coeur}</PorteAbonnement></PorteEquipe></PorteConfidentialite>
-    : coeur}<VisionneusePdf/><PlaceurTampon/></>;
+    : coeur}<VisionneusePdf/><PlaceurTampon/>{authState.user && authState.user.id ? <ConfortCoque uid={authState.user.id} entetes={enTeteSession} onDeconnexion={authSignOut} ticketQr={QR_A_APPROUVER}/> : null}</>;
 }
 
 // ── Le code Discord (revue de sécurité du 21 octobre) ─────────────────────────

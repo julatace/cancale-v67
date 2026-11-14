@@ -1,0 +1,81 @@
+/* ── CONFORT ET SÉCURITÉ (14 nov., lots 117–130) ──────────────────────────────
+   Écran d'atelier, connexion par QR, lien d'aide, code local, aperçu d'annonce,
+   inventaire tournant, carte de remerciement. Les jetons du système (--d-*,
+   src/styles-systeme.css) : la nuit vient d'eux. UN accent (le bouton principal),
+   ambre pour un geste, jamais de rouge ici (§7 : le rouge est aux doublons de N°).
+   Cibles 44 px. Rien ne déborde d'une carte (min-width: 0, overflow-wrap). ── */
+.vrm-cf { font-family: inherit; color: var(--d-encre, #1d1d1f); box-sizing: border-box; }
+.vrm-cf *, .vrm-cf *::before, .vrm-cf *::after { box-sizing: border-box; }
+.vrm-cf-doux { margin: 0; font-size: 13px; line-height: 1.45; color: var(--d-gris, #6e6e73); }
+.vrm-cf-geste { color: var(--d-ambre, #b25000); }
+.vrm-cf-carte { background: var(--d-carte, #fff); border-radius: var(--d-r-carte, 20px); box-shadow: var(--d-ombre-carte); padding: 16px; min-width: 0; overflow-wrap: anywhere; }
+.vrm-cf-titre { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.016em; }
+.vrm-cf-primaire { min-height: 44px; padding: 0 20px; border: 0; border-radius: 999px; background: var(--d-accent, #0071e3); color: #fff; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+.vrm-cf-primaire:disabled { opacity: .45; cursor: default; }
+.vrm-cf-second { min-height: 44px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--d-remplir, rgba(118,118,128,.12)); color: var(--d-encre, #1d1d1f); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+.vrm-cf-lien { min-height: 44px; padding: 0 4px; border: 0; background: transparent; color: var(--d-accent-texte, #0066cc); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+.vrm-cf-rangee { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.vrm-cf-pile { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.vrm-cf-champ { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--d-gris, #6e6e73); }
+.vrm-cf-champ input, .vrm-cf-champ textarea, .vrm-cf-champ select { min-height: 44px; border: 1px solid var(--d-filet-fort, rgba(60,60,67,.29)); border-radius: 12px; padding: 10px 12px; font: inherit; font-size: 16px; color: var(--d-encre, #1d1d1f); background: var(--d-carte, #fff); width: 100%; }
+.vrm-cf-voile { position: fixed; inset: 0; z-index: 20000; display: flex; align-items: flex-end; justify-content: center; background: rgba(0,0,0,.32); }
+.vrm-cf-feuille { width: 100%; max-width: 560px; max-height: 92vh; overflow-y: auto; overscroll-behavior: contain; background: var(--d-fond, #f2f2f7); border-radius: 20px 20px 0 0; padding: 16px 16px max(16px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 16px; }
+@media (min-width: 760px) { .vrm-cf-voile { align-items: center; padding: 24px; } .vrm-cf-feuille { border-radius: 20px; padding: 24px; } }
+.vrm-cf-tete { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.vrm-cf-x { min-width: 44px; min-height: 44px; border: 0; border-radius: 999px; background: transparent; color: var(--d-gris, #6e6e73); font-size: 26px; line-height: 1; cursor: pointer; }
+.vrm-cf-liste { list-style: none; margin: 0; padding: 0; background: var(--d-carte, #fff); border-radius: var(--d-r-carte, 20px); overflow: hidden; }
+.vrm-cf-liste > li { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 10px 16px; min-width: 0; }
+.vrm-cf-liste > li + li { border-top: .5px solid var(--d-filet, rgba(60,60,67,.18)); }
+.vrm-cf-num { flex: none; min-width: 44px; font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.vrm-cf-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.vrm-cf-txt b { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-cf-txt small { font-size: 13px; color: var(--d-gris, #6e6e73); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-cf-point { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--d-point-ambre, #ff9f0a); margin-right: 6px; vertical-align: middle; }
+
+/* ── L'écran d'atelier : plein écran, gros caractères, lisible à 3 m ── */
+.vrm-at { position: fixed; inset: 0; z-index: 20500; background: var(--d-fond, #f2f2f7); overflow-y: auto; padding: max(20px, env(safe-area-inset-top)) clamp(16px, 4vw, 48px) 32px; }
+.vrm-at-tete { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+.vrm-at-heure { font-size: clamp(28px, 4vw, 44px); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+.vrm-at-bande { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 24px; }
+.vrm-at-chiffre { background: var(--d-carte, #fff); border-radius: 20px; box-shadow: var(--d-ombre-carte); padding: 16px 20px; min-width: 0; }
+.vrm-at-chiffre b { display: block; font-size: clamp(40px, 7vw, 72px); font-weight: 700; line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.vrm-at-chiffre span { display: block; margin-top: 6px; font-size: clamp(13px, 1.4vw, 17px); font-weight: 600; color: var(--d-gris, #6e6e73); }
+.vrm-at-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+@media (max-width: 760px) { .vrm-at-cols { grid-template-columns: 1fr; } .vrm-at-bande { grid-template-columns: 1fr 1fr; } }
+.vrm-at h2 { margin: 0 0 8px 4px; font-size: 13px; font-weight: 600; color: var(--d-gris, #6e6e73); }
+.vrm-at .vrm-cf-liste > li { min-height: 64px; }
+.vrm-at .vrm-cf-txt b { font-size: clamp(15px, 1.6vw, 20px); }
+.vrm-at-code { flex: none; font-size: clamp(20px, 2.4vw, 28px); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+.vrm-at-pied { margin-top: 24px; text-align: center; }
+
+/* ── QR de connexion ── */
+.vrm-qr-img { width: 232px; height: 232px; image-rendering: pixelated; border-radius: 12px; background: #fff; padding: 8px; align-self: center; }
+.vrm-qr-compte { font-size: 34px; font-weight: 700; letter-spacing: -.024em; font-variant-numeric: tabular-nums; }
+
+/* ── Le verrou du code local ── */
+.vrm-vc { position: fixed; inset: 0; z-index: 21000; background: var(--d-fond, #f2f2f7); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 24px; text-align: center; }
+.vrm-vc-points { display: flex; gap: 16px; }
+.vrm-vc-points i { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--d-encre, #1d1d1f); }
+.vrm-vc-points i.is-plein { background: var(--d-encre, #1d1d1f); }
+.vrm-vc-pave { display: grid; grid-template-columns: repeat(3, 76px); gap: 16px; }
+.vrm-vc-pave button { width: 76px; height: 76px; border-radius: 50%; border: 0; background: var(--d-remplir, rgba(118,118,128,.12)); color: var(--d-encre, #1d1d1f); font: inherit; font-size: 30px; font-weight: 400; cursor: pointer; }
+.vrm-vc-pave button:active { transform: scale(.96); }
+.vrm-vc-pave .is-vide { background: transparent; }
+@media (prefers-reduced-motion: no-preference) { .vrm-vc-points.is-faux { animation: vrm-vc-non 280ms var(--d-sortie, ease-out); } }
+@keyframes vrm-vc-non { 0%, 100% { transform: none; } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+
+/* ── L'aperçu de l'annonce (comme une page d'article) ── */
+.vrm-ap-photos { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; border-radius: 16px; }
+.vrm-ap-photos img { flex: none; width: 100%; max-width: 420px; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 16px; scroll-snap-align: start; background: var(--d-case, #f2f2f7); }
+.vrm-ap-vide { width: 100%; aspect-ratio: 3 / 4; max-height: 320px; border-radius: 16px; background: var(--d-case, #f2f2f7); display: flex; align-items: center; justify-content: center; }
+.vrm-ap-prix { font-size: 28px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.vrm-ap-details { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; font-size: 15px; }
+.vrm-ap-details dt { color: var(--d-gris, #6e6e73); }
+.vrm-ap-details dd { margin: 0; overflow-wrap: anywhere; }
+.vrm-ap-desc { white-space: pre-wrap; font-size: 15px; line-height: 1.45; margin: 0; overflow-wrap: anywhere; }
+
+/* ── La page de l'aide (lien temporaire) ── */
+.vrm-la { min-height: 100vh; background: var(--d-fond, #f2f2f7); padding: max(20px, env(safe-area-inset-top)) 16px 32px; }
+.vrm-la-col { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
+.vrm-la h1 { margin: 0; font-size: 34px; font-weight: 700; letter-spacing: -.024em; }
+.vrm-la h2 { margin: 0 0 8px 4px; font-size: 13px; font-weight: 600; color: var(--d-gris, #6e6e73); }

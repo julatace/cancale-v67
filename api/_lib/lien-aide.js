@@ -24,39 +24,16 @@
 // fabrique depuis la photo de Ma journée, src/journeeHorsLigne.js) et ici (qui la
 // refiltre : on ne fait jamais confiance au corps). Audit : scripts/audit-confort-securite.cjs.
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { projectionLienAide, txtSansMontant as txt, PDF_OK } from '../../src/lienAideProjection.js';
+export { projectionLienAide };
 
 export const LIEN_DUREE_MS = 24 * 3600000;
 export const PREFIXE_LIEN = 'lien_aide_';
 export const LIENS_ACTIFS_MAX = 3;
-const MAX_LIGNES = 80, MAX_JOURNAL = 50;
+const MAX_JOURNAL = 50;
 const ID_OK = /^[A-Za-z0-9_-]{22}$/;
-const PDF_OK = /^(email_bord_\d{4,20}|harvest_\d{1,20}_label_\d{4,20})$/;
 const b64u = (buf) => Buffer.from(buf).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const egal = (a, b) => { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && timingSafeEqual(x, y); };
-
-// Un montant ne passe JAMAIS, même glissé dans un titre (« Air Max 90 € »).
-const SANS_MONTANT = /(?:\d[\d\s.,]*\s?(?:€|eur\b|euros?\b|\$|£))|(?:(?:€|\$|£)\s?\d[\d\s.,]*)/gi;
-const txt = (v, n = 90) => String(v == null ? '' : v).replace(SANS_MONTANT, '').replace(/[\u0000-\u001f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, n);
-const jour = (j) => (/^\d{4}-\d{2}-\d{2}$/.test(String(j || '').slice(0, 10)) ? String(j).slice(0, 10) : '');
-const heure = (h) => (/^\d{2}:\d{2}$/.test(String(h || '')) ? String(h) : '');
-const qr = (q) => { const t = String(q || ''); return /^https:\/\/[^\s<>"']{4,1500}$/i.test(t) ? t : ''; };
-const code = (c) => String(c == null ? '' : c).replace(/[^A-Za-z0-9 -]/g, '').trim().slice(0, 16);
-
-// LA PROJECTION — liste blanche, champ par champ. Rien d'autre ne sort.
-export function projectionLienAide(photo, maintenant = Date.now()) {
-  const p = photo && typeof photo === 'object' ? photo : {};
-  const envoyer = (Array.isArray(p.envoyer) ? p.envoyer : []).slice(0, MAX_LIGNES).map((e) => ({
-    numero: txt(e && e.numero, 12), titre: txt(e && e.titre), limite: jour(e && (e.jour || e.limite)), heure: heure(e && e.heure),
-    plateforme: e && e.plateforme === 'ebay' ? 'ebay' : 'vinted', transporteur: txt(e && (e.trNom || e.transporteur), 30),
-    pdf: (Array.isArray(e && e.pdf) ? e.pdf : []).map(String).filter((r) => PDF_OK.test(r)).slice(0, 2),
-  }));
-  const retirer = (Array.isArray(p.retirer) ? p.retirer : []).slice(0, MAX_LIGNES).map((r) => ({
-    titre: txt(r && r.titre), lieu: txt(r && r.lieu, 120), code: code(r && r.code), qr: qr(r && r.qr),
-    transporteur: txt(r && r.transporteur, 30), limite: jour(r && r.limite), suivi: String((r && r.suivi) || '').replace(/[^A-Za-z0-9-]/g, '').slice(0, 40),
-  }));
-  const at = Number.isFinite(p.at) ? p.at : maintenant;
-  return { v: 1, at, envoyer, retirer, nEnvoyer: Number.isFinite(p.nEnvoyer) ? p.nEnvoyer : envoyer.length, nRetirer: Number.isFinite(p.nRetirer) ? p.nRetirer : retirer.length };
-}
 
 // ── LE LIEN SIGNÉ ───────────────────────────────────────────────────────────
 const signer = (cle, id, owner, exp) => b64u(createHmac('sha256', cle).update(`${id}.${owner}.${exp}`).digest());

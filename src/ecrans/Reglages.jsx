@@ -74,7 +74,10 @@ import HistoriqueSites from '../HistoriqueSites.jsx';   // (11 nov., lot import-
 import ModeVacances from '../ModeVacances.jsx';   // (10 nov., lot O) le mode vacances, compte par compte (ext. 5.338)
 import SecuriteComptes from '../SecuriteComptes.jsx';   // (11 nov., lot securite-vinted) la sécurité des comptes Vinted et Vestiaire (ext. 5.366)
 import CopieAnnonces from '../CopieAnnonces.jsx';   // (12 nov., sécurité des comptes) un zip d'annonces par compte
-import CarteDoubleVerif from '../CarteDoubleVerif.jsx';   // (12 nov.) « Protège ton compte VRM »
+import CarteDoubleVerif from '../CarteDoubleVerif.jsx';
+import { ReglageCodeLocal } from '../VerrouCode.jsx';   // (14 nov., lot 127) code à 4 chiffres, sur cet appareil
+import { ReglageLienAide } from '../LienAide.jsx';      // (14 nov., lot 120) lien temporaire pour l'aide
+import { ReglageCarteMerci, CLE_CARTE_MERCI } from '../CarteMerci.jsx';   // (14 nov., lot 130) carte de remerciement   // (12 nov.) « Protège ton compte VRM »
 import { JaugesComptes } from '../JaugeActions.jsx';   // (10 nov., lot G) la jauge des 50 actions/h, compte par compte
 import { PanneauDiscretion } from '../Discretion.jsx';   // (12 nov., ext. 5.370) plafond du jour, vérification, freins des 7 jours   // (10 nov., lot G) la jauge des 50 actions/h, compte par compte
 // ⟦→ ecrans/Ebay.jsx #3⟧
@@ -2189,6 +2192,14 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         {derniereSauvegarde.t ? tr('reglages.sauvegarde.derniere', { quand: derniereSauvegarde.days===0 ? tr('commun.aujourdhui') : derniereSauvegarde.days===1 ? tr('commun.hier') : tr('commun.ilYaJours', { n: derniereSauvegarde.days }) }) + (derniereSauvegarde.old ? tr('reglages.sauvegarde.aRefaire') : '') : tr('reglages.sauvegarde.jamais')}
       </span>
     )},
+    // (14 nov., lots 118, 119, 120, 127, 130) Confort et sécurité : un groupe à lui, chaque geste dans son panneau.
+    {id:'confort',titre:tr('confort.groupe'),items:[
+      { id:'code-local', type:'panneau', nu:true, ic:'lock', lib:tr('confort.code.lib'), desc:tr('confort.code.desc'), data:{ 'data-reglage-code-local':'' }, el:<ReglageCodeLocal toast={toast}/> },
+      { id:'connexion-qr', type:'panneau', nu:true, ic:'qr', lib:tr('confort.qr.lib'), desc:tr('confort.qr.desc'), data:{ 'data-reglage-connexion-qr':'' }, el:<p className="vrm-cf-doux" style={{margin:0,fontSize:15,lineHeight:1.5}}>{tr('confort.qr.mode')}</p> },
+      AUTH.user && { id:'lien-aide', type:'panneau', nu:true, ic:'link', lib:tr('confort.aide.lib'), desc:tr('confort.aide.desc'), data:{ 'data-reglage-lien-aide':'' }, el:<ReglageLienAide uid={AUTH.user.id} entetes={enTeteSession} toast={toast}/> },
+      { id:'atelier', type:'action', ic:'device', lib:tr('confort.atelier.lib'), desc:tr('confort.atelier.desc'), onClick:()=>{ try { window.dispatchEvent(new Event('vrm:atelier')); } catch (_) {} }, data:{ 'data-reglage-atelier':'' } },
+      { id:'carte-merci', type:'panneau', nu:true, ic:'heart', lib:tr('confort.merci.lib'), desc:tr('confort.merci.desc'), data:{ 'data-reglage-carte-merci':'' }, el:<ReglageCarteMerci lire={()=>load(CLE_CARTE_MERCI, {})} ecrire={(v)=>save(CLE_CARTE_MERCI, v)} telecharger={telechargerFichier}/> },
+    ]},
     {id:'aide',titre:tr('reglages.groupe.aide'),items:[
       // (8 nov.) Un geste : extension (présente, version, connectée à CE compte), comptes, boîte e-mail, dernière relecture — et ce qui manque.
       { id:'verifier', type:'panneau', nu:true, ic:'scan', lib:tr('reglages.verifier.lib'), desc:tr('reglages.verifier.desc'), data:{ 'data-reglage-verifier':'' }, el:<VerifierInstallationApp comptes={comptes} onNav={setTab} seule/> },
