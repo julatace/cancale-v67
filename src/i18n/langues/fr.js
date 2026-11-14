@@ -28,6 +28,7 @@ import ecran_colisplus from './fr/colisplus.js';   // (14 nov., lot colis-plus)
 import ecran_accueilReste from './fr/accueilReste.js';
 import ecran_fraiscarte from './fr/fraiscarte.js';   // (14 nov., frais-carte)
 import ecran_atelier from './fr/atelier.js';
+import ecran_accompagnement from './fr/accompagnement.js';   // (14 nov.) les quatre moments d'un geste
 import ecran_argentprix from './fr/argentprix.js';   // (14 nov., argent-prix)
 import ecran_rechliste from './fr/rechliste.js';
 export default {
@@ -41,6 +42,7 @@ export default {
   ...ecran_nouveaux,
   ...ecran_atelier,
   ...ecran_rechliste,
+  ...ecran_accompagnement,
   ...ecran_plus,
   ...ecran_argentprix,
   ...ecran_plateformes,

@@ -1899,3 +1899,10 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **14 nov. · Accueil, le reste (133 134 136 139 140 143 145 146 147)** : « J'ai déjà mes N° sur mes cartons » (aucun N° neuf avant sa réponse, N° écrit en double ⇒ rouge, rien adopté), « Ce que VRM a trouvé », visite de 4 écrans, mots expliqués, conseil du jour 30 j, essai en chiffres prouvés, vidéo 45 s, Apple prêt et ÉTEINT, appel de bienvenue Pro ; « À trancher » ne recouvre plus Ma journée. `docs/passation/2026-11-14-accueil-reste.md`. Geste : coller son lien de réservation (Paramètres → Aide) ; Apple si voulu (99 €/an).
 ## Lignes du §9 de CLAUDE.md déplacées telles quelles le 14 nov. (ergonomie des gestes, 2ᵉ fusion)
 
+
+## Déplacé tel quel de CLAUDE.md §9 (14 nov., lot accompagnement)
+
+
+## Déplacé tel quel de CLAUDE.md §9 (14 nov., intégration de la refonte — fichier sous 59 000 octets)
+- **14 nov. · Refonte visible des sites et des Paramètres** : Leboncoin, eBay, Vestiaire « liste d'abord » (« À faire · N › » en feuille gardée montée, une barre, rangées denses) ; Paramètres façon iOS (recherche en haut, avancés repliés) ; connexion et accueil atmosphériques. `2026-11-14-refonte-plateformes-reglages.md`. Geste : aucun.
+- **14 nov. · Refonte Messages, E-mails, Stock** : la liste d'abord (Stock : 1re paire à 1 541 px ⇒ < 422, bande, « À faire · N › », rangées 68 px ; Messages : recherche, « À relier », rangées 72 px, fil iOS ; E-mails : rangées 72 px, code à droite), briques `src/ui` ; banc `refonte-messages-stock` (13 défauts ⇒ 0). `docs/passation/2026-11-14-refonte-messages-stock.md`. Geste : aucun.

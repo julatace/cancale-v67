@@ -66,6 +66,9 @@ const SCRIPT = `(() => {
   // qu'un banc juge. Coupés sur l'appareil du banc, sauf pour un banc qui les juge
   // (vrm_banc_conseils) — le même drapeau que lit l'app (src/accompagnement.js, CLE_APPAREIL).
   try { if (ls.getItem('vrm_banc_conseils') !== '1') Storage.prototype.setItem.call(ls, 'vrm_conseils_appareil', 'coupes'); } catch (_) {}
+  // (14 nov., lot accompagnement) La phrase « première fois » d'un écran (src/ui/Accompagne.jsx) : coupée sur
+  // l'appareil du banc (elle décalerait ce qu'il mesure), sauf pour un banc qui la juge (vrm_banc_aides).
+  try { if (ls.getItem('vrm_banc_aides') !== '1') Storage.prototype.setItem.call(ls, 'vrm_premieres_fois', JSON.stringify({ coupe: true, vus: [] })); } catch (_) {}
   const vrai = window.fetch.bind(window);
   window.fetch = async function (entree, init) {
     const url = typeof entree === 'string' ? entree : (entree && entree.url) || '';

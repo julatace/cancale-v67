@@ -14,6 +14,7 @@ import { useLangue } from './i18n/react.js';
 import { projectionLienAide } from './lienAideProjection.js';
 import { lirePhoto } from './journeeHorsLigne.js';
 import './styles-confort.css';
+import { accompagner } from './accompagnement.js';   // (14 nov.) l'échec d'un geste en mots simples
 // « 2026-11-15 » ⇒ « sam. 15 nov. » (la langue de l'appareil).
 export const jourCourt = (j) => { try { return /^\d{4}-\d{2}-\d{2}$/.test(j) ? new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(j + 'T12:00:00')) : ''; } catch (_) { return j; } };
 
@@ -70,7 +71,8 @@ export function ReglageLienAide({ uid, entetes, toast = () => {} }) {
     setOccupe(true);
     const r = await appel('POST', { action: 'creer', projection: projectionLienAide(photo) }, entetes());
     setOccupe(false);
-    if (r.status !== 200 || !r.j.jeton) { toast(tr(r.j.erreur === 'trop' ? 'confort.aide.trop' : 'confort.erreur')); return; }
+    // (14 nov., lot accompagnement) Un refus dit sa raison en mots simples, et le geste qui répare.
+    if (r.status !== 200 || !r.j.jeton) { if (r.j.erreur === 'trop') toast(tr('confort.aide.trop')); else accompagner('lien.partage').echec({ status: r.status, raison: '' }, { reessayer: creer }); return; }
     ecrireActifs([...lireActifs(), { id: r.j.id, exp: r.j.exp }]);
     setNeuf(`${location.origin}/?${PARAM_AIDE}=${r.j.jeton}`);
     charger();
@@ -90,10 +92,10 @@ export function ReglageLienAide({ uid, entetes, toast = () => {} }) {
   };
   return (
     <div className="vrm-cf vrm-cf-pile" data-lien-aide="">
-      <p className="vrm-cf-doux">{tr('confort.aide.explique')}</p>
+      <p className="vrm-cf-doux" data-acc-avant="lien.partage">{tr('confort.aide.explique')}</p>
       {!photo ? <p className="vrm-cf-doux vrm-cf-geste" data-lien-aide-sans-photo="">{tr('confort.aide.sansPhoto')}</p> : null}
       <button type="button" className="vrm-cf-primaire" disabled={!photo || occupe} onClick={creer} data-lien-aide-creer="">{tr('confort.aide.creer')}</button>
-      {neuf ? <div className="vrm-cf-carte vrm-cf-pile" data-lien-aide-neuf="">
+      {neuf ? <div className="vrm-cf-carte vrm-cf-pile" data-lien-aide-neuf="" data-acc-apres="lien.partage">
         <p className="vrm-cf-doux">{tr('confort.aide.pret')}</p>
         <code style={{ fontSize: 13, overflowWrap: 'anywhere' }}>{neuf}</code>
         <button type="button" className="vrm-cf-second" onClick={partager}>{tr('confort.aide.partager')}</button>
