@@ -50658,7 +50658,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             );
           })]; })}
         </div>
-        <PaireAvantHote rendre={rendreAvantAnnonce} Retour={FermeAuRetour}/>
+        <PaireAvantHote rendre={rendreAvantAnnonce}/>
         <SuitePaquets montres={Math.min(annMax, annShown.length)} total={annShown.length} onPlus={annPlus}/>
         </>)}
           </>)}

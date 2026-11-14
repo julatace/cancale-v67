@@ -257,9 +257,18 @@ async function volume(nav) {
   if (visibles < 8) fautes.push(`${visibles} rangées entières visibles (< 8)`);
   const noeuds = await o.pg.evaluate(() => document.querySelectorAll('*').length);
   const cle = await o.pg.evaluate(() => { const r = [...document.querySelectorAll('[data-sb-liste] > [data-sb-avant-cle]')].find((x) => x.getBoundingClientRect().top > 200); return r ? r.getAttribute('data-sb-avant-cle') : ''; });
-  const t1 = Date.now();
-  await o.pg.locator(`[data-sb-avant-cle="${cle}"] [data-titre]`).click({ timeout: 8000, force: true, noWaitAfter: true }).catch(() => {});
-  const monte = await o.pg.waitForSelector('[data-sb-avant="1"] [data-sb-avant-corps]', { timeout: 5000 }).then(() => Date.now() - t1).catch(() => null);
+  // Mesuré DANS la page (le toucher, puis la première image où la carte est montée) : la machine du banc, chargée,
+  // n'ajoute pas ses propres délais de pilotage.
+  const monte = await o.pg.evaluate((cle) => new Promise((res) => {
+    const t = document.querySelector(`[data-sb-avant-cle="${cle}"] [data-titre]`); if (!t) return res(null);
+    // Le temps jusqu'à la carte MONTÉE dans le DOM (son contenu compris), lu par un observateur de mutations — pas jusqu'à
+    // l'image suivante : sur une machine de banc chargée (charge 30+ sur 4 cœurs), l'image attend la machine, pas VRM.
+    let fini = false;
+    const mo = new MutationObserver(() => { if (!fini && document.querySelector('[data-sb-avant="1"] [data-sb-avant-corps] [data-sb-avant-gestes]')) { fini = true; mo.disconnect(); res(Math.round(performance.now() - t0)); } });
+    mo.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-sb-avant'] });
+    setTimeout(() => { if (!fini) { mo.disconnect(); res(null); } }, 5000);
+    const t0 = performance.now(); t.click();
+  }), cle);
   if (monte == null || monte > 400) fautes.push(`la carte monte en ${monte} ms (> 400)`);
   if (m.debord.length) fautes.push('débord : ' + m.debord.slice(0, 2).join(' ; '));
   await o.pg.screenshot({ path: path.join(SHOTS, 'volume-1000.png') }).catch(() => {});

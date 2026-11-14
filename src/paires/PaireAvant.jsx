@@ -60,23 +60,25 @@ export function ouvrirFicheDe(cle) {
 const lireAvant = () => _cle;
 export function useAvantOuvert() { return React.useSyncExternalStore(abonnerAvant, lireAvant, lireAvant); }
 
-export function PaireAvantHote({ rendre, Retour = null }) {
+export function PaireAvantHote({ rendre }) {
   const cle = useAvantOuvert();
   const fiche = React.useSyncExternalStore(abonnerFiche, ligneOuverte, ligneOuverte);
-  const [place, setPlace] = React.useState(null);
-  // La rangée ouverte : sa place, ses marques, et la liste qui recule.
+  // La place de la carte, lue DANS le rendu (la rangée est déjà là) : un seul rendu, aucun état de plus. 1 000 paires :
+  // ouvrir ne redessine que cet hôte — ni la liste, ni l'écran, ni l'historique du navigateur (pas de `FermeAuRetour` :
+  // ce n'est pas une feuille ; Échap, « × » ou un second toucher la font redescendre).
+  const row = cle ? rangeeDe(cle) : null;
+  const place = row ? row.querySelector('[data-sb-avant-place]') : null;
+  // La rangée ouverte : ses marques, et la liste qui recule.
   React.useLayoutEffect(() => {
-    const row = rangeeDe(cle);
-    if (!row) { setPlace(null); if (cle) fermerAvant(); return undefined; }
+    if (!row) { if (cle) fermerAvant(); return undefined; }
     const liste = row.closest('[data-sb-liste]');
     // Les marques du contrat commun (`.sb-avant`, `.sb-recul`, src/design/studio.css) et leurs attributs (bancs).
     row.setAttribute('data-sb-avant', '1'); row.classList.add('sb-avant');
     if (liste) { liste.setAttribute('data-sb-recul', '1'); liste.classList.add('sb-recul'); }
-    setPlace(row.querySelector('[data-sb-avant-place]'));
     const reduit = (() => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } })();
     const raf = requestAnimationFrame(() => { try { row.scrollIntoView({ block: 'nearest', behavior: reduit ? 'auto' : 'smooth' }); } catch (_) {} });
     return () => { cancelAnimationFrame(raf); row.removeAttribute('data-sb-avant'); row.classList.remove('sb-avant'); if (liste) { liste.removeAttribute('data-sb-recul'); liste.classList.remove('sb-recul'); } };
-  }, [cle]);
+  }, [cle, row]);
   // Échap referme la carte (la fiche, ouverte par-dessus, garde son propre Échap).
   React.useEffect(() => {
     if (!cle) return undefined;
@@ -95,7 +97,6 @@ export function PaireAvantHote({ rendre, Retour = null }) {
   React.useEffect(() => () => fermerAvant(), []);
   if (!cle || !place) return null;
   return createPortal(<div className="sb-avant-corps" data-sb-avant-corps={cle}>
-    {Retour ? <Retour fermer={fermerAvant}/> : null}
     {rendre(cle, fermerAvant)}
   </div>, place);
 }
