@@ -209,7 +209,8 @@ async function blocF(nav, W, sombre) {
           const n = Math.round(el.getBoundingClientRect().height / lh);
           if (n > 1 && (el.innerText || '').trim().split(/\s+/).length > 4) longues.push(`${n} lignes : « ${el.innerText.trim().slice(0, 60)} »`);
         }
-        const tuiles = [...carte.querySelectorAll('.vrm-ms-ligne, [data-ms-source]')].slice(0, 1).map((src) => [...src.querySelectorAll('*')].filter((e) => vis(e) && /\d/.test(e.textContent || '') && e.children.length === 0 && parseFloat(getComputedStyle(e).fontSize) >= 28).length);
+        // Une tuile = un chiffre (le nombre, son unité plus petite à côté) d'au moins 28 px.
+        const tuiles = [...carte.querySelectorAll('.vrm-ms-ligne, [data-ms-source]')].slice(0, 1).map((src) => [...src.querySelectorAll('*')].filter((e) => vis(e) && /\d/.test([...e.childNodes].filter((n) => n.nodeType === 3).map((n) => n.nodeValue).join('')) && parseFloat(getComputedStyle(e).fontSize) >= 28).length);
         out.sources = { titreDansCarte: dansSurface, longues, tuiles: tuiles[0] || 0 };
       }
       // F6 — l'accent sur un montant.
@@ -339,7 +340,8 @@ async function blocP(nav) {
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   try {
     if (SEUL.includes('F')) {
-      for (const [W, sombre] of [[390, false], [390, true], [1512, false]]) await essaie(`F ${W}`, () => blocF(nav, W, sombre));
+      const VUES = (process.env.BANC_VUES || '390,390-sombre,1512').split(',');   // ex. BANC_VUES=390 (les captures montrées à Julien)
+      for (const [W, sombre] of [[390, false], [390, true], [1512, false]].filter(([w, s]) => VUES.includes(w + (s ? '-sombre' : '')))) await essaie(`F ${W}`, () => blocF(nav, W, sombre));
     }
     if (SEUL.includes('P')) await essaie('P', () => blocP(nav));
   } finally { await nav.close(); srv.close(); }

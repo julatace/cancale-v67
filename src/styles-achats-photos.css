@@ -158,7 +158,8 @@
 }
 
 /* 2 · RIEN NE SORT DE SA CARTE. */
-:root:root:root body .vrm-main .vrm-achats .vrm-buy-list:not(:has(> .vrm-gc-tete)) { overflow: clip !important; }
+/* (pas de `overflow: clip` sur la liste : le menu « … » d’une rangée en sort, il ne doit jamais être rogné — rien ne déborde
+   par la mise en page, §1 : le « … » est dans sa colonne, à 6 px du bord.) */
 
 /* 3 · LES COMPTES, liste groupée d'iOS. Quand la liste est groupée par compte (elle porte des en-têtes), elle ne
    peint plus UNE carte : chaque groupe est sa carte (rangées sur fond carte, coins arrondis au début et à la fin
