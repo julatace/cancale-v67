@@ -43250,10 +43250,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const douchettePrete = colisDans === 'ventes' && curSub === 'bordereaux' && Array.isArray(sales.items) && emailBords !== null;
   const resoudreDouchette = React.useRef(null);
-  resoudreDouchette.current = (code) => {
+  resoudreDouchette.current = (code, relu = false) => {
     if (!douchettePrete) { DEMANDE_DOUCHETTE.code = code; DEMANDE_DOUCHETTE.at = Date.now(); toast(tr('cp.douchette.pasLu'), 'info'); return; }
     const r = venteDuCode(code, lignesDouchette());
-    try { document.documentElement.setAttribute('data-douchette', r.etat + (r.ligne ? ':' + r.ligne.cle : '')); } catch (_) {}
+    if (!(r.etat === 'inconnu' && !relu)) { try { document.documentElement.setAttribute('data-douchette', r.etat + (r.ligne ? ':' + r.ligne.cle : '')); } catch (_) {} }
     if (r.etat === 'trouve' && !r.ligne.sansVente) {
       const l = r.ligne;
       toast(tr('cp.douchette.trouve', { qui: [l.num ? `N°${l.num}` : '', l.titre].filter(Boolean).join(' · ') || tr('cp.douchette.sansNum') }), 'ok');
@@ -43263,6 +43263,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     if (r.etat === 'trouve') { toast(tr('cp.douchette.sansVente', { code: codeCourt(code) }), 'info'); return; }
     if (r.etat === 'ambigu') { toast(tr('cp.douchette.ambigu', { n: r.lignes.length, code: codeCourt(code) }), 'err'); return; }
+    // Les bordereaux peuvent encore arriver (lecture en cours) : on relit UNE fois 2 s plus tard avant de dire « inconnu ».
+    if (!relu) { setTimeout(() => { try { resoudreDouchette.current(code, true); } catch (_) {} }, 2000); return; }
     toast(tr('cp.douchette.inconnu', { code: codeCourt(code) }), 'err');
   };
   useEffect(() => {

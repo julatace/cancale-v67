@@ -310,13 +310,13 @@ async function preparer(b, nom, vue, LIGNES, sombre) {
     const annul = !!(await pg.$('[data-preparer-annuler]'));
     const ligneFait = await pg.evaluate(() => { const e = document.querySelector('[data-mains-libres-ligne]'); return e ? e.getAttribute('data-mains-libres-ligne') : null; });
     const shipVite = await lire(pg, 'vinted_ship_done');
-    await shot(pg, `${nom}-voix-fait`);
     dit(annul && ligneFait === 'fait' && JSON.stringify(shipVite) === JSON.stringify(ship0), `${nom} : C4 « fait » ⇒ confirmation visible et « Annuler », rien d'écrit avant 5 s`, JSON.stringify({ annul, ligneFait }));
     await cliquer(pg, '[data-preparer-annuler]');
     await pg.waitForTimeout(6000);
     const shipAnnule = await lire(pg, 'vinted_ship_done');
     dit(JSON.stringify(shipAnnule) === JSON.stringify(ship0), `${nom} : C5 « Annuler » ⇒ rien d'écrit`);
     await pg.evaluate(() => window.__dire('fait'));
+    await shot(pg, `${nom}-voix-fait`);   // (la capture APRÈS « Annuler » : elle peut prendre plus de 5 s sur une machine chargée)
     await pg.waitForFunction((t) => { try { return !!(JSON.parse(localStorage.getItem("vinted_ship_done") || "{}") || {})[t]; } catch (_) { return false; } }, String(c1 || "").replace(/^v:/, ""), { timeout: 20000 }).catch(() => {});
     const ship1 = (await lire(pg, 'vinted_ship_done')) || {};
     const tx1 = String(c1 || '').replace(/^v:/, '');
@@ -414,6 +414,7 @@ async function douchetteBrut(b, nom, vue, LIGNES) {
     await pg.evaluate(() => document.documentElement.setAttribute('data-douchette', 'avant'));
     const marquesAvant = await pg.evaluate(() => document.querySelectorAll('[data-cible-notif]').length);
     await bip('XA999999999FR');
+    await pg.waitForFunction(() => document.documentElement.getAttribute('data-douchette') !== 'avant', null, { timeout: 8000 }).catch(() => {});   // « inconnu » est dit après UNE relecture (2 s)
     const e4 = await etat();
     const toast = await pg.evaluate(() => document.body.innerText.includes('XA999999999FR'));
     await shot(pg, `${nom}-douchette-inconnu`);
