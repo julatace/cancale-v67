@@ -80,7 +80,12 @@ async function controles(T, ok) {
   // (11 nov., lot centre-aide) l'aide choisit ses fiches selon Simple/Complet (`chercherAide`) : lecture d'affichage, permise.
   const permises = lectures.filter((l) => /caseJourneeMontree\(|visibiliteCarte\(|nCartesCachees\(|const ctx = \{[^}]*?\bmode: (p|profil)\.mode|chercherAide\(/.test(l));
   ok(lectures.length > 0 && lectures.length === permises.length, 'B1 le mode n’est lu que par la navigation, les filtres de site, l’aide et les cartes de Ma journée', lectures.filter((l) => !permises.includes(l)).map((l) => l.trim().slice(0, 120)).join(' | '));
-  ok(/<div hidden>\{T\.filter\(\(x\) => !cases\.includes\(x\)\)\.map\(\(x\) => <span key=\{x\.id\} data-tuile=\{x\.id\}/.test(app), 'B2 une case tue garde son compteur publié (bloc caché `data-tuile`)');
+  // (14 nov., Studio) Les cases montrées sont des TUILES (elles portent leur compteur) ; une case tue (Simple, ou cachée
+  // par lui) n'est pas une tuile : son compteur reste dans le bloc caché (`idsCasesTuile` = les cases montrées par la règle).
+  ok(/<div hidden>\{T\.filter\(\(x\) => !cases\.includes\(x\)\)\.map\(\(x\) => <span key=\{x\.id\} data-tuile=\{x\.id\}/.test(app)
+    || (/const idsCasesTuile = new Set\(T\.filter\(\(x\) => visJ\(x\.id\)\.montree\)\.map\(\(x\) => x\.id\)\);/.test(app)
+      && /<div hidden>\{T\.filter\(\(x\) => !idsCasesTuile\.has\(x\.id\)\)\.map\(\(x\) => <span key=\{x\.id\} data-tuile=\{x\.id\}/.test(app)),
+    'B2 une case tue garde son compteur publié (bloc caché `data-tuile`)');
   ok(/entreeMontree\(t, ctx\)/.test(app) && /\.filter\(\(o\) => siteMontre\(o\.id, ctx\)\)/.test(app), 'B3 la navigation et les filtres passent par la règle');
   ok(/<VentesToutes sites=\{sitesPresents\}/.test(app), 'B4 « Tous » des ventes reçoit tous les sites présents (aucun filtre Simple)');
   ok(/'vrm_affichage','vrm_je_vends'/.test(app), 'B5 les deux réglages sont synchronisés (SYNC_KEYS)');
