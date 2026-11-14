@@ -53,7 +53,7 @@ button.vrm-atl-rangee:active { transform: scale(.985); }
 .vrm-atl-chiffre span { font-size: var(--d-t-13, 13px); font-weight: 600; color: var(--d-gris, #6E6E73); }
 .vrm-atl-liste { list-style: none; margin: 0; padding: 0 12px; background: var(--d-carte, #fff); border-radius: var(--d-r-carte, 20px); box-shadow: var(--d-ombre-carte, 0 1px 2px rgb(0 0 0/.04), 0 8px 24px rgb(0 0 0/.06)); min-width: 0; }
 .vrm-atl-ligne { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 8px 0; min-width: 0; content-visibility: auto; contain-intrinsic-size: auto 64px; }
-.vrm-atl-ligne + .vrm-atl-ligne { box-shadow: inset 60px .5px 0 -59.5px var(--d-filet, rgb(0 0 0/.1)); }
+.vrm-atl-ligne + .vrm-atl-ligne { background: linear-gradient(var(--d-filet, rgb(0 0 0/.1)), var(--d-filet, rgb(0 0 0/.1))) 60px 0 / calc(100% - 60px) .5px no-repeat; }
 .vrm-atl-vignette { width: 48px; height: 48px; border-radius: 12px; overflow: hidden; flex-shrink: 0; background: var(--d-remplir, rgb(118 118 128/.12)); display: grid; place-items: center; color: var(--d-gris, #6E6E73); }
 .vrm-atl-vignette img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .vrm-atl-ligne-btn { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; border: 0; background: none; padding: 0; font: inherit; color: inherit; text-align: left; min-height: 48px; cursor: pointer; }

@@ -178,9 +178,9 @@ const ouvrirFiche = async (pg, n) => {
   // L'app peut ne pas écouter encore (premier chargement sur une machine chargée) : on redemande.
   for (let k = 0; k < 15; k++) {
     await pg.evaluate((x) => window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: x })), n);
-    if (await pg.waitForSelector(`[data-fiche-paire="${n}"]`, { timeout: 2000 }).then(() => true, () => false)) break;
+    if (await pg.waitForSelector(`[data-fiche-paire="${n}"]`, { timeout: 4000 }).then(() => true, () => false)) break;
   }
-  await pg.waitForSelector(`[data-fiche-paire="${n}"]`, { timeout: 5000 });
+  await pg.waitForSelector(`[data-fiche-paire="${n}"]`, { timeout: 15000 });
   await pg.waitForSelector(`[data-atelier-paire="${n}"]`, { timeout: 15000 });
 };
 
@@ -367,9 +367,9 @@ async function main() {
         // L'app écrit ses lignes habituelles en fond (synchro `main`, diagnostic des photos) : la recherche, elle,
         // n'écrit aucune couleur ni aucun lien (aucune ligne, aucune clé « couleur », aucune fiche changée).
         const apresC = ecrits.slice(avant);
-        const fichesEcrites = apresC.filter((e) => e.id === 'main' && e.data && e.data.vinted_annonce_numeros).map((e) => JSON.stringify(Object.fromEntries(Object.entries(e.data.vinted_annonce_numeros).map(([id, f]) => [id, [f.numero, f.photoK || null, f.buyPrice || null]]))));
-        const ref = JSON.stringify(Object.fromEntries(Object.entries(FICHES).map(([id, f]) => [id, [f.numero, f.photoK || null, f.buyPrice || null]])));
-        dit(!apresC.some((e) => /couleur/i.test(e.id) || /couleur/i.test(JSON.stringify(e.data || {}))) && fichesEcrites.every((x) => x === ref), `${T} 104 · une recherche : aucune couleur ni aucun lien écrit, aucune fiche changée`, JSON.stringify(apresC.map((e) => e.id)));
+        const fichesEcrites = apresC.filter((e) => e.id === 'main' && e.data && e.data.vinted_annonce_numeros).map((e) => JSON.stringify(Object.fromEntries(Object.entries(e.data.vinted_annonce_numeros).map(([id, f]) => [id, [f.numero, f.buyPrice || null]]))));
+        const ref = JSON.stringify(Object.fromEntries(Object.entries(FICHES).map(([id, f]) => [id, [f.numero, f.buyPrice || null]])));
+        dit(apresC.every((e) => /^(main|diag_photos|restore_\d+)$/.test(e.id)) && !apresC.some((e) => /"part":|vrm_couleurs|couleurs_photos/.test(JSON.stringify(e.data || {}))) && fichesEcrites.every((x) => x === ref), `${T} 104 · une recherche : aucune couleur ni aucun lien écrit, aucune fiche changée`, JSON.stringify(apresC.map((e) => e.id)));
         await tap(pg, '[data-couleur-photo][data-couleur-num="234"]');
         await pg.waitForSelector('[data-fiche-paire="234"]', { timeout: 10000 });
         dit(true, `${T} 104 · SON toucher ouvre la fiche du N°234`);

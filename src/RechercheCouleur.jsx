@@ -17,7 +17,9 @@ export default function RechercheCouleur({ Feuille, Photo, Bouton, famille: init
   const [aLire, setALire] = React.useState(0);
   const [progres, setProgres] = React.useState(null);
   const [illisibles, setIllisibles] = React.useState(0);
-  const vivant = React.useRef(true);
+  const vivant = React.useRef(true), nuancier = React.useRef(null);
+  // La couleur choisie est toujours visible dans le nuancier (centrée), même au bout de la rangée.
+  React.useEffect(() => { const b = nuancier.current && nuancier.current.querySelector('[aria-pressed="true"]'); if (b && b.scrollIntoView) { try { b.scrollIntoView({ inline: 'center', block: 'nearest' }); } catch (_) {} } }, [famille]);
   React.useEffect(() => { vivant.current = true; return () => { vivant.current = false; }; }, []);
   React.useEffect(() => {
     let ok = true;
@@ -43,7 +45,7 @@ export default function RechercheCouleur({ Feuille, Photo, Bouton, famille: init
   return (
     <Feuille onClose={onClose} titre={tr('atelier.couleur.titre')} data-recherche-couleur={famille}>
       <div className="vrm-atl-feuille">
-        <div className="vrm-atl-nuancier" role="group" aria-label={tr('atelier.couleur.choisir')}>
+        <div ref={nuancier} className="vrm-atl-nuancier" role="group" aria-label={tr('atelier.couleur.choisir')}>
           {FAMILLES.map((f) => (
             <button key={f} type="button" className="vrm-atl-teinte" aria-pressed={f === famille} data-couleur-famille={f} onClick={() => setFamille(f)}>
               <i style={{ background: TEINTES[f] }}/>{nomCouleur(f, l)}
@@ -54,7 +56,7 @@ export default function RechercheCouleur({ Feuille, Photo, Bouton, famille: init
         {entrees === null ? <p className="vrm-atl-refus" role="alert" data-couleur-passu="">{tr('atelier.couleur.passu')}</p> : null}
         {Array.isArray(entrees) ? (
           <div className="vrm-atl-chiffre" data-couleur-resultats={res.length}>
-            <b>{res.length}</b><span>{tr('atelier.couleur.nPhotos', { couleur: nomCouleur(famille, l), n: Array.isArray(entrees) ? entrees.length - aLire : 0 })}</span>
+            <b>{res.length}</b><span>{tr('atelier.couleur.nPhotos', { couleur: nomCouleur(famille, l), n: couleurs.size })}</span>
           </div>
         ) : null}
         {aLire > 0 ? (
@@ -71,7 +73,7 @@ export default function RechercheCouleur({ Feuille, Photo, Bouton, famille: init
             {res.slice(0, 120).map((e) => (
               <button key={e.cle} type="button" className="vrm-atl-tuile" data-couleur-photo={e.cle} data-couleur-num={e.num || ''} data-couleur-part={e.part}
                 aria-label={e.num ? tr('atelier.couleur.ouvrir', { num: e.num }) : (e.titre || tr('atelier.fusion.sansNum'))} onClick={() => { if (e.num) ouvrirNumero(e.num); }}>
-                {Photo ? Photo(e.src) : null}
+                {/^data:image\//.test(String(e.src || '')) ? <img src={e.src} alt="" loading="lazy" decoding="async"/> : Photo ? Photo(e.src) : null}
                 <b>{e.num ? `N°${e.num}` : tr('atelier.fusion.sansNum')}</b>
               </button>
             ))}
