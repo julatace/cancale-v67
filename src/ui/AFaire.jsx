@@ -34,7 +34,10 @@ export function AFaireHote({ children }) {
     // Un geste qui OUVRE autre chose (une feuille, une saisie : « Préparer la tournée », « Compléter »…) referme
     // « À faire » juste après son clic — sinon la feuille demandée s'ouvrirait derrière celle-ci. Un geste qui
     // déplie sur place (« 2 nouveaux N° · Vérifier ») la laisse ouverte.
-    const ouvreAilleurs = (b) => b && ([...b.attributes].some((a) => /^data-[a-z-]*(ouvrir|completer)/.test(a.name)) || b.getAttribute('aria-haspopup'));
+    // (14 nov., correctif « À faire ») + `data-afaire-ferme` (un geste qui mène DANS l'écran : filtrer la liste,
+    // aller au bloc — la convention d'AFaireSite) ; un bouton qui DÉPLIE sur place (`aria-expanded`) la laisse
+    // ouverte. Un geste qui ouvre une couche sans le dire est rattrapé par la feuille (`fermeSiAutreCouche`).
+    const ouvreAilleurs = (b) => b && !b.hasAttribute('aria-expanded') && ([...b.attributes].some((a) => /^data-[a-z-]*(ouvrir|completer)/.test(a.name) || a.name === 'data-afaire-ferme') || b.getAttribute('aria-haspopup'));
     const clic = (e) => { const b = e.target && e.target.closest && e.target.closest('button, a'); if (ouvreAilleurs(b)) setTimeout(() => conteneur.dispatchEvent(new CustomEvent('vrm-afaire-fermer')), 0); };
     conteneur.addEventListener('click', clic);
     return () => { mo.disconnect(); conteneur.removeEventListener('click', clic); };
@@ -88,7 +91,7 @@ export function AFaireLigne({ titre, className = '', capsule = false, seulement 
           {capsule ? null : <Chevron/>}
         </button>) : null}
       <div ref={place} hidden data-ui-afaire-place="telephone"/>
-      {ouvert ? <Feuille titre={titre || tr('listes.afaire')} onClose={() => setOuvert(false)} data-ui-afaire-feuille=""><div ref={corps}/></Feuille> : null}
+      {ouvert ? <Feuille titre={titre || tr('listes.afaire')} onClose={() => setOuvert(false)} fermeSiAutreCouche data-ui-afaire-feuille=""><div ref={corps}/></Feuille> : null}
     </>
   );
 }

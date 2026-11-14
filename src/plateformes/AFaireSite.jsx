@@ -52,7 +52,7 @@ export function AFaireSite({ n, site = '', titre, children, className = '', ...a
         <span className="vrm-ui-afaire-mots">{nom} <span className="vrm-ui-afaire-n">· {n}</span></span>
         <Chevron/>
       </button>
-      <Feuille ouvert={ouvert} titre={nom} onClose={() => setOuvert(false)} className="vrm-pf-feuille" voileClassName="vrm-pf-voile"
+      <Feuille ouvert={ouvert} titre={nom} onClose={() => setOuvert(false)} fermeSiAutreCouche className="vrm-pf-feuille" voileClassName="vrm-pf-voile"
         data-pf-afaire-feuille={site} onClick={surClic}>
         <div className="vrm-ui-afaire-corps vrm-pf-afaire-corps">{children}</div>
       </Feuille>

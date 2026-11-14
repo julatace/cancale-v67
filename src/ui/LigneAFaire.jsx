@@ -25,7 +25,7 @@ export function LigneAFaire({ n, titre, children, ouvert: ouvertVoulu, onOuvert,
         <span className="vrm-ui-afaire-mots">{titre || tr('listes.afaire')} <span className="vrm-ui-afaire-n">· {n}</span></span>
         <Chevron/>
       </button>
-      {ouvert ? <Feuille titre={titre || tr('listes.afaire')} onClose={() => poser(false)} data-ui-afaire-feuille=""><div className="vrm-ui-afaire-corps">{children}</div></Feuille> : null}
+      {ouvert ? <Feuille titre={titre || tr('listes.afaire')} onClose={() => poser(false)} fermeSiAutreCouche data-ui-afaire-feuille=""><div className="vrm-ui-afaire-corps">{children}</div></Feuille> : null}
     </>
   );
 }

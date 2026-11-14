@@ -288,6 +288,38 @@ async function unCas(nav, c, W, theme) {
         dit(horizontalOk(fin), `${T} H à la fin : la page n'est pas décalée`, dirH(fin));
       }
     } else dit(false, `${T} F3 « À faire » se rouvre`);
+    // F4 — CHAQUE geste de la feuille (au plus 8) : s'il ouvre une feuille, un menu ou une saisie, « À faire »
+    // n'est plus au-dessus d'elle (sinon : une feuille ouverte DERRIÈRE le voile, invisible, et le doigt
+    // qui ne trouve rien). Un geste qui agit sur place (déplier, cocher) peut laisser « À faire » ouverte.
+    if (await o.pg.locator(c.ligne).filter({ visible: true }).count()) {
+      const premier = c.feuille.split(',')[0].trim();
+      for (let i = 0; i < 8; i++) {
+        await fermerTout(o);
+        if (!(await o.pg.locator(c.ligne).filter({ visible: true }).count())) { await o.pg.goto(`http://localhost:${PORT}${c.url}`, { waitUntil: 'domcontentloaded' }).catch(() => {}); await pret(o.pg); }
+        await toucherSel(o, c.ligne);
+        if (!(await attendreQue(o.pg, () => feuilleVisible(o.pg, c.feuille)))) break;
+        await o.pg.waitForTimeout(350);
+        const gestes = o.pg.locator(`${premier} :is(button, a[href], [role="button"]):not(.vrm-ui-feuille-fermer)`).filter({ visible: true });
+        const n = await gestes.count();
+        if (i >= n) break;
+        const g = gestes.nth(i);
+        const lib = ((await g.getAttribute('aria-label').catch(() => '')) || (await g.innerText().catch(() => '')) || '').trim().replace(/\s+/g, ' ').slice(0, 40);
+        const href = await g.getAttribute('href').catch(() => null);
+        if (href && /^https?:/.test(href)) continue;   // un lien qui part sur un autre site : rien à juger ici
+        const avant = await o.pg.evaluate(() => [...document.querySelectorAll('[role="dialog"], .vrm-fs-voile, [data-feuille]')].filter((x) => x.getClientRects().length && x.getBoundingClientRect().height > 1).length);
+        if (o.tel) await g.tap({ timeout: 3000 }).catch(() => {}); else await g.click({ timeout: 3000 }).catch(() => {});
+        await o.pg.waitForTimeout(1200);
+        const r = await o.pg.evaluate((sel) => {
+          const nous = [...document.querySelectorAll(sel)].find((x) => x.getClientRects().length && x.getBoundingClientRect().height > 1);
+          const autres = [...document.querySelectorAll('[role="dialog"], [data-feuille], [data-confirm], .vrm-confirm')].filter((x) => x.getClientRects().length && x.getBoundingClientRect().height > 1 && (!nous || (!nous.contains(x) && !x.contains(nous))));
+          // Une autre couche est-elle visible AU-DESSUS de nous ? (point au centre de l'autre couche)
+          const derriere = nous ? autres.filter((x) => { const q = x.getBoundingClientRect(); const h = document.elementFromPoint(q.left + q.width / 2, q.top + Math.min(40, q.height / 2)); return !(h && x.contains(h)); }) : [];
+          return { ouverte: !!nous, autres: autres.length, derriere: derriere.map((x) => `${x.tagName.toLowerCase()}.${String(x.className).slice(0, 30)}`) };
+        }, premier);
+        dit(r.derriere.length === 0, `${T} F4 « ${lib} » : rien ne s'ouvre derrière « À faire »`, JSON.stringify(r));
+      }
+      await fermerTout(o);
+    }
     if (o.erreurs.length) dit(false, `${T} aucune erreur JS`, o.erreurs.join(' | '));
   } catch (e) {
     dit(false, `${T} le cas a pu se jouer`, String(e && e.stack || e).slice(0, 400));

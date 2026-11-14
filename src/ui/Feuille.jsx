@@ -24,7 +24,9 @@ import './ui.css';
 const mouvementReduit = () => { try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (_) { return false; } };
 const COURBE = 'cubic-bezier(.32,.72,0,1)';
 
-export function Feuille({ titre, onClose, children, ouvert = true, className = '', voileClassName = '', ...attrs }) {
+// Les couches modales qu'un geste peut ouvrir : une feuille (`SheetShell`, celle-ci), une confirmation.
+const SEL_COUCHES = '[aria-modal="true"], [role="alertdialog"], [data-feuille], .vrm-fs';
+export function Feuille({ titre, onClose, children, ouvert = true, className = '', voileClassName = '', fermeSiAutreCouche = false, ...attrs }) {
   const ref = useRef(null), refVoile = useRef(null), refGeste = useRef(null);
   const refFermer = useRef(onClose); refFermer.current = onClose;
   const fermer = useCallback(() => { const f = refFermer.current; if (f) f(); }, []);
@@ -60,6 +62,27 @@ export function Feuille({ titre, onClose, children, ouvert = true, className = '
       } catch (_) {}
     };
   }, [ouvert, fermer]);
+
+  // `fermeSiAutreCouche` (les feuilles « À faire ») : un geste de la feuille qui OUVRE une autre couche (une
+  // feuille, une saisie, une confirmation — n'importe laquelle, marquée ou non) la referme. Sinon la couche
+  // demandée s'ouvrait DERRIÈRE notre voile (z 20000) : invisible, et le doigt ne trouvait rien. On regarde
+  // pendant 1,5 s après le toucher (un écran chargé à la demande arrive après son clic).
+  useEffect(() => {
+    if (!ouvert || !fermeSiAutreCouche) return undefined;
+    const el = ref.current; if (!el) return undefined;
+    const couches = () => [...document.querySelectorAll(SEL_COUCHES)].filter((x) => x !== el && !el.contains(x) && !x.contains(el) && x.getClientRects().length > 0);
+    let t = null;
+    const clic = (e) => {
+      if (!e.target || !e.target.closest || !e.target.closest('button, a, [role="button"], summary, input, select')) return;
+      const avant = new Set(couches());
+      clearTimeout(t);
+      let n = 0;
+      const voir = () => { if (couches().some((x) => !avant.has(x))) { fermer(); return; } if (++n < 15) t = setTimeout(voir, 100); };
+      t = setTimeout(voir, 0);
+    };
+    el.addEventListener('click', clic, true);
+    return () => { el.removeEventListener('click', clic, true); clearTimeout(t); };
+  }, [ouvert, fermeSiAutreCouche, fermer]);
 
   // Glisser vers le bas : la poignée et la tête se prennent au doigt (pas « OK »).
   const debut = (e) => {
