@@ -119,7 +119,7 @@ const debord = (pg) => pg.evaluate(() => document.documentElement.scrollWidth - 
 const ouvrir = (pg, quoi, detail = {}) => pg.evaluate(([q, d]) => window.dispatchEvent(new CustomEvent('vrm:idees', { detail: { ...d, quoi: q } })), [quoi, detail]);
 const fermer = async (pg) => { await pg.keyboard.press('Escape'); await attendre(pg, () => !document.querySelector('[data-ia-feuille]'), null, 4000); };
 // Les cibles de la feuille ouverte : chaque bouton, champ, lien ≥ 44 px de haut (ou de large pour un rond).
-const cibles = (pg) => pg.evaluate(() => { const f = document.querySelector('[data-ia-feuille]'); if (!f) return ['pas de feuille']; return [...f.querySelectorAll('button, input:not([type=file]):not([type=checkbox]), summary, label.ia-case')].filter((e) => e.getClientRects().length && !e.closest('.ia-cache')).map((e) => { const r = e.getBoundingClientRect(); return r.height >= 43.5 ? null : `${e.tagName.toLowerCase()}[${(e.textContent || e.getAttribute('aria-label') || '').trim().slice(0, 24)}] ${Math.round(r.height)} px`; }).filter(Boolean); });
+const cibles = (pg) => pg.evaluate(() => { const f = document.querySelector('[data-ia-feuille]'); if (!f) return ['pas de feuille']; return [...f.querySelectorAll('button, input:not([type=file]):not([type=checkbox]), summary, label.ia-case')].filter((e) => e.getClientRects().length && !e.closest('.ia-cache')).map((e) => { const r = e.getBoundingClientRect(); const cs = getComputedStyle(e); return r.height >= 43.5 ? null : `${e.tagName.toLowerCase()}[${(e.textContent || e.getAttribute('aria-label') || '').trim().slice(0, 24)}] ${r.height.toFixed(1)} px (min ${cs.minHeight}, transform ${cs.transform})`; }).filter(Boolean); });
 const lireLS = (pg, k) => pg.evaluate((k) => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (_) { return null; } }, k);
 const png = () => { // un PNG 2×2 valide (le ticket « photographié »)
   return Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP8z8DAwMDAxMDAwMDAAAANHQEDasKb6QAAAABJRU5ErkJggg==', 'base64');
@@ -129,7 +129,9 @@ const png = () => { // un PNG 2×2 valide (le ticket « photographié »)
   let b;
   try {
     b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
-    for (const [vp, sombre] of [[{ width: 390, height: 844 }, false], [{ width: 390, height: 844 }, true], [{ width: 1512, height: 950 }, false], [{ width: 1512, height: 950 }, true]]) {
+    const TOUTES = [[{ width: 390, height: 844 }, false], [{ width: 390, height: 844 }, true], [{ width: 1512, height: 950 }, false], [{ width: 1512, height: 950 }, true]];
+    const voulues = process.env.BANC_TAILLES ? process.env.BANC_TAILLES.split(',') : null;   // ex. « 390,1512-sombre »
+    for (const [vp, sombre] of TOUTES.filter(([v, s]) => !voulues || voulues.includes(`${v.width}${s ? '-sombre' : ''}`))) {
       const tel = vp.width < 600; const TT = `[${vp.width}${sombre ? ' sombre' : ''}]`; const suf = `${vp.width}${sombre ? '-sombre' : ''}`;
       console.log(`── ${vp.width} px${sombre ? ' · sombre' : ' · clair'}`);
       const { ctx, pg, errs, ecrits, SIRI } = await preparer(b, vp, { sombre });
@@ -225,15 +227,15 @@ const png = () => { // un PNG 2×2 valide (le ticket « photographié »)
 
       // ── 162 · partager en image (depuis la fiche N°124) ─────────────────
       await essaie('image', async () => {
-        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: '201' })));
-        let ok = await attendre(pg, () => !!document.querySelector('[data-fiche-partager-image]'), null, 6000);
-        if (!ok) {   // « Tout sur le N° » : la ligne exacte ouvre la fiche
-          const l = pg.locator('[data-recherche-exacte] button, [data-recherche-resultat="numero"]').first();
-          if (await l.count()) { await l.click().catch(() => {}); ok = await attendre(pg, () => !!document.querySelector('[data-fiche-partager-image]'), null, 8000); }
-        }
-        dit(ok, `${TT} la fiche N°201 porte « Partager en image »`);
+        // La loupe « ouvrir 124 » ⇒ l'action « Ouvrir N°124 » ⇒ la fiche de la paire.
+        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: 'ouvrir 124' })));
+        const act = await attendre(pg, () => !!document.querySelector('[data-recherche-action="ouvrir-num"][data-recherche-num="124"]'), null, 8000);
+        if (act) await pg.locator('[data-recherche-action="ouvrir-num"]').first().click();
+        let ok = await attendre(pg, () => !!document.querySelector('[data-fiche-partager-image]'), null, 10000);
+        if (!ok) await pg.screenshot({ path: path.join(SHOTS, `fiche-sans-partage-${suf}.png`) });
+        dit(ok, `${TT} la fiche N°124 porte « Partager en image »`);
         if (ok) await pg.locator('[data-fiche-partager-image]').first().click();
-        else await ouvrir(pg, 'partage-image', { paire: { titre: 'Nike Dunk Low Panda', taille: '42', prix: 80, num: '201' } });
+        else await ouvrir(pg, 'partage-image', { paire: { titre: 'Asics Gel-Kayano 14 argent', taille: '43', prix: 90, num: '124' } });
         const pret = await attendre(pg, () => document.querySelector('[data-ia-feuille="partage-image"] [data-ia-pret="1"]') || document.querySelector('[data-ia-pret="1"]'), null, 12000);
         const dim = await pg.evaluate(() => { const c = document.querySelector('[data-ia-toile]'); return c ? [c.width, c.height] : null; });
         dit(pret && dim && dim[0] === 1080 && dim[1] === 1920, `${TT} story : toile 1080×1920`, JSON.stringify(dim));

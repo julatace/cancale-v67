@@ -51,7 +51,7 @@
   display: flex; align-items: center; justify-content: center; gap: 6px;
   min-height: 44px; padding: 0 14px; border-radius: 13px; cursor: pointer;
   border: 0.5px solid rgb(var(--ia-o) / .14); background: linear-gradient(var(--ia-porcelaine), var(--ia-porcelaine-2));
-  color: var(--ia-encre); font: 600 14px/1.2 inherit; font-family: inherit;
+  color: var(--ia-encre); font-family: inherit; font-size: 14px; font-weight: 600; line-height: 1.2;
   box-shadow: 0 1px 2px rgb(var(--ia-o) / .12);
 }
 :where(.ia) .sb-touche:active, :where(.ia) .sb-touche[aria-pressed="true"], :where(.ia) .sb-touche.is-actif {
@@ -67,7 +67,7 @@
 }
 :where(.ia) .sb-lien {
   display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; background: none; cursor: pointer;
-  color: var(--ia-lien); font: 600 14px/1.2 inherit; font-family: inherit; text-decoration: none;
+  color: var(--ia-lien); font-family: inherit; font-size: 14px; font-weight: 600; line-height: 1.2; text-decoration: none;
 }
 :where(.ia) .sb-lien:active { opacity: .55; }
 :where(.ia) .sb-lien:disabled { color: var(--ia-encre-2); opacity: .55; }
@@ -75,7 +75,7 @@
 /* ── composants (provisoire : vient de studio.css) ───────────────────────── */
 :where(.ia) .sb-champ {
   display: block; width: 100%; box-sizing: border-box; min-height: 48px; padding: 0 14px; border-radius: 13px;
-  border: 0; background: var(--ia-creux); color: var(--ia-encre); font: 500 17px/1.2 inherit; font-family: inherit;
+  border: 0; background: var(--ia-creux); color: var(--ia-encre); font-family: inherit; font-size: 17px; font-weight: 500; line-height: 1.2;
   box-shadow: inset 0 1px 3px rgb(var(--ia-o) / .16); outline: none;
 }
 :where(.ia) .sb-champ:focus-visible { box-shadow: inset 0 1px 3px rgb(var(--ia-o) / .16), 0 0 0 2px var(--ia-diode); }
