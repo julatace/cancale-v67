@@ -307,6 +307,45 @@ const ModeEmballage = aLaDemande(() => import('./ModeEmballage.jsx'), true);
 // (9 nov., lot AD) « Préparer mes colis » pas à pas : à la demande (sa feuille de style reste ICI).
 const PreparerColis = aLaDemande(() => import('./PreparerColis.jsx'), true);
 const FichePaire = aLaDemande(() => import('./FichePaire.jsx'), true);
+// (14 nov., proposition 62 — « Une seule fiche partout ») L'HÔTE DE LA FICHE OUVERTE PAR UNE LIGNE.
+// Un toucher sur le corps d'une rangée qui porte `attrsFicheLigne` (src/ficheLigne.js) ouvre LA fiche de
+// la paire (FichePaire), désignée PAR IDENTITÉ (`numeroDeLigne` : N° de la liste, id d'annonce, n° de
+// transaction, photo exacte — jamais le titre). Ligne sans identité sûre ⇒ la fiche de la LIGNE seule
+// (« pas de paire reliée ») ; un lot ⇒ ses N°, aucun choisi. Les gestes de la ligne y sont rendus par
+// `DansFiche`. Cet hôte tient son propre état : ouvrir une fiche ne redessine pas la liste dessous
+// (1 000 articles : la fiche paraît en moins de 150 ms ; les lectures suivent, `onActive`).
+function HoteFicheLigne({ rendre, deps, onActive }) {
+  const l = React.useSyncExternalStore(abonnerFicheLigne, ligneOuverte, ligneOuverte);
+  const [choisi, setChoisi] = React.useState(null);
+  React.useEffect(() => { setChoisi(null); }, [l && l.cle]);
+  // Le toucher : délégué une fois pour toute l'app (les rangées ne portent que leurs `data-fl-*`).
+  React.useEffect(() => {
+    const clic = (e) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const t = e.target; if (!t || typeof t.closest !== 'function') return;
+      const row = t.closest('[data-fiche-ligne]'); if (!row || !toucheLeCorps(t, row)) return;
+      try { const sel = window.getSelection && String(window.getSelection() || ''); if (sel && sel.length > 2) return; } catch (_) {}
+      const x = lireLigne(row); if (x) ouvrirLigne(x);
+    };
+    // Le morceau de la fiche se charge au premier appui (pas au premier toucher complet).
+    const prechauffe = (e) => { const t = e.target; if (t && t.closest && t.closest('[data-fiche-ligne]')) { import('./FichePaire.jsx').catch(() => {}); document.removeEventListener('pointerdown', prechauffe, true); } };
+    document.addEventListener('click', clic);
+    document.addEventListener('pointerdown', prechauffe, true);
+    // …et, l'app au repos, d'avance : le premier toucher n'attend pas le réseau (ouverture < 150 ms).
+    const ric = window.requestIdleCallback || ((f) => setTimeout(f, 1500));
+    const idle = ric(() => { import('./FichePaire.jsx').catch(() => {}); }, { timeout: 4000 });
+    return () => { document.removeEventListener('click', clic); document.removeEventListener('pointerdown', prechauffe, true); try { (window.cancelIdleCallback || clearTimeout)(idle); } catch (_) {} };
+  }, []);
+  const res = l ? numeroDeLigne(l, { fiches: deps.fiches, txnItem: deps.txnItem, cleNum }) : null;
+  const num = !res ? null : (choisi && res.nums.includes(choisi)) ? choisi : res.etat === 'un' ? res.nums[0] : null;
+  // ⚠️ APRÈS la première image de la fiche, jamais pendant : un effet né d'un toucher est rejoué par React
+  // AVANT l'image (React 18, événement discret) — et `onActive` redessine toute l'app (ses lectures). Mesuré :
+  // 300–700 ms d'ouverture sans ce délai ; la fiche paraît d'abord, les lectures suivent.
+  React.useEffect(() => { const v = l ? { cle: l.cle, num } : null; let t = null; const raf = requestAnimationFrame(() => { t = setTimeout(() => onActive(v), 0); }); return () => { cancelAnimationFrame(raf); if (t) clearTimeout(t); }; /* eslint-disable-next-line */ }, [l && l.cle, num]);
+  if (!l) return null;
+  const fermer = () => { fermerLigne(); };
+  return <GardeEcran nom="fiche-ligne" feuille resetKey={l.cle + ':' + (num || '')} onFermer={fermer}>{rendre(num, l, fermer, res, (n) => setChoisi(String(n)))}</GardeEcran>;
+}
 const PrixPartout = aLaDemande(() => import('./PrixPartout.jsx'), true);
 // (10 nov., lot C) « Baisser le prix » en série : à la demande (sa feuille de style reste ICI).
 const BaissePrixSerie = aLaDemande(() => import('./BaissePrixSerie.jsx'), true);
@@ -621,6 +660,8 @@ import "./republier-main.css";
 import "./styles-annonces-coherence.css";   // (5 nov., chantier C) Annonces : barre, carte, feuille Actions
 import { colonnesColis, SITES_COLIS } from "./colisColonnes.js";
 import { fusionEntreeVente, parcoursPaire } from "./fichePaire.js";
+import { abonner as abonnerFicheLigne, ligneOuverte, ouvrirLigne, fermerLigne, lireLigne, toucheLeCorps, numeroDeLigne, attrsFicheLigne } from './ficheLigne.js';
+import DansFiche from './DansFiche.jsx';
 import { cascadeVente, valeurStock, publierValeurStock } from "./coutVente.js";   // (10 nov., lots BA et BF)
 import { CLE_PRIX_LUS, noterPrixLus } from "./historiquePrix.js";
 import { conseilBaisse, derniereBaisseLue, baisseProportion, noterConseils, fusionConseils, CLE_CONSEIL_PRIX } from "./conseilPrix.js";   // (12 nov.) le conseil de baisse, mesuré   // (10 nov., lot L) les prix lus dans le dressing
@@ -23239,7 +23280,7 @@ function ArticlesLotVente({ lot, devise = 'EUR', tx, onRelier }) {
     </ul>
   </section>;
 }
-function LigneVenteCompacte({ photo, photoNoeud = null, titre: titreNom, numTitre = '', sous = '', compte: compteBrut = undefined, etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, montantCentimes, benef, recap = null, friseEtat = null, frise = null, bas = null, basSeul = false, fusion = null, glisse = null, ...props }) {
+function LigneVenteCompacte({ photo, photoNoeud = null, titre: titreNom, numTitre = '', sous = '', compte: compteBrut = undefined, etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, montantCentimes, benef, recap = null, friseEtat = null, frise = null, bas = null, basSeul = false, fusion = null, glisse = null, fl = null, ...props }) {
   const compte = compteFourni(compteBrut) ? compteBrut : undefined;
   // (5 nov., chantier E2) Le N° du titre en pastille `Numero` (la même qu'au téléphone) ; le texte
   // complet « N°x · nom » reste le nom lu et l'infobulle.
@@ -23316,8 +23357,17 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre: titreNom, numTitr
   if (ouvert) dejaOuvert.current = true;
   const numerosFiche=[...new Set(numerosArticle.map(n=>String(n||'').trim()).filter(Boolean))];
   const numerosNote=[...new Set([...numerosFiche, fusion && fusion.num, numTitre].map(n=>String(n||'').trim()).filter(Boolean).map(cleNum))];
-  return <div {...props} data-ligne-ouverte={ouvert} data-plateforme-vente={plateforme||undefined} data-vente-compte={compte||undefined} data-benef-cols={benef?'':undefined} data-fu-forme={fusion?'':undefined}>
-    <button ref={declencheur} type="button" className="vrm-ledger-sale-toggle" aria-expanded={ouvert} aria-controls={panneau} aria-haspopup="dialog" aria-label={`Ouvrir les actions : ${titre || 'vente'}`} onClick={()=>setOuvert(v=>!v)}>
+  // (14 nov., proposition 62) Toucher la ligne ouvre LA fiche de la paire (src/ficheLigne.js), désignée par
+  // les N° que la liste a trouvés PAR IDENTITÉ (`numerosArticle`), son n° de transaction, son annonce — jamais
+  // le titre. Le récapitulatif (ou le détail) de la vente y est rendu EN HAUT (`DansFiche`, place « contexte »).
+  // Une vente sans N° ni transaction a sa clé de ligne (`panneau`) : la fiche de la LIGNE, « pas de paire reliée ».
+  const attrsFl = attrsFicheLigne({ contexte: 'vente', site: plateforme || (fl && fl.site) || '', nums: numerosFiche, tx: fl && fl.tx, item: fl && fl.item,
+    cle: 'l' + panneau, photo: typeof photo === 'string' ? photo : '',
+    titre: titreNom || '', prix: typeof montant === 'string' ? montant : (fusion && typeof fusion.prix === 'string' ? fusion.prix : ''), sous: typeof etat === 'string' ? etat : '' });
+  const ouvrirFiche = (e) => { const el = e && e.currentTarget && e.currentTarget.closest('[data-fiche-ligne]'); const l = el ? lireLigne(el) : null; if (l) { ouvrirLigne(l); return true; } return false; };
+  const cleFl = attrsFl['data-fiche-ligne'] || '';
+  return <div {...props} {...attrsFl} data-ligne-ouverte={ouvert} data-plateforme-vente={plateforme||undefined} data-vente-compte={compte||undefined} data-benef-cols={benef?'':undefined} data-fu-forme={fusion?'':undefined}>
+    <button ref={declencheur} type="button" className="vrm-ledger-sale-toggle" aria-expanded={ouvert} aria-controls={panneau} aria-haspopup="dialog" aria-label={`Ouvrir les actions : ${titre || 'vente'}`} onClick={(e)=>{ if (!ouvrirFiche(e)) setOuvert(v=>!v); }}>
       <span className="vrm-ledger-photo-empty">{photoNoeud || <PhotoVente src={photo} size={46} portrait/>}</span>
       {fusion ? <span className="vrm-fu-vente-txt">
         <span className="vrm-fu-vente-l1"><span className="vrm-fu-vente-nom">{fusion.nom || tr('journee.sansTitre')}</span><span className="vrm-fu-vente-prix" aria-hidden="true">{fusion.prix || montant}</span></span>
@@ -23351,6 +23401,10 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre: titreNom, numTitr
     {glisse}
     {/* « Retour » (geste du téléphone, ← du navigateur) ferme d'abord le tiroir. */}
     {ouvert && <FermeAuRetour fermer={close}/>}
+    {cleFl ? <DansFiche cle={cleFl} place="contexte" seulementFiche>
+      {recap ? <div className="vrm-recap vrm-recap-fiche" data-recap-vente="">{recap({ titreId: panneau+'-titre', fermerRef: fermer, fermer: fermerLigne })}</div>
+        : <div className="vrm-ventes-liste"><div className={props.className} data-ligne-ouverte="true"><div className="vrm-ledger-sale-content">{children}</div></div></div>}
+    </DansFiche> : null}
     {dejaOuvert.current && createPortal(<div className="vrm-app-shell vrm-ledger-drawer-host" hidden={!ouvert}>
       <section className={recap?'vrm-ledger-drawer vrm-recap':'vrm-ledger-drawer'} role="dialog" aria-modal="false" aria-labelledby={panneau+'-titre'} id={panneau} data-recap-vente={recap?'':undefined} onKeyDown={e=>{if(e.target.matches('input,textarea,select,[contenteditable=true]'))return;if(e.key==='Escape'&&!e.defaultPrevented){e.preventDefault();e.stopPropagation();close();}}}>
         {recap ? <div className="vrm-main vrm-ledger-drawer-body vrm-recap-corps">{recap({ titreId: panneau+'-titre', fermerRef: fermer, fermer: close })}</div> : <>
@@ -23364,8 +23418,8 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre: titreNom, numTitr
     </div>,document.body)}
   </div>;
 }
-function LigneVente({ photo, titre, meta, montant, actions, etat, etatNoeud = null, details, sous = '', compte = undefined, ton = '', data = null, numerosArticle = [], plateforme = '', floute = false, gestes = null, frise = null, suite = null }) {
-  return <LigneVenteCompacte {...(data || {})} gestes={gestes} frise={frise} numerosArticle={numerosArticle} plateforme={plateforme} photo={photo} titre={titre} sous={sous} compte={compte} ton={ton} etat={etat} etatNoeud={etatNoeud} montant={montant} initialOuvert={!!details?.props.ouvrir} className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`,...(floute?STYLE_FLOU:null)}}>
+function LigneVente({ photo, titre, meta, montant, actions, etat, etatNoeud = null, details, sous = '', compte = undefined, ton = '', data = null, numerosArticle = [], plateforme = '', floute = false, gestes = null, frise = null, suite = null, fl = null }) {
+  return <LigneVenteCompacte fl={fl} {...(data || {})} gestes={gestes} frise={frise} numerosArticle={numerosArticle} plateforme={plateforme} photo={photo} titre={titre} sous={sous} compte={compte} ton={ton} etat={etat} etatNoeud={etatNoeud} montant={montant} initialOuvert={!!details?.props.ouvrir} className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`,...(floute?STYLE_FLOU:null)}}>
     <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
       <div className="vrm-sale-photo"><PhotoArticleAgrandissable src={photo} titre={titre}><PhotoVente src={photo} size={64} portrait/></PhotoArticleAgrandissable></div>
       <div className="vrm-sale-info" style={{flex:1,minWidth:0}}>
@@ -25318,8 +25372,10 @@ function CarteColisVc({ v, imprime, fait }) {
   const titre = v.titre || 'Article Vestiaire';
   const urg = limiteVcTexte({ ...v, aExpedier: true });
   const sec = { flex: '0 1 auto', minHeight: 44, borderRadius: 12, padding: '0 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' };
+  // (14 nov., proposition 62) Toucher la carte ouvre LA fiche de la paire (le N° lié à SON produit Vestiaire).
+  const fl = attrsFicheLigne({ contexte: 'colis', site: 'vestiaire', cle: 'cvc' + v.id, nums: v.num ? [v.num] : [], photo: v.photo || '', titre: v.titre || '', sous: urg || '' });
   return (
-    <div data-bord-card="" data-vc-colis={v.id} data-colis-ident={'vc:' + v.id} data-vc-colis-num={v.num || ''} data-vc-colis-limite={v.limite ? v.limite.slice(0, 10) : ''} data-jours={j == null ? '' : String(j)} data-plateforme-colis="vestiaire"
+    <div {...fl} data-bord-card="" data-vc-colis={v.id} data-colis-ident={'vc:' + v.id} data-vc-colis-num={v.num || ''} data-vc-colis-limite={v.limite ? v.limite.slice(0, 10) : ''} data-jours={j == null ? '' : String(j)} data-plateforme-colis="vestiaire"
       className="vrm-colis-carte" style={{ position: 'relative', padding: '14px', border: `1px solid ${j != null && j < 0 ? C.warn + '66' : C.border}`, background: C.card, borderRadius: 12, opacity: fait ? 0.55 : 1 }}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
         <div className="vrm-colis-photo" style={{ width: 64, height: 80, borderRadius: 12, background: '#fff', border: `1px solid ${C.border}`, boxSizing: 'border-box', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -25349,6 +25405,7 @@ function CarteColisVc({ v, imprime, fait }) {
       {/* (3 nov.) LA FRISE D'UN COLIS, comme Vinted : « imprimé » = sa coche (`vrm_vc_imprimes`), « déposé » =
           « Colis fait » ; « en route » / « livré » ne sont pas lus pour Vestiaire ⇒ jamais cochés. */}
       {imprime || fait ? <Frise etapes={friseColisFusion({ imprime: !!imprime, depose: !!fait }, { geste: j != null && j <= 1 && !fait })} cle={'vc:' + v.id} className="vrm-colis-frise" label="Où en est le colis"/> : null}
+      <DansFiche cle={fl['data-fiche-ligne']} aussiIci>
       <div className="vrm-colis-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
         {/* (2 nov. au soir) Le transporteur LU dans la puce, À GAUCHE du bouton bordereau, même rangée (comme Vinted). */}
         <div className="vrm-rangee-bord" data-rangee-bord="">
@@ -25364,6 +25421,7 @@ function CarteColisVc({ v, imprime, fait }) {
         <button type="button" data-geste="fait" data-vc-fait={v.id} onClick={() => marquerVc('vrm_vc_colis_done', v.id, !fait)} title={fait ? 'Le colis est encore chez toi : il revient dans « À envoyer »' : 'Marquer déposé : il passe dans « Envoyés »'}
           className="vrm-colis-sec vrm-colis-ter" style={{ ...sec, border: `1px solid ${C.border}`, background: fait ? C.bg : 'transparent', color: fait ? C.text : C.muted }}>{fait ? 'Pas encore déposé' : 'Déposé'}</button>
       </div>
+      </DansFiche>
     </div>
   );
 }
@@ -25373,8 +25431,11 @@ function CarteColisVc({ v, imprime, fait }) {
 // par l'écran, qui la tient de la règle de SON site (`colisEbay`, `colisLbcAPoster`, §11) ; la photo est
 // celle de la commande / vente elle-même (identité, §5).
 function CarteColisSite({ ident, site, photo, titre, num, sous, sousAmbre = false, transporteur, primaire, gestes = null, frise, detail = null, attrs = {} }) {
+  // (14 nov., proposition 62) Toucher la carte ouvre LA fiche de la paire (son N° par identité : SKU, référence) ;
+  // le bordereau et les gestes du colis sont rendus dans « Actions » (`DansFiche`).
+  const fl = attrsFicheLigne({ contexte: 'colis', site, cle: 'c' + ident, nums: num ? [num] : [], photo: typeof photo === 'string' ? photo : '', titre: typeof titre === 'string' ? titre : '', sous: typeof sous === 'string' ? sous : '' });
   return (
-    <div data-bord-card="" data-colis-ident={ident} data-plateforme-colis={site} className="vrm-colis-carte" {...attrs}
+    <div data-bord-card="" data-colis-ident={ident} data-plateforme-colis={site} className="vrm-colis-carte" {...attrs} {...fl}
       style={{ position: 'relative', padding: '14px', border: `1px solid ${sousAmbre ? C.warn + '66' : C.border}`, background: C.card, borderRadius: 12 }}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
         <div className="vrm-colis-photo" style={{ width: 64, height: 80, borderRadius: 12, background: C.card2 || C.bg, border: `1px solid ${C.border}`, boxSizing: 'border-box', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -25392,6 +25453,7 @@ function CarteColisSite({ ident, site, photo, titre, num, sous, sousAmbre = fals
         </div>
       </div>
       {Array.isArray(frise) && frise.some((x) => x.fait) ? <Frise etapes={frise} cle={ident} className="vrm-colis-frise" label="Où en est le colis"/> : null}
+      <DansFiche cle={fl['data-fiche-ligne']} aussiIci>
       <div className="vrm-colis-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
         <div className="vrm-rangee-bord" data-rangee-bord="">
           {/* (12 nov., finitions) « … » DANS la rangée du bordereau, à sa gauche : posé à part (absolu), il passait sous « Imprimer » / « Générer le bordereau » et ne se touchait plus. */}
@@ -25402,6 +25464,7 @@ function CarteColisSite({ ident, site, photo, titre, num, sous, sousAmbre = fals
         </div>
         {gestes}
       </div>
+      </DansFiche>
     </div>
   );
 }
@@ -46904,7 +46967,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // pas de carte encadrée séparée — style démo, comme Achats).
               <LigneVenteCompacte montantCentimes={sell!=null?Math.round(sell*100):undefined} numerosArticle={lot && lot.lu ? lot.nums : (num?[num]:[])} plateforme="vinted" photo={photo} photoNoeud={<><CaseSerie serie={serieVentes} cle={txL} etiquette={o.title} surPhoto/>{photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:12,objectFit:'cover',flexShrink:0}}/>:<PhotoVente src={photo} size={46} portrait/>}</>} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return nom; })()} numTitre={num||''}
                 {...avecSerie(gp, serieVentes.ligne(txL))} glisse={tiroirG} benef={benefLigne} recap={recapVente} data-depose-attente={deposeIci?'1':undefined}
-                data-fu-ligne="" fusion={{ lot: lot ? { n: lot.n, nums: lot.nums || [], nonRelies: lot.nonRelies || 0 } : null, transp: fuTransp, prix: montant(sell, { devise: o.price?.currency_code || 'EUR' }), nom: String(o.title||'').replace(/[\s,·-]*(?:taille|t\.?)\s*[\d.,/ ]+(?:\s*(?:eu|fr|us|uk))?\s*$/i,'').trim() || o.title, num, site: 'vinted', siteNom: 'Vinted', taille: lot ? '' : String((e&&e.size)||o.size||'').trim() || ((String(o.title||'').match(/taille\s*([\d.,/]+)/i)||[])[1]||'') }} friseEtat={fuEtapes ? <Frise inline etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label={tr('ventes.vente3')}/> : null} frise={<>{(o._fromEmail ? o._txMail : o.transaction_id != null) ? <FactureVenteLigne deps={DEPS_FACTURE} groupe={groupeFacture} vente={{ tx: String(o._fromEmail ? o._txMail : o.transaction_id), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', venteLe: o.date || '', commandes: commandesParTx.get(String(o._fromEmail ? o._txMail : o.transaction_id)) || [] }}/> : null}</>}
+                fl={{ tx: txL, item: String(identiteAnnonce(o) || '') }} data-fu-ligne="" fusion={{ lot: lot ? { n: lot.n, nums: lot.nums || [], nonRelies: lot.nonRelies || 0 } : null, transp: fuTransp, prix: montant(sell, { devise: o.price?.currency_code || 'EUR' }), nom: String(o.title||'').replace(/[\s,·-]*(?:taille|t\.?)\s*[\d.,/ ]+(?:\s*(?:eu|fr|us|uk))?\s*$/i,'').trim() || o.title, num, site: 'vinted', siteNom: 'Vinted', taille: lot ? '' : String((e&&e.size)||o.size||'').trim() || ((String(o.title||'').match(/taille\s*([\d.,/]+)/i)||[])[1]||'') }} friseEtat={fuEtapes ? <Frise inline etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label={tr('ventes.vente3')}/> : null} frise={<>{(o._fromEmail ? o._txMail : o.transaction_id != null) ? <FactureVenteLigne deps={DEPS_FACTURE} groupe={groupeFacture} vente={{ tx: String(o._fromEmail ? o._txMail : o.transaction_id), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', venteLe: o.date || '', commandes: commandesParTx.get(String(o._fromEmail ? o._txMail : o.transaction_id)) || [] }}/> : null}</>}
                 data-vente-email-tete={o._venteEmail && emailEnTete ? String(o._acc.vinted_user_id) : undefined}
                 bas={o._venteEmail && emailEnTete && !toShipEmailTx.has(txL) ? null : o._venteEmail ? <>
                   {emailEnTete ? null : <NoteVenteEmail o={o}/>}
@@ -48556,10 +48619,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const suivi = tk && tk.suivi ? String(tk.suivi) : '';
             const rc = receiptFor(o);
             const numA = buyNumByTxn[String(o.transaction_id)];
+            // (14 nov., proposition 62) Toucher l'achat ouvre LA fiche de la paire qu'il a payée (le N° relié par
+            // SON n° de transaction, `buyNumByTxn`) ; sans N° relié, la fiche de l'achat seul (« pas de paire »).
+            const flAchat = attrsFicheLigne({ contexte: 'achat', site: 'vinted', cle: 'b' + String(o.transaction_id), nums: numA != null && numA !== '' ? [String(numA)] : [], photo: orderPhoto(o) || '', titre: o.title || '', prix: montant(montantCommande(o), { devise: o.price?.currency_code || 'EUR' }) || '' });
             return (
             <React.Fragment key={o.transaction_id}>
             {!achatsGroupees && i === achatsSansDate.i ? <LigneSansDate n={achatsSansDate.n}/> : null}
-            <div {...serieAchats.ligne(String(o.transaction_id))} className="vrm-buy-row" data-cible={attrCible(['achat',String(o.transaction_id)])} data-achat-tx={String(o.transaction_id)} data-ordre-t={tsCommande(o) || ''} style={{opacity:cancelled?0.55:1,...(estFloute(o)?STYLE_FLOU:null),...(achatMenu!=null&&achatMenu===String(o.transaction_id||'')?{zIndex:42}:null)}}>{/* (8 nov.) la ligne dont le menu ⋯ est ouvert passe AU-DESSUS des suivantes : une ligne pressée (:active, scale) ou atténuée (opacité) devient un contexte d'empilement, et la ligne suivante recouvrait son menu (banc recu-achat) */}
+            <div {...serieAchats.ligne(String(o.transaction_id))} {...flAchat} className="vrm-buy-row" data-cible={attrCible(['achat',String(o.transaction_id)])} data-achat-tx={String(o.transaction_id)} data-ordre-t={tsCommande(o) || ''} style={{opacity:cancelled?0.55:1,...(estFloute(o)?STYLE_FLOU:null),...(achatMenu!=null&&achatMenu===String(o.transaction_id||'')?{zIndex:42}:null)}}>{/* (8 nov.) la ligne dont le menu ⋯ est ouvert passe AU-DESSUS des suivantes : une ligne pressée (:active, scale) ou atténuée (opacité) devient un contexte d'empilement, et la ligne suivante recouvrait son menu (banc recu-achat) */}
               <div className="vrm-buy-ph" style={{background:C.card2||C.bg}}>
                 <CaseSerie serie={serieAchats} cle={String(o.transaction_id)} etiquette={o.title} surPhoto/>
                 {orderPhoto(o)&&!achatPhKo.has(orderPhoto(o))?<PhotoVinted src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={()=>{ const u=orderPhoto(o); setAchatPhKo(s=>{ if(s.has(u)) return s; const n=new Set(s); n.add(u); return n; }); }}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
@@ -48653,19 +48719,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const peutCode = !!(st.step===3 && tk && (qrImage(tk)||codeRetrait(tk.code)));
                 const item = { display:'flex',alignItems:'center',gap:10,width:'100%',textAlign:'left',border:'none',background:'transparent',color:C.text,fontSize:15,fontWeight:600,padding:'0 14px',minHeight:44,cursor:'pointer',fontFamily:'inherit',textDecoration:'none',boxSizing:'border-box' };
                 const close = () => setAchatMenu(null);
-                return (
-              <div className="vrm-buy-act">
-                {note && <button className="vrm-icon-control vrm-buy-quick" type="button" onClick={()=>setNoteEdit({tid,title:o.title,val:note})} title={tr('achats.note', { note: String(note) })} aria-label={tr('achats.noteInterne')} style={{color:C.accentTexte}}><Icon name="doc" size={15}/></button>}
-                {peutSuivre && (
-                  <a className="vrm-buy-quick" href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" title={tr('achats.suivreColis', { carrierName: String(carrierName(tk.carrier)), suivi: String(suivi) })} aria-label={tr('achats.suivreColis2')} style={{color:C.muted}}><Icon name="truck" size={16}/></a>
-                )}
-                {peutCode && (
-                  <button className="vrm-icon-control vrm-buy-quick" type="button" onClick={()=>openQrView(tk)} title={tr('achats.codeRetrait')} aria-label={tr('achats.codeRetrait')} style={{color:C.warn}}><Icon name="key" size={16}/></button>
-                )}
-                <button className="vrm-icon-control vrm-buy-more" type="button" onClick={()=>setAchatMenu(m=>m===tid?null:tid)} title={tr('achats.codeRetraitSuivi')} aria-label={tr('achats.plusActionsAchat')} aria-haspopup="menu" style={{color:achatMenu===tid?C.accent:C.muted,background:achatMenu===tid?`${C.accent}12`:'transparent'}}>⋯</button>
-                {achatMenu===tid && (<>
-                  <div onClick={close} style={{position:'fixed',inset:0,zIndex:40}}/>
-                  <div role="menu" className="vrm-buy-menu" style={{background:C.card,border:`1px solid ${C.border}`,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.18)'}}>
+                const itemsMenu = (<>
                     {peutCode && <button type="button" role="menuitem" className="vrm-buy-menu-tel" style={item} onClick={()=>{ close(); openQrView(tk); }}><Icon name="key" size={15} style={{color:C.muted}}/>{tr('achats.codeRetrait')}</button>}
                     {peutSuivre && <a role="menuitem" className="vrm-buy-menu-tel" href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" style={item} onClick={close}><Icon name="truck" size={15} style={{color:C.muted}}/>{tr('achats.suivreColis2')}</a>}
                     {arrive && <button type="button" role="menuitem" data-copier-prix={prixPaye} style={item} onClick={async ()=>{ close(); try { await navigator.clipboard.writeText(prixPaye); toast(tr('achats.prixPayeCopie', { prixPaye: String(prixPaye) })); } catch(_) { toast(tr('suivi.journal.pasCopie'),'error'); } }}><Icon name="cash" size={15} style={{color:C.muted}}/>{tr('achats.copierPrixPaye')}</button>}
@@ -48680,8 +48734,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {numA && <button type="button" role="menuitem" style={item} onClick={()=>{ close(); generateEtiquetteSku(numA,{ title:o.title, transaction_id:o.transaction_id }); }}><Icon name="tag" size={15} style={{color:C.muted}}/>{tr('achats.etiquette')}{numA}</button>}
                     <div style={{height:1,background:C.border,margin:'4px 0'}}/>
                     <button type="button" role="menuitem" data-achat-masquer={tid} style={{...item,color:C.muted}} onClick={()=>{ close(); masquerAchat(o); }}><Icon name="eyeOff" size={15} style={{color:C.muted}}/>{tr('achats.masquerAchat')}</button>
+                </>);
+                return (
+              <div className="vrm-buy-act">
+                {note && <button className="vrm-icon-control vrm-buy-quick" type="button" onClick={()=>setNoteEdit({tid,title:o.title,val:note})} title={tr('achats.note', { note: String(note) })} aria-label={tr('achats.noteInterne')} style={{color:C.accentTexte}}><Icon name="doc" size={15}/></button>}
+                {peutSuivre && (
+                  <a className="vrm-buy-quick" href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" title={tr('achats.suivreColis', { carrierName: String(carrierName(tk.carrier)), suivi: String(suivi) })} aria-label={tr('achats.suivreColis2')} style={{color:C.muted}}><Icon name="truck" size={16}/></a>
+                )}
+                {peutCode && (
+                  <button className="vrm-icon-control vrm-buy-quick" type="button" onClick={()=>openQrView(tk)} title={tr('achats.codeRetrait')} aria-label={tr('achats.codeRetrait')} style={{color:C.warn}}><Icon name="key" size={16}/></button>
+                )}
+                <button className="vrm-icon-control vrm-buy-more" type="button" onClick={()=>setAchatMenu(m=>m===tid?null:tid)} title={tr('achats.codeRetraitSuivi')} aria-label={tr('achats.plusActionsAchat')} aria-haspopup="menu" style={{color:achatMenu===tid?C.accent:C.muted,background:achatMenu===tid?`${C.accent}12`:'transparent'}}>⋯</button>
+                {achatMenu===tid && (<>
+                  <div onClick={close} style={{position:'fixed',inset:0,zIndex:40}}/>
+                  <div role="menu" className="vrm-buy-menu" style={{background:C.card,border:`1px solid ${C.border}`,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.18)'}}>
+                    {itemsMenu}
                   </div>
                 </>)}
+                {/* (14 nov., proposition 62) Les MÊMES gestes, dans « Actions » de la fiche ouverte depuis cet achat. */}
+                <DansFiche cle={flAchat['data-fiche-ligne']} seulementFiche>
+                  <div className="vrm-buy-menu-items" data-achat-actions-fiche={tid}>
+                    {itemsMenu}
+                  </div>
+                </DansFiche>
               </div>
                 );
               })()}
@@ -49266,9 +49341,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // mort). L'adresse se refait par l'identité de l'annonce (son id, sur
             // le domaine du compte) ; sans id numérique, la photo n'est pas un lien.
             const urlFiche = it.url || (/^\d+$/.test(String(it.id)) ? `https://${(it._acc && it._acc.domain) || 'www.vinted.fr'}/items/${it.id}` : '');
+            // (14 nov., proposition 62) Toucher l'annonce (ou « Détails et gestes ») ouvre LA fiche de la paire, par
+            // l'identifiant de CETTE annonce et son N° ; ses gestes (« Plus d'actions ») y sont rendus (`DansFiche`).
+            const flAnn = attrsFicheLigne({ contexte: 'annonce', site: 'vinted', cle: 'a' + cleCarte, nums: num ? [num] : [], item: String(it.id || ''), photo: typeof it.photo === 'string' ? it.photo : ((it.photo && it.photo.url) || ''), titre: it.title || '', prix: prix(it.price, it.currency) || '' });
             return (
               <div className="vrm-ann-card vrm-fiche vrm-vignette" key={cleCarte} data-carte-annonce={it.id} data-fiche="29oct" data-fiche-ouverte={ouverte?'1':'0'} data-vignette-cle={cleCarte} data-vignette-double={enDouble?'1':undefined}
-                onClick={(ev)=>{ if (ouverte) return; const t = ev.target; if (t && t.closest && t.closest('a,button,input,select,textarea,label,[data-edition],[role="dialog"]')) return; basculerFiche(); }}
+                {...flAnn}
                 style={{borderRadius:12,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden',...(estFloute(it)?STYLE_FLOU:null)}}>
                 <div className="vrm-ann-overview" style={{display:'flex',flexDirection:'column',position:'relative'}}>
                   <a className="vrm-fiche-photo" data-fiche-photo href={urlFiche||undefined} target={urlFiche?'_blank':undefined} rel="noreferrer" title={urlFiche?tr('annonces.ouvrirAnnonceVinted'):undefined} style={{display:'flex',alignItems:'center',justifyContent:'center',position:'relative',background:C.bg}}>
@@ -49352,13 +49430,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {/* (10 nov., lot P) Au lecteur d'écran, le bouton dit QUELLE paire il ouvre (« N°12, titre, 65 € »). */}
                     <button type="button" className="vrm-fiche-plus-bouton" data-fiche-plus-bouton="" aria-expanded={ouverte} aria-controls={idRepli}
                       aria-label={`${ouverte ? 'Moins de détails' : 'Détails et gestes'} — ${num ? 'N°' + num + ', ' : ''}${it.title || it.brand || 'annonce'}, ${prix(it.price,it.currency) || 'prix pas lu'}`}
-                      onClick={basculerFiche}>
+                      data-fiche-ligne-ouvre="">
                       <span>{ouverte ? tr('annonces.moinsDetails') : tr('annonces.detailsGestes')}</span><Icon name="chevron" size={14} style={{transform:ouverte?'rotate(-90deg)':'rotate(90deg)',transition:'transform .15s'}}/>
                     </button>
                   </div>
                 </div>
                 {/* CE QUI ÉTAIT DANS « ⋯ Gérer l'annonce », À LA VUE (29 oct.) : l'achat
                     relié, le stock, Leboncoin (la file et sa préparation), les gestes. */}
+                <DansFiche cle={flAnn['data-fiche-ligne']}>
                 <div className="vrm-fiche-plus" id={idRepli} data-fiche-plus style={{display:'flex',flexDirection:'column',gap:8,borderTop:`1px solid ${C.border}`}}>
                   <AchatRelie entry={e} numero={num}/>
                   {/* (5 nov., chantier C — revue 2.6) DEUX gestes à la vue, le reste dans « … ».
@@ -49433,6 +49512,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                   )}
                 </div>
+                </DansFiche>
               </div>
             );
           })]; })}
@@ -51477,12 +51557,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // phrase. Le premier groupe en a un aussi : sans lui, dix cartes
                 // rouges commençaient sans qu'on sache où le retard s'arrête.
                 const grp = groupeDe(e);
+                // (14 nov., proposition 62) Toucher la carte ouvre LA fiche de la paire (son N° trouvé par identité, sa
+                // transaction), le bordereau et les gestes du colis rendus dans « Actions » (`DansFiche`).
+                const flColis = attrsFicheLigne({ contexte: 'colis', site: 'vinted', cle: 'c' + (e.txn || e.key), nums: num ? [num] : [], tx: e.txn || '', photo: typeof ph === 'string' ? ph : '', titre: typeof titre === 'string' ? titre : '', sous: '' });
                 // (2 nov.) Toujours l'intertitre (« Prêts à imprimer », « En attente du
                 // bordereau ») : le résumé en colonnes qui les nommait est retiré.
                 return (
                   <React.Fragment key={e.key}>
                   {ouvreSansDate}
-                  <div data-envoyer-rang={ix} data-ordre-t={quandE != null ? String(quandE) : ''} data-bord-card data-cible={attrCible(['colis',e.txn])} data-groupe-carte={grp} data-transporteur={cleStatTransporteur(trV)} data-tx-colis={e.txn||''} data-colis-ident={'v:'+(e.txn||e.key)} data-colis-num={num||''} data-colis-vente-email={e.venteEmail?'1':undefined} data-colis-imprime-sans-num={sansNumC?'1':undefined} data-limite={e.lim&&e.lim.limite||''} data-limite-heure={e.lim&&e.lim.heure||''} data-jours={dl==null?'':String(dl)} data-attente-j={att == null ? '' : String(att)} {...propsGlisserFait({ actif: !posted && !!o && o.transaction_id != null, onFait: () => gesteColisFait(o, b, true) })} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${e.lim && e.lim.retard ? C.warn+'66' : C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
+                  <div data-envoyer-rang={ix} data-ordre-t={quandE != null ? String(quandE) : ''} data-bord-card data-cible={attrCible(['colis',e.txn])} data-groupe-carte={grp} data-transporteur={cleStatTransporteur(trV)} data-tx-colis={e.txn||''} data-colis-ident={'v:'+(e.txn||e.key)} data-colis-num={num||''} data-colis-vente-email={e.venteEmail?'1':undefined} data-colis-imprime-sans-num={sansNumC?'1':undefined} data-limite={e.lim&&e.lim.limite||''} data-limite-heure={e.lim&&e.lim.heure||''} data-jours={dl==null?'':String(dl)} data-attente-j={att == null ? '' : String(att)} {...propsGlisserFait({ actif: !posted && !!o && o.transaction_id != null, onFait: () => gesteColisFait(o, b, true) })} {...flColis} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${e.lim && e.lim.retard ? C.warn+'66' : C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
                     <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                       <div className="vrm-colis-photo" style={{width:64,height:80,borderRadius:12,background:C.card2||C.bg,border:`1px solid ${C.border}`,boxSizing:'border-box',flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                         {ph?<PhotoVinted src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
@@ -51577,6 +51660,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {(()=>{ if (posted) return null; const sv = b && b.suivi ? suiviVente({ site: 'vinted', o, b, lim: e.lim, tr: trV }) : null;
                       const inc = sv ? sv.inc.filter((z) => z.code === 'imprime-pas-depose') : [];
                       return inc.length ? ligneSuiviVente({ cle: String(e.txn||e.key), tr: trV }, sv, inc) : null; })()}
+                    <DansFiche cle={flColis['data-fiche-ligne']} aussiIci>
                     <div className="vrm-colis-actions" style={{display:'flex',gap:8,alignItems:'center',marginTop:12,flexWrap:'wrap'}}>
                       {/* (2 nov. au soir) Julien : « à côté du bouton bordereau, marqué Chronopost avec le
                           logo » — LA RANGÉE : la puce du transporteur LU (n° du bordereau, ligne du
@@ -51665,6 +51749,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           d'attente dit déjà. Retiré : l'absence du bouton
                           « Imprimer » le montre de toute façon. */}
                     </div>
+                    </DansFiche>
                   </div>
                   </React.Fragment>
                 );
@@ -57459,10 +57544,13 @@ function AppCoeur() {
   useEffect(()=>{const ouvrir=e=>{const d=(e&&e.detail)||{}; const its=Array.isArray(d.items)?d.items.filter(x=>x&&x.id!=null):[]; if(!its.length) return;
     setVisuels({ lot: !!d.lot || its.length>1, articles: its.map(it=>articleVisuel(it, galerieDe(typeof it.photo==='string'?it.photo:(it.photo&&it.photo.url)||'').photos)).filter(Boolean) });};
     window.addEventListener('vrm:visuels',ouvrir);return()=>window.removeEventListener('vrm:visuels',ouvrir);},[]);
-  const besoinNumData=gsOpen||!!ficheNum||!!prixNum||!!(pubAil&&pubAil.num)||!!pubPartout;
+  // (14 nov., proposition 62) Une fiche ouverte DEPUIS une ligne (`HoteFicheLigne`) : son N° (par identité), posé
+  // APRÈS son premier dessin — la fiche paraît d'abord, les lectures suivent (1 000 articles : ouverture < 150 ms).
+  const [ficheLigneActive,setFicheLigneActive]=useState(null);
+  const besoinNumData=gsOpen||!!ficheNum||!!ficheLigneActive||!!prixNum||!!(pubAil&&pubAil.num)||!!pubPartout;
   // Les lectures en plus (coffre, offres, reçu, Leboncoin, Vestiaire) du N° ouvert.
   const [ficheExtra,setFicheExtra]=useState(null);
-  const numOutil=ficheNum||prixNum||(pubAil&&pubAil.num)||null;
+  const numOutil=ficheNum||(ficheLigneActive&&ficheLigneActive.num)||prixNum||(pubAil&&pubAil.num)||null;
   useEffect(()=>{ if(!numOutil||!numData){ setFicheExtra(null); return undefined; } let vivant=true; setFicheExtra(null);
     (async()=>{ const { rn }=rechercheParNumero(numOutil, numData, vintedAccounts); const x=await lireExtraFiche(rn); if(vivant) setFicheExtra({ ...x, num: numOutil }); })();
     return ()=>{ vivant=false; }; /* eslint-disable-next-line */ },[numOutil,numData]);
@@ -60379,6 +60467,58 @@ function AppCoeur() {
       <button type="button" className="vrm-hdr-recherche-fermer" aria-label="Fermer la recherche" onClick={fermerRecherche} style={{color:C.text}}>Fermer</button>
     </div>
   );
+  // (14 nov., proposition 62) LA FICHE DE LA PAIRE, rendue par la loupe (`ficheNum`) ET par une ligne de
+  // liste (`HoteFicheLigne`, src/ficheLigne.js) : le MÊME composant, les mêmes lectures. `numF` : le N° désigné
+  // PAR IDENTITÉ (null : la ligne n'a pas de paire sûre) ; `depuis` : la ligne touchée (contexte, identité, résumé).
+  const rendreFichePaire=(numF, depuis, fermerF, ligneRes=null, choisir=null)=>{
+          if (!numF) return <FichePaire owner={AUTH.user?.id||''} p={null} num={''} lecture={!!ligneRes && ligneRes.etat==='lecture'} ligne={depuis} ligneRes={ligneRes} onChoisirNum={choisir} onFermer={fermerF} onRetour={fermerF} Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>} Icon={Icon} Retour={FermeAuRetour}/>;
+          // (1er nov.) LA FICHE COMPLÈTE D'UNE PAIRE : la même lecture que « Tout
+          // sur le N° » (`rechercheParNumero`), racontée en parcours (`parcoursPaire`).
+          const { rn, numeros } = rechercheParNumero(numF, numData, vintedAccounts);
+          const nomCompte = (uid) => { const a = (vintedAccounts || []).find(x => String(x.vinted_user_id) === String(uid)); if (!a) return null; const labels = load('vinted_account_labels', {}) || {}; return labels[a.vinted_user_id] || a.login || `#${a.vinted_user_id}`; };
+          const shipDone = load('vinted_ship_done', {}) || {};
+          // (3 nov.) L'HISTOIRE COMPLÈTE (`histoireArticle`) : le parcours + les
+          // lectures en plus (`ficheExtra`), chaque étape lue et datée par sa donnée.
+          const ex = ficheExtra && ficheExtra.num === numF ? ficheExtra : null;
+          const autresEnLigne = ex && ex.lbcItems != null && ex.vcItems != null ? sitesPrixDe(numF, rn, ex).sites.filter((x) => x.site === 'leboncoin' || x.site === 'vestiaire') : null;
+          const neuve = (neuveRecente && cleNum(neuveRecente.numero) === rn.cle ? neuveRecente : null) || Object.values(load('vrm_fiches_neuves', {}) || {}).find((x) => x && !x.retireeAt && cleNum(x.numero) === rn.cle) || null;
+          const p = histoireArticle(rn, { fiches: numeros, saleOv: load('vinted_sale_overrides', {}) || {}, buyByNum: load('vinted_buyprice_by_num', {}) || {},
+            stats: numData ? (numData.stats === undefined ? null : numData.stats) : null, versements: numData ? (numData.versements === undefined ? null : numData.versements) : null, nomCompte,
+            coffres: ex ? ex.coffres : null, offres: ex ? ex.offres : null, recus: ex ? ex.recus : null, autresEnLigne, colisVente: ex ? ex.colisVente : undefined,
+            journalPrix: (load('vrm_prix_journal', {}) || {})[rn.cle] || [], prixVinted: load('vinted_prix_historique', []) || [], prixLus: load(CLE_PRIX_LUS, null),
+            sortieStock: (load('vrm_stock_sortis', {}) || {})[rn.cle] || null }, {
+            etapeVente: (o) => etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }),
+            venteAnnulee: (o) => classifyOrderStatus(o && o.status) === 'cancelled' || (o && o.transaction_id != null && txnAnnuleeAvantEnvoi(o.transaction_id)),
+            montantRecuEbay, commandeEbayEngagee, lbcAnnulee, lbcFinalisee,
+          });
+          // (5 nov.) « Voir l'état » : ce qui se calcule (`etatArticle`), depuis
+          // l'histoire ci-dessus et deux lectures en plus (dates Vinted, réception).
+          const etat = p ? etatArticle(p, { fiches: numeros, ids: (rn.annonces || []).map((a) => a.id),
+            crees: numData ? (numData.crees === undefined ? null : numData.crees) : undefined,
+            reception: ex ? ex.reception : undefined, receptionRaison: ex ? ex.receptionRaison : '' }) : null;
+          // (9 nov., lot AF) L'HISTOIRE DU N° (src/historiqueNumero.js) : lecture seule, depuis les
+          // traces qui existent (fiches, ventes, marqueur 013, Stock, journal des N°) — jamais devinée.
+          const histoNum = p && rn && rn.cle ? historiqueNumero({ cle: rn.cle, fiches: numeros, saleOv: load('vinted_sale_overrides', {}) || {},
+            journal: load(CLE_JOURNAL_NUMEROS, []) || [], marqueur: marqueurNumerotation(), sortieStock: (load('vrm_stock_sortis', {}) || {})[rn.cle] || null,
+            estArchive: (n) => estArchive(n), cleNum }) : null;
+          const fermer = fermerF;
+          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={numF} lecture={!numData} note={p && p.num && !p.ancienNumero ? <>{questionChezToiFiche(p.num)}{blocVenduAilleurs(p, rn, etat)}<NotePaireCoque numero={p.num} variante="bloc" ajout/><BlocHistoriqueRepub ids={(rn.annonces || []).map((x) => String(x.id))} d={{ numeros, stats: Object.fromEntries((rn.annonces || []).map((x) => [String(x.id), { favoris: Number.isFinite(x.favourites) ? x.favourites : null, vues: Number.isFinite(x.views) ? x.views : null }])) }}/><BoutonRappel cible={{ sorte: 'article', num: p.num, item: (rn.annonces || []).length === 1 ? String(rn.annonces[0].id || '') : '' }} libelle={`N°${p.num}`}/></> : null} onFermer={fermer} onRetour={depuis ? fermer : ()=>{ fermer(); setGsQ(String((p && p.num) || numF)); setGsOpen(true); }}
+            onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}
+            onEmballer={()=>{ fermer(); setGsOpen(false); DEMANDE_EMBALLAGE.at = Date.now(); setTab('cat_bord'); try { window.dispatchEvent(new Event('vrm:emballer')); } catch (_) {} }}
+            onPrix={(n)=>setPrixNum(String(n))} onPublierAilleurs={(n)=>setPubAil({ num: String(n), site: null })} neuve={neuve}
+            onPrixAchat={(pp)=>{ if (pp && pp.idFiche) setAchatFiche({ tx: 'fiche:' + pp.idFiche, item: pp.idFiche, num: String(pp.num || ''), sous: pp.titre ? String(pp.titre).slice(0, 34) : 'prix d’achat' }); }}
+            onSource={(src)=>{ fermer(); setGsOpen(false);
+              // (9 nov.) « Ouvrir dans … » : l'écran d'où vient l'étape, sur SON objet (par identité).
+              if (src.stock) { setGarageLocate(String(src.stock)); DEMANDE_STOCK_CHERCHE.nums=[String(src.stock)]; DEMANDE_STOCK_CHERCHE.at=Date.now(); setTab('garage'); return; }
+              if (src.tab === 'achats') demanderVue('achats'); if (src.sub) subVoulue.current = src.sub;
+              if (src.cible) poserCible(src.cible, redirigerOnglet(src.tab, null, ONGLETS_DEPLACES).tab);
+              setTab(src.tab); }}
+            onCopier={async(f)=>{ try { await navigator.clipboard.writeText(texteAColler(f)); toast('Texte copié'); } catch (_) { toast('Copie impossible ici'); } }}
+            onDupliquer={async()=>{ const r=await dupliquerNumero(rn, ex); if(!r.ok){ toast(`Pas dupliqué : ${r.raison}`); return; } toast(`N°${r.numero} créé`); setNeuveRecente(r.fiche); fermer(); setFicheNum(String(r.numero)); }}
+            ligne={depuis} ligneRes={ligneRes} onChoisirNum={choisir}
+            Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>} Icon={Icon} Retour={FermeAuRetour}/>;
+  };
+
   return (
     <LiveStatsCarte.Provider value={liveStatsVus || null}>
     <SansCompteCarte.Provider value={sansAucunCompte}>
@@ -60539,52 +60679,9 @@ function AppCoeur() {
             ouvrirAnnonces={()=>{ setRpOuvert(false); setTab('cat_annonces'); }} onClose={()=>setRpOuvert(false)}/>
         </React.Suspense>}
         {calcOuverte && <GardeEcran nom="calculette" feuille onFermer={()=>setCalcOuverte(false)}><CalculetteAchat Feuille={SheetShell} onClose={()=>setCalcOuverte(false)} contexte={ctxCalculette} emballages={load(CLE_EMBALLAGES, null)}/></GardeEcran>}
-        {ficheNum && <GardeEcran nom="fiche" feuille resetKey={ficheNum} onFermer={()=>setFicheNum(null)}><Differe rendre={()=>{
-          // (1er nov.) LA FICHE COMPLÈTE D'UNE PAIRE : la même lecture que « Tout
-          // sur le N° » (`rechercheParNumero`), racontée en parcours (`parcoursPaire`).
-          const { rn, numeros } = rechercheParNumero(ficheNum, numData, vintedAccounts);
-          const nomCompte = (uid) => { const a = (vintedAccounts || []).find(x => String(x.vinted_user_id) === String(uid)); if (!a) return null; const labels = load('vinted_account_labels', {}) || {}; return labels[a.vinted_user_id] || a.login || `#${a.vinted_user_id}`; };
-          const shipDone = load('vinted_ship_done', {}) || {};
-          // (3 nov.) L'HISTOIRE COMPLÈTE (`histoireArticle`) : le parcours + les
-          // lectures en plus (`ficheExtra`), chaque étape lue et datée par sa donnée.
-          const ex = ficheExtra && ficheExtra.num === ficheNum ? ficheExtra : null;
-          const autresEnLigne = ex && ex.lbcItems != null && ex.vcItems != null ? sitesPrixDe(ficheNum, rn, ex).sites.filter((x) => x.site === 'leboncoin' || x.site === 'vestiaire') : null;
-          const neuve = (neuveRecente && cleNum(neuveRecente.numero) === rn.cle ? neuveRecente : null) || Object.values(load('vrm_fiches_neuves', {}) || {}).find((x) => x && !x.retireeAt && cleNum(x.numero) === rn.cle) || null;
-          const p = histoireArticle(rn, { fiches: numeros, saleOv: load('vinted_sale_overrides', {}) || {}, buyByNum: load('vinted_buyprice_by_num', {}) || {},
-            stats: numData ? (numData.stats === undefined ? null : numData.stats) : null, versements: numData ? (numData.versements === undefined ? null : numData.versements) : null, nomCompte,
-            coffres: ex ? ex.coffres : null, offres: ex ? ex.offres : null, recus: ex ? ex.recus : null, autresEnLigne, colisVente: ex ? ex.colisVente : undefined,
-            journalPrix: (load('vrm_prix_journal', {}) || {})[rn.cle] || [], prixVinted: load('vinted_prix_historique', []) || [], prixLus: load(CLE_PRIX_LUS, null),
-            sortieStock: (load('vrm_stock_sortis', {}) || {})[rn.cle] || null }, {
-            etapeVente: (o) => etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }),
-            venteAnnulee: (o) => classifyOrderStatus(o && o.status) === 'cancelled' || (o && o.transaction_id != null && txnAnnuleeAvantEnvoi(o.transaction_id)),
-            montantRecuEbay, commandeEbayEngagee, lbcAnnulee, lbcFinalisee,
-          });
-          // (5 nov.) « Voir l'état » : ce qui se calcule (`etatArticle`), depuis
-          // l'histoire ci-dessus et deux lectures en plus (dates Vinted, réception).
-          const etat = p ? etatArticle(p, { fiches: numeros, ids: (rn.annonces || []).map((a) => a.id),
-            crees: numData ? (numData.crees === undefined ? null : numData.crees) : undefined,
-            reception: ex ? ex.reception : undefined, receptionRaison: ex ? ex.receptionRaison : '' }) : null;
-          // (9 nov., lot AF) L'HISTOIRE DU N° (src/historiqueNumero.js) : lecture seule, depuis les
-          // traces qui existent (fiches, ventes, marqueur 013, Stock, journal des N°) — jamais devinée.
-          const histoNum = p && rn && rn.cle ? historiqueNumero({ cle: rn.cle, fiches: numeros, saleOv: load('vinted_sale_overrides', {}) || {},
-            journal: load(CLE_JOURNAL_NUMEROS, []) || [], marqueur: marqueurNumerotation(), sortieStock: (load('vrm_stock_sortis', {}) || {})[rn.cle] || null,
-            estArchive: (n) => estArchive(n), cleNum }) : null;
-          const fermer = () => setFicheNum(null);
-          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={ficheNum} lecture={!numData} note={p && p.num && !p.ancienNumero ? <>{questionChezToiFiche(p.num)}{blocVenduAilleurs(p, rn, etat)}<NotePaireCoque numero={p.num} variante="bloc" ajout/><BlocHistoriqueRepub ids={(rn.annonces || []).map((x) => String(x.id))} d={{ numeros, stats: Object.fromEntries((rn.annonces || []).map((x) => [String(x.id), { favoris: Number.isFinite(x.favourites) ? x.favourites : null, vues: Number.isFinite(x.views) ? x.views : null }])) }}/><BoutonRappel cible={{ sorte: 'article', num: p.num, item: (rn.annonces || []).length === 1 ? String(rn.annonces[0].id || '') : '' }} libelle={`N°${p.num}`}/></> : null} onFermer={fermer} onRetour={()=>{ fermer(); setGsQ(String((p && p.num) || ficheNum)); setGsOpen(true); }}
-            onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}
-            onEmballer={()=>{ fermer(); setGsOpen(false); DEMANDE_EMBALLAGE.at = Date.now(); setTab('cat_bord'); try { window.dispatchEvent(new Event('vrm:emballer')); } catch (_) {} }}
-            onPrix={(n)=>setPrixNum(String(n))} onPublierAilleurs={(n)=>setPubAil({ num: String(n), site: null })} neuve={neuve}
-            onPrixAchat={(pp)=>{ if (pp && pp.idFiche) setAchatFiche({ tx: 'fiche:' + pp.idFiche, item: pp.idFiche, num: String(pp.num || ''), sous: pp.titre ? String(pp.titre).slice(0, 34) : 'prix d’achat' }); }}
-            onSource={(src)=>{ fermer(); setGsOpen(false);
-              // (9 nov.) « Ouvrir dans … » : l'écran d'où vient l'étape, sur SON objet (par identité).
-              if (src.stock) { setGarageLocate(String(src.stock)); DEMANDE_STOCK_CHERCHE.nums=[String(src.stock)]; DEMANDE_STOCK_CHERCHE.at=Date.now(); setTab('garage'); return; }
-              if (src.tab === 'achats') demanderVue('achats'); if (src.sub) subVoulue.current = src.sub;
-              if (src.cible) poserCible(src.cible, redirigerOnglet(src.tab, null, ONGLETS_DEPLACES).tab);
-              setTab(src.tab); }}
-            onCopier={async(f)=>{ try { await navigator.clipboard.writeText(texteAColler(f)); toast('Texte copié'); } catch (_) { toast('Copie impossible ici'); } }}
-            onDupliquer={async()=>{ const r=await dupliquerNumero(rn, ex); if(!r.ok){ toast(`Pas dupliqué : ${r.raison}`); return; } toast(`N°${r.numero} créé`); setNeuveRecente(r.fiche); setFicheNum(String(r.numero)); }}
-            Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>} Icon={Icon} Retour={FermeAuRetour}/>;
-        }}/></GardeEcran>}
+        {ficheNum && <GardeEcran nom="fiche" feuille resetKey={ficheNum} onFermer={()=>setFicheNum(null)}><Differe rendre={()=>rendreFichePaire(ficheNum, null, ()=>setFicheNum(null))}/></GardeEcran>}
+        {/* (14 nov., proposition 62) Toucher une ligne de liste ouvre LA fiche de la paire (même composant). */}
+        <HoteFicheLigne rendre={rendreFichePaire} deps={{ fiches: load('vinted_annonce_numeros', {}) || {}, txnItem: numData ? (numData.txnItem === undefined ? null : numData.txnItem) : undefined }} onActive={setFicheLigneActive}/>
         {achatFiche && <GardeEcran nom="prixachat-fiche" feuille onFermer={()=>setAchatFiche(null)}><FeuillePrixAchat ventes={[achatFiche]} onEnregistrer={poserPrixAchatVente} onFermer={()=>setAchatFiche(null)} Feuille={SheetShellSurFiche} Bouton={Bouton}/></GardeEcran>}
         {prixFeuille && <GardeEcran nom="prixachat" feuille onFermer={()=>setPrixFeuille(null)}><PrixAchatCoque txs={prixFeuille} onPoser={poserPrixAchatVente} onFermer={()=>setPrixFeuille(null)}/></GardeEcran>}
         <GardeEcran nom="lienvc" feuille><HoteLienVc comptes={vintedAccounts}/></GardeEcran>

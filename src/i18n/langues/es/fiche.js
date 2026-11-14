@@ -1,0 +1,23 @@
+// es · fiche (FichePaire ouverte depuis une ligne de liste, 14 nov., proposition 62).
+export default {
+  "fiche.retour": "Volver",
+  "fiche.heros": "El par",
+  "fiche.actions": "Acciones",
+  "fiche.sansNum": "Sin N.º",
+  "fiche.sansTitre": "Sin título",
+  "fiche.lotN": "{n} pares",
+  "fiche.lotTitre": "Esta línea lleva {n} pares: elige cuál ver.",
+  "fiche.lecture": "Leyendo esta línea…",
+  "fiche.passu": "desconocido: la base no respondió, inténtalo de nuevo en un momento.",
+  "fiche.pasDePaire": "Ningún par vinculado a esta línea.",
+  "fiche.gesteRelier.vente": "Para vincularla: pon su N.º o vincula su compra, en las acciones de abajo.",
+  "fiche.gesteRelier.achat": "Para vincularla: pon el N.º del par en su anuncio, o vincula esta compra desde la venta.",
+  "fiche.gesteRelier.annonce": "Para vincularla: da un N.º a este anuncio.",
+  "fiche.ctx.vente": "Venta",
+  "fiche.ctx.colis": "Paquete por enviar",
+  "fiche.ctx.achat": "Compra",
+  "fiche.ctx.annonce": "Anuncio",
+  "fiche.ctx.stock": "Stock",
+  "fiche.ctx.retrait": "Paquete por recoger",
+  "fiche.ctx.journee": "Mi día",
+};

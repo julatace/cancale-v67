@@ -10,7 +10,9 @@ import ecran_emails from './de/emails.js';
 import ecran_stats from './de/stats.js';
 import ecran_compta from './de/compta.js';
 import ecran_argent from './de/argent.js';
+import ecran_fiche from './de/fiche.js';
 export default {
+  ...ecran_fiche,
   ...ecran_compta,
   ...ecran_argent,
   ...ecran_stats,
