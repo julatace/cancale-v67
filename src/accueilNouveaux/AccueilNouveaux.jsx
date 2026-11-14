@@ -89,7 +89,8 @@ export function BilanMinute({ bilan, onFin, onPasser, FermeAuRetour = null }) {
   const eur = useDefile(v.etat === 'lu' ? v.eur : null, 1100);
   const n = useDefile(v.etat === 'lu' ? v.n : null, 900);
   const bouton = React.useRef(null);
-  React.useEffect(() => { try { bouton.current && bouton.current.focus({ preventScroll: true }); } catch (_) {} }, [page]);
+  const cadre = React.useRef(null);
+  React.useEffect(() => { try { cadre.current && cadre.current.focus({ preventScroll: true }); } catch (_) {} }, [page]);
   const tuile = (cle, val, auMoins, lib) => (
     <div className="vrm-an-tuile" data-bilan-tuile={cle} data-bilan-n={val == null ? '' : String(val)}>
       <b>{val == null ? '—' : <>{auMoins ? <span className="vrm-an-plus">≥</span> : null}{ent(val)}</>}</b>
@@ -106,7 +107,7 @@ export function BilanMinute({ bilan, onFin, onPasser, FermeAuRetour = null }) {
     <div className="vrm-an vrm-an-bilan" role="dialog" aria-modal="true" aria-labelledby="vrm-an-bilan-titre" data-bilan-minute={page === 0 ? 'activite' : 'matin'} style={{ zIndex: Z }}>
       {FermeAuRetour ? <FermeAuRetour fermer={fermer} /> : null}
       <div className="vrm-an-lumiere" aria-hidden="true" />
-      <div className="vrm-an-cadre">
+      <div className="vrm-an-cadre" ref={cadre} tabIndex={-1}>
         <div className="vrm-an-haut">
           <div className="vrm-an-points" aria-hidden="true"><span data-on={page >= 0 ? '1' : '0'} /><span data-on={page >= 1 ? '1' : '0'} /></div>
           <button type="button" className="vrm-an-passer" data-bilan-passer="" onClick={fermer}>{tr('nouveaux.passer')}</button>
@@ -230,11 +231,12 @@ export function PremierColis({ deps, onFini, notifs }) {
   const fin = (f) => { deps.save(CLE_PREMIER_COLIS, marqueurColis(f)); onFini(); };
   const FermeAuRetour = deps.FermeAuRetour;
   const bouton = React.useRef(null);
-  React.useEffect(() => { try { bouton.current && bouton.current.focus({ preventScroll: true }); } catch (_) {} }, [i]);
+  const feuille = React.useRef(null);
+  React.useEffect(() => { try { feuille.current && feuille.current.focus({ preventScroll: true }); } catch (_) {} }, [i]);
   return createPortal(
     <div className="vrm-an-voile" style={{ zIndex: Z }} data-premier-colis={etape}>
       {FermeAuRetour ? <FermeAuRetour fermer={() => fin('passe')} /> : null}
-      <div className="vrm-an-feuille vrm-an-feuille-colis" role="dialog" aria-modal="true" aria-labelledby="vrm-an-colis-titre" onClick={(e) => e.stopPropagation()}>
+      <div className="vrm-an-feuille vrm-an-feuille-colis" ref={feuille} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="vrm-an-colis-titre" onClick={(e) => e.stopPropagation()}>
         <span className="vrm-an-poignee" aria-hidden="true" />
         <div className="vrm-an-haut">
           <span className="vrm-an-etape" data-colis-progres={`${i + 1}/${ETAPES_COLIS.length}`}>{tr('nouveaux.colis.surtitre', { i: i + 1, n: ETAPES_COLIS.length })}</span>

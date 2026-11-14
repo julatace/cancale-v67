@@ -21829,8 +21829,11 @@ function useParcoursArrivee({ comptes: comptesCoque, actif = true, tour: tourDem
   const tour = tourDemande + relu;
   React.useEffect(() => {
     const relire = () => setRelu((n) => n + 1);
-    window.addEventListener('vrm:parcours', relire);
-    return () => window.removeEventListener('vrm:parcours', relire);
+    // (14 nov., n° 135) Sans Vinted, la carte relit aussi ses sites quand l'extension
+    // vient d'écrire (`vrm:ext` maj) ou qu'il revient sur l'onglet — comme la sonde des sites.
+    const relireSite = (e) => { if (routeParcoursIci().cle === 'vinted') return; if (e && e.type === 'vrm:ext' && !(e.detail && e.detail.type === 'maj')) return; relire(); };
+    window.addEventListener('vrm:parcours', relire); window.addEventListener('vrm:ext', relireSite); window.addEventListener('focus', relireSite);
+    return () => { window.removeEventListener('vrm:parcours', relire); window.removeEventListener('vrm:ext', relireSite); window.removeEventListener('focus', relireSite); };
   }, []);
   React.useEffect(() => {
     const cles = [CLE_PARCOURS, CLE_PLUS_TARD, CLE_GUIDE_MASQUE];

@@ -71,6 +71,7 @@
 :root[data-theme="dark"] .vrm-an-feuille { background-color: #1C1C1E; }
 @keyframes vrm-an-feuille { from { transform: translateY(40px); opacity: .4; } to { transform: none; opacity: 1; } }
 @media (min-width: 744px) and (hover: hover) { .vrm-an-voile { align-items: center; } .vrm-an-feuille { border-radius: 22px; } }
+.vrm-an-cadre:focus, .vrm-an-feuille:focus { outline: none; }
 .vrm-an-poignee { display: block; width: 36px; height: 5px; border-radius: 999px; background: var(--an-filet); margin: 0 auto 4px; }
 .vrm-an-etape { font-size: 13px; font-weight: 600; color: var(--an-gris); }
 .vrm-an-colis-barre { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 2px 0 8px; }

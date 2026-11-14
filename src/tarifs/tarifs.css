@@ -26,10 +26,11 @@
 .vt-marque img { border-radius: 8px; }
 .vt-marque b { font-size: 17px; letter-spacing: -.01em; }
 .vt-nav-droite { display: flex; align-items: center; gap: 6px; }
-.vt-lien { color: var(--vt-encre); text-decoration: none; font-size: 15px; font-weight: 600; min-height: 44px; display: inline-flex; align-items: center; padding: 0 10px; }
+.vt-lien { color: var(--vt-encre); text-decoration: none; font-size: 15px; font-weight: 600; min-height: 44px; display: inline-flex; align-items: center; padding: 0 10px; white-space: nowrap; }
 .vt-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 50px; padding: 0 24px; border-radius: 999px; background: var(--vt-accent); color: #fff; font-size: 17px; font-weight: 600; text-decoration: none; transition: transform .12s ease-out; }
 .vt-btn:active { transform: scale(.97); }
-.vt-btn-petit { min-height: 44px; padding: 0 18px; font-size: 15px; }
+.vt-btn-petit { min-height: 44px; padding: 0 16px; font-size: 15px; white-space: nowrap; }
+@media (max-width: 380px) { .vt-nav .vt-lien { padding: 0 6px; } .vt-marque b { display: none; } }
 .vt-btn-neutre { background: var(--vt-teinte); color: var(--vt-lien); }
 .vt a:focus-visible { outline: 2px solid var(--vt-accent); outline-offset: 3px; border-radius: 10px; }
 
