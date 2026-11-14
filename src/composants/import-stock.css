@@ -4,12 +4,12 @@
    pastilles ; ambre = à corriger (conflit, à vérifier, ignorée). Jetons seulement.
    ═══════════════════════════════════════════════════════════════════════════ */
 .vrm-imps { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.vrm-imps-phrase { margin: 0; font-size: 16px; line-height: 1.4; color: var(--vrm-ink, #1D1D1F); }
-.vrm-imps-fichier { margin: 0; font-size: 14px; font-weight: 600; color: var(--vrm-ink, #1D1D1F); overflow-wrap: anywhere; }
+.vrm-imps-phrase { margin: 0; font-size: 15px; line-height: 1.4; color: var(--vrm-ink, #1D1D1F); }
+.vrm-imps-fichier { margin: 0; font-size: 15px; font-weight: 600; color: var(--vrm-ink, #1D1D1F); overflow-wrap: anywhere; }
 .vrm-imps-note { margin: 0; font-size: 13px; line-height: 1.45; color: var(--vrm-muted, #6E6E73); }
-.vrm-imps-erreur { margin: 0; font-size: 14px; line-height: 1.45; color: var(--vrm-warn, #B25E00); font-weight: 600; }
+.vrm-imps-erreur { margin: 0; font-size: 15px; line-height: 1.45; color: var(--vrm-warn, #B25E00); font-weight: 600; }
 .vrm-imps-puces { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
-.vrm-imps-puces li { padding: 7px 12px; border-radius: 999px; background: var(--vrm-surface, #fff); box-shadow: 0 0 0 .5px var(--vrm-line, rgba(60,60,67,.18)); font-size: 14px; font-weight: 600; color: var(--vrm-ink, #1D1D1F); }
+.vrm-imps-puces li { padding: 7px 12px; border-radius: 999px; background: var(--vrm-surface, #fff); box-shadow: 0 0 0 .5px var(--vrm-line, rgba(60,60,67,.18)); font-size: 13px; font-weight: 600; color: var(--vrm-ink, #1D1D1F); }
 .vrm-imps-colonnes { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; max-width: 100%; }
 .vrm-imps-col { flex: 0 0 auto; display: flex; flex-direction: column; gap: 4px; min-width: 124px; max-width: 168px; }
 .vrm-imps-col-nom { font-size: 12px; font-weight: 600; color: var(--vrm-muted, #6E6E73); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -19,10 +19,10 @@
 }
 .vrm-imps-col select[data-imps-champ=""] { color: var(--vrm-muted, #6E6E73); }
 .vrm-imps-resume { display: flex; flex-wrap: wrap; gap: 8px; }
-.vrm-imps-pastille { padding: 7px 12px; border-radius: 999px; background: var(--vrm-surface, #fff); box-shadow: 0 0 0 .5px var(--vrm-line, rgba(60,60,67,.18)); font-size: 14px; color: var(--vrm-ink, #1D1D1F); font-variant-numeric: tabular-nums; }
+.vrm-imps-pastille { padding: 7px 12px; border-radius: 999px; background: var(--vrm-surface, #fff); box-shadow: 0 0 0 .5px var(--vrm-line, rgba(60,60,67,.18)); font-size: 13px; color: var(--vrm-ink, #1D1D1F); font-variant-numeric: tabular-nums; }
 .vrm-imps-pastille b { font-weight: 700; }
 .vrm-imps-pastille.vrm-imps-ambre { background: var(--vrm-warn-soft, rgba(255,159,10,.16)); color: var(--vrm-warn, #B25E00); }
-.vrm-imps-case { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; font-size: 14px; line-height: 1.4; color: var(--vrm-ink, #1D1D1F); cursor: pointer; }
+.vrm-imps-case { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; font-size: 15px; line-height: 1.4; color: var(--vrm-ink, #1D1D1F); cursor: pointer; }
 .vrm-imps-case input { flex: 0 0 auto; width: 22px; height: 22px; margin: 1px 0 0; accent-color: var(--vrm-accent, #0071E3); }
 .vrm-imps-lignes {
   list-style: none; margin: 0; padding: 0; border-radius: 12px; overflow: hidden;

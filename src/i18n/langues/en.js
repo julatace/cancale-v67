@@ -9,8 +9,10 @@ import ecran_messages from './en/messages.js';
 import ecran_emails from './en/emails.js';
 import ecran_stats from './en/stats.js';
 import ecran_compta from './en/compta.js';
+import ecran_argent from './en/argent.js';
 export default {
   ...ecran_compta,
+  ...ecran_argent,
   ...ecran_stats,
   ...ecran_emails,
   ...ecran_messages,
@@ -474,6 +476,8 @@ export default {
   "reglages.push.desc": "Get notified on your phone of a sale, an offer or a parcel.",
   "reglages.push.lib": "Phone notifications",
   "reglages.push.muets": { one: "{n} account without email: no notification", other: "{n} accounts without email: no notification" },
+  "reglages.push.soirAuto": "Auto",
+  "reglages.push.soirAutoTitre": "7 pm in winter, 8 pm in summer",
   "reglages.raccourcis-clavier.desc": "On a computer: “g” then a letter, “?” for the list.",
   "reglages.raccourcis-clavier.lib": "Keyboard shortcuts",
   "reglages.raccourcis-siri.desc": "Add a purchase or find a number by talking to Siri.",
