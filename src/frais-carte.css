@@ -29,7 +29,7 @@ html body button.vrm-fc-rangee:active { background: var(--d-remplir, rgba(118,11
 .vrm-fc-pastille { flex: 0 0 32px; width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; font-size: 15px; font-weight: 700; color: var(--d-encre, #1D1D1F); background: var(--d-remplir, rgba(118,118,128,.12)); }
 .vrm-fc-nom { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; }
 .vrm-fc-nom-t { font-size: 17px; letter-spacing: -.012em; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.vrm-fc-nom-s { font-size: 13px; color: var(--d-gris, #6E6E73); line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-variant-numeric: tabular-nums; }
+.vrm-fc-nom-s { font-size: 13px; color: var(--d-gris, #6E6E73); line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; font-variant-numeric: tabular-nums; }
 .vrm-fc-val { flex: 0 0 auto; font-size: 17px; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--d-encre, #1D1D1F); text-align: right; }
 .vrm-fc-val small { font-size: 13px; color: var(--d-gris, #6E6E73); }
 .vrm-fc-val.is-vide { color: var(--d-gris, #6E6E73); }
@@ -47,8 +47,11 @@ html body button.vrm-fc-repli, html body button.vrm-fc-fermer { align-self: flex
 .vrm-cv-carte.is-ko { position: absolute; visibility: hidden; pointer-events: none; height: 0; }
 .vrm-cv-ko { padding: 0 4px; }
 /* Une bulle : encre translucide, chiffre blanc ; la choisie porte l'accent (le geste). */
-html body button.vrm-cv-bulle { display: grid; place-items: center; padding: 0; margin: 0; border: 1.5px solid rgba(255,255,255,.9); border-radius: 50%; background: rgba(29,29,31,.78); color: #fff; font-family: var(--vrm-police, -apple-system, system-ui, sans-serif); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.18); transition: transform var(--d-m-court, 150ms) var(--d-sortie, ease); }
-html body button.vrm-cv-bulle:active { transform: scale(.94); }
+html body button.vrm-cv-bulle { display: grid; place-items: center; padding: 0; margin: 0; border: 1.5px solid rgba(255,255,255,.9); border-radius: 50%; background: rgba(29,29,31,.78); color: #fff; font-family: var(--vrm-police, -apple-system, system-ui, sans-serif); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.18); }   /* aucune transition de transform : MapLibre place la bulle par transform */
+/* La règle des 44 px de l'app (boutons au doigt) ne GROSSIT pas une bulle — sa taille dit le nombre de ventes ;
+   au doigt, la zone touchée reste de 44 px (cercle invisible autour) et la liste dessous a des rangées de 56 px. */
+html body button.vrm-cv-bulle.vrm-cv-bulle { min-width: 0; min-height: 0; box-sizing: border-box; }
+@media (pointer: coarse) { html body button.vrm-cv-bulle::before { content: ""; position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); border-radius: 50%; } }
 html body button.vrm-cv-bulle[data-cv-approx] { border-style: dashed; }
 html body button.vrm-cv-bulle[aria-pressed="true"] { background: var(--d-accent, #0071E3); border-color: #fff; }
 .vrm-cv-point { flex: 0 0 32px; display: grid; place-items: center; width: 32px; height: 32px; }
@@ -62,4 +65,4 @@ html body button.vrm-cv-bulle[aria-pressed="true"] { background: var(--d-accent,
 .vrm-cv-vente { min-height: 52px; content-visibility: auto; contain-intrinsic-size: auto 52px; }
 
 :root[data-theme="dark"] .vrm-cv-point::after { background: var(--d-encre, #F5F5F7); }
-@media (prefers-reduced-motion: reduce) { html body button.vrm-cv-bulle, html body button.vrm-fc-rangee { transition: none; } }
+@media (prefers-reduced-motion: reduce) { html body button.vrm-fc-rangee { transition: none; } }

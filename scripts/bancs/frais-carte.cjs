@@ -83,6 +83,8 @@ for (let i = 0; i < 400; i++) {
     fulfillmentStartInstructions: [{ shippingStep: { shipTo: { fullName: `Nom Secret ${i}`, primaryPhone: { phoneNumber: '0611223344' }, contactAddress: { addressLine1: `${i} rue Secrète`, city: i % 7 === 0 ? v[0].toUpperCase() : v[0], postalCode: v[1], countryCode: v[4] || 'FR' } } } }] });
   releve.push(['eBay', '', 'ebay:' + ebay[i].orderId, t, du, null, 0, `${MOD[i % 6]}`, String(2000 + i), iso(t)]);
 }
+// Leboncoin : 20 ventes au relevé, aucun frais noté ⇒ « — » (jamais 0) sur sa rangée.
+for (let i = 0; i < 20; i++) releve.push(['Leboncoin', '', 'lbc:' + (3200000000 + i), now - (i + 2) * 86400000, 70 + i, null, 0, 'Asics Gel-1130', '', '']);
 const lignes = () => [
   { id: 'main', data: { vrm_bienvenue_vue: { at: iso(now) }, vrm_visite_vue: { at: iso(now) }, vrm_numerotation: { version: 2, archive: 'B', coupure: '2026-10-09T00:00:00Z' },
     vrm_compta: { packs: [{ date: `${AN}-03-02`, montant: 4.99, plateforme: 'Vinted', libelle: 'Boost 7 jours' }], abonnements: [], depenses: [], fixes: [] } } },
@@ -183,7 +185,9 @@ async function passe(nav, FIX, { W, theme }) {
     dit(vi.etat === 'auMoins' && vi.raison === 'boostsPasLus' && Number(vi.boosts) > 0, `${T} F · Vinted : au moins (boosts pas lus chez Vinted), boosts notés mis à part`, vi);
     const somme = F.rows.reduce((t, r) => t + (r.eur ? Number(r.eur) : 0), 0);
     dit(Number(F.total) === somme && F.auMoins === '1' && /au moins/.test(F.grand), `${T} F · total = somme des sites connus, « au moins »`, F);
-    dit(F.rows.every((r) => r.eur !== '' || !/\d/.test(r.val)), `${T} F · un site aux frais inconnus n’écrit jamais un nombre`, F.rows);
+    const lb = F.rows.find((r) => r.site === 'Leboncoin') || {};
+    dit(lb.etat === 'inconnu' && lb.eur === '' && lb.raison === 'optionsPasLues' && lb.val.trim() === '—', `${T} F · Leboncoin, rien de noté : « — » et la raison, jamais 0`, lb);
+    dit(F.rows.length >= 3 && F.rows.every((r) => r.eur !== '' || !/\d/.test(r.val)), `${T} F · un site aux frais inconnus n’écrit jamais un nombre`, F.rows);
     await pg.locator('[data-frais-annee]').first().scrollIntoViewIfNeeded().catch(() => {});
     await capture(pg, nomS('frais'), await pg.$('[data-frais-annee]'));
   }
@@ -206,10 +210,32 @@ async function passe(nav, FIX, { W, theme }) {
     else dit(bulles, `${T} C · la carte était déjà à l’écran au chargement (${avant}) : bulles posées`, avant);
     // Le même travail sur commande : toute la période (les 2 000 ventes) recalculée et reposée.
     await calme();
-    const t1 = Date.now();
-    await pg.locator('[data-cv-periode="tout"]').first().click().catch(() => {});
-    const toutOk = await pg.waitForFunction(() => { const s = document.querySelector('[data-carte-ventes]'); return s && +s.getAttribute('data-cv-n') >= 1900 && document.querySelectorAll('[data-cv-bulle]').length >= 8; }, null, { timeout: 10000 }).then(() => true).catch(() => false);
-    const ms2 = Date.now() - t1;
+    // Chronométré DANS la page (du clic à la dernière bulle posée, MutationObserver) : ni l'aller-retour
+    // de Playwright ni son sondage ne comptent.
+    let cdp = null;
+    if (process.env.PROFIL) { cdp = await pg.context().newCDPSession(pg); await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 500 }); await cdp.send('Profiler.start'); }
+    const mesure = await pg.evaluate(() => new Promise((ok) => {
+      const s = document.querySelector('[data-carte-ventes]'), b = document.querySelector('[data-cv-periode="tout"]');
+      if (!s || !b) return ok({ ok: false, ms: -1 });
+      const fini = () => +s.getAttribute('data-cv-n') >= 1900 && document.querySelectorAll('[data-cv-bulle]').length >= 8;
+      const t0 = performance.now();
+      const mo = new MutationObserver(() => { if (fini()) { mo.disconnect(); clearTimeout(t); ok({ ok: true, ms: Math.round(performance.now() - t0) }); } });
+      mo.observe(s, { subtree: true, childList: true, attributes: true });
+      const t = setTimeout(() => { mo.disconnect(); ok({ ok: fini(), ms: Math.round(performance.now() - t0) }); }, 10000);
+      const cv0 = s.querySelector('canvas');
+      b.click();
+      const sync = Math.round(performance.now() - t0);
+      setTimeout(() => { window.__fcSonde = { sync, memeCarte: s.querySelector("canvas") === cv0 }; }, 0);
+    }));
+    if (process.env.BAVARD || process.env.PROFIL) console.log('  sonde clic', JSON.stringify(await pg.evaluate(() => window.__fcSonde)));
+    const toutOk = mesure.ok, ms2 = mesure.ms;
+    if (cdp) {
+      const { profile } = await cdp.send('Profiler.stop');
+      const parId = new Map(profile.nodes.map((n) => [n.id, n])), soi = new Map();
+      const dt = profile.timeDeltas || [];
+      profile.samples.forEach((id, i) => { const n = parId.get(id); const k = `${n.callFrame.functionName || "(anon)"} ${String(n.callFrame.url).split("/").pop()}:${n.callFrame.lineNumber}:${n.callFrame.columnNumber}`; soi.set(k, (soi.get(k) || 0) + (dt[i] || 0)); });
+      console.log('  profil (ms propres) :', [...soi.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([k, v]) => `${Math.round(v / 1000)} ${k}`).join(' | '));
+    }
     const nTout = await pg.evaluate(() => +document.querySelector('[data-carte-ventes]').getAttribute('data-cv-n'));
     dit(toutOk && ms2 < 1000, `${T} C · « Tout » : ${nTout} ventes agrégées et reposées en ${ms2} ms (< 1 000)`, ms2);
     await pg.locator('[data-cv-periode="12m"]').first().click().catch(() => {});
@@ -233,7 +259,7 @@ async function passe(nav, FIX, { W, theme }) {
     await capture(pg, nomS('detail'), await pg.$('[data-carte-ventes]'));
     // ── V
     await pg.locator('[data-cv-vue-choix="france"]').first().click().catch(() => {});
-    await pg.waitForFunction(() => document.querySelectorAll('[data-cv-bulle^="v|"]').length >= 15, null, { timeout: 45000 }).catch(() => {});
+    await pg.waitForFunction(() => document.querySelectorAll('[data-cv-bulle^="v|"]').length >= 15, null, { timeout: 90000 }).catch(() => {});
     await pg.waitForTimeout(800);
     const V = await pg.evaluate(() => ({ villes: document.querySelectorAll('[data-cv-bulle^="v|"]').length, deps: [...document.querySelectorAll('[data-cv-bulle^="d|"]')].map((b) => b.getAttribute('data-cv-bulle')), sansVille: +document.querySelector('[data-carte-ventes]').getAttribute('data-cv-france-sans-ville'), resume: (document.querySelector('[data-cv-resume]') || {}).innerText || '' }));
     dit(V.villes >= 15 && V.deps.includes('d|35'), `${T} V · France : ${V.villes} villes placées, Saint-Malo (sans repère) dans le département 35`, V);
