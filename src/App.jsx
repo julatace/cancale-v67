@@ -237,7 +237,6 @@ import { brancherVeille, noterReleveVeille } from './veilleLigne.js';
 import { prochainGesteAnnonces } from './prochainGesteAnnonces.js';
 import AnnoncesMasquees from "./AnnoncesMasquees.jsx";
 import VueACompleter from "./AnnoncesACompleter.jsx";
-import { notesAnnonces } from "./noteAnnonce/noteAnnonce.js";   // (14 nov., idée 155) la note de chaque annonce
 import AvisVente from "./AvisVente.jsx";
 import { annoncesACompleter } from "./annoncesACompleter.js";
 import { BoutonCentreNotifs, FeuilleCentreNotifs } from "./CentreNotifs.jsx";
@@ -331,7 +330,7 @@ const ModeEmballage = aLaDemande(() => import('./ModeEmballage.jsx'), true);
 // (9 nov., lot AD) « Préparer mes colis » pas à pas : à la demande (sa feuille de style reste ICI).
 const PreparerColis = aLaDemande(() => import('./PreparerColis.jsx'), true);
 const FichePaire = aLaDemande(() => import('./FichePaire.jsx'), true);
-const OutilsFicheIdeesP = lazy(() => import('./autreTaille/OutilsFiche.jsx'));   // (14 nov., idées 156-157) autre taille, modèle
+const OutilsFicheIdeesP = lazy(() => import('./autreTaille/OutilsFiche.jsx'));   // (14 nov., idée 157) « Dans une autre taille »
 const OutilsFicheIdees = (props) => <Suspense fallback={null}><OutilsFicheIdeesP {...props}/></Suspense>;
 // (14 nov., proposition 62 — « Une seule fiche partout ») L'HÔTE DE LA FICHE OUVERTE PAR UNE LIGNE.
 // Un toucher sur le corps d'une rangée qui porte `attrsFicheLigne` (src/ficheLigne.js) ouvre LA fiche de
@@ -4297,16 +4296,6 @@ function fichesPourPasEnLigne(lignes) {
 }
 // (3 nov.) Mes modèles de description (src/modelesDescription.js), synchronisés.
 const lireModelesRanges = () => lireModeles(load(CLE_MODELES, []));
-// (14 nov., idée 156) La description d'une fiche « À publier » remplie depuis un modèle (SON clic) :
-// écrite sur CETTE fiche (par son id), rien d'autre. Rend la fiche écrite, ou null (fiche absente).
-function poserDescriptionNeuve(id, description) {
-  const t = load('vrm_fiches_neuves', {}) || {};
-  if (!id || !t[id]) return null;
-  const fiche = { ...t[id], description: String(description || '').slice(0, 5000) };
-  save('vrm_fiches_neuves', { ...t, [id]: fiche });
-  emettreClesRelues(['vrm_fiches_neuves']);
-  return fiche;
-}
 // (14 nov., idée 154) Les dates des photos du studio d'UN N° — projection scalaire (jamais `select=data` :
 // la ligne porte les images). null : la base n'a pas répondu (« pas su »).
 const lireStudioDates = (num) => lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent('studio_photos_' + cleNum(num))}&select=${selectStudio()}`);
@@ -41995,8 +41984,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const ouN = ouNumeroEcrit();
     const enLigne = listings.items.filter((it) => it && !acctOffOf(it));
     const unCompte = new Set(enLigne.map((x) => String((x._acc && x._acc.vinted_user_id) || ''))).size <= 1;
-    // (14 nov., idée 155) LA NOTE de chaque annonce : les manques d'« À compléter » + description courte + prix sous l'achat.
-    return notesAnnonces(enLigne.map((it) => { const e = numeros[it.id] || {}; const a = prixAchatDe(e, buyByNum);
+    return annoncesACompleter(enLigne.map((it) => { const e = numeros[it.id] || {}; const a = prixAchatDe(e, buyByNum);
       return { id: it.id, titre: it.title, photo: photoArticle(it) || '', num: e.numero ? String(e.numero) : '', compte: unCompte ? '' : ((it._acc && (it._acc.login || it._acc.username)) || ''),
         domaine: it._acc && it._acc.domain, prix: it.price, ts: it.createdTs, nPhotos: it.champsLus && it.champsLus.photos ? it.photoCount : null, marque: it.brand, taille: it.size, etat: it.condition, champsLus: it.champsLus,
         descNumero: it.numEcritDesc, desc: typeof it.desc === 'string' ? it.desc : typeof it.description === 'string' ? it.description : undefined, descLen: it.descLen, prixAchat: a != null && !isNaN(a) ? a : null }; }),
@@ -61408,13 +61396,14 @@ function AppCoeur() {
             onDupliquer={async()=>{ const r=await dupliquerNumero(rn, ex); if(!r.ok){ toast(`Pas dupliqué : ${r.raison}`); return; } toast(`N°${r.numero} créé`); setNeuveRecente(r.fiche); fermer(); setFicheNum(String(r.numero)); }}
             // (14 nov., idée 154) La ligne de temps : la réception de l'achat relié, les dates Vinted des annonces, les photos du studio (projection scalaire).
             extraTemps={{ reception: ex ? ex.reception : undefined, crees: numData ? (numData.crees === undefined ? null : numData.crees) : undefined, lireStudio: lireStudioDates }}
-            // (14 nov., idées 156-157) « Dans une autre taille » (N° neuf par `dupliquerNumero`) et « Remplir avec un modèle ».
-            outilsIdees={p && !p.ancienNumero ? <OutilsFicheIdees numero={p.num} neuve={neuve} source={champsADupliquer(rn, ex)} modeles={lireModelesRanges()}
-              reglages={{ etiquette: load('vrm_num_vinted', null), numeroEcrit: load('vrm_numero_ecrit', null) }} Retour={FermeAuRetour}
-              onCreerTaille={async (champs, finir) => { const r = await dupliquerNumero(rn, ex, champs); if (!r.ok) return { ok: false, raison: tr('at.pasCree', { raison: r.raison }) };
-                let fiche = r.fiche; const d = finir ? finir(r.fiche) : null; if (d != null) fiche = poserDescriptionNeuve(r.id, d) || fiche;
-                toast(tr('at.cree', { num: r.numero })); setNeuveRecente(fiche); fermer(); setFicheNum(String(r.numero)); return r; }}
-              onPoserDescription={(f, d) => { const x = poserDescriptionNeuve(f.id, d); if (!x) { toast(tr('md.pasPose')); return; } setNeuveRecente(x); toast(tr('md.pose')); }}/> : null}
+            // (14 nov., idée 157) « Dans une autre taille » : une fiche « À publier », N° neuf par `dupliquerNumero`.
+            // ⚠️ §5 : deux paires sous ce N° ⇒ aucune copie (on ne choisit pas laquelle) ; « Je numérote moi-même »
+            // allumé ⇒ VRM ne donne pas de N° (la règle des lots) : la feuille le dit, rien n'est créé.
+            outilsIdees={p && !p.ancienNumero && !p.double ? <OutilsFicheIdees numero={p.num} source={champsADupliquer(rn, ex)} Retour={FermeAuRetour}
+              bloque={numeroEcritActif() ? tr('at.raison.numeroEcrit') : !numerotationPermise() ? tr('at.raison.numeros') : ''}
+              onCreerTaille={async (champs) => { if (numeroEcritActif()) return { ok: false, raison: tr('at.raison.numeroEcrit') };
+                const r = await dupliquerNumero(rn, ex, champs); if (!r.ok) return { ok: false, raison: tr('at.pasCree', { raison: r.raison }) };
+                toast(tr('at.cree', { num: r.numero })); setNeuveRecente(r.fiche); fermer(); setFicheNum(String(r.numero)); return r; }}/> : null}
             ligne={depuis} ligneRes={ligneRes} onChoisirNum={choisir}
             Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>} Icon={Icon} Retour={FermeAuRetour}/>;
   };

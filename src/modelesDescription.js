@@ -8,9 +8,7 @@
 // Module PUR : la feuille (src/ModelesDescription.jsx) et le banc `modeles-description`.
 
 export const CLE_MODELES = 'vrm_modeles_desc';
-// (14 nov., idée 156) + {etat}, {modele}, {boite} — remplis SEULEMENT par un champ écrit
-// (la fiche, ou sa réponse dans la feuille « Remplir avec un modèle ») ; jamais devinés.
-export const VARIABLES = ['taille', 'marque', 'modele', 'etat', 'boite', 'N°', 'titre', 'prix'];
+export const VARIABLES = ['taille', 'marque', 'N°', 'titre', 'prix'];
 const MAX_MODELES = 30, MAX_TEXTE = 2000, MAX_NOM = 40;
 
 const str = (v) => String(v == null ? '' : v);
@@ -35,7 +33,6 @@ export function lireModeles(v) {
 export function remplirModele(texte, v = {}) {
   const val = {
     taille: v.taille, marque: v.marque, titre: v.titre,
-    etat: v.etat, 'état': v.etat, modele: v.modele, 'modèle': v.modele, boite: v.boite, 'boîte': v.boite,
     'n°': v.numero != null && str(v.numero).trim() ? `N°${str(v.numero).trim()}` : null,
     numero: v.numero, 'numéro': v.numero,
     prix: v.prix != null && Number.isFinite(Number(v.prix)) && Number(v.prix) > 0 ? `${String(Math.round(Number(v.prix) * 100) / 100).replace('.', ',')}\u00a0€` : null,

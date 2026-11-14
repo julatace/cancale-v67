@@ -1,24 +1,21 @@
-// Le harnais du banc idees-paires (14 nov., idées 154-158) : les VRAIS composants et les VRAIES
+// Le harnais du banc idees-paires (14 nov., idées 154, 157, 158) : les VRAIS composants et les VRAIES
 // règles, montés seuls, sur des données INVENTÉES (le dépôt est public). Une scène par adresse :
-//   #temps · #note · #modele · #taille · #heure   (+ « sombre » pour la nuit).
+//   #temps · #double · #taille · #bloque · #heure · #partiel   (+ « sombre » pour la nuit).
 // Les gestes sont notés dans window.__* (rien n'est écrit nulle part).
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { ajouterSourceApp } from '../../../src/i18n/index.js';
+import { ajouterSourceApp, tr } from '../../../src/i18n/index.js';
 import fr from '../../../src/i18n/langues/fr.js';
 import { toutSurLeNumero } from '../../../src/rechercheNumero.js';
 import { histoireArticle } from '../../../src/histoireArticle.js';
 import { cleNumero } from '../../../src/numeroEcrit.js';
 import LigneDeTemps, { OngletsFiche } from '../../../src/paireHistoire/LigneDeTemps.jsx';
-import VueACompleter from '../../../src/AnnoncesACompleter.jsx';
-import { notesAnnonces } from '../../../src/noteAnnonce/noteAnnonce.js';
-import RemplirModele from '../../../src/modelesDescription/RemplirModele.jsx';
 import AutreTaille from '../../../src/autreTaille/AutreTaille.jsx';
 import MeilleureHeure, { useMeilleureHeure } from '../../../src/meilleureHeure/MeilleureHeure.jsx';
 
 ajouterSourceApp(fr);
 const sombre = /sombre/.test(location.hash);
-const scene = (/#(\w+)/.exec(location.hash) || [])[1] || 'temps';
+const scene = (/#([a-z]+)/.exec(location.hash) || [])[1] || 'temps';
 document.documentElement.setAttribute('data-theme', sombre ? 'dark' : 'light');
 document.body.style.margin = '0';
 document.body.style.fontFamily = '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif';
@@ -30,7 +27,6 @@ document.body.style.color = sombre ? '#EAF2FB' : '#0C1D30';
 
 const c = document.createElement('canvas'); c.width = 88; c.height = 88; const g = c.getContext('2d'); g.fillStyle = '#d9dee4'; g.fillRect(0, 0, 88, 88); g.fillStyle = '#fff'; g.fillRect(14, 40, 60, 20);
 const PHOTO = c.toDataURL('image/jpeg', 0.8);
-const Photo = ({ src, className }) => <img src={src} className={className} alt="" width="44" height="44"/>;
 
 // ── LA PAIRE N°7 (et ses 49 jumelles au même titre) : la VRAIE chaîne d'identité ──
 const J = 86400e3, T0 = Date.parse('2026-09-01T10:00:00Z');
@@ -69,32 +65,22 @@ function SceneTemps() {
   );
 }
 
-function SceneNote() {
-  const base = { nPhotos: 6, marque: 'Nike', taille: '42', etat: 'Très bon état', champsLus: { marque: true, taille: true, etat: true }, prixAchat: 40, domaine: 'www.vinted.fr', photo: PHOTO };
-  const res = notesAnnonces([
-    { ...base, id: 11, num: '11', titre: 'Nike Dunk Low Panda 42', prix: '30', nPhotos: 2, desc: 'Très bon état.' },
-    { ...base, id: 12, num: '12', titre: 'Nike Dunk Low Panda 43', prix: '80', desc: 'Court.' },
-    { ...base, id: 13, num: '13', titre: 'Adidas Samba OG noires — un titre très long pour voir si la ligne tient sur un téléphone', prix: '60', prixAchat: null, desc: 'x'.repeat(120) },
-    { ...base, id: 14, num: '14', titre: 'New Balance 550', prix: '90', desc: 'x'.repeat(120) },
-    { ...base, id: 15, num: '15', titre: 'Asics Gel-1130', prix: '70', descLen: undefined },
-  ], {});
-  window.__note = res;
-  return <main style={{ maxWidth: 760, margin: '0 auto', padding: '16px' }}><VueACompleter res={res} Photo={Photo} onPrixAchat={(id) => { window.__prixAchat = id; }} onBrouillon={() => {}}/></main>;
+// N°60 porté par DEUX paires présentes : la ligne de temps ne mélange pas leurs histoires.
+function SceneDouble() {
+  const fx = { ...fiches, '9100060': { numero: '60', title: TITRE, price: '80', numberedAt: isoJ(3) }, '9200060': { numero: '60', title: TITRE, price: '80', numberedAt: isoJ(4) } };
+  const rn = toutSurLeNumero('60', { ...D, fiches: fx, enLigne: new Set([...D.enLigne, '9100060', '9200060']) }, { ...oRN, conflits: (m) => Object.values(m).filter((l) => l.length > 1) });
+  const h = histoireArticle(rn, { fiches: fx, saleOv: {}, buyByNum: {}, stats: {}, versements: {}, coffres, offres: [], recus: new Set(), autresEnLigne: [], colisVente: {}, journalPrix: [], prixVinted, prixLus: null }, oH);
+  return <main style={{ maxWidth: 640, margin: '0 auto', padding: 16 }}><h1>N°60</h1><LigneDeTemps h={h} extra={{ crees, lireStudio: async () => [] }}/></main>;
 }
-
-const MODELES = [
-  { id: 'm1', nom: 'Sneakers', texte: '{marque} {modele} · taille {taille}\n{etat} · {boite}\nEnvoi soigné sous 24 h.' },
-  { id: 'm2', nom: 'Court', texte: '{etat}, taille {taille}.' },
-];
-const NEUVE = { id: 'n51', numero: '51', titre: 'Nike Dunk Low Panda 43', marque: 'Nike', taille: '43', etat: 'Très bon état', prix: 80, description: 'Ancien texte.' };
-const REGLAGES = { numeroEcrit: { actif: true, ou: ['description'] } };
-function SceneModele() {
-  return <main style={{ padding: 16 }}><h1>Fiche N°51</h1><RemplirModele fiche={NEUVE} modeles={MODELES} reglages={REGLAGES} onPoser={(d) => { window.__pose = d; }} onFermer={() => { window.__ferme = true; }}/></main>;
-}
+const SRC = { titre: 'Nike Dunk Low Panda 42', marque: 'Nike', taille: '42', etat: 'Très bon état', description: 'Taille 42, semelle 28 cm.\nPortées deux fois, aucun défaut.\nVoir aussi N°99 en 44.\n\nN°7', prix: 80 };
 function SceneTaille() {
-  const src = { titre: 'Nike Dunk Low Panda 42', marque: 'Nike', taille: '42', etat: 'Très bon état', description: 'Taille 42, semelle 28 cm.\nPortées deux fois, aucun défaut.\n\nN°7', prix: 80 };
-  return <main style={{ padding: 16 }}><h1>Fiche N°7</h1><AutreTaille src={src} numero="7" modeles={MODELES} reglages={REGLAGES} onFermer={() => { window.__ferme = true; }}
-    onCreer={async (champs, finir) => { await new Promise((r) => setTimeout(r, 150)); const fiche = { id: 'n241', numero: '241', ...champs, photos: [] }; window.__cree = { champs, fin: finir ? finir(fiche) : null }; return { ok: true, numero: '241', fiche }; }}/></main>;
+  return <main style={{ padding: 16 }}><h1>Fiche N°7</h1><AutreTaille src={SRC} numero="7" onFermer={() => { window.__ferme = true; }}
+    onCreer={async (champs) => { await new Promise((r) => setTimeout(r, 150)); window.__cree = champs; return { ok: true, numero: '241' }; }}/></main>;
+}
+// « Je numérote moi-même » : VRM ne donne pas de N° — la feuille le dit, rien ne se crée.
+function SceneBloque() {
+  return <main style={{ padding: 16 }}><h1>Fiche N°7</h1><AutreTaille src={SRC} numero="7" bloque={tr('at.raison.numeroEcrit')} onFermer={() => {}}
+    onCreer={async () => { window.__cree = 'NON'; return { ok: true }; }}/></main>;
 }
 function SceneHeure() {
   const dim = new Date(2026, 10, 8, 18, 30, 0).getTime();
@@ -103,20 +89,21 @@ function SceneHeure() {
   for (let i = 0; i < 352; i++) lignes.push({ plateforme: 'Vinted', ts: dim - (i % 40) * J - ((i * 5) % 11) * 3600e3 - 9 * 3600e3, eur: 50 });
   for (let i = 0; i < 12; i++) lignes.push({ plateforme: 'Leboncoin', ts: new Date(2026, 10, 2, 0, 0, 0).getTime(), eur: 40, heureLue: false });
   const r = useMeilleureHeure(lignes), peu = useMeilleureHeure(lignes.slice(0, 10));
+  const partiel = scene === 'partiel';
   const [val, setVal] = React.useState('');
   window.__heure = r;
   return (
     <main style={{ maxWidth: 560, margin: '0 auto', padding: 16 }}>
       <h1>Programmer</h1>
       <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>Heure de départ<input type="datetime-local" data-rp-heure="" value={val} onChange={(e) => setVal(e.target.value)} style={{ minHeight: 44, fontSize: 16 }}/></label>
-      <MeilleureHeure r={r} onChoisir={(ms) => { window.__choisi = ms; const d = new Date(ms); const p = (n) => String(n).padStart(2, '0'); setVal(`${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`); }} maintenant={new Date(2026, 10, 14, 12).getTime()}/>
+      <MeilleureHeure r={r} onChoisir={(ms) => { window.__choisi = ms; const d = new Date(ms); const p = (n) => String(n).padStart(2, '0'); setVal(`${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`); }} maintenant={new Date(2026, 10, 14, 12).getTime()} incomplet={partiel}/>
       <hr/>
       <MeilleureHeure r={peu}/>
     </main>
   );
 }
 
-const SCENES = { temps: SceneTemps, note: SceneNote, modele: SceneModele, taille: SceneTaille, heure: SceneHeure };
+const SCENES = { temps: SceneTemps, double: SceneDouble, taille: SceneTaille, bloque: SceneBloque, heure: SceneHeure, partiel: SceneHeure };
 const S = SCENES[scene] || SceneTemps;
 const hote = document.createElement('div'); document.body.appendChild(hote);
 createRoot(hote).render(<S/>);

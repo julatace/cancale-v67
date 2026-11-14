@@ -91,7 +91,10 @@ export function ProgrammerRepub({ uid, compte, action, ids, reglages, verifier, 
   const capOk = extSait('repubdepart') === 'ok';
   // (14 nov., idée 158) Ses ventes datées à l'heure (la règle de Statistiques) ⇒ le moment où elles partent le plus.
   const ls = React.useContext(LiveStatsCarte);
-  const mh = useMeilleureHeure(!ls ? undefined : ls.venduPasSu ? null : (Array.isArray(ls.venduLignes) ? ls.venduLignes : undefined));
+  // Les MÊMES lignes que Statistiques (`liveStats.venduLignes` : comptes choisis seulement, annulées et comptes
+  // écartés hors). Lecture en cours ⇒ rien dit ; une lecture ratée ⇒ « pas su » ; une lecture partielle ⇒ dit.
+  const mh = useMeilleureHeure(!ls || ls.venduEnAttente ? undefined : ls.venduPasSu ? null : (Array.isArray(ls.venduLignes) ? ls.venduLignes : undefined));
+  const mhIncomplet = !!(ls && Array.isArray(ls.venduManque) && ls.venduManque.length);
   const at = Date.parse(val);
   const n = (ids || []).length;
   if (!ouvert) return (
@@ -125,7 +128,7 @@ export function ProgrammerRepub({ uid, compte, action, ids, reglages, verifier, 
         <span>{tr('rp.prog.heure')}</span>
         <input type="datetime-local" data-rp-heure="" value={val} onChange={(e) => setVal(e.target.value)} />
       </label>
-      <MeilleureHeure r={mh} onChoisir={(ms) => setVal(valeurLocale(ms))}/>
+      <MeilleureHeure r={mh} incomplet={mhIncomplet} onChoisir={(ms) => setVal(valeurLocale(ms))}/>
       <div className="vrm-rp-cond" data-rp-conditions="">
         <p>{tr('rp.cond.titre')}</p>
         <ul>

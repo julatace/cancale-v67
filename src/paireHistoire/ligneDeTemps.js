@@ -22,6 +22,7 @@
 // ⚠️ « Pas su » ne s'invente pas : une étape jamais lue ne s'affiche pas ; un
 //    événement prouvé SANS date va dans « date inconnue » (jamais une date
 //    déduite) ; une source pas lue est NOMMÉE (`pasSu`), jamais « rien ».
+// ⚠️ N° porté par deux paires présentes : AUCUN événement (on ne choisit pas, on ne mélange pas).
 // Module PUR : src/paireHistoire/LigneDeTemps.jsx et scripts/audit-idees-paires.cjs.
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -46,6 +47,9 @@ const SITE_DE = { 'en-ligne': 'Vinted', republie: 'Vinted', ebay: 'eBay', lebonc
 //   pasSu: [raison] } — `evenements` du plus ancien au plus récent.
 export function ligneDeTemps(h, x = {}) {
   if (!h || !Array.isArray(h.etapes)) return null;
+  // ⚠️ §5 : DEUX paires présentes sous ce N° ⇒ leurs annonces, ventes et colis sont mêlés sous la même clé.
+  // La ligne de temps ne les mélange pas en UNE histoire : rien n'est rangé, c'est dit (la fiche dit le doublon).
+  if (h.double) return { double: true, evenements: [], sansDate: [], pasSu: [] };
   const evs = [], pasSu = [];
   const pose = (e) => evs.push({ site: '', montant: null, avant: null, preuve: '', id: '', ...e, at: isoDe(e.at) });
   const etape = (cle) => h.etapes.find((e) => e.cle === cle) || null;

@@ -250,7 +250,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
     {onPrix && !neuve ? <button type="button" className="vrm-ao-second" data-fiche-prix="" onClick={() => onPrix(p.num)}>Changer le prix</button> : null}
     {onPublierAilleurs && !neuve && p.etat !== 'rien' ? <button type="button" className="vrm-ao-second" data-fiche-publier-ailleurs="" onClick={() => onPublierAilleurs(p.num)}>Publier ailleurs</button> : null}
     {onDupliquer && p.etat !== 'rien' ? <button type="button" className="vrm-ao-second" data-fiche-dupliquer="" onClick={() => onDupliquer(p.num)}>Dupliquer</button> : null}
-    {/* (14 nov., idées 156-157) « Dans une autre taille », « Remplir avec un modèle » : fournis par l'écran (src/modelesDescription/). */}
+    {/* (14 nov., idée 157) « Dans une autre taille » : fourni par l'écran (src/autreTaille/OutilsFiche.jsx). */}
     {outilsIdees && p.etat !== 'rien' ? outilsIdees : null}
     {neuve && onCopier ? <button type="button" className="vrm-ao-second" data-fiche-copier="" onClick={() => onCopier(neuve)}>Copier le texte</button> : null}
   </>) : null;

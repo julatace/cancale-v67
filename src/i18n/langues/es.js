@@ -2,7 +2,7 @@
 import ecran_journee from './es/journee.js';
 import ecran_confort from './es/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_capte from './es/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
-import ecran_idees from './es/idees.js';   // (14 nov., idées 154-158) ligne de temps, note, modèles, autre taille, meilleure heure
+import ecran_idees from './es/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './es/ventes.js';
 import ecran_commun from './es/commun.js';
 import ecran_achats from './es/achats.js';

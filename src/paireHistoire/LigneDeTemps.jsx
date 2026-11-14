@@ -5,7 +5,7 @@
 //  sa preuve en petit. Ce qui est prouvé sans date : « Date inconnue », en bas.
 //  Ce qui n'a pas pu être lu est NOMMÉ (« Pas encore lu »), jamais caché.
 //  Neutre : aucune couleur (§7) — l'encre, le point de la dernière étape porte la diode.
-//  Deux paires sous ce N° : rien n'est montré comme « l'histoire de la paire » (§5).
+//  Deux paires sous ce N° : aucune ligne de temps (on ne mélange pas deux histoires, §5) — c'est dit.
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { tr, date as dateLoc, monnaie } from '../i18n/index.js';
@@ -60,7 +60,7 @@ export default function LigneDeTemps({ h, extra = {} }) {
   return (
     <section className="vrm-idees vrm-lt" aria-label={tr('lt.titre')} data-ligne-temps={cle} data-lt-n={lt.evenements.length} data-lt-sans-date={lt.sansDate.length} data-lt-studio={studio === undefined ? 'encours' : studio === null ? 'passu' : String(studio.dates.length)}>
       {double ? <p className="vrm-lt-note" data-lt-double="">{tr('lt.double')}</p> : null}
-      {lt.evenements.length ? (
+      {double ? null : lt.evenements.length ? (
         <ol className="vrm-lt-liste">{lt.evenements.map((e, i) => <Ev key={cleEv(e, i)} e={e} double={double} dernier={i === lt.evenements.length - 1}/>)}</ol>
       ) : <p className="vrm-lt-note" data-lt-vide="">{tr('lt.vide')}</p>}
       {lt.sansDate.length ? (<>

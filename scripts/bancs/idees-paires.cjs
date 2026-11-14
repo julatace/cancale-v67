@@ -1,20 +1,20 @@
 // ════════════════════════════════════════════════════════════════════════════
-// BANC « IDÉES 154-158 » (14 nov.) — les VRAIS composants et les VRAIES règles, montés seuls
+// BANC « IDÉES 154, 157, 158 » (14 nov.) — les VRAIS composants et les VRAIES règles, montés seuls
 // (harnais esbuild : scripts/bancs/idees-paires/harnais.jsx), données INVENTÉES, aucun réseau.
 // 390 px tactile et 1512 px, clair et sombre. Exige :
-//   temps  : la ligne de temps de N°7 (parmi 50 paires au même titre) : achetée … versement,
-//            dans l'ordre des dates, chaque preuve ; « date inconnue » pour Leboncoin sans date ;
-//            les onglets « Par étape » · « Dans l'ordre » ≥ 44 px ;
-//   note   : « 3 points à corriger › » sur l'annonce 11 (lien vers SA page « modifier ») ;
-//            « Description courte », « Prix sous l'achat » nommés ; la plus mal notée d'abord ;
-//   modele : les cases vides demandées (modèle, boîte) ; l'aperçu se remplit ; dernière ligne
-//            « N°51 » (il numérote lui-même) ; « Mettre dans la fiche » rend le texte ;
-//   taille : « 43 » ⇒ titre « … 43 », « Taille 43 », étiquette N°7 retirée ; « Créer la fiche »
-//            rend taille / titre / description ; aucun N° proposé avant la création ;
-//   heure  : « le dimanche, entre 18 h et 21 h », « sur 412 ventes datées à l'heure », « 12 sans
-//            heure » ; le lien met un dimanche 18 h dans le champ, rien ne part ; sous le seuil ⇒
-//            « pas assez de ventes » ;
-//   partout : rien ne déborde, aucun violet, aucun rouge, cibles ≥ 44 px ; captures dans SHOTS.
+//   temps   : la ligne de temps de N°7 (parmi 50 paires au même titre) : achetée … versement,
+//             dans l'ordre des dates, SES identifiants et SES dates ; « date inconnue » pour
+//             Leboncoin sans date ; les onglets « Par étape » · « Dans l'ordre » ≥ 44 px ;
+//   double  : N°60 porté par deux paires : AUCUN événement, la phrase le dit ;
+//   taille  : « 43 » ⇒ titre « … 43 », « Taille 43 », « 28 cm » intact, étiquette N°7 retirée,
+//             « N°99 » signalé ; « Créer la fiche » rend taille / titre / description ; aucun
+//             N° montré avant ; même taille ⇒ refus dit ;
+//   bloque  : « Je numérote moi-même » ⇒ la raison dite, champ et bouton éteints, rien créé ;
+//   heure   : « le dimanche, entre 18 h et 21 h », « sur 412 ventes datées à l'heure », « 12 sans
+//             heure » ; le lien met un dimanche 18 h dans le champ, rien ne part ; sous le seuil ⇒
+//             « pas assez » ; partiel ⇒ « lecture incomplète » dite ;
+//   partout : rien ne déborde, aucun violet, aucun rouge, cibles ≥ 44 px, aucune clé i18n brute
+//             à l'écran ; captures dans SHOTS (à regarder).
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
 require('./_garde-reseau.cjs');
@@ -56,7 +56,8 @@ const MESURE = () => {
     }
   }
   const horsCadre = [...document.querySelectorAll('.vrm-idees *')].filter((e) => { const r = e.getBoundingClientRect(); return r.width && (r.right > vw + 1 || r.left < -1); }).map((e) => e.className || e.tagName).slice(0, 4);
-  return { deb, cibles: cibles.slice(0, 6), violet: violet.slice(0, 3), rouge: rouge.slice(0, 3), horsCadre };
+  const cles = (document.body.innerText.match(/\b(?:lt|at|mh)\.[a-zA-Z.]+\b/g) || []).slice(0, 4);
+  return { deb, cibles: cibles.slice(0, 6), violet: violet.slice(0, 3), rouge: rouge.slice(0, 3), horsCadre, cles };
 };
 
 (async () => {
@@ -81,7 +82,7 @@ const MESURE = () => {
       return { p, erreurs };
     };
     const cap = async (p, nom) => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await p.screenshot({ path: path.join(SHOTS, `idees-${nom}-${w}-${theme}.png`), fullPage: true }); } };
-    const propre = (m, quoi) => dit(!m.deb && !m.cibles.length && !m.violet.length && !m.rouge.length && !m.horsCadre.length, `${tag} ${quoi} : rien ne déborde, cibles ≥ 44 px, ni violet ni rouge`, m);
+    const propre = (m, quoi) => dit(!m.deb && !m.cibles.length && !m.violet.length && !m.rouge.length && !m.horsCadre.length && !m.cles.length, `${tag} ${quoi} : rien ne déborde, cibles ≥ 44 px, ni violet ni rouge, aucune clé brute`, m);
 
     // ── temps ───────────────────────────────────────────────────────────────
     { const { p, erreurs } = await ouvrir('temps');
@@ -96,65 +97,52 @@ const MESURE = () => {
       const quoi = r.evs.map((e) => e.q);
       const attendus = ['achetee', 'recue', 'photographiee', 'numerotee', 'publiee', 'baisse', 'hausse', 'vendue', 'bordereau', 'partie', 'relais', 'livree', 'versement'];
       dit(attendus.every((q) => quoi.includes(q)) && r.evs.every((e, i) => i === 0 || Date.parse(r.evs[i - 1].d) <= Date.parse(e.d)), `${tag} temps : les 13 étapes de N°7, dans l'ordre des dates`, quoi);
-      dit(r.evs.filter((e) => e.id && e.q !== 'vendue').every((e) => e.id === '9000007') && r.evs.filter((e) => e.q === 'vendue').every((e) => e.id === '7000007'), `${tag} temps : seulement les identifiants de N°7 (parmi 50 paires au même titre)`, r.evs);
+      // « Publiée » à la date que Vinted donne pour l'annonce de N°7 (9 sept.), jamais celle d'une jumelle.
+      const pub = r.evs.find((e) => e.q === 'publiee');
+      dit(r.evs.filter((e) => e.id && e.q !== 'vendue').every((e) => e.id === '9000007') && r.evs.filter((e) => e.q === 'vendue').every((e) => e.id === '7000007')
+        && !!pub && pub.d === new Date(Date.parse('2026-09-01T10:00:00Z') + 8 * 86400e3).toISOString(), `${tag} temps : seulement les identifiants et les dates de N°7 (parmi 50 paires au même titre)`, r.evs);
       dit(r.sans.includes('publiee:Leboncoin') && /Date inconnue/.test(r.texte) && /Photographiée · 3 photos/.test(r.texte) && /« Commande livrée » sur Vinted/.test(r.texte) && r.dernier, `${tag} temps : « date inconnue », 3 photos du studio, la preuve de la réception, le dernier point`, r.texte.slice(0, 300));
       dit(r.onglets.length === 2 && r.onglets.every((o) => o.h >= 44) && r.onglets.find((o) => o.v === 'temps').on === 'true', `${tag} temps : onglets « Par étape » · « Dans l'ordre » ≥ 44 px`, r.onglets);
       propre(await p.evaluate(MESURE), 'temps'); dit(!erreurs.length, `${tag} temps : aucune erreur`, erreurs);
       await cap(p, 'temps'); await p.close(); }
 
-    // ── note ────────────────────────────────────────────────────────────────
-    { const { p, erreurs } = await ouvrir('note');
-      const r = await p.evaluate(() => ({
-        ordre: [...document.querySelectorAll('[data-ac-annonce]')].map((e) => e.dataset.acAnnonce),
-        n11: (document.querySelector('[data-ac-annonce="11"] [data-na-note]') || {}).textContent || '',
-        lien11: (document.querySelector('[data-ac-annonce="11"] a[data-na-note]') || {}).href || '',
-        man11: (document.querySelector('[data-ac-annonce="11"]') || {}).dataset ? document.querySelector('[data-ac-annonce="11"]').dataset.acManques : '',
-        geste13: (document.querySelector('[data-ac-annonce="13"] [data-na-note]') || {}).dataset ? document.querySelector('[data-ac-annonce="13"] [data-na-note]').dataset.naGeste : '',
-        txt: document.body.innerText,
-        nonLue: (document.querySelector('[data-na-desc-pas-lue]') || {}).textContent || '',
-      }));
-      dit(r.ordre[0] === '11' && /3 points à corriger/.test(r.n11) && r.lien11 === 'https://www.vinted.fr/items/11/edit' && r.man11 === 'courte photos sousAchat', `${tag} note : « 3 points à corriger › » vers SA page « modifier », la plus mal notée d'abord`, r);
-      dit(/Description courte \(14\/80\)/.test(r.txt) && /Prix sous l’achat/.test(r.txt) && r.geste13 === 'achat' && !r.ordre.includes('14') && /Description pas lue sur 1 annonce/.test(r.nonLue), `${tag} note : les deux points neufs nommés ; sans prix d'achat ⇒ la saisie ; rien sur une annonce sans point ; pas lue ⇒ dit`, r.ordre);
-      if (tactile) { await p.tap('[data-ac-annonce="13"] [data-na-note]'); } else { await p.click('[data-ac-annonce="13"] [data-na-note]'); }
-      dit(await p.evaluate(() => window.__prixAchat === '13'), `${tag} note : un toucher sur la note de 13 ouvre la saisie du prix d'achat de 13`);
-      propre(await p.evaluate(MESURE), 'note'); dit(!erreurs.length, `${tag} note : aucune erreur`, erreurs);
-      await cap(p, 'note'); await p.close(); }
 
-    // ── modèle ──────────────────────────────────────────────────────────────
-    { const { p, erreurs } = await ouvrir('modele');
-      await p.click('[data-md-modele="m1"]');
-      const cases = await p.$$eval('[data-md-case]', (l) => l.map((e) => e.dataset.mdCase));
-      await p.fill('[data-md-case="modele"]', 'Dunk Low Panda');
-      await p.fill('[data-md-case="boite"]', 'Avec boîte d’origine');
-      const ap = await p.$eval('[data-md-apercu]', (e) => e.value);
-      const lignes = ap.trim().split('\n'); const derniere = lignes[lignes.length - 1];
-      dit(JSON.stringify(cases) === '["modele","boite"]' && ap.startsWith('Nike Dunk Low Panda · taille 43\nTrès bon état · Avec boîte d’origine') && derniere === 'N°51' && await p.$('[data-md-remplace]') !== null,
-        `${tag} modèle : cases vides demandées, aperçu rempli, « N°51 » en dernière ligne, « remplace » dit`, { cases, ap });
-      await cap(p, 'modele');
-      await p.click('[data-md-poser]');
-      dit(await p.evaluate(() => typeof window.__pose === 'string' && window.__pose.endsWith('N°51') && window.__ferme === true), `${tag} modèle : « Mettre dans la fiche » rend le texte et ferme`);
-      propre(await p.evaluate(MESURE), 'modèle'); dit(!erreurs.length, `${tag} modèle : aucune erreur`, erreurs);
-      await p.close(); }
+
+    // ── N° en double ────────────────────────────────────────────────────────
+    { const { p, erreurs } = await ouvrir('double');
+      const r = await p.evaluate(() => ({ n: document.querySelectorAll('[data-lt-quoi]').length, dit: !!document.querySelector('[data-lt-double]'), t: document.body.innerText }));
+      dit(r.n === 0 && r.dit && /ne mélange pas leurs histoires/.test(r.t), `${tag} double : N°60 sur deux paires ⇒ aucun événement, c'est dit`, r);
+      propre(await p.evaluate(MESURE), 'double'); dit(!erreurs.length, `${tag} double : aucune erreur`, erreurs);
+      await cap(p, 'double'); await p.close(); }
 
     // ── autre taille ────────────────────────────────────────────────────────
     { const { p, erreurs } = await ouvrir('taille');
       const avant = await p.$eval('[data-at-creer]', (b) => b.disabled);
+      await p.fill('[data-at-taille]', '42');
+      const meme = await p.evaluate(() => ({ raison: (document.querySelector('[data-at-raison]') || {}).dataset, off: document.querySelector('[data-at-creer]').disabled }));
       await p.fill('[data-at-taille]', '43');
       const r = await p.evaluate(() => ({ titre: document.querySelector('[data-at-titre]').value, desc: document.querySelector('[data-at-description]').value,
         changes: document.querySelector('[data-at-changes]').dataset.atChanges, etiq: document.querySelector('[data-at-changes]').dataset.atEtiquette,
-        num: /N°\s?24\d|N° neuf : \d/.test(document.body.innerText) }));
-      dit(avant && r.titre === 'Nike Dunk Low Panda 43' && r.desc === 'Taille 43, semelle 28 cm.\nPortées deux fois, aucun défaut.' && r.changes === '1,1' && r.etiq === '1' && !r.num,
-        `${tag} taille : titre et « Taille 43 » changés, « 28 cm » intact, N°7 retiré, aucun N° montré avant la création`, r);
+        autres: (document.querySelector('[data-at-autres-numeros]') || {}).textContent || '', num: /N°\s?24\d/.test(document.body.innerText) }));
+      dit(avant && meme.raison && meme.raison.atRaison === 'meme-taille' && meme.off, `${tag} taille : vide ou même taille ⇒ bouton éteint, refus dit`, meme);
+      dit(r.titre === 'Nike Dunk Low Panda 43' && r.desc === 'Taille 43, semelle 28 cm.\nPortées deux fois, aucun défaut.\nVoir aussi N°99 en 44.' && r.changes === '1,1' && r.etiq === '1' && /N°99/.test(r.autres) && !r.num,
+        `${tag} taille : titre et « Taille 43 » changés, « 28 cm » intact, N°7 retiré, N°99 signalé, aucun N° montré avant`, r);
       await cap(p, 'taille');
-      await p.click('[data-md-modele="m2"]');
-      const d2 = await p.$eval('[data-at-description]', (e) => e.value);
       await p.click('[data-at-creer]');
       await p.waitForFunction(() => !!window.__cree, null, { timeout: 5000 }).catch(() => {});
       const c = await p.evaluate(() => window.__cree);
-      dit(d2 === 'Très bon état, taille 43.' && c && c.champs.taille === '43' && c.champs.titre === 'Nike Dunk Low Panda 43' && c.fin === 'Très bon état, taille 43.\n\nN°241',
-        `${tag} taille : un modèle choisi ⇒ rempli à la nouvelle taille, puis avec le N° neuf à la création`, { d2, c });
+      dit(c && c.taille === '43' && c.titre === 'Nike Dunk Low Panda 43' && /^Taille 43/.test(c.description), `${tag} taille : « Créer la fiche » rend la taille, le titre et la description relus`, c);
       propre(await p.evaluate(MESURE), 'taille'); dit(!erreurs.length, `${tag} taille : aucune erreur`, erreurs);
       await p.close(); }
+
+    // ── « Je numérote moi-même » ────────────────────────────────────────────
+    { const { p, erreurs } = await ouvrir('bloque');
+      const r = await p.evaluate(() => ({ dit: (document.querySelector('[data-at-bloque]') || {}).textContent || '', champ: document.querySelector('[data-at-taille]').disabled, bouton: document.querySelector('[data-at-creer]').disabled }));
+      await p.click('[data-at-creer]', { force: true }).catch(() => {});
+      const cree = await p.evaluate(() => window.__cree || null);
+      dit(/Tu numérotes toi-même/.test(r.dit) && r.champ && r.bouton && cree === null, `${tag} bloque : la raison dite, champ et bouton éteints, rien créé`, { r, cree });
+      propre(await p.evaluate(MESURE), 'bloque'); dit(!erreurs.length, `${tag} bloque : aucune erreur`, erreurs);
+      await cap(p, 'bloque'); await p.close(); }
 
     // ── meilleure heure ─────────────────────────────────────────────────────
     { const { p, erreurs } = await ouvrir('heure');
@@ -166,7 +154,12 @@ const MESURE = () => {
       const d = v ? new Date(v) : null;
       dit(!!d && d.getDay() === 0 && d.getHours() === 18 && d.getTime() > new Date(2026, 10, 14, 12).getTime(), `${tag} heure : le lien met dimanche 18 h dans le champ (rien ne part)`, v);
       propre(await p.evaluate(MESURE), 'heure'); dit(!erreurs.length, `${tag} heure : aucune erreur`, erreurs);
-      await cap(p, 'heure'); await p.close(); }
+\1
+    // ── lecture partielle ───────────────────────────────────────────────────
+    { const { p, erreurs } = await ouvrir('partiel');
+      const r = await p.evaluate(() => ({ inc: !!document.querySelector('[data-mh-incomplet]'), t: document.body.innerText }));
+      dit(r.inc && /Lecture de tes ventes incomplète/.test(r.t), `${tag} partiel : une lecture de ventes manquante est DITE`, r.t.slice(0, 300));
+      dit(!erreurs.length, `${tag} partiel : aucune erreur`, erreurs); await p.close(); }
     await ctx.close();
   }
   await nav.close(); srv.close();

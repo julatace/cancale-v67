@@ -18,9 +18,10 @@ export function useMeilleureHeure(lignes) {
   return React.useMemo(() => meilleureHeure(lignes === undefined ? undefined : (Array.isArray(lignes) ? quandTuVends(lignes) : null)), [lignes]);
 }
 
-export default function MeilleureHeure({ r, onChoisir = null, maintenant = null }) {
+// `incomplet` : une lecture de ventes a manqué (un compte, Leboncoin…) — le résultat est dit « peut encore bouger ».
+export default function MeilleureHeure({ r, onChoisir = null, maintenant = null, incomplet = false }) {
   if (!r || r.etat === 'encours') return null;
-  const couv = r.n != null ? <span className="vrm-mh-couv" data-mh-couverture={r.n} data-mh-sans-heure={r.sansHeure || 0}>{tr('mh.couverture', { n: r.n })}{r.sansHeure ? ` · ${tr('mh.sansHeure', { n: r.sansHeure })}` : ''}</span> : null;
+  const couv = r.n != null ? <span className="vrm-mh-couv" data-mh-couverture={r.n} data-mh-sans-heure={r.sansHeure || 0}>{tr('mh.couverture', { n: r.n })}{r.sansHeure ? ` · ${tr('mh.sansHeure', { n: r.sansHeure })}` : ''}{incomplet ? <span className="vrm-mh-couv" data-mh-incomplet="">{tr('mh.incomplet')}</span> : null}</span> : null;
   if (r.etat === 'passu') return <div className="vrm-idees vrm-mh" data-meilleure-heure="passu"><p className="vrm-mh-phrase">{tr('mh.passu')}</p></div>;
   if (r.etat === 'peu') return <div className="vrm-idees vrm-mh" data-meilleure-heure="peu"><p className="vrm-mh-phrase">{tr('mh.peu', { seuil: r.seuil })}</p>{couv}</div>;
   if (r.etat === 'plat') return <div className="vrm-idees vrm-mh" data-meilleure-heure="plat"><p className="vrm-mh-phrase">{tr('mh.plat')}</p>{couv}</div>;

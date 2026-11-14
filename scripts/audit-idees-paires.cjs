@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-//  AUDIT DES CINQ IDÉES DU 14 NOV. (154–158) — il EXÉCUTE les règles, sur des
+//  AUDIT DES IDÉES DU 14 NOV. (154, 157, 158) — il EXÉCUTE les règles, sur des
 //  données INVENTÉES (le dépôt est public). Lecture seule.
 //
 //  H · 154 la ligne de temps (src/paireHistoire/ligneDeTemps.js, sur la VRAIE chaîne
@@ -10,20 +10,19 @@
 //      H2 « pas su » ne s'invente pas : une source pas lue est NOMMÉE, un événement
 //         prouvé sans date va dans « date inconnue », jamais daté ; un achat NON relié
 //         n'a pas de « reçue » ;
-//      H3 l'ordre des dates ; H4 baisse / hausse datées ; H5 la date de Vinted d'ABORD.
-//  N · 155 la note (src/noteAnnonce/noteAnnonce.js) : description courte (seuil 80,
-//      lue seulement), prix sous l'achat (seulement avec un prix d'achat saisi), la
-//      note = le nombre de points, le geste de correction, l'ordre.
-//  M · 156 les modèles (src/modelesDescription/remplir.js) : cases remplies par un
-//      champ écrit seulement, cases vides demandées, le N° selon LA règle de « Créer
-//      sur Vinted », deux N° refusés.
+//      H3 l'ordre des dates ; H4 baisse / hausse datées ; H5 la date de Vinted d'ABORD ;
+//      H6 un compte exclu n'apporte rien ; H7 tout pas lu ⇒ rien d'inventé, rien ne casse ;
+//      H8 N° porté par deux paires ⇒ AUCUN événement (deux histoires ne se mélangent pas) ;
+//      H9 une vente annulée, une vente Leboncoin sans date.
 //  D · 157 l'autre taille (src/autreTaille/autreTaille.js + `dupliquerFiche` + le VRAI
 //      `prochainLibre` d'App.jsx) : N° NEUF après le plus haut de TOUS les N° servis
 //      (cases du Stock et achats hors plateforme compris), taille changée là où elle
-//      est marquée seulement, ancienne étiquette retirée, autre N° signalé.
+//      est marquée seulement, ancienne étiquette retirée, autre N° signalé ; série à lettre ;
+//      N° en double ⇒ pas de copie ; « Je numérote moi-même » ⇒ aucun N° donné.
 //  T · 158 la meilleure heure (src/meilleureHeure/meilleureHeure.js sur `quandTuVends`) :
 //      la case la plus forte, la couverture, « pas assez », « rien ne se détache »,
-//      les ventes sans heure hors des cases, jamais un lancement.
+//      les ventes sans heure hors des cases, les comptes écartés hors (les lignes de
+//      Statistiques), lecture en cours / ratée / partielle, jamais un lancement.
 //  B · les branchements (fiche, Annonces, atelier Republier) et la lecture du studio
 //      en projection scalaire (jamais `select=data`).
 //
@@ -49,14 +48,13 @@ const MUTATIONS = [
   ['src/paireHistoire/ligneDeTemps.js', "if (x.studio === null) pasSu.push('studio');", "if (x.studio === null) {}", 'H2 : le studio pas lu n’est plus nommé'],
   ['src/paireHistoire/ligneDeTemps.js', "quoi: a == null || b == null || a === b ? 'prix' : b < a ? 'baisse' : 'hausse'", "quoi: 'baisse'", 'H4 : une hausse dite baisse'],
   ['src/histoireArticle.js', ".filter((x) => x && idsSet.has(str(x.item)) && Number.isFinite(Number(x.apres)))", ".filter((x) => x && Number.isFinite(Number(x.apres)))", 'H1 : les prix de toutes les paires (ressemblance)'],
-  ['src/noteAnnonce/noteAnnonce.js', "else if (n > 0 && n < min) points.push({ cle: 'courte', n, min });", "else if (n < min) points.push({ cle: 'courte', n, min });", 'N1 : vide compté deux fois'],
-  ['src/noteAnnonce/noteAnnonce.js', "if (n == null) { if (!pasSu.includes('description')) pasSu.push('description'); }", "if (n == null) points.push({ cle: 'courte', n: 0, min });", 'N1 : pas lue ⇒ « courte »'],
-  ['src/noteAnnonce/noteAnnonce.js', "if (prix != null && achat != null && prix < achat)", "if (prix != null && prix < (achat == null ? 60 : achat))", 'N2 : un prix d’achat deviné'],
-  ['src/modelesDescription.js', "etat: v.etat, 'état': v.etat, modele: v.modele, 'modèle': v.modele, boite: v.boite, 'boîte': v.boite,", "etat: v.etat, 'état': v.etat, modele: v.modele || (v.titre ? String(v.titre).split(' ').slice(1, 3).join(' ') : null), 'modèle': v.modele, boite: v.boite || 'Avec boîte', 'boîte': v.boite,", 'M2 : {modele} et {boite} devinés'],
-  ['src/modelesDescription/remplir.js', "if (!t.ok) return { ok: false, raison: t.raison };", "if (!t.ok) return { ok: true, description: rempli.trim(), vides };", 'M4 : deux N° acceptés'],
   ['src/autreTaille/autreTaille.js', "const re = new RegExp(`(^|[^0-9A-Za-zÀ-ÿ])(${MARQUE_TAILLE}\\\\s?:?\\\\s?)${esc(a)}${apres}`, 'gi');", "const re = new RegExp(`(^|[^0-9A-Za-zÀ-ÿ])()${esc(a)}${apres}`, 'gi');", 'D1 : un « 42 » nu remplacé'],
   ['src/dupliquerFiche.js', "const numero = String(prochainLibre(int, cles, pref));", "const numero = String(prochainLibre(new Set(), new Set(), pref));", 'D3 : un ancien N° redonné'],
   ['src/App.jsx', "  const ns = await numerosServisLus();\n  if (!ns) return { ok: false, raison: 'numéros réservés pas lus' };\n  const pris = ns.int, prisK = ns.cles;", "  const pris = new Set(), prisK = new Set();", 'D3 : dupliquer sans la liste complète des N° servis'],
+  ['src/paireHistoire/ligneDeTemps.js', "if (h.double) return { double: true, evenements: [], sansDate: [], pasSu: [] };", "", 'H8 : deux paires sous un N° mêlées en une histoire'],
+  ['src/App.jsx', "outilsIdees={p && !p.ancienNumero && !p.double ?", "outilsIdees={p && !p.ancienNumero ?", 'D6 : copier une paire d’un N° en double'],
+  ['src/App.jsx', "onCreerTaille={async (champs) => { if (numeroEcritActif()) return { ok: false, raison: tr('at.raison.numeroEcrit') };", "onCreerTaille={async (champs) => {", 'D6 : un N° donné alors qu’il numérote lui-même'],
+  ['src/RepubProgramme.jsx', "useMeilleureHeure(!ls || ls.venduEnAttente ? undefined :", "useMeilleureHeure(!ls ? undefined :", 'T8 : une suggestion sur une lecture en cours'],
   ['src/meilleureHeure/meilleureHeure.js', "if (n < seuil) return { etat: 'peu', n, sansHeure, seuil };", "if (n < 1) return { etat: 'peu', n, sansHeure, seuil };", 'T2 : « dimanche 18 h » sur 20 ventes'],
   ['src/meilleureHeure/meilleureHeure.js', "if (best.n < MIN_CASE || best.n < FACTEUR * moyenne) return { etat: 'plat', n, sansHeure, seuil };", "", 'T3 : une case tirée d’un hasard'],
   ['src/statsVentes.js', "else { heures[d.getHours()].n += 1; grille[j][d.getHours()] += 1; }", "else heures[d.getHours()].n += 1;\n    grille[j][d.getHours()] += 1;", 'T4 : les ventes sans heure dans « 0 h »'],
@@ -85,11 +83,11 @@ function prouver() {
 if (PROUVE) prouver();
 
 (async () => {
-  let L, H, RN, NA, MR, MD, AT, DF, MH, SV, NE, AV;
+  let L, H, RN, AT, DF, MH, SV, NE;
   try {
-    [L, H, RN, NA, MR, MD, AT, DF, MH, SV, NE, AV] = await Promise.all(['paireHistoire/ligneDeTemps.js', 'histoireArticle.js', 'rechercheNumero.js', 'noteAnnonce/noteAnnonce.js',
-      'modelesDescription/remplir.js', 'modelesDescription.js', 'autreTaille/autreTaille.js', 'dupliquerFiche.js', 'meilleureHeure/meilleureHeure.js', 'statsVentes.js', 'numeroEcrit.js', 'annonceVinted.js'].map(imp));
-  } catch (e) { dit(false, 'C0 · les règles des cinq idées existent', e.message); console.log(`\n❌ audit-idees-paires : ${ko} rouge(s)`); process.exit(1); }
+    [L, H, RN, AT, DF, MH, SV, NE] = await Promise.all(['paireHistoire/ligneDeTemps.js', 'histoireArticle.js', 'rechercheNumero.js',
+      'autreTaille/autreTaille.js', 'dupliquerFiche.js', 'meilleureHeure/meilleureHeure.js', 'statsVentes.js', 'numeroEcrit.js'].map(imp));
+  } catch (e) { dit(false, 'C0 · les règles des idées 154, 157, 158 existent', e.message); console.log(`\n❌ audit-idees-paires : ${ko} rouge(s)`); process.exit(1); }
   const cleNum = NE.cleNumero;
   const J = 86400e3, T0 = Date.parse('2026-09-01T10:00:00Z');
   const isoJ = (j, h = 0) => new Date(T0 + j * J + h * 3600e3).toISOString();
@@ -165,52 +163,44 @@ if (PROUVE) prouver();
     const v = sansCree.evenements.find((e) => e.quoi === 'vueEnLigne');
     dit(!!v && v.at === new Date(Date.parse(coffres[item(9)].firstSavedAt)).toISOString() && !sansCree.evenements.some((e) => e.quoi === 'publiee'), 'H5 · sans date Vinted : « vue en ligne » (la 1re vue de VRM), jamais « publiée »', v);
   }
-
-  // ════════ N · LA NOTE DE CHAQUE ANNONCE ══════════════════════════════════════
+  // H6 — un compte exclu : sa fiche n'est pas lue par la recherche (`comptesOk`), elle n'apporte rien.
   {
-    const tous = { marque: true, taille: true, etat: true };
-    const base = { id: 1, nPhotos: 6, marque: 'Nike', taille: '42', etat: 'Très bon état', champsLus: tous, prixAchat: 40, prix: { amount: '80' }, titre: 'x', desc: 'a'.repeat(120) };
-    const cles = (r) => r.points.map((m) => m.cle).join(',');
-    const court = NA.pointsAnnonce({ ...base, desc: 'Très bon état.' }), long = NA.pointsAnnonce({ ...base }), vide = NA.pointsAnnonce({ ...base, desc: '' });
-    const pasLue = NA.pointsAnnonce({ ...base, desc: undefined, descLen: undefined }), parLen = NA.pointsAnnonce({ ...base, desc: undefined, descLen: 40 });
-    dit(cles(court) === 'courte' && court.points[0].n === 14 && court.points[0].min === NA.DESC_COURTE && NA.DESC_COURTE === 80 && cles(long) === '' && cles(vide) === 'description' && cles(pasLue) === '' && pasLue.pasSu.includes('description') && cles(parLen) === 'courte',
-      'N1 · description courte : lue et < 80 caractères ; vide = « sans description » ; pas lue ⇒ rien dit', { court, long, vide, pasLue, parLen });
-    const sous = NA.pointsAnnonce({ ...base, prix: '30' }), egal = NA.pointsAnnonce({ ...base, prix: '40' }), sansAchat = NA.pointsAnnonce({ ...base, prix: '30', prixAchat: null });
-    dit(cles(sous) === 'sousAchat' && sous.points[0].prix === 30 && sous.points[0].achat === 40 && cles(egal) === '' && cles(sansAchat) === 'achat',
-      'N2 · prix sous l’achat seulement avec un prix d’achat saisi ; sinon « prix d’achat manquant »', { sous, egal, sansAchat });
-    const r = NA.notesAnnonces([
-      { ...base, id: 11, nPhotos: 2, prix: '30', desc: 'Court.', domaine: 'www.vinted.fr' },
-      { ...base, id: 12 }, { ...base, id: 13, prixAchat: null }, { ...base, id: 13 },
-    ], {});
-    const i11 = r.items.find((x) => x.id === '11'), i13 = r.items.find((x) => x.id === '13');
-    dit(r.etat === 'lu' && r.total === 3 && r.n === 2 && r.items[0].id === '11' && i11.note === 3 && i11.manques.map((m) => m.cle).join(',') === 'courte,photos,sousAchat' && r.parManque.sousAchat === 1,
-      'N3 · la note = le nombre de points ; la plus mal notée d’abord ; un id une fois', r);
-    dit(JSON.stringify(NA.premierGeste(i11)) === JSON.stringify({ ou: 'vinted', cle: 'courte', lien: 'https://www.vinted.fr/items/11/edit' }) && NA.premierGeste(i13).ou === 'achat',
-      'N4 · un toucher emmène à la correction (Vinted par l’identifiant, sinon le prix d’achat)', [NA.premierGeste(i11), NA.premierGeste(i13)]);
-    const num = NA.pointsAnnonce({ ...base, descNumero: { etat: 'rien', raison: 'aucun N° écrit' } }, { numeroEcrit: true });
-    dit(cles(num) === 'numero' && NA.notesAnnonces(undefined).etat === 'encours' && NA.notesAnnonces(null).etat === 'passu', 'N5 · N° absent de la fin (règle numeroEcrit) ; en cours / pas su', num);
-    dit(NA.textePoint({ cle: 'courte', n: 14, min: 80 }, (k, v) => k + JSON.stringify(v)) === 'na.courte{"n":14,"min":80}' && NA.textePoint({ cle: 'photos', n: 2, min: 5 }, () => '') === '2 photos sur 5', 'N6 · les textes : les deux neufs par tr(), les autres par la règle d’avant');
+    const fx = { ...fiches, [item(7)]: { ...fiches[item(7)], accountId: 'compte_exclu' } };
+    const rn = RN.toutSurLeNumero('7', { ...D, fiches: fx, comptesOk: new Set(['compte_garde']) }, oRN);
+    const lt = L.ligneDeTemps(H.histoireArticle(rn, { ...dH(7), fiches: fx }, oH), { crees, studio: { dates: [] } });
+    const tous = [...lt.evenements, ...lt.sansDate];
+    dit(!tous.some((e) => ['publiee', 'vueEnLigne', 'baisse', 'hausse', 'numerotee'].includes(e.quoi)), 'H6 · une annonce d’un compte exclu n’apporte aucun événement', tous.map((e) => e.quoi));
+  }
+  // H7 — rien de lu : aucun événement inventé, les manques nommés, rien ne casse.
+  {
+    let lt = null, err = '';
+    try {
+      const rn = RN.toutSurLeNumero('7', { fiches: null, pool: null, enLigne: null, ventes: null, txnItem: null, bordereaux: null, ebayCommandes: null, ebayAnnonces: null, lbcVentes: null, plan: null }, oRN);
+      lt = L.ligneDeTemps(H.histoireArticle(rn, { fiches: null, stats: null, versements: null, coffres: null, offres: null, recus: null, colisVente: null, journalPrix: null, prixVinted: null, prixLus: null }, oH), { reception: undefined, crees: null, studio: null });
+    } catch (e) { err = e.stack || String(e); }
+    dit(!err && (lt === null || (lt.evenements.length === 0 && lt.sansDate.length === 0 && lt.pasSu.length > 0)), 'H7 · rien de lu ⇒ aucun événement inventé, les manques nommés, aucune erreur', err || lt);
+  }
+  // H8 — deux paires PRÉSENTES sous le même N° : pas une histoire mélangée.
+  {
+    const fx = { ...fiches, '9100060': { numero: '60', title: TITRE, price: '80', numberedAt: isoJ(3) }, '9200060': { numero: '60', title: TITRE, price: '80', numberedAt: isoJ(4) } };
+    const Dd = { ...D, fiches: fx, enLigne: new Set([...D.enLigne, '9100060', '9200060']) };
+    const rn = RN.toutSurLeNumero('60', Dd, { ...oRN, conflits: (m) => Object.values(m).filter((l) => l.length > 1) });
+    const h = H.histoireArticle(rn, { ...dH(60), fiches: fx }, oH);
+    const lt = L.ligneDeTemps(h, { crees: { '9100060': T0 + 3 * J, '9200060': T0 + 4 * J }, studio: { dates: [isoJ(5)] } });
+    dit(rn.double === true && lt.double === true && lt.evenements.length === 0 && lt.sansDate.length === 0, 'H8 · N° porté par deux paires ⇒ AUCUN événement (deux histoires ne se mélangent pas)', lt);
+  }
+  // H9 — une vente annulée (retour), une vente Leboncoin sans date : jamais « vendue » datée à tort.
+  {
+    const ann = { transaction_id: '7000033', title: TITRE, price: { amount: '70', currency_code: 'EUR' }, status: 'Commande annulée', date: isoJ(50) };
+    const Da = { ...D, ventes: [ann], txnItem: { '7000033': item(33) }, lbcVentes: [{ id: 'l33', itemId: 'lbc33', price: 7500, isSeller: true, txId: 't33' }] };
+    const rn = RN.toutSurLeNumero('33', Da, { ...oRN, numLbc: (v) => (v.id === 'l33' ? '33' : null) });
+    const lt = L.ligneDeTemps(H.histoireArticle(rn, dH(33), { ...oH, venteAnnulee: (v) => /annul/i.test(v.status || '') }), { crees, studio: { dates: [] } });
+    const ventes = [...lt.evenements, ...lt.sansDate].filter((e) => e.quoi === 'vendue');
+    dit(lt.evenements.some((e) => e.quoi === 'annulee' && e.at === isoJ(50)) && ventes.length === 1 && ventes[0].site === 'Leboncoin' && ventes[0].at === null,
+      'H9 · vente annulée ⇒ « annulée » datée ; vente Leboncoin sans date ⇒ « date inconnue », jamais datée', { ev: lt.evenements.map((e) => e.quoi), sans: lt.sansDate });
   }
 
-  // ════════ M · LES MODÈLES DE DESCRIPTION ═════════════════════════════════════
-  {
-    const mod = { id: 'm1', nom: 'Sneakers', texte: '{marque} {modele} · taille {taille}\n{etat} · {boite}\nEnvoi soigné.\n\n{N°}' };
-    const fiche = { numero: '51', titre: TITRE, marque: 'Nike', taille: '42', etat: 'Très bon état' };
-    const a = MR.descriptionDepuisModele(mod, fiche, {});
-    dit(a.ok && a.description.includes('Nike {modele} · taille 42') && a.description.includes('Très bon état · {boite}') && JSON.stringify(a.vides) === '["modele","boite"]',
-      'M1 · une case se remplit par un champ ÉCRIT ; les autres restent visibles et sont demandées', a);
-    const b = MR.descriptionDepuisModele(mod, fiche, { reponses: { modele: 'Dunk Low Panda', boite: 'Avec boîte' } });
-    dit(b.ok && b.description.startsWith('Nike Dunk Low Panda · taille 42\nTrès bon état · Avec boîte') && b.vides.length === 0, 'M2 · SES réponses remplissent les cases ; {modele} jamais tiré du titre', b);
-    const fin = MR.descriptionDepuisModele({ id: 'm2', texte: 'Très bon état.' }, fiche, { reglages: { numeroEcrit: { actif: true, ou: ['description'] } } });
-    const lu = NE.lireNumeroTexte(fin.description, 'description');
-    const eteint = MR.descriptionDepuisModele({ id: 'm2', texte: 'Très bon état.' }, fiche, { reglages: {} });
-    const hautDesc = MR.descriptionDepuisModele({ id: 'm2', texte: 'Très bon état.' }, fiche, { reglages: { etiquette: { place: 'desc_debut', forme: 'diese' } } });
-    dit(fin.ok && lu.etat === 'lu' && lu.cle === '51' && eteint.description === 'Très bon état.' && hautDesc.description.startsWith('#51\n'),
-      'M3 · le N° selon LA règle de « Créer sur Vinted » (fin de description lue « N°51 » ; rien sans réglage ; étiquette en haut)', { fin, eteint, hautDesc });
-    const deux = MR.descriptionDepuisModele({ id: 'm3', texte: 'Ancienne paire N°12.' }, fiche, {});
-    dit(!deux.ok && /autre N°/.test(deux.raison), 'M4 · un AUTRE N° écrit dans le modèle ⇒ refus nommé', deux);
-    dit(['etat', 'modele', 'boite', 'taille', 'marque', 'N°'].every((v) => MD.VARIABLES.includes(v)) && MD.CLE_MODELES === 'vrm_modeles_desc', 'M5 · les cases {etat} {modele} {boite} offertes ; la clé synchronisée d’avant gardée', MD.VARIABLES);
-  }
+
 
   // ════════ D · DANS UNE AUTRE TAILLE ══════════════════════════════════════════
   {
@@ -222,7 +212,7 @@ if (PROUVE) prouver();
     dit(m.ok && JSON.stringify(m.autresNumeros) === '["99"]', 'D2 · un autre N° au milieu du texte est SIGNALÉ, jamais effacé', m);
     dit(!AT.copieAutreTaille(src, { nouvelle: '42' }).ok && !AT.copieAutreTaille(src, { nouvelle: ' ' }).ok, 'D2b · même taille ou taille vide ⇒ refusé');
     // D3 — le N° neuf : `dupliquerFiche` + le VRAI `prochainLibre` d'App.jsx, sur TOUS les N° servis.
-    const { sourceApp } = require(path.join(__dirname, '_source-app.cjs'));
+    const { sourceAppCode: sourceApp } = require(path.join(__dirname, '_source-app.cjs'));
     const APP = sourceApp(RACINE);
     let prochainLibre = null;
     try { const x = /const prochainLibre = \(prisInt, prisCles, pref\) => \{[\s\S]*?\n\};/.exec(APP); prochainLibre = x ? new Function(x[0] + '\nreturn prochainLibre;')() : null; } catch (_) { prochainLibre = null; }
@@ -237,6 +227,12 @@ if (PROUVE) prouver();
     dit(/const ns = await numerosServisLus\(\);/.test(corps) && /pris: \{ int: pris, cles: prisK \}/.test(corps) && /vrm_slots/.test(servis) && /vinted_offvinted_buys/.test(servis) && /panel_num_reserves/.test(servis),
       'D3b · « Dupliquer » et « Dans une autre taille » lisent LA liste des N° servis (cases du Stock, achats hors plateforme, réservés relus)');
     dit(/\['taille', 'titre', 'description'\]\.filter\(\(k\) => typeof remplace\[k\] === 'string'\)/.test(corps), 'D4 · la feuille ne remplace que taille, titre, description (liste blanche)');
+    let d5 = null; try { d5 = DF.dupliquerFiche({ ...c.champs }, { pris: { int: new Set([1, 2, 3]), cles: new Set(['C1', 'C2', 'C9', 'B10', '3']) }, pref: 'C', prochainLibre, cleNum, id: 'n2' }); } catch (e) { d5 = e.message; }
+    dit(d5 && d5.fiche && d5.fiche.numero === 'C10', 'D5 · série à lettre : C10 après C9 (jamais B, jamais un trou)', d5);
+    dit(/outilsIdees=\{p && !p\.ancienNumero && !p\.double \?/.test(APP) && /bloque=\{numeroEcritActif\(\) \? tr\('at\.raison\.numeroEcrit'\)/.test(APP)
+      && /onCreerTaille=\{async \(champs\) => \{ if \(numeroEcritActif\(\)\) return \{ ok: false, raison: tr\('at\.raison\.numeroEcrit'\) \};/.test(APP),
+      'D6 · N° porté par deux paires ⇒ pas de copie ; « Je numérote moi-même » ⇒ aucun N° donné (dit, refusé)');
+    dit(!AT.copieAutreTaille(null, { nouvelle: '43' }).ok === false && AT.copieAutreTaille({}, { nouvelle: '43' }).ok && AT.copieAutreTaille({ taille: '42' }, { nouvelle: 'x'.repeat(21) }).raison === 'taille-longue', 'D7 · données manquantes : une copie sans texte ne casse pas ; taille trop longue refusée');
   }
 
   // ════════ T · LA MEILLEURE HEURE ═════════════════════════════════════════════
@@ -265,13 +261,19 @@ if (PROUVE) prouver();
     dit(dp.getDay() === 0 && dp.getHours() === 18 && p > maint && p - maint < 7 * J, 'T6 · le prochain dimanche 18 h, dans le futur', dp.toString());
     const COMP = fs.readFileSync(path.join(RACINE, 'src', 'meilleureHeure', 'MeilleureHeure.jsx'), 'utf8') + fs.readFileSync(path.join(RACINE, 'src', 'meilleureHeure', 'meilleureHeure.js'), 'utf8');
     const RP = fs.readFileSync(path.join(RACINE, 'src', 'RepubProgramme.jsx'), 'utf8');
-    dit(!/vmrCmd|programmer\(|creerProgramme|poserProgramme|setTimeout/.test(COMP) && /<MeilleureHeure r=\{mh\} onChoisir=\{\(ms\) => setVal\(valeurLocale\(ms\)\)\}\/>/.test(RP),
+    dit(!/vmrCmd|programmer\(|creerProgramme|poserProgramme|setTimeout/.test(COMP) && /<MeilleureHeure r=\{mh\} incomplet=\{mhIncomplet\} onChoisir=\{\(ms\) => setVal\(valeurLocale\(ms\)\)\}\/>/.test(RP),
       'T7 · une SUGGESTION : le lien met le moment dans le champ, « Programmer » reste SON clic (aucun lancement)');
+    dit(/useMeilleureHeure\(!ls \|\| ls\.venduEnAttente \? undefined : ls\.venduPasSu \? null : \(Array\.isArray\(ls\.venduLignes\) \? ls\.venduLignes : undefined\)\)/.test(RP)
+      && /incomplet=\{mhIncomplet\}/.test(RP) && /const mhIncomplet = !!\(ls && Array\.isArray\(ls\.venduManque\) && ls\.venduManque\.length\);/.test(RP),
+      'T8 · les lignes de Statistiques (comptes écartés hors) ; lecture en cours ⇒ rien, ratée ⇒ « pas su », partielle ⇒ dite');
+    const APPt = require(path.join(__dirname, '_source-app.cjs')).sourceAppCode(RACINE);
+    dit(/const cachee = \(o\) => hTx\.has\(String\(o && o\.transaction_id\)\) \|\| ecarte\(o && o\._acc && o\._acc\.vinted_user_id\);\s*const v = ventesFaites\(\{ vinted: ventesCoqueEmail,[^\n]*cachee, excluAutre: excluAutreCoque/.test(APPt),
+      'T9 · `venduLignes` : ventes des comptes écartés et ventes cachées exclues (`cachee`, `excluAutre`)');
   }
 
   // ════════ B · LES BRANCHEMENTS ═══════════════════════════════════════════════
   {
-    const { sourceApp } = require(path.join(__dirname, '_source-app.cjs'));
+    const { sourceAppCode: sourceApp } = require(path.join(__dirname, '_source-app.cjs'));
     const APP = sourceApp(RACINE);
     const FP = fs.readFileSync(path.join(RACINE, 'src', 'FichePaire.jsx'), 'utf8');
     const AC = fs.readFileSync(path.join(RACINE, 'src', 'AnnoncesACompleter.jsx'), 'utf8');
@@ -280,8 +282,8 @@ if (PROUVE) prouver();
     dit(/extraTemps=\{\{ reception: ex \? ex\.reception : undefined, crees: numData \? \(numData\.crees === undefined \? null : numData\.crees\) : undefined, lireStudio: lireStudioDates \}\}/.test(APP)
       && /const lireStudioDates = \(num\) => lireBaseRelue\(`\$\{SUPABASE_URL\}\/rest\/v1\/app_data\?id=eq\.\$\{encodeURIComponent\('studio_photos_' \+ cleNum\(num\)\)\}&select=\$\{selectStudio\(\)\}`\);/.test(APP),
       'B2 · réception, dates Vinted, photos du studio : passées par identité ; studio lu en PROJECTION scalaire (jamais select=data)');
-    dit(/return notesAnnonces\(enLigne\.map/.test(APP) && /<NoteLigne a=\{a\} onPrixAchat=\{onPrixAchat\}\/>/.test(AC), 'B3 · Annonces → À compléter : la note sur chaque annonce');
-    dit(/outilsIdees=\{p && !p\.ancienNumero \? <OutilsFicheIdees numero=\{p\.num\}/.test(APP) && /const r = await dupliquerNumero\(rn, ex, champs\);/.test(APP), 'B4 · la fiche : « Dans une autre taille » passe par dupliquerNumero (N° neuf), « Remplir avec un modèle »');
+    dit(/<OutilsFicheIdees numero=\{p\.num\} source=\{champsADupliquer\(rn, ex\)\}/.test(APP) && /const r = await dupliquerNumero\(rn, ex, champs\);/.test(APP), 'B4 · la fiche : « Dans une autre taille » passe par dupliquerNumero (N° neuf)');
+    dit(!/noteAnnonce|modelesDescription\/|notesAnnonces|RemplirModele/.test(APP + FP + AC), 'B5 · 155 et 156 retirés (décision de Julien) : aucune trace dans l’app');
   }
 
   console.log(`\n${ko ? '❌ audit-idees-paires : ' + ko + ' rouge(s), ' + ok + ' vert(s)' : '✅ audit-idees-paires : ' + ok + ' verts'}`);
