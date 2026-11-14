@@ -14,7 +14,7 @@
 //     carte (liens, boutons, logo à la souris) n'envoie `ouvrirVRM` ; aucun lien vers
 //     vrm.center ; chaque lien est sur le site de l'onglet, et un clic y MÈNE ;
 //   · « 3 favoris à qui écrire · Voir » ⇒ l'aperçu : la phrase de ce qui va se passer,
-//     le message rendu, l'offre, une ligne par personne, « Lancer (3) », l'aide « ? » ;
+//     le message rendu, l'offre, une ligne par personne, « Envoyer le message (3) » (5.377), l'aide « ? » ;
 //   · rien ne part sans « Lancer » ; « Lancer » envoie la sélection de l'aperçu avec
 //     `confirme` ; la progression « 1/3 envoyés · prochain dans … » + « Tout arrêter » ;
 //     une attente dite (« autre compte… rien ne part ») ; la fin ; un blocage dit ;
@@ -150,9 +150,9 @@ const clic = async (pg, sel) => { await pg.evaluate((s) => { const b = document.
         await clic(t.pg, '[data-fav-voir]');
         const b = await lire(t.pg);
         await cap(t.pg, `apercu-${largeur}-${scheme}`);
-        dit(b.vue === 'apercu' && /ces 3 personnes, une par une/.test(b.phrase) && /Rien ne part avant «.Lancer.»/.test(b.phrase), `${T} : l’aperçu dit ce qui va se passer, en une phrase`, b.phrase);
+        dit(b.vue === 'apercu' && /ces 3 personnes, une par une/.test(b.phrase) && /Rien ne part avant «.Envoyer le message.»/.test(b.phrase), `${T} : l’aperçu dit ce qui va se passer, en une phrase`, b.phrase);
         dit(b.message === APERCU.liste[0].texte && b.offre === 'pct' && b.lignes === 3, `${T} : le message rendu, l’offre, une ligne par personne`, JSON.stringify({ m: b.message, o: b.offre, l: b.lignes }));
-        dit(b.lancer === 'Lancer (3)' && b.pleins === 1, `${T} : un seul bouton plein, « Lancer (3) »`, JSON.stringify({ l: b.lancer, p: b.pleins }));
+        dit(b.lancer === 'Envoyer le message (3)' && b.pleins === 1, `${T} : un seul bouton plein, « Envoyer le message (3) » (5.377, sa demande)`, JSON.stringify({ l: b.lancer, p: b.pleins }));
         dit(dedans(b.carte, largeur, hauteur) && b.petits.length === 0 && !b.debord, `${T} : l’aperçu tient dans l’écran, cibles ≥ 44 px, rien ne déborde`, JSON.stringify({ c: b.carte, p: b.petits }));
         dit(!b.envoyes2.some((m) => m.quoi === 'lancer'), `${T} : rien n’est lancé tant qu’il n’a pas touché « Lancer »`, JSON.stringify(b.envoyes2));
         await clic(t.pg, '[data-fav-aide]');
