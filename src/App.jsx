@@ -127,6 +127,7 @@ import {indexCodesSuivis, finParIdentite, fusionnerParCode, suivisLiesDuColis} f
 import { finDatee, texteSortie, sortiRecent, pourquoiPasLu, SORTIS_JOURS, jourCourt as jourCourtParis } from './retraitSuivi.js';
 import {arriveesRelues} from './arriveesRelues.js';
 import { preuveDeLigne } from '../api/_lib/etat-colis.js';
+import { urlQrDuColis } from '../api/_lib/qr-retrait.js';
 import {avecSuiviDuSujet,finsDesLignes,sortiParSuivis,sortiParSuivi,suiviDeLigne,lienSuivi,codePostalLu,nouvelleVinted,transporteurDeForme,colisInternational,suiviValide,TRANSPORTEURS_SAISIE,normaliserCodePostal,idSuiviManuel,relireLigneSuivi,finDeCommandeAchat,fusionTransporteur,ligneDuTransporteur,ligneDeSuiviTransporteur,leverGarde,SELECT_TRANSP_META,ligneTranspDeMeta,sensDeLigne,incidentDeSuivis,incidentDeLigne,repartiAffichable,nomTransporteurSuivi} from '../api/_lib/suivi-colis.js';
 import {ligneTransporteur,texteCodePostalMr,carrierLisible,carrierNonLu,nomTransporteur,LECTURE_SERVEUR_TRANSP,heureParis,indexTranspParSuivi,carrierLuDeLigne,noterLecturesServeur,lecturesCle} from '../api/_lib/transporteurs.js';
 // ⟦→ ecrans/Reglages.jsx #6⟧
@@ -8173,11 +8174,15 @@ const URL_QR_CERTAIN = /\/(?:api\/)?barcode\/(?:datamatrix|azteccode|aztec|qrcod
 // ⚠️ Non mesuré (aucun appel à Vinted d'ici) : que p.vintedgo.com réponde en
 // https — c'est ce que le navigateur lui demande déjà sur vrm.center.
 const qrEnHttps = (u) => String(u || '').replace(/^http:\/\//i, 'https://');
+// (14 nov., capture de Julien) Un QR Vinted Go ne s'affiche que s'il désigne CE colis : son adresse porte le n°
+// de suivi et le code (api/_lib/qr-retrait.js, `urlQrDuColis`) — un autre n° ou un autre code ⇒ aucune image,
+// jamais un QR fabriqué. Ses `&amp;` (lus dans le HTML de l'e-mail) sont décodés.
 const qrImage = (t) => {
   if (!t) return null;
   if (t.qrB64) return `data:${t.qrType || 'image/png'};base64,${t.qrB64}`;
-  if (t.qrUrl && URL_QR_CERTAIN.test(t.qrUrl)) return qrEnHttps(t.qrUrl);
-  if (t.qrUrl && !URL_PAS_UN_QR.test(t.qrUrl)) return qrEnHttps(t.qrUrl);
+  const u = t.qrUrl ? urlQrDuColis(t.qrUrl, t) : '';
+  if (u && URL_QR_CERTAIN.test(u)) return qrEnHttps(u);
+  if (u && !URL_PAS_UN_QR.test(u)) return qrEnHttps(u);
   return null;
 };
 // ⚠️ « DÉLAI DÉPASSÉ » NE DOIT PAS S'AFFICHER « DERNIER JOUR ».
@@ -23146,6 +23151,8 @@ const raisonAVerifier = (x) => {
   if (x.e.etat==='sms_inconnu') return "SMS de Mondial Relay pas reconnu : regarde le SMS ou l'app Mondial Relay";
   // (11 nov., retraits fiables) Un e-mail « disponible » avec son code mais SANS n° de suivi : un colis, pas une pub.
   if (x.e.etat==='sans_suivi') return `E-mail sans n° de suivi : code ${x.t && x.t.code ? x.t.code : ''} — vérifie le point dans l’e-mail`;
+  // (14 nov., Julien) Arrivé, mais le code n'est pas lu : il n'est pas « à retirer » tant qu'on n'a pas son code.
+  if (x.e.etat==='sans_code') return x.kind === 'email' ? tr('achats.sansCodeEmail') : tr('achats.sansCodeVinted');
   if (x.e.etat==='doute_meme_relais') return x.e.avecSuivi ? `compté avec le n°…${String(x.e.avecSuivi).slice(-4)}` : 'compté avec un autre colis de ce point';
   if (x.e.etat==='delai_depasse' && x.e.heurePassee && x.e.limiteAt) return `délai de retrait passé aujourd'hui à ${heureParis(x.e.limiteAt)}`;
   if (x.e.etat==='delai_depasse') { const lim = x.kind==='email' && x.t ? x.t.limite : (x.e.limite || null); const jj = lim ? new Date(String(lim).slice(0,10)+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'}) : ''; return `délai de retrait dépassé${jj?` le ${jj}`:''}`; }
@@ -34716,17 +34723,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       return (tb || 0) - (ta || 0);
     });
     const horsDelai = aVerifier.filter(x => x.kind === 'email' && x.e.etat === 'delai_depasse').map(x => x.t);
+    const sansCodeList = extra.filter(o => { const r = relaisDe(o); return !(r && codeRetrait(r.code)); });
+    // (14 nov., Julien : « je ne veux pas que tu affiches des colis sans code, surtout quand c'est des erreurs »)
+    // AUCUN COLIS SANS CODE DANS « À RETIRER ». Un achat Vinted sans code lu dans sa conversation, un e-mail sans
+    // code ni QR : ni comptés (Ma journée, widget, cloche), ni présentés « à retirer » — ils passent dans « À
+    // vérifier » avec la raison et le geste (§5 : jamais cachés en silence). Les fins prouvées, elles, sont déjà
+    // sorties plus haut (rien n'est montré).
+    for (const o of sansCodeList) aVerifier.push({ kind: 'vinted', o, e: { ...etatColisVinted(o, maintenant, tpm), etat: 'sans_code' } });
+    // Un e-mail sans code dont la conversation de SA commande (par identité : `cmdParColis`, `commandeDuColis`)
+    // donne le code reste à retirer : la carte montre ce code (source « message », banc retraits-irreprochables R5).
+    const codeDeSaCommande = (t) => { let o = null; try { o = (cmdParColis && cmdParColis.get(colisKey(t))) || commandeDuColis(t); } catch (_) { o = null; } const r = o ? relaisDe(o) : null; return !!(r && codeRetrait(r.code)); };
+    const emailSansCode = emailList.filter(t => !codeRetrait(t.code) && !qrImage(t) && !codeDeSaCommande(t));
+    for (const t of emailSansCode) aVerifier.push({ kind: 'email', t, o: commandeDuColis(t), e: { ...etatColisEmail(t, maintenant), etat: 'sans_code' } });
+    if (sansCodeList.length) { const sv = new Set(sansCodeList); extra.splice(0, extra.length, ...extra.filter((o) => !sv.has(o))); }
+    if (emailSansCode.length) { const se = new Set(emailSansCode); emailList.splice(0, emailList.length, ...emailList.filter((t) => !se.has(t))); }
+    const sansCode = 0;
     // Le dernier jour (ou demain) : c'est CE colis qu'il faut aller chercher.
     // (29 oct.) + les achats vus par Vinted dont le TRANSPORTEUR donne la limite
     // (Vinted Go `expiration_time`) : ils sont urgents comme un colis d'e-mail.
     const urgents = emailList.filter(t => { const e = etatColisEmail(t, maintenant); return Number.isFinite(e.jours) && e.jours <= 1; }).length
       + extra.filter(o => { const e = etatColisVinted(o, maintenant, tpm); return Number.isFinite(e.jours) && e.jours <= 1; }).length;
-    const sansCodeList = extra.filter(o => { const r = relaisDe(o); return !(r && codeRetrait(r.code)); });
-    const sansCode = sansCodeList.length;
     // (revue du 23 oct.) Les colis d'e-mail dont le code n'a pas été lu (ni code
     // ni QR) : ils ne sont pas « prêts », et ce n'est pas la conversation Vinted
     // qui les donnera — le code est dans l'e-mail du transporteur.
-    const sansCodeEmail = emailList.filter(t => !codeRetrait(t.code) && !qrImage(t)).length;
+    // (14 nov.) Ils sont désormais dans « À vérifier » (ci-dessus) : plus aucun dans la liste.
+    const sansCodeEmail = 0;
     // ⚠️ SUR QUEL COMPTE SE CONNECTER — il en a NEUF. L'extension va chercher
     // les codes toute seule, mais UNIQUEMENT pour le compte connecté dans
     // l'onglet : « passe sur Vinted avec le bon compte » sans dire lequel, c'est
@@ -43326,8 +43347,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Le lieu d'un e-mail : complété par le suivi du MÊME n°, puis par la conversation de SON
     // achat (relié par identité) quand elle nomme le même point avec une adresse plus complète,
     // puis par le même point déjà connu.
-    const lieuDeLigne = (t, a) => { const k = suiviDeLigne(t); let lu = lieuCompleteParTransporteur(lieuDe(t && t.lieu), (t && t.transp) || (tpmC && k ? tpmC.get(k) : null), Date.parse((t && (t.emailAt || t.receivedAt)) || '') || null);
-      const ra = a ? relaisDe(a) : null; if (ra && ra.lieu) lu = lieuLePlusComplet(lu, lieuDe(ra.lieu));
+    // (14 nov., Vinted Go réacheminé) Un e-mail qui ne nomme pas le point reçoit le lieu du TRANSPORTEUR (rue + ville,
+    // sans nom ni code postal : `lieuDuTransporteur`). Ce lieu-là n'est pas un nom : la conversation de SON achat (même
+    // identité) qui nomme le point part en premier, et le transporteur la complète ou la contredit (règle datée,
+    // `lieuCompleteParTransporteur`) — sinon « 12 Rue X » devenait le NOM du point et l'enseigne disparaissait.
+    const lieuDeLigne = (t, a) => { const k = suiviDeLigne(t); const ra = a ? relaisDe(a) : null;
+      const base = t && t.lieuDuTransporteur && ra && ra.lieu ? ra.lieu : (t && t.lieu);
+      let lu = lieuCompleteParTransporteur(lieuDe(base), (t && t.transp) || (tpmC && k ? tpmC.get(k) : null), Date.parse((t && (t.emailAt || t.receivedAt)) || '') || null);
+      if (ra && ra.lieu && base !== ra.lieu) lu = lieuLePlusComplet(lu, lieuDe(ra.lieu));
       return completer(lu, t && t.carrier, t && t.account); };
     const codeDeLigne = (t) => codeRetrait(t && t.code) || '';
     // (5 nov.) L'ACHAT LEBONCOIN OU VESTIAIRE D'UN COLIS, PAR SON N° DE SUIVI (src/retraitQr.js, §5) :
@@ -43373,8 +43400,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         etat: [lu.lieuNom || nomTr(t.carrier), dernierJour(ej) || (code ? code : (qrImage(t) ? 'QR code' : 'code pas encore lu'))].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
         ...lu, lieuType: typeCasier(t.lieu), transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code && !(scE && scE.code && scE.code.desaccord), jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), arrivee: arriveeLueRetrait({ t }), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), ...champsSources(scE), src: { t } });
     }
+    // (14 nov., Vinted Go réacheminé) LE LIEU D'UN ACHAT VINTED SANS E-MAIL : celui de la conversation de SA commande,
+    // confronté au suivi du transporteur du MÊME n° (son achat → son n° de suivi, une identité). Le plus RÉCENT prouvé
+    // gagne : le transporteur qui le dit disponible AILLEURS par un événement daté APRÈS le premier message d'arrivée
+    // (`arriveLe`) donne la nouvelle adresse, l'ancienne n'est plus un lieu de retrait ; sans date d'arrivée, rien
+    // n'est choisi et le désaccord est dit (`lieuConflit`, la règle de `lieuCompleteParTransporteur`).
+    const lieuDeVinted = (o, r) => {
+      const lu0 = completer(lieuDe(r && r.lieu), r && r.transporteur, '');
+      if (!r || !r.lieu || !tpmC) return lu0;
+      const k = normaliserSuivi(suivisAchat(o, indexSuivisAchats)[0] || ''); const tr = k ? tpmC.get(k) : null;
+      if (!tr) return lu0;
+      const ref = Date.parse(String(r.arriveLe || ''));
+      return lieuCompleteParTransporteur(lu0, tr, Number.isFinite(ref) ? ref : null);
+    };
     for (const o of (pickupUnion.extra || [])) {
-      const r = relaisDe(o); const lu = completer(lieuDe(r && r.lieu), r && r.transporteur, ''); const scV = sourcesCarte({ o }); const code = codeDesSources(scV, r ? codeRetrait(r.code) : ''); const eV = etatColisVinted(o, maintenant, tpmC); const ej = eV.jours;
+      const r = relaisDe(o); const lu = lieuDeVinted(o, r); const scV = sourcesCarte({ o }); const code = codeDesSources(scV, r ? codeRetrait(r.code) : ''); const eV = etatColisVinted(o, maintenant, tpmC); const ej = eV.jours;
       const suV = suivisAchat(o, indexSuivisAchats)[0] || ''; const eSV = entreeSuiviAchat(o); const trInconnu = !!suV && !((r && r.transporteur) || (eSV && eSV.transporteur) || transporteurDeForme(suV) || colisInternational(suV));
       L.push({ cle: 'r:v:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), num: '', trInconnu,
         etat: [lu.lieuNom || 'au point relais', dernierJour(ej) || (code || 'code pas encore lu')].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
@@ -43385,7 +43425,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // (2 nov.) Même fait que les cartes « extra » : un n° vu sans transporteur nommé.
       const suX = x.kind === 'email' ? (suiviDeLigne(x.t) || '') : (suivisAchat(x.o, indexSuivisAchats)[0] || ''); const eSX = x.kind === 'email' ? null : entreeSuiviAchat(x.o);
       const trInconnu = !!suX && !((x.kind === 'email' ? (x.t && x.t.carrier) : (relaisDe(x.o) || {}).transporteur) || (eSX && eSX.transporteur) || transporteurDeForme(suX) || colisInternational(suX));
-      const lu = x.kind === 'email' ? lieuDeLigne(x.t, o) : completer(lieuDe((relaisDe(x.o) || {}).lieu), (relaisDe(x.o) || {}).transporteur, '');
+      const lu = x.kind === 'email' ? lieuDeLigne(x.t, o) : lieuDeVinted(x.o, relaisDe(x.o));
       const scX = sourcesCarte(x.kind === 'email' ? { t: x.t, o } : { o: x.o });
       const code = codeDesSources(scX, scX && scX.code && scX.code.desaccord ? '' : (x.kind === 'email' ? codeDeLigne(x.t) : codeRetrait((relaisDe(x.o) || {}).code)));
       L.push({ cle: x.kind === 'email' ? 'r:e:' + (suiviDeLigne(x.t) || (x.t && (x.t.id || x.t.cleLigne)) || colisKey(x.t) || '') : 'r:v:' + (x.o && x.o.transaction_id), groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o ? o.title : (x.t && nomTr(x.t.carrier) ? 'Colis ' + nomTr(x.t.carrier) : 'Colis à retirer'), o), photo: o ? photoAchat(o) : ((x.t && x.t.photo) || null), trInconnu,

@@ -82,6 +82,9 @@ const CORPS_CHANGEMENT_RELAIS=[
  /\bpoint\s+relais\s+(?:\S+\s+){0,5}(?:est|etait)\s+(?:temporairement\s+|actuellement\s+|momentanement\s+)?(?:indisponible|ferme)e?\b/,
  /\b(?:vers|dans|au|a)\s+(?:le|un|votre|ton|ce)?\s*(?:nouveau\s+point\s+(?:relais|de\s+retrait)|point\s+relais\s+suivant)\b/,
 ];
+// (14 nov.) « il est temps de récupérer ton colis », « récupère ton colis », « t'attend » — une invitation au
+// présent ou à l'impératif, jamais une condition (le sujet n'en porte pas).
+export const SUJET_RECUPERER_AU_NOUVEAU=/\bil\s+est\s+temps\s+de\s+(?:recuperer|retirer)\b|\b(?:recupere|recuperez|retire|retirez)\s+(?:ton|votre)\s+colis\b|\bt'attend\b|\bvous\s+attend\b/;
 export function changementDeRelais(sujet,texte=''){
  const s=normaliser(sujet);
  if(SUJET_CHANGEMENT_RELAIS.test(s))return true;
@@ -147,7 +150,11 @@ export function etatColisDepuisTexte(sujet,texte='') {
  if(/ou vous livrer en cas de point indisponible|au cas ou le point (?:de retrait|relais)/.test(s))return 'transit';
  // (10 nov.) Un changement de point relais : le colis ROULE vers le nouveau point. Un
  // sujet qui constate l'arrivée ou le retrait (« … est disponible ») garde la main.
- if(SUJET_CHANGEMENT_RELAIS.test(s)){const l=lire(sujet);return l==='available'||l==='delivered'||l==='retour'?l:'transit';}
+ // (14 nov., capture de Julien : Vinted Go « Nouveau relais : il est temps de récupérer ton colis ! », code
+ // 348094 et QR) Le sujet qui INVITE à récupérer le colis au nouveau point constate qu'il y est : le colis est
+ // ARRIVÉ (Vinted Go le dit « livré dans un nouveau relais », date limite, code et QR). Rangé « en route », son
+ // QR n'atteignait jamais « À retirer ». « Changé de plan » (Mondial Relay : il roule encore) ne le dit pas.
+ if(SUJET_CHANGEMENT_RELAIS.test(s)){if(SUJET_RECUPERER_AU_NOUVEAU.test(s))return 'available';const l=lire(sujet);return l==='available'||l==='delivered'||l==='retour'?l:'transit';}
  if(/entre de bonnes mains|preuve de depot|confirmation du depot|depot de votre colis|colis est depose|bordereau d'envoi/.test(s)&&!/point|consigne|relais/.test(s))return 'transit';
  // Le sujet courant prime ; le texte n'est consulté que si le sujet est neutre.
  const parSujet=lire(sujet);if(parSujet)return parSujet;

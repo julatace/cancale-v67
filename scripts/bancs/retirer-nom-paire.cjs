@@ -72,7 +72,8 @@ const LIGNES = [
 ];
 // Ma journée se lit SANS le piège : un achat « au point relais » sans identité y est « à vérifier » (la ligne de la
 // case le dit, en ambre, à la place des noms) — la règle des noms se juge seule.
-const LIGNES_JOURNEE = LIGNES.map((r) => (r.id === 'harvest_111_orders_purchased' ? { ...r, data: { ...r.data, payload: { my_orders: ACHATS.filter((o) => o.transaction_id !== 9504) } } } : r));
+// (14 nov., Julien : aucun colis SANS code dans « À retirer ») Ma journée juge les NOMS : l'e-mail de la conversation y porte un code.
+const LIGNES_JOURNEE = LIGNES.map((r) => (r.id === 'harvest_111_orders_purchased' ? { ...r, data: { ...r.data, payload: { my_orders: ACHATS.filter((o) => o.transaction_id !== 9504) } } } : r.id === 'email_track_autre_conv-c-9503' ? { ...r, data: { ...r.data, code: '650003' } } : r));
 let LIGNES_SERVIES = LIGNES;
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (!c && d ? ' — ' + d : '')); };
@@ -159,14 +160,14 @@ const shotDe = (pg, nom) => async (k) => { if (!SHOTS) return; fs.mkdirSync(SHOT
           await pg.waitForTimeout(900);
           const L = await pg.evaluate(() => [...document.querySelectorAll('.vrm-rpf .vrm-rpf-ligne[data-cc-carte]')].map((l) => {
             const im = [...l.querySelectorAll('.vrm-rpf-vignette img')].map((i) => i.getAttribute('src') || '').filter((s) => /images1\.vinted\.net/.test(s));
-            return { cle: l.getAttribute('data-cc-carte'), titre: ((l.querySelector('.vrm-rpf-titre') || {}).textContent || '').trim(), code: (l.querySelector('[data-code-retrait]') || { getAttribute: () => '' }).getAttribute('data-code-retrait'), photo: (/\/t\/b(\d+)\//.exec(im[0] || '') || [])[1] || '', vu: l.getBoundingClientRect().height > 0 };
+            return { cle: l.getAttribute('data-cc-carte'), titre: ((l.querySelector('.vrm-rpf-titre') || {}).textContent || '').trim(), code: (l.querySelector('[data-code-retrait]') || { getAttribute: () => '' }).getAttribute('data-code-retrait'), photo: (/\/t\/b(\d+)\//.exec(im[0] || '') || [])[1] || '', vu: l.getBoundingClientRect().height > 0, verif: l.getAttribute('data-a-verifier-raison') };
           }));
           for (let i = 0; i < 3; i++) { await pg.evaluate((i) => { const e = document.querySelectorAll('.vrm-rpf-point')[i]; if (e) { e.scrollIntoView({ block: 'start' }); window.scrollBy(0, -70); } }, i); await pg.waitForTimeout(250); await shot(`retirer-point${i + 1}`); }
           const par = (code) => L.find((l) => l.code === code) || null;
           const mr = par('400001'), vgo = par('482913'), conv = L.find((l) => l.titre.includes(N_CONV)) || null, cp = par('700001');
           dit(!!mr && mr.titre.includes(N_MR) && mr.photo === '21', `${nom} : A1 Mondial Relay relié par son n° de suivi (ligne de suivi Vinted) ⇒ « ${N_MR} » et SA photo`, JSON.stringify(mr));
           dit(!!vgo && vgo.titre.includes(N_VGO) && vgo.photo === '22', `${nom} : A2 Vinted Go relié par son CODE (conversation de sa commande) ⇒ « ${N_VGO} » et SA photo`, JSON.stringify(vgo));
-          dit(!!conv && conv.photo === '23', `${nom} : A3 e-mail Vinted relié par la CONVERSATION de sa commande ⇒ « ${N_CONV} » et SA photo`, JSON.stringify(conv));
+          dit(!!conv && conv.photo === '23' && conv.verif === 'sans_code', `${nom} : A3 e-mail Vinted relié par la CONVERSATION de sa commande ⇒ « ${N_CONV} » et SA photo — sans code, dans « À vérifier » (14 nov.)`, JSON.stringify(conv));
           dit(!!cp && /^(N°\d+ · )?Colis Chronopost/.test(cp.titre) && !cp.photo && !L.some((l) => l.code === '700001' && l.titre.includes(N_PIEGE)), `${nom} : A4 Chronopost sans identité ⇒ « Colis Chronopost… », sans photo — jamais le nom de l'achat au même point (${N_PIEGE})`, JSON.stringify(cp));
           // B. Le mode relais : chaque carte, son nom.
           const btn = pg.locator('[data-relais-ouvrir]:visible').first();
@@ -180,7 +181,7 @@ const shotDe = (pg, nom) => async (k) => { if (!SHOTS) return; fs.mkdirSync(SHOT
               const s = pg.locator('[data-relais-suivant]:not([disabled])'); if (!(await s.count())) break; await s.first().click(); await pg.waitForTimeout(150);
             }
             const t = (code) => (cartes.find((c) => c.code === code) || {}).titre || '';
-            dit(t('400001').includes(N_MR) && t('482913').includes(N_VGO) && /^Colis Chronopost/.test(t('700001')) && cartes.some((c) => c.titre.includes(N_CONV)), `${nom} : B mode relais — le même nom sur chaque carte, « Colis Chronopost… » pour celui qu'aucune identité ne relie`, JSON.stringify(cartes));
+            dit(t('400001').includes(N_MR) && t('482913').includes(N_VGO) && /^Colis Chronopost/.test(t('700001')) && !cartes.some((c) => c.titre.includes(N_CONV)), `${nom} : B mode relais — le même nom sur chaque carte, « Colis Chronopost… » pour celui qu'aucune identité ne relie ; le colis SANS code n'y est pas (14 nov.)`, JSON.stringify(cartes));
             await pg.locator('[data-relais-fermer]').first().click().catch(() => {});
           } else dit(false, `${nom} : B le bouton « Mode relais » est là`);
           // C. Ce qui est publié (widget), gardé hors ligne (codes, Ma journée).
@@ -189,10 +190,10 @@ const shotDe = (pg, nom) => async (k) => { if (!SHOTS) return; fs.mkdirSync(SHOT
             const k = Object.keys(localStorage).find((x) => x.startsWith('vrm_hl_photo_'));
             return { colis: (lit('vrm_colis_retirer') || {}).colis || null, codes: (lit('vrm_codes_hors_ligne') || {}).codes || null, hl: k ? ((lit(k) || {}).retirer || null) : null }; });
           const nomPub = (id) => ((pub.colis || []).find((c) => Array.isArray(c) && c[3] === id) || [])[7];
-          dit(nomPub('e:40000001') === N_MR && nomPub('e:1VGO00000001') === N_VGO && (pub.colis || []).some((c) => c[7] === N_CONV) && nomPub('e:06000000000001') === '', `${nom} : C1 la liste publiée pour le widget porte le nom [7] (vide pour le Chronopost)`, JSON.stringify(pub.colis));
+          dit(nomPub('e:40000001') === N_MR && nomPub('e:1VGO00000001') === N_VGO && !(pub.colis || []).some((c) => c[7] === N_CONV) && nomPub('e:06000000000001') === '', `${nom} : C1 la liste publiée pour le widget porte le nom [7] (vide pour le Chronopost)`, JSON.stringify(pub.colis));
           const titreCode = (L2, code) => ((L2 || []).find((c) => c.code === code) || {}).titre;
           dit(titreCode(pub.codes, '400001') === N_MR && titreCode(pub.codes, '482913') === N_VGO && !titreCode(pub.codes, '700001'), `${nom} : C2 codes hors ligne — le nom de la paire avec son code`, JSON.stringify(pub.codes && pub.codes.map((c) => [c.code, c.titre])));
-          dit(titreCode(pub.hl, '400001') === N_MR && titreCode(pub.hl, '482913') === N_VGO && (pub.hl || []).some((r) => r.titre === N_CONV) && !titreCode(pub.hl, '700001'), `${nom} : C3 Ma journée hors ligne — le nom de la paire sur chaque colis relié`, JSON.stringify(pub.hl && pub.hl.map((c) => [c.code, c.titre])));
+          dit(titreCode(pub.hl, '400001') === N_MR && titreCode(pub.hl, '482913') === N_VGO && !(pub.hl || []).some((r) => r.titre === N_CONV) && !titreCode(pub.hl, '700001'), `${nom} : C3 Ma journée hors ligne — le nom de la paire sur chaque colis relié`, JSON.stringify(pub.hl && pub.hl.map((c) => [c.code, c.titre])));
         });
         dit(!errs.length, `${nom} : aucune erreur (Colis)`, errs.join(' | ').slice(0, 200));
         await ctx.close(); }
