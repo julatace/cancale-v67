@@ -174,6 +174,7 @@ export default {
   "acc.export.donnees.pas": "Nothing is deleted or sent to anyone.",
   "acc.export.donnees.apres": "File downloaded: {nom}",
   "acc.export.donnees.pendant": "Preparing the export…",
+  "acc.export.donnees.incomplet": "part of your data could not be read (the file is still saved)",
 
   "acc.export.comptable.avant": "A zip for your accountant: spreadsheet, PDF and receipts for the period.",
   "acc.export.comptable.pas": "Nothing is sent: you choose who gets it.",

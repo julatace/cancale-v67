@@ -88,13 +88,15 @@ export function AccApres({ geste, vars = {}, onEnsuite = null, onFermer = null, 
 
 // ── ÉCHEC ────────────────────────────────────────────────────────────────────
 // `erreur` : ce que le geste a rendu (Error, `{ ok:false, error }`, phrase…) ; ou déjà lu : `{ code, texte }`.
-export function AccEchec({ geste, erreur, onReessayer = null, onFermer = null, lu = null }) {
+// `gesteTexte` : le geste que l'écran connaît déjà pour CE refus (« Retélécharge-le depuis la vente ») — il passe
+// avant le geste type de la raison (jamais les deux).
+export function AccEchec({ geste, erreur, onReessayer = null, onFermer = null, lu = null, gesteTexte = '' }) {
   useLangue();
   const e = lu || lireEchec(erreur);
-  const reparer = GESTES_RAISON[e.code] || GESTES_RAISON.inconnu;
+  const reparer = gesteTexte ? {} : (GESTES_RAISON[e.code] || GESTES_RAISON.inconnu);
   const raison = e.texte || tr(`acc.raison.${e.code}`);
   const peutReessayer = reparer.reessayer && typeof onReessayer === 'function';
-  const libGeste = peutReessayer ? tr('acc.reessayer') : tr(`acc.geste.${e.code}`);
+  const libGeste = gesteTexte ? String(gesteTexte).replace(/[.\s]+$/, '') : peutReessayer ? tr('acc.reessayer') : tr(`acc.geste.${e.code}`);
   return (
     <div className="vrm-acc vrm-acc-echec" data-acc-echec={geste} data-acc-raison={e.code} role="alert">
       <span className="vrm-acc-point" aria-hidden="true"/>

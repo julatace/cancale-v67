@@ -174,6 +174,7 @@ export default {
   "acc.export.donnees.pas": "No se borra ni se envía nada a nadie.",
   "acc.export.donnees.apres": "Archivo descargado: {nom}",
   "acc.export.donnees.pendant": "Preparando la exportación…",
+  "acc.export.donnees.incomplet": "una parte de tus datos no se pudo leer (el archivo se guarda igual)",
 
   "acc.export.comptable.avant": "Un zip para tu gestor: hoja de cálculo, PDF y justificantes del periodo.",
   "acc.export.comptable.pas": "No se envía nada: eliges tú a quién darlo.",

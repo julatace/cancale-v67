@@ -200,7 +200,7 @@ export function SuiviTravailFeuille({ s, jobs = null }) {
         ) : null}
 
         {fini && geste && p.nOk ? <AccApres geste={geste} vars={{ n: p.nOk }} onEnsuite={(suite) => { suivi.fermer(); setTimeout(() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: suite.lien })); } catch (_) {} }, 60); }}/> : null}
-        {refus1 && geste ? <AccEchec geste={geste} erreur={refus1.raison || ''}/> : null}
+        {refus1 && geste ? <AccEchec geste={geste} erreur={refus1.raison || ''} gesteTexte={refus1.geste || ''}/> : null}
         {fini || (enPause && !tourne) ? <Recap s={s} jobs={jobs}/> : null}
 
         <Journal s={s}/>

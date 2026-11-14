@@ -174,6 +174,7 @@ export default {
   "acc.export.donnees.pas": "Nichts wird gelöscht oder an jemanden gesendet.",
   "acc.export.donnees.apres": "Datei geladen: {nom}",
   "acc.export.donnees.pendant": "Export wird vorbereitet…",
+  "acc.export.donnees.incomplet": "ein Teil deiner Daten konnte nicht gelesen werden (die Datei wird trotzdem gespeichert)",
 
   "acc.export.comptable.avant": "Ein ZIP für deinen Steuerberater: Tabelle, PDF und Belege des Zeitraums.",
   "acc.export.comptable.pas": "Nichts wird gesendet: du wählst, wer es bekommt.",

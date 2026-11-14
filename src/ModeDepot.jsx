@@ -113,7 +113,7 @@ export default function ModeDepot({ colis, etatDe = () => '', onDeposer, onAnnul
           <div className="vrm-depot-res" role="status" aria-live="assertive" data-depot-resultat={res ? res.etat : ''} data-depot-res-cle={rc ? rc.cle : ''} data-depot-n={res ? res.n : 0}>
             {!res ? <span className="vrm-depot-attente" data-acc-avant="colis.depose">{tr('acc.colis.depose.scan')}</span>
               : rc && (res.etat === 'trouve' || res.etat === 'deja') ? (
-                <span className="vrm-depot-res-paire">
+                <span className="vrm-depot-res-paire" data-acc-apres={res.etat === 'trouve' ? 'colis.depose' : undefined}>
                   {rc.num ? <b className="vrm-depot-res-num">N°{rc.num}</b> : null}
                   <span className="vrm-depot-res-titre">{rc.titre}</span>
                   <span className={'vrm-depot-res-etat' + (res.etat === 'deja' ? ' is-deja' : '')}>{res.etat === 'deja' ? 'Déjà déposé' : 'Déposé ✓'}</span>
@@ -143,7 +143,7 @@ export default function ModeDepot({ colis, etatDe = () => '', onDeposer, onAnnul
                     <span className="vrm-depot-quoi">
                       <span className="vrm-depot-l1">{c.num ? <b className="vrm-depot-num">N°{c.num}</b> : null}<span className="vrm-depot-t">{c.titre}</span></span>
                       {c.sorti ? <span className="vrm-depot-l2">Plus à déposer</span>
-                        : e === 'attente' ? <span className="vrm-depot-l2" data-depot-attente="">{horsLigne ? 'Part au retour du réseau' : 'Déposé · annulable 5 s'}</span>
+                        : e === 'attente' ? <span className="vrm-depot-l2" data-depot-attente="" data-acc-apres="colis.depose">{horsLigne ? 'Part au retour du réseau' : 'Déposé · annulable 5 s'}</span>
                         : c.raison === 'ebay' ? <span className="vrm-depot-l2">Suivi dans eBay</span>
                         : c.raison === 'sans-identite' ? <span className="vrm-depot-l2">Il faut le réseau</span>
                         : c.sansBordereau && !fait ? <span className="vrm-depot-l2">Bordereau pas encore là</span> : null}

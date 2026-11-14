@@ -177,6 +177,7 @@ export default {
   "acc.export.donnees.pas": "Rien n’est supprimé ni envoyé à quelqu’un.",
   "acc.export.donnees.apres": "Fichier téléchargé : {nom}",
   "acc.export.donnees.pendant": "Export en préparation…",
+  "acc.export.donnees.incomplet": "une partie de tes données n’a pas pu être lue (le fichier part quand même)",
 
   "acc.export.comptable.avant": "Un zip pour ton comptable : tableur, PDF et justificatifs de la période.",
   "acc.export.comptable.pas": "Rien n’est envoyé : tu choisis à qui le donner.",

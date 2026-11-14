@@ -68,7 +68,10 @@ function base({ neuve = false } = {}) {
   for (const r of b.rows) {
     if (r.data && typeof r.data.pdfB64 === 'string') r.data.pdfB64 = PDF_B64;
     if (r.data && typeof r.data.pdfTamponneB64 === 'string') r.data.pdfTamponneB64 = PDF_B64;
-    if (/_listings$/.test(r.id) && r.data.payload) for (const [i, it] of r.data.payload.items.entries()) if (i < 4) it.created_at_ts = new Date(Date.now() - (70 + i * 10) * 86400e3).toISOString();
+    if (/_listings$/.test(r.id) && r.data.payload) for (const [i, it] of r.data.payload.items.entries()) if (i < 4) {
+      const s = Math.floor((Date.now() - (70 + i * 10) * 86400e3) / 1000);
+      it.created_at_ts = s; if (it.photo && it.photo.high_resolution) it.photo.high_resolution.timestamp = s;
+    }
   }
   const vus = {}; for (const a of b.accounts) vus[a.vinted_user_id] = Date.now() - 120000;
   b.rows.push({ id: 'ext_appareil_0123456789abcdef', data: { appareil: { paquet: 'chromium', nav: 'chrome', systeme: 'mac' }, ver: '5.375.0', code: '5.375.0', atMs: Date.now() - 60000, flux: {}, vus: { vinted: vus } } });
@@ -251,8 +254,8 @@ action('colis.generer', async (nav) => {
     noter('colis.generer', 'pendant', await moment(o.pg, 'pendant', 'colis.generer', { ms: 5000 }));
     await shot(o.pg, 'colis-generer-pendant');
     await tenir(o.pg, false);
-    await repondre(o.pg, { accepte: true, etape: 'file', jobId: 'x' });
-    await relacher(o.pg, (c) => ({ accepte: true, etape: 'file', jobId: 'bord:' + c.uid + ':' + c.tx }));
+    await repondre(o.pg, { accepte: true, etape: 'file' });
+    await relacher(o.pg, { accepte: true, etape: 'file' });
     noter('colis.generer', 'apres', await moment(o.pg, 'apres', 'colis.generer', { ms: 15000 }), { exigerEnsuite: true });
     await shot(o.pg, 'colis-generer-apres');
   } finally { await o.ctx.close(); }
@@ -309,7 +312,7 @@ action('prix.baisser', async (nav) => {
     await attendreCmd(o.pg, 'baisserPrixVinted');
     noter('prix.baisser', 'pendant', await moment(o.pg, 'pendant', 'prix.baisser', { ms: 6000 }));
     await shot(o.pg, 'prix-baisser-pendant');
-    await relacher(o.pg, (c) => ({ accepte: true, etape: 'fait', prixVu: c.prix || 1 }));
+    await relacher(o.pg, { accepte: true, etape: 'fait', prixVu: 1 });
     noter('prix.baisser', 'apres', await moment(o.pg, 'apres', 'prix.baisser', { ms: 15000 }), { exigerEnsuite: true });
     await shot(o.pg, 'prix-baisser-apres');
   } finally { await o.ctx.close(); }
@@ -325,8 +328,11 @@ action('prix.baisser', async (nav) => {
 
 // 5. EXPORTER MES DONNÉES (Paramètres → Mon compte → Tes données) — PENDANT (route tenue), APRÈS (fichier), ÉCHEC (réseau coupé).
 action('export.donnees', async (nav) => {
+  // La lecture serveur de « toutes tes données » (`/api/compte?mode=mes-donnees`) : TENUE (pendant), servie (après),
+  // coupée par le réseau (échec : le zip part quand même, l'échec le dit).
   let mode = 'tenir', lacher = null; const tenue = new Promise((ok) => { lacher = ok; });
-  const panne = (u) => (/mode=(donnees|rgpd|export)/.test(u) ? (mode === 'couper' ? (r) => r.abort('internetdisconnected') : mode === 'tenir' ? (r) => tenue.then(() => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"fichiers":[]}' })) : null) : null);
+  const servie = (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, morceaux: [{ nom: 'banc.txt', texte: 'banc' }] }) });
+  const panne = (u) => (/mode=mes-donnees/.test(u) ? (mode === 'couper' ? (r) => r.abort('internetdisconnected') : mode === 'tenir' ? (r) => tenue.then(() => servie(r)) : servie) : null);
   const o = await ouvrir(nav, { url: '/?tab=settings', panne });
   try {
     const ok = await ouvrirTesDonnees(o.pg);
@@ -334,24 +340,24 @@ action('export.donnees', async (nav) => {
     noter('export.donnees', 'avant', await moment(o.pg, 'avant', 'export.donnees'), {});
     await toucher(o.pg, '[data-td-exporter]');
     noter('export.donnees', 'pendant', await moment(o.pg, 'pendant', 'export.donnees', { ms: 8000 }));
+    await shot(o.pg, 'export-donnees-pendant');
     mode = ''; lacher();
     noter('export.donnees', 'apres', await moment(o.pg, 'apres', 'export.donnees', { ms: 15000 }));
     await shot(o.pg, 'export-donnees-apres');
   } finally { await o.ctx.close(); }
   mode = 'couper';
-  const o2 = await ouvrir(nav, { url: '/?tab=settings', panne: (u, m) => (/\/rest\/v1\//.test(u) && m === 'GET' && /select=/.test(u) && o2pret ? (r) => r.abort('internetdisconnected') : panne(u, m)) });
-  let o2pret = false;
+  const o2 = await ouvrir(nav, { url: '/?tab=settings', panne });
   try {
-    await ouvrirTesDonnees(o2.pg); o2pret = true;
+    await ouvrirTesDonnees(o2.pg);
     await toucher(o2.pg, '[data-td-exporter]');
     noter('export.donnees', 'echec', await moment(o2.pg, 'echec', 'export.donnees', { ms: 15000 }));
     await shot(o2.pg, 'export-donnees-echec');
   } finally { await o2.ctx.close(); }
 });
 async function ouvrirTesDonnees(pg) {
-  for (const sel of ['[data-reglage-sous="tes-donnees"]', '[data-sous="tes-donnees"]', 'text=Tes données']) {
-    if (await pg.locator(sel).count()) { await pg.locator(sel).first().click().catch(() => {}); break; }
-  }
+  await pg.locator('[data-onglets-reglages] [data-vue="compte"]').first().click({ timeout: 8000 }).catch(() => {});
+  await pg.waitForTimeout(400);
+  await pg.locator('[data-sous-ouvrir="tes-donnees"]').first().click({ timeout: 8000 }).catch(() => {});
   return pg.waitForSelector('[data-td-exporter]', { timeout: 10000 }).then(() => true).catch(() => false);
 }
 

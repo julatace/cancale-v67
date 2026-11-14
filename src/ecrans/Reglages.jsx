@@ -1400,10 +1400,11 @@ async function exporterMesDonnees() {
     acc.pendant(0);
     const tout = await toutesMesDonnees({ entetes: enTeteSession });
     const complet = tout.ok ? tout.fichiers : [{ nom: 'INCOMPLET.txt', texte: "Tes tableaux sont là, mais le reste de tes données n'a pas pu être lu.\r\nRelance « Exporter mes données » dans un instant.\r\n" }];
-    if (!tout.ok) toast('Export incomplet : relance-le dans un instant.');
     const zip = zipStocke([...fichiersExport(feuillesExport(src)), ...complet]);
     telechargerFichier(new Blob([zip], { type: 'application/zip' }), nomExport(), 'application/zip');
-    acc.fini({ nom: nomExport() });
+    // Une partie pas lue : le zip part quand même (tes tableaux, et INCOMPLET.txt), et l'échec le DIT, avec « Réessayer ».
+    if (!tout.ok) acc.echec({ raison: tr('acc.export.donnees.incomplet') }, { reessayer: () => exporterMesDonnees() });
+    else acc.fini({ nom: nomExport() });
   } catch (e) { acc.echec(e, { reessayer: () => exporterMesDonnees() }); }
 }
 // ⟦← App.jsx #35⟧

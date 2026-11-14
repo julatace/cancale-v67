@@ -174,6 +174,7 @@ export default {
   "acc.export.donnees.pas": "Niente viene eliminato né inviato a qualcuno.",
   "acc.export.donnees.apres": "File scaricato: {nom}",
   "acc.export.donnees.pendant": "Esportazione in preparazione…",
+  "acc.export.donnees.incomplet": "una parte dei tuoi dati non è stata letta (il file parte comunque)",
 
   "acc.export.comptable.avant": "Uno zip per il tuo commercialista: foglio di calcolo, PDF e giustificativi del periodo.",
   "acc.export.comptable.pas": "Niente viene inviato: scegli tu a chi darlo.",
