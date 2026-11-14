@@ -3932,7 +3932,7 @@ function ObjectifMoisSetting() {
           onChange={(e) => setSaisie(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') enregistrer(); }}
           style={{ flex: '1 1 auto', minWidth: 0, minHeight: 44, boxSizing: 'border-box', padding: '0 12px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, font: 'inherit', fontSize: 15, fontVariantNumeric: 'tabular-nums' }}/>
         <span aria-hidden="true" style={{ color: C.muted }}>{eur ? '€' : 'ventes'}</span>
-        <Bouton variante="principal" disabled={lu == null} onClick={enregistrer} data-reglage-objectif-ok="">Enregistrer</Bouton>
+        <Bouton variante="primaire" disabled={lu == null} onClick={enregistrer} data-reglage-objectif-ok="" style={{ flex: "none", whiteSpace: "nowrap" }}>Enregistrer</Bouton>
       </div>
       {obj ? <div style={{ marginTop: 10 }}><Bouton variante="discret" onClick={() => { poser(objectifAEnregistrer(brut, null)); setSaisie(''); toast('Objectif du mois retiré.'); }} data-reglage-objectif-retirer="">Retirer l’objectif</Bouton></div> : null}
       <div style={{ fontSize: 13, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>Vendu, bénéfice ou ventes : choisis-le dans la carte de Ma journée.</div>

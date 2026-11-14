@@ -114,14 +114,16 @@ function mesurer3({ racines }) {
       if (!capsule) out.natif.push({ quoi: nom(s) + ' ' + ([...s.options].map((o) => o.text).slice(0, 3).join('/')) });
     }
     // M. contrôles à surface propre : capsule.
-    for (const el of root.querySelectorAll('button, [role="button"], [role="switch"], [role="radio"], [role="checkbox"], [role="tab"], summary, a.vrm-b, label:has(> input[type="checkbox"]), label:has(> input[type="radio"])')) {
+    for (const el of root.querySelectorAll('button, [role="button"], [role="switch"], [role="radio"], [role="checkbox"], [role="tab"], summary, a.vrm-b, label:has(> input[type="checkbox"]), label:has(> input[type="radio"]), label:has(input[type="file"])')) {
       if (!vis(el) || el.closest('svg')) continue;
       const r = el.getBoundingClientRect();
       // Un contrôle (≤ 52 px de haut, ≤ 260 de large) — une tuile de choix plus haute est une carte, pas une capsule.
       if (r.height > 52 || r.width > 260 || el.querySelector('img, canvas, video, picture')) continue;
       const cs = getComputedStyle(el);
       const fondC = rgba(cs.backgroundColor);
-      const surface = (fondC && fondC.a > 0.04) || bordsVus(cs).length >= 3;
+      // (un cadre peut être un anneau INTÉRIEUR — `inset 0 0 0 1px` — : c'est aussi une surface)
+      const anneau = /inset/.test(cs.boxShadow || '') && (cs.boxShadow.split(/,(?![^()]*\))/).some((p) => /inset/.test(p) && (rgba(p) || { a: 0 }).a >= 0.06));
+      const surface = (fondC && fondC.a > 0.04) || bordsVus(cs).length >= 3 || anneau;
       if (!surface) continue;
       const rayon = Math.min(px(cs.borderTopLeftRadius, r.height), px(cs.borderBottomRightRadius, r.height));
       if (rayon + 1 < r.height / 2) out.rectangle.push({ h: Math.round(r.height), rayon: Math.round(rayon), quoi: nom(el) });

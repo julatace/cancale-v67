@@ -528,12 +528,15 @@
 /* Le retour d'une sous-page de Paramètres à l'ordinateur : un lien bleu 15 (comme au doigt), plus un rectangle
    encadré de 14 px (styles-bureau.css) — que la souris soit fine ou non. */
 @media (min-width: 1024px) {
-  :root:root body .vrm-app-shell .vrm-set .vrm-set-retour.vrm-set-retour { font-size: var(--d-t-15) !important; border: 0 !important; background: transparent !important; border-radius: var(--d-r-pilule) !important; padding-left: 0 !important; }
+  :root:root body .vrm-app-shell .vrm-set .vrm-set-retour.vrm-set-retour { font-size: var(--d-t-15) !important; border: 0 !important; background: transparent !important; border-radius: var(--d-r-pilule) !important; }
 }
 
 /* M. Ce qui SE TOUCHE est une capsule : les gestes d'une rangée de bordereau (« Imprimer », « Générer le bordereau »,
    rayon 12 dans fusion.css), les gestes du détail d'un retrait (« Conversation ↗ »). */
 :root:root body .vrm-main :is(.vrm-rangee-bord :is(button, a):not(.vrm-puce-transp *), .vrm-fu-imprimer-ligne, .vrm-rpf-detail .vrm-rp-gestes :is(button, a)) { border-radius: var(--d-r-pilule) !important; }
+/* Annonces : « Stock » et « Publier Leboncoin 36/36 › » (deux replis côte à côte) sont des gestes : la capsule remplie,
+   plus deux tuiles blanches encadrées de 12. */
+:root:root body .vrm-main :is(.vrm-ann-stock-tools, [data-places-wrap]) > summary { border-radius: var(--d-r-pilule) !important; border: 0 !important; background-color: var(--d-remplir) !important; }
 /* Un `<select>` qui reste (le filtre de compte du Stock) : la capsule remplie d'un filtre — jamais un rectangle. */
 :root:root body .vrm-app-shell .vrm-main select[data-stock-filtre-compte][aria-label] { border-radius: var(--d-r-pilule) !important; border: 0 !important; background-color: var(--d-remplir) !important; min-height: var(--d-h-filtre) !important; padding-left: 16px !important; padding-right: 12px !important; font-weight: 600 !important; }
 
@@ -560,7 +563,8 @@
 /* Mon historique : une carte par compte encadrée ⇒ UN groupe (des rangées sur une carte, un filet entre deux). */
 :root:root body .vrm-main .vrm-imp-ligne { border: 0 !important; border-radius: 0 !important; box-shadow: none !important; padding: 12px 16px !important; }
 :root:root body .vrm-main :has(> .vrm-imp-ligne) { row-gap: 0 !important; }
-:root:root body .vrm-main .vrm-imp-ligne:not(.vrm-imp-ligne + .vrm-imp-ligne) { border-top-left-radius: var(--d-r-carte) !important; border-top-right-radius: var(--d-r-carte) !important; }
+:root:root body .vrm-main .vrm-imp-ligne:not(.vrm-imp-ligne + .vrm-imp-ligne) { border-top-left-radius: var(--d-r-carte) !important; border-top-right-radius: var(--d-r-carte) !important; margin-top: var(--d-e-2) !important; }
+:root:root body .vrm-main :has(> .vrm-imp-ligne) > .vrm-imp-note { margin-left: var(--d-e-4) !important; margin-right: var(--d-e-4) !important; }
 :root:root body .vrm-main .vrm-imp-ligne:not(:has(+ .vrm-imp-ligne)) { border-bottom-left-radius: var(--d-r-carte) !important; border-bottom-right-radius: var(--d-r-carte) !important; }
 :root:root body .vrm-main .vrm-imp-ligne + .vrm-imp-ligne { margin-top: 0 !important; background-image: linear-gradient(var(--d-filet), var(--d-filet)) !important; background-repeat: no-repeat !important; background-position: right 0 top 0 !important; background-size: calc(100% - 16px) 1px !important; }
 
@@ -569,7 +573,9 @@
 :root:root body .vrm-main .vrm-set [data-sous-ecran] .vrm-etat-panne { box-shadow: none !important; background-color: var(--d-case) !important; border-radius: var(--d-r-case) !important; }
 :root:root body .vrm-main .vrm-set [data-sous-ecran] details.vrm-bilan-sync { box-shadow: none !important; }
 :root:root body .vrm-main .vrm-boite-lecture:not([data-plein="1"]) .vrm-boite-billet { box-shadow: none !important; background-color: var(--d-case) !important; }
-:root:root body .vrm-main .vrm-boite-lecture:not([data-plein="1"]) :is(.vrm-boite-billet-trou::before, .vrm-boite-billet-trou::after) { box-shadow: none !important; }
+:root:root body .vrm-main .vrm-boite-lecture:not([data-plein="1"]) .vrm-boite-billet-trou::before,
+:root:root body .vrm-main .vrm-boite-lecture:not([data-plein="1"]) .vrm-boite-billet-trou::after { box-shadow: none !important; }
+:root:root body .vrm-main .vrm-boite-lecture:not([data-plein="1"]) .vrm-boite-billet .vrm-boite-puce-code { background-color: var(--d-carte) !important; }
 
 /* Les textes d'une sous-page hors de l'échelle (14, 16) sont ramenés À LA SOURCE (styles-import-depart.css,
    styles-sante-comptes.css, import-stock.css, sms-colis.css, styles-corbeille.css, aide-ecran.css) ; ici, ce qui n'a

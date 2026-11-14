@@ -53665,7 +53665,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <FermeAuRetour fermer={()=>setNoteEdit(null)}/>
           {/* (14 nov., passe design 3) La fenêtre du système : carte 20 sans cadre, l'ombre flottante, titre 20/700,
               note 13 grise, champ rayon 12, deux gestes du système (discret, principal) — plus des rectangles de 12. */}
-          <div className="vrm-note-achat" data-note-achat="" onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:20,width:'100%',maxWidth:420,padding:'20px 20px 16px',boxShadow:'var(--d-ombre-flottant)'}}>
+          <div className="vrm-note-achat" data-note-achat="" onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:'var(--d-r-carte)',width:'100%',maxWidth:420,padding:'20px 20px 16px',boxShadow:'var(--d-ombre-flottant)'}}>
             <div style={{fontSize:20,fontWeight:700,color:C.text,marginBottom:4}}>Note interne</div>
             <div style={{fontSize:13,color:C.muted,marginBottom:12,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{noteEdit.title||'Achat'} — privée, pour toi seul</div>
             <textarea autoFocus value={noteEdit.val} onChange={e=>setNoteEdit(n=>({...n,val:e.target.value}))} placeholder="ex : à retoucher · reçu demandé · pour un client…" rows={4}
