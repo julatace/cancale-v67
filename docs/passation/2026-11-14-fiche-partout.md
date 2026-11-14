@@ -76,6 +76,26 @@ une ligne grise, avec sa porte (« Saisir »). Textes nouveaux par `tr()`, 5 lan
 - Gardés verts : build, audits traduction, tdz, icones, coherence, variables, composants, identite,
   rouge-doublon, quoi-de-neuf ; bancs fiche-paire, recherche-fiche, design-passe, design-passe-2.
 
+## En plus, vu en route
+
+- « Ouvrir dans Ventes » DEPUIS la fiche : l'écran montre la ligne (éclairée) sans la rouvrir — la
+  rouvrir, c'était rouvrir cette même fiche par-dessus (`depuisFiche` sur la cible, `poserCible`).
+- La photo en vedette (demande du 14 nov. : « des visuels de ouf ») : quand la paire a une photo lue
+  par identité, elle est la scène de la fiche — pleine largeur, ENTIÈRE sur un fond doux, rayon 20 —
+  le N°, le titre et le prix sur une ligne dessous ; sans photo, l'en-tête compact (jamais une grande
+  scène vide). Principe d'une fiche produit « photo d'abord », aucune identité de marque reprise.
+- Le Stock : la fiche s'ouvre d'abord (le magasin de la fiche), l'état du Stock suit en transition.
+
+## Mesures (machine de banc partagée, charge 16 à 70 sur 4 cœurs)
+
+- À 390 px : les 10 listes vertes sur A/B/C/E ; la fiche posée en 25–110 ms (médiane) après le toucher
+  sur la plupart des listes ; quelques médianes au-dessus de 150 ms (Annonces, Stock, Ventes à
+  1 512 px) relevées pendant une charge de 40–70, où poser un simple voile vide prenait 150–1 300 ms :
+  le banc imprime les deux nombres côte à côte pour qu'on juge.
+- Le recalcul de style du document qui suit toute feuille posée (80–700 ms sur cette machine) n'est pas
+  la fiche : poser un `<div>` vide plein écran coûte autant, même sans aucune règle `:has()` (mesuré en
+  les retirant toutes) — un chantier à part.
+
 ## Ce qui reste / limites
 
 - Deux paires sous un N° : l'app les règle seule (décision du 20 oct.), l'état est passager ; la règle

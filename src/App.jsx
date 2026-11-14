@@ -17786,7 +17786,7 @@ function CibleNotif({ tab, sub }) {
     const defiler = (el, comportement) => { try { const h = el.getBoundingClientRect().height; el.scrollIntoView({ behavior: comportement, block: h > (window.innerHeight || 800) * 0.7 ? 'start' : 'center' }); } catch (_) {} };
     // Ouvrir l'élément (une ligne qui se déplie sur son code, une conversation) —
     // jamais refermer ce qui est déjà ouvert.
-    const ouvrirEl = (el) => { if (sel.ouvrir == null) return; const b = sel.ouvrir ? el.querySelector(sel.ouvrir) : el; if (b && typeof b.click === 'function') minuteurs.push(setTimeout(() => { try { if (b.isConnected && b.getAttribute('aria-expanded') !== 'true') b.click(); } catch (_) {} }, 120)); };
+    const ouvrirEl = (el) => { if (sel.ouvrir == null || (c && c.depuisFiche)) return; const b = sel.ouvrir ? el.querySelector(sel.ouvrir) : el; if (b && typeof b.click === 'function') minuteurs.push(setTimeout(() => { try { if (b.isConnected && b.getAttribute('aria-expanded') !== 'true') b.click(); } catch (_) {} }, 120)); };
     const marquer = (el) => {
       const reduit = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const tMarque = Date.now();
@@ -60696,7 +60696,7 @@ function AppCoeur() {
               // (9 nov.) « Ouvrir dans … » : l'écran d'où vient l'étape, sur SON objet (par identité).
               if (src.stock) { setGarageLocate(String(src.stock)); DEMANDE_STOCK_CHERCHE.nums=[String(src.stock)]; DEMANDE_STOCK_CHERCHE.at=Date.now(); setTab('garage'); return; }
               if (src.tab === 'achats') demanderVue('achats'); if (src.sub) subVoulue.current = src.sub;
-              if (src.cible) poserCible(src.cible, redirigerOnglet(src.tab, null, ONGLETS_DEPLACES).tab);
+              if (src.cible) poserCible({ ...src.cible, depuisFiche: true }, redirigerOnglet(src.tab, null, ONGLETS_DEPLACES).tab);
               setTab(src.tab); }}
             onCopier={async(f)=>{ try { await navigator.clipboard.writeText(texteAColler(f)); toast('Texte copié'); } catch (_) { toast('Copie impossible ici'); } }}
             onDupliquer={async()=>{ const r=await dupliquerNumero(rn, ex); if(!r.ok){ toast(`Pas dupliqué : ${r.raison}`); return; } toast(`N°${r.numero} créé`); setNeuveRecente(r.fiche); fermer(); setFicheNum(String(r.numero)); }}
