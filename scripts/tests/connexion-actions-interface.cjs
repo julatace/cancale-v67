@@ -15,11 +15,12 @@ const { build } = require("esbuild"),
     stdin: {
       resolveDir: root,
       loader: "jsx",
-      contents: `import React from'react';import{createRoot}from'react-dom/client';import{tr,ajouterSourceApp}from'./src/i18n/index.js';import ChoixLangue from'./src/i18n/ChoixLangue.jsx';import frApp from'./src/i18n/langues/fr.js';ajouterSourceApp(frApp);
+      contents: `import React from'react';import{createRoot}from'react-dom/client';import{tr,ajouterSourceApp}from'./src/i18n/index.js';import ChoixLangue from'./src/i18n/ChoixLangue.jsx';import frApp from'./src/i18n/langues/fr.js';import{lireApercuParrain}from'./src/parrainage/parrainage.js';ajouterSourceApp(frApp);
  const C={text:'#223d41',muted:'#647676',bg:'#f2f5f0',card:'#fff',border:'#dce4de',accent:'#315e62',warn:'#946d27',danger:'#a33c36',onAccent:'#fff'},AUTH_REDIRECT=null,CLOISONNE=true,__lier=null;
  const sondeLectureSansCompte=async()=>false,useSecondesRestantes=()=>0,useCaptcha=()=>({statut:'pret'}),captchaActif=()=>false,confirmRequired=()=>false,CaptchaConnexion=()=>null,LiensLegaux=()=>null,BrandMark=()=>null;
  const etatAuthSettings=()=>({statut:'pret'}),onAuthSettingsChange=()=>()=>{},loadAuthSettings=async()=>{};
  const OAUTH_PROVIDERS=[{id:'google',label:'Google'},{id:'discord',label:'Discord'}],providerEnabled=()=>true,delaiDemandeEmail=()=>null,TEXTE_DELAI_EMAIL_BOUTON='',texteDelaiEmail=()=>'',save=()=>{};
+ let PARRAIN_DU_LIEN='';const codeParrainGarde=()=>'';/* (14 nov.) lot 54 : aucun code de parrainage arrivé ni gardé (App.jsx sans lien) ; l'aperçu du parrain est la vraie fonction, jamais appelée sans code */
  let RECOVERY_PENDING=false;let __lierConnexion=null,__lierRetourPerime=false;window.forcerRecuperation=()=>{RECOVERY_PENDING=true;window.remonter();};
  window.appels=[];window.attentes={};const demande=(action)=>{window.appels.push(action);return new Promise((resolve,reject)=>{window.attentes[action]={resolve,reject};});};
  const oauthStart=p=>demande(p),authSignIn=()=>demande('connexion'),authSignUp=()=>demande('inscription'),authReset=()=>demande('reset'),authSetPassword=()=>demande('motdepasse'),authResendConfirm=()=>demande('renvoyer'),authMagicLink=()=>demande('lien'),authConfirmFromLink=()=>demande('confirmer');
