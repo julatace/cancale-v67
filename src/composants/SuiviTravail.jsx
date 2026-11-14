@@ -26,6 +26,9 @@ import JaugeActions from '../JaugeActions.jsx';
 import { tr, date } from '../i18n/index.js';
 import { useLangue } from '../i18n/react.js';
 import './suivi-travail.css';
+// (14 nov., lot accompagnement) La feuille porte les moments du geste qu'elle suit (src/accompagnement.js §9).
+import { gesteDeSorte } from '../accompagnement.js';
+import { AccApres, AccEchec } from '../ui/Accompagne.jsx';
 
 export const Z_SUIVI = 15000;
 
@@ -152,9 +155,13 @@ export function SuiviTravailFeuille({ s, jobs = null }) {
   const titreEtat = tourne ? (s.demande === 'pause' ? tr('suivi.statut.pauseDemandee') : s.demande === 'arret' ? tr('suivi.statut.arretDemande') : tr('suivi.statut.cours'))
     : tr(`suivi.statut.${s.statut}`);
   const pct = Math.round(p.part * 100);
+  const geste = gesteDeSorte(s.sorte);
+  // La première raison d'un refus (le récapitulatif les détaille toutes, une par article).
+  const refus1 = fini && !p.nOk && p.nRefus ? (s.articles || []).find((x) => x.etat === 'refus') : null;
   return createPortal(
     <div ref={setNoeud} className="vrm-st" role="dialog" aria-modal="true" aria-labelledby="vrm-st-titre" style={{ zIndex: Z_SUIVI }}
-      data-suivi-travail={s.sorte} data-suivi-statut={s.statut} data-suivi-demande={s.demande || ''} data-suivi-n={`${p.nFinis}/${p.total}`}>
+      data-suivi-travail={s.sorte} data-suivi-statut={s.statut} data-suivi-demande={s.demande || ''} data-suivi-n={`${p.nFinis}/${p.total}`}
+      data-acc-pendant={!fini && geste ? geste : undefined}>
       <div className="vrm-st-feuille">
         <header className="vrm-st-tete">
           <p className="vrm-st-etat" data-suivi-etat-texte="">{titreEtat}</p>
@@ -192,6 +199,8 @@ export function SuiviTravailFeuille({ s, jobs = null }) {
           </section>
         ) : null}
 
+        {fini && geste && p.nOk ? <AccApres geste={geste} vars={{ n: p.nOk }} onEnsuite={(suite) => { suivi.fermer(); setTimeout(() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: suite.lien })); } catch (_) {} }, 60); }}/> : null}
+        {refus1 && geste ? <AccEchec geste={geste} erreur={refus1.raison || ''}/> : null}
         {fini || (enPause && !tourne) ? <Recap s={s} jobs={jobs}/> : null}
 
         <Journal s={s}/>

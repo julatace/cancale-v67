@@ -454,7 +454,9 @@ import { CLE_VISITE } from "./visiteBulles.js";
 // (6 nov.) L'ACCOMPAGNEMENT : une bulle, au plus, sur le vrai bouton d'un geste utile,
 // quand un chiffre que l'écran affiche déjà le justifie (src/accompagnement.js).
 import Conseils, { ChiffreConseil, useReglageConseils } from "./Conseils.jsx";
-import { LIGNE_ACCOMPAGNEMENT } from "./accompagnement.js";
+import { LIGNE_ACCOMPAGNEMENT, accompagner } from "./accompagnement.js";
+// (14 nov., lot accompagnement) Les quatre moments d'un geste : avant, pendant, après, échec (src/ui/Accompagne.jsx).
+import { AccAvant, AccApres, AccEchec, AccPendant, AccHote, AccVide, AccPremiereFois } from "./ui/Accompagne.jsx";
 import { estIphoneSafari, estInstallee } from "./guideIphone.js";
 // (6 nov.) VRM ouvert à des clients : le mode exemple (données inventées, en mémoire
 // seulement) et le guide de démarrage (quatre étapes cochées sur une preuve lue).
@@ -18109,6 +18111,8 @@ function Toaster() {
           </button>
         );
       })}
+      {/* (14 nov., lot accompagnement) Les gestes courts : résultat et suite, ou échec et geste. */}
+      <AccHote/>
     </div>
   );
 }
@@ -21050,6 +21054,7 @@ function bilanToutGenerer(b, jobs) {
   }
   if (b.attendent) out.push(b.arret === 'refus' ? `${b.attendent} autre${s(b.attendent)} pas demandé${s(b.attendent)}, pour la même raison.`
     : b.arret === 'muet' ? `${b.attendent} autre${s(b.attendent)} pas demandé${s(b.attendent)} : relance « Tout générer » quand cette ligne avance.`
+    : b.arret === 'toi' ? `${b.attendent} autre${s(b.attendent)} pas demandé${s(b.attendent)} : arrêté par toi.`
     : `${b.attendent} autre${s(b.attendent)} au prochain clic : jamais plus de ${BORD_LOT_MAX} d'affilée chez Vinted.`);
   if (b.autres) out.push(`${b.autres} sur un autre compte (bascule sur vinted.fr pour les générer).`);
   return out.join(' ');
@@ -21060,6 +21065,9 @@ function BoutonToutGenerer({ items }) {
   const [busy, setBusy] = React.useState(false);
   const [prog, setProg] = React.useState(null);
   const [bilan, setBilan] = React.useState(null);
+  // (14 nov., lot accompagnement) « Tout arrêter » : la demande en cours finit, la suivante ne part pas.
+  const arretTg = React.useRef(false);
+  const [arretTgVu, setArretTgVu] = React.useState(false);
   const list = (items || []).filter(x => x && x.uid && x.tx);
   if (list.length < 1) return null;
   const glob = raisonExtGlobale(sansSouris);
@@ -21075,9 +21083,10 @@ function BoutonToutGenerer({ items }) {
     setBilan(null);
     if (!co) { setBilan({ message: etat && etat.vintedPasSu ? `Je regarde quel compte Vinted est ouvert ${NAV.dansNu} — réessaie dans un instant.` : `Aucun compte Vinted ouvert ${NAV.dans} — ouvre vinted.fr sur le compte des colis, puis réessaie.` }); return; }
     if (!lot.length) { setBilan({ message: autres ? `Ces colis sont sur un autre compte — bascule sur vinted.fr pour les générer (${autres}).` : "Leurs bordereaux sont déjà en file ou en cours — chaque ligne suit le sien." }); return; }
-    setBusy(true);
+    setBusy(true); arretTg.current = false; setArretTgVu(false);
     const b = { at: Date.now(), lances: [], dejaPrets: 0, muets: [], refus: [], attendent: mine.length - lot.length, arret: '', autres };
     for (let i = 0; i < lot.length; i++) {
+      if (arretTg.current) { b.attendent += lot.length - i; b.arret = 'toi'; break; }
       setProg({ k: i + 1, n: lot.length });
       const x = lot[i];
       const jobId = `bord:${x.uid}:${x.tx}`;
@@ -21118,8 +21127,15 @@ function BoutonToutGenerer({ items }) {
           padding: '11px 15px', cursor: grise || busy ? 'default' : 'pointer', fontSize: 13, fontWeight: 700, fontFamily: 'inherit', opacity: grise ? 0.55 : (busy ? 0.7 : 1), filter: grise ? 'grayscale(1)' : 'none', whiteSpace: 'nowrap' }}>
         <Icon name="doc" size={14}/> {libelle}
       </button>
+      {/* (14 nov., lot accompagnement) AVANT : ce qui part, et ce qui ne part pas. PENDANT : « k / n » + « Tout arrêter ».
+          APRÈS : le bilan (sa phrase) + « Ensuite : les imprimer ». ÉCHEC : la raison en mots + le geste. */}
+      {!busy && !resume && !grise && n > 0 ? <AccAvant geste="colis.generer" vars={{ n: Math.min(n, BORD_LOT_MAX) }}/> : null}
+      {busy && prog ? <AccPendant geste="colis.generer" fait={prog.k - 1} total={prog.n} onArreter={prog.n >= 3 ? () => { arretTg.current = true; setArretTgVu(true); } : null} arretDemande={arretTgVu}/> : null}
       {resume && <span data-tg-bilan={bilan && !bilan.message ? `lances:${bilan.lances.length},muets:${bilan.muets.length},refus:${bilan.refus.map(r => r.code).join('|')},attendent:${bilan.attendent},arret:${bilan.arret}` : 'message'}
-        style={{ fontSize: 11, color: C.muted, lineHeight: 1.35, whiteSpace: 'normal' }}>{resume}</span>}
+        style={{ whiteSpace: 'normal', display: 'block', width: '100%' }}>
+        {bilan && !bilan.message && (bilan.lances.length + bilan.dejaPrets) > 0
+          ? <AccApres geste="colis.generer" texte={resume}/>
+          : <AccEchec geste="colis.generer" erreur={resume} onReessayer={lancer}/>}</span>}
     </span>
   );
 }
@@ -51367,7 +51383,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       titre={fait ? (fait.confirme ? 'Prêts à déposer' : 'C’est imprimé ?') : lot.echecs.length ? `${lot.echecs.length} pas imprimé${lot.echecs.length>1?'s':''}` : 'Tout imprimer'}>
                       {!fait && <div className="vrm-tip-temps" key="choix">
                         <ol className="vrm-tip-pas" aria-label="Étapes"><li className="is-la">Choisir</li><li>Imprimer</li><li>Déposer</li></ol>
-                        {lot.erreur&&<p className="vrm-tip-alerte" role="alert" data-lot-erreur="">{lot.erreur}</p>}
+                        {lot.erreur&&<div className="vrm-tip-alerte" data-lot-erreur="">{/* (14 nov.) la raison en mots simples + le geste (src/ui/Accompagne.jsx) */}<AccEchec geste="colis.imprimer" erreur={lot.erreur} onReessayer={()=>batchBordereaux(new Set(lot.coches), false, true)}/></div>}
                         {(nSansBord || resL.dejaImprimes || resL.anciennes || resL.decoches) ? <div className="vrm-tip-pourquoi" data-lot-pourquoi="">
                           <b>Pas dans ce lot</b>
                           {nSansBord > 0 && <span className="vrm-tip-pourquoi-ligne" data-lot-pourquoi-sans-bordereau={nSansBord}>{nSansBord} sans bordereau encore{aGenItems.length > 0 ? ' — ' : ''}{aGenItems.length > 0 && <BoutonToutGenerer items={aGenItems}/>}</span>}
@@ -51375,7 +51391,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {resL.anciennes > 0 && <span className="vrm-tip-pourquoi-ligne" data-lot-pourquoi-anciennes={resL.anciennes}>{resL.anciennes} vendue{resL.anciennes > 1 ? 's' : ''} il y a plus de {VENTE_LOT_MAX_J} j — à vérifier</span>}
                           {resL.decoches > 0 && <span className="vrm-tip-pourquoi-ligne" data-lot-pourquoi-decoches={resL.decoches}>{resL.decoches} décoché{resL.decoches > 1 ? 's' : ''} par toi</span>}
                         </div> : null}
-                        {batchBusy&&progressionLot&&<div className="vrm-tip-progression" role="status">{progressionLot.etape==='lecture'?`PDF ${progressionLot.fait}/${progressionLot.total}`:'Préparation…'}<progress {...(progressionLot.etape==='lecture'?{value:progressionLot.fait,max:progressionLot.total}:{})}/></div>}
+                        {batchBusy&&progressionLot&&<div className="vrm-tip-progression" role="status" data-acc-pendant="colis.imprimer" data-acc-n={`${progressionLot.fait||0}/${progressionLot.total||0}`}>{progressionLot.etape==='lecture'?`PDF ${progressionLot.fait}/${progressionLot.total}`:'Préparation…'}<progress {...(progressionLot.etape==='lecture'?{value:progressionLot.fait,max:progressionLot.total}:{})}/></div>}
                         <div className="vrm-tip-outils">
                           <button type="button" className="vrm-tip-lien" disabled={batchBusy} onClick={()=>setLot(x=>({...x,coches:new Set(L.filter(l=>l.cochable!==false).map(l=>l.cle))}))}>Tout sélectionner</button>
                           <button type="button" className="vrm-tip-lien" disabled={batchBusy} onClick={()=>setLot(x=>({...x,coches:new Set()}))}>Tout décocher</button>
@@ -51410,6 +51426,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             {choisis.length > 8 ? <span className="vrm-tip-plus">+{choisis.length - 8}</span> : null}
                           </div>
                         </section>; })()}
+                        {nb > 0 ? <AccAvant geste="colis.imprimer" vars={{ n: nb }}/> : null}
                         <div className="vrm-lot-pied vrm-tip-pied">
                           <button type="button" className="vrm-tip-lien" data-imprime="1" data-lot-placer={nb} disabled={!nb || batchBusy} onClick={()=>batchBordereaux(new Set(lot.coches), true)}>Placer le tampon</button>
                           <Bouton variante="primaire" icone="printer" data-imprime="1" data-lot-imprimer={nb} disabled={!nb || batchBusy} onClick={()=>batchBordereaux(new Set(lot.coches), false, true)}>
@@ -51417,7 +51434,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           </Bouton>
                         </div>
                       </div>}
-                      {fait && !fait.confirme && <div className="vrm-tip-temps vrm-tip-fin" key="imprime" data-lot-question="">
+                      {fait && !fait.confirme && <div className="vrm-tip-temps vrm-tip-fin" key="imprime" data-lot-question="" data-acc-apres="colis.imprimer">
                         <ol className="vrm-tip-pas" aria-label="Étapes"><li className="is-fait">Choisir</li><li className="is-la">Imprimer</li><li>Déposer</li></ol>
                         <p className="vrm-tip-grand"><b>{fait.n}</b> bordereau{fait.n>1?'x':''} dans le PDF.</p>
                         {fait.url ? <a className="vrm-tip-lien vrm-tip-pdf" data-lot-ouvrir-pdf="" href={fait.url} target="_blank" rel="noopener">Ouvrir le PDF</a> : null}

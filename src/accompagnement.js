@@ -304,3 +304,184 @@ export function placerConseil(r, W, H, bw, bh, { bas = 0, marge = 16, ecart = 12
   const flecheX = borne(dansBulle, Math.min(r.right, r.left + 6) - x, Math.max(r.left, r.right - 6) - x);
   return { cote, x: Math.round(x), y: Math.round(y), flecheX: Math.round(flecheX) };
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+//  9. LES GESTES ACCOMPAGNÉS (14 nov., lot accompagnement) — Julien : « tout doit
+//  être plus accompagné dans l'app, chaque action doit être parfaite »,
+//  « l'utilisateur ne doit pas se sentir seul ».
+//
+//  QUATRE MOMENTS pour chaque action qui FAIT quelque chose (pas la navigation) :
+//    · AVANT    — ce qui va se passer (avec ses chiffres) ET ce qui ne se passera
+//                 PAS (« rien n'est mis en ligne », « rien ne part sans ton clic ») ;
+//    · PENDANT  — la progression « 3 / 8 », et « Tout arrêter » quand c'est long
+//                 (la feuille « VRM travaille », src/suiviTravail.js, pour les séries) ;
+//    · APRÈS    — le résultat en mots (« 8 bordereaux dans le PDF ») et le geste
+//                 suivant (« Ensuite : les déposer › ») ;
+//    · ÉCHEC    — « Pas fait : <raison simple>. <geste> › », jamais un code ni
+//                 « erreur » tout court.
+//  ⚠️ Décision de Julien (14 nov.) : AUCUN nouvel « Annuler 5 s », AUCUNE nouvelle
+//     confirmation, AUCUN « ? » ni vidéo par action. Ce qui existe (la pilule de
+//     src/gesteAnnulable.js, askConfirm, le « ? » de l'écran) ne change pas.
+//  ⚠️ Aucune règle métier ici : ce module NOMME les gestes, leur suite et la raison
+//     d'un échec ; il ne décide rien, ne fait aucun geste, n'écrit rien en base.
+//  Les TEXTES sont des clés (`acc.<geste>.avant|pas|apres|ensuite`, `acc.raison.*`,
+//  `acc.geste.*`) traduites par tr() dans src/ui/Accompagne.jsx
+//  (src/i18n/langues/<langue>/accompagnement.js).
+//  Le banc : scripts/bancs/accompagnement.cjs (data-acc-avant / -pendant / -apres / -echec).
+// ════════════════════════════════════════════════════════════════════════════
+
+// Le catalogue : un geste = son écran, la sorte de la feuille « VRM travaille » qui le
+// suit quand c'est une série (`sorte`), et sa SUITE (le lien du geste d'après, ou rien).
+// `ensuite.lien` passe par le chemin des notifications (`?tab=…`, comme l'aide).
+export const GESTES_ACC = {
+  'colis.imprimer':   { ecran: 'colis',     sorte: 'bordereaux',            ensuite: { lien: '?tab=cat_bord' } },
+  'colis.generer':    { ecran: 'colis',     ensuite: { lien: '?tab=cat_bord' } },
+  'colis.depose':     { ecran: 'colis',     ensuite: { lien: '?tab=cat_bord' } },
+  'colis.retire':     { ecran: 'colis',     sorte: 'retirer-ailleurs',      ensuite: { lien: '?tab=garage' } },
+  'achat.relier':     { ecran: 'achats',    ensuite: { lien: '?tab=argent' } },
+  'prix.achat':       { ecran: 'annonces',  ensuite: { lien: '?tab=argent' } },
+  'offre.vinted':     { ecran: 'messages',  ensuite: { lien: '?tab=messages' } },
+  'offre.vestiaire':  { ecran: 'vestiaire', ensuite: { lien: '?tab=plat_vestiaire' } },
+  'offre.ebay':       { ecran: 'ebay',      ensuite: { lien: '?tab=plat_ebay' } },
+  'favoris.messages': { ecran: 'messages',  ensuite: { lien: '?tab=messages' } },
+  'prix.baisser':     { ecran: 'annonces',  sorte: 'baisse-prix',           ensuite: { lien: '?tab=annonces' } },
+  'prix.baisserLbc':  { ecran: 'leboncoin', ensuite: { lien: '?tab=plat_leboncoin' } },
+  'prix.baisserVc':   { ecran: 'vestiaire', sorte: 'baisse-prix-vestiaire', ensuite: { lien: '?tab=plat_vestiaire' } },
+  'ebay.soldes':      { ecran: 'ebay',      ensuite: { lien: '?tab=plat_ebay' } },
+  'republier':        { ecran: 'annonces',  sorte: 'republier-lbc',         ensuite: { lien: '?tab=annonces' } },
+  'creer.vinted':     { ecran: 'annonces',  ensuite: { lien: 'https://www.vinted.fr/items/drafts', dehors: true } },
+  'publier.partout':  { ecran: 'annonces',  sorte: 'publier-partout',       ensuite: { lien: '?tab=annonces' } },
+  'publier.ebay':     { ecran: 'ebay',      sorte: 'publier-ebay',          ensuite: { lien: '?tab=plat_ebay' } },
+  'lbc.supprimer':    { ecran: 'leboncoin', ensuite: { lien: '?tab=plat_leboncoin' } },
+  'vacances':         { ecran: 'settings',  sorte: 'vacances',              ensuite: { lien: '?tab=settings&reglage=vacances' } },
+  'urssaf.declarer':  { ecran: 'compta',    ensuite: { lien: '?tab=argent_declarer' } },
+  'facture.pro':      { ecran: 'compta',    ensuite: { lien: '?tab=invoices' } },
+  'lien.partage':     { ecran: 'settings',  ensuite: null },
+  'connexion.qr':     { ecran: 'settings',  ensuite: { lien: '?tab=journee' } },
+  'fiches.fusion':    { ecran: 'garage',    ensuite: { lien: '?tab=garage' } },
+  'export.donnees':   { ecran: 'settings',  ensuite: null },
+  'export.comptable': { ecran: 'compta',    ensuite: null },
+  'compte.supprimer': { ecran: 'settings',  ensuite: null },
+};
+export const IDS_GESTES_ACC = Object.keys(GESTES_ACC);
+export const gesteAcc = (id) => GESTES_ACC[id] || null;
+// La sorte d'un travail suivi ⇒ son geste (la feuille « VRM travaille » porte `data-acc-pendant`).
+const PAR_SORTE = { bordereaux: 'colis.imprimer', 'retirer-ailleurs': 'colis.retire', 'baisse-prix': 'prix.baisser', 'baisse-prix-vestiaire': 'prix.baisserVc', 'republier-lbc': 'republier', 'publier-partout': 'publier.partout', 'publier-ebay': 'publier.ebay', vacances: 'vacances' };
+export const gesteDeSorte = (sorte) => PAR_SORTE[String(sorte || '')] || '';
+
+// ── LA RAISON D'UN ÉCHEC, EN MOTS SIMPLES ────────────────────────────────────
+// Un échec arrive sous mille formes : une Error, une réponse `{ ok:false, error }`,
+// `{ status: 429 }`, `{ envoye:false }` (aucune extension ici), une phrase déjà écrite
+// par l'écran. On en tire UNE raison connue (sa phrase et son geste sont traduits),
+// et on garde la phrase de l'écran quand elle est déjà lisible (jamais un code).
+export const RAISONS_ACC = ['horsligne', 'reseau', 'limite', 'session', 'refus', 'extension', 'onglet', 'serveur', 'pasSu', 'inconnu'];
+// Le geste qui répare chaque raison : `lien` (chemin de l'app ou site) ou `reessayer`.
+export const GESTES_RAISON = {
+  horsligne: { reessayer: true },
+  reseau:    { reessayer: true },
+  limite:    { lien: '?tab=settings&reglage=toutvabien' },
+  session:   { lien: '?tab=settings&reglage=connexions' },
+  refus:     { lien: '?tab=settings&reglage=toutvabien' },
+  extension: { lien: '?tab=settings&reglage=verifier' },
+  onglet:    { lien: 'https://www.vinted.fr', dehors: true },
+  serveur:   { reessayer: true },
+  pasSu:     { lien: '?tab=settings&reglage=toutvabien' },
+  inconnu:   { lien: '?tab=settings&reglage=depannage' },
+};
+const texteDe = (x) => {
+  if (x == null) return '';
+  if (typeof x === 'string') return x;
+  if (x instanceof Error) return String(x.message || '');
+  if (typeof x === 'object') return String(x.raison || x.error || x.erreur || x.message || x.msg || '');
+  return String(x);
+};
+// Une phrase « technique » ne se montre pas telle quelle (§2.7) : un code HTTP, un nom
+// d'exception, du JSON, « undefined », un chemin d'API, de l'anglais de navigateur.
+export function phraseTechnique(t) {
+  const s = String(t || '').trim();
+  if (!s) return true;
+  return /\b(?:TypeError|ReferenceError|SyntaxError|AbortError|Error|undefined|null|NaN|stack|fetch|JSON|HTTP|status|ECONN\w*|ERR_\w*)\b|\b[1-5]\d\d\b|[{}<>]|\/api\/|\/rest\/|Failed to|NetworkError|Load failed|timed? ?out/i.test(s);
+}
+export function raisonEchec(x, { enLigne = (typeof navigator !== 'undefined' ? navigator.onLine !== false : true) } = {}) {
+  if (x && typeof x === 'object' && x.horsLigne) return 'horsligne';
+  if (!enLigne) return 'horsligne';
+  const st = x && typeof x === 'object' ? Number(x.status || x.statut || x.code) : NaN;
+  const t = texteDe(x);
+  if (st === 429 || /\b429\b|trop de requ|ralenti|freine|rate.?limit/i.test(t)) return 'limite';
+  if (st === 401 || /\b401\b|session|reconnect|jwt|expir/i.test(t)) return 'session';
+  if (x && typeof x === 'object' && x.envoye === false) return 'extension';
+  if (/extension/i.test(t)) return 'extension';
+  if (/onglet|vinted\.fr ouvert|ouvre vinted|ouvre leboncoin|ouvre vestiaire/i.test(t)) return 'onglet';
+  if (st === 403 || /\b403\b|refus|interdit|captcha|forbidden/i.test(t)) return 'refus';
+  if (x && typeof x === 'object' && x.sansReponse) return 'pasSu';
+  if (/pas su\b|pas de réponse à temps|n'a pas répondu|n’a pas répondu/i.test(t)) return 'pasSu';
+  if (x instanceof TypeError || /failed to fetch|networkerror|load failed|réseau|reseau|network|hors ligne|offline|timed? ?out/i.test(t)) return 'reseau';
+  if (st >= 500 || /\b5\d\d\b|serveur|indisponible|unavailable/i.test(t)) return 'serveur';
+  return 'inconnu';
+}
+// { code, texte } : la raison connue, et la phrase de l'écran si elle est lisible (sinon '').
+export function lireEchec(x, opts) {
+  const code = raisonEchec(x, opts);
+  const t = texteDe(x).trim().replace(/^[⚠️❌✗\s]+/u, '').replace(/^(?:erreur|échec|echec)\s*[:·—-]\s*/i, '');
+  return { code, texte: phraseTechnique(t) ? '' : t.replace(/[.\s]+$/, '') };
+}
+
+// ── LE MAGASIN DES GESTES EN COURS (l'hôte de la coque le dessine) ────────────
+// Un geste à la fois par sorte de geste ; l'hôte montre les plus récents. Pur :
+// minuterie en paramètre (l'audit l'exécute). `phase` : 'pendant' | 'apres' | 'echec'.
+let _gestes = [];
+const _abonnesGestes = new Set();
+let _idGeste = 0;
+const _emettreGestes = () => { const v = _gestes.slice(); for (const f of [..._abonnesGestes]) { try { f(v); } catch (_) {} } };
+export const lireGestes = () => _gestes;
+export function abonnerGestes(f) { _abonnesGestes.add(f); return () => _abonnesGestes.delete(f); }
+export const DUREE_APRES = 7000;     // ms : le résultat se lit, puis s'en va (jamais un bandeau qui reste)
+export const DUREE_ECHEC_ACC = 12000; // ms : un échec reste plus longtemps (il demande un geste)
+export const SEUIL_LONG = 3;         // à partir de 3 éléments, « Tout arrêter » est proposé
+const _minuteurs = new Map();
+function _poser(g, minuterie) {
+  _gestes = [..._gestes.filter((x) => x.id !== g.id && x.geste !== g.geste).slice(-2), g];
+  _emettreGestes();
+  clearTimeout(_minuteurs.get(g.id));
+  const ms = g.phase === 'apres' ? DUREE_APRES : g.phase === 'echec' ? DUREE_ECHEC_ACC : 0;
+  if (ms && minuterie) _minuteurs.set(g.id, minuterie(() => oublierGeste(g.id), ms));
+}
+export function oublierGeste(id) {
+  clearTimeout(_minuteurs.get(id)); _minuteurs.delete(id);
+  const n = _gestes.length; _gestes = _gestes.filter((x) => x.id !== id);
+  if (_gestes.length !== n) _emettreGestes();
+}
+// const g = accompagner('colis.generer', { total: 8 }) ⇒ g.pendant(3) · g.fini({ n: 8 }) ·
+// g.echec(err, { reessayer }) · g.arretDemande() (« Tout arrêter » touché).
+export function accompagner(geste, { total = 0, vars = {}, minuterie = (typeof setTimeout !== 'undefined' ? setTimeout : null), arretable = null } = {}) {
+  const id = ++_idGeste;
+  let arret = false;
+  const base = { id, geste, total: Number(total) || 0, vars: vars || {} };
+  const long = (Number(total) || 0) >= SEUIL_LONG;
+  const g = {
+    id, geste,
+    pendant(fait = 0, extra = {}) { _poser({ ...base, ...extra, phase: 'pendant', fait: Number(fait) || 0, arretable: arretable != null ? !!arretable : long, arreter: () => { arret = true; } }, null); return g; },
+    fini(v = {}) { _poser({ ...base, phase: 'apres', vars: { ...base.vars, ...v }, at: Date.now() }, minuterie); return g; },
+    echec(err, { reessayer = null } = {}) { const e = lireEchec(err); _poser({ ...base, phase: 'echec', raison: e.code, texte: e.texte, reessayer, at: Date.now() }, minuterie); return g; },
+    arretDemande: () => arret,
+    oublier: () => oublierGeste(id),
+  };
+  return g;
+}
+
+// ── LES PREMIÈRES FOIS (une phrase d'aide discrète par écran, désactivable) ────
+// Mémoire de CET appareil (un confort : `{ coupe, vus:[ecran] }`). Lecture ratée ⇒ rien
+// n'est montré deux fois de force : on suppose « déjà vu » seulement si la lecture a réussi.
+export const CLE_PREMIERES = 'vrm_premieres_fois';
+export const ECRANS_PREMIERE = ['journee', 'ventes', 'colis', 'annonces', 'achats', 'garage', 'messages', 'emails', 'compta', 'settings'];
+export function lirePremieres(stockage = (typeof localStorage !== 'undefined' ? localStorage : null)) {
+  try {
+    const v = JSON.parse((stockage && stockage.getItem(CLE_PREMIERES)) || 'null');
+    if (v && typeof v === 'object') return { coupe: !!v.coupe, vus: Array.isArray(v.vus) ? v.vus.map(String) : [] };
+  } catch (_) {}
+  return { coupe: false, vus: [] };
+}
+export function ecrirePremieres(m, stockage = (typeof localStorage !== 'undefined' ? localStorage : null)) {
+  try { if (!stockage) return false; stockage.setItem(CLE_PREMIERES, JSON.stringify({ coupe: !!(m && m.coupe), vus: [...new Set((m && m.vus) || [])].slice(-40) })); return true; } catch (_) { return false; }
+}
+export const premiereAMontrer = (ecran, m) => !!ecran && ECRANS_PREMIERE.includes(ecran) && !(m && m.coupe) && !((m && m.vus) || []).includes(ecran);
