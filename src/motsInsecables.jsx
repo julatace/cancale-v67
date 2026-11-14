@@ -9,7 +9,13 @@ import React from 'react';
 export function motsInsecables(texte) {
   const t = texte == null ? '' : String(texte);
   if (!/\S-\S/.test(t)) return t;
-  return t.split(/(\S+)/).map((m, i) => (/^\S{3,20}$/.test(m) && /\S-\S/.test(m)
-    ? <span key={i} className="vrm-insecable" style={{ whiteSpace: 'nowrap' }}>{m}</span>
-    : m));
+  // La clé d'une portée = sa POSITION dans le titre (le texte ne change pas pendant le rendu).
+  const morceaux = []; let pos = 0;
+  for (const m of t.split(/(\S+)/)) {
+    morceaux.push(/^\S{3,20}$/.test(m) && /\S-\S/.test(m)
+      ? <span key={'p' + pos} className="vrm-insecable" style={{ whiteSpace: 'nowrap' }}>{m}</span>
+      : m);
+    pos += m.length;
+  }
+  return morceaux;
 }
