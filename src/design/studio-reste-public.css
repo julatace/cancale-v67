@@ -58,3 +58,6 @@
 :root:root .vt .vt-btn { color: #FFFFFF; box-shadow: 0 1px 0 rgb(255 255 255 / .18) inset, 0 2px 4px rgb(18 52 96 / .18), 0 14px 26px -10px rgb(18 52 96 / .55); }
 :root:root[data-theme="dark"] .vt .vt-btn { color: #0C1D30; }
 @media (prefers-color-scheme: dark) { :root:root:not([data-theme="light"]) .vt .vt-btn { color: #0C1D30; } }
+/* Au téléphone, la barre des tarifs ne tient pas « VRM » + « Se connecter » + « Essayer gratuitement » :
+   le mot « VRM » se tait (le logo reste et garde son nom lu), plus aucun chevauchement. */
+@media (max-width: 440px) { :root:root .vt .vt-marque b { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } }
