@@ -35,12 +35,16 @@ fs.mkdirSync(SHOTS, { recursive: true });
 let ok = 0, ko = 0;
 const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko++; console.log('  ❌ ' + m + (d !== undefined ? ' — ' + (typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 300) : '')); } return c; };
 const pret = async (pg) => { await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {}); await pg.waitForTimeout(2600); };
+// Un toucher (tactile) ; sur une machine chargée, le moteur peut mettre longtemps à rendre la main : on attend.
+const toucher = async (pg, sel) => { await pg.locator(sel).first().waitFor({ state: 'visible', timeout: 30000 }); await pg.locator(sel).first().tap({ timeout: 90000 }); };
 const visible = (pg, sel) => pg.evaluate((s) => [...document.querySelectorAll(s)].filter((e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden').length, sel);
 
 // Le contraste, dans la page : la couleur d'un texte contre un fond donné (couches composées).
 const CONTRASTE = `(() => {
   const rgba = (t) => { t = String(t || ''); const c = t.match(/color\\(srgb ([^)]+)\\)/); if (c) { const p = c[1].split(/[ ,/]+/).filter(Boolean).map(Number); return { r: p[0] * 255, g: p[1] * 255, b: p[2] * 255, a: p.length > 3 ? p[3] : 1 }; }
-    const m = t.match(/rgba?\\(([^)]+)\\)/); if (!m) return null; const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }; };
+    const m = t.match(/^rgba?\\(([^)]+)\\)$/); if (m) { const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }; }
+    // oklab(), color-mix()… : le navigateur la peint sur un pixel, on relit le pixel.
+    try { const c = document.createElement('canvas'); c.width = c.height = 1; const x = c.getContext('2d'); x.clearRect(0, 0, 1, 1); x.fillStyle = t; x.fillRect(0, 0, 1, 1); const d = x.getImageData(0, 0, 1, 1).data; return { r: d[0], g: d[1], b: d[2], a: d[3] / 255 }; } catch (_) { return null; } };
   const hex = (h) => ({ r: parseInt(h.slice(1, 3), 16), g: parseInt(h.slice(3, 5), 16), b: parseInt(h.slice(5, 7), 16), a: 1 });
   const lum = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); };
   const sur = (h, b) => ({ r: h.r * h.a + b.r * (1 - h.a), g: h.g * h.a + b.g * (1 - h.a), b: h.b * h.a + b.b * (1 - h.a), a: 1 });
@@ -92,9 +96,9 @@ async function telephone(nav, sombre, b) {
   dit(await visible(pg, '.sb-btn-plein') <= 1, 'P au plus un .sb-btn-plein sur Ventes');
 
   // E — l'éventail, depuis Ma journée.
-  await pg.locator('.vrm-tabbar [data-nav-entree="journee"]').click(); await pg.waitForTimeout(1500);
+  await pg.locator('.vrm-tabbar [data-nav-entree="journee"]').click(); await pg.waitForSelector('.vrm-main[data-ecran="journee"]'); await pg.waitForTimeout(2500);
   const ondes = await pg.evaluate(() => document.querySelectorAll('[data-sb-onde]').length);
-  await pg.locator('[data-sb-disque]').tap(); await pg.waitForTimeout(500);
+  await toucher(pg, '[data-sb-disque]'); await pg.waitForTimeout(500);
   const ev = await pg.evaluate((src) => { const K = eval(src); const lames = [...document.querySelectorAll('[data-sb-lame]')];
     const voile = document.querySelector('[data-sb-voile]'); const fv = voile ? K.sur(K.rgba(getComputedStyle(voile).backgroundColor), K.jeton('--sb-aplat')) : null;
     const plein = document.querySelector('[data-sb-lame] .sb-btn-plein'); const pc = plein && getComputedStyle(plein);
@@ -117,10 +121,10 @@ async function telephone(nav, sombre, b) {
   await pg.mouse.click(195, 140); await pg.waitForTimeout(400);
   dit(await visible(pg, '[data-sb-lame]') === 0 && !(await pg.evaluate(() => document.documentElement.hasAttribute('data-sb-eventail'))), 'E toucher le voile referme l’éventail');
   // Chercher (toucher).
-  await pg.locator('[data-sb-disque]').tap(); await pg.waitForTimeout(400);
-  await pg.locator('[data-sb-lame="chercher"]').tap(); await pg.waitForTimeout(700);
+  await toucher(pg, '[data-sb-disque]'); await pg.waitForTimeout(400);
+  await toucher(pg, '[data-sb-lame="chercher"]'); await pg.waitForTimeout(700);
   dit(await visible(pg, '[data-recherche-champ]') >= 1, 'E Chercher ⇒ le champ de la loupe');
-  await pg.keyboard.press('Escape').catch(() => {}); await pg.locator('.vrm-hdr-recherche-fermer').first().tap().catch(() => {}); await pg.waitForTimeout(400);
+  await pg.keyboard.press('Escape').catch(() => {}); await pg.locator('.vrm-hdr-recherche-fermer').first().tap({ timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(400);
   // Chercher (GLISSER du disque vers la lame, relâcher).
   {
     const d = await pg.locator('[data-sb-disque]').boundingBox();
@@ -131,15 +135,15 @@ async function telephone(nav, sombre, b) {
       for (let i = 1; i <= 6; i++) ev('pointermove', x0 + (x - x0) * i / 6, y0 + (y - y0) * i / 6); ev('pointerup', x, y); }, { x0: d.x + d.width / 2, y0: d.y + d.height / 2, x: c.x + c.width / 2, y: c.y + 20 });
     await pg.waitForTimeout(700);
     dit(await visible(pg, '[data-recherche-champ]') >= 1, 'E GLISSER du disque vers Chercher, relâcher ⇒ la loupe');
-    await pg.locator('.vrm-hdr-recherche-fermer').first().tap().catch(() => {}); await pg.waitForTimeout(400);
+    await pg.locator('.vrm-hdr-recherche-fermer').first().tap({ timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(400);
   }
   // L — la loupe de l'en-tête s'ouvre toujours au toucher.
-  await pg.locator('button[data-recherche-loupe]').tap(); await pg.waitForTimeout(600);
+  await toucher(pg, 'button[data-recherche-loupe]'); await pg.waitForTimeout(600);
   dit(await visible(pg, '[data-recherche-champ]') >= 1, 'L la loupe de l’en-tête s’ouvre au toucher');
-  await pg.locator('.vrm-hdr-recherche-fermer').first().tap().catch(() => {}); await pg.waitForTimeout(400);
+  await pg.locator('.vrm-hdr-recherche-fermer').first().tap({ timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(400);
   // Publier.
-  await pg.locator('[data-sb-disque]').tap(); await pg.waitForTimeout(400);
-  await pg.locator('[data-sb-lame="publier"]').tap(); await pg.waitForTimeout(1500);
+  await toucher(pg, '[data-sb-disque]'); await pg.waitForTimeout(400);
+  await toucher(pg, '[data-sb-lame="publier"]'); await pg.waitForTimeout(1500);
   dit(await pg.evaluate(() => !!document.querySelector('[class*="vrm-pa"], [data-pa-site], [data-publier-ailleurs]')), 'E Publier ⇒ « Publier ailleurs »');
   await pg.keyboard.press('Escape').catch(() => {}); await pg.goBack().catch(() => {}); await pg.waitForTimeout(600);
   await ctx.close();
@@ -147,16 +151,16 @@ async function telephone(nav, sombre, b) {
   // Imprimer et Scanner : chacun sur une page neuve (Ma journée).
   ({ ctx, pg, erreurs } = await ouvrir(nav, { W: 390, sombre, b, url: '/?tab=ventes' })); await pret(pg); await pg.waitForTimeout(1200);
   await pg.locator('.vrm-tabbar [data-nav-entree="journee"]').click(); await pg.waitForTimeout(1200);
-  await pg.locator('[data-sb-disque]').tap(); await pg.waitForTimeout(400);
-  await pg.locator('[data-sb-lame="imprimer"]').tap();
+  await toucher(pg, '[data-sb-disque]'); await pg.waitForTimeout(400);
+  await toucher(pg, '[data-sb-lame="imprimer"]');
   await pg.waitForFunction(() => document.querySelector('.vrm-main[data-ecran="ventes"]') && document.querySelector('.vrm-fs, [role="dialog"]'), null, { timeout: 12000 }).catch(() => {});
   const impr = await pg.evaluate(() => ({ ecran: document.querySelector('.vrm-main').getAttribute('data-ecran'), feuille: !!document.querySelector('.vrm-fs, [role="dialog"]') }));
   dit(impr.ecran === 'ventes' && impr.feuille, 'E Imprimer ⇒ Ventes et sa feuille « Tout imprimer » (rien n’est imprimé avant son clic)', impr);
   await pg.screenshot({ path: path.join(SHOTS, `imprimer-390-${th}.png`) });
   await ctx.close();
   ({ ctx, pg, erreurs } = await ouvrir(nav, { W: 390, sombre, b, url: '/?tab=journee' })); await pret(pg);
-  await pg.locator('[data-sb-disque]').tap(); await pg.waitForTimeout(400);
-  await pg.locator('[data-sb-lame="scanner"]').tap();
+  await toucher(pg, '[data-sb-disque]'); await pg.waitForTimeout(400);
+  await toucher(pg, '[data-sb-lame="scanner"]');
   await pg.waitForSelector('[data-scan-sheet][data-scan-mode="envoi"]', { timeout: 12000 }).catch(() => {});
   dit(await visible(pg, '[data-scan-sheet][data-scan-mode="envoi"]') >= 1, 'E Scanner ⇒ le scanner de bordereau de Ventes');
   await ctx.close();
@@ -211,7 +215,7 @@ async function ordinateur(nav, sombre, b) {
   const b = base();
   try {
     for (const sombre of [false, true]) { await telephone(nav, sombre, b); await ordinateur(nav, sombre, b); }
-  } catch (e) { ko++; console.log('  ❌ le banc s’est arrêté : ' + String(e && e.stack || e).slice(0, 500)); }
+  } catch (e) { ko++; console.log('  ❌ le banc s’est arrêté : ' + String(e && e.stack || e).slice(0, 1500)); }
   await nav.close(); srv.close();
   console.log(`\n${ko ? '❌' : '✅'} studio-coque : ${ok} verts, ${ko} rouges — captures : ${SHOTS}`);
   process.exit(ko ? 1 : 0);

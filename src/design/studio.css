@@ -419,8 +419,10 @@ button.sb-rangee { cursor: pointer; }
 @keyframes sb-lame { from { opacity: 0; transform: translate(var(--dx, 0), var(--dy, 40px)) scale(.6); } to { opacity: 1; transform: none; } }
 @keyframes sb-fondu { from { opacity: 0; } to { opacity: 1; } }
 /* L'écran recule sous le voile (0,94, flou léger) pendant que l'éventail est ouvert. */
-html[data-sb-eventail] body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transform: scale(.94); filter: blur(1.5px) saturate(.9); transform-origin: 50% 30%; transition: transform 360ms var(--sb-courbe), filter 360ms var(--sb-courbe); }
-body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transition: transform 360ms var(--sb-courbe), filter 360ms var(--sb-courbe); }
+/* (Le flou de la maquette n'est pas repris : sous un voile à 82 %, il ne se voit plus, et flouter tout l'écran
+   coûte cher à un téléphone qui porte 1 000 paires. Le recul seul, sur le compositeur.) */
+html[data-sb-eventail] body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transform: scale(.94); transform-origin: 50% 30%; transition: transform 360ms var(--sb-courbe); }
+body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transition: transform 360ms var(--sb-courbe); }
 /* L'ondulation : un anneau de lumière part de la pastille touchée (560 ms) ; le contenu glisse de 12 px en fondu. */
 .sb-onde { position: fixed; z-index: 70; pointer-events: none; border-radius: 50%;
   background: radial-gradient(closest-side, rgb(255 255 255 / 0) 0%, rgb(255 255 255 / 0) 78%, rgb(255 255 255 / .55) 92%, rgb(255 255 255 / 0) 100%);
@@ -546,7 +548,7 @@ body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transition: transform 36
   :root:root:root body .vrm-app-shell .vrm-tabbar.vrm-tabbar {
     position: relative !important; z-index: 60 !important; align-items: stretch !important;   /* `display` reste celui de la coque : `none` quand le clavier est ouvert */
     height: 64px !important; min-height: 64px !important; padding: 0 6px !important; box-sizing: border-box !important;
-    margin: -84px 12px max(12px, calc(env(safe-area-inset-bottom, 0px) - 14px)) !important;
+    margin: calc(-64px - max(12px, calc(env(safe-area-inset-bottom, 0px) - 14px))) 12px max(12px, calc(env(safe-area-inset-bottom, 0px) - 14px)) !important;   /* elle ne prend AUCUNE place : la page passe dessous */
     border: 0 !important; border-radius: var(--sb-r-barre) !important;
     background: var(--sb-verre) !important; background-image: none !important;
     -webkit-backdrop-filter: var(--sb-verre-flou) !important; backdrop-filter: var(--sb-verre-flou) !important;
@@ -635,7 +637,7 @@ body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transition: transform 36
   .sb-lame { animation: sb-fondu 180ms ease-out both !important; animation-delay: 0ms !important; }
   .sb-onde { display: none !important; animation: none !important; }
   .vrm-main[data-sb-entree] { animation: sb-fondu 180ms ease-out both !important; }
-  html[data-sb-eventail] body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transform: none !important; filter: none !important; }
+  html[data-sb-eventail] body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transform: none !important; }
   body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transition: none !important; }
   .sb-diode, [class*="sb-"]::after { animation: none !important; }
   .vrm-tab-pastille { transition: none !important; }
