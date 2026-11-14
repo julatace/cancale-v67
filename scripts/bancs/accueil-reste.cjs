@@ -55,7 +55,7 @@ function baseNeuve({ ecritActif = false, ecritChoisi = false, poolPlein = false,
     { transaction_id: 51001, title: 'Adidas Gazelle bleu', price: { amount: '55.0', currency_code: 'EUR' }, status: 'Le paiement a été validé', date: iso(4), item_id: 8001, transaction_user_status: 'needs_action', photo: null },
     { transaction_id: 51002, title: 'Nike Cortez blanc', price: { amount: '40.0', currency_code: 'EUR' }, status: 'Commande finalisée', date: iso(9), item_id: 8002, transaction_user_status: 'completed', photo: null },
   ];
-  const main = { vrm_bienvenue_vue: { at: 'banc' }, vrm_visite_vue: { at: 'banc' }, vrm_configuration: { etat: 'fait', at: iso(1), version: 99 }, vrm_je_vends: { choix: 'sneakers', categories: ['sneakers'], at: iso(1), vu: iso(1) }, vrm_plateformes_affichees: { sites: ['vinted'], at: iso(1) }, vrm_parcours: { v: 1, etape: null, ouvert: false, fini: iso(1), at: iso(1) },
+  const main = { vrm_bienvenue_vue: { at: 'banc' }, vrm_visite_vue: { at: 'banc' }, vrm_configuration: { etat: 'fait', at: iso(1), version: 99 }, vrm_bilan_minute: { vu: iso(1), fin: 'vu' }, vrm_je_vends: { choix: 'sneakers', categories: ['sneakers'], at: iso(1), vu: iso(1) }, vrm_plateformes_affichees: { sites: ['vinted'], at: iso(1) }, vrm_parcours: { v: 1, etape: null, ouvert: false, fini: iso(1), at: iso(1) },
     vinted_bords_printed: { 51001: iso(1) },
     // Les visites des écrans déjà vues (sauf le scénario D, qui les joue).
     ...(visites ? {} : { vrm_aides_accueil: { v: 1, off: {}, vues: { journee: iso(1), annonces: iso(1), ventes: iso(1), achats: iso(1) }, ...(aides || {}) } }),
