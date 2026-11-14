@@ -44,6 +44,8 @@ import {lireEntiteVinted,extraitConversation,libelleOffre,etatOffreCourt,estCode
 import { lignesRisqueMessage, phraseRisqueMessage, risquesMessage, erreurMessageAuto } from './messageSur.js';
 import { problemesAnnonce, problemesLot, champsNonJuges, CLE_VERIF_COUPEES, sansCoupees, couperAlerte, rallumerAlerte, lireCoupees, POURQUOI_ALERTE, NOMS_ALERTES, numeroEcritAttendu } from './verifAnnonce.js';
 import { CLE_JOURNEE_PERSO, lireJourneePerso, ordreJournee, visibiliteCarte, urgencesJournee } from './journeePerso.js';
+import { ordreSelonHeure, momentDuJour } from './journeeSelonHeure.js';   // (14 nov., lot 117) Ma journée selon l'heure — le seul point d'entrée : ordreJourneeHeure
+const ordreJourneeHeure = (zone, r) => ordreSelonHeure(ordreJournee(zone, r), zone, { moment: momentDuJour(), sienOrdre: lireJourneePerso(r).ordre.length > 0 });
 import { JourneePersoEditeur, nCachees as nCartesCachees } from './JourneePerso.jsx';
 import { CLE_AFFICHAGE, CLE_JE_VENDS, affichageEffectif, jeVendsEffectif, entreeMontree, siteMontre, caseJourneeMontree, motsArticle, champsFacultatifs, ventesSur30j, lireReglageJeVends, poserSourceVend, motsVendeur, motArticle } from './profilVendeur.js';
 import { exemplesVendeur, motTaille } from './vocabulaireVendeur.js';   // (11 nov., lot DJ2) exemples et petits mots selon ce qu'il vend
@@ -589,7 +591,7 @@ import { lignesVitesse, publierVitesse } from "./vitesseEnvoi.js";   // (10 nov.
 import { LigneVitesse } from "./VitesseEnvoi.jsx";
 import { lignesEnvois, publierEnvois } from "./santeComptes.js";
 import { useSanteComptes, titreJournee, texteRaison } from "./SanteComptes.jsx";   // (11 nov., lot sante-comptes) les envois et leur date limite lue
-import { contenuDossierLitige, pdfDossierLitige, nomFichierDossier, imageEnOctets } from "./dossierLitige.js";   // (10 nov., lot BJ) dossier de litige en PDF
+import { contenuDossierLitige, pdfDossierLitige, nomFichierDossier, imageEnOctets, echangesDossier } from "./dossierLitige.js";   // (10 nov., lot BJ) dossier de litige en PDF
 import { suivisAmbigus } from "../api/_lib/depart-colis.js";
 // ⟦→ ecrans/Reglages.jsx #15⟧
 import { prochainGesteColis, bordereauxAImprimer, gesteEnvoi, compteAImprimer } from "./prochainGesteColis.js";
@@ -42681,10 +42683,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         avecBordereau && (b || lab) ? octetsBordereau(lab && lab.row, b && b.hasPdf ? b._row : null) : Promise.resolve(null),
       ]);
       const carton = cartonLu && cartonLu.src ? await imageEnOctets(cartonLu.src) : null;
+      // (14 nov., lot 126) Les échanges : la conversation de CETTE transaction (égalité exacte du n°),
+      // projetée (jamais `select=data`). Lecture ratée ou aucune conversation ⇒ `null`, « pas lue » dans le PDF.
+      let echanges = null;
+      if (/^\d{1,20}$/.test(tx)) {
+        try {
+          const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_conv_*&data->payload->conversation->transaction->>id=eq.${tx}&select=id,tx:data->payload->conversation->transaction->>id,opp:data->payload->conversation->opposite_user->>id,messages:data->payload->conversation->messages`, { headers: sbAuth() });
+          const rows = r.ok ? await r.json() : null;
+          echanges = Array.isArray(rows) ? echangesDossier(rows, tx) : null;
+        } catch (_) { echanges = null; }
+      }
       const contenu = contenuDossierLitige({
         carte: c, vente: o ? { date: o.date } : null,
         compte: o && o._acc ? (o._acc.login || '') : (c.compte || ''),
-        frise, bordereau, avecBordereau,
+        frise, bordereau, avecBordereau, echanges,
         photos: { annonce: !srcAnnonce ? 'absente' : annonce ? 'ok' : 'ratee', carton: cartonLu === false ? 'absente' : cartonLu == null ? 'passu' : carton ? 'ok' : 'ratee' },
       });
       const octets = await pdfDossierLitige(contenu, { images: { annonce, carton }, bordereauPdf: bordLu && bordLu.octets ? bordLu.octets : null });
@@ -46150,7 +46162,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 favoris: nouveauxFav && nouveauxFav.annonces > 0 ? [tache({ id: 'favoris-nouveaux', n: nouveauxFav.annonces, icon: 'heart', color: C.text, court: tr('favoris.journee.titre', { n: nouveauxFav.annonces }), detail: null, title: tr('favoris.journee.titre', { n: nouveauxFav.annonces }), action: tr('favoris.journee.geste'), tab: 'cat_msg', avant: () => { preparerEnvoiFavoris(favorisUid); demanderVue('favoris'); } }, 98)] : [],
               };
               const forcesAF = [], montresAF = [];
-              for (const id of ordreJournee('afaire', persoJ)) {
+              for (const id of ordreJourneeHeure('afaire', persoJ)) {
                 const v = visJ(id); if (!v.montree) continue;
                 for (const el of (blocsAF[id] || [])) (v.force ? forcesAF : montresAF).push({ el, carte: id });
               }
@@ -46280,7 +46292,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 )}
                     </>),
                   };
-                  return ordreJournee('tete', persoJ).map((id) => {
+                  return ordreJourneeHeure('tete', persoJ).map((id) => {
                     if (id === 'prochain') return <React.Fragment key={id}>{blocsTete.prochain}</React.Fragment>;
                     const v = visibiliteCarte(id, { reglage: persoJ, mode: PROFIL_VENDEUR.mode });
                     if (v.montree) return <React.Fragment key={id}>{blocsTete[id]}</React.Fragment>;

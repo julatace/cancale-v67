@@ -33,6 +33,38 @@ export const jourDossier = (v) => { const t = ms(v); if (t == null) return ''; t
 const jourHeure = (v) => { const t = ms(v); if (t == null) return ''; const j = jourDossier(t); try { return _heure ? `${j}, ${_heure.format(new Date(t))}` : j; } catch (_) { return j; } };
 const NOM_PLATEFORME = { vinted: 'Vinted', ebay: 'eBay', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire Collective' };
 
+// ── (14 nov., lot 126) LES ÉCHANGES DE LA VENTE ────────────────────────────
+// La conversation Vinted de CETTE vente, reliée par SON n° de transaction
+// (`conversation.transaction.id`, égalité exacte — jamais le titre, §5). `convs` :
+// les lignes `harvest_*_conv_*` projetées { tx, opp, messages } (jamais `select=data`).
+// Rend [{ de: 'toi'|'acheteur'|'vinted'|'inconnu', quand, texte }] (les 40 derniers, dans l'ordre),
+// [] si la conversation est lue sans message, ou null si AUCUNE conversation de
+// cette transaction n'a été lue (« pas lue », dit dans le PDF — jamais « aucun échange »).
+// ⚠️ Rien de l'acheteur : ni pseudo ni identifiant — « l'acheteur », c'est tout.
+export const ECHANGES_MAX = 40;
+export function echangesDossier(convs, tx) {
+  const t = str(tx);
+  if (!t || !/^\d{1,20}$/.test(t)) return null;
+  const miennes = (Array.isArray(convs) ? convs : []).filter((c) => c && str(c.tx) === t);
+  if (!miennes.length) return null;
+  const out = [];
+  for (const c of miennes) {
+    const opp = str(c.opp);
+    for (const m of Array.isArray(c.messages) ? c.messages : []) {
+      const e = (m && m.entity) || m || {};
+      const corps = str(e.body);
+      if (!corps) continue;
+      const auteur = str(e.user_id != null ? e.user_id : m && m.user_id);
+      const v = m && (m.created_at_ts ?? e.created_at_ts ?? m.created_at ?? e.created_at);
+      const n = Number(v);
+      const at = v == null ? null : Number.isFinite(n) ? (n < 1e12 ? n * 1000 : n) : (Date.parse(v) || null);
+      out.push({ de: !auteur ? 'vinted' : !opp ? 'inconnu' : auteur === opp ? 'acheteur' : 'toi', at, texte: corps.replace(/\s+/g, ' ').slice(0, 600) });
+    }
+  }
+  out.sort((a, b) => (a.at || 0) - (b.at || 0));
+  return out.slice(-ECHANGES_MAX).map((x) => ({ de: x.de, quand: x.at ? jourHeure(x.at) : 'date non lue', texte: x.texte }));
+}
+
 // ── LE CONTENU (pur) ────────────────────────────────────────────────────────
 // carte    : la carte de l'écran Litiges (src/litigesEcran.js `litigesDesVentes`) ;
 // vente    : { date } — SEULE la date de vente est lue de la vente ;
@@ -41,7 +73,8 @@ const NOM_PLATEFORME = { vinted: 'Vinted', ebay: 'eBay', leboncoin: 'Leboncoin',
 // bordereau: { suivi, at } du bordereau de la vente, ou null ;
 // photos   : { annonce: 'ok'|'absente'|'ratee', carton: 'ok'|'absente'|'passu' } ;
 // avecBordereau : la page du bordereau est jointe (son choix).
-export function contenuDossierLitige({ carte, vente = null, compte = '', frise = null, bordereau = null, photos = {}, avecBordereau = false, maintenant = Date.now() } = {}) {
+// echanges : `echangesDossier(...)` (14 nov., lot 126) — [] lus sans message, null pas lus, undefined pas demandés.
+export function contenuDossierLitige({ carte, vente = null, compte = '', frise = null, bordereau = null, photos = {}, avecBordereau = false, echanges, maintenant = Date.now() } = {}) {
   const c = carte || {};
   const num = str(c.num);
   const plateforme = NOM_PLATEFORME[c.plateforme] || 'Vinted';
@@ -70,6 +103,7 @@ export function contenuDossierLitige({ carte, vente = null, compte = '', frise =
     etapes, bifurcation: bif,
     photos: { annonce: photos.annonce || 'absente', carton: photos.carton || 'absente' },
     etabliLe: jourHeure(maintenant),
+    ...(echanges !== undefined ? { echanges: Array.isArray(echanges) ? echanges.slice(-ECHANGES_MAX).map((e) => ({ de: ['toi', 'acheteur', 'vinted', 'inconnu'].includes(e && e.de) ? e.de : 'inconnu', quand: str(e && e.quand) || 'date non lue', texte: str(e && e.texte).slice(0, 600) })) : null } : {}),
   };
 }
 
@@ -162,6 +196,23 @@ export async function pdfDossierLitige(contenu, { PDFLib = null, images = {}, bo
   }
   if (contenu.bifurcation && y > M + 40) { txt(contenu.bifurcation, M + 16, y, { t: 10.5, c: GRIS }); y -= 17; }
   txt(`Établi le ${contenu.etabliLe} avec VRM. Seules les étapes prouvées sont listées.`, M, M - 14, { t: 8, c: GRIS });
+  // (14 nov., lot 126) Les échanges de la vente, sur une page à eux (seulement s'ils ont été demandés).
+  if (contenu.echanges !== undefined) {
+    const NOM = { toi: 'Toi', acheteur: "L'acheteur", vinted: 'Vinted', inconnu: '—' };
+    let pg = doc.addPage(A4), yy = H - M - 6;
+    const ecrire = (s, x, y2, o = {}) => { let v = propre(s); const font = o.font || f, t = o.t || 10; while (v.length > 1 && font.widthOfTextAtSize(v, t) > (o.max || W - M - x)) v = v.slice(0, -2) + '.'; pg.drawText(v, { x, y: y2, size: t, font, color: o.c || ENCRE }); };
+    const couper = (s, t, max) => { const mots = propre(s).split(' '); const out = []; let l = ''; for (const m of mots) { const e = l ? l + ' ' + m : m; if (f.widthOfTextAtSize(e, t) > max && l) { out.push(l); l = m; } else l = e; } if (l) out.push(l); return out; };
+    ecrire('Échanges avec l\'acheteur', M, yy, { font: fb, t: 14 }); yy -= 24;
+    if (contenu.echanges === null) { ecrire('Conversation pas lue pour cette vente.', M, yy, { c: GRIS }); }
+    else if (!contenu.echanges.length) { ecrire('Aucun message dans la conversation de cette vente.', M, yy, { c: GRIS }); }
+    else for (const e of contenu.echanges) {
+      const ls = couper(e.texte, 10, W - 2 * M - 16);
+      if (yy - 16 - ls.length * 13 < M + 20) { pg = doc.addPage(A4); yy = H - M - 6; }
+      ecrire(`${NOM[e.de] || '—'} · ${e.quand}`, M, yy, { font: fb, t: 9.5, c: e.de === 'toi' ? ENCRE : GRIS }); yy -= 14;
+      for (const l of ls) { ecrire(l, M + 12, yy, { t: 10 }); yy -= 13; }
+      yy -= 8;
+    }
+  }
   // Le bordereau lui-même, en pages jointes, s'il l'a demandé.
   if (contenu.avecBordereau && bordereauPdf) {
     try {
