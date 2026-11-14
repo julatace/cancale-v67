@@ -254,7 +254,8 @@ const telecharge = async (pg, clic, ms = 8000) => {
       {
         const { ctx, pg, errs } = await ouvrir(vp, { profil: PROFIL_OK, regime: null });
         const r = await attendre(pg, (x) => x.etat === 'regime' && x.btn);
-        dit(r.etat === 'regime' && r.btn && r.btn.disabled && /régime/i.test(r.raison), 'régime non renseigné ⇒ pas de facture, la raison est dite (pas de repli sur « micro »)', `${r.etat} · ${r.raison.slice(0, 100)}`);
+        // (14 nov.) La raison nomme la notion par SON mot, « Statut » (src/libelles.js : jamais « Régime fiscal »).
+        dit(r.etat === 'regime' && r.btn && r.btn.disabled && /\bstatut\b/i.test(r.raison) && !/régime fiscal/i.test(r.raison), 'régime non renseigné ⇒ pas de facture, la raison est dite (pas de repli sur « micro »)', `${r.etat} · ${r.raison.slice(0, 100)}`);
         dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
         await ctx.close();
       }
