@@ -194,8 +194,17 @@ const deborde = (pg, zone, cadre) => pg.evaluate(([z, c]) => {
       await pg.waitForTimeout(400);
       const val = await pg.locator('.vrm-chat-compose textarea').inputValue().catch(() => '');
       dit(/Taille réelle : taille petit, prendre ½ au-dessus\./.test(val) && /Longueur de semelle : 28,5 cm\./.test(val), `${T} un toucher INSÈRE dans le champ`, val.slice(0, 120));
-      const apres = await pg.evaluate(() => (window.__commandes || []).length);
-      dit(apres === avant, `${T} rien n’est envoyé sans son clic « Envoyer »`, `${apres - avant} commande(s)`);
+      // Une commande de fond (« lu », relecture) peut passer pendant ce temps : seule une RÉPONSE envoyée compte.
+      const nouvelles = await pg.evaluate((n) => (window.__commandes || []).slice(n), avant);
+      const envois = nouvelles.filter((c) => /repl|messages?\b|send|envoyer/i.test(String(c.endpoint || c.type || '')));
+      dit(envois.length === 0, `${T} rien n’est envoyé sans son clic « Envoyer »`, JSON.stringify(nouvelles).slice(0, 160));
+      // Témoin : SON clic « Envoyer » part bien par le même chemin (le détecteur voit un envoi).
+      await pg.locator('.vrm-chat-send').click().catch(() => {});
+      await pg.waitForTimeout(900);
+      const conf = await pg.$('[data-confirm], .vrm-confirm, [role="dialog"] button');
+      if (conf) { const okb = pg.getByRole('button', { name: /Envoyer|Confirmer|OK/ }).last(); await okb.click({ timeout: 1500 }).catch(() => {}); await pg.waitForTimeout(600); }
+      const tous = await pg.evaluate((n) => (window.__commandes || []).slice(n), avant);
+      dit(tous.some((c) => /repl|messages?\b|send|envoyer/i.test(String(c.endpoint || c.type || ''))), `${T} témoin : SON clic « Envoyer » part (le détecteur le voit)`, JSON.stringify(tous).slice(0, 160));
       if (tel) {
         const petites = await pg.evaluate(() => [...document.querySelectorAll('[data-aide-reponse] button')].filter((e) => e.getBoundingClientRect().height < 43.5).map((e) => e.textContent.slice(0, 20)));
         dit(!petites.length, `${T} les puces font 44 px au doigt`, petites.join(' | '));

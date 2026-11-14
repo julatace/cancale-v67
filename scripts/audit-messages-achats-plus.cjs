@@ -304,6 +304,14 @@ const MESSAGES = [
     const rA = await route({ methode: 'POST', user: { id: A }, corps: { action: 'revoquer', cid } });
     const apres = await route({ methode: 'GET', jeton });
     dit(rA.status === 200 && apres.status === 404, '110 · révoqué ⇒ 404');
+    // L'index encore là (sa suppression a raté) mais la ligne marquée retirée ⇒ 404 quand même.
+    const c3 = await route({ methode: 'POST', user: { id: A }, corps: { action: 'creer', items: ['3330002'] }, lireVendeur: lireVendeurDe(A) });
+    const j3 = c3.body.url.split('/').pop();
+    const l3 = lignes.get(`${A}|vrm_catalogue_${c3.body.cid}`); l3.revoque = true;
+    dit((await route({ methode: 'GET', jeton: j3 })).status === 404, '110 · ligne marquée retirée (index resté) ⇒ 404 quand même');
+    // La sortie publique : seulement la liste blanche.
+    const pp = CP.projectionPublique([{ titre: 'T', marque: 'M', taille: '42', prix: 10, photo: 'https://images1.vinted.net/x.jpeg', numero: '12', prixAchat: 41, buyPrice: '41', login: 'shop', accountId: '11', id: 3330001, url: 'https://www.vinted.fr/items/1' }], true);
+    dit(pp.length === 1 && Object.keys(pp[0]).sort().join() === 'marque,numero,photo,prix,taille,titre', '110 · la projection publique : liste blanche seulement', Object.keys(pp[0] || {}).join());
     // Expiré ⇒ 404.
     const j2 = sansN.body.url.split('/').pop();
     horloge += 7 * 86400000 + 1000;
