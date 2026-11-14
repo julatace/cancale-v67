@@ -74,7 +74,8 @@ export const arreterVoix = (canal) => { const r = ACTIVES.get(canal); if (r) { t
 export const annulerVoix = (canal) => { const r = ACTIVES.get(canal); ACTIVES.delete(canal); if (r) { try { r.abort ? r.abort() : r.stop(); } catch (_) {} } poser(canal, { ecoute: false, direct: '' }); };
 
 // Écouter UNE phrase. Rend false si rien n'a pu démarrer (pas d'API, micro refusé).
-export function ecouter({ canal = 'defaut', onDirect, onFinal, onErreur, onFin } = {}) {
+// (14 nov., proposition 105) `lang` : la langue de la reconnaissance (celle de VRM, Paramètres → Langue) ; défaut `fr-FR`.
+export function ecouter({ canal = 'defaut', onDirect, onFinal, onErreur, onFin, lang = 'fr-FR' } = {}) {
   if (!voixDisponible() || VOIX.refus) return false;
   if (ACTIVES.has(canal)) { arreterVoix(canal); return true; }   // re-toucher le micro = « j'ai fini »
   let rec;
@@ -85,7 +86,7 @@ export function ecouter({ canal = 'defaut', onDirect, onFinal, onErreur, onFin }
     const t = String(texte || '').trim();
     if (t && onFinal) { try { onFinal(t); } catch (_) {} }
   };
-  try { rec.lang = 'fr-FR'; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1; } catch (_) {}
+  try { rec.lang = /^[a-z]{2}-[A-Z]{2}$/.test(String(lang || '')) ? lang : 'fr-FR'; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1; } catch (_) {}
   rec.onresult = (e) => {
     if (ACTIVES.get(canal) !== rec) return;
     const r = lireResultats(e); if (!r.texte) return;

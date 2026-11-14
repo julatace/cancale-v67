@@ -1845,5 +1845,19 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 - **13 nov. · Lot 7 : le nom de la paire sur chaque colis à retirer** : une jonction par IDENTITÉ (`commandeRetrait` ; `commandeUnique` dans `api/_lib/commande-colis.js`, deux commandes ⇒ personne) pour Colis (nom + photo), mode relais, Ma journée (les noms dans la case), hors ligne, codes, et le widget (`pickupColis`, nom publié en [7]) ; mesuré 8/12 reliables, les 4 autres n'ont aucune identité en base (attendent la 5.372). `docs/passation/2026-11-13-lot7-nom-paire.md`. Geste : installer la 5.372 ; le script du widget lit `pickupColis`.
 
-## Ligne de CLAUDE.md §9 (déplacée telle quelle le 14 nov., lot dates-versement, pour rester sous 59 000 octets)
 - **14 nov. · Design, passe écran par écran** : fiche « Tout sur le N° » et loupe au système, 500 → 400/600, tailles à l'échelle, un gris, contrastes ≥ 4,5 (« 36 »), 44 doigt / 36 souris (filtres compris), titres insécables au trait d'union ; banc `design-passe` (avant 1 839 défauts, après 0). `docs/passation/2026-11-14-design-passe.md`. Geste : aucun.
+
+- **14 nov. · Design, passe 2** : Messages, E-mails, Achats, eBay, Leboncoin, Vestiaire, 15 sous-pages de Paramètres, feuilles, connexion, accueil, exemple, démarrage au système (banc `design-passe-2.cjs` : 1 766 défauts ⇒ 0) ; la loupe n'écrit le N° qu'une fois. `docs/passation/2026-11-14-design-passe-2.md`. Geste : aucun.
+
+- **14 nov. · Bancs au vert** : 14 bancs + job `comptes-et-reception` verts sans affaiblir (faux PostgREST à la vraie forme, `in.(…)`, attentes sur condition, porte de banc à jeton JWT) ; 3 défauts de l'app corrigés (⌘K « Imprimer » ouvre la feuille, rail allumé sur Organisation, « Statut » dans Factur-X). `docs/passation/2026-11-14-bancs-au-vert.md`. Geste : aucun.
+
+- **14 nov. · Design, passe 3** : bande Leboncoin dans la colonne, Notifications au segmenté, pas de barre vide, fraîcheur sans cadre, 28 sous-pages, feuilles, e-mail et fil au système ; la feuille de vente ne cache plus l'écran (banc `design-passe-3.cjs` : 1 531 défauts ⇒ 0). `docs/passation/2026-11-14-design-passe-3.md`. Geste : aucun.
+
+- **14 nov. · Argent, quatre choix (75, 80, 81, 82)** : coller « N° ; prix » dans la saisie en série (aperçu, rien d’écrasé) ; « Modèle et taille » + « À racheter » sur les ventes reliées ; objectif sur le REÇU + « X € par jour d'ici le 30 » ; « Ta déclaration de revenus » en tête de Déclarer avec case et source. `docs/passation/2026-11-14-argent-choix.md`. Geste : aucun.
+
+- **14 nov. · Confort et sécurité (117–130)** : journée selon l’heure, écran d’atelier, connexion par QR (iPhone approuve, session neuve serveur, MFA gardée), lien d’aide 24 h sans 016, échanges au dossier de litige, code local, aperçu, inventaire tournant, carte merci. `2026-11-14-confort-securite.md`. Geste : aucun.
+
+- **14 nov. · Une seule fiche partout (proposition 62)** : toucher une ligne (Ventes, À expédier, Annonces Vinted/LBC/eBay/Vestiaire, Stock, Achats, À retirer) ouvre LA fiche de la paire, désignée par identité (`src/ficheLigne.js`), la partie du contexte en haut et les gestes de la ligne dedans (`src/DansFiche.jsx`) ; sans identité ⇒ fiche de la ligne, « pas de paire reliée ». `docs/passation/2026-11-14-fiche-partout.md`. Geste : aucun.
+
+## Lignes de CLAUDE.md §9 (déplacées telles quelles le 14 nov., lot dates-versement, pour rester sous 59 000 octets)
+- **14 nov. · Frais de l'année + carte de tes ventes (123, 124)** : Argent — `fraisAnnee` (= `fraisParPlateforme` sur l'année : au moins / — / couverture, livres écartées et dites, boosts Vinted pas lus) et `lieuxVentes` (pays du profil Vinted par la transaction, ville de livraison eBay par la commande, jamais un nom ; Base Adresse une fois par ville). Mesuré : pays sur 522 / 3 535 ventes Vinted, 0 frais lus. `docs/passation/2026-11-14-frais-carte.md`. Geste : aucun.
