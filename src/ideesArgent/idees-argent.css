@@ -1,0 +1,115 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   LA FEUILLE « VENTE EN MAIN PROPRE » (14 nov., 160) — direction « Studio bleu clair »
+   Les classes `sb-*` sont celles du contrat commun (CONTRAT-STUDIO.md) :
+   « provisoire : vient de studio.css » — définies ici sous `:where(.ia)` (spécificité d'une seule classe, comme dans
+   src/design/studio.css) pour que la fondation les remplace à la fusion sans
+   conflit ; les couleurs lisent d'abord les variables `--sb-*` de la fondation.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:where(.ia) {
+  --ia-encre: var(--sb-encre, #0C1D30);
+  --ia-encre-2: var(--sb-encre-2, #3F5468);
+  --ia-porcelaine: var(--sb-porcelaine, #FFFFFF);
+  --ia-porcelaine-2: var(--sb-porcelaine-2, #F7FAFD);
+  --ia-creux: var(--sb-creux, #E4EEF7);
+  --ia-lien: var(--sb-lien, #0055B8);
+  --ia-diode: var(--sb-diode, #0060CC);
+  --ia-ambre: var(--sb-ambre, #764300);
+  --ia-rouge-double: var(--sb-doublon, #B8261A);   /* rouge : seulement .sb-plaque.is-double (deux paires sous un même numéro) */
+  --ia-o: var(--sb-o, 18 52 96);
+  --ia-affiche: var(--sb-police-affiche, "Urbanist", "Inter", -apple-system, system-ui, sans-serif);
+  color: var(--ia-encre);
+  font-variant-numeric: tabular-nums;
+}
+:root[data-theme="dark"] :where(.ia) {
+  --ia-encre: var(--sb-encre, #EAF2FB); --ia-encre-2: var(--sb-encre-2, #9CB0C6);
+  --ia-porcelaine: var(--sb-porcelaine, #16273C); --ia-porcelaine-2: var(--sb-porcelaine-2, #122135);
+  --ia-creux: var(--sb-creux, #091320); --ia-lien: var(--sb-lien, #6CB4FF); --ia-diode: var(--sb-diode, #4AA3FF);
+  --ia-ambre: var(--sb-ambre, #F2B65E); --ia-o: var(--sb-o, 0 0 0);
+  --ia-rouge-double: var(--sb-doublon, #FF6B5E);   /* rouge : seulement .sb-plaque.is-double (deux paires sous un même numéro) */
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) :where(.ia) {
+    --ia-encre: var(--sb-encre, #EAF2FB); --ia-encre-2: var(--sb-encre-2, #9CB0C6);
+    --ia-porcelaine: var(--sb-porcelaine, #16273C); --ia-porcelaine-2: var(--sb-porcelaine-2, #122135);
+    --ia-creux: var(--sb-creux, #091320); --ia-lien: var(--sb-lien, #6CB4FF); --ia-diode: var(--sb-diode, #4AA3FF);
+    --ia-ambre: var(--sb-ambre, #F2B65E); --ia-o: var(--sb-o, 0 0 0);
+  --ia-rouge-double: var(--sb-doublon, #FF6B5E);   /* rouge : seulement .sb-plaque.is-double (deux paires sous un même numéro) */
+  }
+}
+
+/* ── les quatre formes de bouton (provisoire : vient de studio.css) ───────── */
+:where(.ia) .sb-btn-plein {
+  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
+  min-height: 52px; border: 0; border-radius: 26px; padding: 0 22px; cursor: pointer;
+  background: var(--ia-encre); color: var(--ia-porcelaine); font: 650 16px/1.2 var(--ia-affiche);
+  box-shadow: 0 1px 0 rgb(255 255 255 / .18) inset, 0 6px 18px rgb(var(--ia-o) / .22);
+  transition: transform 90ms cubic-bezier(.2,.9,.25,1), box-shadow 90ms;
+}
+:where(.ia) .sb-btn-plein:active { transform: translateY(1.5px); box-shadow: 0 2px 8px rgb(var(--ia-o) / .18); }
+:where(.ia) .sb-btn-plein:disabled { background: rgb(var(--ia-o) / .18); color: var(--ia-encre-2); box-shadow: none; cursor: default; }
+:where(.ia) .sb-touche {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 44px; padding: 0 14px; border-radius: 13px; cursor: pointer;
+  border: 0.5px solid rgb(var(--ia-o) / .14); background: linear-gradient(var(--ia-porcelaine), var(--ia-porcelaine-2));
+  color: var(--ia-encre); font-family: inherit; font-size: 14px; font-weight: 600; line-height: 1.2;
+  box-shadow: 0 1px 2px rgb(var(--ia-o) / .12);
+}
+:where(.ia) .sb-touche:active, :where(.ia) .sb-touche[aria-pressed="true"], :where(.ia) .sb-touche.is-actif {
+  background: var(--ia-creux); box-shadow: inset 0 1px 3px rgb(var(--ia-o) / .2);
+}
+:where(.ia) .sb-touche[aria-pressed="true"]::before, :where(.ia) .sb-touche.is-actif::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--ia-diode); flex: none;
+}
+:where(.ia) .sb-touche:disabled { opacity: .55; cursor: default; }
+:where(.ia) .sb-rond {
+  display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%;
+  border: 0.5px solid rgb(var(--ia-o) / .14); background: var(--ia-porcelaine); color: var(--ia-encre); cursor: pointer;
+}
+:where(.ia) .sb-lien {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; background: none; cursor: pointer;
+  color: var(--ia-lien); font-family: inherit; font-size: 14px; font-weight: 600; line-height: 1.2; text-decoration: none;
+}
+:where(.ia) .sb-lien:active { opacity: .55; }
+:where(.ia) .sb-lien:disabled { color: var(--ia-encre-2); opacity: .55; }
+
+/* ── composants (provisoire : vient de studio.css) ───────────────────────── */
+:where(.ia) .sb-champ {
+  display: block; width: 100%; box-sizing: border-box; min-height: 48px; padding: 0 14px; border-radius: 13px;
+  border: 0; background: var(--ia-creux); color: var(--ia-encre); font-family: inherit; font-size: 17px; font-weight: 500; line-height: 1.2;
+  box-shadow: inset 0 1px 3px rgb(var(--ia-o) / .16); outline: none;
+}
+:where(.ia) .sb-champ:focus-visible { box-shadow: inset 0 1px 3px rgb(var(--ia-o) / .16), 0 0 0 2px var(--ia-diode); }
+:where(.ia) .sb-champ[aria-invalid="true"] { box-shadow: inset 0 1px 3px rgb(var(--ia-o) / .16), 0 0 0 2px var(--ia-ambre); }
+:where(.ia) .sb-segment { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; padding: 4px; border-radius: 16px; background: var(--ia-creux); }
+:where(.ia) .sb-segment .sb-touche { min-height: 44px; padding: 0 8px; }
+:where(.ia) .sb-plaque {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 52px; height: 30px; padding: 0 8px; border-radius: 6px;
+  background: var(--ia-creux); color: var(--ia-encre); font: 700 15px/1 var(--ia-affiche); letter-spacing: .02em;
+  box-shadow: inset 0 1px 2px rgb(var(--ia-o) / .2); flex: none;
+}
+:where(.ia) .sb-plaque.is-double { color: var(--ia-rouge-double); box-shadow: inset 0 0 0 1.5px var(--ia-rouge-double); }
+:where(.ia) .sb-rangee {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 8px 10px; box-sizing: border-box;
+  border: 0; border-radius: 16px; background: var(--ia-porcelaine); color: inherit; text-align: left; font: inherit; cursor: pointer;
+  box-shadow: 0 1px 2px rgb(var(--ia-o) / .1);
+}
+:where(.ia) .sb-rangee[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ia-diode); }
+:where(.ia) .sb-vignette { width: 48px; height: 48px; border-radius: 11px; object-fit: cover; background: var(--ia-creux); flex: none; }
+:where(.ia) .sb-chiffre-affiche { font: 300 40px/1 var(--ia-affiche); letter-spacing: -.01em; }
+
+/* ── la mise en page des feuilles ────────────────────────────────────────── */
+.ia { display: grid; gap: 14px; padding: 4px 0 8px; }
+.ia-lib { display: block; margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--ia-encre-2); }
+.ia-note { margin: 0; font-size: 13px; line-height: 1.45; color: var(--ia-encre-2); }
+.ia-note.is-geste { color: var(--ia-ambre); }
+.ia-liste { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.ia-rangee-txt { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.ia-rangee-txt b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ia-rangee-txt small { color: var(--ia-encre-2); font-size: 12.5px; }
+.ia-rangee-prix { font: 500 16px/1 var(--ia-affiche); flex: none; }
+.ia-ligne2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ia-fait { display: grid; gap: 4px; padding: 14px; border-radius: 22px; background: var(--ia-porcelaine); box-shadow: 0 1px 2px rgb(var(--ia-o) / .1); }
+.ia-fait b { font: 600 17px/1.3 var(--ia-affiche); }
+.ia-gestes { display: flex; flex-wrap: wrap; gap: 4px 18px; align-items: center; }
+.ia-repli > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--ia-lien); font-weight: 600; font-size: 14px; }
+@media (prefers-reduced-motion: reduce) { :where(.ia) .sb-btn-plein { transition: none; } }

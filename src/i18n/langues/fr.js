@@ -53,6 +53,7 @@ export default {
   ...ecran_plus,
   ...ecran_argentprix,
   ...ecran_plateformes,
+  ...ecran_idees,
   ...ecran_compta,
   ...ecran_argent,
   ...ecran_colisplus,
@@ -2256,5 +2257,4 @@ export default {
   ...ecran_confort,
   ...ecran_studio,
   ...ecran_capte,
-  ...ecran_idees,
 };

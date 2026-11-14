@@ -1118,3 +1118,7 @@ Récit : `historique-interface-stock.md` (« LES QUATRE OUTILS DES ANNONCES »).
 | `freinrepub` | `poserFreinRepub` | **5.311.0** (2 nov.) | un refus de Vinted freine la republication de CE compte (30 min ; 24 h si restreint) |
 | `numeroscompte` | `numerosDuCompte` | **5.311.0** (2 nov.) | sur Vinted, seuls les N° du compte connecté dans l'onglet |
 | `republierquestion` | `reglerAvant` | **5.310.0** (2 nov.) | Republier remplit un champ manquant depuis l'annonce elle-même, sinon DEMANDE (valeurs de Vinted) ; un refus nommé n'est jamais renvoyé tel quel |
+
+## Déplacé tel quel de CLAUDE.md §9 (14 nov., version studio — fichier sous 59 000 octets)
+
+- **14 nov. · Extension 5.377.0 : « VRM a capté » + carte Favoris · Annonces · Ventes** : bulle près du logo et toast dans l'app quand une écriture RÉUSSIE range du nouveau (par identité, `vrmCapteVu`), « Compte relié · … » à la connexion, réglage partagé carte ↔ Paramètres ; carte : compte de l'onglet d'abord, favoris du plus récent cochés ⇒ « Envoyer le message (N) », autres comptes floutés `inert`, lecture seule. `docs/passation/2026-11-14-popup-capte.md`. Geste : installer la 5.377.0.

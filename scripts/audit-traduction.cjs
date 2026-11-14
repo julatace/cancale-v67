@@ -63,6 +63,7 @@ const MIGRES = [
   ['src/composants/SuiviTravail.jsx', ['*']],   // (11 nov., lot suivi-travail)
   ['src/MainsLibres.jsx', ['*']],   // (14 nov., lot colis-plus 100) mains libres
   ['src/TempsColis.jsx', ['*']],    // (14 nov., lot colis-plus 101) le temps par colis
+  ['src/ideesArgent/Feuilles.jsx', ['*']],   // (14 nov., 160) la vente en main propre
   ['src/TvaMargeCarte.jsx', ['*']],
   ['src/RangerAchat.jsx', ['*']],   // (11 nov., lot rangement-guide)
   ['src/FavorisEtapes.jsx', ['*']],   // (11 nov., lot favoris-clair)
