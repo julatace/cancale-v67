@@ -1,5 +1,6 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
+import { joursPourDater } from '../versementRaisons.js';   // (14 nov., lot dates-versement) « environ X jours, Vinted ouvert »
 import { CLE_FOURNISSEURS, lireRegistre } from '../fournisseurs.js';
 import { motsVendeur } from '../profilVendeur.js';
 import { CLE_HORS_MASQUES, horsVisibles } from '../achatsDoubles.js';
@@ -3656,7 +3657,7 @@ function ADaterRaisons({ ad, n, periodeAd, label, onDater }) {
       const comptes = Array.isArray(r.comptes) && r.comptes.length ? r.comptes : [{ uid: '', nom: '', n: r.n }];
       for (const c of comptes) lignes.push(
         <li key={'d' + c.uid} data-adater-raison="vinted-detail" data-adater-compte={c.uid || ''} data-n={c.n}>
-          <span><b>{nbAd(c.n)}</b> {c.nom ? <>{tr('journee.texte2')} <b>{c.nom}</b></> : tr('compta.vinted')} {tr('compta.vente3')}{plAd(c.n)} {tr('compta.encoreRelue')}{plAd(c.n)}.</span>
+          <span><b>{nbAd(c.n)}</b> {c.nom ? <>{tr('journee.texte2')} <b>{c.nom}</b></> : tr('compta.vinted')} {tr('compta.vente3')}{plAd(c.n)} {tr('compta.encoreRelue')}{plAd(c.n)}.{joursPourDater(c.n) ? <> <span data-adater-jours={joursPourDater(c.n)}>{tr('compta.environJoursVinted', { n: joursPourDater(c.n) })}</span></> : null}</span>
           <Bouton variante="discret" href="https://www.vinted.fr/" target="_blank" rel="noopener noreferrer" data-adater-geste="vinted">{tr('annonces.ouvrirVinted')}</Bouton>
         </li>);
     } else if (r.cle === 'leboncoin') lignes.push(
@@ -3682,7 +3683,7 @@ function ADaterRaisons({ ad, n, periodeAd, label, onDater }) {
   return (
     <div className="vrm-adater" data-adater-raisons="">
       <span>
-        {d ? <><b data-adater-datees={d.n}>{trj('compta.datee', { nbAd: nbAd(d.n), plAd: plAd(d.n) })}</b>{d.releve > 0 ? <span data-adater-releve={d.releve}>{trj('compta.dontPorteMonnaie', { nbAd: nbAd(d.releve) })}</span> : null} · </> : null}
+        {d ? <><b data-adater-datees={d.n}>{trj('compta.datee', { nbAd: nbAd(d.n), plAd: plAd(d.n) })}</b>{d.releve > 0 ? <span data-adater-releve={d.releve}>{trj('compta.dontPorteMonnaie', { nbAd: nbAd(d.releve) })}</span> : null}{d.conversation > 0 ? <span data-adater-conversation={d.conversation}>{trj('compta.dontConversation', { nbAd: nbAd(d.conversation) })}</span> : null}{d.email > 0 ? <span data-adater-email={d.email}>{trj('compta.dontEmail', { nbAd: nbAd(d.email) })}</span> : null} · </> : null}
         <b data-adater-sans={n}>{trj('compta.venteSansDate', { nbAd: nbAd(n), plAd: plAd(n) })}</b> {tr('compta.dansMontant')}
         {periodeAd ? <> {tr('compta.ellesOntEte')} <span data-urssaf-adater-periode="">{periodeAd}</span> {tr('compta.venteVersee2')} {label} {tr('compta.manquerait')}</> : null}
       </span>

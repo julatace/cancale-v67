@@ -711,4 +711,7 @@ export default {
   "compta.recapImprimerNote": "Una página A4, legible en blanco y negro. Para un PDF, elige «Guardar como PDF» en la ventana de impresión.",
   "compta.recapFenetreBloquee": "El navegador bloqueó la ventana de impresión: permite las ventanas de VRM y vuelve a intentarlo.",
   "compta.recapPrepare": "Preparando el resumen…",
+  "compta.dontConversation": " · {nbAd} por la conversación de la venta",
+  "compta.dontEmail": " · {nbAd} por el e-mail de Vinted",
+  "compta.environJoursVinted": { one: "Unos {n} día con vinted.fr abierto en esta cuenta.", other: "Unos {n} días con vinted.fr abierto en esta cuenta." },
 };

@@ -203,4 +203,10 @@ export default {
   "journee.avisNegatifs": "Avis négatifs",
   "journee.avisNegatif": "Avis négatif",
   "journee.cartesCachees": { one: "{n} carte cachée", other: "{n} cartes cachées" },
+  "veille.versement.titre": { one: "vente à dater : sa date de versement est en cours de lecture", other: "ventes à dater : leur date de versement est en cours de lecture" },
+  "veille.versement.datees": { one: "{n} déjà datée ✓", other: "{n} déjà datées ✓" },
+  "veille.versement.pourquoi1": "Vinted ne donne cette date qu’en ouvrant chaque vente : l’extension les lit quand vinted.fr est ouvert sur ce compte. D’ici là, elles ne sont dans aucun mois ; aucune n’est devinée.",
+  "veille.versement.pourquoiN": "Vinted ne donne cette date qu’en ouvrant chaque vente : l’extension les lit quand vinted.fr est ouvert sur chacun de ces comptes. D’ici là, elles ne sont dans aucun mois ; aucune n’est devinée.",
+  "veille.versement.jours": { one: "Environ {n} jour, Vinted ouvert.", other: "Environ {n} jours, Vinted ouvert." },
+  "veille.versement.geste": "Voir le détail",
 };

@@ -22,6 +22,9 @@
 .vrm-veille-ligne + .vrm-veille-ligne { border-top: 0.5px solid var(--d-filet, rgba(60,60,67,.14)); }
 .vrm-veille-n { flex: 0 0 auto; min-width: 28px; font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--vrm-warn, #B25000); }
 .vrm-veille-ligne[data-controle-ligne="numeros-double"] .vrm-veille-n { color: var(--vrm-doublon); }   /* deux paires sous un N° : le seul rouge (§7) */
+/* (14 nov.) Des dates « en cours de lecture » ne sont pas un geste : chiffre neutre (§7). */
+.vrm-veille-ligne[data-ton="info"] .vrm-veille-n { color: var(--d-encre, #1D1D1F); }
+.vrm-veille-txt > small.vrm-veille-explique { display: block; margin-top: 2px; line-height: 1.4; }
 .vrm-veille-txt { flex: 1 1 auto; min-width: 0; font-size: 14px; line-height: 1.4; color: var(--d-encre, #1D1D1F); overflow-wrap: anywhere; }
 .vrm-veille-txt > small { color: var(--d-gris, #6E6E73); font-size: 13px; }
 .vrm-veille-ligne > .vrm-b { flex: 0 0 auto; min-height: 44px; }
