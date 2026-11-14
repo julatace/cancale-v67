@@ -12,6 +12,7 @@ import ecran_stats from './en/stats.js';
 import ecran_compta from './en/compta.js';
 import ecran_listes from './en/listes.js';
 import ecran_refonte_ms from './en/refonte-ms.js';
+import ecran_studio_journee from './en/studio-journee.js';   // (14 nov.) Ma journée « Studio bleu clair »
 import ecran_argent from './en/argent.js';
 import ecran_fiche from './en/fiche.js';
 import ecran_ergonomie from './en/ergonomie.js';
@@ -29,6 +30,7 @@ import ecran_rechliste from './en/rechliste.js';
 export default {
   ...ecran_accueilReste,
   ...ecran_refonte_ms,
+  ...ecran_studio_journee,
   ...ecran_listes,
   ...ecran_fiche,
   ...ecran_ergonomie,

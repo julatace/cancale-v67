@@ -110,6 +110,9 @@
        contenu (vercel.json) refuse tout script en ligne. -->
   <script src="/demarrage-theme.js"></script>
   <style>
+    /* (14 nov., Studio · Ma journée) La couche `sj-studio` est DÉCLARÉE ICI, en premier : ses `!important`
+       passent avant ceux des couches posées ensuite (src/design/studio-journee.css, en-tête). */
+    @layer sj-studio;
     body{margin:0;padding:0;background:#FFFFFF;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Inter',system-ui,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}
     /* Le fond n'est plus uniforme : un dégradé très léger vers le haut donne de
        la matière derrière les cartes blanches. À peine perceptible isolément,
