@@ -189,7 +189,7 @@
 :root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-filtre-site > button:is([aria-pressed="true"], [aria-checked="true"], [aria-selected="true"]) {
   background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important;
 }
-:root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-compte-menu-hote { flex: 1 1 auto !important; min-width: 0 !important; display: flex !important; justify-content: flex-end !important; padding: 0 !important; margin: 0 !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-compte-menu-hote { flex: 1 1 0 !important; min-width: 0 !important; display: flex !important; justify-content: flex-end !important; padding: 0 !important; margin: 0 !important; }
 :root:root:root:root:root body [data-espace="paires"] .vrm-compte-menu-hote > .vrm-ui-menu-compte {
   height: 44px !important; min-height: 44px !important; max-width: 100% !important; padding: 0 14px !important; border: 0 !important; border-radius: 13px !important;
   background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important;
@@ -199,31 +199,31 @@
 
 /* ── 6. La bande de chiffres : sur le fond, sans carte ────────────────────── */
 :root:root:root:root:root body [data-espace="paires"] .vrm-market-space > div:has(> .vrm-fu-bande) { padding: 4px 20px 0 !important; }
-:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande.vrm-ui-bande {
+:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande.vrm-ui-bande {
   background: transparent !important; box-shadow: none !important; border: 0 !important; border-radius: 0 !important; padding: 0 !important; margin: 0 !important;
   display: flex !important; align-items: center !important; gap: 22px !important; min-height: 44px !important; overflow: visible !important;
 }
-:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-item {
+:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-item {
   background: transparent !important; box-shadow: none !important; border: 0 !important; padding: 0 !important; margin: 0 !important; min-height: 44px !important; height: 44px !important; width: auto !important;
   display: inline-flex !important; flex-direction: row !important; align-items: baseline !important; align-content: center !important; flex-wrap: nowrap !important; gap: 5px !important; flex: 0 0 auto !important; min-width: 0 !important; color: var(--sbp-encre) !important;
   padding-top: 12px !important; box-sizing: border-box !important; transform: none !important;
 }
-:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-item::before, :root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-item::after { display: none !important; content: none !important; }
-:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-n, :root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-n * {
+:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-item::before, :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-item::after { display: none !important; content: none !important; }
+:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-n, :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-n * {
   font: 300 27px/1 var(--sbp-affiche) !important; letter-spacing: -.03em !important; color: var(--sbp-encre) !important; font-variant-numeric: tabular-nums !important; white-space: nowrap !important; margin: 0 !important;
 }
-:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-l, :root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-l * {
+:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-l, :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-l * {
   font: 550 12.5px/1.2 var(--sbp-texte) !important; color: var(--sbp-encre2) !important; white-space: nowrap !important; margin: 0 !important; letter-spacing: 0 !important;
 }
-:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-fu-bande-action { margin-left: auto !important; align-self: center !important; }
-:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-fu-bande-action button {
+:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-fu-bande-action { margin-left: auto !important; align-self: center !important; }
+:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-fu-bande-action button {
   width: 44px !important; height: 44px !important; min-height: 44px !important; border-radius: 50% !important; border: 0 !important; background: transparent !important; box-shadow: none !important; color: var(--sbp-encre2) !important;
 }
 
 @media (max-width: 767px) {
-  :root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande.vrm-ui-bande { gap: 20px !important; }
-  :root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-item { flex-direction: column !important; align-items: flex-start !important; justify-content: center !important; gap: 3px !important; padding-top: 0 !important; height: 44px !important; min-height: 44px !important; }
-  :root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-n, :root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-n * { font-size: 24px !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande.vrm-ui-bande { gap: 20px !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-item { flex-direction: column !important; align-items: flex-start !important; justify-content: center !important; gap: 3px !important; padding-top: 0 !important; height: 44px !important; min-height: 44px !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-n, :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-n * { font-size: 24px !important; }
 }
 
 /* ── 7. La barre : une recherche CREUSÉE, puis des ronds ───────────────────── */
@@ -653,9 +653,13 @@
 @supports (animation-timeline: scroll()) {
   :root:root:root:root:root body :is([data-espace="paires"] .vrm-ann-workbar, .vrm-main[data-ecran="garage"] .vrm-ms-stock > div[style*="sticky"]) {
     background: transparent !important; box-shadow: none !important;
-    animation: sbp-colle linear both !important; animation-timeline: scroll(nearest block) !important; animation-range: 0 140px !important;
+    animation: sbp-colle linear both !important; animation-timeline: --sbp-defile !important; animation-range: 0 140px !important;
   }
 }
+/* La frise du défilement : celle de la zone qui défile (`.vrm-main`), nommée (la plus proche « zone qui déborde »
+   peut être un conteneur qui ne défile jamais). */
+:root:root:root:root:root body .vrm-main:is([data-ecran="annonces"], [data-ecran="garage"]) { scroll-timeline: --sbp-defile block; }
+:root:root:root:root:root body :is([data-espace="paires"] .vrm-ann-workbar, .vrm-main[data-ecran="garage"] .vrm-ms-stock > div[style*="sticky"]) { z-index: 6 !important; }
 @keyframes sbp-colle {
   0%, 60% { background-color: transparent; box-shadow: 0 0 0 transparent; }
   100% { background-color: color-mix(in srgb, var(--sbp-aplat) 94%, transparent); box-shadow: 0 10px 18px -14px rgb(var(--sbp-o) / .35); }
