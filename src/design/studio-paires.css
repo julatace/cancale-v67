@@ -553,6 +553,119 @@
 }
 @keyframes sbp-plan { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 
+
+/* ── 15. LE STOCK (src/ecrans/Stock.jsx) et L'INVENTAIRE : la même matière que les Annonces ── */
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-stock { color: var(--sbp-encre) !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-stock h1.vrm-display { font: 400 34px/1 var(--sbp-affiche) !important; letter-spacing: -.03em !important; color: var(--sbp-encre) !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] :is(.vrm-aide-bouton, .vrm-ms-tete-outils .vrm-ui-icone) {
+  width: 44px !important; height: 44px !important; min-width: 44px !important; border-radius: 50% !important; border: 0 !important; display: inline-grid !important; place-items: center !important;
+  background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important;
+}
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] :is(.vrm-aide-bouton, .vrm-ms-tete-outils .vrm-ui-icone) svg { color: var(--sbp-encre) !important; width: 21px !important; height: 21px !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-tete-outils { display: flex !important; gap: 10px !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] :is(.vrm-aide-bouton, .vrm-ms-tete-outils .vrm-ui-icone):active { background: var(--sbp-creux) !important; box-shadow: var(--sbp-k-in) !important; transform: translateY(1px); }
+/* La bande. */
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-bande { background: transparent !important; box-shadow: none !important; border: 0 !important; padding: 0 4px !important; gap: 24px !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-bande .vrm-ui-bande-item { background: transparent !important; box-shadow: none !important; border: 0 !important; padding: 0 !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-bande .vrm-ui-bande-n { font: 300 27px/1 var(--sbp-affiche) !important; letter-spacing: -.03em !important; color: var(--sbp-encre) !important; font-variant-numeric: tabular-nums !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-bande .vrm-ui-bande-n .vrm-ms-au-moins { font: 550 12.5px/1 var(--sbp-texte) !important; color: var(--sbp-encre2) !important; letter-spacing: 0 !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-bande .vrm-ui-bande-l { font: 550 12.5px/1.2 var(--sbp-texte) !important; color: var(--sbp-encre2) !important; }
+/* Les puces d'état et le compte : des touches posées (l'ambre reste au texte d'un geste à faire). */
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] :is(.vrm-pop-chip, .vrm-ui-menu-compte) {
+  min-height: 44px !important; height: 44px !important; padding: 0 13px !important; border: 0 !important; border-radius: 13px !important;
+  background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important; font: 600 14px/1 var(--sbp-texte) !important;
+}
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-pop-chip.is-ambre { color: var(--sbp-ambre) !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-pop-chip.is-ambre::before { content: "" !important; width: 6px !important; height: 6px !important; border-radius: 50% !important; background: var(--sbp-point) !important; margin-right: 6px !important; display: inline-block !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] :is(.vrm-pop-chip, .vrm-ui-menu-compte) * { color: inherit !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] :is(.vrm-pop-chips, .vrm-s2d-filtres) { gap: 8px !important; }
+/* La recherche, creusée. */
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ui-outils-champ {
+  min-height: 44px !important; height: 44px !important; border-radius: 14px !important; border: 0 !important; background: var(--sbp-puits) !important; box-shadow: var(--sbp-puits-sh) !important; color: var(--sbp-encre2) !important;
+}
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ui-outils-champ input { background: transparent !important; color: var(--sbp-encre) !important; font: 500 15px/1 var(--sbp-texte) !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ui-outils-champ input::placeholder { color: var(--sbp-encre2) !important; opacity: 1 !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ui-outils :is(.vrm-ui-icone, button) { background: transparent !important; box-shadow: none !important; color: var(--sbp-encre2) !important; }
+/* « • À faire · N › » : un lien, pas une carte. */
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ui-afaire {
+  background: transparent !important; box-shadow: none !important; border: 0 !important; min-height: 44px !important; padding: 0 4px !important; color: var(--sbp-lien) !important; font: 600 14px/1 var(--sbp-texte) !important; justify-content: flex-start !important; width: auto !important;
+}
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ui-afaire * { color: inherit !important; font: inherit !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ui-afaire .vrm-ui-afaire-mots { flex: 0 1 auto !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ui-afaire .vrm-ui-afaire-point { background: var(--sbp-point) !important; width: 6px !important; height: 6px !important; }
+/* Les titres de section, la carte d'explication et les cartes du Stock : de la porcelaine. */
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-h2 { font: 600 13px/1.2 var(--sbp-texte) !important; color: var(--sbp-encre2) !important; letter-spacing: 0 !important; text-transform: none !important; margin: 8px 4px 6px !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] :is(.vrm-sx, .vrm-ms-stock .vrm-card) {
+  background: linear-gradient(180deg, var(--sbp-feuille), var(--sbp-feuille2)) !important; border: 0 !important; border-radius: 22px !important; box-shadow: var(--sbp-om-tuile) !important; color: var(--sbp-encre) !important;
+}
+/* La liste des paires en ligne : un plan de verre, des rangées de 64 px (N° gravé · vignette · paire · geste). */
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-groupe[data-stock-liste] {
+  background: var(--sbp-plan) !important; border: 0 !important; border-radius: 28px !important; box-shadow: inset 0 .5px 0 rgb(255 255 255 / .9), 0 -14px 30px -20px rgb(var(--sbp-o) / .35) !important;
+  padding: 6px 0 !important; overflow: hidden !important;
+}
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-rangee {
+  display: grid !important; grid-template-columns: 50px 44px minmax(0, 1fr) auto !important; grid-template-rows: 20px 18px !important; column-gap: 12px !important; row-gap: 4px !important;
+  align-content: center !important; align-items: center !important; height: 64px !important; min-height: 64px !important; padding: 0 16px !important; margin: 0 !important;
+  background: transparent !important; border: 0 !important; box-shadow: none !important; border-radius: 0 !important; flex-wrap: nowrap !important;
+}
+@media (max-width: 767px) { :root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-rangee { content-visibility: auto; contain-intrinsic-size: auto 64px; } }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-rangee::before, :root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-rangee::after { display: none !important; content: none !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-rangee :is(.vrm-s2d-txt, .vrm-s2d-txt-t) { display: contents !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-rangee .vrm-ms-num {
+  grid-column: 1 !important; grid-row: 1 / 3 !important; justify-self: start !important; display: inline-flex !important; align-items: center !important; justify-content: center !important;
+  min-width: 46px !important; height: 22px !important; padding: 0 6px !important; border-radius: 6px !important; background: var(--sbp-creux) !important; box-shadow: var(--sbp-pl-sh) !important; text-shadow: var(--sbp-pl-ts) !important;
+  font: 600 12.5px/22px var(--sbp-texte) !important; color: var(--sbp-encre) !important; font-variant-numeric: tabular-nums !important; white-space: nowrap !important; margin: 0 !important;
+}
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-rangee .vrm-s2d-vig { grid-column: 2 !important; grid-row: 1 / 3 !important; width: 44px !important; height: 44px !important; border-radius: 11px !important; overflow: hidden !important; background: var(--sbp-socle) !important; box-shadow: var(--sbp-om-pose) !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-rangee .vrm-s2d-vig > * { width: 44px !important; height: 44px !important; border-radius: 11px !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-rangee .vrm-s2d-vig img { animation: none !important; -webkit-mask-image: radial-gradient(78% 78% at 50% 54%, #000 58%, transparent 100%); mask-image: radial-gradient(78% 78% at 50% 54%, #000 58%, transparent 100%); }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-rangee .vrm-ms-titre {
+  grid-column: 3 !important; grid-row: 1 !important; align-self: end !important; font: 600 15px/20px var(--sbp-texte) !important; color: var(--sbp-encre) !important;
+  white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; min-width: 0 !important; letter-spacing: -.008em !important;
+}
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-rangee .vrm-ms-sous {
+  grid-column: 3 !important; grid-row: 2 !important; align-self: start !important; font: 500 12.5px/18px var(--sbp-texte) !important; color: var(--sbp-encre2) !important;
+  white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; min-width: 0 !important; display: block !important;
+}
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-rangee .vrm-ms-sous * { color: inherit !important; font: inherit !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-rangee .vrm-ms-geste {
+  grid-column: 4 !important; grid-row: 1 / 3 !important; min-height: 44px !important; padding: 0 4px !important; background: transparent !important; border: 0 !important; box-shadow: none !important;
+  color: var(--sbp-lien) !important; font: 600 14px/1 var(--sbp-texte) !important; white-space: nowrap !important;
+}
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-rangee .vrm-ms-geste:active { opacity: .55 !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-plus { color: var(--sbp-lien) !important; background: transparent !important; box-shadow: none !important; font: 600 14px/1 var(--sbp-texte) !important; min-height: 44px !important; }
+/* Les boutons du Stock (« Voir la case », « Je l'ai sortie »…) : des touches posées. */
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-stock :is(.vrm-b-secondaire, .vrm-b-discret) {
+  min-height: 44px !important; border: 0 !important; border-radius: 13px !important; background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important; font: 600 14px/1 var(--sbp-texte) !important;
+}
+
+
+/* ── 16. Les barres COLLÉES en haut (recherche d'Annonces et du Stock) ─────────
+   Au repos elles sont posées sur le fond, sans rien autour ; dès que la liste défile dessous, un voile de
+   l'aplat les détache (défilement piloté, sans script). Sans cette possibilité : le voile, toujours. */
+:root:root:root:root:root body :is([data-espace="paires"] .vrm-ann-workbar, .vrm-main[data-ecran="garage"] .vrm-ms-stock > div[style*="sticky"]) {
+  background: color-mix(in srgb, var(--sbp-aplat) 94%, transparent) !important; background-image: none !important;
+  -webkit-backdrop-filter: none !important; backdrop-filter: none !important; border: 0 !important;
+}
+@supports (animation-timeline: scroll()) {
+  :root:root:root:root:root body :is([data-espace="paires"] .vrm-ann-workbar, .vrm-main[data-ecran="garage"] .vrm-ms-stock > div[style*="sticky"]) {
+    background: transparent !important; box-shadow: none !important;
+    animation: sbp-colle linear both !important; animation-timeline: scroll(nearest block) !important; animation-range: 0 140px !important;
+  }
+}
+@keyframes sbp-colle {
+  0%, 60% { background-color: transparent; box-shadow: 0 0 0 transparent; }
+  100% { background-color: color-mix(in srgb, var(--sbp-aplat) 94%, transparent); box-shadow: 0 10px 18px -14px rgb(var(--sbp-o) / .35); }
+}
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-stock > div[style*="sticky"] { border-radius: 0 !important; }
+/* Au téléphone, les puces d'état défilent sur leur ligne ; le compte reste visible au bout. */
+@media (max-width: 767px) {
+  :root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-s2d-resume { flex-wrap: wrap !important; }
+  :root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-pop-ligne { flex: 1 1 0 !important; min-width: 0 !important; overflow: hidden !important; }
+  :root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-pop-chips { flex-wrap: nowrap !important; overflow-x: auto !important; scrollbar-width: none !important; padding: 2px 2px 6px !important; }
+  :root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-s2d-filtres { flex: 0 0 auto !important; }
+}
+
 /* ── 14. Mouvement et transparence réduits ───────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   :root:root:root:root:root body [data-espace="paires"] .sb-rangee[data-sb-avant] { animation: sbp-fondu 180ms both !important; }
