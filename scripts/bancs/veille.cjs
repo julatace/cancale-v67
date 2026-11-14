@@ -145,6 +145,8 @@ const capture = async (pg, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, { rec
     for (const T of TAILLES) {
       for (const sombre of CAPT ? [false, true] : [T.nom === '390']) {
         const suf = `${T.nom}${sombre ? '-sombre' : '-clair'}`;
+        // (14 nov.) La règle de la passe design : 44 px au doigt, 36 px à la souris (CLAUDE.md §9).
+        const CIBLE = T.hasTouch ? 43.5 : 35.5;
         console.log(`\n══ ${T.nom} px${T.hasTouch ? ' (tactile)' : ''}${sombre ? ' · sombre' : ' · clair'}`);
         await essaie('A' + suf, async () => {
           ROWS = [ligneStock(), ctlOk()]; PANNE = null;
@@ -155,7 +157,7 @@ const capture = async (pg, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, { rec
           dit(s && s.alertes.length === 1 && a.type === 'stock' && /Ton stock est passé de 180 à 120 en une nuit/.test(a.titre), 'A1 la carte du stock : « Ton stock est passé de 180 à 120 en une nuit »', s && JSON.stringify(s.alertes.map((x) => x.titre)));
           dit(a && a.bord === s.ambre && s.ambre !== s.rouge, 'A2 son bord est AMBRE, le jeton --vrm-warn (un geste à faire, pas une alarme rouge)', a && `${a.bord} / ${s.ambre}`);
           dit(s && /Vérifie tes annonces Vinted/.test(s.texte), 'A3 le geste est dit (« Vérifie tes annonces Vinted »)', s && s.texte.slice(0, 160));
-          dit(a && a.geste && a.geste.height >= 43.5 && a.vu && a.vu.height >= 43.5, 'A4 « Voir mes annonces » et « C’est vérifié » : 44 px', a && JSON.stringify([a.geste && a.geste.height, a.vu && a.vu.height]));
+          dit(a && a.geste && a.geste.height >= CIBLE && a.vu && a.vu.height >= CIBLE, 'A4 « Voir mes annonces » et « C’est vérifié » : 44 px', a && JSON.stringify([a.geste && a.geste.height, a.vu && a.vu.height]));
           dit(s && s.ok && s.controle === 'ok', 'A5 contrôle de nuit tout lu à 0 ⇒ « Tout est en ordre ✓ »', s && s.controle);
           dit(s && s.deb <= 0, 'A6 aucun défilement horizontal', s && s.deb);
           await capture(pg, `journee-stock-${suf}`);
@@ -179,7 +181,7 @@ const capture = async (pg, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, { rec
           dit(L['comptes-48h'] && L['comptes-48h'].ton === 'geste' && L['comptes-48h'].n === '1' && L['comptes-48h'].couleur === s.ambre, 'B3 un compte pas relu depuis 48 h : ambre, « 1 »', L['comptes-48h'] && JSON.stringify(L['comptes-48h']));
           dit(L['emails-quarantaine'] && L['emails-quarantaine'].n === '1', 'B4 la quarantaine (ligne de l’installation) est dite à qui la lit', JSON.stringify(Object.keys(L)));
           dit(s && s.passu && /ventes sans versement \(ouvre Ventes pour le compter\)/.test(s.texte) && !L['versement-30j'], 'B5 le contrôle pas lu est dit à part avec sa raison, jamais compté 0', s && s.texte.slice(-160));
-          dit(s && s.lignes.every((l) => l.btn && l.btn.height >= 43.5), 'B6 chaque geste fait 44 px', s && JSON.stringify(s.lignes.map((l) => l.btn && l.btn.height)));
+          dit(s && s.lignes.every((l) => l.btn && l.btn.height >= CIBLE), 'B6 chaque geste fait 44 px', s && JSON.stringify(s.lignes.map((l) => l.btn && l.btn.height)));
           dit(s && s.deb <= 0, 'B7 aucun défilement horizontal', s && s.deb);
           dit(!errs.length, 'B8 aucune erreur de page', errs.join(' | ').slice(0, 200));
           await capture(pg, `journee-controle-${suf}`);
@@ -203,7 +205,7 @@ const capture = async (pg, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, { rec
           dit(d && d.datees === '356' && /356 déjà datées ✓/.test(l.texte), 'F3 elle dit combien sont DÉJÀ datées', l && l.texte);
           dit(d && /ouvrant chaque vente/.test(d.pourquoi) && /vinted\.fr est ouvert sur ce compte/.test(d.pourquoi) && /aucune n’est devinée/.test(d.pourquoi), 'F4 elle dit POURQUOI et le geste (Vinted ouvert sur ce compte), jamais devinée', d && d.pourquoi);
           dit(d && /Environ 7 jours/.test(d.jours), 'F5 et combien de temps : « environ 7 jours »', d && d.jours);
-          dit(l && !/sans date de versement depuis 30 jours/.test(l.texte) && /Voir le détail/.test(l.texte) && l.btn && l.btn.height >= 43.5, 'F6 plus l’ancienne phrase alarmante ; « Voir le détail » à 44 px', l && l.texte.slice(0, 120));
+          dit(l && !/sans date de versement depuis 30 jours/.test(l.texte) && /Voir le détail/.test(l.texte) && l.btn && l.btn.height >= CIBLE, 'F6 plus l’ancienne phrase alarmante ; « Voir le détail » à 44 px', l && l.texte.slice(0, 120));
           dit(s && s.deb <= 0 && !errs.length, 'F7 aucun défilement horizontal, aucune erreur', `${s && s.deb} ${errs.join(' | ').slice(0, 120)}`);
           await capture(pg, `journee-versement-${suf}`);
           await ctx.close();

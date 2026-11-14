@@ -25,6 +25,9 @@
 /* (14 nov.) Des dates « en cours de lecture » ne sont pas un geste : chiffre neutre (§7). */
 .vrm-veille-ligne[data-ton="info"] .vrm-veille-n { color: var(--d-encre, #1D1D1F); }
 .vrm-veille-txt > small.vrm-veille-explique { display: block; margin-top: 2px; line-height: 1.4; }
+/* La phrase longue garde toute la largeur ; le geste passe dessous, à droite. */
+.vrm-veille-ligne[data-versement-cause] { flex-wrap: wrap; align-items: baseline; padding-bottom: 8px; }
+.vrm-veille-ligne[data-versement-cause] > .vrm-veille-txt { flex: 1 1 calc(100% - 96px); }
 .vrm-veille-txt { flex: 1 1 auto; min-width: 0; font-size: 14px; line-height: 1.4; color: var(--d-encre, #1D1D1F); overflow-wrap: anywhere; }
 .vrm-veille-txt > small { color: var(--d-gris, #6E6E73); font-size: 13px; }
 .vrm-veille-ligne > .vrm-b { flex: 0 0 auto; min-height: 44px; }
