@@ -517,7 +517,7 @@ body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transition: transform 36
 :root:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-num[data-num-etat="aVerifier"] { background: var(--sb-creux) !important; color: var(--sb-ambre) !important; box-shadow: var(--sb-grave), inset 0 0 0 1px var(--sb-ambre-point) !important; }
 
 /* ── 7.6 Les champs de recherche d'hier → creusés ── */
-:root:root:root body :is(.vrm-app-shell, .vrm-fs) :is(.vrm-champ-recherche, .vrm-ui-outils-champ) {
+:root:root:root body :is(.vrm-app-shell, .vrm-fs) :is(.vrm-champ-recherche, .vrm-ui-outils-champ, .vrm-barre-recherche) {
   background: var(--sb-puits) !important; box-shadow: var(--sb-puits-ombre) !important; border: 0 !important; border-radius: var(--sb-r-champ) !important;
 }
 
@@ -583,7 +583,7 @@ body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transition: transform 36
   }
   :root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab > * { position: relative; z-index: 1; }
   /* L'éventail ouvert : la barre (et son disque devenu « × ») reste AU-DESSUS du voile. */
-  html[data-sb-eventail] body .vrm-app-shell .vrm-tabbar.vrm-tabbar { z-index: 9402 !important; }
+  :root:root:root[data-sb-eventail] body .vrm-app-shell .vrm-tabbar.vrm-tabbar { z-index: 9402 !important; }
   /* Le disque : la cinquième place, au centre (72 px), monté de 16 px. */
   :root:root:root body .vrm-app-shell .vrm-tabbar > .sb-disque { flex: 0 0 60px !important; margin: -16px 6px 0 !important; }
   /* Les pastilles de nombre : l'encre (un geste en attente), cerclées du verre. */
@@ -611,6 +611,11 @@ body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transition: transform 36
   :root:root:root body .vrm-app-shell .vrm-sidebar :is(.vrm-rail-section-label) { color: var(--sb-encre-2) !important; }
   :root:root:root body .vrm-app-shell .vrm-sidebar .vrm-sidebar-mot { font-family: var(--sb-police-affiche) !important; font-weight: 500 !important; letter-spacing: -.04em !important; color: var(--sb-encre) !important; }
   :root:root:root body .vrm-app-shell .vrm-sidebar :is(.vrm-rail-pied, .vrm-nav-compte) { background: transparent !important; box-shadow: none !important; }
+  /* La barre de recherche collée en haut du contenu : la lumière du haut, en verre (plus un aplat posé dessus). */
+  :root:root:root body .vrm-app-shell .vrm-main > .vrm-barre-haut {
+    background: color-mix(in oklab, var(--sb-haut) 74%, transparent) !important; -webkit-backdrop-filter: var(--sb-verre-flou) !important; backdrop-filter: var(--sb-verre-flou) !important;
+    box-shadow: 0 -32px 0 0 var(--sb-haut) !important; border-bottom: 0 !important;
+  }
   /* L'île des actions du haut : des ronds posés. */
   :root:root:root body .vrm-app-shell > .vrm-app-header .vrm-header-actions :is(button.vrm-hbtn, .vrm-cn-cloche > button, button.vrm-cn-cloche) {
     background: var(--sb-touche-fond) !important; box-shadow: var(--sb-touche-ombre) !important; border-radius: 50% !important; color: var(--sb-encre) !important;

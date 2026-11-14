@@ -19013,10 +19013,10 @@ function SelecteurPaires({ tab, setTab, badges, sites }) {
 const lireColisPretsBarre = () => { try { const v = load('vrm_colis_prets', null); return v && typeof v === 'object' ? v : null; } catch (_) { return null; } };
 function BottomBar({tab,setTab,sites,badges,gestes=null}) {
   const [plusOuvert,setPlusOuvert]=React.useState(false);
-  // (14 nov., Studio bleu clair) « Imprimer N » de l'éventail : les bordereaux prêts PAS ENCORE imprimés, tels que
-  // Ventes les publie (`vrm_colis_prets.aImprimer`, §11) ; pas su ⇒ undefined (jamais un 0 deviné).
+  // (14 nov., Studio bleu clair) « Imprimer N » de l'éventail : ce que « Tout imprimer (N) » de Ventes ferait partir, tel que
+  // Ventes le publie (`vrm_colis_prets.lot`, §11 : le même nombre que son bouton) ; pas su ⇒ undefined (jamais un 0 deviné).
   const [colisPrets]=useLigneSynchro('vrm_colis_prets', lireColisPretsBarre);
-  const nImprimer=colisPrets&&Number.isFinite(Number(colisPrets.aImprimer))?Number(colisPrets.aImprimer):undefined;
+  const nImprimer=colisPrets&&Number.isFinite(colisPrets.lot)?colisPrets.lot:undefined;
   // (7 nov., fluidité) L'ONGLET TOUCHÉ S'ALLUME TOUT DE SUITE. Avant, toucher un
   // onglet gelait la barre jusqu'à ce que le nouvel écran soit calculé (jusqu'à
   // une seconde au téléphone) : on retouchait, croyant que rien ne s'était passé.
@@ -39608,8 +39608,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // (6 nov., audit des chiffres) + `aImprimer` : les prêts PAS ENCORE imprimés, la case
       // « À imprimer » de Colis (`bordereauxAImprimer`) — ce que Ma journée doit redire.
       const v = { prets: aPoster.filter(e => e.pret).length, aImprimer: bordereauxAImprimer(lignesLot()).length, total: aPoster.length, at: Date.now() };
+      // (14 nov., Studio bleu clair) + `lot` : ce que « Tout imprimer (N) » ferait partir (`resumeLot`, le MÊME compte que
+      // le bouton de Ventes) — le plein « Imprimer N » du disque de la barre du bas dit ce nombre-là, jamais un autre.
+      try { const r = resumeLot(lignesLotTous()); if (r && Number.isFinite(r.partent)) v.lot = r.partent; } catch (_) {}
       const avant = load('vrm_colis_prets', null);
-      if (!avant || avant.prets !== v.prets || avant.aImprimer !== v.aImprimer || avant.total !== v.total) save('vrm_colis_prets', v);
+      if (!avant || avant.prets !== v.prets || avant.aImprimer !== v.aImprimer || avant.total !== v.total || avant.lot !== v.lot) save('vrm_colis_prets', v);
     } catch (_) {}
   /* eslint-disable-next-line */ }, [sub, labelsPrets, sales.items, emailBords, labelsCaptes, numeros, bordsPrinted, shipDone]);
   // Identité certaine des ventes (transaction → annonce). Une seule lecture, en

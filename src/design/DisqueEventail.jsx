@@ -7,8 +7,8 @@
 // Aucun geste neuf : chacun appelle un geste qui existait déjà dans l'app (`gestes`, posés par
 // la coque, src/App.jsx) — la loupe, le scanner de bordereau de Ventes, « Publier ailleurs »,
 // « Tout imprimer » (la feuille d'aperçu : rien n'est imprimé avant SON clic).
-// « Imprimer N » : N = les bordereaux prêts pas encore imprimés, publiés par Ventes
-// (`vrm_colis_prets.aImprimer`, §11) ; pas su ⇒ « Imprimer » sans nombre (jamais un 0 deviné) ;
+// « Imprimer N » : N = ce que « Tout imprimer (N) » de Ventes ferait partir, publié par Ventes
+// (`vrm_colis_prets.lot`, §11 : le même nombre que son bouton) ; pas su ⇒ « Imprimer » sans nombre (jamais un 0 deviné) ;
 // 0 lu ⇒ le plein désactivé, et une ligne dit pourquoi.
 // Fermer : toucher le voile, Échap, le bouton retour du téléphone (`Retour` = FermeAuRetour),
 // ou retoucher le disque. Mouvement réduit : fondus seulement (studio.css §8).
