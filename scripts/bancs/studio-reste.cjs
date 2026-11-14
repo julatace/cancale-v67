@@ -148,7 +148,9 @@ function mesurer({ racine, tactile }) {
     const rad = parseFloat(cs.borderTopLeftRadius) || 0;
     const ombre = cs.boxShadow && cs.boxShadow !== 'none';
     const bord = parseFloat(cs.borderTopWidth) > 0.6 && cs.borderTopStyle !== 'none' && (rgbs(cs.borderTopColor)[0] || {}).a > 0.3;
-    const plein = bg && bg.a > 0.9 && proche(bg, encre, 30);
+    // le plein : l’encre en fond (couleur, ou le dégradé d’encre de la fondation, --sb-plein-fond)
+    const stopsImg = /gradient/.test(img) ? rgbs(img) : [];
+    const plein = (bg && bg.a > 0.9 && proche(bg, encre, 30)) || (stopsImg.length > 0 && proche(stopsImg[stopsImg.length - 1], encre, 30));
     let forme = null;
     const ligne = el.matches('.sb-rangee, .sb-tuile, .vrm-set-ligne, .vrm-inbox-row, .vrm-argent-w, summary, [data-fil], [role="tab"]:not(.vrm-seg-btn), .vrm-fiche-menu > button, tr, li > a') || (r.width >= parentW * 0.9 && r.width >= 240 && r.height >= 44);
     // une tuile (Bento, record, carte qu'on touche entière) : porcelaine, grand rayon, haute

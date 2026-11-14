@@ -524,6 +524,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **14 nov. · Studio bleu clair, écrans « reste »** : Argent (Bento), Messages, Paramètres, Communauté, E-mails, connexion, accueil, tarifs, feuilles ; 4 formes de bouton, rien retiré (sauf un doublon). `2026-11-14-studio-reste.md`.
 - **14 nov. · Accompagnement des gestes** : chaque action dit avant (ce qui va se passer ET ce qui ne se passera pas), pendant (« 3 / 8 », Tout arrêter), après (résultat + « Ensuite › »), échec (raison en mots + geste) — brique `src/ui/Accompagne.jsx` + `src/accompagnement.js` §9 ; listes vides et premières fois ; aucun « Annuler »/confirmation/« ? » ajouté (sa décision). `docs/passation/2026-11-14-accompagnement.md`. Geste : aucun.
 
 - **14 nov. · Ergonomie des gestes (mesurée)** : banc `ergonomie-gestes` joue 15 gestes au pouce (390 tactile) depuis l'ouverture ; ⌘K « Republier N°x à la main » (kit, 5 → 3 touchers) et « Publier N°x partout » (4 → 3) ; les 15 dans leur plafond. `docs/passation/2026-11-14-ergonomie-gestes.md`. Geste : aucun.

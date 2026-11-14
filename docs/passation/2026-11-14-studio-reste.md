@@ -77,9 +77,17 @@ les filtres de la boîte e-mails capsules noires → touches enfoncées + diode)
   d'avant entier, S7 ni « encaissé », ni « au moins 0 », ni NaN, aucune erreur JS.
   RÉSULTAT_BANC
 - Bancs existants : RÉSULTAT_BANCS_EXISTANTS
-- `design-passe.cjs` adapté (B graisses, C tailles) : sous une racine du Studio, l'échelle de note.md §4
-  (Urbanist 200/300, Inter 500/550/650 ; 12,5 · 13,5 · 14 · 38 · 56 · 68…) est permise — le reste du banc
-  inchangé hors du Studio.
+- `design-passe.cjs` n'est PAS touché ici : la fondation (`claude/studio-fondation`) l'adapte à l'échelle du
+  Studio (texte en « Urbanist VRM » / « Inter VRM ») ; ce chantier n'emploie que des tailles et graisses de
+  cette échelle (le segmenté à 13 px, pas 13,5).
+- **Essai combiné avec la fondation** (`git apply` du diff `integration-refonte...studio-fondation` sur ce
+  chantier, hors design-passe et nouveautes — deux conflits d'une ligne attendus à la fusion) : build ✅,
+  banc studio-reste sur Résumé, Factures, Conversation, Paramètres, E-mails, Connexion (390, clair et sombre)
+  vert après une correction du banc (le plein de la fondation est un DÉGRADÉ d'encre, `--sb-plein-fond`) —
+  sauf S6 Paramètres, qui ne se juge que sur les QUATRE rendus (à 390 seul, les panneaux ouverts d'office à
+  1512 — zoom « Minus/Petit/Compact », rapport de l'extension… — ne sont pas montés) ;
+  captures : polices Urbanist/Inter chargées, barre en verre et disque de la coque, mes écrans dessous.
+  Les jetons provisoires sont en `:where()` : ceux de studio.css gagnent (polices « Urbanist VRM »…).
 
 ## Ce qui reste / à la fusion
 

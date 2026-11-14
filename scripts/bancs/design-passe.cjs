@@ -218,11 +218,7 @@ function mesurer({ tactile, sombre, racines, ciblesEnPlus = '' }) {
         vus.add(el); out.nTextes++;
         const g = Number(cs.fontWeight), fs_ = Math.round(parseFloat(cs.fontSize) * 2) / 2;
         const lib = () => nom(el);
-        // (14 nov., Studio bleu clair — décision de Julien) Sous une racine du Studio (`data-espace`, Messages, les
-        // feuilles), l'échelle est celle de directions/t25-mix/note.md §4 : Urbanist 200/300 pour les chiffres
-        // d'affiche, Inter 500/550/600/650 pour les libellés ; ses tailles (12,5 · 13,5 · 14 · 38 · 56 · 68…).
-        const studio = !!el.closest('[data-espace], .vrm-tache[data-tache="messages"], .vrm-chat-panel, .vrm-cx[data-espace]');
-        if (![400, 600, 700].includes(g) && !(studio && [200, 300, 500, 550, 650].includes(g))) out.graisses.push({ g, quoi: lib() });
+        if (![400, 600, 700].includes(g)) out.graisses.push({ g, quoi: lib() });
         // La barre d'onglets du téléphone garde ses 10 pt (la taille des libellés d'onglet d'iOS ; Julien doit encore
         // trancher « libellés à 9 px », CLAUDE.md §9) : hors de l'échelle exprès.
         // Le chiffre d'une tuile de Ma journée au téléphone se RESSERRE pour tenir (Julien, 10 nov. : « l'euro dépasse » ;
@@ -231,8 +227,7 @@ function mesurer({ tactile, sombre, racines, ciblesEnPlus = '' }) {
         // tenir (« au moins 87,65 € » : 38 px, la taille posée en ligne) — entre son plancher (22) et 44.
         const ajuste = (el.closest('[data-ecran="journee"] .vrm-fu-tete .vrm-fu-case') && fs_ >= 14 && fs_ <= 28)
           || (el.closest('.vrm-fu-grand[style*="font-size"]') && fs_ >= 22 && fs_ <= 44);
-        const ECHELLE_STUDIO = [9.5, 10.5, 11.5, 12.5, 13.5, 14, 18, 21, 26, 27, 32, 38, 42, 56, 68, 72, 96, 104];
-        if (fs_ > 0 && !ECHELLE.includes(fs_) && !(studio && ECHELLE_STUDIO.includes(fs_)) && !ajuste && !el.closest('.vrm-nav-label') && !/^[\s›‹×✓✕·•…—–\-+−⋯▾▸]+$/.test(el.innerText || '')) out.tailles.push({ t: fs_, quoi: lib() });
+        if (fs_ > 0 && !ECHELLE.includes(fs_) && !ajuste && !el.closest('.vrm-nav-label') && !/^[\s›‹×✓✕·•…—–\-+−⋯▾▸]+$/.test(el.innerText || '')) out.tailles.push({ t: fs_, quoi: lib() });
         const col = rgba(cs.color);
         const enSombre = sombreCarte(el);
         // Un texte de couleur TRANSPARENTE (un « — » de remplacement sous un dessin) ne se voit pas : ni gris ni contraste.
