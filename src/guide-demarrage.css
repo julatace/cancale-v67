@@ -193,7 +193,7 @@
 /* ── (14 nov.) Le CADRE de l'exemple : un filet hachuré de 3 px tout autour de l'écran
    et une languette « Exemple · données inventées » qui pend du bord haut. Au-dessus de
    TOUT (feuilles, confirmations), jamais un toucher pris, rien qui bouge. ── */
-.vrm-exemple-cadre { position: fixed; inset: 0; z-index: 2147483000; pointer-events: none; }
+.vrm-exemple-cadre { position: fixed; inset: 0; z-index: 2147483647; pointer-events: none; }   /* le plus haut possible : même la pastille « Ouverture… » (2147483000) passe dessous */
 .vrm-exemple-cadre::before {
   content: ""; position: absolute; inset: 0; padding: 3px; box-sizing: border-box;
   background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--d-encre, #1D1D1F) 42%, transparent) 0 5px, transparent 5px 10px);

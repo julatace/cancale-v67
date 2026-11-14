@@ -1854,3 +1854,5 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **14 nov. · Design, passe 3** : bande Leboncoin dans la colonne, Notifications au segmenté, pas de barre vide, fraîcheur sans cadre, 28 sous-pages, feuilles, e-mail et fil au système ; la feuille de vente ne cache plus l'écran (banc `design-passe-3.cjs` : 1 531 défauts ⇒ 0). `docs/passation/2026-11-14-design-passe-3.md`. Geste : aucun.
 
 - **14 nov. · Argent, quatre choix (75, 80, 81, 82)** : coller « N° ; prix » dans la saisie en série (aperçu, rien d’écrasé) ; « Modèle et taille » + « À racheter » sur les ventes reliées ; objectif sur le REÇU + « X € par jour d'ici le 30 » ; « Ta déclaration de revenus » en tête de Déclarer avec case et source. `docs/passation/2026-11-14-argent-choix.md`. Geste : aucun.
+
+- **14 nov. · Confort et sécurité (117–130)** : journée selon l’heure, écran d’atelier, connexion par QR (iPhone approuve, session neuve serveur, MFA gardée), lien d’aide 24 h sans 016, échanges au dossier de litige, code local, aperçu, inventaire tournant, carte merci. `2026-11-14-confort-securite.md`. Geste : aucun.
