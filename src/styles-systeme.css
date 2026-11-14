@@ -503,11 +503,12 @@
 /* K. La bande des chiffres d'un site (« CA finalisé — · En attente — ») : à l'ordinateur, elle flottait au milieu à
    droite (la 2e colonne d'une grille dont la 1re, le titre d'avant, n'est plus là). Elle prend la colonne, sous le titre. */
 @media (min-width: 1024px) {
-  :root:root body .vrm-main .vrm-tache .vrm-market-space > .vrm-platform-summary { grid-column: 1 / -1 !important; justify-self: stretch !important; padding-right: 0 !important; }
+  :root:root body .vrm-main .vrm-tache .vrm-market-space > .vrm-platform-summary { grid-column: 1 / -1 !important; justify-self: stretch !important; padding-left: var(--d-e-4) !important; padding-right: var(--d-e-4) !important; }
 }
 
 /* P. La ligne de fraîcheur (« Tout est à jour · vérifié à l'instant ») : une LIGNE, pas une carte — ni fond, ni cadre,
    ni ombre ; son point au bord de la colonne (aligné sur le titre). Le même sens, le même texte, le même geste. */
+:root:root body .vrm-main .vrm-fraicheur-hote { margin-left: var(--d-e-4) !important; margin-right: var(--d-e-4) !important; }
 :root:root body .vrm-main .vrm-fraicheur-hote > .vrm-bandeau-abo.vrm-fraicheur {
   background: transparent !important; box-shadow: none !important; border: 0 !important; border-radius: 0 !important; padding-left: 0 !important;
 }
@@ -534,7 +535,7 @@
    rayon 12 dans fusion.css), les gestes du détail d'un retrait (« Conversation ↗ »). */
 :root:root body .vrm-main :is(.vrm-rangee-bord :is(button, a):not(.vrm-puce-transp *), .vrm-fu-imprimer-ligne, .vrm-rpf-detail .vrm-rp-gestes :is(button, a)) { border-radius: var(--d-r-pilule) !important; }
 /* Un `<select>` qui reste (le filtre de compte du Stock) : la capsule remplie d'un filtre — jamais un rectangle. */
-:root:root body .vrm-main select[data-stock-filtre-compte] { border-radius: var(--d-r-pilule) !important; border: 0 !important; background-color: var(--d-remplir) !important; min-height: var(--d-h-filtre) !important; padding-left: 16px !important; padding-right: 12px !important; font-weight: 600 !important; }
+:root:root body .vrm-app-shell .vrm-main select[data-stock-filtre-compte][aria-label] { border-radius: var(--d-r-pilule) !important; border: 0 !important; background-color: var(--d-remplir) !important; min-height: var(--d-h-filtre) !important; padding-left: 16px !important; padding-right: 12px !important; font-weight: 600 !important; }
 
 /* Q. Les cartes écrites avec un cadre deviennent des cartes du système (rayon 20, l'ombre posée, aucun cadre) :
    la carte d'une sous-page de Paramètres (`.vrm-set-carte`, bord 1 px en ligne), « 5 annonces Leboncoin non reliées »,
@@ -551,6 +552,9 @@
 :root:root body .vrm-main .vrm-jp-nom { font-size: var(--d-t-17) !important; }
 /* « 69 bordereaux déjà traités retirés · Les voir » : une ligne d'information, pas un encadré. */
 :root:root body .vrm-main [data-bords-faits] { background: transparent !important; border: 0 !important; border-radius: 0 !important; padding-left: 0 !important; padding-right: 0 !important; }
+/* Annonces : la barre d'outils (recherche, tri, filtres) n'est pas une carte — un cadre autour de capsules, dont
+   « Outils » débordait à l'ordinateur. Une rangée d'outils, posée sur le fond. */
+:root:root body .vrm-main .vrm-workbar.vrm-ann-workbar { background: transparent !important; border: 0 !important; box-shadow: none !important; padding-left: 0 !important; padding-right: 0 !important; }
 /* Mode stream : l'aperçu est une case dans sa carte (fond gris, rayon 12), pas un cadre. */
 :root:root body .vrm-main .vrm-stream-apercu { border: 0 !important; background-color: var(--d-case) !important; border-radius: var(--d-r-case) !important; }
 /* Mon historique : une carte par compte encadrée ⇒ UN groupe (des rangées sur une carte, un filet entre deux). */
@@ -578,6 +582,12 @@
 
 /* Messages : la conversation ouverte sur la case (#F2F2F7) — le gris de la note sur le remplissage ne tenait que 4,4:1. */
 :root:root body .vrm-main .vrm-inbox-row.vrm-inbox-row.is-current { background-color: var(--d-case) !important; }
+/* La feuille d'une vente : sa croix est un rond (plus un carré arrondi de 12). */
+:root:root body .vrm-recap button.vrm-recap-fermer { border-radius: var(--d-r-pilule) !important; }
+/* Messages : l'initiale d'un acheteur sans photo (un monogramme) est à l'encre — en gris gras, elle se lisait éteinte. */
+:root:root body .vrm-main .vrm-msg-ini.vrm-msg-ini { color: var(--d-encre) !important; }
+/* La feuille d'une vente : « N° et frais » (un repli) se lit à l'encre — en gris gras, il se lisait désactivé. */
+:root:root body .vrm-recap .vrm-recap-modifier > summary { color: var(--d-encre) !important; }
 /* Achats · « ⋯ » : « Masquer cet achat » est une entrée du menu comme les autres (à l'encre) — en gris gras, elle se
    lisait désactivée. */
 :root:root body .vrm-main .vrm-buy-menu [data-achat-masquer] { color: var(--d-encre) !important; }

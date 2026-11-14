@@ -140,7 +140,7 @@ function mesurer3({ racines }) {
       // O. gris gras : un texte direct (pas un conteneur).
       const direct = [...el.childNodes].some((n) => n.nodeType === 3 && n.nodeValue.trim());
       // (un texte RECOUVERT — l'initiale sous la photo d'un acheteur — ne se lit pas : pas jugé)
-      const dessus = () => { const rr = el.getBoundingClientRect(); const h = document.elementFromPoint(rr.left + rr.width / 2, rr.top + rr.height / 2); return !h || el.contains(h) || h.contains(el); };
+      const dessus = () => { const b = el.getBoundingClientRect(); return ![...(el.parentElement ? el.parentElement.querySelectorAll('img') : [])].some((im) => { const a = im.getBoundingClientRect(); return vis(im) && a.left <= b.left + 1 && a.top <= b.top + 1 && a.right >= b.right - 1 && a.bottom >= b.bottom - 1; }); };
       if (direct && vis(el) && dessus()) {
         const col = rgba(cs.color), t = parseFloat(cs.fontSize), g = Number(cs.fontWeight);
         if (col && col.a > 0.9 && gris.has(hex(col)) && t >= 15 && g >= 600 && !/^[\s›‹×✓✕·•…—–\-+−⋯▾▸⌄⌃]+$/.test(el.innerText || '')) out.grisGras.push({ t, g, quoi: nom(el) });
