@@ -362,37 +362,37 @@
 .sj-journee .sj-titre-section { display: flex !important; align-items: baseline !important; gap: 10px !important; margin: 0 4px 10px !important; padding: 0 !important; border: 0 !important; }
 .sj-journee .sj-titre-section h2 { font: 400 24px/1.1 var(--sb-police-affiche) !important; letter-spacing: -.02em !important; color: var(--sb-encre) !important; margin: 0 !important; }
 .sj-journee .sj-compte { font: 300 20px/1 var(--sb-police-affiche) !important; color: var(--sb-encre-2) !important; }
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-day-task-list {
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-day-task-list {
   display: block !important; margin: 0 !important; padding: 4px 0 !important; gap: 0 !important; border: 0 !important;
   border-radius: var(--sb-r-tuile) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-plan) !important;
 }
 .sj-journee .sj-deplie .vrm-day-task-list { background: none !important; box-shadow: none !important; border-radius: 0 !important; }
 .sj-journee .vrm-day-task-list > [data-alertes-argent] { display: contents !important; }
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-day-task {
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-day-task {
   display: flex !important; align-items: center !important; gap: 12px !important; width: 100% !important; min-height: 64px !important; height: auto !important;
   margin: 0 !important; padding: 10px 16px !important; border: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important;
   color: var(--sb-encre) !important; text-align: left !important; transform: none !important;
 }
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-day-task:active { background: rgb(var(--sb-o) / .04) !important; }
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-day-task.is-groupe { flex-wrap: wrap !important; }
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-day-task-ouvrir { display: flex !important; align-items: center !important; gap: 12px !important; flex: 1 1 200px !important; min-width: 0 !important; min-height: 44px !important; padding: 0 !important; margin: 0 !important; border: 0 !important; background: none !important; box-shadow: none !important; color: inherit !important; text-align: left !important; }
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-day-task-title,
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-day-task-title-rang { font: 600 15px/1.25 var(--sb-police-texte) !important; color: var(--sb-encre) !important; letter-spacing: -.008em !important; }
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-day-task-note { font: 500 12.5px/1.3 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; }
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-day-task-note.is-urgent { color: var(--sb-ambre) !important; }
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-day-task-action {
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-day-task:active { background: rgb(var(--sb-o) / .04) !important; }
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-day-task.is-groupe { flex-wrap: wrap !important; }
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-day-task-ouvrir { display: flex !important; align-items: center !important; gap: 12px !important; flex: 1 1 200px !important; min-width: 0 !important; min-height: 44px !important; padding: 0 !important; margin: 0 !important; border: 0 !important; background: none !important; box-shadow: none !important; color: inherit !important; text-align: left !important; }
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-day-task-title,
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-day-task-title-rang { font: 600 15px/1.25 var(--sb-police-texte) !important; color: var(--sb-encre) !important; letter-spacing: -.008em !important; }
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-day-task-note { font: 500 12.5px/1.3 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; }
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-day-task-note.is-urgent { color: var(--sb-ambre) !important; }
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-day-task-action {
   margin-left: auto !important; display: inline-flex !important; align-items: center !important; gap: 4px !important; padding: 0 !important; min-height: 0 !important; height: auto !important;
   border: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important; color: var(--sb-encre-2) !important; font: 600 13px/1 var(--sb-police-texte) !important; white-space: nowrap !important;
 }
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-day-task-geste,
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-cycle-choix > button,
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-at-journee button.vrm-b-petit {
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-day-task-geste,
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-cycle-choix > button,
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-at-journee button.vrm-b-petit {
   display: inline-flex !important; align-items: center !important; justify-content: center !important; height: 40px !important; min-height: 40px !important; padding: 0 14px !important;
   border: 0 !important; border-radius: var(--sb-r-touche) !important; background: var(--sj-k-bg) !important; box-shadow: var(--sj-k-sh) !important; color: var(--sb-encre) !important;
   font: 600 14px/1 var(--sb-police-texte) !important;
 }
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-day-task-geste:active { background: var(--sb-creux) !important; box-shadow: var(--sj-k-in) !important; transform: translateY(1px) !important; }
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-pile .vrm-pile-v, .sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-pile .vrm-pile-v.is-tuile {
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-day-task-geste:active { background: var(--sb-creux) !important; box-shadow: var(--sj-k-in) !important; transform: translateY(1px) !important; }
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-pile .vrm-pile-v, .sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-pile .vrm-pile-v.is-tuile {
   border-radius: var(--sb-r-vignette) !important; background: var(--sj-socle) !important; box-shadow: var(--sb-ombre-pose) !important; border: 0 !important; color: var(--sb-encre-2) !important;
 }
 .sj-journee .sj-alertes .vrm-day-task.is-urgent .vrm-day-task-title { color: var(--sb-encre) !important; }
@@ -409,6 +409,20 @@
 .sj-journee .vrm-jp-bas [data-jp-modifier]:active { background: var(--sb-creux) !important; box-shadow: var(--sj-k-in) !important; transform: translateY(1px) !important; }
 .sj-journee .vrm-jp-bas [data-jp-modifier] svg { width: 16px !important; height: 16px !important; color: var(--sb-encre-2) !important; }
 .sj-journee .vrm-jp-bas-note { font: 500 12.5px/1.3 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; }
+
+/* ── 9 bis. L'INSTANTANÉ D'OUVERTURE (src/JourneeInstantanee.jsx) : le même habit ─────────────
+   La prochaine chose en rangée sur la porcelaine, les cases du mois comme la tuile du mois (encre sur
+   porcelaine, jamais le blanc de l'ancienne carte sombre), la mention d'âge en encre 2. */
+.sj-journee .vrm-jv2-prochain { margin: 14px 0 0 !important; padding: 4px 0 !important; border-radius: var(--sb-r-tuile) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-plan) !important; }
+.sj-journee .vrm-jv2-prochain .vrm-day-task-action.vrm-ji-geste, .sj-journee .vrm-jv2-prochain .vrm-day-task-action.vrm-ji-geste * { color: var(--sb-encre-2) !important; background: none !important; }
+.sj-journee [data-ji-cases] { position: relative !important; margin: 18px 0 0 !important; padding: 44px 16px 14px !important; border: 0 !important; border-radius: var(--sb-r-tuile) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important; }
+.sj-journee [data-ji-cases] .vrm-fu-cases { display: grid !important; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)) !important; gap: 10px !important; margin: 0 !important; padding: 0 !important; background: none !important; }
+.sj-journee [data-ji-cases] .vrm-fu-case { display: flex !important; flex-direction: column !important; align-items: flex-start !important; margin: 0 !important; padding: 0 !important; border: 0 !important; background: none !important; box-shadow: none !important; color: var(--sb-encre) !important; text-align: left !important; min-height: 0 !important; }
+.sj-journee [data-ji-cases] .vrm-fu-case > b { display: block !important; font: 300 26px/.95 var(--sb-police-affiche) !important; letter-spacing: -.03em !important; color: var(--sb-encre) !important; white-space: nowrap !important; }
+.sj-journee [data-ji-cases] .vrm-fu-case > span:not(.vrm-sr-seul), .sj-journee [data-ji-cases] .vrm-fu-case > small { display: block !important; margin-top: 6px !important; font: 550 12px/1.2 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; max-width: 100% !important; }
+.sj-journee [data-ji-cases] .vrm-ji-age { position: absolute !important; top: 14px !important; right: 16px !important; left: auto !important; color: var(--sb-encre-2) !important; font: 500 12px/1.2 var(--sb-police-texte) !important; background: none !important; }
+.sj-journee .vrm-ji-age, .sj-journee [data-ji-cases] :is(.vrm-fu-objectif-ligne, .vrm-fu-objectif-bas, .vrm-fu-objectif-reste, .vrm-fu-objectif-rythme) { color: var(--sb-encre-2) !important; }
+.sj-journee [data-ji-cases] .vrm-fu-objectif-ligne b { color: var(--sb-encre) !important; }
 
 /* ── 10. ORDINATEUR : la grille en haut (douze colonnes), ce qui est déplié dessous ── */
 /* Une seule colonne : la grille ancienne (tête à gauche, « À faire » à droite, styles-bureau.css) ne s'applique plus. */
