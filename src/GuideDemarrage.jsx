@@ -13,6 +13,7 @@
 // Mouvement : un fondu court à l'ouverture d'une étape ; rien sous `prefers-reduced-motion`.
 import React from 'react';
 import './guide-demarrage.css';
+import { tr } from './i18n/index.js';
 
 const ETAT_MOT = { fait: 'Fait', encours: 'Je vérifie…', passu: 'Pas pu vérifier', afaire: '' };
 
@@ -190,14 +191,42 @@ export function GuideDemarrage({ guide, nav = '', detail = null, gestes = {}, on
 
 // (13 nov., lot 48) `sansCompte` : entré depuis la page d'accueil ou la connexion, sans
 // compte VRM ⇒ « Créer mon compte » (l'inscription) ; sinon « Passer à mes vraies données ».
-export function BandeauExemple({ onBrancher, style, sansCompte = false }) {
+// (14 nov.) Julien a cru qu'un colis d'exemple (« Le Fournil, Rennes ») était le sien : le
+// bandeau ne ressemblait qu'à une barre de plus. Il porte désormais une étiquette hachurée
+// « EXEMPLE », dit « Exemple — données inventées », et, sans compte, « J'ai déjà un compte ·
+// Me connecter » À CÔTÉ de « Créer mon compte » (`onConnexion`). Le cadre hachuré de l'écran
+// (`CadreExemple`) le prolonge au-dessus des feuilles. Textes par tr() (5 langues).
+export function BandeauExemple({ onBrancher, onConnexion = null, style, sansCompte = false }) {
+  // Le mot que la feuille de style pose sur chaque code et chaque adresse inventés.
+  const mot = tr('exemple.mot');
+  React.useEffect(() => {
+    try { document.documentElement.style.setProperty('--vrm-exemple-mot', JSON.stringify(mot)); } catch (_) {}
+  }, [mot]);
   return (
-    <div className="vrm-exemple-bandeau" role="region" aria-label="Mode exemple" data-exemple-bandeau="" data-exemple-sans-compte={sansCompte ? '1' : '0'} style={style}>
+    <div className="vrm-exemple-bandeau" role="region" aria-label={tr('exemple.bandeau.aria')} data-exemple-bandeau="" data-exemple-sans-compte={sansCompte ? '1' : '0'} style={style}>
       <div className="vrm-exemple-texte">
-        <b>Exemple — rien n’est enregistré</b>
-        <span>Ces données sont inventées. Rien n’est envoyé.</span>
+        <span className="vrm-exemple-etiquette" aria-hidden="true">{tr('exemple.bandeau.etiquette')}</span>
+        <span className="vrm-exemple-phrases">
+          <b>{tr('exemple.bandeau.titre')}</b>
+          <span>{tr('exemple.bandeau.note')}</span>
+        </span>
       </div>
-      <button type="button" className="vrm-b vrm-b-primaire" data-exemple-brancher="" onClick={onBrancher}>{sansCompte ? 'Créer mon compte' : 'Passer à mes vraies données'}</button>
+      <div className="vrm-exemple-gestes">
+        <button type="button" className="vrm-b vrm-b-primaire" data-exemple-brancher="" onClick={onBrancher}>{sansCompte ? tr('exemple.bandeau.creer') : tr('exemple.bandeau.vraies')}</button>
+        {sansCompte && onConnexion ? <button type="button" className="vrm-exemple-connexion" data-exemple-connexion="" onClick={onConnexion}>{tr('exemple.bandeau.connexion')}</button> : null}
+      </div>
+    </div>
+  );
+}
+
+// (14 nov.) Le CADRE de l'exemple : un filet hachuré tout autour de l'écran et une
+// étiquette « Exemple · données inventées » au milieu du bord haut — au-dessus de
+// tout (feuilles et confirmations comprises), sans jamais prendre un toucher
+// (`pointer-events: none`). Muet pour les lecteurs d'écran : le bandeau le dit.
+export function CadreExemple() {
+  return (
+    <div className="vrm-exemple-cadre" data-exemple-cadre="" aria-hidden="true">
+      <span className="vrm-exemple-cadre-mot">{tr('exemple.cadre')}</span>
     </div>
   );
 }

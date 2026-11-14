@@ -139,24 +139,82 @@
   .vrm-guide .g-onde { opacity: 0; }
 }
 
-/* ── Le bandeau du mode exemple : hors de <main>, il ne défile jamais. Neutre (une
-   bande de surface et un filet), distinct de la tête sombre de Ma journée. ── */
+/* ── Le bandeau du mode exemple : hors de <main>, il ne défile jamais.
+   (14 nov.) Julien a pris un colis d'exemple pour le sien : le bandeau ne doit plus
+   ressembler à une barre de l'app. Une ÉTIQUETTE « EXEMPLE » à l'encre pleine, un
+   liseré hachuré sous le bandeau (le même motif que le cadre de l'écran), neutre :
+   l'accent reste au seul geste principal (§7, une couleur rare). ── */
 .vrm-exemple-bandeau {
+  --ex-hachure: color-mix(in srgb, var(--d-encre, #1D1D1F) 34%, transparent);
   box-sizing: border-box; flex: 0 0 auto; position: relative; z-index: 5;
   /* Sur ordinateur, le geste suit le texte (à gauche) : l'île flottante des
      actions du haut occupe le coin droit et le couvrirait. */
-  display: flex; align-items: center; justify-content: flex-start; gap: 8px 20px;
-  padding: 8px 16px; margin: 0;
+  display: flex; align-items: center; justify-content: flex-start; gap: 8px 24px; flex-wrap: wrap;
+  padding: 10px 16px 13px; margin: 0;
   background: var(--d-carte, var(--vrm-surface, #fff)); color: var(--d-encre, var(--vrm-ink, #1D1D1F));
-  border-bottom: .5px solid var(--d-filet, var(--vrm-line, #E5E5EA));
 }
-.vrm-exemple-texte { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 0 1 auto; }
-.vrm-exemple-texte b { font-size: 15px; font-weight: 600; letter-spacing: -.01em; line-height: 1.3; }
-.vrm-exemple-texte span { font-size: 12px; line-height: 1.4; color: var(--d-gris, var(--vrm-muted, #6E6E73)); }
+.vrm-exemple-bandeau::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; pointer-events: none;
+  background: repeating-linear-gradient(-45deg, var(--ex-hachure) 0 5px, transparent 5px 10px);
+}
+.vrm-exemple-texte { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 0 1 auto; }
+.vrm-exemple-etiquette {
+  flex: 0 0 auto; display: inline-flex; align-items: center; height: 24px; padding: 0 9px; border-radius: 7px;
+  background: var(--d-encre, #1D1D1F); color: var(--d-carte, #fff);
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; line-height: 1;
+}
+.vrm-exemple-phrases { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.vrm-exemple-phrases b { font-size: 15px; font-weight: 600; letter-spacing: -.01em; line-height: 1.3; }
+.vrm-exemple-phrases span { font-size: 13px; line-height: 1.35; color: var(--d-gris, var(--vrm-muted, #6E6E73)); }
+.vrm-exemple-gestes { display: flex; align-items: center; gap: 4px 16px; flex-wrap: wrap; }
 .vrm-exemple-bandeau .vrm-b { flex: 0 0 auto; }
+.vrm-exemple-connexion {
+  min-height: 44px; padding: 0 2px; border: 0; background: transparent; cursor: pointer;
+  font: inherit; font-size: 15px; font-weight: 600; color: var(--d-accent-texte, #0066CC); white-space: nowrap;
+}
+.vrm-exemple-connexion:hover { text-decoration: underline; text-underline-offset: 3px; }
+.vrm-exemple-connexion:focus-visible { outline: 2px solid var(--d-accent, #0071E3); outline-offset: 2px; border-radius: 6px; }
 @media (max-width: 560px) {
-  .vrm-exemple-bandeau { padding: 6px 12px; justify-content: space-between; }
-  .vrm-exemple-texte b { font-size: 13px; }
-  .vrm-exemple-texte span { display: none; }
-  .vrm-exemple-bandeau .vrm-b { padding: 0 12px; }
+  .vrm-exemple-bandeau {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "texte geste" "lien lien";
+    align-items: center; gap: 0 10px; padding: 8px 12px 10px;
+  }
+  .vrm-exemple-texte { grid-area: texte; gap: 8px; }
+  .vrm-exemple-gestes { display: contents; }
+  .vrm-exemple-bandeau .vrm-b { grid-area: geste; padding: 0 14px; }
+  .vrm-exemple-connexion { grid-area: lien; justify-self: start; margin: -4px 0 -8px; font-size: 14px; }
+  .vrm-exemple-etiquette { height: 22px; padding: 0 7px; font-size: 10px; }
+  .vrm-exemple-phrases b { font-size: 13px; }
+  .vrm-exemple-phrases span { font-size: 12px; }
+}
+@media (max-width: 380px) { .vrm-exemple-phrases span { display: none; } }
+
+/* ── (14 nov.) Le CADRE de l'exemple : un filet hachuré de 3 px tout autour de l'écran
+   et une languette « Exemple · données inventées » qui pend du bord haut. Au-dessus de
+   TOUT (feuilles, confirmations), jamais un toucher pris, rien qui bouge. ── */
+.vrm-exemple-cadre { position: fixed; inset: 0; z-index: 2147483000; pointer-events: none; }
+.vrm-exemple-cadre::before {
+  content: ""; position: absolute; inset: 0; padding: 3px; box-sizing: border-box;
+  background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--d-encre, #1D1D1F) 42%, transparent) 0 5px, transparent 5px 10px);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+.vrm-exemple-cadre-mot {
+  position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  display: inline-flex; align-items: center; height: 18px; padding: 0 10px; border-radius: 0 0 8px 8px;
+  background: var(--d-encre, #1D1D1F); color: var(--d-carte, #fff); white-space: nowrap;
+  font: 700 10px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase;
+}
+@media print { .vrm-exemple-cadre { display: none; } }
+
+/* ── (14 nov.) « exemple » sur chaque code et chaque adresse inventés : les éléments que
+   l'app marque déjà comme sensibles (`data-stream-type`, le mode « en direct ») et les
+   points relais. Posé par la feuille de style (`content`) : absent du texte que l'app
+   copie ou que les bancs lisent ; le mot vient de tr() (`--vrm-exemple-mot`). ── */
+:root[data-vrm-exemple] :is([data-stream-type="code"], [data-stream-type="adresse"], .vrm-rp-code, [data-relais-adresse])::after {
+  content: var(--vrm-exemple-mot, "exemple");
+  display: inline-block; margin-left: .5em; padding: 2px 6px; border-radius: 5px; vertical-align: .15em;
+  background: var(--d-remplir, rgba(118,118,128,.12)); color: var(--d-gris, #6E6E73);
+  font: 600 10px/1.2 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase;
+  text-decoration: none; white-space: nowrap; filter: none;
 }

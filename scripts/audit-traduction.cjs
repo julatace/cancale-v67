@@ -39,6 +39,7 @@ const MIGRES = [
   ['src/RetoursLitiges.jsx', ['*']],
   ['src/profil/MenuProfil.jsx', ['*']],
   ['src/composants/GardeEcran.jsx', ['*']],
+  ['src/GuideDemarrage.jsx', ['BandeauExemple', 'CadreExemple']],   // (14 nov.) le bandeau et le cadre du mode exemple
   ['src/i18n/ChoixLangue.jsx', ['*']],
   ['src/PublierPartout.jsx', ['*']],
   ['src/main.jsx', ['DernierFilet']],

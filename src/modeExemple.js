@@ -145,7 +145,9 @@ export function installerModeExemple(win = typeof window !== 'undefined' ? windo
   let sansCompte = false;
   try { sansCompte = ssReel.getItem(CLE_SANS_COMPTE) === '1'; } catch (_) {}
   // (11 nov.) Les captures de la page d'accueil posent un catalogue mélangé.
-  const jeu = jeuExemple(Date.now(), { catalogue: win.__vrmExempleCatalogue });
+  // (14 nov.) `origine` : les photos d'exemple sont servies par `public/exemple/` (même origine, CSP).
+  let origine = ''; try { origine = String(win.location.origin || ''); } catch (_) {}
+  const jeu = jeuExemple(Date.now(), { catalogue: win.__vrmExempleCatalogue, origine });
   ETAT = { actif: true, ssReel, sansCompte, base: { lignes: jeu.lignes }, comptes: { lignes: jeu.comptes }, autres: {}, surPlace: 0, ecritures: 0, refusees: 0, coupes: 0 };
 
   // 1. LE STOCKAGE : en mémoire. La session de l'exemple n'existe que là.
@@ -214,6 +216,9 @@ export function installerModeExemple(win = typeof window !== 'undefined' ? windo
     Object.defineProperty(win, 'Notification', { configurable: true, value: N });
   } catch (_) {}
 
+  // (14 nov.) La racine porte `data-vrm-exemple` : la marque « Exemple » sur chaque
+  // code et chaque adresse inventés (src/guide-demarrage.css) et le cadre de l'écran.
+  try { win.document.documentElement.setAttribute('data-vrm-exemple', '1'); } catch (_) {}
   try { win.__vrmExemple = bilanExemple; } catch (_) {}
   return true;
 }
