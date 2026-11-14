@@ -50,7 +50,7 @@
 .vrm-ar-tuiles b { font-size: var(--d-t-28, 28px); line-height: 32px; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .vrm-ar-tuiles span { font-size: var(--d-t-13, 13px); line-height: 16px; color: var(--d-gris, #6e6e73); }
 .vrm-ar-repli { margin-top: 4px; font-size: var(--d-t-15, 15px); }
-.vrm-ar-repli summary { display: flex; align-items: center; gap: 6px; min-height: 44px; cursor: pointer; list-style: none; color: var(--d-accent-texte, #0066CC); font-weight: 600; }
+.vrm-ar-repli summary { display: flex; justify-content: flex-start; align-items: center; gap: 6px; min-height: 44px; cursor: pointer; list-style: none; color: var(--d-accent-texte, #0066CC); font-weight: 600; }
 .vrm-ar-repli summary::-webkit-details-marker { display: none; }
 .vrm-ar-repli p { margin: 0; color: var(--d-gris, #6e6e73); line-height: 21px; }
 .vrm-ar-chev { width: 7px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
@@ -66,7 +66,8 @@
 .vrm-ar-conseil-tete { display: block; font-size: var(--d-t-13, 13px); font-weight: 600; color: var(--d-gris, #6e6e73); }
 .vrm-ar-conseil p { margin: 4px 0 0; font-size: var(--d-t-15, 15px); line-height: 21px; color: var(--d-encre, #1d1d1f); }
 .vrm-ar-conseil-gestes:empty { display: none; }
-.vrm-ar-conseil-gestes .vrm-lien-action { min-height: 44px; padding: 0; }
+.vrm-ar-voir { display: block; min-height: 44px; margin: 0; padding: 0; border: 0; background: none; color: var(--d-accent-texte, #0066CC); font: inherit; font-size: var(--d-t-15, 15px); font-weight: 600; cursor: pointer; }
+.vrm-ar-voir:focus-visible { outline: 2px solid var(--d-accent, #0071E3); outline-offset: 2px; border-radius: 6px; }
 .vrm-ar-fermer { position: absolute; top: 4px; right: 4px; width: 44px; height: 44px; display: grid; place-items: center; border: 0; background: transparent; color: var(--d-gris, #6e6e73); border-radius: 50%; cursor: pointer; }
 .vrm-ar-fermer svg, .vrm-ar-fermer svg path { width: 14px; height: 14px; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; fill: none; }
 .vrm-ar-fermer:active { transform: scale(.94); }

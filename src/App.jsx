@@ -32230,7 +32230,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [verNumTick, setVerNumTick] = useState(0);
   useEffect(() => onVersionNumerotation(() => setVerNumTick(t => t + 1)), []);
   // (14 nov., 134) SA réponse à « J'ai déjà mes N° sur mes cartons » : la numérotation repasse.
-  useEffect(() => { const f = () => setVerNumTick(t => t + 1); window.addEventListener('vrm-cartons', f); return () => window.removeEventListener('vrm-cartons', f); }, []);
+  // `save` range après 500 ms : la numérotation repasse quand le réglage est RANGÉ (`vrm:save`), pas avant.
+  useEffect(() => { const f = (e) => { const d = e && e.detail; if (!d || d.k === CLE_NUMERO_ECRIT) setVerNumTick(t => t + 1); }; window.addEventListener('vrm-cartons', f); window.addEventListener('vrm:save', f); return () => { window.removeEventListener('vrm-cartons', f); window.removeEventListener('vrm:save', f); }; }, []);
   // ⚠️⚠️ CET EFFET RELIT CE QUE LE CLOUD VIENT D'ÉCRIRE DANS LE LOCALSTORAGE.
   // Tout état initialisé par `load(...)` et RÉÉCRIT ENSUITE PAR UN EFFET
   // AUTOMATIQUE doit être ici — sinon, sur un appareil neuf (localStorage vide

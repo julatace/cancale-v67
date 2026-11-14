@@ -170,4 +170,9 @@ export default {
   "accueil.temps.rien": "nothing",
   "accueil.temps.moinsDUne": "< 1 min",
   "accueil.temps.note": "Estimate: reference durations reasoned task by task (by hand → with VRM), not customer results. Your real time may be shorter or longer.",
+  // (14 nov., idée d’accueil 146) la vidéo de 45 s en tête de la page
+  "accueil.video.voir": "Watch VRM in 45 s",
+  "accueil.video.legende": "The real app, on sample data. No sound, subtitled.",
+  "accueil.video.titre": "VRM in 45 seconds",
+  "accueil.video.fermer": "Close the video",
 };

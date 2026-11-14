@@ -189,7 +189,7 @@ export function CarteEssai({ bilan, appel, compact = false }) {
           <p className="vrm-ar-ligne1" data-essai-restants={bilan.restants}>{bilan.restants > 0 ? tr('essai.restants', { n: bilan.restants }) : tr('essai.dernierJour')}{bilan.partiel ? ' · ' + tr('essai.auMoins') : ''}</p>
           {!compact ? (
             <details className="vrm-ar-repli" data-essai-regle="">
-              <summary>{tr('essai.comment')}<Chevron /></summary>
+              <summary>{tr('essai.comment')}</summary>
               <p>{tr('essai.regle', { b: Math.round(SECONDES_PAR.bordereau), c: Math.round(SECONDES_PAR.colis) })}</p>
             </details>
           ) : null}
@@ -234,7 +234,7 @@ function ConseilJour({ c, onFermer }) {
       <span className="vrm-ar-conseil-tete">{tr('cj.tete', { n: c.jour, total: 30 })}</span>
       <p>{tr(c.cle)}</p>
       <div className="vrm-ar-conseil-gestes">
-        {c.tab ? <button type="button" className="vrm-lien-action" data-conseil-voir={c.tab} onClick={() => OUTILS.aller(c.tab)}>{tr('cj.voir')}</button> : null}
+        {c.tab ? <button type="button" className="vrm-ar-voir" data-conseil-voir={c.tab} onClick={() => OUTILS.aller(c.tab)}>{tr('cj.voir')}</button> : null}
       </div>
       <button type="button" className="vrm-ar-fermer" aria-label={tr('cj.fermer')} data-conseil-fermer="" onClick={onFermer}><Croix /></button>
     </div>
