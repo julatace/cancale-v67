@@ -23,7 +23,11 @@
 .vrm-aide-puce:active::before { transform: scale(.97); }
 .vrm-aide-puce:disabled { opacity: .45; cursor: default; }
 .vrm-aide-puce:focus-visible { outline: 2px solid var(--d-accent, #0071E3); outline-offset: -2px; border-radius: var(--d-r-pilule, 999px); }
-@media (hover: hover) and (pointer: fine) { .vrm-aide-puce { min-height: 36px; } .vrm-aide-puce::before { inset: 0; } }
+/* L'app pose des hauteurs fortes sur les boutons des fils : la puce garde SES 44 px au doigt. */
+:root:root:root body .vrm-aide-rep .vrm-aide-puce { min-height: 44px !important; height: auto !important; padding: 0 14px !important; border: 0 !important; background: none !important; box-shadow: none !important; }
+:root:root:root body .vrm-aide-rep .vrm-aide-puce.is-icone { padding: 0 !important; width: 44px !important; }
+.vrm-aide-puce-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (hover: hover) and (pointer: fine) { :root:root:root body .vrm-aide-rep .vrm-aide-puce { min-height: 36px !important; } .vrm-aide-puce::before { inset: 0; } }
 
 /* ── Les feuilles : champs, groupes, lignes ─────────────────────────────── */
 .vrm-plus-desc { margin: 0 0 16px; font: 400 13px/18px var(--vrm-police, system-ui); color: var(--d-gris, #6E6E73); }
@@ -60,3 +64,12 @@
 .vrm-plus-bascule input { width: 22px; height: 22px; accent-color: var(--d-accent, #0071E3); }
 .vrm-plus-url { display: block; padding: 12px; border-radius: var(--d-r-case, 12px); background: var(--d-case, #F2F2F7); font: 500 13px/18px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--d-encre, #1D1D1F); overflow-wrap: anywhere; user-select: all; }
 .vrm-plus-liste { max-height: 46vh; overflow: auto; overscroll-behavior: contain; }
+
+/* Les règles fortes de l'app (rangées blanches, titres en gras) ne reprennent pas la main : les
+   groupes restent des cartes arrondies (inset iOS), les en-têtes de groupe 13/400 gris. */
+:root:root:root body .vrm-plus-groupe { border-radius: 16px !important; overflow: hidden !important; background: var(--d-carte, #fff) !important; }
+:root:root:root body .vrm-plus-groupe .vrm-ui-ligne { background: transparent !important; }
+:root:root:root body .vrm-plus-groupe .vrm-ui-ligne:active { background: var(--d-remplir, rgba(118,118,128,.12)) !important; }
+:root:root:root body .vrm-plus-feuille .vrm-plus-groupe { background: var(--d-carte, #fff) !important; box-shadow: none !important; }
+:root:root:root body h2.vrm-plus-entete, :root:root:root body h3.vrm-plus-entete { font: 400 13px/18px var(--vrm-police, system-ui) !important; color: var(--d-gris, #6E6E73) !important; letter-spacing: 0 !important; margin: 24px 4px 6px !important; text-transform: none !important; }
+:root:root:root body .vrm-ui-feuille.vrm-plus-feuille { background: var(--d-fond, #F2F2F7) !important; }

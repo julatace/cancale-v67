@@ -328,9 +328,13 @@ const MESSAGES = [
   const ar = sansCommentaires(lire('src/AideReponse.jsx'));
   dit(ar && /onInserer\(/.test(ar) && !/onEnvoyer|sendReply|vmrCmd|fetch\s*\(/.test(ar), '108/109 · un toucher INSÈRE dans le champ ; la rangée n’envoie rien elle-même');
   dit(/publierAnnoncesAchetees|annoncesAchetees\(/.test(app), '131 · l’écran Achats publie les annonces achetées');
-  dit(/<CarnetVendeurs\b|CarnetVendeurs\s*=/.test(app), '125 · le carnet des vendeurs est joignable depuis Achats');
-  dit(/<CataloguePrive\b|CataloguePrive\s*=/.test(app), '110 · le catalogue privé est joignable depuis l’app');
-  dit(/<ListeRecherche\b|ListeRecherche\s*=/.test(app), '111 · la liste de recherche se règle dans l’app');
+  const ap = sansCommentaires(lire('src/AchatsPlus.jsx'));
+  dit(/<AchatsPlus\b[\s\S]{0,900}?lireVendeurs=\{lireVendeursAchats\}/.test(app) && /carnetVendeurs\(/.test(ap), '125 · le carnet des vendeurs est joignable depuis Achats (lu à l’ouverture)');
+  dit(/sid:data->payload->transaction->>seller_id/.test(app) && !/login.*vendeursDesAchats|vendeursDesAchats\([^)]*titre/.test(app), '125 · le vendeur vient de `seller_id` de la transaction (jamais d’un pseudo)');
+  dit(/<CataloguePrive\b/.test(app) && /k:'catalogue'/.test(app), '110 · le catalogue privé est joignable depuis l’app (Annonces → Outils)');
+  const cpj = sansCommentaires(lire('src/CataloguePrive.jsx'));
+  dit(cpj && /items: \[\.\.\.choix\]/.test(cpj) && !/prixAchat|buyPrice/.test(cpj), '110 · le navigateur n’envoie que des identifiants d’annonces (aucun prix d’achat)');
+  dit(/onChangerListe=\{changerListeRecherche\}/.test(app) && /save\(CLE_LISTE_RECHERCHE/.test(app), '111 · la liste de recherche se règle dans l’app (rangée chez VRM)');
 
   console.log(ko ? `\n${ko} contrôle(s) rouge(s).` : '\nTout est vert.');
   process.exit(ko ? 1 : 0);

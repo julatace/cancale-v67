@@ -39,15 +39,15 @@ export default function AideReponse({ messages = [], infos = null, tailleFiche =
       <div className="vrm-aide-rep-rangee">
         {pretes.map((p) => (
           <button key={'p' + p.sujet} type="button" className="vrm-aide-puce is-proposee" data-aide-proposition={p.sujet} disabled={desactive}
-            aria-label={tr('plus.aide.insere', { t: p.texte })} title={p.texte} onClick={() => inserer(p.texte)}>{court(p.texte)}</button>
+            aria-label={tr('plus.aide.insere', { t: p.texte })} title={p.texte} onClick={() => inserer(p.texte)}><span className="vrm-aide-puce-t">{court(p.texte)}</span></button>
         ))}
         {morceaux.filter((m) => !pretes.some((p) => p.texte.includes(m.texte))).map((m) => (
           <button key={'i' + m.champ} type="button" className="vrm-aide-puce" data-aide-info={m.champ} disabled={desactive}
-            aria-label={tr('plus.aide.insere', { t: m.texte })} title={m.texte} onClick={() => inserer(m.texte)}>{libInfo(m)}</button>
+            aria-label={tr('plus.aide.insere', { t: m.texte })} title={m.texte} onClick={() => inserer(m.texte)}><span className="vrm-aide-puce-t">{libInfo(m)}</span></button>
         ))}
         {onEditerInfos && manques.map((p) => (
           <button key={'m' + p.manque} type="button" className="vrm-aide-puce is-manque" data-aide-manque={p.manque} onClick={onEditerInfos}>
-            <IconePlus/>{tr('plus.aide.manque.' + p.manque)}</button>
+            <IconePlus/><span className="vrm-aide-puce-t">{tr('plus.aide.manque.' + p.manque)}</span></button>
         ))}
         {cachees ? <span className="vrm-aide-puce is-muette" data-aide-cachees="">{tr('plus.infos.cachees')}</span> : null}
         {onEditerInfos && !cachees ? <button type="button" className="vrm-aide-puce is-icone" data-aide-editer="" aria-label={tr('plus.infos.titre')} title={tr('plus.infos.titre')} onClick={onEditerInfos}><IconeFiche/></button> : null}

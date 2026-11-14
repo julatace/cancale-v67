@@ -66,11 +66,11 @@ function FeuilleCarnet({ achats, lireVendeurs, bilan, estAnnule, montant, onClos
         <p className="vrm-plus-couv" data-carnet-couverture={`${c.avecVendeur}/${c.total}`} title={tr('plus.carnet.pourquoi')}>{tr('plus.carnet.couverture', { n: c.avecVendeur, total: c.total })}</p>
         {!c.vendeurs.length ? <p className="vrm-plus-vide">{tr('plus.carnet.aucun')}</p> : (
           <div className="vrm-plus-groupe vrm-plus-liste" data-carnet-liste="">
-            {c.vendeurs.slice(0, 200).map((v) => {
+            {(() => { const n = new Map(); for (const v of c.vendeurs) if (v.login) n.set(v.login, (n.get(v.login) || 0) + 1); return c.vendeurs.slice(0, 200).map((v) => ({ v, double: v.login && n.get(v.login) > 1 })); })().map(({ v, double }) => {
               const sous = [pl('plus.carnet.achats', v.achats), v.revendus ? pl('plus.carnet.revendus', v.revendus) : '', v.delaiJours != null ? tr('plus.carnet.recu', { j: v.delaiJours }) : '', v.nSoucis ? pl('plus.carnet.soucis', v.nSoucis) : ''].filter(Boolean).join(' · ');
               const val = v.benefice == null ? '' : (v.partiel ? tr('plus.carnet.auPlus', { v: signe(v.benefice) }) : signe(v.benefice));
               return (<React.Fragment key={v.id}>
-                <Ligne titre={v.login || tr('plus.carnet.vendeur', { id: v.id })} sous={sous} valeur={val} onClick={() => setOuvert(ouvert === v.id ? '' : v.id)}
+                <Ligne titre={v.login ? (double ? `${v.login} · #${v.id}` : v.login) : tr('plus.carnet.vendeur', { id: v.id })} sous={sous} valeur={val} onClick={() => setOuvert(ouvert === v.id ? '' : v.id)}
                   aria-expanded={ouvert === v.id} data-carnet-vendeur={v.id} data-carnet-benefice={v.benefice == null ? '' : String(v.benefice)} data-carnet-achats={String(v.achats)}/>
                 {ouvert === v.id ? <div className="vrm-plus-couv" style={{ padding: '4px 12px 12px', margin: 0 }} data-carnet-detail={v.id}>
                   <div>{tr('plus.carnet.investi', { v: v.investi == null ? '—' : (v.auMoins ? tr('plus.carnet.auMoins', { v: eur(v.investi) }) : eur(v.investi)) })}</div>
