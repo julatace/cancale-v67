@@ -125,7 +125,7 @@ async function ouvrir(nav, { url, b = base(), pont = true, panne = null, api = n
   pg.on('popup', (p) => p.close().catch(() => {}));
   await pg.addInitScript(([s, aides]) => {
     try {
-      window.__VRM_BAISSE_PAUSE = 0; window.__VRM_ATTENTE_GESTE = 4000;
+      window.__VRM_BAISSE_PAUSE = 0; window.__VRM_ATTENTE_GESTE = 4000; window.print = () => {};
       if (!sessionStorage.getItem('banc_init')) {
         localStorage.setItem('vrm_banc_vends', '1');
         localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', s.user.id);
@@ -226,7 +226,14 @@ action('colis.imprimer', async (nav) => {
     await toucher(o.pg, '[data-lot-imprimer]');
     noter('colis.imprimer', 'pendant', await moment(o.pg, 'pendant', 'colis.imprimer', { ms: 6000 }));
     tenue = null; lacher();
-    noter('colis.imprimer', 'apres', await moment(o.pg, 'apres', 'colis.imprimer', { ms: 20000 }));
+    // La feuille d'impression du PDF (« Bordereau 105×148mm · Imprimer ») vient d'abord : il imprime, puis « C'est imprimé ? ».
+    let r = await moment(o.pg, 'apres', 'colis.imprimer', { ms: 6000 });
+    for (let k = 0; !r && k < 3; k++) {
+      const imp = o.pg.getByRole('button', { name: /^Imprimer$/ }).last();
+      if (await imp.count()) await imp.click().catch(() => {});
+      r = await moment(o.pg, 'apres', 'colis.imprimer', { ms: 6000 });
+    }
+    noter('colis.imprimer', 'apres', r);
     await shot(o.pg, 'colis-imprimer-apres');
   } finally { await o.ctx.close(); }
   const o2 = await ouvrir(nav, { url: '/?tab=cat_bord', panne });
