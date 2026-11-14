@@ -225,6 +225,7 @@ export default function CarteStats({ owner = '', page, sel, sources, regles, reg
         sous={sous || <span className="vrm-fu-sous-nom">{g.def ? (g.def.local ? (g.def.court || g.def.nom) : g.def.court) : ''}{aide ? <button type="button" className="vrm-fu-aide" data-carte-aide={page} aria-label="D’où viennent ces chiffres ?" title="D’où viennent ces chiffres ?" onClick={() => setAideOuverte(true)}><span aria-hidden="true">?</span></button> : null}</span>}
         courbe={courbe && courbe.length > 1 ? courbe : null}
         pile={extra.pile || null}
+        bande={!!extra.bande}
         tete={typeof extra.tete === 'function' ? extra.tete(g) : null}
         cases={V.c.map((x) => ({
           cle: x.place.id + (x.p && typeof x.p === 'string' ? '-' + x.p : ''),

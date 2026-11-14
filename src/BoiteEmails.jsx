@@ -509,7 +509,8 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
   const [nonLus, setNonLus] = useState(false);
   const [saisie, setSaisie] = useState('');
   const [cherche, setCherche] = useState('');
-  useEffect(() => { const t = setTimeout(() => setCherche(saisie.trim().length >= 2 ? saisie.trim() : ''), 350); return () => clearTimeout(t); }, [saisie]);
+  // (14 nov., refonte — AJOUT 2 « trouver vite ») 150 ms au lieu de 350 : toujours une lecture par pause, pas par frappe.
+  useEffect(() => { const t = setTimeout(() => setCherche(saisie.trim().length >= 2 ? saisie.trim() : ''), 150); return () => clearTimeout(t); }, [saisie]);
   const [pages, setPages] = useState(undefined);
   const [lecture, setLecture] = useState(false);
   const [ouvert, setOuvert] = useState('');
@@ -587,7 +588,15 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
   };
   // L'instant de la liste (les « demain » et « aujourd'hui ») : un par lecture, pour que les lignes restent mémoïsées.
   const maintenant = useMemo(() => Date.now(), [pages]);
-  const groupes = useMemo(() => (pages && Array.isArray(pages.emails) ? groupesParJour(pages.emails).map((g) => ({ ...g, items: empiler(g.emails, delies, maintenant) })) : []), [pages, delies, maintenant]);
+  // (14 nov., refonte — AJOUT 2 « trouver vite ») Comme Mail : pendant que la boîte cherche chez VRM
+  // (`cherche`, après 150 ms), les e-mails DÉJÀ lus qui contiennent le mot se montrent tout de suite.
+  // La réponse de la route remplace ensuite cet aperçu ; rien n'est écrit, rien n'est jeté.
+  const motLocal = saisie.trim().length >= 2 && saisie.trim() !== cherche ? saisie.trim().toLowerCase() : '';
+  const groupes = useMemo(() => {
+    if (!(pages && Array.isArray(pages.emails))) return [];
+    const l = motLocal ? pages.emails.filter((e) => [e.subject, e.from, e.compte && e.compte.nom, JSON.stringify(e.resume || {})].join(' ').toLowerCase().includes(motLocal)) : pages.emails;
+    return groupesParJour(l).map((g) => ({ ...g, items: empiler(g.emails, delies, maintenant) }));
+  }, [pages, delies, maintenant, motLocal]);
   const nomCompte = (adr) => { const a = Array.isArray(adresses) ? adresses.find((x) => x.adresse === adr) : null; return (a && a.nom) || adr; };
   const nomsDoubles = useMemo(() => { const n = {}; (adresses || []).forEach((a) => { if (a.nom) n[a.nom] = (n[a.nom] || 0) + 1; }); return n; }, [adresses]);
   const libelleCompte = (a) => (a.nom ? (nomsDoubles[a.nom] > 1 ? `${a.nom} · ${a.adresse}` : a.nom) : a.adresse);

@@ -85,6 +85,7 @@ import { PanneauDiscretion } from '../Discretion.jsx';   // (12 nov., ext. 5.370
 import { etatExtensionAffichage, etatDerniereLecture } from '../etatConnexions.js';
 // ⟦← App.jsx #2⟧
 import { filtrerReglages } from '../rechercheReglages.js';
+import { AFaireSite } from '../plateformes/AFaireSite.jsx';   // (14 nov.) « Ouvrir le paiement · N › » du propriétaire
 import { preparerApercusModes } from '../apercusBordereaux.js';
 import { CLE_IMPRESSION, FORMATS_THERMIQUES, TAMPONS, ENCRES, CONTRASTES, MARGE_MAX_MM, AUTRE_MIN_MM, AUTRE_MAX_MM, reglageImpression, papierThermique, fmtMm } from '../impression/thermique.js';   // (11 nov., lot thermique)
 import { fabriquerBordereau } from '../impression/bordereauExemple.js';
@@ -148,6 +149,7 @@ import { tr, monnaie, LANGUES, NOMS_LANGUES, langueCourante, choisirLangue } fro
 import { useLangue } from '../i18n/react.js';
 import { ReglagesAidesAccueil } from '../accueilReste/AccueilReste.jsx';   // (14 nov., idées 136 139 140 147)
 import MIGRATION_SQL from "../../supabase/migrations/001-multi-utilisateurs.sql?raw";
+import { accompagner } from '../accompagnement.js';   // (14 nov.) pendant, après, échec d'un geste (src/ui/Accompagne.jsx)
 
 // ⟦← App.jsx #10⟧
 const SuiviReceptionEmails = aLaDemande(() => import('../ReceptionEmails.jsx'));
@@ -1391,6 +1393,7 @@ async function sourcesExportDonnees() {
   };
 }
 async function exporterMesDonnees() {
+  const acc = accompagner('export.donnees');
   // (9 nov., Julien) Sans abonnement, l'export de SES données reste ouvert (RGPD, portabilité,
   // art. 20) : il ne sert pas à utiliser VRM, seulement à repartir avec ses données. La
   // « Sauvegarde complète » (restaurer VRM) reste, elle, fermée sans abonnement.
@@ -1398,13 +1401,16 @@ async function exporterMesDonnees() {
     const src = await sourcesExportDonnees();
     // (12 nov., RGPD) + TOUTES ses données, générées par le serveur pour SA session
     // (src/exportRgpd.js) ; une page ratée ⇒ le zip le DIT (INCOMPLET.txt).
-    toast('Export en préparation…');
+    // (14 nov., lot accompagnement) PENDANT « Export en préparation… », APRÈS « Fichier téléchargé », ÉCHEC en mots simples.
+    acc.pendant(0);
     const tout = await toutesMesDonnees({ entetes: enTeteSession });
     const complet = tout.ok ? tout.fichiers : [{ nom: 'INCOMPLET.txt', texte: "Tes tableaux sont là, mais le reste de tes données n'a pas pu être lu.\r\nRelance « Exporter mes données » dans un instant.\r\n" }];
-    if (!tout.ok) toast('Export incomplet : relance-le dans un instant.');
     const zip = zipStocke([...fichiersExport(feuillesExport(src)), ...complet]);
     telechargerFichier(new Blob([zip], { type: 'application/zip' }), nomExport(), 'application/zip');
-  } catch (e) { toast('Export pas créé : ' + (e && e.message || e)); }
+    // Une partie pas lue : le zip part quand même (tes tableaux, et INCOMPLET.txt), et l'échec le DIT, avec « Réessayer ».
+    if (!tout.ok) acc.echec({ acc: 'reseau', raison: tr('acc.export.donnees.incomplet') }, { reessayer: () => exporterMesDonnees() });
+    else acc.fini({ nom: nomExport() });
+  } catch (e) { acc.echec(e, { reessayer: () => exporterMesDonnees() }); }
 }
 // ⟦← App.jsx #35⟧
 
@@ -2014,13 +2020,23 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     if (g.brut) corps = items.map((it) => <React.Fragment key={it.id}>{it.el}</React.Fragment>);
     else corps = liste(items);
 
-    return (
+    const section = (
       <section key={g.id} id={`reglages-${g.id}`} className="vrm-set-groupe" data-groupe-reglages={g.id}>
         {g.titre && <h3 className="vrm-set-titre" style={{color:C.muted}}>{g.titre}</h3>}
         {corps}
         {g.pied && <div className="vrm-set-pied" style={{color:C.muted}}>{g.pied}</div>}
       </section>
     );
+    // (14 nov., refonte visible) LES OPTIONS AVANCÉES REPLIÉES : un groupe `avance` (Sécurité et sauvegarde)
+    // se range derrière UNE rangée « Réglages avancés › » ; une recherche qui y trouve un réglage le montre
+    // déplié. Les panneaux restent montés (plus bas, `panneaux`) : rien ne cesse de lire sa ligne.
+    if (g.avance && !rechercheReglage.trim()) return (
+      <details key={g.id} className="vrm-pf-set-avances" data-reglages-avances={g.id}>
+        <summary className="vrm-set-ligne vrm-pf-set-avances-ligne"><IconeReglage name="gear"/><span className="vrm-set-lib"><b style={{color:C.text}}>{tr('plateformes.reglages.avances')}</b><small className="vrm-set-desc" style={{color:C.muted}}>{g.titre}</small></span><svg className="vrm-set-chev" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke={C.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m1.5 1.5 6 6-6 6"/></svg></summary>
+        {section}
+      </details>
+    );
+    return section;
   };
 
   // ── TES DONNÉES ET LES CONDITIONS
@@ -2182,7 +2198,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (10 nov., lot P) Les raccourcis clavier (src/raccourcisClavier.js) : la même feuille que « ? ».
       { id:'raccourcis-clavier', type:'action', ic:'key', lib:tr('reglages.raccourcis-clavier.lib'), desc:tr('reglages.raccourcis-clavier.desc'), onClick:()=>{ try { window.dispatchEvent(new Event('vrm:raccourcis-clavier')); } catch (_) {} }, data:{ 'data-reglage-raccourcis-clavier':'' } },
     ]},
-    { id:'sauvegarde', titre:tr('reglages.groupe.sauvegarde'), items:[
+    { id:'sauvegarde', avance:true, titre:tr('reglages.groupe.sauvegarde'), items:[
       { id:'securite', type:'panneau', ic:'shield', lib:tr('reglages.securite.lib'), desc:tr('reglages.securite.desc'), el:<SecuriteSetting/> },
       { id:'donnees', type:'action', ic:'doc', lib:tr('reglages.donnees.lib'), desc:tr('reglages.donnees.desc'), onClick:exporterMesDonnees, data:{ 'data-exporter-donnees':'' } },
       // (11 nov.) Il arrive d'un tableur ou d'un autre logiciel : son stock (N°, emplacement, prix d'achat) et ses ventes passées.
@@ -2291,14 +2307,16 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // Double vérification (TOTP) — facultative, sur SON clic (16 octobre).
       // (4 nov.) Les appareils où VRM est ouvert, et « Se déconnecter partout ».
       AUTH.user && { id:'appareils', type:'panneau', ic:'device', lib:tr('reglages.appareils.lib'), el:<AppareilsConnectes/> },
-      // (4 nov.) Tout ce que VRM a envoyé en son nom, lu de ce qui est noté en base.
-      AUTH.user && { id:'journal-vrm', type:'panneau', ic:'clock', lib:tr('reglages.journal-vrm.lib'), el:<JournalVrm/> },
       AUTH.user && { id:'double', type:'panneau', nu:true, ic:'lock', lib:tr('reglages.double.lib'), val: Array.isArray(AUTH.session && AUTH.session.totp) ? (AUTH.session.totp.length > 1 ? tr('reglages.double.activeN', { n: AUTH.session.totp.length }) : AUTH.session.totp.length ? tr('reglages.double.active') : tr('reglages.double.inactive')) : '', el:<DoubleVerification/> },
     ]},
     AUTH.user && { id:'sortir', titre:null, items:[
       { id:'deconnexion', type:'action', ic:'door', lib:tr('reglages.deconnexion.lib'), danger:true, onClick:()=>{ setAcct({ mode:'out', val:'', err:'', busy:false }); } },
     ], pied:tr('reglages.deconnexion.pied') },
     { id:'donnees', titre:tr('reglages.groupe.donnees'), items:[
+      // (4 nov.) Tout ce que VRM a envoyé en son nom, lu de ce qui est noté en base.
+      // (14 nov., Julien : « il y a 2 “ce que VRM a fait” ») Le JOURNAL quitte « Connexion » : il vit ici, à côté
+      // de la confidentialité, avec un libellé qui ne se confond plus avec elle (« Journal : … » / « Confidentialité : … »).
+      AUTH.user && { id:'journal-vrm', type:'panneau', ic:'clock', lib:tr('reglages.journal-vrm.lib'), el:<JournalVrm/> },
       // (8 nov., confiance) Ce que VRM lit, garde et fait — chaque phrase tenue par le code (src/tesDonnees.js).
       { id:'tes-donnees', type:'panneau', ic:'shield', lib:tr('reglages.tes-donnees.lib'), desc:tr('reglages.tes-donnees.desc'), data:{ 'data-reglage-tes-donnees':'' },
         el:<TesDonnees cloisonne={!!CLOISONNE} onExporter={exporterMesDonnees} onJournal={AUTH.user ? ()=>ouvrirSous('journal-vrm') : undefined} onFermer={AUTH.user ? ()=>ouvrirSous('fermer') : undefined}/> },
@@ -2318,7 +2336,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   ];
   // L'onglet Abonnement : la carte de l'abonnement, d'un bloc (statut, prix,
   // carte, factures, résilier) — le MÊME composant qu'avant (§11).
-  const GROUPES_ABONNEMENT = [{ id:'abonnement', titre:null, brut:true, items:[{ id:'abonnement', type:'el', el:<div key="abonnement" data-onglet-abonnement=""><MonAbonnement/><Parrainage/></div> }] }];
+  const GROUPES_ABONNEMENT = [{ id:'abonnement', titre:null, brut:true, items:[{ id:'abonnement', type:'el', el:<div key="abonnement" data-onglet-abonnement=""><MonAbonnement/>{proprioInst === true ? null : <Parrainage/>}</div> }] }];
   const groupes = [...(voirCompte ? GROUPES_COMPTE : []), ...(voirReglages ? GROUPES_REGLAGES : []), ...(voirAbonnement ? GROUPES_ABONNEMENT : [])].filter(Boolean)
     .map((g) => ({ ...g, items: g.items.filter(Boolean) }));
   const panneaux = groupes.flatMap((g) => g.items.filter((it) => it.type === 'panneau'));
@@ -2378,8 +2396,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         {/* (5 nov., chantier H — revue 2.31) « Enregistrement en cours… » vit dans la
             ligne du titre, à droite : il ne prend plus la place d'un surtitre (le
             titre ne saute plus de 26 px à chaque réglage touché). */}
-        <div className="vrm-set-tete"><h2 className="vrm-set-h1" style={{color:C.text}}>{tr('ecran.settings')}</h2><StatutSauvegardeReglages/></div>
-        {PHRASES_ECRAN.settings ? <p className="vrm-phrase-ecran vrm-phrase-reglages" data-phrase-ecran="settings">{PHRASES_ECRAN.settings}<AideEcran cle="settings"/></p> : null}
+        {/* (14 nov., refonte visible — AJOUT 3.8) Le titre et son « ? » : la phrase de deux lignes sous le titre
+            disparaît (le « ? » la dit, `AideEcran`). Puis la RECHERCHE, en haut, comme les Réglages d'iOS. */}
+        <div className="vrm-set-tete"><h2 className="vrm-set-h1" style={{color:C.text}}>{tr('ecran.settings')}</h2>{PHRASES_ECRAN.settings ? <span className="vrm-pf-set-aide" data-phrase-ecran="settings" title={PHRASES_ECRAN.settings}><AideEcran cle="settings"/></span> : null}<StatutSauvegardeReglages/></div>
+        {voirReglages && <ChampRecherche valeur={rechercheReglage} onChange={setRechercheReglage} placeholder={tr('reglages.recherche.placeholder')} label={tr('reglages.recherche.label')} micro voix="brut" className="vrm-set-recherche" data-recherche-reglages=""/>}
         <ReglagesPasLus/>
         {ongletsCompte && (
           // (5 nov., chantier H) Les trois onglets ont LA forme du contrôle segmenté de
@@ -2399,11 +2419,14 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
 
       {!ouvert && <>
         {profil}
-        {voirReglages && <ActionsReglages comptes={comptes||[]} onOuvrir={id=>id==='comptes'?setTab('vintedaccounts'):id==='adresses'?(ouvrirEmailsRelier('reception'),setTab('emails')):ouvrirSous(id)}/>}
-        {/* (12 nov., sécurité des comptes) Double vérification pas activée : UNE carte discrète, jamais forcée. */}
-        {voirReglages && AUTH.user && !rechercheReglage.trim() && <CarteDoubleVerif/>}
-        {/* (5 nov., chantier H) LE champ de recherche de l'app (`ChampRecherche`). */}
-        {voirReglages && <ChampRecherche valeur={rechercheReglage} onChange={setRechercheReglage} placeholder={tr('reglages.recherche.placeholder')} label={tr('reglages.recherche.label')} micro voix="brut" className="vrm-set-recherche" data-recherche-reglages=""/>}
+        {/* (14 nov., refonte visible) « À terminer » et « Protège ton compte VRM » : UN groupe « À faire » de
+            rangées (pastille ambre, le geste en mot) — plus deux cartes de 120 et 250 px avant la liste. */}
+        {voirReglages && !rechercheReglage.trim() && <div className="vrm-pf-set-afaire" data-pf-set-afaire="">
+          <ActionsReglages comptes={comptes||[]} onOuvrir={id=>id==='comptes'?setTab('vintedaccounts'):id==='adresses'?(ouvrirEmailsRelier('reception'),setTab('emails')):ouvrirSous(id)}/>
+          {/* (12 nov., sécurité des comptes) Double vérification pas activée : UNE carte discrète, jamais forcée. */}
+          {AUTH.user && <CarteDoubleVerif/>}
+        </div>}
+        {/* (5 nov., chantier H) LE champ de recherche de l'app (`ChampRecherche`) — (14 nov.) monté sous le titre. */}
         {(() => {
           const filtres=filtrerReglages(groupes,voirReglages?rechercheReglage:'');
           return filtres.length ? <>{rechercheReglage.trim()&&<p className="vrm-settings-search-info" role="status" style={{color:C.muted}}>{tr('reglages.recherche.trouves', { n: filtres.reduce((n,g)=>n+g.items.length,0) })}</p>}{filtres.map(groupe)}</> : <div role="status" className="vrm-set-rien" style={{color:C.muted,fontSize:13}}><p style={{margin:'0 0 4px'}}>{tr('reglages.recherche.rien', { q: rechercheReglage.trim() })}</p><Bouton variante="discret" onClick={()=>setRechercheReglage('')}>{tr('reglages.recherche.effacer')}</Bouton></div>;
@@ -3065,14 +3088,14 @@ function FermerCompte({ onExporter }) {
         style={{ display: 'flex', width: '100%', minHeight: 44, alignItems: 'center', gap: 10, border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
         <span style={{ flex: 1, minWidth: 0 }}>
           <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.danger }}>Supprimer mon compte</span>
-          <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2 }}>30 jours pour changer d’avis, puis tout est effacé.</span>
+          <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2 }} data-acc-avant="compte.supprimer">30 jours pour changer d’avis, puis tout est effacé.</span>
         </span>
         <span aria-hidden="true" style={{ color: C.muted, fontSize: 13 }}>{ouvert ? '▴' : '▾'}</span>
       </button>
       {ouvert && (
         <div style={{ marginTop: 10, borderTop: `1px solid ${C.border}`, paddingTop: 10 }}>
           {fin ? (
-            <div role="status" data-fermer-resultat={fin.ok ? 'ferme' : 'incomplet'} style={{ ...txt, color: C.text }}>
+            <div role="status" data-fermer-resultat={fin.ok ? 'ferme' : 'incomplet'} {...(fin.ok ? { 'data-acc-apres': 'compte.supprimer' } : { 'data-acc-echec': 'compte.supprimer' })} style={{ ...txt, color: C.text }}>
               {fin.message}
               {fin.ok && <div style={{ ...txt, marginTop: 6 }}>Pense à retirer l’extension VRM de ton navigateur. Retour à l’accueil dans un instant…</div>}
               {!fin.ok && <div style={{ marginTop: 10 }}><Bouton variante="secondaire" onClick={() => setFin(null)}>Revenir</Bouton></div>}
@@ -3092,7 +3115,7 @@ function FermerCompte({ onExporter }) {
             // (13 nov., lot 51) La suppression est PROGRAMMÉE : la date, et « Annuler » en un geste.
             // La date s'écrit UNE fois ici (§7) : la phrase du serveur ne se montre que sur un échec.
             <div data-fermer-etat="prevue" data-supprimer-prevue={info.prevue.effaceLe}>
-              {annonce && !annonce.ok && <div role="status" data-supprimer-annonce="echec" style={{ ...txt, color: C.warn, marginBottom: 8 }}>{annonce.message}</div>}
+              {annonce && !annonce.ok && <div role="status" data-supprimer-annonce="echec" data-acc-echec="compte.supprimer" style={{ ...txt, color: C.warn, marginBottom: 8 }}>{annonce.message}</div>}
               <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>Suppression prévue le {dateLongue(info.prevue.effaceLe)}</div>
               <div style={{ ...txt, marginTop: 4 }}>
                 {joursAvant(info.prevue.effaceLe) ? `Dans ${joursAvant(info.prevue.effaceLe)} jour${joursAvant(info.prevue.effaceLe) > 1 ? 's' : ''}. ` : 'Elle a lieu au prochain passage du matin. '}
@@ -3106,7 +3129,7 @@ function FermerCompte({ onExporter }) {
             </div>
           ) : (
             <div data-fermer-etat="possible">
-              {annonce && <div role="status" data-supprimer-annonce={annonce.ok ? 'ok' : 'echec'} style={{ ...txt, color: annonce.ok ? C.text : C.warn, marginBottom: 8 }}>{annonce.message}</div>}
+              {annonce && <div role="status" data-supprimer-annonce={annonce.ok ? 'ok' : 'echec'} {...(annonce.ok ? { 'data-acc-apres': 'compte.supprimer' } : { 'data-acc-echec': 'compte.supprimer' })} style={{ ...txt, color: annonce.ok ? C.text : C.warn, marginBottom: 8 }}>{annonce.message}</div>}
               <div style={{ ...titreBloc, marginTop: 0 }}>1. D’abord, garde une copie</div>
               <div style={txt}>Un fichier sur ton appareil : ventes, achats, stock, compta, factures.</div>
               {onExporter && <div style={{ marginTop: 8 }}><Bouton variante="secondaire" onClick={onExporter} data-supprimer-exporter="">Exporter mes données</Bouton></div>}
@@ -3363,9 +3386,29 @@ function MonAbonnement() {
   const mentionsAremplir = e.proprietaire && e.mentionsCompletes === false && Array.isArray(e.mentionsManquantes) && e.mentionsManquantes.length ? e.mentionsManquantes : null;
   const texteStripe = prixAcorriger && typeof e.prixStripe.texte === 'string' && e.prixStripe.texte.trim() ? e.prixStripe.texte : 'un prix différent';
   const note = { fontSize: 13, color: C.text, marginTop: 10, lineHeight: 1.5 };
-  if (e.proprietaire) return (
-    <div data-abonnement="proprietaire" data-abonnement-etat="proprietaire">
-      <Tete etat="Ton abonnement" titre="Compte propriétaire" phrase="Compte propriétaire de VRM : gratuit, aucun abonnement.">
+  // (14 nov., Julien : « dans parrainage je ne sais pas pourquoi il y a mon compte, c'est bizarre ») LE COMPTE
+  // PROPRIÉTAIRE : une carte simple « Compte propriétaire · gratuit ». Les offres Solo/Pro et le parrainage sont
+  // pour les clients : ils ne s'affichent pas ici. Ce qu'il reste à faire pour laisser les clients payer (mentions
+  // légales, prix Stripe, offre Pro) tient en UNE ligne « Ouvrir le paiement · N › » ; sa feuille le dit en mots
+  // simples, le détail technique d'avant (mêmes textes, mêmes `data-*`) au bout, replié, pour lui seul.
+  if (e.proprietaire) {
+    const etapes = [
+      mentionsAremplir && { k: 'mentions', l: tr('plateformes.proprio.mentions') },
+      e.mentionsCompletes === null && { k: 'mentions-pas-su', l: tr('plateformes.proprio.mentionsPasSu') },
+      prixAcorriger && { k: 'prix', l: tr('plateformes.proprio.prix') },
+      e.offres && e.offres.pro && !e.offres.pro.ouvert && { k: 'pro', l: tr('plateformes.proprio.pro') },
+    ].filter(Boolean);
+    return (<>
+      <div data-abonnement="proprietaire" data-abonnement-etat="proprietaire">
+        <Tete etat="Ton abonnement" titre="Compte propriétaire" phrase="Compte propriétaire de VRM : gratuit, aucun abonnement."/>
+      </div>
+      {etapes.length ? (
+        <div className="vrm-pf-proprio" data-proprio-paiement={etapes.length}>
+          <AFaireSite site="proprio-paiement" n={etapes.length} titre={tr('plateformes.proprio.ouvrir')}>
+            <p className="vrm-pf-proprio-intro">{tr('plateformes.proprio.intro')}</p>
+            <ol className="vrm-pf-proprio-etapes">{etapes.map((x) => <li key={x.k} data-proprio-etape={x.k}>{x.l}</li>)}</ol>
+            <details className="vrm-pf-proprio-detail" data-proprio-detail="">
+              <summary>{tr('plateformes.proprio.detail')}</summary>
         {mentionsAremplir && (
           <div data-mentions-manquantes={mentionsAremplir.length} style={note}>
             Paiement <b>fermé</b> : mentions légales incomplètes ({mentionsAremplir.join(', ')}). À remplir dans <b>public/legal/editeur.js</b>.{' '}
@@ -3393,10 +3436,12 @@ function MonAbonnement() {
                 : <>Pro ({PRIX_PRO_MOIS} € / mois) : « bientôt ». Pour l'ouvrir : prix Stripe « vrm_pro_mensuel », son price_… dans <b>STRIPE_PRIX_PRO</b> (Vercel).</>}
           </div>
         )}
-      </Tete>
-      {groupeOffres}
-    </div>
-  );
+            </details>
+          </AFaireSite>
+        </div>
+      ) : null}
+    </>);
+  }
   // Stripe pas branché (`STRIPE_SECRET_KEY` absente) : dit calmement, aucun bouton.
   if (!e.configure && !et.lectureSeule) return <div data-abonnement="non-branche" data-abonnement-etat="non-branche"><Tete etat="Ton abonnement" titre="Paiement pas encore ouvert" phrase="Le paiement n'est pas encore ouvert : VRM reste gratuit pour l'instant. Rien ne t'est demandé."/></div>;
   const test = e.modeTest ? <div data-mode-test="" className="vrm-ios-groupe-pied" style={{ margin: '8px 16px 0' }}>Paiement en <b style={{ color: C.text }}>mode test</b> : aucune vraie carte n'est débitée. <Pourquoi label="Carte d’essai">Carte d'essai 4242 4242 4242 4242.</Pourquoi></div> : null;

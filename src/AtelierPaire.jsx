@@ -19,6 +19,7 @@ import { verifierFichier, contenuValide, ecrireCertificat, retirerCertificat, li
 import { apercuFusion, opsFusion, CHAMPS_FUSION } from './fusionFiches.js';
 import { photoDouteuse } from './qualitePhoto.js';
 import './styles-atelier-photos.css';
+import { AccAvant } from './ui/Accompagne.jsx';   // (14 nov.) ce qui va se passer, et ce qui ne se passera pas
 
 const jour = (iso) => (iso ? dateLoc(iso, { day: 'numeric', month: 'short' }) : '');
 const ko = (o) => (o >= 1024 * 1024 ? `${(o / 1048576).toFixed(1).replace('.', ',')} Mo` : `${Math.max(1, Math.round(o / 1024))} Ko`);
@@ -242,7 +243,7 @@ export function FeuilleFusion({ idFiche, fiches, registre, vendus, caseDe, cleNu
           </ul>
           {!candidats.length ? <p className="vrm-atl-raison">{tr('atelier.fusion.aucun')}</p> : null}
         </>) : (<>
-          {ap && !ap.ok ? <p className="vrm-atl-refus" role="alert" data-fusion-refus={ap.raison}>{tr('atelier.fusion.refus.' + ap.raison, { cases: ap.cases ? ap.cases.join(' / ') : '' })}</p> : null}
+          {ap && !ap.ok ? <p className="vrm-atl-refus" role="alert" data-fusion-refus={ap.raison} data-acc-echec="fiches.fusion" data-acc-raison={ap.raison}>{tr('atelier.fusion.refus.' + ap.raison, { cases: ap.cases ? ap.cases.join(' / ') : '' })}</p> : null}
           {ap && ap.ok ? (<>
             <div className="vrm-atl-deux">{cote(ap.a)}{cote(ap.b)}</div>
             <h3 className="vrm-atl-titre" style={{ margin: '4px 4px 0' }}>{tr('atelier.fusion.garde')}</h3>
@@ -264,6 +265,7 @@ export function FeuilleFusion({ idFiche, fiches, registre, vendus, caseDe, cleNu
               </div>
             ) : null}
           </>) : null}
+          {ap && ap.ok ? <AccAvant geste="fiches.fusion"/> : null}
           <div className="vrm-atl-pied">
             {ap && ap.ok ? <Bouton variante="primaire" plein data-fusion-valider="" disabled={!res || !res.ok} onClick={() => { if (res && res.ok) onFusionner(res, ap); }}>{tr('atelier.fusion.valider')}</Bouton> : null}
             <Bouton variante="discret" plein data-fusion-autre="" onClick={() => { setAutre(null); setCarton(null); }}>{tr('atelier.fusion.autreFiche')}</Bouton>

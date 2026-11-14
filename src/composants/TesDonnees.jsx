@@ -11,6 +11,7 @@ import React from 'react';
 import { GroupeIos, RangeeIos } from './Ios.jsx';
 import { CE_QUE_VRM_LIT, CE_QUE_VRM_NE_LIT_PAS, GESTES, STOCKAGE, ACCES } from '../tesDonnees.js';
 import '../tes-donnees.css';
+import { AccAvant } from '../ui/Accompagne.jsx';   // (14 nov.) ce que fait « Exporter », et ce qu'il ne fait pas
 
 export default function TesDonnees({ onJournal, onExporter, onFermer, cloisonne = true }) {
   return (
@@ -37,6 +38,7 @@ export default function TesDonnees({ onJournal, onExporter, onFermer, cloisonne 
           data-td-acces={x.id} {...(x.id === 'toi' ? { 'data-td-cloisonne': cloisonne ? 'oui' : 'non' } : {})}/>)}
       </GroupeIos>
 
+      {onExporter ? <AccAvant geste="export.donnees"/> : null}
       <GroupeIos titre="Tes gestes" data-td-groupe="gestes">
         {onJournal && <RangeeIos titre="Ce que l’extension a fait" detail="Chaque geste fait en ton nom, daté, avec sa preuve." onClick={onJournal} data-td-journal=""/>}
         {onExporter && <RangeeIos titre="Exporter mes données" detail="Un fichier sur ton appareil : ventes, achats, stock, compta." onClick={onExporter} data-td-exporter=""/>}
