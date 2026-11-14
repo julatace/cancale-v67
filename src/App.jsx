@@ -161,6 +161,9 @@ import { RetoursAchatBloc, RetoursAImprimer, PasAPasRetour } from "./RetoursLiti
 import { retoursAchat, avecRemboursementsProuves, remboursementsParTx } from "./retoursAchat.js";
 import { pasAPasVente } from "./retourPasAPas.js";
 import { litigesDesVentes, retoursParModele, preuvesVente, nombreLitigesPublie } from "./litigesEcran.js";
+// (14 nov., lot argent-prix — 114 soldes, 121 écarts) règles pures : src/soldes.js, src/ecartsPrix.js
+import { CLE_SOLDES, enregistrerSolde, soldesARemettre, lignesRemise, commandeRemise, issueRemise, noterRemise, garderSolde, clePaire as clePaireSolde } from "./soldes.js";
+import { ecartsPrix } from "./ecartsPrix.js";
 import { prixAchatSaisi, ecriturePrixSaisi, prixADemander, suggestionNumerotage, MONTANT_ILLISIBLE } from "./prixAuNumerotage.js";
 import "./vague2-ventes.css";
 import { etatCycle, cartesSupprimees, majVusEnLigne, indexPresentes, montantSaisi as montantCycle, CHOIX as CHOIX_CYCLE, LIBELLE_CHOIX, ORDRE_CHOIX as ORDRE_CHOIX_CYCLE, opsChezToi, PLUS_TARD as CYCLE_PLUS_TARD } from "./cycleArticle.js";
@@ -2890,6 +2893,8 @@ const SYNC_KEYS = [
   'vrm_langue',
   // (11 nov.) « Publier partout » : l'écart de prix par site (égal par défaut, src/publierPartout.js).
   'vrm_partout_prix',
+  // (14 nov., lot argent-prix — 114) Les soldes temporaires : le prix d'origine par identité (src/soldes.js).
+  'vrm_soldes',
   // (11 nov. soir) … et TOUS les paramètres de publication par défaut, par site (src/publierPartout.js).
   'vrm_partout_params',
   'vinted_accounts','vinted_account_labels','vinted_account_emails','vinted_account_phones',
@@ -17195,6 +17200,16 @@ const numeroVcIdentite = (id, it, liens) => {
   return ks.size === 1 ? [...ks][0] : '';
 };
 // Les sites où ce N° est en ligne (src/prixPartout.js), avec les règles d'identité de l'app.
+// (14 nov., lot argent-prix — 114) Un solde : les baisses acceptées ET relues, mémorisées avec le prix
+// d'origine LU (src/soldes.js). Rend le nombre de paires gardées. Rien n'est remis ici : la remise part
+// du bouton « Remettre N prix » (HoteRemiseSoldes), sur son clic.
+export function enregistrerSoldeVrm({ fin, site, faites }) {
+  if (!isCloudReady()) return 0;
+  const r = enregistrerSolde(load(CLE_SOLDES, null), { fin, site, faites });
+  if (r.n) save(CLE_SOLDES, r.etat);
+  return r.n;
+}
+export const soldeOkVrm = () => extSait('remiseprix') === 'ok';
 const sitesPrixDe = (k, rn, extra) => sitesDuNumero(k, { rn, fiches: load('vinted_annonce_numeros', {}) || {}, lbcItems: extra ? extra.lbcItems : null, vcItems: extra ? extra.vcItems : null }, {
   cleNum, capVinted: extSait('republiermodif'),
   numLbc: (ad, id) => numeroLbcIdentite({ itemId: id }, { [id]: ad }, load('vrm_lbc_liens', {}) || {}),
@@ -24990,6 +25005,93 @@ function attendreFinJob(jobId, ms = ATTENTE_DEPOT_MS) {
     };
     setTimeout(tic, 1500);
   });
+}
+// ══════════════════════════════════════════════════════════════════════════════
+// (14 nov., lot argent-prix) LES DEUX FEUILLES DE LA COQUE — chargées à la demande (src/ArgentPrix.jsx)
+// ══════════════════════════════════════════════════════════════════════════════
+const EcartsPrixFeuilleL = lazy(() => import('./ArgentPrix.jsx').then((m) => ({ default: m.EcartsPrixFeuille })));
+const RemiseSoldesFeuilleL = lazy(() => import('./ArgentPrix.jsx').then((m) => ({ default: m.RemiseSoldesFeuille })));
+const SoldesJourneeL = lazy(() => import('./ArgentPrix.jsx').then((m) => ({ default: m.SoldesJournee })));
+// Les listes Leboncoin et Vestiaire (trois états : undefined en cours · null pas lu · objet).
+function useAnnoncesAutresSites() {
+  const [autres, setAutres] = React.useState(undefined);
+  React.useEffect(() => {
+    let mort = false;
+    Promise.all([lbcListingsSession().catch(() => null),
+      lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens`).catch(() => null)]).then(([lbc, vc]) => {
+      const vcL = Array.isArray(vc) ? (vc[0] || {}) : null;
+      if (!mort) setAutres({ lbcItems: lbc ? lbc.items || {} : null, vcItems: vcL ? (vcL.items || {}) : null, vcLiens: vcL ? (vcL.liens || {}) : {} });
+    });
+    return () => { mort = true; };
+  }, []);
+  return autres;
+}
+// 121 — LA MÊME PAIRE À DEUX PRIX : chaque N° EN LIGNE sur Vinted, ses autres sites PAR IDENTITÉ
+// (`sitesPrixDe`, la règle de « Changer le prix »), comparés par `ecartsPrix`. Rien n'est changé :
+// « Changer le prix » ouvre la feuille habituelle de ce N°.
+function HoteEcartsPrix({ comptes, numData, onFermer, onChanger }) {
+  const { paires, pret } = useEbayPaires(comptes);
+  const autres = useAnnoncesAutresSites();
+  const res = React.useMemo(() => {
+    if (!pret || !Array.isArray(paires) || autres === undefined || !numData) return null;
+    const vus = new Set(), groupes = [], manques = new Set();
+    for (const p of paires) {
+      if (!p || p.chezMoi) continue;
+      const k = cleNum(p.num);
+      if (!k || vus.has(k)) continue;
+      vus.add(k);
+      const { rn } = rechercheParNumero(String(p.num), numData, comptes);
+      if (!rn || rn.etat === 'invalide') continue;
+      const r = sitesPrixDe(String(p.num), rn, autres);
+      for (const m of r.manques) manques.add(m);
+      groupes.push({ num: k, sites: r.sites.map((x) => ({ site: x.site, id: x.id, prix: x.prix, devise: x.devise, titre: x.titre })) });
+    }
+    const reglage = load(CLE_PRIX_PARTOUT, null);
+    return { ...ecartsPrix(groupes, { prixAttendu: (site, p) => prixParSite(site, p, reglage) }), manques: [...manques] };
+  }, [pret, paires, autres, numData, comptes]);
+  return <Suspense fallback={null}><EcartsPrixFeuilleL res={res} manques={res ? res.manques : []} onChanger={onChanger} onFermer={onFermer} Retour={FermeAuRetour}/></Suspense>;
+}
+// 114 — REMETTRE LES PRIX D'UN SOLDE FINI : le prix ACTUEL lu par identité (Vinted : la paire en ligne ;
+// Leboncoin, Vestiaire : leurs annonces captées), puis UNE commande par paire, seulement depuis le bouton
+// « Remettre N prix » (RemiseSoldesFeuille) — `commandeRemise` porte `remise:true` + le prix d'origine,
+// l'extension 5.376 refuse toute hausse sans eux. 45/h, compte de l'onglet, relu : le chemin de baisse.
+function HoteRemiseSoldes({ comptes, onFermer }) {
+  const { paires, pret, enLigne } = useEbayPaires(comptes);
+  const autres = useAnnoncesAutresSites();
+  const [etat, setEtat] = React.useState(() => load(CLE_SOLDES, null));
+  const proposes = React.useMemo(() => soldesARemettre(etat), [etat]);
+  const lignes = React.useMemo(() => {
+    const prixVinted = (p) => {
+      if (!pret || !Array.isArray(paires)) return undefined;
+      const x = paires.find((q) => String(q.id) === String(p.id) && String(q.uid || '') === String(p.uid || ''));
+      if (x) return x.prix == null ? undefined : Number(x.prix);
+      return enLigne instanceof Set && !enLigne.has(String(p.id)) ? null : undefined;
+    };
+    const prixAutre = (p) => {
+      if (autres === undefined) return undefined;
+      if (p.site === 'leboncoin') { if (!autres.lbcItems) return undefined; const a = autres.lbcItems[String(p.id)]; return !a || String(a.status || '').toLowerCase() !== 'active' ? null : (a.price == null ? undefined : Number(a.price)); }
+      if (!autres.vcItems) return undefined;
+      const it = autres.vcItems[String(p.id)];
+      if (!it || !/^(published|online|active)$/i.test(String(it.statut || ''))) return null;
+      const v = it.prix && typeof it.prix === 'object' ? it.prix.valeur : it.prix;
+      return v == null ? undefined : Number(v);
+    };
+    return proposes.flatMap((s) => lignesRemise(s.paires, (p) => (p.site === 'vinted' ? prixVinted(p) : prixAutre(p))).map((l) => ({ ...l, soldeId: s.id })));
+  }, [proposes, pret, paires, enLigne, autres]);
+  const sites = new Set(lignes.filter((l) => l.action === 'remettre').map((l) => l.site));
+  const rx = sites.has('vinted') ? raisonExtGlobale(false, { cap: 'remiseprix', role: 'remet tes prix sur Vinted' }) : null;
+  const ecrire = (f) => { if (!isCloudReady()) return; const n = f(load(CLE_SOLDES, null)); save(CLE_SOLDES, n); setEtat(n); };
+  return <Suspense fallback={null}><RemiseSoldesFeuilleL lignes={lignes} extRaison={rx ? rx.texte : ''} Retour={FermeAuRetour} onFermer={onFermer}
+    onRemettre={async (l) => {
+      const cmd = commandeRemise(l);   // UNIQUEMENT ici : le clic sur « Remettre N prix »
+      if (!cmd) return { issue: 'refus' };
+      let r = null;
+      try { r = l.site === 'vinted' ? await vmrCmdSuivi(cmd, 120000) : await vmrCmd(cmd, 60000); } catch (_) { r = null; }
+      const issue = issueRemise(r, l);
+      return { issue, raison: r && r.raison, prixVu: r && r.prixVu, arret: !!(r && (r.code === 'pause' || r.code === 'plafond' || r.code === 'captcha')) };
+    }}
+    onFini={(issues) => { for (const s of proposes) ecrire((e) => noterRemise(e, s.id, issues)); }}
+    onGarder={() => { for (const s of proposes) ecrire((e) => garderSolde(e, s.id)); }}/></Suspense>;
 }
 function HotePublierPartout({ comptes, nums, numData, onFermer }) {
   const { paires, pret } = useEbayPaires(comptes);
@@ -46385,6 +46487,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {!loading && !baseKO && accountsReady && Array.isArray(accounts) && accounts.length ? <ImportDepart comptes={accounts} variante="journee"/> : null}
             {/* (11 nov., lot agent2-veille) Un chiffre qui a chuté sans raison, et le contrôle de cette nuit (src/VeilleJournee.jsx). */}
             {!loading && !baseKO && !premierJour ? <VeilleJournee/> : null}
+            {/* (14 nov., lot argent-prix — 114) Un solde fini : VRM PROPOSE « Remettre les prix », c'est SON clic qui lance (src/soldes.js). */}
+            {!loading && !baseKO ? (()=>{ const a = soldesARemettre(load(CLE_SOLDES, null)); return a.length ? <GardeEcran nom="journee:soldes"><Suspense fallback={null}><SoldesJourneeL aRemettre={a} onOuvrir={()=>{ try { window.dispatchEvent(new CustomEvent('vrm:remise-soldes')); } catch (_) {} }}/></Suspense></GardeEcran> : null; })() : null}
 
             {/* ⚠️ `accounts.length===0` veut dire « aucun compte » OU « je n'ai
                 rien pu lire » : pendant la panne cette consigne envoyait lier
@@ -53517,6 +53621,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return r;
           }}
           etaleOk={extSait('discretion')==='ok'}
+          soldeOk={soldeOkVrm()} onSolde={enregistrerSoldeVrm}
           onProgrammer={(lignes)=>{ const uid = lignes.length ? String(lignes[0].uid) : ''; return vmrCmdSuivi({ cmd:'planifierBaisses', uid, confirme:true, items:lignes.filter((l)=>String(l.uid)===uid).map((l)=>({ id:String(l.id), prix:l.nouveau, prixAvant:l.prix, at:l.at })) }, 30000); }}
           onAnnulerProgramme={()=>{ const vc2 = vintedDeChrome(); return vc2 && vc2.uid ? vmrCmdSuivi({ cmd:'annulerBaisses', uid:String(vc2.uid) }, 30000) : Promise.resolve(null); }}
           onFini={()=>setQdSel(new Set())}/>;
@@ -57444,6 +57549,10 @@ function AppCoeur() {
   // (3 nov.) « Changer le prix » d'un N° : ouvert depuis la fiche, ou depuis une
   // ligne d'annonce (événement `vrm:prix-partout`, le N° en détail).
   const [prixNum,setPrixNum]=useState(null);
+  // (14 nov., lot argent-prix) 121 « Prix d'un site à l'autre » et 114 « Remettre les prix » : deux feuilles de la coque.
+  const [ecartsOuvert,setEcartsOuvert]=useState(null);
+  const [remiseOuverte,setRemiseOuverte]=useState(null);
+  useEffect(()=>{const a=()=>setEcartsOuvert(Date.now()); const b=()=>setRemiseOuverte(Date.now()); window.addEventListener('vrm:ecarts-prix',a); window.addEventListener('vrm:remise-soldes',b); return()=>{window.removeEventListener('vrm:ecarts-prix',a); window.removeEventListener('vrm:remise-soldes',b);};},[]);
   useEffect(()=>{const ouvrir=e=>{const n=e&&e.detail; if(typeof n!=='string'||!n.trim()||n.length>64)return; setPrixNum(n.trim());};window.addEventListener('vrm:prix-partout',ouvrir);return()=>window.removeEventListener('vrm:prix-partout',ouvrir);},[]);
   // (5 nov.) « PUBLIER AILLEURS » : { num (null = choisir l'article), site (mis en avant) }.
   const [pubAil,setPubAil]=useState(null);
@@ -60635,9 +60744,15 @@ function AppCoeur() {
           const rx = raisonExtGlobale(false, { cap:'baisseprix', role:'baisse tes prix sur Vinted' });
           return <BaissePrixSerie annonces={baisseCoque.annonces} baisseInitiale={baisseCoque.baisse} compteOnglet={vc === undefined ? undefined : (vc ? String(vc.uid||'') : null)}
             plancherDe={(a)=>plancherVente((load('vinted_annonce_numeros', {}) || {})[String(a.id)] || null)} extRaison={rx ? rx.texte : ''} Photo={PhotoVinted} Retour={FermeAuRetour}
-            onFermer={()=>setBaisseCoque(null)}
+            onFermer={()=>setBaisseCoque(null)} soldeOk={soldeOkVrm()} onSolde={enregistrerSoldeVrm}
             onBaisser={(l)=>vmrCmdSuivi({ cmd:'baisserPrixVinted', uid:l.uid, id:l.id, prix:l.nouveau, prixAvant:l.prix, confirme:true }, 120000)}/>;
         })()}</GardeEcran>}
+        {ecartsOuvert && <GardeEcran nom="ecarts-prix" feuille resetKey={String(ecartsOuvert)} onFermer={()=>setEcartsOuvert(null)}>
+          <HoteEcartsPrix comptes={vintedAccounts} numData={numData} onFermer={()=>setEcartsOuvert(null)} onChanger={(n)=>{ setEcartsOuvert(null); setPrixNum(String(n)); }}/>
+        </GardeEcran>}
+        {remiseOuverte && <GardeEcran nom="remise-soldes" feuille resetKey={String(remiseOuverte)} onFermer={()=>setRemiseOuverte(null)}>
+          <HoteRemiseSoldes comptes={vintedAccounts} onFermer={()=>setRemiseOuverte(null)}/>
+        </GardeEcran>}
         {pubPartout && <GardeEcran nom="partout" feuille resetKey={String(pubPartout.at)} onFermer={()=>setPubPartout(null)}>
           <HotePublierPartout comptes={vintedAccounts} nums={pubPartout.nums} numData={numData} onFermer={()=>setPubPartout(null)}/>
         </GardeEcran>}

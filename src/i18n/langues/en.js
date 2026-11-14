@@ -13,9 +13,11 @@ import ecran_compta from './en/compta.js';
 import ecran_argent from './en/argent.js';
 =======
 import ecran_fraiscarte from './en/fraiscarte.js';   // (14 nov., frais-carte)
+import ecran_argentprix from './en/argentprix.js';   // (14 nov., argent-prix)
 >>>>>>> origin/claude/frais-carte
 export default {
   ...ecran_fraiscarte,
+  ...ecran_argentprix,
   ...ecran_compta,
   ...ecran_argent,
   ...ecran_stats,
