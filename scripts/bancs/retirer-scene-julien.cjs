@@ -194,19 +194,26 @@ const egalTous = (L, k) => new Set(L.map((l) => l[k])).size === 1 && L[0][k] != 
         dit(vSans.length === 2 && vSans.every((l) => l.ou === 'vinted' && /^Code sur Vinted$/.test(l.sansCode)), `${nom} : arrivé sans code ⇒ « Code sur Vinted » (où il est), jamais « Code à venir »`, JSON.stringify(vSans));
         dit(pts.some((p) => /SUPER U|Super U/i.test(p.nom) && p.n === 3 && /^3 colis/.test(p.tete)) && pts.some((p) => /^Intermarché$/.test(p.nom) && p.n === 3) && pts.some((p) => /^Super U\b/.test(p.nom)), `${nom} : Super U 3 colis comptés (2 Chronopost + l'achat au code lu), « Intermarché » (l'orthographe de l'enseigne) 3`, JSON.stringify(pts));
         // Le QR qui ne répond pas : dit, jamais un rond vide.
+        // (14 nov., bancs au vert) Le QR se juge quand il a FINI de charger (l'app : « charge » ⇒ « ok » ou « QR pas
+        // chargé ») — une condition, jamais un délai fixe : en 1512 sombre, la machine partagée dépassait les 10 s
+        // de l'ancienne boucle et le banc lisait un QR encore « en chargement » (§6.5).
+        const finiCharger = (code) => pg.waitForFunction((code) => { const l = [...document.querySelectorAll('.vrm-rpf-ligne[data-cc-carte]')].find((x) => x.querySelector(`[data-code-retrait="${code}"]`)); if (!l) return true; const q = l.querySelector('[data-colis-qr]');
+          if (l.querySelector('[data-colis-qr-pas-charge]')) return true; const im = q && q.querySelector('img'); return !!q && q.getAttribute('data-colis-qr-etat') !== 'charge' && !!im && im.complete; }, code, { timeout: 45000 }).catch(() => {});
+        await pg.evaluate(() => { const l = [...document.querySelectorAll('.vrm-rpf-ligne[data-cc-carte]')].find((x) => x.querySelector('[data-code-retrait="723461"]')); if (!l) return;
+          l.querySelector('.vrm-rpf-ouvrir').click(); l.scrollIntoView({ block: 'start' }); window.scrollBy(0, -60); });
+        await finiCharger('723461');
         const qr = await pg.evaluate(async () => {
           const l = [...document.querySelectorAll('.vrm-rpf-ligne[data-cc-carte]')].find((x) => x.querySelector('[data-code-retrait="723461"]')); if (!l) return null;
-          l.querySelector('.vrm-rpf-ouvrir').click(); l.scrollIntoView({ block: 'start' }); window.scrollBy(0, -60);
-          for (let i = 0; i < 60 && !l.querySelector('[data-colis-qr-pas-charge]'); i++) await new Promise((r) => setTimeout(r, 250));
           const ko = l.querySelector('[data-colis-qr-pas-charge]'); const vide = [...l.querySelectorAll('[data-colis-qr] img')].filter((i) => i.getBoundingClientRect().height > 0 && !i.naturalWidth);
           return { message: ko ? ko.textContent.trim() : null, h: ko ? Math.round(ko.getBoundingClientRect().height) : 0, vide: vide.length, code: (l.querySelector('.vrm-rpf-code-gros') || {}).textContent || '' };
         });
         await shot('qr-ko-depli');
         dit(!!qr && qr.message === 'QR pas chargé — Réessayer' && qr.h >= 44 && !qr.vide && /723461/.test(qr.code), `${nom} : un QR qui ne répond pas ⇒ « QR pas chargé — Réessayer » (44 px), le code reste en gros, aucun rond vide`, JSON.stringify(qr));
+        await pg.evaluate(() => { const l = [...document.querySelectorAll('.vrm-rpf-ligne[data-cc-carte]')].find((x) => x.querySelector('[data-code-retrait="620738"]')); if (!l) return;
+          l.querySelector('.vrm-rpf-ouvrir').click(); l.scrollIntoView({ block: 'start' }); window.scrollBy(0, -60); });
+        await finiCharger('620738');
         const qrOk = await pg.evaluate(async () => {
           const l = [...document.querySelectorAll('.vrm-rpf-ligne[data-cc-carte]')].find((x) => x.querySelector('[data-code-retrait="620738"]')); if (!l) return null;
-          l.querySelector('.vrm-rpf-ouvrir').click(); l.scrollIntoView({ block: 'start' }); window.scrollBy(0, -60);
-          for (let i = 0; i < 40; i++) { const im = l.querySelector('[data-colis-qr] img'); if (im && im.naturalWidth) break; await new Promise((r) => setTimeout(r, 250)); }
           const im = l.querySelector('[data-colis-qr] img'); const d = l.querySelector('[data-rp-detail]');
           return { w: im ? im.naturalWidth : 0, etat: (l.querySelector('[data-colis-qr]') || { getAttribute: () => null }).getAttribute('data-colis-qr-etat'), gestes: d ? [...d.querySelectorAll('.vrm-rp-gestes :is(button, a)')].filter((e) => e.getBoundingClientRect().height > 0).map((e) => e.innerText.trim()) : [], detail: d ? d.innerText : '' };
         });
