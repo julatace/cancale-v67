@@ -128,7 +128,7 @@
 :root:root body .vrm-main .vrm-compte-menu-hote { display: flex !important; align-items: center !important; padding: 4px 16px 0 !important; min-width: 0 !important; }
 /* La barre : le champ de recherche prend la place ; le tri et « ⋯ » en icônes bleues, sans fond. */
 :root:root body .vrm-main[data-ecran="annonces"] .vrm-ann-toolbar.vrm-annbar { gap: 2px !important; align-items: center !important; }
-:root:root body .vrm-main[data-ecran="annonces"] .vrm-ann-toolbar .vrm-annbar-bouton { background: transparent !important; box-shadow: none !important; border: 0 !important; color: var(--d-accent-texte, #0066CC) !important; }
+:root:root:root:root body .vrm-main[data-ecran="annonces"] .vrm-ann-toolbar :is(.vrm-annbar-bouton, .vrm-ann-outils > button) { background: transparent !important; box-shadow: none !important; border: 0 !important; color: var(--d-accent-texte, #0066CC) !important; }
 @media (max-width: 767px) {
   /* « Republier » est aussi une vue (capsule « Republier ») : une fois suffit au téléphone. */
   :root:root body .vrm-main[data-ecran="annonces"] .vrm-ann-toolbar [data-actions-ouvrir] { display: none !important; }
