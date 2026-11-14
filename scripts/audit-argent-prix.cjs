@@ -341,4 +341,4 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   fs.rmSync(T, { recursive: true, force: true });
   console.log(`\n${ko ? '❌' : '✅'} audit-argent-prix : ${ok} vert(s), ${ko} rouge(s)`);
   process.exit(ko ? 1 : 0);
-})().catch((e) => { console.log('❌ audit planté : ' + (e && e.stack || e)); process.exit(1); });
+})().catch((e) => { try { fs.rmSync(T, { recursive: true, force: true }); } catch (_) {} console.log('❌ audit planté : ' + (e && e.stack || e)); process.exit(1); });
