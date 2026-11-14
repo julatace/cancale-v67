@@ -139,6 +139,22 @@ const srvBase = require('https').createServer(certificat(), (q, r) => {
   });
 });
 
+// ── L'ÉTALON DU PROCESSEUR ─────────────────────────────────────────────────────
+// La machine des bancs est PARTAGÉE (mesuré le 14 nov. : charge de 20 à 49 sur 4 cœurs, la même charge de
+// calcul variant de 270 à 1 400 ms dans Chromium). Un « ×4 » posé sur une machine déjà 5 fois plus lente
+// mesure du ×20. Avant chaque ouverture mesurée, une charge FIXE est exécutée ici : son temps ÉCOULÉ divisé
+// par son temps PROCESSEUR (process.cpuUsage, qui ne dépend pas de la file d'attente) dit combien la
+// machine est encombrée à cet instant (1 = au repos). Le ralentissement posé est 4 ÷ encombrement, entre
+// 1 et 4 : « ×4 » par rapport à la machine AU REPOS. Le taux posé et l'encombrement sont imprimés avec
+// chaque mesure ; `CPU_MESURE=4` impose ×4 brut (sans étalon).
+function encombrement() {
+  const charge = () => { let x = 0; for (let i = 0; i < 2e7; i++) x = (x * 31 + i) % 1000003; const o = []; for (let i = 0; i < 1e5; i++) o.push({ a: i, b: String(i) }); return JSON.stringify(o.slice(0, 2e4)).length + (x & 0); };
+  const r = [];
+  for (let i = 0; i < 3; i++) { const t = process.hrtime.bigint(); const c = process.cpuUsage(); charge(); const mur = Number(process.hrtime.bigint() - t) / 1e6; const u = process.cpuUsage(c); const cpu = (u.user + u.system) / 1000; r.push(cpu > 0 ? mur / cpu : 1); }
+  return Math.round(r.sort((a, b) => a - b)[1] * 100) / 100;
+}
+const tauxCpu = (enc) => Math.max(1, Math.min(4, Math.round((4 / Math.max(1, enc)) * 100) / 100));
+
 // Posé avant l'app : l'heure du premier écran utile, mesurée DANS la page (rAF), et les tâches longues.
 const SONDE = () => {
   window.__oi = { inst: null, vrai: null, demarrageParti: null, mention: null, panne: null, dansDemarrage: false };
@@ -300,7 +316,9 @@ const lourde = (u) => /select=data(&|$)/.test(u) && !/id=eq\.(vinted_|vrm_|ext_|
       journal.length = 0; statiques.length = 0; reseau.lent = true; reseau.tuyau = 0;
       const t0 = Date.now();
       // RAPIDE=1 : seulement jusqu'au premier écran utile (comparer deux builds vite, sans l'écran vrai).
-      const o = await ouvrir(ctx, { cpu: Number(process.env.CPU_MESURE || 4), delaiMax: 90000, photo: k === 0 ? '2-instantane' : '', attendrePret: !process.env.RAPIDE });
+      const enc = encombrement();
+      const taux = process.env.CPU_MESURE ? Number(process.env.CPU_MESURE) : tauxCpu(enc);
+      const o = await ouvrir(ctx, { cpu: taux, delaiMax: 90000, photo: k === 0 ? '2-instantane' : '', attendrePret: !process.env.RAPIDE });
       const m = await lire(o.pg);
       const utile = m.inst != null && m.vrai != null ? Math.min(m.inst, m.vrai) : (m.inst != null ? m.inst : m.vrai);
       const borne = utile == null ? Infinity : t0 + utile;
@@ -311,7 +329,7 @@ const lourde = (u) => /select=data(&|$)/.test(u) && !/id=eq\.(vinted_|vrm_|ext_|
       if (process.env.RAPIDE) await attendre(1500); else await calme(journal, 60000);
       const lec2 = journal.filter((r) => r.m === 'GET');
       const p = {
-        n: k + 2, utile_ms: utile, instantane_ms: m.inst, vrai_ms: m.vrai, fcp_ms: m.fcp, demarrageParti_ms: m.demarrageParti,
+        n: k + 2, taux, encombrement: enc, charge: Math.round(os.loadavg()[0] * 10) / 10, utile_ms: utile, instantane_ms: m.inst, vrai_ms: m.vrai, fcp_ms: m.fcp, demarrageParti_ms: m.demarrageParti,
         mention: m.mention != null, jsN: m.jsN, jsReseauKo: m.jsReseauKo, jsAnalyseKo: m.jsAnalyseKo, cssAnalyseKo: m.cssAnalyseKo,
         statiquesReseau: statiques.length, statiquesReseauKo: Math.round(statiques.reduce((a, x) => a + x.o, 0) / 1024),
         // Ce que la PAGE a demandé au réseau avant de se peindre (hors relectures de fond) : la coquille, ses scripts, l'écran d'ouverture.
@@ -405,9 +423,10 @@ const lourde = (u) => /select=data(&|$)/.test(u) && !/id=eq\.(vinted_|vrm_|ext_|
     const o = await ouvrir(ctx, { cpu: 1, attendrePret: false, delaiMax: 20000 });
     await attendre(1500);
     const e = await etatEcran(o.pg);
+    const m5 = await lire(o.pg);   // la sonde a vu TOUT instantané peint, même un instant (dans l'écran de démarrage compris)
     const s = await stockage(o.pg);
     const t = s.valeurs.join('\n') + s.idb.map((x) => x.cles.join(',') + x.texte).join('\n');
-    dit(!e.inst, '5 autre compte : aucun instantané du précédent n’est montré', e.inst ? 'instantané montré' : '');
+    dit(!e.inst && m5.inst == null, '5 autre compte : aucun instantané du précédent n’est montré, même un instant', e.inst || m5.inst != null ? `instantané peint à ${m5.inst} ms` : '');
     dit(!t.includes(UID), '5 autre compte : l’instantané du précédent n’est plus sur l’appareil', t.includes(UID) ? 'encore là' : '');
     await shot(o.pg, '5-autre-compte');
     await o.pg.close();
