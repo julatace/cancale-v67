@@ -1082,3 +1082,7 @@ Récit : `historique-interface-stock.md` (« LES QUATRE OUTILS DES ANNONCES »).
 | `lbcstats` | `noterStatsAnnonceLbc` | **5.291.0** (30 oct.) | « favoris, vues et messages relevés sur tes annonces Leboncoin » |
 | `favorisouvrir` | `ouvrirFavoriNatif` | **5.225.0** | (ajoutée à la table le 30 oct.) |
 | `favorisliste` | `lirePageFavoris` | **5.218.0** | (ajoutée à la table le 30 oct.) |
+
+## Ligne déplacée de CLAUDE.md §9 (14 nov., taille)
+
+- **14 nov. · Carte du logo (5.376.0)** : la carte n'ouvre plus VRM (liens du MÊME site : ventes, messages, dressing du compte de l'onglet ; Vestiaire aucun) ; « N favoris à qui écrire · Voir » ⇒ aperçu calculé par le serveur (règles de l'app) ⇒ « Lancer » = la file d'avant conduite par le fond (15/h, 50/h, pause, autre compte ⇒ rien) ; app : guide des favoris, Créer sur Vinted guidé. `docs/passation/2026-11-14-extension-carte.md`. Geste : installer la 5.376.

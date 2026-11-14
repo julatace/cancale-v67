@@ -524,12 +524,12 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **14 nov. · Retraits d'achat cachés (« je n'ai plus les retraits d'achat »)** : mesuré, la règle comptait 3 colis à retirer AVEC code (publication), mais la refonte d'Achats les rangeait dans un repli fermé sans ligne ; règle `src/repliRetirer.js` : ≥ 1 colis ⇒ « À retirer » ouvert en tête, fermer ne vaut que pour la liste vue, « à vérifier » nommés. `docs/passation/2026-11-14-retraits-achats.md`. Geste : aucun.
 - **14 nov. · Mode exemple : photos et impossible à confondre** : 21 vraies photos (Commons, CC0 / domaine public, crédits `public/exemple/CREDITS.md`, une par paire, titre = la photo) ; bandeau « Exemple — données inventées » + « J’ai déjà un compte · Me connecter », cadre hachuré au-dessus de tout, « exemple » sur codes et adresses, « Relais Exemple, rue Imaginaire » (capture d’accueil refaite). `2026-11-14-exemple-photos.md`. Geste : aucun.
 
 - **14 nov. · Accueil, le reste (133 134 136 139 140 143 145 146 147)** : « J'ai déjà mes N° sur mes cartons » (aucun N° neuf avant sa réponse, N° écrit en double ⇒ rouge, rien adopté), « Ce que VRM a trouvé », visite de 4 écrans, mots expliqués, conseil du jour 30 j, essai en chiffres prouvés, vidéo 45 s, Apple prêt et ÉTEINT, appel de bienvenue Pro ; « À trancher » ne recouvre plus Ma journée. `docs/passation/2026-11-14-accueil-reste.md`. Geste : coller son lien de réservation (Paramètres → Aide) ; Apple si voulu (99 €/an).
 
 - **14 nov. · Extension 5.376.0 consolidée** : quatre branches en UNE version (carte du logo + capture, messages-achats-plus, argent-prix `remiseprix`, dates-versement `versementconv`), zips refaits une fois. `docs/passation/2026-11-14-extension-5376.md`. Geste : installer la 5.376.0 sur chaque navigateur.
-- **14 nov. · Carte du logo (5.376.0)** : la carte n'ouvre plus VRM (liens du MÊME site : ventes, messages, dressing du compte de l'onglet ; Vestiaire aucun) ; « N favoris à qui écrire · Voir » ⇒ aperçu calculé par le serveur (règles de l'app) ⇒ « Lancer » = la file d'avant conduite par le fond (15/h, 50/h, pause, autre compte ⇒ rien) ; app : guide des favoris, Créer sur Vinted guidé. `docs/passation/2026-11-14-extension-carte.md`. Geste : installer la 5.376.
 
 
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
