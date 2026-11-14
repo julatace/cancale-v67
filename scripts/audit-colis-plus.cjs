@@ -65,6 +65,8 @@ const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').split(
 if (MUT) {
   if (!MUTS[MUT]) { console.log('mutation inconnue : ' + MUT); process.exit(2); }
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'colis-plus-'));
+  // La copie mutée est effacée à la sortie (21 Mo par mutation : le disque est compté).
+  process.on('exit', () => { try { fs.rmSync(d, { recursive: true, force: true }); } catch (_) {} });
   fs.cpSync(path.join(R, 'src'), path.join(d, 'src'), { recursive: true, filter: (s) => !/\/node_modules(\/|$)/.test(s) });
   const f = path.join(d, 'src', MUTS[MUT][2]); const s = fs.readFileSync(f, 'utf8');
   if (!s.includes(MUTS[MUT][0])) { console.log('motif introuvable : ' + MUT); process.exit(2); }
