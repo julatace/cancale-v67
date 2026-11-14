@@ -129,7 +129,7 @@
 .vrm-aide-video-apercu { position: relative; flex: 0 0 45px; height: 80px; border-radius: 8px; overflow: hidden; background: var(--vrm-card2, #F2F2F7); }
 .vrm-aide-video-apercu img { display: block; width: 45px; height: 80px; object-fit: cover; }
 .vrm-aide-video-play {
-  position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 15px;
+  position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 12px;
   display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.55); color: #fff;
 }
 .vrm-aide-video-play svg { margin-left: 2px; width: 16px; height: 16px; }
@@ -139,7 +139,7 @@
 .vrm-aide-video { margin: 0 0 12px; }
 .vrm-aide-video video {
   display: block; width: auto; height: auto; max-width: 100%; max-height: min(68vh, 560px); aspect-ratio: 9 / 16;
-  margin: 0 auto; border-radius: 14px; background: #000;
+  margin: 0 auto; border-radius: 12px; background: #000;
 }
 .vrm-aide-video figcaption { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; font-size: 13px; line-height: 1.35; color: var(--vrm-muted, #6E6E73); }
 .vrm-aide-video figcaption b { color: var(--vrm-ink, #1D1D1F); font-weight: 600; }
