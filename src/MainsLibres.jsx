@@ -58,8 +58,8 @@ export function MainsLibres({ onCommande }) {
       <button type="button" className="vrm-cp-voix-b" aria-pressed={actif} data-mains-libres-bouton="" onClick={() => (actif ? arreter() : demarrer())}>
         <span className="vrm-cp-voix-point" aria-hidden="true"/>{actif ? tr('cp.voix.arreter') : tr('cp.voix.bouton')}
       </button>
-      {ligne.texte ? <p className={'vrm-cp-voix-l' + (ligne.cmd ? ' is-cmd' : '')} role="status" aria-live="polite" data-mains-libres-ligne={ligne.c || ''}>{ligne.texte}</p> : null}
       <details><summary>?</summary>{tr('cp.voix.pourquoi')}</details>
+      {ligne.texte ? <p className={'vrm-cp-voix-l' + (ligne.cmd ? ' is-cmd' : '')} role="status" aria-live="polite" data-mains-libres-ligne={ligne.c || ''}>{ligne.texte}</p> : null}
     </div>
   );
 }

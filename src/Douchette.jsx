@@ -16,7 +16,7 @@ export function useDouchette(onCode) {
     if (typeof window === 'undefined') return undefined;
     const d = creerDetecteur();
     const k = (e) => {
-      const code = d.touche({ key: e.key, t: (typeof performance !== 'undefined' ? performance.now() : Date.now()), champ: estChampSaisie(e.target) || e.isComposing, mod: e.ctrlKey || e.metaKey || e.altKey });
+      const code = d.touche({ key: e.key, t: (e.timeStamp > 0 ? e.timeStamp : (typeof performance !== 'undefined' ? performance.now() : Date.now())), champ: estChampSaisie(e.target) || e.isComposing, mod: e.ctrlKey || e.metaKey || e.altKey });
       if (code) { e.preventDefault(); e.stopPropagation(); try { ref.current(code); } catch (_) {} }
     };
     window.addEventListener('keydown', k, true);

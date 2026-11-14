@@ -78,6 +78,7 @@ async function ouvrir(b, vue, LIGNES, { sombre = false, voix = true, imprimante 
   const ctx = await b.newContext({ ...vue, acceptDownloads: true });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+  const consoleErrs = []; pg.on('console', (m) => { if (m.type() === 'error' || (process.env.CP_DIAG && /pdf|worker|warn/i.test(m.type() + m.text()))) consoleErrs.push(m.type() + ':' + m.text().slice(0, 200)); });
   const mainData = LIGNES.find((r) => r.id === 'main').data;
   await pg.addInitScript(({ m, sombre: s, voix: avecVoix, imprimante: impr, emballages: emb, extra: ex }) => {
     try {
@@ -113,7 +114,7 @@ async function ouvrir(b, vue, LIGNES, { sombre = false, voix = true, imprimante 
     if (!fs.existsSync(f)) return r.fulfill({ status: 404, body: '' });
     return r.fulfill({ status: 200, contentType: 'text/javascript', headers: { 'access-control-allow-origin': '*' }, body: fs.readFileSync(f) });
   });
-  await pg.addInitScript((port) => { import(`http://localhost:${port}/__pdfjs/pdf.min.mjs`).then((m) => { window.pdfjsLib = { ...m, getDocument: (o) => { const t = m.getDocument(o); return { promise: t.promise.then((d) => { if (typeof d.destroy !== 'function') d.destroy = () => t.destroy(); return d; }), destroy: () => t.destroy() }; } }; }).catch(() => {}); }, PORT);
+  await pg.addInitScript((port) => { import(`http://localhost:${port}/__pdfjs/pdf.min.mjs`).then((m) => { m.GlobalWorkerOptions.workerSrc = `http://localhost:${port}/__pdfjs/pdf.worker.min.mjs`; /* le lecteur de pdf.js DE LA PAGE (même origine) ; l’app écrit son adresse CDN sur une copie, sans effet */ window.pdfjsLib = { ...m, GlobalWorkerOptions: { workerSrc: "" }, getDocument: (o) => { const t = m.getDocument(o); return { promise: t.promise.then((d) => { if (typeof d.destroy !== 'function') d.destroy = () => t.destroy(); return d; }), destroy: () => t.destroy() }; } }; }).catch(() => {}); }, PORT);
   await pg.route('**/rest/v1/**', (route) => {
     const req = route.request();
     const u = decodeURIComponent(metaVersData(req.url()));
@@ -139,7 +140,7 @@ async function ouvrir(b, vue, LIGNES, { sombre = false, voix = true, imprimante 
   // Les N° arrivent avec les transactions (identité tx → annonce → fiche) : on attend qu'ils soient écrits.
   await pg.waitForFunction((n) => { const t = document.body.innerText; return n.every((x) => t.includes('N°' + x)); }, V.map((v) => v.num), { timeout: 45000 }).catch(() => {});
   await pg.waitForTimeout(600);
-  return { ctx, pg, errs };
+  return { ctx, pg, errs, consoleErrs };
 }
 const lire = (pg, k) => pg.evaluate((cle) => { try { return JSON.parse(localStorage.getItem(cle) || 'null'); } catch (_) { return 'illisible'; } }, k);
 const shot = async (pg, nom) => { if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `colis-plus-${nom}.png`) }); };
@@ -152,7 +153,7 @@ const petites = (pg, racine) => pg.evaluate((r) => [...document.querySelectorAll
 // ── A · 98 : 4 bordereaux par page A4 ─────────────────────────────────────────
 async function lot(b, nom, vue, LIGNES) {
   console.log(`\n— A. 4 par page A4 · ${nom}`);
-  const { ctx, pg, errs } = await ouvrir(b, vue, LIGNES, { imprimante: 'planche4' });
+  const { ctx, pg, errs, consoleErrs } = await ouvrir(b, vue, LIGNES, { imprimante: process.env.CP_IMPR || 'planche4' });
   try {
     await pg.waitForSelector('button[data-lot-ouvrir="1"]', { timeout: 20000 }).catch(() => {});
     const btn = await pg.$('button[data-lot-ouvrir="1"]');
@@ -178,7 +179,8 @@ async function lot(b, nom, vue, LIGNES) {
       await pg.waitForTimeout(250);
     }
     const b64 = await pg.evaluate(async () => { const bl = window.__pdfs[window.__pdfs.length - 1]; if (!bl) return null; const u = new Uint8Array(await bl.arrayBuffer()); let s = ''; for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s); });
-    dit(!!b64, `${nom} : A2 UN PDF est produit`);
+    const diag = b64 ? '' : await pg.evaluate(() => JSON.stringify({ placeur: [...document.querySelectorAll('[data-placeur-tampon]')].map((e) => e.getAttribute('data-placeur-tampon')), dialogues: [...document.querySelectorAll('[role=dialog],[role=alertdialog]')].map((e) => (e.getAttribute('aria-label') || '') + ':' + (e.innerText || '').replace(/\s+/g, ' ').slice(0, 600)) }));
+    dit(!!b64, `${nom} : A2 UN PDF est produit`, diag + ' ' + consoleErrs.slice(-4).join(' | '));
     if (b64) {
       const pages = await pagesDuPdf(b64);
       const a4 = pages.every((p) => Math.abs(p.w - 595.28) < 1 && Math.abs(p.h - 841.89) < 1);
@@ -223,10 +225,10 @@ async function preparer(b, nom, vue, LIGNES, sombre) {
     dit(alerte && /t3/.test(alerte.ids) && !/rgb\(2(1[5-9]|[2-5]\d), (0|[1-5]\d), (0|[1-5]\d)\)/.test(alerte.c), `${nom} : B3 la fourniture au seuil (Scotch) est dite, en ambre (jamais rouge)`, JSON.stringify(alerte));
     await shot(pg, `${nom}-preparer`);
     await cliquer(pg, '[data-emb-prendre]');
-    await pg.waitForTimeout(300);
+    await pg.waitForTimeout(1200);
     const apres1 = await lire(pg, 'vrm_emballages');
     const choix1 = await pg.evaluate(() => { const e = document.querySelector('[data-emb-choix-colis]'); return e ? e.getAttribute('data-emb-choix') : null; });
-    dit(apres1 && apres1.choix && apres1.choix[c1] === 't2' && Object.keys(apres1.choix).length === 1 && choix1 === 't2' && !(await pg.$('[data-emb-propose]')), `${nom} : B4 « Prendre » écrit SON choix pour CE colis seulement`, JSON.stringify(apres1 && apres1.choix));
+    dit(apres1 && apres1.choix && apres1.choix[c1] === 't2' && Object.keys(apres1.choix).length === 1 && choix1 === 't2' && !(await pg.$('[data-emb-propose]')), `${nom} : B4 « Prendre » écrit SON choix pour CE colis seulement`, JSON.stringify({ c1, choix1, ls: apres1 }).slice(0, 400));
     // C · 100 Mains libres
     const bouton = await pg.evaluate(() => { const e = document.querySelector('[data-mains-libres-bouton]'); return e ? Math.round(e.getBoundingClientRect().height) : 0; });
     dit(bouton >= 44, `${nom} : C1 « Mains libres » est là (≥ 44 px)`, String(bouton));
@@ -266,6 +268,7 @@ async function preparer(b, nom, vue, LIGNES, sombre) {
     const jr = await pg.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('vrm_temps_colis')).map((k) => [k, JSON.parse(localStorage.getItem(k))]));
     const sc = jr.length === 1 && jr[0][1].seances.length === 1 ? jr[0][1].seances[0] : null;
     dit(sc && sc.colis.length === 1 && sc.colis[0].cle === c1 && (sc.colis[0].ms === null || (sc.colis[0].ms >= 15000 && sc.colis[0].ms <= 900000)), `${nom} : D1 la séance est rangée sur l'appareil (CE colis, mesuré ou « pas mesuré »)`, JSON.stringify(jr.map((x) => [x[0], x[1].seances])));
+    const msBanc = sc && sc.colis[0] && Number.isFinite(sc.colis[0].ms) ? sc.colis[0].ms : null;
     if (jr.length === 1) {
       const o = MAINTENANT - 2 * J;
       await pg.evaluate(([k, s]) => { const j = JSON.parse(localStorage.getItem(k)); j.seances.unshift(s); localStorage.setItem(k, JSON.stringify(j)); }, [jr[0][0], { ouverture: o, colis: [{ cle: 'v:7000000001', at: o + 240000, ms: 240000 }, { cle: 'v:7000000002', at: o + 420000, ms: 180000 }, { cle: 'v:7000000003', at: o + 3600000, ms: null }] }]);
@@ -275,7 +278,8 @@ async function preparer(b, nom, vue, LIGNES, sombre) {
     await cliquer(pg, '[data-preparer-ouvrir]'); await pg.waitForSelector('[data-preparer-liste]', { timeout: 6000 }).catch(() => {});
     await cliquer(pg, '[data-preparer-liste]'); await pg.waitForSelector('[data-temps-colis]', { timeout: 6000 }).catch(() => {});
     const t = await pg.evaluate(() => { const e = document.querySelector('[data-temps-quand="mois"] [data-temps-par-colis]'); return e ? Object.fromEntries([...e.attributes].filter((a) => a.name.startsWith('data-temps')).map((a) => [a.name.replace('data-temps-', ''), a.value])) : null; });
-    dit(t && t['mesures'] === '2' && t['par-colis'] === '210000' && t['total'] === '420000' && t['n-gain'] === '1' && t['gain'] === String(Math.round(45 / (4 / 60) * 100) / 100) && Number(t['colis']) >= 4,
+    const nM = 2 + (msBanc != null ? 1 : 0), tot = 420000 + (msBanc || 0);
+    dit(t && t['mesures'] === String(nM) && t['par-colis'] === String(Math.round(tot / nM)) && t['total'] === String(tot) && t['n-gain'] === '1' && t['gain'] === String(Math.round(45 / (4 / 60) * 100) / 100) && t['colis'] === '4',
       `${nom} : D2 le récapitulatif : 3 min 30 par colis sur 2 mesurés, au moins 7 min, gain sur 1 colis au prix connu (675 €/h)`, JSON.stringify(t));
     const replis = await pg.evaluate(() => !!document.querySelector('[data-temps-colis] details'));
     dit(replis, `${nom} : D3 « comment c'est mesuré » est replié (pas un mur de texte)`);
@@ -317,7 +321,18 @@ async function douchette(b, nom, vue, LIGNES) {
     await pg.waitForSelector('[data-preparer-ouvrir]', { timeout: 20000 }).catch(() => {});
     await pg.waitForTimeout(800);
     const etat = () => pg.evaluate(() => document.documentElement.getAttribute('data-douchette'));
-    const bip = async (code, delay = 3) => { await pg.evaluate(() => { try { document.activeElement && document.activeElement.blur && document.activeElement.blur(); } catch (_) {} }); await pg.keyboard.type(code, { delay }); await pg.keyboard.press('Enter'); await pg.waitForTimeout(400); };
+    // Une douchette envoie ses touches d'un trait : elles sont posées dans la même tâche (≈ 0 ms d'écart) ;
+    // `lent` : une touche toutes les 160 ms (une frappe humaine).
+    const bip = async (code, lent = 0) => {
+      await pg.evaluate(async ({ c, l }) => {
+        try { document.activeElement && document.activeElement.blur && document.activeElement.blur(); } catch (_) {}
+        const cible = document.activeElement || document.body;
+        const t = (k) => cible.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+        for (const ch of c) { t(ch); if (l) await new Promise((r) => setTimeout(r, l)); }
+        t('Enter');
+      }, { c: code, l: lent });
+      await pg.waitForTimeout(500);
+    };
     const cible = V[4];
     await bip(cible.suivi);
     const e1 = await etat();
@@ -341,7 +356,7 @@ async function douchette(b, nom, vue, LIGNES) {
     dit((await etat()) === 'avant', `${nom} : E5 une frappe lente (160 ms) n'est pas une douchette`, String(await etat()));
     const champ = await pg.$('input[type="search"], input[type="text"]');
     if (champ) {
-      await champ.focus(); await pg.keyboard.type(V[3].suivi, { delay: 3 }); await pg.keyboard.press('Enter'); await pg.waitForTimeout(400);
+      await champ.focus(); await pg.evaluate((c) => { const el = document.activeElement; const t = (k) => el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true })); for (const ch of c) t(ch); t('Enter'); }, V[3].suivi); await pg.waitForTimeout(400);
       dit((await etat()) === 'avant', `${nom} : E6 dans un champ de saisie, rien (la douchette y tape comme un clavier)`, String(await etat()));
     } else dit(false, `${nom} : E6 un champ de saisie pour l'essai`);
     dit(errs.length === 0, `${nom} : aucune erreur d'app`, errs.join(' | ').slice(0, 200));
@@ -363,7 +378,9 @@ async function douchette(b, nom, vue, LIGNES) {
     const ordi = { viewport: { width: 1512, height: 950 } };
     if (VUES.includes('390')) { await preparer(b, '390', tel, LIGNES, false); await sansVoix(b, '390', tel, LIGNES); }
     if (VUES.includes('390-sombre')) await preparer(b, '390-sombre', tel, LIGNES, true);
-    if (VUES.includes('1512')) { await lot(b, '1512', ordi, LIGNES); await douchette(b, '1512', ordi, LIGNES); await preparer(b, '1512', ordi, LIGNES, false); }
+    if (VUES.includes('1512') || VUES.includes('lot')) await lot(b, '1512', ordi, LIGNES);
+    if (VUES.includes('1512') || VUES.includes('douchette')) await douchette(b, '1512', ordi, LIGNES);
+    if (VUES.includes('1512')) await preparer(b, '1512', ordi, LIGNES, false);
     if (VUES.includes('390-lot')) await lot(b, '390', tel, LIGNES);
   } catch (e) { dit(false, 'le banc s’exécute', String(e.stack || e.message || e).slice(0, 300)); }
   finally {

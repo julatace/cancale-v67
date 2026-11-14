@@ -33,7 +33,10 @@
 @media (prefers-reduced-motion: reduce) { .vrm-cp-voix-b[aria-pressed="true"] .vrm-cp-voix-point { animation: none; } }
 .vrm-cp-voix-l { flex: 1 1 200px; min-width: 0; margin: 0; font-size: var(--d-t-13, 13px); color: var(--d-gris, var(--vrm-muted, #6E6E73)); }
 .vrm-cp-voix-l.is-cmd { color: var(--d-encre, var(--vrm-ink, #1D1D1F)); font-weight: 600; }
-.vrm-cp-voix details { flex-basis: 100%; font-size: var(--d-t-13, 13px); color: var(--d-gris, var(--vrm-muted, #6E6E73)); }
+.vrm-cp-voix details { flex: 0 0 auto; font-size: var(--d-t-13, 13px); color: var(--d-gris, var(--vrm-muted, #6E6E73)); }
+.vrm-cp-voix details[open] { flex-basis: 100%; order: 3; }
+.vrm-cp-voix summary { list-style: none; color: var(--d-accent-texte, #0066CC); font-weight: 600; }
+.vrm-cp-voix summary::-webkit-details-marker { display: none; }
 .vrm-cp-voix summary { cursor: pointer; min-height: 44px; min-width: 44px; justify-content: center; display: inline-flex; align-items: center; }
 
 /* 101 · le temps : tuiles (gros chiffre + libellé court), sans carte dans la carte. */
