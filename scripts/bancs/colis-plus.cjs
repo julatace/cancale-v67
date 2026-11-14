@@ -171,8 +171,8 @@ async function lotBrut(b, nom, vue, LIGNES) {
     await cliquer(pg, '[data-lot-imprimante-choix="thermique"]'); await pg.waitForTimeout(900);
     const apresTh = await pg.evaluate(() => ({ seg: (document.querySelector('[data-lot-imprimante]') || {}).getAttribute && document.querySelector('[data-lot-imprimante]').getAttribute('data-lot-imprimante'), papier: (document.querySelector('[data-lot-section="apercu"]') || { getAttribute: () => null }).getAttribute('data-lot-papier'), ls: localStorage.getItem('vrm_imprimante') }));
     await cliquer(pg, '[data-lot-imprimante-choix="planche4"]'); await pg.waitForTimeout(900);
-    const apresPl = await pg.evaluate(() => localStorage.getItem('vrm_imprimante'));
-    dit(JSON.stringify(choix) === JSON.stringify(['normale', 'thermique', 'planche4']) && apresTh.seg === 'thermique' && apresTh.papier === '10x15' && /thermique/.test(apresTh.ls || '') && /planche4/.test(apresPl || ''),
+    const apresPl = await pg.evaluate(() => { const p = document.querySelector('[data-lot-imprimante-choix][aria-pressed="true"]'); return localStorage.getItem('vrm_imprimante') + (p && p.getAttribute('data-lot-imprimante-choix') === 'planche4' ? '' : ' (segment pas à jour)'); });
+    dit(JSON.stringify(choix) === JSON.stringify(['normale', 'thermique', 'planche4']) && apresTh.seg === 'thermique' && apresTh.papier === '10x15' && /thermique/.test(apresTh.ls || '') && /planche4/.test(apresPl || '') && !/segment/.test(apresPl || ''),
       `${nom} : A8 « Tout imprimer » montre le choix Classique · 4 par page · Thermique, et le retient`, JSON.stringify({ choix, apresTh, apresPl }));
     await shot(pg, `${nom}-lot-apercu`);
     await cliquer(pg, 'button[data-lot-imprimer]');
