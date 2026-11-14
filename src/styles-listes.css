@@ -229,6 +229,9 @@
 :root:root body .vrm-main .vrm-colis-section .vrm-colis-carte[data-bord-card] .vrm-colis-photo + div > div:has(> .vrm-colis-choisir) {
   flex: 1 1 100% !important; margin-top: 2px !important; padding: 0 !important; background: none !important; border: 0 !important;
 }
+/* « Choisir la vente » (un N° d'e-mail qui contredit la vente) : un lien ambre de la taille de la note, sans soulignement
+   répété sur chaque rangée (audit de design du 14 nov. : le poids suit l'importance). */
+:root:root:root body .vrm-main .vrm-colis-section .vrm-colis-carte[data-bord-card] .vrm-colis-choisir { text-decoration: none !important; font-size: 13px !important; font-weight: 600 !important; }
 /* Le compte, dans la même ligne que la limite : un mot, sans cadre. */
 :root:root body .vrm-main .vrm-colis-section .vrm-colis-carte[data-bord-card] .vrm-colis-photo + div > div:has(.vrm-acct-tag) { flex: 0 1 auto !important; max-width: 40% !important; overflow: hidden !important; }
 /* « 69 bordereaux déjà traités · retirés tout seuls dès que Vinted confirme » : une ligne, coupée net. */

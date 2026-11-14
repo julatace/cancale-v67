@@ -21,7 +21,7 @@ export function BarreOutils({ valeur = '', onChange, placeholder, label, childre
     <div className={'vrm-ui-outils' + (className ? ' ' + className : '')} role="search" {...attrs}>
       <label className="vrm-ui-outils-champ">
         <Loupe/>
-        <input type="search" inputMode="search" enterKeyHint="search" value={valeur} placeholder={placeholder || tr('listes.rechercher')} aria-label={label || placeholder || tr('listes.rechercher')}
+        <input type="search" name="recherche" autoComplete="off" spellCheck={false} inputMode="search" enterKeyHint="search" value={valeur} placeholder={placeholder || tr('listes.rechercher') + '…'} aria-label={label || placeholder || tr('listes.rechercher')}
           onChange={(e) => onChange && onChange(e.target.value)} {...(champAttrs || {})}/>
       </label>
       {children}

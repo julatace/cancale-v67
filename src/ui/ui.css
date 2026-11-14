@@ -149,4 +149,16 @@
 :root:root:root:root:root:root body .vrm-ui-ligne-valeur { flex: none !important; font: 600 15px/20px var(--vrm-police) !important; font-variant-numeric: tabular-nums !important; color: var(--d-encre, #1D1D1F) !important; text-align: right !important; }
 :root:root:root:root:root:root body .vrm-ui-ligne > svg.vrm-ui-chevron { flex: none !important; color: var(--d-glyphe, #AEAEB2) !important; }
 @media (prefers-reduced-motion: reduce) { :root:root body :is(.vrm-ui-voile, .vrm-ui-feuille) { animation: none !important; } }
+
+/* ── Guide des interfaces (web-design-guidelines, 14 nov.) : focus visible partout où le dessin a été remis à zéro,
+   survol à la souris seulement, double-toucher sans délai, feuille qui ne fait pas défiler la page dessous. ── */
+:root:root:root:root:root:root body :is(.vrm-ui-filtre, .vrm-ui-afaire, .vrm-ui-afaire-capsule, .vrm-ui-ligne, .vrm-ui-choix button, .vrm-ui-feuille-fermer):focus-visible { outline: 2px solid var(--d-accent, #0071E3) !important; outline-offset: 2px !important; }
+:root:root:root:root:root:root body :is(.vrm-ui-filtre, .vrm-ui-afaire, .vrm-ui-afaire-capsule, .vrm-ui-ligne, .vrm-ui-menu-compte, .vrm-ui-icone, .vrm-ui-bande-item, .vrm-ui-choix button) { touch-action: manipulation !important; }
+:root:root:root:root:root:root body .vrm-ui-feuille { overscroll-behavior: contain !important; }
+@media (hover: hover) and (pointer: fine) {
+  :root:root:root:root:root:root body .vrm-ui-filtre:not([aria-pressed="true"]):hover { background-color: var(--d-case, #F2F2F7) !important; }
+  :root:root:root:root:root:root body :is(.vrm-ui-afaire, .vrm-ui-ligne):hover { background-color: var(--d-case, #F2F2F7) !important; }
+  :root:root:root:root:root:root body .vrm-ui-menu-compte:hover > span:first-child { text-decoration: underline !important; text-underline-offset: 3px !important; }
+  :root:root:root:root:root:root body .vrm-ui-choix button:hover { background: var(--d-remplir, rgba(118,118,128,.12)) !important; }
+}
 }
