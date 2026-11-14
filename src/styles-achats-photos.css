@@ -206,11 +206,12 @@
 /* 5 · LA BANDE DE CHIFFRES d'Achats (AJOUT 3 de Julien : « carte sombre géante » interdite hors de Ma journée).
    La MÊME carte réglable (CarteMois : mêmes chiffres, mêmes data-*, « Modifier », « ? ») dessinée en bande sur le
    fond de la page, ≤ 72 px : « Novembre … Modifier » en haut ; puis Dépensé · En route · À retirer · Arrivés côte à
-   côte (libellé 12, chiffre 22/700 tabulaire). Aucune carte, aucun fond sombre. */
+   côte, séparés d'un filet : le chiffre en haut (28/700 tabulaire), son libellé dessous (13) — l'argent rendu lisible,
+   comme une app de banque. Aucune carte, aucun fond sombre. */
 :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero {
-  display: grid !important; grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr)) !important;
-  grid-template-areas: "sur sur sur mod" "l1 c2 c3 c4" "n1 c2 c3 c4" !important; grid-template-rows: auto auto auto !important;
-  column-gap: 12px !important; row-gap: 2px !important; align-items: end !important;
+  display: grid !important; grid-template-columns: auto repeat(3, minmax(0, 1fr)) !important;
+  grid-template-areas: "sur sur sur mod" "n1 c2 c3 c4" "l1 c2 c3 c4" !important; grid-template-rows: auto auto auto !important;
+  column-gap: 0 !important; row-gap: 0 !important; align-items: start !important;
   position: relative !important; padding: 0 !important; margin: 0 0 12px !important; background: transparent !important; box-shadow: none !important; border: 0 !important; min-height: 0 !important;
 }
 :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero::before,
@@ -223,13 +224,13 @@
   min-height: 44px !important; padding: 0 0 0 12px !important; background: transparent !important; border: 0 !important; box-shadow: none !important;
   font-size: var(--d-t-15, 15px) !important; font-weight: 400 !important; color: var(--d-accent-texte, #0066CC) !important;
 }
-:root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-sous { grid-area: l1 !important; color: var(--d-gris, #6E6E73) !important; margin: 0 !important; padding: 0 !important; line-height: 1.3 !important; }
-:root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-sous-nom { display: inline-flex !important; align-items: center !important; gap: 4px !important; font-size: var(--d-t-12, 12px) !important; font-weight: 400 !important; color: var(--d-gris, #6E6E73) !important; }
+:root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-sous { grid-area: l1 !important; color: var(--d-gris, #6E6E73) !important; margin: 0 !important; padding: 2px 12px 0 0 !important; line-height: 1.3 !important; }
+:root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-sous-nom { display: inline-flex !important; align-items: center !important; gap: 4px !important; font-size: var(--d-t-13, 13px) !important; font-weight: 400 !important; color: var(--d-gris, #6E6E73) !important; }
 :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-sous-nom { position: relative !important; padding-right: 22px !important; }
 :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-aide, :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-aide * { color: var(--d-gris, #6E6E73) !important; }
 :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-aide { position: absolute !important; right: -11px !important; top: 50% !important; transform: translateY(-50%) !important; margin: 0 !important; }
 :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-grand {
-  grid-area: n1 !important; font-size: var(--d-t-20, 20px) !important; line-height: 1.15 !important; font-weight: 700 !important; letter-spacing: -.016em !important;
+  grid-area: n1 !important; font-size: var(--d-t-28, 28px) !important; line-height: 1.1 !important; font-weight: 700 !important; letter-spacing: -.02em !important; padding-right: 12px !important;
   color: var(--d-encre, #1D1D1F) !important; font-variant-numeric: tabular-nums !important; white-space: nowrap !important; text-shadow: none !important;
 }
 :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero :is(.vrm-fu-pile, .vrm-courbe) { display: none !important; }
@@ -237,16 +238,17 @@
   display: flex !important; flex-direction: column !important; justify-content: flex-end !important; align-items: flex-start !important; gap: 2px !important;
   padding: 0 !important; min-height: 44px !important; height: auto !important; background: transparent !important; box-shadow: none !important; border: 0 !important; border-radius: 0 !important;
   align-self: stretch !important; text-align: left !important; color: var(--d-encre, #1D1D1F) !important;
+  justify-content: flex-start !important; padding-left: 12px !important; border-left: .5px solid var(--d-filet, rgba(60,60,67,.18)) !important;
 }
 :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-cases > .vrm-fu-case:nth-child(1):nth-last-child(n) { grid-area: c2 !important; }
 :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-cases > .vrm-fu-case:nth-child(2):nth-last-child(n) { grid-area: c3 !important; }
 :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-cases > .vrm-fu-case:nth-child(3):nth-last-child(n) { grid-area: c4 !important; }
 :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-case:nth-child(n + 4) { display: none !important; }
-:root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-cases > .vrm-fu-case:nth-child(n):nth-last-child(n) > span:not(.vrm-sr-seul) { order: -1 !important; font-size: var(--d-t-12, 12px) !important; font-weight: 400 !important; color: var(--d-gris, #6E6E73) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; max-width: 100% !important; }
-:root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-cases > .vrm-fu-case:nth-child(n):nth-last-child(n) > b { font-size: var(--d-t-20, 20px) !important; line-height: 1.15 !important; font-weight: 700 !important; letter-spacing: -.016em !important; margin: 0 !important; color: var(--d-encre, #1D1D1F) !important; white-space: nowrap !important; }
+:root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-cases > .vrm-fu-case:nth-child(n):nth-last-child(n) > span:not(.vrm-sr-seul) { order: 1 !important; font-size: var(--d-t-13, 13px) !important; font-weight: 400 !important; color: var(--d-gris, #6E6E73) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; max-width: 100% !important; }
+:root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-cases > .vrm-fu-case:nth-child(n):nth-last-child(n) > b { font-size: var(--d-t-28, 28px) !important; line-height: 1.1 !important; font-weight: 700 !important; letter-spacing: -.02em !important; margin: 0 !important; color: var(--d-encre, #1D1D1F) !important; white-space: nowrap !important; }
 :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-cases > .vrm-fu-case:nth-child(n):nth-last-child(n) > small { display: none !important; }
 :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero button.vrm-fu-case::after { content: none !important; display: none !important; }
-@media (min-width: 900px) { :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero { grid-template-columns: minmax(0, 1fr) repeat(3, minmax(0, 1fr)) !important; max-width: 720px !important; } }
+@media (min-width: 900px) { :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero { grid-template-columns: auto repeat(3, minmax(0, 160px)) !important; max-width: 720px !important; } }
 
 /* 5 bis · « À RETIRER » rangé dans UNE ligne (App.jsx, `RepliRetirerAchats`) : une rangée d'iOS, le nombre à droite,
    un point ambre si un retrait presse ; ouverte, la section d'avant dessous, telle quelle. */
