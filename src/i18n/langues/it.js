@@ -9,12 +9,9 @@ import ecran_messages from './it/messages.js';
 import ecran_emails from './it/emails.js';
 import ecran_stats from './it/stats.js';
 import ecran_compta from './it/compta.js';
-<<<<<<< HEAD
 import ecran_argent from './it/argent.js';
-=======
 import ecran_fraiscarte from './it/fraiscarte.js';   // (14 nov., frais-carte)
 import ecran_argentprix from './it/argentprix.js';   // (14 nov., argent-prix)
->>>>>>> origin/claude/frais-carte
 export default {
   ...ecran_fraiscarte,
   ...ecran_argentprix,
