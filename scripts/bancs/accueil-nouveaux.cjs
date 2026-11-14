@@ -268,7 +268,7 @@ async function scenarioL(nav, W, theme) {
   const base = { lignes: [MAIN({ vrm_parcours: PARCOURS('extension'), vrm_plateformes_affichees: { sites: ['leboncoin'], at: iso(0) } })], comptes: [], notif: 'denied' };
   const o = await ouvrir(nav, { W, sombre, base, init: { banc_ext: 'connectee' } });
   const carte = () => o.pg.evaluate(() => { const c = document.querySelector('[data-parcours-carte]'); if (!c) return null; const b = c.querySelector('[data-parcours-continuer]'); return { courante: c.getAttribute('data-guide-courante'), faites: c.getAttribute('data-guide-faites'), total: ((c.querySelector('[data-guide-progres]') || { getAttribute: () => '' }).getAttribute('data-guide-progres') || '').split('/')[1], ligne: (c.querySelector('[data-guide-ligne]') || {}).textContent || '', href: b ? b.getAttribute('href') || '' : '', geste: b ? b.textContent.trim() : '', h: b ? b.getBoundingClientRect().height : 0, vinted: /vinted\.fr/i.test(c.textContent) }; });
-  const vu = await attendre(o.pg, async () => { const c = await carte(); return c && c.courante === 'leboncoin'; }, 20000);
+  const vu = await attendre(o.pg, async () => { const c = await carte(); return c && c.courante === 'leboncoin' && !/…$/.test(c.ligne); }, 25000);
   const c = await carte();
   dit(vu && c.faites === '2' && c.total === '3', `${T} L1 Leboncoin seul : « Démarrer avec VRM · 2 sur 3 », l'étape « Ouvre Leboncoin une fois »`, JSON.stringify(c));
   dit(c && !c.vinted, `${T} L1 rien ne lui parle de Vinted`, JSON.stringify(c));
@@ -326,8 +326,8 @@ async function scenarioT(nav, W, theme) {
   dit(v.cgv && v.conf && v.essai === '7' && v.rangees === 5, `${T} T4 CGV, confidentialité, l'essai de 7 jours, la comparaison`, JSON.stringify(v));
   dit(o.journal.base === 0, `${T} T5 aucune lecture de la base (page publique)`, String(o.journal.base));
   dit(!(await deborde(o.pg)), `${T} T5 rien ne déborde`);
-  const nav = await o.pg.evaluate(() => [...document.querySelectorAll('.vt-nav a')].map((a) => Math.round(a.getBoundingClientRect().height)));
-  dit(nav.every((h) => h >= 44 && h < 60), `${T} T5 la barre du haut tient sur une ligne, 44 px`, JSON.stringify(nav));
+  const barre = await o.pg.evaluate(() => [...document.querySelectorAll('.vt-nav a')].map((a) => Math.round(a.getBoundingClientRect().height)));
+  dit(barre.every((h) => h >= 44 && h < 60), `${T} T5 la barre du haut tient sur une ligne, 44 px`, JSON.stringify(barre));
   dit(!o.journal.erreurs.length, `${T} aucune erreur JS`, o.journal.erreurs.join(' ¦ '));
   await capture(o.pg, `an-${W}-${theme}-tarifs`, true);
   await capture(o.pg, `an-${W}-${theme}-tarifs-haut`);
@@ -336,13 +336,16 @@ async function scenarioT(nav, W, theme) {
 
 (async () => {
   await new Promise((r) => srv.listen(PORT, r));
-  const nav = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] });
+  // Un navigateur par scénario : un onglet qui tombe (mémoire de la machine) n'emporte pas les suivants.
+  const lancer = () => chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--disable-dev-shm-usage'] });
   const S = { V: scenarioV, N: scenarioN, L: scenarioL, G: scenarioG, T: scenarioT };
   try {
     for (const W of LARGEURS) for (const th of THEMES) for (const s of SCENARIOS) {
+      const nav = await lancer();
       try { await S[s](nav, W, th); } catch (e) { dit(false, `[${s} ${W}px ${th}] le scénario se déroule`, e && e.stack || e); }
+      finally { await nav.close().catch(() => {}); }
     }
-  } finally { await nav.close(); srv.close(); }
+  } finally { srv.close(); }
   console.log(`\n${ko ? '❌' : '✅'} accueil-nouveaux : ${ok} OK, ${ko} KO`);
   process.exit(ko ? 1 : 0);
 })();
