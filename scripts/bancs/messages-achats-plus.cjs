@@ -219,13 +219,14 @@ const deborde = (pg, zone, cadre) => pg.evaluate(([z, c]) => {
     console.log(`\n── B. Achats : même annonce, carnet, liste de recherche · ${T}`);
     await essaie(`achats ${T}`, async () => {
       const { ctx, pg, errs } = await ouvrir(b, v, 'achats');
-      const bloc = await pg.waitForSelector('[data-achats-plus]', { timeout: 30000 }).catch(() => null);
+      const bloc = await pg.waitForSelector('[data-pour-acheter]', { timeout: 30000 }).catch(() => null);
       dit(!!bloc, `${T} le groupe « Pour mieux acheter » est sous la liste d’Achats`);
+      if (bloc) { const w = await bloc.evaluate((e) => Math.round(e.getBoundingClientRect().width)); dit(w >= 300, `${T} le groupe a la largeur de la colonne (aucun style d’un autre élément ne le rétrécit)`, `${w} px`); }
       if (bloc) {
         await pg.waitForSelector('[data-achats-doubles]', { timeout: 15000 }).catch(() => {});
         const n = await pg.locator('[data-achats-doubles]').getAttribute('data-achats-doubles').catch(() => null);
         dit(n === '1', `${T} « Même annonce achetée deux fois » : 1 annonce (même identifiant, deux comptes)`, String(n));
-        await pg.locator('[data-achats-plus]').scrollIntoViewIfNeeded().catch(() => {});
+        await pg.locator('[data-pour-acheter]').scrollIntoViewIfNeeded().catch(() => {});
         await capturer(pg, `achats-${T.replace(' ', '-')}`);
         if (n) {
           await pg.locator('[data-achats-doubles]').click();

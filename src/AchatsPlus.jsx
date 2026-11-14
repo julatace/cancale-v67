@@ -129,7 +129,7 @@ export default function AchatsPlus({ achats = [], carte = null, achatParTx = new
   const groupes = useMemo(() => groupesMemeAnnonce(carte), [carte]);
   const nListe = listePropre(liste).length;
   return (
-    <section className="vrm-achats-plus" data-achats-plus="" aria-label={tr('plus.achats.titre')}>
+    <section className="vrm-pour-acheter" data-pour-acheter="" aria-label={tr('plus.achats.titre')}>
       <h2 className="vrm-plus-entete" style={{ marginTop: 24 }}>{tr('plus.achats.titre')}</h2>
       <div className="vrm-plus-groupe">
         {groupes.length ? <Ligne titre={tr('plus.double.ligne')} sous={pl('plus.double.sous', groupes.length)} geste valeur={String(groupes.length)} onClick={() => setFeuille('doubles')} data-achats-doubles={String(groupes.length)}

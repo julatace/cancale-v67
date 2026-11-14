@@ -48841,7 +48841,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {dansPlateforme && !modeRetraits && !baseKO && <div className="vrm-achats-sources" data-achats-sources="" style={{ margin: '12px 16px 0' }}><MeilleuresSources owner={AUTH.user?.id || ''} Retour={FermeAuRetour} ici="achats"/></div>}
         {/* (14 nov., lot messages-achats-plus) Même annonce achetée deux fois (131), carnet des vendeurs (125),
             liste de recherche (111) : sous la liste, comme les sources (la liste d'abord). */}
-        {dansPlateforme && !modeRetraits && !baseKO && <div className="vrm-achats-plus-bloc" style={{ margin: '0 16px' }}><AchatsPlus achats={buysBase} carte={carteAchetees} achatParTx={achatParTxPlus}
+        {dansPlateforme && !modeRetraits && !baseKO && <div className="vrm-pour-acheter-bloc" style={{ margin: '0 16px' }}><AchatsPlus achats={buysBase} carte={carteAchetees} achatParTx={achatParTxPlus}
           nomCompte={(u) => { const a = (accounts || []).find((x) => String(x.vinted_user_id) === String(u)); return a ? accNameOf(a) : ''; }}
           lireVendeurs={lireVendeursAchats} lireBilan={() => lireMeilleures(AUTH.user?.id || '')} estAnnule={achatAnnule}
           montant={(o) => { const d = o && o.price && o.price.currency_code; return d && d !== 'EUR' ? null : montantCommandeLu(o); }}
