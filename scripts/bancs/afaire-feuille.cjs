@@ -265,15 +265,82 @@ async function unCas(nav, c, W, theme) {
   } finally { if (o) await o.ctx.close().catch(() => {}); }
 }
 
+// ── B. LE BALAYAGE : chaque écran au téléphone (390 tactile, clair), chaque feuille ou menu visible ──
+//  B0 à l'arrivée : rien ne dépasse, aucun [hidden] dessiné, aucun voile ; B1 un balayage horizontal du
+//  doigt au milieu de l'écran ne décale pas la page ; B2 chaque ouvreur visible (`aria-haspopup`, « À faire »,
+//  menu de compte, `data-*-ouvrir`, au plus OUVREURS par écran) : ouvert, rien ne dépasse ; refermé par
+//  « retour » (puis Échap, puis le voile), aucun calque couvrant de plus qu'au départ, page pas décalée.
+const ECRANS_BALAYAGE = liste('ECRANS', 'journee,ventes,annonces,annonces&site=leboncoin,annonces&site=ebay,annonces&site=vestiaire,ventes&site=leboncoin,ventes&site=ebay,ventes&site=vestiaire,achats,stockvinted,messages,emails,compta,settings,communaute,trancher,semaine,litiges,garage,masques,organisation,parrainage,vintedaccounts,inventory,catalog,cat_msg,cat_bord,dashboard');
+const OUVREURS = Number(process.env.OUVREURS || 6);
+const SEL_OUVREURS = '.vrm-main :is(button[aria-haspopup], [data-ui-afaire], [data-pf-afaire], .vrm-ui-menu-compte, button[data-refaire-ouvrir], button[data-tournee-ouvrir], button[data-depot-ouvrir], button[data-num-neufs-ouvrir])';
+async function fermerTout(o) {
+  const ouvert = () => o.pg.evaluate(() => [...document.querySelectorAll('.vrm-ui-voile, .vrm-fs-voile, [role="dialog"]')].some((x) => x.getClientRects().length && x.getBoundingClientRect().height > 1)).catch(() => false);
+  for (const geste of ['retour', 'echap', 'voile']) {
+    if (!(await ouvert())) return geste === 'retour' ? 'deja' : geste;
+    if (geste === 'retour') await o.pg.evaluate(() => history.back()).catch(() => {});
+    else if (geste === 'echap') await o.pg.keyboard.press('Escape').catch(() => {});
+    else await o.pg.touchscreen.tap(195, 60).catch(() => {});
+    await o.pg.waitForTimeout(700);
+  }
+  return (await ouvert()) ? 'reste' : 'voile';
+}
+async function balayage(nav) {
+  for (const ecran of ECRANS_BALAYAGE) {
+    const url = `/?tab=${ecran}`;
+    const T = `[balayage ${ecran} 390 tactile]`;
+    let o;
+    try {
+      o = await ouvrir(nav, { W: 390, sombre: false, b: D2.baseSites(), url, api: D2.api });
+      o.pg.on('dialog', (d) => d.dismiss().catch(() => {}));
+      await pret(o.pg); await o.pg.waitForTimeout(800);
+      const m0 = await o.pg.evaluate(mesurer);
+      dit(horizontalOk(m0) && m0.hiddenDessines.length === 0 && m0.voiles.length === 0, `${T} B0 à l'arrivée : rien ne dépasse, rien de caché dessiné, aucun voile`, `${dirH(m0)} · hidden dessinés ${m0.hiddenDessines.join(', ')} · voiles ${m0.voiles.join(', ')}`);
+      // B1 : le doigt balaie de droite à gauche au milieu de l'écran.
+      const cdp = await o.ctx.newCDPSession(o.pg);
+      await cdp.send('Input.synthesizeScrollGesture', { x: 195, y: 500, xDistance: -160, yDistance: 0, gestureSourceType: 'touch', speed: 800 }).catch(() => {});
+      await cdp.detach().catch(() => {});
+      await o.pg.waitForTimeout(400);
+      const m1 = await o.pg.evaluate(mesurer);
+      dit(m1.sx === 0 && m1.sl === 0 && m1.mainX === 0, `${T} B1 un balayage horizontal ne décale pas la page`, dirH(m1));
+      const n = Math.min(OUVREURS, await o.pg.locator(SEL_OUVREURS).filter({ visible: true }).count());
+      for (let i = 0; i < n; i++) {
+        const l = o.pg.locator(SEL_OUVREURS).filter({ visible: true }).nth(i);
+        if (!(await l.count())) break;
+        const lib = ((await l.getAttribute('aria-label').catch(() => '')) || (await l.innerText().catch(() => '')) || '').trim().replace(/\s+/g, ' ').slice(0, 30);
+        const avant = await o.pg.evaluate(mesurer);
+        await l.scrollIntoViewIfNeeded().catch(() => {});
+        const base = await o.pg.evaluate(mesurer);
+        await l.tap({ timeout: 3000 }).catch(() => {});
+        await o.pg.waitForTimeout(800);
+        const p = await o.pg.evaluate(mesurer);
+        const changeEcran = p.url !== avant.url;
+        dit(horizontalOk(p), `${T} B2 « ${lib} » ouvert : rien ne dépasse`, dirH(p));
+        const comment = await fermerTout(o);
+        const a = await o.pg.evaluate(mesurer);
+        const nouveaux = a.couvrants.filter((x) => !base.couvrants.includes(x));
+        dit(comment !== 'reste' && a.voiles.length === 0 && nouveaux.length === 0, `${T} B2 « ${lib} » se referme sans laisser de voile (${comment})`, `voiles ${a.voiles.join(', ')} · couvrants nouveaux ${nouveaux.join(', ')}`);
+        dit(horizontalOk(a), `${T} B2 après « ${lib} » : la page n'est pas décalée`, dirH(a));
+        if (comment === 'reste' || a.voiles.length) await o.pg.screenshot({ path: path.join(SHOTS, `balayage-${ecran.replace(/\W+/g, '_')}-${i}-reste.png`) }).catch(() => {});
+        if (changeEcran || a.url !== avant.url) { await o.pg.goto(`http://localhost:${PORT}${url}`, { waitUntil: 'domcontentloaded' }).catch(() => {}); await pret(o.pg); }
+      }
+      if (o.erreurs.length) dit(false, `${T} aucune erreur JS`, o.erreurs.join(' | '));
+    } catch (e) {
+      dit(false, `${T} l'écran a pu se jouer`, String(e && e.stack || e).slice(0, 400));
+    } finally { if (o) await o.ctx.close().catch(() => {}); }
+  }
+}
+
 (async () => {
   await new Promise((ok) => srv.listen(PORT, ok));
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] });
-  for (const W of LARGEURS) for (const theme of THEMES) for (const c of CAS) {
+  const PARTIES = liste('PARTIES', 'feuilles,balayage');
+  if (PARTIES.includes('feuilles')) for (const W of LARGEURS) for (const theme of THEMES) for (const c of CAS) {
     if (CAS_VOULUS.length && !CAS_VOULUS.includes(c.nom)) continue;
     if (!c.largeurs.includes(W)) continue;
     console.log(`— ${c.nom} ${W} ${theme}`);
     await unCas(nav, c, W, theme);
   }
+  if (PARTIES.includes('balayage')) { console.log('— balayage de tous les écrans (390 tactile)'); await balayage(nav); }
   await nav.close(); srv.close();
   fs.writeFileSync(path.join(SHOTS, 'rapport.json'), JSON.stringify(rapport, null, 1));
   console.log(`\nafaire-feuille : ${verts} vert(s), ${rouges} rouge(s) — captures ${SHOTS}`);
