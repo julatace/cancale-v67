@@ -2194,6 +2194,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'verifier', type:'panneau', nu:true, ic:'scan', lib:tr('reglages.verifier.lib'), desc:tr('reglages.verifier.desc'), data:{ 'data-reglage-verifier':'' }, el:<VerifierInstallationApp comptes={comptes} onNav={setTab} seule/> },
       // (2 nov.) La visite en bulles, rejouée sur son clic (src/VisiteBulles.jsx).
       { id:'visite', type:'action', ic:'play', lib:tr('reglages.visite.lib'), desc:tr('reglages.visite.desc'), onClick:()=>{ try { window.dispatchEvent(new Event('vrm:visite')); } catch (_) {} }, data:{ 'data-reglage-visite':'' } },
+      // (14 nov., accueil des nouveaux) Rejouer le bilan en une minute et le premier colis accompagné.
+      { id:'bilan-minute', type:'action', ic:'spark', lib:tr('nouveaux.reglage.bilan.lib'), desc:tr('nouveaux.reglage.bilan.desc'), onClick:()=>{ try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=journee' })); setTimeout(() => window.dispatchEvent(new Event('vrm:bilan-minute')), 50); } catch (_) {} }, data:{ 'data-reglage-bilan':'' } },
+      { id:'premier-colis', type:'action', ic:'printer', lib:tr('nouveaux.reglage.colis.lib'), desc:tr('nouveaux.reglage.colis.desc'), onClick:()=>{ try { window.dispatchEvent(new Event('vrm:premier-colis')); } catch (_) {} }, data:{ 'data-reglage-premier-colis':'' } },
       // (6 nov.) L'accompagnement : une bulle sur le bon bouton, deux par jour au plus (src/accompagnement.js).
       // « Pas su » (ligne pas lue) : l'interrupteur ne ment pas, la phrase le dit.
       { id:'conseils', type:'switch', ic:'spark', lib:tr('reglages.conseils.lib'), desc: conseilsOn === null ? tr('reglages.conseils.pasSu') : tr('reglages.conseils.desc'), on:conseilsOn === true,

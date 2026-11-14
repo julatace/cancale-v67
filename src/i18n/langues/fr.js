@@ -14,7 +14,11 @@ import ecran_messages from './fr/messages.js';
 import ecran_emails from './fr/emails.js';
 import ecran_stats from './fr/stats.js';
 import ecran_compta from './fr/compta.js';
+import ecran_tarifs from './fr/tarifs.js';
+import ecran_nouveaux from './fr/nouveaux.js';
 export default {
+  ...ecran_tarifs,
+  ...ecran_nouveaux,
   ...ecran_compta,
   ...ecran_stats,
   ...ecran_emails,
