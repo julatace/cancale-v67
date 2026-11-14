@@ -87,6 +87,9 @@ export default function CreerSurVinted({ fiches = [], compteOnglet, extRaison = 
   const [confirme, setConfirme] = React.useState(false);
   const [faits, setFaits] = React.useState({});
   const [enCours, setEnCours] = React.useState(false);
+  // (5.376, Julien 14 nov. : « tout doit être accompagné ») l'aide « ? » et l'échec DIT sur la ligne.
+  const [aide, setAide] = React.useState(false);
+  const [echecs, setEchecs] = React.useState({});
   const inputs = React.useRef({});
   const lignes = fiches.map((f0) => {
     const f = ficheDe(f0);
@@ -119,6 +122,16 @@ export default function CreerSurVinted({ fiches = [], compteOnglet, extRaison = 
       etapes: [['envoi', tr('creerVinted.etape.envoi')], ['brouillon', tr('creerVinted.etape.brouillon')]],
       articles: file.map((f) => ({ id: f.id, num: f.numero, titre: f.titre })),
       executer: async (a, o) => {
+        // Jamais un échec muet : ce qui n'a pas abouti est dit sur SA ligne (raison + geste).
+        let res = null;
+        try { res = await executerUn(a, o); } catch (e) { res = { etat: 'refus', raison: '' }; }
+        if (!res || res.etat !== 'ok') setEchecs((x) => ({ ...x, [a.id]: { raison: String((res && res.raison) || ''), geste: String((res && res.geste) || '') } }));
+        else setEchecs((x) => { const y = { ...x }; delete y[a.id]; return y; });
+        return res;
+      },
+    });
+    setEnCours(false);
+    async function executerUn(a, o) {
         const f = file.find((x) => x.id === a.id);
         const l = lignes.find((x) => x.f.id === a.id);
         const reponses = {};
@@ -144,20 +157,31 @@ export default function CreerSurVinted({ fiches = [], compteOnglet, extRaison = 
           return iss;
         }
         return { etat: 'refus', raison: 'trop de questions', geste: tr('creerVinted.geste.relancer') };
-      },
-    });
-    setEnCours(false);
+    }
   };
   const n = pretes.length;
+  // Les étapes du parcours, et celle où il en est (calculée, jamais devinée).
+  const ETAPES = ['verifier', 'photos', 'creer', 'publier'];
+  const etapeIci = Object.keys(faits).length ? 'publier' : n ? 'creer' : lignes.some((l) => l.manque.includes('photos')) ? 'photos' : 'verifier';
+  const rangIci = ETAPES.indexOf(etapeIci);
   const corps = (
     <div className="vrm-cv-voile" style={{ zIndex: Z_FEUILLE }} data-creer-vinted={fiches.length} role="dialog" aria-modal="true" aria-label={tr('creerVinted.titre')}>
       {Retour ? <Retour fermer={onFermer}/> : null}
       <div className="vrm-cv-feuille">
         <div className="vrm-cv-tete">
           <h2>{tr('creerVinted.titre')}</h2>
-          <button type="button" className="vrm-cv-x" aria-label={tr('creerVinted.fermer')} onClick={onFermer} data-creer-vinted-fermer="">×</button>
+          <span className="vrm-cv-tete-d">
+            <button type="button" className="vrm-cv-aide-b" aria-expanded={aide ? 'true' : 'false'} aria-label={tr('creerVinted.aide.bouton')} title={tr('creerVinted.aide.bouton')} onClick={() => setAide((x) => !x)} data-creer-vinted-aide-bouton="">?</button>
+            <button type="button" className="vrm-cv-x" aria-label={tr('creerVinted.fermer')} onClick={onFermer} data-creer-vinted-fermer="">×</button>
+          </span>
         </div>
         <p className="vrm-cv-doux">{tr('creerVinted.intro')}</p>
+        <ol className="vrm-cv-etapes" aria-label={tr('creerVinted.etapes.label')} data-creer-vinted-etape={etapeIci}>
+          {ETAPES.map((k, i) => <li key={k} className={i < rangIci ? 'is-fait' : i === rangIci ? 'is-ici' : ''} aria-current={i === rangIci ? 'step' : undefined}><span aria-hidden="true">{i + 1}</span>{tr('creerVinted.etapes.' + k)}</li>)}
+        </ol>
+        {aide && <ul className="vrm-cv-aide" data-creer-vinted-aide="">
+          <li>{tr('creerVinted.aide.avant')}</li><li>{tr('creerVinted.aide.pendant')}</li><li>{tr('creerVinted.aide.apres')}</li>
+        </ul>}
         <div className={`vrm-cv-compte${bloque ? ' vrm-cv-geste' : ''}`} data-creer-vinted-compte={compte ? compte.uid : (compteOnglet === undefined ? 'pas-su' : 'aucun')}>
           {bloque ? bloque : tr('creerVinted.compte.onglet', { login: compte.login || compte.uid })}
         </div>
@@ -190,6 +214,7 @@ export default function CreerSurVinted({ fiches = [], compteOnglet, extRaison = 
                   </div>
                 ) : null}
                 {fait ? <p className="vrm-cv-ok" data-creer-vinted-fait={fait.draftId}>{tr('creerVinted.fait')} <a href={lienBrouillon(fait.draftId)} target="_blank" rel="noopener noreferrer">{tr('creerVinted.ouvrir')}</a>{fait.aFinir.length ? <><br/><small>{tr('creerVinted.aFinir', { liste: fait.aFinir.join(', ') })}</small></> : null}</p>
+                  : echecs[f.id] && !enCours ? <p className="vrm-cv-geste" data-creer-vinted-echec="">{echecs[f.id].raison ? tr('creerVinted.echec', { raison: echecs[f.id].raison }) : tr('creerVinted.echecSans')}{echecs[f.id].geste ? ' ' + echecs[f.id].geste : ''}</p>
                   : !texte.ok ? <p className="vrm-cv-geste" data-creer-vinted-refus="">{texte.raison}</p>
                   : manque.length ? <p className="vrm-cv-geste" data-creer-vinted-manque={manque.join(',')}>{tr('creerVinted.manque', { liste: manque.map((m) => tr('creerVinted.champ.' + m)).join(', ') })}</p> : null}
               </li>
@@ -197,6 +222,7 @@ export default function CreerSurVinted({ fiches = [], compteOnglet, extRaison = 
           })}
         </ul>
         <div className="vrm-cv-pied">
+          {n > 0 && compte && !bloque ? <p className="vrm-cv-avant" data-creer-vinted-avant={n}>{tr('creerVinted.avant', { n, login: compte.login || compte.uid })}</p> : null}
           <small className="vrm-cv-doux">{tr('creerVinted.pied')}</small>
           <button type="button" className="vrm-cv-primaire" data-creer-vinted-lancer={n} data-creer-vinted-confirme={confirme ? '1' : '0'} disabled={!!bloque || !n || enCours} onClick={lancer}>
             {confirme ? tr('creerVinted.confirmer', { n, login: compte ? (compte.login || compte.uid) : '' }) : tr('creerVinted.lancer', { n })}
