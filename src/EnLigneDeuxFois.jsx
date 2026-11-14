@@ -5,6 +5,7 @@
 // VRM ne supprime rien tout seul (§3 : supprimer une annonce Vinted
 // automatiquement est refusé, irréversible). Une fois supprimée, la prochaine
 // lecture du dressing la sort d'ici (la règle « en ligne »).
+import { tr } from './i18n/index.js';
 import React from 'react';
 import { PhotoVide } from './composants/PhotoVide.jsx';
 import { Numero } from './composants/Numero.jsx';
@@ -12,7 +13,7 @@ import { motsVendeur } from './profilVendeur.js';
 import { texteCarte, texteEuros, texteDepuis } from './enLigneDeuxFois.js';
 import './en-ligne-deux-fois.css';
 
-const PREUVE = { photo: 'même photo exacte', recree: 'recréée par VRM, l’ancienne pas supprimée' };
+const PREUVE = { photo: 'même photo exacte', recree: 'recréée par VRM, l’ancienne pas supprimée', get fusion() { return tr('atelier.fusion.preuve'); } };
 const lienVinted = (a) => (/^https:\/\/www\.vinted\.[a-z.]+\//.test(String(a.url || '')) ? a.url : `https://www.vinted.fr/items/${encodeURIComponent(a.id)}`);
 
 export function EnLigneDeuxFoisDetail({ groupes, manque = [], PhotoVinted = null, maintenant = Date.now() }) {
