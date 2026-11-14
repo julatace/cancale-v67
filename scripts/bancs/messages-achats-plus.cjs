@@ -245,8 +245,8 @@ const deborde = (pg, zone, cadre) => pg.evaluate(([z, c]) => {
         await capturer(pg, `achats-carnet-${T.replace(' ', '-')}`);
         await pg.keyboard.press('Escape'); await pg.waitForTimeout(300);
         await pg.locator('[data-achats-recherche]').click();
-        const fr = await pg.waitForSelector('[data-feuille-recherche]', { timeout: 5000 }).catch(() => null);
-        dit(!!fr && (await pg.locator('[data-recherche-id="r1"]').count()) === 1, `${T} la liste de recherche s’ouvre avec sa ligne`);
+        const fr = await pg.waitForSelector('[data-feuille-recherche] [data-recherche-id="r1"]', { timeout: 8000 }).catch(() => null);
+        dit(!!fr && (await pg.locator('[data-recherche-id="r1"]').count()) === 1, `${T} la liste de recherche s’ouvre avec sa ligne (attendue sur condition, §6.5)`);
         const pleins = await pg.evaluate(() => [...document.querySelectorAll('[data-feuille-recherche] .vrm-plus-principal')].filter((e) => e.getBoundingClientRect().height > 0).length);
         dit(pleins <= 1, `${T} au plus un bouton plein dans la feuille`, String(pleins));
         await capturer(pg, `achats-recherche-${T.replace(' ', '-')}`);
