@@ -232,6 +232,9 @@ async function blocF(nav, W, sombre) {
     await pg.evaluate(() => { const e = document.querySelector('.vrm-achats [data-stats-carte="meilleures-sources"]'); if (e) e.scrollIntoView({ block: 'start' }); for (const c of document.querySelectorAll('.vrm-main')) c.scrollTop -= 110; });
     await pg.waitForTimeout(500);
     await capture(pg, `sources-${tag}`);
+    await pg.evaluate(() => { const e = [...document.querySelectorAll('.vrm-achats .vrm-achats-recus-bas')].find((x) => x.getBoundingClientRect().height > 0); if (e) e.scrollIntoView({ block: 'end' }); });
+    await pg.waitForTimeout(400);
+    await capture(pg, `bas-${tag}`);
     await capture(pg, `plein-${tag}`, true);
     dit(!erreurs.length, `${T} aucune erreur`, erreurs.join(' | '));
   } finally { await ctx.close(); }

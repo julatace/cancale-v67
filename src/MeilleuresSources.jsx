@@ -122,7 +122,7 @@ export default function MeilleuresSources({ owner = '', Retour = null, ici = 'ar
     const tuile = (cle, val, lib) => { const m = /^(au moins|au plus) (.+)$/.exec(val);
       return <span className="vrm-ms-tuile" data-ms-tuile={cle}><b className={val === '—' ? 'is-vide' : undefined}>{m ? <><span className="vrm-ms-pre">{m[1]} </span>{m[2]}</> : val}</b><small>{lib}</small></span>; };
     corps = (
-      <div className="vrm-ms" data-ms-etat="lu" data-ms-n={sources.length}>
+      <div className="vrm-ms-corps" data-ms-etat="lu" data-ms-n={sources.length}>
         <ol className="vrm-ms-lignes vrm-ms-surface">
           {sources.map((s, i) => (
             <li key={s.cle}>
