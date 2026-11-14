@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.375.0';
+const CODE_VERSION = '5.376.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -13090,6 +13090,18 @@ async function republierVinted(msg) {
 // Rien n'est programmé ni répété : sans son clic dans l'app, cette fonction ne
 // tourne pas. Exécuté par scripts/audit-baisse-prix.cjs (le vrai fichier, dans un vm).
 const centimesBaisse = (v) => { const n = Number(v); return Number.isFinite(n) ? Math.round(n * 100) : NaN; };
+// (14 nov., 5.376, lot argent-prix — soldes temporaires) « Remettre les prix » : la SEULE hausse
+// acceptée par les trois chemins de baisse (Vinted, Leboncoin, Vestiaire). Elle exige SON clic
+// (`confirme`, vérifié par chaque chemin), le drapeau `remise`, et un prix voulu ÉGAL au prix
+// d'origine que l'app a mémorisé (`prixOrigine`, lu par cette extension avant la baisse) ; jamais
+// plus de 10 fois le prix actuel. Tout le reste (compte de l'onglet, 45/h, prix lu avant, relu
+// après) est le chemin de baisse, inchangé. Rien n'est remis automatiquement : l'app n'envoie
+// `remise` que depuis le bouton « Remettre N prix ».
+function remisePermise(msg, avantC, vouluC) {
+  if (!msg || msg.remise !== true || msg.confirme !== true) return false;
+  const o = centimesBaisse(msg.prixOrigine);
+  return Number.isInteger(avantC) && Number.isInteger(vouluC) && avantC > 0 && vouluC > avantC && o === vouluC && vouluC <= avantC * 10;
+}
 const memeTexteBaisse = (a, b) => String(a == null ? '' : a).replace(/\s+/g, ' ').trim() === String(b == null ? '' : b).replace(/\s+/g, ' ').trim();
 // Le prix (et ce qui sert à vérifier le modèle) de l'annonce telle que la page
 // « Modifier » la montre. Forme lue défensivement ; inconnue ⇒ null (pas su).
@@ -13126,7 +13138,7 @@ async function baisserPrixVinted(msg) {
   const voulu = centimesBaisse(msg.prix), avant = centimesBaisse(msg.prixAvant);
   if (!(voulu >= 100 && voulu < 10000000 && Math.abs(Number(msg.prix) * 100 - voulu) < 1e-6)) return { accepte: false, code: 'invalide', raison: 'nouveau prix illisible — rien n’est parti' };
   if (!(avant > 0)) return { accepte: false, code: 'invalide', raison: 'ancien prix inconnu — rien n’est parti' };
-  if (!(voulu < avant)) return { accepte: false, code: 'pas-une-baisse', raison: 'le nouveau prix n’est pas plus bas que l’ancien — rien n’est parti' };
+  if (!(voulu < avant) && !remisePermise(msg, avant, voulu)) return { accepte: false, code: 'pas-une-baisse', raison: 'le nouveau prix n’est pas plus bas que l’ancien — rien n’est parti' };
   const accts = await getStoredAccounts();
   const acc = accts.find((a) => String(a.vinted_user_id) === uid);
   if (!acc) return { accepte: false, code: 'absente', raison: 'compte introuvable dans cette extension' };
@@ -23490,7 +23502,7 @@ const centsPrixVc = (p) => (p && typeof p.valeur === 'number' && isFinite(p.vale
 async function baisserPrixVestiaire(msg) {
   const produit = String((msg && msg.produit) || '');
   const avant = Number(msg && msg.avantCents), apres = Number(msg && msg.apresCents);
-  if (!/^\d{3,15}$/.test(produit) || !Number.isInteger(avant) || !Number.isInteger(apres) || !(apres >= 100) || !(apres < avant) || avant > 1e8) return { accepte: false, code: 'invalide', raison: 'article ou prix invalide (le nouveau prix doit être sous l’ancien, 1 € au moins)' };
+  if (!/^\d{3,15}$/.test(produit) || !Number.isInteger(avant) || !Number.isInteger(apres) || !(apres >= 100) || !(apres < avant || remisePermise(msg, avant, apres)) || avant > 1e8) return { accepte: false, code: 'invalide', raison: 'article ou prix invalide (le nouveau prix doit être sous l’ancien, 1 € au moins)' };
   if (VC_REPONSE_EN_VOL) return { accepte: false, code: 'en-cours', raison: 'une autre action Vestiaire part en ce moment — une à la fois' };
   VC_REPONSE_EN_VOL = true;
   try {
@@ -24776,7 +24788,7 @@ async function baisserPrixLbc(msg) {
   const avant = Number(msg && msg.prixAvant), nouveau = Number(msg && msg.prix);
   if (!/^\d{6,12}$/.test(id)) return { accepte: false, code: 'invalide', raison: 'annonce inconnue' };
   if (!msg || msg.confirme !== true) return { accepte: false, code: 'confirmation', raison: "la baisse n'a pas été confirmée — rien n'est parti" };
-  if (!Number.isFinite(avant) || !Number.isFinite(nouveau) || nouveau < 1 || nouveau >= avant || Math.round(nouveau * 100) !== nouveau * 100) return { accepte: false, code: 'invalide', raison: 'une baisse seulement, jamais sous 1 €' };
+  if (!Number.isFinite(avant) || !Number.isFinite(nouveau) || nouveau < 1 || (nouveau >= avant && !remisePermise(msg, Math.round(avant * 100), Math.round(nouveau * 100))) || Math.round(nouveau * 100) !== nouveau * 100) return { accepte: false, code: 'invalide', raison: 'une baisse seulement, jamais sous 1 € (ou la remise du prix d’origine, sur ton clic)' };
   if (PAUSE_LBC_EN_VOL) return { accepte: false, code: 'en-cours', raison: 'une autre action sur Leboncoin est en cours — une à la fois' };
   PAUSE_LBC_EN_VOL = true;
   try {
