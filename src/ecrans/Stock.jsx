@@ -6,7 +6,7 @@ import { unParArticle, planchesCases, planchesRangees } from '../stockRegles.js'
 import { requeteDeLaVoix } from '../rechercheVocale.js';
 import React, { useState, useMemo, useEffect } from 'react';
 import { tr } from '../i18n/index.js';   // (11 nov., lot rangement-guide)
-import DansFiche, { useFicheOuverte } from '../DansFiche.jsx';
+import DansFiche, { useLigneIci } from '../DansFiche.jsx';
 import { ouvrirLigne } from '../ficheLigne.js';
 import { ChiffreConseil } from '../Conseils.jsx';
 import { premiereCaseLibre as premiereCaseMeubles, caseEnMots } from '../ouRanger.js';
@@ -570,7 +570,9 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     setChoisie(null);
     const occ = occupant(mid, i);
     if (place) { const p = place; setPlace(null); poser(p, mid, i); return; }
-    if (occ) setModal({ type: 'fiche', cle: cleDeFiche(occ) });
+    // (14 nov., proposition 62) La fiche de la paire s'ouvre TOUT DE SUITE (le magasin de la fiche) ; l'état du Stock
+    // (ses gestes dans la fiche) suit en transition — à 1 000 articles, redessiner le Stock ne retarde pas la fiche.
+    if (occ) { ouvrirLigne(ligneFicheCase(cleDeFiche(occ), occ)); React.startTransition(() => setModal({ type: 'fiche', cle: cleDeFiche(occ) })); }
     else setModal({ type: 'placer', m: mid, i });
   };
 
@@ -677,17 +679,18 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   // ouvre LA fiche de la paire (src/FichePaire.jsx, par son N°), sa place et ses gestes (Déplacer, Retirer de la
   // case, Je l'ai sortie, Encore là) rendus en haut (`DansFiche`). Fermer la fiche referme ce choix.
   const cleFicheStock = modal && modal.type === 'fiche' ? 'stock:vinted:s' + modal.cle : '';
-  const ficheOuverte = useFicheOuverte();
+  function ligneFicheCase(cle, f) { return { cle: 'stock:vinted:s' + cle, contexte: 'stock', site: 'vinted', nums: f && f.numero != null ? [String(f.numero)] : [], titre: (f && f.title) || '' }; }
+  const ficheIci = useLigneIci(cleFicheStock);   // seule CETTE case se redessine (pas tout le Stock à chaque fiche)
   const ficheVue = React.useRef(false);
   useEffect(() => {
     if (!cleFicheStock) { ficheVue.current = false; return; }
     const f = ficheParCle[modal.cle]; if (!f) return;
-    if (!ficheOuverte.l || ficheOuverte.l.cle !== cleFicheStock) {
+    if (!ficheIci) {
       if (ficheVue.current) { ficheVue.current = false; setModal(null); return; }
-      ouvrirLigne({ cle: cleFicheStock, contexte: 'stock', site: 'vinted', nums: f.numero != null ? [String(f.numero)] : [], titre: f.title || '' });
+      ouvrirLigne(ligneFicheCase(modal.cle, f));
     } else ficheVue.current = true;
     /* eslint-disable-next-line */
-  }, [cleFicheStock, ficheOuverte.l]);
+  }, [cleFicheStock, ficheIci]);
   const Modale = () => {
     if (!modal) return null;
     let corps = null;

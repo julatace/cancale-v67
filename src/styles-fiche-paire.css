@@ -245,3 +245,22 @@
 /* 44 px au doigt pour tout ce qui se touche dans la fiche (les gestes venus d'une ligne portent leurs styles en ligne). */
 .vrm-fp .vrm-fp-depuis-ligne :is(button, a[href], [role="menuitem"]) { min-height: 44px !important; }
 @media (hover: hover) and (pointer: fine) and (min-width: 768px) { .vrm-fp .vrm-fp-depuis-ligne :is(button, a[href], [role="menuitem"]) { min-height: 36px !important; } }
+
+/* (14 nov., « des visuels de ouf ») LA PAIRE EN VEDETTE : quand la fiche a une photo (celle de la paire, lue
+   par identité), elle est la scène — pleine largeur, posée sur un fond doux, ENTIÈRE (contenue, jamais
+   recadrée), rayon 20 ; le N°, le titre et le prix dessous, sur une ligne serrée. Sans photo : l'en-tête
+   compact (aucune grande scène vide). La photo parle, le cadre se tait : ni ombre lourde, ni couleur. */
+.vrm-fp .vrm-fp-heros.a-photo { flex-direction: column; align-items: stretch; gap: 12px; }
+.vrm-fp .vrm-fp-heros.a-photo .vrm-fp-heros-photo {
+  width: 100%; height: auto; aspect-ratio: 4 / 3; max-height: 40vh; border-radius: var(--d-r-photo-grande, 20px);
+  background: var(--d-surface-atelier-2, #F5F5F7); box-shadow: none;
+}
+:root[data-theme="dark"] .vrm-fp .vrm-fp-heros.a-photo .vrm-fp-heros-photo { background: var(--d-surface-atelier, #1C1C1E); }
+.vrm-fp .vrm-fp-heros.a-photo .vrm-fp-heros-photo img { object-fit: contain; }
+.vrm-fp .vrm-fp-heros.a-photo .vrm-fp-quoi { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "ctx ctx ctx" "num titre prix" "sous sous sous"; align-items: baseline; column-gap: 12px; row-gap: 2px; }
+.vrm-fp .vrm-fp-heros.a-photo .vrm-fp-heros-ctx { grid-area: ctx; }
+.vrm-fp .vrm-fp-heros.a-photo .vrm-fp-num { grid-area: num; }
+.vrm-fp .vrm-fp-heros.a-photo .vrm-fp-titre { grid-area: titre; align-self: center; }
+.vrm-fp .vrm-fp-heros.a-photo .vrm-fp-heros-prix { grid-area: prix; }
+.vrm-fp .vrm-fp-heros.a-photo .vrm-fp-sous { grid-area: sous; }
+@media (min-width: 700px) { .vrm-fp .vrm-fp-heros.a-photo .vrm-fp-heros-photo { max-height: 360px; } }

@@ -277,7 +277,7 @@ const fermerFiche = (pg) => pg.evaluate(() => { const b = document.querySelector
       for (const L of listes) {
         const { ctx, pg, errs } = await preparer(b, vp, { sombre, tab: L.tab });
         await essaie(`${L.cle} ${TT}`, async () => {
-          await pg.waitForSelector(L.ligne, { timeout: 15000 });
+          await pg.waitForSelector(L.ligne, { state: 'attached', timeout: 30000 });
           await pg.waitForTimeout(1500);   // la liste posée (lectures de la coque terminées)
           if (EXPLORE) {
             await toucher(pg, L.toucher, tel); await pg.waitForTimeout(900);

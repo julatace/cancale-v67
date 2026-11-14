@@ -210,7 +210,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
   const tailleHeros = p ? ((neuve && neuve.taille) || p.taille || '') : '';
   const sousHeros = [ctx ? tr(CLE_CTX[ctx] || 'fiche.ctx.vente') : '', depuis && depuis.sous ? depuis.sous : ''].filter(Boolean).join(' · ');
   const heros = (p || depuis) ? (
-    <section className={'vrm-fp-heros vrm-fp-entete' + (photoHeros ? '' : ' is-sans-photo')} data-fiche-heros={ctx || 'numero'} aria-label={tr('fiche.heros')}>
+    <section className={'vrm-fp-heros vrm-fp-entete' + (photoHeros ? ' a-photo' : ' is-sans-photo')} data-fiche-heros={ctx || 'numero'} data-fiche-photo-vedette={photoHeros ? '1' : '0'} aria-label={tr('fiche.heros')}>
       <span className="vrm-fp-heros-photo vrm-fp-photo" data-fiche-heros-photo={photoHeros ? '1' : '0'}>{photoHeros && Photo ? Photo(photoHeros) : <Silhouette/>}</span>
       <span className="vrm-fp-quoi">
         {sousHeros ? <span className="vrm-fp-heros-ctx" data-fiche-heros-ctx="">{sousHeros}</span> : null}
