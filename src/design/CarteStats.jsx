@@ -12,6 +12,7 @@ import React from 'react';
 import CarteMois from './CarteMois.jsx';
 import { SheetShell } from '../composants/SheetShell.jsx';
 import { montant } from '../format.js';
+import { tr } from '../i18n/index.js';
 import './aideCarte.css';
 import { AIDE_CHIFFRES, CHIFFRES, NOM_PERIODE, PAGES_CARTE, PLAGE_IDS, clePeriode, maxCases, chiffresProposes, courbeVendu, defDe, horsSelection, libelleCase, nomPeriode, periodeDefaut, raisonCourte, reglageAEnregistrer, reglageDePage, valeursCarte, valeurChiffre, valeurObjectif, valeurObjectifMois } from './carteChiffres.js';
 import { TYPES_OBJECTIF, estEuros, lireSaisieObjectif, objectifAEnregistrer, objectifSurPage, progressionObjectif, resteObjectif, phraseResteObjectif, rythmeObjectif, phraseRythme, propositionObjectif, moisPleinsAvant, moisPasse, objectifDuMoisYm, bilanMoisPasse, phraseBilan } from '../objectifMois.js';
@@ -101,7 +102,7 @@ export function BarreObjectif({ prog, fmt, onOuvrir = null, maintenant = null, p
   const ry = rythmeObjectif(prog, quand);
   const rythme = phraseRythme(ry, prog.type, montre);
   const def = TYPES_OBJECTIF[prog.type] || TYPES_OBJECTIF.ca;
-  const tete = `${eur ? cible : `${prog.objectif} ventes`} ${def.ceMois}`;
+  const tete = `${eur ? cible : `${prog.objectif} ventes`} ${TYPES_OBJECTIF[prog.type] ? tr('ac.obj.ceMois.' + prog.type) : def.ceMois}`;
   const manque = [prog.partiel && prog.manque.length ? `${prog.manque.join(', ')} pas lu` : '', prog.couverture ? `prix d’achat connu pour ${prog.couverture} ventes` : ''].filter(Boolean).join(' · ');
   const titre = prog.valeur == null ? `${tete} : pas su`
     : `${tete} · tu en es à ${prog.partiel ? 'au moins ' : ''}${eur ? fmt(prog.valeur) : prog.valeur}${manque ? ` · ${manque}` : ''}`;
@@ -412,7 +413,7 @@ export function ObjectifFeuille({ page, objectif, objectifBrut = null, poserObje
         <div className="vrm-carte-objectif-corps">
           <div className="vrm-carte-objectif-types" role="group" aria-label="Type d’objectif">
             {Object.entries(TYPES_OBJECTIF).map(([k, d]) => (
-              <button key={k} type="button" aria-pressed={type === k} data-carte-objectif-type={k} onClick={() => setType(k)}>{d.nom}</button>
+              <button key={k} type="button" aria-pressed={type === k} data-carte-objectif-type={k} onClick={() => setType(k)}>{tr('ac.obj.type.' + k)}</button>
             ))}
           </div>
           <PropositionObjectif type={type} sources={sources} regles={regles} onViser={poserValeur} />

@@ -13,7 +13,7 @@ import { caAutresParJour, sommePlage } from '../caAutresParJour.js';   // (11 no
 import { phrasePlage } from '../periodeCalendrier.js';
 import { lireSupprimes, CLE_SUPPRIMES } from '../comptesSupprimes.js';
 import { recuPublieEntre, valeurObjectif, valeurObjectifMois } from '../design/carteChiffres.js';
-import { TYPES_OBJECTIF, estEuros, lireSaisieObjectif, objectifAEnregistrer, progressionObjectif, phraseResteObjectif, rythmeObjectif, phraseRythme, moisPleinsAvant, objectifDuMoisYm } from '../objectifMois.js';
+import { TYPES_OBJECTIF, estEuros, lireSaisieObjectif, objectifAEnregistrer, progressionObjectif, phraseResteObjectif, resteObjectif, rythmeObjectif, phraseRythme, moisPleinsAvant, objectifDuMoisYm } from '../objectifMois.js';
 import { PropositionObjectif, BilanObjectif, bilanObjectif } from '../design/CarteStats.jsx';
 import { NOM_BENEFICE, NOM_BENEFICE_BRUT, chiffreBenefice, chiffreBrut } from '../beneficeNoms.js';
 import { AUTH, FermeAuRetour, Bouton, SheetShell, save, C, Card, DEMANDE_SAISIE_PRIX, FraicheurAnnonces, Icon, LAYOUT, LiveStatsCarte, MOIS_COURTS, PeriodePicker, Pourquoi, REGLES_CARTE, RepartitionsVentes, SUPABASE_URL, ScreenHead, Segmente, StatBox, aPayerUrssaf, beneficeDesJours, beneficeDuMoisPub, bilanLignes, caEbayPayees, classifyOrderStatus, clesVenteStats, commandeEbayEngagee, compteEcarte, dateLocaleISO, dateMiseEnLigneMs, demanderVue, fmt, isCloudReady, lbcAnnulee, lbcFinalisee, lireBeneficeJours, lireComptaSynchro, lireExtrasRepartition, lireReleveVentes, lireTout, load, montantCommande, netApresUrssafDe, nonCompteesDe, onCloudReady, phraseNonComptees, recuAvecADater, sbAuth, tauxUrssaf, useBeneficeCalcul, useExcluAutre, useLigneSynchro, useLigneUrssaf, useObjectifMois, useRegimeFiscal, useSourcesCarte, useVentesCoque, ymCourant, lireDatesLbc, avecDatesLbc, montantRecuEbay, useSansCompte, chargeAbonnement } from '../App.jsx';
@@ -32,6 +32,7 @@ import {fraisParPlateforme,texteCouverture} from '../fraisPlateformes.js';
 import { boostRentable, SEUIL_BOOST } from "../boostRentable.js";
 // ⟦← App.jsx #4⟧
 import CeQuiRapporte from "../design/CeQuiRapporte.jsx";
+import QuoiRacheter from "../design/QuoiRacheter.jsx";
 import SourcesAchats from "../SourcesAchats.jsx";
 import MeilleuresSources from "../MeilleuresSources.jsx";
 import MargePlateforme from "../MargePlateforme.jsx";   // (10 nov., lot I) marge par plateforme — un bloc isolé
@@ -2080,6 +2081,8 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
         offresBrut={offresBrut} comptes={comptesVinted} ecarte={ecarteStats} Segmente={Segmente} fmt={fmt}/>
       {/* (3 nov.) « Ce qui rapporte le plus » : le relevé de la période, classé (src/ceQuiRapporte.js). */}
       <CeQuiRapporte lignes={lp} Segmente={Segmente} fmt={fmt} etat={!releve ? 'passu' : 'encours'}/>
+      {/* (14 nov., lot argent-choix — proposition 80) Modèle ET taille, sur les ventes RELIÉES seulement ; « À racheter » (src/quoiRacheter.js). */}
+      <QuoiRacheter lignes={lp} Segmente={Segmente} fmt={fmt} etat={!releve ? 'passu' : 'encours'} onSaisirPrix={onSaisirPrix}/>
       {/* (10 nov., lot BG) « D'où viennent mes achats » : lu dans `vrm_sources_ventes` (src/sourceAchats.js), sur la période. */}
       <SourcesAchats owner={(AUTH.user && AUTH.user.id) || ''} de={b.de} a={b.a}/>
       {/* (11 nov.) « Tes meilleures sources » : lu dans `vrm_meilleures_sources` (src/meilleuresSources.js), depuis le début. */}
@@ -2646,7 +2649,7 @@ function ObjectifDuMois({ liveStats }) {
     const visait = o && o.type === obj.type ? o.valeur : null;
     return { ...b, x, visait, atteint: visait != null && x && x.valeur != null && x.valeur >= visait };
   }) : [];
-  const tete = prog ? `${eur ? fmt(prog.objectif) : `${prog.objectif} ventes`} ${(TYPES_OBJECTIF[prog.type] || TYPES_OBJECTIF.ca).ceMois}` : '';
+  const tete = prog ? `${eur ? fmt(prog.objectif) : `${prog.objectif} ventes`} ${tr('ac.obj.ceMois.' + (TYPES_OBJECTIF[prog.type] ? prog.type : 'ca'))}` : '';
   return (
     <div data-objectif-bloc={obj ? obj.type : ''}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: prog && !edit ? 8 : 2 }}>
@@ -2655,7 +2658,7 @@ function ObjectifDuMois({ liveStats }) {
       </div>
       {edit ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-          <Segmente label={tr('stats.typeObjectif')} value={type} onChange={setType} options={Object.entries(TYPES_OBJECTIF).map(([v, d]) => ({ v, l: d.nom, data: { 'data-objectif-type': v } }))}/>
+          <Segmente label={tr('stats.typeObjectif')} value={type} onChange={setType} options={Object.keys(TYPES_OBJECTIF).map((v) => ({ v, l: tr('ac.obj.type.' + v), data: { 'data-objectif-type': v } }))}/>
           <PropositionObjectif type={type} sources={sources} regles={REGLES_CARTE} onViser={poserValeur}/>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <input aria-label={eurT ? tr('stats.objectifEuros') : tr('stats.objectifNombreVentes')} type="text" inputMode={eurT ? 'decimal' : 'numeric'} value={saisie} onChange={(e) => setSaisie(e.target.value)} placeholder={eurT ? '2 000' : '40'} data-objectif-saisie=""
@@ -2675,10 +2678,21 @@ function ObjectifDuMois({ liveStats }) {
           <div role="progressbar" aria-label={tr('reglages.objectif-mois.lib')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={prog.pct == null ? undefined : prog.pct} style={{ height: 4, background: C.card2 || C.bg, borderRadius: 999, overflow: 'hidden', marginTop: 8 }}>
             {prog.pct ? <div style={{ width: `${prog.pct}%`, height: '100%', background: C.accent, borderRadius: 999, transition: 'width .3s ease' }}/> : null}
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: '2px 12px', marginTop: 8, fontSize: 13, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>
-            <span data-objectif-detail-reste="">{phraseResteObjectif(prog, montreCourt)}</span>
-            {ry ? <span data-objectif-detail-rythme={ry.etat} style={{ color: ry.etat === 'avance' ? C.text : C.muted }}>{phraseRythme(ry, prog.type, montreCourt)}</span> : null}
-          </div>
+          {/* (14 nov., lot argent-choix — proposition 81) « Il te faut X € par jour d'ici le 30 » : trois tuiles
+              lues de `resteObjectif` (la règle de la barre), à la place de la phrase qui disait les mêmes
+              nombres (§7 : un nombre s'écrit une fois). Atteint, pas su ou dernier jour : la phrase reste. */}
+          {(() => { const r = resteObjectif(prog); return r && !r.atteint && r.parJour != null && r.jours > 1 ? (
+            <div className="vrm-ac-tuiles vrm-ac-objectif-tuiles" data-objectif-detail-reste="" data-objectif-par-jour={eur ? String(Math.round(r.parJour * 100)) : String(r.parJour)} data-objectif-jours={r.jours} data-objectif-reste={eur ? String(Math.round(r.reste * 100)) : String(r.reste)} data-objectif-au-plus={r.auPlus ? '1' : undefined}>
+              <div className="vrm-ac-tuile"><b className="vrm-ac-chiffre">{r.auPlus ? '≤ ' : ''}{montreCourt(r.parJour)}</b><span className="vrm-at-libelle">{tr('ac.obj.parJour', { jour: String(r.dernier) })}</span></div>
+              <div className="vrm-ac-tuile"><b className="vrm-ac-chiffre">{r.auPlus ? '≤ ' : ''}{montreCourt(r.reste)}</b><span className="vrm-at-libelle">{tr('ac.obj.reste')}</span></div>
+              <div className="vrm-ac-tuile"><b className="vrm-ac-chiffre">{r.jours}</b><span className="vrm-at-libelle">{tr('ac.obj.jours', { n: r.jours })}</span></div>
+            </div>) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: '2px 12px', marginTop: 8, fontSize: 13, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>
+              <span data-objectif-detail-reste="">{phraseResteObjectif(prog, montreCourt)}</span>
+            </div>); })()}
+          {ry ? <div data-objectif-detail-rythme={ry.etat} style={{ marginTop: 8, fontSize: 13, color: ry.etat === 'avance' ? C.text : C.muted }}>{phraseRythme(ry, prog.type, montreCourt)}</div> : null}
+          <p className="vrm-ac-objectif-mesure" data-objectif-mesure={prog.type}>{tr('ac.obj.mesure.' + (TYPES_OBJECTIF[prog.type] ? prog.type : 'ca'))}</p>
+          {prog.type === 'recu' && prog.aDater > 0 ? <p className="vrm-ac-objectif-mesure" data-objectif-a-dater={prog.aDater}>{tr('ac.obj.aDater', { n: prog.aDater })}</p> : null}
           {prog.couverture ? <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }} data-objectif-couverture={prog.couverture}>{trj('stats.prixAchatConnu2', { couverture: prog.couverture })}</div> : null}
           {passes.length ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.border}` }} data-objectif-passes="">
