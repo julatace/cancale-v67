@@ -28,8 +28,9 @@ fs.mkdirSync(SHOTS, { recursive: true });
 let ok = 0, ko = 0;
 const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko++; console.log('  ❌ ' + m + (d != null && d !== '' ? '  → ' + String(d).slice(0, 300) : '')); } };
 const MUTATIONS = {
-  feuille: ['CapteNotif.jsx', '    if (!l || feuilleOuverte()) return;', '    if (!l) return;'],
-  unefois: ['CapteNotif.jsx', '      if (!reste) return;                       // déjà dit (une fois par lot)', '      if (!reste && false) return;'],
+  // (les deux gardes de la feuille ensemble : l'une seule est rattrapée par l'autre)
+  feuille: ['CapteNotif.jsx', '    if (!l || feuilleOuverte()) return;', '    if (!l) return;', '  if (!montre || feuille) return null;', '  if (!montre) return null;'],
+  unefois: ['CapteNotif.jsx', '      const reste = resteADire(ev.lot, dit.current);', '      const reste = resteADire(ev.lot, {});'],
 };
 
 async function construire() {
@@ -65,8 +66,9 @@ createRoot(document.getElementById('r')).render(<Coque/>);
   const mutant = MUTANT && MUTATIONS[MUTANT];
   const plugins = mutant ? [{ name: 'mutant', setup(b) {
     b.onLoad({ filter: new RegExp(mutant[0].replace(/\./g, '\\.') + '$') }, (a) => {
-      const t = fs.readFileSync(a.path, 'utf8'); if (!t.includes(mutant[1])) throw Error('mutation introuvable : ' + MUTANT);
-      return { contents: t.replace(mutant[1], mutant[2]), loader: 'jsx' };
+      let t = fs.readFileSync(a.path, 'utf8');
+      for (let i = 1; i < mutant.length; i += 2) { if (!t.includes(mutant[i])) throw Error('mutation introuvable : ' + MUTANT); t = t.replace(mutant[i], mutant[i + 1]); }
+      return { contents: t, loader: 'jsx' };
     });
   } }] : [];
   await esbuild.build({ entryPoints: [path.join(dir, 'entree.jsx')], bundle: true, outdir: path.join(dir, 'out'), format: 'esm', jsx: 'automatic', plugins,

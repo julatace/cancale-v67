@@ -106,10 +106,20 @@ Textes `capte.*` (5 langues, `src/i18n/langues/*/capte.js`). « Quoi de neuf » 
   ignoré, lot vu qui revient, point de départ annoncé).
 - `scripts/audit-carte-listes.cjs` (vrai `background.js` + vraie règle serveur) : 18/18 ; `--prouve` :
   rouge sur origin/main, 7 mutations rouges.
-- Bancs `scripts/bancs/popup-capte.cjs` (51) et `scripts/bancs/carte-listes.cjs` (72) : 390 tactile et
-  1512, clair et sombre ; captures regardées. Rouges sur la 5.376 (`BANC_EXT`).
-- Audits : coherence, extension-zip, extension-navigateurs, traduction, quoi-de-neuf, tdz, variables,
-  csp, violet, rouge-doublon ; `npm run build`. (Résultats chiffrés dans le rapport de session.)
+- Bancs (390 tactile et 1512, clair et sombre, captures regardées) :
+  - `scripts/bancs/popup-capte.cjs` 51/51 — sur la 5.376 (`BANC_EXT=<arbre d'avant>`) : 37 rouges ;
+    mutations « place sans contrôle des boutons » 14 rouges, « lot jamais noté vu » 33 rouges ;
+  - `scripts/bancs/carte-listes.cjs` 72/72 — sur la 5.376 : 56 rouges ; mutations « autre compte sans
+    `inert` », « favoris non triés », « sélection ignorée » : 4 rouges chacune ;
+  - `scripts/bancs/toast-capte.cjs` 44/44 (le VRAI `CapteNotif.jsx` assemblé par esbuild) — mutations
+    `BANC_MUTANT=feuille` 4 rouges, `unefois` 8 rouges ; le composant n'existait pas avant ;
+  - `scripts/bancs/carte-favoris.cjs` 79/79 (mis à « Envoyer le message (3) »).
+- Audits verts : coherence, extension-zip, extension-navigateurs, traduction, quoi-de-neuf, tdz, variables,
+  csp, violet, rouge-doublon, carte-extension, extension-ui, garde-fous-capture, ventes-envoi-leger,
+  inbox-fusion, moisson-dressing, endpoints-vus, favoris-ecritures, identite, fonctions-api, lbc-clair,
+  versement-sources (suit désormais la version : la capacité reste à 5.376.0), extension-capture,
+  evt-extension, robustesse-extension, fiabilite-fond, notifications-vinted, securite-comptes ;
+  `npm run build`.
 
 ## Geste de Julien
 Installer la 5.377.0 sur chaque navigateur (remplacer le dossier, ⟳ ; Orion : `VRM-Orion-dossier.zip`).
