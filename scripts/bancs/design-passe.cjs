@@ -11,7 +11,8 @@ require('./_porte-banc.cjs');
 //    A. cibles : tout bouton visible fait 44 px au doigt (390 tactile) et 36 px à la
 //       souris (1512) — hauteur RENDUE (getBoundingClientRect) ;
 //    B. graisses : 400 · 600 · 700 seulement (graisse CALCULÉE de chaque texte) ;
-//    C. tailles : l'échelle du système (11 · 12 · 13 · 15 · 17 · 20 · 28 · 34 · 40 · 44) ;
+//    C. tailles : l'échelle du système (11 · 12 · 13 · 15 · 17 · 20 · 28 · 34 · 40 · 44, et l'affiche 48 · 56 · 64) ;
+//       un texte de 0 px (une phrase repliée derrière son « ? ») ne se voit pas : pas jugé ;
 //    D. gris : un texte gris est LE gris du système (#6E6E73 · #98989D la nuit), jamais
 //       un gris écrit à la main (#8E8E93, #999, rgba(0,0,0,.5)…) — couleur CALCULÉE ;
 //    E. contraste : ≥ 4,5:1 (3:1 pour un grand texte), couleur du texte contre le fond
@@ -127,7 +128,8 @@ const pret = async (pg) => { await pg.waitForSelector('.vrm-main', { timeout: 25
 // ── La mesure, DANS la page : tout ce qui est rendu sous les racines voulues. ──
 function mesurer({ tactile, sombre, racines, ciblesEnPlus = '' }) {
   const seuil = tactile ? 44 : 36;
-  const ECHELLE = [11, 12, 13, 15, 17, 20, 28, 34, 40, 44];
+  // (14 nov., §4 Atelier) + l'AFFICHE : le chiffre d'un écran en 48, 56 ou 64 (`--d-t-affiche-*`, styles-systeme.css §4).
+  const ECHELLE = [11, 12, 13, 15, 17, 20, 28, 34, 40, 44, 48, 56, 64];
   const out = { cibles: [], graisses: [], tailles: [], gris: [], contraste: [], coupes: [], hyphens: [], rognes: [], mfa: [], violet: [], chrono: [], nTextes: 0, nCibles: 0 };
   const roots = [...new Set(racines.flatMap((s) => [...document.querySelectorAll(s)]))].filter((r) => !roots0(r));
   function roots0(r) { return racines.some((s) => r.parentElement && r.parentElement.closest(s)); }
@@ -217,7 +219,7 @@ function mesurer({ tactile, sombre, racines, ciblesEnPlus = '' }) {
         // tenir (« au moins 87,65 € » : 38 px, la taille posée en ligne) — entre son plancher (22) et 44.
         const ajuste = (el.closest('[data-ecran="journee"] .vrm-fu-tete .vrm-fu-case') && fs_ >= 14 && fs_ <= 28)
           || (el.closest('.vrm-fu-grand[style*="font-size"]') && fs_ >= 22 && fs_ <= 44);
-        if (!ECHELLE.includes(fs_) && !ajuste && !el.closest('.vrm-nav-label') && !/^[\s›‹×✓✕·•…—–\-+−⋯▾▸]+$/.test(el.innerText || '')) out.tailles.push({ t: fs_, quoi: lib() });
+        if (fs_ > 0 && !ECHELLE.includes(fs_) && !ajuste && !el.closest('.vrm-nav-label') && !/^[\s›‹×✓✕·•…—–\-+−⋯▾▸]+$/.test(el.innerText || '')) out.tailles.push({ t: fs_, quoi: lib() });
         const col = rgba(cs.color);
         const enSombre = sombreCarte(el);
         // Un texte de couleur TRANSPARENTE (un « — » de remplacement sous un dessin) ne se voit pas : ni gris ni contraste.
