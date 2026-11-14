@@ -14,8 +14,10 @@ import ecran_messages from './fr/messages.js';
 import ecran_emails from './fr/emails.js';
 import ecran_stats from './fr/stats.js';
 import ecran_compta from './fr/compta.js';
+import ecran_argent from './fr/argent.js';
 export default {
   ...ecran_compta,
+  ...ecran_argent,
   ...ecran_stats,
   ...ecran_emails,
   ...ecran_messages,
@@ -479,6 +481,8 @@ export default {
   "reglages.push.desc": "Être prévenu sur ton téléphone d’une vente, d’une offre ou d’un colis.",
   "reglages.push.lib": "Notifications du téléphone",
   "reglages.push.muets": { one: "{n} compte sans e-mail : pas de notification", other: "{n} comptes sans e-mail : pas de notification" },
+  "reglages.push.soirAuto": "Auto",
+  "reglages.push.soirAutoTitre": "19 h l’hiver, 20 h l’été",
   "reglages.raccourcis-clavier.desc": "Sur ordinateur : « g » puis une lettre, « ? » pour la liste.",
   "reglages.raccourcis-clavier.lib": "Raccourcis clavier",
   "reglages.raccourcis-siri.desc": "Ajouter un achat ou trouver un N° en parlant à Siri.",

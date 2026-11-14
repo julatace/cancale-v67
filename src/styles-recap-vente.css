@@ -45,7 +45,7 @@ html body .vrm-recap h2.vrm-recap-nom {
 }
 .vrm-recap-sous { margin: 6px 0 0; font-size: 15px; color: var(--recap-muted); }
 html body .vrm-recap .vrm-recap-fermer {
-  width: 44px; height: 44px; border-radius: 12px; border: 0; background: var(--recap-soft); color: var(--recap-ink);
+  width: 44px; height: 44px; border-radius: 999px; border: 0; background: var(--recap-soft); color: var(--recap-ink);
   display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;
 }
 

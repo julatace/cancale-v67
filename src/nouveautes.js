@@ -27,6 +27,8 @@ export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
   { id: 'ouverture-instantanee', date: '2026-11-14', titre: 'VRM s’ouvre tout de suite, même sans réseau', phrase: 'Tes derniers chiffres de Ma journée, datés, puis tout se relit.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'argent-choix', date: '2026-11-14', titre: 'Coller tes prix, quoi racheter, déclaration prête', phrase: 'Un tableau « N° ; prix » collé, le bénéfice par modèle et taille.', tab: 'stats', pour: 'tous', mode: 'tous' },
+  { id: 'design-passe-reglages', date: '2026-11-14', titre: 'Paramètres et Notifications plus simples', phrase: 'Choix en un toucher, cartes sans cadre, plus de barre vide.', tab: 'settings', pour: 'tous', mode: 'tous' },
   { id: 'design-passe-autres-ecrans', date: '2026-11-14', titre: 'E-mails, Achats et Leboncoin plus nets', phrase: 'Mêmes cartes, mêmes boutons, un seul N° par ligne de recherche.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'design-passe-ecrans', date: '2026-11-14', titre: 'Fiche du N° et écrans plus nets', phrase: 'Tailles, graisses et gris unifiés, boutons à bonne hauteur, textes plus contrastés.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'design-systeme', date: '2026-11-13', titre: 'Un VRM plus calme et plus net', phrase: 'Mêmes écrans, mêmes gestes : formes, boutons et titres harmonisés.', tab: 'journee', pour: 'tous', mode: 'tous' },

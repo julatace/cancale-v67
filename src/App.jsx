@@ -796,6 +796,8 @@ import { lireLocal, lireJSON, stockageDispo } from "./stockageSur.js";   // (11 
 import { creerMagasinPartage } from "./magasinPartage.js";
 import { fusionnerVersements, garderDatesConnues } from "./versementsConnus.js";   // (13 nov.) une date de versement connue ne redevient jamais « pas lue »   // (13 nov., source unique) une copie des données lues pour tous les moteurs
 import { trj } from './i18n/react.js';
+import { CollerPrixAchatFeuille } from "./composants/CollerPrixAchat.jsx";   // (14 nov., lot argent-choix — proposition 75)
+import { verifierAvantEcriture } from "./collerPrixAchat.js";
 // ⟦→ ecrans/Reglages.jsx #16⟧
 
 // Version visible, pour vérifier d'un coup d'œil si l'app a bien chargé la
@@ -41849,6 +41851,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (6 nov.) Avant : le texte brut (« 25 € env. » enregistré tel quel) et un champ vidé
   // écrivait '' en effaçant le lien vers l'achat. Vide ⇒ rien ; illisible ⇒ rien, dit.
   const setBuyForKey = (key, val) => { ecrirePrixTape(key, val); };
+  // ── (14 nov., lot argent-choix — proposition 75) « COLLER UN TABLEAU » (src/collerPrixAchat.js) ──
+  // Les fiches d'un N° (clé `cleNum`) et leur prix d'achat par LA règle de l'app (`prixAchatDe`).
+  // L'écriture est celle d'un prix TAPÉ (`ecriturePrixSaisi`, comme la saisie en série), en UNE
+  // fois : relue sur les fiches du moment (comparer-et-échanger), jamais sans base chargée.
+  const [collerOuvert, setCollerOuvert] = useState(false);
+  const fichesCollage = React.useCallback((cle) => Object.entries(numeros || {})
+    .filter(([, e]) => e && e.numero != null && String(e.numero).trim() && cleNum(e.numero) === cle)
+    .map(([k, e]) => ({ key: k, numero: String(e.numero).trim(), prix: prixAchatDe(e, buyByNum), titre: String(e.title || ''), photo: e.photo || '' })), [numeros, buyByNum]);
+  const enregistrerCollage = (ecritures) => {
+    if (!isCloudReady()) { toast(tr('ac.coller.pasLu')); return null; }
+    const { garder, changees } = verifierAvantEcriture(ecritures, fichesCollage);
+    const lus = garder.map((w) => ({ w, e: ecriturePrixSaisi(w.prix) })).filter((x) => x.e.etat === 'ok');
+    if (lus.length) {
+      pointAvant('collage', `Collage de ${lus.length} prix d’achat`);   // revenir en arrière (Paramètres)
+      setNumeros((prev) => { const u = { ...prev }; for (const { w, e } of lus) u[w.key] = { ...(u[w.key] || {}), ...e.patch }; save('vinted_annonce_numeros', u); return u; });
+      setBuyByNum((prev) => { const u = { ...prev }; for (const { w, e } of lus) u[w.numero] = e.patch.buyPrice; save('vinted_buyprice_by_num', u); return u; });
+    }
+    return { ecrits: lus.length, changees: changees + (garder.length - lus.length) };
+  };
   const [showReport, setShowReport] = useState(false);
   const [reportMonth, setReportMonth] = useState(() => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; });
   const [moisOuvert, setMoisOuvert] = useState(false);
@@ -52355,6 +52376,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           vendues au CA le plus élevé d'abord : ce sont elles qui faussent le
           plus la compta tant que leur coût manque. */}
       {!fillBuyOpen && fillBuyN0.current ? ((fillBuyN0.current = 0), null) : null}
+      {collerOuvert && <CollerPrixAchatFeuille Feuille={SheetShell} Bouton={Bouton} fichesDe={fichesCollage} lu={isCloudReady()} onEnregistrer={enregistrerCollage} onClose={()=>setCollerOuvert(false)}/>}
       {fillBuyOpen && (
         <div className="vrm-feuille-fond" onClick={()=>setFillBuyOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}} data-noswipe="1" data-fillbuy-feuille="">
           <FermeAuRetour fermer={()=>setFillBuyOpen(false)}/>
@@ -52366,6 +52388,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:20,fontWeight:600,color:C.text,letterSpacing:'-0.02em'}}>Prix d'achat à compléter {fillBuyRows.length>0 && <Pourquoi label="Pourquoi c'est important">Tant qu'un coût manque, la vente compte comme 100&nbsp;% de marge : ton bénéfice et ton rapport comptable sont faussés.</Pourquoi>}</div>
                 </div>
+                <Bouton variante="secondaire" className="vrm-b-petit" icone="copy" data-coller-ouvrir="" onClick={()=>setCollerOuvert(true)}>{tr('ac.coller.bouton')}</Bouton>
                 <button className="vrm-icon-control" type="button" onClick={()=>setFillBuyOpen(false)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',padding:4}}><Icon name="close" size={18}/></button>
               </div>
               {(()=>{ if (fillBuyN0.current < fillBuyRows.length) fillBuyN0.current = fillBuyRows.length;
@@ -53671,16 +53694,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* ── Note interne d'un achat (Actions rapides) — privée, synchronisée ── */}
       {noteEdit && (
-        <div onClick={()=>setNoteEdit(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1360,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+        <div data-note-achat-voile="" onClick={()=>setNoteEdit(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1360,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
           <FermeAuRetour fermer={()=>setNoteEdit(null)}/>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,width:'100%',maxWidth:420,padding:'18px 18px 16px',boxShadow:C.shadow||'0 12px 40px rgba(0,0,0,.3)'}}>
-            <div style={{fontSize:15,fontWeight:700,color:C.text,marginBottom:2}}>Note interne</div>
-            <div style={{fontSize:12,color:C.muted,marginBottom:10,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{noteEdit.title||'Achat'} — privée, pour toi seul</div>
+          {/* (14 nov., passe design 3) La fenêtre du système : carte 20 sans cadre, l'ombre flottante, titre 20/700,
+              note 13 grise, champ rayon 12, deux gestes du système (discret, principal) — plus des rectangles de 12. */}
+          <div className="vrm-note-achat" data-note-achat="" onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:'var(--d-r-carte)',width:'100%',maxWidth:420,padding:'20px 20px 16px',boxShadow:'var(--d-ombre-flottant)'}}>
+            <div style={{fontSize:20,fontWeight:700,color:C.text,marginBottom:4}}>Note interne</div>
+            <div style={{fontSize:13,color:C.muted,marginBottom:12,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{noteEdit.title||'Achat'} — privée, pour toi seul</div>
             <textarea autoFocus value={noteEdit.val} onChange={e=>setNoteEdit(n=>({...n,val:e.target.value}))} placeholder="ex : à retoucher · reçu demandé · pour un client…" rows={4}
-              style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',fontSize:15,background:C.bg,color:C.text,outline:'none',fontFamily:'inherit',resize:'vertical'}}/>
+              style={{width:'100%',boxSizing:'border-box',border:'1px solid var(--d-filet-fort)',borderRadius:12,padding:'10px 12px',fontSize:16,background:C.bg,color:C.text,outline:'none',fontFamily:'inherit',resize:'vertical'}}/>
             <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:12}}>
-              <button className="vrm-b vrm-b-discret" type="button" onClick={()=>setNoteEdit(null)} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:12,padding:'9px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
-              <button type="button" onClick={()=>{ saveAchatNote(noteEdit.tid, noteEdit.val); setNoteEdit(null); }} style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:12,padding:'9px 16px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>Enregistrer</button>
+              <Bouton variante="discret" onClick={()=>setNoteEdit(null)}>Annuler</Bouton>
+              <Bouton variante="primaire" onClick={()=>{ saveAchatNote(noteEdit.tid, noteEdit.val); setNoteEdit(null); }}>Enregistrer</Bouton>
             </div>
           </div>
         </div>
