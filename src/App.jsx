@@ -5497,7 +5497,7 @@ function HoteAtelier({ comptes }) {
     </> : null}
     {couleur ? <RechercheCouleurLazy Feuille={SheetShellSurFiche} Bouton={Bouton} famille={couleur} Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy"/>}
       lireEntrees={lireEntreesCouleur(comptes)} lireOctets={(u) => chargerPhotoBoite(u)}
-      ouvrirNumero={(n) => { setCouleur(null); try { window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: String(n) })); } catch (_) {} }}
+      ouvrirNumero={(n) => { setCouleur(null); try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(n) })); } catch (_) {} }}
       onClose={() => setCouleur(null)}/> : null}
   </>;
 }
