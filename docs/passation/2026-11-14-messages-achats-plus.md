@@ -66,3 +66,6 @@ Mesure de la vraie base (lecture seule, formes seulement) : le détail d'une tra
 
 ## Geste de Julien
 Installer l'extension **5.376.0** (remplacer le dossier, ⟳ dans chaque Chrome ; Orion : `VRM-Orion-dossier.zip`). Rien d'autre : pas de migration, pas de variable. Le carnet et « déjà achetée » se remplissent à mesure que les transactions d'achat sont relues.
+
+## Version de l'extension (consigne du coordinateur, 14 nov.)
+Sources en **5.376.0** (`CODE_VERSION`, manifeste, transports LBC, `EXT_ATTENDUE`, `EXT_CAPACITES.rechercheachat`), mais les zips (`public/VRM-extension.zip`, Orion) et `public/extension-version.json` sont laissés à leur état d'origin/main : la 5.376.0 est UNE version consolidée à l'intégration. `audit-extension-zip` rougit donc seulement sur « zip périmé / version du zip » — attendu ; vert après `node scripts/zip-extension.cjs` à la consolidation. « Extension servie » reste 5.375.0 dans CLAUDE.md jusque-là.
