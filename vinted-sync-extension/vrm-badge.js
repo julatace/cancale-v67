@@ -239,6 +239,41 @@
   .maj li { margin: 2px 0; }
   .rep { margin-top: 4px; font-size: 12px; color: var(--doux); }
   .rep[data-rep="reste"], .rep[data-rep="refus"] { color: var(--ambre); }
+  /* 5.376 : les liens du site (jamais VRM) — des rangées iOS, chevron fin, texte à l'encre. */
+  .liens { margin-top: 8px; border-radius: 12px; background: var(--remplir); overflow: hidden; }
+  .lien-site { display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 0 12px; color: var(--texte); text-decoration: none; font-size: 15px; -webkit-tap-highlight-color: transparent; }
+  .lien-site + .lien-site { border-top: 1px solid var(--filet); }
+  .lien-site:hover { background: var(--survol); }
+  .lien-site:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 12px; }
+  .lien-site i { width: 7px; height: 7px; border-right: 1.5px solid var(--pale); border-top: 1.5px solid var(--pale); transform: rotate(45deg); flex-shrink: 0; margin-left: 8px; }
+  /* 5.376 : les messages aux favoris — un bloc calme ; le seul bouton plein est « Lancer ». */
+  .fav { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--filet); }
+  .fav-t { font-size: 12px; color: var(--doux); font-weight: 500; }
+  .fav-l { margin-top: 2px; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .fav-l b { font-weight: 600; }
+  .fav .barre { margin-top: 6px; }
+  .fav-ligne { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 44px; padding: 0; border: 0; background: transparent; color: var(--texte); font-size: 15px; text-align: left; cursor: pointer; }
+  .fav-ligne b { font-weight: 600; }
+  .fav-go { color: var(--accent); font-size: 15px; }
+  .fav-ligne:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+  .carte:has(.apercu) { width: min(368px, calc(100vw - 32px)); }
+  .ap-tete { display: flex; align-items: center; gap: 2px; margin: -4px 40px 6px -8px; }
+  .ap-tete b { flex: 1; min-width: 0; font-size: 17px; font-weight: 600; letter-spacing: -.012em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ap-retour, .ap-aide-b { width: 44px; height: 44px; flex-shrink: 0; border: 0; border-radius: 10px; background: transparent; color: var(--accent); font-size: 24px; line-height: 44px; padding: 0; cursor: pointer; }
+  .ap-aide-b { border-radius: 999px; background: radial-gradient(circle, var(--remplir) 0 15px, transparent 15.5px); color: var(--texte); font-size: 15px; font-weight: 600; }   /* un rond de 30 px dans une cible de 44 px */
+  .ap-retour:focus-visible, .ap-aide-b:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .ap-aide { margin: 0 0 8px; padding: 10px 12px 10px 28px; border-radius: 12px; background: var(--remplir); font-size: 12.5px; color: var(--doux); }
+  .ap-aide li { margin: 2px 0; }
+  .ap-phrase { margin: 0 0 8px; font-size: 14px; }
+  .ap-lbl { margin: 10px 0 4px; font-size: 12px; color: var(--doux); font-weight: 500; }
+  .bulle { padding: 10px 12px; border-radius: 16px 16px 16px 6px; background: var(--remplir); font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 140px; overflow-y: auto; }
+  .ap-liste { list-style: none; margin: 8px 0 4px; padding: 0; border-radius: 12px; background: var(--remplir); max-height: 220px; overflow-y: auto; }
+  .ap-liste li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 8px; padding: 8px 12px; font-size: 13px; }
+  .ap-liste li + li { border-top: 1px solid var(--filet); }
+  .ap-liste .qui { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ap-liste .quoi { grid-column: 1; color: var(--doux); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ap-liste .px { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .ap-liste .px s { color: var(--pale); margin-right: 4px; }
   .fermer { position: absolute; top: 2px; right: 2px; width: 44px; height: 44px; border: 0; border-radius: 8px; background: transparent;
     color: var(--doux); font-size: 18px; cursor: pointer; line-height: 44px; padding: 0; }
   .fermer:hover { background: var(--survol); color: var(--texte); }
@@ -246,7 +281,7 @@
   .carte.doigt .tete { padding-right: 44px; }
   /* 19 octobre : au doigt (Firefox pour Android, Orion) — pas de survol, pas
      de surlignage gris du navigateur, et aucun double-tap qui zoome. */
-  .btn, .b, .fermer { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  .btn, .b, .fermer, .fav-ligne, .ap-retour, .ap-aide-b, .lien-site { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
   /* 5.351 : le logo se glisse au doigt aussi (sans faire défiler la page). */
   .btn { touch-action: none; }
 </style>
@@ -489,11 +524,158 @@
     return `<details class="detail mois" data-mois${moisOuvert ? ' open' : ''}><summary>Ce mois dans VRM</summary>
       <div class="val mois-l" data-mois-ca="${m.ca == null ? '' : esc(m.ca)}" data-mois-ventes="${m.ventes == null ? '' : esc(m.ventes)}" data-mois-expedier="${m.aExpedier == null ? '' : esc(m.aExpedier)}"><span class="seg">Ce mois : <b>${esc(ca)}</b> vendus</span> · <span class="seg"><b>${esc(nv)}</b> ${ventesMot}</span> · <span class="seg"><b>${esc(ae)}</b> à expédier</span></div>
       ${note ? `<div class="val gris" data-mois-note="${esc(m.raison || 'ok')}">${esc(note)}</div>` : ''}
-      <div class="outils"><button class="lien" data-mois-voir>Voir dans VRM</button><button class="lien" data-mois-masquer>Masquer ce résumé</button></div>
+      <div class="outils"><button class="lien" data-mois-masquer>Masquer ce résumé</button></div>
     </details>`;
   }
   const resumeHtml = (r) => `<div class="resume" data-resume="${esc(r.etat)}" role="status"><span class="d" aria-hidden="true"></span><span class="t">${esc(r.texte)}${r.coche ? ' <span class="coche" aria-label="vérifié">✓</span>' : ''}</span></div>`;
 
+  // ══ 5.376 (Julien, 14 nov., midi) : LA CARTE OUVRE LE SITE, JAMAIS VRM ══════════
+  // « Quand tu appuies dessus ça ouvre juste les ventes de ce compte, les messages de
+  // ce compte, mais pas plus, ça n'ouvre pas VRM. » Les liens viennent du service
+  // worker (`liensCartePour` : des pages du MÊME site que l'onglet, celles du compte
+  // connecté) ; la carte ne compose aucune adresse, et n'en garde aucune d'un autre
+  // site. Pendant que des messages partent depuis cet onglet, un lien s'ouvre dans un
+  // NOUVEL onglet du même site (l'envoi garde le sien).
+  const ORIGINE_ICI = (() => { try { return String(location.origin || ''); } catch (_) { return ''; } })();
+  function liensHtml(e, nouvelOnglet) {
+    const l = Array.isArray(e && e.liens) ? e.liens.filter((x) => { try { const u = new URL(x.url); return u.protocol === 'https:' && u.origin === ORIGINE_ICI; } catch (_) { return false; } }) : [];
+    if (!l.length) return '';
+    return `<nav class="liens" data-liens aria-label="Sur ${esc(NOM_SITE[e.plateforme] || 'ce site')}">`
+      + l.map((x) => `<a class="lien-site" data-lien-site="${esc(x.cle)}" href="${esc(x.url)}" target="${nouvelOnglet ? '_blank' : '_top'}"${nouvelOnglet ? ' rel="noopener"' : ''}><span>${esc(x.libelle)}</span><i aria-hidden="true"></i></a>`).join('')
+      + '</nav>';
+  }
+
+  // ══ 5.376 : LES MESSAGES AUX FAVORIS, LANCÉS D'ICI ═════════════════════════════
+  // « Comme ça on peut lancer les messages aux favoris directement quand on est sur le
+  // compte. » Tout vient du service worker : l'aperçu (calculé par VRM avec les règles
+  // de l'app), la file en cours (`vrmFavorisCarte`). Rien ne part sans « Lancer ».
+  let vueFav = null, apercuFav = null, favErreur = '', favOccupe = false, aideFav = false, minuteurFav = null;
+  const ATTENTES_FAV = {
+    tout_arrete: '« Tout arrêter » est posé : rien ne part. Touche « Reprendre » dans Détails.',
+    reseau: 'Pas de réseau : rien ne part. Ça reprend tout seul.',
+    pause: 'Vinted demande de ralentir : rien ne part. Ça reprend tout seul après la pause.',
+    autre_compte: 'Cet onglet est connecté sur un autre compte Vinted : rien ne part. Reviens sur le bon compte.',
+    onglet: 'Aucun onglet Vinted ouvert sur ce compte : rien ne part. Garde un onglet Vinted ouvert.',
+    vrm: 'VRM ne répond pas pour l’instant : rien ne part. Ça reprend tout seul.',
+  };
+  const BLOCAGES_FAV = {
+    reglages: 'Écris ton message une seule fois dans VRM (Messages → Favoris → Ton message). Ensuite, tout se lance d’ici.',
+    favoris_absents: 'Ouvre la cloche de Vinted une fois : VRM y lit qui a mis tes articles en favori.',
+    dressing_absent: 'Ouvre ton dressing une fois : VRM vérifie que chaque article est encore en vente.',
+    dressing_ancien: 'Ton dressing a été lu il y a plus de 24 h : ouvre-le une fois pour que VRM revérifie tes articles.',
+    dressing_partiel: 'Ton dressing n’a pas été lu en entier : fais-le défiler jusqu’en bas une fois.',
+  };
+  const eurosFav = (n) => { const x = Number(n); if (!isFinite(x) || x <= 0) return ''; const c = Math.round(x * 100); return (c % 100 ? (c / 100).toFixed(2).replace('.', ',') : String(c / 100)) + ' €'; };
+  const dansFav = (t) => { const s = Math.max(0, Math.round((Number(t) - Date.now()) / 1000)); if (s < 60) return s + ' s'; const m = Math.round(s / 60); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0'); };
+  const plurielFav = (n, un, plusieurs) => `${Number(n).toLocaleString('fr-FR')} ${Number(n) > 1 ? plusieurs : un}`;
+  function favorisHtml(e) {
+    if (!e || e.plateforme !== 'vinted' || !e.site || !e.site.id || !e.site.favoris) return '';
+    const f = e.site.favoris, st = f.file, ap = f.apercu;
+    if (st && st.actif) {
+      const fi = st.file || {}, total = Number(fi.total) || Number(st.total) || 0, faits = Number(fi.envoyes) || 0;
+      const pas = (Number(fi.refuses) || 0) + (Number(fi.ignores) || 0) + (Number(fi.incertains) || 0);
+      const dans = !st.enCours && Number(st.prochain) > Date.now() ? dansFav(st.prochain) : '';
+      const att = st.attente && ATTENTES_FAV[st.attente];
+      return `<section class="fav" data-fav="encours" data-fav-envoyes="${faits}" data-fav-total="${total}"${st.attente ? ` data-fav-attente="${esc(st.attente)}"` : ''}>
+        <div class="fav-t">Messages aux favoris</div>
+        <div class="fav-l" role="status"><b>${faits}/${total}</b> envoyés${pas ? ` · ${plurielFav(pas, 'pas envoyé', 'pas envoyés')}` : ''}${st.enCours ? ' · un message part' : dans ? ` · prochain dans <span data-fav-dans="${Number(st.prochain)}">${esc(dans)}</span>` : ''}</div>
+        <div class="barre" aria-hidden="true"><i style="width:${total ? Math.round(100 * faits / total) : 0}%"></i></div>
+        ${att ? `<div class="val alerte" data-fav-attente-texte>${esc(att)}</div>` : '<div class="val gris">Garde cet onglet ouvert : les messages partent un par un, d’ici.</div>'}
+        <button class="b sec" data-fav-arreter>Tout arrêter</button>
+      </section>`;
+    }
+    if (st && !st.actif && st.fin && Date.now() - Number(st.fin.at || 0) < 6 * 3600000) {
+      const fi = st.file || {}, env = Number(fi.envoyes) || 0, inc = Number(fi.incertains) || 0;
+      const pas = (Number(fi.refuses) || 0) + (Number(fi.ignores) || 0) + (Number(fi.annules) || 0);
+      const quoi = st.fin.raison === 'robot' ? 'Arrêté : Vinted demande une vérification. Réponds-lui sur Vinted, puis relance d’ici.'
+        : st.fin.raison === 'arret' ? 'Arrêté, comme tu l’as demandé. Le reste n’est pas parti.'
+        : st.fin.raison === 'interrompu' ? (st.fin.texte ? 'Interrompu : ' + st.fin.texte : 'Interrompu : le reste n’est pas parti.')
+        : 'Terminé.';
+      return `<section class="fav" data-fav="fini" data-fav-fin="${esc(st.fin.raison || '')}" data-fav-envoyes="${env}">
+        <div class="fav-t">Messages aux favoris</div>
+        <div class="fav-l" role="status"><b>${plurielFav(env, 'envoyé', 'envoyés')}</b>${pas ? ` · ${plurielFav(pas, 'pas envoyé', 'pas envoyés')}` : ''}</div>
+        <div class="val${st.fin.raison === 'robot' ? ' alerte' : ' gris'}">${esc(quoi)}</div>
+        ${inc ? `<div class="val alerte" data-fav-verifier="${inc}">${plurielFav(inc, 'message', 'messages')} à vérifier sur Vinted : regarde la conversation avant de relancer.</div>` : ''}
+        <div class="outils"><button class="lien" data-fav-ok>OK</button></div>
+      </section>`;
+    }
+    if (ap && ap.etat === 'pret' && Number(ap.total) > 0) {
+      const n = Number(ap.total);
+      return `<section class="fav" data-fav="pret" data-fav-n="${n}"><button class="fav-ligne" data-fav-voir><span><b>${plurielFav(n, 'favori', 'favoris')}</b> à qui écrire</span><span class="fav-go">Voir</span></button></section>`;
+    }
+    if (ap && ap.etat === 'bloque' && BLOCAGES_FAV[ap.raison]) return `<section class="fav" data-fav="bloque" data-fav-raison="${esc(ap.raison)}"><div class="fav-t">Messages aux favoris</div><div class="val gris">${esc(BLOCAGES_FAV[ap.raison])}</div></section>`;
+    if (ap && ap.etat === 'rien') return `<section class="fav" data-fav="rien"><div class="fav-t">Messages aux favoris</div><div class="val gris">Personne à qui écrire pour l’instant.</div></section>`;
+    return `<section class="fav" data-fav="inconnu"><button class="fav-ligne" data-fav-voir><span>Messages aux favoris</span><span class="fav-go">Voir</span></button></section>`;
+  }
+  function apercuHtml(e) {
+    const a = apercuFav;
+    const tete = `<div class="ap-tete"><button class="ap-retour" data-fav-retour aria-label="Retour">‹</button><b>Messages aux favoris</b><button class="ap-aide-b" data-fav-aide aria-expanded="${aideFav ? 'true' : 'false'}" aria-label="Comment ça marche ?">?</button></div>`;
+    const aide = aideFav ? `<ol class="ap-aide" data-fav-aide-texte>
+        <li>Pour chaque personne, VRM ouvre la conversation sur Vinted${a && a.message && a.message.offre ? ', fait l’offre' : ''}, prend le temps d’écrire, puis envoie le message.</li>
+        <li>15 messages par heure au plus sur ce compte. Une pause de Vinted, un autre compte dans l’onglet ou une vérification de Vinted arrête tout, et c’est dit ici.</li>
+        <li>Garde cet onglet Vinted ouvert. Tu peux tout arrêter à tout moment, ici.</li></ol>` : '';
+    if (!a) return `${tete}${aide}<div class="val gris" role="status" data-fav-charge>${favErreur ? '' : 'Je regarde qui a mis tes articles en favori…'}</div>${favErreur ? `<div class="err" role="alert">${esc(favErreur)}</div><button class="b sec" data-fav-retour>Retour</button>` : ''}`;
+    if (a.etat !== 'pret') {
+      const t = a.etat === 'encours' ? 'Des messages partent déjà sur ce compte (depuis VRM ou une autre carte). Attends la fin avant d’en lancer d’autres.'
+        : a.etat === 'bloque' ? (BLOCAGES_FAV[a.raison] || 'VRM ne peut pas préparer les messages pour l’instant.')
+        : 'Personne à qui écrire pour l’instant : chaque favori a déjà reçu un message, ou son article n’est plus en vente.';
+      return `${tete}${aide}<div class="val" data-fav-apercu="${esc(a.etat)}">${esc(t)}</div>${a.nonProuves ? `<div class="val gris">${plurielFav(a.nonProuves, 'favori attend', 'favoris attendent')} : ouvre un de leurs favoris depuis la cloche de Vinted pour que VRM sache à qui écrire.</div>` : ''}<button class="b sec" data-fav-retour>Retour</button>`;
+    }
+    const n = a.liste.length, m = a.message || {}, premier = a.liste[0];
+    const rythme = Number(m.intervalleMinutes) === 0 ? 'quelques secondes d’écart' : m.intervalleMaxMinutes ? `${m.intervalleMinutes} à ${m.intervalleMaxMinutes} min d’écart` : `${m.intervalleMinutes} min d’écart`;
+    const offreTxt = m.offre ? (m.offre.mode === 'pct' ? `−${m.offre.valeur} %` : m.offre.mode === 'euros' ? `−${eurosFav(m.offre.valeur)}` : `à ${eurosFav(m.offre.valeur)}`) + (m.offre.arrondi ? ', arrondie à l’euro' : '') : '';
+    return `${tete}${aide}
+      <p class="ap-phrase">VRM va écrire à ${n > 1 ? `ces ${n} personnes, une par une` : 'cette personne'}, depuis cet onglet. Rien ne part avant «\u00a0Lancer\u00a0».</p>
+      <div class="ap-lbl">Le message${Number(m.versions) > 1 ? ` · une de tes ${Number(m.versions)} versions, au hasard` : ''}</div>
+      <div class="bulle" data-fav-message>${esc(premier.texte)}</div>
+      ${m.offre ? `<div class="ap-lbl" data-fav-offre="${esc(m.offre.mode)}">Avec une offre ${esc(offreTxt)}</div>` : '<div class="ap-lbl" data-fav-offre="aucune">Sans offre de prix</div>'}
+      <ul class="ap-liste" data-fav-liste="${n}">${a.liste.map((x) => `<li data-fav-qui="${esc(x.id)}"><span class="qui">${esc(x.pseudo || 'Un acheteur')}</span><span class="quoi">${esc(x.titre || 'Article')}</span><span class="px">${x.offre != null ? `<s>${esc(eurosFav(x.prix))}</s> ${esc(eurosFav(x.offre))}` : esc(eurosFav(x.prix))}</span></li>`).join('')}</ul>
+      <div class="val gris" data-fav-rythme>Écrit pour chacun · ${esc(rythme)} · 15 par heure au plus.</div>
+      ${Number(a.total) > n ? `<div class="val gris" data-fav-reste="${Number(a.total) - n}">Les ${n} plus récents d’abord ; les ${Number(a.total) - n} autres, relance après.</div>` : ''}
+      ${a.nonProuves ? `<div class="val gris" data-fav-non-prouves="${Number(a.nonProuves)}">${plurielFav(a.nonProuves, 'autre en attente', 'autres en attente')} : ouvre un favori depuis la cloche de Vinted, VRM saura à qui écrire.</div>` : ''}
+      ${a.ventesAilleurs === 'pas_su' ? '<div class="val alerte" data-fav-ailleurs>Tes ventes sur les autres sites n’ont pas été revérifiées récemment : assure-toi que ces articles ne sont pas vendus ailleurs.</div>' : ''}
+      ${favErreur ? `<div class="err" role="alert">${esc(favErreur)}</div>` : ''}
+      <button class="b" data-fav-lancer${favOccupe ? ' disabled' : ''}>${favOccupe ? 'Lancement…' : `Lancer (${n})`}</button>
+      <button class="b sec" data-fav-retour>Pas maintenant</button>`;
+  }
+  function brancherFavoris(e) {
+    const uid = e && e.site && e.site.id ? String(e.site.id) : '';
+    const demander = (quoi, extra, fin) => {
+      try { chrome.runtime.sendMessage(Object.assign({ from: 'vrm-badge', action: 'favorisCarte', quoi, uid }, extra || {}), (r) => { void chrome.runtime.lastError; fin(r || null); }); } catch (_) { fin(null); }
+    };
+    carte.querySelectorAll('[data-fav-voir]').forEach((el) => el.addEventListener('click', () => {
+      vueFav = 'apercu'; apercuFav = null; favErreur = ''; favOccupe = true; doigt = true; rendre();
+      demander('apercu', null, (r) => {
+        favOccupe = false;
+        if (r && r.ok && r.apercu) apercuFav = r.apercu; else favErreur = (r && r.raison) || 'L’extension n’a pas répondu. Réessaie.';
+        rendre();
+      });
+    }));
+    carte.querySelectorAll('[data-fav-retour]').forEach((el) => el.addEventListener('click', () => { vueFav = null; apercuFav = null; favErreur = ''; rafraichir(); }));
+    const aideB = carte.querySelector('[data-fav-aide]');
+    if (aideB) aideB.addEventListener('click', () => { aideFav = !aideFav; rendre(); });
+    const lancer = carte.querySelector('[data-fav-lancer]');
+    if (lancer) lancer.addEventListener('click', () => {
+      const a = apercuFav;
+      if (!a || a.etat !== 'pret' || favOccupe) return;
+      favOccupe = true; favErreur = ''; rendre();
+      // SON clic : la sélection et les réglages de l'aperçu montré, `confirme` posé ici seulement.
+      demander('lancer', { selection: a.selection, reglages: a.reglages, confirme: true }, (r) => {
+        favOccupe = false;
+        if (r && r.ok) { vueFav = null; apercuFav = null; rafraichir(); return; }
+        favErreur = (r && r.raison) || 'Rien n’est parti : l’extension n’a pas répondu.';
+        rendre();
+      });
+    });
+    const arreter = carte.querySelector('[data-fav-arreter]');
+    if (arreter) arreter.addEventListener('click', () => { arreter.disabled = true; arreter.textContent = 'Arrêt…'; demander('arreter', null, () => rafraichir()); });
+    const okB = carte.querySelector('[data-fav-ok]');
+    if (okB) okB.addEventListener('click', () => demander('oublier', null, () => rafraichir()));
+    // « prochain dans … » suit l'horloge tant que la carte est ouverte (aucune requête).
+    clearInterval(minuteurFav); minuteurFav = null;
+    const dans = carte.querySelector('[data-fav-dans]');
+    if (dans) minuteurFav = setInterval(() => { if (!dans.isConnected || !carte.classList.contains('on')) { clearInterval(minuteurFav); minuteurFav = null; return; } const t = Number(dans.getAttribute('data-fav-dans')); if (t <= Date.now()) { clearInterval(minuteurFav); minuteurFav = null; rafraichir(); return; } dans.textContent = dansFav(t); }, 1000);
+  }
   // ══ 5.371 (Julien, 12 nov.) : LA CARTE EN 4 LIGNES AU PLUS ══════════════════
   // Compte (pseudo) · Lu (« il y a 3 min ») · Jauge (« 23/50 cette heure · 112/200
   // aujourd'hui », Vinted) · État (normal / prudence jusqu'à … / pause / Tout arrêté).
@@ -764,10 +946,23 @@
     // 5.351 : connecté ⇒ « Ouvrir VRM » en premier (souris et doigt), puis les
     // trois écrans les plus demandés à un clic (Colis · Messages · Offres) ;
     // « Changer de compte VRM » passe dans le détail (geste rare).
+    // 5.376 (Julien, 14 nov.) : plus de « Ouvrir VRM » ni de « Colis · Messages · Offres »
+    // qui ouvraient VRM : les messages aux favoris se lancent ICI, et les liens ouvrent
+    // le site lui-même (ventes, messages, dressing du compte de l'onglet).
     const connecte = !!(v && v.connecte) && !changerCompte;
-    const gestes = connecte
-      ? `<div class="gestes"><button class="b" data-ouvrir-vrm>Ouvrir VRM</button><div class="raccourcis" data-raccourcis><button class="b sec" data-ouvrir-ecran="colis" title="Ouvrir VRM sur les colis">Colis</button><button class="b sec" data-ouvrir-ecran="messages" title="Ouvrir VRM sur les messages">Messages</button><button class="b sec" data-ouvrir-ecran="offres" title="Ouvrir VRM sur les favoris et offres">Offres</button></div></div>`
-      : (v && v.connecte) || formulaire ? '' : `<button class="b" data-montrer-connexion>Me connecter</button>`;
+    const fileFav = !!(e.site && e.site.favoris && e.site.favoris.file && e.site.favoris.file.actif);
+    if (vueFav === 'apercu' && connecte && e.plateforme === 'vinted' && e.site && e.site.id) {
+      carte.classList.add('doigt');
+      poserHtml(contenu, `<button class="fermer" data-fermer-carte title="Fermer" aria-label="Fermer">×</button><div class="apercu" data-fav-vue="apercu">${apercuHtml(e)}</div>`);
+      const fermerA = carte.querySelector('[data-fermer-carte]');
+      if (fermerA) fermerA.addEventListener('click', fermerCarte);
+      brancherFavoris(e);
+      poserFormulaire(false);
+      return;
+    }
+    const gestes = (connecte
+      ? `<div class="gestes">${favorisHtml(e)}</div>`
+      : (v && v.connecte) || formulaire ? '' : `<button class="b" data-montrer-connexion>Me connecter</button>`) + (formulaire ? '' : liensHtml(e, fileFav));
     const resume = resumeEtat(e);
     // Leboncoin (5.335, sa décision du 9 nov.) : les trois lignes Compte · Annonces ·
     // Ventes SONT le message principal — visibles, jamais repliées, pas doublées.
@@ -821,11 +1016,9 @@
     brancherRapport();
     const det = carte.querySelector('[data-detail]');
     if (det) det.addEventListener('toggle', () => { if (resume.etat !== 'geste') detailOuvert = det.open; });
-    carte.querySelectorAll('[data-ouvrir-ecran]').forEach((el) => el.addEventListener('click', () => { carte.classList.remove('on'); ouvrirEcran(el.getAttribute('data-ouvrir-ecran')); }));
+    brancherFavoris(e);
     const moisD = carte.querySelector('[data-mois]');
     if (moisD) moisD.addEventListener('toggle', () => { moisOuvert = moisD.open; });
-    const moisVoir = carte.querySelector('[data-mois-voir]');
-    if (moisVoir) moisVoir.addEventListener('click', () => { carte.classList.remove('on'); ouvrirEcran('journee'); });
     carte.querySelectorAll('[data-mois-masquer],[data-mois-afficher]').forEach((el) => el.addEventListener('click', () => {
       const masquer = el.hasAttribute('data-mois-masquer');
       el.disabled = true;
@@ -855,8 +1048,6 @@
     const changer = carte.querySelector('[data-changer-vrm]');
     // 5.329 : changer de compte se fait ICI (le formulaire), jamais en ouvrant VRM.
     if (changer) changer.addEventListener('click', () => { changerCompte = true; formulaireDemande = true; doigt = true; rendre(); focaliser(); });
-    const ouvrir = carte.querySelector('[data-ouvrir-vrm]');
-    if (ouvrir) ouvrir.addEventListener('click', () => { carte.classList.remove('on'); actionLogo(); });
     const fermerC = carte.querySelector('[data-fermer-carte]');
     if (fermerC) fermerC.addEventListener('click', fermerCarte);
     const montrer = carte.querySelector('[data-montrer-connexion]');
@@ -1389,14 +1580,10 @@
     });
   }
   function ouvrirConnexion() { doigt = true; formulaireDemande = true; carte.classList.add('on'); rendre(); }
-  function fermerCarte() { doigt = false; justeConnecte = false; if (changerCompte) { changerCompte = false; formulaireDemande = false; rendre(); } carte.classList.remove('on'); }
+  function fermerCarte() { doigt = false; justeConnecte = false; vueFav = null; apercuFav = null; favErreur = ''; if (changerCompte) { changerCompte = false; formulaireDemande = false; rendre(); } carte.classList.remove('on'); }
 
-  // ══ 5.351 (lot extension-visuel) : OUVRIR VRM SUR UN ÉCRAN, DÉPLACER, RÉDUIRE, TEINTE ══
-  // « Colis · Messages · Offres » : le service worker ouvre VRM sur l'écran nommé
-  // (une liste blanche chez lui, `ECRANS_CARTE`) — jamais une adresse d'ici.
-  function ouvrirEcran(ecran) {
-    try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'ouvrirVRM', ecran: String(ecran || '') }, () => { void chrome.runtime.lastError; }); } catch (_) {}
-  }
+  // ══ 5.351 (lot extension-visuel) : DÉPLACER, RÉDUIRE, TEINTE ══
+  // (5.376 : la carte n'ouvre plus VRM — « Colis · Messages · Offres » sont retirés.)
   // Le logo se GLISSE où il gêne le moins (souris ou doigt) et retient sa place
   // PAR SITE (`vrmBadgePos`, ce navigateur) ; il se RÉDUIT en pastille
   // (`vrmBadgeMini`). La carte s'ouvre du côté où il y a la place. Rien n'est
@@ -1575,7 +1762,11 @@
     await rafraichir();
     const v = etat && etat.vrm;
     if (v && v.connecte) {
-      try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'ouvrirVRM' }, () => { void chrome.runtime.lastError; }); } catch (_) {}
+      // 5.376 (Julien, 14 nov. : « ça n'ouvre pas VRM s'il te plaît ») : un clic sur le
+      // logo ÉPINGLE la carte (elle ne se ferme plus au survol) — jamais VRM. VRM reste
+      // à un clic de l'icône de l'extension, dans la barre du navigateur.
+      if (doigt && carte.classList.contains('on')) { fermerCarte(); return; }
+      doigt = true; carte.classList.add('on'); rendre();
       return;
     }
     // ⚠️ 8 nov. (5.328, Julien sur Orion : « "Se connecter" change de page VRM
@@ -1622,7 +1813,7 @@
       const o = ch.vrmOAuthEtat && ch.vrmOAuthEtat.newValue;
       if (o && o.etat === 'erreur' && formulaireEl) { direEtat(''); direErreur(o.message || 'La connexion n’a pas abouti.'); }
       if (ch.vrmApparence) { const m = ch.vrmApparence.newValue; modeApparence = ['clair', 'sombre', 'auto', 'soir'].includes(m) ? m : null; appliquerTeinte(); }
-      if (ch.vrmPauseVinted || ch.vrmFreinRepub || ch.vrmSession || ch.vrmFlux || ch.vrmVcCapte || ch.vrmBascule || ch.vrmLbcCompte || ch.vrmChoixComptes || ch.vrmLoginsVus || ch.vrmLogins) rafraichir();
+      if (ch.vrmFavorisCarte || ch.vrmFavorisApercu || ch.vrmPauseVinted || ch.vrmFreinRepub || ch.vrmSession || ch.vrmFlux || ch.vrmVcCapte || ch.vrmBascule || ch.vrmLbcCompte || ch.vrmChoixComptes || ch.vrmLoginsVus || ch.vrmLogins) rafraichir();
     });
   } catch (_) {}
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { appliquerTeinte(); rafraichir(); } });

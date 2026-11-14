@@ -3980,7 +3980,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       })().then(sendResponse, () => sendResponse({ ok: false, raison: 'erreur' }));
       return true;
     }
-    if (msg && (msg.from === 'vrm-badge' || msg.from === 'cancale-popup') && msg.action === 'ouvrirVRM') {
+    // 5.376 (Julien, 14 nov. : « ça n'ouvre pas VRM s'il te plaît ») : la carte du logo
+    // n'ouvre JAMAIS VRM — ses liens ouvrent le site (`liensCartePour`). Seule la
+    // fenêtre de l'icône de l'extension (popup) ouvre encore VRM.
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'ouvrirVRM') { sendResponse({ ok: false, code: 'carte' }); return true; }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'favorisCarte') {
+      favorisCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur', raison: 'L’extension n’a pas pu répondre. Rien n’est parti.' }));
+      return true;
+    }
+    if (msg && msg.from === 'cancale-popup' && msg.action === 'ouvrirVRM') {
       // La carte de connexion vit dans un iframe de l'onglet : sender.tab est
       // l'onglet du site, c'est lui qui décide l'onglet de VRM.
       // 5.351 (lot extension-visuel) : la carte ouvre VRM sur un ÉCRAN de la liste
@@ -10717,7 +10725,7 @@ function surAlarme(a) {
   else if (a.name === 'vrm-session') lance('session', () => loadSession().then(s => { if (s) return authToken(); }));
   else if (a.name === 'vrm-reseau') lance('reseau', () => viderFilesEnAttente());   // 5.376 : et les captures en attente   // 5.371 : la file « en attente de réseau »
   else if (a.name === 'vrm-photos') lance('photos', () => tickPhotos());
-  else if (a.name === 'vrm-relais') lance('relais', () => relaisTick('alarme'));
+  else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); }   // 5.376 : les favoris lancés depuis la carte
   else if (a.name === 'vrm-lbc') lance('lbc', () => relireLbcEnFond());
   else if (a.name === 'vrm-offres') { lance('offres', () => offresTick()); lance('baisses', () => baissesTick()); lance('favoriattente', () => reprendreMessagesFavoris()); }   // 5.372 : un message au favori qui attendait après l'offre   // 5.370 : les baisses programmées
   // 5.290 : le statut des colis chez le transporteur (voir `transpTick`).
@@ -16841,6 +16849,12 @@ async function gardeStricte(uid, acc, opts = {}) {
 async function executerPourApp(msg, sender) {
   const src = (sender && sender.origin) || (sender && sender.url) || '';
   if (!ORIGINE_APP.test(src)) return { ok: false, code: 'origine', error: 'origine non autorisee' };
+  return executerPourAppCoeur(msg);
+}
+// (5.376) La porte commune : une commande de l'app (origine vérifiée ci-dessus) ou un
+// message aux favoris lancé par SON clic dans la carte du logo (`__carte`) — mêmes
+// gardes, même file Vinted, mêmes plafonds. Jamais appelée avec un message de page.
+async function executerPourAppCoeur(msg) {
   const methode = String(msg.method || 'POST').toUpperCase();
   const permis = execPermis(methode, msg.endpoint);
   if (!permis) return { ok: false, code: 'non-autorise', error: 'action non autorisée depuis l\'app' };
@@ -16857,6 +16871,7 @@ async function executerPourApp(msg, sender) {
   if (ecriture && horsLigne()) {
     if (msg.__fileReseau) return { ok: false, enAttente: true, code: 'en-attente-reseau', error: 'toujours pas de réseau' };
     if (permis.confirmer) return { ok: false, code: 'hors-ligne', error: `pas de réseau : ce geste vend ${motsExt().le}, il ne part pas plus tard — réessaie quand le réseau revient` };
+    if (msg.__carte) return { ok: false, code: 'hors-ligne', error: 'pas de réseau : rien n’est parti' };   // 5.376 : la carte n'attend pas le réseau en file
     return mettreEnFileReseau(Object.assign({}, msg, { method: methode }));
   }
   const accts = await getStoredAccounts({ ouNull: true });
@@ -17086,6 +17101,215 @@ async function executerMessageFavori(uid,acc,body){
   if(r.ok&&r.json?.code===0){variante=version.n;await noterVarianteDerniere(uid,'favori',variante);etape('confirmation');return rep('envoye',r.status);}
   return rep(!r.ok&&r.status>=400&&r.status<500?'refuse':'incertain',r.status);
   }finally{const reste=nA-ecrits;if(reste>0&&tRes)await rendreActions(String(uid),tRes,reste);if(attente){await poserAttenteFavori(attente,null);_favorisAttenteIci.delete(attente);}}
+}
+// ══ 5.376 (Julien, 14 nov., midi) : LES MESSAGES AUX FAVORIS LANCÉS DEPUIS LA CARTE DU LOGO ══
+// « On peut lancer les messages aux favoris directement quand on est sur le compte,
+//   on n'a pas besoin d'aller sur VRM. »
+// · Le compte : celui de l'ONGLET qui demande (le cookie de SON domaine,
+//   `compteConnecte`) — jamais un compte nommé par le message seul ; le serveur
+//   revérifie qu'il appartient à ce compte VRM (vinted_accounts du propriétaire).
+// · Qui, quoi : l'aperçu est calculé par le SERVEUR avec les règles de l'app
+//   (api/_lib/favoris-carte.js) — la carte n'en recalcule rien.
+// · Rien ne part sans SON clic : `lancer` exige `confirme: true` (le bouton « Lancer »
+//   de l'aperçu) et la sélection de l'aperçu montré, au plus FAVORIS_CARTE_MAX.
+// · L'envoi : la MÊME file (`suivant` → `executerMessageFavori` par la porte des
+//   commandes de l'app, `executerPourAppCoeur` : garde stricte, sécurité du compte (15/h
+//   favoris), 50/h et sa réserve, pause 429/403, une requête Vinted à la fois) →
+//   `terminer` avec la réponse BRUTE (traduite par le serveur, règle de l'app).
+// · Le service worker meurt : l'état vit dans chrome.storage.local (`vrmFavorisCarte`),
+//   le réveil `vrm-relais` (30 s) reprend le tour ; une seule boucle à la fois.
+// · « Tout arrêter », plus de réseau, pause de Vinted, autre compte dans l'onglet,
+//   plus d'onglet vinted.fr ⇒ RIEN ne part, la carte dit pourquoi ; captcha ou
+//   « activité automatisée » ⇒ la file est ARRÊTÉE chez VRM (`arreter`) et c'est dit.
+const FAVORIS_CARTE_CLE = 'vrmFavorisCarte';
+const FAVORIS_CARTE_APERCU = 'vrmFavorisApercu';
+const FAVORIS_CARTE_MAX = 15;               // = api/_lib/favoris-carte.js (une heure de favoris)
+const FAVORIS_CARTE_APERCU_MS = 5 * 60000;
+let _favorisCarteEnVol = false, _favorisCarteMinuteur = null, _favorisCarteApercuEnVol = false;
+async function apiFavorisCarte(uid, action, donnees) {
+  const session = await authToken().catch(() => null);
+  if (!session || !session.access_token) return { ok: false, status: 401, json: { message: 'Connecte d’abord l’extension à VRM (« Me connecter »).' } };
+  const url = `https://vrm.center/api/compte?mode=favoris&uid=${encodeURIComponent(uid)}${action ? '' : '&carte=1'}`;
+  try {
+    const r = await fetch(url, action
+      ? { method: 'POST', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ action }, donnees || {}, { carte: true })), signal: AbortSignal.timeout(15000) }
+      : { method: 'GET', headers: { Authorization: `Bearer ${session.access_token}` }, cache: 'no-store', signal: AbortSignal.timeout(15000) });
+    let j = null; try { j = await r.json(); } catch (_) { j = null; }
+    return { ok: !!(r.ok && j && j.ok), status: r.status, json: j };
+  } catch (_) { return { ok: false, status: 0, json: null }; }
+}
+async function lireEtatFavorisCarte() {
+  try { const v = (await chrome.storage.local.get(FAVORIS_CARTE_CLE))[FAVORIS_CARTE_CLE]; return v && v.v === 1 && /^[1-9]\d{0,19}$/.test(String(v.uid || '')) ? v : null; } catch (_) { return null; }
+}
+async function poserEtatFavorisCarte(st) { try { await chrome.storage.local.set({ [FAVORIS_CARTE_CLE]: st }); return true; } catch (_) { return false; } }
+async function noterApercuCarte(uid, a) {
+  try {
+    const m = (await chrome.storage.local.get(FAVORIS_CARTE_APERCU))[FAVORIS_CARTE_APERCU] || {};
+    m[String(uid)] = { at: Date.now(), etat: String(a && a.etat || ''), total: Number(a && a.total) || 0, raison: String(a && a.raison || '') };
+    await chrome.storage.local.set({ [FAVORIS_CARTE_APERCU]: m });
+  } catch (_) {}
+}
+// L'onglet qui demande : un onglet Vinted, et le compte que SON cookie dit.
+async function compteVintedDeLOnglet(sender) {
+  let dom = ''; try { dom = new URL(sender && sender.tab && sender.tab.url).hostname; } catch (_) {}
+  if (!/(^|\.)vinted\.[a-z.]+$/.test(dom)) return null;
+  const uid = await compteConnecte(dom);
+  return uid ? { uid: String(uid), dom } : null;
+}
+function planifierFavorisCarte(ms) {
+  try { if (_favorisCarteMinuteur) clearTimeout(_favorisCarteMinuteur); } catch (_) {}
+  _favorisCarteMinuteur = setTimeout(() => { _favorisCarteMinuteur = null; sansRejet(tickFavorisCarte(), 'favoriscarte'); }, Math.max(0, Math.min(25000, Number(ms) || 0)));
+}
+// Ce que la carte demande : `apercu` (lecture), `lancer` (SON clic), `arreter`.
+async function favorisCarte(msg, sender) {
+  const o = await compteVintedDeLOnglet(sender);
+  if (!o) return { ok: false, code: 'site', raison: 'Ouvre Vinted, connecté sur ton compte.' };
+  if (String((msg && msg.uid) || '') !== o.uid) return { ok: false, code: 'compte', raison: 'L’onglet est connecté sur un autre compte Vinted : rien n’est parti.' };
+  if (await sansSessionPourEcrire()) return { ok: false, code: 'session', raison: 'Connecte d’abord l’extension à VRM (« Me connecter »).' };
+  const quoi = String((msg && msg.quoi) || '');
+  if (quoi === 'apercu') {
+    const r = await apiFavorisCarte(o.uid, 'apercu');
+    if (!r.ok || !r.json || !r.json.apercu) return { ok: false, code: 'serveur', raison: (r.json && r.json.message) || 'VRM n’a pas répondu. Réessaie dans un instant.' };
+    await noterApercuCarte(o.uid, r.json.apercu);
+    return { ok: true, uid: o.uid, apercu: r.json.apercu };
+  }
+  if (quoi === 'lancer') {
+    if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien ne part sans ton clic sur « Lancer ».' };
+    const sel = Array.isArray(msg.selection) ? [...new Set(msg.selection.filter((x) => typeof x === 'string' && x && x.length <= 160))] : [];
+    if (!sel.length || sel.length > FAVORIS_CARTE_MAX || !msg.reglages || typeof msg.reglages !== 'object' || Array.isArray(msg.reglages)) return { ok: false, code: 'selection', raison: 'Rouvre l’aperçu : la liste n’est plus à jour. Rien n’est parti.' };
+    if (horsLigne()) return { ok: false, code: 'hors-ligne', raison: 'Pas de réseau : rien n’est parti.' };
+    if ((await toutArreteDepuis(null)) > 0) return { ok: false, code: 'tout-arrete', raison: '« Tout arrêter » est posé : touche « Reprendre » d’abord. Rien n’est parti.' };
+    const avant = await lireEtatFavorisCarte();
+    if (avant && avant.actif) return { ok: false, code: 'deja', raison: 'Des messages partent déjà depuis cette carte.' };
+    const r = await apiFavorisCarte(o.uid, 'lancer', { selection: sel, reglages: msg.reglages });
+    if (!r.ok || !r.json || !r.json.vue) return { ok: false, code: 'serveur', raison: (r.json && r.json.message) || 'VRM n’a pas confirmé le lancement : rien n’est parti.' };
+    const st = { v: 1, uid: o.uid, dom: o.dom, actif: true, debut: Date.now(), total: sel.length, file: r.json.carte || null, attente: null, prochain: null, fin: null };
+    await poserEtatFavorisCarte(st);
+    await noterApercuCarte(o.uid, { etat: 'encours', total: 0 });
+    logActivity(`💬 Messages aux favoris lancés depuis la carte : ${sel.length}`);
+    planifierFavorisCarte(0);
+    return { ok: true, etat: st };
+  }
+  if (quoi === 'arreter') {
+    const r = await apiFavorisCarte(o.uid, 'arreter');
+    const st = await lireEtatFavorisCarte();
+    if (st && st.uid === o.uid) { st.actif = false; st.attente = null; st.fin = { at: Date.now(), raison: 'arret' }; if (r.json && r.json.carte) st.file = r.json.carte; await poserEtatFavorisCarte(st); }
+    return { ok: !!r.ok, etat: st, raison: r.ok ? '' : ((r.json && r.json.message) || 'VRM n’a pas confirmé l’arrêt. Réessaie.') };
+  }
+  if (quoi === 'oublier') {
+    const st = await lireEtatFavorisCarte();
+    if (st && st.uid === o.uid && !st.actif) { try { await chrome.storage.local.remove(FAVORIS_CARTE_CLE); } catch (_) {} }
+    return { ok: true };
+  }
+  return { ok: false, code: 'inconnu' };
+}
+// UN tour (au plus quelques messages quand l'espacement est court) : chaque message
+// passe par toutes les gardes ; la moindre incertitude ⇒ rien ne part et c'est dit.
+async function tickFavorisCarte() {
+  if (_favorisCarteEnVol) return;
+  _favorisCarteEnVol = true;
+  try {
+    for (let tour = 0; tour < 6; tour++) {
+      const st = await lireEtatFavorisCarte();
+      if (!st || !st.actif) return;
+      const attendre = async (code) => { if (st.attente !== code) { st.attente = code; st.attenteAt = Date.now(); await poserEtatFavorisCarte(st); } };
+      if ((await toutArreteDepuis(null)) > 0) return attendre('tout_arrete');
+      if (horsLigne()) return attendre('reseau');
+      if (await pauseVinted()) return attendre('pause');
+      const actif = await compteConnecte(st.dom || 'www.vinted.fr');
+      if (!actif || String(actif) !== st.uid) return attendre('autre_compte');
+      let tabs = [];
+      try { tabs = await chrome.tabs.query({ url: ['https://*.vinted.fr/*', 'https://*.vinted.com/*', 'https://*.vinted.it/*', 'https://*.vinted.de/*'] }); } catch (_) { tabs = []; }
+      if (!(tabs || []).some((t) => ongletDuDomaine(t, st.dom || 'www.vinted.fr'))) return attendre('onglet');
+      const g = await apiFavorisCarte(st.uid, null);
+      if (!g.ok || !g.json || !g.json.vue) return attendre('vrm');
+      if (g.json.carte) st.file = g.json.carte;
+      if (!g.json.vue.active) {
+        st.actif = false; st.attente = null; st.prochain = null;
+        st.fin = { at: Date.now(), raison: g.json.vue.raison ? 'interrompu' : 'fini', texte: String(g.json.vue.raison || '').slice(0, 240) };
+        await poserEtatFavorisCarte(st);
+        logActivity(`💬 Messages aux favoris (carte) : ${st.file ? st.file.envoyes : 0} envoyé(s)`);
+        return;
+      }
+      const reste = (Number(g.json.vue.prochain) || 0) - (Number(g.json.serveur) || Date.now());
+      if (reste > 1000) {
+        st.attente = null; st.prochain = Date.now() + reste;
+        await poserEtatFavorisCarte(st);
+        if (reste < 25000) planifierFavorisCarte(reste + 300);
+        return;
+      }
+      const s = await apiFavorisCarte(st.uid, 'suivant');
+      if (!s.ok || !s.json) return attendre('vrm');
+      if (s.json.carte) st.file = s.json.carte;
+      const t = s.json.travail;
+      if (!t || typeof t.jeton !== 'string') { st.attente = null; await poserEtatFavorisCarte(st); return; }
+      st.attente = null; st.prochain = null; st.enCours = Date.now();
+      await poserEtatFavorisCarte(st);
+      let r = null;
+      try { r = await executerPourAppCoeur({ uid: st.uid, method: 'POST', endpoint: '/vrm/favoris', body: t, __carte: true }); } catch (_) { r = null; }
+      const brut = r ? { ok: !!r.ok, code: r.code || undefined, data: r.data || null } : {};
+      const f = await apiFavorisCarte(st.uid, 'terminer', { jeton: t.jeton, brut });
+      const st2 = (await lireEtatFavorisCarte()) || st;
+      st2.enCours = null;
+      if (f.json && f.json.carte) st2.file = f.json.carte;
+      const raison = r && r.data && r.data.raison;
+      if (raison === 'vinted_robot' || (r && r.code === 'verification')) {
+        const a = await apiFavorisCarte(st.uid, 'arreter');
+        st2.actif = false; st2.attente = null; st2.fin = { at: Date.now(), raison: 'robot' };
+        if (a.json && a.json.carte) st2.file = a.json.carte;
+        await poserEtatFavorisCarte(st2);
+        logActivity('⛔ Messages aux favoris (carte) arrêtés : Vinted demande une vérification');
+        return;
+      }
+      await poserEtatFavorisCarte(st2);
+      if (!f.ok) return;
+    }
+  } finally { _favorisCarteEnVol = false; }
+}
+// Pour la carte (lecture locale, aucune requête) : l'aperçu gardé et la file de CE compte.
+// Un aperçu de plus de 5 min est relu EN FOND (VRM seulement, jamais Vinted), une fois à la fois.
+async function favorisPourCarte(uid, relire) {
+  if (!uid) return null;
+  let ap = null;
+  try { ap = ((await chrome.storage.local.get(FAVORIS_CARTE_APERCU))[FAVORIS_CARTE_APERCU] || {})[String(uid)] || null; } catch (_) { ap = null; }
+  const st = await lireEtatFavorisCarte();
+  const file = st && st.uid === String(uid) ? st : null;
+  if (relire && !(file && file.actif) && !_favorisCarteApercuEnVol && (!ap || Date.now() - Number(ap.at || 0) > FAVORIS_CARTE_APERCU_MS)) {
+    _favorisCarteApercuEnVol = true;
+    (async () => {
+      try { if (await sansSessionPourEcrire()) return; const r = await apiFavorisCarte(String(uid), 'apercu'); if (r.ok && r.json && r.json.apercu) await noterApercuCarte(uid, r.json.apercu); }
+      finally { _favorisCarteApercuEnVol = false; }
+    })().catch(() => {});
+  }
+  return { apercu: ap && Date.now() - Number(ap.at || 0) < 6 * 3600000 ? ap : null, file };
+}
+
+// ══ 5.376 : LES LIENS DE LA CARTE OUVRENT LE SITE, JAMAIS VRM ═══════════════════
+// Julien, 14 nov. : « quand tu appuies dessus ça ouvre juste les ventes de ce compte,
+// les messages de ce compte, mais pas plus, ça n'ouvre pas VRM ». Chaque lien est une
+// page du MÊME site que l'onglet (son origine, jamais une adresse reçue), celle du
+// compte connecté. Seules des adresses déjà connues de VRM (son code les ouvre ou les
+// lit déjà) ; ce qui n'a pas d'adresse connue n'est pas proposé (Vestiaire : aucune).
+//   Vinted    : /my_orders/sold (banc numero-vinted), /inbox, /member/{uid} (Réglages) ;
+//   Leboncoin : /compte/part/mes-annonces, /compte/part/mes-transactions, /messages ;
+//   eBay      : /sh/lst/active, /sh/ord (Paramètres eBay, « Retirer ailleurs »).
+const LIENS_CARTE = Object.freeze({
+  vinted: [['ventes', 'Mes ventes', '/my_orders/sold'], ['messages', 'Messages', '/inbox'], ['dressing', 'Mon dressing', '/member/{uid}']],
+  leboncoin: [['annonces', 'Mes annonces', '/compte/part/mes-annonces'], ['ventes', 'Mes ventes', '/compte/part/mes-transactions'], ['messages', 'Messages', '/messages']],
+  ebay: [['annonces', 'Mes annonces', '/sh/lst/active'], ['ventes', 'Mes ventes', '/sh/ord']],
+  vestiaire: [],
+});
+const HOTE_CARTE = { vinted: /(^|\.)vinted\.(fr|com|it|de)$/, leboncoin: /(^|\.)leboncoin\.fr$/, ebay: /(^|\.)ebay\.(fr|com)$/ };
+function liensCartePour(url, plateforme, site) {
+  let u; try { u = new URL(String(url || '')); } catch (_) { return []; }
+  const re = HOTE_CARTE[plateforme];
+  if (u.protocol !== 'https:' || !re || !re.test(u.hostname)) return [];
+  // Un compte du site CONNU dans l'onglet (Vinted, Leboncoin) ; eBay n'est pas capté :
+  // ses pages « Mes annonces / Mes ventes » sont celles du compte connecté, par définition.
+  const id = site && site.id != null ? String(site.id) : '';
+  if (plateforme !== 'ebay' && !id) return [];
+  return (LIENS_CARTE[plateforme] || []).filter((l) => !l[2].includes('{uid}') || /^[1-9]\d{0,19}$/.test(id))
+    .map(([cle, libelle, chemin]) => ({ cle, libelle, url: u.origin + chemin.replace('{uid}', encodeURIComponent(id)) }));
 }
 // (5.309, 2 nov.) LES FREINS DE VINTED, pour le mode automatique des favoris : un
 // 429/403 (la pause de l'extension est déjà posée par `requeteVinted`), une page
@@ -18200,7 +18424,10 @@ async function etatSite(url,tabId) {
   const capture = vrm && vrm.connecte === true ? await capturePourCarte(plateforme, plateforme === 'vinted' && site ? site.id : null, vcCapte).catch(() => null) : null;
   // 5.366 : la sécurité du compte de l'onglet, en UNE phrase (la règle de Paramètres → Mes comptes).
   const secu = plateforme === 'vinted' || plateforme === 'vestiaire' ? await secuPourCarte(plateforme, plateforme === 'vinted' && site ? site.id : null) : null;
-  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, lbc, mois, oauthFenetre: oauthFenetrePossible(), oauthRevenu, toutArrete, maj, aReparer, enAttenteReseau, secu, capture };
+  // 5.376 : les liens du site pour le compte de l'onglet (jamais VRM) et les favoris de CE compte.
+  const liens = liensCartePour(url, plateforme, site);
+  if (plateforme === 'vinted' && site && site.id && vrm && vrm.connecte === true && site.choix !== 'non') site.favoris = await favorisPourCarte(String(site.id), true).catch(() => null);
+  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, lbc, mois, oauthFenetre: oauthFenetrePossible(), oauthRevenu, toutArrete, maj, aReparer, enAttenteReseau, secu, liens, capture };
 }
 // ══ 5.376 — « PLUS SIMPLE POUR TOUT LE MONDE » : CE QUI MANQUE, EN UNE PHRASE ══
 // Julien : « que ce soit beaucoup mieux et beaucoup plus simple pour tout le
