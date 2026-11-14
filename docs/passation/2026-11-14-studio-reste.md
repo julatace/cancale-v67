@@ -27,6 +27,9 @@ sauf UN doublon nommé plus bas.
 | **Accueil public, Tarifs** | `src/design/studio-reste-public.css` : leurs jetons (`.av`, `.vt`) prennent le bleu clair ; le bouton principal = plein d'ENCRE (plus de bouton bleu plein), « Découvrir avec des exemples » = touche en porcelaine |
 | **Feuilles génériques** | `SheetShell` (`.vrm-fs`) : porcelaine, rayon 28 en haut, ombre de premier plan, voile bleuté ; primaire = plein (barre), secondaire = touche, discret = lien, croix = rond 44 ; la confirmation « irréversible » garde son geste (forme du plein) |
 
+Captures avant/après (données inventées, 390 sauf Factures à 1512) : `docs/design/avant-apres/{argent-studio,
+argent-studio-nuit,factures-studio,messages-studio,parametres-studio,emails-studio,connexion-studio}-{avant,apres}.png`.
+
 ## Comment
 
 - `src/design/studio-reste.css` (importé par `src/App.jsx`) : §0 jetons `--sb-*` et §1 les quatre formes
