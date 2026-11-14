@@ -9,9 +9,11 @@ import ecran_messages from './de/messages.js';
 import ecran_emails from './de/emails.js';
 import ecran_stats from './de/stats.js';
 import ecran_compta from './de/compta.js';
+import ecran_argent from './de/argent.js';
 import ecran_colisplus from './de/colisplus.js';   // (14 nov., lot colis-plus)
 export default {
   ...ecran_compta,
+  ...ecran_argent,
   ...ecran_colisplus,
   ...ecran_stats,
   ...ecran_emails,
