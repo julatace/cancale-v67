@@ -9,7 +9,7 @@ export default {
   "ac.coller.tuile.ecrire": "zu speichern",
   "ac.coller.tuile.deja": "schon zu diesem Preis",
   "ac.coller.tuile.refusees": "nicht gespeichert",
-  "ac.coller.remplacer": { one: "Auch den abweichenden Preis ersetzen", other: "Auch die {n} abweichenden Preise ersetzen" },
+  "ac.coller.remplacer": "Auch die abweichenden Preise ersetzen ({n})",
   "ac.coller.autres": { one: "und {n} weitere Zeile.", other: "und {n} weitere Zeilen." },
   "ac.coller.trop": { one: "{n} Zeile über 2000: nicht gelesen.", other: "{n} Zeilen über 2000: nicht gelesen." },
   "ac.coller.enregistrer": { one: "{n} Preis speichern", other: "{n} Preise speichern" },

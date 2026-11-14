@@ -9,7 +9,7 @@ export default {
   "ac.coller.tuile.ecrire": "to save",
   "ac.coller.tuile.deja": "already at this price",
   "ac.coller.tuile.refusees": "not saved",
-  "ac.coller.remplacer": { one: "Also replace the different price already set", other: "Also replace the {n} different prices already set" },
+  "ac.coller.remplacer": "Also replace the different prices already set ({n})",
   "ac.coller.autres": { one: "and {n} more line.", other: "and {n} more lines." },
   "ac.coller.trop": { one: "{n} line beyond 2,000: not read.", other: "{n} lines beyond 2,000: not read." },
   "ac.coller.enregistrer": { one: "Save {n} price", other: "Save {n} prices" },

@@ -9,7 +9,7 @@ export default {
   "ac.coller.tuile.ecrire": "à enregistrer",
   "ac.coller.tuile.deja": "déjà à ce prix",
   "ac.coller.tuile.refusees": "pas enregistrées",
-  "ac.coller.remplacer": { one: "Remplacer aussi le prix différent déjà posé", other: "Remplacer aussi les {n} prix différents déjà posés" },
+  "ac.coller.remplacer": "Remplacer aussi les prix différents déjà posés ({n})",
   "ac.coller.autres": { one: "et {n} autre ligne.", other: "et {n} autres lignes." },
   "ac.coller.trop": { one: "{n} ligne au-delà de 2 000 : pas lue.", other: "{n} lignes au-delà de 2 000 : pas lues." },
   "ac.coller.enregistrer": { one: "Enregistrer {n} prix", other: "Enregistrer {n} prix" },

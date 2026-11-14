@@ -9,7 +9,7 @@ export default {
   "ac.coller.tuile.ecrire": "da salvare",
   "ac.coller.tuile.deja": "già a questo prezzo",
   "ac.coller.tuile.refusees": "non salvate",
-  "ac.coller.remplacer": { one: "Sostituisci anche il prezzo diverso già impostato", other: "Sostituisci anche i {n} prezzi diversi già impostati" },
+  "ac.coller.remplacer": "Sostituisci anche i prezzi diversi già impostati ({n})",
   "ac.coller.autres": { one: "e {n} altra riga.", other: "e altre {n} righe." },
   "ac.coller.trop": { one: "{n} riga oltre 2000: non letta.", other: "{n} righe oltre 2000: non lette." },
   "ac.coller.enregistrer": { one: "Salva {n} prezzo", other: "Salva {n} prezzi" },

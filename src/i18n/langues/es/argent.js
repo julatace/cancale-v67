@@ -9,7 +9,7 @@ export default {
   "ac.coller.tuile.ecrire": "por guardar",
   "ac.coller.tuile.deja": "ya a este precio",
   "ac.coller.tuile.refusees": "no guardadas",
-  "ac.coller.remplacer": { one: "Reemplazar también el precio distinto ya puesto", other: "Reemplazar también los {n} precios distintos ya puestos" },
+  "ac.coller.remplacer": "Reemplazar también los precios distintos ya puestos ({n})",
   "ac.coller.autres": { one: "y {n} línea más.", other: "y {n} líneas más." },
   "ac.coller.trop": { one: "{n} línea más allá de 2000: no leída.", other: "{n} líneas más allá de 2000: no leídas." },
   "ac.coller.enregistrer": { one: "Guardar {n} precio", other: "Guardar {n} precios" },
