@@ -27,7 +27,27 @@ auteurs — aucun des 15 gestes ne passe par ces deux écrans).
 
 ## Tableau avant / après (touchers depuis l'ouverture)
 
-TABLEAU
+| # | geste | plafond | avant | après | chemin retenu après | zone haute après |
+|---|---|---|---|---|---|---|
+| 1 | Imprimer les bordereaux du jour | 2 | 2 | 2 | Ma journée « Imprimer » → feuille → Imprimer | 0 |
+| 2 | Retirer un colis et montrer son code | 3 | 1 | 1 | Ma journée « À retirer » (code écrit sur la ligne) | 0 |
+| 3 | Saisir un prix d'achat | 3 | 2 | 2 | Ma journée « sans prix d'achat » → Saisir (+ la saisie) | 0 |
+| 4 | Trouver la paire N°x | 3 | 2 | 2 | Loupe → N° tapé → « Toute l'histoire du N° » | 2 |
+| 5 | Répondre à une offre | 3 | 3 | 3 | Ma journée « messages » → l'offre → Accepter | 0 |
+| 6 | Baisser un prix | 3 | 3 | 3 | Loupe → N° → « Baisser le prix » → Appliquer | 1 |
+| 7 | **Republier (à la main)** | 3 | **5 ✗** | **3 ✓** | Loupe → N° → « Republier N° à la main » → Tout copier | 1 |
+| 8 | Marquer un colis déposé | 3 | 3 | 3 | Ventes → ⋯ → Déposé (pilule « Annuler » 5 s) | 0 |
+| 9 | Relier un achat | 3 | 2 | 2 | Ma journée « sans achat » → « Relier · 21 € » | 0 |
+| 10 | Voir ce qui est à faire | 0 | 0 | 0 | à l'ouverture | 0 |
+| 11 | Déclarer l'URSSAF du mois | 3 | 3 | 3 | Argent → Déclarer → J'ai déclaré | 1 |
+| 12 | Changer de compte | 3 | 3 | 3 | Paires → compte ▾ → vendeur_2 | 1 |
+| 13 | Lire un message | 3 | 2 | 2 | Ma journée « messages » → le fil | 0 |
+| 14 | **Publier une paire partout** | 3 | **≥ 4, impasse ✗** | **3 ✓** | Loupe → N° → « Publier N° partout » → Publier | 1 |
+| 15 | Voir le bénéfice du mois | 1 | 0 | 0 | à l'ouverture | 0 |
+
+Avant : la paire passe par Paires → la paire → « Publier ailleurs », et la feuille « Publier partout » n'est
+pas atteinte au 4ᵉ toucher (impasse mesurée). Republier « à la main » : Paires → Republier → cocher → À la
+main → Tout copier = 5. Mots à lire, attentes et défilés de chaque geste : `rapport.json` du banc.
 
 ## Ce qui a changé
 
@@ -65,4 +85,12 @@ TABLEAU
 - Focus et retour au même défilement après une feuille : pas mesurés par ce banc (à ajouter).
 
 ## Preuves
-PREUVES
+- `scripts/bancs/ergonomie-gestes.cjs` : sur le build d'AVANT (commit `afd5d31e`, `git archive` + build dans
+  un dossier à part) **13 ✓ · 2 ✗** (republier 5 > 3, publier partout impasse) ; sur ce build **15 ✓**.
+  Mutation : `republier-num` retiré de `ACTIONS_NUM_SEUL` ⇒ republier **ROUGE** (5 touchers, la ligne
+  introuvable). Captures regardées (kit « Republier à la main » N°203, feuille « Publier partout » N°203).
+- Après le vrai `git merge origin/main` et des branches de refonte : build vert, banc relancé (voir le
+  rapport de fin de session), audits verts : traduction, tdz, coherence, variables, quoi-de-neuf,
+  annuler-commandes (43 ✓, A7/A7b nouveaux), icones.
+- Machine de banc très chargée (charge 55–72, autres sessions) : les attentes sont des conditions (15 s pour
+  un toucher décisif, 25 s pour l'ouverture), jamais des délais fixes.
