@@ -1,5 +1,6 @@
 // ESPAÑOL — traducción de fr.js (la fuente). Mismas claves, mismas {variables}.
 import ecran_journee from './es/journee.js';
+import ecran_confort from './es/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_ventes from './es/ventes.js';
 import ecran_commun from './es/commun.js';
 import ecran_achats from './es/achats.js';
@@ -14,11 +15,17 @@ import ecran_listes from './es/listes.js';
 import ecran_fiche from './es/fiche.js';
 import ecran_refonte_ms from './es/refonte-ms.js';
 import ecran_ergonomie from './es/ergonomie.js';
+import ecran_tarifs from './es/tarifs.js';
+import ecran_nouveaux from './es/nouveaux.js';
+import ecran_fraiscarte from './es/fraiscarte.js';   // (14 nov., frais-carte)
 export default {
   ...ecran_listes,
   ...ecran_fiche,
   ...ecran_refonte_ms,
   ...ecran_ergonomie,
+  ...ecran_fraiscarte,
+  ...ecran_tarifs,
+  ...ecran_nouveaux,
   ...ecran_compta,
   ...ecran_argent,
   ...ecran_stats,
@@ -2182,4 +2189,5 @@ export default {
   "rh.vuesPasSu": "visitas —",
   "rh.vendue": "vendida",
   "rh.enLigne": "en línea",
+  ...ecran_confort,
 };

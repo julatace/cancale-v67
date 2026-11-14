@@ -1,0 +1,86 @@
+/* ══ vrm.center/tarifs (14 nov., n° 144) ═══════════════════════════════════════
+   Une vitrine : une lumière bleue dans le tiers haut (jamais de violet), des montants
+   d'affiche à l'encre, Pro sur une carte encre vers bleu nuit, tout le reste calme.
+   Un seul accent (les actions). Clair et sombre soignés autant l'un que l'autre. */
+.vt {
+  --vt-fond: #FBFBFD; --vt-carte: #FFFFFF; --vt-encre: #1D1D1F; --vt-gris: #6E6E73; --vt-filet: rgba(60,60,67,.12);
+  --vt-accent: #0071E3; --vt-lien: #0066CC; --vt-teinte: rgba(0,113,227,.09);
+  --vt-ombre: 0 1px 2px rgb(0 0 0 / .04), 0 12px 32px rgb(0 0 0 / .07);
+  --vt-lumiere: radial-gradient(70% 55% at 12% 0%, rgba(0,122,255,.22), transparent 70%), radial-gradient(60% 45% at 92% 6%, rgba(90,200,250,.20), transparent 70%), radial-gradient(50% 40% at 55% 0%, rgba(52,120,246,.10), transparent 70%);
+  --vt-encre-carte: linear-gradient(155deg, #1D1D1F 0%, #14213D 62%, #0B2A5B 100%);
+  position: relative; min-height: 100vh; overflow-x: hidden; background: var(--vt-fond); color: var(--vt-encre);
+  font: 17px/1.47 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased;
+}
+:root[data-theme="dark"] .vt {
+  --vt-fond: #000000; --vt-carte: #1C1C1E; --vt-encre: #F5F5F7; --vt-gris: #98989D; --vt-filet: rgba(84,84,88,.5);
+  --vt-accent: #0A84FF; --vt-lien: #409CFF; --vt-teinte: rgba(10,132,255,.18); --vt-ombre: none;
+  --vt-lumiere: radial-gradient(70% 55% at 12% 0%, rgba(10,132,255,.36), transparent 70%), radial-gradient(60% 45% at 92% 6%, rgba(64,156,255,.22), transparent 70%);
+  --vt-encre-carte: linear-gradient(155deg, #2C2C2E 0%, #142242 60%, #0B2F66 100%);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vt { --vt-fond: #000; --vt-carte: #1C1C1E; --vt-encre: #F5F5F7; --vt-gris: #98989D; --vt-filet: rgba(84,84,88,.5); --vt-accent: #0A84FF; --vt-lien: #409CFF; --vt-teinte: rgba(10,132,255,.18); --vt-ombre: none; } }
+.vt *, .vt *::before, .vt *::after { box-sizing: border-box; }
+.vt-lumiere { position: absolute; inset: 0 0 auto 0; height: 720px; background: var(--vt-lumiere); pointer-events: none; }
+.vt-nav, .vt-in, .vt-pied { position: relative; max-width: 1040px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+.vt-nav { display: flex; align-items: center; justify-content: space-between; min-height: 64px; padding-top: env(safe-area-inset-top); }
+.vt-marque { display: inline-flex; align-items: center; gap: 10px; color: inherit; text-decoration: none; min-height: 44px; }
+.vt-marque img { border-radius: 8px; }
+.vt-marque b { font-size: 17px; letter-spacing: -.01em; }
+.vt-nav-droite { display: flex; align-items: center; gap: 6px; }
+.vt-lien { color: var(--vt-encre); text-decoration: none; font-size: 15px; font-weight: 600; min-height: 44px; display: inline-flex; align-items: center; padding: 0 10px; white-space: nowrap; }
+.vt-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 50px; padding: 0 24px; border-radius: 999px; background: var(--vt-accent); color: #fff; font-size: 17px; font-weight: 600; text-decoration: none; transition: transform .12s ease-out; }
+.vt-btn:active { transform: scale(.97); }
+.vt-btn-petit { min-height: 44px; padding: 0 16px; font-size: 15px; white-space: nowrap; }
+@media (max-width: 380px) { .vt-nav .vt-lien { padding: 0 6px; } .vt-marque b { display: none; } }
+.vt-btn-neutre { background: var(--vt-teinte); color: var(--vt-lien); }
+.vt a:focus-visible { outline: 2px solid var(--vt-accent); outline-offset: 3px; border-radius: 10px; }
+
+.vt-hero { padding: 56px 0 36px; text-align: center; }
+.vt-surtitre { margin: 0 0 10px; font-size: 15px; font-weight: 600; color: var(--vt-gris); }
+.vt-h1 { margin: 0 auto; max-width: 14em; font-size: clamp(40px, 9vw, 72px); line-height: 1.02; font-weight: 700; letter-spacing: -.035em; }
+.vt-chapo { margin: 18px auto 0; max-width: 30em; font-size: clamp(17px, 2.4vw, 21px); line-height: 1.42; color: var(--vt-gris); }
+.vt-etat { margin: 24px auto 0; display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; max-width: 40em; padding: 10px 16px; border-radius: 18px; background: var(--vt-carte); box-shadow: var(--vt-ombre); font-size: 15px; line-height: 1.4; text-align: left; }
+.vt-pastille { flex: 0 0 auto; padding: 4px 10px; border-radius: 999px; background: var(--vt-teinte); color: var(--vt-lien); font-size: 13px; font-weight: 600; }
+
+.vt-offres { display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (min-width: 744px) { .vt-offres { grid-template-columns: 1fr 1fr; gap: 20px; } }
+.vt-offre { position: relative; border-radius: 28px; padding: 28px 24px 26px; background: var(--vt-carte); box-shadow: var(--vt-ombre); display: flex; flex-direction: column; animation: vt-monte .5s cubic-bezier(.2,.8,.2,1) both; }
+.vt-offre-pro { background: var(--vt-encre-carte); color: #F5F5F7; --vt-gris: rgba(235,235,245,.68); --vt-filet: rgba(255,255,255,.14); animation-delay: 80ms; overflow: hidden; }
+.vt-offre-pro::after { content: ""; position: absolute; inset: auto -20% -40% auto; width: 70%; height: 70%; background: radial-gradient(circle, rgba(64,156,255,.35), transparent 70%); pointer-events: none; }
+.vt-offre-tete { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.vt-offre h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -.016em; }
+.vt-bientot { font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.14); color: #F5F5F7; }
+.vt-montant { margin: 18px 0 0; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.vt-montant b { font-size: clamp(52px, 12vw, 68px); line-height: 1; font-weight: 700; letter-spacing: -.04em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vt-montant span { font-size: 17px; color: var(--vt-gris); }
+.vt-phrase { margin: 16px 0 0; font-size: 17px; line-height: 1.42; }
+.vt-supplement { margin: 8px 0 0; font-size: 15px; color: var(--vt-gris); }
+.vt-inclus { list-style: none; margin: 20px 0 0; padding: 16px 0 0; border-top: .5px solid var(--vt-filet); display: grid; gap: 10px; }
+.vt-inclus li { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; line-height: 1.35; }
+.vt-inclus svg { flex: 0 0 auto; margin-top: 2px; color: var(--vt-accent); }
+.vt-offre-pro .vt-inclus svg { color: #64D2FF; }
+
+.vt-section { padding-top: 64px; }
+.vt-h2 { margin: 0 0 18px; font-size: clamp(28px, 5vw, 40px); line-height: 1.08; font-weight: 700; letter-spacing: -.028em; }
+.vt-note { margin: 12px 0 0; font-size: 15px; color: var(--vt-gris); }
+.vt-tableau { background: var(--vt-carte); border-radius: 22px; box-shadow: var(--vt-ombre); padding: 4px 0; }
+.vt-rangee { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1fr); gap: 10px; padding: 14px 18px; position: relative; font-size: 15px; line-height: 1.35; align-items: center; }
+.vt-rangee + .vt-rangee::before { content: ""; position: absolute; top: 0; left: 18px; right: 0; height: .5px; background: var(--vt-filet); }
+.vt-rangee-tete { font-size: 13px; font-weight: 600; color: var(--vt-gris); padding-top: 12px; padding-bottom: 8px; }
+.vt-rangee [role="rowheader"] { font-weight: 600; }
+.vt-frise { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+@media (min-width: 744px) { .vt-frise { grid-template-columns: repeat(3, 1fr); } }
+.vt-frise li { background: var(--vt-carte); border-radius: 22px; box-shadow: var(--vt-ombre); padding: 18px 18px 16px; position: relative; }
+.vt-jour { display: inline-block; font-size: 13px; font-weight: 600; color: var(--vt-lien); background: var(--vt-teinte); padding: 3px 10px; border-radius: 999px; margin-bottom: 10px; }
+.vt-frise b, .vt-carte b { display: block; font-size: 17px; font-weight: 600; letter-spacing: -.012em; }
+.vt-frise p, .vt-carte p { margin: 6px 0 0; font-size: 15px; line-height: 1.42; color: var(--vt-gris); }
+.vt-cartes { display: grid; gap: 12px; }
+@media (min-width: 744px) { .vt-cartes { grid-template-columns: repeat(3, 1fr); } }
+.vt-carte { background: var(--vt-carte); border-radius: 22px; box-shadow: var(--vt-ombre); padding: 18px; }
+.vt-fin { padding: 72px 0 24px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.vt-pied { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; padding-top: 24px; padding-bottom: max(32px, env(safe-area-inset-bottom)); border-top: .5px solid var(--vt-filet); margin-top: 32px; }
+.vt-pied nav { display: flex; flex-wrap: wrap; gap: 0 16px; }
+.vt-pied a { color: var(--vt-gris); text-decoration: none; font-size: 13px; min-height: 44px; display: inline-flex; align-items: center; }
+.vt-langue { color: var(--vt-gris); font-size: 13px; }
+@keyframes vt-monte { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@media (max-width: 420px) { .vt-rangee { grid-template-columns: minmax(0, 1fr) minmax(0, .9fr) minmax(0, .9fr); padding: 12px 14px; font-size: 13px; } .vt-rangee + .vt-rangee::before { left: 14px; } }
+@media (prefers-reduced-motion: reduce) { .vt-offre { animation: none; } .vt-btn:active { transform: none; } }

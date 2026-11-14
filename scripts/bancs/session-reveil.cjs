@@ -118,6 +118,42 @@ async function main() {
         dit(st.refresh >= 1, 'C. au réveil avec un jeton qui expire, le renouvellement part tout de suite (pas à la minuterie de 4 min)', `${avant} avant le réveil → ${st.refresh} après`);
         await ctx.close();
       }
+      // E (14 nov., fiabilité prod) : LE RÉVEIL D'UN MAC (ou d'un iPhone) après deux heures de veille.
+      // Mesuré en production : 100 à 150 lectures refusées 401 « token is expired » par jour, par
+      // rafales (39 dans la même seconde) — `sbAuth` voyait le jeton mort, lançait le renouvellement
+      // et rendait l'ANCIEN jeton à la requête qui partait. La veille se joue ainsi : la page est
+      // ouverte avec une session valable 30 min ; puis l'horloge de la page saute de 2 h (ce que voit
+      // un onglet au réveil), le jeton devient mort pour la base du banc (401 « JWT expired », comme
+      // PostgREST), et l'onglet revient au premier plan. Aucune requête ne doit partir avec lui
+      // (src/jetonFrais.js : elles attendent le renouvellement partagé).
+      // `BANC_SANS_JETON_FRAIS=1` retire la règle (la page croit qu'elle est déjà posée) : rouge attendu.
+      {
+        const ctx = await nav.newContext(opts); const st = { mode: 'ok', refresh: 0 };
+        await brancher(ctx, st);
+        const vieux = `${b64u({ alg: 'HS256', typ: 'JWT' })}.${b64u({ sub: USER.id, email: USER.email, aal: 'aal1', role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 1800, banc: 'avant-veille' })}.sig`;
+        const compte = { total: 0, vieux: 0, mort: false };
+        await ctx.route('**/rest/v1/**', (route) => {
+          const rq = route.request();
+          if (rq.method() === 'OPTIONS' || !compte.mort) return route.fallback();
+          compte.total++;
+          if ((rq.headers()['authorization'] || '') === `Bearer ${vieux}`) { compte.vieux++; return route.fulfill({ status: 401, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ code: 'PGRST301', message: 'JWT expired' }) }); }
+          return route.fallback();
+        });
+        const sansRegle = process.env.BANC_SANS_JETON_FRAIS === '1';
+        await ctx.addInitScript(([s, sans]) => {
+          try { const n = Date.now.bind(Date); window.__vrmDecalage = 0; Date.now = () => n() + (window.__vrmDecalage || 0); } catch (_) {}
+          try { if (sans) window.__vrmJetonFrais = true; if (!sessionStorage.getItem('_banc')) { localStorage.setItem('vrm_session', s); localStorage.setItem('vrm_schema_cloisonne', '1'); sessionStorage.setItem('_banc', '1'); } } catch (_) {}
+        }, [JSON.stringify(Object.assign(sessionRangee(Date.now() + 30 * 60 * 1000), { access_token: vieux })), sansRegle]);
+        const pg = await ctx.newPage();
+        await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForTimeout(8000);
+        const refreshAvant = st.refresh;
+        compte.mort = true;
+        await pg.evaluate(() => { window.__vrmDecalage = 2 * 3600e3; window.dispatchEvent(new Event('online')); window.dispatchEvent(new Event('focus')); document.dispatchEvent(new Event('visibilitychange')); });
+        await pg.waitForTimeout(5000);
+        dit(compte.total > 0 && compte.vieux === 0 && st.refresh > refreshAvant, 'E. réveil après 2 h de veille : aucune requête de la base ne part avec le jeton mort (toutes attendent le renouvellement)', `${compte.vieux} refusée(s) 401 sur ${compte.total} après le réveil, ${st.refresh - refreshAvant} renouvellement(s)`);
+        await ctx.close();
+      }
       // D : morceau de l'app disparu après un déploiement.
       {
         const ctx = await nav.newContext(opts); const st = { mode: 'ok', refresh: 0 };

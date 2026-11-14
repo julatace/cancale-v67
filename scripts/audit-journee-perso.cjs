@@ -105,7 +105,7 @@ async function controles(T, ok) {
   const liste = (app.split('const listeAF = [')[1] || '').split('].filter(')[0];
   ok(/^\s*\.\.\.alertesArgent\.map\(\(j, i\) => \(\{ el: tache\(j, i\), alerte: true \}\)\),\s*\.\.\.forcesAF, \.\.\.montresAF,\s*$/.test(liste), 'S3 les alertes urgentes en premier, puis les cartes revenues car urgentes, puis les siennes');
   ok(!/visJ\([^)]*alerte/.test(app) && /let alertesArgent = jobs\.filter\(j => j\.urgent\);/.test(app), 'S3 les alertes ne passent pas par la règle (jamais cachées)');
-  ok(/for \(const id of ordreJournee\('afaire', persoJ\)\) \{\s*const v = visJ\(id\); if \(!v\.montree\) continue;\s*for \(const el of \(blocsAF\[id\] \|\| \[\]\)\) \(v\.force \? forcesAF : montresAF\)\.push/.test(app), 'S4 « À faire » suit SON ordre, une carte cachée ne s’affiche pas (sauf urgente)');
+  ok(/for \(const id of ordreJournee(?:Heure)?\('afaire', persoJ\)\) \{\s*const v = visJ\(id\); if \(!v\.montree\) continue;\s*for \(const el of \(blocsAF\[id\] \|\| \[\]\)\) \(v\.force \? forcesAF : montresAF\)\.push/.test(app), 'S4 « À faire » suit SON ordre, une carte cachée ne s’affiche pas (sauf urgente)');
   const blocs = (app.split('const blocsAF = {')[1] || '').split('\n              };')[0];
   const clesBlocs = [...blocs.matchAll(/^\s*(?:'([\w-]+)'|(\w+)):/gm)].map((m) => m[1] || m[2]);
   if (/\['envoyer', 'retirer', 'messages', 'prix'\]\.map/.test(blocs)) clesBlocs.push('envoyer', 'retirer', 'messages', 'prix');
@@ -118,7 +118,7 @@ async function controles(T, ok) {
   const clesN = [...nPar.matchAll(/(?:'([\w-]+)'|(\w+)):/g)].map((m) => m[1] || m[2]);
   const horsCases = clesBlocs.filter((id) => !['envoyer', 'retirer', 'messages', 'prix'].includes(id));
   ok(horsCases.length && horsCases.every((id) => clesN.includes(id)) && /const nGestes = nGestesTout - \(nCacheesAF - casesCachees\.length\);/.test(app), 'S4 chaque carte cachée (hors cases) est retirée de « N gestes »', `manquent : ${horsCases.filter((id) => !clesN.includes(id)).join(',')}`);
-  ok(/ordreJournee\('tete', persoJ\)\.map\(\(id\) => \{/.test(app) && /return id === 'phrase' \? null : <div key=\{id\} hidden data-jp-cachee=\{id\}>\{blocsTete\[id\]\}<\/div>;/.test(app), 'S5 la tête suit SON ordre ; frise et chiffres cachés restent rendus, cachés');
+  ok(/ordreJournee(?:Heure)?\('tete', persoJ\)\.map\(\(id\) => \{/.test(app) && /return id === 'phrase' \? null : <div key=\{id\} hidden data-jp-cachee=\{id\}>\{blocsTete\[id\]\}<\/div>;/.test(app), 'S5 la tête suit SON ordre ; frise et chiffres cachés restent rendus, cachés');
   ok(/const premierAF = !visibiliteCarte\('prochain', \{ reglage: persoJ, mode: PROFIL_VENDEUR\.mode \}\)\.montree \? null :/.test(app), 'S5 « La prochaine chose » cachée : rien ne monte en tête');
   ok((/data-jp-modifier="" onClick=\{\(\) => setFeuillePerso\(true\)\}>Modifier ma journée</.test(app) || (/data-jp-modifier="" onClick=\{\(\) => setFeuillePerso\(true\)\}>\{tr\('journee\.modifierMaJournee'\)\}</.test(app) && /"journee\.modifierMaJournee": "Modifier ma journée"/.test(lire('src/i18n/langues/fr/journee.js') || ''))) && /<JourneePersoSetting\/>/.test(app), 'S6 « Modifier ma journée » en bas de Ma journée');
   ok(/import \{ JourneePersoSetting \} from '\.\.\/App\.jsx';/.test(T.reglages || '') && /id:'ma-journee'[^\n]*el:<JourneePersoSetting\/>/.test(T.reglages || ''), 'S6 Paramètres → Affichage → Ma journée : le même éditeur');
@@ -147,7 +147,8 @@ const MUTATIONS = {
   hors_sync: ['app', (s) => s.replace('  CLE_JOURNEE_PERSO,\n', '\n')],
   sans_urgence: ['app', (s) => s.replace('urgent: !!urgJ[id] });', 'urgent: false });')],
   alertes_cachables: ['app', (s) => s.replace('...alertesArgent.map((j, i) => ({ el: tache(j, i), alerte: true })),\n                ...forcesAF', '...alertesArgent.filter((j) => visJ(j.id).montree).map((j, i) => ({ el: tache(j, i), alerte: true })),\n                ...forcesAF')],
-  ordre_ignore: ['app', (s) => s.replace("for (const id of ordreJournee('afaire', persoJ)) {", "for (const id of Object.keys(blocsAF)) {")],
+  // (14 nov., lot 117) Ma journée passe par `ordreJourneeHeure` (src/journeeSelonHeure.js), qui part de `ordreJournee`.
+  ordre_ignore: ['app', (s) => s.replace(/for \(const id of ordreJournee(?:Heure)?\('afaire', persoJ\)\) \{/, "for (const id of Object.keys(blocsAF)) {")],
   carte_oubliee: ['app', (s) => s.replace("                'a-relier': comptesARelierJour.length ? [carteARelier()] : [],\n", '')],
   cachee_comptee: ['app', (s) => s.replace("const nGestes = nGestesTout - (nCacheesAF - casesCachees.length);", 'const nGestes = nGestesTout;')],
   frise_demontee: ['app', (s) => s.replace("return id === 'phrase' ? null : <div key={id} hidden data-jp-cachee={id}>{blocsTete[id]}</div>;", 'return null;')],
