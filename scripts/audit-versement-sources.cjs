@@ -223,7 +223,11 @@ function regle(nom, f) {
   dit(/versementsDeLignes\(txn, releveL, versConvL, versMailL\)/.test(srv), 'le cron passe les mêmes sources à la même règle');
   const bg = lire('vinted-sync-extension/background.js');   // (pas `sans` : « https://*.vinted.fr/* » ouvrirait un faux commentaire)
   dit(/const versement = versementDeConversation\(brut\)|const v = versementDeConversation\(brut\); if \(v\) await rangerVersementConversation\(uid, v, domain\)/.test(bg), 'extension : une conversation captée en passant range la date (aucune requête de plus)');
-  dit(/CODE_VERSION = '5\.376\.0'/.test(bg) && /"version": "5\.376\.0"/.test(lire('vinted-sync-extension/manifest.json')) && /EXT_ATTENDUE = '5\.376\.0'/.test(app) && /versementconv: '5\.376\.0'/.test(app), 'extension 5.376.0, `EXT_CAPACITES.versementconv` = 5.376.0');
+  // (14 nov., 5.377) La capacité reste à la version où elle est ARRIVÉE (5.376.0) ; l'extension, elle,
+  // peut être plus récente : code, manifeste et `EXT_ATTENDUE` égaux et ≥ 5.376.0.
+  { const v = (re, t) => ((re.exec(t) || [])[1] || ''); const num = (x) => x.split('.').map(Number); const sup = (a, b) => { const A = num(a), B = num(b); for (let i = 0; i < 3; i++) if ((A[i] || 0) !== (B[i] || 0)) return (A[i] || 0) > (B[i] || 0); return true; };
+    const cv = v(/CODE_VERSION = '([\d.]+)'/, bg), mv = v(/"version": "([\d.]+)"/, lire('vinted-sync-extension/manifest.json')), ea = v(/EXT_ATTENDUE = '([\d.]+)'/, app);
+    dit(!!cv && cv === mv && mv === ea && sup(cv, '5.376.0') && /versementconv: '5\.376\.0'/.test(app), `extension ${cv} (≥ 5.376.0), \`EXT_CAPACITES.versementconv\` = 5.376.0`); }
   dit(/joursPourDater\(c\.n\)/.test(sans(lire('src/ecrans/Compta.jsx'))) && /data-adater-conversation/.test(lire('src/ecrans/Compta.jsx')), 'Déclarer : « dont N par la conversation » et « environ X jours »');
 
   console.log(ko ? `\n❌ dates de versement, quatre sources : ${ok} vert(s), ${ko} rouge(s)` : `\n✅ dates de versement, quatre sources : ${ok} vert(s), 0 rouge(s)`);
