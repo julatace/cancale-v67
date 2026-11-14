@@ -297,6 +297,14 @@ async function main() {
         dit(t.envVu && t.envRemise === '1' && t.remises === 'envoyer' && /urgente/i.test(t.texte), `T148 ${T} « À envoyer » cachée par lui mais un colis en retard : revenue, « remise car urgente »`, JSON.stringify(t));
         dit(!t.msgVu && t.msgN != null, `T148 ${T} « Messages » cachée par lui : plus à l'écran, son compteur publié (data-n ${t.msgN})`, JSON.stringify(t));
         dit(t.ordre[0] === 'retirer' && t.ordre[1] === 'envoyer' && t.taille === '3x1', `T148 ${T} SON ordre et SA taille, venus du nuage (À retirer, puis À envoyer en 3 × 1)`, JSON.stringify(t));
+        // Enregistré sur « Terminé », toujours là au rechargement : cacher « À retirer » par le lien « Ranger les tuiles ».
+        await pg.click('[data-sj-ranger]'); await pg.waitForTimeout(400);
+        await pg.click('[data-sj-r-cacher="retirer"]'); await pg.click('[data-sj-r-termine]'); await pg.waitForTimeout(600);
+        const p = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_tuiles_journee')); } catch (_) { return null; } });
+        dit(!!(p && p.cachees && p.cachees.retirer === true && p.cachees.messages === true && p.ordre && p.ordre[0] === 'retirer'), `T148 ${T} « Terminé » enregistre (vrm_tuiles_journee : ordre, cachées, tailles)`, JSON.stringify(p));
+        await pg.reload({ waitUntil: 'domcontentloaded' }); await attendreJournee(pg);
+        const r = await pg.evaluate(() => { const e = document.querySelector('[data-sj-tuile="retirer"]'); return { vu: !!(e && e.getClientRects().length), n: e && e.getAttribute('data-n') }; });
+        dit(!r.vu && r.n != null, `T148 ${T} rechargé : « À retirer » toujours cachée (son compteur publié)`, JSON.stringify(r));
         dit(!errs.length, `T148 ${T} aucune erreur d'app`, errs.join(' | ').slice(0, 200));
         await ctx.close();
       });

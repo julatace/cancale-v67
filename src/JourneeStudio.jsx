@@ -151,6 +151,9 @@ export function BentoJournee({ tuiles: tuilesBrutes, ordi = false, FermeAuRetour
   const entrer = (id) => {
     setOuverte(null); setBrouillon(lireTuilesJournee(reglage)); setRangement(true);
     setAnnonce(tr('sj.r.annonceEntree'));
+    // La grille entière en vue : on range ce qu'on voit.
+    const bas = (() => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } })();
+    setTimeout(() => { try { racine.current && racine.current.scrollIntoView({ block: 'start', behavior: bas ? 'auto' : 'smooth' }); } catch (_) {} }, 0);
     setTimeout(() => { const z = id && zones.current[id]; if (z) { try { z.focus({ preventScroll: true }); } catch (_) {} } }, 30);
   };
   const terminer = () => {

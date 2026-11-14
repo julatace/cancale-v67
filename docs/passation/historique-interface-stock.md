@@ -3579,3 +3579,7 @@ autres onglets sont inchangés. Banc `scripts/bancs/achats-en-route-ordre.cjs`
 ## Ligne déplacée de CLAUDE.md §9 (11 nov., tel quel)
 
 - **11 nov. · VRM installable (lot app-installable)** : 2e ouverture instantanée (coquille servie du cache, relue derrière ; seules `/` et `/index.html`, une page statique ne remplace plus l'app) ; nouvelle version ⇒ « Mettre à jour » discret une fois (jamais de rechargement pendant une saisie, `src/miseAJour.js`) ; aide d'installation une fois (iPhone 2 gestes, Android « Installer », `src/aideInstallation.js`) ; écrans de démarrage iPhone clair/sombre, icônes toutes tailles, raccourcis, plus de rechargement au tirer ; clic de notification vers la fenêtre de l'app. `docs/passation/2026-11-11-app-installable.md`. Geste : aucun (reposer l'icône pour le nouvel écran de démarrage).
+
+## Déplacé de CLAUDE.md §9 le 14 nov. (taille du fichier), tel quel
+
+- **14 nov. · Listes : phrase, glisser, épingles, comparer (92–95)** : « nike 42 pas vendue depuis 2 mois » ⇒ capsules modifiables sans IA (5 langues, Annonces + ⌘K, `src/recherchePhrase.js`) ; cocher en glissant depuis la case ; 20 épingles par identité (`vrm_epingles`, synchronisées) ; comparer deux cochées. `docs/passation/2026-11-14-listes-recherche.md`. Geste : aucun.

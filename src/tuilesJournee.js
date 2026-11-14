@@ -44,10 +44,12 @@ export function appliquerTuiles(tuiles, reglage, urgent = {}) {
   const r = lireTuilesJournee(reglage);
   const rang = new Map(r.ordre.map((id, i) => [id, i]));
   const base = (Array.isArray(tuiles) ? tuiles : []).map((t, i) => ({ t, i }));
-  // Un id absent de SON ordre garde sa place relative d'origine, après ceux qu'il a rangés qui le précèdent.
+  // SON ordre d'abord ; une tuile qu'il n'a jamais rangée (apparue depuis) vient ensuite, dans l'ordre d'origine.
   base.sort((a, b) => {
     const ra = rang.has(a.t.id) ? rang.get(a.t.id) : null, rb = rang.has(b.t.id) ? rang.get(b.t.id) : null;
     if (ra != null && rb != null) return ra - rb;
+    if (ra != null) return -1;
+    if (rb != null) return 1;
     return a.i - b.i;
   });
   return base.map(({ t }) => {

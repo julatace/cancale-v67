@@ -242,7 +242,7 @@
 .sj-journee .vrm-jv2-jour[aria-pressed="true"] .vrm-jv2-barre { background: linear-gradient(to top, var(--sb-encre) max(calc(var(--h, 0) * 100%), 3px), transparent 0), var(--sj-puits) !important; }
 
 /* ── 7. LA GRILLE BENTO ───────────────────────────────────────────────────────── */
-.sj-journee .sj-bento { margin: 22px 0 18px !important; }
+.sj-journee .sj-bento { margin: 22px 0 18px !important; scroll-margin-top: 96px !important; }
 .sj-journee .sj-grille {
   display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)) !important; grid-auto-rows: minmax(100px, auto) !important; gap: 10px !important;
 }
@@ -419,17 +419,15 @@
 .sj-journee .sj-remises { display: flex !important; align-items: center !important; gap: 8px !important; margin: 0 4px 10px !important; font: 600 13px/1.3 var(--sb-police-texte) !important; color: var(--sb-ambre) !important; }
 .sj-journee .sj-rangement-tete { display: flex !important; align-items: center !important; gap: 14px !important; margin: 0 2px 12px !important; flex-wrap: wrap !important; }
 .sj-journee .sj-rangement-titre { flex: 1 1 auto !important; font: 600 14px/1.3 var(--sb-police-texte) !important; color: var(--sb-encre) !important; }
-.sj-journee [data-sj-rangement="1"] .sj-t { touch-action: none !important; cursor: grab !important; outline: 1.5px dashed rgb(var(--sb-o) / .22) !important; outline-offset: -5px !important; animation: sj-pose 1.8s ease-in-out infinite alternate !important; }
+.sj-journee [data-sj-rangement="1"] .sj-t { touch-action: none !important; cursor: grab !important; outline: 1.5px dashed rgb(var(--sb-o) / .22) !important; outline-offset: -5px !important; }
 .sj-journee [data-sj-rangement="1"] .sj-t[data-sj-glisse] { cursor: grabbing !important; z-index: 5 !important; box-shadow: var(--sb-ombre-avant) !important; animation: none !important; transition: none !important; }
 .sj-journee [data-sj-rangement="1"] .sj-t.is-cachee > :not(.sj-r-gestes):not(.sj-zone) { opacity: .38 !important; }
 .sj-journee [data-sj-rangement="1"] .sj-t.is-cachee { background: var(--sb-creux) !important; box-shadow: var(--sj-k-in) !important; }
-@keyframes sj-pose { from { transform: translateY(0); } to { transform: translateY(-1px); } }
 .sj-journee .sj-r-gestes { position: absolute !important; top: 6px !important; right: 6px !important; z-index: 3 !important; display: flex !important; gap: 6px !important; }
 .sj-journee .sj-r-gestes .sb-rond[aria-pressed="true"] { background: var(--sb-creux) !important; box-shadow: var(--sj-k-in) !important; }
 .sj-journee [data-sj-rangement="1"] .sj-lib { padding-right: 96px !important; }
 .sj-journee .sj-ranger { display: flex !important; justify-content: flex-end !important; margin: 2px 2px -6px !important; }
 .sj-journee .sj-ranger .sb-lien { font-size: 13px !important; color: var(--sb-encre-2) !important; }
-@media (prefers-reduced-motion: reduce) { .sj-journee [data-sj-rangement="1"] .sj-t { animation: none !important; } }
 
 /* ── 10. ORDINATEUR : la grille en haut (douze colonnes), ce qui est déplié dessous ── */
 /* Une seule colonne : la grille ancienne (tête à gauche, « À faire » à droite, styles-bureau.css) ne s'applique plus. */

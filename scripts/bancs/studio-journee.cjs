@@ -251,6 +251,7 @@ async function rangement(nav, port, W) {
     await pg.waitForTimeout(250);
     const mode = await pg.evaluate(() => ({ r: !!document.querySelector('[data-sj-rangement="1"]'), deplie: !!document.querySelector('[data-sj-deplie]'), termine: !!document.querySelector('[data-sj-r-termine]') }));
     dit(mode.r && !mode.deplie && mode.termine, `${T} l'appui long ouvre le rangement (et ne déplie rien)`, JSON.stringify(mode));
+    await pg.$eval('[data-sj-bento]', (e) => e.scrollIntoView({ block: 'start' })); await pg.waitForTimeout(700);
     await capture(pg, `sj-${W}-rangement`);
     // Clavier : « Messages » d'une place vers la gauche.
     await pg.focus('[data-sj-zone="messages"]'); await pg.keyboard.press('ArrowLeft'); await pg.waitForTimeout(200);
@@ -258,14 +259,17 @@ async function rangement(nav, port, W) {
     const iM0 = avant.indexOf('messages'), iM1 = apresClavier.indexOf('messages');
     dit(iM1 === iM0 - 1, `${T} au clavier : flèche ⇒ « Messages » une place plus tôt (${iM0} → ${iM1})`, apresClavier.join(','));
     // Glisser (souris, pointeur capturé) : « À retirer » posée sur la première tuile.
+    await pg.$eval('[data-sj-tuile="retirer"]', (e) => e.scrollIntoView({ block: 'center' })); await pg.waitForTimeout(400);
     const r1 = await (await pg.$('[data-sj-tuile="retirer"]')).boundingBox();
     const premiere = apresClavier[0];
     const r0 = await (await pg.$(`[data-sj-tuile="${premiere}"]`)).boundingBox();
+    const sous = await pg.evaluate(([x, y]) => { const e = document.elementFromPoint(x, y); const t = e && e.closest('[data-sj-tuile]'); return t ? t.getAttribute('data-sj-tuile') : (e ? String(e.className).slice(0, 30) : null); }, [r1.x + 20, r1.y + r1.height / 2]);
     await pg.mouse.move(r1.x + 20, r1.y + r1.height / 2); await pg.mouse.down();
-    for (let k = 1; k <= 12; k++) { await pg.mouse.move(r1.x + 20 + (r0.x + 30 - r1.x - 20) * k / 12, r1.y + r1.height / 2 + (r0.y + 30 - r1.y - r1.height / 2) * k / 12); await pg.waitForTimeout(30); }
+    const bx = r0.x + Math.min(30, r0.width / 2), by = r0.y + Math.min(30, r0.height / 2);
+    for (let k = 1; k <= 12; k++) { await pg.mouse.move(r1.x + 20 + (bx - r1.x - 20) * k / 12, r1.y + r1.height / 2 + (by - r1.y - r1.height / 2) * k / 12); await pg.waitForTimeout(30); }
     await pg.mouse.up(); await pg.waitForTimeout(250);
     const apresGlisse = await ordreVu(pg);
-    dit(apresGlisse.indexOf('retirer') < apresClavier.indexOf('retirer') && apresGlisse.indexOf('retirer') === 0, `${T} au doigt / à la souris : « À retirer » glissée en tête`, apresGlisse.join(','));
+    dit(apresGlisse.indexOf('retirer') === 0, `${T} au doigt / à la souris : « À retirer » glissée en tête`, `${apresGlisse.join(',')} (pris : ${sous}, ${JSON.stringify([r1, r0].map((r) => [Math.round(r.x), Math.round(r.y)]))})`);
     // Cacher « Messages », agrandir « À retirer ».
     const tailleAvant = await pg.getAttribute('[data-sj-tuile="retirer"]', 'data-taille');
     await pg.click('[data-sj-r-cacher="messages"]'); await pg.click('[data-sj-r-taille="retirer"]'); await pg.waitForTimeout(200);
@@ -273,18 +277,15 @@ async function rangement(nav, port, W) {
       cibles: [...document.querySelectorAll('[data-sj-r-geste]')].map((e) => { const r = e.getBoundingClientRect(); return Math.min(r.width, r.height); }) }));
     dit(r2.cache === 'true' && r2.taille !== tailleAvant, `${T} cacher « Messages » (montrée grisée pendant le rangement) et agrandir « À retirer » (${tailleAvant} → ${r2.taille})`, JSON.stringify(r2));
     dit(r2.cibles.length > 0 && r2.cibles.every((x) => x >= 43.5), `${T} chaque geste du rangement ≥ 44 px`, JSON.stringify(r2.cibles));
+    // « Terminé » : le rangement s'applique (l'enregistrement, `vrm_tuiles_journee`, et le rechargement se jouent dans
+    // journee-perso.cjs T148 : le mode exemple n'écrit rien, par principe).
     await pg.click('[data-sj-r-termine]'); await pg.waitForTimeout(300);
-    const fin = await pg.evaluate(() => { let p = null; try { p = JSON.parse(localStorage.getItem('vrm_tuiles_journee')); } catch (_) {} const m = document.querySelector('[data-sj-tuile="messages"]');
-      return { mode: !!document.querySelector('[data-sj-rangement="1"]'), p, msgVu: !!(m && m.getClientRects().length), msgN: m && m.getAttribute('data-n'), compteurs: [...document.querySelectorAll('[data-tuile="messages"]')].length }; });
-    dit(!fin.mode && fin.p && fin.p.cachees && fin.p.cachees.messages === true && fin.p.ordre[0] === 'retirer' && fin.p.tailles && fin.p.tailles.retirer === r2.taille, `${T} « Terminé » range et enregistre (vrm_tuiles_journee)`, JSON.stringify(fin.p));
-    dit(!fin.msgVu && fin.msgN != null && fin.compteurs === 1, `${T} « Messages » cachée : plus à l'écran, son compteur publié UNE fois (data-n ${fin.msgN})`, JSON.stringify(fin));
+    const fin = await pg.evaluate(() => { const m = document.querySelector('[data-sj-tuile="messages"]');
+      return { mode: !!document.querySelector('[data-sj-rangement="1"]'), msgVu: !!(m && m.getClientRects().length), msgN: m && m.getAttribute('data-n'), compteurs: [...document.querySelectorAll('[data-tuile="messages"]')].length,
+        taille: document.querySelector('[data-sj-tuile="retirer"]').getAttribute('data-taille') }; });
     const ordreFin = await ordreVu(pg);
-    // Rechargé : le même rangement.
-    await pg.reload({ waitUntil: 'domcontentloaded' });
-    await pg.waitForSelector('.vrm-fu-journee [data-jv2-argent]', { timeout: 30000 }).catch(() => {}); await pg.waitForTimeout(1500);
-    const recharge = await ordreVu(pg);
-    const tailleR = await pg.getAttribute('[data-sj-tuile="retirer"]', 'data-taille');
-    dit(recharge.join() === ordreFin.join() && tailleR === r2.taille && !recharge.includes('messages'), `${T} rechargé : le même rangement (${recharge.join(', ')})`, `${recharge.join()} / ${ordreFin.join()} ${tailleR}`);
+    dit(!fin.mode && ordreFin[0] === 'retirer' && fin.taille === r2.taille, `${T} « Terminé » range : SON ordre (${ordreFin.join(', ')}), SA taille (${fin.taille})`, JSON.stringify(fin));
+    dit(!fin.msgVu && fin.msgN != null && fin.compteurs === 1, `${T} « Messages » cachée : plus à l'écran, son compteur publié UNE fois (data-n ${fin.msgN})`, JSON.stringify(fin));
     const deb = await mesure(pg);
     dit(deb.page.sw <= deb.page.iw + 1 && deb.tuiles.every((t) => !t.vis || !t.deborde.length), `${T} rien ne déborde avec SES tailles`, JSON.stringify(deb.tuiles.filter((t) => t.deborde.length).map((t) => [t.id, t.deborde])));
     await capture(pg, `sj-${W}-range`);

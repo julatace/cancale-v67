@@ -524,11 +524,11 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **14 nov. · Ma journée « Studio bleu clair » + « Tes tuiles à toi » (148)** : tête + affiche (vendu du jour fin, € remonté, semaine), grille Bento (chaque tuile son geste ; « Imprimer » seul plein, parcours inchangé ; codes en plaques), déplier sur place, « À faire » dessous ; appui long ⇒ ranger / cacher / agrandir (`vrm_tuiles_journee`, l'urgent revient). `docs/passation/2026-11-14-studio-journee.md`. Geste : aucun.
 - **14 nov. · Accompagnement des gestes** : chaque action dit avant (ce qui va se passer ET ce qui ne se passera pas), pendant (« 3 / 8 », Tout arrêter), après (résultat + « Ensuite › »), échec (raison en mots + geste) — brique `src/ui/Accompagne.jsx` + `src/accompagnement.js` §9 ; listes vides et premières fois ; aucun « Annuler »/confirmation/« ? » ajouté (sa décision). `docs/passation/2026-11-14-accompagnement.md`. Geste : aucun.
 
 - **14 nov. · Ergonomie des gestes (mesurée)** : banc `ergonomie-gestes` joue 15 gestes au pouce (390 tactile) depuis l'ouverture ; ⌘K « Republier N°x à la main » (kit, 5 → 3 touchers) et « Publier N°x partout » (4 → 3) ; les 15 dans leur plafond. `docs/passation/2026-11-14-ergonomie-gestes.md`. Geste : aucun.
 - **14 nov. · Refonte des listes** : Annonces et Ventes « la liste d'abord » (bande de chiffres au lieu de la carte sombre, compte en menu, barre + petites capsules, alertes dans « • À faire · N », phrase sous le titre retirée), Annonces en liste groupée de 70 px, colis en rangées, Ma journée : héros atelier ; briques communes `src/ui/` ; banc `refonte-listes`. `docs/passation/2026-11-14-refonte-listes.md`. Geste : aucun.
-- **14 nov. · Listes : phrase, glisser, épingles, comparer (92–95)** : « nike 42 pas vendue depuis 2 mois » ⇒ capsules modifiables sans IA (5 langues, Annonces + ⌘K, `src/recherchePhrase.js`) ; cocher en glissant depuis la case ; 20 épingles par identité (`vrm_epingles`, synchronisées) ; comparer deux cochées. `docs/passation/2026-11-14-listes-recherche.md`. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
