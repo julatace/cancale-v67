@@ -69,14 +69,15 @@ Ce qui a changé APRÈS le récit ci-dessus, pour suivre sa maquette (elle gagne
 
 ## Preuves
 - `scripts/bancs/refonte-coque.cjs` : sur origin/main **16 ✅ · 34 ❌** (H1 cinq ronds, H2 petit titre visible
-  et à gauche, H3 pastille encore là après 3 s, H4 « 99+ » bleu, F/N…) ; ici **59 ✅ · 0 ❌** (règles + AJOUT 3 ; machine très chargée — charge 60 — : les attentes du banc lisent l'état, pas un délai fixe).
+  et à gauche, H3 pastille encore là après 3 s, H4 « 99+ » bleu, F/N…) ; ici **règles 50 ✅ · 0 ❌, AJOUT 3 10 ✅ · 0 ❌** (dont Paramètres : « à revoir » jamais au-dessus de son titre) ; le banc attend une page CALME (aucune tâche longue depuis 1,5 s : les ~6 s du démarrage pèsent autant avant qu'après, mesuré) et joue chaque fonction depuis une page neuve.
   Section P (1 000 annonces, `BANC_DIST_AVANT=`) : nœuds DOM 2447 → 2450, CLS 0 → 0, premier rendu et
   défilement dans le bruit. ⚠️ La base à 1 000 annonces n'affiche pas les annonces inventées (24 en ligne : la
   ligne `listings` gonflée n'est pas prise par l'écran) — la mesure compare donc l'écran Annonces réel de la
   base de banc, pas 1 000 rangées : à reprendre avec la base du chantier « listes ».
 - Audits verts : traduction, tdz, icones, coherence, variables, composants, violet, rouge-doublon,
   quoi-de-neuf, onglets-a, onglets-d, garde-ecrans. `npm run build` vert.
-- Captures 390 × dsf 2 : `docs/design/avant-apres/coque-*.png`.
+- Captures 390 × dsf 2 : `docs/design/avant-apres/coque-*.png` (achats, ventes-defile, journee, compte en paires avant/après ; cloche et maj après).
+- Revue « Web Interface Guidelines » : focus visible au clavier sur les onglets, les icônes du haut et les rangées du menu ; `touch-action: manipulation` (§3.10).
 
 ## Restes / à savoir
 - Bancs qui touchaient la pastille « V » ou l'onglet « Annonces » de la barre au téléphone : ils passent

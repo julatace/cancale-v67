@@ -657,7 +657,7 @@
   top: 6px !important; left: 24px !important; right: auto !important; box-shadow: 0 0 0 2px var(--vrm-hdr-anneau, var(--vrm-bg, var(--d-fond))) !important;
 }
 
-:root:root body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) > .vrm-app-header .vrm-cn-cloche .vrm-cn-pastille.vrm-cn-pastille { background: #F5F5F7 !important; color: #1D1D1F !important; }   /* sur la barre encre de Ma journée */
+:root:root body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) > .vrm-app-header .vrm-cn-cloche .vrm-cn-pastille.vrm-cn-pastille { background: var(--d-point-ambre) !important; color: #1D1D1F !important; }   /* sur la barre encre de Ma journée : le même point ambre */
 
 :root:root body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) > .vrm-app-header :is(.vrm-hbtn, .vrm-hbtn svg) { color: #F5F5F7 !important; }   /* ☰, cloche, loupe : lisibles sur la barre encre */
 
