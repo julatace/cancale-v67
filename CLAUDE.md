@@ -440,6 +440,7 @@ sans la fonction.
 
 | capacité | fonction de l'extension | arrivée en | ce que l'app promet |
 |---|---|---|---|
+| `remiseprix` | `remisePermise` | **5.376.0** (14 nov.) | « Remettre les prix » d'un solde : la seule hausse des chemins de baisse (Vinted, Leboncoin, Vestiaire), `remise` + `confirme` + prix = l'origine mémorisée, sur son clic |
 | `importpasse` | `importerAnnonces` | **5.375.0** (13 nov.) | « Import de ton passé · 340 / ~1 200 ventes » : 12 mois (horizon par date), annonces d'un trait, état noté après chaque page, souci dit ; `import_vinted_{uid}` v 2 |
 | `favoriattente` | `attendreOffreMessage` | **5.372.0** (12 nov.) | favoris : après l'offre ACCEPTÉE, 8 à 20 s au hasard (jamais deux fois la même valeur) puis le temps d'écriture ; attente dans `chrome.storage.local` (`vrmFavoriAttente`), reprise par un worker neuf (`reprendreMessagesFavoris`) ; Tout arrêter, captcha, pause, autre compte, onglet fermé ⇒ le message ne part pas, dit |
 | `suivinumero` | `suiviDeTransaction` | **5.372.0** (12 nov.) | chaque achat en cours (payé, en attente de livraison, expédié, au point, livré sans n°) reçoit n° de suivi + transporteur + point de destination (détail de la transaction quand le suivi ne les porte pas), 6 lectures/h ; codes de retrait cherchés aussi quand Vinted demande son geste ou que le suivi dit « disponible » |
@@ -523,21 +524,20 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **14 nov. · Argent et prix (112–116, 121, 122)** : deux taux par modèle (retours · litiges) ; offres acceptées ET payées par compte (par la transaction) ; soldes « Jusqu'au… » remis sur SON clic (Ma journée propose, ext. 5.376 `remiseprix`) ; lien lecture seule signé pour le comptable (`/c/…`, compta seule, journal) ; révision du mois ; même N° à deux prix ; prix à afficher pour toucher X €. `docs/passation/2026-11-14-argent-prix.md`. Geste : installer 5.376.0.
 - **14 nov. · Argent, quatre choix (75, 80, 81, 82)** : coller « N° ; prix » dans la saisie en série (aperçu, rien d’écrasé) ; « Modèle et taille » + « À racheter » sur les ventes reliées ; objectif sur le REÇU + « X € par jour d'ici le 30 » ; « Ta déclaration de revenus » en tête de Déclarer avec case et source. `docs/passation/2026-11-14-argent-choix.md`. Geste : aucun.
 - **14 nov. · Design, passe 3** : bande Leboncoin dans la colonne, Notifications au segmenté, pas de barre vide, fraîcheur sans cadre, 28 sous-pages, feuilles, e-mail et fil au système ; la feuille de vente ne cache plus l'écran (banc `design-passe-3.cjs` : 1 531 défauts ⇒ 0). `docs/passation/2026-11-14-design-passe-3.md`. Geste : aucun.
 - **14 nov. · Bancs au vert** : 14 bancs + job `comptes-et-reception` verts sans affaiblir (faux PostgREST à la vraie forme, `in.(…)`, attentes sur condition, porte de banc à jeton JWT) ; 3 défauts de l'app corrigés (⌘K « Imprimer » ouvre la feuille, rail allumé sur Organisation, « Statut » dans Factur-X). `docs/passation/2026-11-14-bancs-au-vert.md`. Geste : aucun.
-- **14 nov. · Design, passe 2** : Messages, E-mails, Achats, eBay, Leboncoin, Vestiaire, 15 sous-pages de Paramètres, feuilles, connexion, accueil, exemple, démarrage au système (banc `design-passe-2.cjs` : 1 766 défauts ⇒ 0) ; la loupe n'écrit le N° qu'une fois. `docs/passation/2026-11-14-design-passe-2.md`. Geste : aucun.
-- **14 nov. · Design, passe écran par écran** : fiche « Tout sur le N° » et loupe au système, 500 → 400/600, tailles à l'échelle, un gris, contrastes ≥ 4,5 (« 36 »), 44 doigt / 36 souris (filtres compris), titres insécables au trait d'union ; banc `design-passe` (avant 1 839 défauts, après 0). `docs/passation/2026-11-14-design-passe.md`. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.375.0** (13 nov., lot 47). **À lire en premier : `docs/passation/2026-11-10-passation-finale.md`** (état exact, gestes de Julien, ce qui reste, base), puis `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
+**Extension servie : 5.376.0** (14 nov., argent-prix : remise des soldes). **À lire en premier : `docs/passation/2026-11-10-passation-finale.md`** (état exact, gestes de Julien, ce qui reste, base), puis `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
 - Facture Pro : compléter « Ma facture » (Argent → Factures : SIRET, forme, régime de TVA, son e-mail) ; poser `RELANCES_SMTP_*` + `RELANCES_EXPEDITEUR` (SPF/DKIM, Brevo 300/j) — VRM envoie par défaut.
-- Installer l’extension **5.375.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip`). La liste complète et à jour des gestes : `docs/passation/2026-11-09-passation-generale.md` §5.
+- Installer l’extension **5.376.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip`). La liste complète et à jour des gestes : `docs/passation/2026-11-09-passation-generale.md` §5.
 - Sur leboncoin.fr, ouvrir « Mes annonces » sur CHACUN de ses comptes Leboncoin.
 - Recoller `scripts/gmail-forwarder.gs` (avec sa clé) dans la boîte qui fait tourner le
   script, puis poser `EMAIL_INBOUND_SECRET` sur Vercel (l'ancien script lit encore la
