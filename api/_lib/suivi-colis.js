@@ -134,12 +134,20 @@ export function relireLigneMeta(x) {
 // retiré. `etat` = l'état de la transaction ({ s: code, ss: état de
 // l'expédition }) ; `auRelais` = le statut dit « au point relais » (la règle
 // `isAtRelayStatus` de l'app, ou le résumé de l'extension, la même — §11).
+const RETOUR_OUVERT = /retour\s+(?:initi|demand|en\s+cours)/i;
 export function finDeCommandeAchat({ statut = '', etat = null, auRelais = false } = {}) {
   if (etat && /non\s+r[ée]clam/i.test(etat.ss || '')) return 'reparti';
   if (etat && etat.s >= 500 && etat.s < 600) return 'reparti';
   if (etat && etat.s === 450) return 'retire';
+  // (14 nov., Julien : « j'ai fait un litige dessus car la taille n'était pas bonne, elle a donc été retirée ») UN
+  // RETOUR OUVERT SUR CET ACHAT (transaction 440 « Retour initié », mesurée ; ou son libellé) prouve que l'acheteur a
+  // le colis : il n'est plus à retirer — même si la liste des achats, plus ancienne, le dit encore « au point relais ».
+  // Par la transaction de CET achat seulement (jamais le titre). La suspension 430 (« en attente de vérification »)
+  // n'en est pas une : une réclamation peut dire « pas reçu ».
+  if (etat && (etat.s === 440 || RETOUR_OUVERT.test(etat.ss || ''))) return 'retire';
   if (auRelais === true) return null;
   const st = String(statut || '');
+  if (RETOUR_OUVERT.test(st)) return 'retire';
   if (/non\s+r[ée]clam|rembours|annul/i.test(st)) return 'reparti';
   if (/finalis|termin|commande\s+livr|a\s+[ée]t[ée]\s+livr|re[çc]u\s+(?:sa|ta|la)\s+commande/i.test(st)) return 'retire';
   return null;

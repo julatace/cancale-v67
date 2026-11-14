@@ -60,12 +60,29 @@ Captures gardées hors dépôt (données réelles). Branche `claude/retrait-vint
    base (comptes 199082413 et 3203327925) — l'index des suivis ne les relie pas à ces achats ; ces deux cartes
    ne sont plus « à retirer » de toute façon.
 
+4. **Un litige ouvert prouve que le colis a été retiré** (Julien, sur « Autry donna » : « j'ai fait un litige
+   tout à l'heure dessus car la taille n'était pas bonne, elle a donc été retirée »). Mesuré : la liste des achats
+   de ce compte date du 11 nov. (« colis déposé … point relais ») ; aucun détail de transaction rangé ; l'e-mail
+   « Retourne ta commande d'ici le 23 nov. : Autry donna » (14 nov.) et les e-mails « {article} - Confirmation
+   requise » (Autry donna le 13, Nike trainers le 11 : « Il a été indiqué que ta commande a été livrée ») ne
+   portent AUCUNE identité (ni n° de transaction, ni conversation : liens de suivi vers l'accueil) — le titre
+   n'en est pas une (§5) : ils ne servent pas de preuve. En base, statuts d'achats mesurés : « Retour initié »
+   (3 achats ; transaction 440), « Transaction suspendue » (430, 1).
+   ⇒ `finDeCommandeAchat` (api/_lib/suivi-colis.js, la règle des fins d'achat de `pickupUnion` et du rappel du
+   matin `api/ship-reminders.js` — une seule règle, pas de copie) : transaction 440 ou libellé « retour initié /
+   demandé / en cours » de CET achat ⇒ retiré, même quand la liste des achats, plus ancienne, dit encore « au
+   point relais ». La suspension 430 n'en est pas une (une réclamation peut dire « pas reçu »). Ces deux colis
+   sont de toute façon sortis de « À retirer » par la règle 3 (pas de code) ; dès que l'extension relit les
+   achats du compte (« Retour initié »), Autry donna sort aussi de « À vérifier ». Nike trainers : aucune fin
+   prouvée PAR IDENTITÉ en base (seul l'e-mail « Confirmation requise » au titre le dit livré) — reste « À
+   vérifier » jusqu'à la relecture de ses achats.
+
 ## Preuves
 
 - `scripts/audit-retrait-vinted-go.cjs` (règles EXÉCUTÉES : vraie `parseCarrierEmail`, `extractPickupQr`,
   `relireLigneSuivi`, `qr-retrait.js`, `qrImage` extraite par Babel, `colisRelaisChange`,
-  `lieuCompleteParTransporteur`) : **8 rouges** sur origin/main (1acc0a05, arbre `git archive`), vert après ;
-  `--prouve` **7/7 mutations** rouges.
+  `lieuCompleteParTransporteur`, `finDeCommandeAchat`) : **10 rouges** sur origin/main (1acc0a05, arbre
+  `git archive`), vert après ; `--prouve` **9/9 mutations** rouges (dont litige ignoré, libellé ignoré).
 - `scripts/bancs/retirer-vinted-go.cjs` (390 tactile clair + sombre, 1512 ; forme mesurée, données inventées) :
   **8 rouges** sur le build d'origin/main, **36 verts** après (QR chargé à l'adresse du n° et du code, `&time=`
   décodé, QR d'un autre code jamais montré, enseigne gardée, ancien point nulle part — À retirer, mode relais,
@@ -78,4 +95,5 @@ Captures gardées hors dépôt (données réelles). Branche `claude/retrait-vint
 ## Geste de Julien
 
 Aucun : la ligne déjà rangée se relit seule à l'ouverture d'Achats (le QR apparaît). Extension inchangée
-(rien à installer).
+(rien à installer ; la prochaine sera 5.376.0, consolidée à l'intégration). Pour que « Autry donna » et
+« Nike trainers » quittent aussi « À vérifier » : ouvrir Vinted sur leurs comptes (relecture des achats).

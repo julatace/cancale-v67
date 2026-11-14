@@ -27,6 +27,8 @@ const MUTATIONS = {
   'qr-sans-identite-montre': ['api/_lib/qr-retrait.js', "  if (j === 'contredit' || j === 'inconnu') return '';", "  if (j === 'contredit') return '';"],
   'qr-amp-garde': ['api/_lib/qr-retrait.js', ".replace(/&amp;/gi, '&')", ''],
   'deplace-garde-ancien-nom': ['src/relaisColis.js', "? { lieuNom: String(tr.lieuNom || '') || trRue, lieuAdresse:", "? { lieuNom: String(tr.lieuNom || '') || base.lieuNom, lieuAdresse:"],
+  'litige-ignore': ['api/_lib/suivi-colis.js', "  if (etat && (etat.s === 440 || RETOUR_OUVERT.test(etat.ss || ''))) return 'retire';\n", ''],
+  'litige-libelle-ignore': ['api/_lib/suivi-colis.js', "  if (RETOUR_OUVERT.test(st)) return 'retire';\n", ''],
   'app-qr-sans-regle': ['src/App.jsx', "const u = t.qrUrl ? urlQrDuColis(t.qrUrl, t) : '';", "const u = t.qrUrl || '';"],
 };
 if (process.argv.includes('--prouve')) {
@@ -147,6 +149,17 @@ const TEXTE_MR = "Bonjour,\nLe Point Relais prévu est temporairement indisponib
     dit(!!sansDate.lieuConflit && /Ville-Avant/.test(sansDate.lieuAdresse), 'F message sans date : rien n’est écrasé ni deviné, le désaccord est dit', JSON.stringify(sansDate.lieuConflit));
     const plusVieux = lieuCompleteParTransporteur(ancien, { ...tr, etatAt: '2026-11-11T08:00:00Z' }, Date.parse('2026-11-12T08:00:00Z'));
     dit(!!plusVieux.lieuConflit, 'F une lecture du transporteur PLUS ANCIENNE que le message ne remplace rien', JSON.stringify(plusVieux.lieuConflit));
+  });
+  await essaie('G. un litige / retour ouvert sur CET achat prouve la fin (finDeCommandeAchat)', async () => {
+    const { finDeCommandeAchat } = await importer('api/_lib/suivi-colis.js');
+    const AU_RELAIS = "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais";
+    // Comme l'app : l'état de la transaction est lu PAR SON n° (`etatTxn(o.transaction_id)`).
+    const etats = new Map([['9001', { s: 440, ss: 'Retour initié' }]]);
+    const fin = (o) => finDeCommandeAchat({ statut: o.status, etat: etats.get(String(o.transaction_id)) || null, auRelais: /point relais/.test(o.status) });
+    dit(fin({ transaction_id: 9001, status: AU_RELAIS }) === 'retire', 'G transaction 440 « Retour initié » (litige) alors que la liste des achats dit encore « au point relais » ⇒ plus à retirer');
+    dit(fin({ transaction_id: 9002, status: AU_RELAIS }) === null, 'G le litige d’une AUTRE transaction ne touche pas ce colis (toujours au point)');
+    dit(finDeCommandeAchat({ statut: 'Retour initié' }) === 'retire', 'G le libellé « Retour initié » de la liste des achats ⇒ plus à retirer');
+    dit(finDeCommandeAchat({ etat: { s: 430, ss: 'Transaction suspendue - en attente de vérification.' }, auRelais: true }) === null, 'G une suspension (430, réclamation peut-être « pas reçu ») ne vaut pas retrait');
   });
   console.log(ko ? `\n❌ ${ko} contrôle(s) rouge(s)` : '\n✅ le colis Vinted Go réacheminé : son QR prouvé, son nouveau point — tout est vert');
   process.exit(ko ? 1 : 0);
