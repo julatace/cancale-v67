@@ -154,7 +154,7 @@ const MESURE = () => {
       const d = v ? new Date(v) : null;
       dit(!!d && d.getDay() === 0 && d.getHours() === 18 && d.getTime() > new Date(2026, 10, 14, 12).getTime(), `${tag} heure : le lien met dimanche 18 h dans le champ (rien ne part)`, v);
       propre(await p.evaluate(MESURE), 'heure'); dit(!erreurs.length, `${tag} heure : aucune erreur`, erreurs);
-\1
+      await cap(p, 'heure'); await p.close(); }
     // ── lecture partielle ───────────────────────────────────────────────────
     { const { p, erreurs } = await ouvrir('partiel');
       const r = await p.evaluate(() => ({ inc: !!document.querySelector('[data-mh-incomplet]'), t: document.body.innerText }));
