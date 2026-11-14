@@ -141,7 +141,10 @@
   min-width: 0 !important; font-size: var(--d-t-12, 12px) !important; line-height: 17px !important; padding: 2px 0 !important;
 }
 /* Jamais un chiffre rogné (« 11 nov. · depuis 2 j » coupé ment) : la sous-ligne passe à la ligne s'il le faut. */
-:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-meta > * { display: inline !important; white-space: normal !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-meta > * { display: inline-block !important; white-space: normal !important; max-width: 100% !important; vertical-align: top !important; }
+/* Les morceaux restent entiers (« 13 nov. », « · depuis 2 j ») : la coupure tombe ENTRE eux, jamais dans une date. */
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-meta > * > span { display: inline-block !important; white-space: nowrap !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-meta > .vrm-acct-tag { overflow-wrap: anywhere !important; }
 :root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-meta > * + * { margin-left: 4px !important; }
 :root:root:root body .vrm-main .vrm-achats .vrm-buy-row :is(.vrm-buy-transp, .vrm-buy-retour) { grid-area: plus !important; margin: 2px 0 0 !important; min-width: 0 !important; }
 /* L'état : une pastille de 22 px (le même mot) ; le reçu et la facture : une pilule de 22 px dessinée DANS une
@@ -218,9 +221,9 @@
 :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero::after { content: none !important; display: none !important; }
 :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero :is(.vrm-fu-carte-haut, .vrm-fu-carte-tete, .vrm-fu-carte-txt, .vrm-fu-cases) { display: contents !important; }
 :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero > *, :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero :is(.vrm-fu-carte-haut, .vrm-fu-carte-txt, .vrm-fu-cases) > * { margin: 0 !important; min-width: 0 !important; }
-:root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-surtitre { grid-area: sur !important; font-size: var(--d-t-13, 13px) !important; font-weight: 400 !important; color: var(--d-gris, #6E6E73) !important; align-self: center !important; }
+:root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-surtitre { grid-area: sur !important; font-size: var(--d-t-13, 13px) !important; font-weight: 400 !important; color: var(--d-gris, #6E6E73) !important; align-self: center !important; padding-bottom: 6px !important; }
 :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-modifier {
-  position: absolute !important; top: -13px !important; right: 0 !important; height: 44px !important;
+  position: absolute !important; top: -16px !important; right: 0 !important; height: 44px !important;
   min-height: 44px !important; padding: 0 0 0 12px !important; background: transparent !important; border: 0 !important; box-shadow: none !important;
   font-size: var(--d-t-15, 15px) !important; font-weight: 400 !important; color: var(--d-accent-texte, #0066CC) !important;
 }
@@ -238,7 +241,7 @@
   display: flex !important; flex-direction: column !important; justify-content: flex-end !important; align-items: flex-start !important; gap: 2px !important;
   padding: 0 !important; min-height: 44px !important; height: auto !important; background: transparent !important; box-shadow: none !important; border: 0 !important; border-radius: 0 !important;
   align-self: stretch !important; text-align: left !important; color: var(--d-encre, #1D1D1F) !important;
-  justify-content: flex-start !important; padding-left: 12px !important; border-left: .5px solid var(--d-filet, rgba(60,60,67,.18)) !important;
+  justify-content: flex-start !important; padding-left: 10px !important; border-left: .5px solid var(--d-filet, rgba(60,60,67,.18)) !important;
 }
 :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-cases > .vrm-fu-case:nth-child(1):nth-last-child(n) { grid-area: c2 !important; }
 :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-cases > .vrm-fu-case:nth-child(2):nth-last-child(n) { grid-area: c3 !important; }
