@@ -12,6 +12,60 @@ import './styles-annonces-outils.css';
 import { texteDuree } from './etatArticle.js';
 import { escalierPrix, eurosPrix } from './historiquePrix.js';
 import { motsInsecables } from './motsInsecables.jsx';
+import { tr } from './i18n/index.js';
+import { poserSlot } from './ficheLigne.js';
+
+// (14 nov., proposition 62) Ouverte DEPUIS une ligne de liste : ce que la ligne est (le titre de sa partie).
+const CLE_CTX = { vente: 'fiche.ctx.vente', colis: 'fiche.ctx.colis', achat: 'fiche.ctx.achat', annonce: 'fiche.ctx.annonce', stock: 'fiche.ctx.stock', retrait: 'fiche.ctx.retrait', journee: 'fiche.ctx.journee' };
+// La silhouette d'une basket en trait (une fiche sans photo, état vide illustré — direction « Atelier »).
+const Silhouette = () => (
+  <svg className="vrm-fp-silhouette" viewBox="0 0 64 40" width="64" height="40" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 30c0-3 1-6 3-8l9-10c1-1 3-1 4 0l3 3c2 2 5 3 8 3h4c4 0 8 2 11 5l7 5c4 2 7 3 7 6v2H4z"/><path d="M4 33h60M18 14l3 4M23 12l3 4M28 14l2 3"/>
+  </svg>
+);
+// GLISSER POUR FERMER (au doigt) : en haut de la fiche, tirer vers le bas la suit ; relâchée assez loin
+// (ou vite), elle se ferme — sinon elle revient, en ressort court. Jamais pendant une saisie, jamais un
+// défilement horizontal (raccourcis), jamais quand la fiche est défilée (le doigt défile d'abord).
+function useGlisserPourFermer(racine, cadre, fermer) {
+  const f = React.useRef(fermer); f.current = fermer;
+  React.useEffect(() => {
+    const el = racine.current; if (!el) return undefined;
+    let g = null;
+    const debut = (e) => {
+      g = null;
+      if (!e.touches || e.touches.length !== 1 || el.scrollTop > 0) return;
+      const t = e.target;
+      if (t && t.closest && t.closest('input,textarea,select,[contenteditable="true"],.vrm-fp-raccourcis,[data-noglisse],[role="dialog"]:not(.vrm-fp)')) return;
+      g = { y0: e.touches[0].clientY, x0: e.touches[0].clientX, t0: Date.now(), dy: 0, actif: false };
+    };
+    const bouge = (e) => {
+      if (!g || !e.touches || !e.touches[0]) return;
+      const dy = e.touches[0].clientY - g.y0, dx = e.touches[0].clientX - g.x0;
+      if (!g.actif) {
+        if (dy > 10 && dy > Math.abs(dx) * 1.5 && el.scrollTop <= 0) { g.actif = true; g.t0 = Date.now(); }
+        else if (Math.abs(dx) > 10 || dy < -6) { g = null; return; }
+        else return;
+      }
+      g.dy = Math.max(0, dy);
+      const c = cadre.current; if (c) { c.style.transition = 'none'; c.style.transform = `translateY(${Math.round(g.dy)}px)`; }
+      el.setAttribute('data-fiche-glisse', String(Math.round(g.dy)));
+    };
+    const finir = () => {
+      if (!g) return;
+      const v = g.dy / Math.max(1, Date.now() - g.t0);
+      const ferme = g.actif && (g.dy > 120 || (g.dy > 48 && v > 0.6));
+      g = null; el.removeAttribute('data-fiche-glisse');
+      const c = cadre.current;
+      if (ferme) { f.current(); return; }
+      if (c) { c.style.transition = 'transform var(--d-m-ressort, 320ms) var(--d-ressort, cubic-bezier(.32,.72,0,1))'; c.style.transform = ''; }
+    };
+    el.addEventListener('touchstart', debut, { passive: true });
+    el.addEventListener('touchmove', bouge, { passive: true });
+    el.addEventListener('touchend', finir);
+    el.addEventListener('touchcancel', finir);
+    return () => { el.removeEventListener('touchstart', debut); el.removeEventListener('touchmove', bouge); el.removeEventListener('touchend', finir); el.removeEventListener('touchcancel', finir); };
+  }, [racine, cadre]);
+}
 
 const ICONE = { achat: 'bag', numero: 'pencil', stock: 'home', annonces: 'vitrine', prix: 'tag', offres: 'chat', favoris: 'heart', vente: 'cash', colis: 'box', argent: 'euro', retour: 'restore', benefice: 'chart' };
 // (9 nov.) « Ouvrir » : l'écran d'où vient l'étape (`source`, posée par
@@ -109,35 +163,95 @@ const dateCourte = (iso) => {
   return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', ...(d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) });
 };
 
-export default function FichePaire({ owner = '', p, etat = null, histoNum = null, lecture = false, num, onFermer, onRetour, onBordereau, onEmballer, onPrix, onPrixAchat = null, onDupliquer, onPublierAilleurs, onSource, neuve = null, onCopier, Photo, Icon, Retour, note = null }) {
+export default function FichePaire({ owner = '', p, etat = null, histoNum = null, lecture = false, num, onFermer, onRetour, onBordereau, onEmballer, onPrix, onPrixAchat = null, onDupliquer, onPublierAilleurs, onSource, neuve = null, onCopier, Photo, Icon, Retour, note = null, ligne = null, ligneRes = null, onChoisirNum = null }) {
   React.useEffect(() => {
     const k = (e) => { if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); onFermer(); } };
     window.addEventListener('keydown', k, true);
     return () => window.removeEventListener('keydown', k, true);
   }, [onFermer]);
+  const racine = React.useRef(null), cadre = React.useRef(null);
+  useGlisserPourFermer(racine, cadre, onFermer);
+  // (14 nov., proposition 62) Les deux places où la LIGNE touchée range ses gestes (src/DansFiche.jsx) :
+  // « contexte » (en haut : la vente elle-même) et « actions » (au pouce, sous la carte héros).
+  const slotCtx = React.useCallback((el) => poserSlot('contexte', el), []);
+  const slotAct = React.useCallback((el) => poserSlot('actions', el), []);
   if (typeof document === 'undefined') return null;
   const I = (n, s = 18) => (Icon ? <Icon name={n} size={s}/> : null);
   const r = p && p.resume;
+  const depuis = ligne && ligne.cle ? ligne : null;
+  const ctx = depuis ? depuis.contexte : '';
   // (13 nov., point 14) « Saisir le prix d'achat » : seulement sur une fiche connue (l'écriture va sur ELLE).
   const saisir = p && onPrixAchat && p.idFiche && !p.ancienNumero && r && r.achat == null ? () => onPrixAchat(p) : null;
   const sv = r && r.siVendue ? r.siVendue : null;
-  const corps = !p ? (
-    <p className="vrm-fp-vide" data-fiche-vide="">{lecture ? `Je lis l’histoire de ${motsVendeur().ce}…` : `Le N°${num} n’est pas un numéro.`}</p>
-  ) : (
-    <>
-      <div className="vrm-fp-entete">
-        <span className={'vrm-fp-num' + (p.double ? ' is-double' : '')} data-fiche-grand-num="">{p.num}</span>
-        <span className="vrm-fp-quoi">
-          <span className="vrm-fp-titre">{motsInsecables((neuve && neuve.titre) || p.titre || (p.etat === 'rien' ? 'N° jamais servi' : 'Sans titre'))}{(neuve && neuve.taille) || p.taille ? ` · ${(neuve && neuve.taille) || p.taille}` : ''}</span>
-          {neuve ? <span className="vrm-fp-sous" data-fiche-neuve="">Photos à prendre</span> : null}
-          {p.ancienNumero ? <span className="vrm-fp-sous">Ancien numéro (d’avant la remise à zéro)</span> : null}
-        </span>
-        {p.photo && Photo ? <span className="vrm-fp-photo">{Photo(p.photo)}</span> : null}
+  // ⚠️ §5 : deux paires PRÉSENTES sous ce N° — la fiche le dit en rouge et NE CHOISIT PAS : aucun
+  // chiffre d'une des deux (achat, bénéfice, état) n'est montré comme celui « de la paire ».
+  const double = !!(p && p.double);
+  // LA CARTE HÉROS (direction « Atelier ») : la photo (celle de la paire lue par identité, sinon celle de la
+  // LIGNE touchée), le N° en affiche, le titre, le prix à l'encre. Une ligne sans paire : « Sans N° ».
+  const photoHeros = (p && p.photo) || (depuis && depuis.photo) || '';
+  const prixHeros = (depuis && depuis.prix) || (!double && sv && sv.prix != null ? eur(sv.prix) : !double && r && r.vente != null ? eur(r.vente) : '');
+  const titreHeros = p ? ((neuve && neuve.titre) || p.titre || (p.etat === 'rien' ? 'N° jamais servi' : 'Sans titre')) : ((depuis && depuis.titre) || tr('fiche.sansTitre'));
+  const tailleHeros = p ? ((neuve && neuve.taille) || p.taille || '') : '';
+  const sousHeros = [ctx ? tr(CLE_CTX[ctx] || 'fiche.ctx.vente') : '', depuis && depuis.sous ? depuis.sous : ''].filter(Boolean).join(' · ');
+  const heros = (p || depuis) ? (
+    <section className={'vrm-fp-heros vrm-fp-entete' + (photoHeros ? '' : ' is-sans-photo')} data-fiche-heros={ctx || 'numero'} aria-label={tr('fiche.heros')}>
+      <span className="vrm-fp-heros-photo vrm-fp-photo" data-fiche-heros-photo={photoHeros ? '1' : '0'}>{photoHeros && Photo ? Photo(photoHeros) : <Silhouette/>}</span>
+      <span className="vrm-fp-quoi">
+        {sousHeros ? <span className="vrm-fp-heros-ctx" data-fiche-heros-ctx="">{sousHeros}</span> : null}
+        {p ? <span className={'vrm-fp-num' + (double ? ' is-double' : '')} data-fiche-grand-num="">{p.num}</span>
+          : <span className="vrm-fp-num is-sans" data-fiche-grand-num="" data-fiche-sans-num="">{ligneRes && ligneRes.etat === 'lot' ? tr('fiche.lotN', { n: String(ligneRes.nums.length) }) : tr('fiche.sansNum')}</span>}
+        <span className="vrm-fp-titre">{motsInsecables(titreHeros)}{tailleHeros ? ` · ${tailleHeros}` : ''}</span>
+        {neuve ? <span className="vrm-fp-sous" data-fiche-neuve="">Photos à prendre</span> : null}
+        {p && p.ancienNumero ? <span className="vrm-fp-sous">Ancien numéro (d’avant la remise à zéro)</span> : null}
+        {prixHeros ? <span className="vrm-fp-heros-prix" data-fiche-heros-prix={prixHeros}>{prixHeros}</span> : null}
+      </span>
+    </section>
+  ) : null;
+  // La fiche de la LIGNE seule (aucune paire désignée par identité) : jamais une paire devinée.
+  const sansPaire = !p && depuis ? (
+    <section className="vrm-fp-sans-paire" data-fiche-sans-paire={ligneRes ? ligneRes.etat : 'aucun'} role="note">
+      {ligneRes && ligneRes.etat === 'lot' ? <>
+        <p className="vrm-fp-sans-paire-t">{tr('fiche.lotTitre', { n: String(ligneRes.nums.length) })}</p>
+        <div className="vrm-fp-lot" data-fiche-lot={ligneRes.nums.join(',')}>
+          {ligneRes.nums.map((n) => <button key={n} type="button" className="vrm-fp-b" data-fiche-lot-num={n} onClick={() => onChoisirNum && onChoisirNum(n)}>N°{n}</button>)}
+        </div>
+      </> : ligneRes && ligneRes.etat === 'lecture' ? <p className="vrm-fp-sans-paire-t" data-fiche-lecture="">{tr('fiche.lecture')}</p>
+        : ligneRes && ligneRes.etat === 'passu' ? <p className="vrm-fp-sans-paire-t">— {tr('fiche.passu')}</p>
+        : <>
+          <p className="vrm-fp-sans-paire-t">{tr('fiche.pasDePaire')}</p>
+          <p className="vrm-fp-sans-paire-g" data-fiche-geste-relier="">{tr('fiche.gesteRelier.' + (ctx === 'achat' ? 'achat' : ctx === 'annonce' ? 'annonce' : 'vente'))}</p>
+        </>}
+    </section>
+  ) : null;
+  // Les gestes de la fiche elle-même ; ouverte depuis une ligne, ils rejoignent ceux de la ligne dans « Actions ».
+  const outils = p && (onPrix || onDupliquer || onPublierAilleurs) && !p.ancienNumero ? (<>
+    {onPrix && !neuve ? <button type="button" className="vrm-ao-second" data-fiche-prix="" onClick={() => onPrix(p.num)}>Changer le prix</button> : null}
+    {onPublierAilleurs && !neuve && p.etat !== 'rien' ? <button type="button" className="vrm-ao-second" data-fiche-publier-ailleurs="" onClick={() => onPublierAilleurs(p.num)}>Publier ailleurs</button> : null}
+    {onDupliquer && p.etat !== 'rien' ? <button type="button" className="vrm-ao-second" data-fiche-dupliquer="" onClick={() => onDupliquer(p.num)}>Dupliquer</button> : null}
+    {neuve && onCopier ? <button type="button" className="vrm-ao-second" data-fiche-copier="" onClick={() => onCopier(neuve)}>Copier le texte</button> : null}
+  </>) : null;
+  const poster = p && p.aPoster && (onBordereau || onEmballer) ? (
+    <div className="vrm-fp-actions">
+      {onBordereau ? <button type="button" className="vrm-fp-b" data-fiche-bordereau={p.txAPoster} onClick={() => onBordereau(p.txAPoster)}>{I('printer')}Bordereau</button> : null}
+      {onEmballer ? <button type="button" className="vrm-fp-b vrm-fp-b-plein" data-fiche-emballer="" onClick={onEmballer}>{I('box')}Emballer</button> : null}
+    </div>
+  ) : null;
+  const actions = depuis ? (
+    <section className="vrm-fp-actions-sec" data-fiche-actions={ctx} aria-label={tr('fiche.actions')}>
+      <h3 className="vrm-fp-etat-titre">{tr('fiche.actions')}</h3>
+      <div className="vrm-fp-actions-carte">
+        <div className="vrm-fp-actions-ligne" ref={slotAct} data-fiche-actions-ligne=""/>
+        {outils ? <div className="vrm-fp-outils">{outils}</div> : null}
+        {poster}
       </div>
+    </section>
+  ) : null;
+  const histoire = p ? (
+    <>
       {/* (10 nov., lot BD) La note privée de la paire (l'écran la fournit : NotePaireCoque). */}
       {note ? <div className="vrm-fp-note-privee" data-fiche-note="">{note}</div> : null}
-      {p.double ? <p className="vrm-fp-double" role="alert" data-fiche-double="1">Deux {motsVendeur().noms} présent{motsVendeur().e}s portent le N°{p.num} : vérifie là où {motsVendeur().elle}s sont rangé{motsVendeur().e}s avant d’emballer ou d’imprimer.</p> : null}
-      <div className="vrm-fp-tuiles">
+      {double ? <p className="vrm-fp-double" role="alert" data-fiche-double="1" data-fiche-choisit="0">Deux {motsVendeur().noms} présent{motsVendeur().e}s portent le N°{p.num} : vérifie là où {motsVendeur().elle}s sont rangé{motsVendeur().e}s avant d’emballer ou d’imprimer.</p> : null}
+      {double ? null : <div className="vrm-fp-tuiles">
         {/* (5 nov.) Le prix d'achat de « Voir l'état » est CE nombre (jamais écrit deux fois, §7) : sa source dessous. */}
         <div className="vrm-fp-tuile" data-fiche-resume-achat={r.achat == null ? '' : r.achat} {...(etat ? { 'data-etat-ligne': 'prix-achat', 'data-etat-val': etat.prixAchat.cents == null ? '' : etat.prixAchat.cents, 'data-etat-source': etat.prixAchat.source || '' } : {})}>
           <span>Achat</span><b className={r.achat == null ? 'is-vide' : undefined}>{eur(r.achat)}</b>
@@ -162,16 +276,9 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
             {r.benefice == null && r.raisonBenef ? <small data-fiche-raison-benef="">{r.raisonBenef}</small> : r.benefPartiel ? <small>frais pas tous confirmés</small> : null}
           </div>
         </>)}
-      </div>
-      {etat ? <EtatArticle etat={etat}/> : null}
-      {(onPrix || onDupliquer || onPublierAilleurs) && !p.ancienNumero ? (
-        <div className="vrm-fp-outils">
-          {onPrix && !neuve ? <button type="button" className="vrm-ao-second" data-fiche-prix="" onClick={() => onPrix(p.num)}>Changer le prix</button> : null}
-          {onPublierAilleurs && !neuve && p.etat !== 'rien' ? <button type="button" className="vrm-ao-second" data-fiche-publier-ailleurs="" onClick={() => onPublierAilleurs(p.num)}>Publier ailleurs</button> : null}
-          {onDupliquer && p.etat !== 'rien' ? <button type="button" className="vrm-ao-second" data-fiche-dupliquer="" onClick={() => onDupliquer(p.num)}>Dupliquer</button> : null}
-          {neuve && onCopier ? <button type="button" className="vrm-ao-second" data-fiche-copier="" onClick={() => onCopier(neuve)}>Copier le texte</button> : null}
-        </div>
-      ) : null}
+      </div>}
+      {etat && !double ? <EtatArticle etat={etat}/> : null}
+      {!depuis && outils ? <div className="vrm-fp-outils">{outils}</div> : null}
       <nav className="vrm-fp-raccourcis" aria-label="Rubriques de cet article">{p.etapes.map(e=><button key={e.cle} type="button" onClick={()=>document.getElementById(`vrm-fiche-etape-${e.cle}`)?.scrollIntoView({block:'start',behavior:window.matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'})}>{e.titre}</button>)}</nav>
       {histoNum ? <HistoireNumero h={histoNum}/> : null}
       <HistoriqueModifications owner={owner} numero={p.num}/>
@@ -192,23 +299,28 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
       </ol>
       {lecture ? <p className="vrm-fp-note" data-fiche-lecture="">Lecture en cours…</p>
         : p.manques.length ? <p className="vrm-fp-note" data-fiche-manques={p.manques.length}>Pas pu lire : {p.manques.join(', ')}.</p> : null}
-      {p.aPoster && (onBordereau || onEmballer) ? (
-        <div className="vrm-fp-actions">
-          {onBordereau ? <button type="button" className="vrm-fp-b" data-fiche-bordereau={p.txAPoster} onClick={() => onBordereau(p.txAPoster)}>{I('printer')}Bordereau</button> : null}
-          {onEmballer ? <button type="button" className="vrm-fp-b vrm-fp-b-plein" data-fiche-emballer="" onClick={onEmballer}>{I('box')}Emballer</button> : null}
-        </div>
-      ) : null}
+      {!depuis ? poster : null}
     </>
-  );
+  ) : null;
+  const nomFiche = (p && p.num) || num || '';
   return createPortal(
-    <div className="vrm-fp" role="dialog" aria-modal="true" aria-label={`Tout sur le N°${(p && p.num) || num}`} data-fiche-paire={(p && p.num) || num} data-fiche-lecture-en-cours={lecture ? '1' : '0'} data-noswipe="1">
+    <div ref={racine} className={'vrm-fp' + (depuis ? ' is-depuis-ligne' : '')} role="dialog" aria-modal="true" aria-label={nomFiche ? `Tout sur le N°${nomFiche}` : tr('fiche.heros')} data-fiche-paire={nomFiche} data-fiche-contexte-ouvert={ctx || undefined}
+      data-fiche-ligne-cle={depuis ? depuis.cle : undefined} data-fiche-identite={depuis ? (ligneRes ? ligneRes.etat + ':' + (ligneRes.par || '') : '') : 'numero'} data-fiche-lecture-en-cours={lecture ? '1' : '0'} data-noswipe="1">
       {Retour ? <Retour fermer={onFermer}/> : null}
-      <div className="vrm-fp-cadre">
+      <div className="vrm-fp-cadre" ref={cadre}>
+        <span className="vrm-fp-poignee" aria-hidden="true"/>
         <header className="vrm-fp-tete">
-          <button type="button" className="vrm-fp-retour" data-fiche-retour="" onClick={onRetour || onFermer}><svg aria-hidden="true" className="vrm-fp-chevron" viewBox="0 0 24 24" width="22" height="22"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>Tout sur le N°</button>
+          <button type="button" className="vrm-fp-retour" data-fiche-retour="" onClick={onRetour || onFermer}><svg aria-hidden="true" className="vrm-fp-chevron" viewBox="0 0 24 24" width="22" height="22"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>{depuis ? tr('fiche.retour') : 'Tout sur le N°'}</button>
           <button type="button" className="vrm-fp-fermer" aria-label="Fermer la fiche" data-fiche-fermer="" onClick={onFermer}>{I('close', 20) || '×'}</button>
         </header>
-        {corps}
+        {!p && !depuis ? <p className="vrm-fp-vide" data-fiche-vide="">{lecture ? `Je lis l’histoire de ${motsVendeur().ce}…` : `Le N°${num} n’est pas un numéro.`}</p> : null}
+        {heros}
+        {sansPaire}
+        {/* (14 nov., proposition 62) La partie utile au contexte, EN HAUT : la vente touchée (son récapitulatif) ;
+            puis les gestes de la ligne et de la fiche, au pouce ; l'histoire de la paire dessous. */}
+        {depuis ? <section className="vrm-fp-contexte" data-fiche-contexte={ctx} aria-label={tr(CLE_CTX[ctx] || 'fiche.ctx.vente')} ref={slotCtx}/> : null}
+        {actions}
+        {histoire}
       </div>
     </div>, document.body);
 }
