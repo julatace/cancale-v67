@@ -144,6 +144,10 @@ export default {
   "acc.lbc.supprimer.pasSu": "pas de réponse pour le N°{n} : regarde l’annonce sur Leboncoin avant de recliquer",
   "acc.lbc.supprimer.refus": "Leboncoin a refusé pour le N°{n} : l’annonce est toujours en ligne",
 
+  "acc.soldes.remettre.avant": { "one": "{n} prix revient à son prix d’origine, puis VRM le relit.", "other": "{n} prix reviennent à leur prix d’origine, un à la fois, puis VRM les relit." },
+  "acc.soldes.remettre.pas": "Un prix que tu as changé depuis n’est pas touché.",
+  "acc.soldes.remettre.apres": { "one": "{n} prix remis", "other": "{n} prix remis" },
+
   "acc.vacances.avant": "Le mode vacances change sur le compte ouvert dans l’onglet vinted.fr, puis VRM le relit.",
   "acc.vacances.pas": "Tes annonces ne sont pas supprimées ; tes autres comptes ne changent pas.",
   "acc.vacances.apres": "Mode vacances changé et relu",

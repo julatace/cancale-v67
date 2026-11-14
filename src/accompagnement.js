@@ -355,6 +355,7 @@ export const GESTES_ACC = {
   'publier.partout':  { ecran: 'annonces',  sorte: 'publier-partout',       ensuite: { lien: '?tab=annonces' } },
   'publier.ebay':     { ecran: 'ebay',      sorte: 'publier-ebay',          ensuite: { lien: '?tab=plat_ebay' } },
   'lbc.supprimer':    { ecran: 'leboncoin', ensuite: { lien: '?tab=plat_leboncoin' } },
+  'soldes.remettre':  { ecran: 'journee',   ensuite: null },
   'vacances':         { ecran: 'settings',  sorte: 'vacances',              ensuite: { lien: '?tab=settings&reglage=vacances' } },
   'urssaf.declarer':  { ecran: 'compta',    ensuite: { lien: '?tab=argent_declarer' } },
   'facture.pro':      { ecran: 'compta',    ensuite: { lien: '?tab=invoices' } },

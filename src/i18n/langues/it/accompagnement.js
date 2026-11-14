@@ -141,6 +141,10 @@ export default {
   "acc.lbc.supprimer.pasSu": "nessuna risposta per il N°{n}: guarda l’annuncio su Leboncoin prima di ricliccare",
   "acc.lbc.supprimer.refus": "Leboncoin ha rifiutato per il N°{n}: l’annuncio è ancora online",
 
+  "acc.soldes.remettre.avant": { "one": "{n} prezzo torna al prezzo d’origine, poi VRM lo rilegge.", "other": "{n} prezzi tornano al prezzo d’origine, uno alla volta, poi VRM li rilegge." },
+  "acc.soldes.remettre.pas": "Un prezzo che hai cambiato nel frattempo non viene toccato.",
+  "acc.soldes.remettre.apres": { "one": "{n} prezzo ripristinato", "other": "{n} prezzi ripristinati" },
+
   "acc.vacances.avant": "La modalità vacanze cambia sull’account aperto nella scheda vinted.fr, poi VRM la rilegge.",
   "acc.vacances.pas": "I tuoi annunci non vengono eliminati; gli altri account non cambiano.",
   "acc.vacances.apres": "Modalità vacanze cambiata e riletta",

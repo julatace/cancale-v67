@@ -141,6 +141,10 @@ export default {
   "acc.lbc.supprimer.pasSu": "keine Antwort für N°{n}: sieh dir das Angebot auf Leboncoin an, bevor du erneut tippst",
   "acc.lbc.supprimer.refus": "Leboncoin hat für N°{n} abgelehnt: das Angebot ist noch online",
 
+  "acc.soldes.remettre.avant": { "one": "{n} Preis geht auf den Ursprungspreis zurück, dann liest VRM ihn nach.", "other": "{n} Preise gehen auf den Ursprungspreis zurück, einer nach dem anderen, dann liest VRM sie nach." },
+  "acc.soldes.remettre.pas": "Einen Preis, den du seitdem geändert hast, rührt VRM nicht an.",
+  "acc.soldes.remettre.apres": { "one": "{n} Preis zurückgesetzt", "other": "{n} Preise zurückgesetzt" },
+
   "acc.vacances.avant": "Der Urlaubsmodus ändert sich für das Konto im vinted.fr-Tab, dann liest VRM ihn nach.",
   "acc.vacances.pas": "Deine Angebote werden nicht gelöscht; deine anderen Konten ändern sich nicht.",
   "acc.vacances.apres": "Urlaubsmodus geändert und nachgelesen",

@@ -141,6 +141,10 @@ export default {
   "acc.lbc.supprimer.pasSu": "no answer for N°{n}: check the listing on Leboncoin before tapping again",
   "acc.lbc.supprimer.refus": "Leboncoin refused for N°{n}: the listing is still online",
 
+  "acc.soldes.remettre.avant": { "one": "{n} price goes back to its original price, then VRM reads it back.", "other": "{n} prices go back to their original price, one at a time, then VRM reads them back." },
+  "acc.soldes.remettre.pas": "A price you changed since is not touched.",
+  "acc.soldes.remettre.apres": { "one": "{n} price restored", "other": "{n} prices restored" },
+
   "acc.vacances.avant": "Holiday mode changes on the account open in the vinted.fr tab, then VRM reads it back.",
   "acc.vacances.pas": "Your listings are not deleted; your other accounts do not change.",
   "acc.vacances.apres": "Holiday mode changed and read back",
