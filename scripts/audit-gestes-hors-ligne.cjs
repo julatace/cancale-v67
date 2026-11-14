@@ -266,7 +266,11 @@ function texteApp() {
   const sw = fs.readFileSync(path.join(racine, 'public', 'sw.js'), 'utf8').replace(/^\s*\/\/.*$/gm, '');
   const vite = fs.readFileSync(path.join(racine, 'vite.config.js'), 'utf8').replace(/^\s*\/\/.*$/gm, '');
   dit(/writeFileSync\(join\(dir, 'hors-ligne-assets\.json'\)/.test(vite) && /existsSync\(join\(dir, f\)\)/.test(vite) && /plugins: \[[^\]]*listeHorsLigne\(\)/.test(vite), '15. le build publie la liste de ses morceaux');
-  dit(/relireCoquille\(req, cache\)\.then\(\(\) => rechaufferMorceaux\(cache\)\)/.test(sw) && /purgerAncienneVersion\(fresh\.clone\(\)\)\.then\(\(\) => rechaufferMorceaux\(cache\)\)/.test(sw), '15. le service worker range les morceaux, à la 1re ouverture comme aux suivantes');
+  // (14 nov., ouverture instantanée) Le réchauffage peut attendre la fin de l'ouverture (`rechaufferPlusTard`,
+  // qui appelle `rechaufferMorceaux`) : il ne prend plus le réseau aux lectures du démarrage. La règle jugée
+  // reste la même : il part, à la 1re ouverture comme aux suivantes.
+  const rech = /rechaufferPlusTard = \(cache\) => [^\n]*\.then\(\(\) => rechaufferMorceaux\(cache\)\)/.test(sw) ? '(?:Morceaux|PlusTard)' : 'Morceaux';
+  dit(new RegExp('relireCoquille\\(req, cache\\)\\.then\\(\\(\\) => rechauffer' + rech + '\\(cache\\)\\)').test(sw) && new RegExp('purgerAncienneVersion\\(fresh\\.clone\\(\\)\\)\\.then\\(\\(\\) => rechauffer' + rech + '\\(cache\\)\\)').test(sw), '15. le service worker range les morceaux, à la 1re ouverture comme aux suivantes');
   dit(/new Set\(\[\.\.\.noms, \.\.\.\(await nomsGardesHorsLigne\(cache\)\)\]\)/.test(sw), '15. la purge d\'un déploiement garde les morceaux de la liste');
   return ko;
 }

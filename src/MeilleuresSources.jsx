@@ -13,6 +13,7 @@ import { lireMeilleures, classer, CLE_MEILLEURES, EVT_MEILLEURES, euros, jours, 
 import './styles-annonces-outils.css';
 import './styles-sources-achats.css';
 import './styles-meilleures-sources.css';
+import { tr } from './i18n/index.js';
 
 export function useMeilleures(owner) {
   const [v, setV] = useState(() => lireMeilleures(owner));
@@ -85,6 +86,14 @@ function ListeAchats({ s, maintenant }) {
 }
 
 // owner : le compte VRM ; Retour : FermeAuRetour (la feuille se ferme au retour du téléphone).
+// (14 nov., refonte Achats — Julien : « c'est moche », captures à l'appui) LA FORME seulement : le titre HORS de la
+// carte (20/700, comme une section de Réglages) ; la carte = les sources ; chaque source = son nom, son chiffre À
+// L'ENCRE (plus d'accent sur un montant, §7 : le bleu est pour les gestes) et des TUILES (gros chiffre, petit
+// libellé) au lieu de chiffres noyés dans des phrases ; UNE ligne de couverture (§5 : « 45 revendus sur 824
+// achetés … », la même phrase, au même endroit) ; ce qui n'entre dans aucune source en UNE ligne courte, et toutes
+// les explications dans « Comment c'est calculé » (les MÊMES phrases qu'avant, rien de supprimé). Aucun chiffre
+// n'est calculé ici : tout vient de `vrm_meilleures_sources` et de src/meilleuresSources.js.
+const premierePartie = (t) => String(t || '').split(' : ')[0];
 export default function MeilleuresSources({ owner = '', Retour = null, ici = 'argent' }) {
   const r = useMeilleures(owner);
   const [par, setPar] = useState('benefice');
@@ -92,24 +101,35 @@ export default function MeilleuresSources({ owner = '', Retour = null, ici = 'ar
   const maintenant = Date.now();
   const sources = useMemo(() => (r ? classer(r.sources, par) : []), [r, par]);
   const tete = (
-    <div className="vrm-sv-carte-tete vrm-ms-tete">
-      <h2 className="vrm-display vrm-sv-carte-titre">Tes meilleures sources</h2>
+    <div className="vrm-ms-tete">
+      <h2 className="vrm-ms-titre">Tes meilleures sources</h2>
       {r && r.sources.length > 1 ? (
         <div role="group" aria-label="Classer" className="vrm-ms-seg" data-ms-par={par}>
-          <button type="button" aria-pressed={par === 'benefice'} data-ms-classer="benefice" onClick={() => setPar('benefice')}>Bénéfice</button>
-          <button type="button" aria-pressed={par === 'vitesse'} data-ms-classer="vitesse" onClick={() => setPar('vitesse')}>Vitesse</button>
+          <button type="button" aria-pressed={par === 'benefice'} data-ms-classer="benefice" onClick={() => setPar('benefice')}>{tr('achats.ms.benefice')}</button>
+          <button type="button" aria-pressed={par === 'vitesse'} data-ms-classer="vitesse" onClick={() => setPar('vitesse')}>{tr('achats.ms.vitesse')}</button>
         </div>
       ) : null}
     </div>
   );
   let corps;
-  if (!r) corps = <p className="vrm-sa-vide" data-ms-etat="passu">— · ouvre Achats pour les calculer</p>;
-  else if (!r.sources.length) corps = <p className="vrm-sa-vide" data-ms-etat="lu" data-ms-n="0">Aucun achat enregistré pour l’instant.</p>;
+  if (!r) corps = <p className="vrm-sa-vide vrm-ms-surface" data-ms-etat="passu">— · ouvre Achats pour les calculer</p>;
+  else if (!r.sources.length) corps = <p className="vrm-sa-vide vrm-ms-surface" data-ms-etat="lu" data-ms-n="0">Aucun achat enregistré pour l’instant.</p>;
   else {
     const premier = sources.find((s) => s.cle !== 'non-saisie' && (par === 'vitesse' ? s.delaiMoyen != null : s.benefice != null && s.benefice > 0));
+    const hors = texteHorsSources(r);
+    // Une tuile : le gros chiffre, le libellé dessous. « — » reste « — » (pas su ≠ 0, §5).
+    // « au moins 300 € » : « au moins » en petit AU-DESSUS du chiffre (les mêmes mots ; le chiffre tient dans sa tuile).
+    // (AJOUT 3 : jamais une case pour « — ») Une tuile sans valeur n'est pas dessinée : le « — » de la source le dit
+    // déjà sur sa ligne, et « Comment c'est calculé » dit pourquoi.
+    const tuile = (cle, val, lib) => { if (val === '—') return null; const m = /^(au moins|au plus) (.+)$/.exec(val);
+      // L'argent rendu lisible (comme une app de banque) : le nombre en grand, l'unité (€, %, jours) plus petite à côté —
+      // les MÊMES caractères (« 60 500 € »), seule la taille change.
+      const corps = m ? m[2] : val; const u = /^(.*?)(\s(?:€|%|jours?))$/.exec(corps);
+      const chiffre = u ? <>{u[1]}<span className="vrm-ms-unite">{u[2]}</span></> : corps;
+      return <span className="vrm-ms-tuile" data-ms-tuile={cle}><b>{m ? <><span className="vrm-ms-pre">{m[1]} </span>{chiffre}</> : chiffre}</b><small>{lib}</small></span>; };
     corps = (
-      <div className="vrm-ms" data-ms-etat="lu" data-ms-n={sources.length}>
-        <ol className="vrm-ms-lignes">
+      <div className="vrm-ms-corps" data-ms-etat="lu" data-ms-n={sources.length}>
+        <ol className="vrm-ms-lignes vrm-ms-surface">
           {sources.map((s, i) => (
             <li key={s.cle}>
               <button type="button" className="vrm-ms-ligne" data-ms-source={s.cle} data-ms-rang={i + 1} data-ms-tete={premier === s ? '1' : undefined}
@@ -120,26 +140,37 @@ export default function MeilleuresSources({ owner = '', Retour = null, ici = 'ar
                     fin ; un aria-label « source : ouvrir ses achats » taisait les chiffres affichés (WCAG 2.5.3). */}
                 <span className="vrm-ms-nom">{s.libelle}{s.genre ? <span className="vrm-ms-genre"> · {s.genre}</span> : null}</span>
                 <span className="vrm-ms-chiffre">{par === 'vitesse' ? texteDelai(s) : texteBenefice(s)}</span>
-                <span className="vrm-ms-cases">
-                  <span><b>{texteInvesti(s)}</b> investi</span>
-                  <span><b>{texteMarge(s)}</b> marge</span>
-                  {par === 'vitesse' ? <span><b>{texteBenefice(s)}</b> bénéfice</span> : <span><b>{texteDelai(s)}</b> pour revendre</span>}
+                <span className="vrm-ms-chevron" aria-hidden="true">›</span>
+                <span className="vrm-ms-tuiles">
+                  {tuile('investi', texteInvesti(s), tr('achats.ms.investi'))}
+                  {tuile('marge', texteMarge(s), tr('achats.ms.marge'))}
+                  {par === 'vitesse' ? tuile('benefice', texteBenefice(s), tr('achats.ms.benefice')) : tuile('delai', texteDelai(s), tr('achats.ms.pourRevendre'))}
                 </span>
-                <span className="vrm-ms-sur">{texteCouvertureSource(s)}</span>
-                <span className="vrm-ms-sur" data-ms-attente="">{texteAttente(s)}</span>
-                <span className="vrm-sr-seul"> — ouvrir ses achats</span>
+                {/* §5 : la couverture À CÔTÉ des chiffres, en une ligne (la même phrase qu'avant) — « revendus sur
+                    achetés » n'a pas de tuile : le même nombre ne s'écrit qu'une fois (§7). */}
+                <span className="vrm-ms-sur" title={texteCouvertureSource(s)}>{texteCouvertureSource(s)}</span>
+                <span className="vrm-sr-seul"> · {texteAttente(s)} — ouvrir ses achats</span>
               </button>
             </li>
           ))}
         </ol>
-        {texteHorsSources(r).map((t, i) => <p key={i} className="vrm-sa-note" data-ms-hors={i}>{t}</p>)}
-        <p className="vrm-sa-note">Bénéfice et marge : sur les articles revendus et reliés à leur achat · « pas encore revendu » : aucune vente reliée (en stock, ou vendu sans achat relié).</p>
+        {/* Ce qui n'est compté dans AUCUNE source : dit en une ligne courte (le début de la même phrase) ; la phrase
+            entière, et le pourquoi, dans « Comment c'est calculé ». */}
+        {hors.map((t, i) => <p key={i} className="vrm-ms-hors" data-ms-hors={i} title={t}>{premierePartie(t)}</p>)}
+        <details className="vrm-ms-calcul" data-ms-calcul="">
+          <summary>{tr('compta.commentCalcule')}</summary>
+          <ul>
+            {sources.map((s) => <li key={s.cle}><b>{s.libelle}</b> · {texteAttente(s)}</li>)}
+            {hors.map((t, i) => <li key={'h' + i}>{t}</li>)}
+            <li>Bénéfice et marge : sur les articles revendus et reliés à leur achat · « pas encore revendu » : aucune vente reliée (en stock, ou vendu sans achat relié).</li>
+          </ul>
+        </details>
       </div>
     );
   }
   const s = ouverte ? (r && r.sources.find((x) => x.cle === ouverte)) : null;
   return (
-    <section className="vrm-sv-carte vrm-ms-carte" data-stats-carte="meilleures-sources" data-ms-ici={ici}>
+    <section className="vrm-ms-carte" data-stats-carte="meilleures-sources" data-ms-ici={ici}>
       {tete}{corps}
       {s ? <Feuille titre={s.libelle} Retour={Retour} onFermer={() => setOuverte('')}><ListeAchats s={s} maintenant={maintenant}/></Feuille> : null}
     </section>

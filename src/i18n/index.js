@@ -68,7 +68,39 @@ export function langueChoisie(stockage = (typeof localStorage !== 'undefined' ? 
   try { v = JSON.parse(v); } catch (_) {}
   return estLangue(v) ? v : null;
 }
-export const langueInitiale = () => langueChoisie() || langueDuNavigateur();
+// ── (14 nov., accueil des nouveaux, n° 141) LA LANGUE DU TOUT PREMIER LANCEMENT ──
+// La langue du téléphone (`navigator.languages`) n'est lue qu'UNE fois, au tout premier
+// lancement sur cet appareil, et SEULEMENT si aucune langue n'a été choisie. Elle est
+// notée à part (`vrm_langue_detectee`, sur l'appareil, jamais synchronisée) : elle
+// n'écrit JAMAIS `vrm_langue` — le choix explicite (Paramètres → Langue, le sélecteur de
+// l'accueil, ou un autre appareil par le nuage) gagne toujours, et une détection ne
+// peut pas écraser, par le nuage, le choix fait ailleurs. Hors des cinq ⇒ français.
+export const CLE_LANGUE_DETECTEE = 'vrm_langue_detectee';
+export function langueDetectee(stockage = (typeof localStorage !== 'undefined' ? localStorage : null)) {
+  let v = null;
+  try { v = stockage && stockage.getItem(CLE_LANGUE_DETECTEE); } catch (_) { return null; }
+  if (v == null) return null;
+  try { v = JSON.parse(v); } catch (_) { return null; }
+  return v && typeof v === 'object' && estLangue(v.l) ? { l: v.l, at: typeof v.at === 'string' ? v.at : null, vu: v.vu === true } : null;
+}
+// Rend { langue, source } — source : 'choix' (explicite) · 'detectee' (notée à un lancement
+// d'avant) · 'premier' (lue à l'instant, et notée). Ne touche jamais `vrm_langue`.
+export function langueDepart(stockage = (typeof localStorage !== 'undefined' ? localStorage : null), nav = (typeof navigator !== 'undefined' ? navigator : null), at = new Date().toISOString()) {
+  const c = langueChoisie(stockage);
+  if (c) return { langue: c, source: 'choix' };
+  const d = langueDetectee(stockage);
+  if (d) return { langue: d.l, source: 'detectee' };
+  const l = langueDuNavigateur(nav);
+  try { if (stockage) stockage.setItem(CLE_LANGUE_DETECTEE, JSON.stringify({ l, at })); } catch (_) {}
+  return { langue: l, source: 'premier' };
+}
+// L'avis « VRM est en … (la langue de ton téléphone) » a été vu : noté sur l'appareil.
+export function noterLangueDetecteeVue(stockage = (typeof localStorage !== 'undefined' ? localStorage : null)) {
+  const d = langueDetectee(stockage);
+  if (!d || d.vu) return false;
+  try { stockage.setItem(CLE_LANGUE_DETECTEE, JSON.stringify({ ...d, vu: true })); return true; } catch (_) { return false; }
+}
+export const langueInitiale = () => langueDepart().langue;
 
 function emettre() {
   try { if (typeof document !== 'undefined') document.documentElement.lang = langue; } catch (_) {}
@@ -81,6 +113,7 @@ export async function chargerLangue(l) {
   if (!CHARGEURS[l]) return null;
   const m = await CHARGEURS[l]();
   charges[l] = (m && m.default) || null;
+  if (charges[l] && enAttenteTextes[l]) { for (const [k, v] of Object.entries(enAttenteTextes[l])) if (charges[l][k] == null) charges[l][k] = v; delete enAttenteTextes[l]; }
   return charges[l];
 }
 // Pose une langue (chargée d'abord : jamais une moitié d'écran dans l'autre langue).
@@ -150,6 +183,20 @@ export function t(cle, vars) {
   if (e == null) return cle;
   if (typeof e === 'object') e = choisirPluriel(e, vars && (vars.n != null ? vars.n : vars.count));
   return remplir(e, vars);
+}
+// (14 nov., n° 144) Des textes chargés AVEC un morceau à part (la page des tarifs) :
+// `ajouterTextes({ fr: {...}, en: {...} })`. Le français rejoint la source ; une langue
+// pas encore chargée les reçoit à son chargement. Rien n'écrase une clé déjà là.
+const enAttenteTextes = {};
+export function ajouterTextes(parLangue) {
+  if (!parLangue || typeof parLangue !== 'object') return;
+  for (const [l, d] of Object.entries(parLangue)) {
+    if (!estLangue(l) || !d || typeof d !== 'object') continue;
+    const cible = charges[l];
+    if (cible) { for (const k of Object.keys(d)) if (cible[k] == null) cible[k] = d[k]; }
+    else enAttenteTextes[l] = { ...(enAttenteTextes[l] || {}), ...d };
+  }
+  emettre();
 }
 // Une clé existe-t-elle (dans la langue ou en français) ?
 export const aCle = (cle) => dict[cle] != null || fr[cle] != null;

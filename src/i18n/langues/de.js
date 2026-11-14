@@ -1,5 +1,6 @@
 // DEUTSCH — Übersetzung von fr.js (der Quelle). Gleiche Schlüssel, gleiche {Variablen}.
 import ecran_journee from './de/journee.js';
+import ecran_confort from './de/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_ventes from './de/ventes.js';
 import ecran_commun from './de/commun.js';
 import ecran_achats from './de/achats.js';
@@ -10,11 +11,23 @@ import ecran_emails from './de/emails.js';
 import ecran_stats from './de/stats.js';
 import ecran_compta from './de/compta.js';
 import ecran_listes from './de/listes.js';
+import ecran_fiche from './de/fiche.js';
+import ecran_tarifs from './de/tarifs.js';
+import ecran_nouveaux from './de/nouveaux.js';
 import ecran_argent from './de/argent.js';
+import ecran_colisplus from './de/colisplus.js';   // (14 nov., lot colis-plus)
+import ecran_fraiscarte from './de/fraiscarte.js';   // (14 nov., frais-carte)
+import ecran_atelier from './de/atelier.js';
 export default {
   ...ecran_listes,
+  ...ecran_fiche,
+  ...ecran_fraiscarte,
+  ...ecran_tarifs,
+  ...ecran_nouveaux,
+  ...ecran_atelier,
   ...ecran_compta,
   ...ecran_argent,
+  ...ecran_colisplus,
   ...ecran_stats,
   ...ecran_emails,
   ...ecran_messages,
@@ -2169,4 +2182,9 @@ export default {
   "rh.vuesPasSu": "Aufrufe —",
   "rh.vendue": "verkauft",
   "rh.enLigne": "online",
+  "instantane.geste.horsLigne": "Offline",
+  "instantane.geste.panne": "Nicht neu geladen",
+  "instantane.arret.horsLigne": "Offline: Diese Zahlen stammen von deinem letzten Besuch. Sie werden neu geladen, sobald das Netz zurück ist.",
+  "instantane.arret.panne": "Nicht neu geladen: Die Datenbank antwortet nicht. Diese Zahlen stammen von deinem letzten Besuch.",
+  ...ecran_confort,
 };

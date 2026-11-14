@@ -56,7 +56,10 @@ const STATUTS_A = ['Commande finalisée', 'Colis déposé en bureau de Poste ou 
 // `ventes` (12 nov., lot vert-vitesse) : le NOMBRE total de ventes voulu (ex. 20 000, un gros vendeur) — les
 //    ventes en plus sont de vieilles ventes finalisées, dans la ligne `orders_sold` seulement (pas de
 //    transaction ni d'e-mail : c'est le CALCUL des écrans qu'on mesure, pas le réseau). Défaut : la base d'avant.
-function fabriquer({ comptes = 7, volumeReel = false, qr = false, ventes = 0 } = {}) {
+// `achats` / `annonces` (14 nov., ouverture instantanée) : le NOMBRE total d'achats et d'annonces voulu
+//    (ex. 2 500 et 1 000) — en plus, de vieux achats finalisés et des annonces (60 % fermées), réparties par
+//    compte. Défaut : la base d'avant.
+function fabriquer({ comptes = 7, volumeReel = false, qr = false, ventes = 0, achats: achatsVoulus = 0, annonces = 0 } = {}) {
   graine = 42;
   const accounts = [], rows = [], detailsReels = [];
   const numeros = {};
@@ -77,6 +80,15 @@ function fabriquer({ comptes = 7, volumeReel = false, qr = false, ventes = 0 } =
         photo: { url: `https://images1.vinted.net/t/${id}/f800/p.jpeg?s=abc`, high_resolution: { timestamp: Math.floor((NOW - (i + 1) * 2 * J) / 1000) } },
         _pad: pad(300) });
       if (i < 12) numeros[id] = { num: String(num++), numberedAt: iso((i + 1) * 2 * J) };
+    }
+    const annoncesEnPlus = annonces > 0 ? Math.max(0, Math.ceil(annonces / comptes) - items.length) : 0;
+    for (let i = 0; i < annoncesEnPlus; i++) {
+      const id = item++; const ouverte = i % 5 < 2;
+      items.push({ id, title: `${MARQUES[i % 6]} ${MODELES[(i + a + 3) % 8]} taille ${36 + (i % 10)}`, brand_title: MARQUES[i % 6], size_title: String(36 + (i % 10)), status: 'Très bon état',
+        price: { amount: String(30 + (i * 7) % 90) + '.0', currency_code: 'EUR' }, is_closed: !ouverte, is_hidden: false, is_draft: false,
+        favourite_count: i % 5, view_count: 10 + i, created_at_ts: iso((i + 40) * J),
+        photo: { url: `https://images1.vinted.net/t/${id}/f800/p.jpeg?s=abc`, high_resolution: { timestamp: Math.floor((NOW - (i + 40) * J) / 1000) } } });
+      if (ouverte) numeros[id] = { num: String(num++), numberedAt: iso((i + 40) * J) };
     }
     rows.push({ id: `harvest_${uid}_listings`, data: { capturedAt: frais(60000), nItems: items.length, payload: { items, pagination: { total_entries: items.length } } } });
     // Ventes (~60) avec leur transaction ; achats (~80).
@@ -113,6 +125,8 @@ function fabriquer({ comptes = 7, volumeReel = false, qr = false, ventes = 0 } =
     }
     const achats = [];
     for (let i = 0; i < 80; i++) achats.push({ transaction_id: tx++, conversation_id: conv++, title: `${MARQUES[i % 6]} achat ${i}`, price: { amount: '21.0', currency_code: 'EUR' }, status: STATUTS_A[i % 4], date: iso(i * J), _pad: pad(volumeReel ? 900 : 200) });
+    const achatsEnPlus = achatsVoulus > 0 ? Math.max(0, Math.ceil(achatsVoulus / comptes) - achats.length) : 0;
+    for (let i = 0; i < achatsEnPlus; i++) achats.push({ transaction_id: tx++, conversation_id: conv++, title: `${MARQUES[i % 6]} vieil achat ${i}`, price: { amount: String(15 + (i * 3) % 40) + '.0', currency_code: 'EUR' }, status: 'Commande finalisée', date: iso((80 + i * 0.2) * J), transaction_user_status: 'completed' });
     rows.push({ id: `harvest_${uid}_orders_purchased`, data: { capturedAt: frais(120000), nItems: achats.length, payload: { my_orders: achats } } });
     if (volumeReel) {
       // La ligne `orders_bought` (bug de capture : elle porte des VENTES) — jamais lue.

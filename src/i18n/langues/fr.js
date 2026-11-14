@@ -5,6 +5,7 @@
 // sans `other`. Clés : `<écran>.<élément>[.<précision>]`, jamais le texte lui-même.
 // Pluriel : { one: '…', other: '…' } choisi par `n` (Intl.PluralRules).
 import ecran_journee from './fr/journee.js';
+import ecran_confort from './fr/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_ventes from './fr/ventes.js';
 import ecran_commun from './fr/commun.js';
 import ecran_achats from './fr/achats.js';
@@ -15,11 +16,23 @@ import ecran_emails from './fr/emails.js';
 import ecran_stats from './fr/stats.js';
 import ecran_compta from './fr/compta.js';
 import ecran_listes from './fr/listes.js';
+import ecran_fiche from './fr/fiche.js';
+import ecran_tarifs from './fr/tarifs.js';
+import ecran_nouveaux from './fr/nouveaux.js';
 import ecran_argent from './fr/argent.js';
+import ecran_colisplus from './fr/colisplus.js';   // (14 nov., lot colis-plus)
+import ecran_fraiscarte from './fr/fraiscarte.js';   // (14 nov., frais-carte)
+import ecran_atelier from './fr/atelier.js';
 export default {
   ...ecran_listes,
+  ...ecran_fiche,
+  ...ecran_fraiscarte,
+  ...ecran_tarifs,
+  ...ecran_nouveaux,
+  ...ecran_atelier,
   ...ecran_compta,
   ...ecran_argent,
+  ...ecran_colisplus,
   ...ecran_stats,
   ...ecran_emails,
   ...ecran_messages,
@@ -2174,4 +2187,9 @@ export default {
   "rh.vuesPasSu": "vues —",
   "rh.vendue": "vendue",
   "rh.enLigne": "en ligne",
+  "instantane.geste.horsLigne": "Hors ligne",
+  "instantane.geste.panne": "Pas relu",
+  "instantane.arret.horsLigne": "Hors ligne : ces chiffres sont ceux de ta dernière visite. Ils seront relus au retour du réseau.",
+  "instantane.arret.panne": "Pas relu : la base ne répond pas. Ces chiffres sont ceux de ta dernière visite.",
+  ...ecran_confort,
 };

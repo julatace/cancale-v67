@@ -1,7 +1,7 @@
 // (6 nov.) LE MODE EXEMPLE s'installe EN PREMIER, avant tout module de l'app : s'il
 // est demandé par cet onglet, le stockage et la base deviennent des copies en
 // mémoire (src/modeExemple.js) — rien de l'exemple n'est écrit nulle part.
-import './modeExemple.js';
+import { exempleActif } from './modeExemple.js';
 // (8 nov.) Les 30 dernières requêtes de la page (famille, code, durée — jamais une
 // adresse ni un contenu), pour « Signaler un problème » (src/lecturesRecentes.js).
 import { installerJournalLectures } from './lecturesRecentes.js';
@@ -60,7 +60,15 @@ if (typeof window !== 'undefined') {
     // c'est rattrapé par le rechargement. Dans la minute, l'erreur repart telle quelle
     // (vraie panne de réseau) et `noterPlantage` la compte à part elle aussi.
     compterMorceauPerime(ev && ev.payload);
-    ev.preventDefault();
+    // ⚠️ (14 nov., fiabilité prod) JAMAIS `ev.preventDefault()` ici. Vite (son
+    // `preload`) rend alors `undefined` À LA PLACE DU MODULE (`baseModule().catch(
+    // handlePreloadError)`) : `React.lazy` lit `undefined.default`, et
+    // `import(…).then((m) => ({ default: m.FactureVente }))` lève « undefined is not
+    // an object (evaluating 'e.FactureVente') » — un VRAI plantage noté, alerte
+    // « Un écran est tombé » au propriétaire (mesuré dans la base : 64 écrans tombés
+    // du 10 au 12 nov., dont 60 d'un coup sur Ventes, iOS Safari). Sans lui, l'import
+    // est REJETÉ avec sa vraie raison (« Failed to fetch dynamically imported
+    // module… », compté à part par src/plantages.js) et la page se recharge quand même.
     window.location.reload();
   });
 }
@@ -83,6 +91,10 @@ const App = React.lazy(() => import('./App.jsx'));
 // Le film de la page d'accueil (`?film`, export MP4) est un morceau à part : un
 // visiteur de la page ne le télécharge jamais, et `?film` ne charge pas l'app.
 const Film = React.lazy(() => import('./AccueilFilm.jsx'));
+// (14 nov., n° 144) vrm.center/tarifs : la page publique des tarifs, un morceau à part
+// (ni l'app ni l'accueil ne le téléchargent), ses textes avec lui (src/tarifs/Tarifs.jsx).
+const Tarifs = React.lazy(() => import('./tarifs/Tarifs.jsx'));
+const pageTarifs = () => /^\/tarifs\/?$/.test(window.location.pathname || '');
 // Les polices : celle du SYSTÈME (SF Pro sur iPhone et Mac, styles-vitrine.css), aucune
 // police téléchargée. (5 nov., chantier A) Inter et Space Grotesk, hébergées ici depuis
 // le 30 sept. pour ne plus appeler Google Fonts, n'étaient plus dessinées nulle part
@@ -154,9 +166,35 @@ const veutLApp = () => {
 };
 const versApp = () => aUneSession() || veutLApp();
 const filmDemande = /[?&]film(=|&|$)/.test(window.location.search || '');
+// (14 nov., ouverture instantanée) LES DERNIERS CHIFFRES DE MA JOURNÉE, PEINTS AVANT L'APP.
+// src/ouvertureInstantanee.js décide (rien que ce que la porte hors ligne laisserait voir, pour CE
+// compte, sur CET appareil) ; src/OuvertureInstantanee.jsx peint l'instantané dans l'écran de
+// démarrage. L'app (5 Mo à analyser et exécuter : une longue tâche) ne part qu'APRÈS cette image.
+// Aucun instantané ⇒ rien ne change (l'app part tout de suite, comme avant).
+// Ici, seulement le PREMIER tri (une session, et un instantané rangé pour son uid) : la décision et
+// ses règles vivent dans le morceau à part (rien de plus à télécharger pour la page d'accueil).
+const apercuPossible = (() => {
+  try {
+    if (filmDemande || pageTarifs() || exempleActif()) return false;
+    const s = JSON.parse(window.localStorage.getItem('vrm_session') || 'null');
+    const uid = s && s.user && typeof s.user.id === 'string' ? s.user.id : '';
+    // Les traces que la décision exigera (src/ouvertureInstantanee.js) : sans l'une d'elles, aucun morceau
+    // n'est demandé et l'app part tout de suite, exactement comme avant (aucun délai pour un « non »).
+    const q = window.location.search || '';
+    const tab = /[?&]tab=([^&]*)/.exec(q);
+    if (tab && tab[1] !== 'journee') return false;
+    const ls = window.localStorage;
+    return !!uid && ['vrm_journee_instantane:', 'vrm_porte_ok_', 'vrm_abo_dernier_', 'vrm_equipe_cache_'].every((p) => !!ls.getItem(p + uid));
+  } catch (_) { return false; }
+})();
+const apercuPeint = apercuPossible
+  ? import('./OuvertureInstantanee.jsx').then((m) => m.ouvrirAvecInstantane({ stock: window.localStorage, search: window.location.search || '' })).catch(() => false)
+  : Promise.resolve(false);
 // Une session existe : on lance le téléchargement de l'app TOUT DE SUITE, avant
-// même le premier rendu, pour ne pas ajouter un aller-retour à son ouverture.
-if (!filmDemande && versApp()) { try { import('./App.jsx'); } catch (_) {} }
+// même le premier rendu, pour ne pas ajouter un aller-retour à son ouverture
+// (après l'instantané quand il y en a un : le fichier est déjà préchargé par
+// public/demarrage-app.js, seule son exécution attend la peinture).
+if (!filmDemande && versApp()) { if (apercuPossible) apercuPeint.then(() => { try { import('./App.jsx'); } catch (_) {} }); else { try { import('./App.jsx'); } catch (_) {} } }
 
 const FondApp = DemarrageVRM;
 function Racine() {
@@ -168,6 +206,7 @@ function Racine() {
     return () => window.removeEventListener('popstate', f);
   }, []);
   if (filmDemande) return <React.Suspense fallback={<FondApp />}><Film /></React.Suspense>;
+  if (pageTarifs()) return <React.Suspense fallback={<FondApp />}><Tarifs /></React.Suspense>;
   if (vue === 'accueil') {
     return <Accueil onEntrer={(mode) => {
       try { window.history.pushState({}, '', mode === 'up' ? '/?inscription' : '/?connexion'); } catch (_) {}
@@ -186,7 +225,8 @@ const monter = () => ReactDOM.createRoot(document.getElementById('root')).render
   <React.StrictMode><DernierFilet><Racine /></DernierFilet></React.StrictMode>
 );
 // Français (la source) : aucune attente. Une autre langue : son morceau d'abord, 2 s au plus.
-preparerLangue().then(monter, monter);
+// (14 nov.) Et l'instantané d'abord peint, s'il y en a un (1,5 s au plus, src/OuvertureInstantanee.jsx).
+Promise.all([preparerLangue().catch(() => {}), apercuPeint]).then(monter, monter);
 // (6 nov.) L'écran de démarrage d'index.html part quand la page montre autre chose
 // qu'une attente (src/demarrage.js) — l'écran d'ouverture prêt, l'accueil, la connexion.
 suivreDemarrage();
@@ -206,6 +246,9 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').then((reg) => {
       try { reg.update(); } catch (_) {}
+      // (14 nov., ouverture instantanée) L'APP (pas la page d'accueil) fait ranger sa coquille dès la
+      // 1re ouverture : la 2e ne repasse plus par le réseau (public/sw.js, `VRM_RANGER_COQUILLE`).
+      if (versApp()) navigator.serviceWorker.ready.then((r) => { try { if (r && r.active) r.active.postMessage({ type: 'VRM_RANGER_COQUILLE' }); } catch (_) {} }).catch(() => {});
       // ⚠️ RAFRAÎCHIR L'ABONNEMENT PUSH À CHAQUE OUVERTURE. Le jeton d'abonnement
       // tourne (surtout iOS) et l'ancien devient muet → « je ne reçois plus de
       // notif ». Si la permission est accordée : on récupère l'abonnement
