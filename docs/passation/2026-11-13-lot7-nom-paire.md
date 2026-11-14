@@ -80,7 +80,16 @@ dernière étape et point) ; ses extensions sont en 5.368 / 5.336 / 5.329. Tant 
   `api/widget.js` sur une fausse base PostgREST) : **16/0** ; **rouge sur `origin/main`** (2 verts, 5 rouges) ;
   `--prouve` : **4/4 mutations** attrapées (commande devinée, nom pas relu, widget sans liste, widget sans
   transporteur).
-- Verts : audits retrait-fiable, suivi-colis (+ ceux listés dans la ligne §9) ; `vite build` vert.
+- Verts : audits retrait-fiable, suivi-colis, rappels-paire, traduction, variables, tdz, coherence, identite, agenda-appareil,
+  carte-chiffres, statut-transporteurs, a-trancher, icones, fonctions-api ; `vite build` vert. Après le vrai
+  `git merge origin/main` (1c196045, lot 3) : build, audit-nom-paire-retrait 16/0, banc retirer-nom-paire 44/0,
+  traduction, rappels-paire, retrait-fiable, suivi-colis, tdz verts.
+- Bancs voisins : `retirer-scene-julien` 51/1 (le seul rouge : « le QR qui répond s'affiche » à 1512 sombre, état
+  « charge » sous une machine chargée — le QR, pas le nom ; vert aux trois autres tailles) ; `journee-mieux` : J et K
+  rouges (K attend « + N à vérifier » dans la case, mais dans sa scène la case ne porte pas d'« à vérifier »
+  (`retirerVu` faux ⇒ `aVerifier` 0) : sur `origin/main` la sous-ligne y est VIDE, donc K y est rouge aussi ; J
+  compte « 2 » et « 6 » redits par « 2 sur 6 », « 6 gestes », « Les 6 étapes » — textes d'autres lots). Pas
+  rejoué sur `origin/main` : disque plein (20 Mo libres) au moment de le faire, à confirmer.
 
 ## Restes
 
