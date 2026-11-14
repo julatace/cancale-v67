@@ -78,8 +78,23 @@ les filtres de la boîte e-mails capsules noires → touches enfoncées + diode)
   S3 quatre formes (chaque bouton classé plein · touche · rond · lien · rangée/tuile ; 44 px au doigt, lien
   dans une phrase exempté), S4 AA (fond effectif, pire arrêt des dégradés), S5 rien ne déborde, S6 l'inventaire
   d'avant entier, S7 ni « encaissé », ni « au moins 0 », ni NaN, aucune erreur JS.
-  RÉSULTAT_BANC
-- Bancs existants : RÉSULTAT_BANCS_EXISTANTS
+  **Vert** sur le dernier build : 317 ✅ (9 vues × 4 rendus + S6) puis Paramètres et Sécurité des données
+  58 ✅ · 0 ❌ (après avoir nommé la jauge du compte comme libellé d'état, VOLATILS). **Rouge sur le build
+  d'avant** (origin/claude/integration-refonte) : 12 ❌ sur 6 vues à 390 clair — S1 (aucune matière), S3
+  (« + Nouvelle facture » et « Se connecter » bleus pleins, « Ouvrir Ventes » capsule grise, codes de
+  retrait en pastille grise), S4 (chevrons des tuiles d'Argent 2,2:1). Trois tours capture → correction :
+  t1/t3 (premier jet), t5/t6 (conversation sur fond noir, rubriques e-mails invisibles en capsule ::before,
+  « Pas encore calculé » encadré, connexion à l'ordinateur illisible), t7/t9 (vert).
+- Bancs existants (dernier build) : `argent` 269 ✅ · 0 ❌ (N7 adapté : le Bento au lieu de « 2 widgets par
+  ligne ») ; `messages-naturel` tout vert ; `connexion-claire` vert (le titre du téléphone à 28 px : l'en-tête
+  < 280 px) ; `finitions-12nov` 18 ✅ (C adapté au doublon retiré ; le 19e plante sur `cat_bord`, hors
+  chantier) ; `boite-emails` adapté (le bouton qui mène à l'objet = le plein d'encre ; le creux du Studio est
+  un neutre) — ses 4 rouges restants (« la marque à gauche… monogramme MR ») sont **les mêmes sur le build
+  d'avant** (le logo du transporteur a remplacé le monogramme, hors chantier) ; `communaute` : les mêmes
+  ~15 rouges sur le build d'avant (délais de 30 s dépassés sur cette machine, charge 50-70) ; `accueil` :
+  ses 3 rouges (poids du fichier d'entrée 38,1 Ko, film, Vestiaire) identiques sur le build d'avant ;
+  `urssaf` : ses 2 « KO » identiques sur le build d'avant ; `reglages` (données, pas de dessin) : instable
+  sous la charge, le build d'avant plante de la même façon (capture qui dépasse 30 s).
 - `design-passe.cjs` n'est PAS touché ici : la fondation (`claude/studio-fondation`) l'adapte à l'échelle du
   Studio (texte en « Urbanist VRM » / « Inter VRM ») ; ce chantier n'emploie que des tailles et graisses de
   cette échelle (le segmenté à 13 px, pas 13,5).
