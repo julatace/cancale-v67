@@ -525,10 +525,10 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **14 nov. · Idées 154, 157, 158 (155 et 156 retirées, sa décision)** : fiche de la paire « Dans l’ordre » (ligne de temps par identité ; rien sur un N° en double), « Dans une autre taille » (N° neuf par `numerosServisLus`, corrige l’oubli des cases du Stock dans Dupliquer), meilleure heure dans « Programmer » (suggestion, son clic). `docs/passation/2026-11-14-idees-paires.md`. Geste : aucun.
 - **14 nov. · Extension 5.377.0 : « VRM a capté » + carte Favoris · Annonces · Ventes** : bulle près du logo et toast dans l'app quand une écriture RÉUSSIE range du nouveau (par identité, `vrmCapteVu`), « Compte relié · … » à la connexion, réglage partagé carte ↔ Paramètres ; carte : compte de l'onglet d'abord, favoris du plus récent cochés ⇒ « Envoyer le message (N) », autres comptes floutés `inert`, lecture seule. `docs/passation/2026-11-14-popup-capte.md`. Geste : installer la 5.377.0.
 - **14 nov. · Mode exemple : photos et impossible à confondre** : 21 vraies photos (Commons, CC0 / domaine public, crédits `public/exemple/CREDITS.md`, une par paire, titre = la photo) ; bandeau « Exemple — données inventées » + « J’ai déjà un compte · Me connecter », cadre hachuré au-dessus de tout, « exemple » sur codes et adresses, « Relais Exemple, rue Imaginaire » (capture d’accueil refaite). `2026-11-14-exemple-photos.md`. Geste : aucun.
 
-- **14 nov. · Accueil, le reste (133 134 136 139 140 143 145 146 147)** : « J'ai déjà mes N° sur mes cartons » (aucun N° neuf avant sa réponse, N° écrit en double ⇒ rouge, rien adopté), « Ce que VRM a trouvé », visite de 4 écrans, mots expliqués, conseil du jour 30 j, essai en chiffres prouvés, vidéo 45 s, Apple prêt et ÉTEINT, appel de bienvenue Pro ; « À trancher » ne recouvre plus Ma journée. `docs/passation/2026-11-14-accueil-reste.md`. Geste : coller son lien de réservation (Paramètres → Aide) ; Apple si voulu (99 €/an).
 
 
 

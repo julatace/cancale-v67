@@ -63,11 +63,11 @@ export default function LigneDeTemps({ h, extra = {} }) {
       {double ? null : lt.evenements.length ? (
         <ol className="vrm-lt-liste">{lt.evenements.map((e, i) => <Ev key={cleEv(e, i)} e={e} double={double} dernier={i === lt.evenements.length - 1}/>)}</ol>
       ) : <p className="vrm-lt-note" data-lt-vide="">{tr('lt.vide')}</p>}
-      {lt.sansDate.length ? (<>
+      {!double && lt.sansDate.length ? (<>
         <h4 className="vrm-lt-sous">{tr('lt.sansDate')}</h4>
         <ol className="vrm-lt-liste is-sans-date" data-lt-groupe="sans-date">{lt.sansDate.map((e, i) => <Ev key={cleEv(e, i)} e={e} double={double}/>)}</ol>
       </>) : null}
-      {pasSu.length ? <p className="vrm-lt-note" data-lt-pas-su={lt.pasSu.join('|')}>{tr('lt.pasSu.titre')} : {pasSu.join(' · ')}.</p> : null}
+      {!double && pasSu.length ? <p className="vrm-lt-note" data-lt-pas-su={lt.pasSu.join('|')}>{tr('lt.pasSu.titre')} : {pasSu.join(' · ')}.</p> : null}
     </section>
   );
 }

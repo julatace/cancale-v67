@@ -285,7 +285,12 @@ async function controles(racine, silencieux) {
   await essai('A3 · dupliquer : réservations lues (rien sur « pas su »), pool écrit AVANT la fiche', () => {
     const f = (/async function dupliquerNumero[\s\S]*?\n\}\n/.exec(sansCom) || [''])[0];
     const iPool = f.indexOf("save('vinted_used_numeros'"), iFiche = f.indexOf("save('vrm_fiches_neuves'");
-    return (f && /panel_num_reserves/.test(f) && /if \(!Array\.isArray\(jr\)\) return \{ ok: false/.test(f) && iPool > 0 && iFiche > iPool && /numerosReserves\(/.test(f)) || { iPool, iFiche };
+    // (14 nov., idée 157) La liste des N° servis est LA liste de `numerosServisLus` (réservés relus, null sur
+    // « pas su ») : dupliquer la lit et refuse sur null — la règle est la même, elle a déménagé.
+    const servis = (/async function numerosServisLus\(\) \{[\s\S]*?\n\}\n/.exec(sansCom) || [''])[0];
+    const delegue = /const ns = await numerosServisLus\(\);\s*if \(!ns\) return \{ ok: false/.test(f) && /panel_num_reserves/.test(servis) && /if \(!Array\.isArray\(jr\)\) return null;/.test(servis) && /numerosReserves\(/.test(servis);
+    const enLigne = /panel_num_reserves/.test(f) && /if \(!Array\.isArray\(jr\)\) return \{ ok: false/.test(f) && /numerosReserves\(/.test(f);
+    return (f && (delegue || enLigne) && iPool > 0 && iFiche > iPool) || { iPool, iFiche, delegue, enLigne };
   });
   await essai('A4 · fiches neuves, journal des prix et modèles synchronisés (SYNC_KEYS)', () => ['vrm_fiches_neuves', 'vrm_prix_journal', 'vrm_modeles_desc'].every((k) => new RegExp(`'${k}'`).test((/const SYNC_KEYS = \[[\s\S]*?\];/.exec(APP) || [''])[0])) || 'manquant');
   await essai('A5 · les modèles sont insérables dans 4 descriptions (Leboncoin, eBay publier, eBay modifier, brouillon)', () => { const n = (sansCom.match(/<ChipsModeles /g) || []).length; return n >= 4 || n; });
