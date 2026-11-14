@@ -11,10 +11,12 @@ import ecran_stats from './de/stats.js';
 import ecran_compta from './de/compta.js';
 import ecran_listes from './de/listes.js';
 import ecran_refonte_ms from './de/refonte-ms.js';
+import ecran_argent from './de/argent.js';
 export default {
   ...ecran_listes,
   ...ecran_refonte_ms,
   ...ecran_compta,
+  ...ecran_argent,
   ...ecran_stats,
   ...ecran_emails,
   ...ecran_messages,
