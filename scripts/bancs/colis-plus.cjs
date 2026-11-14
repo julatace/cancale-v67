@@ -258,7 +258,7 @@ async function lotClassiqueBrut(b, nom, vue, LIGNES) {
     // F8 · « Tout est sorti ? » : il coche UN raté ⇒ seul lui repart à l'impression, les autres passent « prêts à déposer ».
     await pg.waitForSelector('[data-lot-question] [data-lot-guide="sorti"]', { timeout: 15000 }).catch(() => {});
     const premier = await pg.evaluate(() => { const e = document.querySelector('[data-lot-rate]'); return e ? e.getAttribute('data-lot-rate') : null; });
-    if (premier) await pg.locator(`[data-lot-rate="${premier}"] input`).check().catch(() => {});
+    if (premier) await pg.evaluate((c) => { const i = document.querySelector(`[data-lot-rate="${c}"] input`); if (i) i.click(); }, premier);
     await pg.waitForTimeout(300);
     const bouton = await pg.evaluate(() => (document.querySelector('[data-lot-imprime-oui]') || {}).textContent || '');
     const nPdf0 = await pg.evaluate(() => window.__pdfs.length);
@@ -431,6 +431,8 @@ async function douchetteBrut(b, nom, vue, LIGNES) {
     await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
     await pg.waitForSelector('[data-preparer-ouvrir]', { timeout: 20000 }).catch(() => {}); await pg.waitForTimeout(800);
     await bip(String(V[6].tx));
+    await pg.waitForFunction(() => document.documentElement.getAttribute('data-douchette'), null, { timeout: 15000 }).catch(() => {});
+    await pg.waitForTimeout(1500);
     dit((await etat()) === `trouve:v:${V[6].tx}`, `${nom} : E3 son n° de transaction aussi`, String(await etat()));
     await pg.evaluate(() => document.documentElement.setAttribute('data-douchette', 'avant'));
     const marquesAvant = await pg.evaluate(() => document.querySelectorAll('[data-cible-notif]').length);
@@ -470,7 +472,7 @@ async function douchetteBrut(b, nom, vue, LIGNES) {
     if (VUES.includes('1512') || VUES.includes('lot')) await lot(b, '1512', ordi, LIGNES);
     if (VUES.includes('1512') || VUES.includes('classique')) await lotClassique(b, '1512', ordi, LIGNES);
     if (VUES.includes('1512') || VUES.includes('douchette')) await douchette(b, '1512', ordi, LIGNES);
-    if (VUES.includes('1512')) await preparer(b, '1512', ordi, LIGNES, false);
+    if (VUES.includes('1512') || VUES.includes('preparer1512')) await preparer(b, '1512', ordi, LIGNES, false);
     if (VUES.includes('390-lot')) await lot(b, '390', tel, LIGNES);
   } catch (e) { dit(false, 'le banc s’exécute', String(e.stack || e.message || e).slice(0, 300)); }
   finally {
