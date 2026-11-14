@@ -82,9 +82,29 @@ Un fichier d'écran dont tous les boutons sont aux quatre formes s'ajoute à `MI
 - Banc `scripts/bancs/studio-coque.cjs` (390 tactile et 1512, clair et sombre) : voir « Résultats ».
 - Bancs demandés : voir « Résultats ».
 
-## Résultats
+## Résultats (refaits APRÈS le retrait des idées 149-150, sur la branche fusionnée avec l'intégration)
 
-(complété en fin de lot)
+- `npm run build` vert. **Écrans** : 44 lignes `tab===` avant et après, 31 écrans montés `{tab==='…'}` (21
+  distincts), identiques à `origin/claude/integration-refonte` (§4.11).
+- **Audits** (13) verts : traduction, tdz, variables, coherence, composants, icones, violet, rouge-doublon,
+  identite, csp, quoi-de-neuf, studio, apparence. `--prouve` : studio 13/13, apparence verte, traduction 12/12.
+  (`audit-quoi-de-neuf --prouve` : 2 mutations « introuvables » — leurs motifs n'existent plus dans
+  `src/nouveautes.js` depuis l'intégration, sans lien avec ce lot.)
+- **studio-coque : 78 verts, 0 rouge** (390 tactile et 1512, clair et sombre) — fond, verre, pastille 46 × 30 +
+  diode, disque ⇒ éventail ⇒ Chercher / glisser ⇒ loupe, Scanner ⇒ scanner de Ventes, Publier ⇒ Publier
+  ailleurs, Imprimer ⇒ feuille Tout imprimer avec **N = « Tout imprimer (N) »**, voile qui referme, loupe de
+  l'en-tête au toucher, ondulation sur les quatre espaces (et aucune en mouvement réduit), contrastes AA ≥ 4,5:1
+  mesurés (barre sur le verre posé sur le bas, titre, éventail sur le voile, mot du plein, navigation 1512),
+  rien ne déborde, un plein au plus. Sur le build d'AVANT : **10 rouges** (le banc mord).
+- **garde-ecrans** vert · **accueil-reste** vert · **exemple-photos** vert · **refonte-listes** vert (forme ;
+  volume vert au passage complet). Le banc refonte-listes connaissait l'encre #1D1D1F d'hier comme « nom de
+  paire » : il connaît aussi celle du Studio (sinon chaque titre de paire comptait comme une phrase répétée).
+- **ouverture-instantanee** : 19 verts, 1 rouge (« 2e ouverture < 1 s » à CPU ×4 sur une machine chargée ×5 :
+  1 044 ms) — le MÊME rouge sur le build d'AVANT (machine partagée), sans lien avec le Studio.
+- Captures regardées (390 et 1512, clair et sombre : Ma journée, Ventes, Annonces, Argent ; l'éventail ; la
+  feuille Tout imprimer) : une seule lumière, la porcelaine et la plaque partout ; Ma journée garde sa carte
+  sombre (son chantier) ; les N° posés sur les photos de la grille d'Annonces restent en plaque sombre
+  (lisible sur photo ; à son chantier).
 
 ## Ce qui reste (aux chantiers d'écran)
 
