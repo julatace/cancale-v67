@@ -460,6 +460,7 @@ import { createPortal, flushSync } from "react-dom";
 // (5 nov., chantier B) Les composants partagés et l'écriture unique des euros (docs/passation/2026-11-05-chantier-b.md).
 import { montant, fmt as fmtMontant, fmtE as fmtEMontant, fmtE0 as fmtE0Montant, prixTxt as prixTxtMontant } from "./format.js";
 import { SheetShell as SheetShellBase } from "./composants/SheetShell.jsx";
+import { poserFermeAuRetour } from "./ui/retour.jsx";   // (14 nov., correctif « À faire ») les feuilles de src/ui reçoivent le vrai FermeAuRetour
 import { BoutonBase, SegmenteBase } from "./composants/Bouton.jsx";
 import { ID_PAIRES, ECRANS_PAIRES, estPaires, dernierePaire, noterPaire, groupeBarre, badgePaires } from "./navPaires.js";   // (14 nov., n° 61) l'onglet « Paires »
 // (14 nov., Studio bleu clair) L'espace d'un écran, le disque et son éventail, l'ondulation au changement d'espace.
@@ -3467,6 +3468,9 @@ function FermeAuRetour({ fermer }) {
   }, []);
   return null;
 }
+// (14 nov., correctif « À faire ») Les feuilles de src/ui (Feuille : « À faire », comptes, AFaireSite…) se
+// ferment AUSSI au geste « retour » : elles prennent ce FermeAuRetour-ci (src/ui/retour.jsx).
+poserFermeAuRetour(FermeAuRetour);
 
 // ── L'ORDRE DES COUCHES QUI PASSENT AU-DESSUS DE TOUT (23 oct.) ─────────────
 // Une confirmation (askConfirm / askText) est posée PAR une feuille ouverte —
@@ -61435,8 +61439,13 @@ function AppCoeur() {
   // aussi ce qui servait à publier (ta clé Photoroom — sur l'écran Vestiaire,
   // jamais dans les Paramètres, sa décision du 17 oct. — et le dernier passage
   // de l'extension).
+  // (14 nov., correctif « À faire ») `alignItems:'stretch'` : la règle d'origine de `.vrm-market-space`
+  // (styles-mineral.css, une GRILLE, `align-items:center`) restait sous ce `flex` en colonne — chaque carte
+  // était centrée et prenait la largeur de son contenu : une ligne longue (« N°215 · adidas handball spezial
+  // marron taille 38 ») l'élargissait au-delà de l'écran, des deux côtés (« Mettre en vente » coupé à gauche,
+  // la page glissait de côté sur l'iPhone de Julien). Les cartes prennent la largeur de l'écran, pas plus.
   const rendreVestiaire=(t)=>(
-    <section className="vrm-market-space" aria-label="Vestiaire" data-tache-vestiaire={t} style={{padding:'12px 16px 16px',display:'flex',flexDirection:'column',gap:t==='annonces'?12:18}}>
+    <section className="vrm-market-space" aria-label="Vestiaire" data-tache-vestiaire={t} style={{padding:'12px 16px 16px',display:'flex',flexDirection:'column',alignItems:'stretch',gap:t==='annonces'?12:18}}>
       <ExtVestiaireCompte/>
       {baseKO ? <LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>
         : t==='ventes' ? <><CarteStatsApp page="vestiaire" aide className="vrm-fu-ecran" ici="cat_ventes" onNav={setTab} sel={{ site: 'vestiaire', compte: null, periode: null }}/><VentesVestiaire comptes={vintedAccounts}/></>

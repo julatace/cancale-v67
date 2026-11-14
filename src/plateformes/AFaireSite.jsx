@@ -10,8 +10,8 @@
 // Les enfants restent donc dans la page (et leurs `data-*` aussi) ; seule la feuille se montre ou
 // se cache. Rien n'est calculé ici : `n` est le nombre de choses que l'écran a comptées.
 //   <AFaireSite n={3} site="leboncoin">{portes}</AFaireSite>
-import React, { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useEffect, useState } from 'react';
+import { Feuille } from '../ui/Feuille.jsx';
 import { tr } from '../i18n/index.js';
 import '../ui/ui.css';
 import './plateformes.css';
@@ -24,45 +24,26 @@ export function ouvrirAFaireSite(site) { try { window.dispatchEvent(new CustomEv
 
 export function AFaireSite({ n, site = '', titre, children, className = '', ...attrs }) {
   const [ouvert, setOuvert] = useState(false);
-  const ref = useRef(null);
   useEffect(() => {
     const f = (e) => { if (!e || !e.detail || !e.detail.site || e.detail.site === site) setOuvert(true); };
     window.addEventListener('vrm:afaire-site', f);
     return () => window.removeEventListener('vrm:afaire-site', f);
   }, [site]);
-  useEffect(() => {
-    if (!ouvert) return undefined;
-    const k = (e) => {
-      // Échap ferme LA feuille du dessus seulement : une feuille ouverte depuis la nôtre (baisse en
-      // série, republication) se ferme d'abord (elle est montée après nous, dans <body>).
-      if (e.key !== 'Escape') return;
-      const voiles = [...document.querySelectorAll('.vrm-ui-voile, .vrm-fs, [role="dialog"]')].filter((x) => x.getClientRects().length);
-      const dernier = voiles[voiles.length - 1];
-      if (dernier && ref.current && !ref.current.contains(dernier) && dernier !== ref.current) return;
-      setOuvert(false);
-    };
-    window.addEventListener('keydown', k);
-    try { if (ref.current) ref.current.focus(); } catch (_) {}
-    return () => window.removeEventListener('keydown', k);
-  }, [ouvert]);
-  // Un geste de la feuille qui mène DANS l'écran (filtrer la liste, aller à un bloc) la referme.
+  // Plus rien à faire (la dernière chose faite) : la feuille ouverte se ferme, elle ne reste pas vide.
+  useEffect(() => { if (!n && ouvert) setOuvert(false); }, [n, ouvert]);
+  // Un geste de la feuille qui mène DANS l'écran (filtrer la liste, aller à un bloc) ou qui OUVRE une autre
+  // feuille (« Baisser des prix ») la referme : celle demandée ne s'ouvre jamais derrière la nôtre.
   const surClic = (e) => {
     const t = e.target && e.target.closest ? e.target.closest('[data-afaire-ferme]') : null;
     if (t) setTimeout(() => setOuvert(false), 0);
   };
-  if (!n) return null;
+  // (14 nov., correctif « À faire ») La feuille est celle de src/ui (`Feuille`, `ouvert`) : fermée, elle reste
+  // MONTÉE (ses enfants portent des états longs) mais ne se dessine plus ; ouverte, elle se ferme par « OK »,
+  // le voile, le glisser vers le bas et le geste « retour » (Échap : la feuille du DESSUS seulement, la pile
+  // de `FermeAuRetour`). Avant, le voile `hidden` restait dessiné (`display:flex !important` de ui.css) :
+  // Julien, sur Annonces · Vestiaire, devant une feuille que rien ne fermait.
   const nom = titre || tr('listes.afaire');
-  const feuille = (
-    <div className="vrm-ui-voile vrm-pf-voile" hidden={!ouvert} onClick={(e) => { if (e.target === e.currentTarget) setOuvert(false); }}>
-      <div ref={ref} tabIndex={-1} className="vrm-ui-feuille vrm-pf-feuille" role="dialog" aria-modal="true" aria-label={nom} data-noswipe="" data-pf-afaire-feuille={site} onClick={surClic}>
-        <div className="vrm-ui-feuille-tete">
-          <h2 className="vrm-ui-feuille-titre">{nom}</h2>
-          <button type="button" className="vrm-ui-feuille-fermer" onClick={() => setOuvert(false)}>{tr('listes.ok')}</button>
-        </div>
-        <div className="vrm-ui-afaire-corps vrm-pf-afaire-corps">{children}</div>
-      </div>
-    </div>
-  );
+  if (!n) return null;
   return (
     <>
       <button type="button" className={'vrm-ui-afaire vrm-pf-afaire' + (className ? ' ' + className : '')} aria-haspopup="dialog" aria-expanded={ouvert}
@@ -71,7 +52,10 @@ export function AFaireSite({ n, site = '', titre, children, className = '', ...a
         <span className="vrm-ui-afaire-mots">{nom} <span className="vrm-ui-afaire-n">· {n}</span></span>
         <Chevron/>
       </button>
-      {typeof document !== 'undefined' ? createPortal(feuille, document.body) : null}
+      <Feuille ouvert={ouvert} titre={nom} onClose={() => setOuvert(false)} fermeSiAutreCouche className="vrm-pf-feuille" voileClassName="vrm-pf-voile"
+        data-pf-afaire-feuille={site} onClick={surClic}>
+        <div className="vrm-ui-afaire-corps vrm-pf-afaire-corps">{children}</div>
+      </Feuille>
     </>
   );
 }

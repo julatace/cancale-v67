@@ -28,6 +28,12 @@
   background: var(--d-carte, #fff) !important;
 }
 :root:root body .vrm-pf-feuille .vrm-pf-afaire-corps [data-lbc-baisse-porte] { border: 0 !important; margin: 0 !important; }
+/* (14 nov., correctif « À faire ») Une porte qui ne porte qu'UN bouton (« Baisser des prix ») : le bouton EST la rangée
+   (toute la largeur, sur le fond de la carte) — plus une capsule grise posée dans une rangée blanche à moitié vide. */
+:root:root:root:root:root:root:root body .vrm-pf-feuille .vrm-pf-afaire-corps > .vrm-pf-porte > button:only-child {
+  width: 100% !important; min-height: 48px !important; justify-content: flex-start !important; text-align: left !important;
+  background: transparent !important; box-shadow: none !important; border: 0 !important; border-radius: 12px !important; padding: 0 16px !important;
+}
 
 /* ── 1. La ligne « À faire » d'un site : sous le titre, avant la barre ── */
 :root:root body .vrm-main .vrm-pf-afaire { margin: 0 0 10px !important; }
