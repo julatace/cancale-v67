@@ -523,12 +523,13 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **14 nov. · Une seule fiche partout (proposition 62)** : toucher une ligne (Ventes, À expédier, Annonces Vinted/LBC/eBay/Vestiaire, Stock, Achats, À retirer) ouvre LA fiche de la paire, désignée par identité (`src/ficheLigne.js`), la partie du contexte en haut et les gestes de la ligne dedans (`src/DansFiche.jsx`) ; sans identité ⇒ fiche de la ligne, « pas de paire reliée ». `docs/passation/2026-11-14-fiche-partout.md`. Geste : aucun.
+
 - **14 nov. · Confort et sécurité (117–130)** : journée selon l’heure, écran d’atelier, connexion par QR (iPhone approuve, session neuve serveur, MFA gardée), lien d’aide 24 h sans 016, échanges au dossier de litige, code local, aperçu, inventaire tournant, carte merci. `2026-11-14-confort-securite.md`. Geste : aucun.
 - **14 nov. · Argent, quatre choix (75, 80, 81, 82)** : coller « N° ; prix » dans la saisie en série (aperçu, rien d’écrasé) ; « Modèle et taille » + « À racheter » sur les ventes reliées ; objectif sur le REÇU + « X € par jour d'ici le 30 » ; « Ta déclaration de revenus » en tête de Déclarer avec case et source. `docs/passation/2026-11-14-argent-choix.md`. Geste : aucun.
 - **14 nov. · Design, passe 3** : bande Leboncoin dans la colonne, Notifications au segmenté, pas de barre vide, fraîcheur sans cadre, 28 sous-pages, feuilles, e-mail et fil au système ; la feuille de vente ne cache plus l'écran (banc `design-passe-3.cjs` : 1 531 défauts ⇒ 0). `docs/passation/2026-11-14-design-passe-3.md`. Geste : aucun.
 - **14 nov. · Bancs au vert** : 14 bancs + job `comptes-et-reception` verts sans affaiblir (faux PostgREST à la vraie forme, `in.(…)`, attentes sur condition, porte de banc à jeton JWT) ; 3 défauts de l'app corrigés (⌘K « Imprimer » ouvre la feuille, rail allumé sur Organisation, « Statut » dans Factur-X). `docs/passation/2026-11-14-bancs-au-vert.md`. Geste : aucun.
 - **14 nov. · Design, passe 2** : Messages, E-mails, Achats, eBay, Leboncoin, Vestiaire, 15 sous-pages de Paramètres, feuilles, connexion, accueil, exemple, démarrage au système (banc `design-passe-2.cjs` : 1 766 défauts ⇒ 0) ; la loupe n'écrit le N° qu'une fois. `docs/passation/2026-11-14-design-passe-2.md`. Geste : aucun.
-- **14 nov. · Design, passe écran par écran** : fiche « Tout sur le N° » et loupe au système, 500 → 400/600, tailles à l'échelle, un gris, contrastes ≥ 4,5 (« 36 »), 44 doigt / 36 souris (filtres compris), titres insécables au trait d'union ; banc `design-passe` (avant 1 839 défauts, après 0). `docs/passation/2026-11-14-design-passe.md`. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
