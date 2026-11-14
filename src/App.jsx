@@ -124,6 +124,7 @@ import {achatParConversation, regrouperArrivees, temoinsDe} from '../api/_lib/ac
 import { transporteurRelu, ligneRelueDe, ID_BORD_TRANSPORTEURS } from '../api/_lib/transporteur-anciens.js';
 import InfosSms from './InfosSms.jsx';
 import {indexCodesSuivis, finParIdentite, fusionnerParCode, suivisLiesDuColis} from './retraitPreuves.js';
+import {etatRepliRetirer, choixApresBascule} from './repliRetirer.js';
 import { finDatee, texteSortie, sortiRecent, pourquoiPasLu, SORTIS_JOURS, jourCourt as jourCourtParis } from './retraitSuivi.js';
 import {arriveesRelues} from './arriveesRelues.js';
 import { preuveDeLigne } from '../api/_lib/etat-colis.js';
@@ -31263,19 +31264,37 @@ const demanderRetirer = () => { DEMANDE_RETIRER.at = Date.now(); try { window.di
 const CLE_RETIRER_OUVERT = 'vrm_achats_retirer_ouvert';
 // `sansLigne` (Achats · Vinted) : la bande de chiffres porte déjà « À retirer · N » (sa case mène ici : `retraits`) ;
 // la ligne ne se montre alors qu'OUVERTE, pour refermer — jamais le même nombre deux fois à l'écran (§7).
+// ⚠️ (14 nov., soir — Julien : « je n'ai plus les retraits d'achat, je ne comprends pas ») UN COLIS À RETIRER
+// N'EST JAMAIS REPLIÉ PAR DÉFAUT (§5 : un colis caché est un colis perdu). Mesuré sur sa base : la règle comptait
+// 3 colis à retirer, tous avec leur code (publication `vrm_colis_retirer`), mais le repli fermé par défaut ne
+// laissait sur Achats · Vinted qu'un « 3 À retirer » dans la bande — ni point, ni code, ni ligne pour l'ouvrir.
+// Règle (`etatRepliRetirer`, src/repliRetirer.js) : au moins un colis à retirer ⇒ OUVERT, en tête d'Achats ;
+// il peut le refermer, et ce choix ne vaut QUE pour la liste de colis qu'il avait sous les yeux (un colis
+// de plus ⇒ rouvert) ; l'ancien « fermé » (`'0'`) ne cache plus jamais un colis. Rien à retirer mais des
+// colis « à vérifier » ⇒ la ligne reste visible (fermée), avec leur nombre : jamais cachés.
 function RepliRetirerAchats({ children, sansLigne = false }) {
   const [pub] = useLigneSynchro('vrm_colis_retirer', lireColisARetirer);
-  const [ouvert, setOuvert] = React.useState(() => { if (Date.now() - DEMANDE_RETIRER.at < 8000) return true; try { return localStorage.getItem(CLE_RETIRER_OUVERT) === '1'; } catch (_) { return false; } });
-  React.useEffect(() => { const o = () => setOuvert(true); window.addEventListener('vrm:retirer-ouvrir', o); return () => window.removeEventListener('vrm:retirer-ouvrir', o); }, []);
-  const basculer = () => setOuvert((o) => { const v = !o; try { localStorage.setItem(CLE_RETIRER_OUVERT, v ? '1' : '0'); } catch (_) {} return v; });
-  const n = pub && Number.isFinite(pub.total) ? pub.total : null;
-  const presse = !!(pub && Number(pub.urgents) > 0);
+  const lireChoix = () => { try { return localStorage.getItem(CLE_RETIRER_OUVERT); } catch (_) { return null; } };
+  const [choix, setChoix] = React.useState(lireChoix);
+  const [demande, setDemande] = React.useState(() => Date.now() - DEMANDE_RETIRER.at < 8000);
+  React.useEffect(() => { const o = () => setDemande(true); window.addEventListener('vrm:retirer-ouvrir', o); return () => window.removeEventListener('vrm:retirer-ouvrir', o); }, []);
+  const e = etatRepliRetirer(pub, { choix, demande });
+  const basculer = () => {
+    const v = choixApresBascule(pub, { ouvert: e.ouvert });
+    try { localStorage.setItem(CLE_RETIRER_OUVERT, v); } catch (_) {}
+    setDemande(false); setChoix(v);
+  };
+  const { n, presse, nVerif, ouvert } = e;
+  // Fermée sur Achats · Vinted, la ligne ne se montre que pour des colis « à vérifier » (la bande ne les dit pas).
+  const ligneVisible = !sansLigne || ouvert || (!(n > 0) && nVerif > 0);
+  const nombreLigne = sansLigne && !ouvert ? null : (n == null ? '—' : n);
   return (
-    <div className="vrm-achats-retirer-repli" data-retirer-repli={ouvert ? 'ouvert' : 'ferme'}>
-      <button type="button" className="vrm-achats-retirer-ligne" hidden={sansLigne && !ouvert} aria-expanded={ouvert} aria-controls="vrm-achats-retirer-corps" onClick={basculer} data-retirer-n={n == null ? '' : String(n)} data-retirer-presse={presse ? '1' : '0'}>
+    <div className="vrm-achats-retirer-repli" data-retirer-repli={ouvert ? 'ouvert' : 'ferme'} data-retirer-n={n == null ? '' : String(n)} data-retirer-verif={String(nVerif)}>
+      <button type="button" className="vrm-achats-retirer-ligne" hidden={!ligneVisible} aria-expanded={ouvert} aria-controls="vrm-achats-retirer-corps" onClick={basculer} data-retirer-n={n == null ? '' : String(n)} data-retirer-presse={presse ? '1' : '0'}>
         {presse ? <span className="vrm-achats-retirer-point" aria-hidden="true"/> : null}
         <span className="vrm-achats-retirer-titre">{tr('journee.retirer')}</span>
-        <span className="vrm-achats-retirer-n">{n == null ? '—' : n}</span>
+        {nombreLigne != null ? <span className="vrm-achats-retirer-n">{nombreLigne}</span> : null}
+        {!ouvert && nVerif > 0 ? <span className="vrm-achats-retirer-verif" data-retirer-verif-n={String(nVerif)}>{tr('journee.verifier2', { aVerifier: String(nVerif) })}</span> : null}
         <span className="vrm-achats-retirer-chevron" aria-hidden="true">›</span>
       </button>
       <div id="vrm-achats-retirer-corps" hidden={!ouvert}>{children}</div>
