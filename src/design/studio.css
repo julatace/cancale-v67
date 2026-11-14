@@ -92,6 +92,11 @@
   --sb-e-avant: 360ms var(--sb-courbe);
   --sb-e-diode: 120ms ease-out;
 }
+/* LA DENSITÉ DES LISTES (14 nov., idée 149) : réglée par appareil (src/design/densite.js), posée sur la racine
+   avant le premier rendu ; toutes les rangées la lisent (`.sb-rangee`, et `--d-h-rangee` des listes d'hier). */
+:root { --sb-rangee-h: 64px; }
+:root[data-densite="serree"] { --sb-rangee-h: 56px; }
+:root[data-densite="aeree"] { --sb-rangee-h: 72px; }
 /* LE ROUGE — deux paires présentes sous un même N° (.sb-plaque.is-double), et rien d'autre (§5, §7). */
 :root, .sb-plaque.is-double { --sb-doublon: #B8261A; }
 /* La nuit : un bleu-nuit profond, la même lumière du haut. (Le choix `vinted_dark` gagne ; sans choix, le système.) */
@@ -166,6 +171,7 @@
   --d-ombre-flottant: var(--sb-ombre-avant); --d-ombre-levee: var(--sb-ombre-avant);
   --d-materiau: var(--sb-verre); --d-materiau-plein: var(--sb-porcelaine); --d-materiau-flou: var(--sb-verre-flou); --d-materiau-filet: rgb(var(--sb-o) / .10);
   --d-sortie: var(--sb-courbe); --d-m-appui: 90ms;
+  --d-h-rangee: var(--sb-rangee-h);
   --d-pastille-neutre-fond: var(--sb-creux); --d-pastille-neutre: var(--sb-encre-2);
   --d-pastille-accent-fond: var(--sb-creux); --d-pastille-accent: var(--sb-lien);
   --vrm-police: var(--sb-police-texte);
@@ -331,8 +337,8 @@ button.sb-tuile, a.sb-tuile { cursor: pointer; width: 100%; }
    1 000 rangées : ni ombre ni flou ici ; hors écran, pas dessinée. */
 .sb-rangee {
   display: grid; grid-template-columns: 50px 44px minmax(0, 1fr) auto; column-gap: 12px; align-items: center;
-  width: 100%; min-height: 64px; padding: 0 20px 0 16px; border: 0; background: none; text-align: left; color: var(--sb-encre);
-  font-family: var(--sb-police-texte); content-visibility: auto; contain-intrinsic-size: auto 64px; transition: opacity 240ms;
+  width: 100%; min-height: var(--sb-rangee-h, 64px); padding: 0 20px 0 16px; border: 0; background: none; text-align: left; color: var(--sb-encre);
+  font-family: var(--sb-police-texte); content-visibility: auto; contain-intrinsic-size: auto var(--sb-rangee-h, 64px); transition: opacity 240ms;
   -webkit-tap-highlight-color: transparent;
 }
 button.sb-rangee { cursor: pointer; }

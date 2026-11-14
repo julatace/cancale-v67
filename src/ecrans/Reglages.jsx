@@ -32,6 +32,7 @@ import { L, PAS_SU } from '../libelles.js';
 import { useReglageConseils } from '../Conseils.jsx';
 import { PHRASES_ECRAN } from '../phrasesEcran.js';
 import { APPARENCES, LIBELLES_APPARENCE, PHRASES_APPARENCE } from '../apparence.js';
+import { DENSITES, lireDensite, poserDensite } from '../design/densite.js';   // (14 nov., idée 149) la densité des listes, par appareil
 import { SignalerProblemeFeuille as SignalerProblemeFeuilleBase, SignalementsRecus } from '../composants/SignalerProbleme.jsx';
 import { DemandesAideRecues } from '../composants/EcrireSupport.jsx';   // (13 nov., lot 55) « Demandes d'aide » (propriétaire)
 import { CLE_COMPTES_EXCLUS, estExclu, basculerExclu } from '../../api/_lib/comptes-exclus.js';
@@ -2177,10 +2178,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (11 nov., lot traduction) La langue de VRM (src/i18n/) : Français · English · Español · Italiano · Deutsch.
       { id:'langue', type:'panneau', nu:true, ic:'langue', lib:tr('reglages.langue.lib'), desc:tr('reglages.langue.desc'), val: NOMS_LANGUES[langueCourante()] || '', data:{ 'data-reglage-langue': langueCourante() }, el:<LangueSetting/> },
       { id:'je-vends', type:'panneau', nu:true, ic:'bag', lib:tr('reglages.je-vends.lib'), desc:tr('reglages.je-vends.desc'), val: (() => { const n = nomsCategories(profilV.categories || [], lireReglageJeVends(load(CLE_JE_VENDS, null)).autre); return n.length ? (n.length > 2 ? `${n.slice(0, 2).join(', ')}…` : n.join(', ')) : (profilV.vend === 'sneakers' ? 'Sneakers' : 'Autre'); })(), data:{ 'data-reglage-vends': profilV.vend || 'autre' }, el:<JeVendsSetting/> },
-      { id:'sombre', type:'switch', ic:'moon', lib:tr('reglages.sombre.lib'), desc: apparence === 'auto' || apparence === 'soir' ? `${LIBELLES_APPARENCE[apparence]} : ${PHRASES_APPARENCE[apparence].replace(/\.$/, '').toLowerCase()}.` : tr('reglages.sombre.desc'), on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
+      { id:'sombre', type:'switch', ic:'moon', lib:tr('reglages.sombre.lib'), desc: apparence === 'auto' || apparence === 'soir' ? `${tr('apparence.lib.' + apparence)} : ${tr('apparence.phrase.' + apparence).replace(/\.$/, '').toLowerCase()}.` : tr('reglages.sombre.desc'), on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
       // (8 nov., « beauté ») L'apparence : Clair · Sombre · Automatique (le système) · Le soir (19 h–7 h).
       // L'interrupteur ci-dessus reste le choix explicite (il quitte Automatique / Le soir).
-      onApparence && { id:'apparence', type:'panneau', nu:true, ic:'contraste', lib:tr('reglages.apparence.lib'), desc:tr('reglages.apparence.desc'), val: LIBELLES_APPARENCE[apparence] || '', data:{ 'data-reglage-apparence': apparence || '' }, el:<ApparenceSetting valeur={apparence} onChoisir={onApparence}/> },
+      onApparence && { id:'apparence', type:'panneau', nu:true, ic:'contraste', lib:tr('reglages.apparence.lib'), desc:tr('reglages.apparence.desc'), val: apparence ? tr('apparence.lib.' + apparence) : '', data:{ 'data-reglage-apparence': apparence || '' }, el:<ApparenceSetting valeur={apparence} onChoisir={onApparence}/> },
       // (5 nov.) Le mode stream PROGRAMMÉ : son sous-écran (catégories, mots, aperçu).
       // (5 nov., chantier H) L'interrupteur DANS la liste (le même état que « Stream » en
       // haut : un réglage), et son programme dans un sous-écran à son nom — le titre
@@ -2188,6 +2189,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'stream-on', type:'switch', ic:'stream', lib:tr('reglages.stream-on.lib'), desc:tr('reglages.stream-on.desc'), on:!!streamOn, onClick:()=>poserStream(!streamOn), data:{ 'data-reglage-stream-on': streamOn ? 'on' : 'off' } },
       { id:'stream', type:'panneau', nu:true, ic:'filter', lib:tr('reglages.stream.lib'), desc:tr('reglages.stream.desc'), data:{ 'data-reglage-stream': streamOn ? 'on' : 'off' }, el:<ReglagesStream/> },
       { id:'zoom', type:'panneau', nu:true, ic:'texte', lib:tr('reglages.zoom.lib'), desc:tr('reglages.zoom.desc'), val:valZoom, el:<ZoomSetting nu/> },
+      // (14 nov., idée 149) La densité des listes : Serrées (56) · Normales (64) · Aérées (72), sur CET appareil.
+      { id:'densite', type:'panneau', nu:true, ic:'filter', lib:tr('densite.lib'), desc:tr('densite.desc'), val: tr('densite.' + lireDensite()), data:{ 'data-reglage-densite': lireDensite() }, el:<DensiteSetting/> },
       urlWidget && { id:'widget', type:'panneau', nu:true, ic:'device', lib:tr('reglages.widget.lib'), desc:tr('reglages.widget.desc'), el:widget },
       // (10 nov., lot AH) Deux raccourcis iPhone par liens profonds (src/raccourcisSiri.js) : une PWA ne déclare pas d'intention Siri.
       { id:'raccourcis-siri', type:'panneau', nu:true, ic:'mic', lib:tr('reglages.raccourcis-siri.lib'), desc:tr('reglages.raccourcis-siri.desc'), data:{ 'data-reglage-raccourcis':'' }, el:<RaccourcisSiri toast={toast}/> },
@@ -4601,7 +4604,22 @@ function ApparenceSetting({ valeur, onChoisir }) {
         <button key={m} type="button" role="radio" aria-checked={valeur === m} className={'vrm-apparence-ligne' + (valeur === m ? ' is-choisi' : '')}
           data-apparence={m} onClick={() => onChoisir && onChoisir(m)}>
           <span className={'vrm-apparence-apercu is-' + m} aria-hidden="true"><span/></span>
-          <span className="vrm-apparence-txt"><b>{LIBELLES_APPARENCE[m]}</b><small>{PHRASES_APPARENCE[m]}</small></span>
+          <span className="vrm-apparence-txt"><b>{tr('apparence.lib.' + m)}</b><small>{tr('apparence.phrase.' + m)}</small></span>
+          <svg className="vrm-apparence-coche" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3.2L13 4.8"/></svg>
+        </button>
+      ))}
+    </div>
+  );
+}
+// (14 nov., idée 149) LA DENSITÉ DES LISTES : la même liste d'iOS ; le choix vaut pour CET appareil (src/design/densite.js).
+function DensiteSetting() {
+  const [v, setV] = React.useState(() => lireDensite());
+  return (
+    <div className="vrm-apparence" role="radiogroup" aria-label={tr('densite.lib')} data-densite-choix={v}>
+      {DENSITES.map((d) => (
+        <button key={d} type="button" role="radio" aria-checked={v === d} className={'vrm-apparence-ligne' + (v === d ? ' is-choisi' : '')}
+          data-densite={d} onClick={() => setV(poserDensite(d))}>
+          <span className="vrm-apparence-txt"><b>{tr('densite.' + d)}</b><small>{tr('densite.' + d + '.phrase')}</small></span>
           <svg className="vrm-apparence-coche" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3.2L13 4.8"/></svg>
         </button>
       ))}
