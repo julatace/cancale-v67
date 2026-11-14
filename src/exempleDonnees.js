@@ -74,7 +74,7 @@ export function jeuExemple(now = Date.now(), { catalogue = null, origine = '' } 
     { id: 'email_track_mondialrelay_40817263', data: { carrier: 'mondialrelay', status: 'disponible', suivi: '40817263', code: '582913', lieu: LIEU_EXEMPLE.join('\n'), subject: 'Votre colis est disponible', receivedAt: iso(1), arriveLe: iso(1), dateLimite: new Date(now + 5 * 86400000).toISOString() } },
     { id: 'harvest_111_billing', data: { capturedAt: iso(0.01), payload: { user_balance: { available_amount: { amount: '64.0' }, escrow_amount: { amount: '120.0' } } } } },
     { id: 'lbc_accounts', data: { accounts: { lbcA: { id: 'lbcA', name: 'Ma boutique', sessionAt: iso(1) } } } },
-    { id: 'lbc_listings', data: { items: { 3100000001: { id: '3100000001', ref: '2', customRef: 'VRM-2', subject: varie ? article(2).titre : 'Adidas Samba OG noire T39', status: 'active', account: 'lbcA', seenAt: iso(0.5), price: 55 } } } },
+    { id: 'lbc_listings', data: { items: { 3100000001: { id: '3100000001', ref: '2', customRef: 'VRM-2', subject: varie ? article(2).titre : titreVu(kAnnonce(1), 39, 'Adidas Samba OG noire taille 39').replace(/ taille (\d+)$/, ' T$1'), photo: photo(kAnnonce(1)),   /* le N° 2 = l'annonce 1 : la même paire, la même photo */ status: 'active', account: 'lbcA', seenAt: iso(0.5), price: 55 } } } },
     { id: 'lbc_ventes', data: { ventes: {} } },
   ].map((l) => ({ ...l, owner: UID_EXEMPLE, updated_at: iso(0), created_at: iso(30) }));
   const comptes = [

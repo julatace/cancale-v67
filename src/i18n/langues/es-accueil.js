@@ -71,7 +71,7 @@ export default {
   "accueil.hero.titre": "Tus ventas, tus paquetes y tu contabilidad, en un solo lugar.",
   "accueil.journee.chapo": "Por la mañana, en el punto de recogida, en el almacén, con tus compradores, a fin de mes.",
   "accueil.journee.titre": "Tu día de revendedor, en cinco momentos.",
-  "accueil.moment.colis.alt": "La pantalla Paquetes de VRM, pestaña «Por recoger»: el punto de recogida Le Fournil en Rennes, dos paquetes y el código de recogida 582913 listo para copiar. Datos de ejemplo.",
+  "accueil.moment.colis.alt": "La pantalla Compras de VRM, apartado «Por recoger»: el punto de recogida «Relais Exemple» en Rennes, dos paquetes y sus códigos de recogida 582913 y K48291. Datos de ejemplo.",
   "accueil.moment.colis.point1": "El código, el QR y el punto de recogida de cada compra.",
   "accueil.moment.colis.point2": "«Ya lo recogí» lo quita de la lista; un paquete dudoso sigue visible, nunca oculto.",
   "accueil.moment.colis.texte": "Las etiquetas de envío se imprimen con un toque, selladas con el título y el número del artículo. En el punto de recogida, tus códigos te esperan, ordenados por punto, incluso sin conexión.",

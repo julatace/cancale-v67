@@ -71,7 +71,7 @@ export default {
   "accueil.hero.titre": "Tes ventes, tes colis et ta compta, au même endroit.",
   "accueil.journee.chapo": "Le matin, au relais, au stock, avec tes acheteurs, en fin de mois.",
   "accueil.journee.titre": "Ta journée de revendeur, en cinq moments.",
-  "accueil.moment.colis.alt": "L’écran Colis de VRM, onglet « À retirer » : le point relais Le Fournil à Rennes, deux colis, et le code de retrait 582913 prêt à copier. Données d’exemple.",
+  "accueil.moment.colis.alt": "L’écran Achats de VRM, partie « À retirer » : le point relais « Relais Exemple » à Rennes, deux colis et leurs codes de retrait 582913 et K48291. Données d’exemple.",
   "accueil.moment.colis.point1": "Le code, le QR et le point relais de chaque achat.",
   "accueil.moment.colis.point2": "« J’ai retiré » le sort de la liste ; un colis douteux reste visible, jamais caché.",
   "accueil.moment.colis.texte": "Les bordereaux s’impriment d’un geste, tamponnés du titre et du numéro de l’article. Au relais, tes codes de retrait t’attendent, rangés par point, même sans réseau.",

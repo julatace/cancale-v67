@@ -16,16 +16,38 @@
 // ⚠️ La marque, le modèle et la couleur d'une entrée décrivent CE QU'ON VOIT sur
 //    la photo : le titre de l'exemple en est tiré (titre ⇔ photo cohérents).
 //
-// (14 nov.) VIDE : le réseau du conteneur de la session a refusé les hôtes des
-// sources permises (commons.wikimedia.org, upload.wikimedia.org,
-// api.openverse.org, unsplash.com, images.unsplash.com, www.pexels.com,
-// images.pexels.com — refus 403 du proxy au CONNECT). Rien n'a été mis à la
-// place : pas de photo d'origine inconnue. Récit :
-// docs/passation/2026-11-14-exemple-photos.md (« Pour ajouter les photos »).
+// (14 nov.) 21 photos de Wikimedia Commons (CC0 ou domaine public versé par
+// l'auteur), recadrées en carré (la paire entière, sur un fond tiré de la photo).
+// L'ORDRE compte : l'entrée n° k est la photo de la paire d'exemple n° k
+// (annonces 0-11, ventes 12-15, achats 16-18) ; les deux dernières sont de
+// réserve (pour remplacer une photo retirée sans en chercher une autre).
+// Récit : docs/passation/2026-11-14-exemple-photos.md.
 //
 // Forme d'une entrée :
 //   { fichier: 'nike-air-max-90-blanche', marque: 'Nike', modele: 'Air Max 90', couleur: 'blanche' }
-export const PHOTOS_EXEMPLE = [];
+export const PHOTOS_EXEMPLE = [
+  { fichier: 'adidas-samba-og-blanche', marque: 'Adidas', modele: 'Samba OG', couleur: 'blanche' },
+  { fichier: 'nike-air-force-1-blanche', marque: 'Nike', modele: 'Air Force 1', couleur: 'blanche' },
+  { fichier: 'new-balance-574-grise', marque: 'New Balance', modele: '574', couleur: 'grise' },
+  { fichier: 'adidas-sl-72-og-rouge', marque: 'Adidas', modele: 'SL 72 OG', couleur: 'rouge' },
+  { fichier: 'nike-dunk-low-noire-blanche', marque: 'Nike', modele: 'Dunk Low', couleur: 'noire et blanche' },
+  { fichier: 'puma-suede-noire', marque: 'Puma', modele: 'Suede', couleur: 'noire' },
+  { fichier: 'new-balance-550-blanche-bordeaux', marque: 'New Balance', modele: '550', couleur: 'blanche et bordeaux' },
+  { fichier: 'nike-air-tailwind-grise-bleue', marque: 'Nike', modele: 'Air Tailwind', couleur: 'grise et bleue' },
+  { fichier: 'adidas-sl-72-rs-bleue', marque: 'Adidas', modele: 'SL 72 RS', couleur: 'bleue' },
+  { fichier: 'nike-zoom-vomero-5-argent', marque: 'Nike', modele: 'Zoom Vomero 5', couleur: 'argent' },
+  { fichier: 'new-balance-numeric-480-marron', marque: 'New Balance', modele: 'Numeric 480', couleur: 'marron et verte' },
+  { fichier: 'adidas-superstar-blanche', marque: 'Adidas', modele: 'Superstar', couleur: 'blanche' },
+  { fichier: 'nike-cortez-blanche-rouge', marque: 'Nike', modele: 'Cortez', couleur: 'blanche et rouge' },
+  { fichier: 'new-balance-1906r-argent', marque: 'New Balance', modele: '1906R', couleur: 'argent' },
+  { fichier: 'adidas-handball-spezial-noire', marque: 'Adidas', modele: 'Handball Spezial', couleur: 'noire' },
+  { fichier: 'nike-air-max-90-blanche', marque: 'Nike', modele: 'Air Max 90', couleur: 'blanche' },
+  { fichier: 'nike-terminator-low-rose-grise', marque: 'Nike', modele: 'Terminator Low', couleur: 'rose et grise' },
+  { fichier: 'adidas-forum-low-blanche', marque: 'Adidas', modele: 'Forum Low', couleur: 'blanche' },
+  { fichier: 'adidas-nmd-r1-bleu-marine', marque: 'Adidas', modele: 'NMD R1', couleur: 'bleu marine' },
+  { fichier: 'adidas-campus-00s-marron', marque: 'Adidas', modele: 'Campus 00s', couleur: 'marron' },
+  { fichier: 'nike-air-max-ltd-2-grise', marque: 'Nike', modele: 'Air Max LTD 2', couleur: 'grise' },
+];
 
 // Les licences permises (la même liste que l'audit) et la page source attendue.
 export const LICENCES_PERMISES = {

@@ -71,7 +71,7 @@ export default {
   "accueil.hero.titre": "Le tue vendite, i tuoi pacchi e la tua contabilità, nello stesso posto.",
   "accueil.journee.chapo": "Al mattino, al punto di ritiro, in magazzino, con i tuoi acquirenti, a fine mese.",
   "accueil.journee.titre": "La tua giornata da rivenditore, in cinque momenti.",
-  "accueil.moment.colis.alt": "La schermata Pacchi di VRM, scheda «Da ritirare»: il punto di ritiro Le Fournil a Rennes, due pacchi e il codice di ritiro 582913 pronto da copiare. Dati di esempio.",
+  "accueil.moment.colis.alt": "La schermata Acquisti di VRM, sezione «Da ritirare»: il punto di ritiro «Relais Exemple» a Rennes, due pacchi e i loro codici di ritiro 582913 e K48291. Dati di esempio.",
   "accueil.moment.colis.point1": "Il codice, il QR e il punto di ritiro di ogni acquisto.",
   "accueil.moment.colis.point2": "«Ritirato» lo toglie dalla lista; un pacco dubbio resta visibile, mai nascosto.",
   "accueil.moment.colis.texte": "Le etichette di spedizione si stampano con un tocco, timbrate con titolo e numero dell’articolo. Al punto di ritiro, i tuoi codici ti aspettano, ordinati per punto, anche offline.",

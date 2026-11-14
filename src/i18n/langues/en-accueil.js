@@ -71,7 +71,7 @@ export default {
   "accueil.hero.titre": "Your sales, parcels and accounting, in one place.",
   "accueil.journee.chapo": "In the morning, at the pickup point, in the stockroom, with your buyers, at month’s end.",
   "accueil.journee.titre": "Your reseller day, in five moments.",
-  "accueil.moment.colis.alt": "VRM’s Parcels screen, “To pick up” tab: the Le Fournil pickup point in Rennes, two parcels, and the pickup code 582913 ready to copy. Sample data.",
+  "accueil.moment.colis.alt": "VRM’s Purchases screen, “To pick up” section: the “Relais Exemple” pickup point in Rennes, two parcels and their pickup codes 582913 and K48291. Sample data.",
   "accueil.moment.colis.point1": "The code, the QR and the pickup point for each purchase.",
   "accueil.moment.colis.point2": "“Picked up” takes it off the list; a doubtful parcel stays visible, never hidden.",
   "accueil.moment.colis.texte": "Shipping labels print in one tap, stamped with the item’s title and number. At the pickup point, your pickup codes are waiting, sorted by location, even offline.",

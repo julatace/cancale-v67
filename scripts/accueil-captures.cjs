@@ -13,7 +13,7 @@
 //    SEUL=journee,colis  THEMES=clair  SORTIE=/tmp/x  (pour essayer)
 //  ⚠️ Linux n'a pas SF Pro : la police de l'app est remplacée par Inter (la plus
 //     proche) le temps de la capture — sur iPhone, l'app s'affiche en SF Pro.
-//  ⚠️ Le bandeau « Exemple — rien n'est à toi » est retiré DE LA CAPTURE : la
+//  ⚠️ Le bandeau « Exemple — données inventées » (et le cadre hachuré) est retiré DE LA CAPTURE : la
 //     page d'accueil écrit « Données d'exemple » sous chaque image.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -33,7 +33,8 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/jav
 // Les écrans montrés par la page. `w` × `h` : la taille AFFICHÉE (CSS px).
 const ECRANS = [
   { nom: 'journee', tab: 'journee', w: 390, h: 844 },
-  { nom: 'retirer', tab: 'cat_bord', w: 390, h: 844, gestes: [/^\s*À retirer/, /^\s*Code\s*$/], defile: 560 },
+  // (14 nov.) « À retirer » vit dans Achats (Colis a été réparti entre Ventes et Achats) : le code est sur la ligne.
+  { nom: 'retirer', tab: 'achats', w: 390, h: 844, defile: Number(process.env.DEFILE_RETIRER) || 430 },
   { nom: 'numeros', tab: process.env.TAB_NUMEROS || 'annonces', w: 390, h: 844, defile: 620 },
   { nom: 'compta', tab: 'compta', w: 390, h: 844, gestes: [/^\s*Ventes\s*$/, /^\s*Argent\s*$/, /^\s*Argent\s*$/, /^\s*Déclarer\s*$/, /^\s*Micro-entrepreneur/, /^\s*Par mois\s*$/] },
   { nom: 'messages', tab: 'messages', w: 390, h: 844 },
@@ -55,7 +56,7 @@ const srv = http.createServer((q, r) => {
 
 const CSS_CAPTURE = `
   *{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif!important}
-  [data-mode-exemple-bandeau],[data-exemple-bandeau],.vrm-exemple-bandeau{display:none!important}
+  [data-mode-exemple-bandeau],[data-exemple-bandeau],.vrm-exemple-bandeau,[data-exemple-cadre]{display:none!important}
   *{caret-color:transparent!important}
 `;
 
@@ -76,6 +77,9 @@ async function capturer(nav, e, theme) {
   await pg.goto(`http://localhost:${PORT}/?tab=${e.tab}`, { waitUntil: 'domcontentloaded' });
   await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {});
   await pg.addStyleTag({ content: CSS_CAPTURE });
+  // (14 nov.) Le cadre hachuré et les marques « exemple » des codes et adresses (src/guide-demarrage.css) sont
+  // retirés DE LA CAPTURE, comme le bandeau : la page écrit déjà « Données d'exemple » sous chaque image.
+  await pg.evaluate(() => document.documentElement.removeAttribute('data-vrm-exemple'));
   await pg.waitForTimeout(3500);
   // Les gestes RÉELS qui amènent l'écran montré (un bouton, par son texte).
   for (const g of e.gestes || []) {
