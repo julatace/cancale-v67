@@ -537,6 +537,7 @@
 /* Annonces : « Stock » et « Publier Leboncoin 36/36 › » (deux replis côte à côte) sont des gestes : la capsule remplie,
    plus deux tuiles blanches encadrées de 12. */
 :root:root body .vrm-main :is(.vrm-ann-stock-tools, [data-places-wrap]) > summary { border-radius: var(--d-r-pilule) !important; border: 0 !important; background-color: var(--d-remplir) !important; }
+:root:root body .vrm-main :is(.vrm-ann-stock-tools, [data-places-wrap]) > summary :is(span, small) { color: var(--d-encre) !important; }
 /* Un `<select>` qui reste (le filtre de compte du Stock) : la capsule remplie d'un filtre — jamais un rectangle. */
 :root:root body .vrm-app-shell .vrm-main select[data-stock-filtre-compte][aria-label] { border-radius: var(--d-r-pilule) !important; border: 0 !important; background-color: var(--d-remplir) !important; min-height: var(--d-h-filtre) !important; padding-left: 16px !important; padding-right: 12px !important; font-weight: 600 !important; }
 
@@ -583,6 +584,9 @@
 :root:root body .vrm-main .vrm-set [data-sous-ecran] [data-choix-plateforme] b { font-size: var(--d-t-15) !important; }
 /* « Mes plateformes » : la coche et le « + » d'une plateforme en texte bleu (l'aplat #0071E3 sur la case bleutée : 4,3:1). */
 :root:root body .vrm-main .vrm-cp-coche { color: var(--d-accent-texte) !important; }
+/* Paramètres → Comptes eBay : la section posait un fond du sol et 16 px d'intérieur autour de SA carte — la carte
+   tombait à 32 px du bord, plus alignée sur le titre. La section n'est qu'un contenant. */
+:root:root body .vrm-main .vrm-set [data-ebay-compte-section] { padding: 0 !important; background: transparent !important; }
 /* eBay : « Solde et paramètres du compte » à la hauteur d'un contrôle. */
 :root:root body .vrm-main .vrm-ebay-settings > summary { min-height: var(--d-h-ctrl) !important; display: flex !important; align-items: center !important; }
 
