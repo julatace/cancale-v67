@@ -61075,8 +61075,13 @@ function AppCoeur() {
   // aussi ce qui servait à publier (ta clé Photoroom — sur l'écran Vestiaire,
   // jamais dans les Paramètres, sa décision du 17 oct. — et le dernier passage
   // de l'extension).
+  // (14 nov., correctif « À faire ») `alignItems:'stretch'` : la règle d'origine de `.vrm-market-space`
+  // (styles-mineral.css, une GRILLE, `align-items:center`) restait sous ce `flex` en colonne — chaque carte
+  // était centrée et prenait la largeur de son contenu : une ligne longue (« N°215 · adidas handball spezial
+  // marron taille 38 ») l'élargissait au-delà de l'écran, des deux côtés (« Mettre en vente » coupé à gauche,
+  // la page glissait de côté sur l'iPhone de Julien). Les cartes prennent la largeur de l'écran, pas plus.
   const rendreVestiaire=(t)=>(
-    <section className="vrm-market-space" aria-label="Vestiaire" data-tache-vestiaire={t} style={{padding:'12px 16px 16px',display:'flex',flexDirection:'column',gap:t==='annonces'?12:18}}>
+    <section className="vrm-market-space" aria-label="Vestiaire" data-tache-vestiaire={t} style={{padding:'12px 16px 16px',display:'flex',flexDirection:'column',alignItems:'stretch',gap:t==='annonces'?12:18}}>
       <ExtVestiaireCompte/>
       {baseKO ? <LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>
         : t==='ventes' ? <><CarteStatsApp page="vestiaire" aide className="vrm-fu-ecran" ici="cat_ventes" onNav={setTab} sel={{ site: 'vestiaire', compte: null, periode: null }}/><VentesVestiaire comptes={vintedAccounts}/></>

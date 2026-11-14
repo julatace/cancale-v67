@@ -29,7 +29,12 @@ require('./_porte-banc.cjs');
 //                 nouvelle est seule et au-dessus ; refermée, plus aucun voile ;
 //    H  horizontal à CHAQUE mesure (avant, pendant, après) : `scrollX === 0`,
 //                 `scrollWidth <= innerWidth`, et aucun élément qui dépasse l'écran sans un
-//                 parent qui le coupe (ce qu'un iPhone laisserait glisser de côté).
+//                 parent qui le coupe (ce qu'un iPhone laisserait glisser de côté) ;
+//    H2 Vestiaire une ligne longue posée dans chaque carte de la section (la forme de « N°215 · adidas
+//                 handball spezial marron taille 38… ») : aucune carte ne sort de l'écran. La section était
+//                 un `flex` en colonne sous la règle `align-items:center` d'une ancienne GRILLE
+//                 (`.vrm-market-space`, styles-mineral.css) : la carte s'élargissait des deux côtés ;
+//  B. BALAYAGE (`PARTIES=balayage`) : chaque écran au téléphone, voir plus bas.
 //  `CAS=annonces-vestiaire,colis` `LARGEURS=390` `THEMES=clair` pour un sous-ensemble ;
 //  `BANC_DIST=` le build jugé (avant/après) ; `SHOTS=` les captures (à REGARDER, §6.2).
 //  Un banc ne meurt pas, il rapporte. Preuve : rouge sur origin/claude/integration-refonte,
@@ -51,7 +56,7 @@ fs.mkdirSync(SHOTS, { recursive: true });
 // `aria-haspopup`, `data-afaire-ferme` + une feuille derrière) — la même lecture que src/ui/AFaire.jsx.
 const SEL_AILLEURS = '[data-vc-baisse-ouvrir], [data-tournee-ouvrir], [data-refaire-ouvrir], [data-depot-ouvrir], [data-ann-achats-completer], [data-lbc-baisse-ouvrir], [data-repub-lbc-ouvrir], button[aria-haspopup="dialog"]';
 const CAS = [
-  { nom: 'annonces-vestiaire', url: '/?tab=annonces&site=vestiaire', ligne: '[data-pf-afaire="vestiaire"]', feuille: '[data-pf-afaire-feuille="vestiaire"]', base: D2.baseSites, largeurs: [390, 1512] },
+  { nom: 'annonces-vestiaire', url: '/?tab=annonces&site=vestiaire', ligne: '[data-pf-afaire="vestiaire"]', feuille: '[data-pf-afaire-feuille="vestiaire"]', base: D2.baseSites, largeurs: [390, 1512], sonde: '[data-tache-vestiaire]' },
   { nom: 'annonces-leboncoin', url: '/?tab=annonces&site=leboncoin', ligne: '[data-pf-afaire="leboncoin"]', feuille: '[data-pf-afaire-feuille="leboncoin"]', base: D2.baseSites, largeurs: [390, 1512] },
   { nom: 'annonces-ebay', url: '/?tab=annonces&site=ebay', ligne: '[data-pf-afaire="ebay"]', feuille: '[data-pf-afaire-feuille="ebay"]', base: D2.baseSites, largeurs: [390, 1512] },
   // Annonces · Vinted et Colis : à l'ordinateur, les alertes sont posées dans la page (aucune feuille).
@@ -185,6 +190,28 @@ async function unCas(nav, c, W, theme) {
     dit(m0.hiddenDessines.length === 0, `${T} F0 aucun élément [hidden] dessiné`, m0.hiddenDessines.join(', '));
     dit(horizontalOk(m0), `${T} H avant : rien ne décale la page de côté`, dirH(m0));
     await o.pg.screenshot({ path: path.join(SHOTS, `${c.nom}-${W}-${theme}-0-arrivee.png`) }).catch(() => {});
+    // H2 — une ligne LONGUE dans chaque carte de l'écran (la forme de la ligne de Julien : « N°215 · adidas
+    // handball spezial marron taille 38 · 62 € · 13 photos », sans retour possible) : la carte garde la largeur
+    // de l'écran (elle coupe ou passe à la ligne), elle ne s'élargit pas de part et d'autre. Sonde posée puis retirée.
+    if (c.sonde) {
+      const s = await o.pg.evaluate((sel) => {
+        const sec = document.querySelector(sel); if (!sec) return { absent: true };
+        const iw = window.innerWidth, out = [];
+        for (const k of [...sec.children]) {
+          if (!k.getClientRects().length) continue;
+          const d = document.createElement('div'); d.setAttribute('data-banc-sonde', '');
+          d.style.cssText = 'white-space:nowrap;font:600 13px/1.3 system-ui;overflow:hidden;text-overflow:ellipsis';
+          d.textContent = 'N°215 · adidas handball spezial marron taille 38 · 62 € · 13 photos · Étiquette : pas choisie · Photos Vestiaire 1 manque · 7 à vérifier';
+          k.appendChild(d);
+          const r = k.getBoundingClientRect(); const sw = document.documentElement.scrollWidth;
+          out.push({ quoi: `${k.tagName.toLowerCase()}.${String(k.className).slice(0, 30)}`, l: Math.round(r.left), r: Math.round(r.right), sw });
+          d.remove();
+        }
+        return { iw, out, alignement: getComputedStyle(sec).alignItems };
+      }, c.sonde);
+      const mauvais = (s.out || []).filter((x) => x.l < 0 || x.r > s.iw || x.sw > s.iw);
+      dit(!s.absent && mauvais.length === 0, `${T} H2 une ligne longue ne fait pas déborder les cartes de l'écran`, JSON.stringify({ alignement: s.alignement, mauvais }));
+    }
     if (!(await o.pg.locator(c.ligne).filter({ visible: true }).count())) {
       dit(false, `${T} F1 la ligne « À faire » est à l'écran (sans elle, ce banc ne juge rien)`, `${c.ligne} absent — ${m0.url}`);
       return;
@@ -219,7 +246,9 @@ async function unCas(nav, c, W, theme) {
       dit(fermee && !note, `${T} F2 « ${mth} » ferme la feuille`, note || (fermee ? '' : 'toujours ouverte'));
       dit(apres.voiles.length === 0 && nouveaux.length === 0, `${T} F2 « ${mth} » : aucun voile laissé`, `voiles ${apres.voiles.join(', ')} · couvrants nouveaux ${nouveaux.join(', ')}`);
       dit(horizontalOk(apres) && internesBouges.length === 0, `${T} H après « ${mth} » : la page n'est pas décalée`, `${dirH(apres)}${internesBouges.length ? ' · défilements internes bougés : ' + internesBouges.join(', ') : ''}`);
-      dit(Math.abs(apres.sy - avant.sy) <= 2 && Math.abs(apres.mainY - avant.mainY) <= 2 && apres.url === avant.url, `${T} F2 « ${mth} » : la page revient telle quelle (défilement, écran)`, `y ${avant.sy}→${apres.sy}, main ${avant.mainY}→${apres.mainY}, ${avant.url}→${apres.url}`);
+      const memeEcran = apres.url === avant.url && (await o.pg.locator(c.ligne).filter({ visible: true }).count()) > 0;
+      dit(Math.abs(apres.sy - avant.sy) <= 2 && Math.abs(apres.mainY - avant.mainY) <= 2 && memeEcran, `${T} F2 « ${mth} » : la page revient telle quelle (défilement, même écran : « À faire » toujours là)`, `y ${avant.sy}→${apres.sy}, main ${avant.mainY}→${apres.mainY}, ${avant.url}→${apres.url}, même écran ${memeEcran}`);
+      if (!memeEcran) { await o.pg.goto(`http://localhost:${PORT}${c.url}`, { waitUntil: 'domcontentloaded' }).catch(() => {}); await pret(o.pg); }
       if (!fermee || apres.voiles.length) { await o.pg.screenshot({ path: path.join(SHOTS, `${c.nom}-${W}-${theme}-2-${mth}-PAS-FERMEE.png`) }).catch(() => {}); }
     }
     // F3 : un geste qui ouvre une AUTRE feuille.
@@ -286,6 +315,7 @@ async function fermerTout(o) {
 }
 async function balayage(nav) {
   for (const ecran of ECRANS_BALAYAGE) {
+    if (nav.vivant) await nav.vivant();
     const url = `/?tab=${ecran}`;
     const T = `[balayage ${ecran} 390 tactile]`;
     let o;
@@ -332,16 +362,22 @@ async function balayage(nav) {
 
 (async () => {
   await new Promise((ok) => srv.listen(PORT, ok));
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] });
+  // Un navigateur tombé (machine chargée : « Target crashed ») est relancé pour le cas suivant — le cas
+  // tombé reste dit rouge (« le cas a pu se jouer ») : relancer le banc seul avant de conclure.
+  const lancer = () => chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--disable-dev-shm-usage'] });
+  let navR = await lancer();
+  const nav = new Proxy({}, { get: (_, k) => { const v = navR[k]; return typeof v === 'function' ? v.bind(navR) : v; } });
+  const vivant = async () => { if (!navR.isConnected()) { try { navR = await lancer(); } catch (_) {} } };
   const PARTIES = liste('PARTIES', 'feuilles,balayage');
   if (PARTIES.includes('feuilles')) for (const W of LARGEURS) for (const theme of THEMES) for (const c of CAS) {
     if (CAS_VOULUS.length && !CAS_VOULUS.includes(c.nom)) continue;
     if (!c.largeurs.includes(W)) continue;
     console.log(`— ${c.nom} ${W} ${theme}`);
+    await vivant();
     await unCas(nav, c, W, theme);
   }
-  if (PARTIES.includes('balayage')) { console.log('— balayage de tous les écrans (390 tactile)'); await balayage(nav); }
-  await nav.close(); srv.close();
+  if (PARTIES.includes('balayage')) { console.log('— balayage de tous les écrans (390 tactile)'); await balayage(Object.assign(Object.create(nav), { vivant, newContext: (...a) => navR.newContext(...a) })); }
+  await navR.close().catch(() => {}); srv.close();
   fs.writeFileSync(path.join(SHOTS, 'rapport.json'), JSON.stringify(rapport, null, 1));
   console.log(`\nafaire-feuille : ${verts} vert(s), ${rouges} rouge(s) — captures ${SHOTS}`);
   process.exit(rouges ? 1 : 0);
