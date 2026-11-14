@@ -206,7 +206,10 @@
   background: var(--d-encre, #1D1D1F); color: var(--d-carte, #fff); white-space: nowrap;
   font: 700 10px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase;
 }
-/* Au téléphone, le milieu de l'en-tête porte le compte et les icônes : la languette va à gauche, où il est vide. */
+/* Sur ordinateur, le haut porte déjà le bandeau et ses gestes : la languette remonte du bord BAS.
+   Au téléphone, la barre du bas est pleine et le milieu de l'en-tête porte le compte et les
+   icônes : la languette pend du bord haut, à gauche, où il est vide. */
+@media (min-width: 561px) { .vrm-exemple-cadre-mot { top: auto; bottom: 0; border-radius: 8px 8px 0 0; } }
 @media (max-width: 560px) { .vrm-exemple-cadre-mot { left: 12px; transform: none; } }
 @media print { .vrm-exemple-cadre { display: none; } }
 
