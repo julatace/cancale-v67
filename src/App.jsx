@@ -51052,9 +51052,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const pending = (sales.items||[]).filter(o=> String(o._acc?.vinted_user_id)===String(freshLabel.acc?.vinted_user_id) && aExpedier(o) && !estParti(o));
           const one = pending.length===1 ? pending[0] : null;
           const e = one ? effEntry(one) : null; const num = e?.numero || '';
-          return (
-            /* (5 nov., chantier D) Neutre (plus le vert hors palette ni les emojis 🆕 📄) : une carte de la
-               surface, l'icône du document, une phrase, un geste de 44 px. */
+          return (<VersAFaire>
+            {/* (5 nov., chantier D) Neutre (plus le vert hors palette ni les emojis 🆕 📄) : une carte de la
+               surface, l'icône du document, une phrase, un geste de 44 px. (14 nov.) Dans « À faire » au téléphone. */}
             <div data-colis-bordereau-frais="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 12px 10px 14px',marginBottom:10,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
               <span aria-hidden="true" style={{display:'flex',color:C.muted,flexShrink:0}}><Icon name="doc" size={20}/></span>
               <div style={{flex:'1 1 200px',minWidth:0}}>
@@ -51064,7 +51064,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   : <>{freshLabel.name} · touche « J’ai le PDF » sur la vente concernée : il se tamponne avec son N°.</>}</div>
               </div>
               {one && <Bouton variante="secondaire" icone="doc" onClick={()=>startBordereau(num, one.title, freshLabel.acc, one.transaction_id)}>Tamponner</Bouton>}
-            </div>
+            </div></VersAFaire>
           );
         })()}
         {/* Rappel d'urgence quand l'app est ouverte (complète la notif push quotidienne). */}
