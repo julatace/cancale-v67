@@ -180,7 +180,10 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
           const mq = Object.fromEntries(marques.map((x) => [x.id, x]));
           const chrono = E.find((e) => /Chronopost/.test(e.from) && parId[e.id]);
           const colore = (c) => { const n = (String(c).match(/\d+(\.\d+)?/g) || []).slice(0, 3).map(Number); return n.length === 3 && Math.max(...n) - Math.min(...n) > 12; };
-          const fondsColores = marques.filter((x) => x.ok && colore(x.fond));
+          // (14 nov., Studio bleu clair) Le creux et la porcelaine du Studio sont ses NEUTRES (un bleu-gris très pâle,
+          // le bleu-nuit la nuit) : ce ne sont pas « un fond de couleur ».
+          const neutresStudio = await pg.evaluate(() => ['--sb-creux', '--sb-porcelaine', '--sb-porcelaine-2'].map((v) => { const t = document.createElement('i'); t.style.backgroundColor = `var(${v})`; document.body.appendChild(t); const c = getComputedStyle(t).backgroundColor; t.remove(); return c; }).filter((c) => c && c !== 'rgba(0, 0, 0, 0)'));
+          const fondsColores = marques.filter((x) => x.ok && colore(x.fond) && !neutresStudio.includes(x.fond));
           // (11 nov.) À la souris d'un ordinateur, l'avatar fait 28 px (liste dense comme Mail) ; au doigt, 32 px au moins.
           dit(marques.every((x) => x.ok && x.cache && x.gauche && x.taille >= (tactile ? 32 : 28)) && mq[id(2)].logo === 'vinted' && mq[id(27)].logo === 'vestiaire' && ['monogramme', 'transporteur'].includes(mq[id(1)].k) && mq[id(1)].mono === 'MR' && !!chrono && mq[chrono.id].mono === 'C' && fondsColores.length === 0, `${nom} : la marque de l'expéditeur à GAUCHE de chaque ligne (≥ 32 px) — logo du site, monogramme neutre (« MR », « C ») pour un transporteur, aucun fond de couleur`, JSON.stringify([mq[id(1)], mq[id(2)], fondsColores.slice(0, 1)]));
           // L'heure alignée à droite, sur la ligne de la nature ; le transporteur et le compte en dessous.
@@ -522,7 +525,8 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
         await vd.waitFor({ timeout: 8000 });
         dit(journal(appels).length === avant + 1, `${nom} : « Réessayer » relit la boîte (une lecture, sur SON geste)`);
         const btV = vd.locator('[data-boite-etat-geste="relier"]');
-        const cV = await btV.evaluate((n) => { const t = document.createElement('i'); t.style.color = 'var(--vrm-accent)'; document.body.appendChild(t); const c = getComputedStyle(t).color; t.remove(); return [getComputedStyle(n).backgroundColor, c, n.getBoundingClientRect().height]; });
+        // (14 nov., Studio bleu clair) Le bouton principal est LE plein d'encre (--sb-encre), plus l'accent bleu.
+        const cV = await btV.evaluate((n) => { const t = document.createElement('i'); t.style.color = getComputedStyle(document.documentElement).getPropertyValue('--sb-encre').trim() ? 'var(--sb-encre)' : 'var(--vrm-accent)'; document.body.appendChild(t); const c = getComputedStyle(t).color; t.remove(); return [getComputedStyle(n).backgroundColor, c, n.getBoundingClientRect().height]; });
         dit(/vide/.test(await vd.innerText()) && await btV.count() === 1 && cV[0] === cV[1] && cV[2] >= 44, `${nom} : boîte vide — dit quoi faire, LE geste « Relier ma boîte » (le bouton principal, 44 px)`, JSON.stringify(cV));
         await pg.screenshot({ path: path.join(CAPT, `etat-vide-${nom}.png`) });
         await btV.click();

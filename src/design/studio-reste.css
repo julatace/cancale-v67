@@ -101,7 +101,7 @@
    La capsule DESSINÉE est le ::before (34 px dans une zone de 44, refonte-ms) : c'est elle qui prend la matière. */
 :root:root:root:root:root:root body .vrm-boite .vrm-boite-rubriques.vrm-boite-rubriques > button { background: transparent !important; box-shadow: none !important; border: 0 !important; color: var(--sb-encre) !important; font-weight: 600 !important; }
 :root:root:root:root:root:root body .vrm-boite .vrm-boite-rubriques.vrm-boite-rubriques > button::before {
-  border-radius: var(--sb-r-touche) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-plan) !important;
+  border-radius: var(--sb-r-touche) !important; background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-plan) !important;
 }
 :root:root:root:root:root:root body .vrm-boite .vrm-boite-rubriques.vrm-boite-rubriques > button[aria-pressed="true"] { color: var(--sb-encre) !important; }
 :root:root:root:root:root:root body .vrm-boite .vrm-boite-rubriques.vrm-boite-rubriques > button[aria-pressed="true"]::before { background: var(--sb-creux) !important; box-shadow: var(--sb-gravure) !important; }
@@ -111,7 +111,7 @@
 :root:root:root:root:root:root body .vrm-boite .vrm-boite-rubriques.vrm-boite-rubriques > button[aria-pressed="true"] * { color: var(--sb-encre) !important; }
 :root:root:root:root:root:root body .vrm-boite .vrm-boite-rubriques .vrm-boite-n { color: var(--sb-encre-2) !important; }
 :root:root:root:root:root:root body :is(.vrm-boite, .vrm-boite-feuille) .vrm-boite-puce-code:not(.is-grande) {
-  border: 0 !important; border-radius: var(--sb-r-touche) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important;
+  border: 0 !important; border-radius: var(--sb-r-touche) !important; background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important;
   box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important; font: 600 17px/1 var(--sb-police-texte) !important; letter-spacing: .07em !important; font-variant-numeric: tabular-nums !important;
 }
 :root:root:root:root:root:root body :is(.vrm-boite, .vrm-boite-feuille) .vrm-boite-puce-code[data-copie="1"] { background: var(--sb-creux) !important; box-shadow: var(--sb-gravure) !important; color: var(--sb-encre) !important; }
@@ -121,9 +121,20 @@
 :root:root:root:root:root:root body .vrm-boite .vrm-boite-jour-titre { color: var(--sb-encre-2) !important; font: 600 13px/1.2 var(--sb-police-texte) !important; }
 :root:root:root:root:root:root body .vrm-boite .vrm-boite-plus { color: var(--sb-lien) !important; }
 
+/* Les gestes d'un état de la boîte (« Relier ma boîte », « Réessayer ») : le premier = le plein d'encre,
+   l'autre = une touche (plus de bouton bleu plein). */
+:root:root:root:root:root:root body :is(.vrm-boite, .vrm-boite-feuille) .vrm-boite-principal {
+  border: 0 !important; border-radius: 26px !important; min-height: 52px !important; padding: 0 22px !important;
+  background-color: var(--sb-encre) !important; background-image: var(--sb-plein-fond, none) !important; color: var(--sb-plein-encre, var(--sb-sur-encre)) !important;
+  box-shadow: 0 1px 0 rgb(255 255 255 / .18) inset, 0 2px 4px rgb(var(--sb-o) / .18), 0 14px 26px -10px rgb(var(--sb-o) / .55) !important; font-weight: 600 !important;
+}
+:root:root:root:root:root:root body :is(.vrm-boite, .vrm-boite-feuille) .vrm-boite-second {
+  border: 0 !important; border-radius: var(--sb-r-touche) !important; background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important;
+  box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important; font-weight: 600 !important;
+}
 /* Statistiques : les records sont des tuiles (on touche la tuile entière). */
 :root:root:root:root:root:root body [data-espace="argent"] .vrm-sp-rec {
-  border: 0 !important; border-radius: var(--sb-r-tuile) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-plan) !important;
+  border: 0 !important; border-radius: var(--sb-r-tuile) !important; background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-plan) !important;
 }
 
 /* ══ 7 ter. LA CONNEXION ══ le bleu clair éclairé du haut, le titre en Urbanist, la carte en porcelaine,
@@ -145,10 +156,10 @@
 :root:root:root:root:root:root body .vrm-cx .vrm-cx-marque :is(li, span, p, small, .vrm-cx-pied) { color: var(--sb-encre-2) !important; }
 :root:root:root:root:root:root body .vrm-cx .vrm-cx-marque :is(b, strong, .vrm-cx-logo b) { color: var(--sb-encre) !important; }
 :root:root:root:root:root:root body .vrm-cx .vrm-cx-marque i { background: var(--sb-creux) !important; box-shadow: var(--sb-gravure) !important; color: var(--sb-encre) !important; }
-:root:root:root:root:root:root body .vrm-cx .vrm-cx-etiquettes > * { background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important; box-shadow: var(--sb-ombre-plan) !important; border: 0 !important; }
+:root:root:root:root:root:root body .vrm-cx .vrm-cx-etiquettes > * { background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important; box-shadow: var(--sb-ombre-plan) !important; border: 0 !important; }
 :root:root:root:root:root:root body .vrm-cx .vrm-cx-etiquettes > * * { color: var(--sb-encre) !important; }
 :root:root:root:root:root:root body .vrm-cx .vrm-cx-form {
-  background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; border: 0 !important; border-radius: var(--sb-r-plan) !important; box-shadow: var(--sb-ombre-avant) !important; color: var(--sb-encre) !important;
+  background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; border: 0 !important; border-radius: var(--sb-r-plan) !important; box-shadow: var(--sb-ombre-avant) !important; color: var(--sb-encre) !important;
 }
 :root:root:root:root:root:root body .vrm-cx .vrm-cx-form h2 { font-family: var(--sb-police-affiche) !important; font-weight: 500 !important; letter-spacing: -.02em !important; }
 :root:root:root:root:root:root body .vrm-cx .vrm-cx-form input { background: var(--sb-creux) !important; border: 0 !important; box-shadow: var(--sb-gravure) !important; border-radius: var(--sb-r-champ) !important; color: var(--sb-encre) !important; }
@@ -192,7 +203,7 @@
 :root:root:root:root:root:root body .sb-touche {
   display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 7px !important;
   height: 40px !important; min-height: 40px !important; padding: 0 15px !important; border: 0 !important; border-radius: var(--sb-r-touche) !important;
-  background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important;
+  background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important;
   font: 600 14px/1.2 var(--sb-police-texte) !important; letter-spacing: 0 !important; text-decoration: none !important; white-space: nowrap;
   box-shadow: var(--sb-ombre-plan) !important; position: relative; transition: transform var(--sb-e-appui), box-shadow var(--sb-e-appui), background var(--sb-e-appui) !important; cursor: pointer !important; filter: none !important;
 }
@@ -213,7 +224,7 @@
 :root:root:root:root:root:root body .sb-rond {
   display: inline-flex !important; align-items: center !important; justify-content: center !important;
   width: 44px !important; height: 44px !important; min-width: 44px !important; min-height: 44px !important; padding: 0 !important; border: 0 !important; border-radius: 50% !important;
-  background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important;
+  background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important;
   box-shadow: var(--sb-ombre-plan) !important; position: relative; transition: transform var(--sb-e-appui) !important; cursor: pointer !important;
 }
 :root:root:root:root:root:root body .sb-rond.sb-rond--disque { width: 60px !important; height: 60px !important; min-width: 60px !important; min-height: 60px !important; }
@@ -232,7 +243,7 @@
 /* ── Composants (provisoire : vient de studio.css) ── */
 :root:root:root:root:root:root body .sb-tuile {
   position: relative !important; border: 0 !important; border-radius: var(--sb-r-tuile) !important;
-  background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important;
+  background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important;
   box-shadow: var(--sb-ombre-plan) !important; padding: 14px 14px 14px 16px !important; text-align: left !important;
 }
 :root:root:root:root:root:root body .sb-chiffre-affiche {
@@ -281,14 +292,14 @@
 /* Le « ? » à côté du titre : un rond. */
 :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-aide-bouton {
   width: 44px !important; height: 44px !important; min-width: 44px !important; border-radius: 50% !important; border: 0 !important;
-  background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important; box-shadow: var(--sb-ombre-plan) !important;
+  background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important; box-shadow: var(--sb-ombre-plan) !important;
   display: inline-flex !important; align-items: center !important; justify-content: center !important; padding: 0 !important;
 }
 :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-aide-bouton svg { width: 21px !important; height: 21px !important; }
 
 /* Les cartes : porcelaine posée, rayon 22, sans trait. */
 :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) :is(.vrm-surface, .vrm-card, .vrm-fu-carte, .vrm-carte-mfa, .vrm-settings-todo, .vrm-carte, .vrm-cm-carte, .vrm-fp-section, .vrm-sv-tuile, .vrm-sv-carte, .vrm-d7-carte, .vrm-sx, .vrm-onglet-manque, .vrm-rpf-point, .vrm-ann-card, .vrm-reglages-groupe) {
-  background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; border: 0 !important; border-radius: var(--sb-r-tuile) !important; box-shadow: var(--sb-ombre-plan) !important;
+  background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; border: 0 !important; border-radius: var(--sb-r-tuile) !important; box-shadow: var(--sb-ombre-plan) !important;
 }
 
 /* Les boutons d'avant prennent l'une des quatre formes (rien ne change de place). */
@@ -304,7 +315,7 @@
 /* (b) secondaire / danger / icône + mot ⇒ la touche posée */
 :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-b:is(.vrm-b-secondaire, .vrm-b-danger):not(.vrm-b-icone):where(:not(.sb-lien, .sb-touche, .sb-rond, .sb-btn-plein)) {
   height: 40px !important; min-height: 40px !important; padding: 0 15px !important; border: 0 !important; border-radius: var(--sb-r-touche) !important;
-  background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important;
+  background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important;
   font: 600 14px/1.2 var(--sb-police-texte) !important; box-shadow: var(--sb-ombre-plan) !important; filter: none !important;
 }
 @media (pointer: coarse) { :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-b:is(.vrm-b-secondaire, .vrm-b-danger):not(.vrm-b-icone):where(:not(.sb-lien, .sb-touche, .sb-rond, .sb-btn-plein)) { height: 44px !important; min-height: 44px !important; } }
@@ -315,7 +326,7 @@
 /* (c) icône seule ⇒ le rond de 44 */
 :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-b.vrm-b-icone:where(:not(.sb-lien, .sb-touche, .sb-rond, .sb-btn-plein)) {
   width: 44px !important; height: 44px !important; min-width: 44px !important; min-height: 44px !important; padding: 0 !important; border: 0 !important; border-radius: 50% !important;
-  background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important; box-shadow: var(--sb-ombre-plan) !important;
+  background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important; box-shadow: var(--sb-ombre-plan) !important;
 }
 /* (d) discret / lien d'action ⇒ le lien */
 :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) :is(.vrm-b.vrm-b-discret, .vrm-lien-action):where(:not(.sb-lien, .sb-touche, .sb-rond, .sb-btn-plein)) {
@@ -335,7 +346,7 @@
 }
 @media (pointer: coarse) { :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-seg .vrm-seg-btn { min-height: 44px !important; } }
 :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-seg .vrm-seg-btn:is([aria-current="page"], [aria-pressed="true"], [aria-selected="true"]) {
-  background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important; box-shadow: var(--sb-ombre-plan) !important;
+  background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important; box-shadow: var(--sb-ombre-plan) !important;
 }
 :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-seg .vrm-seg-btn:is([aria-current="page"], [aria-pressed="true"], [aria-selected="true"])::after {
   content: '' !important; position: absolute !important; top: 6px !important; right: 7px !important; width: 5px !important; height: 5px !important; border-radius: 50% !important;
@@ -357,7 +368,7 @@
 /* Les groupes de rangées sobres (Réglages, replis d'Argent) : un plan de porcelaine,
    des rangées de 56 px, séparateur indenté fin, chevron fin. */
 :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"]) .vrm-set-liste {
-  background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; border: 0 !important; border-radius: var(--sb-r-tuile) !important;
+  background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; border: 0 !important; border-radius: var(--sb-r-tuile) !important;
   box-shadow: var(--sb-ombre-plan) !important; overflow: hidden !important;
 }
 :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"]) .vrm-set-ligne { background: transparent !important; min-height: 56px !important; color: var(--sb-encre) !important; }
@@ -380,7 +391,7 @@
 :root:root:root:root:root:root body [data-espace="argent"] .vrm-argent-q .vrm-argent-w {
   display: flex !important; flex-direction: column !important; justify-content: space-between !important; align-items: flex-start !important; gap: 6px !important;
   min-height: 100px !important; height: auto !important; margin: 0 !important; padding: 14px 14px 14px 16px !important; border: 0 !important; border-radius: var(--sb-r-tuile) !important;
-  background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important;
+  background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important;
   text-align: left !important; position: relative !important; cursor: pointer !important; transition: transform var(--sb-e-appui), box-shadow var(--sb-e-appui) !important;
   content-visibility: visible !important;
 }
@@ -425,7 +436,7 @@
 
 /* Les replis (Ton bénéfice, Vendu et reçu, …) : une liste de rangées sur un plan de porcelaine. */
 :root:root:root:root:root:root body [data-espace="argent"] .vrm-compta-replis {
-  background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; border: 0 !important; border-radius: var(--sb-r-tuile) !important;
+  background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; border: 0 !important; border-radius: var(--sb-r-tuile) !important;
   box-shadow: var(--sb-ombre-plan) !important; overflow: hidden !important; padding: 0 !important; gap: 0 !important;
 }
 :root:root:root:root:root:root body [data-espace="argent"] .vrm-compta-repli { background: transparent !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; margin: 0 !important; position: relative !important; }
@@ -461,7 +472,7 @@
 
 /* Déclarer : la carte du mois en porcelaine, l'URSSAF du mois en grand chiffre fin (data-* inchangés). */
 :root:root:root:root:root:root body [data-espace="argent"] :is(.vrm-compta-carte, .vrm-stats-carte, [data-stats-carte]) {
-  background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; border: 0 !important; border-radius: var(--sb-r-tuile) !important; box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important;
+  background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; border: 0 !important; border-radius: var(--sb-r-tuile) !important; box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important;
 }
 :root:root:root:root:root:root body [data-espace="argent"] .vrm-compta-hero {
   font-family: var(--sb-police-affiche) !important; font-weight: 200 !important; font-size: 56px !important; line-height: .9 !important; letter-spacing: -.05em !important;
@@ -471,12 +482,12 @@
 :root:root:root:root:root:root body [data-espace="argent"] .vrm-compta-phrase { color: var(--sb-encre-2) !important; }
 /* Statistiques : les cartes chiffrées en tuiles, leurs chiffres en Urbanist. */
 :root:root:root:root:root:root body [data-espace="argent"] :is(.vrm-sv-tuile, .vrm-sv-carte, .vrm-sp-carte, .vrm-fc-carte, .vrm-ac-carte) {
-  background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; border: 0 !important; border-radius: var(--sb-r-tuile) !important; box-shadow: var(--sb-ombre-plan) !important;
+  background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; border: 0 !important; border-radius: var(--sb-r-tuile) !important; box-shadow: var(--sb-ombre-plan) !important;
 }
 /* « Quel est ton statut ? » : à l'ordinateur, quatre tuiles posées (on touche la tuile entière). */
 @media (min-width: 900px) {
   :root:root:root:root:root:root body [data-espace="argent"] .vrm-statut-option {
-    border: 0 !important; border-radius: var(--sb-r-tuile) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important;
+    border: 0 !important; border-radius: var(--sb-r-tuile) !important; background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important;
   }
   :root:root:root:root:root:root body [data-espace="argent"] .vrm-statut-option[aria-pressed="true"] { background: var(--sb-creux) !important; box-shadow: var(--sb-gravure) !important; }
 }
@@ -493,7 +504,7 @@
   position: relative !important; min-height: 44px !important; border: 0 !important; border-radius: var(--sb-r-touche) !important; background: transparent !important; box-shadow: none !important; color: var(--sb-encre-2) !important;
 }
 :root:root:root:root:root:root body [data-tache="messages"] .vrm-sel-sites > button:is([aria-pressed="true"], [aria-current="page"], [aria-checked="true"], .on, .is-on, [data-on="1"]) {
-  background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important; box-shadow: var(--sb-ombre-plan) !important;
+  background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important; box-shadow: var(--sb-ombre-plan) !important;
 }
 :root:root:root:root:root:root body [data-tache="messages"] .vrm-sel-sites > button:is([aria-pressed="true"], [aria-current="page"], [aria-checked="true"])::after {
   content: '' !important; position: absolute !important; top: 6px !important; right: 7px !important; width: 5px !important; height: 5px !important; border-radius: 50% !important;
@@ -525,12 +536,12 @@
    réponses rapides, négociation et offres en touches ; le fond est le bleu clair (feuille plein écran). */
 :root:root:root:root:root:root body .vrm-chat-panel { color: var(--sb-encre) !important; }
 :root:root:root:root:root:root body .vrm-chat-panel .vrm-bulle-l:not(.vrm-bulle-moi) > .vrm-bulle {
-  background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important; box-shadow: var(--sb-ombre-pose) !important; border: 0 !important;
+  background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important; box-shadow: var(--sb-ombre-pose) !important; border: 0 !important;
 }
 :root:root:root:root:root:root body .vrm-chat-panel .vrm-bulle-l.vrm-bulle-moi > .vrm-bulle { background: var(--sb-plein-fond, var(--sb-encre)) !important; color: var(--sb-plein-encre, var(--sb-sur-encre)) !important; border: 0 !important; box-shadow: var(--sb-ombre-pose) !important; }
 :root:root:root:root:root:root body .vrm-chat-panel .vrm-bulle-l.vrm-bulle-moi > .vrm-bulle * { color: inherit !important; }
 :root:root:root:root:root:root body .vrm-chat-panel :is(.vrm-chat-rapides > button, .vrm-chat-negociation > summary) {
-  border: 0 !important; border-radius: var(--sb-r-touche) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important;
+  border: 0 !important; border-radius: var(--sb-r-touche) !important; background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important;
   box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important; font: 600 14px/1.2 var(--sb-police-texte) !important;
 }
 :root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-negociation[open] > summary { background: var(--sb-creux) !important; box-shadow: var(--sb-gravure) !important; transform: translateY(1px); }
@@ -541,10 +552,10 @@
 /* Les offres dans la conversation : une carte en porcelaine, ses gestes en TOUCHES (Refuser · Proposer ·
    Contre-offre · Accepter) ; le plein reste « Répondre sur Vinted » (un seul plein par écran). */
 :root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-offre {
-  background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; border: 0 !important; border-radius: var(--sb-r-tuile) !important; box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important;
+  background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; border: 0 !important; border-radius: var(--sb-r-tuile) !important; box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important;
 }
 :root:root:root:root:root:root body .vrm-chat-panel :is(.vrm-chat-btn, .vrm-chat-offre-retirer) {
-  min-height: 44px !important; border: 0 !important; border-radius: var(--sb-r-touche) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important;
+  min-height: 44px !important; border: 0 !important; border-radius: var(--sb-r-touche) !important; background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important;
   box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important; font: 600 14px/1.2 var(--sb-police-texte) !important; filter: none !important;
 }
 :root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-btn.vrm-chat-btn-p { font-weight: 700 !important; }
@@ -555,12 +566,12 @@
 /* Les icônes seules (« ⋯ » des factures, « Actualiser la conversation », …) : le rond de 44. */
 :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-icon-control {
   width: 44px !important; height: 44px !important; min-width: 44px !important; min-height: 44px !important; padding: 0 !important; border: 0 !important; border-radius: 50% !important;
-  background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important; box-shadow: var(--sb-ombre-plan) !important;
+  background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important; box-shadow: var(--sb-ombre-plan) !important;
 }
 :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-icon-control:not(:disabled):active { transform: translateY(1px) !important; background: var(--sb-creux) !important; box-shadow: var(--sb-gravure) !important; }
 /* « Retirer » (la conversation de la liste) : une touche. */
 :root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-retirer {
-  min-height: 44px !important; border: 0 !important; border-radius: var(--sb-r-touche) !important; padding: 0 14px !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important;
+  min-height: 44px !important; border: 0 !important; border-radius: var(--sb-r-touche) !important; padding: 0 14px !important; background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important;
   box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important; font: 600 14px/1.2 var(--sb-police-texte) !important;
 }
 
@@ -587,7 +598,7 @@
 
 /* ══ 7. COMMUNAUTÉ · E-MAILS ══ (la même matière ; leurs listes en rangées) ══ */
 :root:root:root:root:root:root body [data-espace="autres"] :is(.vrm-filtres, .vrm-rangee.vrm-filtres) > button:not(.sb-touche):not(.sb-lien) {
-  min-height: 36px !important; border: 0 !important; border-radius: 12px !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important;
+  min-height: 36px !important; border: 0 !important; border-radius: 12px !important; background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important;
   box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important; font: 600 14px/1.2 var(--sb-police-texte) !important; position: relative !important;
 }
 @media (pointer: coarse) { :root:root:root:root:root:root body [data-espace="autres"] :is(.vrm-filtres, .vrm-rangee.vrm-filtres) > button:not(.sb-touche):not(.sb-lien) { min-height: 44px !important; } }
@@ -603,11 +614,11 @@
   --cm-fond: var(--sb-creux); --cm-carte: var(--sb-porcelaine); --cm-encre: var(--sb-encre); --cm-doux: var(--sb-encre-2);
   --cm-bord: rgb(var(--sb-o) / .10); --cm-accent: var(--sb-lien); --cm-accent-fond: var(--sb-creux); --cm-ombre: var(--sb-ombre-plan);
 }
-:root:root:root:root:root:root body .vrm-communaute .vrm-cm-carton { border: 0 !important; border-radius: var(--sb-r-tuile) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-plan) !important; }
+:root:root:root:root:root:root body .vrm-communaute .vrm-cm-carton { border: 0 !important; border-radius: var(--sb-r-tuile) !important; background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-plan) !important; }
 :root:root:root:root:root:root body .vrm-communaute :is(h2, .vrm-cm-entete h2) { font-family: var(--sb-police-affiche) !important; font-weight: 500 !important; letter-spacing: -.02em !important; }
 /* (b) le bouton de base de l'écran ⇒ la touche ; (a) le primaire ⇒ le plein en barre ; (d) le lien ; (c) la croix ⇒ le rond. */
 :root:root:root:root:root:root body .vrm-communaute button:not(.vrm-cm-primaire):not(.vrm-cm-lien):not(.vrm-cm-x):not(.vrm-cm-onglet):not([class*="leaflet"]):not(.vrm-aide-bouton) {
-  border: 0 !important; border-radius: var(--sb-r-touche) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important;
+  border: 0 !important; border-radius: var(--sb-r-touche) !important; background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important;
   box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important; font: 600 14px/1.2 var(--sb-police-texte) !important;
 }
 :root:root:root:root:root:root body .vrm-communaute .vrm-cm-primaire {
@@ -618,14 +629,14 @@
 :root:root:root:root:root:root body .vrm-communaute .vrm-cm-lien { background: transparent !important; box-shadow: none !important; border: 0 !important; color: var(--sb-lien) !important; font: 600 14px/1.2 var(--sb-police-texte) !important; }
 :root:root:root:root:root:root body .vrm-communaute .vrm-cm-x {
   width: 44px !important; height: 44px !important; min-width: 44px !important; border-radius: 50% !important; padding: 0 !important; border: 0 !important;
-  background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important;
+  background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important;
 }
 :root:root:root:root:root:root body .vrm-communaute .vrm-cm-onglets { background: var(--sb-creux) !important; border-radius: 16px !important; padding: 3px !important; box-shadow: var(--sb-gravure) !important; border: 0 !important; }
 :root:root:root:root:root:root body .vrm-communaute .vrm-cm-onglet { position: relative !important; border-radius: var(--sb-r-touche) !important; background: transparent !important; box-shadow: none !important; color: var(--sb-encre-2) !important; font: 600 14px/1.2 var(--sb-police-texte) !important; }
-:root:root:root:root:root:root body .vrm-communaute .vrm-cm-onglet[aria-pressed="true"] { background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important; box-shadow: var(--sb-ombre-plan) !important; }
+:root:root:root:root:root:root body .vrm-communaute .vrm-cm-onglet[aria-pressed="true"] { background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important; box-shadow: var(--sb-ombre-plan) !important; }
 :root:root:root:root:root:root body .vrm-communaute .vrm-cm-onglet[aria-pressed="true"]::after { content: '' !important; position: absolute !important; top: 6px !important; right: 7px !important; width: 5px !important; height: 5px !important; border-radius: 50% !important; background: var(--sb-diode) !important; box-shadow: 0 0 6px var(--sb-diode) !important; }
 :root:root:root:root:root:root body .vrm-communaute :is(.vrm-cm-champ, .vrm-cm-saisie, .vrm-cm-select, input, select, textarea) { background: var(--sb-creux) !important; border: 0 !important; box-shadow: var(--sb-gravure) !important; border-radius: 12px !important; color: var(--sb-encre) !important; }
-:root:root:root:root:root:root body .vrm-communaute .vrm-cm-feuille { background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-avant) !important; border-top-left-radius: var(--sb-r-plan) !important; border-top-right-radius: var(--sb-r-plan) !important; }
+:root:root:root:root:root:root body .vrm-communaute .vrm-cm-feuille { background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-avant) !important; border-top-left-radius: var(--sb-r-plan) !important; border-top-right-radius: var(--sb-r-plan) !important; }
 :root:root:root:root:root:root body .vrm-communaute .vrm-cm-voile { background: rgb(var(--sb-o) / .28) !important; }
 
 /* ══ 8. LES FEUILLES GÉNÉRIQUES (SheetShell, confirmations, aide « ? ») ══════════
@@ -634,13 +645,13 @@
 :root:root:root:root:root:root body .vrm-fs-voile { background: rgb(var(--sb-o) / .28) !important; -webkit-backdrop-filter: blur(1.5px) !important; backdrop-filter: blur(1.5px) !important; }
 :root[data-theme="dark"]:root:root:root:root:root body .vrm-fs-voile { background: rgb(2 8 16 / .62) !important; }
 :root:root:root:root:root:root body .vrm-fs:not(.vrm-fs-sombre) {
-  background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important;
+  background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important;
   border: 0 !important; box-shadow: var(--sb-ombre-avant) !important; border-top-left-radius: var(--sb-r-plan) !important; border-top-right-radius: var(--sb-r-plan) !important;
 }
 :root:root:root:root:root:root body .vrm-fs .vrm-fs-titre { font-family: var(--sb-police-affiche) !important; font-weight: 500 !important; letter-spacing: -.02em !important; color: var(--sb-encre) !important; }
 :root:root:root:root:root:root body .vrm-fs .vrm-fs-sous-titre { color: var(--sb-encre-2) !important; }
 :root:root:root:root:root:root body .vrm-fs .vrm-fs-croix-rond {
-  width: 44px !important; height: 44px !important; border-radius: 50% !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important;
+  width: 44px !important; height: 44px !important; border-radius: 50% !important; background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important;
   box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important; display: inline-flex !important; align-items: center !important; justify-content: center !important;
 }
 :root:root:root:root:root:root body .vrm-fs .vrm-fs-poignee { background: rgb(var(--sb-o) / .22) !important; }
@@ -652,12 +663,12 @@
 :root:root:root:root:root:root body .vrm-fs .vrm-b.vrm-b-primaire:disabled { background: rgb(var(--sb-o) / .10) !important; color: rgb(var(--sb-o) / .45) !important; box-shadow: none !important; }
 :root:root:root:root:root:root body .vrm-fs.vrm-confirmation[data-confirmation="irreversible"] .vrm-b.vrm-b-primaire:where(:not(.sb-lien, .sb-touche, .sb-rond, .sb-btn-plein)) { background: var(--sb-plein-fond, var(--sb-encre)) !important; color: var(--sb-plein-encre, var(--sb-sur-encre)) !important; }
 :root:root:root:root:root:root body .vrm-fs .vrm-b:is(.vrm-b-secondaire, .vrm-b-danger):not(.vrm-b-icone):where(:not(.sb-lien, .sb-touche, .sb-rond, .sb-btn-plein)) {
-  border: 0 !important; border-radius: var(--sb-r-touche) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important;
+  border: 0 !important; border-radius: var(--sb-r-touche) !important; background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important;
   color: var(--sb-encre) !important; box-shadow: var(--sb-ombre-plan) !important; filter: none !important;
 }
 :root:root:root:root:root:root body .vrm-fs .vrm-b.vrm-b-danger { color: var(--sb-ambre) !important; }
 :root:root:root:root:root:root body .vrm-fs :is(.vrm-b.vrm-b-discret, .vrm-lien-action):where(:not(.sb-lien, .sb-touche, .sb-rond, .sb-btn-plein)) { background: transparent !important; box-shadow: none !important; border: 0 !important; color: var(--sb-lien) !important; }
-:root:root:root:root:root:root body .vrm-fs .vrm-b.vrm-b-icone:where(:not(.sb-lien, .sb-touche, .sb-rond, .sb-btn-plein)) { border-radius: 50% !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important; }
+:root:root:root:root:root:root body .vrm-fs .vrm-b.vrm-b-icone:where(:not(.sb-lien, .sb-touche, .sb-rond, .sb-btn-plein)) { border-radius: 50% !important; background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important; }
 
 /* ══ 9. MOUVEMENT ════════════════════════════════════════════════════════════ */
 @media (prefers-reduced-motion: reduce) {
