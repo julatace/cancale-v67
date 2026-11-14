@@ -202,14 +202,19 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
   // ou un mot du dernier message, filtré ICI (rien n'est relu ni écrit ; l'ordre reste celui des fils).
   const [cherche, setCherche] = React.useState('');
 
-  const parCle = new Map();
-  const entrees = [];
-  for (const x of (Array.isArray(vinted) ? vinted : [])) { const e = convVinted(x.c, x.paire); if (e) { e.compteNom = x.compte || ''; parCle.set(e.cle, { e, c: x.c }); entrees.push(e); } }
-  for (const f of ((autres.lbc && autres.lbc.fils) || [])) { const e = convLeboncoin(f); if (e) { e.compteNom = f.nom || ''; parCle.set(e.cle, { e }); entrees.push(e); } }
-  for (const v of ((autres.vc && autres.vc.fils) || [])) { const e = convVestiaire(v); if (e) { parCle.set(e.cle, { e }); entrees.push(e); } }
-  for (const x of ((ebayTous && ebayTous.items) || [])) { const e = convEbay(x.m, x.compte); if (e) { parCle.set(e.cle, { e }); entrees.push(e); } }
-  const fils = regrouperFils(entrees, relies.liens);
-  const propositions = suggestionsFils(fils, relies.liens, relies.refus);
+  // (14 nov., refonte — AJOUT 2) Les fils se regroupent UNE fois par lecture (et par lien posé), pas à
+  // chaque lettre tapée dans la recherche : à 1 000 conversations, c'était le coût de chaque frappe.
+  // Même règle (src/filUnique.js), mêmes entrées : seul le moment du calcul change.
+  const { parCle, fils, propositions } = React.useMemo(() => {
+    const parCle = new Map();
+    const entrees = [];
+    for (const x of (Array.isArray(vinted) ? vinted : [])) { const e = convVinted(x.c, x.paire); if (e) { e.compteNom = x.compte || ''; parCle.set(e.cle, { e, c: x.c }); entrees.push(e); } }
+    for (const f of ((autres.lbc && autres.lbc.fils) || [])) { const e = convLeboncoin(f); if (e) { e.compteNom = f.nom || ''; parCle.set(e.cle, { e }); entrees.push(e); } }
+    for (const v of ((autres.vc && autres.vc.fils) || [])) { const e = convVestiaire(v); if (e) { parCle.set(e.cle, { e }); entrees.push(e); } }
+    for (const x of ((ebayTous && ebayTous.items) || [])) { const e = convEbay(x.m, x.compte); if (e) { parCle.set(e.cle, { e }); entrees.push(e); } }
+    const fils = regrouperFils(entrees, relies.liens);
+    return { parCle, fils, propositions: suggestionsFils(fils, relies.liens, relies.refus) };
+  }, [vinted, autres, ebayTous, relies]);
   const motCherche = cherche.trim().toLowerCase().replace(/^n°\s*/, '');
   const filsVus = motCherche ? fils.filter((f) => {
     const d = f.dernier || f.convs[f.convs.length - 1];
