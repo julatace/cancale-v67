@@ -84,6 +84,24 @@ export function versementsEnRetard(aDater) {
   const p = objet(a.plus30);
   return p && Number.isInteger(p.n) && p.n >= 0 ? p.n : null;
 }
+// (14 nov., lot dates-versement) CE QUI ACCOMPAGNE LE NOMBRE, pour une phrase juste (§2.7) :
+// combien sont DÉJÀ datées (`aDater.datees.n`), la cause quand elle est UNE seule (les
+// raisons publiées par Ventes, src/versementRaisons.js — `vinted-detail` : Vinted ne donne la
+// date qu'en ouvrant chaque vente, l'extension les lit) et combien de comptes. Des nombres et
+// une clé : jamais un pseudo. Absent (ligne d'avant ce lot) ⇒ `null` : la phrase d'avant.
+export function detailVersement(aDater) {
+  const a = objet(aDater);
+  if (!a) return null;
+  const d = objet(a.datees);
+  const datees = d && Number.isInteger(d.n) && d.n >= 0 ? d.n : null;
+  const raisons = Array.isArray(a.raisons) ? a.raisons.filter((r) => r && Number(r.n) > 0) : null;
+  const cause = raisons && raisons.length ? (raisons.every((r) => r.cle === raisons[0].cle) ? String(raisons[0].cle).slice(0, 20) : 'plusieurs') : null;
+  const comptes = raisons && cause === 'vinted-detail' ? raisons.reduce((t, r) => t + (Array.isArray(r.comptes) ? r.comptes.length : 0), 0) : null;
+  const total = Number.isInteger(a.n) && a.n >= 0 ? a.n : null;
+  if (datees == null && cause == null) return null;
+  return { datees, cause, comptes, total };
+}
+const DETAILS_PERMIS = { datees: 'n', comptes: 'n', total: 'n', cause: 's' };
 // Les ventes à dater vendues il y a plus de 30 jours (appelé par l'écran Ventes
 // sur SES lignes `aDater` ; `tsVente(l)` = la date de vente, src/aDaterAnnee.js).
 export function plus30De(aDater, tsVente, maintenant = Date.now()) {
@@ -119,12 +137,20 @@ export function incoherencesStripe(rows, { stripe = null, maintenant = Date.now(
 
 // ── LE RÉSULTAT RANGÉ ───────────────────────────────────────────────────────────
 // `valeurs` : { cle: liste d'identifiants | nombre | null } ; `raisons` : { cle: texte }.
-export function resultatControle(valeurs, raisons = {}, maintenant = Date.now()) {
+// `details` (14 nov.) : { cle: { datees, comptes, total, cause } } — liste blanche, nombres et clé.
+export function resultatControle(valeurs, raisons = {}, maintenant = Date.now(), details = {}) {
   const controles = {};
   for (const [cle, v] of Object.entries(valeurs || {})) {
     if (!CLES_CONTROLES.includes(cle)) continue;
     if (Array.isArray(v)) controles[cle] = { n: v.length, ids: v.slice(0, IDS_MAX).map((x) => String(typeof x === 'object' && x ? (x.cause || x.id || '') : x).slice(0, 40)) };
-    else if (Number.isInteger(v) && v >= 0) controles[cle] = { n: v };
+    else if (Number.isInteger(v) && v >= 0) {
+      controles[cle] = { n: v };
+      const d = objet(details && details[cle]);
+      if (d) for (const [k, t] of Object.entries(DETAILS_PERMIS)) {
+        if (t === 'n' && Number.isInteger(d[k]) && d[k] >= 0) controles[cle][k] = d[k];
+        if (t === 's' && typeof d[k] === 'string' && /^[a-z-]{1,20}$/.test(d[k])) controles[cle][k] = d[k];
+      }
+    }
     else controles[cle] = { n: null, raison: String(raisons[cle] || 'pas lu').slice(0, 80) };
   }
   return { v: 1, at: new Date(maintenant).toISOString(), controles };
@@ -150,7 +176,13 @@ export function etatControle(vendeur, installation, maintenant = Date.now()) {
     const c = objet(src[C.cle]);
     if (!c) continue;
     if (!Number.isInteger(c.n)) { passu.push({ cle: C.cle, nom: C.nom, raison: c.raison || 'pas lu' }); continue; }
-    if (c.n > 0) lignes.push({ cle: C.cle, n: c.n, ton: C.ton || 'geste', phrase: C.phrase(c.n), geste: C.geste, ids: Array.isArray(c.ids) ? c.ids : [] });
+    if (c.n > 0) {
+      // (14 nov.) Des ventes « en cours de lecture » (Vinted les donne une par une, l'extension
+      // les lit) ne sont pas un geste à faire : ton neutre, la phrase dit le reste (VeilleJournee).
+      const lecture = C.cle === 'versement-30j' && c.cause === 'vinted-detail';
+      const detail = C.cle === 'versement-30j' ? { datees: Number.isInteger(c.datees) ? c.datees : null, cause: c.cause || null, comptes: Number.isInteger(c.comptes) ? c.comptes : null, total: Number.isInteger(c.total) ? c.total : null } : null;
+      lignes.push({ cle: C.cle, n: c.n, ton: lecture ? 'info' : (C.ton || 'geste'), phrase: C.phrase(c.n), geste: C.geste, ids: Array.isArray(c.ids) ? c.ids : [], ...(detail ? { detail } : {}) });
+    }
   }
   return { etat: lignes.length ? 'probleme' : passu.length ? 'passu' : 'ok', lignes, passu, at };
 }

@@ -1863,3 +1863,4 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 - **14 nov. · Fiabilité prod (mesurée)** : 64 écrans tombés sur un module « undefined » (main.jsx ne fait plus `preventDefault` sur `vite:preloadError`) ; plus de requête au jeton expiré (`src/jetonFrais.js`, 100–150 refus 401/jour) ; /api/sante relance les sondes que GitHub oublie ; garde des bancs sans `keepalive` vers la prod. `docs/passation/2026-11-14-fiabilite-prod.md`. Geste : recoller le script Gmail (il lit encore la base avec l'ancienne clé).
 ## Lignes du §9 de CLAUDE.md déplacées telles quelles (14 nov., lot argent-prix)
+## Lignes de CLAUDE.md §9 (déplacées telles quelles le 14 nov., lot dates-versement, pour rester sous 59 000 octets)

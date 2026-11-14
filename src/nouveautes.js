@@ -36,6 +36,7 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'carte-logo-site', date: '2026-11-14', titre: 'Le logo ouvre tes pages Vinted', phrase: 'Ventes, messages, dressing du compte ouvert, sans quitter Vinted.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'creer-vinted-guide', date: '2026-11-14', titre: 'Créer sur Vinted, étape par étape', phrase: 'Ce qui va se passer avant, le brouillon ou la raison après.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'extension-capture', date: '2026-11-14', titre: 'Bordereaux Vinted récupérés, même un peu tard', phrase: 'L’extension relance seule et renvoie ce qui n’était pas parti.', tab: 'colis', pour: 'tous', mode: 'tous' },
+  { id: 'dates-versement-conversation', date: '2026-11-14', titre: 'Dates de versement lues dans la conversation', phrase: 'Les ventes sans date se datent par leur conversation Vinted.', tab: 'compta', pour: 'tous', mode: 'tous' },
   { id: 'photo-floue', date: '2026-11-14', titre: 'Photo floue ou sombre signalée', phrase: 'Mesuré sur ton téléphone, avant la mise en ligne. Jamais bloquant.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
   { id: 'seance-photo', date: '2026-11-14', titre: 'Séance photo, dans l’ordre des N°', phrase: 'Les paires sans photo ou à reprendre, cochées une à une.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
   { id: 'recherche-couleur', date: '2026-11-14', titre: 'Chercher tes paires par couleur', phrase: 'Tape « bleu » dans la loupe : la couleur vient de tes photos.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },

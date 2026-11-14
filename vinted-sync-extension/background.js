@@ -3661,6 +3661,9 @@ async function storeHarvest(domain, type, id, body, sourceUrl=null,tabId=null,so
     // 5.204 : une conversation captée en passant dit aussi si une confirmation
     // (« Tout est OK ») attend — ou si elle est réglée (l'entrée sort).
     try { const c = confirmationDeConversation(parsed); if (c) await noterConfirmation(c, uid); } catch (_) {}
+    // 5.376 (14 nov.) : et, si c'est une de SES ventes finalisée, la date du versement
+    // (« Ta vente est finalisée. », par le n° de transaction que la conversation porte).
+    if (ecrit !== false) { try { const v = versementDeConversation(brut); if (v) await rangerVersementConversation(uid, v, domain); } catch (_) {} }
   }
 
   // Une fiche d'annonce vient d'arriver → on la met au COFFRE (texte complet +
@@ -20270,9 +20273,27 @@ async function capterSuivisAchats(uid) {
 //    et un seul passage à la fois (`_versementEnCours`) ;
 //  · un 429/403 pose la pause (`requeteVinted`) et ARRÊTE la série
 //    (`memoApresEchec`) ; rien n'est écrit chez Vinted (des GET seulement).
-// L'ORDRE : la vente la plus RÉCENTE d'abord — l'année en cours, puis 2025.
-// C'est l'année qu'il déclare encore (URSSAF au mois ou au trimestre) ; le mois
-// qu'il va déclarer se complète en premier. Sans date lisible : en dernier.
+// L'ORDRE (5.341) : la vente la plus RÉCENTE d'abord — l'année en cours, puis 2025.
+// ══ 5.376 (14 nov.) — LA CONVERSATION, ET LES PLUS ANCIENNES D'ABORD ═══════════
+// Julien : « il y a les dates dans la conversation, la date de réception d'argent ».
+// Mesuré le 14 nov. (lecture seule) : 1 741 ventes de son grand compte sans date,
+// vendues de mai 2025 à juin 2026 ; AUCUNE n'a son détail rangé, aucune conversation
+// rangée, aucun e-mail (ils commencent en juillet 2026), et le relevé de ce compte ne
+// liste aucun mois passé (`history` vide). Le message système « Ta vente est
+// finalisée. » de la conversation porte la date du versement : sur 41 ventes où l'on a
+// les deux, c'est la date de la transaction 450 à la seconde près.
+//  · PASSIF (aucune requête de plus) : chaque conversation captée en passant qui est
+//    une de SES ventes finalisée range la date (`harvest_{uid}_versement_{tx}`, le n°
+//    de transaction, la date, la conversation — jamais un texte ni un pseudo) ;
+//  · ACTIF : le détail de la transaction reste lu d'abord ; s'il ne répond pas (404,
+//    410, réponse sans transaction), la conversation de CETTE vente (`conversation_id`
+//    de la liste des ventes) est lue à la place — une lecture de plus, DANS les mêmes
+//    budgets (15/h argent, 20/h lecture, réserve des autres), et seulement si elle
+//    porte le MÊME n° de transaction ;
+//  · L'ORDRE : celles vendues dans les 45 derniers jours d'abord (le mois en cours se
+//    déclare), puis LES PLUS ANCIENNES d'abord : l'URSSAF se déclare mois après mois,
+//    le plus ancien mois incomplet est celui à compléter en premier.
+// Sans date lisible : en dernier.
 const VERSEMENT_MAX_PAR_VISITE = 10;
 const VERSEMENT_PART_VISITE = 5;                  // la part ordinaire d'une visite (et la réserve des photos)
 const VERSEMENT_MAX_HEURE = 15;                   // DANS les 20 lectures/h, jamais en plus
@@ -20301,10 +20322,54 @@ async function noterVersementLu(uid) {
     await chrome.storage.local.set({ [VERSEMENT_LUS]: cur });
   } catch (_) {}
 }
-// La plus récente d'abord ; sans date lisible, en dernier (ordre d'arrivée gardé).
-function ordreVersements(liste) {
-  const d = (o) => { const t = Date.parse((o && (o.date || o.created_at)) || ''); return Number.isFinite(t) ? t : -Infinity; };
-  return liste.map((o, i) => [o, i]).sort((a, b) => ((d(b[0]) - d(a[0])) || 0) || (a[1] - b[1])).map((x) => x[0]);
+// 5.376 : les 45 derniers jours (la plus récente d'abord), puis la plus ANCIENNE
+// d'abord ; sans date lisible, en dernier (ordre d'arrivée gardé).
+const VERSEMENT_RECENT_MS = 45 * 864e5;
+function ordreVersements(liste, maintenant = Date.now()) {
+  const d = (o) => { const t = Date.parse((o && (o.date || o.created_at)) || ''); return Number.isFinite(t) ? t : null; };
+  const rang = (t) => (t == null ? 2 : maintenant - t <= VERSEMENT_RECENT_MS ? 0 : 1);
+  return liste.map((o, i) => [o, i, d(o)]).sort((a, b) => {
+    const ra = rang(a[2]), rb = rang(b[2]);
+    if (ra !== rb) return ra - rb;
+    if (ra === 0) return (b[2] - a[2]) || (a[1] - b[1]);
+    if (ra === 1) return (a[2] - b[2]) || (a[1] - b[1]);
+    return a[1] - b[1];
+  }).map((x) => x[0]);
+}
+// 5.376 — LA DATE DU VERSEMENT DANS LA CONVERSATION D'UNE VENTE. Rend { tx, at, cid }
+// ou null. Seulement : la conversation porte une transaction (n° en chiffres), vue du
+// côté VENDEUR, au statut 450 (finalisée), et UN message système « vente finalisée »
+// (`action_message`, `completed`, `completion`) daté ; deux jours différents ⇒ null.
+// Ni texte, ni pseudo, ni montant : la date et les identités seulement.
+function versementDeConversation(json) {
+  const c = json && typeof json === 'object' && json.conversation && typeof json.conversation === 'object' ? json.conversation : null;
+  const t = c && c.transaction && typeof c.transaction === 'object' ? c.transaction : null;
+  if (!t) return null;
+  const tx = t.id == null ? '' : String(t.id);
+  if (!/^\d{1,20}$/.test(tx)) return null;
+  if (String(t.current_user_side || '') !== 'seller') return null;
+  if (String(t.status) !== '450') return null;
+  const jours = new Set();
+  let at = null;
+  for (const m of (Array.isArray(c.messages) ? c.messages : [])) {
+    if (!m || m.entity_type !== 'action_message' || m.event_type !== 'completed' || m.event_group !== 'completion') continue;
+    const d = typeof m.created_at_ts === 'string' ? m.created_at_ts : '';
+    if (!/^\d{4}-\d{2}-\d{2}/.test(d) || isNaN(Date.parse(d))) continue;
+    jours.add(d.slice(0, 10));
+    if (!at) at = d;
+  }
+  if (!at || jours.size !== 1) return null;
+  const cid = c.id != null && /^\d{1,20}$/.test(String(c.id)) ? String(c.id) : '';
+  return { tx, at: at.slice(0, 40), cid };
+}
+// La ligne légère : `true` rangée · `null` notre base a refusé.
+async function rangerVersementConversation(uid, v, domain) {
+  if (!uid || !v || !/^\d{1,20}$/.test(String(v.tx || ''))) return false;
+  const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_versement_${v.tx}`, data: {
+    type: 'versement', uid: String(uid), domain: domain || 'www.vinted.fr', capturedAt: new Date().toISOString(),
+    tx: String(v.tx), at: String(v.at), source: 'conversation', ...(v.cid ? { cid: v.cid } : {}) } }], 'id');
+  noterDiag(ok === false ? 'versement_conv_ecriture_ratee' : 'versement_conv_ecrit');
+  return ok === false ? null : true;
 }
 let _versementEnCours = null;
 // `opts.fond` : le passage de fond — aucune part ordinaire, tout est rattrapage
@@ -20334,6 +20399,10 @@ async function capterDatesVersementUn(uid, opts) {
       const tx = (/_txn_(\d+)$/.exec(String((r && r.id) || '')) || [])[1];
       if (tx && String(r.s) === '450' && r.su && !isNaN(Date.parse(r.su))) datees.add(tx);
     }
+    // 5.376 : une date déjà rangée depuis la conversation n'est pas relue.
+    const parConv = await sbGetTout(`app_data?id=like.harvest_${uid}_versement_*&select=tx:data->>tx,at:data->>at`);
+    if (parConv === null) return 0;                                       // pas su
+    for (const r of parConv) if (r && /^\d{1,20}$/.test(String(r.tx || '')) && r.at && !isNaN(Date.parse(r.at))) datees.add(String(r.tx));
     const memo = (await chrome.storage.local.get('vrmVersementFaits')).vrmVersementFaits || {};
     // Une vente dont la date reste à lire MAINTENANT (pas datée, pas d'essai
     // dans les 24 dernières heures).
@@ -20368,9 +20437,36 @@ async function capterDatesVersementUn(uid, opts) {
       memo[tx] = Date.now();
       n++;
       const rep = await vintedGet(acc, `/api/v2/transactions/${encodeURIComponent(tx)}`);
-      if (!rep.ok || !rep.json) { noterDiag(`versement_refuse_${rep.status}`); if (memoApresEchec(memo, tx, rep, VERSEMENT_RETRY_MS)) break; continue; }
+      // 5.376 : le détail ne répond pas (404, 410, sans transaction) ⇒ la conversation de
+      // CETTE vente, dans les mêmes budgets (une lecture de plus, comptée).
+      const parLaConversation = async () => {
+        const cid = o.conversation_id != null ? String(o.conversation_id) : '';
+        if (!/^[\w-]{1,64}$/.test(cid)) return 'rien';
+        const lus2 = await versementsLusHeure(uid);
+        if (lus2 === null || lus2.length >= VERSEMENT_MAX_HEURE) return 'stop';
+        const plafond2 = LECTURES_MAX_HEURE - (await reserveAutresQueVersement(uid));
+        await pauseLectureArgent();
+        const refus2 = await gardeLecture(uid, acc, 'argent', plafond2);
+        if (refus2) return 'stop';
+        await noterVersementLu(uid);
+        const rc = await vintedGet(acc, `/api/v2/conversations/${encodeURIComponent(cid)}`);
+        if (!rc.ok || !rc.json) { noterDiag(`versement_conv_refuse_${rc.status}`); return memoApresEchec(memo, tx, rc, VERSEMENT_RETRY_MS) ? 'stop' : 'rien'; }
+        const v = versementDeConversation(rc.json);
+        if (!v) { noterDiag('versement_conv_sans_date'); return 'rien'; }
+        if (v.tx !== tx) { noterDiag('versement_conv_autre_tx'); return 'rien'; }   // l'identité prime
+        const r = await rangerVersementConversation(uid, v, acc.domain);
+        if (r === null) { delete memo[tx]; return 'stop'; }
+        ecrites++; datees.add(tx);
+        return 'rien';
+      };
+      if (!rep.ok || !rep.json) {
+        noterDiag(`versement_refuse_${rep.status}`);
+        if (memoApresEchec(memo, tx, rep, VERSEMENT_RETRY_MS)) break;
+        if ((rep.status === 404 || rep.status === 410) && (await parLaConversation()) === 'stop') break;
+        continue;
+      }
       const t = rep.json.transaction;
-      if (!t || typeof t !== 'object') { noterDiag('versement_sans_transaction'); continue; }
+      if (!t || typeof t !== 'object') { noterDiag('versement_sans_transaction'); if ((await parLaConversation()) === 'stop') break; continue; }
       const data = { type: 'transaction', uid: String(uid), domain: acc.domain || 'www.vinted.fr',
         capturedAt: new Date().toISOString(), payload: alleger('transaction', rep.json) };
       const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_txn_${tx}`, data }], 'id');
