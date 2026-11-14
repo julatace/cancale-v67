@@ -52,7 +52,7 @@ textes `listes.*` (5 langues, `src/i18n/langues/<l>/listes.js`). La carte régla
   (`BANC_REF=<dist d'origin/main> PARTIES=volume node scripts/bancs/refonte-listes.cjs`).
 - Captures avant/après : `docs/design/avant-apres/{annonces,ventes,journee}-{avant,apres}.png` (390, dsf 2).
 - Verts : `npm run build`, audits traduction, tdz, icônes, cohérence, variables, composants, violet,
-  rouge-doublon, quoi-de-neuf ; `design-passe` (journée, ventes, colis, annonces).
+  rouge-doublon, quoi-de-neuf ; `design-passe` (journée, ventes, colis, annonces : 0 défaut sur l'arbre fusionné).
 
 ## Restes (honnêtes)
 - **Ventes** n'atteint pas encore « 1re ligne ≤ 50 % » au téléphone (577 px sans la ligne de la coque) : il
@@ -70,5 +70,10 @@ textes `listes.*` (5 langues, `src/i18n/langues/<l>/listes.js`). La carte régla
 - Le « de ouf » (photo en vedette façon Nike, affiches façon Revolut/Oura, finition Linear — skill
   `references-design`) n'a pas été appliqué : arrivé en fin de session, à prendre par le chantier suivant
   sur la base posée ici (structure « liste d'abord » de la maquette, briques `src/ui/`).
-- `design-passe` sur Ma journée 1512 : « À ce rythme, novembre… » (`vrm-ap-ligne`, 34 px, et « estimation »
-  au survol) — ni touché ni ajouté ici (aucune règle de cette ligne dans ce lot) : arrivé avec la fusion de main.
+- **`annonces-grille` rouge (8)** : 6 au téléphone mesurent la grille du 10 nov. (« 2 colonnes », « titre sur deux
+  lignes », « initiale dans l'en-tête ») que la liste dense d'AJOUT 2/3 et la maquette remplacent — le banc est à
+  réécrire sur la nouvelle règle une fois l'écran validé par Julien ; 2 à l'ordinateur : « le scénario a tourné
+  jusqu'au bout — locator.click: Timeout » (le clic sur « Détails et gestes » d'une vignette) — PAS ENCORE
+  EXPLIQUÉ, à reprendre en premier (place des alertes « ordinateur » ou recouvrement).
+- Les autres bancs des écrans touchés (annonces-*, ventes-*, colis*, journee-*, carte-stats, tout-imprimer,
+  retirer-nom-paire) n'ont PAS été relancés (machine à charge 43, 4 min par build) : à passer avant la fusion.
