@@ -526,9 +526,8 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 - **14 nov. · Vente en main propre en 2 touchers (160 seule, choix de Julien ; 159/161/162 retirées)** : loupe « vendu 124 » ⇒ prix ⇒ « Vendue » ; UN verdict fiche + feuille (`verdictVenteMain` sur `histoirePaire` : N° exact, doublon ⇒ question, « B… » proposé, déjà vendue partout ⇒ refus, compte exclu, pas su ⇒ refus), écriture = « Vendu ailleurs » + paiement, reçu PDF. `docs/passation/2026-11-14-vente-main-propre.md`. Geste : aucun.
+- **14 nov. · Retraits d'achat cachés (« je n'ai plus les retraits d'achat »)** : mesuré, la règle comptait 3 colis à retirer AVEC code (publication), mais la refonte d'Achats les rangeait dans un repli fermé sans ligne ; règle `src/repliRetirer.js` : ≥ 1 colis ⇒ « À retirer » ouvert en tête, fermer ne vaut que pour la liste vue, « à vérifier » nommés. `docs/passation/2026-11-14-retraits-achats.md`. Geste : aucun.
 - **14 nov. · Extension 5.377.0 : « VRM a capté » + carte Favoris · Annonces · Ventes** : bulle près du logo et toast dans l'app quand une écriture RÉUSSIE range du nouveau (par identité, `vrmCapteVu`), « Compte relié · … » à la connexion, réglage partagé carte ↔ Paramètres ; carte : compte de l'onglet d'abord, favoris du plus récent cochés ⇒ « Envoyer le message (N) », autres comptes floutés `inert`, lecture seule. `docs/passation/2026-11-14-popup-capte.md`. Geste : installer la 5.377.0.
-- **14 nov. · Mode exemple : photos et impossible à confondre** : 21 vraies photos (Commons, CC0 / domaine public, crédits `public/exemple/CREDITS.md`, une par paire, titre = la photo) ; bandeau « Exemple — données inventées » + « J’ai déjà un compte · Me connecter », cadre hachuré au-dessus de tout, « exemple » sur codes et adresses, « Relais Exemple, rue Imaginaire » (capture d’accueil refaite). `2026-11-14-exemple-photos.md`. Geste : aucun.
-
 
 
 

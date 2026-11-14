@@ -270,6 +270,8 @@
 :root:root:root body .vrm-achats-retirer-point { width: 8px; height: 8px; border-radius: 50%; background: var(--d-point-ambre, #FF9F0A); flex: none; }
 :root:root:root body .vrm-achats-retirer-titre { flex: 1; min-width: 0; }
 :root:root:root body .vrm-achats-retirer-n { color: var(--d-gris, #6E6E73); font-variant-numeric: tabular-nums; }
+/* (14 nov., soir) Fermée sans colis à retirer : les colis « à vérifier » restent nommés sur la ligne (§5). */
+:root:root:root body .vrm-achats-retirer-verif { color: var(--d-gris, #6E6E73); font-size: var(--d-t-15, 15px); font-variant-numeric: tabular-nums; white-space: nowrap; }
 :root:root:root body .vrm-achats-retirer-chevron { color: var(--d-glyphe, #AEAEB2); font-size: var(--d-t-20, 20px); line-height: 1; width: 14px; text-align: right; transition: transform 150ms var(--d-sortie, ease-out); }
 :root:root:root body .vrm-achats-retirer-ligne[aria-expanded="true"] .vrm-achats-retirer-chevron { transform: rotate(90deg); }
 :root:root:root body .vrm-achats-retirer-repli[data-retirer-repli="ouvert"] > #vrm-achats-retirer-corps { margin: 8px -16px 0; }
