@@ -101,10 +101,12 @@ function mesurer() {
   for (const el of document.body.querySelectorAll('*')) { i++; if (el.scrollLeft) internes[nom(el) + '#' + i] = el.scrollLeft; }
   const main = document.querySelector('.vrm-main');
   const scroller = document.scrollingElement || document.documentElement;
-  return { iw, sx: window.scrollX, sl: scroller.scrollLeft, sw: document.documentElement.scrollWidth, bw: document.body.scrollWidth, sy: window.scrollY, mainY: main ? main.scrollTop : 0, mainX: main ? main.scrollLeft : 0, couvrants, voiles, hiddenDessines, depasse, internes, url: location.search };
+  return { iw, sx: window.scrollX, sl: scroller.scrollLeft, sw: document.documentElement.scrollWidth, bw: document.body.scrollWidth, sy: window.scrollY, mainY: main ? main.scrollTop : 0, mainX: main ? main.scrollLeft : 0, mainSW: main ? main.scrollWidth : 0, mainCW: main ? main.clientWidth : 0, couvrants, voiles, hiddenDessines, depasse, internes, url: location.search };
 }
-const horizontalOk = (m) => m.sx === 0 && m.sl === 0 && m.mainX === 0 && m.sw <= m.iw && m.bw <= m.iw && m.depasse.length === 0;
-const dirH = (m) => `scrollX ${m.sx}, scrollLeft ${m.sl}, main ${m.mainX}, scrollWidth ${m.sw}/${m.bw} pour ${m.iw}${m.depasse.length ? ', dépasse : ' + m.depasse.join(' ; ') : ''}`;
+// `.vrm-main` défile en hauteur ; en largeur, il ne doit RIEN avoir à faire défiler (sinon un focus, un
+// `scrollIntoView` ou un toucher le décale — et il reste décalé).
+const horizontalOk = (m) => m.sx === 0 && m.sl === 0 && m.mainX === 0 && m.sw <= m.iw && m.bw <= m.iw && m.mainSW <= m.mainCW && m.depasse.length === 0;
+const dirH = (m) => `scrollX ${m.sx}, scrollLeft ${m.sl}, main ${m.mainX} (largeur défilable ${m.mainSW}/${m.mainCW}), scrollWidth ${m.sw}/${m.bw} pour ${m.iw}${m.depasse.length ? ', dépasse : ' + m.depasse.join(' ; ') : ''}`;
 
 // La feuille ouverte (celle de CE cas), visible.
 const feuilleVisible = (pg, sel) => pg.evaluate((sel) => [...document.querySelectorAll(sel)].some((el) => el.checkVisibility ? el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) && el.getBoundingClientRect().height > 1 : el.getClientRects().length > 0), sel);

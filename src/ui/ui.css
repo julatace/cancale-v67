@@ -57,6 +57,13 @@
    jamais : ni par sa classe de repos, ni par `hidden` — plus haut que toute règle qui pose `display` sur ces
    classes (le `display:flex !important` du voile passait devant `[hidden]` : la feuille restait ouverte). */
 :root:root:root:root:root:root:root body :is(.vrm-ui-voile-repos, .vrm-ui-voile[hidden], .vrm-ui-feuille[hidden]) { display: none !important; }
+/* (14 nov., correctif « À faire ») La page ne glisse JAMAIS de côté : des bandes « bord à bord » (la barre collée
+   d'Annonces, la recherche d'Achats : `margin: 0 -16px` posées dans une gouttière de 14 px) dépassaient de 2 px de
+   chaque côté ; `.vrm-main` (overflow-x: hidden, donc défilable par un focus ou un `scrollIntoView`) se décalait de
+   2 px au toucher d'un « ⋯ » et y restait. Au téléphone, chaque enfant de `.vrm-main` coupe ce qui dépasse en largeur (`clip` :
+   rien de défilable ; le collé reste collé ; une couche fixe n'est pas coupée). Spécificité nulle (`:where`) :
+   un enfant qui pose son propre `overflow-x` garde le sien. */
+@media (max-width: 767px) { :where(.vrm-main) > :where(*) { overflow-x: clip; } }   /* au téléphone : `.vrm-main` y est sans marge, au-delà c'est hors de l'écran */
 /* La poignée (36 × 5) et la tête se prennent au doigt : glisser vers le bas ferme la feuille. */
 :root:root:root:root:root:root body .vrm-ui-feuille-poignee-zone { display: flex !important; justify-content: center !important; padding: 0 0 6px !important; margin: -2px 0 0 !important; cursor: grab !important; touch-action: none !important; -webkit-user-select: none; user-select: none; }
 :root:root:root:root:root:root body .vrm-ui-feuille-poignee { display: block !important; width: 36px !important; height: 5px !important; border-radius: 999px !important; background: var(--d-glyphe, #C7C7CC) !important; }
