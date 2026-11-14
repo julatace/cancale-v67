@@ -139,10 +139,18 @@ case (pas d'ombre, rayon 12). `prefers-contrast: more` rend un cadre net.
   `--d-filet-fort` ; l'erreur se dit sous le champ, en ambre, après un essai.
 - **Interrupteur** (`Interrupteur`, `src/composants/Ios.jsx`) : celui d'iOS. Jamais une
   case à cocher, un `<select>` ou un `<details>` natif nus (règle 3 de la revue du 11 nov.).
+- **Un choix parmi peu** (une heure, un seuil, ≤ 6 valeurs) : le `Segmente` (« Résumé du soir · Auto · 18 h… »,
+  « Avis négatif · 1★… 4★ ») ; plusieurs à la fois (jours calmes) : des capsules de filtre. Un `<select>` qui reste
+  (une longue liste, un compte parmi N) est au moins habillé en capsule remplie, sans cadre (14 nov., passe 3).
+- **Une barre** (délai d'un retrait, coût d'une vente) n'est dessinée que si l'on SAIT ce qu'elle mesure : sinon la
+  phrase seule (« Date limite inconnue »), jamais une piste vide.
 
 ## 8. Cartes et rangées
 
-- **Carte** : `--d-carte`, rayon 20, ombre posée, pas de bordure ; intérieur 16/20.
+- **Carte** : `--d-carte`, rayon 20, ombre posée, pas de bordure ; intérieur 16/20. Jamais de cadre : ni bord
+  1 px, ni liseré (`0 0 0 1px`) — la nuit, `#1C1C1E` sur `#000` suffit.
+- **La ligne de fraîcheur** (« Tout est à jour · vérifié… ») est une LIGNE : ni fond, ni cadre, ni ombre, son point
+  au bord de la colonne. Une bande de chiffres d'un site va dans la colonne, sous le titre — jamais flottante.
 - **Groupe à rangées** (Réglages, Rappels, Mail) : UNE carte, des rangées séparées par
   un filet .5 px qui commence après la photo ou l'icône. Jamais une carte par ligne.
 - **Rangée** : 44 de haut au moins (au doigt) ; photo 56 rayon 12 (44 ronde pour une
