@@ -30,10 +30,10 @@
 @media (hover: hover) and (pointer: fine) { :root:root:root body .vrm-ui-phrase-ailleurs { min-height: 36px !important; } }
 :root:root:root body .vrm-ui-phrase-edit { display: flex !important; flex-direction: column !important; gap: 8px !important; }
 :root:root:root body .vrm-ui-phrase-champ { display: flex !important; gap: 8px !important; align-items: flex-end !important; background: var(--d-carte, #fff) !important; border-radius: 12px !important; padding: 8px 12px !important; }
-:root:root:root body .vrm-ui-phrase-champ label { flex: 1 1 auto !important; display: flex !important; flex-direction: column !important; gap: 2px !important; font: 400 13px/1.2 var(--vrm-police) !important; color: var(--d-gris, #6E6E73) !important; }
-:root:root:root body .vrm-ui-phrase-champ input { all: unset; box-sizing: border-box !important; min-height: 44px !important; font: 400 17px/1.2 var(--vrm-police) !important; color: var(--d-encre, #1D1D1F) !important; font-variant-numeric: tabular-nums !important; }
+:root:root:root body .vrm-ui-phrase-champ label { flex: 1 1 auto !important; min-width: 0 !important; display: flex !important; flex-direction: column !important; gap: 2px !important; font: 400 13px/1.2 var(--vrm-police) !important; color: var(--d-gris, #6E6E73) !important; }
+:root:root:root body .vrm-ui-phrase-champ input { all: unset; box-sizing: border-box !important; width: 100% !important; min-width: 0 !important; min-height: 44px !important; font: 400 17px/1.2 var(--vrm-police) !important; color: var(--d-encre, #1D1D1F) !important; font-variant-numeric: tabular-nums !important; }
 :root:root:root body .vrm-ui-phrase-ok, :root:root:root body .vrm-ui-phrase-geste {
-  all: unset; box-sizing: border-box !important; min-height: 44px !important; display: flex !important; align-items: center !important; justify-content: center !important; padding: 0 16px !important; cursor: pointer !important;
+  all: unset; box-sizing: border-box !important; flex: none !important; min-height: 44px !important; display: flex !important; align-items: center !important; justify-content: center !important; padding: 0 16px !important; cursor: pointer !important;
   border-radius: 12px !important; font: 600 15px/1 var(--vrm-police) !important; color: var(--d-accent-texte, #0066CC) !important; background: var(--d-carte, #fff) !important; }
 :root:root:root body .vrm-ui-phrase-ok { background: var(--d-accent, #0071E3) !important; color: #fff !important; }
 :root:root:root body .vrm-ui-phrase-geste.is-retirer { color: var(--d-encre, #1D1D1F) !important; }

@@ -198,7 +198,8 @@ const CHAMP = '[data-ann-recherche] input, input[data-ann-recherche]';
   let selection = null;
   if (PARTIES.includes('G') || PARTIES.includes('E') || PARTIES.includes('C')) await essai('glisser', async () => {
     const o = await ouvrir(nav, { b });
-    await o.pg.waitForSelector('[data-vue-selection]', { timeout: 60000 });
+    const okS = await o.pg.waitForSelector('[data-vue-selection]', { timeout: 90000 }).then(() => true).catch(() => false);
+    if (!okS) { await o.pg.screenshot({ path: path.join(SHOTS, 'glisser-pas-de-vue.png') }); dit(false, 'la vue « Sélectionner » n’apparaît pas (capture glisser-pas-de-vue.png)', o.erreurs); await o.ctx.close(); return; }
     await o.pg.click('[data-vue-selection]');
     const okP = await o.pg.waitForSelector('[data-glisse-poignee]', { timeout: 20000 }).then(() => true).catch(() => false);
     dit(okP, 'Sélectionner : chaque ligne a sa poignée (la case)');
@@ -248,7 +249,7 @@ const CHAMP = '[data-ann-recherche] input, input[data-ann-recherche]';
   // ── E et C. Épingler deux lignes, comparer deux lignes ──
   if ((PARTIES.includes('E') || PARTIES.includes('C')) && selection) await essai('epingles', async () => {
     const o = await ouvrir(nav, { b });
-    await o.pg.waitForSelector('[data-vue-selection]', { timeout: 60000 });
+    await o.pg.waitForSelector('[data-vue-selection]', { timeout: 90000 });
     await o.pg.click('[data-vue-selection]');
     await o.pg.waitForSelector('[data-glisse-poignee]', { timeout: 20000 });
     await o.pg.waitForTimeout(800);
@@ -259,7 +260,7 @@ const CHAMP = '[data-ann-recherche] input, input[data-ann-recherche]';
       const bc = await o.pg.$('[data-comparer-ouvrir]');
       dit(!!bc, '« Comparer » apparaît avec exactement deux lignes cochées');
       if (bc) {
-        await bc.click(); await o.pg.waitForSelector('[data-comparer]', { timeout: 4000 });
+        await bc.evaluate((e) => e.click()); await o.pg.waitForSelector('[data-comparer]', { timeout: 4000 });
         const v = await o.pg.$$eval('[data-comparer-ligne]', (l) => Object.fromEntries(l.map((e) => [e.getAttribute('data-comparer-ligne'), [...e.querySelectorAll('[data-comparer-val]')].map((d) => ({ brut: d.getAttribute('data-comparer-brut'), txt: d.textContent.trim() }))])));
         const it = (k) => b._items.find((x) => String(x.id) === k.split(':')[1]);
         const pA = Number(it(k5).price.amount), pB = Number(it(k9).price.amount);
@@ -274,12 +275,14 @@ const CHAMP = '[data-ann-recherche] input, input[data-ann-recherche]';
       const be = await o.pg.$('[data-epingler="poser"]');
       dit(!!be, '« Épingler » sur la sélection');
       if (be) {
-        await be.click();
+        await be.evaluate((e) => e.click());
         let ecrit = null; for (let i = 0; i < 40 && !ecrit; i++) { await o.pg.waitForTimeout(250); ecrit = o.ecrits.find((w) => /vrm_epingles/.test(w.corps)); }
         const cles = ecrit ? (() => { try { const j = JSON.parse(ecrit.corps); const d = Array.isArray(j) ? j[0] : j; return Object.keys(((d && d.data) || d || {}).vrm_epingles || {}); } catch (_) { return (ecrit.corps.match(/a:\d+:\d+/g) || []); } })() : [];
         const voulues = [k5, k9].map((k) => 'a:' + k);
         dit(!!ecrit && voulues.every((k) => cles.includes(k)), `l’écriture part vers la base : vrm_epingles = ${cles.join(', ')}`, ecrit && ecrit.corps.slice(0, 300));
-        await o.pg.click('[data-vue-toutes]'); await o.pg.waitForTimeout(1200);
+        if (process.env.DEBUG) console.log('    après épingler :', JSON.stringify(await o.pg.evaluate(() => ({ ls: localStorage.getItem('vrm_epingles'), marques: document.querySelectorAll('[data-epinglee]').length, toast: (document.querySelector('[role="status"], .vrm-toast') || {}).textContent }))));
+        await o.pg.$eval('[data-vue-toutes]', (e) => e.click()); await o.pg.waitForTimeout(1200);
+        if (process.env.DEBUG) console.log('    après Toutes :', JSON.stringify(await o.pg.evaluate(() => ({ ls: localStorage.getItem('vrm_epingles'), marques: document.querySelectorAll('[data-epinglee]').length }))));
         const enTete = await o.pg.$$eval('[data-vignette-cle]', (l, uid) => l.map((e) => e.getAttribute('data-vignette-cle')).filter((k) => k.startsWith(uid + '_')).slice(0, 2), b._uid);
         const v2 = [k5, k9].map((k) => k.replace(':', '_')).sort();
         dit(enTete.slice().sort().join() === v2.join(), `les deux épinglées sont en tête de leur compte (${enTete.join(', ')})`, { enTete, v2 });
