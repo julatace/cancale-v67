@@ -534,6 +534,14 @@ import { ventesEmailFraiches, avecVentesEmail, requeteVentesEmail, gesteVenteEma
 import { TAMPONS as TAMPONS_IMPR } from './impression/thermique.js';   // (14 nov.) le tampon par bordereau
 import { pagesDe, formatRetenu, signatureLot, voieOuverture, absentsDuLot } from './impression/lotSimple.js';   // (14 nov.) « Imprimer » en un toucher
 import { ChoixPapier, FeuilleImpression } from './ImpressionSimple.jsx';   // (14 nov., impression-simple) les deux feuilles
+// (14 nov., idées 151 152 153 163) l'imprimante thermique jumelée, même acheteur, consignes des plateformes, mode samedi
+import { FeuilleJumelage, LigneImprimanteDirecte, useImprimanteDirecte, imprimerDirect, jumelageActuel, voiesActuelles } from './expedition/ImprimanteDirecte.jsx';
+import { voieImpressionDirecte, raisonEchec } from './expedition/thermiqueDirecte.js';
+import { BandeauMemeAcheteur, RappelMemeAcheteur, useAcheteursVinted, useEnsemble } from './expedition/MemeAcheteur.jsx';
+import { groupesMemeAcheteur, rapprocher, autresDuGroupe } from './expedition/memeAcheteur.js';
+import ConsignesColis from './expedition/ConsignesColis.jsx';
+import ModeSamedi from './expedition/ModeSamedi.jsx';
+import { horairesDeVinted } from './expedition/modeSamedi.js';
 import { CLE_IMPRESSION, reglageImpression, papierThermique, placementEtiquette, contenuTampon, carteEncre, boiteEncre, decouperFeuille, fusionnerProches, moduleDuCode, moduleImprimeMm, codeAssezGros, seuillerNoir, tramerNoir, zonesAdresse, CONTRASTES, MODULE_MIN_MM, BANDE_CONTINU_MM } from './impression/thermique.js';
 import { decisionNumeroVenteEmail, numeroEcritDansArticle, colisVentesEmail, MENTION_SANS_NUM, CLE_IMPRIMES_SANS_NUM, phraseImprimeSansNumero } from './bordereauVenteEmail.js';
 import { premiereCaseLibre as premiereCaseMeubles, achatsArrives, notifsOuRanger, caseEnMots } from './ouRanger.js';
@@ -8018,6 +8026,7 @@ const fetchDropOffPoints = async (uidsVivants) => {
           unite: p.distance_unit || 'km',
           ouverture: (p.opening_status && p.opening_status.text) || '',
           lat: p.latitude || '', lon: p.longitude || '',
+          horaires: horairesDeVinted(p.business_hours),   // (14 nov., mode samedi) l'heure limite du point, lue chez Vinted
         });
       }
       parCarrier.set(nom, dedup);
@@ -44612,6 +44621,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const pretPour = (sig) => { const e = prepsRef.current.get(sig); return e && e.etat === 'pret' ? e.res : null; };
   const formatLot = imprMode(imprimante);
+  // (14 nov., idée 151) L'IMPRIMANTE THERMIQUE JUMELÉE : papier thermique + une imprimante jumelée (page d'essai
+  // réussie, src/expedition/) + WebUSB / Web Serial ouverts ⇒ les étiquettes partent au câble, sans fenêtre d'impression.
+  // Sinon, ou si l'envoi échoue, le PDF s'ouvre comme avant ; l'échec est DIT (sa raison), jamais un « envoyé » muet.
+  const sortirLot = (pret, opts = {}) => {
+    const j = jumelageActuel();
+    if (!pret || voieImpressionDirecte({ format: pret.mode || formatLot, jumelage: j, voies: voiesActuelles() }).voie !== 'directe') return ouvrirPdfLot(pret, opts);
+    libererOngletPdf();
+    imprimerDirect({ jumelage: j, octetsPdf: pret.bytes, chargerPdfjs })
+      .then((r) => toast(tr('exp.direct.envoye', { n: r.etiquettes, nom: j.nom }), 'ok'))
+      .catch((err) => {
+        toast(tr('exp.direct.repli', { raison: tr(`exp.direct.echec.${raisonEchec(err)}`) }), 'err');
+        const v = ouvrirPdfLot(pret, { ...opts, geste: false });
+        setImprEtat((x) => (x && x.res === pret ? { ...x, voie: v } : x));
+      });
+    return 'directe';
+  };
   // Le lot d'office (ce qui PART) et sa signature sont posés PAR LE RENDU d'À expédier (`lotDefautRef`, à côté de
   // `resLot`) : ici, dans le corps, la liste n'est pas encore calculable (ses sources sont déclarées plus bas — §4.6).
   const lotDefautRef = React.useRef({ lignes: [], sig: '' });
@@ -44678,7 +44703,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const pret = pretPour(sig);
     // Le chemin du geste : prêt, aucune question due (§5), version des N° relue il y a moins d'une minute.
     if (pret && !numerosDemandent(numeros) && (!numeros.some(Boolean) || versionFraiche())) {
-      montrerApres(pret, ouvrirPdfLot(pret, { titre: tr('impr.titrePdf') }), sig);
+      montrerApres(pret, sortirLot(pret, { titre: tr('impr.titrePdf') }), sig);
       return;
     }
     attendrePuisOuvrir(sig, choisies, numeros, () => composerLot(choisies, format, tampons, { pas: (f) => setImprBusy({ fait: f, total: choisies.length }) }));
@@ -44702,7 +44727,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // Rien n'a bougé pendant l'attente (le N°, l'état, le compte de chaque bordereau) : sinon rien ne s'ouvre.
         const maintenant = new Map(lignesLotTous().map((l) => [l.cle, sigLigneLot(l)]));
         if (choisies.some((l) => maintenant.get(l.cle) !== sigLigneLot(l))) throw new Error(tr('impr.change'));
-        montrerApres(e.res, mobile ? 'bouton' : ouvrirPdfLot(e.res, { geste: false, titre: tr('impr.titrePdf') }), sig, garder);
+        montrerApres(e.res, mobile && voieImpressionDirecte({ format: e.res.mode || formatLot, jumelage: jumelageActuel(), voies: voiesActuelles() }).voie !== 'directe' ? 'bouton' : sortirLot(e.res, { geste: false, titre: tr('impr.titrePdf') }), sig, garder);
       } catch (err) {
         libererOngletPdf();
         if (!estTamponAnnule(err)) toast(err && (err.message === NUM_A_VERIFIER_ANNULE || err.message === NUMEROS_PERIMES_IMPRESSION || err.message === tr('impr.change')) ? err.message : tr('impr.erreur', { raison: String((err && err.message) || err).slice(0, 120) }));
@@ -44728,7 +44753,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const reimprimerManque = () => {
     const s = imprEtatRef.current; if (!s || !s.manque.size) return;
     const sg = sigManque(s, s.manque), pret = pretPour(sg);
-    if (pret) { montrerApres(pret, ouvrirPdfLot(pret, { titre: tr('impr.titrePdf') }), sg); return; }
+    if (pret) { montrerApres(pret, sortirLot(pret, { titre: tr('impr.titrePdf') }), sg); return; }
     const cl = [...s.manque], res = s.res;
     attendrePuisOuvrir(sg, res.lignes.filter((l) => cl.includes(String(l.cle))), [], () => extraireBordereaux(res, cl).then((r) => ({ ...r, url: URL.createObjectURL(new Blob([r.bytes], { type: 'application/pdf' })), items: res.items.filter((it) => cl.includes(String(it.cle))), lignes: res.lignes.filter((l) => cl.includes(String(l.cle))), raisons: {}, reussies: cl })));
   };
@@ -44745,7 +44770,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const reimprimerUn = (cle) => {
     const s = imprEtatRef.current; const l = s && ligneDe(s, cle); if (!l) return;
     const t = s.tamponCorrige, sg = sigUn(s, cle, t), pret = pretPour(sg);
-    if (pret && !numerosDemandent([l.num]) && (!l.num || versionFraiche())) { montrerApres(pret, ouvrirPdfLot(pret, { titre: tr('impr.titrePdf') }), sg); return; }
+    if (pret && !numerosDemandent([l.num]) && (!l.num || versionFraiche())) { montrerApres(pret, sortirLot(pret, { titre: tr('impr.titrePdf') }), sg); return; }
     const format = s.res.mode || formatLot;
     attendrePuisOuvrir(sg, [l], [l.num], () => composerLot([l], format, { [cle]: t }));
   };
@@ -44979,7 +45004,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // d'abord, puis groupes par transporteur) des 8-9 nov. : la date limite reste écrite sur chaque carte
   // (ambre si aujourd'hui/demain), le transporteur devient une pastille (filtre), jamais un ordre imposé.
   // « Tout imprimer » (le PDF) garde ses groupes par transporteur (choix n° 2 du 3 nov.), chacun dans cet ordre.
-  const rangerColisEnvoi = (tous) => ordreRecent(tous, quandColisAEnvoyer);
+  // (14 nov., idée 152) MÊME ACHETEUR : les groupes qu'IL a choisis de « Préparer ensemble » sont rapprochés (chaque
+  // membre juste après le premier du groupe) ; tout le reste garde l'ordre ci-dessous. Identité exacte seulement
+  // (src/expedition/memeAcheteur.js) ; rien n'est fusionné ni écrit en base.
+  const memeAcheteurRef = React.useRef({ groupes: [], choisis: new Set() });
+  const cleRangeColis = (x) => (x && x.__autre ? x.key : 'v:' + ((x && (x.txn || x.key)) || ''));
+  const rangerColisEnvoi = (tous) => rapprocher(ordreRecent(tous, quandColisAEnvoyer), cleRangeColis, memeAcheteurRef.current.groupes, memeAcheteurRef.current.choisis);
   // Les colis à envoyer rangés comme l'écran : le plus récent en haut (lot AJ).
   const colisAEnvoyerRanges = () => { const { exTout, autresColis } = colisAEnvoyerBase(); return rangerColisEnvoi([...exTout.filter(x => !estPosteColis(x)), ...autresColis], trNomColis); };
   const LIMITE_ENVOYES_J = 45;
@@ -45900,6 +45930,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     try { localStorage.setItem('vrm_journee_sorties_vues', JSON.stringify(n)); } catch (_) {}
     setSortiesVues(n);
   };
+  // ── (14 nov., idées 151 152 163) L'EXPÉDITION : l'imprimante jumelée, même acheteur, le mode samedi ────────────
+  // Les identités d'acheteur des colis À ENVOYER (Vinted : `buyer_id` du détail de CETTE transaction, sur le MÊME
+  // compte — une requête projetée ; eBay : `buyer.username` exact de la commande). Seulement sur Colis.
+  const surColisEnvoi = curSub === 'bordereaux' && colisDans !== 'achats';
+  const rangesAcheteurs = surColisEnvoi ? (() => { try { return colisAEnvoyerRanges(); } catch (_) { return []; } })() : [];
+  const ciblesAcheteurs = rangesAcheteurs.filter((x) => !x.__autre && x.o && x.o._acc && x.txn).map((x) => ({ uid: String(x.o._acc.vinted_user_id), tx: String(x.txn) }));
+  const acheteursV = useAcheteursVinted(ciblesAcheteurs, (q) => lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?${q}`));
+  const identitesColis = rangesAcheteurs.map((x) => {
+    if (x.__autre === 'eb') { const b = x.x && x.x.ordre && x.x.ordre.buyer; return { cle: x.key, site: 'ebay', compte: x.x && x.x.compte, acheteurId: b && b.username, pseudo: b && b.username }; }
+    if (x.__autre) return { cle: x.key, site: x.__autre };
+    const a = acheteursV.get(String(x.txn || '')), uid = x.o && x.o._acc ? String(x.o._acc.vinted_user_id) : '';
+    return { cle: cleRangeColis(x), site: 'vinted', compte: a && a.uid === uid ? uid : '', acheteurId: a ? a.acheteurId : '', pseudo: a ? a.pseudo : '' };
+  });
+  const groupesAcheteur = groupesMemeAcheteur(identitesColis);
+  // Un colis d'un groupe, en court (son N° par identité — la règle de la carte —, son titre) : le bandeau et le rappel.
+  const colisCourtDe = (k) => { const x = rangesAcheteurs.find((y) => cleRangeColis(y) === k); if (!x) return null; const o = x.o, b = x.b;
+    return { cle: k, num: x.__autre === 'eb' ? (x.x && x.x.ordre ? (numLigneEbay(x.x.ordre, (x.x.ordre.lineItems || [])[0]) || '') : '') : ((b ? numForBord(b) : '') || (o ? ((effEntry(o) || {}).numero || '') : '')), titre: x.__autre === 'eb' ? (x.x && x.x.titre) || '' : (o && o.title) || (b && (b.modele || b.article)) || '' }; };
+  const { choisis: ensembleChoisis, basculer: basculerEnsemble } = useEnsemble();
+  memeAcheteurRef.current = { groupes: groupesAcheteur, choisis: ensembleChoisis };
+  const { jumelage: imprJumelee, voies: imprVoies } = useImprimanteDirecte();
+  const [jumelageOuvert, setJumelageOuvert] = useState(false);
+  const [samediOuvert, setSamediOuvert] = useState(() => { try { return new URLSearchParams(window.location.search).get('samedi') === '1'; } catch (_) { return false; } });
+  const chargerDepotsSamedi = React.useCallback(() => fetchDropOffPoints(new Set((accounts || []).map((a) => String(a.vinted_user_id)))), [accounts]);
   const sourcesBilan=[
     {id:'ventes-vinted',libelle:'Ventes Vinted',onglet:'cat_ventes',comptes:accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accNameOf(a)})),items:Array.isArray(sales.items)?sales.items.map(o=>({id:o.transaction_id,compte:String(o._acc?.vinted_user_id||''),titre:o.title,valeurs:[o.status,o.price]})):null,charge:sales.loading,erreur:sales.error,echecs:sales.failedUids||[],partiel:true,revision:accounts.map(a=>_harvestSeen[`${a.vinted_user_id}_orders_sold`])},
     {id:'annonces-vinted',libelle:'Annonces Vinted',onglet:'cat_annonces',comptes:accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accNameOf(a)})),items:Array.isArray(listings.items)?listings.items.map(it=>({id:it.id,compte:String(it._acc?.vinted_user_id||''),titre:it.title,valeurs:[it.title,it.price,it.photo,it.photoCount,it.condition]})):null,charge:listings.loading,erreur:listings.error,echecs:listings.ko||[],partiel:!!listings.incomplet,revision:listings.lues},
@@ -51921,7 +51974,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {colisDans !== 'achats' && resLot.total > 0 ? <div className="vrm-impr-ligne" data-impr-ligne="">
               <button type="button" className="vrm-impr-lien" data-impr-format={formatLot} aria-label={tr('impr.formatAria', { format: tr(`impr.format.${formatLot}`) })} disabled={!!imprBusy} onClick={() => setChoixPapier({ puis: null })}>{tr(`impr.format.${formatLot}`)}<span aria-hidden="true"> ▾</span></button>
               <button type="button" className="vrm-impr-lien" data-lot-ouvrir="1" data-impr-autres={resLot.autres} disabled={!!imprBusy || batchBusy} onClick={ouvrirLot}>{resLot.autres > 0 ? tr('impr.choisirAutres', { n: resLot.autres }) : tr('impr.choisir')}</button>
+              {/* (14 nov., idée 151) En papier thermique : l'imprimante jumelée (un toucher ⇒ la feuille), ou une ligne qui dit pourquoi le PDF s'ouvre. */}
+              <LigneImprimanteDirecte format={formatLot} jumelage={imprJumelee} voies={imprVoies} desactive={!!imprBusy} onOuvrir={() => setJumelageOuvert(true)}/>
             </div> : null}
+            {/* (14 nov., idées 152 et 163) Le mode samedi (la journée d'envoi sur un écran) et « Même acheteur : envoyer ensemble ? ». */}
+            {colisDans !== 'achats' && (resLot.total > 0 || rangesAcheteurs.length > 0) ? <div className="vrm-impr-ligne" data-samedi-entree="">
+              <button type="button" className="sb-lien" data-samedi-ouvrir="" onClick={() => setSamediOuvert(true)}>{tr('exp.samedi.ouvrir')}<span aria-hidden="true"> ›</span></button>
+            </div> : null}
+            {colisDans !== 'achats' ? <BandeauMemeAcheteur groupes={groupesAcheteur} choisis={ensembleChoisis} onBasculer={basculerEnsemble}
+              colisDe={colisCourtDe}/> : null}
+            {jumelageOuvert ? <FeuilleJumelage Feuille={SheetShell} toast={(m) => toast(m, 'ok')} onFermer={() => setJumelageOuvert(false)}/> : null}
+            {samediOuvert && colisDans !== 'achats' ? <ModeSamedi colis={colisPreparer()} retraits={colisModeRelais()} horairesRetrait={(r) => (r && r.src && r.src.t && r.src.t.horaires) || null}
+              chargerDepots={chargerDepotsSamedi} ville={String(load('vrm_ville', '') || '')} groupes={groupesAcheteur}
+              impression={{ n: nLot, pret: !!(nLot > 0 && sigDefaut && pretPour(sigDefaut)), occupe: !!imprBusy, format: tr(`impr.format.${formatLot}`), onImprimer: () => imprimerLot(),
+                ligne: <LigneImprimanteDirecte format={formatLot} jumelage={imprJumelee} voies={imprVoies} desactive={!!imprBusy} onOuvrir={() => setJumelageOuvert(true)}/> }}
+              attente={deposeScan.attente ? deposeScan.attente.cle : ''} onDeposer={(c) => { if (c && c.geste) deposeScan.demander(c.cle, c.geste, c.num ? `N°${c.num}` : c.titre); }} onAnnuler={deposeScan.annuler}
+              onFermer={() => setSamediOuvert(false)} Retour={FermeAuRetour} zIndex={8500}
+              Photo={(src) => imgMortes.has(src) ? null : <PhotoVinted src={src} alt="" decoding="async" onError={() => noterImgMorte(src)}/>}/> : null}
             {choixPapier ? <ChoixPapier Feuille={SheetShell} valeur={formatRetenu(load('vrm_imprimante', null)) ? formatLot : null} puisImprimer={!!choixPapier.puis} onChoisir={choisirPapier} onFermer={() => setChoixPapier(null)}/> : null}
             {imprEtat ? <FeuilleImpression Feuille={SheetShell} Bouton={Bouton} etat={imprEtat} dessiner={dessinerPdf} occupe={!!imprBusy}
               pretManque={!!(imprEtat.manque && imprEtat.manque.size && pretPour(sigManque(imprEtat, imprEtat.manque)))}
@@ -53205,7 +53274,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           beneficeDe={beneficeColisPrep}
           Photo={(src) => imgMortes.has(src) ? null : <PhotoVinted src={src} alt="" decoding="async" onError={() => noterImgMorte(src)}/>}
           photoCarton={(c) => { const v = c && venteDuColis(c.geste); return v ? <BoutonPhotoCarton vente={{ ...v, num: c.num || '' }} ton="clair"/> : null; }}
-          note={(c) => (c && c.num ? <NotePaireCoque numero={c.num} variante="bloc" ajout/> : null)}/> : null}
+          note={(c) => (c ? <>{c.num ? <NotePaireCoque numero={c.num} variante="bloc" ajout/> : null}
+            {/* (14 nov., idées 152 et 153) À l'emballage : le même acheteur rappelé, et ce que demande la plateforme. */}
+            <RappelMemeAcheteur autres={autresDuGroupe(groupesAcheteur, c.cle).map(colisCourtDe).filter(Boolean)}/>
+            <ConsignesColis site={c.site} limite={c.limite || ''}/></> : null)}/> : null}
       {(curSub==='bordereaux' || curSub==='achats') && relaisOuvert ? <ModeRelais Photo={PhotoVinted} colis={colisModeRelais()} onRetire={retirerRelais} onAnnuler={(id) => _gestes.annuler(id)}
           onFermer={() => setRelaisOuvert(false)} Retour={FermeAuRetour} Icon={Icon} zIndex={Z_CONFIRMATION - 4}/> : null}
       {curSub==='bordereaux' && depotOuvert ? <ModeDepot colis={colisDepot()} etatDe={(c) => (deposeScan.attente && String(deposeScan.attente.cle) === c.cle ? 'attente' : '')}
