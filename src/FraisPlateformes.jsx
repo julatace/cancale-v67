@@ -64,7 +64,7 @@ export default function FraisPlateformes({ releve, releveAt, ebay, packs, excluA
       <section className="vrm-fc" {...attrs} data-fa-vide={!F.sites.length ? 'aucune' : 'inconnu'}>
         {tete}
         <p className="vrm-fc-ligne-vide" data-fa-ligne-vide="">
-          <b>—</b> {!F.sites.length ? tr('fc.pasDeVente', { annee: y }) : tr('fc.aucunFrais', { annee: y })}{tousPasLus ? ` · ${tr('fc.ouvreVentes')}` : ''}
+          <b>—</b> {!F.sites.length ? tr('fc.pasDeVente', { annee: String(y) }) : tr('fc.aucunFrais', { annee: String(y) })}{tousPasLus ? ` · ${tr('fc.ouvreVentes')}` : ''}
         </p>
         {F.sites.length ? <ListeSites F={F}/> : null}
       </section>
@@ -74,7 +74,7 @@ export default function FraisPlateformes({ releve, releveAt, ebay, packs, excluA
     <section className="vrm-fc" {...attrs}>
       {tete}
       <div className="vrm-fc-chiffre">
-        <span className="vrm-fc-lib">{tr('fc.totalLib', { annee: y })}</span>
+        <span className="vrm-fc-lib">{tr('fc.totalLib', { annee: String(y) })}</span>
         <span className="vrm-fc-grand" data-fa-grand="">
           {F.auMoins ? <small className="vrm-fc-aumoins">{tr('fc.auMoins')} </small> : null}{eur(F.total)}
         </span>
@@ -106,7 +106,7 @@ function ListeSites({ F }) {
               {det ? <span className="vrm-fc-nom-s">{det}</span> : null}
             </span>
             <span className={'vrm-fc-val' + (s.frais == null ? ' is-vide' : '')}>
-              {s.frais == null ? '—' : <>{s.etat === 'auMoins' ? <small>{tr('fc.auMoins')} </small> : null}{eur(s.frais)}</>}
+              {s.frais == null ? '—' : eur(s.frais)}
             </span>
           </div>
         );

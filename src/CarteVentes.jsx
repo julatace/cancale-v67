@@ -147,7 +147,7 @@ export default function CarteVentes({ lignes, paysVinted, ebay, releve, maintena
               <div className="vrm-fc-carte" role="list">
                 {liste.map((x) => (
                   <button key={x.cle} type="button" role="listitem" className="vrm-fc-rangee vrm-cv-lieu" data-cv-lieu={x.cle} data-cv-lieu-n={String(x.n)} data-cv-lieu-c={String(x.c)} onClick={() => setChoisi(x.cle)}>
-                    <span className="vrm-cv-point" aria-hidden="true" style={{ '--r': `${Math.max(8, Math.round(rayonBulle(x.n, max || x.n, { min: 8, maxi: 18 })))}px` }}/>
+                    <span className="vrm-cv-point" aria-hidden="true" style={{ '--r': `${Math.max(8, Math.round(rayonBulle(x.n, max || x.n, { min: 8, maxi: 18, k: 0.6 })))}px` }}/>
                     <span className="vrm-fc-nom">
                       <span className="vrm-fc-nom-t">{nomLieu(x)}</span>
                       <span className="vrm-fc-nom-s">{tr('fc.nVentes', { n: x.n })}{x.horsCarte ? ` · ${tr('fc.horsCarte')}` : ''}{x.niveau === 'departement' && x.villes.length ? ` · ${tr('fc.villesAPlacer', { n: x.villes.length })}` : ''}</span>
@@ -230,13 +230,28 @@ function FondVentes({ bulles, max, vue, choisi, onChoisir }) {
   const marqueurs = React.useRef([]);
   const [etat, setEtat] = React.useState('attente');   // attente · charge · bulles · pret · ko
   const [visible, setVisible] = React.useState(false);
+  const tVisible = React.useRef(null);
+  const [msBulles, setMsBulles] = React.useState(null);   // le temps entre l'entrée à l'écran et les bulles posées (lu par le banc)
   const rappel = React.useRef(onChoisir); rappel.current = onChoisir;
   // Rien ne charge tant que la carte n'entre pas à l'écran.
   React.useEffect(() => {
     const el = boite.current; if (!el) return undefined;
-    if (typeof IntersectionObserver !== 'function') { setVisible(true); return undefined; }
-    const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { setVisible(true); io.disconnect(); } }, { rootMargin: '200px' });
-    io.observe(el); return () => io.disconnect();
+    // La position lue au montage et à chaque défilement (de la page ou d'un conteneur : capture) ;
+    // l'observateur d'intersection en plus, quand il existe.
+    // À un écran et demi : MapLibre se charge déjà (le morceau seul, aucune carte) — la carte est prête à
+    // poser ses bulles quand elle arrive à l'écran.
+    let fini = false, io = null, pre = false;
+    const fin = () => { if (fini) return; fini = true; tVisible.current = performance.now(); setVisible(true); window.removeEventListener('scroll', voir, true); if (io) io.disconnect(); };
+    const voir = () => {
+      if (fini) return;
+      const r = el.getBoundingClientRect(); if (!r.height) return;
+      if (!pre && r.top < window.innerHeight * 2.5) { pre = true; import('./fondCarte.js').then((f) => (f.webglDispo() ? f.chargerMaplibre() : null)).catch(() => {}); }
+      if (r.top < window.innerHeight + 200 && r.bottom > -200) fin();
+    };
+    window.addEventListener('scroll', voir, { capture: true, passive: true });
+    if (typeof IntersectionObserver === 'function') { io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) fin(); }, { rootMargin: '200px' }); io.observe(el); }
+    voir();
+    return () => { fini = true; window.removeEventListener('scroll', voir, true); if (io) io.disconnect(); };
   }, []);
   React.useEffect(() => {
     if (!visible) return undefined;
@@ -248,7 +263,7 @@ function FondVentes({ bulles, max, vue, choisi, onChoisir }) {
         if (!vivant || !boite.current) return;
         mlRef.current = ml;
         const coop = tactile();
-        carte = new ml.Map({ container: boite.current, style: { version: 8, sources: {}, layers: [] }, center: [10, 35], zoom: 1, attributionControl: false,
+        carte = new ml.Map({ container: boite.current, style: { version: 8, sources: {}, layers: [] }, center: [10, 35], zoom: 1, attributionControl: { compact: true },
           dragRotate: false, pitchWithRotate: false, touchPitch: false, renderWorldCopies: false,
           ...(coop ? { cooperativeGestures: true, locale: { 'CooperativeGesturesHandler.WindowsHelpText': tr('fc.ctrlZoom'), 'CooperativeGesturesHandler.MacHelpText': tr('fc.cmdZoom'), 'CooperativeGesturesHandler.MobileHelpText': tr('fc.deuxDoigts') } } : {}) });
         try { carte.touchZoomRotate && carte.touchZoomRotate.disableRotation(); } catch (_) {}
@@ -258,9 +273,9 @@ function FondVentes({ bulles, max, vue, choisi, onChoisir }) {
           try { carte.resize(); } catch (_) {}
           setEtat('bulles');
           // Le fond reste CLAIR, comme les autres cartes de VRM (communauté, points relais).
-          f.poserFond(carte, { sombre: false, annule: () => !vivant }).then((r) => {
+          f.poserFond(carte, { sombre: false, annule: () => !vivant }).then(() => {
             if (!vivant) return;
-            try { carte.addControl(new ml.AttributionControl({ compact: true, ...(r && r.attribution ? { customAttribution: r.attribution } : {}) })); } catch (_) {}
+            try { for (const e of boite.current ? boite.current.querySelectorAll('.maplibregl-compact-show') : []) e.classList.remove('maplibregl-compact-show'); } catch (_) {}   // l'attribution reste derrière son (i)
             setEtat('pret');
           }).catch(() => { if (vivant) setEtat('ko'); });
         });
@@ -278,7 +293,7 @@ function FondVentes({ bulles, max, vue, choisi, onChoisir }) {
     marqueurs.current = [];
     // Les plus petites au-dessus : une grosse bulle ne cache jamais une petite.
     [...bulles].sort((x, y) => y.n - x.n).slice(0, 400).forEach((x) => {
-      const r = rayonBulle(x.n, max);
+      const r = rayonBulle(x.n, max, (boite.current && boite.current.clientWidth < 500) ? { maxi: 24, k: 1.8 } : undefined);
       const el = document.createElement('button');
       el.type = 'button';
       el.className = 'vrm-cv-bulle';
@@ -292,6 +307,7 @@ function FondVentes({ bulles, max, vue, choisi, onChoisir }) {
       el.addEventListener('click', (e) => { e.stopPropagation(); rappel.current && rappel.current(x.cle); });
       marqueurs.current.push(new ml.Marker({ element: el, anchor: 'center', subpixelPositioning: true }).setLngLat([x.lon, x.lat]).addTo(carte));
     });
+    if (msBulles == null && tVisible.current != null && marqueurs.current.length) setMsBulles(Math.round(performance.now() - tVisible.current));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pose, cleBulles, max]);
   // Le cadrage suit la vue (monde / France).
@@ -308,7 +324,7 @@ function FondVentes({ bulles, max, vue, choisi, onChoisir }) {
   }, [choisi, pose, cleBulles]);
   const ko = etat === 'ko';
   return (
-    <div className="vrm-cv-cadre" data-cv-fond={etat}>
+    <div className="vrm-cv-cadre" data-cv-fond={etat} data-cv-ms={msBulles == null ? undefined : String(msBulles)}>
       <div ref={boite} className={'vrm-cv-carte' + (ko ? ' is-ko' : '')} role="region" aria-label={tr('fc.carteNom')}/>
       {ko ? <p className="vrm-fc-nom-s vrm-cv-ko" data-cv-ko="">{tr('fc.carteKo')}</p> : null}
     </div>

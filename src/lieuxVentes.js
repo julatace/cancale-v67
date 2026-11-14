@@ -146,5 +146,6 @@ export function lieuxVentes({ lignes, paysVinted, ebay, releve, de = -Infinity, 
   return R;
 }
 
-// Le rayon d'une bulle (px) : l'aire suit le nombre de ventes.
-export const rayonBulle = (n, max, { min = 11, maxi = 34 } = {}) => (!(n > 0) || !(max > 0) ? min : Math.round(min + (maxi - min) * Math.sqrt(n / max)));
+// Le rayon d'une bulle (px) : l'aire suit le nombre de ventes, sur une échelle FIXE (deux cartes, deux vues :
+// 15 ventes ont toujours la même taille), bornée.
+export const rayonBulle = (n, _max, { min = 9, maxi = 30, k = 2.2 } = {}) => (!(n > 0) ? min : Math.round(Math.max(min, Math.min(maxi, 6 + k * Math.sqrt(n)))));

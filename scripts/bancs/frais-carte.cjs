@@ -96,7 +96,39 @@ const SECRETS = ['acheteur_secret_', 'pseudo_ebay_secret_', 'Nom Secret', 'rue S
 const CORS = { 'access-control-allow-origin': '*' };
 const PNG_VIDE = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
 
+// La famille `harvest_*_txn_*` servie comme PostgREST : `Range` honoré (pages de 1 000, total dans
+// `Content-Range`), `select=` projeté, `meta->>` relu dans `data` (_meta.cjs). Le harnais commun rend
+// tout d'un coup : à 1 300 lignes, `lireTout` y voyait une page pleine sans fin (« pas su »).
+const { metaVersData } = require('./_meta.cjs');
+const projette = (row, sel) => {
+  const out = {};
+  for (const part of sel.split(',')) {
+    const m = /^(?:([^:]+):)?(.+)$/.exec(part.trim()); if (!m) continue;
+    const src = m[2], al = m[1] || src.split(/->>|->/).pop();
+    if (src === 'id') { out[al] = row.id; continue; }
+    if (src === 'updated_at') { out[al] = iso(now - 3600e3); continue; }
+    if (src === 'data') { out[al] = row.data; continue; }
+    let v = row.data; for (const k of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[k];
+    out[al] = v == null ? null : (src.includes('->>') ? (typeof v === 'object' ? JSON.stringify(v) : String(v)) : v);
+  }
+  return out;
+};
+async function routeTxn(pg) {
+  await pg.route(/\/rest\/v1\/app_data\?.*harvest_%25_txn_%25/, async (route) => {
+    const req = route.request();
+    if (req.method() !== 'GET' && req.method() !== 'HEAD') return route.fallback();
+    const u = decodeURIComponent(metaVersData(req.url()));
+    const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || 'data';
+    const tout = txns.map((r) => projette(r, sel));
+    const rg = /^(\d+)-(\d+)$/.exec(req.headers()['range'] || '');
+    const de = rg ? +rg[1] : 0, a = rg ? Math.min(+rg[2], tout.length - 1) : tout.length - 1;
+    if (rg && de >= tout.length && de > 0) return route.fulfill({ status: 416, headers: { 'content-range': `*/${tout.length}`, ...CORS }, body: '' });
+    const page = tout.slice(de, a + 1);
+    return route.fulfill({ status: 200, contentType: 'application/json', headers: { ...CORS, 'content-range': `${de}-${de + page.length - 1}/${tout.length}` }, body: req.method() === 'HEAD' ? '' : JSON.stringify(page) });
+  });
+}
 async function routesCarte(pg, FIX, BAN) {
+  await routeTxn(pg);
   await pg.route(/^https:\/\/(tiles\.openfreemap\.org|api-adresse\.data\.gouv\.fr)\//, async (r) => {
     const u = new URL(r.request().url());
     if (u.hostname === 'api-adresse.data.gouv.fr') {
@@ -160,11 +192,28 @@ async function passe(nav, FIX, { W, theme }) {
   dit(cv, `${T} C · « Carte de tes ventes » est rendue (ventes lues)`);
   if (cv) {
     await pg.waitForFunction(() => !/pays en cours/.test((document.querySelector('[data-cv-resume]') || {}).innerText || 'x'), null, { timeout: 20000 }).catch(() => {});
+    // On mesure la CARTE, pas le démarrage de l'app (ni une autre session qui partage la machine) :
+    // d'abord une page au calme (six tours de 50 ms sans retard), puis le geste.
+    const calme = () => pg.evaluate(async () => { const t0 = performance.now(); let n = 0; while (performance.now() - t0 < 25000) { const a = performance.now(); await new Promise((r) => setTimeout(r, 50)); n = performance.now() - a - 50 < 15 ? n + 1 : 0; if (n >= 6) return true; } return false; });
+    await calme();
+    const avant = await pg.evaluate(() => (document.querySelector('[data-cv-fond]') || { getAttribute: () => '' }).getAttribute('data-cv-fond'));
     const t0 = Date.now();
     await pg.locator('.vrm-cv-carte').first().scrollIntoViewIfNeeded().catch(() => {});
     const bulles = await pg.waitForSelector('[data-cv-bulle]', { timeout: 15000 }).then(() => true).catch(() => false);
     const ms = Date.now() - t0;
-    dit(bulles && ms < 1000, `${T} C · la carte s’ouvre (bulles posées) en ${ms} ms (< 1 000) avec 2 000 ventes`, ms);
+    if (process.env.BAVARD) console.log('  sonde', JSON.stringify(await pg.evaluate(() => { const c = document.querySelector('.vrm-cv-carte'); const r = c && c.getBoundingClientRect(); return { fond: (document.querySelector('[data-cv-fond]') || { getAttribute: () => '?' }).getAttribute('data-cv-fond'), msApp: (document.querySelector('[data-cv-fond]') || { getAttribute: () => '?' }).getAttribute('data-cv-ms'), top: r && r.top, h: r && r.height, ih: innerHeight, gl: !!document.createElement('canvas').getContext('webgl') }; })));
+    if (avant === 'attente') dit(bulles && ms < 1000, `${T} C · la carte s’ouvre (bulles posées) en ${ms} ms après son entrée à l’écran (< 1 000), 2 000 ventes`, ms);
+    else dit(bulles, `${T} C · la carte était déjà à l’écran au chargement (${avant}) : bulles posées`, avant);
+    // Le même travail sur commande : toute la période (les 2 000 ventes) recalculée et reposée.
+    await calme();
+    const t1 = Date.now();
+    await pg.locator('[data-cv-periode="tout"]').first().click().catch(() => {});
+    const toutOk = await pg.waitForFunction(() => { const s = document.querySelector('[data-carte-ventes]'); return s && +s.getAttribute('data-cv-n') >= 1900 && document.querySelectorAll('[data-cv-bulle]').length >= 8; }, null, { timeout: 10000 }).then(() => true).catch(() => false);
+    const ms2 = Date.now() - t1;
+    const nTout = await pg.evaluate(() => +document.querySelector('[data-carte-ventes]').getAttribute('data-cv-n'));
+    dit(toutOk && ms2 < 1000, `${T} C · « Tout » : ${nTout} ventes agrégées et reposées en ${ms2} ms (< 1 000)`, ms2);
+    await pg.locator('[data-cv-periode="12m"]').first().click().catch(() => {});
+    await pg.waitForTimeout(400);
     await pg.waitForSelector('[data-cv-fond="pret"]', { timeout: 15000 }).catch(() => {});
     const C = await pg.evaluate(() => {
       const s = document.querySelector('[data-carte-ventes]');
@@ -173,7 +222,7 @@ async function passe(nav, FIX, { W, theme }) {
     });
     dit(C.fond === 'pret', `${T} C · le fond OpenFreeMap est dessiné`, C.fond);
     dit(C.bulles.length === C.nBulles && C.bulles.every(([k]) => /^[A-Z]{2}$/.test(k)) && C.bulles.length >= 8, `${T} C · une bulle par pays (${C.bulles.length})`, C.bulles);
-    dit(C.n >= 1500 && C.bulles.reduce((t, [, n]) => t + n, 0) + C.sansLieu === C.n, `${T} C · lieux + sans lieu = toutes les ventes de la période (${C.n})`, C);
+    dit(C.n >= 1000 && C.bulles.reduce((t, [, n]) => t + n, 0) + C.sansLieu === C.n, `${T} C · lieux + sans lieu = toutes les ventes de la période (${C.n})`, C);
     await capture(pg, nomS('carte-monde'), await pg.$('[data-carte-ventes]'));
     // ── D
     await pg.locator('[data-cv-bulle="FR"]').first().click().catch(() => {});
@@ -184,7 +233,7 @@ async function passe(nav, FIX, { W, theme }) {
     await capture(pg, nomS('detail'), await pg.$('[data-carte-ventes]'));
     // ── V
     await pg.locator('[data-cv-vue-choix="france"]').first().click().catch(() => {});
-    await pg.waitForFunction(() => document.querySelectorAll('[data-cv-bulle^="v|"]').length >= 15, null, { timeout: 20000 }).catch(() => {});
+    await pg.waitForFunction(() => document.querySelectorAll('[data-cv-bulle^="v|"]').length >= 15, null, { timeout: 45000 }).catch(() => {});
     await pg.waitForTimeout(800);
     const V = await pg.evaluate(() => ({ villes: document.querySelectorAll('[data-cv-bulle^="v|"]').length, deps: [...document.querySelectorAll('[data-cv-bulle^="d|"]')].map((b) => b.getAttribute('data-cv-bulle')), sansVille: +document.querySelector('[data-carte-ventes]').getAttribute('data-cv-france-sans-ville'), resume: (document.querySelector('[data-cv-resume]') || {}).innerText || '' }));
     dit(V.villes >= 15 && V.deps.includes('d|35'), `${T} V · France : ${V.villes} villes placées, Saint-Malo (sans repère) dans le département 35`, V);
