@@ -18132,9 +18132,11 @@ function SideBar({ tab, setTab, entreprise, sites, badges }) {
   // (9 nov., lot AI — demande 13 de Julien) La carte se TOUCHE. (11 nov., lot DJ6) Elle ouvre le
   // MENU DU PROFIL (Paramètres, Appareils, Se déconnecter) ; la photo est celle du profil, et
   // « Masquer mon nom » (ou pas encore lu) ⇒ « Mon compte », ni nom ni e-mail.
+  // (14 nov.) Elle s'allume pour Paramètres ET ses sous-écrans (Organisation…), comme l'ancienne roue
+  // (`entreeActive` → `BAR_GROUPE`) : sans ça, sur Organisation, le rail ne disait plus où l'on est.
   const uidCompte = (AUTH.user && AUTH.user.id) || '';
   const nomCoque = useNomCoque({ owner: uidCompte, headers: enTeteSession, nom: nomCompte, email: mail });
-  const carteCompte = (uidCompte && (nomCompte || mail)) ? <button type="button" className="vrm-nav-compte" data-nav-compte="" data-nav-compte-ouvre="profil" aria-haspopup="dialog" aria-current={tab === 'settings' ? 'page' : undefined}
+  const carteCompte = (uidCompte && (nomCompte || mail)) ? <button type="button" className="vrm-nav-compte" data-nav-compte="" data-nav-compte-ouvre="profil" aria-haspopup="dialog" aria-current={(BAR_GROUPE[tab] || tab) === 'settings' ? 'page' : undefined}
     aria-label={`${nomCoque.texte}${offre ? ' · ' + offre : ''} — ${tr('coque.ouvrirProfil')}`} title={tr('coque.monProfil')} onClick={() => ouvrirMenuProfil()}>
     <PastilleProfil owner={uidCompte} headers={enTeteSession} nom={nomCompte} email={mail} taille={32} className="vrm-nav-avatar vrm-sensible"/>
     <span className="vrm-nav-compte-txt">
