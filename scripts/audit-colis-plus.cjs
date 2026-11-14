@@ -51,6 +51,9 @@ const MUTS = {
   'planche-a4-ecrasee': ['export const ECHELLE_MIN = 0.85;', 'export const ECHELLE_MIN = 0.3;', 'impression/planche4.js'],
   'planche-pas-branchee': ["const planche = modeLot === 'planche4';", 'const planche = false;', 'App.jsx'],
   'douchette-pas-montee': ["<DouchetteGlobale ouvrirVentes={()=>setTab('ventes')}/>", '', 'App.jsx'],
+  'tampon-lot-ignore': ["if (it.tampon && TAMPONS_IMPR.includes(it.tampon)) { const rg0 = reglageImpressionChoisi(); impIt.reg = { ...rg0, tamponA4: it.tampon, tamponTh: it.tampon }; }", '', 'App.jsx'],
+  'lot-sans-garde-numeros': ["if (!(await confirmerNumerosAVerifier((items || []).map((it) => it && it.numero)))) throw new Error(NUM_A_VERIFIER_ANNULE);", '', 'App.jsx'],
+  'lot-sans-choix-imprimante': ["onChange={(v)=>{ if (!batchBusy) choisirImprimante(v); }}", 'onChange={() => {}}', 'App.jsx'],
 };
 if (process.argv.includes('--prouve')) {
   let n = 0;
@@ -288,6 +291,13 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
   dit(/<TempsColis uid=\{uid\} ouverture=\{ouverture\}/.test(PC) && /useJournalTemps\(uid, ouverture, seance\.faits\)/.test(PC) && /beneficeDe=\{beneficeColisPrep\}/.test(A), 'C5 le temps est rangé à chaque « Colis fait » et montré au récapitulatif');
   dit(/<ChoixEmballageColis reglage=\{emballagesR\} cle=\{c\.cle\} titre=\{c\.titre \|\| ''\} lireFaits=\{lireFaitsEmb\}/.test(A) && /propositionFormat\(reglage, cle, modele\)/.test(EC) && /data-emb-prendre=/.test(EC), 'C6 Préparer propose le format retenu (« Prendre ») et dit les fournitures au seuil');
   dit(/const IMPR_MODES = \['normale', 'thermique', 'planche4'\];/.test(A) && /const planche = modeLot === 'planche4';\s*const thermique = modeLot === 'thermique' \|\| planche;/.test(A) && /if \(planche\) \{[\s\S]{0,160}imposerPlanche\(PL, out\)/.test(A) && /v === 'planche4' \? tr\('cp\.planche\.choix'\)/.test(RG), 'C7 « 4 par page A4 » est un choix de Réglages → Imprimante, appliqué à « Tout imprimer »');
+  // (14 nov., Julien : « modifier un par un chaque bordereau avec le tamponnage ») — le tampon de CHAQUE bordereau,
+  // la garde §5 des N° « à vérifier » gardée, l'imprimante choisie dans la feuille, le tampon A4 TOUJOURS posé.
+  dit(/tampon: \(tamponsLotRef\.current \|\| \{\}\)\[l\.cle\] \|\| null/.test(A) && /if \(it\.tampon && TAMPONS_IMPR\.includes\(it\.tampon\)\) \{ const rg0 = reglageImpressionChoisi\(\); impIt\.reg = \{ \.\.\.rg0, tamponA4: it\.tampon, tamponTh: it\.tampon \}; \}/.test(A) && /data-lot-tampon-choix=\{l\.cle\}/.test(A) && /data-lot-retirer=\{l\.cle\}/.test(A),
+    'C9 « Tout imprimer » : le tampon de CHAQUE bordereau (choisi dans l’aperçu) remplace le réglage pour lui seul ; « Retirer du lot »');
+  dit(/if \(!\(await confirmerNumerosAVerifier\(\(items \|\| \[\]\)\.map\(\(it\) => it && it\.numero\)\)\)\) throw new Error\(NUM_A_VERIFIER_ANNULE\);/.test(A), 'C10 §5 : un N° « à vérifier » ou porté par deux fiches DEMANDE toujours avant le lot');
+  dit(/<Segmente label=[^>]{0,60} plein value=\{imprMode\(imprimante\)\} onChange=\{\(v\)=>\{ if \(!batchBusy\) choisirImprimante\(v\); \}\}/.test(lire('App.jsx')), 'C11 l’imprimante (classique, 4 par page, thermique) se choisit DANS la feuille « Tout imprimer » (le réglage `vrm_imprimante`)');
+  dit(/const t = await tamponnerBordereau\(PL, src, \{ numero: contenu\.numero, titre: contenu\.titre, thermique, choix \}\);/.test(A) && /const contenu = contenuTampon\(thermique \? reg\.tamponTh : reg\.tamponA4/.test(A), 'C12 le tampon de l’A4 classique est toujours posé (`tamponnerBordereau` avec le réglage `tamponA4`)');
   dit(!/fetch\(|api\.openai|anthropic|apiKey|x-api-key/i.test(sansCommentaires(lire('mainsLibres.js')) + sansCommentaires(lire('MainsLibres.jsx'))), 'C8 mains libres : aucune clé, aucun appel réseau à nous (§2.9)');
 
   console.log(`\n${ok} verts, ${ko} rouges`);
