@@ -138,7 +138,7 @@
    44 touchées), la choisie à l'encre pleine — la forme de `src/ui/Filtres.jsx`. */
 :root:root body .vrm-main[data-ecran="annonces"] .vrm-stock-views.vrm-filtres { gap: 6px !important; }
 :root:root body .vrm-main[data-ecran="annonces"] .vrm-stock-views.vrm-filtres > button {
-  box-sizing: border-box !important; border: 0 !important; border-top: 5px solid transparent !important; border-bottom: 5px solid transparent !important; background-clip: padding-box !important;
+  box-sizing: border-box !important; border: 0 !important; border-top: 5px solid transparent !important; border-bottom: 5px solid transparent !important; border-left: 0 !important; border-right: 0 !important; background-clip: padding-box !important;
   background-color: var(--d-carte, #fff) !important; box-shadow: none !important; border-radius: 999px !important;
   min-height: 44px !important; height: 44px !important; padding: 0 12px !important; font: 600 15px/1 var(--vrm-police) !important; color: var(--d-encre, #1D1D1F) !important;
 }
@@ -189,7 +189,7 @@
   /* Ventes · « À expédier » : les gestes de préparation en UNE rangée de petites capsules (elle défile). */
   :root:root:root body .vrm-main .vrm-colis-section .vrm-pas-a-pas-rangee { display: flex !important; flex-wrap: nowrap !important; overflow-x: auto !important; gap: 6px !important; margin: 0 -16px 2px !important; padding: 0 16px !important; scrollbar-width: none !important; }
   :root:root:root body .vrm-main .vrm-colis-section :is(.vrm-pas-a-pas-rangee, .vrm-tournee-tete) .vrm-b {
-    box-sizing: border-box !important; border: 0 !important; border-top: 5px solid transparent !important; border-bottom: 5px solid transparent !important; background-clip: padding-box !important;
+    box-sizing: border-box !important; border: 0 !important; border-top: 5px solid transparent !important; border-bottom: 5px solid transparent !important; border-left: 0 !important; border-right: 0 !important; background-clip: padding-box !important;
     background-color: var(--d-carte, #fff) !important; box-shadow: none !important; border-radius: 999px !important; flex: none !important;
     min-height: 44px !important; height: 44px !important; padding: 0 12px !important; font: 600 15px/1 var(--vrm-police) !important; color: var(--d-encre, #1D1D1F) !important; width: auto !important;
   }
@@ -373,6 +373,9 @@
 @media (max-width: 767px) {
   :root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-titre-taille-fin { display: none !important; }
   :root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-etat-taille { display: inline !important; color: var(--d-encre, #1D1D1F) !important; font-weight: 600 !important; }
+  /* La sous-ligne de la rangée : taille, favoris, jours (comme la maquette) ; l'état (« Très bon état ») et les vues
+     sont dans la fiche ouverte — rien de coupé « Très bon é… ». */
+  :root:root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] [data-etat-ligne] .vrm-fiche-etat-court { display: none !important; }
   /* Le nom prend toute la ligne (jusqu'au chevron) ; le prix descend à droite de la sous-ligne. */
   :root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-ann-ledger-info > [data-titre] { grid-column: 2 / -1 !important; }
   :root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-ann-ledger-info > .vrm-ann-price-line { grid-row: 2 !important; grid-column: 4 !important; }
