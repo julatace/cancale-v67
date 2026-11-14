@@ -813,6 +813,12 @@
 :root:root body .vrm-fs .vrm-profil-ecrans .vrm-nav-badge-n { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--d-encre); color: var(--d-carte); font: 700 12px/20px var(--vrm-police, -apple-system, system-ui, sans-serif); text-align: center; font-variant-numeric: tabular-nums; }
 :root:root body .vrm-fs .vrm-profil-ecrans .vrm-nav-badge-point { margin-left: auto; width: 8px; height: 8px; border-radius: 50%; background: var(--d-point-ambre); }
 
+
+/* ── 3.10 Revue « Web Interface Guidelines » (14 nov.) : focus visible au clavier, pas de délai de double-toucher. */
+:root:root body .vrm-app-shell :is(.vrm-tabbar > .vrm-tab, .vrm-app-header .vrm-hbtn, .vrm-paires-selecteur .vrm-seg-btn) { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+:root:root body .vrm-app-shell :is(.vrm-tabbar > .vrm-tab, .vrm-app-header .vrm-hbtn):focus-visible { outline: 2px solid var(--d-accent) !important; outline-offset: -2px !important; border-radius: 12px; }
+:root:root body .vrm-fs .vrm-profil-ecrans .vrm-profil-ligne:focus-visible { outline: 2px solid var(--d-accent) !important; outline-offset: -2px !important; }
+
 } /* fin §3 COQUE (@layer vrm-premium) */
 
 /* ══ §4 ATELIER — la direction artistique commune (14 nov.) ═══════════════════
