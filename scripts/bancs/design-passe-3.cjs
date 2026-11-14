@@ -46,7 +46,9 @@ const SOUS = liste('SOUS', [
   'reglages:ebay', 'reglages:sms-colis', 'reglages:import', 'reglages:agenda', 'reglages:mes-plateformes', 'reglages:affichage-mode',
   'reglages:ma-journee', 'reglages:objectif-mois', 'reglages:je-vends', 'reglages:stream', 'reglages:zoom', 'reglages:raccourcis-siri',
   'reglages:securite', 'reglages:importer', 'reglages:revenir', 'reglages:corbeille', 'reglages:verifier',
-  'compte:equipe', 'compte:journal-vrm', 'compte:tes-donnees', 'compte:conditions', 'compte:fermer',
+  // « Mode équipe » en DERNIER : y passer vide le stockage de la page (le thème choisi revient au clair) — mesuré après
+  // lui, une sous-page se jugeait avec la palette de la nuit sur un écran redevenu clair.
+  'compte:journal-vrm', 'compte:tes-donnees', 'compte:conditions', 'compte:fermer', 'compte:equipe',
 ].join(',')).map((x) => x.split(':'));
 
 // ── La mesure de la passe 3, DANS la page (K–R). ──
