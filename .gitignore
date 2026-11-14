@@ -17,8 +17,6 @@ scripts/bancs/fx
 scripts/bancs/*.json
 # (11 nov.) les budgets de vitesse sont une donnée du dépôt (inventée, aucune donnée réelle)
 !scripts/bancs/budget-vitesse.json
-# (14 nov.) l'inventaire des réglages d'avant (noms d'attributs data-*, aucune donnée) que lit refonte-plateformes-reglages
-!scripts/bancs/_inventaire-reglages.json
 scripts/bancs/*.png
 scripts/bancs/*.pdf
 undefined/

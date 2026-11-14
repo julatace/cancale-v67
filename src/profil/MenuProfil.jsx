@@ -24,9 +24,7 @@ export function useNomCoque({owner,headers,nom,email}){
  return {masque,texte:nomAffiche({masque:masque!==false,nom,email})};
 }
 
-// (14 nov., refonte de la coque) `enPlus` : les commandes que la barre du haut du téléphone ne porte plus
-// (l'état « Actions Vinted », l'œil des montants) — posées par la coque, après Paramètres.
-export default function MenuProfil({owner,headers,email,nom,offre,theme:C,Feuille,Icon,onFermer,onParametres,onAppareils,onDeconnexion,enPlus=null,ecrans=null}){
+export default function MenuProfil({owner,headers,email,nom,offre,theme:C,Feuille,Icon,onFermer,onParametres,onAppareils,onDeconnexion}){
  const masque=useNomMasque(owner,headers);
  const [occupe,setOccupe]=useState(false),[msg,setMsg]=useState(''),[photo,setPhoto]=useState(false);
  const basculer=async()=>{setOccupe(true);setMsg('');try{await poserNomMasque(owner,headers,!masque);}catch(e){setMsg(e.message);}finally{setOccupe(false);}};
@@ -46,14 +44,11 @@ export default function MenuProfil({owner,headers,email,nom,offre,theme:C,Feuill
     </div>
    </div>
    {photo&&<div className="vrm-profil-choix-photo" data-profil-choix-photo=""><ChoixPhoto owner={owner} headers={headers} theme={C} compact/></div>}
-   {/* (14 nov., maquette de Julien) Au téléphone, l'avatar ouvre AUSSI le reste des écrans (le menu du haut). */}
-   {ecrans}
    {/* (11 nov., lot DJ6) Le geste le plus fréquent d'abord : Paramètres, puis le réglage du nom. */}
    <div className="vrm-profil-groupe">
     {ligne('parametres','gear',tr('ecran.settings'),onParametres)}
     {ligne('appareils','shield',tr('profil.appareils'),onAppareils)}
    </div>
-   {enPlus?<div className="vrm-profil-groupe" data-profil-coque="">{enPlus}</div>:null}
    <div className="vrm-profil-groupe">
     <label className="vrm-profil-ligne vrm-profil-bascule" data-profil-menu="masquer">
      <span className="vrm-profil-ligne-ic" aria-hidden="true"><Icon name="eye" size={18}/></span>
