@@ -55,7 +55,7 @@ export function TauxOffresCarte({ T, nomDe = (u) => u }) {
       data-to-recues={t.recues} data-to-acceptees={t.acceptees} data-to-payees={t.payees == null ? '' : t.payees} data-to-taux-acc={t.tauxAcceptation == null ? '' : t.tauxAcceptation} data-to-taux-pay={t.tauxPaiement == null ? '' : t.tauxPaiement}>
       <div className="vrm-ac-carte">
         <div className="vrm-ac-tuiles">
-          <div className="vrm-ac-tuile"><b className="vrm-ac-chiffre">{am(t.partiel)}{n0(t.recues)}</b><span className="vrm-ac-libelle">{tr('ap.off.recues')}</span></div>
+          <div className="vrm-ac-tuile">{t.partiel ? <span className="vrm-ac-aumoins">{tr('ap.auMoins')}</span> : null}<b className="vrm-ac-chiffre">{n0(t.recues)}</b><span className="vrm-ac-libelle">{tr('ap.off.recues')}</span></div>
           <div className="vrm-ac-tuile"><b className="vrm-ac-chiffre">{pctTexte(t.tauxAcceptation)}</b><span className="vrm-ac-libelle">{tr('ap.off.acceptees', { n: n0(t.acceptees) })}</span></div>
           <div className="vrm-ac-tuile"><b className="vrm-ac-chiffre">{pctTexte(t.tauxPaiement)}</b><span className="vrm-ac-libelle">{tr('ap.off.payees', { n: n0(t.payees) })}</span></div>
         </div>

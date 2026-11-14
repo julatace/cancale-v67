@@ -123,7 +123,7 @@ export default {
   "ap.vc.ca": "Gemeldeter Umsatz",
   "ap.vc.declare": "Gemeldet",
   "ap.vc.oui": "ja",
-  "ap.vc.recettes": "Einnahmenbuch · {n} Verkäufe",
+  "ap.vc.recettes": "Einnahmenbuch · {n}",
   "ap.vc.total": "Erhaltener Betrag: {m}",
   "ap.vc.dateVente": "Verkauf",
   "ap.vc.dateVersement": "Auszahlung",

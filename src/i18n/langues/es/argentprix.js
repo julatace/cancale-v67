@@ -123,7 +123,7 @@ export default {
   "ap.vc.ca": "Facturación declarada",
   "ap.vc.declare": "Declarado",
   "ap.vc.oui": "sí",
-  "ap.vc.recettes": "Libro de ingresos · {n} ventas",
+  "ap.vc.recettes": "Libro de ingresos · {n}",
   "ap.vc.total": "Importe recibido: {m}",
   "ap.vc.dateVente": "Venta",
   "ap.vc.dateVersement": "Pago",

@@ -172,7 +172,9 @@ async function contexte(b, vp, sombre, opts) {
   return { ctx, pg, errs };
 }
 const aller = async (pg, tab, repere, ms = 1800) => {
-  await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
+  // Une feuille fermée par Échap revient en arrière (`FermeAuRetour`) : une navigation peut être en vol ⇒ ERR_ABORTED ; on attend et on relance UNE fois.
+  try { await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' }); }
+  catch (e) { if (!/ERR_ABORTED/.test(String(e && e.message))) throw e; await pg.waitForTimeout(1500); await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' }); }
   if (repere) await pg.waitForFunction((r) => document.querySelector(r) || /pas pu s'afficher|n’a pas pu s’afficher/.test(document.body.innerText), repere, { timeout: 30000 }).catch(() => {});
   await pg.waitForTimeout(ms);
 };

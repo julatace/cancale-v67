@@ -123,7 +123,7 @@ export default {
   "ap.vc.ca": "Fatturato dichiarato",
   "ap.vc.declare": "Dichiarato",
   "ap.vc.oui": "sì",
-  "ap.vc.recettes": "Registro degli incassi · {n} vendite",
+  "ap.vc.recettes": "Registro degli incassi · {n}",
   "ap.vc.total": "Importo ricevuto: {m}",
   "ap.vc.dateVente": "Vendita",
   "ap.vc.dateVersement": "Accredito",

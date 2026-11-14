@@ -124,7 +124,7 @@ export default {
   "ap.vc.ca": "CA déclaré",
   "ap.vc.declare": "Déclaré",
   "ap.vc.oui": "oui",
-  "ap.vc.recettes": "Livre des recettes · {n} ventes",
+  "ap.vc.recettes": "Livre des recettes · {n}",
   "ap.vc.total": "Montant reçu : {m}",
   "ap.vc.dateVente": "Vente",
   "ap.vc.dateVersement": "Versement",

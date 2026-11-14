@@ -123,7 +123,7 @@ export default {
   "ap.vc.ca": "Declared turnover",
   "ap.vc.declare": "Declared",
   "ap.vc.oui": "yes",
-  "ap.vc.recettes": "Receipts ledger · {n} sales",
+  "ap.vc.recettes": "Receipts ledger · {n}",
   "ap.vc.total": "Amount received: {m}",
   "ap.vc.dateVente": "Sale",
   "ap.vc.dateVersement": "Payout",
