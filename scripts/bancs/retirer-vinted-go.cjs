@@ -135,18 +135,24 @@ const ANCIEN_RE = /Ville-Avant|Tabac du Port/;
 (async () => {
   const b = await lancer(PW, { executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] }).catch((e) => { if (estWebkit) throw e; return chromium.launch(); });
   try {
-    for (const [vp, sombre, nom] of [[{ width: 390, height: 844 }, false, '390-clair'], [{ width: 390, height: 844 }, true, '390-sombre'], [{ width: 1512, height: 982 }, false, '1512-clair']]) {
+    const VUES = [[{ width: 390, height: 844 }, false, '390-clair'], [{ width: 390, height: 844 }, true, '390-sombre'], [{ width: 1512, height: 982 }, false, '1512-clair']]
+      .filter(([, , n]) => !process.env.VUES || process.env.VUES.split(',').includes(n));   // `VUES=390-clair` : une seule (mémoire)
+    for (const [vp, sombre, nom] of VUES) {
       console.log(`\n— Vinted Go réacheminé · ${nom}`);
       const { ctx, pg, errs, qrDemandes } = await ouvrir(b, vp, sombre);
       await essaie(nom, async () => {
         await pg.locator('[data-colis-section]').first().waitFor({ timeout: 45000 });
         await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' })));
-        await pg.waitForFunction(() => document.querySelectorAll('.vrm-rpf .vrm-rpf-ligne[data-cc-carte]').length >= 3, null, { timeout: 45000 }).catch(() => {});
+        // L'écran Achats se charge à la demande (squelette, puis la liste) : on attend que la liste TIENNE (3 lignes,
+        // deux relevés à 1 s d'intervalle) — une condition, jamais un délai seul.
+        const lignes3 = () => pg.waitForFunction(() => document.querySelectorAll('.vrm-rpf .vrm-rpf-ligne[data-cc-carte]').length >= 3, null, { timeout: 45000 });
+        await lignes3(); await pg.waitForTimeout(1000); await lignes3();
         // Chaque ligne dépliée (le QR vit dans le dépli), puis le QR de A chargé — une condition, jamais un délai fixe.
         // Un dépli à la fois (accordéon) : on ouvre celui de A, puis on juge B sans le déplier (son QR serait dans la
         // ligne fermée aussi : la vignette « QR » de la ligne dit s'il en a un).
         const ligneDe = (code) => `[...document.querySelectorAll('.vrm-rpf-ligne[data-cc-carte]')].find((l) => l.querySelector('[data-code-retrait="${code}"]'))`;
         await pg.evaluate(new Function(`const l = ${ligneDe(A.code)}; const o = l && l.querySelector('.vrm-rpf-ouvrir'); if (o && o.getAttribute('aria-expanded') !== 'true') o.click();`));
+        await pg.waitForFunction(new Function(`const l = ${ligneDe(A.code)}; const o = l && l.querySelector('.vrm-rpf-ouvrir'); return !!o && o.getAttribute('aria-expanded') === 'true';`), null, { timeout: 15000 }).catch(() => {});
         await pg.waitForFunction(new Function(`const l = ${ligneDe(A.code)}; const im = l && l.querySelector('[data-colis-qr] img'); return !!(im && im.complete && im.naturalWidth > 0);`), null, { timeout: 30000 }).catch(() => {});
         await pg.waitForTimeout(300);
         const vue = await pg.evaluate(({ a, bb, c }) => {
@@ -157,6 +163,8 @@ const ANCIEN_RE = /Ville-Avant|Tabac du Port/;
           const points = [...document.querySelectorAll('.vrm-rpf-point')].map((p) => ((p.querySelector('.vrm-rpf-nom') || {}).textContent || '') + ' | ' + ((p.querySelector('.vrm-rpf-adr') || {}).textContent || ''));
           return { a: !!la, b: !!lb, c: !!lc, pa: point(la), pb: point(lb), pc: point(lc), qa: qr(la), qaLigne: !!(la && la.querySelector('[data-rp-qr-ligne]')), qb: qr(lb) || (lb && lb.querySelector('[data-rp-qr-ligne]') ? 'icône QR' : null), qbPasCharge: !!(lb && lb.querySelector('[data-colis-qr-pas-charge]')), points };
         }, { a: A.code, bb: B.code, c: C.code });
+        if (process.env.BANC_DETAIL) console.log(await pg.evaluate(({ a, c }) => { const ligne = (code) => [...document.querySelectorAll('.vrm-rpf-ligne[data-cc-carte]')].find((l) => l.querySelector(`[data-code-retrait="${code}"]`));
+          const la = ligne(a), lc = ligne(c); return 'A: ' + (la ? la.outerHTML.replace(/<svg[\s\S]*?<\/svg>/g, '').slice(0, 1800) : '—') + '\n\nC: ' + (lc && lc.parentElement ? lc.parentElement.outerHTML.replace(/<svg[\s\S]*?<\/svg>/g, '').slice(0, 700) : '—'); }, { a: A.code, c: C.code }));
         await pg.evaluate((code) => { const l = [...document.querySelectorAll('.vrm-rpf-ligne[data-cc-carte]')].find((x) => x.querySelector(`[data-code-retrait="${code}"]`)); if (l) { l.scrollIntoView({ block: 'start' }); window.scrollBy(0, -80); } }, A.code);
         await shot(pg, 'a-retirer', nom);
         dit(vue.a && vue.b && vue.c, `${nom} : les trois colis sont à retirer (A, B, C), chacun sa ligne`, JSON.stringify({ a: vue.a, b: vue.b, c: vue.c }));
