@@ -12,6 +12,8 @@
 //   dans une longue liste) ; « Je choisirai sur Vinted » laisse le champ vide ; « Pas
 //   maintenant » laisse la fiche (rien n'est envoyé).
 // ═══════════════════════════════════════════════════════════════════════════
+// (14 nov., proposition 102) « Floue ? » / « sombre ? » sur chaque photo avant l'envoi — un simple avertissement.
+import AvisPhoto from './AvisPhoto.jsx';
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { createRoot } from 'react-dom/client';
@@ -172,7 +174,7 @@ export default function CreerSurVinted({ fiches = [], compteOnglet, extRaison = 
                   <span className="vrm-cv-txt"><b>{texte.ok ? texte.titre : (f.titre || tr('creerVinted.sansTitre'))}</b><small>{[f.marque, f.taille, f.etat, prixTexte(f.prix)].filter(Boolean).join(' · ')}</small></span>
                 </div>
                 <div className="vrm-cv-photos" data-creer-vinted-photos={ph.length}>
-                  {ph.map((u, i) => <span key={i} className="vrm-cv-photo"><img src={u} alt=""/>{!fait && !enCours && <button type="button" aria-label={tr('creerVinted.photo.retirer', { n: i + 1 })} onClick={() => retirer(f.id, i)}>×</button>}</span>)}
+                  {ph.map((u, i) => <span key={i} className="vrm-cv-photo" style={{ position: 'relative' }}><img src={u} alt=""/><span className="vrm-cv-avis" style={{ position: 'absolute', left: 4, bottom: 4, maxWidth: 'calc(100% - 8px)' }}><AvisPhoto src={u}/></span>{!fait && !enCours && <button type="button" aria-label={tr('creerVinted.photo.retirer', { n: i + 1 })} onClick={() => retirer(f.id, i)}>×</button>}</span>)}
                   {!fait && <button type="button" className="vrm-cv-ajout" disabled={enCours || lecture === f.id || ph.length >= PHOTOS_MAX} onClick={() => inputs.current[f.id] && inputs.current[f.id].click()} data-creer-vinted-ajouter={f.numero}>{lecture === f.id ? tr('creerVinted.photo.lecture') : tr('creerVinted.photo.ajouter')}</button>}
                   <input ref={(el) => { inputs.current[f.id] = el; }} type="file" accept="image/*" multiple hidden onChange={(e) => { ajouter(f.id, e.target.files); e.target.value = ''; }}/>
                 </div>

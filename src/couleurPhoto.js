@@ -5,8 +5,8 @@
 // dont la PHOTO est bleue. La couleur est calculée À PARTIR DE SES PROPRES PHOTOS,
 // sur l'appareil (canvas), sans IA, sans serveur, sans clé (§2.9).
 //   · la couleur DOMINANTE de la paire, pas celle du fond : le fond est estimé par la
-//     couleur médiane du bord de l'image, et chaque pixel compte d'autant plus qu'il
-//     s'en éloigne et qu'il est près du centre ;
+//     couleur médiane de chaque bord de l'image (un mur, un sol), et chaque pixel compte
+//     d'autant plus qu'il s'en éloigne et qu'il est près du centre ;
 //   · rangée PAR IDENTITÉ DE PHOTO (l'adresse exacte de la photo, ou `studio:<N°>:<id>`
 //     pour une photo du studio — src/indexCouleurs.js) : jamais par titre ;
 //   · ⚠️ c'est UNE RECHERCHE, jamais un rapprochement d'identité (§5) : deux paires
@@ -90,17 +90,19 @@ export function couleursDePixels(rgba, w, h) {
       const o = (Y * W + X) * 3; px[o] = r / n; px[o + 1] = g / n; px[o + 2] = b / n;
     }
   }
-  // Le fond : la couleur médiane du bord (canal par canal).
-  const bord = [[], [], []];
-  for (let X = 0; X < W; X++) for (const Y of [0, 1, H - 2, H - 1]) for (let c = 0; c < 3; c++) bord[c].push(px[(Y * W + X) * 3 + c]);
-  for (let Y = 2; Y < H - 2; Y++) for (const X of [0, 1, W - 2, W - 1]) for (let c = 0; c < 3; c++) bord[c].push(px[(Y * W + X) * 3 + c]);
-  const med = bord.map((l) => { const s = l.slice().sort((a, b) => a - b); return s[s.length >> 1]; });
+  // Le fond : la couleur médiane de CHAQUE bord (haut, bas, gauche, droite — un mur et un sol
+  // n'ont pas la même couleur), canal par canal. Un pixel est « du fond » s'il est proche de l'un d'eux.
+  const mediane = (l) => { const t = l.slice().sort((a, b) => a - b); return t[t.length >> 1]; };
+  const cote = (pts) => [0, 1, 2].map((c) => mediane(pts.map(([X, Y]) => px[(Y * W + X) * 3 + c])));
+  const lignes = (ys) => { const o = []; for (const Y of ys) for (let X = 0; X < W; X++) o.push([X, Y]); return o; };
+  const colonnes = (xs) => { const o = []; for (const X of xs) for (let Y = 0; Y < H; Y++) o.push([X, Y]); return o; };
+  const fonds = [cote(lignes([0, 1])), cote(lignes([H - 2, H - 1])), cote(colonnes([0, 1])), cote(colonnes([W - 2, W - 1]))];
   const poids = new Map(); let total = 0;
   const voter = (unif) => {
     poids.clear(); total = 0;
     for (let Y = 0; Y < H; Y++) for (let X = 0; X < W; X++) {
       const o = (Y * W + X) * 3, r = px[o], g = px[o + 1], b = px[o + 2];
-      const d = Math.sqrt((r - med[0]) ** 2 + (g - med[1]) ** 2 + (b - med[2]) ** 2);
+      let d = Infinity; for (const m of fonds) d = Math.min(d, Math.sqrt((r - m[0]) ** 2 + (g - m[1]) ** 2 + (b - m[2]) ** 2));
       const loinFond = unif ? 1 : Math.min(1, Math.max(0, (d - 18) / 50));
       if (!loinFond) continue;
       const dx = (X + 0.5) / W - 0.5, dy = (Y + 0.5) / H - 0.5;

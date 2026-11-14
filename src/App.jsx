@@ -759,8 +759,11 @@ import "./styles-popups.css";       // (9 nov., lot AI) l'avatar du compte Vinte
 import {ChoixReponses,ResumeOffre} from "./ActionsClaires.jsx";
 import {LignePlancher} from "./LignePlancher.jsx";
 import { CLE_NOTES_PAIRES, NOTE_MAX, noteDe, opsNote, notesPropres, numerosAmbigus } from './notePaire.js';
-import { CLE_FUSIONS, pairesFusionnees, aliasDuNumero } from './fusionFiches.js';
-import { CLE_SEANCE } from './seancePhoto.js';
+import { CLE_FUSIONS, pairesFusionnees, aliasDuNumero, opsDefaire, defaisable, finDefaire } from './fusionFiches.js';
+import { CLE_SEANCE, selectStudio, etatStudio, lignesSeance, nouvelleSeance, opsNouvelleSeance, opCoche, triNumSeance } from './seancePhoto.js';
+import { cleCertificat } from './certificatPaire.js';
+import { ajouterDictee, raisonSansDictee } from './noteVocale.js';
+import LigneCouleurLoupe from './LigneCouleurLoupe.jsx';
 // (11 nov.) « Me le rappeler » : la règle (api/_lib/rappels-perso.js, la même que le serveur) et la forme (src/Rappels.jsx).
 import { CLE_RAPPELS, lireRappels, nouveauRappel, reporterRappel, marquerFait, supprimerRappel, purgerRappels, rappelsDuJour, rappelsAVenir, rappelsFaits, rappelDeCible, etatCible, lienRappel, cibleRappel, quandEnMots as quandRappel } from '../api/_lib/rappels-perso.js';
 import { lienNotif as lienNotifRappel } from '../api/_lib/lien-notif.js';
@@ -819,7 +822,7 @@ import { langueNavigateur, poserLangueUneFois } from "./langueCompte.js";
 // (11 nov., lot traduction) Les textes visibles passent par `tr()` (src/i18n/index.js) :
 // `t` est pris partout dans ce fichier comme nom de variable, d'où l'alias `tr`.
 import ChoixLangue from "./i18n/ChoixLangue.jsx";
-import { tr, LANGUES, NOMS_LANGUES, choisirLangue, langueCourante, monnaie as monnaieI18n, ajouterSourceApp } from "./i18n/index.js";
+import { tr, LANGUES, NOMS_LANGUES, choisirLangue, langueCourante, localeCourante, monnaie as monnaieI18n, ajouterSourceApp } from "./i18n/index.js";
 import { offresVestiaire, offresJourneeVc, euros as eurosOffre, resteAvant as resteAvantOffre } from './offresVestiaire.js';
 // La partie « app » du dictionnaire français arrive AVEC l'app (le fichier d'entrée reste léger).
 import frApp from "./i18n/langues/fr.js";
@@ -5336,6 +5339,177 @@ function NotePaireCoque({ numero = '', itemId = '', recreeDe = '', variante = 'l
     onEditer={n && n.cachee ? null : () => editerNotePaire(paire, n && n.texte)}/>;
   return rangee ? <span className="vrm-note-rangee">{vue}</span> : vue;
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// (14 nov., propositions 102-107) PHOTOS ET FICHES — docs/passation/2026-11-14-photos-fiches.md
+// La partie « Atelier » de la fiche (photos du studio et leur avis floue / sombre, note
+// dictée, certificat d'authenticité, fusion de deux fiches), la séance photo et la
+// recherche par couleur. Les règles : src/qualitePhoto.js, src/seancePhoto.js,
+// src/couleurPhoto.js, src/certificatPaire.js, src/fusionFiches.js, src/noteVocale.js
+// (modules purs, audités). Tout se charge À LA DEMANDE.
+// ══════════════════════════════════════════════════════════════════════════════
+const AtelierPaireLazy = aLaDemande(() => import('./AtelierPaire.jsx'));
+const FeuilleFusionLazy = aLaDemande(() => import('./AtelierPaire.jsx').then((m) => ({ default: m.FeuilleFusion })), true);
+const SeancePhotoLazy = aLaDemande(() => import('./SeancePhoto.jsx'), true);
+const RechercheCouleurLazy = aLaDemande(() => import('./RechercheCouleur.jsx'), true);
+const ouvrirAtelier = (quoi, detail = {}) => { try { window.dispatchEvent(new CustomEvent('vrm:atelier', { detail: { quoi, ...detail } })); } catch (_) {} };
+// Une clé synchronisée de la ligne `main`, lue par les écrans qui s'y abonnent (relue à
+// chaque sauvegarde, au retour du nuage, et quand une autre session la réécrit).
+function magasinCle(cle) {
+  let vue = null, ecoute = false;
+  const abonnes = new Set();
+  const notifier = () => { [...abonnes].forEach((f) => { try { f(); } catch (_) {} }); };
+  const lire = () => { if (vue == null) { const v = load(cle, {}); vue = v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } return vue; };
+  const abonner = (fn) => {
+    if (!ecoute) {
+      ecoute = true;
+      const relire = () => { vue = null; notifier(); };
+      window.addEventListener('vrm:save', (e) => { if (e && e.detail && e.detail.k === cle) relire(); });
+      onCloudReady(relire); onCleRelue(cle, relire);
+    }
+    abonnes.add(fn);
+    return () => { abonnes.delete(fn); };
+  };
+  const poser = (f) => { vue = typeof f === 'function' ? f(lire()) : (f || {}); notifier(); };
+  return { lire, abonner, poser };
+}
+const MAG_FUSIONS = magasinCle(CLE_FUSIONS);
+const MAG_SEANCE = magasinCle(CLE_SEANCE);
+// Les paires PRÉSENTES chez lui (la liste publiée par Annonces, `vinted_nums_physiques`, §11),
+// avec le titre et la photo de LEUR fiche (par N°, jamais par titre). null = pas encore publiée.
+const pairesPresentesAtelier = () => {
+  const nums = numsPresents(); if (!nums) return null;
+  const fiches = load('vinted_annonce_numeros', {}) || {};
+  const parCle = new Map();
+  for (const [id, f] of Object.entries(fiches)) {
+    if (!f || f.numero == null) continue;
+    const k = cleNum(f.numero); if (!nums.has(k)) continue;
+    const avant = parCle.get(k);
+    if (!avant || (Number(id) || 0) > (Number(avant.id) || 0)) parCle.set(k, { id, f });
+  }
+  return [...nums].map((k) => { const x = parCle.get(k); const ph = x && x.f.photo;
+    return { num: x ? String(x.f.numero) : k, cle: k, titre: x ? (x.f.title || '') : '', photo: typeof ph === 'string' ? ph : (ph && ph.url) || '' }; })
+    .sort((a, b) => triNumSeance(a.cle, b.cle));
+};
+// Les photos du studio, en SCALAIRES seulement (jamais les images, §4.4) : combien par paire,
+// combien signalées. null = pas su.
+const lireEtatStudio = async () => {
+  const o = AUTH.user && AUTH.user.id ? `&owner=eq.${encodeURIComponent(AUTH.user.id)}` : '';
+  const rows = await lireTout(`id=like.studio_photos_*${o}&select=${selectStudio()}`);
+  return etatStudio(rows, cleNum);
+};
+const BASE_CERTIFICAT = { fetch: (...a) => fetch(...a), url: SUPABASE_URL, auth: (x) => sbAuth(x), withOwner: (r) => withOwner(r), get conflit() { return SB_CONFLICT; }, get owner() { return (AUTH.user && AUTH.user.id) || ''; } };
+// Les propositions d'une fusion (une PROPOSITION peut utiliser la ressemblance, §5 — c'est
+// toujours SON clic qui fusionne) : même photo exacte d'abord, puis même titre, puis les plus récentes.
+const proposerFusion = (tous, moi) => {
+  const pk = String((moi && moi.photoK) || photoKey(moi && moi.photo) || ''), t = normTitle(moi && moi.title);
+  const rang = ([, f]) => (pk && (String(f.photoK || '') === pk || photoKey(f.photo) === pk) ? 0 : t && normTitle(f.title) === t ? 1 : 2);
+  return [...tous].sort((a, b) => rang(a) - rang(b) || (Number(b[0]) || 0) - (Number(a[0]) || 0));
+};
+function AtelierPaireCoque({ num, itemId = '', idFiche = '' }) {
+  const registre = React.useSyncExternalStore(MAG_FUSIONS.abonner, MAG_FUSIONS.lire);
+  const notes = React.useSyncExternalStore(abonnerNotes, lireNotesPaires);
+  const amb = React.useSyncExternalStore(abonnerNotes, lireNumerosAmbigus);
+  const [fusionOuverte, setFusionOuverte] = React.useState(false);
+  const k = cleNum(num);
+  const paire = { numero: num, itemId };
+  const note = noteDe(notes, paire, { cleNum, ambigu: (x) => amb.has(x) });
+  const alias = aliasDuNumero(registre, num, cleNum);
+  const dictee = {
+    raison: () => (note && note.cachee ? 'cachee' : raisonSansDictee({ api: DICTEE_OK, refus: VOIX.refus })),
+    lang: () => localeCourante(),
+    ecouter, arreter: arreterVoix, annuler: annulerVoix,
+    ajouter: (t) => {
+      const n = noteDe(lireNotesPaires(), paire, { cleNum, ambigu: (x) => lireNumerosAmbigus().has(x) });
+      if (n && n.cachee) return { cachee: true };
+      const r = ajouterDictee(n ? n.texte : '', t);
+      if (r.vide) return r;
+      const ops = opsNote(lireNotesPaires(), paire, r.texte, { cleNum });
+      if (ops.length) gesteVrm(tr('atelier.dictee.enregistree'), ops, { [CLE_NOTES_PAIRES]: poserNotesVue });
+      return r;
+    },
+  };
+  const studio = { lire: () => import('./studioPhoto.js').then((m) => m.lireStudio(STUDIO_BASE, k)), ouvrir: () => ouvrirAtelier('studio', { num: k }) };
+  const certificat = { cle: cleCertificat(paire, cleNum), base: BASE_CERTIFICAT, dire: (t) => toast(t), confirmer: (o) => askConfirm(o) };
+  const defaire = async () => {
+    if (!alias) return;
+    const r = opsDefaire(alias.fusion.id, { registre: MAG_FUSIONS.lire(), fiches: load('vinted_annonce_numeros', {}) || {} });
+    if (!r.ok) { toast(tr('atelier.fusion.pasDefaite.' + r.raison)); return; }
+    if (!(await askConfirm({ title: tr('atelier.fusion.defaireTitre'), desc: tr('atelier.fusion.defaireDesc', { autres: [num, ...alias.autres].map((x) => 'N°' + x).join(' / ') }), ok: tr('atelier.fusion.defaire'), cancel: tr('atelier.annuler') }))) return;
+    gesteVrm(tr('atelier.fusion.defaite'), r.ops, { [CLE_FUSIONS]: MAG_FUSIONS.poser });
+  };
+  const fusion = alias ? { alias, defaisable: defaisable(alias.fusion), fin: finDefaire(alias.fusion), onDefaire: defaire }
+    : idFiche ? { ouvrir: () => setFusionOuverte(true) } : { raisonSans: 'sansFiche' };
+  return <>
+    <AtelierPaireLazy num={String(num)} Icon={Icon} studio={studio} dictee={dictee} certificat={certificat} fusion={fusion}/>
+    {fusionOuverte ? <FeuilleFusionLazy idFiche={String(idFiche)} fiches={load('vinted_annonce_numeros', {}) || {}} registre={MAG_FUSIONS.lire()}
+      vendus={(() => { try { return new Set((load('vinted_annonces_vendues', []) || []).map(String)); } catch (_) { return null; } })()}
+      caseDe={(x) => rangementDuNum(x) || ''} cleNum={cleNum} proposer={proposerFusion}
+      Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy"/>} Feuille={SheetShellSurFiche} Bouton={Bouton} Segmente={Segmente}
+      onFusionner={(res) => { setFusionOuverte(false); gesteVrm(tr('atelier.fusion.faite'), res.ops, { [CLE_FUSIONS]: MAG_FUSIONS.poser }); }}
+      onClose={() => setFusionOuverte(false)}/> : null}
+  </>;
+}
+// L'HÔTE (monté une fois, dans la coque) : le studio ouvert sur UNE paire (depuis la fiche ou
+// la séance), la séance photo, la recherche par couleur — ouverts par `ouvrirAtelier`.
+function HoteAtelier({ comptes }) {
+  const [studioSur, setStudioSur] = React.useState(null);     // clé N° ou null
+  const [seance, setSeance] = React.useState(false);
+  const [couleur, setCouleur] = React.useState(null);         // famille ou null
+  const [etatSt, setEtatSt] = React.useState(undefined);      // undefined lecture · null pas su · Map
+  const valeur = React.useSyncExternalStore(MAG_SEANCE.abonner, MAG_SEANCE.lire);
+  React.useEffect(() => {
+    const f = (e) => { const d = (e && e.detail) || {};
+      if (d.quoi === 'studio') setStudioSur(String(d.num || ''));
+      else if (d.quoi === 'seance') setSeance(true);
+      else if (d.quoi === 'couleur') setCouleur(String(d.famille || 'bleu')); };
+    window.addEventListener('vrm:atelier', f);
+    return () => window.removeEventListener('vrm:atelier', f);
+  }, []);
+  const relireStudio = React.useCallback(() => { lireEtatStudio().then((m) => setEtatSt(m == null ? null : m)).catch(() => setEtatSt(null)); }, []);
+  React.useEffect(() => { if (seance) { setEtatSt(undefined); relireStudio(); } }, [seance, relireStudio]);
+  const paires = (studioSur != null || seance) ? (pairesPresentesAtelier() || []) : [];
+  const cocher = (cle, coche) => { const op = opCoche(MAG_SEANCE.lire(), cle, coche); if (op) gesteVrm(tr(coche ? 'atelier.seance.cochee' : 'atelier.seance.decochee'), [op], { [CLE_SEANCE]: MAG_SEANCE.poser }); };
+  // Une photo rangée pendant la séance coche SA paire (par identité), si elle est dans la liste.
+  const surRange = (p) => {
+    if (seance) relireStudio();
+    const v = MAG_SEANCE.lire(); const k = cleNum(p && (p.cle || p.num));
+    if (k && v.seance && Array.isArray(v.seance.cles) && v.seance.cles.includes(k)) cocher(k, true);
+  };
+  const lignes = seance ? lignesSeance(valeur, { studio: etatSt instanceof Map ? etatSt : null, paires, cleNum }) : null;
+  const pairesStudio = studioSur != null && !paires.some((p) => p.cle === studioSur) ? [...paires, { num: studioSur, cle: studioSur, titre: '' }] : paires;
+  return <>
+    {seance ? <SeancePhotoLazy Feuille={SheetShellSurFiche} Bouton={Bouton} Segmente={Segmente} Icon={Icon} Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy"/>}
+      etat={etatSt === undefined ? undefined : etatSt === null ? null : 'pret'} lignes={lignes}
+      onCommencer={async (n) => {
+        const m = etatSt instanceof Map ? etatSt : await lireEtatStudio().catch(() => null);
+        if (m instanceof Map) setEtatSt(m);
+        const s = nouvelleSeance({ paires: pairesPresentesAtelier(), studio: m, n, cleNum });
+        if (!s.ok || pairesPresentesAtelier() == null) { setEtatSt(null); return false; }
+        gesteVrm(tr('atelier.seance.commencee', { n: s.seance.cles.length }), opsNouvelleSeance(MAG_SEANCE.lire(), s.seance), { [CLE_SEANCE]: MAG_SEANCE.poser });
+        return true;
+      }}
+      onCocher={cocher} onPhotographier={(l) => setStudioSur(l.cle)} onClose={() => setSeance(false)}/> : null}
+    {studioSur != null ? <>
+      <FermeAuRetour fermer={() => setStudioSur(null)}/>
+      <React.Suspense fallback={null}>
+        <StudioPhoto C={C} base={STUDIO_BASE} paires={pairesStudio} initiale={studioSur} onRange={surRange} z={Z_CONFIRMATION + 20} onClose={() => setStudioSur(null)}/>
+      </React.Suspense>
+    </> : null}
+    {couleur ? <RechercheCouleurLazy Feuille={SheetShellSurFiche} Bouton={Bouton} famille={couleur} Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy"/>}
+      lireEntrees={lireEntreesCouleur(comptes)} lireOctets={(u) => chargerPhotoBoite(u)}
+      ouvrirNumero={(n) => { setCouleur(null); try { window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: String(n) })); } catch (_) {} }}
+      onClose={() => setCouleur(null)}/> : null}
+  </>;
+}
+// Les photos de SES annonces (la 1re de chaque annonce en ligne et de chaque fiche N° — la même
+// liste que la recherche par photo, `lireCandidatsPhoto`), une entrée par PHOTO (son adresse exacte).
+const _entreesCouleur = new Map();
+const lireEntreesCouleur = (comptes) => {
+  const k = (comptes || []).map((a) => a && a.vinted_user_id).join(',');
+  if (!_entreesCouleur.has(k)) _entreesCouleur.set(k, () => lireCandidatsPhoto(comptes).then((r) => (r ? { entrees: r.candidats.filter((c) => c.url).map((c) => ({ cle: c.url, src: c.url, num: c.numero || '', titre: c.titre || '', etat: c.etat })), raisons: r.raisons } : null)));
+  return _entreesCouleur.get(k);
+};
 
 // ── (11 nov.) « ME LE RAPPELER » (api/_lib/rappels-perso.js, src/Rappels.jsx) ──
 // Les rappels qu'IL pose lui-même sur un article (N°), une vente ou un achat — jamais
@@ -48928,6 +49102,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     /* (11 nov., lot photos-comptes) La même photo sur deux de ses comptes Vinted : la feuille. */
                     {k:'photos-comptes', icon:'image', lab:tr('photosComptes.outil'), n:photosComptes ? photosComptes.groupes.length : 0, desc:tr('photosComptes.outilDesc'), on:()=>{ setAnnToolsOpen(false); relireEmpreintes(); setPhotosComptesOuvert(true); }},
                     {k:'studio', icon:'camera', lab:'Studio photo', desc:tr('annonces.cadreGuidePrise'), on:()=>{ setAnnToolsOpen(false); setStudioOpen(true); }},
+                    {k:'seance-photo', icon:'camera', lab:tr('atelier.seance.titre'), desc:tr('atelier.seance.outil'), on:()=>{ setAnnToolsOpen(false); ouvrirAtelier('seance'); }},
                     /* (5 nov., chantier C — revue 2.7) « Compléter les prix d'achat » n'est plus
                        dans ce menu : le bandeau « Prix d'achat · N/M → Compléter », au-dessus de
                        la grille, est la seule porte (le même nombre ne s'écrit pas deux fois). */
@@ -60394,6 +60569,7 @@ function AppCoeur() {
             {q && compris && compris.genres.length > 0 && <div data-recherche-compris={compris.genres.join(' ')} style={{padding:'8px 2px 0',color:C.muted,fontSize:12,lineHeight:1.4}}>Je cherche {compris.genres.map(g=>GENRES_REQUETE[g]).filter(Boolean).join(', ')}.</div>}
             {nonLues.length > 0 && <div data-recherche-non-lu={idx.nonLues.join(' ')} data-recherche-non-lu-encours={gsData ? '0' : '1'} style={{padding:'6px 2px 0',color:C.muted,fontSize:12,lineHeight:1.4}}>{nonLues}</div>}
             {q && blocExactes}
+            {q && !estNumQ && <LigneCouleurLoupe q={qBrut} onOuvrir={(f)=>{ setGsOpen(false); ouvrirAtelier('couleur', { famille: f }); }}/>}
             {q && !estNumQ && blocActions}
             {q && blocAide}
             {q && total===0 && !estNumQ && !actionsGs.length && !fichesGs.length && !(mails && mails.liste === undefined) && <div data-recherche-rien="" style={{padding:'14px 12px',textAlign:'left',color:C.muted,fontSize:13,lineHeight:1.45}}>{gsData?<>Aucun résultat pour « {qBrut.trim()} ».<br/>Essaie un N° (« B125 »), un pseudo, un suivi ou deux mots.</>:'Je lis tes ventes, achats et colis…'}</div>}
@@ -60512,7 +60688,7 @@ function AppCoeur() {
             journal: load(CLE_JOURNAL_NUMEROS, []) || [], marqueur: marqueurNumerotation(), sortieStock: (load('vrm_stock_sortis', {}) || {})[rn.cle] || null,
             estArchive: (n) => estArchive(n), cleNum }) : null;
           const fermer = fermerF;
-          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={numF} lecture={!numData} note={p && p.num && !p.ancienNumero ? <>{questionChezToiFiche(p.num)}{blocVenduAilleurs(p, rn, etat)}<NotePaireCoque numero={p.num} variante="bloc" ajout/><BlocHistoriqueRepub ids={(rn.annonces || []).map((x) => String(x.id))} d={{ numeros, stats: Object.fromEntries((rn.annonces || []).map((x) => [String(x.id), { favoris: Number.isFinite(x.favourites) ? x.favourites : null, vues: Number.isFinite(x.views) ? x.views : null }])) }}/><BoutonRappel cible={{ sorte: 'article', num: p.num, item: (rn.annonces || []).length === 1 ? String(rn.annonces[0].id || '') : '' }} libelle={`N°${p.num}`}/></> : null} onFermer={fermer} onRetour={depuis ? fermer : ()=>{ fermer(); setGsQ(String((p && p.num) || numF)); setGsOpen(true); }}
+          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={numF} lecture={!numData} note={p && p.num && !p.ancienNumero ? <>{questionChezToiFiche(p.num)}{blocVenduAilleurs(p, rn, etat)}<NotePaireCoque numero={p.num} variante="bloc" ajout/><AtelierPaireCoque num={p.num} idFiche={p.idFiche || ''} itemId={(rn.annonces || []).length === 1 ? String(rn.annonces[0].id || '') : ''}/><BlocHistoriqueRepub ids={(rn.annonces || []).map((x) => String(x.id))} d={{ numeros, stats: Object.fromEntries((rn.annonces || []).map((x) => [String(x.id), { favoris: Number.isFinite(x.favourites) ? x.favourites : null, vues: Number.isFinite(x.views) ? x.views : null }])) }}/><BoutonRappel cible={{ sorte: 'article', num: p.num, item: (rn.annonces || []).length === 1 ? String(rn.annonces[0].id || '') : '' }} libelle={`N°${p.num}`}/></> : null} onFermer={fermer} onRetour={depuis ? fermer : ()=>{ fermer(); setGsQ(String((p && p.num) || numF)); setGsOpen(true); }}
             onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}
             onEmballer={()=>{ fermer(); setGsOpen(false); DEMANDE_EMBALLAGE.at = Date.now(); setTab('cat_bord'); try { window.dispatchEvent(new Event('vrm:emballer')); } catch (_) {} }}
             onPrix={(n)=>setPrixNum(String(n))} onPublierAilleurs={(n)=>setPubAil({ num: String(n), site: null })} neuve={neuve}
@@ -60691,6 +60867,8 @@ function AppCoeur() {
         {calcOuverte && <GardeEcran nom="calculette" feuille onFermer={()=>setCalcOuverte(false)}><CalculetteAchat Feuille={SheetShell} onClose={()=>setCalcOuverte(false)} contexte={ctxCalculette} emballages={load(CLE_EMBALLAGES, null)}/></GardeEcran>}
         {ficheNum && <GardeEcran nom="fiche" feuille resetKey={ficheNum} onFermer={()=>setFicheNum(null)}><Differe rendre={()=>rendreFichePaire(ficheNum, null, ()=>setFicheNum(null))}/></GardeEcran>}
         {/* (14 nov., proposition 62) Toucher une ligne de liste ouvre LA fiche de la paire (même composant). */}
+        {/* (14 nov., propositions 102-107) Studio sur une paire, séance photo, recherche par couleur. */}
+        <HoteAtelier comptes={vintedAccounts}/>
         <HoteFicheLigne rendre={rendreFichePaire} deps={{ fiches: load('vinted_annonce_numeros', {}) || {}, txnItem: numData ? (numData.txnItem === undefined ? null : numData.txnItem) : undefined }} onActive={setFicheLigneActive}/>
         {achatFiche && <GardeEcran nom="prixachat-fiche" feuille onFermer={()=>setAchatFiche(null)}><FeuillePrixAchat ventes={[achatFiche]} onEnregistrer={poserPrixAchatVente} onFermer={()=>setAchatFiche(null)} Feuille={SheetShellSurFiche} Bouton={Bouton}/></GardeEcran>}
         {prixFeuille && <GardeEcran nom="prixachat" feuille onFermer={()=>setPrixFeuille(null)}><PrixAchatCoque txs={prixFeuille} onPoser={poserPrixAchatVente} onFermer={()=>setPrixFeuille(null)}/></GardeEcran>}
