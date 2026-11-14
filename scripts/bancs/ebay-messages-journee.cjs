@@ -108,7 +108,16 @@ async function sain(pg, ecran) {
   const m = /n'a pas pu s'afficher|n’a pas pu s’afficher|Cannot access|is not defined/.exec(r.t);
   dit(!m, `${ecran} : l'écran n'est pas tombé sur le garde-fou`, m && m[0]);
 }
-const lireJour = (pg) => pg.evaluate(() => {
+// (14 nov., Studio) La carte « messages eBay sans réponse » vit dans la tuile « Messages » : on la déplie pour la lire
+// (le compteur et `data-ebay` restent sur la tuile), puis on la replie.
+const lireJour = async (pg) => {
+  const z = await pg.$('[data-sj-zone="messages"]');
+  if (z) { await z.click(); await pg.waitForTimeout(400); }
+  const r = await lireJour0(pg);
+  if (z) { await pg.click('[data-sj-fermer]').catch(() => {}); await pg.waitForTimeout(200); }
+  return r;
+};
+const lireJour0 = (pg) => pg.evaluate(() => {
   const t = document.querySelector('[data-tuile="messages"]');
   const job = document.querySelector('[data-job="messages-ebay"]');
   return { n: t && t.getAttribute('data-n'), eb: t ? t.getAttribute('data-ebay') : null,

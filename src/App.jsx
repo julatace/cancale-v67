@@ -47407,6 +47407,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const Tc = (id) => T.find((x) => x.id === id);
               const nDe = (x) => (x && x.t ? Number(x.t.n) || 0 : 0);
               const attrsCase = (x) => ({ 'data-tuile': x.id, 'data-case': x.id, 'data-n': x.pasSu ? '' : String(nDe(x)), title: titreCase(x),
+                // Ce qu'eBay ajoute à la case (« pas su » si son résumé est illisible) — le même attribut qu'avant.
+                'data-ebay': (x.id === 'envoyer' || x.id === 'messages') && x.t && x.t.ebay !== undefined ? (x.t.ebay === null ? 'passu' : String(x.t.ebay)) : undefined,
                 'data-jp-force': visT(x.id).force ? '' : undefined,
                 'data-presses': x.id === 'envoyer' && x.t && x.t.presses ? String(x.t.presses.n) : undefined,
                 'data-limite-heure': x.id === 'envoyer' && x.t && x.t.presses ? x.t.presses.heure : undefined,
@@ -47562,7 +47564,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 } catch (_) {} return m; })();
                 const plaque = (c) => c.desaccord ? <span className="sb-plaque sb-plaque--grande is-doute">{tr('sj.codesDifferents')}</span>
                   : <span className="sb-plaque sb-plaque--grande">{c.code || 'QR'}</span>;
-                out.retirer = { id: 'retirer', lib: xR.pasSu ? tr('sj.l.aRetirer') : tr('sj.l.aRetirerN', { n }), aria: tr('sj.aria.aRetirer', { n: xR.pasSu ? '—' : n }), attrs: { ...attrsCase(xR), 'data-sj-titre': `${n} colis ${Lbas.aRetirer}`, 'data-sj-geste': VERBES.voir }, vide: !xR.pasSu && n === 0,
+                // Le libellé porte la sous-ligne de la case (« + N à vérifier », ambre) : sous les codes en plaques, plus de place.
+                const soR = !xR.pasSu && comptes.length && n > 0 ? sous(xR) : null;
+                out.retirer = { id: 'retirer', lib: xR.pasSu ? tr('sj.l.aRetirer') : soR ? <>{tr('sj.l.aRetirerN', { n })} · {soR}</> : tr('sj.l.aRetirerN', { n }), aria: tr('sj.aria.aRetirer', { n: xR.pasSu ? '—' : n }), attrs: { ...attrsCase(xR), 'data-sj-titre': `${n} colis ${Lbas.aRetirer}`, 'data-sj-geste': VERBES.voir }, vide: !xR.pasSu && n === 0,
                   tasse: { n: xR.pasSu ? '—' : String(n), l: tr('sj.t.aRetirer') },
                   face: xR.pasSu ? <><b className="sj-n">—</b><span className="sj-sous">{pasSuTexte(xR)}</span></>
                     : n === 0 ? <><b className="sj-n">0</b><span className="sj-sous"><span className="sj-sous-l">{tr('sj.rienARetirer')}</span></span></>
