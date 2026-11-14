@@ -495,6 +495,126 @@
 /* Messages (« Choisis une conversation ») : la note est LE gris plein — à 80 % d'opacité, 3,1:1 sur le fond. */
 :root:root body .vrm-main .vrm-message-workspace .vrm-chat-empty small { opacity: 1 !important; color: var(--d-gris) !important; }
 
+/* ── 2.12 LA PASSE 3 (14 nov.) — les restes nommés par la passe 2 ────────────────
+   Ce que `scripts/bancs/design-passe-3.cjs` a MESURÉ (K bande · L select natif · M rectangle · N barre vide ·
+   O gris gras · P fraîcheur · Q cadre · R carte dans carte) et ce que ses captures ont montré.
+   Récit : docs/passation/2026-11-14-design-passe-3.md. Aucun texte, chiffre ni geste ne change. */
+
+/* K. La bande des chiffres d'un site (« CA finalisé — · En attente — ») : à l'ordinateur, elle flottait au milieu à
+   droite (la 2e colonne d'une grille dont la 1re, le titre d'avant, n'est plus là). Elle prend la colonne, sous le titre. */
+@media (min-width: 1024px) {
+  :root:root body .vrm-main .vrm-tache .vrm-market-space > .vrm-platform-summary { grid-column: 1 / -1 !important; justify-self: stretch !important; padding-left: var(--d-e-4) !important; padding-right: var(--d-e-4) !important; }
+}
+
+/* P. La ligne de fraîcheur (« Tout est à jour · vérifié à l'instant ») : une LIGNE, pas une carte — ni fond, ni cadre,
+   ni ombre ; son point au bord de la colonne (aligné sur le titre). Le même sens, le même texte, le même geste. */
+:root:root body .vrm-main .vrm-fraicheur-hote { margin-left: var(--d-e-4) !important; margin-right: var(--d-e-4) !important; }
+:root:root body .vrm-main .vrm-fraicheur-hote > .vrm-bandeau-abo.vrm-fraicheur {
+  background: transparent !important; box-shadow: none !important; border: 0 !important; border-radius: 0 !important; padding-left: 0 !important;
+}
+
+/* N. Une barre de délai n'est dessinée que si l'on SAIT où en est le délai (CarteRelais.jsx, `barre: false`) :
+   « Date limite inconnue », « Vérification en cours », « En route · point changé » s'écrivent seuls. */
+:root:root body .vrm-rpf-delai.is-sans-barre .vrm-rpf-delai-piste { display: none !important; }
+
+/* O. Un gris n'est jamais un titre : « Code sur Vinted » (à la place du code) est une note du texte, 15/400. */
+:root:root body .vrm-main .vrm-rpf-ligne .vrm-rpf-code-venir.vrm-rpf-code-venir { font-weight: 400 !important; font-size: var(--d-t-15) !important; }
+
+/* La carte du parcours plein écran : la carte du système (rayon 20, l'ombre posée, AUCUN cadre — la nuit, le liseré
+   #38383A sur #1C1C1E la redessinait) ; la croix est un rond, comme tout bouton d'icône seule. */
+:root:root body .vrm-pa .vrm-pa-detail > .vrm-premiers-sans-cadre { border: 0 !important; border-radius: var(--d-r-carte) !important; box-shadow: var(--d-ombre-carte) !important; background: var(--d-carte) !important; }
+:root:root body .vrm-pa button.vrm-pa-fermer { border-radius: var(--d-r-pilule) !important; }
+
+/* Le retour d'une sous-page de Paramètres à l'ordinateur : un lien bleu 15 (comme au doigt), plus un rectangle
+   encadré de 14 px (styles-bureau.css) — que la souris soit fine ou non. */
+@media (min-width: 1024px) {
+  :root:root body .vrm-app-shell .vrm-set .vrm-set-retour.vrm-set-retour { font-size: var(--d-t-15) !important; border: 0 !important; background: transparent !important; border-radius: var(--d-r-pilule) !important; }
+}
+
+/* M. Ce qui SE TOUCHE est une capsule : les gestes d'une rangée de bordereau (« Imprimer », « Générer le bordereau »,
+   rayon 12 dans fusion.css), les gestes du détail d'un retrait (« Conversation ↗ »). */
+:root:root body .vrm-main :is(.vrm-rangee-bord :is(button, a):not(.vrm-puce-transp *), .vrm-fu-imprimer-ligne, .vrm-rpf-detail .vrm-rp-gestes :is(button, a)) { border-radius: var(--d-r-pilule) !important; }
+/* Annonces : « Stock » et « Publier Leboncoin 36/36 › » (deux replis côte à côte) sont des gestes : la capsule remplie,
+   plus deux tuiles blanches encadrées de 12. */
+:root:root body .vrm-main :is(.vrm-ann-stock-tools, [data-places-wrap]) > summary { border-radius: var(--d-r-pilule) !important; border: 0 !important; background-color: var(--d-remplir) !important; }
+:root:root body .vrm-main :is(.vrm-ann-stock-tools, [data-places-wrap]) > summary :is(span, small) { color: var(--d-encre) !important; }
+/* Un `<select>` qui reste (le filtre de compte du Stock) : la capsule remplie d'un filtre — jamais un rectangle. */
+:root:root body .vrm-app-shell .vrm-main select[data-stock-filtre-compte][aria-label] { border-radius: var(--d-r-pilule) !important; border: 0 !important; background-color: var(--d-remplir) !important; min-height: var(--d-h-filtre) !important; padding-left: 16px !important; padding-right: 12px !important; font-weight: 600 !important; }
+
+/* Q. Les cartes écrites avec un cadre deviennent des cartes du système (rayon 20, l'ombre posée, aucun cadre) :
+   la carte d'une sous-page de Paramètres (`.vrm-set-carte`, bord 1 px en ligne), « 5 annonces Leboncoin non reliées »,
+   « 0 à publier sur Leboncoin », « Reçus d'achat par e-mail ». */
+:root:root body .vrm-main :is(.vrm-set-carte, .vrm-lbc-non-reliees, .vrm-lbc-a-publier, details.vrm-recus-email) {
+  border: 0 !important; border-radius: var(--d-r-carte) !important; box-shadow: var(--d-ombre-carte) !important; background-color: var(--d-carte) !important;
+}
+/* Une sous-page dont le contenu porte SES groupes (Ma journée : « En haut », « À faire ») : la carte autour s'efface — un
+   groupe dans une carte était une carte dans une carte. Les groupes sont les cartes. */
+:root:root body .vrm-main .vrm-set-carte:has(.vrm-jp) { background-color: transparent !important; box-shadow: none !important; padding: 0 !important; }
+:root:root body .vrm-main .vrm-jp-liste { box-shadow: var(--d-ombre-carte) !important; }
+:root:root body .vrm-main .vrm-jp-aide { font-size: var(--d-t-13) !important; margin: 0 var(--d-e-4) !important; }
+:root:root body .vrm-main .vrm-jp-zone-titre { margin-left: var(--d-e-4) !important; }
+:root:root body .vrm-main .vrm-jp-nom { font-size: var(--d-t-17) !important; }
+/* « 69 bordereaux déjà traités retirés · Les voir » : une ligne d'information, pas un encadré. */
+:root:root body .vrm-main [data-bords-faits] { background: transparent !important; border: 0 !important; border-radius: 0 !important; padding-left: 0 !important; padding-right: 0 !important; }
+/* Annonces : la barre d'outils (recherche, tri, filtres) n'est pas une carte — un cadre autour de capsules, dont
+   « Outils » débordait à l'ordinateur. Une rangée d'outils, posée sur le fond. */
+:root:root body .vrm-main .vrm-workbar.vrm-ann-workbar { background: transparent !important; border: 0 !important; box-shadow: none !important; padding-left: 0 !important; padding-right: 0 !important; }
+/* Mode stream : l'aperçu est une case dans sa carte (fond gris, rayon 12), pas un cadre. */
+:root:root body .vrm-main .vrm-stream-apercu { border: 0 !important; background-color: var(--d-case) !important; border-radius: var(--d-r-case) !important; }
+/* Mon historique : une carte par compte encadrée ⇒ UN groupe (des rangées sur une carte, un filet entre deux). */
+:root:root body .vrm-main .vrm-imp-ligne { border: 0 !important; border-radius: 0 !important; box-shadow: none !important; padding: 12px 16px !important; }
+:root:root body .vrm-main :has(> .vrm-imp-ligne) { row-gap: 0 !important; }
+:root:root body .vrm-main .vrm-imp-ligne:not(.vrm-imp-ligne + .vrm-imp-ligne) { border-top-left-radius: var(--d-r-carte) !important; border-top-right-radius: var(--d-r-carte) !important; margin-top: var(--d-e-2) !important; }
+:root:root body .vrm-main :has(> .vrm-imp-ligne) > .vrm-imp-note { margin-left: var(--d-e-4) !important; margin-right: var(--d-e-4) !important; }
+:root:root body .vrm-main .vrm-imp-ligne:not(:has(+ .vrm-imp-ligne)) { border-bottom-left-radius: var(--d-r-carte) !important; border-bottom-right-radius: var(--d-r-carte) !important; }
+:root:root body .vrm-main .vrm-imp-ligne + .vrm-imp-ligne { margin-top: 0 !important; background-image: linear-gradient(var(--d-filet), var(--d-filet)) !important; background-repeat: no-repeat !important; background-position: right 0 top 0 !important; background-size: calc(100% - 16px) 1px !important; }
+
+/* R. Une carte DANS une carte devient une case (pas d'ombre) : l'état « pas su » d'une sonde dans la carte « Sécurité »,
+   « Données » dans la carte eBay, le billet du code dans la lecture d'un e-mail (à l'ordinateur). */
+:root:root body .vrm-main .vrm-set [data-sous-ecran] .vrm-etat-panne { box-shadow: none !important; background-color: var(--d-case) !important; border-radius: var(--d-r-case) !important; }
+:root:root body .vrm-main .vrm-set [data-sous-ecran] details.vrm-bilan-sync { box-shadow: none !important; }
+:root:root body .vrm-main .vrm-boite-lecture:not([data-plein="1"]) .vrm-boite-billet { box-shadow: none !important; background-color: var(--d-case) !important; }
+:root:root body .vrm-main .vrm-boite-lecture:not([data-plein="1"]) .vrm-boite-billet-trou::before,
+:root:root body .vrm-main .vrm-boite-lecture:not([data-plein="1"]) .vrm-boite-billet-trou::after { box-shadow: none !important; }
+:root:root body .vrm-main .vrm-boite-lecture:not([data-plein="1"]) .vrm-boite-billet .vrm-boite-puce-code { background-color: var(--d-carte) !important; }
+
+/* Les textes d'une sous-page hors de l'échelle (14, 16) sont ramenés À LA SOURCE (styles-import-depart.css,
+   styles-sante-comptes.css, import-stock.css, sms-colis.css, styles-corbeille.css, aide-ecran.css) ; ici, ce qui n'a
+   pas de feuille à soi : le nom d'une plateforme dans « Mes plateformes » (14 ⇒ 15). */
+:root:root body .vrm-main .vrm-set [data-sous-ecran] [data-choix-plateforme] b { font-size: var(--d-t-15) !important; }
+/* « Mes plateformes » : la coche et le « + » d'une plateforme en texte bleu (l'aplat #0071E3 sur la case bleutée : 4,3:1). */
+:root:root body .vrm-main .vrm-cp-coche { color: var(--d-accent-texte) !important; }
+/* Paramètres → Comptes eBay : la section posait un fond du sol et 16 px d'intérieur autour de SA carte — la carte
+   tombait à 32 px du bord, plus alignée sur le titre. La section n'est qu'un contenant. */
+:root:root body .vrm-main .vrm-set [data-ebay-compte-section] { padding: 0 !important; background: transparent !important; }
+/* eBay : « Solde et paramètres du compte » à la hauteur d'un contrôle. */
+:root:root body .vrm-main .vrm-ebay-settings > summary { min-height: var(--d-h-ctrl) !important; display: flex !important; align-items: center !important; }
+
+/* La nuit, un gris du JOUR écrit en ligne (#6E6E73, un `C.muted` lu avant le passage au thème sombre — « Supprimer mon
+   compte », son « ▾ ») devient LE gris de la nuit. */
+:root:root[data-theme="dark"] body :is(.vrm-main, .vrm-fs) [style*="color: rgb(110, 110, 115)"] { color: var(--d-gris) !important; }
+/* Ventes · À expédier, Achats · À retirer : la section des colis à 16 px du bord, comme le titre de l'écran (14 en ligne). */
+:root:root body .vrm-main .vrm-colis-section > [data-colis-dans] { padding-left: var(--d-e-4) !important; padding-right: var(--d-e-4) !important; }
+/* Un fil de Messages ouvert : la paire en tête est une carte du système (plus un cadre 1 px) ; « Retirer » est le geste
+   secondaire (la capsule remplie, sans anneau). */
+:root:root body .vrm-chat-panel .vrm-chat-paire.vrm-chat-paire { border: 0 !important; background-color: var(--d-carte) !important; border-radius: var(--d-r-carte) !important; box-shadow: var(--d-ombre-carte) !important; }
+:root:root body .vrm-chat-panel .vrm-chat-retirer.vrm-chat-retirer { border: 0 !important; background-color: var(--d-remplir) !important; box-shadow: none !important; }
+/* Messages : la conversation ouverte sur la case (#F2F2F7) — le gris de la note sur le remplissage ne tenait que 4,4:1. */
+:root:root body .vrm-main .vrm-inbox-row.vrm-inbox-row.is-current { background-color: var(--d-case) !important; }
+/* La feuille d'une vente : son hôte (`.vrm-app-shell.vrm-ledger-drawer-host`, plein écran, z 150) est TRANSPARENT
+   (styles-gestion.css) — le fond d'app de jetons.css (`.vrm-app-shell { background }`, plus spécifique) le peignait :
+   l'écran derrière la feuille disparaissait sous un aplat gris (vu en capture, 390 et 1512). */
+:root:root body .vrm-app-shell.vrm-ledger-drawer-host { background: transparent !important; background-color: transparent !important; }
+/* La feuille d'une vente : sa croix est un rond (plus un carré arrondi de 12). */
+:root:root body .vrm-recap button.vrm-recap-fermer { border-radius: var(--d-r-pilule) !important; }
+/* Messages : l'initiale d'un acheteur sans photo (un monogramme) est à l'encre — en gris gras, elle se lisait éteinte. */
+:root:root body .vrm-main .vrm-msg-ini.vrm-msg-ini { color: var(--d-encre) !important; }
+/* La feuille d'une vente : « N° et frais » (un repli) se lit à l'encre — en gris gras, il se lisait désactivé. */
+:root:root body .vrm-recap .vrm-recap-modifier > summary { color: var(--d-encre) !important; }
+/* Achats · « ⋯ » : « Masquer cet achat » est une entrée du menu comme les autres (à l'encre) — en gris gras, elle se
+   lisait désactivée. */
+:root:root body .vrm-main .vrm-buy-menu [data-achat-masquer] { color: var(--d-encre) !important; }
+
 } /* fin @layer vrm-premium */
 
 /* ══ §4 ATELIER — la direction artistique commune (14 nov.) ═══════════════════

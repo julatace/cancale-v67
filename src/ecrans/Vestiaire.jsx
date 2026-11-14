@@ -140,7 +140,8 @@ function ClePhotoroom({ cadre = true }) {
   const aRevoir = etat === 'illisible' || (verif && verif.ton === 'attention');
   const formulaire = s && s.coffre !== false && (etat === 'aucune' || etat === 'illisible' || remplacer);
   const ligneFine = { fontSize: 13, color: C.muted, lineHeight: 1.55 };
-  const bouton = (plein) => ({ border: plein ? 'none' : `1px solid ${C.border}`, background: plein ? C.accent : 'transparent', color: plein ? (C.onAccent || '#fff') : C.text, borderRadius: 12, padding: '0 16px', minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' });
+  // (14 nov., passe design 3) Les deux gestes du système : principal (l'aplat bleu) ou secondaire (capsule remplie) — plus un rectangle encadré.
+  const bouton = (plein) => ({ border: 'none', background: plein ? C.accent : 'var(--d-remplir)', color: plein ? (C.onAccent || '#fff') : C.text, borderRadius: 999, padding: '0 16px', minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' });
   const pastille = etat === 'chargement' ? null : (
     <span data-photoroom-pastille={aRevoir ? 'a-revoir' : posee ? 'rangee' : etat === 'pas-su' ? 'pas-su' : 'aucune'}
       style={{ fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 999, border: `1px solid ${aRevoir ? C.warn + '66' : C.border}`, color: aRevoir ? C.warn : posee ? C.text : C.muted, background: aRevoir ? `${C.warn}12` : 'transparent', whiteSpace: 'nowrap' }}>

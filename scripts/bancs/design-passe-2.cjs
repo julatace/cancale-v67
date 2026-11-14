@@ -179,9 +179,12 @@ const ECRANS = [
   { nom: 'parcours', url: '/?tab=journee', base: () => baseNeuve(true), attendre: '[data-parcours]', racines: ['[data-parcours]'] },
 ];
 
-(async () => {
+// (14 nov., passe 3) La boucle est exportée : `design-passe-3.cjs` la reprend sur SES écrans, avec SES mesures en plus
+// (`enPlus(o, E, sous, racines)` rend des listes de défauts, une par clé de `cles`). Rien ne change pour ce banc-ci.
+async function lancer(ECRANS, { cles = [...P.CLES, 'numDouble'], nomRapport = 'rapport-2.json', enPlus = null, api: apiE = api } = {}) {
   await new Promise((ok) => srv.listen(PORT, ok));
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] });
+  const CLES = cles;
   const total = Object.fromEntries(CLES.map((k) => [k, 0]));
   const rapport = {};
   let vus = 0, manques = 0;
@@ -192,7 +195,7 @@ const ECRANS = [
       const suf0 = `${E.nom}-${W}-${theme}`;
       let o;
       try {
-        o = await ouvrir(nav, { W, sombre, b: E.base ? E.base() : base(), url: E.url, sansSession: !!E.sansSession, api });
+        o = await ouvrir(nav, { W, sombre, b: E.base ? E.base() : base(), url: E.url, sansSession: !!E.sansSession, api: apiE });
         if (E.attendre) { await o.pg.waitForSelector(E.attendre, { timeout: 25000 }).catch(() => {}); await o.pg.waitForTimeout(2200); }
         else await pret(o.pg);
         const mesure = async (sous, racines) => {
@@ -221,6 +224,7 @@ const ECRANS = [
           if (E.nom === 'loupe') { const nR = await o.pg.evaluate(() => document.querySelectorAll('[data-recherche-resultat][data-recherche-num]').length); if (!nR) { console.log(`✗ ${suf} : aucune rangée de N° rendue (la loupe n'est pas mesurée)`); manques++; } }
           // La vitrine publique : ses titres de 40 à 64 px sont sa typographie (jugés partout ailleurs).
           if (E.vitrine) m.tailles = m.tailles.filter((x) => x.t <= 20);
+          if (enPlus) Object.assign(m, await enPlus(o, E, sous, racines, { W, sombre }));
           rapport[suf] = m;
           const rouge = CLES.some((k) => m[k].length);
           console.log(`${rouge ? '✗' : '✓'} ${suf} (${m.nTextes} textes, ${m.nCibles} cibles) : ${CLES.map((k) => `${k} ${m[k].length}`).join(' · ')}`);
@@ -238,11 +242,13 @@ const ECRANS = [
       finally { if (o) await o.ctx.close().catch(() => {}); }
     }
   }
-  fs.writeFileSync(path.join(SHOTS, 'rapport-2.json'), JSON.stringify(rapport, null, 1));
+  fs.writeFileSync(path.join(SHOTS, nomRapport), JSON.stringify(rapport, null, 1));
   console.log('\nTOTAL :', CLES.map((k) => `${k} ${total[k]}`).join(' · '), `· rendus mesurés ${vus} · manqués ${manques}`);
   const rouges = Object.values(total).reduce((a, b) => a + b, 0) + manques;
   console.log(rouges ? `✗ ROUGE — ${rouges} défauts` : '✓ VERT — tout est dans le système');
   console.log('captures :', SHOTS);
   await nav.close(); srv.close();
   process.exit(rouges ? 1 : 0);
-})().catch((e) => { console.error(e); process.exit(2); });
+}
+module.exports = { ECRANS, api, sites, baseSites, baseNeuve, toucher, attendre, APP, lancer, EMAILS };
+if (require.main === module) lancer(ECRANS).catch((e) => { console.error(e); process.exit(2); });
