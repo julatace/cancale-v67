@@ -89,8 +89,15 @@ main → Tout copier = 5. Mots à lire, attentes et défilés de chaque geste : 
   un dossier à part) **13 ✓ · 2 ✗** (republier 5 > 3, publier partout impasse) ; sur ce build **15 ✓**.
   Mutation : `republier-num` retiré de `ACTIONS_NUM_SEUL` ⇒ republier **ROUGE** (5 touchers, la ligne
   introuvable). Captures regardées (kit « Republier à la main » N°203, feuille « Publier partout » N°203).
-- Après le vrai `git merge origin/main` et des branches de refonte : build vert, banc relancé (voir le
-  rapport de fin de session), audits verts : traduction, tdz, coherence, variables, quoi-de-neuf,
-  annuler-commandes (43 ✓, A7/A7b nouveaux), icones.
+- Après le vrai `git merge origin/main` (deux fois) et des branches de refonte : build vert, banc relancé
+  sur ce build **15 ✓** (le « bilan en une minute » de l'accueil des nouveaux, arrivé par main, est posé
+  « vu » dans la base du banc : un vendeur installé ouvre sur Ma journée) ; banc `annuler-commandes`
+  79 ✓ ; audits verts : traduction, tdz, coherence, variables, quoi-de-neuf, annuler-commandes (43 ✓,
+  A7/A7b nouveaux), icones.
+- ⚠️ Fusions : la ligne §9 et la ligne « Quoi de neuf » de coque / listes / achats / messages-stock avaient
+  sauté dans une résolution (« theirs ») : remises telles quelles. Les plus vieilles lignes du §9 sont
+  déplacées telles quelles dans `historique-divers.md` (CLAUDE.md < 59 000 octets).
+- Le « Tout sur le N° » de la loupe n'apparaît que quand la loupe a lu ses données : sous forte charge,
+  « Trouver la paire » a une fois dépassé 10 s d'attente de la fiche (passe seul) ; le but attend 15 s.
 - Machine de banc très chargée (charge 55–72, autres sessions) : les attentes sont des conditions (15 s pour
   un toucher décisif, 25 s pour l'ouverture), jamais des délais fixes.

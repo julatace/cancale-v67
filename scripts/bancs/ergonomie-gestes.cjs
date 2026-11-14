@@ -143,7 +143,7 @@ async function jouerChemin(o, g, ch) {
   }
   const t0 = Date.now();
   let ok = false;
-  while (Date.now() - t0 < 10000) { if (await g.but(pg).catch(() => false)) { ok = true; break; } await pg.waitForTimeout(200); }
+  while (Date.now() - t0 < 15000) { if (await g.but(pg).catch(() => false)) { ok = true; break; } await pg.waitForTimeout(200); }
   if (!ok) return { ...m, impasse: 'but pas atteint' };
   return m;
 }
