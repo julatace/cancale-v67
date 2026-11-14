@@ -28995,6 +28995,13 @@ const INV_STATUS = {
 const normTitle = (t) => (t || '').toLowerCase().replace(/\s+/g, ' ').trim();
 // La taille est-elle DÉJÀ écrite dans le titre ? (« taille 42 », « T40,5 ») —
 // la carte d'annonce ne la redit pas (26 oct., « trop brouillon »).
+// (14 nov., refonte des listes — « le nom ne se coupe pas sur "taille 3…" au profit du prix ») La taille ÉCRITE à la
+// fin du titre (« … taille 37 », « … T. 40,5 ») : sur une rangée de liste au téléphone, le nom tient sa ligne et la
+// taille passe dans la sous-ligne (« T. 37 »). Affichage seulement : le titre reste ENTIER dans le DOM (recherche, bancs).
+const tailleEnFin = (titre) => {
+  const m = String(titre || '').match(/^(.*\S)\s*[-–·,]?\s*\b(?:taille|t\.?)\s*(\d{2}(?:[.,]5)?)\s*$/i);
+  return m && m[1].length >= 3 ? { nom: m[1], fin: String(titre).slice(m[1].length), taille: m[2] } : null;
+};
 const tailleDansTitre = (titre, taille) => {
   const t = normTitle(titre).replace(/,/g, '.'), z = normTitle(String(taille || '')).replace(/,/g, '.');
   if (!z) return false;
@@ -49659,7 +49666,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       titre={tr('annonces.numeroRangementEcrit')} rendu={num?<Numero n={num} taille="grand" titre={tr('annonces.numeroChanger', { num: String(num) })}/>:<span className="vrm-fiche-num-vide">+ N°</span>}/>
                   </span>
                   <div className="vrm-ann-ledger-info" style={{display:'flex',flexDirection:'column',gap:8}}>
-                    <div data-titre style={{fontSize:15,fontWeight:600,color:C.text,lineHeight:1.35,overflowWrap:'anywhere'}}>{motsInsecables(it.title||it.brand||'—')}{tailleHorsTitre ? <span data-titre-taille=""> · {tailleHorsTitre}</span> : null}</div>
+                    <div data-titre style={{fontSize:15,fontWeight:600,color:C.text,lineHeight:1.35,overflowWrap:'anywhere'}}>{(() => { const tf = tailleEnFin(it.title); return tf ? <>{motsInsecables(tf.nom)}<span className="vrm-titre-taille-fin" data-titre-taille-fin="">{tf.fin}</span></> : motsInsecables(it.title||it.brand||'—'); })()}{tailleHorsTitre ? <span data-titre-taille=""> · {tailleHorsTitre}</span> : null}</div>
                     {/* (10 nov., lot BD) La note privée de la paire, par SON identité (N°, sinon l'annonce). */}
                     <NotePaireCoque numero={num} itemId={it.id} recreeDe={e && e.recreeDe} ajout rangee/>
                     {remiseIci ? carteRemise(remiseIci, true) : null}
@@ -49701,6 +49708,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                     <div data-etat-ligne style={{fontSize:12,color:C.muted,display:'flex',alignItems:'center',flexWrap:'wrap',gap:'4px 12px',minWidth:0}}>
                       <span data-stats-annonce style={{display:'inline-flex',flexWrap:'wrap',alignItems:'center',gap:'2px 12px'}}>
+                        {(() => { const tf = tailleEnFin(it.title); return tf ? <span className="vrm-etat-taille" data-etat-taille={tf.taille}>T. {tf.taille}</span> : null; })()}
                         {it.condition ? <span className="vrm-fiche-etat-court" data-etat-court="">{String(it.condition)}</span> : null}
                         {it.views!=null && <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="eye" size={13}/>{it.views}</span>}
                         {it.favourites!=null && <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="heart" size={13}/>{it.favourites}</span>}
@@ -50974,7 +50982,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 : [['imprimer', nPrets === nLot ? 0 : nPrets, 'à imprimer'], (() => { const d = gestesDepuis(shipDone, m0.getTime()); return ['deposes', d, d > 1 ? 'déposés aujourd’hui' : 'déposé aujourd’hui']; })()];
               const vus = parts.filter((x) => x[1] > 0);
               if (!vus.length) return null;
-              return <p className="vrm-colis-resume" data-colis-resume={colisDans}>{vus.map((x, i) => <span key={x[0]} data-colis-resume-case={x[0]} data-n={String(x[1])}>{i ? ' · ' : ''}{x[1]} {x[2]}</span>)}</p>; })() : null}
+              return <VersAFaire><p className="vrm-colis-resume" data-colis-resume={colisDans}>{vus.map((x, i) => <span key={x[0]} data-colis-resume-case={x[0]} data-n={String(x[1])}>{i ? ' · ' : ''}{x[1]} {x[2]}</span>)}</p></VersAFaire>; })() : null}
             {!baseKO && !colisDans && onglet !== 'retirer' && (() => { const m0 = new Date(); m0.setHours(0, 0, 0, 0); const deposes = gestesDepuis(shipDone, m0.getTime());
               // (3 nov., carte réglable par page) Défaut = la carte d'avant : « à poster » (la publication
               // `vrm_colis_aposter`, pour le site choisi en tête de Colis), « à imprimer » (`lignesLot`),
@@ -51012,7 +51020,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   { v: 'envoyes', l: 'Envoyés', n: nEnvoyes != null ? String(nEnvoyes) : null, data: { 'data-colis-onglet-choix': 'envoyes', 'data-colis-onglet-n': nEnvoyes != null ? String(nEnvoyes) : '' } },
                   { v: 'retirer', l: 'À retirer', n: nRet != null ? `${nRet}${retPartiel ? '+' : ''}` : null, data: { 'data-colis-onglet-choix': 'retirer', 'data-colis-onglet-n': nRet != null ? String(nRet) : '', 'data-urgent': urgentRet ? '1' : '0', title: retPartiel && nRet != null ? `Au moins ${nRet} : les e-mails de suivi n'ont pas pu être lus` : undefined } },
                 ].filter((o) => !colisDans || o.v !== 'retirer')}/>}
+              {/* (14 nov., refonte des listes — AJOUT 3) Au téléphone, « 15 à imprimer », « N à envoyer en priorité »,
+                  « Préparer mes colis · Je dépose » et la tournée vivent dans « • À faire · N » (src/ui/AFaire.jsx) : la
+                  1re vente à expédier monte dans la moitié haute de l'écran. Mêmes éléments, mêmes gestes. */}
+              <AFaireLigne capsule seulement="telephone" className="vrm-colis-afaire"/>
             </div>
+            <AFaireLigne seulement="ordinateur" className="vrm-colis-afaire"/>
             {/* (3 nov.) Les puces du haut : « N en route » (achats dont Vinted ne dit pas encore le point — la liste
                 au toucher) et « N comptes à relire » (la fraîcheur des lectures, `FraicheurDonnees` — elle ouvre
                 les comptes). Remplacent les bandeaux de texte du bas de l'écran. */}
@@ -51027,12 +51040,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {(onglet === 'envoyer' || onglet === 'retirer') ? <InfosSms key={onglet} onglet={onglet} lire={lireInfosSms} ecrireLiens={ecrireLiensSms} publier={publierATrancher} /> : null}
             {/* (9 nov., lot AD) « Préparer mes colis » : un colis à la fois, plein écran, dans l'ordre de cette liste. */}
             {/* Une rangée À ELLE (pas `.vrm-colis-outils`, rangée derrière « … ») : le geste du moment. */}
-            {onglet === 'envoyer' && (nEnv || 0) > 0 ? (
+            {onglet === 'envoyer' && (nEnv || 0) > 0 ? (<VersAFaire>
               <div className="vrm-pas-a-pas-rangee" data-preparer-rangee="">
                 <Bouton variante="secondaire" icone="box" data-preparer-ouvrir={nEnv} onClick={() => setPreparerOuvert(true)} style={{ minHeight: 44 }}>Préparer mes colis</Bouton>
                 {/* (10 nov., lot AU) Au point relais : les colis à déposer, scannés un à un. */}
                 <Bouton variante="secondaire" icone="scan" data-depot-ouvrir={nEnv} onClick={() => setDepotOuvert(true)} style={{ minHeight: 44 }}>Je dépose</Bouton>
-              </div>) : null}
+              </div></VersAFaire>) : null}
             {onglet === 'envoyer' && nPretsVue > 0 && (
               <div className="vrm-colis-outils" data-cc-colonne="prets">
                 <Bouton variante="secondaire" icone="box" data-emballer-ouvrir={nPretsVue} onClick={() => setEmballage(true)} style={{ minHeight: 44 }}>Emballer</Bouton>
@@ -51402,9 +51415,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const pending = (sales.items||[]).filter(o=> String(o._acc?.vinted_user_id)===String(freshLabel.acc?.vinted_user_id) && aExpedier(o) && !estParti(o));
           const one = pending.length===1 ? pending[0] : null;
           const e = one ? effEntry(one) : null; const num = e?.numero || '';
-          return (
-            /* (5 nov., chantier D) Neutre (plus le vert hors palette ni les emojis 🆕 📄) : une carte de la
-               surface, l'icône du document, une phrase, un geste de 44 px. */
+          return (<VersAFaire>
+            {/* (5 nov., chantier D) Neutre (plus le vert hors palette ni les emojis 🆕 📄) : une carte de la
+               surface, l'icône du document, une phrase, un geste de 44 px. (14 nov.) Dans « À faire » au téléphone. */}
             <div data-colis-bordereau-frais="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 12px 10px 14px',marginBottom:10,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
               <span aria-hidden="true" style={{display:'flex',color:C.muted,flexShrink:0}}><Icon name="doc" size={20}/></span>
               <div style={{flex:'1 1 200px',minWidth:0}}>
@@ -51414,7 +51427,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   : <>{freshLabel.name} · touche « J’ai le PDF » sur la vente concernée : il se tamponne avec son N°.</>}</div>
               </div>
               {one && <Bouton variante="secondaire" icone="doc" onClick={()=>startBordereau(num, one.title, freshLabel.acc, one.transaction_id)}>Tamponner</Bouton>}
-            </div>
+            </div></VersAFaire>
           );
         })()}
         {/* Rappel d'urgence quand l'app est ouverte (complète la notif push quotidienne). */}
@@ -51430,7 +51443,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // ⚠️ Ne s'affiche que si l'urgence est un SOUS-ENSEMBLE strict : sinon
           // c'est le même ensemble que le bandeau du haut, qui le dit déjà.
           if (!total || total >= nAPoster()) return null;
-          return (
+          return (<VersAFaire>
             <div data-colis-urgence={danger?'danger':'presse'} style={{border:`1px solid ${C.warn}66`,background:`${C.warn}12`,borderRadius:12,padding:'10px 13px',marginBottom:10}}>
               {/* ⚠️ CE BANDEAU NE COMPTE QUE L'URGENT (en retard / aujourd'hui /
                   demain), pas tous les colis. Il disait « N colis à expédier »,
@@ -51446,7 +51459,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <span className="vrm-urgence-pourquoi" data-urgence-pourquoi=""><Pourquoi label={tr('listes.urgence.pourquoi')} titre={tr('listes.urgence.titre')}>{parts.join(' · ')} — {ouSontLesPresses(u)}</Pourquoi></span>
               </div>
               <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>{parts.join(' · ')} — {ouSontLesPresses(u)}</div>
-            </div>
+            </div></VersAFaire>
           );
         })()}
         </>)}
@@ -51667,9 +51680,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const totalT = deposesAujT + nDeposablesT;
                 const tourneeEl = (tourneeItems.length || tourneeDepot) ? (
                   <div key="__tournee" className="vrm-tournee-tete" >
-                    {tourneeItems.length ? <span style={{display:'inline-flex',alignItems:'center',gap:2}}><Bouton variante="secondaire" icone="pin" data-tournee-ouvrir={tourneeItems.length} onClick={() => setTourneeDepot(true)}>Préparer la tournée de dépôt</Bouton>
+                    {tourneeItems.length ? <VersAFaire><span style={{display:'inline-flex',alignItems:'center',gap:2}}><Bouton variante="secondaire" icone="pin" data-tournee-ouvrir={tourneeItems.length} onClick={() => setTourneeDepot(true)}>Préparer la tournée de dépôt</Bouton>
                       {/* (8 nov., clarté) Ce que fait la tournée, pour qui la découvre : deux phrases derrière « ⓘ ». */}
-                      <Pourquoi label="À quoi sert la tournée ?" titre="La tournée de dépôt">Les colis prêts à déposer, rangés par transporteur, pour tout faire en un passage. Au point relais, touche « Déposé » (ou scanne le bordereau) : il est noté déposé.</Pourquoi></span> : null}
+                      <Pourquoi label="À quoi sert la tournée ?" titre="La tournée de dépôt">Les colis prêts à déposer, rangés par transporteur, pour tout faire en un passage. Au point relais, touche « Déposé » (ou scanne le bordereau) : il est noté déposé.</Pourquoi></span></VersAFaire> : null}
                     {tourneeDepot ? (
                       <SheetShell onClose={() => setTourneeDepot(false)} titre="Tournée de dépôt" maxWidth={560} data-tournee-sheet=""
                         className="vrm-tournee-feuille"
@@ -60257,9 +60270,9 @@ function AppCoeur() {
     const commun={accounts:vintedAccounts,liveStats:liveStatsVus,accountsReady:accountsLoaded,baseKO,onNav:setTab,garageGrid,onLocate:(n)=>{setGarageLocate(String(n));setTab('garage');},onStore:(n)=>{setGaragePlace(String(n));setTab('garage');},onFreeNum:freeGarageNum};
     if(t==='ventes') return (
       <section className="vrm-colis-section" data-colis-hote="ventes" data-colis-site={site} aria-label="À expédier">
-        <GardeEcran nom="ventes:colis"><Comptabilite key="colis_ventes" {...commun} only="bordereaux" colisDans="ventes"
+        <AFaireHote><GardeEcran nom="ventes:colis"><Comptabilite key="colis_ventes" {...commun} only="bordereaux" colisDans="ventes"
           siteColisDemande={site==='toutes'?null:site} sitesPresents={sitesPresents}
-          ongletColis={ongletColis} onOngletColis={choisirOngletColis} onOngletVu={setOngletColisMontre}/></GardeEcran>
+          ongletColis={ongletColis} onOngletColis={choisirOngletColis} onOngletVu={setOngletColisMontre}/></GardeEcran></AFaireHote>
       </section>);
     if(t==='achats') return (
       <RepliRetirerAchats sansLigne={site==='vinted'}>

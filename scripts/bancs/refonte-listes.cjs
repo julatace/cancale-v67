@@ -148,7 +148,7 @@ function mesurerForme({ tactile, sombre, liste }) {
     const grandHeros = [...root.querySelectorAll('.vrm-fu-tete :is(.vrm-jv2-grand, .vrm-fu-grand)')].filter(vis)[0];
     const zero = grandHeros && (grandHeros.classList.contains('is-zero') || grandHeros.classList.contains('is-vide'));
     if (zero) { /* rien à afficher en grand aujourd'hui */ }
-    else if (!meilleur || meilleur.fs < 48) out.heros.push({ quoi: 'pas de chiffre d’affiche dans le premier écran', plusGrand: meilleur ? Math.round(meilleur.fs) : 0, el: meilleur ? nom(meilleur.el) : '' });
+    else if (!meilleur || meilleur.fs < 48) out.heros.push({ quoi: 'pas de chiffre d’affiche dans le premier écran', plusGrand: meilleur ? Math.round(meilleur.fs) : 0, el: meilleur ? nom(meilleur.el) : '', grand: grandHeros ? `${grandHeros.className} « ${grandHeros.textContent.slice(0, 16)} » ${getComputedStyle(grandHeros).fontSize} y${Math.round(grandHeros.getBoundingClientRect().top)}` : 'aucun' });
     else {
       const carte = meilleur.el.closest('.vrm-fu-carte, .vrm-fu-tete, [data-heros]');
       if (!carte) out.heros.push({ quoi: 'le chiffre d’affiche n’est dans aucune carte héros', el: nom(meilleur.el) });
@@ -344,6 +344,10 @@ const ouvrirSur = (nav, dist, opts) => ouvrir(nav, opts);
         o = await ouvrir(nav, { W, sombre: theme === 'sombre', b: base(), url: ECRANS[e] });
         if (DSF !== 1) { /* captures nettes : un second contexte au facteur voulu */ }
         await pret(o.pg); await o.pg.waitForTimeout(3500);   // la pastille « Mis à jour » a disparu
+        // Ma journée : sa tête attend ses chiffres (premier écran du passage, à froid) — sur la condition, pas un délai.
+        if (e === 'journee') await o.pg.waitForSelector('.vrm-fu-tete :is(.vrm-jv2-grand, .vrm-fu-grand)', { timeout: 15000 }).catch(() => {});
+        // Les animations FINIES d'abord (le chiffre qui roule, l'apparition) : un texte en plein fondu n'est pas jugé à mi-chemin.
+        await o.pg.evaluate(() => Promise.race([Promise.all(document.getAnimations().filter((a) => a.effect && a.effect.getTiming && a.effect.getTiming().iterations !== Infinity).map((a) => a.finished.catch(() => {}))), new Promise((r) => setTimeout(r, 3000))])).catch(() => {});
         const m = await o.pg.evaluate(mesurerForme, { tactile: W < 600, sombre: theme === 'sombre', liste: e !== 'journee' });
         await o.pg.screenshot({ path: path.join(SHOTS, suf + '.png') });
         const n = CLES.reduce((s, k) => s + m[k].length, 0);
