@@ -706,6 +706,7 @@ import "./styles-annonces-coherence.css";   // (5 nov., chantier C) Annonces : b
 import { colonnesColis, SITES_COLIS } from "./colisColonnes.js";
 import { fusionEntreeVente, parcoursPaire } from "./fichePaire.js";
 import { abonner as abonnerFicheLigne, ligneOuverte, ouvrirLigne, fermerLigne, lireLigne, toucheLeCorps, numeroDeLigne, attrsFicheLigne } from './ficheLigne.js';
+import { PaireAvantHote, clicAvant, ouvrirFicheDe } from './paires/PaireAvant.jsx';   // (14 nov., Studio bleu clair) la paire qui monte au premier plan
 import DansFiche from './DansFiche.jsx';
 import { cascadeVente, valeurStock, publierValeurStock } from "./coutVente.js";   // (10 nov., lots BA et BF)
 import { CLE_PRIX_LUS, noterPrixLus } from "./historiquePrix.js";
@@ -880,6 +881,7 @@ import { retirerPublie as retirerPubliePhrase } from '../api/_lib/retrait-colis.
 import { NOM_TRANSPORTEUR as NOM_TRANSPORTEUR_PHRASE, filtreApplicable as filtreApplicablePhrase } from './recherchePhrase.js';
 import "./styles-tablette.css";   // (11 nov., iPad) la coque ordinateur AU DOIGT : 44 px, rien au survol, rail libellé — sous `data-tablette` seulement, EN DERNIER
 import "./styles-refonte-ms.css";   // (14 nov., refonte) Messages, E-mails, Stock : la liste d'abord, des rangées denses, le fil comme Messages d'iPhone — portée par leurs classes seulement
+import "./design/studio-paires.css";   // (14 nov., « Studio bleu clair ») Paires : Annonces, Stock, Inventaire, la fiche — EN DERNIER (docs/passation/2026-11-14-studio-paires.md)
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
@@ -14822,6 +14824,9 @@ const fmt  = fmtMontant;
 // Revue du 16 octobre : « 65 € » sur une ligne, « 65,00 € » ou « +12,00€ »
 // juste à côté. UNE forme pour les écrans Ventes et Annonces — l'entier quand
 // le montant est rond, sinon deux décimales, toujours une espace avant €.
+// (14 nov., « Studio bleu clair ») Un prix déjà écrit (« 107 € ») rendu nombre + devise plus petite (Urbanist, € à
+// 0,68 em remonté : studio-paires.css `.sb-eur`). Le TEXTE lu ne change pas (« 107 € », espace insécable compris).
+const prixAffiche = (t) => { const s = String(t == null ? '' : t); const i = s.lastIndexOf('\u00a0'); if (i <= 0 || i >= s.length - 1 || s.length - i > 5) return s; return <>{s.slice(0, i)}<span className="sb-eur">{s.slice(i)}</span></>; };
 const prixCourt = (n) => { const v = Number(n); if (n == null || n === '' || !isFinite(v)) return '—'; const c = Math.round(v * 100) / 100; return (Number.isInteger(c) ? String(c) : c.toFixed(2).replace('.', ',')) + '\u00a0€'; };
 // ⟦→ ecrans/Compta.jsx #13⟧
 const uid  = () => Math.random().toString(36).slice(2,9);
@@ -33207,6 +33212,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [passportFor, setPassportFor] = useState(null); // { it, e, num } → modale « Passeport de la paire »
   // (1er nov.) Téléphone : les fiches dont « Plus d'actions » est ouvert (par id d'annonce).
   const [fichesOuvertes, setFichesOuvertes] = useState(() => new Set());
+  // (14 nov., « Studio bleu clair ») Annonces en LISTE (rangées de 64 px, par défaut) ou en GRILLE de vignettes (celle
+  // d'hier) : un choix d'affichage, retenu sur cet appareil seulement (rien de métier).
+  const [vuePaires, setVuePaires] = useState(() => { try { return localStorage.getItem('vrm_paires_vue') === 'grille' ? 'grille' : 'liste'; } catch (_) { return 'liste'; } });
+  const changerVuePaires = (v) => { setVuePaires(v); try { localStorage.setItem('vrm_paires_vue', v); } catch (_) {} };
   // (5 nov., chantier C) La feuille « … » d'UNE carte d'annonce (clé `uid_id`), ou null.
   const [ficheMenu, setFicheMenu] = useState(null);
   // (5 nov., chantier C) La liste « N nouveaux N° posés par VRM », dépliée sous la ligne d’avis.
@@ -37942,6 +37951,51 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const e = numeros[it.id] || {};
     return { id: String(it.id), uid, compte: it._acc ? accNameOf(it._acc) : (uid ? `compte ${uid}` : ''), numero: e.numero ? String(e.numero) : '',
       titre: it.title || '', photo: photoArticle(it) || '', prix: dev === 'EUR' && isFinite(n) && n > 0 ? n : null };
+  };
+  // (14 nov., « Studio bleu clair » — src/paires/PaireAvant.jsx) LA PAIRE QUI MONTE AU PREMIER PLAN, au téléphone :
+  // la rangée touchée devient une carte À SA PLACE. Elle porte quatre chiffres LUS (prix affiché, acheté — la même
+  // lecture `prixAchatDe` et la même écriture `ecrirePrixTape` que la case « Prix d'achat » —, jours en ligne,
+  // favoris ; « — » quand on ne sait pas, jamais 0) et deux touches : « Baisser le prix » (la MÊME feuille que la
+  // série, `BaissePrixSerie`, pour CETTE annonce) et « Republier » (le MÊME atelier et la MÊME règle que la vue
+  // « Republier », `actionsPossibles` ; refus ⇒ sa raison). « ⋯ » ouvre la fiche de la paire avec tout le reste.
+  // La paire est désignée par la clé que la rangée porte (compte + identifiant d'annonce), jamais par son titre.
+  const rendreAvantAnnonce = (cle, fermer) => {
+    const it = (annShown || []).find((x) => x && x._acc && (String(x._acc.vinted_user_id) + '_' + String(x.id)) === String(cle));
+    if (!it) return null;
+    const e = numeros[it.id] || {};
+    const achat = prixAchatDe(e, buyByNum);
+    const achatConnu = achat != null && !isNaN(achat);
+    const age = listedAgeDays(it);
+    const fav = it.favourites != null && isFinite(Number(it.favourites)) ? Number(it.favourites) : null;
+    const prixTxt = prix(it.price, it.currency) || '';
+    const baisser = () => { fermer(); setBaisseSel([annonceBaisse(it)]); };
+    const republier = () => {
+      const uid = String(it._acc.vinted_user_id), id = String(it.id);
+      const a = annSelectionnables.find((x) => String(x.uid) === uid && String(x.id) === id);
+      if (!a || a.raisonPas || a.etat !== 'en-ligne') { toast((a && a.raisonPas) || tr('qr.pasCochable')); return; }
+      const vc = vintedDeChrome();
+      const r = actionsPossibles({ selection: [{ id: a.id, uid: a.uid, etat: a.etat }], chrome: vc === undefined ? undefined : (vc ? String(vc.uid || '') : null),
+        capOk: (cap) => extSait(cap) === 'ok', nomCompte: (u) => { const x = (accounts || []).find((y) => String(y.vinted_user_id) === String(u)); return x ? accNameOf(x) : ''; } }).find((x) => x.k === 'recreer');
+      if (!r || !r.ok) { toast((r && r.raison) || tr('annonces.republierPossibleSelection')); return; }
+      fermer(); setRepubReprise([a.id]); setRepubDepart(true); setRepubCle((c) => c + 1); setRepubAction('recreer');
+    };
+    return (<>
+      <button type="button" className="sb-rond sb-avant-fermer" data-sb-avant-fermer="" aria-label={tr('studio.paires.fermer')} onClick={fermer}><Icon name="close" size={21}/></button>
+      <div className="sb-avant-ch" data-sb-avant-chiffres="">
+        <div className="sb-avant-c is-prix" data-sb-avant-chiffre="prix" data-val={prixTxt}><b className="sb-chiffre-affiche">{prixTxt ? prixAffiche(prixTxt) : '—'}</b><span>{tr('studio.paires.prixAffiche')}</span></div>
+        <div className="sb-avant-c" data-sb-avant-chiffre="achat" data-val={achatConnu ? String(achat) : ''}>
+          <EnLigne data="achat-avant" value={e.buyPrice ?? ''} onCommit={(v) => String(v ?? '').trim() ? ecrirePrixTape(it, v) : updatePair(it, { buyPrice: '', buyFromId: null, buyFrom: null })} inputMode="decimal" placeholder={achatConnu ? String(achat) : '€'} largeur={64}
+            titre={tr('annonces.prixAchatTouche')} rendu={<b data-vide={achatConnu ? undefined : ''}>{achatConnu ? prixCourt(achat) : '—'}</b>}/>
+          <span>{tr('studio.paires.achete')}</span></div>
+        <div className="sb-avant-c" data-sb-avant-chiffre="jours" data-val={age != null ? String(age) : ''}><b>{age != null ? `${age} ${tr('studio.paires.j')}` : '—'}</b><span>{tr('studio.paires.enLigne')}</span></div>
+        <div className="sb-avant-c" data-sb-avant-chiffre="favoris" data-val={fav != null ? String(fav) : ''}><b>{fav != null ? fav : '—'}</b><span>{tr('studio.paires.favoris')}</span></div>
+      </div>
+      <div className="sb-avant-gestes" data-sb-avant-gestes="">
+        <button type="button" className="sb-touche" data-sb-avant-baisser={String(it.id)} onClick={baisser}><Icon name="tag" size={16}/>{tr('studio.paires.baisser')}</button>
+        <button type="button" className="sb-touche" data-sb-avant-republier={String(it.id)} onClick={republier}><Icon name="sync" size={16}/>{tr('annonces.republier')}</button>
+        <button type="button" className="sb-rond" data-sb-avant-plus="" aria-label={tr('studio.paires.plus')} onClick={() => { if (!ouvrirFicheDe(cle)) toast(tr('studio.paires.ficheIntrouvable')); }}><Icon name="more" size={21}/></button>
+      </div>
+    </>);
   };
   const annSelectionnables = useMemo(() => {
     const out = []; const vus = new Set();
@@ -49845,6 +49899,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* (26 oct., « trop brouillon ») Dans l'espace Vinted, l'onglet « Annonces »
             dit déjà où l'on est : pas de second titre. */}
         {!dansPlateforme && <ScreenHead icon="vitrine" title={tr('annonces.annoncesLigne')} />}
+        {/* (14 nov., « Studio bleu clair ») « • À faire · N › » : un LIEN sur la ligne du titre (téléphone), plus en tête des vues. */}
+        <AFaireLigne capsule seulement="telephone" className="vrm-ann-afaire"/>
         <NoAcc/>
         {/* (2 nov.) Sans compte Vinted, rien à compléter : « 0 à relire sur Vinted » n'était qu'un zéro de plus. */}
         {/* (3 nov., critique #7) « Annonces à compléter » et « Offres automatiques » vivent dans « Outils » (…). */}
@@ -49894,8 +49950,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 brouillons » (un second chemin, d'autres mots) est retirée. */}
             {/* (9 nov., lot AL) … et depuis que « Republier » est une vue d'Annonces, il mène à ELLE
                 (cocher, puis « Republier » ouvre l'atelier) ; « Sélectionner » garde la feuille « Actions ». */}
-            <button type="button" className="vrm-annbar-bouton" data-actions-ouvrir="" aria-pressed={annSort==='republier'} aria-label={tr('annonces.republierAnnonces')} title={tr('annonces.republierCocheAnnonces')}
-              onClick={()=>setAnnSort('republier')}><Icon name="sync" size={17}/><span className="vrm-annbar-mot">{tr('annonces.republier')}</span></button>
+            {/* (14 nov., « Studio bleu clair » — « aucun geste en double ») « Republier » n'est plus ICI : la vue « Republier »,
+                juste dessous, est le même geste (elle porte désormais `data-actions-ouvrir`). À sa place, le choix LISTE / GRILLE
+                (la grille de vignettes d'hier reste au choix, retenue sur cet appareil). */}
+            <button type="button" className="vrm-annbar-bouton sb-rond" data-sb-vue-bascule={vuePaires} aria-pressed={vuePaires==='grille'} aria-label={vuePaires==='grille' ? tr('studio.paires.voirListe') : tr('studio.paires.voirGrille')} title={vuePaires==='grille' ? tr('studio.paires.voirListe') : tr('studio.paires.voirGrille')}
+              onClick={()=>changerVuePaires(vuePaires==='grille' ? 'liste' : 'grille')}><Icon name={vuePaires==='grille' ? 'menu' : 'grid'} size={17}/><span className="vrm-annbar-mot">{vuePaires==='grille' ? tr('studio.paires.liste') : tr('studio.paires.grille')}</span></button>
             <div className="vrm-ann-outils">
               <button type="button" className="vrm-annbar-bouton" aria-label={tr('annonces.outilsAnnonces')} onClick={(e)=>{ try { const r=e.currentTarget.getBoundingClientRect(); setAnnToolsCote(r.right>=246?'droite':'gauche'); } catch(_){} setAnnToolsOpen(v=>!v); }} aria-expanded={annToolsOpen} title={tr('annonces.outilsOffresAutomatiques')}>
                 <Icon name="more" size={17}/><span className="vrm-annbar-mot vrm-ann-outils-mot">{tr('ventes.outils')}</span></button>
@@ -50004,7 +50063,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {(listings.items?.length>0 || annMasquees.length>0 || (brVinted.liste||[]).length>0) && <div className="vrm-stock-views vrm-filtres" role="group" aria-label={tr('annonces.vuesRapidesAnnonces')}>
           {/* (14 nov., refonte des listes) « • À faire · N » en tête des vues : au téléphone, la feuille des alertes (src/ui/AFaire.jsx) ;
               à l'ordinateur, les alertes restent posées ensemble sous les vues (place « ordinateur » ci-dessous). */}
-          <AFaireLigne capsule seulement="telephone" className="vrm-ann-afaire"/>
+          {/* (14 nov., « Studio bleu clair ») « • À faire · N › » est monté sur la ligne du titre (ci-dessus, hors de la barre). */}
           {/* (5 nov., chantier C — revue 2.10) « Sélectionner » en DEUXIÈME : au téléphone, la
               rangée défile et le coupait au bord (« Séle… »). « Tout le stock » devient « Toutes »
               (le Stock est un autre écran). */}
@@ -50013,7 +50072,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <button type="button" data-vue-selection aria-pressed={annSort==='selection'} onClick={()=>setAnnSort('selection')}>{tr('annonces.selectionner')}{selAnn.length ? <span className="vrm-of-n">{selAnn.length}</span> : null}</button>
           {/* (9 nov., lot AL — Julien : « Republier dans Annonces ») L'ancienne entrée « Republier » du menu
               est ICI : ses annonces en ligne à cocher, puis « Republier » ouvre l'atelier (ordre, espacement, lancer). */}
-          <button type="button" data-vue-republier="" aria-pressed={annSort==='republier'} onClick={()=>setAnnSort('republier')}>{tr('annonces.republier2')}</button>
+          <button type="button" data-vue-republier="" data-actions-ouvrir="" aria-pressed={annSort==='republier'} onClick={()=>setAnnSort('republier')}>{tr('annonces.republier2')}</button>
           {/* (5 nov., Julien : « les annonces en brouillon doivent apparaître dans Annonces,
               avec leur marque « brouillon » ») Ses brouillons, compte par compte, à cocher. */}
           {((brVinted.liste||[]).length>0 || annSort==='brouillons') && <button type="button" data-vue-brouillons={(brVinted.liste||[]).length} aria-pressed={annSort==='brouillons'} onClick={()=>setAnnSort('brouillons')}>{tr('annonces.brouillons')}<span className="vrm-of-n">{(brVinted.liste||[]).length}</span></button>}
@@ -50335,7 +50394,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             c'est la fiche d'avant, entière (achat, mini, refuse, boost, marge, achat relié, stock, « … »), mêmes
             éléments, mêmes écritures, mêmes data-* (rien n'est retiré, seulement replié). Toucher la PHOTO ouvre la
             visionneuse unique (src/visionneuse.js). L'ordre et la règle « en ligne » ne changent pas (`annShown`). */}
-        <div className="vrm-ann-grid vrm-fiches vrm-ann-vignettes" data-ann-grille="vignettes" data-ann-grille-comptes={annGroupes.length} style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 180px), 1fr))',gap:16}}>
+        {/* (14 nov., « Studio bleu clair ») LA LISTE D'ABORD : des rangées de 64 px posées sur un plan de verre (plaque N° ·
+            vignette · titre et méta · prix), la grille de vignettes d'hier restant au choix (« Grille », retenu sur cet
+            appareil). Toucher une rangée la fait monter au premier plan, à sa place (src/paires/PaireAvant.jsx). */}
+        <div className="vrm-ann-grid vrm-fiches vrm-ann-vignettes sb-liste" data-sb-liste="" data-sb-vue={vuePaires} onClick={clicAvant} data-ann-grille="vignettes" data-ann-grille-comptes={annGroupes.length} style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 180px), 1fr))',gap:16}}>
           {annGroupesVus.map(g=>{ const acc0 = g.items[0] && g.items[0]._acc; const nomG = acc0 ? accNameOf(acc0) : ''; return [
           <div key={'compte-'+g.uid} className="vrm-ann-compte-tete" data-ann-compte={g.uid} data-ann-compte-n={g.tous} role="heading" aria-level={3}>
             <span className="vrm-ann-compte-avatar" aria-hidden="true">{initialeCompte(nomG)}</span>
@@ -50415,7 +50477,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // l'identifiant de CETTE annonce et son N° ; ses gestes (« Plus d'actions ») y sont rendus (`DansFiche`).
             const flAnn = attrsFicheLigne({ contexte: 'annonce', site: 'vinted', cle: 'a' + cleCarte, nums: num ? [num] : [], item: String(it.id || ''), photo: typeof it.photo === 'string' ? it.photo : ((it.photo && it.photo.url) || ''), titre: it.title || '', prix: prix(it.price, it.currency) || '' });
             return (
-              <div className="vrm-ann-card vrm-fiche vrm-vignette" key={cleCarte} data-carte-annonce={it.id} data-fiche="29oct" data-fiche-ouverte={ouverte?'1':'0'} data-vignette-cle={cleCarte} data-vignette-double={enDouble?'1':undefined}
+              <div className="vrm-ann-card vrm-fiche vrm-vignette sb-rangee" key={cleCarte} data-sb-avant-cle={cleCarte} data-sb-alerte={soldBord ? 'vendue' : enDouble ? 'double' : undefined} data-carte-annonce={it.id} data-fiche="29oct" data-fiche-ouverte={ouverte?'1':'0'} data-vignette-cle={cleCarte} data-vignette-double={enDouble?'1':undefined}
                 {...flAnn}
                 style={{borderRadius:12,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden',...(estFloute(it)?STYLE_FLOU:null)}}>
                 <div className="vrm-ann-overview" style={{display:'flex',flexDirection:'column',position:'relative'}}>
@@ -50445,8 +50507,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <NotePaireCoque numero={num} itemId={it.id} recreeDe={e && e.recreeDe} ajout rangee/>
                     {remiseIci ? carteRemise(remiseIci, true) : null}
                     <div className="vrm-ann-price-line" style={{display:'flex',alignItems:'center',gap:10}}>
-                      <span data-prix style={{fontSize:20,fontWeight:700,color:C.text,fontVariantNumeric:'tabular-nums',letterSpacing:'-.02em'}}>{prix(it.price,it.currency)||'—'}</span>
+                      <span data-prix style={{fontSize:20,fontWeight:700,color:C.text,fontVariantNumeric:'tabular-nums',letterSpacing:'-.02em'}}>{prixAffiche(prix(it.price,it.currency)||'—')}</span>
                     </div>
+                    {/* (14 nov., « Studio bleu clair ») L'état, le prix d'achat et les chiffres de l'annonce (accepter dès, refuser
+                        sous, boost, marge) : la rangée ne les montre plus ; ouverte en fiche, ils montent EN TÊTE de la fiche
+                        (`DansFiche`, place « contexte ») — les mêmes éléments, les mêmes écritures, les mêmes data-*. */}
+                    <DansFiche cle={flAnn['data-fiche-ligne']} place="contexte">
                     {/* L'ÉTAT EN JAUGE, et JUSTE À CÔTÉ le prix d'achat qu'on tape en place. */}
                     <div className="vrm-fiche-duo" data-fiche-duo style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr)',gap:8}}>
                       <div className="vrm-fiche-cell vrm-fiche-etat" data-fiche-etat style={cell}>
@@ -50480,12 +50546,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <span data-marge={marge==null?'':String(marge)} style={{...valeur,color:marge!=null&&marge<0?C.warn:marge==null?C.muted:C.text}}>{marge==null?'—':montant(marge,{signe:true})}</span>
                       </div>
                     </div>
+                    </DansFiche>
                     <div data-etat-ligne style={{fontSize:12,color:C.muted,display:'flex',alignItems:'center',flexWrap:'wrap',gap:'4px 12px',minWidth:0}}>
                       <span data-stats-annonce style={{display:'inline-flex',flexWrap:'wrap',alignItems:'center',gap:'2px 12px'}}>
                         {(() => { const tf = tailleEnFin(it.title); return tf ? <span className="vrm-etat-taille" data-etat-taille={tf.taille}>T. {tf.taille}</span> : null; })()}
                         {it.condition ? <span className="vrm-fiche-etat-court" data-etat-court="">{String(it.condition)}</span> : null}
-                        {it.views!=null && <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="eye" size={13}/>{it.views}</span>}
-                        {it.favourites!=null && <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="heart" size={13}/>{it.favourites}</span>}
+                        {it.views!=null && <span data-stat="vues" style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="eye" size={13}/>{it.views}</span>}
+                        {it.favourites!=null && <span data-stat="favoris" style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="heart" size={13}/>{it.favourites}</span>}
                         {age!=null && <span title={tr('annonces.ligneDepuisJours', { age: String(age) })} style={{color:sleeps?C.warn:C.muted,fontWeight:sleeps?600:400}}>{age} j{sleeps?tr('annonces.dort'):''}</span>}
                         {!annUnCompte && <span data-stats-compte="" style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:140}}>{accNameOf(it._acc)}</span>}
                       </span>
@@ -50585,10 +50652,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   )}
                 </div>
                 </DansFiche>
+                {/* La place de la partie « premier plan » (chiffres et gestes) : remplie seulement quand CETTE rangée monte. */}
+                <div className="sb-avant-place" data-sb-avant-place=""/>
               </div>
             );
           })]; })}
         </div>
+        <PaireAvantHote rendre={rendreAvantAnnonce} Retour={FermeAuRetour}/>
         <SuitePaquets montres={Math.min(annMax, annShown.length)} total={annShown.length} onPlus={annPlus}/>
         </>)}
           </>)}
@@ -61131,7 +61201,7 @@ function AppCoeur() {
     const sec=sectionDeTache(t,platSub);
     const sous=sousSections(t,site);
     return (
-      <section className="vrm-tache" data-tache={t} data-tache-site={site} data-tache-section={sec} aria-label={TITRES_TACHE[t]}>
+      <section className="vrm-tache" data-tache={t} data-tache-site={site} data-tache-section={sec} aria-label={TITRES_TACHE[t]} data-espace={t==='annonces' ? 'paires' : undefined}>
         <header className="vrm-market-heading vrm-tache-tete" data-tache-tete={t}>
           {t === 'ventes' ? <span className="vrm-fu-date-tete" data-date-tete="">{dateJourFr(new Date())}</span> : null}
           <h1>{TITRES_TACHE[t]}</h1>
@@ -61139,6 +61209,9 @@ function AppCoeur() {
         </header>
         <div className="vrm-tache-filtres" style={{padding:'0 16px'}}>
           <DansBarreHaut><FiltreSites tache={t} site={site} sites={sitesPresents} onSite={(s)=>setPlatSub(s)} onChoix={(s)=>{ retenirFiltre(t,s,true); noterReprise({ sites:{ [t]:{ valeur:s, at:Date.now() } } }); }}/></DansBarreHaut>
+          {/* (14 nov., « Studio bleu clair ») Annonces Vinted : le choix du compte sur la MÊME ligne que les sites (une ligne de
+              moins avant la liste). Le même composant, les mêmes états qu'avant dans l'espace Vinted. */}
+          {t==='annonces' && site==='vinted' && !baseKO && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} compact/>}
           {/* Les sections propres du site, sous son filtre (31 oct., soir) : la
               même forme que les rubriques de l'app (`PlatSubNav`). */}
           {sous && <div className="vrm-tache-sous" data-tache-sous={t+'.'+site}><PlatSubNav sub={sec} setSub={(x)=>{ setEbayCible(null); setPlatSub(subDeTache(site,x)); }} sections={sous}/></div>}
@@ -61182,7 +61255,7 @@ function AppCoeur() {
           {/* (3 nov.) Les montants du haut (CA finalisé, disponible, en attente) se choisissent
               désormais dans LA carte sombre de chaque page (« Modifier ») : la bande ne les redit plus
               (§7) ; la ligne de fraîcheur reste. */}
-          {!filTous && (sec==='ventes'||sec==='annonces'||sec==='achats'||sec==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} messages={sec==='messages'} compact={sec==='annonces'}/>}
+          {!filTous && (sec==='ventes'||(sec==='annonces'&&tab!=='annonces')||sec==='achats'||sec==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} messages={sec==='messages'} compact={sec==='annonces'}/>}
           {/* (9 nov., lot AG) La tête de Vinted ne dit plus la fraîcheur des comptes (« ✓ Ventes Vinted à jour »,
               « N comptes pas relus depuis N j ») : la ligne de fraîcheur UNIQUE du haut de l'app la dit, avec le
               geste (src/fraicheur.js). Sans montants (3 nov.) ni fraîcheur, `VintedResume` n'a plus rien à rendre ici. */}
