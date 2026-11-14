@@ -27,6 +27,12 @@
 //   G11 aucune page qui défile de côté, aucune erreur.
 //  BANC_PORT (aléatoire si absent), BANC_DIST, BANC_CAPTURES.
 // ════════════════════════════════════════════════════════════════════════════
+// (14 nov., « Studio bleu clair » — docs/passation/2026-11-14-studio-paires.md) LA LISTE D'ABORD : au téléphone,
+// Annonces est une LISTE de rangées (plaque N° · vignette · titre et méta · prix À DROITE, le titre sur UNE ligne,
+// coupé « … » s'il le faut, comme la maquette) ; toucher une rangée la fait MONTER au premier plan (`data-sb-avant`) ;
+// ses autres gestes sont dans LA fiche (« ⋯ »). À l'ordinateur, la grille de vignettes reste AU CHOIX (rond
+// Liste / Grille, `vrm_paires_vue`) : ce banc la choisit à 1512 et juge la grille comme avant ; toucher une vignette y
+// ouvre la fiche EN PLAN À DROITE. Les gestes jugés sont les mêmes, à leur nouvelle place.
 const path = require('path');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
@@ -109,6 +115,8 @@ async function ouvrir(b, { largeur, sombre }) {
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   const onglets = []; ctx.on('page', (p) => onglets.push(p));
   await pg.addInitScript((s) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_dark', JSON.stringify(s)); } catch (_) {} }, !!sombre);
+  // (14 nov., studio) À l'ordinateur, ce banc juge la GRILLE (le choix « Grille » de la barre) ; au téléphone, la liste.
+  if (largeur >= 700) await pg.addInitScript(() => { try { localStorage.setItem('vrm_paires_vue', 'grille'); } catch (_) {} });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   // Les photos inventées : une image locale (la visionneuse ne s'ouvre que sur une image chargée).
   await pg.route(/images1\.vinted\.net/, (r) => r.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: PNG }));
@@ -156,7 +164,8 @@ const LIRE = () => {
     n: cartes.length, ids: cartes.map((c) => c.getAttribute('data-carte-annonce')),
     tetes: tetes.map((t) => ({ uid: t.getAttribute('data-ann-compte'), n: Number(t.getAttribute('data-ann-compte-n')), txt: t.innerText.replace(/\s+/g, ' ').trim() })),
     ordre: [...grille ? grille.children : []].map((c) => c.getAttribute('data-ann-compte') ? 'T' + c.getAttribute('data-ann-compte') : c.getAttribute('data-carte-annonce')),
-    colonnes: grille ? getComputedStyle(grille).gridTemplateColumns.split(' ').filter(Boolean).length : 0,
+    colonnes: grille ? (getComputedStyle(grille).display !== 'grid' ? 1 : getComputedStyle(grille).gridTemplateColumns.split(' ').filter(Boolean).length) : 0,
+    studio: !!(grille && grille.getAttribute('data-sb-vue') === 'liste'),
     largeurGrille: grille ? grille.getBoundingClientRect().width : 0,
     sw: (document.scrollingElement || document.documentElement).scrollWidth, cw: window.innerWidth,
     cartes: cartes.map((c) => {
@@ -164,13 +173,14 @@ const LIRE = () => {
       const t = c.querySelector('[data-titre]'); const ts = t ? getComputedStyle(t) : null;
       const r = c.getBoundingClientRect();
       return {
-        id: c.getAttribute('data-carte-annonce'), ouverte: c.getAttribute('data-fiche-ouverte') === '1', h: Math.round(r.height), w: Math.round(r.width), x: Math.round(r.left), y: Math.round(r.top),
+        id: c.getAttribute('data-carte-annonce'), ouverte: c.getAttribute('data-fiche-ouverte') === '1' || c.getAttribute('data-sb-avant') === '1', h: Math.round(r.height), w: Math.round(r.width), x: Math.round(r.left), y: Math.round(r.top),
         photoCarree: pr.width > 40 && Math.abs(pr.width - pr.height) <= 2,
         num: vis(c.querySelector('[data-fiche-num] .vrm-num, [data-fiche-num] .vrm-fiche-num-vide')),
         prix: vis(c.querySelector('[data-prix]')), titre: vis(t), titreLignes: ts ? ts.webkitLineClamp : '', titreBlanc: ts ? ts.whiteSpace : '',
         // (14 nov., refonte des listes) la rangée du téléphone : le titre rendu (lignes de son texte), la place du prix,
         // et le nom lui-même (la taille en fin de titre passe dans la sous-ligne, « T. 37 »).
         titreRendu: t ? lignes(t) : 0, titreCoupe: t ? t.scrollWidth > t.clientWidth + 1 : false,
+        titreDroite: t ? Math.round(t.getBoundingClientRect().right) : 0, prixGauche: (() => { const e = c.querySelector('[data-prix]'); return e ? Math.round(e.getBoundingClientRect().left) : 0; })(),
         titreBas: t ? Math.round(t.getBoundingClientRect().bottom) : 0, prixHaut: (() => { const e = c.querySelector('[data-prix]'); return e ? Math.round(e.getBoundingClientRect().top) : 0; })(),
         tailleSous: vis(c.querySelector('[data-etat-taille]')) ? c.querySelector('[data-etat-taille]').textContent.trim() : '',
         tailleAuTitre: vis(c.querySelector('[data-titre-taille-fin]')),
@@ -185,6 +195,61 @@ const LIRE = () => {
     resume: (document.querySelector('[data-remise-resume]') || { getAttribute: () => null }).getAttribute('data-remise-resume'),
   };
 };
+
+// (14 nov., studio) G7 et G9, là où les gestes vivent maintenant : téléphone ⇒ la paire MONTE (chiffres, acheté qui se
+// saisit, Baisser · Republier · « ⋯ ») puis la fiche ; ordinateur (grille) ⇒ la fiche EN PLAN À DROITE. Les mêmes
+// écritures (`ecrirePrixTape`), le même menu « … » (relier un achat, passeport, histoire, marquer vendue).
+async function gestesStudio(pg, { tag, nom, mobile, L, errs }) {
+  const vis = (s) => pg.evaluate((s) => { const e = document.querySelector(s); if (!e) return false; const r = e.getBoundingClientRect(); return r.width > 1 && r.height > 1; }, s);
+  const avant = Object.fromEntries(L.cartes.map((c) => [c.id, c.h]));
+  await toucher(pg, '[data-carte-annonce="9402"] [data-titre]', mobile);
+  if (mobile) {
+    const monte = await pg.waitForSelector('[data-carte-annonce="9402"][data-sb-avant="1"] [data-sb-avant-gestes]', { timeout: 6000 }).then(() => true).catch(() => false);
+    await pg.waitForTimeout(500);
+    const L2 = await pg.evaluate(LIRE); const o = L2.cartes.find((c) => c.id === '9402');
+    dit(monte && o && o.ouverte && Math.abs(o.w - L2.largeurGrille) <= 20, `${tag} G7 : toucher la rangée la fait MONTER sur toute la largeur (studio)`, JSON.stringify(o && { monte, w: o.w, grille: L2.largeurGrille }));
+    const etirees = L2.cartes.filter((c) => !c.ouverte && Math.abs(c.h - avant[c.id]) > 2).map((c) => `${c.id}:${avant[c.id]}→${c.h}`);
+    dit(etirees.length === 0, `${tag} G7 : paire montée ⇒ aucune rangée voisine étirée`, etirees.join(' '));
+    const ici = await pg.evaluate(() => ['[data-sb-avant-chiffre="prix"]', '[data-sb-avant-chiffre="achat"] [data-edition="achat-avant"]', '[data-sb-avant-chiffre="jours"]', '[data-sb-avant-chiffre="favoris"]', '[data-sb-avant-baisser]', '[data-sb-avant-republier]', '[data-sb-avant-plus]'].filter((s) => { const e = document.querySelector('[data-carte-annonce="9402"] ' + s); return e && e.getBoundingClientRect().width > 1; }).length);
+    dit(ici === 7, `${tag} G7 : montée, elle porte prix · acheté · jours · favoris et Baisser · Republier · « ⋯ »`, `${ici}/7`);
+    await capture(pg, `grille-${nom}-montee`);
+    await toucher(pg, '[data-carte-annonce="9402"] [data-edition="achat-avant"]', mobile);
+  } else {
+    const plan = await pg.waitForSelector('.vrm-fp.sb-plan [data-fiche-menu-ouvrir]', { timeout: 8000 }).then(() => true).catch(() => false);
+    dit(plan, `${tag} G7 : toucher la vignette ouvre la fiche EN PLAN À DROITE (studio)`);
+    await pg.waitForTimeout(500);
+    await capture(pg, `grille-${nom}-plan`);
+    await toucher(pg, '.vrm-fp [data-edition="achat"]', mobile);
+  }
+  await pg.keyboard.type('30'); await pg.keyboard.press('Enter');
+  await attendre(async () => /^30(,00?)?$/.test(String((((await local(pg, 'vinted_annonce_numeros')) || {})['9402'] || {}).buyPrice || '')), 6000);
+  const lu = await pg.evaluate((m) => (document.querySelector(m ? '[data-carte-annonce="9402"] [data-sb-avant-chiffre="achat"]' : '.vrm-fp [data-fiche-achat]') || {}).innerText || '', mobile);
+  dit(/^30(,00?)?$/.test(String((((await local(pg, 'vinted_annonce_numeros')) || {})['9402'] || {}).buyPrice || '')) && /30(,00)?\s*€/.test(lu), `${tag} G7 : le prix d'achat se saisit à sa place (studio) et s'écrit`, lu);
+  // « ⋯ » : la fiche (téléphone), puis son « … » : les autres gestes ; ouverte, la fiche porte achat · mini · refuse · boost · marge · gestes · « … » · changer le prix.
+  if (mobile) { await toucher(pg, '[data-sb-avant-plus]', mobile); await pg.waitForSelector('.vrm-fp [data-fiche-menu-ouvrir]', { timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(500); }
+  const dansFiche = await pg.evaluate(() => ['[data-edition="achat"]', '[data-edition="min"]', '[data-edition="refuse"]', '[data-edition="boost"]', '[data-marge]', '[data-fiche-gestes]', '[data-fiche-menu-ouvrir]', '[data-annonce-prix-partout], [data-annonce-prix-vinted]'].filter((s) => { const e = document.querySelector('.vrm-fp ' + s.split(', ').join(', .vrm-fp ')); return e && e.getBoundingClientRect().width > 1; }).length);
+  dit(dansFiche === 8, `${tag} G7 : la fiche porte tout le reste (achat, mini, refuse, boost, marge, gestes, « … », changer le prix)`, `${dansFiche}/8`);
+  await toucher(pg, '.vrm-fp [data-fiche-menu-ouvrir]', mobile);
+  const menu = await pg.waitForSelector('[data-fiche-menu="9402"]', { timeout: 5000 }).then(() => true).catch(() => false);
+  const gestes = menu ? await pg.evaluate(() => ['[data-fiche-relier-achat]', '[data-fiche-passeport]', '[data-fiche-vendue]', '[data-annonce-histoire]'].filter((s) => document.querySelector(s)).length) : 0;
+  dit(menu && gestes === 4, `${tag} G7 : « … » ouvre ses gestes (relier un achat, passeport, histoire, marquer vendue)`, `menu ${menu} · ${gestes}/4`);
+  if (menu) { await capture(pg, `grille-${nom}-menu`); await pg.keyboard.press('Escape'); await pg.waitForSelector('[data-fiche-menu="9402"]', { state: 'detached', timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(200); }
+  await pg.keyboard.press('Escape'); await pg.waitForSelector('.vrm-fp', { state: 'detached', timeout: 6000 }).catch(() => {});
+  if (mobile && await vis('[data-sb-avant-fermer]')) { await toucher(pg, '[data-sb-avant-fermer]', mobile); await pg.waitForTimeout(500); }
+  const ferme = await pg.evaluate(() => !document.querySelector('.vrm-fp') && !document.querySelector('[data-sb-avant="1"]'));
+  dit(ferme, `${tag} G7 : Échap / « × » la referme (fiche et paire montée)`);
+  // G9 — rien relié avant SON clic ; « Oui » (sur la rangée ou la vignette) donne N°7.
+  dit(String((((await local(pg, 'vinted_annonce_numeros')) || {})['9303'] || {}).numero || '') !== '7', `${tag} G9 : rien n'est relié avant son clic (9303 ne porte pas le N°7)`);
+  await pg.locator('[data-carte-annonce="9303"]').scrollIntoViewIfNeeded().catch(() => {});
+  await capture(pg, `grille-${nom}-meme-paire`);
+  await toucher(pg, '[data-carte-annonce="9303"] [data-remise-oui="7"]', mobile);
+  await pg.waitForTimeout(600);
+  const conf = pg.locator('[role="dialog"] button:has-text("Oui"), [role="dialog"] button:has-text("Confirmer"), [role="dialog"] button:has-text("C’est la même"), [role="dialog"] button:has-text("Garder")');
+  if (await conf.count()) await conf.first().click().catch(() => {});
+  await attendre(async () => String((((await local(pg, 'vinted_annonce_numeros')) || {})['9303'] || {}).numero || '') === '7', 8000);
+  dit(String((((await local(pg, 'vinted_annonce_numeros')) || {})['9303'] || {}).numero || '') === '7', `${tag} G9 : « Oui » sur la rangée ⇒ 9303 porte N°7`, JSON.stringify((((await local(pg, 'vinted_annonce_numeros')) || {})['9303']) || null));
+  dit(errs.length === 0, `${tag} G11 : aucune erreur d'app`, errs.join(' | ').slice(0, 200));
+}
 
 async function scenario(b, largeur, sombre) {
   const mobile = largeur < 700, tag = `${largeur}${sombre ? ' sombre' : ' clair'}`, nom = `${largeur}-${sombre ? 'sombre' : 'clair'}`;
@@ -216,7 +281,8 @@ async function scenario(b, largeur, sombre) {
     const fermees = L.cartes.filter((c) => !c.ouverte);
     dit(fermees.length === L.n && fermees.every((c) => c.photoCarree && c.num && c.prix && c.titre), `${tag} G4 : photo carrée, N° en pastille, titre, prix sur chaque vignette`, JSON.stringify(fermees.filter((c) => !(c.photoCarree && c.num && c.prix && c.titre)).map((c) => c.id)));
     dit(fermees.every((c) => c.caches.length === 0 && c.visibles.length === 0), `${tag} G4 : fermée, rien d'autre (ni achat/mini/refuse/boost/marge/gestes, ni le « V », ni le compte, ni l'icône note seule)`, JSON.stringify(fermees.filter((c) => c.caches.length || c.visibles.length).map((c) => [c.id, c.caches, c.visibles])));
-    if (mobile) dit(fermees.every((c) => c.titreRendu === 1 && c.prixHaut >= c.titreBas - 1 && (!c.finTaille || (!c.tailleAuTitre && /^T\. \d/.test(c.tailleSous)))), `${tag} G4 : le nom tient sa ligne (jamais coupé au profit du prix, qui est dessous) ; la taille dans la sous-ligne`, JSON.stringify(fermees.map((c) => [c.id, c.titreRendu, c.prixHaut - c.titreBas, c.finTaille, c.tailleSous])));
+    if (mobile && L.studio) dit(fermees.every((c) => c.titreRendu === 1 && c.prixGauche >= c.titreDroite - 1 && (!c.finTaille || (!c.tailleAuTitre && /^T\. \d/.test(c.tailleSous)))), `${tag} G4 : le nom sur UNE ligne, le prix dans SA colonne à droite (studio) ; la taille dans la sous-ligne`, JSON.stringify(fermees.map((c) => [c.id, c.titreRendu, c.prixGauche - c.titreDroite, c.finTaille, c.tailleSous])));
+    else if (mobile) dit(fermees.every((c) => c.titreRendu === 1 && c.prixHaut >= c.titreBas - 1 && (!c.finTaille || (!c.tailleAuTitre && /^T\. \d/.test(c.tailleSous)))), `${tag} G4 : le nom tient sa ligne (jamais coupé au profit du prix, qui est dessous) ; la taille dans la sous-ligne`, JSON.stringify(fermees.map((c) => [c.id, c.titreRendu, c.prixHaut - c.titreBas, c.finTaille, c.tailleSous])));
     else dit(fermees.every((c) => String(c.titreLignes) === '2' && c.titreBlanc === 'normal'), `${tag} G4 : le titre tient sur deux lignes (jamais une ligne coupée « … »)`, JSON.stringify(fermees.map((c) => [c.titreLignes, c.titreBlanc])));
     // G5 — un seul gabarit (hors la vignette qui porte une proposition « Même paire ? »)
     const hs = fermees.filter((c) => !c.remise).map((c) => c.h);
@@ -232,13 +298,16 @@ async function scenario(b, largeur, sombre) {
     dit(L.sw <= L.cw + 1, `${tag} G11 : aucune page qui défile de côté`, `${L.sw} > ${L.cw}`);
     await pg.locator('.vrm-ann-grid').first().scrollIntoViewIfNeeded().catch(() => {});
     await capture(pg, `grille-${nom}-fermee`);
-    // G8 — la photo ouvre la visionneuse
+    // G8 — la photo ouvre la visionneuse (studio, téléphone : sur la paire MONTÉE — fermée, la rangée est UN geste)
+    if (mobile && L.studio) { await toucher(pg, '[data-carte-annonce="9402"] [data-titre]', mobile); await pg.waitForSelector('[data-carte-annonce="9402"][data-sb-avant="1"]', { timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(400); }
     await toucher(pg, '[data-carte-annonce="9402"] [data-fiche-photo] img', mobile);
     const visio = await pg.waitForSelector('[data-visionneuse="ouverte"]', { timeout: 5000 }).then(() => true).catch(() => false);
     await pg.waitForTimeout(300);
     dit(visio && onglets.length === 0, `${tag} G8 : toucher la photo ouvre la visionneuse (pas un onglet Vinted)`, `visionneuse ${visio} · onglets ${onglets.length}`);
     if (visio) { await capture(pg, `grille-${nom}-visionneuse`); await pg.keyboard.press('Escape'); await pg.waitForTimeout(400); }
     if (await pg.locator('[data-visionneuse="ouverte"]').count()) { await pg.locator('[data-visionneuse-fermer], .vrm-visionneuse button[aria-label="Fermer"]').first().click().catch(() => {}); await pg.waitForTimeout(300); }
+    if (mobile && L.studio && await pg.locator('[data-sb-avant-fermer]').count()) { await toucher(pg, '[data-sb-avant-fermer]', mobile); await pg.waitForTimeout(500); }
+    if (!mobile || L.studio) return await gestesStudio(pg, { tag, nom, mobile, L, errs });
     // G7 — toucher la vignette (le titre) l'ouvre en place, sans étirer ses voisines
     const avant = Object.fromEntries((await pg.evaluate(LIRE)).cartes.map((c) => [c.id, c.h]));
     await toucher(pg, '[data-carte-annonce="9402"] [data-titre]', mobile);
