@@ -41,7 +41,13 @@ let ok = 0, ko = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
 const veut = (k) => !SEUL.length || SEUL.includes(k);
 const attendre = async (pg, f, ms = 8000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await f().catch(() => false)) return true; await pg.waitForTimeout(200); } return false; };
-const pret = async (pg) => { await pg.waitForSelector('.vrm-main', { timeout: 25000 }).catch(() => {}); await pg.waitForTimeout(2600); };
+// Prêt = l'écran est là ET la page est CALME (aucune tâche longue depuis 1,5 s) : pendant les ~6 s du
+// démarrage, un toucher attend que la page réponde (mesuré : même charge avant et après la refonte).
+const calme = async (pg) => {
+  await pg.evaluate(() => { if (window.__ltObs) return; window.__ltDer = performance.now(); try { window.__ltObs = new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__ltDer = Math.max(window.__ltDer, e.startTime + e.duration); }); window.__ltObs.observe({ type: 'longtask', buffered: true }); } catch (_) {} }).catch(() => {});
+  const t0 = Date.now(); while (Date.now() - t0 < 20000) { if (await pg.evaluate(() => performance.now() - window.__ltDer > 1500).catch(() => false)) return; await pg.waitForTimeout(300); }
+};
+const pret = async (pg) => { await pg.waitForSelector('.vrm-main', { timeout: 25000 }).catch(() => {}); await pg.waitForTimeout(1500); await calme(pg); };
 const ilYa = (min) => new Date(Date.now() - min * 60000).toISOString();
 
 // 120 notifications non lues (la cloche d'hier écrivait « 99+ » en bleu).
@@ -83,7 +89,8 @@ async function regles(nav) {
         fr: f ? f.getAttribute('data-fraicheur-unique') : null, frH: hote ? Math.round(hote.getBoundingClientRect().height) : 0, debord: document.documentElement.scrollWidth > innerWidth + 1 };
     });
     dit(h.droite.length <= 3, `${url} · H1 à droite, trois icônes au plus (cloche · loupe · compte)`, h.droite.join(' | '));
-    dit(h.menu && h.gauche.length === 1, `${url} · H1 à gauche, le ☰ du menu du haut (choix n° 61), seul`, h.gauche.join(' | '));
+    // (14 nov., maquette de Julien) Rien à gauche : le reste des écrans s'ouvre par l'avatar (H1 « menu » ci-dessous).
+    dit(h.gauche.length === 0, `${url} · H1 à gauche, rien (le menu du haut s'ouvre par l'avatar)`, h.gauche.join(' | '));
     dit(!(h.fr === 'a-jour' || h.fr === 'encours') || h.frH <= 1, `${url} · H5 « Tout est à jour » ne prend aucune place en tête de page`, `${h.fr} · ${h.frH} px`);
     dit(!h.debord, `${url} · D aucun débordement horizontal`);
     dit(!o.erreurs.length, `${url} · aucune erreur d'app`, o.erreurs.join(' | ').slice(0, 200));
@@ -100,8 +107,10 @@ async function regles(nav) {
     });
     dit(haut.grand.length >= 1, `${url} · H2 un grand titre (≥ 30 px) dans la page, en haut`, haut.grand.join(' | ') || 'aucun');
     dit(haut.op < 0.1, `${url} · H2 le petit titre de la barre est caché en haut de page (jamais deux fois)`, String(haut.op));
-    await o.pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 500; });
-    await o.pg.waitForTimeout(700);
+    // Défiler (deux fois : un écran qui finit d'arriver peut ramener le défilement en haut).
+    await o.pg.waitForTimeout(1500);
+    for (let i = 0; i < 2; i++) { await o.pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) { m.scrollTop = 500; m.dispatchEvent(new Event('scroll')); } }); await o.pg.waitForTimeout(900); }
+    await attendre(o.pg, () => o.pg.evaluate(() => { const t = document.querySelector('.vrm-hdr-titre'); return t && +getComputedStyle(t).opacity > .9; }), 5000);
     const bas = await o.pg.evaluate(() => { const t = document.querySelector('.vrm-hdr-titre'); if (!t) return null; const r = t.getBoundingClientRect(); return { op: +getComputedStyle(t).opacity, centre: Math.round(r.left + r.width / 2), txt: t.textContent.trim() }; });
     dit(!!bas && bas.op > 0.9 && Math.abs(bas.centre - 195) <= 8, `${url} · H2 défilé : le petit titre arrive, CENTRÉ dans la barre`, JSON.stringify(bas));
     await o.ctx.close();
@@ -109,7 +118,8 @@ async function regles(nav) {
 
   // ── H3 : « Mis à jour à … » ne reste pas sur le contenu ──
   {
-    const o = await ouvrir(nav, { W: 390, sombre: false, b: base(), url: '/?tab=achats' }); await pret(o.pg);
+    // Sans attendre le calme : la pastille vit 2 s, on la guette dès l'ouverture.
+    const o = await ouvrir(nav, { W: 390, sombre: false, b: base(), url: '/?tab=achats' });
     const vu = await o.pg.waitForSelector('[data-temps-reel-neuf]', { timeout: 30000 }).then(() => true).catch(() => false);
     dit(vu, 'H3 la pastille « Mis à jour à … » apparaît bien (la veille a trouvé du neuf)');
     if (vu) {
@@ -142,22 +152,30 @@ async function regles(nav) {
   {
     const o = await ouvrir(nav, { W: 390, sombre: false, b: base(), url: '/?tab=journee' }); await pret(o.pg);
     const pg = o.pg;
-    await toucher(pg, 'button[data-recherche-loupe]'); await pg.waitForTimeout(600);
+    // Chaque fonction depuis une page neuve : un panneau resté ouvert ne masque jamais la suivante.
+    const neuf = async () => { await pg.reload({ waitUntil: 'domcontentloaded' }).catch(() => {}); await pret(pg); };
+    await toucher(pg, 'button[data-recherche-loupe]');
+    await attendre(pg, async () => (await visibles(pg, '[data-recherche-champ]')) >= 1, 6000);
     dit(await visibles(pg, '[data-recherche-champ]') >= 1, 'F la loupe ouvre la recherche'); await toucher(pg, '.vrm-hdr-recherche-fermer'); await pg.waitForTimeout(400);
+    await neuf();
     await toucher(pg, '[data-centre-notifs-cloche]'); await pg.waitForTimeout(900);
     dit(await visibles(pg, '[data-centre-notifs]') >= 1, 'F la cloche ouvre ses notifications'); await fermer(pg);
-    await toucher(pg, '[data-profil-tete]'); await pg.waitForTimeout(900);
+    await neuf();
+    await toucher(pg, '[data-profil-tete]'); await pg.waitForSelector('[data-menu-profil] [data-profil-menu="montants"]', { timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(300);
     const lignes = await pg.evaluate(() => [...document.querySelectorAll('[data-menu-profil] [data-profil-menu]')].map((e) => e.getAttribute('data-profil-menu')));
     dit(['parametres', 'etat-actions', 'montants'].every((x) => lignes.includes(x)) && lignes[0] === 'parametres', 'F le menu du compte : Paramètres d\'abord, puis « Actions Vinted » et l\'œil des montants', lignes.join(','));
-    await toucher(pg, '[data-profil-menu="etat-actions"]'); await pg.waitForTimeout(900);
+    await toucher(pg, '[data-profil-menu="etat-actions"]');
+    await attendre(pg, async () => (await visibles(pg, '[data-etat-panneau]')) >= 1, 5000);
     dit(await visibles(pg, '[data-etat-panneau]') >= 1, 'F « Actions Vinted » ouvre le panneau d\'état de la pastille d\'hier');
     await toucher(pg, '[data-etat-fermer]'); await pg.waitForTimeout(400);
-    await toucher(pg, '[data-profil-tete]'); await pg.waitForTimeout(900);
-    await toucher(pg, '[data-profil-menu="montants"] input'); await pg.waitForTimeout(600);
+    await neuf();
+    await toucher(pg, '[data-profil-tete]'); await pg.waitForSelector('[data-menu-profil] [data-profil-menu="montants"]', { timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(300);
+    await toucher(pg, '[data-profil-menu="montants"] input');
+    await attendre(pg, () => pg.evaluate(() => { const b = document.querySelector('.vrm-app-header [data-bouton-montants]'); return !!b && b.getAttribute('data-montants-caches') === '1'; }), 6000);
     const caches = await pg.evaluate(() => { const b = document.querySelector('.vrm-app-header [data-bouton-montants]'); return b ? b.getAttribute('data-montants-caches') : null; });
     dit(caches === '1', 'F l\'œil du menu cache les montants — et l\'œil revient dans la barre tant qu\'ils sont cachés (pour les montrer d\'un geste)', String(caches));
     await fermer(pg);
-    if (caches === '1') { await toucher(pg, '.vrm-app-header [data-bouton-montants]'); await pg.waitForTimeout(500); }
+    if (caches === '1') { await toucher(pg, '.vrm-app-header [data-bouton-montants]'); await attendre(pg, async () => (await visibles(pg, '.vrm-app-header [data-bouton-montants]')) === 0, 6000); }
     dit(await visibles(pg, '.vrm-app-header [data-bouton-montants]') === 0, 'F montants remontrés : l\'œil quitte la barre');
     dit(!o.erreurs.length, 'F aucune erreur d\'app', o.erreurs.join(' | ').slice(0, 200));
     await o.ctx.close();
@@ -169,24 +187,27 @@ async function regles(nav) {
     const pg = o.pg;
     const onglets = await pg.evaluate(() => [...document.querySelectorAll('.vrm-tabbar > button')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => b.getAttribute('data-nav-entree') || (b.classList.contains('vrm-nav-more') ? 'plus' : '?')));
     dit(onglets.join(',') === 'journee,paires,ventes,compta', 'N la barre du bas : quatre onglets — Aujourd\'hui · Paires · Ventes · Argent', onglets.join(','));
+    await attendre(pg, () => pg.evaluate(() => !!document.querySelector('.vrm-tabbar [data-badge-nav="paires"]')), 12000);
     const pastilles = await pg.evaluate(() => { const b = document.querySelector('.vrm-tabbar [data-badge-nav="paires"]'); return b ? b.getAttribute('data-badge-n') : null; });
     dit(pastilles != null && Number(pastilles) > 0, 'N l\'onglet Paires porte la somme de ses écrans (ailleurs que sur Paires)', String(pastilles));
     // Les écrans d'hier : barre (journee, annonces, ventes, achats) + « Plus » (messages, garage, emails, compta, communaute) + Paramètres.
     const chemins = {
       journee: [['.vrm-tabbar [data-nav-entree="journee"]']], ventes: [['.vrm-tabbar [data-nav-entree="ventes"]']], compta: [['.vrm-tabbar [data-nav-entree="compta"]']],
-      annonces: [['.vrm-tabbar [data-nav-entree="paires"]'], ['.vrm-tabbar [data-nav-entree="paires"]', '[data-paires-segment="annonces"]'], ['[data-menu-ecrans]', '.vrm-sheet-haut [data-nav-entree="annonces"]']],
-      garage: [['.vrm-tabbar [data-nav-entree="paires"]', '[data-paires-segment="garage"]'], ['[data-menu-ecrans]', '.vrm-sheet-haut [data-nav-entree="garage"]']],
-      achats: [['.vrm-tabbar [data-nav-entree="paires"]', '[data-paires-segment="achats"]'], ['[data-menu-ecrans]', '.vrm-sheet-haut [data-nav-entree="achats"]']],
-      messages: [['[data-menu-ecrans]', '.vrm-sheet-haut [data-nav-entree="messages"]']], emails: [['[data-menu-ecrans]', '.vrm-sheet-haut [data-nav-entree="emails"]']],
-      communaute: [['[data-menu-ecrans]', '.vrm-sheet-haut [data-nav-entree="communaute"]']], settings: [['[data-profil-tete]', '[data-profil-menu="parametres"]']],
+      annonces: [['.vrm-tabbar [data-nav-entree="paires"]'], ['.vrm-tabbar [data-nav-entree="paires"]', '[data-paires-segment="annonces"]'], ['[data-profil-tete]', '[data-menu-profil] [data-nav-entree="annonces"]']],
+      garage: [['.vrm-tabbar [data-nav-entree="paires"]', '[data-paires-segment="garage"]'], ['[data-profil-tete]', '[data-menu-profil] [data-nav-entree="garage"]']],
+      achats: [['.vrm-tabbar [data-nav-entree="paires"]', '[data-paires-segment="achats"]'], ['[data-profil-tete]', '[data-menu-profil] [data-nav-entree="achats"]']],
+      messages: [['[data-profil-tete]', '[data-menu-profil] [data-nav-entree="messages"]']], emails: [['[data-profil-tete]', '[data-menu-profil] [data-nav-entree="emails"]']],
+      communaute: [['[data-profil-tete]', '[data-menu-profil] [data-nav-entree="communaute"]']], settings: [['[data-profil-tete]', '[data-profil-menu="parametres"]']],
     };
     for (const [cible, essais] of Object.entries(chemins)) {
       let atteint = null;
       for (const ch of essais) {
         // Le départ : Ma journée (un lien rechargé peut rouvrir le dernier écran : on y retourne par la barre).
-        await pg.goto(pg.url().replace(/\?.*$/, '?tab=journee')); await pret(pg);
+        for (let k = 0; k < 3; k++) { const ok = await pg.goto(pg.url().replace(/\?.*$/, '?tab=journee')).then(() => true).catch(() => false); if (ok) break; await pg.waitForTimeout(1000); }
+        await pret(pg);
         if ((await ecran(pg)) !== 'journee') { await toucher(pg, '.vrm-tabbar [data-nav-entree="journee"]'); await pg.waitForTimeout(900); }
-        let n = 0; for (const s of ch) { if (await toucher(pg, s)) n++; await pg.waitForTimeout(900); }
+        let n = 0; for (const s of ch) { await pg.locator(s).filter({ visible: true }).first().waitFor({ timeout: 5000 }).catch(() => {}); if (await toucher(pg, s)) n++; await pg.waitForTimeout(900); }
+        await attendre(pg, async () => (await ecran(pg)) === cible, 4000);
         if ((await ecran(pg)) === cible) { atteint = `${n} toucher(s) : ${ch.join(' → ')}`; break; }
       }
       dit(!!atteint, `N « ${cible} » joignable en ≤ 2 touchers depuis Ma journée`, atteint || 'introuvable');
@@ -198,9 +219,9 @@ async function regles(nav) {
     dit(/\d/.test(surPaires.seg) && !surPaires.onglet, 'N sur Achats : le segment porte le nombre d\'Achats, l\'onglet Paires se tait', JSON.stringify(surPaires));
     dit(surPaires.actif === 'paires', 'N sur Achats, l\'onglet allumé est Paires', String(surPaires.actif));
     // Le menu du haut : tout ce que « Plus » portait, groupé ; il ne répète pas les onglets de la barre.
-    await toucher(pg, '[data-menu-ecrans]'); await pg.waitForTimeout(800);
-    const menu = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sheet-haut [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
-    dit(['messages', 'garage', 'emails', 'communaute'].every((x) => menu.includes(x)) && !['journee', 'ventes', 'compta'].some((x) => menu.includes(x)), 'N le menu du haut porte tout ce que « Plus » portait, sans répéter la barre', menu.join(','));
+    await toucher(pg, '[data-profil-tete]'); await pg.waitForSelector('[data-menu-profil] [data-nav-entree]', { timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(400);
+    const menu = await pg.evaluate(() => [...document.querySelectorAll('[data-menu-profil] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
+    dit(['messages', 'garage', 'emails', 'communaute'].every((x) => menu.includes(x)) && !['journee', 'ventes', 'compta'].some((x) => menu.includes(x)), 'N le menu de l\'avatar porte tout ce que « Plus » portait, sans répéter la barre', menu.join(','));
     if (CAPTURES) await pg.screenshot({ path: path.join(CAPTURES, `coque-menu-${SUFFIXE}.png`) });
     dit(!o.erreurs.length, 'N aucune erreur d\'app', o.erreurs.join(' | ').slice(0, 200));
     await o.ctx.close();
@@ -236,6 +257,15 @@ async function ajout3(nav) {
     const f = await o.pg.evaluate(() => { const x = document.querySelector('[data-centre-fraicheur] [data-fraicheur-unique]'); if (!x) { const d = document.querySelector('[data-centre-fraicheur]'); return { absent: true, entete: d ? d.innerHTML.slice(0, 120) : null, feuille: !!document.querySelector('[data-centre-notifs]') }; } const r = x.getBoundingClientRect(); return { etat: x.getAttribute('data-fraicheur-unique'), h: Math.round(r.height), txt: x.innerText.replace(/\s+/g, ' ').slice(0, 60) }; });
     dit(!!f && f.etat === 'retard' && f.h >= 40, 'A3.1 … et sa feuille montre la ligne entière (détail et geste)', JSON.stringify(f));
     if (CAPTURES) await o.pg.screenshot({ path: path.join(CAPTURES, `coque-cloche-${SUFFIXE}.png`) });
+    await o.ctx.close();
+  }
+  // A3.1 bis · Paramètres (sa capture du 14 nov. : « N choses à revoir » au-dessus du titre de Paramètres).
+  {
+    const o = await ouvrir(nav, { W: 390, sombre: false, b: baseRetard(), url: '/?tab=settings' }); await pret(o.pg);
+    await attendre(o.pg, () => o.pg.evaluate(() => { const f = document.querySelector('[data-fraicheur-unique]'); return f && f.getAttribute('data-fraicheur-unique') === 'retard'; }), 15000);
+    const e = await o.pg.evaluate(() => { const f = document.querySelector('.vrm-main [data-fraicheur-unique]'); const hote = f && f.closest('.vrm-fraicheur-hote'); const r = hote ? hote.getBoundingClientRect() : null;
+      return { etat: f && f.getAttribute('data-fraicheur-unique'), h: r ? Math.round(r.height) : 0, visible: /choses à revoir|pas relu/.test((document.querySelector('.vrm-main') || {}).innerText || '') }; });
+    dit(e.h <= 1, 'A3.1 Paramètres : « à revoir » ne s\'écrit pas au-dessus du titre', JSON.stringify(e));
     await o.ctx.close();
   }
   // A3.2 · le titre : le « ? » à côté, pas de phrase écrite dessous.
@@ -321,7 +351,9 @@ async function captures(nav) {
   if (!CAPTURES) return;
   fs.mkdirSync(CAPTURES, { recursive: true });
   const shot = async (url, nom, jouer) => {
-    const o = await ouvrir(nav, { W: 390, sombre: false, b: baseCloche(), url, dsf: 2 }); await pret(o.pg); await o.pg.waitForTimeout(1500);
+    const o = await ouvrir(nav, { W: 390, sombre: false, b: baseCloche(), url, dsf: 2 }); await pret(o.pg);
+    // La pastille « Mis à jour » (2 s) : on attend qu'elle soit passée, et que l'écran ait ses nombres.
+    await o.pg.waitForSelector('[data-temps-reel-neuf]', { timeout: 9000 }).catch(() => {}); await o.pg.waitForTimeout(3500);
     if (jouer) await jouer(o.pg);
     await o.pg.screenshot({ path: path.join(CAPTURES, `coque-${nom}-${SUFFIXE}.png`) });
     await o.ctx.close();

@@ -55,9 +55,21 @@ fond chaud `--d-fond-atelier`, ombres douces, héros encre→bleu nuit, rayons, 
 pastilles teintées, rangée dense SANS ombre ni flou `.vrm-at-rangee`, apparition limitée aux 12 premières).
 Le fond clair de l'app passe à `--d-fond-atelier` (#F4F3EF ; gris 4,6:1 dessus) ; la nuit reste #000.
 
+## Dernière main : la maquette de Julien (`clair.html`, 14 nov.)
+Ce qui a changé APRÈS le récit ci-dessus, pour suivre sa maquette (elle gagne) :
+- plus de ☰ dans la barre : en haut, **loupe · cloche · avatar** (dans cet ordre) ; le reste des écrans
+  (Paires, Gérer, Moi, avec leurs pastilles) est EN TÊTE du menu de l'avatar, avant Paramètres
+  (`MenuProfil` prop `ecrans`, rangées `data-nav-entree`, 48 px). Le bouton `MenuEcrans` reste monté (caché au
+  téléphone) : rien de perdu, ⌘K et liens inchangés ;
+- la cloche : un POINT ambre (le nombre reste lu dans `aria-label` et dans la feuille ; « 9+ » au plus) ;
+- les pastilles des onglets : à l'ENCRE, chiffre clair (jamais rouge, jamais l'accent) ;
+- fond clair UNI #F2F2F7 (`--d-fond-atelier` ramené au gris d'iOS), barres `rgb(249 249 251/.82)` + flou.
+- Pris aux références (principes, pas d'identité) : la retenue d'Apple et la densité de Linear/Raycast pour la
+  barre (trois commandes, rien d'autre), la pastille-point d'Oura pour « il y a quelque chose », sans chiffre crié.
+
 ## Preuves
 - `scripts/bancs/refonte-coque.cjs` : sur origin/main **16 ✅ · 34 ❌** (H1 cinq ronds, H2 petit titre visible
-  et à gauche, H3 pastille encore là après 3 s, H4 « 99+ » bleu, F/N…) ; ici **59 ✅ · 0 ❌** (règles + AJOUT 3).
+  et à gauche, H3 pastille encore là après 3 s, H4 « 99+ » bleu, F/N…) ; ici **59 ✅ · 0 ❌** (règles + AJOUT 3 ; machine très chargée — charge 60 — : les attentes du banc lisent l'état, pas un délai fixe).
   Section P (1 000 annonces, `BANC_DIST_AVANT=`) : nœuds DOM 2447 → 2450, CLS 0 → 0, premier rendu et
   défilement dans le bruit. ⚠️ La base à 1 000 annonces n'affiche pas les annonces inventées (24 en ligne : la
   ligne `listings` gonflée n'est pas prise par l'écran) — la mesure compare donc l'écran Annonces réel de la
