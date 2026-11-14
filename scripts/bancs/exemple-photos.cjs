@@ -76,6 +76,9 @@ async function capture(pg, nom) {
 }
 // Une navigation qu'un geste précédent de la page (Échap, loupe) interrompt (ERR_ABORTED) : on la refait une fois.
 const aller = async (pg, url, o) => { try { return await pg.goto(url, o); } catch (e) { if (!/ERR_ABORTED|interrupted/.test(String(e))) throw e; await pg.waitForTimeout(500); return pg.goto(url, o); } };
+// L'écran de démarrage (#vrm-demarrage, z 2147483000) couvre tout tant que l'écran charge : on attend qu'il parte
+// (sur une condition, jamais un délai fixe) — sinon « rien ne couvre » jugerait le chargement, pas la page.
+const sansDemarrage = (pg) => pg.waitForFunction(() => { const d = document.getElementById('vrm-demarrage'); return !d || d.hasAttribute('data-sortie'); }, null, { timeout: 20000 }).then(() => pg.waitForTimeout(300)).catch(() => {});
 const attendre = async (pg, f, ms = 8000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await f().catch(() => false)) return true; await pg.waitForTimeout(250); } return false; };
 
 // Le bandeau, le cadre et sa languette : visibles, et le cadre au-dessus de TOUT.
@@ -121,7 +124,7 @@ async function parcours(nav, W, theme) {
   o.journal.prochaine = 'exemple';
   await o.pg.goto(`http://localhost:${PORT}/?exemple`, { waitUntil: 'domcontentloaded' });
   await o.pg.waitForSelector('[data-exemple-bandeau]', { timeout: 25000 }).catch(() => {});
-  await o.pg.waitForSelector('.vrm-main', { timeout: 25000 }).catch(() => {});
+  await o.pg.waitForSelector('.vrm-main', { timeout: 25000 }).catch(() => {}); await sansDemarrage(o.pg);
   await o.pg.waitForTimeout(2500);
   const actif = await o.pg.evaluate(() => (typeof window.__vrmExemple === 'function' ? window.__vrmExemple().actif : false));
   dit(actif, `${T} le lien /?exemple ouvre l'app EN MODE EXEMPLE`);
@@ -130,7 +133,7 @@ async function parcours(nav, W, theme) {
   for (const tab of ECRANS) {
     await aller(o.pg, `http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
     await o.pg.waitForSelector('[data-exemple-bandeau]', { timeout: 20000 }).catch(() => {});
-    await o.pg.waitForSelector('.vrm-main', { timeout: 20000 }).catch(() => {});
+    await o.pg.waitForSelector('.vrm-main', { timeout: 20000 }).catch(() => {}); await sansDemarrage(o.pg);
     await o.pg.waitForTimeout(2200);
     const k = await marques(o.pg);
     const b = k.bandeau;
@@ -163,7 +166,7 @@ async function parcours(nav, W, theme) {
 
   // B2 : une feuille ouverte (la loupe, Ctrl/⌘ K sur ordinateur, l'icône au téléphone).
   await aller(o.pg, `http://localhost:${PORT}/?tab=ventes`, { waitUntil: 'domcontentloaded' });
-  await o.pg.waitForSelector('[data-exemple-bandeau]', { timeout: 20000 }).catch(() => {});
+  await o.pg.waitForSelector('[data-exemple-bandeau]', { timeout: 20000 }).catch(() => {}); await sansDemarrage(o.pg);
   await o.pg.waitForTimeout(1800);
   if (o.tel) await o.pg.click('[data-recherche-loupe]').catch(() => {}); else await o.pg.keyboard.press('Control+k').catch(() => {});
   await o.pg.waitForTimeout(900);
@@ -180,14 +183,14 @@ async function parcours(nav, W, theme) {
 
   // C1 : « J'ai déjà un compte · Me connecter ».
   await aller(o.pg, `http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
-  await o.pg.waitForSelector('[data-exemple-bandeau]', { timeout: 20000 }).catch(() => {});
+  await o.pg.waitForSelector('[data-exemple-bandeau]', { timeout: 20000 }).catch(() => {}); await sansDemarrage(o.pg);
   await o.pg.waitForTimeout(1500);
   const lien = await o.pg.evaluate(() => {
     const e = document.querySelector('[data-exemple-bandeau] [data-exemple-connexion]'); const c = document.querySelector('[data-exemple-bandeau] [data-exemple-brancher]');
     if (!e) return null;
     const b = e.getBoundingClientRect(), bc = c ? c.getBoundingClientRect() : null;
     const x = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
-    return { texte: e.textContent.trim(), h: b.height, libre: !!x && (x === e || e.contains(x)), creer: c ? c.textContent.trim() : '', ecart: bc ? Math.hypot((b.left + b.right) / 2 - (bc.left + bc.right) / 2, (b.top + b.bottom) / 2 - (bc.top + bc.bottom) / 2) : 9999 };
+    return { texte: e.textContent.trim(), h: b.height, libre: !!x && (x === e || e.contains(x)), dessus: x && !(x === e || e.contains(x)) ? (x.tagName + "." + String(x.className).slice(0, 60)) : "", creer: c ? c.textContent.trim() : '', ecart: bc ? Math.hypot((b.left + b.right) / 2 - (bc.left + bc.right) / 2, (b.top + b.bottom) / 2 - (bc.top + bc.bottom) / 2) : 9999 };
   });
   dit(lien && lien.texte === 'J’ai déjà un compte · Me connecter' && lien.creer === 'Créer mon compte', `${T} C1 « J’ai déjà un compte · Me connecter » à côté de « Créer mon compte »`, JSON.stringify(lien));
   dit(lien && lien.libre && lien.h >= 43.5 && lien.ecart < 320, `${T} C1 « Me connecter » : 44 px, rien ne le couvre, près de « Créer mon compte »`, JSON.stringify(lien));
