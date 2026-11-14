@@ -60,7 +60,17 @@ existe encore. Avant : 145 · après : 145 (R = 0).
 
 ## Preuves
 Banc `scripts/bancs/refonte-plateformes-reglages.cjs` (la mesure des passes design + L liste ≤ 50 % · V carte « — »
-· A ≤ 1 plein accent · G capsules grises · B bandeau · R réglages joignables). Résultats : voir la fin de ce récit.
+· A ≤ 1 plein accent · G capsules grises · B bandeau · R réglages joignables), 12 écrans, base inventée :
+- **origin/main** (`BANC_DIST` = build d'avant, 390 clair) : **ROUGE** — 1re ligne à 968 px (Leboncoin), 693 (eBay),
+  534 (Vestiaire) ; la première passe complète (390, deux thèmes) : 29 défauts (liste 8, cartes « — » 10, bandeau 11).
+- **après**, 390 tactile dsf 2 clair + sombre : **VERT, 24 rendus, 0 défaut** ; 1512 clair + sombre : **VERT, 24 rendus**.
+  1re ligne : Leboncoin ≈ 393 px, eBay ≈ 421 (juste : le segment « Annonces · Promotion » de la tâche reste au-dessus), Vestiaire ≈ 335, Paramètres ≈ 240 (à 390 × 844).
+- **mutation** (`MUTATION=1`, la 1re ligne repoussée d'un écran) : **ROUGE** (2/2).
+- R : 145 réglages d'avant, 145 joignables (les trois vues).
+- Deux règles laissent explicitement à leur chantier ce qui est à lui : V ne juge pas la carte de chiffres PARTAGÉE
+  (`CarteStatsApp`, `.vrm-fu-*`, `[data-ventes-kpi]` : `claude/refonte-listes`) ; B ne juge pas la pastille
+  « Mis à jour » ni le bandeau de mise à jour (`.vrm-neuf-hote` : `claude/refonte-coque`).
+- Paires : `docs/design/avant-apres/{leboncoin,leboncoin-sombre,ebay,vestiaire,reglages,reglages-sombre,connexion,connexion-accueil}-{avant,apres}.png`.
 
 ## Bancs adaptés
 - `design-passe-2.cjs` `toucher` : une ligne rangée dans un repli fermé (« Réglages avancés ») — on touche d'abord
