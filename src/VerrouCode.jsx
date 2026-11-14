@@ -27,10 +27,10 @@ function Pave({ titre, sous, onCode, faux = false, desactive = false, pied = nul
     <>
       <h1 className="vrm-cf-titre" style={{ fontSize: 22 }}>{titre}</h1>
       {sous ? <p className="vrm-cf-doux">{sous}</p> : null}
-      <div className={'vrm-vc-points' + (faux ? ' is-faux' : '')} aria-hidden="true">{[0, 1, 2, 3].map((i) => <i key={i} className={i < c.length ? 'is-plein' : ''}/>)}</div>
+      <div className={'vrm-vc-points' + (faux ? ' is-faux' : '')} aria-hidden="true">{[0, 1, 2, 3].map((i) => <i key={'pt' + i} className={i < c.length ? 'is-plein' : ''}/>)}</div>
       <div className="vrm-vc-pave" role="group" aria-label={titre}>
-        {['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'].map((x, i) => x === '' ? <span key={i} className="is-vide"/>
-          : <button key={i} type="button" disabled={desactive} aria-label={x === '⌫' ? tr('confort.code.effacer') : x} data-pave={x === '⌫' ? 'effacer' : x}
+        {['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'].map((x, i) => x === '' ? <span key="vide" className="is-vide"/>
+          : <button key={'t' + x} type="button" disabled={desactive} aria-label={x === '⌫' ? tr('confort.code.effacer') : x} data-pave={x === '⌫' ? 'effacer' : x}
               onClick={() => (x === '⌫' ? setC((v) => v.slice(0, -1)) : taper(x))}>{x}</button>)}
       </div>
       {pied}

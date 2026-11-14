@@ -32,7 +32,7 @@ export function nomParDefaut(ua = (typeof navigator !== 'undefined' ? navigator.
 }
 const qrDe = (texte) => { try { const q = qrcode(0, 'M'); q.addData(texte, 'Byte'); q.make(); return q.createDataURL(6, 2); } catch (_) { return ''; } };
 
-export function QrOrdinateur({ onSession, origine = (typeof location !== 'undefined' ? location.origin : 'https://vrm.center') }) {
+export function QrOrdinateur({ onSession, origine = (typeof location !== 'undefined' ? location.origin : '') }) {
   useLangue();
   const [nom, setNom] = React.useState(() => nomParDefaut());
   const [t, setT] = React.useState(null);            // { ticket, secret, exp }

@@ -80,7 +80,7 @@ export default function EcranAtelier({ uid, onFermer }) {
           <section>
             <h2>{tr('confort.atelier.envoyerTitre')}</h2>
             {v.envoyer.lignes.length ? <ul className="vrm-cf-liste">{v.envoyer.lignes.map((l, i) => (
-              <li key={i} data-atelier-colis={l.numero || ''}>
+              <li key={'e' + i + l.numero + l.titre} data-atelier-colis={l.numero || ''}>
                 <span className="vrm-cf-num">{l.numero ? `N°${l.numero}` : '—'}</span>
                 <span className="vrm-cf-txt"><b>{l.titre || tr('confort.sansTitre')}</b><small>{l.retard ? <><i className="vrm-cf-point"/>{tr('confort.atelier.enRetard')}</> : l.limite ? tr('confort.atelier.avant', { jour: jourCourt(l.limite), heure: l.heure || '' }) : ''}{l.transporteur ? ` · ${l.transporteur}` : ''}</small></span>
               </li>))}</ul> : <p className="vrm-cf-doux">{tr('confort.atelier.rienEnvoyer')}</p>}
@@ -88,7 +88,7 @@ export default function EcranAtelier({ uid, onFermer }) {
           <section>
             <h2>{tr('confort.atelier.retirerTitre')}</h2>
             {v.retirer.lignes.length ? <ul className="vrm-cf-liste">{v.retirer.lignes.map((l, i) => (
-              <li key={i} data-atelier-retrait="">
+              <li key={'r' + i + l.code + l.titre} data-atelier-retrait="">
                 <span className="vrm-cf-txt"><b>{l.titre || l.transporteur || tr('confort.sansTitre')}</b><small>{l.dernierJour ? <><i className="vrm-cf-point"/>{tr('confort.atelier.dernierJour')}</> : l.limite ? tr('confort.atelier.jusquau', { jour: jourCourt(l.limite) }) : ''}{l.lieu ? ` · ${l.lieu}` : ''}</small></span>
                 {l.code ? <span className="vrm-at-code">{l.code}</span> : null}
               </li>))}</ul> : <p className="vrm-cf-doux">{tr('confort.atelier.rienRetirer')}</p>}

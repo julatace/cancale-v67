@@ -135,7 +135,7 @@ export function VueLienAide({ jeton }) {
             <section>
               <h2>{tr('confort.aide.aEnvoyer', { n: p.nEnvoyer })}</h2>
               {p.envoyer.length ? <ul className="vrm-cf-liste">{p.envoyer.map((e, i) => (
-                <li key={i} data-aide-envoyer={e.numero}>
+                <li key={'e' + i + e.numero + e.titre} data-aide-envoyer={e.numero}>
                   <span className="vrm-cf-num">{e.numero ? `N°${e.numero}` : '—'}</span>
                   <span className="vrm-cf-txt"><b>{e.titre || tr('confort.sansTitre')}</b><small>{[e.limite ? tr('confort.atelier.avant', { jour: jourCourt(e.limite), heure: e.heure }) : '', e.transporteur].filter(Boolean).join(' · ')}</small></span>
                   {e.pdf && e.pdf[0] ? <a className="vrm-cf-lien" href={`${ROUTE}&t=${encodeURIComponent(jeton)}&bord=${encodeURIComponent(e.pdf[0])}`} target="_blank" rel="noopener noreferrer" data-aide-bordereau="">{tr('confort.aide.bordereau')}</a> : null}
@@ -144,7 +144,7 @@ export function VueLienAide({ jeton }) {
             <section>
               <h2>{tr('confort.aide.aRetirer', { n: p.nRetirer })}</h2>
               {p.retirer.length ? <ul className="vrm-cf-liste">{p.retirer.map((r, i) => (
-                <li key={i} data-aide-retirer="">
+                <li key={'r' + i + r.code + r.titre} data-aide-retirer="">
                   <span className="vrm-cf-txt"><b>{r.titre || r.transporteur || tr('confort.sansTitre')}</b><small>{[r.lieu, r.limite ? tr('confort.atelier.jusquau', { jour: jourCourt(r.limite) }) : ''].filter(Boolean).join(' · ')}</small></span>
                   {r.code ? <span className="vrm-at-code">{r.code}</span> : null}
                 </li>))}</ul> : <p className="vrm-cf-doux">{tr('confort.atelier.rienRetirer')}</p>}

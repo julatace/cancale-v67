@@ -48,12 +48,12 @@ export default function InventaireTournant({ unites, uid = '', lire, ecrire, onF
           </li>))}</ul>
         {absents.length ? <>
           <h3 className="vrm-cf-doux" style={{ margin: '8px 0 0 4px' }}>{tr('confort.tournant.aChercherTitre')}</h3>
-          <ul className="vrm-cf-liste">{absents.map((k) => (
-            <li key={k} data-tournant-signal={k}>
+          <ul className="vrm-cf-liste">{absents.map((cle) => (
+            <li key={cle} data-tournant-signal={cle}>
               <i className="vrm-cf-point" aria-hidden="true"/>
-              <span className="vrm-cf-txt"><b>N°{numDe(k)}</b><small>{tr('confort.tournant.signal')}</small></span>
-              {onFiche ? <button type="button" className="vrm-cf-lien" onClick={() => onFiche(numDe(k))}>{tr('confort.tournant.fiche')}</button> : null}
-              <button type="button" className="vrm-cf-second" onClick={() => noter(k, 'retrouve')} data-tournant-retrouve={k}>{tr('confort.tournant.retrouve')}</button>
+              <span className="vrm-cf-txt"><b>N°{numDe(cle)}</b><small>{tr('confort.tournant.signal')}</small></span>
+              {onFiche ? <button type="button" className="vrm-cf-lien" onClick={() => onFiche(numDe(cle))}>{tr('confort.tournant.fiche')}</button> : null}
+              <button type="button" className="vrm-cf-second" onClick={() => noter(cle, 'retrouve')} data-tournant-retrouve={cle}>{tr('confort.tournant.retrouve')}</button>
             </li>))}</ul>
         </> : null}
       </div> : null}

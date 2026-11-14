@@ -22,14 +22,14 @@ export default function ApercuAnnonce({ fiche, texte, photos, onFermer, zIndex =
           <p className="vrm-cf-doux">{tr('confort.apercu.commeAcheteur')}</p>
           <button type="button" className="vrm-cf-x" aria-label={tr('confort.fermer')} onClick={onFermer} data-apercu-fermer="">×</button>
         </div>
-        {a.photos.length ? <div className="vrm-ap-photos" data-apercu-photos={a.photos.length}>{a.photos.map((u, i) => <img key={i} src={u} alt="" loading={i ? 'lazy' : 'eager'} decoding="async"/>)}</div>
+        {a.photos.length ? <div className="vrm-ap-photos" data-apercu-photos={a.photos.length}>{a.photos.map((u, i) => <img key={'p' + i + u.slice(-16)} src={u} alt="" loading={i ? 'lazy' : 'eager'} decoding="async"/>)}</div>
           : <div className="vrm-ap-vide" data-apercu-photos="0"><span className="vrm-cf-doux vrm-cf-geste">{tr('confort.apercu.sansPhoto')}</span></div>}
         <div className="vrm-cf-pile" style={{ gap: 6 }}>
           <h2 className="vrm-cf-titre" style={{ fontSize: 22 }} data-apercu-titre="">{a.titre || tr('confort.sansTitre')}</h2>
           <span className="vrm-ap-prix" data-apercu-prix="">{a.prix}</span>
           <p className="vrm-cf-doux">{tr('confort.apercu.frais')}</p>
         </div>
-        {a.details.length ? <dl className="vrm-ap-details">{a.details.map(([k, v]) => <React.Fragment key={k}><dt>{tr('confort.apercu.' + k)}</dt><dd>{v}</dd></React.Fragment>)}</dl> : null}
+        {a.details.length ? <dl className="vrm-ap-details">{a.details.map(([champ, v]) => <React.Fragment key={champ}><dt>{tr('confort.apercu.' + champ)}</dt><dd>{v}</dd></React.Fragment>)}</dl> : null}
         <p className="vrm-ap-desc" data-apercu-description="">{a.description || tr('confort.apercu.sansDescription')}</p>
         <button type="button" className="vrm-cf-second" onClick={onFermer}>{tr('confort.fermer')}</button>
       </div>
