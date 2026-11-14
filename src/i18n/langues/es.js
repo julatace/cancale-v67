@@ -2104,6 +2104,7 @@ export default {
   "creerVinted.aide.apres": "Después: un enlace «Abrir en Vinted» por borrador. Lo revisas y lo publicas.",
   "creerVinted.avant": {"one": "VRM va a crear {n} borrador en {login}, desde la pestaña vinted.fr. Nada se publica: tú revisas y publicas.", "other": "VRM va a crear {n} borradores en {login}, uno a uno, desde la pestaña vinted.fr. Nada se publica: tú revisas y publicas."},
   "creerVinted.echec": "No creado: {raison}.",
+  "creerVinted.aVerifier": "Por comprobar: {raison}.",
   "creerVinted.echecSans": "No creado: Vinted no lo confirmó.",
   "favoris.guide.bouton": "¿Cómo funciona?",
   "favoris.guide.titre": "Los mensajes a favoritos, en 3 pasos",

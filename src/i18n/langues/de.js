@@ -2104,6 +2104,7 @@ export default {
   "creerVinted.aide.apres": "Danach: ein Link „Auf Vinted öffnen“ pro Entwurf. Du prüfst und veröffentlichst.",
   "creerVinted.avant": {"one": "VRM erstellt {n} Entwurf auf {login}, aus dem vinted.fr-Tab. Nichts geht online: Du prüfst und veröffentlichst.", "other": "VRM erstellt {n} Entwürfe auf {login}, einen nach dem anderen, aus dem vinted.fr-Tab. Nichts geht online: Du prüfst und veröffentlichst."},
   "creerVinted.echec": "Nicht erstellt: {raison}.",
+  "creerVinted.aVerifier": "Zu prüfen: {raison}.",
   "creerVinted.echecSans": "Nicht erstellt: Vinted hat nicht bestätigt.",
   "favoris.guide.bouton": "Wie funktioniert das?",
   "favoris.guide.titre": "Nachrichten an Favoriten, in 3 Schritten",

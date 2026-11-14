@@ -2104,6 +2104,7 @@ export default {
   "creerVinted.aide.apres": "After: an “Open on Vinted” link for each draft. You review it, then publish.",
   "creerVinted.avant": {"one": "VRM will create {n} draft on {login}, from the vinted.fr tab. Nothing goes live: you review and publish.", "other": "VRM will create {n} drafts on {login}, one at a time, from the vinted.fr tab. Nothing goes live: you review and publish."},
   "creerVinted.echec": "Not created: {raison}.",
+  "creerVinted.aVerifier": "To check: {raison}.",
   "creerVinted.echecSans": "Not created: Vinted did not confirm.",
   "favoris.guide.bouton": "How does it work?",
   "favoris.guide.titre": "Messages to favourites, in 3 steps",

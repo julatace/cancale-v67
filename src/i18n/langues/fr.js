@@ -2109,6 +2109,7 @@ export default {
   "creerVinted.aide.apres": "Après : un lien « Ouvrir sur Vinted » par brouillon. Tu relis, puis tu publies.",
   "creerVinted.avant": {"one": "VRM va créer {n} brouillon sur {login}, depuis l’onglet vinted.fr. Rien n’est mis en ligne : tu relis et tu publies.", "other": "VRM va créer {n} brouillons sur {login}, un par un, depuis l’onglet vinted.fr. Rien n’est mis en ligne : tu relis et tu publies."},
   "creerVinted.echec": "Pas créé : {raison}.",
+  "creerVinted.aVerifier": "À vérifier : {raison}.",
   "creerVinted.echecSans": "Pas créé : Vinted n’a pas confirmé.",
   "favoris.guide.bouton": "Comment ça marche ?",
   "favoris.guide.titre": "Les messages aux favoris, en 3 temps",

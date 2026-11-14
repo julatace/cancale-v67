@@ -2104,6 +2104,7 @@ export default {
   "creerVinted.aide.apres": "Dopo: un link «Apri su Vinted» per ogni bozza. Controlli, poi pubblichi.",
   "creerVinted.avant": {"one": "VRM creerà {n} bozza su {login}, dalla scheda vinted.fr. Niente va online: controlli e pubblichi tu.", "other": "VRM creerà {n} bozze su {login}, una alla volta, dalla scheda vinted.fr. Niente va online: controlli e pubblichi tu."},
   "creerVinted.echec": "Non creata: {raison}.",
+  "creerVinted.aVerifier": "Da verificare: {raison}.",
   "creerVinted.echecSans": "Non creata: Vinted non ha confermato.",
   "favoris.guide.bouton": "Come funziona?",
   "favoris.guide.titre": "I messaggi ai preferiti, in 3 passaggi",

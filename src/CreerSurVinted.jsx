@@ -125,7 +125,7 @@ export default function CreerSurVinted({ fiches = [], compteOnglet, extRaison = 
         // Jamais un échec muet : ce qui n'a pas abouti est dit sur SA ligne (raison + geste).
         let res = null;
         try { res = await executerUn(a, o); } catch (e) { res = { etat: 'refus', raison: '' }; }
-        if (!res || res.etat !== 'ok') setEchecs((x) => ({ ...x, [a.id]: { raison: String((res && res.raison) || ''), geste: String((res && res.geste) || '') } }));
+        if (!res || res.etat !== 'ok') setEchecs((x) => ({ ...x, [a.id]: { etat: String((res && res.etat) || 'refus'), raison: String((res && res.raison) || ''), geste: String((res && res.geste) || '') } }));
         else setEchecs((x) => { const y = { ...x }; delete y[a.id]; return y; });
         return res;
       },
@@ -214,7 +214,7 @@ export default function CreerSurVinted({ fiches = [], compteOnglet, extRaison = 
                   </div>
                 ) : null}
                 {fait ? <p className="vrm-cv-ok" data-creer-vinted-fait={fait.draftId}>{tr('creerVinted.fait')} <a href={lienBrouillon(fait.draftId)} target="_blank" rel="noopener noreferrer">{tr('creerVinted.ouvrir')}</a>{fait.aFinir.length ? <><br/><small>{tr('creerVinted.aFinir', { liste: fait.aFinir.join(', ') })}</small></> : null}</p>
-                  : echecs[f.id] && !enCours ? <p className="vrm-cv-geste" data-creer-vinted-echec="">{echecs[f.id].raison ? tr('creerVinted.echec', { raison: echecs[f.id].raison }) : tr('creerVinted.echecSans')}{echecs[f.id].geste ? ' ' + echecs[f.id].geste : ''}</p>
+                  : echecs[f.id] && !enCours ? <p className="vrm-cv-geste" data-creer-vinted-echec={echecs[f.id].etat}>{echecs[f.id].etat === 'main' ? tr('creerVinted.aVerifier', { raison: echecs[f.id].raison }) : echecs[f.id].raison ? tr('creerVinted.echec', { raison: echecs[f.id].raison }) : tr('creerVinted.echecSans')}{echecs[f.id].geste ? ' ' + echecs[f.id].geste : ''}</p>
                   : !texte.ok ? <p className="vrm-cv-geste" data-creer-vinted-refus="">{texte.raison}</p>
                   : manque.length ? <p className="vrm-cv-geste" data-creer-vinted-manque={manque.join(',')}>{tr('creerVinted.manque', { liste: manque.map((m) => tr('creerVinted.champ.' + m)).join(', ') })}</p> : null}
               </li>
