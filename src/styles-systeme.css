@@ -67,7 +67,7 @@
 
   /* Hauteur d'un contrôle : 44 au doigt ; 36 à la souris (plus bas). */
   --d-h-ctrl: 44px;
-  --d-h-filtre: 44px;              /* une pilule de filtre, une puce : 44 au doigt, 32 à la souris */
+  --d-h-filtre: 44px;              /* une pilule de filtre, une puce : 44 au doigt, 36 à la souris (14 nov. : plus de 32) */
   --d-t-ctrl: 15px;
 
   /* Surfaces — le « groupé » d'iOS. */
@@ -165,7 +165,7 @@
 /* À la souris (ordinateur), les contrôles sont plus bas : un écran d'ordinateur n'est pas
    un téléphone agrandi (règle 4 de la revue du 11 nov.). Au doigt (iPad compris), 44. */
 @media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  :root:root { --d-h-ctrl: 36px; --d-h-filtre: 32px; --d-t-ctrl: 13px; --d-t-44: 44px; }
+  :root:root { --d-h-ctrl: 36px; --d-h-filtre: 36px; --d-t-ctrl: 13px; --d-t-44: 44px; }
 }
 
 /* ══ 2. LES FORMES ═══════════════════════════════════════════════════════════ */
@@ -297,7 +297,7 @@
 }
 /* Le compte d'un segment choisi, la nuit : #98989D sur #636366 ne tenait que 2,1:1 (mesuré) — l'encre (5,8:1). */
 :root:root[data-theme="dark"] body .vrm-main :is(.vrm-seg, .vrm-sel-sites, .vrm-messages-sections) > button:is([aria-pressed="true"], .is-actif, [aria-current="page"]) .vrm-seg-n { color: var(--d-encre) !important; opacity: .85 !important; }
-/* Les filtres (pilules) : 44 au doigt, 32 à la souris ; l'actif à l'encre pleine. */
+/* Les filtres (pilules) : 44 au doigt, 36 à la souris ; l'actif à l'encre pleine. */
 :root:root body .vrm-main :is(.vrm-filtres:not(.vrm-filtre-site) button, .vrm-stock-views > button, .vrm-inbox-filters > button, .vrm-compte-puce, .vrm-pop-chip) {
   border-radius: var(--d-r-pilule) !important; font-weight: 600 !important; min-height: var(--d-h-filtre) !important;
 }
@@ -359,5 +359,45 @@
   :root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b:active { transform: none !important; }
   :root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b { transition: background-color var(--d-m-court) ease, color var(--d-m-court) ease, opacity var(--d-m-court) ease !important; }
 }
+
+/* ── 2.10 LA PASSE ÉCRAN PAR ÉCRAN (14 nov.) ──────────────────────────────────
+   Ce que `scripts/bancs/design-passe.cjs` a MESURÉ hors du système sur Ma journée, Ventes,
+   Colis, Annonces, Stock, Argent, Paramètres (390 tactile et 1512, clair et sombre).
+   Récit : docs/passation/2026-11-14-design-passe.md. Aucun texte, chiffre ni geste ne change. */
+
+/* Trois graisses : le 500 des feuilles d'avant (DA 1-4) redescend à 400 pour une note, monte à
+   600 pour un libellé ou un titre de rangée. (Les styles EN LIGNE ont été ramenés à la source.) */
+:root:root body :is(.vrm-app-shell, .vrm-fs, .vrm-fp) [style*="font-weight: 500"] { font-weight: 400 !important; }
+:root:root body .vrm-main :is([data-colis-limite-texte]:not([style*="font-weight: 600"]), .vrm-fu-sous-nom, .vrm-argent-w-note, .vrm-ap-ligne-t, [data-fu-gestes], .vrm-phrase-ecran, .vrm-set b, .vrm-ios-rangee b) { font-weight: 400 !important; }
+:root:root body :is(.vrm-app-shell, .vrm-fs) :is(.vrm-set-titre, .vrm-compta-repli-titre, .vrm-rail-section-label, .vrm-nav-label, .vrm-argent-w-l) { font-weight: 600 !important; }
+
+/* Le compte d'un segment ou d'un filtre (« Envoyés · 18 », « À compléter 36 ») : le gris sur la
+   piste grise ne tenait que 3,1 à 4,4:1 (mesuré) — l'encre du libellé, en 400 : la graisse
+   sépare le compte du mot, sans un gris de plus. */
+:root:root body .vrm-main :is(.vrm-seg-n, .vrm-filtres .vrm-of-n, .vrm-stock-views .vrm-of-n) { color: inherit !important; opacity: 1 !important; font-weight: 400 !important; }
+:root:root body .vrm-main .vrm-seg-n.vrm-seg-n[style*="color"] { color: inherit !important; }
+
+/* L'échelle des tailles (11 · 12 · 13 · 15 · 17 · 20 · 28 · 34 · 40/44). */
+:root:root body .vrm-main .vrm-colis-section-titre { font-size: var(--d-t-20) !important; letter-spacing: var(--d-ap-22) !important; }
+:root:root body .vrm-main :is(.vrm-lib-court.vrm-lib-court, .vrm-ann-compte-n, .vrm-pop-chip) { font-size: var(--d-t-13) !important; }
+:root:root body .vrm-main .vrm-ann-card [data-prix][data-prix] { font-size: var(--d-t-20) !important; }
+:root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-titre][data-titre] { font-size: var(--d-t-15) !important; }
+:root:root body .vrm-main :is(.vrm-fu-jour, .vrm-jv2-jour) > b { font-size: var(--d-t-15) !important; }
+:root:root body .vrm-main :is(.vrm-roule, .vrm-jv2-grand:not(.is-zero):not(.is-vide)) { font-size: var(--d-t-44) !important; }
+:root:root body .vrm-main .vrm-argent-w .vrm-argent-w-n:not([data-argent-pas-su]) { font-size: var(--d-t-28) !important; }
+:root:root body .vrm-main .vrm-argent-w .vrm-argent-w-n[data-argent-pas-su] { font-size: var(--d-t-20) !important; font-weight: 400 !important; }
+
+/* UN gris de texte : les gris « un cran plus sombres » écrits pour une tuile grise (#5E5E63) et
+   ceux de la colonne (#636366) lisent LE gris ; la tuile est blanche depuis le 13 nov. (5,1:1). */
+:root:root body .vrm-main .vrm-argent-w { --w-gris: var(--d-gris) !important; }
+:root:root body .vrm-app-shell .vrm-barre-kbd { color: var(--d-gris) !important; opacity: 1 !important; }
+/* (La colonne de gauche garde SON gris, `--n2-titre` #636366 : sur le panneau #E5E5EA, LE gris ne tiendrait que
+   4,1:1 — mesuré. C'est le seul autre gris de texte, et il ne vit que sur ce panneau.) */
+:root:root body .vrm-app-shell .vrm-sidebar .vrm-rail-section-label { color: var(--n2-titre) !important; opacity: 1 !important; }
+:root:root body .vrm-app-shell .vrm-barre-kbd.vrm-barre-kbd { background: var(--d-carte) !important; border: 0 !important; }
+:root:root body .vrm-app-shell .vrm-nav-offre { color: var(--d-encre) !important; background: var(--d-remplir) !important; }
+
+/* Les cibles à la souris : 36 px au moins (« Choisir la vente », la feuille du rappel). */
+:root:root body .vrm-main .vrm-colis-choisir { min-height: var(--d-h-ctrl) !important; font-size: var(--d-t-13) !important; }
 
 } /* fin @layer vrm-premium */

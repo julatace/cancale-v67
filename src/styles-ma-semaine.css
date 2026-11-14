@@ -49,7 +49,7 @@
 @media (min-width: 1024px) { :root:root body .vrm-ms .vrm-ms-v.is-grand { font-size: 44px !important; } }
 :root:root body .vrm-ms .vrm-ms-v.is-vide { color: var(--ms-gris) !important; }
 :root:root body .vrm-ms .vrm-ms-borne { font: 600 15px/1 var(--ms-police) !important; color: var(--ms-gris) !important; letter-spacing: 0 !important; }
-:root:root body .vrm-ms .vrm-ms-sous { font: 500 13px/1.3 var(--ms-police) !important; color: var(--ms-gris) !important; }
+:root:root body .vrm-ms .vrm-ms-sous { font: 400 13px/1.3 var(--ms-police) !important; color: var(--ms-gris) !important; }
 :root:root body .vrm-ms .vrm-ms-porte { font: 600 13px/1.3 var(--ms-police) !important; color: var(--ms-ambre) !important; }
 
 /* La comparaison : neutre, une flèche. */
@@ -75,7 +75,7 @@
 @media (min-width: 1024px) {
   :root:root body .vrm-ms .vrm-ms-grille { grid-template-columns: repeat(4, minmax(0,1fr)) !important; gap: 14px !important; }
 }
-:root:root body .vrm-ms .vrm-ms-pied { margin: 0 4px !important; font: 500 13px/1.4 var(--ms-police) !important; color: var(--ms-gris) !important; }
+:root:root body .vrm-ms .vrm-ms-pied { margin: 0 4px !important; font: 400 13px/1.4 var(--ms-police) !important; color: var(--ms-gris) !important; }
 @media (prefers-reduced-motion: no-preference) {
   :root:root body .vrm-ms .vrm-ms-barre::after { transition: height .35s cubic-bezier(.2,.8,.2,1); }
 }

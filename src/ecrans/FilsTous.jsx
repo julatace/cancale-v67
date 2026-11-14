@@ -174,7 +174,7 @@ function FilEbay({ x, onFerme, onEnvoye }) {
   return (
     <div data-fil-ebay={m.id} style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <button type="button" onClick={onFerme} aria-label={tr('ebay.fil.fermer')} style={{ minHeight: 44, minWidth: 44, border: 'none', background: 'transparent', color: C.muted, fontSize: 22, cursor: 'pointer' }}>‹</button>
+        <button type="button" onClick={onFerme} aria-label={tr('ebay.fil.fermer')} style={{ minHeight: 44, minWidth: 44, border: 'none', background: 'transparent', color: C.muted, fontSize: 20, cursor: 'pointer' }}>‹</button>
         <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 15, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.titre || m.subject || 'eBay'}</div><div style={{ fontSize: 12, color: C.muted }}>eBay</div></div>
       </div>
       <div data-fil-ebay-question style={{ alignSelf: 'flex-start', maxWidth: '85%', background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: '8px 12px', fontSize: 15, color: C.text, whiteSpace: 'pre-wrap' }}>{m.body || m.subject}</div>
@@ -257,7 +257,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
             const A = filDe(p.a), B = filDe(p.b); if (!A || !B) return null;
             return (
               <div key={p.cle} data-fil-proposition={p.sorte} data-fil-a={p.a} data-fil-b={p.b} style={{ border: `1px solid ${C.border}`, borderRadius: 16, background: C.card, padding: 12, marginBottom: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600, color: C.text }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 600, color: C.text }}>
                   <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 999, background: C.warn, flexShrink: 0 }}/>
                   {p.sorte === 'paire' ? `Peut-être ${motsVendeur().meme} ?` : tr('messages.peutEtreMeme2')}
                 </div>

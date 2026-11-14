@@ -63,7 +63,7 @@
 :root:root body .vrm-argent-w-n small { font-size: 13px; font-weight: 600; letter-spacing: 0; color: var(--w-gris, #6E6E73); }
 :root:root body .vrm-argent-w-n[data-argent-pas-su] { color: var(--w-gris, #6E6E73); }
 :root:root body .vrm-argent-w-note {
-  font-size: 12px; font-weight: 500; line-height: 1.3; color: var(--w-gris, #6E6E73); margin-top: auto;
+  font-size: 12px; font-weight: 400; line-height: 1.3; color: var(--w-gris, #6E6E73); margin-top: auto;
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
 }
 :root:root body .vrm-argent-w-chev {
@@ -94,4 +94,5 @@
 /* (11 nov., lot accessibilité, axe « color-contrast ») Sur le remplissage gris du widget
    (rgba(118,118,128,.12) sur #F2F2F7 ≈ #E3E3E9), le gris #6E6E73 ne donnait que 3,97:1.
    En CLAIR seulement, un cran plus sombre (#5E5E63 : 5,0:1) ; le sombre passe déjà. */
-:root:not([data-theme="dark"]) body .vrm-argent-w { --w-gris: #5E5E63; }
+/* (14 nov., passe design) La tuile est BLANCHE depuis le 13 nov. (styles-systeme.css §2.2) : LE gris y tient 5,1:1 —
+   plus de gris écrit à la main. */

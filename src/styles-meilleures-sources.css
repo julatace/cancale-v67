@@ -21,7 +21,7 @@
 .vrm-ms-achats { list-style: none; margin: 0; padding: 0; }
 .vrm-ms-achat { padding: 10px 0; border-top: 1px solid var(--vrm-line, #E5E5EA); display: flex; flex-direction: column; gap: 3px; }
 .vrm-ms-achat-l1, .vrm-ms-achat-l2 { display: flex; justify-content: space-between; gap: 10px; min-width: 0; }
-.vrm-ms-achat-titre { font-size: 15px; font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-ms-achat-titre { font-size: 15px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vrm-ms-achat-prix { font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .vrm-ms-achat-l2 { font-size: 13px; color: var(--vrm-muted, #6E6E73); flex-wrap: wrap; }
 .vrm-ms-plus { min-height: 44px; margin-top: 8px; }

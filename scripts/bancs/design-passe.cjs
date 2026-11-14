@@ -173,6 +173,9 @@ function mesurer({ tactile, sombre, racines }) {
     for (let i = couches.length - 1; i >= 0; i--) f = melange(couches[i], f);
     return f;
   };
+  // Un texte qui APPARAÎT ou S'EFFACE (un toast « Mis à jour à … » en fondu) se juge à son état final : une
+  // animation FINIE en cours le met hors mesure. Une boucle infinie (le film du Stock) reste jugée à l'instant mesuré.
+  const enFondu = (el) => { for (let x = el; x; x = x.parentElement) { if (x.getAnimations && x.getAnimations().some((a) => a.playState === 'running' && a.effect && a.effect.getTiming && a.effect.getTiming().iterations !== Infinity)) return true; } return false; };
   const opacite = (el) => { let o = 1; for (let x = el; x; x = x.parentElement) o *= Number(getComputedStyle(x).opacity || 1); return o; };
   const cartes = new Set();
   for (const root of roots) {
@@ -197,15 +200,19 @@ function mesurer({ tactile, sombre, racines }) {
         const g = Number(cs.fontWeight), fs_ = Math.round(parseFloat(cs.fontSize) * 2) / 2;
         const lib = () => nom(el);
         if (![400, 600, 700].includes(g)) out.graisses.push({ g, quoi: lib() });
-        if (!ECHELLE.includes(fs_) && !/^[\s›‹×✓✕·•…—–\-+−⋯▾▸]+$/.test(el.innerText || '')) out.tailles.push({ t: fs_, quoi: lib() });
+        // La barre d'onglets du téléphone garde ses 10 pt (la taille des libellés d'onglet d'iOS ; Julien doit encore
+        // trancher « libellés à 9 px », CLAUDE.md §9) : hors de l'échelle exprès.
+        if (!ECHELLE.includes(fs_) && !el.closest('.vrm-nav-label') && !/^[\s›‹×✓✕·•…—–\-+−⋯▾▸]+$/.test(el.innerText || '')) out.tailles.push({ t: fs_, quoi: lib() });
         const col = rgba(cs.color);
         const enSombre = sombreCarte(el);
         if (col && !enSombre) {
           const hs = hsl(col);
           const neutre = Math.max(col.r, col.g, col.b) - Math.min(col.r, col.g, col.b) <= 10;
-          if (neutre && (col.a < 0.999 || !PERMIS.has(hex(col)))) out.gris.push({ c: col.a < 1 ? `rgba(${col.r},${col.g},${col.b},${col.a})` : hex(col), quoi: lib() });
+          // La colonne de gauche (panneau #E5E5EA) a SON gris, le jeton `--n2-titre` (#636366 ; LE gris n'y tient que 4,1:1).
+          const gNav = !sombre && el.closest('.vrm-sidebar') && hex(col) === '#636366';
+          if (neutre && !gNav && (col.a < 0.999 || !PERMIS.has(hex(col)))) out.gris.push({ c: col.a < 1 ? `rgba(${col.r},${col.g},${col.b},${col.a})` : hex(col), quoi: lib() });
           if (hs.s > 0.3 && hs.h >= 255 && hs.h <= 320 && hs.l > 0.15 && hs.l < 0.9) out.violet.push({ c: hex(col), quoi: lib() });
-          const disabled = el.closest(':disabled, [aria-disabled="true"]');
+          const disabled = el.closest(':disabled, [aria-disabled="true"]') || enFondu(el);
           if (!disabled) {
             const f = fond(el);
             const o = opacite(el);

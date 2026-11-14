@@ -10,7 +10,7 @@ function PrixMarche({ data, baseKO, sousNav = null }) {
   const eur2 = (n) => n.toFixed(n % 1 ? 2 : 0).replace('.', ',');
   const groups = data && data.groups;
   const valo = data && data.valo;
-  const eti = { fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500 };
+  const eti = { fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 400 };
   return (
     <div data-prix-marche="" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <ScreenHead icon="euro" title={tr('nav.compta')} sous={sousNav ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}</div> : null}
@@ -54,8 +54,8 @@ function PrixMarche({ data, baseKO, sousNav = null }) {
                 </div>
               </div>
               <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500 }}>{tr('stats.prixMedian')}</div>
-                <div className="vrm-display" style={{ fontSize: 22, fontWeight: 700, color: C.text }}>{eur2(gr.med)}&nbsp;€</div>
+                <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 400 }}>{tr('stats.prixMedian')}</div>
+                <div className="vrm-display" style={{ fontSize: 20, fontWeight: 700, color: C.text }}>{eur2(gr.med)}&nbsp;€</div>
               </div>
             </div>
           ))}

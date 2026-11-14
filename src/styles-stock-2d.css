@@ -198,9 +198,10 @@
   81%, 94% { opacity: 1; }
   100% { opacity: 0; }
 }
-@keyframes vrm-sx-e1 { 0%, 34% { opacity: 1; } 37%, 97% { opacity: .38; } 100% { opacity: 1; } }
-@keyframes vrm-sx-e2 { 0%, 34% { opacity: .38; } 37%, 64% { opacity: 1; } 67%, 100% { opacity: .38; } }
-@keyframes vrm-sx-e3 { 0%, 64% { opacity: .38; } 67%, 97% { opacity: 1; } 100% { opacity: .38; } }
+/* (14 nov., passe design) Une étape en attente reste LISIBLE : à .38 elle tombait à 2,35:1 (mesuré) ; à .7, 6:1 — l’étape en cours se lit toujours à 1. */
+@keyframes vrm-sx-e1 { 0%, 34% { opacity: 1; } 37%, 97% { opacity: .7; } 100% { opacity: 1; } }
+@keyframes vrm-sx-e2 { 0%, 34% { opacity: .7; } 37%, 64% { opacity: 1; } 67%, 100% { opacity: .7; } }
+@keyframes vrm-sx-e3 { 0%, 64% { opacity: .7; } 67%, 97% { opacity: 1; } 100% { opacity: .7; } }
 
 /* « Réduire les animations » : rien ne bouge, nulle part dans le Stock. */
 @media (prefers-reduced-motion: reduce) {

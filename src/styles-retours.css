@@ -27,17 +27,17 @@
 :root:root body .vrm-ret-tuile svg { width: 26px; height: 26px; }
 :root:root body .vrm-ret-textes, :root:root body .vrm-ret-tip-corps { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 :root:root body .vrm-ret-num { font: 700 19px/1.1 var(--vrm-police, system-ui, sans-serif); letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--ret-encre); }
-:root:root body .vrm-ret-titre { font: 500 14px/1.3 var(--vrm-police, system-ui, sans-serif); color: var(--ret-encre); overflow-wrap: anywhere; }
+:root:root body .vrm-ret-titre { font: 400 14px/1.3 var(--vrm-police, system-ui, sans-serif); color: var(--ret-encre); overflow-wrap: anywhere; }
 :root:root body .vrm-ret-limite { font: 600 14px/1.3 var(--vrm-police, system-ui, sans-serif); color: var(--ret-gris); }
 :root:root body .vrm-ret-limite.is-presse { color: var(--ret-ambre); }
 :root:root body .vrm-ret-lignes { display: flex; flex-direction: column; gap: 4px; }
-:root:root body .vrm-ret-ligne { font: 500 14px/1.35 var(--vrm-police, system-ui, sans-serif); color: var(--ret-gris); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+:root:root body .vrm-ret-ligne { font: 400 14px/1.35 var(--vrm-police, system-ui, sans-serif); color: var(--ret-gris); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 :root:root body .vrm-ret-ligne.is-ok { color: var(--ret-encre); font-weight: 650; }
 :root:root body .vrm-ret-gestes, :root:root body .vrm-pap-gestes { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
 :root:root body .vrm-ret-imprimer { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 :root:root body .vrm-ret-imprimer .vrm-b { min-height: 44px; }
 :root:root body a.vrm-ret-lien { min-height: 44px; display: flex; align-items: center; color: var(--ret-encre); font: 600 15px/1.2 var(--vrm-police, system-ui, sans-serif); text-decoration: none; }
-:root:root body .vrm-ret-note { margin: 0 2px; color: var(--ret-gris); font: 500 14px/1.4 var(--vrm-police, system-ui, sans-serif); }
+:root:root body .vrm-ret-note { margin: 0 2px; color: var(--ret-gris); font: 400 14px/1.4 var(--vrm-police, system-ui, sans-serif); }
 :root:root body .vrm-ret-note.is-ok { color: var(--ret-encre); font-weight: 650; }
 :root:root body .vrm-ret-anciens > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font: 600 15px/1.2 var(--vrm-police, system-ui, sans-serif); color: var(--ret-gris); }
 /* « Tout imprimer » → Retours : une ligne par bordereau de retour. */
@@ -48,8 +48,8 @@
 :root:root body .vrm-pap .vrm-pap-bloc { margin: 0 0 18px; padding: 12px 14px; border-radius: 20px; background: var(--ret-tuile); }
 :root:root body .vrm-pap .vrm-pap-bloc > h3 { margin: 0 0 8px; font: 700 13px/1.2 var(--vrm-police, system-ui, sans-serif); text-transform: uppercase; letter-spacing: .04em; color: var(--ret-gris); }
 :root:root body .vrm-pap .vrm-pap-ligne { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; min-height: 32px; font: 600 15px/1.35 var(--vrm-police, system-ui, sans-serif); color: var(--ret-encre); flex-wrap: wrap; }
-:root:root body .vrm-pap .vrm-pap-ligne small { font: 500 13px/1.3 var(--vrm-police, system-ui, sans-serif); color: var(--ret-gris); }
-:root:root body .vrm-pap .vrm-pap-etapes { margin: 0; padding: 0 0 0 20px; display: flex; flex-direction: column; gap: 6px; font: 500 15px/1.35 var(--vrm-police, system-ui, sans-serif); color: var(--ret-gris); }
+:root:root body .vrm-pap .vrm-pap-ligne small { font: 400 13px/1.3 var(--vrm-police, system-ui, sans-serif); color: var(--ret-gris); }
+:root:root body .vrm-pap .vrm-pap-etapes { margin: 0; padding: 0 0 0 20px; display: flex; flex-direction: column; gap: 6px; font: 600 15px/1.35 var(--vrm-police, system-ui, sans-serif); color: var(--ret-gris); }
 :root:root body .vrm-pap .vrm-pap-etapes > li.is-la { color: var(--ret-encre); font-weight: 700; }
 :root:root body .vrm-pap .vrm-pap-etapes > li.is-fait { text-decoration: line-through; text-decoration-thickness: 1px; }
 :root:root body .vrm-pap .vrm-pap-gestes { margin-top: 10px; }

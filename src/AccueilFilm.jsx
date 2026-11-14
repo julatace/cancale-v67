@@ -302,7 +302,7 @@ function Plateau({ t, W, H, portrait, court }) {
       if (ap <= 0) return;
       const [x, y] = posO[i], v = vers(x, y, 7 + i), der = 4 * (t - 2) * (i % 2 ? 1 : -1);
       libres.push(<div key={`o${i}`} style={{ position: 'absolute', left: x, top: y, height: 44, padding: '0 18px', display: 'flex', alignItems: 'center', gap: 10, borderRadius: '10px 10px 0 0',
-        background: K.card2, border: `1px solid ${K.line2}`, color: K.muted, fontSize: 22, fontWeight: 500, whiteSpace: 'nowrap',
+        background: K.card2, border: `1px solid ${K.line2}`, color: K.muted, fontSize: 20, fontWeight: 400, whiteSpace: 'nowrap',
         opacity: 0.35 * ap * v.o, transform: `translate(${(v.dx + der).toFixed(1)}px, ${v.dy.toFixed(1)}px) scale(${v.s.toFixed(3)})` }}>
         <i style={{ width: 9, height: 9, borderRadius: 3, background: i < 2 ? PLATEFORMES.vinted.point : i === 2 ? PLATEFORMES.leboncoin.point : i === 3 ? PLATEFORMES.ebay.point : K.faint }} />{o}
       </div>);
@@ -329,7 +329,7 @@ function Plateau({ t, W, H, portrait, court }) {
         libres.push(<div key="feuille" style={{ position: 'absolute', left: x, top: y, width: 280, height: 220, borderRadius: 12, background: K.paper, color: K.ink, padding: 24,
           opacity: 0.9 * ap * v.o, transform: `translate(${v.dx.toFixed(1)}px, ${(v.dy + mix(20, 0, ap)).toFixed(1)}px) rotate(4deg) scale(${v.s.toFixed(3)})` }}>
           {[78, 56, 70, 44].map((w, i) => <div key={i} style={{ height: 10, width: `${w}%`, background: '#E5E5EA', borderRadius: 3, marginTop: i ? 14 : 0 }} />)}
-          <div style={{ marginTop: 26, fontSize: 22, fontWeight: 600 }}>à déclarer : ? €</div>
+          <div style={{ marginTop: 26, fontSize: 20, fontWeight: 600 }}>à déclarer : ? €</div>
         </div>);
       }
     }
@@ -411,7 +411,7 @@ function Plateau({ t, W, H, portrait, court }) {
     const hFin = cibles.ident ? cibles.ident.h * cam.s : 37;
     const sc = mix(mix(0.5, 1, nait), hFin / 72, sortie(pose));
     libres.push(<div key="n128" style={{ position: 'absolute', left: x, top: y, height: 72, padding: '0 26px', display: 'flex', alignItems: 'center', borderRadius: 14,
-      background: 'rgba(0,113,227,.16)', border: `2px solid ${K.accent}`, color: K.text, fontSize: 38, fontWeight: 600, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
+      background: 'rgba(0,113,227,.16)', border: `2px solid ${K.accent}`, color: K.text, fontSize: 34, fontWeight: 600, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
       opacity: Math.min(1, nait * 1.6), transform: `translate(-50%, -50%) scale(${sc.toFixed(4)})` }}>N°{V.n}</div>);
   }
 
@@ -439,9 +439,9 @@ function Plateau({ t, W, H, portrait, court }) {
       libres.push(<div key={`r${i}`} style={{ position: 'absolute', left: gx + (i % 2) * (cw + g), top: gy + Math.floor(i / 2) * (ch + g), width: cw, height: ch, borderRadius: 20,
         background: K.card, border: `1px solid ${K.line2}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,.06), 0 2px 4px rgba(0,0,0,.5), 0 40px 90px rgba(0,0,0,.45)', padding: portrait ? '30px 32px' : '30px 34px',
         opacity: p * (1 - out), transform: `translateY(${(mix(16, 0, p) - 0).toFixed(1)}px) scale(${mix(1, 0.96, out).toFixed(4)})` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 22, fontWeight: 500, color: K.muted, whiteSpace: 'nowrap' }}>{point && <i style={{ width: 11, height: 11, borderRadius: 3, background: point }} />}{a}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 20, fontWeight: 400, color: K.muted, whiteSpace: 'nowrap' }}>{point && <i style={{ width: 11, height: 11, borderRadius: 3, background: point }} />}{a}</div>
         <div style={{ fontFamily: POLICE_TITRE, fontSize: portrait ? 38 : 44, fontWeight: 700, color: K.text, marginTop: 16, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{b}</div>
-        <div style={{ fontSize: 22, color: K.muted, marginTop: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c}</div>
+        <div style={{ fontSize: 20, color: K.muted, marginTop: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c}</div>
       </div>);
     });
   }
@@ -457,7 +457,7 @@ function Plateau({ t, W, H, portrait, court }) {
       libres.push(<Mots key="f1" texte="Tu ouvres VRM." t={t} t0={tf[1]} couleur={K.muted} style={titreStyle(y + 170)} />);
       libres.push(<Mots key="f2" texte="Tu sais quoi faire." t={t} t0={tf[2]} style={titreStyle(y + 170 + T * 1.12)} />);
       libres.push(<Mots key="f3" texte="vrm.center" t={t} t0={tf[3]} style={titreStyle(y + 170 + T * 2.24 + 70, 40, { fontWeight: 600 })} />);
-      libres.push(<Mots key="f4" texte="Crée ton compte" t={t} t0={tf[3] + 0.15} couleur={K.muted} style={{ ...titreStyle(y + 170 + T * 2.24 + 130, 24), fontFamily: "'Inter',sans-serif", fontWeight: 500, letterSpacing: 0 }} />);
+      libres.push(<Mots key="f4" texte="Crée ton compte" t={t} t0={tf[3] + 0.15} couleur={K.muted} style={{ ...titreStyle(y + 170 + T * 2.24 + 130, 24), fontFamily: "'Inter',sans-serif", fontWeight: 400, letterSpacing: 0 }} />);
     }
   }
 

@@ -67,11 +67,11 @@ html body .vrm-recap .vrm-recap-fermer {
 .vrm-recap-frise > li[data-fait="0"] .vrm-recap-point { background: var(--vrm-surface, #FFF); border-color: var(--recap-muted); }
 .vrm-recap-frise > li[data-ici="1"] .vrm-recap-point { background: var(--vrm-surface, #FFF); border: 4px solid var(--recap-accent); }
 .vrm-recap-etape { margin-top: 6px; font-size: 13px; font-weight: 600; line-height: 1.2; overflow-wrap: anywhere; hyphens: auto; }
-.vrm-recap-frise > li[data-fait="0"] .vrm-recap-etape { color: var(--recap-muted); font-weight: 500; }
+.vrm-recap-frise > li[data-fait="0"] .vrm-recap-etape { color: var(--recap-muted); font-weight: 400; }
 .vrm-recap-quand { font-size: 13px; color: var(--recap-muted); font-variant-numeric: tabular-nums; }
 
 /* ── 3. L'argent, en lignes nettes ───────────────────────────────────────── */
-html body .vrm-recap h3.vrm-recap-titre { margin: 0 0 6px !important; font-size: 13px !important; font-weight: 500 !important; color: var(--recap-muted); letter-spacing: 0 !important; font-family: inherit !important; }
+html body .vrm-recap h3.vrm-recap-titre { margin: 0 0 6px !important; font-size: 13px !important; font-weight: 400 !important; color: var(--recap-muted); letter-spacing: 0 !important; font-family: inherit !important; }
 .vrm-recap-corps dl { margin: 0; }
 .vrm-recap-ligne { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; }
 .vrm-recap-ligne > dt { margin: 0; color: var(--recap-muted); font-size: 15px; flex: 0 1 auto; min-width: 0; }
@@ -84,7 +84,7 @@ html body .vrm-recap h3.vrm-recap-titre { margin: 0 0 6px !important; font-size:
 .vrm-recap-argent .vrm-recap-benef .vrm-recap-borne { font-family: var(--vrm-police, inherit); font-size: 13px; color: var(--recap-muted); margin-right: 4px; }
 .vrm-recap-argent .vrm-recap-valeur { display: inline-flex; align-items: baseline; gap: 0; flex-wrap: wrap; justify-content: flex-end; }
 .vrm-recap-argent .vrm-recap-montant { white-space: nowrap; }
-.vrm-recap-argent .vrm-recap-ligne > dd { font-weight: 500; word-spacing: -.3em; }
+.vrm-recap-argent .vrm-recap-ligne > dd { font-weight: 400; word-spacing: -.3em; }
 .vrm-recap-argent .vrm-recap-ligne > dd small, .vrm-recap-argent .vrm-recap-borne, .vrm-recap-argent .vrm-recap-verse > dd { word-spacing: normal; }
 .vrm-recap-argent .vrm-recap-verse > dd { font-family: var(--vrm-police, inherit); color: var(--recap-muted); }
 /* Le prix d'achat qui manque : le geste ambre à la place du montant */

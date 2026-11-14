@@ -128,7 +128,7 @@
   padding: 0 10px !important; border: 0 !important; border-radius: 12px !important;
   background: transparent !important; box-shadow: none !important; filter: none !important;
   color: var(--n2-libelle) !important;
-  font: 500 14px/1.2 var(--vrm-police) !important; letter-spacing: -.008em !important; text-align: left !important;
+  font: 400 14px/1.2 var(--vrm-police) !important; letter-spacing: -.008em !important; text-align: left !important;
   transition: background-color 120ms ease, transform 120ms var(--p-sortie, ease-out) !important;
   -webkit-tap-highlight-color: transparent;
 }

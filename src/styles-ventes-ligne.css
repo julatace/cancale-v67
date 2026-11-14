@@ -12,11 +12,11 @@ html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-l
 html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-state { grid-column: 3; grid-row: 3; }
 html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-achat { display: none; }
 .vrm-ledger-sale-benef, .vrm-ledger-sale-achat { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 600; color: var(--vrm-ink); }
-.vrm-ledger-sale-benef[data-benef-etat="achat"], .vrm-ledger-sale-benef[data-benef-etat="illisible"], .vrm-ledger-sale-benef[data-benef-etat="prix"] { color: var(--vrm-muted); font-weight: 500; }
-.vrm-ledger-sale-benef .vrm-benef-borne { display: block; font-size: 11px; line-height: 1.2; font-weight: 500; color: var(--vrm-muted); }
+.vrm-ledger-sale-benef[data-benef-etat="achat"], .vrm-ledger-sale-benef[data-benef-etat="illisible"], .vrm-ledger-sale-benef[data-benef-etat="prix"] { color: var(--vrm-muted); font-weight: 400; }
+.vrm-ledger-sale-benef .vrm-benef-borne { display: block; font-size: 11px; line-height: 1.2; font-weight: 400; color: var(--vrm-muted); }
 /* (6 nov., vague 2) Le prix d'achat qui manque se dit UNE fois, en tête de Ventes (« Prix d'achat
    N/M · Compléter ») : la case de chaque ligne est grise, plus l'ambre répété sur chaque vente. */
-.vrm-ledger-sale-achat[data-achat-etat="manque"] { color: var(--vrm-muted); font-weight: 500; }
+.vrm-ledger-sale-achat[data-achat-etat="manque"] { color: var(--vrm-muted); font-weight: 400; }
 .vrm-ventes-entete { display: none; }
 @media (min-width: 768px) {
   html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-ledger-sale-toggle {
@@ -31,7 +31,7 @@ html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-l
   html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-plus { grid-column: 7; }
   html body .vrm-app-shell .vrm-main .vrm-ventes-liste > .vrm-ventes-entete {
     display: grid; grid-template-columns: 80px minmax(0, 1fr) minmax(110px, 170px) minmax(72px, 100px) minmax(64px, 90px) minmax(84px, 120px) 32px;
-    column-gap: 16px; padding: 4px 0 10px; border-bottom: 1px solid var(--vrm-line); font-size: 13px; font-weight: 500; color: var(--vrm-muted);
+    column-gap: 16px; padding: 4px 0 10px; border-bottom: 1px solid var(--vrm-line); font-size: 13px; font-weight: 400; color: var(--vrm-muted);
   }
   html body .vrm-app-shell .vrm-main .vrm-ventes-liste > .vrm-ventes-entete > .is-droite { text-align: right; }
 }

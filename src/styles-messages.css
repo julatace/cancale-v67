@@ -112,7 +112,7 @@ html body .vrm-chat-panel .vrm-chat-offre-actions > [data-offre-geste="proposer"
 /* Le pied : pastilles de réponses rapides, champ, micro, envoyer cobalt rond. */
 html body .vrm-chat-panel .vrm-chat-foot { background: var(--vrm-bg) !important; border-top: 0 !important; padding: 10px 22px 14px !important; }
 html body .vrm-chat-panel .vrm-chat-rapides { gap: 8px !important; padding-bottom: 12px !important; }
-html body .vrm-chat-panel .vrm-chat-rapides > button { min-height: 40px !important; padding: 0 16px !important; border-radius: 999px !important; border: 1px solid var(--vrm-line) !important; background: var(--vrm-bg) !important; color: var(--vrm-ink) !important; font: 500 15px/1 var(--vrm-police, inherit) !important; box-shadow: none !important; white-space: nowrap; }
+html body .vrm-chat-panel .vrm-chat-rapides > button { min-height: 40px !important; padding: 0 16px !important; border-radius: 999px !important; border: 1px solid var(--vrm-line) !important; background: var(--vrm-bg) !important; color: var(--vrm-ink) !important; font: 600 15px/1 var(--vrm-police, inherit) !important; box-shadow: none !important; white-space: nowrap; }
 html body .vrm-chat-panel .vrm-chat-compose { display: flex !important; align-items: center !important; gap: 10px !important; border: 0 !important; background: transparent !important; padding: 0 !important; }
 html body .vrm-chat-panel .vrm-chat-compose > textarea { flex: 1; min-height: 46px !important; border-radius: 12px !important; border: 0 !important; background: var(--vrm-card2, var(--vrm-surface)) !important; padding: 13px 16px !important; font: 400 15px/1.35 var(--vrm-police, inherit) !important; resize: none !important; }
 html body .vrm-chat-panel .vrm-chat-compose > [data-mic-dictee] { width: 46px !important; height: 46px !important; min-height: 46px !important; border-radius: 50% !important; border: 0 !important; background: var(--vrm-card2, var(--vrm-surface)) !important; color: var(--vrm-ink) !important; }
@@ -143,7 +143,7 @@ html body .vrm-ebay-q-nav.vrm-seg > button.vrm-seg-btn,
 /* (5 nov.) Une offre en dernier message se lit DANS l'extrait de la ligne, à
    gauche, marquée « Offre » avec son montant — le prix d'avant barré, en sourdine. */
 .vrm-msg-extrait .vrm-msg-offre-der { display: inline-block; vertical-align: baseline; }
-.vrm-msg-offre-der .vrm-msg-offre-ancien { font-weight: 500; }
+.vrm-msg-offre-der .vrm-msg-offre-ancien { font-weight: 400; }
 
 /* ═══════════════════════════════════════════════════════════════════════
    (5 nov., chantier G — revue de cohérence 2.23) MESSAGES, UNE FORME
@@ -193,7 +193,7 @@ html body .vrm-app-shell .vrm-main .vrm-pied-lien:not(#_) {
 html body .vrm-pied-lien:active { opacity: .55; }
 @media (hover: hover) and (pointer: fine) { html body .vrm-pied-lien:hover { opacity: .7; } }
 html body .vrm-pied-lien:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: 2px; }
-html body .vrm-pied-lien .vrm-pied-lien-n { font-weight: 500; font-size: 13px; color: var(--vrm-muted); font-variant-numeric: tabular-nums; }
+html body .vrm-pied-lien .vrm-pied-lien-n { font-weight: 400; font-size: 13px; color: var(--vrm-muted); font-variant-numeric: tabular-nums; }
 html body .vrm-msg-more.vrm-pied-lien { display: flex !important; width: 100%; justify-content: center; margin-top: 4px; }
 html body .vrm-msg-retirees { display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; }
 

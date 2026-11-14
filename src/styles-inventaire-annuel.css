@@ -6,7 +6,7 @@
 .vrm-ia-date input {
   flex: 1; min-width: 0; height: 44px; box-sizing: border-box; border-radius: 12px; padding: 0 12px;
   border: 1px solid var(--vrm-line, rgba(0,0,0,.12)); background: var(--vrm-surface, #fff); color: var(--vrm-ink, #1D1D1F);
-  font: 500 17px var(--vrm-police, inherit); font-variant-numeric: tabular-nums; color-scheme: light dark;
+  font: 600 17px var(--vrm-police, inherit); font-variant-numeric: tabular-nums; color-scheme: light dark;
 }
 .vrm-ia-lue { margin: -4px 0 0; font-size: 13px; color: var(--vrm-muted, #6E6E73); }
 .vrm-ia-carte {

@@ -76,7 +76,7 @@ html body .vrm-chat-panel .vrm-chat-head { border-bottom: 1px solid var(--vrm-li
 html body .vrm-chat-panel .vrm-chat-head .vrm-chat-head-n { font-size: 17px; font-weight: 600; line-height: 1.25; letter-spacing: -.01em; }
 html body .vrm-chat-panel .vrm-chat-head .vrm-chat-head-s { font-size: 13px; line-height: 1.35; margin-top: 1px; }
 html body .vrm-chat-panel .vrm-chat-head-ph { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; }
-html body .vrm-chat-panel .vrm-chat-head .vrm-chat-retirer { min-height: 36px; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 500; gap: 6px; display: inline-flex; align-items: center; }
+html body .vrm-chat-panel .vrm-chat-head .vrm-chat-retirer { min-height: 36px; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 400; gap: 6px; display: inline-flex; align-items: center; }
 html body .vrm-chat-panel .vrm-chat-head .vrm-chat-sync { width: 40px; height: 40px; border-radius: 50%; }
 /* Les notes sous l'en-tête (actualisation, état de la négociation) : un rythme de 8. */
 html body .vrm-chat-panel > .vrm-chat-note { padding: 10px 16px; margin: 0; font-size: 13px; line-height: 1.45; border-bottom: 1px solid var(--vrm-line); }
@@ -94,7 +94,7 @@ html body .vrm-chat-panel .vrm-bulle-h { font-size: 11px; opacity: .62; letter-s
 html body .vrm-chat-panel .vrm-bulle-pied { margin: 2px 0 0 12px; }
 html body .vrm-chat-panel .vrm-bulle-pied [data-traduire]:not(#_):not(#_) { min-height: 28px; font-size: 12px !important; color: var(--vrm-muted) !important; text-decoration: underline; text-decoration-color: var(--vrm-line); text-underline-offset: 3px; }
 /* Le séparateur de jour : une étiquette centrée, discrète. */
-html body .vrm-chat-panel .vrm-chat-jour { align-self: center; font-size: 12px; font-weight: 500; padding: 4px 10px; border-radius: 999px; margin: 8px 0 4px; }
+html body .vrm-chat-panel .vrm-chat-jour { align-self: center; font-size: 12px; font-weight: 400; padding: 4px 10px; border-radius: 999px; margin: 8px 0 4px; }
 /* Une offre dans le fil : un encart à filet, du même rayon que la carte d'offre,
    sans dégradé (« acceptée » portait un dégradé vert). */
 html body .vrm-chat-panel .vrm-chat-offer-event { border-radius: 12px !important; padding: 10px 14px !important; margin: 6px 0 !important; background: var(--vrm-bg) !important; border: 1px solid var(--vrm-line) !important; }
@@ -104,14 +104,14 @@ html body .vrm-chat-panel .vrm-chat-offer-event strong { font-size: 17px; font-w
 html body .vrm-chat-panel .vrm-chat-offer-event :is(small, time) { font-size: 12px; color: var(--vrm-muted); }
 /* La carte d'offre : boutons à la même hauteur, le secondaire à filet. */
 html body .vrm-chat-panel .vrm-chat-offre-actions > .vrm-chat-btn { font-size: 15px !important; font-weight: 600 !important; }
-html body .vrm-chat-panel .vrm-chat-negociation > summary { min-height: 40px; display: flex; align-items: center; font-size: 13px; font-weight: 500; }
+html body .vrm-chat-panel .vrm-chat-negociation > summary { min-height: 40px; display: flex; align-items: center; font-size: 13px; font-weight: 400; }
 /* La carte de la paire en tête du fil (téléphone) : titre sur une ligne propre. */
 html body .vrm-chat-panel .vrm-chat-paire-n { font-size: 15px !important; }
 html body .vrm-chat-panel .vrm-chat-paire-l { font-size: 13px !important; }
 /* Le pied : un filet au-dessus, pastilles 36 px, champ à filet qui s'allume au focus. */
 html body .vrm-chat-panel .vrm-chat-foot { border-top: 1px solid var(--vrm-line) !important; padding: 12px 16px 14px !important; }
 html body .vrm-chat-panel .vrm-chat-rapides { padding-bottom: 10px !important; scroll-padding-inline: 16px; }
-html body .vrm-chat-panel .vrm-chat-rapides > button { min-height: 36px !important; padding: 0 14px !important; font-size: 13px !important; font-weight: 500 !important; white-space: nowrap; }
+html body .vrm-chat-panel .vrm-chat-rapides > button { min-height: 36px !important; padding: 0 14px !important; font-size: 13px !important; font-weight: 400 !important; white-space: nowrap; }
 html body .vrm-chat-panel .vrm-chat-rapides > button:not(:disabled):active { transform: scale(.97); }
 @media (hover: hover) and (pointer: fine) {
   html body .vrm-chat-panel .vrm-chat-rapides > button:not(:disabled):hover { border-color: var(--vrm-muted) !important; }
@@ -153,10 +153,10 @@ html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-time { margin-
 html body .vrm-inbox-filters:not(#_) { display: flex !important; flex-wrap: wrap !important; gap: 6px !important; padding: 0 !important; border: 0 !important; background: transparent !important; box-shadow: none !important; }
 html body .vrm-inbox-filters > button:not(#_) {
   min-height: 36px !important; padding: 0 12px !important; border-radius: 999px !important; border: 1px solid var(--vrm-line) !important;
-  background: var(--vrm-bg) !important; color: var(--vrm-ink) !important; font-size: 13px !important; font-weight: 500 !important;
+  background: var(--vrm-bg) !important; color: var(--vrm-ink) !important; font-size: 13px !important; font-weight: 400 !important;
   display: inline-flex !important; align-items: center; gap: 6px; flex: 0 0 auto !important; box-shadow: none !important;
 }
-html body .vrm-inbox-filters > button > span { color: inherit; opacity: .72; font-weight: 500; } /* le gris sur la pilule « remplissage » ne tenait que 3,9:1 (finition 6 nov.) */
+html body .vrm-inbox-filters > button > span { color: inherit; opacity: .72; font-weight: 400; } /* le gris sur la pilule « remplissage » ne tenait que 3,9:1 (finition 6 nov.) */
 html body .vrm-inbox-filters > button[aria-pressed="true"]:not(#_) { background: var(--vrm-ink) !important; border-color: var(--vrm-ink) !important; color: var(--vrm-bg) !important; }
 html body .vrm-inbox-filters > button[aria-pressed="true"] > span { color: inherit; opacity: .85; }
 @media (pointer: coarse) { html body .vrm-inbox-filters > button:not(#_) { min-height: 44px !important; } }

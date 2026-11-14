@@ -135,7 +135,7 @@ function BoutonPublier({ place, id, croitVendue, photos = null, total = null, on
           border: `1px solid ${glob ? C.border : C.accent}`, background: glob ? 'transparent' : (fait ? 'transparent' : `${C.accent}14`),
           color: glob ? C.muted : C.accent, opacity: glob ? 0.55 : 1, filter: glob ? 'grayscale(1)' : 'none' }}>
         {libelle}
-        {textePhotos && !fait ? <span data-photos-bouton="" style={{ fontWeight: 500, fontSize: 12, color: glob ? C.muted : C.text, opacity: 0.8 }}>· {textePhotos}</span> : null}
+        {textePhotos && !fait ? <span data-photos-bouton="" style={{ fontWeight: 400, fontSize: 12, color: glob ? C.muted : C.text, opacity: 0.8 }}>· {textePhotos}</span> : null}
       </button>
       {refus && <span data-refus-publier="" style={{ fontSize: 11, color: C.warn, lineHeight: 1.35, whiteSpace: 'normal' }}>{refus}</span>}
     </span>
@@ -294,7 +294,7 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
               const fini = rang > i; const ici = rang === i && !abandonne;
               return (
                 <div key={k} data-fiche-etape={k} data-fini={fini ? '1' : '0'} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0', fontSize: 13, color: fini || ici ? C.text : C.muted }}>
-                  <span style={{ width: 18, height: 18, borderRadius: 999, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800,
+                  <span style={{ width: 18, height: 18, borderRadius: 999, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700,
                     background: fini ? C.accent : 'transparent', color: fini ? '#fff' : C.muted, border: fini ? 'none' : `1.5px solid ${ici ? C.accent : C.border}` }}>{fini ? '✓' : ''}</span>
                   <span style={{ flex: 1, minWidth: 0, fontWeight: ici ? 700 : 500 }}>{lib}</span>
                   {k === 'photos' && (ph || (rang >= 2 && !fait)) && <span data-fiche-photos-progres="" style={{ fontSize: 12, color: C.muted, textAlign: 'right' }}>{textePhotosProgres}</span>}
@@ -353,7 +353,7 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
                 style={{ position: 'relative', padding: 0, minHeight: 0, aspectRatio: '1 / 1', borderRadius: 12, overflow: 'hidden', cursor: enCours || fait ? 'default' : 'pointer',
                   border: pris ? `2px solid ${C.accent}` : `1px solid ${C.border}`, background: C.card2 || C.card }}>
                 <PhotoVinted src={u} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: pris ? 1 : 0.38, transition: 'opacity .15s ease' }}/>
-                {pris && <span style={{ position: 'absolute', top: 5, left: 5, minWidth: 20, height: 20, padding: '0 5px', boxSizing: 'border-box', borderRadius: 999, background: C.accent, color:C.onAccent, fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>}
+                {pris && <span style={{ position: 'absolute', top: 5, left: 5, minWidth: 20, height: 20, padding: '0 5px', boxSizing: 'border-box', borderRadius: 999, background: C.accent, color:C.onAccent, fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>}
                 {i === 0 && <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,.55)', color: '#fff', fontSize: 11, fontWeight: 700, padding: '2px 0', textAlign: 'center' }}>Couverture</span>}
               </button>
             );
@@ -605,8 +605,8 @@ function LeboncoinColis({ lbcVentes = { ventes: [] }, enSection = false }) {
             <a href={bordResult.url} target="_blank" rel="noreferrer" style={{ display: 'block', background: C.accent, color: C.onAccent, borderRadius: 12, padding: '13px 16px', fontSize: 15, fontWeight: 600, textDecoration: 'none', marginBottom: 8, textAlign: 'center' }}>📄 Ouvrir le bordereau</a>
             <TamponPose r={bordResult}/>
             {bordResult.thermique && <div data-lbc-thermique={bordResult.isoles>0?'isole':'entier'} style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>{bordResult.isoles>0 ? <>Imprimante thermique : <b style={{color:C.text}}>l'étiquette seule, au format 10×15 cm</b>, ton N° en bas.</> : <>Imprimante thermique : je n'ai pas su repérer l'étiquette ({(bordResult.entiers&&bordResult.entiers[0]&&bordResult.entiers[0].raison)||'mise en page inconnue'}) — la page part entière, découpe-la à la main.</>}</div>}
-            {bordResult.pdfBuf && <button type="button" data-imprime="1" data-tampon-deplacer="1" onClick={adjustBordPlacement} style={{ width: '100%', border: `1px solid ${C.border}`, borderRadius: 12, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '11px', marginBottom: 8, fontFamily: 'inherit' }}>Déplacer le tampon</button>}
-            <button type="button" onClick={() => { if (bordResult.url) URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{ width: '100%', border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '8px', fontFamily: 'inherit' }}>Fermer</button>
+            {bordResult.pdfBuf && <button type="button" data-imprime="1" data-tampon-deplacer="1" onClick={adjustBordPlacement} style={{ width: '100%', border: `1px solid ${C.border}`, borderRadius: 12, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 400, padding: '11px', marginBottom: 8, fontFamily: 'inherit' }}>Déplacer le tampon</button>}
+            <button type="button" onClick={() => { if (bordResult.url) URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{ width: '100%', border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, fontWeight: 400, padding: '8px', fontFamily: 'inherit' }}>Fermer</button>
           </div>
         </div>
       )}
@@ -1217,7 +1217,7 @@ function RepublierLeboncoin({ liste, exclues, onClose, onFini }) {
           <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, margin: '12px 0 8px' }}>{tr('lbcplus.repub.mainIntro')}</div>
           {fiches.map(({ it, f }, i) => { const s0 = st[it.lbc.id]; const a = f.v.ok ? f.v.annonce : null; return (
             <div key={it.lbc.id} data-repub-lbc-main={it.lbc.id} data-repub-lbc-etat={s0 ? s0.etat : 'attente'} style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '10px 12px', marginBottom: 10 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{i + 1}. N°{it.numero} · {a ? a.title : it.title}</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{i + 1}. N°{it.numero} · {a ? a.title : it.title}</div>
               <div style={{ fontSize: 12, color: C.muted, margin: '2px 0 8px' }}>{euro(f.np)}{a ? ` · ${(a.photos || []).length} photo${(a.photos || []).length > 1 ? 's' : ''}` : ''}</div>
               {a ? <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 <button type="button" data-repub-lbc-copier="titre" onClick={() => copierTexte(a.title)} style={petit}>{tr('lbcplus.repub.copierTitre')}</button>
@@ -1966,7 +1966,7 @@ function LeboncoinScreen() {
       {erreurReception && <LignePanne>Relecture Leboncoin ratée (ancien affichage gardé) : touche Actualiser.</LignePanne>}
       {conseilsLbc.length > 0 && (
         <Card data-lbc-conseils={conseilsLbc.length} style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: C.text }}>À faire sur Leboncoin</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>À faire sur Leboncoin</div>
           {conseilsLbc.slice(0, 4).map((c, i) => (
             <div key={c.k} data-lbc-conseil={c.k} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 0', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
               {/* (6 nov., v36-visuel-2) Une icône de Réglages par geste (au lieu d'un point bleu) ; l'ambre au geste pressé. */}
@@ -2086,7 +2086,7 @@ function LeboncoinScreen() {
               aucune annonce confirmée en ligne, mais des annonces à confirmer. */}
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
             <span className="vrm-display" data-lbc-en-ligne={data.lbcKO || (n === 0 && nAConf > 0) ? '' : String(n)} style={{ fontSize: 20, fontWeight: 700, color: C.text }}>{data.lbcKO || (data.lbcJamaisLu && !data.postedCount) || (n === 0 && nAConf > 0) ? '—' : n}</span>
-            <span style={{ fontSize: 15, color: C.muted, fontWeight: 500 }}>annonce{n > 1 ? 's' : ''} en ligne sur Leboncoin{lim ? ` / ${lim}` : ''}</span>
+            <span style={{ fontSize: 15, color: C.muted, fontWeight: 600 }}>annonce{n > 1 ? 's' : ''} en ligne sur Leboncoin{lim ? ` / ${lim}` : ''}</span>
             {/* (6 nov.) « À CONFIRMER » (src/enLigneLbc.js) : le nombre ici ; la raison
                 et le geste UNE fois, en tête de « Mes annonces » (là où sont les cartes). */}
             {nAConf > 0 && <span data-lbc-a-confirmer={nAConf} style={{ fontSize: 15, color: C.warn, fontWeight: 600 }}>· {nAConf} à confirmer</span>}
@@ -2542,7 +2542,7 @@ function LeboncoinScreen() {
             : null;
         return (
           <Card style={{ borderColor: C.border }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: C.text, marginBottom: 2 }}>Publier sans rien retaper — préparation</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 2 }}>Publier sans rien retaper — préparation</div>
             <div style={{ fontSize: 12, color: C.muted, marginBottom: 10, lineHeight: 1.5 }}>
               {p === null
                 ? 'Je n’ai pas pu lire où ça en est. Rien n’est perdu — rouvre cet écran dans un moment.'
@@ -2554,7 +2554,7 @@ function LeboncoinScreen() {
                   const e = aPiece(k); const pa = pastille(e); const m = morceaux[k] || {};
                   return (
                     <div key={k} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: 12 }}>
-                      <span style={{ color: pa.c, fontWeight: 800, width: 12, flexShrink: 0 }}>{pa.t}</span>
+                      <span style={{ color: pa.c, fontWeight: 700, width: 12, flexShrink: 0 }}>{pa.t}</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <span style={{ color: e === 'non' ? C.muted : C.text, fontWeight: e === 'non' ? 500 : 700 }}>{titre}</span>
                         <span style={{ color: C.muted }}> — {quoi}</span>

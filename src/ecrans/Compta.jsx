@@ -422,7 +422,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
         ))}
       </div>
       {oldStockCount>0&&(
-        <div style={{background:C.card2||C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 14px',fontSize:12,color:C.muted,fontWeight:500}}>{trj('compta.articlesStockDepuis', { n: oldStockCount })}</div>
+        <div style={{background:C.card2||C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 14px',fontSize:12,color:C.muted,fontWeight:400}}>{trj('compta.articlesStockDepuis', { n: oldStockCount })}</div>
       )}
       <Card style={{padding:0,overflow:'hidden'}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
@@ -448,7 +448,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
                 </td>
                 <td style={{padding:'2px 12px',color:C.muted,fontSize:11,minWidth:80}}>
                   <Cell value={p.addedAt||'—'} onChange={v=>update(p.id,'addedAt',v)}/>
-                  {p.status==='stock'&&(()=>{const parts=(p.addedAt||'').split('/');if(parts.length!==3) return null;const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);if(days>30) return <span style={{fontSize:11,color:C.muted,fontWeight:500,marginLeft:3}}>{days}j</span>;return null;})()}
+                  {p.status==='stock'&&(()=>{const parts=(p.addedAt||'').split('/');if(parts.length!==3) return null;const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);if(days>30) return <span style={{fontSize:11,color:C.muted,fontWeight:400,marginLeft:3}}>{days}j</span>;return null;})()}
                 </td>
                 <td style={{padding:'2px 12px'}}>
                   <Btn small danger onClick={()=>remove(p.id)}>✕</Btn>
@@ -636,7 +636,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
       {/* Bandeau mois en cours */}
       <div style={{display:'flex',flexWrap:'wrap',gap:14,background:C.card,
         border:`1px solid ${C.blue}44`,borderRadius:12,padding:'12px 16px'}}>
-        <div style={{fontSize:11,color:C.blue,textTransform:'uppercase',letterSpacing:1,fontWeight:500,width:'100%'}}>{trj('compta.moisCours', { nom: moisVentes.nom })}</div>
+        <div style={{fontSize:11,color:C.blue,textTransform:'uppercase',letterSpacing:1,fontWeight:400,width:'100%'}}>{trj('compta.moisCours', { nom: moisVentes.nom })}</div>
         <div><span style={{fontSize:11,color:C.muted}}>{tr('ventes.caFinalise')}</span><div style={{fontSize:20,fontWeight:600,color:C.text}}>{fmt(moisVentes.ca)}</div></div>
         <div><span style={{fontSize:11,color:C.muted}}>{tr('ventes.benefice')}</span><div data-ventes-man-benef={moisVentes.profit==null?'':moisVentes.profit} style={{fontSize:20,fontWeight:600,color:C.text}}>{moisVentes.profit==null?'—':fmt(moisVentes.profit)}</div>{moisVentes.connus<moisVentes.count?<div style={{fontSize:11,color:C.muted}}>{trj('compta.ventes2', { n: moisVentes.connus, x: moisVentes.count })}</div>:null}</div>
         <div><span style={{fontSize:11,color:C.muted}}>{tr('historiqueSites.type.ventes')}</span><div style={{fontSize:20,fontWeight:600,color:C.muted}}>{moisVentes.count}</div></div>
@@ -715,7 +715,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
                     }:undefined}
                     data-vid={v.id}
                     style={{borderTop:`1px solid ${C.border}`,background:isSelected?`${C.accent}33`:'transparent',cursor:selectMode?'pointer':'auto',userSelect:selectMode?'none':'auto',position:'relative'}}>
-                    <td style={{padding:'2px 10px',minWidth:100,fontWeight:500,color:C.accentTexte}}>
+                    <td style={{padding:'2px 10px',minWidth:100,fontWeight:400,color:C.accentTexte}}>
                       <Cell value={v.productId||''} onChange={val=>updateSale(v.id,'productId',val)}/>
                     </td>
                     <td style={{padding:'2px 10px',minWidth:90}}>
@@ -738,7 +738,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
                         if(!inv) return <span style={{color:C.muted,fontSize:11}}>—</span>;
                         return <button type="button" onClick={()=>generatePDF(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings||{...ENTREPRISE_VIDE}))}
                           title={tr('compta.voirFacture', { number: String(inv.number) })}
-                          style={{background:`${C.blue}22`,border:`1px solid ${C.blue}66`,borderRadius:6,color:C.blue,padding:'2px 8px',fontSize:11,fontWeight:500,cursor:'pointer',fontFamily:'monospace'}}>
+                          style={{background:`${C.blue}22`,border:`1px solid ${C.blue}66`,borderRadius:6,color:C.blue,padding:'2px 8px',fontSize:11,fontWeight:400,cursor:'pointer',fontFamily:'monospace'}}>
                           📄 {inv.number}
                         </button>;
                       })()}
@@ -763,7 +763,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
                     }));
                   }}
                     placeholder={tr('compta.lot')} onKeyDown={e=>{if(e.key==='Enter')addRow();}}
-                    style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.accentTexte,padding:'4px 6px',fontSize:12,width:90,fontFamily:'monospace',outline:'none',fontWeight:500}}
+                    style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.accentTexte,padding:'4px 6px',fontSize:12,width:90,fontFamily:'monospace',outline:'none',fontWeight:400}}
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />
                 </td>
@@ -1088,7 +1088,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
         ].map(z=>(
           <button key={z.id} type="button" aria-pressed={zone===z.id} onClick={()=>{setZone(z.id);setPage(null);}}
             style={{background:'transparent',border:'none',borderBottom:zone===z.id?`3px solid ${C.accent}`:'3px solid transparent',
-              color:zone===z.id?C.accentTexte:C.muted,padding:'8px 14px',cursor:'pointer',fontSize:13,fontWeight:500,fontFamily:'inherit',whiteSpace:'nowrap'}}>
+              color:zone===z.id?C.accentTexte:C.muted,padding:'8px 14px',cursor:'pointer',fontSize:13,fontWeight:400,fontFamily:'inherit',whiteSpace:'nowrap'}}>
             <span style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name={z.icon} size={13}/>{z.label} ({z.count})</span>
           </button>
         ))}
@@ -1125,13 +1125,13 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:12,minWidth:700}}>
           <thead>
             <tr style={{background:C.surface,borderBottom:`1px solid ${C.border}`}}>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('compta.article')}</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('compta.facture')}</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('compta.dateVente')}</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('compta.designation')}</th>
-              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('partout.part.prix')}</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('ventes.acheteur')}</th>
-              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('ventes.actions')}</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('compta.article')}</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('compta.facture')}</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('compta.dateVente')}</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('compta.designation')}</th>
+              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('partout.part.prix')}</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('ventes.acheteur')}</th>
+              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('ventes.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -1145,10 +1145,10 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
               return (
                 <tr key={inv.id} style={{borderBottom:`1px solid ${C.border}`}}>
                   <td style={{padding:'8px',color:C.text,fontWeight:600,fontFamily:'monospace',fontSize:15}}>#{inv.productId||'?'}</td>
-                  <td style={{padding:'8px',color:C.accentTexte,fontWeight:500,fontFamily:'monospace',fontSize:11}}>{inv.number||'—'}{(entreprises&&entreprises.length>1)&&(()=>{const e=entForInvoice(inv,entreprises,activeEnt,invoiceSettings);return e&&e.companyName?<div style={{marginTop:2,fontFamily:'inherit',fontSize:11,color:C.muted,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:110}}>🏢 {e.companyName}</div>:null;})()}</td>
+                  <td style={{padding:'8px',color:C.accentTexte,fontWeight:400,fontFamily:'monospace',fontSize:11}}>{inv.number||'—'}{(entreprises&&entreprises.length>1)&&(()=>{const e=entForInvoice(inv,entreprises,activeEnt,invoiceSettings);return e&&e.companyName?<div style={{marginTop:2,fontFamily:'inherit',fontSize:11,color:C.muted,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:110}}>🏢 {e.companyName}</div>:null;})()}</td>
                   <td style={{padding:'8px',color:C.text,fontFamily:'monospace',fontSize:11}}>{fmtDate(inv.saleDate)}</td>
                   <td style={{padding:'8px',color:C.text}}>{String(inv.itemName||'—').replace(/\bimages?\s*:\s*/gi,'').replace(/\bimages?\b/gi,'').replace(/\s+/g,' ').trim()||'—'}</td>
-                  <td style={{padding:'8px',textAlign:'right',color:C.accentTexte,fontWeight:500}}>{fmt(valeurSue(inv.sellPrice))}</td>
+                  <td style={{padding:'8px',textAlign:'right',color:C.accentTexte,fontWeight:400}}>{fmt(valeurSue(inv.sellPrice))}</td>
                   <td style={{padding:'8px',color:C.muted,fontSize:11}}>{inv.buyerName||'—'}</td>
                   <td style={{padding:'8px',textAlign:'right',whiteSpace:'nowrap'}}>
                     <Btn small onClick={()=>generatePDF(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.blue} style={{marginRight:4}} aria-label={tr('compta.imprimerFacture')} title={tr('compta.imprimerFacture')}><Icon name="printer" size={15}/></Btn>
@@ -1209,7 +1209,7 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
       <div onClick={e=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:20,maxWidth:480,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
           <h3 style={{margin:0,color:C.accentTexte}}>{tr('compta.nouvelleFacture2')}</h3>
-          <button type="button" onClick={onClose} style={{background:'none',border:'none',color:C.muted,fontSize:22,cursor:'pointer',padding:0}}>×</button>
+          <button type="button" onClick={onClose} style={{background:'none',border:'none',color:C.muted,fontSize:20,cursor:'pointer',padding:0}}>×</button>
         </div>
         <div style={{fontSize:11,color:C.muted,marginBottom:14}}>{tr('compta.numeroAuto')} <b style={{color:C.accentTexte}}>{nextNumber}</b></div>
         
@@ -1234,7 +1234,7 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
           </div>
 
           <div style={{borderTop:`1px solid ${C.border}`,paddingTop:10,marginTop:4}}>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:8,fontWeight:500}}>{tr('ventes.acheteur')}</div>
+            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:8,fontWeight:400}}>{tr('ventes.acheteur')}</div>
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               <Field label={tr('compta.nomComplet')}><Input value={data.buyerName} onChange={e=>setData(d=>({...d,buyerName:e.target.value}))} placeholder={tr('compta.prenomNom')}/></Field>
               <Field label={tr('auth.champ.emailPlaceholder')}><Input type="email" value={data.buyerEmail} onChange={e=>setData(d=>({...d,buyerEmail:e.target.value}))} placeholder={tr('compta.prenomNomExemple')}/></Field>
@@ -1281,7 +1281,7 @@ function InvoiceSettings({settings,setSettings,entreprises,setEntreprises,active
       <div onClick={e=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:20,maxWidth:480,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
           <h3 style={{margin:0,color:C.accentTexte}}>{tr('compta.reglagesFactures2')}</h3>
-          <button type="button" onClick={onClose} style={{background:'none',border:'none',color:C.muted,fontSize:22,cursor:'pointer',padding:0}}>×</button>
+          <button type="button" onClick={onClose} style={{background:'none',border:'none',color:C.muted,fontSize:20,cursor:'pointer',padding:0}}>×</button>
         </div>
         {/* Sélecteur de micro-entreprise */}
         <div style={{marginBottom:12}}>
@@ -1665,7 +1665,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
           <div className="vrm-ca-periode-tuiles" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', borderBottom: `1px solid ${C.border}` }}>
             {COLS.map(([k, l, s], i) => (
               <div key={k} data-ca-cur={k} data-ca-eur={cur[k] == null ? '' : String(cur[k].eur)} data-ca-min={((partiel || (k === 'recu' && recuMin)) && cur[k] != null) ? '1' : undefined} style={{ padding: '14px 16px', borderLeft: i ? `1px solid ${C.border}` : 'none' }}>
-                <div style={{ fontSize: 11, color: C.muted, fontWeight: 500 }}>{l} · {cur.libelle}</div>
+                <div style={{ fontSize: 11, color: C.muted, fontWeight: 400 }}>{l} · {cur.libelle}</div>
                 <div className="vrm-display" style={{ fontSize: 20, fontWeight: 700, color: cur[k] == null || minNul(cur[k], k) ? C.muted : C.text, marginTop: 4, letterSpacing: -0.5 }}>{(partiel || (k === 'recu' && recuMin)) && cur[k] != null && !minNul(cur[k], k) ? <span style={{ fontSize: 13, fontWeight: 600, color: C.muted }}>{tr('journee.moins')} </span> : null}{minNul(cur[k], k) ? '—' : montant(cur[k])}</div>
                 <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{cur[k] == null ? s : `${nb(cur[k])} · ${s}`}</div>
               </div>
@@ -2148,7 +2148,7 @@ function ExportComptableCorps({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, 
       <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 0 }}>
         {D === undefined ? <div style={{ fontSize: 13, color: C.muted, padding: '8px 0' }}>{tr('compta.jeLisVentes')}</div>
           : resumeExport(D).map(([k, v, cle]) => (
-            <div key={cle} data-export-ligne={cle} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '8px 0', borderTop: `1px solid ${C.border}`, fontSize: 14 }}>
+            <div key={cle} data-export-ligne={cle} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '8px 0', borderTop: `1px solid ${C.border}`, fontSize: 15 }}>
               <span style={{ color: C.muted }}>{k}</span><span className="vrm-display" style={{ color: C.text, fontWeight: 600, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{v}</span>
             </div>))}
       </div>
@@ -2807,7 +2807,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux, activite
         <div data-statut-taux={String(taux)} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12, marginTop: 2 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
             <span style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{tr('compta.taux')}</span>
-            <span className="vrm-display" style={{ fontSize: 22, fontWeight: 700, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{pctFr(taux)}</span>
+            <span className="vrm-display" style={{ fontSize: 20, fontWeight: 700, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{pctFr(taux)}</span>
           </div>
           {officiel ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '4px 12px', marginTop: 8, fontSize: 13, color: C.muted }}>
@@ -2937,7 +2937,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux, activite
             {dr.enCours ? <>{tr('compta.revenus')} {dr.annee}{tr('compta.declarerPrintemps')} {dr.annee + 1} {tr('compta.instant')}</> : <>{tr('compta.revenus')} {dr.annee}{tr('compta.declarerPrintempsDeclaration')}</>}
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
-            <b className="vrm-display" style={{ fontSize: 22, color: C.text }}>{dr.partiel ? tr('journee.moins3') : ''}{eurMicro(dr.ca)}</b>
+            <b className="vrm-display" style={{ fontSize: 20, color: C.text }}>{dr.partiel ? tr('journee.moins3') : ''}{eurMicro(dr.ca)}</b>
             <span style={{ fontSize: 13, color: C.text }}>{dr.liberatoire ? <>{tr('compta.case')} <b>{dr.cases[0]}</b></> : <>{tr('compta.case')} <b>{tr('compta.5ko')}</b> {tr('compta.sansVersementLiberatoire')} <b>{tr('compta.5ta')}</b> {tr('compta.avec')}</>}</span>
           </div>
           <div style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>
@@ -2965,7 +2965,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux, activite
     <summary>
       <span style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: '1 1 auto', minWidth: 0 }}>
         <span style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{tr('compta.microEntreprise')}</span>
-        <span style={{ fontSize: 13, color: besoin ? (C.warn || '#B25000') : C.muted, fontWeight: 500, lineHeight: 1.4 }}>{aConfirmer ? tr('compta.1QuestionConfirmer') : ''}{seuilAlerte ? tr('compta.seuilApproche') : ''}{tr('compta.taux2')} {String(taux).replace('.', ',')}&nbsp;%{prochaine ? ` · ${prochaine.periode} à déclarer avant le ${prochaine.limite.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''} {tr('compta.seuilsImpots')}</span>
+        <span style={{ fontSize: 13, color: besoin ? (C.warn || '#B25000') : C.muted, fontWeight: 400, lineHeight: 1.4 }}>{aConfirmer ? tr('compta.1QuestionConfirmer') : ''}{seuilAlerte ? tr('compta.seuilApproche') : ''}{tr('compta.taux2')} {String(taux).replace('.', ',')}&nbsp;%{prochaine ? ` · ${prochaine.periode} à déclarer avant le ${prochaine.limite.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''} {tr('compta.seuilsImpots')}</span>
       </span>
     </summary>
     <div data-micro-entreprise="" className="vrm-micro-grille" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 440px), 1fr))', gap: 12, alignItems: 'stretch', marginTop: 8 }}>{calendrier}{seuils}{profil}{impots}</div>
@@ -3139,7 +3139,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
   const montantEnHaut = prev.etat === 'lu' && prev.enCours && Array.isArray(prev.mois) && prev.mois.length === 1 && prev.mois[0] === ymCour && urssafEstime != null;
   const Mt = ({ v: x }) => <span style={{whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums'}}>{fmt(x)}</span>;
   const sTitre = {fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15};
-  const sLib = {fontSize:13,color:C.muted,fontWeight:500};
+  const sLib = {fontSize:13,color:C.muted,fontWeight:400};
   const sNote = {fontSize:13,color:C.muted,lineHeight:1.5};
   const sHero = {fontWeight:700,color:C.text,letterSpacing:-1,lineHeight:1.05,fontVariantNumeric:'tabular-nums',whiteSpace:'nowrap'};
   const sCarte = {padding:18,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,boxShadow:C.shadow};
@@ -3203,7 +3203,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
           </div>
           {prev.etat === 'rythme' ? (
             <div data-prevision-urssaf="rythme" style={{background:C.card2||C.bg,borderRadius:12,padding:'12px 14px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px 12px',flexWrap:'wrap'}}>
-              <span className="vrm-display" style={{fontSize:22,fontWeight:700,color:C.muted}}>—</span>
+              <span className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.muted}}>—</span>
               <Segmente label={tr('compta.rythmeDeclaration')} value={null} onChange={(f) => save('vinted_urssaf_freq', f)}
                 options={[{ v: 'mensuel', l: 'Par mois', data: { 'data-prevision-rythme': 'mensuel' } }, { v: 'trimestriel', l: 'Par trimestre', data: { 'data-prevision-rythme': 'trimestriel' } }]} />
             </div>
@@ -3255,12 +3255,12 @@ function CarteUrssafMois({ liveStats, onNav }) {
                   <span style={{fontSize:13,fontWeight:600,color:(late||soon)?col:C.muted,whiteSpace:'nowrap'}}>{late?tr('compta.retard', { x: String(-urssafDue.daysLeft) }):urssafDue.daysLeft===0?tr('compta.aujourdHui'):tr('compta.dans2', { daysLeft: String(urssafDue.daysLeft) })}</span>
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'auto 1fr',gap:'4px 12px',marginTop:10,fontSize:13,color:C.muted}}>
-                  <span>{tr('stats.periode')}</span><span style={{color:C.text,fontWeight:500,textAlign:'right'}}>{urssafDue.label}</span>
+                  <span>{tr('stats.periode')}</span><span style={{color:C.text,fontWeight:400,textAlign:'right'}}>{urssafDue.label}</span>
                   {/* (revue du 19 oct.) Ce montant vient de la ligne publiée, datée au
                       VERSEMENT : c'est le « Reçu (versé) » du tableau juste au-dessus,
                       pas son « Finalisé ». Le libellé « CA finalisé » le contredisait
                       sur le même écran (septembre : 0,00 € ici, 4 224,77 € là). */}
-                  <span>{tr('compta.declarerArgentRecu')}</span><span data-echeance-ca={urssafPeriodCA==null?'':String(urssafPeriodCA)} data-echeance-de={urssafDue.periodStart.toISOString()} data-echeance-a={urssafDue.periodEnd.toISOString()} data-echeance-partiel={echeancePartiel||undefined} style={{color:urssafPeriodCA==null?C.muted:C.text,fontWeight:500,textAlign:'right'}}>{urssafPeriodCA==null?'—':<>{echeancePartiel>0?tr('journee.moins3'):''}<Mt v={urssafPeriodCA}/></>}</span>
+                  <span>{tr('compta.declarerArgentRecu')}</span><span data-echeance-ca={urssafPeriodCA==null?'':String(urssafPeriodCA)} data-echeance-de={urssafDue.periodStart.toISOString()} data-echeance-a={urssafDue.periodEnd.toISOString()} data-echeance-partiel={echeancePartiel||undefined} style={{color:urssafPeriodCA==null?C.muted:C.text,fontWeight:400,textAlign:'right'}}>{urssafPeriodCA==null?'—':<>{echeancePartiel>0?tr('journee.moins3'):''}<Mt v={urssafPeriodCA}/></>}</span>
                   <span>{tr('compta.payer2')}</span><span data-echeance-apayer={urssafPeriodCA==null?'':String(aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100))} style={{color:urssafPeriodCA==null?C.muted:C.text,fontWeight:700,textAlign:'right'}}>{urssafPeriodCA==null?'—':<>{echeancePartiel>0?tr('journee.moins3'):''}<Mt v={aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100)}/></>}</span>
                   {prevIci && prevIci.aDater > 0 ? <><span>{tr('compta.dater2')}</span><span data-prevision-adater={prevIci.aDater} style={{color:C.text,textAlign:'right'}}>{trj('compta.ventes4', { n: prevIci.aDater })}</span></> : null}
                   {prevIci && prevIci.declares.length > 0 ? <><span>{tr('compta.dejaDeclare')}</span><span data-prevision-declares={prevIci.declares.join(',')} style={{color:C.muted,textAlign:'right'}}>{prevIci.declares.map(ym=>new Date(Number(ym.slice(0,4)),Number(ym.slice(5,7))-1,1).toLocaleDateString('fr-FR',{month:'long'})).join(', ')}</span></> : null}
@@ -3301,7 +3301,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
         {/* ⚠️ HONNÊTETÉ (§5.57) : l'URSSAF veut le CA ENCAISSÉ, et l'app dit
             comment elle date chaque vente — replié, pas retiré. */}
         <details className="vrm-stats-calcul" style={{marginTop:10}}>
-          <summary style={{cursor:'pointer',fontSize:13,fontWeight:500,color:C.muted,padding:'6px 0'}}>{tr('compta.commentCalcule')}</summary>
+          <summary style={{cursor:'pointer',fontSize:13,fontWeight:400,color:C.muted,padding:'6px 0'}}>{tr('compta.commentCalcule')}</summary>
           <div style={{...sNote,display:'flex',flexDirection:'column',gap:8,padding:'4px 0 6px'}}>
             {moisCourantCA!=null && <div>{tr('compta.additionneVentes')} <b>{tr('compta.finalisees')}</b> {tr('compta.argentVerse')} {moisCourant.nom}, <b>{tr('compta.toutesPlateformes2')}</b>{tr('compta.ventesMasqueesComprises')}{nA > 0 && <> — {nA>1?tr('compta.ventesVersees'):tr('compta.venteVersee')} {tr('compta.moisCiMais')}{ou ? <> {tr('annonces.texte7')} {ou}</> : null} {nA>1?tr('compta.sontRecomptees'):tr('compta.recomptee')} {tr('compta.ici')}</>}{tr('compta.sommeVerserFin')}</div>}
             {moisCourantCA!=null && adV && adV.n > 0 && extSait('versement')!=='retard' && <div>{tr('compta.ventesVintedSans')} {extSait('versement')==='ok' ? <>{tr('compta.extensionVaChercher')}</> : <>{tr('compta.extensionInstalleeVa')}</>}.</div>}
@@ -3436,7 +3436,7 @@ function RecapComptableMensuel({ liveStats, compta: comptaEcran, panelOff, accou
       {moisRecap.length>0&&(
         <Card><details className="vrm-repli" data-recap-repli="">
           <summary style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
-            <span data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15}}>{tr('compta.recapComptableMensuel')}</span><span style={{fontSize:13,color:C.muted,fontWeight:500,marginLeft:'auto'}}>{trj('compta.mois3', { moisRecapN: moisRecap.length })}</span>
+            <span data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15}}>{tr('compta.recapComptableMensuel')}</span><span style={{fontSize:13,color:C.muted,fontWeight:400,marginLeft:'auto'}}>{trj('compta.mois3', { moisRecapN: moisRecap.length })}</span>
           </summary>
           <div style={{display:'flex',justifyContent:'flex-end',margin:'8px 0 10px'}}><Btn small outline onClick={exportCompta} style={{fontSize:13}}>{tr('compta.exporterCsv')}</Btn></div>
 
@@ -3454,7 +3454,7 @@ function RecapComptableMensuel({ liveStats, compta: comptaEcran, panelOff, accou
                   <tr key={m.label} style={{borderBottom:`1px solid ${C.border}`}}>
                     <td style={{padding:'8px 10px',fontWeight:600,color:C.text,whiteSpace:'nowrap'}}>{m.label}</td>
                     <td style={{padding:'8px 10px',textAlign:'right'}}>{m.count}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',fontWeight:500,whiteSpace:'nowrap'}}>{fmt(m.ca)}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',fontWeight:400,whiteSpace:'nowrap'}}>{fmt(m.ca)}</td>
                     <td data-benef-notion="benefice" data-benef-mois={m.ym} data-benef-valeur={m.profit==null?'':String(Math.round(m.profit*100))} style={{padding:'8px 10px',textAlign:'right',color:m.profit==null?C.muted:C.text,whiteSpace:'nowrap'}}>{m.profit==null?'—':fmt(m.profit)}</td>
                     <td style={{padding:'8px 10px',textAlign:'right',color:C.muted,whiteSpace:'nowrap'}}>{fmt(m.urssaf)}</td>
                     <td style={{padding:'8px 10px',textAlign:'right',color:C.text,fontWeight:600,whiteSpace:'nowrap'}}>{fmt(m.net)}</td>
@@ -4760,7 +4760,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
               endroit où l'accent est permis (§7 : rare) : le filet du haut. */}
           <Card id="compta-resultat" className="vrm-finance-result" style={{ padding: 0, overflow: 'hidden', scrollMarginTop: 72 }}>
             <div style={{ padding: '16px 18px' }} data-compta-resultat={resultatAnnee == null ? '' : String(Math.round(resultatAnnee * 100) / 100)} data-compta-ca={recettesAnnee == null ? '' : String(Math.round(recettesAnnee * 100) / 100)} data-compta-charges={String(Math.round(chargesAnnee * 100) / 100)} data-compta-ca-etat={etatCa} data-compta-ca-at={caAt ? new Date(caAt).toISOString() : ''}>
-              <div style={{ fontSize: 13, color: C.muted, fontWeight: 500, marginBottom: 6 }}>{trj('compta.resultatCaDeclare', { annee: annee })}</div>
+              <div style={{ fontSize: 13, color: C.muted, fontWeight: 400, marginBottom: 6 }}>{trj('compta.resultatCaDeclare', { annee: annee })}</div>
               {recettesAnnee == null ? (
                 <div>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>

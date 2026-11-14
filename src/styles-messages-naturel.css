@@ -17,7 +17,7 @@ html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-av { width: 48
 html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-l1 { display: flex; align-items: baseline; gap: 8px; }
 html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-time { margin-left: auto; flex: none; font-family: inherit !important; font-variant-numeric: tabular-nums; font-size: 13px !important; }
 html body :is([data-messagerie], [data-messagerie-site]) .vrm-inbox-row[data-nonlu="1"] .vrm-msg-name { font-weight: 700 !important; }
-html body :is([data-messagerie], [data-messagerie-site]) .vrm-inbox-row[data-nonlu="1"] .vrm-msg-extrait { color: var(--vrm-ink) !important; font-weight: 500; }
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-inbox-row[data-nonlu="1"] .vrm-msg-extrait { color: var(--vrm-ink) !important; font-weight: 400; }
 html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-extrait { font-size: 14px !important; line-height: 1.35; }
 html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-paire { font-size: 12px !important; opacity: .9; }
 html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-dot { width: 9px !important; height: 9px !important; min-width: 9px; border-radius: 50% !important; flex: none; }
@@ -64,7 +64,7 @@ html body .vrm-envoi-etat .vrm-envoi-reessayer:disabled { opacity: .5; cursor: d
 /* « Proposer un prix » replié derrière un bouton discret ; ouvert, le champ suit. */
 html body .vrm-chat-panel .vrm-chat-offre[data-offre="libre"] { background: transparent !important; padding: 0 !important; border: 0 !important; }
 html body .vrm-chat-panel .vrm-chat-negociation { border-top: 0 !important; margin-top: 4px !important; padding-top: 0 !important; }
-html body .vrm-chat-panel .vrm-chat-negociation > summary { display: inline-flex !important; width: auto; min-height: 36px !important; padding: 0 14px; border: 1px solid var(--vrm-line); border-radius: 999px; font-size: 14px !important; font-weight: 500 !important; color: var(--vrm-ink); list-style: none; cursor: pointer; }
+html body .vrm-chat-panel .vrm-chat-negociation > summary { display: inline-flex !important; width: auto; min-height: 36px !important; padding: 0 14px; border: 1px solid var(--vrm-line); border-radius: 999px; font-size: 14px !important; font-weight: 400 !important; color: var(--vrm-ink); list-style: none; cursor: pointer; }
 html body .vrm-chat-panel .vrm-chat-negociation > summary::-webkit-details-marker { display: none; }
 html body .vrm-chat-panel .vrm-chat-negociation > summary::after { content: none !important; }
 html body .vrm-chat-panel .vrm-chat-negociation[open] > summary { border-color: transparent; padding-left: 0; color: var(--vrm-muted); }

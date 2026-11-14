@@ -59,12 +59,12 @@
 .vrm-ent-ligne dt { font-size: 13px; color: var(--ent-gris); }
 .vrm-ent-ligne dd { margin: 0; display: grid; gap: 6px; min-width: 0; }
 .vrm-ent-ligne dd > b { font-size: 16px; font-weight: 600; overflow-wrap: anywhere; letter-spacing: -.01em; }
-.vrm-ent-ligne[data-ent-cas="info"] dd > b { font-weight: 500; }
-.vrm-ent-trou { display: inline-block; min-width: 3.5em; padding: 0 6px; border-radius: 6px; background: var(--ent-remplir); color: var(--ent-gris); font-weight: 500; font-size: 14px; }
+.vrm-ent-ligne[data-ent-cas="info"] dd > b { font-weight: 400; }
+.vrm-ent-trou { display: inline-block; min-width: 3.5em; padding: 0 6px; border-radius: 6px; background: var(--ent-remplir); color: var(--ent-gris); font-weight: 400; font-size: 14px; }
 .vrm-ent-aide { font-size: 13px; color: var(--ent-gris); }
 .vrm-ent-ecart { display: grid; gap: 6px; font-size: 13px; color: var(--ent-ambre); overflow-wrap: anywhere; }
 .vrm-ent-choix { display: inline-grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 2px; border-radius: 12px; background: var(--ent-remplir); justify-self: start; }
-.vrm-ent-choix button { appearance: none; border: 0; min-height: 44px; padding: 0 14px; border-radius: 8px; background: transparent; color: var(--ent-encre); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
+.vrm-ent-choix button { appearance: none; border: 0; min-height: 44px; padding: 0 14px; border-radius: 8px; background: transparent; color: var(--ent-encre); font: inherit; font-size: 14px; font-weight: 400; cursor: pointer; }
 .vrm-ent-choix button[aria-checked="true"] { background: var(--ent-carte); box-shadow: 0 1px 3px rgba(0,0,0,.12); font-weight: 600; }
 .vrm-ent-ville { display: grid; gap: 4px; }
 .vrm-ent-ville span { font-size: 13px; color: var(--ent-gris); }

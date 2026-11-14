@@ -36,7 +36,7 @@
 .vrm-sr-champ:has(input[aria-invalid="true"]) { box-shadow: 0 0 0 2px var(--sr-faux) inset; }
 .vrm-sr-prix { flex: 1 1 150px; }
 .vrm-sr-date { flex: 1 1 170px; }
-.vrm-sr-note { margin: 0; font: 500 14px/1.35 var(--vrm-police, system-ui, sans-serif); color: var(--sr-gris); }
+.vrm-sr-note { margin: 0; font: 400 14px/1.35 var(--vrm-police, system-ui, sans-serif); color: var(--sr-gris); }
 .vrm-sr-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .vrm-sr-actions > * { flex: 1 1 120px; min-height: 44px; }
 .vrm-sr-feuille { display: flex; flex-direction: column; gap: 12px; padding: 4px 0 8px; }

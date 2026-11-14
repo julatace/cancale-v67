@@ -24,7 +24,7 @@
 
 @layer vrm-premium {
 :root:root body .vrm-lit { display: flex !important; flex-direction: column !important; gap: 22px !important; padding: 16px !important; max-width: 1180px; box-sizing: border-box; min-width: 0; }
-:root:root body .vrm-lit .vrm-lit-note { margin: 0 2px !important; color: var(--lit-gris) !important; font: 500 15px/1.4 var(--vrm-police, -apple-system, system-ui, sans-serif) !important; }
+:root:root body .vrm-lit .vrm-lit-note { margin: 0 2px !important; color: var(--lit-gris) !important; font: 600 15px/1.4 var(--vrm-police, -apple-system, system-ui, sans-serif) !important; }
 
 :root:root body .vrm-lit .vrm-lit-resume { display: flex !important; align-items: baseline !important; gap: 10px !important; margin: -6px 2px 0 !important; color: var(--lit-gris) !important; font: 600 17px/1.2 var(--vrm-police, -apple-system, system-ui, sans-serif) !important; }
 :root:root body .vrm-lit .vrm-lit-total { font: 700 44px/1 var(--vrm-police, -apple-system, system-ui, sans-serif) !important; letter-spacing: -.03em !important; color: var(--lit-encre) !important; font-variant-numeric: tabular-nums !important; }
@@ -46,7 +46,7 @@
 :root:root body .vrm-lit .vrm-lit-genre { font: 650 16px/1.3 var(--vrm-police, system-ui, sans-serif); color: var(--lit-encre); letter-spacing: -.01em; overflow-wrap: anywhere; }
 :root:root body .vrm-lit .vrm-lit-limite { font: 600 14px/1.3 var(--vrm-police, system-ui, sans-serif); color: var(--lit-gris); }
 :root:root body .vrm-lit .vrm-lit-limite.is-presse { color: var(--lit-ambre); }
-:root:root body .vrm-lit .vrm-lit-titre { margin: 0 !important; font: 500 13px/1.3 var(--vrm-police, system-ui, sans-serif) !important; color: var(--lit-gris) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:root:root body .vrm-lit .vrm-lit-titre { margin: 0 !important; font: 400 13px/1.3 var(--vrm-police, system-ui, sans-serif) !important; color: var(--lit-gris) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Les quatre preuves : deux par ligne (la carte reste étroite, même sur ordinateur). */
 :root:root body .vrm-lit .vrm-lit-preuves { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
@@ -112,9 +112,9 @@
 }
 :root:root body .vrm-lit button.vrm-lit-dossier-b:disabled { opacity: .6 !important; cursor: default; }
 :root:root body .vrm-lit button.vrm-lit-dossier-b:focus-visible { outline: 3px solid var(--w-accent, #0071E3) !important; outline-offset: 2px !important; }
-:root:root body .vrm-lit .vrm-lit-dossier-case { display: flex !important; align-items: center !important; gap: 10px !important; min-height: 44px !important; padding: 0 4px !important; color: var(--lit-encre) !important; font: 500 15px/1.3 var(--vrm-police, system-ui, sans-serif) !important; cursor: pointer; }
+:root:root body .vrm-lit .vrm-lit-dossier-case { display: flex !important; align-items: center !important; gap: 10px !important; min-height: 44px !important; padding: 0 4px !important; color: var(--lit-encre) !important; font: 600 15px/1.3 var(--vrm-police, system-ui, sans-serif) !important; cursor: pointer; }
 :root:root body .vrm-lit .vrm-lit-dossier-case input { width: 22px !important; height: 22px !important; margin: 0 !important; flex: 0 0 auto; accent-color: var(--w-accent, #0071E3); }
 :root:root body .vrm-lit .vrm-lit-dossier-case small { color: var(--lit-gris) !important; font-size: 13px !important; }
-:root:root body .vrm-lit .vrm-lit-dossier-msg { margin: 0 4px !important; color: var(--lit-gris) !important; font: 500 14px/1.3 var(--vrm-police, system-ui, sans-serif) !important; }
+:root:root body .vrm-lit .vrm-lit-dossier-msg { margin: 0 4px !important; color: var(--lit-gris) !important; font: 400 14px/1.3 var(--vrm-police, system-ui, sans-serif) !important; }
 :root:root body .vrm-lit .vrm-lit-dossier-msg.is-passu { color: var(--lit-ambre) !important; }
 }

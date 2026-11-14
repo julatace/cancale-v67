@@ -44,7 +44,7 @@
 .vrm-pm-ligne { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--fu-filet); }
 .vrm-pm-ligne:first-child { border-top: 0; }
 .vrm-pm-nom { display: flex; flex-direction: column; min-width: 0; font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vrm-pm-quand { font-size: 12px; font-weight: 500; color: var(--fu-gris); }
+.vrm-pm-quand { font-size: 12px; font-weight: 400; color: var(--fu-gris); }
 .vrm-pm-quand.is-vieux, .vrm-mq-quand.is-vieux { color: var(--fu-ambre-txt); }
 .vrm-pm-val { font-size: 15px; font-weight: 700; font-variant-numeric: var(--fu-chiffres); white-space: nowrap; text-align: right; }
 .vrm-pm-val.is-gris { color: var(--fu-gris); font-weight: 600; }

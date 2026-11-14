@@ -78,7 +78,7 @@ export function NoteSatisfaction({ compteCreeLe, lireEtat, ecrireEtat, lireAbonn
           <label htmlFor="vrm-note-mot" style={S.muet}>Un mot (facultatif)</label>
           <textarea id="vrm-note-mot" data-note-mot="" value={mot} maxLength={MOT_MAX} rows={2} onChange={(e) => setMot(e.target.value)}
             placeholder="Ce qui t’aide, ce qui manque…"
-            style={{ display: 'block', width: '100%', boxSizing: 'border-box', marginTop: 4, padding: '10px 12px', borderRadius: 12, border: '1px solid var(--vrm-line)', background: 'var(--vrm-surface)', color: 'var(--vrm-ink)', fontSize: 16, fontFamily: 'inherit', resize: 'vertical' }}/>
+            style={{ display: 'block', width: '100%', boxSizing: 'border-box', marginTop: 4, padding: '10px 12px', borderRadius: 12, border: '1px solid var(--vrm-line)', background: 'var(--vrm-surface)', color: 'var(--vrm-ink)', fontSize: 15, fontFamily: 'inherit', resize: 'vertical' }}/>
           <button type="button" data-note-envoyer="" disabled={envoi} onClick={() => geste('repondre')}
             style={{ marginTop: 8, minHeight: 44, padding: '0 18px', borderRadius: 12, border: 0, background: 'var(--vrm-accent)', color: 'var(--vrm-on-accent, #fff)', fontSize: 15, fontWeight: 600, cursor: envoi ? 'default' : 'pointer', opacity: envoi ? 0.6 : 1 }}>
             {envoi ? 'Envoi…' : 'Envoyer'}

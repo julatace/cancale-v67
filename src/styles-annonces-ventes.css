@@ -19,7 +19,7 @@
 }
 .vrm-app-shell .vrm-main .vrm-ledger-sale-sous {
   display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  font-size: 11px; font-weight: 500; color: var(--vrm-muted);
+  font-size: 11px; font-weight: 400; color: var(--vrm-muted);
 }
 .vrm-app-shell .vrm-main .vrm-ledger-sale-state[data-ton=action] { color: var(--av-warn) !important; font-weight: 700; }
 .vrm-app-shell .vrm-main .vrm-ledger-sale-state[data-ton=annule] { opacity: .75; }

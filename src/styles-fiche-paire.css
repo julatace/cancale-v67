@@ -1,82 +1,143 @@
 /* ── FICHE COMPLÈTE D'UNE PAIRE (1er nov.) — Vitrine ─────────────────────────
-   Un écran plein (portail) : grand N° en Geist Mono, trois tuiles « surface »,
+   Un écran plein (portail) : grand N° (40/700), trois tuiles (cartes),
    le parcours en frise. Étape lue : pastille pleine à l'encre ; pas su ou pas
    arrivée : pastille au trait, texte gris. Aucune couleur sauf le rouge des
    deux paires sous un N° (§5, §7). Cibles 44 px. */
 .vrm-fp {
   position: fixed; inset: 0; z-index: 9000; overflow-y: auto; overscroll-behavior: contain;
-  background: var(--vrm-bg, #FFFFFF); color: var(--vrm-ink, #1D1D1F); font-family: var(--vrm-police, system-ui, sans-serif);
+  background: var(--d-fond, #F2F2F7); color: var(--d-encre, #1D1D1F); font-family: var(--vrm-police, system-ui, sans-serif);
 }
 .vrm-fp-cadre { box-sizing: border-box; width: 100%; max-width: 640px; margin: 0 auto; padding: max(10px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom)); }
 .vrm-fp-tete { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 56px; }
-.vrm-fp-retour { display: flex; align-items: center; gap: 8px; min-height: 44px; border: 0; background: transparent; color: inherit; font: inherit; font-size: 20px; font-weight: 600; padding: 0 4px 0 0; cursor: pointer; }
+.vrm-fp-retour { display: flex; align-items: center; gap: 4px; min-height: 44px; border: 0; background: transparent; color: inherit; font: inherit; font-size: var(--d-t-17, 17px); font-weight: 600; letter-spacing: var(--d-ap-17, -.012em); padding: 0 4px 0 0; cursor: pointer; }
 .vrm-fp-chevron { flex: none; display: block; }
 .vrm-fp-retour { white-space: nowrap; }
-.vrm-fp-fermer { width: 44px; height: 44px; border-radius: 999px; border: 0; background: var(--vrm-surface, #F2F2F7); color: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+.vrm-fp-fermer { width: 44px; height: 44px; border-radius: 999px; border: 0; background: var(--d-remplir, rgba(118,118,128,.12)); color: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
 .vrm-fp-retour:focus-visible, .vrm-fp-fermer:focus-visible, .vrm-fp-b:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 2px; }
-.vrm-fp-entete { display: flex; align-items: center; gap: 16px; margin: 6px 0 16px; min-width: 0; }
+.vrm-fp-entete { display: flex; align-items: center; gap: 16px; margin: 8px 0 16px; min-width: 0; }
 .vrm-fp-num {
-  flex: none; font-family: var(--vrm-police-mono, ui-monospace, monospace) !important; font-weight: 500 !important;
-  font-size: clamp(72px, 24vw, 128px); line-height: .9; letter-spacing: -.05em; word-spacing: -.2em; font-variant-numeric: tabular-nums;
+  /* (14 nov., passe design) LE chiffre de la fiche, à l'échelle du système : 40/700 (44 à l'ordinateur), la police
+     du système, jamais 500 ni 128 px. */
+  flex: none; font-family: var(--vrm-police, system-ui, sans-serif) !important; font-weight: 700 !important;
+  font-size: var(--d-t-44, 40px); line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums;
 }
-.vrm-fp-num.is-double { color: var(--vrm-danger, #B42318); }
+/* Deux paires présentes sous ce N° : le SEUL rouge de l'app (§5, §7) — `--vrm-doublon` (danger est l'ambre). */
+.vrm-fp-num.is-double { color: var(--vrm-doublon, #D70015); }
 .vrm-fp-quoi { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.vrm-fp-titre { font-size: 20px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2; overflow-wrap: anywhere; }
-.vrm-fp-sous { font-size: 15px; color: var(--vrm-muted, #6E6E73); }
+.vrm-fp-titre { font-size: var(--d-t-20, 20px); font-weight: 700; letter-spacing: var(--d-ap-22, -.016em); line-height: 1.2; overflow-wrap: break-word; hyphens: none; }
+.vrm-fp-sous { font-size: var(--d-t-15, 15px); color: var(--d-gris, #6E6E73); }
 .vrm-fp-photo { flex: none; width: 64px; height: 64px; border-radius: 12px; overflow: hidden; background: var(--vrm-card2, #F2F2F7); display: block; }
 .vrm-fp-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.vrm-fp-double { margin: -4px 0 14px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--vrm-danger, #B42318); color: var(--vrm-danger, #B42318); font-weight: 600; font-size: 15px; line-height: 1.4; }
-.vrm-fp-tuiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
-.vrm-fp-tuile { background: var(--vrm-surface, #FFFFFF); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.vrm-fp-tuile > span { font-size: 13px; color: var(--vrm-muted, #6E6E73); }
-.vrm-fp-tuile > b { font-size: 22px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.vrm-fp-tuile > small { font-size: 12px; color: var(--vrm-muted, #6E6E73); line-height: 1.3; }
+.vrm-fp-double { margin: -4px 0 16px; padding: 12px 16px; border-radius: var(--d-r-case, 12px); border: 1px solid var(--vrm-doublon, #D70015); color: var(--vrm-doublon, #D70015); font-weight: 600; font-size: var(--d-t-15, 15px); line-height: 1.4; }
+/* Les tuiles : des cartes (rayon 20, ombre posée) ; libellé 13/600 gris, chiffre 20/700 au téléphone (trois
+   tuiles de 114 px) et 28/700 dès 700 px ; « — » (pas su) à la taille du texte, en 400 ; la note 13 grise. */
+.vrm-fp-tuiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 24px; }
+.vrm-fp-tuile { background: var(--d-carte, #FFFFFF); border-radius: var(--d-r-carte, 20px); box-shadow: var(--d-ombre-carte, none); padding: 12px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.vrm-fp-tuile > span { font-size: var(--d-t-13, 13px); font-weight: 600; color: var(--d-gris, #6E6E73); }
+.vrm-fp-tuile > b { font-size: var(--d-t-20, 20px); font-weight: 700; letter-spacing: var(--d-ap-22, -.016em); line-height: 1.15; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-fp-tuile > b.is-vide { font-weight: 400; }
+.vrm-fp-tuile > small { font-size: var(--d-t-13, 13px); color: var(--d-gris, #6E6E73); line-height: 1.35; overflow-wrap: break-word; hyphens: none; }
+@media (min-width: 700px) {
+  .vrm-fp-tuile { padding: 16px; }
+  .vrm-fp-tuile > b:not(.is-vide) { font-size: var(--d-t-28, 28px); letter-spacing: var(--d-ap-28, -.02em); }
+}
 .vrm-fp-parcours { list-style: none; margin: 0; padding: 0; }
-.vrm-fp-etape { position: relative; display: flex; gap: 14px; padding: 0 0 16px; }
-.vrm-fp-etape:not(:last-child)::before { content: ''; position: absolute; left: 21px; top: 44px; bottom: 0; width: 2px; background: var(--vrm-line, #E5E5EA); }
+.vrm-fp-etape { position: relative; display: flex; gap: 12px; padding: 0 0 16px; }
+.vrm-fp-etape:not(:last-child)::before { content: ''; position: absolute; left: 21px; top: 44px; bottom: 0; width: 2px; background: var(--d-filet, #E5E5EA); }
 .vrm-fp-pastille { flex: none; width: 44px; height: 44px; border-radius: 999px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
-.vrm-fp-etape.is-fait .vrm-fp-pastille { background: var(--vrm-ink, #1D1D1F); color: var(--vrm-bg, #FFFFFF); }
-.vrm-fp-etape:not(.is-fait) .vrm-fp-pastille { border: 2px solid var(--vrm-line, #D1D1D6); color: var(--vrm-muted, #6E6E73); background: var(--vrm-bg, #FFFFFF); }
+.vrm-fp-etape.is-fait .vrm-fp-pastille { background: var(--d-encre, #1D1D1F); color: var(--d-fond, #FFFFFF); }
+.vrm-fp-etape:not(.is-fait) .vrm-fp-pastille { border: 1.5px solid var(--d-filet-fort, #D1D1D6); color: var(--d-gris, #6E6E73); background: var(--d-fond, #FFFFFF); }
 .vrm-fp-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; padding-top: 2px; }
 .vrm-fp-ligne1 { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.vrm-fp-ligne1 b { font-size: 17px; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; }
-.vrm-fp-etape:not(.is-fait) .vrm-fp-ligne1 b { color: var(--vrm-muted, #6E6E73); }
-.vrm-fp-date { flex: none; font-family: var(--vrm-police-mono, ui-monospace, monospace); font-size: 13px; color: var(--vrm-muted, #6E6E73); }
-.vrm-fp-detail { font-size: 15px; color: var(--vrm-muted, #6E6E73); line-height: 1.4; overflow-wrap: anywhere; }
-.vrm-fp-note { font-size: 13px; color: var(--vrm-muted, #6E6E73); margin: 0 2px 12px; }
-.vrm-fp-vide { font-size: 17px; color: var(--vrm-muted, #6E6E73); margin: 24px 2px; }
-.vrm-fp-actions { display: flex; gap: 10px; margin-top: 6px; }
+.vrm-fp-ligne1 b { font-size: var(--d-t-17, 17px); font-weight: 600; letter-spacing: var(--d-ap-17, -.012em); line-height: 1.3; }
+.vrm-fp-etape:not(.is-fait) .vrm-fp-ligne1 b { color: var(--d-gris, #6E6E73); }
+.vrm-fp-date { flex: none; font-size: var(--d-t-13, 13px); color: var(--d-gris, #6E6E73); font-variant-numeric: tabular-nums; }
+.vrm-fp-detail { font-size: var(--d-t-15, 15px); color: var(--d-gris, #6E6E73); line-height: 1.4; overflow-wrap: break-word; hyphens: none; }
+.vrm-fp-note { font-size: var(--d-t-13, 13px); color: var(--d-gris, #6E6E73); margin: 0 4px 12px; }
+.vrm-fp-vide { font-size: var(--d-t-17, 17px); color: var(--d-gris, #6E6E73); margin: 24px 4px; }
+/* Bordereau / Emballer : deux capsules de la hauteur d'un contrôle ; Emballer est L'action (le seul aplat bleu). */
+.vrm-fp-actions { display: flex; gap: 8px; margin-top: 8px; }
 .vrm-fp-b {
-  flex: 1 1 0; min-height: 56px; border-radius: 12px; padding: 0 14px; display: flex; align-items: center; justify-content: center; gap: 10px;
-  border: 1px solid var(--vrm-line, #D1D1D6); background: var(--vrm-bg, #FFFFFF); color: var(--vrm-ink, #1D1D1F); font: inherit; font-size: 17px; font-weight: 700; cursor: pointer;
+  flex: 1 1 0; min-height: var(--d-h-ctrl, 44px); border-radius: 999px; padding: 0 16px; display: flex; align-items: center; justify-content: center; gap: 8px;
+  border: 0; background: var(--d-remplir, rgba(118,118,128,.12)); color: var(--d-encre, #1D1D1F); font: inherit; font-size: var(--d-t-ctrl, 15px); font-weight: 600; cursor: pointer;
 }
-.vrm-fp-b-plein { background: var(--vrm-ink, #1D1D1F); border-color: var(--vrm-ink, #1D1D1F); color: var(--vrm-bg, #FFFFFF); }
-@media (max-width: 380px) { .vrm-fp-tuile > b { font-size: 20px; } }
+.vrm-fp-b > svg { width: 17px; height: 17px; }
+.vrm-fp-b-plein { background: var(--d-accent, #0071E3); color: #FFFFFF; }
 /* La règle commune des croix « Fermer… » (marge négative, rayon 10 px) : ici la
    croix est un rond de 44 px posé dans la barre, sans marge. */
 .vrm-fp .vrm-fp-fermer:not(#vrm-fp-a):not(#vrm-fp-b) { margin: 0 !important; border-radius: 999px !important; }
 
 /* (5 nov.) « Voir l'état » : tout ce qui se calcule, en une grille sobre. */
-.vrm-fp-etat { margin: 0 0 18px; }
-.vrm-fp-etat-titre { font-size: 15px; font-weight: 700; margin: 0 2px 8px; color: var(--vrm-ink, inherit); }
-.vrm-fp-etat-grille { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; }
-.vrm-fp-etat-l { background: var(--vrm-surface, #FFFFFF); border-radius: 12px; padding: 10px 12px; min-width: 0; }
-.vrm-fp-etat-l dt { font-size: 12px; color: var(--vrm-muted, #6E6E73); margin: 0 0 4px; }
+/* (14 nov.) La section porte UN titre de section (20/700) et UNE carte ; les chiffres y sont posés sans case.
+   ⚠️ `.vrm-fp-etat` est aussi le nom d'un encadré de la facture Pro (facture-pro.css : cadre 1 px, rayon 12) qui
+   s'appliquait ICI (la carte « L'état » portait un cadre, visible la nuit) : la fiche le remet à zéro, `.vrm-fp` devant. */
+.vrm-fp .vrm-fp-etat { margin: 0 0 24px; display: block; padding: 0; border: 0; border-radius: 0; background: none; }
+.vrm-fp-etat-titre { font-size: var(--d-t-20, 20px); font-weight: 700; letter-spacing: var(--d-ap-22, -.016em); margin: 0 4px 8px; color: var(--d-encre, inherit); }
+.vrm-fp-etat-grille { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0; padding: 16px; background: var(--d-carte, #FFFFFF); border-radius: var(--d-r-carte, 20px); box-shadow: var(--d-ombre-carte, none); }
+.vrm-fp-etat-l { min-width: 0; }
+.vrm-fp-etat-l dt { font-size: var(--d-t-13, 13px); color: var(--d-gris, #6E6E73); margin: 0 0 4px; }
 .vrm-fp-etat-l dd { margin: 0; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.vrm-fp-etat-l dd b { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
-.vrm-fp-etat-l dd small { font-size: 12px; color: var(--vrm-muted, #6E6E73); line-height: 1.3; overflow-wrap: anywhere; }
-@media (min-width: 700px) { .vrm-fp-etat-grille { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.vrm-fp-etat-l dd b { font-size: var(--d-t-17, 17px); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: var(--d-ap-17, -.012em); }
+.vrm-fp-etat-l dd small { font-size: var(--d-t-13, 13px); color: var(--d-gris, #6E6E73); line-height: 1.35; overflow-wrap: break-word; hyphens: none; }
+@media (min-width: 700px) { .vrm-fp-etat-grille { grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 20px; } }
 
 /* (9 nov.) « Ouvrir dans … › » : la porte vers l'écran d'où vient l'étape. Un lien
    d'action (la règle commune `vrm-lien-action`), aligné sur le texte, 44 px. */
-.vrm-fp .vrm-fp-source { align-self: flex-start; min-height: 44px; margin: 0 0 -6px; padding: 0; border: 0; background: transparent; font: inherit; font-size: 15px; font-weight: 600; color: var(--vrm-accent-texte, #0066CC); cursor: pointer; text-align: left; }
+.vrm-fp .vrm-fp-source { align-self: flex-start; min-height: 44px; margin: 0 0 -6px; padding: 0; border: 0; background: transparent; font: inherit; font-size: var(--d-t-15, 15px); font-weight: 600; color: var(--d-accent-texte, #0066CC); cursor: pointer; text-align: left; }
 .vrm-fp .vrm-fp-source:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 2px; border-radius: 6px; }
 
 /* (9 nov., lot AF) « L’histoire du N° » : lecture seule, un groupe blanc rayon 24 (DA6), neutre — aucune couleur. */
-.vrm-fp-histo-num { margin: 0 0 18px; }
-.vrm-fp-histo-num .vrm-fp-evs { background: var(--vrm-surface, #FFFFFF); border-radius: 20px; padding: 12px 14px; margin: 0; gap: 10px; }
+.vrm-fp-histo-num { margin: 0 0 24px; }
+.vrm-fp-histo-num .vrm-fp-evs { background: var(--d-carte, #FFFFFF); border-radius: var(--d-r-carte, 20px); box-shadow: var(--d-ombre-carte, none); padding: 12px 16px; margin: 0; gap: 8px; }
 .vrm-fp-histo-num .vrm-fp-ev time, .vrm-fp-histo-num .vrm-fp-ev .vrm-fp-ev-sansdate { min-width: 76px; }
 .vrm-fp-histo-num .vrm-fp-note { margin: 8px 2px 0; }
 /* (13 nov., point 14) « Saisir » dans une tuile : la porte du chiffre qui manque (§5). 44 px au doigt (§7),
    le texte du lien d'action de l'app, jamais une couleur de plus. */
-.vrm-fp-tuile > .vrm-fp-saisir { align-self: flex-start; min-height: 44px; margin: -10px 0 -12px; padding: 0; border: none; background: transparent; font: 600 13px/1.25 var(--vrm-police, inherit); color: var(--vrm-accent-texte, #0066CC); cursor: pointer; text-align: left; }
+.vrm-fp-tuile > .vrm-fp-saisir { align-self: flex-start; min-height: 44px; margin: -10px 0 -12px; padding: 0; border: none; background: transparent; font: 600 13px/1.25 var(--vrm-police, inherit); color: var(--d-accent-texte, #0066CC); cursor: pointer; text-align: left; }
+
+/* ══ (14 nov., passe design) LA FICHE DANS LE SYSTÈME ══════════════════════════
+   Ce que d'autres feuilles posaient sur la fiche (note, rappel, gestes, raccourcis, journal)
+   ramené aux formes de docs/design/DESIGN.md : ce qui se touche = une capsule à la hauteur
+   d'un contrôle (44 au doigt, 36 à la souris), remplissage gris, encre, 600 ; ce qui contient =
+   une carte rayon 20 sans cadre. `.vrm-fp` devant : ces règles ne sortent pas de la fiche. */
+/* La note privée et « Me le rappeler » : deux capsules côte à côte (avant : une barre pleine largeur de 30 px). */
+.vrm-fp .vrm-fp-note-privee { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+.vrm-fp .vrm-fp-note-privee > * { flex: 1 1 100%; min-width: 0; }
+.vrm-fp .vrm-fp-note-privee > :is(.vrm-note-ajout.is-bloc, .vrm-rp-bouton) {
+  flex: 0 0 auto; width: auto; height: auto; min-height: var(--d-h-ctrl, 44px); padding: 0 16px; gap: 6px; border-radius: 999px;
+  background: var(--d-remplir, rgba(118,118,128,.12)); color: var(--d-encre, #1D1D1F); font-size: var(--d-t-ctrl, 15px); font-weight: 600; justify-content: center;
+}
+.vrm-fp .vrm-fp-note-privee > :is(.vrm-note-ajout.is-bloc, .vrm-rp-bouton) svg { color: var(--d-encre, #1D1D1F); width: 17px; height: 17px; }
+.vrm-fp .vrm-fp-note-privee > .vrm-note.is-bloc { border-radius: var(--d-r-case, 12px); font-weight: 400; }
+/* Les gestes (Changer le prix, Publier ailleurs, Dupliquer) : capsules sur UNE ligne chacune, qui passent à la
+   ligne ensemble (au téléphone, « Changer le / prix » se cassait dans un tiers de largeur). */
+.vrm-fp .vrm-fp-outils { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 24px; }
+.vrm-fp .vrm-fp-outils .vrm-ao-second {
+  flex: 1 1 auto; min-height: var(--d-h-ctrl, 44px); padding: 0 16px; border: 0; border-radius: 999px; white-space: nowrap;
+  background: var(--d-remplir, rgba(118,118,128,.12)); color: var(--d-encre, #1D1D1F); font-size: var(--d-t-ctrl, 15px); font-weight: 600;
+}
+/* Les raccourcis vers chaque étape : des filtres (capsules remplies, sans cadre) ; au téléphone, UNE rangée qui défile. */
+.vrm-fp .vrm-fp-raccourcis { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 24px; }
+.vrm-fp .vrm-fp-raccourcis button {
+  flex: none; min-height: var(--d-h-filtre, 44px); padding: 0 14px; border: 0; border-radius: 999px;
+  background: var(--d-remplir, rgba(118,118,128,.12)); color: var(--d-encre, #1D1D1F); font-size: var(--d-t-13, 13px); font-weight: 600; white-space: nowrap;
+}
+@media (max-width: 699px) {
+  .vrm-fp .vrm-fp-raccourcis { flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px 24px; padding: 0 16px; scrollbar-width: none; overscroll-behavior-x: contain; }
+  .vrm-fp .vrm-fp-raccourcis::-webkit-scrollbar { display: none; }
+}
+/* « Modifications enregistrées sur cet appareil » : une carte (rayon 20, sans cadre), le titre est une rangée. */
+.vrm-fp .vrm-parcours-historique { margin: 0 0 24px; padding: 0 16px; border: 0; border-radius: var(--d-r-carte, 20px); background: var(--d-carte, #FFFFFF); box-shadow: var(--d-ombre-carte, none); }
+.vrm-fp .vrm-parcours-historique summary { min-height: var(--d-h-ctrl, 44px); display: flex; align-items: center; gap: 6px; font-size: var(--d-t-15, 15px); font-weight: 600; }
+.vrm-fp .vrm-parcours-historique p { font-size: var(--d-t-13, 13px); color: var(--d-gris, #6E6E73); }
+.vrm-fp .vrm-parcours-historique[open] { padding-bottom: 12px; }
+.vrm-fp .vrm-fp-ev time, .vrm-fp .vrm-fp-ev .vrm-fp-ev-sansdate { color: var(--d-gris, #6E6E73); }
+.vrm-fp .vrm-fp-ev-txt small { font-size: var(--d-t-12, 12px); color: var(--d-gris, #6E6E73); }
+/* À l'ordinateur : la croix est un contrôle à la souris (36). */
+@media (hover: hover) and (pointer: fine) and (min-width: 768px) {
+  .vrm-fp .vrm-fp-fermer:not(#vrm-fp-a):not(#vrm-fp-b) { width: var(--d-h-ctrl, 36px); height: var(--d-h-ctrl, 36px); }
+  .vrm-fp .vrm-fp-cadre { padding-left: 20px; padding-right: 20px; }
+}
+@media (hover: hover) and (pointer: fine) {
+  .vrm-fp :is(.vrm-fp-raccourcis button, .vrm-fp-outils .vrm-ao-second, .vrm-fp-b:not(.vrm-fp-b-plein), .vrm-fp-fermer):hover { background: var(--d-remplir-fort, rgba(118,118,128,.2)); }
+}

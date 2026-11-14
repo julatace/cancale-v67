@@ -11,6 +11,7 @@ import './styles-fiche-paire.css';
 import './styles-annonces-outils.css';
 import { texteDuree } from './etatArticle.js';
 import { escalierPrix, eurosPrix } from './historiquePrix.js';
+import { motsInsecables } from './motsInsecables.jsx';
 
 const ICONE = { achat: 'bag', numero: 'pencil', stock: 'home', annonces: 'vitrine', prix: 'tag', offres: 'chat', favoris: 'heart', vente: 'cash', colis: 'box', argent: 'euro', retour: 'restore', benefice: 'chart' };
 // (9 nov.) « Ouvrir » : l'écran d'où vient l'étape (`source`, posée par
@@ -127,7 +128,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
       <div className="vrm-fp-entete">
         <span className={'vrm-fp-num' + (p.double ? ' is-double' : '')} data-fiche-grand-num="">{p.num}</span>
         <span className="vrm-fp-quoi">
-          <span className="vrm-fp-titre">{(neuve && neuve.titre) || p.titre || (p.etat === 'rien' ? 'N° jamais servi' : 'Sans titre')}{(neuve && neuve.taille) || p.taille ? ` · ${(neuve && neuve.taille) || p.taille}` : ''}</span>
+          <span className="vrm-fp-titre">{motsInsecables((neuve && neuve.titre) || p.titre || (p.etat === 'rien' ? 'N° jamais servi' : 'Sans titre'))}{(neuve && neuve.taille) || p.taille ? ` · ${(neuve && neuve.taille) || p.taille}` : ''}</span>
           {neuve ? <span className="vrm-fp-sous" data-fiche-neuve="">Photos à prendre</span> : null}
           {p.ancienNumero ? <span className="vrm-fp-sous">Ancien numéro (d’avant la remise à zéro)</span> : null}
         </span>
@@ -139,7 +140,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
       <div className="vrm-fp-tuiles">
         {/* (5 nov.) Le prix d'achat de « Voir l'état » est CE nombre (jamais écrit deux fois, §7) : sa source dessous. */}
         <div className="vrm-fp-tuile" data-fiche-resume-achat={r.achat == null ? '' : r.achat} {...(etat ? { 'data-etat-ligne': 'prix-achat', 'data-etat-val': etat.prixAchat.cents == null ? '' : etat.prixAchat.cents, 'data-etat-source': etat.prixAchat.source || '' } : {})}>
-          <span>Achat</span><b>{eur(r.achat)}</b>
+          <span>Achat</span><b className={r.achat == null ? 'is-vide' : undefined}>{eur(r.achat)}</b>
           {/* (13 nov., point 14) Le chiffre qui manque est la porte pour le corriger (§5) : « Saisir » ; la tuile
               du bénéfice, à côté, NOMME le manque (« prix d'achat pas saisi ») — une porte, pas deux. */}
           {r.achat == null && saisir ? <button type="button" className="vrm-lien-action vrm-fp-saisir" data-fiche-saisir-achat={p.idFiche} onClick={saisir}>Saisir</button>
@@ -148,16 +149,16 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
         {sv ? (<>
           {/* (13 nov., point 14) PAS ENCORE VENDUE : le prix affiché, et le bénéfice SI elle se vend à ce prix
               (la même règle que la vente, src/dormantes.js). Ce n'est pas un bénéfice : aucun « Bénéfice » écrit. */}
-          <div className="vrm-fp-tuile" data-fiche-resume-vente="" data-fiche-prix-affiche={sv.prix == null ? '' : sv.prix}><span>En ligne à</span><b>{eur(sv.prix)}</b></div>
+          <div className="vrm-fp-tuile" data-fiche-resume-vente="" data-fiche-prix-affiche={sv.prix == null ? '' : sv.prix}><span>En ligne à</span><b className={sv.prix == null ? 'is-vide' : undefined}>{eur(sv.prix)}</b></div>
           <div className="vrm-fp-tuile" data-fiche-resume-benefice="" data-fiche-si-vendue={sv.benefice == null ? '' : sv.benefice} data-fiche-si-vendue-etat={sv.etat} data-fiche-benefice-partiel={sv.etat === 'partiel' ? '1' : undefined}>
-            <span>Si vendue</span><b>{signe(sv.benefice)}</b>
+            <span>Si vendue</span><b className={sv.benefice == null ? 'is-vide' : undefined}>{signe(sv.benefice)}</b>
             {sv.benefice == null ? <small data-fiche-raison-benef="">{sv.raison}</small>
               : <small>{sv.etat === 'partiel' ? 'au plus : frais à confirmer' : 'tous frais comptés'}</small>}
           </div>
         </>) : (<>
-          <div className="vrm-fp-tuile" data-fiche-resume-vente={r.vente == null ? '' : r.vente}><span>{r.venteLib || 'Vente'}</span><b>{eur(r.vente)}</b></div>
+          <div className="vrm-fp-tuile" data-fiche-resume-vente={r.vente == null ? '' : r.vente}><span>{r.venteLib || 'Vente'}</span><b className={r.vente == null ? 'is-vide' : undefined}>{eur(r.vente)}</b></div>
           <div className="vrm-fp-tuile" data-fiche-resume-benefice={r.benefice == null ? '' : r.benefice} data-fiche-benefice-partiel={r.benefPartiel ? '1' : undefined}>
-            <span>Bénéfice</span><b>{signe(r.benefice)}</b>
+            <span>Bénéfice</span><b className={r.benefice == null ? 'is-vide' : undefined}>{signe(r.benefice)}</b>
             {r.benefice == null && r.raisonBenef ? <small data-fiche-raison-benef="">{r.raisonBenef}</small> : r.benefPartiel ? <small>frais pas tous confirmés</small> : null}
           </div>
         </>)}
