@@ -28,6 +28,8 @@ import { estLot as estLotAchat, nombreLot } from '../achatsSourcing.js';   // (1
 import '../styles-mois-boucle.css';
 import { PrevisionMoisCarte, CoutPlateformes } from '../ArgentPlus.jsx';
 import {fraisParPlateforme,texteCouverture} from '../fraisPlateformes.js';
+import FraisPlateformes from '../FraisPlateformes.jsx';   // (14 nov., frais-carte) les frais de l'année
+import CarteVentes from '../CarteVentes.jsx';   // (14 nov., frais-carte) où partent tes paires
 // ⟦← App.jsx #3⟧
 import { boostRentable, SEUIL_BOOST } from "../boostRentable.js";
 // ⟦← App.jsx #4⟧
@@ -682,6 +684,9 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       <ComparerMoisCarte liveStats={liveStats} panelOff={panelOff}/>
       {/* (11 nov., agent2-argent-parrainage) « Frais par site » sur la période OU mois par mois, une vue à la fois (src/ArgentPlus.jsx). */}
       <CoutSitesCarte periode={periodeStats} ebayCommandes={ebayCommandes} parPeriode={<FraisParSiteCarte periode={periodeStats} ebayCommandes={ebayCommandes} ventesVc={ventesVc}/>}/>
+      {/* (14 nov., frais-carte) « Frais de l'année » et « Carte de tes ventes » (src/FraisPlateformes.jsx, src/CarteVentes.jsx). */}
+      <FraisAnneeArgent ebayCommandes={ebayCommandes} ventesVc={ventesVc}/>
+      <CarteVentesArgent liveStats={liveStats} ebayCommandes={ebayCommandes}/>
       {/* (2 nov., « beaucoup d'incompréhension » — Julien) En haut, les chiffres qui
           comptent pour la période ; tout le reste est rangé en deux volets repliés,
           ouverts d'un geste et gardés ouverts sur cet appareil. Aucune règle ne change. */}
@@ -2397,6 +2402,25 @@ function FraisParSiteCarte({ periode, ebayCommandes, ventesVc }) {
       })}
     </section>
   );
+}
+// (14 nov., frais-carte) Les deux blocs isolés reçoivent ici ce que l'écran sait déjà : le relevé de Ventes,
+// les Dépenses, les commandes eBay, les ventes Vestiaire, les ventes FAITES de la coque et le pays de
+// l'acheteur lu par « Ce qui se vend » (`lireExtrasRepartition`, une lecture projetée partagée). Rien recalculé.
+function FraisAnneeArgent({ ebayCommandes, ventesVc }) {
+  const [releve] = useLigneSynchro('vrm_stats_ventes', lireReleveFrais);
+  const [compta] = useLigneSynchro('vrm_compta', lireComptaSynchro);
+  const excluAutre = useExcluAutre();
+  const R = React.useMemo(() => ({ commandeEbayEngagee, fraisVc }), []);
+  return <FraisPlateformes releve={releve ? releve.l : null} releveAt={releve ? releve.at : null} ebay={Array.isArray(ebayCommandes) ? ebayCommandes : null}
+    packs={compta && compta.packs} excluAutre={excluAutre} R={R} vestiaire={Array.isArray(ventesVc) ? ventesVc : null}/>;
+}
+function CarteVentesArgent({ liveStats, ebayCommandes }) {
+  const lignes = !liveStats ? undefined : liveStats.venduPasSu ? null : liveStats.venduLignes;
+  const [pays, setPays] = React.useState(undefined);
+  React.useEffect(() => { let mort = false; lireExtrasRepartition().then((x) => { if (!mort) setPays(x && x.txn ? x.txn : null); }).catch(() => { if (!mort) setPays(null); }); return () => { mort = true; }; }, []);
+  const [releve] = useLigneSynchro('vrm_stats_ventes', lireReleveFrais);
+  const sombre = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark';
+  return <CarteVentes lignes={lignes} paysVinted={pays} ebay={Array.isArray(ebayCommandes) ? ebayCommandes : null} releve={releve ? releve.l : null} sombre={sombre}/>;
 }
 // ⟦← App.jsx #18⟧
 

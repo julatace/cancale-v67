@@ -58,6 +58,8 @@ const MIGRES = [
   ['src/OffresAuto.jsx', ['*']],
   ['src/PrixMiniManquants.jsx', ['*']],
   ['src/design/QuoiRepublier.jsx', ['*']],   // (11 nov., lot quoi-republier)
+  ['src/FraisPlateformes.jsx', ['*']],   // (14 nov., frais-carte) les frais de l'année
+  ['src/CarteVentes.jsx', ['*']],   // (14 nov., frais-carte) la carte des ventes
   ['src/RepubProgramme.jsx', ['*']],   // (11 nov., lot republier-programme)
   ['src/HistoriqueRepub.jsx', ['*']],
   ['src/ecrans/Achats.jsx', ['*']],
