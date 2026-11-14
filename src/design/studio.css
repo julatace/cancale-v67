@@ -587,7 +587,12 @@ body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transition: transform 36
   /* L'éventail ouvert : la barre (et son disque devenu « × ») reste AU-DESSUS du voile. */
   :root:root:root[data-sb-eventail] body .vrm-app-shell .vrm-tabbar.vrm-tabbar { z-index: 9402 !important; }
   /* Le disque : la cinquième place, au centre (72 px), monté de 16 px. */
-  :root:root:root body .vrm-app-shell .vrm-tabbar > .sb-disque { flex: 0 0 60px !important; margin: -16px 6px 0 !important; }
+  :root:root:root body .vrm-app-shell .vrm-tabbar > .sb-disque {
+    flex: 0 0 60px !important; width: 60px !important; height: 60px !important; min-height: 60px !important; margin: -16px 6px 0 !important; padding: 0 !important;
+    border: 0 !important; border-radius: 50% !important; background: var(--sb-touche-fond) !important; color: var(--sb-encre) !important;
+    box-shadow: var(--sb-touche-ombre), 0 10px 22px -10px rgb(var(--sb-o) / .55) !important;
+  }
+  :root:root:root body .vrm-app-shell .vrm-tabbar > .sb-disque:is(:active, [aria-expanded="true"]) { background: var(--sb-creux) !important; box-shadow: var(--sb-enfonce) !important; transform: translateY(1px) !important; }
   /* Les pastilles de nombre : l'encre (un geste en attente), cerclées du verre. */
   :root:root:root body .vrm-app-shell .vrm-tabbar .vrm-nav-badge-barre.vrm-nav-badge-n { background: var(--sb-encre) !important; color: var(--sb-porcelaine) !important; box-shadow: 0 0 0 2px var(--sb-haut) !important; top: -3px !important; left: calc(100% - 12px) !important; }
 }
