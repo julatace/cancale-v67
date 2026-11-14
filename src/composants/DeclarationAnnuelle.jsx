@@ -38,8 +38,8 @@ export default function DeclarationAnnuelle({ D, fmt, id = 'compta-revenus' }) {
         {D.montants.map((m) => (
           <div key={m.case} className="vrm-ac-montant-case" data-dr-case={m.case} data-dr-montant={cents(m.montant)}>
             <span className="vrm-ac-case-pastille">{tr('ac.dr.case', { c: m.case })}</span>
-            <span className="vrm-at-affiche vrm-ac-affiche">{auMoins ? <span className="vrm-ac-aumoins">{tr('ac.dr.auMoins')} </span> : null}{D.etat === 'incoherent' ? '—' : fmt(m.montant)}</span>
-            {m.si ? <span className="vrm-at-libelle">{tr(m.si === 'avec' ? 'ac.dr.siAvec' : 'ac.dr.siSans')}</span> : null}
+            <span className="vrm-ac-affiche">{auMoins ? <span className="vrm-ac-aumoins">{tr('ac.dr.auMoins')} </span> : null}{D.etat === 'incoherent' ? '—' : fmt(m.montant)}</span>
+            {m.si ? <span className="vrm-ac-libelle">{tr(m.si === 'avec' ? 'ac.dr.siAvec' : 'ac.dr.siSans')}</span> : null}
           </div>
         ))}
         {D.etat === 'incoherent' ? <p className="vrm-ac-note is-ambre" data-dr-incoherent="">{tr('ac.dr.incoherent')}</p> : (

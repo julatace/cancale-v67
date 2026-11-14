@@ -17,7 +17,8 @@
 .vrm-ac-note.is-ambre, .vrm-ac-hors .is-ambre, .vrm-ac-tuile.is-ambre .vrm-ac-chiffre { color: var(--d-ambre, #B25000); }
 .vrm-ac-affiche { display: block; color: var(--d-encre, inherit); font-size: var(--d-t-affiche, clamp(44px, 12vw, 56px)); font-weight: 700; letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-ac-aumoins { font-size: 15px; font-weight: 600; letter-spacing: 0; color: var(--d-gris, #6E6E73); }
-.vrm-ac-chiffre { display: block; font-size: var(--d-t-28, 28px); font-weight: 700; letter-spacing: -.02em; line-height: 1.05; font-variant-numeric: tabular-nums; color: var(--d-encre, inherit); white-space: nowrap; }
+.vrm-ac-chiffre { display: block; font-size: clamp(20px, 6vw, 28px); font-weight: 700; letter-spacing: -.02em; line-height: 1.05; font-variant-numeric: tabular-nums; color: var(--d-encre, inherit); white-space: nowrap; }
+.vrm-ac-libelle { display: block; font-size: 13px; font-weight: 600; line-height: 1.3; letter-spacing: 0; color: var(--d-gris, #6E6E73); }
 .vrm-ac-etiquette { margin-bottom: 8px; }
 .vrm-ac-lien { align-self: flex-start; min-height: 44px; }
 .vrm-ac-repli { font-size: 13px; }

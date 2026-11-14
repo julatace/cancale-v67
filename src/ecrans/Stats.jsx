@@ -669,10 +669,11 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   return (
     <div className="vrm-finance-page vrm-statistiques-premium" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
       <ScreenHead icon="euro" title={L.argent} phrase="dashboard" sous={sousNav ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}</div> : null} right={<Segmente label={tr('stats.periode')} className="vrm-sv-periode" value={periodeStats} onChange={setPeriodeStats} options={Object.entries(PERIODES).map(([v,l])=>({v,l,data:{'data-sv-choix':v}}))}/>}/>
-      <StatsVitrine liveStats={liveStats} panelOff={panelOff} periode={periodeStats} onSaisirPrix={versSaisiePrix} onGo={onGo}/>
       {/* 🎯 OBJECTIF DU MOIS (4 nov.) — le MÊME réglage et la MÊME règle que la barre de la carte sombre.
-          (11 nov., lot objectifs-mois) Sorti du volet replié : c'est LE détail de l'objectif dans Argent. */}
-      <div className="vrm-objectif-argent" data-objectif-argent=""><Card><ObjectifDuMois liveStats={liveStats}/></Card></div>
+          (11 nov., lot objectifs-mois) Sorti du volet replié : c'est LE détail de l'objectif dans Argent.
+          (14 nov., lot argent-choix) Remonté sous les tuiles de la vitrine (trouvable sans défiler). */}
+      <StatsVitrine liveStats={liveStats} panelOff={panelOff} periode={periodeStats} onSaisirPrix={versSaisiePrix} onGo={onGo}
+        apresTuiles={<div className="vrm-objectif-argent" data-objectif-argent=""><Card><ObjectifDuMois liveStats={liveStats}/></Card></div>}/>
       {/* (11 nov., agent2-argent-parrainage) « Fin de novembre, à ce rythme » : le vendu prouvé du mois prolongé (src/previsionMois.js). */}
       <PrevisionMoisCarte liveStats={liveStats} onSaisirPrix={versSaisiePrix}/>
       {/* (8 nov., « beauté ») Le vendu par semaine façon Santé : les 12 semaines de `rythmeVendu`
@@ -1787,7 +1788,7 @@ function StatsPlus({ b, V, partielVendu, lp, stock, barres, ligneUrssaf, lib, no
     </>
   );
 }
-function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo = null }) {
+function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo = null, apresTuiles = null }) {
   const sansCompteStats = useSansCompte();   // (11 nov., états vides) aucun compte relié, prouvé par la coque
   const maintenant = React.useMemo(() => Date.now(), [periode, liveStats]); // eslint-disable-line react-hooks/exhaustive-deps
   const b = React.useMemo(() => bornesPeriode(periode, maintenant), [periode, maintenant]);
@@ -2006,6 +2007,8 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
     <div className="vrm-stats-vitrine" data-sv-periode={b.type} data-sv-de={b.de} data-sv-a={b.a}>
       <div className="vrm-sv-sous-titre" data-sv-sous-titre="">{titrePeriodeStats(b)}{auMemePoint ? <span className="vrm-sv-note"> {tr('stats.memeJour')}</span> : null}</div>
       <div className="vrm-sv-tuiles">{tVendu}{tBenef}{tDelai}{tEnLigne}{tTotal}</div>
+      {/* (14 nov., lot argent-choix — 81) L'objectif du mois juste sous les tuiles : il était à ~6 écrans de défilement. */}
+      {apresTuiles}
       {/* (11 nov., lot stats-plus) En bref (ventes, panier moyen, marge connue), puis « Plus de chiffres ». */}
       <StatsPlus b={b} V={vendu === undefined ? undefined : V} partielVendu={partielVendu} lp={lignes === null ? null : lp} stock={stockPlus} barres={barres} ligneUrssaf={ligneUrssafPlus}
         lib={libBarre} nomPrec={nomPrec} auMemePoint={auMemePoint} titreBarres={titreBarres} noteBarres={noteBarres}
@@ -2683,9 +2686,9 @@ function ObjectifDuMois({ liveStats }) {
               nombres (§7 : un nombre s'écrit une fois). Atteint, pas su ou dernier jour : la phrase reste. */}
           {(() => { const r = resteObjectif(prog); return r && !r.atteint && r.parJour != null && r.jours > 1 ? (
             <div className="vrm-ac-tuiles vrm-ac-objectif-tuiles" data-objectif-detail-reste="" data-objectif-par-jour={eur ? String(Math.round(r.parJour * 100)) : String(r.parJour)} data-objectif-jours={r.jours} data-objectif-reste={eur ? String(Math.round(r.reste * 100)) : String(r.reste)} data-objectif-au-plus={r.auPlus ? '1' : undefined}>
-              <div className="vrm-ac-tuile"><b className="vrm-ac-chiffre">{r.auPlus ? '≤ ' : ''}{montreCourt(r.parJour)}</b><span className="vrm-at-libelle">{tr('ac.obj.parJour', { jour: String(r.dernier) })}</span></div>
-              <div className="vrm-ac-tuile"><b className="vrm-ac-chiffre">{r.auPlus ? '≤ ' : ''}{montreCourt(r.reste)}</b><span className="vrm-at-libelle">{tr('ac.obj.reste')}</span></div>
-              <div className="vrm-ac-tuile"><b className="vrm-ac-chiffre">{r.jours}</b><span className="vrm-at-libelle">{tr('ac.obj.jours', { n: r.jours })}</span></div>
+              <div className="vrm-ac-tuile"><b className="vrm-ac-chiffre">{r.auPlus ? '≤ ' : ''}{montreCourt(r.parJour)}</b><span className="vrm-ac-libelle">{tr('ac.obj.parJour', { jour: String(r.dernier) })}</span></div>
+              <div className="vrm-ac-tuile"><b className="vrm-ac-chiffre">{r.auPlus ? '≤ ' : ''}{montreCourt(r.reste)}</b><span className="vrm-ac-libelle">{tr('ac.obj.reste')}</span></div>
+              <div className="vrm-ac-tuile"><b className="vrm-ac-chiffre">{r.jours}</b><span className="vrm-ac-libelle">{tr('ac.obj.jours', { n: r.jours })}</span></div>
             </div>) : (
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: '2px 12px', marginTop: 8, fontSize: 13, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>
               <span data-objectif-detail-reste="">{phraseResteObjectif(prog, montreCourt)}</span>

@@ -50,8 +50,8 @@ export function CollerPrixAchatFeuille({ onClose, onEnregistrer, fichesDe, lu, F
       <div className="vrm-ac-coller">
         {fait ? (
           <div className="vrm-ac-fait" data-coller-ecrits={fait.ecrits} data-coller-changees={fait.changees}>
-            <p className="vrm-at-affiche vrm-ac-affiche">{fait.ecrits}</p>
-            <p className="vrm-at-libelle">{tr('ac.coller.ecrits', { n: fait.ecrits })}</p>
+            <p className="vrm-ac-affiche">{fait.ecrits}</p>
+            <p className="vrm-ac-libelle">{tr('ac.coller.ecrits', { n: fait.ecrits })}</p>
             {fait.changees > 0 ? <p className="vrm-ac-note is-ambre" data-coller-changees-texte="">{tr('ac.coller.changees', { n: fait.changees })}</p> : null}
           </div>
         ) : (
@@ -62,9 +62,9 @@ export function CollerPrixAchatFeuille({ onClose, onEnregistrer, fichesDe, lu, F
             {A && !A.lu ? <p className="vrm-ac-note is-ambre" role="alert" data-coller-lecture="ko">{tr('ac.coller.pasLu')}</p> : null}
             {A && A.lu ? (
               <div className="vrm-ac-tuiles" data-coller-resume="" data-ok={R.ok} data-different={R.different} data-identique={R.identique} data-refusees={refusees} data-vides={R.vide}>
-                <div className="vrm-ac-tuile"><b className="vrm-ac-chiffre">{ecritures.length}</b><span className="vrm-at-libelle">{tr('ac.coller.tuile.ecrire')}</span></div>
-                {R.identique + R.doublon > 0 ? <div className="vrm-ac-tuile"><b className="vrm-ac-chiffre">{R.identique + R.doublon}</b><span className="vrm-at-libelle">{tr('ac.coller.tuile.deja')}</span></div> : null}
-                {refusees + (remplacer ? 0 : R.different) > 0 ? <div className="vrm-ac-tuile is-ambre"><b className="vrm-ac-chiffre">{refusees + (remplacer ? 0 : R.different)}</b><span className="vrm-at-libelle">{tr('ac.coller.tuile.refusees')}</span></div> : null}
+                <div className="vrm-ac-tuile"><b className="vrm-ac-chiffre">{ecritures.length}</b><span className="vrm-ac-libelle">{tr('ac.coller.tuile.ecrire')}</span></div>
+                {R.identique + R.doublon > 0 ? <div className="vrm-ac-tuile"><b className="vrm-ac-chiffre">{R.identique + R.doublon}</b><span className="vrm-ac-libelle">{tr('ac.coller.tuile.deja')}</span></div> : null}
+                {refusees + (remplacer ? 0 : R.different) > 0 ? <div className="vrm-ac-tuile is-ambre"><b className="vrm-ac-chiffre">{refusees + (remplacer ? 0 : R.different)}</b><span className="vrm-ac-libelle">{tr('ac.coller.tuile.refusees')}</span></div> : null}
               </div>
             ) : null}
             {A && A.lu && R.different > 0 ? (
@@ -79,7 +79,7 @@ export function CollerPrixAchatFeuille({ onClose, onEnregistrer, fichesDe, lu, F
                   const ecrit = l.etat === 'ok' || (remplacer && l.etat === 'different');
                   return (
                     <li key={l.n} className={'vrm-ac-ligne vrm-at-rangee' + (ecrit ? ' is-ecrit' : REFUSEES.includes(l.etat) ? ' is-refuse' : '')} data-coller-ligne={l.n} data-coller-etat={l.etat} data-coller-cle={l.cle || ''} data-coller-prix={l.centimes == null ? '' : String(l.centimes)}>
-                      <span className="vrm-ac-num">{l.numero ? `N°${l.numero}` : '—'}</span>
+                      <span className="vrm-ac-num">{l.fiche ? `N°${l.fiche.numero}` : l.numero ? `N°${l.numero}` : '—'}</span>
                       <span className="vrm-ac-corps">
                         <span className="vrm-ac-titre">{l.fiche && l.fiche.titre ? l.fiche.titre : l.brut}</span>
                         <span className="vrm-ac-sous">{raison(l, remplacer)}</span>

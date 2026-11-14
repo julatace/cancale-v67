@@ -14,7 +14,8 @@ import '../argent-choix.css';
 
 const cents = (v) => (v == null ? '' : String(Math.round(Number(v) * 100)));
 const VISIBLES = 8;
-const jours = (m) => (m == null ? '—' : m < 1 ? tr('ac.qr.moinsUnJour') : tr('ac.qr.jours', { n: Math.round(m) }));
+// Le délai médian : au dixième sous 10 jours (« 4,5 j »), au jour au-delà.
+const jours = (m) => (m == null ? '—' : m < 1 ? tr('ac.qr.moinsUnJour') : tr('ac.qr.jours', { n: m < 10 ? Math.round(m * 10) / 10 : Math.round(m) }));
 
 export default function QuoiRacheter({ lignes, Segmente, fmt, etat, onSaisirPrix = null }) {
   const [tri, setTri] = React.useState(() => { try { const v = localStorage.getItem('vrm_qr_tri'); return TRIS_RACHAT.includes(v) ? v : 'brut'; } catch (_) { return 'brut'; } });
@@ -34,7 +35,7 @@ export default function QuoiRacheter({ lignes, Segmente, fmt, etat, onSaisirPrix
     );
   }
   const vus = tout ? Q.groupes : Q.groupes.slice(0, VISIBLES);
-  const options = TRIS_RACHAT.map((v) => ({ v, l: tr('ac.qr.tri.' + v), data: { 'data-qr-tri': v } }));
+  const options = TRIS_RACHAT.filter((v) => v !== 'nombre').map((v) => ({ v, l: tr('ac.qr.tri.' + v), data: { 'data-qr-tri': v } }));
   return (
     <section className="vrm-ac-section" data-stats-carte="sv-racheter" data-qr-etat="lu" data-qr-n={Q.n} data-qr-reliees={Q.nReliees} data-qr-ndelai={Q.nDelai} data-qr-ecartees={Q.ecartees}
       data-qr-autres={Q.autres.n} data-qr-classables={Q.classables} data-qr-peu={Q.peu ? '1' : '0'} data-qr-tri-actif={tri}>
@@ -43,7 +44,7 @@ export default function QuoiRacheter({ lignes, Segmente, fmt, etat, onSaisirPrix
         <p className="vrm-ac-couv" data-qr-couv={`${Q.nReliees}/${Q.n}`}>{tr('ac.qr.couverture', { reliees: Q.nReliees, n: Q.n })}</p>
       </div>
       <div className="vrm-at-carte vrm-ac-carte vrm-ac-racheter" data-qr-racheter={Q.aRacheter.map((g) => g.k).join(',')}>
-        <div className="vrm-at-libelle vrm-ac-etiquette">{tr('ac.qr.aRacheter')}</div>
+        <div className="vrm-ac-libelle vrm-ac-etiquette">{tr('ac.qr.aRacheter')}</div>
         {Q.peu ? <p className="vrm-ac-note" data-qr-peu-texte="">{tr('ac.qr.peu', { min: MIN_RACHAT })}</p>
           : !Q.aRacheter.length ? <p className="vrm-ac-note">{tr('ac.qr.aucunRachat')}</p>
             : (
@@ -52,8 +53,8 @@ export default function QuoiRacheter({ lignes, Segmente, fmt, etat, onSaisirPrix
                   <li key={g.k} className="vrm-ac-rachat" data-qr-rachat={g.k} data-moyen={cents(g.moyen)} data-mediane={g.mediane}>
                     <span className="vrm-ac-rachat-nom">{g.nom}</span>
                     <span className="vrm-ac-rachat-chiffres">
-                      <span><b className="vrm-ac-chiffre">{montant(g.moyen)}</b><span className="vrm-at-libelle">{tr('ac.qr.parPaire')}</span></span>
-                      <span><b className="vrm-ac-chiffre">{jours(g.mediane)}</b><span className="vrm-at-libelle">{tr('ac.qr.pourVendre')}</span></span>
+                      <span><b className="vrm-ac-chiffre">{montant(g.moyen)}</b><span className="vrm-ac-libelle">{tr('ac.qr.parPaire')}</span></span>
+                      <span><b className="vrm-ac-chiffre">{jours(g.mediane)}</b><span className="vrm-ac-libelle">{tr('ac.qr.pourVendre')}</span></span>
                     </span>
                   </li>
                 ))}
@@ -73,7 +74,7 @@ export default function QuoiRacheter({ lignes, Segmente, fmt, etat, onSaisirPrix
             </span>
             <span className="vrm-ac-droite">
               <b className="vrm-ac-montant">{tri === 'moyen' ? montant(g.moyen) : tri === 'marge' ? (g.marge == null ? '—' : `${String(g.marge).replace('.', ',')} %`) : tri === 'vite' ? jours(g.mediane) : tri === 'nombre' ? String(g.n) : montant(g.brut)}</b>
-              <span className="vrm-at-libelle">{tri === 'moyen' ? tr('ac.qr.parPaire') : tri === 'marge' ? tr('ac.qr.marge') : tri === 'vite' ? tr('ac.qr.pourVendre') : tri === 'nombre' ? tr('ac.qr.ventes') : tr('ac.qr.benefice')}</span>
+              <span className="vrm-ac-libelle">{tri === 'moyen' ? tr('ac.qr.parPaire') : tri === 'marge' ? tr('ac.qr.marge') : tri === 'vite' ? tr('ac.qr.pourVendre') : tri === 'nombre' ? tr('ac.qr.ventes') : tr('ac.qr.benefice')}</span>
             </span>
           </li>
         ))}
