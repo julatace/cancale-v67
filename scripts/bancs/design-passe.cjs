@@ -83,17 +83,17 @@ async function rest(route, b) {
   const r = servir(lignes, decodeURIComponent(metaVersData(req.url())), req.headers());
   return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': r.range || '0-0/0' }, body: JSON.stringify(r.body) });
 }
-async function ouvrir(nav, { W, sombre, b, url }) {
+async function ouvrir(nav, { W, sombre, b, url, sansSession = false, api = null }) {
   const tel = W < 600;
   const ctx = await nav.newContext({ ...(tel ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 } : { viewport: { width: 1512, height: 950 }, deviceScaleFactor: 1 }), colorScheme: sombre ? 'dark' : 'light', locale: 'fr-FR', timezoneId: 'Europe/Paris' });
   const pg = await ctx.newPage();
   const erreurs = [];
   pg.on('pageerror', (e) => erreurs.push(String(e.message || e).slice(0, 200)));
-  await pg.addInitScript(([s, sombre]) => {
+  await pg.addInitScript(([s, sombre, sansSession]) => {
     try {
       if (!sessionStorage.getItem('banc_init')) {
         localStorage.setItem('vrm_banc_vends', '1');
-        localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', s.user.id);
+        if (!sansSession) { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', s.user.id); }
         localStorage.setItem('vinted_dark', sombre ? 'true' : 'false');
         localStorage.setItem('vrm_bienvenue_vue', JSON.stringify({ at: 'banc' }));
         localStorage.setItem('vrm_visite_vue', JSON.stringify({ at: 'banc' }));
@@ -102,7 +102,7 @@ async function ouvrir(nav, { W, sombre, b, url }) {
         sessionStorage.setItem('banc_init', '1');
       }
     } catch (_) {}
-  }, [SESSION, sombre]);
+  }, [SESSION, sombre, sansSession]);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
     const u = r.request().url();
     if (/vinted\.net|vinted\.fr\/.*\.(jpe?g|png|webp)/i.test(u) || r.request().resourceType() === 'image') return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: vignette(u) });
@@ -115,6 +115,7 @@ async function ouvrir(nav, { W, sombre, b, url }) {
     const u = r.request().url();
     if (/mode=confidentialite/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, uid: UID }) });
     if (/mode=abonnement/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, proprietaire: true, acces: true }) });
+    if (api) { const x = api(u, r.request()); if (x) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(x) }); }
     return r.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
   });
   await pg.route('**/rest/v1/**', (r) => rest(r, b));
@@ -124,7 +125,7 @@ async function ouvrir(nav, { W, sombre, b, url }) {
 const pret = async (pg) => { await pg.waitForSelector('.vrm-main', { timeout: 25000 }).catch(() => {}); await pg.waitForTimeout(2800); };
 
 // ── La mesure, DANS la page : tout ce qui est rendu sous les racines voulues. ──
-function mesurer({ tactile, sombre, racines }) {
+function mesurer({ tactile, sombre, racines, ciblesEnPlus = '' }) {
   const seuil = tactile ? 44 : 36;
   const ECHELLE = [11, 12, 13, 15, 17, 20, 28, 34, 40, 44];
   const out = { cibles: [], graisses: [], tailles: [], gris: [], contraste: [], coupes: [], hyphens: [], rognes: [], mfa: [], violet: [], chrono: [], nTextes: 0, nCibles: 0 };
@@ -186,7 +187,8 @@ function mesurer({ tactile, sombre, racines }) {
   const cartes = new Set();
   for (const root of roots) {
     // A. cibles
-    for (const el of root.querySelectorAll('button, [role="button"], [role="tab"], [role="menuitem"], [role="switch"], summary, a.vrm-b, select')) {
+    // `ciblesEnPlus` (banc 2) : des liens qui SONT des boutons (les appels de la page d'accueil).
+    for (const el of root.querySelectorAll('button, [role="button"], [role="tab"], [role="menuitem"], [role="switch"], summary, a.vrm-b, select' + (ciblesEnPlus ? ', ' + ciblesEnPlus : ''))) {
       if (!vis(el) || el.closest('[aria-hidden="true"]')) continue;   // une cible cachée aux lecteurs n'est pas une cible
       if (el.closest('svg')) continue;
       out.nCibles++;
@@ -282,8 +284,10 @@ const ECRANS = [
 ];
 const RACINES = ['.vrm-main', '.vrm-fs', '.vrm-fp', '[data-recherche-panneau]'];
 const CLES = ['cibles', 'graisses', 'tailles', 'gris', 'contraste', 'coupes', 'hyphens', 'rognes', 'mfa', 'violet', 'chrono'];
+// (14 nov., passe 2) Le banc frère `design-passe-2.cjs` reprend la MÊME mesure sur les autres écrans.
+module.exports = { mesurer, ouvrir, base, pret, srv, PORT, SHOTS, CLES, LARGEURS, THEMES, ECRANS_VOULUS, DETAIL, UID, SESSION, chromium };
 
-(async () => {
+if (require.main === module) (async () => {
   await new Promise((ok) => srv.listen(PORT, ok));
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] });
   const total = Object.fromEntries(CLES.map((k) => [k, 0]));
