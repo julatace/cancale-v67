@@ -105,7 +105,11 @@ const marques = (pg) => pg.evaluate(() => {
 const rangees = (pg) => pg.evaluate(() => {
   const m = document.querySelector('.vrm-main'); if (!m) return { titres: 0, sans: 0, chargees: 0, exemple: 0 };
   const vis = (e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0; };
-  const sans = [...m.querySelectorAll('[data-sans-photo]')].filter(vis).length;
+  // Une vignette neutre ne compte que sur une rangée d'ARTICLE (son texte porte « taille 42 ») : un colis
+  // sans article (lu dans un e-mail du transporteur, aucune identité de paire) n'a pas à avoir de photo —
+  // mieux vaut un blanc qu'un faux (§5).
+  const rangeeDe = (e) => { let n = e; for (let i = 0; i < 6 && n && n !== m; i++) { if (n.matches('[data-fiche-ligne], .vrm-rpf-ligne, .vrm-cc-carte, li, [role="listitem"]')) return n; n = n.parentElement; } return e.parentElement; };
+  const sans = [...m.querySelectorAll('[data-sans-photo]')].filter(vis).filter((e) => / taille \d\d/.test((rangeeDe(e) || e).textContent || '')).length;
   const imgs = [...m.querySelectorAll('img')].filter((i) => vis(i) && /\/exemple\//.test(i.currentSrc || i.src));
   const titres = new Set([...m.querySelectorAll('*')].filter((e) => !e.children.length && vis(e) && /^.{3,90} taille \d\d$/.test(e.textContent.trim())).map((e) => e.textContent.trim()));
   const ok = new Set(imgs.filter((i) => i.complete && i.naturalWidth > 0).map((i) => i.currentSrc || i.src));
@@ -142,7 +146,11 @@ async function parcours(nav, W, theme) {
     dit(k.mot && k.mot.visible && k.mot.top >= -1 && /Exemple · données inventées/i.test(k.motTexte), `${T} B1 ${tab} : la languette « Exemple · données inventées » est visible`, JSON.stringify(k.mot));
     dit(k.zCadre > k.zMax, `${T} B1 ${tab} : le cadre est au-dessus de TOUT (z ${k.zCadre} > ${k.zMax}, ${k.plusHaut})`);
     if (AVEC_PHOTOS.includes(tab) && !process.env.SANS_PHOTOS) {
-      await o.pg.waitForTimeout(800);
+      // Les vignettes se chargent à l'approche (`loading="lazy"`) : on parcourt la liste, puis on revient en haut.
+      await o.pg.evaluate(async () => { const m = document.querySelector('.vrm-main'); const h = Math.max(m ? m.scrollHeight : 0, document.documentElement.scrollHeight);
+        for (let y = 0; y <= h; y += 400) { if (m) m.scrollTop = y; window.scrollTo(0, y); await new Promise((r) => setTimeout(r, 150)); } if (m) m.scrollTop = 0; window.scrollTo(0, 0); });
+      await o.pg.waitForFunction(() => [...document.querySelectorAll('.vrm-main img')].filter((i) => /\/exemple\//.test(i.currentSrc || i.src)).every((i) => i.complete), null, { timeout: 8000 }).catch(() => {});
+      await o.pg.waitForTimeout(300);
       const r = await rangees(o.pg);
       dit(r.titres > 0 && r.sans === 0 && r.chargees >= r.titres, `${T} P1 ${tab} : chaque rangée a une image chargée (${r.chargees} photos d’exemple chargées pour ${r.titres} articles, ${r.sans} vignette(s) neutre(s))`, JSON.stringify(r));
     }
