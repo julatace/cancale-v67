@@ -204,14 +204,24 @@ export function retoursParModele({ ventes, etats, emails, modeleDe = null } = {}
     else { g.ventes++; if (compte === 'retour') g.retours++; if (compte === 'litige') g.litiges++; }
     groupes.set(k, g);
   }
+  // (14 nov., lot argent-prix — proposition 112 : « taux de retour et de litige par modèle »)
+  // Les DEUX taux, chacun à part, sur les mêmes ventes prouvées ; un taux n'est dit qu'à partir de
+  // SEUIL_TAUX_RETOURS ventes du modèle (en dessous : les nombres seuls, le taux « — ») ; un groupe
+  // dont la cause d'un remboursement n'est pas lue dit « au moins » (jamais un taux exact).
+  const tx_ = (n, d) => (d >= SEUIL_TAUX_RETOURS ? Math.round((n / d) * 1000) / 10 : null);
   const lignes = [...groupes.values()].filter((g) => g.ventes > 0 || g.inconnues > 0).map((g) => ({
     ...g, total: g.retours + g.litiges, auMoins: g.inconnues > 0,
     taux: g.ventes > 0 ? (g.retours + g.litiges) / g.ventes : null,
+    tauxRetour: tx_(g.retours, g.ventes), tauxLitige: tx_(g.litiges, g.ventes),
   }));
   // Les modèles qui reviennent le plus d'abord ; « Autres » toujours en dernier.
   lignes.sort((a, b) => (a.cle === '' ? 1 : 0) - (b.cle === '' ? 1 : 0) || b.total - a.total || (b.taux || 0) - (a.taux || 0) || b.ventes - a.ventes || a.nom.localeCompare(b.nom));
-  return { etat: 'lu', lignes, inconnues, manques };
+  // La couverture, en une ligne : sur combien de ventes prouvées, dont combien sans modèle sûr.
+  const nVentes = lignes.reduce((t, l) => t + l.ventes, 0);
+  const sansModele = (lignes.find((l) => l.cle === '') || { ventes: 0 }).ventes;
+  return { etat: 'lu', lignes, inconnues, manques, couverture: { ventes: nVentes, sansModele } };
 }
+export const SEUIL_TAUX_RETOURS = 3;
 
 // Le texte d'une ligne du tableau, d'une seule source : « 2 sur 15 » (« au moins 2 sur 15 »).
 export const texteRetours = (l) => (l ? `${l.auMoins && l.total > 0 ? 'au moins ' : ''}${l.total} sur ${l.ventes}` : '');

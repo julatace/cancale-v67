@@ -39,7 +39,7 @@ catch (e) { console.log('❌ analyseur Babel introuvable — ' + e.message); pro
 // règles Vestiaire que lisent `ventesFaites`/`ventesDeclarables` vivent dans
 // api/_lib/vestiaire-regle.js (un propriétaire, importé par l'app ET par le
 // miroir) : elles sont posées dans le contexte de l'app avant d'exécuter.
-const NOMS = ['classifyOrderStatus', 'tsCommande', 'montantCommande', 'montantCommandeLu', 'lbcAnnulee', 'lbcFinalisee', 'lbcExpediee', 'venteFinalisee', 'commandeEbayEngagee', 'montantRecuEbay', 'ymDeTs', 'indexDeclarations', 'moisDeclare', 'ventesDeclarables', 'ventesFaites', 'compteEcarteChoix', 'compteEcarteRegle'];
+const NOMS = ['classifyOrderStatus', 'tsCommande', 'montantCommande', 'montantCommandeLu', 'lbcAnnulee', 'lbcFinalisee', 'lbcExpediee', 'venteFinalisee', 'commandeEbayEngagee', 'montantRecuEbay', 'ymDeTs', 'indexDeclarations', 'moisDeclare', 'ventesDeclarables', 'ventesFaites', 'compteEcarteChoix', 'compteEcarteRegle', 'datesDeVersement'];
 // (9 nov., offres Solo/Pro) Dans l'app, `compteEcarte` = `compteEcarteRegle(uid, masques, panneau,
 // reglePlanCourante())` : le choix du vendeur OU une vente hors de son offre Solo (`venteHorsPlan`,
 // api/_lib/plan-regle.js, importé tel quel des deux côtés). (9 nov., suites serveur) Le serveur porte
@@ -174,11 +174,17 @@ if (process.argv.includes('--recopie')) {
 
   console.log('\n── 3. Les dates de versement : la condition de l’app');
   const bilSrc = lire('api/_lib/bilan-semaine.js') || '';
-  // La condition entre « for (const r of rows) if ( » et « ) map[ », côté serveur.
-  const iC = bilSrc.indexOf('for (const r of rows) if (');
-  const cond = iC < 0 ? '' : bilSrc.slice(iC + 'for (const r of rows) if ('.length, bilSrc.indexOf(') map[', iC));
-  const fv = (/const fetchVersementsVinted = async \(\) => \{([\s\S]*?)\n\};/.exec(app || '') || [])[1] || '';
-  dit(!!cond && fv.includes(cond), 'versementsDeLignes reprend la condition exacte de fetchVersementsVinted (statut 450, date lisible)', cond ? cond.slice(0, 80) : 'condition introuvable côté serveur');
+  // (14 nov., lot dates-versement) LA règle est `datesDeVersement` (App.jsx, recopiée au jeton
+  // près dans le miroir, contrôle 1) : l'app ET le serveur l'appellent, sur les mêmes sources.
+  const sansC = (x) => x.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/[^\n]*/g, '$1');
+  const fv = sansC((/const fetchVersementsVinted = async \(\) => \{([\s\S]*?)\n\};/.exec(app || '') || [])[1] || '');
+  const vl = sansC((/export function versementsDeLignes\([^)]*\) \{([\s\S]*?)\n\}/.exec(bilSrc) || [])[1] || '');
+  dit(/return datesDeVersement\(rows, releve, convL, emailsL\)/.test(fv), 'fetchVersementsVinted (app) rend LA règle `datesDeVersement`', fv.slice(0, 80));
+  dit(/return datesDeVersement\(rows, releve, conversations, emails\)/.test(vl) && /versementsDuReleve\(releveRows\)/.test(vl), 'versementsDeLignes (serveur) rend la MÊME règle, recopiée, sur les mêmes sources (relevé compris)', vl.slice(0, 80));
+  const shipSrc = lire('api/ship-reminders.js') || '';
+  const selApp = (n) => ((new RegExp(`const ${n} = '([^']+)'`).exec(app || '') || [])[1] || '');
+  dit(!!selApp('VERSEMENT_CONV_SELECT') && shipSrc.includes(`'app_data?${selApp('VERSEMENT_CONV_SELECT')}'`) && !!selApp('VERSEMENT_EMAIL_SELECT') && shipSrc.includes(`'app_data?${selApp('VERSEMENT_EMAIL_SELECT')}'`),
+    'le cron lit la conversation et l’e-mail par la MÊME projection que l’app', selApp('VERSEMENT_CONV_SELECT'));
   await essaie('versementsDeLignes', async () => {
     const m = bil.versementsDeLignes([{ tx: '9', s: '450', su: '2026-10-01T10:00:00Z' }, { tx: '8', s: '400', su: '2026-10-01T10:00:00Z' }, { tx: '7', s: '450', su: 'n/a' }]);
     dit(m && m['9'] && !m['8'] && !m['7'], 'seule une transaction FINALISÉE (450) à date lisible est datée');

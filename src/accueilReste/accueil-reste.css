@@ -1,0 +1,105 @@
+/* L'accueil des nouveaux, le reste (14 nov.) — src/accueilReste/AccueilReste.jsx.
+   Direction (skill vrm-design) : titre de section HORS de la carte (20/700), carte sans
+   bordure, ombre diffuse, padding 16, une ligne courte au plus ; un seul bouton plein ;
+   ambre = un geste (un point, jamais un rond plein brun) ; rouge = deux paires sous un N°.
+   Les jetons du système (src/styles-systeme.css) ; le sombre suit `data-theme`. */
+.vrm-ar-journee { display: flex; flex-direction: column; gap: var(--d-entre-sections, 28px); margin: var(--d-e-6, 24px) 0 var(--d-e-4, 16px); }
+.vrm-ar-section { margin: 0; }
+.vrm-ar-titre { margin: 0 4px var(--d-e-2, 8px); font-size: var(--d-t-20, 20px); line-height: 25px; font-weight: 700; letter-spacing: -.02em; color: var(--d-encre, #1d1d1f); }
+.vrm-ar-carte {
+  background: var(--d-carte, #fff); border-radius: var(--d-r-carte, 20px); padding: var(--d-e-4, 16px);
+  box-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 8px 24px rgb(0 0 0 / .06); color: var(--d-encre, #1d1d1f);
+  overflow: hidden; box-sizing: border-box; max-width: 100%;
+}
+:root[data-theme="dark"] .vrm-ar-carte { box-shadow: none; }
+.vrm-ar-carte-liste { padding: 4px 0 var(--d-e-3, 12px); }
+.vrm-ar-ligne1 { margin: 0 0 var(--d-e-3, 12px); font-size: var(--d-t-17, 17px); line-height: 22px; font-weight: 600; }
+.vrm-ar-carte-liste .vrm-ar-ligne1 { padding: 12px 16px 0; }
+.vrm-ar-note { margin: var(--d-e-2, 8px) 0 0; font-size: var(--d-t-13, 13px); line-height: 18px; color: var(--d-gris, #6e6e73); }
+.vrm-ar-carte-liste .vrm-ar-note { padding: 0 16px; }
+
+/* Les N° lus (134) : une rangée par annonce, le N° en pastille d'encre. */
+.vrm-ar-liste, .vrm-ar-doublons, .vrm-ar-rangs { list-style: none; margin: 0; padding: 0; }
+.vrm-ar-liste li, .vrm-ar-doublons li { display: flex; align-items: center; gap: 12px; min-height: 44px; border-top: .5px solid var(--d-filet, rgba(60,60,67,.18)); }
+.vrm-ar-liste li:first-child { border-top: 0; }
+.vrm-ar-num { flex: none; min-width: 56px; font-size: var(--d-t-17, 17px); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.vrm-ar-quoi { flex: 1; min-width: 0; font-size: var(--d-t-15, 15px); color: var(--d-gris, #6e6e73); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* ROUGE : deux annonces sous le même N° (le seul rouge justifié, §7). */
+.vrm-ar-doublons { margin: 0 0 var(--d-e-3, 12px); padding: 4px 12px; border-radius: var(--d-r-case, 12px); border: 1px solid var(--vrm-doublon, #D70015); color: var(--vrm-doublon, #D70015); }
+.vrm-ar-doublons li { border-top: 0; font-size: var(--d-t-15, 15px); font-weight: 600; }
+.vrm-ar-num.is-double { color: var(--vrm-doublon, #D70015); }
+:root[data-theme="dark"] .vrm-ar-doublons, :root[data-theme="dark"] .vrm-ar-num.is-double { --vrm-doublon: #FF6961; }
+.vrm-ar-plus { margin-top: 4px; }
+.vrm-ar-gestes { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: var(--d-e-4, 16px); }
+.vrm-ar-carte-liste .vrm-ar-gestes { padding: 0 16px; margin-top: var(--d-e-2, 8px); }
+.vrm-ar-gestes .vrm-b { min-height: 44px; }
+
+/* « Ce que VRM a trouvé » (133) : rangées iOS 56 px, une pastille, le geste à droite. */
+.vrm-ar-rangs li { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 16px; box-sizing: border-box; }
+.vrm-ar-rangs li + li { box-shadow: inset 36px .5px 0 0 var(--d-carte, #fff), inset 0 .5px 0 0 var(--d-filet, rgba(60,60,67,.18)); }
+.vrm-ar-pastille { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--d-filet-fort, rgba(60,60,67,.29)); }
+.vrm-ar-pastille.is-geste { background: var(--d-ambre, #B25000); }
+.vrm-ar-rang-texte { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.vrm-ar-rang-texte b { font-size: var(--d-t-17, 17px); line-height: 22px; font-weight: 400; }
+.vrm-ar-rang-texte small { font-size: var(--d-t-13, 13px); line-height: 18px; color: var(--d-gris, #6e6e73); }
+.vrm-ar-geste { flex: none; min-height: 36px; }
+
+/* Ton essai (145) : trois tuiles, gros chiffre à l'encre, libellé court. */
+.vrm-ar-tuiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: var(--d-e-3, 12px); }
+.vrm-ar-tuiles > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.vrm-ar-tuiles b { font-size: var(--d-t-28, 28px); line-height: 32px; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-ar-tuiles span { font-size: var(--d-t-13, 13px); line-height: 16px; color: var(--d-gris, #6e6e73); }
+.vrm-ar-repli { margin-top: 4px; font-size: var(--d-t-15, 15px); }
+.vrm-ar-repli summary { display: flex; justify-content: flex-start; align-items: center; gap: 6px; min-height: 44px; cursor: pointer; list-style: none; color: var(--d-accent-texte, #0066CC); font-weight: 600; }
+.vrm-ar-repli summary::-webkit-details-marker { display: none; }
+.vrm-ar-repli p { margin: 0; color: var(--d-gris, #6e6e73); line-height: 21px; }
+.vrm-ar-chev { width: 7px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.vrm-ar-repli[open] .vrm-ar-chev { transform: rotate(90deg); }
+/* L'appel de bienvenue (147) : une rangée, le geste en texte accent. */
+.vrm-ar-appel { display: flex; align-items: center; gap: 12px; min-height: 56px; margin-top: 8px; padding-top: 8px; border-top: .5px solid var(--d-filet, rgba(60,60,67,.18)); color: inherit; text-decoration: none; }
+.vrm-ar-section[data-essai="non"] .vrm-ar-appel { margin-top: 0; padding-top: 0; border-top: 0; }
+.vrm-ar-appel-geste { flex: none; color: var(--d-accent-texte, #0066CC); font-weight: 600; font-size: var(--d-t-15, 15px); }
+
+/* Le conseil du jour (140) : une carte basse, calme, en bas de Ma journée. */
+.vrm-ar-conseil { position: relative; background: var(--d-carte, #fff); border-radius: var(--d-r-carte, 20px); padding: 14px 52px 14px 16px; box-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 8px 24px rgb(0 0 0 / .06); }
+:root[data-theme="dark"] .vrm-ar-conseil { box-shadow: none; }
+.vrm-ar-conseil-tete { display: block; font-size: var(--d-t-13, 13px); font-weight: 600; color: var(--d-gris, #6e6e73); }
+.vrm-ar-conseil p { margin: 4px 0 0; font-size: var(--d-t-15, 15px); line-height: 21px; color: var(--d-encre, #1d1d1f); }
+.vrm-ar-conseil-gestes:empty { display: none; }
+.vrm-ar-voir { display: block; min-height: 44px; margin: 0; padding: 0; border: 0; background: none; color: var(--d-accent-texte, #0066CC); font: inherit; font-size: var(--d-t-15, 15px); font-weight: 600; cursor: pointer; }
+.vrm-ar-voir:focus-visible { outline: 2px solid var(--d-accent, #0071E3); outline-offset: 2px; border-radius: 6px; }
+.vrm-ar-fermer { position: absolute; top: 4px; right: 4px; width: 44px; height: 44px; display: grid; place-items: center; border: 0; background: transparent; color: var(--d-gris, #6e6e73); border-radius: 50%; cursor: pointer; }
+.vrm-ar-fermer svg, .vrm-ar-fermer svg path { width: 14px; height: 14px; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; fill: none; }
+.vrm-ar-fermer:active { transform: scale(.94); }
+
+/* Le mot qu'on touche (139) : souligné en pointillé, la cible agrandie sans bouger la ligne. */
+.vrm-mot { display: inline; font: inherit; color: inherit; background: none; border: 0; padding: 12px 0; margin: -12px 0; cursor: help; text-decoration: underline dotted; text-decoration-color: var(--d-gris, #6e6e73); text-underline-offset: 3px; -webkit-tap-highlight-color: transparent; }
+.vrm-mot:focus-visible { outline: 2px solid var(--d-accent, #0071E3); outline-offset: 2px; border-radius: 4px; }
+.vrm-mot-bulle { position: fixed; z-index: 21000; box-sizing: border-box; padding: 12px 14px; border-radius: 14px; background: var(--d-carte, #fff); color: var(--d-encre, #1d1d1f);
+  box-shadow: 0 1px 2px rgb(0 0 0 / .06), 0 12px 32px rgb(0 0 0 / .16); font-size: var(--d-t-15, 15px); line-height: 21px; display: flex; flex-direction: column; gap: 2px; animation: vrm-mot-entre .2s cubic-bezier(.2,.8,.2,1) both; }
+:root[data-theme="dark"] .vrm-mot-bulle { background: #2c2c2e; }
+.vrm-mot-bulle b { font-weight: 600; }
+.vrm-mot-bulle span { color: var(--d-gris, #6e6e73); }
+@keyframes vrm-mot-entre { from { opacity: 0; transform: translateY(3px) scale(.98); } to { opacity: 1; transform: none; } }
+.vrm-ar-glossaire dl { margin: 0; padding: 0 16px 8px; }
+.vrm-ar-glossaire dl > div { padding: 8px 0; border-top: .5px solid var(--d-filet, rgba(60,60,67,.18)); }
+.vrm-ar-glossaire dt { font-weight: 600; font-size: var(--d-t-15, 15px); }
+.vrm-ar-glossaire dd { margin: 2px 0 0; color: var(--d-gris, #6e6e73); font-size: var(--d-t-15, 15px); line-height: 21px; }
+
+/* Paramètres → Aide : les interrupteurs (style Réglages iOS). */
+.vrm-ar-reglages { display: flex; flex-direction: column; }
+.vrm-ar-reglage { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 16px; box-sizing: border-box; }
+.vrm-ar-reglage + .vrm-ar-reglage { border-top: .5px solid var(--d-filet, rgba(60,60,67,.18)); }
+.vrm-ar-reglage-col { flex-direction: column; align-items: stretch; }
+.vrm-ar-switch { flex: none; position: relative; width: 51px; height: 31px; border-radius: 16px; border: 0; padding: 0; cursor: pointer; background: var(--d-remplir-fort, rgba(120,120,128,.32)); transition: background .2s; margin: 6px 0; }
+.vrm-ar-switch[aria-checked="true"] { background: #34C759; }
+.vrm-ar-switch span { position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 3px 8px rgb(0 0 0 / .15), 0 1px 1px rgb(0 0 0 / .16); transition: transform .22s cubic-bezier(.2,.8,.2,1); }
+.vrm-ar-switch[aria-checked="true"] span { transform: translateX(20px); }
+.vrm-ar-champ { display: flex; gap: 8px; }
+.vrm-ar-champ input { flex: 1; min-width: 0; min-height: 44px; padding: 0 12px; border-radius: var(--d-r-ctrl, 12px); border: 0; background: var(--d-remplir, rgba(118,118,128,.12)); color: inherit; font: inherit; font-size: 16px; }
+.vrm-ar-revoir { margin-top: 8px; }
+@media (prefers-reduced-motion: reduce) {
+  .vrm-mot-bulle { animation: none; }
+  .vrm-ar-switch, .vrm-ar-switch span { transition: none; }
+  .vrm-ar-fermer:active { transform: none; }
+}

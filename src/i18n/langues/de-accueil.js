@@ -171,4 +171,9 @@ export default {
   "accueil.temps.rien": "nichts",
   "accueil.temps.moinsDUne": "< 1 Min.",
   "accueil.temps.note": "Schätzung: Referenzdauern, Schritt für Schritt hergeleitet (von Hand → mit VRM), keine Kundenergebnisse. Deine echte Zeit kann kürzer oder länger sein.",
+  // (14 nov., idée d’accueil 146) la vidéo de 45 s en tête de la page
+  "accueil.video.voir": "VRM in 45 s ansehen",
+  "accueil.video.legende": "Die echte App mit Beispieldaten. Ohne Ton, mit Untertiteln.",
+  "accueil.video.titre": "VRM in 45 Sekunden",
+  "accueil.video.fermer": "Video schließen",
 };

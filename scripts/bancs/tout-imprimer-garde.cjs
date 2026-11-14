@@ -145,7 +145,7 @@ const attendre = async (pg, q) => { await pg.waitForSelector(q, { timeout: 30000
       const temoin = process.env.TEMOIN === '1';
       const { ctx, pg, errs, tel } = await ouvrir(b, vp, sombre, temoin ? '?tab=journee' : '?tab=achats');
       await essaie('G ' + nom, async () => {
-        await attendre(pg, temoin ? '[data-nav-entree="ventes"]' : '[data-cc-colonne="retirer"]');
+        await attendre(pg, temoin ? '[data-nav-entree="ventes"]' : '[data-tache="achats"] [data-achats-onglet]');
         // Le toucher de la barre (écran gardé réutilisé) : Ventes.
         const nav = pg.locator('[data-nav-entree="ventes"]').filter({ visible: true }).first();
         if (tel) await nav.tap(); else await nav.click();

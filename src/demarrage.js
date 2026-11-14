@@ -25,6 +25,8 @@ export function finDemarrage(raison = '') {
   obs = null;
   const el = document.getElementById('vrm-demarrage');
   try { window.__vrmDemarrage = { fin: Math.round(performance.now()), raison: String(raison || '') }; } catch (_) {}
+  // (14 nov.) L'instantané peint dans l'écran de démarrage (src/OuvertureInstantanee.jsx) part avec lui.
+  try { window.dispatchEvent(new Event('vrm:demarrage-fin')); } catch (_) {}
   if (!el) return;
   let reduit = false;
   try { reduit = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) {}

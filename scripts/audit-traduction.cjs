@@ -56,6 +56,8 @@ const MIGRES = [
   ['src/BaissePrixVestiaire.jsx', ['*']],
   ['src/OffresVestiaire.jsx', ['*']],
   ['src/composants/SuiviTravail.jsx', ['*']],   // (11 nov., lot suivi-travail)
+  ['src/MainsLibres.jsx', ['*']],   // (14 nov., lot colis-plus 100) mains libres
+  ['src/TempsColis.jsx', ['*']],    // (14 nov., lot colis-plus 101) le temps par colis
   ['src/TvaMargeCarte.jsx', ['*']],
   ['src/RangerAchat.jsx', ['*']],   // (11 nov., lot rangement-guide)
   ['src/FavorisEtapes.jsx', ['*']],   // (11 nov., lot favoris-clair)
@@ -64,12 +66,14 @@ const MIGRES = [
   ['src/OffresAuto.jsx', ['*']],
   ['src/PrixMiniManquants.jsx', ['*']],
   ['src/design/QuoiRepublier.jsx', ['*']],   // (11 nov., lot quoi-republier)
-  ['src/FraisPlateformes.jsx', ['*']],   // (14 nov., frais-carte) les frais de l'année
-  ['src/CarteVentes.jsx', ['*']],   // (14 nov., frais-carte) la carte des ventes
   // (14 nov., lot argent-choix) coller des prix, modèle et taille, déclaration annuelle.
   ['src/composants/CollerPrixAchat.jsx', ['*']],
   ['src/design/QuoiRacheter.jsx', ['*']],
   ['src/composants/DeclarationAnnuelle.jsx', ['*']],
+  ['src/FraisPlateformes.jsx', ['*']],   // (14 nov., frais-carte) les frais de l'année
+  ['src/ArgentPrix.jsx', ['*']],   // (14 nov., argent-prix) offres payées, prix voulu, écarts, révision, lien comptable, soldes
+  ['src/VueComptable.jsx', ['*']],   // (14 nov., argent-prix) la page du comptable
+  ['src/CarteVentes.jsx', ['*']],   // (14 nov., frais-carte) la carte des ventes
   ['src/RepubProgramme.jsx', ['*']],   // (11 nov., lot republier-programme)
   ['src/HistoriqueRepub.jsx', ['*']],
   ['src/ecrans/Achats.jsx', ['*']],

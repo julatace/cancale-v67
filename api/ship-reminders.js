@@ -268,7 +268,7 @@ const objet = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 // Lit tout ce que le bilan d'UN vendeur demande. Chaque source vaut `null`
 // quand sa lecture a échoué — jamais `[]` à sa place (« rien lu » ≠ « rien »).
 async function lireDonneesBilan() {
-  const [comptesL, m, panneau, lignes, lbcL, ebayL, txn, vcV, vcL, dep, regle] = await Promise.all([
+  const [comptesL, m, panneau, lignes, lbcL, ebayL, txn, vcV, vcL, dep, regle, releveL, versConvL, versMailL] = await Promise.all([
     fetchPaginated(scoped('vinted_accounts?select=vinted_user_id,login')),
     getRowProjete('main', MAIN_BILAN),
     getRow('panel_accounts_off'),
@@ -287,6 +287,11 @@ async function lireDonneesBilan() {
     // (9 nov., suites serveur) L'offre du vendeur : en Solo, les ventes des comptes d'achat
     // n'entrent dans aucun total (`compteEcarte`, 4e argument). `null` = pas su ⇒ rien bridé.
     regleDuVendeur(proprietaireCourant()).catch(() => null),
+    // (14 nov., lot dates-versement) Les autres sources de la date de versement, les mêmes
+    // lectures légères que l'app (`fetchVersementsVinted`) : relevé, conversation, e-mail.
+    fetchPaginated(scoped('app_data?id=like.harvest_%25_releve_%25&select=id,l:data->lignes')),
+    fetchPaginated(scoped('app_data?id=like.harvest_%25_versement_%25&select=tx:data->>tx,at:data->>at,src:data->>source')),
+    fetchPaginated(scoped('app_data?id=like.email_final_%25&data->>transaction=not.is.null&select=tx:data->>transaction,at:data->>receivedAt')),
   ]);
   const departs = Array.isArray(dep) ? departsParSuivi(dep) : null;
   // (8 nov., « à envoyer » prouvé) Les bordereaux (leur n° de suivi) et les preuves de départ :
@@ -323,7 +328,7 @@ async function lireDonneesBilan() {
     departs, bords: bordsB, preuves,
     mailsVentes: Array.isArray(mailsVentes) ? mailsVentes : null,
     ebay: ebayL,
-    versements: versementsDeLignes(txn),
+    versements: versementsDeLignes(txn, releveL, versConvL, versMailL),
     // (11 nov., saisie rapide) « Vendu ailleurs » et la table transaction → annonce (jamais un titre).
     decisions: mm && Array.isArray(txn) ? objet(mm.vrm_cycle_decisions) : null,   // table illisible ⇒ pas de dédoublonnage sûr ⇒ rien
     txItem: Array.isArray(txn) ? Object.fromEntries(txn.filter((r) => r && r.tx && r.it).map((r) => [String(r.tx), String(r.it)])) : {},

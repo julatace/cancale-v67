@@ -102,9 +102,55 @@ export function capturerJournee(racine, { uid, maintenant = Date.now(), largeur 
   const g = racine.querySelector('[data-fu-gestes]');
   snap.gestes = g && /^\d+$/.test(attr(g, 'data-fu-gestes') || '') ? Number(attr(g, 'data-fu-gestes')) : null;
   snap.hauteur = Math.round(tete.getBoundingClientRect ? tete.getBoundingClientRect().height : 0) || 0;
+  // (14 nov., ouverture instantanée) LA PLACE de l'écran, pour le peindre avant l'app (src/OuvertureInstantanee.jsx).
+  snap.cadre = cadreDe(racine);
   // Rien d'utile (aucun chiffre) : rien n'est rangé.
   if (!snap.cases && !snap.frise && !snap.prochain) return null;
   return snap;
+}
+
+// (14 nov., ouverture instantanée) Le CADRE où l'écran était peint : la boîte de Ma journée (haut, gauche,
+// largeur, dans le défilement de la page), la largeur de la fenêtre et le thème, et ce que la coque pose
+// autour d'elle — ses classes et les variables de couleur du thème (`--…`, sans `url(`). Rien de personnel :
+// des nombres de mise en page et des noms de VRM. Sert à peindre l'instantané À LA MÊME PLACE avant que l'app
+// soit chargée ; une autre largeur ou un autre thème ⇒ src/OuvertureInstantanee.jsx ne s'en sert pas.
+const classesDe = (el) => String((el && el.className) || '').split(/\s+/).filter((c) => /^[a-z][\w-]{0,60}$/i.test(c)).slice(0, 12).join(' ');
+export function cadreDe(racine) {
+  try {
+    const boite = racine && racine.parentElement;
+    if (!boite || !boite.getBoundingClientRect || typeof window === 'undefined') return null;
+    const r = boite.getBoundingClientRect();
+    const shell = racine.closest('.vrm-app-shell');
+    const main = racine.closest('main');
+    const vars = {};
+    if (shell && shell.style) {
+      for (let i = 0; i < shell.style.length && Object.keys(vars).length < 80; i++) {
+        const p = shell.style[i];
+        if (!/^--[\w-]{1,60}$/.test(p)) continue;
+        const v = String(shell.style.getPropertyValue(p) || '').trim();
+        if (v && v.length <= 160 && !/url\s*\(|expression|[<>{};]/i.test(v)) vars[p] = v;
+      }
+    }
+    // Le HAUT de la zone des écrans (sous la barre fixe de la coque), pas celui de la boîte : les bandeaux
+    // posés au-dessus d'elle à la capture (fraîcheur, extension, envois en attente) sont passagers.
+    const zone = main ? main.getBoundingClientRect() : r;
+    const haut = Math.round(zone.top + (window.scrollY || 0));
+    const gauche = Math.round(r.left + (window.scrollX || 0));
+    if (!Number.isFinite(haut) || !Number.isFinite(gauche) || haut < 0 || haut > 200 || gauche < 0) return null;
+    // La barre fixe du haut (au-dessus de la zone des écrans) : sa couleur de fond, rien d'autre.
+    let barre = '';
+    try {
+      const el = haut > 0 ? document.elementFromPoint(Math.round((window.innerWidth || 0) / 2), Math.max(0, Math.round(haut / 2))) : null;
+      for (let x = el; x && x !== document.body; x = x.parentElement) {
+        const c = getComputedStyle(x).backgroundColor;
+        if (c && c !== 'transparent' && !/^rgba\(\s*0,\s*0,\s*0,\s*0\s*\)$/.test(c)) { barre = c; break; }
+      }
+    } catch (_) { barre = ''; }
+    if (!/^(rgba?\([\d.,\s%]+\)|#[0-9a-f]{3,8})$/i.test(barre)) barre = '';
+    return { haut, gauche, large: Math.round(r.width), vw: Math.round(window.innerWidth || 0), barre,
+      theme: (document.documentElement && document.documentElement.getAttribute('data-theme')) || '',
+      shell: classesDe(shell) || 'vrm-app-shell', main: classesDe(main) || 'vrm-main', vars };
+  } catch (_) { return null; }
 }
 
 // ── LECTURE ─────────────────────────────────────────────────────────────────
@@ -123,7 +169,7 @@ export function instantaneMontrable(s, maintenant = Date.now()) {
     gestes: s.gestes,
     cases: memeMois ? s.cases || null : null,
     objectif: memeMois ? s.objectif || null : null,
-    frise: null, hauteur: s.hauteur || 0, largeur: s.largeur || 0,
+    frise: null, hauteur: s.hauteur || 0, largeur: s.largeur || 0, cadre: s.cadre || null,
   };
   if (s.frise && Array.isArray(s.frise.jours)) {
     // Les sept jours d'AUJOURD'HUI : un jour connu garde son chiffre, aujourd'hui (pas encore relu) n'en a pas.
@@ -137,4 +183,25 @@ export function instantaneMontrable(s, maintenant = Date.now()) {
 
 // ── ÉCRITURE ───────────────────────────────────────────────────────────────
 // Un seul compte sur l'appareil : écrire pour un uid efface les instantanés des autres (tous écrans).
-export const ecrireInstantane = (snap, opts) => ecrireInstantaneEcran('journee', snap, opts);
+// (14 nov., ouverture instantanée) §4.2 : UNE CAPTURE PLUS PAUVRE N'ÉCRASE PAS UNE PLUS RICHE. Le même jour,
+// un instantané de moins de 6 h qui connaissait plus de chiffres (une case lue au lieu de « — », un jour de la
+// frise, la prochaine chose, l'objectif) est GARDÉ, avec SA date : montrer « 3 340 € · il y a 2 h » vaut mieux
+// que « — · à l'instant » quand la relecture d'après n'a pas tout su. Un autre jour, ou plus vieux : remplacé.
+export const GARDE_PLUS_RICHE_MS = 6 * 3600000;
+export function chiffresConnus(s) {
+  if (!s || typeof s !== 'object') return 0;
+  let n = 0;
+  for (const c of Array.isArray(s.cases) ? s.cases : []) if (c && !c.vide && String(c.b || '').trim() && String(c.b).trim() !== '—') n++;
+  for (const j of (s.frise && Array.isArray(s.frise.jours)) ? s.frise.jours : []) if (j && j.v != null) n++;
+  if (s.frise && s.frise.panneau && s.frise.panneau.vendu !== '') n++;
+  if (s.prochain) n++;
+  if (s.objectif && s.objectif.valeur !== '') n++;
+  return n;
+}
+export const ecrireInstantane = (snap, opts = {}) => {
+  if (snap && snap.uid) {
+    const ancien = lireInstantane(snap.uid, { ...opts, maintenant: Number(snap.t) || Date.now() });
+    if (ancien && ancien.jour === snap.jour && (Number(snap.t) - Number(ancien.t)) < GARDE_PLUS_RICHE_MS && chiffresConnus(snap) < chiffresConnus(ancien)) return false;
+  }
+  return ecrireInstantaneEcran('journee', snap, opts);
+};

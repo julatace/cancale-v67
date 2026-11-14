@@ -1,0 +1,46 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   ARGENT ET PRIX (14 nov., lot argent-prix — 112 à 122). Les cartes reprennent
+   les formes d'argent-choix.css (titre hors de la carte, tuiles, rangées denses) ;
+   ici seulement ce qui leur manque. Jetons de l'atelier LUS avec repli.
+   Aucun montant en bleu ; ambre = un geste à faire.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.vrm-ap { margin: var(--d-e-6, 24px) 0 0; }
+.vrm-ap-sous { display: block; font: 400 13px/1.3 var(--vrm-police, system-ui, sans-serif); color: var(--d-gris, #6E6E73); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.vrm-ap-liste { padding: 0; margin: 0; }
+.vrm-ap-liste .vrm-ac-ligne { padding-left: 16px; padding-right: 16px; }
+.vrm-ap-repli > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--d-gris, #6E6E73); font-size: 13px; }
+.vrm-ap-champ { display: flex; flex-direction: column; gap: 6px; }
+.vrm-ap-saisie { display: flex; align-items: baseline; gap: 6px; }
+.vrm-ap-saisie input { width: 100%; max-width: 220px; min-height: 52px; box-sizing: border-box; border: 0; border-radius: var(--d-r-case, 12px); background: var(--d-surface-atelier-2, var(--d-case, #F2F2F7)); color: var(--d-encre, inherit); padding: 0 14px; font: 700 clamp(28px, 8vw, 34px)/1 var(--vrm-police, system-ui, sans-serif); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.vrm-ap-saisie b { font-size: 22px; font-weight: 700; color: var(--d-gris, #6E6E73); }
+.vrm-ap-mois, .vrm-ap-date { align-self: flex-start; min-height: 44px; border: 0; border-radius: var(--d-r-case, 12px); background: var(--d-remplir, rgba(118,118,128,.12)); color: var(--d-encre, inherit); padding: 0 12px; font: 600 15px/1 var(--vrm-police, system-ui, sans-serif); }
+.vrm-ap-tuile { border: 0; text-align: left; cursor: pointer; font: inherit; min-height: 64px; }
+.vrm-ap-tuile:disabled { cursor: default; }
+.vrm-ap-tuile.is-ambre .vrm-ac-chiffre { color: var(--d-ambre, #B25000); }
+.vrm-ap-ligne-bouton { padding: 0 !important; }
+.vrm-ap-ligne-geste { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 8px 16px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; box-sizing: border-box; min-width: 0; }
+.vrm-ap-chevron { flex: 0 0 auto; color: var(--d-gris-3, #C7C7CC); font-size: 20px; line-height: 1; }
+.vrm-ap-rangee { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.vrm-ap-lien { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; padding-top: 16px; box-shadow: inset 0 .5px 0 var(--d-filet, rgba(60,60,67,.18)); min-width: 0; }
+.vrm-ap-sous-titre { font-size: 17px; font-weight: 600; color: var(--d-encre, inherit); }
+.vrm-ap-url { background: var(--d-remplir, rgba(118,118,128,.12)); border-radius: var(--d-r-case, 12px); padding: 10px 12px; overflow-x: auto; min-width: 0; }
+.vrm-ap-url code { font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; white-space: normal; color: var(--d-encre, inherit); }
+.vrm-ap-acces { list-style: none; margin: 6px 0 0; padding: 0; font-size: 13px; color: var(--d-gris, #6E6E73); font-variant-numeric: tabular-nums; }
+.vrm-ap-acces li { min-height: 28px; display: flex; align-items: center; }
+.vrm-ap-journee { display: flex; align-items: center; gap: 12px; margin: 12px 0; }
+.vrm-ap-solde { align-items: center; flex-wrap: wrap; gap: 8px; }
+
+/* ── La page du comptable (lecture seule, sans l'app) ── */
+.vrm-vc { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; box-sizing: border-box; color: var(--d-encre, #1D1D1F); font-family: var(--vrm-police, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif); }
+.vrm-vc h1 { font-size: clamp(28px, 7vw, 34px); font-weight: 700; letter-spacing: -.02em; margin: 0 0 4px; }
+.vrm-vc h2 { font-size: 20px; font-weight: 700; margin: 28px 0 8px; }
+.vrm-vc .vrm-vc-note { font-size: 13px; color: var(--d-gris, #6E6E73); margin: 0; line-height: 1.45; }
+.vrm-vc .vrm-vc-chiffre { font-size: clamp(40px, 11vw, 56px); font-weight: 700; letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; margin: 12px 0 4px; }
+.vrm-vc-table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.vrm-vc-table th, .vrm-vc-table td { padding: 8px 10px; text-align: left; border-bottom: .5px solid var(--d-filet, rgba(60,60,67,.18)); vertical-align: top; }
+.vrm-vc-table th { font-size: 12px; font-weight: 600; color: var(--d-gris, #6E6E73); }
+.vrm-vc-table td.n, .vrm-vc-table th.n { text-align: right; white-space: nowrap; }
+.vrm-vc-defile { overflow-x: auto; background: var(--d-carte, #fff); border-radius: 16px; box-shadow: var(--d-ombre-douce, 0 1px 2px rgb(0 0 0/.04), 0 8px 24px rgb(0 0 0/.06)); }
+.vrm-vc-onglets { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 0; }
+.vrm-vc-onglets button { min-height: 44px; padding: 0 14px; border-radius: 22px; border: 0; background: var(--d-remplir, rgba(118,118,128,.12)); color: inherit; font: 600 15px/1 inherit; cursor: pointer; }
+.vrm-vc-onglets button[aria-pressed="true"] { background: var(--d-encre, #1D1D1F); color: var(--d-fond, #fff); }

@@ -33,7 +33,9 @@
 .vrm-cf-point { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--d-point-ambre, #ff9f0a); margin-right: 6px; vertical-align: middle; }
 
 /* ── L'écran d'atelier : plein écran, gros caractères, lisible à 3 m ── */
-.vrm-at { position: fixed; inset: 0; z-index: 20500; background: var(--d-fond, #f2f2f7); overflow-y: auto; padding: max(20px, env(safe-area-inset-top)) clamp(16px, 4vw, 48px) 32px; }
+/* (14 nov., accueil-reste) `.vrm-at` est AUSSI la classe d'« À trancher » (src/ATrancher.jsx, ouvert DANS
+   Ma journée) : sans `.vrm-cf`, la règle plein écran recouvrait toute Ma journée, sans bouton pour fermer. */
+.vrm-at.vrm-cf { position: fixed; inset: 0; z-index: 20500; background: var(--d-fond, #f2f2f7); overflow-y: auto; padding: max(20px, env(safe-area-inset-top)) clamp(16px, 4vw, 48px) 32px; }
 .vrm-at-tete { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
 .vrm-at-heure { font-size: clamp(28px, 4vw, 44px); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
 .vrm-at-bande { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 24px; }
@@ -42,9 +44,9 @@
 .vrm-at-chiffre span { display: block; margin-top: 6px; font-size: clamp(13px, 1.4vw, 17px); font-weight: 600; color: var(--d-gris, #6e6e73); }
 .vrm-at-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
 @media (max-width: 760px) { .vrm-at-cols { grid-template-columns: minmax(0, 1fr); } .vrm-at-bande { gap: 8px; } .vrm-at-chiffre { padding: 12px 14px; } }
-.vrm-at h2 { margin: 0 0 8px 4px; font-size: 13px; font-weight: 600; color: var(--d-gris, #6e6e73); }
-.vrm-at .vrm-cf-liste > li { min-height: 64px; }
-.vrm-at .vrm-cf-txt b { font-size: clamp(15px, 1.6vw, 20px); }
+.vrm-at.vrm-cf h2 { margin: 0 0 8px 4px; font-size: 13px; font-weight: 600; color: var(--d-gris, #6e6e73); }
+.vrm-at.vrm-cf .vrm-cf-liste > li { min-height: 64px; }
+.vrm-at.vrm-cf .vrm-cf-txt b { font-size: clamp(15px, 1.6vw, 20px); }
 .vrm-at-code { flex: none; font-size: clamp(20px, 2.4vw, 28px); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: .04em; }
 .vrm-at-pied { margin-top: 24px; text-align: center; }
 

@@ -33,6 +33,11 @@ const CHEMINS = ['vinted-sync-extension/manifest.json', 'vinted-sync-extension/b
 const INSTALLEES_HORS_MAIN = [
   { sha: 'cdc9c1d', pourquoi: '5.164.0 — panel_diag_capture.ver chez lui les 9-10 octobre, production servait la 5.163' },
 ];
+// (14 nov.) 5.376.0 — consolidée sur `claude/extension-5376` (quatre branches en une version,
+// docs/passation/2026-11-14-extension-5376.md). Elle n'entre PAS ici : aucun de ses zips n'a été
+// installé chez lui hors de `main` (les zips de `claude/argent-prix` ont été écartés, jamais
+// servis — les branches `claude/**` ne se déploient pas). Elle sera lue dans l'historique de
+// `main` dès que `main` la servira, comme toutes les autres.
 
 function git(depot, args, entree) {
   const r = spawnSync('git', ['-C', depot, ...args], { encoding: 'latin1', input: entree, maxBuffer: 1 << 30 });

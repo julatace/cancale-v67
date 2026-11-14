@@ -24,7 +24,10 @@ var __vrmReglesAchat = (() => {
   var regles_achat_entree_exports = {};
   __export(regles_achat_entree_exports, {
     SITES_CALCULETTE: () => SITES_CALCULETTE,
+    achatsDeLAnnonce: () => achatsDeLAnnonce,
     calculer: () => calculer,
+    correspond: () => correspond,
+    correspondances: () => correspondances,
     eurosCalc: () => eurosCalc,
     extractBrand: () => extractBrand,
     extractColors: () => extractColors,
@@ -32,7 +35,8 @@ var __vrmReglesAchat = (() => {
     fraisSite: () => fraisSite,
     memeModele: () => memeModele,
     pairesDuModele: () => pairesDuModele,
-    prixAchatDe: () => prixAchatDe
+    prixAchatDe: () => prixAchatDe,
+    resumeRecherche: () => resumeRecherche
   });
 
   // src/profilVendeur.js
@@ -292,6 +296,109 @@ var __vrmReglesAchat = (() => {
     }
     paires.sort((x, y) => (y.jours == null ? -1 : y.jours) - (x.jours == null ? -1 : x.jours));
     return { n: paires.length, paires };
+  }
+
+  // src/listeRecherche.js
+  var MAX_RECHERCHES = 50;
+  var str = (v) => String(v == null ? "" : v).trim();
+  var motsDe = (t) => str(t).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter(Boolean);
+  function tailleCle(t) {
+    let s = str(t).toLowerCase().replace(/\b(eu|fr|eur|taille|pointure|size)\b/g, " ").replace(/½/g, " 1/2").trim();
+    const fr = /(\d{2})(?:\s*(?:[.,](\d{1,2})|\s+(1|2)\/(2|3)))?/.exec(s);
+    if (fr) {
+      const n = Number(fr[1]);
+      if (n >= 15 && n <= 55) {
+        if (fr[2]) {
+          const d = Number("0." + fr[2]);
+          return String(Math.round((n + d) * 100) / 100);
+        }
+        if (fr[3]) return String(Math.round((n + Number(fr[3]) / Number(fr[4])) * 100) / 100);
+        return String(n);
+      }
+    }
+    const l = /^(xxs|xs|s|m|l|xl|xxl|xxxl)$/.exec(s.replace(/\s+/g, ""));
+    return l ? l[1].toUpperCase() : "";
+  }
+  function prixLu(v) {
+    if (v == null || v === "") return null;
+    if (typeof v === "number") return Number.isFinite(v) && v >= 0 ? v : null;
+    const m = /(\d{1,6})(?:[.,](\d{1,2}))?/.exec(str(v).replace(/\s/g, ""));
+    return m ? Number(m[1] + "." + (m[2] || "0")) : null;
+  }
+  function rechercheNette(x) {
+    const o = x && typeof x === "object" ? x : {};
+    const marque = str(o.marque).slice(0, 40), modele = str(o.modele).slice(0, 80);
+    if (!motsDe(marque).length && !motsDe(modele).length) return null;
+    const tailles = [...new Set((Array.isArray(o.tailles) ? o.tailles : str(o.tailles).split(/[;/|]|\s{2,}|,(?!\d)/)).map(tailleCle).filter(Boolean))].slice(0, 12);
+    const p = prixLu(o.prixMax);
+    return { id: str(o.id).slice(0, 40) || "", marque, modele, tailles, prixMax: p != null && p > 0 ? Math.round(p * 100) / 100 : null, actif: o.actif !== false };
+  }
+  function listePropre(v) {
+    const out = [], vus = /* @__PURE__ */ new Set();
+    for (const x of Array.isArray(v) ? v : []) {
+      const r = rechercheNette(x);
+      if (!r || !r.id || vus.has(r.id)) continue;
+      vus.add(r.id);
+      out.push(r);
+      if (out.length >= MAX_RECHERCHES) break;
+    }
+    return out;
+  }
+  function correspond(recherche, annonce, { marqueDe = null } = {}) {
+    const r = rechercheNette(recherche);
+    if (!r || !r.actif) return { ok: false, raison: "inactive" };
+    const a = annonce && typeof annonce === "object" ? annonce : {};
+    const titre = motsDe(a.titre);
+    if (motsDe(r.marque).length) {
+      let m = motsDe(a.marque);
+      if (!m.length && typeof marqueDe === "function") m = motsDe(marqueDe(str(a.titre)));
+      if (!m.length) return { ok: false, raison: "marque", pasSu: true };
+      if (m.join(" ") !== motsDe(r.marque).join(" ")) return { ok: false, raison: "marque" };
+    }
+    const mod = motsDe(r.modele);
+    if (mod.length) {
+      if (!titre.length) return { ok: false, raison: "modele", pasSu: true };
+      const t = new Set(titre);
+      if (!mod.every((w) => t.has(w))) return { ok: false, raison: "modele" };
+    }
+    if (r.tailles.length) {
+      const k = tailleCle(a.taille);
+      if (!k) return { ok: false, raison: "taille", pasSu: true };
+      if (!r.tailles.includes(k)) return { ok: false, raison: "taille" };
+    }
+    if (r.prixMax != null) {
+      const p = prixLu(a.prix);
+      if (p == null) return { ok: false, raison: "prix", pasSu: true };
+      if (p > r.prixMax + 1e-9) return { ok: false, raison: "prix" };
+    }
+    return { ok: true };
+  }
+  function correspondances(liste, annonce, deps = {}) {
+    return listePropre(liste).filter((r) => correspond(r, annonce, deps).ok);
+  }
+  function resumeRecherche(r) {
+    const x = rechercheNette(r);
+    if (!x) return "";
+    const p = [x.marque, x.modele].filter(Boolean).join(" · ");
+    const t = x.tailles.length ? x.tailles.map((k) => k.replace(".", ",")).join(" / ") : "";
+    const m = x.prixMax != null ? `≤ ${String(x.prixMax).replace(".", ",")} €` : "";
+    return [p, t, m].filter(Boolean).join(" · ");
+  }
+
+  // src/achatMemeAnnonce.js
+  var idOk = (v) => {
+    const s = String(v == null ? "" : v).trim();
+    return /^\d{4,15}$/.test(s) ? s : "";
+  };
+  var txOk = (v) => {
+    const s = String(v == null ? "" : v).trim();
+    return /^\d{4,20}$/.test(s) ? s : "";
+  };
+  function achatsDeLAnnonce(carte, itemId) {
+    const id = idOk(itemId);
+    if (!id || !carte || typeof carte !== "object" || !carte.ids || typeof carte.ids !== "object") return [];
+    const l = carte.ids[id];
+    return Array.isArray(l) ? l.filter((x) => x && txOk(x.tx)) : [];
   }
 
   // regles-achat-entree.js

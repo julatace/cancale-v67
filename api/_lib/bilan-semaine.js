@@ -40,7 +40,9 @@
 //      · pour le reçu : des ventes finalisées sans date de versement (elles
 //        peuvent avoir été payées cette semaine — le dire, pas les deviner).
 import { motsArticle } from '../../src/profilVendeur.js';
-import { ventesFaites, ventesDeclarables, compteEcarte, classifyOrderStatus } from './ventes-regle.js';
+import { ventesFaites, ventesDeclarables, compteEcarte, classifyOrderStatus, datesDeVersement } from './ventes-regle.js';
+// (14 nov., lot dates-versement) Le relevé du porte-monnaie : LA règle de l'app, importée telle quelle.
+import { versementsDuReleve } from '../../src/versementReleve.js';
 // (11 nov., saisie rapide) « Vendu ailleurs » : LA règle de l'app (src/venteAilleurs.js), importée telle quelle.
 import { ventesAilleursPour } from '../../src/venteAilleurs.js';
 import { excluAutreDe } from './comptes-exclus.js';
@@ -97,13 +99,15 @@ export function semaineCourante(maintenant = Date.now()) {
   return { lundi: lundiCourant, dimanche: auj, debut: minuitParis(lundiCourant), fin: maintenant, seuilCapture: minuitParis(auj), jour };
 }
 
-// tx → date du versement (statut 450, `status_updated_at`) — la MÊME condition
-// que `fetchVersementsVinted` dans l'app (l'audit compare les deux textes).
-export function versementsDeLignes(rows) {
-  if (!Array.isArray(rows)) return null;
-  const map = {};
-  for (const r of rows) if (r && r.tx && String(r.s) === '450' && r.su && !isNaN(Date.parse(r.su))) map[String(r.tx)] = r.su;
-  return map;
+// tx → date du versement — LA règle de l'app (`datesDeVersement`, recopiée au jeton près
+// dans ./ventes-regle.js par `audit-bilan-semaine.cjs --recopie`), sur les MÊMES sources
+// que `fetchVersementsVinted` : la transaction 450, le relevé (par n° de transaction), la
+// conversation de la transaction (`harvest_*_versement_*`) et l'e-mail qui porte son n°.
+// `rows` (transactions) illisible ⇒ `null` (pas su) ; une autre source illisible se tait.
+export function versementsDeLignes(rows, releveRows = null, conversations = null, emails = null) {
+  let releve = null;
+  try { releve = versementsDuReleve(releveRows); } catch (_) { releve = null; }
+  return datesDeVersement(rows, releve, conversations, emails);
 }
 
 const jourCourt = (t) => new Date(t).toLocaleDateString('fr-FR', { timeZone: PARIS, weekday: 'long' });

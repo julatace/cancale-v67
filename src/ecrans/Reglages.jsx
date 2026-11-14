@@ -145,6 +145,7 @@ import { ligneEmailsCompte } from "../emailsCompteLie.js";
 // (11 nov., lot traduction) Les textes de Paramètres passent par `tr()` (src/i18n/index.js).
 import { tr, monnaie, LANGUES, NOMS_LANGUES, langueCourante, choisirLangue } from '../i18n/index.js';
 import { useLangue } from '../i18n/react.js';
+import { ReglagesAidesAccueil } from '../accueilReste/AccueilReste.jsx';   // (14 nov., idées 136 139 140 147)
 import MIGRATION_SQL from "../../supabase/migrations/001-multi-utilisateurs.sql?raw";
 import { accompagner } from '../accompagnement.js';   // (14 nov.) pendant, après, échec d'un geste (src/ui/Accompagne.jsx)
 
@@ -348,7 +349,7 @@ const TITRE_EXEMPLE = 'Veste en jean bleue';
 const champMm = { width: 76, minHeight: 44, border: `1px solid ${C.border}`, borderRadius: 12, padding: '0 10px', fontSize: 15, background: C.bg, color: C.text, fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums' };
 const ImpressionBordereaux = ({ mode, reg, changer }) => {
   useLangue();
-  const th = mode === 'thermique';
+  const th = mode === 'thermique' || mode === 'planche4';   // (14 nov., 98) 4 par page : les étiquettes isolées comme en thermique
   const papier = papierThermique(reg);
   const fmt = FORMATS_THERMIQUES.find((f) => f.id === reg.format) || FORMATS_THERMIQUES[0];
   const [ap, setAp] = React.useState(null);   // null · {etat:'charge'} · {etat:'ko'} · {etat:'lu', octets, pages, r1}
@@ -517,15 +518,17 @@ const ImprimanteSetting = ({ nu = false }) => {
     <div data-imprimante-reglage={mode} style={nu ? {} : {padding:'13px 16px',borderRadius:12,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
       {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text}}>Imprimante et bordereaux</div>}
       <Segmente label="Imprimante" plein value={mode} onChange={choisir} style={{marginTop:nu?0:10}}
-        options={IMPR_MODES.map((v) => ({ v, l: v === 'thermique' ? tr('reglages.imprimante.thermique', { papier: nomPapier(papier) }) : tr('reglages.imprimante.normale'), data: { 'data-imprimante-choix': v } }))}/>
-      <div className="vrm-setting-applique" role="status" style={{color:erreurMode?C.warn:C.text}}>{erreurMode||`Format appliqué sur cet appareil : ${mode==='thermique'?`étiquettes ${nomPapier(papier)}`:'papier A4'}.`}</div>
+        options={IMPR_MODES.map((v) => ({ v, l: v === 'thermique' ? tr('reglages.imprimante.thermique', { papier: nomPapier(papier) }) : v === 'planche4' ? tr('cp.planche.choix') : tr('reglages.imprimante.normale'), data: { 'data-imprimante-choix': v } }))}/>
+      <div className="vrm-setting-applique" role="status" style={{color:erreurMode?C.warn:C.text}}>{erreurMode||(mode==='planche4'?tr('cp.planche.applique'):`Format appliqué sur cet appareil : ${mode==='thermique'?`étiquettes ${nomPapier(papier)}`:'papier A4'}.`)}</div>
       <GuideReglage titre="Avant d’imprimer" etapes={[
         ['Choisis le papier', 'A4 en classique, celui de ton rouleau en thermique.'],
         ['Vérifie un aperçu', 'Codes lisibles, N° et titre hors des codes.'],
         ['À l’impression', 'Vérifie le papier et l’échelle : ton imprimante décide.']
       ]}/>
       <div data-imprimante-phrase style={{fontSize:13,color:C.muted,marginTop:10,lineHeight:1.5}}>
-        {mode === 'thermique'
+        {mode === 'planche4'
+          ? <span data-imprimante-planche="">{tr('cp.planche.phrase')} <Pourquoi label={tr('cp.planche.detail')}>{tr('cp.planche.pourquoi')}</Pourquoi></span>
+          : mode === 'thermique'
           ? <>Une étiquette par page, <b style={{color:C.text}}>{nomPapier(papier)}</b>, ton N° dessus ; étiquette pas repérée ⇒ page <b style={{color:C.text}}>entière</b>. <Pourquoi label="Détail">Chaque étiquette sort seule, tournée à l’endroit et entière (sans la fiche destinataire ni la pub), ton N° dans un espace blanc vérifié. Quand l’app ne sait pas repérer l’étiquette sur un bordereau, la page part entière et l’écran le dit — jamais un code-barres coupé.</Pourquoi></>
           : <>A4, <b style={{color:C.text}}>une feuille par bordereau</b>, ton N° dans un blanc du PDF. <Pourquoi label="Recto-verso ?">Le document n’est pas réduit. Si ton imprimante sort du recto-verso, décoche-le dans sa fenêtre d’impression : le PDF le demande, le pilote peut passer outre.</Pourquoi></>}
       </div>
@@ -2210,6 +2213,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'verifier', type:'panneau', nu:true, ic:'scan', lib:tr('reglages.verifier.lib'), desc:tr('reglages.verifier.desc'), data:{ 'data-reglage-verifier':'' }, el:<VerifierInstallationApp comptes={comptes} onNav={setTab} seule/> },
       // (2 nov.) La visite en bulles, rejouée sur son clic (src/VisiteBulles.jsx).
       { id:'visite', type:'action', ic:'play', lib:tr('reglages.visite.lib'), desc:tr('reglages.visite.desc'), onClick:()=>{ try { window.dispatchEvent(new Event('vrm:visite')); } catch (_) {} }, data:{ 'data-reglage-visite':'' } },
+      // (14 nov., accueil, le reste) La visite des écrans, les mots expliqués, le conseil du jour (par compte),
+      // et — au propriétaire seul — le lien de l'appel de bienvenue des comptes Pro (src/accueilReste/).
+      { id:'aides-accueil', type:'panneau', nu:true, ic:'spark', lib:tr('reglages.aidesAccueil.lib'), desc:tr('reglages.aidesAccueil.desc'), data:{ 'data-reglage-aides-accueil':'' }, el:<ReglagesAidesAccueil proprietaire={proprioInst === true}/> },
       // (14 nov., accueil des nouveaux) Rejouer le bilan en une minute et le premier colis accompagné.
       { id:'bilan-minute', type:'action', ic:'spark', lib:tr('nouveaux.reglage.bilan.lib'), desc:tr('nouveaux.reglage.bilan.desc'), onClick:()=>{ try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=journee' })); setTimeout(() => window.dispatchEvent(new Event('vrm:bilan-minute')), 50); } catch (_) {} }, data:{ 'data-reglage-bilan':'' } },
       { id:'premier-colis', type:'action', ic:'printer', lib:tr('nouveaux.reglage.colis.lib'), desc:tr('nouveaux.reglage.colis.desc'), onClick:()=>{ try { window.dispatchEvent(new Event('vrm:premier-colis')); } catch (_) {} }, data:{ 'data-reglage-premier-colis':'' } },
@@ -2266,7 +2272,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // Discord » (pseudo de la carte, `DiscordCompte`) ne s'affiche plus ici : elle faisait croire
       // que Discord était relié pour se connecter (c'est ainsi que le compte en trop a été créé) ;
       // le pseudo de la carte se relie dans Communauté.
-      {id:'google',type:'el',el:<ConnexionsCompte nu theme={C} providers={OAUTH_PROVIDERS} enabled={providerEnabled} relier={oauthRelier} lire={lireConnexionsOAuth} delier={oauthDelier} retour={AUTH_REDIRECT?.error||(AUTH_REDIRECT?.liaison==='google'?tr('reglages.associe',{ nom:'Google' }):AUTH_REDIRECT?.liaison==='discord'?tr('reglages.associe',{ nom:'Discord' }):'')} icone={id=><BrandMark id={id}/>}/>},
+      {id:'google',type:'el',el:<ConnexionsCompte nu theme={C} providers={OAUTH_PROVIDERS} enabled={providerEnabled} relier={oauthRelier} lire={lireConnexionsOAuth} delier={oauthDelier} retour={AUTH_REDIRECT?.error||(AUTH_REDIRECT?.liaison==='google'?tr('reglages.associe',{ nom:'Google' }):AUTH_REDIRECT?.liaison==='discord'?tr('reglages.associe',{ nom:'Discord' }):AUTH_REDIRECT?.liaison==='apple'?tr('reglages.associe',{ nom:'Apple' }):'')} icone={id=><BrandMark id={id}/>}/>},
     ]},
     // (29 oct., revue) PAS de carte Photoroom ici : le 17 oct. Julien a dit du
     // détourage « ne le mets pas dans les paramètres ». Elle vit sur l'écran

@@ -82,7 +82,7 @@ export const ageTexte = (ms) => {
 export function capturerCases(carte) {
   const cases = carte ? [...carte.querySelectorAll('[data-fu-case]')].map((c) => {
     const b = c.querySelector('b');
-    return { cle: attr(c, 'data-fu-case') || '', valeur: attr(c, 'data-carte-valeur') || '', partiel: attr(c, 'data-carte-partiel') === '1', b: txt(b), vide: !!(b && b.classList.contains('is-vide')), l: txt(c.querySelector(':scope > span')), raison: txt(c.querySelector('small')) };
+    return { cle: attr(c, 'data-fu-case') || '', valeur: attr(c, 'data-carte-valeur') || '', partiel: attr(c, 'data-carte-partiel') === '1', b: txt(b), vide: !!(b && b.classList.contains('is-vide')), l: txt(c.querySelector(':scope > span:not(.vrm-sr-seul)')), raison: txt(c.querySelector('small')) };
   }) : [];
   return cases.length && !cases.some((c) => enLecture(c.b) || enLecture(c.raison)) ? cases : null;
 }
