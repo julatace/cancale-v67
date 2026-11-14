@@ -17,11 +17,20 @@ require('./_porte-banc.cjs');
 //     accent    un montant (« 43 € ») écrit dans la couleur d'accent (le bleu est aux actions) ;
 //     repetes   la même phrase (≥ 28 signes) sur 3 rangées ou plus : c'est UNE phrase, elle va
 //               dans l'en-tête du groupe ;
-//     heros     au téléphone : UNE carte héros en haut de l'écran, son chiffre ≥ 48 px, et
-//               elle tient dans 40 % du premier écran (le reste est à la liste).
+//     heros     Ma journée : sa carte héros, son chiffre ≥ 48 px ; un écran de LISTE (Ventes,
+//               Annonces) : AUCUNE carte sombre (AJOUT 3 : une bande de chiffres à la place) ;
+//     AJOUT 3 (Julien, ses captures d'Annonces), sur les écrans de liste :
+//     premiere  la 1re ligne de la liste dans la moitié haute d'un iPhone (≤ 422 px sur 844 ; la
+//               ligne de fraîcheur de la COQUE, que claude/refonte-coque retire, est décomptée et dite) ;
+//     vides     aucune case dont la valeur est « — » ;
+//     pleins    au plus UN bouton plein accent dans le premier écran ;
+//     capsules  aucune rangée de plus de 3 capsules grises de 44 px posée sans défilement ;
+//     flottants aucun bandeau flottant au-dessus de la barre du bas après 3 s (celui de la coque dit à part).
 //  B. VOLUME — 1 000 annonces (un compte) et 1 000 ventes, 390 tactile, clair :
 //     rendu     temps jusqu'à la première rangée de la liste ;
-//     cls       somme des décalages de mise en page en défilant jusqu'en bas (≈ 0) ;
+//     cls       somme des décalages de mise en page en défilant jusqu'en bas ; les RANGÉES ne sautent
+//               pas (≈ 0) — le pied de page qui descend quand le paquet suivant arrive (« suite par
+//               paquets ») compte dans le total, jugé contre l'avant seulement ;
 //     noeuds    nombre de nœuds du DOM ;
 //     visibles  rangées ENTIÈRES dans un écran d'iPhone une fois la liste en haut (≥ 8) ;
 //     recherche le N° tapé dans la recherche d'Annonces trouve sa paire (< 300 ms).
@@ -47,7 +56,7 @@ const ECRANS = { journee: '/?tab=journee', ventes: '/?tab=ventes', annonces: '/?
 
 // ── A. La mesure de FORME, dans la page ─────────────────────────────────────
 function mesurerForme({ tactile, sombre, liste }) {
-  const out = { murs: [], debords: [], cartes: [], accent: [], repetes: [], heros: [] };
+  const out = { murs: [], debords: [], cartes: [], accent: [], repetes: [], heros: [], premiere: [], vides: [], pleins: [], capsules: [], flottants: [], info: {} };
   const root = document.querySelector('.vrm-main');
   if (!root) { out.heros.push('pas de .vrm-main'); return out; }
   const rgba = (s) => { const m = String(s || '').match(/rgba?\(([^)]+)\)/); if (!m) return null; const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }; };
@@ -126,8 +135,8 @@ function mesurerForme({ tactile, sombre, liste }) {
       if (q.right > r.right + 1.5 || q.left < r.left - 1.5) { out.debords.push({ de: Math.round(Math.max(q.right - r.right, r.left - q.left)), quoi: nom(d), carte: nom(el).slice(0, 50) }); break; }
     }
   }
-  // le héros (au téléphone) : dans le premier écran, un chiffre ≥ 48 px, et sa carte ≤ 40 % de l'écran.
-  if (tactile) {
+  // le héros de Ma journée (au téléphone) : dans le premier écran, un chiffre d'affiche ≥ 48 px, dans sa carte.
+  if (tactile && !liste) {
     const H = window.innerHeight; let meilleur = null;
     for (const [el] of textes) {
       const r = el.getBoundingClientRect(); if (r.top > H || r.bottom < 0) continue;
@@ -135,13 +144,77 @@ function mesurerForme({ tactile, sombre, liste }) {
       if (!/\d/.test(el.textContent || '')) continue;
       if (!meilleur || fs > meilleur.fs) meilleur = { fs, el };
     }
-    if (!meilleur || meilleur.fs < 48) out.heros.push({ quoi: 'pas de chiffre d’affiche dans le premier écran', plusGrand: meilleur ? Math.round(meilleur.fs) : 0, el: meilleur ? nom(meilleur.el) : '' });
+    // Un zéro (ou « — ») ne s'écrit JAMAIS à la taille d'une affiche (DESIGN, revue du 11 nov., 5) : sa carte suffit.
+    const grandHeros = [...root.querySelectorAll('.vrm-fu-tete :is(.vrm-jv2-grand, .vrm-fu-grand)')].filter(vis)[0];
+    const zero = grandHeros && (grandHeros.classList.contains('is-zero') || grandHeros.classList.contains('is-vide'));
+    if (zero) { /* rien à afficher en grand aujourd'hui */ }
+    else if (!meilleur || meilleur.fs < 48) out.heros.push({ quoi: 'pas de chiffre d’affiche dans le premier écran', plusGrand: meilleur ? Math.round(meilleur.fs) : 0, el: meilleur ? nom(meilleur.el) : '' });
     else {
       const carte = meilleur.el.closest('.vrm-fu-carte, .vrm-fu-tete, [data-heros]');
       if (!carte) out.heros.push({ quoi: 'le chiffre d’affiche n’est dans aucune carte héros', el: nom(meilleur.el) });
       // Sur un écran-LISTE (Ventes, Annonces) la carte laisse 60 % du premier écran à la liste. Ma journée n'est
       // pas une liste : sa tête sombre (le choix de Julien) porte la semaine et le prochain geste — pas de plafond.
       else if (liste) { const h = carte.getBoundingClientRect().height; if (h > 0.4 * H + 1) out.heros.push({ quoi: 'carte héros trop haute', h: Math.round(h), max: Math.round(0.4 * H) }); }
+    }
+  }
+  // ── AJOUT 3 (Julien, captures d'Annonces, 14 nov. 09:01), sur les écrans de LISTE ──
+  if (liste) {
+    const H = window.innerHeight;
+    const rgbaS = (x) => { const c = rgba(x); return c ? hex(c) + (c.a < 1 ? '/' + c.a : '') : ''; };
+    // Pas de carte sombre sur un écran de liste (la carte héros reste à Ma journée).
+    for (const c of root.querySelectorAll('.vrm-fu-carte, .vrm-fu-tete')) {
+      if (!vis(c)) continue;
+      const av = getComputedStyle(c, '::before');
+      if ((av && av.content !== 'none' && /gradient|rgb/.test(av.backgroundImage + av.backgroundColor) && av.backgroundColor !== 'rgba(0, 0, 0, 0)') || /gradient/.test(getComputedStyle(c).backgroundImage)) out.heros.push({ quoi: 'carte sombre sur un écran de liste', el: nom(c) });
+    }
+    // La 1re ligne de la liste dans la moitié haute du premier écran (téléphone). La ligne de fraîcheur
+    // « Tout est à jour » et la pastille « Mis à jour » sont à la COQUE (claude/refonte-coque les retire) :
+    // leur hauteur est retirée du compte, et dite.
+    if (tactile) {
+      const sel = '[data-carte-annonce], .vrm-colis-section .vrm-colis-carte[data-bord-card], .vrm-toutes-ligne';
+      const l = [...root.querySelectorAll(sel)].filter(vis)[0];
+      const fr = [...document.querySelectorAll('.vrm-fraicheur-hote')].filter((e) => e.getBoundingClientRect().height > 2)[0];
+      const coque = fr ? Math.round(fr.getBoundingClientRect().height) : 0;
+      if (!l) out.premiere.push({ quoi: 'aucune ligne de liste' });
+      else {
+        const haut = Math.round(l.getBoundingClientRect().top);
+        out.info.premiere = { haut, coque, sansCoque: haut - coque, max: Math.round(H / 2) };
+        if (haut - coque > H / 2) out.premiere.push({ quoi: '1re ligne trop bas', haut, coque, sansCoque: haut - coque, max: Math.round(H / 2) });
+      }
+    }
+    // Aucune case dont la valeur principale est « — ».
+    for (const c of root.querySelectorAll('[data-fu-case], .vrm-ui-bande-item, .vrm-fu-carte')) {
+      if (!vis(c)) continue;
+      const b = c.querySelector('b, .vrm-fu-grand, .vrm-ui-bande-n');
+      if (b && vis(b) && (b.textContent || '').trim() === '—') out.vides.push({ quoi: nom(c) });
+    }
+    // Au plus UN bouton plein accent visible dans le premier écran.
+    const pleins = [...root.querySelectorAll('button, a, [role="button"]')].filter((b) => {
+      if (!vis(b)) return false; const r = b.getBoundingClientRect(); if (r.bottom < 0 || r.top > H) return false;
+      const c = rgba(getComputedStyle(b).backgroundColor); return c && c.a >= .9 && ACCENT.has(hex(c));
+    });
+    if (pleins.length > 1) out.pleins.push({ n: pleins.length, quoi: pleins.slice(0, 3).map(nom) });
+    // Aucune rangée de plus de 3 capsules GRISES de 44 px ou plus, posée sans défilement.
+    const gris = [...root.querySelectorAll('button, a, label, [role="button"], [role="radio"]')].filter((b) => {
+      if (!vis(b)) return false; const r = b.getBoundingClientRect(); if (r.height < 43.5) return false;
+      const cs = getComputedStyle(b); const c = rgba(cs.backgroundColor);
+      const grise = c && c.a > 0.05 && c.a < 0.6 && Math.abs(c.r - c.g) < 12 && Math.abs(c.g - c.b) < 16;   // un remplissage gris translucide
+      const capsule = (parseFloat(cs.borderTopLeftRadius) || 0) >= r.height / 2 - 2;
+      if (!grise || !capsule) return false;
+      for (let x = b.parentElement; x && x !== root; x = x.parentElement) { const o = getComputedStyle(x).overflowX; if (/(auto|scroll)/.test(o) && x.scrollWidth > x.clientWidth + 2) return false; }
+      return true;
+    });
+    const rangs = new Map(); for (const b of gris) { const k = Math.round(b.getBoundingClientRect().top / 6); rangs.set(k, [...(rangs.get(k) || []), b]); }
+    for (const [, l] of rangs) if (l.length > 3) out.capsules.push({ n: l.length, quoi: l.slice(0, 4).map(nom) });
+    // Aucun bandeau flottant au-dessus de la barre du bas après 3 s (la pastille de la COQUE est dite à part).
+    for (const e of document.querySelectorAll('body *')) {
+      const cs = getComputedStyle(e); if (cs.position !== 'fixed' && cs.position !== 'sticky') continue;
+      if (e.closest('.vrm-app-header, .vrm-mobile-nav, nav, [role="dialog"], .vrm-ui-voile, .vrm-ann-workbar, .vrm-ann-compte-tete')) continue;
+      const r = e.getBoundingClientRect(); if (r.height < 16 || r.height > 160 || r.bottom < 0 || r.top > H) continue;
+      if (!(e.innerText || '').trim() || !vis(e)) continue;
+      if (cs.position === 'sticky' && r.top > 60) continue;
+      const coque = !!e.closest('.vrm-neuf-hote, .vrm-fraicheur-hote, [data-maj-dispo], .vrm-maj');
+      (coque ? (out.info.flottantsCoque = [...(out.info.flottantsCoque || []), nom(e)]) : out.flottants.push({ quoi: nom(e) }));
     }
   }
   return out;
@@ -203,15 +276,17 @@ async function mesurerVolume(nav, dist, ecran) {
     return l.filter((e) => { const r = e.getBoundingClientRect(); return r.top >= plafond - 1 && r.bottom <= bas + 1; }).length;
   }, sel);
   // CLS : décalages de mise en page en défilant jusqu'en bas, par pas d'un écran.
-  const cls = await o.pg.evaluate(async () => {
-    window.__cls = 0;
-    const po = new PerformanceObserver((l) => { for (const e of l.getEntries()) if (!e.hadRecentInput) window.__cls += e.value; });
+  const { cls, clsRangees } = await o.pg.evaluate(async (sel) => {
+    window.__cls = 0; window.__clsR = 0;
+    window.__sources = [];
+    const po = new PerformanceObserver((l) => { for (const e of l.getEntries()) if (!e.hadRecentInput) { window.__cls += e.value; if ((e.sources || []).some((x) => x.node && x.node.nodeType === 1 && (x.node.matches(sel) || x.node.closest(sel)))) window.__clsR += e.value; if (window.__sources.length < 12) window.__sources.push({ v: Math.round(e.value * 1000) / 1000, s: (e.sources || []).slice(0, 3).map((x) => { const n = x.node; return n && n.nodeType === 1 ? `${n.tagName.toLowerCase()}.${String(n.className || '').split(' ').slice(0, 2).join('.')} ${Math.round(x.previousRect.top)}→${Math.round(x.currentRect.top)} h${Math.round(x.previousRect.height)}→${Math.round(x.currentRect.height)}` : String(n && n.nodeName); }) }); } });
     po.observe({ type: 'layout-shift', buffered: false });
     const m = document.querySelector('.vrm-main'); const sc = m && m.scrollHeight > m.clientHeight + 4 ? m : document.scrollingElement;
     for (let i = 0; i < 80; i++) { const av = sc.scrollTop; sc.scrollTop += innerHeight * 0.9; await new Promise((r) => setTimeout(r, 60)); if (sc.scrollTop === av) break; }
     await new Promise((r) => setTimeout(r, 500)); po.disconnect();
-    return Math.round(window.__cls * 1000) / 1000;
-  });
+    return { cls: Math.round(window.__cls * 1000) / 1000, clsRangees: Math.round(window.__clsR * 1000) / 1000 };
+  }, sel);
+  if (process.env.DEBUG) console.log('    décalages :', JSON.stringify(await o.pg.evaluate(() => window.__sources)).slice(0, 2500));
   let recherche = null;
   if (ecran === 'annonces') {
     await o.pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 0; document.scrollingElement.scrollTop = 0; });
@@ -243,7 +318,7 @@ async function mesurerVolume(nav, dist, ecran) {
   if (recherche == null && ecran === 'annonces') console.log('    recherche :', JSON.stringify(await o.pg.evaluate(() => window.__rech || null)));
   await o.pg.screenshot({ path: path.join(SHOTS, `volume-${ecran}-${path.basename(dist)}.png`) });
   await o.ctx.close();
-  return { rendu, noeuds, visibles, cls, recherche, erreurs: o.erreurs.slice(0, 2) };
+  return { rendu, noeuds, visibles, cls, clsRangees, recherche, erreurs: o.erreurs.slice(0, 2) };
 }
 
 // Le build de référence (BANC_REF) se mesure dans un processus à lui (même banc, même base).
@@ -260,7 +335,7 @@ const ouvrirSur = (nav, dist, opts) => ouvrir(nav, opts);
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] });
   let rouges = 0;
   if (PARTIES.includes('forme')) {
-    const CLES = ['murs', 'debords', 'cartes', 'accent', 'repetes', 'heros'];
+    const CLES = ['murs', 'debords', 'cartes', 'accent', 'repetes', 'heros', 'premiere', 'vides', 'pleins', 'capsules', 'flottants'];
     const total = Object.fromEntries(CLES.map((k) => [k, 0]));
     for (const W of LARGEURS) for (const theme of THEMES) for (const e of ECRANS_VOULUS) {
       const suf = `${e}-${W}-${theme}`;
@@ -274,6 +349,7 @@ const ouvrirSur = (nav, dist, opts) => ouvrir(nav, opts);
         const n = CLES.reduce((s, k) => s + m[k].length, 0);
         console.log(`${n ? '✗' : '✓'} ${suf} : ${CLES.map((k) => `${k} ${m[k].length}`).join(' · ')}`);
         for (const k of CLES) { total[k] += m[k].length; m[k].slice(0, Number(process.env.DETAIL || 4)).forEach((x) => console.log(`    ${k} ${JSON.stringify(x)}`)); }
+        if (m.info && Object.keys(m.info).length) console.log('    (mesuré) ' + JSON.stringify(m.info));
         if (o.erreurs.length) { console.log('    erreurs JS :', o.erreurs.slice(0, 2).join(' | ')); rouges++; }
       } catch (err) { console.log('ÉCHEC', suf, String(err.message || err).slice(0, 200)); rouges++; }
       finally { if (o) await o.ctx.close().catch(() => {}); }
@@ -295,16 +371,16 @@ const ouvrirSur = (nav, dist, opts) => ouvrir(nav, opts);
         const fautes = [];
         if (a.rendu == null) fautes.push('aucune rangée rendue');
         if (a.visibles < 8) fautes.push(`${a.visibles} rangées visibles (< 8)`);
-        if (a.cls > 0.05) fautes.push(`CLS ${a.cls} (> 0,05)`);
+        if (a.clsRangees > 0.05) fautes.push(`les rangées sautent en défilant : CLS des rangées ${a.clsRangees} (> 0,05)`);
         if (e === 'annonces' && !(a.recherche != null && a.recherche < 300)) fautes.push(`recherche par N° : ${a.recherche == null ? 'pas trouvée' : a.recherche + ' ms'} (≥ 300 ms)`);
         if (r) {
           if (a.rendu != null && r.rendu != null && a.rendu > r.rendu * 1.25 + 250) fautes.push(`rendu ${a.rendu} ms, pire que l'avant (${r.rendu} ms)`);
           if (a.noeuds > r.noeuds * 1.1) fautes.push(`${a.noeuds} nœuds, plus que l'avant (${r.noeuds})`);
-          if (a.cls > r.cls + 0.02) fautes.push(`CLS ${a.cls}, pire que l'avant (${r.cls})`);
+          if (a.clsRangees > (r.clsRangees || 0) + 0.02) fautes.push(`CLS des rangées ${a.clsRangees}, pire que l'avant (${r.clsRangees})`);
           if (a.visibles < r.visibles) fautes.push(`${a.visibles} rangées visibles, moins que l'avant (${r.visibles})`);
           if (a.recherche != null && r.recherche != null && a.recherche > r.recherche * 1.25 + 100) fautes.push(`recherche ${a.recherche} ms, pire que l'avant (${r.recherche} ms)`);
         }
-        console.log(`${fautes.length ? '✗' : '✓'} volume ${e} : rendu ${a.rendu} ms · nœuds ${a.noeuds} · visibles ${a.visibles} · CLS ${a.cls}${e === 'annonces' ? ` · recherche ${a.recherche} ms` : ''}${r ? `  (avant : rendu ${r.rendu} ms · nœuds ${r.noeuds} · visibles ${r.visibles} · CLS ${r.cls}${e === 'annonces' ? ` · recherche ${r.recherche} ms` : ''})` : ''}`);
+        console.log(`${fautes.length ? '✗' : '✓'} volume ${e} : rendu ${a.rendu} ms · nœuds ${a.noeuds} · visibles ${a.visibles} · CLS ${a.cls} (rangées ${a.clsRangees})${e === 'annonces' ? ` · recherche ${a.recherche} ms` : ''}${r ? `  (avant : rendu ${r.rendu} ms · nœuds ${r.noeuds} · visibles ${r.visibles} · CLS ${r.cls}${e === 'annonces' ? ` · recherche ${r.recherche} ms` : ''})` : ''}`);
         fautes.forEach((f) => console.log('    ' + f));
         if (a.erreurs.length) console.log('    erreurs JS :', a.erreurs.join(' | '));
         rouges += fautes.length;
