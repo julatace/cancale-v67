@@ -497,6 +497,131 @@
 
 } /* fin @layer vrm-premium */
 
+/* ══ §3 COQUE — la refonte visible de la coque (14 nov.) ══════════════════════
+   Julien, sur son iPhone : « c'est moche, rien n'a changé ». Ce qui était sur
+   CHAQUE écran : une barre du haut à cinq ronds (compte, œil, cloche « 99+ »
+   bleue, loupe, logo), un bandeau « Tout est à jour » encadré en tête de page,
+   une pastille « Mis à jour à 08:19 » posée sur la liste, une barre du bas à
+   capsule grise. Récit : docs/passation/2026-11-14-refonte-coque.md.
+     · en haut : ☰ (le menu du haut, choix n° 61) à gauche ; le petit titre
+       centré qui n'arrive qu'au défilement ; à droite cloche · loupe · compte
+       (l'état « Actions Vinted » est un point sur la photo du compte, son panneau
+       et l'œil des montants sont dans le menu du compte) ;
+     · la pastille de la cloche plafonnée « 9+ », à l'ENCRE (l'accent est rare) ;
+     · « Tout est à jour » ne s'écrit plus en tête de page (lu par les lecteurs
+       d'écran, `role=status`) : seule une alerte se voit ;
+     · la barre du bas : quatre onglets, l'actif = icône + libellé teintés, pas
+       de capsule ; pastilles nettes cerclées du fond ;
+     · fond légèrement chaud (§4 Atelier), barres en matériau (§4).
+   Formes seulement : aucun texte métier, aucun chiffre, aucun geste retiré.
+   Dans `@layer vrm-premium` avec `!important` (comme §2), sélecteurs `:root:root`.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@layer vrm-premium {
+
+/* ── 3.1 LE FOND : légèrement chaud au jour (§4 `--d-fond-atelier`), noir la nuit ── */
+:root:root:not([data-theme="dark"]) body .vrm-app-shell { --vrm-bg: var(--d-fond-atelier) !important; --d-fond: var(--d-fond-atelier) !important; --p-fond: var(--d-fond-atelier) !important; --fu-fond: var(--d-fond-atelier) !important; --w-fond: var(--d-fond-atelier) !important; background-color: var(--d-fond-atelier) !important; }
+
+/* ── 3.2 LA LIGNE DE FRAÎCHEUR : rien quand tout va bien ──────────────────────
+   « Tout est à jour · vérifié à l'instant » (et « Vérification… ») restent dans la
+   page pour les lecteurs d'écran et les bancs (`role=status`, data-*), sans place
+   ni dessin ; une ALERTE (retard, pas su) garde sa ligne et son geste. */
+:root:root body .vrm-app-shell .vrm-fraicheur-hote:has(> .vrm-fraicheur:is([data-fraicheur-unique="a-jour"], [data-fraicheur-unique="encours"], [data-fraicheur-unique="charge"])) {
+  position: absolute !important; width: 1px !important; height: 1px !important; margin: 0 !important; padding: 0 !important; overflow: hidden !important; clip-path: inset(50%) !important; white-space: nowrap !important; border: 0 !important;
+}
+
+/* ── 3.3 LA CLOCHE : « 9+ » au plus (CentreNotifs.jsx), une pastille d'ENCRE, pas l'accent ── */
+:root:root body .vrm-cn-cloche .vrm-cn-pastille.vrm-cn-pastille {
+  background: var(--d-encre) !important; color: var(--d-carte) !important;
+  min-width: 18px !important; height: 18px !important; padding: 0 5px !important; border-radius: 999px !important;
+  font: 700 11px/18px var(--vrm-police, -apple-system, system-ui, sans-serif) !important; letter-spacing: 0 !important;
+  top: 5px !important; right: 3px !important; box-shadow: 0 0 0 2px var(--vrm-bg, var(--d-fond)) !important;
+}
+
+/* ── 3.4 LA PHOTO DU COMPTE porte le point d'état « Actions Vinted » (ambre = un geste, gris = lecture) ── */
+:root:root body .vrm-app-shell .vrm-hdr-profil { position: relative !important; }
+:root:root body .vrm-hdr-profil-etat { position: absolute; right: 6px; bottom: 7px; width: 10px; height: 10px; border-radius: 50%; background: var(--etat-point, var(--d-gris)); box-shadow: 0 0 0 2px var(--vrm-bg, var(--d-fond)); pointer-events: none; }
+:root:root body .vrm-hdr-profil-etat[data-etat-point="ok"] { display: none; }
+/* Dans le menu du compte : le même point, dans la ligne. */
+:root:root body .vrm-fs .vrm-profil-ligne .vrm-hdr-profil-etat.vrm-profil-ligne-point { position: static; display: inline-block; flex: 0 0 auto; width: 8px; height: 8px; margin-left: auto; box-shadow: none; }
+:root:root body .vrm-fs .vrm-profil-ligne .vrm-hdr-profil-etat.vrm-profil-ligne-point[data-etat-point="ok"] { display: none; }
+:root:root body .vrm-fs .vrm-profil-ligne .vrm-profil-ligne-etat { color: var(--d-gris); font-weight: 400; }
+
+/* ── 3.5 L'EN-TÊTE DU TÉLÉPHONE ───────────────────────────────────────────── */
+@media (max-width: 743px), (max-width: 767px) and (hover: hover) and (pointer: fine), (max-width: 1023px) and (max-height: 599px) and (hover: none), (max-width: 1023px) and (max-height: 599px) and (pointer: coarse), (max-width: 1023px) and (max-height: 599px) and (pointer: none) {
+  /* Trois colonnes ÉGALES sur les côtés : le petit titre est au CENTRE de l'écran (Réglages iOS). */
+  :root:root body .vrm-app-shell > .vrm-app-header.vrm-app-header {
+    grid-template-columns: minmax(0, 1fr) minmax(0, max-content) minmax(0, 1fr) !important;
+    min-height: 52px !important; padding-left: max(8px, env(safe-area-inset-left)) !important; padding-right: max(8px, env(safe-area-inset-right)) !important;
+    background: var(--vrm-bg, var(--d-fond)) !important; border-bottom: .5px solid transparent !important;
+    transition: background-color var(--d-m-moyen) ease-out, border-color var(--d-m-moyen) ease-out !important;
+  }
+  /* Au défilement : le matériau translucide (§4) et un filet d'un demi-pixel. */
+  :root:root body .vrm-app-shell > .vrm-app-header.vrm-app-header.is-defile {
+    background: var(--d-materiau) !important; -webkit-backdrop-filter: var(--d-materiau-flou) !important; backdrop-filter: var(--d-materiau-flou) !important;
+    border-bottom-color: var(--d-materiau-filet) !important;
+  }
+  :root:root body .vrm-app-shell > .vrm-app-header .vrm-header-brand { justify-self: start !important; min-width: 0 !important; }
+  :root:root body .vrm-app-shell > .vrm-app-header .vrm-header-actions { justify-self: end !important; gap: 0 !important; }
+  /* Le petit titre : 17/600, centré, n'apparaît qu'une fois le grand titre parti (fondu court). */
+  :root:root body .vrm-app-shell > .vrm-app-header .vrm-hdr-titre.vrm-hdr-titre {
+    display: block !important; grid-column: 2 !important; justify-self: center !important; max-width: 100% !important; min-width: 0 !important;
+    font-size: var(--d-t-17) !important; font-weight: 600 !important; letter-spacing: -.016em !important; text-align: center !important;
+    white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important;
+    opacity: 0 !important; transform: translateY(4px) !important; pointer-events: none !important;
+    transition: opacity var(--d-m-moyen) var(--d-sortie), transform var(--d-m-long) var(--d-sortie) !important;
+  }
+  :root:root body .vrm-app-shell > .vrm-app-header.is-defile .vrm-hdr-titre.vrm-hdr-titre { opacity: 1 !important; transform: none !important; }
+  /* Le ☰ du menu du haut (choix n° 61) : visible, à gauche, 44 px. Le logo et le nom restent hors de la barre. */
+  :root:root body .vrm-app-shell > .vrm-app-header .vrm-header-brand > .vrm-hdr-menu.vrm-hdr-menu { display: inline-flex !important; }
+  /* L'état « Actions Vinted » ne prend plus de place dans la barre : un point sur la photo du compte,
+     son panneau depuis le menu du compte (la pastille reste montée : son panneau s'ouvre d'ici). */
+  :root:root body .vrm-app-shell > .vrm-app-header .vrm-header-actions .vrm-hdr-etat { display: none !important; }
+  /* Les icônes de la barre : un dessin, sans boîte ; un appui s'enfonce (pointer-down). */
+  :root:root body .vrm-app-shell > .vrm-app-header :is(.vrm-hbtn) { transition: transform var(--d-m-appui) ease-out, opacity var(--d-m-appui) ease-out !important; }
+  :root:root body .vrm-app-shell > .vrm-app-header :is(.vrm-hbtn):active { transform: var(--d-appui) !important; opacity: .7 !important; }
+
+  /* Le sélecteur « Paires » (Annonces | Stock | Achats) : en tête de l'écran, au bord de la page. */
+  :root:root body .vrm-main > .vrm-paires-selecteur { padding: var(--d-e-2) var(--d-marge) var(--d-e-1) !important; margin: 0 !important; }
+  :root:root body .vrm-main > .vrm-paires-selecteur .vrm-seg { width: 100% !important; }
+
+  /* ── 3.6 LA BARRE DU BAS : quatre onglets, l'actif teinté (icône + libellé), pas de capsule ── */
+  :root:root body .vrm-app-shell .vrm-tabbar.vrm-tabbar {
+    background: var(--d-materiau) !important; background-image: none !important;
+    -webkit-backdrop-filter: var(--d-materiau-flou) !important; backdrop-filter: var(--d-materiau-flou) !important;
+    border-top: .5px solid var(--d-materiau-filet) !important; box-shadow: none !important;
+  }
+  :root:root body .vrm-app-shell .vrm-tabbar .vrm-tab-pastille { display: none !important; }
+  :root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab { background: transparent !important; box-shadow: none !important; flex: 1 1 0 !important; min-width: 0 !important; }
+  :root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab::before, :root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab::after { display: none !important; }
+  :root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-tab-ic { color: var(--d-gris) !important; transition: transform var(--d-m-appui) ease-out !important; }
+  :root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-nav-label { color: var(--d-gris) !important; font-size: 11px !important; font-weight: 600 !important; letter-spacing: 0 !important; }
+  :root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] :is(.vrm-tab-ic, .vrm-nav-label) { color: var(--d-accent-texte) !important; }
+  :root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab:active .vrm-tab-ic { transform: scale(.9) !important; }
+  /* Pastilles : un nombre ambre net (un geste), cerclé du fond de la barre ; le point sans chiffre. */
+  :root:root body .vrm-app-shell .vrm-tabbar .vrm-nav-badge-barre.vrm-nav-badge-n {
+    min-width: 18px !important; height: 18px !important; padding: 0 5px !important; box-sizing: border-box !important; border-radius: 999px !important;
+    background: var(--d-point-ambre) !important; color: #1D1D1F !important; font: 700 11px/18px var(--vrm-police, -apple-system, system-ui, sans-serif) !important; letter-spacing: 0 !important;
+    top: -5px !important; left: calc(100% - 8px) !important; box-shadow: 0 0 0 2px var(--vrm-bg, var(--d-fond)) !important; font-variant-numeric: tabular-nums;
+  }
+  :root:root body .vrm-app-shell .vrm-app-header .vrm-nav-badge-point { position: absolute !important; top: 8px !important; right: 7px !important; left: auto !important; width: 8px !important; height: 8px !important; border-radius: 50% !important; background: var(--d-point-ambre) !important; box-shadow: 0 0 0 2px var(--vrm-bg, var(--d-fond)) !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:root body .vrm-app-shell > .vrm-app-header .vrm-hdr-titre.vrm-hdr-titre { transform: none !important; transition: opacity 120ms ease-out !important; }
+  :root:root body .vrm-app-shell > .vrm-app-header :is(.vrm-hbtn):active, :root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab:active .vrm-tab-ic { transform: none !important; }
+}
+
+/* ── 3.7 ORDINATEUR : la barre de recherche et les alertes sur la grille du contenu ──
+   Le contenu des écrans commence au bord de leur colonne + 16 px (`--d-e-4`) : la recherche
+   et la ligne d'alerte partaient 16 px plus à gauche que le titre. Même bord pour tous. */
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
+  :root:root body .vrm-app-shell .vrm-main > .vrm-barre-haut { padding-left: var(--d-e-4) !important; margin-top: 12px !important; }
+  :root:root body .vrm-app-shell .vrm-main > .vrm-fraicheur-hote { margin-left: var(--d-e-4) !important; margin-right: var(--d-e-4) !important; }
+  /* La colonne de gauche : une carte posée de l'atelier (ombre douce, sans filet). */
+  :root:root body .vrm-app-shell .vrm-sidebar.vrm-atelier-rail { border: 0 !important; box-shadow: var(--d-ombre-douce) !important; }
+}
+
+} /* fin §3 COQUE (@layer vrm-premium) */
+
 /* ══ §4 ATELIER — la direction artistique commune (14 nov.) ═══════════════════
    Julien (14 nov.) : « le design fait basique, il faut vraiment qu'on sorte des
    classiques ». Une liste iOS propre ne suffit plus : la paire est la matière,

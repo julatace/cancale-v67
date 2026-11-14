@@ -68,7 +68,8 @@ export function BoutonCentreNotifs({ nonLues, onOuvrir, Icon, enPlus = 0 }) {
     <button className="vrm-hbtn vrm-cn-cloche" type="button" data-centre-notifs-cloche="" data-non-lues={Number.isSafeInteger(nonLues) ? String(nonLues) : ''}
       aria-label={lib} title={lib} onClick={onOuvrir}>
       <Icon name="bell2" size={21}/>
-      {n ? <span className="vrm-cn-pastille" aria-hidden="true">{n > 99 ? '99+' : n}</span> : null}
+      {/* (14 nov., refonte de la coque) « 9+ » au plus : au-delà, le nombre exact est dans la feuille (et lu dans `aria-label`). */}
+      {n ? <span className="vrm-cn-pastille" data-cn-pastille={String(n)} aria-hidden="true">{n > 9 ? '9+' : n}</span> : null}
     </button>
   );
 }
