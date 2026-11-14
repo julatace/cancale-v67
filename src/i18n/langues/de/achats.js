@@ -33,6 +33,8 @@ export default {
   "achats.colisEtaitDeja": "Das Paket war an dem Tag schon im Paketshop; das genaue Ankunftsdatum ist unbekannt.",
   "achats.suivre": "Verfolgen ↗",
   "achats.chercher": "Suchen ↗",
+  "achats.sansCodeVinted": "Code nicht gelesen: öffne die Vinted-Unterhaltung (das Paket zählt nur mit seinem Code als „abzuholen“)",
+  "achats.sansCodeEmail": "Code in der E-Mail des Versanddienstes nicht gelesen: öffne sie (das Paket zählt nur mit seinem Code als „abzuholen“)",
   "achats.transporteurEncoreConnu": "Versanddienst noch unbekannt: Status noch nicht gelesen",
   "achats.confirmeChez": "Bestätigt von",
   "achats.texte": "vor {ageCourtMs}",

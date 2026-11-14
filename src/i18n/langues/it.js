@@ -18,6 +18,7 @@ import ecran_ergonomie from './it/ergonomie.js';
 import ecran_tarifs from './it/tarifs.js';
 import ecran_nouveaux from './it/nouveaux.js';
 import ecran_fraiscarte from './it/fraiscarte.js';   // (14 nov., frais-carte)
+import ecran_atelier from './it/atelier.js';
 export default {
   ...ecran_listes,
   ...ecran_fiche,
@@ -26,6 +27,7 @@ export default {
   ...ecran_fraiscarte,
   ...ecran_tarifs,
   ...ecran_nouveaux,
+  ...ecran_atelier,
   ...ecran_compta,
   ...ecran_argent,
   ...ecran_stats,

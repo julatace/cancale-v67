@@ -33,6 +33,8 @@ export default {
   "achats.colisEtaitDeja": "Le colis était déjà au point relais ce jour-là ; la date exacte de son arrivée n’est pas connue.",
   "achats.suivre": "Suivre ↗",
   "achats.chercher": "Chercher ↗",
+  "achats.sansCodeVinted": "Code pas lu : ouvre la conversation Vinted (le colis n’est compté « à retirer » qu’avec son code)",
+  "achats.sansCodeEmail": "Code pas lu dans l’e-mail du transporteur : ouvre-le (le colis n’est compté « à retirer » qu’avec son code)",
   "achats.transporteurEncoreConnu": "Transporteur pas encore connu : son statut n'est pas encore lu",
   "achats.confirmeChez": "Confirmé chez",
   "achats.texte": "il y a {ageCourtMs}",

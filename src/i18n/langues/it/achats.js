@@ -33,6 +33,8 @@ export default {
   "achats.colisEtaitDeja": "Il pacco era già al punto di ritiro quel giorno; la data esatta di arrivo non è nota.",
   "achats.suivre": "Traccia ↗",
   "achats.chercher": "Cerca ↗",
+  "achats.sansCodeVinted": "Codice non letto: apri la conversazione Vinted (il pacco conta «da ritirare» solo con il suo codice)",
+  "achats.sansCodeEmail": "Codice non letto nell’e-mail del corriere: aprila (il pacco conta «da ritirare» solo con il suo codice)",
   "achats.transporteurEncoreConnu": "Corriere non ancora noto: stato non ancora letto",
   "achats.confirmeChez": "Confermato da",
   "achats.texte": "{ageCourtMs} fa",
