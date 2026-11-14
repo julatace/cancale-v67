@@ -534,6 +534,8 @@ export default function Accueil({ onEntrer }) {
               {ACCES_OFFERT && <p className="av-offert" data-acces-offert="">{tr('accueil.offres.gratuitLong')}</p>}
               <p><span data-essai={ESSAI_JOURS}>{ligneEssai}</span>{tr('accueil.offres.essai')}</p>
               <p className="petit">{tr('accueil.offres.paiement')}<a href="/legal/cgv.html">{tr('accueil.offres.cgv')}</a>.</p>
+              {/* (14 nov., n° 144) Tout le détail : la page publique des tarifs. */}
+              <p className="petit"><a href="/tarifs" data-lien-tarifs="">{tr('accueil.offres.tarifs')}</a></p>
               {creer()}
             </div>
           </div>

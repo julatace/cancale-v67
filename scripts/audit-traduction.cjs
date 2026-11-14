@@ -35,6 +35,9 @@ const LANGUES = ['fr', 'en', 'es', 'it', 'de'];
 // `*` = tout le fichier. Ajouter ici chaque écran migré (méthode : docs/passation/2026-11-11-traduction.md).
 const MIGRES = [
   ['src/Accueil.jsx', ['*']],
+  // (14 nov., accueil des nouveaux) Bilan, premier colis, notifications, langue ; la page des tarifs.
+  ['src/accueilNouveaux/AccueilNouveaux.jsx', ['*']],
+  ['src/tarifs/Tarifs.jsx', ['*']],
   ['src/accueil/TempsGagne.jsx', ['*']],
   ['src/RetoursLitiges.jsx', ['*']],
   ['src/profil/MenuProfil.jsx', ['*']],

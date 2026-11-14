@@ -2,7 +2,7 @@
 //  LA VIDÉO DE 45 S DE LA PAGE D'ACCUEIL (14 nov., idée d'accueil 146) — tournée
 //  dans la VRAIE app (dist/) avec le monde INVENTÉ des films (`_monde.cjs` : pseudos,
 //  codes, montants fabriqués ; dépôt public), comme les vidéos du « ? » (lot 49).
-//  Quatre plans enchaînés par un fondu (la même app, `Film.coupe`) : Ma journée → le
+//  Quatre plans mis bout à bout (une app neuve chacun) : Ma journée → le
 //  bordereau imprimé d'un geste → les codes de retrait → le N° de rangement.
 //
 //  ⚠️ AUCUN TITRE INCRUSTÉ : la page parle cinq langues ; les sous-titres sont des
@@ -52,17 +52,11 @@ function vtt(cues, duree, l) {
   return out.join('\n');
 }
 
-async function tourner(nav) {
-  const m = monde();
-  const f = new Film({ nom: 'accueil-45s', format: 'portrait', monde: m, tab: 'journee' });
-  const cues = [];
-  const dire = (cle) => cues.push({ cle, t: f.t });
-  await f.demarrer(nav);
-  await f.app.evaluate(() => { window.print = () => {}; });
-  const dossier = sortie('accueil');
-  const fichier = path.join(dossier, 'film-45s.mp4');
-  await f.enregistrer(fichier);
-  try {
+// QUATRE PLANS tournés chacun dans SA page (une app neuve par plan : trois apps chargées
+// l'une après l'autre dans la même page faisaient tomber le navigateur du tournage), puis
+// mis bout à bout par ffmpeg (même codage, copie sans réencodage).
+const PLANS = [
+  { tab: 'journee', async jouer(f, dire) {
     f.telY = f.F.h; f.telOpacite = 0;
     dire('journee');
     await f.jouer(0.3); await f.entree(1.0); await f.jouer(0.4);
@@ -73,40 +67,63 @@ async function tourner(nav) {
     await f.defilerVers('[data-fu-case="vendu-mois"]', { marge: 300, dur: 0.9 });
     await f.viser('[data-fu-case="vendu-mois"]', { zoom: 1.38, dur: 0.9 });
     await f.jouer(2.6); f.cle('chiffres');
-    f.repos_(0.6);
-    await f.coupe(null, { tab: 'ventes', fondu: 0.5 });
+  } },
+  { tab: 'ventes', async jouer(f, dire) {
     dire('ventes');
+    await f.jouer(0.4);
     await f.viser('[data-lot-ouvrir]', { zoom: 1.38, dur: 1.0, dy: 140 });
     await f.jouer(1.2);
     await f.toucher('[data-lot-ouvrir]', { apres: 0.6 });
     await f.jouer(2.6); f.cle('ventes');
-    f.repos_(0.6);
-    await f.coupe(null, { tab: 'achats', fondu: 0.5 });
+  } },
+  { tab: 'achats', async jouer(f, dire) {
     dire('retrait');
+    await f.jouer(0.4);
     await f.defilerVers('texte:Relais du Marché', { marge: 60, dur: 1.0 });
     await f.viser('texte:Relais du Marché', { zoom: 1.3, dur: 1.0, dy: 130 });
     await f.jouer(2.2);
     await f.toucher('1@[data-rp-comptoir]', { apres: 0.5 });
     await f.viser('[aria-label^="Copier code de retrait"]', { zoom: 1.38, dur: 0.9, dy: 60 });
     await f.jouer(2.0); f.cle('retrait');
-    f.repos_(0.6);
-    await f.coupe(null, { tab: 'annonces', fondu: 0.5 });
+  } },
+  { tab: 'annonces', async jouer(f, dire) {
     dire('numero');
+    await f.jouer(0.4);
     await f.defilerVers('[data-carte-annonce="7115"]', { marge: 120, dur: 1.2 });
     await f.viser('[data-carte-annonce="7115"]', { zoom: 1.38, dur: 1.0 });
     await f.jouer(3.0); f.cle('numero');
     dire('fin');
     await f.fin('vrm.center', 3.2);
-  } catch (e) { try { f.ff.kill('SIGKILL'); } catch (_) {} try { await f.ctx.close(); } catch (_) {} throw e; }
-  const r = await f.finir();
-  for (const l of LANGUES) fs.writeFileSync(path.join(dossier, `film-45s.${l}.vtt`), vtt(cues, r.duree, l));
-  const cles = fs.readdirSync(dossier).filter((x) => x.startsWith('film-45s-cle') && x.endsWith('.png')).sort();
-  if (cles.length) execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', path.join(dossier, cles[0]), '-vf', 'scale=360:640', '-q:v', '6', path.join(dossier, 'film-45s.jpg')]);
+  } },
+];
+
+async function tourner(nav) {
+  const dossier = sortie('accueil');
+  const fichier = path.join(dossier, 'film-45s.mp4');
+  const cues = []; const morceaux = []; let decalage = 0; const erreurs = [];
+  for (const [i, p] of PLANS.entries()) {
+    const f = new Film({ nom: 'accueil-45s-' + i, format: 'portrait', monde: monde(), tab: p.tab });
+    await f.demarrer(nav);
+    await f.app.evaluate(() => { window.print = () => {}; });
+    const morceau = path.join(dossier, `plan-${i}.mp4`);
+    await f.enregistrer(morceau);
+    try { await p.jouer(f, (cle) => cues.push({ cle, t: decalage + f.t })); }
+    catch (e) { try { f.ff.kill('SIGKILL'); } catch (_) {} try { await f.ctx.close(); } catch (_) {} throw e; }
+    const r = await f.finir();
+    decalage += r.duree; morceaux.push(morceau); erreurs.push(...r.erreurs);
+    if (i === 0) { const cles = fs.readdirSync(dossier).filter((x) => x.startsWith('plan-0-cle') && x.endsWith('.png')).sort(); if (cles.length) execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', path.join(dossier, cles[0]), '-vf', 'scale=360:640', '-q:v', '6', path.join(dossier, 'film-45s.jpg')]); }
+  }
+  const liste = path.join(dossier, 'plans.txt');
+  fs.writeFileSync(liste, morceaux.map((m) => `file '${m.replace(/'/g, "'\\''")}'`).join('\n') + '\n');
+  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', liste, '-c', 'copy', '-movflags', '+faststart', fichier]);
+  const duree = Number(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', fichier]).toString().trim()) || decalage;
+  const poids = fs.statSync(fichier).size;
+  for (const l of LANGUES) fs.writeFileSync(path.join(dossier, `film-45s.${l}.vtt`), vtt(cues, duree, l));
   // Aucune piste audio : vérifié sur le fichier, pas supposé.
   let audio = '';
   try { audio = execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'a', '-show_entries', 'stream=index', '-of', 'csv=p=0', fichier]).toString().trim(); } catch (_) { audio = '?'; }
-  const ok = r.poids <= POIDS_MAX && r.duree <= DUREE_MAX + 0.05 && r.duree >= 30 && audio === '';
-  console.log(`${ok ? '✅' : '❌'} film-45s : ${r.duree.toFixed(1)} s, ${(r.poids / 1048576).toFixed(2)} Mo, son : ${audio === '' ? 'aucun' : audio}${r.erreurs.length ? ' — erreurs de page : ' + r.erreurs.join(' | ') : ''}`);
+  const ok = poids <= POIDS_MAX && duree <= DUREE_MAX + 0.05 && duree >= 30 && audio === '';
+  console.log(`${ok ? '✅' : '❌'} film-45s : ${duree.toFixed(1)} s, ${(poids / 1048576).toFixed(2)} Mo, son : ${audio === '' ? 'aucun' : audio}${erreurs.length ? ' — erreurs de page : ' + erreurs.join(' | ') : ''}`);
   if (ok && process.env.PUBLIER) {
     fs.mkdirSync(PUBLIC, { recursive: true });
     for (const x of ['mp4', 'jpg', ...LANGUES.map((l) => `${l}.vtt`)]) fs.copyFileSync(path.join(dossier, `film-45s.${x}`), path.join(PUBLIC, `film-45s.${x}`));
