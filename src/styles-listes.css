@@ -368,4 +368,27 @@
   :root:root body .vrm-main[data-ecran="journee"] .vrm-jv2-quand > .vrm-jv2-ma-semaine { order: 3 !important; }
 }
 
+/* La taille écrite en fin de titre : au titre partout ; sur la RANGÉE fermée du téléphone, dans la sous-ligne (« T. 37 »). */
+:root:root body .vrm-main .vrm-etat-taille { display: none !important; }
+@media (max-width: 767px) {
+  :root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-titre-taille-fin { display: none !important; }
+  :root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-etat-taille { display: inline !important; color: var(--d-encre, #1D1D1F) !important; font-weight: 600 !important; }
+  /* Le nom prend toute la ligne (jusqu'au chevron) ; le prix descend à droite de la sous-ligne. */
+  :root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-ann-ledger-info > [data-titre] { grid-column: 2 / -1 !important; }
+  :root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-ann-ledger-info > .vrm-ann-price-line { grid-row: 2 !important; grid-column: 4 !important; }
+  :root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-ann-ledger-info > [data-etat-ligne] { grid-column: 3 / 4 !important; }
+  :root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-ann-overview:not(:has(> .vrm-fiche-numero)) > .vrm-ann-ledger-info > [data-etat-ligne] { grid-column: 2 / 4 !important; }
+  /* La bande : trois chiffres au plus au téléphone ; « ⋯ » au bout de la même rangée (jamais seul au-dessus). */
+  :root:root:root body .vrm-main .vrm-fu-bande > .vrm-ui-bande-item:not(.vrm-sr-seul) ~ .vrm-ui-bande-item:not(.vrm-sr-seul) ~ .vrm-ui-bande-item:not(.vrm-sr-seul) ~ .vrm-ui-bande-item { display: none !important; }
+  :root:root:root body .vrm-main[data-ecran="annonces"] .vrm-fu-bande > .vrm-fu-bande-action { position: static !important; }
+  /* « À expédier » : N° + titre de la paire sur UNE ligne. */
+  :root:root:root body .vrm-main .vrm-colis-section .vrm-colis-carte[data-bord-card] .vrm-colis-titre { -webkit-line-clamp: 1 !important; line-clamp: 1 !important; white-space: nowrap !important; display: block !important; text-overflow: ellipsis !important; }
+  :root:root:root body .vrm-main .vrm-colis-section .vrm-colis-onglets { display: flex !important; align-items: center !important; gap: 6px !important; }
+  :root:root:root:root body .vrm-main .vrm-colis-section .vrm-colis-section-tete > .vrm-colis-section-titre { font-size: 17px !important; }
+  :root:root:root:root body .vrm-main .vrm-colis-section > div > [data-colis-dans] { padding-top: 0 !important; }
+  :root:root:root:root body .vrm-main .vrm-colis-section [data-colis-dans] > .vrm-colis-section-tete { margin-top: 0 !important; }
+  :root:root:root:root body .vrm-main .vrm-colis-section .vrm-colis-section-tete .vrm-b-primaire { padding: 0 10px !important; }
+  :root:root:root body .vrm-main .vrm-colis-section .vrm-colis-onglets > :first-child { flex: 1 1 auto !important; min-width: 0 !important; }
+}
+
 } /* fin @layer vrm-premium */

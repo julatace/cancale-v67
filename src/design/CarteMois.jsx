@@ -149,8 +149,10 @@ export default function CarteMois({ surtitre, valeur, sous = null, cases = [], c
   // il reste dit au lecteur d'écran. Mêmes classes de lecture (`.vrm-fu-grand`, `[data-fu-case]`) pour l'instantané.
   if (bande && !nu) {
     const classes = String(className || '').split(/\s+/).filter((c) => c && c !== 'vrm-fu-ecran').join(' ');
-    const vues = (cases || []).filter((c) => c && c.n != null);
-    const pasSus = (cases || []).filter((c) => c && c.n == null);
+    // « Qui dorment » à 0 non plus : rien à faire, rien à montrer (Julien, AJOUT 3) — dit au lecteur d'écran.
+    const zeroQuiDort = (c) => /dorm/.test(String(c.cle || '')) && /^0(\s|$)/.test(texteDe(c.n).trim());
+    const vues = (cases || []).filter((c) => c && c.n != null && !zeroQuiDort(c));
+    const pasSus = (cases || []).filter((c) => c && (c.n == null || zeroQuiDort(c)));
     return (
       <section className={'vrm-fu-bande vrm-ui-bande' + (classes ? ' ' + classes : '')} data-fu-bande={vues.length + 1} {...attrs}>
         {enHaut}
@@ -166,7 +168,7 @@ export default function CarteMois({ surtitre, valeur, sous = null, cases = [], c
             ? <button key={c.cle} type="button" className="vrm-fu-case vrm-ui-bande-item" data-fu-case={c.cle} title={c.titre} onClick={c.onClick} {...(c.attrs || {})}>{corps}</button>
             : <div key={c.cle} className="vrm-fu-case vrm-ui-bande-item" data-fu-case={c.cle} title={c.titre} {...(c.attrs || {})}>{corps}</div>;
         })}
-        {pasSus.length ? <span className="vrm-sr-seul" data-fu-bande-pas-su={pasSus.map((c) => c.cle).join(',')}>{pasSus.map((c) => `${texteDe(c.l)} : pas su${c.raison ? ', ' + texteDe(c.raison) : ''}`).join(' · ')}</span> : null}
+        {pasSus.length ? <span className="vrm-sr-seul" data-fu-bande-pas-su={pasSus.map((c) => c.cle).join(',')}>{pasSus.map((c) => `${texteDe(c.l)} : ${c.n == null ? 'pas su' : texteDe(c.n)}${c.raison ? ', ' + texteDe(c.raison) : ''}`).join(' · ')}</span> : null}
         {action ? <div className="vrm-fu-bande-action">{action}</div> : null}
         {children}
       </section>
