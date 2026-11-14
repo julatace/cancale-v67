@@ -53,6 +53,8 @@ const MUTS = {
   'douchette-pas-montee': ["<DouchetteGlobale ouvrirVentes={()=>setTab('ventes')}/>", '', 'App.jsx'],
   'tampon-lot-ignore': ["if (it.tampon && TAMPONS_IMPR.includes(it.tampon)) { const rg0 = reglageImpressionChoisi(); impIt.reg = { ...rg0, tamponA4: it.tampon, tamponTh: it.tampon }; }", '', 'App.jsx'],
   'lot-sans-garde-numeros': ["if (!(await confirmerNumerosAVerifier((items || []).map((it) => it && it.numero)))) throw new Error(NUM_A_VERIFIER_ANNULE);", '', 'App.jsx'],
+  'lot-rates-marques-imprimes': ["for (const k of (fait && fait.vinted) || []) if (!rates.has(k)) ops.push(", "for (const k of (fait && fait.vinted) || []) ops.push(", 'App.jsx'],
+  'lot-rates-pas-reimprimes': ["if (rates.size) { const encore = [...rates]; setLot((x) => x ? { ...x, fait: null, coches: new Set(encore) } : x); setTimeout(() => batchBordereaux(new Set(encore), false, true), 0); return; }", '', 'App.jsx'],
   'lot-sans-choix-imprimante': ["onChange={(v)=>{ if (!batchBusy) choisirImprimante(v); }}", 'onChange={() => {}}', 'App.jsx'],
 };
 if (process.argv.includes('--prouve')) {
@@ -298,6 +300,11 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
   dit(/if \(!\(await confirmerNumerosAVerifier\(\(items \|\| \[\]\)\.map\(\(it\) => it && it\.numero\)\)\)\) throw new Error\(NUM_A_VERIFIER_ANNULE\);/.test(A), 'C10 §5 : un N° « à vérifier » ou porté par deux fiches DEMANDE toujours avant le lot');
   dit(/<Segmente label=[^>]{0,60} plein value=\{imprMode\(imprimante\)\} onChange=\{\(v\)=>\{ if \(!batchBusy\) choisirImprimante\(v\); \}\}/.test(lire('App.jsx')), 'C11 l’imprimante (classique, 4 par page, thermique) se choisit DANS la feuille « Tout imprimer » (le réglage `vrm_imprimante`)');
   dit(/const t = await tamponnerBordereau\(PL, src, \{ numero: contenu\.numero, titre: contenu\.titre, thermique, choix \}\);/.test(A) && /const contenu = contenuTampon\(thermique \? reg\.tamponTh : reg\.tamponA4/.test(A), 'C12 le tampon de l’A4 classique est toujours posé (`tamponnerBordereau` avec le réglage `tamponA4`)');
+  // (14 nov., Julien : « l'impression beaucoup mieux guidée ») une phrase par étape ; « Tout est sorti ? » : les
+  // ratés cochés ne passent PAS « imprimés » et repartent seuls à l'impression.
+  const AB = lire('App.jsx');
+  dit(/data-lot-guide="choix"/.test(AB) && /data-lot-guide="apercu"/.test(AB) && /data-lot-guide="sorti"/.test(AB) && /data-lot-imprimante-phrase=/.test(AB), 'C13 « Tout imprimer » dit à chaque étape ce qui se passe et ce qu’on attend (imprimante, aperçu, « Tout est sorti ? »)');
+  dit(/for \(const k of \(fait && fait\.vinted\) \|\| \[\]\) if \(!rates\.has\(k\)\) ops\.push\(/.test(A) && /if \(rates\.size\) \{ const encore = \[\.\.\.rates\];[^\n]*batchBordereaux\(new Set\(encore\), false, true\)/.test(A), 'C14 « Tout est sorti ? » : les ratés ne passent pas « prêts à déposer » et sont réimprimés, seuls');
   dit(!/fetch\(|api\.openai|anthropic|apiKey|x-api-key/i.test(sansCommentaires(lire('mainsLibres.js')) + sansCommentaires(lire('MainsLibres.jsx'))), 'C8 mains libres : aucune clé, aucun appel réseau à nous (§2.9)');
 
   console.log(`\n${ok} verts, ${ko} rouges`);

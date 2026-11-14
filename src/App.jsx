@@ -43556,7 +43556,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       (r.rates || []).forEach(i => echecs.push(items[i].cle));
       const reussiesVinted = (r.reussis || []).filter(i => items[i].site === 'vinted').map(i => items[i].cle);
       const differe = parcours && !echecs.length && choisis;
-      if (differe && (AUTH.user?.id||null)===proprietaire) setLot(x => x ? { ...x, fait: { planche: r.planche || null, n: imprimes, url: r.url, nom: r.filename, vinted: reussiesVinted, vestiaire: (r.reussis || []).filter(i => items[i].site === 'vestiaire').map(i => items[i].ligne.v.id) } } : x);
+      if (differe && (AUTH.user?.id||null)===proprietaire) setLot(x => x ? { ...x, fait: { planche: r.planche || null, lignes: (r.reussis || []).map(i => ({ cle: items[i].cle, num: items[i].numero || '', titre: items[i].title || '' })), n: imprimes, url: r.url, nom: r.filename, vinted: reussiesVinted, vestiaire: (r.reussis || []).filter(i => items[i].site === 'vestiaire').map(i => items[i].ligne.v.id) } } : x);
       if (!differe && reussiesVinted.length) setBordsPrinted(prev => { const u = { ...prev }; const at = new Date().toISOString(); reussiesVinted.forEach(k => { u[k] = at; }); save('vinted_bords_printed', u); return u; });
       noterImprimeSansNum((r.reussis || []).filter(i => items[i].site === 'vinted' && !String(items[i].numero || '').trim()).map(i => items[i].ligne && items[i].ligne.e && items[i].ligne.e.txn));
       if (!differe) (r.reussis || []).filter(i => items[i].site === 'vestiaire').forEach(i => { try { marquerVc('vrm_vc_imprimes', items[i].ligne.v.id, true); } catch (_) {} });
@@ -50989,18 +50989,30 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const choisis = L.filter((l) => lot.coches.has(l.cle) && l.cochable !== false);
                   const fait = lot.fait || null;
                   // 3 · « C'est imprimé ? » — les colis passent « prêts à déposer » (la date d'impression), annulable.
+                  // (14 nov., Julien : « l'impression beaucoup mieux guidée ») 5 · « Tout est sorti correctement ? » : il
+                  // peut cocher ceux qui ont RATÉ ; les autres seuls passent « imprimés », les ratés repartent à l'impression.
+                  const rates = new Set((fait && fait.rates) || []);
+                  const basculerRate = (cle) => setLot((x) => { if (!x || !x.fait) return x; const s = new Set(x.fait.rates || []); if (s.has(cle)) s.delete(cle); else s.add(cle); return { ...x, fait: { ...x.fait, rates: [...s] } }; });
                   const confirmerImprime = () => {
                     const at = new Date().toISOString(), ops = [];
-                    for (const k of (fait && fait.vinted) || []) ops.push({ k: 'vinted_bords_printed', type: 'cle', id: k, apres: at, avant: bordsPrinted[k] });
+                    for (const k of (fait && fait.vinted) || []) if (!rates.has(k)) ops.push({ k: 'vinted_bords_printed', type: 'cle', id: k, apres: at, avant: bordsPrinted[k] });
                     if (ops.length) gesteVrm(`${ops.length} prêt${ops.length>1?'s':''} à déposer`, ops, { vinted_bords_printed: setBordsPrinted });
-                    for (const id of (fait && fait.vestiaire) || []) { try { marquerVc('vrm_vc_imprimes', id, true); } catch (_) {} }
+                    for (const id of (fait && fait.vestiaire) || []) { if (rates.has('vc:' + id) || rates.has(id)) continue; try { marquerVc('vrm_vc_imprimes', id, true); } catch (_) {} }
+                    if (rates.size) { const encore = [...rates]; setLot((x) => x ? { ...x, fait: null, coches: new Set(encore) } : x); setTimeout(() => batchBordereaux(new Set(encore), false, true), 0); return; }
                     setLot((x) => x ? { ...x, fait: { ...x.fait, confirme: true } } : x);
                   };
                   return (
                     <SheetShell onClose={()=>setLot(null)} maxWidth={620} z={9000} className="vrm-lot vrm-tip" data-noswipe="1" data-lot={L.length} data-lot-etape={fait ? (fait.confirme ? 'depot' : 'imprime') : 'choix'} aria-label="Tout imprimer"
-                      titre={fait ? (fait.confirme ? 'Prêts à déposer' : 'C’est imprimé ?') : lot.echecs.length ? `${lot.echecs.length} pas imprimé${lot.echecs.length>1?'s':''}` : 'Tout imprimer'}>
+                      titre={fait ? (fait.confirme ? 'Prêts à déposer' : tr('cp.guide.sortiTitre')) : lot.echecs.length ? `${lot.echecs.length} pas imprimé${lot.echecs.length>1?'s':''}` : 'Tout imprimer'}>
                       {!fait && <div className="vrm-tip-temps" key="choix">
                         <ol className="vrm-tip-pas" aria-label="Étapes"><li className="is-la">Choisir</li><li>Imprimer</li><li>Déposer</li></ol>
+                        {/* (14 nov., Julien : « l'impression beaucoup mieux guidée ») ce qui se passe, ce qu'on attend de lui. */}
+                        <p className="vrm-cp-guide" data-lot-guide="choix">{tr('cp.guide.choix')}</p>
+                        <div className="vrm-cp-imprimante" data-lot-imprimante={imprMode(imprimante)}>
+                          <Segmente label={tr('cp.lot.imprimante')} plein value={imprMode(imprimante)} onChange={(v)=>{ if (!batchBusy) choisirImprimante(v); }}
+                            options={IMPR_MODES.map((v) => ({ v, l: v === 'thermique' ? tr('cp.lot.thermique') : v === 'planche4' ? tr('cp.planche.choix') : tr('cp.lot.classique'), data: { 'data-lot-imprimante-choix': v } }))}/>
+                          <p className="vrm-cp-guide-sous" data-lot-imprimante-phrase={imprMode(imprimante)}>{tr(`cp.guide.imprimante.${imprMode(imprimante)}`)}</p>
+                        </div>
                         {lot.erreur&&<p className="vrm-tip-alerte" role="alert" data-lot-erreur="">{lot.erreur}</p>}
                         {(nSansBord || resL.dejaImprimes || resL.anciennes || resL.decoches) ? <div className="vrm-tip-pourquoi" data-lot-pourquoi="">
                           <b>Pas dans ce lot</b>
@@ -51040,10 +51052,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           // (14 nov., lot colis-plus 98) 4 par page : au plus ⌈n/4⌉ feuilles (une page pas découpable part seule).
                           return <section className="vrm-tip-groupe" data-lot-section="apercu" data-lot-papier={pl4 ? 'planche4' : th ? rg.format : 'a4'} data-lot-tampon={mt} aria-label={tr('impression.lot.apercu')}>
                           <h3>{tr('impression.lot.apercu')} <span>{pl4 ? tr('cp.planche.lotPages', { n: Math.ceil(choisis.length / 4) }) : tr('impression.lot.pages', { n: choisis.length, papier: papierLot })}</span></h3>
-                          <div className="vrm-cp-imprimante" data-lot-imprimante={imprMode(imprimante)}>
-                            <Segmente label={tr('cp.lot.imprimante')} plein value={imprMode(imprimante)} onChange={(v)=>{ if (!batchBusy) choisirImprimante(v); }}
-                              options={IMPR_MODES.map((v) => ({ v, l: v === 'thermique' ? tr('cp.lot.thermique') : v === 'planche4' ? tr('cp.planche.choix') : tr('cp.lot.classique'), data: { 'data-lot-imprimante-choix': v } }))}/>
-                          </div>
+                          <p className="vrm-cp-guide" data-lot-guide="apercu">{tr('cp.guide.apercu')}</p>
                           <button type="button" className="vrm-tip-lien" data-lot-reglage-impression="" disabled={batchBusy} onClick={()=>{ setLot(null); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=settings&reglage=imprimante' })); } catch (_) {} }}>{tr('impression.lot.changer')}</button>
                           <div className="vrm-tip-pages">
                             {choisis.map((l) => { const m = TAMPONS_IMPR.includes(tampons[l.cle]) ? tampons[l.cle] : mt; const c = contenuTampon(m, { numero: l.num || '', titre: l.titre || '' }); return <div key={l.cle} className="vrm-cp-apercu" data-lot-apercu-carte={l.cle}><figure className="vrm-tip-a4" data-lot-apercu={l.cle} data-lot-apercu-tampon={m}>
@@ -51068,11 +51077,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {fait && !fait.confirme && <div className="vrm-tip-temps vrm-tip-fin" key="imprime" data-lot-question="">
                         <ol className="vrm-tip-pas" aria-label="Étapes"><li className="is-fait">Choisir</li><li className="is-la">Imprimer</li><li>Déposer</li></ol>
                         <p className="vrm-tip-grand"><b>{fait.n}</b> bordereau{fait.n>1?'x':''} dans le PDF.</p>
+                        <p className="vrm-cp-guide" data-lot-guide="sorti">{tr('cp.guide.sorti')}</p>
                         {fait.planche ? <p className="vrm-tip-sous" data-planche-resultat={`${fait.planche.etiquettes}/${fait.planche.feuilles}/${fait.planche.echelle}`}>{tr('cp.planche.resultat', { etiquettes: fait.planche.etiquettes, feuilles: fait.planche.feuilles, echelle: fait.planche.echelle })}{fait.planche.entieres ? <> {tr('cp.planche.entieres', { n: fait.planche.entieres })}</> : null}</p> : null}
                         {fait.url ? <a className="vrm-tip-lien vrm-tip-pdf" data-lot-ouvrir-pdf="" href={fait.url} target="_blank" rel="noopener">Ouvrir le PDF</a> : null}
+                        {(fait.lignes || []).length > 1 ? <ul className="vrm-cp-rates" data-lot-rates={rates.size}>
+                          {(fait.lignes || []).map((l) => <li key={l.cle}><label className="vrm-cp-rate" data-lot-rate={l.cle} data-lot-rate-coche={rates.has(l.cle) ? '1' : '0'}>
+                            <input type="checkbox" checked={rates.has(l.cle)} onChange={()=>basculerRate(l.cle)}/>
+                            <span>{l.num ? <b>N°{l.num}</b> : null} {l.titre}</span><small>{tr('cp.guide.rate')}</small></label></li>)}
+                        </ul> : null}
                         <div className="vrm-tip-pied">
-                          <Bouton variante="secondaire" data-lot-pas-imprime="" onClick={()=>setLot((x)=>x?{...x,fait:null}:x)}>Pas encore</Bouton>
-                          <Bouton variante="primaire" icone="check" data-lot-imprime-oui="" onClick={confirmerImprime}>Oui, imprimé</Bouton>
+                          <Bouton variante="secondaire" data-lot-pas-imprime="" onClick={()=>setLot((x)=>x?{...x,fait:null}:x)}>{tr('cp.guide.rienSorti')}</Bouton>
+                          <Bouton variante="primaire" icone="check" data-lot-imprime-oui="" onClick={confirmerImprime}>{rates.size ? tr('cp.guide.reimprimer', { n: rates.size }) : tr('cp.guide.toutSorti')}</Bouton>
                         </div>
                       </div>}
                       {fait && fait.confirme && <div className="vrm-tip-temps vrm-tip-fin" key="depot" data-lot-depot="">

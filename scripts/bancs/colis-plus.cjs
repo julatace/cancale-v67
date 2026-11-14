@@ -255,6 +255,27 @@ async function lotClassiqueBrut(b, nom, vue, LIGNES) {
     dit(autres.length === ap.length - 3 && autres.every((j) => j.n && j.titre), `${nom} : F4 CLASSIQUE A4 : chaque bordereau porte SON tampon (N° + titre, le réglage)`, JSON.stringify(autres.filter((j) => !j.n || !j.titre)).slice(0, 200) + " · pages : " + JSON.stringify(pages.map((p) => p.texte.slice(0, 160))).slice(0, 900));
     dit(sans && !sans.n && !sans.titre, `${nom} : F5 le bordereau réglé « sans tampon » n'a ni N° ni titre`, JSON.stringify(sans));
     dit(tt && tt.n && !tt.titre, `${nom} : F6 le bordereau réglé « N° seul » porte son N°, sans le titre`, JSON.stringify(tt));
+    // F8 · « Tout est sorti ? » : il coche UN raté ⇒ seul lui repart à l'impression, les autres passent « prêts à déposer ».
+    await pg.waitForSelector('[data-lot-question] [data-lot-guide="sorti"]', { timeout: 15000 }).catch(() => {});
+    const premier = await pg.evaluate(() => { const e = document.querySelector('[data-lot-rate]'); return e ? e.getAttribute('data-lot-rate') : null; });
+    if (premier) await pg.locator(`[data-lot-rate="${premier}"] input`).check().catch(() => {});
+    await pg.waitForTimeout(300);
+    const bouton = await pg.evaluate(() => (document.querySelector('[data-lot-imprime-oui]') || {}).textContent || '');
+    const nPdf0 = await pg.evaluate(() => window.__pdfs.length);
+    await cliquer(pg, '[data-lot-imprime-oui]');
+    for (let i = 0; i < 400; i++) {
+      const e = await pg.evaluate((n0) => { if (window.__pdfs.length > n0) return 'pdf'; const f = document.querySelector('[data-placeur-tampon]:not([data-placeur-tampon="charge"]) [data-tampon-imprimer]'); if (f) { f.click(); return 'clic'; } return 'attente'; }, nPdf0);
+      if (e === 'pdf') break;
+      await pg.waitForTimeout(250);
+    }
+    await pg.waitForTimeout(1500);
+    const b2 = await pg.evaluate(async () => { const bl = window.__pdfs[window.__pdfs.length - 1]; if (!bl) return null; const u = new Uint8Array(await bl.arrayBuffer()); let s = ''; for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s); });
+    const p2 = b2 ? (await pagesDuPdf(b2)).map((p) => (/ETIQUETTE (\d+)/.exec(p.texte) || [])[1]).filter(Boolean) : [];
+    const imprimes = await lire(pg, 'vinted_bords_printed') || {};
+    const restants = ap.slice(0, -1).map((x) => nu(x.cle)).filter((t) => t !== nu(premier || ''));
+    dit(!!premier && /1/.test(bouton) && JSON.stringify(p2) === JSON.stringify([nu(premier || '')]) && !imprimes[nu(premier || '')] && restants.every((t) => imprimes[t]),
+      `${nom} : F8 « Tout est sorti ? » : le raté coché est seul réimprimé, les autres passent « prêts à déposer »`, JSON.stringify({ premier, bouton, p2, imprimes: Object.keys(imprimes) }).slice(0, 300));
+    await shot(pg, `${nom}-lot-sorti`);
     dit(errs.length === 0, `${nom} : F7 aucune erreur d'app`, errs.join(' | ').slice(0, 200));
   } finally { await ctx.close(); }
 }

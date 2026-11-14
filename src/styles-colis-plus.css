@@ -62,3 +62,13 @@
   background: var(--d-remplir, rgba(120,120,128,.12)); color: var(--d-encre, var(--vrm-ink, #1D1D1F)); font: 400 var(--d-t-13, 13px) var(--vrm-police, inherit); }
 .vrm-cp-tampon:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 2px; }
 .vrm-cp-retirer { min-height: 44px; font-size: var(--d-t-13, 13px); }
+/* (14 nov., Julien : « l'impression beaucoup mieux guidée ») une phrase par étape, courte, à l'encre douce. */
+.vrm-cp-guide { margin: 6px 14px 10px; font-size: var(--d-t-15, 15px); line-height: 1.4; color: var(--d-encre, var(--vrm-ink, #1D1D1F)); }
+.vrm-cp-guide-sous { margin: 6px 2px 0; font-size: var(--d-t-13, 13px); color: var(--d-gris, var(--vrm-muted, #6E6E73)); }
+.vrm-cp-rates { list-style: none; margin: 0 14px 10px; padding: 0; }
+.vrm-cp-rates > li + li { border-top: 1px solid var(--d-filet, rgba(0,0,0,.08)); }
+.vrm-cp-rate { display: flex; align-items: center; gap: 10px; min-height: 48px; font-size: var(--d-t-15, 15px); cursor: pointer; }
+.vrm-cp-rate input { width: 22px; height: 22px; flex: none; accent-color: var(--d-accent, #0071E3); }
+.vrm-cp-rate span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-cp-rate small { flex: none; font-size: var(--d-t-13, 13px); color: var(--d-gris, var(--vrm-muted, #6E6E73)); }
+.vrm-cp-rate[data-lot-rate-coche="1"] small { color: var(--d-ambre, var(--vrm-warn, #B25000)); font-weight: 600; }
