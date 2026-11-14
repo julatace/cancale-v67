@@ -72,14 +72,40 @@ Banc `scripts/bancs/refonte-plateformes-reglages.cjs` (la mesure des passes desi
   « Mis à jour » ni le bandeau de mise à jour (`.vrm-neuf-hote` : `claude/refonte-coque`).
 - Paires : `docs/design/avant-apres/{leboncoin,leboncoin-sombre,ebay,vestiaire,reglages,reglages-sombre,connexion,connexion-accueil}-{avant,apres}.png`.
 
+## Paramètres, d'après les captures de Julien de midi
+- **Compte propriétaire** (« dans parrainage je ne sais pas pourquoi il y a mon compte ») : l'onglet Abonnement
+  montre « Compte propriétaire · gratuit », SANS les offres Solo/Pro ni le parrainage (pour les clients). Ce qui
+  reste pour laisser les clients payer (mentions légales, prix Stripe, offre Pro) tient en UNE ligne
+  « Ouvrir le paiement · N › » (`AFaireSite`, hors de la carte `[data-abonnement]`) : sa feuille dit les étapes en
+  mots simples, le détail technique d'avant (mêmes textes et `data-mentions-manquantes`, `data-prix-stripe`,
+  `data-pro-geste`) replié au bout, pour lui seul. Un client ne voit rien de technique (inchangé).
+- **« Il y a 2 “ce que VRM a fait” »** : « Journal : ce que VRM a fait » quitte « Connexion » pour « Tes données »,
+  à côté de « Confidentialité : ce que VRM lit et garde » (5 langues ; `audit-confiance-publique` suit le libellé).
+- « N choses à revoir » au-dessus du titre et la phrase sous « Paramètres » : l'écran ne les rajoute pas (la
+  phrase est devenue le « ? » à côté du titre ; l'alerte de tête est la coque, `claude/refonte-coque`).
+
 ## Bancs adaptés
 - `design-passe-2.cjs` `toucher` : une ligne rangée dans un repli fermé (« Réglages avancés ») — on touche d'abord
   le repli (un geste de plus, rien de caché). Profite à `design-passe-3`.
+- `lbc-plus`, `lbc-comme-vinted`, `lbc-supprimer`, `quoi-republier`, `vestiaire-plus` : la porte (Republier,
+  Baisser le prix) vit dans « À faire » — on l'ouvre d'abord (`[data-pf-afaire]`), la porte attendue `attached`.
 
+## Bancs relancés (machine très chargée : charge 50–78, 1 à 2 Go libres, disque à 98 %)
+- Après la fusion de main : `design-passe` (Paramètres) VERT ; `design-passe-2` (Paramètres 390 sombre) VERT ;
+  `design-passe-3` (Paramètres 390 clair) VERT ; `reglages.cjs` VERT ; `detourage-reglage` VERT ;
+  `entree-publier-ailleurs` VERT ; ce banc 390 (23/24 rendus verts, le 24e « Page crashed » — mémoire de la
+  machine) et 1512 clair VERT.
+- ⚠️ Un premier passage avait rougi `design-passe-3` (sous-pages) : la copie du §4 prise le matin sur
+  `claude/refonte-coque` datait d'avant la passe 3 et effaçait sa section 2.12. Corrigé (`styles-systeme.css` =
+  main + §3/§4 de la coque, 0 ligne retirée à main), relancé vert.
+- Pas relancés jusqu'au bout ici (pages qui « crashent » sous la charge, pas une règle) : `lbc-plus`,
+  `vestiaire-plus`, `lbc-comme-vinted`, `lbc-supprimer`, `quoi-republier`, `abonnement`, `parrainage-lot54` — à
+  relancer machine calme.
 ## Ce qui reste (hors de ce chantier, ou à reprendre)
 - Ventes · site : la carte sombre des chiffres (`CarteStatsApp`, « — Finalisé ») est la carte partagée du chantier
   `claude/refonte-listes` ; elle n'est pas jugée ici (règle V) et n'a pas été touchée.
 - La pastille « Mis à jour à … » posée sur la liste (règle B) : la coque (`claude/refonte-coque`) la fait
   disparaître après 2 s ; tant que ce chantier n'est pas sur `main`, la règle B la voit.
-- Les bancs de gestes qui touchaient directement `[data-repub-lbc-ouvrir]`, `[data-lbc-baisse-ouvrir]`,
-  `[data-vc-baisse-ouvrir]` doivent d'abord ouvrir « À faire » (`[data-pf-afaire]`) : voir la fin de ce récit.
+- `AJOUT 2` (1 000 annonces) n'a pas de mesure dans ce banc : les rangées sont `content-visibility:auto`, sans ombre
+  ni flou, l'animation sur les 12 premières seulement ; un banc de volume Leboncoin/Vestiaire reste à écrire.
+- eBay : la 1re rangée tient à 421 px pour 422 — le segment « Annonces · Promotion » (la tâche, App.jsx) reste au-dessus.
