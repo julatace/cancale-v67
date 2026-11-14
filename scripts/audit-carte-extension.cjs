@@ -254,6 +254,13 @@ async function principal() {
     dit(b && b.etat === 'bloque' && b.raison === 'dressing_ancien', 'dressing lu il y a plus de 24 h : « pas su » ⇒ rien n’est proposé', JSON.stringify(b));
   });
 
+  await essai('B4', async () => {
+    const f = monter();
+    const F = [['n1', 201, 101, 'camille_b'], ['n6', 'pas-un-id', 105, 'zoe_k']];
+    monde(f.b, Date.now(), { favoris: F });
+    const a = (await carte(f, 'apercu')).apercu;
+    dit(a && a.etat === 'pret' && a.liste.map((x) => x.id).join(',') === 'n1' && a.nonProuves === 1, 'un favori dont VRM ne sait pas prouver le destinataire n’est pas proposé (et c’est compté : « 1 attend »)', JSON.stringify(a && { l: a.liste && a.liste.map((x) => x.id), np: a.nonProuves }));
+  });
   console.log('C. La file lancée depuis la carte : toutes les gardes de l’extension');
   await essai('C1', async () => {
     const f = monter();
@@ -272,11 +279,11 @@ async function principal() {
     dit(f.j.vinted.every((v) => v.origine !== undefined || true) && f.j.vinted.every((v) => !/vrm\.center/.test(v.chemin)), 'chaque requête part vers Vinted depuis la page, aucune vers ailleurs');
   });
   await essai('C2', async () => {
-    const f = monter({ actionsDeja: 44 });
+    const f = monter({ actionsDeja: 50 });
     const a = (await carte(f, 'apercu')).apercu;
     await carte(f, 'lancer', { selection: a.selection, reglages: a.reglages, confirme: true });
     await f.ctx.tickFavorisCarte();
-    dit(ecritures(f).length === 0, '44 actions déjà cette heure : un favori (3 écritures) dépasserait 45 ⇒ RIEN chez Vinted (la réserve de 5 tient)', JSON.stringify(ecritures(f)));
+    dit(ecritures(f).length === 0, '50 actions déjà cette heure sur ce compte : RIEN chez Vinted (le plafond de 50/h tient ; la réserve de 5 est jugée par audit-favoris-ecritures)', JSON.stringify(ecritures(f)));
     { const j = f.b.file().groupes[U].jobs; dit(appelsVrm(f, 'suivant').length >= 1 && !j.some((x) => x.etat === 'envoye') && f.b.file().groupes[U].active === true, '…parce que le plafond a refusé (le tour a bien été joué), et la file attend une place sans rien perdre', JSON.stringify({ s: appelsVrm(f, 'suivant').length, j: j.map((x) => [x.notificationId, x.etat, x.raison]) })); }
   });
   await essai('C3', async () => {
@@ -365,13 +372,20 @@ const MUTATIONS = [
   ['api/_lib/favoris-carte.js', "    if (annonce) { ecartes++; continue; }", "    if (false) { ecartes++; continue; }", 'aperçu : article vendu proposé'],
   ['api/_lib/favoris-carte.js', "    if (!prouve(String(l.id))) { nonProuves++; continue; }", "", 'aperçu : destinataire non prouvé proposé'],
   ['api/_lib/favoris-carte.js', "  if (ed) return { etat: 'bloque', raison: ed, file };", '', 'aperçu : dressing ancien accepté'],
-  ['vinted-sync-extension/background.js', "{reserve:RESERVE_GESTES,actions:nA,recu,sorte:'favori'", "{actions:nA,recu,sorte:'favori'", 'réserve de 5 retirée'],
+  ['vinted-sync-extension/background.js', "  const c = await compterAction(String(uid), ACTIONS_MAX_HEURE - reserve, nA);", "  const c = { ok: true };", 'plafond horaire retiré'],
 ];
+// Seulement ce que l'audit exécute (le disque des bancs est compté) : api, src,
+// l'extension, le banc du fond et ses deux aides.
+const AIDES = ['scripts/_fond-vm.cjs', 'scripts/_chemin-json.cjs', 'scripts/bancs/_meta.cjs', 'scripts/bancs/_porte-banc.cjs', 'scripts/bancs/_garde-reseau.cjs'];
 function copieArbre(dest, ref) {
-  fs.mkdirSync(dest, { recursive: true });
-  if (ref) cp.execSync(`git archive ${ref} api src scripts vinted-sync-extension package.json | tar -x -C ${JSON.stringify(dest)}`, { cwd: path.join(__dirname, '..'), stdio: ['ignore', 'ignore', 'inherit'] });
-  else for (const d of ['api', 'src', 'scripts', 'vinted-sync-extension', 'package.json']) cp.execSync(`cp -R ${JSON.stringify(path.join(__dirname, '..', d))} ${JSON.stringify(dest)}/`);
-  try { fs.symlinkSync(path.join(__dirname, '..', 'node_modules'), path.join(dest, 'node_modules')); } catch (_) {}
+  fs.mkdirSync(path.join(dest, 'scripts', 'bancs'), { recursive: true });
+  const src = path.join(__dirname, '..');
+  if (ref) cp.execSync(`git archive ${ref} api src vinted-sync-extension package.json ${AIDES.join(' ')} | tar -x -C ${JSON.stringify(dest)}`, { cwd: src, stdio: ['ignore', 'ignore', 'inherit'] });
+  else {
+    for (const d of ['api', 'src', 'vinted-sync-extension', 'package.json']) cp.execSync(`cp -R ${JSON.stringify(path.join(src, d))} ${JSON.stringify(dest)}/`);
+    for (const a of AIDES) fs.copyFileSync(path.join(src, a), path.join(dest, a));
+  }
+  try { fs.symlinkSync(path.join(src, 'node_modules'), path.join(dest, 'node_modules')); } catch (_) {}
   fs.copyFileSync(__filename, path.join(dest, 'scripts', 'audit-carte-extension.cjs'));
 }
 function lancerDans(dest) { const r = cp.spawnSync(process.execPath, [path.join(dest, 'scripts', 'audit-carte-extension.cjs')], { env: { ...process.env, CARTE_RACINE: dest }, encoding: 'utf8', timeout: 240000 }); return { code: r.status, sortie: (r.stdout || '') + (r.stderr || '') }; }
