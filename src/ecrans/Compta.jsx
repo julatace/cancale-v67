@@ -1043,7 +1043,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
   };
   
   return (
-    <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
+    <div data-espace="argent" data-argent-factures="" style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
       {/* ⚠️ LES BOUTONS PASSENT DANS LE `right` DE `ScreenHead`. Posés à côté
           dans une rangée à part, ils sortaient de la zone protégée et
           glissaient SOUS l'île d'actions flottante : « ⚙ Réglages » était
@@ -1104,13 +1104,13 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
       </div>
       {search&&<div style={{fontSize:12,color:C.muted}}>{trj('compta.resultatsDansToutes', { n: fullList.length, search: search })}</div>}
       
-      {/* Sous-onglets zones */}
-      <div style={{display:'flex',gap:0,borderBottom:`1px solid ${C.border}`,overflowX:'auto',opacity:search?0.4:1,pointerEvents:search?'none':'auto'}}>
+      {/* Sous-onglets zones — (14 nov., Studio) un segmenté (creusé, le choisi posé + diode), plus un soulignement bleu. */}
+      <div className="vrm-seg" role="group" aria-label={tr('compta.factures')} data-fac-zones="" style={{display:'inline-flex',alignSelf:'flex-start',maxWidth:'100%',gap:0,borderBottom:`1px solid ${C.border}`,overflowX:'auto',opacity:search?0.4:1,pointerEvents:search?'none':'auto'}}>
         {[
           {id:'attente',icon:'clock',label:tr('compta.attente'),count:counters.attente},
           {id:'comptabilisees',icon:'check',label:tr('compta.comptabilisees'),count:counters.comptabilisees},
         ].map(z=>(
-          <button key={z.id} type="button" aria-pressed={zone===z.id} onClick={()=>{setZone(z.id);setPage(null);}}
+          <button key={z.id} type="button" className="vrm-seg-btn" aria-pressed={zone===z.id} onClick={()=>{setZone(z.id);setPage(null);}}
             style={{background:'transparent',border:'none',borderBottom:zone===z.id?`3px solid ${C.accent}`:'3px solid transparent',
               color:zone===z.id?C.accentTexte:C.muted,padding:'8px 14px',cursor:'pointer',fontSize:13,fontWeight:400,fontFamily:'inherit',whiteSpace:'nowrap'}}>
             <span style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name={z.icon} size={13}/>{z.label} ({z.count})</span>
@@ -1136,10 +1136,8 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
                           qui remplit vraiment cet écran, ce sont les reçus
                           Vinted reçus par email, et sa propre saisie. */}
                       
-                      <span style={{display:'inline-block',marginTop:10}}>
-                        <Btn small color={C.accent} onClick={()=>setShowForm(true)}
-                          style={{display:'inline-flex',alignItems:'center',gap:5}}>{tr('compta.nouvelleFacture')}</Btn>
-                      </span>
+                      {/* (14 nov., Studio) « + Nouvelle facture » était écrit deux fois sur l'écran : le geste
+                          reste UNE fois, le plein de l'écran (en tête, `data-fac-principal` au téléphone). */}
                     </>
                   : <>{tr('compta.aucuneFactureComptabilisee')}<br/>
                       <span style={{fontSize:12}}>{tr('compta.factureArriveIci')}</span>
@@ -2448,13 +2446,13 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
         <div data-spdp data-spdp-etat={spdp === undefined ? 'encours' : spdp === null ? 'passu' : spdp.connecte ? 'connecte' : spdp.illisible ? 'illisible' : 'deconnecte'} style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border}` }}>
           <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>{tr('compta.plateformeAgreeeSuper')}</div>
           {spdp === undefined && <div style={{ fontSize: 13, color: C.muted, marginTop: 8 }}>{tr('compta.jeLisConnexion')}</div>}
-          {spdp === null && <div style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.55 }}>{tr('compta.connexionSuperPdp')} <button type="button" onClick={() => { setSpdp(undefined); relireSpdp(); }} style={{ ...btn2(true), padding: '4px 10px', marginLeft: 4 }}>{tr('ranger.reessayer')}</button></div>}
+          {spdp === null && <div style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.55 }}>{tr('compta.connexionSuperPdp')} <button type="button" onClick={() => { setSpdp(undefined); relireSpdp(); }} className="sb-touche" style={{ ...btn2(true), padding: '4px 10px', marginLeft: 4 }}>{tr('ranger.reessayer')}</button></div>}
           {spdp && spdp.connecte && <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
             <div style={{ flex: '1 1 220px', fontSize: 13, color: C.text, lineHeight: 1.5 }} data-spdp-env={spdp.env}>
               <strong>{tr('compta.connecteSuperPdp2')}</strong> · {ENV_LIBELLE[spdp.env] || spdp.env}{spdp.env === 'sandbox' ? tr('compta.rienPartReellement') : ''}
               <div className="vrm-aide" style={{ fontSize: 11, color: C.muted }}>{tr('compta.identifiantsRestentChiffres')} <Pourquoi label={tr('compta.environnement')}>{tr('compta.choixCeluiAs')}</Pourquoi></div>
             </div>
-            <button type="button" data-spdp-deconnecter disabled={!!spOccupe} onClick={deconnecterSpdp} style={btn2(!spOccupe)}>{spOccupe === 'deconnexion' ? '…' : tr('annonces.deconnecter2')}</button>
+            <button type="button" data-spdp-deconnecter disabled={!!spOccupe} onClick={deconnecterSpdp} className="sb-touche" style={btn2(!spOccupe)}>{spOccupe === 'deconnexion' ? '…' : tr('annonces.deconnecter2')}</button>
           </div>}
           {spdp && !spdp.connecte && <div style={{ marginTop: 8 }}>
             {spdp.illisible && <div data-spdp-illisible style={{ fontSize: 13, color: C.text, lineHeight: 1.5, marginBottom: 8 }}>{tr('compta.connexionSuperPdp2')}</div>}
@@ -2463,7 +2461,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
             <div role="radiogroup" aria-label={tr('compta.environnement2')} style={{ display: 'flex', gap: 6, marginTop: 10 }}>
               {[['sandbox', 'Bac à sable'], ['production', 'Production']].map(([k, t]) => (
                 <button key={k} type="button" role="radio" aria-checked={spEnv === k} data-spdp-choix={k} onClick={() => setSpEnv(k)}
-                  style={{ ...btn2(true), borderColor: spEnv === k ? C.accent : C.border, color: spEnv === k ? C.accent : C.text }}>{t}</button>
+                  className="sb-touche" style={{ ...btn2(true), borderColor: spEnv === k ? C.accent : C.border, color: spEnv === k ? C.accent : C.text }}>{t}</button>
               ))}
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
@@ -2471,7 +2469,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
                 style={{ flex: '1 1 200px', minWidth: 0, border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 12, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit' }} />
               <input data-spdp-secret type="password" value={spSecret} onChange={(e) => setSpSecret(e.target.value)} placeholder={tr('compta.secretClientClient')} autoComplete="new-password" spellCheck={false}
                 style={{ flex: '1 1 200px', minWidth: 0, border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 12, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit' }} />
-              <button type="button" data-spdp-connecter disabled={!!spOccupe || !spId.trim() || !spSecret.trim() || spdp.coffre === false} onClick={connecterSpdp} style={btn2(!spOccupe && !!spId.trim() && !!spSecret.trim() && spdp.coffre !== false)}>{spOccupe === 'connexion' ? tr('compta.verification') : tr('compta.connecter')}</button>
+              <button type="button" data-spdp-connecter disabled={!!spOccupe || !spId.trim() || !spSecret.trim() || spdp.coffre === false} onClick={connecterSpdp} className="sb-touche" style={btn2(!spOccupe && !!spId.trim() && !!spSecret.trim() && spdp.coffre !== false)}>{spOccupe === 'connexion' ? tr('compta.verification') : tr('compta.connecter')}</button>
             </div>
           </div>}
           {spMsg && <div data-spdp-msg role="status" style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>{spMsg}</div>}
@@ -2497,8 +2495,8 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
             {recap.partiel && <div data-fe-manque style={{ fontSize: 11, color: C.muted, lineHeight: 1.55, marginTop: 8 }}>{trj('compta.totalPartielManque', { x: recap.manques.join(' ; ') })}</div>}
             <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>{tr('compta.toutesVentesMois')} <Pourquoi>{tr('compta.vrmSaitAcheteur')}</Pourquoi></div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-              <button type="button" onClick={() => exporter('csv')} data-fe-recap-csv style={btn2(true)} title={tr('compta.recapitulatifFacturesExcel')}><Icon name="save" size={14} />{tr('compta.recapitulatifTableur')}</button>
-              <button type="button" onClick={() => exporter('json')} data-fe-recap-json style={btn2(true)} title={tr('compta.memeRecapitulatifFichier')}><Icon name="save" size={14} />{tr('compta.recapitulatifFichier')}</button>
+              <button type="button" onClick={() => exporter('csv')} data-fe-recap-csv className="sb-touche" style={btn2(true)} title={tr('compta.recapitulatifFacturesExcel')}><Icon name="save" size={14} />{tr('compta.recapitulatifTableur')}</button>
+              <button type="button" onClick={() => exporter('json')} data-fe-recap-json className="sb-touche" style={btn2(true)} title={tr('compta.memeRecapitulatifFichier')}><Icon name="save" size={14} />{tr('compta.recapitulatifFichier')}</button>
             </div>
             {spdp && spdp.connecte && <div data-spdp-recap style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>{tr('compta.recapitulatifPartTout')} <Pourquoi>{tr('compta.formeEnvoiApi')}</Pourquoi></div>}
           </div>)}
@@ -2527,13 +2525,13 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
                   </div>
                   <span className="vrm-display" style={{ fontSize: 13, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{fmt(l.eur)}</span>
                   <button type="button" data-fe-facture={l.id} disabled={!peutFacturer || enCours === l.id} title={raisonGrise || tr('compta.telechargerFactureFactur')}
-                    onClick={() => genererFacture(l)} style={btn2(peutFacturer && enCours !== l.id)}>
+                    onClick={() => genererFacture(l)} className="sb-touche" style={btn2(peutFacturer && enCours !== l.id)}>
                     <Icon name="receipt" size={14} />{enCours === l.id ? '…' : tr('achats.facture')}
                   </button>
                   {spdp && spdp.connecte && (peutRelire
-                    ? <button type="button" data-spdp-relire={l.id} onClick={() => envoyerSpdp(l, true)} style={btn2(true)}>{tr('compta.relire')}</button>
+                    ? <button type="button" data-spdp-relire={l.id} onClick={() => envoyerSpdp(l, true)} className="sb-touche" style={btn2(true)}>{tr('compta.relire')}</button>
                     : <button type="button" data-spdp-envoyer={l.id} disabled={!peutEnvoyer} title={!peutFacturer ? raisonGrise : tr('compta.envoyerFactureFactur')}
-                        onClick={() => envoyerSpdp(l, false)} style={btn2(peutEnvoyer)}>{enCours === l.id ? '…' : tr('compta.envoyerSuperPdp')}</button>)}
+                        onClick={() => envoyerSpdp(l, false)} className="sb-touche" style={btn2(peutEnvoyer)}>{enCours === l.id ? '…' : tr('compta.envoyerSuperPdp')}</button>)}
                 </div>
               );
             })}
@@ -3644,6 +3642,9 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
     ouvrirRepliCompta(q.aller);
   };
   const somme = (x) => (Math.abs(Number(x)) < 1000 ? montant(x) : montant(x, { centimes: 'jamais' }));
+  // (14 nov., Studio) Le chiffre d'affiche : « 1 625 » puis « € » plus petit, remonté (rien d'autre ne change :
+  // le même texte, le même `aria-label`, les mêmes data-*).
+  const sommeAffiche = (t) => { const m = /^(.*?)[\s\u00a0\u202f]*€$/.exec(String(t)); return m ? <bdi className="sb-nb">{m[1]}<span className="eur">{'\u00a0'}€</span></bdi> : t; };
   return (
     <section className="vrm-argent-q" aria-label={tr('compta.argentMois')} data-argent-questions="">
       {Q.map((q) => (
@@ -3659,7 +3660,7 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
               les espaces séparent les morceaux pour le lecteur. */}
           <span className="vrm-argent-w-l">{q.libelle}</span>{' '}
           <b className="vrm-argent-w-n" data-argent-pas-su={q.valeur == null && !q.texte ? '' : undefined}>
-            {q.valeur != null ? <>{q.partiel ? <small>{tr('journee.moins')} </small> : null}{somme(q.valeur)}</> : (q.texte || '—')}
+            {q.valeur != null ? <>{q.partiel ? <small>{tr('journee.moins')} </small> : null}{sommeAffiche(somme(q.valeur))}</> : (q.texte || '—')}
           </b>
           {q.note ? <>{' '}<span className="vrm-argent-w-note">{q.note}</span></> : null}
           <span className="vrm-argent-w-chev" aria-hidden="true">›</span>
@@ -4542,7 +4543,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   // se dit UNE fois ici, avec le geste ; les cartes ne gardent que « — ».
   const ligneComptaPub = useLigneUrssaf();
   return (
-    <div className="vrm-finance-page vrm-fu-ecran vrm-argent" data-argent-ecran={vue} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="vrm-finance-page vrm-fu-ecran vrm-argent" data-espace="argent" data-argent-ecran={vue} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* (10 nov., Argent) Statistiques et Comptabilité en UN endroit (src/argent.js) : le titre
           « Argent » et ses quatre segments. Chaque segment montre SES cartes ; les autres restent
           montées (`hidden` : mêmes lectures, mêmes états, mêmes data-*), jamais supprimées. */}
@@ -4553,10 +4554,10 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
             seulement quand la liste des comptes est LUE (pas su ≠ aucun). */}
         {comptesLus && Array.isArray(accounts) && accounts.length === 0 ? (<>
           <span style={{ flex: '1 1 220px' }} data-compta-sans-compte="">{tr('compta.calculPartVentes')}</span>
-          <Bouton className="vrm-b-petit" onClick={() => onNav && onNav('vintedaccounts')}>{tr('compta.relierMonCompte')}</Bouton>
+          <Bouton variante="discret" className="sb-lien" onClick={() => onNav && onNav('vintedaccounts')}>{tr('compta.relierMonCompte')}</Bouton>
         </>) : (<>
         <span style={{ flex: '1 1 220px' }}>{tr('stats.encoreCalcule')}</span>
-        <Bouton className="vrm-b-petit" onClick={() => onNav && onNav('cat_ventes')}>{tr('compta.ouvrirVentes')}</Bouton>
+        <Bouton variante="discret" className="sb-lien" onClick={() => onNav && onNav('cat_ventes')}>{tr('compta.ouvrirVentes')}</Bouton>
         </>)}
       </div>}
       <div className="vrm-argent-partie" data-argent-vue="resume" hidden={vue !== 'resume'}>

@@ -2375,7 +2375,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   ));
 
   return (
-    <div ref={racine} className="vrm-set" data-reglages-disposition={etroit ? 'telephone' : 'ordinateur'} data-sous-ecran-ouvert={ouvert ? ouvert.id : ''}
+    <div ref={racine} className="vrm-set" data-espace="autres" data-reglages-disposition={etroit ? 'telephone' : 'ordinateur'} data-sous-ecran-ouvert={ouvert ? ouvert.id : ''}
       style={{'--vrm-set-filet': C.border, '--vrm-set-appui': `${C.text}0a`}}>
       {/* (5 nov., chantier H) Appelée, pas montée : `<AcctSheet/>` était un composant
           RECRÉÉ à chaque rendu — chaque lettre tapée remontait la feuille. */}
