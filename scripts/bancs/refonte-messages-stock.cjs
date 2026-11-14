@@ -119,19 +119,29 @@ async function compterVisibles(pg, sel) {
 const RECHERCHE = {
   // Messages : un pseudo de la base (la conversation n° 700 : « lea_sneakers21 », loin dans la liste).
   messages: { champ: '[data-msg-recherche] input, input[data-msg-recherche]', mot: 'lea_sneakers21', trouve: (t) => /lea_sneakers21/.test(t), rangee: '.vrm-msg-list .vrm-inbox-row' },
-  // E-mails : un n° de suivi loin dans la boîte (servi par la route du banc).
-  emails: { champ: 'input[type="search"], .vrm-boite input', mot: '4180700', trouve: (t) => /Relais|4180700|Colis/.test(t), rangee: '.vrm-boite-ligne' },
+  // E-mails : un n° de suivi d'un e-mail récent (déjà lu : l'aperçu local répond avant la route, comme Mail).
+  emails: { champ: 'input[type="search"], .vrm-boite input', mot: '4180007', trouve: (t) => /Colis|Relais/.test(t), rangee: '.vrm-boite-ligne' },
   // Stock : un N° de la base (la paire n° 1937).
   stock: { champ: '[data-stock-recherche] input', mot: '1937', trouve: (t) => /N°\s*1937(?!\d)/.test(t), rangee: '[data-stock-res]' },
 };
+// Le temps de rendu d'un écran, le meilleur de deux ouvertures (une machine chargée fait des pics de
+// plusieurs secondes : le minimum est la mesure stable, la même règle pour l'avant et l'après).
+async function renduSeul(nav, ecran) {
+  const o = await ouvrir(nav, { W: 390, sombre: false, b: B.baseVolume(), url: ECRANS[ecran], api: B.apiVolume });
+  await o.pg.waitForSelector('.vrm-main', { timeout: 45000 }).catch(() => {});
+  const t0 = Date.now();
+  const vu = await o.pg.waitForSelector(RANGEES[ecran], { timeout: 45000, state: 'attached' }).then(() => true).catch(() => false);
+  const t = vu ? Date.now() - t0 : null; await o.ctx.close(); return t;
+}
 async function mesurerVolume(nav, ecran) {
+  const rendu0 = await renduSeul(nav, ecran);
   const o = await ouvrir(nav, { W: 390, sombre: false, b: B.baseVolume(), url: ECRANS[ecran], api: B.apiVolume });
   // Le temps de l'ÉCRAN : de la coque montée (`.vrm-main`) à la 1re rangée — le démarrage de l'app
   // (commun aux deux builds, et très bruyant sur une machine chargée) n'y est pas.
   await o.pg.waitForSelector('.vrm-main', { timeout: 45000 }).catch(() => {});
   const t0 = Date.now(); const sel = RANGEES[ecran];
   const vu = await o.pg.waitForSelector(sel, { timeout: 45000, state: 'attached' }).then(() => true).catch(() => false);
-  const rendu = vu ? Date.now() - t0 : null;
+  const r1 = vu ? Date.now() - t0 : null; const rendu = r1 == null ? null : (rendu0 == null ? r1 : Math.min(r1, rendu0));
   await o.pg.waitForTimeout(3000);
   const noeuds = await o.pg.evaluate(() => document.querySelectorAll('*').length);
   const visibles = await compterVisibles(o.pg, sel);

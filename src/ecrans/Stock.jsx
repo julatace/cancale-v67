@@ -967,12 +967,11 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
               <span className="vrm-s2d-vig"><Vignette f={{ numero: a.numero || '—', title: a.titre, photo: a.photo }} sold={false} mini /></span>
               <span className="vrm-s2d-txt">
                 <span className="vrm-s2d-txt-t">{a.cle ? <b className="vrm-ms-num">N°{a.numero}</b> : null}<span className="vrm-ms-titre">{a.titre || '—'}</span></span>
+                {/* UNE sous-ligne en texte (1 000 rangées : le moins de nœuds possible) : sites · comptes · état · aussi · où. */}
                 <span className="vrm-s2d-txt-s vrm-ms-sous">
-                  <span className="vrm-s2d-sites" data-stock-sites={a.plateformes.join(',')}>{a.plateformes.map((x) => <span key={x} className="vrm-s2d-site" data-site={x}>{NOM_PLAT_FILTRE[x] || x}</span>)}</span>
-                  {a.comptes.length ? <span className="vrm-ms-sep">{a.comptes.map((u) => comptesNoms.get(u) || u).join(', ')}</span> : null}
-                  {a.etat === 'aconfirmer' ? <span>{tr('stock.confirmer3')}</span> : (a.etat === 'masquee' ? <span>{tr('stock.masqueeVinted')}</span> : null)}
-                  {(a.aussi || []).length ? <span className="vrm-ms-sep">{'aussi N°' + a.aussi.join(', N°')}</span> : null}
-                  <span className={'vrm-ms-sep' + (ou ? ' vrm-ms-ou' : '')}>{ou ? trj('stock.rangeeColonne', { name: ou.meuble.name, rangee: ou.rangee, colonne: ou.colonne }) : (a.cle ? tr('stock.encoreRangee') : tr('stock.sansRangeable'))}</span>
+                  <span className="vrm-s2d-sites" data-stock-sites={a.plateformes.join(',')}>{a.plateformes.map((x) => NOM_PLAT_FILTRE[x] || x).join(', ')}</span>
+                  {[a.comptes.length ? ' · ' + a.comptes.map((u) => comptesNoms.get(u) || u).join(', ') : '', a.etat === 'aconfirmer' ? tr('stock.confirmer3') : (a.etat === 'masquee' ? tr('stock.masqueeVinted') : ''), (a.aussi || []).length ? ' · aussi N°' + a.aussi.join(', N°') : '', ' · '].join('')}
+                  <span className={ou ? 'vrm-ms-ou' : undefined}>{ou ? trj('stock.rangeeColonne', { name: ou.meuble.name, rangee: ou.rangee, colonne: ou.colonne }) : (a.cle ? tr('stock.encoreRangee') : tr('stock.sansRangeable'))}</span>
                   {/* (10 nov., lot BD) La note privée de la paire, par son N° (jamais le titre). */}
                   {a.cle ? <NotePaireCoque numero={a.numero} ajout rangee/> : null}
                 </span>
