@@ -62,11 +62,12 @@ const PLANS = [
     await f.jouer(0.3); await f.entree(1.0); await f.jouer(0.4);
     f.cle('apercu');
     await f.viser('[data-tuile="envoyer"]', { zoom: 1.38, dur: 1.0 });
-    await f.jouer(2.4);
+    await f.jouer(3.4);
     dire('chiffres');
     await f.defilerVers('[data-fu-case="vendu-mois"]', { marge: 300, dur: 0.9 });
     await f.viser('[data-fu-case="vendu-mois"]', { zoom: 1.38, dur: 0.9 });
-    await f.jouer(2.6); f.cle('chiffres');
+    await f.jouer(3.4); f.cle('chiffres');
+    f.repos_(0.8); await f.jouer(1.2);
   } },
   { tab: 'ventes', async jouer(f, dire) {
     dire('ventes');
@@ -74,7 +75,8 @@ const PLANS = [
     await f.viser('[data-lot-ouvrir]', { zoom: 1.38, dur: 1.0, dy: 140 });
     await f.jouer(1.2);
     await f.toucher('[data-lot-ouvrir]', { apres: 0.6 });
-    await f.jouer(2.6); f.cle('ventes');
+    await f.jouer(3.4); f.cle('ventes');
+    f.repos_(0.8); await f.jouer(2.4);
   } },
   { tab: 'achats', async jouer(f, dire) {
     dire('retrait');
@@ -84,14 +86,16 @@ const PLANS = [
     await f.jouer(2.2);
     await f.toucher('1@[data-rp-comptoir]', { apres: 0.5 });
     await f.viser('[aria-label^="Copier code de retrait"]', { zoom: 1.38, dur: 0.9, dy: 60 });
-    await f.jouer(2.0); f.cle('retrait');
+    await f.jouer(3.2); f.cle('retrait');
+    f.repos_(0.8); await f.jouer(2.0);
   } },
   { tab: 'annonces', async jouer(f, dire) {
     dire('numero');
     await f.jouer(0.4);
     await f.defilerVers('[data-carte-annonce="7115"]', { marge: 120, dur: 1.2 });
     await f.viser('[data-carte-annonce="7115"]', { zoom: 1.38, dur: 1.0 });
-    await f.jouer(3.0); f.cle('numero');
+    await f.jouer(4.0); f.cle('numero');
+    f.repos_(0.8); await f.jouer(1.6);
     dire('fin');
     await f.fin('vrm.center', 3.2);
   } },
@@ -107,6 +111,8 @@ async function tournerPlan(i) {
     const f = new Film({ nom: 'accueil-45s-' + i, format: 'portrait', monde: monde(), tab: p.tab });
     await f.demarrer(nav);
     await f.app.evaluate(() => { window.print = () => {}; });
+    // L'horloge du cadre peut avoir pris de l'avance pendant le chargement : on fige un peu plus loin.
+    { const orig = f.pg.clock.pauseAt.bind(f.pg.clock); f.pg.clock.pauseAt = async (d) => { let e0; for (const pas of [0, 5e3, 6e4, 36e5, 864e5]) { try { return await orig(new Date(new Date(d).getTime() + pas)); } catch (e) { e0 = e; if (!/past/i.test(String(e && e.message))) throw e; } } throw e0; }; }
     await f.enregistrer(path.join(dossier, `plan-${i}.mp4`));
     try { await p.jouer(f, (cle) => cues.push({ cle, t: f.t })); }
     catch (e) { try { f.ff.kill('SIGKILL'); } catch (_) {} try { await f.ctx.close(); } catch (_) {} throw e; }
