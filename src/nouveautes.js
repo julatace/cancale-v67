@@ -30,6 +30,7 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'refonte-coque', date: '2026-11-14', titre: 'Quatre onglets et un menu en haut', phrase: 'Paires réunit Annonces, Stock, Achats ; le reste sous ☰.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'refonte-listes', date: '2026-11-14', titre: 'Annonces et Ventes : la liste d’abord', phrase: 'Chiffres en une bande, compte en menu, alertes dans « À faire ».', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'refonte-achats', date: '2026-11-14', titre: 'Achats plus dense, plus net', phrase: 'Huit achats par écran, tes sources en chiffres, recherche par N°.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'fiche-partout', date: '2026-11-14', titre: 'Une seule fiche pour chaque paire', phrase: 'Touche une vente, un colis, une annonce : sa fiche s’ouvre.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'design-passe-reglages', date: '2026-11-14', titre: 'Paramètres et Notifications plus simples', phrase: 'Choix en un toucher, cartes sans cadre, plus de barre vide.', tab: 'settings', pour: 'tous', mode: 'tous' },
   { id: 'design-passe-autres-ecrans', date: '2026-11-14', titre: 'E-mails, Achats et Leboncoin plus nets', phrase: 'Mêmes cartes, mêmes boutons, un seul N° par ligne de recherche.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'design-passe-ecrans', date: '2026-11-14', titre: 'Fiche du N° et écrans plus nets', phrase: 'Tailles, graisses et gris unifiés, boutons à bonne hauteur, textes plus contrastés.', tab: 'journee', pour: 'tous', mode: 'tous' },

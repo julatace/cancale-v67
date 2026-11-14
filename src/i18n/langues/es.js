@@ -11,8 +11,10 @@ import ecran_stats from './es/stats.js';
 import ecran_compta from './es/compta.js';
 import ecran_argent from './es/argent.js';
 import ecran_listes from './es/listes.js';
+import ecran_fiche from './es/fiche.js';
 export default {
   ...ecran_listes,
+  ...ecran_fiche,
   ...ecran_compta,
   ...ecran_argent,
   ...ecran_stats,
