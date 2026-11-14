@@ -71,7 +71,7 @@ export default {
   "accueil.hero.titre": "Deine Verkäufe, Pakete und Buchhaltung an einem Ort.",
   "accueil.journee.chapo": "Morgens, im Paketshop, im Lager, mit deinen Käufern, am Monatsende.",
   "accueil.journee.titre": "Dein Tag als Wiederverkäufer, in fünf Momenten.",
-  "accueil.moment.colis.alt": "Die Seite Pakete in VRM, Reiter „Abzuholen“: der Paketshop Le Fournil in Rennes, zwei Pakete und der Abholcode 582913 zum Kopieren. Beispieldaten.",
+  "accueil.moment.colis.alt": "Die Seite Einkäufe in VRM, Bereich „Abzuholen“: der Paketshop „Relais Exemple“ in Rennes, zwei Pakete und ihre Abholcodes 582913 und K48291. Beispieldaten.",
   "accueil.moment.colis.point1": "Code, QR und Paketshop für jeden Einkauf.",
   "accueil.moment.colis.point2": "„Abgeholt“ nimmt es von der Liste; ein fragliches Paket bleibt sichtbar, nie versteckt.",
   "accueil.moment.colis.texte": "Versandetiketten druckst du mit einem Tipp, gestempelt mit Titel und Nummer des Artikels. Im Paketshop warten deine Abholcodes, nach Ort sortiert, auch offline.",

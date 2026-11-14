@@ -482,7 +482,7 @@ import { exempleActif, exempleSansCompte, entrerModeExemple, sortirModeExemple }
 // (6 nov., v36) Les temps réels chez les vendeurs, anonymes et agrégés (src/mesuresCollecte.js).
 import { demarrerMesures, mesuresEcran } from "./mesuresCollecte.js";
 // ⟦→ ecrans/Reglages.jsx #11⟧
-import { GuideDemarrage, BandeauExemple, ChoixNumerotation, VerificationInstallation } from "./GuideDemarrage.jsx";
+import { GuideDemarrage, BandeauExemple, CadreExemple, ChoixNumerotation, VerificationInstallation } from "./GuideDemarrage.jsx";
 import { ParcoursArrivee, CarteParcours } from "./ParcoursArrivee.jsx";
 // (14 nov.) L'accueil des nouveaux : bilan, premier colis, « Nouveau », langue, notifications (src/accueilNouveaux/).
 import { AccueilNouveauxCoque, LangueDetecteeCarte } from "./accueilNouveaux/AccueilNouveaux.jsx";
@@ -61532,7 +61532,10 @@ function AppCoeur() {
       {/* Sur ordinateur, le contenu occupe la largeur disponible après le rail.
           L'ordre des blocs et la disposition de chaque page restent conservés. */}
       {/* (6 nov.) Mode exemple : le bandeau, hors de <main> (il ne défile pas), sur TOUS les écrans. */}
-      {exempleActif() && <BandeauExemple sansCompte={exempleSansCompte()} style={ordi ? { marginLeft: NAV_LARGEUR + 36 } : undefined} onBrancher={() => (exempleSansCompte() ? sortirModeExemple(window, '/?inscription') : sortirModeExemple())}/>}
+      {/* (14 nov.) « J'ai déjà un compte · Me connecter » à côté de « Créer mon compte » ; le cadre hachuré
+          (au-dessus des feuilles, par un portail) : l'exemple ne se confond plus avec ses vraies données. */}
+      {exempleActif() && <BandeauExemple sansCompte={exempleSansCompte()} style={ordi ? { marginLeft: NAV_LARGEUR + 36 } : undefined} onBrancher={() => (exempleSansCompte() ? sortirModeExemple(window, '/?inscription') : sortirModeExemple())} onConnexion={() => sortirModeExemple(window, '/?connexion')}/>}
+      {exempleActif() && createPortal(<CadreExemple/>, document.body)}
       <main className="vrm-main" data-ecran={tab} data-defile="1" style={{
         // ⚠️ COQUE APP-SHELL : c'est `<main>` qui défile, pas le document. La
         // barre du bas est un frère HORS de ce conteneur → elle ne bouge plus

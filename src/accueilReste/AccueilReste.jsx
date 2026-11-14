@@ -130,7 +130,7 @@ function CarteCartons({ p, onRepondre, enCours }) {
       <div className="vrm-ar-carte">
         <p className="vrm-ar-ligne1">{p.aAdopter ? tr('cartons.lus', { n: p.aAdopter }) : tr('cartons.lusAucun')}</p>
         {p.doublons.length ? (
-          <ul className="vrm-ar-doublons" data-cartons-rouge="">
+          <ul className="vrm-ar-double" data-cartons-rouge="">
             {p.doublons.map((d) => <li key={d.cle} data-cartons-doublon={d.cle}><span className="vrm-ar-num is-double"><Mot k="numero" />{d.cle}</span><span>{tr('cartons.double', { n: d.ids.length })}</span></li>)}
           </ul>
         ) : null}

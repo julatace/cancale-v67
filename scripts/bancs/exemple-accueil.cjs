@@ -118,7 +118,7 @@ async function entrerDepuis(o, sel, T, X) {
   await o.pg.waitForTimeout(2500);
   dit(await exempleActif(o.pg), `${T} ${X} le geste ouvre l'app EN MODE EXEMPLE`);
   const b = await bandeau(o.pg);
-  dit(b && /Exemple — rien n’est enregistré/.test(b.texte) && b.geste === 'Créer mon compte' && b.sansCompte === '1', `${T} ${X} bandeau « Exemple — rien n’est enregistré · Créer mon compte »`, JSON.stringify(b));
+  dit(b && /Exemple — données inventées/.test(b.texte) && b.geste === 'Créer mon compte' && b.sansCompte === '1', `${T} ${X} bandeau « Exemple — données inventées · Créer mon compte »`, JSON.stringify(b));
   dit(b && b.libre && (!o.tel || b.h >= 43.5), `${T} ${X} « Créer mon compte » : rien ne le couvre${o.tel ? ', 44 px' : ''}`, JSON.stringify(b));
   dit((await ecranRempli(o.pg)) > 400, `${T} ${X} l'écran est rempli de données inventées`);
   const versBase = o.journal.base.filter((r) => r.phase === 'exemple');
@@ -181,7 +181,7 @@ async function connecte(nav, W, theme) {
   await o.pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
   await o.pg.waitForSelector('[data-exemple-bandeau]', { timeout: 25000 }).catch(() => {});
   const b = await bandeau(o.pg);
-  dit(b && b.sansCompte === '0' && b.geste === 'Passer à mes vraies données' && /rien n’est enregistré/.test(b.texte), `${T} X5 entré depuis l'app, connectée : « Passer à mes vraies données »`, JSON.stringify(b));
+  dit(b && b.sansCompte === '0' && b.geste === 'Passer à mes vraies données' && /Exemple — données inventées/.test(b.texte), `${T} X5 entré depuis l'app, connectée : « Passer à mes vraies données »`, JSON.stringify(b));
   dit(!o.journal.erreurs.length, `${T} aucune erreur JS`, o.journal.erreurs.join(' ¦ '));
   await o.ctx.close();
 }

@@ -27,6 +27,7 @@ export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
   { id: 'accompagnement', date: '2026-11-14', titre: 'Chaque geste dit ce qu’il fait', phrase: 'Avant, pendant, après ; et si ça bloque, pourquoi et quoi faire.', tab: 'cat_bord', pour: 'tous', mode: 'tous' },
+  { id: 'exemple-impossible-a-confondre', date: '2026-11-14', titre: 'Exemple avec photos, impossible à confondre', phrase: 'Vraies photos de paires, bandeau et cadre « Exemple » partout.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (14 nov., lot colis-plus : propositions 96 à 101, puis l'impression guidée)
   { id: 'impression-guidee', date: '2026-11-14', titre: 'Tout imprimer, guidé pas à pas', phrase: 'Ton imprimante, le tampon de chaque bordereau, puis « Tout est sorti ? ».', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'colis-format-modele', date: '2026-11-14', titre: 'Le bon carton proposé pour chaque modèle', phrase: 'Ton dernier choix pour ce modèle revient ; tu le prends d’un toucher.', tab: 'ventes', pour: 'tous', mode: 'tous' },
