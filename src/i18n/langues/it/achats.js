@@ -348,4 +348,10 @@ export default {
   "achats.rienRelieEncore": { one: "Niente lo collega ancora a un pacco qui sopra (né codice di ritiro, né n° di tracciamento). Non conta in «da ritirare» finché il n° di tracciamento non è noto.", other: "Niente li collega ancora a un pacco qui sopra (né codice di ritiro, né n° di tracciamento). Non contano in «da ritirare» finché il n° di tracciamento non è noto." },
   "achats.commandeJours": { one: " · ordinato {n} giorno fa", other: "· ordinato {n} giorni fa" },
   "achats.autresIlsSont": { one: "e {n} altro — sono tutti nella scheda «Tutti».", other: "e {n} altri — sono tutti nella scheda «Tutti»." },
+  "achats.ms.benefice": "Profitto",
+  "achats.ms.vitesse": "Velocità",
+  "achats.ms.investi": "Investito",
+  "achats.ms.marge": "Margine",
+  "achats.ms.pourRevendre": "Per rivendere",
+  "achats.selectionner": "Seleziona",
 };
