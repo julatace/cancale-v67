@@ -28,6 +28,32 @@ J'espère que le tamponnage pour la feuille classique est resté. »
 | Modifier un par un, avec le tampon | Le tampon était un réglage GLOBAL (`tamponA4`, `tamponTh`) ; « Placer le tampon » (la place, par forme) ; décocher une ligne | Sous CHAQUE aperçu : son tampon (**N° seul / N° + titre / + taille / Rien**) et **Retirer du lot**. Le choix vaut pour CE bordereau seulement (`it.tampon` remplace `tamponA4`/`tamponTh` dans `poserBordereau`) ; « Placer le tampon » reste. §5 : la garde `confirmerNumerosAVerifier` DEMANDE toujours avant le lot (audit C10, mutation rouge). |
 | Le tampon de la feuille classique est-il resté ? | Oui : `poserBordereau` (page entière) → `tamponnerBordereau` avec `tamponA4` (N° + titre par défaut) | **Prouvé dans la vraie app** (banc `colis-plus` F) : Tout imprimer en classique ⇒ chaque page du PDF (relu par pdf.js) porte SON « N° 31… » et son titre ; le bordereau réglé « Rien » n'a ni N° ni titre ; « N° seul » a son N° sans titre ; le bordereau retiré n'est pas dans le PDF. En 4 par page (isolation thermique) : chaque étiquette porte SON N° (A4/A5). Le thermique pur est jugé par `thermique.cjs` (inchangé). |
 
+## Ajout de l'après-midi : « l'impression beaucoup mieux guidée »
+
+Sur sa capture de Ventes → À expédier. La feuille « Tout imprimer » (Choisir · Imprimer · Déposer, lot DJ3) devient
+un parcours qui dit à chaque étape ce qui se passe et ce qu'on attend de lui, un seul bouton plein par étape :
+
+1. **L'imprimante**, en tête : Classique · A4 / Thermique · 10×15 / 4 par page A4, avec UNE phrase sur la différence
+   (« Classique : une feuille A4 par bordereau, ton N° tamponné dessus » …), mémorisée (`vrm_imprimante`).
+2. **Ce qui part** : cochés par défaut ; « Pas dans ce lot » dit ceux sans bordereau et porte « Générer » groupé
+   (`BoutonToutGenerer`, déjà là) ; « à vérifier » à part.
+3. **L'aperçu** : chaque bordereau tel qu'il sortira, SON tampon (N° seul, N° + titre, + taille, rien) et « Retirer du lot ».
+4. **Imprimer** (le seul bouton plein).
+5. **« Tout est sorti ? »** : la liste des bordereaux imprimés ; il coche ceux « mal sortis » ⇒ le bouton devient
+   « Réimprimer les N ratés » : les autres passent « prêts à déposer », les ratés repartent SEULS à l'impression
+   (preuve : banc F8, et audit C14 + mutations). « Rien n'est sorti » revient à l'étape 1 sans rien marquer.
+
+## Preuves (fin de journée)
+
+- `audit-colis-plus` : 67 verts ; `--prouve` 26/26 mutations rouges ; sur `origin/main` : rouge (modules absents).
+- Banc `colis-plus` (lancé par sections, la machine était partagée et chargée) : 390 clair 17/17, 390 sans voix 3/3,
+  390 sombre 17/17, 4 par page 8/8, classique un par un + « Tout est sorti ? » 8/8, douchette 7/7, Préparer 1512 17/17.
+  Sur `origin/main` (même banc copié dans l'arbre, dist reconstruit) : 18 contrôles rouges.
+- Gardés verts : `tout-imprimer` (28), `tout-imprimer-garde` (8), `colis`, `thermique` (403), `tampon-bordereau` (199),
+  audits traduction, tdz, coherence, variables, identite, csp, quoi-de-neuf, impression, calculette-emballages.
+- ⚠️ `colis-a-leur-place` : son contrôle « I » (clic sur « Oui, imprimé » : « élément pas stable ») est rouge AUSSI
+  sur `origin/main` (même dist reconstruit, même vue) : défaut d'avant ce lot, pas corrigé ici.
+
 ## Où c'est
 
 - Règles : `src/douchette.js`, `src/mainsLibres.js`, `src/tempsColis.js`, `src/impression/planche4.js`, `src/emballages.js` (étendu, les lignes que l'audit du lot L mute sont gardées mot pour mot).
