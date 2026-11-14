@@ -104,6 +104,7 @@ export default {
   "accueil.offre.solo.supplement": "1 Vinted seller account included · +{prix}/month per extra account",
   "accueil.offres.bientot": " · soon",
   "accueil.offres.cgv": "Terms of Sale",
+  "accueil.offres.tarifs": "All the pricing details ›",
   "accueil.offres.essai": ", once per email and per Vinted account. No commitment: cancel from the app.",
   "accueil.offres.ouverture": " Opening soon.",
   "accueil.offres.paiement": "No payment until you’ve seen the price and accepted the ",

@@ -88,6 +88,7 @@ const iso = (ms) => new Date(ms).toISOString();
     const l = (message, extra = {}) => Object.assign({ message, ecran: 'cat_bord', navigateur: 'iOS Safari', at: iso(now - 2 * H), owner: VENDEUR }, extra);
     dit(L.estBruit(l('ResizeObserver loop limit exceeded')) && L.estBruit(l('Failed to fetch')) && L.estBruit(l('Load failed')), 'A1 le bruit connu (BRUIT de src/plantages.js) est écarté');
     dit(P.BRUIT && P.BRUIT.test('kagi.executeCallback is not a function'), 'A2 la liste BRUIT est celle de l’app (exportée, importée, jamais recopiée)');
+    dit(P.BRUIT && P.BRUIT.test('vrm-hors-ligne') && L.estBruit(l('vrm-hors-ligne')) && !P.BRUIT.test("Cannot read properties of undefined (reading 'vrm-hors-ligne')"), 'A2 le refus voulu de la garde hors ligne (`vrm-hors-ligne`) est du bruit, pas un plantage ; un vrai message qui le cite reste un plantage');
     dit(L.estBruit(l('Unable to preload CSS for /assets/App-CM2cYfGZ.css')) && L.estBruit(l('Failed to fetch dynamically imported module: https://vrm.center/assets/Communaute-x.js')), 'A3 un morceau d’un ancien déploiement (rattrapé par rechargement) n’est pas un plantage');
     dit(L.estBruit(l('CSP connect-src ← https://exemple.test (report-only)', { origine: 'csp' })), 'A4 un signalement de la politique de contenu n’est pas un plantage');
     dit(!L.estBruit(l("Cannot access 'xe' before initialization")), 'A5 une vraie erreur de l’app compte');
