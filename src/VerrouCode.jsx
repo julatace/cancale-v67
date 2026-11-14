@@ -20,7 +20,7 @@ function Pave({ titre, sous, onCode, faux = false, desactive = false, pied = nul
   React.useEffect(() => { if (faux) setC(''); }, [faux]);
   const taper = (x) => { if (desactive) return; setC((v) => { const n = (v + x).slice(0, 4); if (n.length === 4) setTimeout(() => { onCode(n); setC(''); }, 60); return n; }); };
   React.useEffect(() => {
-    const k = (e) => { if (/^\d$/.test(e.key)) taper(e.key); else if (e.key === 'Backspace') setC((v) => v.slice(0, -1)); };
+    const k = (e) => { if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return; if (/^\d$/.test(e.key)) taper(e.key); else if (e.key === 'Backspace') setC((v) => v.slice(0, -1)); };
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
   });
   return (
