@@ -26,6 +26,11 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (14 nov., idées argent 159-162) src/ideesArgent/
+  { id: 'vente-main-propre', date: '2026-11-14', titre: 'Vente en main propre en deux touchers', phrase: 'Le N°, le prix : sortie du stock, comptée dans ton CA.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  { id: 'depense-photo', date: '2026-11-14', titre: 'Tes dépenses en photo du ticket', phrase: 'Montant et date lus sur ton téléphone ; tu confirmes.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  { id: 'siri-repond', date: '2026-11-14', titre: '« Dis Siri, combien j’ai vendu ? »', phrase: 'Ventes du jour, colis à retirer, colis à envoyer, à voix haute.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  { id: 'partage-image', date: '2026-11-14', titre: 'Partager une paire en image', phrase: 'Une carte story ou carré, sans ton prix d’achat.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
   // (14 nov., extension 5.377) « L'extension a capté » et la carte du logo en trois onglets.
   { id: 'extension-capte', date: '2026-11-14', titre: 'L’extension dit ce qu’elle vient de capter', phrase: 'Un petit message près du logo VRM : ventes, bordereaux, messages captés.', tab: 'settings', pour: 'tous', mode: 'tous' },
   { id: 'carte-favoris-annonces-ventes', date: '2026-11-14', titre: 'Favoris, annonces, ventes dans la carte VRM', phrase: 'Le compte connecté d’abord ; les autres floutés, sans action possible.', tab: 'favoris', pour: 'tous', mode: 'tous' },

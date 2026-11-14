@@ -248,8 +248,9 @@ function declaration(src, nom) {
     const cb = await poster('revoquer', 'x.session-b.y');
     dit(cb.code === 200 && lignes.has(`${NEUTRE}|jeton_siri_${sha(jeton2)}`), 'S18 couper avec la session de B ne touche pas au jeton de A');
     const cp = await poster('revoquer', 'x.session-a.y');
+    const indexParti = !lignes.has(`${NEUTRE}|jeton_siri_${sha(jeton2)}`);   // retiré PAR « couper » (avant toute question)
     const apresCoupe = await demander(jeton2, 'vendu');
-    dit(cp.code === 200 && apresCoupe.code === 401 && !lignes.has(`${NEUTRE}|jeton_siri_${sha(jeton2)}`) && lignes.get(`${A}|vrm_siri`).h === null && lignes.get(`${A}|siri_retrait`).prochains.length === 0, 'S19 coupé ⇒ 401, index retiré, ligne vidée, codes publiés pour Siri effacés');
+    dit(cp.code === 200 && apresCoupe.code === 401 && indexParti && lignes.get(`${A}|vrm_siri`).h === null && lignes.get(`${A}|siri_retrait`).prochains.length === 0, 'S19 coupé ⇒ 401, index retiré, ligne vidée, codes publiés pour Siri effacés');
     const lib = sansCommentaires(lire('api/_lib/siri-jeton.js'));
     dit(/crypto\.timingSafeEqual/.test(lib) && /crypto\.randomBytes\(32\)/.test(lib), 'S20 comparaison à durée constante (`timingSafeEqual`), jeton de 32 octets aléatoires');
   });
