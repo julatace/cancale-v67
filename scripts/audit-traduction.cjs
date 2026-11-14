@@ -61,6 +61,10 @@ const MIGRES = [
   ['src/OffresAuto.jsx', ['*']],
   ['src/PrixMiniManquants.jsx', ['*']],
   ['src/design/QuoiRepublier.jsx', ['*']],   // (11 nov., lot quoi-republier)
+  // (14 nov., lot argent-choix) coller des prix, modèle et taille, déclaration annuelle.
+  ['src/composants/CollerPrixAchat.jsx', ['*']],
+  ['src/design/QuoiRacheter.jsx', ['*']],
+  ['src/composants/DeclarationAnnuelle.jsx', ['*']],
   ['src/RepubProgramme.jsx', ['*']],   // (11 nov., lot republier-programme)
   ['src/HistoriqueRepub.jsx', ['*']],
   ['src/ecrans/Achats.jsx', ['*']],
