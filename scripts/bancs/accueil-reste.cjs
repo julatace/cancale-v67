@@ -40,7 +40,7 @@ const SESSION = { access_token: 'jeton-accueil-reste', refresh_token: 'r', totp:
 // ── LA BOUTIQUE INVENTÉE ─────────────────────────────────────────────────────
 const ann = (id, title, heures, numEcrit) => ({ id, title, price: { amount: '49.0', currency_code: 'EUR' }, is_closed: false, is_draft: false, is_hidden: false, photo: null, brand_title: 'Nike', size_title: '42', size: '42', status: 'Très bon état', view_count: 3, favourite_count: 1, created_at_ts: Math.floor((Date.now() - heures * 3600e3) / 1000), descLen: 60, ...(numEcrit ? { numEcrit } : {}) });
 const lu = (cle) => ({ etat: 'lu', cle, brut: 'N° ' + cle });
-function baseNeuve({ ecritChoisi = false, poolPlein = false, sansEcrit = false, abo = {}, auth = {}, visites = false, aides = null } = {}) {
+function baseNeuve({ ecritActif = false, ecritChoisi = false, poolPlein = false, sansEcrit = false, abo = {}, auth = {}, visites = false, aides = null } = {}) {
   const items = sansEcrit ? [ann(9001, 'Nike Air Max 90 blanc', 30), ann(9002, 'Nike Dunk Low Panda', 20), ann(9003, 'Adidas Samba OG', 10)] : [
     ann(9001, 'Nike Air Max 90 blanc', 30, lu('12')),
     ann(9002, 'Nike Air Max 90 blanc', 29, lu('12')),     // le même N° écrit sur DEUX annonces : rouge, rien adopté
@@ -59,7 +59,7 @@ function baseNeuve({ ecritChoisi = false, poolPlein = false, sansEcrit = false, 
     vinted_bords_printed: { 51001: iso(1) },
     // Les visites des écrans déjà vues (sauf le scénario D, qui les joue).
     ...(visites ? {} : { vrm_aides_accueil: { v: 1, off: {}, vues: { journee: iso(1), annonces: iso(1), ventes: iso(1), achats: iso(1) }, ...(aides || {}) } }),
-    ...(ecritChoisi ? { vrm_numero_ecrit: { actif: false, depuis: iso(1), choisi: iso(1) } } : {}),
+    ...(ecritChoisi || ecritActif ? { vrm_numero_ecrit: { actif: ecritActif, depuis: iso(1), choisi: iso(1) } } : {}),
     ...(poolPlein ? { vinted_used_numeros: ['1', '2'], vinted_annonce_numeros: { 7001: { numero: '1', auto: true } } } : {}) };
   return {
     comptes: [{ id: 1, vinted_user_id: VUID, login: 'nouvelle_boutique', domain: 'www.vinted.fr', updated_at: iso(0), created_at: iso(2) }],
@@ -162,7 +162,7 @@ let ko = 0;
 const dit = (bon, quoi, det) => { if (!bon) ko++; console.log(`${bon ? 'OK  ' : 'KO  '}${quoi}${!bon && det !== undefined ? ' — ' + String(typeof det === 'string' ? det : JSON.stringify(det)).slice(0, 400) : ''}`); };
 const attendre = async (pg, f, ms = 9000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { try { if (await f()) return true; } catch (_) {} await pg.waitForTimeout(250); } return false; };
 const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
-async function capture(pg, nom) { if (!SHOTS) return; fs.mkdirSync(SHOTS, { recursive: true }); await pg.waitForTimeout(350); await pg.screenshot({ path: path.join(SHOTS, nom + '.png') }); }
+async function capture(pg, nom) { if (!SHOTS) return; fs.mkdirSync(SHOTS, { recursive: true }); await pg.waitForTimeout(350); try { await pg.screenshot({ path: path.join(SHOTS, nom + '.png'), timeout: 60000, animations: 'disabled' }); } catch (e) { console.log('    (capture ' + nom + ' manquée : ' + String(e.message).split('\n')[0] + ')'); } }
 const numeros = (base) => { const n = ligneMain(base).vinted_annonce_numeros || {}; return Object.fromEntries(Object.entries(n).filter(([, v]) => v && String(v.numero || '').trim()).map(([k, v]) => [k, String(v.numero)])); };
 // Les cibles au doigt de nos cartes : ≥ 44 px de haut (390, tactile).
 const ciblesPetites = (pg) => pg.evaluate(() => [...document.querySelectorAll('[data-accueil-reste] button, [data-accueil-reste] a, [data-reglages-aides-accueil] button')].filter((b) => { const r = b.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.height < 43.5 && !b.classList.contains('vrm-mot'); }).map((b) => (b.textContent || '').trim().slice(0, 30)));
@@ -235,13 +235,14 @@ async function scenarioB(nav, W, sombre, suffixe) {
   }
   dit(!journal.erreurs.length, `B5 ${suffixe} aucune erreur JS`, journal.erreurs);
   await ctx.close();
-  // Le geste « Voir » des annonces sans N° ouvre la vue « Sans numéro ».
-  const b2 = baseNeuve({ ecritChoisi: true, sansEcrit: true });
+  // Le geste « Voir » des annonces sans N° ouvre la vue « Sans numéro » (il numérote lui-même et
+  // n'a rien écrit : ses annonces restent sans N°, un nombre stable).
+  const b2 = baseNeuve({ ecritActif: true, sansEcrit: true });
   const o2 = await ouvrir(nav, { W, sombre, base: b2, tab: 'journee' });
   if (await attendre(o2.pg, () => o2.pg.$('[data-trouve-ligne="sans-numero"] [data-trouve-geste]'), 15000)) {
     await o2.pg.click('[data-trouve-ligne="sans-numero"] [data-trouve-geste]');
     dit(await attendre(o2.pg, () => o2.pg.$('[data-vue-toutes]'), 8000), `B6 ${suffixe} « Voir » mène aux annonces`);
-  } else dit(true, `B6 ${suffixe} (aucune annonce sans N° : rien à ouvrir)`);
+  } else dit(false, `B6 ${suffixe} 3 annonces sans N° : la ligne porte « Voir »`);
   await o2.ctx.close();
 }
 

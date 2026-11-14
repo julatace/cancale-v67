@@ -40,7 +40,14 @@ export function Mot({ k, children }) {
   const texte = children != null ? children : tr(cleMot(k));
   React.useEffect(() => {
     if (!ouvert) return undefined;
-    const fermer = (e) => { if (e.type === 'keydown' && e.key !== 'Escape') return; if (e.type !== 'keydown' && ref.current && ref.current.contains(e.target)) return; setOuvert(null); };
+    // Un défilement qui DÉPLACE le mot (plus de 24 px) referme la bulle ; un petit recalage de la page, non.
+    const y0 = ref.current ? ref.current.getBoundingClientRect().top : 0;
+    const fermer = (e) => {
+      if (e.type === 'keydown' && e.key !== 'Escape') return;
+      if (e.type === 'scroll') { const y = ref.current ? ref.current.getBoundingClientRect().top : y0; if (Math.abs(y - y0) < 24) return; }
+      if (e.type === 'pointerdown' && ref.current && ref.current.contains(e.target)) return;
+      setOuvert(null);
+    };
     const t = setTimeout(() => { document.addEventListener('pointerdown', fermer, true); document.addEventListener('keydown', fermer, true); window.addEventListener('scroll', fermer, true); }, 0);
     return () => { clearTimeout(t); document.removeEventListener('pointerdown', fermer, true); document.removeEventListener('keydown', fermer, true); window.removeEventListener('scroll', fermer, true); };
   }, [ouvert]);
