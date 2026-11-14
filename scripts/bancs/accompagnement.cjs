@@ -226,12 +226,13 @@ action('colis.imprimer', async (nav) => {
     await toucher(o.pg, '[data-lot-imprimer]');
     noter('colis.imprimer', 'pendant', await moment(o.pg, 'pendant', 'colis.imprimer', { ms: 6000 }));
     tenue = null; lacher();
-    // La feuille d'impression du PDF (« Bordereau 105×148mm · Imprimer ») vient d'abord : il imprime, puis « C'est imprimé ? ».
-    let r = await moment(o.pg, 'apres', 'colis.imprimer', { ms: 6000 });
-    for (let k = 0; !r && k < 3; k++) {
-      const imp = o.pg.getByRole('button', { name: /^Imprimer$/ }).last();
+    // Le PDF inventé n'a pas de forme connue : VRM demande où poser le tampon (« Placer le tampon ·
+    // Imprimer », une fois par bordereau) ; il répond, puis vient « C'est imprimé ? ».
+    let r = await moment(o.pg, 'apres', 'colis.imprimer', { ms: 4000 });
+    for (let k = 0; !r && k < 8; k++) {
+      const imp = o.pg.locator('[data-tampon-imprimer]').last();
       if (await imp.count()) await imp.click().catch(() => {});
-      r = await moment(o.pg, 'apres', 'colis.imprimer', { ms: 6000 });
+      r = await moment(o.pg, 'apres', 'colis.imprimer', { ms: 3000 });
     }
     noter('colis.imprimer', 'apres', r);
     await shot(o.pg, 'colis-imprimer-apres');
