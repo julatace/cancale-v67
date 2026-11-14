@@ -792,7 +792,7 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
           </div>
         </section>) : null}
       {parSection.verifier.length ? (
-        <details className="vrm-rpf-section is-repli vrm-rpf-verifier" data-rp-section="verifier" data-rp-section-n={parSection.verifier.length} data-retirer-a-verifier={parSection.verifier.length}>
+        <details open className="vrm-rpf-section is-repli vrm-rpf-verifier" data-rp-section="verifier" data-rp-section-n={parSection.verifier.length} data-retirer-a-verifier={parSection.verifier.length}>
           <summary className="vrm-rpf-section-titre is-repli"><span>À vérifier<span className="vrm-rpf-section-n">{parSection.verifier.length}</span></span><span className="vrm-rpf-chevron" aria-hidden="true">›</span></summary>
           <div className="vrm-rpf-section-corps"><section className="vrm-rpf-point"><div className="vrm-rpf-liste">{parSection.verifier.map(({ x }) => ligne(x))}</div></section></div>
         </details>) : null}
