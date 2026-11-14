@@ -92,7 +92,11 @@ function mesurerForme({ tactile, sombre, sel }) {
     const cs = getComputedStyle(el); if (cs.position !== 'fixed') continue; if (!vis(el)) continue;
     if (el.closest('.vrm-app-header, .vrm-mobile-nav, [role="dialog"], .vrm-fs, .vrm-chat-overlay, .vrm-toast, [aria-live="assertive"]')) continue;
     const r = el.getBoundingClientRect(); if (r.height > H * 0.6 || r.width < 60 || r.height < 16) continue;
-    if (r.top > haut && r.bottom <= bas + 2 && r.top > H * 0.45) out.flottant.push(nom(el));
+    if (!(r.top > haut && r.bottom <= bas + 2 && r.top > H * 0.45)) continue;
+    // « Mis à jour à … » (`.vrm-neuf-hote`) est la pastille de la COQUE (chantier claude/refonte-coque : elle
+    // ne vit que 2 s) : dite à part, jamais comptée ici — ce banc juge les trois écrans, pas la coque.
+    if (el.closest('.vrm-neuf-hote')) { out.coque = (out.coque || []).concat(nom(el)); continue; }
+    out.flottant.push(nom(el));
   }
   return out;
 }
@@ -113,15 +117,18 @@ async function compterVisibles(pg, sel) {
 
 // ── B. Le volume, mesuré DANS la page ───────────────────────────────────────
 const RECHERCHE = {
-  // Messages : un pseudo de la base (la conversation n° 700, loin dans la liste).
-  messages: { champ: '[data-msg-recherche] input, input[data-msg-recherche]', mot: 'adam_vintage_paris', trouve: (t) => /adam_vintage_paris/.test(t), rangee: '.vrm-msg-list .vrm-inbox-row' },
+  // Messages : un pseudo de la base (la conversation n° 700 : « lea_sneakers21 », loin dans la liste).
+  messages: { champ: '[data-msg-recherche] input, input[data-msg-recherche]', mot: 'lea_sneakers21', trouve: (t) => /lea_sneakers21/.test(t), rangee: '.vrm-msg-list .vrm-inbox-row' },
   // E-mails : un n° de suivi loin dans la boîte (servi par la route du banc).
   emails: { champ: 'input[type="search"], .vrm-boite input', mot: '4180700', trouve: (t) => /Relais|4180700|Colis/.test(t), rangee: '.vrm-boite-ligne' },
   // Stock : un N° de la base (la paire n° 1937).
-  stock: { champ: '[data-stock-recherche] input', mot: '1937', trouve: (t) => /N°\s*1937(?!\d)/.test(t), rangee: '[data-stock-res], [data-stock-annonce]' },
+  stock: { champ: '[data-stock-recherche] input', mot: '1937', trouve: (t) => /N°\s*1937(?!\d)/.test(t), rangee: '[data-stock-res]' },
 };
 async function mesurerVolume(nav, ecran) {
   const o = await ouvrir(nav, { W: 390, sombre: false, b: B.baseVolume(), url: ECRANS[ecran], api: B.apiVolume });
+  // Le temps de l'ÉCRAN : de la coque montée (`.vrm-main`) à la 1re rangée — le démarrage de l'app
+  // (commun aux deux builds, et très bruyant sur une machine chargée) n'y est pas.
+  await o.pg.waitForSelector('.vrm-main', { timeout: 45000 }).catch(() => {});
   const t0 = Date.now(); const sel = RANGEES[ecran];
   const vu = await o.pg.waitForSelector(sel, { timeout: 45000, state: 'attached' }).then(() => true).catch(() => false);
   const rendu = vu ? Date.now() - t0 : null;
@@ -160,8 +167,8 @@ async function mesurerVolume(nav, ecran) {
 function mesurerRef(ref) {
   const sortie = path.join(SHOTS, 'volume-ref.json');
   try { fs.unlinkSync(sortie); } catch (_) {}
-  require('child_process').spawnSync(process.execPath, [__filename], { env: { ...process.env, BANC_DIST: ref, BANC_REF: '', PARTIES: 'volume', SORTIE_VOLUME: sortie, BANC_PORT: '' }, stdio: 'ignore', timeout: 480000 });
-  try { return JSON.parse(fs.readFileSync(sortie, 'utf8')); } catch (_) { return null; }
+  const r = require('child_process').spawnSync(process.execPath, [__filename], { env: { ...process.env, BANC_DIST: ref, BANC_REF: '', PARTIES: 'volume', SORTIE_VOLUME: sortie, BANC_PORT: '' }, encoding: 'utf8', timeout: 600000 });
+  try { return JSON.parse(fs.readFileSync(sortie, 'utf8')); } catch (_) { console.log('    référence :', String(r.error || '').slice(0, 120), String(r.stderr || r.stdout || '').slice(-400)); return null; }
 }
 
 (async () => {
@@ -181,7 +188,7 @@ function mesurerRef(ref) {
         await o.pg.screenshot({ path: path.join(SHOTS, suf + '.png') });
         if (W < 600) { const v = await compterVisibles(o.pg, RANGEES[e]); if (v < 8) m.visibles.push({ visibles: v, min: 8 }); }
         const n = CLES.reduce((s, k) => s + m[k].length, 0);
-        console.log(`${n ? '✗' : '✓'} ${suf} : ${CLES.map((k) => `${k} ${m[k].length}`).join(' · ')}`);
+        console.log(`${n ? "✗" : "✓"} ${suf} : ${CLES.map((k) => `${k} ${m[k].length}`).join(" · ")}${m.coque ? " · (coque : « Mis à jour » encore posé, hors de ce banc)" : ""}`);
         for (const k of CLES) { total[k] += m[k].length; m[k].slice(0, Number(process.env.DETAIL || 3)).forEach((x) => console.log(`    ${k} ${JSON.stringify(x)}`)); }
         if (o.erreurs.length) { console.log('    erreurs JS :', o.erreurs.slice(0, 2).join(' | ')); rouges++; }
       } catch (err) { console.log('ÉCHEC', suf, String(err.message || err).slice(0, 200)); rouges++; }
