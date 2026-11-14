@@ -52,7 +52,9 @@
 :root:root body .vrm-ms-tete-outils .vrm-ui-icone { color: var(--d-accent-texte, #0066CC) !important; }
 /* la bande : le fond de la page, pas de carte */
 :root:root body .vrm-ms-stock-resume { margin: 0 !important; padding: 0 !important; background: none !important; box-shadow: none !important; }
-:root:root body .vrm-ms-stock-resume .vrm-s2d-resume { display: flex !important; flex-direction: column !important; gap: 6px !important; padding: 0 !important; background: none !important; }
+/* (14 nov., intégration) plus de `flex-direction: column` ici : il écrasait la règle du haut (bande sur sa ligne, puis les
+   puces ET « Tous les comptes » sur UNE ligne) et posait « Tous les comptes » seul sur une ligne de 44 px. */
+:root:root body .vrm-ms-stock-resume .vrm-s2d-resume { display: flex !important; gap: 6px !important; padding: 0 !important; background: none !important; }
 :root:root body .vrm-ms-stock-resume .vrm-ui-bande { padding: 0 !important; }
 :root:root body .vrm-ms-stock-resume .vrm-ui-bande-item.vrm-s2d-resume-n { margin: 0 !important; padding: 0 !important; font-size: inherit !important; }
 :root:root body .vrm-ms-au-moins { font: 600 15px/1 var(--vrm-police) !important; color: var(--d-gris, #6E6E73) !important; letter-spacing: 0 !important; }
@@ -60,6 +62,8 @@
 :root:root body .vrm-ms-stock-resume .vrm-pop-ligne { margin: 0 !important; padding: 0 !important; background: none !important; border: 0 !important; box-shadow: none !important; }
 :root:root body .vrm-ms-stock-resume .vrm-pop-chips { display: flex !important; flex-wrap: nowrap !important; overflow-x: auto !important; scrollbar-width: none !important; gap: 6px !important; margin: 0 -16px !important; padding: 0 16px !important; }
 :root:root body .vrm-ms-stock-resume .vrm-pop-chips::-webkit-scrollbar { display: none !important; }
+:root:root body .vrm-ms-stock-resume .vrm-s2d-resume:has(> .vrm-s2d-filtres) > .vrm-pop-ligne { flex: 1 1 0 !important; min-width: 120px !important; overflow: hidden !important; }   /* la place qui reste : les puces s'y font défiler */
+:root:root body .vrm-ms-stock-resume .vrm-s2d-resume:has(> .vrm-s2d-filtres) > .vrm-pop-ligne .vrm-pop-chips { margin-right: 0 !important; padding-right: 0 !important; }   /* les puces défilent jusqu'à « Tous les comptes », jamais dessous */
 :root:root body .vrm-ms-stock-resume .vrm-pop-chip {
   flex: none !important; min-height: 32px !important; height: 32px !important; padding: 0 12px !important; border-radius: 999px !important; border: 0 !important;
   font: 600 13px/1 var(--vrm-police) !important; background: var(--d-pastille-neutre-fond, rgba(118,118,128,.12)) !important; color: var(--d-encre, #1D1D1F) !important; box-shadow: none !important;

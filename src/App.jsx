@@ -18990,7 +18990,10 @@ function SelecteurPaires({ tab, setTab, badges, sites }) {
   vus.add(tab);
   const options = ENTREES_PAIRES.filter((t) => vus.has(t.id)).map((t) => {
     const v = badges && badges[t.id];
-    return { v: t.id, l: t.label, n: typeof v === 'number' && v > 0 ? (v > 99 ? '99+' : v) : undefined, data: { 'data-nav-entree': t.id, 'data-paires-segment': t.id } };
+    // (14 nov., intégration) Le nombre du segment porte le même repère que la pastille de la barre d'hier
+    // (`data-badge-nav` + `data-badge-n`) : « À retirer · N » se lit au même endroit qu'avant (bancs, cibles).
+    const nb = typeof v === 'number' && v > 0;
+    return { v: t.id, l: t.label, n: nb ? (v > 99 ? '99+' : v) : undefined, data: { 'data-nav-entree': t.id, 'data-paires-segment': t.id, ...(nb ? { 'data-badge-nav': t.id, 'data-badge-n': String(v) } : {}) } };
   });
   return <div className="vrm-paires-selecteur" data-paires-selecteur="">
     <Segmente label={tr('nav.paires')} options={options} value={tab} plein onChange={(id) => { if (id === tab) { remonterEnHaut(); return; } noterNavigationSimple(id); setTab(id); }}/>

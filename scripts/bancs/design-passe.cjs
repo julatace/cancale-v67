@@ -69,6 +69,9 @@ function base() {
   m.vrm_configuration = { etat: 'fait', at, statut: null, version: 1 };
   m.vrm_plateformes_affichees = { sites: ['vinted', 'leboncoin', 'ebay'], at };
   m.vrm_parcours = { etat: 'fini', at };
+  // (14 nov., intégration) Le « bilan en une minute » (accueil des nouveaux, main) déjà vu : sinon sa feuille modale
+  // couvre Ma journée au 1er chargement et prend chaque toucher (la loupe, la cloche…) d'un banc qui juge autre chose.
+  m.vrm_bilan_minute = { vu: at, fin: 'vu' };
   const vus = {}; for (const a of b.accounts) vus[a.vinted_user_id] = Date.now() - 120000;
   b.rows.push({ id: 'ext_appareil_0123456789abcdef', data: { appareil: { paquet: 'chromium', nav: 'chrome', systeme: 'mac' }, ver: '5.375.0', code: '5.375.0', atMs: Date.now() - 60000, flux: {}, vus: { vinted: vus } } });
   return b;
@@ -104,14 +107,19 @@ async function ouvrir(nav, { W, sombre, b, url, sansSession = false, api = null,
       }
     } catch (_) {}
   }, [SESSION, sombre, sansSession]);
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
+  // (14 nov., intégration) La même route AUSSI sur le contexte : les images que le service worker de l'app va
+  // chercher (sw.js, sa propre requête) ne passent pas par les routes de la page — elles sortaient sur Internet
+  // (garde réseau : « hôte réel », images1.vinted.net). La route de la page reste servie la première.
+  const externe = (r) => {
     const u = r.request().url();
     if (/vinted\.net|vinted\.fr\/.*\.(jpe?g|png|webp)/i.test(u) || r.request().resourceType() === 'image') return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: vignette(u) });
     if (/\/auth\/v1\/settings/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ external: { email: true } }) });
     if (/\/auth\/v1\//.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: SESSION.access_token, refresh_token: 'r', expires_in: 3600, user: { ...SESSION.user, factors: [] }, id: UID, email: SESSION.user.email, factors: [] }) });
     if (/\/rest\/v1\//.test(u)) return rest(r, b);
     return r.abort();
-  });
+  };
+  await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, externe);
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, externe);
   await pg.route('**/api/**', (r) => {
     const u = r.request().url();
     if (/mode=confidentialite/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, uid: UID }) });

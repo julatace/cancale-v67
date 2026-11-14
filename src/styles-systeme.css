@@ -819,6 +819,19 @@
 :root:root body .vrm-app-shell :is(.vrm-tabbar > .vrm-tab, .vrm-app-header .vrm-hbtn):focus-visible { outline: 2px solid var(--d-accent) !important; outline-offset: -2px !important; border-radius: 12px; }
 :root:root body .vrm-fs .vrm-profil-ecrans .vrm-profil-ligne:focus-visible { outline: 2px solid var(--d-accent) !important; outline-offset: -2px !important; }
 
+/* ── 3.11 (14 nov., intégration de la refonte) Le sélecteur « Paires » ET « la liste d'abord » ──────────────
+   Le sélecteur Annonces | Stock | Achats (60 px) posé au-dessus d'Annonces poussait sa 1re rangée à 463 px :
+   sous la moitié d'un iPhone (422 px sur 844, règle de claude/refonte-listes). Au téléphone, quand il est là,
+   l'air AUTOUR des blocs se resserre (aucun bloc retiré, aucune cible sous 44 px) : sélecteur 4/0, grand titre
+   sans marge haute ni basse, rangée des sites 0/4, bande de chiffres 4 au-dessus ; Stock 8 au-dessus. */
+@media (max-width: 743px), (max-width: 767px) and (hover: hover) and (pointer: fine), (max-width: 1023px) and (max-height: 599px) and (hover: none), (max-width: 1023px) and (max-height: 599px) and (pointer: coarse), (max-width: 1023px) and (max-height: 599px) and (pointer: none) {
+  :root:root body .vrm-app-shell .vrm-main:has(> .vrm-paires-selecteur) > .vrm-paires-selecteur { padding-top: var(--d-e-1, 4px) !important; padding-bottom: 0 !important; }
+  :root:root body .vrm-app-shell .vrm-main[data-ecran="annonces"]:has(> .vrm-paires-selecteur) .vrm-tache > .vrm-tache-tete { padding-top: 0 !important; padding-bottom: 0 !important; }
+  :root:root body .vrm-app-shell .vrm-main[data-ecran="annonces"]:has(> .vrm-paires-selecteur) .vrm-tache-filtres > .vrm-filtre-site { margin-top: 0 !important; margin-bottom: 4px !important; }
+  :root:root body .vrm-app-shell .vrm-main[data-ecran="annonces"]:has(> .vrm-paires-selecteur) :has(> .vrm-fu-bande) { padding-top: 4px !important; }
+  :root:root body .vrm-app-shell .vrm-main:has(> .vrm-paires-selecteur) .vrm-ms-stock { padding-top: var(--d-e-2, 8px) !important; }
+}
+
 } /* fin §3 COQUE (@layer vrm-premium) */
 
 /* ══ §4 ATELIER — la direction artistique commune (14 nov.) ═══════════════════

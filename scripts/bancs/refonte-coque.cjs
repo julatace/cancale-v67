@@ -215,8 +215,12 @@ async function regles(nav) {
     // Sur Achats : le segment porte le nombre, l'onglet Paires se tait (un nombre une fois).
     await toucher(pg, '.vrm-tabbar [data-nav-entree="paires"]'); await pg.waitForTimeout(900);
     await toucher(pg, '[data-paires-segment="achats"]'); await pg.waitForTimeout(1500);
-    const surPaires = await pg.evaluate(() => ({ seg: (document.querySelector('[data-paires-segment="achats"] .vrm-seg-n') || {}).textContent || '', onglet: !!document.querySelector('.vrm-tabbar [data-badge-nav="paires"]'), actif: (document.querySelector('.vrm-tabbar [aria-current="page"]') || {}).getAttribute?.('data-nav-entree') }));
-    dit(/\d/.test(surPaires.seg) && !surPaires.onglet, 'N sur Achats : le segment porte le nombre d\'Achats, l\'onglet Paires se tait', JSON.stringify(surPaires));
+    // (14 nov., intégration) Le nombre d'Achats est « À retirer » PUBLIÉ (vrm_colis_retirer.total). Depuis la règle
+    // de main du 14 nov. (aucun colis sans code dans « À retirer »), cette base n'a rien à retirer (60 « à vérifier ») :
+    // le segment porte alors exactement ce nombre — aucun s'il est 0 — et celui d'Annonces porte le sien.
+    const surPaires = await pg.evaluate(() => { let pub = null; try { pub = JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) {} return { seg: (document.querySelector('[data-paires-segment="achats"] .vrm-seg-n') || {}).textContent || '', publie: pub && typeof pub.total === 'number' ? pub.total : null, segAnnonces: (document.querySelector('[data-paires-segment="annonces"] .vrm-seg-n') || {}).textContent || '', onglet: !!document.querySelector('.vrm-tabbar [data-badge-nav="paires"]'), actif: (document.querySelector('.vrm-tabbar [aria-current="page"]') || {}).getAttribute?.('data-nav-entree') }; });
+    const segJuste = surPaires.publie == null ? /\d/.test(surPaires.seg) : (surPaires.publie > 0 ? surPaires.seg === String(surPaires.publie > 99 ? '99+' : surPaires.publie) : surPaires.seg === '');
+    dit(segJuste && /\d/.test(surPaires.segAnnonces) && !surPaires.onglet, 'N sur Achats : chaque segment porte le nombre de son écran (Achats = « À retirer » publié, Annonces le sien), l\'onglet Paires se tait', JSON.stringify(surPaires));
     dit(surPaires.actif === 'paires', 'N sur Achats, l\'onglet allumé est Paires', String(surPaires.actif));
     // Le menu du haut : tout ce que « Plus » portait, groupé ; il ne répète pas les onglets de la barre.
     await toucher(pg, '[data-profil-tete]'); await pg.waitForSelector('[data-menu-profil] [data-nav-entree]', { timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(400);

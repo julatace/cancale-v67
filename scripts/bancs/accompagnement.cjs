@@ -284,6 +284,11 @@ action('colis.depose', async (nav) => {
   try {
     const btn = await o.pg.locator('[data-depot-ouvrir]').count();
     if (!btn) { for (const s of ['avant', 'pendant', 'apres', 'echec']) noter('colis.depose', s, null, { raisonNonJoue: '« Je dépose » absent (aucun colis à déposer dans cette base)' }); return; }
+    // (14 nov., intégration avec claude/refonte-listes) Au téléphone, « Préparer mes colis · Je dépose » vit dans
+    // « • À faire · N » (src/ui/AFaire.jsx) : on ouvre d'abord sa feuille, comme lui.
+    await o.pg.locator('[data-depot-ouvrir]').first().waitFor({ state: 'visible', timeout: 4000 }).catch(async () => {
+      if (await o.pg.locator('[data-ui-afaire]').count()) { await toucher(o.pg, '[data-ui-afaire]'); await o.pg.waitForSelector('[data-ui-afaire-feuille] [data-depot-ouvrir]', { timeout: 8000 }).catch(() => {}); }
+    });
     await toucher(o.pg, '[data-depot-ouvrir]');
     noter('colis.depose', 'avant', await moment(o.pg, 'avant', 'colis.depose'));
     noter('colis.depose', 'pendant', await moment(o.pg, 'pendant', 'colis.depose'));

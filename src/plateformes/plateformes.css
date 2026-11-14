@@ -116,6 +116,9 @@
 }
 :root:root body .vrm-main .vrm-pf-barre-ebay > .vrm-eb-vendre > button[data-poster]:active { transform: var(--d-appui, scale(.97)) !important; background: var(--d-remplir, rgb(118 118 128 / .12)) !important; }
 :root:root body .vrm-main .vrm-pf-barre-ebay > :is(.vrm-mic, button.vrm-icon-control, [class*="mic"]) { flex: none !important; }
+/* (14 nov., intégration avec claude/refonte-listes) le champ part de 0 (sa brique src/ui le fait partir de son contenu) :
+   champ, micro, « Vendre » et réglages tiennent sur UNE ligne au téléphone, la 1re annonce remonte de 48 px. */
+:root:root:root:root:root:root:root body .vrm-main .vrm-pf-barre-ebay > .vrm-ui-outils-champ { flex: 1 1 0 !important; }
 :root:root body .vrm-main .vrm-pf-barre-ebay > button.vrm-ebay-reglages-bouton { order: 4 !important; width: 44px !important; height: 44px !important; min-width: 44px !important; border: 0 !important; background: none !important; box-shadow: none !important; color: var(--d-accent-texte, #0066CC) !important; border-radius: 999px !important; }
 @media (hover: hover) and (pointer: fine) {
   :root:root body .vrm-main .vrm-pf-barre-ebay > .vrm-eb-vendre > button[data-poster], :root:root body .vrm-main .vrm-pf-barre-ebay > button.vrm-ebay-reglages-bouton { width: 36px !important; height: 36px !important; min-width: 36px !important; }
