@@ -206,10 +206,10 @@ async function main() {
         await pg.waitForTimeout(2500);
         await ouvrirFiche(pg, '205');
         await pg.waitForSelector('[data-atelier-photos="3"]', { timeout: 10000 });
-        await pg.waitForSelector('[data-atelier-photo] [data-avis-photo="flou"]', { timeout: 10000 }).catch(() => {});
+        await pg.waitForFunction(() => document.querySelectorAll('[data-atelier-photo] [data-avis-photo]').length === 3 && document.querySelector('[data-atelier-photo] [data-avis-photo="flou"]'), null, { timeout: 15000 }).catch(() => {});
         const avis = await pg.$$eval('[data-atelier-photo] [data-avis-photo]', (l) => l.map((x) => x.getAttribute('data-avis-photo')));
         dit(avis.filter((x) => x === 'flou').length === 1 && avis.length === 3, `${T} 102 · N°205 : trois photos, « Floue ? » sur UNE (la signalée)`, JSON.stringify(avis));
-        dit(await pg.locator('[data-atelier-douteuses="1"]').count() === 1, `${T} 102 · l’en-tête dit « 1 à revoir »`);
+        dit(await pg.waitForSelector('[data-atelier-douteuses="1"]', { timeout: 5000 }).then(() => true, () => false), `${T} 102 · l’en-tête dit « 1 à revoir »`);
         await pg.locator('[data-atelier-photos]').scrollIntoViewIfNeeded();
         await capture(pg, `fiche-photos-${nomC}`);
         // 105 · dicter
