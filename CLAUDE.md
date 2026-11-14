@@ -105,7 +105,7 @@ Chaque refus a une raison technique ou une décision de Julien. Détail complet 
 | **Téléphone (vérification par SMS à l'inscription)** | Pas fait exprès (§2.9, payant sur sa clé). |
 | **International** | ⚠️ **11 nov. : décision de Julien du 11 nov. — VRM se TRADUIT en anglais, espagnol, italien, allemand, compta comprise** (remplace le refus du 28 oct.) : les TEXTES seulement, par `tr()` (`src/i18n/`, langue = Paramètres → Langue, `vrm_langue`) ; aucune règle de calcul ne change (compta par pays : lot d'étude `fiscalite-pays`). L'argent reste en euros (une commande en GBP/USD est écartée et dite, jamais convertie). Écrans traduits et ce qui reste en français : `2026-11-11-traduction.md`, `2026-11-13-integration-traduction.md`. |
 | **Détourage** | Vestiaire Collective SEUL (sa décision du 17 oct. : « pas du tout pour Leboncoin, ne le mets pas dans les paramètres »). La carte « Ta clé Photoroom » vit sur l'écran Vestiaire, **pas dans Paramètres** (`detourage-reglage.cjs` le refuse). Studio photo : détourage local gratuit (U²-Net, licences vérifiées). |
-| **Palette** | Violet **REFUSÉ** ; Vitrine (31 oct.) + **Apple (2 nov., sa demande)** : blanc, encre, accent **bleu Apple** `#0071E3`/`#0A84FF` rare, police système (SF Pro), chiffres alignés sans chasse fixe (`src/themeMineral.js`, `src/styles-vitrine.css`). |
+| **Palette** | ⚠️ 14 nov. (Julien) : **« Studio bleu clair »** — remplace Vitrine/Apple. UN bleu clair partout (nuit : bleu-nuit), lumière du haut, porcelaine/verre/plaque, accent `#0060CC` rare, Urbanist + Inter (`src/design/studio.css`, `docs/design/studio-bleu-clair.md`). Violet **REFUSÉ**, rouge = doublon de N° seulement (inchangés). |
 | **Sans abonnement** | ⛔ 8 nov. (Julien) : ni la lecture seule complète, ni la porte qui cache tout — **un extrait net (titres, 3 premières lignes de chaque liste), le reste flouté, `inert`, aucune action ni export, aucune écriture** ; rien n'est supprimé. Ne pas rendre le reste lisible (`src/abonnement/apercu.js`, banc `abonnement-propre`). |
 | **Ventes masquées** | ⚠️ 29 oct. : **on ne peut plus masquer une vente** (« on ne doit plus pouvoir les masquer ») ; `vinted_sales_hidden` n'est plus lu nulle part. Les ACHATS masqués restent. |
 | **Saisie « N° + Entrée »** | Retirée de Ventes, Colis, Annonces, Leboncoin, eBay (29 oct.) ; la loupe « Tout sur le N° » et la saisie du Stock restent. |
@@ -408,11 +408,13 @@ déploient pas (`vercel.json`) ; ne jamais « promouvoir » une prévisualisatio
 > chiffre ne porte une couleur que s'il y a vraiment quelque chose à rattraper ;
 > **ambre** pour un geste à faire, **rouge** seulement pour deux paires sous un N°.
 
-- Vitrine + Apple (police système, bleu Apple ; styles-vitrine.css en dernier), mode sombre CHOISI
-  (`vinted_dark`, estampillé sur la racine avant le premier rendu).
-- Une forme par fonction : boutons (une règle de base, jamais `display:inline-flex`),
-  `Segmente`, `vrm-filtres`, `vrm-repli`, `vrm-lien-action`, rangées défilantes.
-  Cibles au doigt **44 px** affichés.
+- **Studio bleu clair** (14 nov.) : `src/design/studio.css` EN DERNIER, jetons `--sb-*` (la famille
+  `--d-*` les lit), mode sombre CHOISI (`vinted_dark`, sur la racine avant le premier rendu).
+- **Quatre formes de bouton, aucune autre** : `.sb-btn-plein` (rond d'encre, **UN par écran** au plus),
+  `.sb-touche`, `.sb-rond`, `.sb-lien` ; une rangée ou une tuile entière se touche. Aucun bouton inutile
+  (navigation seule, doublon, explication, état) ; actif = enfoncé + diode. Matières : porcelaine
+  (tuiles), verre (barres, plan de liste), plaque gravée (N°). Gestes globaux : le disque « + »
+  (`audit-studio`, banc `studio-coque`). Cibles au doigt **44 px** affichés.
 - Une même phrase sur chaque ligne est UNE phrase (dans l'en-tête du groupe) ; le même
   nombre ne s'écrit jamais deux fois sur un écran ; pas de « n/d ».
 - Un nom d'icône absent de `ICON_PATHS` ne dessine rien sans erreur (`audit-icones`).
@@ -524,11 +526,10 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **14 nov. · Studio bleu clair — la fondation** : jetons `--sb-*`, quatre formes de bouton, coque (lumière, barre en verre, pastille enfoncée + diode, disque « + » ⇒ Chercher · Scanner · Publier · Imprimer N), polices Urbanist/Inter embarquées, `src/ui` migré ; `docs/passation/2026-11-14-studio-fondation.md`. Geste : regarder sur iPhone, dire ce qui gêne.
 - **14 nov. · Accompagnement des gestes** : chaque action dit avant (ce qui va se passer ET ce qui ne se passera pas), pendant (« 3 / 8 », Tout arrêter), après (résultat + « Ensuite › »), échec (raison en mots + geste) — brique `src/ui/Accompagne.jsx` + `src/accompagnement.js` §9 ; listes vides et premières fois ; aucun « Annuler »/confirmation/« ? » ajouté (sa décision). `docs/passation/2026-11-14-accompagnement.md`. Geste : aucun.
 
 - **14 nov. · Ergonomie des gestes (mesurée)** : banc `ergonomie-gestes` joue 15 gestes au pouce (390 tactile) depuis l'ouverture ; ⌘K « Republier N°x à la main » (kit, 5 → 3 touchers) et « Publier N°x partout » (4 → 3) ; les 15 dans leur plafond. `docs/passation/2026-11-14-ergonomie-gestes.md`. Geste : aucun.
-- **14 nov. · Refonte des listes** : Annonces et Ventes « la liste d'abord » (bande de chiffres au lieu de la carte sombre, compte en menu, barre + petites capsules, alertes dans « • À faire · N », phrase sous le titre retirée), Annonces en liste groupée de 70 px, colis en rangées, Ma journée : héros atelier ; briques communes `src/ui/` ; banc `refonte-listes`. `docs/passation/2026-11-14-refonte-listes.md`. Geste : aucun.
-- **14 nov. · Listes : phrase, glisser, épingles, comparer (92–95)** : « nike 42 pas vendue depuis 2 mois » ⇒ capsules modifiables sans IA (5 langues, Annonces + ⌘K, `src/recherchePhrase.js`) ; cocher en glissant depuis la case ; 20 épingles par identité (`vrm_epingles`, synchronisées) ; comparer deux cochées. `docs/passation/2026-11-14-listes-recherche.md`. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).

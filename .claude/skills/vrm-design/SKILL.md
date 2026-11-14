@@ -1,9 +1,36 @@
 ---
 name: vrm-design
-description: La direction visuelle de VRM voulue par Julien (14 nov. 2026) — à charger AVANT de toucher à un écran, une feuille, un bouton ou une couleur de l'app. Règles « liste d'abord », 1 000 articles, Atelier, interdits vus sur ses captures, preuves attendues.
+description: La direction visuelle de VRM voulue par Julien — « Studio bleu clair » (14 nov. 2026) — à charger AVANT de toucher à un écran, une feuille, un bouton ou une couleur de l'app. Quatre formes de bouton, un seul plein, porcelaine/verre/plaque, le disque, « liste d'abord », 1 000 articles, interdits vus sur ses captures, preuves attendues.
 ---
 
 # VRM — direction visuelle (skill du projet)
+
+## ⚠️⚠️ STUDIO BLEU CLAIR — la direction CHOISIE par Julien (14 nov. 2026, soir)
+Elle REMPLACE la direction « Atelier » ci-dessous partout où elles se contredisent (couleurs, carte héros
+sombre, capsules, bouton bleu plein, police système). « Liste d'abord » (AJOUT 3) et « 1 000 articles »
+(AJOUT 2) RESTENT au-dessus de tout. Spec complète, chiffrée : `docs/design/studio-bleu-clair.md`.
+Code : `src/design/studio.css` (chargé EN DERNIER). Récit : `docs/passation/2026-11-14-studio-fondation.md`.
+
+- **Un seul bleu clair partout** (la nuit, un bleu-nuit profond), éclairé du haut ; seul l'aplat varie de
+  ±2 points par espace (`data-espace="journee|paires|ventes|argent|autres"`). Jamais une autre teinte.
+- **Matières** : porcelaine (`.sb-tuile`, cartes, feuilles), verre dépoli (barre du bas `.sb-barre`,
+  navigation de l'ordinateur, plan de liste `.sb-plan` — UNE couche, jamais par rangée), creux (`.sb-champ`,
+  `.sb-segment` choisi), plaque gravée (`.sb-plaque` = le N° ; `.is-double` = le SEUL rouge).
+- **QUATRE formes de bouton, aucune autre** : `.sb-btn-plein` (rond d'encre 72, UN par écran au plus, il
+  nomme le geste du jour : « Imprimer 8 ») · `.sb-touche` (40/44, rayon 13) · `.sb-rond` (44, 60 disque) ·
+  `.sb-lien`. Une rangée (`.sb-rangee`) ou une tuile (`.sb-tuile`) entière se touche : jamais un bouton dedans.
+- **Actif = enfoncé + diode** (`aria-pressed`, `aria-current`, `.is-actif`) ; jamais un fond coloré.
+- **À retirer** : le bouton qui ne fait que naviguer, le doublon d'un geste, l'action rare (→ « ⋯ » ou la
+  fiche), l'action globale posée sur un écran (→ le DISQUE : Chercher · Scanner · Publier · Imprimer N),
+  le second plein, le gros bouton d'explication (→ un rond « ? »), le bouton d'état, plus de 3 capsules.
+  AUCUNE fonction supprimée : un bouton retiré = son geste rangé ailleurs (ligne, fiche, « ⋯ », disque).
+- **Typo** : Urbanist (affiche : chiffres 200/300, titres 400, `.sb-chiffre-affiche`, € à 0,44 em remonté
+  `.sb-eur`) + Inter (texte) ; `tnum`. **Mouvement** : appui 90 ms, ondulation 420/560 ms, premier plan
+  360 ms, aucun rebond ; mouvement réduit = fondus seuls.
+- **Contrôle** : `node scripts/audit-studio.cjs` (ajoute ton fichier à `MIGRES` quand tous ses boutons
+  sont aux quatre formes) ; banc `scripts/bancs/studio-coque.cjs` ; un seul `.sb-btn-plein` par écran.
+- Ce qui suit (Atelier, AJOUTS) est l'historique de la demande : ses interdits restent vrais, ses
+  couleurs et sa carte héros sombre sont remplacées par le Studio.
 
 Julien, sur son iPhone, le 14 nov. 2026 : « C'est moche », « rien n'a changé », « sortir des classiques »,
 « imagine si j'ai 1000 articles », « pas beau du tout : les couleurs, les formes, les boutons »,
