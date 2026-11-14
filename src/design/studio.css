@@ -628,6 +628,7 @@ body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transition: transform 36
 :root:root:root body .vrm-main :is(.vrm-screen-head .vrm-display, .vrm-tache-tete h1, .vrm-market-heading h1, .vrm-fu-titre-tete) {
   font-family: var(--sb-police-affiche) !important; font-weight: 400 !important; letter-spacing: -.03em !important; color: var(--sb-encre);
 }
+:root:root:root body .vrm-main .vrm-fu-date-tete { font-family: var(--sb-police-texte) !important; font-weight: 500 !important; font-size: 13px !important; letter-spacing: 0 !important; color: var(--sb-encre-2) !important; }
 }   /* fin de @layer vrm-premium */
 
 /* ══ 8. MOUVEMENT RÉDUIT : des fondus seulement (ni glissé, ni flou, ni ondulation) ══ */

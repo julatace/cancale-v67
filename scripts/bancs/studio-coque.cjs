@@ -168,8 +168,14 @@ async function telephone(nav, sombre, b) {
   ({ ctx, pg, erreurs } = await ouvrir(nav, { W: 390, sombre, b, url: '/?tab=journee' })); await pret(pg);
   const vus = [];
   for (const id of ['paires', 'ventes', 'compta', 'journee']) {
+    // Un témoin posé AVANT le toucher : il voit l'anneau et l'entrée même si la machine rend la main tard
+    // (l'anneau ne vit que 560 ms, l'entrée 320 ms).
+    await pg.evaluate(() => { const v = window.__sbVu = { onde: 0, entree: false }; const main = document.querySelector('.vrm-main');
+      if (window.__sbObs) window.__sbObs.disconnect();
+      window.__sbObs = new MutationObserver((ms) => { for (const m of ms) { for (const n of m.addedNodes || []) if (n.nodeType === 1 && n.hasAttribute('data-sb-onde')) v.onde++; if (m.type === 'attributes' && m.target === main && main.hasAttribute('data-sb-entree')) v.entree = true; } });
+      window.__sbObs.observe(document.body, { childList: true }); window.__sbObs.observe(main, { attributes: true, attributeFilter: ['data-sb-entree'] }); });
     await pg.locator(`.vrm-tabbar [data-nav-entree="${id}"]`).click(); await pg.waitForTimeout(120);
-    const o = await pg.evaluate(() => ({ onde: document.querySelectorAll('[data-sb-onde]').length, entree: document.querySelector('.vrm-main').hasAttribute('data-sb-entree') }));
+    const o = await pg.evaluate(() => ({ ...window.__sbVu }));
     await pg.waitForTimeout(1400);
     const e = await pg.evaluate(() => ({ ecran: document.querySelector('.vrm-main').getAttribute('data-ecran'), esp: document.querySelector('.vrm-main').getAttribute('data-espace'), texte: (document.querySelector('.vrm-main').innerText || '').trim().length }));
     vus.push({ id, ...o, ...e });
@@ -181,8 +187,10 @@ async function telephone(nav, sombre, b) {
   {
     const x = await ouvrir(nav, { W: 390, sombre, b, url: '/?tab=journee' }); await pret(x.pg);
     await x.pg.emulateMedia({ reducedMotion: 'reduce' });
-    await x.pg.locator('.vrm-tabbar [data-nav-entree="ventes"]').click(); await x.pg.waitForTimeout(100);
-    dit(await x.pg.evaluate(() => document.querySelectorAll('[data-sb-onde]').length) === 0, 'O mouvement réduit : aucun anneau (un fondu seul)');
+    await x.pg.evaluate(() => { const v = window.__sbVu = { onde: 0 }; new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes || []) if (n.nodeType === 1 && n.hasAttribute('data-sb-onde')) v.onde++; }).observe(document.body, { childList: true }); });
+    await x.pg.locator('.vrm-tabbar [data-nav-entree="ventes"]').click(); await x.pg.waitForTimeout(400);
+    const vu = await x.pg.evaluate(() => ({ onde: window.__sbVu.onde, ecran: document.querySelector('.vrm-main').getAttribute('data-ecran') }));
+    dit(vu.onde === 0 && vu.ecran === 'ventes', 'O mouvement réduit : aucun anneau (un fondu seul), l’écran change', vu);
     await x.ctx.close();
   }
 }
