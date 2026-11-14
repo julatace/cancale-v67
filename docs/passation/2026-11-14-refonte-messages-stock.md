@@ -75,14 +75,27 @@ reprise ; le violet de ces références est refusé (§3).
   - après : **vert**, forme 0 défaut sur les 12 cas ; volume (machine très chargée, charge 50–60) :
     Messages 9 visibles (8 avant), recherche ~80–250 ms ; E-mails 9 visibles (6), recherche ~230 ms ;
     Stock 9 visibles (7), recherche ~70–200 ms, CLS 0, nœuds +2 %.
-  - **mutation** : remettre la carte « Comment marche le Stock » au-dessus de la liste (ordre d'avant)
-    ⇒ `premiere` rouge ; rendre la hauteur des rangées libre ⇒ voir la passation du banc (résultat noté
-    ci-dessous).
+  - **mutation** (faite) : la liste du Stock remise sous « Mes meubles » ⇒ `premiere` ROUGE
+    (1re rangée à 1 118 px) ; rétablie ⇒ vert.
+  - ⚠️ Machine partagée très chargée (charge 47–73) : les temps (rendu, recherche) varient du simple au
+    double d'un passage à l'autre, pour l'avant comme pour l'après ; le banc prend le meilleur de deux
+    ouvertures. Dernier passage après fusion : Stock rendu 4,9 s (avant 9,4 s), recherche 568 ms (avant
+    754 ms) ; Messages recherche 263 ms ; E-mails 352 ms (avant 834 ms). Au repos (passages du matin) :
+    Messages 80 ms, E-mails 232 ms, Stock 68–214 ms.
   - La pastille « Mis à jour à … » de la COQUE est dite à part (« hors de ce banc ») : son chantier est
     `claude/refonte-coque` (elle n'y vit que 2 s).
-- `fil-unique.cjs` : ouvre la feuille « À relier » avant de lire les questions (même règle jugée).
+- `fil-unique.cjs` : ouvre la feuille « À relier » avant de lire les questions (même règle jugée). Il reste
+  UN rouge (« E · relier », `[data-fil-proposition="acheteur"]` introuvable) — le MÊME sur origin/main
+  (rejoué sur un arbre d'origin/main le 14 nov.) : pas de cette refonte.
+- `boite-emails.cjs` : 278 verts, 4 rouges = les 4 d'origin/main (« la marque de l'expéditeur… MR/C »).
+- `stock-annonces.cjs`, `retour-stock-auto.cjs` : verts. `messages-sites.cjs` : trop long pour 9 min sur
+  la machine chargée (coupé), « Envoyer rond 44 px » corrigé (bouton 44 au doigt, cercle de 36 dessiné).
 - Audits verts : traduction, tdz, icones, coherence, variables, composants, violet, rouge-doublon,
-  quoi-de-neuf. Bancs rejoués : voir le rapport de fin de session.
+  quoi-de-neuf. Revue `web-design-guidelines` + `design-audit` : nombres dans la langue (« 1 024 »),
+  focus visible, survol à la souris seulement, `touch-action`, « … » aux champs de recherche.
+- Fusion de main : l'inventaire tournant (lot 129, arrivé sur main) est rangé dans « Plus », sous la liste ;
+  `src/styles-systeme.css` = la version de main + le diff de `claude/refonte-coque` (§3 Coque et §4
+  Atelier), rien de retiré.
 
 ## Restes / à reprendre
 
