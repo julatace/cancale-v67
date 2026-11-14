@@ -16,6 +16,7 @@ import ecran_fiche from './it/fiche.js';
 import ecran_tarifs from './it/tarifs.js';
 import ecran_nouveaux from './it/nouveaux.js';
 import ecran_plus from './it/plus.js';
+import ecran_plateformes from './it/plateformes.js';
 import ecran_argent from './it/argent.js';
 import ecran_colisplus from './it/colisplus.js';   // (14 nov., lot colis-plus)
 import ecran_accueilReste from './it/accueilReste.js';
@@ -33,6 +34,7 @@ export default {
   ...ecran_listes,
   ...ecran_plus,
   ...ecran_argentprix,
+  ...ecran_plateformes,
   ...ecran_compta,
   ...ecran_argent,
   ...ecran_colisplus,
@@ -478,7 +480,7 @@ export default {
   "reglages.imprimante.thermique": "Termica · {papier}",
   "reglages.je-vends.desc": "Cosa vendi: parole ed esempi si adattano.",
   "reglages.je-vends.lib": "Vendo",
-  "reglages.journal-vrm.lib": "Cosa ha fatto VRM",
+  "reglages.journal-vrm.lib": "Registro: cosa ha fatto VRM",
   "reglages.langue.chargement": "Caricamento…",
   "reglages.langue.desc": "La lingua di VRM, la stessa su tutti i tuoi dispositivi.",
   "reglages.langue.rate": "Impossibile caricare questa lingua — riprova.",
@@ -560,7 +562,7 @@ export default {
   "reglages.stream.desc": "Scegli parole, marchi e account da nascondere.",
   "reglages.stream.lib": "Cosa nasconde lo streaming",
   "reglages.tes-donnees.desc": "Per sito, dove è salvato e chi vi ha accesso.",
-  "reglages.tes-donnees.lib": "Cosa VRM legge e fa",
+  "reglages.tes-donnees.lib": "Privacy: cosa VRM legge e conserva",
   "reglages.toutvabien.desc": "Ogni account, la sua ultima lettura e l’estensione di ogni dispositivo.",
   "reglages.toutvabien.lib": "Tutto bene?",
   "reglages.discretion.desc": "Limite giornaliero e freni di Vinted, account per account.",

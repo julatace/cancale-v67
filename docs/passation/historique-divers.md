@@ -1886,3 +1886,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Déplacé tel quel de CLAUDE.md §9 (14 nov., intégration de la refonte — fichier sous 59 000 octets)
 - **14 nov. · Refonte de la coque (n° 61)** : 4 onglets (Aujourd'hui · Paires · Ventes · Argent ; Paires = Annonces|Stock|Achats, `src/navPaires.js`), barre du haut loupe · cloche (point) · avatar (qui ouvre le reste des écrans), « à revoir » dans la cloche, §3/§4 `styles-systeme.css`. `2026-11-14-refonte-coque.md`. Geste : aucun.
+
+## Déplacé tel quel de CLAUDE.md §9 (14 nov., intégration de la refonte — fichier sous 59 000 octets)
+- **14 nov. · Extension 5.376.0 consolidée** : quatre branches en UNE version (carte du logo + capture, messages-achats-plus, argent-prix `remiseprix`, dates-versement `versementconv`), zips refaits une fois. `docs/passation/2026-11-14-extension-5376.md`. Geste : installer la 5.376.0 sur chaque navigateur.

@@ -21,6 +21,7 @@ import ecran_fiche from './fr/fiche.js';
 import ecran_tarifs from './fr/tarifs.js';
 import ecran_nouveaux from './fr/nouveaux.js';
 import ecran_plus from './fr/plus.js';
+import ecran_plateformes from './fr/plateformes.js';
 import ecran_argent from './fr/argent.js';
 import ecran_colisplus from './fr/colisplus.js';   // (14 nov., lot colis-plus)
 import ecran_accueilReste from './fr/accueilReste.js';
@@ -38,6 +39,7 @@ export default {
   ...ecran_listes,
   ...ecran_plus,
   ...ecran_argentprix,
+  ...ecran_plateformes,
   ...ecran_compta,
   ...ecran_argent,
   ...ecran_colisplus,
@@ -483,7 +485,7 @@ export default {
   "reglages.imprimante.thermique": "Thermique · {papier}",
   "reglages.je-vends.desc": "Ce que tu vends : les mots et les exemples suivent.",
   "reglages.je-vends.lib": "Je vends",
-  "reglages.journal-vrm.lib": "Ce que VRM a fait",
+  "reglages.journal-vrm.lib": "Journal : ce que VRM a fait",
   "reglages.langue.chargement": "Chargement…",
   "reglages.langue.desc": "La langue de VRM, la même sur tous tes appareils.",
   "reglages.langue.rate": "Pas pu charger cette langue — réessaie.",
@@ -565,7 +567,7 @@ export default {
   "reglages.stream.desc": "Choisir les mots, marques et comptes à cacher.",
   "reglages.stream.lib": "Ce que le stream cache",
   "reglages.tes-donnees.desc": "Par site, où c’est rangé, qui y a accès.",
-  "reglages.tes-donnees.lib": "Ce que VRM lit et fait",
+  "reglages.tes-donnees.lib": "Confidentialité : ce que VRM lit et garde",
   "reglages.toutvabien.desc": "Chaque compte, sa dernière relecture et l’extension de chaque appareil.",
   "reglages.toutvabien.lib": "Tout va bien ?",
   "reglages.discretion.desc": "Plafond par jour et freins de Vinted, compte par compte.",
@@ -1115,7 +1117,7 @@ export default {
   "suivi.arreter.non": "Continuer",
   "suivi.arreter.oui": "Arrêter",
   "suivi.fermer": "Fermer",
-  "suivi.garde": "Le détail reste dans Paramètres → Ce que VRM a fait.",
+  "suivi.garde": "Le détail reste dans Paramètres → Mon compte → Journal.",
   "suivi.passes.titre": "Travaux suivis sur cet appareil",
   "suivi.reprise.sansEcran": "Rouvre l’écran du travail pour reprendre.",
   // (11 nov., lot sante-comptes) la santé de chaque compte Vinted (src/SanteComptes.jsx)
