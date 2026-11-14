@@ -18,6 +18,7 @@
 export const DEBITS = {
   widget: { parMinute: 12, parHeure: 120 },      // le widget iPhone se rafraîchit ~4 fois par heure
   commandes: { parMinute: 40, parHeure: 400 },   // l'extension : quelques envois par compte et par visite
+  siri: { parMinute: 10, parHeure: 120 },        // (14 nov., idées argent 161) « Dis Siri… » : une question à la fois
 };
 const MAX_CLES = 5000;   // mémoire bornée : au-delà, les plus anciennes clés partent
 const fenetres = new Map();

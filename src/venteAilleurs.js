@@ -26,6 +26,9 @@ export const CLE_DECISIONS = 'vrm_cycle_decisions';
 export const CLE_VENDUES = 'vinted_annonces_vendues';
 export const CHOIX_MAIN = 'vendu-main';
 export const PLATEFORME_AILLEURS = 'Ailleurs';
+// (14 nov., idées argent 160) Le MODE DE PAIEMENT d'une vente en main propre, dit par lui
+// (« Espèces », « Virement », « Autre ») : rangé avec la décision, jamais deviné ; absent = pas dit.
+export const PAIEMENTS = Object.freeze(['especes', 'virement', 'autre']);
 const DATE_OK = /^\d{4}-\d{2}-\d{2}$/;
 const str = (v) => String(v == null ? '' : v).trim();
 const cleDefaut = (n) => { const s = str(n).toUpperCase().replace(/\s+/g, '').replace(/^N[°O]?(?=\d)/, ''); const m = /^([A-Z]*)0*(\d+)$/.exec(s); return m ? m[1] + m[2] : s; };
@@ -49,15 +52,16 @@ export function dateValide(s, maintenant = Date.now()) {
 //   montant nombre > 0 (déjà lu par `montantSaisi`) ; date « AAAA-MM-JJ »
 //   decisions, vendues (liste d'ids), slots : les valeurs COURANTES (pour « avant »)
 // Rend { ops, texte } ou null (rien n'est écrit).
-export function opsVenduAilleurs({ carte, montant, date, decisions = {}, vendues = [], slots = {}, cle = cleDefaut, maintenant = Date.now() } = {}) {
+export function opsVenduAilleurs({ carte, montant, date, paiement = null, decisions = {}, vendues = [], slots = {}, cle = cleDefaut, maintenant = Date.now() } = {}) {
   if (!carte || carte.id == null || str(carte.id) === '') return null;
   const m = Number(montant);
   if (!Number.isFinite(m) || m <= 0 || m >= 100000) return null;
   if (!dateValide(date, maintenant)) return null;
+  if (paiement != null && !PAIEMENTS.includes(paiement)) return null;
   const id = str(carte.id), numero = str(carte.numero);
   const D = decisions || {}, S = slots || {};
   const eur = Math.round(m * 100) / 100;
-  const ops = [{ k: CLE_DECISIONS, type: 'cle', id, apres: { choix: CHOIX_MAIN, numero, at: new Date(maintenant).toISOString(), montant: eur, date: str(date), ailleurs: true }, avant: D[id] }];
+  const ops = [{ k: CLE_DECISIONS, type: 'cle', id, apres: { choix: CHOIX_MAIN, numero, at: new Date(maintenant).toISOString(), montant: eur, date: str(date), ailleurs: true, ...(paiement ? { paiement } : {}) }, avant: D[id] }];
   const dedans = (Array.isArray(vendues) ? vendues : [...(vendues || [])]).map(String).includes(id);
   if (!dedans) ops.push({ k: CLE_VENDUES, type: 'ensemble', id, apres: true, avant: false });
   const kn = numero ? cle(numero) : '';
