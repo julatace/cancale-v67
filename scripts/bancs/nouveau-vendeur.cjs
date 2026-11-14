@@ -152,7 +152,10 @@ async function ouvrir(nav, { W, sombre, base, tab = 'journee', bienvenue = true 
     const inn = /[?&]id=in\.\(([^)]*)\)/.exec(u);
     if (inn) { const ids = inn[1].split(',').map((x) => x.replace(/^"|"$/g, '')); return json(base.lignes.filter((r) => ids.includes(r.id)).map(forme)); }
     const lk = /[?&]id=like\.([^&]*)/.exec(u);
-    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return json(base.lignes.filter((r) => re.test(r.id)).map(forme)); }
+    // (14 nov.) + le filtre `data->>k=not.is.null` (la lecture des e-mails de versement), comme PostgREST.
+    const nonNuls = [...u.matchAll(/[?&]data->>(\w+)=not\.is\.null/g)].map((x) => x[1]);
+    const garde = (r) => nonNuls.every((k) => r && r.data && r.data[k] != null);
+    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return json(base.lignes.filter((r) => re.test(r.id) && garde(r)).map(forme)); }
     return json([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));

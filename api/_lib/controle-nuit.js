@@ -15,7 +15,7 @@
 import { annoncesVintedParNumero } from './double-vente.js';
 import { comptesARelire, dernieresCaptures, SELECT_CAPTURES } from './comptes-a-relire.js';
 import { PROPRIETAIRE_NEUTRE } from './proprietaire-email.js';
-import { CLE_CONTROLE, CLE_CONTROLE_INSTALLATION, numerosEnDouble, comptesPasRelus, versementsEnRetard, incoherencesStripe, resultatControle } from '../../src/controleNuit.js';
+import { CLE_CONTROLE, CLE_CONTROLE_INSTALLATION, numerosEnDouble, comptesPasRelus, versementsEnRetard, detailVersement, incoherencesStripe, resultatControle } from '../../src/controleNuit.js';
 
 const objetJson = (v) => {
   if (typeof v === 'string') { try { v = JSON.parse(v); } catch (_) { return undefined; } }
@@ -59,6 +59,9 @@ export async function controleVendeur({ lireTout, ecrire, maintenant = Date.now(
   // 2. Ventes sans versement depuis 30 jours : le nombre publié par l'écran Ventes.
   valeurs['versement-30j'] = m0 ? versementsEnRetard(objetJson(m0.aDater)) : null;
   if (valeurs['versement-30j'] == null) raisons['versement-30j'] = m0 ? 'ouvre Ventes pour le compter' : 'pas lu';
+  // (14 nov., lot dates-versement) + combien sont déjà datées et pourquoi le reste attend.
+  const details = {};
+  if (valeurs['versement-30j'] != null) { const d = detailVersement(objetJson(m0.aDater)); if (d) details['versement-30j'] = d; }
   // 3. Comptes pas relus depuis 48 h : la règle de « Tout va bien ? ».
   valeurs['comptes-48h'] = null;
   if (!m0 || !Array.isArray(comptesL) || !Array.isArray(panneau) || !Array.isArray(etats) || !Array.isArray(noirs) || !Array.isArray(captures)) raisons['comptes-48h'] = 'tes comptes n’ont pas pu être lus';
@@ -70,7 +73,7 @@ export async function controleVendeur({ lireTout, ecrire, maintenant = Date.now(
     valeurs['comptes-48h'] = comptesPasRelus(liste, maintenant);
     if (valeurs['comptes-48h'] == null) raisons['comptes-48h'] = 'pas lu';
   }
-  const data = resultatControle(valeurs, raisons, maintenant);
+  const data = resultatControle(valeurs, raisons, maintenant, details);
   const ecrit = await ecrire(CLE_CONTROLE, data);
   // La réponse du cron : des NOMBRES seulement.
   return { ecrit: !!ecrit, n: Object.fromEntries(Object.entries(data.controles).map(([k, c]) => [k, c.n])) };

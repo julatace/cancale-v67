@@ -18,6 +18,8 @@ import JaugeActions from './JaugeActions.jsx';   // (10 nov., lot G) les 50 acti
 import { facteursBaisse, heuresEtalees, ETALEMENT_H } from './discretion.js';
 import { heureFr } from './jaugeActions.js';
 import { tr } from './i18n/index.js';
+import { finValide, SOLDE_MAX_J, jourParis } from './soldes.js';   // (14 nov., lot argent-prix — 114) soldes temporaires
+import { date as dateLoc } from './i18n/index.js';
 
 const ETAT = { prevue: 'Prévue', envoi: 'Envoi…', fait: 'Fait', ecart: 'Autre prix', incertain: 'Pas relu', echec: 'Refusé', refus: 'Pas envoyée', 'pas-envoye': 'Pas envoyée' };
 const pauseEntre = () => {
@@ -33,7 +35,7 @@ const pauseEntre = () => {
 // prix envoyés que Leboncoin a acceptés sans les montrer sont RELUS (« Mes annonces » relue par
 // l'extension) — relu égal ⇒ « Fait », autre ⇒ « Autre prix », rien de neuf ⇒ reste « Pas relu ».
 // `baisseInitiale` (proposée) l'emporte sur `modeDefaut`/`texteDefaut`.
-export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherDe, extRaison = '', onBaisser, onRelire = null, onFermer, onFini, Photo, Retour, site = 'vinted', modeDefaut = 'eur', texteDefaut = '5', baisseInitiale = null, varierDefaut = true, etaleOk = false, onProgrammer = null, onAnnulerProgramme = null }) {
+export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherDe, extRaison = '', onBaisser, onRelire = null, onFermer, onFini, Photo, Retour, site = 'vinted', modeDefaut = 'eur', texteDefaut = '5', baisseInitiale = null, varierDefaut = true, etaleOk = false, onProgrammer = null, onAnnulerProgramme = null, soldeOk = false, onSolde = null }) {
   const nomSite = site === 'leboncoin' ? 'Leboncoin' : 'Vinted';
   const [mode, setMode] = React.useState(baisseInitiale && baisseInitiale.mode ? (baisseInitiale.mode === 'pct' ? 'pct' : 'eur') : modeDefaut);
   const [texte, setTexte] = React.useState(baisseInitiale && baisseInitiale.texte ? String(baisseInitiale.texte) : texteDefaut);
@@ -52,6 +54,13 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
   const [quand, setQuand] = React.useState(etaleOk ? 'etale' : 'maintenant');
   const etale = quand === 'etale' && etaleOk && typeof onProgrammer === 'function';
   const [programme, setProgramme] = React.useState(null);   // { n, de, a } une fois rangé par l'extension
+  // (14 nov., lot argent-prix — 114) « Jusqu'au … » : la baisse est un SOLDE. Après la série, les baisses
+  // acceptées ET relues sont mémorisées avec leur prix d'origine (lu par l'extension avant l'envoi) ; à la
+  // date, Ma journée PROPOSE « Remettre les prix » — rien n'est remis sans son clic (src/soldes.js).
+  const [jusqua, setJusqua] = React.useState('');
+  const [soldeNote, setSoldeNote] = React.useState(null);
+  const soldeVoulu = soldeOk && typeof onSolde === 'function' && jusqua !== '';
+  const soldeV = soldeVoulu ? finValide(jusqua) : null;
   const [heures, setHeures] = React.useState({});           // id → heure prévue (montrée avant de confirmer)
   const lignes = React.useMemo(() => lignesBaisse({ annonces, baisse, compteOnglet, plancherDe, facteurs: varier && site === 'vinted' ? facteurs : null, site }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -98,6 +107,7 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
       etapes: [['envoi', `Envoi du nouveau prix à ${nomSite}`], ['relu', `Prix relu sur ${nomSite}`]], uid: site === 'vinted' ? (compteOnglet || '') : '',
       articles: file.map((l) => ({ id: l.id, num: l.numero || '', titre: l.titre || '' })) });
     const poser = (id, e) => { res[id] = e; setEtats((x) => ({ ...x, [id]: e })); };
+    const bruts = {};   // (114) la réponse BRUTE de l'extension (l'ancien prix LU), pour le solde
     let stopVinted = '';
     for (let i = 0; i < file.length; i++) {
       const l = file[i];
@@ -115,6 +125,7 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
         if (!arret.current) { i--; continue; }
       }
       const iss = issueBaisse(r);
+      if (r) bruts[l.id] = r;
       if (r && r.accepte === true && r.etape === 'envoye') iss.aRelire = true;   // accepté, prix pas montré : relu après la série
       poser(l.id, iss);
       if (t) {
@@ -145,10 +156,17 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
           : Math.round(pv * 100) === Math.round(Number(l.nouveau) * 100) ? { etat: 'fait', prixVu: pv, raison: '' }
             : { etat: 'ecart', prixVu: pv, raison: tr('lbcplus.baisse.autrePrix', { site: nomSite }) };
         poser(l.id, e);
+        // (114) Leboncoin : l'extension a vérifié l'ancien prix (= celui de l'aperçu) avant d'envoyer ; RELU ici.
+        if (e.etat === 'fait') bruts[l.id] = { accepte: true, etape: 'fait', ancien: l.prix, prixVu: e.prixVu };
         if (t) t.fin(l.id, e.etat === 'fait' ? { etat: 'ok' } : { etat: 'main', raison: e.raison, geste: tr('lbcplus.baisse.regarder', { site: nomSite }) });
       }
     } else for (const l of aRelire) if (t) t.fin(l.id, { etat: 'main', raison: tr('lbcplus.baisse.pasRelu', { site: nomSite }), geste: tr('lbcplus.baisse.regarder', { site: nomSite }) });
     if (t) t.terminer(arret.current ? 'arrêté par toi' : stopVinted, stopVinted ? 'arrete' : undefined);
+    if (soldeVoulu && soldeV && soldeV.ok) {
+      let n = 0;
+      try { n = await onSolde({ fin: soldeV.fin, site, faites: file.map((l) => ({ ligne: { ...l, num: l.numero || '' }, r: bruts[l.id] || null })) }); } catch (_) { n = 0; }
+      setSoldeNote({ n: Number(n) || 0, fin: soldeV.fin });
+    }
     setPhase('fini');
     if (onFini) onFini(file.map((l) => ({ ligne: l, issue: res[l.id] || null })));
   };
@@ -188,6 +206,21 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
             </div>
           ) : null}
         </div> : null}
+        {soldeOk && typeof onSolde === 'function' && !etale ? (
+          <div className="vrm-bp-options vrm-ap-solde" data-bp-solde={jusqua ? 'date' : 'toujours'}>
+            <div className="vrm-bp-modes" role="group" aria-label={tr('ap.solde.combien')}>
+              {[['', tr('ap.solde.toujours')], ['date', tr('ap.solde.jusqua')]].map(([v, t]) => (
+                <button key={v || 'x'} type="button" className="vrm-bp-mode" aria-pressed={(v === '') === (jusqua === '')} data-bp-solde-choix={v || 'toujours'} disabled={fige}
+                  onClick={() => setJusqua(v === '' ? '' : (jusqua || (() => { const d = new Date(); d.setDate(d.getDate() + 7); return jourParis(d.getTime()); })()))}>{t}</button>
+              ))}
+            </div>
+            {jusqua ? <input type="date" className="vrm-ap-date" value={jusqua} disabled={fige} data-bp-solde-fin="" aria-label={tr('ap.solde.fin')}
+              min={(() => { const d = new Date(); d.setDate(d.getDate() + 1); return jourParis(d.getTime()); })()}
+              max={(() => { const d = new Date(); d.setDate(d.getDate() + SOLDE_MAX_J); return jourParis(d.getTime()); })()}
+              onChange={(e) => setJusqua(e.target.value || '')}/> : null}
+            {jusqua ? <small className="vrm-bp-raison" data-bp-solde-note="">{soldeV && soldeV.ok ? tr('ap.solde.note', { date: dateLoc(soldeV.fin + 'T12:00:00', { day: 'numeric', month: 'long' }) }) : tr('ap.solde.dateInvalide', { n: SOLDE_MAX_J })}</small> : null}
+          </div>
+        ) : null}
         {compteOnglet && site === 'vinted' ? <div className="vrm-bp-plafond"><JaugeActions uid={compteOnglet} /></div> : null}
         {!baisse.ok ? <p className="vrm-ao-mini" role="alert" data-bp-erreur="">{baisse.erreur}</p> : null}
         {extRaison ? <p className="vrm-ao-mini" role="status" data-bp-ext="">{extRaison}</p> : null}
@@ -248,6 +281,7 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
           </div>
         ) : phase === 'fini' ? (
           <div className="vrm-bp-bas is-fini" data-bp-bilan={`${bilan.fait}/${bilan.ecart}/${bilan.incertain}/${bilan.echec + bilan.refus}/${bilan.pasEnvoye}`}>
+            {soldeNote ? <p className="vrm-bp-progres" data-bp-solde-garde={soldeNote.n}>{tr('ap.solde.garde', { n: soldeNote.n, date: dateLoc(soldeNote.fin + 'T12:00:00', { day: 'numeric', month: 'long' }) })}</p> : null}
             <p className="vrm-bp-progres" role="status">{[bilan.fait ? `${bilan.fait} baissé${bilan.fait > 1 ? 's' : ''}` : '', bilan.ecart ? `${bilan.ecart} autre prix` : '', bilan.incertain ? `${bilan.incertain} pas relu${bilan.incertain > 1 ? 's' : ''}` : '', (bilan.echec + bilan.refus + bilan.pasEnvoye) ? `${bilan.echec + bilan.refus + bilan.pasEnvoye} pas fait${(bilan.echec + bilan.refus + bilan.pasEnvoye) > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ') || 'Rien envoyé'}</p>
             <button type="button" className="vrm-ao-principal" data-bp-fermer-fin="" onClick={onFermer}>Fermer</button>
           </div>
@@ -261,7 +295,7 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
           </div>
         ) : (
           <div className="vrm-bp-bas">
-            <button type="button" className="vrm-ao-principal" data-bp-lancer={choisies.length} disabled={!baisse.ok || !choisies.length || !!extRaison} onClick={demanderConfirmation}>
+            <button type="button" className="vrm-ao-principal" data-bp-lancer={choisies.length} disabled={!baisse.ok || !choisies.length || !!extRaison || (soldeVoulu && !(soldeV && soldeV.ok))} onClick={demanderConfirmation}>
               {choisies.length ? (etale ? `Programmer ${choisies.length} baisse${choisies.length > 1 ? 's' : ''}` : `Baisser ${choisies.length} prix`) : 'Coche au moins une annonce'}
             </button>
           </div>

@@ -203,4 +203,10 @@ export default {
   "journee.avisNegatifs": "Negative Bewertungen",
   "journee.avisNegatif": "Negative Bewertung",
   "journee.cartesCachees": { one: "{n} versteckte Karte", other: "{n} versteckte Karten" },
+  "veille.versement.titre": { one: "Verkauf ohne Datum: sein Auszahlungsdatum wird gelesen", other: "Verkäufe ohne Datum: ihr Auszahlungsdatum wird gelesen" },
+  "veille.versement.datees": { one: "{n} schon datiert ✓", other: "{n} schon datiert ✓" },
+  "veille.versement.pourquoi1": "Vinted nennt dieses Datum nur, wenn man jeden Verkauf öffnet: Die Erweiterung liest sie, solange vinted.fr in diesem Konto offen ist. Bis dahin sind sie in keinem Monat; keines wird geraten.",
+  "veille.versement.pourquoiN": "Vinted nennt dieses Datum nur, wenn man jeden Verkauf öffnet: Die Erweiterung liest sie, solange vinted.fr in jedem dieser Konten offen ist. Bis dahin sind sie in keinem Monat; keines wird geraten.",
+  "veille.versement.jours": { one: "Etwa {n} Tag mit offenem Vinted.", other: "Etwa {n} Tage mit offenem Vinted." },
+  "veille.versement.geste": "Details ansehen",
 };

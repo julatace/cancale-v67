@@ -1,7 +1,7 @@
 import {signalDelai} from '../compatSafari.js';
 // Relier une identité au compte connecté, jamais ouvrir une nouvelle connexion.
 export async function preparerLiaisonOAuth({provider,enabled,token,owner,base,cle,origine,verifier,challenge,essai='',fetcher=fetch,storage=sessionStorage,stockageAppareil=localStorage,maintenant=Date.now()}){
- if(!['google','discord'].includes(provider)||!enabled)return{ok:false,error:'Cette connexion n’est pas encore activée dans VRM.'};
+ if(!['google','discord','apple'].includes(provider)||!enabled)return{ok:false,error:'Cette connexion n’est pas encore activée dans VRM.'};
  if(!token||!owner)return{ok:false,error:'Reconnecte-toi à VRM avant de relier ce compte.'};
  const key='vrm_oauth_liaison';
  try{
@@ -17,7 +17,7 @@ export async function preparerLiaisonOAuth({provider,enabled,token,owner,base,cl
   // jamais retomber sur une connexion qui créerait un compte neuf.
   const t=String(j?.error_code||'')+' '+String(j?.msg||j?.message||'');
   if(!r.ok)return{ok:false,error:r.status===401?'Ta session a expiré. Reconnecte-toi avant de réessayer.':/manual.?linking|manual.*link.*disabled/i.test(t)?'La liaison n’est pas encore activée sur VRM. Ton compte reste inchangé.':/already.*link|identity.*(exists|already)/i.test(t)?'Ce compte est déjà relié à un autre compte VRM.':'La liaison n’est pas disponible pour le moment. Ton compte VRM reste inchangé.'};
-  const retour=new URL(j?.url||'');const hotes=provider==='google'?['accounts.google.com']:['discord.com','discordapp.com'];
+  const retour=new URL(j?.url||'');const hotes=provider==='google'?['accounts.google.com']:provider==='apple'?['appleid.apple.com']:['discord.com','discordapp.com'];
   if(retour.protocol!=='https:'||retour.username||retour.password||!hotes.includes(retour.hostname))throw Error('retour');
   const contexte=JSON.stringify({owner,provider,verifier,at:maintenant,...(essai?{essai}:{})});storage.setItem(key,contexte);try{stockageAppareil.setItem(key,contexte);}catch(_){}
   return{ok:true,url:retour.href};
@@ -25,7 +25,7 @@ export async function preparerLiaisonOAuth({provider,enabled,token,owner,base,cl
 }
 export function lireLiaisonOAuth(storage,stockageAppareil,maintenant=Date.now()){
  const key='vrm_oauth_liaison';let c=null;
- for(const s of [storage,stockageAppareil]){try{const j=JSON.parse(s.getItem(key)||'null');s.removeItem(key);if(!c&&j?.owner&&j?.verifier&&['google','discord'].includes(j.provider)&&maintenant-j.at>=0&&maintenant-j.at<600000)c=j;}catch(_){}}
+ for(const s of [storage,stockageAppareil]){try{const j=JSON.parse(s.getItem(key)||'null');s.removeItem(key);if(!c&&j?.owner&&j?.verifier&&['google','discord','apple'].includes(j.provider)&&maintenant-j.at>=0&&maintenant-j.at<600000)c=j;}catch(_){}}
  return c;
 }
 export function resultatLiaisonPermis(contexte,reponse){return !contexte||!!(reponse?.access_token&&reponse?.user?.id===contexte.owner);}

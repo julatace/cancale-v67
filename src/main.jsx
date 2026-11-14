@@ -166,6 +166,10 @@ const veutLApp = () => {
 };
 const versApp = () => aUneSession() || veutLApp();
 const filmDemande = /[?&]film(=|&|$)/.test(window.location.search || '');
+// (14 nov., lot argent-prix — 115) Le lien de son COMPTABLE (`/c/<jeton>` → `?comptable=`) : une page en lecture
+// seule, SANS l'app ni session (src/VueComptable.jsx) — même quand une session existe sur ce navigateur.
+const comptableDemande = /[?&]comptable=/.test(window.location.search || '');
+const VueComptable = React.lazy(() => import('./VueComptable.jsx'));
 // (14 nov., ouverture instantanée) LES DERNIERS CHIFFRES DE MA JOURNÉE, PEINTS AVANT L'APP.
 // src/ouvertureInstantanee.js décide (rien que ce que la porte hors ligne laisserait voir, pour CE
 // compte, sur CET appareil) ; src/OuvertureInstantanee.jsx peint l'instantané dans l'écran de
@@ -175,7 +179,7 @@ const filmDemande = /[?&]film(=|&|$)/.test(window.location.search || '');
 // ses règles vivent dans le morceau à part (rien de plus à télécharger pour la page d'accueil).
 const apercuPossible = (() => {
   try {
-    if (filmDemande || pageTarifs() || exempleActif()) return false;
+    if (filmDemande || comptableDemande || pageTarifs() || exempleActif()) return false;
     const s = JSON.parse(window.localStorage.getItem('vrm_session') || 'null');
     const uid = s && s.user && typeof s.user.id === 'string' ? s.user.id : '';
     // Les traces que la décision exigera (src/ouvertureInstantanee.js) : sans l'une d'elles, aucun morceau
@@ -194,7 +198,7 @@ const apercuPeint = apercuPossible
 // même le premier rendu, pour ne pas ajouter un aller-retour à son ouverture
 // (après l'instantané quand il y en a un : le fichier est déjà préchargé par
 // public/demarrage-app.js, seule son exécution attend la peinture).
-if (!filmDemande && versApp()) { if (apercuPossible) apercuPeint.then(() => { try { import('./App.jsx'); } catch (_) {} }); else { try { import('./App.jsx'); } catch (_) {} } }
+if (!filmDemande && !comptableDemande && versApp()) { if (apercuPossible) apercuPeint.then(() => { try { import('./App.jsx'); } catch (_) {} }); else { try { import('./App.jsx'); } catch (_) {} } }
 
 const FondApp = DemarrageVRM;
 function Racine() {
@@ -205,6 +209,7 @@ function Racine() {
     window.addEventListener('popstate', f);
     return () => window.removeEventListener('popstate', f);
   }, []);
+  if (comptableDemande) return <React.Suspense fallback={null}><VueComptable /></React.Suspense>;
   if (filmDemande) return <React.Suspense fallback={<FondApp />}><Film /></React.Suspense>;
   if (pageTarifs()) return <React.Suspense fallback={<FondApp />}><Tarifs /></React.Suspense>;
   if (vue === 'accueil') {

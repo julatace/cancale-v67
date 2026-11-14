@@ -33,6 +33,11 @@
       "source": "/r/:code([A-Za-z0-9]{8})",
       "destination": "/?parrain=:code",
       "permanent": false
+    },
+    {
+      "source": "/c/:jeton([A-Za-z0-9_.-]{40,80})",
+      "destination": "/?comptable=:jeton",
+      "permanent": false
     }
   ],
   "rewrites": [
@@ -51,6 +56,10 @@
     {
       "source": "/agenda/:fichier",
       "destination": "/api/compte?mode=agenda&f=:fichier"
+    },
+    {
+      "source": "/catalogue/:jeton",
+      "destination": "/api/compte?mode=catalogue&j=:jeton"
     },
     {
       "source": "/etat",

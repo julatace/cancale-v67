@@ -203,4 +203,10 @@ export default {
   "journee.avisNegatifs": "Negative reviews",
   "journee.avisNegatif": "Negative review",
   "journee.cartesCachees": { one: "{n} hidden card", other: "{n} hidden cards" },
+  "veille.versement.titre": { one: "sale to date: its payout date is being read", other: "sales to date: their payout date is being read" },
+  "veille.versement.datees": { one: "{n} already dated ✓", other: "{n} already dated ✓" },
+  "veille.versement.pourquoi1": "Vinted only gives this date when each sale is opened: the extension reads them while vinted.fr is open on this account. Until then they are in no month; none is guessed.",
+  "veille.versement.pourquoiN": "Vinted only gives this date when each sale is opened: the extension reads them while vinted.fr is open on each of these accounts. Until then they are in no month; none is guessed.",
+  "veille.versement.jours": { one: "About {n} day with Vinted open.", other: "About {n} days with Vinted open." },
+  "veille.versement.geste": "See details",
 };

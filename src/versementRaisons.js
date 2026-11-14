@@ -66,12 +66,31 @@ export function raisonsADater(aDater, { etat, compteDe } = {}) {
 
 // Les ventes DATÉES (une date de versement lue) : combien, et combien par le relevé.
 // parReleve : Set des n° de transaction datés par le relevé (`versementsParReleve`).
-export function venteDatees(lignes, parReleve) {
-  let n = 0, releve = 0;
+// (14 nov., lot dates-versement) `sources` : Map tx → 'transaction' | 'releve' |
+// 'conversation' | 'email' (`sourcesDeVersement`, la règle `datesDeVersement` d'App.jsx) :
+// combien sont datées par la conversation de la vente et par l'e-mail qui porte son n°.
+export function venteDatees(lignes, parReleve, sources) {
+  let n = 0, releve = 0, conversation = 0, email = 0;
+  const src = sources instanceof Map ? sources : null;
   for (const l of (lignes || [])) {
     if (!l || !l.ts) continue;                 // déclarée sans date : pas « datée »
     n += 1;
-    if (l.plateforme === 'Vinted' && parReleve && parReleve.has(txDe(l.o))) releve += 1;
+    if (l.plateforme !== 'Vinted') continue;
+    const tx = txDe(l.o);
+    if (parReleve && parReleve.has(tx)) releve += 1;
+    const s = src ? src.get(tx) : null;
+    if (s === 'conversation') conversation += 1;
+    else if (s === 'email') email += 1;
   }
-  return { n, releve };
+  return { n, releve, conversation, email };
 }
+// La source de chaque date de la carte tx → date (`datesDeVersement`) : toujours une Map.
+export function sourcesDeVersement(map) {
+  const s = map && map.__vrmSources;
+  return s instanceof Map ? s : new Map();
+}
+// (14 nov.) Le rythme de la relecture de fond, onglet vinted.fr ouvert sur le compte :
+// 12 lectures/h (20 moins la réserve des codes, preuves et relevés) ⇒ 288 par jour
+// (la même estimation que la carte de l'extension, `VERSEMENT_PAR_JOUR_ESTIME`).
+export const VERSEMENTS_PAR_JOUR = 12 * 24;
+export const joursPourDater = (n) => (Number.isFinite(Number(n)) && Number(n) > 0 ? Math.max(1, Math.ceil(Number(n) / VERSEMENTS_PAR_JOUR)) : 0);

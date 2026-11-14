@@ -82,7 +82,7 @@ const lire = (f) => { try { return fs.readFileSync(path.join(RACINE, f), 'utf8')
   console.log('── 4. Le câblage');
   const app = sans(lire('src/App.jsx'));
   dit(/ad\.raisons = raisonsADater\(aDater, \{ etat: \(tx\) => etatTxn\(tx\)/.test(app), 'Ventes PUBLIE les raisons (`vinted_urssaf_mois.aDater.raisons`), d’après l’état RANGÉ des transactions');
-  dit(/ad\.datees = venteDatees\(lignes, versementsParReleve\(versements\)\)/.test(app), 'Ventes PUBLIE les datées, dont par le relevé');
+  dit(/ad\.datees = venteDatees\(lignes, versementsParReleve\(versements\)(?:, sourcesDeVersement\(versements\))?\)/.test(app), 'Ventes PUBLIE les datées, dont par le relevé');
   const compta = sans(lire('src/ecrans/Compta.jsx'));
   const i = compta.indexOf('function ADaterRaisons('), j = compta.indexOf('function PrevisionUrssafCarte(');
   const comp = i > 0 && j > i ? compta.slice(i, j) : '';
