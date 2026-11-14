@@ -110,6 +110,9 @@
 :root:root:root body .vrm-main .vrm-fu-bande > .vrm-fu-case.vrm-ui-bande-item > b { display: block !important; margin: 0 !important; }
 :root:root:root body .vrm-main .vrm-fu-bande > .vrm-fu-case.vrm-ui-bande-item > .vrm-ui-bande-l { display: block !important; order: 1 !important; }
 :root:root:root body .vrm-main .vrm-fu-bande > .vrm-fu-bande-grand { flex: 0 0 auto !important; }
+/* Les couleurs de la bande : encre et gris de la PAGE (les règles de la carte sombre visent encore `[data-carte-stats]`). */
+:root:root:root:root body .vrm-app-shell .vrm-main .vrm-fu-bande.vrm-ui-bande :is(.vrm-ui-bande-n, .vrm-fu-grand, .vrm-ui-bande-n *) { color: var(--d-encre, #1D1D1F) !important; }
+:root:root:root:root body .vrm-app-shell .vrm-main .vrm-fu-bande.vrm-ui-bande :is(.vrm-ui-bande-l, .vrm-fu-sous, .vrm-fu-sous-nom, .vrm-ui-bande-l *) { color: var(--d-gris, #6E6E73) !important; opacity: 1 !important; }
 
 /* ══ 1 ter. LE HAUT D'UN ÉCRAN DE LISTE : le titre et son « ? », rien d'autre ═════
    Julien (AJOUT 3, 8) : la phrase d'explication de deux lignes sous « Annonces » disparaît ;

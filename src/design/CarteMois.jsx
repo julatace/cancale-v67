@@ -154,7 +154,8 @@ export default function CarteMois({ surtitre, valeur, sous = null, cases = [], c
     return (
       <section className={'vrm-fu-bande vrm-ui-bande' + (classes ? ' ' + classes : '')} data-fu-bande={vues.length + 1} {...attrs}>
         {enHaut}
-        <div className="vrm-ui-bande-item vrm-fu-bande-grand">
+        {/* Le grand chiffre PAS SU ne prend pas de place non plus : il reste lu (et lisible par l'instantané). */}
+        <div className={'vrm-ui-bande-item vrm-fu-bande-grand' + (vide ? ' vrm-sr-seul' : '')}>
           <div ref={grandRef} className={'vrm-fu-grand vrm-ui-bande-n' + (vide ? ' is-vide' : '')} {...(grandAttrs || {})}>{vide ? '—' : <ChiffreRoule valeur={valeur} />}</div>
           {sous ? <div className="vrm-fu-sous vrm-ui-bande-l">{sous}</div> : null}
         </div>
