@@ -47312,7 +47312,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               ) : null;
               return { prochain: null, alertes: alertesHaut, jobsTuile, section: (
                 <section className="vrm-fu-afaire sj-afaire" aria-label={tr('journee.faire')} data-fu-gestes={nListe}>
-                  {nListe ? <div className="vrm-fu-titre-section sj-titre-section"><h2 className="vrm-day-titre-section">{tr('journee.faire')}</h2><span className="sj-compte" data-fu-gestes={nListe}>{nListe}</span></div> : null}
+                  {nListe ? <div className="vrm-fu-titre-section sj-titre-section"><h2 className="vrm-day-titre-section">{tr('journee.faire')}</h2>{/* Le compte reste sur la section (`data-fu-gestes`) : pas écrit à côté du titre, où il redisait un autre nombre (journee-mieux J). */}</div> : null}
                   {/* (11 nov., lot DJ4) « À trancher » en tête de la liste, ouvert en place. */}
                   {/* (11 nov., lot journee-perso) Carte FIXE (toujours en tête, ouverte en place) : il peut la cacher. */}
                   {trancherVu ? carteTrancher(jobTrancher) : null}
