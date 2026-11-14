@@ -119,6 +119,9 @@ import './notif-reglages.css';
 // ⟦→ ecrans/Reglages.jsx #5⟧
 import './design/guide-iphone.css'; // (8 nov.) style de ./GuideIphone.jsx, gardé à sa place (son écran est chargé à la demande)
 import './design/sms-colis.css'; // (8 nov.) style de ./SmsColis.jsx, gardé à sa place (son écran est chargé à la demande)
+// (14 nov., Studio bleu clair) Ventes · À expédier et Achats · À retirer : l'habit « Studio » (src/design/StudioVentes.jsx).
+import './design/studio-ventes.css';
+import { TeteStudio, BoutonPlein, Rond, TuilesFiltres } from './design/StudioVentes.jsx';
 import {achatDuColis,suivisAchat,entreeIndexAchat} from './liensColis.js';
 import {sourcesDuColis,codeLuDeLigne,verdictCode,codesDesLignes,NOMS_SOURCES,texteVerifie} from './sourcesRetrait.js';
 import { dateLocale } from './formatsDate.js';
@@ -31459,15 +31462,21 @@ function RepliRetirerAchats({ children, sansLigne = false }) {
   const basculer = () => setOuvert((o) => { const v = !o; try { localStorage.setItem(CLE_RETIRER_OUVERT, v ? '1' : '0'); } catch (_) {} return v; });
   const n = pub && Number.isFinite(pub.total) ? pub.total : null;
   const presse = !!(pub && Number(pub.urgents) > 0);
+  // (14 nov., Studio bleu clair — Julien : « je n'ai plus les retraits d'achat, je ne comprends pas ») DÈS QU'UN COLIS
+  // ATTEND (à retirer, à vérifier ou en vérification : la publication `vrm_colis_retirer`), « À retirer » est EN TÊTE
+  // d'Achats et OUVERT, sans toucher : jamais replié derrière une ligne. La ligne-repli ne sert plus que quand rien
+  // n'attend (ou pas encore lu), pour ne pas pousser la liste des achats sous l'écran.
+  const attend = !!(pub && ((Number(pub.total) || 0) > 0 || (Number(pub.aVerifier) || 0) > 0 || (Number(pub.enVerification) || 0) > 0));
+  const montre = ouvert || attend;
   return (
-    <div className="vrm-achats-retirer-repli" data-retirer-repli={ouvert ? 'ouvert' : 'ferme'}>
-      <button type="button" className="vrm-achats-retirer-ligne" hidden={sansLigne && !ouvert} aria-expanded={ouvert} aria-controls="vrm-achats-retirer-corps" onClick={basculer} data-retirer-n={n == null ? '' : String(n)} data-retirer-presse={presse ? '1' : '0'}>
+    <div className="vrm-achats-retirer-repli" data-retirer-repli={montre ? 'ouvert' : 'ferme'} data-retirer-force={attend ? '1' : undefined}>
+      <button type="button" className="vrm-achats-retirer-ligne" hidden={attend || (sansLigne && !ouvert)} aria-expanded={montre} aria-controls="vrm-achats-retirer-corps" onClick={basculer} data-retirer-n={n == null ? '' : String(n)} data-retirer-presse={presse ? '1' : '0'}>
         {presse ? <span className="vrm-achats-retirer-point" aria-hidden="true"/> : null}
         <span className="vrm-achats-retirer-titre">{tr('journee.retirer')}</span>
         <span className="vrm-achats-retirer-n">{n == null ? '—' : n}</span>
         <span className="vrm-achats-retirer-chevron" aria-hidden="true">›</span>
       </button>
-      <div id="vrm-achats-retirer-corps" hidden={!ouvert}>{children}</div>
+      <div id="vrm-achats-retirer-corps" hidden={!montre}>{children}</div>
     </div>
   );
 }
@@ -44754,6 +44763,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const trNomColis = (x) => { if (x.__autre) return x.trNom; return nomEnvoye(transporteurVente(x.b)); };
   const estPosteColis = (x) => !!(x.o ? isShipDone(x.o) : isBordShippedManual(x.b));
+  // (14 nov., Studio bleu clair) « AVANT DEMAIN » : la tuile-filtre et l'ambre du grand chiffre de « À expédier »,
+  // UNE règle sur LA liste de l'écran (`colisAEnvoyerBase`, la même que « Tout imprimer ») : la limite (`dl`, jours
+  // avant la limite LUE — Vinted, eBay, Vestiaire) tombe aujourd'hui ou demain, ou elle est LUE et passée. Une date
+  // ESTIMÉE dépassée n'est jamais « en retard » (§5) : elle reste « à vérifier sur Vinted », hors de ce compte.
+  const avantDemainColis = (x) => { const d = x ? x.dl : null; if (d == null || !Number.isFinite(d) || d > 1) return false;
+    return !(!x.__autre && d < 0 && x.lim && x.lim.depasse && !x.lim.retard); };
+  const colisAEnvoyerListe = () => { const { exTout, autresColis } = colisAEnvoyerBase(); return [...exTout.filter((x) => !estPosteColis(x)), ...autresColis]; };
   // (5 nov., chantier D) « TEMPS DE PRÉPARATION » : depuis combien de jours chaque vente attend son
   // envoi — jours de calendrier depuis la date de VENTE lue (src/colisEnvoi.js), jamais deviné : une
   // vente sans date lue n'a pas de nombre. Vinted `o.date`, Vestiaire `v.date`, eBay `creationDate`,
@@ -44770,6 +44786,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (`texteLimiteEnvoi`, api/_lib/limite-envoi.js, rappels et widget) dit « poster » ; l'écran la traduit.
   // (« \b » ne voit pas le « à » : la limite de mot se lit sur le début ou une espace.) L'heure garde
   // son « h » sur la même ligne (espace insécable : « 12 h » ne se coupe plus en « 12 / h »).
+  // (14 nov., Studio bleu clair) L'échéance COURTE de la rangée (« demain 12 h », « aujourd'hui », « 18 nov. »), de la
+  // même limite que la phrase longue (`echeanceLimite` : la règle de api/_lib/limite-envoi.js). Estimée dépassée ⇒
+  // « à vérifier » (jamais « en retard », §5) ; lue dépassée ⇒ « N j de retard ». Pas de limite ⇒ rien.
+  const echeanceCourteColis = (l) => {
+    if (!l || !l.jour) return null;
+    const ech = echeanceLimite(l, Date.now());
+    const m = /^(\d{1,2}):(\d{2})$/.exec(String(l.heure || '')); const H = m ? tr('sv.ech.heure', { h: +m[1], m: m[2] === '00' ? '' : ' ' + m[2] }) : '';
+    if (ech.depasse && !ech.retard) return { code: 'estimee-depassee', texte: tr('sv.ech.aVerifier') };
+    if (ech.depasse) return { code: 'retard', texte: tr('sv.ech.retard', { n: Math.max(1, -ech.jours) }) };
+    if (ech.ecart === 0) return { code: 'aujourdhui', texte: H ? tr('sv.ech.aujourdhuiH', { h: H }) : tr('sv.ech.aujourdhui') };
+    if (ech.ecart === 1) return { code: 'demain', texte: H ? tr('sv.ech.demainH', { h: H }) : tr('sv.ech.demain') };
+    const d = new Date(String(l.jour).slice(0, 10) + 'T12:00:00');
+    let j = ''; try { j = d.toLocaleDateString(localeCourante(), { day: 'numeric', month: 'short' }); } catch (_) { j = String(l.jour).slice(5); }
+    return { code: 'date', texte: j };
+  };
   const texteEnvoiColis = (t) => String(t || '').replace(/(^|\s)à poster(?=\s|$)/g, '$1à envoyer').replace(/(^|\s)pour poster(?=\s|$)/g, '$1pour l’envoyer').replace(/(\d) h\b/g, '$1 h');
   // (5 nov.) Le compte d'un colis ne se dit que s'il y en a plusieurs (un seul compte : la même étiquette
   // sur chaque carte ne distingue rien, §7).
@@ -51703,11 +51734,41 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               );
               // (11 nov., lot DJ3) En section de Ventes / d'Achats : un intertitre (le titre de l'écran est « Ventes »
               // ou « Achats ») et la MÊME barre à sa droite ; jamais un second « Colis » en grand titre.
-              if (colisDans) return (
-                <header className="vrm-colis-section-tete" data-colis-section={colisDans} id={ID_SECTION_COLIS[colisDans === 'achats' ? 'achats' : 'ventes']}>
-                  <h2 className="vrm-colis-section-titre">{colisDans === 'achats' ? 'À retirer' : 'À expédier'}</h2>
-                  {barreColis}
-                </header>);
+              // (14 nov., Studio bleu clair — choix de Julien) En section, la tête devient LE GRAND CHIFFRE (« 10 colis à
+              // envoyer · 3 avant demain ») et LE seul bouton plein « Imprimer N » (la même fonction `ouvrirLot`, le même
+              // compte `resumeLot`, les mêmes data-* : le parcours d'impression n'est pas touché, seulement son habit et sa
+              // place). Scanner et « … » deviennent deux ronds (au plus deux en tête). Les nombres sont CEUX publiés
+              // (`vrm_colis_aposter`, `vrm_colis_retirer`) ; pas lus ⇒ « — » (§5). Achats · À retirer : son chiffre, aucun plein.
+              if (colisDans) {
+                const achatsSec = colisDans === 'achats';
+                const nTete = achatsSec ? nRet : nEnv;
+                const pressesTete = achatsSec ? (pubRet && Number.isFinite(pubRet.urgents) ? pubRet.urgents : 0) : colisAEnvoyerListe().filter(avantDemainColis).length;
+                const ronds = (<>
+                  <Rond icone="scan" label={scanRetraitBarre ? tr('sv.scanner.retrait') : tr('sv.scanner.envoi')} titre={scanRetraitBarre ? tr('sv.scanner.retraitTitre') : tr('sv.scanner.envoiTitre')}
+                    onClick={() => setScanOuvert(scanRetraitBarre ? 'retrait' : 'envoi')}
+                    attrs={{ 'data-colis-barre-btn': 'scanner', 'data-colis-scanner': '', 'data-scan-mode-bouton': scanRetraitBarre ? 'retrait' : 'envoi' }}/>
+                  {achatsSec ? null : <Rond icone="more" label={tr('sv.outils')} actif={!!outilsColis} onClick={() => setOutilsColis((v) => !v)}
+                    attrs={{ 'data-colis-barre-btn': 'outils', 'data-colis-outils-bascule': '', 'aria-expanded': outilsColis ? 'true' : 'false' }}/>}
+                </>);
+                const plein = achatsSec ? null : (<>
+                  <BoutonPlein icone="printer" enCours={!!batchBusy} disabled={batchBusy || resLot.total === 0} onClick={ouvrirLot}
+                    libelle={batchBusy ? tr('sv.imprimer.enCours') : nLot > 0 ? tr('sv.imprimer.n', { n: nLot }) : tr('sv.imprimer.court')}
+                    titre={nLot > 0 ? tr('sv.imprimer.titre', { n: nLot }) : resLot.total > 0 ? tr('sv.imprimer.rienDeNeuf') : tr('sv.imprimer.aucun')}
+                    attrs={{ 'data-colis-barre-btn': 'imprimer', 'data-lot-ouvrir': resLot.total > 0 ? '1' : '0', 'data-imprimer-prets': nLot }}/>
+                  {/* (6 nov.) Le conseil « Un envoi presse » (src/accompagnement.js) : le compte du bouton, inchangé. */}
+                  <ChiffreConseil cle="colis.imprimer" valeur={baseKO ? null : { nLot, presse: !!gesteEnvoi({ aImprimer: bordereauxAImprimer(lignesImpr).map((l) => ({ jours: l.e && Number.isFinite(l.e.dl) ? l.e.dl : null })) }, { urgentSeul: true }) }}/>
+                </>);
+                return (
+                  <div className="vrm-colis-barre sb-tete-hote" data-colis-barre="" data-sb-studio={colisDans}>
+                    <TeteStudio section={colisDans} id={ID_SECTION_COLIS[achatsSec ? 'achats' : 'ventes']}
+                      titre={achatsSec ? tr('sv.titre.retirer') : tr('sv.titre.expedier')}
+                      n={nTete} auMoins={(achatsSec ? retPartiel : envPartiel) && nTete != null ? tr('sv.auMoins') : ''}
+                      libelle={achatsSec ? tr('sv.lib.retirer', { n: nTete || 0 }) : tr('sv.lib.envoyer', { n: nTete || 0 })}
+                      enLecture={tr('sv.lib.lecture')}
+                      presses={pressesTete} libellePresses={achatsSec ? tr('sv.presses.retirer', { n: pressesTete }) : tr('sv.presses.envoyer', { n: pressesTete })}
+                      ronds={ronds} droite={plein}/>
+                  </div>);
+              }
               return <ScreenHead icon="doc" title="Colis" date={dateJourFr(new Date())} phrase="colis"
               desc="Ce que Vinted attend de toi, capté par l'extension. Le bordereau manquant est généré tout seul quand tu passes sur Vinted, puis déposé ici. Un colis parti disparaît sans rien cocher."
               right={barreColis}/>; })()}
@@ -51750,7 +51811,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {!baseKO && colisDans ? (() => {
               const m0 = new Date(); m0.setHours(0, 0, 0, 0);
               const parts = colisDans === 'achats'
-                ? [['dernier', pickupUnion.urgents || 0, 'd’ici demain'], ['code', pickupUnion.prets || 0, 'avec code'], ['verifier', (pickupUnion.aVerifier || []).length + (pickupUnion.aConfirmer || []).length, 'à vérifier']]
+                ? [/* (14 nov., Studio) « d’ici demain » est l’ambre du grand chiffre (§7) */ ['code', pickupUnion.prets || 0, 'avec code'], ['verifier', (pickupUnion.aVerifier || []).length + (pickupUnion.aConfirmer || []).length, 'à vérifier']]
                 // (12 nov., finitions) « 15 à imprimer » sous « Tout imprimer (15) » redisait le même nombre (§7) :
                 // la case ne se dit que si elle apprend autre chose que le bouton.
                 : [['imprimer', nPrets === nLot ? 0 : nPrets, 'à imprimer'], (() => { const d = gestesDepuis(shipDone, m0.getTime()); return ['deposes', d, d > 1 ? 'déposés aujourd’hui' : 'déposé aujourd’hui']; })()];
@@ -51790,7 +51851,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {/* (11 nov., lot DJ3) Ventes : À envoyer · Envoyés ; Achats : la liste « À retirer » seule (pas d'onglet). */}
               {colisDans === 'achats' ? null : <Segmente plein label={colisDans ? 'Colis à envoyer ou envoyés' : 'Colis à envoyer, envoyés ou à retirer'} value={onglet} onChange={(v) => onOngletColis && onOngletColis(v)}
                 options={[
-                  { v: 'envoyer', l: 'À envoyer', n: nEnv != null ? `${nEnv}${envPartiel ? '+' : ''}` : null, data: { 'data-colis-onglet-choix': 'envoyer', 'data-colis-onglet-n': nEnv != null ? String(nEnv) : '', 'data-urgent': urgentEnv ? '1' : '0', title: envPartiel ? `Au moins ${nEnv} : un site n'a pas pu être lu` : undefined } },
+                  { v: 'envoyer', l: 'À envoyer', n: colisDans ? null /* (14 nov., Studio) le grand chiffre de la tête le dit déjà (§7) */ : nEnv != null ? `${nEnv}${envPartiel ? '+' : ''}` : null, data: { 'data-colis-onglet-choix': 'envoyer', 'data-colis-onglet-n': nEnv != null ? String(nEnv) : '', 'data-urgent': urgentEnv ? '1' : '0', title: envPartiel ? `Au moins ${nEnv} : un site n'a pas pu être lu` : undefined } },
                   { v: 'envoyes', l: 'Envoyés', n: nEnvoyes != null ? String(nEnvoyes) : null, data: { 'data-colis-onglet-choix': 'envoyes', 'data-colis-onglet-n': nEnvoyes != null ? String(nEnvoyes) : '' } },
                   { v: 'retirer', l: 'À retirer', n: nRet != null ? `${nRet}${retPartiel ? '+' : ''}` : null, data: { 'data-colis-onglet-choix': 'retirer', 'data-colis-onglet-n': nRet != null ? String(nRet) : '', 'data-urgent': urgentRet ? '1' : '0', title: retPartiel && nRet != null ? `Au moins ${nRet} : les e-mails de suivi n'ont pas pu être lus` : undefined } },
                 ].filter((o) => !colisDans || o.v !== 'retirer')}/>}
@@ -52570,16 +52631,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // le transporteur est une PASTILLE (filtre, comme « Envoyés »), plus un groupe qui impose l'ordre.
                 const trDeColis = (x) => (x.__autre ? x.tr : transporteurVente(x.b));
                 const pastillesEnv = filtresTransporteurs(tous, trDeColis);
-                const { liste: tousF, filtre: filtreEnvT } = filtrerEnvoyes(tous, filtreEnvoyer, trDeColis);
+                // (14 nov., Studio bleu clair) LES TUILES-FILTRES : « Tous », « Avant demain » (la règle `avantDemainColis`,
+                // celle de l'ambre du grand chiffre) et un transporteur par tuile (`filtresTransporteurs`, inchangé). Une tuile
+                // posée est ENFONCÉE avec sa diode ; une tuile qui ne filtre plus rien revient à « tous » (aucun colis caché).
+                const nAvantDemain = tous.filter(avantDemainColis).length;
+                const { liste: tousF, filtre: filtreEnvT } = (filtreEnvoyer === '__avantDemain' && nAvantDemain > 0)
+                  ? { liste: tous.filter(avantDemainColis), filtre: '__avantDemain' }
+                  : filtrerEnvoyes(tous, filtreEnvoyer, trDeColis);
                 const exT = rangerColisEnvoi(tousF, trNomDe);
                 const iSansDateEnv = debutSansDate(exT, quandColisAEnvoyer), nSansDateEnv = nbSansDate(exT, quandColisAEnvoyer);
-                const pastillesEl = pastillesEnv.length > 1 ? (
-                  <div key="__filtres-env" className="vrm-rangee vrm-filtres" role="group" aria-label="Filtrer par transporteur" data-envoyer-filtres="" data-envoyer-filtre={filtreEnvT} style={{display:'flex',gap:6,marginBottom:4}}>
-                    <button type="button" aria-pressed={filtreEnvT === 'tous'} data-envoyer-filtre-choix="tous" data-envoyer-filtre-n={tous.length} onClick={() => setFiltreEnvoyer('tous')} style={{whiteSpace:'nowrap',flexShrink:0,padding:'7px 14px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Tous · {tous.length}</button>
-                    {pastillesEnv.map((p) => (
-                      <button key={p.nom} type="button" aria-pressed={filtreEnvT === p.nom} data-envoyer-filtre-choix={p.nom} data-envoyer-filtre-cle={p.cle || 'inconnu'} data-envoyer-filtre-n={p.n} onClick={() => setFiltreEnvoyer(filtreEnvT === p.nom ? 'tous' : p.nom)} style={{whiteSpace:'nowrap',flexShrink:0,padding:'7px 14px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{p.nom} · {p.n}</button>
-                    ))}
-                  </div>
+                const tuilesEnv = [
+                  { v: 'tous', l: tr('sv.filtre.tous'), n: tous.length, attrs: { 'data-envoyer-filtre-choix': 'tous', 'data-envoyer-filtre-n': tous.length } },
+                  ...(nAvantDemain > 0 && nAvantDemain < tous.length ? [{ v: '__avantDemain', l: tr('sv.filtre.avantDemain'), n: nAvantDemain, unite: tr('sv.filtre.aPoster'), ambre: true, attrs: { 'data-envoyer-filtre-choix': 'avant-demain', 'data-envoyer-filtre-n': nAvantDemain } }] : []),
+                  ...(pastillesEnv.length > 1 ? pastillesEnv.map((p) => ({ v: p.nom, l: p.nom, n: p.n, unite: tr('sv.filtre.colis', { n: p.n }), attrs: { 'data-envoyer-filtre-choix': p.nom, 'data-envoyer-filtre-cle': p.cle || 'inconnu', 'data-envoyer-filtre-n': p.n } })) : []),
+                ];
+                const pastillesEl = tuilesEnv.length > 1 ? (
+                  <TuilesFiltres key="__filtres-env" tuiles={tuilesEnv} valeur={filtreEnvT} onChoix={(v) => setFiltreEnvoyer(v)} label={tr('sv.filtre.label')}
+                    attrs={{ 'data-envoyer-filtres': '', 'data-envoyer-filtre': filtreEnvT }}/>
                 ) : null;
                 const primaireBleu = {flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit',textDecoration:'none',boxSizing:'border-box'};
                 const carteAutre = (e) => {
@@ -52690,6 +52758,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               deux fois (« N°31 · … » puis une pastille « N°31 » dessous). */}
                           <span className="vrm-colis-titre" title={titre} style={{flex:1,minWidth:0,fontSize:15,fontWeight:600,lineHeight:1.35,color:C.text,letterSpacing:'-.01em',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',overflowWrap:'anywhere'}}>{num ? <><Numero n={num} taille="petit" etat={conflitsNum.some(x => String(x.numero) === String(num)) ? 'doublon' : undefined} className="vrm-colis-titre-num"/>{' '}</> : null}{motsInsecables(titre)}</span>
                           {o && o.price && <span className="vrm-display vrm-colis-prix" style={{flexShrink:0,fontSize:17,fontWeight:700,color:C.text,whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums',letterSpacing:'-.02em'}}>{montant(o.price, { etrangere: 'ecarter' })}</span>}
+                          {/* (14 nov., Studio bleu clair) L'ÉCHÉANCE à droite de la rangée, en court (« demain 12 h », « 18 nov. »),
+                              de la MÊME limite (`e.lim`, lue ou estimée) ; ambre seulement « avant demain » (`avantDemainColis`).
+                              Une date estimée dépassée dit « à vérifier », jamais « en retard » (§5). */}
+                          {(() => { const ec = echeanceCourteColis(e.lim); return ec ? <span className={'sb-echeance' + (avantDemainColis(e) ? ' is-ambre' : '')} data-sb-echeance={ec.code}>{ec.texte}</span> : null; })()}
                         </div>
                         {(!num || (plusieursComptesColis && (acc || (b && b.account)))) ? <div style={{fontSize:12,color:C.muted,marginTop:6,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                           {!num ? <span className="vrm-colis-num" title="Le numéro arrive dès que l'article est relié à une annonce numérotée. Tu peux le poser à la main." style={{fontSize:12,fontWeight:600,color:C.warn,background:'transparent',border:`1px dashed ${C.warn}88`,borderRadius:999,padding:'2px 9px',flexShrink:0,whiteSpace:'nowrap'}}>N° en attente</span> : null}
@@ -52709,7 +52781,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             <Icon name="mail" size={13}/></button> : null}
                           {(o && o.date) || urgTxt ? <span data-colis-dates="" style={{flex:'0 1 auto',minWidth:0}}>
                             {urgTxt && <span data-colis-limite-texte="" title={urgTxt !== limiteCourte(urgTxt) ? texteEnvoiColis(urgTxt) : undefined} style={{overflowWrap:'anywhere',color:urgCol,fontWeight:dl!=null&&dl<=1?600:500}}>{texteEnvoiColis(limiteCourte(urgTxt))}</span>}
-                            {att != null ? <span data-colis-attente={att}>{urgTxt ? '\u00a0· ' : ''}{texteAttenteVente(att)}</span> : null}
+                            {att != null ? <span data-colis-attente={att}>{urgTxt ? <span className="vrm-colis-sep">{'\u00a0· '}</span> : ''}{texteAttenteVente(att)}</span> : null}
                           </span> : null}
                           {cell
                             ? <button type="button" onClick={()=>onLocate&&onLocate(num)} style={{flexShrink:0,border:'none',background:'transparent',color:C.accentTexte||C.text,fontWeight:600,cursor:'pointer',padding:0,fontSize:12,fontFamily:'inherit'}}>· {garageCellLabel(cell)}</button>
@@ -52755,9 +52827,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           </div>
                         ) : null; })()}
                       </div>
-                      {b && <button type="button" onClick={async ()=>{
-                        hideBord(b);
-                      }} title="Masquer" aria-label="Masquer" className="vrm-icon-control vrm-colis-masquer" style={{alignSelf:'flex-start',flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',width:32,height:32,margin:'-6px -6px 0 0',display:'inline-flex',alignItems:'center',justifyContent:'center',borderRadius:12,fontFamily:'inherit'}}><Icon name="close" size={15}/></button>}
+                      {/* (14 nov., Studio bleu clair) « Masquer » n'est plus un × de 32 px dans la rangée (aucun bouton dans une
+                          rangée) : il est rangé avec les gestes du colis, dans la fiche ouverte (plus bas, `data-geste="masquer"`). */}
                       {/* (2 nov., 22 h) « … » : « Colis fait », « Marquer imprimé », « Suivre » (maquette : rien sous la frise). */}
                     </div>
                     {/* ACTION PRINCIPALE : imprimer si le PDF est là, sinon aller
@@ -52853,6 +52924,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         className="vrm-colis-sec vrm-colis-ter" style={{...sec,border:`1px solid ${C.border}`,background:posted?C.bg:'transparent',color:posted?C.text:C.muted}}>
                         {posted?'Pas encore déposé':'Déposé'}
                       </button>
+                      {b && <button type="button" onClick={()=>hideBord(b)} title={tr('sv.masquer.titre')} data-geste="masquer"
+                        className="vrm-colis-sec vrm-colis-ter vrm-colis-masquer-geste" style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted}}>{tr('sv.masquer')}</button>}
                       {b && b.suivi && <a href={trackUrl(trV.cle||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} data-geste="suivre" className="vrm-colis-sec vrm-colis-ter" style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,textDecoration:'none',display:'inline-flex',alignItems:'center'}}><Icon name="truck" size={13} style={{marginRight:5}}/>Suivre</a>}
                       {capte && <span className="vrm-colis-source" style={{fontSize:12,color:C.muted,fontWeight:400,flexBasis:'100%'}}>Bordereau récupéré chez Vinted par l'extension{b && b.hasPdf ? ' · confirmé par l\'email' : ''}</span>}
                       {/* ⚠️ « Bordereau pas encore reçu » disait, sur la MÊME carte
@@ -61131,7 +61204,7 @@ function AppCoeur() {
     const sec=sectionDeTache(t,platSub);
     const sous=sousSections(t,site);
     return (
-      <section className="vrm-tache" data-tache={t} data-tache-site={site} data-tache-section={sec} aria-label={TITRES_TACHE[t]}>
+      <section className="vrm-tache" data-tache={t} data-tache-site={site} data-tache-section={sec} data-espace={t === 'ventes' || t === 'achats' ? 'ventes' : undefined} aria-label={TITRES_TACHE[t]}>
         <header className="vrm-market-heading vrm-tache-tete" data-tache-tete={t}>
           {t === 'ventes' ? <span className="vrm-fu-date-tete" data-date-tete="">{dateJourFr(new Date())}</span> : null}
           <h1>{TITRES_TACHE[t]}</h1>
