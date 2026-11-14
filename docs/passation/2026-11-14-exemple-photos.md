@@ -114,7 +114,10 @@ des sources permises ; rien de faux n'a été mis. **Après ouverture des hôtes
   déborde, 0 erreur JS, **P1 chaque rangée d'article a sa photo chargée (Annonces 12/12, Ventes 4/4,
   Achats 3/3, Colis 4/4 ; les vignettes chargées à l'approche sont parcourues ; un colis SANS article,
   lu dans un e-mail du transporteur, n'a pas à avoir de photo)** : **70 OK, 0 KO par passe** (4 passes).
-  Au premier passage, sans photos : P1 rouge × 4 par passe. Sur **origin/main** (390 clair) : **47 KO** (B1 × 36, B2, B3, B4, C1, P1). Mutations sur le
+  Au premier passage, sans photos : P1 rouge × 4 par passe.
+  **Après le dernier `git merge origin/main`** (refonte d'Achats : « À retirer » replié), le banc et
+  `scripts/accueil-captures.cjs` ouvrent la section par le chemin de l'app (`vrm:retirer-ouvrir`) :
+  rebuild, puis **70 OK / 0 KO** sur les 4 passes ; `exemple-accueil` et `mode-exemple` verts. Sur **origin/main** (390 clair) : **47 KO** (B1 × 36, B2, B3, B4, C1, P1). Mutations sur le
   `dist` (CSS du cadre à z 1, marque `content: none`) : B1 × 9, B2, B3 rouges.
 - Bancs touchés, verts : `exemple-accueil` (52 OK, 390 + 1512 clair), `mode-exemple` (116 OK).
 - Audits verts : `traduction` (45 ; `BandeauExemple`/`CadreExemple` ajoutés aux écrans migrés),
