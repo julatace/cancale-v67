@@ -847,6 +847,9 @@ import { PREFIXE_POINT, slotDe, idPoint, instantane as instantaneRestauration, i
 import "./styles-restauration.css";
 // (9 nov., lot B) « Annuler » au lieu des confirmations réversibles + ⌘K qui agit (src/annulerCommandes.js).
 import { champsAvant, actionsPour, destinationAction, DEMANDE_COMMANDE } from "./annulerCommandes.js";
+// (14 nov., idées argent 159-162) Dépense en photo, vente en main propre, partager en image : une racine, feuilles à la demande.
+import IdeesArgentRacine, { ouvrirIdee } from "./ideesArgent/Racine.jsx";
+import { vendusDuJourPublies } from "../api/_lib/siri-reponses.js";   // (161) « vendu aujourd'hui » publié dans widget_stats
 import { PiluleAnnuler } from "./PiluleAnnuler.jsx";
 import Visionneuse from "./Visionneuse.jsx";
 import { useFacturesAchat, PastilleFacture } from "./FactureAchat.jsx";   // (10 nov., lot AN) facture d'achat jointe
@@ -59914,7 +59917,7 @@ function AppCoeur() {
     // seulement complet ; sinon la valeur d'avant reste (jamais un minimum présenté complet).
     const aV = aVenirPour(liveStatsVus.aVenir);
     if (aV.valeur != null && !aV.partiel) base0.enAttente = Math.round(aV.valeur);
-    const data = { ...base0, caMois: Math.round(liveStatsVus.caMois || 0), ventesMois: liveStatsVus.ventesMois || 0, caMoisNonComptees: liveStatsVus.venduNonCompteesMois || 0, ...(onlinePasSu ? { onlineRaison: onlinePasSu } : { onlineAt: jourParis() }), aExpedier: aExpedierPourCarte(load('vrm_colis_aposter', null)) };
+    const data = { ...base0, caMois: Math.round(liveStatsVus.caMois || 0), ventesMois: liveStatsVus.ventesMois || 0, caMoisNonComptees: liveStatsVus.venduNonCompteesMois || 0, ...(vendusDuJourPublies({ caJour: liveStatsVus.caJour, ventesJour: liveStatsVus.ventesJour, nonComptees: (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return nonCompteesDe(liveStatsVus.venduNonComptees || [], d.getTime()).length; })() }) || {}), ...(onlinePasSu ? { onlineRaison: onlinePasSu } : { onlineAt: jourParis() }), aExpedier: aExpedierPourCarte(load('vrm_colis_aposter', null)) };
     const cle = JSON.stringify(data);
     if (cle === widgetEcrit.current) return;
     widgetEcrit.current = cle;
@@ -61036,6 +61039,7 @@ function AppCoeur() {
     const d = destinationAction(a); if (!d) return;
     if (qBrut && String(qBrut).trim()) setGsRecents(noterRecent(String(qBrut).trim()));
     setGsOpen(false);
+    if (d.feuille === 'vente-main' || d.feuille === 'depense-photo') { ouvrirIdee(d.feuille, { num: d.num || '' }); return; }   // (14 nov., idées argent)
     if (d.feuille === 'fiche') { setFicheNum(String(d.num)); return; }
     if (d.feuille === 'calculette') { setCalcOuverte(true); return; }
     if (d.feuille === 'prix') { setPrixNum(String(d.num)); return; }
@@ -61404,6 +61408,8 @@ function AppCoeur() {
       <CentreAide/>
       <PiluleAnnulerCoque/>
       {AUTH.user && <RangerAchatCoque/>}
+      {/* (14 nov., idées argent) Dépense en photo · Vente en main propre · Partager en image (src/ideesArgent/). */}
+      {AUTH.user && <IdeesArgentRacine/>}
       {/* (11 nov.) « Me le rappeler » : la feuille et le bandeau ouvert par la notification (api/_lib/rappels-perso.js). */}
       <HoteRappels/>
       {/* (10 nov., lot P) Raccourcis clavier : « g » + lettre, « n », « ? » (src/RaccourcisClavier.jsx) — naviguer ou ouvrir, jamais écrire. */}

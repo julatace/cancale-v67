@@ -14,6 +14,7 @@ import { escalierPrix, eurosPrix } from './historiquePrix.js';
 import { motsInsecables } from './motsInsecables.jsx';
 import { tr } from './i18n/index.js';
 import { poserSlot } from './ficheLigne.js';
+import { ouvrirIdee } from './ideesArgent/Racine.jsx';   // (14 nov., idées argent 162) « Partager en image »
 
 // (14 nov., proposition 62) Ouverte DEPUIS une ligne de liste : ce que la ligne est (le titre de sa partie).
 const CLE_CTX = { vente: 'fiche.ctx.vente', colis: 'fiche.ctx.colis', achat: 'fiche.ctx.achat', annonce: 'fiche.ctx.annonce', stock: 'fiche.ctx.stock', retrait: 'fiche.ctx.retrait', journee: 'fiche.ctx.journee' };
@@ -243,12 +244,16 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
         </>}
     </section>
   ) : null;
+  // (14 nov., idées argent 162) « Partager en image » : la photo, le modèle, la taille, le prix AFFICHÉ, le N°
+  // s'il le coche — rien d'autre ne part dans la feuille (ni achat, ni bénéfice, ni acheteur). Deux paires sous ce N° : rien.
+  const partager = p && !double && !p.ancienNumero && p.etat !== 'rien' ? <button type="button" className="vrm-ao-second" data-fiche-partager-image="" onClick={() => ouvrirIdee('partage-image', { paire: { photo: photoHeros, titre: titreHeros, taille: tailleHeros, prix: sv && sv.prix != null ? sv.prix : null, num: p.num } })}>{tr('ia.img.ouvrir')}</button> : null;
   // Les gestes de la fiche elle-même ; ouverte depuis une ligne, ils rejoignent ceux de la ligne dans « Actions ».
-  const outils = p && (onPrix || onDupliquer || onPublierAilleurs) && !p.ancienNumero ? (<>
+  const outils = p && (onPrix || onDupliquer || onPublierAilleurs || partager) && !p.ancienNumero ? (<>
     {onPrix && !neuve ? <button type="button" className="vrm-ao-second" data-fiche-prix="" onClick={() => onPrix(p.num)}>Changer le prix</button> : null}
     {onPublierAilleurs && !neuve && p.etat !== 'rien' ? <button type="button" className="vrm-ao-second" data-fiche-publier-ailleurs="" onClick={() => onPublierAilleurs(p.num)}>Publier ailleurs</button> : null}
     {onDupliquer && p.etat !== 'rien' ? <button type="button" className="vrm-ao-second" data-fiche-dupliquer="" onClick={() => onDupliquer(p.num)}>Dupliquer</button> : null}
     {neuve && onCopier ? <button type="button" className="vrm-ao-second" data-fiche-copier="" onClick={() => onCopier(neuve)}>Copier le texte</button> : null}
+    {partager}
   </>) : null;
   const poster = p && p.aPoster && (onBordereau || onEmballer) ? (
     <div className="vrm-fp-actions">

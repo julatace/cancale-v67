@@ -85,7 +85,8 @@ async function gerer(req, res, ctx) {
   const maint = new Date(ctx.maintenant()).toISOString();
   if (action === 'revoquer') {
     if (hAvant && !(await supprimerIndex(ctx, hAvant))) return res.status(503).json(PAS_SU);
-    if (!(await ecrire(ctx, [{ owner: u.id, id: LIGNE_SIRI, data: { h: null, coupeAt: maint }, updated_at: maint }]))) return res.status(503).json(PAS_SU);
+    // + la ligne publiée pour Siri vidée (elle portait des codes de retrait) : rien ne reste servi.
+    if (!(await ecrire(ctx, [{ owner: u.id, id: LIGNE_SIRI, data: { h: null, coupeAt: maint }, updated_at: maint }, { owner: u.id, id: LIGNE_SIRI_RETRAIT, data: { at: 0, total: 0, prochains: [] }, updated_at: maint }]))) return res.status(503).json(PAS_SU);
     return res.status(200).json({ ok: true, actif: false });
   }
   if (action !== 'creer') return res.status(400).json({ erreur: 'action', message: 'Action inconnue.' });
