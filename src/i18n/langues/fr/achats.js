@@ -350,4 +350,10 @@ export default {
   "achats.rienRelieEncore": { one: "Rien ne le relie encore à un colis ci-dessus (ni code de retrait, ni n° de suivi). Il ne compte pas dans « à retirer » tant que son n° de suivi n'est pas connu.", other: "Rien ne les relie encore à un colis ci-dessus (ni code de retrait, ni n° de suivi). Ils ne comptent pas dans « à retirer » tant que leur n° de suivi n'est pas connu." },
   "achats.commandeJours": { one: " · commandé il y a {n} jour", other: " · commandé il y a {n} jours" },
   "achats.autresIlsSont": { one: "et {n} autre — ils sont tous dans l'onglet « Tous ».", other: "et {n} autres — ils sont tous dans l'onglet « Tous »." },
+  "achats.ms.benefice": "Bénéfice",
+  "achats.ms.vitesse": "Vitesse",
+  "achats.ms.investi": "Investi",
+  "achats.ms.marge": "Marge",
+  "achats.ms.pourRevendre": "Pour revendre",
+  "achats.selectionner": "Sélectionner",
 };
