@@ -74,7 +74,7 @@ const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/htm
 // Ici tout est servi par de VRAIS serveurs locaux : l'app et /api/ (http://localhost), la base sous
 // son vrai nom (https, `--host-resolver-rules` vers 127.0.0.1, certificat jetable) — comme session.cjs.
 const HOTE_BASE = 'lgonxzrzjcqthjtbdpzo.supabase.co';
-const PORT_BASE = PORT + 1;
+const PORT_BASE = PORT < 50000 ? PORT + 15000 : PORT - 15000;   // jamais le port du banc suivant (lancer-bancs donne base + rang)
 const statiques = [];
 const journal = [];
 const etat = { panne: false };
