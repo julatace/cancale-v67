@@ -1,5 +1,6 @@
 // ENGLISH — translation of fr.js (the source). Same keys, same {variables}.
 import ecran_journee from './en/journee.js';
+import ecran_confort from './en/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_ventes from './en/ventes.js';
 import ecran_commun from './en/commun.js';
 import ecran_achats from './en/achats.js';
@@ -9,8 +10,16 @@ import ecran_messages from './en/messages.js';
 import ecran_emails from './en/emails.js';
 import ecran_stats from './en/stats.js';
 import ecran_compta from './en/compta.js';
+import ecran_fiche from './en/fiche.js';
+import ecran_tarifs from './en/tarifs.js';
+import ecran_nouveaux from './en/nouveaux.js';
 import ecran_argent from './en/argent.js';
+import ecran_fraiscarte from './en/fraiscarte.js';   // (14 nov., frais-carte)
 export default {
+  ...ecran_fiche,
+  ...ecran_fraiscarte,
+  ...ecran_tarifs,
+  ...ecran_nouveaux,
   ...ecran_compta,
   ...ecran_argent,
   ...ecran_stats,
@@ -2171,4 +2180,5 @@ export default {
   "instantane.geste.panne": "Not reloaded",
   "instantane.arret.horsLigne": "Offline: these figures are from your last visit. They will be reloaded when the network is back.",
   "instantane.arret.panne": "Not reloaded: the database is not responding. These figures are from your last visit.",
+  ...ecran_confort,
 };

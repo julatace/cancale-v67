@@ -1,5 +1,6 @@
 // ESPAÑOL — traducción de fr.js (la fuente). Mismas claves, mismas {variables}.
 import ecran_journee from './es/journee.js';
+import ecran_confort from './es/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_ventes from './es/ventes.js';
 import ecran_commun from './es/commun.js';
 import ecran_achats from './es/achats.js';
@@ -9,8 +10,16 @@ import ecran_messages from './es/messages.js';
 import ecran_emails from './es/emails.js';
 import ecran_stats from './es/stats.js';
 import ecran_compta from './es/compta.js';
+import ecran_fiche from './es/fiche.js';
+import ecran_tarifs from './es/tarifs.js';
+import ecran_nouveaux from './es/nouveaux.js';
 import ecran_argent from './es/argent.js';
+import ecran_fraiscarte from './es/fraiscarte.js';   // (14 nov., frais-carte)
 export default {
+  ...ecran_fiche,
+  ...ecran_fraiscarte,
+  ...ecran_tarifs,
+  ...ecran_nouveaux,
   ...ecran_compta,
   ...ecran_argent,
   ...ecran_stats,
@@ -2171,4 +2180,5 @@ export default {
   "instantane.geste.panne": "Sin releer",
   "instantane.arret.horsLigne": "Sin conexión: estas cifras son las de tu última visita. Se volverán a leer cuando vuelva la red.",
   "instantane.arret.panne": "Sin releer: la base no responde. Estas cifras son las de tu última visita.",
+  ...ecran_confort,
 };

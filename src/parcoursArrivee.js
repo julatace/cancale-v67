@@ -26,6 +26,8 @@
 // n'importe quel appareil. « Plus tard » : `vrm_parcours_plus_tard` (7 jours).
 // JS pur, sans React : `scripts/audit-parcours-arrivee.cjs` l'exécute.
 
+import { tr } from './i18n/index.js';
+
 export const CLE_PARCOURS = 'vrm_parcours';
 export const CLE_PARCOURS_PLUS_TARD = 'vrm_parcours_plus_tard';
 export const JOURS_REPORT = 7;
@@ -35,7 +37,74 @@ export const ETAPES_PARCOURS = [
   { cle: 'extension', titre: 'Installe l’extension', court: 'Extension', pourquoi: 'Elle lit tes ventes et tes colis, depuis ton navigateur.' },
   { cle: 'vinted', titre: 'Ouvre Vinted une fois', court: 'Vinted', geste: 'Ouvrir vinted.fr', pourquoi: 'Connecté à ton compte, l’extension lit tes ventes.' },
 ];
-const CLES = ETAPES_PARCOURS.map((e) => e.cle);
+// ── (14 nov., accueil des nouveaux, n° 135) UN PARCOURS PAR PLATEFORME ─────────
+// Un vendeur qui ne vend PAS sur Vinted (« Où vends-tu ? » de Ma configuration,
+// `vrm_plateformes_affichees`) a ses propres étapes — seulement ce que l'extension
+// d'aujourd'hui sait faire (EXT_CAPACITES) :
+//   · Leboncoin : compte · extension · « Ouvre Mes annonces sur leboncoin.fr » —
+//     preuve : une ligne rangée par l'extension (`lbc_listings` ou `lbc_ventes`) ;
+//     `lbc_accounts` seul = compte vu, lecture en cours (`lbcclair`, 5.335) ;
+//   · Vestiaire : compte · extension · « Ouvre tes annonces sur vestiairecollective.com »
+//     — preuve : `vc_listings` ou `vc_ventes` ; `vc_session` seul = compte vu
+//     (`vcsession` 5.295, `vcfiche` 5.296) ;
+//   · eBay : compte · « Relie ton compte eBay » — eBay passe par sa connexion
+//     officielle (Paramètres → Comptes eBay), JAMAIS par l'extension : aucune étape
+//     d'extension ne lui est demandée. Preuve : un compte RELIÉ au registre
+//     (`lireComptesEbay`, le compte « implicite » ne prouve rien).
+// Vinted choisi (ou rien choisi) ⇒ les trois étapes d'avant, inchangées. Plusieurs
+// sites de l'extension : la 3e étape est faite dès que l'UN d'eux est lu.
+// Les lectures : `select=id` (aucune donnée lue), comme la sonde des sites de la coque.
+export const SITES_EXTENSION = Object.freeze(['leboncoin', 'vestiaire']);
+export const LIGNES_SITE_LUES = Object.freeze({ leboncoin: ['lbc_listings', 'lbc_ventes'], vestiaire: ['vc_listings', 'vc_ventes'] });
+export const LIGNES_SITE_VUES = Object.freeze({ leboncoin: ['lbc_accounts'], vestiaire: ['vc_session'] });
+export const REQUETE_SITES_PARCOURS = `id=in.(${[...LIGNES_SITE_LUES.leboncoin, ...LIGNES_SITE_VUES.leboncoin, ...LIGNES_SITE_LUES.vestiaire, ...LIGNES_SITE_VUES.vestiaire].join(',')})&select=id`;
+export const LIENS_SITE = Object.freeze({ leboncoin: 'https://www.leboncoin.fr/compte/part/mes-annonces', vestiaire: 'https://www.vestiairecollective.com/' });
+// La route : `reglage` = `lirePlateformes(vrm_plateformes_affichees)` (ou null : rien choisi).
+export function routeParcours(reglage) {
+  const sites = reglage && Array.isArray(reglage.sites) ? reglage.sites : null;
+  if (!sites || !sites.length || sites.includes('vinted')) return { cle: 'vinted', sites: ['vinted'] };
+  const ext = sites.filter((s) => SITES_EXTENSION.includes(s));
+  if (ext.length) return { cle: ext[0], sites: ext };
+  if (sites.includes('ebay')) return { cle: 'ebay', sites: ['ebay'] };
+  return { cle: 'vinted', sites: ['vinted'] };
+}
+const NOM_SITE = { leboncoin: 'Leboncoin', vestiaire: 'Vestiaire', ebay: 'eBay' };
+// Les étapes d'une route (textes dans la langue, à l'appel).
+export function etapesRoute(route) {
+  const r = route && route.cle ? route : { cle: 'vinted' };
+  if (r.cle === 'vinted') return ETAPES_PARCOURS;
+  const compte = ETAPES_PARCOURS[0];
+  if (r.cle === 'ebay') return [compte, { cle: 'ebay', titre: tr('nouveaux.parcours.ebay.titre'), court: 'eBay', geste: tr('nouveaux.parcours.ebay.geste'), pourquoi: tr('nouveaux.parcours.ebay.pourquoi') }];
+  const extension = { ...ETAPES_PARCOURS[1], pourquoi: tr('nouveaux.parcours.extension.pourquoi', { site: NOM_SITE[r.cle] }) };
+  const k = r.cle === 'leboncoin' ? 'lbc' : 'vc';
+  return [compte, extension, { cle: r.cle, titre: tr(`nouveaux.parcours.${k}.titre`), court: NOM_SITE[r.cle], geste: tr(`nouveaux.parcours.${k}.geste`), pourquoi: tr(`nouveaux.parcours.${k}.pourquoi`) }];
+}
+// Toutes les clés d'étape possibles (une position rangée vaut sur n'importe quelle route).
+const CLES_TOUTES = ['compte', 'extension', 'vinted', 'leboncoin', 'vestiaire', 'ebay'];
+// Les lignes des sites (`select=id`) : `undefined` en cours · `null` pas su · tableau lu.
+export function preuveSite(lignes, sites) {
+  if (lignes === undefined) return { etat: 'encours' };
+  if (!Array.isArray(lignes)) return { etat: 'passu' };
+  const ids = new Set(lignes.map((l) => String((l && l.id) || '')));
+  const lus = (sites || []).filter((s) => (LIGNES_SITE_LUES[s] || []).some((k) => ids.has(k)));
+  if (lus.length) return { etat: 'fait', sitesLus: lus };
+  if ((sites || []).some((s) => (LIGNES_SITE_VUES[s] || []).some((k) => ids.has(k)))) return { etat: 'attente', detail: 'lecture' };
+  return { etat: 'afaire' };
+}
+// Les lignes d'un site rangées par l'extension prouvent qu'elle est installée et reliée
+// à CE compte (seule elle les écrit) — comme un compte Vinted rangé.
+export function lignesDuSite(lignes, sites) {
+  if (!Array.isArray(lignes)) return lignes;
+  const ok = new Set((sites || []).flatMap((s) => [...(LIGNES_SITE_LUES[s] || []), ...(LIGNES_SITE_VUES[s] || [])]));
+  return lignes.filter((l) => ok.has(String((l && l.id) || '')));
+}
+// Le registre eBay (`lireComptesEbay`) : `undefined` en cours · `null` pas su · tableau.
+export function preuveEbay(comptes) {
+  if (comptes === undefined) return { etat: 'encours' };
+  if (!Array.isArray(comptes)) return { etat: 'passu' };
+  return comptes.some((c) => c && !c.implicite) ? { etat: 'fait' } : { etat: 'afaire' };
+}
+const CLES = CLES_TOUTES;
 const ETATS = new Set(['fait', 'afaire', 'attente', 'encours', 'passu']);
 
 // ── LES PREUVES ─────────────────────────────────────────────────────────────
@@ -93,7 +162,9 @@ export function reportee(plusTard, cle, maintenant = Date.now()) {
   return Number.isFinite(t) && t <= maintenant + 60000 && maintenant - t < JOURS_REPORT * 86400000;
 }
 // Relier Vinted suppose l'extension : l'extension de côté met Vinted de côté.
-const reporteeParcours = (plusTard, cle, m) => reportee(plusTard, cle, m) || (cle === 'vinted' && reportee(plusTard, 'extension', m));
+const reporteeParcours = (plusTard, cle, m) => reportee(plusTard, cle, m) || (SUIT_EXTENSION.includes(cle) && reportee(plusTard, 'extension', m));
+// Lire un site suppose l'extension (Vinted, Leboncoin, Vestiaire — pas eBay).
+const SUIT_EXTENSION = ['vinted', 'leboncoin', 'vestiaire'];
 
 // ── LA POSITION RANGÉE (`vrm_parcours`) ─────────────────────────────────────
 // { v: 1, etape, ouvert, fini, at } — tout champ inconnu est ignoré (une étape
@@ -120,15 +191,15 @@ export function ecritureParcours(brut, changement = {}, at = new Date().toISOStr
 // `preuves` : { [cle]: { etat, … } }. Rend les étapes avec leur état, `faites`,
 // `courante` (la première pas faite ni mise de côté ; `null` si tout ce qui reste
 // est de côté), et `fini` (toutes faites — sur des preuves LUES).
-export function etatParcours(preuves = {}, { plusTard = null, maintenant = Date.now() } = {}) {
-  const etapes = ETAPES_PARCOURS.map((e) => {
+export function etatParcours(preuves = {}, { plusTard = null, maintenant = Date.now(), route = null } = {}) {
+  const etapes = etapesRoute(route).map((e) => {
     const p = preuves[e.cle] && typeof preuves[e.cle] === 'object' ? preuves[e.cle] : {};
     const etat = ETATS.has(p.etat) ? p.etat : 'passu';
     return { ...e, ...p, etat, reportee: etat !== 'fait' && reporteeParcours(plusTard, e.cle, maintenant) };
   });
   const faites = etapes.filter((e) => e.etat === 'fait').length;
   const courante = (etapes.find((e) => e.etat !== 'fait' && !e.reportee) || {}).cle || null;
-  return { etapes, faites, total: etapes.length, courante, fini: faites === etapes.length };
+  return { etapes, faites, total: etapes.length, courante, fini: faites === etapes.length, route: (route && route.cle) || 'vinted' };
 }
 // L'étape que l'écran plein montre : celle où il s'est arrêté (`voulue`) si elle
 // n'est pas faite, sinon la courante, sinon la première pas faite (même de côté) ;
@@ -144,9 +215,9 @@ export function etapeAMontrer(etat, voulue) {
 // Après « Plus tard » sur `cle` : la suivante à faire, ni faite ni de côté ; `null` ⇒ on ferme.
 export function suivanteApres(etat, cle, plusTard = null, maintenant = Date.now()) {
   if (!etat) return null;
-  const i = CLES.indexOf(cle);
+  const i = etat.etapes.findIndex((x) => x.cle === cle);
   const reste = etat.etapes.slice(i + 1).concat(etat.etapes.slice(0, Math.max(0, i)));
-  const n = reste.find((x) => x.etat !== 'fait' && x.cle !== cle && !reporteeParcours(plusTard, x.cle, maintenant) && !(cle === 'extension' && x.cle === 'vinted'));
+  const n = reste.find((x) => x.etat !== 'fait' && x.cle !== cle && !reporteeParcours(plusTard, x.cle, maintenant) && !(cle === 'extension' && SUIT_EXTENSION.includes(x.cle)));
   return n ? n.cle : null;
 }
 // La carte de Ma journée : 'cachee' · 'etape' (une étape à faire) · 'reprendre'
@@ -175,6 +246,11 @@ export function reussite(e) {
     return typeof e.achats === 'number' ? (e.achats === 1 ? '1 achat lu' : `${e.achats} achats lus`) : 'Compte relié';
   }
   if (e.cle === 'extension') return 'Connectée à ton compte';
+  if (e.cle === 'leboncoin' || e.cle === 'vestiaire') {
+    const lus = Array.isArray(e.sitesLus) && e.sitesLus.length ? e.sitesLus : [e.cle];
+    return lus.map((s) => tr(s === 'leboncoin' ? 'nouveaux.parcours.lbc.ok' : 'nouveaux.parcours.vc.ok')).join(' · ');
+  }
+  if (e.cle === 'ebay') return tr('nouveaux.parcours.ebay.ok');
   return 'Créé';
 }
 // Ce qu'une étape PAS faite dit, en une ligne (≤ 12 mots) : le geste exact quand elle
@@ -190,5 +266,8 @@ export function ligneEtape(e, { ou = 'dans ton navigateur' } = {}) {
     return `Télécharge-la, puis installe-la ${ou}.`;
   }
   if (e.cle === 'vinted') return e.etat === 'attente' ? 'Lecture de tes ventes…' : `Ouvre vinted.fr ${ou}, connecté à ton compte.`;
+  if (e.cle === 'leboncoin') return e.etat === 'attente' ? tr('nouveaux.parcours.attente') : tr('nouveaux.parcours.lbc.ligne', { ou });
+  if (e.cle === 'vestiaire') return e.etat === 'attente' ? tr('nouveaux.parcours.attente') : tr('nouveaux.parcours.vc.ligne', { ou });
+  if (e.cle === 'ebay') return tr('nouveaux.parcours.ebay.ligne');
   return '';
 }
