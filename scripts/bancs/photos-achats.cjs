@@ -23,8 +23,8 @@ require('./_porte-banc.cjs');
 //      ⋯ d'un achat ; le ⋯ l'ouvre toujours ;
 //   V6 image absente (404) ⇒ rien ne s'ouvre ;
 //   A1 Achats : une rangée par achat, plus récent en haut parmi « Tous » d'une même
-//      étape, vignette ≥ 56 px, prix calé à droite et tabulaire, l'état en UNE
-//      pastille (fond rempli, rayon ≥ moitié de la hauteur), groupe rayon ≥ 22 ;
+//      étape, vignette ≥ 48 px (14 nov., « 1 000 articles » : 48–56), prix calé à droite et tabulaire, l'état en UNE
+//      pastille (fond rempli, rayon ≥ moitié de la hauteur), groupe rayon ≥ 20 (le système, 13 nov.) ;
 //   A2 aucune phrase de plus de 12 mots dans une rangée d'achat ;
 //   F1 « Joindre une facture » (menu ⋯) : une photo part dans SA ligne
 //      (`achat_facture_tx_<n°>`, owner = la session, id par identité), la rangée
@@ -298,9 +298,9 @@ async function blocA(nav, W, sombre) {
     });
     const uniq = new Set(m.txs);
     dit(m.txs.length === 5 && uniq.size === 5, `${T} A1 une rangée par achat`, m.txs.join(','));
-    dit(m.groupeRayon >= 22, `${T} A1 groupe arrondi (rayon ≥ 22)`, m.groupeRayon);
+    dit(m.groupeRayon >= 20, `${T} A1 groupe arrondi (rayon ≥ 20, celui du système)`, m.groupeRayon);
     for (const l of m.lignes) {
-      dit(l.ph >= 56, `${T} A1 ${l.tx} grande vignette (≥ 56 px)`, l.ph);
+      dit(l.ph >= 48, `${T} A1 ${l.tx} vignette de liste (≥ 48 px, AJOUT 2 : 48–56)`, l.ph);
       dit(l.prixDroite != null && l.prixDroite <= 72 && l.prixGauche && /tabular/.test(l.tab), `${T} A1 ${l.tx} prix calé à droite, tabulaire`, JSON.stringify(l));
       const p = l.pastille; const rempli = p && !/rgba\(0, 0, 0, 0\)|transparent/.test(p.fond);
       dit(!!p && rempli && p.rayon >= p.h / 2 - 1, `${T} A1 ${l.tx} l'état en une pastille`, JSON.stringify(p));

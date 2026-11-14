@@ -81,7 +81,8 @@ const LIGNES = [
   { id: 'panel_colis_relais', data: {} },
   ...TRACKS,
 ];
-const ATTENDU = 3;
+// 14 nov. (Julien) : AUCUN colis sans code dans « À retirer » — le colis « code à venir » passe dans « À vérifier ».
+const ATTENDU = 2;
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
 const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom, String(e.message || e).slice(0, 200)); } };
@@ -178,18 +179,21 @@ const deborde = (pg) => pg.evaluate(() => { const vis = (e) => { const r = e.get
             };
           });
           dit(m.pub && m.pub.total === ATTENDU, `le nombre publié (vrm_colis_retirer) = ${ATTENDU} (les Mondial Relay disponibles seuls)`, JSON.stringify(m.pub));
-          dit(m.onglet === String(ATTENDU) && m.carte === String(ATTENDU), '« À retirer · 3 » : la pastille d’Achats et la publication disent le même nombre', `${m.onglet}/${m.carte}`);
-          dit(m.journal === 1 && m.lignesJournal === 3, '« Maison du Journal » : UN point, ses 3 colis dedans (même avec un code à venir)', `${m.journal} carte(s), ${m.lignesJournal} ligne(s)`);
-          dit(m.avenir === 1, 'le colis sans code garde sa puce « Code à venir » dans la carte du point', String(m.avenir));
+          dit(m.onglet === String(ATTENDU) && m.carte === String(ATTENDU), `« À retirer · ${ATTENDU} » : la pastille d’Achats et la publication disent le même nombre`, `${m.onglet}/${m.carte}`);
+          dit(m.journal === 1 && m.lignesJournal === 2, '« Maison du Journal » : UN point, ses 2 colis avec code dedans (le colis sans code n’y est pas)', `${m.journal} carte(s), ${m.lignesJournal} ligne(s)`);
+          dit(m.avenir === 0 && m.pub && m.pub.aVerifier === 1, 'le colis sans code n’est pas dans « À retirer » : il est compté « à vérifier » (règle du 14 nov.)', `${m.avenir} / ${m.pub && m.pub.aVerifier}`);
           // (11 nov.) Depuis le 9 nov., 17 h 24 (Julien : « TU NE PEUX PAS AVOIR D'HÉSITATION », passation
           // 2026-11-09-retraits-frais.md) il n'y a plus de « Peut-être en double » : chaque moitié Vinted sans
           // identité reçoit SON témoin (un témoin = un carton) — comptée AVEC un colis encore au point
           // (« Comptés avec un autre colis »), ou FINIE avec un colis retiré (dite dans les sortis). Les 9 moitiés
           // (3 achats « déposé » sans n° + 6 d'une adresse sans compte) sont toutes montrées, chacune UNE fois,
           // jamais comptées (le total reste 3, ci-dessus) ; il n'y a que 3 colis au point pour les « compter avec ».
+          // (14 nov.) Les colis encore au point sont 3 : les 2 « À retirer » (avec code) + celui sans code,
+          // rangé « à vérifier » mais toujours au point : une moitié peut être comptée avec lui.
+          const AU_POINT = ATTENDU + 1;
           const nDouble = Number(m.double || 0), nFinies = m.sortisDoute.length;
           const deuxEtats = m.sortisDoute.filter((t) => m.titresDouble.some((d) => d && t.startsWith(d)));
-          dit(nDouble + nFinies === 9 && nDouble <= ATTENDU && !deuxEtats.length, 'les 9 moitiés Vinted sans identité : chacune UN état (comptée avec un colis au point, ou finie avec lui), montrées, jamais comptées', `${nDouble} comptées avec + ${nFinies} finies${deuxEtats.length ? ' · deux états : ' + deuxEtats.join(' | ') : ''}`);
+          dit(nDouble + nFinies === 9 && nDouble <= AU_POINT && !deuxEtats.length, 'les 9 moitiés Vinted sans identité : chacune UN état (comptée avec un colis au point, ou finie avec lui), montrées, jamais comptées', `${nDouble} comptées avec + ${nFinies} finies${deuxEtats.length ? ' · deux états : ' + deuxEtats.join(' | ') : ''}`);
           // La liste « À vérifier » porte aussi les achats au point relais qu'aucune identité ne relie
           // (`enVerification`) : le nombre publié qu'elle doit égaler est celui que lit À trancher (src/aTrancher.js).
           const pubVerif = m.pub ? Number(m.pub.aVerifier) + (Number(m.pub.enVerification) || 0) : null;

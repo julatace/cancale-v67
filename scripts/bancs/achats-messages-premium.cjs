@@ -145,7 +145,10 @@ async function ouvrir(b, vp, tab) {
   const ctx = await b.newContext({ viewport: vp, ...(tel ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-  await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_prenom', JSON.stringify('Julien')); } catch (_) {} });
+  await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_prenom', JSON.stringify('Julien'));
+    // (14 nov., refonte Achats) « À retirer » est rangé dans un repli sur Achats ; ce banc juge les codes DANS la section :
+    // il l'a ouverte (le choix que l'app retient, `vrm_achats_retirer_ouvert`).
+    localStorage.setItem('vrm_achats_retirer_ouvert', '1'); } catch (_) {} });
   if (!tel) await pg.addInitScript(PONT, { fils: { 301: FIL } });
   await pg.route(/^https?:\/\/[^/]*vinted\.net\//i, (r) => { const m = /\/b(\d+)\//.exec(r.request().url()); return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: photoSvg(m ? Number(m[1]) : 0) }); });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1|[^/]*vinted\.net)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
