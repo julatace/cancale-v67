@@ -45,8 +45,6 @@ const TITRE = 'Nike Dunk Low Panda taille 42';
 const photo = (id) => `https://images1.vinted.net/t/${id}/f800/photo.jpeg`;
 const FICHES = {};
 for (let i = 0; i < 50; i++) FICHES[7200 + i] = { numero: String(201 + i), title: TITRE, numberedAt: '2026-10-22T10:00:00Z', auto: false, buyPrice: String(10 + i), accountId: '111' };
-// Le N°230 porté par DEUX annonces présentes (deux paires sous un N°) : le seul rouge.
-FICHES[7299] = { numero: '230', title: TITRE, numberedAt: '2026-10-23T10:00:00Z', auto: false, buyPrice: '99', accountId: '111' };
 // L'achat 33000000001 relié par SON clic à la paire N°206.
 FICHES[7205].buyFromId = '33000000001';
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_banc', domain: 'www.vinted.fr', updated_at: iso(M) }];
@@ -55,7 +53,7 @@ const item = (id, title) => ({ id: Number(id), title, price: { amount: '60.0', c
 // 1 000 ventes finalisées de plus (d'autres paires, sans N°) : la fiche s'ouvre sur une liste de cette taille.
 const MILLE = Number(process.env.MILLE || 1000);
 for (let i = 0; i < MILLE; i++) FICHES[8000 + i] = { numero: String(301 + i), title: `Adidas Samba OG blanc ${36 + (i % 10)} lot ${i}`, numberedAt: '2026-09-01T10:00:00Z', auto: true, accountId: '111' };
-const LISTINGS = Array.from({ length: 50 }, (_, i) => item(7200 + i, TITRE)).filter((x) => ![7226, 7210, 7240].includes(x.id)).concat([item(7299, TITRE)])
+const LISTINGS = Array.from({ length: 50 }, (_, i) => item(7200 + i, TITRE)).filter((x) => ![7226, 7210, 7240].includes(x.id))
   .concat(Array.from({ length: MILLE }, (_, i) => item(8000 + i, FICHES[8000 + i].title)));
 const vente = (tx, j, prix, extra = {}) => ({ transaction_id: tx, title: TITRE, status: 'Commande finalisée', transaction_user_status: 'completed', price: { amount: prix, currency_code: 'EUR' }, date: ilYa(j), photo: { url: photo(String(tx).slice(-4)) }, ...extra });
 const VENTES = [
@@ -69,13 +67,13 @@ const ACHATS = [{ transaction_id: ACHAT_TX, title: 'Nike Dunk Low Panda taille 4
 const txn = (tx, it, s, su, side = 'seller') => ({ id: `harvest_111_txn_${tx}`, data: { capturedAt: iso(M), side, payload: { transaction: { id: tx, item_id: it, status: s, status_title: 'x', status_updated_at: su } } } });
 const LBC = 'aaaa1111-0000-4000-8000-00000000000a';
 const MEUBLES = [{ id: 'm1', name: 'Étagère banc', cols: 3, rows: 2 }];
-const SLOTS = { '7202': { m: 'm1', i: 1 } };
+const SLOTS = { 203: { m: 'm1', i: 1 } };
 const ROWS = [
   { id: 'main', data: { vinted_annonce_numeros: FICHES, vinted_used_numeros: Object.values(FICHES).map((f) => f.numero), vrm_meubles: MEUBLES, vrm_slots: SLOTS } },
   { id: 'harvest_111_listings', data: { capturedAt: iso(M - 600e3), payload: { items: LISTINGS, pagination: { total_entries: LISTINGS.length } } } },
   { id: 'harvest_111_orders_sold', data: { capturedAt: iso(M), nItems: VENTES.length, payload: { my_orders: VENTES } } },
   { id: 'harvest_111_orders_purchased', data: { capturedAt: iso(M), nItems: ACHATS.length, payload: { my_orders: ACHATS } } },
-  txn(22999990226, 7226, 450, ilYa(1)), txn(22999990210, 7210, 300, ilYa(2)), txn(22999990240, 7240, 220, ilYaH(6)),
+  txn(22999990226, 7226, 450, ilYa(1)), txn(22999990210, 7210, 300, ilYa(2)), { id: 'harvest_111_txn_22999990240', data: { capturedAt: iso(M), side: 'seller', payload: { transaction: { id: 22999990240, item_id: 7240 } } } },
   txn(ACHAT_TX, 9900001, 300, ilYa(1), 'buyer'),
   { id: 'email_bord_9226', data: { type: 'bordereau', transaction: '22999990226', suivi: '6A11111111111', filename: 'b.pdf', pdfB64: 'JVBERi0x', receivedAt: '2026-11-04T12:00:00.000Z' } },
   { id: 'email_bord_9240', data: { type: 'bordereau', transaction: '22999990240', uid: '111', suivi: '6A24024024024', filename: 'bordereau-22999990240.pdf', pdfB64: 'JVBERi0x', receivedAt: ilYaH(5), modele: TITRE, article: TITRE } },
@@ -174,6 +172,26 @@ async function preparer(b, vp, { sombre = false, tab = 'journee' } = {}) {
 const LISTES = [
   { cle: 'ventes', tab: 'tab=ventes&site=vinted', ligne: '[data-serie-ligne="22999990226"]', toucher: '[data-serie-ligne="22999990226"] .vrm-ledger-sale-toggle', num: '227', ctx: 'vente',
     inventaire: ['[data-photo-grand]', '[data-cv-emballage-saisir]', '[data-photo-carton-prendre]', '[data-rappel-bouton]', '[data-recap-vinted]', '[data-recap-benef-etat]', '.vrm-recap-modifier'] },
+  // 50 paires au même titre : la vente À EXPÉDIER du N°241 ouvre le N°241 (et son bordereau), jamais le 227.
+  { cle: 'ventes-241', tab: 'tab=ventes&site=vinted', ligne: '[data-serie-ligne="22999990240"]', toucher: '[data-serie-ligne="22999990240"] .vrm-ledger-sale-toggle', num: '241', ctx: 'vente',
+    inventaire: ['[data-recap-conversation]', '[data-rappel-bouton]', '[data-recap-vinted]'] },
+  { cle: 'colis', tab: 'tab=ventes&site=vinted', ligne: '[data-bord-card][data-tx-colis="22999990240"]', toucher: '[data-bord-card][data-tx-colis="22999990240"] .vrm-colis-titre', num: '241', ctx: 'colis',
+    inventaire: ['[data-imprime]', '[data-geste]'] },
+  { cle: 'annonces', tab: 'tab=annonces&site=vinted', ligne: '[data-carte-annonce="7203"]', toucher: '[data-carte-annonce="7203"] .vrm-ann-price-line', num: '204', ctx: 'annonce',
+    inventaire: ['[data-annonce-prix-partout]', '[data-fiche-stock]', '[data-fiche-menu-ouvrir]'] },
+  { cle: 'annonces-lbc', tab: 'tab=annonces&site=leboncoin', ligne: '[data-lbc-catalog-id="4100000001"]', toucher: '[data-lbc-catalog-id="4100000001"] strong', num: '205', ctx: 'annonce',
+    inventaire: [] },
+  { cle: 'annonces-ebay', tab: 'tab=annonces&site=ebay', ligne: '[data-ebay-annonce="5550001"]', toucher: '[data-ebay-annonce="5550001"] .vrm-eb-titre', num: '209', ctx: 'annonce',
+    inventaire: ['[data-ebay-fiche]'] },
+  { cle: 'annonces-vestiaire', tab: 'tab=annonces&site=vestiaire', ligne: '[data-vc-annonce="71000009"]', toucher: '[data-vc-annonce="71000009"] strong', num: '212', ctx: 'annonce',
+    inventaire: [] },
+  { cle: 'stock', tab: 'tab=garage', ligne: '[data-case-num="203"]', toucher: '[data-case-num="203"]', num: '203', ctx: 'stock',
+    inventaire: ['[data-fiche-ranger]', '[data-fiche-retirer]'] },
+  { cle: 'achats', tab: 'tab=achats&site=vinted', ligne: '[data-achat-tx="33000000001"]', toucher: '[data-achat-tx="33000000001"] .vrm-buy-title', num: '206', ctx: 'achat',
+    inventaire: ['[data-rappel-bouton]', '[data-achat-masquer="33000000001"]', '[data-achat-joindre-facture="33000000001"]'] },
+  // Le colis à retirer n'a AUCUNE identité de paire sur sa ligne : la fiche de la LIGNE, jamais une paire devinée.
+  { cle: 'retrait', tab: 'tab=achats&site=vinted', ligne: '[data-cc-carte]', toucher: '[data-cc-carte] .vrm-rpf-titre', num: '', ctx: 'retrait', sansPaire: true,
+    inventaire: ['[data-rp-detail]', '[data-colis-retire]'] },
 ];
 
 const lireFiche = (pg) => pg.evaluate(() => {
@@ -201,7 +219,7 @@ const amener = async (pg, sel) => { const el = pg.locator(sel).first(); await el
 const guetter = (pg) => pg.evaluate(() => {
   window.__fpClic = null; window.__fpVu = null;
   document.addEventListener('click', (e) => { if (window.__fpClic == null) window.__fpClic = e.timeStamp; }, { capture: true, once: true });
-  const mo = new MutationObserver(() => { const el = document.querySelector('[data-fiche-paire]'); if (el && window.__fpVu == null) { mo.disconnect(); requestAnimationFrame(() => { window.__fpVu = performance.now(); }); } });
+  const mo = new MutationObserver(() => { const el = document.querySelector('[data-fiche-paire]'); if (el && window.__fpVu == null) { mo.disconnect(); window.__fpVu = performance.now(); requestAnimationFrame(() => { window.__fpImage = performance.now(); }); } });
   mo.observe(document.body, { childList: true, subtree: true });
 });
 // LE PLANCHER DE LA MACHINE : ce que coûte, sur CETTE page et à CET instant, poser un voile vide plein
@@ -224,7 +242,7 @@ const toucher = async (pg, sel, tel) => {
 };
 const attendreFiche = async (pg, t0, n = null) => {
   for (let i = 0; i < 80; i++) {
-    const r = await pg.evaluate(({ t0, n }) => { const el = document.querySelector('[data-fiche-paire]'); if (!el || !el.getClientRects().length || window.__fpVu == null) return null; if (n != null && el.getAttribute('data-fiche-paire') !== n) return null; return { ms: window.__fpVu - (window.__fpClic != null ? window.__fpClic : t0) }; }, { t0, n });
+    const r = await pg.evaluate(({ t0, n }) => { const el = document.querySelector('[data-fiche-paire]'); if (!el || !el.getClientRects().length || window.__fpVu == null) return null; if (n != null && el.getAttribute('data-fiche-paire') !== n) return null; const z = window.__fpClic != null ? window.__fpClic : t0; return { ms: window.__fpVu - z, image: window.__fpImage != null ? window.__fpImage - z : null }; }, { t0, n });
     if (r) r.base = PLANCHER;
     if (r) return r;
     await pg.waitForTimeout(25);
@@ -244,6 +262,18 @@ const fermerFiche = (pg) => pg.evaluate(() => { const b = document.querySelector
     for (const [vp, sombre] of tours) {
       const tel = vp.width < 600; const TT = `[${vp.width}${sombre ? ' sombre' : ''}]`; const suf = `${vp.width}${sombre ? '-sombre' : '-clair'}`;
       console.log(`── ${vp.width} px${sombre ? ' · sombre' : ' · clair'}`);
+      if (process.env.SONDE_TABS) {
+        for (const tab of process.env.SONDE_TABS.split(';')) {
+          const { ctx, pg } = await preparer(b, vp, { sombre, tab });
+          await pg.waitForTimeout(3000);
+          const r = await pg.evaluate((SEL) => [...document.querySelectorAll(SEL)].slice(0, 12).map((x) => ({ cle: x.getAttribute('data-fiche-ligne'), num: x.getAttribute('data-fl-num'), item: x.getAttribute('data-fl-item'), tx: x.getAttribute('data-fl-tx'), tag: x.tagName, cls: String(x.className).slice(0, 40), vis: !!x.getClientRects().length, attrs: [...x.attributes].filter((a) => a.name.startsWith('data-')).map((a) => a.name).join(' ').slice(0, 200) })), process.env.SEL || '[data-fiche-ligne]');
+          console.log('SONDE', tab, JSON.stringify(r));
+          await pg.screenshot({ path: path.join(SHOTS, `fp-sonde-${tab.replace(/[^a-z]/g, '')}.png`), fullPage: !!process.env.PLEIN });
+          if (process.env.PLEIN) console.log('LIGNES', JSON.stringify(await pg.evaluate(() => [...document.querySelectorAll('.vrm-main [data-tx], .vrm-main [data-num], .vrm-main [data-numero], .vrm-main [data-jv2-ligne], .vrm-main [data-journee-ligne]')].slice(0, 30).map((x) => x.tagName + ' ' + [...x.attributes].filter((a) => a.name.startsWith('data-')).map((a) => a.name + '=' + a.value.slice(0, 20)).join(' ').slice(0, 200)))));
+          await ctx.close();
+        }
+        continue;
+      }
       for (const L of listes) {
         const { ctx, pg, errs } = await preparer(b, vp, { sombre, tab: L.tab });
         await essaie(`${L.cle} ${TT}`, async () => {
@@ -269,17 +299,18 @@ const fermerFiche = (pg) => pg.evaluate(() => { const b = document.querySelector
           dit(!!vu, `A ${L.cle} ${TT} toucher la ligne ouvre LA fiche de la paire (FichePaire)`);
           if (!vu) return;
           let f = await lireFiche(pg);
-          for (let i = 0; i < 40 && f && f.num !== L.num; i++) { await pg.waitForTimeout(150); f = await lireFiche(pg); }
-          dit(f && f.num === L.num && !!f.ligne && f.ctx === L.ctx, `A ${L.cle} ${TT} la fiche du N°${L.num}, par identité, ouverte depuis la ligne (contexte « ${L.ctx} »)`, f);
+          for (let i = 0; i < 40 && f && f.num !== L.num && !L.sansPaire; i++) { await pg.waitForTimeout(150); f = await lireFiche(pg); }
+          if (L.sansPaire) dit(f && f.num === '' && f.sansPaire === 'aucun' && !!f.ligne && f.ctx === L.ctx, `B ${L.cle} ${TT} une ligne sans identité de paire ouvre la fiche de la LIGNE : « pas de paire reliée », aucun N° deviné`, f);
+          else dit(f && f.num === L.num && !!f.ligne && f.ctx === L.ctx, `A ${L.cle} ${TT} la fiche du N°${L.num} (par identité, sur 50 paires au même titre), ouverte depuis la ligne (contexte « ${L.ctx} »)`, f);
           // Le temps d'ouverture : la médiane de trois touchers (le premier, puis deux autres après fermeture) —
           // une machine de banc (swiftshader) a des à-coups qu'un seul toucher prendrait pour la règle.
-          const temps = [vu.ms - vu.base]; const bruts = [`${Math.round(vu.ms)}−${Math.round(vu.base)}`];
+          const temps = [vu.ms]; const bruts = [`${Math.round(vu.ms)} (image ${Math.round(vu.image || 0)}, voile vide ${Math.round(vu.base)})`];
           for (let k = 0; k < 2; k++) {
             await fermerFiche(pg); await pg.waitForTimeout(1500);
-            const tk = await toucher(pg, L.toucher, tel); const v2 = await attendreFiche(pg, tk); if (v2) { temps.push(v2.ms - v2.base); bruts.push(`${Math.round(v2.ms)}−${Math.round(v2.base)}`); }
+            const tk = await toucher(pg, L.toucher, tel); const v2 = await attendreFiche(pg, tk); if (v2) { temps.push(v2.ms); bruts.push(`${Math.round(v2.ms)} (image ${Math.round(v2.image || 0)}, voile vide ${Math.round(v2.base)})`); }
           }
           const med = temps.slice().sort((x, y) => x - y)[Math.floor(temps.length / 2)];
-          dit(temps.length === 3 && med < 150, `D ${L.cle} ${TT} la fiche paraît en ${Math.round(med)} ms au-dessus du plancher de la machine (médiane de ${bruts.join(', ')} ; < 150)`, bruts);
+          dit(temps.length === 3 && med < 150, `D ${L.cle} ${TT} la fiche est posée ${Math.round(med)} ms après le toucher (médiane de ${bruts.join(', ')} ; < 150)`, bruts);
           f = await lireFiche(pg);
           for (const a of L.inventaire) dit(await pg.evaluate((a) => !!document.querySelector('[data-fiche-paire]') && [...document.querySelectorAll(a)].some((x) => x.closest('[data-fiche-paire]')), a), `C ${L.cle} ${TT} l'action « ${a} » est DANS la fiche`);
           dit(f && f.petits.length === 0, `E ${L.cle} ${TT} chaque bouton de la fiche fait au moins ${f && f.seuil} px`, f && f.petits);

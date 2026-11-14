@@ -25403,7 +25403,7 @@ function CarteColisVc({ v, imprime, fait }) {
       {/* (3 nov.) LA FRISE D'UN COLIS, comme Vinted : « imprimé » = sa coche (`vrm_vc_imprimes`), « déposé » =
           « Colis fait » ; « en route » / « livré » ne sont pas lus pour Vestiaire ⇒ jamais cochés. */}
       {imprime || fait ? <Frise etapes={friseColisFusion({ imprime: !!imprime, depose: !!fait }, { geste: j != null && j <= 1 && !fait })} cle={'vc:' + v.id} className="vrm-colis-frise" label="Où en est le colis"/> : null}
-      <DansFiche cle={fl['data-fiche-ligne']}>
+      <DansFiche cle={fl['data-fiche-ligne']} aussiIci>
       <div className="vrm-colis-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
         {/* (2 nov. au soir) Le transporteur LU dans la puce, À GAUCHE du bouton bordereau, même rangée (comme Vinted). */}
         <div className="vrm-rangee-bord" data-rangee-bord="">
@@ -25451,7 +25451,7 @@ function CarteColisSite({ ident, site, photo, titre, num, sous, sousAmbre = fals
         </div>
       </div>
       {Array.isArray(frise) && frise.some((x) => x.fait) ? <Frise etapes={frise} cle={ident} className="vrm-colis-frise" label="Où en est le colis"/> : null}
-      <DansFiche cle={fl['data-fiche-ligne']}>
+      <DansFiche cle={fl['data-fiche-ligne']} aussiIci>
       <div className="vrm-colis-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
         <div className="vrm-rangee-bord" data-rangee-bord="">
           {/* (12 nov., finitions) « … » DANS la rangée du bordereau, à sa gauche : posé à part (absolu), il passait sous « Imprimer » / « Générer le bordereau » et ne se touchait plus. */}
@@ -51639,7 +51639,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {(()=>{ if (posted) return null; const sv = b && b.suivi ? suiviVente({ site: 'vinted', o, b, lim: e.lim, tr: trV }) : null;
                       const inc = sv ? sv.inc.filter((z) => z.code === 'imprime-pas-depose') : [];
                       return inc.length ? ligneSuiviVente({ cle: String(e.txn||e.key), tr: trV }, sv, inc) : null; })()}
-                    <DansFiche cle={flColis['data-fiche-ligne']}>
+                    <DansFiche cle={flColis['data-fiche-ligne']} aussiIci>
                     <div className="vrm-colis-actions" style={{display:'flex',gap:8,alignItems:'center',marginTop:12,flexWrap:'wrap'}}>
                       {/* (2 nov. au soir) Julien : « à côté du bouton bordereau, marqué Chronopost avec le
                           logo » — LA RANGÉE : la puce du transporteur LU (n° du bordereau, ligne du

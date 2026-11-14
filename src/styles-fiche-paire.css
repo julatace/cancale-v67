@@ -242,3 +242,6 @@
 .vrm-fp-depuis-ligne .vrm-fu-plus { display: none !important; }
 .vrm-fp-depuis-ligne .vrm-buy-menu-tel { display: flex !important; }
 .vrm-fp-contexte :is([data-stock-fiche-tete], [data-fiche-voir-etat]) { display: none !important; }
+/* 44 px au doigt pour tout ce qui se touche dans la fiche (les gestes venus d'une ligne portent leurs styles en ligne). */
+.vrm-fp .vrm-fp-depuis-ligne :is(button, a[href], [role="menuitem"]) { min-height: 44px !important; }
+@media (hover: hover) and (pointer: fine) and (min-width: 768px) { .vrm-fp .vrm-fp-depuis-ligne :is(button, a[href], [role="menuitem"]) { min-height: 36px !important; } }
