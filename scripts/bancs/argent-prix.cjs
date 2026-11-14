@@ -44,7 +44,7 @@ for (let i = 1; i <= 12; i++) {
 for (let i = 1; i <= 6; i++) {
   const item = 600000 + i;
   LISTINGS.push({ id: item, title: `Paire inventée N°${i} taille 42`, price: { amount: String(i === 1 ? 100 : 80), currency_code: 'EUR' }, is_hidden: false, created_at_ts: Math.round((NOW - 30 * J) / 1000), photos: [] });
-  FICHES[String(item)] = { numero: String(i), title: `Paire inventée N°${i} taille 42`, numberedAt: '2026-10-20T10:00:00Z', accountId: A, buyPrice: '40' };
+  FICHES[String(item)] = { numero: String(i), title: `Paire inventée N°${i} taille 42`, numberedAt: '2026-10-20T10:00:00Z', accountId: A, buyPrice: '40', price: String(i === 1 ? 100 : 80) };   // le prix capté sur la fiche (la forme que lit `toutSurLeNumero`)
 }
 // 8 offres acceptées : 5 dans une conversation dont la transaction est vendue (payées), 3 sans vente.
 const offre = (id, st, ts) => ({ entity_type: 'offer_request_message', created_at_ts: iso(ts), entity: { user_id: 9, offer_request_id: id, status: st, price: { amount: '90.0' } } });
@@ -282,8 +282,13 @@ const regles7 = (pg, sel) => pg.evaluate((s) => {
         await sain(pg, 'Ma journée');
       });
 
+      dit(!errs.length, 'aucune erreur d’app', errs.join(' | ').slice(0, 300));
+      await ctx.close();
+
       await essaie('E. Litiges', async () => {
-        console.log('── E. Ventes → Litiges : deux taux par modèle');
+        console.log('── E. Ventes → Litiges : deux taux par modèle (contexte neuf)');
+        const { ctx: c3, pg, errs: e3 } = await contexte(b, vp, sombre, { main: mainDe() });
+        const shot = async (sel, f) => { if (!SHOTS) return; const l = pg.locator(sel).first(); if (await l.count()) { await l.scrollIntoViewIfNeeded().catch(() => {}); await pg.waitForTimeout(250); await l.screenshot({ path: path.join(SHOTS, `${f}-${nom}.png`) }).catch(() => {}); } };
         await pg.waitForTimeout(1500);
         try { await aller(pg, 'litiges', '[data-retours-modeles]', 3000); } catch (_) { await pg.waitForTimeout(2000); await aller(pg, 'litiges', '[data-retours-modeles]', 3000); }
         await pg.waitForFunction(() => { const e = document.querySelector('[data-retours-modeles]'); return e && e.getAttribute('data-retours-modeles') === 'lu'; }, null, { timeout: 25000 }).catch(() => {});
@@ -293,10 +298,9 @@ const regles7 = (pg, sel) => pg.evaluate((s) => {
         dit(s && s['ventes-n'] === '2' && s['taux-retour'] === '', '112 : Samba, 2 ventes ⇒ taux « — » (trop peu pour un taux)', JSON.stringify(s));
         await shot('[data-retours-modeles]', 'retours');
         await sain(pg, 'Litiges');
+        dit(!e3.length, 'Litiges : aucune erreur', e3.join(' | ').slice(0, 200));
+        await c3.close();
       });
-      dit(!errs.length, 'aucune erreur d’app', errs.join(' | ').slice(0, 300));
-      await ctx.close();
-
       await essaie('D. Page du comptable', async () => {
         console.log('── D. La page du comptable');
         const { ctx: c2, pg: p2, errs: e2 } = await contexte(b, vp, sombre, { main: mainDe() });

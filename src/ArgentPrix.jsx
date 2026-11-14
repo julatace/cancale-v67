@@ -140,7 +140,7 @@ export function EcartsPrixFeuille({ res, manques = [], onChanger, onFermer, Reto
           {res.ecarts.length ? <ul className="vrm-ac-lignes vrm-ac-carte vrm-ap-liste" data-ecarts-n={res.ecarts.length}>{res.ecarts.slice(0, 200).map((e) => ligne(e, false))}</ul>
             : <p className="vrm-ac-note" data-ecarts-aucun="">{tr('ap.ec.aucun')}</p>}
           {res.voulus.length ? <details className="vrm-ac-repli"><summary data-ecarts-voulus={res.voulus.length}>{tr('ap.ec.voulus', { n: res.voulus.length })}</summary><ul className="vrm-ac-lignes vrm-ac-carte vrm-ap-liste">{res.voulus.slice(0, 200).map((e) => ligne(e, true))}</ul></details> : null}
-          {res.nonJuges.length ? <p className="vrm-ac-note" data-ecarts-non-juges={res.nonJuges.length}>{tr('ap.ec.nonJuges', { n: res.nonJuges.length })}</p> : null}
+          {res.nonJuges.length ? <p className="vrm-ac-note" data-ecarts-non-juges={res.nonJuges.length} data-ecarts-raisons={res.nonJuges.map((x) => `${x.num}:${x.raison}:${x.sites.join('+')}`).join(' ')}>{tr('ap.ec.nonJuges', { n: res.nonJuges.length })}</p> : null}
           {manques.length ? <p className="vrm-ac-note" data-ecarts-manques={manques.join('|')}>{tr('ap.ec.manques', { x: manques.join(', ') })}</p> : null}
           <Repli titre={tr('ap.comment')}>{tr('ap.ec.comment')}</Repli>
         </div>

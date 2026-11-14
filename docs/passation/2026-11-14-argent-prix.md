@@ -1,0 +1,33 @@
+# 14 nov. 2026 — Argent et prix (112, 113, 114, 115, 116, 121, 122)
+
+Branche `claude/argent-prix` (depuis `origin/main`, avec `claude/frais-carte` fusionnée : sa règle de frais
+est réutilisée pour 122). Julien : « fais tout, lance tout en même temps ». On a MESURÉ l'existant d'abord,
+puis complété. Aucune règle de chiffre neuve quand une existait (§5, une règle par notion).
+
+## Ce qui existait, ce qui manquait, ce qui est fait
+
+| # | existait | manquait | fait |
+|---|---|---|---|
+| 112 | `retoursParModele` (src/litigesEcran.js), Ventes → Litiges : « 2 sur 15 » (retours + litiges ensemble) | les DEUX taux, chacun à part ; la couverture | `tauxRetour`, `tauxLitige` (en %, « — » sous 3 ventes du modèle, « au moins » si une cause de remboursement n'est pas lue) ; « Sur N ventes prouvées · S sans modèle sûr » ; titre « Retours et litiges par modèle » |
+| 113 | `statsOffres` (carte « Les offres ») : reçues, acceptées par compte | « payées », les taux | `src/tauxOffres.js` : payée = la transaction de la conversation (`transaction.id`, projeté avec les messages — mesuré : 798/798 conversations à offre la portent) est une vente prouvée (`ventesFaites`) ; une conversation = une transaction : seule la DERNIÈRE acceptée peut être payée ; < 48 h = en attente ; sans transaction ou ventes pas lues = pas su. Carte « Offres acceptées et payées » (Statistiques) : tuiles + une rangée par compte |
+| 114 | « Baisser le prix » en série (Vinted, Leboncoin ; Vestiaire à part), baisses programmées | une date de fin, le prix d'origine gardé, la remise | « Pour toujours / Jusqu'au… » dans la feuille ; après la série, seules les baisses ACCEPTÉES ET RELUES sont gardées (`vrm_soldes`, SYNC_KEYS) avec le prix d'origine LU par l'extension avant l'envoi, par identité (site + compte + id) ; une 2e baisse garde le 1er prix d'origine. Le jour venu (Paris), Ma journée PROPOSE « Solde fini · N prix à remettre » ; la feuille relit le prix actuel (changé par lui ⇒ pas touché ; vendue ⇒ rien ; pas lu ⇒ rien ne part) ; « Remettre N prix » = son clic, une commande à la fois, relue. **Extension 5.376.0** : les trois chemins de baisse acceptent UNE hausse, `remise:true` + `confirme` + prix voulu = `prixOrigine` (≤ 10 × le prix actuel) — `remisePermise`, capacité `remiseprix` |
+| 115 | « Exporter pour mon comptable » (zip, CSV, PDF) | un lien lecture seule | `api/_lib/comptable-lien.js` dans `api/compte.js` (`mode=comptable`, aucune fonction neuve) : jeton `aléa.expiration.HMAC` (clé `COMPTABLE_SECRET`, sinon la clé de service), indexé par empreinte (`jeton-index`, genre `comptable`), 7/30/90/365 jours, couper, remplacer ; la vue = `donneesExportComptable` RÉDUITE par une liste BLANCHE côté serveur (aucun pseudo, acheteur, fournisseur, e-mail, id interne) ; journal des accès `vrm_comptable_acces` (date, navigateur, jamais d'IP) ; `vrm.center/c/<jeton>` → `/?comptable=` → `src/VueComptable.jsx` (sans l'app, sans session, sans écriture). Carte dans Déclarer → export : créer, copier, ajouter la période, couper, accès |
+| 116 | « Mois bouclé » (micro seulement, des NOMBRES et des portes) | la LISTE vente par vente, pour tous | `src/revisionMois.js` sur le relevé de Ventes : prix d'achat pas saisi, versement Vinted pas lu, vente sans N° ; une ligne par vente, ses manques, la porte du premier (les portes de « Mois bouclé » : saisie en série, « Vendu et reçu », Ventes) ; Déclarer, sous « Mois bouclé » |
+| 121 | « Changer le prix » d'un N° (sites par identité, `sitesDuNumero`) | la liste des N° à deux prix | `src/ecartsPrix.js` + feuille « Prix d'un site à l'autre » (Statistiques → « Vérifier mes prix ») : chaque N° en ligne sur Vinted, ses autres sites par `sitesPrixDe` ; deux annonces d'un site sous un N° ⇒ pas jugé ; autre devise ⇒ pas comparé ; l'écart de SON réglage « Publier partout » rangé à part ; « Changer le prix » ouvre la feuille habituelle. Rien n'est changé |
+| 122 | la calculette (prix → bénéfice) | l'inverse : net voulu → prix par site | `src/prixVoulu.js` : taux LUS par `fraisParPlateforme` (règle de frais-carte) sur toutes ses ventes : Vinted/Leboncoin 0, eBay commission ÷ dû au vendeur, Vestiaire commission lue ; le plus petit prix (au centime) qui laisse le net, puis arrondi à l'euro AU-DESSUS, le net à ce prix dit ; eBay : port payé par l'acheteur (§2.8) ; pas lu ⇒ « — ». Carte « Le prix à afficher » (Statistiques) |
+
+## Tranché
+- 113 : on ne sait pas qui a accepté (lui ou le moteur) : non dit (comme la carte des offres).
+- 114 : une baisse PROGRAMMÉE (étalée) ne peut pas être un solde (le résultat n'est pas relu dans la feuille) : l'option est cachée quand « Dans les 12 h » est choisi. Vestiaire : l'extension accepte la remise, mais la feuille Vestiaire (BaissePrixVestiaire) ne propose pas encore « Jusqu'au… ».
+- 114 : l'option n'apparaît qu'à une extension qui sait remettre (`remiseprix`, 5.376) — sinon un solde ne pourrait pas finir.
+- 115 : le comptable voit les périodes PUBLIÉES par Julien (8 au plus), pas un calcul serveur : la compta reste calculée par l'app (une règle), le serveur ne fait que filtrer.
+- 121 : seules les paires en ligne sur Vinted sont le point de départ (un N° présent sur Leboncoin et eBay sans Vinted n'est pas comparé).
+
+## Preuves
+- `node scripts/audit-argent-prix.cjs` : 64 verts — EXÉCUTE les règles et la route comptable (projection = compta seule, signature retouchée / expiré / coupé / remplacé ⇒ 404, base KO ⇒ 503), le vrai `baisserPrixVinted` dans un vm (hausse sans `remise` refusée, 0 PUT ; remise vers un autre prix refusée ; sans `confirme` refusée ; remise à l'origine : un PUT, relue), 50 conversations au même titre (une payée), 50 paires au même titre (aucun faux écart), aller-retour prix ⇄ net au centime (> 10 000 nets × 8 taux). 16 mutations, toutes rouges (`--mutation=taux|payee|attente|origine|relu|date|whitelist|expire|signature|double|voulu|inverse|arrondi|revision|ext|clic`). Sur l'arbre d'`origin/main` : rouge (112 sans taux, modules absents).
+- Banc `scripts/bancs/argent-prix.cjs` (390 tactile, base inventée) : voir le rapport du dernier lancement ci-dessous.
+- Gardés verts : build, audits traduction, tdz, variables, coherence, urssaf, identite, fonctions-api, argent-choix, frais-carte, quoi-de-neuf, baisse-prix, agenda-appareil, jeton-index, lbc-plus, litiges-ecran, stats-offres, securite-comptes, discretion.
+- Réparation : la fusion de `claude/frais-carte` avait laissé des marqueurs de conflit dans les 5 fichiers de langue et `audit-traduction.cjs` (commit 7dc36a6e) — résolus en gardant les deux côtés.
+
+## Geste de Julien
+Installer l'extension **5.376.0** (pour « Jusqu'au… » et « Remettre les prix ») ; facultatif : poser `COMPTABLE_SECRET` sur Vercel (sinon la clé de service signe les liens).
