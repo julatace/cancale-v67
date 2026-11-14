@@ -78,13 +78,14 @@ export function AideEcranFeuille({ cle, onClose, onSignaler, Feuille = SheetShel
       <AideVideo cle={cle}/>
       {/* (11 nov.) L'animation de l'écran : une scène par geste, le geste en cours s'allume dessous. */}
       <AideAnimation cle={cle} onEtape={setEtape}/>
-      <RevoirVisite cle={cle} onAvant={onClose}/>
       {/* (10 nov., lot J) EN TÊTE : les 3 à 5 gestes de cet écran (sans vidéo), texte de scripts/aide-contenu.cjs. */}
       {etapes.length ? (
         <ol className="vrm-aide-etapes" data-aide-etapes={etapes.length}>
           {etapes.map((e, i) => <li key={i} data-aide-etape={i + 1} data-aide-etape-actif={etape === i ? '1' : undefined} aria-current={etape === i ? 'step' : undefined}><span className="vrm-aide-etape-n" aria-hidden="true">{i + 1}</span><span>{e}</span></li>)}
         </ol>
       ) : null}
+      {/* (14 nov., idée 136) « Revoir la visite de cet écran » : sur SON geste, la feuille se ferme d'abord. */}
+      <RevoirVisite cle={cle} onAvant={onClose}/>
       {/* (11 nov.) « Comment faire… ? » : toutes les fiches, sans IA (src/aideFiches.js). */}
       <label className="vrm-aide-cherche" data-aide-cherche="">
         <svg width="17" height="17" viewBox="0 0 17 17" aria-hidden="true" focusable="false"><circle cx="7.3" cy="7.3" r="5.6" fill="none" stroke="currentColor" strokeWidth="1.7"/><path d="M11.6 11.6l3.8 3.8" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>
