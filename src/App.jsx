@@ -18091,7 +18091,7 @@ poserLecteurFiche(async () => {
   return { identities: (Array.isArray(j.identities) ? j.identities : []).map((i) => ({ provider: i && i.provider, identity_id: i && i.identity_id, last_sign_in_at: i && i.last_sign_in_at, updated_at: i && i.updated_at,
     identity_data: { avatar_url: i && i.identity_data && i.identity_data.avatar_url, picture: i && i.identity_data && i.identity_data.picture } })) };
 });
-function MenuProfilCoque({ setTab, entreprise }) {
+function MenuProfilCoque({ setTab, entreprise, badges = null, sites = null }) {
   const [ouvert, setOuvert] = React.useState(false);
   React.useEffect(() => { const f = () => setOuvert(true); window.addEventListener('vrm:profil-ouvrir', f); return () => window.removeEventListener('vrm:profil-ouvrir', f); }, []);
   const [, rafraichir] = React.useState(0);
@@ -18104,6 +18104,17 @@ function MenuProfilCoque({ setTab, entreprise }) {
   // (14 nov., refonte de la coque) Au téléphone, la barre du haut ne porte que loupe · cloche · compte :
   // l'état « Actions Vinted » (son panneau entier) et l'œil des montants vivent ICI, après Paramètres.
   // À l'ordinateur, l'île les montre déjà : rien en double.
+  // (14 nov., maquette de Julien : « le menu du haut s'ouvre depuis le titre ou l'avatar ») Au téléphone, le
+  // reste des écrans (tout ce que « Plus » portait, groupé, avec ses pastilles) vit en tête de ce menu.
+  const groupesEcrans = ordiMenu ? [] : groupesVisibles(sites, () => true);
+  const ecrans = ordiMenu ? null : groupesEcrans.map((g) => <div className="vrm-profil-groupe vrm-profil-ecrans" key={g.nom} role="group" aria-label={g.titre} data-nav-groupe={g.nom}>
+    {g.items.map((t) => <button key={cleEntree(t)} type="button" className="vrm-profil-ligne" data-nav-entree={cleEntree(t)} aria-label={t.label + suffixeBadgeNav(t, badges)} onClick={() => { setOuvert(false); ouvrirEntree(t, setTab); }}>
+      <span className="vrm-profil-ligne-ic" aria-hidden="true"><NavigationIcon item={t} size={18}/></span>
+      <span className="vrm-profil-ligne-lib">{t.label}</span>
+      <BadgeNav t={t} badges={badges} place="feuille"/>
+      <span aria-hidden="true" className="vrm-profil-ligne-fin"><Icon name="chevron" size={15}/></span>
+    </button>)}
+  </div>);
   const enPlus = ordiMenu ? null : <>
     {MULTI_USER ? <button type="button" className="vrm-profil-ligne" data-profil-menu="etat-actions" data-etat-ton={etatVu ? etatVu.ton : undefined}
       onClick={() => { setOuvert(false); setTimeout(ouvrirEtatActions, 0); }}>
@@ -18122,7 +18133,7 @@ function MenuProfilCoque({ setTab, entreprise }) {
   return <MenuProfil owner={AUTH.user.id} headers={enTeteSession} email={String(AUTH.user.email || '')} nom={(entreprise && entreprise.nom) || ''}
     offre={planLu === 'pro' ? 'Pro' : planLu === 'solo' ? 'Solo' : ''} theme={C} Feuille={SheetShell} Icon={Icon}
     onFermer={() => setOuvert(false)} onParametres={() => aller('')} onAppareils={() => aller('appareils')}
-    onDeconnexion={async () => { setOuvert(false); await seDeconnecter(); }} enPlus={enPlus}/>;
+    onDeconnexion={async () => { setOuvert(false); await seDeconnecter(); }} enPlus={enPlus} ecrans={ecrans}/>;
 }
 // (14 nov., refonte de la coque) L'ÉTAT DE « Puis-je agir sur Vinted ? » (EtatActions), publié pour
 // la photo du compte au téléphone : `ton` ok · attention (ambre, un geste) · neutre (lecture). Rien n'est
@@ -60683,7 +60694,7 @@ function AppCoeur() {
       {/* (10 nov., lot P) Raccourcis clavier : « g » + lettre, « n », « ? » (src/RaccourcisClavier.jsx) — naviguer ou ouvrir, jamais écrire. */}
       <RaccourcisClavier Feuille={SheetShell}/>
       {/* (11 nov., lot DJ6) Le menu du profil (photo de la colonne / de l'en-tête). */}
-      {MULTI_USER && <MenuProfilCoque setTab={setTab} entreprise={entreprise}/>}
+      {MULTI_USER && <MenuProfilCoque setTab={setTab} entreprise={entreprise} badges={badgesNav} sites={sitesPresents}/>}
       {/* (10 nov., lot AN) La photo d'un article en grand, depuis n'importe quel écran (src/Visionneuse.jsx). */}
       <Visionneuse Photo={PhotoVinted} Retour={FermeAuRetour}/>
       <DefilementPartout/>
