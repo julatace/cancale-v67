@@ -56,6 +56,33 @@ const carteDe = (cartes, h) => (cartes || []).find((c) => c.motif.test(h)) || nu
 function surveiller(ctx, cartes) {
   if (!ctx || ctx.__vrmGardeReseau) return ctx;
   ctx.__vrmGardeReseau = true;
+  // (14 nov., fiabilité prod) UNE ÉCRITURE DE SORTIE NE QUITTE JAMAIS LE BANC. Mesuré dans les journaux de la
+  // PRODUCTION (13 → 14 nov.) : des PATCH `app_data?id=eq.main&…&data->>rev=eq.N` et ~240 OPTIONS par jour venus
+  // de `http://localhost:10033/10038` (bancs WebKit en CI) — l'envoi de sortie de l'app (App.jsx, `pagehide` ⇒
+  // PATCH `keepalive: true`). Une requête `keepalive` (et `sendBeacon`) survit à la page : les routes de Playwright
+  // ne la voient PAS (banc garde-keepalive.cjs, K2), Chromium la laisse filer, WebKit (sans règle de résolution)
+  // jusqu'à la base. Dans la page, vers la production seulement : `keepalive` est retiré (la requête reste une
+  // requête de la page, que les routes du banc servent, ou qui meurt avec elle) et un `sendBeacon` n'envoie rien.
+  // `BANC_GARDE_KEEPALIVE=0` la retire (pour prouver le banc rouge) — la garde elle-même reste.
+  if (process.env.BANC_GARDE_KEEPALIVE !== '0') {
+    try {
+      ctx.addInitScript(() => {
+        try {
+          if (window.__vrmGardeKeepalive) return; window.__vrmGardeKeepalive = true;
+          const PROD = /(^|\.)(supabase\.co|supabase\.in|vrm\.center)$/i;
+          const versProd = (u) => { try { return PROD.test(new URL(String(u), location.href).hostname); } catch (_) { return false; } };
+          const f0 = window.fetch;
+          if (typeof f0 === 'function') window.fetch = function (entree, init) {
+            const u = typeof entree === 'string' ? entree : (entree && entree.url) || '';
+            if (init && init.keepalive && versProd(u)) { const o = Object.assign({}, init); delete o.keepalive; return f0.call(this, entree, o); }
+            return f0.call(this, entree, init);
+          };
+          const b0 = navigator.sendBeacon;
+          if (typeof b0 === 'function') navigator.sendBeacon = function (u, d) { return versProd(u) ? false : b0.call(navigator, u, d); };
+        } catch (_) {}
+      }).catch(() => {});
+    } catch (_) {}
+  }
   try {
     // La production : refusée au niveau du contexte (une route du banc qui `fulfill` passe AVANT).
     ctx.route((u) => PROD.test(u.hostname) && !carteDe(cartes, u.hostname), (r) => { noter('production', r.request().url()); if (process.env.BANC_GARDE_TRACE) { const q = r.request(); let fr = ''; try { fr = q.frame().url(); } catch (_) { fr = 'sw?'; } console.log('GARDE', q.method(), q.resourceType(), fr, q.url().slice(0, 200)); } return r.abort('blockedbyclient'); }).catch(() => {});

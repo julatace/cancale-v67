@@ -38,8 +38,8 @@ async function versEmails(pg, tel) {
   const tuile = pg.locator('[data-nav-entree="emails"]:visible').first();
   if (await tuile.count()) await tuile.click();
 }
-async function scenario(nav, { W, panne }) {
-  const T = `[${W}px ${panne ? 'panne' : 'déploiement'}]`;
+async function scenario(nav, { W, panne, jsSeul = false }) {
+  const T = `[${W}px ${panne ? 'panne' : jsSeul ? 'déploiement, CSS déjà là' : 'déploiement'}]`;
   const tel = W < 600;
   // Le « déploiement » : un drapeau ; tant qu'il est levé, tout /assets/ que la
   // page n'a pas DÉJÀ chargé répond 404. `panne` : il reste levé après le rechargement.
@@ -49,7 +49,8 @@ async function scenario(nav, { W, panne }) {
     const ctx = await nc(...a);
     await ctx.route(/\/assets\//, (route) => {
       const p = new URL(route.request().url()).pathname;
-      if (etat.deploye && !etat.charges.has(p)) { etat.refus.push(p); return route.fulfill({ status: 404, contentType: 'text/plain', body: 'Not Found' }); }
+      // `jsSeul` (14 nov.) : la feuille de style est déjà là (gardée, ou un morceau sans CSS) — seul le JS manque.
+      if (etat.deploye && !etat.charges.has(p) && !(jsSeul && /\.css$/.test(p))) { etat.refus.push(p); return route.fulfill({ status: 404, contentType: 'text/plain', body: 'Not Found' }); }
       etat.charges.add(p);
       return route.fallback();
     });
@@ -57,6 +58,17 @@ async function scenario(nav, { W, panne }) {
     // d'un coup) : la page relue vise alors des fichiers qui existent. En « panne »,
     // les fichiers restent introuvables même après.
     ctx.on('request', (r) => { if (!panne && etat.deploye && r.resourceType() === 'document') etat.deploye = false; });
+    // (14 nov., fiabilité prod) Le rechargement d'un iPhone n'est pas instantané : tant que la
+    // page relue n'est pas arrivée, l'ANCIENNE page vit encore et React rend ce que l'import lui a
+    // donné. Mesuré en production (64 écrans tombés du 10 au 12 nov. : « undefined is not an object
+    // (evaluating 'e.FactureVente') », « …reading 'default' ») : main.jsx appelait
+    // `ev.preventDefault()` et Vite rendait `undefined` au lieu du module. La page relue arrive
+    // donc ici 2,5 s plus tard (le premier chargement, lui, tout de suite).
+    let documents = 0;
+    await ctx.route('**/*', async (route) => {
+      if (route.request().resourceType() === 'document' && route.request().frame() === route.request().frame().page().mainFrame() && documents++ > 0) await new Promise((ok) => setTimeout(ok, 2500));
+      return route.fallback();
+    });
     return ctx;
   };
   const bv = base();
@@ -68,7 +80,7 @@ async function scenario(nav, { W, panne }) {
   // La mise en ligne.
   etat.deploye = true;
   await versEmails(o.pg, tel);
-  await o.pg.waitForTimeout(2500);
+  await o.pg.waitForTimeout(5000);
   await o.pg.waitForLoadState('domcontentloaded').catch(() => {});
   await o.pg.waitForSelector('.vrm-main', { timeout: 20000 }).catch(() => {});
   await o.pg.waitForTimeout(2500);
@@ -93,6 +105,9 @@ async function scenario(nav, { W, panne }) {
   dit(etat.refus.length > 0, `${T} (contrôle du banc) des fichiers d'avant ont bien été refusés`, JSON.stringify(etat.refus));
   dit(chargements === 1, `${T} la page s'est rechargée UNE fois (jamais une boucle)`, `${chargements} rechargement(s)`);
   dit(!morceaux.length, `${T} aucun plantage noté pour un morceau d'un ancien déploiement`, JSON.stringify(morceaux));
+  // (14 nov.) Ni « undefined is not an object » ni « reading 'default' » : l'import ne rend jamais `undefined`.
+  const indefinis = vu.file.concat(enBase).filter((m) => /undefined|is not an object|reading 'default'/i.test(m || ''));
+  dit(!indefinis.length, `${T} aucun écran tombé sur un module « undefined » pendant le rechargement`, JSON.stringify(indefinis));
   dit(vu.compte && vu.compte.n >= 1 && /preload CSS|imported module/i.test(vu.compte.message || ''), `${T} le morceau est compté À PART sur l'appareil (vrm_morceaux_perimes)`, JSON.stringify(vu.compte));
   if (!panne) dit(vu.ecran === 'emails' && !vu.souci && !vu.dernierFilet, `${T} après le rechargement, E-mails s'ouvre normalement`, JSON.stringify(vu));
   else {
@@ -105,8 +120,8 @@ async function scenario(nav, { W, panne }) {
   await new Promise((ok) => NV.srv.listen(PORT, ok));
   const nav = await chromium.launch({ executablePath: process.env.BANC_CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
   try {
-    for (const W of [1512, 390]) for (const panne of [false, true]) {
-      try { await scenario(nav, { W, panne }); } catch (e) { dit(false, `[${W}px] le passage a pu aller au bout`, String(e && e.stack).slice(0, 300)); }
+    for (const W of [1512, 390]) for (const [panne, jsSeul] of [[false, false], [false, true], [true, false]]) {
+      try { await scenario(nav, { W, panne, jsSeul }); } catch (e) { dit(false, `[${W}px] le passage a pu aller au bout`, String(e && e.stack).slice(0, 300)); }
     }
   } catch (e) { dit(false, 'le banc a pu aller au bout', String(e && e.stack).slice(0, 300)); }
   await nav.close(); NV.srv.close();
