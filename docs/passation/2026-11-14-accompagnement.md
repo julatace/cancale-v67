@@ -49,7 +49,7 @@ Note 1 = le moment existe ET dit l'essentiel (quoi, combien ; résultat + suite 
 | Exporter mes données | 1→1 | 1→1 | 0→1 | 0→1 | « Fichier téléchargé : nom » ; « Export pas créé : TypeError… » ⇒ raison + « Réessayer » ; export incomplet = échec dit (le zip part quand même) | joué 4/4 |
 | Export comptable | 0→1 | 1→1 | 1→1 | 0→1 | « rien n'est envoyé : tu choisis à qui le donner » ; raison brute ⇒ mots + Réessayer | — |
 | Supprimer mon compte | 1→1 | 1→1 | 1→1 | 1→1 | data-acc seulement (tout y était) | — |
-| Soldes / remise des prix | — | — | — | — | absents de `project-review-nsk5su` (arrivent avec la 5.376 sur `main`) : à brancher après fusion | — |
+| Remettre les prix (soldes) | 0→1 | 1→1 | 0→1 | 0→1 | arrivé par la fusion de `project-review-nsk5su` (5.376) : « un prix changé depuis n’est pas touché » ; « N prix remis » ; extension absente / refus ⇒ raison + geste | — |
 | Lien comptable / catalogue | — | — | — | — | pas de geste de ce nom dans l'app | — |
 
 Listes vides (base neuve, jouées) : Ventes, Achats, Annonces, Colis disent pourquoi ET le premier
@@ -61,8 +61,18 @@ La porte des bancs (`_porte-banc.cjs`) la coupe partout sauf pour un banc qui la
 ## 3. Preuves
 
 - Banc `scripts/bancs/accompagnement.cjs` (390 tactile, base inventée `_base-volume`, vrais PDF par
-  pdf-lib, faux pont d'extension qui TIENT les commandes) : voir le résultat de fin de session plus bas.
-- Rouge sur le build d'avant (`BANC_DIST=` le build de `origin/claude/project-review-nsk5su`) et par mutation.
+  pdf-lib, faux pont d'extension qui TIENT les commandes ; échecs simulés : réseau coupé, 429, refus,
+  extension absente) : **28 moments verts, 0 manquant, 3 non joués** (URSSAF : la base n'a pas de mois à
+  noter ; « Tout imprimer » après : le PDF inventé déclenche « Placer le tampon », qui attend un vrai
+  bordereau — vert au premier passage, dit « non joué » quand la feuille du tampon s'ouvre).
+  Joués : Tout imprimer, Tout générer, Je dépose, Baisser le prix, Exporter mes données, Mode vacances,
+  4 listes vides, 3 premières fois.
+- **Rouge sur le build d'avant** (`BANC_DIST=` le build de `20b40950`) : 0 vert, 29 manquants.
+- **Mutation** (`data-acc-echec` renommé dans une copie du build) : les échecs de « Tout générer » et du
+  mode vacances deviennent rouges, le reste vert.
+- `baisse-prix.cjs` : 26 verts, 0 rouge. `tout-generer.cjs` : 3 rouges **déjà présents sur le build
+  d'avant** (même 3, lancés depuis l'arbre de `20b40950` : la raison « une seule fois », le bandeau du
+  téléphone, un clic sur un bouton caché par la refonte de Colis) — pas de ce lot.
 - Audits verts : traduction (45), tdz, coherence, variables, identite, quoi-de-neuf, conseils (135), geste-annulable.
 - Captures regardées : feuille « Tout imprimer » (la phrase de « Tout générer » sous son bouton),
   échec du lot (raison + geste du refus), listes vides, premières fois.
@@ -72,4 +82,4 @@ La porte des bancs (`_porte-banc.cjs`) la coupe partout sauf pour un banc qui la
 - Jouer au banc les gestes « — » (offres Vinted/Vestiaire, favoris, Republier, Publier partout, Créer
   sur Vinted, LBC, facture, QR, fusion) : leur monde demande des conversations/commandes inventées
   à la forme réelle ; les marques `data-acc-*` sont posées.
-- Brancher « Soldes / Remettre les prix » (5.376, `remiseprix`) une fois `main` fusionnée.
+- « Soldes » (poser un solde) : la feuille « Baisser le prix » porte déjà ses moments (même feuille).
