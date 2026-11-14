@@ -52,6 +52,7 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'accueil-visite-ecrans', date: '2026-11-14', titre: 'Une visite guidée de quatre écrans', phrase: 'Des bulles sur les bons boutons ; le « ? » la rejoue.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'accueil-mots-conseil', date: '2026-11-14', titre: 'Mots expliqués et conseil du jour', phrase: 'Touche un mot souligné ; un conseil par jour, 30 jours.', tab: 'settings', pour: 'tous', mode: 'tous' },
   { id: 'accueil-essai-bilan', date: '2026-11-14', titre: 'Ce que VRM a fait pendant ton essai', phrase: 'Colis suivis, bordereaux imprimés, temps estimé, jours restants.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'refonte-coque', date: '2026-11-14', titre: 'Quatre onglets et un menu en haut', phrase: 'Paires réunit Annonces, Stock, Achats ; le reste sous ☰.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'photo-floue', date: '2026-11-14', titre: 'Photo floue ou sombre signalée', phrase: 'Mesuré sur ton téléphone, avant la mise en ligne. Jamais bloquant.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
   { id: 'seance-photo', date: '2026-11-14', titre: 'Séance photo, dans l’ordre des N°', phrase: 'Les paires sans photo ou à reprendre, cochées une à une.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
   { id: 'recherche-couleur', date: '2026-11-14', titre: 'Chercher tes paires par couleur', phrase: 'Tape « bleu » dans la loupe : la couleur vient de tes photos.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },

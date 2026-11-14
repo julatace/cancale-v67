@@ -63,7 +63,9 @@ function useHorsLigneLigne() {
   return h;
 }
 
-export default function LigneFraicheur({ baseKO = false, comptes, onNav }) {
+// (14 nov., refonte de la coque) `publier` : la copie montrée dans la feuille de la cloche ne publie pas (une
+// seule voix publie — celle de la coque ; sinon son « vérification… » de départ éteignait le point de la cloche).
+export default function LigneFraicheur({ baseKO = false, comptes, onNav, publier = true }) {
   const horsLigne = useHorsLigneLigne();
   const actif = useDepart();
   const { etat: capture, relire } = useEtatCapture({ complet: true, actif: actif && !baseKO && !horsLigne });
@@ -100,7 +102,7 @@ export default function LigneFraicheur({ baseKO = false, comptes, onNav }) {
   // comptes pas relus, sans recalculer (§5 : une règle, un propriétaire).
   const signature = `${f.etat}|${f.raison || ''}|${f.retards.map((r) => r.cle).join(',')}|${f.passu.join(',')}`;
   const fRef = React.useRef(f); fRef.current = f;
-  React.useEffect(() => { publierFraicheur(fRef.current); }, [signature]);
+  React.useEffect(() => { if (publier) publierFraicheur(fRef.current); }, [signature, publier]);
   if (f.etat === 'cache') return null;
 
   const voirToutVaBien = () => { DEMANDE_REGLAGE_SOUS.id = 'toutvabien'; try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} if (onNav) onNav('settings'); };
