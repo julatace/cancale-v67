@@ -128,7 +128,8 @@ const lire = (pg) => pg.evaluate(() => {
   // Visible sans clic : posé, de taille réelle, et pas dans un <details> fermé.
   const ferme = courbe && courbe.closest('details:not([open])');
   // (9 nov., Ma journée v2) La prochaine chose à faire est posée EN TÊTE (`data-prochain`) : un geste du jour aussi.
-  const tuiles = [...document.querySelectorAll('[data-prochain][data-tuile], [data-barre-jour] [data-tuile]')].map((e) => [e.getAttribute('data-tuile'), e.getAttribute('data-n')]);
+  // (14 nov., Studio) Les gestes du jour sont les TUILES de la grille (`[data-sj-grille]`), plus des cartes de la liste.
+  const tuiles = [...document.querySelectorAll('[data-prochain][data-tuile], [data-barre-jour] [data-tuile], [data-sj-grille] [data-tuile]')].map((e) => [e.getAttribute('data-tuile'), e.getAttribute('data-n')]);
   // Un texte qui déborde de sa boîte (le « porte-monnaie » coupé de sa capture).
   const deborde = [];
   for (const e of document.querySelectorAll('.vrm-day-layout *')) {
@@ -138,7 +139,7 @@ const lire = (pg) => pg.evaluate(() => {
     bonjour: g ? g.innerText.replace(/\s+/g, ' ').trim() : '',
     hBonjour: g ? Math.round(g.getBoundingClientRect().height) : 0,
     // Le premier geste du jour (la première carte « À faire ») et le haut de la barre du bas.
-    geste1: (() => { const t = document.querySelector('[data-barre-jour] [data-tuile]'); if (!t) return null; const r = t.getBoundingClientRect(); return { haut: Math.round(r.top), bas: Math.round(r.bottom) }; })(),
+    geste1: (() => { const t = document.querySelector('[data-sj-grille] [data-tuile], [data-barre-jour] [data-tuile]'); if (!t) return null; const r = t.getBoundingClientRect(); return { haut: Math.round(r.top), bas: Math.round(r.bottom) }; })(),
     hautBarre: (() => { const n = document.querySelector('.vrm-mobile-nav'); const r = n && n.getClientRects().length ? n.getBoundingClientRect() : null; return r ? Math.round(r.top) : window.innerHeight; })(),
     courbeVisible: !!(rc && rc.width > 200 && rc.height > 80 && !ferme),
     tuiles, deborde,
@@ -181,7 +182,9 @@ const lire = (pg) => pg.evaluate(() => {
         // ligne de flottaison : la première carte « À faire » est ENTIÈRE au-dessus de la barre du bas,
         // sans défiler, sur un téléphone de 844 px. Une tête qui grandit encore la repousse dessous (rouge).
         if (vp.width < 600) dit(lu.hBonjour > 0 && !!lu.geste1 && lu.geste1.bas <= lu.hautBarre, 'la tête sombre laisse le premier geste entier au-dessus de la barre du bas (téléphone, 844 px)', `tête ${lu.hBonjour} px · 1er geste ${lu.geste1 ? lu.geste1.haut + '→' + lu.geste1.bas : 'absent'} · barre à ${lu.hautBarre}`);
-        dit(lu.tuiles.length >= 1 && lu.tuiles.every(([, n]) => Number(n) > 0), 'les gestes du jour sont là, un par carte, jamais une carte à zéro', JSON.stringify(lu.tuiles));
+        // (14 nov., Studio) « À envoyer » et « À retirer » sont l'état du jour : toujours une tuile (« Rien à … » à zéro, calme) ;
+        // les autres cases ne sont une tuile que lorsqu'elles portent quelque chose — jamais une petite tuile à zéro.
+        dit(lu.tuiles.length >= 1 && lu.tuiles.every(([id, n]) => Number(n) > 0 || id === 'envoyer' || id === 'retirer'), 'les gestes du jour sont là, une tuile par geste, jamais une petite tuile à zéro', JSON.stringify(lu.tuiles));
         dit(lu.tuiles.some(([id, n]) => id === 'envoyer' && n === '2'), '« À envoyer » compte les 2 ventes à expédier', JSON.stringify(lu.tuiles));
         dit(lu.deborde.length === 0, 'aucun texte ne sort de sa boîte', lu.deborde.join(' | '));
         await ctx.close();

@@ -194,7 +194,7 @@
 .sj-journee .vrm-jv2-frise { order: 2 !important; }
 .sj-journee .vrm-jv2-quand { order: 3 !important; display: flex !important; align-items: center !important; flex-wrap: wrap !important; gap: 0 18px !important; margin: -6px 0 0 !important; min-height: 0 !important; overflow: visible !important; }
 .sj-journee .vrm-jv2-quand > *::before, .sj-journee .vrm-jv2-quand > *::after { content: none !important; display: none !important; }
-.sj-journee .vrm-jv2-nom { font: 600 13px/1.2 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; text-transform: none !important; letter-spacing: 0 !important; margin: 0 auto 0 0 !important; opacity: 1 !important; }
+.sj-journee .vrm-jv2-nom { font: 500 13px/1.2 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; text-transform: none !important; letter-spacing: 0 !important; margin: 0 auto 0 0 !important; opacity: 1 !important; }
 .sj-journee .vrm-jv2-sem {
   display: inline-flex !important; align-items: center !important; min-height: 44px !important; height: auto !important; padding: 0 !important; margin: 0 !important;
   border: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important;
@@ -244,8 +244,11 @@
 /* ── 7. LA GRILLE BENTO ───────────────────────────────────────────────────────── */
 .sj-journee .sj-bento { margin: 22px 0 18px !important; }
 .sj-journee .sj-grille {
-  display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)) !important; grid-auto-rows: 100px !important; gap: 10px !important;
+  display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)) !important; grid-auto-rows: minmax(100px, auto) !important; gap: 10px !important;
 }
+/* Ses tuiles à lui (« Tes tuiles à toi ») : la grille se remplit sans trou, quelles que soient ses tailles. */
+.sj-journee .sj-bento[data-sj-perso="1"] .sj-grille { grid-auto-flow: dense !important; }
+.sj-journee .sj-grille > [hidden] { display: none !important; }
 .sj-journee .sj-grille[hidden] { display: none !important; }
 .sj-journee .sb-tuile {
   position: relative !important; display: block !important; min-width: 0 !important; margin: 0 !important; padding: 14px 14px 14px 16px !important;
@@ -281,7 +284,7 @@
 .sj-journee .sj-t-envoyer .sj-face { inset: 38px 100px 14px 16px !important; justify-content: space-between !important; }
 .sj-journee .sj-t-envoyer .sj-n-grand, .sj-journee .sj-deplie .sj-n-grand { font: 200 70px/.8 var(--sb-police-affiche) !important; letter-spacing: -.05em !important; margin-left: -3px !important; }
 .sj-journee .sj-t-envoyer .sj-face .sj-sous { font-size: 13px !important; color: var(--sb-encre) !important; }
-.sj-journee .sj-t-envoyer .sj-pile { position: absolute !important; left: 82px !important; top: 0 !important; transform: scale(1.12) !important; transform-origin: 0 0 !important; }
+.sj-journee .sj-t-envoyer .sj-pile { position: absolute !important; left: 82px !important; top: 4px !important; }
 .sj-journee .sj-plein-place { position: absolute !important; right: 14px !important; bottom: 14px !important; z-index: 2 !important; }
 .sj-journee .sj-t-envoyer[data-taille="3x2"] .sj-face { right: 110px !important; }
 
@@ -296,12 +299,13 @@
 .sj-journee .sj-t-mois .vrm-carte-stats, .sj-journee .sj-t-mois [data-carte-stats] {
   margin: 0 !important; padding: 0 !important; background: none !important; border: 0 !important; box-shadow: none !important; color: var(--sb-encre) !important; min-height: 0 !important; border-radius: 0 !important;
 }
-.sj-journee .sj-t-mois .sj-face { position: absolute !important; inset: 34px 16px 12px 16px !important; display: block !important; height: auto !important; }
+.sj-journee .sj-t-mois .sj-face { position: static !important; inset: auto !important; display: block !important; height: auto !important; margin-top: 18px !important; }
+.sj-journee .sj-t-mois [data-carte-stats] { position: static !important; }
 .sj-journee .sj-t-mois .vrm-fu-modifier {
-  position: absolute !important; top: -34px !important; right: -4px !important; min-height: 44px !important; height: 44px !important; padding: 0 4px !important; margin: 0 !important;
+  position: absolute !important; top: 0 !important; right: 6px !important; min-height: 44px !important; height: 44px !important; min-width: 44px !important; padding: 0 8px !important; margin: 0 !important; z-index: 2 !important;
   border: 0 !important; background: none !important; box-shadow: none !important; color: var(--sb-lien) !important; font: 600 13.5px/1 var(--sb-police-texte) !important; opacity: 1 !important;
 }
-.sj-journee .sj-t-mois .vrm-fu-cases { display: grid !important; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)) !important; gap: 10px !important; margin: 0 !important; padding: 0 !important; height: 100% !important; align-items: end !important; background: none !important; }
+.sj-journee .sj-t-mois .vrm-fu-cases { display: grid !important; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)) !important; gap: 10px !important; margin: 0 !important; padding: 0 !important; height: auto !important; align-items: end !important; background: none !important; }
 .sj-journee .sj-t-mois .vrm-fu-case {
   display: flex !important; flex-direction: column !important; align-items: flex-start !important; justify-content: flex-end !important; gap: 0 !important; min-width: 0 !important; min-height: 44px !important;
   height: auto !important; margin: 0 !important; padding: 0 !important; border: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important; text-align: left !important; color: var(--sb-encre) !important;
@@ -347,7 +351,7 @@
   border: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important; color: var(--sb-encre) !important; text-align: left !important; cursor: pointer !important;
   content-visibility: auto !important; contain-intrinsic-size: auto 60px !important;
 }
-.sj-journee .sj-code-rangee { grid-template-columns: auto minmax(0, 1fr) !important; cursor: default !important; padding-left: 16px !important; column-gap: 14px !important; }
+.sj-journee .sj-code-rangee { grid-template-columns: auto 40px minmax(0, 1fr) !important; cursor: default !important; padding-left: 16px !important; column-gap: 14px !important; }
 .sj-journee .sj-rangee:active { background: rgb(var(--sb-o) / .04) !important; }
 .sj-journee .sj-plaque-vide { display: block !important; width: 46px !important; }
 .sj-journee .sj-r-txt { display: block !important; min-width: 0 !important; }
@@ -361,37 +365,37 @@
 .sj-journee .sj-titre-section { display: flex !important; align-items: baseline !important; gap: 10px !important; margin: 0 4px 10px !important; padding: 0 !important; border: 0 !important; }
 .sj-journee .sj-titre-section h2 { font: 400 24px/1.1 var(--sb-police-affiche) !important; letter-spacing: -.02em !important; color: var(--sb-encre) !important; margin: 0 !important; }
 .sj-journee .sj-compte { font: 300 20px/1 var(--sb-police-affiche) !important; color: var(--sb-encre-2) !important; }
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie) .vrm-day-task-list {
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-day-task-list {
   display: block !important; margin: 0 !important; padding: 4px 0 !important; gap: 0 !important; border: 0 !important;
   border-radius: var(--sb-r-tuile) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-plan) !important;
 }
 .sj-journee .sj-deplie .vrm-day-task-list { background: none !important; box-shadow: none !important; border-radius: 0 !important; }
 .sj-journee .vrm-day-task-list > [data-alertes-argent] { display: contents !important; }
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie) .vrm-day-task {
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-day-task {
   display: flex !important; align-items: center !important; gap: 12px !important; width: 100% !important; min-height: 64px !important; height: auto !important;
   margin: 0 !important; padding: 10px 16px !important; border: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important;
   color: var(--sb-encre) !important; text-align: left !important; transform: none !important;
 }
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie) .vrm-day-task:active { background: rgb(var(--sb-o) / .04) !important; }
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie) .vrm-day-task.is-groupe { flex-wrap: wrap !important; }
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie) .vrm-day-task-ouvrir { display: flex !important; align-items: center !important; gap: 12px !important; flex: 1 1 200px !important; min-width: 0 !important; min-height: 44px !important; padding: 0 !important; margin: 0 !important; border: 0 !important; background: none !important; box-shadow: none !important; color: inherit !important; text-align: left !important; }
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie) .vrm-day-task-title,
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie) .vrm-day-task-title-rang { font: 600 15px/1.25 var(--sb-police-texte) !important; color: var(--sb-encre) !important; letter-spacing: -.008em !important; }
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie) .vrm-day-task-note { font: 500 12.5px/1.3 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; }
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie) .vrm-day-task-note.is-urgent { color: var(--sb-ambre) !important; }
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie) .vrm-day-task-action {
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-day-task:active { background: rgb(var(--sb-o) / .04) !important; }
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-day-task.is-groupe { flex-wrap: wrap !important; }
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-day-task-ouvrir { display: flex !important; align-items: center !important; gap: 12px !important; flex: 1 1 200px !important; min-width: 0 !important; min-height: 44px !important; padding: 0 !important; margin: 0 !important; border: 0 !important; background: none !important; box-shadow: none !important; color: inherit !important; text-align: left !important; }
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-day-task-title,
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-day-task-title-rang { font: 600 15px/1.25 var(--sb-police-texte) !important; color: var(--sb-encre) !important; letter-spacing: -.008em !important; }
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-day-task-note { font: 500 12.5px/1.3 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; }
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-day-task-note.is-urgent { color: var(--sb-ambre) !important; }
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-day-task-action {
   margin-left: auto !important; display: inline-flex !important; align-items: center !important; gap: 4px !important; padding: 0 !important; min-height: 0 !important; height: auto !important;
   border: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important; color: var(--sb-encre-2) !important; font: 600 13px/1 var(--sb-police-texte) !important; white-space: nowrap !important;
 }
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie) .vrm-day-task-geste,
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie) .vrm-cycle-choix > button,
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie) .vrm-at-journee button.vrm-b-petit {
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-day-task-geste,
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-cycle-choix > button,
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-at-journee button.vrm-b-petit {
   display: inline-flex !important; align-items: center !important; justify-content: center !important; height: 40px !important; min-height: 40px !important; padding: 0 14px !important;
   border: 0 !important; border-radius: var(--sb-r-touche) !important; background: var(--sj-k-bg) !important; box-shadow: var(--sj-k-sh) !important; color: var(--sb-encre) !important;
   font: 600 14px/1 var(--sb-police-texte) !important;
 }
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie) .vrm-day-task-geste:active { background: var(--sb-creux) !important; box-shadow: var(--sj-k-in) !important; transform: translateY(1px) !important; }
-.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie) .vrm-pile .vrm-pile-v, .sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie) .vrm-pile .vrm-pile-v.is-tuile {
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-day-task-geste:active { background: var(--sb-creux) !important; box-shadow: var(--sj-k-in) !important; transform: translateY(1px) !important; }
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-pile .vrm-pile-v, .sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-ji) .vrm-pile .vrm-pile-v.is-tuile {
   border-radius: var(--sb-r-vignette) !important; background: var(--sj-socle) !important; box-shadow: var(--sb-ombre-pose) !important; border: 0 !important; color: var(--sb-encre-2) !important;
 }
 .sj-journee .sj-alertes .vrm-day-task.is-urgent .vrm-day-task-title { color: var(--sb-encre) !important; }
@@ -402,12 +406,30 @@
    « Modifier ma journée » : une touche (forme b), pas une pilule grise. */
 .sj-journee .vrm-jp-bas { margin-top: 18px !important; display: flex !important; align-items: center !important; justify-content: center !important; gap: 12px !important; flex-wrap: wrap !important; }
 .sj-journee .vrm-jp-bas [data-jp-modifier] {
-  display: inline-flex !important; align-items: center !important; gap: 7px !important; height: 40px !important; min-height: 40px !important; padding: 0 15px !important; border: 0 !important; border-radius: var(--sb-r-touche) !important;
+  display: inline-flex !important; align-items: center !important; gap: 7px !important; height: 44px !important; min-height: 44px !important; padding: 0 15px !important; border: 0 !important; border-radius: var(--sb-r-touche) !important;
   background: var(--sj-k-bg) !important; box-shadow: var(--sj-k-sh) !important; color: var(--sb-encre) !important; font: 600 14px/1 var(--sb-police-texte) !important;
 }
 .sj-journee .vrm-jp-bas [data-jp-modifier]:active { background: var(--sb-creux) !important; box-shadow: var(--sj-k-in) !important; transform: translateY(1px) !important; }
 .sj-journee .vrm-jp-bas [data-jp-modifier] svg { width: 16px !important; height: 16px !important; color: var(--sb-encre-2) !important; }
 .sj-journee .vrm-jp-bas-note { font: 500 12.5px/1.3 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; }
+
+/* ── 9 bis. « TES TUILES À TOI » : le mode rangement (appui long) ─────────────────── */
+.sj-journee .sj-t { -webkit-touch-callout: none !important; -webkit-user-select: none !important; user-select: none !important; }
+.sj-journee .sj-sr { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; white-space: nowrap !important; margin: -1px !important; }
+.sj-journee .sj-remises { display: flex !important; align-items: center !important; gap: 8px !important; margin: 0 4px 10px !important; font: 600 13px/1.3 var(--sb-police-texte) !important; color: var(--sb-ambre) !important; }
+.sj-journee .sj-rangement-tete { display: flex !important; align-items: center !important; gap: 14px !important; margin: 0 2px 12px !important; flex-wrap: wrap !important; }
+.sj-journee .sj-rangement-titre { flex: 1 1 auto !important; font: 600 14px/1.3 var(--sb-police-texte) !important; color: var(--sb-encre) !important; }
+.sj-journee [data-sj-rangement="1"] .sj-t { touch-action: none !important; cursor: grab !important; outline: 1.5px dashed rgb(var(--sb-o) / .22) !important; outline-offset: -5px !important; animation: sj-pose 1.8s ease-in-out infinite alternate !important; }
+.sj-journee [data-sj-rangement="1"] .sj-t[data-sj-glisse] { cursor: grabbing !important; z-index: 5 !important; box-shadow: var(--sb-ombre-avant) !important; animation: none !important; transition: none !important; }
+.sj-journee [data-sj-rangement="1"] .sj-t.is-cachee > :not(.sj-r-gestes):not(.sj-zone) { opacity: .38 !important; }
+.sj-journee [data-sj-rangement="1"] .sj-t.is-cachee { background: var(--sb-creux) !important; box-shadow: var(--sj-k-in) !important; }
+@keyframes sj-pose { from { transform: translateY(0); } to { transform: translateY(-1px); } }
+.sj-journee .sj-r-gestes { position: absolute !important; top: 6px !important; right: 6px !important; z-index: 3 !important; display: flex !important; gap: 6px !important; }
+.sj-journee .sj-r-gestes .sb-rond[aria-pressed="true"] { background: var(--sb-creux) !important; box-shadow: var(--sj-k-in) !important; }
+.sj-journee [data-sj-rangement="1"] .sj-lib { padding-right: 96px !important; }
+.sj-journee .sj-ranger { display: flex !important; justify-content: flex-end !important; margin: 2px 2px -6px !important; }
+.sj-journee .sj-ranger .sb-lien { font-size: 13px !important; color: var(--sb-encre-2) !important; }
+@media (prefers-reduced-motion: reduce) { .sj-journee [data-sj-rangement="1"] .sj-t { animation: none !important; } }
 
 /* ── 10. ORDINATEUR : la grille en haut (douze colonnes), ce qui est déplié dessous ── */
 /* Une seule colonne : la grille ancienne (tête à gauche, « À faire » à droite, styles-bureau.css) ne s'applique plus. */
@@ -424,7 +446,7 @@
 .sj-journee[data-sj-ordi="1"] .sj-grille { grid-template-columns: repeat(12, minmax(0, 1fr)) !important; grid-auto-rows: 128px !important; gap: 14px !important; }
 .sj-journee[data-sj-ordi="1"] .sj-t { grid-column: span var(--sj-c, 3) !important; grid-row: span var(--sj-r, 1) !important; padding: 15px 16px 16px !important; }
 .sj-journee[data-sj-ordi="1"] .sj-t-envoyer .sj-n-grand { font-size: 96px !important; }
-.sj-journee[data-sj-ordi="1"] .sj-t-envoyer .sj-pile { left: 110px !important; top: 6px !important; transform: scale(1.7) !important; }
+.sj-journee[data-sj-ordi="1"] .sj-t-envoyer .sj-pile { left: 120px !important; top: 14px !important; }
 .sj-journee[data-sj-ordi="1"] .sj-t-envoyer .sb-btn-plein { width: 80px !important; height: 80px !important; min-width: 80px !important; min-height: 80px !important; font-size: 12px !important; }
 .sj-journee[data-sj-ordi="1"] .sj-t .sj-n:not(.sj-n-grand) { font-size: 44px !important; }
 /* Sur ordinateur la tuile reste en vue au-dessus : le déplié ne redit pas son chiffre (le même nombre une fois, §7). */

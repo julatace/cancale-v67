@@ -58,7 +58,8 @@ export function capturerJournee(racine, { uid, maintenant = Date.now(), largeur 
   const ph = tete.querySelector('[data-phrase-jour]');
   snap.phrase = ph ? { texte: propre(attr(ph, 'data-phrase-jour')), env: attr(ph, 'data-phrase-jour-env') || '', ret: attr(ph, 'data-phrase-jour-ret') || '' } : null;
   // La prochaine chose : son titre et son geste ; la sous-ligne seulement pour une case de VRM (compteurs).
-  const pr = tete.querySelector('[data-prochain]');
+  // (14 nov., Studio) La prochaine chose est la première carte de « À faire » (sous la grille), plus dans la tête.
+  const pr = tete.querySelector('[data-prochain]') || racine.querySelector('[data-prochain]');
   if (pr) {
     const tuile = attr(pr, 'data-tuile');
     const titre = txt(pr.querySelector('.vrm-day-task-title'));
@@ -94,7 +95,8 @@ export function capturerJournee(racine, { uid, maintenant = Date.now(), largeur 
     snap.frise = jours.length === 7 ? { jours, panneau } : null;
   } else snap.frise = null;
   // Les cases du mois de la carte (son choix, « Modifier ») : le texte rendu et la valeur des `data-*`.
-  const carte = tete.querySelector('[data-carte-stats="journee"]');
+  // (14 nov., Studio) Les chiffres du mois sont une tuile de la grille : cherchés dans tout l'écran.
+  const carte = tete.querySelector('[data-carte-stats="journee"]') || racine.querySelector('[data-carte-stats="journee"]');
   snap.cases = capturerCases(carte);
   // L'objectif du mois (src/objectifMois.js) : les nombres de SA barre (la valeur = la case « Vendu · mois »).
   snap.objectif = capturerObjectif(carte);

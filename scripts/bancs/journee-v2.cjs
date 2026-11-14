@@ -163,12 +163,19 @@ async function main() {
           const pro = [...document.querySelectorAll('[data-prochain]')];
           const liste = document.querySelector('[data-barre-jour]');
           return { grandCarte, txt, nPro: pro.length, proEnTete: pro.length === 1 && tete.contains(pro[0]), redit: pro.length ? [...document.querySelectorAll('[data-tuile], [data-job]')].filter((x) => x !== pro[0] && x.getClientRects().length && ((x.getAttribute('data-tuile') && x.getAttribute('data-tuile') === pro[0].getAttribute('data-tuile')) || (x.getAttribute('data-job') && x.getAttribute('data-job') === pro[0].getAttribute('data-job')))).length : -1,
-            proAvantFrise: pro.length ? !!(pro[0].compareDocumentPosition(document.querySelector('[data-fu-semaine]')) & Node.DOCUMENT_POSITION_FOLLOWING) : false, liste: !!liste };
+            proAvantFrise: pro.length ? !!(pro[0].compareDocumentPosition(document.querySelector('[data-fu-semaine]')) & Node.DOCUMENT_POSITION_FOLLOWING) : false, liste: !!liste,
+            // (14 nov., Studio) La prochaine chose n'est plus sortie en tête : c'est la PREMIÈRE carte de « À faire »
+            // (`data-prochain`), à sa place ; les quatre cases sont des tuiles de la grille, au-dessus.
+            proDansListe: pro.length === 1 && !!liste && liste.contains(pro[0]) && liste.firstElementChild === pro[0] };
         });
         const montantJ1 = `${venduDu(J1)} €`;
-        const fois = (u.txt.match(new RegExp('(^|[^\\d])' + montantJ1.replace(/\s/g, '\\s') + '(?![\\d,])', 'g')) || []).length;
+        // (14 nov., Studio) Le grand chiffre pose son € à part, remonté (« 125€ ») : l'espace avant le € est facultatif.
+        const fois = (u.txt.match(new RegExp('(^|[^\\d])' + montantJ1.replace(/\s/g, '\\s?') + '(?![\\d,])', 'g')) || []).length;
         dit(u.grandCarte === 0 && fois === 1, `U ${T} le vendu du jour choisi (${montantJ1}) écrit UNE fois dans la tête, aucun second grand chiffre`, JSON.stringify({ grandCarte: u.grandCarte, fois }));
-        dit(u.nPro === 1 && u.proEnTete && u.proAvantFrise && u.redit === 0, `U ${T} UNE prochaine chose à faire, en tête AVANT l'argent, pas redite dans « Ensuite »`, JSON.stringify({ n: u.nPro, enTete: u.proEnTete, avant: u.proAvantFrise, redit: u.redit }));
+        // (14 nov., Studio — disposition changée exprès) Les gestes du jour sont les TUILES de la grille ; la prochaine
+        // chose est la première carte de « À faire », jamais redite. Sans autre carte (ici : trois colis, rien d'autre),
+        // la liste est vide et rien n'est marqué : aucune carte inventée.
+        dit((u.nPro === 0 && !u.liste) || (u.nPro === 1 && u.proDansListe && u.redit === 0), `U ${T} au plus UNE prochaine chose, la première carte de « À faire », jamais redite`, JSON.stringify({ n: u.nPro, dansListe: u.proDansListe, redit: u.redit, liste: u.liste }));
         // F — toucher un jour, aujourd'hui, la semaine.
         await pg.locator(`[data-jv2-toucher="${isoJour(J3)}"]`).click(); await pg.waitForTimeout(400);
         e = await etat(pg);

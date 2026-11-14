@@ -13,6 +13,7 @@
 // tuile et une rangée se touchent entières. Récit : docs/passation/2026-11-14-studio-journee.md.
 import React from 'react';
 import { tr } from './i18n/index.js';
+import { appliquerTuiles, lireTuilesJournee, estOrigineTuiles, deplacerTuile, basculerTuile, agrandirTuile, tailleSuivante, tuilesOrigine, TAILLES, TAILLES_DE } from './tuilesJournee.js';
 
 // Le « + » du coin d'une tuile : un SIGNE, pas une cible (la tuile entière se touche).
 export const SignePlus = ({ taille = 15 }) => (
@@ -74,15 +75,44 @@ export function LienJ({ children, onClick, attrs = null }) {
 // ordinateur), attrs (data-* de la tuile : ses compteurs), face (le corps de la tuile), plein (le
 // bouton plein posé SUR la tuile, au-dessus de sa zone), tasse ({ n, l } : la tuile tassée),
 // deplie (ce qui s'ouvre ; null ⇒ `toucher` est son geste), toucher, aria (nom de la tuile) }].
-export function BentoJournee({ tuiles, ordi = false, FermeAuRetour = null, avant = null }) {
+// « Tes tuiles à toi » (idée 148) : `reglage` (vrm_tuiles_journee), `poser` (l'enregistre), `urgent`
+// ({ id: true } : une tuile cachée qui porte un geste urgent revient, « remise car urgente »).
+const APPUI_LONG_MS = 520;
+const SigneOeil = ({ barre }) => (
+  <svg width="21" height="21" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z" vectorEffect="non-scaling-stroke"/><circle cx="12" cy="12" r="2.8" vectorEffect="non-scaling-stroke"/>
+    {barre ? <path d="M4 20L20 4" vectorEffect="non-scaling-stroke"/> : null}
+  </svg>
+);
+const SigneTaille = () => (
+  <svg width="21" height="21" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 4h6v6M10 20H4v-6M20 4l-6.5 6.5M4 20l6.5-6.5" vectorEffect="non-scaling-stroke"/>
+  </svg>
+);
+export function BentoJournee({ tuiles: tuilesBrutes, ordi = false, FermeAuRetour = null, avant = null, reglage = null, poser = null, urgent = null }) {
   const [ouverte, setOuverte] = React.useState(null);
+  const [rangement, setRangement] = React.useState(false);
+  const [brouillon, setBrouillon] = React.useState(null);
+  const [annonce, setAnnonce] = React.useState('');
   const zones = React.useRef({});
+  const elTuiles = React.useRef({});
   const fermerRef = React.useRef(null);
+  const termineRef = React.useRef(null);
   const panneauRef = React.useRef(null);
-  const tuileOuverte = ouverte ? tuiles.find((t) => t.id === ouverte && t.deplie) : null;
+  const appui = React.useRef(null);      // l'appui long en cours { id, x, y, minuterie }
+  const apresLong = React.useRef(false);  // le clic qui suit un appui long ne déplie rien
+  const glisse = React.useRef(null);      // le glisser en cours { id, x0, y0, pointerId, cible }
+  const reglageVu = rangement && brouillon ? brouillon : reglage;
+  const toutes = appliquerTuiles(tuilesBrutes, reglageVu, urgent || {});
+  const tuiles = toutes.filter((t) => rangement || !t.cachee);
+  const remises = toutes.filter((t) => t.remise);
+  const ids = toutes.map((t) => t.id);
+  const tuileOuverte = !rangement && ouverte ? tuiles.find((t) => t.id === ouverte && t.deplie) : null;
   // Une tuile qui disparaît (plus rien à faire) se replie d'elle-même : jamais un panneau orphelin.
   React.useEffect(() => { if (ouverte && !tuileOuverte) setOuverte(null); }, [ouverte, tuileOuverte]);
   const ouvrir = (t) => {
+    if (apresLong.current) { apresLong.current = false; return; }
+    if (rangement) return;
     if (!t.deplie) { if (t.toucher) t.toucher(); return; }
     setOuverte((o) => (o === t.id ? null : t.id));
   };
@@ -116,9 +146,95 @@ export function BentoJournee({ tuiles, ordi = false, FermeAuRetour = null, avant
     if (idOuvert) ecran.setAttribute('data-sj-ouverte', idOuvert); else ecran.removeAttribute('data-sj-ouverte');
     return () => { try { ecran.removeAttribute('data-sj-ouverte'); } catch (_) {} };
   }, [idOuvert]);
+
+  // ── LE MODE RANGEMENT ──
+  const entrer = (id) => {
+    setOuverte(null); setBrouillon(lireTuilesJournee(reglage)); setRangement(true);
+    setAnnonce(tr('sj.r.annonceEntree'));
+    setTimeout(() => { const z = id && zones.current[id]; if (z) { try { z.focus({ preventScroll: true }); } catch (_) {} } }, 30);
+  };
+  const terminer = () => {
+    if (brouillon && poser) poser(brouillon);
+    setRangement(false); setBrouillon(null); setAnnonce(tr('sj.r.annonceRange'));
+  };
+  React.useEffect(() => {
+    if (!rangement) return undefined;
+    const echap = (e) => { if (e.key === 'Escape') terminer(); };
+    window.addEventListener('keydown', echap);
+    return () => window.removeEventListener('keydown', echap);
+  });
+  const deplacer = (id, vers) => {
+    setBrouillon((b) => deplacerTuile(b, ids, id, vers));
+    const t = toutes.find((x) => x.id === id);
+    setAnnonce(tr('sj.r.annoncePlace', { lib: (t && (t.aria || t.lib)) || id, n: Math.max(1, Math.min(ids.length, vers + 1)), total: ids.length }));
+  };
+  const annulerAppui = () => { const a = appui.current; if (a) clearTimeout(a.minuterie); appui.current = null; };
+  const surAppui = (t, e) => {
+    if (rangement) {
+      // Glisser : la tuile suit le doigt (ou la souris) depuis l'endroit où on l'a prise.
+      if (e.target && e.target.closest && e.target.closest('[data-sj-r-geste]')) return;
+      const el = elTuiles.current[t.id]; if (!el) return;
+      glisse.current = { id: t.id, x0: e.clientX, y0: e.clientY, pointerId: e.pointerId, cible: null };
+      try { el.setPointerCapture(e.pointerId); } catch (_) {}
+      el.setAttribute('data-sj-glisse', '');
+      return;
+    }
+    if (e.button != null && e.button > 0) return;
+    annulerAppui();
+    appui.current = { id: t.id, x: e.clientX, y: e.clientY, minuterie: setTimeout(() => { appui.current = null; apresLong.current = true; entrer(t.id); }, APPUI_LONG_MS) };
+  };
+  const surMouvement = (t, e) => {
+    const a = appui.current;
+    if (a && (Math.abs(e.clientX - a.x) > 10 || Math.abs(e.clientY - a.y) > 10)) annulerAppui();
+    const g = glisse.current; if (!g || g.id !== t.id || g.pointerId !== e.pointerId) return;
+    const el = elTuiles.current[t.id]; if (!el) return;
+    el.style.transform = `translate(${e.clientX - g.x0}px, ${e.clientY - g.y0}px)`;
+    // La tuile survolée (par le doigt) prend la place : l'ordre suit, la tuile reprend depuis sa nouvelle case.
+    let vers = null;
+    for (const id of ids) {
+      if (id === t.id) continue;
+      const o = elTuiles.current[id]; if (!o || !o.getClientRects().length) continue;
+      const r = o.getBoundingClientRect();
+      if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) { vers = id; break; }
+    }
+    if (vers && vers !== g.cible) {
+      g.cible = vers;
+      deplacer(t.id, ids.indexOf(vers));
+      g.x0 = e.clientX; g.y0 = e.clientY; el.style.transform = '';
+    } else if (!vers) g.cible = null;
+  };
+  const surFin = (t, e) => {
+    annulerAppui();
+    const g = glisse.current; if (!g || g.id !== t.id) return;
+    const el = elTuiles.current[t.id];
+    if (el) { el.style.transform = ''; el.removeAttribute('data-sj-glisse'); try { el.releasePointerCapture(e.pointerId); } catch (_) {} }
+    glisse.current = null;
+  };
+  const surTouche = (t, e) => {
+    if (!rangement) return;
+    const i = ids.indexOf(t.id);
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); if (i > 0) { deplacer(t.id, i - 1); setTimeout(() => zones.current[t.id] && zones.current[t.id].focus(), 0); } }
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); if (i < ids.length - 1) { deplacer(t.id, i + 1); setTimeout(() => zones.current[t.id] && zones.current[t.id].focus(), 0); } }
+  };
+
   const autres = tuiles.filter((t) => !tuileOuverte || t.id !== tuileOuverte.id);
   return (
-    <div ref={racine} className="sj-bento" data-sj-bento="" data-sj-ouverte={tuileOuverte ? tuileOuverte.id : ''} data-sj-ordi={ordi ? '1' : '0'}>
+    <div ref={racine} className="sj-bento" data-sj-bento="" data-sj-ouverte={tuileOuverte ? tuileOuverte.id : ''} data-sj-ordi={ordi ? '1' : '0'}
+      data-sj-rangement={rangement ? '1' : undefined} data-sj-perso={estOrigineTuiles(reglageVu) ? undefined : '1'}>
+      <p className="sj-sr" aria-live="polite">{annonce}</p>
+      {/* Une tuile qu'il a cachée et qui porte un geste urgent revient d'elle-même : une ligne le dit. */}
+      {!rangement && remises.length ? (
+        <p className="sj-remises" data-sj-remises={remises.map((t) => t.id).join(' ')}>
+          <span className="sj-point" aria-hidden="true"/>{remises.map((t) => tr('sj.r.remise', { lib: t.lib })).join(' · ')}
+        </p>
+      ) : null}
+      {rangement ? (
+        <div className="sj-rangement-tete" data-sj-rangement-tete="">
+          <span className="sj-rangement-titre">{tr('sj.r.titre')}</span>
+          {!estOrigineTuiles(brouillon) ? <button type="button" className="sb-lien" data-sj-r-origine="" onClick={() => { setBrouillon(tuilesOrigine()); setAnnonce(tr('sj.r.annonceOrigine')); }}>{tr('sj.r.origine')}</button> : null}
+          <button type="button" ref={termineRef} className="sb-touche" data-sj-r-termine="" onClick={terminer}>{tr('sj.r.termine')}</button>
+        </div>
+      ) : null}
       {/* La rangée tassée (téléphone, une tuile ouverte) : les AUTRES tuiles en chiffres ; une touche
           ouvre la sienne à la place. Pas de compteur `data-*` ici : ils restent sur la grille. */}
       {tuileOuverte && !ordi ? (
@@ -133,27 +249,48 @@ export function BentoJournee({ tuiles, ordi = false, FermeAuRetour = null, avant
         </div>
       ) : null}
       <div className="sj-grille" data-sj-grille="" hidden={!!(tuileOuverte && !ordi)}>
-        {tuiles.map((t) => {
+        {toutes.map((t) => {
           const actif = !!(tuileOuverte && tuileOuverte.id === t.id);
+          const montree = rangement || !t.cachee;
           return (
-            <div key={t.id} className={'sb-tuile sj-t sj-t-' + t.id + (actif ? ' is-actif' : '') + (t.vide ? ' is-calme' : '')}
-              data-taille={t.taille} data-sj-tuile={t.id}
+            <div key={t.id} ref={(el) => { elTuiles.current[t.id] = el; }}
+              className={'sb-tuile sj-t sj-t-' + t.id + (actif ? ' is-actif' : '') + (t.vide ? ' is-calme' : '') + (rangement && t.cachee ? ' is-cachee' : '')}
+              data-taille={t.taille} data-sj-tuile={t.id} hidden={!montree}
+              data-sj-cachee={t.cacheeParLui ? '1' : undefined} data-sj-remise={t.remise ? '1' : undefined}
               style={t.place ? { '--sj-c': t.place.c, '--sj-r': t.place.r || 1 } : undefined}
+              onPointerDown={(e) => surAppui(t, e)} onPointerMove={(e) => surMouvement(t, e)}
+              onPointerUp={(e) => surFin(t, e)} onPointerCancel={(e) => surFin(t, e)} onPointerLeave={() => { if (!glisse.current) annulerAppui(); }}
+              onContextMenu={(e) => { if (appui.current || rangement) e.preventDefault(); }}
               {...(t.attrs || {})}>
               {/* Une tuile « interactif » (le mois : ses chiffres, son « Modifier ») ne se déplie pas : pas de zone
-                  par-dessus, ses propres gestes restent touchables. */}
-              {t.interactif ? null : <button type="button" className="sj-zone" ref={(el) => { zones.current[t.id] = el; }}
-                aria-expanded={t.deplie ? actif : undefined} aria-controls={t.deplie ? 'sj-deplie' : undefined}
-                aria-label={t.aria || t.lib} data-sj-zone={t.id} onClick={() => ouvrir(t)}/>}
+                  par-dessus, ses propres gestes restent touchables — sauf pendant le rangement (on la déplace). */}
+              {t.interactif && !rangement ? null : <button type="button" className="sj-zone" ref={(el) => { zones.current[t.id] = el; }}
+                aria-expanded={t.deplie && !rangement ? actif : undefined} aria-controls={t.deplie && !rangement ? 'sj-deplie' : undefined}
+                aria-label={rangement ? tr('sj.r.zone', { lib: t.aria || t.lib || '' }) : (t.aria || t.lib)} data-sj-zone={t.id}
+                onClick={() => ouvrir(t)} onKeyDown={(e) => surTouche(t, e)}/>}
               {t.lib ? <span className="sj-lib" aria-hidden="true">{t.lib}</span> : null}
-              {t.deplie ? <SignePlus/> : null}
+              {t.deplie && !rangement ? <SignePlus/> : null}
               {actif ? <span className="sb-diode sj-diode" aria-hidden="true"/> : null}
-              <div className="sj-face" aria-hidden={t.interactif ? undefined : 'true'}>{t.face}</div>
-              {t.plein ? <div className="sj-plein-place">{t.plein}</div> : null}
+              <div className="sj-face" aria-hidden={t.interactif && !rangement ? undefined : 'true'} inert={rangement ? '' : undefined}>{t.face}</div>
+              {t.plein && !rangement ? <div className="sj-plein-place">{t.plein}</div> : null}
+              {rangement ? (
+                <div className="sj-r-gestes">
+                  <button type="button" className="sb-rond" data-sj-r-geste="cacher" data-sj-r-cacher={t.id} aria-pressed={t.cacheeParLui ? 'true' : 'false'}
+                    aria-label={t.cacheeParLui ? tr('sj.r.montrer', { lib: t.aria || t.lib }) : tr('sj.r.cacher', { lib: t.aria || t.lib })}
+                    onClick={() => setBrouillon((b) => basculerTuile(b, t.id, !t.cacheeParLui))}><SigneOeil barre={!t.cacheeParLui}/></button>
+                  {(TAILLES_DE[t.id] || TAILLES).length > 1 ? (
+                    <button type="button" className="sb-rond" data-sj-r-geste="taille" data-sj-r-taille={t.id}
+                      aria-label={tr('sj.r.taille', { lib: t.aria || t.lib, taille: tailleSuivante(t.id, t.taille).replace('x', ' × ') })}
+                      onClick={() => setBrouillon((b) => agrandirTuile(b, t.id, t.taille))}><SigneTaille/></button>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           );
         })}
       </div>
+      {/* L'appui long a son double pour la souris et le clavier : un lien discret sous la grille. */}
+      {!rangement && !tuileOuverte ? <div className="sj-ranger"><button type="button" className="sb-lien" data-sj-ranger="" onClick={() => entrer(tuiles[0] && tuiles[0].id)}>{tr('sj.r.ranger')}</button></div> : null}
       {avant}
       {tuileOuverte ? (
         <section id="sj-deplie" ref={panneauRef} className="sb-tuile sb-avant sj-deplie" data-sj-deplie={tuileOuverte.id}

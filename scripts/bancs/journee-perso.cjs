@@ -86,12 +86,12 @@ const projette = (row, sel) => {
   }
   return out;
 };
-async function preparer(b, vp, { theme = 'light', reduit = false, urgent = false, perso = undefined, persoLocal = undefined } = {}) {
+async function preparer(b, vp, { theme = 'light', reduit = false, urgent = false, perso = undefined, persoLocal = undefined, tuiles = undefined } = {}) {
   VENTES = urgent ? [...VENTES_BASE, VENTE_RETARD] : VENTES_BASE;
   const ctx = await b.newContext({ viewport: vp, colorScheme: theme, reducedMotion: reduit ? 'reduce' : 'no-preference', ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-  const ROWS = lignes(); const MAIN = { vinted_dark: theme === 'dark', vinted_sale_overrides: OV, vinted_bords_printed: {}, ...(perso !== undefined ? { vrm_journee_perso: perso } : {}) };
+  const ROWS = lignes(); const MAIN = { vinted_dark: theme === 'dark', vinted_sale_overrides: OV, vinted_bords_printed: {}, ...(perso !== undefined ? { vrm_journee_perso: perso } : {}), ...(tuiles !== undefined ? { vrm_tuiles_journee: tuiles } : {}) };
   const ecrits = [];
   if (persoLocal !== undefined) await pg.addInitScript((p) => { try { if (!sessionStorage.getItem('jp_pose')) { localStorage.setItem('vrm_journee_perso', JSON.stringify(p)); sessionStorage.setItem('jp_pose', '1'); } } catch (_) {} }, persoLocal);
   await pg.addInitScript((sombre) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vrm_visite_bulles_vue', '1'); localStorage.setItem('vinted_dark', JSON.stringify(sombre)); localStorage.setItem('vrm_apparence', JSON.stringify(sombre ? 'sombre' : 'clair')); } catch (_) {} }, theme === 'dark');
@@ -129,7 +129,9 @@ const etat = (pg) => pg.evaluate(() => {
   const cartes = [...document.querySelectorAll('[data-tuile], [data-job], [data-vendus-ailleurs], [data-stock-sortie], [data-cycle-groupe]')].filter(vis)
     .map((e) => e.getAttribute('data-tuile') || e.getAttribute('data-job') || 'autre');
   const cachees = Object.fromEntries([...document.querySelectorAll('[hidden] [data-tuile]')].map((e) => [e.getAttribute('data-tuile'), e.getAttribute('data-n')]));
-  const tete = document.querySelector('.vrm-fu-tete');
+  // (14 nov., Studio) La tête porte la phrase et l'affiche (dans SON ordre) ; « Les chiffres du mois » sont une tuile de la
+  // grille, « la prochaine chose » la première carte de « À faire » : l'ordre se lit sur tout l'écran.
+  const tete = document.querySelector('.sj-journee') || document.querySelector('.vrm-fu-tete');
   // La carte des chiffres peut n'avoir aucune boîte à elle (ses cases sont posées par la grille) : « montrée » = pas dans un bloc caché.
   const ordreTete = tete ? [...tete.querySelectorAll('[data-jv2-prochain], [data-jv2-argent], [data-carte-stats="journee"], [data-phrase-jour], .vrm-fu-phrase-tete')].filter((e) => !e.closest('[hidden]') && (e.hasAttribute('data-carte-stats') || vis(e))).map((e) => e.hasAttribute('data-jv2-prochain') ? 'prochain' : e.hasAttribute('data-jv2-argent') ? 'frise' : e.hasAttribute('data-carte-stats') ? 'chiffres' : 'phrase') : [];
   const force = [...document.querySelectorAll('[data-jp-force]')].filter(vis).map((e) => ({ id: e.getAttribute('data-tuile'), texte: e.innerText, prochain: e.hasAttribute('data-prochain') }));
@@ -187,7 +189,7 @@ async function main() {
         await attendreJournee(pg);
         const e0 = await etat(pg);
         await shot(pg, `jp-origine-${vp.width}-${theme}`);
-        dit(e0.cartes.includes('envoyer') && e0.cachees.envoyer === undefined && e0.nCachees === 0 && e0.ordreTete.join() === 'phrase,prochain,frise,chiffres', `D ${T} sans réglage : Ma journée d'avant (« à envoyer » affichée, tête dans l'ordre d'origine, rien de caché)`, JSON.stringify({ cartes: e0.cartes, tete: e0.ordreTete, nc: e0.nCachees }));
+        dit(e0.cartes.includes('envoyer') && e0.cachees.envoyer === undefined && e0.nCachees === 0 && e0.ordreTete.join() === 'phrase,frise,chiffres,prochain', `D ${T} sans réglage : Ma journée d'avant (« à envoyer » affichée, tête dans l'ordre d'origine, rien de caché)`, JSON.stringify({ cartes: e0.cartes, tete: e0.ordreTete, nc: e0.nCachees }));
         await pg.locator('[data-jp-modifier]').scrollIntoViewIfNeeded();
         const mb = await pg.locator('[data-jp-modifier]').boundingBox();
         dit(mb && mb.height >= 44, `D ${T} « Modifier ma journée » se touche (44 px)`, mb ? String(Math.round(mb.height)) : 'absent');
@@ -228,8 +230,10 @@ async function main() {
         const e1 = await etat(pg);
         await shot(pg, `jp-modifiee-${vp.width}-${theme}`);
         dit(!e1.cartes.includes('envoyer') && e1.cachees.envoyer === '3' && e1.nCachees === 1, `D ${T} « à envoyer » cachée : plus à l'écran, son compteur reste publié (bloc caché, 3)`, JSON.stringify({ cartes: e1.cartes, cachees: e1.cachees, nc: e1.nCachees }));
-        dit(e0.gestes != null && e1.gestes === e0.gestes - 1, `D ${T} « N gestes » ne compte plus la carte cachée (${e0.gestes} ⇒ ${e0.gestes - 1})`, String(e1.gestes));
-        dit(e1.ordreTete.join() === 'phrase,frise,chiffres' || e1.ordreTete.join() === 'phrase,frise,prochain,chiffres', `D ${T} la tête suit SON ordre (la frise avant la prochaine chose)`, e1.ordreTete.join());
+        // (14 nov., Studio) « À envoyer » est une TUILE : « N gestes » ne compte que les cartes de la liste « À faire » —
+        // la cacher retire la tuile, le compte de la liste ne bouge pas (le nombre dit = les cartes vues, journee-coherence E1).
+        dit(e0.gestes != null && e1.gestes === e0.gestes, `D ${T} « N gestes » (les cartes de la liste) ne bouge pas quand la tuile est cachée (${e0.gestes})`, String(e1.gestes));
+        dit(e1.ordreTete.join() === 'phrase,frise,chiffres' || e1.ordreTete.join() === 'phrase,frise,chiffres,prochain', `D ${T} la tête suit SON ordre (la phrase, puis l'affiche ; la grille ; la liste)`, e1.ordreTete.join());
         // O — enregistré, synchronisé, et toujours là au rechargement.
         await pg.waitForFunction(() => { try { const p = JSON.parse(localStorage.getItem('vrm_journee_perso')); return p && p.choix && p.choix.envoyer === false; } catch (_) { return false; } }, null, { timeout: 8000 }).catch(() => {});
         const p = await lirePerso(pg);
@@ -270,6 +274,30 @@ async function main() {
         dit(iEnv >= 0 && e.cartes.slice(0, iEnv).every((c) => c !== 'envoyer' && !['messages', 'prix'].includes(c)) && (iAl < 0 || iAl < iEnv || (f && f.prochain)), `U ${T} elle vient en tête (après les seules alertes urgentes)`, e.cartes.join(','));
         dit(e.friseCachee && !e.ordreTete.includes('frise'), `U ${T} le réglage venu du nuage s'applique (frise cachée, toujours rendue dans un bloc caché)`, JSON.stringify({ fc: e.friseCachee, tete: e.ordreTete }));
         dit(!errs.length, `U ${T} aucune erreur d'app`, errs.join(' | ').slice(0, 200));
+        await ctx.close();
+      });
+      // ── T148 (14 nov., idée 148, « Tes tuiles à toi ») : son rangement des TUILES arrive par le NUAGE
+      //    (`vrm_tuiles_journee`, lu par onCloudReady) ; « À envoyer » et « Messages » cachées par lui, mais un colis
+      //    est en retard : « À envoyer » revient d'elle-même, « remise car urgente » ; « Messages » reste cachée
+      //    (son compteur toujours publié). ──
+      await essaie('T148 ' + T, async () => {
+        const { ctx, pg, errs } = await preparer(b, vp, { theme, urgent: true, tuiles: { v: 1, ordre: ['retirer', 'envoyer'], cachees: { envoyer: true, messages: true }, tailles: { envoyer: '3x1' } } });
+        await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+        await attendreJournee(pg);
+        await pg.waitForFunction(() => !!document.querySelector('[data-sj-remises]'), null, { timeout: 15000 }).catch(() => {});
+        const t = await pg.evaluate(() => {
+          const vis = (e) => !!(e && e.getClientRects().length);
+          const env = document.querySelector('[data-sj-tuile="envoyer"]'), msg = document.querySelector('[data-sj-tuile="messages"]');
+          const ordre = [...document.querySelectorAll('[data-sj-grille] > [data-sj-tuile]')].filter(vis).map((e) => e.getAttribute('data-sj-tuile'));
+          const rem = document.querySelector('[data-sj-remises]');
+          return { envVu: vis(env), envRemise: env && env.getAttribute('data-sj-remise'), taille: env && env.getAttribute('data-taille'), msgVu: vis(msg), msgN: msg && msg.getAttribute('data-n'),
+            remises: rem ? rem.getAttribute('data-sj-remises') : null, texte: rem ? rem.innerText : '', ordre };
+        });
+        await shot(pg, `jp-tuiles-urgent-${vp.width}-${theme}`);
+        dit(t.envVu && t.envRemise === '1' && t.remises === 'envoyer' && /urgente/i.test(t.texte), `T148 ${T} « À envoyer » cachée par lui mais un colis en retard : revenue, « remise car urgente »`, JSON.stringify(t));
+        dit(!t.msgVu && t.msgN != null, `T148 ${T} « Messages » cachée par lui : plus à l'écran, son compteur publié (data-n ${t.msgN})`, JSON.stringify(t));
+        dit(t.ordre[0] === 'retirer' && t.ordre[1] === 'envoyer' && t.taille === '3x1', `T148 ${T} SON ordre et SA taille, venus du nuage (À retirer, puis À envoyer en 3 × 1)`, JSON.stringify(t));
+        dit(!errs.length, `T148 ${T} aucune erreur d'app`, errs.join(' | ').slice(0, 200));
         await ctx.close();
       });
     }

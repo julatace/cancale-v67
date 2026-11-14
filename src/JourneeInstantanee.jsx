@@ -17,6 +17,9 @@ import { SqLignes } from './Squelette.jsx';
 // (9 nov., soir) Le rendu commun des instantanés (Ma journée, Colis, Ventes).
 import { useInerte, useMaintenant, MentionInstantane, CasesInstantanees, progObjectif } from './InstantaneCommun.jsx';
 import { tr } from './i18n/index.js';
+import { MQ_ORDINATEUR } from './coque.js';
+// (14 nov., Studio) La grille d'ordinateur ou de téléphone, comme l'écran vrai (`useOrdinateur`).
+const ordiJI = () => { try { return window.matchMedia(MQ_ORDINATEUR).matches; } catch (_) { return false; } };
 
 const LETTRES = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
 const majuscule = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
@@ -59,11 +62,13 @@ export function JourneeInstantanee({ snap, maintenant = null, ScreenHead = null,
   return (
     // Le cadre de l'écran vrai (la racine de `Comptabilite` : 16 px en haut), puis sa mise en page.
     <div ref={ref} style={{ padding: '16px 14px 40px' }} data-journee-instantane="" data-ji-t={String(M.t)} data-ji-age={String(Math.floor(M.age / 60000))} data-ji-etat={etat || undefined} aria-busy={arret ? undefined : 'true'}>
-    <div className="vrm-day-layout vrm-fu-ecran vrm-fu-journee vrm-ji">
+    <div className="vrm-day-layout vrm-fu-ecran vrm-fu-journee vrm-ji sj-journee" data-espace="journee" data-sj-ordi={ordiJI() ? '1' : '0'}>
       {ScreenHead ? <ScreenHead icon="soleilLevant" title="Ma journée"/> : null}
-      <section className="vrm-day-greeting vrm-w-tete vrm-fu-tete" aria-label="Ta journée — derniers chiffres connus" style={largeurOk && M.hauteur ? { minHeight: M.hauteur } : undefined}>
-        <div className="vrm-day-hello vrm-fu-bonjour">{hello}{M.prenom ? ' ' + M.prenom : ''}</div>
-        <h1 className="vrm-fu-titre-tete">Ma journée</h1>
+      {/* (14 nov., Studio) Le même habit que l'écran vrai (`.sj-journee`, src/design/studio-journee.css) : la lumière de
+          studio et l'affiche, aucune carte sombre qui basculerait au clair à l'arrivée des données. */}
+      <section className="vrm-day-greeting vrm-w-tete vrm-fu-tete sj-tete" aria-label="Ta journée — derniers chiffres connus" style={largeurOk && M.hauteur ? { minHeight: M.hauteur } : undefined}>
+        <div className="vrm-day-hello vrm-fu-bonjour sj-bonjour">{hello}{M.prenom ? ' ' + M.prenom : ''}</div>
+        <h1 className="vrm-fu-titre-tete sj-titre">Ma journée</h1>
         {M.cases ? null : mention('vrm-ji-age vrm-ji-age-seule')}
         <p className="vrm-phrase-ecran vrm-fu-phrase-tete" data-ji-phrase="">{M.phrase && M.phrase.texte ? M.phrase.texte : 'Tes derniers chiffres, le temps de tout relire'}</p>
         {arret ? <p className="vrm-ji-arret" role="status" data-instantane-panne={etat}>{etat === 'hors-ligne' ? tr('instantane.arret.horsLigne') : tr('instantane.arret.panne')}</p> : null}

@@ -195,13 +195,15 @@ const mesureJournee = (pg) => pg.evaluate(() => {
   const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
   const rgb = (x) => { const m = /rgba?\(([\d.]+), ([\d.]+), ([\d.]+)(?:, ([\d.]+))?/.exec(x || ''); return m ? { r: +m[1], g: +m[2], b: +m[3], a: m[4] == null ? 1 : +m[4] } : null; };
   // (9 nov., Ma journée v2) « À faire » = la prochaine chose (en tête, `.vrm-jv2-prochain`) + « Ensuite ».
-  const racines = [...document.querySelectorAll('.vrm-jv2-prochain, .vrm-fu-afaire')];
+  // (14 nov., Studio) + la grille : les quatre cases sont des TUILES (`[data-sj-grille] [data-tuile]`).
+  const racines = [...document.querySelectorAll('.vrm-jv2-prochain, .vrm-fu-afaire, [data-sj-grille]')];
   const liste = racines.length ? { querySelectorAll: (q) => racines.flatMap((r) => [...r.querySelectorAll(q)]) } : null;
-  const taches = liste ? [...liste.querySelectorAll('.vrm-day-task')].filter(vis) : [];
+  const taches = liste ? [...liste.querySelectorAll('.vrm-day-task, [data-sj-tuile][data-tuile]')].filter(vis) : [];
   const lignes = taches.map((t) => {
     const p = t.querySelector('[data-pile]');
     return { cas: t.getAttribute('data-case') || t.getAttribute('data-job') || '', n: t.getAttribute('data-n'), pile: p ? { n: p.getAttribute('data-pile-n'), photos: Number(p.getAttribute('data-pile-photos')), plus: Number(p.getAttribute('data-pile-plus')), estPile: p.classList.contains('is-pile'), srcs: [...p.querySelectorAll('[data-vignette-src]')].map((v) => v.getAttribute('data-vignette-src')), imgs: [...p.querySelectorAll('img')].filter((i) => i.complete && i.naturalWidth > 0).length, w: Math.round(p.querySelector('.vrm-pile-v').getBoundingClientRect().width), rayon: getComputedStyle(p.querySelector('.vrm-pile-v')).borderTopLeftRadius } : null,
-      fond: getComputedStyle(t).backgroundColor, prochain: t.hasAttribute('data-prochain'), titre: (t.querySelector('.vrm-day-task-title') || {}).textContent || '' };
+      fond: getComputedStyle(t).backgroundColor, prochain: t.hasAttribute('data-prochain'), tuile: t.hasAttribute('data-sj-tuile'),
+      titre: (t.querySelector('.vrm-day-task-title') || {}).textContent || (t.querySelector('[data-sj-zone]') ? t.querySelector('[data-sj-zone]').getAttribute('aria-label') : '') || '' };
   });
   // Une « pastille pleine colorée » : un élément de 20 px ou plus, fond plein ambre ou encre/noir.
   const pleines = liste ? [...liste.querySelectorAll('*')].filter(vis).filter((e) => {
@@ -230,7 +232,7 @@ const mesureJournee = (pg) => pg.evaluate(() => {
       { const { ctx, pg, errs } = await ouvrir(b, vp, sombre, 'journee');
         await essaie('journee', async () => {
           await pg.locator('.vrm-day-layout').first().waitFor({ timeout: 30000 });
-          if (JEU !== 'zero') await pg.locator(':is(.vrm-jv2-prochain, .vrm-fu-afaire) [data-case="envoyer"], [data-prochain][data-case="envoyer"]').first().waitFor({ timeout: 20000 });
+          if (JEU !== 'zero') await pg.locator(':is(.vrm-jv2-prochain, .vrm-fu-afaire, [data-sj-grille]) [data-case="envoyer"], [data-prochain][data-case="envoyer"]').first().waitFor({ timeout: 20000 });
           await pg.waitForTimeout(2200);
           const m = await mesureJournee(pg);
           const env = m.lignes.find((l) => l.cas === 'envoyer');
@@ -255,10 +257,23 @@ const mesureJournee = (pg) => pg.evaluate(() => {
               // (échelle fermée, 3 nov.) Le rayon 10 n'est pas sur l'échelle Fusion (6·12·14·20·24) : 12.
               dit(env.pile.w === 44 && env.pile.rayon === '12px', 'vignette 44 px, rayon 12 (échelle fermée, 3 nov.)', `${env.pile.w}px ${env.pile.rayon}`);
               // (5 nov., chantier E1) le mot de l'app est « à envoyer » (« à poster » est écarté, src/libelles.js).
-              dit(/^\d+ colis à envoyer/.test(env.titre.trim()), 'le titre dit le nombre (« 3 colis à envoyer »)', env.titre);
+              // (14 nov., Studio) La tuile dit son nom et son nombre (« À envoyer : 3 », nom de la zone qui la déplie).
+              dit(env.tuile ? new RegExp('^À envoyer\\s*:\\s*' + env.n + '$').test(env.titre.trim()) : /^\d+ colis à envoyer/.test(env.titre.trim()), 'le titre dit le nombre (« À envoyer : 3 »)', env.titre);
             }
             if (JEU === 'base' || SANS) {
-              const ret = m.lignes.find((l) => l.cas === 'retirer'), msg = m.lignes.find((l) => l.cas === 'messages'), prix = m.lignes.find((l) => l.cas === 'prix');
+              let ret = m.lignes.find((l) => l.cas === 'retirer'), msg = m.lignes.find((l) => l.cas === 'messages'), prix = m.lignes.find((l) => l.cas === 'prix');
+              // (14 nov., Studio) « À retirer », « Messages », « Prix à baisser » sont des tuiles : leurs photos (par identité)
+              // sont celles des rangées de la tuile DÉPLIÉE — la même règle, lue là où elle se montre maintenant.
+              const photosDeplie = async (id) => {
+                if (!(await pg.$(`[data-sj-zone="${id}"]`))) return null;
+                await pg.click(`[data-sj-zone="${id}"]`); await pg.waitForTimeout(500);
+                const srcs = await pg.evaluate((id) => [...document.querySelectorAll(`[data-sj-deplie="${id}"] .sb-vignette img`)].map((i) => i.getAttribute('src')), id);
+                await pg.click('[data-sj-fermer]').catch(() => {}); await pg.waitForTimeout(250);
+                return { n: String(srcs.length), photos: srcs.length, plus: 0, estPile: srcs.length > 1, srcs: srcs.slice(0, 3), imgs: srcs.length };
+              };
+              if (ret && ret.tuile) ret = { ...ret, pile: await photosDeplie('retirer') };
+              if (msg && msg.tuile) msg = { ...msg, pile: await photosDeplie('messages') };
+              if (prix && prix.tuile) prix = { ...prix, pile: await photosDeplie('prix') };
               dit(!!ret && !!ret.pile && (SANS ? ret.pile.photos === 0 : JSON.stringify(ret.pile.srcs) === JSON.stringify([url(9), url(10)])), 'J1 · « à retirer » : les photos des ACHATS au relais', ret && JSON.stringify(ret.pile));
               dit(!!msg && !!msg.pile && (SANS ? msg.pile.photos === 0 : JSON.stringify(msg.pile.srcs) === JSON.stringify([url(11), url(12), url(13)])), 'J1 · « messages » : les photos des conversations non lues (article, sinon avatar), jamais la lue', msg && JSON.stringify(msg.pile));
               dit(!!prix && !!prix.pile && (SANS ? prix.pile.photos === 0 : JSON.stringify(prix.pile.srcs) === JSON.stringify([url(7), url(8)])), 'J1 · « prix à baisser » : les photos des ANNONCES elles-mêmes', prix && JSON.stringify(prix.pile));

@@ -44,6 +44,7 @@ import {lireEntiteVinted,extraitConversation,libelleOffre,etatOffreCourt,estCode
 import { lignesRisqueMessage, phraseRisqueMessage, risquesMessage, erreurMessageAuto } from './messageSur.js';
 import { problemesAnnonce, problemesLot, champsNonJuges, CLE_VERIF_COUPEES, sansCoupees, couperAlerte, rallumerAlerte, lireCoupees, POURQUOI_ALERTE, NOMS_ALERTES, numeroEcritAttendu } from './verifAnnonce.js';
 import { CLE_JOURNEE_PERSO, lireJourneePerso, ordreJournee, visibiliteCarte, urgencesJournee } from './journeePerso.js';
+import { CLE_TUILES_JOURNEE, lireTuilesJournee } from './tuilesJournee.js';   // (14 nov., idée 148) « Tes tuiles à toi »
 import { ordreSelonHeure, momentDuJour } from './journeeSelonHeure.js';
 import ConfortCoque from './ConfortCoque.jsx';   // (14 nov., lots 118, 119, 120, 127) atelier, QR, lien d'aide, code local
 import { QrOrdinateur, ticketDeLAdresse } from './ConnexionQr.jsx';   // (14 nov., lot 119) connexion par QR
@@ -3047,6 +3048,9 @@ const SYNC_KEYS = [
   // (11 nov., lot journee-perso) SA Ma journée : l'ordre et les cartes qu'il a cachées
   // (src/journeePerso.js) : { v, ordre, choix, at } — la même sur tous ses appareils.
   CLE_JOURNEE_PERSO,
+  // (14 nov., idée 148) « Tes tuiles à toi » : l'ordre, les tuiles cachées, leurs tailles (src/tuilesJournee.js) :
+  // { v, ordre, cachees, tailles, at } — les mêmes sur tous ses appareils.
+  CLE_TUILES_JOURNEE,
   // (14 nov., lots 129 et 130) L'inventaire tournant (« vu », « pas trouvé » : jamais un N° changé, src/inventaireTournant.js)
   // et SA carte de remerciement (ses propres champs, src/carteMerci.js) : les mêmes sur tous ses appareils.
   'vrm_inventaire_tournant', 'vrm_carte_merci',
@@ -3940,6 +3944,9 @@ let _pendingBordPrint = false;
 // (14 nov., Studio · Ma journée) Les cartes de « À faire » qui vivent dans LEUR tuile (src/JourneeStudio.jsx) :
 // le prix d'achat à saisir (« Sans prix d'achat »), les offres Vestiaire (« Offres »), les messages eBay et
 // Vestiaire (« Messages »). Même carte, même geste, ouverte dans la tuile.
+// Une case devient une TUILE : « À envoyer » et « À retirer » toujours (l'état du jour, « Rien à … »), les autres
+// seulement quand elles ont quelque chose (ou ne sont pas lues : « — ») — jamais une petite tuile à zéro.
+const caseEnTuileJ = (x) => !!x && (x.id === 'envoyer' || x.id === 'retirer' || !!x.pasSu || (!!x.t && Number(x.t.n) > 0));
 const JOBS_TUILE_JOURNEE = new Set(['prix-achat-vente', 'vestiaire-offre', 'vestiaire-offres-reste', 'messages-ebay', 'vestiaire-messages']);
 
 // Recupere TOUT le contenu du cloud (au demarrage)
@@ -45678,6 +45685,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // et la feuille « Modifier ma journée ».
   const [persoJ] = useJourneePerso();
   const [feuillePerso, setFeuillePerso] = useState(false);
+  const [tuilesJ, poserTuilesJ] = useTuilesJournee();   // (14 nov., idée 148) « Tes tuiles à toi »
   const ordiJournee = useOrdinateur();   // (14 nov., Studio) la grille de Ma journée : tassée au téléphone, dépliée dessous sur ordinateur
   // (11 nov., lot avis-negatif) Un avis de 3★ ou moins (seuil réglable) arrivé sur un compte : une carte AMBRE
   // dans « À faire » tant qu'il n'est pas « vu » (14 jours au plus) ; la détection est au serveur.
@@ -47233,7 +47241,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const pasLus = T.filter((x) => x.pasSu).map((x) => x.l);
               // (14 nov., Studio) Les cases montrées (réglage « Modifier ma journée » respecté, une case cachée
               // revient quand elle est urgente) sont des TUILES : elles portent leur compteur (`data-tuile`).
-              const idsCasesTuile = new Set(T.filter((x) => visJ(x.id).montree).map((x) => x.id));
+              const idsCasesTuile = new Set(T.filter((x) => visJ(x.id).montree && caseEnTuileJ(x)).map((x) => x.id));
               // Les cases à zéro ET celles qu'il a cachées restent lisibles par les autres écrans et les bancs
               // (mêmes compteurs), sans place à l'écran — aussi quand tout ce qui reste à faire est caché.
               const compteursCaches = (<>
@@ -47291,6 +47299,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // SON ordre ; plus de « prochaine chose » sortie de la liste : les tuiles portent les gestes du jour.
               const alertesAF = alertesArgent.map((j, i) => tache(j, i)).filter((el) => el && React.isValidElement(el));
               const resteAF = [...forcesAF, ...montresAF].filter((x) => x.el && React.isValidElement(x.el));
+              // « La prochaine chose à faire » (réglable dans « Modifier ma journée ») : la première carte de la liste
+              // la porte (`data-prochain`) — à sa place, plus sortie en tête : la grille porte les gestes du jour.
+              { const iP = !visibiliteCarte('prochain', { reglage: persoJ, mode: PROFIL_VENDEUR.mode }).montree ? -1 : resteAF.findIndex((x) => !(x.el.props && x.el.props['data-cycle-groupe'] != null));
+                if (iP >= 0) resteAF[iP] = { ...resteAF[iP], el: React.cloneElement(resteAF[iP].el, { className: ((resteAF[iP].el.props && resteAF[iP].el.props.className) || '') + ' is-prochain', 'data-prochain': '' }) }; }
               const trancherVu = !!(jobTrancher && visJ('trancher').montree);
               const nListe = resteAF.length + (trancherVu ? 1 : 0);
               const alertesHaut = alertesAF.length ? (
@@ -47377,9 +47389,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <section className="vrm-day-greeting vrm-w-tete vrm-fu-tete sj-tete" data-fu-carte="" aria-label={tr('journee.journee2')}>
                 <div className="vrm-day-hello vrm-fu-bonjour sj-bonjour">{hello}{prenomLisible(prenom) ? ' ' + prenomLisible(prenom) : ''}<span className="sj-date"> · {dateStr}</span></div>
                 <h1 className="vrm-fu-titre-tete sj-titre">{tr('reglages.ma-journee.lib')}</h1>
-                {vuT('phrase') ? <div className="sj-phrase">{blocsTete.phrase}</div> : null}
                 {AF.alertes || null}
-                {vuT('frise') ? <div className="sj-affiche" data-sj-affiche="">{blocsTete.frise}</div> : <div hidden data-jp-cachee="frise">{blocsTete.frise}</div>}
+                {/* SON ordre (« Modifier ma journée ») entre la phrase et l'affiche ; « Les chiffres du mois » sont une
+                    tuile de la grille, « la prochaine chose » la première carte de « À faire » (`data-prochain`). */}
+                {ordreJourneeHeure('tete', persoJ).filter((id) => id === 'phrase' || id === 'frise').map((id) => id === 'phrase'
+                  ? (vuT('phrase') ? <div key={id} className="sj-phrase">{blocsTete.phrase}</div> : null)
+                  : (vuT('frise') ? <div key={id} className="sj-affiche" data-sj-affiche="">{blocsTete.frise}</div> : <div key={id} hidden data-jp-cachee="frise">{blocsTete.frise}</div>))}
               </section>
               ); })()}
 
@@ -47400,6 +47415,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const jobsDe = (ids) => jobsT.filter((j) => ids.includes(j.id));
               const sommeN = (l) => l.reduce((a, j) => a + (Number(j.n) || 0), 0);
               const urgentPt = <span className="sj-point" aria-hidden="true"/>;
+              // Cachée par lui, revenue parce qu'elle est urgente (`visT(id).force`) : la tuile le dit.
+              const forceDit = (x) => visT(x.id).force ? <span className="sj-sous-l is-ambre" data-jp-urgent="">{tr('journee.afficheeCarUrgent')}</span> : null;
               const sous = (x) => { const so = sousCase(x); return so ? <span className={'sj-sous-l' + (so.ambre ? ' is-ambre' : '')} data-sous-ligne={so.cle}>{so.texte}</span> : null; };
               const pasSuTexte = (x) => <span className="sj-sous-l">{x.titrePasSu || tr('sj.pasLu')}</span>;
               const lienPied = (txt, f, attrs) => <div className="sj-pied"><LienJ onClick={f} attrs={attrs}>{txt}</LienJ></div>;
@@ -47445,7 +47462,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {n > 0 ? <PileVignettes className="sj-pile" srcs={photosCase.envoyer} n={n} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="truck" size={20}/>}/> : null}
                     <span className="sj-sous">
                       {xE.pasSu ? pasSuTexte(xE) : <span className="sj-sous-l">{n === 0 ? tr('sj.rienAEnvoyer') : em ? tr(em.exact === false ? 'sj.pretsAuMoins' : 'sj.prets', { n: em.n }) : tr('sj.colis', { n })}</span>}
-                      {sous(xE)}
+                      {forceDit(xE) || sous(xE)}
                     </span>
                   </>),
                   plein,
@@ -47470,7 +47487,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // ── MESSAGES (Vinted, la règle de Messages) ; les messages eBay et Vestiaire s'ouvrent dans la tuile.
               const xM = Tc('messages');
               const jobsM = jobsDe(['messages-ebay', 'vestiaire-messages']);
-              if (xM && visT('messages').montree) {
+              if (xM && visT('messages').montree && caseEnTuileJ(xM)) {
                 const n = nDe(xM), ailleurs = sommeN(jobsM);
                 const nonLues = (convs.items || []).filter((c) => !acctOffOf(c) && conversationNonLue(c) && !conversationRetiree(convRetirees, String((c._acc && c._acc.vinted_user_id) || ''), c));
                 out.simples.push({ id: 'messages', lib: tr('sj.l.messages'), aria: tr('sj.aria.messages', { n: xM.pasSu ? '—' : n }), attrs: attrsCase(xM), vide: !xM.pasSu && n === 0 && !ailleurs,
@@ -47512,7 +47529,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
               // ── PRIX À BAISSER (les conseils de prix, la liste d'Annonces).
               const xP = Tc('prix');
-              if (xP && visT('prix').montree) {
+              if (xP && visT('prix').montree && caseEnTuileJ(xP)) {
                 const n = nDe(xP);
                 out.simples.push({ id: 'prix', lib: tr('sj.l.prixBaisser'), aria: tr('sj.aria.prixBaisser', { n: xP.pasSu ? '—' : n }), attrs: attrsCase(xP), vide: !xP.pasSu && n === 0,
                   tasse: { n: xP.pasSu ? '—' : String(n), l: tr('sj.t.prixBaisser') },
@@ -47534,6 +47551,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const codes = (() => { try { return listeCodesRetrait(); } catch (_) { return []; } })();
                 const comptes = codes.filter((c) => c.compte);
                 const nomTr = (c) => (CARRIERS[carrierKey(c.carrier)] || {}).name || '';
+                // La photo d'un colis à retirer : celle de SA commande, par identité (l'identité publiée du colis,
+                // `identRetraitEmail` / `identRetraitVinted`, puis la commande reliée par n° de suivi ou code) — jamais un titre.
+                const photoRetrait = (() => { const m = new Map(); try {
+                  for (const t of (pickupUnion.emailList || []).concat((pickupUnion.aVerifier || []).filter((x) => x.kind === 'email').map((x) => x.t))) { const o = commandeRetrait(t); if (o) m.set(identRetraitEmail(t), orderPhoto(o)); }
+                  for (const o of (pickupUnion.extra || [])) m.set(identRetraitVinted(o), orderPhoto(o));
+                } catch (_) {} return m; })();
                 const plaque = (c) => c.desaccord ? <span className="sb-plaque sb-plaque--grande is-doute">{tr('sj.codesDifferents')}</span>
                   : <span className="sb-plaque sb-plaque--grande">{c.code || 'QR'}</span>;
                 out.retirer = { id: 'retirer', lib: xR.pasSu ? tr('sj.l.aRetirer') : tr('sj.l.aRetirerN', { n }), aria: tr('sj.aria.aRetirer', { n: xR.pasSu ? '—' : n }), attrs: attrsCase(xR), vide: !xR.pasSu && n === 0,
@@ -47548,6 +47571,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {codes.length ? <div className="sj-liste" role="list">{codes.map((c, k) => (
                       <div key={k} role="listitem" className="sj-code-rangee" data-sj-code={c.code || ''} data-sj-compte={c.compte ? '1' : '0'}>
                         {plaque(c)}
+                        <span className={'sb-vignette' + (photoRetrait.get(c.id) ? '' : ' is-vide')} aria-hidden="true">{photoRetrait.get(c.id) ? <PhotoVinted src={photoRetrait.get(c.id)} alt="" loading="lazy" decoding="async" width={40} height={40}/> : <Icon name="pin" size={18}/>}</span>
                         <span className="sj-r-txt"><span className="sj-r-titre">{c.titre || tr('sj.colisSansTitre')}</span>
                           <span className="sj-r-meta">{[nomTr(c), c.lieu].filter(Boolean).join(' · ')}{c.compte ? '' : ' · ' + tr('sj.aVerifier')}</span></span>
                       </div>
@@ -47573,9 +47597,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 )}
               </>);
               if (visT('chiffres').montree) out.mois = { id: 'mois', lib: (() => { const m = new Date().toLocaleDateString(localeCourante(), { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1); })(), interactif: true, aria: tr('sj.l.mois'), face: chiffresMois, tasse: null };
-              const tuilesJ = placerTuiles(out);
+              const tuilesPlacees = placerTuiles(out);
               return (<>
-                <BentoJournee tuiles={tuilesJ} ordi={ordiJournee} FermeAuRetour={FermeAuRetour}/>
+                <BentoJournee tuiles={tuilesPlacees} ordi={ordiJournee} FermeAuRetour={FermeAuRetour}
+                  reglage={tuilesJ} poser={poserTuilesJ} urgent={{ envoyer: !!urgT.envoyer, retirer: !!urgT.retirer }}/>
                 {!out.mois ? <div hidden data-jp-cachee="chiffres">{chiffresMois}</div> : null}
               </>);
             })() : null}
@@ -56710,6 +56735,17 @@ function useJourneePerso() {
   }, []);
   // Toutes les instances (Ma journée et sa feuille, Paramètres) suivent le geste tout de suite.
   const poser = React.useCallback((n) => { touche.current = true; const x = lireJourneePerso(n); [..._ecoutesPerso].forEach((f) => f(x)); save(CLE_JOURNEE_PERSO, x); }, []);
+  return [r, poser];
+}
+// (14 nov., idée 148) « Tes tuiles à toi » : le réglage des tuiles de Ma journée. Lu au montage ; le nuage
+// (`onCloudReady`) ne le remplace que s'il est resté VIDE ici et qu'il n'a rien touché ; posé sur « Terminé ».
+const _ecoutesTuiles = new Set();
+function useTuilesJournee() {
+  const [r, setR] = useState(() => lireTuilesJournee(load(CLE_TUILES_JOURNEE, null)));
+  useEffect(() => { _ecoutesTuiles.add(setR); return () => { _ecoutesTuiles.delete(setR); }; }, []);
+  const touche = useRef(false);
+  useEffect(() => onCloudReady(() => { if (!touche.current && load(CLE_TUILES_JOURNEE, null) != null) setR((cur) => (cur && (cur.ordre.length || Object.keys(cur.cachees).length || Object.keys(cur.tailles).length)) ? cur : lireTuilesJournee(load(CLE_TUILES_JOURNEE, null))); }), []);
+  const poser = React.useCallback((n) => { touche.current = true; const x = lireTuilesJournee(n); [..._ecoutesTuiles].forEach((f) => f(x)); save(CLE_TUILES_JOURNEE, x); }, []);
   return [r, poser];
 }
 // Le contenu de « Modifier ma journée » (feuille de Ma journée, et Paramètres → Affichage).
