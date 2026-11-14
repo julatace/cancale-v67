@@ -67,7 +67,7 @@ export const MOTS = {
   envoi: {
     fr: ['envoi', 'envoyer', 'envoyez', 'expedi*', 'livraison', 'delai', 'delais', 'colis'],
     en: ['ship', 'shipping', 'ships', 'send', 'delivery', 'dispatch*'],
-    es: ['envio', 'enviar', 'envias', 'entrega', 'mandar', 'mandas'],
+    es: ['envio', 'enviar', 'envias', 'mandar', 'mandas', 'plazo de entrega'],
     it: ['spedi*', 'invio', 'inviare', 'consegna'],
     de: ['versand', 'versenden', 'verschick*', 'lieferung', 'schickst'],
   },

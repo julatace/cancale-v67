@@ -26,6 +26,12 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  { id: 'infos-paire-reponse', date: '2026-11-14', titre: 'Taille réelle et défauts dans ta réponse', phrase: 'Un toucher les met dans le message ; tu envoies.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  { id: 'questions-frequentes', date: '2026-11-14', titre: '« Dispo ? » repéré, réponse proposée', phrase: 'Cinq langues, sans IA ; ton clic envoie.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  { id: 'catalogue-prive', date: '2026-11-14', titre: 'Catalogue privé en un lien', phrase: 'Photos, tailles, prix ; jamais ton prix d’achat. Expire seul.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'liste-recherche', date: '2026-11-14', titre: 'Ta liste de recherche sur Vinted', phrase: 'L’encart VRM te dit quand l’annonce ouverte correspond.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'carnet-vendeurs', date: '2026-11-14', titre: 'Carnet des vendeurs chez qui tu achètes', phrase: 'Ce que leurs paires ont rapporté, délais, soucis.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'achat-meme-annonce', date: '2026-11-14', titre: 'Annonce déjà achetée signalée', phrase: 'Par son identifiant Vinted, dans Achats et sur Vinted.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'design-passe-reglages', date: '2026-11-14', titre: 'Paramètres et Notifications plus simples', phrase: 'Choix en un toucher, cartes sans cadre, plus de barre vide.', tab: 'settings', pour: 'tous', mode: 'tous' },
   { id: 'design-passe-autres-ecrans', date: '2026-11-14', titre: 'E-mails, Achats et Leboncoin plus nets', phrase: 'Mêmes cartes, mêmes boutons, un seul N° par ligne de recherche.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'design-passe-ecrans', date: '2026-11-14', titre: 'Fiche du N° et écrans plus nets', phrase: 'Tailles, graisses et gris unifiés, boutons à bonne hauteur, textes plus contrastés.', tab: 'journee', pour: 'tous', mode: 'tous' },

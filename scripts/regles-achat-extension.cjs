@@ -7,6 +7,8 @@
 //   · la calculette d'achat (`calculer`, `eurosCalc`, `SITES_CALCULETTE` de
 //     src/calculetteAchat.js → `cascadeVente`, src/coutVente.js) ;
 //   · « déjà N paires de ce modèle » (`pairesDuModele`, src/dejaEnStock.js, lot F) ;
+//   · (14 nov., 5.376) « dans ta liste de recherche » (`correspondances`, src/listeRecherche.js)
+//     et « déjà achetée » (`achatsDeLAnnonce`, src/achatMemeAnnonce.js) ;
 //   · la marque, le modèle, les couleurs (`extractBrand`, `extractModel`,
 //     `extractColors` de src/App.jsx) et le prix d'achat SAISI (`prixAchatDe`),
 //     recopiés TELS QUELS depuis App.jsx.
@@ -48,6 +50,8 @@ async function fabriquer() {
   const entree = [
     "export { calculer, eurosCalc, SITES_CALCULETTE, fraisSite } from './src/calculetteAchat.js';",
     "export { pairesDuModele, memeModele } from './src/dejaEnStock.js';",
+    "export { correspondances, correspond, resumeRecherche } from './src/listeRecherche.js';   // (14 nov., 5.376) ta liste de recherche",
+    "export { achatsDeLAnnonce } from './src/achatMemeAnnonce.js';   // (14 nov., 5.376) déjà achetée",
     '// ── recopié de src/App.jsx ──',
     decl,
     'export { extractBrand, extractModel, extractColors, prixAchatDe };',
