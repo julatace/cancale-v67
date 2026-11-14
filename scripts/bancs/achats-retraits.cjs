@@ -81,7 +81,8 @@ const LIGNES = [
   { id: 'panel_colis_relais', data: {} },
   ...TRACKS,
 ];
-const ATTENDU = 3;
+// 14 nov. (Julien) : AUCUN colis sans code dans « À retirer » — le colis « code à venir » passe dans « À vérifier ».
+const ATTENDU = 2;
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
 const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom, String(e.message || e).slice(0, 200)); } };
@@ -178,9 +179,9 @@ const deborde = (pg) => pg.evaluate(() => { const vis = (e) => { const r = e.get
             };
           });
           dit(m.pub && m.pub.total === ATTENDU, `le nombre publié (vrm_colis_retirer) = ${ATTENDU} (les Mondial Relay disponibles seuls)`, JSON.stringify(m.pub));
-          dit(m.onglet === String(ATTENDU) && m.carte === String(ATTENDU), '« À retirer · 3 » : la pastille d’Achats et la publication disent le même nombre', `${m.onglet}/${m.carte}`);
-          dit(m.journal === 1 && m.lignesJournal === 3, '« Maison du Journal » : UN point, ses 3 colis dedans (même avec un code à venir)', `${m.journal} carte(s), ${m.lignesJournal} ligne(s)`);
-          dit(m.avenir === 1, 'le colis sans code garde sa puce « Code à venir » dans la carte du point', String(m.avenir));
+          dit(m.onglet === String(ATTENDU) && m.carte === String(ATTENDU), `« À retirer · ${ATTENDU} » : la pastille d’Achats et la publication disent le même nombre`, `${m.onglet}/${m.carte}`);
+          dit(m.journal === 1 && m.lignesJournal === 2, '« Maison du Journal » : UN point, ses 2 colis avec code dedans (le colis sans code n’y est pas)', `${m.journal} carte(s), ${m.lignesJournal} ligne(s)`);
+          dit(m.avenir === 0 && m.pub && m.pub.aVerifier === 1, 'le colis sans code n’est pas dans « À retirer » : il est compté « à vérifier » (règle du 14 nov.)', `${m.avenir} / ${m.pub && m.pub.aVerifier}`);
           // (11 nov.) Depuis le 9 nov., 17 h 24 (Julien : « TU NE PEUX PAS AVOIR D'HÉSITATION », passation
           // 2026-11-09-retraits-frais.md) il n'y a plus de « Peut-être en double » : chaque moitié Vinted sans
           // identité reçoit SON témoin (un témoin = un carton) — comptée AVEC un colis encore au point
