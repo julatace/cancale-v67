@@ -10,7 +10,8 @@
 //    toucher, comme Safari l'exige) ; le PDF a 4 pages, chacune SON « ETIQUETTE » et SON « N° » ; le papier est
 //    retenu (`vrm_imprimante`) ; le bordereau Vestiaire sans PDF est DIT (raison) ; « Il en manque » ⇒ toucher le
 //    N°22 ⇒ « Réimprimer (1) » ⇒ un PDF d'UNE page, la sienne, dans le geste ; « Oui » ferme et les 4 sont imprimés.
-//  B (1512, clair ET sombre) — ENSUITE (papier déjà choisi) : 1 toucher ⇒ la visionneuse s'ouvre et l'impression
+//  B (1512, clair ET sombre) — ENSUITE (papier déjà choisi) ; sur ordinateur AUCUN PDF lu avant le toucher (§4.4 : rien
+//    n'oblige à préparer d'avance, la visionneuse de VRM attend le PDF) ; 1 toucher ⇒ la visionneuse s'ouvre et l'impression
 //    part seule ; aucune question de papier ; changer de papier = un toucher discret (pas une étape) et retenu ;
 //    le tampon d'UN bordereau se corrige APRÈS (sa vignette ⇒ « Rien » ⇒ « Réimprimer celui-ci ») : une page, son
 //    étiquette, sans son N°.
@@ -110,6 +111,7 @@ async function ouvrir(b, { tactile, sombre = false, imprimante = null, LIGNES })
   const ctx = await b.newContext({ ...vue, colorScheme: sombre ? 'dark' : 'light' });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+  const compte = { pdf: 0 };   // les lectures de PDF dans la base (la ligne lourde, §4.4)
   const mainData = LIGNES.find((r) => r.id === 'main').data;
   await pg.addInitScript(({ m, sombre: s, impr }) => {
     try {
@@ -142,6 +144,7 @@ async function ouvrir(b, { tactile, sombre = false, imprimante = null, LIGNES })
   await pg.route('**/rest/v1/**', (route) => {
     const req = route.request();
     const u = decodeURIComponent(metaVersData(req.url()));
+    if (/select=(b:data->>pdfB64|b64:data->>b64)/.test(u)) { compte.pdf++; if (process.env.IS_DIAG) console.log('    (lecture) ' + u.slice(0, 200)); }
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': `0-${Math.max(0, d.length - 1)}/${d.length}` }, body: JSON.stringify(d) });
     if (req.method() !== 'GET') return route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' });
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
@@ -163,7 +166,7 @@ async function ouvrir(b, { tactile, sombre = false, imprimante = null, LIGNES })
   await srvPret;
   await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
   await pg.waitForFunction((n) => { const t = document.body.innerText; return n.every((x) => t.includes('N°' + x)); }, V.map((v) => v.num), { timeout: 45000 }).catch(() => {});
-  return { ctx, pg, errs };
+  return { ctx, pg, errs, compte };
 }
 let nShot = 0;
 const shot = async (pg, nom) => { if (SHOTS) { try { await pg.screenshot({ path: path.join(SHOTS, `impression-simple-${String(++nShot).padStart(2, '0')}-${nom}.png`), timeout: 60000 }); } catch (_) {} } };
@@ -186,6 +189,7 @@ async function scenarioA(b, nom, sombre) {
     const pret = await attendre(pg, () => { const e = document.querySelector('[data-impr-lot]'); return e && e.getAttribute('data-impr-pret') === '1' && e.getAttribute('data-impr-lot') === '5'; }, null, 45000);
     const etat0 = await pg.evaluate(() => { const e = document.querySelector('[data-impr-lot]'); return e ? { n: e.getAttribute('data-impr-lot'), pret: e.getAttribute('data-impr-pret'), txt: e.innerText.trim() } : null; });
     dit(pret && etat0 && /\(5\)/.test(etat0.txt), `${nom} : A0 « Imprimer (5) » est là, son PDF préparé d'avance (4 Vinted + 1 Vestiaire annoncé)`, JSON.stringify(etat0));
+    dit(o.compte.pdf === 5, `${nom} : A0 au téléphone, seuls les 5 bordereaux qui PARTENT sont lus d'avance (une fois)`, String(o.compte.pdf));
     await shot(pg, `${nom}-ecran`);
     await toucher(o, '[data-impr-lot]');
     const q = await attendre(pg, () => !!document.querySelector('[data-impr-papier-feuille="premiere"]'), null, 8000);
@@ -245,10 +249,14 @@ async function scenarioB(b, nom, sombre) {
   const o = { ...(await ouvrir(b, { tactile: false, sombre, imprimante: 'normale', LIGNES })), tactile: false, touchers: 0 };
   const { pg } = o;
   try {
-    const pret = await attendre(pg, () => { const e = document.querySelector('[data-impr-lot]'); return e && e.getAttribute('data-impr-pret') === '1'; }, null, 45000);
+    // Sur ORDINATEUR rien n'est lu d'avance (§4.4 : la visionneuse de VRM attend le PDF, aucun geste à préserver).
+    const pret = await attendre(pg, () => { const e = document.querySelector('[data-impr-lot]'); return e && !e.disabled && e.getAttribute('data-impr-lot') === '5'; }, null, 45000);
+    await pg.waitForTimeout(2500);
+    const luAvant = o.compte.pdf, pretAvant = await pg.evaluate(() => document.querySelector('[data-impr-lot]').getAttribute('data-impr-pret'));
+    dit(pret && luAvant === 0 && pretAvant === '0', `${nom} : B0 sur ordinateur, AUCUN PDF n'est lu avant son toucher`, JSON.stringify({ luAvant, pretAvant }));
     await shot(pg, `${nom}-ecran`);
     await toucher(o, '[data-impr-lot]');
-    const vis = await attendre(pg, () => !!document.querySelector('[data-visionneuse-pdf="pret"]'), null, 5000);
+    const vis = await attendre(pg, () => !!document.querySelector('[data-visionneuse-pdf="pret"]'), null, 30000);
     const papier = !!(await pg.$('[data-impr-papier-feuille]'));
     dit(pret && vis && !papier && o.touchers === 1, `${nom} : B1 papier déjà choisi : UN toucher ⇒ la visionneuse s'ouvre avec le PDF (aucune question de papier)`, JSON.stringify({ pret, vis, papier, touchers: o.touchers }));
     const auto = await attendre(pg, () => { const v = document.querySelector('[data-visionneuse-pdf]'); return v && v.getAttribute('data-visionneuse-auto') === 'lancee'; }, null, 8000);

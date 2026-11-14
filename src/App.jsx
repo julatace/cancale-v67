@@ -44611,12 +44611,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // `resLot`) : ici, dans le corps, la liste n'est pas encore calculable (ses sources sont déclarées plus bas — §4.6).
   const lotDefautRef = React.useRef({ lignes: [], sig: '' });
   const prepPlanRef = React.useRef({ sig: '', t: null });
-  // LA PRÉPARATION D'AVANCE : l'écran montré, la liste lue en entier, rien en cours. Les PDF ne sont lus que pour
-  // les bordereaux qui PARTENT (pas toute la liste, §4.4) et une fois par séance (`_octetsLot`). Après chaque rendu
+  // LA PRÉPARATION D'AVANCE (au téléphone) : l'écran montré, la liste lue en entier, rien en cours. Les PDF ne sont lus
+  // que pour les bordereaux qui PARTENT (pas toute la liste, §4.4) et une fois par séance (`_octetsLot`). Après chaque rendu
   // (sans dépendances : la signature est lue dans le ref), un seul minuteur par signature.
   React.useEffect(() => {
     const { lignes, sig } = lotDefautRef.current, plan = prepPlanRef.current;
-    if (!sig || imprBusy || !isCloudReady() || !lotLu() || cache() || prepsRef.current.has(sig)) {
+    // SEULEMENT au téléphone (iPhone, Android) : c'est là que le navigateur n'ouvre rien après une attente. Sur
+    // ordinateur la visionneuse de VRM s'ouvre au toucher et attend le PDF : rien n'est lu avant son clic (§4.4).
+    if (!(estIOS() || estAndroid()) || !sig || imprBusy || !isCloudReady() || !lotLu() || cache() || prepsRef.current.has(sig)) {
       if (plan.t && plan.sig !== sig) { clearTimeout(plan.t); plan.t = null; plan.sig = ''; }
       return;
     }
@@ -44683,12 +44685,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const attendrePuisOuvrir = (sig, choisies, numeros, fabrique, garder = {}) => {
     const mobile = estIOS() || estAndroid();
     const proprio = AUTH.user?.id || null;
+    // Sur ordinateur, la visionneuse s'ouvre AU TOUCHER (« Préparation… ») : il voit tout de suite que ça part.
+    if (!mobile) reserverOngletPdf();
     setImprBusy({ fait: 0, total: choisies.length });
     (async () => {
       try {
         if (numeros.some(Boolean) && !(await assurerVersionNumerotation())) throw new Error(NUMEROS_PERIMES_IMPRESSION);
         if (!(await confirmerNumerosAVerifier(numeros))) throw new Error(NUM_A_VERIFIER_ANNULE);
-        if (!mobile) reserverOngletPdf();
+        if (!mobile && !(_visionneuse && _visionneuse.prep)) reserverOngletPdf();
         const e = preparer(sig, fabrique);
         await e.promesse;
         if ((AUTH.user?.id || null) !== proprio) throw new Error(tr('impr.change'));
