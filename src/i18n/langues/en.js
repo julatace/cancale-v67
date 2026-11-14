@@ -1,6 +1,7 @@
 // ENGLISH — translation of fr.js (the source). Same keys, same {variables}.
 import ecran_journee from './en/journee.js';
 import ecran_confort from './en/confort.js';   // (14 nov., lots 117–130) confort et sécurité
+import ecran_capte from './en/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_ventes from './en/ventes.js';
 import ecran_commun from './en/commun.js';
 import ecran_achats from './en/achats.js';
@@ -2242,4 +2243,5 @@ export default {
   "instantane.arret.horsLigne": "Offline: these figures are from your last visit. They will be reloaded when the network is back.",
   "instantane.arret.panne": "Not reloaded: the database is not responding. These figures are from your last visit.",
   ...ecran_confort,
+  ...ecran_capte,
 };

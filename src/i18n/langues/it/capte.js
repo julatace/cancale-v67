@@ -1,0 +1,23 @@
+// it · «L'estensione ha rilevato» (14 nov., estensione 5.377) — fonte: fr/capte.js.
+export default {
+  "capte.titre": "L’estensione ha rilevato",
+  "capte.relie": "Account collegato",
+  "capte.voir": "Vedi",
+  "capte.fermer": "Chiudi",
+  "capte.s.ventes": {"one": "{n} nuova vendita", "other": "{n} nuove vendite"},
+  "capte.s.achats": {"one": "{n} nuovo acquisto", "other": "{n} nuovi acquisti"},
+  "capte.s.bordereaux": {"one": "{n} etichetta di spedizione", "other": "{n} etichette di spedizione"},
+  "capte.s.codes": {"one": "{n} codice di ritiro", "other": "{n} codici di ritiro"},
+  "capte.s.versements": {"one": "{n} data di pagamento", "other": "{n} date di pagamento"},
+  "capte.s.messages": {"one": "{n} messaggio", "other": "{n} messaggi"},
+  "capte.s.offres": {"one": "{n} offerta ricevuta", "other": "{n} offerte ricevute"},
+  "capte.s.annonces": {"one": "{n} nuovo annuncio", "other": "{n} nuovi annunci"},
+  "capte.lu.ventes": {"one": "{n} vendita letta", "other": "{n} vendite lette"},
+  "capte.lu.achats": {"one": "{n} acquisto letto", "other": "{n} acquisti letti"},
+  "capte.lu.annonces": {"one": "{n} annuncio letto", "other": "{n} annunci letti"},
+  "capte.lu.messages": {"one": "{n} messaggio letto", "other": "{n} messaggi letti"},
+  "capte.lu.offres": {"one": "{n} offerta letta", "other": "{n} offerte lette"},
+  "capte.reglage.lib": "Dimmi cosa rileva l’estensione",
+  "capte.reglage.desc": "Un piccolo messaggio accanto al logo VRM sul sito, e qui con l’app aperta: nuove vendite, etichette, messaggi…",
+  "capte.reglage.pasSu": "L’estensione non ha ancora risposto: l’impostazione varrà al suo prossimo passaggio.",
+};

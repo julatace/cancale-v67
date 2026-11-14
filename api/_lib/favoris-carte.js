@@ -92,7 +92,9 @@ export function apercuCarte({ prefs, capture, vue, dressing, garde = () => null,
   const versions = 1 + (Array.isArray(prefs.variantes) ? prefs.variantes.length : 0);
   const liste = prets.slice(0, FAVORIS_CARTE_MAX).map(({ l, itemId, it, prix, prixOffre }) => {
     const pseudo = pseudoFavori(l), titre = titreItem(it) || titreNotification(l.body);
-    return { id: String(l.id), itemId: String(itemId), pseudo, titre, prix,
+    // 5.377 : la date du favori (la carte trie du plus récent au plus ancien) et la photo de l'annonce.
+    const photoIt = it && it.photo && typeof it.photo.url === 'string' && /^https:\/\/images\d*\.vinted\.net\//.test(it.photo.url) ? it.photo.url : '';
+    return { id: String(l.id), itemId: String(itemId), pseudo, titre, prix, date: l.date || null, photo: l.photo || photoIt || '',
       ...(offre ? { offre: Number(prixOffre) } : {}),
       texte: personnaliserMessageFavori(prefs.message, pseudo, () => 0, { article: titre, prix: prixOffre != null ? Number(prixOffre) : prix }).slice(0, 2000) };
   });
