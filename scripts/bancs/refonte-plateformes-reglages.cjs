@@ -116,6 +116,9 @@ function mesurerAjout3({ selListe, mutation }) {
     if (cs.position === 'sticky') continue;
     if (!vis(el) || el === barre || (barre && (barre.contains(el) || el.contains(barre)))) continue;
     if (el.closest('.vrm-ui-voile, [role="dialog"], .vrm-fs, .vrm-app-header, header, [role="banner"]')) continue;
+    // La pastille « Mis à jour à … » (`.vrm-neuf-hote`) et le bandeau « Nouvelle version » sont la COQUE
+    // (brief, AJOUT 3.5 et 3.7 : `claude/refonte-coque` les fait partir après 2 s) ; jugés par son banc.
+    if (el.closest('.vrm-neuf-hote, [data-maj-dispo], .vrm-maj-bandeau')) continue;
     const r = el.getBoundingClientRect(); if (r.height < 28 || r.width < W * 0.4) continue;
     if (!(el.innerText || '').trim()) continue;
     if (r.top > H * 0.55 && r.bottom <= hautBarre + 2 && r.bottom > H * 0.6) out.bandeau.push({ quoi: nom(el), top: Math.round(r.top) });

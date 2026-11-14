@@ -137,6 +137,10 @@
   background: none !important; border: 0 !important; box-shadow: none !important; outline: none !important; padding: 0 !important; margin: 0 !important;
   height: 36px !important; min-height: 0 !important; border-radius: 0 !important; width: auto !important; flex: 1 1 auto !important; min-width: 0 !important;
 }
+/* (styles-systeme §2 habille tout champ de recherche de Leboncoin en pilule : pas celui de la barre commune.) */
+:root:root body .vrm-main .vrm-lbc-ecran.vrm-lbc-ecran .vrm-pf-collant .vrm-ui-outils-champ > input[type="search"][type="search"] {
+  background: none !important; border: 0 !important; border-radius: 0 !important; min-height: 0 !important; height: 36px !important; padding: 0 !important; box-shadow: none !important;
+}
 :root:root body .vrm-main .vrm-pf-collant .vrm-ui-outils .vrm-ui-icone,
 :root:root body .vrm-main .vrm-pf-collant .vrm-ui-outils .vrm-ui-icone:hover { background: none !important; border: 0 !important; box-shadow: none !important; }
 :root:root body .vrm-main .vrm-pf-collant .vrm-ui-outils .vrm-ui-icone:active { background: var(--d-remplir, rgb(118 118 128 / .12)) !important; }
@@ -292,7 +296,8 @@
 }
 
 /* Le mode exemple : le bandeau est une ligne d'information, son geste une teinte légère (pas un 2e bouton plein). */
-:root:root body .vrm-exemple-bandeau .vrm-pf-exemple-cta {
+:root:root body .vrm-exemple-bandeau .vrm-pf-exemple-cta,
+:root:root body .vrm-app-shell .vrm-exemple-bandeau button.vrm-b.vrm-b-secondaire.vrm-pf-exemple-cta {
   background: var(--d-pastille-accent-fond, rgb(0 113 227 / .12)) !important; color: var(--d-pastille-accent, #0066CC) !important; border: 0 !important; box-shadow: none !important;
 }
 
