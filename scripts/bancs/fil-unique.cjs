@@ -248,6 +248,7 @@ const ouvrirAFaire = async (pg) => { if (await pg.$('[data-fil-proposition]')) r
         await ouvrirAFaire(r.pg);
         const petits = await r.pg.$$eval('[data-fil-proposition] button, [data-fil]', (l) => l.filter((x) => x.getBoundingClientRect().height < 43.5).map((x) => x.textContent.slice(0, 20) + ':' + Math.round(x.getBoundingClientRect().height)));
         dit(!petits.length, `J · ${nom} : 44 px au doigt`, petits.join(' | '));
+        await r.pg.keyboard.press('Escape'); await r.pg.waitForTimeout(200);   // referme « À relier » (ouverte pour mesurer ses boutons)
       }
       await r.pg.screenshot({ path: path.join(CAP, 'fil-unique-' + nom + '.png'), fullPage: false });
       if (vp.width < 600) {
