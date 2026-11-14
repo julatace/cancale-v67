@@ -21,7 +21,7 @@ import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { JourneeInstantanee } from './JourneeInstantanee.jsx';
 import { fmt } from './format.js';
-import { apercuOuverture } from './ouvertureInstantanee.js';
+import { apercuOuverture, cadreUtilisable } from './ouvertureInstantanee.js';
 
 const DELAI_FEUILLE_MS = 1500;
 
@@ -42,25 +42,13 @@ const feuillesApp = () => {
   return String((s && s.getAttribute('data-css')) || '').split(',').map((x) => x.trim()).filter((x) => /^\/assets\/[\w.-]+\.css$/.test(x));
 };
 
-// Le cadre relevé à la capture, s'il vaut pour CETTE fenêtre et CE thème.
-export function cadreUtilisable(cadre, { largeur, theme }) {
-  if (!cadre || typeof cadre !== 'object') return null;
-  if (!(Math.abs((Number(cadre.vw) || 0) - largeur) < 2)) return null;
-  if ((cadre.theme || '') !== (theme || '')) return null;
-  const n = (x) => (Number.isFinite(Number(x)) ? Math.round(Number(x)) : null);
-  const haut = n(cadre.haut), gauche = n(cadre.gauche), large = n(cadre.large);
-  if (haut == null || gauche == null || !large || haut < 0 || haut > 600 || gauche < 0 || large > largeur + 2) return null;
-  const propre = (c) => String(c || '').split(/\s+/).filter((x) => /^[a-z][\w-]{0,60}$/i.test(x)).slice(0, 12).join(' ');
-  const vars = {};
-  for (const [k, v] of Object.entries(cadre.vars || {})) if (/^--[\w-]{1,60}$/.test(k) && typeof v === 'string' && v.length <= 160 && !/url\s*\(|expression|[<>{};]/i.test(v)) vars[k] = v;
-  return { haut, gauche, large, shell: propre(cadre.shell) || 'vrm-app-shell', main: propre(cadre.main) || 'vrm-main', vars };
-}
-
 function Apercu({ snap, cadre }) {
   return (
     <div className={cadre.shell} style={cadre.vars} data-ouverture-instantanee="">
-      <main className={cadre.main} data-ecran="journee">
-        <div style={{ position: 'absolute', top: cadre.haut, left: cadre.gauche, width: cadre.large }}>
+      {/* La barre fixe du haut de la coque : sa place et sa couleur seulement (ses boutons arrivent avec l'app). */}
+      {cadre.haut > 0 && cadre.barre ? <div aria-hidden="true" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: cadre.haut, background: cadre.barre }}/> : null}
+      <main className={cadre.main} data-ecran="journee" style={{ top: cadre.haut }}>
+        <div style={{ position: 'absolute', top: 0, left: cadre.gauche, width: cadre.large }}>
           <JourneeInstantanee snap={snap} fmt={fmt}/>
         </div>
       </main>

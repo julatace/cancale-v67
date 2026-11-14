@@ -107,3 +107,18 @@ export function apercuOuverture({ stock, search = '', maintenant = Date.now() } 
     return { uid, snap, montrable };
   } catch (_) { return { raison: 'erreur' }; }
 }
+
+// Le cadre relevé à la capture, s'il vaut pour CETTE fenêtre et CE thème.
+export function cadreUtilisable(cadre, { largeur, theme }) {
+  if (!cadre || typeof cadre !== 'object') return null;
+  if (!(Math.abs((Number(cadre.vw) || 0) - largeur) < 2)) return null;
+  if ((cadre.theme || '') !== (theme || '')) return null;
+  const n = (x) => (Number.isFinite(Number(x)) ? Math.round(Number(x)) : null);
+  const haut = n(cadre.haut), gauche = n(cadre.gauche), large = n(cadre.large);
+  if (haut == null || gauche == null || !large || haut < 0 || haut > 200 || gauche < 0 || large > largeur + 2) return null;
+  const barre = typeof cadre.barre === 'string' && /^(rgba?\([\d.,\s%]+\)|#[0-9a-f]{3,8})$/i.test(cadre.barre) ? cadre.barre : '';
+  const propre = (c) => String(c || '').split(/\s+/).filter((x) => /^[a-z][\w-]{0,60}$/i.test(x)).slice(0, 12).join(' ');
+  const vars = {};
+  for (const [k, v] of Object.entries(cadre.vars || {})) if (/^--[\w-]{1,60}$/.test(k) && typeof v === 'string' && v.length <= 160 && !/url\s*\(|expression|[<>{};]/i.test(v)) vars[k] = v;
+  return { haut, gauche, large, barre, shell: propre(cadre.shell) || 'vrm-app-shell', main: propre(cadre.main) || 'vrm-main', vars };
+}

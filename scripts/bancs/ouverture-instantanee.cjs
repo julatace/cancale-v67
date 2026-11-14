@@ -246,7 +246,10 @@ const lourde = (u) => /select=data(&|$)/.test(u) && !/id=eq\.(vinted_|vrm_|ext_|
   // La base sous son vrai nom vers le serveur local ; tout autre nom réel ne se résout pas (garde réseau).
   const regles = `MAP ${HOTE_BASE} 127.0.0.1:${PORT_BASE}, MAP *.supabase.co ~NOTFOUND, MAP *.supabase.in ~NOTFOUND, MAP vrm.center ~NOTFOUND, MAP *.vrm.center ~NOTFOUND, MAP * ~NOTFOUND, EXCLUDE localhost`;
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--no-proxy-server', '--ignore-certificate-errors', `--host-resolver-rules=${regles}`, '--use-angle=swiftshader'] });
-  const ctx = await nav.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+  // LARGEUR=1512 / THEME=dark : la même ouverture sur ordinateur, en sombre (captures à regarder).
+  const L = Number(process.env.LARGEUR) || 390;
+  const ctx = await nav.newContext({ viewport: { width: L, height: L < 600 ? 844 : 945 }, ...(L < 600 ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}), colorScheme: process.env.THEME === 'dark' ? 'dark' : 'light' });
+  if (process.env.THEME === 'dark') await ctx.addInitScript(() => { try { localStorage.setItem('vinted_dark', 'true'); localStorage.setItem('vrm_apparence', JSON.stringify('sombre')); } catch (_) {} });
   // La route de la garde réseau coupe le cache HTTP (voir plus haut) : retirée. La garde reste : les noms
   // réels ne se résolvent pas (règles ci-dessus) et toute réponse d'un hôte réel la rend rouge.
   await ctx.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});

@@ -131,10 +131,23 @@ export function cadreDe(racine) {
         if (v && v.length <= 160 && !/url\s*\(|expression|[<>{};]/i.test(v)) vars[p] = v;
       }
     }
-    const haut = Math.round(r.top + (main ? main.scrollTop || 0 : 0) + (window.scrollY || 0));
+    // Le HAUT de la zone des écrans (sous la barre fixe de la coque), pas celui de la boîte : les bandeaux
+    // posés au-dessus d'elle à la capture (fraîcheur, extension, envois en attente) sont passagers.
+    const zone = main ? main.getBoundingClientRect() : r;
+    const haut = Math.round(zone.top + (window.scrollY || 0));
     const gauche = Math.round(r.left + (window.scrollX || 0));
-    if (!Number.isFinite(haut) || !Number.isFinite(gauche) || haut < 0 || haut > 600 || gauche < 0) return null;
-    return { haut, gauche, large: Math.round(r.width), vw: Math.round(window.innerWidth || 0),
+    if (!Number.isFinite(haut) || !Number.isFinite(gauche) || haut < 0 || haut > 200 || gauche < 0) return null;
+    // La barre fixe du haut (au-dessus de la zone des écrans) : sa couleur de fond, rien d'autre.
+    let barre = '';
+    try {
+      const el = haut > 0 ? document.elementFromPoint(Math.round((window.innerWidth || 0) / 2), Math.max(0, Math.round(haut / 2))) : null;
+      for (let x = el; x && x !== document.body; x = x.parentElement) {
+        const c = getComputedStyle(x).backgroundColor;
+        if (c && c !== 'transparent' && !/^rgba\(\s*0,\s*0,\s*0,\s*0\s*\)$/.test(c)) { barre = c; break; }
+      }
+    } catch (_) { barre = ''; }
+    if (!/^(rgba?\([\d.,\s%]+\)|#[0-9a-f]{3,8})$/i.test(barre)) barre = '';
+    return { haut, gauche, large: Math.round(r.width), vw: Math.round(window.innerWidth || 0), barre,
       theme: (document.documentElement && document.documentElement.getAttribute('data-theme')) || '',
       shell: classesDe(shell) || 'vrm-app-shell', main: classesDe(main) || 'vrm-main', vars };
   } catch (_) { return null; }

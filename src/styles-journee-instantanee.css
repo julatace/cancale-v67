@@ -72,4 +72,4 @@ html body .vrm-app-shell .vrm-ji .vrm-ji-arret {
 #vrm-demarrage[data-apercu] > .vrm-boot-centre { display: none; }
 #vrm-apercu { position: absolute; inset: 0; overflow: hidden; text-align: left; }
 #vrm-apercu > .vrm-app-shell { position: absolute; inset: 0; overflow: hidden; display: block; height: auto; min-height: 0; }
-#vrm-apercu > .vrm-app-shell > main { position: absolute; inset: 0; overflow: hidden; display: block; padding: 0; margin: 0; }
+#vrm-apercu > .vrm-app-shell > main { position: absolute; left: 0; right: 0; bottom: 0; top: 0; overflow: hidden; display: block; padding: 0; margin: 0; }
