@@ -102,8 +102,7 @@ function ListeSites({ F }) {
             <span className="vrm-fc-pastille" aria-hidden="true">{(NOMS[s.plateforme] || '·').slice(0, 1)}</span>
             <span className="vrm-fc-nom">
               <span className="vrm-fc-nom-t">{NOMS[s.plateforme] || s.plateforme}</span>
-              {sous ? <span className="vrm-fc-nom-s">{sous}</span> : null}
-              {det ? <span className="vrm-fc-nom-s">{det}</span> : null}
+              {sous || det ? <span className="vrm-fc-nom-s">{[sous, det].filter(Boolean).join(" · ")}</span> : null}
             </span>
             <span className={'vrm-fc-val' + (s.frais == null ? ' is-vide' : '')}>
               {s.frais == null ? '—' : eur(s.frais)}

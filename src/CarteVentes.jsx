@@ -293,7 +293,7 @@ function FondVentes({ bulles, max, vue, choisi, onChoisir }) {
     marqueurs.current = [];
     // Les plus petites au-dessus : une grosse bulle ne cache jamais une petite.
     [...bulles].sort((x, y) => y.n - x.n).slice(0, 400).forEach((x) => {
-      const r = rayonBulle(x.n, max, (boite.current && boite.current.clientWidth < 500) ? { maxi: 24, k: 1.8 } : undefined);
+      const r = rayonBulle(x.n, max, (boite.current && boite.current.clientWidth < 500) ? { min: 8, maxi: 22, k: 1.4 } : undefined);
       const el = document.createElement('button');
       el.type = 'button';
       el.className = 'vrm-cv-bulle';
@@ -302,8 +302,8 @@ function FondVentes({ bulles, max, vue, choisi, onChoisir }) {
       if (x.approx) el.setAttribute('data-cv-approx', '');
       el.setAttribute('aria-label', tr('fc.bulle', { lieu: nomLieu(x), n: x.n }));
       el.style.width = el.style.height = `${2 * r}px`;
-      el.style.fontSize = r >= 20 ? '13px' : '11px';
-      el.textContent = r >= 13 ? (x.n >= 10000 ? `${Math.round(x.n / 1000)}k` : String(x.n)) : '';
+      el.style.fontSize = r >= 20 ? '13px' : r >= 14 ? '11px' : '10px';
+      el.textContent = r >= 11 ? (x.n >= 10000 ? `${Math.round(x.n / 1000)}k` : String(x.n)) : '';
       el.addEventListener('click', (e) => { e.stopPropagation(); rappel.current && rappel.current(x.cle); });
       marqueurs.current.push(new ml.Marker({ element: el, anchor: 'center', subpixelPositioning: true }).setLngLat([x.lon, x.lat]).addTo(carte));
     });
