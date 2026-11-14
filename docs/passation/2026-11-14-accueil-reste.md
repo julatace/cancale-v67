@@ -65,13 +65,28 @@ Interrupteurs (Paramètres → Aide → « Visite, mots expliqués, conseil du j
   installé, « pas su » = 0, visite sur geste urgent, conseil au-delà de 30 j, lien http, Apple montré
   sans activation, aides hors SYNC_KEYS…).
 - `scripts/bancs/accueil-reste.cjs` (base inventée, `BANC_PORT` aléatoire, 390 tactile et 1512, clair et
-  sombre, `SHOTS=`) : A 134 (aucun N° neuf avant la réponse, 12 en rouge, « Oui » pose 4/5/9/15 sur LEURS
+  sombre, `SHOTS=` ; `BANC_DIST=` un autre build) : A 134 (aucun N° neuf avant la réponse, 12 en rouge, « Oui » pose 4/5/9/15 sur LEURS
   annonces, « Non » numérote, compte installé jamais retenu), B 133, C 140, D 136, E 139, F 145/147,
   G 143. **Rouge sur origin/main** (build a8220150 : VRM donnait N°1…N°8 par-dessus les N° écrits, aucune
   des cartes) ; vert après. Captures regardées.
 - Restés verts : build, `audit-traduction`, `tdz`, `coherence`, `variables`, `csp`, `lancement`,
   `quoi-de-neuf`, `identite`, `numero-ecrit`, `numero-*`, `numeros-*`, `reprise-numero`, `centre-aide`,
   `parcours-arrivee`, `connexions-oauth`, `fonctions-api`, `relances-essai`, `accueil-nouveaux`.
+
+## Trouvé en route (corrigé)
+
+- **Ma journée recouverte par « À trancher »** (arrivé avec `origin/main`, lot confort) : la règle plein écran de
+  l'écran d'atelier (`.vrm-at { position: fixed; inset: 0; z-index: 20500 }`, `src/styles-confort.css`) visait aussi
+  « À trancher » (`.vrm-a-trancher.vrm-at`), ouvert DANS Ma journée quand il y a 3 choses ou moins : tout l'écran
+  était couvert, sans bouton pour fermer. Limitée à `.vrm-at.vrm-cf` (la classe de `EcranAtelier.jsx`).
+- Le film tourné en un seul processus faisait tomber le navigateur au 3e écran : un processus par plan, mis bout à bout.
+
+## Mesures du banc
+
+- origin/main (a8220150) : **11 rouges** à 390 clair (aucune carte, N°1…N°8 donnés par-dessus les N° écrits, pas d'Apple).
+- Après (fusionné avec origin/main 154750ed et `claude/accueil-nouveaux`) : 390 clair 47/47, 390 sombre 47/47,
+  1512 clair 46/46, 1512 sombre 46/46.
+- Vidéo : 39,0 s, 1,32 Mo, aucune piste audio (ffprobe), 5 pistes `.vtt`.
 
 ## Gestes de Julien
 
