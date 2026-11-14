@@ -534,12 +534,14 @@
   background: var(--d-encre) !important; color: var(--d-carte) !important;
   min-width: 18px !important; height: 18px !important; padding: 0 5px !important; border-radius: 999px !important;
   font: 700 11px/18px var(--vrm-police, -apple-system, system-ui, sans-serif) !important; letter-spacing: 0 !important;
-  top: 5px !important; right: 3px !important; box-shadow: 0 0 0 2px var(--vrm-bg, var(--d-fond)) !important;
+  top: 5px !important; right: 3px !important; box-shadow: 0 0 0 2px var(--vrm-hdr-anneau, var(--vrm-bg, var(--d-fond))) !important;
 }
+
+:root:root body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) > .vrm-app-header .vrm-cn-cloche .vrm-cn-pastille.vrm-cn-pastille { background: #F5F5F7 !important; color: #1D1D1F !important; }   /* sur la barre encre de Ma journée */
 
 /* ── 3.4 LA PHOTO DU COMPTE porte le point d'état « Actions Vinted » (ambre = un geste, gris = lecture) ── */
 :root:root body .vrm-app-shell .vrm-hdr-profil { position: relative !important; }
-:root:root body .vrm-hdr-profil-etat { position: absolute; right: 6px; bottom: 7px; width: 10px; height: 10px; border-radius: 50%; background: var(--etat-point, var(--d-gris)); box-shadow: 0 0 0 2px var(--vrm-bg, var(--d-fond)); pointer-events: none; }
+:root:root body .vrm-hdr-profil-etat { position: absolute; right: 6px; bottom: 7px; width: 10px; height: 10px; border-radius: 50%; background: var(--etat-point, var(--d-gris)); box-shadow: 0 0 0 2px var(--vrm-hdr-anneau, var(--vrm-bg, var(--d-fond))); pointer-events: none; }
 :root:root body .vrm-hdr-profil-etat[data-etat-point="ok"] { display: none; }
 /* Dans le menu du compte : le même point, dans la ligne. */
 :root:root body .vrm-fs .vrm-profil-ligne .vrm-hdr-profil-etat.vrm-profil-ligne-point { position: static; display: inline-block; flex: 0 0 auto; width: 8px; height: 8px; margin-left: auto; box-shadow: none; }
@@ -549,14 +551,16 @@
 /* ── 3.5 L'EN-TÊTE DU TÉLÉPHONE ───────────────────────────────────────────── */
 @media (max-width: 743px), (max-width: 767px) and (hover: hover) and (pointer: fine), (max-width: 1023px) and (max-height: 599px) and (hover: none), (max-width: 1023px) and (max-height: 599px) and (pointer: coarse), (max-width: 1023px) and (max-height: 599px) and (pointer: none) {
   /* Trois colonnes ÉGALES sur les côtés : le petit titre est au CENTRE de l'écran (Réglages iOS). */
-  :root:root body .vrm-app-shell > .vrm-app-header.vrm-app-header {
-    grid-template-columns: minmax(0, 1fr) minmax(0, max-content) minmax(0, 1fr) !important;
+  :root:root body .vrm-app-shell > .vrm-app-header.vrm-app-header { grid-template-columns: minmax(0, 1fr) minmax(0, max-content) minmax(0, 1fr) !important;
     min-height: 52px !important; padding-left: max(8px, env(safe-area-inset-left)) !important; padding-right: max(8px, env(safe-area-inset-right)) !important;
-    background: var(--vrm-bg, var(--d-fond)) !important; border-bottom: .5px solid transparent !important;
+    border-bottom: .5px solid transparent !important;
     transition: background-color var(--d-m-moyen) ease-out, border-color var(--d-m-moyen) ease-out !important;
   }
+  /* Ma journée garde sa barre ENCRE, d'un bloc avec sa carte héros (styles-visuel-2.css) : ces règles ne la touchent pas. */
+  :root:root body .vrm-app-shell:not(:has(.vrm-main .vrm-fu-journee)) > .vrm-app-header.vrm-app-header { background: var(--vrm-bg, var(--d-fond)) !important; }
+  :root:root body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) > .vrm-app-header { --vrm-hdr-anneau: #1d1d1f; }
   /* Au défilement : le matériau translucide (§4) et un filet d'un demi-pixel. */
-  :root:root body .vrm-app-shell > .vrm-app-header.vrm-app-header.is-defile {
+  :root:root body .vrm-app-shell:not(:has(.vrm-main .vrm-fu-journee)) > .vrm-app-header.vrm-app-header.is-defile {
     background: var(--d-materiau) !important; -webkit-backdrop-filter: var(--d-materiau-flou) !important; backdrop-filter: var(--d-materiau-flou) !important;
     border-bottom-color: var(--d-materiau-filet) !important;
   }
@@ -603,7 +607,7 @@
     background: var(--d-point-ambre) !important; color: #1D1D1F !important; font: 700 11px/18px var(--vrm-police, -apple-system, system-ui, sans-serif) !important; letter-spacing: 0 !important;
     top: -5px !important; left: calc(100% - 8px) !important; box-shadow: 0 0 0 2px var(--vrm-bg, var(--d-fond)) !important; font-variant-numeric: tabular-nums;
   }
-  :root:root body .vrm-app-shell .vrm-app-header .vrm-nav-badge-point { position: absolute !important; top: 8px !important; right: 7px !important; left: auto !important; width: 8px !important; height: 8px !important; border-radius: 50% !important; background: var(--d-point-ambre) !important; box-shadow: 0 0 0 2px var(--vrm-bg, var(--d-fond)) !important; }
+:root:root body .vrm-app-shell .vrm-app-header .vrm-nav-badge-point { position: absolute !important; top: -2px !important; right: -4px !important; left: auto !important; width: 9px !important; height: 9px !important; border-radius: 50% !important; background: var(--d-point-ambre) !important; box-shadow: 0 0 0 2px var(--vrm-hdr-anneau, var(--vrm-bg, var(--d-fond))) !important; }
 }
 @media (prefers-reduced-motion: reduce) {
   :root:root body .vrm-app-shell > .vrm-app-header .vrm-hdr-titre.vrm-hdr-titre { transform: none !important; transition: opacity 120ms ease-out !important; }
