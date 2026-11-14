@@ -26,6 +26,11 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (14 nov., idées 151 152 153 163) l'expédition
+  { id: 'mode-samedi', date: '2026-11-14', titre: 'Mode samedi : la journée d’envoi', phrase: 'Imprimer, emballer, puis les points dans l’ordre, avec leur heure limite.', tab: 'cat_bord', pour: 'tous', mode: 'tous' },
+  { id: 'imprimante-directe', date: '2026-11-14', titre: 'Imprimante thermique sans fenêtre', phrase: 'Sur ordinateur (Chrome, Edge) : jumelée une fois, « Imprimer » lui envoie tout.', tab: 'cat_bord', pour: 'tous', mode: 'tous' },
+  { id: 'meme-acheteur', date: '2026-11-14', titre: 'Même acheteur : préparer ensemble', phrase: 'Deux ventes au même acheteur : rapprochées et rappelées à l’emballage.', tab: 'cat_bord', pour: 'tous', mode: 'tous' },
+  { id: 'consignes-plateformes', date: '2026-11-14', titre: 'Ce que demande chaque plateforme', phrase: 'Vinted, Leboncoin, eBay, Vestiaire : rappelé quand tu prépares le colis.', tab: 'cat_bord', pour: 'tous', mode: 'tous' },
   { id: 'imprimer-un-toucher', date: '2026-11-14', titre: 'Imprimer en un toucher', phrase: 'Le PDF tamponné s’ouvre tout de suite ; le tampon se corrige après.', tab: 'cat_bord', pour: 'tous', mode: 'tous' },
   { id: 'accompagnement', date: '2026-11-14', titre: 'Chaque geste dit ce qu’il fait', phrase: 'Avant, pendant, après ; et si ça bloque, pourquoi et quoi faire.', tab: 'cat_bord', pour: 'tous', mode: 'tous' },
   // (14 nov., extension 5.377) « L'extension a capté » et la carte du logo en trois onglets.
