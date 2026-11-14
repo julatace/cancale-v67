@@ -1840,3 +1840,7 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **13 nov. · Démarrage en 3 étapes + exemple (lot 46/48)** : compte · extension reliée à CE compte · Vinted lu (ventes, sinon dressing), cochées sur preuve, geste exact, carte disparue à 3/3, jamais chez un installé ; « Découvrir avec des exemples » sur l'accueil et la connexion, bandeau « Créer mon compte ». `docs/passation/2026-11-13-lot4648.md`. Geste : aucun.
 
 - **13 nov. · Import de ton passé (lot 47, ext. 5.375.0)** : 12 derniers mois (ventes, achats ; annonces = dressing complet d'un trait), dans les 20 lectures/h étalées (« suite dans 40 min »), reprise page suivante, souci dit et reprise seule ; « Ton passé est importé (12 mois) » une fois (`vrm_import_passe_vu`). `docs/passation/2026-11-13-lot47.md`. Geste : installer 5.375.0.
+
+## Déplacé de CLAUDE.md §9 le 14 nov. (accueil des nouveaux), tel quel
+
+- **13 nov. · Design système** : jetons `--d-*` (`src/styles-systeme.css`) lus par toutes les familles ; contient 20 · se touche capsule · montre 12 · N° 6 ; 400/600/700 ; 44 doigt / 36 souris. `docs/design/DESIGN.md`, `2026-11-13-design-systeme.md`. Geste : aucun.

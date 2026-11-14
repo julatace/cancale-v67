@@ -26,6 +26,10 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  { id: 'accueil-nouveaux-tarifs', date: '2026-11-14', titre: 'Une page des tarifs claire', phrase: 'Solo et Pro côte à côte, l’essai, la suite : vrm.center/tarifs.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  { id: 'accueil-nouveaux-premier-colis', date: '2026-11-14', titre: 'Ton premier colis, accompagné', phrase: 'Imprimer, coller, déposer, suivre : rejouable dans Paramètres → Aide.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  { id: 'accueil-nouveaux-bilan', date: '2026-11-14', titre: 'Ton bilan en une minute', phrase: 'Ventes de l’année, colis, paires en ligne : rejouable dans Paramètres → Aide.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'accueil-nouveaux-plateformes', date: '2026-11-14', titre: 'Un démarrage pour Leboncoin, Vestiaire, eBay', phrase: 'Sans Vinted, les étapes de tes plateformes, chacune prouvée.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'design-passe-reglages', date: '2026-11-14', titre: 'Paramètres et Notifications plus simples', phrase: 'Choix en un toucher, cartes sans cadre, plus de barre vide.', tab: 'settings', pour: 'tous', mode: 'tous' },
   { id: 'design-passe-autres-ecrans', date: '2026-11-14', titre: 'E-mails, Achats et Leboncoin plus nets', phrase: 'Mêmes cartes, mêmes boutons, un seul N° par ligne de recherche.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'design-passe-ecrans', date: '2026-11-14', titre: 'Fiche du N° et écrans plus nets', phrase: 'Tailles, graisses et gris unifiés, boutons à bonne hauteur, textes plus contrastés.', tab: 'journee', pour: 'tous', mode: 'tous' },
