@@ -54,10 +54,42 @@ textes `listes.*` (5 langues, `src/i18n/langues/<l>/listes.js`). La carte régla
 - Verts : `npm run build`, audits traduction, tdz, icônes, cohérence, variables, composants, violet,
   rouge-doublon, quoi-de-neuf ; `design-passe` (journée, ventes, colis, annonces : 0 défaut sur l'arbre fusionné).
 
+## Deuxième tour (demandes du coordinateur après les captures)
+- **Annonces** : la bande garde 3 chiffres au plus au téléphone (« Qui dorment » à 0 n'y est que lu), « ⋯ »
+  au bout de la même rangée ; le NOM tient sa ligne et la taille écrite en fin de titre passe dans la
+  sous-ligne (« T. 37 », `tailleEnFin`, affichage seulement : le titre reste entier dans le DOM), le prix
+  dessous à droite ; la sous-ligne = taille, favoris, jours (l'état et les vues dans la fiche ouverte).
+- **Ventes** : au téléphone « 15 à imprimer », « N à envoyer en priorité », « Préparer mes colis · Je
+  dépose », la tournée et « Bordereau téléchargé il y a N min » vont dans « • À faire · N » (capsule à côté
+  des onglets, `AFaireHote` posé sur la section « À expédier ») ; « À expédier » + scanner + « Tout imprimer »
+  (seul bouton plein) + « ⋯ » sur une rangée ; N° + titre du colis sur UNE ligne. 1re vente à 414 px.
+- **Panne trouvée et corrigée** : une coupe automatique avait laissé la requête « souris » de `ui.css`
+  ouverte : au téléphone AUCUNE règle des capsules ni d'« À faire » ne s'appliquait (« À faire » en boîte à
+  bord noir). Refermée, la règle de la ligne rétablie.
+- **`annonces-grille`** : les 2 délais à 1512 venaient du banc (le menu « … » refermé par Échap, son voile
+  encore là 400 ms après sur une machine chargée) : il attend maintenant que le menu soit parti (règle 5 du
+  §6). Les 6 contrôles du téléphone sont réécrits pour la liste (une colonne, rangées 64–76 px hors
+  proposition « Même paire ? », nom sur sa ligne et taille dessous, en-tête nom + nombre) : **rouges sur
+  origin/main (6 ❌), verts ici (96 ✅)**.
+- Le site + compte en UN menu sur Ventes (« Vinted · tous ▾ ») n'est pas fait : le filtre des sites est
+  celui de la coque (onglets « Paires ») ; la règle des 50 % est tenue sans lui.
+
+## Bancs relancés (un à la fois, sur la branche fusionnée ; « main » = origin/main construit à part)
+| banc | branche | origin/main | note |
+|---|---|---|---|
+| refonte-listes (forme) | vert (1re ligne : Ventes 414, Annonces ≤ 422) | rouge | le banc de ce lot |
+| annonces-grille | 96 ✅ / 0 | 6 ❌ (les contrôles téléphone réécrits) | 1512 : délai du banc corrigé |
+| annonces-outils · ventes-une-phrase · carte-stats · tout-imprimer · retirer-nom-paire · ventes-colis-premium | verts | — | |
+| annonces-coherence | 10 → (B, P corrigés) | 8 rouges | G (« Ouvrir sur Vinted » bleu) et F (feuille Actions 36 px à l'ordinateur) : rouges sur main aussi |
+| colis-heure | 8 | 16 | « carte absente » et l'ambre de nuit : rouges sur main aussi |
+| journee-v2 | 8 | 8 | « Ventes · Vinted : lien vers Colis » : identique sur main |
+| journee-premium | 1 | 1 | tête 592 px : identique sur main |
+| vague2-ventes | 3 | 4 | « ouvrir la remise n'écrit rien » : rouge sur main aussi |
+| colis-envoi | 6 → (tournée depuis « À faire » corrigée) | 1 (le scénario tombe) | G 1512 (boutons 36 px souris) : de main |
+| annonces-actions | 2 | 4 | F 1512 (cibles 36 px souris) : de main |
+| design-passe-2 | 8 coupes (« Tout imprimer » secondaire, corrigé) + 26 écrans non mesurés (délai) | — | relancé en fin de lot |
+
 ## Restes (honnêtes)
-- **Ventes** n'atteint pas encore « 1re ligne ≤ 50 % » au téléphone (577 px sans la ligne de la coque) : il
-  faudrait ranger « 15 à imprimer », « 28 à envoyer en priorité » et la tournée dans « À faire » et le « ⋯ »
-  de « À expédier » (même mécanique `AFaire`), et passer les sites en menu comme sur la maquette.
 - La maquette met le **site et le compte dans UN menu** (« Vinted · tous ▾ ») sur la rangée de la recherche,
   et le segment « Annonces | Stock | Achats » : ce sont la coque (onglets « Paires ») et le filtre des sites —
   à faire quand la coque est fusionnée.
@@ -70,10 +102,4 @@ textes `listes.*` (5 langues, `src/i18n/langues/<l>/listes.js`). La carte régla
 - Le « de ouf » (photo en vedette façon Nike, affiches façon Revolut/Oura, finition Linear — skill
   `references-design`) n'a pas été appliqué : arrivé en fin de session, à prendre par le chantier suivant
   sur la base posée ici (structure « liste d'abord » de la maquette, briques `src/ui/`).
-- **`annonces-grille` rouge (8)** : 6 au téléphone mesurent la grille du 10 nov. (« 2 colonnes », « titre sur deux
-  lignes », « initiale dans l'en-tête ») que la liste dense d'AJOUT 2/3 et la maquette remplacent — le banc est à
-  réécrire sur la nouvelle règle une fois l'écran validé par Julien ; 2 à l'ordinateur : « le scénario a tourné
-  jusqu'au bout — locator.click: Timeout » (le clic sur « Détails et gestes » d'une vignette) — PAS ENCORE
-  EXPLIQUÉ, à reprendre en premier (place des alertes « ordinateur » ou recouvrement).
-- Les autres bancs des écrans touchés (annonces-*, ventes-*, colis*, journee-*, carte-stats, tout-imprimer,
-  retirer-nom-paire) n'ont PAS été relancés (machine à charge 43, 4 min par build) : à passer avant la fusion.
+- Les bancs des écrans touchés : voir « Bancs relancés » ci-dessous.

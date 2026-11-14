@@ -391,7 +391,10 @@
   :root:root:root body .vrm-main .vrm-colis-section .vrm-colis-carte[data-bord-card] .vrm-colis-titre { -webkit-line-clamp: 1 !important; line-clamp: 1 !important; white-space: nowrap !important; display: block !important; text-overflow: ellipsis !important; }
   :root:root:root body .vrm-main .vrm-colis-section .vrm-colis-onglets { display: flex !important; align-items: center !important; gap: 6px !important; }
   :root:root:root:root body .vrm-main .vrm-colis-section .vrm-colis-section-tete > .vrm-colis-section-titre { font-size: 17px !important; }
-  :root:root:root:root body .vrm-main .vrm-colis-section > div > [data-colis-dans] { padding-top: 0 !important; }
+  :root:root:root:root body .vrm-main .vrm-colis-section [data-colis-dans] { padding-top: 0 !important; }
+  :root:root:root:root body .vrm-main .vrm-colis-section .vrm-colis-onglets { margin-bottom: 4px !important; }
+  :root:root:root:root body .vrm-main .vrm-colis-section .vrm-tournee-tete:empty { margin: 0 !important; }
+  :root:root:root:root:root body .vrm-main[data-ecran="ventes"] .vrm-fu-bande { padding-bottom: 2px !important; }
   :root:root:root:root body .vrm-main .vrm-colis-section [data-colis-dans] > .vrm-colis-section-tete { margin-top: 0 !important; }
   :root:root:root:root body .vrm-main .vrm-colis-section .vrm-colis-section-tete .vrm-b-primaire { padding: 0 10px !important; }
   :root:root:root body .vrm-main .vrm-colis-section .vrm-colis-onglets > :first-child { flex: 1 1 auto !important; min-width: 0 !important; }
