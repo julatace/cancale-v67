@@ -123,7 +123,7 @@ journee / leboncoin-annonces / achats à 1512).
   arbre de main construit à part) : `centre-notifs` (F1 « huit types » — il y en a onze ; F11), `cout-vente` (« paires »
   / « articles »), `boite-emails` (4 : la marque de l'expéditeur), `colis-retirer-propre` (l'air de 15 px avant « argent »),
   `feuilles-coque` (16 : clics hors délai). Les C8 de `centre-notifs` (le choix au segmenté) verts.
-- `design-passe.cjs` et `design-passe-2.cjs` relancés sur le build final (390 et 1512 séparés) : DPRES.
+- `design-passe.cjs` et `design-passe-2.cjs` relancés sur le build final (390 et 1512 séparés) : VERTS (36 + 134 rendus, 0 défaut).
 - Captures REGARDÉES (deviceScaleFactor 1, défilées `SUITE=1–2`) : Leboncoin (1512 clair/sombre), Notifications (390,
   1512), Achats et un retrait ouvert (390 clair/sombre, 1512), la feuille d'une vente (390, 1512 clair/sombre), un
   e-mail ouvert, un fil ouvert (390, 1512), Ma journée (réglage), Mon historique, Comptes eBay, Mes plateformes, Mode
