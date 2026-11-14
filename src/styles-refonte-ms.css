@@ -302,7 +302,7 @@
 :root:root body .vrm-boite .vrm-boite-rubriques.vrm-boite-rubriques > button[aria-pressed="true"] { background: transparent !important; color: var(--d-carte, #fff) !important; }
 :root:root body .vrm-boite .vrm-boite-rubriques.vrm-boite-rubriques > button[aria-pressed="true"]::before { background: var(--d-encre, #1D1D1F) !important; box-shadow: none !important; }
 :root:root body .vrm-boite .vrm-boite-vues.vrm-boite-vues > button { min-height: 40px !important; height: 40px !important; }
-@media (pointer: coarse) { :root:root body .vrm-boite .vrm-boite-vues.vrm-boite-vues > button { min-height: 44px !important; height: 44px !important; border-radius: 10px !important; } :root:root body .vrm-boite .vrm-boite-vues.vrm-boite-vues { border-radius: 12px !important; } }
+@media (pointer: coarse), (max-width: 743px) { :root:root body .vrm-boite .vrm-boite-vues.vrm-boite-vues > button { min-height: 44px !important; height: 44px !important; border-radius: 10px !important; } :root:root body .vrm-boite .vrm-boite-vues.vrm-boite-vues { border-radius: 12px !important; } }
 /* Stock : les puces d'état et le menu du compte sur UNE ligne */
 :root:root body .vrm-ms-stock-resume .vrm-s2d-resume > .vrm-pop-ligne { overflow: hidden !important; }
 :root:root body .vrm-ms-stock-resume .vrm-pop-chips { margin: 0 !important; padding: 0 !important; }

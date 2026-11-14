@@ -126,7 +126,7 @@ const attendreFils = async (pg) => { await pg.waitForFunction(() => { const e = 
 // (14 nov., refonte Messages · E-mails · Stock — AJOUT 3) Les questions « Peut-être la même paire ? » vivent
 // dans la ligne « À relier · N › » au-dessus de la liste : la feuille s'ouvre avant de les lire. La RÈGLE jugée
 // (une question à la fois, ses deux gestes, rien relié sans son clic) est la même.
-const ouvrirAFaire = async (pg) => { if (await pg.$('[data-fil-proposition]')) return; if (await pg.$('[data-msg-afaire]')) { await pg.click('[data-msg-afaire]'); await pg.waitForTimeout(350); } };
+const ouvrirAFaire = async (pg) => { if (await pg.$('[data-fil-proposition]')) return; if (await pg.$('[data-msg-afaire]')) { await pg.$eval('[data-msg-afaire]', (b) => b.click()); await pg.waitForTimeout(350); } };   // un clic DOM : au téléphone le fil ouvert couvre la liste
 (async () => {
   fs.mkdirSync(CAP, { recursive: true });
   let b;
