@@ -82,6 +82,25 @@ import { CATEGORIES_DEPENSE, idTicket, montantDuTicket, texteMontantSaisie, text
 // ⟦← App.jsx #3⟧
 const Dac7Comptes = aLaDemande(() => import('../Dac7Comptes.jsx'));
 import MoisBoucle, { portesMoisBoucle } from '../MoisBoucle.jsx';   // (10 nov., lot BK)
+// (14 nov., lot argent-prix — 115 lien comptable, 116 révision du mois)
+import { LienComptable, RevisionMoisCarte } from '../ArgentPrix.jsx';
+import { revisionMois, moisRevision, moisPrecedent } from '../revisionMois.js';
+// Le lien comptable, sur SA session (api/_lib/comptable-lien.js). Une réponse illisible ⇒ null (« — »).
+const appelComptable = async (methode, corps) => {
+  try {
+    const r = await fetch('/api/compte?mode=comptable', { method: methode, headers: { ...enTeteSession(), ...(corps ? { 'Content-Type': 'application/json' } : {}) }, ...(corps ? { body: JSON.stringify(corps) } : {}) });
+    const j = await r.json().catch(() => null);
+    return r.ok && j && j.ok === true ? j : null;
+  } catch (_) { return null; }
+};
+// (116) La révision : le relevé de Ventes (`vrm_stats_ventes`), le mois passé d'abord ; chaque ligne ouvre la porte existante.
+function RevisionMoisCompta({ onNav, ouvrirRepli }) {
+  const [releve, pret] = useLigneSynchro('vrm_stats_ventes', lireReleveVentes);
+  const [ym, setYm] = React.useState(() => moisPrecedent());
+  const R = React.useMemo(() => revisionMois({ releve: !pret ? undefined : (releve && Array.isArray(releve.l) ? releve.l : null), ym }), [releve, pret, ym]);
+  const P = portesMoisBoucle({ onNav, ouvrirRepli });
+  return <RevisionMoisCarte R={R} mois={moisRevision()} ym={ym} setYm={setYm} portes={{ achat: P.prix, versement: P.adater, relier: () => onNav && onNav('cat_ventes') }}/>;
+}
 import ClotureAnnee from '../ClotureAnnee.jsx';   // (11 nov.) « Clôturer l'année »
 import { DEMANDE_INVENTAIRE_ANNUEL } from '../inventaireAnnuel.js';
 import { jourParis } from '../dateParis.js';   // (11 nov.) jour à l'heure de Paris
@@ -2169,6 +2188,8 @@ function ExportComptableCorps({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, 
           <Bouton variante="secondaire" icone="doc" data-export-pdf="" disabled={!D || !!enCours} onClick={() => telecharger('pdf')} style={{ flex: '1 1 140px' }}>{enCours === 'pdf' ? '…' : tr('compta.recapPdf')}</Bouton>
         </div>
       </details>
+      {/* (14 nov., lot argent-prix — 115) Le lien lecture seule pour son comptable : la période choisie, réduite à la compta par le serveur. */}
+      <LienComptable vue={D || null} appel={appelComptable} />
     </div>
   );
 }
@@ -4748,6 +4769,8 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         <PrevisionUrssafCarte onNav={onNav} />
         {/* (10 nov., lot BK) « Mois bouclé » : ce qui manque avant de déclarer le mois choisi (src/moisBoucle.js). */}
         <MoisBoucle portes={portesMoisBoucle({ onNav, ouvrirRepli: ouvrirRepliCompta })} />
+        {/* (14 nov., lot argent-prix — 116) La révision du mois : chaque vente à compléter, une liste à vider (src/revisionMois.js). */}
+        <RevisionMoisCompta onNav={onNav} ouvrirRepli={ouvrirRepliCompta} />
         <StatutFiscal partie="declarer" liveStats={liveStats} onNav={onNav} />
         {exportDevant ? <div data-compta-export-devant="" style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 16 }}>
           <ExportComptableCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />

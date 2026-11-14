@@ -166,9 +166,13 @@ const veutLApp = () => {
 };
 const versApp = () => aUneSession() || veutLApp();
 const filmDemande = /[?&]film(=|&|$)/.test(window.location.search || '');
+// (14 nov., lot argent-prix — 115) Le lien de son COMPTABLE (`/c/<jeton>` → `?comptable=`) : une page en lecture
+// seule, SANS l'app ni session (src/VueComptable.jsx) — même quand une session existe sur ce navigateur.
+const comptableDemande = /[?&]comptable=/.test(window.location.search || '');
+const VueComptable = React.lazy(() => import('./VueComptable.jsx'));
 // Une session existe : on lance le téléchargement de l'app TOUT DE SUITE, avant
 // même le premier rendu, pour ne pas ajouter un aller-retour à son ouverture.
-if (!filmDemande && versApp()) { try { import('./App.jsx'); } catch (_) {} }
+if (!filmDemande && !comptableDemande && versApp()) { try { import('./App.jsx'); } catch (_) {} }
 
 const FondApp = DemarrageVRM;
 function Racine() {
@@ -179,6 +183,7 @@ function Racine() {
     window.addEventListener('popstate', f);
     return () => window.removeEventListener('popstate', f);
   }, []);
+  if (comptableDemande) return <React.Suspense fallback={null}><VueComptable /></React.Suspense>;
   if (filmDemande) return <React.Suspense fallback={<FondApp />}><Film /></React.Suspense>;
   if (pageTarifs()) return <React.Suspense fallback={<FondApp />}><Tarifs /></React.Suspense>;
   if (vue === 'accueil') {

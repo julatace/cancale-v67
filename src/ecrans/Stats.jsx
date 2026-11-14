@@ -30,6 +30,10 @@ import { PrevisionMoisCarte, CoutPlateformes } from '../ArgentPlus.jsx';
 import {fraisParPlateforme,texteCouverture} from '../fraisPlateformes.js';
 import FraisPlateformes from '../FraisPlateformes.jsx';   // (14 nov., frais-carte) les frais de l'année
 import CarteVentes from '../CarteVentes.jsx';   // (14 nov., frais-carte) où partent tes paires
+// (14 nov., lot argent-prix — 113 offres payées, 121 écarts de prix, 122 prix à afficher)
+import { TauxOffresCarte, PrixVouluCarte, EcartsPrixPorte } from '../ArgentPrix.jsx';
+import { tauxOffresComptes } from '../tauxOffres.js';
+import { tauxDesSites } from '../prixVoulu.js';
 // ⟦← App.jsx #3⟧
 import { boostRentable, SEUIL_BOOST } from "../boostRentable.js";
 // ⟦← App.jsx #4⟧
@@ -689,6 +693,9 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       {/* (14 nov., frais-carte) « Frais de l'année » et « Carte de tes ventes » (src/FraisPlateformes.jsx, src/CarteVentes.jsx). */}
       <FraisAnneeArgent ebayCommandes={ebayCommandes} ventesVc={ventesVc}/>
       <CarteVentesArgent liveStats={liveStats} ebayCommandes={ebayCommandes}/>
+      {/* (14 nov., lot argent-prix — 122, 121) Le prix à afficher pour toucher X € ; la même paire à deux prix. */}
+      <PrixVouluArgent ebayCommandes={ebayCommandes} ventesVc={ventesVc}/>
+      <EcartsPrixPorte onOuvrir={() => { try { window.dispatchEvent(new CustomEvent('vrm:ecarts-prix')); } catch (_) {} }}/>
       {/* (2 nov., « beaucoup d'incompréhension » — Julien) En haut, les chiffres qui
           comptent pour la période ; tout le reste est rangé en deux volets repliés,
           ouverts d'un geste et gardés ouverts sur cet appareil. Aucune règle ne change. */}
@@ -1144,7 +1151,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
 // Une lecture ratée ⇒ `null` (« — »), jamais une liste vide.
 let _offresCache = null;
 const OFFRES_STATS_CONV = 'id=like.harvest_%25_conv_%25&data->payload->conversation->messages=cs.' + encodeURIComponent(JSON.stringify([{ entity_type: 'offer_request_message' }]))
-  + '&data->payload->conversation->transaction->>current_user_side=eq.seller&select=id,opp:data->payload->conversation->opposite_user->>id,side:data->payload->conversation->transaction->>current_user_side,msgs:data->payload->conversation->messages';
+  + '&data->payload->conversation->transaction->>current_user_side=eq.seller&select=id,opp:data->payload->conversation->opposite_user->>id,side:data->payload->conversation->transaction->>current_user_side,tx:data->payload->conversation->transaction->>id,msgs:data->payload->conversation->messages';
 const OFFRES_STATS_LECTURES = 'id=like.harvest_%25_conv_%25&select=id,cap:data->>capturedAt';
 const OFFRES_STATS_TXN = 'id=like.harvest_%25_txn_%25&select=tx:meta->>id,sys:data->payload->transaction->offer->>is_system,op:data->payload->transaction->offer->price->>amount,oc:data->payload->transaction->offer->price->>currency_code,ic:data->payload->transaction->order->>item_count,ip:data->payload->transaction->order->items->0->price->>amount,icur:data->payload->transaction->order->items->0->price->>currency_code';
 const lireOffresStats = async () => {
@@ -1157,7 +1164,7 @@ const lireOffresStats = async () => {
     lireTout(OFFRES_STATS_TXN, { strict: true }).catch(() => null),
   ]);
   const uidDe = (id) => { const m = /^harvest_(\d+)_conv_\d+$/.exec(String(id || '')); return m ? m[1] : null; };
-  const convs = Array.isArray(rc) && Array.isArray(rl) ? rc.map((r) => ({ compte: uidDe(r.id), side: r.side, opp: r.opp, messages: Array.isArray(r.msgs) ? r.msgs : [] })).filter((c) => c.compte) : null;
+  const convs = Array.isArray(rc) && Array.isArray(rl) ? rc.map((r) => ({ compte: uidDe(r.id), side: r.side, opp: r.opp, tx: r.tx == null ? '' : String(r.tx), messages: Array.isArray(r.msgs) ? r.msgs : [] })).filter((c) => c.compte) : null;
   let lectures = null;
   if (convs && Array.isArray(rl)) {
     lectures = {};
@@ -1908,6 +1915,15 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
     const ventes = Array.isArray(vendu) ? vendu.filter((l) => l.plateforme === 'Vinted') : null;
     return statsOffres({ convs, lectures, ventes, txn: offresBrut.txn, de: b.de, a: b.a, maintenant });
   }, [offresBrut, vendu, ecarteStats, b, maintenant]);
+  // (14 nov., lot argent-prix — 113) Acceptées et PAYÉES, compte par compte (src/tauxOffres.js) : les mêmes
+  // conversations ; « payée » = la transaction de la conversation est une vente prouvée (`vendu`, toutes dates).
+  const tauxOffres = React.useMemo(() => {
+    if (offresBrut === undefined || vendu === undefined) return { etat: 'encours', comptes: [], total: null };
+    const convs = Array.isArray(offresBrut.convs) ? offresBrut.convs.filter((c) => !ecarteStats(c.compte)) : null;
+    const lectures = offresBrut.lectures ? Object.fromEntries(Object.entries(offresBrut.lectures).filter(([u]) => !ecarteStats(u))) : {};
+    const ventes = Array.isArray(vendu) ? vendu.filter((l) => l.plateforme === 'Vinted') : null;
+    return tauxOffresComptes({ convs, ventes, lectures, de: b.de, a: b.a, maintenant });
+  }, [offresBrut, vendu, ecarteStats, b, maintenant]);
   const nomCompteOffres = (uid) => {
     const labels = load('vinted_account_labels', {}) || {};
     if (labels[uid]) return labels[uid];
@@ -2105,6 +2121,8 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
       <ParCategorie vendu={Array.isArray(vendu) ? vendu.filter(dansP) : vendu} lp={lp} extras={extras} stock={stock} b={b}/>
       {/* (4 nov.) Les offres de la période, par compte (src/statsOffres.js). */}
       <div ref={refOffres}><CarteOffres S={offres} etat={offresBrut === undefined || vendu === undefined ? 'encours' : 'passu'} fmt={fmt} nomDe={nomCompteOffres}/></div>
+      {/* (14 nov., lot argent-prix — 113) Offres acceptées et payées, compte par compte (src/tauxOffres.js). */}
+      <TauxOffresCarte T={tauxOffres} nomDe={nomCompteOffres}/>
       <div className="vrm-sv-rangee vrm-sv-rangee-2">
         {carte('sv-tailles', tr('stats.taillesVendent'), tailles && tailles.groupes.length ? 'ventes · jours pour vendre' : null, !lignes
           ? vide(tr('stats.encoreCalcule'), { 'data-sv-etat': 'passu' })
@@ -2419,6 +2437,16 @@ function FraisAnneeArgent({ ebayCommandes, ventesVc }) {
   const R = React.useMemo(() => ({ commandeEbayEngagee, fraisVc }), []);
   return <FraisPlateformes releve={releve ? releve.l : null} releveAt={releve ? releve.at : null} ebay={Array.isArray(ebayCommandes) ? ebayCommandes : null}
     packs={compta && compta.packs} excluAutre={excluAutre} R={R} vestiaire={Array.isArray(ventesVc) ? ventesVc : null}/>;
+}
+// (14 nov., lot argent-prix — 122) Les taux de frais LUS par `fraisParPlateforme` (la règle de frais-carte), sur toutes
+// ses ventes connues : le relevé de Ventes, les commandes eBay, les ventes Vestiaire. Rien recalculé ailleurs.
+function PrixVouluArgent({ ebayCommandes, ventesVc }) {
+  const [releve] = useLigneSynchro('vrm_stats_ventes', lireReleveFrais);
+  const excluAutre = useExcluAutre();
+  const R = React.useMemo(() => ({ commandeEbayEngagee, fraisVc }), []);
+  const taux = React.useMemo(() => (ebayCommandes === undefined ? null : tauxDesSites({ releve: releve ? releve.l : null,
+    ebay: Array.isArray(ebayCommandes) ? ebayCommandes.filter((o) => !(excluAutre && excluAutre('ebay', o))) : null, vestiaire: Array.isArray(ventesVc) ? ventesVc : null, R })), [releve, ebayCommandes, ventesVc, excluAutre, R]);
+  return <PrixVouluCarte taux={taux}/>;
 }
 function CarteVentesArgent({ liveStats, ebayCommandes }) {
   const lignes = !liveStats ? undefined : liveStats.venduPasSu ? null : liveStats.venduLignes;

@@ -18,6 +18,7 @@ import ecran_plus from './en/plus.js';
 import ecran_argent from './en/argent.js';
 import ecran_fraiscarte from './en/fraiscarte.js';   // (14 nov., frais-carte)
 import ecran_atelier from './en/atelier.js';
+import ecran_argentprix from './en/argentprix.js';   // (14 nov., argent-prix)
 export default {
   ...ecran_fiche,
   ...ecran_fraiscarte,
@@ -26,6 +27,7 @@ export default {
   ...ecran_atelier,
   ...ecran_listes,
   ...ecran_plus,
+  ...ecran_argentprix,
   ...ecran_compta,
   ...ecran_argent,
   ...ecran_stats,
