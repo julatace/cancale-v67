@@ -218,14 +218,18 @@ async function passe(nav, FIX, { W, theme }) {
       const mo = new MutationObserver(() => { if (fini()) { mo.disconnect(); clearTimeout(t); ok({ ok: true, ms: Math.round(performance.now() - t0) }); } });
       mo.observe(s, { subtree: true, childList: true, attributes: true });
       const t = setTimeout(() => { mo.disconnect(); ok({ ok: fini(), ms: Math.round(performance.now() - t0) }); }, 10000);
+      const cv0 = s.querySelector('canvas');
       b.click();
+      const sync = Math.round(performance.now() - t0);
+      setTimeout(() => { window.__fcSonde = { sync, memeCarte: s.querySelector("canvas") === cv0 }; }, 0);
     }));
+    if (process.env.BAVARD || process.env.PROFIL) console.log('  sonde clic', JSON.stringify(await pg.evaluate(() => window.__fcSonde)));
     const toutOk = mesure.ok, ms2 = mesure.ms;
     if (cdp) {
       const { profile } = await cdp.send('Profiler.stop');
       const parId = new Map(profile.nodes.map((n) => [n.id, n])), soi = new Map();
       const dt = profile.timeDeltas || [];
-      profile.samples.forEach((id, i) => { const n = parId.get(id); const k = `${n.callFrame.functionName || '(anon)'} ${String(n.callFrame.url).split('/').pop()}:${n.callFrame.lineNumber}`; soi.set(k, (soi.get(k) || 0) + (dt[i] || 0)); });
+      profile.samples.forEach((id, i) => { const n = parId.get(id); const k = `${n.callFrame.functionName || "(anon)"} ${String(n.callFrame.url).split("/").pop()}:${n.callFrame.lineNumber}:${n.callFrame.columnNumber}`; soi.set(k, (soi.get(k) || 0) + (dt[i] || 0)); });
       console.log('  profil (ms propres) :', [...soi.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([k, v]) => `${Math.round(v / 1000)} ${k}`).join(' | '));
     }
     const nTout = await pg.evaluate(() => +document.querySelector('[data-carte-ventes]').getAttribute('data-cv-n'));

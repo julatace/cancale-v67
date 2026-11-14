@@ -227,7 +227,8 @@ function FondVentes({ bulles, max, vue, choisi, onChoisir }) {
   const boite = React.useRef(null);
   const carteRef = React.useRef(null);
   const mlRef = React.useRef(null);
-  const marqueurs = React.useRef([]);
+  const marqueurs = React.useRef(new Map());   // clé du lieu → { sig, m }
+  const choisiRef = React.useRef(choisi); choisiRef.current = choisi;
   const [etat, setEtat] = React.useState('attente');   // attente · charge · bulles · pret · ko
   const [visible, setVisible] = React.useState(false);
   const tVisible = React.useRef(null);
@@ -281,7 +282,7 @@ function FondVentes({ bulles, max, vue, choisi, onChoisir }) {
         });
       });
     }).catch(() => { if (vivant) setEtat('ko'); });
-    return () => { vivant = false; carteRef.current = null; for (const m of marqueurs.current) { try { m.remove(); } catch (_) {} } marqueurs.current = []; if (carte) { try { carte.remove(); } catch (_) {} } };
+    return () => { vivant = false; carteRef.current = null; for (const v of marqueurs.current.values()) { try { v.m.remove(); } catch (_) {} } marqueurs.current = new Map(); if (carte) { try { carte.remove(); } catch (_) {} } };
   }, [visible]);
   // Les bulles : refaites quand les lieux changent ; posées dès que la carte vide est chargée.
   const cleBulles = bulles.map((x) => `${x.cle}:${x.n}:${x.lat}:${x.lon}`).join('|');
@@ -289,25 +290,39 @@ function FondVentes({ bulles, max, vue, choisi, onChoisir }) {
   React.useEffect(() => {
     const carte = carteRef.current, ml = mlRef.current;
     if (!pose || !carte || !ml) return;
-    for (const m of marqueurs.current) { try { m.remove(); } catch (_) {} }
-    marqueurs.current = [];
-    // Les plus petites au-dessus : une grosse bulle ne cache jamais une petite.
-    [...bulles].sort((x, y) => y.n - x.n).slice(0, 400).forEach((x) => {
-      const r = rayonBulle(x.n, max, (boite.current && boite.current.clientWidth < 500) ? { min: 8, maxi: 22, k: 1.4 } : undefined);
-      const el = document.createElement('button');
-      el.type = 'button';
-      el.className = 'vrm-cv-bulle';
-      el.setAttribute('data-cv-bulle', x.cle);
+    // Seules les bulles qui CHANGENT sont refaites (une ville placée ne refait pas les 30 autres), et la
+    // largeur n'est lue qu'UNE fois : la lire après chaque bulle posée forçait une mise en page de tout
+    // l'écran Argent par bulle (2 s mesurées au banc pour 11 bulles).
+    const petit = !!(boite.current && boite.current.clientWidth < 500);
+    const voulues = [...bulles].sort((x, y) => y.n - x.n).slice(0, 400);
+    // Une bulle au même endroit est MISE À JOUR sur place (nombre, taille) ; seule une bulle neuve ou
+    // déplacée passe par MapLibre (`addTo`).
+    const pos = (x) => `${x.lat}:${x.lon}`;
+    const garder = new Map(voulues.map((x) => [x.cle, x]));
+    for (const [k, v] of marqueurs.current) { const x = garder.get(k); if (!x || v.pos !== pos(x)) { try { v.m.remove(); } catch (_) {} marqueurs.current.delete(k); } }
+    const habiller = (el, x) => {
+      const r = rayonBulle(x.n, max, petit ? { min: 8, maxi: 22, k: 1.4 } : undefined);
       el.setAttribute('data-cv-bulle-n', String(x.n));
-      if (x.approx) el.setAttribute('data-cv-approx', '');
+      if (x.approx) el.setAttribute('data-cv-approx', ''); else el.removeAttribute('data-cv-approx');
       el.setAttribute('aria-label', tr('fc.bulle', { lieu: nomLieu(x), n: x.n }));
       el.style.width = el.style.height = `${2 * r}px`;
       el.style.fontSize = r >= 20 ? '13px' : r >= 14 ? '11px' : '10px';
       el.textContent = r >= 11 ? (x.n >= 10000 ? `${Math.round(x.n / 1000)}k` : String(x.n)) : '';
+      el.style.zIndex = String(Math.max(1, 100000 - x.n));   // les plus petites au-dessus : une grosse bulle ne cache jamais une petite
+    };
+    voulues.forEach((x) => {
+      const deja = marqueurs.current.get(x.cle);
+      if (deja) { habiller(deja.m.getElement(), x); return; }
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'vrm-cv-bulle';
+      el.setAttribute('data-cv-bulle', x.cle);
+      habiller(el, x);
+      el.setAttribute('aria-pressed', x.cle === choisiRef.current ? 'true' : 'false');
       el.addEventListener('click', (e) => { e.stopPropagation(); rappel.current && rappel.current(x.cle); });
-      marqueurs.current.push(new ml.Marker({ element: el, anchor: 'center', subpixelPositioning: true }).setLngLat([x.lon, x.lat]).addTo(carte));
+      marqueurs.current.set(x.cle, { pos: pos(x), m: new ml.Marker({ element: el, anchor: 'center', subpixelPositioning: true }).setLngLat([x.lon, x.lat]).addTo(carte) });
     });
-    if (msBulles == null && tVisible.current != null && marqueurs.current.length) setMsBulles(Math.round(performance.now() - tVisible.current));
+    if (msBulles == null && tVisible.current != null && marqueurs.current.size) setMsBulles(Math.round(performance.now() - tVisible.current));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pose, cleBulles, max]);
   // Le cadrage suit la vue (monde / France).
@@ -320,8 +335,8 @@ function FondVentes({ bulles, max, vue, choisi, onChoisir }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pose, vue]);
   React.useEffect(() => {
-    for (const m of marqueurs.current) { const el = m.getElement(); el.setAttribute('aria-pressed', el.getAttribute('data-cv-bulle') === choisi ? 'true' : 'false'); }
-  }, [choisi, pose, cleBulles]);
+    for (const [k, v] of marqueurs.current) v.m.getElement().setAttribute('aria-pressed', k === choisi ? 'true' : 'false');
+  }, [choisi]);
   const ko = etat === 'ko';
   return (
     <div className="vrm-cv-cadre" data-cv-fond={etat} data-cv-ms={msBulles == null ? undefined : String(msBulles)}>
