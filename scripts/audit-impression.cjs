@@ -219,7 +219,9 @@ const airePage = (p) => { const s = p.getSize(); return s.width * s.height; };
   const poser = (APP.match(/const poserBordereau = async[\s\S]*?\n\};/) || [])[0] || '';
   dit(/zoneEtiquette\(PL, first\)/.test(poser) && /if \(thermique && z\.ok\)/.test(poser),
     'la découpe ne part que d’une zone MESURÉE (`poserBordereau`)');
-  const fusion = (APP.match(/const mergeAndDownloadBordereaux(?:Brut)? = async[\s\S]*?\n\};/) || [])[0] || '';
+  // (14 nov., impression-simple) La fusion du lot vit dans `composerBordereaux` (préparée d'avance, ouverte dans le geste) ;
+  // `mergeAndDownloadBordereauxBrut` l'appelle aussi.
+  const fusion = (APP.match(/const composerBordereaux = async[\s\S]*?\n\};/) || [])[0] || '';
   const unique = (APP.match(/const annotateAndDownloadBordereau(?:Brut)? = async[\s\S]*?\n\};/) || [])[0] || '';
   const avecFacture = (APP.match(/const printBordAndInvoice = async[\s\S]*?\n  \};/) || [])[0] || '';
   dit(/poserBordereau\(/.test(fusion) && /poserBordereau\(/.test(unique) && /poserBordereau\(/.test(avecFacture),

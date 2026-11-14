@@ -53,9 +53,14 @@ const MUTS = {
   'douchette-pas-montee': ["<DouchetteGlobale ouvrirVentes={()=>setTab('ventes')}/>", '', 'App.jsx'],
   'tampon-lot-ignore': ["if (it.tampon && TAMPONS_IMPR.includes(it.tampon)) { const rg0 = reglageImpressionChoisi(); impIt.reg = { ...rg0, tamponA4: it.tampon, tamponTh: it.tampon }; }", '', 'App.jsx'],
   'lot-sans-garde-numeros': ["if (!(await confirmerNumerosAVerifier((items || []).map((it) => it && it.numero)))) throw new Error(NUM_A_VERIFIER_ANNULE);", '', 'App.jsx'],
-  'lot-rates-marques-imprimes': ["for (const k of (fait && fait.vinted) || []) if (!rates.has(k)) ops.push(", "for (const k of (fait && fait.vinted) || []) ops.push(", 'App.jsx'],
-  'lot-rates-pas-reimprimes': ["if (rates.size) { const encore = [...rates]; setLot((x) => x ? { ...x, fait: null, coches: new Set(encore) } : x); setTimeout(() => batchBordereaux(new Set(encore), false, true), 0); return; }", '', 'App.jsx'],
-  'lot-sans-choix-imprimante': ["onChange={(v)=>{ if (!batchBusy) choisirImprimante(v); }}", 'onChange={() => {}}', 'App.jsx'],
+  // (14 nov., impression-simple) le parcours en un toucher : « Il en manque » ne reprend QUE ceux-là, le papier se change
+  // d'un toucher à côté du bouton, et la première fois il est demandé (puis retenu).
+  'manque-tout-reimprime': ['for (const p of plages || []) if (p && voulu.has(String(p.cle))) for', 'for (const p of plages || []) if (p) for', 'impression/lotSimple.js'],
+  'manque-pas-branche': ['const idx = pagesDe(compo.plages, cles);', 'const idx = compo.plages.map((p) => p.debut);', 'App.jsx'],
+  'lot-sans-choix-imprimante': ["onClick={() => setChoixPapier({ puis: null })}", 'onClick={() => {}}', 'App.jsx'],
+  'papier-jamais-demande': ["if (isCloudReady() && !imprTouchee.current && formatRetenu(load('vrm_imprimante', null)) == null) { setChoixPapier({ puis: cles ? [...cles] : [] }); return; }", '', 'App.jsx'],
+  'ouvert-hors-geste-iphone': ["if (!pret || !geste) return 'bouton';", '', 'impression/lotSimple.js'],
+  'tampon-apres-ignore': ["tampon: TAMPONS_IMPR.includes((tampons || {})[l.cle]) ? tampons[l.cle] : null", 'tampon: null', 'App.jsx'],
 };
 if (process.argv.includes('--prouve')) {
   let n = 0;
@@ -88,10 +93,11 @@ const J = 86400000, MIN = 60000;
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 
 (async () => {
-  let D, V, T, E, P, DV;
+  let D, V, T, E, P, DV, LS;
   try {
     D = await import(url('douchette.js')); V = await import(url('mainsLibres.js')); T = await import(url('tempsColis.js'));
     E = await import(url('emballages.js')); P = await import(url('impression/planche4.js')); DV = await import(url('dicteeNavigateur.js'));
+    LS = await import(url('impression/lotSimple.js'));
   } catch (e) { dit(false, 'les modules du lot colis-plus existent et se chargent', e.message); console.log(`\n${ok} verts, ${ko} rouges`); process.exit(1); }
 
   // ── D · la douchette ───────────────────────────────────────────────────────
@@ -284,6 +290,18 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
   }
 
   // ── C · le code des écrans ───────────────────────────────────────────────────
+  // ── S · (14 nov., impression-simple) « Imprimer » en un toucher : les règles ─────────────────────────
+  console.log('\n── S. Imprimer en un toucher');
+  const plg = [{ cle: 'a', debut: 0, n: 1 }, { cle: 'b', debut: 1, n: 2 }, { cle: 'c', debut: 3, n: 1 }];
+  dit(JSON.stringify(LS.pagesDe(plg, ['b'])) === '[1,2]' && JSON.stringify(LS.pagesDe(plg, ['c', 'a'])) === '[0,3]' && LS.pagesDe(plg, []).length === 0, 'S1 « Il en manque » : les pages des SEULS bordereaux touchés (sa page + sa fiche), dans l’ordre du lot');
+  dit(LS.voieOuverture({ ios: true, partageFichiers: true, pret: true, geste: true }) === 'partage' && LS.voieOuverture({ ios: true, partageFichiers: true, pret: false, geste: true }) === 'bouton' && LS.voieOuverture({ ios: true, partageFichiers: true, pret: true, geste: false }) === 'bouton' && LS.voieOuverture({ ios: true, pret: true, geste: true }) === 'onglet' && LS.voieOuverture({ android: true, pret: true, geste: true }) === 'bouton' && LS.voieOuverture({ pret: false, geste: false }) === 'visionneuse',
+    'S2 iPhone : partage (ou onglet) SEULEMENT prêt et dans le geste, sinon « Ouvrir le PDF » ; l’ordinateur : la visionneuse');
+  dit(LS.formatRetenu(null) === null && LS.formatRetenu('rien') === null && LS.formatRetenu('planche4') === 'planche4', 'S3 un papier jamais choisi est « pas choisi » (null), jamais deviné');
+  const abs = LS.absentsDuLot([{ cle: 'a', num: '1' }, { cle: 'b', num: '2', titre: 'B' }], ['a'], { b: 'sansPdf' });
+  dit(abs.length === 1 && abs[0].cle === 'b' && abs[0].raison === 'sansPdf' && LS.absentsDuLot([{ cle: 'z' }], [], {})[0].raison === 'pasLu', 'S4 un bordereau absent du PDF est NOMMÉ avec sa raison (« pas su » ⇒ « la base n’a pas répondu »)');
+  const sg = (t) => LS.signatureLot({ lignes: [{ cle: 'a' }], sig: () => 'x', format: 'normale', tampons: t });
+  dit(sg({}) !== sg({ a: 'rien' }) && LS.signatureLot({ lignes: [{ cle: 'a' }], sig: () => 'x', format: 'thermique' }) !== sg({}), 'S5 un PDF préparé ne sert que s’il est le même (papier, tampon de chaque bordereau, empreinte)');
+
   console.log('\n── C. Les écrans branchent ces règles');
   const A = sansCommentaires(lire('App.jsx')), PC = sansCommentaires(lire('PreparerColis.jsx')), EC = sansCommentaires(lire('EmballagesCarte.jsx')), RG = sansCommentaires(lire('ecrans/Reglages.jsx')), DJ = sansCommentaires(lire('Douchette.jsx'));
   dit(/<DouchetteGlobale ouvrirVentes=/.test(A) && /enregistrerResolveur\(/.test(A) && /venteDuCode\(code, lignesDouchette\(\)\)/.test(A), 'C1 la douchette est montée une fois (coque) et résolue par Ventes, par `venteDuCode`');
@@ -295,16 +313,20 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
   dit(/const IMPR_MODES = \['normale', 'thermique', 'planche4'\];/.test(A) && /const planche = modeLot === 'planche4';\s*const thermique = modeLot === 'thermique' \|\| planche;/.test(A) && /if \(planche\) \{[\s\S]{0,160}imposerPlanche\(PL, out\)/.test(A) && /v === 'planche4' \? tr\('cp\.planche\.choix'\)/.test(RG), 'C7 « 4 par page A4 » est un choix de Réglages → Imprimante, appliqué à « Tout imprimer »');
   // (14 nov., Julien : « modifier un par un chaque bordereau avec le tamponnage ») — le tampon de CHAQUE bordereau,
   // la garde §5 des N° « à vérifier » gardée, l'imprimante choisie dans la feuille, le tampon A4 TOUJOURS posé.
-  dit(/tampon: \(tamponsLotRef\.current \|\| \{\}\)\[l\.cle\] \|\| null/.test(A) && /if \(it\.tampon && TAMPONS_IMPR\.includes\(it\.tampon\)\) \{ const rg0 = reglageImpressionChoisi\(\); impIt\.reg = \{ \.\.\.rg0, tamponA4: it\.tampon, tamponTh: it\.tampon \}; \}/.test(A) && /data-lot-tampon-choix=\{l\.cle\}/.test(A) && /data-lot-retirer=\{l\.cle\}/.test(A),
-    'C9 « Tout imprimer » : le tampon de CHAQUE bordereau (choisi dans l’aperçu) remplace le réglage pour lui seul ; « Retirer du lot »');
+  const IS = sansCommentaires(lire('ImpressionSimple.jsx'));
+  dit(/tampon: TAMPONS_IMPR\.includes\(\(tampons \|\| \{\}\)\[l\.cle\]\) \? tampons\[l\.cle\] : null/.test(A) && /if \(it\.tampon && TAMPONS_IMPR\.includes\(it\.tampon\)\) \{ const rg0 = reglageImpressionChoisi\(\); impIt\.reg = \{ \.\.\.rg0, tamponA4: it\.tampon, tamponTh: it\.tampon \}; \}/.test(A) && /data-impr-tampon-choix=\{t\}/.test(IS) && /onTampon=\{choisirTamponUn\}/.test(A) && /data-lot-ligne=\{l\.cle\}/.test(A),
+    'C9 « Imprimer » : le tampon de CHAQUE bordereau se corrige APRÈS (sa vignette), pour lui seul ; « Choisir » retire un bordereau avant');
   dit(/if \(!\(await confirmerNumerosAVerifier\(\(items \|\| \[\]\)\.map\(\(it\) => it && it\.numero\)\)\)\) throw new Error\(NUM_A_VERIFIER_ANNULE\);/.test(A), 'C10 §5 : un N° « à vérifier » ou porté par deux fiches DEMANDE toujours avant le lot');
-  dit(/<Segmente label=[^>]{0,60} plein value=\{imprMode\(imprimante\)\} onChange=\{\(v\)=>\{ if \(!batchBusy\) choisirImprimante\(v\); \}\}/.test(lire('App.jsx')), 'C11 l’imprimante (classique, 4 par page, thermique) se choisit DANS la feuille « Tout imprimer » (le réglage `vrm_imprimante`)');
+  dit(/formatRetenu\(load\('vrm_imprimante', null\)\) == null\) \{ setChoixPapier\(\{ puis:/.test(A) && /onClick=\{\(\) => setChoixPapier\(\{ puis: null \}\)\}/.test(A) && /choisirImprimante\(f\);/.test(A) && /data-impr-papier-choix=\{f\}/.test(IS),
+    'C11 le papier (classique, 4 par page, thermique) est demandé UNE fois puis retenu (`vrm_imprimante`) ; un toucher discret à côté d’« Imprimer » le change');
   dit(/const t = await tamponnerBordereau\(PL, src, \{ numero: contenu\.numero, titre: contenu\.titre, thermique, choix \}\);/.test(A) && /const contenu = contenuTampon\(thermique \? reg\.tamponTh : reg\.tamponA4/.test(A), 'C12 le tampon de l’A4 classique est toujours posé (`tamponnerBordereau` avec le réglage `tamponA4`)');
   // (14 nov., Julien : « l'impression beaucoup mieux guidée ») une phrase par étape ; « Tout est sorti ? » : les
   // ratés cochés ne passent PAS « imprimés » et repartent seuls à l'impression.
   const AB = lire('App.jsx');
-  dit(/data-lot-guide="choix"/.test(AB) && /data-lot-guide="apercu"/.test(AB) && /data-lot-guide="sorti"/.test(AB) && /data-lot-imprimante-phrase=/.test(AB), 'C13 « Tout imprimer » dit à chaque étape ce qui se passe et ce qu’on attend (imprimante, aperçu, « Tout est sorti ? »)');
-  dit(/for \(const k of \(fait && fait\.vinted\) \|\| \[\]\) if \(!rates\.has\(k\)\) ops\.push\(/.test(A) && /if \(rates\.size\) \{ const encore = \[\.\.\.rates\];[^\n]*batchBordereaux\(new Set\(encore\), false, true\)/.test(A), 'C14 « Tout est sorti ? » : les ratés ne passent pas « prêts à déposer » et sont réimprimés, seuls');
+  dit(/tr\(`impr\.voie\.\$\{voie\}`\)/.test(IS) && /data-impr-question=""/.test(IS) && /data-impr-absent=\{a\.cle\}/.test(IS) && /tr\(`impr\.raison\.\$\{a\.raison\}`\)/.test(IS),
+    'C13 après l’impression, la feuille dit ce qui s’est passé (partage, onglet, impression lancée), « Tout est sorti ? », et NOMME ce qui manque au PDF');
+  dit(/const idx = pagesDe\(compo\.plages, cles\);/.test(A) && /extraireBordereaux\(res, cl\)/.test(A) && /onReimprimerManque=\{reimprimerManque\}/.test(A),
+    'C14 « Il en manque » : seuls les bordereaux touchés repartent (leurs pages déjà tamponnées)');
   dit(!/fetch\(|api\.openai|anthropic|apiKey|x-api-key/i.test(sansCommentaires(lire('mainsLibres.js')) + sansCommentaires(lire('MainsLibres.jsx'))), 'C8 mains libres : aucune clé, aucun appel réseau à nous (§2.9)');
 
   console.log(`\n${ok} verts, ${ko} rouges`);

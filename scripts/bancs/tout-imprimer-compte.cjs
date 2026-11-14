@@ -102,8 +102,12 @@ const attendre = async (pg, q) => { await pg.waitForSelector(q, { timeout: 30000
       await essaie('L ' + nom, async () => {
         await attendre(pg, '[data-colis-barre-btn="imprimer"]:not([disabled])');
         const bouton = await pg.evaluate(() => { const e = document.querySelector('[data-colis-barre-btn="imprimer"]'); return { n: Number(e.getAttribute('data-imprimer-prets')), txt: e.innerText.trim() }; });
-        dit(bouton.n === 2 && /Tout imprimer \(2\)/.test(bouton.txt), 'L le bouton compte ce qui PART : « Tout imprimer (2) » (2 prêts, pas les 4 lignes du lot)', JSON.stringify(bouton));
-        const btn = pg.locator('[data-colis-barre-btn="imprimer"]').first();
+        // (14 nov., impression-simple) « Imprimer (N) » imprime d'un toucher ; la feuille qui dit POURQUOI les autres n'y
+        // sont pas est « Choisir », juste à côté (`data-lot-ouvrir`), et son lien le dit déjà (« 2 autres · Choisir »).
+        dit(bouton.n === 2 && /Imprimer \(2\)/.test(bouton.txt), 'L le bouton compte ce qui PART : « Imprimer (2) » (2 prêts, pas les 4 lignes du lot)', JSON.stringify(bouton));
+        const autres = await pg.evaluate(() => { const e = document.querySelector('[data-lot-ouvrir="1"]'); return e ? { n: e.getAttribute('data-impr-autres'), txt: e.innerText.trim() } : null; });
+        dit(autres && autres.n === '2' && /2/.test(autres.txt), 'L à côté du bouton : « 2 autres · Choisir » (ce qui ne part pas est DIT)', JSON.stringify(autres));
+        const btn = pg.locator('[data-lot-ouvrir="1"]').first();
         if (tel) await btn.tap(); else await btn.click();
         await pg.waitForSelector('[data-lot-etape="choix"]', { timeout: 12000 });
         await pg.waitForTimeout(400);

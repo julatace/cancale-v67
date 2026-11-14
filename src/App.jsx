@@ -539,7 +539,9 @@ import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLie
 import { lignesFraicheur, quandRelu } from './fraicheurComptes.js';
 import { FRAICHEUR_ACHATS_J, fraicheurPubliee, suivreFraicheur } from './fraicheur.js';   // (9 nov., lot AG) le seuil des achats vit avec la ligne de fraîcheur unique
 import { ventesEmailFraiches, avecVentesEmail, requeteVentesEmail, gesteVenteEmail, STATUT_VENTE_EMAIL, groupesVentesEmailEnTete, statutVentesEmail } from './venteEmailFraiche.js';
-import { TAMPONS as TAMPONS_IMPR } from './impression/thermique.js';   // (14 nov.) le tampon par bordereau dans « Tout imprimer »
+import { TAMPONS as TAMPONS_IMPR } from './impression/thermique.js';   // (14 nov.) le tampon par bordereau
+import { pagesDe, formatRetenu, signatureLot, voieOuverture, absentsDuLot } from './impression/lotSimple.js';   // (14 nov.) « Imprimer » en un toucher
+import { ChoixPapier, FeuilleImpression } from './ImpressionSimple.jsx';   // (14 nov., impression-simple) les deux feuilles
 import { CLE_IMPRESSION, reglageImpression, papierThermique, placementEtiquette, contenuTampon, carteEncre, boiteEncre, decouperFeuille, fusionnerProches, moduleDuCode, moduleImprimeMm, codeAssezGros, seuillerNoir, tramerNoir, zonesAdresse, CONTRASTES, MODULE_MIN_MM, BANDE_CONTINU_MM } from './impression/thermique.js';
 import { decisionNumeroVenteEmail, numeroEcritDansArticle, colisVentesEmail, MENTION_SANS_NUM, CLE_IMPRIMES_SANS_NUM, phraseImprimeSansNumero } from './bordereauVenteEmail.js';
 import { premiereCaseLibre as premiereCaseMeubles, achatsArrives, notifsOuRanger, caseEnMots } from './ouRanger.js';
@@ -14372,11 +14374,32 @@ const ouvrirPdfOnglet = (url, nom, titre) => {
     return true;
   } catch (_) { return false; }
 };
+// (14 nov., impression-simple) OUVRIR LE LOT PRÊT, DANS LE GESTE. `pret` : { bytes, url, file, filename }.
+// Appelé DANS le gestionnaire du toucher, sans aucune attente avant (`voieOuverture`) : iPhone/Android ⇒
+// la feuille de partage (« Imprimer » y est) ou un onglet ; ordinateur ⇒ la visionneuse de VRM, qui lance
+// l'impression seule. Rend la voie prise ; 'bouton' ⇒ la feuille propose « Ouvrir le PDF » (SON toucher).
+// Le fichier est refait si les octets ont changé (un PDF « Il en manque » hérite des champs du lot : jamais son fichier).
+const fichierPdf = (pret) => { try { if (!pret.file || pret.fileDe !== pret.bytes) { pret.file = new File([pret.bytes], pret.filename || 'bordereaux.pdf', { type: 'application/pdf' }); pret.fileDe = pret.bytes; } return pret.file; } catch (_) { return null; } };
+const partageFichiersPossible = (f) => { try { return !!(f && navigator.canShare && navigator.share && navigator.canShare({ files: [f] })); } catch (_) { return false; } };
+const ouvrirPdfLot = (pret, { geste = true, titre = '' } = {}) => {
+  if (!pret || !pret.url) return 'bouton';
+  const ios = estIOS(), android = estAndroid();
+  const f = ios || android ? fichierPdf(pret) : null;
+  const voie = voieOuverture({ ios, android, partageFichiers: partageFichiersPossible(f), pret: true, geste });
+  try {
+    if (voie === 'partage') { const p = navigator.share({ files: [f], title: titre || pret.filename }); if (p && p.catch) p.catch(() => {}); return 'partage'; }
+    if (voie === 'onglet') { const w = window.open(pret.url, '_blank'); return w ? 'onglet' : 'bouton'; }
+    if (voie === 'visionneuse') { _poserVisionneuse({ url: pret.url, nom: pret.filename || 'bordereaux.pdf', titre: titre || '', auto: true, at: Date.now() }); return 'visionneuse'; }
+  } catch (_) {}
+  return 'bouton';
+};
 function VisionneusePdf() {
   const [v, setV] = React.useState(_visionneuse);
   React.useEffect(() => { _ecoutesVisionneuse.add(setV); setV(_visionneuse); return () => { _ecoutesVisionneuse.delete(setV); }; }, []);
   const cadre = React.useRef(null);
   const boutonFermer = React.useRef(null);
+  const imprimerCadreRef = React.useRef(null);
+  const imprimerCadre = () => { try { if (imprimerCadreRef.current) imprimerCadreRef.current(); } catch (_) {} };
   // Échap (31 oct.) : (1) écouté sur `window` en CAPTURE et arrêté là — sinon le
   // reçu d'achat ouvert dessous (qui écoute aussi le document) se fermait avec la
   // visionneuse, d'un seul Échap ; (2) le focus part sur « Fermer » à l'ouverture
@@ -14406,9 +14429,13 @@ function VisionneusePdf() {
   // Le lecteur PDF du navigateur prend le focus en se chargeant (mesuré : l'iframe
   // devenait l'élément actif) : on le rend à « Fermer » au chargement, puis une
   // fois encore juste après (le lecteur le reprend parfois un instant plus tard).
+  // (14 nov., impression-simple) `v.auto` : le lot « Imprimer » — l'impression part SEULE une fois le PDF
+  // chargé (une fois par PDF) ; « Imprimer » reste en haut si la fenêtre d'impression a été fermée.
+  const [autoLancee, setAutoLancee] = React.useState('');
   const cadreCharge = () => {
     try { const w = cadre.current && cadre.current.contentWindow; if (w && kRef.current) w.addEventListener('keydown', kRef.current, true); } catch (_) { /* autre origine : rien à écouter */ }
     reprendreFocus(); setTimeout(reprendreFocus, 300);
+    if (v && v.auto && autoLancee !== v.url) { const u = v.url; setAutoLancee(u); setTimeout(() => { if (_visionneuse && _visionneuse.url === u) imprimerCadre(); }, 450); }
   };
   // Le chargement du lecteur n'émet pas toujours `load` (lecteur intégré) : les
   // 2 premières secondes, on rend le focus à « Fermer » s'il est parti dans le PDF
@@ -14425,9 +14452,10 @@ function VisionneusePdf() {
   if (!v || typeof document === 'undefined') return null;
   const fermer = () => _poserVisionneuse(null);
   const imprimer = () => { try { const w = cadre.current && cadre.current.contentWindow; w.focus(); w.print(); } catch (_) { try { window.open(v.url, '_blank'); } catch (_) {} } };
+  imprimerCadreRef.current = imprimer;
   const btn = { minHeight:44, padding:'0 16px', borderRadius:12, border:`1px solid ${C.border}`, background:'transparent', color:C.text, fontSize:15, fontWeight:600, cursor:'pointer', fontFamily:'inherit', textDecoration:'none', display:'inline-flex', alignItems:'center' };
   return createPortal(
-    <div data-visionneuse-pdf={v.prep ? 'prep' : 'pret'} role="dialog" aria-modal="true" aria-label={v.titre || 'Bordereau'} onClick={fermer}
+    <div data-visionneuse-pdf={v.prep ? 'prep' : 'pret'} data-visionneuse-auto={v.auto ? (autoLancee === v.url ? 'lancee' : 'attend') : undefined} role="dialog" aria-modal="true" aria-label={v.titre || 'Bordereau'} onClick={fermer}
       style={{ position:'fixed', inset:0, zIndex:9500, background:'rgba(0,0,0,.55)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
       <FermeAuRetour fermer={fermer}/>
       <div onClick={(e) => e.stopPropagation()} style={{ width:'min(980px,100%)', height:'min(92vh,100%)', background:C.card, color:C.text, border:`1px solid ${C.border}`, borderRadius:12, display:'flex', flexDirection:'column', overflow:'hidden' }}>
@@ -14449,7 +14477,11 @@ function VisionneusePdf() {
 // le bordereau, c'est la mauvaise chaussure dans le colis. On demande avant.
 // Rend true si on peut tamponner (vérifié, pas concerné, ou il confirme).
 const NUM_A_VERIFIER_ANNULE = "Impression annulée : vérifie d'abord le numéro de l'article (Annonces → « numéros à vérifier »).";
-const confirmerNumerosAVerifier = async (numeros) => {
+// (14 nov., impression-simple) `sonde` : { demande } — la MÊME règle, sans rien demander. Une fonction
+// `async` s'exécute d'un trait jusqu'à son premier `await` : avec une sonde, aucun `await` n'est atteint,
+// `sonde.demande` est donc posé AVANT que l'appel rende la main (`numerosDemandent`, synchrone). C'est ce
+// qui permet d'ouvrir le PDF dans le geste quand aucune question n'est due — et de DEMANDER sinon.
+const confirmerNumerosAVerifier = async (numeros, sonde = null) => {
   try {
     const fiches = load('vinted_annonce_numeros', {}) || {};
     const cles = new Set((numeros || []).filter(Boolean).map((n) => cleNum(n)));
@@ -14478,6 +14510,7 @@ const confirmerNumerosAVerifier = async (numeros) => {
     for (const k of Object.keys(parCle)) parCle[k] = pairesDe(parCle[k]);
     const doubles = Object.keys(parCle).filter((k) => parCle[k].length > 1);
     if (doubles.length) {
+      if (sonde) { sonde.demande = true; return false; }
       const liste = doubles.slice(0, 3).map((k) => `N°${k} : ${parCle[k].slice(0, 3).map((f) => f.title || 'un article').join(' · ')}`).join('\n');
       const ok = await askConfirm({
         title: doubles.length > 1 ? `${doubles.length} numéros portés par deux ${motsVendeur().noms}` : `Le N°${doubles[0]} est porté par deux ${motsVendeur().noms}`,
@@ -14493,6 +14526,7 @@ const confirmerNumerosAVerifier = async (numeros) => {
     const vivantes = Object.entries(fiches).filter(([id]) => !remplacees.has(String(id))).map(([, f]) => f);
     const pasEcrit = vivantes.filter((f) => f && cles.has(cleNum(f.numero)) && reattribueAEcrire(f));
     if (pasEcrit.length) {
+      if (sonde) { sonde.demande = true; return false; }
       const ok = await askConfirm({
         title: `As-tu écrit le N°${pasEcrit[0].numero} là où l’article est rangé ?`,
         desc: `${pasEcrit.slice(0, 3).map((f) => `N°${f.reattribue.de} → N°${f.numero} · ${f.title || 'un article'}`).join('\n')}\n\n${pasEcrit.every((f) => f.reattribue.main) ? 'Tu as changé ce numéro' : pasEcrit.some((f) => f.reattribue.main) ? 'Ces numéros ont changé (à la main ou doublon réglé)' : 'Cet article a reçu un numéro neuf (doublon réglé)'}. Là où il est rangé (carton, étagère, bac…), c'est peut-être encore l'ancien qui est écrit.`,
@@ -14502,6 +14536,7 @@ const confirmerNumerosAVerifier = async (numeros) => {
     }
     const doute = vivantes.filter((f) => f && cles.has(cleNum(f.numero)) && ficheAVerifier(f));
     if (!doute.length) return true;
+    if (sonde) { sonde.demande = true; return false; }
     const liste = doute.slice(0, 4).map((f) => `N°${f.numero} · ${f.title || 'un article'}`).join('\n');
     return await askConfirm({
       title: doute.length > 1 ? `${doute.length} numéros pas encore vérifiés` : `Le N°${doute[0].numero} n'est pas encore vérifié`,
@@ -14510,6 +14545,8 @@ const confirmerNumerosAVerifier = async (numeros) => {
     });
   } catch (_) { return true; }
 };
+// Une question est-elle due pour ces N° ? (synchrone ; la règle est celle d'au-dessus, appelée en sonde.)
+const numerosDemandent = (numeros) => { const s = { demande: false }; try { confirmerNumerosAVerifier(numeros, s); } catch (_) {} return s.demande; };
 // (14 nov., n° 137) LE PREMIER COLIS ACCOMPAGNÉ : un bordereau imprimé SEUL le signale
 // (avec le nombre de bordereaux déjà imprimés AVANT ce geste — nuage pas lu ⇒ pas su) ;
 // une série le signale aussi, pour ne JAMAIS l'interrompre (src/premierColis.js).
@@ -14546,15 +14583,18 @@ const annotateAndDownloadBordereauBrut = async (numero, title, pdfArrayBuffer, p
 };
 // Un échec (annulé, PDF illisible) referme la visionneuse « préparation… ».
 const annotateAndDownloadBordereau = async (...a) => { try { return await annotateAndDownloadBordereauBrut(...a); } catch (e) { libererOngletPdf(); throw e; } };
-// Regroupe plusieurs bordereaux en UN seul PDF (chaque bordereau tamponné à la
-// suite, une page par bordereau) pour tout imprimer d'un coup. `items` =
-// [{ numero, title, pdfBuf }]. `resolvePos(w,h)` donne la position mémorisée du
-// tampon pour chaque format → le N° tombe au MÊME endroit sur tous.
-const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
-  if ((items || []).some((it) => it && it.numero) && !(await assurerVersionNumerotation())) throw new Error(NUMEROS_PERIMES_IMPRESSION);
-  if (!(await confirmerNumerosAVerifier((items || []).map((it) => it && it.numero)))) throw new Error(NUM_A_VERIFIER_ANNULE);
+// (14 nov., impression-simple) LA COMPOSITION SEULE : tamponner chaque bordereau et les mettre à la suite
+// dans UN PDF — sans question, sans rien ouvrir. « Imprimer » la prépare D'AVANCE (pendant qu'il regarde
+// À expédier) pour que son toucher ouvre le PDF DANS le geste (Safari d'iPhone n'ouvre rien après une attente).
+// Rend aussi les PLAGES de pages de chaque bordereau (`plages` : sa page, sa fiche, sa facture) : « Il en
+// manque » reprend ces pages-là, déjà tamponnées. La garde des N° (`confirmerNumerosAVerifier`) est posée
+// par l'appelant, AVANT d'ouvrir (§5) — jamais sautée.
+// Les octets lus pour « Imprimer » (par clé + empreinte), gardés le temps de la séance : un lot préparé d'avance
+// ne relit pas la base à chaque rendu (§4.4 — 60 au plus).
+const _octetsLot = new Map();
+const composerBordereaux = async (items, resolvePos, opts = {}) => {
   const PL = await import('pdf-lib');
-  const { PDFDocument, rgb, StandardFonts } = PL;
+  const { PDFDocument } = PL;
   const modeLot = imprMode(opts.imprimante || imprimanteChoisie());
   // (14 nov., lot colis-plus 98) 4 PAR PAGE A4 : la MÊME isolation que la thermique (les mêmes PDF, le
   // même tampon, la page entière quand on ne sait pas), posée dans un document à part, puis rangée
@@ -14565,12 +14605,13 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
   let count = 0, nInv = 0, isoles = 0, nEtiquettes = 0, fiches = 0, bandes = 0;
   const entiers = [];   // ce qu'on n'a PAS su isoler — l'écran doit le dire
   const details = [];   // (11 nov., lot thermique) ce qui a été mesuré, étiquette par étiquette
-  const reussis = [], rates = [];
+  const reussis = [], rates = [], plages = [];
   // (4 nov., Julien : « pareil pour le tamponnage, on doit pouvoir le faire quand tous les bordereaux
   // sont sélectionnés ») `opts.apercu` : true ⇒ la feuille s'ouvre UNE fois par forme sans place gardée ;
   // 'force' (« Placer le tampon ») ⇒ une fois par forme, toujours ; false ⇒ jamais. Annuler ⇒ rien.
   const dejaLot = {};
   for (const [index, it] of items.entries()) {
+    const debut = out.getPageCount();
     try {
       const src = await PDFDocument.load(it.pdfBuf);
       const { width, height } = src.getPages()[0].getSize();
@@ -14593,11 +14634,18 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
       if (it.invBytes) {
         try { const isrc = await PDFDocument.load(it.invBytes); (await out.copyPages(isrc, isrc.getPageIndices())).forEach(p => out.addPage(p)); nInv++; } catch (_) {}
       }
-    } catch (e) { if (estTamponAnnule(e)) throw e; rates.push(index); }
+      plages.push({ index, cle: it.cle != null ? String(it.cle) : String(index), debut, n: out.getPageCount() - debut });
+    } catch (e) {
+      if (estTamponAnnule(e)) throw e;
+      // Un bordereau qui casse en route ne laisse aucune page à moitié posée dans le lot.
+      try { while (out.getPageCount() > debut) out.removePage(out.getPageCount() - 1); } catch (_) {}
+      rates.push(index);
+    }
   }
   if (!count) throw new Error('Aucun bordereau exploitable.');
-  let docFinal = out, infoPlanche = null;
+  let docFinal = out, infoPlanche = null, unitBytes = null;
   if (planche) {
+    unitBytes = await out.save();
     const { imposerPlanche } = await import('./impression/planche4.js');
     const { doc, plan } = await imposerPlanche(PL, out);
     docFinal = doc;
@@ -14605,15 +14653,46 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
   }
   posePrefsImpression(PL, docFinal);   // une feuille par bordereau (§ recto-verso)
   const bytes = await docFinal.save();
-  if(opts.avantOuverture)opts.avantOuverture();
-  const blob = new Blob([bytes], { type:'application/pdf' });
-  const url = URL.createObjectURL(blob);
   const filename = `bordereaux-${count}${nInv?'-'+nInv+'factures':''}${planche?'-4-par-page':thermique?'-thermique':''}-a-la-suite.pdf`;
+  const base = { bytes, unitBytes: unitBytes || bytes, plages, filename, count, nInv, isoles, etiquettes: nEtiquettes, reussis, rates, fiches, bandes, mode: modeLot };
+  if (planche) return { ...base, thermique: false, planche: infoPlanche, entiers: [] };
+  return { ...base, thermique, entiers, ...bilanThermique(details) };
+};
+// (14 nov., impression-simple) « IL EN MANQUE » : un PDF des seuls bordereaux choisis, fait des pages DÉJÀ
+// tamponnées du lot (`unitBytes` + `plages`, règle `pagesDe`) ; en 4 par page, ré-imposées sur des feuilles neuves.
+const extraireBordereaux = async (compo, cles) => {
+  const PL = await import('pdf-lib');
+  const src = await PL.PDFDocument.load(compo.unitBytes);
+  const idx = pagesDe(compo.plages, cles);
+  if (!idx.length) throw new Error('Aucun bordereau exploitable.');
+  const sub = await PL.PDFDocument.create();
+  (await sub.copyPages(src, idx)).forEach((p) => sub.addPage(p));
+  const unitBytes = await sub.save();
+  let doc = sub, planche = null;
+  if (compo.mode === 'planche4') { const { imposerPlanche } = await import('./impression/planche4.js'); const r = await imposerPlanche(PL, sub); doc = r.doc; planche = { feuilles: doc.getPageCount(), etiquettes: r.plan.etiquettes, entieres: r.plan.entieres, echelle: Math.round(r.plan.echelle * 100) }; }
+  posePrefsImpression(PL, doc);
+  const bytes = await doc.save();
+  const voulu = new Set((cles || []).map(String));
+  const plages = []; let debut = 0;
+  for (const p of compo.plages) if (voulu.has(String(p.cle))) { plages.push({ ...p, debut }); debut += p.n; }
+  return { ...compo, bytes, unitBytes: compo.mode === 'planche4' ? unitBytes : bytes, plages, count: plages.length, planche, filename: `bordereaux-${plages.length}-a-reimprimer.pdf` };
+};
+// Regroupe plusieurs bordereaux en UN seul PDF (chaque bordereau tamponné à la
+// suite, une page par bordereau) pour tout imprimer d'un coup. `items` =
+// [{ numero, title, pdfBuf }]. `resolvePos(w,h)` donne la position mémorisée du
+// tampon pour chaque format → le N° tombe au MÊME endroit sur tous.
+const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
+  if ((items || []).some((it) => it && it.numero) && !(await assurerVersionNumerotation())) throw new Error(NUMEROS_PERIMES_IMPRESSION);
+  if (!(await confirmerNumerosAVerifier((items || []).map((it) => it && it.numero)))) throw new Error(NUM_A_VERIFIER_ANNULE);
+  const r = await composerBordereaux(items, resolvePos, opts);
+  if(opts.avantOuverture)opts.avantOuverture();
+  const blob = new Blob([r.bytes], { type:'application/pdf' });
+  const url = URL.createObjectURL(blob);
   // Ouvert dans un onglet (ordinateur) ; sinon la modale propose « Ouvrir ».
-  const printed = ouvrirPdfOnglet(url, filename);
+  const printed = ouvrirPdfOnglet(url, r.filename);
   signalerBordereauImprime(true, null);
-  if (planche) return { url, filename, count, nInv, printed, ouvert: printed, thermique: false, planche: infoPlanche, isoles, etiquettes: nEtiquettes, entiers: [], reussis, rates, fiches, bandes };
-  return { url, filename, count, nInv, printed, ouvert: printed, thermique, isoles, etiquettes: nEtiquettes, entiers, reussis, rates, fiches, bandes, ...bilanThermique(details) };
+  const { bytes: _b, unitBytes: _u, plages: _p, mode: _m, ...reste } = r;
+  return { ...reste, url, printed, ouvert: printed };
 };
 // Un échec (annulé, PDF illisible) referme la visionneuse « préparation… ».
 const mergeAndDownloadBordereaux = async (...a) => { try { return await mergeAndDownloadBordereauxBrut(...a); } catch (e) { libererOngletPdf(); throw e; } };
@@ -43944,8 +44023,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // échec se relance seul (« Réessayer les échecs »).
   const VENTE_LOT_MAX_J = 14;
   const [lot, setLot] = useState(null);   // null · { coches: Set(cle), echecs: [cle] }
-  // (14 nov.) Le tampon choisi pour chaque bordereau dans l’aperçu de « Tout imprimer » (lu par `batchBordereaux`).
-  const tamponsLotRef = React.useRef({}); tamponsLotRef.current = (lot && lot.tampons) || {};
   const ageVenteJ = (o) => { const t = Date.parse(o && o.date); return Number.isFinite(t) ? (Date.now() - t) / 864e5 : null; };
   const lignesLot = () => expeditions()
     .filter(e => ((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn])) && !(e.o && isShipDone(e.o)))
@@ -44509,136 +44586,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!L.length) { toast('Aucun bordereau prêt à imprimer pour l\'instant.'); return; }
     setProgressionLot(null);setLot({ lignes:L,verifications:{},coches:cochesParDefaut(L),echecs:[] });
   };
-  // (11 nov., lot DJ3) `parcours` : lancé depuis « Tout imprimer » (trois temps) — pas de question « contrôlé » (l'aperçu
-  // A4 de la feuille la remplace) ; un lot tout réussi n'est marqué imprimé qu'à « Oui, imprimé » (étape 3).
-  const batchBordereaux = async (cles, placer = false, parcours = false) => {
-    if (batchBusy) return;
-    // ⚠️⚠️ « TOUT IMPRIMER » IMPRIME EXACTEMENT CE QUE LE BOUTON COMPTE (§11).
-    // Julien, 21 sept. : « le bouton tout imprimer imprime des bordereaux qui
-    // n'existent pas ou plus, et ne prend pas en compte ceux qui sont déjà là ».
-    // Cause mesurée, un pur écart §11 — DEUX règles pour « quoi imprimer » :
-    //  · le compteur du bouton (`avecPdf`) part de `expeditions()` : une entrée
-    //    par VENTE encore à expédier (`!isShipDone`), qui a un PDF — email
-    //    (`b.hasPdf`) OU capté par l'extension (`labelsCaptes[txn]`) ;
-    //  · l'ancien `batchBordereaux` partait de `emailBords.filter(hasPdf &&
-    //    !isBordDone)` — donc (a) il IGNORAIT les bordereaux captés par
-    //    l'extension (« ceux qui sont déjà là »), et (b) il jugeait sur
-    //    `isBordDone` (marqué imprimé) au lieu de `isShipDone` (colis parti) :
-    //    un colis déjà expédié mais non coché « imprimé » repartait à
-    //    l'impression — « un bordereau qui n'existe plus ».
-    // ⇒ On construit la liste depuis `expeditions()`, filtrée À L'IDENTIQUE du
-    //    compteur `avecPdf`. Une seule règle, un seul propriétaire.
-    const choisis = cles instanceof Set ? cles : null;
-    // (3 nov.) Les lignes de « Tout imprimer » (toutes plateformes, ordre des transporteurs) ;
-    // pour Vinted, la règle d'avant : PDF présent et colis pas coché parti (`lignesLot`).
-    // (4 nov.) Jamais une ligne non cochable (eBay : l'étiquette se prend dans eBay).
-    const aImprimer = selectionImprimable(lignesLotTous(), choisis);
-    if (!aImprimer.length) { libererOngletPdf(); toast(choisis ? 'Coche au moins un bordereau.' : 'Aucun bordereau prêt à imprimer pour l\'instant.'); return; }
-    const encoreDisponibles = new Set(aImprimer.map(l => l.cle));
-    const disparus = choisis ? [...choisis].filter(cle => !encoreDisponibles.has(cle)) : [];
-    if (disparus.length) { libererOngletPdf(); toast(`${disparus.length} bordereau(x) sélectionné(s) ne sont plus disponibles à l’expédition. Ferme puis rouvre la sélection pour vérifier la liste. Aucun lot lancé.`); return; }
-    const proprietaire=AUTH.user?.id||null;
-    const empreintes=new Map(aImprimer.map(l=>[l.cle,sigLigneLot(l)]));
-    const verifierContexte=()=>{
-      if((AUTH.user?.id||null)!==proprietaire)throw Error('Le compte VRM a changé : aucun nouveau PDF ouvert.');
-      const actuelles=new Map(lotActuel.current.lignes().map(l=>[l.cle,l]));
-      for(const [cle,empreinte] of empreintes){const l=actuelles.get(cle);if(!l||lotActuel.current.sig(l)!==empreinte)throw Error('Un article, son numéro ou son état a changé. Vérifie la sélection avant de préparer les PDF.');}
-    };
-    setBatchBusy(true);
-    // (11 nov., Julien) Plus de confirmation « N sur M contrôlés » à chaque impression : le N° et la photo sont sur
-    // chaque ligne de la feuille ; `verifierContexte` refuse toujours un lot dont un article a changé.
-    const echecs = [], faits = [];let documentPrepare=false;
-    if(choisis)setLot(x=>(AUTH.user?.id||null)===proprietaire&&x?{...x,erreur:''}:x);
-    setBatchBusy(true);setProgressionLot({etape:'lecture',fait:0,total:aImprimer.length});
-    // (11 nov., lot suivi-travail) « VRM travaille » : chaque bordereau lu, puis la fusion. Sous 1 s et
-    // sans souci, rien ne s'affiche ; une question (placement du tampon) passe AU-DESSUS de la feuille.
-    const stB = suiviTravail.demarrer({ sorte: 'bordereaux', titre: placer ? 'Placer le tampon' : 'Imprimer les bordereaux', seuilMs: 1000,
-      etapes: [['lecture', 'Lecture du PDF'], ['fusion', 'Ajout au PDF groupé'], ['imprime', 'Dans le PDF à imprimer ✓']],
-      articles: aImprimer.map(l => ({ id: l.cle, num: l.num || '', titre: l.titre || '' })) });
-    const finSuiviB = (raisonErreur) => {
-      if (!stB) return;
-      const s0 = stB.etat();
-      if (s0 && raisonErreur) for (const a of s0.articles) stB.fin(a.id, { etat: 'refus', raison: raisonErreur });
-      stB.terminer('');
-      const s1 = stB.etat();
-      const toutBon = s1 && s1.articles.every(a => a.etat === 'ok');
-      if (s1 && toutBon && s1.visibleDes && Date.now() < s1.visibleDes) suiviTravail.oublier(); else suiviTravail.montrer();
-    };
-    try {
-      verifierContexte();
-      // Les PDF sont téléchargés MAINTENANT, et seulement ceux à imprimer :
-      // les embarquer dans la liste coûtait 6 Mo à chaque ouverture de l'écran.
-      const items = [];
-      let pasLus = 0, sansPdf = 0; const sansLignes = [];
-      for (const [index,l] of aImprimer.entries()) {
-        verifierContexte();
-        let buf = null, invBytes = null;
-        if (l.site === 'vinted') {
-          const e = l.e, b = e.b;
-          // ⚠️ LE PDF CAPTÉ PAR L'EXTENSION PASSE EN PREMIER (même règle que la
-          //    carte, § per-card) : c'est l'étiquette prise chez Vinted, rattachée
-          //    par n° de transaction ; l'email n'est qu'un secours.
-          const capte = e.txn ? labelsCaptes[e.txn] : null;
-          const lu = await octetsBordereau(capte && capte.row, b && b.hasPdf ? b._row : null);
-          if (lu === null) pasLus++; else if (!lu.octets) { sansPdf++; sansLignes.push(l); }
-          buf = lu && lu.octets ? lu.octets : null;
-          // Compte pro (une facture existe pour cette vente) → on joint la facture
-          // juste après son bordereau dans le PDF groupé (§41).
-          const inv = buf && b ? invForBord(b) : null;
-          if (inv) { const ent = entForBordInvoice(inv); if (ent) { try { invBytes = await buildFacturXBytes(inv, ent); } catch(_) {} } }
-        } else if (l.site === 'vestiaire' && !(l.v && l.v.bordereau && l.v.bordereau.id)) {
-          sansPdf++; sansLignes.push(l);   // (4 nov.) cochée sans bordereau rangé : nommée « sans bordereau »
-        } else if (l.site === 'vestiaire') {
-          // Le PDF rapatrié (`vc_label_{produit}`), lu au clic — comme « Imprimer » de sa carte.
-          const j = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(l.v.bordereau.id)}&select=b64:data->>b64`);
-          const b64 = Array.isArray(j) && j[0] && j[0].b64;
-          if (!Array.isArray(j)) pasLus++; else if (!b64) { sansPdf++; sansLignes.push(l); }
-          if (b64) { try { buf = b64ToBytes(b64); } catch (_) { buf = null; } }
-        } else if (l.site === 'leboncoin' && !l.pdf) {
-          sansPdf++; sansLignes.push(l);   // (4 nov.) pas de lien de bordereau, ou pas d'extension ici pour le lire
-        } else if (l.site === 'leboncoin') {
-          // Le PDF Leboncoin passe par l'extension (`lbcpdf`), comme « Imprimer » de sa carte.
-          let r0 = null; try { r0 = await vmrPdfLbc(l.lo.label.voucherUrl); } catch (_) { r0 = null; }
-          if (!r0 || !r0.dataUrl) pasLus++; else { try { buf = b64ToBytes(r0.dataUrl.split(',')[1] || ''); } catch (_) { buf = null; } }
-        }
-        setProgressionLot({etape:'lecture',fait:index+1,total:aImprimer.length});
-        if (stB) { if (buf) stB.etape(l.cle, 'fusion'); else stB.fin(l.cle, { etat: 'refus', raison: l.site === 'leboncoin' || l.site === 'vestiaire' ? 'pas de bordereau lisible' : 'PDF pas lu', geste: 'Retélécharge-le depuis la vente' }); }
-        if (!buf) { echecs.push(l.cle); continue; }   // pas d'octets : on saute, on n'imprime pas du vide — et on le DIT après
-        faits.push(l.cle);
-        // Numéro et titre : même dérivation que la carte (identité, jamais le titre — §5).
-        items.push({ numero: l.num || '', title: l.titre || '', pdfBuf: buf, invBytes, cle: l.cle, site: l.site, ligne: l, tampon: (tamponsLotRef.current || {})[l.cle] || null });
-      }
-      verifierContexte();
-      if (!items.length) { finSuiviB(''); if(choisis&&(AUTH.user?.id||null)===proprietaire)setLot(x=>x?{...x,coches:new Set(echecs),echecs}:x); libererOngletPdf(); toast(pasLus ? "La base n'a pas répondu — réessaie dans un instant." : (sansLignes.length ? texteSansBordereau(sansLignes) + '.' : "Ces bordereaux n'ont plus leur PDF — retélécharge-les depuis les ventes sur Vinted.")); setBatchBusy(false); return; }
-      setProgressionLot({etape:'fusion',fait:items.length,total:aImprimer.length});
-      if (stB) stB.noter('Fusion en un seul PDF…');
-      const r = await mergeAndDownloadBordereaux(items, (w, h) => posForFormat(w, h, false), { autoprint:true,imprimante,avantOuverture:verifierContexte, apercu: placer ? 'force' : true });
-      documentPrepare=true;verifierContexte();
-      // (11 nov., lot DJ3) Dans le parcours « Tout imprimer », la feuille dit la suite (« C'est imprimé ? », le lien du PDF) :
-      // pas de seconde fenêtre « N bordereaux prêts » par-dessus (la même chose deux fois).
-      if (!(parcours && choisis && !echecs.length && !(r.rates || []).length)) setBordResult({ ...r, batch:true,attendus:aImprimer.length });setProgressionLot({etape:'termine',fait:r.count,total:aImprimer.length});
-      // Un lot imprimé en partie ne se présente pas comme complet (§5). Le
-      // nombre imprimé est celui que la fusion a VRAIMENT gardé (`r.count`) :
-      // un PDF qui commence par %PDF mais que pdf-lib refuse (chiffré, abîmé)
-      // est écarté par la fusion, et il doit être compté ici aussi.
-      const imprimes = Number(r && r.count) || 0;
-      const illisibles = Math.max(0, items.length - imprimes);
-      // La fusion rend l'identité exacte des PDF réussis et refusés.
-      const clesReussies = (r.reussis || []).map(i => items[i].cle);
-      if (stB) { (r.reussis || []).forEach(i => { stB.etape(items[i].cle, 'imprime'); stB.fin(items[i].cle, { etat: 'ok' }); }); (r.rates || []).forEach(i => stB.fin(items[i].cle, { etat: 'refus', raison: 'PDF illisible', geste: 'Retélécharge-le depuis la vente' })); }
-      finSuiviB('');
-      (r.rates || []).forEach(i => echecs.push(items[i].cle));
-      const reussiesVinted = (r.reussis || []).filter(i => items[i].site === 'vinted').map(i => items[i].cle);
-      const differe = parcours && !echecs.length && choisis;
-      if (differe && (AUTH.user?.id||null)===proprietaire) setLot(x => x ? { ...x, fait: { planche: r.planche || null, lignes: (r.reussis || []).map(i => ({ cle: items[i].cle, num: items[i].numero || '', titre: items[i].title || '' })), n: imprimes, url: r.url, nom: r.filename, vinted: reussiesVinted, vestiaire: (r.reussis || []).filter(i => items[i].site === 'vestiaire').map(i => items[i].ligne.v.id) } } : x);
-      if (!differe && reussiesVinted.length) setBordsPrinted(prev => { const u = { ...prev }; const at = new Date().toISOString(); reussiesVinted.forEach(k => { u[k] = at; }); save('vinted_bords_printed', u); return u; });
-      noterImprimeSansNum((r.reussis || []).filter(i => items[i].site === 'vinted' && !String(items[i].numero || '').trim()).map(i => items[i].ligne && items[i].ligne.e && items[i].ligne.e.txn));
-      if (!differe) (r.reussis || []).filter(i => items[i].site === 'vestiaire').forEach(i => { try { marquerVc('vrm_vc_imprimes', items[i].ligne.v.id, true); } catch (_) {} });
-      if (!differe && choisis && (AUTH.user?.id||null)===proprietaire) setLot(x => (AUTH.user?.id||null)!==proprietaire?x:x?(echecs.length ? { ...x, coches: new Set(echecs), echecs } : null):x);
-      if (pasLus || sansPdf || illisibles) toast(`${imprimes} sur ${aImprimer.length} imprimé${imprimes>1?'s':''} — ${[pasLus?`${pasLus} que la base n'a pas rendu${pasLus>1?'s':''} (réessaie)`:'', sansPdf?texteSansBordereau(sansLignes):'', illisibles?`${illisibles} PDF illisible${illisibles>1?'s':''} (retélécharge-le${illisibles>1?'s':''} depuis la vente sur Vinted)`:''].filter(Boolean).join(', ')}.`);
-    } catch(err){ if (estTamponAnnule(err)) { if (stB) { stB.terminer(''); suiviTravail.oublier(); } } else finSuiviB(String((err && err.message) || err).slice(0, 160)); libererOngletPdf();if(!documentPrepare&&!estTamponAnnule(err)&&choisis&&(AUTH.user?.id||null)===proprietaire)setLot(x=>(AUTH.user?.id||null)===proprietaire&&x?{...x,coches:new Set(aImprimer.map(l=>l.cle)),echecs:aImprimer.map(l=>l.cle),erreur:'La préparation s’est interrompue. Ta sélection est conservée ; tu peux réessayer.'}:x); if (!estTamponAnnule(err)) toast(/Aucun bordereau exploitable/.test(String(err && err.message || err)) ? "Aucun de ces PDF n'a pu être lu — retélécharge-les depuis les ventes sur Vinted." : 'Erreur : ' + String(err)); }
-    setBatchBusy(false);
-  };
+  // (14 nov., impression-simple) L'ancien moteur « Tout imprimer » (feuille en trois temps, « Place du tampon » qui
+  // s'ouvrait seule, panneau de suivi par-dessus) est remplacé par `imprimerLot` (plus bas) : le PDF préparé
+  // d'avance, ouvert DANS le toucher. Les appelants d'avant (« Imprimer » des actions en série) passent par lui ;
+  // il dit lui-même ce qui manque (feuille d'après), la garde des N° (§5) comprise.
+  const batchBordereaux = async (cles) => { imprimerLotRef.current && imprimerLotRef.current(cles instanceof Set ? cles : null); };
+  const imprimerLotRef = React.useRef(null);
   // Deep-link « Tout imprimer » depuis l'extension (?print=bord) : dès que les
   // bordereaux sont chargés, on lance l'impression groupée une seule fois.
   // (11 nov., revue colis) Deux moteurs `only="bordereaux"` existent depuis le lot DJ3 (Ventes « À expédier »,
@@ -44678,6 +44631,250 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     window.addEventListener('vrm:scanner', prendre); return ()=>window.removeEventListener('vrm:scanner', prendre);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[only, colisDans]);
+  // ══ (14 nov., impression-simple) « IMPRIMER » EN UN TOUCHER ═══════════════════════════════════════════
+  // Julien : « le bouton imprimer […] c'est n'importe quoi ça marche pas du tout, tout le processus est
+  // horrible ». Mesuré (banc impression-simple, avant) : 4 touchers avant que le PDF existe, la feuille
+  // « Place du tampon » qui s'ouvrait seule pour chaque transporteur, un panneau « 6 sur 6 » par-dessus tout,
+  // et sur iPhone AUCUN PDF ouvert (Safari refuse une fenêtre ouverte après une attente).
+  // Maintenant : le PDF du lot (les bordereaux qui partent, chacun tamponné de SON N°, au format retenu) est
+  // PRÉPARÉ pendant qu'il regarde À expédier ; « Imprimer (N) » l'ouvre DANS son toucher (`ouvrirPdfLot`).
+  // La garde du §5 reste : un N° « à vérifier » ou porté par deux fiches DEMANDE d'abord (`numerosDemandent`,
+  // la même règle que `confirmerNumerosAVerifier`) — le PDF s'ouvre alors après sa réponse. Rien n'est caché :
+  // un bordereau qui manque au PDF est NOMMÉ dans la feuille d'après, avec sa raison.
+  const [imprEtat, setImprEtat] = useState(null);       // la feuille d'après : { res, sig, voie, etape, manque, corrige, absents, tamponCorrige }
+  const [choixPapier, setChoixPapier] = useState(null); // { puis: null | [cles] } — la question du papier
+  const [imprBusy, setImprBusy] = useState(null);       // null | { fait, total } : le bouton plein reste enfoncé, « Préparation… »
+  const [tamponsPerso, setTamponsPerso] = useState({}); // cle → tampon choisi APRÈS, pour CE bordereau (cette séance)
+  const [, setPrepVu] = useState(0);
+  const prepsRef = React.useRef(new Map());              // signature → { etat: 'encours'|'pret'|'vide'|'echec', res, promesse }
+  const imprEtatRef = React.useRef(null); imprEtatRef.current = imprEtat;
+  // Les octets d'un bordereau, par la règle de chaque site (celle de « Tout imprimer » d'avant, recopiée d'un bloc) ;
+  // gardés en mémoire pour la séance (`_octetsLot`, par clé ET empreinte : un N° changé ⇒ relu).
+  const lireOctetsLigne = async (l) => {
+    const memo = `${l.cle}|${sigLigneLot(l)}`;
+    if (_octetsLot.has(memo)) return _octetsLot.get(memo);
+    let buf = null, invBytes = null, raison = '';
+    if (l.site === 'vinted') {
+      const e = l.e, b = e.b;
+      const capte = e.txn ? labelsCaptes[e.txn] : null;
+      const lu = await octetsBordereau(capte && capte.row, b && b.hasPdf ? b._row : null);
+      if (lu === null) raison = 'pasLu'; else if (!lu.octets) raison = 'sansPdf';
+      buf = lu && lu.octets ? lu.octets : null;
+      const inv = buf && b ? invForBord(b) : null;
+      if (inv) { const ent = entForBordInvoice(inv); if (ent) { try { invBytes = await buildFacturXBytes(inv, ent); } catch (_) {} } }
+    } else if (l.site === 'vestiaire' && !(l.v && l.v.bordereau && l.v.bordereau.id)) {
+      raison = 'sansPdf';
+    } else if (l.site === 'vestiaire') {
+      const j = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(l.v.bordereau.id)}&select=b64:data->>b64`);
+      const b64 = Array.isArray(j) && j[0] && j[0].b64;
+      if (!Array.isArray(j)) raison = 'pasLu'; else if (!b64) raison = 'sansPdf';
+      if (b64) { try { buf = b64ToBytes(b64); } catch (_) { buf = null; raison = 'illisible'; } }
+    } else if (l.site === 'leboncoin' && !l.pdf) {
+      raison = 'sansPdf';
+    } else if (l.site === 'leboncoin') {
+      let r0 = null; try { r0 = await vmrPdfLbc(l.lo.label.voucherUrl); } catch (_) { r0 = null; }
+      if (!r0 || !r0.dataUrl) raison = 'pasLu'; else { try { buf = b64ToBytes(r0.dataUrl.split(',')[1] || ''); } catch (_) { buf = null; raison = 'illisible'; } }
+    } else raison = 'sansPdf';
+    const r = buf ? { buf, invBytes } : { raison: raison || 'pasLu' };
+    if (buf) { _octetsLot.set(memo, r); if (_octetsLot.size > 60) _octetsLot.delete(_octetsLot.keys().next().value); }
+    return r;
+  };
+  // Composer UN lot : lire les octets, tamponner (jamais la feuille « Place du tampon » toute seule : la place
+  // gardée, sinon la place automatique), mettre à la suite. Rien n'est ouvert ici.
+  const composerLot = async (lignes, format, tampons, { apercu = false, pas = null } = {}) => {
+    const items = [], raisons = {};
+    for (const [i, l] of lignes.entries()) {
+      const o = await lireOctetsLigne(l);
+      if (pas) pas(i + 1);
+      if (!o.buf) { raisons[l.cle] = o.raison; continue; }
+      items.push({ numero: l.num || '', title: l.titre || '', pdfBuf: o.buf, invBytes: o.invBytes, cle: l.cle, site: l.site, ligne: l, tampon: TAMPONS_IMPR.includes((tampons || {})[l.cle]) ? tampons[l.cle] : null });
+    }
+    if (!items.length) return { vide: true, raisons, lignes };
+    const r = await composerBordereaux(items, (w, h) => posForFormat(w, h, false), { imprimante: format, apercu });
+    (r.rates || []).forEach((i) => { raisons[items[i].cle] = 'illisible'; });
+    const reussies = (r.reussis || []).map((i) => items[i].cle);
+    const url = URL.createObjectURL(new Blob([r.bytes], { type: 'application/pdf' }));
+    return { ...r, url, items: items.map((it) => ({ ...it, pdfBuf: null, invBytes: null })), raisons, lignes, reussies, owner: AUTH.user?.id || null };
+  };
+  // La signature compte AUSSI ce qui change le PDF hors des lignes : les places de tampon gardées (« Toujours ici ») et le
+  // réglage d'impression (papier thermique, contenu du tampon) — un PDF préparé avant un de ces changements n'est plus le bon.
+  const empreinteReglagesImpr = () => { let h = 5381; const t = (() => { try { return JSON.stringify([positionsTampon(), reglageImpressionChoisi()]); } catch (_) { return ''; } })(); for (let i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0; return h.toString(36); };
+  const sigImpr = (lignes, format, tampons) => `${AUTH.user?.id || ''}#${empreinteReglagesImpr()}#` + signatureLot({ lignes, sig: sigLigneLot, format, tampons });
+  const preparer = (sig, fabrique) => {
+    const m = prepsRef.current;
+    if (m.has(sig) && m.get(sig).etat !== 'echec') return m.get(sig);
+    const e = { etat: 'encours', res: null };
+    m.set(sig, e);
+    e.promesse = fabrique().then((res) => { e.res = res; e.etat = res && !res.vide ? 'pret' : 'vide'; }, (err) => { e.err = err; e.etat = 'echec'; })
+      .then(() => {
+        // Au plus 8 PDF gardés ; jamais celui que la feuille montre.
+        const vu = imprEtatRef.current && imprEtatRef.current.res;
+        for (const [k, v] of m) { if (m.size <= 8) break; if (k === sig || (v.res && v.res === vu)) continue; if (v.res && v.res.url) { try { URL.revokeObjectURL(v.res.url); } catch (_) {} } m.delete(k); }
+        setPrepVu((x) => x + 1);
+      });
+    return e;
+  };
+  const pretPour = (sig) => { const e = prepsRef.current.get(sig); return e && e.etat === 'pret' ? e.res : null; };
+  const formatLot = imprMode(imprimante);
+  // Le lot d'office (ce qui PART) et sa signature sont posés PAR LE RENDU d'À expédier (`lotDefautRef`, à côté de
+  // `resLot`) : ici, dans le corps, la liste n'est pas encore calculable (ses sources sont déclarées plus bas — §4.6).
+  const lotDefautRef = React.useRef({ lignes: [], sig: '' });
+  const prepPlanRef = React.useRef({ sig: '', t: null });
+  // LA PRÉPARATION D'AVANCE (au téléphone) : l'écran montré, la liste lue en entier, rien en cours. Les PDF ne sont lus
+  // que pour les bordereaux qui PARTENT (pas toute la liste, §4.4) et une fois par séance (`_octetsLot`). Après chaque rendu
+  // (sans dépendances : la signature est lue dans le ref), un seul minuteur par signature.
+  React.useEffect(() => {
+    const { lignes, sig } = lotDefautRef.current, plan = prepPlanRef.current;
+    // SEULEMENT au téléphone (iPhone, Android) : c'est là que le navigateur n'ouvre rien après une attente. Sur
+    // ordinateur la visionneuse de VRM s'ouvre au toucher et attend le PDF : rien n'est lu avant son clic (§4.4).
+    if (!(estIOS() || estAndroid()) || !sig || imprBusy || !isCloudReady() || !lotLu() || cache() || prepsRef.current.has(sig)) {
+      if (plan.t && plan.sig !== sig) { clearTimeout(plan.t); plan.t = null; plan.sig = ''; }
+      return;
+    }
+    if (plan.t && plan.sig === sig) return;
+    if (plan.t) clearTimeout(plan.t);
+    plan.sig = sig;
+    const format = formatLot, tampons = tamponsPerso;
+    plan.t = setTimeout(() => {
+      plan.t = null;
+      if (cache() || lotDefautRef.current.sig !== sig) { plan.sig = ''; setPrepVu((x) => x + 1); return; }
+      preparer(sig, () => composerLot(lignes, format, tampons));
+      if (lignes.some((l) => l.num) && !(_verNum.etat === 'ok' && Date.now() - _verNum.at < 50000)) verifierVersionNumerotation();
+    }, 600);
+  });
+  React.useEffect(() => () => { const plan = prepPlanRef.current; if (plan.t) clearTimeout(plan.t); }, []);
+  // La version des numéros relue (moins d'une minute, la règle d'`assurerVersionNumerotation`) tant que l'écran
+  // montre un lot : c'est elle qui permet d'ouvrir le PDF dans le geste.
+  React.useEffect(() => {
+    const id = setInterval(() => { try { if (lotDefautRef.current.sig && !cache() && document.visibilityState === 'visible') verifierVersionNumerotation(); } catch (_) {} }, 45000);
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const versionFraiche = () => _verNum.etat === 'ok' && Date.now() - _verNum.at <= 60000;
+  // Marqué « imprimé » quand le PDF est OUVERT (partage, onglet, visionneuse) — jamais sur un PDF resté fermé.
+  const marquerImprimes = (res, cles) => {
+    const voulu = new Set((cles || res.reussies || []).map(String));
+    const its = (res.items || []).filter((it) => voulu.has(String(it.cle)));
+    const vinted = its.filter((it) => it.site === 'vinted').map((it) => it.cle);
+    if (vinted.length) setBordsPrinted((prev) => { const u = { ...prev }; const at = new Date().toISOString(); vinted.forEach((k) => { u[k] = at; }); save('vinted_bords_printed', u); return u; });
+    noterImprimeSansNum(its.filter((it) => it.site === 'vinted' && !String(it.numero || '').trim()).map((it) => it.ligne && it.ligne.e && it.ligne.e.txn));
+    its.filter((it) => it.site === 'vestiaire').forEach((it) => { try { marquerVc('vrm_vc_imprimes', it.ligne.v.id, true); } catch (_) {} });
+    signalerBordereauImprime(true, null);
+  };
+  const montrerApres = (res, voie, sig, garder = {}) => {
+    if (voie !== 'bouton') marquerImprimes(res);
+    setImprEtat({ res, sig, voie, etape: 'question', manque: new Set(), corrige: null, tamponCorrige: '', absents: absentsDuLot(res.lignes, res.reussies, res.raisons), ...garder });
+  };
+  // LE TOUCHER. `cles` : une sélection (feuille « Choisir »), sinon ce qui part d'office.
+  const imprimerLot = (cles = null) => {
+    if (imprBusy) return;
+    // Le papier, UNE fois : jamais choisi (ni ici, ni dans Réglages, ni sur un autre appareil) ⇒ la question ; le
+    // toucher sur un papier imprime aussitôt (2 touchers la première fois, 1 ensuite).
+    if (isCloudReady() && !imprTouchee.current && formatRetenu(load('vrm_imprimante', null)) == null) { setChoixPapier({ puis: cles ? [...cles] : [] }); return; }
+    lancerImpression(cles, formatLot);
+  };
+  const lancerImpression = (cles, format, tampons = tamponsPerso) => {
+    const L = lignesLotTous();
+    const voulues = cles ? (cles instanceof Set ? cles : new Set(cles)) : null;
+    const choisies = selectionImprimable(L, voulues || cochesParDefaut(L));
+    if (!choisies.length) { toast(tr('impr.rien')); return; }
+    if (voulues) { const dispo = new Set(choisies.map((l) => l.cle)); const partis = [...voulues].filter((c) => !dispo.has(c)); if (partis.length) { toast(tr('impr.disparus', { n: partis.length })); return; } }
+    const sig = sigImpr(choisies, format, tampons);
+    const numeros = choisies.map((l) => l.num);
+    const pret = pretPour(sig);
+    // Le chemin du geste : prêt, aucune question due (§5), version des N° relue il y a moins d'une minute.
+    if (pret && !numerosDemandent(numeros) && (!numeros.some(Boolean) || versionFraiche())) {
+      montrerApres(pret, ouvrirPdfLot(pret, { titre: tr('impr.titrePdf') }), sig);
+      return;
+    }
+    attendrePuisOuvrir(sig, choisies, numeros, () => composerLot(choisies, format, tampons, { pas: (f) => setImprBusy({ fait: f, total: choisies.length }) }));
+  };
+  // Le chemin d'attente (pas prêt, ou une question due) : la question d'abord, puis le PDF — la visionneuse sur
+  // ordinateur (l'impression part seule), « Ouvrir le PDF » sur téléphone (SON toucher ouvre).
+  const attendrePuisOuvrir = (sig, choisies, numeros, fabrique, garder = {}) => {
+    const mobile = estIOS() || estAndroid();
+    const proprio = AUTH.user?.id || null;
+    // Sur ordinateur, la visionneuse s'ouvre AU TOUCHER (« Préparation… ») : il voit tout de suite que ça part.
+    if (!mobile) reserverOngletPdf();
+    setImprBusy({ fait: 0, total: choisies.length });
+    (async () => {
+      try {
+        if (numeros.some(Boolean) && !(await assurerVersionNumerotation())) throw new Error(NUMEROS_PERIMES_IMPRESSION);
+        if (!(await confirmerNumerosAVerifier(numeros))) throw new Error(NUM_A_VERIFIER_ANNULE);
+        if (!mobile && !(_visionneuse && _visionneuse.prep)) reserverOngletPdf();
+        const e = preparer(sig, fabrique);
+        await e.promesse;
+        if ((AUTH.user?.id || null) !== proprio) throw new Error(tr('impr.change'));
+        if (e.etat === 'vide') { libererOngletPdf(); toast(e.res && e.res.raisons && Object.values(e.res.raisons).every((r) => r === 'pasLu') ? tr('impr.basePasLue') : tr('impr.vide')); return; }
+        if (e.etat !== 'pret') throw (e.err || new Error('PDF'));
+        // Rien n'a bougé pendant l'attente (le N°, l'état, le compte de chaque bordereau) : sinon rien ne s'ouvre.
+        const maintenant = new Map(lignesLotTous().map((l) => [l.cle, sigLigneLot(l)]));
+        if (choisies.some((l) => maintenant.get(l.cle) !== sigLigneLot(l))) throw new Error(tr('impr.change'));
+        montrerApres(e.res, mobile ? 'bouton' : ouvrirPdfLot(e.res, { geste: false, titre: tr('impr.titrePdf') }), sig, garder);
+      } catch (err) {
+        libererOngletPdf();
+        if (!estTamponAnnule(err)) toast(err && (err.message === NUM_A_VERIFIER_ANNULE || err.message === NUMEROS_PERIMES_IMPRESSION || err.message === tr('impr.change')) ? err.message : tr('impr.erreur', { raison: String((err && err.message) || err).slice(0, 120) }));
+      } finally { setImprBusy(null); }
+    })();
+  };
+  // « Ouvrir le PDF » (téléphone, PDF pas prêt au premier toucher) : CE toucher est le geste.
+  const ouvrirApres = (ev) => {
+    const s = imprEtatRef.current; if (!s) return;
+    const voie = ouvrirPdfLot(s.res, { titre: tr('impr.titrePdf') });
+    if (voie !== 'bouton' && ev && ev.preventDefault) ev.preventDefault();
+    marquerImprimes(s.res);
+    setImprEtat((x) => x ? { ...x, voie: voie === 'bouton' ? 'onglet' : voie } : x);
+  };
+  // « IL EN MANQUE » : il touche ceux qui manquent ; leur PDF (pages déjà tamponnées) se prépare à chaque toucher.
+  const sigManque = (s, cles) => `${s.sig}#manque:${[...cles].sort().join(',')}`;
+  const basculerManque = (cle) => setImprEtat((x) => {
+    if (!x) return x;
+    const m = new Set(x.manque); if (m.has(cle)) m.delete(cle); else m.add(cle);
+    if (m.size) { const res = x.res, sg = sigManque(x, m), cl = [...m]; preparer(sg, () => extraireBordereaux(res, cl).then((r) => ({ ...r, url: URL.createObjectURL(new Blob([r.bytes], { type: 'application/pdf' })), items: res.items.filter((it) => cl.includes(String(it.cle))), lignes: res.lignes.filter((l) => cl.includes(String(l.cle))), raisons: {}, reussies: cl }))); }
+    return { ...x, manque: m };
+  });
+  const reimprimerManque = () => {
+    const s = imprEtatRef.current; if (!s || !s.manque.size) return;
+    const sg = sigManque(s, s.manque), pret = pretPour(sg);
+    if (pret) { montrerApres(pret, ouvrirPdfLot(pret, { titre: tr('impr.titrePdf') }), sg); return; }
+    const cl = [...s.manque], res = s.res;
+    attendrePuisOuvrir(sg, res.lignes.filter((l) => cl.includes(String(l.cle))), [], () => extraireBordereaux(res, cl).then((r) => ({ ...r, url: URL.createObjectURL(new Blob([r.bytes], { type: 'application/pdf' })), items: res.items.filter((it) => cl.includes(String(it.cle))), lignes: res.lignes.filter((l) => cl.includes(String(l.cle))), raisons: {}, reussies: cl })));
+  };
+  // CHANGER LE TAMPON D'UN BORDEREAU, après : son nouveau tampon, son PDF seul préparé aussitôt.
+  const ligneDe = (s, cle) => (s.res.lignes || []).find((l) => String(l.cle) === String(cle));
+  const sigUn = (s, cle, t) => sigImpr([ligneDe(s, cle)], s.res.mode || formatLot, { [cle]: t });
+  const choisirTamponUn = (cle, t) => {
+    const s = imprEtatRef.current; const l = s && ligneDe(s, cle); if (!l) return;
+    setTamponsPerso((x) => ({ ...x, [cle]: t }));
+    setImprEtat((x) => x ? { ...x, tamponCorrige: t } : x);
+    const format = s.res.mode || formatLot;
+    preparer(sigUn(s, cle, t), () => composerLot([l], format, { [cle]: t }));
+  };
+  const reimprimerUn = (cle) => {
+    const s = imprEtatRef.current; const l = s && ligneDe(s, cle); if (!l) return;
+    const t = s.tamponCorrige, sg = sigUn(s, cle, t), pret = pretPour(sg);
+    if (pret && !numerosDemandent([l.num]) && (!l.num || versionFraiche())) { montrerApres(pret, ouvrirPdfLot(pret, { titre: tr('impr.titrePdf') }), sg); return; }
+    const format = s.res.mode || formatLot;
+    attendrePuisOuvrir(sg, [l], [l.num], () => composerLot([l], format, { [cle]: t }));
+  };
+  // « Déplacer le tampon » : la feuille « Place du tampon » pour CE bordereau seulement (sur sa demande).
+  const deplacerTamponUn = (cle) => {
+    const s = imprEtatRef.current; const l = s && ligneDe(s, cle); if (!l) return;
+    const format = s.res.mode || formatLot, t = s.tamponCorrige || (tamponsPerso[cle] || '');
+    attendrePuisOuvrir(`${sigImpr([l], format, { [cle]: t })}#place:${Date.now()}`, [l], [l.num], () => composerLot([l], format, t ? { [cle]: t } : {}, { apercu: 'force' }));
+  };
+  const corrigerUn = (cle) => setImprEtat((x) => x ? { ...x, corrige: x.corrige === cle ? null : cle, tamponCorrige: x.corrige === cle ? '' : (tamponsPerso[cle] || '') } : x);
+  const fermerApres = (dire = true) => {
+    const s = imprEtatRef.current;
+    setImprEtat(null);
+    if (dire && s && s.voie !== 'bouton') { const n = (s.res.reussies || []).length; if (n) toast(tr('impr.prets', { n })); }
+  };
+  const choisirPapier = (f) => {
+    const c = choixPapier; setChoixPapier(null);
+    choisirImprimante(f);
+    if (c && c.puis) lancerImpression(c.puis.length ? new Set(c.puis) : null, imprMode(f));
+  };
+  imprimerLotRef.current = imprimerLot;
   // « Déplacer le tampon » (depuis « Bordereau prêt ») : l'aperçu s'ouvre toujours.
   const adjustBordPlacement = async () => {
     const r = bordResult; if (!r?.pdfBuf) return;
@@ -51561,7 +51758,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const nPrets = bordereauxAImprimer(lignesImpr).length, nDejaImpr = lignesImpr.length - nPrets;
           // (12 nov.) Le bouton compte ce qui PART (cochées d'office), comme « Imprimer (N) » de la feuille : une source
           // (`resumeLot`). Avant : toutes les lignes du lot ⇒ « Tout imprimer (15) » ouvrait « Imprimer (6) ».
-          const resLot = resumeLot(lignesLotTous()), nLot = resLot.partent;
+          const Ltous = lignesLotTous(), resLot = resumeLot(Ltous), nLot = resLot.partent;
+          // (14 nov., impression-simple) Le lot d'office et sa signature, pour la préparation d'avance (`lotDefautRef`).
+          const lotD = colisDans !== 'achats' ? selectionImprimable(Ltous, cochesParDefaut(Ltous)) : [];
+          const sigDefaut = lotD.length ? sigImpr(lotD, formatLot, tamponsPerso) : '';
+          lotDefautRef.current = { lignes: lotD, sig: sigDefaut };
           // (1er nov., capture de Julien : « Vestiaire » absent de Colis alors
           // qu'il y a un compte) Même règle que les filtres d'Annonces, Ventes,
           // Messages et que la rangée de Colis · Leboncoin : un site où il a un
@@ -51837,9 +52038,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div className="vrm-colis-barre" data-colis-barre="">
                   <Bouton variante="secondaire" icone="scan" className="vrm-colis-scanner" data-colis-barre-btn="scanner" data-colis-scanner="" aria-label={scanRetraitBarre ? 'Scanner un colis à retirer' : 'Scanner un bordereau'} data-scan-mode-bouton={scanRetraitBarre ? 'retrait' : 'envoi'} title={scanRetraitBarre ? 'Scanner le colis au point relais : VRM montre l’achat attendu' : `Scanner le code-barres d’un bordereau : VRM montre ${motsVendeur().le} qui doit être dedans`} onClick={() => setScanOuvert(scanRetraitBarre ? 'retrait' : 'envoi')}><span className="vrm-colis-scanner-l">Scanner</span></Bouton>
                   {colisDans === 'achats' ? null : <>
-                  <Bouton variante={nLot > 0 ? 'primaire' : 'secondaire'} icone="printer" data-colis-barre-btn="imprimer" data-lot-ouvrir={resLot.total > 0 ? '1' : '0'} data-imprimer-prets={nLot}
-                    title={nLot > 0 ? `${nLot} bordereau${nLot > 1 ? 'x' : ''} prêt${nLot > 1 ? 's' : ''} : un PDF, rangé par transporteur` : resLot.total > 0 ? 'Rien de neuf à imprimer : ouvre pour voir pourquoi' : 'Aucun bordereau prêt à imprimer pour l’instant'}
-                    onClick={ouvrirLot} disabled={batchBusy || resLot.total === 0}>{batchBusy ? 'Préparation…' : nLot > 0 ? `Tout imprimer (${nLot})` : 'Tout imprimer'}</Bouton>
+                  {/* (14 nov., impression-simple) « Imprimer (N) » IMPRIME : le PDF du lot (préparé d'avance) s'ouvre dans
+                      CE toucher. Plus rien de neuf ⇒ il ouvre « Choisir » (réimprimer, voir pourquoi). */}
+                  <Bouton variante={nLot > 0 ? 'primaire' : 'secondaire'} icone="printer" className={imprBusy ? 'vrm-impr-enfonce' : undefined} data-colis-barre-btn="imprimer" data-impr-lot={nLot} data-impr-pret={nLot > 0 && sigDefaut && pretPour(sigDefaut) ? '1' : '0'} data-imprimer-prets={nLot}
+                    aria-pressed={imprBusy ? 'true' : undefined}
+                    title={nLot > 0 ? tr('impr.boutonTitre', { n: nLot, format: tr(`impr.format.${formatLot}`) }) : resLot.total > 0 ? tr('impr.rienDeNeuf') : tr('impr.rien')}
+                    onClick={() => { if (nLot > 0) imprimerLot(); else ouvrirLot(); }} disabled={batchBusy || !!imprBusy || resLot.total === 0}>{imprBusy ? tr('impr.enCours', { fait: imprBusy.fait || 0, total: imprBusy.total || 0 }) : nLot > 0 ? tr('impr.bouton', { n: nLot }) : tr('impr.boutonSeul')}</Bouton>
                   {/* (6 nov.) Pour le conseil « Un envoi presse » (src/accompagnement.js) : le compte du bouton,
                       et la règle de « Prochain geste » (`gesteEnvoi`) — un bordereau pour aujourd'hui ou demain. */}
                   <ChiffreConseil cle="colis.imprimer" valeur={baseKO ? null : { nLot, presse: !!gesteEnvoi({ aImprimer: bordereauxAImprimer(lignesImpr).map((l) => ({ jours: l.e && Number.isFinite(l.e.dl) ? l.e.dl : null })) }, { urgentSeul: true }) }}/>
@@ -51907,6 +52111,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               return <ScreenHead icon="doc" title="Colis" date={dateJourFr(new Date())} phrase="colis"
               desc="Ce que Vinted attend de toi, capté par l'extension. Le bordereau manquant est généré tout seul quand tu passes sur Vinted, puis déposé ici. Un colis parti disparaît sans rien cocher."
               right={barreColis}/>; })()}
+            {/* (14 nov., impression-simple) À côté d'« Imprimer » : le papier retenu (un toucher discret pour le changer,
+                jamais une étape) et « Choisir » — ce qui n'est pas dans le lot y est DIT, avec sa raison. */}
+            {colisDans !== 'achats' && resLot.total > 0 ? <div className="vrm-impr-ligne" data-impr-ligne="">
+              <button type="button" className="vrm-impr-lien" data-impr-format={formatLot} aria-label={tr('impr.formatAria', { format: tr(`impr.format.${formatLot}`) })} disabled={!!imprBusy} onClick={() => setChoixPapier({ puis: null })}>{tr(`impr.format.${formatLot}`)}<span aria-hidden="true"> ▾</span></button>
+              <button type="button" className="vrm-impr-lien" data-lot-ouvrir="1" data-impr-autres={resLot.autres} disabled={!!imprBusy || batchBusy} onClick={ouvrirLot}>{resLot.autres > 0 ? tr('impr.choisirAutres', { n: resLot.autres }) : tr('impr.choisir')}</button>
+            </div> : null}
+            {choixPapier ? <ChoixPapier Feuille={SheetShell} valeur={formatRetenu(load('vrm_imprimante', null)) ? formatLot : null} puisImprimer={!!choixPapier.puis} onChoisir={choisirPapier} onFermer={() => setChoixPapier(null)}/> : null}
+            {imprEtat ? <FeuilleImpression Feuille={SheetShell} Bouton={Bouton} etat={imprEtat} dessiner={dessinerPdf} occupe={!!imprBusy}
+              pretManque={!!(imprEtat.manque && imprEtat.manque.size && pretPour(sigManque(imprEtat, imprEtat.manque)))}
+              pretUn={!!(imprEtat.corrige && imprEtat.tamponCorrige && pretPour(sigUn(imprEtat, imprEtat.corrige, imprEtat.tamponCorrige)))}
+              onOuvrir={ouvrirApres} onOui={() => fermerApres(true)} onFermer={() => fermerApres(true)}
+              onManque={() => setImprEtat((x) => x ? { ...x, etape: 'manque', manque: new Set(), corrige: null } : x)} onBasculer={basculerManque}
+              onReimprimerManque={reimprimerManque} onAnnulerManque={() => setImprEtat((x) => x ? { ...x, etape: 'question', manque: new Set() } : x)}
+              onCorriger={corrigerUn} onTampon={choisirTamponUn} onReimprimerUn={reimprimerUn} onDeplacer={deplacerTamponUn}/> : null}
             {/* (10 nov., Julien sur captures iPhone : « Enlève imprime bordereaux … Et imprimer garde tout
                 imprimer ») LA LIGNE « PROCHAIN GESTE » N'EST PLUS RENDUE : « N bordereaux à imprimer — Imprimer »
                 redisait le bouton « Tout imprimer » du haut, « 1 à envoyer en priorité » la limite déjà écrite sur
@@ -52267,33 +52485,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       </label>);
                   };
                   const choisis = L.filter((l) => lot.coches.has(l.cle) && l.cochable !== false);
-                  const fait = lot.fait || null;
-                  // 3 · « C'est imprimé ? » — les colis passent « prêts à déposer » (la date d'impression), annulable.
-                  // (14 nov., Julien : « l'impression beaucoup mieux guidée ») 5 · « Tout est sorti correctement ? » : il
-                  // peut cocher ceux qui ont RATÉ ; les autres seuls passent « imprimés », les ratés repartent à l'impression.
-                  const rates = new Set((fait && fait.rates) || []);
-                  const basculerRate = (cle) => setLot((x) => { if (!x || !x.fait) return x; const s = new Set(x.fait.rates || []); if (s.has(cle)) s.delete(cle); else s.add(cle); return { ...x, fait: { ...x.fait, rates: [...s] } }; });
-                  const confirmerImprime = () => {
-                    const at = new Date().toISOString(), ops = [];
-                    for (const k of (fait && fait.vinted) || []) if (!rates.has(k)) ops.push({ k: 'vinted_bords_printed', type: 'cle', id: k, apres: at, avant: bordsPrinted[k] });
-                    if (ops.length) gesteVrm(`${ops.length} prêt${ops.length>1?'s':''} à déposer`, ops, { vinted_bords_printed: setBordsPrinted });
-                    for (const id of (fait && fait.vestiaire) || []) { if (rates.has('vc:' + id) || rates.has(id)) continue; try { marquerVc('vrm_vc_imprimes', id, true); } catch (_) {} }
-                    if (rates.size) { const encore = [...rates]; setLot((x) => x ? { ...x, fait: null, coches: new Set(encore) } : x); setTimeout(() => batchBordereaux(new Set(encore), false, true), 0); return; }
-                    setLot((x) => x ? { ...x, fait: { ...x.fait, confirme: true } } : x);
-                  };
+                  // (14 nov., impression-simple) « CHOISIR » : la feuille ne sert plus qu'à choisir CE qui part (et à dire
+                  // pourquoi les autres n'y sont pas). Le papier, l'aperçu, « Placer le tampon » et « Tout est sorti ? » n'y
+                  // sont plus : le papier est retenu (un toucher à côté d'« Imprimer »), le tampon se corrige APRÈS, sur la
+                  // vignette du bordereau, et la question vient dans la feuille d'après (`FeuilleImpression`).
+                  const imprimerChoisis = () => { const c = new Set(lot.coches); setLot(null); imprimerLot(c); };
                   return (
-                    <SheetShell onClose={()=>setLot(null)} maxWidth={620} z={9000} className="vrm-lot vrm-tip" data-noswipe="1" data-lot={L.length} data-lot-etape={fait ? (fait.confirme ? 'depot' : 'imprime') : 'choix'} aria-label="Tout imprimer"
-                      titre={fait ? (fait.confirme ? 'Prêts à déposer' : tr('cp.guide.sortiTitre')) : lot.echecs.length ? `${lot.echecs.length} pas imprimé${lot.echecs.length>1?'s':''}` : 'Tout imprimer'}>
-                      {!fait && <div className="vrm-tip-temps" key="choix">
-                        <ol className="vrm-tip-pas" aria-label="Étapes"><li className="is-la">Choisir</li><li>Imprimer</li><li>Déposer</li></ol>
-                        {/* (14 nov., Julien : « l'impression beaucoup mieux guidée ») ce qui se passe, ce qu'on attend de lui. */}
-                        <p className="vrm-cp-guide" data-lot-guide="choix">{tr('cp.guide.choix')}</p>
-                        <div className="vrm-cp-imprimante" data-lot-imprimante={imprMode(imprimante)}>
-                          <Segmente label={tr('cp.lot.imprimante')} plein value={imprMode(imprimante)} onChange={(v)=>{ if (!batchBusy) choisirImprimante(v); }}
-                            options={IMPR_MODES.map((v) => ({ v, l: v === 'thermique' ? tr('cp.lot.thermique') : v === 'planche4' ? tr('cp.planche.choix') : tr('cp.lot.classique'), data: { 'data-lot-imprimante-choix': v } }))}/>
-                          <p className="vrm-cp-guide-sous" data-lot-imprimante-phrase={imprMode(imprimante)}>{tr(`cp.guide.imprimante.${imprMode(imprimante)}`)}</p>
-                        </div>
-                        {lot.erreur&&<div className="vrm-tip-alerte" data-lot-erreur="">{/* (14 nov.) la raison en mots simples + le geste (src/ui/Accompagne.jsx) */}<AccEchec geste="colis.imprimer" erreur={lot.erreur} onReessayer={()=>batchBordereaux(new Set(lot.coches), false, true)}/></div>}
+                    <SheetShell onClose={()=>setLot(null)} maxWidth={620} z={9000} className="vrm-lot vrm-tip" data-noswipe="1" data-lot={L.length} data-lot-etape="choix" aria-label={tr('impr.choisir')}
+                      titre={tr('impr.choisirTitre')}>
+                      <div className="vrm-tip-temps" key="choix">
+                        {lot.erreur&&<div className="vrm-tip-alerte" data-lot-erreur="">{/* (14 nov.) la raison en mots simples + le geste (src/ui/Accompagne.jsx) */}<AccEchec geste="colis.imprimer" erreur={lot.erreur} onReessayer={imprimerChoisis}/></div>}
                         {(nSansBord || resL.dejaImprimes || resL.anciennes || resL.decoches) ? <div className="vrm-tip-pourquoi" data-lot-pourquoi="">
                           <b>Pas dans ce lot</b>
                           {nSansBord > 0 && <span className="vrm-tip-pourquoi-ligne" data-lot-pourquoi-sans-bordereau={nSansBord}>{nSansBord} sans bordereau encore{aGenItems.length > 0 ? ' — ' : ''}{aGenItems.length > 0 && <BoutonToutGenerer items={aGenItems}/>}</span>}
@@ -52301,10 +52502,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {resL.anciennes > 0 && <span className="vrm-tip-pourquoi-ligne" data-lot-pourquoi-anciennes={resL.anciennes}>{resL.anciennes} vendue{resL.anciennes > 1 ? 's' : ''} il y a plus de {VENTE_LOT_MAX_J} j — à vérifier</span>}
                           {resL.decoches > 0 && <span className="vrm-tip-pourquoi-ligne" data-lot-pourquoi-decoches={resL.decoches}>{resL.decoches} décoché{resL.decoches > 1 ? 's' : ''} par toi</span>}
                         </div> : null}
-                        {batchBusy&&progressionLot&&<div className="vrm-tip-progression" role="status" data-acc-pendant="colis.imprimer" data-acc-n={`${progressionLot.fait||0}/${progressionLot.total||0}`}>{progressionLot.etape==='lecture'?`PDF ${progressionLot.fait}/${progressionLot.total}`:'Préparation…'}<progress {...(progressionLot.etape==='lecture'?{value:progressionLot.fait,max:progressionLot.total}:{})}/></div>}
                         <div className="vrm-tip-outils">
-                          <button type="button" className="vrm-tip-lien" disabled={batchBusy} onClick={()=>setLot(x=>({...x,coches:new Set(L.filter(l=>l.cochable!==false).map(l=>l.cle))}))}>Tout sélectionner</button>
-                          <button type="button" className="vrm-tip-lien" disabled={batchBusy} onClick={()=>setLot(x=>({...x,coches:new Set()}))}>Tout décocher</button>
+                          <button type="button" className="vrm-tip-lien" disabled={!!imprBusy} onClick={()=>setLot(x=>({...x,coches:new Set(L.filter(l=>l.cochable!==false).map(l=>l.cle))}))}>Tout sélectionner</button>
+                          <button type="button" className="vrm-tip-lien" disabled={!!imprBusy} onClick={()=>setLot(x=>({...x,coches:new Set()}))}>Tout décocher</button>
                         </div>
                         <section className="vrm-tip-groupe" data-lot-section="partent">
                           <h3>Ce qui part <span>{partent.length}</span></h3>
@@ -52320,65 +52520,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         </section>}
                         {/* (11 nov., lot retours-litiges) Les bordereaux de RETOUR d'achat : imprimés un par un, tamponnés « RETOUR · N°… ». */}
                         <RetoursAImprimer r={retoursAchatRes} onImprimer={imprimerRetourAchat} Bouton={Bouton}/>
-                        {/* 2 · L'APERÇU : une page A4 par colis coché — l'étiquette du transporteur, le tampon N° + titre en bas. */}
-                        {/* (11 nov., lot thermique) Le papier et le tampon CHOISIS (Paramètres → Impression des bordereaux,
-                            `vrm_impression`) : l'aperçu dit ce qui sortira, et « Changer » y mène. */}
-                        {choisis.length > 0 && (()=>{ const pl4 = imprMode(imprimante) === 'planche4', th = imprMode(imprimante) === 'thermique' || pl4, rg = reglageImpressionChoisi(), pp = papierThermique(rg), mt = th ? rg.tamponTh : rg.tamponA4;
-                          // (14 nov., Julien : « laisse la possibilité de sélectionner imprimante classique ou thermique ») le choix,
-                          // visible AU MOMENT d'imprimer : le même réglage `vrm_imprimante` que Réglages (mémorisé, jamais deviné).
-                          const tampons = lot.tampons || {};
-                          const poserTampon = (cle, m) => setLot((x) => x ? { ...x, tampons: { ...(x.tampons || {}), [cle]: m } } : x);
-                          const papierLot = th ? (pp.id === 'autre' ? pp.nom : tr(`impression.format.${pp.id}`)) : 'A4';
-                          // (14 nov., lot colis-plus 98) 4 par page : au plus ⌈n/4⌉ feuilles (une page pas découpable part seule).
-                          return <section className="vrm-tip-groupe" data-lot-section="apercu" data-lot-papier={pl4 ? 'planche4' : th ? rg.format : 'a4'} data-lot-tampon={mt} aria-label={tr('impression.lot.apercu')}>
-                          <h3>{tr('impression.lot.apercu')} <span>{pl4 ? tr('cp.planche.lotPages', { n: Math.ceil(choisis.length / 4) }) : tr('impression.lot.pages', { n: choisis.length, papier: papierLot })}</span></h3>
-                          <p className="vrm-cp-guide" data-lot-guide="apercu">{tr('cp.guide.apercu')}</p>
-                          <button type="button" className="vrm-tip-lien" data-lot-reglage-impression="" disabled={batchBusy} onClick={()=>{ setLot(null); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=settings&reglage=imprimante' })); } catch (_) {} }}>{tr('impression.lot.changer')}</button>
-                          <div className="vrm-tip-pages">
-                            {choisis.map((l) => { const m = TAMPONS_IMPR.includes(tampons[l.cle]) ? tampons[l.cle] : mt; const c = contenuTampon(m, { numero: l.num || '', titre: l.titre || '' }); return <div key={l.cle} className="vrm-cp-apercu" data-lot-apercu-carte={l.cle}><figure className="vrm-tip-a4" data-lot-apercu={l.cle} data-lot-apercu-tampon={m}>
-                              <span className="vrm-tip-a4-etiquette">{logo(l)}<i/><i/><i/></span>
-                              <figcaption className="vrm-tip-a4-tampon">{m === 'rien' ? <b>{tr('impression.lot.sansTampon')}</b> : <><b>{l.num ? `N° ${l.num}` : 'sans N°'}</b>{c.titre ? <span>{c.titre}</span> : null}</>}</figcaption>
-                              </figure>
-                              {/* (14 nov.) CE bordereau : son tampon (ou aucun), ou le retirer du lot — avant d'imprimer. */}
-                              <select className="vrm-cp-tampon" aria-label={tr('cp.lot.tamponDe', { qui: l.num ? `N°${l.num}` : (l.titre || '') })} data-lot-tampon-choix={l.cle} value={m} disabled={batchBusy} onChange={(e)=>poserTampon(l.cle, e.target.value)}>
-                                {TAMPONS_IMPR.map((t) => <option key={t} value={t}>{tr(`impression.tampon.${t}`)}</option>)}
-                              </select>
-                              <button type="button" className="vrm-tip-lien vrm-cp-retirer" data-lot-retirer={l.cle} disabled={batchBusy} onClick={()=>basculer(l.cle)}>{tr('cp.lot.retirer')}</button>
-                            </div>; })}
-                          </div>
-                        </section>; })()}
                         {nb > 0 ? <AccAvant geste="colis.imprimer" vars={{ n: nb }}/> : null}
                         <div className="vrm-lot-pied vrm-tip-pied">
-                          <button type="button" className="vrm-tip-lien" data-imprime="1" data-lot-placer={nb} disabled={!nb || batchBusy} onClick={()=>batchBordereaux(new Set(lot.coches), true)}>Placer le tampon</button>
-                          <Bouton variante="primaire" icone="printer" data-imprime="1" data-lot-imprimer={nb} disabled={!nb || batchBusy} onClick={()=>batchBordereaux(new Set(lot.coches), false, true)}>
-                            {batchBusy?'Préparation…':lot.echecs.length?`Réessayer (${nb})`:`Imprimer (${nb})`}
+                          <span className="vrm-impr-sous" data-lot-papier-dit={formatLot}>{tr(`impr.format.${formatLot}`)}</span>
+                          <Bouton variante="primaire" icone="printer" data-lot-imprimer={nb} disabled={!nb || !!imprBusy} onClick={imprimerChoisis}>
+                            {tr('impr.bouton', { n: nb })}
                           </Bouton>
                         </div>
-                      </div>}
-                      {fait && !fait.confirme && <div className="vrm-tip-temps vrm-tip-fin" key="imprime" data-lot-question="" data-acc-apres="colis.imprimer">
-                        <ol className="vrm-tip-pas" aria-label="Étapes"><li className="is-fait">Choisir</li><li className="is-la">Imprimer</li><li>Déposer</li></ol>
-                        <p className="vrm-tip-grand"><b>{fait.n}</b> bordereau{fait.n>1?'x':''} dans le PDF.</p>
-                        <p className="vrm-cp-guide" data-lot-guide="sorti">{tr('cp.guide.sorti')}</p>
-                        {fait.planche ? <p className="vrm-tip-sous" data-planche-resultat={`${fait.planche.etiquettes}/${fait.planche.feuilles}/${fait.planche.echelle}`}>{tr('cp.planche.resultat', { etiquettes: fait.planche.etiquettes, feuilles: fait.planche.feuilles, echelle: fait.planche.echelle })}{fait.planche.entieres ? <> {tr('cp.planche.entieres', { n: fait.planche.entieres })}</> : null}</p> : null}
-                        {fait.url ? <a className="vrm-tip-lien vrm-tip-pdf" data-lot-ouvrir-pdf="" href={fait.url} target="_blank" rel="noopener">Ouvrir le PDF</a> : null}
-                        {(fait.lignes || []).length > 1 ? <ul className="vrm-cp-rates" data-lot-rates={rates.size}>
-                          {(fait.lignes || []).map((l) => <li key={l.cle}><label className="vrm-cp-rate" data-lot-rate={l.cle} data-lot-rate-coche={rates.has(l.cle) ? '1' : '0'}>
-                            <input type="checkbox" checked={rates.has(l.cle)} onChange={()=>basculerRate(l.cle)}/>
-                            <span>{l.num ? <b>N°{l.num}</b> : null} {l.titre}</span><small>{tr('cp.guide.rate')}</small></label></li>)}
-                        </ul> : null}
-                        <div className="vrm-tip-pied">
-                          <Bouton variante="secondaire" data-lot-pas-imprime="" onClick={()=>setLot((x)=>x?{...x,fait:null}:x)}>{tr('cp.guide.rienSorti')}</Bouton>
-                          <Bouton variante="primaire" icone="check" data-lot-imprime-oui="" onClick={confirmerImprime}>{rates.size ? tr('cp.guide.reimprimer', { n: rates.size }) : tr('cp.guide.toutSorti')}</Bouton>
-                        </div>
-                      </div>}
-                      {fait && fait.confirme && <div className="vrm-tip-temps vrm-tip-fin" key="depot" data-lot-depot="">
-                        <ol className="vrm-tip-pas" aria-label="Étapes"><li className="is-fait">Choisir</li><li className="is-fait">Imprimer</li><li className="is-la">Déposer</li></ol>
-                        <p className="vrm-tip-grand"><b>{fait.n}</b> prêt{fait.n>1?'s':''} à déposer.</p>
-                        <div className="vrm-tip-pied">
-                          <Bouton variante="secondaire" onClick={()=>setLot(null)}>Plus tard</Bouton>
-                          <Bouton variante="primaire" icone="truck" data-lot-je-depose="" onClick={()=>{ setLot(null); setDepotOuvert(true); }}>Je dépose</Bouton>
-                        </div>
-                      </div>}
+                      </div>
                     </SheetShell>
                   );
                 })()}

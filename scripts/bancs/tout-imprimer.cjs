@@ -166,6 +166,9 @@ async function scenario(b, nom, vue, LIGNES) {
   // (11 nov., lot DJ3) Une case par colis (la case « Contrôlé » est remplacée par l'aperçu A4 de la feuille).
   for (const x of ap) { if (!x.coche) await pg.locator(`[data-lot-ligne="${x.cle}"] input`).first().check(); }
   await pg.click('button[data-lot-imprimer]');
+  // (14 nov., impression-simple) La PREMIÈRE fois, le papier est demandé une fois (puis retenu) : on prend « Classique ».
+  // (`data-lot-ouvrir` est désormais « Choisir », à côté d'« Imprimer (N) » qui imprime d'un toucher : banc impression-simple.)
+  await pg.waitForSelector('[data-impr-papier-choix="normale"]', { timeout: 3000 }).then(() => pg.click('[data-impr-papier-choix="normale"]')).catch(() => {});
   // C : le N° à vérifier DEMANDE.
   // (Si une case « Contrôlé » n'a pas pris, la question « Vérifier les articles » passe d'abord : on la franchit.)
   let q = false;
