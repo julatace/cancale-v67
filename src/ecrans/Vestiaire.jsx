@@ -1,5 +1,7 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
+import DansFiche from '../DansFiche.jsx';
+import { attrsFicheLigne } from '../ficheLigne.js';
 import { problemesAnnonce } from '../verifAnnonce.js';
 import { AlerteArnaque, CompteurArnaque, PastilleArnaque } from '../AlerteArnaque.jsx';
 import { motifDeLApercu } from '../antiArnaque.js';
@@ -338,19 +340,22 @@ function AnnoncesVestiaire() {
             const flou = vcFloute(vcOuvert, it.compte);
             const prix = it.prix && isFinite(Number(it.prix.valeur)) ? (it.prix.devise && it.prix.devise !== 'EUR' ? `${Number(it.prix.valeur).toFixed(2).replace('.', ',')} ${it.prix.devise}` : fmt(it.prix.valeur)) : '—';
             const extra = [it.boost === true ? 'boostée' : '', typeof it.favoris === 'number' ? `${it.favoris} favori${it.favoris > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ');
+            // (14 nov., proposition 62) Toucher l'annonce ouvre LA fiche de la paire (le N° lié à CE produit Vestiaire) ;
+            // « Relier / Délier Vinted » y est rendu dans « Actions » (`DansFiche`).
+            const flVc = attrsFicheLigne({ contexte: 'annonce', site: 'vestiaire', cle: 'v' + id, nums: num ? [String(num)] : [], photo: it.photo || '', titre: it.titre || '', prix: prix !== '—' ? prix : '' });
             return (
-              <li key={id} data-vc-annonce={id} data-vc-annonce-num={num || ''} data-vc-annonce-etat={etat} data-flou={flou ? '1' : '0'} style={flou ? STYLE_FLOU : undefined}>
+              <li key={id} {...flVc} data-vc-annonce={id} data-vc-annonce-num={num || ''} data-vc-annonce-etat={etat} data-flou={flou ? '1' : '0'} style={flou ? STYLE_FLOU : undefined}>
                 <PhotoVc src={it.photo}/>
                 <div className="vrm-lbc-catalog-info">
                   <strong>{it.titre || (num ? `N°${num}` : 'Annonce sans titre lu')}</strong>
                   <small>{num ? <span data-vc-annonce-numtxt="">N°{num}</span> : etat === 'retiree' ? 'Sans N° (retirée)' : 'N° en attente'}{extra ? ` · ${extra}` : ''}</small>
                   <div><span data-etat={etat === 'en-ligne' ? 'active' : etat === 'vendue' ? 'vendue' : 'autre'} title={brut ? 'État lu sur Vestiaire' : undefined}>{label}</span></div>
                   {/* (3 nov.) Un seul N° pour l'article aussi en ligne sur Vinted : SON toucher relie. */}
-                  {lienDe(vcLoc.liens, id)
+                  <DansFiche cle={flVc['data-fiche-ligne']}>{lienDe(vcLoc.liens, id)
                     ? <button type="button" className="vrm-lvc-geste" data-vc-delier={id} onClick={() => defaireVc(id)}>Délier Vinted</button>
                     : etat !== 'retiree' && etat !== 'vendue' && vcReliable({ productId: id, item: it, liensPub: d.liens, liens: vcLoc.liens, cleNum })
                       ? <button type="button" className="vrm-lvc-geste" data-vc-relier={id} onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:lien-vc', { detail: { sens: 'vc', id, num: num || '', titre: it.titre || '', photo: it.photo || '', site: 'Vestiaire' } })); } catch (_) {} }}>Relier à Vinted</button>
-                      : null}
+                      : null}</DansFiche>
                 </div>
                 <b data-vc-annonce-prix={it.prix ? String(it.prix.valeur) : ''} title={it.prix && it.prix.cle ? 'Prix lu sur Vestiaire' : undefined}>{prix}</b>
               </li>

@@ -32,3 +32,9 @@ export default function DansFiche({ cle, place = 'actions', seulementFiche = fal
   if (seulementFiche) return null;
   return <>{children}</>;
 }
+
+// Vrai quand la fiche est ouverte DEPUIS cette ligne (seule la rangée concernée se redessine).
+export function useLigneIci(cle) {
+  const lire = React.useCallback(() => { const l = ligneOuverte(); return !!(cle && l && l.cle === cle); }, [cle]);
+  return React.useSyncExternalStore(abonner, lire, lire);
+}

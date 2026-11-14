@@ -28,6 +28,8 @@
 //  (photo, nom + taille, code de retrait en grand, N°). Les colis sans lieu
 //  sont sous « Point pas encore connu », avec la raison et le geste.
 // ════════════════════════════════════════════════════════════════════════════
+import DansFiche from './DansFiche.jsx';
+import { attrsFicheLigne, ouvrirLigne } from './ficheLigne.js';
 import React from 'react';
 import LigneGlissable from './LigneGlissable.jsx';   // (11 nov., gestes-glisser) « Retiré » / « Le code » au glisser
 import { jugerBan, requetesBan, nombreEpingle, RAISONS_BAN, surLaCarte, pointsARetirer } from './relaisColis.js';
@@ -406,11 +408,12 @@ export function BarreDelai({ d, enTete = false }) {
 }
 function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C = null, avecTransp = false, titreDe = null, delai = null, delaiEnTete = false, suiviDe = null, qrDe = null }) {
   const [ouvert, setOuvert] = React.useState(false);
+  const ouvrirFicheRef = React.useRef(() => setOuvert(true));
   const detailId = React.useId();
   const [copie,setCopie]=React.useState(false);
   const copieGen=React.useRef(0);
   React.useEffect(()=>{copieGen.current++;setCopie(false);return()=>{copieGen.current++;};},[x.cle,x.code]);
-  const voirCode=async()=>{setOuvert(true);if(!x.code)return;const gen=copieGen.current;try{await navigator.clipboard.writeText(String(x.code));if(gen===copieGen.current)setCopie(true);}catch(_){if(gen===copieGen.current)setCopie(false);}};
+  const voirCode=async()=>{try{ouvrirFicheRef.current();}catch(_){}if(!x.code)return;const gen=copieGen.current;try{await navigator.clipboard.writeText(String(x.code));if(gen===copieGen.current)setCopie(true);}catch(_){if(gen===copieGen.current)setCopie(false);}};
   const ph = x.photo && Photo ? Photo(x.photo) : null;
   // La barre dit l'échéance (§7 : jamais deux fois) ; sans barre, la puce d'échéance reste.
   // (12 nov., finitions — Julien : « rien n'est cohérent ») UNE FORME DE LIGNE, la même pour chaque colis :
@@ -438,9 +441,15 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
     'data-a-verifier-raison': x.horsCompte && x.raisonCode ? x.raisonCode : undefined, 'data-a-verifier-code': x.horsCompte ? (x.encoreCode || x.code || x.qr ? 'oui' : 'non') : undefined,
     'data-transporteur': x.transp ? cleStatTransporteur(x.transp) : undefined, 'data-ordre-t': x.arrivee != null ? String(x.arrivee) : '',  // (lot AJ) l'arrivée lue qui range la ligne
     'data-rp-sources': marques.join(','), 'data-rp-verifie': Number.isFinite(x.verifieMs) ? String(x.verifieMs) : '', 'data-rp-code-sur': x.code && x.codeSur ? '1' : undefined, 'data-rp-codes-desaccord': desaccord ? desaccord.map((d) => d.source + ':' + d.code).join(',') : undefined };
-  const basculer = () => setOuvert((o) => !o);
   const suLigne = suiviDe ? String(suiviDe(x) || '') : '';
   const titreLigne = (titreDe && titreDe(x)) || x.titre || '';
+  // (14 nov., proposition 62) Toucher le colis ouvre LA fiche de la paire (le N° relié à CE colis par identité :
+  // son n° de commande, son suivi) ; le code, ses sources et les gestes (Retiré, QR…) y sont rendus en haut.
+  // Un colis sans paire reliée : la fiche du colis seul (« pas de paire reliée »), jamais une paire devinée.
+  const fl = attrsFicheLigne({ contexte: 'retrait', site: x.site || 'vinted', cle: 'r' + x.cle, nums: x.num ? [String(x.num)] : [], suivi: suLigne, titre: titreLigne, sous: x.code ? String(x.code) : '' });
+  const ouvrirFiche = () => { if (fl['data-fiche-ligne']) ouvrirLigne({ cle: fl['data-fiche-ligne'], contexte: 'retrait', site: x.site || 'vinted', nums: x.num ? [String(x.num)] : [], suivi: suLigne, titre: titreLigne, sous: x.code ? String(x.code) : '' }); else setOuvert((o) => !o); };
+  const basculer = ouvrirFiche;
+  ouvrirFicheRef.current = ouvrirFiche;
   const titreSansArticle = !titreLigne || /^n°/i.test(titreLigne) || /^colis\b/i.test(titreLigne);
   const nomTransp = x.transp && !x.trInconnu ? String(x.transp.nom || '') : '';
   // Au point relais, un colis Chronopost est un colis « Chronopost Pickup » (le nom du réseau de points).
@@ -470,7 +479,7 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
   ];
   return (
     <LigneGlissable actions={actionsG} cle={x.cle} libelle={x.titre || 'colis'}>{(gp, tiroirG) => (
-    <div className="vrm-rpf-ligne" {...attrs} {...gp} data-ouvert={ouvert ? '1' : undefined}>
+    <div className="vrm-rpf-ligne" {...attrs} {...gp} {...fl} data-ouvert={ouvert ? '1' : undefined}>
       {/* Le code de CE colis, lisible par les autres écrans et les bancs (`data-code-retrait`) ; affiché au toucher. */}
       {x.code ? <span hidden data-code-retrait={x.code}/> : null}
       <div className="vrm-rpf-rang">
@@ -514,7 +523,7 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
         {retirer ? <button type="button" className="vrm-rpf-retire" data-colis-retire="" aria-label="J’ai retiré ce colis" onClick={(ev) => { ev.stopPropagation(); retirer(x); }}>J’ai retiré</button> : null}
       </div>
       {/* La barre hors du bouton de la ligne (un bouton rend ses enfants muets pour un lecteur d'écran). */}
-      {ouvert ? <div className="vrm-rpf-detail" id={detailId} data-rp-detail="">
+      {fl['data-fiche-ligne'] || ouvert ? <DansFiche cle={fl['data-fiche-ligne']} place="contexte" seulementFiche={!ouvert}><div className="vrm-rpf-detail" id={detailId} data-rp-detail="">
         {desaccord ? <div className="vrm-rpf-desaccord" data-rp-desaccord="" role="note">
           <span className="vrm-rpf-desaccord-t">Deux codes différents — vérifie sur place</span>
           {desaccord.map((d) => <span key={d.source + d.code} className="vrm-rpf-desaccord-v" data-rp-desaccord-valeur={d.code} data-rp-desaccord-source={d.source}><b>{d.code}</b> · {NOMS_SOURCES[d.source] || d.source}</span>)}
@@ -525,7 +534,7 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
         {/* (12 nov., finitions) La dernière ligne de la fiche : « Vérifié · e-mail · par Mondial Relay à 14:26 », étiquetée comme les autres. */}
         {marquesVues.length || verifie ? <div className="vrm-rpf-fiche-l vrm-rpf-sources is-detail" data-rp-sources-ligne=""><span className="vrm-rpf-fiche-k">Vérifié</span><span className="vrm-rpf-fiche-v">{marquesVues.map((m) => <span key={m} className="vrm-rpf-source" data-rp-source={m}>{NOMS_SOURCES[m] || m}</span>)}{verifie ? <span className={'vrm-rpf-verifie' + (ancien ? ' is-ambre' : '')} data-rp-verifie-texte="">{verifieCourt(verifie, marquesVues.length > 0)}</span> : null}</span></div> : null}
         {gestes ? <div className="vrm-rp-gestes">{gestes(x)}</div> : null}
-      </div> : null}
+      </div></DansFiche> : null}
       {tiroirG}
     </div>
     )}</LigneGlissable>

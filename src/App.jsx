@@ -25370,8 +25370,10 @@ function CarteColisVc({ v, imprime, fait }) {
   const titre = v.titre || 'Article Vestiaire';
   const urg = limiteVcTexte({ ...v, aExpedier: true });
   const sec = { flex: '0 1 auto', minHeight: 44, borderRadius: 12, padding: '0 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' };
+  // (14 nov., proposition 62) Toucher la carte ouvre LA fiche de la paire (le N° lié à SON produit Vestiaire).
+  const fl = attrsFicheLigne({ contexte: 'colis', site: 'vestiaire', cle: 'cvc' + v.id, nums: v.num ? [v.num] : [], photo: v.photo || '', titre: v.titre || '', sous: urg || '' });
   return (
-    <div data-bord-card="" data-vc-colis={v.id} data-colis-ident={'vc:' + v.id} data-vc-colis-num={v.num || ''} data-vc-colis-limite={v.limite ? v.limite.slice(0, 10) : ''} data-jours={j == null ? '' : String(j)} data-plateforme-colis="vestiaire"
+    <div {...fl} data-bord-card="" data-vc-colis={v.id} data-colis-ident={'vc:' + v.id} data-vc-colis-num={v.num || ''} data-vc-colis-limite={v.limite ? v.limite.slice(0, 10) : ''} data-jours={j == null ? '' : String(j)} data-plateforme-colis="vestiaire"
       className="vrm-colis-carte" style={{ position: 'relative', padding: '14px', border: `1px solid ${j != null && j < 0 ? C.warn + '66' : C.border}`, background: C.card, borderRadius: 12, opacity: fait ? 0.55 : 1 }}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
         <div className="vrm-colis-photo" style={{ width: 64, height: 80, borderRadius: 12, background: '#fff', border: `1px solid ${C.border}`, boxSizing: 'border-box', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -25401,6 +25403,7 @@ function CarteColisVc({ v, imprime, fait }) {
       {/* (3 nov.) LA FRISE D'UN COLIS, comme Vinted : « imprimé » = sa coche (`vrm_vc_imprimes`), « déposé » =
           « Colis fait » ; « en route » / « livré » ne sont pas lus pour Vestiaire ⇒ jamais cochés. */}
       {imprime || fait ? <Frise etapes={friseColisFusion({ imprime: !!imprime, depose: !!fait }, { geste: j != null && j <= 1 && !fait })} cle={'vc:' + v.id} className="vrm-colis-frise" label="Où en est le colis"/> : null}
+      <DansFiche cle={fl['data-fiche-ligne']}>
       <div className="vrm-colis-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
         {/* (2 nov. au soir) Le transporteur LU dans la puce, À GAUCHE du bouton bordereau, même rangée (comme Vinted). */}
         <div className="vrm-rangee-bord" data-rangee-bord="">
@@ -25416,6 +25419,7 @@ function CarteColisVc({ v, imprime, fait }) {
         <button type="button" data-geste="fait" data-vc-fait={v.id} onClick={() => marquerVc('vrm_vc_colis_done', v.id, !fait)} title={fait ? 'Le colis est encore chez toi : il revient dans « À envoyer »' : 'Marquer déposé : il passe dans « Envoyés »'}
           className="vrm-colis-sec vrm-colis-ter" style={{ ...sec, border: `1px solid ${C.border}`, background: fait ? C.bg : 'transparent', color: fait ? C.text : C.muted }}>{fait ? 'Pas encore déposé' : 'Déposé'}</button>
       </div>
+      </DansFiche>
     </div>
   );
 }
@@ -25425,8 +25429,11 @@ function CarteColisVc({ v, imprime, fait }) {
 // par l'écran, qui la tient de la règle de SON site (`colisEbay`, `colisLbcAPoster`, §11) ; la photo est
 // celle de la commande / vente elle-même (identité, §5).
 function CarteColisSite({ ident, site, photo, titre, num, sous, sousAmbre = false, transporteur, primaire, gestes = null, frise, detail = null, attrs = {} }) {
+  // (14 nov., proposition 62) Toucher la carte ouvre LA fiche de la paire (son N° par identité : SKU, référence) ;
+  // le bordereau et les gestes du colis sont rendus dans « Actions » (`DansFiche`).
+  const fl = attrsFicheLigne({ contexte: 'colis', site, cle: 'c' + ident, nums: num ? [num] : [], photo: typeof photo === 'string' ? photo : '', titre: typeof titre === 'string' ? titre : '', sous: typeof sous === 'string' ? sous : '' });
   return (
-    <div data-bord-card="" data-colis-ident={ident} data-plateforme-colis={site} className="vrm-colis-carte" {...attrs}
+    <div data-bord-card="" data-colis-ident={ident} data-plateforme-colis={site} className="vrm-colis-carte" {...attrs} {...fl}
       style={{ position: 'relative', padding: '14px', border: `1px solid ${sousAmbre ? C.warn + '66' : C.border}`, background: C.card, borderRadius: 12 }}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
         <div className="vrm-colis-photo" style={{ width: 64, height: 80, borderRadius: 12, background: C.card2 || C.bg, border: `1px solid ${C.border}`, boxSizing: 'border-box', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -25444,6 +25451,7 @@ function CarteColisSite({ ident, site, photo, titre, num, sous, sousAmbre = fals
         </div>
       </div>
       {Array.isArray(frise) && frise.some((x) => x.fait) ? <Frise etapes={frise} cle={ident} className="vrm-colis-frise" label="Où en est le colis"/> : null}
+      <DansFiche cle={fl['data-fiche-ligne']}>
       <div className="vrm-colis-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
         <div className="vrm-rangee-bord" data-rangee-bord="">
           {/* (12 nov., finitions) « … » DANS la rangée du bordereau, à sa gauche : posé à part (absolu), il passait sous « Imprimer » / « Générer le bordereau » et ne se touchait plus. */}
@@ -25454,6 +25462,7 @@ function CarteColisSite({ ident, site, photo, titre, num, sous, sousAmbre = fals
         </div>
         {gestes}
       </div>
+      </DansFiche>
     </div>
   );
 }
@@ -48589,10 +48598,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const suivi = tk && tk.suivi ? String(tk.suivi) : '';
             const rc = receiptFor(o);
             const numA = buyNumByTxn[String(o.transaction_id)];
+            // (14 nov., proposition 62) Toucher l'achat ouvre LA fiche de la paire qu'il a payée (le N° relié par
+            // SON n° de transaction, `buyNumByTxn`) ; sans N° relié, la fiche de l'achat seul (« pas de paire »).
+            const flAchat = attrsFicheLigne({ contexte: 'achat', site: 'vinted', cle: 'b' + String(o.transaction_id), nums: numA != null && numA !== '' ? [String(numA)] : [], photo: orderPhoto(o) || '', titre: o.title || '', prix: montant(montantCommande(o), { devise: o.price?.currency_code || 'EUR' }) || '' });
             return (
             <React.Fragment key={o.transaction_id}>
             {!achatsGroupees && i === achatsSansDate.i ? <LigneSansDate n={achatsSansDate.n}/> : null}
-            <div {...serieAchats.ligne(String(o.transaction_id))} className="vrm-buy-row" data-cible={attrCible(['achat',String(o.transaction_id)])} data-achat-tx={String(o.transaction_id)} data-ordre-t={tsCommande(o) || ''} style={{opacity:cancelled?0.55:1,...(estFloute(o)?STYLE_FLOU:null),...(achatMenu!=null&&achatMenu===String(o.transaction_id||'')?{zIndex:42}:null)}}>{/* (8 nov.) la ligne dont le menu ⋯ est ouvert passe AU-DESSUS des suivantes : une ligne pressée (:active, scale) ou atténuée (opacité) devient un contexte d'empilement, et la ligne suivante recouvrait son menu (banc recu-achat) */}
+            <div {...serieAchats.ligne(String(o.transaction_id))} {...flAchat} className="vrm-buy-row" data-cible={attrCible(['achat',String(o.transaction_id)])} data-achat-tx={String(o.transaction_id)} data-ordre-t={tsCommande(o) || ''} style={{opacity:cancelled?0.55:1,...(estFloute(o)?STYLE_FLOU:null),...(achatMenu!=null&&achatMenu===String(o.transaction_id||'')?{zIndex:42}:null)}}>{/* (8 nov.) la ligne dont le menu ⋯ est ouvert passe AU-DESSUS des suivantes : une ligne pressée (:active, scale) ou atténuée (opacité) devient un contexte d'empilement, et la ligne suivante recouvrait son menu (banc recu-achat) */}
               <div className="vrm-buy-ph" style={{background:C.card2||C.bg}}>
                 <CaseSerie serie={serieAchats} cle={String(o.transaction_id)} etiquette={o.title} surPhoto/>
                 {orderPhoto(o)&&!achatPhKo.has(orderPhoto(o))?<PhotoVinted src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={()=>{ const u=orderPhoto(o); setAchatPhKo(s=>{ if(s.has(u)) return s; const n=new Set(s); n.add(u); return n; }); }}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
@@ -48686,19 +48698,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const peutCode = !!(st.step===3 && tk && (qrImage(tk)||codeRetrait(tk.code)));
                 const item = { display:'flex',alignItems:'center',gap:10,width:'100%',textAlign:'left',border:'none',background:'transparent',color:C.text,fontSize:15,fontWeight:600,padding:'0 14px',minHeight:44,cursor:'pointer',fontFamily:'inherit',textDecoration:'none',boxSizing:'border-box' };
                 const close = () => setAchatMenu(null);
-                return (
-              <div className="vrm-buy-act">
-                {note && <button className="vrm-icon-control vrm-buy-quick" type="button" onClick={()=>setNoteEdit({tid,title:o.title,val:note})} title={tr('achats.note', { note: String(note) })} aria-label={tr('achats.noteInterne')} style={{color:C.accentTexte}}><Icon name="doc" size={15}/></button>}
-                {peutSuivre && (
-                  <a className="vrm-buy-quick" href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" title={tr('achats.suivreColis', { carrierName: String(carrierName(tk.carrier)), suivi: String(suivi) })} aria-label={tr('achats.suivreColis2')} style={{color:C.muted}}><Icon name="truck" size={16}/></a>
-                )}
-                {peutCode && (
-                  <button className="vrm-icon-control vrm-buy-quick" type="button" onClick={()=>openQrView(tk)} title={tr('achats.codeRetrait')} aria-label={tr('achats.codeRetrait')} style={{color:C.warn}}><Icon name="key" size={16}/></button>
-                )}
-                <button className="vrm-icon-control vrm-buy-more" type="button" onClick={()=>setAchatMenu(m=>m===tid?null:tid)} title={tr('achats.codeRetraitSuivi')} aria-label={tr('achats.plusActionsAchat')} aria-haspopup="menu" style={{color:achatMenu===tid?C.accent:C.muted,background:achatMenu===tid?`${C.accent}12`:'transparent'}}>⋯</button>
-                {achatMenu===tid && (<>
-                  <div onClick={close} style={{position:'fixed',inset:0,zIndex:40}}/>
-                  <div role="menu" className="vrm-buy-menu" style={{background:C.card,border:`1px solid ${C.border}`,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.18)'}}>
+                const itemsMenu = (<>
                     {peutCode && <button type="button" role="menuitem" className="vrm-buy-menu-tel" style={item} onClick={()=>{ close(); openQrView(tk); }}><Icon name="key" size={15} style={{color:C.muted}}/>{tr('achats.codeRetrait')}</button>}
                     {peutSuivre && <a role="menuitem" className="vrm-buy-menu-tel" href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" style={item} onClick={close}><Icon name="truck" size={15} style={{color:C.muted}}/>{tr('achats.suivreColis2')}</a>}
                     {arrive && <button type="button" role="menuitem" data-copier-prix={prixPaye} style={item} onClick={async ()=>{ close(); try { await navigator.clipboard.writeText(prixPaye); toast(tr('achats.prixPayeCopie', { prixPaye: String(prixPaye) })); } catch(_) { toast(tr('suivi.journal.pasCopie'),'error'); } }}><Icon name="cash" size={15} style={{color:C.muted}}/>{tr('achats.copierPrixPaye')}</button>}
@@ -48713,8 +48713,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {numA && <button type="button" role="menuitem" style={item} onClick={()=>{ close(); generateEtiquetteSku(numA,{ title:o.title, transaction_id:o.transaction_id }); }}><Icon name="tag" size={15} style={{color:C.muted}}/>{tr('achats.etiquette')}{numA}</button>}
                     <div style={{height:1,background:C.border,margin:'4px 0'}}/>
                     <button type="button" role="menuitem" data-achat-masquer={tid} style={{...item,color:C.muted}} onClick={()=>{ close(); masquerAchat(o); }}><Icon name="eyeOff" size={15} style={{color:C.muted}}/>{tr('achats.masquerAchat')}</button>
+                </>);
+                return (
+              <div className="vrm-buy-act">
+                {note && <button className="vrm-icon-control vrm-buy-quick" type="button" onClick={()=>setNoteEdit({tid,title:o.title,val:note})} title={tr('achats.note', { note: String(note) })} aria-label={tr('achats.noteInterne')} style={{color:C.accentTexte}}><Icon name="doc" size={15}/></button>}
+                {peutSuivre && (
+                  <a className="vrm-buy-quick" href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" title={tr('achats.suivreColis', { carrierName: String(carrierName(tk.carrier)), suivi: String(suivi) })} aria-label={tr('achats.suivreColis2')} style={{color:C.muted}}><Icon name="truck" size={16}/></a>
+                )}
+                {peutCode && (
+                  <button className="vrm-icon-control vrm-buy-quick" type="button" onClick={()=>openQrView(tk)} title={tr('achats.codeRetrait')} aria-label={tr('achats.codeRetrait')} style={{color:C.warn}}><Icon name="key" size={16}/></button>
+                )}
+                <button className="vrm-icon-control vrm-buy-more" type="button" onClick={()=>setAchatMenu(m=>m===tid?null:tid)} title={tr('achats.codeRetraitSuivi')} aria-label={tr('achats.plusActionsAchat')} aria-haspopup="menu" style={{color:achatMenu===tid?C.accent:C.muted,background:achatMenu===tid?`${C.accent}12`:'transparent'}}>⋯</button>
+                {achatMenu===tid && (<>
+                  <div onClick={close} style={{position:'fixed',inset:0,zIndex:40}}/>
+                  <div role="menu" className="vrm-buy-menu" style={{background:C.card,border:`1px solid ${C.border}`,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.18)'}}>
+                    {itemsMenu}
                   </div>
                 </>)}
+                {/* (14 nov., proposition 62) Les MÊMES gestes, dans « Actions » de la fiche ouverte depuis cet achat. */}
+                <DansFiche cle={flAchat['data-fiche-ligne']} seulementFiche>
+                  <div className="vrm-buy-menu-items" data-achat-actions-fiche={tid}>
+                    {itemsMenu}
+                  </div>
+                </DansFiche>
               </div>
                 );
               })()}
@@ -49299,9 +49320,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // mort). L'adresse se refait par l'identité de l'annonce (son id, sur
             // le domaine du compte) ; sans id numérique, la photo n'est pas un lien.
             const urlFiche = it.url || (/^\d+$/.test(String(it.id)) ? `https://${(it._acc && it._acc.domain) || 'www.vinted.fr'}/items/${it.id}` : '');
+            // (14 nov., proposition 62) Toucher l'annonce (ou « Détails et gestes ») ouvre LA fiche de la paire, par
+            // l'identifiant de CETTE annonce et son N° ; ses gestes (« Plus d'actions ») y sont rendus (`DansFiche`).
+            const flAnn = attrsFicheLigne({ contexte: 'annonce', site: 'vinted', cle: 'a' + cleCarte, nums: num ? [num] : [], item: String(it.id || ''), photo: typeof it.photo === 'string' ? it.photo : ((it.photo && it.photo.url) || ''), titre: it.title || '', prix: prix(it.price, it.currency) || '' });
             return (
               <div className="vrm-ann-card vrm-fiche vrm-vignette" key={cleCarte} data-carte-annonce={it.id} data-fiche="29oct" data-fiche-ouverte={ouverte?'1':'0'} data-vignette-cle={cleCarte} data-vignette-double={enDouble?'1':undefined}
-                onClick={(ev)=>{ if (ouverte) return; const t = ev.target; if (t && t.closest && t.closest('a,button,input,select,textarea,label,[data-edition],[role="dialog"]')) return; basculerFiche(); }}
+                {...flAnn}
                 style={{borderRadius:12,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden',...(estFloute(it)?STYLE_FLOU:null)}}>
                 <div className="vrm-ann-overview" style={{display:'flex',flexDirection:'column',position:'relative'}}>
                   <a className="vrm-fiche-photo" data-fiche-photo href={urlFiche||undefined} target={urlFiche?'_blank':undefined} rel="noreferrer" title={urlFiche?tr('annonces.ouvrirAnnonceVinted'):undefined} style={{display:'flex',alignItems:'center',justifyContent:'center',position:'relative',background:C.bg}}>
@@ -49385,13 +49409,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {/* (10 nov., lot P) Au lecteur d'écran, le bouton dit QUELLE paire il ouvre (« N°12, titre, 65 € »). */}
                     <button type="button" className="vrm-fiche-plus-bouton" data-fiche-plus-bouton="" aria-expanded={ouverte} aria-controls={idRepli}
                       aria-label={`${ouverte ? 'Moins de détails' : 'Détails et gestes'} — ${num ? 'N°' + num + ', ' : ''}${it.title || it.brand || 'annonce'}, ${prix(it.price,it.currency) || 'prix pas lu'}`}
-                      onClick={basculerFiche}>
+                      data-fiche-ligne-ouvre="">
                       <span>{ouverte ? tr('annonces.moinsDetails') : tr('annonces.detailsGestes')}</span><Icon name="chevron" size={14} style={{transform:ouverte?'rotate(-90deg)':'rotate(90deg)',transition:'transform .15s'}}/>
                     </button>
                   </div>
                 </div>
                 {/* CE QUI ÉTAIT DANS « ⋯ Gérer l'annonce », À LA VUE (29 oct.) : l'achat
                     relié, le stock, Leboncoin (la file et sa préparation), les gestes. */}
+                <DansFiche cle={flAnn['data-fiche-ligne']}>
                 <div className="vrm-fiche-plus" id={idRepli} data-fiche-plus style={{display:'flex',flexDirection:'column',gap:8,borderTop:`1px solid ${C.border}`}}>
                   <AchatRelie entry={e} numero={num}/>
                   {/* (5 nov., chantier C — revue 2.6) DEUX gestes à la vue, le reste dans « … ».
@@ -49466,6 +49491,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                   )}
                 </div>
+                </DansFiche>
               </div>
             );
           })]; })}
@@ -51510,12 +51536,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // phrase. Le premier groupe en a un aussi : sans lui, dix cartes
                 // rouges commençaient sans qu'on sache où le retard s'arrête.
                 const grp = groupeDe(e);
+                // (14 nov., proposition 62) Toucher la carte ouvre LA fiche de la paire (son N° trouvé par identité, sa
+                // transaction), le bordereau et les gestes du colis rendus dans « Actions » (`DansFiche`).
+                const flColis = attrsFicheLigne({ contexte: 'colis', site: 'vinted', cle: 'c' + (e.txn || e.key), nums: num ? [num] : [], tx: e.txn || '', photo: typeof ph === 'string' ? ph : '', titre: typeof titre === 'string' ? titre : '', sous: e.lim && e.lim.limite ? String(e.lim.limite).slice(0, 10) : '' });
                 // (2 nov.) Toujours l'intertitre (« Prêts à imprimer », « En attente du
                 // bordereau ») : le résumé en colonnes qui les nommait est retiré.
                 return (
                   <React.Fragment key={e.key}>
                   {ouvreSansDate}
-                  <div data-envoyer-rang={ix} data-ordre-t={quandE != null ? String(quandE) : ''} data-bord-card data-cible={attrCible(['colis',e.txn])} data-groupe-carte={grp} data-transporteur={cleStatTransporteur(trV)} data-tx-colis={e.txn||''} data-colis-ident={'v:'+(e.txn||e.key)} data-colis-num={num||''} data-colis-vente-email={e.venteEmail?'1':undefined} data-colis-imprime-sans-num={sansNumC?'1':undefined} data-limite={e.lim&&e.lim.limite||''} data-limite-heure={e.lim&&e.lim.heure||''} data-jours={dl==null?'':String(dl)} data-attente-j={att == null ? '' : String(att)} {...propsGlisserFait({ actif: !posted && !!o && o.transaction_id != null, onFait: () => gesteColisFait(o, b, true) })} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${e.lim && e.lim.retard ? C.warn+'66' : C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
+                  <div data-envoyer-rang={ix} data-ordre-t={quandE != null ? String(quandE) : ''} data-bord-card data-cible={attrCible(['colis',e.txn])} data-groupe-carte={grp} data-transporteur={cleStatTransporteur(trV)} data-tx-colis={e.txn||''} data-colis-ident={'v:'+(e.txn||e.key)} data-colis-num={num||''} data-colis-vente-email={e.venteEmail?'1':undefined} data-colis-imprime-sans-num={sansNumC?'1':undefined} data-limite={e.lim&&e.lim.limite||''} data-limite-heure={e.lim&&e.lim.heure||''} data-jours={dl==null?'':String(dl)} data-attente-j={att == null ? '' : String(att)} {...propsGlisserFait({ actif: !posted && !!o && o.transaction_id != null, onFait: () => gesteColisFait(o, b, true) })} {...flColis} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${e.lim && e.lim.retard ? C.warn+'66' : C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
                     <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                       <div className="vrm-colis-photo" style={{width:64,height:80,borderRadius:12,background:C.card2||C.bg,border:`1px solid ${C.border}`,boxSizing:'border-box',flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                         {ph?<PhotoVinted src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
@@ -51610,6 +51639,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {(()=>{ if (posted) return null; const sv = b && b.suivi ? suiviVente({ site: 'vinted', o, b, lim: e.lim, tr: trV }) : null;
                       const inc = sv ? sv.inc.filter((z) => z.code === 'imprime-pas-depose') : [];
                       return inc.length ? ligneSuiviVente({ cle: String(e.txn||e.key), tr: trV }, sv, inc) : null; })()}
+                    <DansFiche cle={flColis['data-fiche-ligne']}>
                     <div className="vrm-colis-actions" style={{display:'flex',gap:8,alignItems:'center',marginTop:12,flexWrap:'wrap'}}>
                       {/* (2 nov. au soir) Julien : « à côté du bouton bordereau, marqué Chronopost avec le
                           logo » — LA RANGÉE : la puce du transporteur LU (n° du bordereau, ligne du
@@ -51698,6 +51728,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           d'attente dit déjà. Retiré : l'absence du bouton
                           « Imprimer » le montre de toute façon. */}
                     </div>
+                    </DansFiche>
                   </div>
                   </React.Fragment>
                 );

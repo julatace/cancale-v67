@@ -1,6 +1,8 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { ordreRecent, quandEbay } from '../ordreRecent.js';
+import DansFiche, { useLigneIci } from '../DansFiche.jsx';
+import { attrsFicheLigne, ouvrirLigne } from '../ficheLigne.js';
 import { suivi } from '../suiviTravail.js';   // (11 nov., lot suivi-travail) VRM figé, détail et barre pendant la publication
 import { modifierLigneCas } from '../ligneCas.js';
 import BilanSynchronisation from '../BilanSynchronisation.jsx';
@@ -2189,7 +2191,11 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
 function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [], numsConnus = null, titreDeNum = null, pris = null, onSku, onOffre, compteNom = '',
   regle = null, bloquee = null, achat, onRegle, enLot = false, prixAffiche, nomCompteConfirm = '',onRelire }) {
   const E = EBAY_SKIN;
-  const [open, setOpen] = React.useState(false);
+  // (14 nov., proposition 62) Toucher l'annonce (ou « … ») ouvre LA fiche de la paire (son N° lu dans SON SKU,
+  // par identité) ; la fiche de l'annonce eBay (modifier, règle d'offre, supprimer…) y est rendue en haut.
+  const flEb = attrsFicheLigne({ contexte: 'annonce', site: 'ebay', cle: 'e' + (it._compte || '') + ':' + (it.itemId || ''), nums: numero ? [String(numero)] : [], photo: typeof it.photo === 'string' ? it.photo : '', titre: it.title || '' });
+  const open = useLigneIci(flEb['data-fiche-ligne']);
+  const setOpen = () => { if (flEb['data-fiche-ligne']) ouvrirLigne({ cle: flEb['data-fiche-ligne'], contexte: 'annonce', site: 'ebay', nums: numero ? [String(numero)] : [], photo: typeof it.photo === 'string' ? it.photo : '', titre: it.title || '' }); };
   // ── RELIER À UNE PAIRE (action `sku`) ────────────────────────────────────
   const [relierOuvert, setRelierOuvert] = React.useState(false);
   const [numSaisi, setNumSaisi] = React.useState('');
@@ -2496,7 +2502,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
   const desc = String(d.description || '').replace(/&lt;br&gt;|<br\s*\/?>/gi, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
   const chip = { fontSize: 11, color: E.text, background: E.card2, border: `1px solid ${E.border}`, borderRadius: 999, padding: '3px 9px', whiteSpace: 'nowrap' };
   return (
-    <div className="vrm-eb-carte" data-regle-envoi={envoiRegle || undefined} data-ouverte={open ? '1' : undefined}>
+    <div className="vrm-eb-carte" {...flEb} data-regle-envoi={envoiRegle || undefined} data-ouverte={open ? '1' : undefined}>
       {/* ── (6 nov., Julien : « eBay, c'est vraiment pas ouf ») LA CARTE : photo ·
           titre (2 lignes) · N° · prix ; UNE ligne d'état ; UN geste (« Relier »
           quand le lien manque) et « … » pour la fiche. « Pas reliée » n'est plus
@@ -2544,7 +2550,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
         </div>
       )}
       {info && <div data-ebay-info={it.itemId} data-ebay-info-ton={infoTon || (/^✓/.test(info) ? 'ok' : 'warn')} style={{ fontSize: 12, color: (infoTon ? infoTon === 'ok' : /^✓/.test(info)) ? E.text : E.warn, margin: '0 16px 11px', lineHeight: 1.45 }}>{info}{lienEbayInfo && url ? <> <a href={url} target="_blank" rel="noreferrer" style={{ color: E.accentSoft, fontWeight: 700 }}>Voir sur eBay ↗</a></> : null}</div>}
-      {open && (
+      {open && (<DansFiche cle={flEb['data-fiche-ligne']} place="contexte" seulementFiche>
         <div className="vrm-eb-fiche" data-ebay-fiche={it.itemId}>
           {/* La référence VRM d'une annonce « à vérifier » : dite ICI, sur la fiche
               de cette annonce — plus en ambre sur la liste (§7). */}
@@ -2682,7 +2688,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           {desc && <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 10 }}>{desc.slice(0, 280)}{desc.length > 280 ? '…' : ''}</div>}
           {specs.length === 0 && !d.categoryName && !desc && <div style={{ fontSize: 12, color: E.muted, marginTop: 8 }}>Caractéristiques pas encore captées pour cette annonce — rouvre-la sur eBay.</div>}
         </div>
-      )}
+      </DansFiche>)}
     </div>
   );
 }

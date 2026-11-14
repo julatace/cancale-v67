@@ -239,3 +239,6 @@
   .vrm-fp :is(.vrm-fp-actions-carte, .vrm-fp-contexte .vrm-recap-gestes) :is(.vrm-b, .vrm-fp-b, .vrm-ao-second, .vrm-fiche-geste, [role="menuitem"]):not([data-fiche-principal]) { min-height: 40px !important; font-size: var(--d-t-15, 15px) !important; }
   .vrm-fp [data-fiche-principal] { min-height: 40px !important; }
 }
+.vrm-fp-depuis-ligne .vrm-fu-plus { display: none !important; }
+.vrm-fp-depuis-ligne .vrm-buy-menu-tel { display: flex !important; }
+.vrm-fp-contexte :is([data-stock-fiche-tete], [data-fiche-voir-etat]) { display: none !important; }
