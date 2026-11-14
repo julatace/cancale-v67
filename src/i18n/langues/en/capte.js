@@ -1,0 +1,23 @@
+// en · "The extension picked up" (14 Nov, extension 5.377) — source: fr/capte.js.
+export default {
+  "capte.titre": "The extension picked up",
+  "capte.relie": "Account linked",
+  "capte.voir": "View",
+  "capte.fermer": "Close",
+  "capte.s.ventes": {"one": "{n} new sale", "other": "{n} new sales"},
+  "capte.s.achats": {"one": "{n} new purchase", "other": "{n} new purchases"},
+  "capte.s.bordereaux": {"one": "{n} shipping label", "other": "{n} shipping labels"},
+  "capte.s.codes": {"one": "{n} pickup code", "other": "{n} pickup codes"},
+  "capte.s.versements": {"one": "{n} payout date", "other": "{n} payout dates"},
+  "capte.s.messages": {"one": "{n} message", "other": "{n} messages"},
+  "capte.s.offres": {"one": "{n} offer received", "other": "{n} offers received"},
+  "capte.s.annonces": {"one": "{n} new listing", "other": "{n} new listings"},
+  "capte.lu.ventes": {"one": "{n} sale read", "other": "{n} sales read"},
+  "capte.lu.achats": {"one": "{n} purchase read", "other": "{n} purchases read"},
+  "capte.lu.annonces": {"one": "{n} listing read", "other": "{n} listings read"},
+  "capte.lu.messages": {"one": "{n} message read", "other": "{n} messages read"},
+  "capte.lu.offres": {"one": "{n} offer read", "other": "{n} offers read"},
+  "capte.reglage.lib": "Tell me what the extension picks up",
+  "capte.reglage.desc": "A small message next to the VRM logo on the site, and here while the app is open: new sales, labels, messages…",
+  "capte.reglage.pasSu": "The extension hasn't answered yet: the setting will apply on its next pass.",
+};
