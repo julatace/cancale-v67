@@ -188,9 +188,12 @@ const deborde = (pg) => pg.evaluate(() => { const vis = (e) => { const r = e.get
           // (« Comptés avec un autre colis »), ou FINIE avec un colis retiré (dite dans les sortis). Les 9 moitiés
           // (3 achats « déposé » sans n° + 6 d'une adresse sans compte) sont toutes montrées, chacune UNE fois,
           // jamais comptées (le total reste 3, ci-dessus) ; il n'y a que 3 colis au point pour les « compter avec ».
+          // (14 nov.) Les colis encore au point sont 3 : les 2 « À retirer » (avec code) + celui sans code,
+          // rangé « à vérifier » mais toujours au point : une moitié peut être comptée avec lui.
+          const AU_POINT = ATTENDU + 1;
           const nDouble = Number(m.double || 0), nFinies = m.sortisDoute.length;
           const deuxEtats = m.sortisDoute.filter((t) => m.titresDouble.some((d) => d && t.startsWith(d)));
-          dit(nDouble + nFinies === 9 && nDouble <= ATTENDU && !deuxEtats.length, 'les 9 moitiés Vinted sans identité : chacune UN état (comptée avec un colis au point, ou finie avec lui), montrées, jamais comptées', `${nDouble} comptées avec + ${nFinies} finies${deuxEtats.length ? ' · deux états : ' + deuxEtats.join(' | ') : ''}`);
+          dit(nDouble + nFinies === 9 && nDouble <= AU_POINT && !deuxEtats.length, 'les 9 moitiés Vinted sans identité : chacune UN état (comptée avec un colis au point, ou finie avec lui), montrées, jamais comptées', `${nDouble} comptées avec + ${nFinies} finies${deuxEtats.length ? ' · deux états : ' + deuxEtats.join(' | ') : ''}`);
           // La liste « À vérifier » porte aussi les achats au point relais qu'aucune identité ne relie
           // (`enVerification`) : le nombre publié qu'elle doit égaler est celui que lit À trancher (src/aTrancher.js).
           const pubVerif = m.pub ? Number(m.pub.aVerifier) + (Number(m.pub.enVerification) || 0) : null;
