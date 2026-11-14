@@ -148,6 +148,12 @@ const CSS = `
 .av-nav .av-btn.la{opacity:1;pointer-events:auto;transform:none}
 .av-nav .av-lien{font-size:15px}
 .av-hero{padding:72px 0 0;text-align:center}
+/* (14 nov., refonte visible — « de ouf », principe seulement : une lumière dans le tiers haut) Un halo bleu très
+   doux derrière le titre : la profondeur sans trait ni dégradé criard ; jamais de violet (§3). Aucun texte dessus ne
+   change de contraste (le halo reste sous 10 % d'opacité derrière l'encre). */
+.av-hero{position:relative;isolation:isolate}
+.av-hero:before{content:"";position:absolute;z-index:-1;left:50%;top:-40px;width:min(1100px,140vw);height:560px;transform:translateX(-50%);pointer-events:none;background:radial-gradient(42% 46% at 30% 38%,rgb(0 113 227/.10),transparent 70%),radial-gradient(38% 40% at 72% 30%,rgb(90 200 250/.10),transparent 70%),radial-gradient(50% 50% at 50% 70%,rgb(15 42 85/.06),transparent 72%)}
+@media (prefers-color-scheme:dark){.av-hero:before{background:radial-gradient(42% 46% at 30% 38%,rgb(10 132 255/.22),transparent 70%),radial-gradient(38% 40% at 72% 30%,rgb(90 200 250/.12),transparent 70%),radial-gradient(50% 50% at 50% 70%,rgb(15 42 85/.5),transparent 72%)}}
 .av-pour{font-size:clamp(15px,1.2vw,17px);font-weight:600;color:var(--gris);margin:0 auto 14px;max-width:30em;text-wrap:balance}
 .av-h1{font-size:clamp(36px,5.2vw,76px);line-height:1.04;letter-spacing:-.035em;font-weight:700;max-width:16em;margin:0 auto;text-wrap:balance}
 .av-sous{font-size:clamp(20px,1.7vw,24px);line-height:1.4;color:var(--gris);max-width:34em;margin:24px auto 0;text-wrap:balance;letter-spacing:-.015em}

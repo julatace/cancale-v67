@@ -267,6 +267,13 @@
    titre d'iOS (34/700 serré), le formulaire flotte (une ombre douce, aucune bordure) ; le second
    appel n'est plus une capsule grise mais un lien à l'accent. Un seul bouton plein : « Se connecter ». */
 :root:root body .vrm-cx .vrm-cx-marque { background: var(--d-heros-fond, #1D1D1F) !important; background-image: var(--d-heros-degrade) !important; }
+/* L'atmosphère (principe : un maillage de lumière dans le tiers haut, profondeur sans trait) : les trois
+   halos qui dérivent déjà (`vrm-cx-aurore`) passent du gris au bleu — accent, bleu ciel, bleu nuit. Jamais
+   de violet (§3). Leur dérive lente garde son repli « mouvement réduit » (feuille de la connexion). */
+:root:root body .vrm-cx .vrm-cx-aurore i:nth-child(1) { background: #0071E3 !important; opacity: .55 !important; }
+:root:root body .vrm-cx .vrm-cx-aurore i:nth-child(2) { background: #5AC8FA !important; opacity: .22 !important; }
+:root:root body .vrm-cx .vrm-cx-aurore i:nth-child(3) { background: #0F2A55 !important; opacity: .85 !important; }
+@media (prefers-reduced-motion: reduce) { :root:root body .vrm-cx .vrm-cx-aurore i { animation: none !important; } }
 :root:root body .vrm-cx .vrm-cx-titre { font-size: 34px !important; line-height: 1.08 !important; letter-spacing: -.03em !important; }
 :root:root body .vrm-cx .vrm-cx-titre span { color: var(--d-heros-gris, rgb(235 235 245 / .64)) !important; }
 :root:root body .vrm-cx .vrm-cx-retour { color: var(--d-heros-gris, rgb(235 235 245 / .64)) !important; }
