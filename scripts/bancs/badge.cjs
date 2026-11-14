@@ -269,7 +269,8 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
     await pg.screenshot({ path: path.join(SORTIE, 'badge-connecte.png') });
     await cliquer(pg);
     l = await lire(pg);
-    dit(l.envoyes.includes('ouvrirVRM'), 'un clic ouvre VRM', JSON.stringify(l.envoyes));
+    // 5.376 (Julien, 14 nov. : « ça n'ouvre pas VRM s'il te plaît ») : le clic ÉPINGLE la carte.
+    dit(!l.envoyes.includes('ouvrirVRM'), 'un clic n’ouvre PAS VRM (5.376 ; l’épinglage est jugé par carte-favoris)', JSON.stringify(l.envoyes));
     dit(!l.iframe && !l.form, 'et ne montre aucun formulaire', JSON.stringify({ iframe: l.iframe, form: l.form }));
     await ctx.close();
   });
@@ -535,11 +536,13 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
       dit(c && c.l >= 0 && c.r <= largeur, `${nom} : la carte tient dans l'écran (${c && Math.round(c.l)}–${c && Math.round(c.r)} sur ${largeur})`, JSON.stringify(c));
       const o = await rect(pg, '[data-ouvrir-vrm]');
       const f = await rect(pg, '[data-fermer-carte]');
-      dit(o && o.h >= 44 && f && f.h >= 44 && f.w >= 44, `${nom} : « Ouvrir VRM » et la croix ≥ 44 px`, JSON.stringify({ o: o && o.h, f: f && [f.w, f.h] }));
-      await toucher(pg, '[data-ouvrir-vrm]');
+      dit(!o && f && f.h >= 44 && f.w >= 44, `${nom} : plus de « Ouvrir VRM » (5.376 : la carte n’ouvre pas VRM) ; la croix ≥ 44 px`, JSON.stringify({ o: !!o, f: f && [f.w, f.h] }));
       l = await lire(pg);
-      dit(l.envoyes.includes('ouvrirVRM'), `${nom} : « Ouvrir VRM » fait ce que faisait le logo`, JSON.stringify(l.envoyes));
-      // Toucher ailleurs referme.
+      dit(!l.envoyes.includes('ouvrirVRM'), `${nom} : rien n’a demandé VRM`, JSON.stringify(l.envoyes));
+      // 5.376 : plus de « Ouvrir VRM » qui fermait la carte — retoucher le logo la REFERME, puis la rouvre.
+      await toucher(pg, '.btn');
+      l = await lire(pg);
+      dit(!l.carteVisible, `${nom} : retoucher le logo referme la carte`);
       await toucher(pg, '.btn');
       l = await lire(pg);
       dit(l.carteVisible, `${nom} : retoucher le logo rouvre la carte`);
@@ -575,7 +578,7 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
     const { ctx, pg } = await rendre(nav, AC({ choix: 'oui' }));
     await cliquer(pg);
     const l = await lire(pg);
-    dit(l.envoyes.includes('ouvrirVRM'), 'à la souris rien ne change : un clic sur le logo ouvre VRM', JSON.stringify(l.envoyes));
+    dit(!l.envoyes.includes('ouvrirVRM'), 'à la souris non plus, un clic sur le logo n’ouvre plus VRM (5.376)', JSON.stringify(l.envoyes));
     await ctx.close();
   });
 

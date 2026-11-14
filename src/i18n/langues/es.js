@@ -13,16 +13,22 @@ import ecran_compta from './es/compta.js';
 import ecran_fiche from './es/fiche.js';
 import ecran_tarifs from './es/tarifs.js';
 import ecran_nouveaux from './es/nouveaux.js';
+import ecran_listes from './es/listes.js';
+import ecran_plus from './es/plus.js';
 import ecran_argent from './es/argent.js';
 import ecran_colisplus from './es/colisplus.js';   // (14 nov., lot colis-plus)
 import ecran_fraiscarte from './es/fraiscarte.js';   // (14 nov., frais-carte)
 import ecran_atelier from './es/atelier.js';
+import ecran_argentprix from './es/argentprix.js';   // (14 nov., argent-prix)
 export default {
   ...ecran_fiche,
   ...ecran_fraiscarte,
   ...ecran_tarifs,
   ...ecran_nouveaux,
   ...ecran_atelier,
+  ...ecran_listes,
+  ...ecran_plus,
+  ...ecran_argentprix,
   ...ecran_compta,
   ...ecran_argent,
   ...ecran_colisplus,
@@ -2105,6 +2111,27 @@ export default {
   "creerVinted.publier.fait": "En línea en Vinted ✓",
   "creerVinted.publier.suivi": "Publicar en Vinted",
   "creerVinted.annuler": "Cancelar",
+  // ── 5.376 (14 nov.) : Créer sur Vinted guidé, messages aux favoris accompagnés
+  "creerVinted.etapes.verifier": "Revisar",
+  "creerVinted.etapes.photos": "Fotos",
+  "creerVinted.etapes.creer": "Crear el borrador",
+  "creerVinted.etapes.publier": "Publicar en Vinted",
+  "creerVinted.etapes.label": "Pasos",
+  "creerVinted.aide.bouton": "¿Cómo funciona?",
+  "creerVinted.aide.avant": "Antes: VRM revisa cada ficha (título, precio, fotos, N.º). Lo que falta se pide aquí o con las opciones de Vinted.",
+  "creerVinted.aide.pendant": "Durante: un borrador por ficha, uno a uno, desde la pestaña vinted.fr de la cuenta. Nada se publica.",
+  "creerVinted.aide.apres": "Después: un enlace «Abrir en Vinted» por borrador. Lo revisas y lo publicas.",
+  "creerVinted.avant": {"one": "VRM va a crear {n} borrador en {login}, desde la pestaña vinted.fr. Nada se publica: tú revisas y publicas.", "other": "VRM va a crear {n} borradores en {login}, uno a uno, desde la pestaña vinted.fr. Nada se publica: tú revisas y publicas."},
+  "creerVinted.echec": "No creado: {raison}.",
+  "creerVinted.aVerifier": "Por comprobar: {raison}.",
+  "creerVinted.echecSans": "No creado: Vinted no lo confirmó.",
+  "favoris.guide.bouton": "¿Cómo funciona?",
+  "favoris.guide.titre": "Los mensajes a favoritos, en 3 pasos",
+  "favoris.guide.qui": "Quién: marca a las personas que guardaron un artículo en favoritos.",
+  "favoris.guide.quoi": "Qué: escribe tu mensaje una vez; la vista previa muestra lo que leerá el comprador, con la oferta.",
+  "favoris.guide.quand": "Cuándo: toca «Enviar». VRM escribe a una persona cada vez, desde la pestaña vinted.fr, 15 por hora como máximo.",
+  "favoris.guide.carte": "En vinted.fr, el logo VRM abajo a la derecha también lanza estos mensajes, sin abrir VRM.",
+  "favoris.guide.compris": "Entendido",
   // ── republier programmé, historique des republications (lot republier-programme)
   "rp.prog.bouton": "Programar…",
   "rp.prog.titre": "Lanzar más tarde",

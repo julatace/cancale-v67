@@ -94,7 +94,9 @@ import {routeFavoris} from './_lib/favoris.js';
 import { routeCommandes } from './_lib/commandes-leger.js';
 import { traiterAppareils, lireJournal } from './_lib/securite-compte.js';
 import { verifierNouvelAppareil } from './_lib/appareil-nouveau.js';   // (10 nov., lot H)
-import { traiterAgenda } from './_lib/agenda-ics.js';                 // (10 nov., lot H)
+import { traiterAgenda } from './_lib/agenda-ics.js';
+import { traiterCatalogue, langueVisiteur, CSP_CATALOGUE } from './_lib/catalogue-prive.js';   // (14 nov., lot messages-achats-plus) le catalogue privé                 // (10 nov., lot H)
+import { traiterComptable } from './_lib/comptable-lien.js';   // (14 nov., lot argent-prix — 115) le lien lecture seule pour son comptable                 // (10 nov., lot H)
 import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
 import { verifierConfirmation, verifierMotDePasse, inventaire, lireProprietaire, noterJournal, mailSuppression, FENETRE_RECENTE_MS, MOT_CONFIRMATION } from './_lib/suppression-compte.js';
 import { effacerCompte } from './_lib/effacer-compte.js';
@@ -1394,6 +1396,51 @@ async function agenda(req, res) {
   if (r.type === 'ics') res.setHeader('Content-Disposition', 'inline; filename="vrm-echeances.ics"');
   res.end(r.body);
 }
+// (14 nov., lot messages-achats-plus, n° 110) LE CATALOGUE PRIVÉ (api/_lib/catalogue-prive.js) :
+//   GET  ?j=<jeton> (sans session)  ⇒ la page en lecture seule (HTML, aucun script) ;
+//   GET  + session                  ⇒ ses liens ; POST + session { action: 'creer' | 'revoquer' }.
+async function catalogue(req, res) {
+  const jeton = req.query && req.query.j != null ? String(req.query.j) : null;
+  let user = null, corps = null;
+  if (jeton == null) {
+    user = await vendeurExige(req, res);
+    if (!user) return;
+    if (req.method === 'POST') {
+      corps = await lireCorpsJson(req);
+      if (!corps || typeof corps !== 'object' || Array.isArray(corps)) return repondre(res, 400, { erreur: 'corps-invalide' });
+    }
+  }
+  const r = await traiterCatalogue({ base: SUPABASE_URL, cle: process.env.SUPABASE_SERVICE_KEY || '', methode: req.method, jeton, user, corps,
+    lireVendeur: (c) => lireCommeVendeur(req, c), acces: accesVendeur, langue: langueVisiteur(req.headers && req.headers['accept-language']) });
+  if (r.type === 'json') return repondre(res, r.status, r.body);
+  res.statusCode = r.status;
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Content-Security-Policy', CSP_CATALOGUE);
+  res.end(r.body);
+}
+// (14 nov., lot argent-prix — 115) Le lien comptable : `j` = le jeton (sans session, lecture seule de la
+// compta projetée) ; sinon la session du vendeur (créer, publier, couper). Règle : api/_lib/comptable-lien.js.
+async function comptable(req, res) {
+  const jeton = req.query && req.query.j != null ? String(req.query.j) : null;
+  let user = null, corps = null;
+  if (jeton == null) {
+    user = await vendeurExige(req, res);
+    if (!user) return;
+    if (req.method === 'POST') {
+      corps = await lireCorpsJson(req);
+      if (!corps || typeof corps !== 'object' || Array.isArray(corps)) return repondre(res, 400, { erreur: 'corps-invalide' });
+    }
+  }
+  const r = await traiterComptable({ base: SUPABASE_URL, cle: process.env.SUPABASE_SERVICE_KEY || '', env: process.env, methode: req.method, jeton, user, corps,
+    ua: req.headers && req.headers['user-agent'], acces: accesVendeur });
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('X-Robots-Tag', 'noindex');
+  return repondre(res, r.status, r.body);
+}
 async function journalVrm(req, res) {
   const u = await vendeurExige(req, res);
   if (!u) return;
@@ -2275,7 +2322,9 @@ export default async function handler(req, res) {
   }
   // (4 nov.) Paramètres → Mon compte : « Appareils connectés » et « Ce que VRM a fait ».
   if (mode === 'appareils') return (m === 'GET' || m === 'POST') ? appareils(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
+  if (mode === 'catalogue') return (m === 'GET' || m === 'POST') ? catalogue(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'agenda') return (m === 'GET' || m === 'POST') ? agenda(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
+  if (mode === 'comptable') return (m === 'GET' || m === 'POST') ? comptable(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'journal') return m === 'GET' ? journalVrm(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   // (5 nov.) Les e-mails de l'essai gratuit : état, choix, lien de désinscription.
   if (mode === 'relances') return (m === 'GET' || m === 'POST') ? relances(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });

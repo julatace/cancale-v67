@@ -14,7 +14,7 @@ import { propositionsBaisse, JOURS_SANS_FAVORI, PCT_PROPOSE } from './lbcPlus.js
 import { idCompteLbcFlou } from './flouCompte.js';
 import { tr } from './i18n/index.js';
 import { useLangue } from './i18n/react.js';
-import { C, PhotoVinted, SUPABASE_URL, extSait, lireBaseRelue, useCompteLbcOuvert, vmrCmd, vmrExtPresent, vmrExtVersion, EXT_CAPACITES } from './App.jsx';
+import { C, PhotoVinted, SUPABASE_URL, extSait, lireBaseRelue, useCompteLbcOuvert, vmrCmd, vmrExtPresent, vmrExtVersion, EXT_CAPACITES, enregistrerSoldeVrm, soldeOkVrm } from './App.jsx';
 
 const URL_RECETTE = () => `${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_prix_recette&select=appris:data->appris,raison:data->>raison,at:data->>at`;
 
@@ -81,6 +81,7 @@ export default function LbcBaissePrix({ annonces = [], onFini }) {
       </div>
       {ouvert ? <BaissePrixSerie site="leboncoin" modeDefaut="pct" texteDefaut={String(PCT_PROPOSE)} annonces={lignes} compteOnglet={compteOnglet}
         extRaison={extRaison} onBaisser={onBaisser} onRelire={onRelire} Photo={PhotoVinted}
+        soldeOk={soldeOkVrm()} onSolde={enregistrerSoldeVrm}
         onFermer={() => setOuvert(false)} onFini={() => { if (onFini) onFini(); }}/> : null}
     </>
   );

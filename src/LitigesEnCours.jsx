@@ -14,7 +14,9 @@
 import React from 'react';
 import { GroupeIos, RangeeIos } from './composants/Ios.jsx';
 import { phraseLimite, texteRetours, NOM_SITE } from './litigesEcran.js';
+import { texteTauxRetours } from './argentPrixTextes.js';   // (14 nov., lot argent-prix — 112) les deux taux, chacun à part
 import './styles-litiges.css';
+import './argent-prix.css';
 import { BoutonPasAPas } from './RetoursLitiges.jsx';
 import { tr } from './i18n/index.js';
 import { trj } from './i18n/react.js';
@@ -118,15 +120,17 @@ function RetoursParModele({ bi }) {
   const maxTaux = Math.max(0.0001, ...lignes.map((l) => l.taux || 0));
   return (
     <section className="vrm-lit-bi" data-retours-modeles={bi.etat} data-retours-inconnues={bi.inconnues || 0} aria-label={tr('ventes.retoursModele')}>
-      <h2 className="vrm-lit-h2">{tr('ventes.retoursModele')}</h2>
+      <h2 className="vrm-lit-h2">{tr('ap.ret.titre')}</h2>
+      {bi.etat === 'lu' && bi.couverture && bi.couverture.ventes > 0 ? <p className="vrm-lit-note" data-retours-couverture={bi.couverture.ventes} data-retours-sans-modele={bi.couverture.sansModele}>{tr('ap.ret.couverture', { n: bi.couverture.ventes, s: bi.couverture.sansModele })}</p> : null}
       {bi.etat === 'encours' ? <p className="vrm-lit-note" role="status">{tr('messages.lecture')}</p> : null}
       {bi.etat === 'passu' ? <p className="vrm-lit-note" data-retours-passu="">{tr('ventes.ventesOntPu')}</p> : null}
       {bi.etat === 'lu' && !lignes.length ? <p className="vrm-lit-note">{tr('ventes.aucuneVenteLue')}</p> : null}
       {lignes.length ? (
         <div className="vrm-lit-bi-carte">
           {montrees.map((l) => (
-            <div key={l.cle || 'autres'} className="vrm-lit-bi-ligne" data-retours-modele={l.cle || 'autres'} data-retours-n={l.total} data-ventes-n={l.ventes} data-au-moins={l.auMoins ? '1' : '0'}>
-              <span className="vrm-lit-bi-nom">{l.nom}</span>
+            <div key={l.cle || 'autres'} className="vrm-lit-bi-ligne" data-retours-modele={l.cle || 'autres'} data-retours-n={l.total} data-ventes-n={l.ventes} data-au-moins={l.auMoins ? '1' : '0'}
+              data-taux-retour={l.tauxRetour == null ? '' : l.tauxRetour} data-taux-litige={l.tauxLitige == null ? '' : l.tauxLitige} data-n-retours={l.retours} data-n-litiges={l.litiges}>
+              <span className="vrm-lit-bi-nom">{l.nom}<small className="vrm-ap-sous">{texteTauxRetours(l)}</small></span>
               <span className="vrm-lit-bi-barre" aria-hidden="true"><span style={{ width: `${l.taux ? Math.max(4, Math.round((l.taux / maxTaux) * 100)) : 0}%` }}/></span>
               <span className="vrm-lit-bi-val">{texteRetours(l)}</span>
             </div>
