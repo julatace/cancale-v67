@@ -108,6 +108,9 @@ export const cleAxe = (l, axe) => {
   if (axe === 'modele') { const m = l.modeleSur; return m && m.cle ? { k: m.cle, nom: m.nom } : { k: '', nom: AUTRES }; }
   if (axe === 'marque') { const k = cleMarque(l.marque); return k ? { k, nom: nomMarqueAffiche(l.marque) } : { k: '', nom: AUTRES }; }
   if (axe === 'taille') { const t = String(l.taille || '').trim(); return t ? { k: t.toLowerCase(), nom: t } : { k: '', nom: AUTRES }; }
+  // (14 nov., lot argent-choix — proposition 80) MODÈLE ET TAILLE : le modèle SÛR (`modeleSur`) et la
+  // taille de la vente ; l'un des deux manque ⇒ « Autres ». Une statistique, jamais une identité (§5).
+  if (axe === 'modeleTaille') { const m = l.modeleSur, t = String(l.taille || '').trim(); return m && m.cle && t ? { k: `${m.cle}|${t.toLowerCase()}`, nom: `${m.nom} · ${t}` } : { k: '', nom: AUTRES }; }
   if (axe === 'compte') {
     if (l.plateforme === 'Vinted') { const c = String(l.compte || '').trim(); return c ? { k: 'Vinted|' + c, nom: c } : { k: 'Vinted|', nom: 'Vinted' }; }
     return { k: String(l.plateforme || ''), nom: String(l.plateforme || AUTRES) };
