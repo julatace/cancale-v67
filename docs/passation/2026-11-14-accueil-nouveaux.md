@@ -54,10 +54,23 @@ signal des bordereaux, `DEPS_ACCUEIL_NOUVEAUX`, montage), `src/ecrans/Reglages.j
   Sur `origin/main` (arbre `git archive`, audit copié dedans) : rouge (les règles n'existent pas — les
   mutations font la vraie preuve).
 - **Banc `scripts/bancs/accueil-nouveaux.cjs`** (V compte neuf Vinted, N notifications, L Leboncoin seul,
-  G langue, T /tarifs ; 390 tactile et 1512, clair et sombre) : voir le résultat chiffré ci-dessous.
+  G langue, T /tarifs ; 390 tactile et 1512, clair et sombre), sur le build fusionné avec `origin/main` :
+  **390 : 108 OK, 0 KO ; 1512 : 107 OK + G rejoué seul 5 OK** (un `page.goto` à 30 s sous une charge
+  machine de 65). Sur un build SANS ce lot (le `dist` du dépôt principal, branche fusionnée dans main
+  juste avant) : **22 KO** (390 clair). Un navigateur par scénario (un onglet tombé par manque de mémoire
+  n'emporte pas les suivants). Captures regardées : bilan (clair, sombre), « chaque matin », premier colis
+  (390 et 1512), question des notifications, carte Leboncoin, avis de langue, /tarifs (390 pleine page,
+  1512 sombre), « Nouveau » dans la colonne et la barre.
 - Audits gardés verts : `traduction`, `tdz`, `coherence`, `variables`, `csp`, `lancement`, `quoi-de-neuf`,
   `parcours-arrivee` (+ `--prouve` 17/17), `premieres-minutes`, `mode-exemple`, `plans-solo-pro`,
   `icones`, `boutons`, `violet`.
+
+## Accompagné (Julien, 14 nov. : « il ne doit pas se sentir seul »)
+
+- Le premier colis porte « Voir le geste en vidéo » à chaque étape (la vidéo « Imprimer tes bordereaux »
+  du « ? » de Ventes, lot 49) ; la fin du bilan dit où est l'aide de chaque écran (« ? », en vidéo).
+- Chaque étape du parcours sans Vinted dit SON geste exact (lien du site, ou le chemin Paramètres →
+  Comptes eBay), « Pourquoi ? » et « Plus tard » comme le parcours Vinted.
 
 ## Restes / à décider par Julien
 
