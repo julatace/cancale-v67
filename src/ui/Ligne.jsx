@@ -1,3 +1,5 @@
+// (14 nov., Studio bleu clair) La rangée du studio (`sb-rangee`) : la rangée ENTIÈRE est le geste, jamais un bouton dedans ;
+// vignette posée 44, titre Inter 600, chiffre à l'affiche (ui.css, section Studio).
 // ── src/ui/Ligne.jsx — la rangée d'une liste longue (Julien : « imagine si j'ai 1000 articles ») ──
 // 64–72 px, vignette 52 (rayon 12, `loading="lazy"`, taille fixée : aucun saut), le N° en
 // pastille + le nom sur UNE ligne, UNE sous-ligne grise (le geste en encre avec un point ambre
@@ -15,7 +17,7 @@ export function Ligne({ photo, Photo, num, titre, sous, geste = false, valeur, c
   const Balise = onClick ? 'button' : 'div';
   const img = photo ? (Photo ? <Photo src={photo} alt="" loading="lazy" decoding="async" width={52} height={52}/> : <img src={photo} alt="" loading="lazy" decoding="async" width={52} height={52}/>) : null;
   return (
-    <Balise {...(onClick ? { type: 'button', onClick } : {})} className={'vrm-ui-ligne' + (className ? ' ' + className : '')} {...attrs}>
+    <Balise {...(onClick ? { type: 'button', onClick } : {})} className={'vrm-ui-ligne sb-rangee' + (className ? ' ' + className : '')} {...attrs}>
       {photo !== undefined ? <span className="vrm-ui-ligne-photo" aria-hidden="true">{img}</span> : null}
       <span className="vrm-ui-ligne-textes">
         <span className="vrm-ui-ligne-titre">{num || null}<span>{titre}</span></span>

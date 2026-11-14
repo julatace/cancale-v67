@@ -1,3 +1,4 @@
+// (14 nov., Studio bleu clair) La ligne « À faire » est un LIEN (`sb-lien`) ; sa variante capsule, une TOUCHE (`sb-touche`).
 // ── src/ui/AFaire.jsx — regrouper les alertes d'un écran SANS les déplacer dans le code ──
 // Julien (AJOUT 3) : les alertes éparpillées avant la liste (« 4 brouillons à refaire »,
 // « 18 retirées de Vinted », « Prix d'achat 0/19 · Compléter », « 2 nouveaux N° »…) vont
@@ -78,7 +79,7 @@ export function AFaireLigne({ titre, className = '', capsule = false, seulement 
   return (
     <>
       {c.n > 0 ? (
-        <button type="button" className={(capsule ? 'vrm-ui-afaire-capsule' : 'vrm-ui-afaire') + (className ? ' ' + className : '')} aria-haspopup="dialog" aria-expanded={ouvert} data-ui-afaire={c.n} onClick={() => setOuvert(true)}>
+        <button type="button" className={(capsule ? 'vrm-ui-afaire-capsule sb-touche' : 'vrm-ui-afaire sb-lien') + (className ? ' ' + className : '')} aria-haspopup="dialog" aria-expanded={ouvert} data-ui-afaire={c.n} onClick={() => setOuvert(true)}>
           <span className="vrm-ui-afaire-point" aria-hidden="true"/>
           <span className="vrm-ui-afaire-mots">{titre || tr('listes.afaire')} <span className="vrm-ui-afaire-n">· {c.n}</span></span>
           {capsule ? null : <Chevron/>}

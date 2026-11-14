@@ -1,3 +1,4 @@
+// (14 nov., Studio bleu clair) « • À faire · N › » est un LIEN du studio (`sb-lien`, « aller voir plus »), son point ambre devant.
 // ── src/ui/LigneAFaire.jsx — « • À faire · 5 › » : toutes les alertes d'un écran en UNE ligne ──
 // Julien (AJOUT 3) : « 4 brouillons à refaire », « 18 retirées de Vinted », « Bénéfice — :
 // prix d'achat 0/19 connus », « 2 nouveaux N° »… éparpillés avant la liste. Ici : une
@@ -20,7 +21,7 @@ export function LigneAFaire({ n, titre, children, ouvert: ouvertVoulu, onOuvert,
   if (!n) return null;
   return (
     <>
-      <button type="button" className={'vrm-ui-afaire' + (className ? ' ' + className : '')} aria-haspopup="dialog" aria-expanded={ouvert} data-ui-afaire={n} onClick={() => poser(true)} {...attrs}>
+      <button type="button" className={'vrm-ui-afaire sb-lien' + (className ? ' ' + className : '')} aria-haspopup="dialog" aria-expanded={ouvert} data-ui-afaire={n} onClick={() => poser(true)} {...attrs}>
         <span className="vrm-ui-afaire-point" aria-hidden="true"/>
         <span className="vrm-ui-afaire-mots">{titre || tr('listes.afaire')} <span className="vrm-ui-afaire-n">· {n}</span></span>
         <Chevron/>
