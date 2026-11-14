@@ -279,6 +279,7 @@ async function scenarioA(b, vp, sombre) {
     await allerSegment(pg, 'resume');
     await ouvrirRepli(pg, 'compta-benefice');
     await ouvrirRepli(pg, 'compta-ca');
+    const benefAvant = await pg.evaluate(() => (document.querySelector('[data-benef-periode]') || { getAttribute: () => null }).getAttribute('data-benef-periode'));
     await pg.locator('[data-ca-choix="annee"]').first().click();
     await pg.waitForFunction(() => { const e = document.querySelector('[data-ca-periode]'); return e && e.getAttribute('data-ca-periode') === 'annee'; }, null, { timeout: 5000 }).catch(() => {});
     await pg.waitForTimeout(300);
@@ -286,7 +287,12 @@ async function scenarioA(b, vp, sombre) {
     check(!tableVide, `A ${nom} — « Année » : aucun en-tête de tableau sans ligne`);
     const labels = await pg.evaluate(() => { const ca = document.querySelector('[data-ca-periode] [role="group"]'); const be = document.querySelector('[data-benef-etat] [role="group"], [data-benef-etat] [aria-label*="Période"]'); return [ca && ca.getAttribute('aria-label'), be && be.getAttribute('aria-label')]; });
     check(!!labels[0] && !!labels[1] && labels[0] !== labels[1] && /chiffre|vendu/i.test(labels[0]) && /bénéfice/i.test(labels[1]), `A ${nom} — chaque carte nomme SA période : ${JSON.stringify(labels)}`);
-    check(/ne vaut que pour cette carte/.test((await texte(pg, '[data-ca-periode]')) || ''), `A ${nom} — la carte Vendu et reçu dit que sa période ne vaut que pour elle`);
+    // (14 nov., bancs au vert) La RÈGLE, pas sa phrase : depuis le 2 nov., la carte vit dans le repli « Vendu et reçu »
+    // (le repli porte le titre, la phrase sous le titre dit « Vendu : jour de la vente. Reçu : … ») — la phrase « ne vaut
+    // que pour cette carte » n'y est plus. Ce qu'elle promettait se MESURE : « Année » choisi ici ne touche pas la
+    // période du bénéfice (`data-benef-periode`), et la carte porte bien « annee » (`data-ca-periode`).
+    const periodes = await pg.evaluate(() => ({ ca: (document.querySelector('[data-ca-periode]') || { getAttribute: () => null }).getAttribute('data-ca-periode'), benef: (document.querySelector('[data-benef-periode]') || { getAttribute: () => null }).getAttribute('data-benef-periode') }));
+    check(periodes.ca === 'annee' && !!periodes.benef && periodes.benef === benefAvant && periodes.benef !== 'annee', `A ${nom} — la période de Vendu et reçu ne vaut que pour elle (bénéfice inchangé) : ${JSON.stringify({ ...periodes, benefAvant })}`);
     await pg.locator('[data-ca-choix="mois"]').first().click();
     await pg.waitForTimeout(300);
     // ── (10 nov., lot AO) un toucher sur « Factures » : la facturation électronique ; son geste nomme une carte qui existe
@@ -371,7 +377,9 @@ async function scenarioC(b, vp, sombre) {
     // l'écran d'où l'on vient s'appelle désormais « Paramètres ».
     check(!/gestion/i.test(tete.sur) && /paramètres/i.test(tete.sur), `C ${nom} — le surtitre de l'écran dit « Paramètres », plus « Gestion » : « ${tete.sur} »`);
     check(!!tete.acc && /à plusieurs|mises de côté|à racheter/.test(tete.acc), `C ${nom} — sous le titre de l'écran, à quoi sert Organisation : « ${tete.acc} »`);
-    if (!tel) check((await pg.locator('.vrm-sidebar [aria-label="Paramètres"][aria-current="page"]').count()) === 1, `C ${nom} — la roue des Réglages est mise en avant dans le rail`);
+    // (11 nov., lot DJ6) Paramètres n'est plus une entrée du rail : la carte du profil (`data-nav-compte`) y mène et
+    // s'allume pour Paramètres et ses sous-écrans (comme l'ancienne roue, `BAR_GROUPE`).
+    if (!tel) check((await pg.locator('.vrm-sidebar :is([aria-label="Paramètres"], [data-nav-compte])[aria-current="page"]').count()) === 1, `C ${nom} — la roue des Réglages (la carte du profil depuis le 11 nov.) est mise en avant dans le rail`);
     await ouvrir(pg, 'organisation');
     await ecran.waitFor({ timeout: 10000 });
     check(await ecran.isVisible(), `C ${nom} — ?tab=organisation marche toujours`);
@@ -394,12 +402,12 @@ async function scenarioD(b, vp, sombre) {
     const r = await pg.evaluate(() => {
       const c = document.querySelector('[data-urssaf-couverture]');
       const t = c ? c.innerText : '';
-      const cite = (/dater dans « ([^»]+) »/.exec(t) || /saisir dans « ([^»]+) »/.exec(t) || [])[1] || null;
+      const cite = (/(?:dater|date-la|date-les|saisir) dans « ([^»]+) »/.exec(t) || [])[1] || null;
       const titres = [...document.querySelectorAll('.vrm-main *')].filter((e) => e.children.length === 0 && e.checkVisibility && e.checkVisibility()).map((e) => (e.innerText || e.textContent || '').trim());
       return { t, cite, existe: !!cite && titres.includes(cite.trim()) };
     });
     check(!!r.cite && r.existe, `D ${nom} — la vente Leboncoin à dater renvoie à une carte qui existe : « ${r.cite} »`);
-    check(/sa date/.test(r.t) && !/leur date/.test(r.t), `D ${nom} — une seule vente : « sa date », jamais « leur date »`);
+    check(/sa date|date-la\b/.test(r.t) && !/leur date|date-les\b/.test(r.t), `D ${nom} — une seule vente : « date-la » (« sa date »), jamais « date-les »`);
     check(!errs.length, `D ${nom} — aucune erreur JavaScript${errs.length ? ' : ' + errs[0].slice(0, 160) : ''}`);
   });
   await ctx.close();

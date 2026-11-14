@@ -30,7 +30,12 @@
 require('./_garde-reseau.cjs');   // (11 nov.) la garde réseau : aucun banc ne joint la production ni Internet
 const SCRIPT = `(() => {
   if (window.__vrmPorteBanc) return; window.__vrmPorteBanc = true;
-  const SESS_BANC = { access_token: 'jeton-de-banc-direct', refresh_token: 'r', totp: [], expires_at: Date.now() + 864e5, user: { id: '__UID_BANC__', email: 'banc@vrm.test', totp: [] } };
+  // (14 nov., bancs au vert) Le jeton d'accès a la FORME d'un jeton Supabase (trois morceaux, \`sub\` = l'uid de la
+  // session) : la porte hors ligne (src/porteHorsLigne.js, \`subDuJeton\`) vérifie cette cohérence. L'ancien
+  // « jeton-de-banc-direct » n'était pas un JWT : aucun banc ne pouvait rouvrir l'app sans réseau (une fiction).
+  // Ni \`aal\` ni \`exp\` : la double vérification et l'expiration se lisent comme avant (totp vide, expires_at).
+  const jetonBanc = (() => { try { const b = (o) => btoa(JSON.stringify(o)).replace(/=+$/, '').split('+').join('-').split('/').join('_'); return b({ alg: 'none', typ: 'JWT' }) + '.' + b({ sub: '__UID_BANC__', role: 'authenticated', aud: 'authenticated' }) + '.banc'; } catch (_) { return 'jeton-de-banc-direct'; } })();
+  const SESS_BANC = { access_token: jetonBanc, refresh_token: 'r', totp: [], expires_at: Date.now() + 864e5, user: { id: '__UID_BANC__', email: 'banc@vrm.test', totp: [] } };
   // La récupération autonome ne doit recevoir ni session ni stockage du banc.
   if (location.pathname === '/recuperation.html') return;
   const ls = window.localStorage; const poserSess = () => {
@@ -109,7 +114,7 @@ function poser(pw) {
   // BANC_TRACE=1 : chaque réponse /rest/v1 ou /api en erreur est imprimée (diagnostic).
   const tracer = (ctx) => { if (process.env.BANC_TRACE !== '1') return; ctx.on('response', (r) => { const u = decodeURIComponent(r.url()); if (/\/rest\/v1\/|\/api\//.test(u) && (r.status() >= 400 || process.env.BANC_TRACE_TOUT)) console.log('TRACE', r.status(), u.slice(0, 200)); }); ctx.on('requestfailed', (r) => { if (/\/rest\/v1\/|\/api\//.test(r.url())) console.log('TRACE échec', r.url().slice(0, 200)); }); };
   // BANC_SESSION_UID : un banc qui déclare SON vendeur (owner explicite sur ses lignes) le donne ici.
-  const script = () => SCRIPT.replace('__UID_BANC__', process.env.BANC_SESSION_UID || '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b');
+  const script = () => SCRIPT.replace(/__UID_BANC__/g, process.env.BANC_SESSION_UID || '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b');
   const surContexte = (ctx) => { try { ctx.addInitScript(script()); tracer(ctx); } catch (_) {} return ctx; };
   // Un banc écrit sur une autre machine vise parfois /usr/bin/chromium : absent,
   // on prend le Chromium installé ici (même moteur, rien d'autre ne change).

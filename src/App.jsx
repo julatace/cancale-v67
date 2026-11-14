@@ -18133,9 +18133,11 @@ function SideBar({ tab, setTab, entreprise, sites, badges }) {
   // (9 nov., lot AI — demande 13 de Julien) La carte se TOUCHE. (11 nov., lot DJ6) Elle ouvre le
   // MENU DU PROFIL (Paramètres, Appareils, Se déconnecter) ; la photo est celle du profil, et
   // « Masquer mon nom » (ou pas encore lu) ⇒ « Mon compte », ni nom ni e-mail.
+  // (14 nov.) Elle s'allume pour Paramètres ET ses sous-écrans (Organisation…), comme l'ancienne roue
+  // (`entreeActive` → `BAR_GROUPE`) : sans ça, sur Organisation, le rail ne disait plus où l'on est.
   const uidCompte = (AUTH.user && AUTH.user.id) || '';
   const nomCoque = useNomCoque({ owner: uidCompte, headers: enTeteSession, nom: nomCompte, email: mail });
-  const carteCompte = (uidCompte && (nomCompte || mail)) ? <button type="button" className="vrm-nav-compte" data-nav-compte="" data-nav-compte-ouvre="profil" aria-haspopup="dialog" aria-current={tab === 'settings' ? 'page' : undefined}
+  const carteCompte = (uidCompte && (nomCompte || mail)) ? <button type="button" className="vrm-nav-compte" data-nav-compte="" data-nav-compte-ouvre="profil" aria-haspopup="dialog" aria-current={(BAR_GROUPE[tab] || tab) === 'settings' ? 'page' : undefined}
     aria-label={`${nomCoque.texte}${offre ? ' · ' + offre : ''} — ${tr('coque.ouvrirProfil')}`} title={tr('coque.monProfil')} onClick={() => ouvrirMenuProfil()}>
     <PastilleProfil owner={uidCompte} headers={enTeteSession} nom={nomCompte} email={mail} taille={32} className="vrm-nav-avatar vrm-sensible"/>
     <span className="vrm-nav-compte-txt">
@@ -43476,21 +43478,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // moteur MONTRÉ qui porte les colis à envoyer (jamais la section « À retirer ») prend la demande « Tout
   // imprimer » — sinon Achats caché l'avalait et la feuille ne s'ouvrait jamais (banc tout-imprimer-garde).
   const prendImpression = () => only==='bordereaux' && colisDans!=='achats' && !cache();
+  // (14 nov., banc annuler-commandes) La demande attend que la liste de « Tout imprimer » soit LUE en entier :
+  // ventes, e-mails de bordereau ET bordereaux captés (`labelsPrets`) — la même condition que la publication
+  // `vrm_colis_prets`. Avant, elle partait dès les e-mails lus : sur un écran remonté, `lignesLotTous()` était
+  // encore vide, « Aucun bordereau prêt » s'affichait et la demande était perdue (§4.1 : une liste pas encore
+  // lue n'est pas une liste vide).
+  const lotLu = () => labelsPrets && sales.items !== null && Array.isArray(emailBords);
+  // La demande n'est retirée qu'à l'ouverture de la feuille : un nouveau rendu pendant les 400 ms (les ventes
+  // relues…) annulait le minuteur APRÈS avoir effacé la demande — la feuille ne s'ouvrait jamais.
   React.useEffect(()=>{
-    if(!prendImpression() || !_pendingBordPrint || !Array.isArray(emailBords)) return;
-    _pendingBordPrint=false;
-    const t=setTimeout(()=>{ try{ ouvrirLot(); }catch(_){} }, 400);
+    if(!prendImpression() || !_pendingBordPrint || !lotLu()) return;
+    const t=setTimeout(()=>{ if(!_pendingBordPrint || !prendImpression()) return; _pendingBordPrint=false; try{ ouvrirLotRef.current && ouvrirLotRef.current(); }catch(_){} }, 400);
     return ()=>clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[emailBords, only]);
+  },[emailBords, only, labelsPrets, sales.items]);
   // (9 nov., lot B) ⌘K « Imprimer les bordereaux du jour » quand Colis est DÉJÀ ouvert : la même
   // feuille « Tout imprimer » (rien n'est imprimé avant son clic).
   const ouvrirLotRef = React.useRef(null); ouvrirLotRef.current = ouvrirLot;
   React.useEffect(()=>{
     if(only!=='bordereaux' || colisDans==='achats') return undefined;
-    const f=()=>{ if(!prendImpression() || !_pendingBordPrint || !Array.isArray(emailBords)) return; _pendingBordPrint=false; try{ ouvrirLotRef.current && ouvrirLotRef.current(); }catch(_){} };
+    const f=()=>{ if(!prendImpression() || !_pendingBordPrint || !lotLu()) return; _pendingBordPrint=false; try{ ouvrirLotRef.current && ouvrirLotRef.current(); }catch(_){} };
     window.addEventListener('vrm:tout-imprimer', f); return ()=>window.removeEventListener('vrm:tout-imprimer', f);
-  },[emailBords, only]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[emailBords, only, labelsPrets, sales.items]);
   // « Déplacer le tampon » (depuis « Bordereau prêt ») : l'aperçu s'ouvre toujours.
   const adjustBordPlacement = async () => {
     const r = bordResult; if (!r?.pdfBuf) return;

@@ -51,8 +51,15 @@ const jeu = (scen) => {
   // Une vente finalisée de plus, jamais versée (« à dater »).
   const v2 = L.find((r) => r.id === 'harvest_222_orders_sold');
   v2.data.payload.my_orders.push({ transaction_id: 62006, title: 'Asics Gel-1130 argent taille 42', price: { amount: '70', currency_code: 'EUR' }, status: 'Commande finalisée', transaction_user_status: 'completed', date: iso(12), photo: null });
-  // Versements lus : 62005 vendue il y a 9 j, versée il y a 6 j (3 j) ; 62002 vendue il y a 6 j, versée il y a 4 j (2 j).
-  L.push(txn(222, 62005, 6), txn(111, 62002, 4));
+  // Versements lus : 62005 vendue, versée 3 j après ; 62002 vendue, versée 2 j après.
+  // (14 nov., bancs au vert) DANS LE MOIS PASSÉ, à midi UTC, quel que soit le jour où le banc tourne : U1 juge l'échéance
+  // FINIE (mensuel ⇒ le mois passé). Avec « il y a 6 et 4 jours », un banc lancé après le 6 du mois ne mettait aucun
+  // versement dans la période finie : la prévision était « pas su » (§5, jamais « au moins 0 € ») et U1 mesurait le calendrier.
+  const moisPasse = (jour) => { const d = new Date(now); return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, jour, 12)).toISOString(); };
+  const dater = (uid, tx, vendue) => { const r = L.find((x) => x.id === `harvest_${uid}_orders_sold`); const o = r && r.data.payload.my_orders.find((x) => x.transaction_id === tx); if (o) o.date = moisPasse(vendue); };
+  dater(222, 62005, 18); dater(111, 62002, 20);
+  const txnLe = (uid, tx, jour) => { const t = txn(uid, tx, 0); t.data.payload.transaction.status_updated_at = moisPasse(jour); return t; };
+  L.push(txnLe(222, 62005, 21), txnLe(111, 62002, 22));
   const main = L.find((r) => r.id === 'main');
   if (scen === 'B') { main.data.vinted_regime = 'micro'; main.data.vinted_urssaf_freq = 'mensuel'; main.data.vrm_urssaf_declare = {}; }
   return { lignes: L, comptes: NV.JEU_COMPTES, ecritures: 0 };
@@ -203,7 +210,7 @@ const capture = async (pg, nom) => {
             const attendu = u.ca === '' ? null : (Math.round(Number(u.ca) * 100) / 100).toFixed(2).replace(/\.00$/, '').replace('.', ',');
             dit(u.texte != null && u.texte === attendu, `U1 ${T} : le montant à copier = le chiffre d'affaires de la prévision`, `${u.texte} / ${attendu}`);
             dit(!tel || u.h >= 44, `U1 ${T} : « Copier » fait 44 px au doigt`, String(u.h));
-            dit(/1 vente sans date de versement/.test(u.manque), `U1 ${T} : la vente à dater est nommée`, u.manque);
+            dit(/(^|\D)1 vente sans date( de versement)?\b/.test(u.manque), `U1 ${T} : la vente à dater est nommée (1 vente sans date)`, u.manque);
             dit(u.declare && u.site, `U1 ${T} : « Ouvrir l'URSSAF » et « J'ai déclaré »`);
             dit(!u.encaisse, `U1 ${T} : jamais « encaissé »`);
             await pg.locator('[data-urssaf-copier="ca"]').first().click();

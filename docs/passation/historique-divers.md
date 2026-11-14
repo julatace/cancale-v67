@@ -1836,3 +1836,5 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **13 nov. · Vente Vestiaire sur Orion (5.374)** : capteur en ligne + rattrapage, compte lu dans la page, date = `soldDate` de « Mes ventes » (Paris), jamais l'heure de lecture. `docs/passation/2026-11-13-vestiaire-vente-orion.md`. Geste : 5.374 dans Orion, ouvrir Mes ventes.
 
 - **13 nov. · Lot 49 (vidéos du « ? »)** : 10 vidéos 720p tournées dans la vraie app, données inventées (`scripts/films/aide-videos.cjs`), ≤ 0,8 Mo, demandées au toucher seulement. `docs/passation/2026-11-13-lot49.md`. Geste : les regarder sur l’iPhone.
+
+- **13 nov. · Démarrage en 3 étapes + exemple (lot 46/48)** : compte · extension reliée à CE compte · Vinted lu (ventes, sinon dressing), cochées sur preuve, geste exact, carte disparue à 3/3, jamais chez un installé ; « Découvrir avec des exemples » sur l'accueil et la connexion, bandeau « Créer mon compte ». `docs/passation/2026-11-13-lot4648.md`. Geste : aucun.

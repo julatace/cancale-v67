@@ -1,4 +1,5 @@
 import { jourParis } from './dateParis.js';
+import { L } from './libelles.js';   // (14 nov.) « Statut », jamais « Régime fiscal » (une notion = UN mot, src/libelles.js)
 // ════════════════════════════════════════════════════════════════════════════
 //  FACTURATION ÉLECTRONIQUE — ce que VRM PRÉPARE, gratuitement (16 octobre)
 // ════════════════════════════════════════════════════════════════════════════
@@ -55,9 +56,9 @@ export const frJour = (t) => { const j = jourParis(t); return j ? `${j.slice(8, 
 export const etatFacturation = ({ cfg, regime, verifier }) => {
   if (cfg === undefined) return { ok: false, etat: 'encours', raison: 'Je lis ton profil fiscal…', geste: '' };
   if (cfg === null) return { ok: false, etat: 'passu', raison: "Ton profil fiscal n'a pas pu être lu (la base n'a pas répondu).", geste: 'Rouvre cet écran dans un moment : aucune facture ne part sur un profil que je n\'ai pas lu.' };
-  if (regime == null || regime === '') return { ok: false, etat: 'regime', raison: "Régime fiscal pas renseigné.", geste: 'Choisis-le dans « Ton entreprise » (Argent → Déclarer).' };
+  if (regime == null || regime === '') return { ok: false, etat: 'regime', raison: `${L.statut} pas renseigné.`, geste: 'Choisis-le dans « Ton entreprise » (Argent → Déclarer).' };
   if (regime === 'marge') return { ok: false, etat: 'regime', raison: "Le régime de la marge n'est pas encore pris en charge par cette facture (sa mention de TVA est différente).", geste: 'Émets-la depuis ta plateforme agréée, ou vois-la avec ton comptable.' };
-  if (regime !== 'micro') return { ok: false, etat: 'regime', raison: 'Régime fiscal inconnu.', geste: 'Choisis-le dans « Ton entreprise » (Argent → Déclarer).' };
+  if (regime !== 'micro') return { ok: false, etat: 'regime', raison: `${L.statut} inconnu.`, geste: 'Choisis-le dans « Ton entreprise » (Argent → Déclarer).' };
   if (String(cfg.tva || '').trim()) return { ok: false, etat: 'tva', raison: "Un n° de TVA est renseigné : tu es assujetti, la mention « art. 293 B » ne s'applique pas et VRM ne sait pas encore faire une facture avec TVA.", geste: 'Si tu es en franchise de TVA, vide le champ « N° TVA » de ton profil fiscal.' };
   const s = typeof verifier === 'function' ? verifier(cfg.siret) : { etat: 'invalide', raison: 'vérification indisponible' };
   if (s.etat === 'vide') return { ok: false, etat: 'siren', raison: 'Ton SIREN est absent : une facture doit le porter.', geste: 'Renseigne-le dans « Ton entreprise » (Argent → Déclarer) : 9 chiffres, sur ton avis de situation INSEE.' };
