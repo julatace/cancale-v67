@@ -29,7 +29,8 @@ export default function CapteNotif({ feuilleOuverte = () => false, abonnerFeuill
   const minuteur = React.useRef(null);
   const dit = React.useRef(lireDit());
 
-  const fermer = React.useCallback((raison) => { clearTimeout(minuteur.current); setMontre((m) => (m ? null : m)); if (raison) try { document.documentElement.setAttribute('data-capte-fin', raison); } catch (_) {} }, []);
+  // (Un élément retiré de la page ne rend pas son « blur » : la pause tombe à la fermeture.)
+  const fermer = React.useCallback((raison) => { clearTimeout(minuteur.current); pause.current = false; setMontre((m) => (m ? null : m)); if (raison) try { document.documentElement.setAttribute('data-capte-fin', raison); } catch (_) {} }, []);
   const minuter = React.useCallback(() => {
     clearTimeout(minuteur.current);
     minuteur.current = setTimeout(function fin() { if (pause.current) { minuteur.current = setTimeout(fin, 800); return; } fermer('seul'); }, DUREE);
