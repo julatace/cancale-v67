@@ -509,7 +509,8 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
   const [nonLus, setNonLus] = useState(false);
   const [saisie, setSaisie] = useState('');
   const [cherche, setCherche] = useState('');
-  useEffect(() => { const t = setTimeout(() => setCherche(saisie.trim().length >= 2 ? saisie.trim() : ''), 350); return () => clearTimeout(t); }, [saisie]);
+  // (14 nov., refonte — AJOUT 2 « trouver vite ») 150 ms au lieu de 350 : toujours une lecture par pause, pas par frappe.
+  useEffect(() => { const t = setTimeout(() => setCherche(saisie.trim().length >= 2 ? saisie.trim() : ''), 150); return () => clearTimeout(t); }, [saisie]);
   const [pages, setPages] = useState(undefined);
   const [lecture, setLecture] = useState(false);
   const [ouvert, setOuvert] = useState('');

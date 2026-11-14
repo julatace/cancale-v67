@@ -767,6 +767,7 @@ import "./styles-pire-cas.css";   // (11 nov.) pire cas : chiffres et titres ext
 import "./styles-ventes-achats-visuel.css";   // (11 nov., lot ventes-achats-visuel) Ventes et Achats sobres : frise fine, impression compacte, grille alignée
 import "./styles-systeme.css";   // (13 nov., design-systeme) LE système : un jeu de jetons (--d-*) que toutes les familles lisent, une forme par fonction — docs/design/DESIGN.md ; juste avant la tablette
 import "./styles-tablette.css";   // (11 nov., iPad) la coque ordinateur AU DOIGT : 44 px, rien au survol, rail libellé — sous `data-tablette` seulement, EN DERNIER
+import "./styles-refonte-ms.css";   // (14 nov., refonte) Messages, E-mails, Stock : la liste d'abord, des rangées denses, le fil comme Messages d'iPhone — portée par leurs classes seulement
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";

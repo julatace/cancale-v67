@@ -35,6 +35,7 @@ import { motsVendeur } from '../profilVendeur.js';
 import { jourParis } from '../dateParis.js';   // (11 nov.) jour à l'heure de Paris
 import { planSynchroInventaire, relierProposition } from "../inventaireSynchro.js";   // (11 nov.) synchro par identité
 import { trj } from '../i18n/react.js';
+import { BandeChiffres, Filtres, MenuCompte, LigneAFaire, BoutonIcone } from '../ui/index.js';   // (14 nov., refonte) les briques communes des écrans de liste
 
 // ⟦← App.jsx #3⟧
 
@@ -363,7 +364,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   const [filtreCompte, setFiltreCompteEtat] = React.useState(() => { try { return localStorage.getItem('vrm_stock_filtre_compte') || ''; } catch (_) { return ''; } });
   const setFiltrePlat = (v) => { setFiltrePlatEtat(v); try { localStorage.setItem('vrm_stock_filtre_plat', v); } catch (_) {} };
   const setFiltreCompte = (v) => { setFiltreCompteEtat(v); try { localStorage.setItem('vrm_stock_filtre_compte', v); } catch (_) {} };
-  const [maxListe, setMaxListe] = React.useState(60);        // la liste des annonces actuelles, 60 par 60
+  const [maxListe, setMaxListe] = React.useState(60);
+  const [aFaireOuvert, setAFaireOuvert] = React.useState(false);   // (14 nov., refonte) la feuille « À faire »        // la liste des annonces actuelles, 60 par 60
   const [, setTic] = React.useState(0);                      // relire après « Elle est encore là »
   const garder = { ...(load('vrm_stock_garde_hors_ligne', {}) || {}), ...(load('vrm_stock_garder', {}) || {}) };
   // Vestiaire : ses annonces jugées par la règle de Vestiaire, avec les N° du
@@ -804,14 +806,23 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         {etatStockVieux(etatHl.at) ? <span data-stock-hl-vieux="" style={{ display: 'block', marginTop: 6, padding: '6px 10px', borderRadius: 10, border: `1px solid ${C.warn}66`, background: `${C.warn}12` }}>Ce dernier état a plus d’un jour : {motsStock.nom === 'paire' ? 'une paire' : 'un article'} a pu se vendre depuis — vérifie au retour du réseau.</span> : null}
       </span>
     </div>) : null;
+  // (14 nov., refonte — AJOUT 3) Plus de carte : une BANDE de chiffres (en ligne · rangées · à ranger)
+  // posée sur le fond, les puces d'état sur une ligne, puis les filtres (petites capsules, le compte en
+  // UN menu). Les mêmes nombres, les mêmes attributs ; l'explication entière reste dans sa pop-up.
+  const nARanger = nAffiche - nRangees - nSansNum;
   const blocResume = (
-    <Card style={{ padding: '13px 14px' }}>
+    <div className="vrm-ms-stock-resume">
       <div className="vrm-s2d-resume" data-stock-actuelles={lecture === undefined ? 'encours' : (aa && aa.su ? nAffiche : 'passu')} data-stock-au-moins={aa && aa.auMoins ? '1' : '0'} data-stock-a-confirmer={aa && aa.su ? nAConf : undefined} data-stock-masquees={aa && aa.su ? nMasq : undefined} data-stock-rangees={aa && aa.su ? nRangees : undefined}>
-        <div className="vrm-s2d-resume-n">
-          {/* (11 nov., états vides) « au moins 0 » ne se dit jamais (§5) : rien lu et une lecture qui manque ⇒ « — ». */}
-          {lecture === undefined ? '…' : (aa && aa.su && !(aa.auMoins && nAffiche === 0) ? <>{aa.auMoins ? <span style={{ fontSize: 15, fontWeight: 600 }}>{tr('journee.moins')} </span> : null}{nAffiche}</> : '—')}
-          <small>{nAffiche === 1 && aa && aa.su ? `${motsVendeur().nom} en ligne` : `${motsVendeur().noms} en ligne`}{filtreActif ? tr('stock.filtrees') : ''}</small>
-        </div>
+        {/* (11 nov., états vides) « au moins 0 » ne se dit jamais (§5) : rien lu et une lecture qui manque ⇒ « — ». */}
+        {/* (14 nov., refonte) La bande : le nombre en ligne (« au moins » À CÔTÉ du chiffre quand une lecture manque),
+            puis rangées et à ranger — les mêmes nombres que la ligne d'avant, une seule fois chacun (§7). */}
+        <BandeChiffres className="vrm-ms-bande" items={[
+          { cle: 'enligne', garderVide: true, attrs: { className: 'vrm-ui-bande-item vrm-s2d-resume-n' },
+            n: lecture === undefined ? '…' : (aa && aa.su && !(aa.auMoins && nAffiche === 0) ? <>{aa.auMoins ? <small className="vrm-ms-au-moins">{tr('journee.moins')} </small> : null}{nAffiche}</> : null),
+            l: <>{nAffiche === 1 && aa && aa.su ? `${motsVendeur().nom} en ligne` : `${motsVendeur().noms} en ligne`}{filtreActif ? tr('stock.filtrees') : ''}</> },
+          aa && aa.su && nAffiche > 0 ? { cle: 'rangees', n: nRangees, l: `rangé${motsStock.e}${nRangees > 1 ? 's' : ''}` } : null,
+          aa && aa.su && nAffiche > 0 ? { cle: 'aranger', n: nARanger, l: tr('ms.stock.aRanger') } : null,
+        ]}/>
         {/* (6 nov.) La lecture garde la place des lignes qui suivront (trois lignes) : le Stock ne saute plus quand elles arrivent. */}
         {lecture === undefined && <div className="vrm-s2d-resume-l" data-stock-resume-attente="" style={{ minHeight: 'calc(3 * 1.45em)' }}>{tr('stock.jeLisAnnonces')}</div>}
         {/* (11 nov., états vides) Aucun compte Vinted relié (liste LUE et vide) : le geste qui remplit le Stock. */}
@@ -825,9 +836,9 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           ton={nAConf > 0 || aa.manque.length > 0 || aa.vcVieille ? 'ambre' : 'neutre'}
           attrs={{ 'data-stock-resume-court': '' }}
           puces={nAffiche > 0
-            ? [{ texte: `${nRangees} rangé${motsStock.e}${nRangees > 1 ? 's' : ''}` }, { texte: tr('stock.ranger', { x: String(nAffiche - nRangees - nSansNum) }) },
-               nAConf > 0 ? { texte: tr('stock.confirmer', { nAConf: String(nAConf) }), ton: 'ambre' } : null, aa.manque.length > 0 ? { texte: tr('stock.toutLu'), ton: 'ambre' } : null,
-               nSansNum + sansNumAutres + vcSansNum.length > 0 ? { texte: tr('stock.sans', { x: String(nSansNum + sansNumAutres + vcSansNum.length) }) } : null].filter(Boolean)
+            ? [nAConf > 0 ? { texte: tr('stock.confirmer', { nAConf: String(nAConf) }), ton: 'ambre' } : null, aa.manque.length > 0 ? { texte: tr('stock.toutLu'), ton: 'ambre' } : null,
+               nSansNum + sansNumAutres + vcSansNum.length > 0 ? { texte: tr('stock.sans', { x: String(nSansNum + sansNumAutres + vcSansNum.length) }) } : null,
+               { texte: tr('ms.stock.commentCompte') }].filter(Boolean)
             : [{ texte: tr('stock.aucuneAnnonceLue') }, aa.manque.length > 0 ? { texte: tr('stock.toutLu'), ton: 'ambre' } : null].filter(Boolean)}
           phrase={aa.manque.length > 0 ? 'Une lecture manque : ouvre ce site avec l’extension.' : nAConf > 0 ? 'À confirmer : repasse sur ce compte pour le relire.' : nAffiche - nRangees - nSansNum > 0 ? `Range ${motsStock.chaque.toLowerCase()} : touche « Ranger » dans la liste.` : 'Tout ce qui est en ligne est rangé.'}>
         <div data-stock-resume-detail="">
@@ -843,17 +854,14 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         </div></InfoPop>}
         {aa && aa.su && (platsPresents.length > 1 || comptesPresents.length > 1) && (
           <div className="vrm-s2d-filtres" data-stock-filtres="">
-            {platsPresents.length > 1 && <div className="vrm-rangee vrm-filtres" role="group" aria-label={tr('stock.filtrerPlateforme')} data-stock-filtre-plat={filtrePlat || 'toutes'}>
-              {['', ...platsPresents].map((x) => <button key={x || 'toutes'} type="button" aria-pressed={filtrePlat === x} data-plat={x || 'toutes'} onClick={() => setFiltrePlat(x)}>{x ? (NOM_PLAT_FILTRE[x] || x) : tr('journee.toutes')}</button>)}
-            </div>}
-            {comptesPresents.length > 1 && <select aria-label={tr('stock.filtrerCompte')} data-stock-filtre-compte={filtreCompte || 'tous'} value={filtreCompte} onChange={(e) => setFiltreCompte(e.target.value)}>
-              <option value="">{tr('achats.tousComptes')}</option>
-              {comptesPresents.map((u) => <option key={u} value={u}>{comptesNoms.get(u) || u}</option>)}
-            </select>}
+            {platsPresents.length > 1 && <Filtres className="vrm-rangee vrm-filtres" label={tr('stock.filtrerPlateforme')} data-stock-filtre-plat={filtrePlat || 'toutes'} valeur={filtrePlat}
+              onChange={(v) => setFiltrePlat(v)} options={['', ...platsPresents].map((x) => ({ v: x, l: x ? (NOM_PLAT_FILTRE[x] || x) : tr('journee.toutes'), attrs: { 'data-plat': x || 'toutes' } }))}/>}
+            {comptesPresents.length > 1 && <MenuCompte data-stock-filtre-compte={filtreCompte || 'tous'} valeur={filtreCompte} onChange={(v) => setFiltreCompte(v || '')}
+              comptes={comptesPresents.map((u) => ({ id: u, nom: comptesNoms.get(u) || u }))}/>}
           </div>
         )}
       </div>
-    </Card>
+    </div>
   );
   // (11 nov., lot actions-serie) Les rangées « Vendues à sortir » et « Plus en ligne » :
   // sélectionner plusieurs paires, agir une fois. « Enlever du stock » = le geste de la
@@ -943,30 +951,37 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       <p data-stock-rangees-passu-detail="">{rangeesPasSu.length} {rangeesPasSu.length > 1 ? motsStock.noms : motsStock.nom} {tr('stock.range3')}{motsStock.e}{rangeesPasSu.length > 1 ? 's' : ''} {tr('stock.verifie')}{motsStock.e}{rangeesPasSu.length > 1 ? 's' : ''} ({rangeesPasSu.slice(0, 6).map((f) => 'N°' + f.numero).join(', ')}{rangeesPasSu.length > 6 ? '…' : ''}) : {aa.manque.length > 0 && manqueTxt ? tr('stock.lectureManqueTout') : (manqueTxt || tr('stock.lectureCompteManque'))}{tr('stock.lignePartieSu')}</p>
     </InfoPop>) : null;
   // ── La liste de toutes les annonces actuelles, et où chacune est ────────────
+  // (14 nov., refonte Messages · E-mails · Stock — AJOUT 2 et 3 de Julien) LA LISTE D'ABORD, DENSE :
+  // une rangée de 68 px (vignette 52, le N° en pastille et le modèle sur UNE ligne, UNE sous-ligne :
+  // sites · compte · où elle est rangée · sa note), le geste en texte d'action à droite. Plus de carte
+  // autour (un groupe blanc inset, filets indentés) ; même contenu, mêmes attributs, même tri, 60 par 60.
   const blocListe = aa && aa.su && articlesVus.length ? (
-    <Card style={{ padding: '12px 13px' }}>
-      <div data-stock-liste={articlesVus.length}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 4 }}>{tr('stock.ligne')}</div>
-        {articlesVus.slice().sort((a, b) => (articleRange(a) - articleRange(b)) || triNum(a.numero, b.numero)).slice(0, maxListe).map((a) => {
+    <section className="vrm-ms-section" aria-label={tr('stock.ligne')}>
+      <div className="vrm-ms-groupe" data-stock-liste={articlesVus.length}>
+        {articlesVus.slice().sort((a, b) => (articleRange(a) - articleRange(b)) || triNum(a.numero, b.numero)).slice(0, maxListe).map((a, i) => {
           const f = a.cle ? ficheParCle[a.cle] : null;
           const fOu = f ? ((ouEst(f) ? f : null) || (a.aussi || []).map((n) => ficheParCle[cleNum(n)]).filter(Boolean).find((x) => ouEst(x)) || null) : null;
           const ou = fOu ? ouEst(fOu) : null;
           return (
-            <div key={a.ids[0]} className="vrm-s2d-liste-ligne" data-stock-annonce={a.cle || 'sans:' + a.ids[0]} data-stock-annonce-etat={a.etat} data-stock-annonce-plats={a.plateformes.join(',')} data-stock-annonce-place={ou ? `${ou.meuble.name}|${ou.rangee}|${ou.colonne}` : (a.cle ? 'non-range' : 'sans-numero')}>
+            <div key={a.ids[0]} className="vrm-s2d-liste-ligne vrm-ms-rangee vrm-at-entree" style={{ '--i': i }} data-stock-annonce={a.cle || 'sans:' + a.ids[0]} data-stock-annonce-etat={a.etat} data-stock-annonce-plats={a.plateformes.join(',')} data-stock-annonce-place={ou ? `${ou.meuble.name}|${ou.rangee}|${ou.colonne}` : (a.cle ? 'non-range' : 'sans-numero')}>
               <span className="vrm-s2d-vig"><Vignette f={{ numero: a.numero || '—', title: a.titre, photo: a.photo }} sold={false} mini /></span>
               <span className="vrm-s2d-txt">
-                <span className="vrm-s2d-txt-t">{a.cle ? <b>N°{a.numero} · </b> : null}{a.titre || '—'}</span>
-                <span className="vrm-s2d-sites" data-stock-sites={a.plateformes.join(',')}>{a.plateformes.map((x) => <span key={x} className="vrm-s2d-site" data-site={x}>{NOM_PLAT_FILTRE[x] || x}</span>)}</span>
-                <span className="vrm-s2d-txt-s">{a.comptes.length ? a.comptes.map((u) => comptesNoms.get(u) || u).join(', ') : ''}{a.etat === 'aconfirmer' ? tr('stock.confirmer3') : (a.etat === 'masquee' ? tr('stock.masqueeVinted') : '')}{(a.aussi || []).length ? ' · aussi N°' + a.aussi.join(', N°') : ''}
-                  <br />{ou ? <b>{trj('stock.rangeeColonne', { name: ou.meuble.name, rangee: ou.rangee, colonne: ou.colonne })}</b> : (a.cle ? tr('stock.encoreRangee') : tr('stock.sansRangeable'))}</span>
-                {/* (10 nov., lot BD) La note privée de la paire, par son N° (jamais le titre). */}
-                {a.cle ? <NotePaireCoque numero={a.numero} ajout rangee/> : null}
+                <span className="vrm-s2d-txt-t">{a.cle ? <b className="vrm-ms-num">N°{a.numero}</b> : null}<span className="vrm-ms-titre">{a.titre || '—'}</span></span>
+                <span className="vrm-s2d-txt-s vrm-ms-sous">
+                  <span className="vrm-s2d-sites" data-stock-sites={a.plateformes.join(',')}>{a.plateformes.map((x) => <span key={x} className="vrm-s2d-site" data-site={x}>{NOM_PLAT_FILTRE[x] || x}</span>)}</span>
+                  {a.comptes.length ? <span className="vrm-ms-sep">{a.comptes.map((u) => comptesNoms.get(u) || u).join(', ')}</span> : null}
+                  {a.etat === 'aconfirmer' ? <span>{tr('stock.confirmer3')}</span> : (a.etat === 'masquee' ? <span>{tr('stock.masqueeVinted')}</span> : null)}
+                  {(a.aussi || []).length ? <span className="vrm-ms-sep">{'aussi N°' + a.aussi.join(', N°')}</span> : null}
+                  <span className={'vrm-ms-sep' + (ou ? ' vrm-ms-ou' : '')}>{ou ? trj('stock.rangeeColonne', { name: ou.meuble.name, rangee: ou.rangee, colonne: ou.colonne }) : (a.cle ? tr('stock.encoreRangee') : tr('stock.sansRangeable'))}</span>
+                  {/* (10 nov., lot BD) La note privée de la paire, par son N° (jamais le titre). */}
+                  {a.cle ? <NotePaireCoque numero={a.numero} ajout rangee/> : null}
+                </span>
               </span>
-              {a.cle && f && <button className="vrm-b vrm-b-discret" type="button" data-stock-annonce-geste={ou ? 'voir' : 'ranger'} onClick={() => { if (ou) montrer(fOu); else { setPlace(a.cle); toast(tr('stock.toucheCaseRanges3', { numero: String(a.numero) })); } }} style={{ flexShrink: 0 }}>{ou ? tr('stock.voir') : tr('stock.ranger2')}</button>}
+              {a.cle && f && <button className="vrm-ms-geste" type="button" data-stock-annonce-geste={ou ? 'voir' : 'ranger'} onClick={() => { if (ou) montrer(fOu); else { setPlace(a.cle); toast(tr('stock.toucheCaseRanges3', { numero: String(a.numero) })); } }}>{ou ? tr('stock.voir') : tr('stock.ranger2')}</button>}
             </div>); })}
-        {articlesVus.length > maxListe && <button className="vrm-b vrm-b-discret" type="button" onClick={() => setMaxListe((x) => x + 60)} style={{ width: '100%' }}>{trj('stock.voirPlus', { maxListe: maxListe, articlesVusN: articlesVus.length })}</button>}
       </div>
-    </Card>) : null;
+      {articlesVus.length > maxListe && <button className="vrm-ms-plus" type="button" data-stock-liste-plus="" onClick={() => setMaxListe((x) => x + 60)}>{trj('stock.voirPlus', { maxListe: maxListe, articlesVusN: articlesVus.length })}</button>}
+    </section>) : null;
 
   // ── (11 nov., lot DJ4) À PART : ce qui n'est pas « en ligne » mais reste chez lui ──────
   // Trois replis fermés : « À confirmer » (lecture de plus de 24 h : la date de lecture dite),
@@ -1168,26 +1183,58 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     </div>
   );
 
+  // (14 nov., refonte — AJOUT 3 de Julien : « la liste arrive après 1,5 écran ») L'ORDRE DU STOCK :
+  // la bande de chiffres, la recherche collée, UNE ligne « À faire · N › », puis LA LISTE. Les gestes
+  // (vendues à sortir, retours, plus en ligne, pas vérifiées, cases libérées, à ranger) gardent leur bloc,
+  // posé sous la liste dans « À faire » ; la feuille de la ligne les nomme et y mène. « Mes meubles »
+  // (la vue 2D, ses cases, le glisser) et « Plus » (valeur, emballages, inventaire de l'année) suivent.
+  // Rien n'est retiré : on déplace.
+  const aFaire = [
+    vendSortir.length ? { k: 'vendues', cible: '[data-stock-vendues-sortir]', mot: tr('ms.stock.af.vendues', { n: vendSortir.length }) } : null,
+    (revenus.length || retoursANumeroter) ? { k: 'retours', cible: '[data-stock-retours]', mot: tr('ms.stock.af.retours', { n: revenus.length + retoursANumeroter }) } : null,
+    plusEnLigne.length ? { k: 'plusenligne', cible: '[data-stock-plus-en-ligne]', mot: tr('ms.stock.af.plusEnLigne', { n: plusEnLigne.length }) } : null,
+    rangeesPasSu.length && aa ? { k: 'passu', cible: '[data-stock-rangees-passu]', mot: tr('ms.stock.af.pasVerifiees', { n: rangeesPasSu.length }) } : null,
+    sortisMeubles.length ? { k: 'sortis', cible: '[data-stock-sortis-meubles]', mot: tr('ms.stock.af.sortis', { n: sortisMeubles.length }) } : null,
+    aRanger.length ? { k: 'aranger', cible: '[data-bande-a-ranger]', mot: tr('ms.stock.af.aRanger', { n: aRanger.length }) } : null,
+  ].filter(Boolean);
+  const allerA = (sel) => { setAFaireOuvert(false); setTimeout(() => { try { const el = document.querySelector(sel); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.setAttribute('data-ms-vise', '1'); setTimeout(() => el.removeAttribute('data-ms-vise'), 1600); } } catch (_) {} }, 60); };
   return (<>
     {/* (6 nov.) Pour le conseil « Ton premier inventaire » : les N° des annonces actuelles (lus seulement). */}
     <ChiffreInventaire numeros={aa ? aa.articles.filter((a) => a.cle).length : (lecture === undefined ? undefined : null)}/>
     {elInventaire}
+    {elAnnuel}
     {blocHorsLigne}
     {blocResume}
-    <ValeurStockCarte v={valeurStk} onSaisir={saisirPrixStock} mots={motsStock}/>
-    {/* (10 nov., lot L) Le stock d'emballages : écrit sur SON clic ; le reste dérive des « Colis fait ». */}
-    <EmballagesCarte reglage={emballagesR} Feuille={SheetShell} exemple={exemplesStock.emballage} ecrire={(r) => { setEmballagesR(r); save(CLE_EMBALLAGES, r); }}
-      lireFaits={() => colisFaits({ vinted: load('vinted_ship_done', {}), leboncoin: load('vrm_lbc_colis_done', {}), vestiaire: load('vrm_vc_colis_done', {}) })}/>
-    <button type="button" className="vrm-ia-entree" data-ia-ouvrir="" onClick={() => setAnnuel(true)}><span>{tr('stock.inventaireFinAnnee')}</span><span aria-hidden="true">›</span></button>
-    {elAnnuel}
     {blocCherche}
+    {place && (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '11px 14px', borderRadius: 12, background: C.accent, color: C.onAccent, fontSize: 15, fontWeight: 700, position: 'sticky', top: 8, zIndex: 20, boxShadow: '0 3px 12px rgba(0,0,0,0.18)' }}>
+        <span>{tr('stock.ranger4')} <b>N°{(ficheParCle[place] || {}).numero || place}</b> {tr('stock.toucheCase')}</span>
+        <button type="button" onClick={() => setPlace(null)} style={{ background: 'rgba(0,0,0,0.18)', border: 'none', color: C.onAccent, borderRadius: 999, padding: '5px 11px', fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>{tr('achats.annuler')}</button>
+      </div>
+    )}
+
+    <LigneAFaire n={aFaire.length} ouvert={aFaireOuvert} onOuvert={setAFaireOuvert} data-stock-afaire={aFaire.length}>
+      <ul className="vrm-ui-choix vrm-ms-afaire-liste">
+        {aFaire.map((x) => <li key={x.k}><button type="button" data-stock-afaire-aller={x.k} onClick={() => allerA(x.cible)}><span>{x.mot}</span><span className="vrm-ms-chevron" aria-hidden="true">›</span></button></li>)}
+      </ul>
+    </LigneAFaire>
+    {blocListe}
+    {blocAPart}
+    {nEcartes > 0 && <div data-stock-ecartes={nEcartes} style={{ fontSize: 12, color: C.muted }}>{nEcartes} {nEcartes > 1 ? motsStock.noms : motsStock.nom} d'un compte retiré ou masqué {nEcartes > 1 ? 'ne sont' : "n'est"} pas montré{motsStock.e}{nEcartes > 1 ? 's' : ''} ici.</div>}
+
+    {aFaire.length ? <section className="vrm-ms-section" data-stock-section="afaire" aria-label={tr('listes.afaire')}>
+      <h2 className="vrm-ms-h2">{tr('listes.afaire')}</h2>
+      {blocVendues}
+      {blocRetours}
+      {blocPlusEnLigne}
+      {barreSerieStock}
+      {blocPasSu}
+      {blocSortis}
+    </section> : <>{barreSerieStock}</>}
+
+    <section className="vrm-ms-section" data-stock-section="meubles" aria-label={tr('ms.stock.meubles')}>
+    <h2 className="vrm-ms-h2">{tr('ms.stock.meubles')}</h2>
     {meubles.length === 0 && <StockExplication sneakers={motsStock.nom === 'paire'} />}
-    {blocVendues}
-    {blocRetours}
-    {blocPlusEnLigne}
-    {barreSerieStock}
-    {blocPasSu}
-    {blocSortis}
     {/* à ranger */}
     {aRanger.length > 0 && (
       <Card style={{ padding: '12px 13px' }}>
@@ -1216,14 +1263,6 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       </Card>
     )}
 
-    {place && (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '11px 14px', borderRadius: 12, background: C.accent, color: C.onAccent, fontSize: 15, fontWeight: 700, position: 'sticky', top: 8, zIndex: 20, boxShadow: '0 3px 12px rgba(0,0,0,0.18)' }}>
-        <span>{tr('stock.ranger4')} <b>N°{(ficheParCle[place] || {}).numero || place}</b> {tr('stock.toucheCase')}</span>
-        <button type="button" onClick={() => setPlace(null)} style={{ background: 'rgba(0,0,0,0.18)', border: 'none', color: C.onAccent, borderRadius: 999, padding: '5px 11px', fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>{tr('achats.annuler')}</button>
-      </div>
-    )}
-
-    {nEcartes > 0 && <div data-stock-ecartes={nEcartes} style={{ fontSize: 12, color: C.muted }}>{nEcartes} {nEcartes > 1 ? motsStock.noms : motsStock.nom} d'un compte retiré ou masqué {nEcartes > 1 ? 'ne sont' : "n'est"} pas montré{motsStock.e}{nEcartes > 1 ? 's' : ''} ici.</div>}
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'space-between' }}>
       {/* (6 nov., onglets B) CE QUE VEULENT DIRE LES CASES, en une ligne (Julien : « être accompagné ») :
           les MÊMES classes que les cases (libre, rangée, vendue = l'accent, plus en ligne = l'ambre, §7). */}
@@ -1241,15 +1280,22 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     <div data-meubles-liste="" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', columnGap: zoom === 'pres' ? 0 : 28 }}>
       {meubles.map((m) => <div key={m.id} style={{ flex: zoom === 'pres' ? '1 1 100%' : '0 1 auto', minWidth: 0, maxWidth: '100%' }}>{cadreMeuble(m)}</div>)}
     </div>
-    {blocListe}
-    {blocAPart}
-
     {/* (30 oct.) Pièce vide : créer un meuble est LE geste de l'écran (primaire) ; ensuite il redevient secondaire. */}
     <button className={`vrm-b ${meubles.length ? 'vrm-b-secondaire' : 'vrm-b-primaire'}`} type="button" data-creer-meuble="" onClick={() => setModal({ type: 'meuble' })} style={{ alignSelf: meubles.length ? 'stretch' : 'flex-start' }}>{tr('stock.ajouterMeuble')}</button>
     {meubles.length > 0 && (explication
       ? <StockExplication sneakers={motsStock.nom === 'paire'} onFermer={() => setExplication(false)} />
       : <button className="vrm-b vrm-b-discret" type="button" data-stock-explication-ouvrir="" onClick={() => setExplication(true)} style={{ alignSelf: 'center' }}>{tr('stock.commentCaMarche')}</button>)}
 
+    </section>
+
+    <section className="vrm-ms-section" data-stock-section="plus" aria-label={tr('ms.stock.plus')}>
+    <h2 className="vrm-ms-h2">{tr('ms.stock.plus')}</h2>
+    <ValeurStockCarte v={valeurStk} onSaisir={saisirPrixStock} mots={motsStock}/>
+    {/* (10 nov., lot L) Le stock d'emballages : écrit sur SON clic ; le reste dérive des « Colis fait ». */}
+    <EmballagesCarte reglage={emballagesR} Feuille={SheetShell} exemple={exemplesStock.emballage} ecrire={(r) => { setEmballagesR(r); save(CLE_EMBALLAGES, r); }}
+      lireFaits={() => colisFaits({ vinted: load('vinted_ship_done', {}), leboncoin: load('vrm_lbc_colis_done', {}), vestiaire: load('vrm_vc_colis_done', {}) })}/>
+    <button type="button" className="vrm-ia-entree" data-ia-ouvrir="" onClick={() => setAnnuel(true)}><span>{tr('stock.inventaireFinAnnee')}</span><span aria-hidden="true">›</span></button>
+    </section>
     {Modale()}
   </>);
 }
@@ -1516,9 +1562,14 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
 
   let colN=0;
   return (
-    <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
+    <div className="vrm-ms-stock" data-refonte-ms="stock" style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
       <ScreenHead icon="home" title={tr('nav.garage')} phrase="garage" desc="Tes étagères en 2D : chaque article dans sa case. Cherche un numéro, il te dit le meuble et la case."
-        right={<div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><Bouton variante="secondaire" icone="camera" data-stock-recherche-photo="" onClick={ouvrirRecherchePhoto} style={{ minHeight: 44 }} title={`Photographie ${motsStock.le} : VRM montre les annonces qui lui ressemblent`}>{tr('stock.trouverPhoto')}</Bouton><button type="button" className="vrm-b vrm-b-secondaire" data-stock-inventaire-ouvrir="" title={`Compter ${motsStock.tes.replace(/^tes /, 'les ')} présent${motsStock.es}, case par case`} onClick={() => { try { window.dispatchEvent(new Event('vrm:inventaire-ouvrir')); } catch (_) {} }}>{tr('stock.faireInventaire')}</button></div>}/>
+        right={<div className="vrm-ms-tete-outils">
+          {/* (14 nov., refonte — AJOUT 3) Deux outils en ICÔNES nettes à côté du titre (plus deux capsules grises
+              pleine largeur) ; leur nom complet est dit au lecteur d'écran et au survol. */}
+          <BoutonIcone label={tr('stock.trouverPhoto')} data-stock-recherche-photo="" onClick={ouvrirRecherchePhoto} title={`Photographie ${motsStock.le} : VRM montre les annonces qui lui ressemblent`}><Icon name="camera" size={22}/></BoutonIcone>
+          <BoutonIcone label={tr('stock.faireInventaire')} data-stock-inventaire-ouvrir="" title={`Compter ${motsStock.tes.replace(/^tes /, 'les ')} présent${motsStock.es}, case par case`} onClick={() => { try { window.dispatchEvent(new Event('vrm:inventaire-ouvrir')); } catch (_) {} }}><Icon name="scan" size={22}/></BoutonIcone>
+        </div>}/>
 
       <StockMeubles locate={locate} placeNum={placeNum} onPlaced={onPlaced} accounts={accounts} comptesLus={comptesLus}/>
 
