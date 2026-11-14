@@ -523,23 +523,22 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **14 nov. · Messages et achats, en plus (108-111, 125, 131 ; ext. 5.376.0)** : infos de la fiche et réponse aux questions fréquentes insérées d'un toucher (mots fermés, 5 langues, sans IA, son clic envoie) ; catalogue privé en un lien (`/catalogue/<jeton>`, 7 j, révocable, sans prix d'achat) ; liste de recherche et « déjà achetée » dans l'encart (0 requête Vinted) ; carnet des vendeurs (`seller_id`). `docs/passation/2026-11-14-messages-achats-plus.md`. Geste : installer 5.376.0.
 - **14 nov. · Design, passe 3** : bande Leboncoin dans la colonne, Notifications au segmenté, pas de barre vide, fraîcheur sans cadre, 28 sous-pages, feuilles, e-mail et fil au système ; la feuille de vente ne cache plus l'écran (banc `design-passe-3.cjs` : 1 531 défauts ⇒ 0). `docs/passation/2026-11-14-design-passe-3.md`. Geste : aucun.
 - **14 nov. · Bancs au vert** : 14 bancs + job `comptes-et-reception` verts sans affaiblir (faux PostgREST à la vraie forme, `in.(…)`, attentes sur condition, porte de banc à jeton JWT) ; 3 défauts de l'app corrigés (⌘K « Imprimer » ouvre la feuille, rail allumé sur Organisation, « Statut » dans Factur-X). `docs/passation/2026-11-14-bancs-au-vert.md`. Geste : aucun.
 - **14 nov. · Design, passe 2** : Messages, E-mails, Achats, eBay, Leboncoin, Vestiaire, 15 sous-pages de Paramètres, feuilles, connexion, accueil, exemple, démarrage au système (banc `design-passe-2.cjs` : 1 766 défauts ⇒ 0) ; la loupe n'écrit le N° qu'une fois. `docs/passation/2026-11-14-design-passe-2.md`. Geste : aucun.
 - **14 nov. · Design, passe écran par écran** : fiche « Tout sur le N° » et loupe au système, 500 → 400/600, tailles à l'échelle, un gris, contrastes ≥ 4,5 (« 36 »), 44 doigt / 36 souris (filtres compris), titres insécables au trait d'union ; banc `design-passe` (avant 1 839 défauts, après 0). `docs/passation/2026-11-14-design-passe.md`. Geste : aucun.
-- **13 nov. · Lot 7 : le nom de la paire sur chaque colis à retirer** : une jonction par IDENTITÉ (`commandeRetrait` ; `commandeUnique` dans `api/_lib/commande-colis.js`, deux commandes ⇒ personne) pour Colis (nom + photo), mode relais, Ma journée (les noms dans la case), hors ligne, codes, et le widget (`pickupColis`, nom publié en [7]) ; mesuré 8/12 reliables, les 4 autres n'ont aucune identité en base (attendent la 5.372). `docs/passation/2026-11-13-lot7-nom-paire.md`. Geste : installer la 5.372 ; le script du widget lit `pickupColis`.
 
-- **13 nov. · Design système** : jetons `--d-*` (`src/styles-systeme.css`) lus par toutes les familles ; contient 20 · se touche capsule · montre 12 · N° 6 ; 400/600/700 ; 44 doigt / 36 souris. `docs/design/DESIGN.md`, `2026-11-13-design-systeme.md`. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.375.0** (13 nov., lot 47). **À lire en premier : `docs/passation/2026-11-10-passation-finale.md`** (état exact, gestes de Julien, ce qui reste, base), puis `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
+**Extension servie : 5.376.0** (14 nov., lot 108-131). **À lire en premier : `docs/passation/2026-11-10-passation-finale.md`** (état exact, gestes de Julien, ce qui reste, base), puis `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
 - Facture Pro : compléter « Ma facture » (Argent → Factures : SIRET, forme, régime de TVA, son e-mail) ; poser `RELANCES_SMTP_*` + `RELANCES_EXPEDITEUR` (SPF/DKIM, Brevo 300/j) — VRM envoie par défaut.
-- Installer l’extension **5.375.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip`). La liste complète et à jour des gestes : `docs/passation/2026-11-09-passation-generale.md` §5.
+- Installer l’extension **5.376.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip`). La liste complète et à jour des gestes : `docs/passation/2026-11-09-passation-generale.md` §5.
 - Sur leboncoin.fr, ouvrir « Mes annonces » sur CHACUN de ses comptes Leboncoin.
 - Recoller `scripts/gmail-forwarder.gs` (avec sa clé) dans la boîte qui fait tourner le
   script, puis poser `EMAIL_INBOUND_SECRET` sur Vercel (l'ancien script lit encore la
