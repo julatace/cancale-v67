@@ -18,7 +18,6 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { tr } from './i18n/index.js';
-import { AccAvant, AccEchec } from './ui/Accompagne.jsx';   // (14 nov.) ce qui va se passer, et ce qui ne se passera pas
 import { useLangue } from './i18n/react.js';
 import { lancerTravail } from './suiviTravail.js';
 import { texteAnnonceVinted, manquesFiche, payloadFiche, issueCreation, questionOk, filtrerOptions, PHOTOS_MAX } from './annonceVinted.js';
@@ -188,7 +187,7 @@ export default function CreerSurVinted({ fiches = [], compteOnglet, extRaison = 
           <li>{tr('creerVinted.aide.avant')}</li><li>{tr('creerVinted.aide.pendant')}</li><li>{tr('creerVinted.aide.apres')}</li>
         </ul>}
         <div className={`vrm-cv-compte${bloque ? ' vrm-cv-geste' : ''}`} data-creer-vinted-compte={compte ? compte.uid : (compteOnglet === undefined ? 'pas-su' : 'aucun')}>
-          {bloque ? <AccEchec geste="creer.vinted" erreur={bloque}/> : tr('creerVinted.compte.onglet', { login: compte.login || compte.uid })}
+          {bloque ? bloque : tr('creerVinted.compte.onglet', { login: compte.login || compte.uid })}
         </div>
         <ul className="vrm-cv-liste">
           {lignes.map(({ f, texte, manque }, iL) => {
@@ -230,7 +229,6 @@ export default function CreerSurVinted({ fiches = [], compteOnglet, extRaison = 
         <div className="vrm-cv-pied">
           {n > 0 && compte && !bloque ? <p className="vrm-cv-avant" data-creer-vinted-avant={n}>{tr('creerVinted.avant', { n, login: compte.login || compte.uid })}</p> : null}
           <small className="vrm-cv-doux">{tr('creerVinted.pied')}</small>
-          {n && !bloque ? <AccAvant geste="creer.vinted" vars={{ n }}/> : null}
           <button type="button" className="vrm-cv-primaire" data-creer-vinted-lancer={n} data-creer-vinted-confirme={confirme ? '1' : '0'} disabled={!!bloque || !n || enCours} onClick={lancer}>
             {confirme ? tr('creerVinted.confirmer', { n, login: compte ? (compte.login || compte.uid) : '' }) : tr('creerVinted.lancer', { n })}
           </button>

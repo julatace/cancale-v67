@@ -18,7 +18,6 @@ import { netTape, prixAAfficher } from './prixVoulu.js';
 const DUREES_J = [7, 30, 90, 365];   // = api/_lib/comptable-lien.js DUREES_J (audit-argent-prix le vérifie)
 import './argent-choix.css';
 import './argent-prix.css';
-import { AccAvant, AccApres, AccEchec } from './ui/Accompagne.jsx';   // (14 nov.) les quatre moments de « Remettre les prix »
 
 const eur = (v) => (v == null || !Number.isFinite(Number(v)) ? '—' : monnaie(Number(v), 'EUR', Math.round(Number(v) * 100) % 100 ? undefined : { minimumFractionDigits: 0, maximumFractionDigits: 0 }));
 const eurC = (c) => (c == null ? '—' : eur(c / 100));
@@ -287,7 +286,7 @@ export function RemiseSoldesFeuille({ lignes, extRaison = '', onRemettre, onFini
   return (
     <SheetShell titre={tr('ap.solde.titreFeuille')} sousTitre={tr('ap.solde.sousFeuille', { n: aRemettre.length })} onClose={() => { if (phase !== 'envoi') onFermer(); }} FermeAuRetour={Retour} maxWidth={560} data-remise-soldes={phase}>
       <div className="vrm-ac-section">
-        {extRaison ? <div className="vrm-ac-note" data-remise-ext=""><AccEchec geste="soldes.remettre" erreur={extRaison}/></div> : null}
+        {extRaison ? <p className="vrm-ac-note is-ambre" data-remise-ext="">{extRaison}</p> : null}
         <ul className="vrm-ac-lignes vrm-ac-carte vrm-ap-liste">
           {(lignes || []).map((l) => {
             const e = etats[l.id];
@@ -302,18 +301,15 @@ export function RemiseSoldesFeuille({ lignes, extRaison = '', onRemettre, onFini
             );
           })}
         </ul>
-        {phase === 'choix' && aRemettre.length ? <AccAvant geste="soldes.remettre" vars={{ n: aRemettre.length }}/> : null}
         {phase === 'choix' ? (
           <div className="vrm-ap-rangee">
             <Bouton variante="primaire" data-remise-lancer={aRemettre.length} disabled={!aRemettre.length || !!extRaison} onClick={lancer}>{tr('ap.solde.remettreN', { n: aRemettre.length })}</Bouton>
             <Bouton variante="discret" data-remise-garder="" onClick={() => { if (onGarder) onGarder(); onFermer(); }}>{tr('ap.solde.garder')}</Bouton>
           </div>
         ) : phase === 'envoi' ? (
-          <div className="vrm-ap-rangee" data-acc-pendant="soldes.remettre"><span className="vrm-ac-note" role="status">{tr('ap.solde.enCours')}</span><Bouton variante="secondaire" data-remise-arreter="" onClick={() => { arret.current = true; }}>{tr('ap.arreter')}</Bouton></div>
+          <div className="vrm-ap-rangee"><span className="vrm-ac-note" role="status">{tr('ap.solde.enCours')}</span><Bouton variante="secondaire" data-remise-arreter="" onClick={() => { arret.current = true; }}>{tr('ap.arreter')}</Bouton></div>
         ) : (
-          <div className="vrm-ap-rangee"><span className="vrm-ac-note" data-remise-faits={nFait}>{nFait
-            ? <AccApres geste="soldes.remettre" texte={tr('ap.solde.faits', { n: nFait })} ensuite={null}/>
-            : <AccEchec geste="soldes.remettre" erreur={(Object.values(etats).find((e) => e && e.raison) || {}).raison || tr('ap.solde.faits', { n: nFait })}/>}</span><Bouton variante="primaire" onClick={onFermer}>{tr('ap.fermer')}</Bouton></div>
+          <div className="vrm-ap-rangee"><span className="vrm-ac-note" role="status" data-remise-faits={nFait}>{tr('ap.solde.faits', { n: nFait })}</span><Bouton variante="primaire" onClick={onFermer}>{tr('ap.fermer')}</Bouton></div>
         )}
         <Repli titre={tr('ap.comment')}>{tr('ap.solde.comment')}</Repli>
       </div>
