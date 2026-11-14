@@ -90,18 +90,62 @@ pointeur (44 au doigt, 36 à la souris ; filtres 44/32) ; un seul gris de texte.
   tant que personne n'ajoutait de ligne — la règle §9 l'exige pourtant) : il juge maintenant la
   RÈGLE (rien d'avant l'inscription ; inscrit le 10 nov. ⇒ le 11 nov. et après). Rouge si
   `nouveautesDuCompte` rend l'historique.
-- Fusion : vrai `git merge origin/main` (c03957dd, lots 1 et 2 du 13 nov.) ; le seul conflit
-  (CLAUDE.md §9) réglé en gardant les lignes de main ; CLAUDE.md repassé sous 59 000 octets en
-  déplaçant TELLES QUELLES ses deux lignes de §9 les plus anciennes dans
-  `etat-detaille-2026-11.md` ; la feuille arrivée de main (`favoris-clair.css`) ramenée à l'échelle.
+- Fusions : deux vrais `git merge origin/main` (c03957dd puis 1c196045, lots 1 à 3 du 13 nov.) ;
+  le seul conflit (CLAUDE.md §9) réglé en gardant les lignes de main + la mienne (58 241 octets) ;
+  les feuilles arrivées de main ramenées à l'échelle.
+- ⚠️ **Le piège des ronds** (trouvé à la relecture du diff) : un rayon égal à la MOITIÉ de la
+  hauteur (13 px sur 26, 15 sur 30, 22 sur 44) est un rond ou une capsule — le ramener à 12 ou
+  20 en faisait un carré arrondi. 23 règles (15 feuilles) rendues à 999 ; la règle des styles en
+  ligne ne réduit plus un rayon sur un élément qui pose sa hauteur. Un prochain passage de
+  `normaliser.py` doit garder ce cas.
 
 ## 4. Après (mesuré de la même façon)
 
-RESULTATS_MESURES
+Même relevé, mêmes 19 écrans, mêmes données inventées (`recensement.json` des captures) :
+
+| mesure | avant | après |
+|---|---|---|
+| rayons des surfaces, 390 | 12 · 14 · 16 · 18 · 20 · 24 (6) | **12 · 20** (+ capsule) |
+| rayons des surfaces, 1512 | 10 valeurs | 7 (les restes : 8, 14, 16 écrits dans des écrans hors des composants) |
+| rayons des boutons | 10 (390) / 12 (1512) | 7 / 7 (capsule, rond, rangées sans fond à 0) |
+| graisses rendues | 400 · 500 · 600 · 700 · **800** (27–31 textes en 800) | 400 · 500 · 600 · 700 — **0 en 800** |
+| ombres de surface | 4 (390) / 5 (1512) | 2 / 3 ; **1 la nuit** (aucune ombre posée) |
+| hauteurs de bouton d'une ligne, 1512 | 26 · 30 · 34 · 36 · 37 · 38 · 40 · 44 · 48 | `.vrm-b` partout à 36, filtres à 32 ; restent des boutons écrits à la main (26, 34, 37, 38) |
+| titre d'écran | 34/800 (40/800 à l'ordinateur) | 34/700 (28/700 à l'ordinateur) |
+
+**Contraste AA mesuré sur les textes RENDUS** (chaque texte visible, sa couleur contre son fond
+effectif, `contraste.cjs`, 19 écrans × clair/sombre) : 390 — 946 textes avant / 972 après ;
+1512 — 1 370 / 1 084. Sous le seuil, hors des faux positifs de la carte sombre (son dégradé est
+peint par un `::before`, que la mesure ne voit pas : ratio lu ≈ 1,1) : avant 3 (390) et 7 (1512),
+après 2 et 6 — le « 30 » d'un segment choisi la nuit (`#98989D` sur `#636366`, **2,09:1**, il
+était déjà là) est corrigé ensuite (3d996192, encre à 85 % ≈ 4,6:1) ; reste le « 36 » d'un
+compteur à 4,40/4,47:1, identique avant (hors de cette passe).
 
 ## 5. Les preuves
 
-PREUVES
+- **Planches avant/après, REGARDÉES** : `scratchpad/design-systeme/planches/` de la session
+  (53 planches, `<écran>-390.jpg` = avant clair | après clair | avant sombre | après sombre,
+  2e rangée = la suite défilée ; `<écran>-1512.jpg` = avant | après, clair puis sombre) — 19
+  écrans (Ma journée, Ventes/À expédier, Achats/À retirer, Annonces, Stock, Argent ×4, Messages,
+  E-mails, Paramètres, eBay, Leboncoin, Vestiaire, Ventes Leboncoin) et 10 feuilles (fiche
+  « Tout sur le N° », confirmation, Tout imprimer, vente, Mon compte, notifications, appareils,
+  Tout va bien ?, menu du profil, Ma facture). Avant = `origin/main` 1c196045 construit ; après
+  = la branche au même main. ⚠️ Les trois derniers correctifs (ronds gardés ronds, segment à
+  44, compte du segment la nuit) sont postérieurs aux captures.
+- **Bancs** (un à la fois, mémoire ≥ 3 000 Mo, base inventée) : `nouveau-vendeur` vert sur les
+  quatre (390/1512 × clair/sombre) — il a d'abord été ROUGE (8 : segments à 40 px au doigt),
+  corrigé (segment = hauteur d'un contrôle) ; `navigation-tache` 164 verts ; `onglets-a` 29
+  verts ; `garde-ecrans` vert ; `chargement` : rouges **identiques sur main** (CLS et « pas su
+  qui devient une valeur » sur 4G/lent, mêmes écrans, CLS à ±0,01 : Ma journée 0,167 contre
+  0,157, Ventes 0,022 contre 0,026, Messages 0,122 contre 0,131 ; le banc dépasse 9 min, mesuré
+  sur sa première moitié des deux côtés).
+- **Audits** verts : `violet`, `rouge-doublon` (rouge d'abord : `--d-doublon` en dur — retiré, le
+  rouge garde sa seule source), `composants`, `icones`, `tdz`, `variables`, `coherence`,
+  `coque-tablette`, `quoi-de-neuf`, `traduction` ; et les 38 audits qui lisent une feuille CSS,
+  verts sur la branche ET sur main.
+- Outils (scratchpad) : `captures.cjs` (le banc de la revue du 11 nov. + eBay, Leboncoin,
+  Vestiaire, fiche, confirmation, relevé des formes), `sonde.cjs`, `contraste.cjs`,
+  `planches.py`, `normaliser.py`.
 
 ## 6. Ce qui reste (hors de la forme partagée)
 
@@ -109,9 +153,13 @@ PREUVES
   police hors échelle à la source (14, 16, 22 px : 193 + 68 + 87 déclarations) : à résorber
   écran par écran, chacun avec son banc de débordement — un remplacement aveugle casserait des
   rangées serrées.
+- Les hauteurs de bouton à l'ordinateur hors `.vrm-b` (26, 34, 37, 38 px : boutons écrits à
+  la main dans App.jsx) ; la carte « Protège ton compte » garde un cadre la nuit.
 - Les gris écrits en dur dans les feuilles (`#8E8E93`, `#86868B`…) : les jetons sont unifiés,
   pas encore les valeurs littérales.
-- Les gestes de la fiche « Tout sur le N° » (« Changer le prix / Publier ailleurs /
+- La fiche « Tout sur le N° » n'a pas bougé (ses classes ne sont pas dans les composants
+  partagés) : puces d'historique en rectangles 12, « Me le rappeler » en barre pleine largeur ;
+  et les gestes de la fiche « Tout sur le N° » (« Changer le prix / Publier ailleurs /
   Dupliquer ») passent sur deux lignes dans leur capsule au téléphone : une mise en page
   d'écran (zone Annonces), pas une forme partagée.
 - Le liseré bleu d'une feuille ouverte par un clic SIMULÉ (le corps défilant reçoit le focus,
