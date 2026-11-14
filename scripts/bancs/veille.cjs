@@ -13,6 +13,8 @@
 //   C. Rien (aucune ligne) ⇒ Ma journée ne montre rien de la veille.
 //   D. La base refuse la ligne des chiffres (500) ⇒ aucune alerte, rien écrit (« pas su »).
 //   E. Le CA d'octobre qui baisse : la carte du mois, son geste vers Argent.
+//   F. (14 nov., lot dates-versement) 1 741 ventes à dater, 356 déjà datées, cause « détail
+//      pas encore lu » : la ligne dit datées ✓, pourquoi, « environ 7 jours », ton NEUTRE.
 // Jugé sur des data-* et des nombres. `BANC_CAPTURE=<dossier>` : captures 390 tactile et
 // 1512, clair et sombre. `BANC_DIST=<dossier>` : un autre build (preuve §6.1).
 const path = require('path');
@@ -132,6 +134,11 @@ const capture = async (pg, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, { rec
   };
   const ctlOk = () => ({ id: C.CLE_CONTROLE, data: C.resultatControle({ 'numeros-double': [], 'versement-30j': 0, 'comptes-48h': [] }, {}, auj - 2 * 3600e3) });
   const ctlPb = () => ({ id: C.CLE_CONTROLE, data: C.resultatControle({ 'numeros-double': ['12'], 'versement-30j': null, 'comptes-48h': ['111'] }, { 'versement-30j': 'ouvre Ventes pour le compter' }, auj - 2 * 3600e3) });
+  // (14 nov.) Le contrôle tel que le cron le range (src/controleNuit.js, `detailVersement`).
+  const ctlVers = () => {
+    const aDater = { n: 1741, plus30: { n: 1741, ca: 1 }, datees: { n: 356, releve: 0 }, raisons: [{ cle: 'vinted-detail', n: 1741, ca: 1, comptes: [{ uid: '111', nom: 'atelier_test', n: 1741 }] }] };
+    return { id: C.CLE_CONTROLE, data: C.resultatControle({ 'numeros-double': [], 'versement-30j': C.versementsEnRetard(aDater), 'comptes-48h': [] }, {}, auj - 2 * 3600e3, { 'versement-30j': C.detailVersement(aDater) }) };
+  };
   let b;
   try {
     b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
@@ -180,6 +187,25 @@ const capture = async (pg, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, { rec
           await pg.waitForFunction(() => /tab=vintedaccounts|vintedaccounts/.test(location.search) || !!document.querySelector('[data-ecran="vintedaccounts"],[data-comptes-lies]'), null, { timeout: 8000 }).catch(() => {});
           const ici = await pg.evaluate(() => !document.querySelector('[data-veille]'));
           dit(ici, 'B9 « Mes comptes » quitte Ma journée vers Comptes liés');
+          await ctx.close();
+        });
+        await essaie('F' + suf, async () => {
+          ROWS = [ctlVers()]; PANNE = null;
+          const { ctx, pg, errs } = await page(b, T, { sombre });
+          await ouvrir(pg);
+          const s = await lire(pg);
+          const l = s && s.lignes.find((x) => x.cle === 'versement-30j');
+          const d = await pg.evaluate(() => { const e = document.querySelector('[data-controle-ligne="versement-30j"]'); if (!e) return null;
+            const q = (k) => e.querySelector(k); return { cause: e.getAttribute('data-versement-cause'), datees: q('[data-versement-datees]') && q('[data-versement-datees]').getAttribute('data-versement-datees'),
+              jours: q('[data-versement-jours]') ? q('[data-versement-jours]').innerText : '', pourquoi: q('[data-versement-pourquoi]') ? q('[data-versement-pourquoi]').innerText : '' }; });
+          dit(l && l.n === '1741' && d && d.cause === 'vinted-detail', 'F1 la ligne des ventes à dater : 1741, cause « pas encore lue »', JSON.stringify(d));
+          dit(l && l.ton === 'info' && l.couleur !== s.ambre && l.couleur !== s.rouge, 'F2 ton NEUTRE (ni ambre ni rouge) : rien n’est en faute, la lecture est en cours', l && `${l.ton} ${l.couleur} / ${s.ambre}`);
+          dit(d && d.datees === '356' && /356 déjà datées ✓/.test(l.texte), 'F3 elle dit combien sont DÉJÀ datées', l && l.texte);
+          dit(d && /ouvrant chaque vente/.test(d.pourquoi) && /vinted\.fr est ouvert sur ce compte/.test(d.pourquoi) && /aucune n’est devinée/.test(d.pourquoi), 'F4 elle dit POURQUOI et le geste (Vinted ouvert sur ce compte), jamais devinée', d && d.pourquoi);
+          dit(d && /Environ 7 jours/.test(d.jours), 'F5 et combien de temps : « environ 7 jours »', d && d.jours);
+          dit(l && !/sans date de versement depuis 30 jours/.test(l.texte) && /Voir le détail/.test(l.texte) && l.btn && l.btn.height >= 43.5, 'F6 plus l’ancienne phrase alarmante ; « Voir le détail » à 44 px', l && l.texte.slice(0, 120));
+          dit(s && s.deb <= 0 && !errs.length, 'F7 aucun défilement horizontal, aucune erreur', `${s && s.deb} ${errs.join(' | ').slice(0, 120)}`);
+          await capture(pg, `journee-versement-${suf}`);
           await ctx.close();
         });
         await essaie('C' + suf, async () => {
