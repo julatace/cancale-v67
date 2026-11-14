@@ -70,7 +70,16 @@ devient une règle importée — garder `etatRepliRetirer` / `choixApresBascule`
   matin + 1 Vinted Go au code de sa conversation —, 5 e-mails Vinted sans code, 12 Mondial Relay retirés au même
   point, 1 000 achats finis ; 390 tactile clair + sombre, 1512) : **18 rouges sur le build d'origin/main**
   (R1 ouvert / codes visibles / en tête, R2 ancien « fermé », R4 colis de plus, R5 « à vérifier » nommés — à chaque
-  taille) ; vert après (voir le résultat en bas).
+  taille) ; **54 verts après** (captures regardées : « À retirer · 3 » en tête, Tabac du Port C00001/C00002,
+  Vinted Go V12345 ; à 0, « À retirer + 5 à vérifier › » au-dessus de la liste). Rejoué après le merge d'origin/main :
+  vert jusqu'à un arrêt du navigateur faute de mémoire (machine partagée), sans rouge.
+- Verts : build ; audits repli-retirer, codes-retrait, retrait-fiable, retrait-vinted-go, suivi-colis,
+  nom-paire-retrait, identite, tdz, variables, traduction, quoi-de-neuf, coherence ; bancs achats-retraits (84),
+  garde-ecrans, retirer-nom-paire (44), retrait-autre-ville.
+- Rouges **déjà rouges sur origin/main, à l'identique** (rejoués depuis un arbre `git archive` d'origin/main) :
+  refonte-achats P5 (temps de recherche, 548–824 ms sur une machine chargée), retirer-scene-julien (QR / fiche),
+  retraits-fiables F7, retraits-irreprochables R1 + un clic, achats-messages-premium, retrait-carte, retrait-lieux,
+  retirer-vinted-go (6). Aucun n'est touché par ce correctif ; à reprendre à part.
 - Un piège du banc lui-même, noté : deux colis inventés au MÊME code de retrait sont UN colis (le code est une
   identité, §5) — un code « retiré » ailleurs les faisait sortir ; les codes du banc sont distincts.
 
