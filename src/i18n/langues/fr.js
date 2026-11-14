@@ -14,8 +14,10 @@ import ecran_messages from './fr/messages.js';
 import ecran_emails from './fr/emails.js';
 import ecran_stats from './fr/stats.js';
 import ecran_compta from './fr/compta.js';
+import ecran_colisplus from './fr/colisplus.js';   // (14 nov., lot colis-plus)
 export default {
   ...ecran_compta,
+  ...ecran_colisplus,
   ...ecran_stats,
   ...ecran_emails,
   ...ecran_messages,

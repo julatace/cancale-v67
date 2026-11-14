@@ -626,7 +626,11 @@ import { CLE_PRIX_LUS, noterPrixLus } from "./historiquePrix.js";
 import { conseilBaisse, derniereBaisseLue, baisseProportion, noterConseils, fusionConseils, CLE_CONSEIL_PRIX } from "./conseilPrix.js";   // (12 nov.) le conseil de baisse, mesuré   // (10 nov., lot L) les prix lus dans le dressing
 import CalculetteAchat from "./CalculetteAchat.jsx";   // (10 nov., lot L) la calculette d'achat (Achats, ⌘K)
 import { ChoixEmballageColis } from "./EmballagesCarte.jsx";   // (10 nov., lot L) l'emballage d'un colis (facultatif)
-import { CLE_EMBALLAGES } from "./emballages.js";
+import { CLE_EMBALLAGES, colisFaits as colisFaitsEmb } from "./emballages.js";
+// (14 nov., lot colis-plus 99, 101) La douchette (un code lu ⇒ LA vente, par identité) et le bénéfice par colis.
+import { DouchetteGlobale } from "./Douchette.jsx";
+import { venteDuCode, enregistrerResolveur, prendreDemande as prendreDemandeDouchette, codeCourt, DEMANDE_DOUCHETTE } from "./douchette.js";
+import { beneficesParColis } from "./tempsColis.js";
 import { listeInventaire, publierInventaireAnnuel } from "./inventaireAnnuel.js";   // (10 nov., lot W) l'inventaire de fin d'année
 import { BarreCoutVente, PointCout, SaisieEmballage } from "./CascadeVente.jsx";
 import { etatNumeroColis } from "./emballage.js";
@@ -13172,7 +13176,10 @@ const tamponnerBordereau = async (PL, pdf, { numero, titre, thermique = false, c
 // bas. D'où les deux repères ci-dessous, et JAMAIS une position écrite en dur :
 // une zone devinée de travers, c'est un code-barres coupé, donc un colis qui ne
 // part pas. Quand on ne SAIT pas, la page part entière — et l'écran le dit.
-const IMPR_MODES = ['normale', 'thermique'];
+// (14 nov., lot colis-plus 98) 'planche4' : sans imprimante thermique, « Tout imprimer » range les
+// étiquettes isolées QUATRE par feuille A4, dans l'ordre (src/impression/planche4.js) ; ailleurs
+// (un bordereau seul) c'est l'A4 normale.
+const IMPR_MODES = ['normale', 'thermique', 'planche4'];
 const imprMode = (v) => (IMPR_MODES.includes(String(v)) ? String(v) : 'normale');
 
 // Mots qui NE SONT PAS l'étiquette : la fiche à glisser dans le colis, la notice
@@ -14038,8 +14045,13 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
   if (!(await confirmerNumerosAVerifier((items || []).map((it) => it && it.numero)))) throw new Error(NUM_A_VERIFIER_ANNULE);
   const PL = await import('pdf-lib');
   const { PDFDocument, rgb, StandardFonts } = PL;
+  const modeLot = imprMode(opts.imprimante || imprimanteChoisie());
+  // (14 nov., lot colis-plus 98) 4 PAR PAGE A4 : la MÊME isolation que la thermique (les mêmes PDF, le
+  // même tampon, la page entière quand on ne sait pas), posée dans un document à part, puis rangée
+  // quatre par feuille dans l'ordre (`imposerPlanche`). Les factures restent des pages entières.
+  const planche = modeLot === 'planche4';
+  const thermique = modeLot === 'thermique' || planche;
   const out = await PDFDocument.create();
-  const thermique = imprMode(opts.imprimante || imprimanteChoisie()) === 'thermique';
   let count = 0, nInv = 0, isoles = 0, nEtiquettes = 0, fiches = 0, bandes = 0;
   const entiers = [];   // ce qu'on n'a PAS su isoler — l'écran doit le dire
   const details = [];   // (11 nov., lot thermique) ce qui a été mesuré, étiquette par étiquette
@@ -14070,14 +14082,22 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
     } catch (e) { if (estTamponAnnule(e)) throw e; rates.push(index); }
   }
   if (!count) throw new Error('Aucun bordereau exploitable.');
-  posePrefsImpression(PL, out);   // une feuille par bordereau (§ recto-verso)
-  const bytes = await out.save();
+  let docFinal = out, infoPlanche = null;
+  if (planche) {
+    const { imposerPlanche } = await import('./impression/planche4.js');
+    const { doc, plan } = await imposerPlanche(PL, out);
+    docFinal = doc;
+    infoPlanche = { feuilles: doc.getPageCount(), etiquettes: plan.etiquettes, entieres: plan.entieres, echelle: Math.round(plan.echelle * 100) };
+  }
+  posePrefsImpression(PL, docFinal);   // une feuille par bordereau (§ recto-verso)
+  const bytes = await docFinal.save();
   if(opts.avantOuverture)opts.avantOuverture();
   const blob = new Blob([bytes], { type:'application/pdf' });
   const url = URL.createObjectURL(blob);
-  const filename = `bordereaux-${count}${nInv?'-'+nInv+'factures':''}${thermique?'-thermique':''}-a-la-suite.pdf`;
+  const filename = `bordereaux-${count}${nInv?'-'+nInv+'factures':''}${planche?'-4-par-page':thermique?'-thermique':''}-a-la-suite.pdf`;
   // Ouvert dans un onglet (ordinateur) ; sinon la modale propose « Ouvrir ».
   const printed = ouvrirPdfOnglet(url, filename);
+  if (planche) return { url, filename, count, nInv, printed, ouvert: printed, thermique: false, planche: infoPlanche, isoles, etiquettes: nEtiquettes, entiers: [], reussis, rates, fiches, bandes };
   return { url, filename, count, nInv, printed, ouvert: printed, thermique, isoles, etiquettes: nEtiquettes, entiers, reussis, rates, fiches, bandes, ...bilanThermique(details) };
 };
 // Un échec (annulé, PDF illisible) referme la visionneuse « préparation… ».
@@ -43183,6 +43203,46 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const trouverScan = (brut) => { const r = trouverParScan(brut, colisScannables());
     if (r.etat === 'trouve' && attenteScan.current && attenteScan.current.cle === String(r.colis.cle)) return { ...r, etat: 'deja' };
     return r; };
+  // ── (14 nov., lot colis-plus 99) LA DOUCHETTE : un code lu ⇒ LA vente, PAR IDENTITÉ (§5) ──────────
+  // Les identités de chaque vente : SON n° de transaction, le n° de suivi de SON bordereau (e-mail et
+  // étiquette lue), Vestiaire par son n° de suivi. Égalité exacte (`venteDuCode`) ; deux ventes ⇒ rien.
+  // Trouvée ⇒ elle s'ouvre dans Ventes (la cible `vente:{tx}`, le chemin des notifications).
+  const lignesDouchette = () => {
+    const L = [];
+    for (const o of (Array.isArray(sales.items) ? sales.items : [])) {
+      if (!o || o.transaction_id == null) continue;
+      const tx = String(o.transaction_id), b = bordsParTxn[tx];
+      L.push({ cle: 'v:' + tx, site: 'vinted', tx, suivis: [b && b.suivi, b && b.suiviPdf].filter(Boolean), num: (b ? numForBord(b) : '') || ((effEntry(o) || {}).numero || ''), titre: o.title || '' });
+    }
+    for (const c of colisScannables()) {
+      if (c.site === 'vestiaire') L.push({ cle: c.cle, site: 'vestiaire', suivis: c.suivis, num: c.num, titre: c.titre, vc: c.v && c.v.id });
+      else if (c.site === 'vinted' && !c.o) L.push({ cle: c.cle, site: 'vinted', suivis: c.suivis, num: c.num, titre: c.titre, sansVente: true });
+    }
+    return L;
+  };
+  const douchettePrete = colisDans === 'ventes' && curSub === 'bordereaux' && Array.isArray(sales.items) && emailBords !== null;
+  const resoudreDouchette = React.useRef(null);
+  resoudreDouchette.current = (code) => {
+    if (!douchettePrete) { DEMANDE_DOUCHETTE.code = code; DEMANDE_DOUCHETTE.at = Date.now(); toast(tr('cp.douchette.pasLu'), 'info'); return; }
+    const r = venteDuCode(code, lignesDouchette());
+    try { document.documentElement.setAttribute('data-douchette', r.etat + (r.ligne ? ':' + r.ligne.cle : '')); } catch (_) {}
+    if (r.etat === 'trouve' && !r.ligne.sansVente) {
+      const l = r.ligne;
+      toast(tr('cp.douchette.trouve', { qui: [l.num ? `N°${l.num}` : '', l.titre].filter(Boolean).join(' · ') || tr('cp.douchette.sansNum') }), 'ok');
+      const q = l.site === 'vestiaire' ? `?tab=ventes&site=vestiaire&cible=vcvente&vc=${encodeURIComponent(l.vc || '')}` : `?tab=ventes&site=vinted&cible=vente&tx=${encodeURIComponent(l.tx)}`;
+      try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: q })); } catch (_) {}
+      return;
+    }
+    if (r.etat === 'trouve') { toast(tr('cp.douchette.sansVente', { code: codeCourt(code) }), 'info'); return; }
+    if (r.etat === 'ambigu') { toast(tr('cp.douchette.ambigu', { n: r.lignes.length, code: codeCourt(code) }), 'err'); return; }
+    toast(tr('cp.douchette.inconnu', { code: codeCourt(code) }), 'err');
+  };
+  useEffect(() => {
+    if (colisDans !== 'ventes' || curSub !== 'bordereaux') return undefined;
+    return enregistrerResolveur((code) => resoudreDouchette.current(code));
+  }, [colisDans, curSub]);
+  // Un code lu avant que Ventes soit prêt (l'app y menait) : repris une fois les ventes lues.
+  useEffect(() => { if (!douchettePrete) return; const c = prendreDemandeDouchette(); if (c) resoudreDouchette.current(c); }, [douchettePrete]);
   const [emballage, setEmballage] = useState(() => {
     if (curSub !== 'bordereaux' || !DEMANDE_EMBALLAGE.at || Date.now() - DEMANDE_EMBALLAGE.at > 60000) return false;
     DEMANDE_EMBALLAGE.at = 0; return true;
@@ -43324,6 +43384,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const retirerRelais = (x) => { const t = (x && x.src && x.src.t) || null, o = (x && x.src && x.src.o) || null; if (t) return markCollected(t); if (o) return markPickupDone(o); return null; };
   const [preparerOuvert, setPreparerOuvert] = useState(false);
+  // (14 nov., lot colis-plus 97, 101) Les « Colis fait » datés (le stock de fournitures, comme au Stock) et le
+  // bénéfice de chaque colis lu dans le relevé de Ventes, PAR SA TRANSACTION (src/tempsColis.js) — rien d'écrit.
+  const lireFaitsEmb = React.useCallback(() => colisFaitsEmb({ vinted: load('vinted_ship_done', {}), leboncoin: load('vrm_lbc_colis_done', {}), vestiaire: load('vrm_vc_colis_done', {}) }), []);
+  const beneficeColisPrep = useMemo(() => (preparerOuvert ? beneficesParColis(lireReleveVentes()) : null), [preparerOuvert]);
   const [relaisOuvert, setRelaisOuvert] = useState(false);
   // (11 nov., lot rangement-guide) Scanner ou mode relais refermé : les achats retirés au comptoir, en série.
   useEffect(() => { if (scanOuvert || relaisOuvert || !retraitsARanger.current.length) return; const l = retraitsARanger.current; retraitsARanger.current = []; ouvrirRangement(l); }, [scanOuvert, relaisOuvert]);
@@ -50937,10 +51001,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {/* 2 · L'APERÇU : une page A4 par colis coché — l'étiquette du transporteur, le tampon N° + titre en bas. */}
                         {/* (11 nov., lot thermique) Le papier et le tampon CHOISIS (Paramètres → Impression des bordereaux,
                             `vrm_impression`) : l'aperçu dit ce qui sortira, et « Changer » y mène. */}
-                        {choisis.length > 0 && (()=>{ const th = imprimanteChoisie() === 'thermique', rg = reglageImpressionChoisi(), pp = papierThermique(rg), mt = th ? rg.tamponTh : rg.tamponA4;
+                        {choisis.length > 0 && (()=>{ const pl4 = imprimanteChoisie() === 'planche4', th = imprimanteChoisie() === 'thermique' || pl4, rg = reglageImpressionChoisi(), pp = papierThermique(rg), mt = th ? rg.tamponTh : rg.tamponA4;
                           const papierLot = th ? (pp.id === 'autre' ? pp.nom : tr(`impression.format.${pp.id}`)) : 'A4';
-                          return <section className="vrm-tip-groupe" data-lot-section="apercu" data-lot-papier={th ? rg.format : 'a4'} data-lot-tampon={mt} aria-label={tr('impression.lot.apercu')}>
-                          <h3>{tr('impression.lot.apercu')} <span>{tr('impression.lot.pages', { n: choisis.length, papier: papierLot })}</span></h3>
+                          // (14 nov., lot colis-plus 98) 4 par page : au plus ⌈n/4⌉ feuilles (une page pas découpable part seule).
+                          return <section className="vrm-tip-groupe" data-lot-section="apercu" data-lot-papier={pl4 ? 'planche4' : th ? rg.format : 'a4'} data-lot-tampon={mt} aria-label={tr('impression.lot.apercu')}>
+                          <h3>{tr('impression.lot.apercu')} <span>{pl4 ? tr('cp.planche.lotPages', { n: Math.ceil(choisis.length / 4) }) : tr('impression.lot.pages', { n: choisis.length, papier: papierLot })}</span></h3>
                           <button type="button" className="vrm-tip-lien" data-lot-reglage-impression="" disabled={batchBusy} onClick={()=>{ setLot(null); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=settings&reglage=imprimante' })); } catch (_) {} }}>{tr('impression.lot.changer')}</button>
                           <div className="vrm-tip-pages">
                             {choisis.slice(0, 8).map((l) => { const c = contenuTampon(mt, { numero: l.num || '', titre: l.titre || '' }); return <figure key={l.cle} className="vrm-tip-a4" data-lot-apercu={l.cle}>
@@ -51834,7 +51899,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           onFait={(c) => { if (c && c.geste) deposeScan.demander(c.cle, c.geste, c.num ? `N°${c.num}` : c.titre); }} onAnnuler={deposeScan.annuler}
           onImprimer={(c) => (c && c.site === 'vinted' && c.x ? imprimerColisVinted(c.x) : null)} onScanner={(c) => { setScanAttendu(c.cle); setScanOuvert('envoi'); }}
           onFermer={() => setPreparerOuvert(false)} Retour={FermeAuRetour} Icon={Icon} zIndex={Z_CONFIRMATION - 4}
-          emballage={(c) => <ChoixEmballageColis reglage={emballagesR} cle={c.cle} ecrire={(r) => { setEmballagesR(r); save(CLE_EMBALLAGES, r); }}/>}
+          emballage={(c) => <ChoixEmballageColis reglage={emballagesR} cle={c.cle} titre={c.titre || ''} lireFaits={lireFaitsEmb} ecrire={(r) => { setEmballagesR(r); save(CLE_EMBALLAGES, r); }}/>}
+          beneficeDe={beneficeColisPrep}
           Photo={(src) => imgMortes.has(src) ? null : <PhotoVinted src={src} alt="" decoding="async" onError={() => noterImgMorte(src)}/>}
           photoCarton={(c) => { const v = c && venteDuColis(c.geste); return v ? <BoutonPhotoCarton vente={{ ...v, num: c.num || '' }} ton="clair"/> : null; }}
           note={(c) => (c && c.num ? <NotePaireCoque numero={c.num} variante="bloc" ajout/> : null)}/> : null}
@@ -51951,7 +52017,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:12,padding:'13px 16px',fontSize:15,fontWeight:600,textDecoration:'none',marginBottom:8}}>📄 {bordResult.batch?'Ouvrir les bordereaux':bordResult.withInvoice?'Ouvrir bordereau + facture':'Ouvrir le bordereau'}</a>
             {/* (3 nov.) « Déplacer le tampon » : l'aperçu s'ouvre, la place choisie s'imprime (et se mémorise pour la forme). */}
             {bordResult.pdfBuf && !bordResult.batch && <button type="button" data-imprime="1" data-tampon-deplacer="1" onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:12,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:400,padding:'11px',marginBottom:8}}>Déplacer le tampon</button>}
-            {bordResult.batch && !bordResult.thermique && <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Ton N° est tamponné sur chaque PDF, sinon sur une fiche juste après.</div>}
+            {bordResult.batch && !bordResult.thermique && !bordResult.planche && <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Ton N° est tamponné sur chaque PDF, sinon sur une fiche juste après.</div>}
+            {/* (14 nov., lot colis-plus 98) 4 par page A4 : ce qui a VRAIMENT été posé (étiquettes, feuilles, échelle, pages entières). */}
+            {bordResult.batch && bordResult.planche ? <div className="vrm-aide" data-planche-resultat={`${bordResult.planche.etiquettes}/${bordResult.planche.feuilles}/${bordResult.planche.echelle}`} style={{fontSize:13,color:C.text,marginBottom:8,lineHeight:1.4}}>
+              {tr('cp.planche.resultat', { etiquettes: bordResult.planche.etiquettes, feuilles: bordResult.planche.feuilles, echelle: bordResult.planche.echelle })}
+              {bordResult.planche.entieres ? <> {tr('cp.planche.entieres', { n: bordResult.planche.entieres })}</> : null}</div> : null}
             {/* ── CE QUE L'IMPRESSION THERMIQUE A VRAIMENT FAIT ────────────────
                 LE CHIFFRE, JAMAIS LA PROMESSE. « Ton étiquette est prête » sur
                 un bordereau qu'on n'a pas su découper, c'est le défaut le plus
@@ -60509,6 +60579,8 @@ function AppCoeur() {
         <RepriseRetenue tab={tab} compteChoisi={!!compteSel&&compteSel!=='*'} effacerCompte={()=>setCompteSel('')}/>
         <BarreHautSlot.Provider value={ordi ? slotBarre : null}>
         <CibleNotif tab={tab} sub={platSub}/>
+        {/* (14 nov., lot colis-plus 99) La douchette : un code lu hors des champs ⇒ LA vente (par identité, src/douchette.js). */}
+        <DouchetteGlobale ouvrirVentes={()=>setTab('ventes')}/>
         {rpOuvert && <React.Suspense fallback={null}>
           <RecherchePhoto C={C} Feuille={SheetShell} Bouton={Bouton} PhotoVinted={PhotoVinted}
             lireCandidats={()=>lireCandidatsPhoto(vintedAccounts)} lireOctets={(u)=>chargerPhotoBoite(u)}

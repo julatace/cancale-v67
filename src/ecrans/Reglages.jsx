@@ -344,7 +344,7 @@ const TITRE_EXEMPLE = 'Veste en jean bleue';
 const champMm = { width: 76, minHeight: 44, border: `1px solid ${C.border}`, borderRadius: 12, padding: '0 10px', fontSize: 15, background: C.bg, color: C.text, fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums' };
 const ImpressionBordereaux = ({ mode, reg, changer }) => {
   useLangue();
-  const th = mode === 'thermique';
+  const th = mode === 'thermique' || mode === 'planche4';   // (14 nov., 98) 4 par page : les étiquettes isolées comme en thermique
   const papier = papierThermique(reg);
   const fmt = FORMATS_THERMIQUES.find((f) => f.id === reg.format) || FORMATS_THERMIQUES[0];
   const [ap, setAp] = React.useState(null);   // null · {etat:'charge'} · {etat:'ko'} · {etat:'lu', octets, pages, r1}
@@ -513,15 +513,17 @@ const ImprimanteSetting = ({ nu = false }) => {
     <div data-imprimante-reglage={mode} style={nu ? {} : {padding:'13px 16px',borderRadius:12,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
       {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text}}>Imprimante et bordereaux</div>}
       <Segmente label="Imprimante" plein value={mode} onChange={choisir} style={{marginTop:nu?0:10}}
-        options={IMPR_MODES.map((v) => ({ v, l: v === 'thermique' ? tr('reglages.imprimante.thermique', { papier: nomPapier(papier) }) : tr('reglages.imprimante.normale'), data: { 'data-imprimante-choix': v } }))}/>
-      <div className="vrm-setting-applique" role="status" style={{color:erreurMode?C.warn:C.text}}>{erreurMode||`Format appliqué sur cet appareil : ${mode==='thermique'?`étiquettes ${nomPapier(papier)}`:'papier A4'}.`}</div>
+        options={IMPR_MODES.map((v) => ({ v, l: v === 'thermique' ? tr('reglages.imprimante.thermique', { papier: nomPapier(papier) }) : v === 'planche4' ? tr('cp.planche.choix') : tr('reglages.imprimante.normale'), data: { 'data-imprimante-choix': v } }))}/>
+      <div className="vrm-setting-applique" role="status" style={{color:erreurMode?C.warn:C.text}}>{erreurMode||(mode==='planche4'?tr('cp.planche.applique'):`Format appliqué sur cet appareil : ${mode==='thermique'?`étiquettes ${nomPapier(papier)}`:'papier A4'}.`)}</div>
       <GuideReglage titre="Avant d’imprimer" etapes={[
         ['Choisis le papier', 'A4 en classique, celui de ton rouleau en thermique.'],
         ['Vérifie un aperçu', 'Codes lisibles, N° et titre hors des codes.'],
         ['À l’impression', 'Vérifie le papier et l’échelle : ton imprimante décide.']
       ]}/>
       <div data-imprimante-phrase style={{fontSize:13,color:C.muted,marginTop:10,lineHeight:1.5}}>
-        {mode === 'thermique'
+        {mode === 'planche4'
+          ? <span data-imprimante-planche="">{tr('cp.planche.phrase')} <Pourquoi label={tr('cp.planche.detail')}>{tr('cp.planche.pourquoi')}</Pourquoi></span>
+          : mode === 'thermique'
           ? <>Une étiquette par page, <b style={{color:C.text}}>{nomPapier(papier)}</b>, ton N° dessus ; étiquette pas repérée ⇒ page <b style={{color:C.text}}>entière</b>. <Pourquoi label="Détail">Chaque étiquette sort seule, tournée à l’endroit et entière (sans la fiche destinataire ni la pub), ton N° dans un espace blanc vérifié. Quand l’app ne sait pas repérer l’étiquette sur un bordereau, la page part entière et l’écran le dit — jamais un code-barres coupé.</Pourquoi></>
           : <>A4, <b style={{color:C.text}}>une feuille par bordereau</b>, ton N° dans un blanc du PDF. <Pourquoi label="Recto-verso ?">Le document n’est pas réduit. Si ton imprimante sort du recto-verso, décoche-le dans sa fenêtre d’impression : le PDF le demande, le pilote peut passer outre.</Pourquoi></>}
       </div>
