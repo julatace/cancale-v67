@@ -2419,8 +2419,7 @@ function CarteVentesArgent({ liveStats, ebayCommandes }) {
   const [pays, setPays] = React.useState(undefined);
   React.useEffect(() => { let mort = false; lireExtrasRepartition().then((x) => { if (!mort) setPays(x && x.txn ? x.txn : null); }).catch(() => { if (!mort) setPays(null); }); return () => { mort = true; }; }, []);
   const [releve] = useLigneSynchro('vrm_stats_ventes', lireReleveFrais);
-  const sombre = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark';
-  return <CarteVentes lignes={lignes} paysVinted={pays} ebay={Array.isArray(ebayCommandes) ? ebayCommandes : null} releve={releve ? releve.l : null} sombre={sombre}/>;
+  return <CarteVentes lignes={lignes} paysVinted={pays} ebay={Array.isArray(ebayCommandes) ? ebayCommandes : null} releve={releve ? releve.l : null}/>;
 }
 // ⟦← App.jsx #18⟧
 

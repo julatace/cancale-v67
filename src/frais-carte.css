@@ -61,7 +61,5 @@ html body button.vrm-cv-bulle[aria-pressed="true"] { background: var(--d-accent,
 .vrm-cv-date { font-size: 15px; }
 .vrm-cv-vente { min-height: 52px; content-visibility: auto; contain-intrinsic-size: auto 52px; }
 
-html[data-theme="dark"] body button.vrm-cv-bulle { background: rgba(245,245,247,.86); color: #1D1D1F; border-color: rgba(0,0,0,.6); }
-html[data-theme="dark"] body button.vrm-cv-bulle[aria-pressed="true"] { background: var(--d-accent, #0071E3); color: #fff; }
 :root[data-theme="dark"] .vrm-cv-point::after { background: var(--d-encre, #F5F5F7); }
 @media (prefers-reduced-motion: reduce) { html body button.vrm-cv-bulle, html body button.vrm-fc-rangee { transition: none; } }

@@ -87,7 +87,7 @@ const bornes = (p, maintenant) => {
   const y = Number(p); return { de: new Date(y, 0, 1).getTime(), a: new Date(y + 1, 0, 1).getTime() };
 };
 
-export default function CarteVentes({ lignes, paysVinted, ebay, releve, maintenant: tFourni = null, sombre = false }) {
+export default function CarteVentes({ lignes, paysVinted, ebay, releve, maintenant: tFourni = null }) {
   useLangue();
   const [maintenant] = React.useState(() => tFourni || Date.now());
   const an = new Date(maintenant).getFullYear();
@@ -140,7 +140,7 @@ export default function CarteVentes({ lignes, paysVinted, ebay, releve, maintena
       {filtres}
       {!L.n ? <p className="vrm-fc-ligne-vide" data-cv-vide="">{tr('fc.aucuneVente')}</p> : !bulles.length ? <p className="vrm-fc-ligne-vide" data-cv-vide="">{tr('fc.aucunLieu')}</p> : (
         <>
-          <FondVentes bulles={surCarte} max={max} vue={vue} choisi={choisi} onChoisir={(k) => setChoisi(k === choisi ? null : k)} sombre={sombre}/>
+          <FondVentes bulles={surCarte} max={max} vue={vue} choisi={choisi} onChoisir={(k) => setChoisi(k === choisi ? null : k)}/>
           {sel ? <DetailLieu b={sel} onFermer={() => setChoisi(null)}/> : (
             <div className="vrm-fc-groupe">
               <div className="vrm-fc-entete">{tr('fc.lieux')}</div>
@@ -223,7 +223,7 @@ function cadrer(carte, vue, bulles, anime) {
     carte.fitBounds(bb, opts);
   } catch (_) {}
 }
-function FondVentes({ bulles, max, vue, choisi, onChoisir, sombre }) {
+function FondVentes({ bulles, max, vue, choisi, onChoisir }) {
   const boite = React.useRef(null);
   const carteRef = React.useRef(null);
   const mlRef = React.useRef(null);
@@ -257,7 +257,8 @@ function FondVentes({ bulles, max, vue, choisi, onChoisir, sombre }) {
           if (!vivant) return;
           try { carte.resize(); } catch (_) {}
           setEtat('bulles');
-          f.poserFond(carte, { sombre, annule: () => !vivant }).then((r) => {
+          // Le fond reste CLAIR, comme les autres cartes de VRM (communauté, points relais).
+          f.poserFond(carte, { sombre: false, annule: () => !vivant }).then((r) => {
             if (!vivant) return;
             try { carte.addControl(new ml.AttributionControl({ compact: true, ...(r && r.attribution ? { customAttribution: r.attribution } : {}) })); } catch (_) {}
             setEtat('pret');
@@ -266,7 +267,7 @@ function FondVentes({ bulles, max, vue, choisi, onChoisir, sombre }) {
       });
     }).catch(() => { if (vivant) setEtat('ko'); });
     return () => { vivant = false; carteRef.current = null; for (const m of marqueurs.current) { try { m.remove(); } catch (_) {} } marqueurs.current = []; if (carte) { try { carte.remove(); } catch (_) {} } };
-  }, [visible, sombre]);
+  }, [visible]);
   // Les bulles : refaites quand les lieux changent ; posées dès que la carte vide est chargée.
   const cleBulles = bulles.map((x) => `${x.cle}:${x.n}:${x.lat}:${x.lon}`).join('|');
   const pose = etat === 'bulles' || etat === 'pret';
