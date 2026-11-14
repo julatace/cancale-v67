@@ -166,7 +166,13 @@ const apercuPossible = (() => {
     if (filmDemande || exempleActif()) return false;
     const s = JSON.parse(window.localStorage.getItem('vrm_session') || 'null');
     const uid = s && s.user && typeof s.user.id === 'string' ? s.user.id : '';
-    return !!uid && !!window.localStorage.getItem('vrm_journee_instantane:' + uid);
+    // Les traces que la décision exigera (src/ouvertureInstantanee.js) : sans l'une d'elles, aucun morceau
+    // n'est demandé et l'app part tout de suite, exactement comme avant (aucun délai pour un « non »).
+    const q = window.location.search || '';
+    const tab = /[?&]tab=([^&]*)/.exec(q);
+    if (tab && tab[1] !== 'journee') return false;
+    const ls = window.localStorage;
+    return !!uid && ['vrm_journee_instantane:', 'vrm_porte_ok_', 'vrm_abo_dernier_', 'vrm_equipe_cache_'].every((p) => !!ls.getItem(p + uid));
   } catch (_) { return false; }
 })();
 const apercuPeint = apercuPossible
