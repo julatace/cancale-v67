@@ -1673,23 +1673,26 @@ function PushPrefsSetting({ comptes, onMuets }) {
       {/* (11 nov., décision C8 — Julien : « tranche ») L'heure du résumé du soir : le défaut
           INCHANGÉ (19 h l'hiver, 20 h l'été), ou son heure, de 18 h à 22 h (heure de Paris).
           Rangée dans `push_prefs.soirHeure` ; le serveur la lit (api/_lib/notif-textes.js, `soirALHeure`). */}
-      <div className="vrm-np-ligne" data-np-soir={soir.heure == null ? 'defaut' : String(soir.heure)}>
+      {/* (14 nov., passe design 3) Plus de `<select>` natif (règle 3 : un choix est un composant du système) :
+          le segmenté, comme « Regrouper ». « Auto » = le défaut inchangé (19 h l'hiver, 20 h l'été), dit au survol. */}
+      <div className="vrm-np-ligne vrm-np-ligne-col" data-np-soir={soir.heure == null ? 'defaut' : String(soir.heure)}>
         <span className="vrm-np-lib">Résumé du soir<small>Ce qu’il y a à faire demain.</small></span>
-        <select className="vrm-np-soir" aria-label="Heure du résumé du soir" data-np-soir-choix="" value={soir.heure == null ? '' : String(soir.heure)} disabled={!prefs||busy}
-          onChange={(e)=>{ const v = e.target.value; const suite = { ...(prefs || {}) }; if (v === '') delete suite.soirHeure; else suite.soirHeure = Number(v); ecrirePrefs(suite, 'L’heure du résumé'); }}>
-          <option value="">19 h (hiver) · 20 h (été)</option>
-          {HEURES_SOIR.map((h)=><option key={h} value={String(h)}>{h} h</option>)}
-        </select>
+        <div className="vrm-np-choix" data-np-soir-choix="">
+          <Segmente label="Heure du résumé du soir" plein value={soir.heure == null ? '' : String(soir.heure)} disabled={!prefs||busy}
+            onChange={(v)=>{ const suite = { ...(prefs || {}) }; if (v === '') delete suite.soirHeure; else suite.soirHeure = Number(v); ecrirePrefs(suite, 'L’heure du résumé'); }}
+            options={[{ v: '', l: tr('reglages.push.soirAuto'), titre: tr('reglages.push.soirAutoTitre'), data: { 'data-np-soir-opt': '' } }, ...HEURES_SOIR.map((h)=>({ v: String(h), l: `${h} h`, data: { 'data-np-soir-opt': String(h) } }))]}/>
+        </div>
       </div>
       {soirCalme ? <div className="vrm-np-relance" data-np-soir-calme="">Pendant tes heures calmes : il ne sonnera pas.</div> : null}
       {/* (11 nov., lot avis-negatif) Le seuil d'un « avis négatif » : 1★ à 4★, défaut 3★ (src/avisNegatif.js).
           Rangé dans `push_prefs.avisSeuil` ; le serveur le lit avant de décider (api/_lib/avis-negatif.js). */}
-      <div className="vrm-np-ligne" data-np-avis-seuil={String(reglageSeuilAvis(prefs || {}))}>
+      <div className="vrm-np-ligne vrm-np-ligne-col" data-np-avis-seuil={String(reglageSeuilAvis(prefs || {}))}>
         <span className="vrm-np-lib">Avis négatif<small>Prévenu quand un avis Vinted arrive à ce nombre d’étoiles ou moins.</small></span>
-        <select className="vrm-np-soir" aria-label="Seuil d’un avis négatif" data-np-avis-choix="" value={String(reglageSeuilAvis(prefs || {}))} disabled={!prefs||busy}
-          onChange={(e)=>{ const v = Number(e.target.value); const suite = { ...(prefs || {}) }; if (v === SEUIL_AVIS_DEFAUT) delete suite.avisSeuil; else suite.avisSeuil = v; ecrirePrefs(suite, 'Le seuil des avis'); }}>
-          {SEUILS_AVIS.map((n)=><option key={n} value={String(n)}>{n}★ ou moins</option>)}
-        </select>
+        <div className="vrm-np-choix" data-np-avis-choix="">
+          <Segmente label="Seuil d’un avis négatif" plein value={String(reglageSeuilAvis(prefs || {}))} disabled={!prefs||busy}
+            onChange={(x)=>{ const v = Number(x); const suite = { ...(prefs || {}) }; if (v === SEUIL_AVIS_DEFAUT) delete suite.avisSeuil; else suite.avisSeuil = v; ecrirePrefs(suite, 'Le seuil des avis'); }}
+            options={SEUILS_AVIS.map((n)=>({ v: String(n), l: `${n}★`, data: { 'data-np-avis-opt': String(n) } }))}/>
+        </div>
       </div>
       {/* (11 nov., lot `notifs-groupees`) La fenêtre du résumé (api/_lib/notif-groupe.js) :
           la première sonne, les suivantes partent ensemble. L'urgent passe tout de suite. */}
@@ -3929,7 +3932,7 @@ function ObjectifMoisSetting() {
           onChange={(e) => setSaisie(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') enregistrer(); }}
           style={{ flex: '1 1 auto', minWidth: 0, minHeight: 44, boxSizing: 'border-box', padding: '0 12px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, font: 'inherit', fontSize: 15, fontVariantNumeric: 'tabular-nums' }}/>
         <span aria-hidden="true" style={{ color: C.muted }}>{eur ? '€' : 'ventes'}</span>
-        <Bouton variante="principal" disabled={lu == null} onClick={enregistrer} data-reglage-objectif-ok="">Enregistrer</Bouton>
+        <Bouton variante="primaire" disabled={lu == null} onClick={enregistrer} data-reglage-objectif-ok="" style={{ flex: "none", whiteSpace: "nowrap" }}>Enregistrer</Bouton>
       </div>
       {obj ? <div style={{ marginTop: 10 }}><Bouton variante="discret" onClick={() => { poser(objectifAEnregistrer(brut, null)); setSaisie(''); toast('Objectif du mois retiré.'); }} data-reglage-objectif-retirer="">Retirer l’objectif</Bouton></div> : null}
       <div style={{ fontSize: 13, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>Vendu, bénéfice ou ventes : choisis-le dans la carte de Ma journée.</div>

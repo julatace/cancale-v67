@@ -476,6 +476,8 @@ export default {
   "reglages.push.desc": "Aufs Handy benachrichtigt bei Verkauf, Angebot oder Paket.",
   "reglages.push.lib": "Handy-Mitteilungen",
   "reglages.push.muets": { one: "{n} Konto ohne E-Mail: keine Mitteilung", other: "{n} Konten ohne E-Mail: keine Mitteilung" },
+  "reglages.push.soirAuto": "Auto",
+  "reglages.push.soirAutoTitre": "19 Uhr im Winter, 20 Uhr im Sommer",
   "reglages.raccourcis-clavier.desc": "Am Computer: „g“, dann ein Buchstabe, „?“ für die Liste.",
   "reglages.raccourcis-clavier.lib": "Tastenkürzel",
   "reglages.raccourcis-siri.desc": "Einen Einkauf hinzufügen oder eine Nr. finden, per Siri.",

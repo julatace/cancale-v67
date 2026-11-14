@@ -395,14 +395,18 @@ export function nomEnseigne(nom) {
   for (const [k, v] of ENSEIGNES) if (b === k || b.startsWith(k + ' ') || b.startsWith(k + ',') || b.startsWith(k + '-')) return v + n.slice(k.length);
   return n;
 }
+// (14 nov., passe design 3) `d.barre === false` : on ne sait pas où en est le délai (date limite inconnue, colis en
+// vérification, point changé) — la phrase seule, AUCUNE piste dessinée (une barre vide se lit « tout le temps devant
+// soi »). La piste reste dans le DOM, masquée (`is-sans-barre`), pour ceux qui la lisent ; la phrase est lue à sa place.
 export function BarreDelai({ d, enTete = false }) {
   if (!d) return null;
+  const sansBarre = d.barre === false;
   return (
-    <span className={'vrm-rpf-delai' + (d.ambre ? ' is-ambre' : '') + (enTete ? ' is-tete' : '')} data-rp-delai={d.code} data-rp-delai-pct={d.pct} data-rp-delai-ambre={d.ambre ? '1' : '0'} data-rp-delai-estimee={d.estimee ? '1' : undefined} data-rp-delai-tete={enTete ? '1' : undefined}>
+    <span className={'vrm-rpf-delai' + (d.ambre ? ' is-ambre' : '') + (enTete ? ' is-tete' : '') + (sansBarre ? ' is-sans-barre' : '')} data-rp-delai={d.code} data-rp-delai-pct={d.pct} data-rp-delai-ambre={d.ambre ? '1' : '0'} data-rp-delai-estimee={d.estimee ? '1' : undefined} data-rp-delai-tete={enTete ? '1' : undefined} data-rp-delai-barre={sansBarre ? '0' : undefined}>
       <span className="vrm-rpf-delai-piste" role="progressbar" aria-label="Délai pour retirer" aria-valuemin={0} aria-valuemax={100} aria-valuenow={d.pct} aria-valuetext={d.valeurTexte}>
         <span className="vrm-rpf-delai-plein" style={{ width: `${d.pct}%` }}/>
       </span>
-      <span className={'vrm-rpf-delai-txt' + (d.ambre ? ' is-ambre' : '')} data-rp-echeance={d.code} aria-hidden="true">{d.texte}{d.estimee ? <span className="vrm-rpf-delai-est"> · estimée</span> : null}</span>
+      <span className={'vrm-rpf-delai-txt' + (d.ambre ? ' is-ambre' : '')} data-rp-echeance={d.code} aria-hidden={sansBarre ? undefined : 'true'}>{d.texte}{d.estimee ? <span className="vrm-rpf-delai-est"> · estimée</span> : null}</span>
     </span>
   );
 }
@@ -424,7 +428,8 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
   // Seul l'AFFICHAGE change : les mêmes sources, les mêmes règles (`delai`, `echeance`, `titreDe`, `suiviDe`).
   const dl0 = !x.horsCompte && delai ? delai(x) : null;
   const e0 = dl0 ? null : (echeance ? echeance(x) : null);
-  const dl = dl0 || (e0 ? { code: e0.code || 'date', pct: 0, ambre: !!e0.ambre, texte: e0.t, valeurTexte: e0.t } : { code: 'inconnue', pct: 0, ambre: false, texte: 'Date limite inconnue', valeurTexte: 'Date limite inconnue' });
+  // (14 nov., passe design 3) Sans délai CALCULÉ (`delai`), la progression n'est pas sue : la phrase, sans barre.
+  const dl = dl0 || (e0 ? { code: e0.code || 'date', pct: 0, ambre: !!e0.ambre, texte: e0.t, valeurTexte: e0.t, barre: false } : { code: 'inconnue', pct: 0, ambre: false, texte: 'Date limite inconnue', valeurTexte: 'Date limite inconnue', barre: false });
   const e = null;
   const st = statut ? statut(x) : null;
   // (10 nov., retraits irréprochables) Deux sources donnent deux codes différents : rien n'est choisi,
@@ -469,7 +474,7 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
   // place du délai (jamais une question, jamais ambre), même place, même hauteur.
   const verifT = !!(x.src && x.src.t && x.src.t.aVerifierTransporteur);
   // (13 nov.) Un colis REDIRIGÉ, encore en route : une mention neutre (rien à faire), à la place du délai.
-  const dl4 = x.redirige ? { code: 'point-change', pct: 0, ambre: false, texte: 'En route · point changé', valeurTexte: 'En route vers un nouveau point relais' } : verifT ? { code: 'verif-transporteur', pct: 0, ambre: false, texte: 'Vérification en cours', valeurTexte: `Vérification chez ${nomAffiche || 'le transporteur'} en cours` } : dl;
+  const dl4 = x.redirige ? { code: 'point-change', pct: 0, ambre: false, texte: 'En route · point changé', valeurTexte: 'En route vers un nouveau point relais', barre: false } : verifT ? { code: 'verif-transporteur', pct: 0, ambre: false, texte: 'Vérification en cours', valeurTexte: `Vérification chez ${nomAffiche || 'le transporteur'} en cours`, barre: false } : dl;
   // (11 nov., gestes-glisser) Glisser vers la gauche : « Retiré » (principale, le glisser long : `retirer`,
   // le geste annulable 5 s) et « Le code » (le MÊME geste que le bouton « Code » : la ligne s'ouvre, le code
   // est copié ; deux codes en désaccord ⇒ la ligne s'ouvre, rien n'est choisi).

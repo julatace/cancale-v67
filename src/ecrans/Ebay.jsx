@@ -1911,16 +1911,16 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
               {Array.isArray(comptesStatut) && comptesStatut.length === 1 && typeCompteEbayTexte(comptesStatut[0]) && <span data-ebay-compte-type={comptesStatut[0].type} style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 999, padding: '1px 7px' }}>{typeCompteEbayTexte(comptesStatut[0])}</span>}
               {Array.isArray(comptesStatut) && comptesStatut.length === 1 && <div style={{ marginTop: 4 }}><EtatJetonEbay C={C} compte={comptesStatut[0]} busy={busy} onReconnecter={() => connecter(!comptesStatut[0].principal)}/></div>}
             </div>
-            <button type="button" onClick={synchroniser} disabled={syncing}
-              style={{ flexShrink: 0, border: `1px solid ${C.border}`, background: C.card, color: C.text, borderRadius: 12, padding: '9px 13px', cursor: syncing ? 'default' : 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', opacity: syncing ? 0.6 : 1 }}>
+            {/* (14 nov., passe design 3) Le geste secondaire du système (capsule), plus un rectangle encadré. */}
+            <Bouton variante="secondaire" onClick={synchroniser} disabled={syncing} style={{ flexShrink: 0 }}>
               {syncing ? 'Lecture eBay…' : 'Actualiser'}
-            </button>
+            </Bouton>
           </div>
           {/* (9 octobre) SES COMPTES eBAY : chacun nommé (son pseudo eBay), relié
               ou non, et « Déconnecter » — qui ne touche pas aux autres. La liste
               n'apparaît qu'à partir de deux comptes (un seul : rien ne change). */}
           {Array.isArray(comptesStatut) && comptesStatut.length >= 2 && (
-            <div data-ebay-comptes={comptesStatut.length} style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '10px 12px', marginBottom: 10 }}>
+            <div data-ebay-comptes={comptesStatut.length} style={{ background: 'var(--d-case)', borderRadius: 12, padding: '10px 12px', marginBottom: 10 }}>
               <div style={{ ...eti, marginBottom: 6 }}>Tes comptes eBay</div>
               {comptesStatut.map((c) => {
                 const ref = c.principal ? 'principal' : c.cle; const etat = deconnexion[ref];
@@ -1939,21 +1939,20 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
             </div>
           )}
           <div style={{ marginBottom: 10 }}>
-            <button type="button" data-ebay-connecter-autre onClick={() => connecter(true)} disabled={busy}
-              style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 12, padding: '9px 13px', cursor: busy ? 'default' : 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', opacity: busy ? 0.6 : 1 }}>
+            <Bouton variante="secondaire" data-ebay-connecter-autre="" onClick={() => connecter(true)} disabled={busy}>
               {busy ? 'Ouverture d\'eBay…' : '+ Connecter un autre compte eBay'}
-            </button>
+            </Bouton>
             <div style={{ fontSize: 11, color: C.muted, marginTop: 4, lineHeight: 1.45 }}>Choisis l'AUTRE compte chez eBay. Chacun garde ses ventes à part.</div>
           </div>
           {/* (11 nov.) Les réglages que chaque nouvelle annonce reprend. */}
-          <div data-ebay-defauts-ligne="" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '10px 12px', marginBottom: 10 }}>
+          <div data-ebay-defauts-ligne="" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', background: 'var(--d-case)', borderRadius: 12, padding: '10px 12px', marginBottom: 10 }}>
             <div style={{ flex: '1 1 180px', minWidth: 0 }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{tr('ebay.param.titreDefauts')}</div>
               <div data-ebay-defauts-resume={resumeReglagesEbay(defautsEbay).length} style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{resumeReglagesEbay(defautsEbay).length ? resumeReglagesEbay(defautsEbay).map((x) => tr(x.cle, x.vars)).join(' · ') : tr('ebay.param.commeAvant')}</div>
             </div>
             <Bouton variante="secondaire" data-ebay-defauts-ouvrir="" onClick={ouvrirDefauts}>{tr('ebay.param.regler')}</Bouton>
           </div>
-          <details style={{fontSize:12,marginBottom:12}}><summary style={{cursor:'pointer'}}>Synchronisation par compte</summary><div style={{display:'grid',gap:8,marginTop:10}}>{(data?.lectures || []).map(l=>{const result=syncResult[l.compte.ref];const lecture=(v)=>v===undefined?'Lecture indisponible':v===null?'Jamais lu':Number(v.capturedAt)>0?new Date(Number(v.capturedAt)).toLocaleString('fr-FR'):'Date inconnue';return <div key={l.compte.ref} data-ebay-sync-compte={l.compte.ref} style={{border:`1px solid ${C.border}`,borderRadius:12,padding:10}}><b>{nomCompteEbay(l.compte)}</b><div style={{color:C.muted,fontSize:11,marginTop:4}}>Annonces : {lecture(l.annonces)}{l.annonces && l.annonces.complet!==true?' · partiel':''}<br/>Commandes : {lecture(l.commandes)}{l.commandes && l.commandes.complet!==true?' · partiel':''}</div>{l.commandes?.lecture!=null && <p style={{fontSize:11,color:C.muted}}>{l.commandes.lecture}{l.commandes.totalLecture!=null?` sur ${l.commandes.totalLecture}`:''} commandes pour cette lecture eBay</p>}{commandesSuite[l.compte.ref] && <p role="status" style={{fontSize:11}}>{commandesSuite[l.compte.ref]}</p>}{result && <p role="status" style={{fontSize:11}}>{result.etat==='lecture'?'Lecture en cours…':result.etat==='ok'?'Actualisé':result.etat==='partiel'?[result.manque?.length?`Non relu : ${result.manque.join(', ')}.`:'',result.incompletes?.length?`Lecture partielle : ${result.incompletes.join(', ')}.`:'','Historique conservé.'].filter(Boolean).join(' '):'Lecture échouée. Dernières données conservées.'}</p>}<button type="button" disabled={syncing} onClick={()=>synchroniser(l.compte.ref)} style={{marginTop:6,border:`1px solid ${C.border}`,borderRadius:12,background:C.card,color:C.text,padding:'6px 9px',cursor:'pointer'}}>{result && (result.etat==='erreur' || result.manque?.length)?'Reprendre ce compte':'Actualiser ce compte'}</button>{l.commandes?.complet!==true && <button type="button" disabled={syncing} onClick={()=>chargerPlusCommandes(l.compte.ref)} style={{marginTop:6,marginLeft:6,border:`1px solid ${C.border}`,borderRadius:12,background:C.card,color:C.text,padding:'6px 9px',cursor:'pointer'}}>Lire davantage de commandes</button>}</div>;})}</div></details>
+          <details style={{fontSize:12,marginBottom:12}}><summary style={{cursor:'pointer',minHeight:'var(--d-h-ctrl)',display:'flex',alignItems:'center'}}>Synchronisation par compte</summary><div style={{display:'grid',gap:8,marginTop:10}}>{(data?.lectures || []).map(l=>{const result=syncResult[l.compte.ref];const lecture=(v)=>v===undefined?'Lecture indisponible':v===null?'Jamais lu':Number(v.capturedAt)>0?new Date(Number(v.capturedAt)).toLocaleString('fr-FR'):'Date inconnue';return <div key={l.compte.ref} data-ebay-sync-compte={l.compte.ref} style={{border:`1px solid ${C.border}`,borderRadius:12,padding:10}}><b>{nomCompteEbay(l.compte)}</b><div style={{color:C.muted,fontSize:11,marginTop:4}}>Annonces : {lecture(l.annonces)}{l.annonces && l.annonces.complet!==true?' · partiel':''}<br/>Commandes : {lecture(l.commandes)}{l.commandes && l.commandes.complet!==true?' · partiel':''}</div>{l.commandes?.lecture!=null && <p style={{fontSize:11,color:C.muted}}>{l.commandes.lecture}{l.commandes.totalLecture!=null?` sur ${l.commandes.totalLecture}`:''} commandes pour cette lecture eBay</p>}{commandesSuite[l.compte.ref] && <p role="status" style={{fontSize:11}}>{commandesSuite[l.compte.ref]}</p>}{result && <p role="status" style={{fontSize:11}}>{result.etat==='lecture'?'Lecture en cours…':result.etat==='ok'?'Actualisé':result.etat==='partiel'?[result.manque?.length?`Non relu : ${result.manque.join(', ')}.`:'',result.incompletes?.length?`Lecture partielle : ${result.incompletes.join(', ')}.`:'','Historique conservé.'].filter(Boolean).join(' '):'Lecture échouée. Dernières données conservées.'}</p>}<button type="button" disabled={syncing} onClick={()=>synchroniser(l.compte.ref)} style={{marginTop:6,border:`1px solid ${C.border}`,borderRadius:12,background:C.card,color:C.text,padding:'6px 9px',cursor:'pointer'}}>{result && (result.etat==='erreur' || result.manque?.length)?'Reprendre ce compte':'Actualiser ce compte'}</button>{l.commandes?.complet!==true && <button type="button" disabled={syncing} onClick={()=>chargerPlusCommandes(l.compte.ref)} style={{marginTop:6,marginLeft:6,border:`1px solid ${C.border}`,borderRadius:12,background:C.card,color:C.text,padding:'6px 9px',cursor:'pointer'}}>Lire davantage de commandes</button>}</div>;})}</div></details>
           <details className="vrm-ebay-settings"><summary>Solde et paramètres du compte</summary>
           {data == null ? (
             <div style={{ fontSize: 13, color: C.muted }}>{syncing ? 'Première lecture de ton compte eBay…' : 'Chargement…'}</div>
