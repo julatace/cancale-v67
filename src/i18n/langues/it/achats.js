@@ -353,4 +353,5 @@ export default {
   "achats.ms.investi": "Investito",
   "achats.ms.marge": "Margine",
   "achats.ms.pourRevendre": "Per rivendere",
+  "achats.selectionner": "Seleziona",
 };

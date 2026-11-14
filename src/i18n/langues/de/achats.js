@@ -353,4 +353,5 @@ export default {
   "achats.ms.investi": "Investiert",
   "achats.ms.marge": "Marge",
   "achats.ms.pourRevendre": "Bis Verkauf",
+  "achats.selectionner": "Auswählen",
 };

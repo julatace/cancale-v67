@@ -23,8 +23,11 @@ require('./_porte-banc.cjs');
 //   F5 des tuiles : au moins 3 chiffres ≥ 28 px par source ;
 //   F6 aucun montant (€) à la couleur d'accent hors d'un lien ou d'un bouton ;
 //   F7 la rangée d'achat : 64–76 px de haut au téléphone, vignette 48–56 px ;
-//   F8 la carte héros d'Achats (`data-achats-hero`) : un chiffre ≥ 40 px, et elle
-//      tient au plus 40 % du premier écran du téléphone.
+//   F8 les chiffres d'Achats (`data-achats-hero`) en BANDE : ≥ 3 chiffres, ≤ 72 px, sans
+//      carte sombre (AJOUT 3 : la carte sombre reste à Ma journée seulement) ;
+//   F9 la liste d'abord : Achats ne pose qu'un quart d'écran au-dessus de sa 1re ligne (la position
+//      dans l'écran entier est dite : la coque y ajoute titre, fraîcheur et choix du compte) ;
+//   F10 au plus UN bouton plein à l'accent à l'écran.
 //
 //  À 1 000 ACHATS (390 tactile, aucun compte choisi : la liste à plat) :
 //   P1 premier rendu de la liste (ms, de la navigation à la 1re rangée) ;
@@ -131,7 +134,14 @@ async function ouvrir(nav, { W, sombre, choisi }) {
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return json(m === 'GET' ? ACCOUNTS : []);
     if (!/\/rest\/v1\/app_data/.test(u)) return json([]);
     if (process.env.BANC_SONDE && /main/.test(u)) console.log('  · ' + m + ' ' + u.slice(0, 220));
-    if (m !== 'GET') return json([], 201);
+    if (m !== 'GET') {
+      // Une écriture ACCEPTÉE rend ses lignes (`return=representation`, `select=id`) : sans elles, l'app y lit un
+      // conflit et empile « N changements en attente d'envoi » sur l'écran (rien n'est gardé : base de banc).
+      let corps = null; try { corps = JSON.parse(req.postData() || 'null'); } catch (_) {}
+      const id = (/[?&]id=eq\.([^&]+)/.exec(u) || [])[1];
+      const rows = Array.isArray(corps) ? corps.map((l) => ({ id: l && l.id })) : [{ id: (corps && corps.id) || id || 'main' }];
+      return json(rows, m === 'POST' ? 201 : 200);
+    }
     // Base non cloisonnée : toutes les lignes sont au vendeur de la session (la porte de banc pose l'owner).
     const r = servir(lignes.map((l) => ({ updated_at: iso(0), ...l })), u.replace(/([?&])owner=eq\.[^&]*&?/, '$1'), req.headers()); return json(r.body, 200, r.range);
   });
@@ -150,6 +160,7 @@ async function blocF(nav, W, sombre) {
   try {
     await attendreListe(pg); await pg.waitForTimeout(2500);
     if (process.env.BANC_SONDE) console.log(await pg.evaluate(() => JSON.stringify(['vinted_sale_overrides', 'vinted_offvinted_buys', 'vinted_annonce_numeros', 'vrm_meilleures_sources'].map((k) => [k, (localStorage.getItem(k) || '').slice(0, 200)]))));
+    if (process.env.BANC_SONDE2) console.log(await pg.evaluate(() => { for (const c of document.querySelectorAll('.vrm-main')) c.scrollTop = 0; const h = document.querySelector('[data-achats-hero]'); const out = []; for (let x = h; x && !x.classList.contains('vrm-main'); x = x.parentElement) { const r = x.getBoundingClientRect(); const cs = getComputedStyle(x); out.push(`${x.tagName}.${String(x.className).slice(0, 40)} top=${Math.round(r.top)} pt=${cs.paddingTop} mt=${cs.marginTop}`); let p = x.previousElementSibling; let k = 0; while (p && k < 4) { const q = p.getBoundingClientRect(); if (q.height > 0) out.push(`   ↑ ${p.tagName}.${String(p.className).slice(0, 40)} top=${Math.round(q.top)} h=${Math.round(q.height)} mb=${getComputedStyle(p).marginBottom}`); p = p.previousElementSibling; k++; } } return out.join('\n'); }));
     if (process.env.BANC_SONDE) console.log(await pg.evaluate(() => { const a = [...document.querySelectorAll('.vrm-achats')].find((x) => x.getBoundingClientRect().height > 0); const pa = a && a.parentElement; return [...(pa ? pa.children : [])].map((e) => `${e.tagName}.${String(e.className).slice(0, 50)} [${[...e.attributes].filter((x) => x.name.startsWith('data-')).map((x) => x.name).slice(0, 2)}] h=${Math.round(e.getBoundingClientRect().height)}`).join('\n') + '\n--- dans .vrm-achats\n' + [...(a ? a.children : [])].map((e) => `${e.tagName}.${String(e.className).slice(0, 50)} [${[...e.attributes].filter((x) => x.name.startsWith('data-')).map((x) => x.name).slice(0, 2)}] h=${Math.round(e.getBoundingClientRect().height)}`).join('\n'); }));
     if (process.env.BANC_SONDE) console.log(await pg.evaluate(() => { const r = [...document.querySelectorAll('.vrm-achats .vrm-buy-row')].find((x) => x.getBoundingClientRect().height > 0); if (!r) return 'pas de rangée'; const R = r.getBoundingClientRect(); return [r, ...r.querySelectorAll('*')].slice(0, 30).map((e) => { const b = e.getBoundingClientRect(); const cs = getComputedStyle(e); return `${e.tagName}.${String(e.className).slice(0, 30)} x=${Math.round(b.left - R.left)} y=${Math.round(b.top - R.top)} w=${Math.round(b.width)} h=${Math.round(b.height)} ga=${cs.gridArea} mw=${cs.maxWidth} d=${cs.display}`; }).join('\n'); }));
     const tag = `${W}${sombre ? '-sombre' : ''}`;
@@ -215,7 +226,19 @@ async function blocF(nav, W, sombre) {
       out.rangees = [...document.querySelectorAll('.vrm-achats .vrm-buy-row')].filter(vis).slice(0, 6).map((r) => { const ph = r.querySelector('.vrm-buy-ph'); return { h: Math.round(r.getBoundingClientRect().height), ph: ph ? Math.round(ph.getBoundingClientRect().width) : 0 }; });
       // F8 — la carte héros.
       const hero = document.querySelector('.vrm-achats [data-achats-hero]');
-      out.hero = hero ? { h: Math.round(hero.getBoundingClientRect().height), grand: Math.max(0, ...[...hero.querySelectorAll('*')].filter((e) => e.children.length === 0 && /\d/.test(e.textContent || '')).map((e) => parseFloat(getComputedStyle(e).fontSize))) } : null;
+      out.hero = hero ? { h: Math.round(hero.getBoundingClientRect().height), sombre: (() => { const av = getComputedStyle(hero, '::before'); const bg = getComputedStyle(hero).backgroundColor; return (av.content !== 'none' && /gradient|rgb/.test(av.backgroundImage + av.backgroundColor) && !/rgba\(0, 0, 0, 0\)/.test(av.backgroundColor + '')) || !/rgba\(0, 0, 0, 0\)|transparent/.test(bg); })(),
+        chiffres: [...hero.querySelectorAll('b, .vrm-fu-grand')].filter((e) => vis(e) && /\d/.test(e.textContent || '')).length } : null;
+      // F9 — la liste d'abord : sa 1re ligne (en-tête de groupe ou rangée) est sur le PREMIER écran, à mi-hauteur au plus.
+      for (const c of document.querySelectorAll('.vrm-main')) c.scrollTop = 0;
+      const liste = [...document.querySelectorAll('.vrm-achats .vrm-buy-list')].find((l) => l.querySelector('.vrm-buy-row') && vis(l));
+      const prem = liste && [...liste.children].find(vis);
+      out.premiere = prem ? Math.round(prem.getBoundingClientRect().top) : null;
+      // Ce qu'Achats pose lui-même au-dessus de sa liste (depuis le haut de son écran) : un QUART de l'écran au plus — le
+      // reste (grand titre, choix du compte, ligne de fraîcheur) appartient à la coque.
+      const ecr = [...document.querySelectorAll('.vrm-achats')].find(vis);
+      out.dansAchats = prem && ecr ? Math.round(prem.getBoundingClientRect().top - ecr.getBoundingClientRect().top) : null;
+      // F10 — au plus UN bouton plein à l'accent visible.
+      out.pleins = [...document.querySelectorAll('.vrm-main button, .vrm-main a')].filter((x) => { if (!vis(x)) return false; const r = x.getBoundingClientRect(); if (r.bottom < 0 || r.top > innerHeight) return false; return bleu(getComputedStyle(x).backgroundColor); }).map((x) => (x.innerText || x.getAttribute('aria-label') || '').trim().slice(0, 24));
       out.vh = innerHeight;
       return out;
     });
@@ -228,7 +251,11 @@ async function blocF(nav, W, sombre) {
     dit(m.sources && m.sources.tuiles >= 3, `${T} F5 des tuiles : ≥ 3 chiffres d'au moins 28 px par source`, m.sources && m.sources.tuiles);
     dit(!m.accent.length, `${T} F6 aucun montant à la couleur d'accent`, m.accent.slice(0, 3).join(' | '));
     if (tel) dit(m.rangees.length >= 2 && m.rangees.every((r) => r.h >= 64 && r.h <= 76 && r.ph >= 48 && r.ph <= 56), `${T} F7 rangée d'achat 64–76 px, vignette 48–56 px`, JSON.stringify(m.rangees.slice(0, 3)));
-    dit(!!m.hero && m.hero.grand >= 40 && (!tel || m.hero.h <= 0.4 * m.vh), `${T} F8 une carte héros : un chiffre ≥ 40 px, ≤ 40 % du premier écran`, JSON.stringify(m.hero));
+    dit(!!m.hero && !m.hero.sombre && m.hero.h <= 72 && m.hero.chiffres >= 3, `${T} F8 une BANDE de chiffres (≥ 3), ≤ 72 px, sans carte sombre (AJOUT 3)`, JSON.stringify(m.hero));
+    // F9 : Achats ne pose au-dessus de sa liste qu'un QUART de l'écran (bande + barre + recherche) ; l'écran entier vise la
+    // mi-hauteur (AJOUT 3) — la part de la coque (titre, phrase, fraîcheur, comptes) est dite, pas jugée ici.
+    if (tel) dit(m.dansAchats != null && m.dansAchats <= m.vh / 4, `${T} F9 la liste d'abord : Achats pose ≤ ${m.vh / 4} px au-dessus de sa 1re ligne (écran entier : ${m.premiere} px, visé ≤ ${m.vh / 2})`, m.dansAchats);
+    dit(m.pleins.length <= 1, `${T} F10 au plus un bouton plein à l'accent à l'écran`, JSON.stringify(m.pleins));
     await pg.evaluate(() => { const e = document.querySelector('.vrm-achats [data-stats-carte="meilleures-sources"]'); if (e) e.scrollIntoView({ block: 'start' }); for (const c of document.querySelectorAll('.vrm-main')) c.scrollTop -= 110; });
     await pg.waitForTimeout(500);
     await capture(pg, `sources-${tag}`);

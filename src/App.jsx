@@ -30617,6 +30617,37 @@ function useObjectifMois() {
 // ⟦→ ecrans/Stats.jsx #19⟧
 const lirePub = (cle) => () => { try { const v = load(cle, null); return v && typeof v === 'object' ? v : null; } catch (_) { return null; } };
 const lireColisAPoster = lirePub('vrm_colis_aposter'), lireColisARetirer = lirePub('vrm_colis_retirer'), lirePairesDorment = lirePub('vrm_paires_dorment');
+// (14 nov., refonte Achats — AJOUT 3 de Julien : « la liste arrive après 1,5 écran ») Sur Achats, « À retirer »
+// (points relais, codes, QR, Mode relais, ses outils) se range dans UNE ligne « À retirer · N › » qui l'ouvre sur
+// place : la liste des achats arrive sur le premier écran. RIEN n'est démonté (la section reste montée, `hidden`) :
+// ses publications (`vrm_colis_retirer`, codes, rappels) continuent. Elle s'OUVRE seule quand on vient pour un
+// retrait (anciens chemins Colis / À retirer, notification d'un colis, Ma journée : `DEMANDE_RETIRER`), et reste
+// ouverte si on l'a ouverte (`vrm_achats_retirer_ouvert`, cet appareil). Le nombre est LA publication
+// (`pickupUnion.total`, la même que Ma journée) ; pas lue ⇒ « — ». Point ambre : un retrait pressé (`urgents`).
+const DEMANDE_RETIRER = { at: 0 };
+const demanderRetirer = () => { DEMANDE_RETIRER.at = Date.now(); try { window.dispatchEvent(new Event('vrm:retirer-ouvrir')); } catch (_) {} };
+const CLE_RETIRER_OUVERT = 'vrm_achats_retirer_ouvert';
+// `sansLigne` (Achats · Vinted) : la bande de chiffres porte déjà « À retirer · N » (sa case mène ici : `retraits`) ;
+// la ligne ne se montre alors qu'OUVERTE, pour refermer — jamais le même nombre deux fois à l'écran (§7).
+function RepliRetirerAchats({ children, sansLigne = false }) {
+  const [pub] = useLigneSynchro('vrm_colis_retirer', lireColisARetirer);
+  const [ouvert, setOuvert] = React.useState(() => { if (Date.now() - DEMANDE_RETIRER.at < 8000) return true; try { return localStorage.getItem(CLE_RETIRER_OUVERT) === '1'; } catch (_) { return false; } });
+  React.useEffect(() => { const o = () => setOuvert(true); window.addEventListener('vrm:retirer-ouvrir', o); return () => window.removeEventListener('vrm:retirer-ouvrir', o); }, []);
+  const basculer = () => setOuvert((o) => { const v = !o; try { localStorage.setItem(CLE_RETIRER_OUVERT, v ? '1' : '0'); } catch (_) {} return v; });
+  const n = pub && Number.isFinite(pub.total) ? pub.total : null;
+  const presse = !!(pub && Number(pub.urgents) > 0);
+  return (
+    <div className="vrm-achats-retirer-repli" data-retirer-repli={ouvert ? 'ouvert' : 'ferme'}>
+      <button type="button" className="vrm-achats-retirer-ligne" hidden={sansLigne && !ouvert} aria-expanded={ouvert} aria-controls="vrm-achats-retirer-corps" onClick={basculer} data-retirer-n={n == null ? '' : String(n)} data-retirer-presse={presse ? '1' : '0'}>
+        {presse ? <span className="vrm-achats-retirer-point" aria-hidden="true"/> : null}
+        <span className="vrm-achats-retirer-titre">{tr('journee.retirer')}</span>
+        <span className="vrm-achats-retirer-n">{n == null ? '—' : n}</span>
+        <span className="vrm-achats-retirer-chevron" aria-hidden="true">›</span>
+      </button>
+      <div id="vrm-achats-retirer-corps" hidden={!ouvert}>{children}</div>
+    </div>
+  );
+}
 // (9 nov., lot AC) « À TRANCHER » : les lignes (src/aTrancher.js), lues des publications
 // des écrans propriétaires — la coque (badge, écran) et Ma journée (sa ligne) lisent ce
 // MÊME calcul. Relu à chaque publication et toutes les 5 min (une publication vieillit).
@@ -47259,7 +47290,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             déjà « Scanner » en tête de l'onglet (mode retrait) ; il ne reste que dans l'espace plateforme → Achats. */}
         {/* (11 nov., lot DJ3) « Scanner » au point relais vit dans la barre de la section « À retirer », en tête
             d'Achats (une fois) : ici, la calculette seule. */}
-        {dansPlateforme && !modeRetraits ? <div className="vrm-achats-scan" data-achats-scan="" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>{boutonCalculette}</div> : null}
+        {/* (14 nov., refonte Achats) La calculette vit dans la barre de recherche quand la liste a des achats (une barre d'outils). */}
+        {dansPlateforme && !modeRetraits && !(buysBase.length>0 && aFilter!=='attente') ? <div className="vrm-achats-scan" data-achats-scan="" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>{boutonCalculette}</div> : null}
         {/* (3 nov.) LA carte d'Achats parle d'ACHATS (jamais « Vendu · mois ») : Dépensé du mois (la règle de la
             case « Dépensé » plus bas — hors annulés, `montantCommande` — sur le mois en cours), En route et Reçus
             (les nombres des onglets, `phaseReception`), À retirer (`vrm_colis_retirer`). Aucun nombre recalculé. */}
@@ -47278,11 +47310,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const depense = depS ? depS.total : null;
           const depPartiel = !!(depS && (depS.partiel || comptesKO > 0));
           const n = { route: 0, recu: 0 }; if (lu) buysBase.forEach((o) => { const ph = phaseReception(o); if (n[ph] != null) n[ph]++; });
-          // (14 nov., refonte Achats — direction « Atelier ») LA carte héros d'Achats : le même chiffre, et les PHOTOS des
-          // paires achetées ce mois-ci en pile (chacune par SON achat, `orderPhoto` — jamais un titre ; §5).
-          const pileMois = lu ? { srcs: ordreRecent(mois, quandCommandeVinted).map((o) => orderPhoto(o)), n: mois.length, Photo: PhotoVinted, mortes: imgMortes, onMorte: noterImgMorte } : null;
+          // (14 nov., refonte Achats — AJOUT 3 de Julien : pas de carte sombre hors de Ma journée) LA même carte réglable,
+          // dessinée en BANDE de chiffres compacte (styles-achats-photos.css §5) : mêmes chiffres, « Modifier », « ? ».
           return <CarteStatsApp page="achats" aide liveStats={liveStats} className="vrm-fu-ecran vrm-achats-hero" ici="achats" onNav={onNav} sel={{ site: 'toutes', compte: null, periode: null }}
-            attrs={{ 'data-achats-hero': '' }} pile={pileMois}
+            attrs={{ 'data-achats-hero': '' }}
             locaux={{
               depense: { nom: 'Dépensé du mois', court: tr('achats.depense'), type: 'eur', aide: tr('achats.achatsMoisHors'), valeur: depense, partiel: depPartiel, manque: depPartiel ? [...(depS.partiel ? [`${depS.manque} prix pas lu${depS.manque > 1 ? 's' : ''}`] : []), ...(comptesKO ? [`${comptesKO} compte${comptesKO > 1 ? 's' : ''} pas relu${comptesKO > 1 ? 's' : ''}`] : [])] : [], couverture: depS && depS.partiel ? `${depS.connus} sur ${depS.n}` : '', ...enLecture, quand: (() => { const m = m0.toLocaleDateString('fr-FR', { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1); })(), attrs: { 'data-n': lu ? String(mois.length) : '' } },
               enroute: { nom: 'En route', court: tr('achats.route'), type: 'n', aide: tr('achats.achatsPayesExpedies'), valeur: lu ? n.route : null, ...enLecture, attrs: { 'data-n': lu ? String(n.route) : '' } },
@@ -47342,6 +47373,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <button type="button" key={id} className="vrm-seg-btn" data-achats-onglet={id} data-n={cnt==null?undefined:String(cnt)} onClick={()=>setAFilter(id)} aria-pressed={aFilter===id} aria-label={cnt?`${label} ${cnt}`:undefined} style={{whiteSpace:'nowrap'}}>{label}{cnt&&!dejaDit(id)?<span className="vrm-seg-n" title={String(cnt)}> {cnt>=1000?`${(Math.floor(cnt/100)/10).toLocaleString('fr-FR')} k`:cnt}</span>:null}</button>
           )); })()}
         </div>
+        {achatsAffiches.length>1 && !serieAchats.actif && serieAchats.total ? <button type="button" className="vrm-icon-control vrm-achats-selection" data-serie-ouvrir={serieAchats.nom} aria-label={tr('achats.selectionner')} title={tr('achats.selectionner')} onClick={()=>serieAchats.ouvrir()}><Icon name="check" size={20}/></button> : null}
         {!baseKO && <button type="button" className="vrm-icon-control vrm-achats-plus" data-achats-plus={achatsOutilsOuverts?'ouvert':'ferme'} aria-expanded={achatsOutilsOuverts} aria-controls="vrm-achats-outils" aria-label={tr('achats.plusFournisseursDelai')} title={tr('achats.fournisseursDelaiLots')} onClick={()=>setAchatsOutilsOuverts(v=>!v)}><Icon name="more" size={20}/></button>}
         </div>}
         {/* (31 oct., soir) Achats ne montre plus les colis à retirer : une ligne mène
@@ -47441,7 +47473,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <label className="vrm-msg-search vrm-achats-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label={tr('achats.rechercherAchat')} value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder={tr('achats.titreVendeur')}
             style={{color:C.text,background:'transparent',border:0,boxShadow:'none'}}/><MicDictee nu titre={tr('achats.chercherVoixNumero')} onDirect={setOrdSearch} onText={(t)=>setOrdSearch(requeteDeLaVoix(t).requete)}/></label>
         )}
-        <PeriodePicker value={periode} onChange={setPeriode} titre={tr('achats.periodeAchats')} datation="Date d’achat"/></div>}
+        <PeriodePicker value={periode} onChange={setPeriode} titre={tr('achats.periodeAchats')} datation="Date d’achat"/>{dansPlateforme && !modeRetraits ? boutonCalculette : null}</div>}
         {/* ── LES CHIFFRES DE L'ACHAT (l'écran n'en avait AUCUN) ─────────────────
             « C'est mon métier, fais ça comme un pro. » L'écran Ventes porte
             quatre chiffres depuis toujours ; Achats, zéro — alors que l'achat,
@@ -48471,30 +48503,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           onGarder={garderAchatDouble} onReafficher={reafficherHorsDouble} Photo={PhotoVinted} Icon={Icon} photo={(a) => (a.source === 'vinted' ? orderPhoto(a.achat) || '' : '')} prixAchat={(a) => (a.source === 'vinted' ? (a.achat && a.achat.price && a.achat.price.amount != null ? Number(a.achat.price.amount) : null) : prixAchatHorsNombre(a.achat))}
           compte={(a) => (a.source === 'vinted' && a.achat && a.achat._acc ? accNameOf(a.achat._acc) : '')} quand={(a) => (a.source === 'vinted' ? quandCommandeVinted(a.achat) : (a.achat && a.achat.date ? Date.parse(String(a.achat.date).length === 10 ? a.achat.date + 'T12:00:00' : a.achat.date) : null))}/>}
         {!modeRetraits && <AchatsParEmail lireTout={lireTout} offBuys={offBuysTous || []} onAjouter={addOffBuy} onModifier={updOffBuy} C={C}/>}
-        {/* (11 nov., lot pas-en-ligne) « Achetés, pas en ligne » : l'entrée de la liste sur l'écran Achats,
-            seulement quand il y a quelque chose (prouvé ou à confirmer). Le nombre écrit est le PROUVÉ. */}
-        {!modeRetraits && pasEnLigneJ && (pasEnLigneJ.liste.length || pasEnLigneJ.aConfirmer.length) ? (
-          <button type="button" className="vrm-pel-entree" data-pel-entree={String(pasEnLigneJ.liste.length)} onClick={() => setFeuillePasEnLigne(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', minHeight: 52, padding: '8px 14px', marginBottom: 12, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, color: C.text, fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}>
-            <Icon name="box" size={18} style={{ color: C.muted, flexShrink: 0 }}/>
-            <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600 }}>{tr('pasEnLigne.titre')}</span>
-            <span style={{ fontSize: 13, color: C.muted, whiteSpace: 'nowrap' }}>{[pasEnLigneJ.liste.length ? String(pasEnLigneJ.liste.length) : null, pasEnLigneJ.aConfirmer.length ? tr('pasEnLigne.aConfirmer', { n: pasEnLigneJ.aConfirmer.length }) : null].filter(Boolean).join(' · ')} ›</span>
-          </button>
-        ) : null}
-        {curSub === 'achats' && feuillePasEnLigne ? (
-          <SheetShell titre={tr('pasEnLigne.titre')} sousTitre={tr('pasEnLigne.sousTitre')} onClose={() => setFeuillePasEnLigne(false)} maxWidth={620} data-feuille-pas-en-ligne="">
-            {detailPasEnLigne}
-          </SheetShell>
-        ) : null}
-        {curSub === 'achats' ? feuilleCreerPel : null}
-        {!modeRetraits && <AchatsHorsPlateforme achats={offBuys} ouvert={offSecOpen} onBasculer={setOffSecOpen} facture={facturesAchat} importer={importAchats}
-          onAjouter={addOffBuy} onModifier={updOffBuy} onSupprimer={delOffBuy}
-          paires={annBase.filter(it=>String((numeros[it.id]||{}).numero||'').trim()).map(it=>({ id: it.id, num: String((numeros[it.id]||{}).numero), title: it.title||'' })).sort((a,b)=>String(a.num).localeCompare(String(b.num),'fr',{numeric:true}))}
-          prochainNumero={horsLigneVue ? null : nextNumero} onReserverNumero={recordUsed} horsLigne={horsLigneVue} garderPhotoHorsLigne={garderPhotoHorsLigne}
-          lot={horsLigneVue ? null : { creer: (d) => creerGrosLot(d, { vinted_offvinted_buys: setOffBuys, vinted_buyprice_by_num: setBuyByNum }), moiMeme: numeroEcritActif(), apercu: apercuNumerosLot, cases: casesLotApercu, cleNum }}
-          stock={Array.isArray(listings.items)&&!listings.error?stockPourModele:null}
-          chargerStock={()=>{ if (accounts.length && listings.items===null && !listings.loading) loadListings(false, true); }}
-          onPrixParNumero={(nm,pr)=>setBuyByNum(prev=>{ const u={...prev,[nm]:pr}; save('vinted_buyprice_by_num',u); return u; })}/>}
         {/* (Ancien bloc « Colis en route » retiré : le suivi est maintenant DANS
             chaque ligne d'achat ci-dessous — photo + statut + progression + Suivre.) */}
         {/* (la barre d'outils est remontée sous le titre, comme sur Ventes) */}
@@ -48536,7 +48544,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const unCompte = cptes.length===1 ? (tranche.find(({o})=>o._acc)||{}).o._acc : null;
           return (<>
         {unCompte && tranche.length>1 && <div className="vrm-buy-compte" style={{color:C.muted}}>{tr('achats.tous')} <AcctTag acc={unCompte} name={accNameOf(unCompte)}/></div>}
-        {tranche.length>1 && <div className="vrm-serie-entree" style={{display:'flex',justifyContent:'flex-end'}}><OuvrirSerie serie={serieAchats}/></div>}
+        {/* (14 nov., refonte Achats — AJOUT 3) « Sélectionner » vit dans la barre des étapes (une icône), plus sur sa ligne. */}
         <BarreSerie serie={serieAchats} actions={actionsSerieAchats()} rendreIcone={iconeApp}/>
         <div className="vrm-buy-list" style={{background:C.card,border:tranche.length?`1px solid ${C.border}`:'none'}}>
           {tranche.map((x,i)=>{
@@ -48693,6 +48701,35 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </Bouton>
         )}
         </>}
+        {/* (14 nov., refonte Achats — AJOUT 3 de Julien : « la liste d'abord ») « Achetés, pas en ligne » et « Achats hors
+            plateforme » (avec « + Ajouter ») passent SOUS la liste : les mêmes blocs, les mêmes gestes, la liste arrive
+            sur le premier écran. */}
+        <div className="vrm-achats-apres-liste" data-achats-apres-liste="">
+        {/* (11 nov., lot pas-en-ligne) « Achetés, pas en ligne » : l'entrée de la liste sur l'écran Achats,
+            seulement quand il y a quelque chose (prouvé ou à confirmer). Le nombre écrit est le PROUVÉ. */}
+        {!modeRetraits && pasEnLigneJ && (pasEnLigneJ.liste.length || pasEnLigneJ.aConfirmer.length) ? (
+          <button type="button" className="vrm-pel-entree" data-pel-entree={String(pasEnLigneJ.liste.length)} onClick={() => setFeuillePasEnLigne(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', minHeight: 52, padding: '8px 14px', marginBottom: 12, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, color: C.text, fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}>
+            <Icon name="box" size={18} style={{ color: C.muted, flexShrink: 0 }}/>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600 }}>{tr('pasEnLigne.titre')}</span>
+            <span style={{ fontSize: 13, color: C.muted, whiteSpace: 'nowrap' }}>{[pasEnLigneJ.liste.length ? String(pasEnLigneJ.liste.length) : null, pasEnLigneJ.aConfirmer.length ? tr('pasEnLigne.aConfirmer', { n: pasEnLigneJ.aConfirmer.length }) : null].filter(Boolean).join(' · ')} ›</span>
+          </button>
+        ) : null}
+        {curSub === 'achats' && feuillePasEnLigne ? (
+          <SheetShell titre={tr('pasEnLigne.titre')} sousTitre={tr('pasEnLigne.sousTitre')} onClose={() => setFeuillePasEnLigne(false)} maxWidth={620} data-feuille-pas-en-ligne="">
+            {detailPasEnLigne}
+          </SheetShell>
+        ) : null}
+        {curSub === 'achats' ? feuilleCreerPel : null}
+        {!modeRetraits && <AchatsHorsPlateforme achats={offBuys} ouvert={offSecOpen} onBasculer={setOffSecOpen} facture={facturesAchat} importer={importAchats}
+          onAjouter={addOffBuy} onModifier={updOffBuy} onSupprimer={delOffBuy}
+          paires={annBase.filter(it=>String((numeros[it.id]||{}).numero||'').trim()).map(it=>({ id: it.id, num: String((numeros[it.id]||{}).numero), title: it.title||'' })).sort((a,b)=>String(a.num).localeCompare(String(b.num),'fr',{numeric:true}))}
+          prochainNumero={horsLigneVue ? null : nextNumero} onReserverNumero={recordUsed} horsLigne={horsLigneVue} garderPhotoHorsLigne={garderPhotoHorsLigne}
+          lot={horsLigneVue ? null : { creer: (d) => creerGrosLot(d, { vinted_offvinted_buys: setOffBuys, vinted_buyprice_by_num: setBuyByNum }), moiMeme: numeroEcritActif(), apercu: apercuNumerosLot, cases: casesLotApercu, cleNum }}
+          stock={Array.isArray(listings.items)&&!listings.error?stockPourModele:null}
+          chargerStock={()=>{ if (accounts.length && listings.items===null && !listings.loading) loadListings(false, true); }}
+          onPrixParNumero={(nm,pr)=>setBuyByNum(prev=>{ const u={...prev,[nm]:pr}; save('vinted_buyprice_by_num',u); return u; })}/>}
+        </div>
         {/* (11 nov.) Où acheter ce qui se revend le mieux : la carte lit la publication faite plus haut
             (`publierMeilleures`), la même qu'Argent → Statistiques. (Intégration colis, demande g) APRÈS la liste :
             posée avant, elle repoussait les achats et leurs colis (689 ⇒ 973 px sur ordinateur). */}
@@ -56831,7 +56868,7 @@ function AppCoeur() {
   const [search0]=useState(()=>{ try{ return window.location.search||''; }catch(_){ return ''; } });
   const [reprise0]=useState(()=>{ try{ const owner=AUTH.user?.id||readSession()?.user?.id||''; const st=stockageParcours(); return ecranAOuvrir({ carte:carteReprise(), locale:st?repriseLocale(st,owner):null, ongletsOk:ONGLETS_LIENS, search:search0 }); }catch(_){ return null; } });
   // (11 nov., lot DJ3) Une reprise sur l'ancien onglet Colis rouvre sa moitié : Ventes ou Achats.
-  const [tab,setTabBrut]=useState(()=>{ if(!reprise0) return 'journee'; const pl=placeDesColis({ tab:reprise0.tab, sub:reprise0.sub, onglet:reprise0.colis }); return pl?pl.tab:reprise0.tab; });
+  const [tab,setTabBrut]=useState(()=>{ if(!reprise0) return 'journee'; const pl=placeDesColis({ tab:reprise0.tab, sub:reprise0.sub, onglet:reprise0.colis }); if(pl&&pl.onglet==='retirer') demanderRetirer(); return pl?pl.tab:reprise0.tab; });
   // (6 nov.) L'écran ouvert et celui d'avant, pour « Signaler un problème ».
   noterEcranVu(tab);
   // (6 nov., v36) Et pour les temps réels : une visite d'écran par onglet ouvert.
@@ -56866,7 +56903,7 @@ function AppCoeur() {
     // (11 nov., lot DJ3) Les anciens chemins vers Colis : « À expédier » de Ventes ou « À retirer » d'Achats.
     if(typeof v==='string'){ const frais=(x)=>x&&Date.now()-x.at<3000;
       const pl=placeDesColis({ tab:v, sub:subVoulue.current, onglet:frais(DEMANDE_COLIS)?DEMANDE_COLIS.o:null, cible:frais(CIBLE_NOTIF)?CIBLE_NOTIF.c:null });
-      if(pl){ v=pl.tab; subVoulue.current=pl.sub; if(pl.tab==='ventes') setOngletColis(pl.onglet);
+      if(pl){ v=pl.tab; subVoulue.current=pl.sub; if(pl.tab==='ventes') setOngletColis(pl.onglet); if(pl.onglet==='retirer') demanderRetirer();
         const id=ID_SECTION_COLIS[pl.tab==='achats'?'achats':'ventes']; const t0=Date.now();
         const aller=()=>{ const el=document.getElementById(id); if(el&&el.getClientRects().length){ try{ el.scrollIntoView({block:'start'}); }catch(_){} return; } if(Date.now()-t0<6000) setTimeout(aller,200); };
         if(!(frais(CIBLE_NOTIF)&&CIBLE_NOTIF.c)) setTimeout(aller,150); } }
@@ -59843,6 +59880,7 @@ function AppCoeur() {
           ongletColis={ongletColis} onOngletColis={choisirOngletColis} onOngletVu={setOngletColisMontre}/></GardeEcran>
       </section>);
     if(t==='achats') return (
+      <RepliRetirerAchats sansLigne={site==='vinted'}>
       <section className="vrm-colis-section" data-colis-hote="achats" aria-label="À retirer">
         {/* (11 nov., revue colis) Le filtre de site d'Achats vaut pour « À retirer » (un seul filtre, comme Ventes) :
             Achats · eBay ne montre plus les colis Vinted et leurs codes (banc achats-retirer-site). Achats n'a pas
@@ -59857,7 +59895,8 @@ function AppCoeur() {
             portent (à confirmer, à vérifier, e-mails de suivi, argent à vérifier) vient des achats Vinted et des e-mails —
             montrés sur Vinted (l'écran d'arrivée, qui montre tout), jamais sous eBay, Leboncoin ou Vestiaire. */}
         {site==='toutes'||site==='vinted' ? <GardeEcran nom="achats:retirer"><div data-colis-retraits="outils"><Comptabilite key="colis_achats_outils" {...commun} only="achats" vueAchats="retraits" retraitsOutils dansPlateforme/></div></GardeEcran> : null}
-      </section>);
+      </section>
+      </RepliRetirerAchats>);
     return null;
   };
   const rendreTache=(t)=>{
