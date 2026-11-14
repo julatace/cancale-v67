@@ -2185,5 +2185,9 @@ export default {
   "rh.vuesPasSu": "vues —",
   "rh.vendue": "vendue",
   "rh.enLigne": "en ligne",
+  "instantane.geste.horsLigne": "Hors ligne",
+  "instantane.geste.panne": "Pas relu",
+  "instantane.arret.horsLigne": "Hors ligne : ces chiffres sont ceux de ta dernière visite. Ils seront relus au retour du réseau.",
+  "instantane.arret.panne": "Pas relu : la base ne répond pas. Ces chiffres sont ceux de ta dernière visite.",
   ...ecran_confort,
 };

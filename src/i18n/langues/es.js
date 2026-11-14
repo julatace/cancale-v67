@@ -2180,5 +2180,9 @@ export default {
   "rh.vuesPasSu": "visitas —",
   "rh.vendue": "vendida",
   "rh.enLigne": "en línea",
+  "instantane.geste.horsLigne": "Sin conexión",
+  "instantane.geste.panne": "Sin releer",
+  "instantane.arret.horsLigne": "Sin conexión: estas cifras son las de tu última visita. Se volverán a leer cuando vuelva la red.",
+  "instantane.arret.panne": "Sin releer: la base no responde. Estas cifras son las de tu última visita.",
   ...ecran_confort,
 };
