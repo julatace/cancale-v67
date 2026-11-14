@@ -37,6 +37,8 @@ const MIGRES = [
   ['src/Accueil.jsx', ['*']],
   ['src/ui/Accompagne.jsx', ['*']],   // (14 nov., lot accompagnement) la brique commune des quatre moments
   ['src/ImpressionSimple.jsx', ['*']],   // (14 nov., impression-simple) « Imprimer » en un toucher : les deux feuilles
+  // (14 nov., idées 151 152 153 163) impression directe, même acheteur, consignes, mode samedi
+  ['src/expedition/ImprimanteDirecte.jsx', ['*']], ['src/expedition/MemeAcheteur.jsx', ['*']], ['src/expedition/ConsignesColis.jsx', ['*']], ['src/expedition/ModeSamedi.jsx', ['*']],
   // (14 nov., propositions 102-107) Photos et fiches.
   ['src/AtelierPaire.jsx', ['*']], ['src/SeancePhoto.jsx', ['*']], ['src/RechercheCouleur.jsx', ['*']], ['src/AvisPhoto.jsx', ['*']], ['src/LigneCouleurLoupe.jsx', ['*']],
   // (14 nov., accueil des nouveaux) Bilan, premier colis, notifications, langue ; la page des tarifs.

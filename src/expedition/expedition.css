@@ -1,0 +1,128 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   IDÉES 151 · 152 · 153 · 163 — impression directe, même acheteur, consignes, mode samedi
+   Direction « Studio bleu clair » (CONTRAT-STUDIO) : les classes `.sb-*` et les quatre formes
+   de bouton. Tant que `src/design/studio.css` n'est pas fusionné ici, une définition minimale
+   est posée plus bas, à spécificité NULLE (`:where`) pour céder à la fondation dès qu'elle arrive.
+   Une couleur d'accent, rare ; ambre = un geste à faire ; rouge = deux paires sous un N° (§7).
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Jetons locaux : ceux du studio s'ils existent, sinon leurs valeurs (clair / nuit) ── */
+:where(.vrm-exp) {
+  --x-encre: var(--sb-encre, #0C1D30); --x-encre-2: var(--sb-encre-2, #3F5468);
+  --x-lien: var(--sb-lien, #0055B8); --x-diode: var(--sb-diode, #0060CC);
+  --x-ambre: var(--sb-ambre, #764300); --x-doublon: var(--sb-doublon, #B8261A);
+  --x-porcelaine: var(--sb-porcelaine, #FFFFFF); --x-porcelaine-2: var(--sb-porcelaine-2, #F7FAFD);
+  --x-creux: var(--sb-creux, #E4EEF7); --x-haut: var(--sb-haut, #EEF6FD); --x-aplat: var(--sb-aplat, #D2E5F4);
+  --x-o: var(--sb-o, 18 52 96);
+  --x-plan: var(--sb-ombre-plan, inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(18 52 96 / .07), 0 12px 26px -14px rgb(18 52 96 / .30));
+  color: var(--x-encre);
+}
+:root[data-theme="dark"] :where(.vrm-exp) {
+  --x-encre: var(--sb-encre, #EAF2FB); --x-encre-2: var(--sb-encre-2, #9CB0C6);
+  --x-lien: var(--sb-lien, #6CB4FF); --x-diode: var(--sb-diode, #4AA3FF);
+  --x-ambre: var(--sb-ambre, #F2B65E); --x-doublon: var(--sb-doublon, #FF6B5E);
+  --x-porcelaine: var(--sb-porcelaine, #16273C); --x-porcelaine-2: var(--sb-porcelaine-2, #122135);
+  --x-creux: var(--sb-creux, #091320); --x-haut: var(--sb-haut, #15263D); --x-aplat: var(--sb-aplat, #0B1727);
+  --x-o: var(--sb-o, 0 0 0);
+  --x-plan: var(--sb-ombre-plan, inset 0 .5px 0 rgb(255 255 255 / .09), 0 0 0 .5px rgb(0 0 0 / .5), 0 12px 26px -12px rgb(0 0 0 / .8));
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) :where(.vrm-exp) {
+    --x-encre: var(--sb-encre, #EAF2FB); --x-encre-2: var(--sb-encre-2, #9CB0C6); --x-lien: var(--sb-lien, #6CB4FF); --x-diode: var(--sb-diode, #4AA3FF);
+    --x-ambre: var(--sb-ambre, #F2B65E); --x-porcelaine: var(--sb-porcelaine, #16273C); --x-porcelaine-2: var(--sb-porcelaine-2, #122135);
+    --x-creux: var(--sb-creux, #091320); --x-haut: var(--sb-haut, #15263D); --x-aplat: var(--sb-aplat, #0B1727); --x-o: var(--sb-o, 0 0 0);
+  }
+}
+
+/* ── provisoire : vient de studio.css (les quatre formes, la plaque, la vignette) ── */
+:where(.vrm-exp, .vrm-impr-ligne) :where(.sb-btn-plein, .sb-touche, .sb-rond, .sb-lien) {
+  -webkit-appearance: none; appearance: none; border: 0; margin: 0; cursor: pointer; position: relative; font-family: inherit; text-decoration: none;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation; -webkit-user-select: none; user-select: none;
+  transition: transform 160ms cubic-bezier(.2,.9,.25,1), box-shadow 160ms cubic-bezier(.2,.9,.25,1), opacity 160ms;
+}
+:where(.vrm-exp, .vrm-impr-ligne) :where(.sb-btn-plein) {
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; flex: none;
+  width: 80px; height: 80px; padding: 0 4px; border-radius: 50%;
+  background: radial-gradient(120% 90% at 50% 0%, color-mix(in oklab, var(--x-encre) 80%, #FFFFFF) 0%, var(--x-encre) 55%);
+  color: var(--x-porcelaine); box-shadow: inset 0 .5px 0 rgb(255 255 255 / .25), 0 12px 22px -10px rgb(var(--x-o) / .6);
+  font-weight: 600; font-size: 12px; line-height: 1.05; text-align: center;
+}
+:where(.vrm-exp) :where(.sb-btn-plein:active, .sb-btn-plein[aria-busy="true"]) { transform: translateY(1.5px) scale(.985); box-shadow: inset 0 2px 6px rgb(0 0 0 / .45); }
+:where(.vrm-exp) :where(.sb-btn-plein:disabled) { background: color-mix(in oklab, var(--x-encre) 18%, var(--x-aplat)); color: color-mix(in oklab, var(--x-encre) 48%, var(--x-aplat)); box-shadow: none; cursor: default; }
+:where(.vrm-exp) :where(.sb-btn-plein--barre) { flex-direction: row; gap: 8px; width: auto; min-width: 120px; height: 52px; padding: 0 22px; border-radius: 18px; font-size: 15px; }
+:where(.vrm-exp, .vrm-impr-ligne) :where(.sb-touche) {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; padding: 0 15px; border-radius: 13px;
+  background: linear-gradient(180deg, var(--x-porcelaine), var(--x-porcelaine-2));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .9), 0 0 0 .5px rgb(var(--x-o) / .14), 0 4px 9px -5px rgb(var(--x-o) / .26);
+  color: var(--x-encre); font-weight: 600; font-size: 14px; line-height: 1.1; white-space: nowrap;
+}
+:where(.vrm-exp) :where(.sb-touche:active, .sb-touche[aria-pressed="true"], .sb-touche[aria-checked="true"]) { background: var(--x-creux); box-shadow: inset 0 1px 2px rgb(var(--x-o) / .20), inset 0 0 0 .5px rgb(var(--x-o) / .12); transform: translateY(1px); }
+:where(.vrm-exp) :where(.sb-touche[aria-pressed="true"])::after { content: ""; position: absolute; top: 6px; right: 7px; width: 5px; height: 5px; border-radius: 50%; background: var(--x-diode); box-shadow: 0 0 5px color-mix(in oklab, var(--x-diode) 55%, transparent); }
+:where(.vrm-exp) :where(.sb-touche:disabled) { background: transparent; box-shadow: inset 0 0 0 .5px rgb(var(--x-o) / .18); color: color-mix(in oklab, var(--x-encre-2) 55%, transparent); cursor: default; }
+:where(.vrm-exp) :where(.sb-rond) { display: inline-grid; place-items: center; flex: none; width: 44px; height: 44px; padding: 0; border-radius: 50%; font-size: 22px; line-height: 1;
+  background: linear-gradient(180deg, var(--x-porcelaine), var(--x-porcelaine-2)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .9), 0 0 0 .5px rgb(var(--x-o) / .14), 0 4px 9px -5px rgb(var(--x-o) / .26); color: var(--x-encre); }
+:where(.vrm-exp, .vrm-impr-ligne) :where(.sb-lien) { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0; background: none; box-shadow: none; color: var(--x-lien, #0055B8); font-weight: 600; font-size: 14px; line-height: 1.2; }
+:where(.vrm-exp, .vrm-impr-ligne) :where(.sb-lien:active) { opacity: .55; }
+:where(.vrm-exp, .vrm-impr-ligne) :where(.sb-lien:disabled) { opacity: .5; cursor: default; }
+:where(.vrm-exp) :where(.sb-plaque) { display: inline-flex; align-items: baseline; justify-content: center; flex: none; min-width: 46px; height: 22px; padding: 0 6px; border-radius: 6px;
+  background: var(--x-creux); box-shadow: inset 0 .5px 1px rgb(var(--x-o) / .26), inset 0 0 0 .5px rgb(var(--x-o) / .08); color: var(--x-encre); font-weight: 600; font-size: 12.5px; line-height: 22px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+:where(.vrm-exp) :where(.sb-plaque small) { font-size: 9.5px; color: var(--x-encre-2); margin-right: 1.5px; }
+:where(.vrm-exp) :where(.sb-plaque.is-double) { color: var(--x-doublon); box-shadow: inset 0 0 0 1px var(--x-doublon); }
+:where(.vrm-exp) :where(.sb-plaque--grande) { height: 30px; line-height: 30px; padding: 0 9px; border-radius: 8px; font-size: 17px; letter-spacing: .07em; }
+:where(.vrm-exp) :where(.sb-vignette) { display: block; position: relative; flex: none; width: 44px; height: 44px; border-radius: 12px; overflow: hidden; background: var(--x-creux); }
+:where(.vrm-exp) :where(.sb-vignette img) { display: block; width: 100%; height: 100%; object-fit: cover; }
+:where(.vrm-exp) :where(.sb-surtitre) { font-size: 13px; font-weight: 500; color: var(--x-encre-2); margin: 0 0 7px; }
+:where(.vrm-exp) :where(.sb-ecran-titre) { font-weight: 400; font-size: 34px; line-height: 1; letter-spacing: -.03em; margin: 0; }
+:where(.vrm-exp) :where(.sb-btn-plein, .sb-touche, .sb-rond, .sb-lien):focus-visible { outline: 2px solid var(--x-diode); outline-offset: 2px; }
+
+/* ── Les textes ── */
+.vrm-exp-phrase { margin: 0 0 8px; font-size: 15px; line-height: 1.4; color: var(--x-encre); }
+.vrm-exp-sous { margin: 0; font-size: 13px; line-height: 1.4; color: var(--x-encre-2); }
+.vrm-exp-souci { margin: 8px 0; font-size: 14px; line-height: 1.4; color: var(--x-ambre); }
+.vrm-exp-ambre { color: var(--x-ambre); font-weight: 600; }
+.vrm-exp-ligne-dite { display: inline-flex; align-items: center; min-height: 44px; font-size: 13px; color: var(--x-encre-2, #3F5468); }
+.vrm-exp-pied { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 16px; }
+.vrm-exp-rappel { margin: 4px 0 0; font-size: 13px; line-height: 1.35; color: var(--x-ambre); }
+
+/* ── Même acheteur (le bandeau de Colis) ── */
+.vrm-exp-meme { display: grid; gap: 10px; margin: 8px 0 12px; }
+.vrm-exp-meme-groupe { padding: 14px 16px; border-radius: 22px; background: linear-gradient(180deg, var(--x-porcelaine), var(--x-porcelaine-2)); box-shadow: var(--x-plan); display: grid; gap: 6px; justify-items: start; }
+.vrm-exp-meme-titre { margin: 0; font-size: 15px; }
+.vrm-exp-meme-colis { margin: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 14px; }
+.vrm-exp-meme-un { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+
+/* ── Consignes ── */
+.vrm-exp-consignes { margin: 2px 0 4px; }
+.vrm-exp-consignes-liste { margin: 0 0 8px; padding: 0 0 0 18px; display: grid; gap: 4px; font-size: 14px; line-height: 1.4; color: var(--x-encre); }
+
+/* ── Mode samedi : plein écran ── */
+.vrm-samedi { position: fixed; inset: 0; background: linear-gradient(180deg, var(--x-haut) 0%, var(--x-aplat) 40%); overflow: hidden; }
+.vrm-samedi-defile { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; padding: max(16px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom)); box-sizing: border-box; }
+.vrm-samedi-defile > * { max-width: 880px; margin-left: auto; margin-right: auto; }
+.vrm-samedi-tete { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.vrm-samedi-date::first-letter { text-transform: uppercase; }
+.vrm-samedi-bande { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0 auto 16px; font-size: 14px; color: var(--x-encre-2); }
+.vrm-samedi-bande b { color: var(--x-encre); font-weight: 600; font-variant-numeric: tabular-nums; }
+.vrm-samedi-etape { margin-bottom: 16px; padding: 16px; border-radius: 28px; background: linear-gradient(180deg, var(--x-porcelaine), var(--x-porcelaine-2)); box-shadow: var(--x-plan); }
+.vrm-samedi-h2 { margin: 0 0 10px; font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
+.vrm-samedi-imprimer { display: flex; align-items: center; gap: 16px; }
+.vrm-samedi-imprimer-dit { min-width: 0; flex: 1; }
+.vrm-samedi-plein-icone { font-size: 22px; line-height: 1; }
+.vrm-samedi-groupe + .vrm-samedi-groupe { margin-top: 12px; padding-top: 8px; border-top: .5px solid rgb(var(--x-o) / .14); }
+.vrm-samedi-liste, .vrm-samedi-points, .vrm-samedi-point-colis { list-style: none; margin: 0; padding: 0; }
+.vrm-samedi-rangee { display: flex; align-items: center; gap: 10px; min-height: 64px; padding: 6px 0; }
+.vrm-samedi-rangee + .vrm-samedi-rangee { border-top: .5px solid rgb(var(--x-o) / .10); }
+.vrm-samedi-case { width: 44px; min-width: 44px; padding: 0; font-size: 18px; }
+.vrm-samedi-rangee[data-samedi-emballe="1"] .vrm-samedi-nom { color: var(--x-encre-2); }
+.vrm-samedi-texte { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.vrm-samedi-nom { font-size: 15px; font-weight: 500; overflow-wrap: anywhere; min-width: 0; }
+.vrm-samedi-point { display: flex; gap: 12px; padding: 12px 0; }
+.vrm-samedi-point + .vrm-samedi-point { border-top: .5px solid rgb(var(--x-o) / .12); }
+.vrm-samedi-rang { flex: none; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--x-creux); font-weight: 600; font-variant-numeric: tabular-nums; }
+.vrm-samedi-point-corps { min-width: 0; flex: 1; display: grid; gap: 3px; }
+.vrm-samedi-point-tete { margin: 0; font-size: 15px; overflow-wrap: anywhere; }
+.vrm-samedi-type { color: var(--x-encre-2); font-weight: 500; }
+.vrm-samedi-point-colis { display: grid; gap: 4px; margin-top: 6px; }
+.vrm-samedi-point-colis > li { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-height: 44px; }
+.vrm-samedi-point-colis .vrm-samedi-nom { flex: 1; min-width: 120px; }
+@media (min-width: 1024px) { .vrm-samedi-defile { padding: 32px 32px 48px; } .vrm-samedi-etape { padding: 22px 24px; } }
