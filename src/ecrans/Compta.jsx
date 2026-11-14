@@ -87,6 +87,8 @@ import { DEMANDE_INVENTAIRE_ANNUEL } from '../inventaireAnnuel.js';
 import { jourParis } from '../dateParis.js';   // (11 nov.) jour à l'heure de Paris
 import { valeurSue } from '../sommeConnue.js';   // (11 nov.) « pas su » ≠ 0
 import { trj } from '../i18n/react.js';
+import DeclarationAnnuelle from '../composants/DeclarationAnnuelle.jsx';   // (14 nov., lot argent-choix — proposition 82)
+import { declarationAnnuelle } from '../declarationAnnuelle.js';
 // ⟦← App.jsx #4⟧
 const FicheFacturation = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.FicheFacturation })));
 const ListeFacturesPro = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.ListeFacturesPro })));
@@ -2936,10 +2938,10 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux, activite
           <div style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>
             {dr.enCours ? <>{tr('compta.revenus')} {dr.annee}{tr('compta.declarerPrintemps')} {dr.annee + 1} {tr('compta.instant')}</> : <>{tr('compta.revenus')} {dr.annee}{tr('compta.declarerPrintempsDeclaration')}</>}
           </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
-            <b className="vrm-display" style={{ fontSize: 20, color: C.text }}>{dr.partiel ? tr('journee.moins3') : ''}{eurMicro(dr.ca)}</b>
-            <span style={{ fontSize: 13, color: C.text }}>{dr.liberatoire ? <>{tr('compta.case')} <b>{dr.cases[0]}</b></> : <>{tr('compta.case')} <b>{tr('compta.5ko')}</b> {tr('compta.sansVersementLiberatoire')} <b>{tr('compta.5ta')}</b> {tr('compta.avec')}</>}</span>
-          </div>
+          {/* (14 nov., lot argent-choix) Le montant, la case et leur source vivent dans « Ta déclaration de
+              revenus », en tête de Déclarer : ici, un renvoi (§7 : un nombre s'écrit une fois sur un écran). */}
+          <button type="button" className="vrm-lien-action" data-micro-impots-voir="" onClick={() => { try { document.getElementById('compta-revenus').scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {} }}
+            style={{ marginTop: 6, border: 'none', background: 'transparent', color: C.accentTexte, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, padding: 0, minHeight: 44, cursor: 'pointer', textAlign: 'left' }}>{tr('ac.dr.voir')}</button>
           <div style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>
             {dr.liberatoire === 'oui' ? <>{tr('compta.impotDejaPaye')}</>
               : <>{tr('compta.chiffreAffairesBrut')}</>}
@@ -2970,6 +2972,16 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux, activite
     </summary>
     <div data-micro-entreprise="" className="vrm-micro-grille" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 440px), 1fr))', gap: 12, alignItems: 'stretch', marginTop: 8 }}>{calendrier}{seuils}{profil}{impots}</div>
   </details>);
+}
+// (14 nov., lot argent-choix — proposition 82) « Ta déclaration de revenus » PRÊTE, en tête de Déclarer :
+// chaque montant avec sa case et sa source (src/declarationAnnuelle.js, sur `declarationRevenus`).
+// Les mêmes entrées que la carte de la micro-entreprise : statut (jamais deviné), ligne publiée, SA réponse.
+function DeclarationAnnuelleCarte() {
+  const regime = useRegimeFiscal();
+  const ligne = useLigneUrssaf();
+  const [opts, optsPret] = useLigneSynchro('vrm_micro_options', lireOptionsMicro);
+  const D = React.useMemo(() => declarationAnnuelle({ ligne: ligne === undefined ? undefined : ligne, now: new Date(), liberatoire: optsPret ? opts.liberatoire : null, regime: optsPret ? regime : undefined }), [ligne, opts, optsPret, regime]);
+  return <DeclarationAnnuelle D={D} fmt={eurMicro} />;
 }
 function SuiviUrssaf({ onNav, sansTitre = false }) {
   const v = useLigneUrssaf();
@@ -4742,6 +4754,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
           <RegistresCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
         </div> : null}
       </section>
+          <DeclarationAnnuelleCarte />
           <StatutFiscal partie="suivi" liveStats={liveStats} onNav={onNav} />
           {/* (5 nov.) DAC7 compte par compte : ventes N/30, montant / 2 000 €, le rapport de la plateforme, l'export (src/dac7Comptes.js). */}
           <ComptaRepli id="compta-dac7" titre={tr('compta.dac7')} resume="Ce que chaque plateforme transmet aux impôts, compte par compte">
