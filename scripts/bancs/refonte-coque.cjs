@@ -145,23 +145,25 @@ async function regles(nav) {
   {
     const o = await ouvrir(nav, { W: 390, sombre: false, b: base(), url: '/?tab=journee' }); await pret(o.pg);
     const pg = o.pg;
-    await toucher(pg, 'button[data-recherche-loupe]'); await pg.waitForTimeout(600);
+    await toucher(pg, 'button[data-recherche-loupe]');
+    await attendre(pg, async () => (await visibles(pg, '[data-recherche-champ]')) >= 1, 6000);
     dit(await visibles(pg, '[data-recherche-champ]') >= 1, 'F la loupe ouvre la recherche'); await toucher(pg, '.vrm-hdr-recherche-fermer'); await pg.waitForTimeout(400);
     await toucher(pg, '[data-centre-notifs-cloche]'); await pg.waitForTimeout(900);
     dit(await visibles(pg, '[data-centre-notifs]') >= 1, 'F la cloche ouvre ses notifications'); await fermer(pg);
-    await toucher(pg, '[data-profil-tete]'); await pg.waitForTimeout(900);
+    await toucher(pg, '[data-profil-tete]'); await pg.waitForSelector('[data-menu-profil] [data-profil-menu="montants"]', { timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(300);
     const lignes = await pg.evaluate(() => [...document.querySelectorAll('[data-menu-profil] [data-profil-menu]')].map((e) => e.getAttribute('data-profil-menu')));
     dit(['parametres', 'etat-actions', 'montants'].every((x) => lignes.includes(x)) && lignes[0] === 'parametres', 'F le menu du compte : Paramètres d\'abord, puis « Actions Vinted » et l\'œil des montants', lignes.join(','));
     await toucher(pg, '[data-profil-menu="etat-actions"]');
     await attendre(pg, async () => (await visibles(pg, '[data-etat-panneau]')) >= 1, 5000);
     dit(await visibles(pg, '[data-etat-panneau]') >= 1, 'F « Actions Vinted » ouvre le panneau d\'état de la pastille d\'hier');
     await toucher(pg, '[data-etat-fermer]'); await pg.waitForTimeout(400);
-    await toucher(pg, '[data-profil-tete]'); await pg.waitForTimeout(900);
-    await toucher(pg, '[data-profil-menu="montants"] input'); await pg.waitForTimeout(600);
+    await toucher(pg, '[data-profil-tete]'); await pg.waitForSelector('[data-menu-profil] [data-profil-menu="montants"]', { timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(300);
+    await toucher(pg, '[data-profil-menu="montants"] input');
+    await attendre(pg, () => pg.evaluate(() => { const b = document.querySelector('.vrm-app-header [data-bouton-montants]'); return !!b && b.getAttribute('data-montants-caches') === '1'; }), 6000);
     const caches = await pg.evaluate(() => { const b = document.querySelector('.vrm-app-header [data-bouton-montants]'); return b ? b.getAttribute('data-montants-caches') : null; });
     dit(caches === '1', 'F l\'œil du menu cache les montants — et l\'œil revient dans la barre tant qu\'ils sont cachés (pour les montrer d\'un geste)', String(caches));
     await fermer(pg);
-    if (caches === '1') { await toucher(pg, '.vrm-app-header [data-bouton-montants]'); await pg.waitForTimeout(500); }
+    if (caches === '1') { await toucher(pg, '.vrm-app-header [data-bouton-montants]'); await attendre(pg, async () => (await visibles(pg, '.vrm-app-header [data-bouton-montants]')) === 0, 6000); }
     dit(await visibles(pg, '.vrm-app-header [data-bouton-montants]') === 0, 'F montants remontrés : l\'œil quitte la barre');
     dit(!o.erreurs.length, 'F aucune erreur d\'app', o.erreurs.join(' | ').slice(0, 200));
     await o.ctx.close();
