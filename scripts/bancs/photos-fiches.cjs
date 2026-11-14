@@ -193,7 +193,11 @@ async function main() {
       const sombre = tour.endsWith('s');
       const T = (vp.width < 600 ? '📱' : '🖥️') + (sombre ? '🌙' : '');
       const nomC = `${vp.width}${sombre ? '-sombre' : ''}`;
-      const tap = async (pg, loc) => { const l = typeof loc === 'string' ? pg.locator(loc).first() : loc; await l.scrollIntoViewIfNeeded(); if (vp.width < 600) await l.tap(); else await l.click(); };
+      // Une feuille qui finit d'entrer peut ne pas être « stable » pour Playwright sur la machine de banc chargée :
+      // on retente le même geste (un vrai clic à l'endroit de l'élément) sans l'attente de stabilité.
+      const tap = async (pg, loc) => { const l = typeof loc === 'string' ? pg.locator(loc).first() : loc;
+        try { await l.scrollIntoViewIfNeeded({ timeout: 6000 }); if (vp.width < 600) await l.tap({ timeout: 6000 }); else await l.click({ timeout: 6000 }); }
+        catch (_) { if (vp.width < 600) await l.tap({ force: true }); else await l.click({ force: true }); } };
 
       // ── 102 · 105 · 106 : la fiche du N°205, puis du N°202 ──────────────────
       await essaie(`${T} fiche : photos, avis, dictée, certificat`, async () => {
