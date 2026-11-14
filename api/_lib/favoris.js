@@ -13,7 +13,7 @@ import {messageAutoPermis} from '../../src/messageSur.js';
 import {AUTO_FAVORI_MAX_MS} from '../../src/favorisAuto.js';
 import {DEMANDES_AUTO} from '../../src/favorisAuto.js';
 import {demanderAuto,etatAuto,reglerAuto,stopAuto,trierFavorisAuto,ajouterAuto,notificationsCompletes,favorisDepuisNotifications,etatDressingAuto,etatAnnonceAuto,gardeRefuse} from './favoris-auto.js';
-import {apercuCarte} from './favoris-carte.js';
+import {apercuCarte,resumeFileCarte} from './favoris-carte.js';
 import {traduireResultatFavori} from '../../src/favorisProgression.js';
 
 // (11 nov., M82 de la revue serveur) Jamais `select=data` sur une capture : les
@@ -313,6 +313,9 @@ export async function routeFavoris(req,res){
     // ne change rien à la réponse : la file est déjà rangée.
     if(req.method==='POST'&&req.body?.action==='terminer'&&r.valeur?.fin)await notifierFinFavoris(owner,r.valeur.fin).catch(()=>{});
     if(req.method==='POST'&&req.body?.action==='terminer'&&r.valeur?.nouvelleDemande)await notifierDemandeAuto(owner,r.valeur.nouvelleDemande).catch(()=>{});
-    return res.status(200).json({ok:true,uid,...(['suivant','consommer','verifier'].includes(req.body?.action)?r.valeur:{vue:r.valeur}),serveur:maintenant});
+    // (5.376) La carte du logo demande le suivi en NOMBRES (`carte`), calculé ici par la règle de l'app.
+    const pourCarte=req.method==='GET'?String(req.query?.carte||'')==='1':req.body?.carte===true;
+    const vueR=['suivant','consommer','verifier'].includes(req.body?.action)?r.valeur?.vue:r.valeur;
+    return res.status(200).json({ok:true,uid,...(['suivant','consommer','verifier'].includes(req.body?.action)?r.valeur:{vue:r.valeur}),...(pourCarte&&vueR?{carte:resumeFileCarte(vueR,maintenant)}:{}),serveur:maintenant});
   }catch(e){return res.status(e instanceof RefusFavoris?e.status:503).json({message:e instanceof RefusFavoris?e.message:'La file n’a pas pu être confirmée. Actualise avant toute nouvelle action.',...(e instanceof RefusFavoris&&['favoris_preuve_absente','favoris_identite_non_unique'].includes(e.code)?{code:e.code,diagnostic:e.diagnostic}:{})});}
 }
