@@ -256,10 +256,11 @@
   .fav-ligne b { font-weight: 600; }
   .fav-go { color: var(--accent); font-size: 15px; }
   .fav-ligne:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
-  .ap-tete { display: flex; align-items: center; gap: 4px; margin: -4px 40px 6px -6px; }
-  .ap-tete b { flex: 1; font-size: 17px; font-weight: 600; letter-spacing: -.012em; }
+  .carte:has(.apercu) { width: min(368px, calc(100vw - 32px)); }
+  .ap-tete { display: flex; align-items: center; gap: 2px; margin: -4px 40px 6px -8px; }
+  .ap-tete b { flex: 1; min-width: 0; font-size: 17px; font-weight: 600; letter-spacing: -.012em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .ap-retour, .ap-aide-b { width: 44px; height: 44px; flex-shrink: 0; border: 0; border-radius: 10px; background: transparent; color: var(--accent); font-size: 24px; line-height: 44px; padding: 0; cursor: pointer; }
-  .ap-aide-b { width: 30px; height: 30px; margin: 7px; border-radius: 999px; background: var(--remplir); color: var(--texte); font-size: 15px; font-weight: 600; line-height: 30px; }
+  .ap-aide-b { border-radius: 999px; background: radial-gradient(circle, var(--remplir) 0 15px, transparent 15.5px); color: var(--texte); font-size: 15px; font-weight: 600; }   /* un rond de 30 px dans une cible de 44 px */
   .ap-retour:focus-visible, .ap-aide-b:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .ap-aide { margin: 0 0 8px; padding: 10px 12px 10px 28px; border-radius: 12px; background: var(--remplir); font-size: 12.5px; color: var(--doux); }
   .ap-aide li { margin: 2px 0; }
@@ -621,17 +622,17 @@
       return `${tete}${aide}<div class="val" data-fav-apercu="${esc(a.etat)}">${esc(t)}</div>${a.nonProuves ? `<div class="val gris">${plurielFav(a.nonProuves, 'favori attend', 'favoris attendent')} : ouvre un de leurs favoris depuis la cloche de Vinted pour que VRM sache à qui écrire.</div>` : ''}<button class="b sec" data-fav-retour>Retour</button>`;
     }
     const n = a.liste.length, m = a.message || {}, premier = a.liste[0];
-    const rythme = Number(m.intervalleMinutes) === 0 ? 'quelques secondes entre deux messages' : m.intervalleMaxMinutes ? `entre ${m.intervalleMinutes} et ${m.intervalleMaxMinutes} min entre deux messages` : `${m.intervalleMinutes} min entre deux messages`;
+    const rythme = Number(m.intervalleMinutes) === 0 ? 'quelques secondes d’écart' : m.intervalleMaxMinutes ? `${m.intervalleMinutes} à ${m.intervalleMaxMinutes} min d’écart` : `${m.intervalleMinutes} min d’écart`;
     const offreTxt = m.offre ? (m.offre.mode === 'pct' ? `−${m.offre.valeur} %` : m.offre.mode === 'euros' ? `−${eurosFav(m.offre.valeur)}` : `à ${eurosFav(m.offre.valeur)}`) + (m.offre.arrondi ? ', arrondie à l’euro' : '') : '';
     return `${tete}${aide}
-      <p class="ap-phrase">VRM va écrire à ${n > 1 ? `ces ${n} personnes, une par une` : 'cette personne'}, depuis cet onglet. Rien ne part avant « Lancer ».</p>
+      <p class="ap-phrase">VRM va écrire à ${n > 1 ? `ces ${n} personnes, une par une` : 'cette personne'}, depuis cet onglet. Rien ne part avant «\u00a0Lancer\u00a0».</p>
       <div class="ap-lbl">Le message${Number(m.versions) > 1 ? ` · une de tes ${Number(m.versions)} versions, au hasard` : ''}</div>
       <div class="bulle" data-fav-message>${esc(premier.texte)}</div>
       ${m.offre ? `<div class="ap-lbl" data-fav-offre="${esc(m.offre.mode)}">Avec une offre ${esc(offreTxt)}</div>` : '<div class="ap-lbl" data-fav-offre="aucune">Sans offre de prix</div>'}
       <ul class="ap-liste" data-fav-liste="${n}">${a.liste.map((x) => `<li data-fav-qui="${esc(x.id)}"><span class="qui">${esc(x.pseudo || 'Un acheteur')}</span><span class="quoi">${esc(x.titre || 'Article')}</span><span class="px">${x.offre != null ? `<s>${esc(eurosFav(x.prix))}</s> ${esc(eurosFav(x.offre))}` : esc(eurosFav(x.prix))}</span></li>`).join('')}</ul>
-      <div class="val gris">Le message est écrit pour chacun (son pseudo, son article). Rythme : ${esc(rythme)}, 15 par heure au plus.</div>
+      <div class="val gris" data-fav-rythme>Écrit pour chacun · ${esc(rythme)} · 15 par heure au plus.</div>
       ${Number(a.total) > n ? `<div class="val gris" data-fav-reste="${Number(a.total) - n}">Les ${n} plus récents d’abord ; les ${Number(a.total) - n} autres, relance après.</div>` : ''}
-      ${a.nonProuves ? `<div class="val gris">${plurielFav(a.nonProuves, 'autre favori attend', 'autres favoris attendent')} : ouvre un de leurs favoris depuis la cloche de Vinted pour que VRM sache à qui écrire.</div>` : ''}
+      ${a.nonProuves ? `<div class="val gris" data-fav-non-prouves="${Number(a.nonProuves)}">${plurielFav(a.nonProuves, 'autre en attente', 'autres en attente')} : ouvre un favori depuis la cloche de Vinted, VRM saura à qui écrire.</div>` : ''}
       ${a.ventesAilleurs === 'pas_su' ? '<div class="val alerte" data-fav-ailleurs>Tes ventes sur les autres sites n’ont pas été revérifiées récemment : assure-toi que ces articles ne sont pas vendus ailleurs.</div>' : ''}
       ${favErreur ? `<div class="err" role="alert">${esc(favErreur)}</div>` : ''}
       <button class="b" data-fav-lancer${favOccupe ? ' disabled' : ''}>${favOccupe ? 'Lancement…' : `Lancer (${n})`}</button>
