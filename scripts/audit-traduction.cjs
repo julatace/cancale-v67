@@ -35,6 +35,9 @@ const LANGUES = ['fr', 'en', 'es', 'it', 'de'];
 // `*` = tout le fichier. Ajouter ici chaque écran migré (méthode : docs/passation/2026-11-11-traduction.md).
 const MIGRES = [
   ['src/Accueil.jsx', ['*']],
+  // (14 nov., accueil des nouveaux) Bilan, premier colis, notifications, langue ; la page des tarifs.
+  ['src/accueilNouveaux/AccueilNouveaux.jsx', ['*']],
+  ['src/tarifs/Tarifs.jsx', ['*']],
   ['src/accueil/TempsGagne.jsx', ['*']],
   ['src/RetoursLitiges.jsx', ['*']],
   ['src/profil/MenuProfil.jsx', ['*']],
@@ -58,6 +61,8 @@ const MIGRES = [
   ['src/OffresAuto.jsx', ['*']],
   ['src/PrixMiniManquants.jsx', ['*']],
   ['src/design/QuoiRepublier.jsx', ['*']],   // (11 nov., lot quoi-republier)
+  ['src/FraisPlateformes.jsx', ['*']],   // (14 nov., frais-carte) les frais de l'année
+  ['src/CarteVentes.jsx', ['*']],   // (14 nov., frais-carte) la carte des ventes
   // (14 nov., lot argent-choix) coller des prix, modèle et taille, déclaration annuelle.
   ['src/composants/CollerPrixAchat.jsx', ['*']],
   ['src/design/QuoiRacheter.jsx', ['*']],

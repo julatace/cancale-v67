@@ -1,0 +1,23 @@
+// fr · fiche (FichePaire ouverte depuis une ligne de liste, 14 nov., proposition 62).
+export default {
+  "fiche.retour": "Retour",
+  "fiche.heros": "La paire",
+  "fiche.actions": "Actions",
+  "fiche.sansNum": "Sans N°",
+  "fiche.sansTitre": "Sans titre",
+  "fiche.lotN": "{n} paires",
+  "fiche.lotTitre": "Cette ligne porte {n} paires : choisis laquelle voir.",
+  "fiche.lecture": "Je lis cette ligne…",
+  "fiche.passu": "pas su : la base n’a pas répondu, réessaie dans un instant.",
+  "fiche.pasDePaire": "Pas de paire reliée à cette ligne.",
+  "fiche.gesteRelier.vente": "Pour la relier : pose son N° ou relie son achat, dans les actions ci-dessous.",
+  "fiche.gesteRelier.achat": "Pour la relier : pose le N° de la paire sur son annonce, ou relie cet achat depuis la vente.",
+  "fiche.gesteRelier.annonce": "Pour la relier : donne un N° à cette annonce.",
+  "fiche.ctx.vente": "Vente",
+  "fiche.ctx.colis": "Colis à expédier",
+  "fiche.ctx.achat": "Achat",
+  "fiche.ctx.annonce": "Annonce",
+  "fiche.ctx.stock": "Stock",
+  "fiche.ctx.retrait": "Colis à retirer",
+  "fiche.ctx.journee": "Ma journée",
+};

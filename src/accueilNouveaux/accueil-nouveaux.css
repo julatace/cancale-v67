@@ -1,0 +1,114 @@
+/* ══ L'ACCUEIL DES NOUVEAUX (14 nov., n° 132 · 137 · 138 · 141 · 142) ════════════
+   Direction « Atelier » (vrm-design) : chiffre d'affiche énorme, profondeur sans
+   traits, une lumière bleue dans le tiers haut (jamais de violet), un seul accent
+   rare (les actions), montants à l'encre, mode sombre soigné autant que le clair.
+   Jetons du système (`--d-*`, src/styles-systeme.css) avec leurs replis. */
+.vrm-an, .vrm-an-voile {
+  --an-fond: #FBFBFD; --an-carte: #FFFFFF; --an-encre: #1D1D1F; --an-gris: #6E6E73; --an-filet: rgba(60,60,67,.12);
+  --an-accent: var(--d-accent, #0071E3); --an-sur-accent: #FFFFFF; --an-teinte: rgba(0,113,227,.10);
+  --an-ombre: 0 1px 2px rgb(0 0 0 / .04), 0 8px 24px rgb(0 0 0 / .06);
+  --an-lumiere: radial-gradient(120% 60% at 18% -8%, rgba(0,122,255,.20), transparent 62%), radial-gradient(90% 50% at 100% 0%, rgba(90,200,250,.16), transparent 60%);
+  --an-ressort: cubic-bezier(.2, .8, .2, 1);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  color: var(--an-encre); -webkit-font-smoothing: antialiased;
+}
+:root[data-theme="dark"] .vrm-an, :root[data-theme="dark"] .vrm-an-voile {
+  --an-fond: #000000; --an-carte: #1C1C1E; --an-encre: #F5F5F7; --an-gris: #98989D; --an-filet: rgba(84,84,88,.48);
+  --an-accent: var(--d-accent, #0A84FF); --an-teinte: rgba(10,132,255,.18); --an-ombre: none;
+  --an-lumiere: radial-gradient(120% 60% at 18% -8%, rgba(10,132,255,.34), transparent 62%), radial-gradient(90% 50% at 100% 0%, rgba(64,156,255,.18), transparent 60%);
+}
+
+/* ── Le plein écran du bilan ─────────────────────────────────────────────── */
+.vrm-an-bilan { position: fixed; inset: 0; background: var(--an-fond); overflow-y: auto; overscroll-behavior: contain; }
+.vrm-an-lumiere { position: absolute; inset: 0 0 auto 0; height: 62vh; background: var(--an-lumiere); pointer-events: none; }
+.vrm-an-cadre { position: relative; max-width: 560px; margin: 0 auto; min-height: 100%; display: flex; flex-direction: column;
+  padding: max(12px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left)); box-sizing: border-box; }
+.vrm-an-haut { display: flex; align-items: center; justify-content: space-between; min-height: 44px; }
+.vrm-an-points { display: flex; gap: 6px; }
+.vrm-an-points span { width: 22px; height: 4px; border-radius: 999px; background: var(--an-filet); transition: background-color .3s ease-out; }
+.vrm-an-points span[data-on="1"] { background: var(--an-encre); }
+.vrm-an-passer { min-height: 44px; min-width: 44px; padding: 0 4px; border: 0; background: none; color: var(--an-gris); font: 600 15px/1 inherit; font-family: inherit; cursor: pointer; }
+.vrm-an-corps { flex: 1; display: flex; flex-direction: column; padding-top: 28px; }
+.vrm-an-surtitre { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--an-gris); letter-spacing: .01em; }
+.vrm-an-titre { margin: 0; font-size: 34px; line-height: 1.08; font-weight: 700; letter-spacing: -.026em; }
+.vrm-an-affiche { margin-top: 28px; display: flex; flex-direction: column; }
+.vrm-an-aumoins { font-size: 13px; font-weight: 600; color: var(--an-gris); margin-bottom: 2px; }
+.vrm-an-chiffre { font-size: clamp(52px, 15vw, 76px); line-height: 1; font-weight: 700; letter-spacing: -.04em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-an-sous { margin-top: 10px; font-size: 17px; color: var(--an-gris); }
+.vrm-an-courbe-hote { margin-top: 22px; color: var(--an-encre); }
+.vrm-an-courbe { display: block; width: 100%; height: 64px; overflow: visible; }
+.vrm-an-courbe-trait { stroke-dasharray: 1; stroke-dashoffset: 0; animation: vrm-an-trace 1.2s var(--an-ressort) .35s both; }
+@keyframes vrm-an-trace { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+.vrm-an-couverture { margin: 10px 0 0; font-size: 13px; color: var(--an-gris); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-an-tuiles { margin-top: 28px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.vrm-an-tuile { background: var(--an-carte); border-radius: 18px; box-shadow: var(--an-ombre); padding: 14px 12px 12px; display: flex; flex-direction: column; min-height: 84px; box-sizing: border-box; }
+.vrm-an-tuile b { font-size: 28px; line-height: 1.05; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.vrm-an-plus { font-size: 17px; font-weight: 600; margin-right: 2px; color: var(--an-gris); }
+.vrm-an-tuile span { margin-top: auto; padding-top: 6px; font-size: 13px; color: var(--an-gris); line-height: 1.2; }
+.vrm-an-pied { margin-top: auto; padding-top: 28px; display: flex; flex-direction: column; gap: 8px; }
+.vrm-an-principal { min-height: 50px; border: 0; border-radius: 999px; background: var(--an-accent); color: var(--an-sur-accent); font: 600 17px/1 inherit; font-family: inherit; cursor: pointer; padding: 0 22px; transition: transform .12s ease-out; }
+.vrm-an-principal:active { transform: scale(.97); }
+.vrm-an-principal:disabled { opacity: .55; }
+.vrm-an-secondaire { min-height: 44px; border: 0; border-radius: 999px; background: transparent; color: var(--an-accent); font: 600 15px/1 inherit; font-family: inherit; cursor: pointer; padding: 0 16px; }
+.vrm-an-principal:focus-visible, .vrm-an-secondaire:focus-visible, .vrm-an-passer:focus-visible { outline: 2px solid var(--an-accent); outline-offset: 3px; }
+.vrm-an-liste { list-style: none; margin: 26px 0 0; padding: 6px 0; background: var(--an-carte); border-radius: 20px; box-shadow: var(--an-ombre); }
+.vrm-an-liste li { display: flex; align-items: center; gap: 14px; padding: 12px 16px; min-height: 64px; box-sizing: border-box; position: relative; }
+.vrm-an-liste li + li::before { content: ""; position: absolute; top: 0; left: 66px; right: 0; height: .5px; background: var(--an-filet); }
+.vrm-an-liste b { display: block; font-size: 17px; font-weight: 600; letter-spacing: -.012em; }
+.vrm-an-liste small { display: block; font-size: 15px; color: var(--an-gris); margin-top: 2px; line-height: 1.3; }
+.vrm-an-pastille { flex: 0 0 auto; width: 36px; height: 36px; border-radius: 10px; background: var(--an-teinte); color: var(--an-accent); display: inline-flex; align-items: center; justify-content: center; }
+.vrm-an-pastille-grande { width: 52px; height: 52px; border-radius: 15px; }
+
+/* Apparition : un ressort court, décalé de 40 ms par bloc. */
+.vrm-an-entre { animation: vrm-an-monte .42s var(--an-ressort) both; animation-delay: calc(var(--i, 0) * 60ms + 40ms); }
+@keyframes vrm-an-monte { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+/* ── Les feuilles (premier colis, notifications) ─────────────────────────── */
+.vrm-an-voile { position: fixed; inset: 0; background: rgba(0,0,0,.38); display: flex; align-items: flex-end; justify-content: center; animation: vrm-an-fondu .2s ease-out both; }
+@keyframes vrm-an-fondu { from { opacity: 0; } to { opacity: 1; } }
+.vrm-an-feuille { position: relative; width: min(520px, 100%); max-height: 92vh; overflow-y: auto; background: var(--an-carte); color: var(--an-encre); border-radius: 22px 22px 0 0;
+  padding: 8px 20px max(20px, env(safe-area-inset-bottom)); box-sizing: border-box; animation: vrm-an-feuille .36s var(--an-ressort) both; background-image: var(--an-lumiere); background-repeat: no-repeat; background-size: 100% 260px; }
+:root[data-theme="dark"] .vrm-an-feuille { background-color: #1C1C1E; }
+@keyframes vrm-an-feuille { from { transform: translateY(40px); opacity: .4; } to { transform: none; opacity: 1; } }
+@media (min-width: 744px) and (hover: hover) { .vrm-an-voile { align-items: center; } .vrm-an-feuille { border-radius: 22px; } }
+.vrm-an-cadre:focus, .vrm-an-feuille:focus { outline: none; }
+.vrm-an-poignee { display: block; width: 36px; height: 5px; border-radius: 999px; background: var(--an-filet); margin: 0 auto 4px; }
+.vrm-an-etape { font-size: 13px; font-weight: 600; color: var(--an-gris); }
+.vrm-an-colis-barre { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 2px 0 8px; }
+.vrm-an-colis-barre span { height: 4px; border-radius: 999px; background: var(--an-filet); transition: background-color .3s ease-out; }
+.vrm-an-colis-barre span[data-on="1"] { background: var(--an-encre); }
+.vrm-an-colis-corps { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 8px 4px 0; animation: vrm-an-monte .36s var(--an-ressort) both; }
+.vrm-an-dessin { width: 220px; max-width: 70%; height: auto; margin: 6px 0 14px; color: var(--an-encre); }
+.vrm-an-dessin .a-carte { fill: var(--an-carte); stroke: var(--an-encre); stroke-width: 1.6; stroke-linejoin: round; }
+.vrm-an-dessin .a-papier { fill: var(--an-fond); stroke: var(--an-gris); stroke-width: 1.4; }
+.vrm-an-dessin .a-trait { fill: none; stroke: var(--an-encre); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.vrm-an-dessin .a-ligne { fill: var(--an-filet); }
+.vrm-an-dessin .a-accent { fill: var(--an-accent); }
+.vrm-an-h2 { margin: 0; font-size: 24px; line-height: 1.15; font-weight: 700; letter-spacing: -.02em; }
+.vrm-an-texte { margin: 8px 0 0; font-size: 17px; line-height: 1.4; color: var(--an-gris); max-width: 30em; }
+.vrm-an-note { margin: 18px 2px 0; font-size: 15px; line-height: 1.4; color: var(--an-gris); }
+.vrm-an-video { margin-top: 6px; }
+.vrm-an-notifs { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 10px 0 4px; }
+.vrm-an-notifs .vrm-an-principal { align-self: stretch; margin-top: 8px; }
+.vrm-an-notifs-res { margin: 8px 0 0; font-size: 17px; }
+.vrm-an-colis-notifs { align-self: stretch; margin-top: 16px; padding-top: 16px; border-top: .5px solid var(--an-filet); }
+.vrm-an-feuille .vrm-an-pied { padding-top: 22px; }
+
+/* ── 141 · la carte de la langue (Ma journée) ────────────────────────────── */
+.vrm-an-langue { --an-carte: var(--d-carte, #fff); --an-gris: var(--d-gris, #6E6E73); --an-accent: var(--d-accent, #0071E3); --an-teinte: rgba(0,113,227,.10);
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--an-carte); border-radius: var(--d-r-carte, 20px); padding: 12px 14px; margin: 0 0 12px; box-shadow: var(--d-ombre-carte, 0 1px 2px rgb(0 0 0 / .04), 0 8px 24px rgb(0 0 0 / .06)); }
+:root[data-theme="dark"] .vrm-an-langue { --an-teinte: rgba(10,132,255,.18); }
+.vrm-an-langue p { margin: 0; flex: 1 1 180px; font-size: 15px; line-height: 1.35; }
+.vrm-an-langue-choix select { font: inherit; font-size: 15px; font-weight: 600; color: var(--an-accent); background: transparent; border: 0; min-height: 44px; cursor: pointer; }
+.vrm-an-langue-ok { min-height: 44px; }
+.vrm-an-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* ── 138 · « Nouveau » dans la navigation ─────────────────────────────────── */
+.vrm-nav-nouveau { display: inline-flex; align-items: center; margin-left: auto; padding: 2px 7px; border-radius: 999px; background: rgba(0,113,227,.10); color: var(--d-accent-texte, #0066CC); font-size: 11px; font-weight: 600; line-height: 14px; letter-spacing: 0; white-space: nowrap; flex: 0 0 auto; }
+:root[data-theme="dark"] .vrm-nav-nouveau { background: rgba(10,132,255,.20); color: #409CFF; }
+.vrm-nav-nouveau-point { position: absolute; top: -2px; right: -4px; width: 8px; height: 8px; border-radius: 50%; background: var(--d-accent, #0071E3); box-shadow: 0 0 0 2px var(--vrm-bg, var(--d-fond, #F2F2F7)); }
+
+@media (prefers-reduced-motion: reduce) {
+  .vrm-an-entre, .vrm-an-colis-corps, .vrm-an-feuille, .vrm-an-voile, .vrm-an-courbe-trait { animation: none !important; }
+  .vrm-an-principal:active { transform: none; }
+}
