@@ -34,8 +34,8 @@ export default {
   "ap.pv.r.commissionPasLue": "Commission Vestiaire pas lue",
   "ap.pv.exact": "Aucune commission au vendeur",
   "ap.pv.exactEbay": "Aucune commission",
-  "ap.pv.environ": {"one": "environ {p} de frais, d’après ta vente · tu touches {net}", "other": "environ {p} de frais, d’après tes {n} ventes · tu touches {net}"},
-  "ap.pv.environEbay": {"one": "environ {p} de frais, d’après ta vente · tu touches {net} · port payé par l’acheteur", "other": "environ {p} de frais, d’après tes {n} ventes · tu touches {net} · port payé par l’acheteur"},
+  "ap.pv.environ": {"one": "environ {p} de frais, d’après {n} vente · tu touches {net}", "other": "environ {p} de frais, d’après tes {n} ventes · tu touches {net}"},
+  "ap.pv.environEbay": {"one": "environ {p} de frais, d’après {n} vente · tu touches {net} · port payé par l’acheteur", "other": "environ {p} de frais, d’après tes {n} ventes · tu touches {net} · port payé par l’acheteur"},
   "ap.pv.auCentime": "{p} au centime",
   "ap.pv.comment": "C’est ton prix, pas un conseil : VRM inverse les frais que tu paies déjà. Vinted et Leboncoin ne prennent rien au vendeur. eBay et Vestiaire : la part des frais lus sur tes propres ventes. Le prix est arrondi à l’euro au-dessus ; à côté, ce que tu touches à ce prix. Les boosts et options ne sont pas comptés.",
 

@@ -33,8 +33,8 @@ export default {
   "ap.pv.r.commissionPasLue": "Vestiaire-Provision nicht gelesen",
   "ap.pv.exact": "Keine Provision für Verkäufer",
   "ap.pv.exactEbay": "Keine Provision",
-  "ap.pv.environ": {"one": "etwa {p} Gebühren, laut deinem Verkauf · du bekommst {net}", "other": "etwa {p} Gebühren, laut deinen {n} Verkäufen · du bekommst {net}"},
-  "ap.pv.environEbay": {"one": "etwa {p} Gebühren, laut deinem Verkauf · du bekommst {net} · Versand zahlt der Käufer", "other": "etwa {p} Gebühren, laut deinen {n} Verkäufen · du bekommst {net} · Versand zahlt der Käufer"},
+  "ap.pv.environ": {"one": "etwa {p} Gebühren, laut {n} Verkauf · du bekommst {net}", "other": "etwa {p} Gebühren, laut deinen {n} Verkäufen · du bekommst {net}"},
+  "ap.pv.environEbay": {"one": "etwa {p} Gebühren, laut {n} Verkauf · du bekommst {net} · Versand zahlt der Käufer", "other": "etwa {p} Gebühren, laut deinen {n} Verkäufen · du bekommst {net} · Versand zahlt der Käufer"},
   "ap.pv.auCentime": "{p} auf den Cent",
   "ap.pv.comment": "Es ist dein Preis, kein Rat: VRM rechnet die Gebühren zurück, die du schon zahlst. Vinted und Leboncoin nehmen dem Verkäufer nichts. eBay und Vestiaire: der Anteil der Gebühren, gelesen bei deinen eigenen Verkäufen. Der Preis wird auf den Euro aufgerundet; daneben, was du zu diesem Preis bekommst. Boosts und Optionen werden nicht gezählt.",
 

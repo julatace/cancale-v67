@@ -33,8 +33,8 @@ export default {
   "ap.pv.r.commissionPasLue": "Vestiaire commission not read",
   "ap.pv.exact": "No seller commission",
   "ap.pv.exactEbay": "No commission",
-  "ap.pv.environ": {"one": "about {p} in fees, from your sale · you receive {net}", "other": "about {p} in fees, from your {n} sales · you receive {net}"},
-  "ap.pv.environEbay": {"one": "about {p} in fees, from your sale · you receive {net} · postage paid by the buyer", "other": "about {p} in fees, from your {n} sales · you receive {net} · postage paid by the buyer"},
+  "ap.pv.environ": {"one": "about {p} in fees, from {n} sale · you receive {net}", "other": "about {p} in fees, from your {n} sales · you receive {net}"},
+  "ap.pv.environEbay": {"one": "about {p} in fees, from {n} sale · you receive {net} · postage paid by the buyer", "other": "about {p} in fees, from your {n} sales · you receive {net} · postage paid by the buyer"},
   "ap.pv.auCentime": "{p} to the cent",
   "ap.pv.comment": "It’s your price, not advice: VRM reverses the fees you already pay. Vinted and Leboncoin take nothing from the seller. eBay and Vestiaire: the share of fees read on your own sales. The price is rounded up to the euro; next to it, what you receive at that price. Boosts and options aren’t counted.",
 

@@ -33,8 +33,8 @@ export default {
   "ap.pv.r.commissionPasLue": "Commissione Vestiaire non letta",
   "ap.pv.exact": "Nessuna commissione al venditore",
   "ap.pv.exactEbay": "Nessuna commissione",
-  "ap.pv.environ": {"one": "circa {p} di commissioni, dalla tua vendita · incassi {net}", "other": "circa {p} di commissioni, dalle tue {n} vendite · incassi {net}"},
-  "ap.pv.environEbay": {"one": "circa {p} di commissioni, dalla tua vendita · incassi {net} · spedizione pagata dall’acquirente", "other": "circa {p} di commissioni, dalle tue {n} vendite · incassi {net} · spedizione pagata dall’acquirente"},
+  "ap.pv.environ": {"one": "circa {p} di commissioni, da {n} vendita · incassi {net}", "other": "circa {p} di commissioni, dalle tue {n} vendite · incassi {net}"},
+  "ap.pv.environEbay": {"one": "circa {p} di commissioni, da {n} vendita · incassi {net} · spedizione pagata dall’acquirente", "other": "circa {p} di commissioni, dalle tue {n} vendite · incassi {net} · spedizione pagata dall’acquirente"},
   "ap.pv.auCentime": "{p} al centesimo",
   "ap.pv.comment": "È il tuo prezzo, non un consiglio: VRM inverte le commissioni che già paghi. Vinted e Leboncoin non prendono nulla al venditore. eBay e Vestiaire: la quota di commissioni letta sulle tue vendite. Il prezzo è arrotondato all’euro superiore; accanto, quello che incassi a quel prezzo. Boost e opzioni non sono contati.",
 

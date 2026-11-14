@@ -33,8 +33,8 @@ export default {
   "ap.pv.r.commissionPasLue": "Comisión de Vestiaire no leída",
   "ap.pv.exact": "Sin comisión para el vendedor",
   "ap.pv.exactEbay": "Sin comisión",
-  "ap.pv.environ": {"one": "unos {p} de comisión, según tu venta · cobras {net}", "other": "unos {p} de comisión, según tus {n} ventas · cobras {net}"},
-  "ap.pv.environEbay": {"one": "unos {p} de comisión, según tu venta · cobras {net} · envío pagado por el comprador", "other": "unos {p} de comisión, según tus {n} ventas · cobras {net} · envío pagado por el comprador"},
+  "ap.pv.environ": {"one": "unos {p} de comisión, según {n} venta · cobras {net}", "other": "unos {p} de comisión, según tus {n} ventas · cobras {net}"},
+  "ap.pv.environEbay": {"one": "unos {p} de comisión, según {n} venta · cobras {net} · envío pagado por el comprador", "other": "unos {p} de comisión, según tus {n} ventas · cobras {net} · envío pagado por el comprador"},
   "ap.pv.auCentime": "{p} al céntimo",
   "ap.pv.comment": "Es tu precio, no un consejo: VRM invierte las comisiones que ya pagas. Vinted y Leboncoin no cobran nada al vendedor. eBay y Vestiaire: la parte de comisiones leída en tus propias ventas. El precio se redondea al euro superior; al lado, lo que cobras a ese precio. Los impulsos y opciones no se cuentan.",
 
