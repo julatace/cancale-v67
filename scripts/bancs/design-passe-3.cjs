@@ -9,7 +9,8 @@ require('./_porte-banc.cjs');
 //  passe 2 ont montré sans qu'une mesure le voie :
 //    K bande      — à l'ordinateur, la bande « CA finalisé — · En attente — » d'un site (`[data-plat-resume]`)
 //                   est posée dans la colonne (son bord gauche = celui du titre), jamais flottante à droite ;
-//    L natif      — aucun `<select>` natif nu (règle 3 : un choix est un composant du système) ;
+//    L natif      — aucun `<select>` natif NU (règle 3 : un choix est un composant du système) : un `<select>` qui
+//                   reste (un filtre de compte) est au moins habillé en capsule remplie, sans cadre ;
 //    M rectangle  — un contrôle qui SE TOUCHE et porte sa propre surface (fond ou cadre) est une capsule
 //                   (rayon ≥ la moitié de sa hauteur) : jamais un rectangle encadré (« les jours calmes ») ;
 //    N barreVide  — une barre de délai n'est dessinée que si l'on sait le délai (pas de piste vide sous
@@ -106,12 +107,18 @@ function mesurer3({ racines }) {
   const cartes = [];
   for (const root of roots) {
     // L. `<select>` natif.
-    for (const s of root.querySelectorAll('select')) if (vis(s)) out.natif.push({ quoi: nom(s) + ' ' + ([...s.options].map((o) => o.text).slice(0, 3).join('/')) });
+    for (const s of root.querySelectorAll('select')) {
+      if (!vis(s)) continue;
+      const cs = getComputedStyle(s), r = s.getBoundingClientRect(), f = rgba(cs.backgroundColor);
+      const capsule = px(cs.borderTopLeftRadius, r.height) + 1 >= r.height / 2 && !bordsVus(cs).length && f && f.a > 0.04;
+      if (!capsule) out.natif.push({ quoi: nom(s) + ' ' + ([...s.options].map((o) => o.text).slice(0, 3).join('/')) });
+    }
     // M. contrôles à surface propre : capsule.
     for (const el of root.querySelectorAll('button, [role="button"], [role="switch"], [role="radio"], [role="checkbox"], [role="tab"], summary, a.vrm-b, label:has(> input[type="checkbox"]), label:has(> input[type="radio"])')) {
       if (!vis(el) || el.closest('svg')) continue;
       const r = el.getBoundingClientRect();
-      if (r.height > 64 || r.width > 260 || el.querySelector('img, canvas, video, picture')) continue;
+      // Un contrôle (≤ 52 px de haut, ≤ 260 de large) — une tuile de choix plus haute est une carte, pas une capsule.
+      if (r.height > 52 || r.width > 260 || el.querySelector('img, canvas, video, picture')) continue;
       const cs = getComputedStyle(el);
       const fondC = rgba(cs.backgroundColor);
       const surface = (fondC && fondC.a > 0.04) || bordsVus(cs).length >= 3;
@@ -132,7 +139,9 @@ function mesurer3({ racines }) {
       const cs = getComputedStyle(el);
       // O. gris gras : un texte direct (pas un conteneur).
       const direct = [...el.childNodes].some((n) => n.nodeType === 3 && n.nodeValue.trim());
-      if (direct && vis(el)) {
+      // (un texte RECOUVERT — l'initiale sous la photo d'un acheteur — ne se lit pas : pas jugé)
+      const dessus = () => { const rr = el.getBoundingClientRect(); const h = document.elementFromPoint(rr.left + rr.width / 2, rr.top + rr.height / 2); return !h || el.contains(h) || h.contains(el); };
+      if (direct && vis(el) && dessus()) {
         const col = rgba(cs.color), t = parseFloat(cs.fontSize), g = Number(cs.fontWeight);
         if (col && col.a > 0.9 && gris.has(hex(col)) && t >= 15 && g >= 600 && !/^[\s›‹×✓✕·•…—–\-+−⋯▾▸⌄⌃]+$/.test(el.innerText || '')) out.grisGras.push({ t, g, quoi: nom(el) });
       }
@@ -151,7 +160,8 @@ function mesurer3({ racines }) {
       // Q. un cadre (bord sur trois côtés ou plus, ou liseré clair hors des surfaces flottantes).
       const b = bordsVus(cs);
       const zoneDepot = /dashed|dotted/.test(cs.borderTopStyle);
-      if ((b.length >= 3 && !zoneDepot) || (o.lisere && !flottant(el) && o.lisere.a > 0.06 && /^#(F|E|D|C|B|A|9|8)/.test(o.lisere.c) && !o.porte)) {
+      // Un liseré (0 0 0 Npx, sans ombre portée) hors d'une surface flottante est un cadre (clair la nuit, gris le jour).
+      if ((b.length >= 3 && !zoneDepot) || (o.lisere && !flottant(el) && !o.porte)) {
         if (!el.closest('[data-carte-sombre], .vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte')) out.cadre.push({ bords: b.join(''), lisere: o.lisere ? `${o.lisere.c}/${o.lisere.a}` : '', quoi: nom(el) });
       }
       // R. une carte (ombre posée, fond plein) DANS une carte.
@@ -194,6 +204,7 @@ const ouvrirSous = async (o, mesure, liste) => {
 const fermerFeuille = async (o) => {
   await o.pg.keyboard.press('Escape').catch(() => {}); await o.pg.waitForTimeout(450);
   if (await o.pg.$('.vrm-fs')) { await toucher(o, '[data-feuille-croix]'); await o.pg.waitForTimeout(400); }
+  if (await o.pg.$('div[style*="z-index: 1360"]')) { await o.pg.mouse.click(4, 4); await o.pg.waitForTimeout(400); }
 };
 
 const ECRANS = [
@@ -215,23 +226,24 @@ const ECRANS = [
       await mesure('menu', ['.vrm-buy-menu']);
       const note = o.pg.locator('.vrm-buy-menu [role="menuitem"]', { hasText: /note/i }).first();
       if (await note.count()) {
-        await note.click().catch(() => {}); await o.pg.waitForSelector('.vrm-fs', { timeout: 4000 }).catch(() => {}); await o.pg.waitForTimeout(800);
-        await mesure('note', ['.vrm-fs']);
+        await note.click().catch(() => {}); await o.pg.waitForSelector('.vrm-fs, [data-note-achat]', { timeout: 4000 }).catch(() => {}); await o.pg.waitForTimeout(800);
+        // (la fenêtre « Note interne » d'avant n'avait ni classe ni attribut : sa carte, mesurée par sa place)
+        await mesure('note', ['.vrm-fs', '[data-note-achat]', 'div[style*="z-index: 1360"] > div[style*="max-width: 420px"]']);
         await fermerFeuille(o);
       } else console.log('  · achats-note : pas d’entrée « note » dans le menu (pas mesuré)');
     } else console.log('  · achats-menu : pas de « ⋯ » (pas mesuré)');
     // La feuille d'aide de l'écran (« ? » après la phrase).
     if (await toucher(o, '.vrm-main .vrm-phrase-ecran button')) { await o.pg.waitForSelector('.vrm-fs', { timeout: 4000 }).catch(() => {}); await o.pg.waitForTimeout(900); await mesure('aide', ['.vrm-fs']); await fermerFeuille(o); }
   } },
-  // Ventes : la feuille d'une vente (toucher la première ligne), et la feuille d'aide.
-  { nom: 'ventes-feuilles', url: '/?tab=ventes', jouer: async (o, mesure) => {
-    const sel = '.vrm-main :is([data-vente-ligne], [data-toutes-ligne], .vrm-toutes-ligne, .vrm-sale-row, [data-sale-tx])';
-    if (await toucher(o, sel)) {
+  // Ventes : la feuille d'une vente (toucher une ligne : `aria-haspopup="dialog"`, son panneau `aria-controls`), et l'aide.
+  { nom: 'ventes-feuilles', url: '/?tab=ventes&site=vinted', jouer: async (o, mesure) => {
+    const id = await o.pg.evaluate(() => { const b = [...document.querySelectorAll('.vrm-main .vrm-ledger-sale-toggle')].find((x) => x.getClientRects().length); if (!b) return null; b.scrollIntoView({ block: 'center' }); return b.getAttribute('aria-controls'); });
+    if (id && await toucher(o, `.vrm-main .vrm-ledger-sale-toggle[aria-controls="${id}"]`)) {
       await o.pg.waitForTimeout(1200);
-      if (await o.pg.$('.vrm-fs, .vrm-fp')) await mesure('vente', ['.vrm-fs', '.vrm-fp']);
-      else await mesure('vente-ouverte', APP);
+      await mesure('vente', [`[id="${id}"]`]);
       await fermerFeuille(o);
     } else console.log('  · ventes-vente : aucune ligne de vente (pas mesuré)');
+    await o.pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 0; window.scrollTo(0, 0); });
     if (await toucher(o, '.vrm-main .vrm-phrase-ecran button')) { await o.pg.waitForSelector('.vrm-fs', { timeout: 4000 }).catch(() => {}); await o.pg.waitForTimeout(900); await mesure('aide', ['.vrm-fs']); await fermerFeuille(o); }
   } },
   // Un e-mail ouvert.
