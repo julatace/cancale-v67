@@ -1,0 +1,66 @@
+/* ══ src/ui/listes-recherche.css — recherche en phrase, glisser, épingles, comparer (14 nov., chantiers 92–95) ══
+   Couche des briques de liste (même spécificité que ui.css, jetons --d-*). AJOUT 3 de Julien :
+   de PETITES capsules (34 px dessinées, 44 touchées), une teinte très légère d'accent pour un
+   filtre de la phrase (pas un gris de plus, pas un bouton plein), le « pas ici » en gris ;
+   aucune ombre ni flou sur une rangée (1 000 rangées). */
+
+/* ── Les capsules de la phrase ── */
+:root:root:root body .vrm-ui-phrase { display: flex !important; flex-direction: column !important; gap: 2px !important; margin: 4px 0 8px !important; }
+:root:root:root body .vrm-ui-phrase-capsules { display: flex !important; gap: 6px !important; overflow-x: auto !important; scrollbar-width: none !important; margin: 0 -16px !important; padding: 0 16px !important; }
+:root:root:root body .vrm-ui-phrase-capsules::-webkit-scrollbar { display: none !important; }
+:root:root:root body .vrm-ui-capsule {
+  all: unset; box-sizing: border-box !important; flex: none !important; display: inline-flex !important; align-items: center !important; gap: 6px !important;
+  min-height: 44px !important; padding: 0 12px !important; cursor: pointer !important; white-space: nowrap !important; -webkit-tap-highlight-color: transparent;
+  font: 600 15px/1 var(--vrm-police) !important; color: var(--d-accent-texte, #0066CC) !important;
+  border-top: 5px solid transparent !important; border-bottom: 5px solid transparent !important; background-clip: padding-box !important;
+  background-color: color-mix(in srgb, var(--d-accent, #0071E3) 11%, transparent) !important; border-radius: 999px !important;
+  transition: transform var(--d-m-appui, 100ms) ease-out !important;
+}
+:root:root:root body .vrm-ui-capsule:active { transform: var(--d-appui, scale(.97)) !important; }
+:root:root:root body .vrm-ui-capsule:focus-visible { outline: 2px solid var(--d-accent, #0071E3) !important; outline-offset: 1px !important; }
+:root:root:root body .vrm-ui-capsule > svg { flex: none !important; opacity: .7 !important; }
+:root:root:root body .vrm-ui-capsule.is-pas-ici { color: var(--d-gris, #6E6E73) !important; background-color: var(--d-carte, #fff) !important; }
+:root:root:root body .vrm-ui-capsule-off { font-weight: 400 !important; }
+@media (hover: hover) and (pointer: fine) { :root:root:root body .vrm-ui-capsule { min-height: 36px !important; border-width: 1px !important; } }
+:root:root:root body .vrm-ui-phrase-ligne { display: flex !important; flex-wrap: wrap !important; align-items: center !important; column-gap: 4px !important; min-height: 20px !important;
+  font: 400 13px/1.35 var(--vrm-police) !important; color: var(--d-gris, #6E6E73) !important; font-variant-numeric: tabular-nums !important; }
+:root:root:root body .vrm-ui-phrase-ligne [data-phrase-rien] { color: var(--d-encre, #1D1D1F) !important; }
+:root:root:root body .vrm-ui-phrase-ailleurs { all: unset; box-sizing: border-box !important; min-height: 44px !important; display: inline-flex !important; align-items: center !important; padding: 0 0 0 8px !important;
+  cursor: pointer !important; color: var(--d-accent-texte, #0066CC) !important; font: 600 13px/1 var(--vrm-police) !important; }
+@media (hover: hover) and (pointer: fine) { :root:root:root body .vrm-ui-phrase-ailleurs { min-height: 36px !important; } }
+:root:root:root body .vrm-ui-phrase-edit { display: flex !important; flex-direction: column !important; gap: 8px !important; }
+:root:root:root body .vrm-ui-phrase-champ { display: flex !important; gap: 8px !important; align-items: flex-end !important; background: var(--d-carte, #fff) !important; border-radius: 12px !important; padding: 8px 12px !important; }
+:root:root:root body .vrm-ui-phrase-champ label { flex: 1 1 auto !important; display: flex !important; flex-direction: column !important; gap: 2px !important; font: 400 13px/1.2 var(--vrm-police) !important; color: var(--d-gris, #6E6E73) !important; }
+:root:root:root body .vrm-ui-phrase-champ input { all: unset; box-sizing: border-box !important; min-height: 44px !important; font: 400 17px/1.2 var(--vrm-police) !important; color: var(--d-encre, #1D1D1F) !important; font-variant-numeric: tabular-nums !important; }
+:root:root:root body .vrm-ui-phrase-ok, :root:root:root body .vrm-ui-phrase-geste {
+  all: unset; box-sizing: border-box !important; min-height: 44px !important; display: flex !important; align-items: center !important; justify-content: center !important; padding: 0 16px !important; cursor: pointer !important;
+  border-radius: 12px !important; font: 600 15px/1 var(--vrm-police) !important; color: var(--d-accent-texte, #0066CC) !important; background: var(--d-carte, #fff) !important; }
+:root:root:root body .vrm-ui-phrase-ok { background: var(--d-accent, #0071E3) !important; color: #fff !important; }
+:root:root:root body .vrm-ui-phrase-geste.is-retirer { color: var(--d-encre, #1D1D1F) !important; }
+
+/* ── Glisser pour cocher : la case est la poignée (le doigt ailleurs fait défiler) ── */
+:root:root:root body [data-glisse-poignee] { touch-action: none !important; display: inline-flex !important; align-items: center !important; justify-content: center !important;
+  min-width: 44px !important; min-height: 44px !important; margin: -6px 0 -6px -10px !important; flex: none !important; }
+:root.vrm-glisse-en-cours, :root.vrm-glisse-en-cours body { -webkit-user-select: none !important; user-select: none !important; }
+:root:root:root body .vrm-sel-astuce { font: 400 13px/1.35 var(--vrm-police) !important; color: var(--d-gris, #6E6E73) !important; margin: 0 0 6px !important; }
+
+/* ── L'épingle : une petite marque sur la rangée (pas de fond, pas d'ombre) ── */
+:root:root:root body .vrm-epingle-marque { position: absolute !important; top: 8px !important; right: 8px !important; z-index: 1 !important; width: 26px !important; height: 26px !important; border-radius: 50% !important;
+  display: grid !important; place-items: center !important; background: var(--d-carte, #fff) !important; color: var(--d-encre, #1D1D1F) !important; pointer-events: none !important; }
+:root:root:root body .vrm-sel-nom .vrm-epingle-mot { flex: none !important; color: var(--d-gris, #6E6E73) !important; display: inline-flex !important; margin-right: 4px !important; }
+:root:root:root body .vrm-sel-barre-actions { display: flex !important; gap: 8px !important; align-items: center !important; flex-wrap: wrap !important; }
+
+/* ── Comparer : deux colonnes alignées ── */
+:root:root:root body .vrm-ui-comparer { display: flex !important; flex-direction: column !important; gap: 12px !important; }
+:root:root:root body .vrm-ui-comparer-tete, :root:root:root body .vrm-ui-comparer-ligne { display: grid !important; grid-template-columns: minmax(84px, .8fr) minmax(0, 1fr) minmax(0, 1fr) !important; gap: 12px !important; align-items: center !important; }
+:root:root:root body .vrm-ui-comparer-paire { display: flex !important; flex-direction: column !important; gap: 6px !important; min-width: 0 !important; }
+:root:root:root body .vrm-ui-comparer-photo { width: 88px !important; height: 88px !important; max-width: 100% !important; border-radius: 14px !important; overflow: hidden !important; background: var(--d-remplir, rgba(118,118,128,.12)) !important; }
+:root:root:root body .vrm-ui-comparer-photo img { width: 100% !important; height: 100% !important; object-fit: cover !important; display: block !important; }
+:root:root:root body .vrm-ui-comparer-nom { font: 600 15px/1.25 var(--vrm-police) !important; color: var(--d-encre, #1D1D1F) !important; display: -webkit-box !important; -webkit-line-clamp: 2 !important; -webkit-box-orient: vertical !important; overflow: hidden !important; overflow-wrap: anywhere !important; }
+:root:root:root body .vrm-ui-comparer-lignes { margin: 0 !important; background: var(--d-carte, #fff) !important; border-radius: 12px !important; padding: 0 12px !important; }
+:root:root:root body .vrm-ui-comparer-ligne { min-height: 44px !important; padding: 8px 0 !important; }
+:root:root:root body .vrm-ui-comparer-ligne + .vrm-ui-comparer-ligne { box-shadow: inset 0 .5px 0 var(--d-filet, rgba(60,60,67,.18)) !important; }
+:root:root:root body .vrm-ui-comparer-ligne dt { font: 400 13px/1.25 var(--vrm-police) !important; color: var(--d-gris, #6E6E73) !important; margin: 0 !important; }
+:root:root:root body .vrm-ui-comparer-ligne dd { margin: 0 !important; font: 600 15px/1.25 var(--vrm-police) !important; color: var(--d-encre, #1D1D1F) !important; font-variant-numeric: tabular-nums !important; min-width: 0 !important; overflow-wrap: anywhere !important; }
+:root:root:root body .vrm-ui-comparer-ligne dd.is-ambre { color: var(--d-ambre, #B25000) !important; }
+:root:root:root body .vrm-ui-comparer-pied { margin: 0 !important; font: 400 13px/1.35 var(--vrm-police) !important; color: var(--d-gris, #6E6E73) !important; }

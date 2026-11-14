@@ -48,6 +48,8 @@ export function normaliserPhrase(s) {
   return out;
 }
 const compact = (s) => normaliserPhrase(s).replace(/\s+/g, ' ').trim();
+// La même chose, sans garder la longueur (plus rapide : pour les titres des 2 000 paires).
+const rapide = (s) => str(s).normalize('NFD').replace(COMBINANT, '').toLowerCase();
 
 // ── LE VOCABULAIRE (5 langues, sans accents : la normalisation les retire) ──
 const NOMBRES_MOTS = { un: 1, une: 1, one: 1, a: 1, an: 1, uno: 1, una: 1, ein: 1, eine: 1, einem: 1, einer: 1, einen: 1,
@@ -156,7 +158,7 @@ const SEMAINE = [
   ['jeudi', 'thursday', 'jueves', 'giovedi', 'donnerstag'], ['vendredi', 'friday', 'viernes', 'venerdi', 'freitag'], ['samedi', 'saturday', 'sabado', 'sabato', 'samstag'],
   ['dimanche', 'sunday', 'domingo', 'domenica', 'sonntag'],
 ];
-const AVANT_JOUR = ["d'ici", 'avant', 'pour', 'by', 'before', 'until', 'antes de', 'para', 'entro', 'prima di', 'bis', 'vor'];
+const AVANT_JOUR = ["d'ici", 'avant', 'pour', 'by', 'before', 'until', 'antes del', 'antes de', 'para el', 'para', 'entro', 'prima di', 'bis', 'vor'];
 const AVANT_TAILLE = ['tailles', 'taille', 'pointure', 'size', 'sz', 'talla', 'taglia', 'misura', 'groesse', 'grosse', 'große', 'gr', 'eu', 't'];
 const AVANT_NUMERO = ['n°', 'nº', 'no.', 'no', 'num.', 'num', 'numero', 'nr.', 'nr', 'nummer', 'number', '#', 'n'];
 const VIDES = new Set(('le la les l de du des d un une et ou au aux en pour avec sans sur dans qui que mes mon ma tes ton ta ses son sa paire paires chaussure chaussures basket baskets sneaker sneakers article articles moi j je ' +
@@ -171,6 +173,15 @@ const B0 = "(?<=^|[\\s,;.!?(\\-])", B1 = "(?=$|[\\s,;.!?)\\-])";
 const NOMBRE = '(\\d{1,6}(?:[.,]\\d{1,2})?)';
 const _reMots = new Map();
 const reMot = (a) => { let r = _reMots.get(a); if (!r) { r = new RegExp(`${B0}${esc(a)}${B1}`, 'g'); _reMots.set(a, r); } return r; };
+const _vocabs = new Map();
+function vocabulaire(paires, nom) {
+  if (nom && _vocabs.has(nom)) return _vocabs.get(nom);
+  const parAlias = new Map(); const tous = [];
+  for (const [cle, al, ...rest] of paires) for (const a of al) { if (!parAlias.has(a)) parAlias.set(a, [cle, rest]); tous.push(a); }
+  const v = { re: new RegExp(`${B0}(?:${alt(tous)})${B1}`, 'g'), parAlias };
+  if (nom) _vocabs.set(nom, v);
+  return v;
+}
 const nombreDe = (s) => { const t = str(s).trim(); if (/^\d/.test(t)) return Number(t.replace(',', '.')); return NOMBRES_MOTS[t] != null ? NOMBRES_MOTS[t] : null; };
 const uniteDe = (u) => { for (const [k, l] of Object.entries(UNITES)) if (l.includes(u)) return k; return null; };
 
@@ -194,11 +205,12 @@ const RE = (() => {
 
 // La date du jour à Paris (« 2026-11-14 ») et ses voisines — sans horloge cachée.
 export function jourParis(ms) {
-  try {
-    const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(ms));
-    const g = (t) => (p.find((x) => x.type === t) || {}).value;
-    return `${g('year')}-${g('month')}-${g('day')}`;
-  } catch (_) { return new Date(ms).toISOString().slice(0, 10); }
+  // L'heure de Paris sans Intl (rapide, la même partout) : UTC+1, UTC+2 du dernier dimanche de mars
+  // (1 h UTC) au dernier dimanche d'octobre (1 h UTC) — la règle européenne.
+  const d = new Date(ms); const y = d.getUTCFullYear();
+  const dernierDimanche = (m) => { const x = new Date(Date.UTC(y, m + 1, 0, 1)); x.setUTCDate(x.getUTCDate() - x.getUTCDay()); return x.getTime(); };
+  const ete = ms >= dernierDimanche(2) && ms < dernierDimanche(9);
+  return new Date(ms + (ete ? 2 : 1) * 3600000).toISOString().slice(0, 10);
 }
 export function decalerJour(jour, n) {
   const [y, m, d] = String(jour).split('-').map(Number);
@@ -217,13 +229,10 @@ export function analyserPhrase(q, { maintenant = Date.now(), marques = [] } = {}
   const prendre = (de, a) => { s = s.slice(0, de) + ' '.repeat(a - de) + s.slice(a); };
   const poser = (f, de, a) => { filtres.push({ ...f, de, a, src: brut.slice(de, a) }); prendre(de, a); };
   const chaque = (re, fn) => { re.lastIndex = 0; const trouves = []; let m; while ((m = re.exec(s))) { trouves.push(m); if (m[0] === '') re.lastIndex++; } for (const x of trouves) fn(x, x.index, x.index + x[0].length); };
-  const listeMots = (paires, fn) => {
-    const tous = []; for (const [cle, al, ...rest] of paires) for (const a of al) tous.push([a, cle, rest]);
-    tous.sort((x, y) => y[0].length - x[0].length);
-    for (const [a, cle, rest] of tous) {
-      const re = reMot(a);
-      chaque(re, (m, de, fin) => fn(cle, de, fin, rest, a));
-    }
+  // UNE expression par vocabulaire (les alias du plus long au plus court : à une même place, le plus long gagne).
+  const listeMots = (paires, fn, nom = null) => {
+    const v = vocabulaire(paires, nom);
+    chaque(v.re, (m, de, fin) => { const e = v.parAlias.get(m[0].replace(/[\s-]+/g, ' ')); if (e) fn(e[0], de, fin, e[1], m[0]); });
   };
   if (!s.trim()) return { q: brut, filtres: [], mots: [], structure: false, vide: true };
 
@@ -233,6 +242,11 @@ export function analyserPhrase(q, { maintenant = Date.now(), marques = [] } = {}
     // « a/an/una… » sans préposition n'est pas un nombre (« a month » oui, « pour un jour » oui ; « une semaine » oui)
     poser({ k: 'depuis', op: m[1] ? '<' : '>=', n, unite: u, jours: n * JOURS_UNITE[u] }, de, a);
   });
+  // 1 bis. Les modèles écrits en lettres (« air max 90 » n'est pas « max 90 € ») ; ceux en chiffres seuls
+  //        (New Balance « 550 ») attendent les prix (« 550 € » est un prix).
+  const ditNb = /(?:^|[\s-])(?:new balance|newbalance|nb)(?=[\s-]|$)/.test(s);
+  const modele = (k, de, a) => poser({ k: 'modele', v: k, cles: (MODELES.find((x) => x[0] === k) || [, []])[1] }, de, a);
+  listeMots(MODELES.filter((x) => x[2] !== 'nb'), modele, 'modeles');
   // 2. Les prix (avant les tailles : « 42 € » est un prix).
   chaque(RE.prixEntre, (m, de, a) => { const x = Number(m[1].replace(',', '.')), y = Number(m[2].replace(',', '.')); poser({ k: 'prix', min: Math.min(x, y), max: Math.max(x, y) }, de, a); });
   chaque(RE.prixTiret, (m, de, a) => { const x = Number(m[1].replace(',', '.')), y = Number(m[2].replace(',', '.')); poser({ k: 'prix', min: Math.min(x, y), max: Math.max(x, y) }, de, a); });
@@ -241,9 +255,9 @@ export function analyserPhrase(q, { maintenant = Date.now(), marques = [] } = {}
   chaque(RE.prixMot, (m, de, a) => { const v = Number(m[1].replace(',', '.')); poser({ k: 'prix', min: v, max: v }, de, a); });
   chaque(RE.prixExact, (m, de, a) => { const v = Number(String(m[1] || m[2]).replace(',', '.')); poser({ k: 'prix', min: v, max: v }, de, a); });
   // 3. Les transporteurs (avant « colis » : « colis privé »).
-  listeMots(TRANSPORTEURS.map(([k, , al]) => [k, al]), (k, de, a) => poser({ k: 'transporteur', v: k }, de, a));
+  listeMots(TRANSPORTEURS.map(([k, , al]) => [k, al]), (k, de, a) => poser({ k: 'transporteur', v: k }, de, a), 'transporteurs');
   // 4. Les états (avant les jours et les mots : « à retirer », « pas vendue »).
-  listeMots(ETATS, (k, de, a) => { poser({ k: 'etat', v: k }, de, a); });
+  listeMots(ETATS, (k, de, a) => { poser({ k: 'etat', v: k }, de, a); }, 'etats');
   // 5. Les jours (« demain », « lundi », « avant demain »).
   const auj = jourParis(maintenant);
   const reAvant = `(?:(${alt(AVANT_JOUR)})\\s+)?`;
@@ -255,14 +269,14 @@ export function analyserPhrase(q, { maintenant = Date.now(), marques = [] } = {}
     poser({ k: 'jour', rel: 'semaine', jourSemaine: i, de_: m[1] ? null : j, jusqua: j, avant: !!m[1] }, de, a);
   }));
   // 6. Ce qu'on cherche (« colis », « ventes »…).
-  listeMots(QUOI, (k, de, a) => poser({ k: 'quoi', v: k }, de, a));
-  // 7. Les modèles (les chiffres New Balance seulement si la phrase dit New Balance).
-  const ditNb = /(?:^|\s)(?:new balance|newbalance|nb)(?=\s|$)/.test(s);
-  listeMots(MODELES, (k, de, a, rest) => { if (rest[0] === 'nb' && !ditNb) return; poser({ k: 'modele', v: k, cles: (MODELES.find((x) => x[0] === k) || [, []])[1] }, de, a); });
+  listeMots(QUOI, (k, de, a) => poser({ k: 'quoi', v: k }, de, a), 'quoi');
+  // 7. Les modèles New Balance en chiffres, seulement si la phrase dit New Balance.
+  listeMots(MODELES.filter((x) => x[2] === 'nb'), (k, de, a, rest) => { if (rest[0] === 'nb' && !ditNb) return; modele(k, de, a); }, 'modeles-nb');
   // 8. Les marques (connues, puis LUES dans ses annonces).
   const lues = [];
   for (const mq of marques || []) { const c = compact(mq); if (c.length >= 3 && !VIDES.has(c) && !MARQUES.some(([, al]) => al.includes(c))) lues.push([str(mq).trim(), [c]]); }
-  listeMots([...MARQUES, ...lues], (k, de, a) => poser({ k: 'marque', v: k, cles: ([...MARQUES, ...lues].find((x) => x[0] === k) || [, []])[1] }, de, a));
+  const toutes = [...MARQUES, ...lues];
+  listeMots(toutes, (k, de, a) => poser({ k: 'marque', v: k, cles: (toutes.find((x) => x[0] === k) || [, []])[1] }, de, a), 'marques|' + lues.map((x) => x[1][0]).join('|'));
   // 9. Les tailles écrites (« taille 42 », « t42 », « EU 42,5 »), puis les N° écrits (« N°42 », « #42 », « B230 »).
   chaque(RE.taille, (m, de, a) => { const v = tailleNombre(m[1]); if (v == null || v < 16 || v > 52) return; poser({ k: 'taille', v, ambigu: false }, de, a); });
   chaque(RE.numero, (m, de, a) => poser({ k: 'numero', v: cleNumeroPhrase(m[1]) }, de, a));
@@ -320,12 +334,22 @@ export function remplacerFiltre(q, f, texte) {
 //   chacun rend la valeur LUE, `null` si pas lue ; un accesseur absent ⇒ le filtre « ne s'applique pas ici ».
 // `quoi` : ce que l'écran liste ('annonce', 'vente', 'colis'…) ; `etats` : les états qui ont un sens ici.
 // Rend { liste, ignores: [ids], pasSu: { [id]: n }, n }.
-const _cacheTitre = new WeakMap();
+// Ce qu'une ligne porte, normalisé UNE fois par objet (une frappe de plus ne refait rien).
+const _cache = new WeakMap();
+const fiche = (it, acces) => {
+  let c = it && typeof it === 'object' ? _cache.get(it) : undefined;
+  if (c === undefined) { c = {}; if (it && typeof it === 'object') _cache.set(it, c); }
+  return c;
+};
 const titreNorm = (it, acces) => {
-  if (it && typeof it === 'object') { const c = _cacheTitre.get(it); if (c !== undefined) return c; }
-  const v = ' ' + compact([acces.titre ? acces.titre(it) : '', acces.marque ? acces.marque(it) : ''].join(' ')).replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ') + ' ';
-  if (it && typeof it === 'object') _cacheTitre.set(it, v);
-  return v;
+  const c = fiche(it, acces);
+  if (c.t === undefined) c.t = ' ' + rapide([acces.titre ? acces.titre(it) : '', acces.marque ? acces.marque(it) : ''].join(' ')).replace(/[^a-z0-9ß]+/g, ' ').trim() + ' ';
+  return c.t;
+};
+const marqueNorm = (it, acces) => {
+  const c = fiche(it, acces);
+  if (c.m === undefined) { const m = acces.marque ? acces.marque(it) : null; c.m = m == null || !str(m).trim() ? null : rapide(m).replace(/[^a-z0-9ß]+/g, ' ').trim(); }
+  return c.m;
 };
 export function filtreApplicable(f, { acces = {}, quoi = null, etats = null } = {}) {
   switch (f.k) {
@@ -353,11 +377,11 @@ export function filtrerPhrase(items, filtres, { acces = {}, quoi = null, etats =
       case 'mots': { const t = titreNorm(it, acces); return f.v.every((w) => t.includes(' ' + w) || t.includes(w)); }
       case 'modele': { const t = titreNorm(it, acces); return (f.cles || [compact(f.v)]).some((c) => t.includes(' ' + c + ' ')); }
       case 'marque': {
-        const m = acces.marque ? acces.marque(it) : null;
+        const mc = marqueNorm(it, acces);
         const cles = f.cles || [compact(f.v)];
-        if (m != null && str(m).trim()) { const mc = compact(m); if (cles.some((c) => mc === c || (' ' + mc + ' ').includes(' ' + c + ' '))) return true; }
+        if (mc != null && cles.some((c) => mc === c || (' ' + mc + ' ').includes(' ' + c + ' '))) return true;
         const t = titreNorm(it, acces); if (cles.some((c) => t.includes(' ' + c + ' '))) return true;
-        return (m == null || !str(m).trim()) && !t.trim() ? null : false;
+        return mc == null && !t.trim() ? null : false;
       }
       case 'taille': { const v = acces.taille(it); if (v == null || str(v).trim() === '') return null; const n = tailleNombre(v); if (n == null) return null; return Math.abs(n - f.v) < 0.01; }
       case 'numero': { const v = acces.numero(it); if (v == null || str(v).trim() === '') return false; return cleNumeroPhrase(v) === f.v; }

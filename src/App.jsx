@@ -774,6 +774,16 @@ import "./styles-systeme.css";   // (13 nov., design-systeme) LE système : un j
 import "./styles-listes.css";
 import { AFaireHote, VersAFaire, AFaireLigne } from "./ui/AFaire.jsx";   // (14 nov., refonte des listes) les alertes d'un écran en « À faire · N »
 import { MenuCompte } from "./ui/MenuCompte.jsx";   // (14 nov., refonte des listes) Ma journée, Ventes, Annonces : une carte héros, des rangées denses, rien qui déborde — après le système, avant la tablette
+// (14 nov., chantiers 92–95) Listes : la recherche en PHRASE sans IA (src/recherchePhrase.js) en capsules,
+// cocher en glissant le doigt, épingler en haut, comparer deux paires — docs/passation/2026-11-14-listes-recherche.md.
+import { analyserPhrase, estPhrase, filtrerPhrase, ailleurs as phraseAilleurs, jourParis as jourParisPhrase } from './recherchePhrase.js';
+import { CLE_EPINGLES, MAX_EPINGLES, epinglesPropres, basculerEpingles, epinglesPresentes, cleEpingle } from './epingles.js';
+import { deuxChoisies } from './comparerPaires.js';
+import { CapsulesPhrase } from './ui/CapsulesPhrase.jsx';
+import { ComparerFeuille } from './ui/ComparerFeuille.jsx';
+import { useGlisserSelection } from './ui/useGlisserSelection.js';
+import { retirerPublie as retirerPubliePhrase } from '../api/_lib/retrait-colis.js';
+import { NOM_TRANSPORTEUR as NOM_TRANSPORTEUR_PHRASE, filtreApplicable as filtreApplicablePhrase } from './recherchePhrase.js';
 import "./styles-tablette.css";   // (11 nov., iPad) la coque ordinateur AU DOIGT : 44 px, rien au survol, rail libellé — sous `data-tablette` seulement, EN DERNIER
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
@@ -2962,6 +2972,9 @@ const SYNC_KEYS = [
   // src/notePaire.js) — à lui seul, jamais envoyée à une plateforme. (lot BH) Les achats
   // hors plateforme masqués comme DOUBLE d'un autre (« Garder celle-ci », src/achatsDoubles.js).
   'vrm_notes_paires', 'vrm_achats_hors_masques',
+  // (14 nov., chantier 94) Les paires ÉPINGLÉES en haut des listes : { ['a:{uid}:{id}']: { uid, id, n, t } }
+  // (src/epingles.js) — par identité, 20 au plus, fusionnées sous-clé par sous-clé.
+  CLE_EPINGLES,
   // (11 nov.) Les RAPPELS qu'il a posés (« Me le rappeler », api/_lib/rappels-perso.js) :
   // { [id]: { sorte, num|item|tx, jour, note, etat… } } — lus PROJETÉS par le cron (9 h) et l'agenda.
   'vrm_rappels',
@@ -5271,6 +5284,29 @@ const abonnerNotes = (fn) => {
   }
   _notesAbonnes.add(fn);
   return () => { _notesAbonnes.delete(fn); };
+};
+// ── (14 nov., chantier 94) LES ÉPINGLES (src/epingles.js) : un état pour Annonces et sa vue « Sélectionner »,
+// relu à chaque sauvegarde ou fusion du nuage. Tant que le nuage n'est pas lu, RIEN ne s'écrit (pas su ≠ vide).
+let _epinglesVue = null, _epinglesEcoute = false;
+const _epinglesAbonnes = new Set();
+const lireEpinglesVue = () => { if (_epinglesVue == null) _epinglesVue = epinglesPropres(load(CLE_EPINGLES, {})); return _epinglesVue; };
+const abonnerEpingles = (fn) => {
+  if (!_epinglesEcoute) {
+    _epinglesEcoute = true;
+    const relire = () => { _epinglesVue = null; [..._epinglesAbonnes].forEach((f) => { try { f(); } catch (_) {} }); };
+    window.addEventListener('vrm:save', (e) => { if (e && e.detail && e.detail.k === CLE_EPINGLES) relire(); });
+    onCloudReady(relire);
+  }
+  _epinglesAbonnes.add(fn);
+  return () => { _epinglesAbonnes.delete(fn); };
+};
+// Poser / retirer les épingles d'une sélection ([{ uid, id, numero }]) ; rend le message à dire.
+const epinglerPaires = (paires, poser) => {
+  if (!isCloudReady()) return tr('listes.epingle.attente');
+  const r = basculerEpingles(lireEpinglesVue(), paires, { poser, maintenant: Date.now() });
+  if (r.faites) { _epinglesVue = r.v; save(CLE_EPINGLES, r.v); [..._epinglesAbonnes].forEach((f) => { try { f(); } catch (_) {} }); }
+  if (r.refusees && !r.faites) return tr('listes.epingle.max');
+  return poser ? tr('listes.epingle.faites', { n: r.faites }) + (r.refusees ? ' · ' + tr('listes.epingle.max') : '') : tr('listes.epingle.retirees', { n: r.faites });
 };
 const poserNotesVue = (f) => { _notesVue = notesPropres(typeof f === 'function' ? f(lireNotesPaires()) : f); notifierNotes(); };
 const editerNotePaire = async (paire, actuelle) => {
@@ -15789,10 +15825,13 @@ async function demanderQuestionRepub(q, titre) {
 // (9 nov., lot AL) `filtre = 'republier'` : la vue « Republier » d'Annonces (l'ancienne entrée
 // du menu) — ses annonces EN LIGNE seulement, la même sélection, et au pied « Republier · N »
 // (`onRepublier`) qui ouvre l'atelier ; « Sélectionner » garde « Actions · N ».
-function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, brLecture, onActions, onRepublier, onALaMain, suivis = [], onSuivi, onDetailBrouillons }) {
+function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, brLecture, onActions, onRepublier, onALaMain, suivis = [], onSuivi, onDetailBrouillons, epinglees = null, onEpingler = null }) {
   const rep = filtre === 'republier';
-  const liste = (annonces || []).filter((a) => (filtre !== 'brouillon' || a.etat === 'brouillon') && (!rep || a.etat === 'en-ligne'));
   const cle = (a) => a.uid + ':' + a.id;
+  // (14 nov., chantier 94) Les épinglées d'abord (tri stable : l'ordre lu est gardé pour le reste).
+  const epK = (a) => cleEpingle(a.uid, a.id);
+  const liste0 = (annonces || []).filter((a) => (filtre !== 'brouillon' || a.etat === 'brouillon') && (!rep || a.etat === 'en-ligne'));
+  const liste = epinglees && epinglees.size ? [...liste0.filter((a) => epinglees.has(epK(a))), ...liste0.filter((a) => !epinglees.has(epK(a)))] : liste0;
   const coches = new Set((sel || []).map((x) => x.uid + ':' + x.id));
   const groupes = []; const parUid = new Map();
   for (const a of liste) { if (!parUid.has(a.uid)) { const g = { uid: a.uid, compte: a.compte, items: [] }; parUid.set(a.uid, g); groupes.push(g); } parUid.get(a.uid).items.push(a); }
@@ -15805,11 +15844,21 @@ function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, b
   const decocherG = (g) => setSel((v) => v.filter((x) => x.uid !== g.uid));
   const prixTxt = prixTxtMontant;   // (5 nov.) alias de `montant()`, src/format.js
   const nCoches = (sel || []).length;
+  // (14 nov., chantier 93) COCHER EN GLISSANT depuis une case (src/ui/useGlisserSelection.js) : l'ordre AFFICHÉ
+  // (groupes de comptes), les lignes qui ne se cochent pas restent telles quelles ; les cases restent de vraies cases.
+  const ordreGlisse = groupes.flatMap((g) => g.items.map(cle));
+  const { surPointeur, glisse } = useGlisserSelection({ ordre: ordreGlisse, coches, exclues: new Set(liste.filter((a) => a.raisonPas).map(cle)),
+    poser: (s) => setSel((v) => { const ici = new Set(ordreGlisse); const garde = (v || []).filter((x) => !ici.has(x.uid + ':' + x.id)); return [...garde, ...liste.filter((a) => s.has(cle(a))).map((a) => ({ id: a.id, uid: a.uid, etat: a.etat }))]; }) });
+  // (14 nov., chantier 95) Comparer : exactement DEUX cochées, par identité (src/comparerPaires.js).
+  const [comparer, setComparer] = useState(null);
+  const deux = deuxChoisies(sel, liste);
+  const cochees = liste.filter((a) => coches.has(cle(a)));
+  const toutesEpinglees = !!(epinglees && cochees.length && cochees.every((a) => epinglees.has(epK(a))));
   // Republier : seules les annonces en ligne cochées DE CETTE LISTE partent (un brouillon coché dans
   // « Sélectionner » reste coché, mais n'est pas republié).
   const aRepublier = rep ? liste.filter((a) => coches.has(cle(a))) : [];
   return (
-    <section className="vrm-sel" data-selection-vue={filtre} data-selection-n={liste.length}>
+    <section className="vrm-sel" data-selection-vue={filtre} data-selection-n={liste.length} data-glisse={glisse ? '1' : '0'} onPointerDown={surPointeur}>
       {/* (11 nov., lot DJ8) Le conseil passe AVANT les suivis : en arrivant, « À la main » se voit d'abord. */}
       {/* (10 nov., lot AP — demande 17) À LA MAIN, CONSEILLÉ : le moins risqué (c'est lui qui publie,
           rien ne part d'ici), rendu attirant — trois gestes prêts, le N° qui suit la paire. */}
@@ -15834,7 +15883,7 @@ function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, b
       </div>
       {charge ? <div className="vrm-sel-vide" data-selection-charge="">{PAS_SU.enCours}</div>
         : !liste.length ? <div className="vrm-sel-vide" data-selection-vide="">{filtre === 'brouillon' ? (brLecture ? PAS_SU.enCours : tr('annonces.aucunBrouillonLu')) : tr('annonces.aucuneAnnonceLue')}</div>
-        : groupes.map((g) => (
+        : <>{liste.length > 1 ? <p className="vrm-sel-astuce" data-glisse-astuce="">{tr('listes.glisser.astuce')}</p> : null}{groupes.map((g) => (
           <div key={g.uid || 'x'} className="vrm-sel-groupe" data-selection-compte={g.uid} data-selection-compte-n={g.items.length}>
             <div className="vrm-sel-compte"><b>{g.compte}</b><span className="vrm-sel-n">{trj('annonces.annonces', { n: g.items.length })}</span>
               {g.items.some((a) => !a.raisonPas) && (toutCocheG(g)
@@ -15842,13 +15891,13 @@ function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, b
                 : <Bouton variante="discret" data-selection-compte-cocher={g.uid} onClick={() => cocherTout(g)}>{tr('annonces.toutCocher')}</Bouton>)}
             </div>
             <ul className="vrm-sel-liste">
-              {g.items.map((a) => { const on = coches.has(cle(a)); const off = !!a.raisonPas; return (
-                <li key={cle(a)}>
-                  <label className="vrm-sel-ligne" data-selection-annonce={a.id} data-selection-etat={a.etat} data-sel-coche={on ? '1' : '0'} aria-disabled={off ? 'true' : undefined} title={off ? a.raisonPas : undefined}>
-                    <input type="checkbox" className="vrm-sel-case" checked={on} disabled={off} onChange={() => basculer(a)} aria-label={`Sélectionner ${a.titre || 'cette annonce'}`}/>
+              {g.items.map((a) => { const on = coches.has(cle(a)); const off = !!a.raisonPas; const ep = !!(epinglees && epinglees.has(epK(a))); return (
+                <li key={cle(a)} data-glisse-cle={cle(a)}>
+                  <label className="vrm-sel-ligne" data-selection-annonce={a.id} data-selection-etat={a.etat} data-sel-coche={on ? '1' : '0'} data-epinglee={ep ? '1' : undefined} aria-disabled={off ? 'true' : undefined} title={off ? a.raisonPas : undefined}>
+                    <span data-glisse-poignee=""><input type="checkbox" className="vrm-sel-case" checked={on} disabled={off} onChange={() => basculer(a)} aria-label={`Sélectionner ${a.titre || 'cette annonce'}`}/></span>
                     {a.photo ? <PhotoVinted src={a.photo} alt="" className="vrm-sel-photo" loading="lazy"/> : <PhotoVide taille={52} className="vrm-sel-photo"/>}
                     <span className="vrm-sel-centre">
-                      <span className="vrm-sel-nom">{a.numero ? <Numero n={a.numero} taille="petit" className="vrm-sel-num"/> : null}<span className="vrm-sel-titre">{a.titre || tr('annonces.sansTitre')}</span></span>
+                      <span className="vrm-sel-nom">{ep ? <span className="vrm-epingle-mot" title={tr('listes.epingle.marque')}><Icon name="pin" size={13}/><span className="vrm-sr">{tr('listes.epingle.marque')}</span></span> : null}{a.numero ? <Numero n={a.numero} taille="petit" className="vrm-sel-num"/> : null}<span className="vrm-sel-titre">{a.titre || tr('annonces.sansTitre')}</span></span>
                       <span className="vrm-sel-sous"><span className="vrm-sel-etat" data-etat-annonce={a.etat}>{ETATS_ANNONCE[a.etat] || a.etat}</span><span className="vrm-sel-prix">{prixTxt(a.prix)}</span></span>
                       {off && <span className="vrm-sel-raison" data-selection-raison="">{a.raisonPas}</span>}
                     </span>
@@ -15857,13 +15906,18 @@ function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, b
               ); })}
             </ul>
           </div>
-        ))}
+        ))}</>}
+      {comparer ? <ComparerFeuille paires={comparer} onClose={() => setComparer(null)} Photo={PhotoVinted}/> : null}
       {rep
         ? (aRepublier.length > 0 && <div className="vrm-sel-barre vrm-sel-barre-deux">
             <Bouton variante="secondaire" data-republier-lancer={aRepublier.length} onClick={() => onRepublier && onRepublier(aRepublier)}>{trj('annonces.vrm', { aRepublierN: aRepublier.length })}</Bouton>
             <Bouton variante="primaire" icone="shield" data-republier-main-lancer={aRepublier.length} onClick={() => onALaMain && onALaMain(aRepublier)}>{trj('annonces.main', { aRepublierN: aRepublier.length })}</Bouton>
           </div>)
-        : (nCoches > 0 && <div className="vrm-sel-barre"><Bouton variante="primaire" data-actions-possibles={nCoches} onClick={onActions}>{trj('annonces.actions', { nCoches: nCoches })}</Bouton></div>)}
+        : (nCoches > 0 && <div className="vrm-sel-barre vrm-sel-barre-actions">
+            {/* (14 nov., chantiers 94-95) Épingler et Comparer : des secondaires (un seul bouton plein, AJOUT 3). */}
+            {onEpingler && cochees.length > 0 ? <Bouton variante="discret" icone="pin" data-epingler={toutesEpinglees ? 'retirer' : 'poser'} data-epingler-n={cochees.length} onClick={() => onEpingler(cochees, !toutesEpinglees)}>{tr(toutesEpinglees ? 'listes.epingle.desepingler' : 'listes.epingle.epingler')}</Bouton> : null}
+            {deux ? <Bouton variante="discret" data-comparer-ouvrir="" onClick={() => setComparer(deux)}>{tr('listes.comparer.bouton')}</Bouton> : null}
+            <Bouton variante="primaire" data-actions-possibles={nCoches} onClick={onActions}>{trj('annonces.actions', { nCoches: nCoches })}</Bouton></div>)}
     </section>
   );
 }
@@ -37034,6 +37088,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Leboncoin/eBay : seul l'affichage change — une paire peut-être encore en
   // vente ne disparaît plus de l'écran. Une suppression VUE par l'extension
   // l'en retire toujours (`supprimeeApres`).
+  // (14 nov., chantier 92) LA RECHERCHE EN PHRASE : « nike 42 pas vendue depuis 2 mois » ⇒ des filtres
+  // (src/recherchePhrase.js) montrés en capsules sous la recherche ; « 128 » seul reste la recherche par N°.
+  const annMarques = useMemo(() => [...new Set(annBase.map((it) => String(it.brand || '').trim()).filter(Boolean))].slice(0, 400), [annBase]);
+  const annPhrase = useMemo(() => { const a = analyserPhrase(annSearch, { marques: annMarques }); return estPhrase(a) ? a : null; }, [annSearch, annMarques]);
+  const annPhraseInfo = useRef(null);
+  // (14 nov., chantier 94) Les épingles de son compte VRM (lues du nuage, src/epingles.js).
+  const epinglesVal = React.useSyncExternalStore(abonnerEpingles, lireEpinglesVue);
   const annShown = useMemo(() => {
     const vus = new Set(annBase.map((it) => String(it.id)));
     const lues = listings.lues || {};
@@ -37041,7 +37102,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       .map((it) => ({ ...it, _vrmAConfirmerLu: Number(lues[String((it._acc && it._acc.vinted_user_id) || '')]) || null, _vrmAConfirmer: true }));
     let arr = [...annBase, ...conf];
     const q = annSearch.trim().toLowerCase();
-    if (q) arr = arr.filter(it => {
+    annPhraseInfo.current = null;
+    if (annPhrase) {
+      // Les accesseurs de l'annonce : la valeur LUE, `null` si pas lue (écartée et comptée, jamais devinée).
+      const res = filtrerPhrase(arr, annPhrase.filtres, { quoi: 'annonce', etats: ['en-ligne'], acces: {
+        titre: (it) => it.title || '', marque: (it) => (it.brand == null ? null : it.brand), taille: (it) => (it.size == null || it.size === '' ? null : it.size),
+        numero: (it) => (numeros[it.id] && numeros[it.id].numero) || '',
+        prix: (it) => { const p = it.price; const v = Number(String(p && typeof p === 'object' ? p.amount : p ?? '').replace(',', '.')); return p == null || p === '' || !isFinite(v) ? null : v; },
+        etat: (it) => (it._vrmAConfirmer ? null : 'en-ligne'), age: (it) => listedAgeDays(it) } });
+      annPhraseInfo.current = res; arr = res.liste;
+    } else if (q) arr = arr.filter(it => {
       const num = String(numeros[it.id]?.numero || '');
       return (it.title||'').toLowerCase().includes(q)
         || (it.brand||'').toLowerCase().includes(q)
@@ -37097,9 +37167,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // l'affichage, pas masqués — demande de Julien).
     const c = selEff;
     if (c) arr = [...arr].sort((a,b) => { const ac = uidAnn(a)===c, bc = uidAnn(b)===c; return ac===bc ? 0 : (ac ? -1 : 1); });
+    // (14 nov., chantier 94) Les ÉPINGLÉES en tête de LEUR compte (le compte de l'onglet reste en tête) ; rien n'entre ni ne sort.
+    const rangEp = epinglesPresentes(epinglesVal, arr, { uid: uidAnn, id: (it) => String(it.id), numero: (it) => (numeros[it.id] && numeros[it.id].numero) || '' });
+    if (rangEp.size) {
+      const ordreC = new Map(); arr.forEach((it) => { const u = uidAnn(it); if (!ordreC.has(u)) ordreC.set(u, ordreC.size); });
+      const r = (it) => { const k = cleEpingle(uidAnn(it), String(it.id)); return rangEp.has(k) ? rangEp.get(k) : MAX_EPINGLES * 10; };
+      arr = arr.map((it, i) => [it, i]).sort((x, y) => (ordreC.get(uidAnn(x[0])) - ordreC.get(uidAnn(y[0]))) || (r(x[0]) - r(y[0])) || (x[1] - y[1])).map((x) => x[0]);
+    }
     return arr;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annBase, annAConfirmer, listings.lues, annSearch, annSort, numeros, compteSel, compteConnecte, selEff, seuilDort, modeDort, seuilFav]);
+  }, [annBase, annAConfirmer, listings.lues, annSearch, annSort, numeros, compteSel, compteConnecte, selEff, seuilDort, modeDort, seuilFav, annPhrase, epinglesVal]);
+  // (14 nov., chantier 94) L'ensemble des annonces épinglées présentes (marque sur la vignette, vue « Sélectionner »).
+  const annEpinglees = useMemo(() => new Set(epinglesPresentes(epinglesVal, annBase, { uid: (it) => String((it._acc && it._acc.vinted_user_id) || ''), id: (it) => String(it.id), numero: (it) => (numeros[it.id] && numeros[it.id].numero) || '' }).keys()), [epinglesVal, annBase, numeros]);
   // Un seul compte à l'écran ⇒ le nommer sur chaque carte ne distingue rien (§7).
   const annUnCompte = useMemo(() => new Set(annShown.map(x => String(x._acc && x._acc.vinted_user_id || ''))).size <= 1, [annShown]);
   // (10 nov., lot AM — demande 15 de Julien) LA GRILLE « COMME LE DRESSING VINTED », RANGÉE PAR COMPTE :
@@ -49008,7 +49087,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* (5 nov., chantier C — revue 2.9) « sélection » ne nomme plus que les cases cochées :
             le filtre dit « affichées ». Dans les vues à cocher (Sélectionner, Brouillons), leur
             propre tête dit déjà quoi faire : pas de ligne de filtre en plus. */}
-        {(annSearch.trim() || annSort!=='oldest') && annSort!=='selection' && annSort!=='republier' && annSort!=='brouillons' && annSort!=='sansachat' && annSort!=='acompleter' && <div className="vrm-filter-recap" role="status" data-ann-filtre="">
+        {/* (14 nov., chantier 92) La phrase comprise, en capsules qu'on change (src/ui/CapsulesPhrase.jsx) ; « colis »,
+            « vendue »… n'ont pas de sens ici : dits « pas ici », et la loupe y cherche. */}
+        {annPhrase && !['selection','republier','brouillons'].includes(annSort) && <CapsulesPhrase analyse={annPhrase} q={annSearch} onQ={setAnnSearch}
+          resultat={{ ...(annPhraseInfo.current || {}), n: annShown.length }} total={annBase.length + annAConfirmer.length}
+          ailleursVers={phraseAilleurs(annPhrase, { quoi: 'annonce', etats: ['en-ligne'] })}
+          onAilleurs={() => { try { window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: annSearch.trim().slice(0, 64) })); } catch (_) {} }}/>}
+        {(annSearch.trim() || annSort!=='oldest') && !annPhrase && annSort!=='selection' && annSort!=='republier' && annSort!=='brouillons' && annSort!=='sansachat' && annSort!=='acompleter' && <div className="vrm-filter-recap" role="status" data-ann-filtre="">
           <span>{(()=>{ const k = annSort==='masquees' ? annMasquees.length : annShown.length; return `${k} annonce${k>1?'s':''} affichée${k>1?'s':''}`; })()}</span>
           <button type="button" onClick={()=>{setAnnSearch('');setAnnSort('oldest');}}>{tr('annonces.toutAfficher')}</button>
         </div>}
@@ -49257,6 +49342,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         ) : null}
         {(annSort==='selection' || annSort==='brouillons' || annSort==='republier') ? (
           <ChoixAnnoncesVinted filtre={annSort==='brouillons' ? 'brouillon' : annSort==='republier' ? 'republier' : 'tout'} annonces={annSelectionnables} sel={selAnn} setSel={setSelAnn}
+            epinglees={annEpinglees} onEpingler={(choisies, poser) => toast(epinglerPaires(choisies.map((a) => ({ uid: a.uid, id: a.id, numero: a.numero })), poser))}
             charge={listings.items==null && listings.loading} brLecture={brVinted.liste==null}
             onActions={()=>setActionsSelOpen(true)}
             onRepublier={(choisies)=>{
@@ -49387,6 +49473,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<PhotoVide remplir rayon={0}/>}
                     {it._vrmAConfirmer && <span data-ann-a-confirmer="" title={tr('annonces.compteEteRelu')} style={{position:'absolute',right:10,top:10,fontSize:11,fontWeight:600,whiteSpace:'nowrap',color:C.text,background:C.card,border:`1px solid ${C.warn || C.border}`,borderRadius:999,padding:'4px 9px'}}>{tr('annonces.confirmer3')}{it._vrmAConfirmerLu ? ` · lu ${new Date(it._vrmAConfirmerLu).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}` : ''}</span>}
                     {enDouble && <span className="vrm-vignette-marque is-ambre" data-vignette-en-double="" title={`${motsVendeur().Meme} est en ligne deux fois sur Vinted (même photo) : retire celle en trop sur vinted.fr — l'alerte au-dessus les nomme`}>{tr('annonces.double')}</span>}
+                    {annEpinglees.has(cleEpingle(String(it._acc && it._acc.vinted_user_id || ''), String(it.id))) && <span className="vrm-epingle-marque" data-epinglee="" title={tr('listes.epingle.marque')}><Icon name="pin" size={15}/><span className="vrm-sr">{tr('listes.epingle.marque')}</span></span>}
                     {it.promoted===true && <span data-boostee title={tr('annonces.vintedDitAnnonce')} style={{position:'absolute',left:10,bottom:10,fontSize:11,fontWeight:600,whiteSpace:'nowrap',color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 9px'}}>{tr('annonces.boostee')}</span>}
                   </a>
                   {/* (31 oct., Vitrine) Le N° de rangement SUR la photo, en haut à
@@ -60398,6 +60485,64 @@ function AppCoeur() {
             <span style={{fontSize:17,color:C.muted}}>›</span>
           </button>))}</div> : null;
         const blocActions = actionsGs.length ? <div data-recherche-groupe="action" data-recherche-n={actionsGs.length}>{entete('Actions', null, 'action')}{actionsGs.map(ligneAction)}</div> : null;
+        // (14 nov., chantier 92) LA PHRASE (src/recherchePhrase.js) : « nike 42 pas vendue depuis 2 mois », « colis mondial
+        // relay demain ». Des FILTRES en capsules (on les change ou on les retire), appliqués à ce que la loupe a LU :
+        // paires et annonces (l'index), ventes et achats (l'index), colis à retirer (la publication de Colis,
+        // `vrm_colis_retirer`, relue par la même règle que le widget). Rien de deviné : un filtre sans sens pour un type
+        // l'écarte, une valeur pas lue est comptée « pas lue ».
+        const phraseGs = q && !estNumQ ? memoSur('gs-phrase', [qBrut], () => { const a = analyserPhrase(qBrut, { maintenant: Date.now() }); return estPhrase(a) ? a : null; }) : null;
+        let blocPhrase = null, nPhrase = 0;
+        if (phraseGs) {
+          const quoiF = phraseGs.filtres.find((f) => f.k === 'quoi');
+          const veut = (typ) => !quoiF || quoiF.v === typ;
+          const centimesEnEuros = (e) => (e.montants && e.montants.length ? e.montants[0] / 100 : null);
+          const tailleTitre = (s) => { const m = /(?:taille|size|talla|taglia|gr(?:ö|o)(?:ß|ss)e|eu|t)\s?\.?\s?(\d{2}(?:[.,]5)?)\b/i.exec(String(s || '')); return m ? m[1] : null; };
+          const ageDe = (d) => { const ms = Date.parse(d || ''); return Number.isFinite(ms) ? Math.floor((Date.now() - ms) / 86400000) : null; };
+          const ents = (idx && idx.entrees) || [];
+          const pasSuTous = {};
+          // Un type n'est cherché que si CHAQUE filtre y a un sens (« vendue hier » ne ramène pas les achats d'hier) ;
+          // un filtre « pas ici » est celui qui n'a de sens pour AUCUN type cherché.
+          let sansSens = null;
+          const passe = (liste, opts) => {
+            const hors = phraseGs.filtres.filter((f) => f.k !== 'quoi' && !filtreApplicablePhrase(f, opts)).map((f) => f.id);
+            sansSens = sansSens == null ? new Set(hors) : new Set([...sansSens].filter((x) => hors.includes(x)));
+            if (hors.length) return [];
+            const r = filtrerPhrase(liste, phraseGs.filtres, opts); Object.entries(r.pasSu).forEach(([k, v]) => { pasSuTous[k] = (pasSuTous[k] || 0) + v; }); return r.liste; };
+          const paires = veut('annonce') ? passe(ents.filter((e) => e.type === 'paire' || e.type === 'annonce'), { quoi: 'annonce', etats: ['en-ligne'], acces: {
+            titre: (e) => e.titre, marque: (e) => (e.a && e.a.brand) || (e.f && e.f.brand) || null, taille: (e) => (e.a && e.a.size) || (e.f && e.f.size) || tailleTitre(e.titre),
+            numero: (e) => e.numero || '', prix: (e) => { const p = e.a ? e.a.price : e.f ? e.f.price : null; const v = Number(String(p && typeof p === 'object' ? p.amount : p ?? '').replace(',', '.')); return p == null || p === '' || !isFinite(v) ? null : v; },
+            etat: (e) => (e.enLigne === true ? 'en-ligne' : e.enLigne === false ? 'hors-ligne' : null) } }) : [];
+          const ventesP = veut('vente') ? passe(ents.filter((e) => e.type === 'vente'), { quoi: 'vente', etats: ['vendue'], acces: {
+            titre: (e) => e.titre, taille: (e) => tailleTitre(e.titre), numero: (e) => e.numero || '', prix: centimesEnEuros, etat: () => 'vendue',
+            age: (e) => ageDe(e.date), jour: (e) => (e.date ? jourParisPhrase(Date.parse(e.date)) : null) } }) : [];
+          const achatsP = veut('achat') ? passe(ents.filter((e) => e.type === 'achat'), { quoi: 'achat', etats: [], acces: {
+            titre: (e) => e.titre, taille: (e) => tailleTitre(e.titre), prix: centimesEnEuros, age: (e) => ageDe(e.date), jour: (e) => (e.date ? jourParisPhrase(Date.parse(e.date)) : null) } }) : [];
+          // Les colis à retirer : la liste PUBLIÉE par l'écran Colis (§11 : un propriétaire, les autres consomment).
+          const pubR = load('vrm_colis_retirer', null);
+          const lusColis = pubR ? retirerPubliePhrase(pubR, Date.now()) : null;
+          const colisP = veut('colis') && lusColis ? passe(lusColis.liste.map((c, i) => ({ ...c, _i: i })), { quoi: 'colis', etats: ['a-retirer'], acces: {
+            titre: (c) => c.nom || '', transporteur: (c) => c.transporteur || null, etat: () => 'a-retirer', jour: (c) => c.limite || null } }) : [];
+          const MAXP = 8;
+          nPhrase = paires.length + ventesP.length + achatsP.length + colisP.length;
+          const lignesColis = colisP.slice(0, MAXP).map((c) => (
+            <button key={'phrase-colis-' + c._i} type="button" className="vrm-recherche-ligne" data-recherche-resultat="phrase-colis" data-phrase-colis={c.transporteur || ''} data-phrase-limite={c.limite || ''}
+              onClick={() => ouvrir({ e: { type: 'colis', c: { sens: 'entrant' } }, par: 'phrase' }, 'colis')} style={styleLigne}>
+              {thumb(null, <LogoTransporteur cle={carrierKey(c.transporteur || '')} taille={26} repli={<Icon name="box" size={18} style={{color:C.muted}}/>}/>)}
+              {ligneTexte(c.nom || tr('listes.phrase.colisNom', { t: NOM_TRANSPORTEUR_PHRASE[c.transporteur] || c.transporteur || '' }).trim(), [NOM_TRANSPORTEUR_PHRASE[c.transporteur] || c.transporteur || '', c.limite ? tr('listes.phrase.colisLimite', { d: jourCourt(c.limite + 'T12:00:00') }) : ''].filter(Boolean).join(' · '))}
+              <span style={{fontSize:17,color:C.muted}}>›</span>
+            </button>));
+          const sous = (cleT, liste, type) => liste.length ? <div data-recherche-phrase-type={type} data-recherche-n={liste.length}>{entete(cleT, liste.length, 'phrase-' + type)}{liste.slice(0, MAXP).map((e, i) => ligne({ e, par: 'phrase', exact: false, valeur: '' }, e.type, i))}</div> : null;
+          blocPhrase = (
+            <div data-recherche-groupe="phrase" data-recherche-n={nPhrase}>
+              {entete(tr('listes.phrase.loupe'), null, 'phrase')}
+              <CapsulesPhrase analyse={phraseGs} q={qBrut} onQ={(v) => setGsQ(v)} resultat={{ ignores: [...(sansSens || [])], pasSu: pasSuTous, n: nPhrase }} motTotal="trouves"/>
+              {sous(motsVendeur().Noms, paires, 'paire')}
+              {sous(tr('listes.phrase.quoi.vente'), ventesP, 'vente')}
+              {sous(tr('listes.phrase.quoi.achat'), achatsP, 'achat')}
+              {veut('colis') && (phraseGs.filtres.some((f) => f.k === 'transporteur' || (f.k === 'etat' && f.v === 'a-retirer')) || quoiF) && !lusColis ? <div data-phrase-colis-pas-su="" style={{fontSize:12,color:C.muted,padding:'4px 2px'}}>{tr('listes.phrase.colisPasSu')}</div> : null}
+              {colisP.length ? <div data-recherche-phrase-type="colis" data-recherche-n={colisP.length}>{entete(tr('listes.phrase.loupeColis'), colisP.length, 'phrase-colis')}{lignesColis}</div> : null}
+            </div>);
+        }
         return (
         <div className="vrm-global-search vrm-recherche-panneau" id="vrm-recherche-resultats" data-recherche-panneau="" data-recherche-q={q} data-recherche-pret={gsData ? '1' : '0'} role="region" aria-label="Résultats de la recherche"
           style={ordi?{background:C.bg,borderColor:C.border}:{top:hautRecherche,background:C.bg,borderColor:C.border}} onMouseDown={e=>{ if(e.target===e.currentTarget) e.preventDefault(); }} onKeyDown={clavierPanneau}>
@@ -60419,10 +60564,11 @@ function AppCoeur() {
             <LigneVoix canal="loupe" Pourquoi={Pourquoi} couleur={C.muted} mobile={!ordi} vide={!q}/>
             {q && compris && compris.genres.length > 0 && <div data-recherche-compris={compris.genres.join(' ')} style={{padding:'8px 2px 0',color:C.muted,fontSize:12,lineHeight:1.4}}>Je cherche {compris.genres.map(g=>GENRES_REQUETE[g]).filter(Boolean).join(', ')}.</div>}
             {nonLues.length > 0 && <div data-recherche-non-lu={idx.nonLues.join(' ')} data-recherche-non-lu-encours={gsData ? '0' : '1'} style={{padding:'6px 2px 0',color:C.muted,fontSize:12,lineHeight:1.4}}>{nonLues}</div>}
+            {q && blocPhrase}
             {q && blocExactes}
             {q && !estNumQ && blocActions}
             {q && blocAide}
-            {q && total===0 && !estNumQ && !actionsGs.length && !fichesGs.length && !(mails && mails.liste === undefined) && <div data-recherche-rien="" style={{padding:'14px 12px',textAlign:'left',color:C.muted,fontSize:13,lineHeight:1.45}}>{gsData?<>Aucun résultat pour « {qBrut.trim()} ».<br/>Essaie un N° (« B125 »), un pseudo, un suivi ou deux mots.</>:'Je lis tes ventes, achats et colis…'}</div>}
+            {q && total===0 && !nPhrase && !estNumQ && !actionsGs.length && !fichesGs.length && !(mails && mails.liste === undefined) && <div data-recherche-rien="" style={{padding:'14px 12px',textAlign:'left',color:C.muted,fontSize:13,lineHeight:1.45}}>{gsData?<>Aucun résultat pour « {qBrut.trim()} ».<br/>Essaie un N° (« B125 »), un pseudo, un suivi ou deux mots.</>:'Je lis tes ventes, achats et colis…'}</div>}
             {q && estNumQ && exacteNumero && <div data-recherche-exacte-numero="" style={{padding:'8px 2px 0',fontSize:12,color:C.muted,lineHeight:1.4}}>Correspondance exacte · trouvé par son N° — pas par ressemblance.</div>}
             {q && estNumQ && <ToutSurLeNumero q={qBrut} numData={numData} comptes={vintedAccounts} onNav={(tab,cible)=>{ setGsOpen(false); if(cible) poserCible(cible, redirigerOnglet(tab, null, ONGLETS_DEPLACES).tab); setTab(tab); }} onFiche={(n)=>setFicheNum(String(n))} onChercher={(n)=>setGsQ(String(n))} onStock={(n)=>{ setGsOpen(false); setGarageLocate(String(n)); DEMANDE_STOCK_CHERCHE.nums=[String(n)]; DEMANDE_STOCK_CHERCHE.at=Date.now(); setTab('garage'); }}/>}
             {q && estNumQ && blocActions}
