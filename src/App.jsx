@@ -51760,7 +51760,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </>);
                 // (14 nov., Studio) LES TUILES-FILTRES sous le grand chiffre (« À envoyer » seulement) : « Tous », « Avant demain »
                 // (`avantDemainColis`), un transporteur par tuile (`filtresTransporteurs`) — la liste les applique (`filtrerEnvoyes`).
-                const tuilesTete = (achatsSec || onglet !== 'envoyer') ? null : (() => {
+                const tuilesTete = achatsSec ? null : (() => {
                   const tous = colisAEnvoyerListe(); if (tous.length < 2) return null;
                   const trDe = (x) => (x.__autre ? x.tr : transporteurVente(x.b));
                   const nAD = tous.filter(avantDemainColis).length;
@@ -51771,7 +51771,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     ...(nAD > 0 && nAD < tous.length ? [{ v: '__avantDemain', l: tr('sv.filtre.avantDemain'), n: nAD, unite: tr('sv.filtre.aPoster'), ambre: true, attrs: { 'data-envoyer-filtre-choix': 'avant-demain', 'data-envoyer-filtre-n': nAD } }] : []),
                     ...(pastilles.length > 1 ? pastilles.map((p) => ({ v: p.nom, l: p.nom, n: p.n, unite: tr('sv.filtre.colis', { n: p.n }), attrs: { 'data-envoyer-filtre-choix': p.nom, 'data-envoyer-filtre-cle': p.cle || 'inconnu', 'data-envoyer-filtre-n': p.n } })) : []),
                   ];
-                  return <TuilesFiltres tuiles={tuiles} valeur={eff} onChoix={(v) => setFiltreEnvoyer(v)} label={tr('sv.filtre.label')} attrs={{ 'data-envoyer-filtres': '', 'data-envoyer-filtre': eff }}/>;
+                  // Sur « Envoyés », les tuiles restent à leur place (la tête ne bouge pas d'un onglet à l'autre) ; aucune n'est posée,
+                  // et en toucher une ramène à « À envoyer », filtré.
+                  const surEnvoyer = onglet === 'envoyer';
+                  return <TuilesFiltres tuiles={tuiles} valeur={surEnvoyer ? eff : null} onChoix={(v) => { setFiltreEnvoyer(v); if (!surEnvoyer && onOngletColis) onOngletColis('envoyer'); }} label={tr('sv.filtre.label')} attrs={{ 'data-envoyer-filtres': '', 'data-envoyer-filtre': surEnvoyer ? eff : '' }}/>;
                 })();
                 return (
                   <div className="sb-tete-hote" data-colis-barre="" data-sb-studio={colisDans} data-sb-tuiles={tuilesTete ? '1' : '0'}>
