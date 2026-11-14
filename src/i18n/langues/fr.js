@@ -20,11 +20,13 @@ import ecran_tarifs from './fr/tarifs.js';
 import ecran_nouveaux from './fr/nouveaux.js';
 import ecran_argent from './fr/argent.js';
 import ecran_fraiscarte from './fr/fraiscarte.js';   // (14 nov., frais-carte)
+import ecran_atelier from './fr/atelier.js';
 export default {
   ...ecran_fiche,
   ...ecran_fraiscarte,
   ...ecran_tarifs,
   ...ecran_nouveaux,
+  ...ecran_atelier,
   ...ecran_compta,
   ...ecran_argent,
   ...ecran_stats,
