@@ -87,6 +87,13 @@ export function relireLigneSuivi(d) {
     return { ...d, status: 'transit', statusLabel: 'Point relais changé', relaisChange: true, retireLe: null,
       ...(autrePreuve ? { aVerifierTransporteur: 'Retiré puis « changé de plan » : VRM le vérifie chez le transporteur' } : {}) };
   }
+  // (14 nov., capture de Julien : Vinted Go « Nouveau relais : il est temps de récupérer ton colis ! ») Une ligne
+  // rangée « en route · point changé » AVANT la règle du sujet qui invite à récupérer (etat-colis-email.js,
+  // `SUJET_RECUPERER_AU_NOUVEAU`) : son propre sujet dit le colis ARRIVÉ au nouveau point, et son code ou son QR le
+  // prouve. Elle redevient « à retirer » — avec SON QR (il n'atteignait jamais la liste). Sans code ni QR : inchangée.
+  if (d.status === 'transit' && d.relaisChange && etat === 'available' && preuve) {
+    return { ...d, status: 'available', statusLabel: 'Arrivé au nouveau point relais', relaisChange: false, redirige: true };
+  }
   if (d.status === 'transit' && d.relaisChange && !d.statusLabel) return { ...d, statusLabel: 'Point relais changé' };
   // (10 nov., retraits irréprochables) « Action requise : le colis semble avoir été perdu » rangé
   // « livré / retiré » avant la règle du 3 nov. (mesuré : une ligne du 2 nov. l'est encore) : un colis

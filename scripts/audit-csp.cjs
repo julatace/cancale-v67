@@ -152,7 +152,7 @@ for (const [nom, c, cle] of [['le reçu', recu, 'recu'], ['la facture', facture,
 const mainSrc = sansCommentaires(lire('src/main.jsx'));
 dit(/history\.state/.test(mainSrc) && /vrmTab/.test(mainSrc), 'le journal nomme l\'écran par `history.state.vrmTab` (l\'app retire `?tab=` de l\'adresse)');
 const qi = corps('const qrImage = (t) => {');
-const retours = [...qi.matchAll(/return ([^;]+);/g)].map((m) => m[1]).filter((x) => /qrUrl/.test(x));
+const retours = [...qi.matchAll(/return ([^;]+);/g)].map((m) => m[1]).filter((x) => /qrUrl|\(u\)/.test(x));   // (14 nov.) l'adresse passe d'abord par `urlQrDuColis` (u)
 dit(retours.length > 0 && retours.every((x) => /^qrEnHttps\(/.test(x)) && /const qrEnHttps = \(u\) => String\(u \|\| ''\)\.replace\(\/\^http:/.test(appSrc),
   'un QR hébergé en http (Vinted Go, 15 sur 15) est rendu en https par qrImage — la règle unique de tous les lecteurs', retours.join(' · '));
 const swCode = sansCommentaires(swSrc);

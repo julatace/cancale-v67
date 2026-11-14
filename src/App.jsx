@@ -119,6 +119,7 @@ import {indexCodesSuivis, finParIdentite, fusionnerParCode, suivisLiesDuColis} f
 import { finDatee, texteSortie, sortiRecent, pourquoiPasLu, SORTIS_JOURS, jourCourt as jourCourtParis } from './retraitSuivi.js';
 import {arriveesRelues} from './arriveesRelues.js';
 import { preuveDeLigne } from '../api/_lib/etat-colis.js';
+import { urlQrDuColis } from '../api/_lib/qr-retrait.js';
 import {avecSuiviDuSujet,finsDesLignes,sortiParSuivis,sortiParSuivi,suiviDeLigne,lienSuivi,codePostalLu,nouvelleVinted,transporteurDeForme,colisInternational,suiviValide,TRANSPORTEURS_SAISIE,normaliserCodePostal,idSuiviManuel,relireLigneSuivi,finDeCommandeAchat,fusionTransporteur,ligneDuTransporteur,ligneDeSuiviTransporteur,leverGarde,SELECT_TRANSP_META,ligneTranspDeMeta,sensDeLigne,incidentDeSuivis,incidentDeLigne,repartiAffichable,nomTransporteurSuivi} from '../api/_lib/suivi-colis.js';
 import {ligneTransporteur,texteCodePostalMr,carrierLisible,carrierNonLu,nomTransporteur,LECTURE_SERVEUR_TRANSP,heureParis,indexTranspParSuivi,carrierLuDeLigne,noterLecturesServeur,lecturesCle} from '../api/_lib/transporteurs.js';
 // ⟦→ ecrans/Reglages.jsx #6⟧
@@ -7924,11 +7925,15 @@ const URL_QR_CERTAIN = /\/(?:api\/)?barcode\/(?:datamatrix|azteccode|aztec|qrcod
 // ⚠️ Non mesuré (aucun appel à Vinted d'ici) : que p.vintedgo.com réponde en
 // https — c'est ce que le navigateur lui demande déjà sur vrm.center.
 const qrEnHttps = (u) => String(u || '').replace(/^http:\/\//i, 'https://');
+// (14 nov., capture de Julien) Un QR Vinted Go ne s'affiche que s'il désigne CE colis : son adresse porte le n°
+// de suivi et le code (api/_lib/qr-retrait.js, `urlQrDuColis`) — un autre n° ou un autre code ⇒ aucune image,
+// jamais un QR fabriqué. Ses `&amp;` (lus dans le HTML de l'e-mail) sont décodés.
 const qrImage = (t) => {
   if (!t) return null;
   if (t.qrB64) return `data:${t.qrType || 'image/png'};base64,${t.qrB64}`;
-  if (t.qrUrl && URL_QR_CERTAIN.test(t.qrUrl)) return qrEnHttps(t.qrUrl);
-  if (t.qrUrl && !URL_PAS_UN_QR.test(t.qrUrl)) return qrEnHttps(t.qrUrl);
+  const u = t.qrUrl ? urlQrDuColis(t.qrUrl, t) : '';
+  if (u && URL_QR_CERTAIN.test(u)) return qrEnHttps(u);
+  if (u && !URL_PAS_UN_QR.test(u)) return qrEnHttps(u);
   return null;
 };
 // ⚠️ « DÉLAI DÉPASSÉ » NE DOIT PAS S'AFFICHER « DERNIER JOUR ».

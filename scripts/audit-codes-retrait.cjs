@@ -235,6 +235,8 @@ const CORPUS = [
   await essaie('D. app : deux lignes « disponible » du même n° (fusionLignesMemeSuivi)', async () => {
     // (10 nov.) La fusion note ce que chaque ligne disait du code (src/sourcesRetrait.js, importé par l'app).
     let injecte = {}; try { const sr = await importer('src/sourcesRetrait.js'); injecte = { codeLuDeLigne: sr.codeLuDeLigne }; } catch (_) {}
+    // (14 nov.) `qrImage` passe par la règle partagée du QR prouvé (api/_lib/qr-retrait.js), importée par l'app.
+    try { const qr = await importer('api/_lib/qr-retrait.js'); injecte.urlQrDuColis = qr.urlQrDuColis; } catch (_) {}
     const app = chargeApp(['URL_PAS_UN_QR', 'codeRetrait', 'URL_QR_CERTAIN', 'qrEnHttps', 'qrImage', 'titleCasePR', 'TYPE_LIEU', 'cleanLieuCorps', 'cleanLieu', 'scoreLigneRetrait', 'fusionLignesMemeSuivi'], injecte);
     const f = app.fusionLignesMemeSuivi, sc = app.scoreLigneRetrait;
     dit(typeof f === 'function' && typeof sc === 'function', 'D la fusion de deux lignes du même n° est une règle de l’app (exécutable)', app.__absent_fusionLignesMemeSuivi ? 'absente' : (app.__err_fusionLignesMemeSuivi || ''));
