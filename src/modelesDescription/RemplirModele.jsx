@@ -27,10 +27,10 @@ export function CasesVides({ cases, reponses, onReponse }) {
   if (!cases.length) return null;
   return (<>
     <p className="vrm-idees-dit" data-md-cases={cases.join(' ')}>{tr('md.casesDit')}</p>
-    {cases.map((k) => (
-      <label key={k} className="vrm-idees-champ">
-        <span>{tr('md.case.' + k)}</span>
-        <input type="text" value={reponses[k] || ''} maxLength={60} data-md-case={k} onChange={(e) => onReponse(k, e.target.value)} placeholder={tr('md.case.exemple.' + k)}/>
+    {cases.map((cle) => (
+      <label key={cle} className="vrm-idees-champ">
+        <span>{tr('md.case.' + cle)}</span>
+        <input type="text" value={reponses[cle] || ''} maxLength={60} data-md-case={cle} onChange={(e) => onReponse(cle, e.target.value)} placeholder={tr('md.case.exemple.' + cle)}/>
       </label>
     ))}
   </>);

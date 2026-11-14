@@ -43,7 +43,7 @@ export default function AutreTaille({ src, numero = '', modeles = [], reglages =
     // Le modèle choisi est rempli AVEC le N° neuf, une fois celui-ci donné (règle de « Créer sur Vinted »).
     // Retouché à la main : seules les cases du N° ({N°}, {numero}) prennent le N° neuf.
     const finir = (fiche) => {
-      if (m && desc == null) { const r = descriptionDepuisModele(m, fiche, { reponses, reglages }); return r.ok ? r.description : null; }
+      if (m && desc == null) { const r = descriptionDepuisModele(m, { ...s, ...c.champs, ...(fiche || {}) }, { reponses, reglages }); return r.ok ? r.description : null; }
       const t = remplirModele(descV, { numero: fiche && fiche.numero });
       return t !== descV ? t : null;
     };

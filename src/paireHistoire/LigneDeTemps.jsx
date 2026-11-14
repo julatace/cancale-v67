@@ -29,6 +29,8 @@ function preuve(e) {
   return PREUVE_CLE[e.preuve] ? tr(PREUVE_CLE[e.preuve]) : (e.preuve || '');
 }
 
+// La clé d'un événement : son identité (sorte, date, annonce ou transaction), le rang seulement pour départager.
+const cleEv = (e, i) => `${e.quoi}|${e.at || ''}|${e.id || ''}|${e.preuve || ''}|${i}`;
 const Ev = ({ e, dernier, double }) => (
   <li className={'vrm-lt-ev' + (dernier ? ' is-dernier' : '')} data-lt-quoi={e.quoi} data-lt-date={e.at || ''} data-lt-site={e.site || undefined} data-lt-id={e.id || undefined}>
     <span className="vrm-lt-point" aria-hidden="true"/>
@@ -59,11 +61,11 @@ export default function LigneDeTemps({ h, extra = {} }) {
     <section className="vrm-idees vrm-lt" aria-label={tr('lt.titre')} data-ligne-temps={cle} data-lt-n={lt.evenements.length} data-lt-sans-date={lt.sansDate.length} data-lt-studio={studio === undefined ? 'encours' : studio === null ? 'passu' : String(studio.dates.length)}>
       {double ? <p className="vrm-lt-note" data-lt-double="">{tr('lt.double')}</p> : null}
       {lt.evenements.length ? (
-        <ol className="vrm-lt-liste">{lt.evenements.map((e, i) => <Ev key={i} e={e} double={double} dernier={i === lt.evenements.length - 1}/>)}</ol>
+        <ol className="vrm-lt-liste">{lt.evenements.map((e, i) => <Ev key={cleEv(e, i)} e={e} double={double} dernier={i === lt.evenements.length - 1}/>)}</ol>
       ) : <p className="vrm-lt-note" data-lt-vide="">{tr('lt.vide')}</p>}
       {lt.sansDate.length ? (<>
         <h4 className="vrm-lt-sous">{tr('lt.sansDate')}</h4>
-        <ol className="vrm-lt-liste is-sans-date" data-lt-groupe="sans-date">{lt.sansDate.map((e, i) => <Ev key={i} e={e} double={double}/>)}</ol>
+        <ol className="vrm-lt-liste is-sans-date" data-lt-groupe="sans-date">{lt.sansDate.map((e, i) => <Ev key={cleEv(e, i)} e={e} double={double}/>)}</ol>
       </>) : null}
       {pasSu.length ? <p className="vrm-lt-note" data-lt-pas-su={lt.pasSu.join('|')}>{tr('lt.pasSu.titre')} : {pasSu.join(' · ')}.</p> : null}
     </section>

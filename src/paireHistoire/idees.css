@@ -72,7 +72,7 @@
 :where(.vrm-idees).sb-segment, :where(.vrm-idees) .sb-segment {
   display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px; border-radius: 15px; background: var(--id-creux);
 }
-:where(.vrm-idees) .sb-segment .sb-touche, :where(.vrm-idees).sb-segment .sb-touche { min-height: 40px; }
+:where(.vrm-idees) .sb-segment .sb-touche, :where(.vrm-idees).sb-segment .sb-touche { min-height: 44px; }
 
 /* ── 154 · La ligne de temps ───────────────────────────────────────────── */
 .vrm-lt-onglets { margin: 14px 0 6px; }
