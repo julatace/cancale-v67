@@ -449,7 +449,7 @@ import {colisLbcAPoster,lbcColisAPoster,totalColis,colisLbcVendeur} from '../api
 import {CLE_COMPTES_EXCLUS,SANS_COMPTE_VC,excluAutreDe,estExclu,basculerExclu,compteDeVente,exclusNormes} from '../api/_lib/comptes-exclus.js';
 import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLies,comptesEbayLies,refDeLigneEbay,nomCompteLie,LIBELLE_ETAT} from './comptesLies.js';
 import { lignesFraicheur, quandRelu } from './fraicheurComptes.js';
-import { FRAICHEUR_ACHATS_J } from './fraicheur.js';   // (9 nov., lot AG) le seuil des achats vit avec la ligne de fraîcheur unique
+import { FRAICHEUR_ACHATS_J, fraicheurPubliee, suivreFraicheur } from './fraicheur.js';   // (9 nov., lot AG) le seuil des achats vit avec la ligne de fraîcheur unique
 import { ventesEmailFraiches, avecVentesEmail, requeteVentesEmail, gesteVenteEmail, STATUT_VENTE_EMAIL, groupesVentesEmailEnTete, statutVentesEmail } from './venteEmailFraiche.js';
 import { CLE_IMPRESSION, reglageImpression, papierThermique, placementEtiquette, contenuTampon, carteEncre, boiteEncre, decouperFeuille, fusionnerProches, moduleDuCode, moduleImprimeMm, codeAssezGros, seuillerNoir, tramerNoir, zonesAdresse, CONTRASTES, MODULE_MIN_MM, BANDE_CONTINU_MM } from './impression/thermique.js';
 import { decisionNumeroVenteEmail, numeroEcritDansArticle, colisVentesEmail, MENTION_SANS_NUM, CLE_IMPRIMES_SANS_NUM, phraseImprimeSansNumero } from './bordereauVenteEmail.js';
@@ -17655,7 +17655,10 @@ function PhraseEcran({ cle, className = '' }) {
   const t = cle && phraseEcranPour(cle, p.vend || vendActuel());
   const aide = cle && AIDE_ECRANS[cle] ? <AideEcran cle={cle}/> : null;
   if (!t) return aide ? <p className={'vrm-phrase-ecran vrm-phrase-ecran-seule' + (className ? ' ' + className : '')}>{aide}</p> : null;
-  return <p className={'vrm-phrase-ecran' + (className ? ' ' + className : '')} data-phrase-ecran={cle}>{t}{aide}</p>;
+  // ⚠️ (14 nov., refonte de la coque — Julien, capture d'Annonces : « Annonces » + deux lignes d'explication + « ? »)
+  // La phrase n'est plus ÉCRITE sous le titre : le « ? » reste, à côté du titre, et ouvre l'aide de l'écran. La
+  // phrase reste dans la page pour les lecteurs d'écran (`vrm-sr-seul`) : rien de supprimé, rien de deviné.
+  return <p className={'vrm-phrase-ecran vrm-phrase-ecran-aide' + (className ? ' ' + className : '')} data-phrase-ecran={cle}><span className="vrm-sr-seul">{t}</span>{aide}</p>;
 }
 function ScreenHead({ icon, title, desc, right, principal, sous, phrase, date = '' }) {
   const line = typeof icon === 'string' && ICON_PATHS[icon];
@@ -55149,8 +55152,13 @@ async function calculerOuRanger() {
   const vivants = new Set(achatsARanger({ proposes: out, fiches: load(CLE_FICHES_RANGEES, {}) || {} }).map((p) => String(p.tx)));
   return notifsOuRanger({ proposes: Object.fromEntries(Object.entries(out).filter(([k]) => vivants.has(k))), caseLibre });
 }
-function CentreNotifsCoque({ onReglages }) {
+function CentreNotifsCoque({ onReglages, enTete = null }) {
   const [nonLues, setNonLues] = useState(null);
+  // (14 nov., refonte de la coque) La ligne de fraîcheur (« N choses à revoir ») ne s'écrit plus en tête de page :
+  // la cloche porte son point ambre, sa feuille porte la ligne (détail et geste inchangés, src/LigneFraicheur.jsx).
+  const [fraicheurVue, setFraicheurVue] = useState(() => fraicheurPubliee());
+  useEffect(() => suivreFraicheur((f) => setFraicheurVue(f)), []);
+  const alerteFraicheur = !!fraicheurVue && (fraicheurVue.etat === 'retard' || fraicheurVue.etat === 'passu');
   const [ouvert, setOuvert] = useState(false);
   const [aRanger, setARanger] = useState(null);
   const relireRanger = React.useCallback(() => { calculerOuRanger().then((l) => setARanger(l)).catch(() => setARanger(null)); }, []);
@@ -55193,9 +55201,9 @@ function CentreNotifsCoque({ onReglages }) {
   const aller = React.useCallback((q) => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: q })); } catch (_) {} }, []);
   return (
     <>
-      <BoutonCentreNotifs nonLues={nonLues} enPlus={Array.isArray(aRanger) ? aRanger.length : 0} onOuvrir={() => setOuvert(true)} Icon={Icon}/>
+      <BoutonCentreNotifs nonLues={nonLues} enPlus={Array.isArray(aRanger) ? aRanger.length : 0} onOuvrir={() => setOuvert(true)} Icon={Icon} alerte={alerteFraicheur} alerteNom={alerteFraicheur ? tr('coque.aRevoir') : ''}/>
       {ouvert && <FeuilleCentreNotifs onFermer={fermer} charger={chargerCentreNotifs} ecrireLu={ecrireLuNotifs} onAller={aller} onReglages={onReglages} Fermer={FermeAuRetour} Icon={Icon}
-        aRanger={aRanger} onRanger={ranger} onRangeFait={rangeFait}/>}
+        aRanger={aRanger} onRanger={ranger} onRangeFait={rangeFait} enTete={alerteFraicheur && typeof enTete === 'function' ? enTete(fermer) : null}/>}
     </>
   );
 }
@@ -60530,7 +60538,7 @@ function AppCoeur() {
                 SONT cachés (un mode allumé garde son interrupteur sous le pouce). */}
             {((!reglesStream.bouton && !streamOn) || montantsCaches) && (ordi || montantsCaches) ? <BoutonMontants/> : null}
             {/* (5 nov.) La cloche : ce que VRM a envoyé (src/CentreNotifs.jsx). */}
-            {AUTH.user && <CentreNotifsCoque onReglages={()=>setTab('settings')}/>}
+            {AUTH.user && <CentreNotifsCoque onReglages={()=>setTab('settings')} enTete={(fermer)=>!baseKO && !horsLigne ? <Suspense fallback={null}><LigneFraicheurParesseuse baseKO={baseKO} comptes={vintedAccounts} onNav={(t)=>{ fermer(); setTab(t); }}/></Suspense> : null}/>}
             {!ordi && <button className="vrm-hbtn" type="button" data-recherche-zone="" data-recherche-loupe="" data-recherche-loupe-voix={DICTEE_OK && !VOIX.refus ? '1' : '0'}
               onPointerDown={(e)=>{ if(!DICTEE_OK || VOIX.refus || (e.button!=null && e.button!==0)) return; clearTimeout(appuiLoupe.current.t); appuiLoupe.current.long=false;
                 appuiLoupe.current.t=setTimeout(()=>{ appuiLoupe.current.long=true; flushSync(()=>setGsOpen(true)); if(!ecouteEnCours('loupe')) dicterLoupe(); }, 550); }}

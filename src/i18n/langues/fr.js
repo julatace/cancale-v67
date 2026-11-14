@@ -206,6 +206,7 @@ export default {
   // ── coque
   "coque.fermerMenu": "Fermer le menu",
   "coque.monProfil": "Mon profil",
+  "coque.aRevoir": "à revoir",
   "coque.actionsVinted": "Actions Vinted",
   "coque.cacherMontants": "Cacher les montants",
   "coque.nouveau": "nouveau",

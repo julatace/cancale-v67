@@ -534,10 +534,12 @@
   background: var(--d-encre) !important; color: var(--d-carte) !important;
   min-width: 18px !important; height: 18px !important; padding: 0 5px !important; border-radius: 999px !important;
   font: 700 11px/18px var(--vrm-police, -apple-system, system-ui, sans-serif) !important; letter-spacing: 0 !important;
-  top: 5px !important; right: 3px !important; box-shadow: 0 0 0 2px var(--vrm-hdr-anneau, var(--vrm-bg, var(--d-fond))) !important;
+  top: 6px !important; left: 24px !important; right: auto !important; box-shadow: 0 0 0 2px var(--vrm-hdr-anneau, var(--vrm-bg, var(--d-fond))) !important;
 }
 
 :root:root body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) > .vrm-app-header .vrm-cn-cloche .vrm-cn-pastille.vrm-cn-pastille { background: #F5F5F7 !important; color: #1D1D1F !important; }   /* sur la barre encre de Ma journée */
+
+:root:root body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) > .vrm-app-header :is(.vrm-hbtn, .vrm-hbtn svg) { color: #F5F5F7 !important; }   /* ☰, cloche, loupe : lisibles sur la barre encre */
 
 /* ── 3.4 LA PHOTO DU COMPTE porte le point d'état « Actions Vinted » (ambre = un geste, gris = lecture) ── */
 :root:root body .vrm-app-shell .vrm-hdr-profil { position: relative !important; }
@@ -547,6 +549,20 @@
 :root:root body .vrm-fs .vrm-profil-ligne .vrm-hdr-profil-etat.vrm-profil-ligne-point { position: static; display: inline-block; flex: 0 0 auto; width: 8px; height: 8px; margin-left: auto; box-shadow: none; }
 :root:root body .vrm-fs .vrm-profil-ligne .vrm-hdr-profil-etat.vrm-profil-ligne-point[data-etat-point="ok"] { display: none; }
 :root:root body .vrm-fs .vrm-profil-ligne .vrm-profil-ligne-etat { color: var(--d-gris); font-weight: 400; }
+
+/* Les interrupteurs du menu du compte : l'interrupteur d'iOS (piste 51 × 31, pastille blanche), pas une case. */
+:root:root body .vrm-fs .vrm-profil-menu input[type="checkbox"][role="switch"] {
+  -webkit-appearance: none !important; appearance: none !important; flex: 0 0 auto !important; position: relative !important; width: 51px !important; height: 31px !important; margin: 0 0 0 auto !important;
+  border: 0 !important; border-radius: 999px !important; background: var(--d-remplir-fort) !important; cursor: pointer; transition: background-color var(--d-m-moyen) ease-out !important;
+}
+:root:root body .vrm-fs .vrm-profil-menu input[type="checkbox"][role="switch"]::before {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff;
+  box-shadow: 0 3px 8px rgb(0 0 0 / .15), 0 1px 1px rgb(0 0 0 / .16); transition: transform var(--d-m-long) var(--d-ressort);
+}
+:root:root body .vrm-fs .vrm-profil-menu input[type="checkbox"][role="switch"]:checked { background: var(--d-accent) !important; }
+:root:root body .vrm-fs .vrm-profil-menu input[type="checkbox"][role="switch"]:checked::before { transform: translateX(20px); }
+:root:root body .vrm-fs .vrm-profil-menu input[type="checkbox"][role="switch"]:disabled { opacity: .5 !important; }
+:root:root body .vrm-fs .vrm-profil-menu input[type="checkbox"][role="switch"]:focus-visible { outline: 2px solid var(--d-accent) !important; outline-offset: 2px !important; }
 
 /* ── 3.5 L'EN-TÊTE DU TÉLÉPHONE ───────────────────────────────────────────── */
 @media (max-width: 743px), (max-width: 767px) and (hover: hover) and (pointer: fine), (max-width: 1023px) and (max-height: 599px) and (hover: none), (max-width: 1023px) and (max-height: 599px) and (pointer: coarse), (max-width: 1023px) and (max-height: 599px) and (pointer: none) {
@@ -622,6 +638,38 @@
   :root:root body .vrm-app-shell .vrm-main > .vrm-fraicheur-hote { margin-left: var(--d-e-4) !important; margin-right: var(--d-e-4) !important; }
   /* La colonne de gauche : une carte posée de l'atelier (ombre douce, sans filet). */
   :root:root body .vrm-app-shell .vrm-sidebar.vrm-atelier-rail { border: 0 !important; box-shadow: var(--d-ombre-douce) !important; }
+}
+
+
+/* ── 3.8 AJOUT 3 (Julien, 14 nov. 09:01, capture d'Annonces) ──────────────────
+   · « 10 choses à revoir » ne s'écrit JAMAIS au-dessus du titre : la ligne de fraîcheur quitte la tête de
+     page (tous ses états) ; la cloche porte son point ambre, la feuille de la cloche porte la ligne entière ;
+   · le « ? » d'aide à CÔTÉ du grand titre, la phrase n'est plus écrite (lue par les lecteurs d'écran) ;
+   · « Nouvelle version de VRM » : une ligne fine sous la barre du haut, qui POUSSE la page (rien couvert). */
+:root:root body .vrm-app-shell .vrm-fraicheur-hote {
+  position: absolute !important; width: 1px !important; height: 1px !important; margin: 0 !important; padding: 0 !important; overflow: hidden !important; clip-path: inset(50%) !important; white-space: nowrap !important; border: 0 !important;
+}
+:root:root body .vrm-fs.vrm-cn-feuille .vrm-cn-entete { margin: 0 0 var(--d-e-3); }
+:root:root body .vrm-fs.vrm-cn-feuille .vrm-cn-entete .vrm-fraicheur-hote { position: static !important; width: auto !important; height: auto !important; overflow: visible !important; clip-path: none !important; white-space: normal !important; margin: 0 !important; }
+:root:root body .vrm-cn-cloche .vrm-cn-alerte { position: absolute; left: 26px; bottom: 9px; width: 9px; height: 9px; border-radius: 50%; background: var(--d-point-ambre); box-shadow: 0 0 0 2px var(--vrm-hdr-anneau, var(--vrm-bg, var(--d-fond))); pointer-events: none; }
+:root:root body .vrm-cn-cloche:has(.vrm-cn-pastille) .vrm-cn-alerte { left: 10px; }
+
+/* Le titre et son « ? » sur UNE ligne ; la date au-dessus et le sous-titre dessous gardent leur ligne. */
+:root:root body .vrm-main :is(.vrm-screen-head-titre, .vrm-tache-tete) { display: flex !important; flex-wrap: wrap !important; align-items: center !important; column-gap: var(--d-e-2) !important; }
+:root:root body .vrm-main :is(.vrm-screen-head-titre, .vrm-tache-tete) > :not(h1, h2, .vrm-phrase-ecran, .vrm-screen-repere) { flex-basis: 100% !important; }
+:root:root body .vrm-main :is(.vrm-screen-head-titre, .vrm-tache-tete) > .vrm-phrase-ecran.vrm-phrase-ecran-aide { margin: 0 !important; padding: 0 !important; flex: 0 0 auto !important; display: inline-flex !important; align-items: center !important; min-height: 44px !important; }
+
+/* « Nouvelle version de VRM · Mettre à jour » (src/AppInstallable.jsx) : plus une bulle posée sur la liste. */
+@media (max-width: 743px), (max-width: 767px) and (hover: hover) and (pointer: fine), (max-width: 1023px) and (max-height: 599px) and (hover: none), (max-width: 1023px) and (max-height: 599px) and (pointer: coarse), (max-width: 1023px) and (max-height: 599px) and (pointer: none) {
+  :root:root body .vrm-maj.vrm-maj {
+    top: calc(52px + env(safe-area-inset-top, 0px)) !important; bottom: auto !important; left: 0 !important; right: 0 !important; transform: none !important; max-width: none !important;
+    height: 36px !important; padding: 0 4px 0 var(--d-marge) !important; border-radius: 0 !important; border: 0 !important; border-bottom: .5px solid var(--d-materiau-filet) !important;
+    background: var(--d-materiau) !important; -webkit-backdrop-filter: var(--d-materiau-flou) !important; backdrop-filter: var(--d-materiau-flou) !important; box-shadow: none !important;
+    font-size: 13px !important; justify-content: flex-start !important; animation: none !important; z-index: 49 !important;
+  }
+  :root:root body .vrm-maj.vrm-maj .vrm-maj-oui { margin-left: auto !important; min-height: 36px !important; font-size: 13px !important; }
+  /* La place de la ligne est rendue par la page (rien n'est couvert). */
+  html:has(.vrm-maj) body .vrm-app-shell > .vrm-main { padding-top: 36px !important; }
 }
 
 } /* fin §3 COQUE (@layer vrm-premium) */

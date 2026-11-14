@@ -205,16 +205,20 @@ async function regles(nav) {
 }
 
 // ── P : 1 000 annonces, l'arbre d'avant contre celui-ci ──
+// Les annonces inventées à l'écran (leur titre, la feuille de texte la plus fine), par le texte seulement.
+const vusALecranSrc = `window.vusALecran = (m) => { const vus = new Set(); const it = document.createTreeWalker(m, NodeFilter.SHOW_TEXT); let n; while ((n = it.nextNode())) { const t = n.nodeValue; const k = /Paire inventée (\\d+)/.exec(t || ''); if (!k) continue; const e = n.parentElement; const r = e.getBoundingClientRect(); if (r.height > 0 && r.top < innerHeight - 60 && r.bottom > 60) vus.add(k[1]); } return vus.size; };`;
 async function mesureMille(nav, port) {
   const o = await ouvrir(nav, { W: 390, sombre: false, b: baseMille(), url: '/?tab=journee' });
   await o.pg.waitForTimeout(1500);
+  await o.pg.addInitScript(vusALecranSrc);
   await o.pg.addInitScript(() => { window.__cls = 0; try { new PerformanceObserver((l) => { for (const e of l.getEntries()) if (!e.hadRecentInput) window.__cls += e.value; }).observe({ type: 'layout-shift', buffered: true }); } catch (_) {} });
   const t0 = Date.now();
   await o.pg.goto(`http://localhost:${port}/?tab=annonces`, { waitUntil: 'domcontentloaded' });
-  const pretListe = await attendre(o.pg, () => o.pg.evaluate(() => { const m = document.querySelector('.vrm-main[data-ecran="annonces"]'); if (!m) return false; return [...m.querySelectorAll('img')].filter((i) => { const r = i.getBoundingClientRect(); return r.width > 20 && r.top < innerHeight && r.bottom > 0; }).length >= 4; }), 30000);
+  const pretListe = await attendre(o.pg, () => o.pg.evaluate(() => { const m = document.querySelector('.vrm-main[data-ecran="annonces"]'); if (!m) return false; return vusALecran(m) >= 4; }), 30000);
   const premier = Date.now() - t0;
   await o.pg.waitForTimeout(1500);
   const noeuds = await o.pg.evaluate(() => document.querySelectorAll('.vrm-main *').length);
+  const aLecran = await o.pg.evaluate(() => { const m = document.querySelector('.vrm-main'); return m ? window.vusALecran(m) : 0; });
   const cls0 = await o.pg.evaluate(() => window.__cls || 0);
   const tr0 = Date.now();
   await o.pg.evaluate(async () => { const m = document.querySelector('.vrm-main'); for (let i = 0; i < 60; i++) { m.scrollTop += 700; await new Promise((r) => requestAnimationFrame(() => r())); } });
@@ -222,7 +226,7 @@ async function mesureMille(nav, port) {
   await o.pg.waitForTimeout(600);
   const cls = (await o.pg.evaluate(() => window.__cls || 0)) - cls0;
   await o.ctx.close();
-  return { pretListe, premier, noeuds, cls: Math.round(cls * 1000) / 1000, defile };
+  return { pretListe, premier, noeuds, aLecran, cls: Math.round(cls * 1000) / 1000, defile };
 }
 async function vitesse(nav) {
   if (!AVANT) { console.log('  · P : sans BANC_DIST_AVANT, la vitesse à 1 000 annonces n\'est pas comparée'); return; }
@@ -231,13 +235,14 @@ async function vitesse(nav) {
   const srv2 = http.createServer((q, r) => { let f = q.url.split('?')[0]; if (f === '/' || !path.extname(f)) f = '/index.html'; const p = path.join(DIST2, f); if (!p.startsWith(DIST2) || !fs.existsSync(p) || !fs.statSync(p).isFile()) { r.writeHead(404); return r.end(); } r.writeHead(200, { 'content-type': MIME[path.extname(p)] || 'application/octet-stream' }); r.end(fs.readFileSync(p)); });
   const PORT2 = PORT + 1; await new Promise((ok2) => srv2.listen(PORT2, ok2));
   const res = { avant: [], apres: [] };
-  for (let i = 0; i < 2; i++) { res.avant.push(await mesureMille(nav, PORT2)); res.apres.push(await mesureMille(nav, PORT)); }
+  for (let i = 0; i < 3; i++) { res.avant.push(await mesureMille(nav, PORT2)); res.apres.push(await mesureMille(nav, PORT)); }
   srv2.close();
   const med = (l, k) => l.map((x) => x[k]).sort((a, b) => a - b)[Math.floor((l.length - 1) / 2)];
-  const A = { premier: med(res.avant, 'premier'), noeuds: med(res.avant, 'noeuds'), cls: Math.max(...res.avant.map((x) => x.cls)), defile: med(res.avant, 'defile') };
-  const B = { premier: med(res.apres, 'premier'), noeuds: med(res.apres, 'noeuds'), cls: Math.max(...res.apres.map((x) => x.cls)), defile: med(res.apres, 'defile') };
+  const A = { aLecran: med(res.avant, 'aLecran'), premier: med(res.avant, 'premier'), noeuds: med(res.avant, 'noeuds'), cls: Math.max(...res.avant.map((x) => x.cls)), defile: med(res.avant, 'defile') };
+  const B = { aLecran: med(res.apres, 'aLecran'), premier: med(res.apres, 'premier'), noeuds: med(res.apres, 'noeuds'), cls: Math.max(...res.apres.map((x) => x.cls)), defile: med(res.apres, 'defile') };
   console.log('  · P avant', JSON.stringify(A), '· après', JSON.stringify(B));
   dit(res.apres.every((x) => x.pretListe), 'P 1 000 annonces : la liste s\'affiche (photos à l\'écran)');
+  dit(B.aLecran >= A.aLecran, 'P articles visibles sur un écran 390 : jamais moins qu\'avant (la coque ne mange pas de place)', `${A.aLecran} → ${B.aLecran}`);
   dit(B.premier <= A.premier * 1.25 + 400, 'P premier rendu de la liste jamais pire que l\'arbre d\'avant (+25 % + 400 ms de bruit au plus)', `${A.premier} → ${B.premier} ms`);
   dit(B.noeuds <= A.noeuds + 150, 'P nœuds DOM de l\'écran : la coque n\'en ajoute pas plus de 150', `${A.noeuds} → ${B.noeuds}`);
   dit(B.cls <= A.cls + 0.01, 'P défilement jusqu\'en bas : aucun saut de mise en page de plus', `${A.cls} → ${B.cls}`);

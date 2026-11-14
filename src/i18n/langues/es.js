@@ -201,6 +201,7 @@ export default {
   // ── coque
   "coque.fermerMenu": "Cerrar el menú",
   "coque.monProfil": "Mi perfil",
+  "coque.aRevoir": "por revisar",
   "coque.actionsVinted": "Acciones Vinted",
   "coque.cacherMontants": "Ocultar importes",
   "coque.nouveau": "nuevo",
