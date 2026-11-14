@@ -21856,10 +21856,19 @@ function useParcoursArrivee({ comptes: comptesCoque, actif = true, tour: tourDem
   const route = routeParcoursIci();
   const lignesSites = useLectureParcours(lireSitesParcours, actif && route.cle !== 'vinted' && route.cle !== 'ebay', tour, 'parcours:sites');
   const comptesEbayLus = useLectureParcours(() => lireComptesEbay(tour > 0), actif && route.cle === 'ebay', tour, 'parcours:ebay');
-  const preuves = { compte: preuveCompteParcours(AUTH.user?.id || '') };
-  if (route.cle === 'vinted') { preuves.extension = preuveExtensionParcours(pont, comptes); preuves.vinted = preuveVinted(comptes, annonces, commandes); }
-  else if (route.cle === 'ebay') preuves.ebay = preuveEbayParcours(comptesEbayLus);
-  else { preuves.extension = preuveExtensionParcours(pont, lignesDuSiteParcours(lignesSites, route.sites)); preuves[route.cle] = preuveSiteParcours(lignesSites, route.sites); }
+  const compte = preuveCompteParcours(AUTH.user?.id || '');
+  const preuves = route.cle === 'vinted' ? {
+    compte,
+    extension: preuveExtensionParcours(pont, comptes),
+    vinted: preuveVinted(comptes, annonces, commandes),
+  } : route.cle === 'ebay' ? {
+    compte,
+    ebay: preuveEbayParcours(comptesEbayLus),
+  } : {
+    compte,
+    extension: preuveExtensionParcours(pont, lignesDuSiteParcours(lignesSites, route.sites)),
+    [route.cle]: preuveSiteParcours(lignesSites, route.sites),
+  };
   const etat = etatParcours(preuves, { plusTard, route });
   return { etat, pret, parcours: pret ? lirePositionParcours(parcoursRange()) : undefined, parcoursBrut: pret ? parcoursRange() : undefined, plusTard, comptes, route };
 }
