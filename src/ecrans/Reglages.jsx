@@ -4,6 +4,7 @@ import { modifierLigneCas, ecrireDifference } from '../ligneCas.js';
 import { signalDelai } from '../compatSafari.js';
 import { QuoiDeNeufParametres } from '../App.jsx';   // (11 nov.) « Quoi de neuf »
 import { RappelsSetting } from '../App.jsx';
+import { useReglageCapte } from '../capteNotif/useReglageCapte.js';   // (14 nov., ext. 5.377) « Dire ce que l'extension capte »
 import { CLE_VERIF_COUPEES, lireCoupees, rallumerAlerte, NOMS_ALERTES } from '../verifAnnonce.js';
 // (9 nov.) L'objectif du mois (src/objectifMois.js) : le MÊME réglage que la barre de Ma journée.
 import { useObjectifMois } from '../App.jsx';
@@ -1934,6 +1935,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   const etroit = useEtroitReglages();
   const streamOn = useStream();
   const [nMuetsPush, setNMuetsPush] = React.useState(null);
+  const capte = useReglageCapte();   // (14 nov., ext. 5.377)
   const [rechercheReglage, setRechercheReglage] = React.useState('');
   // (5 nov., chantier G, revue 2.24) Les e-mails ne sont plus un sous-écran d'ici : la demande
   // « ouvre mes adresses » (`DEMANDE_ADRESSES`) est servie par l'écran E-mails, onglet « Relier ma boîte ».
@@ -2128,6 +2130,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (10 nov., lot H) Les échéances LUES dans le calendrier du téléphone (lien .ics secret).
       AUTH.user && { id:'agenda', type:'panneau', ic:'target', lib:tr('reglages.agenda.lib'), desc:tr('reglages.agenda.desc'), data:{ 'data-reglage-agenda':'' }, el:<AgendaEcheances enTete={enTeteSession} toast={toast} confirmer={askConfirm}/> },
       { id:'alertes', type:'switch', ic:'alert', lib:tr('reglages.alertes.lib'), desc:tr('reglages.alertes.desc'), on:!!notifEnabled, onClick:onToggleNotif, data:{ 'data-reglage-alertes': notifEnabled ? 'on' : 'off' } },
+      // (14 nov., ext. 5.377) « L'extension a capté » : le petit message sur le site et ici — le même réglage que la carte du logo.
+      { id:'capte', type:'switch', ic:'bell2', lib:tr('capte.reglage.lib'), desc:capte.connu ? tr('capte.reglage.desc') : tr('capte.reglage.pasSu'), on:capte.on, onClick:capte.basculer, data:{ 'data-reglage-capte': capte.on ? 'on' : 'off' } },
     ]},
     // « Mon abonnement » : l'onglet du haut, joignable depuis la liste (le même écran, §11).
     MULTI_USER && AUTH.user && { id:'abonnement-lien', titre:tr('reglages.groupe.abonnement-lien'), items:[

@@ -2,6 +2,7 @@
 import ecran_journee from './it/journee.js';
 import ecran_confort from './it/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_studio from './it/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
+import ecran_capte from './it/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_ventes from './it/ventes.js';
 import ecran_commun from './it/commun.js';
 import ecran_achats from './it/achats.js';
@@ -2242,4 +2243,5 @@ export default {
   "instantane.arret.panne": "Non riletto: la base non risponde. Queste cifre sono quelle della tua ultima visita.",
   ...ecran_confort,
   ...ecran_studio,
+  ...ecran_capte,
 };
