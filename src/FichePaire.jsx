@@ -175,6 +175,22 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
   // « contexte » (en haut : la vente elle-même) et « actions » (au pouce, sous la carte héros).
   const slotCtx = React.useCallback((el) => poserSlot('contexte', el), []);
   const slotAct = React.useCallback((el) => poserSlot('actions', el), []);
+  // (14 nov., AJOUT 3 de Julien) UN SEUL bouton plein accent dans la fiche : l'action principale du contexte
+  // (le premier geste « principal » rendu : imprimer, emballer…). Les autres sont des rangées de liste, texte accent.
+  React.useEffect(() => {
+    const el = racine.current; if (!el || typeof MutationObserver === 'undefined') return undefined;
+    const PRINC = '.vrm-fp-b-plein, .vrm-b-primaire, [data-bouton-bord], .vrm-fu-imprimer-ligne, [data-variante="primaire"]';
+    const marquer = () => {
+      const tous = [...el.querySelectorAll(PRINC)].filter((b) => b.getClientRects().length);
+      const p = tous[0] || null;
+      el.querySelectorAll('[data-fiche-principal]').forEach((b) => { if (b !== p) b.removeAttribute('data-fiche-principal'); });
+      if (p && !p.hasAttribute('data-fiche-principal')) p.setAttribute('data-fiche-principal', '');
+    };
+    marquer();
+    const mo = new MutationObserver(() => marquer());
+    mo.observe(el, { childList: true, subtree: true });
+    return () => mo.disconnect();
+  }, []);
   if (typeof document === 'undefined') return null;
   const I = (n, s = 18) => (Icon ? <Icon name={n} size={s}/> : null);
   const r = p && p.resume;
@@ -253,7 +269,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
       {double ? <p className="vrm-fp-double" role="alert" data-fiche-double="1" data-fiche-choisit="0">Deux {motsVendeur().noms} présent{motsVendeur().e}s portent le N°{p.num} : vérifie là où {motsVendeur().elle}s sont rangé{motsVendeur().e}s avant d’emballer ou d’imprimer.</p> : null}
       {double ? null : <div className="vrm-fp-tuiles">
         {/* (5 nov.) Le prix d'achat de « Voir l'état » est CE nombre (jamais écrit deux fois, §7) : sa source dessous. */}
-        <div className="vrm-fp-tuile" data-fiche-resume-achat={r.achat == null ? '' : r.achat} {...(etat ? { 'data-etat-ligne': 'prix-achat', 'data-etat-val': etat.prixAchat.cents == null ? '' : etat.prixAchat.cents, 'data-etat-source': etat.prixAchat.source || '' } : {})}>
+        <div className={'vrm-fp-tuile' + (r.achat == null ? ' is-manque' : '')} data-fiche-resume-achat={r.achat == null ? '' : r.achat} {...(etat ? { 'data-etat-ligne': 'prix-achat', 'data-etat-val': etat.prixAchat.cents == null ? '' : etat.prixAchat.cents, 'data-etat-source': etat.prixAchat.source || '' } : {})}>
           <span>Achat</span><b className={r.achat == null ? 'is-vide' : undefined}>{eur(r.achat)}</b>
           {/* (13 nov., point 14) Le chiffre qui manque est la porte pour le corriger (§5) : « Saisir » ; la tuile
               du bénéfice, à côté, NOMME le manque (« prix d'achat pas saisi ») — une porte, pas deux. */}
@@ -263,15 +279,15 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
         {sv ? (<>
           {/* (13 nov., point 14) PAS ENCORE VENDUE : le prix affiché, et le bénéfice SI elle se vend à ce prix
               (la même règle que la vente, src/dormantes.js). Ce n'est pas un bénéfice : aucun « Bénéfice » écrit. */}
-          <div className="vrm-fp-tuile" data-fiche-resume-vente="" data-fiche-prix-affiche={sv.prix == null ? '' : sv.prix}><span>En ligne à</span><b className={sv.prix == null ? 'is-vide' : undefined}>{eur(sv.prix)}</b></div>
-          <div className="vrm-fp-tuile" data-fiche-resume-benefice="" data-fiche-si-vendue={sv.benefice == null ? '' : sv.benefice} data-fiche-si-vendue-etat={sv.etat} data-fiche-benefice-partiel={sv.etat === 'partiel' ? '1' : undefined}>
+          <div className={'vrm-fp-tuile' + (sv.prix == null ? ' is-manque' : '')} data-fiche-resume-vente="" data-fiche-prix-affiche={sv.prix == null ? '' : sv.prix}><span>En ligne à</span><b className={sv.prix == null ? 'is-vide' : undefined}>{eur(sv.prix)}</b></div>
+          <div className={'vrm-fp-tuile' + (sv.benefice == null ? ' is-manque' : '')} data-fiche-resume-benefice="" data-fiche-si-vendue={sv.benefice == null ? '' : sv.benefice} data-fiche-si-vendue-etat={sv.etat} data-fiche-benefice-partiel={sv.etat === 'partiel' ? '1' : undefined}>
             <span>Si vendue</span><b className={sv.benefice == null ? 'is-vide' : undefined}>{signe(sv.benefice)}</b>
             {sv.benefice == null ? <small data-fiche-raison-benef="">{sv.raison}</small>
               : <small>{sv.etat === 'partiel' ? 'au plus : frais à confirmer' : 'tous frais comptés'}</small>}
           </div>
         </>) : (<>
-          <div className="vrm-fp-tuile" data-fiche-resume-vente={r.vente == null ? '' : r.vente}><span>{r.venteLib || 'Vente'}</span><b className={r.vente == null ? 'is-vide' : undefined}>{eur(r.vente)}</b></div>
-          <div className="vrm-fp-tuile" data-fiche-resume-benefice={r.benefice == null ? '' : r.benefice} data-fiche-benefice-partiel={r.benefPartiel ? '1' : undefined}>
+          <div className={'vrm-fp-tuile' + (r.vente == null ? ' is-manque' : '')} data-fiche-resume-vente={r.vente == null ? '' : r.vente}><span>{r.venteLib || 'Vente'}</span><b className={r.vente == null ? 'is-vide' : undefined}>{eur(r.vente)}</b></div>
+          <div className={'vrm-fp-tuile' + (r.benefice == null ? ' is-manque' : '')} data-fiche-resume-benefice={r.benefice == null ? '' : r.benefice} data-fiche-benefice-partiel={r.benefPartiel ? '1' : undefined}>
             <span>Bénéfice</span><b className={r.benefice == null ? 'is-vide' : undefined}>{signe(r.benefice)}</b>
             {r.benefice == null && r.raisonBenef ? <small data-fiche-raison-benef="">{r.raisonBenef}</small> : r.benefPartiel ? <small>frais pas tous confirmés</small> : null}
           </div>

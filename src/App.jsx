@@ -331,11 +331,17 @@ function HoteFicheLigne({ rendre, deps, onActive }) {
     const prechauffe = (e) => { const t = e.target; if (t && t.closest && t.closest('[data-fiche-ligne]')) { import('./FichePaire.jsx').catch(() => {}); document.removeEventListener('pointerdown', prechauffe, true); } };
     document.addEventListener('click', clic);
     document.addEventListener('pointerdown', prechauffe, true);
-    return () => { document.removeEventListener('click', clic); document.removeEventListener('pointerdown', prechauffe, true); };
+    // …et, l'app au repos, d'avance : le premier toucher n'attend pas le réseau (ouverture < 150 ms).
+    const ric = window.requestIdleCallback || ((f) => setTimeout(f, 1500));
+    const idle = ric(() => { import('./FichePaire.jsx').catch(() => {}); }, { timeout: 4000 });
+    return () => { document.removeEventListener('click', clic); document.removeEventListener('pointerdown', prechauffe, true); try { (window.cancelIdleCallback || clearTimeout)(idle); } catch (_) {} };
   }, []);
   const res = l ? numeroDeLigne(l, { fiches: deps.fiches, txnItem: deps.txnItem, cleNum }) : null;
   const num = !res ? null : (choisi && res.nums.includes(choisi)) ? choisi : res.etat === 'un' ? res.nums[0] : null;
-  React.useEffect(() => { onActive(l ? { cle: l.cle, num } : null); /* eslint-disable-next-line */ }, [l && l.cle, num]);
+  // ⚠️ APRÈS la première image de la fiche, jamais pendant : un effet né d'un toucher est rejoué par React
+  // AVANT l'image (React 18, événement discret) — et `onActive` redessine toute l'app (ses lectures). Mesuré :
+  // 300–700 ms d'ouverture sans ce délai ; la fiche paraît d'abord, les lectures suivent.
+  React.useEffect(() => { const v = l ? { cle: l.cle, num } : null; let t = null; const raf = requestAnimationFrame(() => { t = setTimeout(() => onActive(v), 0); }); return () => { cancelAnimationFrame(raf); if (t) clearTimeout(t); }; /* eslint-disable-next-line */ }, [l && l.cle, num]);
   if (!l) return null;
   const fermer = () => { fermerLigne(); };
   return <GardeEcran nom="fiche-ligne" feuille resetKey={l.cle + ':' + (num || '')} onFermer={fermer}>{rendre(num, l, fermer, res, (n) => setChoisi(String(n)))}</GardeEcran>;

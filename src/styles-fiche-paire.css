@@ -148,32 +148,19 @@
   .vrm-fp :is(.vrm-fp-raccourcis button, .vrm-fp-outils .vrm-ao-second, .vrm-fp-b:not(.vrm-fp-b-plein), .vrm-fp-fermer):hover { background: var(--d-remplir-fort, rgba(118,118,128,.2)); }
 }
 
-/* ══ (14 nov., proposition 62 — « Une seule fiche partout ») LA FICHE DEPUIS UNE LIGNE, DIRECTION « ATELIER » ══
-   Toucher une ligne (vente, colis, annonce, achat, stock, retrait) ouvre CETTE fiche. Une carte héros (la photo en
-   couleur, le N° en affiche, le prix à l'encre), la partie utile au contexte en haut, « Actions » au pouce, puis
-   l'histoire de la paire. Les jetons de la direction (§4 Atelier, styles-systeme.css) sont LUS, avec leur valeur
-   de repli : un seul accent (les actions), rouge pour un N° porté par deux paires seulement. */
-.vrm-fp {
-  --fp-heros-fond: var(--d-heros-fond, #1D1D1F);
-  --fp-heros-degrade: var(--d-heros-degrade, radial-gradient(120% 90% at 100% 0%, rgb(40 84 160 / .38) 0%, rgb(40 84 160 / 0) 60%), linear-gradient(150deg, #1D1D1F 0%, #17213A 58%, #0F2A55 100%));
-  --fp-heros-encre: var(--d-heros-encre, #F5F5F7);
-  --fp-heros-gris: var(--d-heros-gris, rgb(235 235 245 / .64));
-  --fp-heros-ombre: var(--d-ombre-heros, 0 2px 4px rgb(0 0 0 / .06), 0 20px 44px -14px rgb(14 31 61 / .45));
-  --fp-ombre-douce: var(--d-ombre-douce, 0 1px 2px rgb(0 0 0 / .04), 0 8px 24px rgb(0 0 0 / .06));
-  --fp-r-heros: var(--d-r-heros, 24px);
-  --fp-r-photo: var(--d-r-photo-grande, 20px);
-}
-:root[data-theme="dark"] .vrm-fp {
-  --fp-heros-degrade: var(--d-heros-degrade, radial-gradient(120% 90% at 100% 0%, rgb(64 120 220 / .30) 0%, rgb(64 120 220 / 0) 60%), linear-gradient(150deg, #1C1C1E 0%, #151E33 58%, #10284F 100%));
-  --fp-heros-ombre: var(--d-ombre-heros, 0 0 0 .5px rgb(255 255 255 / .08));
-  --fp-ombre-douce: var(--d-ombre-douce, none);
-}
+/* ══ (14 nov., proposition 62 — « Une seule fiche partout ») LA FICHE OUVERTE DEPUIS UNE LIGNE ══════════════
+   Toucher une ligne (vente, colis, annonce, achat, stock, retrait) ouvre CETTE fiche. Dessin (AJOUT 3 de
+   Julien, 14 nov. 09:01, qui passe avant la direction « Atelier ») : en tête COMPACTE sur le fond de la page
+   (photo + N° + titre + prix — pas de grande carte sombre), la partie utile au contexte, puis « Actions » au
+   pouce : UN seul bouton plein accent (l'action principale, `data-fiche-principal`), les autres en rangées de
+   liste, texte accent ; aucun bloc « — » (une ligne au plus). Rouge : un N° porté par deux paires, seulement. */
+.vrm-fp { --fp-ombre-douce: var(--d-ombre-douce, 0 1px 2px rgb(0 0 0 / .04), 0 8px 24px rgb(0 0 0 / .06)); --fp-filet: var(--d-filet, #E5E5EA); }
+:root[data-theme="dark"] .vrm-fp { --fp-ombre-douce: var(--d-ombre-douce, none); }
 /* Ouverte DEPUIS une ligne : sous les feuilles de la liste (relier un achat, code en grand… z ≥ 1000) qu'un
    geste de la ligne ouvre par-dessus, au-dessus des barres de l'app (≤ 90). La loupe garde 9000. */
 .vrm-fp.is-depuis-ligne { z-index: 950; animation: vrm-fp-monte var(--d-m-ressort, 320ms) var(--d-ressort, cubic-bezier(.32,.72,0,1)) both; }
 @keyframes vrm-fp-monte { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .vrm-fp.is-depuis-ligne { animation: none; } }
-.vrm-fp-cadre { will-change: auto; }
 .vrm-fp[data-fiche-glisse] .vrm-fp-cadre { will-change: transform; }
 /* La poignée (glisser pour fermer) : au doigt seulement. */
 .vrm-fp-poignee { display: none; }
@@ -181,56 +168,74 @@
   .vrm-fp-poignee { display: block; width: 36px; height: 5px; border-radius: 999px; margin: 2px auto -2px; background: var(--d-filet-fort, #D1D1D6); }
 }
 
-/* La carte héros. */
-.vrm-fp .vrm-fp-heros {
-  display: flex; align-items: stretch; gap: 16px; margin: 4px 0 24px; padding: 16px; min-width: 0;
-  background: var(--fp-heros-fond); background-image: var(--fp-heros-degrade); color: var(--fp-heros-encre);
-  border-radius: var(--fp-r-heros); box-shadow: var(--fp-heros-ombre); overflow: hidden;
-}
+/* L'en-tête compact : photo 72, N° 28/700, titre 17/600 (2 lignes), prix 22/700 à l'encre. */
+.vrm-fp .vrm-fp-heros { display: flex; align-items: center; gap: 14px; margin: 4px 0 20px; min-width: 0; }
 .vrm-fp .vrm-fp-heros .vrm-fp-heros-photo {
-  flex: none; width: 120px; height: 150px; border-radius: var(--fp-r-photo); overflow: hidden; display: flex; align-items: center; justify-content: center;
-  background: rgb(255 255 255 / .10); color: var(--fp-heros-gris);
+  flex: none; width: 72px; height: 72px; border-radius: var(--d-r-photo, 16px); overflow: hidden; display: flex; align-items: center; justify-content: center;
+  background: var(--d-carte, #FFFFFF); color: var(--d-gris, #6E6E73); box-shadow: var(--fp-ombre-douce);
 }
 .vrm-fp .vrm-fp-heros .vrm-fp-heros-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.vrm-fp .vrm-fp-heros .vrm-fp-quoi { justify-content: center; gap: 6px; }
-.vrm-fp .vrm-fp-heros .vrm-fp-num { color: var(--fp-heros-encre); font-size: var(--d-t-affiche, clamp(48px, 13vw, 64px)); letter-spacing: var(--d-ap-affiche, -.03em); }
-.vrm-fp .vrm-fp-heros .vrm-fp-num.is-sans { font-size: var(--d-t-28, 28px); letter-spacing: -.02em; }
-/* Deux paires sous ce N° : le seul rouge (§5), lisible sur le héros sombre. */
-.vrm-fp .vrm-fp-heros .vrm-fp-num.is-double { color: #FF6961; }
-.vrm-fp .vrm-fp-heros .vrm-fp-titre { color: var(--fp-heros-encre); font-size: var(--d-t-17, 17px); font-weight: 600; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-.vrm-fp .vrm-fp-heros .vrm-fp-sous, .vrm-fp .vrm-fp-heros-ctx { color: var(--fp-heros-gris); font-size: var(--d-t-13, 13px); font-weight: 600; }
-.vrm-fp .vrm-fp-heros-prix { font-size: var(--d-t-28, 28px); font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--fp-heros-encre); margin-top: 2px; }
-.vrm-fp-silhouette { width: 64px; height: 40px; opacity: .75; }
-@media (min-width: 700px) {
-  .vrm-fp .vrm-fp-heros { padding: 20px; gap: 20px; }
-  .vrm-fp .vrm-fp-heros .vrm-fp-heros-photo { width: 168px; height: 200px; }
-}
-@media (max-width: 359px) { .vrm-fp .vrm-fp-heros .vrm-fp-heros-photo { width: 96px; height: 120px; } }
+.vrm-fp .vrm-fp-heros .vrm-fp-quoi { gap: 2px; }
+.vrm-fp .vrm-fp-heros .vrm-fp-num { font-size: var(--d-t-28, 28px); letter-spacing: -.02em; }
+.vrm-fp .vrm-fp-heros .vrm-fp-num.is-sans { font-size: var(--d-t-20, 20px); color: var(--d-gris, #6E6E73); }
+.vrm-fp .vrm-fp-heros .vrm-fp-titre { font-size: var(--d-t-17, 17px); font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.vrm-fp .vrm-fp-heros-ctx { font-size: var(--d-t-13, 13px); font-weight: 600; color: var(--d-gris, #6E6E73); }
+.vrm-fp .vrm-fp-heros-prix { font-size: var(--d-t-22, 22px); font-weight: 700; letter-spacing: -.016em; font-variant-numeric: tabular-nums; color: var(--d-encre, #1D1D1F); }
+.vrm-fp-silhouette { width: 44px; height: 28px; opacity: .7; }
+@media (min-width: 700px) { .vrm-fp .vrm-fp-heros .vrm-fp-heros-photo { width: 96px; height: 96px; } }
 
-/* La ligne sans paire : dit, avec le geste — jamais une paire devinée. */
-.vrm-fp-sans-paire { margin: 0 0 24px; padding: 16px; background: var(--d-carte, #FFFFFF); border-radius: var(--d-r-carte, 20px); box-shadow: var(--fp-ombre-douce); }
-.vrm-fp-sans-paire-t { margin: 0; font-size: var(--d-t-17, 17px); font-weight: 600; }
-.vrm-fp-sans-paire-g { margin: 6px 0 0; font-size: var(--d-t-15, 15px); color: var(--d-gris, #6E6E73); line-height: 1.4; }
-.vrm-fp-lot { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.vrm-fp-lot .vrm-fp-b { flex: 0 0 auto; }
+/* Les chiffres : une bande (pas de cartes) ; un chiffre qui manque n'est pas une case « — » :
+   il se range en une ligne grise, avec sa porte (« Saisir »). */
+.vrm-fp .vrm-fp-tuiles { display: flex; flex-wrap: wrap; gap: 4px 20px; margin: 0 0 24px; }
+.vrm-fp .vrm-fp-tuile { flex: 0 1 auto; background: none; box-shadow: none; padding: 0; border-radius: 0; gap: 0; }
+.vrm-fp .vrm-fp-tuile > b { font-size: var(--d-t-22, 22px); }
+.vrm-fp .vrm-fp-tuile > span { font-size: var(--d-t-13, 13px); font-weight: 400; order: 2; }
+.vrm-fp .vrm-fp-tuile.is-manque { order: 9; flex: 1 1 100%; flex-direction: row; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.vrm-fp .vrm-fp-tuile.is-manque > span { order: 0; }
+.vrm-fp .vrm-fp-tuile.is-manque > b { font-size: var(--d-t-13, 13px); font-weight: 400; color: var(--d-gris, #6E6E73); }
+.vrm-fp .vrm-fp-tuile.is-manque > small { font-size: var(--d-t-13, 13px); }
+.vrm-fp .vrm-fp-tuile.is-manque > .vrm-fp-saisir { margin: -12px 0; }
+@media (min-width: 700px) { .vrm-fp .vrm-fp-tuile { padding: 0; } .vrm-fp .vrm-fp-tuile > b:not(.is-vide) { font-size: var(--d-t-28, 28px); } }
 
-/* La partie utile au contexte (la vente touchée…) : une carte, sans titre en double (la carte héros le dit). */
+/* La ligne sans paire : dit, avec le geste — jamais une paire devinée. Une ligne, pas une carte. */
+.vrm-fp-sans-paire { margin: 0 0 20px; }
+.vrm-fp-sans-paire-t { margin: 0; font-size: var(--d-t-15, 15px); font-weight: 600; }
+.vrm-fp-sans-paire-g { margin: 4px 0 0; font-size: var(--d-t-13, 13px); color: var(--d-gris, #6E6E73); line-height: 1.4; }
+.vrm-fp-lot { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.vrm-fp-lot .vrm-fp-b { flex: 0 0 auto; min-height: 36px; background: transparent; color: var(--d-accent-texte, #0066CC); padding: 0 4px; }
+
+/* La partie utile au contexte (le récapitulatif de la vente touchée) : une carte blanche, sans tête en double. */
 .vrm-fp-contexte:empty { display: none; }
 .vrm-fp-contexte { margin: 0 0 24px; padding: 4px 16px 12px; background: var(--d-carte, #FFFFFF); border-radius: var(--d-r-carte, 20px); box-shadow: var(--fp-ombre-douce); min-width: 0; }
-/* Le récapitulatif d'une vente gardait sa propre tête (photo, N°, nom, croix) : la carte héros la dit déjà. */
 .vrm-fp-contexte .vrm-recap-tete, .vrm-fp-contexte .vrm-ledger-drawer-head { display: none; }
 .vrm-fp-contexte .vrm-ledger-drawer-body, .vrm-fp-contexte .vrm-recap-corps { padding: 0; max-height: none; overflow: visible; }
+/* « Fiche de l'article » du récapitulatif : on Y EST (le bouton rouvrirait la même fiche par-dessus). */
+.vrm-fp-contexte [data-recap-fiche] { display: none !important; }
 
-/* « Actions » au pouce : les gestes de la ligne, puis ceux de la fiche. */
+/* « Actions » au pouce : les gestes de la ligne et ceux de la fiche, en RANGÉES (texte accent, filet fin
+   indenté), une seule action pleine en tête. */
 .vrm-fp-actions-sec { margin: 0 0 24px; }
-.vrm-fp-actions-carte { padding: 12px 16px; background: var(--d-carte, #FFFFFF); border-radius: var(--d-r-carte, 20px); box-shadow: var(--fp-ombre-douce); display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.vrm-fp-actions-carte { padding: 4px 16px; background: var(--d-carte, #FFFFFF); border-radius: var(--d-r-carte, 20px); box-shadow: var(--fp-ombre-douce); display: flex; flex-direction: column; min-width: 0; }
 .vrm-fp-actions-ligne:empty { display: none; }
-.vrm-fp-actions-carte .vrm-fp-outils { margin: 0; }
-.vrm-fp-actions-carte .vrm-fp-actions { margin: 0; }
-.vrm-fp-depuis-ligne { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-/* Ce qui vivait sur la ligne (rangée de boutons d'un colis, menu d'un achat) : à la largeur de la carte, 44 px. */
-.vrm-fp-depuis-ligne :is(button, a.vrm-b, [role="menuitem"]) { min-height: 44px; }
-.vrm-fp-depuis-ligne .vrm-buy-menu-items, .vrm-fp-depuis-ligne .vrm-fiche-plus { display: flex !important; flex-direction: column; gap: 8px; border: 0 !important; }
+.vrm-fp-depuis-ligne { min-width: 0; display: flex; flex-direction: column; }
+.vrm-fp-depuis-ligne > *, .vrm-fp-depuis-ligne :is(.vrm-rangee-bord, .vrm-colis-actions, .vrm-fiche-gestes, .vrm-fiche-plus, .vrm-fiche-menu, .vrm-rp-gestes, .vrm-recap-grille, .vrm-buy-act) { display: flex !important; flex-direction: column !important; align-items: stretch !important; gap: 0 !important; flex-wrap: nowrap !important; border: 0 !important; background: none !important; padding: 0 !important; margin: 0 !important; width: 100%; }
+.vrm-fp :is(.vrm-fp-actions-carte, .vrm-fp-contexte .vrm-recap-gestes) :is(.vrm-b, .vrm-fp-b, .vrm-ao-second, .vrm-fiche-geste, .vrm-buy-quick, .vrm-buy-more, [role="menuitem"], .vrm-lvc-geste, .vrm-rpf-retire, .vrm-fu-imprimer-ligne, [data-bouton-bord]):not([data-fiche-principal]):not(.vrm-serie-case) {
+  display: flex !important; align-items: center !important; justify-content: flex-start !important; gap: 10px !important; width: 100% !important; min-height: 48px !important; height: auto !important;
+  padding: 0 !important; margin: 0 !important; border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important;
+  color: var(--d-accent-texte, #0066CC) !important; font-size: var(--d-t-17, 17px) !important; font-weight: 400 !important; text-align: left !important; white-space: normal !important;
+}
+.vrm-fp :is(.vrm-fp-actions-carte, .vrm-fp-contexte .vrm-recap-gestes) :is(.vrm-b, .vrm-fp-b, .vrm-ao-second, .vrm-fiche-geste, [role="menuitem"], .vrm-lvc-geste, .vrm-rpf-retire, .vrm-fu-imprimer-ligne):not([data-fiche-principal]) + :is(*) { box-shadow: inset 0 .5px 0 var(--d-filet-indente, var(--fp-filet)) !important; }
+.vrm-fp :is(.vrm-fp-actions-carte, .vrm-fp-contexte .vrm-recap-gestes) :is(.vrm-b, .vrm-fp-b, .vrm-ao-second, .vrm-fiche-geste, [role="menuitem"]) svg { color: var(--d-accent-texte, #0066CC) !important; }
+/* L'action principale : le seul aplat accent de la fiche. */
+.vrm-fp [data-fiche-principal] {
+  display: flex !important; align-items: center !important; justify-content: center !important; gap: 8px !important; width: 100% !important; min-height: 50px !important; margin: 12px 0 !important;
+  border: 0 !important; border-radius: 14px !important; background: var(--d-accent, #0071E3) !important; color: #FFFFFF !important; font-size: var(--d-t-17, 17px) !important; font-weight: 600 !important;
+}
+.vrm-fp [data-fiche-principal] svg { color: #FFFFFF !important; }
+/* Un second « plein » éventuel (une autre feuille l'a voulu principal) : rangée, comme les autres. */
+.vrm-fp .vrm-fp-actions-carte :is(.vrm-fp-b-plein, .vrm-b-primaire):not([data-fiche-principal]) { color: var(--d-accent-texte, #0066CC) !important; }
+.vrm-fp-actions-carte .vrm-fp-outils, .vrm-fp-actions-carte .vrm-fp-actions { display: flex; flex-direction: column; gap: 0; margin: 0; }
 @media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  .vrm-fp-depuis-ligne :is(button, a.vrm-b, [role="menuitem"]) { min-height: 36px; }
+  .vrm-fp :is(.vrm-fp-actions-carte, .vrm-fp-contexte .vrm-recap-gestes) :is(.vrm-b, .vrm-fp-b, .vrm-ao-second, .vrm-fiche-geste, [role="menuitem"]):not([data-fiche-principal]) { min-height: 40px !important; font-size: var(--d-t-15, 15px) !important; }
+  .vrm-fp [data-fiche-principal] { min-height: 40px !important; }
 }
