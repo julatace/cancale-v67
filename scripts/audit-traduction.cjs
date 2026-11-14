@@ -35,6 +35,7 @@ const LANGUES = ['fr', 'en', 'es', 'it', 'de'];
 // `*` = tout le fichier. Ajouter ici chaque écran migré (méthode : docs/passation/2026-11-11-traduction.md).
 const MIGRES = [
   ['src/Accueil.jsx', ['*']],
+  ['src/ui/Accompagne.jsx', ['*']],   // (14 nov., lot accompagnement) la brique commune des quatre moments
   // (14 nov., propositions 102-107) Photos et fiches.
   ['src/AtelierPaire.jsx', ['*']], ['src/SeancePhoto.jsx', ['*']], ['src/RechercheCouleur.jsx', ['*']], ['src/AvisPhoto.jsx', ['*']], ['src/LigneCouleurLoupe.jsx', ['*']],
   // (14 nov., accueil des nouveaux) Bilan, premier colis, notifications, langue ; la page des tarifs.

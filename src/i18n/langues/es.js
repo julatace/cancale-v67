@@ -16,12 +16,14 @@ import ecran_nouveaux from './es/nouveaux.js';
 import ecran_argent from './es/argent.js';
 import ecran_fraiscarte from './es/fraiscarte.js';   // (14 nov., frais-carte)
 import ecran_atelier from './es/atelier.js';
+import ecran_accompagnement from './es/accompagnement.js';   // (14 nov.) les quatre moments d'un geste
 export default {
   ...ecran_fiche,
   ...ecran_fraiscarte,
   ...ecran_tarifs,
   ...ecran_nouveaux,
   ...ecran_atelier,
+  ...ecran_accompagnement,
   ...ecran_compta,
   ...ecran_argent,
   ...ecran_stats,

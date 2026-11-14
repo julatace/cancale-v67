@@ -17322,10 +17322,12 @@ function PeriodePicker({ value, onChange, titre = 'Période', vide, datation }) 
   return <ChoixPeriode owner={AUTH.user?.id||''} value={value} onChange={onChange} Retour={FermeAuRetour} Icon={Icon} titre={titre} vide={vide} datation={datation}/>;
 }
 
-function EmptyState({ icon, title, desc, action }) {
-  return <div className="vrm-empty-state vrm-empty-clair">
+// (14 nov., lot accompagnement) `vide` : la clé de « pourquoi c'est vide, et le premier geste » (AccVide,
+// `vide.<cle>.pourquoi|geste`) — dit quand l'écran ne le dit pas déjà (`desc`), le geste quand il n'en a pas.
+function EmptyState({ icon, title, desc, action, vide = '', onGeste = null, lien = '' }) {
+  return <div className="vrm-empty-state vrm-empty-clair" data-acc-vide={vide || (desc && action ? 'ecran' : undefined)}>
     <div className="vrm-empty-ic vrm-empty-dessin" aria-hidden="true"><Illustration nom={depuisIcone(icon)} taille={64} vend={vendActuel()}/></div>
-    <div className="vrm-empty-corps"><h3>{title}</h3>{desc&&<p>{desc}</p>}{action&&<div className="vrm-empty-actions">{action}</div>}</div>
+    <div className="vrm-empty-corps"><h3>{title}</h3>{desc&&<p data-acc-vide-pourquoi="">{desc}</p>}{vide && !desc ? <AccVide cle={vide} onGeste={action ? null : onGeste} lien={action ? '' : lien}/> : null}{action&&<div className="vrm-empty-actions" data-acc-vide-geste="">{action}</div>}{vide && desc && !action ? <AccVide cle={vide} onGeste={onGeste} lien={lien} sansPourquoi/> : null}</div>
   </div>;
 }
 
@@ -17905,8 +17907,11 @@ function PhraseEcran({ cle, className = '' }) {
   const p = useProfilVendeur();   // (11 nov., lot DJ2) « paires » seulement pour Sneakers
   const t = cle && phraseEcranPour(cle, p.vend || vendActuel());
   const aide = cle && AIDE_ECRANS[cle] ? <AideEcran cle={cle}/> : null;
-  if (!t) return aide ? <p className={'vrm-phrase-ecran vrm-phrase-ecran-seule' + (className ? ' ' + className : '')}>{aide}</p> : null;
-  return <p className={'vrm-phrase-ecran' + (className ? ' ' + className : '')} data-phrase-ecran={cle}>{t}{aide}</p>;
+  // (14 nov., lot accompagnement) La PREMIÈRE fois sur l'écran : une phrase d'aide discrète, sous la phrase de
+  // l'écran, désactivable (« Compris » · « Ne plus afficher ces aides ») — src/ui/Accompagne.jsx.
+  const premiere = cle && cle !== 'journee' ? <AccPremiereFois ecran={cle}/> : null;
+  if (!t) return aide ? <><p className={'vrm-phrase-ecran vrm-phrase-ecran-seule' + (className ? ' ' + className : '')}>{aide}</p>{premiere}</> : premiere;
+  return <><p className={'vrm-phrase-ecran' + (className ? ' ' + className : '')} data-phrase-ecran={cle}>{t}{aide}</p>{premiere}</>;
 }
 function ScreenHead({ icon, title, desc, right, principal, sous, phrase, date = '' }) {
   const line = typeof icon === 'string' && ICON_PATHS[icon];
@@ -44369,7 +44374,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   });
   const NoAcc = () => !noAcc ? null : (baseKO
     ? <LignePanne>Je n'ai pas pu lire tes comptes Vinted — ce n'est pas « aucun compte lié ».</LignePanne>
-    : <div className="vrm-noacc" style={{marginBottom:12}}>{/* (2 nov.) la carte touchait le sélecteur posé dessous (Messages, Achats) */}<EmptyState icon="link" title="Aucun compte Vinted lié"
+    : <div className="vrm-noacc" style={{marginBottom:12}}>{/* (2 nov.) la carte touchait le sélecteur posé dessous (Messages, Achats) */}<EmptyState icon="link" title="Aucun compte Vinted lié" vide="comptes"
         action={onNav && <Bouton variante="primaire" icone="link" onClick={()=>onNav('vintedaccounts')}>Relier un compte</Bouton>}/></div>
   );
   // ── MESSAGES : LE COMPTE DE L'EXTENSION D'ABORD (16 octobre) ─────────────
@@ -46699,6 +46704,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {(() => { const pj = loading ? null : phraseDuJour({ envoyer: { n: T[0].t ? T[0].t.n : 0, pasSu: !!T[0].pasSu, presses: T[0].t && T[0].t.presses }, retirer: { n: T[1].t ? T[1].t.n : 0, pasSu: !!T[1].pasSu } }, h);
                   return pj ? <p className="vrm-phrase-ecran vrm-fu-phrase-tete" data-phrase-jour={pj} data-phrase-jour-env={T[0].pasSu ? '' : String(T[0].t ? T[0].t.n : 0)} data-phrase-jour-ret={T[1].pasSu ? '' : String(T[1].t ? T[1].t.n : 0)}>{pj}{AIDE_ECRANS.journee ? <AideEcran cle="journee"/> : null}</p>
                     : <PhraseEcran cle="journee" className="vrm-fu-phrase-tete"/>; })()}
+                <AccPremiereFois ecran="journee"/>
                     </>),
                     prochain: (<>
                 {/* (9 nov., Ma journée v2) LA PROCHAINE CHOSE À FAIRE, en tête : avant l'argent. La carte de
@@ -47058,7 +47064,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {sales.error && <EtatPanne quoi="Tes ventes Vinted" raison="La lecture n’a pas répondu. Rien n’est perdu." onReessayer={()=>loadOrders('sold',setSales,true)}/>}
         {/* (5 nov., chantier E2) L'état vide dit ce qui va se passer : TOUTES les ventes arrivent ici
             (pas seulement les finalisées, comme le disait l'ancienne phrase). */}
-        {sales.items && !sales.error && sales.items.length===0 && <div className="vrm-toutes-vide vrm-vide-dessin" data-ventes-vide=""><Illustration nom="etiquette" taille={110}/><p className="vrm-toutes-vide-titre">{tr('ventes.aucuneVenteInstant')}</p><p>{tr('ventes.articlePartVinted')}</p></div>}
+        {sales.items && !sales.error && sales.items.length===0 && <div className="vrm-toutes-vide vrm-vide-dessin" data-ventes-vide="" data-acc-vide="ventes"><Illustration nom="etiquette" taille={110}/><p className="vrm-toutes-vide-titre">{tr('ventes.aucuneVenteInstant')}</p><p data-acc-vide-pourquoi="">{tr('ventes.articlePartVinted')}</p><AccVide cle="ventes" lien="?tab=settings&reglage=verifier" sansPourquoi/></div>}
         {/* ⚠️ SUR ORDINATEUR, LA LISTE SE RANGE EN DEUX COLONNES.
             Une ligne de vente de 980 px pour une photo, un titre et un
             prix, c'est le meme defaut que les cartes d'action de Ma
@@ -48933,7 +48939,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           ? <div data-achats-vide="ecartes"><EmptyState icon="bag" title={tr('achats.achatsSontComptes')}
               desc="Les comptes écartés n'entrent dans aucun écran ni aucun total. Paramètres → Comptes liés pour les remettre."/></div>
           : <div data-achats-vide="aucun"><EmptyState icon="bag" title={tr('achats.aucunAchatInstant')}
-              desc="Tes achats Vinted arrivent ici tout seuls dès que l'extension a capté ton compte. Rien à faire."/></div>
+              desc="Tes achats Vinted arrivent ici tout seuls dès que l'extension a capté ton compte. Rien à faire." vide="achats" lien="?tab=achats&achat=1"/></div>
         )}
         {/* (5 nov.) Un filtre ou une recherche qui ne trouve rien le DIT (avant : une liste vide, muette). */}
         {!modeRetraits && buys.items && !buys.error && buysBase.length>0 && achatsAffiches.length===0 && aFilter!=='attente' && (
@@ -50769,7 +50775,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (colisSansCompte) return colisDans ? null : (<>
             <ScreenHead icon="doc" title="Colis" date={dateJourFr(new Date())} phrase="colis"/>
             <div data-colis-sans-compte="">
-              <EmptyState icon="link" title="Aucun compte Vinted lié"
+              <EmptyState icon="link" title="Aucun compte Vinted lié" vide="comptes"
                 action={onNav && <Bouton variante="primaire" icone="link" data-colis-relier="" onClick={()=>onNav('vintedaccounts')}>Relier un compte</Bouton>}/>
             </div>
           </>);
@@ -57013,11 +57019,11 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
         </details>
       )}
       {lignes.length === 0
-        ? <div data-toutes-vide="" className="vrm-toutes-vide">
+        ? <div data-toutes-vide="" className="vrm-toutes-vide" data-acc-vide="ventes">
             {enCours ? <p>{PAS_SU.enCours}</p>
               : visibles.some((e) => e[1] === 'pas-su' || e[1] === 'partiel') ? <p>Aucune vente lue : une lecture a échoué (ci-dessus). Rien n’est perdu.</p>
-              : sansCompteVinted ? <><p className="vrm-toutes-vide-titre">Tes ventes arriveront ici</p><p data-toutes-etat-site="vinted" data-etat="jamais">Vinted : aucun compte relié. Installe l’extension VRM {ouExtensionIci()}, puis ouvre vinted.fr.</p></>
-              : <><p className="vrm-toutes-vide-titre">Aucune vente pour l’instant</p><p>Dès qu’un article part, il apparaît ici, sur tous tes sites.</p></>}
+              : sansCompteVinted ? <><p className="vrm-toutes-vide-titre">Tes ventes arriveront ici</p><p data-toutes-etat-site="vinted" data-etat="jamais" data-acc-vide-pourquoi="">Vinted : aucun compte relié. Installe l’extension VRM {ouExtensionIci()}, puis ouvre vinted.fr.</p><AccVide cle="ventes" lien="?tab=settings&reglage=verifier" sansPourquoi/></>
+              : <><p className="vrm-toutes-vide-titre">Aucune vente pour l’instant</p><p data-acc-vide-pourquoi="">Dès qu’un article part, il apparaît ici, sur tous tes sites.</p><AccVide cle="ventes" lien="?tab=settings&reglage=verifier" sansPourquoi/></>}
           </div>
         : (
           <div className="vrm-toutes-liste">

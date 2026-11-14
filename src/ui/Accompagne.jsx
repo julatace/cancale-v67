@@ -128,14 +128,15 @@ export function AccHote() {
 // ── LISTE VIDE : pourquoi, et le premier geste ───────────────────────────────
 // `cle` : `vide.<cle>.pourquoi` (et `.geste` si `onGeste`/`lien`). Rendu DANS l'état vide
 // de l'écran (EmptyState), jamais une seconde carte.
-export function AccVide({ cle, onGeste = null, lien = '', vars = {} }) {
+// `sansPourquoi` : l'écran dit déjà pourquoi (sa phrase) ; seul le premier geste s'ajoute.
+export function AccVide({ cle, onGeste = null, lien = '', vars = {}, sansPourquoi = false }) {
   useLangue();
   const pourquoi = t2(`vide.${cle}.pourquoi`, vars);
   const geste = t2(`vide.${cle}.geste`, vars);
-  if (!pourquoi) return null;
+  if (!pourquoi || (sansPourquoi && !(geste && (onGeste || lien)))) return null;
   return (
     <div className="vrm-acc-vide" data-acc-vide={cle}>
-      <p data-acc-vide-pourquoi="">{pourquoi}</p>
+      {sansPourquoi ? null : <p data-acc-vide-pourquoi="">{pourquoi}</p>}
       {geste && (onGeste || lien) ? <button type="button" className="vrm-acc-lien" data-acc-vide-geste="" onClick={() => (onGeste ? onGeste() : allerVers(lien))}>{geste}</button> : null}
     </div>
   );

@@ -347,7 +347,6 @@ export const GESTES_ACC = {
   'prix.baisser':     { ecran: 'annonces',  sorte: 'baisse-prix',           ensuite: { lien: '?tab=annonces' } },
   'prix.baisserLbc':  { ecran: 'leboncoin', ensuite: { lien: '?tab=plat_leboncoin' } },
   'prix.baisserVc':   { ecran: 'vestiaire', sorte: 'baisse-prix-vestiaire', ensuite: { lien: '?tab=plat_vestiaire' } },
-  'ebay.soldes':      { ecran: 'ebay',      ensuite: { lien: '?tab=plat_ebay' } },
   'republier':        { ecran: 'annonces',  ensuite: { lien: '?tab=annonces' } },
   'republier.lbc':    { ecran: 'leboncoin', sorte: 'republier-lbc',         ensuite: { lien: '?tab=plat_leboncoin' } },
   'publier.lbc':      { ecran: 'leboncoin', sorte: 'publier-lbc',           ensuite: { lien: '?tab=plat_leboncoin' } },
