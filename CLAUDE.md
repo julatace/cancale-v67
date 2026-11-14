@@ -527,7 +527,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **14 nov. · Studio bleu clair — la fondation** : jetons `--sb-*`, quatre formes de bouton, coque (lumière, barre en verre, pastille enfoncée + diode, disque « + » ⇒ Chercher · Scanner · Publier · Imprimer N), polices Urbanist/Inter embarquées, `src/ui` migré ; densité des listes au choix et « Automatique (le soir) » au coucher du soleil (idées 149-150) ; `docs/passation/2026-11-14-studio-fondation.md`. Geste : regarder sur iPhone, dire ce qui gêne.
+- **14 nov. · Studio bleu clair — la fondation** : jetons `--sb-*`, quatre formes de bouton, coque (lumière, barre en verre, pastille enfoncée + diode, disque « + » ⇒ Chercher · Scanner · Publier · Imprimer N), polices Urbanist/Inter embarquées, `src/ui` migré ; `docs/passation/2026-11-14-studio-fondation.md`. Geste : regarder sur iPhone, dire ce qui gêne.
 - **14 nov. · Extension 5.377.0 : « VRM a capté » + carte Favoris · Annonces · Ventes** : bulle près du logo et toast dans l'app quand une écriture RÉUSSIE range du nouveau (par identité, `vrmCapteVu`), « Compte relié · … » à la connexion, réglage partagé carte ↔ Paramètres ; carte : compte de l'onglet d'abord, favoris du plus récent cochés ⇒ « Envoyer le message (N) », autres comptes floutés `inert`, lecture seule. `docs/passation/2026-11-14-popup-capte.md`. Geste : installer la 5.377.0.
 
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier

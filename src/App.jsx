@@ -58512,19 +58512,18 @@ function AppCoeur() {
   const [apparenceLue,setApparenceLue]=useStateCle('vrm_apparence', ()=>load('vrm_apparence',null));
   const apparence = apparenceDe(apparenceLue, choixSombre);
   const systemeSombre = useSystemeSombre(apparence === 'auto');
-  // (14 nov., idée 150) « Automatique (le soir) » : sombre du coucher au lever du soleil (src/apparence.js), REVU
-  // CHAQUE MINUTE ; l'état ne change que si la teinte change (React ignore une valeur identique : aucun rendu,
-  // aucun clignement). Un téléphone réveillé après des heures (minuterie gelée) se recale à son retour.
-  const [soirSombre, setSoirSombre] = useState(() => sombreEffectif('soir', { date: new Date() }));
+  const [, setTicTheme] = useState(0);
   useEffect(() => {
+    // « Le soir » : la teinte change à 19 h et à 7 h ; un téléphone réveillé après des heures
+    // (minuterie gelée) se recale à son retour au premier plan.
     if (apparence !== 'soir') return undefined;
-    const revoir = () => setSoirSombre(sombreEffectif('soir', { date: new Date() }));
-    const t = setInterval(revoir, 60000);
-    const vu = () => { if (document.visibilityState === 'visible') revoir(); };
-    revoir(); document.addEventListener('visibilitychange', vu);
-    return () => { clearInterval(t); document.removeEventListener('visibilitychange', vu); };
+    let t = null;
+    const armer = () => { if (t) clearTimeout(t); const ms = prochainChangement('soir', new Date()); t = setTimeout(() => { setTicTheme((n) => n + 1); armer(); }, Math.min(ms, 2147000000)); };
+    const vu = () => { if (document.visibilityState === 'visible') { setTicTheme((n) => n + 1); armer(); } };
+    armer(); document.addEventListener('visibilitychange', vu);
+    return () => { if (t) clearTimeout(t); document.removeEventListener('visibilitychange', vu); };
   }, [apparence]);
-  const dark = apparence === 'soir' ? soirSombre : sombreEffectif(apparence, { date: new Date(), systemeSombre });
+  const dark = sombreEffectif(apparence, { date: new Date(), systemeSombre });
   // Applique le thème (clair/sombre) en réassignant C avant chaque rendu
   C = dark ? THEMES.dark : THEMES.light;
   const choisirApparence = (mode) => {

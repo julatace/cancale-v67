@@ -8,8 +8,7 @@
 //  sur toutes les entrées (24 heures × 5 valeurs de `vrm_apparence` × ancien
 //  `vinted_dark` × préférence du système) : même verdict partout, sinon l'app
 //  s'affiche d'une teinte puis bascule (le « flash »).
-//  Et la règle elle-même : « Le soir » = (14 nov., idée 150) du COUCHER au LEVER du soleil de la ville du fuseau
-//  de l'appareil, sinon 20 h–7 h ; « Automatique » = le système ;
+//  Et la règle elle-même : « Le soir » = 19 h–7 h ; « Automatique » = le système ;
 //  absent ⇒ le choix d'avant (`vinted_dark`) ; un choix explicite écrit aussi
 //  `vinted_dark` ; App.jsx branche la règle aux deux endroits (avant le cœur,
 //  dans le cœur) et synchronise `vrm_apparence`.
@@ -32,54 +31,42 @@ async function verifier({ src, dem, app }, bavard = true) {
   try { A = await import(pathToFileURL(f).href + '?t=' + Date.now() + Math.random()); }
   catch (e) { dit(false, 'src/apparence.js se charge', String(e.message).slice(0, 120)); return ko; }
   // Le script de démarrage, dans un faux navigateur.
-  const lanceDemarrage = (stock, heure, systeme, fuseauForce, minute = 30) => {
+  const lanceDemarrage = (stock, heure, systeme) => {
     const attrs = {}; let meta = null;
     const doc = { documentElement: { setAttribute: (k, v) => { attrs[k] = v; } }, querySelector: () => ({ setAttribute: (k, v) => { meta = v; } }) };
     const RealDate = Date;
-    class FausseDate extends RealDate { constructor(...a) { if (a.length) super(...a); else { super(2026, 10, 8, heure, minute, 0); } } getHours() { return super.getHours(); } }
+    class FausseDate extends RealDate { constructor(...a) { if (a.length) super(...a); else { super(2026, 10, 8, heure, 30, 0); } } getHours() { return super.getHours(); } }
     const ctx = { window: {}, document: doc, localStorage: { getItem: (k) => (k in stock ? stock[k] : null) }, Date: FausseDate, JSON };
     ctx.window.matchMedia = (q) => ({ matches: /dark/.test(q) && systeme });
     ctx.window.localStorage = ctx.localStorage;
-    if (fuseauForce !== undefined) ctx.Intl = { DateTimeFormat: () => ({ resolvedOptions: () => ({ timeZone: fuseauForce }) }) };
     try { vm.runInNewContext(dem, ctx, { timeout: 500 }); } catch (e) { return { erreur: e.message }; }
     return { theme: attrs['data-theme'], meta };
   };
   // 1. Les deux copies, sur toutes les entrées.
   const MODES = [undefined, 'clair', 'sombre', 'auto', 'soir', 'n_importe'];
   let ecarts = [], n = 0;
-  for (const fz of ['', 'Europe/Paris', 'Europe/Madrid', 'Indian/Reunion']) for (const mode of MODES) for (const ancien of [undefined, false, true]) for (const sys of [false, true]) for (let h = 0; h < 24; h++) for (const mi of [0, 30]) {
+  for (const mode of MODES) for (const ancien of [undefined, false, true]) for (const sys of [false, true]) for (let h = 0; h < 24; h++) {
     const stock = {}; if (mode !== undefined) stock.vrm_apparence = JSON.stringify(mode); if (ancien !== undefined) stock.vinted_dark = JSON.stringify(ancien);
-    const d = new Date(2026, 10, 8, h, mi, 0);
-    const react = A.sombreEffectif(A.apparenceDe(mode === undefined ? null : mode, ancien === true), { date: d, systemeSombre: sys, fuseau: fz });
-    const r = lanceDemarrage(stock, h, sys, fz, mi);
+    const d = new Date(2026, 10, 8, h, 30, 0);
+    const react = A.sombreEffectif(A.apparenceDe(mode === undefined ? null : mode, ancien === true), { date: d, systemeSombre: sys });
+    const r = lanceDemarrage(stock, h, sys);
     n++;
     if (r.erreur || (r.theme === 'dark') !== react) ecarts.push(`${mode}/${ancien}/${sys ? 'sys-sombre' : 'sys-clair'}/${h}h : React ${react ? 'sombre' : 'clair'}, démarrage ${r.erreur || r.theme}`);
   }
   dit(ecarts.length === 0, `le script de démarrage et React donnent la MÊME teinte sur ${n} entrées (aucun flash)`, ecarts.slice(0, 3).join(' | '));
   const r0 = lanceDemarrage({ vrm_apparence: '"sombre"' }, 12, false);
-  dit(r0.meta === '#15263D', 'la barre d’état suit (theme-color = le haut de la lumière de nuit #15263D)', String(r0.meta));
+  dit(r0.meta === '#15263D', 'la barre d’état suit (theme-color = le haut de la lumière de nuit du Studio, #15263D)', String(r0.meta));
   // 2. La règle.
-  const S = (mode, h, sys = false, ancien = false, fuseau = '') => A.sombreEffectif(A.apparenceDe(mode, ancien), { date: new Date(2026, 10, 8, h, 0, 0), systemeSombre: sys, fuseau });
-  dit(S('soir', 20) && S('soir', 23) && S('soir', 0) && S('soir', 6) && !S('soir', 19), '« Le soir », fuseau sans ville connue : sombre de 20 h à 6 h 59');
-  dit(!S('soir', 7) && !S('soir', 12) && !S('soir', 19), '« Le soir », fuseau sans ville connue : clair de 7 h à 19 h 59');
-  // Le soleil, calculé : Paris le 8 novembre (heure de l'appareil, quel que soit son fuseau système) — lever ≈ 7 h 50,
-  // coucher ≈ 17 h 15 en heure de Paris ; le 21 juin, coucher ≈ 21 h 58. On juge dans le repère de l'appareil.
-  const decal = -new Date(2026, 10, 8, 12).getTimezoneOffset() - 60, decalJ = -new Date(2026, 5, 21, 12).getTimezoneOffset() - 120;
-  const sN = A.soleil(new Date(2026, 10, 8, 12), 'Europe/Paris'), sJ = A.soleil(new Date(2026, 5, 21, 12), 'Europe/Paris');
-  const hm = (m) => m - decal, hmJ = (m) => m - decalJ;
-  dit(sN && Math.abs(hm(sN.coucher) - (17 * 60 + 15)) <= 12 && Math.abs(hm(sN.lever) - (7 * 60 + 50)) <= 12, 'le soleil de Paris le 8 nov. : lever ≈ 7 h 50, coucher ≈ 17 h 15 (± 12 min)', sN && `${Math.round(hm(sN.lever))} / ${Math.round(hm(sN.coucher))}`);
-  dit(sJ && Math.abs(hmJ(sJ.coucher) - (21 * 60 + 58)) <= 12, 'le soleil de Paris le 21 juin : coucher ≈ 21 h 58', sJ && `${Math.round(hmJ(sJ.coucher))}`);
-  const P = (date) => A.sombreEffectif('soir', { date, fuseau: 'Europe/Paris' });
-  dit(P(new Date(new Date(2026, 10, 8, 0).getTime() + (22 * 60 + decal) * 60000)) && !P(new Date(new Date(2026, 10, 8, 0).getTime() + (12 * 60 + decal) * 60000)), '« Automatique (le soir) » à Paris : sombre à 22 h, clair à 12 h');
-  dit(A.soleil(new Date(2026, 10, 8), 'Mars/Olympus') === null, 'un fuseau sans ville : aucun soleil inventé (20 h → 7 h)');
+  const S = (mode, h, sys = false, ancien = false) => A.sombreEffectif(A.apparenceDe(mode, ancien), { date: new Date(2026, 10, 8, h, 0, 0), systemeSombre: sys });
+  dit(S('soir', 19) && S('soir', 23) && S('soir', 0) && S('soir', 6), '« Le soir » : sombre de 19 h à 6 h 59');
+  dit(!S('soir', 7) && !S('soir', 12) && !S('soir', 18), '« Le soir » : clair de 7 h à 18 h 59');
   dit(S('auto', 12, true) && !S('auto', 22, false), '« Automatique » : la préférence de l’appareil, jamais l’heure');
   dit(S(null, 12, false, true) && !S(null, 22, true, false), 'rien de choisi ⇒ le choix d’avant (`vinted_dark`), ni l’heure ni le système');
   dit(S('sombre', 12) && !S('clair', 22, true), 'Clair et Sombre : toujours, quoi qu’il arrive');
   const w1 = A.ecrituresApparence('sombre'), w2 = A.ecrituresApparence('soir');
   dit(w1 && w1.vinted_dark === true && w1.vrm_apparence === 'sombre' && w2 && !('vinted_dark' in w2), 'un choix explicite écrit aussi `vinted_dark` ; « Le soir » ne le touche pas');
-  const p19 = A.prochainChangement('soir', new Date(2026, 10, 8, 19, 30, 0), ''), p23 = A.prochainChangement('soir', new Date(2026, 10, 8, 23, 0, 0), '');
-  dit(p19 === 30 * 60000 && p23 === 8 * 3600000 && A.prochainChangement('auto', new Date()) === null, '« Le soir » sans ville se recale à 20 h et à 7 h pile', `${p19} / ${p23}`);
-  dit(/setInterval\(revoir, 60000\)/.test(app) && /apparence === 'soir' \? soirSombre :/.test(app), '« Automatique (le soir) » revu chaque minute, sans rendu si la teinte ne change pas');
+  const p18 = A.prochainChangement('soir', new Date(2026, 10, 8, 18, 30, 0)), p23 = A.prochainChangement('soir', new Date(2026, 10, 8, 23, 0, 0));
+  dit(p18 === 30 * 60000 && p23 === 8 * 3600000 && A.prochainChangement('auto', new Date()) === null, '« Le soir » se recale à 19 h et à 7 h pile', `${p18} / ${p23}`);
   // 3. Le branchement dans l'app.
   dit((app.match(/sombreEffectif\(/g) || []).length >= 2, 'App.jsx applique la règle AVANT le cœur et DANS le cœur (une source)');
   dit(/'vinted_dark','vinted_stock_vinted',[\s\S]{0,200}'vrm_apparence'/.test(app), '`vrm_apparence` voyage entre ses appareils (comme `vinted_dark`)');
@@ -93,10 +80,7 @@ async function verifier({ src, dem, app }, bavard = true) {
   const ko = await verifier(base);
   if (process.argv.includes('--prouve')) {
     const M = [
-      ['démarrage : le soir commence à 21 h', (b) => ({ ...b, dem: b.dem.replace('heure >= 20', 'heure >= 21') })],
-      ['démarrage : Paris oublié', (b) => ({ ...b, dem: b.dem.replace("'Europe/Paris': [48.86, 2.35], ", '') })],
-      ['règle : le soleil décalé d’une heure', (b) => ({ ...b, src: b.src.replace('const decalage = -d.getTimezoneOffset();', 'const decalage = -d.getTimezoneOffset() + 60;') })],
-      ['app : la minute oubliée', (b) => ({ ...b, app: b.app.replace('setInterval(revoir, 60000)', 'setInterval(revoir, 3600000)') })],
+      ['démarrage : le soir commence à 20 h', (b) => ({ ...b, dem: b.dem.replace('heure >= 19', 'heure >= 20') })],
       ['démarrage : ignore vrm_apparence', (b) => ({ ...b, dem: b.dem.replace("lire('vrm_apparence')", 'null') })],
       ['démarrage : automatique ignoré', (b) => ({ ...b, dem: b.dem.replace("if (mode === 'auto') return systeme === true;", '') })],
       ['règle : le soir finit à 8 h', (b) => ({ ...b, src: b.src.replace('SOIR_FIN = 7', 'SOIR_FIN = 8') })],

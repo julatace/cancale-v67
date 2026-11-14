@@ -45,26 +45,13 @@ donnée réelle, + le contrat des noms). Branche `claude/studio-fondation` (depu
   « À faire · N › » = lien, champ creusé, feuille porcelaine sous un voile de bleu, bande en Urbanist 300,
   rangée 64 avec vignette posée.
 
-## Idées 149 et 150 de Julien (ajoutées en cours de lot)
+## Idées 149 et 150 : commencées, puis RETIRÉES (Julien ne les a pas retenues)
 
-- **149 · Densité au choix** : Paramètres → Affichage → **Densité des listes** : Serrées (rangées de 56 px,
-  12 paires ou plus sur un iPhone), Normales (64, le Studio), Aérées (72, 8 paires). Un réglage **par appareil**
-  (`localStorage` `vrm_densite`, try/catch ; jamais le nuage), `src/design/densite.js`. La racine porte
-  `data-densite` — posée AVANT le premier rendu par `public/demarrage-theme.js` (aucun saut) — et studio.css en
-  tire `--sb-rangee-h`, que `.sb-rangee` lit, ainsi que `--d-h-rangee` (les listes d'hier : Messages, E-mails,
-  Stock, Achats) et la rangée de `src/ui` (`Ligne`). La rangée entière reste la cible (56 ≥ 44 px).
-- **150 · Sombre le soir tout seul** : le choix « Le soir » devient **« Automatique (le soir) »** (et
-  « Automatique » devient « Comme l'appareil ») : sombre du **coucher au lever du soleil**, calculés sur
-  l'appareil (formule astronomique simple — jour de l'année, ville du FUSEAU de l'appareil, 19 villes ;
-  aucune position demandée) ; fuseau sans ville ⇒ 20 h → 7 h. `src/apparence.js` (`soleil`, `estLeSoir`) et sa
-  COPIE dans `public/demarrage-theme.js` (avant le premier rendu : pas de flash) ; l'app la revoit **chaque
-  minute** dans un état qui ne change que si la teinte change (aucun rendu, aucun clignement). `vinted_dark`
-  reste la vérité d'un choix explicite. `audit-apparence` : les deux copies donnent la même teinte sur
-  6 912 entrées (4 fuseaux × 48 demi-heures × modes × anciens choix × système), Paris le 8 nov. lever ≈ 7 h 50 /
-  coucher ≈ 17 h 15, le 21 juin coucher ≈ 21 h 58 ; 10/10 mutations rougissent. Libellés par `tr()` (5 langues).
-- Banc `scripts/bancs/studio-reglages.cjs` : densité (56 · 64 · 72, nombre de paires visibles, posée avant
-  React, choix dans Paramètres) et « Automatique (le soir) » (22 h sombre et 12 h clair dès le premier rendu,
-  jamais l'autre teinte entre-temps ; bascule toute seule au coucher ; Paramètres le dit).
+La densité des listes au choix (149) et « Automatique (le soir) » au coucher du soleil (150) ont été
+construites puis retirées proprement le même soir (`git revert` du commit, banc `studio-reglages` supprimé,
+textes retirés des cinq langues). Restent : UNE hauteur de rangée du Studio (64 px, `.sb-rangee`) et les
+choix d'apparence d'avant (Clair · Sombre · Automatique · Le soir, `src/apparence.js` inchangé). Seul le
+`theme-color` du script de démarrage a gardé les couleurs du Studio (le haut de la lumière).
 
 ## Fichiers
 

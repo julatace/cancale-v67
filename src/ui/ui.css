@@ -243,7 +243,7 @@
 :root:root:root:root:root:root body .vrm-ui-afaire-capsule .vrm-ui-afaire-n { color: var(--sb-ambre) !important; }
 
 /* La rangée : 64 px, vignette posée 44, titre Inter 600, méta gris, chiffre à l'affiche. Ni ombre ni flou (1 000 rangées). */
-:root:root:root:root:root:root body .vrm-ui-ligne { min-height: var(--sb-rangee-h, 64px) !important; padding: max(4px, calc((var(--sb-rangee-h, 64px) - 44px) / 2)) 20px max(4px, calc((var(--sb-rangee-h, 64px) - 44px) / 2)) 16px !important; background: var(--sb-porcelaine) !important; color: var(--sb-encre) !important; font-family: var(--sb-police-texte) !important; contain-intrinsic-size: auto var(--sb-rangee-h, 64px); }
+:root:root:root:root:root:root body .vrm-ui-ligne { min-height: 64px !important; padding: 8px 20px 8px 16px !important; background: var(--sb-porcelaine) !important; color: var(--sb-encre) !important; font-family: var(--sb-police-texte) !important; contain-intrinsic-size: auto 64px; }
 :root:root:root:root:root:root body .vrm-ui-ligne + .vrm-ui-ligne::before { left: 72px !important; background: rgb(var(--sb-o) / .10) !important; }
 :root[data-theme="dark"] body .vrm-ui-ligne + .vrm-ui-ligne::before { background: rgb(255 255 255 / .07) !important; }
 :root:root:root:root:root:root body .vrm-ui-ligne:active { background: var(--sb-creux) !important; }
