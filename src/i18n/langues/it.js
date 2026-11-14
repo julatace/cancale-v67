@@ -11,6 +11,7 @@ import ecran_emails from './it/emails.js';
 import ecran_stats from './it/stats.js';
 import ecran_compta from './it/compta.js';
 import ecran_listes from './it/listes.js';
+import ecran_refonte_ms from './it/refonte-ms.js';
 import ecran_fiche from './it/fiche.js';
 import ecran_tarifs from './it/tarifs.js';
 import ecran_nouveaux from './it/nouveaux.js';
@@ -23,6 +24,7 @@ import ecran_atelier from './it/atelier.js';
 import ecran_argentprix from './it/argentprix.js';   // (14 nov., argent-prix)
 export default {
   ...ecran_accueilReste,
+  ...ecran_refonte_ms,
   ...ecran_fiche,
   ...ecran_fraiscarte,
   ...ecran_tarifs,

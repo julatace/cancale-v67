@@ -1882,3 +1882,7 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Déplacé tel quel de CLAUDE.md §9 (14 nov., intégration de la refonte — fichier sous 59 000 octets)
 - **14 nov. · Mode exemple : photos et impossible à confondre** : 21 vraies photos (Commons, CC0 / domaine public, crédits `public/exemple/CREDITS.md`, une par paire, titre = la photo) ; bandeau « Exemple — données inventées » + « J’ai déjà un compte · Me connecter », cadre hachuré au-dessus de tout, « exemple » sur codes et adresses, « Relais Exemple, rue Imaginaire » (capture d’accueil refaite). `2026-11-14-exemple-photos.md`. Geste : aucun.
+## Ligne déplacée de CLAUDE.md §9 le 14 nov. (taille du fichier)
+
+## Déplacé tel quel de CLAUDE.md §9 (14 nov., intégration de la refonte — fichier sous 59 000 octets)
+- **14 nov. · Refonte de la coque (n° 61)** : 4 onglets (Aujourd'hui · Paires · Ventes · Argent ; Paires = Annonces|Stock|Achats, `src/navPaires.js`), barre du haut loupe · cloche (point) · avatar (qui ouvre le reste des écrans), « à revoir » dans la cloche, §3/§4 `styles-systeme.css`. `2026-11-14-refonte-coque.md`. Geste : aucun.
