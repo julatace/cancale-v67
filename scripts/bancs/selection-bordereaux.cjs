@@ -8,12 +8,12 @@
 //  A. Vestiaire (V1, V2) et Leboncoin ont leur case, cochable ; eBay a sa ligne grisée « eBay », jamais cochable ;
 //  B. cochées d'office : celles qui ont leur bordereau ; « Sans bordereau » sur V2 et Leboncoin ;
 //  C. « Tout sélectionner » coche tout sauf eBay ;
-//  D. tout sélectionné ⇒ la feuille du tampon s'ouvre UNE fois par TYPE (Mondial Relay 10×15, Chronopost A4), sur le
-//     premier bordereau de ce type ; la place posée (« Toujours ici ») est gardée () et les autres
-//     bordereaux du même type sont tamponnés AU MÊME ENDROIT ; eBay jamais dans le PDF ;
-//  E. le lot NOMME « 2 sans bordereau » (V2 et Leboncoin) ;
-//  F. second lot : le type gardé ne redemande pas ; « Placer le tampon » redemande chaque type ;
-//  G. « Annuler » dans la feuille ⇒ aucun PDF ;
+//  D. (14 nov., impression-simple) tout sélectionné ⇒ UN PDF, AUCUNE feuille « Place du tampon » pendant le lot ;
+//     APRÈS, « Déplacer le tampon » sur un Mondial Relay ⇒ sa feuille ; la place posée (« Toujours ici ») est gardée
+//     pour son TYPE ; eBay jamais dans le PDF ;
+//  E. la feuille d'après NOMME les 2 absents du PDF (V2 et Leboncoin, sans bordereau) ;
+//  F. second lot : aucune feuille ; les deux Mondial Relay ont leur N° à la place posée ;
+//  G. « Déplacer le tampon » puis « Annuler » ⇒ aucun PDF ;
 //  H. aucune erreur ; rien ne déborde ; 390 tactile clair, 1512 clair, 1512 sombre (SHOTS=dossier).
 const path = require('path');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
@@ -143,71 +143,78 @@ async function scenario(b, nom, vue, LIGNES, sombre) {
   const tous = L.filter((l) => l.coche).map((l) => l.site);
   dit(L.filter((l) => l.coche).length === 6 && !tous.includes('ebay'), `${nom} : C « Tout sélectionner » coche tout sauf eBay`, JSON.stringify(L.map((l) => l.cle + ':' + l.coche)));
   for (const l of L.filter((x) => x.coche)) await pg.locator(`[data-lot-ligne="${l.cle}"] input`).nth(1).check({ timeout: 1500 }).catch(() => {});   // (11 nov., lot DJ3) plus de case « Contrôlé » : sans effet
-  // D : imprimer ; une feuille par type.
-  const imprimer = async (bouton, { annuler = false, deplacer = false } = {}) => {
+  // (14 nov., impression-simple) D–G suivaient l'ANCIEN parcours : la feuille « Place du tampon » s'ouvrait D'OFFICE,
+  // une fois par type, pendant le lot (c'est elle qui bloquait l'impression). Maintenant : le lot sort à la place gardée
+  // (sinon l'automatique), sans aucune feuille ; « Déplacer le tampon » l'ouvre APRÈS, pour UN bordereau, sur sa
+  // demande ; « Toujours ici » la garde pour TOUS les bordereaux du même type (la demande du 4 nov. reste tenue).
+  const lirePdf = () => pg.evaluate(async () => { const f = document.querySelector('[data-visionneuse-cadre]'); const bl = f ? await (await fetch(f.src)).blob() : window.__pdfs[window.__pdfs.length - 1]; if (!bl) return null; const u = new Uint8Array(await bl.arrayBuffer()); let s = ''; for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s); });
+  const feuillesVues = () => pg.evaluate(() => window.__formesVues || []);
+  await pg.evaluate(() => { window.__formesVues = []; new MutationObserver(() => { for (const f of document.querySelectorAll('[data-placeur-tampon]:not([data-placeur-tampon="charge"])')) if (!f.__vu) { f.__vu = 1; window.__formesVues.push(f.getAttribute('data-forme')); } }).observe(document.body, { childList: true, subtree: true, attributes: true }); });
+  const lotImprime = async () => {
     const avant = await pg.evaluate(() => window.__pdfs.length);
-    await pg.waitForSelector(bouton + ':not([disabled])', { timeout: 20000 }).catch(() => {});
-    await pg.evaluate((b) => { const x = document.querySelector(b); if (x) x.click(); }, bouton);
-    const formes = [];
+    await pg.waitForSelector('button[data-lot-imprimer]:not([disabled])', { timeout: 20000 }).catch(() => {});
+    await pg.evaluate(() => { const x = document.querySelector('button[data-lot-imprimer]'); if (x) x.click(); });
+    await pg.waitForSelector('[data-impr-papier-choix="normale"]', { timeout: 2500 }).then(() => pg.click('[data-impr-papier-choix="normale"]')).catch(() => {});
     for (let i = 0; i < 240; i++) {
-      const e = await pg.evaluate(({ annuler }) => {
-        if (window.__pdfs.length > window.__avant) return { fin: 'pdf' };
-        const clic = (l) => { const bs = [...document.querySelectorAll('button')].filter((x) => x.innerText.trim() === l && x.offsetParent); if (bs.length) { bs[bs.length - 1].click(); return true; } return false; };
-        if (clic("J'ai vérifié, imprimer") || clic('Préparer quand même les PDF')) return { clic: 1 };
-        const f = document.querySelector('[data-placeur-tampon]:not([data-placeur-tampon="charge"])');
-        if (f && !f.__vu) { f.__vu = 1; return { feuille: f.getAttribute('data-forme') }; }
-        if (!document.querySelector('[data-lot]')) return { fin: 'ferme' };
-        return { attente: 1 };
-      }, { annuler });
-      if (e.feuille) {
-        formes.push(e.feuille);
-        if (annuler) { await pg.click('[data-tampon-annuler]'); await pg.waitForTimeout(1200); return { formes, pdf: (await pg.evaluate(() => window.__pdfs.length)) - avant }; }
-        if (deplacer && /mondialrelay/.test(e.feuille)) { await pg.focus('[data-tampon-boite]'); for (let k = 0; k < 6; k++) await pg.keyboard.press('Shift+ArrowRight'); for (let k = 0; k < 4; k++) await pg.keyboard.press('Shift+ArrowDown'); }
-        if (formes.length === 1) await shot(pg, `selection-${nom}-feuille`);
-        await pg.click('[data-tampon-imprimer]');
-      }
-      if (e.fin) break;
+      const e = await pg.evaluate(() => { const clic = (l) => { const bs = [...document.querySelectorAll('button')].filter((x) => x.innerText.trim() === l && x.offsetParent); if (bs.length) { bs[bs.length - 1].click(); return true; } return false; };
+        if (clic("J'ai vérifié, imprimer")) return 'clic'; return document.querySelector('[data-visionneuse-pdf="pret"]') ? 'pdf' : 'attente'; });
+      if (e === 'pdf') break;
       await pg.waitForTimeout(250);
     }
-    return { formes, pdf: (await pg.evaluate(() => window.__pdfs.length)) - avant };
+    const b64 = await lirePdf();
+    await pg.evaluate(() => { const f = document.querySelector('[data-visionneuse-fermer]'); if (f) f.click(); });
+    await pg.waitForSelector('[data-impr-feuille="question"]', { timeout: 8000 }).catch(() => {});
+    return { b64, pdf: (await pg.evaluate(() => window.__pdfs.length)) - avant };
   };
-  await pg.evaluate(() => { window.__avant = window.__pdfs.length; });
-  // G d'abord : « Annuler » ⇒ aucun PDF, le lot reste.
-  const g = await imprimer('button[data-lot-imprimer]', { annuler: true });
-  dit(g.formes.length === 1 && g.pdf === 0 && !!(await pg.$('[data-lot]')), `${nom} : G « Annuler » dans la feuille ⇒ aucun PDF, la sélection reste`, JSON.stringify(g));
-  await pg.evaluate(() => { window.__avant = window.__pdfs.length; });
-  const d1 = await imprimer('button[data-lot-imprimer]', { deplacer: true });
-  dit(d1.formes.length === 2 && new Set(d1.formes).size === 2 && /mondialrelay/.test(d1.formes[0] + d1.formes[1]) && /chronopost/.test(d1.formes[0] + d1.formes[1]), `${nom} : D une feuille par TYPE (Mondial Relay 10×15, Chronopost A4), une fois chacun`, JSON.stringify(d1.formes));
-  dit(d1.pdf === 1, `${nom} : D un PDF`, String(d1.pdf));
+  const deplacer = async (cle, { annuler = false, bouger = false } = {}) => {
+    const avant = await pg.evaluate(() => window.__pdfs.length);
+    await pg.evaluate((c) => { const v = document.querySelector(`[data-impr-vignette="${c}"]`); if (v) v.click(); }, cle);
+    await pg.waitForSelector(`[data-impr-deplacer="${cle}"]`, { timeout: 5000 }).catch(() => {});
+    await pg.evaluate((c) => { const d = document.querySelector(`[data-impr-deplacer="${c}"]`); if (d) d.click(); }, cle);
+    const vue = await pg.waitForSelector('[data-placeur-tampon]:not([data-placeur-tampon="charge"]) [data-tampon-imprimer]', { timeout: 120000 }).then(() => true).catch(() => false);
+    if (!vue) { await shot(pg, `selection-${nom}-sans-feuille-${cle}`); console.log('    (diag) ' + JSON.stringify(await pg.evaluate(() => ({ corrige: [...document.querySelectorAll('[data-impr-corrige]')].map((e) => e.getAttribute('data-impr-corrige')), placeur: [...document.querySelectorAll('[data-placeur-tampon]')].map((e) => e.getAttribute('data-placeur-tampon')), vis: !!document.querySelector('[data-visionneuse-pdf]'), toasts: document.body.innerText.split('\n').filter((l) => /Erreur|annul|imprim/i.test(l)).slice(0, 4) })))); }
+    if (vue && annuler) { await pg.click('[data-tampon-annuler]'); await pg.waitForTimeout(1200); return { vue, pdf: (await pg.evaluate(() => window.__pdfs.length)) - avant }; }
+    if (vue && bouger) { await pg.focus('[data-tampon-boite]'); for (let k = 0; k < 6; k++) await pg.keyboard.press('Shift+ArrowRight'); for (let k = 0; k < 4; k++) await pg.keyboard.press('Shift+ArrowDown'); }
+    if (vue) { await shot(pg, `selection-${nom}-feuille`); await pg.click('[data-tampon-imprimer]'); }
+    await pg.waitForSelector('[data-visionneuse-pdf="pret"]', { timeout: 20000 }).catch(() => {});
+    await pg.evaluate(() => { const f = document.querySelector('[data-visionneuse-fermer]'); if (f) f.click(); });
+    return { vue, pdf: (await pg.evaluate(() => window.__pdfs.length)) - avant };
+  };
+  // D : le lot sort SANS aucune feuille (place gardée, sinon automatique), un PDF, eBay jamais.
+  const d1 = await lotImprime();
+  dit((await feuillesVues()).length === 0 && d1.pdf >= 1 && !!d1.b64, `${nom} : D tout sélectionné ⇒ UN PDF, et AUCUNE feuille « Place du tampon » n'interrompt le lot`, JSON.stringify({ feuilles: await feuillesVues(), pdf: d1.pdf }));
+  if (d1.b64) {
+    const pages = await pagesDuPdf(d1.b64);
+    const codes = pages.map((p) => (/ETIQUETTE (\S+)/.exec(p.t) || [])[1]).filter(Boolean);
+    dit(codes.length === 4 && !pages.some((p) => /eBay Golf/.test(p.t)), `${nom} : D 4 bordereaux (3 Vinted + Vestiaire), eBay jamais`, JSON.stringify(codes));
+  }
+  // E : ce qui manque au PDF est NOMMÉ (V2 et Leboncoin, sans bordereau).
+  const abs = await pg.evaluate(() => [...document.querySelectorAll('[data-impr-absent]')].map((e) => e.getAttribute('data-impr-absent') + ':' + e.getAttribute('data-impr-absent-raison')).sort());
+  dit(JSON.stringify(abs) === JSON.stringify(['l:77001:sansPdf', 'vc:V2:sansPdf']), `${nom} : E « 2 pas dans le PDF » nommés (V2, Leboncoin), avec leur raison`, JSON.stringify(abs));
+  // G : « Déplacer le tampon » puis « Annuler » ⇒ aucun PDF, la feuille d'après reste.
+  const g = await deplacer('9402', { annuler: true });
+  dit(g.vue && g.pdf === 0 && !!(await pg.$('[data-impr-feuille]')), `${nom} : G « Déplacer le tampon » ouvre la feuille de CE bordereau ; « Annuler » ⇒ aucun PDF`, JSON.stringify(g));
+  // D bis : « Déplacer le tampon » sur un Mondial Relay, posé ailleurs, « Toujours ici » ⇒ gardé pour son TYPE.
+  const dp = await deplacer('9401', { bouger: true });
   await pg.waitForFunction(() => { try { return Object.keys(JSON.parse(localStorage.getItem('vrm_tampon_positions') || '{}')).length > 0; } catch (_) { return false; } }, null, { timeout: 8000 }).catch(() => {});
   const pos = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_tampon_positions') || '{}'); } catch (_) { return null; } });
   const kMr = Object.keys(pos || {}).filter((k) => /^mondialrelay/.test(k));
-  dit(kMr.length === 1, `${nom} : D « Toujours ici » garde la place du type déplacé (\`vrm_tampon_positions\`)`, JSON.stringify(Object.keys(pos || {})));
-  const toast = await pg.evaluate(() => document.body.innerText.split('\n').filter((l) => /sans bordereau/.test(l)).join(' | '));
-  dit(/2 sans bordereau/.test(toast) && /Echo Pochette/.test(toast) && /Foxtrot/.test(toast), `${nom} : E « 2 sans bordereau » nommés`, toast);
-  if (d1.pdf) {
-    const b64 = await pg.evaluate(async () => { const bl = window.__pdfs[window.__pdfs.length - 1]; const u = new Uint8Array(await bl.arrayBuffer()); let s = ''; for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s); });
-    const pages = await pagesDuPdf(b64);
-    const codes = pages.map((p) => (/ETIQUETTE (\S+)/.exec(p.t) || [])[1]).filter(Boolean);
-    dit(codes.length === 4 && !pages.some((p) => /eBay Golf/.test(p.t)), `${nom} : D 4 bordereaux (3 Vinted + Vestiaire), eBay jamais`, JSON.stringify(codes));
-    // Le N° de chaque Mondial Relay au MÊME endroit (même type ⇒ même place).
+  dit(dp.vue && dp.pdf >= 1 && kMr.length === 1, `${nom} : D « Déplacer le tampon » (APRÈS, sur sa demande) : « Toujours ici » garde la place du type (\`vrm_tampon_positions\`)`, JSON.stringify({ dp, cles: Object.keys(pos || {}) }));
+  // F : second lot — AUCUNE feuille ; les deux Mondial Relay ont leur N° à la place posée (même type ⇒ même place).
+  await pg.evaluate(() => { const o = document.querySelector('[data-impr-oui]'); if (o) o.click(); });
+  await pg.waitForTimeout(600);
+  await ouvrir();
+  await pg.evaluate(() => { const b = [...document.querySelectorAll('[data-lot] button')].find((x) => x.innerText.trim() === 'Tout sélectionner'); if (b) b.click(); });
+  await pg.evaluate(() => { window.__formesVues = []; });
+  const f1 = await lotImprime();
+  dit((await feuillesVues()).length === 0 && !!f1.b64, `${nom} : F second lot : aucune feuille, la place gardée sert`, JSON.stringify(await feuillesVues()));
+  if (f1.b64) {
+    const pages = await pagesDuPdf(f1.b64);
     const ou = (code, num) => { const p = pages.find((x) => x.t.includes('ETIQUETTE ' + code)); const it = p && p.items.find((i) => i.s.replace(/\s/g, '') === 'N°' + num || i.s.trim() === num); return it ? [Math.round(it.x), Math.round(it.y)] : null; };
     const a = ou('9401', '21'), c = ou('9402', '22');
-    dit(a && c && Math.abs(a[0] - c[0]) <= 3 && Math.abs(a[1] - c[1]) <= 3 && (Math.abs(a[0] - 17) > 10 || Math.abs(a[1] - 368) > 10), `${nom} : D les deux Mondial Relay ont leur N° au même endroit (la place posée, ±3 pt ; pas la place de VRM)`, JSON.stringify({ a, c }));
+    dit(a && c && Math.abs(a[0] - c[0]) <= 3 && Math.abs(a[1] - c[1]) <= 3 && (Math.abs(a[0] - 17) > 10 || Math.abs(a[1] - 368) > 10), `${nom} : F les deux Mondial Relay ont leur N° au même endroit (la place posée, ±3 pt ; pas la place de VRM)`, JSON.stringify({ a, c }));
   }
-  // F : second lot — le type gardé ne redemande pas ; « Placer le tampon » redemande tout.
-  if (!(await pg.$('[data-lot]'))) await ouvrir();
-  await pg.evaluate(() => { const b = [...document.querySelectorAll('[data-lot] button')].find((x) => x.innerText.trim() === 'Tout sélectionner'); if (b) b.click(); });
-  for (const l of (await lignes()).filter((x) => x.coche)) await pg.locator(`[data-lot-ligne="${l.cle}"] input`).nth(1).check({ timeout: 1500 }).catch(() => {});   // (11 nov., lot DJ3) plus de case « Contrôlé » : sans effet
-  await pg.evaluate(() => { window.__avant = window.__pdfs.length; });
-  const f1 = await imprimer('button[data-lot-imprimer]');
-  dit(f1.formes.length === 1 && /chronopost/.test(f1.formes[0]), `${nom} : F le type gardé (Mondial Relay) ne redemande pas`, JSON.stringify(f1.formes));
-  if (!(await pg.$('[data-lot]'))) await ouvrir();
-  await pg.evaluate(() => { const b = [...document.querySelectorAll('[data-lot] button')].find((x) => x.innerText.trim() === 'Tout sélectionner'); if (b) b.click(); });
-  for (const l of (await lignes()).filter((x) => x.coche)) await pg.locator(`[data-lot-ligne="${l.cle}"] input`).nth(1).check({ timeout: 1500 }).catch(() => {});   // (11 nov., lot DJ3) plus de case « Contrôlé » : sans effet
-  await pg.evaluate(() => { window.__avant = window.__pdfs.length; });
-  const f2 = await imprimer('button[data-lot-placer]');
-  dit(f2.formes.length === 2, `${nom} : F « Placer le tampon » rouvre la feuille de chaque type`, JSON.stringify(f2.formes));
+  await pg.evaluate(() => { const o = document.querySelector('[data-impr-oui]'); if (o) o.click(); });
   const deb = await pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   dit(deb <= 1, `${nom} : H rien ne déborde`, String(deb));
   dit(errs.length === 0, `${nom} : H aucune erreur d'app`, errs.join(' | ').slice(0, 200));

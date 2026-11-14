@@ -44587,7 +44587,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const url = URL.createObjectURL(new Blob([r.bytes], { type: 'application/pdf' }));
     return { ...r, url, items: items.map((it) => ({ ...it, pdfBuf: null, invBytes: null })), raisons, lignes, reussies, owner: AUTH.user?.id || null };
   };
-  const sigImpr = (lignes, format, tampons) => `${AUTH.user?.id || ''}#` + signatureLot({ lignes, sig: sigLigneLot, format, tampons });
+  // La signature compte AUSSI ce qui change le PDF hors des lignes : les places de tampon gardées (« Toujours ici ») et le
+  // réglage d'impression (papier thermique, contenu du tampon) — un PDF préparé avant un de ces changements n'est plus le bon.
+  const empreinteReglagesImpr = () => { let h = 5381; const t = (() => { try { return JSON.stringify([positionsTampon(), reglageImpressionChoisi()]); } catch (_) { return ''; } })(); for (let i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0; return h.toString(36); };
+  const sigImpr = (lignes, format, tampons) => `${AUTH.user?.id || ''}#${empreinteReglagesImpr()}#` + signatureLot({ lignes, sig: sigLigneLot, format, tampons });
   const preparer = (sig, fabrique) => {
     const m = prepsRef.current;
     if (m.has(sig) && m.get(sig).etat !== 'echec') return m.get(sig);
