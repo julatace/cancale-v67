@@ -23,7 +23,7 @@ export function MenuCompte({ comptes = [], valeur = '', onChange, tous = true, t
     <>
       <button type="button" className={'vrm-ui-menu-compte' + (className ? ' ' + className : '')} aria-haspopup="dialog" aria-expanded={ouvert}
         aria-label={tr('listes.choisirCompte', { nom })} data-ui-menu-compte={valeur || 'tous'} onClick={() => setOuvert(true)} {...attrs}>
-        <span>{nom}</span><Chevron/>
+        <span translate={choisi ? 'no' : undefined}>{nom}</span><Chevron/>
       </button>
       {ouvert ? (
         <Feuille titre={titre || tr('listes.comptes')} onClose={() => setOuvert(false)} data-ui-menu-compte-feuille="">
@@ -33,7 +33,7 @@ export function MenuCompte({ comptes = [], valeur = '', onChange, tous = true, t
               return (
                 <li key={c.id || '__tous'}>
                   <button type="button" role="radio" aria-checked={oui} data-ui-compte-choix={c.id || 'tous'} onClick={() => { setOuvert(false); if (!oui && onChange) onChange(c.id); }}>
-                    <span>{c.nom}{c.connecte ? ' · ' + tr('listes.ouvertVinted') : ''}</span>
+                    <span><span translate={c.id ? 'no' : undefined}>{c.nom}</span>{c.connecte ? ' · ' + tr('listes.ouvertVinted') : ''}</span>
                     {c.n != null ? <span className="vrm-ui-choix-n">{c.n}</span> : null}
                     <span className="vrm-ui-choix-coche" style={{ visibility: oui ? 'visible' : 'hidden' }}><Coche/></span>
                   </button>

@@ -524,12 +524,12 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **14 nov. · Refonte de la coque (n° 61)** : 4 onglets (Aujourd'hui · Paires · Ventes · Argent ; Paires = Annonces|Stock|Achats, `src/navPaires.js`), barre du haut loupe · cloche (point) · avatar (qui ouvre le reste des écrans), « à revoir » dans la cloche, §3/§4 `styles-systeme.css`. `2026-11-14-refonte-coque.md`. Geste : aucun.
-- **14 nov. · Mode exemple : photos et impossible à confondre** : 21 vraies photos (Commons, CC0 / domaine public, crédits `public/exemple/CREDITS.md`, une par paire, titre = la photo) ; bandeau « Exemple — données inventées » + « J’ai déjà un compte · Me connecter », cadre hachuré au-dessus de tout, « exemple » sur codes et adresses, « Relais Exemple, rue Imaginaire » (capture d’accueil refaite). `2026-11-14-exemple-photos.md`. Geste : aucun.
-
+- **14 nov. · Refonte des listes** : Annonces et Ventes « la liste d'abord » (bande de chiffres au lieu de la carte sombre, compte en menu, barre + petites capsules, alertes dans « • À faire · N », phrase sous le titre retirée), Annonces en liste groupée de 70 px, colis en rangées, Ma journée : héros atelier ; briques communes `src/ui/` ; banc `refonte-listes`. `docs/passation/2026-11-14-refonte-listes.md`. Geste : aucun.
 - **14 nov. · Accueil, le reste (133 134 136 139 140 143 145 146 147)** : « J'ai déjà mes N° sur mes cartons » (aucun N° neuf avant sa réponse, N° écrit en double ⇒ rouge, rien adopté), « Ce que VRM a trouvé », visite de 4 écrans, mots expliqués, conseil du jour 30 j, essai en chiffres prouvés, vidéo 45 s, Apple prêt et ÉTEINT, appel de bienvenue Pro ; « À trancher » ne recouvre plus Ma journée. `docs/passation/2026-11-14-accueil-reste.md`. Geste : coller son lien de réservation (Paramètres → Aide) ; Apple si voulu (99 €/an).
 
 - **14 nov. · Extension 5.376.0 consolidée** : quatre branches en UNE version (carte du logo + capture, messages-achats-plus, argent-prix `remiseprix`, dates-versement `versementconv`), zips refaits une fois. `docs/passation/2026-11-14-extension-5376.md`. Geste : installer la 5.376.0 sur chaque navigateur.
+
+- **14 nov. · Refonte de la coque (n° 61)** : 4 onglets (Aujourd'hui · Paires · Ventes · Argent ; Paires = Annonces|Stock|Achats, `src/navPaires.js`), barre du haut loupe · cloche (point) · avatar (qui ouvre le reste des écrans), « à revoir » dans la cloche, §3/§4 `styles-systeme.css`. `2026-11-14-refonte-coque.md`. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).

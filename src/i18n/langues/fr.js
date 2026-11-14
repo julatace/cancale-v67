@@ -15,10 +15,10 @@ import ecran_messages from './fr/messages.js';
 import ecran_emails from './fr/emails.js';
 import ecran_stats from './fr/stats.js';
 import ecran_compta from './fr/compta.js';
+import ecran_listes from './fr/listes.js';
 import ecran_fiche from './fr/fiche.js';
 import ecran_tarifs from './fr/tarifs.js';
 import ecran_nouveaux from './fr/nouveaux.js';
-import ecran_listes from './fr/listes.js';
 import ecran_plus from './fr/plus.js';
 import ecran_argent from './fr/argent.js';
 import ecran_colisplus from './fr/colisplus.js';   // (14 nov., lot colis-plus)
