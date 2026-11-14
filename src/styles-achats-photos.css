@@ -137,15 +137,15 @@
 }
 :root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-pastilles { grid-area: etat !important; flex-wrap: nowrap !important; margin: 0 !important; gap: 0 4px !important; min-width: 0 !important; }
 :root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-meta {
-  grid-area: meta !important; display: block !important; overflow: visible !important; white-space: normal !important;
-  min-width: 0 !important; font-size: var(--d-t-12, 12px) !important; line-height: 17px !important; padding: 2px 0 !important;
+  grid-area: meta !important; display: block !important; overflow: hidden !important; white-space: nowrap !important; text-overflow: ellipsis !important;
+  min-width: 0 !important; font-size: var(--d-t-12, 12px) !important; line-height: 22px !important; padding: 0 !important;
 }
-/* Jamais un chiffre rogné (« 11 nov. · depuis 2 j » coupé ment) : la sous-ligne passe à la ligne s'il le faut. */
-:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-meta > * { display: inline-block !important; white-space: normal !important; max-width: 100% !important; vertical-align: top !important; }
-/* Les morceaux restent entiers (« 13 nov. », « · depuis 2 j ») : la coupure tombe ENTRE eux, jamais dans une date. */
-:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-meta > * > span { display: inline-block !important; white-space: nowrap !important; }
-:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-meta > .vrm-acct-tag { overflow-wrap: anywhere !important; }
+/* Une seule ligne (la rangée reste à 68 px, ≥ 8 achats par écran) ; ce qui ne tient pas finit par « … » — jamais
+   coupé net (design-passe, « I »). Le pseudo du compte (liste à plat) prend la moitié au plus : la date passe d'abord. */
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-meta > * { display: inline !important; white-space: nowrap !important; }
 :root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-meta > * + * { margin-left: 4px !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-meta > .vrm-acct-tag { display: inline-block !important; vertical-align: top !important; max-width: 46% !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; padding: 0 !important; background: transparent !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-meta > .vrm-acct-tag > span { display: inline !important; }
 :root:root:root body .vrm-main .vrm-achats .vrm-buy-row :is(.vrm-buy-transp, .vrm-buy-retour) { grid-area: plus !important; margin: 2px 0 0 !important; min-width: 0 !important; }
 /* L'état : une pastille de 22 px (le même mot) ; le reçu et la facture : une pilule de 22 px dessinée DANS une
    cible de 44 px (la marge négative rend 22 px à la ligne : la rangée reste à 72). */
@@ -354,3 +354,24 @@
 @media (hover: hover) and (pointer: fine) { :root:root:root body .vrm-main .vrm-achats .vrm-recus-email > summary { min-height: 44px !important; } }
 @media (prefers-reduced-motion: reduce) { :root:root:root body .vrm-main .vrm-achats .vrm-recus-email > summary::after { transition: none; } }
 } /* fin @layer vrm-premium — hors plateforme, reçus */
+
+@layer vrm-premium {
+/* 9 · FINITIONS (audit « web-design-guidelines » + « design-audit », 14 nov.) :
+   — moins de ronds gris : « ✓ Sélectionner », « … », la période et la calculette sont des ICÔNES nues (cible 44,
+     aucun fond) ; la seule capsule pleine est l'étape choisie (AJOUT 3 : pas de rangée de capsules grises) ;
+   — un état au survol (souris) et un anneau au clavier (`:focus-visible`) sur chaque nouveau bouton ;
+   — la barre collée ne cache jamais la rangée qui a le focus (`scroll-margin-top`) ;
+   — chiffres de la bande en chasse fixe ; `touch-action: manipulation` (pas d'attente du double-toucher). */
+:root:root:root body .vrm-main .vrm-achats :is(.vrm-achats-selection, .vrm-achats-plus) { background: transparent !important; box-shadow: none !important; border: 0 !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-achats-plus { color: var(--d-encre, #1D1D1F) !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-achats-filtres :is([data-achats-calculette], .vrm-cal-declencheur[data-periode-valeur=""]) { background: transparent !important; box-shadow: none !important; border: 0 !important; }
+@media (hover: hover) and (pointer: fine) {
+  :root:root:root body .vrm-main .vrm-achats :is(.vrm-achats-selection, .vrm-achats-plus, .vrm-achats-filtres [data-achats-calculette]):hover { background: var(--d-remplir, rgba(118,118,128,.12)) !important; }
+  :root:root:root body .vrm-achats-retirer-ligne:hover { background: var(--d-survol, #F5F5F7) !important; }
+  :root:root:root body .vrm-ms-carte .vrm-ms-ligne:hover .vrm-ms-nom { text-decoration: underline; text-underline-offset: 3px; }
+}
+:root:root:root body :is(.vrm-achats-retirer-ligne, .vrm-achats-selection, .vrm-gc-compte, .vrm-ms-calcul > summary):focus-visible { outline: 2px solid var(--d-accent, #0071E3) !important; outline-offset: 2px !important; }
+:root:root:root body :is(.vrm-achats-retirer-ligne, .vrm-achats-selection, .vrm-ms-ligne, .vrm-gc-compte, .vrm-buy-row button) { touch-action: manipulation; }
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-list > .vrm-buy-row { scroll-margin-top: 72px; }
+:root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-cases > .vrm-fu-case:nth-child(n):nth-last-child(n) > b { font-variant-numeric: tabular-nums !important; }
+} /* fin @layer vrm-premium — finitions */
