@@ -86,12 +86,12 @@ const projette = (row, sel) => {
   }
   return out;
 };
-async function preparer(b, vp, { theme = 'light', reduit = false, urgent = false, perso = undefined, persoLocal = undefined, tuiles = undefined } = {}) {
+async function preparer(b, vp, { theme = 'light', reduit = false, urgent = false, perso = undefined, persoLocal = undefined } = {}) {
   VENTES = urgent ? [...VENTES_BASE, VENTE_RETARD] : VENTES_BASE;
   const ctx = await b.newContext({ viewport: vp, colorScheme: theme, reducedMotion: reduit ? 'reduce' : 'no-preference', ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-  const ROWS = lignes(); const MAIN = { vinted_dark: theme === 'dark', vinted_sale_overrides: OV, vinted_bords_printed: {}, ...(perso !== undefined ? { vrm_journee_perso: perso } : {}), ...(tuiles !== undefined ? { vrm_tuiles_journee: tuiles } : {}) };
+  const ROWS = lignes(); const MAIN = { vinted_dark: theme === 'dark', vinted_sale_overrides: OV, vinted_bords_printed: {}, ...(perso !== undefined ? { vrm_journee_perso: perso } : {}) };
   const ecrits = [];
   if (persoLocal !== undefined) await pg.addInitScript((p) => { try { if (!sessionStorage.getItem('jp_pose')) { localStorage.setItem('vrm_journee_perso', JSON.stringify(p)); sessionStorage.setItem('jp_pose', '1'); } } catch (_) {} }, persoLocal);
   await pg.addInitScript((sombre) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vrm_visite_bulles_vue', '1'); localStorage.setItem('vinted_dark', JSON.stringify(sombre)); localStorage.setItem('vrm_apparence', JSON.stringify(sombre ? 'sombre' : 'clair')); } catch (_) {} }, theme === 'dark');
@@ -276,38 +276,6 @@ async function main() {
         dit(iEnv >= 0 && e.cartes.slice(0, iEnv).every((c) => c !== 'envoyer' && !['messages', 'prix'].includes(c)) && (iAl < 0 || iAl < iEnv || (f && f.prochain)), `U ${T} elle vient en tête (après les seules alertes urgentes)`, e.cartes.join(','));
         dit(e.friseCachee && !e.ordreTete.includes('frise'), `U ${T} le réglage venu du nuage s'applique (frise cachée, toujours rendue dans un bloc caché)`, JSON.stringify({ fc: e.friseCachee, tete: e.ordreTete }));
         dit(!errs.length, `U ${T} aucune erreur d'app`, errs.join(' | ').slice(0, 200));
-        await ctx.close();
-      });
-      // ── T148 (14 nov., idée 148, « Tes tuiles à toi ») : son rangement des TUILES arrive par le NUAGE
-      //    (`vrm_tuiles_journee`, lu par onCloudReady) ; « À envoyer » et « Messages » cachées par lui, mais un colis
-      //    est en retard : « À envoyer » revient d'elle-même, « remise car urgente » ; « Messages » reste cachée
-      //    (son compteur toujours publié). ──
-      await essaie('T148 ' + T, async () => {
-        const { ctx, pg, errs } = await preparer(b, vp, { theme, urgent: true, tuiles: { v: 1, ordre: ['retirer', 'envoyer'], cachees: { envoyer: true, messages: true }, tailles: { envoyer: '3x1' } } });
-        await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
-        await attendreJournee(pg);
-        await pg.waitForFunction(() => !!document.querySelector('[data-sj-remises]'), null, { timeout: 15000 }).catch(() => {});
-        const t = await pg.evaluate(() => {
-          const vis = (e) => !!(e && e.getClientRects().length);
-          const env = document.querySelector('[data-sj-tuile="envoyer"]'), msg = document.querySelector('[data-sj-tuile="messages"]');
-          const ordre = [...document.querySelectorAll('[data-sj-grille] > [data-sj-tuile]')].filter(vis).map((e) => e.getAttribute('data-sj-tuile'));
-          const rem = document.querySelector('[data-sj-remises]');
-          return { envVu: vis(env), envRemise: env && env.getAttribute('data-sj-remise'), taille: env && env.getAttribute('data-taille'), msgVu: vis(msg), msgN: msg && msg.getAttribute('data-n'),
-            remises: rem ? rem.getAttribute('data-sj-remises') : null, texte: rem ? rem.innerText : '', ordre };
-        });
-        await shot(pg, `jp-tuiles-urgent-${vp.width}-${theme}`);
-        dit(t.envVu && t.envRemise === '1' && t.remises === 'envoyer' && /urgente/i.test(t.texte), `T148 ${T} « À envoyer » cachée par lui mais un colis en retard : revenue, « remise car urgente »`, JSON.stringify(t));
-        dit(!t.msgVu && t.msgN != null, `T148 ${T} « Messages » cachée par lui : plus à l'écran, son compteur publié (data-n ${t.msgN})`, JSON.stringify(t));
-        dit(t.ordre[0] === 'retirer' && t.ordre[1] === 'envoyer' && t.taille === '3x1', `T148 ${T} SON ordre et SA taille, venus du nuage (À retirer, puis À envoyer en 3 × 1)`, JSON.stringify(t));
-        // Enregistré sur « Terminé », toujours là au rechargement : cacher « À retirer » par le lien « Ranger les tuiles ».
-        await pg.click('[data-sj-ranger]'); await pg.waitForTimeout(400);
-        await pg.click('[data-sj-r-cacher="retirer"]'); await pg.click('[data-sj-r-termine]'); await pg.waitForTimeout(600);
-        const p = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_tuiles_journee')); } catch (_) { return null; } });
-        dit(!!(p && p.cachees && p.cachees.retirer === true && p.cachees.messages === true && p.ordre && p.ordre[0] === 'retirer'), `T148 ${T} « Terminé » enregistre (vrm_tuiles_journee : ordre, cachées, tailles)`, JSON.stringify(p));
-        await pg.reload({ waitUntil: 'domcontentloaded' }); await attendreJournee(pg);
-        const r = await pg.evaluate(() => { const e = document.querySelector('[data-sj-tuile="retirer"]'); return { vu: !!(e && e.getClientRects().length), n: e && e.getAttribute('data-n') }; });
-        dit(!r.vu && r.n != null, `T148 ${T} rechargé : « À retirer » toujours cachée (son compteur publié)`, JSON.stringify(r));
-        dit(!errs.length, `T148 ${T} aucune erreur d'app`, errs.join(' | ').slice(0, 200));
         await ctx.close();
       });
     }

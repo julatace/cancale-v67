@@ -44,7 +44,6 @@ import {lireEntiteVinted,extraitConversation,libelleOffre,etatOffreCourt,estCode
 import { lignesRisqueMessage, phraseRisqueMessage, risquesMessage, erreurMessageAuto } from './messageSur.js';
 import { problemesAnnonce, problemesLot, champsNonJuges, CLE_VERIF_COUPEES, sansCoupees, couperAlerte, rallumerAlerte, lireCoupees, POURQUOI_ALERTE, NOMS_ALERTES, numeroEcritAttendu } from './verifAnnonce.js';
 import { CLE_JOURNEE_PERSO, lireJourneePerso, ordreJournee, visibiliteCarte, urgencesJournee } from './journeePerso.js';
-import { CLE_TUILES_JOURNEE, lireTuilesJournee } from './tuilesJournee.js';   // (14 nov., idée 148) « Tes tuiles à toi »
 import { ordreSelonHeure, momentDuJour } from './journeeSelonHeure.js';
 import ConfortCoque from './ConfortCoque.jsx';
 import CapteNotif from './capteNotif/CapteNotif.jsx';   // (14 nov., ext. 5.377) « L'extension a capté » — le toast
@@ -3050,9 +3049,6 @@ const SYNC_KEYS = [
   // (11 nov., lot journee-perso) SA Ma journée : l'ordre et les cartes qu'il a cachées
   // (src/journeePerso.js) : { v, ordre, choix, at } — la même sur tous ses appareils.
   CLE_JOURNEE_PERSO,
-  // (14 nov., idée 148) « Tes tuiles à toi » : l'ordre, les tuiles cachées, leurs tailles (src/tuilesJournee.js) :
-  // { v, ordre, cachees, tailles, at } — les mêmes sur tous ses appareils.
-  CLE_TUILES_JOURNEE,
   // (14 nov., lots 129 et 130) L'inventaire tournant (« vu », « pas trouvé » : jamais un N° changé, src/inventaireTournant.js)
   // et SA carte de remerciement (ses propres champs, src/carteMerci.js) : les mêmes sur tous ses appareils.
   'vrm_inventaire_tournant', 'vrm_carte_merci',
@@ -45693,7 +45689,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // et la feuille « Modifier ma journée ».
   const [persoJ] = useJourneePerso();
   const [feuillePerso, setFeuillePerso] = useState(false);
-  const [tuilesJ, poserTuilesJ] = useTuilesJournee();   // (14 nov., idée 148) « Tes tuiles à toi »
   const ordiJournee = useOrdinateur();   // (14 nov., Studio) la grille de Ma journée : tassée au téléphone, dépliée dessous sur ordinateur
   // (11 nov., lot avis-negatif) Un avis de 3★ ou moins (seuil réglable) arrivé sur un compte : une carte AMBRE
   // dans « À faire » tant qu'il n'est pas « vu » (14 jours au plus) ; la détection est au serveur.
@@ -47607,8 +47602,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               if (visT('chiffres').montree) out.mois = { id: 'mois', lib: (() => { const m = new Date().toLocaleDateString(localeCourante(), { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1); })(), interactif: true, aria: tr('sj.l.mois'), face: chiffresMois, tasse: null };
               const tuilesPlacees = placerTuiles(out);
               return (<>
-                <BentoJournee tuiles={tuilesPlacees} ordi={ordiJournee} FermeAuRetour={FermeAuRetour}
-                  reglage={tuilesJ} poser={poserTuilesJ} urgent={{ envoyer: !!urgT.envoyer, retirer: !!urgT.retirer }}/>
+                <BentoJournee tuiles={tuilesPlacees} ordi={ordiJournee} FermeAuRetour={FermeAuRetour}/>
                 {!out.mois ? <div hidden data-jp-cachee="chiffres">{chiffresMois}</div> : null}
               </>);
             })() : null}
@@ -56743,17 +56737,6 @@ function useJourneePerso() {
   }, []);
   // Toutes les instances (Ma journée et sa feuille, Paramètres) suivent le geste tout de suite.
   const poser = React.useCallback((n) => { touche.current = true; const x = lireJourneePerso(n); [..._ecoutesPerso].forEach((f) => f(x)); save(CLE_JOURNEE_PERSO, x); }, []);
-  return [r, poser];
-}
-// (14 nov., idée 148) « Tes tuiles à toi » : le réglage des tuiles de Ma journée. Lu au montage ; le nuage
-// (`onCloudReady`) ne le remplace que s'il est resté VIDE ici et qu'il n'a rien touché ; posé sur « Terminé ».
-const _ecoutesTuiles = new Set();
-function useTuilesJournee() {
-  const [r, setR] = useState(() => lireTuilesJournee(load(CLE_TUILES_JOURNEE, null)));
-  useEffect(() => { _ecoutesTuiles.add(setR); return () => { _ecoutesTuiles.delete(setR); }; }, []);
-  const touche = useRef(false);
-  useEffect(() => onCloudReady(() => { if (!touche.current && load(CLE_TUILES_JOURNEE, null) != null) setR((cur) => (cur && (cur.ordre.length || Object.keys(cur.cachees).length || Object.keys(cur.tailles).length)) ? cur : lireTuilesJournee(load(CLE_TUILES_JOURNEE, null))); }), []);
-  const poser = React.useCallback((n) => { touche.current = true; const x = lireTuilesJournee(n); [..._ecoutesTuiles].forEach((f) => f(x)); save(CLE_TUILES_JOURNEE, x); }, []);
   return [r, poser];
 }
 // Le contenu de « Modifier ma journée » (feuille de Ma journée, et Paramètres → Affichage).

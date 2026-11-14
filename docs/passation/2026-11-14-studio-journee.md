@@ -2,7 +2,7 @@
 
 Décision de Julien : la direction t25 « Studio bleu clair » (Spatial × Bento × Aplats × Lumière), « tout doit
 être parfait, tu peux changer les dispositions », aucune fonction perdue. Ce lot applique la direction à
-**Ma journée** (téléphone et ordinateur), plus l'idée 148 « Tes tuiles à toi ». Branche `claude/studio-journee`
+**Ma journée** (téléphone et ordinateur). Branche `claude/studio-journee`
 (partie de `claude/integration-refonte`). D'autres agents font la fondation (coque, `studio.css`), Paires,
 Ventes/Colis et le reste en même temps.
 
@@ -46,18 +46,12 @@ Ventes/Colis et le reste en même temps.
 - **L'instantané d'ouverture** porte le même habit (`sj-journee`) et lit la carte des chiffres et la
   prochaine chose là où elles vivent maintenant (src/journeeInstantanee.js).
 
-## « Tes tuiles à toi » (idée 148)
+## L'idée 148 « Tes tuiles à toi » : NON retenue
 
-Appui long sur une tuile (0,52 s sans bouger, doigt ou souris) — ou le lien « Ranger les tuiles » sous la
-grille (clavier, souris) ⇒ **mode rangement** : glisser une tuile (elle suit le doigt, la tuile survolée lui
-cède la place), flèches au clavier (annoncé), « œil » pour cacher / montrer (la tuile cachée reste visible,
-grisée, pendant le rangement), « agrandir » (une taille du Bento parmi celles que la tuile accepte :
-`TAILLES_DE`, le rond d'encre et les codes ne descendent jamais en 1 × 1, le mois garde ses trois chiffres),
-« Revenir à l'origine », **« Terminé » range et enregistre**. Réglage synchronisé `vrm_tuiles_journee`
-(SYNC_KEYS, `{ v, ordre, cachees, tailles, at }`), lu au montage, le nuage (`onCloudReady`) ne le remplace que
-s'il est resté vide ici. Règle pure : src/tuilesJournee.js (`appliquerTuiles`). Une tuile cachée qui porte
-un geste urgent (`urgencesJournee` : colis en retard ou avant demain, retrait au dernier jour) **revient
-d'elle-même**, avec la ligne « « À envoyer » remise car urgente ». Une tuile cachée garde son compteur.
+Construite pendant la session (appui long ⇒ réordonner, cacher, agrandir, réglage `vrm_tuiles_journee`), puis
+**retirée entièrement sur la décision de Julien** (message du coordinateur) : plus de module, de réglage
+synchronisé, de textes, de styles ni de contrôles de banc. Ma journée garde la grille Bento FIXE décrite
+ci-dessus. Ne pas la remettre sans qu'il la redemande.
 
 ## Inventaire : tout ce que l'écran montrait et faisait, et où c'est maintenant
 
@@ -109,11 +103,8 @@ l'origine »). Une tuile et une rangée se touchent entières. Les pilules des c
 - `scripts/bancs/studio-journee.cjs` (390 tactile et 1512, clair et sombre, mode exemple) : T chaque tuile et
   son geste, D déplier / replier (tassé au téléphone, dessous sur ordinateur, focus rendu), P un seul plein
   (fermé et déplié), C 44 px, A contraste AA mesuré sur les jetons rendus (24 paires) et sur chaque texte des
-  tuiles, O rien ne déborde, I inventaire (et avant → après), R rangement (appui long, clavier, glisser,
-  cacher, agrandir, Terminé, origine) + la règle pure (urgence ⇒ remise). Mutations (`MUTATION=deux-pleins|
+  tuiles, O rien ne déborde, I inventaire (et avant → après). Mutations (`MUTATION=deux-pleins|
   deborde|contraste|petit|perdu`) : chacune rend le banc rouge. Sur le dist d'avant : rouge (pas de grille).
-- `journee-perso.cjs` T148 : le rangement venu du nuage, l'urgence qui ramène « À envoyer » (« remise car
-  urgente »), « Terminé » enregistre, rechargé toujours caché.
 - Bancs adaptés (la disposition a changé exprès, aucune règle affaiblie) : `journee-v2` (le € remonté sans
   espace ; la prochaine chose = 1re carte de la liste), `journee-perso` (ordre lu sur tout l'écran ; « N
   gestes » = les cartes de la liste), `journee-premium` (les gestes sont les tuiles ; jamais de petite tuile à
@@ -129,4 +120,4 @@ l'origine »). Une tuile et une rangée se touchent entières. Les pilules des c
 
 ## Geste de Julien
 
-Aucun : ouvrir Ma journée ; appui long sur une tuile pour la ranger.
+Aucun : ouvrir Ma journée.
