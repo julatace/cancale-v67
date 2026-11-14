@@ -1834,3 +1834,5 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Déplacé de CLAUDE.md §9 le 14 nov. (taille du fichier)
 
 - **13 nov. · Vente Vestiaire sur Orion (5.374)** : capteur en ligne + rattrapage, compte lu dans la page, date = `soldDate` de « Mes ventes » (Paris), jamais l'heure de lecture. `docs/passation/2026-11-13-vestiaire-vente-orion.md`. Geste : 5.374 dans Orion, ouvrir Mes ventes.
+
+- **13 nov. · Lot 49 (vidéos du « ? »)** : 10 vidéos 720p tournées dans la vraie app, données inventées (`scripts/films/aide-videos.cjs`), ≤ 0,8 Mo, demandées au toucher seulement. `docs/passation/2026-11-13-lot49.md`. Geste : les regarder sur l’iPhone.

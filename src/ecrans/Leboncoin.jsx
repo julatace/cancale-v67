@@ -786,7 +786,7 @@ function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail, vendue = fals
     poser(n);
   };
   const sugg = (suggestions || []).filter((s) => s && s.numero);
-  const btn = { border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, color: C.text, padding: '7px 11px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' };
+  const btn = { border: 0, borderRadius: 999, background: 'var(--d-remplir)', color: C.text, padding: '0 14px', minHeight: 'var(--d-h-ctrl)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' };
   return (
     <div data-lbc-relier={id} style={{ padding: '12px 0', borderTop: `1px solid ${C.border}` }}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -830,7 +830,7 @@ function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail, vendue = fals
       )}
       {cleRangement && (
         <div style={{ marginTop: 8 }}>
-          <button type="button" data-lbc-aucune={cleRangement} onClick={aucune} style={{ ...btn, color: C.muted }}>{sugg.length ? 'Aucun de ceux-là' : 'Pas d’article à relier'}</button>
+          <button type="button" data-lbc-aucune={cleRangement} onClick={aucune} style={btn}>{sugg.length ? 'Aucun de ceux-là' : 'Pas d’article à relier'}</button>
         </div>
       )}
     </div>

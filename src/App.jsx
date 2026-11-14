@@ -18914,45 +18914,45 @@ function AuthScreen() {
 .vrm-cx-logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}
 .vrm-cx-logo img{width:36px;height:36px;border-radius:12px;box-shadow:0 0 0 1px rgba(255,255,255,.12)}
 .vrm-cx-logo b{font-size:20px;letter-spacing:-.04em;font-weight:700}
-.vrm-cx-retour{display:inline-flex;align-items:center;min-height:44px;font-size:15px;color:#98989D;text-decoration:none;font-weight:500}
+.vrm-cx-retour{display:inline-flex;align-items:center;min-height:44px;font-size:15px;color:#98989D;text-decoration:none;font-weight:400}
 .vrm-cx-titre{position:relative;font-size:28px;line-height:1.15;letter-spacing:-.04em;font-weight:700;margin:22px 0 0}
 .vrm-cx-titre span{display:block;color:#98989D}
 .vrm-cx-points{display:none}
 .vrm-cx-main{display:flex;justify-content:center;padding:0 16px 32px}
 .vrm-cx-boite{width:100%;max-width:400px;margin-top:-44px;position:relative}
-.vrm-cx-form{background:${C.card};border:1px solid ${C.border};border-radius:14px;padding:22px 20px;box-shadow:none;border-color:transparent}
+.vrm-cx-form{background:${C.card};border:0;border-radius:20px;padding:22px 20px;box-shadow:none}
 .vrm-cx-form input:focus{border-color:${C.accent}!important;box-shadow:0 0 0 3px ${C.accent}26}
-.vrm-cx-form button[type=submit]{min-height:50px;transition:transform 140ms cubic-bezier(0.23,1,0.32,1),opacity 140ms ease}
+.vrm-cx-form button[type=submit]{min-height:50px;border-radius:999px!important;transition:transform 140ms cubic-bezier(0.23,1,0.32,1),opacity 140ms ease}
 .vrm-cx-form button[type=submit]:active{transform:scale(.98)}
 .vrm-cx-liens button{min-height:44px}
 .vrm-cx-exemple{margin:14px 0 0;text-align:center}
 .vrm-cx-exemple p{margin:0 0 8px;font-size:13px;line-height:1.45;color:${C.muted}}
-.vrm-cx-exemple a{display:flex;align-items:center;justify-content:center;min-height:44px;border-radius:12px;border:1px solid ${C.border};color:${C.text};font-size:15px;font-weight:600;text-decoration:none}
+.vrm-cx-exemple a{display:flex;align-items:center;justify-content:center;min-height:44px;border-radius:999px;border:0;background:rgba(118,118,128,${C.bg==='#000000'||C.bg==='#000'?'.24':'.12'});color:${C.text};font-size:15px;font-weight:600;text-decoration:none}
 .vrm-cx-exemple a:focus-visible{outline:2px solid ${C.accent};outline-offset:3px}
-.vrm-cx-oublie{border:0;background:transparent;color:${C.accent};padding:4px 0;font:inherit;font-size:12px;font-weight:500;min-height:32px;cursor:pointer}
+.vrm-cx-oublie{border:0;background:transparent;color:${C.accentTexte||C.accent};padding:4px 0;font:inherit;font-size:13px;font-weight:600;min-height:44px;cursor:pointer}
 .vrm-cx-aide-confirmation{margin-top:12px;border-top:1px solid ${C.border};padding-top:10px}
-.vrm-cx-aide-confirmation summary{min-height:32px;cursor:pointer;font-weight:600;color:${C.accent}}
+.vrm-cx-aide-confirmation summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:600;color:${C.accentTexte||C.accent}}
 .vrm-cx-form button:disabled{cursor:default}
 .vrm-cx-champ{display:block;margin-bottom:12px;font-size:13px;font-weight:600;color:${C.text}}
-.vrm-cx-parrain{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.45;color:${C.text};background:${C.accent}0D;border:1px solid ${C.accent}40;border-radius:12px;padding:10px 12px;margin-bottom:14px}
+.vrm-cx-parrain{display:flex;gap:10px;align-items:flex-start;font-size:15px;line-height:1.45;color:${C.text};background:${C.accent}0D;border:1px solid ${C.accent}40;border-radius:12px;padding:10px 12px;margin-bottom:14px}
 .vrm-cx-parrain-ic{display:flex;flex:none;color:${C.accentTexte||C.accent};margin-top:1px}
 .vrm-cx-parrain b{display:block;font-weight:600;overflow-wrap:anywhere}
 .vrm-cx-parrain-texte{display:block;color:${C.muted};font-size:13px}
 .vrm-cx-champ>span:first-child{display:block;margin-bottom:6px}
 .vrm-cx-secret{position:relative;display:block}
-.vrm-cx-secret button{position:absolute;right:4px;top:3px;min-height:44px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:${C.accent};font-size:12px;font-weight:600;font-family:inherit;cursor:pointer}
+.vrm-cx-secret button{position:absolute;right:4px;top:3px;min-height:44px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:${C.accentTexte||C.accent};font-size:13px;font-weight:600;font-family:inherit;cursor:pointer}
 .vrm-cx-form button:focus-visible,.vrm-cx-form a:focus-visible{outline:2px solid ${C.accent};outline-offset:3px}
 .vrm-cx-regles{display:flex;flex-wrap:wrap;gap:5px 12px;margin:0 0 14px;padding:0;list-style:none;font-size:12px;line-height:1.5;color:${C.muted}}
-.vrm-cx-regles [data-valide=true]{color:${C.accent}}
+.vrm-cx-regles [data-valide=true]{color:${C.accentTexte||C.accent}}
 .vrm-cx-regles li:before{content:'○ ';font-weight:700}
 .vrm-cx-regles [data-valide=true]:before{content:'✓ '}
 .vrm-cx-form [role=status],.vrm-cx-form [role=alert]{overflow-wrap:anywhere}
 @media (min-width:900px){
  .vrm-cx{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:1fr}
  .vrm-cx-marque{display:flex;flex-direction:column;padding:40px 56px}
- .vrm-cx-titre{font-size:clamp(34px,3.2vw,46px);margin-top:auto}
+ .vrm-cx-titre{font-size:clamp(34px,3vw,44px);margin-top:auto}
  .vrm-cx-points{display:grid;gap:14px;margin:28px 0 auto;padding:0;list-style:none;max-width:420px;position:relative}
- .vrm-cx-points li{display:grid;grid-template-columns:28px 1fr;gap:10px;font-size:15px;line-height:1.5;color:#D1D1D6}
+ .vrm-cx-points li{display:grid;grid-template-columns:28px 1fr;gap:10px;font-size:15px;line-height:1.5;color:#98989D}
  .vrm-cx-points li b{color:#F5F5F7;font-weight:600}
  .vrm-cx-points i{width:28px;height:28px;border-radius:12px;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-style:normal;font-size:13px;color:#F5F5F7}
  .vrm-cx-pied{position:relative;font-size:13px;color:#98989D}
@@ -19192,7 +19192,7 @@ function AuthScreen() {
               mot de passe) — jamais sur « Se connecter ». */}
           {(()=>{ const bloque = busy || attendCaptcha || (enAttenteEmail && (mode==='up'||mode==='reset')); return (
           <button type="submit" data-auth-valider="" disabled={bloque} style={{width:'100%',border:'none',background:C.accent,color:C.onAccent||'#fff',
-            borderRadius:12,padding:'13px',fontSize:15,fontWeight:600,cursor:bloque?'default':'pointer',opacity:bloque?0.6:1,fontFamily:'inherit'}}>
+            borderRadius:999,padding:'13px',fontSize:15,fontWeight:600,cursor:bloque?'default':'pointer',opacity:bloque?0.6:1,fontFamily:'inherit'}}>
             {busy ? (fournisseurEnCours?tr('auth.bouton.ouverture'):mode==='up'?tr('auth.bouton.creation'):mode==='reset'?tr('auth.bouton.envoiLien'):mode==='newpw'?tr('auth.bouton.enregistrement'):tr('auth.bouton.connexion')) : (enAttenteEmail && mode==='reset' && resetEnvoye) ? tr('auth.renvoyerDans', { s: resteAttente }) : (enAttenteEmail && (mode==='up'||mode==='reset')) ? tr('auth.reessaieDans', { s: resteAttente }) : attendCaptcha ? (captcha.statut==='erreur' ? tr('auth.captcha.indisponible') : captcha.statut==='interactif' ? tr('auth.captcha.coche') : tr('auth.captcha.enCours')) : mode==='up' ? tr('auth.bouton.creer') : mode==='reset' ? (resetEnvoye ? tr('auth.bouton.renvoyer') : tr('auth.bouton.envoyerLien')) : mode==='newpw' ? tr('commun.enregistrer') : tr('auth.titre.in')}
           </button>);})()}
           {/* Acceptation des conditions AVANT la création du compte (art. 1127-1
@@ -60123,7 +60123,7 @@ function AppCoeur() {
         const posteMain = (o) => !!(o && shipDoneGs[String(o.transaction_id)]);
         const jourCourt = (d) => { const t = new Date(d); return isNaN(t.getTime()) ? '' : t.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); };
         const nomCompteGs = (uid) => { const a = (vintedAccounts || []).find(x => String(x.vinted_user_id) === String(uid)); if (!a) return ''; const labels = load('vinted_account_labels', {}) || {}; return labels[a.vinted_user_id] || a.login || ''; };
-        const numBadge=(n)=> <span className="vrm-recherche-num" style={{flexShrink:0,minWidth:26,height:26,borderRadius:12,background:C.accent,color:C.onAccent,fontSize:12,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 5px'}}>{n?`#${n}`:'—'}</span>;
+        const numBadge=(n)=> <span className="vrm-recherche-num" style={{flexShrink:0,minWidth:26,height:26,borderRadius:12,background:C.accent,color:C.onAccent,fontSize:12,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 5px'}}>{n?`N°${n}`:'—'}</span>;
         const thumb=(src,fb)=> <div style={{width:44,height:44,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{src?<PhotoVinted src={src} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20,display:'flex'}}>{fb||<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}</span>}</div>;
         // Où mène une ligne : SON objet, par son identité (`destinationResultat`).
         const ouvrir = (r, type) => {
@@ -60187,7 +60187,9 @@ function AppCoeur() {
               data-recherche-vente={type==='vente'&&e.tx?e.tx:undefined} data-recherche-achat={type==='achat'&&e.tx?e.tx:undefined} data-recherche-num={e.numero || undefined} data-recherche-statut={etat || undefined}
               data-recherche-site={e.site || undefined} data-recherche-commande={e.site ? e.id : undefined} data-recherche-conv={type==='message' ? e.id : undefined}
               style={styleLigne}>
-              {vignette}{ligneTexte(titre, info)}{pastille(r)}
+              {/* (14 nov., passe 2) Trouvée PAR son N° : le N° est déjà écrit sur la rangée (la pastille de gauche, ou « N°… »
+                  de la ligne d'info) — il ne s'écrit pas une seconde fois à droite (§7 : le même nombre, une fois). */}
+              {vignette}{ligneTexte(titre, info)}{r.par === 'numero' && e.numero ? null : pastille(r)}
               <span style={{fontSize:17,color:C.muted}}>›</span>
             </button>); };
         // Un e-mail trouvé par le moteur de l'écran E-mails : sa nature, l'essentiel, sa date.

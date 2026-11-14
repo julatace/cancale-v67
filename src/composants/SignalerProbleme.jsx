@@ -154,7 +154,7 @@ export function SignalerProblemeFeuille({ onClose, contexte, entetes, masque, Fe
               ? 'S’y ajoutent l’identifiant de ton compte VRM, l’heure, et ton e-mail de connexion pour te répondre. Rien d’autre : ni ventes, ni pseudos, ni montant, ni le contenu de l’écran.'
               : 'S’y ajoutent l’identifiant de ton compte VRM (pour savoir à qui répondre) et l’heure. Rien d’autre : ni ventes, ni pseudos, ni adresse e-mail, ni montant, ni le contenu de l’écran.'}</p>
           </section>
-          {contact ? <p style={{ ...S.muet, margin: '12px 2px 0' }} data-signaler-contact="">Ou écris à <a href={'mailto:' + contact} style={{ color: 'var(--vrm-accent)' }}>{contact}</a>.</p> : null}
+          {contact ? <p style={{ ...S.muet, margin: '12px 2px 0' }} data-signaler-contact="">Ou écris à <a href={'mailto:' + contact} style={{ color: 'var(--d-accent-texte)' }}>{contact}</a>.</p> : null}
 
           {etat.phase === 'refus' && <p role="alert" data-signalement-refus="" style={{ margin: '14px 0 0', padding: '10px 12px', borderRadius: 12, background: 'var(--vrm-warn-soft)', color: 'var(--vrm-ink)', fontSize: 15, lineHeight: 1.4 }}><b style={{ color: 'var(--vrm-warn)' }}>Pas envoyé.</b> {(() => { const r = etat.phrase.replace(/^Pas envoyé : /, ''); return r.charAt(0).toUpperCase() + r.slice(1); })()}</p>}
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>

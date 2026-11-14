@@ -83,17 +83,17 @@ async function rest(route, b) {
   const r = servir(lignes, decodeURIComponent(metaVersData(req.url())), req.headers());
   return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': r.range || '0-0/0' }, body: JSON.stringify(r.body) });
 }
-async function ouvrir(nav, { W, sombre, b, url }) {
+async function ouvrir(nav, { W, sombre, b, url, sansSession = false, api = null }) {
   const tel = W < 600;
   const ctx = await nav.newContext({ ...(tel ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 } : { viewport: { width: 1512, height: 950 }, deviceScaleFactor: 1 }), colorScheme: sombre ? 'dark' : 'light', locale: 'fr-FR', timezoneId: 'Europe/Paris' });
   const pg = await ctx.newPage();
   const erreurs = [];
   pg.on('pageerror', (e) => erreurs.push(String(e.message || e).slice(0, 200)));
-  await pg.addInitScript(([s, sombre]) => {
+  await pg.addInitScript(([s, sombre, sansSession]) => {
     try {
       if (!sessionStorage.getItem('banc_init')) {
         localStorage.setItem('vrm_banc_vends', '1');
-        localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', s.user.id);
+        if (!sansSession) { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', s.user.id); }
         localStorage.setItem('vinted_dark', sombre ? 'true' : 'false');
         localStorage.setItem('vrm_bienvenue_vue', JSON.stringify({ at: 'banc' }));
         localStorage.setItem('vrm_visite_vue', JSON.stringify({ at: 'banc' }));
@@ -102,7 +102,7 @@ async function ouvrir(nav, { W, sombre, b, url }) {
         sessionStorage.setItem('banc_init', '1');
       }
     } catch (_) {}
-  }, [SESSION, sombre]);
+  }, [SESSION, sombre, sansSession]);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
     const u = r.request().url();
     if (/vinted\.net|vinted\.fr\/.*\.(jpe?g|png|webp)/i.test(u) || r.request().resourceType() === 'image') return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: vignette(u) });
@@ -115,6 +115,7 @@ async function ouvrir(nav, { W, sombre, b, url }) {
     const u = r.request().url();
     if (/mode=confidentialite/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, uid: UID }) });
     if (/mode=abonnement/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, proprietaire: true, acces: true }) });
+    if (api) { const x = api(u, r.request()); if (x) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(x) }); }
     return r.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
   });
   await pg.route('**/rest/v1/**', (r) => rest(r, b));
@@ -124,7 +125,7 @@ async function ouvrir(nav, { W, sombre, b, url }) {
 const pret = async (pg) => { await pg.waitForSelector('.vrm-main', { timeout: 25000 }).catch(() => {}); await pg.waitForTimeout(2800); };
 
 // ── La mesure, DANS la page : tout ce qui est rendu sous les racines voulues. ──
-function mesurer({ tactile, sombre, racines }) {
+function mesurer({ tactile, sombre, racines, ciblesEnPlus = '' }) {
   const seuil = tactile ? 44 : 36;
   const ECHELLE = [11, 12, 13, 15, 17, 20, 28, 34, 40, 44];
   const out = { cibles: [], graisses: [], tailles: [], gris: [], contraste: [], coupes: [], hyphens: [], rognes: [], mfa: [], violet: [], chrono: [], nTextes: 0, nCibles: 0 };
@@ -155,9 +156,10 @@ function mesurer({ tactile, sombre, racines }) {
   const hex = (c) => '#' + [c.r, c.g, c.b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('').toUpperCase();
   const hsl = (c) => { const r = c.r / 255, g = c.g / 255, b = c.b / 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b); const l = (mx + mn) / 2; if (mx === mn) return { h: 0, s: 0, l }; const d = mx - mn; const s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn); let h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; return { h: h * 60, s, l }; };
   // Les gris PERMIS (un texte) : l'encre, LE gris, le glyphe, le blanc, le noir, le fond (texte sur encre).
-  const PERMIS = new Set(sombre
-    ? ['#F5F5F7', '#98989D', '#5A5A5E', '#FFFFFF', '#000000', '#1C1C1E', '#1D1D1F', '#F2F2F7', '#2C2C2E']
-    : ['#1D1D1F', '#6E6E73', '#AEAEB2', '#FFFFFF', '#000000', '#F2F2F7', '#F5F5F7', '#1C1C1E']);
+  // (14 nov., passe 2) Un texte posé sur une surface SOMBRE (le panneau de marque de la connexion, au jour) se lit
+  // avec la palette de la nuit : c'est le fond effectif qui choisit, pas seulement le thème de l'app.
+  const PERMIS_NUIT = new Set(['#F5F5F7', '#98989D', '#5A5A5E', '#FFFFFF', '#000000', '#1C1C1E', '#1D1D1F', '#F2F2F7', '#2C2C2E']);
+  const PERMIS_JOUR = new Set(['#1D1D1F', '#6E6E73', '#AEAEB2', '#FFFFFF', '#000000', '#F2F2F7', '#F5F5F7', '#1C1C1E']);
   const sombreCarte = (el) => {
     for (let x = el; x && x !== document.body; x = x.parentElement) {
       const cs = getComputedStyle(x);
@@ -186,7 +188,8 @@ function mesurer({ tactile, sombre, racines }) {
   const cartes = new Set();
   for (const root of roots) {
     // A. cibles
-    for (const el of root.querySelectorAll('button, [role="button"], [role="tab"], [role="menuitem"], [role="switch"], summary, a.vrm-b, select')) {
+    // `ciblesEnPlus` (banc 2) : des liens qui SONT des boutons (les appels de la page d'accueil).
+    for (const el of root.querySelectorAll('button, [role="button"], [role="tab"], [role="menuitem"], [role="switch"], summary, a.vrm-b, select' + (ciblesEnPlus ? ', ' + ciblesEnPlus : ''))) {
       if (!vis(el) || el.closest('[aria-hidden="true"]')) continue;   // une cible cachée aux lecteurs n'est pas une cible
       if (el.closest('svg')) continue;
       out.nCibles++;
@@ -210,11 +213,16 @@ function mesurer({ tactile, sombre, racines }) {
         // trancher « libellés à 9 px », CLAUDE.md §9) : hors de l'échelle exprès.
         // Le chiffre d'une tuile de Ma journée au téléphone se RESSERRE pour tenir (Julien, 10 nov. : « l'euro dépasse » ;
         // styles-widgets-ios.css, `--nc`) : une taille fluide entre 14 et 28, exprès — jamais rogné (I le vérifie).
-        const ajuste = el.closest('[data-ecran="journee"] .vrm-fu-tete .vrm-fu-case') && fs_ >= 14 && fs_ <= 28;
+        // (14 nov., passe 2) De même LE chiffre de la carte sombre que `ajusterChiffre` (CarteMois.jsx) a resserré pour
+        // tenir (« au moins 87,65 € » : 38 px, la taille posée en ligne) — entre son plancher (22) et 44.
+        const ajuste = (el.closest('[data-ecran="journee"] .vrm-fu-tete .vrm-fu-case') && fs_ >= 14 && fs_ <= 28)
+          || (el.closest('.vrm-fu-grand[style*="font-size"]') && fs_ >= 22 && fs_ <= 44);
         if (!ECHELLE.includes(fs_) && !ajuste && !el.closest('.vrm-nav-label') && !/^[\s›‹×✓✕·•…—–\-+−⋯▾▸]+$/.test(el.innerText || '')) out.tailles.push({ t: fs_, quoi: lib() });
         const col = rgba(cs.color);
         const enSombre = sombreCarte(el);
-        if (col && !enSombre) {
+        // Un texte de couleur TRANSPARENTE (un « — » de remplacement sous un dessin) ne se voit pas : ni gris ni contraste.
+        if (col && !enSombre && col.a > 0) {
+          const PERMIS = (sombre || lum(fond(el)) < 0.18) ? PERMIS_NUIT : PERMIS_JOUR;
           const hs = hsl(col);
           const neutre = Math.max(col.r, col.g, col.b) - Math.min(col.r, col.g, col.b) <= 10;
           // La colonne de gauche (panneau #E5E5EA) a SON gris, le jeton `--n2-titre` (#636366 ; LE gris n'y tient que 4,1:1).
@@ -282,8 +290,10 @@ const ECRANS = [
 ];
 const RACINES = ['.vrm-main', '.vrm-fs', '.vrm-fp', '[data-recherche-panneau]'];
 const CLES = ['cibles', 'graisses', 'tailles', 'gris', 'contraste', 'coupes', 'hyphens', 'rognes', 'mfa', 'violet', 'chrono'];
+// (14 nov., passe 2) Le banc frère `design-passe-2.cjs` reprend la MÊME mesure sur les autres écrans.
+module.exports = { mesurer, ouvrir, base, pret, srv, PORT, SHOTS, CLES, LARGEURS, THEMES, ECRANS_VOULUS, DETAIL, UID, SESSION, chromium };
 
-(async () => {
+if (require.main === module) (async () => {
   await new Promise((ok) => srv.listen(PORT, ok));
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] });
   const total = Object.fromEntries(CLES.map((k) => [k, 0]));

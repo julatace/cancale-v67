@@ -52,7 +52,7 @@
 :root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-pastilles { display: flex !important; flex-wrap: wrap !important; align-items: center !important; gap: 0 6px !important; margin-top: 3px !important; }
 :root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-statut {
   display: inline-flex !important; align-items: center !important; height: 26px !important; padding: 0 10px !important; border-radius: 999px !important;
-  background: var(--w-remplir) !important; color: var(--w-encre) !important; font-size: 12.5px !important; font-weight: 600 !important; white-space: nowrap !important; gap: 0 !important;
+  background: var(--w-remplir) !important; color: var(--w-encre) !important; font-size: var(--d-t-12, 12px) !important; font-weight: 600 !important; white-space: nowrap !important; gap: 0 !important;
 }
 :root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-statut > i { display: none !important; }
 :root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-statut[data-achat-etat="geste"] { background: var(--a-ambre-fond) !important; color: var(--a-ambre-encre) !important; }

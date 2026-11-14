@@ -1598,7 +1598,7 @@ function PushPrefsSetting({ comptes, onMuets }) {
   return (
     <>
     <details style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 14px'}} onToggle={(e) => setOuvert(e.currentTarget.open)}>
-      <summary style={{cursor:'pointer',listStyle:'none',display:'flex',alignItems:'center',gap:8}}>
+      <summary style={{cursor:'pointer',listStyle:'none',display:'flex',alignItems:'center',gap:8,minHeight:'var(--d-h-ctrl)'}}>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:13,fontWeight:600,color:C.text}}>Ce que tu reçois sur ton téléphone</div>
           <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>

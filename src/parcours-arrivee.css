@@ -75,18 +75,20 @@ button.vrm-pa-fermer {
 .vrm-pa-carte .vrm-pa-carte-marque { background: var(--g-accent); color: #fff; }
 .vrm-pa-carte-texte { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .vrm-pa-carte-texte b { font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
-.vrm-pa-carte-texte span { font-size: 14px; line-height: 1.4; color: var(--g-gris); }
-.vrm-pa-carte-note { margin: 10px 0 0; font-size: 14px; color: var(--g-gris); }
+.vrm-pa-carte-texte span { font-size: 13px; line-height: 1.4; color: var(--g-gris); }
+.vrm-pa-carte-note { margin: 10px 0 0; font-size: 13px; color: var(--g-gris); }
+/* (14 nov., passe 2) « Importer mon stock » passe sous sa phrase (son retrait : styles-systeme.css §2.11). */
+.vrm-pa-carte .vrm-pa-carte-note[data-guide-importer] .vrm-b.vrm-b-discret { display: flex; }
 .vrm-pa-carte-gestes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 0 4px; }
 .vrm-pa-carte-gestes .vrm-b { min-height: 44px; }
 .vrm-pa-carte-repli { border-top: .5px solid var(--g-filet); margin-top: 8px; }
-.vrm-pa-carte-repli summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-size: 14px; color: var(--g-gris); }
+.vrm-pa-carte-repli summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-size: 13px; color: var(--g-gris); }
 .vrm-pa-carte-liste { list-style: none; margin: 0 0 8px; padding: 0; }
-.vrm-pa-carte-liste li { display: grid; grid-template-columns: 24px auto minmax(0, 1fr); gap: 10px; align-items: center; min-height: 36px; font-size: 14px; }
+.vrm-pa-carte-liste li { display: grid; grid-template-columns: 24px auto minmax(0, 1fr); gap: 10px; align-items: center; min-height: 36px; font-size: 15px; }
 .vrm-pa-carte-puce { width: 22px; height: 22px; border-radius: 50%; background: var(--g-remplir); color: var(--g-gris); display: inline-grid; place-items: center; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .vrm-pa-carte-liste li[data-etat="fait"] .vrm-pa-carte-puce { background: var(--g-encre); color: var(--g-carte); }
 .vrm-pa-carte-quoi { text-align: right; color: var(--g-gris); font-size: 13px; font-variant-numeric: tabular-nums; min-width: 0; overflow-wrap: anywhere; }
-.vrm-pa-carte-pied { display: flex; flex-wrap: wrap; gap: 4px 12px; border-top: .5px solid var(--g-filet); padding: 4px 0; }
+.vrm-pa-carte-pied { display: flex; flex-wrap: wrap; gap: 4px 24px; border-top: .5px solid var(--g-filet); padding: 4px 0; margin-top: 8px; }
 .vrm-pa-carte-pied .vrm-b { min-height: 44px; }
 
 @media (prefers-reduced-motion: reduce) {
