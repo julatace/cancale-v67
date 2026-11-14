@@ -112,7 +112,7 @@ import { routePilotage } from './_lib/pilotage.js';
 import { recevoirMesures, listerMesures } from './_lib/mesures-terrain.js';
 import { etatPublic } from './_lib/etat-public.js';
 // (9 nov.) L'état rangé par les sondes automatiques (projection publique, api/_lib/statut-sondes.js).
-import { statutPourSante } from './_lib/statut-sondes.js';
+import { statutPourSante, relancerSondesSiVieilles, oublierStatutPublic } from './_lib/statut-sondes.js';
 import { sendPushToAll, pushConfigure } from './_lib/push.js';
 import { contexteVendeur } from './_lib/owner.js';
 import { freinFork } from './_lib/frein-fork.js';   // (12 nov., M54)
@@ -124,6 +124,8 @@ import { codeDe, suiviDe, parrainageOuvert, rattacher, factureFilleulPayee, aper
 // (9 nov.) Solo et Pro : la règle (api/_lib/plan-regle.js, la même que l'app).
 import { planDeLAbonnement, prochainChangement, uidValide, PLAN_PRO, PLAN_SOLO, CLE_PRIX_SOLO, PLATEFORMES_SOLO, NOMS_PLATEFORMES_SOLO, META_VENDEUR, idCompteVendeur, PRIX_COMPTE_SUP_CENTIMES, CLE_PRIX_COMPTE_SUP, COMPTES_INCLUS_SOLO, META_COMPTES_SUP, MAX_COMPTES_SUP, estPrixCompteSup } from './_lib/plan-regle.js';
 import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
+import { routeQrConnexion, depotPostgrest, cleSignature } from './_lib/qr-connexion.js';   // (14 nov., lot 119) connexion par QR
+import { routeLienAide, depotLienAide } from './_lib/lien-aide.js';   // (14 nov., lot 120) lien temporaire pour l'aide
 import { empreinte } from './_lib/empreinte.js';   // (11 nov.) clé d'idempotence avec les paramètres
 
 export const config = { api: { bodyParser: false } };
@@ -1460,6 +1462,79 @@ async function sessionExtension(req, res) {
   });
 }
 
+// ── (14 nov., lot 119) SE CONNECTER EN SCANNANT UN QR (api/_lib/qr-connexion.js) ──
+// L'ordinateur demande un ticket signé, l'iPhone CONNECTÉ l'approuve (son clic,
+// sa session, `aal2` si double vérification), l'ordinateur récupère une session
+// NEUVE fabriquée ici par la voie de Supabase (lien magique d'administration
+// aussitôt échangé, comme `session-extension`) — jamais le jeton de l'iPhone.
+async function utilisateurAvecFacteurs(jeton) {
+  if (!jeton || jeton.split('.').length !== 3 || jeton.length > 4096) return null;
+  try {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/auth/v1/user`, { signal: AbortSignal.timeout(10000), headers: { apikey: ANON, Authorization: `Bearer ${jeton}` } });
+    if (!r.ok) return (r.status >= 500 || r.status === 429) ? undefined : null;
+    const j = await r.json();
+    const id = String((j && j.id) || '');
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
+    return { id, email: String((j && j.email) || ''), emailConfirme: !!(j && j.email_confirmed_at), factors: Array.isArray(j && j.factors) ? j.factors : [] };
+  } catch (_) { return undefined; }
+}
+async function sessionNeuvePour(uid, email) {
+  const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
+  if (!SERVICE || !email) return null;
+  const lien = await appelAuth('admin/generate_link', sbCle(SERVICE), { type: 'magiclink', email });
+  const hache = lien && typeof lien.hashed_token === 'string' ? lien.hashed_token : '';
+  if (!lien || !hache || lien.verification_type !== 'magiclink') return null;
+  if (String(lien.id || (lien.user && lien.user.id) || '') !== uid) return null;
+  const v = await appelAuth('verify', sbCle(ANON), { type: 'magiclink', token_hash: hache });
+  if (!v) return null;
+  const acces = typeof v.access_token === 'string' ? v.access_token : '';
+  if (!v.user || String(v.user.id || '') !== uid || acces.split('.').length !== 3 || typeof v.refresh_token !== 'string') { await fermerSession(acces); return null; }
+  // Les seuls champs utiles à l'app (`sessionFrom`) : les facteurs TOTP pour la porte du code.
+  const factors = (Array.isArray(v.user.factors) ? v.user.factors : []).filter((f) => f && f.factor_type === 'totp').map((f) => ({ id: f.id, factor_type: f.factor_type, status: f.status, friendly_name: f.friendly_name || '', created_at: f.created_at || '' }));
+  return { access_token: acces, refresh_token: v.refresh_token, expires_in: Number(v.expires_in) || 3600, user: { id: uid, email: String(v.user.email || email), factors } };
+}
+async function qrConnexion(req, res) {
+  const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
+  if (!SERVICE) return repondre(res, 503, { erreur: 'non-configure' });
+  const corps = await lireCorpsJson(req);
+  if (!corps || typeof corps !== 'object' || Array.isArray(corps)) return repondre(res, 400, { erreur: 'corps-invalide' });
+  const r = await routeQrConnexion({
+    corps, jeton: jetonDe(req), cle: cleSignature('QR_CONNEXION_SECRET'),
+    depot: depotPostgrest({ url: SUPABASE_URL, entetes: sbCle(SERVICE), owner: PROPRIETAIRE_NEUTRE, fetcher: fetchAvecDelai }),
+    auth: { utilisateur: utilisateurAvecFacteurs, session: sessionNeuvePour },
+  });
+  res.setHeader('Cache-Control', 'no-store');
+  return repondre(res, r.status, r.body);
+}
+// ── (14 nov., lot 120) LE LIEN TEMPORAIRE POUR L'AIDE (api/_lib/lien-aide.js) ──
+// Public en LECTURE (`?t=`) : la photo filtrée de ses colis, un bordereau de la
+// liste ; le vendeur crée / rafraîchit / coupe ses liens avec SA session.
+async function lienAide(req, res) {
+  const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
+  if (!SERVICE) return repondre(res, 503, { erreur: 'non-configure' });
+  let corps = {};
+  if (req.method === 'POST') {
+    corps = await lireCorpsJson(req);
+    if (!corps || typeof corps !== 'object' || Array.isArray(corps)) return repondre(res, 400, { erreur: 'corps-invalide' });
+  }
+  const r = await routeLienAide({
+    methode: req.method, query: req.query || {}, corps, jeton: jetonDe(req), ua: String((req.headers && req.headers['user-agent']) || ''),
+    cle: cleSignature('LIEN_AIDE_SECRET'),
+    depot: depotLienAide({ url: SUPABASE_URL, entetes: sbCle(SERVICE), fetcher: fetchAvecDelai }),
+    auth: { utilisateur: async (j) => (j ? utilisateurAvecFacteurs(j) : null) },
+  });
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('X-Robots-Tag', 'noindex');
+  if (r.pdf) {
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline; filename="bordereau.pdf"');
+    return res.end(Buffer.from(r.pdf, 'base64'));
+  }
+  return repondre(res, r.status, r.body);
+}
+
 // ── FERMER MON COMPTE (5 octobre) ────────────────────────────────────────────
 // La politique de confidentialité promet l'effacement (« supprimées dans un
 // délai de 30 jours après la clôture du compte ») — et aucun bouton ne le
@@ -2085,7 +2160,12 @@ async function sante(req, res) {
   const config = await configPourProprietaire(req);
   res.setHeader('Cache-Control', config ? 'private, no-store' : 'public, max-age=0, s-maxage=30');
   if (config) res.setHeader('Vary', 'Authorization');
-  const [etat, statut] = await Promise.all([etatPublic({ pushPret: pushConfigure(), anon: ANON }), statutPourSante().catch(() => null)]);
+  const [etat, statut0] = await Promise.all([etatPublic({ pushPret: pushConfigure(), anon: ANON }), statutPourSante().catch(() => null)]);
+  // (14 nov., fiabilité prod) GitHub ne lance les sondes que 3 à 4 fois par jour : un état de plus
+  // de 15 min est relancé ICI (api/_lib/statut-sondes.js `relancerSondesSiVieilles`), puis relu.
+  let statut = statut0;
+  const relance = await relancerSondesSiVieilles({ statut: statut0 }).catch(() => null);
+  if (relance && relance.ok) { oublierStatutPublic(); statut = await statutPourSante().catch(() => statut0); }
   return repondre(res, 200, {
     ok: true,
     serviceKey: !!process.env.SUPABASE_SERVICE_KEY,
@@ -2138,6 +2218,8 @@ export default async function handler(req, res) {
   if (mode === 'factures') return m === 'GET' ? factures(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'resilier') return m === 'POST' ? resilier(req, res, false) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'reprendre') return m === 'POST' ? resilier(req, res, true) : repondre(res, 405, { erreur: 'POST seulement' });
+  if (mode === 'qr-connexion') return m === 'POST' ? qrConnexion(req, res) : repondre(res, 405, { erreur: 'POST seulement' });   // (14 nov., lot 119)
+  if (mode === 'lien-aide') return (m === 'GET' || m === 'POST') ? lienAide(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });   // (14 nov., lot 120)
   if (mode === 'session-extension') return m === 'POST' ? sessionExtension(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'superpdp') return (m === 'GET' || m === 'POST') ? superpdp(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'facture-autre') return m === 'POST' ? factureAutre(req, res) : repondre(res, 405, { erreur: 'POST' });

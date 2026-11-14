@@ -1,0 +1,23 @@
+// en · fiche (FichePaire ouverte depuis une ligne de liste, 14 nov., proposition 62).
+export default {
+  "fiche.retour": "Back",
+  "fiche.heros": "The pair",
+  "fiche.actions": "Actions",
+  "fiche.sansNum": "No No.",
+  "fiche.sansTitre": "Untitled",
+  "fiche.lotN": "{n} pairs",
+  "fiche.lotTitre": "This line holds {n} pairs: choose which one to view.",
+  "fiche.lecture": "Reading this line…",
+  "fiche.passu": "unknown: the database did not answer, try again in a moment.",
+  "fiche.pasDePaire": "No pair linked to this line.",
+  "fiche.gesteRelier.vente": "To link it: set its No. or link its purchase, in the actions below.",
+  "fiche.gesteRelier.achat": "To link it: set the pair's No. on its listing, or link this purchase from the sale.",
+  "fiche.gesteRelier.annonce": "To link it: give this listing a No.",
+  "fiche.ctx.vente": "Sale",
+  "fiche.ctx.colis": "Parcel to ship",
+  "fiche.ctx.achat": "Purchase",
+  "fiche.ctx.annonce": "Listing",
+  "fiche.ctx.stock": "Stock",
+  "fiche.ctx.retrait": "Parcel to collect",
+  "fiche.ctx.journee": "My day",
+};

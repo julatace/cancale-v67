@@ -34,7 +34,10 @@ let notesCetteOuverture = 0;
 
 // Ce qui n'est PAS un défaut de l'app. (5 nov.) `kagi.executeCallback` : le pont d'Orion lui-même
 // (10 des 15 plantages relevés le 5 nov.), pas VRM.
-export const BRUIT = /ResizeObserver loop|^Script error\.?$|Failed to fetch|NetworkError|Load failed|AbortError|The (user|operation) aborted|chrome-extension:\/\/|moz-extension:\/\/|safari-(web-)?extension:\/\/|Importing a module script failed|error loading dynamically imported module|Failed to update a ServiceWorker|kagi\.executeCallback/i;
+// (14 nov., fiabilité prod) `vrm-hors-ligne` : le refus VOULU de la garde hors ligne (src/porteHorsLigne.js,
+// CODE_HORS_LIGNE), levé comme une coupure réseau — le même bruit que « Failed to fetch » (relevé le 10 nov.
+// sur iOS, Réglages → Ventes, une promesse non tenue).
+export const BRUIT = /ResizeObserver loop|^Script error\.?$|Failed to fetch|NetworkError|Load failed|AbortError|The (user|operation) aborted|chrome-extension:\/\/|moz-extension:\/\/|safari-(web-)?extension:\/\/|Importing a module script failed|error loading dynamically imported module|Failed to update a ServiceWorker|kagi\.executeCallback|^vrm-hors-ligne$/i;
 
 // ── UN MORCEAU D'UN ANCIEN DÉPLOIEMENT N'EST PAS UN PLANTAGE (6 nov., filet 3) ──
 // Après une mise en ligne, une page restée ouverte demande des fichiers qui
