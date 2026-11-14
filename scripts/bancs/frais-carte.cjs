@@ -83,6 +83,8 @@ for (let i = 0; i < 400; i++) {
     fulfillmentStartInstructions: [{ shippingStep: { shipTo: { fullName: `Nom Secret ${i}`, primaryPhone: { phoneNumber: '0611223344' }, contactAddress: { addressLine1: `${i} rue Secrète`, city: i % 7 === 0 ? v[0].toUpperCase() : v[0], postalCode: v[1], countryCode: v[4] || 'FR' } } } }] });
   releve.push(['eBay', '', 'ebay:' + ebay[i].orderId, t, du, null, 0, `${MOD[i % 6]}`, String(2000 + i), iso(t)]);
 }
+// Leboncoin : 20 ventes au relevé, aucun frais noté ⇒ « — » (jamais 0) sur sa rangée.
+for (let i = 0; i < 20; i++) releve.push(['Leboncoin', '', 'lbc:' + (3200000000 + i), now - (i + 2) * 86400000, 70 + i, null, 0, 'Asics Gel-1130', '', '']);
 const lignes = () => [
   { id: 'main', data: { vrm_bienvenue_vue: { at: iso(now) }, vrm_visite_vue: { at: iso(now) }, vrm_numerotation: { version: 2, archive: 'B', coupure: '2026-10-09T00:00:00Z' },
     vrm_compta: { packs: [{ date: `${AN}-03-02`, montant: 4.99, plateforme: 'Vinted', libelle: 'Boost 7 jours' }], abonnements: [], depenses: [], fixes: [] } } },
@@ -183,7 +185,9 @@ async function passe(nav, FIX, { W, theme }) {
     dit(vi.etat === 'auMoins' && vi.raison === 'boostsPasLus' && Number(vi.boosts) > 0, `${T} F · Vinted : au moins (boosts pas lus chez Vinted), boosts notés mis à part`, vi);
     const somme = F.rows.reduce((t, r) => t + (r.eur ? Number(r.eur) : 0), 0);
     dit(Number(F.total) === somme && F.auMoins === '1' && /au moins/.test(F.grand), `${T} F · total = somme des sites connus, « au moins »`, F);
-    dit(F.rows.every((r) => r.eur !== '' || !/\d/.test(r.val)), `${T} F · un site aux frais inconnus n’écrit jamais un nombre`, F.rows);
+    const lb = F.rows.find((r) => r.site === 'Leboncoin') || {};
+    dit(lb.etat === 'inconnu' && lb.eur === '' && lb.raison === 'optionsPasLues' && lb.val.trim() === '—', `${T} F · Leboncoin, rien de noté : « — » et la raison, jamais 0`, lb);
+    dit(F.rows.length >= 3 && F.rows.every((r) => r.eur !== '' || !/\d/.test(r.val)), `${T} F · un site aux frais inconnus n’écrit jamais un nombre`, F.rows);
     await pg.locator('[data-frais-annee]').first().scrollIntoViewIfNeeded().catch(() => {});
     await capture(pg, nomS('frais'), await pg.$('[data-frais-annee]'));
   }
