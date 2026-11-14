@@ -45,7 +45,9 @@ import { lignesRisqueMessage, phraseRisqueMessage, risquesMessage, erreurMessage
 import { problemesAnnonce, problemesLot, champsNonJuges, CLE_VERIF_COUPEES, sansCoupees, couperAlerte, rallumerAlerte, lireCoupees, POURQUOI_ALERTE, NOMS_ALERTES, numeroEcritAttendu } from './verifAnnonce.js';
 import { CLE_JOURNEE_PERSO, lireJourneePerso, ordreJournee, visibiliteCarte, urgencesJournee } from './journeePerso.js';
 import { ordreSelonHeure, momentDuJour } from './journeeSelonHeure.js';
-import ConfortCoque from './ConfortCoque.jsx';   // (14 nov., lots 118, 119, 120, 127) atelier, QR, lien d'aide, code local
+import ConfortCoque from './ConfortCoque.jsx';
+import CapteNotif from './capteNotif/CapteNotif.jsx';   // (14 nov., ext. 5.377) « L'extension a capté » — le toast
+import { brancherExtensionCapte } from './capteNotif/regle.js';   // (14 nov., lots 118, 119, 120, 127) atelier, QR, lien d'aide, code local
 import { QrOrdinateur, ticketDeLAdresse } from './ConnexionQr.jsx';   // (14 nov., lot 119) connexion par QR
 import { VueLienAide, jetonAideDeLAdresse } from './LienAide.jsx';   // (14 nov., lot 120) la page de l'aide
 // Lus UNE fois au chargement : le ticket du QR (retiré de la barre d'adresse) et le lien de l'aide.
@@ -11735,6 +11737,12 @@ async function sessionParLaPage(s, u, e) {
     setTimeout(battementExt, 800);
   } finally { enVolSession(false); }
 }
+// (14 nov., ext. 5.377) « Dire ce que l'extension capte » : le MÊME réglage que la carte du logo
+// (lu dans l'état de l'extension, réglé par le canal adressé `reglageCapte`) — src/capteNotif/.
+brancherExtensionCapte({
+  coupe: () => { const c = __vmrEtat && __vmrEtat.ok && __vmrEtat.capte; return c ? (c.coupe === true ? true : c.coupe === false ? false : null) : null; },
+  regler: (coupe) => { const id = String((__vmrEtat && __vmrEtat.ok && __vmrEtat.ext) || ''); return id ? versExtension(id, { type: 'reglageCapte', coupe: coupe === true }, 3000) : Promise.resolve(null); },
+});
 // « Se déconnecter » dans VRM : l'extension de ce Chrome oublie sa session —
 // seulement si elle écrit sous CE compte (elle le vérifie elle-même). Adressé.
 function deconnecterExtension(uid) {
@@ -57151,7 +57159,7 @@ export default function App() {
   // vendeur que la base vérifie). Sans invitation acceptée, rien ne change.
   return <>{(MULTI_USER && authState.user)
     ? <PorteConfidentialite key={authState.user.id} session={authState.session} theme={C} onDeconnexion={authSignOut} onRafraichir={()=>authRefresh()} onVerifier={uid=>{_confidentialiteUid=uid;}}><PorteEquipe key={authState.user.id} uid={authState.user.id}><PorteAbonnement uid={authState.user.id}>{coeur}</PorteAbonnement></PorteEquipe></PorteConfidentialite>
-    : coeur}<VisionneusePdf/><PlaceurTampon/>{authState.user && authState.user.id ? <ConfortCoque uid={authState.user.id} entetes={enTeteSession} onDeconnexion={authSignOut} ticketQr={QR_A_APPROUVER}/> : null}</>;
+    : coeur}<VisionneusePdf/><PlaceurTampon/>{authState.user && authState.user.id ? <ConfortCoque uid={authState.user.id} entetes={enTeteSession} onDeconnexion={authSignOut} ticketQr={QR_A_APPROUVER}/> : null}{authState.user && authState.user.id ? <CapteNotif feuilleOuverte={uneFeuilleOuverte} abonnerFeuilles={abonnerFeuilles}/> : null}</>;
 }
 
 // ── Le code Discord (revue de sécurité du 21 octobre) ─────────────────────────
