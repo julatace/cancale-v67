@@ -13,6 +13,8 @@ import {messageAutoPermis} from '../../src/messageSur.js';
 import {AUTO_FAVORI_MAX_MS} from '../../src/favorisAuto.js';
 import {DEMANDES_AUTO} from '../../src/favorisAuto.js';
 import {demanderAuto,etatAuto,reglerAuto,stopAuto,trierFavorisAuto,ajouterAuto,notificationsCompletes,favorisDepuisNotifications,etatDressingAuto,etatAnnonceAuto,gardeRefuse} from './favoris-auto.js';
+import {apercuCarte,resumeFileCarte} from './favoris-carte.js';
+import {traduireResultatFavori} from '../../src/favorisProgression.js';
 
 // (11 nov., M82 de la revue serveur) Jamais `select=data` sur une capture : les
 // lignes `harvest_{uid}_notifications`, `…_favoris_archive` et la trace
@@ -175,6 +177,48 @@ export async function tourAuto(req,{owner,uid,cle,maintenant,extension=null}){
     return r.valeur;
   }catch(e){if(e?.auto)return await stop(e.auto);if(e instanceof RefusFavoris)throw e;return await stop('lecture');}
 }
+// ══ 5.376 : l'aperçu pour la carte du logo (« N favoris à qui écrire ») ══════════
+// LECTURE seule (aucune écriture, aucune requête à Vinted) : qui peut recevoir un
+// message, le message rendu et l'offre calculée, par les règles de l'app
+// (api/_lib/favoris-carte.js). Le destinataire est PROUVÉ par la même résolution
+// que `lancer` ; les preuves plus lourdes (conversations, autres comptes) ne sont
+// lues que si la première passe en laisse sans preuve.
+async function apercuPourCarte(req,{owner,uid,cle,maintenant}){
+  const lu=await modifierNeutre(cle,d=>({valeur:vueFile(initialiserFile(d),owner)}));
+  if(!lu)throw new RefusFavoris('L’état des envois n’a pas pu être relu. Réessaie dans un instant.',503);
+  const vue=lu.valeur;
+  if(vue.active)return apercuCarte({vue,maintenant});
+  const ids=[`harvest_${uid}_notifications`,`harvest_${uid}_wreq_api_v2_conversations`,`vrm_favoris_reglages_${uid}`,`harvest_${uid}_favoris_archive`];
+  const rows=await lireLignesFavoris(c=>lireCommeVendeur(req,c),owner,[ids[0],ids[1],ids[3]],ids[2]);
+  if(!Array.isArray(rows)||rows.some(x=>x.owner!==owner))throw new RefusFavoris('Tes favoris n’ont pas pu être relus. Réessaie dans un instant.',503);
+  const lire=id=>rows.find(x=>x.id===id)?.data;
+  let prefs=null;const brut=lire(ids[2]);
+  if(brut?.version===1&&brut.envoisActifs===false){try{prefs=validerReglagesFavoris(brut);}catch{prefs=null;}}
+  if(prefs&&!preparerMessageFavori(prefs.message,prefs.pourcentage).message)prefs=null;
+  const archive=lire(ids[3]),capture0=lire(ids[0])||archive,trace=lire(ids[1]);
+  if(!capture0||capture0.type!=='notifications'||String(capture0.uid)!==uid)return apercuCarte({vue,prefs,maintenant});
+  let capture;try{capture=notificationsCompletes(capture0,archive);}catch{throw new RefusFavoris('Une notification a changé sur Vinted : rouvre la cloche de Vinted, puis réessaie.',409);}
+  const dr=await lireCommeVendeur(req,`app_data?owner=eq.${owner}&id=eq.harvest_${uid}_listings&select=cap:data->>capturedAt,pg:data->payload->pagination,items:data->payload->items`);
+  const mg=await lireCommeVendeur(req,`app_data?owner=eq.${owner}&id=eq.main&select=g:data->vinted_offres_garde`);
+  if(!Array.isArray(dr)||!Array.isArray(mg))throw new RefusFavoris('Ton dressing n’a pas pu être relu. Réessaie dans un instant.',503);
+  const garde=mg[0]?.g||null;
+  // Vendue AILLEURS et prouvée : écartée. Garde absente ou périmée : « pas su », dit
+  // dans l'aperçu (comme « Accepter » à la main) — c'est son clic qui décide.
+  const gardeDe=item=>Array.isArray(garde?.items)&&garde.items.includes(String(item))?'vendue-ailleurs':null;
+  const ventesAilleurs=gardeRefuse(garde,'0',maintenant)&&gardeRefuse(garde,'0',maintenant)!=='vendue-ailleurs'?'pas_su':'ok';
+  const opts={uid,capture,trace,traces:archive?.creations||[],lectures:archive?.lecturesLiees||[]};
+  const passe=extra=>{
+    const prouve=id=>{if(!trace)return false;try{const t=resoudreCiblesFavoris({...opts,...extra,selection:[id]});return t.length===1&&String(t[0].notificationId)===String(id);}catch{return false;}};
+    return apercuCarte({vue,prefs,capture,dressing:dr[0]||null,garde:gardeDe,prouve,maintenant});
+  };
+  let a=passe({});
+  if(a.nonProuves>0&&trace){
+    const conversations=await lirePreuvesConversationsFavoris(req,{owner,uid,capture,selection:[]}).catch(()=>[]);
+    a=passe({conversations});
+    if(a.nonProuves>0){const parametresAilleurs=await parametresDesAutresComptes(req,{owner,uid});if(parametresAilleurs.length)a=passe({conversations,parametresAilleurs});}
+  }
+  return {...a,ventesAilleurs};
+}
 export async function routeFavoris(req,res){
   res.setHeader('Cache-Control','no-store');
   if(!['GET','POST'].includes(req.method))return res.status(405).json({message:'GET ou POST seulement.'});
@@ -192,6 +236,7 @@ export async function routeFavoris(req,res){
       const c=req.body;
       // (5.369) 5 versions du message (2 000 caractères chacune) peuvent voyager dans les réglages.
       if(!c||typeof c!=='object'||Array.isArray(c)||JSON.stringify(c).length>(c&&c.action==='lancer'?100000:16000))throw new RefusFavoris('Commande invalide.',400);
+      if(c.action==='apercu')return res.status(200).json({ok:true,uid,apercu:await apercuPourCarte(req,{owner,uid,cle,maintenant}),serveur:maintenant});
       if(c.action==='lancer'){
         const ids=[`harvest_${uid}_notifications`,`harvest_${uid}_wreq_api_v2_conversations`,`vrm_favoris_reglages_${uid}`];
         const archiveId=`harvest_${uid}_favoris_archive`;
@@ -242,7 +287,10 @@ export async function routeFavoris(req,res){
         const jeton=randomUUID(),suivi=randomUUID();decision=d=>reserverFile(d,{owner,maintenant,jeton,suivi});
       }else if(c.action==='terminer'){
         if(typeof c.jeton!=='string'||!/^[0-9a-f-]{36}$/.test(c.jeton))throw new RefusFavoris('Tentative invalide.',400);
-        decision=d=>terminerFile(d,{owner,jeton:c.jeton,resultat:c.resultat,raison:c.raison,maintenant,ecrits:Number.isInteger(c.ecrits)?c.ecrits:null,variante:Number.isInteger(c.variante)?c.variante:null});
+        // (5.376) La carte du logo rend la réponse BRUTE de l'extension : la traduction est
+        // celle de l'app (traduireResultatFavori), une seule règle, faite ici.
+        const t=c.brut&&typeof c.brut==='object'&&!Array.isArray(c.brut)?traduireResultatFavori(c.brut):{resultat:c.resultat,raison:c.raison,ecrits:c.ecrits,variante:c.variante};
+        decision=d=>terminerFile(d,{owner,jeton:c.jeton,resultat:t.resultat,raison:t.raison,maintenant,ecrits:Number.isInteger(t.ecrits)?t.ecrits:null,variante:Number.isInteger(t.variante)?t.variante:null});
       }else if(c.action==='consommer'){
         const v=typeof c.version==='string'&&c.version.length<32?/^(\d+)\.(\d+)\.(\d+)$/.exec(c.version):null;
         if(!v||!(Number(v[1])>5||Number(v[1])===5&&Number(v[2])>=217))throw new RefusFavoris('Recharge l’extension 5.217 pour vérifier l’historique avant tout envoi.');
@@ -265,6 +313,9 @@ export async function routeFavoris(req,res){
     // ne change rien à la réponse : la file est déjà rangée.
     if(req.method==='POST'&&req.body?.action==='terminer'&&r.valeur?.fin)await notifierFinFavoris(owner,r.valeur.fin).catch(()=>{});
     if(req.method==='POST'&&req.body?.action==='terminer'&&r.valeur?.nouvelleDemande)await notifierDemandeAuto(owner,r.valeur.nouvelleDemande).catch(()=>{});
-    return res.status(200).json({ok:true,uid,...(['suivant','consommer','verifier'].includes(req.body?.action)?r.valeur:{vue:r.valeur}),serveur:maintenant});
+    // (5.376) La carte du logo demande le suivi en NOMBRES (`carte`), calculé ici par la règle de l'app.
+    const pourCarte=req.method==='GET'?String(req.query?.carte||'')==='1':req.body?.carte===true;
+    const vueR=['suivant','consommer','verifier'].includes(req.body?.action)?r.valeur?.vue:r.valeur;
+    return res.status(200).json({ok:true,uid,...(['suivant','consommer','verifier'].includes(req.body?.action)?r.valeur:{vue:r.valeur}),...(pourCarte&&vueR?{carte:resumeFileCarte(vueR,maintenant)}:{}),serveur:maintenant});
   }catch(e){return res.status(e instanceof RefusFavoris?e.status:503).json({message:e instanceof RefusFavoris?e.message:'La file n’a pas pu être confirmée. Actualise avant toute nouvelle action.',...(e instanceof RefusFavoris&&['favoris_preuve_absente','favoris_identite_non_unique'].includes(e.code)?{code:e.code,diagnostic:e.diagnostic}:{})});}
 }

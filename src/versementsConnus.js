@@ -27,7 +27,17 @@ export function fusionnerVersements(avant, lu) {
     if (!d) continue;                            // jamais du vide par-dessus une date
     if (out[tx] !== d) { out[tx] = d; change = true; }
   }
-  return change ? out : connu;
+  if (!change) return connu;
+  // (14 nov., lot dates-versement) D'où vient chaque date (`__vrmSources`, `__vrmParReleve`,
+  // propriétés NON énumérables de `datesDeVersement`) : la copie les perdait, et « dont N par
+  // ton porte-monnaie / par la conversation » retombait à 0. La lecture neuve fait foi.
+  for (const k of ['__vrmSources', '__vrmParReleve']) {
+    const a = connu[k], b = lu[k];
+    if (!(a instanceof Map || a instanceof Set) && !(b instanceof Map || b instanceof Set)) continue;
+    const v = b instanceof Map ? new Map([...(a instanceof Map ? a : []), ...b]) : b instanceof Set ? new Set([...(a instanceof Set ? a : []), ...b]) : a;
+    Object.defineProperty(out, k, { value: v, enumerable: false });
+  }
+  return out;
 }
 
 // Le relevé à publier (`lignes` : [plateforme, compte, id, …, [9] date de versement]) : une

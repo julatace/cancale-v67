@@ -182,3 +182,14 @@
 .vrm-sv-geste { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-width: 0; }
 .vrm-sv-geste .vrm-fc-bouton { min-height: 44px; }
 .vrm-sv-geste small { flex: 1 1 12em; min-width: 0; }
+
+/* 5.376 (14 nov.) : le guide en 3 temps (première fois, puis « ? ») — calme, sans couleur. */
+.vrm-fc-rond-aide { font-size: 16px; font-weight: 600; }
+.vrm-fc-guide { padding: 16px; border-radius: 16px; display: grid; gap: 10px; }
+.vrm-fc-guide h3 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
+.vrm-fc-guide ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.vrm-fc-guide li { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; align-items: start; font-size: 15px; line-height: 1.4; }
+.vrm-fc-guide li span { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 999px; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums;
+  background: var(--vrm-fill, rgba(118,118,128,.12)); }
+.vrm-fc-guide-carte { margin: 0; font-size: 13px; line-height: 1.45; color: var(--vrm-muted, #6e6e73); }
+.vrm-fc-guide .vrm-fc-bouton { justify-self: start; }

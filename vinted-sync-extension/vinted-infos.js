@@ -6,6 +6,11 @@
 //  2. Sur la page d'une annonce d'un AUTRE vendeur : un encart replié « VRM » —
 //     la calculette d'achat (la règle de l'app, `calculer` → `cascadeVente`) et
 //     « peut-être N paires proches en ligne chez toi » (`pairesDuModele`, lot F).
+//  3. (14 nov., 5.376, lot messages-achats-plus) Dans le même encart, sans rien ouvrir :
+//     « Dans ta liste de recherche » (sa liste rangée chez VRM, comparée à l'annonce
+//     DÉJÀ ouverte par `correspondances` — marque, modèle saisi, taille, prix ≤ max :
+//     un SIGNAL, jamais une identité) et « Déjà achetée le … » (ses achats de CETTE
+//     annonce, par son identifiant exact, `achatsDeLAnnonce`). Aucune requête Vinted.
 //
 // LECTURE SEULE : rien n'est envoyé à Vinted, rien n'est cliqué, rien n'est
 // écrit. Aucune requête Vinted : la page est lue telle qu'elle est affichée, le
@@ -72,6 +77,12 @@
     .stock{margin-top:12px;font:600 13px/1.4 -apple-system,system-ui,sans-serif}
     .stock ul{list-style:none;padding:0;margin:4px 0 0}
     .stock li{font:500 12px/1.4 -apple-system,system-ui,sans-serif;color:${nuit ? '#98989D' : '#6E6E73'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .signaux{display:flex;flex-direction:column;gap:6px;margin:0 0 10px}
+    .signal{display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border-radius:14px;background:${nuit ? '#2C2C2E' : '#FFFFFF'};font:600 13px/1.35 -apple-system,system-ui,sans-serif}
+    .signal .pt{flex:none;width:8px;height:8px;border-radius:50%;margin-top:5px;background:${nuit ? '#FFD60A' : '#B25000'}}
+    .signal .pt.n{background:${nuit ? '#98989D' : '#6E6E73'}}
+    .signal small{display:block;font-weight:500;color:${nuit ? '#98989D' : '#6E6E73'};margin-top:2px}
+    .tete .pt{flex:none;width:8px;height:8px;border-radius:50%;background:${nuit ? '#FFD60A' : '#B25000'}}
   `;
   const ombre = (hote) => { const sr = hote.attachShadow({ mode: 'closed' }); const st = document.createElement('style'); st.textContent = STYLE(sombre()); sr.appendChild(st); return sr; };
   const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
@@ -130,8 +141,9 @@
 
   // ── 1. LA LIGNE SOUS SES ANNONCES ───────────────────────────────────────
   let chemin = location.pathname, connus = {}, demandes = new Set(), enVol = false, generation = 0, achatIci = false, membresVus = '';
+  let rechercheIci = [], acheteIci = null;   // (5.376) sa liste de recherche · ses achats de cette annonce (null = pas su)
   const remettre = () => {
-    chemin = location.pathname; generation++; connus = {}; demandes = new Set(); enVol = false; achatIci = false; membresVus = ''; stockLu = null;
+    chemin = location.pathname; generation++; connus = {}; demandes = new Set(); enVol = false; achatIci = false; membresVus = ''; stockLu = null; rechercheIci = []; acheteIci = null;
     document.querySelectorAll('[data-vrm-infos-pour],[data-vrm-achat]').forEach((e) => e.remove());
   };
   async function demanderInfos() {
@@ -155,7 +167,11 @@
     if (!r || !r.ok) { items.forEach((x) => demandes.delete(x)); membresVus = ''; return; }
     if (r.portee !== 'compte') return;
     Object.assign(connus, r.infos || {});
-    if (ici && r.achat === true && !connus[ici]) achatIci = true;
+    if (ici && r.achat === true && !connus[ici]) {
+      achatIci = true;
+      rechercheIci = Array.isArray(r.recherche) ? r.recherche : [];
+      acheteIci = Array.isArray(r.achete) ? r.achete : null;
+    }
   }
   function poserLignesInfos() {
     if (chemin !== location.pathname) return;
@@ -191,6 +207,14 @@
     const prix = m ? m[1] + (m[2] ? ',' + m[2].padEnd(2, '0') : '') : '';
     return { titre: titre.slice(0, 200), marque: marque.slice(0, 60), taille: taille.slice(0, 20), prix };
   }
+  // (5.376) Les deux signaux de l'encart : les règles de l'app, recopiées (vrm-regles-achat.js).
+  //   achete : ses achats de CETTE annonce (identifiant exact) · null = pas su (jamais publié) ;
+  //   dansListe : les lignes de SA liste de recherche qui correspondent à l'annonce affichée.
+  function signauxAchat(annonce, id) {
+    const achete = acheteIci == null ? null : R.achatsDeLAnnonce({ ids: { [id]: acheteIci } }, id);
+    const dansListe = R.correspondances(rechercheIci, annonce, { marqueDe: R.extractBrand });
+    return { achete, dansListe };
+  }
   let stockLu = null;   // undefined en cours · null pas encore · { ok, stock } lu
   function poserEncartAchat() {
     const ici = articleIci();
@@ -204,10 +228,31 @@
     const sr = ombre(hote);
     const boite = el('div', 'encart');
     const tete = el('button', 'tete'); tete.type = 'button'; tete.setAttribute('aria-expanded', 'false');
-    tete.append(el('span', 'logo', 'VRM'), el('span', 'sous', 'Calculette et ton stock'), el('span', 'chev'));
+    const a = lireAnnonce();
+    // (5.376) Les deux signaux, lus AVANT d'ouvrir : l'identifiant exact pour « déjà achetée »,
+    // les critères structurés pour « dans ta liste ». Rien n'est écrit, rien n'est bloqué.
+    const { achete, dansListe } = signauxAchat(a, ici);
+    hote.setAttribute('data-vrm-deja-achete', achete == null ? 'pas-su' : String(achete.length));
+    hote.setAttribute('data-vrm-recherche', String(dansListe.length));
+    const dateCourte = (d) => { const t = Date.parse(String(d || '') + 'T12:00:00'); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : ''; };
+    const sousTete = achete && achete.length ? (achete.length > 1 ? `Annonce déjà achetée ${achete.length} fois` : `Annonce déjà achetée${dateCourte(achete[0].d) ? ' le ' + dateCourte(achete[0].d) : ''}`)
+      : dansListe.length ? 'Dans ta liste de recherche' : 'Calculette et ton stock';
+    if ((achete && achete.length) || dansListe.length) tete.appendChild(el('span', 'pt'));
+    tete.append(el('span', 'logo', 'VRM'), el('span', 'sous', sousTete), el('span', 'chev'));
     const corps = el('div', 'corps'); corps.hidden = true;
     boite.append(tete, corps); sr.appendChild(boite);
-    const a = lireAnnonce();
+    const signaux = el('div', 'signaux');
+    if (achete && achete.length) {
+      const s = el('div', 'signal'); s.setAttribute('data-vrm-signal', 'deja-achete');
+      const t = el('div', '', achete.length > 1 ? `Tu as déjà acheté cette annonce ${achete.length} fois` : 'Tu as déjà acheté cette annonce');
+      t.appendChild(el('small', '', achete.map((x) => dateCourte(x.d)).filter(Boolean).join(' · ') + (achete.some((x) => x.d) ? ' · ' : '') + 'même identifiant Vinted'));
+      s.append(el('span', 'pt'), t); signaux.appendChild(s);
+    }
+    for (const x of dansListe.slice(0, 3)) {
+      const s = el('div', 'signal'); s.setAttribute('data-vrm-signal', 'recherche');
+      const t = el('div', '', 'Dans ta liste de recherche'); t.appendChild(el('small', '', R.resumeRecherche(x)));
+      s.append(el('span', 'pt n'), t); signaux.appendChild(s);
+    }
     hote.setAttribute('data-vrm-achat-prix-lu', a.prix || '');
     // La calculette : la règle de l'app (`calculer`), les deux prix tapés par lui.
     const champ = (id, lib, val, ph) => { const l = el('label', '', lib); const i = el('input'); i.id = id; i.inputMode = 'decimal'; i.autocomplete = 'off'; i.value = val; i.placeholder = ph; l.appendChild(i); return [l, i]; };
@@ -225,6 +270,7 @@
     const res = el('div', 'res'); res.setAttribute('aria-live', 'polite');
     const note = el('p', 'petit', a.prix ? 'Prix de l’annonce, sans port ni protection. Rien n’est enregistré.' : 'Rien n’est enregistré.');
     const stock = el('div', 'stock');
+    if (signaux.children.length) corps.appendChild(signaux);
     corps.append(grille, sites, lE, res, note, stock);
     function calcul() {
       const r = R.calculer({ achat: iA.value, revente: iR.value, site, emballage: iE.value }, {});

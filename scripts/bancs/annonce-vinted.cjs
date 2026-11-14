@@ -61,6 +61,15 @@ function batir() {
     // 8
     const mesure = await p.evaluate(() => { const f = document.querySelector('.vrm-cv-feuille'); const pet = [...document.querySelectorAll('.vrm-cv-voile button')].filter((b) => b.offsetParent && b.getBoundingClientRect().height < 44 && !b.closest('.vrm-cv-photo')).map((b) => b.textContent.trim().slice(0, 20)); return { deborde: document.documentElement.scrollWidth > innerWidth + 1 || f.scrollWidth > f.clientWidth + 1, pet }; });
     dit(!mesure.deborde && !mesure.pet.length, `${tag} 8 rien ne déborde, cibles ≥ 44 px`, mesure);
+    // 9 (5.376, « tout doit être accompagné ») : les étapes, ce qui va se passer AVANT, l'aide « ? ».
+    const g = await p.evaluate(() => ({ etape: document.querySelector('[data-creer-vinted-etape]')?.getAttribute('data-creer-vinted-etape'), n: document.querySelectorAll('.vrm-cv-etapes li').length, ici: document.querySelector('.vrm-cv-etapes li[aria-current="step"]')?.textContent || '', avant: document.querySelector('[data-creer-vinted-avant]')?.textContent || '', aide: !!document.querySelector('[data-creer-vinted-aide]') }));
+    dit(g.etape === 'creer' && g.n === 4 && /Créer le brouillon/.test(g.ici), `${tag} 9 les 4 étapes, « Créer le brouillon » en cours`, g);
+    dit(/1 brouillon sur compte_banc/.test(g.avant) && /Rien n’est mis en ligne/.test(g.avant), `${tag} 9b ce qui va se passer est dit AVANT le bouton (compte, rien en ligne)`, g.avant);
+    await p.click('[data-creer-vinted-aide-bouton]');
+    const aide = await p.evaluate(() => document.querySelectorAll('[data-creer-vinted-aide] li').length);
+    dit(!g.aide && aide === 3, `${tag} 9c « ? » ouvre l’aide (avant, pendant, après)`, aide);
+    if (SHOTS) await p.screenshot({ path: path.join(SHOTS, `aide-${w}-${theme}.png`) });
+    await p.click('[data-creer-vinted-aide-bouton]');
     if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await p.screenshot({ path: path.join(SHOTS, `feuille-${w}-${theme}.png`) }); }
     // 3
     await p.click('[data-creer-vinted-lancer]');
@@ -99,6 +108,19 @@ function batir() {
     dit(sc.v === 'aucun' && sc.ambre && sc.off, `${tag} 7 sans compte dans l'onglet : bouton éteint, « ouvre vinted.fr » en ambre`, sc);
     if (SHOTS && theme === themes[0]) await p2.screenshot({ path: path.join(SHOTS, `sans-compte-${w}.png`) });
     await ctx2.close();
+    // 10 (5.376) : jamais un échec muet — un refus de Vinted est dit sur la ligne de la fiche.
+    const ctx3 = await nav.newContext({ viewport: { width: w, height: h }, hasTouch: tactile, isMobile: tactile });
+    const p3 = await ctx3.newPage();
+    await p3.goto(`http://127.0.0.1:${PORT}/#${theme}-refus`);
+    await p3.waitForSelector('[data-creer-vinted]');
+    await p3.click('[data-creer-vinted-lancer]'); await p3.click('[data-creer-vinted-lancer]');
+    await p3.waitForSelector('[data-suivi-travail][data-suivi-statut="fini"]', { timeout: 8000 }).catch(() => {});
+    await p3.evaluate(() => { const b = [...document.querySelectorAll('[data-suivi-travail] button')].find((x) => /Fermer/.test(x.textContent)); if (b) b.click(); });
+    await p3.waitForSelector('[data-creer-vinted-echec]', { timeout: 4000 }).catch(() => {});
+    const ec = await p3.evaluate(() => { const e = document.querySelector('[data-creer-vinted-fiche="41"] [data-creer-vinted-echec]'); return e ? { etat: e.getAttribute('data-creer-vinted-echec'), txt: e.textContent } : null; });
+    dit(ec && ec.etat === 'refus' && /Pas créé : Vinted demande une photo plus nette/.test(ec.txt) && /Corrige la fiche/.test(ec.txt), `${tag} 10 un refus de Vinted est dit sur SA ligne, avec le geste`, ec);
+    if (SHOTS && theme === themes[0]) await p3.screenshot({ path: path.join(SHOTS, `refus-${w}.png`) });
+    await ctx3.close();
   }
   await nav.close(); srv.close();
   console.log(`\n${ko ? '❌' : '✅'} banc annonce-vinted : ${ok} vert(s), ${ko} rouge(s)`);

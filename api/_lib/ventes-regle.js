@@ -386,4 +386,35 @@ export const compteEcarteChoix = (uid, masques, panneau) => {
 
 export const compteEcarteRegle = (uid, masques, panneau, regle) => compteEcarteChoix(uid, masques, panneau) || venteHorsPlan(regle, uid);
 
+export const datesDeVersement = (txn, releve, conversations, emails) => {
+  if (!Array.isArray(txn)) return null;
+  const jourOk = (d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}/.test(d) && !isNaN(Date.parse(d));
+  const identite = (tx) => (tx == null ? '' : String(tx).trim());
+  const out = {};
+  const sources = new Map();
+  const poser = (src, carte) => { for (const [tx, d] of carte) if (out[tx] == null) { out[tx] = d; sources.set(tx, src); } };
+  const uneSource = (lignes, lire) => {
+    const vus = new Map();
+    for (const r of (Array.isArray(lignes) ? lignes : [])) {
+      const x = r ? lire(r) : null;
+      if (!x) continue;
+      const tx = identite(x.tx);
+      if (!/^\d{1,20}$/.test(tx) || !jourOk(x.d)) continue;
+      const q = vus.get(tx);
+      if (!q) vus.set(tx, { d: x.d, jours: new Set([x.d.slice(0, 10)]) });
+      else q.jours.add(x.d.slice(0, 10));
+    }
+    const carte = new Map();
+    for (const [tx, q] of vus) if (q.jours.size === 1) carte.set(tx, q.d);
+    return carte;
+  };
+  poser('transaction', uneSource(txn, (r) => (String(r.s) === '450' ? { tx: r.tx, d: r.su } : null)));
+  if (releve && typeof releve === 'object') poser('releve', uneSource(Object.entries(releve), ([tx, d]) => ({ tx, d })));
+  poser('conversation', uneSource(conversations, (r) => (r.src === 'conversation' ? { tx: r.tx, d: r.at } : null)));
+  poser('email', uneSource(emails, (r) => ({ tx: r.tx, d: r.at })));
+  Object.defineProperty(out, '__vrmSources', { value: sources, enumerable: false });
+  Object.defineProperty(out, '__vrmParReleve', { value: new Set([...sources].filter(([, s]) => s === 'releve').map(([tx]) => tx)), enumerable: false });
+  return out;
+};
+
 export const compteEcarte = compteEcarteRegle;

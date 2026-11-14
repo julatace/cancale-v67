@@ -45,6 +45,8 @@ const TempsGagne = React.lazy(() => import('./accueil/TempsGagne.jsx'));
 // (5 nov.) Les navigateurs où l'extension SERVIE s'installe : une source, la même
 // que l'app — jamais « Chrome obligatoire ». Module léger.
 import { navigateursServis, NAVS_ORDINATEUR_TEXTE as NAVS_ORDI } from './navigateursServis.js';
+// (14 nov., idée d'accueil 146) « Voir VRM en 45 s » : rien n'est téléchargé avant le toucher.
+import AccueilVideo from './accueil/AccueilVideo.jsx';
 const SERVIS = navigateursServis();
 
 // ── Les captures (public/accueil/, scripts/accueil-captures.cjs) ────────────
@@ -413,6 +415,7 @@ export default function Accueil({ onEntrer }) {
               {exemple()}
               {connexion({ 'data-cta': 'connexion' })}
             </div>
+            <AccueilVideo />
             <p className="av-prix-ligne" data-prix-ligne="">
               {ACCES_OFFERT && <><span className="nw" data-acces-offert="">{tr('accueil.gratuit')}</span>{tr('accueil.prix.puis')}</>}
               <span className="nw"><b>{prixLu(PRIX_MOIS)}</b> {tr('accueil.prix.parMois')}</span> {tr('accueil.prix.apres')} <span className="nw" data-essai={ESSAI_JOURS}>{ligneEssai}</span> · <span className="nw">{tr('accueil.prix.sansEngagement')}</span>

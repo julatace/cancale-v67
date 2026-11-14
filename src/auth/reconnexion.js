@@ -5,7 +5,7 @@
 // au retour, une session d'un AUTRE compte n'est pas écrite (la sienne reste).
 export const CLE_RECONNEXION = 'vrm_oauth_reconnexion';
 const DUREE_MS = 10 * 60 * 1000;
-const PERMIS = ['google', 'discord'];
+const PERMIS = ['google', 'discord', 'apple'];
 
 export function poserReconnexion(stockages, { owner, provider, maintenant = Date.now() }) {
   if (!owner || !PERMIS.includes(provider)) return false;

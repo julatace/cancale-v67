@@ -210,6 +210,18 @@ createRoot(document.getElementById('r')).render(<><Banc/><SuiviTravailHote/></>)
       });
       if (tel) { const petits = commun.cibles.filter((c) => c.h < 43.5 || c.w < 43.5); dit(!petits.length, `${T} cibles au doigt ≥ 44 px`, petits.map((c) => `${c.t} ${Math.round(c.w)}×${Math.round(c.h)}`).join(' | ')); }
       dit(commun.deb <= 1, `${T} aucun débordement horizontal`, commun.deb + ' px');
+      // (5.376, « il ne doit pas se sentir seul ») le guide en 3 temps : ouvert la 1re fois, « J’ai compris » le range, « ? » le rouvre.
+      if (FAV.length) {
+        const g0 = await pg.evaluate(() => { const g = document.querySelector('[data-fav-guide]'); return g ? { n: g.querySelectorAll('li').length, carte: !!g.querySelector('[data-fav-guide-carte]') } : null; });
+        dit(g0 && g0.n === 3 && g0.carte, `${T} première fois : le guide en 3 temps, et « le logo VRM sur vinted.fr lance aussi ces messages »`, g0);
+        if (tel && theme === 'clair' && JEU === 'base') await pg.locator('[data-fav-guide]').screenshot({ path: path.join(SHOTS, `fc-${F}-guide.png`) }).catch(() => {});
+        await pg.click('[data-fav-guide-compris]');
+        const g1 = await pg.evaluate(() => ({ g: !!document.querySelector('[data-fav-guide]'), vu: localStorage.getItem('vrm_favoris_guide_vu') }));
+        await pg.click('[data-fav-guide-bouton]');
+        const g2 = await pg.evaluate(() => !!document.querySelector('[data-fav-guide]'));
+        dit(!g1.g && g1.vu === '1' && g2, `${T} « J’ai compris » range le guide (retenu), « ? » le rouvre`, { g1, g2 });
+        await pg.click('[data-fav-guide-compris]');
+      }
       dit(!commun.couleurs.length, `${T} aucune couleur hors du bleu d’Apple et de l’ambre`, [...new Set(commun.couleurs)].slice(0, 6).join(' | '));
       if (!tel) dit(commun.largeur > 0 && commun.largeur <= 760, `${T} colonne ≤ 760 px`, commun.largeur);
       if (!FAV.length) {

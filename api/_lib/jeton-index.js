@@ -27,10 +27,10 @@ import crypto from 'crypto';
 import { PROPRIETAIRE_NEUTRE } from './proprietaire-email.js';
 import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
-export const CHAMP_JETON = { widget: 'vrm_widget_token', sms: 'vrm_sms_token', reception: 'jeton', agenda: 'jeton' };
+export const CHAMP_JETON = { widget: 'vrm_widget_token', sms: 'vrm_sms_token', reception: 'jeton', agenda: 'jeton', comptable: 'jeton' };
 // La ligne du vendeur qui porte le jeton : `main` pour le widget et les SMS ;
 // (8 nov.) l'ADRESSE DE RÉCEPTION UNIQUE vit dans SA ligne (api/_lib/adresse-reception.js).
-export const LIGNE_JETON = { widget: 'main', sms: 'main', reception: 'vrm_adresse_reception', agenda: 'vrm_agenda' };   // (10 nov., lot H) l'agenda .ics (api/_lib/agenda-ics.js)
+export const LIGNE_JETON = { widget: 'main', sms: 'main', reception: 'vrm_adresse_reception', agenda: 'vrm_agenda', comptable: 'vrm_comptable' };   // (14 nov., argent-prix : le lien comptable, api/_lib/comptable-lien.js) (10 nov., lot H) l'agenda .ics (api/_lib/agenda-ics.js)
 const RE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const empreinteJeton = (jeton) => crypto.createHash('sha256').update(String(jeton || ''), 'utf8').digest('hex');
