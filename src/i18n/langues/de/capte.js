@@ -1,0 +1,23 @@
+// de · „Die Erweiterung hat erfasst" (14. Nov., Erweiterung 5.377) — Quelle: fr/capte.js.
+export default {
+  "capte.titre": "Die Erweiterung hat erfasst",
+  "capte.relie": "Konto verbunden",
+  "capte.voir": "Ansehen",
+  "capte.fermer": "Schließen",
+  "capte.s.ventes": {"one": "{n} neuer Verkauf", "other": "{n} neue Verkäufe"},
+  "capte.s.achats": {"one": "{n} neuer Kauf", "other": "{n} neue Käufe"},
+  "capte.s.bordereaux": {"one": "{n} Versandetikett", "other": "{n} Versandetiketten"},
+  "capte.s.codes": {"one": "{n} Abholcode", "other": "{n} Abholcodes"},
+  "capte.s.versements": {"one": "{n} Auszahlungsdatum", "other": "{n} Auszahlungsdaten"},
+  "capte.s.messages": {"one": "{n} Nachricht", "other": "{n} Nachrichten"},
+  "capte.s.offres": {"one": "{n} erhaltenes Angebot", "other": "{n} erhaltene Angebote"},
+  "capte.s.annonces": {"one": "{n} neue Anzeige", "other": "{n} neue Anzeigen"},
+  "capte.lu.ventes": {"one": "{n} Verkauf gelesen", "other": "{n} Verkäufe gelesen"},
+  "capte.lu.achats": {"one": "{n} Kauf gelesen", "other": "{n} Käufe gelesen"},
+  "capte.lu.annonces": {"one": "{n} Anzeige gelesen", "other": "{n} Anzeigen gelesen"},
+  "capte.lu.messages": {"one": "{n} Nachricht gelesen", "other": "{n} Nachrichten gelesen"},
+  "capte.lu.offres": {"one": "{n} Angebot gelesen", "other": "{n} Angebote gelesen"},
+  "capte.reglage.lib": "Sagen, was die Erweiterung erfasst",
+  "capte.reglage.desc": "Eine kleine Nachricht neben dem VRM-Logo auf der Website und hier bei geöffneter App: neue Verkäufe, Etiketten, Nachrichten…",
+  "capte.reglage.pasSu": "Die Erweiterung hat noch nicht geantwortet: Die Einstellung gilt bei ihrem nächsten Durchlauf.",
+};
