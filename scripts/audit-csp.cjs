@@ -46,6 +46,13 @@ const ss = dir(complete, 'script-src') || [];
 dit(ss.length && !ss.includes("'unsafe-inline'") && !ss.includes("'unsafe-eval'"), "script-src sans 'unsafe-inline' ni 'unsafe-eval'", ss.join(' '));
 dit((dir(complete, 'object-src') || []).join() === "'none'", "politique complète : object-src 'none'");
 dit(/^deny$/i.test(((h('X-Frame-Options') || {}).value || '')), 'X-Frame-Options DENY');
+// (14 nov., idée 151) L'impression directe sur l'imprimante thermique passe par WebUSB / Web Serial : la page
+// elle-même seulement (`usb=(self)`, `serial=(self)`), jamais un cadre tiers ; bluetooth, hid, payment restent fermés.
+// Un `usb=()` bloquerait l'impression directe en silence (le parcours PDF prendrait le relais, mais sans raison).
+const pp = ((h('Permissions-Policy') || {}).value || '').split(',').map((x) => x.trim());
+const ppDe = (k) => (pp.find((x) => x.startsWith(k + '=')) || '').slice(k.length + 1);
+dit(ppDe('usb') === '(self)' && ppDe('serial') === '(self)', 'Permissions-Policy : usb=(self) et serial=(self) — l’impression directe permise à VRM seul', pp.join(', '));
+dit(ppDe('bluetooth') === '()' && ppDe('hid') === '()' && ppDe('payment') === '()', 'Permissions-Policy : bluetooth, hid, payment restent fermés', pp.join(', '));
 
 console.log('\n── index.html');
 const html = lire('index.html');

@@ -128,7 +128,7 @@
         },
         {
           "key": "Permissions-Policy",
-          "value": "camera=(self), microphone=(self), geolocation=(self), payment=(), usb=(), serial=(), bluetooth=(), hid=()"
+          "value": "camera=(self), microphone=(self), geolocation=(self), payment=(), usb=(self), serial=(self), bluetooth=(), hid=()"
         },
         {
           "key": "Cross-Origin-Opener-Policy",
