@@ -60538,7 +60538,7 @@ function AppCoeur() {
                 SONT cachés (un mode allumé garde son interrupteur sous le pouce). */}
             {((!reglesStream.bouton && !streamOn) || montantsCaches) && (ordi || montantsCaches) ? <BoutonMontants/> : null}
             {/* (5 nov.) La cloche : ce que VRM a envoyé (src/CentreNotifs.jsx). */}
-            {AUTH.user && <CentreNotifsCoque onReglages={()=>setTab('settings')} enTete={(fermer)=>!baseKO && !horsLigne ? <Suspense fallback={null}><LigneFraicheurParesseuse baseKO={baseKO} comptes={vintedAccounts} onNav={(t)=>{ fermer(); setTab(t); }}/></Suspense> : null}/>}
+            {AUTH.user && <CentreNotifsCoque onReglages={()=>setTab('settings')} enTete={(fermer)=>!baseKO && !horsLigne ? <Suspense fallback={null}><LigneFraicheurParesseuse baseKO={baseKO} comptes={vintedAccounts} publier={false} onNav={(t)=>{ fermer(); setTab(t); }}/></Suspense> : null}/>}
             {!ordi && <button className="vrm-hbtn" type="button" data-recherche-zone="" data-recherche-loupe="" data-recherche-loupe-voix={DICTEE_OK && !VOIX.refus ? '1' : '0'}
               onPointerDown={(e)=>{ if(!DICTEE_OK || VOIX.refus || (e.button!=null && e.button!==0)) return; clearTimeout(appuiLoupe.current.t); appuiLoupe.current.long=false;
                 appuiLoupe.current.t=setTimeout(()=>{ appuiLoupe.current.long=true; flushSync(()=>setGsOpen(true)); if(!ecouteEnCours('loupe')) dicterLoupe(); }, 550); }}

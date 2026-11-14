@@ -655,8 +655,10 @@
 :root:root body .vrm-cn-cloche:has(.vrm-cn-pastille) .vrm-cn-alerte { left: 10px; }
 
 /* Le titre et son « ? » sur UNE ligne ; la date au-dessus et le sous-titre dessous gardent leur ligne. */
-:root:root body .vrm-main :is(.vrm-screen-head-titre, .vrm-tache-tete) { display: flex !important; flex-wrap: wrap !important; align-items: center !important; column-gap: var(--d-e-2) !important; }
+:root:root body .vrm-main :is(.vrm-screen-head-titre, .vrm-tache-tete) { display: flex !important; flex-direction: row !important; flex-wrap: wrap !important; align-items: center !important; column-gap: var(--d-e-2) !important; }
 :root:root body .vrm-main :is(.vrm-screen-head-titre, .vrm-tache-tete) > :not(h1, h2, .vrm-phrase-ecran, .vrm-screen-repere) { flex-basis: 100% !important; }
+:root:root body .vrm-main :is(.vrm-screen-head-titre, .vrm-tache-tete) { justify-content: flex-start !important; text-align: left !important; }
+:root:root body .vrm-main :is(.vrm-screen-head-titre, .vrm-tache-tete) > :is(h1, h2) { flex: 0 1 auto !important; width: auto !important; max-width: 100% !important; margin-left: 0 !important; margin-right: 0 !important; }
 :root:root body .vrm-main :is(.vrm-screen-head-titre, .vrm-tache-tete) > .vrm-phrase-ecran.vrm-phrase-ecran-aide { margin: 0 !important; padding: 0 !important; flex: 0 0 auto !important; display: inline-flex !important; align-items: center !important; min-height: 44px !important; }
 
 /* « Nouvelle version de VRM · Mettre à jour » (src/AppInstallable.jsx) : plus une bulle posée sur la liste. */

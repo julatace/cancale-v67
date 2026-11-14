@@ -21,6 +21,9 @@ require('./_porte-banc.cjs');
 //       écran d'hier joignable en ≤ 2 touchers depuis Ma journée ; pastilles conservées
 //       (segment Achats = son nombre ; onglet Paires = la somme, muet sur un écran de Paires) ;
 //    D  pas de débordement horizontal ;
+//    A3 (AJOUT 3) « N choses à revoir » jamais au-dessus du titre (point ambre sur la cloche, la ligne dans sa
+//       feuille) ; sous le grand titre aucune phrase, le « ? » sur sa ligne ; « Nouvelle version » jamais un
+//       bandeau sur la liste ni au-dessus de la barre du bas (une ligne sous la barre du haut qui pousse la page) ;
 //    P  (avec `BANC_DIST_AVANT`) 1 000 annonces : premier rendu de la liste, nœuds DOM, saut de
 //       mise en page au défilement — jamais pires que l'arbre d'avant (tolérance de bruit).
 //  `BANC_DIST=` juge un autre build (avant/après). `CAPTURES=dossier` : les captures 390 × dsf 2
@@ -204,6 +207,70 @@ async function regles(nav) {
   }
 }
 
+
+// ── A3 : AJOUT 3 (capture d'Annonces, 09:01) — ce que la coque met en tête de page ──
+function baseRetard() {
+  const b = base();
+  const e = b.rows.find((r) => /^ext_appareil_/.test(r.id));
+  const uid = Object.keys(e.data.vus.vinted)[0];
+  e.data.vus.vinted[uid] = Date.now() - 3 * 864e5;   // un compte pas relu depuis 3 jours ⇒ « à revoir »
+  for (const r of b.rows) if (r.id.startsWith(`harvest_${uid}_`) && !/_txn_|_label_/.test(r.id) && r.data && r.data.capturedAt) r.data.capturedAt = typeof r.data.capturedAt === 'number' ? Date.now() - 3 * 864e5 : new Date(Date.now() - 3 * 864e5).toISOString();
+  return b;
+}
+async function ajout3(nav) {
+  // A3.1 · « N choses à revoir » jamais au-dessus du titre : rien dans la page ; la cloche porte le point ambre ; sa feuille, la ligne.
+  {
+    const o = await ouvrir(nav, { W: 390, sombre: false, b: baseRetard(), url: '/?tab=annonces' }); await pret(o.pg);
+    await attendre(o.pg, () => o.pg.evaluate(() => { const f = document.querySelector('[data-fraicheur-unique]'); return f && !/encours|charge/.test(f.getAttribute('data-fraicheur-unique')); }), 15000);
+    const e = await o.pg.evaluate(() => {
+      const f = document.querySelector('[data-fraicheur-unique]'); const h = document.querySelector('.vrm-main h1');
+      const hote = f && f.closest('.vrm-fraicheur-hote'); const r = hote ? hote.getBoundingClientRect() : null;
+      return { etat: f && f.getAttribute('data-fraicheur-unique'), hauteur: r ? Math.round(r.height) : 0, au_dessus: !!(r && h && r.height > 1 && r.bottom <= h.getBoundingClientRect().top + 1),
+        point: (document.querySelector('[data-centre-notifs-cloche]') || {}).getAttribute?.('data-cn-alerte') || null };
+    });
+    dit(e.etat === 'retard', 'A3.1 le cas servi : un compte pas relu depuis 3 jours ⇒ « à revoir »', String(e.etat));
+    dit(e.hauteur <= 1 && !e.au_dessus, 'A3.1 « à revoir » ne s\'écrit pas en tête de page (jamais au-dessus du titre)', `${e.hauteur} px`);
+    dit(e.point === '1', 'A3.1 … la cloche porte un point ambre', String(e.point));
+    await toucher(o.pg, '[data-centre-notifs-cloche]'); await o.pg.waitForTimeout(1500);
+    await attendre(o.pg, () => o.pg.evaluate(() => { const x = document.querySelector('[data-centre-fraicheur] [data-fraicheur-unique]'); return x && x.getAttribute('data-fraicheur-unique') === 'retard'; }), 12000);
+    const f = await o.pg.evaluate(() => { const x = document.querySelector('[data-centre-fraicheur] [data-fraicheur-unique]'); if (!x) { const d = document.querySelector('[data-centre-fraicheur]'); return { absent: true, entete: d ? d.innerHTML.slice(0, 120) : null, feuille: !!document.querySelector('[data-centre-notifs]') }; } const r = x.getBoundingClientRect(); return { etat: x.getAttribute('data-fraicheur-unique'), h: Math.round(r.height), txt: x.innerText.replace(/\s+/g, ' ').slice(0, 60) }; });
+    dit(!!f && f.etat === 'retard' && f.h >= 40, 'A3.1 … et sa feuille montre la ligne entière (détail et geste)', JSON.stringify(f));
+    if (CAPTURES) await o.pg.screenshot({ path: path.join(CAPTURES, `coque-cloche-${SUFFIXE}.png`) });
+    await o.ctx.close();
+  }
+  // A3.2 · le titre : le « ? » à côté, pas de phrase écrite dessous.
+  for (const url of ['/?tab=annonces', '/?tab=ventes']) {
+    const o = await ouvrir(nav, { W: 390, sombre: false, b: base(), url }); await pret(o.pg);
+    const t = await o.pg.evaluate(() => {
+      const h = [...document.querySelectorAll('.vrm-main h1')].find((x) => x.getBoundingClientRect().height > 0); if (!h) return null;
+      const p = h.parentElement.querySelector('.vrm-phrase-ecran'); if (!p) return { sans: true };
+      const lisible = [...p.childNodes].map((n) => (n.nodeType === 3 ? n.nodeValue : (n.classList && n.classList.contains('vrm-sr-seul') ? '' : n.innerText || ''))).join('').replace(/[?\s]/g, '');
+      const b = p.querySelector('button, [role="button"]'); const rh = h.getBoundingClientRect(); const rb = b ? b.getBoundingClientRect() : null;
+      return { lisible, memeLigne: !!rb && Math.abs((rb.top + rb.height / 2) - (rh.top + rh.height / 2)) < 20 };
+    });
+    dit(!!t && (t.sans || (t.lisible === '' && t.memeLigne)), `${url} · A3.2 sous le grand titre, aucune phrase écrite ; le « ? » sur la ligne du titre`, JSON.stringify(t));
+    await o.ctx.close();
+  }
+  // A3.3 · « Nouvelle version de VRM » : jamais un bandeau posé sur la liste ni au-dessus de la barre du bas.
+  {
+    const o = await ouvrir(nav, { W: 390, sombre: false, b: base(), url: '/?tab=achats' }); await pret(o.pg);
+    await o.pg.evaluate(() => { window.__vrmMajDispo = 'assets/index-banc.js'; window.dispatchEvent(new Event('vrm:maj-dispo')); });
+    await o.pg.waitForTimeout(3200);
+    const m = await o.pg.evaluate(() => {
+      const x = document.querySelector('[data-maj-dispo]'); if (!x) return null;
+      const r = x.getBoundingClientRect(); const bar = document.querySelector('.vrm-tabbar'); const rb = bar ? bar.getBoundingClientRect() : null;
+      const main = document.querySelector('.vrm-main'); const premier = main && [...main.children].find((c) => c.getBoundingClientRect().height > 2 && getComputedStyle(c).position !== 'fixed');
+      const rp = premier ? premier.getBoundingClientRect() : null;
+      return { haut: Math.round(r.top), bas: Math.round(r.bottom), barre: rb ? Math.round(rb.top) : null, contenu: rp ? Math.round(rp.top) : null };
+    });
+    dit(!!m, 'A3.3 « Mettre à jour » toujours proposé (rien de perdu)');
+    dit(!!m && m.barre != null && m.bas < m.barre - 200, 'A3.3 … pas au-dessus de la barre du bas', JSON.stringify(m));
+    dit(!!m && m.contenu != null && m.contenu >= m.bas - 1, 'A3.3 … une ligne sous la barre du haut qui pousse la page : rien du contenu dessous', JSON.stringify(m));
+    if (CAPTURES) await o.pg.screenshot({ path: path.join(CAPTURES, `coque-maj-${SUFFIXE}.png`) });
+    await o.ctx.close();
+  }
+}
+
 // ── P : 1 000 annonces, l'arbre d'avant contre celui-ci ──
 // Les annonces inventées à l'écran (leur titre, la feuille de texte la plus fine), par le texte seulement.
 const vusALecranSrc = `window.vusALecran = (m) => { const vus = new Set(); const it = document.createTreeWalker(m, NodeFilter.SHOW_TEXT); let n; while ((n = it.nextNode())) { const t = n.nodeValue; const k = /Paire inventée (\\d+)/.exec(t || ''); if (!k) continue; const e = n.parentElement; const r = e.getBoundingClientRect(); if (r.height > 0 && r.top < innerHeight - 60 && r.bottom > 60) vus.add(k[1]); } return vus.size; };`;
@@ -270,6 +337,7 @@ async function captures(nav) {
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] });
   try {
     if (veut('regles')) await regles(nav);
+    if (veut('ajout3')) await ajout3(nav);
     if (veut('vitesse')) await vitesse(nav);
     if (veut('captures')) await captures(nav);
   } catch (e) { dit(false, 'le banc a planté', String(e && e.stack || e).slice(0, 400)); }
