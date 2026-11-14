@@ -101,7 +101,8 @@ dès qu'il y a des ventes eBay.
 - **branche** : 92 / 92 verts (passe complète avant le merge) ; après le merge de `origin/main`, 87 / 92 sur
   une machine saturée (charge 60–80, d'autres sessions y construisaient en même temps) : en 390 sombre, le fond
   OpenFreeMap n'est pas arrivé dans ses 12 s (la carte tombe alors en liste, comme prévu : « la liste reste
-  juste ») et « Tout » a pris 1 078 ms à 1512 ; ces deux passes relancées seules : voir le rapport final ;
+  juste ») et « Tout » a pris 1 078 ms à 1512 ; ces deux passes relancées seules sur l'arbre fusionné :
+  **23 / 23 chacune** (« Tout » en 99 ms à 390 sombre, 671 ms à 1512 clair) ;
 - **mutant** (`{s.frais == null ? '—' : …}` ⇒ `eur(s.frais || 0)`) : **rouge** (2 contrôles : Leboncoin
   écrit « 0 € ») ;
 - **`origin/main`** : **rouge** (ni « Frais de l'année » ni « Carte de tes ventes »).
