@@ -144,6 +144,8 @@ export function BilanMinute({ bilan, onFin, onPasser, FermeAuRetour = null }) {
                 </li>
               ))}
             </ul>
+            {/* (14 nov., Julien : « il ne doit pas se sentir seul ») L'aide de chaque écran, dite ici. */}
+            <p className="vrm-an-note vrm-an-entre" style={{ '--i': 6 }} data-bilan-aide="">{tr('nouveaux.bilan.aide')}</p>
             <div className="vrm-an-pied">
               <button type="button" ref={bouton} className="vrm-an-principal" data-bilan-fin="" onClick={() => onFin && onFin()}>{tr('nouveaux.bilan.commencer')}</button>
             </div>
@@ -247,6 +249,8 @@ export function PremierColis({ deps, onFini, notifs }) {
           <DessinColis etape={etape} />
           <h2 id="vrm-an-colis-titre" className="vrm-an-h2">{tr(`nouveaux.colis.${etape}.titre`)}</h2>
           <p className="vrm-an-texte">{tr(`nouveaux.colis.${etape}.texte`)}</p>
+          {/* Le geste en vidéo (lot 49, le « ? » de Ventes) : le guide se range, l'aide s'ouvre. */}
+          <button type="button" className="vrm-an-secondaire vrm-an-video" data-colis-video="" onClick={() => { fin('aide'); try { window.dispatchEvent(new CustomEvent('vrm:aide', { detail: { ecran: 'ventes' } })); } catch (_) {} }}>{tr('nouveaux.aide.video')}</button>
           {dernier && notifs ? <div className="vrm-an-colis-notifs"><QuestionNotifs mode={notifs} moment="premier-colis" deps={deps} onFini={() => fin('fait')} /></div> : null}
         </div>
         {!(dernier && notifs) ? (

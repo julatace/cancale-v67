@@ -73,4 +73,6 @@ export default {
   "nouveaux.parcours.ebay.ligne": "Paramètres → Comptes eBay → Relier un compte.",
   "nouveaux.parcours.ebay.ok": "Compte eBay relié",
   "nouveaux.parcours.attente": "Compte vu. Lecture de tes annonces…",
+  "nouveaux.aide.video": "Voir le geste en vidéo",
+  "nouveaux.bilan.aide": "Une question ? Le « ? » de chaque écran montre le geste, en vidéo.",
 };

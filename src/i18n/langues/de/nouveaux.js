@@ -73,4 +73,6 @@ export default {
   "nouveaux.parcours.ebay.ligne": "Einstellungen → eBay-Konten → Konto verbinden.",
   "nouveaux.parcours.ebay.ok": "eBay-Konto verbunden",
   "nouveaux.parcours.attente": "Konto erkannt. Anzeigen werden gelesen…",
+  "nouveaux.aide.video": "Im Video ansehen",
+  "nouveaux.bilan.aide": "Eine Frage? Das „?“ auf jedem Bildschirm zeigt es im Video.",
 };

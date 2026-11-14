@@ -182,6 +182,7 @@ async function scenarioV(nav, W, theme) {
   await attendre(o.pg, async () => { const q = await bilan(o.pg); return q && q.page === 'matin'; }, 4000);
   b = await bilan(o.pg);
   dit(b && b.page === 'matin' && b.matin === 4, `${T} V4 « Suivant » ⇒ « chaque matin, VRM… » (4 choses)`, JSON.stringify(b));
+  dit(!!(await o.pg.$('[data-bilan-aide]')), `${T} V4 accompagné : où trouver l'aide de chaque écran`);
   await capture(o.pg, `an-${W}-${theme}-bilan-2`);
   await o.pg.click('[data-bilan-fin]');
   await attendre(o.pg, async () => !(await bilan(o.pg)), 4000);
@@ -216,6 +217,7 @@ async function scenarioV(nav, W, theme) {
   await o.pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:bordereau-imprime', { detail: { serie: false, avant: 0 } })));
   const colis = await attendre(o.pg, async () => !!(await o.pg.$('[data-premier-colis="imprimer"]')), 5000);
   dit(colis, `${T} V7 le premier bordereau imprimé seul ⇒ « Ton premier colis · 1 sur 4 »`);
+  dit(!!(await o.pg.$('[data-premier-colis] [data-colis-video]')), `${T} V7 accompagné : « Voir le geste en vidéo » à chaque étape`);
   await capture(o.pg, `an-${W}-${theme}-colis-1`);
   for (const e of ['imprimer', 'coller', 'deposer']) { const s = await o.pg.$(`[data-colis-suivant="${e}"]`); if (s) await s.click(); await o.pg.waitForTimeout(450); }
   const etape4 = await o.pg.$('[data-premier-colis="suivre"]');

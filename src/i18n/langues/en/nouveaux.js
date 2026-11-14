@@ -73,4 +73,6 @@ export default {
   "nouveaux.parcours.ebay.ligne": "Settings → eBay accounts → Connect an account.",
   "nouveaux.parcours.ebay.ok": "eBay account connected",
   "nouveaux.parcours.attente": "Account seen. Reading your listings…",
+  "nouveaux.aide.video": "Watch it in a video",
+  "nouveaux.bilan.aide": "A question? The “?” on each screen shows how, in a video.",
 };

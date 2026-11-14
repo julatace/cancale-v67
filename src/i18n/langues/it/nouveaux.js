@@ -73,4 +73,6 @@ export default {
   "nouveaux.parcours.ebay.ligne": "Impostazioni → Account eBay → Collega un account.",
   "nouveaux.parcours.ebay.ok": "Account eBay collegato",
   "nouveaux.parcours.attente": "Account visto. Lettura dei tuoi annunci…",
+  "nouveaux.aide.video": "Guarda il gesto in video",
+  "nouveaux.bilan.aide": "Una domanda? Il «?» di ogni schermata mostra il gesto, in video.",
 };

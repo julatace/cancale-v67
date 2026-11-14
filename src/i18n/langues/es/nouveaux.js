@@ -73,4 +73,6 @@ export default {
   "nouveaux.parcours.ebay.ligne": "Ajustes → Cuentas de eBay → Vincular una cuenta.",
   "nouveaux.parcours.ebay.ok": "Cuenta de eBay vinculada",
   "nouveaux.parcours.attente": "Cuenta vista. Leyendo tus anuncios…",
+  "nouveaux.aide.video": "Ver el gesto en vídeo",
+  "nouveaux.bilan.aide": "¿Una duda? El «?» de cada pantalla muestra el gesto, en vídeo.",
 };
