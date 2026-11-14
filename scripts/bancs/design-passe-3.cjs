@@ -259,7 +259,7 @@ const ECRANS = [
   // Un fil de Messages ouvert.
   { nom: 'messages', url: '/?tab=messages', jouer: async (o, mesure) => {
     await o.pg.waitForSelector('.vrm-inbox-row', { timeout: 8000 }).catch(() => {});
-    if (await toucher(o, '.vrm-inbox-row')) { await o.pg.waitForTimeout(1500); await mesure('fil', ['.vrm-main', '.vrm-fs']); }
+    if (await toucher(o, '.vrm-inbox-row')) { await o.pg.waitForTimeout(1500); await mesure('fil', ['.vrm-main', '.vrm-fs', '.vrm-chat-panel']); }
     else console.log('  · messages-fil : aucune conversation (pas mesuré)');
   } },
   // Paramètres : les sous-pages (Notifications d'abord).
