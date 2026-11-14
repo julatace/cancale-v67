@@ -2153,6 +2153,11 @@ const makeChallenge = async (v) => b64url(await crypto.subtle.digest('SHA-256', 
 const OAUTH_PROVIDERS = [
   { id: 'google',  label: 'Google' },
   { id: 'discord', label: 'Discord' },
+  // (14 nov., idée d'accueil 143) « Continuer avec Apple » : PRÊT et ÉTEINT. Comme les deux autres,
+  // le bouton n'existe que si Supabase dit le fournisseur ACTIVÉ (`providerEnabled`, lu dans
+  // /auth/v1/settings) — tant que Julien n'a pas de compte développeur Apple (99 €/an) et ne
+  // l'a pas activé chez Supabase, rien ne s'affiche. Geste : docs/passation/2026-11-14-accueil-reste.md.
+  { id: 'apple',   label: 'Apple' },
 ];
 
 // ── CE QUE LA BASE ACCEPTE VRAIMENT ───────────────────────────────────────
@@ -2180,7 +2185,7 @@ const loadAuthSettings = () => {
       if(!r.ok)throw Error('Lecture indisponible');
       const j=await r.json();
       if(!j||!j.external||typeof j.external!=='object'||Array.isArray(j.external)
-        ||['google','discord'].some(id=>j.external[id]!==undefined&&typeof j.external[id]!=='boolean')
+        ||['google','discord','apple'].some(id=>j.external[id]!==undefined&&typeof j.external[id]!=='boolean')
         ||(j.mailer_autoconfirm!==undefined&&typeof j.mailer_autoconfirm!=='boolean'))throw Error('Réponse incomplète');
       AUTH_SETTINGS=j;AUTH_SETTINGS_ETAT='pret';
     }catch(_){AUTH_SETTINGS=null;AUTH_SETTINGS_ETAT='erreur';}
@@ -2250,7 +2255,7 @@ const compteOAuthNeuf=(u)=>{
   try{
     const ids=Array.isArray(u?.identities)?u.identities.map(i=>i?.provider).filter(Boolean):[];
     if(!ids.length||ids.includes('email'))return'';
-    const fourn=ids.find(p=>p==='discord'||p==='google');if(!fourn)return'';
+    const fourn=ids.find(p=>p==='discord'||p==='google'||p==='apple');if(!fourn)return'';
     const cree=Date.parse(u?.created_at||'');if(!Number.isFinite(cree))return'';
     return Date.now()-cree<10*60*1000?fourn:'';
   }catch(_){return'';}
@@ -2259,7 +2264,7 @@ const compteOAuthNeuf=(u)=>{
 // vieux (> 10 min) : la liaison automatique de Supabase par adresse vérifiée. Sinon ''.
 const identiteRelieeAuto=(u,f)=>{
   try{
-    if(f!=='google'&&f!=='discord')return'';
+    if(f!=='google'&&f!=='discord'&&f!=='apple')return'';
     const cree=Date.parse(u?.created_at||'');if(!Number.isFinite(cree)||Date.now()-cree<10*60*1000)return'';
     const id=(Array.isArray(u?.identities)?u.identities:[]).find(i=>i&&i.provider===f);
     const t=Date.parse(id?.created_at||'');return Number.isFinite(t)&&Date.now()-t>=-60000&&Date.now()-t<10*60*1000?f:'';
@@ -18489,7 +18494,13 @@ function Sparkline({data,color=C.accent,h=60}) {
 // chose qu'un nouveau vendeur voit — s'il hésite ici, il n'ira pas plus loin.
 // Marques Google et Discord, en SVG : un bouton de connexion sans le logo du
 // service inspire moins confiance qu'un bouton qui montre où on va.
-const BrandMark = ({ id }) => id === 'google' ? (
+// (14 nov., 143) La pomme d'Apple : au trait de l'encre courante (Apple demande son logo noir
+// sur clair, blanc sur sombre — jamais une couleur), comme les boutons « Sign in with Apple ».
+const BrandMark = ({ id }) => id === 'apple' ? (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style={{flexShrink:0}} data-marque="apple">
+    <path d="M16.37 12.6c-.02-2.2 1.8-3.26 1.88-3.31-1.03-1.5-2.62-1.7-3.19-1.73-1.36-.14-2.65.8-3.34.8-.69 0-1.75-.78-2.88-.76-1.48.02-2.85.86-3.61 2.19-1.54 2.67-.39 6.62 1.1 8.79.73 1.06 1.6 2.25 2.74 2.2 1.1-.04 1.51-.71 2.84-.71 1.32 0 1.7.71 2.86.69 1.18-.02 1.93-1.08 2.65-2.14.84-1.23 1.18-2.42 1.2-2.48-.03-.01-2.3-.88-2.32-3.5zM14.18 6.13c.6-.73 1.01-1.75.9-2.76-.87.04-1.92.58-2.54 1.31-.56.65-1.05 1.69-.92 2.68.97.08 1.96-.49 2.56-1.23z"/>
+  </svg>
+) : id === 'google' ? (
   <svg width="17" height="17" viewBox="0 0 48 48" aria-hidden="true" style={{flexShrink:0}}>
     <path fill="#8DB8F2" d="M45.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11.8c-.5 2.7-2 5-4.4 6.6v5.5h7.1c4.1-3.8 6.6-9.4 6.6-16.1z"/>
     <path fill="#34A853" d="M24 46c5.9 0 10.9-2 14.5-5.4l-7.1-5.5c-2 1.3-4.5 2.1-7.4 2.1-5.7 0-10.5-3.8-12.2-9H4.5v5.7C8.1 41.1 15.5 46 24 46z"/>

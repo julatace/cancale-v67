@@ -2247,7 +2247,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // Discord » (pseudo de la carte, `DiscordCompte`) ne s'affiche plus ici : elle faisait croire
       // que Discord était relié pour se connecter (c'est ainsi que le compte en trop a été créé) ;
       // le pseudo de la carte se relie dans Communauté.
-      {id:'google',type:'el',el:<ConnexionsCompte nu theme={C} providers={OAUTH_PROVIDERS} enabled={providerEnabled} relier={oauthRelier} lire={lireConnexionsOAuth} delier={oauthDelier} retour={AUTH_REDIRECT?.error||(AUTH_REDIRECT?.liaison==='google'?tr('reglages.associe',{ nom:'Google' }):AUTH_REDIRECT?.liaison==='discord'?tr('reglages.associe',{ nom:'Discord' }):'')} icone={id=><BrandMark id={id}/>}/>},
+      {id:'google',type:'el',el:<ConnexionsCompte nu theme={C} providers={OAUTH_PROVIDERS} enabled={providerEnabled} relier={oauthRelier} lire={lireConnexionsOAuth} delier={oauthDelier} retour={AUTH_REDIRECT?.error||(AUTH_REDIRECT?.liaison==='google'?tr('reglages.associe',{ nom:'Google' }):AUTH_REDIRECT?.liaison==='discord'?tr('reglages.associe',{ nom:'Discord' }):AUTH_REDIRECT?.liaison==='apple'?tr('reglages.associe',{ nom:'Apple' }):'')} icone={id=><BrandMark id={id}/>}/>},
     ]},
     // (29 oct., revue) PAS de carte Photoroom ici : le 17 oct. Julien a dit du
     // détourage « ne le mets pas dans les paramètres ». Elle vit sur l'écran

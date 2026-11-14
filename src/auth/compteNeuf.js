@@ -11,7 +11,7 @@
 //   lue avec la clé de service, et exige un compte VIDE) et l'écran le dit.
 //   Créer un compte avec Discord/Google reste possible, mais EXPLICITE (inscription).
 // Même règle ici et sur le serveur (le serveur importe ce fichier).
-export const FOURNISSEURS_OAUTH = Object.freeze(['google', 'discord']);
+export const FOURNISSEURS_OAUTH = Object.freeze(['google', 'discord', 'apple']);   // (14 nov., 143) Apple : prêt, éteint tant que Supabase ne l'active pas
 export const FENETRE_NEUF_MS = 10 * 60 * 1000;   // créé il y a moins de 10 min
 export const ECART_CONNEXION_MS = 2 * 60 * 1000; // et jamais reconnecté depuis (mesuré : 1,4 s entre création et 1re connexion)
 export const CLE_INTENTION = 'vrm_oauth_intention';
