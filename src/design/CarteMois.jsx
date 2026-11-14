@@ -7,7 +7,8 @@
 import React, { useLayoutEffect, useRef } from 'react';
 import { cheminMonotone } from '../courbeMonotone.js';
 import { PileVignettes } from './PileVignettes.jsx';
-import './carte-pages.css';   // (11 nov., lot stats-plus) plus de trois cases : pages de 2×2 au téléphone
+import './carte-pages.css';
+import '../ui/ui.css';   // (14 nov.) la bande de chiffres des écrans de liste (`bande`)   // (11 nov., lot stats-plus) plus de trois cases : pages de 2×2 au téléphone
 
 // La courbe : des valeurs (une par jour), dessinées sans sommet inventé
 // (interpolation monotone), remplissage dégradé. Moins de trois points ⇒ rien (deux points font un trait plat, pas une tendance — critique du 3 nov., #12).
@@ -122,7 +123,7 @@ function ChiffreCase({ n, nc }) {
 // (9 nov., Ma journée v2) `tete` : un bloc qui prend la place du grand chiffre (et de son
 // surtitre, de sa sous-ligne, de sa pile) — la frise de la semaine de Ma journée, qui porte
 // le MÊME chiffre (« vendu » du jour) pour le jour choisi : jamais deux fois à l'écran.
-export default function CarteMois({ surtitre, valeur, sous = null, cases = [], courbe = null, pile = null, enHaut = null, children = null, className = '', action = null, nu = false, grandAttrs = null, tete = null, ...attrs }) {
+export default function CarteMois({ surtitre, valeur, sous = null, cases = [], courbe = null, pile = null, enHaut = null, children = null, className = '', action = null, nu = false, grandAttrs = null, tete = null, bande = false, ...attrs }) {
   const vide = valeur == null || valeur === '';
   // (3 nov., cas extrêmes) Un montant à 5 chiffres (« 35 211,97 € ») ne se coupe jamais
   // en « 35 211,9… » : la taille descend d'un pixel à la fois jusqu'à ce qu'il tienne
@@ -142,6 +143,35 @@ export default function CarteMois({ surtitre, valeur, sous = null, cases = [], c
   // courbe et le grand chiffre commencent dessous, rien ne peut plus passer sous lui. Posée
   // nue dans une tête (Ma journée), la tête le place sur la ligne de son titre.
   const enRangee = !nu && !!action;
+  // (14 nov., refonte des listes — Julien, AJOUT 3 : « carte sombre géante pour un seul chiffre ») `bande` : sur un
+  // écran de LISTE, les MÊMES chiffres (le grand, puis les cases, « Modifier ») en une BANDE ≤ 72 px sur le fond de la
+  // page (la forme de src/ui/BandeChiffres.jsx). Un chiffre PAS SU n'y prend pas de place (jamais une case pour « — ») ;
+  // il reste dit au lecteur d'écran. Mêmes classes de lecture (`.vrm-fu-grand`, `[data-fu-case]`) pour l'instantané.
+  if (bande && !nu) {
+    const classes = String(className || '').split(/\s+/).filter((c) => c && c !== 'vrm-fu-ecran').join(' ');
+    const vues = (cases || []).filter((c) => c && c.n != null);
+    const pasSus = (cases || []).filter((c) => c && c.n == null);
+    return (
+      <section className={'vrm-fu-bande vrm-ui-bande' + (classes ? ' ' + classes : '')} data-fu-bande={vues.length + 1} {...attrs}>
+        {enHaut}
+        {/* Le grand chiffre PAS SU ne prend pas de place non plus : il reste lu (et lisible par l'instantané). */}
+        <div className={'vrm-ui-bande-item vrm-fu-bande-grand' + (vide ? ' vrm-sr-seul' : '')}>
+          <div ref={grandRef} className={'vrm-fu-grand vrm-ui-bande-n' + (vide ? ' is-vide' : '')} {...(grandAttrs || {})}>{vide ? '—' : <ChiffreRoule valeur={valeur} />}</div>
+          {sous ? <div className="vrm-fu-sous vrm-ui-bande-l">{sous}</div> : null}
+        </div>
+        {vues.map((c) => {
+          const lu = `${texteDe(c.l)} : ${texteDe(c.n)}`;
+          const corps = <><span className="vrm-sr-seul">{lu}</span><b className="vrm-ui-bande-n" aria-hidden="true" data-fu-case-chiffre=""><ChiffreRoule valeur={c.n} /></b><span className="vrm-ui-bande-l" aria-hidden="true">{c.l}</span></>;
+          return c.onClick
+            ? <button key={c.cle} type="button" className="vrm-fu-case vrm-ui-bande-item" data-fu-case={c.cle} title={c.titre} onClick={c.onClick} {...(c.attrs || {})}>{corps}</button>
+            : <div key={c.cle} className="vrm-fu-case vrm-ui-bande-item" data-fu-case={c.cle} title={c.titre} {...(c.attrs || {})}>{corps}</div>;
+        })}
+        {pasSus.length ? <span className="vrm-sr-seul" data-fu-bande-pas-su={pasSus.map((c) => c.cle).join(',')}>{pasSus.map((c) => `${texteDe(c.l)} : pas su${c.raison ? ', ' + texteDe(c.raison) : ''}`).join(' · ')}</span> : null}
+        {action ? <div className="vrm-fu-bande-action">{action}</div> : null}
+        {children}
+      </section>
+    );
+  }
   return (
     <section className={(nu ? 'vrm-fu-carte-nu' : 'vrm-fu-carte') + (action ? ' a-action' : '') + (enRangee ? ' a-rangee' : '') + (className ? ' ' + className : '')} {...(nu ? {} : { 'data-fu-carte': '' })} {...attrs}>
       {enHaut}

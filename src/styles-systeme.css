@@ -616,3 +616,146 @@
 :root:root body .vrm-main .vrm-buy-menu [data-achat-masquer] { color: var(--d-encre) !important; }
 
 } /* fin @layer vrm-premium */
+
+/* ══ §4 ATELIER — la direction artistique commune (14 nov.) ═══════════════════
+   Julien (14 nov.) : « le design fait basique, il faut vraiment qu'on sorte des
+   classiques ». Une liste iOS propre ne suffit plus : la paire est la matière,
+   le chiffre est une affiche, la profondeur remplace les traits, une carte héros
+   par écran, un mouvement court qui répond au doigt.
+   Ces jetons sont COMMUNS aux trois chantiers (coque, listes, achats) : on les
+   LIT, on ne recopie pas leurs valeurs. Toujours la famille --d-* (pas une
+   septième famille). Rien de métier ici ; un seul accent, rare ; ambre = geste ;
+   rouge = doublon de N° seulement ; violet interdit ; montants à l'encre.
+   Hors couche, sous `:root:root` (comme §1) : ils passent devant toutes les
+   feuilles d'avant. Les classes utilitaires `.vrm-at-*` sont hors couche aussi :
+   des classes neuves, que personne d'autre ne vise.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root:root {
+  /* Fond : très légèrement chaud, pas le gris plat d'iOS (#F2F2F7). */
+  --d-fond-atelier: #F4F3EF;
+  --d-surface-atelier: #FFFFFF;          /* la carte posée sur ce fond */
+  --d-surface-atelier-2: #FAF9F6;        /* une case dans une carte */
+
+  /* Profondeur, pas de traits : une ombre diffuse à deux couches ; la nuit, aucune. */
+  --d-ombre-douce: 0 1px 2px rgb(0 0 0 / .04), 0 8px 24px rgb(0 0 0 / .06);
+  --d-ombre-douce-haute: 0 2px 6px rgb(0 0 0 / .05), 0 16px 40px rgb(0 0 0 / .09);   /* au survol, une feuille */
+  --d-ombre-heros: 0 2px 4px rgb(0 0 0 / .06), 0 20px 44px -14px rgb(14 31 61 / .45);
+  --d-filet-indente: rgb(60 60 67 / .12);   /* séparateur fin, indenté après la vignette */
+
+  /* La carte héros : encre profonde qui glisse vers le bleu nuit (une carte Wallet). */
+  --d-heros-fond: #1D1D1F;
+  --d-heros-degrade: radial-gradient(120% 90% at 100% 0%, rgb(40 84 160 / .38) 0%, rgb(40 84 160 / 0) 60%), linear-gradient(150deg, #1D1D1F 0%, #17213A 58%, #0F2A55 100%);
+  --d-heros-encre: #F5F5F7;
+  --d-heros-gris: rgb(235 235 245 / .64);   /* ≥ 6:1 sur tout le dégradé */
+  --d-heros-filet: rgb(255 255 255 / .12);
+  --d-heros-remplir: rgb(255 255 255 / .12);
+  --d-heros-courbe: rgb(255 255 255 / .85); /* la mini-courbe (sparkline) sur le héros */
+  --d-heros-courbe-aire: rgb(255 255 255 / .10);
+
+  /* Rayons de l'atelier. */
+  --d-r-photo: 16px;                 /* vignette de paire : 14–20 */
+  --d-r-photo-grande: 20px;
+  --d-r-heros: 24px;                 /* la carte héros */
+  --d-r-pastille-icone: 10px;        /* la pastille d'icône teintée */
+  --d-pastille-icone: 32px;
+
+  /* Typographie d'affiche : LE chiffre d'un écran, énorme ; son libellé, petit. */
+  --d-t-affiche-48: 48px;
+  --d-t-affiche-56: 56px;
+  --d-t-affiche-64: 64px;
+  --d-t-affiche: clamp(48px, 13vw, 64px);   /* 48 à 360 px · 51 à 390 px · 64 au-delà */
+  --d-ap-affiche: -.03em;
+  --d-il-affiche: 1;
+  --d-g-affiche: 700;
+  --d-t-libelle: 13px; --d-g-libelle: 600;  /* le libellé sous une affiche */
+  --d-t-grand-titre: 34px; --d-ap-grand-titre: -.026em; --d-g-grand-titre: 700;
+
+  /* Le matériau translucide (barres du haut et du bas, iOS). */
+  --d-materiau: rgb(249 248 245 / .72);
+  --d-materiau-plein: #F9F8F5;              /* transparence réduite : opaque */
+  --d-materiau-flou: saturate(180%) blur(20px);
+  --d-materiau-filet: rgb(0 0 0 / .08);
+
+  /* Mouvement : ressort court. Sans rebond par défaut (amorti critique) ; le
+     rebond seulement après un geste qui a de l'élan. Appui = scale(.97). */
+  --d-ressort: cubic-bezier(.32, .72, 0, 1);
+  --d-ressort-rebond: linear(0, .006, .025 2.8%, .101 6.1%, .539 18.9%, .721 25.3%, .849 31.5%, .937 38.1%, .968 41.8%, .991 45.7%, 1.006 50%, 1.015 55%, 1.017 63.9%, 1.001 85.9%, 1);
+  --d-m-ressort: 320ms;                     /* une carte, une feuille */
+  --d-m-rangee: 240ms;                      /* l'apparition d'une rangée */
+  --d-m-decalage: 24ms;                     /* décalage entre deux rangées (20–30) */
+  --d-m-appui: 100ms;
+  --d-appui: scale(.97);
+
+  /* ⚠️ AJOUT 2 (« imagine si j'ai 1000 articles ») — passe AVANT l'atelier :
+     une RANGÉE de liste est dense (64–72 px, vignette 48–56), SANS ombre ni flou ;
+     les ombres sont pour les cartes, le flou pour les deux barres seulement ;
+     l'apparition ne joue que sur les 12 premières rangées (jamais 1 000 décalées). */
+  --d-h-rangee: 68px;                       /* hauteur d'une rangée de liste longue */
+  --d-vignette-rangee: 52px;                /* sa vignette */
+  --d-r-vignette-rangee: 12px;
+  --d-entree-max: 12;                       /* rangées animées à l'apparition, au plus (lu par `.vrm-at-entree`) */
+
+  /* Pastilles d'icônes teintées (12 %) : neutre, nuit, accent (rare), ambre (geste). */
+  --d-pastille-neutre-fond: rgb(118 118 128 / .12);  --d-pastille-neutre: #3A3A3C;
+  --d-pastille-nuit-fond: rgb(23 33 58 / .10);       --d-pastille-nuit: #17213A;
+  --d-pastille-accent-fond: rgb(0 113 227 / .12);    --d-pastille-accent: #0066CC;
+  --d-pastille-ambre-fond: rgb(255 159 10 / .14);    --d-pastille-ambre: #B25000;
+}
+:root:root[data-theme="dark"] {
+  --d-fond-atelier: #000000;
+  --d-surface-atelier: #1C1C1E;             /* la nuit : la surface plus claire que le fond, sans ombre */
+  --d-surface-atelier-2: #2C2C2E;
+  --d-ombre-douce: none;
+  --d-ombre-douce-haute: 0 0 0 .5px rgb(255 255 255 / .08), 0 20px 48px rgb(0 0 0 / .55);
+  --d-ombre-heros: 0 0 0 .5px rgb(255 255 255 / .08);
+  --d-filet-indente: rgb(84 84 88 / .45);
+  --d-heros-fond: #1C1C1E;
+  --d-heros-degrade: radial-gradient(120% 90% at 100% 0%, rgb(64 120 220 / .30) 0%, rgb(64 120 220 / 0) 60%), linear-gradient(150deg, #1C1C1E 0%, #151E33 58%, #10284F 100%);
+  --d-materiau: rgb(22 22 24 / .72);
+  --d-materiau-plein: #161618;
+  --d-materiau-filet: rgb(255 255 255 / .10);
+  --d-pastille-neutre-fond: rgb(118 118 128 / .24);  --d-pastille-neutre: #E5E5EA;
+  --d-pastille-nuit-fond: rgb(100 140 220 / .18);    --d-pastille-nuit: #A9C4F5;
+  --d-pastille-accent-fond: rgb(10 132 255 / .18);   --d-pastille-accent: #409CFF;
+  --d-pastille-ambre-fond: rgb(255 159 10 / .18);    --d-pastille-ambre: #FFB340;
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root:root { --d-materiau: var(--d-materiau-plein); --d-materiau-flou: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:root { --d-m-ressort: 1ms; --d-m-rangee: 1ms; --d-m-decalage: 0ms; --d-appui: none; --d-ressort-rebond: var(--d-ressort); }
+}
+
+/* ── Classes utilitaires de l'atelier (à poser par les écrans, hors couche) ── */
+/* Carte posée : sans bordure, ombre douce, rayon de carte. */
+.vrm-at-carte { background: var(--d-surface-atelier); border: 0; border-radius: var(--d-r-carte); box-shadow: var(--d-ombre-douce); }
+/* Carte héros : le dégradé encre → bleu nuit, le texte clair. */
+.vrm-at-heros { background: var(--d-heros-fond); background-image: var(--d-heros-degrade); color: var(--d-heros-encre); border: 0; border-radius: var(--d-r-heros); box-shadow: var(--d-ombre-heros); padding: var(--d-e-5); overflow: hidden; position: relative; }
+.vrm-at-heros .vrm-at-libelle { color: var(--d-heros-gris); }
+/* L'affiche : le chiffre de l'écran ; le libellé dessous. */
+.vrm-at-affiche { font-size: var(--d-t-affiche); font-weight: var(--d-g-affiche); letter-spacing: var(--d-ap-affiche); line-height: var(--d-il-affiche); font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+.vrm-at-libelle { font-size: var(--d-t-libelle); font-weight: var(--d-g-libelle); color: var(--d-gris); letter-spacing: 0; line-height: 1.3; }
+/* Pastille d'icône teintée (neutre par défaut ; is-nuit, is-accent, is-ambre). */
+.vrm-at-pastille { width: var(--d-pastille-icone); height: var(--d-pastille-icone); border-radius: var(--d-r-pastille-icone); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; background: var(--d-pastille-neutre-fond); color: var(--d-pastille-neutre); }
+.vrm-at-pastille.is-nuit { background: var(--d-pastille-nuit-fond); color: var(--d-pastille-nuit); }
+.vrm-at-pastille.is-accent { background: var(--d-pastille-accent-fond); color: var(--d-pastille-accent); }
+.vrm-at-pastille.is-ambre { background: var(--d-pastille-ambre-fond); color: var(--d-pastille-ambre); }
+/* Vignette de paire : rayon généreux. */
+.vrm-at-photo { border-radius: var(--d-r-photo); overflow: hidden; object-fit: cover; }
+/* Matériau translucide (barre). */
+.vrm-at-materiau { background: var(--d-materiau); -webkit-backdrop-filter: var(--d-materiau-flou); backdrop-filter: var(--d-materiau-flou); }
+/* Appui : on enfonce au toucher (pointer-down), sans attendre le relâché. */
+.vrm-at-appui { transition: transform var(--d-m-appui) ease-out; }
+.vrm-at-appui:active { transform: var(--d-appui); }
+/* Rangée de liste longue : dense, sans ombre, sans flou, filet fin indenté ; hors
+   écran, le navigateur ne la dessine pas (`content-visibility`, place tenue : aucun saut). */
+.vrm-at-rangee { min-height: var(--d-h-rangee); box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; content-visibility: auto; contain-intrinsic-size: auto var(--d-h-rangee); }
+.vrm-at-rangee + .vrm-at-rangee { box-shadow: inset 0 .5px 0 var(--d-filet-indente); }
+.vrm-at-rangee .vrm-at-photo { width: var(--d-vignette-rangee); height: var(--d-vignette-rangee); border-radius: var(--d-r-vignette-rangee); }
+/* Apparition d'une liste en ressort court : poser `--i` (rang) sur chaque rangée.
+   SEULEMENT les 12 premières enfants (`--d-entree-max`) : la 13e et les suivantes
+   arrivent sans animation, tout de suite (1 000 rangées ne s'animent jamais). */
+@keyframes vrm-at-entree { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.vrm-at-entree:nth-child(-n+12) { animation: vrm-at-entree var(--d-m-rangee) var(--d-ressort) both; animation-delay: calc(min(var(--i, 0), var(--d-entree-max)) * var(--d-m-decalage)); }
+@media (prefers-reduced-motion: reduce) { .vrm-at-entree:nth-child(-n+12) { animation: none; } .vrm-at-appui:active { transform: none; } }
+/* ══ fin §4 ATELIER ════════════════════════════════════════════════════════ */
