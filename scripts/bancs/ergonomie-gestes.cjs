@@ -37,6 +37,8 @@ function base() {
   const a = b.accounts[0], uid = a.vinted_user_id;
   // Le régime choisi (un vendeur installé l'a posé) : « J'ai déclaré ce mois » est alors à sa place (declare-urssaf.cjs).
   Object.assign(b.main[0].data, { vinted_regime: 'micro', vinted_urssaf_taux: 12.4, vinted_urssaf_freq: 'mensuel' });
+  // Le « bilan en une minute » (accueil des nouveaux, src/bilanMinute.js) déjà vu : un vendeur installé ouvre sur Ma journée.
+  b.main[0].data.vrm_bilan_minute = { vu: '2026-11-01T10:00:00.000Z', fin: 'vu' };
   const maintenant = Date.now();
   const conv = { id: 18999000001, unread: true, updated_at: new Date(maintenant - 20 * 60e3).toISOString(), description: 'Vous feriez 55 € ?', opposite_user: { id: 95001, login: 'offreur_jour' }, item_count: 1 };
   const boite = b.rows.find((r) => r.id === `harvest_${uid}_inbox`);
