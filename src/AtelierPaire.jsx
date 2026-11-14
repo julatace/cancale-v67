@@ -24,16 +24,17 @@ const jour = (iso) => (iso ? dateLoc(iso, { day: 'numeric', month: 'short' }) : 
 const ko = (o) => (o >= 1024 * 1024 ? `${(o / 1048576).toFixed(1).replace('.', ',')} Mo` : `${Math.max(1, Math.round(o / 1024))} Ko`);
 
 // ── 102 · SES PHOTOS ─────────────────────────────────────────────────────────
-function PhotosPaire({ num, lire, ouvrirStudio, Icon }) {
+function PhotosPaire({ num, cle, lire, ouvrirStudio, Icon }) {
   const [photos, setPhotos] = React.useState(undefined);
   React.useEffect(() => {
     let vivant = true; setPhotos(undefined);
     const relire = () => { Promise.resolve(lire ? lire() : null).then((r) => { if (vivant) setPhotos(r ? r.photos : null); }).catch(() => { if (vivant) setPhotos(null); }); };
     relire();
-    const surRange = (e) => { if (e && e.detail && String(e.detail.num) === String(num)) relire(); };
+    // Une photo rangée pour CETTE paire (par la clé de son N°, jamais le texte du N°) : relue.
+    const surRange = (e) => { if (e && e.detail && cle && e.detail.cle === cle) relire(); };
     window.addEventListener('vrm:studio-range', surRange);
     return () => { vivant = false; window.removeEventListener('vrm:studio-range', surRange); };
-  }, [lire, num]);
+  }, [lire, cle]);
   const douteuses = Array.isArray(photos) ? photos.filter((p) => photoDouteuse(p.qualite)).length : 0;
   const sous = photos === undefined ? tr('atelier.photos.lecture') : photos === null ? '— ' + tr('atelier.photos.passu')
     : !photos.length ? tr('atelier.photos.aucune') : douteuses ? tr('atelier.photos.nDouteuses', { n: photos.length, d: douteuses }) : tr('atelier.photos.n', { n: photos.length });
@@ -63,7 +64,7 @@ function PhotosPaire({ num, lire, ouvrirStudio, Icon }) {
 }
 
 // ── 105 · DICTER UNE NOTE ────────────────────────────────────────────────────
-function DicterNote({ num, dictee, Icon }) {
+export function DicterNote({ num, dictee, Icon }) {
   const [direct, setDirect] = React.useState('');
   const [ecoute, setEcoute] = React.useState(false);
   const [mot, setMot] = React.useState('');
@@ -303,11 +304,12 @@ function FusionPaire({ num, fusion, Icon }) {
   );
 }
 
-export default function AtelierPaire({ num, Icon, studio, dictee, certificat, fusion }) {
+// La dictée (105) vit SOUS la note, rendue par la coque de la note (`NotePaireCoque`, App.jsx : la note ne se lit
+// qu'à un endroit) ; l'atelier rend le reste.
+export default function AtelierPaire({ num, Icon, studio, certificat, fusion }) {
   return (
     <div className="vrm-at" data-atelier-paire={num}>
-      {dictee ? <DicterNote num={num} dictee={dictee} Icon={Icon}/> : null}
-      {studio ? <PhotosPaire num={num} lire={studio.lire} ouvrirStudio={studio.ouvrir} Icon={Icon}/> : null}
+      {studio ? <PhotosPaire num={num} cle={studio.cle} lire={studio.lire} ouvrirStudio={studio.ouvrir} Icon={Icon}/> : null}
       {certificat && certificat.cle ? <CertificatPaire cle={certificat.cle} num={num} base={certificat.base} Icon={Icon} confirmer={certificat.confirmer} dire={certificat.dire}/> : null}
       <FusionPaire num={num} fusion={fusion} Icon={Icon}/>
     </div>

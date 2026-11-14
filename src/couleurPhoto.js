@@ -18,8 +18,9 @@
 export const V_COULEUR = 1;
 export const FAMILLES = ['noir', 'blanc', 'gris', 'beige', 'marron', 'rouge', 'orange', 'jaune', 'vert', 'bleu', 'violet', 'rose'];
 export const PART_MIN = 0.22;       // une couleur est « de la paire » si elle en couvre au moins 22 %
-// La pastille affichée pour chaque famille (un repère visuel, pas une donnée).
-export const TEINTES = { noir: '#1c1c1e', blanc: '#f5f5f7', gris: '#8e8e93', beige: '#d8c7a6', marron: '#7a4e2d', rouge: '#d70015', orange: '#ff8a00', jaune: '#ffd60a', vert: '#2fa84f', bleu: '#0a64d8', violet: '#7d3cc8', rose: '#ff5fa2' };
+// La pastille affichée pour chaque famille (un repère visuel). Le rouge est un rouge SOMBRE (lie-de-vin) :
+// le rouge vif reste réservé à deux paires sous un N° (§7), même sur une pastille de couleur.
+export const TEINTES = { noir: '#1c1c1e', blanc: '#f5f5f7', gris: '#8e8e93', beige: '#d8c7a6', marron: '#7a4e2d', rouge: '#6e0a16', orange: '#ff8a00', jaune: '#ffd60a', vert: '#2fa84f', bleu: '#0a64d8', violet: '#7d3cc8', rose: '#ff5fa2' };
 
 // Les mots de chaque famille, dans les cinq langues de VRM (sans accents, minuscules).
 // Le premier mot de chaque langue est celui qu'on AFFICHE.

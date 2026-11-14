@@ -5328,16 +5328,32 @@ const editerNotePaire = async (paire, actuelle) => {
 };
 // `ajout` : l'icône discrète pour en écrire une quand il n'y en a pas (Annonces,
 // fiche paire, Stock, Préparer) ; ailleurs (Ventes, scan) seule une note existante se montre.
-function NotePaireCoque({ numero = '', itemId = '', recreeDe = '', variante = 'ligne', ajout = false, rangee = false }) {
+// (14 nov., proposition 105) `dicter` : sous la note de la fiche, « Dicter une note » — la reconnaissance du
+// NAVIGATEUR seulement (src/noteVocale.js) ; le texte s'AJOUTE à la note, par le même geste annulable.
+const DicterNoteLazy = aLaDemande(() => import('./AtelierPaire.jsx').then((m) => ({ default: m.DicterNote })));
+function NotePaireCoque({ numero = '', itemId = '', recreeDe = '', variante = 'ligne', ajout = false, rangee = false, dicter = false }) {
   const notes = React.useSyncExternalStore(abonnerNotes, lireNotesPaires);
   const amb = React.useSyncExternalStore(abonnerNotes, lireNumerosAmbigus);
   const paire = { numero, itemId, recreeDe };
   const n = noteDe(notes, paire, { cleNum, ambigu: (k) => amb.has(k) });
+  const derniere = React.useRef(n); derniere.current = n;
   const peutEcrire = !!(String(numero || '').trim() || /^\d{3,}$/.test(String(itemId || '')));
   if (!n && !(ajout && peutEcrire)) return null;
   const vue = <NotePaireVue note={n} variante={variante} ajout={ajout && peutEcrire} numero={String(numero || '')}
     onEditer={n && n.cachee ? null : () => editerNotePaire(paire, n && n.texte)}/>;
-  return rangee ? <span className="vrm-note-rangee">{vue}</span> : vue;
+  const dictee = dicter && peutEcrire ? {
+    raison: () => (derniere.current && derniere.current.cachee ? 'cachee' : raisonSansDictee({ api: DICTEE_OK, refus: VOIX.refus })),
+    lang: () => localeCourante(), ecouter, arreter: arreterVoix, annuler: annulerVoix,
+    ajouter: (t) => {
+      const cur = derniere.current; if (cur && cur.cachee) return { cachee: true };
+      const r = ajouterDictee(cur ? cur.texte : '', t); if (r.vide) return r;
+      const ops = opsNote(lireNotesPaires(), paire, r.texte, { cleNum });
+      if (ops.length) gesteVrm(tr('atelier.dictee.enregistree'), ops, { [CLE_NOTES_PAIRES]: poserNotesVue });
+      return r;
+    },
+  } : null;
+  const tout = dictee ? <>{vue}<DicterNoteLazy num={String(numero || itemId)} dictee={dictee} Icon={Icon}/></> : vue;
+  return rangee ? <span className="vrm-note-rangee">{tout}</span> : tout;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -5408,28 +5424,11 @@ const proposerFusion = (tous, moi) => {
 };
 function AtelierPaireCoque({ num, itemId = '', idFiche = '' }) {
   const registre = React.useSyncExternalStore(MAG_FUSIONS.abonner, MAG_FUSIONS.lire);
-  const notes = React.useSyncExternalStore(abonnerNotes, lireNotesPaires);
-  const amb = React.useSyncExternalStore(abonnerNotes, lireNumerosAmbigus);
   const [fusionOuverte, setFusionOuverte] = React.useState(false);
   const k = cleNum(num);
   const paire = { numero: num, itemId };
-  const note = noteDe(notes, paire, { cleNum, ambigu: (x) => amb.has(x) });
   const alias = aliasDuNumero(registre, num, cleNum);
-  const dictee = {
-    raison: () => (note && note.cachee ? 'cachee' : raisonSansDictee({ api: DICTEE_OK, refus: VOIX.refus })),
-    lang: () => localeCourante(),
-    ecouter, arreter: arreterVoix, annuler: annulerVoix,
-    ajouter: (t) => {
-      const n = noteDe(lireNotesPaires(), paire, { cleNum, ambigu: (x) => lireNumerosAmbigus().has(x) });
-      if (n && n.cachee) return { cachee: true };
-      const r = ajouterDictee(n ? n.texte : '', t);
-      if (r.vide) return r;
-      const ops = opsNote(lireNotesPaires(), paire, r.texte, { cleNum });
-      if (ops.length) gesteVrm(tr('atelier.dictee.enregistree'), ops, { [CLE_NOTES_PAIRES]: poserNotesVue });
-      return r;
-    },
-  };
-  const studio = { lire: () => import('./studioPhoto.js').then((m) => m.lireStudio(STUDIO_BASE, k)), ouvrir: () => ouvrirAtelier('studio', { num: k }) };
+  const studio = { cle: k, lire: () => import('./studioPhoto.js').then((m) => m.lireStudio(STUDIO_BASE, k)), ouvrir: () => ouvrirAtelier('studio', { num: k }) };
   const certificat = { cle: cleCertificat(paire, cleNum), base: BASE_CERTIFICAT, dire: (t) => toast(t), confirmer: (o) => askConfirm(o) };
   const defaire = async () => {
     if (!alias) return;
@@ -5441,7 +5440,7 @@ function AtelierPaireCoque({ num, itemId = '', idFiche = '' }) {
   const fusion = alias ? { alias, defaisable: defaisable(alias.fusion), fin: finDefaire(alias.fusion), onDefaire: defaire }
     : idFiche ? { ouvrir: () => setFusionOuverte(true) } : { raisonSans: 'sansFiche' };
   return <>
-    <AtelierPaireLazy num={String(num)} Icon={Icon} studio={studio} dictee={dictee} certificat={certificat} fusion={fusion}/>
+    <AtelierPaireLazy num={String(num)} Icon={Icon} studio={studio} certificat={certificat} fusion={fusion}/>
     {fusionOuverte ? <FeuilleFusionLazy idFiche={String(idFiche)} fiches={load('vinted_annonce_numeros', {}) || {}} registre={MAG_FUSIONS.lire()}
       vendus={(() => { try { return new Set((load('vinted_annonces_vendues', []) || []).map(String)); } catch (_) { return null; } })()}
       caseDe={(x) => rangementDuNum(x) || ''} cleNum={cleNum} proposer={proposerFusion}
@@ -60688,7 +60687,7 @@ function AppCoeur() {
             journal: load(CLE_JOURNAL_NUMEROS, []) || [], marqueur: marqueurNumerotation(), sortieStock: (load('vrm_stock_sortis', {}) || {})[rn.cle] || null,
             estArchive: (n) => estArchive(n), cleNum }) : null;
           const fermer = fermerF;
-          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={numF} lecture={!numData} note={p && p.num && !p.ancienNumero ? <>{questionChezToiFiche(p.num)}{blocVenduAilleurs(p, rn, etat)}<NotePaireCoque numero={p.num} variante="bloc" ajout/><AtelierPaireCoque num={p.num} idFiche={p.idFiche || ''} itemId={(rn.annonces || []).length === 1 ? String(rn.annonces[0].id || '') : ''}/><BlocHistoriqueRepub ids={(rn.annonces || []).map((x) => String(x.id))} d={{ numeros, stats: Object.fromEntries((rn.annonces || []).map((x) => [String(x.id), { favoris: Number.isFinite(x.favourites) ? x.favourites : null, vues: Number.isFinite(x.views) ? x.views : null }])) }}/><BoutonRappel cible={{ sorte: 'article', num: p.num, item: (rn.annonces || []).length === 1 ? String(rn.annonces[0].id || '') : '' }} libelle={`N°${p.num}`}/></> : null} onFermer={fermer} onRetour={depuis ? fermer : ()=>{ fermer(); setGsQ(String((p && p.num) || numF)); setGsOpen(true); }}
+          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={numF} lecture={!numData} note={p && p.num && !p.ancienNumero ? <>{questionChezToiFiche(p.num)}{blocVenduAilleurs(p, rn, etat)}<NotePaireCoque numero={p.num} variante="bloc" ajout dicter/><AtelierPaireCoque num={p.num} idFiche={p.idFiche || ''} itemId={(rn.annonces || []).length === 1 ? String(rn.annonces[0].id || '') : ''}/><BlocHistoriqueRepub ids={(rn.annonces || []).map((x) => String(x.id))} d={{ numeros, stats: Object.fromEntries((rn.annonces || []).map((x) => [String(x.id), { favoris: Number.isFinite(x.favourites) ? x.favourites : null, vues: Number.isFinite(x.views) ? x.views : null }])) }}/><BoutonRappel cible={{ sorte: 'article', num: p.num, item: (rn.annonces || []).length === 1 ? String(rn.annonces[0].id || '') : '' }} libelle={`N°${p.num}`}/></> : null} onFermer={fermer} onRetour={depuis ? fermer : ()=>{ fermer(); setGsQ(String((p && p.num) || numF)); setGsOpen(true); }}
             onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}
             onEmballer={()=>{ fermer(); setGsOpen(false); DEMANDE_EMBALLAGE.at = Date.now(); setTab('cat_bord'); try { window.dispatchEvent(new Event('vrm:emballer')); } catch (_) {} }}
             onPrix={(n)=>setPrixNum(String(n))} onPublierAilleurs={(n)=>setPubAil({ num: String(n), site: null })} neuve={neuve}

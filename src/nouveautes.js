@@ -26,6 +26,12 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  { id: 'photo-floue', date: '2026-11-14', titre: 'Photo floue ou sombre signalée', phrase: 'Mesuré sur ton téléphone, avant la mise en ligne. Jamais bloquant.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
+  { id: 'seance-photo', date: '2026-11-14', titre: 'Séance photo, dans l’ordre des N°', phrase: 'Les paires sans photo ou à reprendre, cochées une à une.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
+  { id: 'recherche-couleur', date: '2026-11-14', titre: 'Chercher tes paires par couleur', phrase: 'Tape « bleu » dans la loupe : la couleur vient de tes photos.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
+  { id: 'note-dictee', date: '2026-11-14', titre: 'Dicter une note sur une paire', phrase: 'Ton téléphone écrit ce que tu dis dans sa note.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
+  { id: 'certificat-paire', date: '2026-11-14', titre: 'Le certificat d’authenticité rangé avec la paire', phrase: 'PDF ou photo, dans sa fiche, prêt à envoyer à un acheteur.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
+  { id: 'fusion-fiches', date: '2026-11-14', titre: 'Fusionner deux fiches de la même paire', phrase: 'Sur ton clic, avec un aperçu ; aucun N° perdu, réversible 30 jours.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
   { id: 'argent-choix', date: '2026-11-14', titre: 'Coller tes prix, quoi racheter, déclaration prête', phrase: 'Un tableau « N° ; prix » collé, le bénéfice par modèle et taille.', tab: 'stats', pour: 'tous', mode: 'tous' },
   { id: 'fiche-partout', date: '2026-11-14', titre: 'Une seule fiche pour chaque paire', phrase: 'Touche une vente, un colis, une annonce : sa fiche s’ouvre.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'design-passe-reglages', date: '2026-11-14', titre: 'Paramètres et Notifications plus simples', phrase: 'Choix en un toucher, cartes sans cadre, plus de barre vide.', tab: 'settings', pour: 'tous', mode: 'tous' },
