@@ -10,7 +10,7 @@
   display: flex; align-items: center; gap: 8px; box-sizing: border-box; width: 100%;
   min-height: 44px; padding: 0 14px; border: 0; border-radius: 12px; margin: 0;
   background: var(--w-remplir, rgba(118,118,128,.12)); color: var(--w-encre, #1D1D1F);
-  font-size: 15px; font-weight: 500; text-align: left;
+  font-size: 15px; font-weight: 600; text-align: left;
 }
 .vrm-rp-bouton .vrm-rp-icone { color: var(--w-gris, #6E6E73); }
 .vrm-rp-bouton.is-ligne { width: auto; display: inline-flex; min-height: 36px; padding: 0 12px; border-radius: 999px; font-size: 13px; position: relative; }
@@ -43,7 +43,7 @@
 .vrm-rp-rapides { display: flex; flex-wrap: wrap; gap: 8px; margin-top: -4px; }
 .vrm-rp-rapide {
   font-family: inherit; cursor: pointer; position: relative; min-height: 34px; padding: 0 12px; border-radius: 999px; border: 0; margin: 0;
-  background: var(--w-remplir, rgba(118,118,128,.12)); color: var(--w-encre, #1D1D1F); font-size: 13px; font-weight: 500;
+  background: var(--w-remplir, rgba(118,118,128,.12)); color: var(--w-encre, #1D1D1F); font-size: 13px; font-weight: 400;
 }
 .vrm-rp-rapide::after { content: ''; position: absolute; inset: -5px 0; }
 .vrm-rp-rapide[aria-pressed="true"] { background: var(--w-encre, #1D1D1F); color: var(--w-carte, #fff); }
@@ -62,7 +62,7 @@
 }
 .vrm-rp-carte h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; font-size: 17px; font-weight: 600; }
 .vrm-rp-carte h3 .vrm-rp-icone { color: var(--w-gris, #6E6E73); }
-.vrm-rp-carte h3 small { margin-left: auto; font-size: 15px; font-weight: 500; color: var(--w-gris, #6E6E73); font-variant-numeric: tabular-nums; }
+.vrm-rp-carte h3 small { margin-left: auto; font-size: 15px; font-weight: 600; color: var(--w-gris, #6E6E73); font-variant-numeric: tabular-nums; }
 .vrm-rp-liste { list-style: none; margin: 0; padding: 0; }
 .vrm-rp-ligne { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 8px 0; border-top: .5px solid var(--w-filet, rgba(60,60,67,.18)); min-width: 0; }
 .vrm-rp-liste > .vrm-rp-ligne:first-child { border-top: 0; }
@@ -76,7 +76,7 @@
 .vrm-rp-gestes { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
 .vrm-rp-geste {
   font-family: inherit; cursor: pointer; min-height: 44px; min-width: 44px; padding: 0 12px; border-radius: 999px; border: 0; margin: 0;
-  background: var(--w-remplir, rgba(118,118,128,.12)); color: var(--w-encre, #1D1D1F); font-size: 14px; font-weight: 500;
+  background: var(--w-remplir, rgba(118,118,128,.12)); color: var(--w-encre, #1D1D1F); font-size: 14px; font-weight: 400;
 }
 .vrm-rp-geste.is-discret { background: transparent; color: var(--w-gris, #6E6E73); }
 .vrm-rp-params { display: grid; gap: 14px; }

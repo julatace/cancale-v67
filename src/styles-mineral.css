@@ -34,7 +34,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-sidebar-link {
   display:flex; align-items:center; gap:12px; width:100%; min-height:44px;
   padding:10px 12px; border:0; border-radius:12px; background:transparent;
-  text-align:left; font-size:13px; font-weight:500; color:var(--vrm-muted);
+  text-align:left; font-size:13px; font-weight:400; color:var(--vrm-muted);
 }
 .vrm-sidebar-link svg { flex-shrink:0; }
 .vrm-sidebar-link span { min-width:0; }
@@ -304,7 +304,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-ann-overview > a img { transition:transform .2s ease; }
 .vrm-ann-card [data-chiffres] { font-variant-numeric:tabular-nums; }
 .vrm-ann-actions { background:transparent; border-top:1px solid var(--vrm-line); }
-.vrm-ann-actions > summary { font-weight:500; }
+.vrm-ann-actions > summary { font-weight:400; }
 .vrm-sale-row { border-radius:12px; transition:background .15s; }
 .vrm-sale-price .vrm-display, .vrm-ann-price-line { font-variant-numeric:tabular-nums; }
 .vrm-sale-photo { background:var(--vrm-surface); overflow:hidden; }
@@ -315,7 +315,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-finance-metric.is-primary .vrm-display { font-size:38px !important; letter-spacing:-1.4px; }
 .vrm-finance-goal > div { border-radius:12px; }
 .vrm-inbox-filters { display:flex; gap:6px; padding:0 0 12px; }
-.vrm-inbox-filters button { display:flex; align-items:center; gap:7px; border:1px solid var(--vrm-line); border-radius:12px; background:transparent; color:var(--vrm-muted); padding:7px 10px; font:500 12px Inter,system-ui,sans-serif; cursor:pointer; }
+.vrm-inbox-filters button { display:flex; align-items:center; gap:7px; border:1px solid var(--vrm-line); border-radius:12px; background:transparent; color:var(--vrm-muted); padding:7px 10px; font:400 12px Inter,system-ui,sans-serif; cursor:pointer; }
 .vrm-inbox-filters button[aria-pressed="true"] { background:var(--vrm-ink); color:var(--vrm-bg); border-color:var(--vrm-ink); }
 .vrm-inbox-filters button span { font-size:11px; font-variant-numeric:tabular-nums; }
 .vrm-inbox-feedback { color:var(--vrm-muted); font-size:12px; padding:12px 0; }
@@ -348,10 +348,10 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-list-search input { flex:1; min-width:0; background:transparent !important; border:0 !important; padding-left:0 !important; }
 .vrm-list-search > button { border:0; background:transparent; color:var(--vrm-muted); width:42px; flex-shrink:0; }
 .vrm-stock-views { display:flex; gap:6px; flex-wrap:wrap; margin:0 0 10px; }
-.vrm-stock-views button { border:1px solid var(--vrm-line); border-radius:12px; background:transparent; color:var(--vrm-muted); padding:7px 10px; font:500 12px Inter,system-ui,sans-serif; cursor:pointer; }
+.vrm-stock-views button { border:1px solid var(--vrm-line); border-radius:12px; background:transparent; color:var(--vrm-muted); padding:7px 10px; font:400 12px Inter,system-ui,sans-serif; cursor:pointer; }
 .vrm-stock-views button[aria-pressed="true"] { background:var(--vrm-ink); border-color:var(--vrm-ink); color:var(--vrm-bg); }
 .vrm-filter-recap { display:flex; align-items:center; gap:8px; justify-content:space-between; color:var(--vrm-muted); font-size:11px; margin:6px 0 10px; }
-.vrm-filter-recap button { border:0; background:transparent; color:var(--vrm-ink); font:500 11px Inter,system-ui,sans-serif; padding:6px 0; cursor:pointer; }
+.vrm-filter-recap button { border:0; background:transparent; color:var(--vrm-ink); font:400 11px Inter,system-ui,sans-serif; padding:6px 0; cursor:pointer; }
 /* (11 nov., clics-directs) Plus de loupe : ni icône, ni curseur « zoom » — toucher ouvre la photo en grand. */
 .vrm-photo-open { position:relative; display:block; width:100%; height:100%; padding:0; border:0; background:transparent; cursor:pointer; overflow:hidden; }
 .vrm-photo-open > img { width:100% !important; height:100% !important; object-fit:cover; }
@@ -519,13 +519,13 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
    les tailles et les espacements (multiples de 4). */
 .vrm-day-greeting { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:baseline; gap:2px 12px; margin:0 2px 16px; }
 .vrm-day-hello { font-size:20px; font-weight:700; letter-spacing:-.02em; line-height:1.2; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.vrm-day-date { font-size:12px; font-weight:500; text-transform:capitalize; white-space:nowrap; }
+.vrm-day-date { font-size:12px; font-weight:400; text-transform:capitalize; white-space:nowrap; }
 .vrm-day-todo { grid-column:1 / -1; font-size:13px; line-height:1.35; }
 .vrm-day-bar { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); border-radius:12px; overflow:hidden; margin-bottom:16px; }
 .vrm-day-bar > button { display:flex; flex-direction:column; align-items:center; gap:4px; padding:14px 4px 12px; min-width:0; background:transparent; border:0; border-radius:0; cursor:pointer; font-family:inherit; min-height:0; }
 .vrm-day-bar-ic { display:flex; }
 .vrm-day-bar-n { font-size:22px; font-weight:700; line-height:1.05; font-variant-numeric:tabular-nums; }
-.vrm-day-bar-l { font-size:11px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+.vrm-day-bar-l { font-size:11px; font-weight:400; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
 .vrm-day-top { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; margin-bottom:16px; }
 .vrm-day-card { border-radius:12px; padding:18px; box-sizing:border-box; min-width:0; }
 .vrm-day-head { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:20px; }
@@ -537,7 +537,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-day-recu-n { font-size:22px; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; flex-shrink:0; }
 .vrm-day-note { font-size:12px; line-height:1.45; margin-top:3px; }
 .vrm-day-week-n { font-size:22px; font-weight:700; margin:6px 0 4px; font-variant-numeric:tabular-nums; }
-.vrm-day-legende { display:inline-flex; gap:12px; font-size:12px; font-weight:500; }
+.vrm-day-legende { display:inline-flex; gap:12px; font-size:12px; font-weight:400; }
 .vrm-day-legende > span { display:inline-flex; align-items:center; gap:6px; }
 .vrm-day-legende i { display:inline-block; width:14px; height:3px; border-radius:3px; }
 .vrm-day-legende i.vrm-day-pointille { height:0; border-top:2px dashed; background:transparent !important; border-radius:0; }
@@ -694,7 +694,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 /* La ligne d'annonce eBay : « détails » n'est pas une action d'argent — gris,
    pas l'accent ; l'accent reste à « Vendre une paire sur eBay ». La règle
    d'offre tient sur une ligne : l'état à gauche, le geste à droite. */
-.vrm-ebay-carte-tete > div:last-child > div:last-child { color:var(--vrm-muted) !important; font-weight:500 !important; font-size:12px !important; margin-top:4px !important; }
+.vrm-ebay-carte-tete > div:last-child > div:last-child { color:var(--vrm-muted) !important; font-weight:400 !important; font-size:12px !important; margin-top:4px !important; }
 .vrm-ebay-carte [data-offre-ouvrir] { background:transparent !important; color:var(--vrm-ink) !important; border:1px solid var(--vrm-line) !important; }
 .vrm-ebay-carte [data-regle-offre-ligne] > div:first-child { justify-content:space-between; row-gap:4px !important; }
 .vrm-ebay-carte [data-regle-offre-ligne] button, .vrm-ebay-carte [data-relier-ouvrir], .vrm-ebay-carte [data-offre-ouvrir] { font-size:13px !important; border-radius:12px !important; }
@@ -750,7 +750,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-seg { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:2px; padding:3px; border-radius:12px; margin:0 0 16px; }
 .vrm-seg > button { min-height:38px; border:0 !important; border-radius:12px !important; padding:0 6px !important; font:600 13px/1.2 Inter,system-ui,sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; box-shadow:none; }
 .vrm-seg > button[aria-pressed="true"] { box-shadow:0 1px 2px rgba(0,0,0,.10), 0 0 0 .5px rgba(0,0,0,.06); }
-.vrm-seg-n { font-weight:500; opacity:.85; font-variant-numeric:tabular-nums; } /* .6 : 4,1:1 au clair, 3,3:1 au sombre (finition 6 nov.) */
+.vrm-seg-n { font-weight:400; opacity:.85; font-variant-numeric:tabular-nums; } /* .6 : 4,1:1 au clair, 3,3:1 au sombre (finition 6 nov.) */
 @media(max-width:767px){ .vrm-main .vrm-seg > button { min-height:44px !important; } }
 
 /* Recherche : un champ, une loupe. */
@@ -898,7 +898,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-msg-bar > .vrm-inbox-filters { padding:3px !important; margin:0; flex:0 1 auto; gap:2px !important; border-radius:12px; background:var(--vrm-bg,#F2F2F7); border:1px solid var(--vrm-line,#E5E5EA); }
 .vrm-msg-bar > .vrm-inbox-filters button { border:0 !important; border-radius:12px !important; min-height:36px; padding:0 14px !important; font:600 13px Inter,system-ui,sans-serif !important; background:transparent !important; color:var(--vrm-muted) !important; }
 .vrm-msg-bar > .vrm-inbox-filters button[aria-pressed="true"] { background:var(--vrm-surface,#fff) !important; color:var(--vrm-ink) !important; box-shadow:0 1px 2px rgba(0,0,0,.10), 0 0 0 .5px rgba(0,0,0,.06); }
-.vrm-msg-bar > .vrm-inbox-filters button span { font-size:12px !important; font-weight:500; }
+.vrm-msg-bar > .vrm-inbox-filters button span { font-size:12px !important; font-weight:400; }
 .vrm-msg-refresh { margin-left:auto; display:flex; align-items:center; justify-content:center; width:44px; height:44px; border:0; border-radius:12px; background:transparent; color:var(--vrm-muted); cursor:pointer; flex-shrink:0; }
 .vrm-msg-list { border-radius:12px; overflow:hidden; }
 .vrm-msg-section { display:flex; align-items:center; gap:8px; padding:10px 16px 8px; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; }
@@ -912,12 +912,12 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-msg-body { flex:1; min-width:0; display:block; }
 .vrm-msg-l1, .vrm-msg-l2 { display:flex; align-items:center; gap:6px; min-width:0; }
 .vrm-msg-l2 { margin-top:3px; }
-.vrm-msg-name { font-size:15px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:0 1 auto; letter-spacing:-.01em; }
+.vrm-msg-name { font-size:15px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:0 1 auto; letter-spacing:-.01em; }
 .vrm-inbox-row[data-nonlu] .vrm-msg-name { font-weight:700; }
 .vrm-msg-acc { font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:0 1 auto; }
 .vrm-msg-time { margin-left:auto; font-size:12px; white-space:nowrap; flex-shrink:0; padding-left:6px; font-variant-numeric:tabular-nums; }
 .vrm-msg-extrait { flex:1; min-width:0; font-size:15px; line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.vrm-inbox-row[data-nonlu] .vrm-msg-extrait { font-weight:500; }
+.vrm-inbox-row[data-nonlu] .vrm-msg-extrait { font-weight:400; }
 .vrm-msg-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
 .vrm-msg-more { display:block; width:100%; min-height:44px; margin:8px 0 0; border:0; border-radius:12px; background:transparent; font:600 13px Inter,system-ui,sans-serif; cursor:pointer; }
 .vrm-inbox-row.is-current { box-shadow:inset 3px 0 var(--vrm-focus,#0071E3) !important; }
@@ -959,7 +959,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-chat-prix { width:96px; min-height:40px; border-radius:12px; padding:0 10px; font:400 15px Inter,system-ui,sans-serif; box-sizing:border-box; }
 .vrm-chat-rapides { display:flex; gap:8px; overflow-x:auto; margin:0 -12px; padding:0 12px 10px; scrollbar-width:none; -webkit-overflow-scrolling:touch; scroll-padding-inline:12px; }
 .vrm-chat-rapides::-webkit-scrollbar { display:none; }
-.vrm-chat-rapides > button { flex-shrink:0; min-height:36px; padding:0 14px; border-radius:999px; font:500 13px Inter,system-ui,sans-serif; white-space:nowrap; cursor:pointer; }
+.vrm-chat-rapides > button { flex-shrink:0; min-height:36px; padding:0 14px; border-radius:999px; font:400 13px Inter,system-ui,sans-serif; white-space:nowrap; cursor:pointer; }
 .vrm-chat-compose { display:flex; align-items:flex-end; gap:8px; }
 .vrm-chat-compose > textarea { flex:1; resize:none; max-height:120px; min-height:40px; border-radius:20px; padding:9px 16px; font:400 15px/1.4 Inter,system-ui,sans-serif; outline:none; box-sizing:border-box; }
 .vrm-chat-send { flex-shrink:0; min-height:40px; padding:0 18px; border:0; border-radius:20px; font:600 15px Inter,system-ui,sans-serif; cursor:pointer; }
@@ -992,8 +992,8 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-ventes-liste .vrm-sale-photo img { width:100% !important; height:100% !important; }
 .vrm-ventes-liste .vrm-sale-title { font-size:15px !important; line-height:1.35 !important; font-weight:600 !important; }
 .vrm-ventes-liste .vrm-sale-meta { font-size:13px !important; gap:2px 8px !important; margin-top:4px !important; }
-.vrm-ventes-liste .vrm-statut { font-weight:500 !important; }
-.vrm-ventes-liste .vrm-sale-meta > span:has(> .vrm-sensible), .vrm-colis-carte span:has(> .vrm-sensible) { background:transparent !important; border:0 !important; padding:0 !important; font-size:13px !important; font-weight:500 !important; }
+.vrm-ventes-liste .vrm-statut { font-weight:400 !important; }
+.vrm-ventes-liste .vrm-sale-meta > span:has(> .vrm-sensible), .vrm-colis-carte span:has(> .vrm-sensible) { background:transparent !important; border:0 !important; padding:0 !important; font-size:13px !important; font-weight:400 !important; }
 .vrm-ventes-liste .vrm-sale-price > .vrm-display { font-size:17px !important; letter-spacing:-.02em; white-space:nowrap; font-variant-numeric:tabular-nums; }
 .vrm-ventes-liste .vrm-sale-price [data-benef-vente] { white-space:nowrap; font-variant-numeric:tabular-nums; }
 .vrm-ventes-liste .vrm-sale-bas { display:flex; flex-wrap:wrap; align-items:center; gap:4px 12px; padding-left:76px; }
@@ -1005,12 +1005,12 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 /* Revue du 16 octobre : la rangée disait trois choses en trois styles (gras
    encre, gris, gris + chevron). UNE seule forme pour les trois liens de la
    rangée secondaire — même taille, même graisse, même gris que « Modifier ». */
-.vrm-ventes-liste .vrm-cout-rangee > button { height:44px !important; padding:0 8px !important; border:0 !important; background:transparent !important; border-radius:12px !important; font-size:13px !important; font-weight:500 !important; color:var(--vrm-muted) !important; box-shadow:none !important; }
+.vrm-ventes-liste .vrm-cout-rangee > button { height:44px !important; padding:0 8px !important; border:0 !important; background:transparent !important; border-radius:12px !important; font-size:13px !important; font-weight:400 !important; color:var(--vrm-muted) !important; box-shadow:none !important; }
 .vrm-ventes-liste .vrm-sale-footer { margin:0 0 0 auto !important; flex:0 1 auto; gap:4px 12px; }
 .vrm-ventes-liste .vrm-sale-footer:has(.vrm-sale-details[open]) { flex-basis:100%; margin-left:0 !important; }
 .vrm-ventes-liste .vrm-sale-details > summary {
   display:inline-flex; align-items:center; gap:6px; min-height:44px; padding:0 4px;
-  font-size:13px; font-weight:500; color:var(--vrm-muted); list-style:none;
+  font-size:13px; font-weight:400; color:var(--vrm-muted); list-style:none;
 }
 .vrm-ventes-liste .vrm-sale-details > summary::-webkit-details-marker { display:none; }
 .vrm-ventes-liste .vrm-sale-details > summary::after { content:'›'; font-size:17px; line-height:1; transition:transform .15s; }
@@ -1216,7 +1216,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
     border:1px solid var(--vrm-line); border-radius:12px;
     background:var(--vrm-surface); padding:3px; gap:3px;
   }
-  .vrm-market-space .vrm-platform-tabs > button { border-radius:6px; font-weight:500; }
+  .vrm-market-space .vrm-platform-tabs > button { border-radius:6px; font-weight:400; }
   :root[data-theme="light"] .vrm-market-space .vrm-platform-tabs > button[aria-current="page"] {
     background:var(--vrm-ink); color:var(--vrm-surface); box-shadow:none; font-weight:600;
   }
@@ -1280,7 +1280,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
   .vrm-app-shell .vrm-header-logo > img.vrm-logo { width:40px !important; height:40px !important; border-radius:0; object-fit:contain; }
 }
 .vrm-chart-compare { display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 12px; font-size:13px; color:var(--vrm-muted); padding-top:6px; }
-.vrm-chart-compare strong { font-weight:500; font-variant-numeric:tabular-nums; max-width:100%; overflow-wrap:anywhere; }
+.vrm-chart-compare strong { font-weight:400; font-variant-numeric:tabular-nums; max-width:100%; overflow-wrap:anywhere; }
 .vrm-filter-recap { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12px; color:var(--vrm-muted); }
 .vrm-filter-recap button,.vrm-chat-shortcuts button { background:transparent; border:0; color:var(--vrm-accent-texte); font:600 12px/1.4 Inter,system-ui,sans-serif; cursor:pointer; padding:8px 0; }
 .vrm-chat-shortcuts { flex-shrink:0; padding:0 16px; border-bottom:1px solid var(--vrm-line); }

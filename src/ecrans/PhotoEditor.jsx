@@ -109,7 +109,7 @@ function PhotoEditor({ refPhoto, refTitle, onClose, toast }) {
             <div style={{fontSize:15,fontWeight:700,color:C.text}}>✂️ Retoucher la photo</div>
             <div style={{fontSize:12,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{refTitle || 'Recadre, zoome, redresse'}</div>
           </div>
-          <button type="button" onClick={onClose} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+          <button type="button" onClick={onClose} style={{border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
         </div>
 
         <div style={{flex:1,minHeight:0,overflow:'auto',WebkitOverflowScrolling:'touch',overscrollBehavior:'contain',padding:'14px 16px'}}>

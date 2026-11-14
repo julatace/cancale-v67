@@ -24,7 +24,7 @@
 .vrm-cl-etat.is-ouvert { background: var(--fu-encre); color: var(--fu-carte); }
 .vrm-cl-etat.is-a-relire, .vrm-cl-etat.is-jamais { background: var(--fu-ambre-fond); color: var(--fu-ambre-txt); }
 .vrm-cl-etat.is-banni { background: var(--fu-ambre-fond); color: var(--fu-ambre-txt); }
-.vrm-cl-age { font: 500 12px/1.4 var(--vrm-police); color: var(--fu-gris2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-cl-age { font: 400 12px/1.4 var(--vrm-police); color: var(--fu-gris2); font-variant-numeric: tabular-nums; white-space: nowrap; }
 /* L'interrupteur « dans les totaux » : 51×31 (iOS), cible 44 px. */
 .vrm-cl-inclus { flex: none; position: relative; width: 51px; min-height: 44px; display: grid; place-items: center; cursor: pointer; }
 .vrm-cl-inclus input { position: absolute; inset: 0; z-index: 1; opacity: 0; margin: 0; cursor: pointer; width: 100%; height: 100%; }
@@ -35,7 +35,7 @@
 .vrm-cl-inclus input:focus-visible + span { outline: 2px solid var(--fu-bleu); outline-offset: 2px; }
 /* (6 nov.) La ligne « E-mails » d'une carte Vinted : neutre ; ambre seulement pour un
    compte MUET prouvé (un geste à faire, §7), avec son lien « Relier sa boîte » (44 px). */
-.vrm-cl-emails { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 8px; padding-left: 56px; min-width: 0; font: 500 13px/1.4 var(--vrm-police); color: var(--fu-gris); }
+.vrm-cl-emails { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 8px; padding-left: 56px; min-width: 0; font: 400 13px/1.4 var(--vrm-police); color: var(--fu-gris); }
 .vrm-cl-emails-lib { font-weight: 600; color: var(--fu-gris2); }
 .vrm-cl-emails-txt { min-width: 0; overflow-wrap: anywhere; }
 .vrm-cl-emails-txt.is-geste { color: var(--fu-ambre-txt); font-weight: 600; }
@@ -43,20 +43,20 @@ html body .vrm-app-shell .vrm-cl-carte .vrm-cl-emails-geste { min-height: 44px; 
 .vrm-cl-actions { display: flex; gap: 8px; flex-wrap: wrap; padding-left: 56px; }
 html body .vrm-app-shell .vrm-cl-carte .vrm-cl-bouton { min-height: 44px; border-radius: 12px; }
 html body .vrm-app-shell .vrm-cl-carte a.vrm-cl-bouton { display: flex; align-items: center; justify-content: center; padding: 0 16px; text-decoration: none; background: var(--fu-case); color: var(--fu-encre); font: 600 15px/1 var(--vrm-police); }
-.vrm-cl-vide { font: 500 15px/1.4 var(--vrm-police); color: var(--fu-gris); padding: 4px 2px; display: flex; align-items: center; gap: 10px; }
+.vrm-cl-vide { font: 600 15px/1.4 var(--vrm-police); color: var(--fu-gris); padding: 4px 2px; display: flex; align-items: center; gap: 10px; }
 .vrm-cl-gerer { padding-left: 56px; }
 /* (11 nov., lot vinted-pro) La phrase du compte Pro et l'argent de ses ventes. */
-.vrm-cl-pro { margin: 0; padding-left: 56px; font: 500 13px/1.4 var(--vrm-police); color: var(--fu-gris); overflow-wrap: anywhere; }
+.vrm-cl-pro { margin: 0; padding-left: 56px; font: 400 13px/1.4 var(--vrm-police); color: var(--fu-gris); overflow-wrap: anywhere; }
 .vrm-vpro-corps { display: flex; flex-direction: column; gap: 6px; padding-bottom: 6px; }
-.vrm-vpro-muet { margin: 0; font: 500 13px/1.4 var(--vrm-police); color: var(--fu-gris); overflow-wrap: anywhere; }
+.vrm-vpro-muet { margin: 0; font: 400 13px/1.4 var(--vrm-police); color: var(--fu-gris); overflow-wrap: anywhere; }
 .vrm-vpro-muet .vrm-lien-action { min-height: 44px; display: inline-flex; align-items: center; }
 .vrm-vpro-liste { margin: 0; display: flex; flex-direction: column; }
 .vrm-vpro-liste > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 8px 0; border-top: 1px solid var(--fu-trait, rgba(0,0,0,.08)); }
 .vrm-vpro-liste > div:first-child { border-top: none; }
-.vrm-vpro-liste dt { font: 500 14px/1.35 var(--vrm-police); color: var(--fu-encre, inherit); min-width: 0; }
+.vrm-vpro-liste dt { font: 400 14px/1.35 var(--vrm-police); color: var(--fu-encre, inherit); min-width: 0; }
 .vrm-vpro-liste dd { margin: 0; display: flex; flex-direction: column; align-items: flex-end; text-align: right; min-width: 0; max-width: 55%; }
 .vrm-vpro-liste dd b { font: 600 15px/1.3 var(--vrm-police); font-variant-numeric: tabular-nums; }
-.vrm-vpro-liste dd small { font: 500 12px/1.35 var(--vrm-police); color: var(--fu-gris2); overflow-wrap: anywhere; }
+.vrm-vpro-liste dd small { font: 400 12px/1.35 var(--vrm-police); color: var(--fu-gris2); overflow-wrap: anywhere; }
 .vrm-cl-gerer > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font: 600 13px/1 var(--vrm-police); color: var(--fu-gris); list-style: none; }
 .vrm-cl-gerer > summary::-webkit-details-marker { display: none; }
 .vrm-cl-alerte { background: var(--fu-ambre-fond); color: var(--fu-ambre-txt); border-radius: 16px; padding: 12px 14px; font: 600 14px/1.4 var(--vrm-police); display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
@@ -77,9 +77,9 @@ html body .vrm-app-shell .vrm-cl-carte a.vrm-cl-bouton { display: flex; align-it
 .vrm-sans-compte-ligne + .vrm-sans-compte-ligne { border-top: .5px solid var(--w-filet, var(--fu-piste)); }
 .vrm-sans-compte-ic { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--w-remplir, rgba(118,118,128,.12)); font: 700 16px/1 var(--vrm-police); color: var(--w-encre, var(--fu-encre)); }
 .vrm-sans-compte-tete { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.vrm-sans-compte-titre { font: 500 13px/1.3 var(--vrm-police); color: var(--fu-ambre-txt); }
+.vrm-sans-compte-titre { font: 400 13px/1.3 var(--vrm-police); color: var(--fu-ambre-txt); }
 .vrm-sans-compte-adresse { font: 600 15px/1.35 var(--vrm-police); color: var(--w-encre, var(--fu-encre)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.vrm-sans-compte-aide { font: 500 13px/1.45 var(--vrm-police); color: var(--fu-gris); }
+.vrm-sans-compte-aide { font: 400 13px/1.45 var(--vrm-police); color: var(--fu-gris); }
 .vrm-sans-compte-gestes, .vrm-sans-compte-choix { display: flex; flex-wrap: nowrap; gap: 8px; align-items: center; min-width: 0; }
 .vrm-sans-compte .vrm-b { border-radius: 999px; }
 .vrm-sans-compte-choix { grid-column: 1 / -1; flex-wrap: wrap; padding-top: 10px; border-top: .5px solid var(--w-filet, var(--fu-piste)); }
@@ -88,13 +88,13 @@ html body .vrm-app-shell .vrm-cl-carte a.vrm-cl-bouton { display: flex; align-it
 html body .vrm-app-shell .vrm-sans-compte .vrm-b { min-height: 44px; }
 .vrm-sans-compte-acheteurs { padding: 0 16px; border-top: .5px solid var(--w-filet, var(--fu-piste)); }
 .vrm-sans-compte-acheteurs > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font: 600 13px/1.3 var(--vrm-police); color: var(--fu-gris); }
-.vrm-sans-compte-acheteur { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; font: 500 13px/1.4 var(--vrm-police); color: var(--fu-encre); overflow-wrap: anywhere; }
+.vrm-sans-compte-acheteur { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; font: 400 13px/1.4 var(--vrm-police); color: var(--fu-encre); overflow-wrap: anywhere; }
 .vrm-sans-compte-acheteur .vrm-lien-action { min-height: 44px; }
 @media (max-width: 420px) { .vrm-sans-compte-gestes > * { flex: 1 1 100%; } }
 /* (6 nov., onglets C) Colis : un compte dont les e-mails n'arrivent pas, avec des colis à
    envoyer — une ligne ambre (un geste à faire), LE geste « Relier la boîte de <compte> ». */
 .vrm-colis-arelier { display: grid; gap: 6px; margin: 0 0 12px; padding: 10px 14px; border-radius: 12px; border-left: 3px solid var(--fu-ambre-txt, #B25000); background: color-mix(in srgb, var(--fu-ambre-txt, #B25000) 8%, transparent); }
 .vrm-colis-arelier-ligne { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; min-width: 0; }
-.vrm-colis-arelier-txt { flex: 1 1 220px; min-width: 0; font: 500 14px/1.4 var(--vrm-police); color: var(--fu-encre, inherit); overflow-wrap: anywhere; }
+.vrm-colis-arelier-txt { flex: 1 1 220px; min-width: 0; font: 400 14px/1.4 var(--vrm-police); color: var(--fu-encre, inherit); overflow-wrap: anywhere; }
 .vrm-colis-arelier-txt b { color: var(--fu-ambre-txt, #B25000); font-weight: 600; }
 html body .vrm-app-shell .vrm-colis-arelier .vrm-lien-action { min-height: 44px; padding: 0 2px; border: none; background: transparent; font: 600 14px/1.2 var(--vrm-police); color: var(--vrm-accent-texte, #0066CC); cursor: pointer; text-align: left; }

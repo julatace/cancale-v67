@@ -28,7 +28,7 @@
 .vrm-cv-champ input {
   width: 84px; height: 44px; box-sizing: border-box; border-radius: 12px; padding: 0 10px; text-align: right;
   border: 1px solid var(--vrm-line, rgba(0,0,0,.12)); background: var(--vrm-surface, #fff); color: var(--vrm-ink, #1D1D1F);
-  font: 500 17px var(--vrm-police, inherit); font-variant-numeric: tabular-nums;
+  font: 600 17px var(--vrm-police, inherit); font-variant-numeric: tabular-nums;
 }
 .vrm-cv-champ input[aria-invalid="true"] { border-color: var(--vrm-warn, #B25000); }
 .vrm-cv-ok {

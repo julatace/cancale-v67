@@ -113,7 +113,7 @@ function AtelierBrouillon({ it, e, k, draft, onSave, onClose }) {
 
 
   const champ = { width: '100%', border: `1px solid ${C.border}`, borderRadius: 12, padding: '9px 11px', fontSize: 13, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' };
-  const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500, marginBottom: 4 };
+  const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 400, marginBottom: 4 };
   return (
     <VoileAtelier onClick={fermer}>
       <FermeAuRetour fermer={fermer}/>
@@ -123,7 +123,7 @@ function AtelierBrouillon({ it, e, k, draft, onSave, onClose }) {
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>✨ Préparer l'annonce</div>
             <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Gardé en brouillon : <b>rien n'est envoyé à Vinted</b>. Même N°.</div>
           </div>
-          <button type="button" onClick={fermer} aria-label="Fermer" style={{ border: 'none', background: 'transparent', fontSize: 22, color: C.muted, cursor: 'pointer', lineHeight: 1 }}>×</button>
+          <button type="button" onClick={fermer} aria-label="Fermer" style={{ border: 'none', background: 'transparent', fontSize: 20, color: C.muted, cursor: 'pointer', lineHeight: 1 }}>×</button>
         </div>
         <div style={{ overflowY: 'auto', padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, color: C.muted }}>
@@ -249,7 +249,7 @@ function AtelierLots({ candidats, onSave, onClose }) {
     setDone(true); setTimeout(onClose, 800);
   };
   const champ = { border: `1px solid ${C.border}`, borderRadius: 12, padding: '7px 10px', fontSize: 13, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' };
-  const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500, marginBottom: 5 };
+  const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 400, marginBottom: 5 };
   const selStyle = { ...champ, padding: '6px 8px' };
   return (
     <VoileAtelier onClick={onClose}>
@@ -260,7 +260,7 @@ function AtelierLots({ candidats, onSave, onClose }) {
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>✨ Lots — titres &amp; prix</div>
             <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Gardé en brouillon : <b>rien n'est envoyé à Vinted</b>. Mêmes N°.</div>
           </div>
-          <button type="button" onClick={onClose} aria-label="Fermer" style={{ border: 'none', background: 'transparent', fontSize: 22, color: C.muted, cursor: 'pointer', lineHeight: 1 }}>×</button>
+          <button type="button" onClick={onClose} aria-label="Fermer" style={{ border: 'none', background: 'transparent', fontSize: 20, color: C.muted, cursor: 'pointer', lineHeight: 1 }}>×</button>
         </div>
         <div style={{ overflowY: 'auto', padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* ── sélection ─────────────────────────────────────────── */}
@@ -444,7 +444,7 @@ function AtelierFile({ candidats, verifier, publier, majExt, onClose }) {
   const arreter = () => setQ(p => ({ ...p, mode: 'idle' }));
   const vider = () => setQ(p => ({ ordre: [], statuts: {}, raisons: {}, titres: {}, mode: 'idle', esp: p.esp }));
   const champ = { border: `1px solid ${C.border}`, borderRadius: 12, padding: '6px 9px', fontSize: 13, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' };
-  const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500, marginBottom: 5 };
+  const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 400, marginBottom: 5 };
   const btn = (extra) => ({ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 12, padding: '6px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', ...extra });
   const stLabel = { attente: 'en attente', fait: reel ? 'publiée ✓' : 'prête ✓', saute: 'sautée', echec: 'échec', encours: 'en cours…' };
   return (
@@ -456,7 +456,7 @@ function AtelierFile({ candidats, verifier, publier, majExt, onClose }) {
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>✨ File de publication</div>
             <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Ordonne et cadence tes brouillons. {reel ? <><b style={{ color: C.warn }}>Publication réelle</b> — chaque annonce sera modifiée sur Vinted (prix baissé), une par une, à l'espacement choisi.</> : <><b>Essai à blanc</b> — rien n'est publié tant que tu n'actives pas la publication réelle, plus bas.</>}</div>
           </div>
-          <button type="button" onClick={onClose} aria-label="Fermer" style={{ border: 'none', background: 'transparent', fontSize: 22, color: C.muted, cursor: 'pointer', lineHeight: 1 }}>×</button>
+          <button type="button" onClick={onClose} aria-label="Fermer" style={{ border: 'none', background: 'transparent', fontSize: 20, color: C.muted, cursor: 'pointer', lineHeight: 1 }}>×</button>
         </div>
         <div style={{ overflowY: 'auto', padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* ── à ajouter ─────────────────────────────── */}
@@ -575,7 +575,7 @@ function BrouillonsARefaire({ br, refaire, onClose, onVoirBrouillons, peutAgir, 
       <div data-refaire-liste={Array.isArray(liste) ? liste.length : liste === null ? 'passu' : 'lecture'} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: C.text, flex: 1 }}>Brouillons à refaire <Pourquoi label="C'est quoi ?">Les republications par brouillon qui ne sont pas allées au bout. Chaque geste demande ta confirmation ; rien ne part tout seul.</Pourquoi></h2>
-          <button type="button" onClick={onClose} aria-label="Fermer" style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 22, minWidth: 44, minHeight: 44, cursor: 'pointer' }}>✕</button>
+          <button type="button" onClick={onClose} aria-label="Fermer" style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 20, minWidth: 44, minHeight: 44, cursor: 'pointer' }}>✕</button>
         </div>
         {liste === undefined && <div style={{ fontSize: 13, color: C.muted }}>Lecture…</div>}
         {liste === null && <div data-refaire-passu style={{ fontSize: 13, color: C.muted }}>VRM n'a pas pu lire ce qui reste à refaire — rien n'est perdu, réessaie dans un moment.</div>}
@@ -1761,7 +1761,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
               ); })}
             </ol>
           </div>
-          <button type="button" onClick={fermer} aria-label="Fermer" disabled={mode === 'run'} title={mode === 'run' ? 'Mets en pause pour fermer' : undefined} style={{ border: 'none', background: 'transparent', fontSize: 22, color: C.muted, cursor: mode === 'run' ? 'default' : 'pointer', minWidth: 44, minHeight: 44 }}>×</button>
+          <button type="button" onClick={fermer} aria-label="Fermer" disabled={mode === 'run'} title={mode === 'run' ? 'Mets en pause pour fermer' : undefined} style={{ border: 'none', background: 'transparent', fontSize: 20, color: C.muted, cursor: mode === 'run' ? 'default' : 'pointer', minWidth: 44, minHeight: 44 }}>×</button>
         </div>
         {/* (2 nov.) L'avancée HORS de la zone qui défile : la paire en cours, son étape,
             la barre, « N sur M » et le temps avant la suivante se voient toujours,

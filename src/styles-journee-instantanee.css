@@ -11,7 +11,7 @@
 html body .vrm-app-shell .vrm-ji .vrm-fu-modifier.vrm-ji-age,
 html body .vrm-app-shell .vrm-ji .vrm-ji-age {
   cursor: default; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
-  font: 500 12px/1 var(--vrm-police); color: var(--fu-sur-sombre-2, rgba(255,255,255,.7));
+  font: 400 12px/1 var(--vrm-police); color: var(--fu-sur-sombre-2, rgba(255,255,255,.7));
   background: none !important; padding: 0 4px; min-height: 44px; pointer-events: none;
 }
 html body .vrm-app-shell .vrm-ji .vrm-ji-age-seule { position: absolute; top: 18px; right: 16px; }
@@ -55,7 +55,7 @@ html body .vrm-app-shell .vrm-fu-objectif > .vrm-fu-objectif-ligne,
 html body .vrm-app-shell .vrm-fu-objectif > .vrm-fu-objectif-piste { display: flex; }
 html body .vrm-app-shell .vrm-fu-objectif > .vrm-fu-objectif-piste { display: block; }
 html body .vrm-app-shell .vrm-fu-objectif-reste {
-  display: block; font: 500 12px/1.35 var(--vrm-police); color: var(--fu-sur-sombre-2, rgba(255,255,255,.7));
+  display: block; font: 400 12px/1.35 var(--vrm-police); color: var(--fu-sur-sombre-2, rgba(255,255,255,.7));
   font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 html body .vrm-app-shell .vrm-fu-objectif-reste.is-atteint { color: #fff; font-weight: 600; }

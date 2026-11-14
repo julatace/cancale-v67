@@ -126,7 +126,9 @@ const lire = (pg) => pg.evaluate(() => {
     etapes: Object.fromEntries([...el.querySelectorAll('[data-fiche-etape]')].map((x) => [x.getAttribute('data-fiche-etape'), { etat: x.getAttribute('data-fiche-etat'), txt: x.innerText.replace(/\n/g, ' | '), raison: !!x.querySelector('[data-fiche-raison]') }])),
     ordre: [...el.querySelectorAll('[data-fiche-etape]')].map((x) => x.getAttribute('data-fiche-etape')),
     txs: [...el.querySelectorAll('[data-fiche-tx]')].map((x) => x.getAttribute('data-fiche-tx')),
-    petits: [...el.querySelectorAll('button')].filter((x) => { const r = x.getBoundingClientRect(); return r.height > 0 && r.height < 43.5; }).map((x) => x.textContent.slice(0, 30)),
+    // (14 nov., système de design) 44 px au doigt, 36 à la souris (DESIGN.md §6 : une hauteur de contrôle par pointeur).
+    seuil: matchMedia('(hover: hover) and (pointer: fine) and (min-width: 768px)').matches ? 36 : 44,
+    petits: [...el.querySelectorAll('button')].filter((x) => { const r = x.getBoundingClientRect(); return r.height > 0 && r.height < (matchMedia('(hover: hover) and (pointer: fine) and (min-width: 768px)').matches ? 36 : 44) - 0.5; }).map((x) => x.textContent.slice(0, 30)),
     pastille: (() => { const p = el.querySelector('[data-fiche-etat="fait"] .vrm-fp-pastille'); return p ? getComputedStyle(p).backgroundColor : null; })(),
     gris: (() => { const p = el.querySelector('[data-fiche-etat="absent"] .vrm-fp-ligne1 b'); return p ? getComputedStyle(p).color : null; })(),
     sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
@@ -158,7 +160,7 @@ const rgb = (s) => (/rgba?\((\d+), (\d+), (\d+)/.exec(s || '') || []).slice(1).m
         dit(f.etapes.argent.etat === 'fait' && /versé/i.test(f.etapes.argent.txt), `A ${T} l'argent versé (transaction finalisée), daté`, (f.etapes.argent || {}).txt);
         dit(f.benef === '4300' && f.partiel === '1' && /\+43/.test(f.benefTxt) && /frais pas tous confirmés/.test(f.benefTxt), `A ${T} bénéfice +43 €, dit partiel (frais pas tous confirmés)`, f.benef + ' ' + f.benefTxt);
         dit(rgb(f.pastille)[0] < 60, `A ${T} une étape lue : pastille pleine, à l'encre`, f.pastille);
-        dit(!f.petits.length, `F ${T} chaque bouton fait au moins 44 px`, f.petits.join(' | '));
+        dit(!f.petits.length, `F ${T} chaque bouton fait au moins ${f.seuil} px (44 au doigt, 36 à la souris)`, f.petits.join(' | '));
         dit(f.sw <= f.cw + 1, `F ${T} aucun débordement horizontal`, `${f.sw} > ${f.cw}`);
         await pg.screenshot({ path: path.join(SHOTS, `fiche-paire-${vp.width}-117.png`) });
       });

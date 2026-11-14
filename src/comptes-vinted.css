@@ -6,7 +6,7 @@
 .vrm-cv-table thead th { border-top: 0; font-size: 12px; font-weight: 600; color: var(--vrm-muted); line-height: 1.25; }
 .vrm-cv-table th:first-child { width: 30%; padding-left: 0; text-align: left; }
 .vrm-cv-table tbody th { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.vrm-cv-table td { font-weight: 500; }
+.vrm-cv-table td { font-weight: 400; }
 .vrm-cv-table td:last-child, .vrm-cv-table th:last-child { padding-right: 0; }
 .vrm-cv-notes { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
 .vrm-cv-notes .vrm-sv-note { margin: 0; }
@@ -18,5 +18,5 @@
   .vrm-cv-table tbody tr:first-child { border-top: 0; }
   .vrm-cv-table tbody th { grid-column: 1 / -1; width: auto; padding: 0 0 4px; border: 0; font-size: 15px; }
   .vrm-cv-carte .vrm-cv-table td { padding: 0; border: 0; text-align: left; font-size: 15px; font-weight: 600; }
-  .vrm-cv-table td::before { content: attr(data-lib); display: block; font-size: 11px; font-weight: 500; color: var(--vrm-muted); line-height: 1.3; margin-bottom: 2px; }
+  .vrm-cv-table td::before { content: attr(data-lib); display: block; font-size: 11px; font-weight: 400; color: var(--vrm-muted); line-height: 1.3; margin-bottom: 2px; }
 }

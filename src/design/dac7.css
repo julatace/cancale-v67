@@ -23,7 +23,7 @@
 .vrm-d7-carte { background: var(--fu-carte); border: 1px solid var(--fu-filet); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .vrm-d7-carte-tete { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .vrm-d7-nom { font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vrm-d7-verdict { font-size: 13px; color: var(--fu-gris); font-weight: 500; }
+.vrm-d7-verdict { font-size: 13px; color: var(--fu-gris); font-weight: 400; }
 .vrm-d7-verdict.is-atteint { color: var(--fu-encre); font-weight: 700; }
 .vrm-d7-mesures { display: flex; flex-direction: column; gap: 8px; }
 .vrm-d7-mesure { display: flex; flex-direction: column; gap: 5px; }

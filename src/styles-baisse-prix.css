@@ -36,7 +36,7 @@
 .vrm-bp-prix { font-size: 17px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .vrm-bp-prix s { color: var(--fu-gris, #6e6e73); text-decoration-thickness: 1px; }
 .vrm-bp-prix b { font-weight: 700; }
-.vrm-bp-prix small { font-size: 12px; color: var(--fu-gris, #6e6e73); font-weight: 500; }
+.vrm-bp-prix small { font-size: 12px; color: var(--fu-gris, #6e6e73); font-weight: 400; }
 .vrm-bp-raison { font-size: 13px; color: var(--fu-gris, #6e6e73); overflow-wrap: anywhere; }
 .vrm-bp-ambre { font-size: 13px; font-weight: 700; color: var(--fu-ambre-txt, #b25000); }
 .vrm-bp-bas { display: flex; flex-direction: column; gap: 10px; position: sticky; bottom: 0; padding: 10px 0 0; background: var(--fu-fond, #f2f2f7); }

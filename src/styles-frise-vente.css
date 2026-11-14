@@ -39,7 +39,7 @@
 .vrm-frv-texte { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-width: 0; }
 .vrm-frv-nom { display: inline-flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; color: var(--frv-ink); white-space: nowrap; }
 .vrm-frv-sous { font-size: 13px; color: var(--frv-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.vrm-frv-etape[data-frv-etat="paslu"] .vrm-frv-nom { color: var(--frv-muted); font-weight: 500; }
+.vrm-frv-etape[data-frv-etat="paslu"] .vrm-frv-nom { color: var(--frv-muted); font-weight: 400; }
 .vrm-frv-etape[data-frv-etat="geste"] .vrm-frv-nom, .vrm-frv-etape[data-frv-etat="geste"] .vrm-frv-sous { color: var(--frv-warn); font-weight: 600; }
 .vrm-frv-etape[data-frv-apres-bif] { opacity: .45; }
 .vrm-frv-etape[data-frv-apres-bif]::before { background: repeating-linear-gradient(to bottom, var(--frv-line) 0 3px, transparent 3px 6px); }

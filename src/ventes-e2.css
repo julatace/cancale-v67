@@ -6,7 +6,7 @@
 
 /* ── « Tous » : l'état sur SA ligne au téléphone (revue 2.13) ─────────────── */
 html body .vrm-app-shell .vrm-main .vrm-toutes-etat {
-  display: block; margin-top: 3px; font-size: 13px; line-height: 1.35; font-weight: 500;
+  display: block; margin-top: 3px; font-size: 13px; line-height: 1.35; font-weight: 400;
   color: var(--vrm-muted); white-space: normal; overflow-wrap: anywhere;
 }
 html body .vrm-app-shell .vrm-main :is(.vrm-toutes-etat, .vrm-toutes-bureau > span)[data-ton="action"] { color: var(--vrm-warn); font-weight: 600; }

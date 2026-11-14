@@ -178,7 +178,7 @@ html body .vrm-ann-avis > button.vrm-ann-avis-neufs:active { background: var(--v
   white-space: normal !important; overflow: visible !important; text-overflow: clip !important; line-height: 1.2;
 }
 :root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-gestes > .vrm-fiche-geste > svg { flex: none; }
-.vrm-fiche-geste-sous { display: block; font-size: 11px; font-weight: 500; color: var(--vrm-muted); white-space: nowrap; }
+.vrm-fiche-geste-sous { display: block; font-size: 11px; font-weight: 400; color: var(--vrm-muted); white-space: nowrap; }
 /* (12 nov.) « Baisser à 92 € ? · en ligne depuis 45 j · 3 favoris » : la question reste entière, la raison s'efface au bord. */
 .vrm-fiche-geste-sous[data-conseil-raison] { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 

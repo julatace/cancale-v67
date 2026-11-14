@@ -131,7 +131,7 @@ case (pas d'ombre, rayon 12). `prefers-contrast: more` rend un cadre net.
 - **Segmenté** (`Segmente`, `.vrm-seg`) : une piste capsule `--d-remplir`, 2 px
   d'intérieur ; le segment choisi = capsule blanche (nuit `#636366`) à ombre fine ; un
   seul niveau par écran ; le compte après « · ».
-- **Filtres** (`.vrm-filtres`, puces de compte) : capsules, **44 au doigt, 32 à la souris**
+- **Filtres** (`.vrm-filtres`, puces de compte) : capsules, **44 au doigt, 36 à la souris** (14 nov. : une seule hauteur de contrôle par pointeur)
   (`--d-h-filtre`) ; l'actif à l'encre pleine, texte fond.
 - **Recherche** (`ChampRecherche`) : la capsule remplie d'iOS, sans cadre ; l'anneau
   bleu au focus seulement.

@@ -29,7 +29,7 @@ export function FenetreGuideeEbay({ id, Feuille, onClose, C, vars = {}, action =
       <ol data-ebay-guide-etapes={etapesGuide(id).length} style={{ listStyle: 'none', margin: 0, padding: '4px 0 0', display: 'grid', gap: 12 }}>
         {etapesGuide(id).map((k, i) => (
           <li key={k} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-            <span aria-hidden="true" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 14, background: `${C.accent}15`, color: C.accentTexte || C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700 }}>{i + 1}</span>
+            <span aria-hidden="true" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 14, background: `${C.accent}15`, color: C.accentTexte || C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 700 }}>{i + 1}</span>
             <span style={{ fontSize: 15, color: C.text, lineHeight: 1.45, paddingTop: 3 }}>{tr(k, vars)}</span>
           </li>
         ))}
@@ -127,7 +127,7 @@ export function QuestionsEbay({ questions = [], Feuille, C, onClose, onRepondre,
   } else if (q.type === 'politique') {
     corps = (<>
       <p style={{ fontSize: 15, color: C.text, margin: '0 0 10px', lineHeight: 1.45 }}>{tr(`ebay.q.politique.${q.quoi}`)}</p>
-      <ol style={{ margin: '0 0 10px', paddingLeft: 20, fontSize: 14, color: C.text, lineHeight: 1.5 }}>
+      <ol style={{ margin: '0 0 10px', paddingLeft: 20, fontSize: 15, color: C.text, lineHeight: 1.5 }}>
         <li>{tr('ebay.guide.politique.1')}</li><li>{tr('ebay.guide.politique.2')}</li>
       </ol>
       <BoutonBase href={GUIDES.politique.lien} target="_blank" rel="noreferrer" data-ebay-q-politique-lien>{tr('ebay.guide.ouvrirEbay')}</BoutonBase>

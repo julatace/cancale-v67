@@ -1727,7 +1727,7 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
       )}
       {/* Contrôles de vue : tourner à gauche/droite + zoom (fiables sur mobile) */}
       {!loading && (() => {
-        const btn = { width: 38, height: 38, borderRadius: 12, border: '1px solid rgba(0,0,0,0.15)', background: 'rgba(255,255,255,0.92)', color: '#1c1c22', fontSize: 17, fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.18)', touchAction: 'manipulation', userSelect: 'none', flexShrink: 0 };
+        const btn = { width: 38, height: 38, borderRadius: 12, border: '1px solid rgba(0,0,0,0.15)', background: 'rgba(255,255,255,0.92)', color: '#1c1c22', fontSize: 17, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.18)', touchAction: 'manipulation', userSelect: 'none', flexShrink: 0 };
         const stop = (e) => { e.stopPropagation(); };
         const call = (fn, ...a) => { const s = st.current || {}; if (s[fn]) s[fn](...a); };
         return (
@@ -1804,10 +1804,10 @@ function RoomPerspective({ items, room, hi, sel, onOpen, colorOf, emojiOf, h3dOf
             <div style={{ position: 'absolute', left: '7%', right: '7%', top: -Math.min(12, hpx * 0.16), height: Math.min(12, hpx * 0.16), background: col, filter: 'brightness(1.3)', transform: 'skewX(-34deg)', borderRadius: '3px 3px 0 0', opacity: 0.92 }} />
             <div style={{ width: '100%', height: '100%', background: `linear-gradient(180deg, ${col}, ${col} 62%, rgba(0,0,0,0.22))`, border: `2px solid ${isHi ? '#e5484d' : isSel ? '#fff' : 'rgba(0,0,0,0.28)'}`, borderRadius: 3, boxShadow: isHi ? '0 0 0 4px rgba(229,72,77,0.4)' : '0 5px 10px rgba(0,0,0,0.28)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', overflow: 'hidden' }}>
               <span style={{ fontSize: Math.max(11, Math.min(26, hpx * 0.42)), lineHeight: 1 }}>{emojiOf(it)}</span>
-              {hpx > 40 && <span style={{ fontSize: 11, fontWeight: 800, textShadow: '0 1px 2px rgba(0,0,0,0.6)', maxWidth: '96%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</span>}
-              {storedCount(it) > 0 && <span style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.55)', borderRadius: 999, fontSize: 11, fontWeight: 800, padding: '1px 5px' }}>{storedCount(it)}</span>}
+              {hpx > 40 && <span style={{ fontSize: 11, fontWeight: 700, textShadow: '0 1px 2px rgba(0,0,0,0.6)', maxWidth: '96%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</span>}
+              {storedCount(it) > 0 && <span style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.55)', borderRadius: 999, fontSize: 11, fontWeight: 700, padding: '1px 5px' }}>{storedCount(it)}</span>}
             </div>
-            {isHi && <div style={{ position: 'absolute', top: -18, left: '50%', transform: 'translateX(-50%)', background: '#e5484d', color: '#fff', fontSize: 11, fontWeight: 800, padding: '1px 7px', borderRadius: 999, whiteSpace: 'nowrap', zIndex: 400 }}>ici 📍</div>}
+            {isHi && <div style={{ position: 'absolute', top: -18, left: '50%', transform: 'translateX(-50%)', background: '#e5484d', color: '#fff', fontSize: 11, fontWeight: 700, padding: '1px 7px', borderRadius: 999, whiteSpace: 'nowrap', zIndex: 400 }}>ici 📍</div>}
           </div>
         );
       })}

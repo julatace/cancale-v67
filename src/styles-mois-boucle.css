@@ -70,8 +70,8 @@
 :root:root body .vrm-mb .vrm-mb-rond.is-manque { background: var(--mb-ambre-fond) !important; color: var(--mb-ambre) !important; }
 :root:root body .vrm-mb .vrm-mb-l { display: flex !important; flex-direction: column !important; gap: 2px !important; min-width: 0 !important; }
 :root:root body .vrm-mb .vrm-mb-nom { font: 600 15px/1.25 var(--mb-police) !important; color: var(--mb-encre) !important; }
-:root:root body .vrm-mb .vrm-mb-ligne.is-ok .vrm-mb-nom { color: var(--mb-gris) !important; font-weight: 500 !important; }
-:root:root body .vrm-mb .vrm-mb-sous { font: 500 13px/1.3 var(--mb-police) !important; color: var(--mb-gris) !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+:root:root body .vrm-mb .vrm-mb-ligne.is-ok .vrm-mb-nom { color: var(--mb-gris) !important; font-weight: 400 !important; }
+:root:root body .vrm-mb .vrm-mb-sous { font: 400 13px/1.3 var(--mb-police) !important; color: var(--mb-gris) !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
 :root:root body .vrm-mb .vrm-mb-chev { font: 600 20px/1 var(--mb-police) !important; color: var(--mb-gris-2) !important; }
 
 /* ── COMPARER DEUX MOIS ──────────────────────────────────────────────────── */
@@ -89,15 +89,15 @@
 :root:root body .vrm-cm .vrm-cm-cols { padding: 4px 0 !important; font: 600 12px/1.2 var(--mb-police) !important; color: var(--mb-gris) !important; }
 :root:root body .vrm-cm .vrm-cm-cols > span { text-align: right !important; font-variant-numeric: tabular-nums !important; }
 :root:root body .vrm-cm .vrm-cm-ligne { min-height: 52px !important; border-top: 1px solid var(--mb-sep) !important; padding: 6px 0 !important; }
-:root:root body .vrm-cm .vrm-cm-nom { font: 500 15px/1.25 var(--mb-police) !important; color: var(--mb-encre) !important; min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+:root:root body .vrm-cm .vrm-cm-nom { font: 600 15px/1.25 var(--mb-police) !important; color: var(--mb-encre) !important; min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
 :root:root body .vrm-cm .vrm-cm-v, :root:root body .vrm-cm .vrm-cm-ecart { display: flex !important; flex-direction: column !important; align-items: flex-end !important; gap: 1px !important; min-width: 0 !important; text-align: right !important; }
 :root:root body .vrm-cm .vrm-cm-v b { font: 400 15px/1.2 var(--mb-police) !important; font-variant-numeric: tabular-nums !important; color: var(--mb-gris) !important; white-space: nowrap !important; }
 :root:root body .vrm-cm .vrm-cm-v.is-a b { font-weight: 700 !important; color: var(--mb-encre) !important; }
 :root:root body .vrm-cm .vrm-cm-v.is-vide b { color: var(--mb-gris) !important; font-weight: 400 !important; }
-:root:root body .vrm-cm .vrm-cm-v small, :root:root body .vrm-cm .vrm-cm-ecart small { font: 500 11px/1.2 var(--mb-police) !important; color: var(--mb-gris) !important; white-space: nowrap !important; }
+:root:root body .vrm-cm .vrm-cm-v small, :root:root body .vrm-cm .vrm-cm-ecart small { font: 400 11px/1.2 var(--mb-police) !important; color: var(--mb-gris) !important; white-space: nowrap !important; }
 :root:root body .vrm-cm .vrm-cm-ecart b { display: inline-flex !important; align-items: center !important; gap: 4px !important; font: 600 13px/1.2 var(--mb-police) !important; font-variant-numeric: tabular-nums !important; color: var(--mb-gris) !important; white-space: nowrap !important; }
 :root:root body .vrm-cm .vrm-cm-fleche { flex: none !important; color: var(--mb-gris) !important; }
 :root:root body .vrm-cm .vrm-cm-pourquoi { display: flex !important; flex-direction: column !important; gap: 2px !important; margin-top: 8px !important; padding-top: 8px !important; border-top: 1px solid var(--mb-sep) !important; font: 400 11px/1.45 var(--mb-police) !important; color: var(--mb-gris) !important; }
 :root:root body .vrm-cm .vrm-cm-pourquoi b { font-weight: 600 !important; color: var(--mb-encre) !important; }
-:root:root body .vrm-cm .vrm-cm-vide { margin: 0 !important; font: 500 13px/1.4 var(--mb-police) !important; color: var(--mb-gris) !important; }
+:root:root body .vrm-cm .vrm-cm-vide { margin: 0 !important; font: 400 13px/1.4 var(--mb-police) !important; color: var(--mb-gris) !important; }
 }

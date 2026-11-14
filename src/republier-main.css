@@ -30,7 +30,7 @@ p.vrm-rm-muet { margin: 0; }
 html body button.vrm-rm-etape {
   width: 100%; min-height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 4px;
   padding: 4px 2px; margin: 0; border: 0 !important; background: transparent !important; box-shadow: none !important;
-  color: var(--vrm-muted, #6E6E73) !important; font: 500 12px/1.2 var(--vrm-police, inherit); cursor: pointer;
+  color: var(--vrm-muted, #6E6E73) !important; font: 400 12px/1.2 var(--vrm-police, inherit); cursor: pointer;
   -webkit-tap-highlight-color: transparent; border-radius: 12px !important;
 }
 html body button.vrm-rm-etape:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3) !important; outline-offset: -2px; }

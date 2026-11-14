@@ -101,7 +101,7 @@ html body .vrm-app-shell:has(.vrm-main .vrm-fu-ecran) { background-color: var(--
 .vrm-fu-grand.is-vide { color: var(--fu-sur-sombre-2); }
 .vrm-fu-grand .vrm-fu-borne { font-size: 15px; font-weight: 600; letter-spacing: 0; color: var(--fu-sur-sombre-2); margin-right: 6px; vertical-align: .55em; }
 .vrm-fu-grand .vrm-jc-montant, .vrm-fu-grand .vrm-jc-eur { color: inherit !important; font: inherit !important; letter-spacing: inherit !important; }
-.vrm-fu-sous { margin-top: 6px; font: 500 13px/1.4 var(--vrm-police); color: var(--fu-sur-sombre-2); }
+.vrm-fu-sous { margin-top: 6px; font: 400 13px/1.4 var(--vrm-police); color: var(--fu-sur-sombre-2); }
 .vrm-fu-sous b { color: #fff; font-weight: 600; }
 .vrm-fu-sous button { all: unset; cursor: pointer; color: #fff; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(255,255,255,.35); }
 .vrm-fu-courbe { flex: none; margin-top: 6px; }
@@ -116,7 +116,7 @@ button.vrm-fu-case { cursor: pointer; transition: background-color .15s ease; }
 button.vrm-fu-case:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: 2px; }
 .vrm-fu-case b { display: block; font: 700 20px/1.15 var(--vrm-police); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-fu-case b.is-vide { color: var(--fu-sur-sombre-2); }
-.vrm-fu-case > span { font: 500 12px/1.3 var(--vrm-police); color: var(--fu-sur-sombre-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-fu-case > span { font: 400 12px/1.3 var(--vrm-police); color: var(--fu-sur-sombre-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* (5 nov., chantier A, revue 3.1) La casse des tuiles : une majuscule en tête, partout (« Dernier jour », « Avec code », « À vérifier »). */
 .vrm-fu-case > span::first-letter { text-transform: uppercase; }
 .vrm-fu-case .vrm-jc-montant, .vrm-fu-case .vrm-jc-eur { color: inherit !important; font: inherit !important; }
@@ -129,17 +129,17 @@ button.vrm-fu-case:focus-visible { outline: 2px solid var(--fu-bleu); outline-of
 @media (max-width: 360px) { .vrm-fu-grand { font-size: 34px; } .vrm-fu-case { padding: 9px 9px; } .vrm-fu-case b { font-size: 17px; } }
 /* (4 nov.) L'objectif du mois : une barre fine sous les cases, rien d'autre. */
 .vrm-fu-objectif { display: flex; flex-direction: column; gap: 6px; min-width: 0; max-width: 100%; box-sizing: border-box; }
-.vrm-fu-objectif-ligne { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font: 500 12px/1.3 var(--vrm-police); color: var(--fu-sur-sombre-2); }
+.vrm-fu-objectif-ligne { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font: 400 12px/1.3 var(--vrm-police); color: var(--fu-sur-sombre-2); }
 .vrm-fu-objectif-ligne > b { font: 600 13px/1.3 var(--vrm-police); color: #fff; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.vrm-fu-objectif-sur { color: var(--fu-sur-sombre-2); font-weight: 500; }
+.vrm-fu-objectif-sur { color: var(--fu-sur-sombre-2); font-weight: 400; }
 .vrm-fu-objectif-bas { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px; min-width: 0; }
 .vrm-fu-objectif-bas > .vrm-fu-objectif-reste { flex: 0 1 auto; min-width: 0; max-width: 100%; }
-.vrm-fu-objectif-rythme { flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; font: 500 12px/1.35 var(--vrm-police); color: var(--fu-sur-sombre-2, rgba(255,255,255,.7)); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-fu-objectif-rythme { flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; font: 400 12px/1.35 var(--vrm-police); color: var(--fu-sur-sombre-2, rgba(255,255,255,.7)); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .vrm-fu-objectif-rythme.is-avance { color: #fff; }
-.vrm-fu-objectif-bilan { box-sizing: border-box; max-width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.12); font: 500 13px/1.35 var(--vrm-police); color: #fff; font-variant-numeric: tabular-nums; }
+.vrm-fu-objectif-bilan { box-sizing: border-box; max-width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.12); font: 400 13px/1.35 var(--vrm-police); color: #fff; font-variant-numeric: tabular-nums; }
 .vrm-fu-objectif-vu { all: unset; box-sizing: border-box; min-height: 44px; min-width: 44px; padding: 0 14px; border-radius: 999px; display: grid; place-items: center; background: rgba(255,255,255,.14); color: #fff; font: 600 13px/1 var(--vrm-police); cursor: pointer; }
 .vrm-fu-objectif-vu:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: 2px; }
-.vrm-carte-objectif-prop { display: flex; align-items: center; gap: 10px; margin: 0; font: 500 13px/1.35 var(--vrm-police); color: var(--fu-gris, #6e6e73); font-variant-numeric: tabular-nums; }
+.vrm-carte-objectif-prop { display: flex; align-items: center; gap: 10px; margin: 0; font: 400 13px/1.35 var(--vrm-police); color: var(--fu-gris, #6e6e73); font-variant-numeric: tabular-nums; }
 .vrm-carte-objectif-prop.is-vide { display: block; }
 .vrm-fu-objectif-piste { height: 4px; border-radius: 999px; background: rgba(255,255,255,.14); overflow: hidden; }
 .vrm-fu-objectif-piste > span { display: block; height: 100%; border-radius: 999px; background: var(--fu-bleu); transition: width .4s cubic-bezier(.23,1,.32,1); }
@@ -164,7 +164,7 @@ button.vrm-fu-case:focus-visible { outline: 2px solid var(--fu-bleu); outline-of
   display: inline-block; padding: 1px 7px; border-radius: 6px; background: var(--fu-encre); color: var(--fu-carte);
   font: 700 12px/1.45 var(--vrm-police); font-variant-numeric: tabular-nums; white-space: nowrap;
 }
-.vrm-fu-site { display: inline-flex; align-items: center; gap: 6px; font: 500 12px/1.3 var(--vrm-police); color: var(--fu-gris); white-space: nowrap; }
+.vrm-fu-site { display: inline-flex; align-items: center; gap: 6px; font: 400 12px/1.3 var(--vrm-police); color: var(--fu-gris); white-space: nowrap; }
 .vrm-fu-site::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--fu-gris3); flex: none; }
 .vrm-fu-transp {
   display: inline-flex !important; align-items: center !important; gap: 7px !important; min-height: 44px !important; padding: 0 12px !important; box-sizing: border-box;
@@ -188,7 +188,7 @@ html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-t
 }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-tete .vrm-day-date { font: 600 13px/1.3 var(--vrm-police) !important; color: var(--fu-sur-sombre-2) !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-tete .vrm-day-hello { margin-top: 2px !important; font: 700 34px/1.1 var(--vrm-police) !important; letter-spacing: -.03em !important; color: #fff !important; }
-html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-tete :is(.vrm-day-todo, .vrm-phrase-ecran) { margin-top: 6px !important; font: 500 15px/1.35 var(--vrm-police) !important; color: var(--fu-sur-sombre-2) !important; }
+html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-tete :is(.vrm-day-todo, .vrm-phrase-ecran) { margin-top: 6px !important; font: 600 15px/1.35 var(--vrm-police) !important; color: var(--fu-sur-sombre-2) !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-tete .vrm-day-date + .vrm-day-todo::before { content: none !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-tete .vrm-day-todo b { color: #fff !important; font-weight: 600 !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-tete .vrm-day-todo + .vrm-phrase-ecran, html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-tete .vrm-phrase-ecran + .vrm-day-todo { margin-top: 2px !important; }
@@ -212,7 +212,7 @@ html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-t
 }
 .vrm-fu-tete .vrm-fu-bonjour { font: 600 13px/1.3 var(--vrm-police); color: var(--fu-sur-sombre-2); }
 .vrm-fu-tete .vrm-fu-titre-tete { margin: 2px 0 0; font: 700 34px/1.1 var(--vrm-police); letter-spacing: -.03em; color: #fff; }
-.vrm-fu-tete .vrm-fu-date { margin-top: 4px; font: 500 13px/1.35 var(--vrm-police); color: var(--fu-sur-sombre-2); }
+.vrm-fu-tete .vrm-fu-date { margin-top: 4px; font: 400 13px/1.35 var(--vrm-police); color: var(--fu-sur-sombre-2); }
 .vrm-fu-tete .vrm-fu-date b { color: #fff; font-weight: 600; }
 .vrm-fu-tete .vrm-w-modifier { position: absolute !important; top: 14px !important; right: 14px !important; min-height: 44px; padding: 0 12px; color: var(--fu-sur-sombre-2) !important; background: transparent; border: 0; font: 600 15px var(--vrm-police) !important; cursor: pointer; transform: none !important; }
 .vrm-fu-semaine { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin: 2px 0 0; padding: 0; list-style: none; }
@@ -229,16 +229,16 @@ html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-t
   box-sizing: border-box; min-width: 0; min-height: 64px; padding: 12px 14px !important; margin: 0 !important; border: 0 !important;
   border-radius: 12px !important; background: rgba(255,255,255,.1) !important; color: #fff !important; display: flex; flex-direction: column; gap: 2px;
 }
-.vrm-fu-tete .vrm-fu-cases .vrm-jc-cell :is(.vrm-jc-l, .vrm-jc-l-lien) { order: 0; font: 500 12px/1.3 var(--vrm-police) !important; color: var(--fu-sur-sombre-2) !important; text-decoration: none !important; text-transform: none !important; letter-spacing: 0 !important; }
+.vrm-fu-tete .vrm-fu-cases .vrm-jc-cell :is(.vrm-jc-l, .vrm-jc-l-lien) { order: 0; font: 400 12px/1.3 var(--vrm-police) !important; color: var(--fu-sur-sombre-2) !important; text-decoration: none !important; text-transform: none !important; letter-spacing: 0 !important; }
 .vrm-fu-tete .vrm-fu-cases .vrm-jc-cell .vrm-jc-v { order: 1; font: 700 28px/1.15 var(--vrm-police) !important; color: #fff !important; letter-spacing: -.03em; }
 .vrm-fu-tete .vrm-fu-cases .vrm-jc-cell .vrm-jc-v :is(.vrm-jc-montant, .vrm-jc-eur) { color: inherit !important; font: inherit !important; letter-spacing: inherit !important; }
-.vrm-fu-tete .vrm-fu-cases .vrm-jc-cell .vrm-jc-sous { order: 2; font: 500 12px/1.35 var(--vrm-police) !important; color: var(--fu-sur-sombre-2) !important; }
+.vrm-fu-tete .vrm-fu-cases .vrm-jc-cell .vrm-jc-sous { order: 2; font: 400 12px/1.35 var(--vrm-police) !important; color: var(--fu-sur-sombre-2) !important; }
 .vrm-fu-tete .vrm-fu-cases .vrm-jc-cell .vrm-jc-sous :is(button, a) { color: #fff !important; font-weight: 600 !important; background: none !important; border: 0 !important; padding: 0 !important; min-height: 0 !important; text-decoration: underline; text-underline-offset: 2px; }
 .vrm-fu-tete .vrm-fu-cases .vrm-jc-cell .vrm-jc-choix { order: 3; }
 .vrm-fu-tete .vrm-fu-case.is-jour b { font-size: 28px; font-weight: 700; letter-spacing: -.03em; }
 .vrm-fu-tete .vrm-fu-case.is-jour > span { font-size: 12px; }
 .vrm-fu-tete .vrm-fu-case.is-jour { min-height: 64px; padding: 12px 14px; }
-.vrm-fu-tete .vrm-fu-case.is-jour .vrm-fu-case-sous { font: 500 12px/1.35 var(--vrm-police); color: var(--fu-sur-sombre-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-fu-tete .vrm-fu-case.is-jour .vrm-fu-case-sous { font: 400 12px/1.35 var(--vrm-police); color: var(--fu-sur-sombre-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* « Bénéfice » d'abord le libellé, puis le montant : dans la case « jour », pareil. */
 .vrm-fu-tete .vrm-fu-case.is-jour { justify-content: flex-start; }
 .vrm-fu-tete .vrm-fu-case.is-jour > span:first-child { order: 0; }
@@ -271,7 +271,7 @@ html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-task.is-groupe > 
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-task .vrm-day-task-ic { display: none !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-task .vrm-day-task-textes { flex: 1 1 auto !important; min-width: 0 !important; display: flex !important; flex-direction: column !important; gap: 3px !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-task .vrm-day-task-title { font: 600 17px/1.3 var(--vrm-police) !important; color: var(--fu-encre) !important; letter-spacing: -.01em !important; }
-html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-task .vrm-day-task-note { font: 500 13px/1.35 var(--vrm-police) !important; color: var(--fu-gris) !important; }
+html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-task .vrm-day-task-note { font: 400 13px/1.35 var(--vrm-police) !important; color: var(--fu-gris) !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-task .vrm-day-task-note.is-urgent { color: var(--fu-ambre-txt) !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-task .vrm-day-task-action {
   flex: none !important; display: inline-flex !important; align-items: center !important; justify-content: center !important;
@@ -332,7 +332,7 @@ html body .vrm-app-shell .vrm-sale-row[data-fu-ligne] .vrm-ledger-photo-empty { 
 html body .vrm-app-shell .vrm-sale-row[data-fu-ligne] .vrm-ledger-photo-empty :is(img, picture, .vrm-photo-vente) { width: 100% !important; height: 100% !important; border-radius: 0 !important; object-fit: cover !important; }
 html body .vrm-app-shell .vrm-sale-row[data-fu-ligne] .vrm-ledger-sale-nom { font: 600 15px/1.3 var(--vrm-police) !important; color: var(--fu-encre) !important; letter-spacing: -.01em; }
 html body .vrm-app-shell .vrm-sale-row[data-fu-ligne] .vrm-ledger-sale-amount { font: 700 15px/1.3 var(--vrm-police) !important; color: var(--fu-encre) !important; font-variant-numeric: tabular-nums; }
-html body .vrm-app-shell .vrm-sale-row[data-fu-ligne] .vrm-ledger-sale-sous { font: 500 12px/1.35 var(--vrm-police) !important; color: var(--fu-gris) !important; }
+html body .vrm-app-shell .vrm-sale-row[data-fu-ligne] .vrm-ledger-sale-sous { font: 400 12px/1.35 var(--vrm-police) !important; color: var(--fu-gris) !important; }
 /* L'en-tête des groupes de ventes (« Aujourd'hui », « Cette semaine »…) */
 html body .vrm-app-shell .vrm-fu-ecran .vrm-ventes-groupe-titre, html body .vrm-app-shell .vrm-fu-ecran .vrm-sales-day-head { font: 700 13px/1.3 var(--vrm-police) !important; color: var(--fu-gris2) !important; text-transform: none !important; letter-spacing: 0 !important; background: transparent !important; border: 0 !important; padding: 12px 4px 2px !important; }
 
@@ -357,13 +357,13 @@ html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-
 .vrm-fu-panneau { background: var(--fu-carte); border-radius: var(--fu-r-carte); box-shadow: var(--fu-ombre); padding: 18px; color: var(--fu-encre); min-width: 0; }
 .vrm-fu-panneau-tete { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 0 0 14px; }
 .vrm-fu-panneau-tete h3 { margin: 0; font: 700 17px/1.25 var(--vrm-police); letter-spacing: -.01em; }
-.vrm-fu-panneau-tete span { font: 500 13px/1.2 var(--vrm-police); color: var(--fu-gris2); }
+.vrm-fu-panneau-tete span { font: 400 13px/1.2 var(--vrm-police); color: var(--fu-gris2); }
 .vrm-fu-anneau { display: flex; align-items: center; gap: 20px; }
 .vrm-fu-anneau svg { flex: none; }
 .vrm-fu-anneau-centre { font: 700 28px/1 var(--vrm-police); letter-spacing: -.03em; fill: var(--fu-encre); font-variant-numeric: tabular-nums; }
-.vrm-fu-anneau-sous { font: 500 11px/1 var(--vrm-police); fill: var(--fu-gris); }
+.vrm-fu-anneau-sous { font: 400 11px/1 var(--vrm-police); fill: var(--fu-gris); }
 .vrm-fu-legende { list-style: none; margin: 0; padding: 0; flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
-.vrm-fu-legende li { display: flex; align-items: center; gap: 10px; min-width: 0; font: 500 15px/1.25 var(--vrm-police); }
+.vrm-fu-legende li { display: flex; align-items: center; gap: 10px; min-width: 0; font: 600 15px/1.25 var(--vrm-police); }
 .vrm-fu-legende li > i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
 .vrm-fu-legende li > span { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-fu-legende li > b { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -380,7 +380,7 @@ html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-
 }
 .vrm-fu-declaration > div { min-width: 0; flex: 1 1 180px; }
 .vrm-fu-declaration b { display: block; font: 700 17px/1.25 var(--vrm-police); }
-.vrm-fu-declaration span { display: block; margin-top: 2px; font: 500 13px/1.35 var(--vrm-police); }
+.vrm-fu-declaration span { display: block; margin-top: 2px; font: 400 13px/1.35 var(--vrm-police); }
 .vrm-fu-encre-btn {
   all: unset; box-sizing: border-box; min-height: 44px; padding: 0 18px; border-radius: 12px; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center; background: var(--fu-encre); color: var(--fu-carte);
@@ -410,7 +410,7 @@ html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-ligne] > button.vrm-led
 .vrm-fu-legende li > i.is-cotis { background: var(--fu-gris2); }
 .vrm-fu-legende li > i.is-achat { background: var(--fu-gris3); }
 .vrm-fu-legende li > i.is-frais { background: var(--fu-piste); }
-.vrm-fu-note { margin: 12px 0 0; font: 500 13px/1.45 var(--vrm-police); color: var(--fu-gris); }
+.vrm-fu-note { margin: 12px 0 0; font: 400 13px/1.45 var(--vrm-police); color: var(--fu-gris); }
 .vrm-fu-barre-v { font: 700 11px/1 var(--vrm-police); color: var(--fu-gris2); text-align: center; font-variant-numeric: tabular-nums; }
 .vrm-fu-barre[data-courant] .vrm-fu-barre-v { color: var(--fu-encre); }
 .vrm-fu-barre[data-courant] .vrm-fu-barre-piste > i { background: var(--fu-encre); }
@@ -444,7 +444,7 @@ html body .vrm-puce-transp > [data-transporteur-nom] {
   font: 600 13px/1.2 var(--vrm-police) !important; letter-spacing: -.01em; color: var(--fu-encre) !important;
   white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; min-width: 0;
 }
-html body .vrm-puce-transp[data-lu="0"] > [data-transporteur-nom] { color: var(--fu-gris) !important; font-weight: 500 !important; }
+html body .vrm-puce-transp[data-lu="0"] > [data-transporteur-nom] { color: var(--fu-gris) !important; font-weight: 400 !important; }
 
 /* La rangée : puce + bouton principal, jamais à la ligne. */
 html body .vrm-rangee-bord {
@@ -545,7 +545,7 @@ html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-fu-compta
 /* ── 10. CONTRASTE (revue ui-ux-pro-max §1, craft-floor) ──────────────────────
    Tout TEXTE gris passe à 4,5:1 au moins : le gris le plus clair (#aeaeb2,
    #8e8e93) ne sert plus qu'aux pistes et aux formes, jamais aux mots. */
-.vrm-fu-seg > span { color: var(--fu-gris) !important; font-size: 11px !important; font-weight: 500 !important; }
+.vrm-fu-seg > span { color: var(--fu-gris) !important; font-size: 11px !important; font-weight: 400 !important; }
 .vrm-fu-seg[data-derniere] > span { color: var(--fu-encre) !important; font-weight: 600 !important; }
 .vrm-fu-seg[data-cours][data-ton="urgent"] > span { color: var(--fu-ambre-txt) !important; }
 .vrm-fu-barre > span, .vrm-fu-panneau-tete span, .vrm-fu-titre-section span { color: var(--fu-gris) !important; }
@@ -573,7 +573,7 @@ html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete > .vrm-fu-c
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-case.is-jour {
   all: unset; box-sizing: border-box; display: block !important; min-height: 0 !important; padding: 12px !important; border-radius: 12px !important; background: rgba(255,255,255,.1) !important; color: #fff; cursor: pointer; min-width: 0;
 }
-html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-case.is-jour > span { display: block; font: 500 12px/1.3 var(--vrm-police) !important; color: var(--fu-sur-sombre-2) !important; }
+html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-case.is-jour > span { display: block; font: 400 12px/1.3 var(--vrm-police) !important; color: var(--fu-sur-sombre-2) !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-case.is-jour > b { display: block; font: 700 28px/1.2 var(--vrm-police) !important; letter-spacing: -.02em !important; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-case.is-jour > b.is-vide { color: var(--fu-sur-sombre-2); }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-case.is-jour .vrm-fu-borne { font-size: 17px; margin-right: 3px; vertical-align: .2em; color: var(--fu-sur-sombre-2); }
@@ -593,14 +593,14 @@ html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-pastille.is-urge
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-pastille.is-icone { background: #8e8e93; color: #fff; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-textes { gap: 1px !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-title { display: block; font: 600 15px/1.3 var(--vrm-police) !important; letter-spacing: 0 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-note { display: block; font: 500 12px/1.35 var(--vrm-police) !important; color: #6e6e73 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-note { display: block; font: 400 12px/1.35 var(--vrm-police) !important; color: #6e6e73 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 :root[data-theme="dark"] .vrm-fu-journee .vrm-day-task .vrm-day-task-note { color: #98989d !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-action {
   min-height: 0 !important; padding: 8px 12px !important; border-radius: 999px !important; background: var(--fu-case) !important; color: var(--vrm-accent-texte) !important; font: 600 13px/1.2 var(--vrm-police) !important;
 }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task.is-urgent .vrm-day-task-action { color: var(--vrm-accent-texte) !important; background: var(--fu-case) !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list { gap: 10px !important; }
-.vrm-fu-vide { margin: 18px 0 0; font: 500 15px/1.4 var(--vrm-police); color: var(--fu-gris); }
+.vrm-fu-vide { margin: 18px 0 0; font: 600 15px/1.4 var(--vrm-police); color: var(--fu-gris); }
 /* Ce que la maquette ne montre pas : retiré de Ma journée. (8 nov., clarté) La phrase de l’écran revient (src/phrasesEcran.js). */
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee :is(.vrm-day-date, .vrm-day-todo, .vrm-w-modifier, .vrm-w-modifier-bas) { display: none !important; }
 html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task > span.vrm-fu-pastille { background: #1d1d1f !important; }
@@ -640,12 +640,12 @@ html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > button.vrm-led
 .vrm-fu-vente-nom { font: 600 15px/1.3 var(--vrm-police); color: var(--fu-encre); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .vrm-fu-vente-prix { font: 700 15px/1.3 var(--vrm-police); color: var(--fu-encre); font-variant-numeric: tabular-nums; white-space: nowrap; flex: none; }
 .vrm-fu-vente-l2 { margin-top: 4px; display: flex; align-items: center; gap: 6px; min-width: 0; }
-.vrm-fu-vente-l2 .vrm-fu-site { font: 500 12px/1.3 var(--vrm-police); color: #6e6e73; }
+.vrm-fu-vente-l2 .vrm-fu-site { font: 400 12px/1.3 var(--vrm-police); color: #6e6e73; }
 :root[data-theme="dark"] .vrm-fu-vente-l2 .vrm-fu-site, :root[data-theme="dark"] .vrm-fu-vente-l3 { color: #98989d; }
 .vrm-fu-vente-l2 .vrm-fu-site::before { width: 6px; height: 6px; background: #8e8e93; }
 /* (5 nov.) Le compte de la vente, écrit sur chaque ligne : même taille et même encre que le site,
    coupé en fin s'il est long (le titre complet est dans l'infobulle et le détail). */
-.vrm-fu-vente-l2 .vrm-fu-vente-compte { font: 500 12px/1.3 var(--vrm-police); color: #6e6e73; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.vrm-fu-vente-l2 .vrm-fu-vente-compte { font: 400 12px/1.3 var(--vrm-police); color: #6e6e73; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 :root[data-theme="dark"] .vrm-fu-vente-l2 .vrm-fu-vente-compte { color: #98989d; }
 .vrm-fu-vente-l2 .vrm-fu-vente-compte .vrm-vente-compte { font: inherit; color: inherit; }
 .vrm-fu-vente-l3 { margin-top: 3px; font: 600 12px/1.3 var(--vrm-police); color: #6e6e73; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -746,7 +746,7 @@ html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran :is(.vrm-compt
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte { padding: 18px 18px 18px !important; display: flex !important; flex-direction: column !important; gap: 0 !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-compta-libelle { margin: 0 !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-compta-hero { font: 700 38px/1.08 var(--vrm-police) !important; letter-spacing: -.03em !important; margin-top: 4px; }
-html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-fu-compta-sous { margin: 6px 0 0 !important; font: 500 13px/1.4 var(--vrm-police) !important; color: var(--fu-sur-sombre-2) !important; }
+html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-fu-compta-sous { margin: 6px 0 0 !important; font: 400 13px/1.4 var(--vrm-police) !important; color: var(--fu-sur-sombre-2) !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-fu-compta-sous button { all: unset; cursor: pointer; color: var(--fu-sur-sombre-2) !important; font: inherit !important; text-decoration: none !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-fu-compta-cases { margin-top: 12px; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-fu-compta-cases .vrm-fu-case b { color: #fff !important; }
@@ -796,7 +796,7 @@ html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-
 /* (3 nov.) La carte Vestiaire a son « … » comme les autres (la même carte pour tous les sites). */
 /* La carte n'a plus de gestes visibles : sa rangée d'actions ne prend pas de place quand elle est vide. */
 html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]):not([data-plus-ouvert]) .vrm-colis-actions:not(:has(> [data-geste="relier"], > [data-geste="poser-num"])) { margin-top: 0 !important; min-height: 0 !important; }
-.vrm-fu-vente-taille { font: 500 12px/1.3 var(--vrm-police); color: #6e6e73; white-space: nowrap; }
+.vrm-fu-vente-taille { font: 400 12px/1.3 var(--vrm-police); color: #6e6e73; white-space: nowrap; }
 :root[data-theme="dark"] .vrm-fu-vente-taille { color: #98989d; }
 .vrm-fu-apres { display: flex; }
 .vrm-fu-apres :is(button, .vrm-b) { min-height: 44px !important; border-radius: 12px !important; background: var(--fu-case) !important; border: 0 !important; color: var(--fu-encre) !important; font: 600 15px/1 var(--vrm-police) !important; padding: 0 14px !important; }
@@ -961,7 +961,7 @@ html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] .vrm-rangee-bord
 /* ══ 20. CRITIQUE DU 3 NOV. (#6) — la frise du récapitulatif = celle de la ligne ══ */
 html body .vrm-recap-frise[data-recap-frise] { display: block !important; margin: 16px 0 0 !important; grid-template-columns: none !important; }
 html body .vrm-recap-frise[data-recap-frise] > .vrm-fu-frise { margin: 0; }
-html body .vrm-recap-frise-detail { margin: 10px 0 0; font: 500 13px/1.4 var(--vrm-police); color: var(--fu-gris); }
+html body .vrm-recap-frise-detail { margin: 10px 0 0; font: 400 13px/1.4 var(--vrm-police); color: var(--fu-gris); }
 /* (3 nov.) Le détail d'une ligne « À faire » se lit : #6e6e73 sur blanc (5:1), jamais #8e8e93 (3,4:1). */
 :root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-note:not(.is-urgent) { color: #6e6e73 !important; }
 :root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-note:not(.is-urgent) { color: #98989d !important; }
@@ -1041,7 +1041,7 @@ html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-
 .vrm-rpf { display: flex; flex-direction: column; gap: 12px; }
 .vrm-rpf-carte { position: relative; border-radius: var(--fu-r-carte, 20px); overflow: hidden; }
 .vrm-rpf-carte .vrm-relais-fond { border-radius: var(--fu-r-carte, 20px) !important; }
-.vrm-rpf-attrib { position: absolute; right: 8px; bottom: 6px; z-index: 2; font: 500 11px/1.2 var(--vrm-police, system-ui); color: #3a3a3c; background: rgba(255,255,255,.75); padding: 2px 5px; border-radius: 6px; pointer-events: none; }
+.vrm-rpf-attrib { position: absolute; right: 8px; bottom: 6px; z-index: 2; font: 400 11px/1.2 var(--vrm-police, system-ui); color: #3a3a3c; background: rgba(255,255,255,.75); padding: 2px 5px; border-radius: 6px; pointer-events: none; }
 .vrm-rpf-carte .maplibregl-ctrl-attrib { display: none !important; }
 .vrm-rpf-point { background: var(--fu-carte, #fff); border-radius: var(--fu-r-carte, 20px); box-shadow: var(--fu-ombre); padding: 4px 14px 6px; }
 :root[data-theme="dark"] .vrm-rpf-point { background: #1c1c1e; box-shadow: 0 0 0 1px rgba(255,255,255,.06); }
@@ -1055,7 +1055,7 @@ html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-
 .vrm-rpf-verifier[open] .vrm-rpf-chevron { transform: rotate(90deg); }
 .vrm-rpf-ident { flex: 1 1 auto; min-width: 0; display: flex; align-items: baseline; gap: 6px; overflow: hidden; white-space: nowrap; }
 .vrm-rpf-nom { font: 700 15px/1.3 var(--vrm-police, system-ui); color: var(--fu-encre, #1d1d1f); flex: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.01em; }
-.vrm-rpf-adr { font: 500 13px/1.3 var(--vrm-police, system-ui); color: var(--fu-gris, #6e6e73); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.vrm-rpf-adr { font: 400 13px/1.3 var(--vrm-police, system-ui); color: var(--fu-gris, #6e6e73); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .vrm-rpf-transp { flex: none; display: inline-flex; }
 .vrm-rpf .vrm-puce-transp[data-lu="0"] { display: none !important; }
 .vrm-rpf-n { flex: none; font: 600 13px/1.2 var(--vrm-police, system-ui); color: var(--fu-gris2, #8e8e93); }
@@ -1085,7 +1085,7 @@ html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-
 .vrm-rpf-detail { padding: 0 0 12px 56px; display: flex; flex-direction: column; gap: 8px; }
 .vrm-rpf-detail .vrm-rp-gestes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .vrm-rpf-detail [data-colis-retire] { display: none !important; }
-.vrm-rpf-detail-txt { display: flex; flex-direction: column; gap: 3px; font: 500 13px/1.4 var(--vrm-police, system-ui); color: var(--fu-gris, #6e6e73); }
+.vrm-rpf-detail-txt { display: flex; flex-direction: column; gap: 3px; font: 400 13px/1.4 var(--vrm-police, system-ui); color: var(--fu-gris, #6e6e73); }
 @media (max-width: 420px) { .vrm-rpf-detail { padding-left: 0; } }
 /* Les puces du haut de Colis (« N en route », « N comptes à relire ») et la liste en route. */
 .vrm-colis-puces { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 2px; }
@@ -1158,7 +1158,7 @@ html:not([data-colis-outils]) body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-coli
 .vrm-carte-places { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 @media (min-width: 560px) { .vrm-carte-places { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .vrm-carte-place { all: unset; box-sizing: border-box; min-height: 56px; min-width: 0; padding: 8px 12px; border-radius: 12px; background: var(--fu-carte, #fff); display: flex; flex-direction: column; justify-content: center; gap: 2px; cursor: pointer; box-shadow: inset 0 0 0 1px var(--fu-filet, rgba(0,0,0,.08)); }
-.vrm-carte-place > span { font: 500 12px/1.2 var(--vrm-police); color: var(--fu-gris, #6e6e73); }
+.vrm-carte-place > span { font: 400 12px/1.2 var(--vrm-police); color: var(--fu-gris, #6e6e73); }
 .vrm-carte-place > b { font: 600 15px/1.25 var(--vrm-police); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-carte-place[aria-pressed="true"] { background: var(--fu-sombre, #1d1d1f); color: #fff; box-shadow: none; }
 .vrm-carte-place[aria-pressed="true"] > span { color: var(--fu-sur-sombre-2); }
@@ -1170,8 +1170,8 @@ html:not([data-colis-outils]) body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-coli
 .vrm-carte-liste { list-style: none; margin: 6px 0 0; padding: 0; border-radius: 12px; overflow: hidden; background: var(--fu-carte, #fff); }
 .vrm-carte-liste > li + li { border-top: 1px solid var(--fu-filet, rgba(0,0,0,.08)); }
 .vrm-carte-choix { all: unset; box-sizing: border-box; width: 100%; min-height: 48px; padding: 8px 14px; display: flex; align-items: center; gap: 10px; cursor: pointer; }
-.vrm-carte-choix-nom { flex: 1; min-width: 0; font: 500 15px/1.3 var(--vrm-police); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.vrm-carte-choix-v { flex: none; font: 500 15px/1.2 var(--vrm-police); color: var(--fu-gris, #6e6e73); font-variant-numeric: tabular-nums; }
+.vrm-carte-choix-nom { flex: 1; min-width: 0; font: 600 15px/1.3 var(--vrm-police); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-carte-choix-v { flex: none; font: 600 15px/1.2 var(--vrm-police); color: var(--fu-gris, #6e6e73); font-variant-numeric: tabular-nums; }
 .vrm-carte-coche { flex: none; width: 18px; text-align: center; font: 700 15px/1 var(--vrm-police); color: var(--vrm-accent-texte); }
 .vrm-carte-choix:focus-visible, .vrm-carte-place:focus-visible, .vrm-carte-periodes > button:focus-visible, .vrm-carte-ok:focus-visible, .vrm-carte-defaut:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: 2px; }
 .vrm-carte-defaut { all: unset; box-sizing: border-box; align-self: center; min-height: 44px; padding: 0 14px; display: grid; place-items: center; font: 600 15px/1 var(--vrm-police); color: var(--fu-encre, #1d1d1f); cursor: pointer; margin-top: 6px; }
@@ -1184,9 +1184,9 @@ html:not([data-colis-outils]) body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-coli
 :root[data-theme="dark"] .vrm-carte-objectif-types > button[aria-pressed="true"] { background: #3a3a3c; color: #fff; box-shadow: none; }
 .vrm-carte-objectif-corps { display: flex; flex-direction: column; gap: 8px; padding: 0 14px 12px; }
 .vrm-carte-objectif-saisie { display: flex; align-items: center; gap: 8px; }
-.vrm-carte-objectif-saisie > input { flex: 1; min-width: 0; min-height: 44px; box-sizing: border-box; padding: 0 12px; border-radius: 12px; border: 1px solid var(--fu-filet, rgba(0,0,0,.08)); background: var(--fu-fond, #f2f2f7); color: inherit; font: 500 17px/1 var(--vrm-police); font-variant-numeric: tabular-nums; outline: none; }
+.vrm-carte-objectif-saisie > input { flex: 1; min-width: 0; min-height: 44px; box-sizing: border-box; padding: 0 12px; border-radius: 12px; border: 1px solid var(--fu-filet, rgba(0,0,0,.08)); background: var(--fu-fond, #f2f2f7); color: inherit; font: 600 17px/1 var(--vrm-police); font-variant-numeric: tabular-nums; outline: none; }
 .vrm-carte-objectif-saisie > input:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: 1px; }
-.vrm-carte-objectif-saisie > span { font: 500 15px/1 var(--vrm-police); color: var(--fu-gris, #6e6e73); }
+.vrm-carte-objectif-saisie > span { font: 600 15px/1 var(--vrm-police); color: var(--fu-gris, #6e6e73); }
 .vrm-carte-objectif-saisie > .vrm-carte-ok:disabled { opacity: .4; cursor: default; }
 .vrm-carte-objectif-gestes { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .vrm-carte-objectif-gestes > .vrm-carte-defaut { margin-top: 0; }
@@ -1250,7 +1250,7 @@ html body .vrm-app-shell .vrm-main .vrm-day-layout .vrm-cycle-carte > .vrm-cycle
 /* (3 nov.) La prévision de la prochaine échéance URSSAF (PrevisionUrssafCarte). */
 .vrm-fu-prevision { margin: 0 0 14px; }
 .vrm-fu-prevision .vrm-fu-prevision-montant { font: 700 22px/1.2 var(--vrm-police); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
-.vrm-fu-prevision .vrm-fu-prevision-montant small { font: 500 13px/1 var(--vrm-police); color: var(--fu-gris); margin-right: 2px; }
+.vrm-fu-prevision .vrm-fu-prevision-montant small { font: 400 13px/1 var(--vrm-police); color: var(--fu-gris); margin-right: 2px; }
 
 /* Retraits : une ouverture explicite, des actions séparées et accessibles au clavier. */
 .vrm-rpf-ouvrir { display:flex; align-items:center; gap:10px; flex:1 1 0; min-width:0; min-height:44px; padding:0; border:0; background:transparent; color:inherit; text-align:left; cursor:pointer; font:inherit; }
@@ -1282,7 +1282,7 @@ html body .vrm-app-shell .vrm-main .vrm-day-layout .vrm-cycle-carte > .vrm-cycle
 html body .vrm-app-shell .vrm-fu-carte-haut > .vrm-fu-modifier { position: static !important; flex: none; min-height: 44px !important; min-width: 44px !important; height: auto !important; padding: 0 12px !important; }
 .vrm-fu-carte.a-rangee > .vrm-fu-carte-tete .vrm-fu-surtitre { padding-right: 0; }
 /* Un « — » dit sa raison sous le libellé (§5) ; un montant laisse son manque nommé. */
-.vrm-fu-case > .vrm-fu-case-raison { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; margin-top: 1px; font: 500 11px/1.3 var(--vrm-police); color: var(--fu-sur-sombre-2); white-space: normal; overflow: hidden; overflow-wrap: anywhere; }
+.vrm-fu-case > .vrm-fu-case-raison { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; margin-top: 1px; font: 400 11px/1.3 var(--vrm-police); color: var(--fu-sur-sombre-2); white-space: normal; overflow: hidden; overflow-wrap: anywhere; }
 .vrm-fu-tete .vrm-fu-cases { align-items: stretch; }
 /* Un toucher se sent (feedback au doigt, jamais sur la souris seule). */
 button.vrm-fu-case { transition: background-color .15s ease, transform .16s cubic-bezier(.23,1,.32,1); }
@@ -1301,17 +1301,17 @@ html body .vrm-app-shell .vrm-main .vrm-journal-semaine > .vrm-js-bascule {
 }
 html body .vrm-app-shell .vrm-main .vrm-journal-semaine > .vrm-js-bascule:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: 2px; border-radius: 12px; }
 .vrm-js-titre { flex: 0 1 auto; min-width: 0; font: 600 17px/1.3 var(--vrm-police); letter-spacing: -.01em; color: var(--fu-encre); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.vrm-js-resume { flex: none; margin-left: auto; font: 500 15px/1.3 var(--vrm-police); color: var(--fu-gris); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-js-resume { flex: none; margin-left: auto; font: 600 15px/1.3 var(--vrm-police); color: var(--fu-gris); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .vrm-js-chevron { flex: none; width: 20px; height: 20px; display: grid; place-items: center; color: var(--fu-gris2); transition: transform .2s cubic-bezier(.23,1,.32,1); }
 .vrm-js-bascule[aria-expanded="true"] > .vrm-js-chevron { transform: rotate(90deg); }
 @media (prefers-reduced-motion: reduce) { .vrm-js-chevron { transition: none; } }
 .vrm-js-cases { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; padding: 0 0 16px; }
 @media (min-width: 600px) { .vrm-js-cases { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .vrm-js-case { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.vrm-js-l { font: 500 13px/1.3 var(--vrm-police); color: var(--fu-gris); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-js-l { font: 400 13px/1.3 var(--vrm-police); color: var(--fu-gris); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-js-v { font: 700 22px/1.2 var(--vrm-police); letter-spacing: -.02em; color: var(--fu-encre); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-js-v.is-vide { color: var(--fu-gris2); }
-.vrm-js-sous { font: 500 12px/1.3 var(--vrm-police); color: var(--fu-gris); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-js-sous { font: 400 12px/1.3 var(--vrm-police); color: var(--fu-gris); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* La feuille « Vendus ailleurs » (SheetShell) : le détail de la vérification, sans cadre de repli. */
 html body .vrm-va-feuille.vrm-bilan-sync { border: 0 !important; padding: 0 !important; margin: 0 !important; background: transparent !important; font-size: 15px; }
@@ -1360,7 +1360,7 @@ html body .vrm-va-feuille.vrm-bilan-sync > button { margin: 0 0 12px; }
 .vrm-tip-pas li.is-fait::before { content: '✓'; background: var(--fu-case); color: var(--fu-encre); }
 .vrm-tip-groupe { display: flex; flex-direction: column; background: var(--fu-carte); border-radius: 12px; overflow: hidden; }
 .vrm-tip-groupe > h3 { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0; padding: 12px 14px 6px; font: 700 15px/1.25 var(--vrm-police); letter-spacing: -.01em; color: var(--fu-encre); }
-.vrm-tip-groupe > h3 > span { font: 500 13px/1.2 var(--vrm-police); color: var(--fu-gris); font-variant-numeric: tabular-nums; }
+.vrm-tip-groupe > h3 > span { font: 400 13px/1.2 var(--vrm-police); color: var(--fu-gris); font-variant-numeric: tabular-nums; }
 .vrm-tip-groupe.is-verifier > h3 { color: var(--fu-ambre-txt, #B25000); }
 .vrm-tip-ligne { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 8px 14px; border-top: 1px solid var(--fu-filet); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .vrm-tip-ligne.is-off { cursor: default; opacity: .55; }
@@ -1371,14 +1371,14 @@ html body .vrm-va-feuille.vrm-bilan-sync > button { margin: 0 0 12px; }
 .vrm-tip-case-off { flex: none; width: 24px; }
 .vrm-tip-corps { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .vrm-tip-titre { font: 600 15px/1.3 var(--vrm-police); color: var(--fu-encre); letter-spacing: -.01em; }
-.vrm-tip-sous { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font: 500 13px/1.3 var(--vrm-police); color: var(--fu-gris); }
+.vrm-tip-sous { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font: 400 13px/1.3 var(--vrm-police); color: var(--fu-gris); }
 /* (11 nov., intégration colis) L'emplacement de la paire, en petit, sous la ligne — lisible en entier, jamais coupé. */
-.vrm-tip-place { display: block; margin-top: 2px; font: 500 12px/1.3 var(--vrm-police); color: var(--fu-gris); overflow-wrap: anywhere; }
+.vrm-tip-place { display: block; margin-top: 2px; font: 400 12px/1.3 var(--vrm-police); color: var(--fu-gris); overflow-wrap: anywhere; }
 .vrm-tip-place.is-sans { opacity: .7; }
 .vrm-tip-num { font-weight: 700; color: var(--fu-encre); font-variant-numeric: tabular-nums; }
 .vrm-tip-num.is-sans, .vrm-tip-raison, .vrm-tip-lim.is-urgent { color: var(--fu-ambre-txt, #B25000); font-weight: 600; }
 .vrm-tip-logo { flex: none; display: grid; place-items: center; width: 28px; }
-.vrm-tip-vide { margin: 0; padding: 4px 14px 14px; font: 500 14px/1.35 var(--vrm-police); color: var(--fu-gris); }
+.vrm-tip-vide { margin: 0; padding: 4px 14px 14px; font: 400 14px/1.35 var(--vrm-police); color: var(--fu-gris); }
 .vrm-tip-pages { display: flex; gap: 10px; padding: 6px 14px 14px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; }
 .vrm-tip-a4 { flex: none; scroll-snap-align: start; margin: 0; width: 132px; aspect-ratio: 297 / 210; background: #fff; border-radius: 6px; box-shadow: 0 0 0 1px rgba(0,0,0,.08), 0 2px 8px rgba(0,0,0,.08); position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 8px; color: #1d1d1f; }
 .vrm-tip-a4-etiquette { border: 1px solid #d2d2d7; border-radius: 3px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 5px; }
@@ -1386,13 +1386,13 @@ html body .vrm-va-feuille.vrm-bilan-sync > button { margin: 0 0 12px; }
 .vrm-tip-a4-etiquette > i:nth-of-type(2) { width: 70%; } .vrm-tip-a4-etiquette > i:nth-of-type(3) { width: 85%; }
 .vrm-tip-a4-tampon { align-self: end; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .vrm-tip-a4-tampon b { font: 700 13px/1.1 var(--vrm-police); letter-spacing: -.01em; }
-.vrm-tip-a4-tampon span { font: 500 7px/1.25 var(--vrm-police); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; overflow-wrap: anywhere; }
+.vrm-tip-a4-tampon span { font: 400 7px/1.25 var(--vrm-police); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; overflow-wrap: anywhere; }
 .vrm-tip-plus { flex: none; align-self: center; font: 600 15px/1 var(--vrm-police); color: var(--fu-gris); padding: 0 6px; }
 .vrm-tip-pied { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 12px 0 calc(4px + env(safe-area-inset-bottom)); background: linear-gradient(to top, var(--fu-fond) 70%, transparent); }
 .vrm-tip-pied > .vrm-btn, .vrm-tip-pied > button:not(.vrm-tip-lien) { min-height: 44px; }
 .vrm-tip-lien { margin-right: auto; min-height: 44px; padding: 0 4px; border: 0; background: none; font: 600 14px/1 var(--vrm-police); color: var(--vrm-accent-texte, #0066CC); cursor: pointer; }   /* (intégration g1) texte bleu = accentTexte (contraste ≥ 4,5:1, axe) */
 .vrm-tip-lien:disabled { color: var(--fu-gris); cursor: default; }
-.vrm-tip-grand { margin: 8px 0 0; font: 500 17px/1.35 var(--vrm-police); color: var(--fu-gris); text-align: center; }
+.vrm-tip-grand { margin: 8px 0 0; font: 600 17px/1.35 var(--vrm-police); color: var(--fu-gris); text-align: center; }
 .vrm-tip-grand b { display: block; font: 700 44px/1.05 var(--vrm-police); letter-spacing: -.03em; color: var(--fu-encre); font-variant-numeric: tabular-nums; }
 .vrm-tip-fin .vrm-tip-pied { justify-content: stretch; } .vrm-tip-fin .vrm-tip-pied > * { flex: 1 1 0; }
 .vrm-tip-alerte { margin: 0; padding: 10px 14px; border-radius: 12px; background: var(--fu-ambre-fond); color: var(--fu-ambre-txt, #B25000); font: 600 14px/1.35 var(--vrm-police); }
@@ -1401,7 +1401,7 @@ html body .vrm-va-feuille.vrm-bilan-sync > button { margin: 0 0 12px; }
 .vrm-tip-pdf { display: flex; align-items: center; justify-content: center; margin: 0 auto; text-decoration: none; }
 .vrm-tip-outils { display: flex; gap: 16px; margin-top: -4px; }
 /* (12 nov.) « Pas dans ce lot » : pourquoi « Imprimer (N) » n'est pas le total — neutre, une ligne par raison. */
-.vrm-tip-pourquoi { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 10px 14px; border-radius: 12px; background: var(--fu-case); font: 500 14px/1.35 var(--vrm-police); color: var(--fu-gris); }
+.vrm-tip-pourquoi { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 10px 14px; border-radius: 12px; background: var(--fu-case); font: 400 14px/1.35 var(--vrm-police); color: var(--fu-gris); }
 .vrm-tip-pourquoi > b { color: var(--fu-encre); font-weight: 600; }
 .vrm-tip-pourquoi-ligne { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
 .vrm-tip-outils .vrm-tip-lien { margin-right: 0; font-size: 13px; }

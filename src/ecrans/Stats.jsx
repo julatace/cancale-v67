@@ -182,7 +182,7 @@ function MonthDetail({mois,type,C,fmt,catMap,catalog,onClose}){
     <div style={{marginTop:16,padding:14,background:C.bg,borderRadius:12,border:`1px solid ${C.border}`}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
         <span style={{fontSize:13,fontWeight:600,color:C.text}}>{trj('stats.ventes', { n: ventes.length, nomComplet: mois.nomComplet })}</span>
-        <span onClick={onClose} style={{cursor:'pointer',color:C.muted,fontSize:20,fontWeight:500,lineHeight:1}}>×</span>
+        <span onClick={onClose} style={{cursor:'pointer',color:C.muted,fontSize:20,fontWeight:600,lineHeight:1}}>×</span>
       </div>
       <div style={{display:'flex',gap:16,marginBottom:12,fontSize:12}}>
         <span style={{color:C.text}}>{tr('stats.ca')} <b>{fmt(totalCA)}</b></span>
@@ -200,7 +200,7 @@ function MonthDetail({mois,type,C,fmt,catMap,catalog,onClose}){
                 <div style={{color:C.muted,fontSize:11}}>{dateAff}{v.productId?` · n°${v.productId}`:''}</div>
               </div>
               <div style={{textAlign:'right',marginLeft:10}}>
-                <div style={{color:C.text,fontWeight:500}}>{fmt(valeurSue(v.sellPrice))}</div>
+                <div style={{color:C.text,fontWeight:400}}>{fmt(valeurSue(v.sellPrice))}</div>
                 <div style={{color:C.muted,fontSize:11}}>{benef==null?'—':`${benef>=0?'+':''}${fmt(benef)}`}</div>
               </div>
             </div>
@@ -649,7 +649,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
     <button type="button" onClick={versSaisiePrix}
       title={tr('stats.ouvrirSaisieSerie')}
       style={{alignSelf:'flex-start',border:'none',background:'transparent',padding:0,margin:dans?0:'-4px 0 0',cursor:'pointer',
-        fontFamily:'inherit',fontSize:13,fontWeight:500,color:C.muted,textAlign:'left',minHeight:0,lineHeight:1.45}}>
+        fontFamily:'inherit',fontSize:13,fontWeight:400,color:C.muted,textAlign:'left',minHeight:0,lineHeight:1.45}}>
       {quoi} {tr('stats.attendentPrixAchat')} <span style={{color:C.accentTexte,fontWeight:600,whiteSpace:'nowrap'}}>{tr('stats.saisir')}</span>
     </button>
   );
@@ -660,7 +660,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   // Libellés en casse normale (plus de capitales espacées partout) : un titre
   // de carte, un libellé de chiffre, une note.
   const sTitre = {fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15};
-  const sLib = {fontSize:13,color:C.muted,fontWeight:500};
+  const sLib = {fontSize:13,color:C.muted,fontWeight:400};
   const sNote = {fontSize:13,color:C.muted,lineHeight:1.5};
   const sHero = {fontWeight:700,color:C.text,letterSpacing:-1,lineHeight:1.05,fontVariantNumeric:'tabular-nums',whiteSpace:'nowrap'};
   const sCarte = {padding:18,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,boxShadow:C.shadow};
@@ -807,12 +807,12 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:12}}>
               <div style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:C.muted}}>
                 <span aria-hidden="true" style={{width:10,height:10,borderRadius:999,background:C.accent,flexShrink:0}}/>
-                <span style={{flex:1,minWidth:0}}>{tr('stats.meilleurMois')} <span style={{color:C.text,fontWeight:500}}>{meilleur.long}</span></span>
+                <span style={{flex:1,minWidth:0}}>{tr('stats.meilleurMois')} <span style={{color:C.text,fontWeight:400}}>{meilleur.long}</span></span>
                 <b style={{color:C.text,fontWeight:600}}><Mt v={meilleur.eur}/></b>
               </div>
               {encours.cle !== meilleur.cle && <div style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:C.muted}}>
                 <span aria-hidden="true" style={{width:10,height:10,borderRadius:999,flexShrink:0,boxSizing:'border-box',border:`2px solid ${C.accent}`,background:C.card}}/>
-                <span style={{flex:1,minWidth:0}}>{tr('stats.cours2')} <span style={{color:C.text,fontWeight:500}}>{encours.long}</span></span>
+                <span style={{flex:1,minWidth:0}}>{tr('stats.cours2')} <span style={{color:C.text,fontWeight:400}}>{encours.long}</span></span>
                 <b style={{color:C.text,fontWeight:600}}><Mt v={encours.eur}/></b>
               </div>}
             </div>
@@ -986,7 +986,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             <CourbeMois mois={moisMoisson.map(h=>({cle:h.key,long:h.nomComplet,n:h.ventes,ca:h.ca,ventes:h.ventes,enCours:h.enCours}))} valeur={(m)=>caMode==='ca'?m.ca:m.ventes} format={(v)=>caMode==='ca'?`${Math.round(v).toLocaleString('fr-FR')}\u00a0€`:String(Math.round(v))} choisi={selMois} onChoisir={setSelMois} attr="data-courbe-finalise"/>
             {sel&&(
               <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`,fontSize:13,color:C.text}}>
-                <b>{sel.nomComplet}</b>{sel.enCours&&<span style={{color:C.muted,fontWeight:500}}> {tr('stats.coursFinalise2')}</span>} — <b>{fmt(sel.ca)}</b> · {sel.ventes} {tr('journee.vente')}{sel.ventes>1?'s':''}
+                <b>{sel.nomComplet}</b>{sel.enCours&&<span style={{color:C.muted,fontWeight:400}}> {tr('stats.coursFinalise2')}</span>} — <b>{fmt(sel.ca)}</b> · {sel.ventes} {tr('journee.vente')}{sel.ventes>1?'s':''}
               </div>
             )}
           </Card>
@@ -1017,7 +1017,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           onChange={v=>{ const k=(d)=>{ if(!d) return ''; const t=d instanceof Date?d:new Date(d); return isNaN(t.getTime())?'':`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`; }; setCaDu(v?k(v.from):''); setCaAu(v?k(v.to):''); setCaLabel(v&&v.label?String(v.label):''); }}/>
         {caRange ? (
           <div style={{marginTop:14}}>
-            <div className="vrm-display" data-ca-plage={caRange.passu?'':String(Math.round(caRange.ca*100))} data-ca-plage-au-moins={(caRange.pasLues||[]).length?'1':'0'} style={{fontSize:28,fontWeight:800,color:C.text}}>{caRange.passu?'—':((caRange.pasLues||[]).length?'au moins ':'')+fmt(caRange.ca)}</div>
+            <div className="vrm-display" data-ca-plage={caRange.passu?'':String(Math.round(caRange.ca*100))} data-ca-plage-au-moins={(caRange.pasLues||[]).length?'1':'0'} style={{fontSize:28,fontWeight:700,color:C.text}}>{caRange.passu?'—':((caRange.pasLues||[]).length?'au moins ':'')+fmt(caRange.ca)}</div>
             <div data-ca-plage-phrase style={{fontSize:13,color:C.muted,marginTop:2}}>
               {caRange.passu
                 ? (caRange.enCours ? `Lecture de tes ventes… (${phrasePlage(caDu?new Date(caDu+'T00:00:00'):null, caAu?new Date(caAu+'T00:00:00'):null)})` : `Tes ventes Vinted n'ont pas pu être lues — le total ${phrasePlage(caDu?new Date(caDu+'T00:00:00'):null, caAu?new Date(caAu+'T00:00:00'):null)} ne se calcule pas pour l'instant.`)
@@ -1071,7 +1071,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                 const pct=Math.round(h.count/maxAjout*100);
                 return (
                   <div key={i} style={{flex:'1 0 auto',minWidth:22,display:'flex',flexDirection:'column',alignItems:'center',gap:6,height:'100%',justifyContent:'flex-end'}}>
-                    <div style={{fontSize:11,color:C.muted,fontWeight:500}}>{h.count}</div>
+                    <div style={{fontSize:11,color:C.muted,fontWeight:400}}>{h.count}</div>
                     <div style={{width:'100%',maxWidth:30,height:`${pct}%`,minHeight:4,background:C.accent,borderRadius:'14px 14px 0 0',transition:'height .4s'}}/>
                     <div style={{fontSize:11,color:C.muted,fontWeight:600,whiteSpace:'nowrap'}}>{h.label}</div>
                   </div>
@@ -2387,7 +2387,7 @@ function FraisParSiteCarte({ periode, ebayCommandes, ventesVc }) {
             title={x.options > 0 ? tr('stats.dontOptionsPacks', { fmt: String(fmt(x.options)), nOptions: String(x.nOptions) }) : undefined}
             style={{ ...grille, minHeight: 44, borderTop: `1px solid ${C.border}` }}>
             <span style={{ minWidth: 0 }}>
-              <span style={{ display: 'block', fontSize: 15, fontWeight: 500, color: C.text }}>{x.plateforme}</span>
+              <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.text }}>{x.plateforme}</span>
               <span style={{ display: 'block', fontSize: 12, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{x.passu ? tr('journee.lu') : `${x.n} vente${x.n > 1 ? 's' : ''}${cov ? ` · ${cov}` : ''}`}</span>
             </span>
             <span style={{ textAlign: 'right', fontSize: 15, fontWeight: 600, color: x.frais == null ? C.muted : C.text, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{x.frais == null ? '—' : fmt(x.frais)}</span>
@@ -2418,7 +2418,7 @@ function VenduParSemaineSante({ liveStats }) {
 function StatsDetaillees({ liveStats, panelOff, onVoirDorment = null }) {
   const sCarte = { padding: 18, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadow };
   const sTitre = { fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15 };
-  const sLib = { fontSize: 13, color: C.muted, fontWeight: 500 };
+  const sLib = { fontSize: 13, color: C.muted, fontWeight: 400 };
   const sNote = { fontSize: 11, color: C.muted, lineHeight: 1.5 };
   // Un montant dans une phrase ne se coupe jamais en deux (« 31,07 » / « € »).
   const mt = (v) => <span style={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{fmt(v)}</span>;
@@ -2670,7 +2670,7 @@ function ObjectifDuMois({ liveStats }) {
         <div data-objectif-valeur={prog.valeur == null ? '' : (eur ? String(Math.round(prog.valeur * 100)) : String(prog.valeur))} data-objectif-pct={prog.pct == null ? '' : prog.pct} data-objectif-partiel={prog.partiel ? '1' : undefined} data-objectif-rythme={ry ? ry.etat : undefined}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
             <span style={{ fontSize: 13, color: C.muted }}>{prog.partiel ? tr('stats.moins2') : tr('stats.es')}</span>
-            <span className="vrm-display" style={{ fontSize: 28, fontWeight: 800, color: C.text }} title={prog.partiel ? (prog.couverture ? tr('stats.prixAchatConnu', { couverture: String(prog.couverture) }) : tr('stats.lu3', { x: String(prog.manque.join(', ')) })) : undefined}>{prog.valeur == null ? '—' : montreCourt(prog.valeur)}</span>
+            <span className="vrm-display" style={{ fontSize: 28, fontWeight: 700, color: C.text }} title={prog.partiel ? (prog.couverture ? tr('stats.prixAchatConnu', { couverture: String(prog.couverture) }) : tr('stats.lu3', { x: String(prog.manque.join(', ')) })) : undefined}>{prog.valeur == null ? '—' : montreCourt(prog.valeur)}</span>
           </div>
           <div role="progressbar" aria-label={tr('reglages.objectif-mois.lib')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={prog.pct == null ? undefined : prog.pct} style={{ height: 4, background: C.card2 || C.bg, borderRadius: 999, overflow: 'hidden', marginTop: 8 }}>
             {prog.pct ? <div style={{ width: `${prog.pct}%`, height: '100%', background: C.accent, borderRadius: 999, transition: 'width .3s ease' }}/> : null}
@@ -2687,7 +2687,7 @@ function ObjectifDuMois({ liveStats }) {
                 return (
                   <div key={m.ym} data-objectif-passe={m.ym} data-objectif-passe-valeur={v == null ? '' : (eur ? String(Math.round(v * 100)) : String(v))} data-objectif-passe-atteint={m.atteint ? '1' : undefined} style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 13, color: C.muted }}>{NOMS_MOIS_OBJ[Number(m.ym.slice(5)) - 1]}</div>
-                    <div style={{ fontSize: 15, fontWeight: 600, color: v == null ? C.muted : C.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{v == null ? '—' : <>{m.x.partiel ? <span style={{ fontSize: 11, fontWeight: 500, color: C.muted }}>≥ </span> : null}{montreCourt(v)}</>}{m.atteint ? ' ✓' : ''}</div>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: v == null ? C.muted : C.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{v == null ? '—' : <>{m.x.partiel ? <span style={{ fontSize: 11, fontWeight: 400, color: C.muted }}>≥ </span> : null}{montreCourt(v)}</>}{m.atteint ? ' ✓' : ''}</div>
                     <div style={{ fontSize: 11, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v == null ? (m.x && !m.x.couvert ? tr('stats.avantHistorique') : tr('stats.su')) : m.visait != null ? tr('stats.vise', { montreCourt: String(montreCourt(m.visait)) }) : tr('stats.sansObjectif')}</div>
                   </div>
                 );

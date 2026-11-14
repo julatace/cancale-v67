@@ -701,7 +701,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
             <button type="button" key={f.id} onClick={() => { poser(cleDeFiche(f), modal.m, modal.i); fermerModal(); }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 8px', borderRadius: 12, border: 'none', background: 'transparent', color: C.text, cursor: 'pointer', textAlign: 'left', width: '100%' }}>
               <span style={{ position: 'relative', width: 46, height: 46, borderRadius: 12, overflow: 'hidden', flex: 'none', background: C.card2 }}><Vignette f={f} sold={estVendu(f)} /></span>
               <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.title || '—'}</span>
-              <span style={{ fontWeight: 800, color: estVendu(f) ? C.accent : C.muted }}>N°{f.numero}</span>
+              <span style={{ fontWeight: 700, color: estVendu(f) ? C.accent : C.muted }}>N°{f.numero}</span>
             </button>
           ))}
         </div> : <div style={{ color: C.muted, padding: '22px 0', textAlign: 'center' }}>{tr('stock.tousArticlesSont')}</div>}
@@ -713,12 +713,12 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       corps = (<>
         <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 10 }}>
           <span style={{ position: 'relative', width: 72, height: 72, borderRadius: 12, overflow: 'hidden', flex: 'none', background: C.card2 }}><Vignette f={f} sold={sold} hors={hors} /></span>
-          <div><div style={{ fontSize: 17, fontWeight: 800, color: C.text, lineHeight: 1.25 }}>{f.title || '—'}</div><div data-fiche-statut={sold ? 'vendue' : (hors ? 'plusenligne' : (f.actuelle ? 'actuelle' : (rangeeEtat(f) === 'arrivee' ? 'arrivee' : (f.retour ? 'retour' : 'autre'))))} style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>{sold ? tr('stock.venduSortirStock') : (hors ? tr('stock.plusLignePlus') : (!f.actuelle && rangeeEtat(f) === 'arrivee' ? tr('ranger.stock.arrivee') : f.actuelle ? `En ligne${(f.plateformes || []).length ? ' sur ' + f.plateformes.map((x) => NOM_PLAT_FILTRE[x] || x).join(' et ') : ''}` : (f.retour ? libelleRetour(f.retour) : tr('stock.stock'))))} · N°{f.numero}</div></div>
+          <div><div style={{ fontSize: 17, fontWeight: 700, color: C.text, lineHeight: 1.25 }}>{f.title || '—'}</div><div data-fiche-statut={sold ? 'vendue' : (hors ? 'plusenligne' : (f.actuelle ? 'actuelle' : (rangeeEtat(f) === 'arrivee' ? 'arrivee' : (f.retour ? 'retour' : 'autre'))))} style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>{sold ? tr('stock.venduSortirStock') : (hors ? tr('stock.plusLignePlus') : (!f.actuelle && rangeeEtat(f) === 'arrivee' ? tr('ranger.stock.arrivee') : f.actuelle ? `En ligne${(f.plateformes || []).length ? ' sur ' + f.plateformes.map((x) => NOM_PLAT_FILTRE[x] || x).join(' et ') : ''}` : (f.retour ? libelleRetour(f.retour) : tr('stock.stock'))))} · N°{f.numero}</div></div>
         </div>
         <div style={{ textAlign: 'center', background: C.card2, border: `1px solid ${sold ? C.accent : C.line}`, borderRadius: 14, padding: 14, margin: '12px 0' }}>
           <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>{sold ? tr('stock.vaChercher') : tr('stock.rangeDans')}</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: sold ? C.accent : C.text, marginTop: 4 }}>{m ? m.name : tr('stock.range')}</div>
-          {m && (() => { const p = placeDansMeubles(s.i, m); return <div data-fiche-place="" style={{ fontSize: 15, fontWeight: 700, color: C.text, marginTop: 4 }}>{tr('stock.rangee2')} {p.rangee} <span style={{ color: C.muted, fontWeight: 500 }}>{tr('stock.partantHaut')}</span> {tr('stock.colonne2')} {p.colonne} <span style={{ color: C.muted, fontWeight: 500 }}>{tr('stock.depuisGauche')}</span></div>; })()}
+          <div style={{ fontSize: 20, fontWeight: 700, color: sold ? C.accent : C.text, marginTop: 4 }}>{m ? m.name : tr('stock.range')}</div>
+          {m && (() => { const p = placeDansMeubles(s.i, m); return <div data-fiche-place="" style={{ fontSize: 15, fontWeight: 700, color: C.text, marginTop: 4 }}>{tr('stock.rangee2')} {p.rangee} <span style={{ color: C.muted, fontWeight: 400 }}>{tr('stock.partantHaut')}</span> {tr('stock.colonne2')} {p.colonne} <span style={{ color: C.muted, fontWeight: 400 }}>{tr('stock.depuisGauche')}</span></div>; })()}
           {!m && (() => { const a = ancienneplace(f.numero); return a ? <div data-fiche-ancienne-place="" style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.4 }}>{tr('stock.anciennePlaceDans')} <b style={{ color: C.text }}>{[a.roomName, a.itemName, a.nom].filter(Boolean).join(' · ')}</b></div> : null; })()}
         </div>
         {/* (5 nov.) « Voir l'état » : la fiche complète du N°, avec tout ce qui se
@@ -738,7 +738,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     return (
       <div data-stock-modale="" onClick={fermerModal} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9400, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
         <div className="vrm-feuille-surface" onClick={(e) => e.stopPropagation()} style={{ width: 'min(540px,100%)', maxHeight: '86vh', overflowY: 'auto', background: C.card, border: `1px solid ${C.line}`, borderRadius: '20px 20px 0 0', padding: '18px 18px calc(20px + env(safe-area-inset-bottom,0px))' }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button type="button" onClick={fermerModal} aria-label={tr('creerVinted.fermer')} style={{ background: 'transparent', border: 'none', color: C.muted, fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>×</button></div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button type="button" onClick={fermerModal} aria-label={tr('creerVinted.fermer')} style={{ background: 'transparent', border: 'none', color: C.muted, fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button></div>
           {corps}
         </div>
       </div>
@@ -901,7 +901,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   const blocRetours = (revenus.length || retoursANumeroter) ? (
     <Card style={{ padding: '12px 13px' }}>
       <div data-stock-retours={revenus.length} data-stock-retours-a-numeroter={retoursANumeroter || undefined}>
-        <div style={{ fontSize: 15, fontWeight: 800, color: C.text, marginBottom: 4 }}>{revenus.length + retoursANumeroter > 1 ? `${revenus.length + retoursANumeroter} articles revenus d’un retour` : 'Un article revenu d’un retour'}</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 4 }}>{revenus.length + retoursANumeroter > 1 ? `${revenus.length + retoursANumeroter} articles revenus d’un retour` : 'Un article revenu d’un retour'}</div>
         {revenus.map((f) => ligneRangee(f, <button className="vrm-b vrm-b-secondaire" type="button" data-stock-remettre-en-ligne={cleDeFiche(f)} onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=cat_bord' })); } catch (_) {} }}>Remettre en ligne</button>, libelleRetour(f.retour)))}
         {retoursANumeroter > 0 && <p data-stock-retours-sans-num="" style={{ fontSize: 13, color: C.muted, margin: '6px 0 0', lineHeight: 1.45 }}>{retoursANumeroter > 1 ? `${retoursANumeroter} sans N° connu : à numéroter` : 'Un sans N° connu : à numéroter'} — {retoursANumeroter > 1 ? 'ils recevront' : 'il recevra'} un N° à la remise en ligne.</p>}
       </div>
@@ -910,7 +910,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     <Card style={{ padding: '12px 13px' }}>
       <div data-stock-vendues-sortir={vendSortir.length}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
-          <span style={{ fontSize: 15, fontWeight: 800, color: C.text }}>{trj('stock.venduesSortir', { vendSortirN: vendSortir.length })}</span>
+          <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{trj('stock.venduesSortir', { vendSortirN: vendSortir.length })}</span>
           <span style={{ flex: 1 }} />
           <OuvrirSerie serie={serieStock}/>
           {vendSortir.length > 1 && <button className="vrm-b vrm-b-discret" type="button" data-vendues-chercher={vendSortir.length} onClick={() => { setQ(''); setCibles(vendSortir.map(cleDeFiche)); try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (_) {} }}>{tr('stock.cheminSortir')}</button>}
@@ -922,7 +922,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   const blocPlusEnLigne = plusEnLigne.length ? (
     <Card style={{ padding: '12px 13px' }}>
       <div data-stock-plus-en-ligne={plusEnLigne.length}>
-        <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>{trj('stock.plusLigne', { plusEnLigneN: plusEnLigne.length })}</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{trj('stock.plusLigne', { plusEnLigneN: plusEnLigne.length })}</div>
         <InfoPop nom="stock-plus-en-ligne" titre={tr('stock.plusLigne2')} style={{ margin: '2px 0 4px' }} resume="Retire-les de leur case, ou garde-les">
           <p>{tr('stock.rangeesMaisPlus')}</p>
         </InfoPop>
@@ -946,7 +946,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   const blocListe = aa && aa.su && articlesVus.length ? (
     <Card style={{ padding: '12px 13px' }}>
       <div data-stock-liste={articlesVus.length}>
-        <div style={{ fontSize: 15, fontWeight: 800, color: C.text, marginBottom: 4 }}>{tr('stock.ligne')}</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 4 }}>{tr('stock.ligne')}</div>
         {articlesVus.slice().sort((a, b) => (articleRange(a) - articleRange(b)) || triNum(a.numero, b.numero)).slice(0, maxListe).map((a) => {
           const f = a.cle ? ficheParCle[a.cle] : null;
           const fOu = f ? ((ouEst(f) ? f : null) || (a.aussi || []).map((n) => ficheParCle[cleNum(n)]).filter(Boolean).find((x) => ouEst(x)) || null) : null;
@@ -1192,8 +1192,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     {aRanger.length > 0 && (
       <Card style={{ padding: '12px 13px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 15, fontWeight: 800, color: C.text }}>{tr('stock.ranger3')}</span>
-          <span style={{ fontSize: 12, fontWeight: 800, color: C.onAccent, background: C.accent, borderRadius: 999, padding: '1px 8px' }}>{aRanger.length}</span>
+          <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{tr('stock.ranger3')}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: C.onAccent, background: C.accent, borderRadius: 999, padding: '1px 8px' }}>{aRanger.length}</span>
           <span style={{ fontSize: 12, color: C.muted, marginLeft: 'auto' }}>{souris ? tr('stock.glisseArticleDans') : tr('stock.toucheArticlePuis')}</span>
         </div>
         <div data-bande-a-ranger="" style={{ display: 'flex', gap: 9, overflowX: 'auto', paddingBottom: 3 }}>
@@ -1268,9 +1268,9 @@ function EditeurMeuble({ modal, onSave, onDelete }) {
     <div style={{ flex: 1 }}>
       <div style={{ fontSize: 13, fontWeight: 700, color: C.muted, marginBottom: 7 }}>{label}</div>
       <div style={{ display: 'flex', alignItems: 'center', background: C.card2, border: `1px solid ${C.line}`, borderRadius: 12, width: 'fit-content' }}>
-        <button type="button" onClick={step(set, v, -1, min, max)} aria-label={tr('stock.moins')} style={{ width: 48, height: 48, background: 'transparent', border: 'none', color: C.text, fontSize: 22, cursor: 'pointer' }}>−</button>
-        <span style={{ minWidth: 48, textAlign: 'center', fontSize: 20, fontWeight: 800, color: C.text }}>{v}</span>
-        <button type="button" onClick={step(set, v, 1, min, max)} aria-label={tr('nav.plus')} style={{ width: 48, height: 48, background: 'transparent', border: 'none', color: C.text, fontSize: 22, cursor: 'pointer' }}>+</button>
+        <button type="button" onClick={step(set, v, -1, min, max)} aria-label={tr('stock.moins')} style={{ width: 48, height: 48, background: 'transparent', border: 'none', color: C.text, fontSize: 20, cursor: 'pointer' }}>−</button>
+        <span style={{ minWidth: 48, textAlign: 'center', fontSize: 20, fontWeight: 700, color: C.text }}>{v}</span>
+        <button type="button" onClick={step(set, v, 1, min, max)} aria-label={tr('nav.plus')} style={{ width: 48, height: 48, background: 'transparent', border: 'none', color: C.text, fontSize: 20, cursor: 'pointer' }}>+</button>
       </div>
     </div>
   );
@@ -1621,7 +1621,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
     <div style={{padding:16}}>
       <ScreenHead icon="tag" title={tr('stock.stockVinted', { stockVintedN: String(stockVinted.length) })}
         desc="L'ancienne liste des numéros en ligne."
-        right={<button type="button" onClick={()=>setShowBulk(s=>!s)} style={{background:C.purple,color:'#fff',border:'none',borderRadius:12,padding:'7px 12px',fontWeight:500,fontSize:12,cursor:'pointer'}}>
+        right={<button type="button" onClick={()=>setShowBulk(s=>!s)} style={{background:C.purple,color:'#fff',border:'none',borderRadius:12,padding:'7px 12px',fontWeight:400,fontSize:12,cursor:'pointer'}}>
           {showBulk?tr('creerVinted.fermer'):tr('stock.collerMasse')}
         </button>}/>
 
@@ -1640,7 +1640,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
           inputMode="numeric"
           style={{flex:1,minWidth:0,boxSizing:'border-box',padding:'10px 12px',border:`1px solid ${C.border||'#ccc'}`,borderRadius:12,fontSize:15}}
         />
-        <button type="button" onClick={addOne} style={{flexShrink:0,background:C.accent,color:C.onAccent,border:'none',borderRadius:12,padding:'10px 16px',fontWeight:500,fontSize:15,cursor:'pointer'}}>
+        <button type="button" onClick={addOne} style={{flexShrink:0,background:C.accent,color:C.onAccent,border:'none',borderRadius:12,padding:'10px 16px',fontWeight:600,fontSize:15,cursor:'pointer'}}>
           {tr('stock.ajouter')}
         </button>
       </div>
@@ -1656,7 +1656,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
             placeholder="1908 1925 898 ..."
             style={{width:'100%',padding:10,border:`1px solid ${C.border||'#ccc'}`,borderRadius:12,fontSize:13,boxSizing:'border-box',resize:'vertical'}}
           />
-          <button type="button" onClick={addBulk} style={{marginTop:8,background:C.accent,color:C.onAccent,border:'none',borderRadius:12,padding:'9px 16px',fontWeight:500,fontSize:13,cursor:'pointer'}}>
+          <button type="button" onClick={addBulk} style={{marginTop:8,background:C.accent,color:C.onAccent,border:'none',borderRadius:12,padding:'9px 16px',fontWeight:400,fontSize:13,cursor:'pointer'}}>
             {tr('stock.ajouterTout')}
           </button>
         </div>
@@ -1675,11 +1675,11 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
 
           {enLignePasGarage.length>0&&(
             <div style={{marginBottom:10,padding:10,background:'rgba(156,106,31,0.10)',borderRadius:12}}>
-              <div style={{fontSize:13,fontWeight:500,marginBottom:4}}>{trj('stock.ligneMaisAbsent', { enLignePasGarageN: enLignePasGarage.length })}</div>
+              <div style={{fontSize:13,fontWeight:400,marginBottom:4}}>{trj('stock.ligneMaisAbsent', { enLignePasGarageN: enLignePasGarage.length })}</div>
               <div className="vrm-aide" style={{fontSize:12,color:C.muted,marginBottom:6}}>{tr('stock.cesAnnoncesSont')}</div>
               <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
                 {enLignePasGarage.slice(0,ecartsMax).map(n=>(
-                  <span key={n} style={{background:C.warn,color:C.onWarn||'#fff',borderRadius:6,padding:'3px 8px',fontSize:12,fontWeight:500}}>{n}</span>
+                  <span key={n} style={{background:C.warn,color:C.onWarn||'#fff',borderRadius:6,padding:'3px 8px',fontSize:12,fontWeight:400}}>{n}</span>
                 ))}
               </div>
               {enLignePasGarage.length>ecartsMax && (
@@ -1691,11 +1691,11 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
 
           {garagePasEnLigne.length>0&&(
             <div style={{padding:10,background:'rgba(0,119,130,0.08)',borderRadius:12}}>
-              <div style={{fontSize:13,fontWeight:500,marginBottom:4}}>{trj('stock.stockMaisLigne', { garagePasEnLigneN: garagePasEnLigne.length })}</div>
+              <div style={{fontSize:13,fontWeight:400,marginBottom:4}}>{trj('stock.stockMaisLigne', { garagePasEnLigneN: garagePasEnLigne.length })}</div>
               <div className="vrm-aide" style={{fontSize:12,color:C.muted,marginBottom:6}}>{tr('stock.dansStockVinted')}</div>
               <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
                 {garagePasEnLigne.map(n=>(
-                  <span key={n} style={{background:C.accent,color:C.onAccent,borderRadius:6,padding:'3px 8px',fontSize:12,fontWeight:500}}>{n}</span>
+                  <span key={n} style={{background:C.accent,color:C.onAccent,borderRadius:6,padding:'3px 8px',fontSize:12,fontWeight:400}}>{n}</span>
                 ))}
               </div>
             </div>
@@ -1730,7 +1730,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
                 display:'inline-flex',alignItems:'center',gap:6,
                 background:absentGarage?'rgba(156,106,31,0.12)':(C.card2||'rgba(0,0,0,0.05)'),
                 border:absentGarage?`1px solid ${C.warn}`:'1px solid transparent',
-                borderRadius:12,padding:'5px 8px 5px 10px',fontSize:13,fontWeight:500
+                borderRadius:12,padding:'5px 8px 5px 10px',fontSize:13,fontWeight:400
               }}>
                 {n}
                 <button type="button" onClick={()=>removeOne(n)} title={tr('achats.retirer')} style={{background:'none',border:'none',color:C.danger,cursor:'pointer',fontSize:15,lineHeight:1,padding:0,fontWeight:700}}>×</button>
@@ -1935,7 +1935,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
   }), [inventory]);
 
   const inputStyle = { padding:'8px 10px', borderRadius:12, border:`1px solid ${C.border}`, background:C.bg, color:C.text, fontSize:13 };
-  const btn = (bg, fg='#fff') => ({ padding:'8px 12px', borderRadius:12, border:'none', background:bg, color:fg, fontWeight:500, fontSize:13, cursor:'pointer' });
+  const btn = (bg, fg='#fff') => ({ padding:'8px 12px', borderRadius:12, border:'none', background:bg, color:fg, fontWeight:400, fontSize:13, cursor:'pointer' });
 
   return (
     <div style={{padding:'0 4px'}}>
@@ -2022,7 +2022,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
             return (
               <div key={acc.vinted_user_id} style={{marginBottom:14,paddingBottom:14,borderBottom:`1px solid ${C.border}`}}>
                 <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
-                  <div style={{fontWeight:500,color:C.text,fontSize:13}}>{accName(acc.vinted_user_id)}</div>
+                  <div style={{fontWeight:400,color:C.text,fontSize:13}}>{accName(acc.vinted_user_id)}</div>
                   <button type="button" onClick={()=>loadListings(acc)} style={{...btn(C.blue||C.accent),padding:'5px 10px',fontSize:12}}>
                     {st.loading ? tr('reglages.langue.chargement') : (st.items ? tr('erreur.recharger') : tr('stock.chargerAnnonces'))}
                   </button>
@@ -2041,7 +2041,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
                           <div style={{padding:8}}>
                             <div title={listing.title} style={{fontSize:11,fontWeight:600,color:C.text,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',minHeight:28}}>{listing.title}</div>
                             {linked ? (
-                              <div style={{fontSize:11,color:INV_STATUS.online.color,fontWeight:500,marginTop:6}}>{tr('stock.associee')}</div>
+                              <div style={{fontSize:11,color:INV_STATUS.online.color,fontWeight:400,marginTop:6}}>{tr('stock.associee')}</div>
                             ) : (
                               <div style={{display:'flex',gap:4,marginTop:6}}>
                                 <input value={importNums[listing.id] ?? ''} onChange={e=>setImportNums(n=>({...n,[listing.id]:e.target.value}))}
@@ -2074,19 +2074,19 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
           return (
             <div key={p.id} style={{display:'flex',gap:12,alignItems:'center',padding:11,borderRadius:12,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
               <div style={{width:52,height:52,borderRadius:12,background:C.border,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
-                {p.photo ? <PhotoVinted src={p.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:22}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                {p.photo ? <PhotoVinted src={p.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
               </div>
               <div style={{flexShrink:0,minWidth:54,textAlign:'center'}}>
                 <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>N°</div>
                 <div style={{fontSize:20,fontWeight:700,color:C.text,lineHeight:1}}>{p.numero}</div>
               </div>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.title || <span style={{color:C.muted,fontStyle:'italic'}}>{tr('annonces.sansTitre')}</span>}</div>
+                <div style={{fontSize:13,fontWeight:400,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.title || <span style={{color:C.muted,fontStyle:'italic'}}>{tr('annonces.sansTitre')}</span>}</div>
                 <div style={{display:'flex',gap:6,alignItems:'center',marginTop:5,flexWrap:'wrap'}}>
                   <Badge color={stt.color}>{stt.icon} {stt.label}</Badge>
                   <button type="button" onClick={()=>garage && onLocate && onLocate(p.numero)}
                     title={garage?tr('stock.voirDansStock'):tr('stock.numeroApparaitDans')}
-                    style={{border:'none',background:'transparent',cursor:garage?'pointer':'default',padding:0,fontSize:11,fontWeight:500,color:garage?C.blue||C.accent:C.muted}}>
+                    style={{border:'none',background:'transparent',cursor:garage?'pointer':'default',padding:0,fontSize:11,fontWeight:400,color:garage?C.blue||C.accent:C.muted}}>
                     {garage ? tr('stock.stock3') : tr('stock.absentStock')}
                   </button>
                   {p.price != null && <span style={{fontSize:11,color:C.muted}}>{p.price}&nbsp;€</span>}

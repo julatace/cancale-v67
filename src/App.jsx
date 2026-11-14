@@ -433,6 +433,7 @@ import { SignalerProbleme as SignalerProblemeBase, SignalerProblemeFeuille as Si
 import { EcrireSupport as EcrireSupportBase, EcrireSupportFeuille as EcrireSupportFeuilleBase } from "./composants/EcrireSupport.jsx";   // (13 nov., lot 55) « Écrire au support »
 import * as photosVinted from "./photosVinted.js";
 import { MINERAL, MINERAL_DARK, variablesTheme } from "./themeMineral.js";
+import { motsInsecables } from "./motsInsecables.jsx";   // (14 nov.) un modèle « xt-6 » ne se coupe pas au trait d'union
 import { apparenceDe, sombreEffectif, prochainChangement, ecrituresApparence } from "./apparence.js";
 import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
 import { fusionnerConversation } from "./conversations.js";
@@ -8107,12 +8108,12 @@ function OsmMap({ points, height = 230, selected, onSelect }) {
               <path d="M17 0C7.6 0 0 7.5 0 16.8 0 29 17 44 17 44s17-15 17-27.2C34 7.5 26.4 0 17 0z" fill={col} />
               <circle cx="17" cy="16.5" r="12" fill="#fff" />
             </svg>
-            <span style={{ position: 'absolute', left: '50%', top: 16.5, transform: 'translate(-50%,-50%)', color: col, fontSize: inner.length > 2 ? 11 : 12, fontWeight: 800, letterSpacing: 0.2 }}>{inner}</span>
+            <span style={{ position: 'absolute', left: '50%', top: 16.5, transform: 'translate(-50%,-50%)', color: col, fontSize: inner.length > 2 ? 11 : 12, fontWeight: 700, letterSpacing: 0.2 }}>{inner}</span>
             {/* Pastille « nombre de colis » en coin si c'est une marque */}
-            {car && p.count > 0 && <span style={{ position: 'absolute', top: -5, right: -8, minWidth: 18, height: 18, borderRadius: 999, background: '#e5484d', color: '#fff', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px', boxShadow: '0 1px 3px rgba(0,0,0,0.3)', border: '1.5px solid #fff' }}>{p.count}</span>}
+            {car && p.count > 0 && <span style={{ position: 'absolute', top: -5, right: -8, minWidth: 18, height: 18, borderRadius: 999, background: '#e5484d', color: '#fff', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px', boxShadow: '0 1px 3px rgba(0,0,0,0.3)', border: '1.5px solid #fff' }}>{p.count}</span>}
             {/* Étiquette NOM du point (rend chaque relais distinct d'un coup d'œil) */}
             {(() => { const lbl = p.label || p.key; return (pts.length <= 14 || isSel || p.count > 0) && lbl && (
-              <span style={{ position: 'absolute', left: '50%', top: '100%', transform: 'translate(-50%, 1px)', whiteSpace: 'nowrap', maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 11, fontWeight: 800, color: p.count > 0 ? '#b3261e' : '#2C2C2E', background: 'rgba(255,255,255,0.92)', borderRadius: 6, padding: '1px 5px', boxShadow: '0 1px 2px rgba(0,0,0,0.18)', border: isSel ? `1.5px solid ${col}` : '1px solid rgba(0,0,0,0.06)' }}>{String(lbl).length > 20 ? String(lbl).slice(0, 19) + '…' : lbl}</span>
+              <span style={{ position: 'absolute', left: '50%', top: '100%', transform: 'translate(-50%, 1px)', whiteSpace: 'nowrap', maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 11, fontWeight: 700, color: p.count > 0 ? '#b3261e' : '#2C2C2E', background: 'rgba(255,255,255,0.92)', borderRadius: 6, padding: '1px 5px', boxShadow: '0 1px 2px rgba(0,0,0,0.18)', border: isSel ? `1.5px solid ${col}` : '1px solid rgba(0,0,0,0.06)' }}>{String(lbl).length > 20 ? String(lbl).slice(0, 19) + '…' : lbl}</span>
             ); })()}
           </div>
         );
@@ -15082,7 +15083,7 @@ function MarquePlateforme({ p, taille = 18 }) {
   const m = MARQUES_PLAT[p]; if (!m) return null;
   return <span data-marque={p} title={`En ligne sur ${m.nom}`} aria-label={`En ligne sur ${m.nom}`}
     style={{display:'inline-flex',alignItems:'center',justifyContent:'center',minWidth:taille,height:taille,padding:'0 4px',borderRadius:6,
-      background:m.bg,color:m.fg,border:`1px solid ${m.bord||m.bg}`,fontSize:Math.round(taille*0.5),fontWeight:800,letterSpacing:-0.2,lineHeight:1,flexShrink:0}}>{m.court}</span>;
+      background:m.bg,color:m.fg,border:`1px solid ${m.bord||m.bg}`,fontSize:Math.round(taille*0.5),fontWeight:700,letterSpacing:-0.2,lineHeight:1,flexShrink:0}}>{m.court}</span>;
 }
 // Pourquoi « J'ai déclaré ce mois » ne s'enregistre pas (revue du 6 octobre) :
 // ce qui a ÉCHOUÉ et le geste, ou ce qui se lit ENCORE. `manque` vient de
@@ -15161,7 +15162,7 @@ function StatBox({label,value,color=C.text,sub=null,subColor=null,onClick=null,t
     <Balise {...extra} style={compact
         ? {flex:1,minWidth:0,...(extra.style||{}),padding:'2px 14px',boxShadow:`-1px 0 0 ${C.border}`}
         : {flex:1,minWidth:118,paddingTop:11,borderTop:`3px solid ${color===C.text?C.border:color}`,...(extra.style||{})}}>
-      <div className={compact?undefined:'vrm-label'} style={compact?{fontSize:12,color:C.muted,fontWeight:500}:{color:C.muted,minHeight:'2.44em'}}>{label}</div>
+      <div className={compact?undefined:'vrm-label'} style={compact?{fontSize:12,color:C.muted,fontWeight:400}:{color:C.muted,minHeight:'2.44em'}}>{label}</div>
       <div className="vrm-display" style={{fontSize:compact?'clamp(17px,5vw,22px)':fs,fontWeight:700,color,lineHeight:1.05,marginTop:compact?4:2,whiteSpace:'nowrap'}}>{value}</div>
       {sub && <div style={{fontSize:12,color:subColor||C.muted,fontWeight:subColor?600:400,marginTop:4,lineHeight:1.35}}>{sub}</div>}
     </Balise>
@@ -15449,7 +15450,7 @@ function CourbeVentes({ jours, hauteur = 70, surSombre = false, libDebut = null,
       <div style={{position:'relative',height:0}}>
         <span aria-hidden="true" style={{position:'absolute',right:`${(pad / W) * 100}%`,top:-(H - last[1]) - 4,width:8,height:8,marginRight:-4,borderRadius:999,background:trait,boxShadow:`0 0 0 4px ${surSombre ? 'rgba(143,178,255,.22)' : C.accent + '33'}`}}/>
       </div>
-      <div style={{display:'flex',justifyContent:'space-between',marginTop:7,fontSize:11,color:texte,fontWeight:500}}>
+      <div style={{display:'flex',justifyContent:'space-between',marginTop:7,fontSize:11,color:texte,fontWeight:400}}>
         <span>{libDebut || court(jours[0])}</span><span>{libFin || "aujourd'hui"}</span>
       </div>
     </div>
@@ -17842,7 +17843,7 @@ function Toaster() {
               boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',
               animation:'cancaleToast .26s cubic-bezier(.32,.72,0,1) both'}}>
             <span className="vrm-toast-icon" aria-hidden="true" style={{color:col}}><Icon name={t.type==='err'?'alert':t.type==='ok'?'check':'info'} size={18}/></span>
-            <span style={{fontSize:13,fontWeight:500,color:C.text,lineHeight:1.45,whiteSpace:'pre-wrap'}}>{t.text}</span>
+            <span style={{fontSize:13,fontWeight:400,color:C.text,lineHeight:1.45,whiteSpace:'pre-wrap'}}>{t.text}</span>
           </button>
         );
       })}
@@ -18654,7 +18655,7 @@ function PorteMfa({ session }) {
   const noms = (Array.isArray(session.totp) ? session.totp : []).map((id) => (session.totpNoms && session.totpNoms[id]) || '').filter(Boolean);
   const plusieurs = Array.isArray(session.totp) && session.totp.length > 1;
   const contact = contactEmail();
-  const field = { width:'100%', boxSizing:'border-box', border:`1px solid ${C.border}`, borderRadius:12, padding:'13px 14px', fontSize:22, letterSpacing:6, textAlign:'center',
+  const field = { width:'100%', boxSizing:'border-box', border:`1px solid ${C.border}`, borderRadius:12, padding:'13px 14px', fontSize:20, letterSpacing:6, textAlign:'center',
     background:C.card, color:C.text, outline:'none', fontFamily:'inherit', fontVariantNumeric:'tabular-nums' };
   const lien = { background:'none', border:'none', color:C.muted, fontSize:13, cursor:'pointer', fontFamily:'inherit', padding:'10px 4px', minHeight:44, textDecoration:'underline' };
   return (
@@ -19053,7 +19054,7 @@ function AuthScreen() {
             </div>
           )}
           {/* (11 nov., lot DJ6) « Continuer avec Discord » sans compte VRM : rien n'a été créé (annulé par le serveur). */}
-          {AUTH_REDIRECT?.sansCompteFournisseur && mode==='in' && (()=>{ const p=AUTH_REDIRECT.sansCompteFournisseur, nom=p==='google'?'Google':'Discord'; return <div role="alert" data-sans-compte={p} style={{fontSize:14,color:C.text,border:`1px solid ${C.warn}66`,background:`${C.warn}10`,borderRadius:12,padding:'10px 12px',marginBottom:14,lineHeight:1.45}}>
+          {AUTH_REDIRECT?.sansCompteFournisseur && mode==='in' && (()=>{ const p=AUTH_REDIRECT.sansCompteFournisseur, nom=p==='google'?'Google':'Discord'; return <div role="alert" data-sans-compte={p} style={{fontSize:15,color:C.text,border:`1px solid ${C.warn}66`,background:`${C.warn}10`,borderRadius:12,padding:'10px 12px',marginBottom:14,lineHeight:1.45}}>
             <div style={{fontWeight:600}}>{tr('auth.sansCompte.titre', { nom })}</div>
             <div style={{color:C.muted,marginTop:2}}>{tr('auth.sansCompte.texte', { nom })}</div>
             {providerEnabled(p) && <button type="button" data-sans-compte-creer={p} disabled={busy} onClick={()=>oauth(p,'inscription')} style={{display:'block',minHeight:44,padding:'8px 0 0',border:0,background:'transparent',color:C.accentTexte,font:'inherit',fontWeight:600,cursor:busy?'default':'pointer'}}>{tr('auth.sansCompte.creer', { nom })}</button>}
@@ -19087,7 +19088,7 @@ function AuthScreen() {
               ))}
               <div style={{display:'flex',alignItems:'center',gap:10,margin:'4px 0 12px'}}>
                 <span style={{flex:1,height:1,background:C.border}}/>
-                <span style={{fontSize:11,color:C.muted,fontWeight:500}}>{tr('auth.ouEmail')}</span>
+                <span style={{fontSize:11,color:C.muted,fontWeight:400}}>{tr('auth.ouEmail')}</span>
                 <span style={{flex:1,height:1,background:C.border}}/>
               </div>
             </>);
@@ -19215,11 +19216,11 @@ function AuthScreen() {
                 {mode==='up' ? tr('auth.dejaCompte') : tr('auth.creerCompte')}
               </button>
             ) : (
-              <span style={{fontSize:15,color:C.muted,fontWeight:500}}>{tr('auth.inscriptionsBientot')}</span>
+              <span style={{fontSize:15,color:C.muted,fontWeight:600}}>{tr('auth.inscriptionsBientot')}</span>
             ))}
             {mode==='reset' && (
               <button type="button" disabled={busy} onClick={()=>changerMode('in')}
-                style={{border:'none',background:'transparent',color:C.muted,fontSize:15,fontWeight:500,cursor:'pointer',padding:0,fontFamily:'inherit'}}>
+                style={{border:'none',background:'transparent',color:C.muted,fontSize:15,fontWeight:600,cursor:'pointer',padding:0,fontFamily:'inherit'}}>
                 {tr('commun.retour')}
               </button>
             )}
@@ -19585,7 +19586,7 @@ function BandeauStatut() {
   return (
     <div data-bandeau-statut={bandeau.composant} role="status" style={{margin:'10px 16px 0',display:'flex',alignItems:'center',gap:10,padding:'8px 8px 8px 14px',borderRadius:12,border:`1px solid ${C.border}`,background:C.card,fontSize:13,lineHeight:1.4,color:C.text}}>
       <span style={{flex:1,minWidth:0}}>{bandeau.phrase} <a href="/statut" target="_blank" rel="noreferrer" style={{color:C.accentTexte,fontWeight:600,whiteSpace:'nowrap'}}>Voir l’état</a></span>
-      <button type="button" aria-label="Fermer" onClick={() => setFerme(true)} style={{flexShrink:0,minWidth:44,minHeight:44,border:0,background:'transparent',color:C.muted,fontSize:18,cursor:'pointer'}}>×</button>
+      <button type="button" aria-label="Fermer" onClick={() => setFerme(true)} style={{flexShrink:0,minWidth:44,minHeight:44,border:0,background:'transparent',color:C.muted,fontSize:17,cursor:'pointer'}}>×</button>
     </div>
   );
 }
@@ -19712,7 +19713,7 @@ function BlocCodesHorsLigne() {
                   <div style={{fontSize:11,color:C.muted}}>{[x.lieu, x.suivi && `n°${x.suivi}`].filter(Boolean).join(' · ')}</div>
                 </div>
                 {x.code
-                  ? <div className="vrm-sensible" data-stream-type="code" style={{flexShrink:0,fontSize:17,fontWeight:800,letterSpacing:1,color:C.text,background:C.card2||`${C.accent}12`,border:`1px solid ${C.border}`,borderRadius:12,padding:'5px 11px'}}>{x.code}</div>
+                  ? <div className="vrm-sensible" data-stream-type="code" style={{flexShrink:0,fontSize:17,fontWeight:700,letterSpacing:1,color:C.text,background:C.card2||`${C.accent}12`,border:`1px solid ${C.border}`,borderRadius:12,padding:'5px 11px'}}>{x.code}</div>
                   : Array.isArray(x.desaccord) && x.desaccord.length > 1
                   ? <div className="vrm-sensible" data-code-hl-desaccord="" style={{flexShrink:0,fontSize:12,fontWeight:700,color:C.warn,textAlign:'right'}}>2 codes : {x.desaccord.map((d) => d.code).join(' / ')}</div>
                   : <div style={{flexShrink:0,fontSize:11,color:C.muted,fontStyle:'italic'}}>QR — besoin d’internet</div>}
@@ -19938,12 +19939,12 @@ function FeuilleGestesHL({ onFermer }) {
     <SheetShell onClose={onFermer} z={Z_CONFIRMATION}>
       <div data-gestes-hl-feuille="" style={{ padding: '6px 4px 18px' }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, color: C.text, margin: '0 0 12px' }}>{tr('horsligne.feuille.titre')}</h2>
-        {!atr.length && !att.length ? <p style={{ color: C.muted, fontSize: 14 }}>{tr('horsligne.feuille.vide')}</p> : null}
-        {atr.length ? <h3 style={{ fontSize: 14, fontWeight: 600, color: C.text, margin: '6px 0 8px' }}>{tr('horsligne.feuille.atrancher')}</h3> : null}
+        {!atr.length && !att.length ? <p style={{ color: C.muted, fontSize: 13 }}>{tr('horsligne.feuille.vide')}</p> : null}
+        {atr.length ? <h3 style={{ fontSize: 15, fontWeight: 600, color: C.text, margin: '6px 0 8px' }}>{tr('horsligne.feuille.atrancher')}</h3> : null}
         {atr.map((gr) => { const g = principalHL(gr), ids = gr.map((x) => x.id); return (
           <div key={g.id} data-geste-atrancher={g.id} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 14px', marginBottom: 10, background: C.card }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 8 }}>{sujetGroupeHL(g)}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 10px', fontSize: 14, lineHeight: 1.4 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 10px', fontSize: 15, lineHeight: 1.4 }}>
               <span style={{ color: C.muted }}>{tr('horsligne.feuille.ici')}</span><span data-geste-mien="" style={{ color: C.text, overflowWrap: 'anywhere' }}>{valeurGroupeHL(g, g.apres)}</span>
               <span style={{ color: C.muted }}>{tr('horsligne.feuille.ailleurs')}</span><span data-geste-autre="" style={{ color: C.text, overflowWrap: 'anywhere' }}>{valeurGroupeHL(g, g.nuage)}</span>
             </div>
@@ -19953,9 +19954,9 @@ function FeuilleGestesHL({ onFermer }) {
             </div>
           </div>
         ); })}
-        {att.length ? <h3 style={{ fontSize: 14, fontWeight: 600, color: C.text, margin: '12px 0 8px' }}>{tr('horsligne.feuille.attente')}</h3> : null}
+        {att.length ? <h3 style={{ fontSize: 15, fontWeight: 600, color: C.text, margin: '12px 0 8px' }}>{tr('horsligne.feuille.attente')}</h3> : null}
         {att.map((gr) => { const g = principalHL(gr); return (
-          <div key={g.id} data-geste-attente={g.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, borderBottom: `1px solid ${C.border}`, padding: '10px 2px', fontSize: 14 }}>
+          <div key={g.id} data-geste-attente={g.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, borderBottom: `1px solid ${C.border}`, padding: '10px 2px', fontSize: 15 }}>
             <span style={{ color: C.text }}>{sujetGroupeHL(g)}</span>
             <span style={{ color: C.muted, textAlign: 'right', overflowWrap: 'anywhere' }}>{g.ligne ? '✓' : valeurGroupeHL(g, g.apres)}</span>
           </div>
@@ -20112,7 +20113,7 @@ function LigneRetraitHorsLigne({ r, i, quand, maintenant, verifier = false, sans
         {!r.code && Array.isArray(r.desaccord) && r.desaccord.length > 1
           ? <div className="vrm-sensible" data-stream-type="code" data-hl-desaccord="" style={{marginTop:6,fontSize:13,fontWeight:700,color:C.warn}}>2 codes : {r.desaccord.map((d) => d.code).join(' / ')} — vérifie sur place</div>
           : r.code
-          ? <div className="vrm-sensible" data-stream-type="code" data-hl-code={r.code} style={{display:'inline-block',marginTop:8,fontSize:20,fontWeight:800,letterSpacing:1.2,color:C.text,background:C.card2 || C.bg,border:`1px solid ${C.border}`,borderRadius:12,padding:'5px 12px'}}>{r.code}</div>
+          ? <div className="vrm-sensible" data-stream-type="code" data-hl-code={r.code} style={{display:'inline-block',marginTop:8,fontSize:20,fontWeight:700,letterSpacing:1.2,color:C.text,background:C.card2 || C.bg,border:`1px solid ${C.border}`,borderRadius:12,padding:'5px 12px'}}>{r.code}</div>
           : !r.qr && <div style={{marginTop:6,fontSize:12,color:C.muted}}>Code pas lu à {quand}.</div>}
         <div style={{marginTop:8,display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
           {(r.code || r.qr) && onEnGrand ? <Bouton variante="secondaire" className="vrm-b-petit" data-hl-en-grand-ouvrir="" onClick={() => onEnGrand(r)} aria-label="Afficher le code et le QR en grand">En grand</Bouton> : null}
@@ -20277,14 +20278,14 @@ function JourneeHorsLigne({ uid, tab }) {
   // (9 nov.) Le Stock hors connexion : l'inventaire contre la dernière liste gardée.
   if (tab === 'garage') return (
     <div data-hors-ligne="stock" style={{padding:'16px 14px 40px'}}>
-      <h2 data-hl-titre="" style={{fontSize:22,fontWeight:700,color:C.text,margin:'4px 2px 12px',letterSpacing:-0.3}}>{tr('nav.garage')}</h2>
+      <h2 data-hl-titre="" style={{fontSize:20,fontWeight:700,color:C.text,margin:'4px 2px 12px',letterSpacing:-0.3}}>{tr('nav.garage')}</h2>
       <LigneHorsLigne>{tr('journee.horsConnexionInventaire')}</LigneHorsLigne>
       <BlocInventaireHorsLigne uid={uid}/>
     </div>
   );
   // L'en-tête dit déjà « Ma journée » quand c'est l'écran demandé ; sur un autre
   // onglet, le titre dit ce qu'on voit à la place (§7 : un titre par écran).
-  const titre = tab === 'journee' ? null : <h2 data-hl-titre="" style={{fontSize:22,fontWeight:700,color:C.text,margin:'4px 2px 12px',letterSpacing:-0.3}}>{colis ? (tab === 'ventes' ? tr('historiqueSites.type.ventes') : tab === 'achats' ? tr('historiqueSites.type.achats') : 'Colis') : tr('reglages.ma-journee.lib')}</h2>;
+  const titre = tab === 'journee' ? null : <h2 data-hl-titre="" style={{fontSize:20,fontWeight:700,color:C.text,margin:'4px 2px 12px',letterSpacing:-0.3}}>{colis ? (tab === 'ventes' ? tr('historiqueSites.type.ventes') : tab === 'achats' ? tr('historiqueSites.type.achats') : 'Colis') : tr('reglages.ma-journee.lib')}</h2>;
   if (!photo) return (
     <div data-hors-ligne="sans-photo" style={{padding:'16px 14px 40px'}}>
       {titre}
@@ -20365,7 +20366,7 @@ function JourneeHorsLigne({ uid, tab }) {
               <div key={p.cle} data-hl-point={p.lieu || p.nom} style={carte}>
                 <div style={{display:'flex',alignItems:'center',gap:8,padding:'10px 0 4px'}}>
                   <span aria-hidden="true" style={{display:'flex',color:C.muted}}><Icon name="pin" size={15}/></span>
-                  <span style={{fontSize:14,fontWeight:700,color:C.text,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.nom}</span>
+                  <span style={{fontSize:15,fontWeight:700,color:C.text,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.nom}</span>
                   <span style={{marginLeft:'auto',fontSize:12,color:C.muted,flexShrink:0}}>{trj('journee.colis4', { x: p.colis.length })}</span>
                 </div>
                 {p.colis.map((r, i) => ligneRet(r, i + 1, { sansLieu: !!p.lieu }))}
@@ -20424,7 +20425,7 @@ function LignePanne({ children }) {
   return (
     <div style={{display:'flex',alignItems:'center',gap:10,border:`1px solid ${C.warn}55`,background:`${C.warn}12`,borderRadius:12,padding:'12px 14px'}}>
       <span aria-hidden="true" style={{fontSize:20}}>⚠️</span>
-      <span style={{fontSize:13,fontWeight:500,color:C.text}}>{children}</span>
+      <span style={{fontSize:13,fontWeight:400,color:C.text}}>{children}</span>
     </div>
   );
 }
@@ -21128,7 +21129,7 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
           <span aria-hidden="true" className="vrm-etat-point" style={{ width: 8, height: 8, borderRadius: 6, background: point, flexShrink: 0 }}/>
         </span>
         <span className={st.niveau === 'ok' && loginVinted ? 'vrm-etat-compte vrm-sensible' : undefined} style={st.niveau === 'ok' && loginVinted ? { maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' } : undefined}>{texteCourt}</span>
-        {precisionPastille ? <>{' '}<span className="vrm-etat-precision" style={{ color: C.muted, fontWeight: 500 }}>{precisionPastille}</span></> : null}
+        {precisionPastille ? <>{' '}<span className="vrm-etat-precision" style={{ color: C.muted, fontWeight: 400 }}>{precisionPastille}</span></> : null}
         {!court ? <i className="vrm-etat-chevron" aria-hidden="true"><Icon name="chevron" size={13}/></i> : null}
       </button>
       {/* (23 oct.) Sur téléphone le panneau part dans document.body : posé dans
@@ -21636,7 +21637,7 @@ function GuideDemarrageApp(props) {
   // (11 nov.) « Configure VRM » est l'étape 2 du parcours d'arrivée : sa carte la porte
   // (la carte « Reprendre » ne revient que pour un vendeur sans Vinted, ou guide masqué).
   return <>{sansVinted ? <ReprendreConfiguration/> : null}<AlerteDejaRelie lire={lireLitigesVinted} comptes={props.comptes} contact={contactEmail()} onChangerCompte={changerCompteVrm} ou="journee"/>{sansVinted
-    ? aRelier.length > 0 ? <section className="vrm-choix-plateformes" data-guide-sites="" aria-label="Relier mes plateformes"><h2 style={{fontSize:18,margin:'0 0 8px'}}>Relie tes comptes</h2><p className="vrm-cp-note">Tes plateformes sont prêtes. Voici comment faire arriver tes données.</p><ul style={{fontSize:13,lineHeight:1.6,paddingLeft:18}}>{aRelier.map(id => <li key={id}><b>{nomPlateforme(id)}</b> : {id === 'ebay' ? 'Paramètres → Comptes eBay → Relier un compte.' : `ouvre ton compte sur ${id === 'leboncoin' ? 'leboncoin.fr' : 'vestiairecollective.com'} dans le navigateur avec l’extension VRM.`}</li>)}</ul><Bouton variante="secondaire" onClick={()=>props.onNav?.('settings')}>Ouvrir les paramètres</Bouton></section> : null
+    ? aRelier.length > 0 ? <section className="vrm-choix-plateformes" data-guide-sites="" aria-label="Relier mes plateformes"><h2 style={{fontSize:17,margin:'0 0 8px'}}>Relie tes comptes</h2><p className="vrm-cp-note">Tes plateformes sont prêtes. Voici comment faire arriver tes données.</p><ul style={{fontSize:13,lineHeight:1.6,paddingLeft:18}}>{aRelier.map(id => <li key={id}><b>{nomPlateforme(id)}</b> : {id === 'ebay' ? 'Paramètres → Comptes eBay → Relier un compte.' : `ouvre ton compte sur ${id === 'leboncoin' ? 'leboncoin.fr' : 'vestiairecollective.com'} dans le navigateur avec l’extension VRM.`}</li>)}</ul><Bouton variante="secondaire" onClick={()=>props.onNav?.('settings')}>Ouvrir les paramètres</Bouton></section> : null
     : <CarteParcoursApp comptes={props.comptes} plein={!!props.plein}/>}</>;
 }
 // Préférences synchronisées et cloisonnées par le stockage du compte VRM.
@@ -21705,7 +21706,7 @@ function ReprendreConfiguration() {
   const aReprendre = conf ? conf.etat === 'plusTard' : !lirePlateformes(load(CLE_PLATEFORMES, null));
   if (!aReprendre) return null;
   return <section className="vrm-choix-plateformes" data-reprendre-configuration={conf ? 'plustard' : 'jamais'} aria-label="Ma configuration">
-    <h2 style={{fontSize:19,letterSpacing:-0.4,margin:'0 0 5px'}}>{conf ? 'Termine ta configuration' : 'Configure VRM'}</h2>
+    <h2 style={{fontSize:20,letterSpacing:-0.4,margin:'0 0 5px'}}>{conf ? 'Termine ta configuration' : 'Configure VRM'}</h2>
     {/* (9 nov., lot AI) Une ligne courte ; la phrase entière dans sa pop-up. */}
     <InfoPop nom="configuration" titre={conf ? 'Termine ta configuration' : 'Configure VRM'} resume="Deux minutes, et VRM s’adapte à toi"><p className="vrm-cp-note">Ce que tu vends, tes plateformes, ton statut, ton numéro : deux minutes, et VRM s’adapte à toi.</p></InfoPop>
     <Bouton variante="primaire" data-configuration-ouvrir="" onClick={() => { try { window.dispatchEvent(new Event('vrm:configuration')); } catch (_) {} }}>{conf ? 'Reprendre' : 'Commencer'}</Bouton>
@@ -21975,7 +21976,7 @@ function Onboarding({ setTab }) {
       <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}>
         <VrmLogo size={44}/>
         <div>
-          <div style={{fontSize:22,fontWeight:700,color:C.text,letterSpacing:'-0.02em'}}>Bienvenue</div>
+          <div style={{fontSize:20,fontWeight:700,color:C.text,letterSpacing:'-0.02em'}}>Bienvenue</div>
           <div style={{fontSize:13,color:C.muted,lineHeight:1.45,marginTop:2}}>
             Ton poste de pilotage&nbsp;: ce que tu vends, où c'est rangé, ce que ça te rapporte.
           </div>
@@ -22323,8 +22324,8 @@ function ArgentAVenirCarte({ A, plateforme = null, reserve = false }) {
           {/* Le groupe unique : qui doit l'argent, en une phrase (aucun montant redit). */}
           {resume ? <div data-a-venir-resume="" {...attrsGroupe(resume)} style={{ fontSize: 13, color: C.muted, marginTop: 2, overflowWrap: 'anywhere' }}>{NOM_SITE_AVENIR[resume.plateforme] || resume.plateforme}{resume.compte && resume.plateforme === 'Vinted' ? <span className="vrm-sensible"> · {resume.compte}</span> : null} · {quand(resume)}</div> : null}
         </div>
-        <span className="vrm-display" data-a-venir-total="" style={{ fontSize: 22, fontWeight: 700, color: C.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }} title={T.partiel ? tr('journee.moinsSans2', { x: String(T.manque.join(', ')) }) : undefined}>
-          {T.partiel && T.valeur != null ? <span style={{ fontSize: 13, fontWeight: 500, color: C.muted }}>{tr('journee.moins')} </span> : null}{T.valeur == null ? '—' : montant(T.valeur)}
+        <span className="vrm-display" data-a-venir-total="" style={{ fontSize: 20, fontWeight: 700, color: C.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }} title={T.partiel ? tr('journee.moinsSans2', { x: String(T.manque.join(', ')) }) : undefined}>
+          {T.partiel && T.valeur != null ? <span style={{ fontSize: 13, fontWeight: 400, color: C.muted }}>{tr('journee.moins')} </span> : null}{T.valeur == null ? '—' : montant(T.valeur)}
         </span>
         {lignes.length > 0 ? <span aria-hidden="true" style={{ color: C.muted, transform: detail ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }}>›</span> : null}
       </div>
@@ -23049,7 +23050,7 @@ function SuivisManuels({ liste, tracking, achats, accName, relire, etapeDe, tran
                     {!candidats.length && <div style={{ fontSize: 12, color: C.muted }}>Aucun achat des 45 derniers jours.</div>}
                     {candidats.map(o => (
                       <button key={String(o.transaction_id)} type="button" data-suivi-achat={String(o.transaction_id)} onClick={async () => { const r = await ecrireSuiviManuel(m.id, { tx: String(o.transaction_id), uid: String((o._acc && o._acc.vinted_user_id) || '') || null }); if (!r.ok) setMsg(r.msg); setRelierPour(''); relire(); }}
-                        style={{ ...bouton, textAlign: 'left', fontWeight: 500, overflowWrap: 'anywhere' }}>{o.title || 'Achat'}{o._acc ? ` · ${accName(o._acc)}` : ''}{o.date ? ` · ${dateFr(o.date)}` : ''}</button>
+                        style={{ ...bouton, textAlign: 'left', fontWeight: 400, overflowWrap: 'anywhere' }}>{o.title || 'Achat'}{o._acc ? ` · ${accName(o._acc)}` : ''}{o.date ? ` · ${dateFr(o.date)}` : ''}</button>
                     ))}
                   </div>
                 )}
@@ -23644,11 +23645,11 @@ function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
       {actives.length > 0 && (
         <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', padding: '2px 0 10px' }}>
           <div>
-            <div className="vrm-display" style={{ fontSize: 20, fontWeight: 800, color: C.text }}>{fmt2(somme(recus))}</div>
+            <div className="vrm-display" style={{ fontSize: 20, fontWeight: 700, color: C.text }}>{fmt2(somme(recus))}</div>
             <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: 600 }}>Reçus · {recus.length}</div>
           </div>
           <div>
-            <div className="vrm-display" style={{ fontSize: 20, fontWeight: 800, color: C.muted }}>{fmt2(somme(enRoute))}</div>
+            <div className="vrm-display" style={{ fontSize: 20, fontWeight: 700, color: C.muted }}>{fmt2(somme(enRoute))}</div>
             <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: 600 }}>En route · {enRoute.length}</div>
           </div>
         </div>
@@ -25323,7 +25324,7 @@ function CarteColisVc({ v, imprime, fait }) {
         <div style={{ flex: '1 1 150px', minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
             {/* (3 nov.) Le N° dans le titre, comme la carte d'un colis Vinted : la même carte pour tous les sites. */}
-            <span className="vrm-colis-titre" title={titre} style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, lineHeight: 1.35, color: C.text, letterSpacing: '-.01em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', overflowWrap: 'anywhere' }}>{v.num ? <><Numero n={v.num} taille="petit"/>{' '}</> : null}{titre}</span>
+            <span className="vrm-colis-titre" title={titre} style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, lineHeight: 1.35, color: C.text, letterSpacing: '-.01em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', overflowWrap: 'anywhere' }}>{v.num ? <><Numero n={v.num} taille="petit"/>{' '}</> : null}{motsInsecables(titre)}</span>
             {verse != null ? <span className="vrm-display vrm-colis-prix" data-vc-colis-verse={verse.toFixed(2)} title="Ce que Vestiaire te verse" style={{ flexShrink: 0, fontSize: 17, fontWeight: 700, color: C.text, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-.02em' }}>{montant(verse)}</span> : null}
           </div>
           <div style={{ fontSize: 12, color: C.muted, marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -25378,7 +25379,7 @@ function CarteColisSite({ ident, site, photo, titre, num, sous, sousAmbre = fals
         </div>
         <div style={{ flex: '1 1 150px', minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-            <span className="vrm-colis-titre" title={titre} style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, lineHeight: 1.35, color: C.text, letterSpacing: '-.01em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', overflowWrap: 'anywhere' }}>{num ? <><Numero n={num} taille="petit"/>{' '}</> : null}{titre}</span>
+            <span className="vrm-colis-titre" title={titre} style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, lineHeight: 1.35, color: C.text, letterSpacing: '-.01em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', overflowWrap: 'anywhere' }}>{num ? <><Numero n={num} taille="petit"/>{' '}</> : null}{motsInsecables(titre)}</span>
           </div>
           <div style={{ fontSize: 12, color: C.muted, marginTop: 6, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
             <span data-colis-dates="" style={{ flex: '0 1 auto', minWidth: 0 }}><span data-colis-limite-texte="" style={{ overflowWrap: 'anywhere', color: sousAmbre ? C.warn : C.muted, fontWeight: sousAmbre ? 600 : 500 }}>{sous}</span></span>
@@ -27623,7 +27624,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
                   <button type="button" key={p.numero} data-paire-a-ranger={p.numero} data-paire-plateformes={(p.plateformes || []).join(' ')} data-paire-aussi={(p.aussi || []).join(' ') || undefined} title={p.aussi && p.aussi.length ? `Même photo que N°${p.aussi.join(', N°')} : c'est un seul article — range-le sous le numéro écrit dessus.` : undefined} aria-pressed={on} onPointerDown={(e) => debutGlisser(e, p)} onClick={(e) => e.preventDefault()}
                     style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 7, padding: '5px 10px 5px 5px', borderRadius: 999, border: `1px solid ${on ? C.text : C.border}`, background: on ? `${C.text}10` : C.bg, color: C.text, cursor: 'grab', fontFamily: 'inherit', touchAction: 'pan-x', userSelect: 'none' }}>
                     {p.photo ? <PhotoVinted src={p.photo} alt="" style={{ width: 28, height: 28, borderRadius: 999, objectFit: 'cover', background: C.card2 }}/> : <span style={{ width: 28, height: 28, borderRadius: 999, background: C.card2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="box" size={14} style={{ color: C.muted }}/></span>}
-                    <span style={{ fontSize: 13, fontWeight: 600 }}>N°{p.numero}{p.aussi && p.aussi.length ? <span style={{ fontWeight: 500, color: C.muted }}> · N°{p.aussi.join(' · N°')}</span> : null}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>N°{p.numero}{p.aussi && p.aussi.length ? <span style={{ fontWeight: 400, color: C.muted }}> · N°{p.aussi.join(' · N°')}</span> : null}</span>
                     {p.plateformes && p.plateformes.length && !p.plateformes.includes('vinted') ? <span style={{ fontSize: 12, color: C.muted }}>{p.plateformes.map(x => NOM_PLAT_STOCK[x] || x).join(' · ')}</span> : null}
                   </button>
                 );
@@ -27666,7 +27667,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, color: C.text }}>
               {chercheLoc.length} article{chercheLoc.length > 1 ? 's' : ''} à aller chercher
-              <span style={{ fontWeight: 500, color: C.muted }}> · en couleur dans la pièce</span>
+              <span style={{ fontWeight: 400, color: C.muted }}> · en couleur dans la pièce</span>
             </span>
             <button className="vrm-icon-control vrm-b vrm-b-discret vrm-b-icone" type="button" aria-label="Ne plus colorer les articles à aller chercher" onClick={() => setAChercher(null)}><Icon name="close" size={14}/></button>
           </div>
@@ -27700,7 +27701,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           pastilles ne servent qu'à passer d'une pièce à l'autre, à partir de deux,
           et la pièce choisie est marquée en NEUTRE (§7 : l'accent ne sélectionne pas). */}
       <div data-pieces={plan.rooms.length} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-        {plan.rooms.length > 1 && <span style={{ fontSize: 13, color: C.muted, fontWeight: 500, alignSelf: 'center', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="home" size={13}/>Pièces :</span>}
+        {plan.rooms.length > 1 && <span style={{ fontSize: 13, color: C.muted, fontWeight: 400, alignSelf: 'center', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="home" size={13}/>Pièces :</span>}
         {plan.rooms.length > 1 && plan.rooms.map(r => {
           const on = r.id === activeRoom.id;
           return (
@@ -27771,15 +27772,15 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           }} />
         {/* Taille de la pièce */}
         <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', fontSize: 12, color: C.muted }}>
-          <span style={{ fontWeight: 800 }}>Pièce {room.w}×{room.h} :</span>
+          <span style={{ fontWeight: 700 }}>Pièce {room.w}×{room.h} :</span>
           <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setRoom(1, 0)}>largeur +</button>
           <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire la largeur de la pièce" onClick={() => setRoom(-1, 0)}>−</button>
           <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setRoom(0, 1)}>profondeur +</button>
           <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire la profondeur de la pièce" onClick={() => setRoom(0, -1)}>−</button>
-          <span style={{ fontWeight: 800, marginLeft: 8 }}>Plafond :</span>
+          <span style={{ fontWeight: 700, marginLeft: 8 }}>Plafond :</span>
           <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Augmenter la hauteur du plafond" onClick={() => patchRoom(r => ({ room: { ...r.room, wallH: Math.min(6, Math.round(((r.room.wallH || 3.4) + 0.4) * 10) / 10) } }))}>+</button>
           <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire la hauteur du plafond" onClick={() => patchRoom(r => ({ room: { ...r.room, wallH: Math.max(2.4, Math.round(((r.room.wallH || 3.4) - 0.4) * 10) / 10) } }))}>−</button>
-          <span style={{ fontWeight: 800, marginLeft: 8 }}>Murs :</span>
+          <span style={{ fontWeight: 700, marginLeft: 8 }}>Murs :</span>
           {['#E5E5EA', '#E5E5EA', '#E5E5EA', '#E5E5EA', '#E5E5EA', '#E5E5EA', '#E5E5EA', '#2C2C2E'].map(c => (
             <button type="button" aria-label={`Couleur de mur ${['#E5E5EA', '#E5E5EA', '#E5E5EA', '#E5E5EA', '#E5E5EA', '#E5E5EA', '#E5E5EA', '#2C2C2E'].indexOf(c)+1}`} aria-pressed={(room.wallColor || '#E5E5EA')===c} key={c} onClick={() => patchRoom(r => ({ room: { ...r.room, wallColor: c } }))} title="Couleur des murs" style={{ width: 18, height: 18, borderRadius: 6, background: c, border: (room.wallColor || '#E5E5EA') === c ? `2px solid ${C.accent}` : '1px solid rgba(0,0,0,0.2)', cursor: 'pointer', padding: 0 }} />
           ))}
@@ -27801,14 +27802,14 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       {/* Bandeau « poser une pile sur un meuble » actif */}
       {putOnSrc && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 11px', border: `1.5px solid ${C.accent}`, borderRadius: 12, background: `${C.accent}14` }}>
-          <span style={{ fontSize: 13, fontWeight: 800, color: C.text }}>Touche le <b>meuble</b> (table, commode…) sur lequel poser la pile — elle se posera dessus, centrée.</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Touche le <b>meuble</b> (table, commode…) sur lequel poser la pile — elle se posera dessus, centrée.</span>
           <button className="vrm-b vrm-b-discret" type="button" onClick={() => setPutOnSrc(null)} style={{ marginLeft: 'auto' }}>Annuler</button>
         </div>
       )}
       {/* Bandeau « empiler par toucher » actif */}
       {stackSrc && (()=>{ const s = items.find(o => o.id === stackSrc); return (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 11px', border: `1.5px solid ${C.accent}`, borderRadius: 12, background: `${C.accent}14` }}>
-          <span style={{ fontSize: 13, fontWeight: 800, color: C.text }}>Touche la boîte sur laquelle poser <b>N°{(s && s.num) || '?'}</b> (elle montera dessus).</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Touche la boîte sur laquelle poser <b>N°{(s && s.num) || '?'}</b> (elle montera dessus).</span>
           <button className="vrm-b vrm-b-discret" type="button" onClick={() => setStackSrc(null)} style={{ marginLeft: 'auto' }}>Annuler</button>
         </div>
       ); })()}
@@ -27816,8 +27817,8 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       {/* Tableau de bord d'occupation de la pièce */}
       {items.length > 0 && (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: '8px 12px', border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, fontSize: 13 }}>
-          <span style={{ fontWeight: 800, color: C.text }}>{activeRoom.name}</span>
-          <span style={{ fontWeight: 800, color: C.text }}>{capacity.boxes} boîte{capacity.boxes > 1 ? 's' : ''} rangée{capacity.boxes > 1 ? 's' : ''}</span>
+          <span style={{ fontWeight: 700, color: C.text }}>{activeRoom.name}</span>
+          <span style={{ fontWeight: 700, color: C.text }}>{capacity.boxes} boîte{capacity.boxes > 1 ? 's' : ''} rangée{capacity.boxes > 1 ? 's' : ''}</span>
           {capacity.freeCells > 0 && <span style={{ fontWeight: 700, color: C.muted }}>· {capacity.freeCells} place{capacity.freeCells > 1 ? 's' : ''} libre{capacity.freeCells > 1 ? 's' : ''}</span>}
           <span style={{ fontWeight: 700, color: C.muted }}>· {capacity.furn} meuble{capacity.furn > 1 ? 's' : ''}</span>
         </div>
@@ -27827,7 +27828,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       {/* Barre du meuble sélectionné */}
       {selItem && (
         <div data-meuble-choisi={selItem.id} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', padding: '9px 11px', border: `1px solid ${C.accent}`, borderRadius: 12, background: `${C.accent}0c` }}>
-          <span style={{ fontSize: 13, fontWeight: 800, color: C.text, flex: '1 1 100%', marginBottom: 2 }}>{emojiOf(selItem)} {selItem.name}{(FURN_TYPES[selItem.type] || {}).box && selItem.num ? ` — N°${selItem.num}` : ''}</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: C.text, flex: '1 1 100%', marginBottom: 2 }}>{emojiOf(selItem)} {selItem.name}{(FURN_TYPES[selItem.type] || {}).box && selItem.num ? ` — N°${selItem.num}` : ''}</span>
           {/* ── CE QU'IL Y A DEDANS ────────────────────────────────────────
               Le garage savait ranger, pas MONTRER. On voit maintenant chaque
               paire du meuble — photo, N°, titre — et on peut la SORTIR d'un
@@ -27934,7 +27935,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             const cellCm = Math.round((selItem.cell || 0.5) * 100);
             return (
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '7px 9px', border: `1px dashed ${C.border}`, borderRadius: 9 }}>
-                <span style={{ fontSize: 11, color: C.text, fontWeight: 800 }}>Grille</span>
+                <span style={{ fontSize: 11, color: C.text, fontWeight: 700 }}>Grille</span>
                 <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>↔ Boîtes en largeur</span><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire les colonnes" onClick={() => gridCols(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 13, minWidth: 16, textAlign: 'center' }}>{selItem.cols || 4}</b><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Augmenter les colonnes" onClick={() => gridCols(selItem, 1)} style={stepBtn}>+</button></span>
                 <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>↕ Boîtes en hauteur</span><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire les rangées" onClick={() => gridRows(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 13, minWidth: 16, textAlign: 'center' }}>{selItem.rows || 3}</b><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Augmenter les rangées" onClick={() => gridRows(selItem, 1)} style={stepBtn}>+</button><button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => gridToCeiling(selItem)} title="Empiler jusqu'au plafond">Jusqu'au plafond</button></span>
                 <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>Taille case</span><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire la taille des cases" onClick={() => gridCell(selItem, -0.06)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 34, textAlign: 'center' }}>{cellCm} cm</b><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Augmenter la taille des cases" onClick={() => gridCell(selItem, 0.06)} style={stepBtn}>+</button></span>
@@ -27951,7 +27952,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             const nums = pileNums(selItem), total = cartonsDePile(nums).length, rows = Math.max(1, selItem.rows || 5), cols = Math.max(1, Math.ceil(nums.length / rows));
             return (
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '7px 9px', border: `1px dashed ${C.border}`, borderRadius: 9 }}>
-                <span style={{ fontSize: 11, color: C.text, fontWeight: 800 }}>Pile</span>
+                <span style={{ fontSize: 11, color: C.text, fontWeight: 700 }}>Pile</span>
                 <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>Nombre de boîtes</span><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Retirer la dernière boîte de la pile" onClick={() => pileRemoveLast(selItem)} style={stepBtn}>−</button><b style={{ fontSize: 15, minWidth: 24, textAlign: 'center' }}>{total}</b><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Ajouter une boîte à la pile" onClick={() => pileAdd(selItem)} style={stepBtn}>+</button></span>
                 <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>{cols > 1 ? 'Boîtes de haut (toutes les piles)' : 'Boîtes de haut'}</span><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire la hauteur de la pile" onClick={() => pileHeight(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{rows}</b><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Augmenter la hauteur de la pile" onClick={() => pileHeight(selItem, 1)} style={stepBtn}>+</button></span>
                 {cols > 1 && <span data-pile-hauteurs style={{ flex: '1 1 100%', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -28000,7 +28001,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
         <div onClick={() => setOpenItem(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 14 }}>
           <div onClick={e => e.stopPropagation()} style={{ background: C.bg, borderRadius: 14, maxWidth: 460, width: '100%', maxHeight: '92vh', overflow: 'auto', padding: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <span style={{ fontSize: 15, fontWeight: 800, color: C.text, flex: 1 }}>{emojiOf(opened)} {opened.name}</span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: C.text, flex: 1 }}>{emojiOf(opened)} {opened.name}</span>
               <button className="vrm-icon-control vrm-b vrm-b-discret vrm-b-icone" type="button" aria-label="Fermer le contenu du meuble" onClick={() => setOpenItem(null)}><Icon name="close" size={15}/></button>
             </div>
             <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>Vue de face — touche une case pour y ranger un N° (empilable).
@@ -28019,7 +28020,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
                       <div key={c} onClick={() => cellAdd(opened, cell)} style={{ flex: 1, minHeight: 52, borderRadius: 6, border: `1.5px ${cellHi ? 'solid #e5484d' : 'dashed ' + C.border}`, background: cellHi ? '#e5484d18' : C.card, padding: 4, display: 'flex', flexWrap: 'wrap', gap: 3, alignContent: 'flex-start', cursor: 'pointer' }}>
                         {arr.length === 0 && <span style={{ margin: 'auto', color: C.muted, fontSize: 17 }}>＋</span>}
                         {arr.map((n, i) => (
-                          <span key={i} onClick={async (e) => { e.stopPropagation(); if (await askConfirm({ title:`Retirer le N°${n} de cette case ?`, ok:'Retirer', danger:true })) cellRemove(opened, cell, n); }} style={{ background: C.accent, color:C.onAccent, borderRadius: 6, fontSize: 11, fontWeight: 800, padding: '2px 6px', height: 'fit-content' }}>{n}</span>
+                          <span key={i} onClick={async (e) => { e.stopPropagation(); if (await askConfirm({ title:`Retirer le N°${n} de cette case ?`, ok:'Retirer', danger:true })) cellRemove(opened, cell, n); }} style={{ background: C.accent, color:C.onAccent, borderRadius: 6, fontSize: 11, fontWeight: 700, padding: '2px 6px', height: 'fit-content' }}>{n}</span>
                         ))}
                       </div>
                     );
@@ -28337,7 +28338,7 @@ function StockPhotos() {
               {f.photo
                 ? <PhotoVinted src={f.photo} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                 : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: 11 }}>pas de photo</div>}
-              <span style={{ position: 'absolute', left: 6, top: 6, background: C.accent, color: C.onAccent, fontWeight: 800, fontSize: 13, padding: '2px 8px', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>N°{f.numero}</span>
+              <span style={{ position: 'absolute', left: 6, top: 6, background: C.accent, color: C.onAccent, fontWeight: 700, fontSize: 13, padding: '2px 8px', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>N°{f.numero}</span>
             </div>
             <div style={{ padding: '7px 9px', display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ fontSize: 12, color: C.text, lineHeight: 1.3, minHeight: 31, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{f.title || '—'}</div>
@@ -28507,7 +28508,7 @@ function ChoixPlanches({ cols, rows, planches, setPlanches, plateau = false, fix
             {r <= fixe ? <span data-plateau-fixe={r} title="Le dessus de la table" style={{ alignSelf: 'center', fontSize: 11, color: C.muted, fontWeight: 700, textAlign: 'center', lineHeight: 1.1 }}>dessus</span> : <button type="button" data-planche-choix={r} aria-pressed={plein} onClick={() => basculer(r)}
               aria-label={plein ? `Enlever la planche sous la rangée ${r}, sur toute la largeur` : `Poser une planche sous la rangée ${r}, sur toute la largeur`}
               title="Toute la largeur"
-              style={{ width: 30, height: 30, alignSelf: 'center', padding: 0, border: `1px solid ${plein ? C.text : C.line}`, background: plein ? C.text : 'transparent', color: plein ? C.bg : C.muted, borderRadius: 6, fontSize: 15, fontWeight: 800, cursor: 'pointer' }}>⟷</button>}
+              style={{ width: 30, height: 30, alignSelf: 'center', padding: 0, border: `1px solid ${plein ? C.text : C.line}`, background: plein ? C.text : 'transparent', color: plein ? C.bg : C.muted, borderRadius: 6, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>⟷</button>}
             <div style={{ background: C.line, padding: '0 5px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},1fr)`, gap: 4 }}>
                 {Array.from({ length: cols }).map((_, c) => { const on = cases.has(r + ':' + (c + 1)) || r <= fixe; return r <= fixe ? <span key={c} style={{ height: 30, display: 'flex', alignItems: 'center' }}><span style={{ display: 'block', width: '100%', height: 7, borderRadius: 3, background: C.text }} /></span> : (
@@ -28616,7 +28617,7 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
               <span style={{
                 display:'inline-block',background:C.warn,color:'#000',
                 border:'none',borderRadius:12,padding:'5px 12px',
-                fontSize:12,fontWeight:500,fontFamily:'inherit',
+                fontSize:12,fontWeight:400,fontFamily:'inherit',
               }}>📁 Choisir un fichier JSON</span>
             </label>
           </div>
@@ -30253,11 +30254,11 @@ function RepartitionsVentes({ panelOff, apercu = false }) {
       {/* Le temps de vente : la moyenne, la médiane, et SUR combien de ventes. */}
       <div data-repart-delai={delai && delai.n ? Math.round(delai.moyenne * 10) / 10 : ''} data-repart-delai-n={delai ? delai.n : ''} style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:'4px 16px',marginTop:14,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
         <div style={{minWidth:0}}>
-          <div style={{fontSize:13,color:C.muted,fontWeight:500}}>Temps moyen de vente</div>
+          <div style={{fontSize:13,color:C.muted,fontWeight:400}}>Temps moyen de vente</div>
           <div className="vrm-display" style={{fontSize:20,fontWeight:700,color:delai && delai.n ? C.text : C.muted,letterSpacing:-0.5,marginTop:4,fontVariantNumeric:'tabular-nums'}}>{delai && delai.n ? jFmt(delai.moyenne) : '—'}</div>
         </div>
         <div style={{minWidth:0}}>
-          <div style={{fontSize:13,color:C.muted,fontWeight:500}}>La moitié part en</div>
+          <div style={{fontSize:13,color:C.muted,fontWeight:400}}>La moitié part en</div>
           <div className="vrm-display" style={{fontSize:20,fontWeight:700,color:delai && delai.n ? C.text : C.muted,letterSpacing:-0.5,marginTop:4,fontVariantNumeric:'tabular-nums'}}>{delai && delai.n ? jFmt(delai.mediane) : '—'}</div>
         </div>
         <div style={{...sNote,fontSize:11,gridColumn:'1 / -1',marginTop:2}}>
@@ -31293,7 +31294,7 @@ function Skeleton({ variant='row', count=6 }) {
 function LoadError({ onRetry }) {
   return <div className="vrm-erreur-chargement" style={{textAlign:'center',padding:'28px 16px'}}>
     <div aria-hidden="true" style={{width:44,height:44,margin:'0 auto 10px',borderRadius:12,display:'flex',alignItems:'center',justifyContent:'center',background:C.card2,color:C.muted}}><Icon name="cloudOff" size={20}/></div>
-    <div style={{fontSize:15,fontWeight:500,color:C.text,marginBottom:4}}>{tr('commun.impossibleChargerCes')}</div>
+    <div style={{fontSize:15,fontWeight:600,color:C.text,marginBottom:4}}>{tr('commun.impossibleChargerCes')}</div>
     <div style={{marginBottom:12}}/>
     <button type="button" className="vrm-erreur-chargement-bouton" onClick={onRetry} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:12,padding:'0 22px',minHeight:44,cursor:'pointer',fontSize:15,fontWeight:600}}>{tr('ranger.reessayer')}</button>
   </div>;
@@ -33429,7 +33430,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {ph ? <PhotoVinted src={ph} alt="Photo de l'achat" data-photo-achat="1" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:15}}>🧾</span>}
         </div>
         <div style={{flex:'1 1 90px',minWidth:0}}>
-          <div style={{fontSize:11,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={a.title}><span style={{color:C.muted,fontWeight:500}}>Achat relié · </span>{a.title||'sans titre'}</div>
+          <div style={{fontSize:11,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={a.title}><span style={{color:C.muted,fontWeight:400}}>Achat relié · </span>{a.title||'sans titre'}</div>
           <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
             Acheté {a.price?.amount!=null?`${Number(a.price.amount).toFixed(2).replace('.',',')}\u00a0${cur(a.price?.currency_code)}`:'—'}{a.date?` · ${new Date(a.date).toLocaleDateString('fr-FR')}`:''}
           </div>
@@ -44068,7 +44069,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     : /code|retrait|pickup|pin|suivi|tracking|colis|r[ée]cup[ée]rer|point relais/i.test(m.body)
                       ? <div key={i} className="vrm-chat-event vrm-chat-event-colis" style={{background:C.card,border:`1px solid ${C.border}`}}>
                           <div className="vrm-chat-event-k" style={{color:C.muted}}>Colis</div>
-                          <div style={{fontSize:15,fontWeight:500,color:C.text,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{texteSansBalises(m.body)}</div>
+                          <div style={{fontSize:15,fontWeight:600,color:C.text,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{texteSansBalises(m.body)}</div>
                           {(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accentTexte}}>{l.bordereau?'Ouvrir le bordereau ↗':'Ouvrir le lien ↗'}</a>)}
                         </div>
                       : <div key={i} className="vrm-chat-event" data-chat-evenement="" style={{color:C.muted,whiteSpace:'pre-line'}}>{texteSansBalises(m.body)}{(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accentTexte}}>{l.bordereau?'bordereau ↗':'lien ↗'}</a>)}</div>)
@@ -44141,7 +44142,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const etat = msgRelais ? 'ok' : extSait('messagerie');
                   if (etat !== 'ok' || (!msgRelais && __vmrPlusieurs)) return (
                     <div className="vrm-chat-offre vrm-chat-offre-info" data-cible={off?'offre':undefined} data-offre="indisponible" style={{background:C.bg,border:`1px solid ${C.border}`}}>
-                      {off ? <div className="vrm-chat-offre-t" style={{color:C.text}}>Offre de <b data-montant="">{fmtE(off.prix)}</b> <span style={{color:C.muted,fontWeight:500}}>en attente</span></div> : null}
+                      {off ? <div className="vrm-chat-offre-t" style={{color:C.text}}>Offre de <b data-montant="">{fmtE(off.prix)}</b> <span style={{color:C.muted,fontWeight:400}}>en attente</span></div> : null}
                       {off ? <LignePlancher plancher={plancherDeItem(itemF,pc?.devise)} offre={off.prix} mini={isFinite(minF)&&minF>0?minF:null} ambre={C.warn} onSaisir={annonceParId.get(String(itemF))?()=>saisirPrixAnnonce(annonceParId.get(String(itemF))):null}/> : null}
                       <div className="vrm-chat-offre-p" style={{color:C.muted}}>
                         {__vmrPlusieurs ? textePlusieurs() : etat==='retard' ? `Mets l'extension à jour (${EXT_CAPACITES.messagerie}) pour trancher ou faire une offre d'ici.` : "Les offres se font depuis le navigateur où l'extension est installée."}
@@ -46385,7 +46386,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {/* Mêmes symboles que la barre du bas : un écran et son raccourci
               portent le même signe, au trait, pas un emoji du système. */}
           {[['ventes','cash','Ventes'],['achats','bag','Achats'],['annonces','shop','Annonces'],['bordereaux','printer','Bordereaux']].map(([id,ic,label])=>(
-            <button type="button" key={id} onClick={()=>setSub(id)} style={{display:'flex',alignItems:'center',gap:6,padding:'6px 14px',borderRadius:12,border:`1px solid ${sub===id?C.accent:C.border}`,background:sub===id?C.accent:'transparent',color:sub===id?'#fff':C.text,fontWeight:500,fontSize:13,cursor:'pointer',fontFamily:'inherit'}}><Icon name={ic} size={15}/>{label}</button>
+            <button type="button" key={id} onClick={()=>setSub(id)} style={{display:'flex',alignItems:'center',gap:6,padding:'6px 14px',borderRadius:12,border:`1px solid ${sub===id?C.accent:C.border}`,background:sub===id?C.accent:'transparent',color:sub===id?'#fff':C.text,fontWeight:400,fontSize:13,cursor:'pointer',fontFamily:'inherit'}}><Icon name={ic} size={15}/>{label}</button>
           ))}
         </div>
       )}
@@ -46529,7 +46530,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const tot = boostsDetected.reduce((s,b)=>s+(b.amount||0),0);
           return (
             <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 13px',marginBottom:10}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>{montant(tot)} {tr('ventes.boostsVinted')} <span style={{color:C.muted,fontWeight:500}}>{trj('ventes.misesAvant', { n: boostsDetected.length })}</span>
+              <div style={{fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>{montant(tot)} {tr('ventes.boostsVinted')} <span style={{color:C.muted,fontWeight:400}}>{trj('ventes.misesAvant', { n: boostsDetected.length })}</span>
                 <Pourquoi label={tr('ventes.vientMontant')}>{tr('ventes.capteDansFacturation')}</Pourquoi></div>
             </div>
           );
@@ -46550,7 +46551,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* Les comptes non chargés, jugés par leur IDENTITÉ (`failedUids`) et
             nommés au rendu — y compris quand la liste vient du cache. */}
         {nomsVentesKO.length>0 && (
-          <div data-ventes-ko={nomsVentesKO.length} style={{fontSize:12,fontWeight:500,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'8px 12px',marginBottom:12,lineHeight:1.4}}>{trj('ventes.comptesNonCharges', { n: nomsVentesKO.length, x: nomsVentesKO.join(', ') })}</div>
+          <div data-ventes-ko={nomsVentesKO.length} style={{fontSize:12,fontWeight:400,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'8px 12px',marginBottom:12,lineHeight:1.4}}>{trj('ventes.comptesNonCharges', { n: nomsVentesKO.length, x: nomsVentesKO.join(', ') })}</div>
         )}
         {/* (5 nov., chantier E2) UN COMPTE QUI ANNULE NETTEMENT PLUS QUE LES AUTRES, sur 30 jours.
             Mesuré par `annulationsParCompte` (src/annulationsCompte.js, la règle de Statistiques,
@@ -46839,14 +46840,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {!hidden && (
                       <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap',minWidth:0}}>
                         <div title={num?undefined:tr('ventes.articleEncoreIdentifie')} style={{display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:12,padding:'5px 7px',background:C.bg,width:74,flexShrink:0}}>
-                          <span style={{fontSize:11,color:C.muted,fontWeight:500}}>N°</span>
-                          <ChampSaisie value={ov.numero ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{numero:v})} placeholder={baseNum||'?'} inputMode={clavierNum()} style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
+                          <span style={{fontSize:11,color:C.muted,fontWeight:400}}>N°</span>
+                          <ChampSaisie value={ov.numero ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{numero:v})} placeholder={baseNum||'?'} inputMode={clavierNum()} style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:400,outline:'none'}}/>
                         </div>
                         {/* (30 oct.) Tant que « Saisir le prix d'achat » est visible plus haut, ce champ
                             ferait la même chose une seconde fois (même écriture) : il ne revient qu'une
                             fois le coût connu, pour le CORRIGER. */}
                         {!coutManque && <div style={{flex:'1 1 140px',minWidth:0,display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:12,padding:'5px 8px',background:C.bg}}>
-                          <ChampSaisie value={ov.buyPrice ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{buyPrice:v})} placeholder={baseBuy?tr('ventes.achatAuto', { baseBuy: String(baseBuy) }):tr('ventes.prixAchat2')} inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
+                          <ChampSaisie value={ov.buyPrice ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{buyPrice:v})} placeholder={baseBuy?tr('ventes.achatAuto', { baseBuy: String(baseBuy) }):tr('ventes.prixAchat2')} inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:400,outline:'none'}}/>
                           <span style={{fontSize:11,color:C.muted}}>€</span>
                         </div>}
                         {(ov.numero!=null||ov.buyPrice!=null) && <span style={{fontSize:11,color:C.muted,flexShrink:0}} title={tr('ventes.valeursSaisiesMain')}>✎</span>}
@@ -46935,7 +46936,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               style={{width:'100%',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'11px 14px',cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
               <span aria-hidden="true" style={{color:C.accentTexte,display:'flex'}}><Icon name="chart" size={17}/></span>
               <span style={{flex:1,textAlign:'left',fontSize:13,fontWeight:600,color:C.text}}>{tr('ventes.analyseVentes')}</span>
-              <span style={{fontSize:11,color:C.muted,fontWeight:500}}>{analyseOpen?'masquer':'voir'}</span>
+              <span style={{fontSize:11,color:C.muted,fontWeight:400}}>{analyseOpen?'masquer':'voir'}</span>
               <span style={{fontSize:13,color:C.muted,transform:analyseOpen?'rotate(90deg)':'none',transition:'transform .2s ease'}}>›</span>
             </button>
           </div>
@@ -47124,7 +47125,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {totals.nb>0 && (
           <details data-repere-modeles onToggle={(e)=>{ if (e.currentTarget.open) { setRepereOuvert(true); if (buys.items===null && !buys.loading && accounts.length) loadOrders('purchased', setBuys); } }}
             style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'9px 13px',marginBottom:8}}>
-            <summary style={{cursor:'pointer',fontSize:13,fontWeight:600,color:C.text}}>{tr('ventes.repereAchatModele')} <span style={{fontWeight:500,color:C.muted}}>{tr('ventes.combienGagnesMoyenne')}</span></summary>
+            <summary style={{cursor:'pointer',fontSize:13,fontWeight:600,color:C.text}}>{tr('ventes.repereAchatModele')} <span style={{fontWeight:400,color:C.muted}}>{tr('ventes.combienGagnesMoyenne')}</span></summary>
             {(() => {
               const r = margeModeles;
               if (r === null) return null;
@@ -47192,7 +47193,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'14px 15px',marginBottom:12,boxShadow:C.shadow||'none'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10,flexWrap:'wrap',gap:6}}>
               <div style={{fontSize:13,fontWeight:600,color:C.text}}>{tr('ventes.tendance6Mois')}</div>
-              <div style={{display:'flex',gap:12,fontSize:11,fontWeight:500,color:C.muted}}>
+              <div style={{display:'flex',gap:12,fontSize:11,fontWeight:400,color:C.muted}}>
                 <span style={{display:'inline-flex',alignItems:'center',gap:5}}><span style={{width:9,height:9,borderRadius:6,background:s1,display:'inline-block'}}/>CA</span>
                 <span style={{display:'inline-flex',alignItems:'center',gap:5}}><span style={{width:9,height:9,borderRadius:6,background:s2,display:'inline-block'}}/>{tr('ventes.beneficeNet')}</span>
               </div>
@@ -47359,7 +47360,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const unSeul = comptes.length===1;
           return (
             <div className="vrm-achats-bloc" data-a-confirmer={l.length} data-a-confirmer-limite={l[0].limite||''} style={{background:C.card,border:`1px solid ${C.border}`}}>
-              <div className="vrm-achats-bloc-t" style={{color:C.text}}><span style={{color:C.warn}}>✓</span> {l.length} {motAConfirmer(l)} {tr('achats.confirmerAvant')} {texteLimite(l[0])}{unSeul?<span style={{fontWeight:500,color:C.muted}}>{trj('achats.compte4', { x: comptes[0] })}</span>:null} <Pourquoi label={tr('achats.commentConfirmer')}>{tr('achats.verifieArticlePuis')}</Pourquoi></div>
+              <div className="vrm-achats-bloc-t" style={{color:C.text}}><span style={{color:C.warn}}>✓</span> {l.length} {motAConfirmer(l)} {tr('achats.confirmerAvant')} {texteLimite(l[0])}{unSeul?<span style={{fontWeight:400,color:C.muted}}>{trj('achats.compte4', { x: comptes[0] })}</span>:null} <Pourquoi label={tr('achats.commentConfirmer')}>{tr('achats.verifieArticlePuis')}</Pourquoi></div>
               {l.map(e=>(
                 <div key={e.tx} data-confirmer-tx={e.tx} data-confirmer-sur={e.limiteMs!=null?'oui':'texte'} style={{display:'flex',alignItems:'center',gap:10,marginTop:9,flexWrap:'wrap'}}>
                   {e.photo && !imgMortes.has(e.photo) ? <PhotoVinted src={e.photo} alt="" loading="lazy" onError={()=>noterImgMorte(e.photo)} style={{width:38,height:38,borderRadius:12,objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/> : null}
@@ -47386,7 +47387,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const unSeul = comptes.length===1;
           return (
             <div className="vrm-achats-bloc" data-a-renvoyer={l.length} style={{background:C.card,border:`1px solid ${C.border}`}}>
-              <div className="vrm-achats-bloc-t" style={{color:C.text}}><span style={{color:C.warn}}>↩</span> {l.length} {tr('achats.article')}{l.length>1?'s':''} {tr('achats.renvoyerLitige')}{unSeul?<span style={{fontWeight:500,color:C.muted}}>{trj('achats.compte4', { x: comptes[0] })}</span>:null} <Pourquoi label={tr('achats.pourquoiVinted')}>{tr('achats.etiquetteRetourGenere')}</Pourquoi></div>
+              <div className="vrm-achats-bloc-t" style={{color:C.text}}><span style={{color:C.warn}}>↩</span> {l.length} {tr('achats.article')}{l.length>1?'s':''} {tr('achats.renvoyerLitige')}{unSeul?<span style={{fontWeight:400,color:C.muted}}>{trj('achats.compte4', { x: comptes[0] })}</span>:null} <Pourquoi label={tr('achats.pourquoiVinted')}>{tr('achats.etiquetteRetourGenere')}</Pourquoi></div>
               {l.map(o=>{ const ph=orderPhoto(o); return (
                 <div key={o.transaction_id} style={{display:'flex',alignItems:'center',gap:10,marginTop:9,flexWrap:'wrap'}}>
                   {ph && !imgMortes.has(ph) ? <PhotoVinted src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:38,height:38,borderRadius:12,objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/> : null}
@@ -47571,7 +47572,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div className="vrm-pickup-card" {...gp} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${cd?INV_STATUS.online.color+'55':C.border}`,borderRadius:12,padding:'10px 12px'}}>
                       {thumb(orderPhoto(o)||(rel&&rel.photo))}
                       <div style={{flex:'1 1 150px',minWidth:0}}>
-                        <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div>
+                        <div style={{fontSize:13,fontWeight:400,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div>
                         {/* (29 oct.) L'arrivée et la LIMITE lues chez le transporteur (son
                             n° de suivi, une identité) : la même ligne qu'un colis d'e-mail. */}
                         {(()=>{ const ev = etatColisVinted(o, Date.now(), transpMap); const jl = ev.limite ? joursAvant(ev.limite) : null;
@@ -48117,7 +48118,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div key={'m'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',marginBottom:7}}>
                       <span style={{opacity:.45,display:'flex',flexShrink:0}}>{thumb(photoColis(t))}</span>
                       <div style={{flex:'1 1 150px',minWidth:0,opacity:.6}}>
-                        <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',textDecoration:'line-through'}}>{t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>
+                        <div style={{fontSize:13,fontWeight:400,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',textDecoration:'line-through'}}>{t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>
                         <div style={{fontSize:11,color:C.muted,marginTop:1}}>{tr('achats.cocheRecupereQr')}</div>
                         <LigneArrivee arr={arriveeColisEmail(t)}/>
                         {t.suivi&&<div style={{fontSize:11,color:C.muted,fontFamily:'monospace',letterSpacing:.5,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>n° {t.suivi}</div>}
@@ -48159,7 +48160,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div key={'w'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',marginBottom:7}}>
                       <span style={{opacity:.45,display:'flex',flexShrink:0}}>{thumb(orderPhoto(o))}</span>
                       <div style={{flex:'1 1 150px',minWidth:0,opacity:.6}}>
-                        <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',textDecoration:'line-through'}}>{o.title||'Colis'}</div>
+                        <div style={{fontSize:13,fontWeight:400,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',textDecoration:'line-through'}}>{o.title||'Colis'}</div>
                         <div style={{fontSize:11,color:C.muted,marginTop:1}}>{tr('achats.cocheRecupereVinted')}</div>
                         <LigneArrivee arr={tk ? arriveeColisEmail(tk) : arriveeColisVinted(relaisDe(o))}/>
                         {tk&&tk.suivi&&<div style={{fontSize:11,color:C.muted,fontFamily:'monospace',letterSpacing:.5,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>n° {tk.suivi}</div>}
@@ -48408,7 +48409,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     return (
                       <div key={'nrt'+(t.suivi||ix)} data-reparti-suivi={t.suivi||''} className="vrm-achats-bloc-ligne" style={{borderColor:C.border}}>
                         <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:15,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{carrierName(t.carrier)} · n° {t.suivi}</div>
+                          <div style={{fontSize:15,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{carrierName(t.carrier)} · n° {t.suivi}</div>
                           <div style={{fontSize:12,color:C.muted,marginTop:2}}>{r.statut==='transporteur'?tr('achats.transporteurDitSite'):tr('achats.transporteurEcritRepart')}{compteDuColisEmail(t)?` · ${compteDuColisEmail(t)}`:''}</div>
                           <LigneTransporteur transp={transpMap} suivi={suiviDeLigne(t)} carrier={t.carrier}/>
                         </div>
@@ -48423,7 +48424,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   return (
                     <div key={'nr'+o.transaction_id} data-reparti-tx={String(o.transaction_id)} className="vrm-achats-bloc-ligne" style={{borderColor:C.border}}>
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:15,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||tr('ventes.achat')}</div>
+                        <div style={{fontSize:15,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||tr('ventes.achat')}</div>
                         <div style={{fontSize:12,color:C.muted,marginTop:2}}>
                           {montant(montantCommande(o))}{isFinite(j) ? tr('achats.commandeJours', { n: String(j) }) : ''}{st?` · ${st}`:''}
                         </div>
@@ -48547,7 +48548,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       n'a pas de sens pour un colis qui attend au point. Sur sa base : « 16 oct. · depuis 20 j »
                       pour un colis arrivé le 28 oct. L'arrivée est celle LUE dans l'e-mail du colis
                       (`arriveLe`, relié par identité) ; pas lue ⇒ rien d'écrit. */}
-                  {!cancelled && !st.retour && st.step===3 && (()=>{ const a=Date.parse((tk&&tk.arriveLe)||''); if(!Number.isFinite(a)) return null; const j=Math.max(0,Math.floor((Date.now()-a)/86400000)); return <span data-achat-au-relais={j} style={{fontWeight:500,color:C.muted,whiteSpace:'normal'}}> {tr('achats.relais')} {j===0?tr('achats.depuisAujourdHui'):tr('achats.depuis', { j: String(j) })}</span>; })()}
+                  {!cancelled && !st.retour && st.step===3 && (()=>{ const a=Date.parse((tk&&tk.arriveLe)||''); if(!Number.isFinite(a)) return null; const j=Math.max(0,Math.floor((Date.now()-a)/86400000)); return <span data-achat-au-relais={j} style={{fontWeight:400,color:C.muted,whiteSpace:'normal'}}> {tr('achats.relais')} {j===0?tr('achats.depuisAujourdHui'):tr('achats.depuis', { j: String(j) })}</span>; })()}
                   {!cancelled && !st.retour && st.step>=1 && st.step<3 && (()=>{ const t=tsCommande(o); if(!t) return null; const j=Math.floor((Date.now()-t)/86400000); if(j<2) return null; const tard=j>ACHAT_RETARD_J; return <span style={{fontWeight:tard?700:500,color:tard?C.warn:C.muted,whiteSpace:'normal'}}> {tr('achats.depuis2')} {j} j{tard?tr('achats.relanceVendeur'):''}</span>; })()}</span>
                   {tk && tk.lieu && st.step===3 && <span style={{color:C.text}} title={tk.lieu}>· {(cleanLieu(tk.lieu).nom || tk.lieu)}</span>}
                   {numA!=null && <span title={tr('achats.numeroArticleLien')} style={{fontWeight:600,color:C.text}}>N°{numA}</span>}
@@ -48619,7 +48620,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const prixPaye = montantCommande(o).toFixed(2).replace('.',',');
                 const peutSuivre = !!(suivi && (st.step===2||st.step===3));
                 const peutCode = !!(st.step===3 && tk && (qrImage(tk)||codeRetrait(tk.code)));
-                const item = { display:'flex',alignItems:'center',gap:10,width:'100%',textAlign:'left',border:'none',background:'transparent',color:C.text,fontSize:15,fontWeight:500,padding:'0 14px',minHeight:44,cursor:'pointer',fontFamily:'inherit',textDecoration:'none',boxSizing:'border-box' };
+                const item = { display:'flex',alignItems:'center',gap:10,width:'100%',textAlign:'left',border:'none',background:'transparent',color:C.text,fontSize:15,fontWeight:600,padding:'0 14px',minHeight:44,cursor:'pointer',fontFamily:'inherit',textDecoration:'none',boxSizing:'border-box' };
                 const close = () => setAchatMenu(null);
                 return (
               <div className="vrm-buy-act">
@@ -49259,12 +49260,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       titre={tr('annonces.numeroRangementEcrit')} rendu={num?<Numero n={num} taille="grand" titre={tr('annonces.numeroChanger', { num: String(num) })}/>:<span className="vrm-fiche-num-vide">+ N°</span>}/>
                   </span>
                   <div className="vrm-ann-ledger-info" style={{display:'flex',flexDirection:'column',gap:8}}>
-                    <div data-titre style={{fontSize:15,fontWeight:600,color:C.text,lineHeight:1.35,overflowWrap:'anywhere'}}>{it.title||it.brand||'—'}{tailleHorsTitre ? <span data-titre-taille=""> · {tailleHorsTitre}</span> : null}</div>
+                    <div data-titre style={{fontSize:15,fontWeight:600,color:C.text,lineHeight:1.35,overflowWrap:'anywhere'}}>{motsInsecables(it.title||it.brand||'—')}{tailleHorsTitre ? <span data-titre-taille=""> · {tailleHorsTitre}</span> : null}</div>
                     {/* (10 nov., lot BD) La note privée de la paire, par SON identité (N°, sinon l'annonce). */}
                     <NotePaireCoque numero={num} itemId={it.id} recreeDe={e && e.recreeDe} ajout rangee/>
                     {remiseIci ? carteRemise(remiseIci, true) : null}
                     <div className="vrm-ann-price-line" style={{display:'flex',alignItems:'center',gap:10}}>
-                      <span data-prix style={{fontSize:22,fontWeight:700,color:C.text,fontVariantNumeric:'tabular-nums',letterSpacing:'-.02em'}}>{prix(it.price,it.currency)||'—'}</span>
+                      <span data-prix style={{fontSize:20,fontWeight:700,color:C.text,fontVariantNumeric:'tabular-nums',letterSpacing:'-.02em'}}>{prix(it.price,it.currency)||'—'}</span>
                     </div>
                     {/* L'ÉTAT EN JAUGE, et JUSTE À CÔTÉ le prix d'achat qu'on tape en place. */}
                     <div className="vrm-fiche-duo" data-fiche-duo style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr)',gap:8}}>
@@ -49437,7 +49438,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.item.title}</div>
-                      <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:2,display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}><Numero n={r.current.numero} taille="petit"/> {tr('annonces.neuf')} <Numero n={r.orphan.e.numero} taille="petit"/>{garageCellOf(garageGrid,r.orphan.e.numero)?` · ${garageCellLabel(garageCellOf(garageGrid,r.orphan.e.numero))}`:''}</div>
+                      <div style={{fontSize:11,color:C.muted,fontWeight:400,marginTop:2,display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}><Numero n={r.current.numero} taille="petit"/> {tr('annonces.neuf')} <Numero n={r.orphan.e.numero} taille="petit"/>{garageCellOf(garageGrid,r.orphan.e.numero)?` · ${garageCellLabel(garageCellOf(garageGrid,r.orphan.e.numero))}`:''}</div>
                       {r.vendue && <div style={{fontSize:11,color:C.warn,fontWeight:600,marginTop:2}}>{trj('annonces.articleEteVendu', { numero: r.orphan.e.numero })}</div>}
                     </div>
                     <Bouton variante="secondaire" taille="petit" onClick={()=>applyReprise(r)} style={{flexShrink:0}}>{trj('annonces.remettre', { numero: r.orphan.e.numero })}</Bouton>
@@ -49610,7 +49611,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <span style={{fontSize:20}}>🏷️</span>
                 <span style={{flex:1,minWidth:0}}>
                   <span style={{display:'block',fontSize:13,fontWeight:700,color:C.text}}>{trj('annonces.repricingArticlesBaisser', { n: repriceList.length })}</span>
-                  <span className="vrm-aide" style={{display:'block',fontSize:11,color:C.muted,fontWeight:500}}>{tr('annonces.ligneDepuis30')}</span>
+                  <span className="vrm-aide" style={{display:'block',fontSize:11,color:C.muted,fontWeight:400}}>{tr('annonces.ligneDepuis30')}</span>
                 </span>
                 <span style={{fontSize:13,color:C.muted}}>{showReprice?'▲':'▼'}</span>
               </button>
@@ -50154,7 +50155,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {/* (19 oct.) Sur la ligne du message, pas sur celle de la paire : là
                               elle tronquait le N° et le prix (vu au rendu à 1512 px). */}
                           <PastilleArnaque motif={ex.kind==='message'&&ex.source==='fil'&&!ex.vinted?motifDeLApercu(ex.texte, ex.de==='eux'?false:ex.de==='toi'?true:null):null}/>
-                          {messageFilter.startsWith('repondre')&&!offre&&<span className="vrm-msg-etat">{/\?/.test(c.description||'')?'Question reçue':'Message reçu'}</span>}{offre && <span className="vrm-msg-etat vrm-msg-offre" data-offre-liste={String(offre.prix)} style={{color:C.text,borderColor:C.border,fontWeight:600}}>Offre {prix(offre.prix)} en attente</span>}{offre && offreFacePlancher(offre.prix, plancherDeItem(offre.item, paire&&paire.devise))?.niveau==='sous' && <span data-offre-sous-plancher="" title="Sous ton prix d’achat et tes frais connus" style={{color:C.warn,fontSize:13,fontWeight:500,marginLeft:6,whiteSpace:'nowrap'}}>à perte</span>}
+                          {messageFilter.startsWith('repondre')&&!offre&&<span className="vrm-msg-etat">{/\?/.test(c.description||'')?'Question reçue':'Message reçu'}</span>}{offre && <span className="vrm-msg-etat vrm-msg-offre" data-offre-liste={String(offre.prix)} style={{color:C.text,borderColor:C.border,fontWeight:600}}>Offre {prix(offre.prix)} en attente</span>}{offre && offreFacePlancher(offre.prix, plancherDeItem(offre.item, paire&&paire.devise))?.niveau==='sous' && <span data-offre-sous-plancher="" title="Sous ton prix d’achat et tes frais connus" style={{color:C.warn,fontSize:13,fontWeight:400,marginLeft:6,whiteSpace:'nowrap'}}>à perte</span>}
                           {/* (5 nov.) Le dernier message est une offre (reçue, envoyée, tranchée) :
                               marquée « Offre » avec son montant, à SA conversation — plus jamais un
                               code ni un montant nu. L'offre EN ATTENTE garde sa pastille d'accent. */}
@@ -50196,7 +50197,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
             {quickReplies.map((t,i)=>(
               <div key={i} className="vrm-qr-puce" style={{display:'flex',alignItems:'center',gap:2,border:`1px solid ${C.border}`,borderRadius:999,background:C.bg,padding:'0 4px 0 14px'}}>
-                <button type="button" onClick={(ev)=>{ try{navigator.clipboard.writeText(t);}catch(_){ } const b=ev.currentTarget; const p=b.textContent; b.textContent=VERBES.copie; setTimeout(()=>{ try{b.textContent=p;}catch(_){ } },1000); }} title="Copier ce message" style={{border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,cursor:'pointer',fontFamily:'inherit',maxWidth:240,minHeight:36,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',padding:'0 6px 0 0'}}>{t}</button>
+                <button type="button" onClick={(ev)=>{ try{navigator.clipboard.writeText(t);}catch(_){ } const b=ev.currentTarget; const p=b.textContent; b.textContent=VERBES.copie; setTimeout(()=>{ try{b.textContent=p;}catch(_){ } },1000); }} title="Copier ce message" style={{border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:400,cursor:'pointer',fontFamily:'inherit',maxWidth:240,minHeight:36,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',padding:'0 6px 0 0'}}>{t}</button>
                 {showQR ? (
                   <>
                     <button className="vrm-icon-control" aria-label={`Modifier « ${t} »`} type="button" onClick={async ()=>{ const v=await askText({ desc: 'Modifier le message :', value: t }); if(v!=null){ const a=[...quickReplies]; if(v.trim()){a[i]=v.trim();} else {a.splice(i,1);} saveQR(a); } }} title={VERBES.modifier} style={{border:'none',background:'transparent',color:C.muted,cursor:'pointer'}}><Icon name="pencil" size={15}/></button>
@@ -50685,7 +50686,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {(pickupUnion.sortis || []).length > 0 ? (
                   <details className="vrm-repli" data-retraits-sortis={pickupUnion.sortis.length} style={{marginTop:12}}>
                     <summary style={{minHeight:44,display:'flex',alignItems:'center',gap:6,fontSize:13,fontWeight:600,color:C.text}}>
-                      <span>Sortis de « à retirer »</span><span style={{color:C.muted,fontWeight:500}}>{` · ${pickupUnion.sortis.length} · ${SORTIS_JOURS} derniers jours`}</span>
+                      <span>Sortis de « à retirer »</span><span style={{color:C.muted,fontWeight:400}}>{` · ${pickupUnion.sortis.length} · ${SORTIS_JOURS} derniers jours`}</span>
                     </summary>
                     <p style={{fontSize:12,color:C.muted,margin:'4px 0 8px',lineHeight:1.45}}>Le suivi dit qu’ils ne t’attendent plus : ils ne comptent plus. Si l’un d’eux est encore au point, montre-le au comptoir avec son n°.</p>
                     {pickupUnion.sortis.map((x) => { const su = x.t ? suiviDeLigne(x.t) : ''; const o = x.o || null;
@@ -50807,7 +50808,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div className="vrm-colis-recap-texte" style={{flex:1,minWidth:0}}>
                   <div className="vrm-lu-seulement" role="status" data-colis-recap-texte="">
                   <div style={{display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap'}}>
-                    {tot>0 && <span className="vrm-display" style={{fontSize:34,fontWeight:800,color:C.text,letterSpacing:'-.035em',lineHeight:1,fontVariantNumeric:'tabular-nums'}}>{autresPasLusRecap.length ? 'au moins ' : ''}{tot}</span>}
+                    {tot>0 && <span className="vrm-display" style={{fontSize:34,fontWeight:700,color:C.text,letterSpacing:'-.035em',lineHeight:1,fontVariantNumeric:'tabular-nums'}}>{autresPasLusRecap.length ? 'au moins ' : ''}{tot}</span>}
                     <span style={{fontSize:15,fontWeight:600,color:C.text}}>{tot>0 ? 'colis à envoyer' : (sales.error && !(sales.items||[]).length) ? 'Colis à envoyer : pas encore lus' : autresPasLusRecap.length ? 'Aucun colis Vinted à envoyer' : 'Aucun colis à envoyer'}</span>
                   </div>
                   <div style={{fontSize:13,color:C.muted,marginTop:8,lineHeight:1.45}}>
@@ -51006,7 +51007,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div data-colis-bordereau-frais="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 12px 10px 14px',marginBottom:10,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
               <span aria-hidden="true" style={{display:'flex',color:C.muted,flexShrink:0}}><Icon name="doc" size={20}/></span>
               <div style={{flex:'1 1 200px',minWidth:0}}>
-                <div style={{fontSize:14,fontWeight:600,color:C.text}}>Bordereau téléchargé il y a {freshLabel.mins} min</div>
+                <div style={{fontSize:15,fontWeight:600,color:C.text}}>Bordereau téléchargé il y a {freshLabel.mins} min</div>
                 <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4,overflowWrap:'anywhere'}}>{one
                   ? <>Pour {num ? <><Numero n={num} taille="petit"/>{' '}</> : null}{one.title} · {freshLabel.name}</>
                   : <>{freshLabel.name} · touche « J’ai le PDF » sur la vente concernée : il se tamponne avec son N°.</>}</div>
@@ -51462,7 +51463,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {/* (5 nov., chantier D) Le N° en pastille (`Numero`, la forme de toute l'app ; rouge
                               seulement quand deux articles le portent) DANS le titre, une fois — il était écrit
                               deux fois (« N°31 · … » puis une pastille « N°31 » dessous). */}
-                          <span className="vrm-colis-titre" title={titre} style={{flex:1,minWidth:0,fontSize:15,fontWeight:600,lineHeight:1.35,color:C.text,letterSpacing:'-.01em',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',overflowWrap:'anywhere'}}>{num ? <><Numero n={num} taille="petit" etat={conflitsNum.some(x => String(x.numero) === String(num)) ? 'doublon' : undefined} className="vrm-colis-titre-num"/>{' '}</> : null}{titre}</span>
+                          <span className="vrm-colis-titre" title={titre} style={{flex:1,minWidth:0,fontSize:15,fontWeight:600,lineHeight:1.35,color:C.text,letterSpacing:'-.01em',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',overflowWrap:'anywhere'}}>{num ? <><Numero n={num} taille="petit" etat={conflitsNum.some(x => String(x.numero) === String(num)) ? 'doublon' : undefined} className="vrm-colis-titre-num"/>{' '}</> : null}{motsInsecables(titre)}</span>
                           {o && o.price && <span className="vrm-display vrm-colis-prix" style={{flexShrink:0,fontSize:17,fontWeight:700,color:C.text,whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums',letterSpacing:'-.02em'}}>{montant(o.price, { etrangere: 'ecarter' })}</span>}
                         </div>
                         {(!num || (plusieursComptesColis && (acc || (b && b.account)))) ? <div style={{fontSize:12,color:C.muted,marginTop:6,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
@@ -51511,7 +51512,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           return (
                             <div style={{fontSize:12,fontWeight:600,marginTop:5,color:C.doublon,background:`${C.doublon}14`,border:`1px solid ${C.doublon}`,borderRadius:12,padding:'6px 9px',lineHeight:1.45}}>
                               <span style={{display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={14}/>Le N°{num} est porté par un autre article</span>
-                              <span style={{display:'block',color:C.text,fontWeight:500,marginTop:3}}>
+                              <span style={{display:'block',color:C.text,fontWeight:400,marginTop:3}}>
                                 {autres.map(x=>`${x.type==='annonce'?'en ligne':x.type==='vente'?'à envoyer':'au garage'} « ${String(x.titre||'').slice(0,44)} »`).join(' · ')}
                                 {' '}— vérifie la photo, puis corrige l'autre dans Annonces.
                               </span>
@@ -51525,7 +51526,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {b && !e.venteEmail && (()=>{ const lit=numLitige(b); return lit ? (
                           <div style={{fontSize:11,fontWeight:600,marginTop:5,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}44`,borderRadius:12,padding:'4px 8px',display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                             <span className="vrm-aide" style={{flex:'1 1 150px',minWidth:0}}>⚠️ L'email disait N°{lit.mail}, la vente dit N°{lit.txn} — on garde celui de la vente.</span>
-                            <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} style={{flexShrink:0,border:'none',background:'transparent',color:C.warn,fontWeight:700,cursor:'pointer',fontSize:11,padding:0,fontFamily:'inherit',textDecoration:'underline'}}>Choisir la vente</button>
+                            <button type="button" className="vrm-colis-choisir" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} style={{flexShrink:0,border:'none',background:'transparent',color:C.warn,fontWeight:700,cursor:'pointer',fontSize:11,padding:0,fontFamily:'inherit',textDecoration:'underline'}}>Choisir la vente</button>
                           </div>
                         ) : null; })()}
                       </div>
@@ -51627,7 +51628,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {posted?'Pas encore déposé':'Déposé'}
                       </button>
                       {b && b.suivi && <a href={trackUrl(trV.cle||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} data-geste="suivre" className="vrm-colis-sec vrm-colis-ter" style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,textDecoration:'none',display:'inline-flex',alignItems:'center'}}><Icon name="truck" size={13} style={{marginRight:5}}/>Suivre</a>}
-                      {capte && <span className="vrm-colis-source" style={{fontSize:12,color:C.muted,fontWeight:500,flexBasis:'100%'}}>Bordereau récupéré chez Vinted par l'extension{b && b.hasPdf ? ' · confirmé par l\'email' : ''}</span>}
+                      {capte && <span className="vrm-colis-source" style={{fontSize:12,color:C.muted,fontWeight:400,flexBasis:'100%'}}>Bordereau récupéré chez Vinted par l'extension{b && b.hasPdf ? ' · confirmé par l\'email' : ''}</span>}
                       {/* ⚠️ « Bordereau pas encore reçu » disait, sur la MÊME carte
                           et à trois lignes d'écart, exactement ce que le bandeau
                           d'attente dit déjà. Retiré : l'absence du bouton
@@ -51859,7 +51860,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {[pickerFor.brand, pickerFor.size && `taille ${pickerFor.size}`, pickerFor.price!=null && `en vente ${eur(pickerFor.price).toFixed(2).replace('.',',')}\u00a0€`].filter(Boolean).join(' · ')}
                 </div>
               </div>
-              <button type="button" onClick={()=>setPickerFor(null)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer'}}>×</button>
+              <button type="button" onClick={()=>setPickerFor(null)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer'}}>×</button>
             </div>
             <div data-relier-achat-corps style={{flex:1,overflow:'auto',padding:'4px 14px 14px'}}>
               <RelierAchatCorps C={C} cible={cibleRelier} achats={purchasesPick.loading ? null : purchasesPick.items} liens={liensAchats}
@@ -51883,7 +51884,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{fontSize:15,fontWeight:700,color:C.text}}>📍 Ajouter un point relais</div>
                 <div style={{fontSize:11,color:C.muted}}>Tape le nom du lieu + la ville, puis choisis-le sur la carte</div>
               </div>
-              <button type="button" onClick={()=>setRelayPicker(null)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer'}}>×</button>
+              <button type="button" onClick={()=>setRelayPicker(null)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer'}}>×</button>
             </div>
             <div style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{display:'flex',gap:6}}>
@@ -51939,7 +51940,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <a href={bordResult.url} target="_blank" rel="noreferrer"
               style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:12,padding:'13px 16px',fontSize:15,fontWeight:600,textDecoration:'none',marginBottom:8}}>📄 {bordResult.batch?'Ouvrir les bordereaux':bordResult.withInvoice?'Ouvrir bordereau + facture':'Ouvrir le bordereau'}</a>
             {/* (3 nov.) « Déplacer le tampon » : l'aperçu s'ouvre, la place choisie s'imprime (et se mémorise pour la forme). */}
-            {bordResult.pdfBuf && !bordResult.batch && <button type="button" data-imprime="1" data-tampon-deplacer="1" onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:12,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'11px',marginBottom:8}}>Déplacer le tampon</button>}
+            {bordResult.pdfBuf && !bordResult.batch && <button type="button" data-imprime="1" data-tampon-deplacer="1" onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:12,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:400,padding:'11px',marginBottom:8}}>Déplacer le tampon</button>}
             {bordResult.batch && !bordResult.thermique && <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Ton N° est tamponné sur chaque PDF, sinon sur une fiche juste après.</div>}
             {/* ── CE QUE L'IMPRESSION THERMIQUE A VRAIMENT FAIT ────────────────
                 LE CHIFFRE, JAMAIS LA PROMESSE. « Ton étiquette est prête » sur
@@ -51963,7 +51964,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {(bordResult.sansTampon||0)>0 && <div data-bord-sans-tampon={bordResult.sansTampon} style={{color:C.warn,marginTop:4}}>{bordResult.sansTampon===1?'1 étiquette part':`${bordResult.sansTampon} étiquettes partent`} sans N° (aucune place sûre, fiche de préparation coupée) : écris-le à la main.</div>}
                 </div>
               ); })()}
-            <button type="button" data-bord-fermer="1" onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{width:'100%',border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:500,padding:'8px'}}>Fermer</button>
+            <button type="button" data-bord-fermer="1" onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{width:'100%',border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:400,padding:'8px'}}>Fermer</button>
           </div>
         </div>
       )}
@@ -51977,12 +51978,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{fontSize:15,fontWeight:700,color:C.text}}>📚 Registre comptable {annual.year}</div>
                 <div style={{fontSize:11,color:C.muted}}>{libelleRegime(annual.regime)} · <span style={{opacity:0.8}}>le CSV contient le détail ventes + achats ligne par ligne</span></div>
               </div>
-              <button type="button" onClick={()=>setShowAnnual(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+              <button type="button" onClick={()=>setShowAnnual(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
             <div style={{flex:1,overflow:'auto',padding:16}}>
               <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
-                <span style={{fontSize:12,fontWeight:500,color:C.text}}>Année</span>
-                <select value={reportYear} onChange={e=>setReportYear(Number(e.target.value))} style={{border:`1px solid ${C.border}`,borderRadius:12,padding:'6px 10px',fontSize:13,fontWeight:500,background:C.card,color:C.text,cursor:'pointer'}}>
+                <span style={{fontSize:12,fontWeight:400,color:C.text}}>Année</span>
+                <select value={reportYear} onChange={e=>setReportYear(Number(e.target.value))} style={{border:`1px solid ${C.border}`,borderRadius:12,padding:'6px 10px',fontSize:13,fontWeight:400,background:C.card,color:C.text,cursor:'pointer'}}>
                   {reportYears.map(y=><option key={y} value={y}>{y}</option>)}
                 </select>
               </div>
@@ -52035,11 +52036,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{overflowX:'auto',marginBottom:12}}>
                 <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
                   <thead><tr style={{color:C.muted,textAlign:'right'}}>
-                    <th style={{textAlign:'left',padding:'4px 6px',fontWeight:500}}>Mois</th>
-                    <th style={{padding:'4px 6px',fontWeight:500}}>CA</th>
-                    <th style={{padding:'4px 6px',fontWeight:500}}>Coût</th>
-                    <th style={{padding:'4px 6px',fontWeight:500}}>Bénéf.</th>
-                    <th style={{padding:'4px 6px',fontWeight:500}}>Ventes</th>
+                    <th style={{textAlign:'left',padding:'4px 6px',fontWeight:400}}>Mois</th>
+                    <th style={{padding:'4px 6px',fontWeight:400}}>CA</th>
+                    <th style={{padding:'4px 6px',fontWeight:400}}>Coût</th>
+                    <th style={{padding:'4px 6px',fontWeight:400}}>Bénéf.</th>
+                    <th style={{padding:'4px 6px',fontWeight:400}}>Ventes</th>
                   </tr></thead>
                   <tbody>
                     {annual.months.map((m,i)=>{ const b=m.ca-m.cout-m.frais; return (
@@ -52047,7 +52048,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <td style={{textAlign:'left',padding:'5px 6px',textTransform:'capitalize'}}>{m.label}</td>
                         <td style={{padding:'5px 6px'}}>{m.ca?m.ca.toFixed(0)+'\u00a0€':'—'}</td>
                         <td style={{padding:'5px 6px',color:C.muted}}>{m.cout?m.cout.toFixed(0)+'\u00a0€':'—'}</td>
-                        <td style={{padding:'5px 6px',fontWeight:500,color:m.nbCout?(INV_STATUS.online.color):C.muted}}>{m.nbCout?(b>=0?'+':'')+b.toFixed(0)+'\u00a0€':'—'}</td>
+                        <td style={{padding:'5px 6px',fontWeight:400,color:m.nbCout?(INV_STATUS.online.color):C.muted}}>{m.nbCout?(b>=0?'+':'')+b.toFixed(0)+'\u00a0€':'—'}</td>
                         <td style={{padding:'5px 6px',color:C.muted}}>{m.nb||'—'}</td>
                       </tr>
                     );})}
@@ -52069,7 +52070,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {annual.buyLines.map((b,i)=>(
                   <div key={'a'+String((b.o&&(b.o.transaction_id||b.o.id))||i)} style={{display:'flex',gap:8,alignItems:'center',padding:'7px 10px',border:`1px solid ${C.border}`,borderRadius:12,background:C.card}}>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.title||'—'}</div>
+                      <div style={{fontSize:12,fontWeight:400,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.title||'—'}</div>
                       <div style={{fontSize:11,color:C.muted}}>{b.date?new Date(b.date).toLocaleDateString('fr-FR'):''}{b.seller?` · ${b.seller}`:''}</div>
                     </div>
                     <div style={{fontSize:13,fontWeight:600,color:C.text,flexShrink:0}}>{b.montant==null?'—':<>{b.montant.toFixed(2)}&nbsp;€</>}</div>
@@ -52085,7 +52086,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8}}>Le vrai reçu Vinted, le dernier que tu as ouvert.</div>
                     {capturedReceipts.map((rec,i)=>(
                       <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0'}}>
-                        <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:500,color:C.text}}>{rec.name}</div><div style={{fontSize:11,color:C.muted}}>capté le {rec.capturedAt?new Date(rec.capturedAt).toLocaleDateString('fr-FR'):'—'}</div></div>
+                        <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:400,color:C.text}}>{rec.name}</div><div style={{fontSize:11,color:C.muted}}>capté le {rec.capturedAt?new Date(rec.capturedAt).toLocaleDateString('fr-FR'):'—'}</div></div>
                         <button type="button" onClick={()=>downloadReceipt(rec)} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accentTexte,borderRadius:12,padding:'5px 11px',cursor:'pointer',fontSize:12,fontWeight:600}}>⬇️ Télécharger</button>
                       </div>
                     ))}
@@ -52101,7 +52102,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 )}
               </div>
               <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                <button type="button" onClick={exportAnnualCsv} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:12,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:13,fontWeight:500,cursor:'pointer'}}>⬇️ CSV (registre détaillé)</button>
+                <button type="button" onClick={exportAnnualCsv} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:12,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:13,fontWeight:400,cursor:'pointer'}}>⬇️ CSV (registre détaillé)</button>
                 <button type="button" onClick={exportAnnualPdf} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:12,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accentTexte,fontSize:13,fontWeight:600,cursor:'pointer'}}>📄 PDF</button>
               </div>
               <div className="vrm-aide" style={{fontSize:11,color:C.muted,lineHeight:1.5,marginTop:12}}>Indicatif, pas un conseil comptable. Sans prix d'achat, bénéfice incomplet.</div>
@@ -52118,7 +52119,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{fontSize:15,fontWeight:700,color:C.text}}>🪄 Aide à la vente</div>
                 <div className="vrm-aide" style={{fontSize:11,color:C.muted}}>Titre & description prêts à coller</div>
               </div>
-              <button type="button" onClick={()=>setShowLister(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+              <button type="button" onClick={()=>setShowLister(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
             <div style={{flex:1,overflow:'auto',padding:16}}>
               <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:14}}>
@@ -52135,15 +52136,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     refusé par Julien le 11 oct. (CLAUDE.md §3). Restent le titre et la description. */}
                 {/* Titre optimisé */}
                 <div style={{marginBottom:12}}>
-                  <div style={{fontSize:11,color:C.muted,fontWeight:500,marginBottom:5}}>TITRE OPTIMISÉ</div>
+                  <div style={{fontSize:11,color:C.muted,fontWeight:400,marginBottom:5}}>TITRE OPTIMISÉ</div>
                   <div style={{display:'flex',gap:8,alignItems:'stretch'}}>
-                    <div style={{flex:1,minWidth:0,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'9px 12px',fontSize:13,fontWeight:500,color:C.text}}>{lister.title}</div>
+                    <div style={{flex:1,minWidth:0,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'9px 12px',fontSize:13,fontWeight:400,color:C.text}}>{lister.title}</div>
                     <button type="button" onClick={()=>copyText(lister.title,'title')} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:copied==='title'?C.accent:`${C.accent}12`,color:copied==='title'?'#fff':C.accent,borderRadius:12,padding:'0 14px',fontSize:13,fontWeight:600,cursor:'pointer'}}>{copied==='title'?'✓ Copié':'Copier'}</button>
                   </div>
                 </div>
                 {/* Description prête */}
                 <div style={{marginBottom:6}}>
-                  <div style={{fontSize:11,color:C.muted,fontWeight:500,marginBottom:5}}>DESCRIPTION PRÊTE À COLLER</div>
+                  <div style={{fontSize:11,color:C.muted,fontWeight:400,marginBottom:5}}>DESCRIPTION PRÊTE À COLLER</div>
                   <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'11px 13px',fontSize:13,color:C.text,whiteSpace:'pre-wrap',lineHeight:1.5}}>{lister.desc}</div>
                   <button type="button" onClick={()=>copyText(lister.desc,'desc')} style={{marginTop:8,width:'100%',border:`1px solid ${C.accent}`,background:copied==='desc'?C.accent:`${C.accent}12`,color:copied==='desc'?'#fff':C.accent,borderRadius:12,padding:'10px',fontSize:13,fontWeight:600,cursor:'pointer'}}>{copied==='desc'?'✓ Description copiée':'📋 Copier la description'}</button>
                 </div>
@@ -52187,7 +52188,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         ? <PhotoVinted src={it.photo} alt="" style={{flexShrink:0,width:34,height:34,borderRadius:12,objectFit:'cover',background:C.border}}/>
                         : <span style={{flexShrink:0,width:34,height:34,borderRadius:12,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                       <span style={{flexShrink:0,minWidth:30,height:30,borderRadius:12,background:num?C.accent:C.border,color:num?C.onAccent:C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,padding:'0 5px'}}>{num?`#${num}`:'—'}</span>
-                      <span style={{flex:'1 1 120px',minWidth:0,fontSize:13,fontWeight:500,color:C.text,overflow:'hidden',textOverflow:'ellipsis'}}>{it.title}{it.size?<span style={{color:C.muted,fontWeight:400}}> · {it.size}</span>:''}</span>
+                      <span style={{flex:'1 1 120px',minWidth:0,fontSize:13,fontWeight:400,color:C.text,overflow:'hidden',textOverflow:'ellipsis'}}>{it.title}{it.size?<span style={{color:C.muted,fontWeight:400}}> · {it.size}</span>:''}</span>
                       {it.price!=null && <span style={{fontSize:12,fontWeight:600,color:C.muted}}>{Number(it.price).toFixed(0)}&nbsp;€</span>}
                     </div>
                   );
@@ -52210,7 +52211,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{fontSize:15,fontWeight:700,color:C.text}}>🎯 Sourcing — quoi racheter</div>
                 <div style={{fontSize:11,color:C.muted}}>{sourcing.total} vente{sourcing.total>1?'s':''} finalisée{sourcing.total>1?'s':''} analysée{sourcing.total>1?'s':''}</div>
               </div>
-              <button type="button" onClick={()=>setShowSourcing(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+              <button type="button" onClick={()=>setShowSourcing(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
             <div style={{flex:1,overflow:'auto',padding:16}}>
               {/* Vérificateur d'achat : en friperie, tape le modèle + le prix demandé */}
@@ -52262,7 +52263,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           return (
                           <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${top?(INV_STATUS.online.color+'88'):C.border}`,borderRadius:12,background:top?`${INV_STATUS.online.color}10`:C.card}}>
                             <div style={{flex:1,minWidth:0}}>
-                              <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.key==='—'?'Marque inconnue':(r.key==='?'?'Taille inconnue':r.key)} {top && <span style={{fontSize:11,color:INV_STATUS.online.color,fontWeight:500}}>★ top marge</span>}</div>
+                              <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.key==='—'?'Marque inconnue':(r.key==='?'?'Taille inconnue':r.key)} {top && <span style={{fontSize:11,color:INV_STATUS.online.color,fontWeight:400}}>★ top marge</span>}</div>
                               <div style={{fontSize:11,color:C.muted}}>{r.nb} vendue{r.nb>1?'s':''} · CA {r.ca==null?'—':`${r.caPartiel?'au moins ':''}${fmtE(r.ca)}`}{r.joursMoy!=null?` · ${r.joursMoy.toFixed(0)} j en moy.`:''}</div>
                             </div>
                             <div style={{textAlign:'right',flexShrink:0}}>
@@ -52294,7 +52295,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{fontSize:15,fontWeight:700,color:C.text}}>💰 Trésorerie</div>
                 <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginTop:1}}>L'argent réel, pas le chiffre d'affaires</div>
               </div>
-              <button type="button" onClick={()=>setShowTreasury(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+              <button type="button" onClick={()=>setShowTreasury(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
             <div style={{padding:'14px 16px',overflowY:'auto'}}>
               {/* ARGENT RÉELLEMENT REÇU */}
@@ -52389,7 +52390,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                   <div style={{flex:'1 1 130px',minWidth:0}}>
                     <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                      <span style={{color:C.text,fontWeight:700}}>N°{r.numero}</span> {r.titre||<span style={{color:C.muted,fontWeight:500}}>titre pas encore capté</span>}
+                      <span style={{color:C.text,fontWeight:700}}>N°{r.numero}</span> {r.titre||<span style={{color:C.muted,fontWeight:400}}>titre pas encore capté</span>}
                     </div>
                     <div style={{fontSize:11,color:C.muted,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
                       {/* Montants au format français (virgule) : `eur` ne fait que
@@ -52402,7 +52403,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       onCommit={v=>setBuyForKey(r.key,v)}
                       apresEntree={()=>{ const n=document.querySelector(`[data-fillbuy="${i+1}"]`); if(n) n.focus(); }}
                       placeholder="achat" inputMode="decimal"
-                      style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
+                      style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:400,outline:'none'}}/>
                     <span style={{fontSize:11,color:C.muted}}>€</span>
                   </div>
                  </div>
@@ -52469,7 +52470,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{fontSize:15,fontWeight:700,color:C.text}}>✨ Rédiger une annonce (IA)</div>
                 <div style={{fontSize:11,color:C.muted,marginTop:1}}>Choisis un article : l'IA propose titre et description. <b>Tu copies, tu publies.</b> <Pourquoi>Rien n'est envoyé tout seul, et l'IA n'invente aucune caractéristique.</Pourquoi></div>
               </div>
-              <button type="button" onClick={()=>setIaOpen(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+              <button type="button" onClick={()=>setIaOpen(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
             <div style={{overflowY:'auto',padding:'10px 12px 16px'}}>
               {(()=>{ const items=Object.entries(numeros)
@@ -52511,12 +52512,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       return (
                       <div data-ia-etiquette={etq.pose?etq.place:(etq.refus?'refus':'aucune')} style={{marginTop:8,display:'flex',flexDirection:'column',gap:8}}>
                         <div style={{border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',background:C.card2||C.card}}>
-                          <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:2}}>Titre proposé</div>
+                          <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:400,marginBottom:2}}>Titre proposé</div>
                           <div style={{fontSize:13,color:C.text,fontWeight:600}}>{tIA}</div>
                           <button type="button" onClick={()=>copyText(tIA,'iat'+k)} style={{marginTop:6,border:`1px solid ${C.border}`,background:'transparent',color:copied==='iat'+k?C.accent:C.text,borderRadius:12,padding:'5px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{copied==='iat'+k?'✓ Copié':'Copier le titre'}</button>
                         </div>
                         <div style={{border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',background:C.card2||C.card}}>
-                          <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:2}}>Description proposée</div>
+                          <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:400,marginBottom:2}}>Description proposée</div>
                           <div style={{fontSize:13,color:C.text,whiteSpace:'pre-wrap',lineHeight:1.45}}>{dIA}</div>
                           <button type="button" onClick={()=>copyText(dIA,'iad'+k)} style={{marginTop:6,border:`1px solid ${C.border}`,background:'transparent',color:copied==='iad'+k?C.accent:C.text,borderRadius:12,padding:'5px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{copied==='iad'+k?'✓ Copié':'Copier la description'}</button>
                         </div>
@@ -52540,7 +52541,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{fontSize:15,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:8}}><Icon name="doc" size={17}/>Rapport comptable</div>
                 <div style={{fontSize:11,color:C.muted}}>{libelleRegime(report.regime)} · <span style={{opacity:0.8}}>statut modifiable dans Paramètres → Statut</span></div>
               </div>
-              <button type="button" onClick={()=>setShowReport(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+              <button type="button" onClick={()=>setShowReport(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
             <div style={{flex:1,overflow:'auto',padding:16}}>
               {/* ⚠️ N'IMPORTE QUEL MOIS, pas seulement ceux d'une liste : la même
@@ -52548,7 +52549,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   Un menu déroulant enterrait le mois qu'il cherchait. */}
               <div style={{marginBottom:14}}>
                 <div style={{display:'flex',alignItems:'center',gap:8}}>
-                  <span style={{fontSize:12,fontWeight:500,color:C.text}}>Mois</span>
+                  <span style={{fontSize:12,fontWeight:400,color:C.text}}>Mois</span>
                   <button type="button" className="vrm-b vrm-b-secondaire vrm-b-petit" aria-expanded={moisOuvert} onClick={()=>setMoisOuvert(v=>!v)} style={{textTransform:'capitalize'}}>
                     {report.monthLabel} ▾
                   </button>
@@ -52791,7 +52792,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {report.saleLines.map((v,i)=>(
                   <div key={i} style={{display:'flex',gap:8,alignItems:'center',padding:'7px 10px',border:`1px solid ${C.border}`,borderRadius:12,background:C.card}}>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{v.num?<span style={{fontWeight:700}}>N°{v.num} · </span>:null}{v.title||'—'}</div>
+                      <div style={{fontSize:12,fontWeight:400,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{v.num?<span style={{fontWeight:700}}>N°{v.num} · </span>:null}{v.title||'—'}</div>
                       <div style={{fontSize:11,color:C.muted}}>{v.plateforme||'Vinted'}{' · '}{v.date?new Date(v.date).toLocaleDateString('fr-FR'):''}{' · achat '}{v.buy!=null?fmtE(v.buy):'—'}{v.fee?` · frais ${fmtE(v.fee)}`:''}{v.buy!=null?` · bénéfice ${fmtE(v.sell-v.buy-v.fee)}`:''}</div>
                     </div>
                     <div style={{fontSize:13,fontWeight:600,color:C.text,flexShrink:0}}>{fmtE(v.sell)}</div>
@@ -52805,7 +52806,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {report.buyLines.map((b,i)=>(
                   <div key={'a'+String((b.o&&(b.o.transaction_id||b.o.id))||i)} style={{display:'flex',gap:8,alignItems:'center',padding:'7px 10px',border:`1px solid ${C.border}`,borderRadius:12,background:C.card}}>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.title||'—'}</div>
+                      <div style={{fontSize:12,fontWeight:400,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.title||'—'}</div>
                       <div style={{fontSize:11,color:C.muted}}>{b.date?new Date(b.date).toLocaleDateString('fr-FR'):''}{b.seller?` · ${b.seller}`:''}</div>
                     </div>
                     <div style={{fontSize:13,fontWeight:600,color:C.text,flexShrink:0}}>{b.montant==null?'—':<>{b.montant.toFixed(2)}&nbsp;€</>}</div>
@@ -52841,7 +52842,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{fontSize:15,fontWeight:600,color:C.text}}>Relier à un article numéroté</div>
                   <div style={{fontSize:12,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{linkPickFor.modele||linkPickFor.article||'Bordereau'}{linkPickFor.taille?` · T${linkPickFor.taille}`:''}</div>
                 </div>
-                <button type="button" onClick={()=>setLinkPickFor(null)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+                <button type="button" onClick={()=>setLinkPickFor(null)} style={{border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
               </div>
               <input autoFocus value={linkSearch} onChange={e=>setLinkSearch(e.target.value)} placeholder="Chercher par N°, titre ou taille…" style={{marginTop:10,width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'9px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',fontFamily:'inherit'}}/>
             </div>
@@ -52882,10 +52883,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'85vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',alignItems:'center',gap:8,padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:C.text}}>📈 Prix de vente par marque</div><div className="vrm-aide" style={{fontSize:12,color:C.muted}}>Prix de vente moyen mois par mois (12 derniers mois).</div></div>
-              <button type="button" onClick={()=>setShowBrandCurves(false)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+              <button type="button" onClick={()=>setShowBrandCurves(false)} style={{border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
             <div style={{padding:'12px 16px',flexShrink:0}}>
-              <select value={effBrand} onChange={e=>setCurveBrand(e.target.value)} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',fontSize:13,background:C.card,color:C.text,fontWeight:500,cursor:'pointer'}}>
+              <select value={effBrand} onChange={e=>setCurveBrand(e.target.value)} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',fontSize:13,background:C.card,color:C.text,fontWeight:400,cursor:'pointer'}}>
                 <option value="__ALL__">Toutes marques confondues</option>
                 {brandCurves.brandList.map(b=><option key={b} value={b}>{b}</option>)}
               </select>
@@ -52919,21 +52920,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         cards.push({ bg:FOND_ACCENT, body:(
           <div style={{textAlign:'center'}}>
             <div style={{fontSize:15,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:2,textTransform:'uppercase'}}>{w.mode==='month'?'Ton mois':'Ton année'}</div>
-            <div style={{fontSize:w.mode==='month'?52:76,fontWeight:800,color:'#fff',letterSpacing:'-.03em',lineHeight:1.05}}>{w.mode==='month'?w.moisNoms[w.mo]:w.yr}</div>
+            <div style={{fontSize:w.mode==='month'?52:76,fontWeight:700,color:'#fff',letterSpacing:'-.03em',lineHeight:1.05}}>{w.mode==='month'?w.moisNoms[w.mo]:w.yr}</div>
             {w.mode==='month' && <div style={{fontSize:20,fontWeight:700,color:'rgba(255,255,255,0.9)'}}>{w.yr}</div>}
-            <div style={{fontSize:15,color:'rgba(255,255,255,0.9)',fontWeight:500,marginTop:14}}>Prêt à revivre {w.mode==='month'?'ton mois':'ta saison'} ? 👉</div>
+            <div style={{fontSize:15,color:'rgba(255,255,255,0.9)',fontWeight:600,marginTop:14}}>Prêt à revivre {w.mode==='month'?'ton mois':'ta saison'} ? 👉</div>
           </div>
         )});
         if(w.nb>0) cards.push({ bg:FOND_ENCRE, body:(
           <div style={{textAlign:'center'}}>
-            <CountUp value={w.nb} style={{fontSize:96,fontWeight:800,color:'#fff',letterSpacing:'-.03em',lineHeight:1,display:'block'}}/>
+            <CountUp value={w.nb} style={{fontSize:96,fontWeight:700,color:'#fff',letterSpacing:'-.03em',lineHeight:1,display:'block'}}/>
             <div style={{fontSize:20,color:'#fff',fontWeight:600,marginTop:6}}>articles vendus</div>
             <div style={{fontSize:13,color:'rgba(255,255,255,0.85)',marginTop:10}}>Chaque article, une petite victoire. 💪</div>
           </div>
         )});
         cards.push({ bg:FOND_ENCRE, body:(
           <div style={{textAlign:'center'}}>
-            <CountUp value={w.ca} format={eur0} style={{fontSize:72,fontWeight:800,color:'#fff',letterSpacing:'-.03em',lineHeight:1,display:'block'}}/>
+            <CountUp value={w.ca} format={eur0} style={{fontSize:72,fontWeight:700,color:'#fff',letterSpacing:'-.03em',lineHeight:1,display:'block'}}/>
             <div style={{fontSize:20,color:'#fff',fontWeight:600,marginTop:8}} data-somme-partielle={w.pasLu>0?'1':'0'}>{w.pasLu>0?`au moins, de chiffre d'affaires (${w.pasLu} sans prix lu)`:"de chiffre d'affaires"}</div>
             <div style={{fontSize:13,color:'rgba(255,255,255,0.85)',marginTop:10}}>Prix de vente moyen : <b>{eur0(w.avg)}</b></div>
           </div>
@@ -52941,14 +52942,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if(w.topBrand) cards.push({ bg:FOND_ENCRE, body:(
           <div style={{textAlign:'center'}}>
             <div style={{fontSize:15,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:1,textTransform:'uppercase'}}>Ta marque star</div>
-            <div style={{fontSize:52,fontWeight:800,color:'#fff',letterSpacing:-1,lineHeight:1.05,marginTop:6}}>{w.topBrand[0]}</div>
+            <div style={{fontSize:52,fontWeight:700,color:'#fff',letterSpacing:-1,lineHeight:1.05,marginTop:6}}>{w.topBrand[0]}</div>
             <div style={{fontSize:17,color:'#fff',fontWeight:600,marginTop:10}}><CountUp value={w.topBrand[1]}/> articles vendus</div>
           </div>
         )});
         if(w.bestMonth) cards.push({ bg:FOND_ENCRE, body:(
           <div style={{textAlign:'center'}}>
             <div style={{fontSize:15,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:1,textTransform:'uppercase'}}>Ton mois record</div>
-            <div style={{fontSize:56,fontWeight:800,color:'#fff',letterSpacing:-1,lineHeight:1,marginTop:6}}>{w.bestMonth.nom}</div>
+            <div style={{fontSize:56,fontWeight:700,color:'#fff',letterSpacing:-1,lineHeight:1,marginTop:6}}>{w.bestMonth.nom}</div>
             <div style={{fontSize:20,color:'#fff',fontWeight:700,marginTop:10}}>{eur0(w.bestMonth.v)}</div>
           </div>
         )});
@@ -52957,33 +52958,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{fontSize:15,color:'rgba(255,255,255,0.85)',fontWeight:700,letterSpacing:1,textTransform:'uppercase'}}>Article de l'année</div>
             <div style={{width:130,height:130,borderRadius:12,overflow:'hidden',margin:'14px auto',background:'rgba(255,255,255,0.10)',display:'flex',alignItems:'center',justifyContent:'center'}}>{w.bestPair.photo?<PhotoVinted src={w.bestPair.photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={40} style={{color:'rgba(255,255,255,0.6)'}}/>}</div>
             <div style={{fontSize:17,fontWeight:700,color:'#fff',padding:'0 20px',lineHeight:1.2}}>{w.bestPair.num?`N°${w.bestPair.num} · `:''}{w.bestPair.title}</div>
-            <div style={{fontSize:22,fontWeight:800,color:'#fff',marginTop:8}}>+{eur0(w.bestPair.m)} de bénéfice</div>
+            <div style={{fontSize:20,fontWeight:700,color:'#fff',marginTop:8}}>+{eur0(w.bestPair.m)} de bénéfice</div>
           </div>
         )});
         if(w.fastest) cards.push({ bg:FOND_ENCRE, body:(
           <div style={{textAlign:'center'}}>
             <div style={{fontSize:15,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:1,textTransform:'uppercase'}}>Vente éclair</div>
-            <div style={{fontSize:76,fontWeight:800,color:'#fff',letterSpacing:'-.03em',lineHeight:1,marginTop:6}}><CountUp value={w.fastest.j}/> j</div>
-            <div style={{fontSize:15,color:'#fff',fontWeight:500,marginTop:10,padding:'0 24px'}}>entre la mise en ligne et la vente{w.fastest.num?` · N°${w.fastest.num}`:''}</div>
+            <div style={{fontSize:76,fontWeight:700,color:'#fff',letterSpacing:'-.03em',lineHeight:1,marginTop:6}}><CountUp value={w.fastest.j}/> j</div>
+            <div style={{fontSize:15,color:'#fff',fontWeight:600,marginTop:10,padding:'0 24px'}}>entre la mise en ligne et la vente{w.fastest.num?` · N°${w.fastest.num}`:''}</div>
           </div>
         )});
         if(w.streak>1) cards.push({ bg:FOND_ENCRE, body:(
           <div style={{textAlign:'center'}}>
             <div style={{fontSize:15,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:1,textTransform:'uppercase'}}>Ta plus longue série</div>
-            <div style={{fontSize:88,fontWeight:800,color:'#fff',letterSpacing:'-.03em',lineHeight:1,marginTop:6}}><CountUp value={w.streak}/></div>
+            <div style={{fontSize:88,fontWeight:700,color:'#fff',letterSpacing:'-.03em',lineHeight:1,marginTop:6}}><CountUp value={w.streak}/></div>
             <div style={{fontSize:17,color:'#fff',fontWeight:600}}>jours d'affilée avec une vente</div>
           </div>
         )});
         cards.push({ bg:FOND_ACCENT, last:true, body:(
           <div style={{textAlign:'center',width:'100%'}}>
-            <div style={{fontSize:28,fontWeight:800,color:'#fff',letterSpacing:-0.5}}>{(()=>{ /* (1er nov.) Le prénom DU vendeur (`vrm_prenom`, saisi par lui) ou rien — jamais celui d'un autre. */ const p=prenomLisible(load('vrm_prenom',''));return (w.mode==='month'?'Quel mois':'Quelle année')+(p?`, ${p}`:'')+' !';})()}</div>
+            <div style={{fontSize:28,fontWeight:700,color:'#fff',letterSpacing:-0.5}}>{(()=>{ /* (1er nov.) Le prénom DU vendeur (`vrm_prenom`, saisi par lui) ou rien — jamais celui d'un autre. */ const p=prenomLisible(load('vrm_prenom',''));return (w.mode==='month'?'Quel mois':'Quelle année')+(p?`, ${p}`:'')+' !';})()}</div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,margin:'18px 6px 0'}}>
-              <div style={{background:'rgba(255,255,255,0.15)',borderRadius:12,padding:'12px 8px'}}><div style={{fontSize:22,fontWeight:800,color:'#fff'}}>{w.nb}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>articles vendus</div></div>
-              <div style={{background:'rgba(255,255,255,0.15)',borderRadius:12,padding:'12px 8px'}}><div style={{fontSize:22,fontWeight:800,color:'#fff'}}>{eur0(w.ca)}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>de CA</div></div>
-              {w.topBrand && <div style={{background:'rgba(255,255,255,0.15)',borderRadius:12,padding:'12px 8px'}}><div style={{fontSize:17,fontWeight:800,color:'#fff'}}>{w.topBrand[0]}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>marque star</div></div>}
-              {w.bestMonth && <div style={{background:'rgba(255,255,255,0.15)',borderRadius:12,padding:'12px 8px'}}><div style={{fontSize:17,fontWeight:800,color:'#fff'}}>{w.bestMonth.nom}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>mois record</div></div>}
+              <div style={{background:'rgba(255,255,255,0.15)',borderRadius:12,padding:'12px 8px'}}><div style={{fontSize:20,fontWeight:700,color:'#fff'}}>{w.nb}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>articles vendus</div></div>
+              <div style={{background:'rgba(255,255,255,0.15)',borderRadius:12,padding:'12px 8px'}}><div style={{fontSize:20,fontWeight:700,color:'#fff'}}>{eur0(w.ca)}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>de CA</div></div>
+              {w.topBrand && <div style={{background:'rgba(255,255,255,0.15)',borderRadius:12,padding:'12px 8px'}}><div style={{fontSize:17,fontWeight:700,color:'#fff'}}>{w.topBrand[0]}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>marque star</div></div>}
+              {w.bestMonth && <div style={{background:'rgba(255,255,255,0.15)',borderRadius:12,padding:'12px 8px'}}><div style={{fontSize:17,fontWeight:700,color:'#fff'}}>{w.bestMonth.nom}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>mois record</div></div>}
             </div>
-            <div style={{fontSize:13,color:'rgba(255,255,255,0.85)',marginTop:18,fontWeight:500}}>On remet ça l'année prochaine ? 👊</div>
+            <div style={{fontSize:13,color:'rgba(255,255,255,0.85)',marginTop:18,fontWeight:400}}>On remet ça l'année prochaine ? 👊</div>
           </div>
         )});
         const step = Math.min(wrapStep, cards.length-1);
@@ -53034,7 +53035,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div onClick={prev} style={{position:'absolute',left:0,top:0,bottom:0,width:'32%',cursor:'pointer'}} aria-label="Précédent"/>
             <div onClick={next} style={{position:'absolute',right:0,top:0,bottom:0,width:'68%',cursor:'pointer'}} aria-label="Suivant"/>
           </div>
-          <div style={{textAlign:'center',padding:'0 0 calc(18px + env(safe-area-inset-bottom))',fontSize:12,color:'rgba(255,255,255,0.8)',fontWeight:500}}>{cur.last?'Touche pour fermer':'Touche pour continuer →'}</div>
+          <div style={{textAlign:'center',padding:'0 0 calc(18px + env(safe-area-inset-bottom))',fontSize:12,color:'rgba(255,255,255,0.8)',fontWeight:400}}>{cur.last?'Touche pour fermer':'Touche pour continuer →'}</div>
         </div>, document.body);
       })()}
 
@@ -53052,7 +53053,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{display:'flex',alignItems:'center',gap:8,padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:C.text}}>🗺️ Ma tournée</div><div style={{fontSize:12,color:C.muted}}>{avail.length} colis · {points.length} point{points.length>1?'s':''} relais — le plus chargé en premier.</div></div>
               {avail.length>0 && <button type="button" onClick={()=>{ markAllCollected(avail); setTourneeOpen(false); }} style={{border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:12,padding:'6px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>✓ Tout retiré</button>}
-              <button type="button" onClick={()=>setTourneeOpen(false)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+              <button type="button" onClick={()=>setTourneeOpen(false)} style={{border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
             <div style={{flex:1,overflow:'auto',padding:'12px 14px',display:'flex',flexDirection:'column',gap:10}}>
               {points.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px'}}>Aucun colis à retirer. 👌</div>}
@@ -53071,7 +53072,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {p.colis.map((t,j)=>{ const buy=buyForTrack(t); return (
                       <div key={j} style={{display:'flex',gap:9,alignItems:'center',padding:'7px 12px',borderTop:j>0?`1px solid ${C.border}`:'none'}}>
                         <div style={{width:32,height:32,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{buy&&orderPhoto(buy)?<PhotoVinted src={orderPhoto(buy)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>📦</span>}</div>
-                        <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(buy&&buy.title)||t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>{codeRetrait(t.code)&&<div style={{fontSize:11,color:C.muted}}>code {codeRetrait(t.code)}</div>}</div>
+                        <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:400,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(buy&&buy.title)||t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>{codeRetrait(t.code)&&<div style={{fontSize:11,color:C.muted}}>code {codeRetrait(t.code)}</div>}</div>
                         <button className="vrm-icon-control" aria-label="J'ai retiré ce colis" type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:12,padding:'5px 8px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>✓</button>
                       </div>
                     ); })}
@@ -53091,17 +53092,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',alignItems:'center',gap:8,padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:C.text}}>⚖️ Litiges & remboursements</div><div className="vrm-aide" style={{fontSize:12,color:C.muted}}>L'argent perdu (ventes annulées/remboursées) et récupéré (achats remboursés).</div></div>
-              <button type="button" onClick={()=>setShowDisputes(false)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+              <button type="button" onClick={()=>setShowDisputes(false)} style={{border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
             <div style={{display:'flex',gap:10,padding:'12px 16px',flexShrink:0}}>
               <div style={{flex:1,border:`1px solid ${C.danger}44`,background:`${C.danger}0e`,borderRadius:12,padding:'10px 12px'}}>
-                <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>Manque à gagner</div>
-                <div style={{fontSize:22,fontWeight:700,color:C.danger}} data-somme-partielle={disputes.lostS.partiel?'1':'0'}>{disputes.lostS.total==null?'—':<>{disputes.lostS.partiel?'au moins ':''}−{Math.round(disputes.lostS.total)}&nbsp;€</>}</div>
+                <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:400}}>Manque à gagner</div>
+                <div style={{fontSize:20,fontWeight:700,color:C.danger}} data-somme-partielle={disputes.lostS.partiel?'1':'0'}>{disputes.lostS.total==null?'—':<>{disputes.lostS.partiel?'au moins ':''}−{Math.round(disputes.lostS.total)}&nbsp;€</>}</div>
                 <div style={{fontSize:11,color:C.muted}}>{disputes.salesLost.length} vente{disputes.salesLost.length>1?'s':''} perdue{disputes.salesLost.length>1?'s':''}</div>
               </div>
               <div style={{flex:1,border:`1px solid ${INV_STATUS.online.color}44`,background:`${INV_STATUS.online.color}0e`,borderRadius:12,padding:'10px 12px'}}>
-                <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>Récupéré (achats)</div>
-                <div style={{fontSize:22,fontWeight:700,color:INV_STATUS.online.color}} data-somme-partielle={disputes.backS.partiel?'1':'0'}>{disputes.backS.total==null?'—':<>{disputes.backS.partiel?'au moins ':''}+{Math.round(disputes.backS.total)}&nbsp;€</>}</div>
+                <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:400}}>Récupéré (achats)</div>
+                <div style={{fontSize:20,fontWeight:700,color:INV_STATUS.online.color}} data-somme-partielle={disputes.backS.partiel?'1':'0'}>{disputes.backS.total==null?'—':<>{disputes.backS.partiel?'au moins ':''}+{Math.round(disputes.backS.total)}&nbsp;€</>}</div>
                 <div style={{fontSize:11,color:C.muted}}>{disputes.buysBack.length} achat{disputes.buysBack.length>1?'s':''} remboursé{disputes.buysBack.length>1?'s':''}</div>
               </div>
             </div>
@@ -53109,14 +53110,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {disputes.salesLost.length>0 && <div style={{fontSize:12,fontWeight:700,color:C.danger,margin:'6px 0 6px'}}>💸 Ventes annulées / remboursées</div>}
               {disputes.salesLost.map((x,i)=>(
                 <div key={'s'+i} style={{display:'flex',gap:8,alignItems:'center',padding:'7px 0',borderBottom:`1px solid ${C.border}`}}>
-                  <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{x.title}</div><div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[x.date?new Date(x.date).toLocaleDateString('fr-FR'):'', x.status].filter(Boolean).join(' · ')}</div></div>
+                  <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:400,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{x.title}</div><div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[x.date?new Date(x.date).toLocaleDateString('fr-FR'):'', x.status].filter(Boolean).join(' · ')}</div></div>
                   <div style={{flexShrink:0,fontSize:13,fontWeight:700,color:C.danger}}>{x.amount==null?'—':<>−{Math.round(x.amount)}&nbsp;€</>}</div>
                 </div>
               ))}
               {disputes.buysBack.length>0 && <div style={{fontSize:12,fontWeight:700,color:INV_STATUS.online.color,margin:'14px 0 6px'}}>↩️ Achats remboursés</div>}
               {disputes.buysBack.map((x,i)=>(
                 <div key={'b'+i} style={{display:'flex',gap:8,alignItems:'center',padding:'7px 0',borderBottom:`1px solid ${C.border}`}}>
-                  <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{x.title}</div><div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[x.date?new Date(x.date).toLocaleDateString('fr-FR'):'', x.status].filter(Boolean).join(' · ')}</div></div>
+                  <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:400,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{x.title}</div><div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[x.date?new Date(x.date).toLocaleDateString('fr-FR'):'', x.status].filter(Boolean).join(' · ')}</div></div>
                   <div style={{flexShrink:0,fontSize:13,fontWeight:700,color:INV_STATUS.online.color}}>{x.amount==null?'—':<>+{Math.round(x.amount)}&nbsp;€</>}</div>
                 </div>
               ))}
@@ -53147,11 +53148,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{padding:'0 18px 12px',flexShrink:0}}>
                 <div style={{display:'flex',gap:8}}>
                   <div style={{flex:1,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'11px 13px'}}>
-                    <div style={{fontSize:22,fontWeight:600,color:C.accentTexte,lineHeight:1,letterSpacing:'-0.02em'}}>{moves.length}</div>
+                    <div style={{fontSize:20,fontWeight:600,color:C.accentTexte,lineHeight:1,letterSpacing:'-0.02em'}}>{moves.length}</div>
                     <div style={{fontSize:11,color:C.muted,fontWeight:600,marginTop:3}}>article{moves.length>1?'s':''} à renuméroter</div>
                   </div>
                   <div style={{flex:1,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'11px 13px'}}>
-                    <div style={{fontSize:22,fontWeight:600,color:C.text,lineHeight:1,letterSpacing:'-0.02em'}}>{nLocked}</div>
+                    <div style={{fontSize:20,fontWeight:600,color:C.text,lineHeight:1,letterSpacing:'-0.02em'}}>{nLocked}</div>
                     <div style={{fontSize:11,color:C.muted,fontWeight:600,marginTop:3}}>gardent leur numéro</div>
                   </div>
                 </div>
@@ -53178,7 +53179,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               ))}
             </div>
             <div style={{padding:'12px 18px calc(16px + env(safe-area-inset-bottom))',borderTop:`1px solid ${C.border}`,display:'flex',gap:9,flexShrink:0,background:C.bg}}>
-              <button className="vrm-b vrm-b-discret" type="button" onClick={()=>setRenumOpen(false)} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'12px',fontSize:13,fontWeight:500,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
+              <button className="vrm-b vrm-b-discret" type="button" onClick={()=>setRenumOpen(false)} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'12px',fontSize:13,fontWeight:400,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
               {moves.length>0 && <button type="button" onClick={applyRenum} style={{flex:2,border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:12,padding:'12px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Renuméroter {moves.length} article{moves.length>1?'s':''}</button>}
             </div>
           </div>
@@ -53242,7 +53243,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {conflits.size>0 && (
                 <div style={{fontSize:12,fontWeight:600,color:C.doublon,background:`${C.doublon}12`,border:`1px solid ${C.doublon}`,borderRadius:12,padding:'9px 11px',marginBottom:12,lineHeight:1.45}}>
                   <span style={{display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={14}/>{conflits.size} numéro{conflits.size>1?'s':''} porté{conflits.size>1?'s':''} par deux articles</span>
-                  <span style={{display:'block',color:C.text,fontWeight:500,marginTop:3}}>À corriger AVANT de déménager : rien ne dit lequel expédier (en rouge ci-dessous).</span>
+                  <span style={{display:'block',color:C.text,fontWeight:400,marginTop:3}}>À corriger AVANT de déménager : rien ne dit lequel expédier (en rouge ci-dessous).</span>
                 </div>
               )}
               <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,overflow:'hidden'}}>
@@ -53307,7 +53308,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',paddingBottom:'env(safe-area-inset-bottom)',}}>
             <div style={{display:'flex',alignItems:'center',gap:8,padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:C.text}}>🔎 Audit d'inventaire</div><div className="vrm-aide" style={{fontSize:12,color:C.muted}}>Réconcilie tes numéros avec le garage, les annonces et les ventes.</div></div>
-              <button type="button" onClick={()=>setAuditOpen(false)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+              <button type="button" onClick={()=>setAuditOpen(false)} style={{border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
             <div style={{flex:1,minHeight:0,overflow:'auto',WebkitOverflowScrolling:'touch',overscrollBehavior:'contain',padding:'14px 16px'}}>
               {nothing && <div style={{fontSize:13,color:INV_STATUS.online.color,fontWeight:600,textAlign:'center',padding:'24px 0'}}>✓ Tout est cohérent, rien à signaler !</div>}
@@ -53340,11 +53341,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{display:'flex',alignItems:'center',gap:8}}>
                 <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:C.text}}>🧮 Répartir un lot</div><div className="vrm-aide" style={{fontSize:12,color:C.muted}}>Prix d'un achat groupé ventilé sur les articles choisis → marge juste sur chacun.</div></div>
-                <button type="button" onClick={()=>setLotOpen(false)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+                <button type="button" onClick={()=>setLotOpen(false)} style={{border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
               </div>
               <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap',alignItems:'center'}}>
                 <div style={{display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:12,padding:'7px 10px',background:C.card}}>
-                  <span style={{fontSize:11,color:C.muted,fontWeight:500}}>Prix du lot</span>
+                  <span style={{fontSize:11,color:C.muted,fontWeight:400}}>Prix du lot</span>
                   <input autoFocus value={lotTotal} onChange={e=>setLotTotal(e.target.value)} placeholder="0" inputMode="decimal" style={{width:70,border:'none',background:'transparent',color:C.text,fontSize:15,fontWeight:600,outline:'none'}}/>
                   <span style={{fontSize:11,color:C.muted}}>€</span>
                 </div>
@@ -53687,13 +53688,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div onClick={ev=>ev.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'85vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',paddingBottom:'env(safe-area-inset-bottom)',}}>
             <div style={{display:'flex',gap:12,alignItems:'center',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{width:52,height:52,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                {photo?<PhotoVinted src={photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:22}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                {photo?<PhotoVinted src={photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
               </div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:700,color:C.text}}>📖 Passeport {num?`· N°${num}`:''}</div>
                 <div style={{fontSize:12,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{title}{e&&e.size?` · T${e.size}`:(it&&it.size?` · T${it.size}`:'')}</div>
               </div>
-              <button type="button" onClick={()=>setPassportFor(null)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+              <button type="button" onClick={()=>setPassportFor(null)} style={{border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
             <div style={{flex:1,overflow:'auto',padding:'16px 18px'}}>
               <HistoriqueArticle key={String(AUTH.user?.id)+':'+it?.id} item={it?.id} uid={it?._acc?.vinted_user_id} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} lire={q=>lireTout(q,{strict:true})} numeros={numeros} prix={prixHistorique}/>
@@ -55458,7 +55459,7 @@ function AbonnementRequis({ info }) {
     <div data-abonnement-requis="" style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ width: '100%', maxWidth: 420, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '26px 22px', boxShadow: C.shadowLg || 'none' }}>
         <img className="vrm-brand-asset vrm-brand-auth" src="/vrm-logo-v5-192.png" srcSet="/vrm-logo-v5-96.png 96w, /vrm-logo-v5-192.png 192w" sizes="44px" alt="VRM" width="44" height="44" style={{ borderRadius: 12, display: 'block' }}/>
-        <div style={{ fontSize: 22, fontWeight: 700, color: C.text, marginTop: 16, letterSpacing: -0.4 }}>Ton abonnement VRM</div>
+        <div style={{ fontSize: 20, fontWeight: 700, color: C.text, marginTop: 16, letterSpacing: -0.4 }}>Ton abonnement VRM</div>
         <div style={{ fontSize: 15, color: C.muted, marginTop: 8, lineHeight: 1.55 }} data-impaye={impaye ? '' : undefined} data-paiement-ferme={paiementFerme ? '' : undefined}>
           {impaye
             ? "Prélèvement échoué depuis 14 jours : VRM en pause. Mets ta carte à jour."
@@ -55811,7 +55812,7 @@ function ColisEquipe({ vendeur, de, onPropre }) {
             <div style={{ fontSize: 15, fontWeight: 600, color: C.text, overflowWrap: 'anywhere' }}>{o.title || 'Article'}</div>
             <div style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>{[plusieurs && compte(o) ? `compte ${compte(o)}` : '', r && r.lieu ? r.lieu : ''].filter(Boolean).join(' · ') || o.status || ''}</div>
             {code
-              ? <div className="vrm-sensible" data-stream-type="code" data-equipe-code={k} style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '.06em', marginTop: 8 }}>{code}</div>
+              ? <div className="vrm-sensible" data-stream-type="code" data-equipe-code={k} style={{ fontSize: 20, fontWeight: 700, color: C.text, letterSpacing: '.06em', marginTop: 8 }}>{code}</div>
               : <div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>{d.relais === null ? 'Code pas encore vérifié' : 'Code pas encore lu — il est dans la conversation Vinted de cet achat.'}</div>}
             {qr && <PhotoVinted src={qr} alt="QR de retrait" style={{ width: 140, height: 140, objectFit: 'contain', marginTop: 8, background: '#fff', borderRadius: 8 }}/>}
           </div>
@@ -55827,7 +55828,7 @@ function ColisEquipe({ vendeur, de, onPropre }) {
               {/* « aaaa-mm-jj » s'écrivait tel quel (revue visuelle du 17 oct.) :
                   la date se lit comme sur l'écran Achats ; illisible ⇒ rien. */}
               {joursAvant(t.limite) != null && <div data-equipe-limite="" style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>à retirer avant le {new Date(String(t.limite) + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}</div>}
-              {code ? <div className="vrm-sensible" data-stream-type="code" style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '.06em', marginTop: 8 }}>{code}</div> : null}
+              {code ? <div className="vrm-sensible" data-stream-type="code" style={{ fontSize: 20, fontWeight: 700, color: C.text, letterSpacing: '.06em', marginTop: 8 }}>{code}</div> : null}
               {qr && <PhotoVinted src={qr} alt="QR de retrait" style={{ width: 140, height: 140, objectFit: 'contain', marginTop: 8, background: '#fff', borderRadius: 8 }}/>}
             </div>
           );
@@ -55845,7 +55846,7 @@ function ColisEquipe({ vendeur, de, onPropre }) {
             <div key={'v' + (t.suivi || '') + i} data-equipe-track-a-verifier={e.etat} style={carte}>
               <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{(CARRIERS[t.carrier] && CARRIERS[t.carrier].name) || 'Transporteur'}{t.lieu ? ` · ${cleanLieu(t.lieu).nom || t.lieu}` : ''}</div>
               <div style={{ fontSize: 13, color: C.warn, marginTop: 3 }}>{raison}{t.suivi ? ` · n° ${t.suivi}` : ''}</div>
-              {code ? <div className="vrm-sensible" data-stream-type="code" style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '.06em', marginTop: 8 }}>{code}</div> : null}
+              {code ? <div className="vrm-sensible" data-stream-type="code" style={{ fontSize: 20, fontWeight: 700, color: C.text, letterSpacing: '.06em', marginTop: 8 }}>{code}</div> : null}
               {qr && <PhotoVinted src={qr} alt="QR de retrait" style={{ width: 140, height: 140, objectFit: 'contain', marginTop: 8, background: '#fff', borderRadius: 8 }}/>}
             </div>
           );
@@ -56213,7 +56214,7 @@ function DemandeCodeDiscord() {
           <div style={{ fontSize:15, marginBottom:14 }}>Tape ici le code à 6 chiffres affiché après Discord.</div>
           <input data-discord-code-saisie="" value={code} onChange={ev => setCode(ev.target.value.replace(/[^\d ]/g, '').slice(0, 7))} onKeyDown={ev => { if (ev.key === 'Enter') valider(); }}
             inputMode="numeric" autoComplete="one-time-code" aria-label="Code à 6 chiffres" placeholder="123 456"
-            style={{ width:'100%', boxSizing:'border-box', minHeight:50, fontSize:22, letterSpacing:4, textAlign:'center', borderRadius:12, border:`1px solid ${C.border}`, background:C.bg, color:C.text, marginBottom:10 }}/>
+            style={{ width:'100%', boxSizing:'border-box', minHeight:50, fontSize:20, letterSpacing:4, textAlign:'center', borderRadius:12, border:`1px solid ${C.border}`, background:C.bg, color:C.text, marginBottom:10 }}/>
           {e.erreur && <div data-discord-code-erreur="" style={{ fontSize:15, color:C.warn || C.text, marginBottom:10 }}>{e.erreur}</div>}
           <div style={{ display:'flex', gap:8 }}>
             <button className="vrm-b vrm-b-discret" type="button" onClick={fermer} style={{ minHeight:44, flex:1, borderRadius:12, border:`1px solid ${C.border}`, background:'transparent', color:C.text }}>Annuler</button>
@@ -60147,7 +60148,7 @@ function AppCoeur() {
         const styleLigne = {width:'100%',minHeight:44,display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left'};
         const ligneTexte = (titre, info) => (<div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{titre}</div>
-          <div data-recherche-info="" style={{fontSize:12,color:C.muted,fontWeight:500,marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{info}</div>
+          <div data-recherche-info="" style={{fontSize:12,color:C.muted,fontWeight:400,marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{info}</div>
         </div>);
         // UNE ligne de résultat, quel que soit son type : vignette · titre · une ligne d'info · pastille · ›
         const ligne = (r, type, i) => { const e = r.e; const o = e.o; const c = e.c || {};

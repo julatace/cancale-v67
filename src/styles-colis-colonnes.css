@@ -6,7 +6,7 @@
 .vrm-cc-col { background: var(--vrm-surface, #FFFFFF); border-radius: 12px; padding: 14px; min-width: 0; display: flex; flex-direction: column; }
 .vrm-cc-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
 .vrm-cc-tete h2 { margin: 0; font-size: 17px !important; font-weight: 700 !important; letter-spacing: -.01em; line-height: 1.2; color: var(--vrm-ink, #1D1D1F); }
-.vrm-cc-compte { font-family: var(--vrm-police-mono, ui-monospace, monospace); font-weight: 500; font-size: 15px; color: var(--vrm-muted, #6E6E73); font-variant-numeric: tabular-nums; }
+.vrm-cc-compte { font-family: var(--vrm-police-mono, ui-monospace, monospace); font-weight: 600; font-size: 15px; color: var(--vrm-muted, #6E6E73); font-variant-numeric: tabular-nums; }
 .vrm-cc-liste { display: flex; flex-direction: column; gap: 8px; }
 .vrm-cc-carte {
   display: block; width: 100%; box-sizing: border-box; text-align: left; font: inherit; color: inherit;
@@ -26,7 +26,7 @@ button.vrm-cc-carte:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3)
 .vrm-cc-bas { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
 .vrm-cc-etat { font-size: 12px; line-height: 1.35; color: var(--vrm-muted, #6E6E73); min-width: 0; overflow-wrap: anywhere; }
 .vrm-cc-etat.is-ambre { color: var(--vrm-warn, #B25000); font-weight: 700; }
-.vrm-cc-num { flex: none; font-family: var(--vrm-police-mono, ui-monospace, monospace); font-weight: 500; font-size: 12px; word-spacing: -.3em;
+.vrm-cc-num { flex: none; font-family: var(--vrm-police-mono, ui-monospace, monospace); font-weight: 400; font-size: 12px; word-spacing: -.3em;
   background: var(--vrm-surface, #FFFFFF); color: var(--vrm-ink, #1D1D1F); border-radius: 999px; padding: 3px 7px; white-space: nowrap; }
 .vrm-cc-note { font-size: 12px; line-height: 1.4; color: var(--vrm-muted, #6E6E73); margin: 0 0 8px; }
 .vrm-cc-vide { font-size: 13px; color: var(--vrm-muted, #6E6E73); margin: 4px 2px; }
@@ -259,7 +259,7 @@ html body .vrm-main .vrm-colis-titre .vrm-num, html body .vrm-tournee .vrm-num, 
 :root:root body .vrm-rpf-delai-piste { position: relative; flex: 1 1 auto; min-width: 48px; height: 4px; border-radius: 2px; overflow: hidden; background: var(--d-remplir, rgba(118,118,128,.12)); }
 :root:root body .vrm-rpf-delai-plein { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: var(--d-gris, #6E6E73); }
 :root:root body .vrm-rpf-delai.is-ambre .vrm-rpf-delai-plein { background: var(--d-ambre, var(--vrm-warn, #B25000)); }
-:root:root body .vrm-rpf-delai-txt { flex: none; font-size: 12px; line-height: 16px; font-weight: 500; color: var(--d-gris, #6E6E73); white-space: nowrap; font-variant-numeric: tabular-nums; }
+:root:root body .vrm-rpf-delai-txt { flex: none; font-size: 12px; line-height: 16px; font-weight: 400; color: var(--d-gris, #6E6E73); white-space: nowrap; font-variant-numeric: tabular-nums; }
 :root:root body .vrm-rpf-delai-txt.is-ambre { color: var(--d-ambre, var(--vrm-warn, #B25000)); font-weight: 600; }
 :root:root body .vrm-rpf-delai-est { font-weight: 400; }
 html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete-delai { padding: 10px 16px 2px !important; margin: 0 !important; }
@@ -273,7 +273,7 @@ html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete-delai { paddin
    TRAVERS de la carte à chaque défilement d'un doigt : éteint. L'indice bref de FondRelais le remplace
    (en haut à gauche, il s'efface seul ; il ne prend aucun toucher). */
 .vrm-relais-fond .maplibregl-cooperative-gesture-screen { display: none !important; }
-:root:root body .vrm-relais-indice { position: absolute; left: 8px; top: 8px; z-index: 3; max-width: calc(100% - 16px); padding: 4px 10px; border-radius: 12px; font: 500 12px/18px var(--vrm-police, system-ui); color: #1d1d1f; background: rgba(255,255,255,.88); box-shadow: 0 1px 3px rgba(0,0,0,.15); pointer-events: none; animation: vrm-indice-part 2.5s ease forwards; }
+:root:root body .vrm-relais-indice { position: absolute; left: 8px; top: 8px; z-index: 3; max-width: calc(100% - 16px); padding: 4px 10px; border-radius: 12px; font: 400 12px/18px var(--vrm-police, system-ui); color: #1d1d1f; background: rgba(255,255,255,.88); box-shadow: 0 1px 3px rgba(0,0,0,.15); pointer-events: none; animation: vrm-indice-part 2.5s ease forwards; }
 @keyframes vrm-indice-part { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { :root:root body .vrm-relais-indice { animation: none; } }
 

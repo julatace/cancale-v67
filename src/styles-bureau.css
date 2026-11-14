@@ -87,7 +87,7 @@
   html body .vrm-app-shell .vrm-main .vrm-toutes-meta { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   html body .vrm-app-shell .vrm-main .vrm-toutes-bureau { display: contents; }
   html body .vrm-app-shell .vrm-main .vrm-toutes-bureau > span { min-width: 0; font-size: 12px; color: var(--vrm-muted); overflow-wrap: anywhere; }
-  html body .vrm-app-shell .vrm-main .vrm-toutes-bureau b { color: var(--vrm-ink); font-weight: 500; }
+  html body .vrm-app-shell .vrm-main .vrm-toutes-bureau b { color: var(--vrm-ink); font-weight: 400; }
   html body .vrm-app-shell .vrm-main .vrm-toutes-bureau small { display: block; margin-top: 4px; font-size: 12px; }
   html body .vrm-app-shell .vrm-main .vrm-toutes-montant { grid-column: 6; font-variant-numeric: tabular-nums; }
   html body .vrm-app-shell .vrm-main .vrm-toutes-ligne:hover { background: var(--vrm-surface) !important; }

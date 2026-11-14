@@ -24,8 +24,8 @@ export function ConnexionEbayGuidee({ C, busy, onConnecter, passu = false }) {
       <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 10 }}>
         {[1, 2, 3].map((n) => (
           <li key={n} data-ebay-cx-etape={n} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-            <span aria-hidden="true" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 14, background: `${C.accent}15`, color: C.accentTexte || C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700 }}>{n}</span>
-            <span style={{ fontSize: 14, color: C.text, lineHeight: 1.45, paddingTop: 4 }}>{tr(`ebay.cx.etape.${n}`)}</span>
+            <span aria-hidden="true" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 14, background: `${C.accent}15`, color: C.accentTexte || C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 700 }}>{n}</span>
+            <span style={{ fontSize: 15, color: C.text, lineHeight: 1.45, paddingTop: 4 }}>{tr(`ebay.cx.etape.${n}`)}</span>
           </li>
         ))}
       </ol>

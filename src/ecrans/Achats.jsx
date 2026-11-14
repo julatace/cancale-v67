@@ -218,8 +218,8 @@ function FeuilleRecuAchat({ recu, fermer }) {
   // gardent `anywhere` : jamais de débordement.
   const Row = ({ label, val, attrs, montant }) => val ? (
     <div {...(attrs || {})} style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:12,padding:'10px 0',borderBottom:`1px solid ${C.border}`}}>
-      <span style={{fontSize:15,color:C.muted,fontWeight:500,minWidth:0}}>{label}</span>
-      <span style={{fontSize:15,color:C.text,fontWeight:500,textAlign:'right',...(montant ? { whiteSpace:'nowrap', flexShrink:0 } : { overflowWrap:'anywhere' })}}>{val}</span>
+      <span style={{fontSize:15,color:C.muted,fontWeight:600,minWidth:0}}>{label}</span>
+      <span style={{fontSize:15,color:C.text,fontWeight:600,textAlign:'right',...(montant ? { whiteSpace:'nowrap', flexShrink:0 } : { overflowWrap:'anywhere' })}}>{val}</span>
     </div>) : null;
   const cible = { minWidth:44, minHeight:44, boxSizing:'border-box', display:'inline-flex', alignItems:'center', justifyContent:'center', borderRadius:12, border:`1px solid ${C.border}`, background:C.card, color:C.text, cursor:'pointer', fontFamily:'inherit', flexShrink:0 };
   return createPortal(
@@ -227,7 +227,7 @@ function FeuilleRecuAchat({ recu, fermer }) {
       <FermeAuRetour fermer={fermer}/>
       <div ref={boite} className="vrm-recu-feuille" data-recu-feuille="" role="dialog" aria-modal="true" aria-label={NOM_RECU_ACHAT} tabIndex={-1} onClick={e=>e.stopPropagation()} style={{background:C.bg,color:C.text,width:'100%',maxWidth:520,borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',outline:'none'}}>
         <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-          <button type="button" data-recu-retour="" onClick={fermer} aria-label={tr('ebay.param.politique.retour')} style={{...cible,width:44,height:44,padding:0,fontSize:22,fontWeight:600,lineHeight:1}}>‹</button>
+          <button type="button" data-recu-retour="" onClick={fermer} aria-label={tr('ebay.param.politique.retour')} style={{...cible,width:44,height:44,padding:0,fontSize:20,fontWeight:600,lineHeight:1}}>‹</button>
           <div style={{flex:1,minWidth:0,fontSize:17,fontWeight:700,color:C.text}}>{NOM_RECU_ACHAT}</div>
           <button type="button" data-recu-pdf="" onClick={()=>openReceipt(recu)} title={tr('achats.imprimerPdf')} style={{...cible,gap:6,padding:'0 14px',fontSize:15,fontWeight:600}}><Icon name="printer" size={15}/>PDF</button>
         </div>
@@ -242,14 +242,14 @@ function FeuilleRecuAchat({ recu, fermer }) {
         <div ref={defile} className="vrm-recu-defile" data-recu-defile="" tabIndex={0} role="region" aria-label={tr('achats.detailRecu')} style={{flex:1,minHeight:0,overflowY:'auto',overscrollBehavior:'contain',WebkitOverflowScrolling:'touch'}}>
           <div style={{background:C.card,borderRadius:12,overflow:'hidden',border:`1px solid ${C.border}`}}>
             <div style={{background:COULEUR_PLATEFORME.vinted,color:'#fff',padding:'16px 18px'}}>
-              <div style={{fontSize:11,opacity:0.9,fontWeight:500,letterSpacing:0.4,textTransform:'uppercase'}}>{tr('achats.recuAchatVinted')}</div>
+              <div style={{fontSize:11,opacity:0.9,fontWeight:400,letterSpacing:0.4,textTransform:'uppercase'}}>{tr('achats.recuAchatVinted')}</div>
               <div style={{fontSize:20,fontWeight:600,marginTop:3,lineHeight:1.3,overflowWrap:'anywhere'}}>{r.article}</div>
             </div>
             {r.hasStructured ? (
               <div style={{padding:'14px 18px 16px'}}>
                 {r.paye != null && (
                   <div data-recu-total={r.paye} style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:12,paddingBottom:12,borderBottom:`1px solid ${C.border}`,marginBottom:2}}>
-                    <span style={{fontSize:15,color:C.muted,fontWeight:500}}>{tr('achats.montantPaye')}</span>
+                    <span style={{fontSize:15,color:C.muted,fontWeight:600}}>{tr('achats.montantPaye')}</span>
                     <span style={{fontSize:28,fontWeight:700,color:C.text,whiteSpace:'nowrap'}}>{texteCentimesRecu(r.paye)}</span>
                   </div>
                 )}
@@ -563,7 +563,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
                   onClick={() => ticketRef.current && ticketRef.current.click()} style={{ borderColor: C.border, background: C.card, color: C.text }}>
                   <span className="vrm-ahp-ticket-icone" aria-hidden="true" style={{ background: C.card2 || C.bg, color: C.text }}>{lecture ? <span className="vrm-ahp-ticket-roue" /> : <Icon name="receipt" size={20} />}</span>
                   <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: 'block', fontSize: 16, fontWeight: 600 }}>{lecture ? tr('achats.lectureTicket') : t ? tr('achats.lireAutreTicket') : tr('achats.photoTicket')}</span>
+                    <span style={{ display: 'block', fontSize: 17, fontWeight: 600 }}>{lecture ? tr('achats.lectureTicket') : t ? tr('achats.lireAutreTicket') : tr('achats.photoTicket')}</span>
                     <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 1 }}>{lecture ? tr('achats.appareilRienEnvoye') : tr('achats.remplitPrixDate')}</span>
                   </span>
                   {!lecture ? <Icon name="camera" size={18} style={{ color: C.muted, flexShrink: 0 }} /> : null}
@@ -591,7 +591,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
           {/* (10 nov., lot AV) Ce que tu as revendu ce modèle : le passé, jamais un conseil (src/reventeModele.js). */}
           {!enLot && titreForm.trim().length >= 3 && <ReventeModele C={C} cible={{ titre: titreForm }} lireReleve={lireReleveVentes} lireExtras={lireExtrasRepartition} dateEnLigne={dateMiseEnLigneMs} />}
           {/* 3. Le prix payé, en grand : c'est LUI qui le tape (§2.5). */}
-          {champ(prixEncoreLu(form) ? <span data-prix-lu-note="" style={{ color: C.warn }}>{tr('achats.luTicketVerifie')}</span> : (enLot ? tr('groslot.prixTotal') : 'Prix payé'), <div className="vrm-ahp-prix" style={{ position: 'relative' }}><input data-champ="prix" data-prix-lu={prixEncoreLu(form) ? '1' : undefined} aria-label={tr('achats.prixPaye')} readOnly={!!(editId && (liste.find(x => x.id === editId) || {}).lot)} value={form.price} onChange={e => { setErreur(""); setForm(d => ({ ...d, price: e.target.value })); }} inputMode="decimal" enterKeyHint="next" placeholder="0,00" autoComplete="off" style={{ ...inp, height: 58, fontSize: 28, fontWeight: 700, paddingRight: 40, fontVariantNumeric: 'tabular-nums', ...(prixEncoreLu(form) ? { borderColor: C.warn, boxShadow: `0 0 0 3px ${C.warnSoft || 'transparent'}`, background: C.warnSoft || C.card } : null) }} /><span aria-hidden="true" style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: C.muted, fontSize: 22, fontWeight: 600, pointerEvents: 'none' }}>€</span></div>)}
+          {champ(prixEncoreLu(form) ? <span data-prix-lu-note="" style={{ color: C.warn }}>{tr('achats.luTicketVerifie')}</span> : (enLot ? tr('groslot.prixTotal') : 'Prix payé'), <div className="vrm-ahp-prix" style={{ position: 'relative' }}><input data-champ="prix" data-prix-lu={prixEncoreLu(form) ? '1' : undefined} aria-label={tr('achats.prixPaye')} readOnly={!!(editId && (liste.find(x => x.id === editId) || {}).lot)} value={form.price} onChange={e => { setErreur(""); setForm(d => ({ ...d, price: e.target.value })); }} inputMode="decimal" enterKeyHint="next" placeholder="0,00" autoComplete="off" style={{ ...inp, height: 58, fontSize: 28, fontWeight: 700, paddingRight: 40, fontVariantNumeric: 'tabular-nums', ...(prixEncoreLu(form) ? { borderColor: C.warn, boxShadow: `0 0 0 3px ${C.warnSoft || 'transparent'}`, background: C.warnSoft || C.card } : null) }} /><span aria-hidden="true" style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: C.muted, fontSize: 20, fontWeight: 600, pointerEvents: 'none' }}>€</span></div>)}
           {enLot ? <BlocGrosLot lot={form.lot} setLot={(f) => { setErreursNum(null); setForm(d => d && ({ ...d, lot: typeof f === 'function' ? f(d.lot) : f })); }} totalTexte={form.price} C={C} Icon={Icon} Bouton={Bouton}
             moiMeme={!!lot.moiMeme} apercuNumeros={lot.apercu} apercuCases={lot.cases} compresser={compressImage} clavier={clavierNum()} cleNum={lot.cleNum} erreursNum={erreursNum} /> : null}
           {/* 4. Où : ses derniers lieux d'abord, puis la liste courte ; un champ libre. */}
@@ -601,7 +601,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
               {lieux.map(({ l: s, recent }) => {
                 const actif = form.source.trim().toLowerCase() === s.toLowerCase();
                 return <button key={s} type="button" className="vrm-ahp-puce" data-source={s} data-source-recent={recent ? '1' : undefined} onClick={() => setForm(d => ({ ...d, source: s }))} aria-pressed={actif}
-                  style={{ flexShrink: 0, minHeight: 44, padding: '0 15px', borderRadius: 999, border: `1px solid ${actif ? C.text : C.border}`, background: actif ? C.text : C.card, color: actif ? C.card : C.text, fontSize: 15, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>{recent ? <Icon name="clock" size={14} /> : null}{s}</button>;
+                  style={{ flexShrink: 0, minHeight: 44, padding: '0 15px', borderRadius: 999, border: `1px solid ${actif ? C.text : C.border}`, background: actif ? C.text : C.card, color: actif ? C.card : C.text, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>{recent ? <Icon name="clock" size={14} /> : null}{s}</button>;
               })}
             </div>
           </div>
@@ -761,7 +761,7 @@ function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, recep
           <div style={{ width: 44, height: 44, borderRadius: 12, background: C.border, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{orderPhoto(actuel) ? <PhotoVinted src={orderPhoto(actuel)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <Icon name="link" size={18} style={{ color: C.muted }}/>}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 12, color: C.muted }}>{tr('achats.relie')}</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{actuel.title || '—'}</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{actuel.title || '—'}</div>
           </div>
           {onDelier ? <Bouton variante="discret" data-relier-delier={String(actuel.transaction_id || '')} onClick={onDelier} style={{ flexShrink: 0, minHeight: 44 }}>{tr('achats.delier')}</Bouton> : null}
         </div>

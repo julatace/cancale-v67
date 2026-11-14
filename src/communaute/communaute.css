@@ -69,7 +69,7 @@
 /* (« :root body … » : la règle générale des boutons de .vrm-main est très forte.) */
 :root body .vrm-cm-carte .maplibregl-ctrl-attrib.maplibregl-ctrl summary.maplibregl-ctrl-attrib-button { width: 24px; height: 24px; min-height: 24px !important; padding: 0 !important; background-repeat: no-repeat; background-position: center; }
 .vrm-cm-ctrl { position: absolute; top: 12px; right: 12px; z-index: 2; display: flex; flex-direction: column; border-radius: 12px; overflow: hidden; border: 1px solid var(--cm-bord); background: var(--cm-carte); box-shadow: var(--cm-ombre); }
-.vrm-communaute .vrm-cm-ctrl button { width: 44px; height: 44px; min-height: 44px; padding: 0; border: 0; border-radius: 0; background: transparent; font-size: 22px; font-weight: 500; line-height: 1; display: grid; place-items: center; }
+.vrm-communaute .vrm-cm-ctrl button { width: 44px; height: 44px; min-height: 44px; padding: 0; border: 0; border-radius: 0; background: transparent; font-size: 22px; font-weight: 400; line-height: 1; display: grid; place-items: center; }
 .vrm-communaute .vrm-cm-ctrl button + button { border-top: 1px solid var(--cm-bord); }
 .vrm-communaute .vrm-cm-ctrl button:hover, .vrm-communaute .vrm-cm-recentrer:hover { background: var(--cm-fond); }
 .vrm-communaute .vrm-cm-recentrer { position: absolute; left: 12px; top: 12px; z-index: 2; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; box-shadow: var(--cm-ombre); font-size: 13px; }
@@ -100,8 +100,8 @@
 .vrm-cm-pastille { display: inline-block; min-width: 22px; padding: 2px 8px; border-radius: 999px; background: var(--cm-accent); color: #fff; font-size: 12px; font-weight: 700; text-align: center; }
 .vrm-communaute .vrm-cm-conv { width: 100%; display: grid; grid-template-columns: 1fr auto auto; grid-template-rows: auto auto; text-align: left; gap: 2px 10px; padding: 8px 10px; border: 0; background: none; min-height: 56px; }
 .vrm-cm-conv b { grid-column: 1; font-size: 15px; }
-.vrm-cm-conv span:not(.vrm-cm-pastille) { grid-column: 1; grid-row: 2; color: var(--cm-doux); font-weight: 500; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vrm-cm-conv time { grid-column: 2; grid-row: 1; color: var(--cm-doux); font-size: 12px; font-weight: 500; }
+.vrm-cm-conv span:not(.vrm-cm-pastille) { grid-column: 1; grid-row: 2; color: var(--cm-doux); font-weight: 400; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-cm-conv time { grid-column: 2; grid-row: 1; color: var(--cm-doux); font-size: 12px; font-weight: 400; }
 .vrm-cm-conv .vrm-cm-pastille { grid-column: 3; grid-row: 1 / span 2; align-self: center; }
 .vrm-cm-voile { position: fixed; inset: 0; z-index: 10000; background: rgba(0,0,0,.55); backdrop-filter: blur(3px); display: flex; align-items: flex-end; justify-content: center; }
 .vrm-cm-feuille { background: var(--cm-carte); color: var(--cm-encre); width: min(560px, 100%); max-height: 88vh; overflow: auto; border-radius: 16px 16px 0 0; padding: 14px 16px calc(20px + env(safe-area-inset-bottom)); box-shadow: var(--cm-ombre); animation: vrm-cm-monte .22s ease-out; }
@@ -110,14 +110,14 @@
 @media (prefers-reduced-motion: reduce) { .vrm-cm-feuille { animation: none; } }
 .vrm-cm-feuille-tete { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
 .vrm-cm-feuille-tete h3 { margin: 0; font-size: 17px; font-weight: 700; }
-.vrm-cm-feuille-tete small { color: var(--cm-doux); font-weight: 500; }
+.vrm-cm-feuille-tete small { color: var(--cm-doux); font-weight: 400; }
 .vrm-communaute .vrm-cm-x { width: 44px; padding: 0; font-size: 22px; line-height: 1; }
 .vrm-cm-champ { display: block; margin: 10px 0; }
 .vrm-cm-champ span { display: block; font-size: 13px; font-weight: 700; margin-bottom: 4px; }
 .vrm-cm-champ input, .vrm-cm-saisie textarea { width: 100%; min-height: 44px; border-radius: 12px; border: 1px solid var(--cm-bord); background: var(--cm-carte); color: var(--cm-encre); font: inherit; font-size: 17px; padding: 10px 12px; }
 .vrm-cm-villes { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 6px; }
 .vrm-communaute .vrm-cm-villes button { width: 100%; text-align: left; display: flex; flex-direction: column; justify-content: center; padding: 6px 12px; }
-.vrm-cm-villes button span { color: var(--cm-doux); font-weight: 500; font-size: 12px; }
+.vrm-cm-villes button span { color: var(--cm-doux); font-weight: 400; font-size: 12px; }
 .vrm-communaute .vrm-cm-villes button.pris { border-color: var(--cm-accent); background: var(--cm-accent-fond); }
 .vrm-communaute .vrm-cm-feuille > .vrm-cm-primaire { width: 100%; margin-top: 10px; }
 .vrm-cm-bulles { display: flex; flex-direction: column; gap: 6px; max-height: 46vh; overflow: auto; padding: 6px 2px; margin: 6px 0 10px; }
@@ -224,7 +224,7 @@ form.vrm-cm-discord-moi { display: block !important; }
 .vrm-cm-partage-option b { display: block; font-size: 15px; }
 .vrm-cm-partage-option small { display: block; color: var(--cm-doux); font-size: 13px; line-height: 1.4; }
 .vrm-cm-champ textarea { width: 100%; border-radius: 12px; border: 1px solid var(--cm-bord); background: var(--cm-carte); color: var(--cm-encre); font: inherit; font-size: 17px; padding: 10px 12px; resize: vertical; }
-.vrm-cm-champ span small { font-weight: 500; color: var(--cm-doux); }
+.vrm-cm-champ span small { font-weight: 400; color: var(--cm-doux); }
 .vrm-cm-apercu { background: var(--cm-fond) !important; }
 .vrm-cm-apercu small { color: var(--cm-doux); }
 .vrm-cm-vue { display: grid; gap: 8px; }

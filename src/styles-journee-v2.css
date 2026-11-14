@@ -166,7 +166,7 @@
 .vrm-main[data-ecran="journee"] .vrm-cycle-photo > img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .vrm-main[data-ecran="journee"] .vrm-cycle-txt { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .vrm-main[data-ecran="journee"] .vrm-cycle-txt > :first-child { flex: none; }
-.vrm-main[data-ecran="journee"] .vrm-cycle-titre { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 15px/1.3 var(--vrm-police); color: var(--p-encre); }
+.vrm-main[data-ecran="journee"] .vrm-cycle-titre { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 15px/1.3 var(--vrm-police); color: var(--p-encre); }
 .vrm-main[data-ecran="journee"] .vrm-cycle-menu { position: relative; display: inline-flex; align-items: center; flex: none; }
 .vrm-main[data-ecran="journee"] .vrm-cycle-menu > select {
   -webkit-appearance: none; appearance: none; min-height: 44px; max-width: 150px; padding: 0 30px 0 14px; margin: 0;

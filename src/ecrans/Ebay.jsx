@@ -691,7 +691,7 @@ function PhotosEbayEditeur({ urls, envois, places, message, onUrls, onAjouter, o
   const choisis = (e) => { const l = Array.from((e.target && e.target.files) || []); try { e.target.value = ''; } catch (_) {} if (l.length) onAjouter(l); };
   const tuile = { position: 'relative', width: 96, height: 96, borderRadius: 12, overflow: 'hidden', border: `1px solid ${C.border}`, background: C.bg };
   const croix = { position: 'absolute', top: 0, right: 0, width: 44, height: 44, border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end' };
-  const rond = { margin: 4, width: 26, height: 26, borderRadius: 13, background: 'rgba(0,0,0,.62)', color: '#fff', fontSize: 16, lineHeight: '26px', textAlign: 'center' };
+  const rond = { margin: 4, width: 26, height: 26, borderRadius: 13, background: 'rgba(0,0,0,.62)', color: '#fff', fontSize: 15, lineHeight: '26px', textAlign: 'center' };
   const fleche = (off) => ({ flex: 1, height: 44, border: 'none', background: 'transparent', color: off ? C.border : C.text, fontSize: 20, fontWeight: 700, cursor: off ? 'default' : 'pointer', fontFamily: 'inherit' });
   const geste = (off) => ({ flex: '1 1 150px', minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, border: `1px solid ${C.border}`, borderRadius: 999, background: C.card2, color: C.text, fontSize: 15, fontWeight: 700, cursor: off ? 'default' : 'pointer', opacity: off ? 0.5 : 1, fontFamily: 'inherit' });
   const nEchec = envois.filter((x) => x.etat === 'echec').length;
@@ -728,8 +728,8 @@ function PhotosEbayEditeur({ urls, envois, places, message, onUrls, onAjouter, o
       )}
       {nEchec > 0 && <div role="status" data-ebay-photos-raison="" style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45 }}>{nEchec === 1 ? 'Une photo n\'est pas partie' : nEchec + ' photos ne sont pas parties'} : {(envois.find((x) => x.etat === 'echec') || {}).raison || 'raison inconnue'}. Réessaie, ou retire-{nEchec === 1 ? 'la' : 'les'}.</div>}
       {message && <div role="status" data-ebay-photos-trop="" style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45 }}>{message}</div>}
-      <input ref={refAppareil} type="file" accept="image/*" capture="environment" data-ebay-photo-appareil="" onChange={choisis} style={{ display: 'none', fontSize: 16 }} />
-      <input ref={refGalerie} type="file" accept="image/*" multiple data-ebay-photo-galerie="" onChange={choisis} style={{ display: 'none', fontSize: 16 }} />
+      <input ref={refAppareil} type="file" accept="image/*" capture="environment" data-ebay-photo-appareil="" onChange={choisis} style={{ display: 'none', fontSize: 15 }} />
+      <input ref={refGalerie} type="file" accept="image/*" multiple data-ebay-photo-galerie="" onChange={choisis} style={{ display: 'none', fontSize: 15 }} />
       <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
         <button type="button" data-ebay-prendre-photo="" disabled={!places} onClick={() => refAppareil.current && refAppareil.current.click()} style={geste(!places)}><Icon name="camera" size={18}/> Prendre une photo</button>
         <button type="button" data-ebay-galerie="" disabled={!places} onClick={() => refGalerie.current && refGalerie.current.click()} style={geste(!places)}><Icon name="image" size={18}/> Depuis la galerie</button>
@@ -1316,7 +1316,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     }
     setBusy(false);
   };
-  const lab = { fontSize: 13, color: C.muted, display: 'block', marginBottom: 6, fontWeight: 500 };
+  const lab = { fontSize: 13, color: C.muted, display: 'block', marginBottom: 6, fontWeight: 400 };
   // ⚠️ fontSize 16 MINIMUM : en dessous, iOS Safari ZOOME automatiquement dès
   // qu'on touche un champ (plainte de Julien « ça zoome »). 16px = pas de zoom.
   const inp = { width: '100%', boxSizing: 'border-box', border: '1px solid transparent', background: C.card2, color: C.text, borderRadius: 12, padding: '13px 14px', fontSize: 17, fontFamily: 'inherit', outline: 'none' };
@@ -1383,16 +1383,16 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', background: C.card, borderBottom: `1px solid ${C.border}` }}>
         <span style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 12, background: `${C.accent}15`, color: C.accentTexte, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="tag" size={17}/></span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>Vendre sur eBay</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Vendre sur eBay</div>
           <div style={{ fontSize: 12, color: C.muted }}>{brouillonId ? 'Brouillon enregistré — modifie-le, enregistre-le ou publie-le' : 'Ton annonce, comme sur eBay — vérifiée avant publication'}</div>
         </div>
-        <button type="button" onClick={() => setOuvert(false)} aria-label="Fermer" style={{ flexShrink: 0, border: 'none', background: 'transparent', color: C.muted, fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>×</button>
+        <button type="button" onClick={() => setOuvert(false)} aria-label="Fermer" style={{ flexShrink: 0, border: 'none', background: 'transparent', color: C.muted, fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button>
       </div>
 
       {res && res.ok ? (
         <div style={{ padding: 20, textAlign: 'center' }}>
           <div style={{ width: 52, height: 52, margin: '0 auto 12px', borderRadius: 24, background: `${C.accent}15`, color: C.accentTexte, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>✓</div>
-          <div style={{ fontSize: 17, fontWeight: 800, color: C.text, marginBottom: 4 }}>Annonce publiée sur eBay{res.compte ? <span data-publie-compte={res.compte}> · {res.compte}</span> : null}</div>
+          <div style={{ fontSize: 17, fontWeight: 700, color: C.text, marginBottom: 4 }}>Annonce publiée sur eBay{res.compte ? <span data-publie-compte={res.compte}> · {res.compte}</span> : null}</div>
           <div style={{ fontSize: 13, color: C.muted, marginBottom: res.sku ? 4 : 14 }}>N° {res.itemId}</div>
           {/* Le lien à la paire se DIT : c'est lui qui fera apparaître « vendue
               sur Vinted → retire-la d'eBay » le jour où elle part ailleurs. */}
@@ -1429,7 +1429,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: titre.trim() ? C.text : C.muted, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{titre.trim() || 'Titre de ton annonce…'}</div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 3 }}>
-                  <span className="vrm-display" style={{ fontSize: 17, fontWeight: 800, color: C.text }}>{prix.trim() ? eur(Number(String(prix).replace(',', '.')) || 0) : '—'}</span>
+                  <span className="vrm-display" style={{ fontSize: 17, fontWeight: 700, color: C.text }}>{prix.trim() ? eur(Number(String(prix).replace(',', '.')) || 0) : '—'}</span>
                   <span style={{ fontSize: 11, color: C.muted }}>{condLabel}{urls.length ? ` · ${urls.length} photo${urls.length > 1 ? 's' : ''}` : ''}</span>
                 </div>
               </div>
@@ -1467,7 +1467,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
             ) : (<>
               {/* Paire choisie : son N° et son titre ; ses photos sont dans le bloc « Photos » (5 nov.). */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                <span className="vrm-display" style={{ fontSize: 13, fontWeight: 800, color: C.accentTexte }}>N°{pairSel.num}</span>
+                <span className="vrm-display" style={{ fontSize: 13, fontWeight: 700, color: C.accentTexte }}>N°{pairSel.num}</span>
                 <span style={{ fontSize: 13, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pairSel.title}</span>
               </div>
               {nVinted === 0 && (
@@ -1602,7 +1602,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                   programmation, sponsorisée, options payantes, annonce privée. */}
               <div data-ebay-reglages-ligne="" style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '10px 12px' }}>
                 <div style={{ flex: '1 1 180px', minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{tr('ebay.param.titre')}</div>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{tr('ebay.param.titre')}</div>
                   <div data-ebay-reglages-resume={resumeReglagesEbay(reglagesPub, { type: typeComptePub }).length} style={{ fontSize: 12, color: C.muted, marginTop: 2, lineHeight: 1.4 }}>{resumeReglagesEbay(reglagesPub, { type: typeComptePub }).map((x) => tr(x.cle, x.vars)).join(' · ') || tr('ebay.param.commeAvant')}</div>
                 </div>
                 <Bouton variante="secondaire" data-ebay-tous-reglages="" onClick={ouvrirReglages}>{tr('ebay.param.regler')}</Bouton>
@@ -1873,7 +1873,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
     })();
     return () => { stop = true; };
   }, [connected, lireData, synchroniser, lireSolde, comptesEbay]);
-  const eti = { fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500 };
+  const eti = { fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 400 };
   const boite = (bg, bord) => ({ border: `1px solid ${bord || C.border}`, background: bg || C.card, borderRadius: 12, padding: '14px 16px' });
   return (
     <div style={boite()}>
@@ -1945,7 +1945,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
           {/* (11 nov.) Les réglages que chaque nouvelle annonce reprend. */}
           <div data-ebay-defauts-ligne="" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '10px 12px', marginBottom: 10 }}>
             <div style={{ flex: '1 1 180px', minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{tr('ebay.param.titreDefauts')}</div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{tr('ebay.param.titreDefauts')}</div>
               <div data-ebay-defauts-resume={resumeReglagesEbay(defautsEbay).length} style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{resumeReglagesEbay(defautsEbay).length ? resumeReglagesEbay(defautsEbay).map((x) => tr(x.cle, x.vars)).join(' · ') : tr('ebay.param.commeAvant')}</div>
             </div>
             <Bouton variante="secondaire" data-ebay-defauts-ouvrir="" onClick={ouvrirDefauts}>{tr('ebay.param.regler')}</Bouton>
@@ -1976,7 +1976,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
                 const enRoute = (solde.enAttente != null || solde.retenu != null) ? (Number(solde.enAttente || 0) + Number(solde.retenu || 0)) : null;
                 return (
                   <div key={cpt.ref} data-ebay-solde={cpt.ref} style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '12px 14px', marginBottom: 10 }}>
-                    <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500, marginBottom: 8 }}>Solde eBay{nomS}</div>
+                    <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 400, marginBottom: 8 }}>Solde eBay{nomS}</div>
                     <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
                       {item(solde.dispo, 'disponible à virer', C.text)}
                       {enRoute != null && enRoute > 0 && item(enRoute, 'en attente / retenu par eBay', C.muted)}
@@ -2750,7 +2750,7 @@ function EbayBrouillons({ brouillons, connected, paires = [], onModifier, onPlan
   return (
     <div data-ebay-brouillons={etatListe} data-nb={liste.length} style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, padding: '12px 14px', marginTop: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
-        <span style={{ flex: '1 1 auto', fontSize: 17, fontWeight: 800, color: E.text }}>Brouillons{liste.length ? ` (${liste.length})` : ''}</span>
+        <span style={{ flex: '1 1 auto', fontSize: 17, fontWeight: 700, color: E.text }}>Brouillons{liste.length ? ` (${liste.length})` : ''}</span>
         {liste.length > 1 && <button type="button" data-brouillons-tout="1" onClick={tout} style={{ ...btn, border: 'none', padding: '4px 0', color: E.accentSoft }}>{coches.length === ids.length ? 'Tout désélectionner' : 'Tout sélectionner'}</button>}
       </div>
       {etatListe === 'charge' && <div style={{ fontSize: 13, color: E.muted }}>Chargement…</div>}
@@ -3047,7 +3047,7 @@ function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes,
 
   // ── RENDU ──
   const inp = { boxSizing: 'border-box', border: '1px solid transparent', background: E.card2, color: E.text, borderRadius: 12, padding: '10px 11px', fontSize: 17, fontFamily: 'inherit', outline: 'none' };
-  const lab = { fontSize: 12, color: E.muted, display: 'block', marginBottom: 5, fontWeight: 500 };
+  const lab = { fontSize: 12, color: E.muted, display: 'block', marginBottom: 5, fontWeight: 400 };
   const pastille = (actif) => ({ border: `1px solid ${actif ? E.accent : E.border}`, background: actif ? `${E.accent}22` : 'transparent', color: actif ? E.text : E.muted, borderRadius: 999, padding: '7px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' });
   const groupes = [];
   for (const l of lignes) { const g = groupes[groupes.length - 1]; if (g && g.date === l.h.date) g.lignes.push(l); else groupes.push({ date: l.h.date, lignes: [l] }); }
@@ -3059,14 +3059,14 @@ function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes,
   return (
     <div data-planif="1" style={{ background: E.card, border: `1px solid ${E.accent}`, borderRadius: 14, padding: '14px', marginTop: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-        <span style={{ flex: 1, fontSize: 17, fontWeight: 800, color: E.text }}>Programmer la sélection ({brouillons.length})</span>
-        <button type="button" onClick={onFermer} aria-label="Fermer" style={{ border: 'none', background: 'transparent', color: E.muted, fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>×</button>
+        <span style={{ flex: 1, fontSize: 17, fontWeight: 700, color: E.text }}>Programmer la sélection ({brouillons.length})</span>
+        <button type="button" onClick={onFermer} aria-label="Fermer" style={{ border: 'none', background: 'transparent', color: E.muted, fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button>
       </div>
       <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 10 }}>eBay les met en ligne à tes heures, même VRM fermé (± 15 min).</div>
 
       {bilan ? (
         <div data-planif-bilan="1" data-programmees={bilan.programmees.length} data-refusees={bilan.refusees.length} data-incertaines={bilan.incertaines.length} style={{ fontSize: 13, color: E.text, lineHeight: 1.55 }}>
-          <div style={{ fontWeight: 800, fontSize: 15 }}>{bilan.programmees.length} sur {bilan.programmees.length + bilan.refusees.length + bilan.incertaines.length} programmée{bilan.programmees.length > 1 ? 's' : ''}{bilan.refusees.length ? ` · ${bilan.refusees.length} refusée${bilan.refusees.length > 1 ? 's' : ''}` : ''}{bilan.incertaines.length ? ` · ${bilan.incertaines.length} incertaine${bilan.incertaines.length > 1 ? 's' : ''}` : ''}</div>
+          <div style={{ fontWeight: 700, fontSize: 15 }}>{bilan.programmees.length} sur {bilan.programmees.length + bilan.refusees.length + bilan.incertaines.length} programmée{bilan.programmees.length > 1 ? 's' : ''}{bilan.refusees.length ? ` · ${bilan.refusees.length} refusée${bilan.refusees.length > 1 ? 's' : ''}` : ''}{bilan.incertaines.length ? ` · ${bilan.incertaines.length} incertaine${bilan.incertaines.length > 1 ? 's' : ''}` : ''}</div>
           {bilan.programmees.filter((x) => x.enLigne).length > 0 && <div style={{ color: E.warn, marginTop: 4 }}>⚠️ En ligne TOUT DE SUITE : {bilan.programmees.filter((x) => x.enLigne).map((x) => (x.d.numero ? `N°${cleNum(x.d.numero)}` : x.d.titre)).join(', ')}.</div>}
           {bilan.programmees.filter(x=>x.offre).map(x=><div key={x.d.id} data-planif-offre={x.d.id} style={{fontSize:12,color:x.offre.ok?E.muted:E.warn,marginTop:6}}>{x.d.titre} · {x.offre.msg}</div>)}
           {[...bilan.refusees.map((x) => ({ ...x, k: 'refusée' })), ...bilan.incertaines.map((x) => ({ ...x, k: 'incertaine' }))].map((x) => (
@@ -3152,7 +3152,7 @@ function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes,
                   const v = verifDe(l);
                   return (
                     <div key={l.d.id} data-planif-ligne={l.d.id} data-heure-paris={`${l.h.date} ${l.h.heure}`} data-utc={l.h.utc} data-immediat={l.h.immediat ? '1' : '0'} style={{ display: 'flex', gap: 10, alignItems: 'baseline', padding: '4px 0', flexWrap: 'wrap' }}>
-                      <span className="vrm-display" style={{ fontSize: 15, fontWeight: 800, color: E.text, width: 92, flexShrink: 0 }}>{l.h.immediat ? 'tout de suite' : l.h.heure}</span>
+                      <span className="vrm-display" style={{ fontSize: 15, fontWeight: 700, color: E.text, width: 92, flexShrink: 0 }}>{l.h.immediat ? 'tout de suite' : l.h.heure}</span>
                       <span style={{ flex: '1 1 140px', minWidth: 0, fontSize: 13, color: E.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.d.numero ? <b>N°{cleNum(l.d.numero)} · </b> : null}{l.d.titre}</span>
                       {v && v.etat === 'ok' && <span data-planif-frais={l.d.id} data-frais-total={v.fees == null ? 'pas-su' : String(v.fees)} data-frais-programmation={l.h.immediat ? 'sans' : (v.frais && v.frais.programmation != null ? String(v.frais.programmation) : 'pas-su')} style={{ flexBasis: '100%', paddingLeft: 102, fontSize: 12, color: E.muted, lineHeight: 1.45 }}>
                         {lignesFraisEbay(v.frais, !l.h.immediat).map((f) => `${f.nom} ${f.montant == null ? 'pas su' : eurEbay(f.montant)}`).join(' · ')} · total {v.fees == null ? 'pas su' : eurEbay(v.fees)}
@@ -3321,7 +3321,7 @@ function EbayProgrammees({ programmees, brouillons, onRelire, onAnnule, vue = '*
   return (
     <div data-ebay-programmees={etat} data-nb={lignes.length} style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, padding: '12px 14px', marginTop: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
-        <span style={{ flex: '1 1 auto', fontSize: 17, fontWeight: 800, color: E.text }}>Programmées sur eBay{lignes.length ? ` (${lignes.length})` : ''}</span>
+        <span style={{ flex: '1 1 auto', fontSize: 17, fontWeight: 700, color: E.text }}>Programmées sur eBay{lignes.length ? ` (${lignes.length})` : ''}</span>
         {onRelire && <button type="button" data-prog-relire="1" onClick={onRelire} style={{ ...btn, border: 'none', padding: '4px 0', color: E.accentSoft }}>Relire chez eBay</button>}
       </div>
       {etat === 'charge' && <div style={{ fontSize: 13, color: E.muted }}>Chargement…</div>}
@@ -3928,7 +3928,7 @@ function EbayReglesToutes({ items = [], etatDe, prixDe, regleBloquee, achats, no
           )}
         </div>
       )}
-      <div style={{ fontSize: 15, fontWeight: 800, color: E.text }}>Une règle pour toutes</div>
+      <div style={{ fontSize: 15, fontWeight: 700, color: E.text }}>Une règle pour toutes</div>
       <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '3px 0 8px' }}>Un % du prix, calculé maintenant puis fixé. Rien ne part sans ta confirmation.</div>
       <label style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 13, color: E.text }}>
         Accepter les offres dès
@@ -4638,7 +4638,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     )}
     {deuxComptesVue.length > 0 && (
       <div data-ebay-deux-comptes={deuxComptesVue.length} style={bloc(E.warn)}>
-        <div style={{ fontSize: 15, fontWeight: 800, color: E.text }}>{deuxComptesVue.length} article{deuxComptesVue.length > 1 ? 's' : ''} en vente sur deux de tes comptes eBay en même temps <Pourquoi>Deux acheteurs possibles pour un article : retire une des deux annonces.</Pourquoi></div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: E.text }}>{deuxComptesVue.length} article{deuxComptesVue.length > 1 ? 's' : ''} en vente sur deux de tes comptes eBay en même temps <Pourquoi>Deux acheteurs possibles pour un article : retire une des deux annonces.</Pourquoi></div>
         {deuxComptesVue.map((d) => (
           <div key={d.numero} data-ebay-deux-comptes-paire={d.numero} style={{ padding: '8px 0', borderTop: `1px solid ${E.border}` }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: E.text }}>N°{d.numero} · {d.annonces[0].title || d.annonces[0].itemId}</div>
@@ -4653,7 +4653,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
         ligne à l'heure dite si personne ne l'arrête. Identité par SKU (§5). */}
     {dvVue.aAnnulerEbay.length > 0 && (
       <div data-ebay-a-annuler={dvVue.aAnnulerEbay.length} style={bloc(E.warn)}>
-        <div style={{ fontSize: 15, fontWeight: 800, color: E.text }}>{dvVue.aAnnulerEbay.length} article{dvVue.aAnnulerEbay.length > 1 ? 's' : ''} vendu{dvVue.aAnnulerEbay.length > 1 ? 's' : ''} {ouVenduesTexte(dvVue.aAnnulerEbay)} — programmé{dvVue.aAnnulerEbay.length > 1 ? 's' : ''} sur eBay, à annuler</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: E.text }}>{dvVue.aAnnulerEbay.length} article{dvVue.aAnnulerEbay.length > 1 ? 's' : ''} vendu{dvVue.aAnnulerEbay.length > 1 ? 's' : ''} {ouVenduesTexte(dvVue.aAnnulerEbay)} — programmé{dvVue.aAnnulerEbay.length > 1 ? 's' : ''} sur eBay, à annuler</div>
         <Pourquoi>Sinon eBay {dvVue.aAnnulerEbay.length > 1 ? 'les' : 'la'} mettra en vente à l'heure prévue, et quelqu'un pourra l'acheter une deuxième fois. L'annulation par VRM n'est pas garantie : si eBay refuse, fais-le dans le Seller Hub.</Pourquoi>
         {dvVue.aAnnulerEbay.map((d) => {
           const id = String(d.annonce.itemId); const etat = annulations[id]; const t = Date.parse(d.annonce.debut || '');
@@ -4673,7 +4673,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     )}
     {dvVue.aRetirerEbay.length > 0 && (
       <div data-ebay-a-retirer={dvVue.aRetirerEbay.length} data-cible="doublon:ebay" style={bloc(E.warn)}>
-        <div style={{ fontSize: 15, fontWeight: 800, color: E.text }}>{motArticle(dvVue.aRetirerEbay.length)} vendu{motsVendeur().e}{dvVue.aRetirerEbay.length > 1 ? 's' : ''} sur Vinted — encore en vente sur eBay <Pourquoi>Retire-{dvVue.aRetirerEbay.length > 1 ? 'les' : 'la'} d'eBay, sinon quelqu'un peut l'acheter une deuxième fois. VRM te demande de confirmer : une annonce eBay terminée ne revient pas.</Pourquoi></div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: E.text }}>{motArticle(dvVue.aRetirerEbay.length)} vendu{motsVendeur().e}{dvVue.aRetirerEbay.length > 1 ? 's' : ''} sur Vinted — encore en vente sur eBay <Pourquoi>Retire-{dvVue.aRetirerEbay.length > 1 ? 'les' : 'la'} d'eBay, sinon quelqu'un peut l'acheter une deuxième fois. VRM te demande de confirmer : une annonce eBay terminée ne revient pas.</Pourquoi></div>
         {(() => {
           // Retrait automatique allumé : la raison commune à TOUTES les lignes se
           // dit une fois (§7) ; une raison qui distingue se dit sur sa ligne.
@@ -4706,7 +4706,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     )}
     {dvVue.aRetirerEbayAilleurs.length > 0 && (
       <div data-ebay-a-retirer-ailleurs={dvVue.aRetirerEbayAilleurs.length} data-cible="doublon:ebay" style={bloc(E.warn)}>
-        <div style={{ fontSize: 15, fontWeight: 800, color: E.text }}>{motArticle(dvVue.aRetirerEbayAilleurs.length)} vendu{motsVendeur().e}{dvVue.aRetirerEbayAilleurs.length > 1 ? 's' : ''} {ouVenduesTexte(dvVue.aRetirerEbayAilleurs)} — encore en vente sur eBay <Pourquoi>Retire-{dvVue.aRetirerEbayAilleurs.length > 1 ? 'les' : 'la'} d'eBay, sinon quelqu'un peut l'acheter une deuxième fois. VRM ne le fait jamais tout seul pour une vente faite ailleurs que sur Vinted : confirme, une annonce eBay terminée ne revient pas.</Pourquoi></div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: E.text }}>{motArticle(dvVue.aRetirerEbayAilleurs.length)} vendu{motsVendeur().e}{dvVue.aRetirerEbayAilleurs.length > 1 ? 's' : ''} {ouVenduesTexte(dvVue.aRetirerEbayAilleurs)} — encore en vente sur eBay <Pourquoi>Retire-{dvVue.aRetirerEbayAilleurs.length > 1 ? 'les' : 'la'} d'eBay, sinon quelqu'un peut l'acheter une deuxième fois. VRM ne le fait jamais tout seul pour une vente faite ailleurs que sur Vinted : confirme, une annonce eBay terminée ne revient pas.</Pourquoi></div>
         {dvVue.aRetirerEbayAilleurs.map((d) => {
           const id = String(d.annonce.itemId); const etat = retraits[id];
           return (
@@ -4725,7 +4725,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     )}
     {dvVue.aRetirerVinted.length > 0 && (
       <div data-ebay-retirer-vinted={dvVue.aRetirerVinted.length} style={bloc(E.warn)}>
-        <div style={{ fontSize: 15, fontWeight: 800, color: E.text }}>{motArticle(dvVue.aRetirerVinted.length)} vendu{motsVendeur().e}{dvVue.aRetirerVinted.length > 1 ? 's' : ''} sur eBay — retire-{dvVue.aRetirerVinted.length > 1 ? 'les' : 'la'} de Vinted <Pourquoi>Sinon quelqu'un peut l'acheter une deuxième fois sur Vinted. VRM ne la retire pas de Vinted à ta place : là-bas, c'est sans retour.</Pourquoi></div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: E.text }}>{motArticle(dvVue.aRetirerVinted.length)} vendu{motsVendeur().e}{dvVue.aRetirerVinted.length > 1 ? 's' : ''} sur eBay — retire-{dvVue.aRetirerVinted.length > 1 ? 'les' : 'la'} de Vinted <Pourquoi>Sinon quelqu'un peut l'acheter une deuxième fois sur Vinted. VRM ne la retire pas de Vinted à ta place : là-bas, c'est sans retour.</Pourquoi></div>
         {dvVue.aRetirerVinted.map((d, i) => (
           <div key={String((d.commande && d.commande.orderId) || i) + d.numero} data-ebay-vendue={d.numero} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderTop: `1px solid ${E.border}`, flexWrap: 'wrap' }}>
             <div style={{ flex: '1 1 150px', minWidth: 0 }}>
@@ -4889,7 +4889,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
         <div className="vrm-alerte-ligne-sous" data-ebay-sans-preuve-court="">{noms.join(', ')} · {promet ? `se relie toute seule ${quand}` : ailleurs ? 'à relier : ouvre Vinted là où est l’extension' : cap === 'retard' ? `mets l'extension à jour (${EXT_ATTENDUE})` : blocage ? 'l\'extension ne peut pas la lire' : 'je vérifie l\'extension…'}</div>
         <Bouton variante="secondaire" data-ebay-sans-preuve-voir={nSansPreuve} onClick={() => setSansPreuveOuvert(true)} style={{ minHeight: 44, marginTop: 8 }}>{un ? 'Voir la vente' : `Voir les ${nSansPreuve} ventes`}</Bouton>
         {sansPreuveOuvert && <SheetShell onClose={() => setSansPreuveOuvert(false)} titre={`Vente${un ? '' : 's'} Vinted à relier`} data-ebay-sans-preuve-feuille="">
-          <p style={{ margin: '0 0 8px', fontSize: 14, color: E.muted, lineHeight: 1.45 }}>Relie chaque vente à son annonce, pour le retrait d'eBay. {geste}</p>
+          <p style={{ margin: '0 0 8px', fontSize: 15, color: E.muted, lineHeight: 1.45 }}>Relie chaque vente à son annonce, pour le retrait d'eBay. {geste}</p>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
           {sansPreuve.map((v) => (
             <div key={v.uid + ':' + v.tx} data-ebay-sans-preuve-vente={v.tx} className="vrm-eb-sanspreuve-vente">
@@ -5409,7 +5409,7 @@ function EbayRemises({ compte = 'principal' }) {
           {liste.map((p) => (
             <div key={p.id} data-ebay-remise={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
               <div style={{ flex: '1 1 180px', minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{p.nom || tr(`ebay.remise.type.${p.type}`)}</div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{p.nom || tr(`ebay.remise.type.${p.type}`)}</div>
                 <div data-ebay-remise-fin={p.fin || ''} style={{ fontSize: 12, color: C.muted }}>{tr(`ebay.remise.type.${p.type}`)} · {p.fin ? tr('ebay.remise.finLe', { date: finTexte(Date.parse(p.fin)) }) : tr('ebay.remise.finPasSu')}</div>
               </div>
               {!/ENDED/i.test(p.etat) && <Bouton variante="secondaire" data-ebay-remise-retirer={p.id} onClick={() => retirer(p)}>{tr('ebay.remise.retirer.ok')}</Bouton>}
@@ -5418,19 +5418,19 @@ function EbayRemises({ compte = 'principal' }) {
         </div>
       ) : <p data-ebay-remises-vide style={{ fontSize: 13, color: C.muted }}>{tr('ebay.remise.aucuneEnCours')}</p>}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-        {['periode', 'quantite'].map((t) => <button key={t} type="button" aria-pressed={type === t} data-ebay-remise-type={t} onClick={() => setType(t)} style={{ minHeight: 44, border: `1px solid ${type === t ? C.accent : C.border}`, background: type === t ? `${C.accent}12` : 'transparent', color: C.text, borderRadius: 12, padding: '0 12px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>{tr(`ebay.remise.type.${t}`)}</button>)}
+        {['periode', 'quantite'].map((t) => <button key={t} type="button" aria-pressed={type === t} data-ebay-remise-type={t} onClick={() => setType(t)} style={{ minHeight: 44, border: `1px solid ${type === t ? C.accent : C.border}`, background: type === t ? `${C.accent}12` : 'transparent', color: C.text, borderRadius: 12, padding: '0 12px', fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>{tr(`ebay.remise.type.${t}`)}</button>)}
       </div>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
         {type === 'periode'
-          ? <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, color: C.text }}>{tr('ebay.remise.pourcent')}<input data-ebay-remise-pct inputMode="numeric" value={remise} onChange={(e) => setRemise(e.target.value.replace(/\D/g, '').slice(0, 2))} style={{ ...inp, width: 70 }}/>%</label>
-          : paliers.map((v, i) => <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, color: C.text }}>{tr('ebay.remise.palier', { n: i + 2 })}<input data-ebay-remise-palier={i} inputMode="numeric" value={v} onChange={(e) => setPaliers((l) => l.map((x, k) => (k === i ? e.target.value.replace(/\D/g, '').slice(0, 2) : x)))} style={{ ...inp, width: 64 }}/>%</label>)}
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, color: C.text }}>{tr('ebay.remise.duree')}<input data-ebay-remise-jours inputMode="numeric" value={jours} onChange={(e) => setJours(e.target.value.replace(/\D/g, '').slice(0, 2))} style={{ ...inp, width: 64 }}/></label>
+          ? <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 15, color: C.text }}>{tr('ebay.remise.pourcent')}<input data-ebay-remise-pct inputMode="numeric" value={remise} onChange={(e) => setRemise(e.target.value.replace(/\D/g, '').slice(0, 2))} style={{ ...inp, width: 70 }}/>%</label>
+          : paliers.map((v, i) => <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 15, color: C.text }}>{tr('ebay.remise.palier', { n: i + 2 })}<input data-ebay-remise-palier={i} inputMode="numeric" value={v} onChange={(e) => setPaliers((l) => l.map((x, k) => (k === i ? e.target.value.replace(/\D/g, '').slice(0, 2) : x)))} style={{ ...inp, width: 64 }}/>%</label>)}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 15, color: C.text }}>{tr('ebay.remise.duree')}<input data-ebay-remise-jours inputMode="numeric" value={jours} onChange={(e) => setJours(e.target.value.replace(/\D/g, '').slice(0, 2))} style={{ ...inp, width: 64 }}/></label>
       </div>
       <p data-ebay-remise-fin-prevue style={{ fontSize: 13, color: C.text, margin: '0 0 10px' }}>{tr('ebay.remise.finPrevue', { date: finTexte(fin) })}</p>
       {annonces === undefined ? <p style={{ fontSize: 13, color: C.muted }}>…</p> : annonces === null ? <p style={{ fontSize: 13, color: C.muted }}>{tr('ebay.remise.annoncesPasSu')}</p> : (
         <div style={{ display: 'grid', gap: 4, maxHeight: 260, overflowY: 'auto', marginBottom: 10 }}>
           {annonces.slice(0, 200).map((a) => { const id = String(a.itemId); const pa = prixApres(a.price); return (
-            <label key={id} data-ebay-remise-annonce={id} style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44, fontSize: 14, color: C.text, cursor: 'pointer' }}>
+            <label key={id} data-ebay-remise-annonce={id} style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44, fontSize: 15, color: C.text, cursor: 'pointer' }}>
               <input type="checkbox" checked={!!choisies[id]} onChange={(e) => setChoisies((c) => ({ ...c, [id]: e.target.checked }))} style={{ width: 22, height: 22 }}/>
               <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.title || id}</span>
               {type === 'periode' && pa != null ? <span data-ebay-remise-prix={pa} style={{ flexShrink: 0, fontSize: 13, color: C.muted }}>{tr('ebay.remise.prixApres', { prix: eurEbay(pa) })}</span> : null}

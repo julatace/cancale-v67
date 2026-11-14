@@ -14,7 +14,7 @@
 .vrm-fp-section > h3 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .01em; color: var(--vrm-muted); text-transform: none; }
 
 .vrm-fp-champ { display: grid; gap: 5px; min-width: 0; font-size: 13px; color: var(--vrm-ink); }
-.vrm-fp-champ > span { font-weight: 500; }
+.vrm-fp-champ > span { font-weight: 400; }
 .vrm-fp-champ input, .vrm-fp-champ select, .vrm-fp-champ textarea {
   width: 100%; box-sizing: border-box; min-height: 44px; padding: 10px 12px; border-radius: 12px;
   border: 1px solid var(--vrm-line); background: var(--vrm-bg); color: var(--vrm-ink);
