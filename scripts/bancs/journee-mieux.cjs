@@ -43,7 +43,8 @@ const path = require('path');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
-const { metaVersData } = require('./_meta.cjs');
+const { metaVersData, metaDe } = require('./_meta.cjs');
+const { servir } = require('./_minipgrest.cjs');
 const fs = require('fs'), http = require('http');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || Number(process.env.PORT) || 4871;
@@ -128,20 +129,6 @@ const srv = http.createServer((q, r) => {
 srv.on('error', (e) => { console.log('❌ le port ' + PORT + ' est pris (' + e.code + ') — relance avec BANC_PORT=…'); process.exit(1); });
 srv.listen(PORT);
 
-const projette = (row, sel) => {
-  if (!sel || sel === '*') return row;
-  const out = {};
-  for (const part of sel.split(',')) {
-    const m = /^(?:([^:]+):)?(.+)$/.exec(part.trim()); if (!m) continue;
-    const src = m[2], alias = m[1] || src.split(/->>|->/).pop();
-    if (src === 'id') { out[alias] = row.id; continue; }
-    if (src === 'data') { out[alias] = row.data; continue; }
-    if (src === 'updated_at') { out[alias] = cap; continue; }
-    let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg];
-    out[alias] = v == null ? null : (/->>/.test(src) && typeof v === 'object' ? JSON.stringify(v) : (/->>/.test(src) ? String(v) : v));
-  }
-  return out;
-};
 
 const SANS_ATTENTE = { v: 1, w: ['barre', 'afaire', 'vendu', 'semaine', 'recentes', 'stock', 'tendances'].map((id) => ({ id, t: { barre: 'pleine', afaire: 'pleine', recentes: 'grand', tendances: 'pleine' }[id] || 'moyen' })), connus: ['barre', 'afaire', 'vendu', 'semaine', 'attente', 'recentes', 'stock', 'jours14', 'performance', 'urssaf', 'envoyer', 'retirer', 'messages', 'prix', 'tendances'] };
 const ouvrir = async (b, vp, sombre, sansAttente) => {
@@ -159,13 +146,15 @@ const ouvrir = async (b, vp, sombre, sansAttente) => {
     if (route.request().method() !== 'GET') return j([]);
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
-    const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || '';
-    const eq = /id=eq\.([^&]*)/.exec(u);
-    if (eq && eq[1] === 'main') return j([projette({ id: 'main', data: main }, sel)]);
-    if (eq) return j(LIGNES.filter((r) => r.id === eq[1]).map((r) => projette(r, sel)));
-    const lk = /id=like\.([^&]*)/.exec(u);
-    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(LIGNES.filter((r) => re.test(r.id)).map((r) => projette(r, sel))); }
-    return j([]);
+    // (14 nov., bancs au vert) La base servie comme PostgREST (`_minipgrest`) : `id=in.(…)`, `or=(…)`,
+    // filtres `data->>k`, projections mixtes, la colonne `meta` entière. L'ancien faux ne servait que
+    // `id=eq.` et `id=like.` : depuis que l'app lit les e-mails de suivi, les achats et les panneaux par
+    // `id=in.(…)`, la scène (5 à retirer, 8 à vérifier) n'arrivait plus à l'écran — J et K mesuraient
+    // une Ma journée sans ses colis. Toutes les lignes sont celles de la session (`owner=eq.` ignoré).
+    if (!/\/rest\/v1\/app_data/.test(u)) return j([]);
+    const url = u.replace(/[?&]owner=eq\.[^&]*/, (m) => (m[0] === '?' ? '?' : '')).replace('?&', '?');
+    const s = servir([{ id: 'main', data: main }, ...LIGNES].map((r) => ({ ...r, meta: metaDe(r.data), updated_at: cap })), url.replace(/\+/g, ' ').replace(/#/g, '%23'), route.request().headers());
+    return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': s.range }, body: JSON.stringify(s.body) });
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
   // Le bénéfice se publie en lisant les ventes (écran Ventes) ; Colis publie ses prêts.
@@ -234,7 +223,9 @@ const lire = (pg) => pg.evaluate(() => {
     for (let n = tw.nextNode(); n; n = tw.nextNode()) {
       const p = n.parentElement; if (!p || !n.textContent.trim()) continue;
       // Hors jeu : les dernières ventes (prix, N°, tailles) et la carte de la semaine (axe des jours, barres).
-      if (p.closest('.vrm-day-recent, [data-carte-jours], svg, [aria-hidden="true"], .vrm-screen-head, [hidden], .vrm-sr-only')) continue;
+      // (14 nov.) Depuis Ma journée v2 (9 nov.), l'axe des jours est la frise des sept jours (`[data-fu-semaine]`) :
+      // « 27 28 29 30 31 1 2 » sont des DATES (le 2 = aujourd'hui), pas des quantités.
+      if (p.closest('.vrm-day-recent, [data-carte-jours], [data-fu-semaine], svg, [aria-hidden="true"], .vrm-screen-head, [hidden], .vrm-sr-only')) continue;
       if (!vu(p)) continue;
       morceaux.push(n.textContent);
     }
