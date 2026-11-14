@@ -97,7 +97,23 @@ dès qu'il y a des ventes eBay.
 
 ## 5. Résultat du banc
 
-(rempli à la fin du lot)
+`scripts/bancs/frais-carte.cjs` (23 contrôles × 4 passes : 390 tactile et 1512, clair et sombre) :
+- **branche** : 92 / 92 verts (passe complète avant le merge) ; après le merge de `origin/main`, 87 / 92 sur
+  une machine saturée (charge 60–80, d'autres sessions y construisaient en même temps) : en 390 sombre, le fond
+  OpenFreeMap n'est pas arrivé dans ses 12 s (la carte tombe alors en liste, comme prévu : « la liste reste
+  juste ») et « Tout » a pris 1 078 ms à 1512 ; ces deux passes relancées seules : voir le rapport final ;
+- **mutant** (`{s.frais == null ? '—' : …}` ⇒ `eur(s.frais || 0)`) : **rouge** (2 contrôles : Leboncoin
+  écrit « 0 € ») ;
+- **`origin/main`** : **rouge** (ni « Frais de l'année » ni « Carte de tes ventes »).
+
+Vitesse (chronométrée DANS la page, du clic à la dernière bulle posée) : « Tout » = 1 959 ventes agrégées et
+reposées en 233–535 ms. L'agrégat seul : 6 ms pour 2 000 ventes (audit). Un défaut trouvé et corrigé par le
+banc : lire la largeur de la carte après chaque bulle posée forçait une mise en page de tout l'écran Argent
+par bulle (2,2 s pour 11 bulles) — les bulles sont désormais mises à jour sur place, la largeur lue une fois.
+Captures regardées (390/1512, clair/sombre : frais, monde, France, détail) — aucune donnée réelle.
+
+Le banc sert aussi la famille `harvest_*_txn_*` **avec `Range`** (pages de 1 000, total) : le harnais
+commun rendait tout d'un coup, et `lireTout` y voyait une page pleine sans fin (« pays pas su »).
 
 ## Geste de Julien
 
