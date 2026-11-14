@@ -142,6 +142,7 @@ import { ligneEmailsCompte } from "../emailsCompteLie.js";
 // (11 nov., lot traduction) Les textes de Paramètres passent par `tr()` (src/i18n/index.js).
 import { tr, monnaie, LANGUES, NOMS_LANGUES, langueCourante, choisirLangue } from '../i18n/index.js';
 import { useLangue } from '../i18n/react.js';
+import { ReglagesAidesAccueil } from '../accueilReste/AccueilReste.jsx';   // (14 nov., idées 136 139 140 147)
 import MIGRATION_SQL from "../../supabase/migrations/001-multi-utilisateurs.sql?raw";
 
 // ⟦← App.jsx #10⟧
@@ -2194,6 +2195,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'verifier', type:'panneau', nu:true, ic:'scan', lib:tr('reglages.verifier.lib'), desc:tr('reglages.verifier.desc'), data:{ 'data-reglage-verifier':'' }, el:<VerifierInstallationApp comptes={comptes} onNav={setTab} seule/> },
       // (2 nov.) La visite en bulles, rejouée sur son clic (src/VisiteBulles.jsx).
       { id:'visite', type:'action', ic:'play', lib:tr('reglages.visite.lib'), desc:tr('reglages.visite.desc'), onClick:()=>{ try { window.dispatchEvent(new Event('vrm:visite')); } catch (_) {} }, data:{ 'data-reglage-visite':'' } },
+      // (14 nov., accueil, le reste) La visite des écrans, les mots expliqués, le conseil du jour (par compte),
+      // et — au propriétaire seul — le lien de l'appel de bienvenue des comptes Pro (src/accueilReste/).
+      { id:'aides-accueil', type:'panneau', nu:true, ic:'spark', lib:tr('reglages.aidesAccueil.lib'), desc:tr('reglages.aidesAccueil.desc'), data:{ 'data-reglage-aides-accueil':'' }, el:<ReglagesAidesAccueil proprietaire={proprioInst === true}/> },
       // (6 nov.) L'accompagnement : une bulle sur le bon bouton, deux par jour au plus (src/accompagnement.js).
       // « Pas su » (ligne pas lue) : l'interrupteur ne ment pas, la phrase le dit.
       { id:'conseils', type:'switch', ic:'spark', lib:tr('reglages.conseils.lib'), desc: conseilsOn === null ? tr('reglages.conseils.pasSu') : tr('reglages.conseils.desc'), on:conseilsOn === true,

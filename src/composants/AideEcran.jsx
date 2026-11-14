@@ -21,6 +21,8 @@ import { phraseVendeur } from '../profilVendeur.js';
 import { AideAnimation } from './AideAnimation.jsx';
 import { AideVideo } from './AideVideo.jsx';
 import './aide-ecran.css';
+// (14 nov., idées 136 et 139) « Revoir la visite de cet écran » et « Les mots de VRM ».
+import { RevoirVisite, GlossaireListe } from '../accueilReste/AccueilReste.jsx';
 
 export const NOMS_ECRANS_AIDE = {
   journee: 'Ma journée', annonces: 'Annonces', ventes: 'Ventes', colis: 'Colis', messages: 'Messages', achats: 'Achats',
@@ -76,6 +78,7 @@ export function AideEcranFeuille({ cle, onClose, onSignaler, Feuille = SheetShel
       <AideVideo cle={cle}/>
       {/* (11 nov.) L'animation de l'écran : une scène par geste, le geste en cours s'allume dessous. */}
       <AideAnimation cle={cle} onEtape={setEtape}/>
+      <RevoirVisite cle={cle} onAvant={onClose}/>
       {/* (10 nov., lot J) EN TÊTE : les 3 à 5 gestes de cet écran (sans vidéo), texte de scripts/aide-contenu.cjs. */}
       {etapes.length ? (
         <ol className="vrm-aide-etapes" data-aide-etapes={etapes.length}>
@@ -100,6 +103,7 @@ export function AideEcranFeuille({ cle, onClose, onSignaler, Feuille = SheetShel
           {faqAide(fiches).map((f) => <FicheAide key={'faq-' + f.id} f={f} ouverte={false} avecEcran={false} onEmmener={allerA} Bouton={Bouton}/>)}
         </ul>
       </> : null}
+      <GlossaireListe groupe/>
       <h3 className="vrm-aide-tete">Questions fréquentes</h3>
       <ul className="vrm-aide-groupe" data-aide-questions={a.questions.length}>
         {a.questions.map(([qq, r], i) => (

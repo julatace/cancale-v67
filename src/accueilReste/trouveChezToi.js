@@ -62,6 +62,17 @@ export function lignesTrouve({ sansNumero = null, colisAposter = null, urssafMoi
   };
 }
 
+// « Juste après l'import » : `etats` = { [uid]: état | null } (src/importDepart.js
+// `lireImportDepart`), `null` = pas su. Un import EN COURS (attente, encours, pause)
+// ⇒ pas encore ; un import FINI ⇒ prêt ; aucun import (ligne absente, arrêté) ⇒ prêt
+// si le dressing a été lu (`dressingLu`). Pas su ⇒ le dressing seul décide.
+export function importPret(etats, dressingLu) {
+  const l = etats && typeof etats === 'object' ? Object.values(etats).filter(Boolean) : [];
+  if (l.some((e) => ['attente', 'encours', 'pause'].includes(e.etat))) return false;
+  if (l.some((e) => e.etat === 'fini')) return true;
+  return dressingLu === true;
+}
+
 // La carte : 'cachee' · 'liste' (au moins une chose à régler) · 'rien' (tout est su
 // et vaut 0) · 'attente' (rien de su encore : on ne montre pas une liste vide).
 // `pret` : l'import est fini OU le dressing a été lu (la preuve du parcours, étape Vinted).
