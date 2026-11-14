@@ -91,14 +91,26 @@ refusée à l'entrée (les lignes « main propre » n'ont pas de compte dans les
   sous `:where(.ia)` (à retirer quand `src/design/studio.css` arrive) ; le rouge (`--ia-rouge-double`)
   ne sert qu'à `.sb-plaque.is-double`.
 
-## Preuves
+## Preuves (après la fusion de `origin/main`)
 
-- `node scripts/audit-vente-main-propre.cjs` : voir le compte rendu (R verdict sur les vraies
-  `toutSurLeNumero` + `histoireArticle`, G geste et annulations, T totaux + bilan + bénéfice,
-  P reçu PDF relu par pdfjs, C branchement et absence de 159/161/162). `--prouve` : 15 mutations.
-- Sur `origin/main` (arbre extrait, audit copié) : rouge (les modules n'existent pas).
-- `node scripts/bancs/vente-main-propre.cjs` après `npm run build` : 390 tactile et 1512, clair et
-  sombre ; captures `$TMPDIR/vrm-bancs/vente-main-propre/`.
+- `node scripts/audit-vente-main-propre.cjs` : **43 verts** — R verdict sur les vraies `toutSurLeNumero`
+  + `histoireArticle` (N° exact, archive, inconnu, 50 titres identiques, doublon ⇒ question puis son
+  toucher, même paire deux fois, vendue Vinted à envoyer / en route / finie, annulée ⇒ possible,
+  Leboncoin, eBay, Vestiaire, pas lu ⇒ refus, déjà vendue en main propre, marquée, sortie, compte
+  exclu) ; G geste et annulations (5 s exacte ; remise en stock : décision d'avant, case si libre) ;
+  T vendu, CA URSSAF, bénéfice (`ventesAutresBenefice`), bilan serveur ; P reçu PDF relu par pdfjs ;
+  C une règle fiche + feuille, verdict relu au clic, aucune trace de 159/161/162.
+  `--prouve` : **17/17 mutations attrapées**. Sur l'arbre de départ (578bd343, `git archive`) : rouge.
+- `node scripts/bancs/vente-main-propre.cjs` (après `npm run build`) : **88 OK, 0 KO** à 390 tactile
+  et 1512, clair et sombre — deux touchers mesurés (pointerdown), décision + paiement + sortie du
+  stock, Ma journée « vendu 45 € / versé 45 € » du jour (`data-jv2-vendu`, `data-jv2-verse`),
+  « Annuler » ⇒ stockage d'avant exact et chiffres d'avant, « Vente annulée » dite, reçu PDF
+  téléchargé, refus (inconnu, vendue sur Vinted), archive proposée puis prise par son toucher,
+  doublon ⇒ question + plaques rouges, cibles ≥ 44 px, aucun débordement, aucune erreur. Captures
+  regardées (`$TMPDIR/vrm-bancs/vente-main-propre/`) : bénéfice du mois 8 € (45 − 37), vendu du mois
+  125 € (80 + 45), cohérents.
+- Audits passés : build, traduction, tdz, variables, coherence, identite, csp, fonctions-api, urssaf,
+  violet, rouge-doublon, quoi-de-neuf, annuler-commandes, saisie-rapide, bilan-semaine, bilan-mois.
 
 ## Geste de Julien
 
