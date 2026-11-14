@@ -50477,7 +50477,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // l'identifiant de CETTE annonce et son N° ; ses gestes (« Plus d'actions ») y sont rendus (`DansFiche`).
             const flAnn = attrsFicheLigne({ contexte: 'annonce', site: 'vinted', cle: 'a' + cleCarte, nums: num ? [num] : [], item: String(it.id || ''), photo: typeof it.photo === 'string' ? it.photo : ((it.photo && it.photo.url) || ''), titre: it.title || '', prix: prix(it.price, it.currency) || '' });
             return (
-              <div className="vrm-ann-card vrm-fiche vrm-vignette sb-rangee" key={cleCarte} data-sb-avant-cle={cleCarte} data-sb-alerte={soldBord ? 'vendue' : enDouble ? 'double' : undefined} data-carte-annonce={it.id} data-fiche="29oct" data-fiche-ouverte={ouverte?'1':'0'} data-vignette-cle={cleCarte} data-vignette-double={enDouble?'1':undefined}
+              <div className={'vrm-ann-card vrm-fiche vrm-vignette' + (vuePaires === 'liste' ? ' sb-rangee' : '')} key={cleCarte} data-sb-avant-cle={cleCarte} data-sb-alerte={soldBord ? 'vendue' : enDouble ? 'double' : undefined} data-carte-annonce={it.id} data-fiche="29oct" data-fiche-ouverte={ouverte?'1':'0'} data-vignette-cle={cleCarte} data-vignette-double={enDouble?'1':undefined}
                 {...flAnn}
                 style={{borderRadius:12,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden',...(estFloute(it)?STYLE_FLOU:null)}}>
                 <div className="vrm-ann-overview" style={{display:'flex',flexDirection:'column',position:'relative'}}>

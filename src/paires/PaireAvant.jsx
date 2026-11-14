@@ -69,12 +69,13 @@ export function PaireAvantHote({ rendre, Retour = null }) {
     const row = rangeeDe(cle);
     if (!row) { setPlace(null); if (cle) fermerAvant(); return undefined; }
     const liste = row.closest('[data-sb-liste]');
-    row.setAttribute('data-sb-avant', '1');
-    if (liste) liste.setAttribute('data-sb-recul', '1');
+    // Les marques du contrat commun (`.sb-avant`, `.sb-recul`, src/design/studio.css) et leurs attributs (bancs).
+    row.setAttribute('data-sb-avant', '1'); row.classList.add('sb-avant');
+    if (liste) { liste.setAttribute('data-sb-recul', '1'); liste.classList.add('sb-recul'); }
     setPlace(row.querySelector('[data-sb-avant-place]'));
     const reduit = (() => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } })();
     const raf = requestAnimationFrame(() => { try { row.scrollIntoView({ block: 'nearest', behavior: reduit ? 'auto' : 'smooth' }); } catch (_) {} });
-    return () => { cancelAnimationFrame(raf); row.removeAttribute('data-sb-avant'); if (liste) liste.removeAttribute('data-sb-recul'); };
+    return () => { cancelAnimationFrame(raf); row.removeAttribute('data-sb-avant'); row.classList.remove('sb-avant'); if (liste) { liste.removeAttribute('data-sb-recul'); liste.classList.remove('sb-recul'); } };
   }, [cle]);
   // Échap referme la carte (la fiche, ouverte par-dessus, garde son propre Échap).
   React.useEffect(() => {
