@@ -34,7 +34,8 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/jav
 const ECRANS = [
   { nom: 'journee', tab: 'journee', w: 390, h: 844 },
   // (14 nov.) « À retirer » vit dans Achats (Colis a été réparti entre Ventes et Achats) : le code est sur la ligne.
-  { nom: 'retirer', tab: 'achats', w: 390, h: 844, defile: Number(process.env.DEFILE_RETIRER) || 430 },
+  // Depuis la refonte d'Achats, « À retirer » est replié : on l'ouvre par le chemin de l'app (`vrm:retirer-ouvrir`) et on amène sa section en haut.
+  { nom: 'retirer', tab: 'achats', w: 390, h: 844, evenement: 'vrm:retirer-ouvrir', vers: '[data-retirer-repli]' },
   { nom: 'numeros', tab: process.env.TAB_NUMEROS || 'annonces', w: 390, h: 844, defile: 620 },
   { nom: 'compta', tab: 'compta', w: 390, h: 844, gestes: [/^\s*Ventes\s*$/, /^\s*Argent\s*$/, /^\s*Argent\s*$/, /^\s*Déclarer\s*$/, /^\s*Micro-entrepreneur/, /^\s*Par mois\s*$/] },
   { nom: 'messages', tab: 'messages', w: 390, h: 844 },
@@ -87,6 +88,8 @@ async function capturer(nav, e, theme) {
     if (await b.count()) { await b.click().catch(() => {}); await pg.waitForTimeout(1500); }
     else console.log(`  (geste ${g} introuvable sur ${e.nom})`);
   }
+  if (e.evenement) { await pg.evaluate((n) => window.dispatchEvent(new Event(n)), e.evenement); await pg.waitForTimeout(1500); }
+  if (e.vers) { await pg.evaluate((sel) => { const x = document.querySelector(sel); if (x) x.scrollIntoView({ block: 'start' }); }, e.vers); await pg.waitForTimeout(800); }
   if (e.defile) { await pg.evaluate((y) => { const m = document.querySelector('.vrm-main'); window.scrollTo(0, y); if (m) m.scrollTop = y; }, e.defile); await pg.waitForTimeout(800); }
   const exemple = await pg.evaluate(() => { try { return sessionStorage.getItem('vrm_mode_exemple') === '1'; } catch (_) { return false; } });
   const png = path.join(os.tmpdir(), `vrm-acc-${process.pid}-${e.nom}-${theme}.png`);

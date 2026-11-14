@@ -155,9 +155,15 @@ async function parcours(nav, W, theme) {
       dit(r.titres > 0 && r.sans === 0 && r.chargees >= r.titres, `${T} P1 ${tab} : chaque rangée a une image chargée (${r.chargees} photos d’exemple chargées pour ${r.titres} articles, ${r.sans} vignette(s) neutre(s))`, JSON.stringify(r));
     }
     if (tab === 'achats') {   // (Colis vit dans Ventes « À envoyer » et Achats « À retirer » : les codes et les points sont ici)
+      // (14 nov., refonte d'Achats) « À retirer » est replié (`RepliRetirerAchats`) : on l'ouvre par le chemin
+      // de l'app elle-même (`vrm:retirer-ouvrir`, celui de Ma journée et des notifications d'un colis).
+      // (La section reste montée, repliée : `.vrm-rpf-ouvrir` existe déjà, caché — on ouvre toujours.)
+      await o.pg.evaluate(() => window.dispatchEvent(new Event('vrm:retirer-ouvrir')));
+      await o.pg.waitForSelector('.vrm-rpf-ouvrir', { state: 'visible', timeout: 8000 }).catch(() => {});
+      await o.pg.waitForTimeout(600);
       // Le code ne s'écrit qu'à l'ouverture de la ligne : on ouvre le premier colis « à retirer ».
-      await o.pg.evaluate(() => { const b = document.querySelector('.vrm-rpf-ouvrir'); if (b) b.scrollIntoView({ block: 'center' }); });
-      await o.pg.click('.vrm-rpf-ouvrir').catch(() => {});
+      await o.pg.evaluate(() => { const b = [...document.querySelectorAll('.vrm-rpf-ouvrir')].find((x) => x.getBoundingClientRect().width > 0); if (b) b.scrollIntoView({ block: 'center' }); });
+      await o.pg.locator('.vrm-rpf-ouvrir:visible').first().click().catch(() => {});
       await o.pg.waitForTimeout(700);
       const c = await marquesCodes(o.pg);
       const codes = c.filter((x) => !/adresse|vrm-rpf-adr/.test(x.quoi));
