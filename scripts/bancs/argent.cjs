@@ -159,8 +159,14 @@ const lireStats = (pg) => pg.evaluate(() => {
         if (scen === 'C') dit(Q.declarer && Q.declarer.v === '' && Q.declarer.n === 'Rien' && /particulier/.test(Q.declarer.note), `N3 ${T} : particulier ⇒ « Rien » (pas d'URSSAF)`, JSON.stringify(Q.declarer));
         dit(!tete.encaisse && !tete.nan && !tete.auMoins0, `N3 ${T} : jamais « encaissé », NaN, undefined ni « au moins 0 »`, JSON.stringify({ e: tete.encaisse, n: tete.nan, z: tete.auMoins0 }));
         if (tel) {
-          const rangs = [...new Set(tete.q.map((x) => x.y))];
-          dit(rangs.length === 2 && tete.q.every((x) => x.h >= 44), `N7 ${T} : 2 widgets par ligne, ≥ 44 px`, JSON.stringify(tete.q.map((x) => [x.x, x.y, Math.round(x.h)])));
+          // (14 nov., Studio bleu clair — décision de Julien, « tu peux changer les dispositions ») Le Bento léger :
+          // « Vendu » en grande tuile pleine largeur, « Reçu » · « Bénéfice » côte à côte, « À déclarer » pleine largeur.
+          // Avant : 2 widgets par ligne (deux lignes égales).
+          const Qy = Object.fromEntries(tete.q.map((x) => [x.id, x]));
+          const bento = Qy.vendu && Qy.recu && Qy.benefice && Qy.declarer
+            && Qy.recu.y === Qy.benefice.y && Qy.vendu.y < Qy.recu.y && Qy.declarer.y > Qy.recu.y
+            && Qy.vendu.w > Qy.recu.w * 1.8 && Qy.declarer.w > Qy.recu.w * 1.8 && Qy.vendu.h >= Qy.recu.h;
+          dit(bento && tete.q.every((x) => x.h >= 44), `N7 ${T} : le Bento (Vendu en grand, Reçu · Bénéfice, À déclarer), ≥ 44 px`, JSON.stringify(tete.q.map((x) => [x.id, x.x, x.y, Math.round(x.w), Math.round(x.h)])));
           dit(!tete.deborde, `N7 ${T} : rien ne déborde`);
         } else dit(new Set(tete.q.map((x) => x.y)).size === 1, `N7 ${T} : les 4 widgets sur une ligne`, JSON.stringify(tete.q.map((x) => [x.x, x.y])));
         const longues = tete.resumes.filter((t) => t.split(/\s+/).length > 12);

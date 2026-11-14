@@ -103,7 +103,10 @@ function mesurer({ racine, tactile }) {
     const pile = [];
     for (let x = el; x; x = x.parentElement) {
       const cs = getComputedStyle(x);
-      const c = rgbs(cs.backgroundColor)[0];
+      // une capsule DESSINÉE en ::before (position absolue, sous le texte) est le vrai fond du texte
+      const av = getComputedStyle(x, "::before");
+      const cAv = av && av.content !== "none" && av.position === "absolute" ? rgbs(av.backgroundColor)[0] : null;
+      const c = cAv && cAv.a >= 0.5 ? cAv : rgbs(cs.backgroundColor)[0];
       const g = cs.backgroundImage && cs.backgroundImage !== 'none' ? rgbs(cs.backgroundImage).filter((k) => k.a >= 0.5) : [];
       pile.push({ c, g });
       if ((c && c.a >= 0.99) || g.length) break;
