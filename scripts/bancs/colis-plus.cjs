@@ -3,9 +3,9 @@
 // `{amount}`), leur transaction (`harvest_111_txn_{tx}` → item → fiche N°), leurs bordereaux e-mail
 // (`email_bord_{tx}` : PDF 4×6 qui porte « ETIQUETTE <tx> », `suivi`), le stock d'emballages (`vrm_emballages`).
 // Exige (jugé sur data-* et sur ce qui est ÉCRIT, §6.4) :
-//  A. 98 « 4 par page A4 » (Réglages → Imprimante = 'planche4') : « Tout imprimer » des 9 bordereaux ⇒ UN PDF de
-//     3 pages A4, les 9 étiquettes dans l'ORDRE de l'aperçu (relu par pdf.js) ; l'aperçu dit « 3 feuilles » ; le
-//     résultat dit 9 étiquettes / 3 feuilles / l'échelle ;
+//  A. 98 « 4 par page A4 » (papier retenu = 'planche4') : « Imprimer (9) » ⇒ UN PDF de 3 pages A4, les 9 étiquettes
+//     dans l'ORDRE du lot (relu par pdf.js) ; le résultat dit 9 étiquettes / 3 feuilles / l'échelle ; le papier se
+//     change d'un toucher à côté du bouton, retenu (14 nov., impression-simple : A et F suivent le nouveau parcours) ;
 //  B. 96 Préparer : le format retenu pour ce modèle est PROPOSÉ (« Prendre »), RIEN n'est écrit avant son toucher,
 //     « Prendre » écrit SON choix pour CE colis seulement ; 97 : la fourniture au seuil est dite (ambre) ;
 //  C. 100 Mains libres (fausse reconnaissance du navigateur) : bouton ≥ 44 px ; « suivant » / « précédent »
@@ -151,45 +151,42 @@ const deborde = (pg, racine) => pg.evaluate((r) => { const s = document.querySel
 const petites = (pg, racine) => pg.evaluate((r) => [...document.querySelectorAll(`${r} button, ${r} a, ${r} summary`)].filter((e) => e.getBoundingClientRect().width > 0 && !e.disabled).map((e) => ({ q: (e.getAttribute('aria-label') || e.textContent || '').trim().slice(0, 24), h: Math.round(e.getBoundingClientRect().height) })).filter((x) => x.h < 44), racine);
 
 // ── A · 98 : 4 bordereaux par page A4 ─────────────────────────────────────────
+// (14 nov., impression-simple) A et F jugeaient l'ANCIEN parcours (le papier choisi dans la feuille « Tout imprimer »,
+// le tampon réglé dans son aperçu AVANT d'imprimer, « Tout est sorti ? » dans la même feuille). Le parcours est
+// maintenant : « Imprimer (N) » ⇒ le PDF (préparé d'avance) ; le papier retenu se change d'un toucher à côté ; le tampon
+// d'un bordereau se corrige APRÈS, sur sa vignette ; « Il en manque » réimprime ceux-là. Les MÊMES exigences, sur ce parcours.
+const lirePdfVisionneuse = (pg) => pg.evaluate(async () => { const f = document.querySelector('[data-visionneuse-cadre]'); if (!f) return null; const r = await fetch(f.src); const u = new Uint8Array(await r.arrayBuffer()); let s = ''; for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s); });
+const attendrePdfVisionneuse = async (pg, nAvant, ms = 240000) => { await pg.waitForFunction((n) => window.__pdfs.length > n && !!document.querySelector('[data-visionneuse-pdf="pret"] [data-visionneuse-cadre]'), nAvant, { timeout: ms }).catch(() => {}); return lirePdfVisionneuse(pg); };
+const fermerVisionneuse = async (pg) => { await cliquer(pg, '[data-visionneuse-fermer]'); await pg.waitForTimeout(400); };
 async function lot(b, nom, vue, LIGNES) { try { return await lotBrut(b, nom, vue, LIGNES); } catch (e) { dit(false, `${nom} : A le lot s’exécute`, String(e.message).slice(0, 200)); } }
 async function lotBrut(b, nom, vue, LIGNES) {
   console.log(`\n— A. 4 par page A4 · ${nom}`);
   const { ctx, pg, errs, consoleErrs } = await ouvrir(b, vue, LIGNES, { imprimante: process.env.CP_IMPR || 'planche4' });
   try {
-    await pg.waitForSelector('button[data-lot-ouvrir="1"]', { timeout: 20000 }).catch(() => {});
-    const btn = await pg.$('button[data-lot-ouvrir="1"]');
-    if (!btn) { dit(false, `${nom} : « Tout imprimer » est là`); return; }
-    await btn.click();
-    await pg.waitForSelector('[data-lot-ligne]', { timeout: 8000 }).catch(() => {});
-    const ap = await pg.evaluate(() => [...document.querySelectorAll('[data-lot-ligne]')].map((e) => ({ cle: e.getAttribute('data-lot-ligne'), num: e.getAttribute('data-lot-num'), coche: e.getAttribute('data-coche') === '1' })));
-    for (const x of ap) { if (!x.coche) await pg.locator(`[data-lot-ligne="${x.cle}"] input`).first().check().catch(() => {}); }
-    await pg.waitForTimeout(300);
-    const papier = await pg.evaluate(() => { const s = document.querySelector('[data-lot-section="apercu"]'); return s ? { p: s.getAttribute('data-lot-papier'), t: (s.querySelector('h3 span') || {}).textContent || '' } : null; });
-    dit(ap.length === 9 && papier && papier.p === 'planche4' && /\b3\b/.test(papier.t), `${nom} : A1 l'aperçu des 9 bordereaux dit « 3 feuilles A4, 4 par page »`, JSON.stringify({ n: ap.length, papier }));
-    // A8 · l'imprimante se choisit ICI, au moment d'imprimer (le réglage `vrm_imprimante`, mémorisé).
-    const choix = await pg.evaluate(() => [...document.querySelectorAll('[data-lot-imprimante-choix]')].map((e) => e.getAttribute('data-lot-imprimante-choix')));
-    await cliquer(pg, '[data-lot-imprimante-choix="thermique"]'); await pg.waitForTimeout(900);
-    const apresTh = await pg.evaluate(() => ({ seg: (document.querySelector('[data-lot-imprimante]') || {}).getAttribute && document.querySelector('[data-lot-imprimante]').getAttribute('data-lot-imprimante'), papier: (document.querySelector('[data-lot-section="apercu"]') || { getAttribute: () => null }).getAttribute('data-lot-papier'), ls: localStorage.getItem('vrm_imprimante') }));
-    await cliquer(pg, '[data-lot-imprimante-choix="planche4"]'); await pg.waitForTimeout(900);
-    const apresPl = await pg.evaluate(() => { const p = document.querySelector('[data-lot-imprimante-choix][aria-pressed="true"]'); return localStorage.getItem('vrm_imprimante') + (p && p.getAttribute('data-lot-imprimante-choix') === 'planche4' ? '' : ' (segment pas à jour)'); });
-    dit(JSON.stringify(choix) === JSON.stringify(['normale', 'thermique', 'planche4']) && apresTh.seg === 'thermique' && apresTh.papier === '10x15' && /thermique/.test(apresTh.ls || '') && /planche4/.test(apresPl || '') && !/segment/.test(apresPl || ''),
-      `${nom} : A8 « Tout imprimer » montre le choix Classique · 4 par page · Thermique, et le retient`, JSON.stringify({ choix, apresTh, apresPl }));
-    await shot(pg, `${nom}-lot-apercu`);
-    await cliquer(pg, 'button[data-lot-imprimer]');
-    for (let i = 0; i < 1000; i++) {   // (thermique : chaque étiquette est rendue par pdf.js ; jusqu’à 4 min sur une machine chargée)
-      const etat = await pg.evaluate(() => {
-        if (window.__pdfs && window.__pdfs.length) return 'pdf';
-        const clic = (l) => { const bs = [...document.querySelectorAll('button')].filter((x) => x.innerText.trim() === l && x.offsetParent); if (bs.length) { bs[bs.length - 1].click(); return true; } return false; };
-        if (clic("J'ai vérifié, imprimer") || clic('Préparer quand même les PDF')) return 'clic';
-        const f = document.querySelector('[data-placeur-tampon]:not([data-placeur-tampon="charge"]) [data-tampon-imprimer]'); if (f) { f.click(); return 'clic'; }
-        return 'attente';
-      });
-      if (etat === 'pdf') break;
-      await pg.waitForTimeout(250);
-    }
-    const b64 = await pg.evaluate(async () => { const bl = window.__pdfs[window.__pdfs.length - 1]; if (!bl) return null; const u = new Uint8Array(await bl.arrayBuffer()); let s = ''; for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s); });
-    const diag = b64 ? '' : await pg.evaluate(() => JSON.stringify({ placeur: [...document.querySelectorAll('[data-placeur-tampon]')].map((e) => e.getAttribute('data-placeur-tampon')), dialogues: [...document.querySelectorAll('[role=dialog],[role=alertdialog]')].map((e) => (e.getAttribute('aria-label') || '') + ':' + (e.innerText || '').replace(/\s+/g, ' ').slice(0, 600)) }));
-    dit(!!b64, `${nom} : A2 UN PDF est produit`, diag + ' ' + consoleErrs.slice(-4).join(' | '));
+    // A8 · le papier retenu se dit à côté d'« Imprimer » et se change d'un toucher (le réglage `vrm_imprimante`, mémorisé).
+    await pg.waitForSelector('[data-impr-format]', { timeout: 30000 }).catch(() => {});
+    const f0 = await pg.evaluate(() => (document.querySelector('[data-impr-format]') || { getAttribute: () => null }).getAttribute('data-impr-format'));
+    await cliquer(pg, '[data-impr-format]'); await pg.waitForSelector('[data-impr-papier-choix]', { timeout: 5000 }).catch(() => {});
+    const choix = await pg.evaluate(() => [...document.querySelectorAll('[data-impr-papier-choix]')].map((e) => e.getAttribute('data-impr-papier-choix')));
+    await cliquer(pg, '[data-impr-papier-choix="thermique"]'); await pg.waitForTimeout(900);
+    await pg.waitForFunction(() => /thermique/.test(localStorage.getItem('vrm_imprimante') || ''), null, { timeout: 5000 }).catch(() => {});   // `save` écrit un instant après
+    const apresTh = await pg.evaluate(() => ({ lien: (document.querySelector('[data-impr-format]') || { getAttribute: () => null }).getAttribute('data-impr-format'), ls: localStorage.getItem('vrm_imprimante') }));
+    await cliquer(pg, '[data-impr-format]'); await pg.waitForSelector('[data-impr-papier-choix="planche4"]', { timeout: 5000 }).catch(() => {});
+    await cliquer(pg, '[data-impr-papier-choix="planche4"]'); await pg.waitForTimeout(900);
+    await pg.waitForFunction(() => /planche4/.test(localStorage.getItem('vrm_imprimante') || ''), null, { timeout: 5000 }).catch(() => {});
+    const apresPl = await pg.evaluate(() => localStorage.getItem('vrm_imprimante') + ' ' + (document.querySelector('[data-impr-format]') || { getAttribute: () => '' }).getAttribute('data-impr-format'));
+    dit(f0 === 'planche4' && JSON.stringify(choix) === JSON.stringify(['normale', 'thermique', 'planche4']) && apresTh.lien === 'thermique' && /thermique/.test(apresTh.ls || '') && /planche4.* planche4$/.test(apresPl || ''),
+      `${nom} : A8 à côté d'« Imprimer » : le papier retenu, changé d'un toucher (Classique · Thermique · 4 par page), et retenu`, JSON.stringify({ f0, choix, apresTh, apresPl }));
+    await pg.waitForFunction(() => { const e = document.querySelector('[data-impr-lot]'); return e && e.getAttribute('data-impr-pret') === '1'; }, null, { timeout: 240000 }).catch(() => {});
+    const n0 = await pg.evaluate(() => window.__pdfs.length);
+    await cliquer(pg, '[data-impr-lot]');
+    const b64 = await attendrePdfVisionneuse(pg, n0 - 1);
+    const diag = b64 ? '' : await pg.evaluate(() => JSON.stringify({ dialogues: [...document.querySelectorAll('[role=dialog],[role=alertdialog]')].map((e) => (e.getAttribute('aria-label') || '') + ':' + (e.innerText || '').replace(/\s+/g, ' ').slice(0, 300)) }));
+    dit(!!b64, `${nom} : A2 UN toucher ⇒ UN PDF ouvert`, diag + ' ' + consoleErrs.slice(-4).join(' | '));
+    await fermerVisionneuse(pg);
+    await pg.waitForSelector('[data-impr-feuille]', { timeout: 10000 }).catch(() => {});
+    const ap = await pg.evaluate(() => [...document.querySelectorAll('[data-impr-vignette]')].map((e) => ({ cle: e.getAttribute('data-impr-vignette'), num: e.getAttribute('data-impr-vignette-num') })));
+    dit(ap.length === 9, `${nom} : A1 la feuille d'après montre les 9 bordereaux (vignettes)`, String(ap.length));
     if (b64) {
       const pages = await pagesDuPdf(b64);
       const a4 = pages.every((p) => Math.abs(p.w - 595.28) < 1 && Math.abs(p.h - 841.89) < 1);
@@ -197,11 +194,10 @@ async function lotBrut(b, nom, vue, LIGNES) {
       const ordre = pages.flatMap((p) => [...p.texte.matchAll(/N°\s*(\d+)/g)].map((m) => m[1]));
       const attendu = ap.map((x) => x.num);
       dit(pages.length === 3 && a4, `${nom} : A3 9 bordereaux ⇒ 3 pages A4`, JSON.stringify(pages.map((p) => [Math.round(p.w), Math.round(p.h)])));
-      dit(ordre.length === 9 && JSON.stringify(ordre) === JSON.stringify(attendu), `${nom} : A4 les 9 étiquettes, dans l'ordre de l'aperçu (4 + 4 + 1)`, JSON.stringify({ pdf: ordre, apercu: attendu }));
+      dit(ordre.length === 9 && JSON.stringify(ordre) === JSON.stringify(attendu), `${nom} : A4 les 9 étiquettes, dans l'ordre du lot (4 + 4 + 1)`, JSON.stringify({ pdf: ordre, lot: attendu }));
       const parPage = pages.map((p) => (p.texte.match(/N°\s*\d+/g) || []).length).join(',');
       dit(parPage === '4,4,1', `${nom} : A5 quatre par feuille, la dernière entamée (chacune tamponnée de SON N°)`, parPage);
     }
-    await pg.waitForTimeout(500);
     const res = await pg.evaluate(() => { const e = document.querySelector('[data-planche-resultat]'); return e ? e.getAttribute('data-planche-resultat') : null; });
     dit(res && /^9\/3\/(9[0-9])$/.test(res), `${nom} : A6 le résultat dit ce qui a été posé (9 étiquettes, 3 feuilles, l'échelle)`, String(res));
     await shot(pg, `${nom}-lot-resultat`);
@@ -209,72 +205,91 @@ async function lotBrut(b, nom, vue, LIGNES) {
   } finally { await ctx.close(); }
 }
 
-// ── F · Classique A4 : chaque bordereau se règle un par un (tampon, retirer) et le tampon est TOUJOURS là ──
+// ── F · Classique A4 : retirer un bordereau AVANT (Choisir), corriger le tampon d'un bordereau APRÈS ──
 async function lotClassique(b, nom, vue, LIGNES) { try { return await lotClassiqueBrut(b, nom, vue, LIGNES); } catch (e) { dit(false, `${nom} : F le lot classique s’exécute`, String(e.message).slice(0, 200)); } }
 async function lotClassiqueBrut(b, nom, vue, LIGNES) {
   console.log(`\n— F. Imprimante classique, un par un · ${nom}`);
   const { ctx, pg, errs } = await ouvrir(b, vue, LIGNES, { imprimante: 'normale' });
   try {
     await pg.waitForSelector('button[data-lot-ouvrir="1"]', { timeout: 20000 }).catch(() => {});
-    if (!(await cliquer(pg, 'button[data-lot-ouvrir="1"]'))) { dit(false, `${nom} : « Tout imprimer » est là`); return; }
+    if (!(await cliquer(pg, 'button[data-lot-ouvrir="1"]'))) { dit(false, `${nom} : « Choisir » est là`); return; }
     await pg.waitForSelector('[data-lot-ligne]', { timeout: 8000 }).catch(() => {});
     const ap = await pg.evaluate(() => [...document.querySelectorAll('[data-lot-ligne]')].map((e) => ({ cle: e.getAttribute('data-lot-ligne'), num: e.getAttribute('data-lot-num'), coche: e.getAttribute('data-coche') === '1' })));
     for (const x of ap) { if (!x.coche) await pg.locator(`[data-lot-ligne="${x.cle}"] input`).first().check().catch(() => {}); }
+    const retire = ap[ap.length - 1];
+    await pg.locator(`[data-lot-ligne="${retire.cle}"] input`).first().uncheck().catch(() => {});
     await pg.waitForTimeout(300);
-    const sansTampon = ap[1], titreTaille = ap[0], retire = ap[ap.length - 1];
-    await pg.selectOption(`[data-lot-tampon-choix="${sansTampon.cle}"]`, 'rien');
-    await pg.selectOption(`[data-lot-tampon-choix="${titreTaille.cle}"]`, 'num');
-    await cliquer(pg, `[data-lot-retirer="${retire.cle}"]`);
-    await pg.waitForTimeout(400);
-    const etat = await pg.evaluate(([a, r]) => ({ apercuA: (document.querySelector(`[data-lot-apercu="${a}"]`) || { getAttribute: () => null }).getAttribute('data-lot-apercu-tampon'), retireCoche: (document.querySelector(`[data-lot-ligne="${r}"]`) || { getAttribute: () => null }).getAttribute('data-coche'), n: (document.querySelector('[data-lot-imprimer]') || { getAttribute: () => null }).getAttribute('data-lot-imprimer'), choisi: (document.querySelector('[data-lot-imprimante]') || { getAttribute: () => null }).getAttribute('data-lot-imprimante') }), [sansTampon.cle, retire.cle]);
-    dit(etat.apercuA === 'rien' && etat.retireCoche === '0' && etat.n === String(ap.length - 1) && etat.choisi === 'normale', `${nom} : F1 dans l'aperçu, CE bordereau : « sans tampon » ; un autre retiré du lot (${ap.length - 1} restent) ; Classique choisi`, JSON.stringify(etat));
+    const etat = await pg.evaluate((r) => ({ retireCoche: (document.querySelector(`[data-lot-ligne="${r}"]`) || { getAttribute: () => null }).getAttribute('data-coche'), n: (document.querySelector('[data-lot-imprimer]') || { getAttribute: () => null }).getAttribute('data-lot-imprimer'), papier: (document.querySelector('[data-lot-papier-dit]') || { getAttribute: () => null }).getAttribute('data-lot-papier-dit') }), retire.cle);
+    dit(etat.retireCoche === '0' && etat.n === String(ap.length - 1) && etat.papier === 'normale', `${nom} : F1 « Choisir » : un bordereau retiré du lot (${ap.length - 1} restent) ; Classique dit`, JSON.stringify(etat));
     await shot(pg, `${nom}-lot-classique`);
+    const n0 = await pg.evaluate(() => window.__pdfs.length);
     await cliquer(pg, 'button[data-lot-imprimer]');
-    for (let i = 0; i < 600; i++) {
-      const e = await pg.evaluate(() => {
-        if (window.__pdfs && window.__pdfs.length) return 'pdf';
-        const clic = (l) => { const bs = [...document.querySelectorAll('button')].filter((x) => x.innerText.trim() === l && x.offsetParent); if (bs.length) { bs[bs.length - 1].click(); return true; } return false; };
-        if (clic("J'ai vérifié, imprimer") || clic('Préparer quand même les PDF')) return 'clic';
-        const f = document.querySelector('[data-placeur-tampon]:not([data-placeur-tampon="charge"]) [data-tampon-imprimer]'); if (f) { f.click(); return 'clic'; }
-        return 'attente';
-      });
-      if (e === 'pdf') break;
-      await pg.waitForTimeout(250);
-    }
-    const b64 = await pg.evaluate(async () => { const bl = window.__pdfs[window.__pdfs.length - 1]; if (!bl) return null; const u = new Uint8Array(await bl.arrayBuffer()); let s = ''; for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s); });
-    dit(!!b64, `${nom} : F2 UN PDF est produit`);
+    const b64 = await attendrePdfVisionneuse(pg, n0);
+    dit(!!b64, `${nom} : F2 UN PDF est produit et ouvert`);
     if (!b64) return;
     const pages = await pagesDuPdf(b64);
     // Le bordereau et, s'il n'a pas de blanc sûr, sa fiche juste après : la « zone » de chaque bordereau.
     const zones = []; pages.forEach((p) => { const m = /ETIQUETTE (\d+)/.exec(p.texte); if (m) zones.push({ tx: m[1], t: p.texte }); else if (zones.length) zones[zones.length - 1].t += ' ' + p.texte; });
-    const txs = zones.map((z) => z.tx), attendu = ap.slice(0, -1).map((x) => x.cle.replace(/^v:/, ''));
-    dit(JSON.stringify(txs) === JSON.stringify(attendu), `${nom} : F3 le bordereau retiré n'est pas dans le PDF, les autres dans l'ordre`, JSON.stringify({ txs, attendu }));
     const nu = (c) => String(c).replace(/^v:/, ''); const num = (tx) => (ap.find((x) => nu(x.cle) === tx) || {}).num;
-    const juge = zones.map((z) => ({ tx: z.tx, n: new RegExp(`N°\\s*${num(z.tx)}(\\D|$)`).test(z.t.replace(/ETIQUETTE \d+/g, '')), titre: /Nike Air Force/.test(z.t), taille: /\b42\b/.test(z.t.replace(/ETIQUETTE \d+/g, '')) }));
-    const sans = juge.find((j) => j.tx === nu(sansTampon.cle)), tt = juge.find((j) => j.tx === nu(titreTaille.cle)), autres = juge.filter((j) => j !== sans && j !== tt);
-    dit(autres.length === ap.length - 3 && autres.every((j) => j.n && j.titre), `${nom} : F4 CLASSIQUE A4 : chaque bordereau porte SON tampon (N° + titre, le réglage)`, JSON.stringify(autres.filter((j) => !j.n || !j.titre)).slice(0, 200) + " · pages : " + JSON.stringify(pages.map((p) => p.texte.slice(0, 160))).slice(0, 900));
-    dit(sans && !sans.n && !sans.titre, `${nom} : F5 le bordereau réglé « sans tampon » n'a ni N° ni titre`, JSON.stringify(sans));
-    dit(tt && tt.n && !tt.titre, `${nom} : F6 le bordereau réglé « N° seul » porte son N°, sans le titre`, JSON.stringify(tt));
-    // F8 · « Tout est sorti ? » : il coche UN raté ⇒ seul lui repart à l'impression, les autres passent « prêts à déposer ».
-    await pg.waitForSelector('[data-lot-question] [data-lot-guide="sorti"]', { timeout: 15000 }).catch(() => {});
-    const premier = await pg.evaluate(() => { const e = document.querySelector('[data-lot-rate]'); return e ? e.getAttribute('data-lot-rate') : null; });
-    if (premier) await pg.evaluate((c) => { const i = document.querySelector(`[data-lot-rate="${c}"] input`); if (i) i.click(); }, premier);
-    await pg.waitForTimeout(300);
-    const bouton = await pg.evaluate(() => (document.querySelector('[data-lot-imprime-oui]') || {}).textContent || '');
-    const nPdf0 = await pg.evaluate(() => window.__pdfs.length);
-    await cliquer(pg, '[data-lot-imprime-oui]');
-    for (let i = 0; i < 400; i++) {
-      const e = await pg.evaluate((n0) => { if (window.__pdfs.length > n0) return 'pdf'; const f = document.querySelector('[data-placeur-tampon]:not([data-placeur-tampon="charge"]) [data-tampon-imprimer]'); if (f) { f.click(); return 'clic'; } return 'attente'; }, nPdf0);
-      if (e === 'pdf') break;
-      await pg.waitForTimeout(250);
-    }
-    await pg.waitForTimeout(1500);
-    const b2 = await pg.evaluate(async () => { const bl = window.__pdfs[window.__pdfs.length - 1]; if (!bl) return null; const u = new Uint8Array(await bl.arrayBuffer()); let s = ''; for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s); });
+    const txs = zones.map((z) => z.tx), attendu = ap.slice(0, -1).map((x) => nu(x.cle));
+    dit(JSON.stringify(txs) === JSON.stringify(attendu), `${nom} : F3 le bordereau retiré n'est pas dans le PDF, les autres dans l'ordre`, JSON.stringify({ txs, attendu }));
+    const juge = (z) => ({ tx: z.tx, n: new RegExp(`N°\\s*${num(z.tx)}(\\D|$)`).test(z.t.replace(/ETIQUETTE \d+/g, '')), titre: /Nike Air Force/.test(z.t) });
+    const tous = zones.map(juge);
+    dit(tous.length === ap.length - 1 && tous.every((j) => j.n && j.titre), `${nom} : F4 CLASSIQUE A4 : chaque bordereau porte SON tampon (N° + titre, le réglage)`, JSON.stringify(tous.filter((j) => !j.n || !j.titre)).slice(0, 300));
+    await fermerVisionneuse(pg);
+    await pg.waitForSelector('[data-impr-feuille="question"]', { timeout: 10000 }).catch(() => {});
+    // F5 / F6 · APRÈS : la vignette d'UN bordereau ⇒ son tampon ⇒ « Réimprimer celui-ci » (lui seul).
+    const unSeul = async (cle, t) => {
+      await cliquer(pg, `[data-impr-vignette="${cle}"]`);
+      await pg.waitForSelector(`[data-impr-corrige="${cle}"] [data-impr-tampon-choix="${t}"]`, { timeout: 5000 }).catch(() => {});
+      await cliquer(pg, `[data-impr-corrige="${cle}"] [data-impr-tampon-choix="${t}"]`);
+      await pg.waitForFunction(() => { const e = document.querySelector('[data-impr-reimprimer-un]'); return e && e.getAttribute('data-impr-pret') === '1'; }, null, { timeout: 60000 }).catch(() => {});
+      const n1 = await pg.evaluate(() => window.__pdfs.length);
+      await cliquer(pg, '[data-impr-reimprimer-un]');
+      const b = await attendrePdfVisionneuse(pg, n1 - 1, 60000);
+      await fermerVisionneuse(pg);
+      if (!b) return null;
+      const ps = await pagesDuPdf(b); const t2 = ps.map((p) => p.texte).join(' ');
+      const tx = (/ETIQUETTE (\d+)/.exec(t2) || [])[1];
+      return { pages: ps.length, tx, n: tx ? new RegExp(`N°\\s*${num(tx)}(\\D|$)`).test(t2.replace(/ETIQUETTE \d+/g, '')) : null, titre: /Nike Air Force/.test(t2) };
+    };
+    const sans = await unSeul(ap[1].cle, 'rien');
+    dit(sans && sans.tx === nu(ap[1].cle) && !sans.n && !sans.titre, `${nom} : F5 APRÈS, CE bordereau réglé « Rien » repart seul, sans N° ni titre`, JSON.stringify(sans));
+    await pg.waitForSelector('[data-impr-feuille="question"]', { timeout: 10000 }).catch(() => {});
+    await cliquer(pg, '[data-impr-oui]'); await pg.waitForTimeout(400);
+    // De retour à la liste : le lot entier n'est plus « à imprimer » ; on relance le PDF du N° ap[0] par « Choisir ».
+    // F6 sur le PDF d'un bordereau seul (la feuille d'après d'un lot d'un) : « N° seul ».
+    await cliquer(pg, 'button[data-lot-ouvrir="1"]'); await pg.waitForSelector('[data-lot-ligne]', { timeout: 8000 }).catch(() => {});
+    await pg.evaluate(() => { for (const i of document.querySelectorAll('[data-lot-ligne] input')) if (i.checked) i.click(); });
+    await pg.locator(`[data-lot-ligne="${ap[0].cle}"] input`).first().check().catch(() => {});
+    const n2 = await pg.evaluate(() => window.__pdfs.length);
+    await cliquer(pg, 'button[data-lot-imprimer]');
+    await attendrePdfVisionneuse(pg, n2, 60000); await fermerVisionneuse(pg);
+    await pg.waitForSelector('[data-impr-feuille="question"]', { timeout: 10000 }).catch(() => {});
+    const tt = await unSeul(ap[0].cle, 'num');
+    dit(tt && tt.tx === nu(ap[0].cle) && tt.n && !tt.titre, `${nom} : F6 APRÈS, CE bordereau réglé « N° seul » porte son N°, sans le titre`, JSON.stringify(tt));
+    // F8 · « Il en manque » : il touche UN bordereau ⇒ seul lui repart.
+    await pg.waitForSelector('[data-impr-feuille="question"]', { timeout: 10000 }).catch(() => {});
+    await cliquer(pg, '[data-impr-oui]'); await pg.waitForTimeout(400);
+    await cliquer(pg, 'button[data-lot-ouvrir="1"]'); await pg.waitForSelector('[data-lot-ligne]', { timeout: 8000 }).catch(() => {});
+    await pg.evaluate(() => { for (const i of document.querySelectorAll('[data-lot-ligne] input')) if (!i.checked && !i.disabled) i.click(); });
+    const n3 = await pg.evaluate(() => window.__pdfs.length);
+    await cliquer(pg, 'button[data-lot-imprimer]');
+    await attendrePdfVisionneuse(pg, n3, 240000); await fermerVisionneuse(pg);
+    await pg.waitForSelector('[data-impr-manque]', { timeout: 10000 }).catch(() => {});
+    await cliquer(pg, '[data-impr-manque]');
+    const premier = ap[2].cle;
+    await cliquer(pg, `[data-impr-vignette="${premier}"]`);
+    await pg.waitForFunction(() => { const e = document.querySelector('[data-impr-reimprimer]'); return e && e.getAttribute('data-impr-pret') === '1'; }, null, { timeout: 30000 }).catch(() => {});
+    const bouton = await pg.evaluate(() => (document.querySelector('[data-impr-reimprimer]') || {}).textContent || '');
+    const n4 = await pg.evaluate(() => window.__pdfs.length);
+    await cliquer(pg, '[data-impr-reimprimer]');
+    const b2 = await attendrePdfVisionneuse(pg, n4 - 1, 30000);
     const p2 = b2 ? (await pagesDuPdf(b2)).map((p) => (/ETIQUETTE (\d+)/.exec(p.texte) || [])[1]).filter(Boolean) : [];
+    await fermerVisionneuse(pg);
     const imprimes = await lire(pg, 'vinted_bords_printed') || {};
-    const restants = ap.slice(0, -1).map((x) => nu(x.cle)).filter((t) => t !== nu(premier || ''));
-    dit(!!premier && /1/.test(bouton) && JSON.stringify(p2) === JSON.stringify([nu(premier || '')]) && !imprimes[nu(premier || '')] && restants.every((t) => imprimes[t]),
-      `${nom} : F8 « Tout est sorti ? » : le raté coché est seul réimprimé, les autres passent « prêts à déposer »`, JSON.stringify({ premier, bouton, p2, imprimes: Object.keys(imprimes) }).slice(0, 300));
+    dit(/1/.test(bouton) && JSON.stringify(p2) === JSON.stringify([nu(premier)]) && ap.map((x) => nu(x.cle)).every((t) => imprimes[t]),
+      `${nom} : F8 « Il en manque » : le bordereau touché est seul réimprimé ; tous les PDF ouverts sont notés imprimés`, JSON.stringify({ premier, bouton, p2, imprimes: Object.keys(imprimes) }).slice(0, 300));
     await shot(pg, `${nom}-lot-sorti`);
     dit(errs.length === 0, `${nom} : F7 aucune erreur d'app`, errs.join(' | ').slice(0, 200));
   } finally { await ctx.close(); }
