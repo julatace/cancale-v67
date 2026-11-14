@@ -44,6 +44,14 @@ import {lireEntiteVinted,extraitConversation,libelleOffre,etatOffreCourt,estCode
 import { lignesRisqueMessage, phraseRisqueMessage, risquesMessage, erreurMessageAuto } from './messageSur.js';
 import { problemesAnnonce, problemesLot, champsNonJuges, CLE_VERIF_COUPEES, sansCoupees, couperAlerte, rallumerAlerte, lireCoupees, POURQUOI_ALERTE, NOMS_ALERTES, numeroEcritAttendu } from './verifAnnonce.js';
 import { CLE_JOURNEE_PERSO, lireJourneePerso, ordreJournee, visibiliteCarte, urgencesJournee } from './journeePerso.js';
+import { ordreSelonHeure, momentDuJour } from './journeeSelonHeure.js';
+import ConfortCoque from './ConfortCoque.jsx';   // (14 nov., lots 118, 119, 120, 127) atelier, QR, lien d'aide, code local
+import { QrOrdinateur, ticketDeLAdresse } from './ConnexionQr.jsx';   // (14 nov., lot 119) connexion par QR
+import { VueLienAide, jetonAideDeLAdresse } from './LienAide.jsx';   // (14 nov., lot 120) la page de l'aide
+// Lus UNE fois au chargement : le ticket du QR (retiré de la barre d'adresse) et le lien de l'aide.
+const QR_A_APPROUVER = typeof window !== 'undefined' ? ticketDeLAdresse() : '';
+const LIEN_AIDE_JETON = typeof window !== 'undefined' ? jetonAideDeLAdresse() : '';   // (14 nov., lot 117) Ma journée selon l'heure — le seul point d'entrée : ordreJourneeHeure
+const ordreJourneeHeure = (zone, r) => ordreSelonHeure(ordreJournee(zone, r), zone, { moment: momentDuJour(), sienOrdre: lireJourneePerso(r).ordre.length > 0 });
 import { JourneePersoEditeur, nCachees as nCartesCachees } from './JourneePerso.jsx';
 import { CLE_AFFICHAGE, CLE_JE_VENDS, affichageEffectif, jeVendsEffectif, entreeMontree, siteMontre, caseJourneeMontree, motsArticle, champsFacultatifs, ventesSur30j, lireReglageJeVends, poserSourceVend, motsVendeur, motArticle } from './profilVendeur.js';
 import { exemplesVendeur, motTaille } from './vocabulaireVendeur.js';   // (11 nov., lot DJ2) exemples et petits mots selon ce qu'il vend
@@ -126,6 +134,7 @@ import PorteConfidentialite from './PorteConfidentialite.jsx';
 import { AlerteDejaRelie } from './AlerteDejaRelie.jsx';
 import { REQUETE_LITIGES, requetePseudos, litigesDeLignes, pseudosDeLignes } from './vintedDejaRelie.js';
 import { installerGardeHorsLigne, horsLigneActif, etatHorsLigne, noterAbonnement, effacerLaissezPasser, suivreHorsLigne } from './porteHorsLigne.js';
+import { installerJetonFrais } from './jetonFrais.js';   // (14 nov., fiabilité prod) jamais une requête avec un jeton déjà expiré
 // ⟦→ ecrans/Reglages.jsx #7⟧
 // (6 nov., vitesse 2) SuiviReceptionEmails (Réglages → E-mails) : à la demande ; sa feuille de style reste ICI.
 import './reception-emails.css';
@@ -454,7 +463,14 @@ import { demarrerMesures, mesuresEcran } from "./mesuresCollecte.js";
 // ⟦→ ecrans/Reglages.jsx #11⟧
 import { GuideDemarrage, BandeauExemple, ChoixNumerotation, VerificationInstallation } from "./GuideDemarrage.jsx";
 import { ParcoursArrivee, CarteParcours } from "./ParcoursArrivee.jsx";
-import { CLE_PARCOURS, etatParcours, preuveCompte as preuveCompteParcours, preuveExtension as preuveExtensionParcours, preuveVinted, lireParcours as lirePositionParcours, ecritureParcours, etapeAMontrer, suivanteApres, carteParcours } from "./parcoursArrivee.js";
+// (14 nov.) L'accueil des nouveaux : bilan, premier colis, « Nouveau », langue, notifications (src/accueilNouveaux/).
+import { AccueilNouveauxCoque, LangueDetecteeCarte } from "./accueilNouveaux/AccueilNouveaux.jsx";
+import { CLE_ECRANS_VUS, poserStockageEcransVus, ecranNouveau, badgeAvecNouveau, abonnerEcransVus } from "./ecransVus.js";
+import { CLE_BILAN_MINUTE } from "./bilanMinute.js";
+import { CLE_PREMIER_COLIS, EVT_BORDEREAU_IMPRIME, bordereauxDejaImprimes } from "./premierColis.js";
+import { CLE_NOTIFS_DEMANDE } from "./notifsBonMoment.js";
+import { lireImportDepart } from "./importDepart.js";
+import { CLE_PARCOURS, etatParcours, preuveCompte as preuveCompteParcours, preuveExtension as preuveExtensionParcours, preuveVinted, lireParcours as lirePositionParcours, ecritureParcours, etapeAMontrer, suivanteApres, carteParcours, routeParcours, preuveSite as preuveSiteParcours, preuveEbay as preuveEbayParcours, lignesDuSite as lignesDuSiteParcours, REQUETE_SITES_PARCOURS, LIENS_SITE as LIENS_SITE_PARCOURS } from "./parcoursArrivee.js";
 import { etatGuide, preuveCompte, preuveExtension, preuveListe, preuveNombre, compterNumeros, compterVentes, CLE_PLUS_TARD, CHOIX_NUMEROTATION, choixNumerotation, numerotationAChoisir, reglageDuChoix, reporteeActive, verifierInstallation } from "./guideDemarrage.js";
 import { PHRASES_ECRAN, phraseEcranPour } from "./phrasesEcran.js";
 import { AIDE_ECRANS } from "./aideEcrans.js";
@@ -628,7 +644,7 @@ import { lignesVitesse, publierVitesse } from "./vitesseEnvoi.js";   // (10 nov.
 import { LigneVitesse } from "./VitesseEnvoi.jsx";
 import { lignesEnvois, publierEnvois } from "./santeComptes.js";
 import { useSanteComptes, titreJournee, texteRaison } from "./SanteComptes.jsx";   // (11 nov., lot sante-comptes) les envois et leur date limite lue
-import { contenuDossierLitige, pdfDossierLitige, nomFichierDossier, imageEnOctets } from "./dossierLitige.js";   // (10 nov., lot BJ) dossier de litige en PDF
+import { contenuDossierLitige, pdfDossierLitige, nomFichierDossier, imageEnOctets, echangesDossier } from "./dossierLitige.js";   // (10 nov., lot BJ) dossier de litige en PDF
 import { suivisAmbigus } from "../api/_lib/depart-colis.js";
 // ⟦→ ecrans/Reglages.jsx #15⟧
 import { prochainGesteColis, bordereauxAImprimer, gesteEnvoi, compteAImprimer } from "./prochainGesteColis.js";
@@ -1834,6 +1850,9 @@ const authRefresh = (opt) => {
   }).catch(() => null).finally(() => { _authRefreshEnVol = null; });
   return _authRefreshEnVol;
 };
+// (14 nov., fiabilité prod) Les lectures du RÉVEIL attendent ce renouvellement au lieu de partir
+// avec le jeton mort (src/jetonFrais.js : 100 à 150 refus 401 par jour mesurés, par rafales).
+installerJetonFrais({ session: () => AUTH.session, rafraichir: (o) => authRefresh(o), base: SUPABASE_URL });
 const sessionFrom = (j) => ({
   access_token: j.access_token,
   refresh_token: j.refresh_token,
@@ -2966,6 +2985,9 @@ const SYNC_KEYS = [
   // (11 nov., lot journee-perso) SA Ma journée : l'ordre et les cartes qu'il a cachées
   // (src/journeePerso.js) : { v, ordre, choix, at } — la même sur tous ses appareils.
   CLE_JOURNEE_PERSO,
+  // (14 nov., lots 129 et 130) L'inventaire tournant (« vu », « pas trouvé » : jamais un N° changé, src/inventaireTournant.js)
+  // et SA carte de remerciement (ses propres champs, src/carteMerci.js) : les mêmes sur tous ses appareils.
+  'vrm_inventaire_tournant', 'vrm_carte_merci',
   // (9 nov.) La configuration de départ (src/configurationDepart.js) : { etat: 'fait'|'plusTard', at,
   // statut: 'inconnu'|null } ; la TVA d'une société (src/profilFiscal.js). La méthode d'étiquetage
   // est `vrm_numero_ecrit` (actif + `ou`, src/numeroEcrit.js), déjà synchronisée.
@@ -2984,6 +3006,11 @@ const SYNC_KEYS = [
   // (11 nov.) Le parcours d'arrivée (src/parcoursArrivee.js) : { v, etape, ouvert, fini, at } —
   // on reprend à la même étape, écran ouvert ou non, sur n'importe quel appareil.
   'vrm_parcours',
+  // (14 nov., accueil des nouveaux) Par compte VRM, vu sur un appareil, vu partout : les écrans
+  // déjà ouverts (« Nouveau », src/ecransVus.js), le bilan en une minute vu (src/bilanMinute.js),
+  // le premier colis accompagné vu (src/premierColis.js), la réponse à la question des
+  // notifications (src/notifsBonMoment.js).
+  CLE_ECRANS_VUS, CLE_BILAN_MINUTE, CLE_PREMIER_COLIS, CLE_NOTIFS_DEMANDE,
   // (28 oct., 5.252) Les brouillons qu'il a retirés de la liste (« plus sur Vinted »).
   'vrm_brouillons_ecartes',
   // (5 nov.) « Republier à la main, accompagné » : { [ancienId]: { uid, num, titre, at, nouvelId?, lieAt? } }.
@@ -14222,7 +14249,13 @@ const confirmerNumerosAVerifier = async (numeros) => {
     });
   } catch (_) { return true; }
 };
+// (14 nov., n° 137) LE PREMIER COLIS ACCOMPAGNÉ : un bordereau imprimé SEUL le signale
+// (avec le nombre de bordereaux déjà imprimés AVANT ce geste — nuage pas lu ⇒ pas su) ;
+// une série le signale aussi, pour ne JAMAIS l'interrompre (src/premierColis.js).
+const bordsAvantImpression = () => { if (!isCloudReady()) return null; let n = 0; for (const k of ['vinted_bords_printed', 'vrm_vc_imprimes', 'vrm_bords_sans_num']) { const c = bordereauxDejaImprimes(load(k, {})); if (c == null) return null; n += c; } return n; };
+const signalerBordereauImprime = (serie, avant) => { try { window.dispatchEvent(new CustomEvent(EVT_BORDEREAU_IMPRIME, { detail: { serie, avant } })); } catch (_) {} };
 const annotateAndDownloadBordereauBrut = async (numero, title, pdfArrayBuffer, pos, opts = {}) => {
+  const avantColis = bordsAvantImpression();
   if (numero && !(await assurerVersionNumerotation())) throw new Error(NUMEROS_PERIMES_IMPRESSION);
   // (11 nov., lot ventes-lot) Un lot : `opts.numeros` = les N° de ses articles, vérifiés UN PAR UN
   // (le tampon « 124 · 131 » n'est pas un N°).
@@ -14244,6 +14277,7 @@ const annotateAndDownloadBordereauBrut = async (numero, title, pdfArrayBuffer, p
   // Ouvert dans un onglet (ordinateur) ; sinon la modale propose « Ouvrir ».
   try { if(opts.avantOuverture)await opts.avantOuverture(); } catch(e) { URL.revokeObjectURL(url); throw e; }
   const ouvert = ouvrirPdfOnglet(url, filename);
+  signalerBordereauImprime(false, avantColis);
   const tp = r0.tampons || [];
   return { url, filename, printed: ouvert, ouvert, thermique, isoles: r0.isole ? 1 : 0, etiquettes: r0.etiquettes,
            fiches: tp.filter((m) => m === 'fiche').length, bandes: tp.filter((m) => m === 'bande').length,
@@ -14300,6 +14334,7 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
   const filename = `bordereaux-${count}${nInv?'-'+nInv+'factures':''}${thermique?'-thermique':''}-a-la-suite.pdf`;
   // Ouvert dans un onglet (ordinateur) ; sinon la modale propose « Ouvrir ».
   const printed = ouvrirPdfOnglet(url, filename);
+  signalerBordereauImprime(true, null);
   return { url, filename, count, nInv, printed, ouvert: printed, thermique, isoles, etiquettes: nEtiquettes, entiers, reussis, rates, fiches, bandes, ...bilanThermique(details) };
 };
 // Un échec (annulé, PDF illisible) referme la visionneuse « préparation… ».
@@ -18196,16 +18231,24 @@ function groupesVisibles(sites, filtre, ordi = false, profil = PROFIL_VENDEUR) {
 // POINT (la barre est petite). Ambre discret : un geste à faire (§7).
 // (11 nov., lot accessibilité) Ce que le badge ajoute au NOM d'une entrée (« · 3 à faire ») :
 // le nom contient alors le texte visible (« Annonces 3 », WCAG 2.5.3), jamais « Annonces » seul.
+// (14 nov., n° 138) Un écran jamais ouvert par un compte NEUF porte « Nouveau » (src/ecransVus.js) —
+// jamais à la place d'un nombre (un geste à faire passe avant), ni d'un point déjà posé.
 function suffixeBadgeNav(t, badges) {
   if (!badges || t.vue) return '';
-  const v = badges[cleEntree(t)];
+  const v = badgeAvecNouveau(badges[cleEntree(t)], ecranNouveau(t.id));
   if (typeof v === 'number' && v > 0) return ` · ${v > 99 ? '99+' : v} à faire`;
+  if (v === 'nouveau') return ' · ' + tr('nouveaux.badge');
   return v === true ? ' · nouveau' : '';
 }
+function useEcransVusTick() { const [, maj] = React.useReducer((x) => x + 1, 0); React.useEffect(() => abonnerEcransVus(maj), []); }
 function BadgeNav({ t, badges, place }) {
+  useEcransVusTick();
   if (!badges || t.vue) return null;
   const k = cleEntree(t);
-  const v = badges[k];
+  const v = badgeAvecNouveau(badges[k], ecranNouveau(t.id));
+  if (v === 'nouveau') return place === 'barre' || place === 'tuile'
+    ? <><span className="vrm-nav-nouveau-point" data-nav-nouveau={k} aria-hidden="true"/><span className="vrm-sr-seul"> · {tr('nouveaux.badge')}</span></>
+    : <span className="vrm-nav-nouveau" data-nav-nouveau={k}>{tr('nouveaux.badge')}</span>;
   // (11 nov., lot accessibilité) Le chiffre est DESSINÉ (aria-hidden) et son sens est lu à
   // part (« · 3 à faire ») : un `aria-label` sur un <span> sans rôle n'est pas lu, et le
   // chiffre nu collé au libellé donnait « Annonces3 ».
@@ -19452,6 +19495,11 @@ function AuthScreen() {
         </form>
         {/* (13 nov., lot 48) VRM rempli de données INVENTÉES, sans compte (src/modeExemple.js) :
             un vrai lien, rien n'est enregistré ni envoyé ; le bandeau propose « Créer mon compte ». */}
+        {/* (14 nov., lot 119) Se connecter avec l'iPhone déjà connecté : un QR, son clic, une session neuve (api/_lib/qr-connexion.js). */}
+        {mode==='in' && !__lier && <details className="vrm-cx-qr" data-cx-qr="" style={{maxWidth:420,margin:'0 auto 16px',width:'100%'}}>
+          <summary style={{cursor:'pointer',fontSize:15,fontWeight:600,color:C.accentTexte||C.accent,minHeight:44,display:'flex',alignItems:'center',justifyContent:'center'}}>{tr('confort.qr.ouvrir')}</summary>
+          <QrOrdinateur onSession={(j)=>{ writeSession(sessionFrom(j)); }}/>
+        </details>}
         {(mode==='in'||mode==='up') && !__lier && <div className="vrm-cx-exemple" data-cx-exemple="">
           <p>{tr('auth.exemple.note')}</p>
           <a href="/?exemple" data-cx-exemple-entrer="">{tr('auth.exemple')}</a>
@@ -21860,9 +21908,12 @@ function GuideDemarrageApp(props) {
   const aRelier = sansVinted ? profil.plateformes.filter(id => profil.relies[id] !== true) : [];
   // (11 nov.) « Configure VRM » est l'étape 2 du parcours d'arrivée : sa carte la porte
   // (la carte « Reprendre » ne revient que pour un vendeur sans Vinted, ou guide masqué).
-  return <>{sansVinted ? <ReprendreConfiguration/> : null}<AlerteDejaRelie lire={lireLitigesVinted} comptes={props.comptes} contact={contactEmail()} onChangerCompte={changerCompteVrm} ou="journee"/>{sansVinted
-    ? aRelier.length > 0 ? <section className="vrm-choix-plateformes" data-guide-sites="" aria-label="Relier mes plateformes"><h2 style={{fontSize:17,margin:'0 0 8px'}}>Relie tes comptes</h2><p className="vrm-cp-note">Tes plateformes sont prêtes. Voici comment faire arriver tes données.</p><ul style={{fontSize:13,lineHeight:1.6,paddingLeft:18}}>{aRelier.map(id => <li key={id}><b>{nomPlateforme(id)}</b> : {id === 'ebay' ? 'Paramètres → Comptes eBay → Relier un compte.' : `ouvre ton compte sur ${id === 'leboncoin' ? 'leboncoin.fr' : 'vestiairecollective.com'} dans le navigateur avec l’extension VRM.`}</li>)}</ul><Bouton variante="secondaire" onClick={()=>props.onNav?.('settings')}>Ouvrir les paramètres</Bouton></section> : null
-    : <CarteParcoursApp comptes={props.comptes} plein={!!props.plein}/>}</>;
+  // (14 nov., n° 135) Sans Vinted : le parcours de SES plateformes (étapes prouvées, un
+  // geste chacune) ; la liste « Relie tes comptes » ne reste que pour les sites qui restent
+  // une fois ce parcours fini (eBay à côté de Leboncoin, par exemple).
+  const relierListe = sansVinted && aRelier.length > 0 ? <section className="vrm-choix-plateformes" data-guide-sites="" aria-label="Relier mes plateformes"><h2 style={{fontSize:17,margin:'0 0 8px'}}>Relie tes comptes</h2><p className="vrm-cp-note">Tes plateformes sont prêtes. Voici comment faire arriver tes données.</p><ul style={{fontSize:13,lineHeight:1.6,paddingLeft:18}}>{aRelier.map(id => <li key={id}><b>{nomPlateforme(id)}</b> : {id === 'ebay' ? 'Paramètres → Comptes eBay → Relier un compte.' : `ouvre ton compte sur ${id === 'leboncoin' ? 'leboncoin.fr' : 'vestiairecollective.com'} dans le navigateur avec l’extension VRM.`}</li>)}</ul><Bouton variante="secondaire" onClick={()=>props.onNav?.('settings')}>Ouvrir les paramètres</Bouton></section> : null;
+  return <><LangueDetecteeCarte save={save}/><AlerteDejaRelie lire={lireLitigesVinted} comptes={props.comptes} contact={contactEmail()} onChangerCompte={changerCompteVrm} ou="journee"/>
+    <CarteParcoursApp comptes={props.comptes} plein={!!props.plein} sinon={relierListe}/></>;
 }
 // Préférences synchronisées et cloisonnées par le stockage du compte VRM.
 function PlateformesSetting({ initial = false }) {
@@ -21975,6 +22026,10 @@ async function lireLignesParcours(q) {
 }
 const lireAnnoncesParcours = () => lireLignesParcours('id=like.harvest_*_listings&select=id,n:data->>nItems').then((j) => (j ? j.filter((x) => ligneDeSaSession(x && x.id)) : null));
 const lireCommandesParcours = () => lireLignesParcours('id=like.harvest_*_orders_*&select=id,n:data->>nItems').then((j) => (j ? j.filter((x) => ligneDeSaSession(x && x.id)) : null));
+// (14 nov., n° 135) Les sites de l'extension (Leboncoin, Vestiaire) : `select=id`, rien lu d'autre.
+const lireSitesParcours = () => lireLignesParcours(REQUETE_SITES_PARCOURS);
+// La route du parcours : les plateformes qu'IL a choisies (« Où vends-tu ? »), jamais devinées.
+const routeParcoursIci = () => routeParcours(lirePlateformes(load(CLE_PLATEFORMES, null)));
 // Une lecture qui GARDE la dernière valeur lue pendant qu'elle relit (pas de « Je vérifie… »
 // toutes les 10 s) ; la première lecture ratée rend `null` (pas su), jamais « aucun ».
 function useLectureParcours(lire, actif, tour, cle) {
@@ -22016,8 +22071,11 @@ function useParcoursArrivee({ comptes: comptesCoque, actif = true, tour: tourDem
   const tour = tourDemande + relu;
   React.useEffect(() => {
     const relire = () => setRelu((n) => n + 1);
-    window.addEventListener('vrm:parcours', relire);
-    return () => window.removeEventListener('vrm:parcours', relire);
+    // (14 nov., n° 135) Sans Vinted, la carte relit aussi ses sites quand l'extension
+    // vient d'écrire (`vrm:ext` maj) ou qu'il revient sur l'onglet — comme la sonde des sites.
+    const relireSite = (e) => { if (routeParcoursIci().cle === 'vinted') return; if (e && e.type === 'vrm:ext' && !(e.detail && e.detail.type === 'maj')) return; relire(); };
+    window.addEventListener('vrm:parcours', relire); window.addEventListener('vrm:ext', relireSite); window.addEventListener('focus', relireSite);
+    return () => { window.removeEventListener('vrm:parcours', relire); window.removeEventListener('vrm:ext', relireSite); window.removeEventListener('focus', relireSite); };
   }, []);
   React.useEffect(() => {
     const cles = [CLE_PARCOURS, CLE_PLUS_TARD, CLE_GUIDE_MASQUE];
@@ -22039,12 +22097,25 @@ function useParcoursArrivee({ comptes: comptesCoque, actif = true, tour: tourDem
   const comptes = tour > 0 && Array.isArray(comptesLus) ? comptesLus : comptesCoque;
   const pret = isCloudReady();
   const plusTard = pret ? plusTardRange() : {};
-  const etat = etatParcours({
-    compte: preuveCompteParcours(AUTH.user?.id || ''),
+  // (14 nov., n° 135) Un vendeur sans Vinted : les étapes de SES plateformes.
+  const route = routeParcoursIci();
+  const lignesSites = useLectureParcours(lireSitesParcours, actif && route.cle !== 'vinted' && route.cle !== 'ebay', tour, 'parcours:sites');
+  const comptesEbayLus = useLectureParcours(() => lireComptesEbay(tour > 0), actif && route.cle === 'ebay', tour, 'parcours:ebay');
+  const compte = preuveCompteParcours(AUTH.user?.id || '');
+  const preuves = route.cle === 'vinted' ? {
+    compte,
     extension: preuveExtensionParcours(pont, comptes),
     vinted: preuveVinted(comptes, annonces, commandes),
-  }, { plusTard });
-  return { etat, pret, parcours: pret ? lirePositionParcours(parcoursRange()) : undefined, parcoursBrut: pret ? parcoursRange() : undefined, plusTard, comptes };
+  } : route.cle === 'ebay' ? {
+    compte,
+    ebay: preuveEbayParcours(comptesEbayLus),
+  } : {
+    compte,
+    extension: preuveExtensionParcours(pont, lignesDuSiteParcours(lignesSites, route.sites)),
+    [route.cle]: preuveSiteParcours(lignesSites, route.sites),
+  };
+  const etat = etatParcours(preuves, { plusTard, route });
+  return { etat, pret, parcours: pret ? lirePositionParcours(parcoursRange()) : undefined, parcoursBrut: pret ? parcoursRange() : undefined, plusTard, comptes, route };
 }
 // Où faire le geste : le navigateur d'ici, ou l'ordinateur pour un téléphone sans extension
 // (Orion sur iPhone et Firefox sur Android ont la leur).
@@ -22053,20 +22124,22 @@ const ouGesteParcours = (sansSouris) => (sansSouris && !['ios-orion', 'firefox-a
 // téléchargement de CE navigateur, ou vinted.fr. Le lien fait la chose ET ouvre l'écran plein.
 function gesteCarteParcours(c, sansSouris) {
   if (!c || c.etat !== 'afaire') return null;
+  if (c.cle === 'leboncoin' || c.cle === 'vestiaire') return ouGesteParcours(sansSouris) === NAV.dansNu ? { libelle: c.geste, href: LIENS_SITE_PARCOURS[c.cle] } : null;
+  if (c.cle === 'ebay') return null;
   if (c.cle === 'vinted') return ouGesteParcours(sansSouris) === NAV.dansNu ? { libelle: 'Ouvrir vinted.fr', href: 'https://www.vinted.fr' } : null;
   if (c.cle === 'extension' && c.detail === 'absente') { const lien = lienInstallerIci(sansSouris); return lien ? { libelle: 'Télécharger l’extension', href: lien, telecharger: /\.zip(\?|$)/.test(lien) } : null; }
   return null;
 }
 // La petite carte de Ma journée : l'étape courante, son geste exact ou « Continuer » (qui
 // ouvre l'écran plein). « Ma configuration » mise de côté garde sa carte « Reprendre ».
-function CarteParcoursApp({ comptes, plein = false }) {
+function CarteParcoursApp({ comptes, plein = false, sinon = null }) {
   const sansSouris = useSansSouris();
   const [masque, setMasque] = React.useState(() => !!load(CLE_GUIDE_MASQUE, null));
   React.useEffect(() => onCloudReady(() => setMasque(!!load(CLE_GUIDE_MASQUE, null))), []);
   const { etat, pret, parcours, parcoursBrut } = useParcoursArrivee({ comptes, actif: !masque || plein });
   if (!pret) return null;
   const mode = carteParcours(etat, parcoursBrut, { masque: masque && !plein, exemple: exempleActif(), comptes });
-  if (mode === 'cachee') return <ReprendreConfiguration/>;
+  if (mode === 'cachee') return <><ReprendreConfiguration/>{sinon}</>;
   const sansCompte = Array.isArray(comptes) && comptes.length === 0;
   const c = etat.etapes.find((x) => x.cle === etat.courante) || null;
   const continuer = () => ecrireParcoursIci({ etape: etapeAMontrer(etat, parcours && parcours.etape), ouvert: true });
@@ -22127,6 +22200,10 @@ function ParcoursArriveeApp({ comptes, retenu = false, onNav, onOuvert }) {
   const fermer = () => ecrireParcoursIci({ ouvert: false });
   const gestes = {
     vinted: { libelle: 'Ouvrir vinted.fr', href: 'https://www.vinted.fr' },
+    // (14 nov., n° 135) Les autres plateformes : leur site, ou (eBay) Paramètres → Comptes eBay.
+    leboncoin: { libelle: tr('nouveaux.parcours.lbc.geste'), href: LIENS_SITE_PARCOURS.leboncoin },
+    vestiaire: { libelle: tr('nouveaux.parcours.vc.geste'), href: LIENS_SITE_PARCOURS.vestiaire },
+    ebay: { libelle: tr('nouveaux.parcours.ebay.geste'), onClick: () => { fermer(); allerComptesEbay(); } },
   };
   const details = {
     extension: <PremiersPas onNav={onNav} dansGuide/>,
@@ -42948,10 +43025,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         avecBordereau && (b || lab) ? octetsBordereau(lab && lab.row, b && b.hasPdf ? b._row : null) : Promise.resolve(null),
       ]);
       const carton = cartonLu && cartonLu.src ? await imageEnOctets(cartonLu.src) : null;
+      // (14 nov., lot 126) Les échanges : la conversation de CETTE transaction (égalité exacte du n°),
+      // projetée (jamais `select=data`). Lecture ratée ou aucune conversation ⇒ `null`, « pas lue » dans le PDF.
+      let echanges = null;
+      if (/^\d{1,20}$/.test(tx)) {
+        try {
+          const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_conv_*&data->payload->conversation->transaction->>id=eq.${tx}&select=id,tx:data->payload->conversation->transaction->>id,opp:data->payload->conversation->opposite_user->>id,messages:data->payload->conversation->messages`, { headers: sbAuth() });
+          const rows = r.ok ? await r.json() : null;
+          echanges = Array.isArray(rows) ? echangesDossier(rows, tx) : null;
+        } catch (_) { echanges = null; }
+      }
       const contenu = contenuDossierLitige({
         carte: c, vente: o ? { date: o.date } : null,
         compte: o && o._acc ? (o._acc.login || '') : (c.compte || ''),
-        frise, bordereau, avecBordereau,
+        frise, bordereau, avecBordereau, echanges,
         photos: { annonce: !srcAnnonce ? 'absente' : annonce ? 'ok' : 'ratee', carton: cartonLu === false ? 'absente' : cartonLu == null ? 'passu' : carton ? 'ok' : 'ratee' },
       });
       const octets = await pdfDossierLitige(contenu, { images: { annonce, carton }, bordereauPdf: bordLu && bordLu.octets ? bordLu.octets : null });
@@ -46417,7 +46504,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 favoris: nouveauxFav && nouveauxFav.annonces > 0 ? [tache({ id: 'favoris-nouveaux', n: nouveauxFav.annonces, icon: 'heart', color: C.text, court: tr('favoris.journee.titre', { n: nouveauxFav.annonces }), detail: null, title: tr('favoris.journee.titre', { n: nouveauxFav.annonces }), action: tr('favoris.journee.geste'), tab: 'cat_msg', avant: () => { preparerEnvoiFavoris(favorisUid); demanderVue('favoris'); } }, 98)] : [],
               };
               const forcesAF = [], montresAF = [];
-              for (const id of ordreJournee('afaire', persoJ)) {
+              for (const id of ordreJourneeHeure('afaire', persoJ)) {
                 const v = visJ(id); if (!v.montree) continue;
                 for (const el of (blocsAF[id] || [])) (v.force ? forcesAF : montresAF).push({ el, carte: id });
               }
@@ -46547,7 +46634,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 )}
                     </>),
                   };
-                  return ordreJournee('tete', persoJ).map((id) => {
+                  return ordreJourneeHeure('tete', persoJ).map((id) => {
                     if (id === 'prochain') return <React.Fragment key={id}>{blocsTete.prochain}</React.Fragment>;
                     const v = visibiliteCarte(id, { reglage: persoJ, mode: PROFIL_VENDEUR.mode });
                     if (v.montree) return <React.Fragment key={id}>{blocsTete[id]}</React.Fragment>;
@@ -55481,6 +55568,21 @@ const ecrireReglage = async (id, data) => {
     return r.ok;
   } catch (_) { return false; }
 };
+// (14 nov.) L'ACCUEIL DES NOUVEAUX (src/accueilNouveaux/AccueilNouveaux.jsx) : ce qu'il lit et écrit
+// passe par ici — les règles de l'app (VENDU `bilanLignes`, `aExpedierPourCarte`), jamais une copie.
+const DEPS_ACCUEIL_NOUVEAUX = { load, save, isCloudReady, onCloudReady, exempleActif: () => exempleActif(), enTeteSession, FermeAuRetour,
+  bilanLignes, aExpedierPourCarte, lireImports: (uids) => lireImportDepart(uids, lireTout), creeLe: () => (AUTH.user && AUTH.user.created_at) || '' };
+// « VRM a lu ta plateforme une première fois » (le bilan peut se montrer) : la route du parcours
+// (src/parcoursArrivee.js) et ce que la coque a DÉJÀ lu — Vinted : un compte relié et VENDU lu
+// (même vide : un débutant) ; Leboncoin / Vestiaire : une ligne de l'extension ; eBay : un compte relié.
+function premiereLectureFaite({ comptes, liveStats, sitesLus, comptesEbay }) {
+  const r = routeParcoursIci();
+  if (r.cle === 'vinted') return Array.isArray(comptes) && comptes.length > 0 && !!liveStats && !liveStats.venduPasSu && Array.isArray(liveStats.venduLignes);
+  if (r.cle === 'ebay') return Array.isArray(comptesEbay) && comptesEbay.some((c) => c && !c.implicite);
+  return !!sitesLus && r.sites.some((x) => sitesLus[x] === true);
+}
+// (14 nov., n° 138) « Nouveau » lit la liste des écrans vus du compte (SYNC_KEYS).
+poserStockageEcransVus(() => load(CLE_ECRANS_VUS, null));
 const DEPS_FACTURE = { lireReglage, lireReglageMontage, ecrireReglage, lireTout, enTeteSession, askConfirm, toast: (m) => toast(m), chercherEntreprise, ouvrirPdfOnglet, FermeAuRetour, typeCompteVinted, lireProprietaire: () => lireProprietaire(), useVentesCoque, classifyOrderStatus, vendActuel: () => vendActuel(), exemples: () => exemplesActuels() };
 // Trois états : `undefined` en cours · `null` pas su · l'objet du serveur.
 async function lireAbonnement() {
@@ -56465,6 +56567,8 @@ export default function App() {
   //    sur un document déjà sombre (index.html lit `vinted_dark`). Même source.
   // (8 nov.) Le mode CHOISI (Clair · Sombre · Automatique · Le soir, src/apparence.js) : la même règle.
   C = sombreEffectif(apparenceDe(load('vrm_apparence', null), load('vinted_dark', false)), { systemeSombre: systemeSombreMaintenant() }) ? THEMES.dark : THEMES.light;
+  // (14 nov., lot 120) Le lien temporaire de l'aide : sa page, SANS compte, en lecture seule (api/_lib/lien-aide.js).
+  if (LIEN_AIDE_JETON) return <VueLienAide jeton={LIEN_AIDE_JETON}/>;
   if (MULTI_USER && !authState.ready) return <div data-demarrage-attente="" style={{minHeight:'100vh',background:C.bg}}/>;
   const bypass = false; // Aucun accès direct à une boutique partagée.
   if (MULTI_USER && !bypass && (!authState.session || RECOVERY_PENDING)) return <AuthScreen/>;
@@ -56484,7 +56588,7 @@ export default function App() {
   // vendeur que la base vérifie). Sans invitation acceptée, rien ne change.
   return <>{(MULTI_USER && authState.user)
     ? <PorteConfidentialite key={authState.user.id} session={authState.session} theme={C} onDeconnexion={authSignOut} onRafraichir={()=>authRefresh()} onVerifier={uid=>{_confidentialiteUid=uid;}}><PorteEquipe key={authState.user.id} uid={authState.user.id}><PorteAbonnement uid={authState.user.id}>{coeur}</PorteAbonnement></PorteEquipe></PorteConfidentialite>
-    : coeur}<VisionneusePdf/><PlaceurTampon/></>;
+    : coeur}<VisionneusePdf/><PlaceurTampon/>{authState.user && authState.user.id ? <ConfortCoque uid={authState.user.id} entetes={enTeteSession} onDeconnexion={authSignOut} ticketQr={QR_A_APPROUVER}/> : null}</>;
 }
 
 // ── Le code Discord (revue de sécurité du 21 octobre) ─────────────────────────
@@ -58351,15 +58455,13 @@ function AppCoeur() {
   // Demande automatiquement l'autorisation de notifications au démarrage.
   // Si l'utilisateur accepte, les notifications restent activées en permanence.
   // (Le navigateur impose ce consentement une seule fois ; on ne peut pas l'éviter.)
+  // ⚠️ (14 nov., accueil des nouveaux, n° 142) PLUS AUCUNE DEMANDE AU DÉMARRAGE (§3 : jamais
+  // d'invitation forcée). La permission se demande APRÈS un geste qui en montre l'utilité (le
+  // premier colis suivi, src/notifsBonMoment.js), ou dans Paramètres → Notifications.
+  // Déjà accordée : l'interrupteur local suit, rien n'est demandé.
   useEffect(()=>{
     if(typeof Notification==='undefined') return;
-    if(Notification.permission==='granted'){
-      if(!notifEnabled){ setNotifEnabled(true); save('vinted_notif_enabled',true); }
-    } else if(Notification.permission==='default'){
-      askNotifPermission().then(res=>{
-        if(res==='granted'){ setNotifEnabled(true); save('vinted_notif_enabled',true); }
-      });
-    }
+    if(Notification.permission==='granted' && !notifEnabled){ setNotifEnabled(true); save('vinted_notif_enabled',true); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
 
@@ -61247,6 +61349,11 @@ function AppCoeur() {
         if(!seule){ const pc=lirePositionParcours(load(CLE_PARCOURS,null)); if(etatFin==='fait'&&(auto||(pc&&pc.ouvert))) ecrireParcoursIci({ ouvert:true, etape:'extension' }); else if(etatFin!=='fait'&&pc&&pc.ouvert) ecrireParcoursIci({ ouvert:false }); }
         if(!seule&&tab!=='journee'&&!load(CLE_VISITE,null)) setTab('journee'); }}/></GardeEcran>}
       {nuagePret && !baseKO && accountsLoaded && <ParcoursArriveeApp comptes={vintedAccounts} retenu={!!(bienvenue||configOuverte)} onNav={setTab} onOuvert={setParcoursOuvert}/>}
+      {nuagePret && !baseKO && <GardeEcran nom="accueil-nouveaux"><AccueilNouveauxCoque tab={tab} retenu={!!(bienvenue||configOuverte||parcoursOuvert||visite)} deps={DEPS_ACCUEIL_NOUVEAUX}
+        donnees={{ vendu: liveStatsVus ? { lignes: liveStatsVus.venduPasSu ? null : liveStatsVus.venduLignes, pasSu: !!liveStatsVus.venduPasSu, enAttente: !!liveStatsVus.venduEnAttente, manque: liveStatsVus.venduManque || [], nonCompteesAnnee: nonCompteesDe(liveStatsVus.venduNonComptees, new Date(new Date().getFullYear(), 0, 1).getTime()).length } : undefined,
+          caParMois: liveStatsVus && liveStatsVus.caParMois, enLigne: widgetBase || undefined, parcours: lirePositionParcours(load(CLE_PARCOURS, null)),
+          uids: (Array.isArray(vintedAccounts) ? vintedAccounts : []).map((a) => String((a && a.vinted_user_id) || '')).filter(Boolean),
+          luUneFois: premiereLectureFaite({ comptes: vintedAccounts, liveStats: liveStatsVus, sitesLus, comptesEbay }) }}/></GardeEcran>}
       {visite && !bienvenue && !configOuverte && !parcoursOuvert && <GardeEcran nom="visite" feuille onFermer={()=>setVisite(false)}><VisiteBulles z={Z_CONFIRMATION}
         onTerminer={(raison)=>{ setVisite(false); if(raison!=='rien') save(CLE_VISITE,{at:new Date().toISOString(),fin:raison}); }}/></GardeEcran>}
       {/* (6 nov.) L'ACCOMPAGNEMENT (src/Conseils.jsx) : une bulle au plus, jamais pendant

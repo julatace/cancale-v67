@@ -13,7 +13,9 @@ import { premiereCaseLibre as premiereCaseMeubles, caseEnMots } from '../ouRange
 import { attrCible } from '../cibleNotif.js';
 import { remettreCase, resteAuStock, etatCase } from '../stockSortie.js';
 import { annoncesActuelles, annoncesVcStock, classerRangees, partagerParEtat } from '../stockAnnonces.js';
-import { LIGNE_INVENTAIRE } from '../inventaire.js';
+import { LIGNE_INVENTAIRE, indexerAttendu } from '../inventaire.js';
+import InventaireTournant from '../InventaireTournant.jsx';   // (14 nov., lot 129) 10 N° par jour à vérifier
+import { CLE_TOURNANT } from '../inventaireTournant.js';
 import { ValeurStockCarte, useValeurStock } from '../CascadeVente.jsx';   // (10 nov., lot BF) la valeur du stock, publiée par Annonces
 import { EmballagesCarte } from '../EmballagesCarte.jsx';
 import { useSelectionSerie, CaseSerie, BarreSerie, OuvrirSerie } from '../composants/SelectionSerie.jsx';   // (11 nov., lot actions-serie)
@@ -1070,6 +1072,13 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sigAttendu, etatHl]);
+  // (14 nov., lot 129) L'INVENTAIRE TOURNANT : les unités de l'attendu (src/inventaire.js, la même règle
+  // que « Faire l'inventaire » : paires présentes, par N°), recalculées quand l'attendu change (`sigAttendu`).
+  const unitesTournant = React.useMemo(() => {
+    if (!sigAttendu) return null;
+    try { const st = fabriquerStockInv(); return st && st.su ? indexerAttendu(st, cleNum).unites : null; } catch (_) { return null; }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sigAttendu]);
   const elInventaire = inventaire ? (() => {
     const stockInv = fabriquerStockInv();
     const ficheDe = (k) => ficheParCle[k] || (fichesParCle[k] || [])[0] || null;
@@ -1195,6 +1204,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     {elInventaire}
     {blocHorsLigne}
     {blocResume}
+    {unitesTournant ? <div style={{ marginBottom: 14 }}><InventaireTournant unites={unitesTournant} uid={AUTH.user?.id || ''} lire={() => load(CLE_TOURNANT, {})} ecrire={(v) => save(CLE_TOURNANT, v)}
+      onFiche={(n) => { try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(n) })); } catch (_) {} }}/></div> : null}
     <ValeurStockCarte v={valeurStk} onSaisir={saisirPrixStock} mots={motsStock}/>
     {/* (10 nov., lot L) Le stock d'emballages : écrit sur SON clic ; le reste dérive des « Colis fait ». */}
     <EmballagesCarte reglage={emballagesR} Feuille={SheetShell} exemple={exemplesStock.emballage} ecrire={(r) => { setEmballagesR(r); save(CLE_EMBALLAGES, r); }}

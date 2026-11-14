@@ -22,6 +22,7 @@ import { useLangue } from './i18n/react.js';
 import { lancerTravail } from './suiviTravail.js';
 import { texteAnnonceVinted, manquesFiche, payloadFiche, issueCreation, questionOk, filtrerOptions, PHOTOS_MAX } from './annonceVinted.js';
 import './styles-creer-vinted.css';
+import ApercuAnnonce from './ApercuAnnonce.jsx';   // (14 nov., lot 128) l'annonce telle que l'acheteur la verra (rendu local, aucune requête)
 
 const Z_FEUILLE = 1200, Z_QUESTION = 20001;
 const prixTexte = (p) => { const n = Number(p); return Number.isFinite(n) && n > 0 ? `${String(Math.round(n * 100) / 100).replace('.', ',')} €` : ''; };
@@ -90,6 +91,7 @@ export default function CreerSurVinted({ fiches = [], compteOnglet, extRaison = 
   const [faits, setFaits] = React.useState({});
   const [enCours, setEnCours] = React.useState(false);
   const inputs = React.useRef({});
+  const [apercu, setApercu] = React.useState(null);   // (14 nov., lot 128) l'id de la fiche montrée en aperçu
   const lignes = fiches.map((f0) => {
     const f = ficheDe(f0);
     const texte = texteAnnonceVinted(f, reglages);
@@ -191,6 +193,7 @@ export default function CreerSurVinted({ fiches = [], compteOnglet, extRaison = 
                     ))}
                   </div>
                 ) : null}
+                {!fait ? <button type="button" className="vrm-cv-second" style={{ alignSelf: 'flex-start' }} onClick={() => setApercu(f.id)} data-creer-vinted-apercu={f.numero}>{tr('confort.apercu.ouvrir')}</button> : null}
                 {fait ? <p className="vrm-cv-ok" data-creer-vinted-fait={fait.draftId}>{tr('creerVinted.fait')} <a href={lienBrouillon(fait.draftId)} target="_blank" rel="noopener noreferrer">{tr('creerVinted.ouvrir')}</a>{fait.aFinir.length ? <><br/><small>{tr('creerVinted.aFinir', { liste: fait.aFinir.join(', ') })}</small></> : null}</p>
                   : !texte.ok ? <p className="vrm-cv-geste" data-creer-vinted-refus="">{texte.raison}</p>
                   : manque.length ? <p className="vrm-cv-geste" data-creer-vinted-manque={manque.join(',')}>{tr('creerVinted.manque', { liste: manque.map((m) => tr('creerVinted.champ.' + m)).join(', ') })}</p> : null}
@@ -207,5 +210,7 @@ export default function CreerSurVinted({ fiches = [], compteOnglet, extRaison = 
       </div>
     </div>
   );
-  return typeof document !== 'undefined' ? createPortal(corps, document.body) : corps;
+  const lA = apercu ? lignes.find((l) => l.f.id === apercu) : null;
+  const avecApercu = <>{corps}{lA ? <ApercuAnnonce fiche={lA.f} texte={lA.texte} photos={photos[lA.f.id] || []} onFermer={() => setApercu(null)} zIndex={Z_QUESTION}/> : null}</>;
+  return typeof document !== 'undefined' ? createPortal(avecApercu, document.body) : avecApercu;
 }

@@ -37,6 +37,9 @@ const MIGRES = [
   ['src/Accueil.jsx', ['*']],
   // (14 nov., propositions 102-107) Photos et fiches.
   ['src/AtelierPaire.jsx', ['*']], ['src/SeancePhoto.jsx', ['*']], ['src/RechercheCouleur.jsx', ['*']], ['src/AvisPhoto.jsx', ['*']], ['src/LigneCouleurLoupe.jsx', ['*']],
+  // (14 nov., accueil des nouveaux) Bilan, premier colis, notifications, langue ; la page des tarifs.
+  ['src/accueilNouveaux/AccueilNouveaux.jsx', ['*']],
+  ['src/tarifs/Tarifs.jsx', ['*']],
   ['src/accueil/TempsGagne.jsx', ['*']],
   ['src/RetoursLitiges.jsx', ['*']],
   ['src/profil/MenuProfil.jsx', ['*']],
@@ -60,6 +63,8 @@ const MIGRES = [
   ['src/OffresAuto.jsx', ['*']],
   ['src/PrixMiniManquants.jsx', ['*']],
   ['src/design/QuoiRepublier.jsx', ['*']],   // (11 nov., lot quoi-republier)
+  ['src/FraisPlateformes.jsx', ['*']],   // (14 nov., frais-carte) les frais de l'année
+  ['src/CarteVentes.jsx', ['*']],   // (14 nov., frais-carte) la carte des ventes
   // (14 nov., lot argent-choix) coller des prix, modèle et taille, déclaration annuelle.
   ['src/composants/CollerPrixAchat.jsx', ['*']],
   ['src/design/QuoiRacheter.jsx', ['*']],

@@ -60,7 +60,15 @@ if (typeof window !== 'undefined') {
     // c'est rattrapé par le rechargement. Dans la minute, l'erreur repart telle quelle
     // (vraie panne de réseau) et `noterPlantage` la compte à part elle aussi.
     compterMorceauPerime(ev && ev.payload);
-    ev.preventDefault();
+    // ⚠️ (14 nov., fiabilité prod) JAMAIS `ev.preventDefault()` ici. Vite (son
+    // `preload`) rend alors `undefined` À LA PLACE DU MODULE (`baseModule().catch(
+    // handlePreloadError)`) : `React.lazy` lit `undefined.default`, et
+    // `import(…).then((m) => ({ default: m.FactureVente }))` lève « undefined is not
+    // an object (evaluating 'e.FactureVente') » — un VRAI plantage noté, alerte
+    // « Un écran est tombé » au propriétaire (mesuré dans la base : 64 écrans tombés
+    // du 10 au 12 nov., dont 60 d'un coup sur Ventes, iOS Safari). Sans lui, l'import
+    // est REJETÉ avec sa vraie raison (« Failed to fetch dynamically imported
+    // module… », compté à part par src/plantages.js) et la page se recharge quand même.
     window.location.reload();
   });
 }
@@ -83,6 +91,10 @@ const App = React.lazy(() => import('./App.jsx'));
 // Le film de la page d'accueil (`?film`, export MP4) est un morceau à part : un
 // visiteur de la page ne le télécharge jamais, et `?film` ne charge pas l'app.
 const Film = React.lazy(() => import('./AccueilFilm.jsx'));
+// (14 nov., n° 144) vrm.center/tarifs : la page publique des tarifs, un morceau à part
+// (ni l'app ni l'accueil ne le téléchargent), ses textes avec lui (src/tarifs/Tarifs.jsx).
+const Tarifs = React.lazy(() => import('./tarifs/Tarifs.jsx'));
+const pageTarifs = () => /^\/tarifs\/?$/.test(window.location.pathname || '');
 // Les polices : celle du SYSTÈME (SF Pro sur iPhone et Mac, styles-vitrine.css), aucune
 // police téléchargée. (5 nov., chantier A) Inter et Space Grotesk, hébergées ici depuis
 // le 30 sept. pour ne plus appeler Google Fonts, n'étaient plus dessinées nulle part
@@ -168,6 +180,7 @@ function Racine() {
     return () => window.removeEventListener('popstate', f);
   }, []);
   if (filmDemande) return <React.Suspense fallback={<FondApp />}><Film /></React.Suspense>;
+  if (pageTarifs()) return <React.Suspense fallback={<FondApp />}><Tarifs /></React.Suspense>;
   if (vue === 'accueil') {
     return <Accueil onEntrer={(mode) => {
       try { window.history.pushState({}, '', mode === 'up' ? '/?inscription' : '/?connexion'); } catch (_) {}

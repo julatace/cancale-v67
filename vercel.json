@@ -73,6 +73,10 @@
       "destination": "/statut.html"
     },
     {
+      "source": "/tarifs",
+      "destination": "/index.html"
+    },
+    {
       "source": "/f/([a-z0-9-]+)",
       "destination": "/formateur.html"
     },
