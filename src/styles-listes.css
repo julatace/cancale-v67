@@ -138,7 +138,7 @@
    44 touchées), la choisie à l'encre pleine — la forme de `src/ui/Filtres.jsx`. */
 :root:root body .vrm-main[data-ecran="annonces"] .vrm-stock-views.vrm-filtres { gap: 6px !important; }
 :root:root body .vrm-main[data-ecran="annonces"] .vrm-stock-views.vrm-filtres > button {
-  box-sizing: border-box !important; border: 0 !important; border-top: 5px solid transparent !important; border-bottom: 5px solid transparent !important; background-clip: padding-box !important;
+  box-sizing: border-box !important; border: 0 !important; border-top: 5px solid transparent !important; border-bottom: 5px solid transparent !important; border-left: 0 !important; border-right: 0 !important; background-clip: padding-box !important;
   background-color: var(--d-carte, #fff) !important; box-shadow: none !important; border-radius: 999px !important;
   min-height: 44px !important; height: 44px !important; padding: 0 12px !important; font: 600 15px/1 var(--vrm-police) !important; color: var(--d-encre, #1D1D1F) !important;
 }
@@ -176,20 +176,20 @@
     grid-template-columns: 52px auto minmax(0, 1fr) auto !important; min-height: 70px !important; column-gap: 8px !important; row-gap: 3px !important;
   }
   :root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-ann-overview > a.vrm-fiche-photo { border-radius: 10px !important; margin-right: 6px !important; }
-  :root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-ann-ledger-info > [data-titre] { grid-column: 2 / 4 !important; grid-row: 1 !important; font-size: 16px !important; height: 21px !important; max-height: 21px !important; line-height: 21px !important; }
+  :root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-ann-ledger-info > [data-titre] { grid-column: 2 / 4 !important; grid-row: 1 !important; font-size: 17px !important; height: 22px !important; max-height: 22px !important; line-height: 22px !important; }
   :root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-ann-overview > .vrm-fiche-numero { grid-column: 2 !important; grid-row: 2 !important; margin: -12px 0 !important; }
   :root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-ann-overview > .vrm-fiche-numero .vrm-num:not([data-num-etat="doublon"]) { background: var(--d-remplir, rgba(118,118,128,.12)) !important; color: var(--d-encre, #1D1D1F) !important; }
   :root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-ann-overview > .vrm-fiche-numero .vrm-num:not([data-num-etat="doublon"]) * { color: var(--d-encre, #1D1D1F) !important; }
   :root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-ann-ledger-info > [data-etat-ligne] { grid-column: 3 / -1 !important; grid-row: 2 !important; }
   :root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-ann-overview:not(:has(> .vrm-fiche-numero)) > .vrm-ann-ledger-info > [data-etat-ligne] { grid-column: 2 / -1 !important; }
-  :root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-ann-ledger-info > .vrm-ann-price-line [data-prix] { font-size: 16px !important; }
+  :root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-ann-ledger-info > .vrm-ann-price-line [data-prix] { font-size: 17px !important; }
   /* La bande : trois chiffres séparés par un filet fin, comme la maquette. */
   :root:root:root body .vrm-main .vrm-fu-bande > .vrm-ui-bande-item + .vrm-ui-bande-item { border-left: .5px solid var(--d-filet-fort, rgba(60,60,67,.29)) !important; padding-left: 14px !important; }
 
   /* Ventes · « À expédier » : les gestes de préparation en UNE rangée de petites capsules (elle défile). */
   :root:root:root body .vrm-main .vrm-colis-section .vrm-pas-a-pas-rangee { display: flex !important; flex-wrap: nowrap !important; overflow-x: auto !important; gap: 6px !important; margin: 0 -16px 2px !important; padding: 0 16px !important; scrollbar-width: none !important; }
   :root:root:root body .vrm-main .vrm-colis-section :is(.vrm-pas-a-pas-rangee, .vrm-tournee-tete) .vrm-b {
-    box-sizing: border-box !important; border: 0 !important; border-top: 5px solid transparent !important; border-bottom: 5px solid transparent !important; background-clip: padding-box !important;
+    box-sizing: border-box !important; border: 0 !important; border-top: 5px solid transparent !important; border-bottom: 5px solid transparent !important; border-left: 0 !important; border-right: 0 !important; background-clip: padding-box !important;
     background-color: var(--d-carte, #fff) !important; box-shadow: none !important; border-radius: 999px !important; flex: none !important;
     min-height: 44px !important; height: 44px !important; padding: 0 12px !important; font: 600 15px/1 var(--vrm-police) !important; color: var(--d-encre, #1D1D1F) !important; width: auto !important;
   }
@@ -200,7 +200,7 @@
   :root:root:root body .vrm-main .vrm-colis-section .vrm-colis-section-tete > .vrm-colis-section-titre { flex: 0 1 auto !important; min-width: 0 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
   :root:root:root body .vrm-main .vrm-colis-section .vrm-colis-section-tete > :not(.vrm-colis-section-titre) { flex: 0 0 auto !important; display: flex !important; flex-wrap: nowrap !important; gap: 0 !important; align-items: center !important; margin-left: auto !important; }
   :root:root:root body .vrm-main .vrm-colis-section .vrm-colis-section-tete .vrm-b-secondaire { background: transparent !important; box-shadow: none !important; color: var(--d-accent-texte, #0066CC) !important; width: 44px !important; min-width: 44px !important; padding: 0 !important; }
-  :root:root:root body .vrm-main .vrm-colis-section .vrm-colis-section-tete .vrm-b-primaire { padding: 0 12px !important; font-size: 14px !important; gap: 6px !important; }
+  :root:root:root body .vrm-main .vrm-colis-section .vrm-colis-section-tete .vrm-b-primaire { padding: 0 12px !important; font-size: 15px !important; gap: 6px !important; }
   :root:root:root body .vrm-main .vrm-colis-section [data-colis-urgence] { padding: 6px 12px !important; margin-bottom: 6px !important; }
 }
 
@@ -352,6 +352,10 @@
   border-radius: var(--d-r-pastille-icone, 10px) !important; background: var(--d-pastille-neutre-fond, rgba(118,118,128,.12)) !important; color: var(--d-pastille-neutre, #3A3A3C) !important; box-shadow: none !important; border: 0 !important;
 }
 :root:root body .vrm-main[data-ecran="journee"] .vrm-day-task-list .vrm-day-task:has(.is-urgent) .vrm-pile.is-vide .vrm-pile-v.is-tuile { background: var(--d-pastille-ambre-fond, rgba(255,159,10,.14)) !important; color: var(--d-pastille-ambre, #B25000) !important; }
+/* « À ce rythme, novembre finira vers … » : une rangée sur le fond de la page (son « estimation » gris lisible, ≥ 4,5:1),
+   44 px au doigt, 36 à la souris. */
+:root:root:root body .vrm-main[data-ecran="journee"] .vrm-ap-ligne { min-height: 44px !important; background: transparent !important; box-shadow: none !important; }
+@media (hover: hover) and (pointer: fine) { :root:root:root body .vrm-main[data-ecran="journee"] .vrm-ap-ligne { min-height: 36px !important; } }
 /* Une sous-ligne d'« Ensuite » : UNE ligne. */
 :root:root body .vrm-main[data-ecran="journee"] .vrm-day-task-list .vrm-day-task-note { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; -webkit-line-clamp: unset !important; display: block !important; }
 @media (max-width: 767px) {
@@ -362,6 +366,32 @@
   :root:root body .vrm-main[data-ecran="journee"] .vrm-jv2-quand > .vrm-jv2-nom { flex: 1 1 auto !important; min-width: 0 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
   :root:root body .vrm-main[data-ecran="journee"] .vrm-jv2-quand > .vrm-jv2-sem { flex: 0 0 auto !important; padding: 0 10px !important; font-size: 12px !important; margin-left: 0 !important; }
   :root:root body .vrm-main[data-ecran="journee"] .vrm-jv2-quand > .vrm-jv2-ma-semaine { order: 3 !important; }
+}
+
+/* La taille écrite en fin de titre : au titre partout ; sur la RANGÉE fermée du téléphone, dans la sous-ligne (« T. 37 »). */
+:root:root body .vrm-main .vrm-etat-taille { display: none !important; }
+@media (max-width: 767px) {
+  :root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-titre-taille-fin { display: none !important; }
+  :root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-etat-taille { display: inline !important; color: var(--d-encre, #1D1D1F) !important; font-weight: 600 !important; }
+  /* La sous-ligne de la rangée : taille, favoris, jours (comme la maquette) ; l'état (« Très bon état ») et les vues
+     sont dans la fiche ouverte — rien de coupé « Très bon é… ». */
+  :root:root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] [data-etat-ligne] .vrm-fiche-etat-court { display: none !important; }
+  /* Le nom prend toute la ligne (jusqu'au chevron) ; le prix descend à droite de la sous-ligne. */
+  :root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-ann-ledger-info > [data-titre] { grid-column: 2 / -1 !important; }
+  :root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-ann-ledger-info > .vrm-ann-price-line { grid-row: 2 !important; grid-column: 4 !important; }
+  :root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-ann-ledger-info > [data-etat-ligne] { grid-column: 3 / 4 !important; }
+  :root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-ann-overview:not(:has(> .vrm-fiche-numero)) > .vrm-ann-ledger-info > [data-etat-ligne] { grid-column: 2 / 4 !important; }
+  /* La bande : trois chiffres au plus au téléphone ; « ⋯ » au bout de la même rangée (jamais seul au-dessus). */
+  :root:root:root body .vrm-main .vrm-fu-bande > .vrm-ui-bande-item:not(.vrm-sr-seul) ~ .vrm-ui-bande-item:not(.vrm-sr-seul) ~ .vrm-ui-bande-item:not(.vrm-sr-seul) ~ .vrm-ui-bande-item { display: none !important; }
+  :root:root:root body .vrm-main[data-ecran="annonces"] .vrm-fu-bande > .vrm-fu-bande-action { position: static !important; }
+  /* « À expédier » : N° + titre de la paire sur UNE ligne. */
+  :root:root:root body .vrm-main .vrm-colis-section .vrm-colis-carte[data-bord-card] .vrm-colis-titre { -webkit-line-clamp: 1 !important; line-clamp: 1 !important; white-space: nowrap !important; display: block !important; text-overflow: ellipsis !important; }
+  :root:root:root body .vrm-main .vrm-colis-section .vrm-colis-onglets { display: flex !important; align-items: center !important; gap: 6px !important; }
+  :root:root:root:root body .vrm-main .vrm-colis-section .vrm-colis-section-tete > .vrm-colis-section-titre { font-size: 17px !important; }
+  :root:root:root:root body .vrm-main .vrm-colis-section > div > [data-colis-dans] { padding-top: 0 !important; }
+  :root:root:root:root body .vrm-main .vrm-colis-section [data-colis-dans] > .vrm-colis-section-tete { margin-top: 0 !important; }
+  :root:root:root:root body .vrm-main .vrm-colis-section .vrm-colis-section-tete .vrm-b-primaire { padding: 0 10px !important; }
+  :root:root:root body .vrm-main .vrm-colis-section .vrm-colis-onglets > :first-child { flex: 1 1 auto !important; min-width: 0 !important; }
 }
 
 } /* fin @layer vrm-premium */

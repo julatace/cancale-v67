@@ -69,7 +69,7 @@ export function AFaireLigne({ titre, className = '', capsule = false, seulement 
         <button type="button" className={(capsule ? 'vrm-ui-afaire-capsule' : 'vrm-ui-afaire') + (className ? ' ' + className : '')} aria-haspopup="dialog" aria-expanded={ouvert} data-ui-afaire={c.n} onClick={() => setOuvert(true)}>
           <span className="vrm-ui-afaire-point" aria-hidden="true"/>
           <span className="vrm-ui-afaire-mots">{titre || tr('listes.afaire')} <span className="vrm-ui-afaire-n">· {c.n}</span></span>
-          <Chevron/>
+          {capsule ? null : <Chevron/>}
         </button>) : null}
       <div ref={place} hidden data-ui-afaire-place="telephone"/>
       {ouvert ? <Feuille titre={titre || tr('listes.afaire')} onClose={() => setOuvert(false)} data-ui-afaire-feuille=""><div ref={corps}/></Feuille> : null}

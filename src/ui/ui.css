@@ -15,129 +15,138 @@
 @layer vrm-premium {
 
 /* ── BandeChiffres : 2 à 4 chiffres côte à côte, fond de la page, ≤ 72 px ── */
-:root:root:root body .vrm-ui-bande {
+:root:root:root:root:root:root body .vrm-ui-bande {
   display: flex !important; align-items: flex-end !important; gap: 4px 24px !important; flex-wrap: nowrap !important;
   min-height: 0 !important; max-height: 72px !important; margin: 0 !important; padding: 4px 0 8px !important;
   background: none !important; box-shadow: none !important; border: 0 !important; overflow: hidden !important;
 }
-:root:root:root body .vrm-ui-bande-item {
+:root:root:root:root:root:root body .vrm-ui-bande-item {
   all: unset; box-sizing: border-box !important; display: flex !important; flex-direction: column !important; gap: 2px !important; min-width: 0 !important;
   flex: 0 1 auto !important; color: var(--d-encre, #1D1D1F) !important; font-family: var(--vrm-police) !important; -webkit-tap-highlight-color: transparent;
 }
 :root:root body button.vrm-ui-bande-item { cursor: pointer !important; min-height: 44px !important; justify-content: flex-end !important; transition: transform var(--d-m-appui, 100ms) ease-out !important; }
 :root:root body button.vrm-ui-bande-item:active { transform: var(--d-appui, scale(.97)) !important; }
 :root:root body button.vrm-ui-bande-item:focus-visible { outline: 2px solid var(--d-accent, #0071E3) !important; outline-offset: 2px !important; border-radius: 6px !important; }
-:root:root:root body .vrm-ui-bande-n {
+:root:root:root:root:root:root body .vrm-ui-bande-n {
   font: 700 28px/1 var(--vrm-police) !important; letter-spacing: -.02em !important; font-variant-numeric: tabular-nums !important;
   color: var(--d-encre, #1D1D1F) !important; white-space: nowrap !important;
 }
-:root:root:root body .vrm-ui-bande-n.is-vide { font-weight: 400 !important; color: var(--d-gris, #6E6E73) !important; }
-:root:root:root body .vrm-ui-bande-l { font: 400 13px/1.25 var(--vrm-police) !important; color: var(--d-gris, #6E6E73) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+:root:root:root:root:root:root body .vrm-ui-bande-n.is-vide { font-weight: 400 !important; color: var(--d-gris, #6E6E73) !important; }
+:root:root:root:root:root:root body .vrm-ui-bande-l { font: 400 13px/1.25 var(--vrm-police) !important; color: var(--d-gris, #6E6E73) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
 
 /* ── MenuCompte : « compte_1 ▾ », un bouton texte, la liste dans une feuille ── */
-:root:root:root body .vrm-ui-menu-compte {
+:root:root:root:root:root:root body .vrm-ui-menu-compte {
   all: unset; box-sizing: border-box !important; display: flex !important; align-items: center !important; gap: 4px !important;
   min-height: 44px !important; max-width: 100% !important; padding: 0 2px !important; cursor: pointer !important; background: none !important; box-shadow: none !important; border: 0 !important; border-radius: 0 !important;
   font: 600 15px/1.2 var(--vrm-police) !important; color: var(--d-encre, #1D1D1F) !important; -webkit-tap-highlight-color: transparent;
 }
-:root:root:root body .vrm-ui-menu-compte > span:first-child { min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
-:root:root:root body .vrm-ui-menu-compte > svg { flex: none !important; color: var(--d-gris, #6E6E73) !important; }
-:root:root:root body .vrm-ui-menu-compte:focus-visible { outline: 2px solid var(--d-accent, #0071E3) !important; outline-offset: 2px !important; border-radius: 6px !important; }
-@media (hover: hover) and (pointer: fine) { :root:root:root body .vrm-ui-menu-compte { min-height: 36px !important; } }
+:root:root:root:root:root:root body .vrm-ui-menu-compte > span:first-child { min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+:root:root:root:root:root:root body .vrm-ui-menu-compte > svg { flex: none !important; color: var(--d-gris, #6E6E73) !important; }
+:root:root:root:root:root:root body .vrm-ui-menu-compte:focus-visible { outline: 2px solid var(--d-accent, #0071E3) !important; outline-offset: 2px !important; border-radius: 6px !important; }
+@media (hover: hover) and (pointer: fine) { :root:root:root:root:root:root body .vrm-ui-menu-compte { min-height: 36px !important; } }
 
 /* ── Feuille (MenuCompte, LigneAFaire) : portail, voile, une carte en bas au téléphone ── */
-:root:root:root body .vrm-ui-voile { position: fixed !important; inset: 0 !important; z-index: 20000 !important; background: rgb(0 0 0 / .32) !important; display: flex !important; align-items: flex-end !important; justify-content: center !important; animation: vrm-ui-voile 200ms ease-out both; }
-:root:root:root body .vrm-ui-feuille {
+:root:root:root:root:root:root body .vrm-ui-voile { position: fixed !important; inset: 0 !important; z-index: 20000 !important; background: rgb(0 0 0 / .32) !important; display: flex !important; align-items: flex-end !important; justify-content: center !important; animation: vrm-ui-voile 200ms ease-out both; }
+:root:root:root:root:root:root body .vrm-ui-feuille {
   width: min(560px, 100%) !important; max-height: min(80vh, 640px) !important; overflow: auto !important; box-sizing: border-box !important;
   background: var(--d-fond, #F2F2F7) !important; border-radius: 20px 20px 0 0 !important; padding: 8px 16px calc(16px + env(safe-area-inset-bottom, 0px)) !important;
   box-shadow: var(--d-ombre-flottant, 0 24px 56px rgba(0,0,0,.16)) !important; animation: vrm-ui-feuille var(--d-m-ressort, 320ms) var(--d-ressort, cubic-bezier(.32,.72,0,1)) both;
 }
-@media (min-width: 768px) { :root:root:root body .vrm-ui-voile { align-items: center !important; } :root:root:root body .vrm-ui-feuille { border-radius: 20px !important; } }
-:root:root:root body .vrm-ui-feuille-tete { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 12px !important; min-height: 44px !important; margin: 0 0 8px !important; }
-:root:root:root body .vrm-ui-feuille-titre { font: 700 20px/1.2 var(--vrm-police) !important; letter-spacing: -.016em !important; color: var(--d-encre, #1D1D1F) !important; margin: 0 !important; }
-:root:root:root body .vrm-ui-feuille-fermer { all: unset; box-sizing: border-box !important; min-width: 44px !important; min-height: 44px !important; display: grid !important; place-items: center !important; cursor: pointer !important; color: var(--d-accent-texte, #0066CC) !important; font: 600 15px/1 var(--vrm-police) !important; }
-:root:root:root body .vrm-ui-choix { list-style: none !important; margin: 0 !important; padding: 0 !important; background: var(--d-carte, #fff) !important; border-radius: 12px !important; overflow: hidden !important; }
-:root:root:root body .vrm-ui-choix > li + li { box-shadow: inset 0 .5px 0 var(--d-filet, rgba(60,60,67,.18)) !important; }
-:root:root:root body .vrm-ui-choix button {
+@media (min-width: 768px) { :root:root:root:root:root:root body .vrm-ui-voile { align-items: center !important; } :root:root:root:root:root:root body .vrm-ui-feuille { border-radius: 20px !important; } }
+:root:root:root:root:root:root body .vrm-ui-feuille-tete { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 12px !important; min-height: 44px !important; margin: 0 0 8px !important; }
+:root:root:root:root:root:root body .vrm-ui-feuille-titre { font: 700 20px/1.2 var(--vrm-police) !important; letter-spacing: -.016em !important; color: var(--d-encre, #1D1D1F) !important; margin: 0 !important; }
+:root:root:root:root:root:root body .vrm-ui-feuille-fermer { all: unset; box-sizing: border-box !important; min-width: 44px !important; min-height: 44px !important; display: grid !important; place-items: center !important; cursor: pointer !important; color: var(--d-accent-texte, #0066CC) !important; font: 600 15px/1 var(--vrm-police) !important; }
+:root:root:root:root:root:root body .vrm-ui-choix { list-style: none !important; margin: 0 !important; padding: 0 !important; background: var(--d-carte, #fff) !important; border-radius: 12px !important; overflow: hidden !important; }
+:root:root:root:root:root:root body .vrm-ui-choix > li + li { box-shadow: inset 0 .5px 0 var(--d-filet, rgba(60,60,67,.18)) !important; }
+:root:root:root:root:root:root body .vrm-ui-choix button {
   all: unset; box-sizing: border-box !important; width: 100% !important; min-height: 48px !important; display: flex !important; align-items: center !important; gap: 12px !important;
   padding: 0 16px !important; cursor: pointer !important; font: 400 17px/1.25 var(--vrm-police) !important; color: var(--d-encre, #1D1D1F) !important;
 }
-:root:root:root body .vrm-ui-choix button > span:first-child { flex: 1 1 auto !important; min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
-:root:root:root body .vrm-ui-choix button > .vrm-ui-choix-n { color: var(--d-gris, #6E6E73) !important; font-variant-numeric: tabular-nums !important; }
-:root:root:root body .vrm-ui-choix button[aria-checked="true"] > .vrm-ui-choix-coche { color: var(--d-accent-texte, #0066CC) !important; }
-:root:root:root body .vrm-ui-choix button:active { background: var(--d-remplir, rgba(118,118,128,.12)) !important; }
+:root:root:root:root:root:root body .vrm-ui-choix button > span:first-child { flex: 1 1 auto !important; min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+:root:root:root:root:root:root body .vrm-ui-choix button > .vrm-ui-choix-n { color: var(--d-gris, #6E6E73) !important; font-variant-numeric: tabular-nums !important; }
+:root:root:root:root:root:root body .vrm-ui-choix button[aria-checked="true"] > .vrm-ui-choix-coche { color: var(--d-accent-texte, #0066CC) !important; }
+:root:root:root:root:root:root body .vrm-ui-choix button:active { background: var(--d-remplir, rgba(118,118,128,.12)) !important; }
 @keyframes vrm-ui-voile { from { opacity: 0; } to { opacity: 1; } }
 @keyframes vrm-ui-feuille { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
 
 /* ── BarreOutils : un vrai champ de recherche + 1–2 icônes, 36 px dessinés ── */
-:root:root:root body .vrm-ui-outils { display: flex !important; align-items: center !important; gap: 4px !important; min-height: 44px !important; margin: 0 !important; }
-:root:root:root body .vrm-ui-outils-champ {
+:root:root:root:root:root:root body .vrm-ui-outils { display: flex !important; align-items: center !important; gap: 4px !important; min-height: 44px !important; margin: 0 !important; }
+:root:root:root:root:root:root body .vrm-ui-outils-champ {
   flex: 1 1 auto !important; min-width: 0 !important; display: flex !important; align-items: center !important; gap: 6px !important;
   height: 36px !important; padding: 0 10px !important; box-sizing: border-box !important; border-radius: 12px !important;
   background: var(--d-remplir, rgba(118,118,128,.12)) !important; color: var(--d-gris, #6E6E73) !important;
 }
-:root:root:root body .vrm-ui-outils-champ > input {
+:root:root:root:root:root:root body .vrm-ui-outils-champ > input {
   all: unset; flex: 1 1 auto !important; min-width: 0 !important; height: 36px !important; font: 400 17px/1 var(--vrm-police) !important; color: var(--d-encre, #1D1D1F) !important;
 }
-:root:root:root body .vrm-ui-outils-champ > input::placeholder { color: var(--d-gris, #6E6E73) !important; }
-:root:root:root body .vrm-ui-outils-champ:focus-within { box-shadow: 0 0 0 2px var(--d-accent, #0071E3) !important; }
-:root:root:root body .vrm-ui-icone {
+:root:root:root:root:root:root body .vrm-ui-outils-champ > input::placeholder { color: var(--d-gris, #6E6E73) !important; }
+:root:root:root:root:root:root body .vrm-ui-outils-champ:focus-within { box-shadow: 0 0 0 2px var(--d-accent, #0071E3) !important; }
+:root:root:root:root:root:root body .vrm-ui-icone {
   all: unset; box-sizing: border-box !important; flex: none !important; width: 44px !important; height: 44px !important; display: grid !important; place-items: center !important;
   border-radius: 999px !important; cursor: pointer !important; background: none !important; box-shadow: none !important; border: 0 !important; color: var(--d-accent-texte, #0066CC) !important; transition: transform var(--d-m-appui, 100ms) ease-out !important; -webkit-tap-highlight-color: transparent;
 }
-:root:root:root body .vrm-ui-icone:active { transform: var(--d-appui, scale(.97)) !important; background: var(--d-remplir, rgba(118,118,128,.12)) !important; }
-:root:root:root body .vrm-ui-icone[aria-pressed="true"] { color: var(--d-encre, #1D1D1F) !important; background: var(--d-remplir, rgba(118,118,128,.12)) !important; }
-@media (hover: hover) and (pointer: fine) { :root:root:root body .vrm-ui-icone { width: 36px !important; height: 36px !important; } :root:root:root body .vrm-ui-icone:hover { background: var(--d-remplir, rgba(118,118,128,.12)) !important; } }
+:root:root:root:root:root:root body .vrm-ui-icone:active { transform: var(--d-appui, scale(.97)) !important; background: var(--d-remplir, rgba(118,118,128,.12)) !important; }
+:root:root:root:root:root:root body .vrm-ui-icone[aria-pressed="true"] { color: var(--d-encre, #1D1D1F) !important; background: var(--d-remplir, rgba(118,118,128,.12)) !important; }
+@media (hover: hover) and (pointer: fine) { :root:root:root:root:root:root body .vrm-ui-icone { width: 36px !important; height: 36px !important; } :root:root:root:root:root:root body .vrm-ui-icone:hover { background: var(--d-remplir, rgba(118,118,128,.12)) !important; } }
 
 /* ── Filtres : petites capsules (34 px dessinées, 44 touchées), la choisie à l'encre pleine ── */
-:root:root:root body .vrm-ui-filtres { display: flex !important; gap: 6px !important; overflow-x: auto !important; scrollbar-width: none !important; margin: 0 -16px !important; padding: 0 16px !important; }
-:root:root:root body .vrm-ui-filtres::-webkit-scrollbar { display: none !important; }
-:root:root:root body .vrm-ui-filtre {
+:root:root:root:root:root:root body .vrm-ui-filtres { display: flex !important; gap: 6px !important; overflow-x: auto !important; scrollbar-width: none !important; margin: 0 -16px !important; padding: 0 16px !important; }
+:root:root:root:root:root:root body .vrm-ui-filtres::-webkit-scrollbar { display: none !important; }
+:root:root:root:root:root:root body .vrm-ui-filtre {
   all: unset; box-sizing: border-box !important; position: relative !important; isolation: isolate !important; flex: none !important;
   display: inline-flex !important; align-items: center !important; gap: 6px !important; min-height: 44px !important; padding: 0 12px !important; cursor: pointer !important;
   font: 600 15px/1 var(--vrm-police) !important; color: var(--d-encre, #1D1D1F) !important; white-space: nowrap !important; background: none !important; box-shadow: none !important; border: 0 !important; -webkit-tap-highlight-color: transparent;
 }
-:root:root:root body .vrm-ui-filtre { border-top: 5px solid transparent !important; border-bottom: 5px solid transparent !important; background-clip: padding-box !important; background-color: var(--d-carte, #fff) !important; border-radius: 999px !important; transition: transform var(--d-m-appui, 100ms) ease-out !important; }
-:root:root:root body .vrm-ui-filtre[aria-pressed="true"] { color: var(--d-carte, #fff) !important; background-color: var(--d-encre, #1D1D1F) !important; }
-:root:root:root body .vrm-ui-filtre:active { transform: var(--d-appui, scale(.97)) !important; }
-:root:root:root body .vrm-ui-filtre-n { font-weight: 400 !important; font-variant-numeric: tabular-nums !important; opacity: .7 !important; }
-@media (hover: hover) and (pointer: fine) { :root:root:root body .vrm-ui-filtre { min-height: 36px !important; } :root:root:root body .vrm-ui-afaire:active { transform: var(--d-appui, scale(.97)) !important; }
-:root:root:root body .vrm-ui-afaire-point { flex: none !important; width: 8px !important; height: 8px !important; border-radius: 50% !important; background: var(--d-point-ambre, #FF9F0A) !important; }
-:root:root:root body .vrm-ui-afaire-mots { flex: 1 1 auto !important; min-width: 0 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
-:root:root:root body .vrm-ui-afaire-n { font-weight: 400 !important; color: var(--d-gris, #6E6E73) !important; font-variant-numeric: tabular-nums !important; }
-:root:root:root body .vrm-ui-afaire > svg { flex: none !important; color: var(--d-glyphe, #AEAEB2) !important; }
-:root:root:root body .vrm-ui-afaire-corps { display: flex !important; flex-direction: column !important; gap: 8px !important; }
+:root:root:root:root:root:root body .vrm-ui-filtre { border-top: 5px solid transparent !important; border-bottom: 5px solid transparent !important; border-left: 0 !important; border-right: 0 !important; outline: 0; background-clip: padding-box !important; background-color: var(--d-carte, #fff) !important; border-radius: 999px !important; transition: transform var(--d-m-appui, 100ms) ease-out !important; }
+:root:root:root:root:root:root body .vrm-ui-filtre[aria-pressed="true"] { color: var(--d-carte, #fff) !important; background-color: var(--d-encre, #1D1D1F) !important; }
+:root:root:root:root:root:root body .vrm-ui-filtre:active { transform: var(--d-appui, scale(.97)) !important; }
+:root:root:root:root:root:root body .vrm-ui-filtre-n { font-weight: 400 !important; font-variant-numeric: tabular-nums !important; opacity: .7 !important; }
+@media (hover: hover) and (pointer: fine) { :root:root:root:root:root:root body .vrm-ui-filtre { min-height: 36px !important; border-top-width: 1px !important; border-bottom-width: 1px !important; } }
+
+/* ── LigneAFaire : « • À faire · 5 › », une rangée, une feuille ── */
+:root:root:root:root:root:root body .vrm-ui-afaire {
+  all: unset; box-sizing: border-box !important; width: 100% !important; display: flex !important; align-items: center !important; gap: 10px !important;
+  min-height: 44px !important; padding: 0 12px 0 14px !important; border-radius: 12px !important; cursor: pointer !important;
+  background: var(--d-carte, #fff) !important; box-shadow: var(--d-ombre-douce, 0 1px 2px rgba(0,0,0,.04)) !important;
+  font: 600 15px/1.2 var(--vrm-police) !important; color: var(--d-encre, #1D1D1F) !important; -webkit-tap-highlight-color: transparent; transition: transform var(--d-m-appui, 100ms) ease-out !important;
+}
+:root:root:root:root:root:root body .vrm-ui-afaire:active { transform: var(--d-appui, scale(.97)) !important; }
+:root:root:root:root:root:root body .vrm-ui-afaire-point { flex: none !important; width: 8px !important; height: 8px !important; border-radius: 50% !important; background: var(--d-point-ambre, #FF9F0A) !important; }
+:root:root:root:root:root:root body .vrm-ui-afaire-mots { flex: 1 1 auto !important; min-width: 0 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+:root:root:root:root:root:root body .vrm-ui-afaire-n { font-weight: 400 !important; color: var(--d-gris, #6E6E73) !important; font-variant-numeric: tabular-nums !important; }
+:root:root:root:root:root:root body .vrm-ui-afaire > svg { flex: none !important; color: var(--d-glyphe, #AEAEB2) !important; }
+:root:root:root:root:root:root body .vrm-ui-afaire-corps { display: flex !important; flex-direction: column !important; gap: 8px !important; }
 
 /* ── la variante « capsule » de LigneAFaire (en tête d'une rangée de filtres) ── */
-:root:root:root body .vrm-ui-afaire-capsule {
+:root:root:root:root:root:root body .vrm-ui-afaire-capsule {
   all: unset; box-sizing: border-box !important; position: relative !important; isolation: isolate !important; flex: none !important;
   display: inline-flex !important; align-items: center !important; gap: 6px !important; min-height: 44px !important; padding: 0 12px !important; cursor: pointer !important;
   font: 600 15px/1 var(--vrm-police) !important; color: var(--d-encre, #1D1D1F) !important; white-space: nowrap !important; background: none !important; -webkit-tap-highlight-color: transparent;
 }
-:root:root:root body .vrm-ui-afaire-capsule > svg { display: none !important; }
-:root:root:root body .vrm-ui-afaire-capsule .vrm-ui-afaire-mots { overflow: visible !important; }
-:root:root:root body .vrm-ui-afaire-capsule .vrm-ui-afaire-n { color: var(--d-ambre, #B25000) !important; font-weight: 600 !important; }
-:root:root:root body .vrm-ui-afaire-capsule { border-top: 5px solid transparent !important; border-bottom: 5px solid transparent !important; background-clip: padding-box !important; background-color: var(--d-ambre-fond, #FFF4E5) !important; border-radius: 999px !important; }
-:root:root:root body .vrm-ui-afaire-capsule:active { transform: var(--d-appui, scale(.97)) !important; }
+:root:root:root:root:root:root body .vrm-ui-afaire-capsule > svg { display: none !important; }
+:root:root:root:root:root:root body .vrm-ui-afaire-capsule .vrm-ui-afaire-mots { overflow: visible !important; }
+:root:root:root:root:root:root body .vrm-ui-afaire-capsule .vrm-ui-afaire-n { color: var(--d-ambre, #B25000) !important; font-weight: 600 !important; }
+:root:root:root:root:root:root body .vrm-ui-afaire-capsule { border-top: 5px solid transparent !important; border-bottom: 5px solid transparent !important; border-left: 0 !important; border-right: 0 !important; outline: 0; background-clip: padding-box !important; background-color: var(--d-ambre-fond, #FFF4E5) !important; border-radius: 999px !important; }
+:root:root:root:root:root:root body .vrm-ui-afaire-capsule:active { transform: var(--d-appui, scale(.97)) !important; }
 
 /* ── Ligne : la rangée d'une liste longue (64–72 px, vignette 52) ── */
-:root:root:root body .vrm-ui-ligne {
+:root:root:root:root:root:root body .vrm-ui-ligne {
   all: unset; box-sizing: border-box !important; width: 100% !important; display: flex !important; align-items: center !important; gap: 12px !important;
   min-height: var(--d-h-rangee, 68px) !important; padding: 8px 12px !important; cursor: pointer !important; position: relative !important;
   background: var(--d-carte, #fff) !important; color: var(--d-encre, #1D1D1F) !important; font-family: var(--vrm-police) !important;
   content-visibility: auto; contain-intrinsic-size: auto var(--d-h-rangee, 68px); -webkit-tap-highlight-color: transparent;
 }
-:root:root:root body .vrm-ui-ligne + .vrm-ui-ligne::before { content: '' !important; position: absolute !important; top: 0 !important; left: 76px !important; right: 0 !important; height: .5px !important; background: var(--d-filet, rgba(60,60,67,.18)) !important; }
-:root:root:root body .vrm-ui-ligne:active { background: var(--d-case, #F2F2F7) !important; }
-:root:root:root body .vrm-ui-ligne-photo { flex: none !important; width: var(--d-vignette-rangee, 52px) !important; height: var(--d-vignette-rangee, 52px) !important; border-radius: var(--d-r-vignette-rangee, 12px) !important; overflow: hidden !important; background: var(--d-case, #F2F2F7) !important; display: grid !important; place-items: center !important; }
-:root:root:root body .vrm-ui-ligne-photo > img { width: 100% !important; height: 100% !important; object-fit: cover !important; display: block !important; }
-:root:root:root body .vrm-ui-ligne-textes { flex: 1 1 auto !important; min-width: 0 !important; display: flex !important; flex-direction: column !important; gap: 2px !important; }
-:root:root:root body .vrm-ui-ligne-titre { display: flex !important; align-items: center !important; gap: 6px !important; min-width: 0 !important; font: 600 15px/20px var(--vrm-police) !important; letter-spacing: -.006em !important; }
-:root:root:root body .vrm-ui-ligne-titre > span:last-child { min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
-:root:root:root body .vrm-ui-ligne-sous { font: 400 13px/18px var(--vrm-police) !important; color: var(--d-gris, #6E6E73) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
-:root:root:root body .vrm-ui-ligne-sous.is-geste { color: var(--d-encre, #1D1D1F) !important; }
-:root:root:root body .vrm-ui-ligne-sous.is-geste::before { content: '' !important; display: inline-block !important; width: 7px !important; height: 7px !important; border-radius: 50% !important; background: var(--d-point-ambre, #FF9F0A) !important; margin: 0 6px 1px 0 !important; vertical-align: middle !important; }
-:root:root:root body .vrm-ui-ligne-valeur { flex: none !important; font: 600 15px/20px var(--vrm-police) !important; font-variant-numeric: tabular-nums !important; color: var(--d-encre, #1D1D1F) !important; text-align: right !important; }
-:root:root:root body .vrm-ui-ligne > svg.vrm-ui-chevron { flex: none !important; color: var(--d-glyphe, #AEAEB2) !important; }
+:root:root:root:root:root:root body .vrm-ui-ligne + .vrm-ui-ligne::before { content: '' !important; position: absolute !important; top: 0 !important; left: 76px !important; right: 0 !important; height: .5px !important; background: var(--d-filet, rgba(60,60,67,.18)) !important; }
+:root:root:root:root:root:root body .vrm-ui-ligne:active { background: var(--d-case, #F2F2F7) !important; }
+:root:root:root:root:root:root body .vrm-ui-ligne-photo { flex: none !important; width: var(--d-vignette-rangee, 52px) !important; height: var(--d-vignette-rangee, 52px) !important; border-radius: var(--d-r-vignette-rangee, 12px) !important; overflow: hidden !important; background: var(--d-case, #F2F2F7) !important; display: grid !important; place-items: center !important; }
+:root:root:root:root:root:root body .vrm-ui-ligne-photo > img { width: 100% !important; height: 100% !important; object-fit: cover !important; display: block !important; }
+:root:root:root:root:root:root body .vrm-ui-ligne-textes { flex: 1 1 auto !important; min-width: 0 !important; display: flex !important; flex-direction: column !important; gap: 2px !important; }
+:root:root:root:root:root:root body .vrm-ui-ligne-titre { display: flex !important; align-items: center !important; gap: 6px !important; min-width: 0 !important; font: 600 15px/20px var(--vrm-police) !important; letter-spacing: -.006em !important; }
+:root:root:root:root:root:root body .vrm-ui-ligne-titre > span:last-child { min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+:root:root:root:root:root:root body .vrm-ui-ligne-sous { font: 400 13px/18px var(--vrm-police) !important; color: var(--d-gris, #6E6E73) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+:root:root:root:root:root:root body .vrm-ui-ligne-sous.is-geste { color: var(--d-encre, #1D1D1F) !important; }
+:root:root:root:root:root:root body .vrm-ui-ligne-sous.is-geste::before { content: '' !important; display: inline-block !important; width: 7px !important; height: 7px !important; border-radius: 50% !important; background: var(--d-point-ambre, #FF9F0A) !important; margin: 0 6px 1px 0 !important; vertical-align: middle !important; }
+:root:root:root:root:root:root body .vrm-ui-ligne-valeur { flex: none !important; font: 600 15px/20px var(--vrm-police) !important; font-variant-numeric: tabular-nums !important; color: var(--d-encre, #1D1D1F) !important; text-align: right !important; }
+:root:root:root:root:root:root body .vrm-ui-ligne > svg.vrm-ui-chevron { flex: none !important; color: var(--d-glyphe, #AEAEB2) !important; }
 @media (prefers-reduced-motion: reduce) { :root:root body :is(.vrm-ui-voile, .vrm-ui-feuille) { animation: none !important; } }
 }
