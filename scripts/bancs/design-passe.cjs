@@ -156,9 +156,10 @@ function mesurer({ tactile, sombre, racines, ciblesEnPlus = '' }) {
   const hex = (c) => '#' + [c.r, c.g, c.b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('').toUpperCase();
   const hsl = (c) => { const r = c.r / 255, g = c.g / 255, b = c.b / 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b); const l = (mx + mn) / 2; if (mx === mn) return { h: 0, s: 0, l }; const d = mx - mn; const s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn); let h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; return { h: h * 60, s, l }; };
   // Les gris PERMIS (un texte) : l'encre, LE gris, le glyphe, le blanc, le noir, le fond (texte sur encre).
-  const PERMIS = new Set(sombre
-    ? ['#F5F5F7', '#98989D', '#5A5A5E', '#FFFFFF', '#000000', '#1C1C1E', '#1D1D1F', '#F2F2F7', '#2C2C2E']
-    : ['#1D1D1F', '#6E6E73', '#AEAEB2', '#FFFFFF', '#000000', '#F2F2F7', '#F5F5F7', '#1C1C1E']);
+  // (14 nov., passe 2) Un texte posé sur une surface SOMBRE (le panneau de marque de la connexion, au jour) se lit
+  // avec la palette de la nuit : c'est le fond effectif qui choisit, pas seulement le thème de l'app.
+  const PERMIS_NUIT = new Set(['#F5F5F7', '#98989D', '#5A5A5E', '#FFFFFF', '#000000', '#1C1C1E', '#1D1D1F', '#F2F2F7', '#2C2C2E']);
+  const PERMIS_JOUR = new Set(['#1D1D1F', '#6E6E73', '#AEAEB2', '#FFFFFF', '#000000', '#F2F2F7', '#F5F5F7', '#1C1C1E']);
   const sombreCarte = (el) => {
     for (let x = el; x && x !== document.body; x = x.parentElement) {
       const cs = getComputedStyle(x);
@@ -212,11 +213,16 @@ function mesurer({ tactile, sombre, racines, ciblesEnPlus = '' }) {
         // trancher « libellés à 9 px », CLAUDE.md §9) : hors de l'échelle exprès.
         // Le chiffre d'une tuile de Ma journée au téléphone se RESSERRE pour tenir (Julien, 10 nov. : « l'euro dépasse » ;
         // styles-widgets-ios.css, `--nc`) : une taille fluide entre 14 et 28, exprès — jamais rogné (I le vérifie).
-        const ajuste = el.closest('[data-ecran="journee"] .vrm-fu-tete .vrm-fu-case') && fs_ >= 14 && fs_ <= 28;
+        // (14 nov., passe 2) De même LE chiffre de la carte sombre que `ajusterChiffre` (CarteMois.jsx) a resserré pour
+        // tenir (« au moins 87,65 € » : 38 px, la taille posée en ligne) — entre son plancher (22) et 44.
+        const ajuste = (el.closest('[data-ecran="journee"] .vrm-fu-tete .vrm-fu-case') && fs_ >= 14 && fs_ <= 28)
+          || (el.closest('.vrm-fu-grand[style*="font-size"]') && fs_ >= 22 && fs_ <= 44);
         if (!ECHELLE.includes(fs_) && !ajuste && !el.closest('.vrm-nav-label') && !/^[\s›‹×✓✕·•…—–\-+−⋯▾▸]+$/.test(el.innerText || '')) out.tailles.push({ t: fs_, quoi: lib() });
         const col = rgba(cs.color);
         const enSombre = sombreCarte(el);
-        if (col && !enSombre) {
+        // Un texte de couleur TRANSPARENTE (un « — » de remplacement sous un dessin) ne se voit pas : ni gris ni contraste.
+        if (col && !enSombre && col.a > 0) {
+          const PERMIS = (sombre || lum(fond(el)) < 0.18) ? PERMIS_NUIT : PERMIS_JOUR;
           const hs = hsl(col);
           const neutre = Math.max(col.r, col.g, col.b) - Math.min(col.r, col.g, col.b) <= 10;
           // La colonne de gauche (panneau #E5E5EA) a SON gris, le jeton `--n2-titre` (#636366 ; LE gris n'y tient que 4,1:1).

@@ -192,7 +192,7 @@
 
 /* ── 2.2 LES SURFACES : rayon 20, l'ombre posée, aucun cadre ─────────────── */
 :root:root body .vrm-main :is(.vrm-toutes-liste, .vrm-day-task-list, .vrm-buy-list, .vrm-msg-list, .vrm-colis-carte, .vrm-a-venir,
-  .vrm-colis-prochain, .vrm-ann-geste, details.vrm-quick-settings, .vrm-ann-card, .vrm-ios-groupe, .vrm-reglages-groupe,
+  .vrm-colis-prochain, .vrm-ann-geste, details.vrm-quick-settings, .vrm-ann-card, .vrm-ios-carte, .vrm-reglages-groupe,
   .vrm-set-liste, .vrm-settings-todo, .vrm-fu-panneau,
   .vrm-sv-tuile, .vrm-sv-carte, .vrm-onglet-manque, .vrm-d7-carte, .vrm-fp-section, .vrm-boite-liste-col, .vrm-rpf-point,
   .vrm-sx, .vrm-guide.vrm-pa-carte, .vrm-carte-mfa, .vrm-sp-rec, .vrm-compta-replis) {
@@ -407,5 +407,63 @@
 
 /* Les cibles à la souris : 36 px au moins (« Choisir la vente », la feuille du rappel). */
 :root:root body .vrm-main .vrm-colis-choisir { min-height: var(--d-h-ctrl) !important; font-size: var(--d-t-13) !important; }
+
+/* ── 2.11 LA PASSE, SECONDE MOITIÉ (14 nov.) ─────────────────────────────────
+   Ce que `scripts/bancs/design-passe-2.cjs` a MESURÉ (et ce qui s'est VU sur ses captures) sur
+   Messages, E-mails, Achats, eBay, Leboncoin, Vestiaire, les sous-pages de Paramètres, les
+   feuilles, la connexion, l'accueil, l'exemple et la carte de démarrage.
+   Récit : docs/passation/2026-11-14-design-passe-2.md. Aucun texte, chiffre ni geste ne change. */
+
+/* Achats · À retirer : `.vrm-rp` est AUSSI la carte du programme de Republier (repub-programme.css,
+   bord 1 px, rayon 12, intérieur 12) — la liste des retraits la recevait : chaque point devenait
+   une carte DANS une carte. La liste n'est qu'un contenant ; les points sont les cartes. */
+:root:root body .vrm-main .vrm-rp.vrm-rpf { background: transparent !important; border: 0 !important; border-radius: 0 !important; padding: 0 !important; box-shadow: none !important; }
+
+/* Un groupe de Réglages (`GroupeIos` : titre + carte) n'est PAS une carte : seule `.vrm-ios-carte` l'est.
+   Le groupe en carte dessinait le titre (« Réglages eBay ») DANS un cadre, et la liste en second cadre. */
+:root:root body .vrm-main section.vrm-ios-groupe.vrm-ios-groupe { background: transparent !important; box-shadow: none !important; border-radius: 0 !important; border: 0 !important; }
+:root:root body .vrm-main section.vrm-ios-groupe > .vrm-ios-carte { background: var(--d-carte) !important; border-radius: var(--d-r-carte) !important; box-shadow: var(--d-ombre-carte) !important; border: 0 !important; }
+:root:root body .vrm-main section.vrm-ios-groupe > .vrm-ios-groupe-titre { margin-left: var(--d-e-4) !important; color: var(--d-gris) !important; }
+
+/* La rangée de Réglages : 17 (le corps d'iOS), plus 16 ; sa tuile d'initiale 13. */
+:root:root body :is(.vrm-main, .vrm-fs) .vrm-ios-titre { font-size: var(--d-t-17) !important; }
+:root:root body :is(.vrm-main, .vrm-fs) .vrm-ios-icone:is(.vrm-secu-initiale, .vrm-vac-initiale) { font-size: var(--d-t-13) !important; }
+:root:root body .vrm-main :is([data-secu-jour-n], [data-secu-jour-n] ~ td, table:has([data-secu-jour-n]) th, .vrm-vac-note, .vrm-rp-vide p) { font-size: var(--d-t-13) !important; }
+:root:root body .vrm-main select.vrm-np-soir { min-height: var(--d-h-ctrl) !important; border-radius: var(--d-r-pilule) !important; }
+/* Le retour d'une sous-page : 17 au doigt (iOS), le texte d'un contrôle à la souris (plus 14). */
+:root:root body .vrm-app-shell .vrm-set .vrm-set-retour { font-size: var(--d-t-17) !important; }
+@media (hover: hover) and (pointer: fine) and (min-width: 768px) { :root:root body .vrm-app-shell .vrm-set .vrm-set-retour { font-size: var(--d-t-15) !important; border: 0 !important; background: transparent !important; } }
+
+/* Achats : la rangée d'un achat — titre 15/600, montant 15/600 tabulaire (sa pastille d'état : 12/600, à la source) ; « ⋯ » à l'encre
+   (le gris sur le rond gris ne tenait que 4,4:1) ; le chevron d'un retrait à 17. */
+:root:root body .vrm-app-shell .vrm-main .vrm-buy-title.vrm-buy-title { font-size: var(--d-t-15) !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-buy-price.vrm-buy-price { font-size: var(--d-t-15) !important; font-weight: 600 !important; font-variant-numeric: tabular-nums; }
+:root:root body .vrm-main .vrm-rpf-chevron.vrm-rpf-chevron { font-size: var(--d-t-17) !important; }
+:root:root body .vrm-main .vrm-buy-more.vrm-buy-more { color: var(--d-encre) !important; }
+:root:root body .vrm-main details.vrm-recus-email > summary { min-height: var(--d-h-ctrl) !important; display: flex !important; align-items: center !important; }
+
+/* Le compte d'un filtre CHOISI (eBay « Toutes 4 », E-mails « Tout 6 ») : à l'encre de son libellé, la nuit
+   (le gris à .75 sur #636366 ne tenait que 3,9 à 4,2:1). */
+:root:root body .vrm-main :is([data-ebay-filtre], [data-boite-rubrique]) > span { opacity: 1 !important; color: inherit !important; }
+:root:root body .vrm-main .vrm-boite-n { opacity: 1 !important; color: inherit !important; }
+
+/* Leboncoin : l'écran suit la colonne des autres écrans (bord gauche), plus une colonne de 920 px centrée
+   dont rien ne s'alignait avec le titre ni avec « Publier sur Leboncoin ». */
+@media (min-width: 1024px) {
+  :root:root body .vrm-main .vrm-lbc-ecran { max-width: none !important; margin-left: 0 !important; margin-right: 0 !important; align-self: stretch !important; padding-left: var(--d-e-4) !important; padding-right: var(--d-e-4) !important; }
+}
+
+/* La carte « Démarrer avec VRM » : ses liens d'action s'alignent sur le texte (plus 8 px de retrait sous la phrase). */
+:root:root body .vrm-main .vrm-pa-carte :is(.vrm-pa-carte-note, .vrm-pa-carte-pied) .vrm-b.vrm-b-discret { padding-left: 0 !important; padding-right: 0 !important; }
+
+/* Les feuilles : le lien d'une feuille est le texte bleu, jamais l'aplat (#0071E3 sur le fond : 4,2:1). */
+:root:root body .vrm-fs a[href^="mailto:"] { color: var(--d-accent-texte) !important; }
+/* La confirmation : un mot par ligne, jamais « Se déconnecter / partout » sur deux lignes à 390 px — les deux
+   gestes prennent chacun sa place (le principal d'abord, la largeur de son texte). */
+:root:root body .vrm-fs.vrm-confirmation .vrm-b.vrm-b { white-space: nowrap !important; flex: 1 1 auto !important; }
+:root:root body .vrm-fs.vrm-confirmation .vrm-b.vrm-b-discret { flex: 0 1 auto !important; }
+
+/* Messages (« Choisis une conversation ») : la note est LE gris plein — à 80 % d'opacité, 3,1:1 sur le fond. */
+:root:root body .vrm-main .vrm-message-workspace .vrm-chat-empty small { opacity: 1 !important; color: var(--d-gris) !important; }
 
 } /* fin @layer vrm-premium */

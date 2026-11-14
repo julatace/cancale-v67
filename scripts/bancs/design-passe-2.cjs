@@ -16,6 +16,7 @@ require('./_porte-banc.cjs');
 //      le menu « Plus » du téléphone (portails, `.vrm-fs`) ·
 //    connexion (sans session, `/?connexion`) · accueil (sans session, `/`) ·
 //    exemple (« Découvrir avec des exemples », `/?exemple`, bandeau compris) ·
+//    loupe : en plus, J — une rangée trouvée par son N° n'écrit ce N° qu'une fois (§7) ·
 //    demarrage (la carte « Démarrer avec VRM · 1 sur 3 » d'un compte NEUF) et
 //    parcours (l'écran plein des trois étapes).
 //  390 tactile ET 1512, clair ET sombre, deviceScaleFactor 1. Base INVENTÉE
@@ -28,7 +29,8 @@ require('./_porte-banc.cjs');
 'use strict';
 const path = require('path'), fs = require('fs');
 const P = require('./design-passe.cjs');
-const { mesurer, ouvrir, base, pret, srv, PORT, SHOTS, CLES, LARGEURS, THEMES, ECRANS_VOULUS, DETAIL, chromium } = P;
+const { mesurer, ouvrir, base, pret, srv, PORT, SHOTS, LARGEURS, THEMES, ECRANS_VOULUS, DETAIL, chromium } = P;
+const CLES = [...P.CLES, 'numDouble'];
 const liste = (v, d) => String(process.env[v] || d).split(',').map((x) => x.trim()).filter(Boolean);
 // Les sous-pages de Paramètres (ids de `Reglages.jsx`, `data-sous-ouvrir`) ; [vue, id].
 const SOUS = liste('SOUS', 'reglages:toutvabien,reglages:connexions,reglages:securite-comptes,reglages:vacances,reglages:push,reglages:rappels,reglages:numeros,reglages:modeles,reglages:imprimante,reglages:regime,reglages:langue,reglages:apparence,reglages:widget,compte:appareils,compte:double').map((x) => x.split(':'));
@@ -160,6 +162,16 @@ const ECRANS = [
       await mesure('plus', ['.vrm-plus-panneau', '.vrm-fs', '[role="menu"]']);
     }
   } },
+  // La loupe : une rangée trouvée PAR son N° n'écrit ce N° qu'UNE fois (« #125 » à gauche et « N°125 » à droite, avant).
+  { nom: 'loupe', url: '/?tab=journee', jouer: async (o, mesure) => {
+    if (o.tel) await o.pg.locator('button[data-recherche-loupe]').first().tap().catch(() => {});
+    else { await o.pg.mouse.click(5, 300); await o.pg.keyboard.press('Control+K'); }
+    await o.pg.waitForSelector('[data-recherche-champ]', { timeout: 8000 }).catch(() => {});
+    await o.pg.evaluate(() => { const el = document.querySelector('[data-recherche-champ]'); if (!el) return; const poser = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; poser.call(el, '5'); el.dispatchEvent(new Event('input', { bubbles: true })); });
+    await o.pg.waitForSelector('[data-recherche-resultat]', { timeout: 8000 }).catch(() => {});
+    await o.pg.waitForTimeout(1200);
+    await mesure('', ['[data-recherche-panneau]']);
+  } },
   { nom: 'connexion', url: '/?connexion', sansSession: true, attendre: '[data-auth-valider]', racines: ['body'], ciblesEnPlus: 'a[data-retour-accueil], a[data-cta]' },
   { nom: 'accueil', url: '/', sansSession: true, attendre: '[data-accueil]', racines: ['[data-accueil]'], vitrine: true, ciblesEnPlus: 'a[data-cta], a[data-cta-nav]' },
   { nom: 'exemple', url: '/?exemple', sansSession: true, attendre: '[data-exemple-bandeau]', racines: APP },
@@ -200,6 +212,13 @@ const ECRANS = [
           await o.pg.evaluate(() => { for (const c of [document.querySelector('.vrm-fs-corps'), document.querySelector('[data-parcours]'), document.querySelector('.vrm-main'), document.scrollingElement]) if (c) c.scrollTop = 0; });
           if (process.env.SONDE) console.log('    sonde :', JSON.stringify(await o.pg.evaluate(process.env.SONDE).catch((e) => String(e))).slice(0, 4000));
           const m = await o.pg.evaluate(mesurer, { tactile: o.tel, sombre, racines, ciblesEnPlus: E.ciblesEnPlus || '' });
+          // J. Le même N° écrit deux fois sur une rangée de résultat (§7 : le même nombre, une fois).
+          m.numDouble = await o.pg.evaluate(() => [...document.querySelectorAll('[data-recherche-resultat][data-recherche-num]')].filter((r) => r.getClientRects().length).map((r) => {
+            const n = r.getAttribute('data-recherche-num'); const echap = n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const fois = (r.innerText.match(new RegExp('(?:#|N°\\s?)' + echap + '(?![0-9A-Za-z])', 'g')) || []).length;
+            return { n, fois, quoi: r.innerText.replace(/\s+/g, ' ').slice(0, 60) };
+          }).filter((x) => x.fois > 1));
+          if (E.nom === 'loupe') { const nR = await o.pg.evaluate(() => document.querySelectorAll('[data-recherche-resultat][data-recherche-num]').length); if (!nR) { console.log(`✗ ${suf} : aucune rangée de N° rendue (la loupe n'est pas mesurée)`); manques++; } }
           // La vitrine publique : ses titres de 40 à 64 px sont sa typographie (jugés partout ailleurs).
           if (E.vitrine) m.tailles = m.tailles.filter((x) => x.t <= 20);
           rapport[suf] = m;

@@ -41,6 +41,7 @@ import { ConnexionEbayGuidee, RetourConnexionEbay, EtatJetonEbay } from '../ebay
 // (10 nov., lot S) La facture Pro d'une commande eBay (src/FactureAutres.jsx), chargée à la demande.
 import { DEPS_FACTURE, MicDictee, DEMANDE_RETOUR_EBAY, lireComptesEbay, montantRecuEbay } from '../App.jsx';
 import { requeteDeLaVoix } from '../rechercheVocale.js';
+import { motsInsecables } from '../motsInsecables.jsx';   // (14 nov., passe 2) « Gel-1130 » ne se coupe pas au trait d'union
 const FactureEbayParesseuse = React.lazy(() => import('../FactureAutres.jsx').then((m) => ({ default: m.FactureAutreVente })));
 const FactureEbayVente = (props) => <React.Suspense fallback={null}><FactureEbayParesseuse {...props}/></React.Suspense>;
 
@@ -2507,7 +2508,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           /* (11 nov., lot accessibilité) Nommé par ce qu'il montre (titre, N°, état) ; ouvert/fermé : aria-expanded. */>
           <PhotoVente src={it.photo} size={56} />
           <span className="vrm-eb-texte">
-            <span className="vrm-eb-titre">{it.title || '(sans titre)'}</span>
+            <span className="vrm-eb-titre">{motsInsecables(it.title || '(sans titre)')}</span>
             <span className="vrm-eb-meta" data-relie={numero} data-sku-douteux={!numero && skuEbayDouteux(it) ? String(it.sku) : undefined}>
               {numero ? <Numero n={numero} taille="petit" /> : null}
               <span className="vrm-eb-etat" data-ebay-etat={supprimee ? 'supprimee' : 'enligne'}>{[supprimee ? 'supprimée d’eBay' : (j != null ? `en ligne · ${j} j` : 'en ligne'), nb ? `${nb} photo${nb > 1 ? 's' : ''}` : '', obs ? `${obs} observateur${obs > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ')}{compteNom ? <span data-ebay-carte-compte="">{` · ${compteNom}`}</span> : null}</span>
