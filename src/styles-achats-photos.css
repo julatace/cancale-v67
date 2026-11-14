@@ -143,6 +143,7 @@
 /* Une seule ligne (la rangée reste à 68 px, ≥ 8 achats par écran) ; ce qui ne tient pas finit par « … » — jamais
    coupé net (design-passe, « I »). Le pseudo du compte (liste à plat) prend la moitié au plus : la date passe d'abord. */
 :root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-meta > * { display: inline !important; white-space: nowrap !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-meta * { white-space: nowrap !important; }
 :root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-meta > * + * { margin-left: 4px !important; }
 :root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-meta > .vrm-acct-tag { display: inline-block !important; vertical-align: top !important; max-width: 46% !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; padding: 0 !important; background: transparent !important; }
 :root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-meta > .vrm-acct-tag > span { display: inline !important; }
@@ -360,7 +361,6 @@
    — moins de ronds gris : « ✓ Sélectionner », « … », la période et la calculette sont des ICÔNES nues (cible 44,
      aucun fond) ; la seule capsule pleine est l'étape choisie (AJOUT 3 : pas de rangée de capsules grises) ;
    — un état au survol (souris) et un anneau au clavier (`:focus-visible`) sur chaque nouveau bouton ;
-   — la barre collée ne cache jamais la rangée qui a le focus (`scroll-margin-top`) ;
    — chiffres de la bande en chasse fixe ; `touch-action: manipulation` (pas d'attente du double-toucher). */
 :root:root:root body .vrm-main .vrm-achats :is(.vrm-achats-selection, .vrm-achats-plus) { background: transparent !important; box-shadow: none !important; border: 0 !important; }
 :root:root:root body .vrm-main .vrm-achats .vrm-achats-plus { color: var(--d-encre, #1D1D1F) !important; }
@@ -372,6 +372,5 @@
 }
 :root:root:root body :is(.vrm-achats-retirer-ligne, .vrm-achats-selection, .vrm-gc-compte, .vrm-ms-calcul > summary):focus-visible { outline: 2px solid var(--d-accent, #0071E3) !important; outline-offset: 2px !important; }
 :root:root:root body :is(.vrm-achats-retirer-ligne, .vrm-achats-selection, .vrm-ms-ligne, .vrm-gc-compte, .vrm-buy-row button) { touch-action: manipulation; }
-:root:root:root body .vrm-main .vrm-achats .vrm-buy-list > .vrm-buy-row { scroll-margin-top: 72px; }
 :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-cases > .vrm-fu-case:nth-child(n):nth-last-child(n) > b { font-variant-numeric: tabular-nums !important; }
 } /* fin @layer vrm-premium — finitions */
