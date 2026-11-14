@@ -168,7 +168,7 @@
   :root:root:root body .vrm-main .vrm-fu-bande { padding: 0 0 2px !important; }
   :root:root:root body .vrm-main .vrm-fu-bande .vrm-ui-bande-l { line-height: 1.15 !important; }
   :root:root:root body .vrm-main .vrm-compte-menu-hote { padding-top: 0 !important; }
-  :root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-ann-compte-tete:first-child { padding-top: 6px !important; }
+  :root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-ann-compte-tete:first-child { padding-top: 2px !important; }
   /* (14 nov., maquette « Paires » montrée à Julien) La rangée : le NOM en tête sur toute la ligne (16/600), dessous la
      pastille du N° (claire : encre sur gris très léger — rouge toujours si deux paires le portent) puis l'état et les
      chiffres ; le prix à droite. 70 px (huit paires au moins dans un iPhone, sous la barre collée), vignette 52 rayon 10. */

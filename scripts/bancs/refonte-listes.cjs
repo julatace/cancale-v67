@@ -344,6 +344,8 @@ const ouvrirSur = (nav, dist, opts) => ouvrir(nav, opts);
         o = await ouvrir(nav, { W, sombre: theme === 'sombre', b: base(), url: ECRANS[e] });
         if (DSF !== 1) { /* captures nettes : un second contexte au facteur voulu */ }
         await pret(o.pg); await o.pg.waitForTimeout(3500);   // la pastille « Mis à jour » a disparu
+        // Les animations FINIES d'abord (le chiffre qui roule, l'apparition) : un texte en plein fondu n'est pas jugé à mi-chemin.
+        await o.pg.evaluate(() => Promise.race([Promise.all(document.getAnimations().filter((a) => a.effect && a.effect.getTiming && a.effect.getTiming().iterations !== Infinity).map((a) => a.finished.catch(() => {}))), new Promise((r) => setTimeout(r, 3000))])).catch(() => {});
         const m = await o.pg.evaluate(mesurerForme, { tactile: W < 600, sombre: theme === 'sombre', liste: e !== 'journee' });
         await o.pg.screenshot({ path: path.join(SHOTS, suf + '.png') });
         const n = CLES.reduce((s, k) => s + m[k].length, 0);
