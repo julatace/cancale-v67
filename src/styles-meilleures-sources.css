@@ -47,8 +47,9 @@
 /* Les tuiles : au téléphone, « investi » en LARGE puis deux tuiles côte à côte (bento) ; trois sur une ligne
    dès qu'il y a la place. */
 .vrm-ms-tuiles { grid-area: tuiles; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; min-width: 0; }
-.vrm-ms-tuiles > .vrm-ms-tuile:first-child { grid-column: 1 / -1; }
-@media (min-width: 720px) { .vrm-ms-tuiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } .vrm-ms-tuiles > .vrm-ms-tuile:first-child { grid-column: auto; } }
+.vrm-ms-tuiles > .vrm-ms-tuile:first-child:nth-last-child(odd) { grid-column: 1 / -1; }
+.vrm-ms-tuiles:empty { display: none; }
+@media (min-width: 720px) { .vrm-ms-tuiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } .vrm-ms-tuiles > .vrm-ms-tuile:first-child:nth-last-child(odd) { grid-column: auto; } }
 .vrm-ms-tuile { display: flex; flex-direction: column; justify-content: flex-end; gap: 4px; min-width: 0; padding: 12px; border-radius: var(--d-r-case, 12px); background: var(--d-case, #F2F2F7); }
 :root[data-theme="dark"] .vrm-ms-tuile { background: var(--d-case, #2C2C2E); }
 .vrm-ms-tuile b { font-size: var(--d-t-28, 28px); font-weight: 700; letter-spacing: -.02em; line-height: 1.1; font-variant-numeric: tabular-nums; color: var(--d-encre, #1D1D1F); white-space: nowrap; min-width: 0; }

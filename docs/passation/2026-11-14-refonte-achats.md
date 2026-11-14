@@ -1,56 +1,59 @@
 # Refonte d'Achats — 14 novembre 2026
 
 Branche `claude/refonte-achats`. Forme seulement : aucune règle métier, aucun chiffre calculé
-autrement, aucune donnée supprimée (on déplace, on replie, on hiérarchise).
+autrement, aucune donnée supprimée (on déplace, on replie, on hiérarchise). Skill du projet :
+`vrm-design` (ordre : AJOUT 3 « la liste d'abord » > AJOUT 2 « 1 000 articles » > Atelier).
 
-## Ce que Julien a dit (captures d'iPhone, `achats-comptes.png`, `achats-sources.png`)
+## Ce que Julien a dit (captures d'iPhone, non versionnées : données réelles)
 
 1. « C'est moche. Continue à améliorer le design, rien n'a changé. »
-2. « Il faut vraiment qu'on sorte des classiques » (direction « Atelier », commune aux trois chantiers).
-3. « Il faut que ça soit pratique, imagine si j'ai 1000 articles » (passe AVANT l'Atelier).
+2. « Il faut vraiment qu'on sorte des classiques » (direction « Atelier »).
+3. « Il faut que ça soit pratique, imagine si j'ai 1000 articles ».
+4. (Annonces) « pas beau du tout : les couleurs, les formes, les boutons » ⇒ AJOUT 3, appliqué à Achats.
 
-Ce qu'on voyait : le « … » d'une rangée qui débordait de la carte ; « Autres comptes · 9 comptes ·
-2456 achats » en long gris ; « Tes meilleures sources » = un grand titre DANS une carte au padding
-énorme, des chiffres noyés dans des phrases (« 41 071 € investi 61 % marge 167 jours… »), quatre
-paragraphes gris, « au plus +43 € » en bleu d'accent.
+Ce qu'on voyait sur Achats : le « … » d'une rangée collé au bord (débordant chez lui) ;
+« Autres comptes · 9 comptes · 2456 achats » en long gris ; « Tes meilleures sources » = un grand
+titre DANS une carte au padding énorme, des chiffres noyés dans des phrases, quatre paragraphes
+gris, « au plus +43 € » en bleu ; une carte sombre de 411 px ; « À retirer » (des centaines de px)
+avant la première ligne d'achat.
 
 ## Ce qui a changé (visible)
 
-| où | avant | après |
+| où | avant (origin/main) | après |
 |---|---|---|
-| rangée d'achat | 114 px (titre sur 2 lignes, sous-ligne, rangée de pastilles), vignette 60, ≤ 6 achats par écran | **68 px** (jetons §4 `--d-h-rangee`, `--d-vignette-rangee` 52) : titre sur une ligne ; l'état, la date et le **prix** sur la seconde ; `…` DANS la carte (6 px du bord) ; **8 achats entiers** sur un écran de 390 |
-| liste par compte | une carte, en-têtes « Compte choisi : X · N achats » en phrase, rangées de 44 px à 15 px | **liste groupée iOS** : un groupe = une carte, en-tête court au-dessus (13 px, le nom à gauche, les nombres calés à droite), rangées de **52 px**, nom **17**, nombre 17 gris, chevron fin, filets indentés |
+| haut d'Achats | carte SOMBRE « Dépensé » + 3 grandes cases (411 px, 49 % de l'écran) | **bande de chiffres** sur le fond (≤ 72 px) : « Novembre … Modifier », puis Dépensé · En route · À retirer · Arrivés (libellé 12, chiffre 20/700). La MÊME carte réglable (`CarteStatsApp`, mêmes chiffres, mêmes `data-*`, « ? », « Modifier ») dessinée autrement |
+| « À retirer » (points, codes, QR, Mode relais, outils) | toute la section AVANT la liste | rangée dans un repli (`RepliRetirerAchats`) : la case « À retirer · N » de la bande l'ouvre (`retraits` ⇒ ouvert + défilé jusqu'à elle) ; il s'ouvre SEUL quand on vient pour un retrait (anciens chemins Colis/À retirer, notification, Ma journée), reste ouvert si on l'a ouvert (`vrm_achats_retirer_ouvert`, cet appareil). Rien n'est démonté : ses publications continuent. Hors Vinted (eBay, Leboncoin, Vestiaire), une ligne « À retirer · N › » |
+| outils | 3 grandes capsules grises + « … », recherche, calculette sur sa propre ligne, « Sélectionner » sur sa ligne | étapes en **petites capsules** dessinées à 36 px (cible 44), la choisie à l'encre pleine ; « Sélectionner » en icône ✓ à côté de « … » ; la calculette en icône dans la barre de recherche |
 | recherche + période | défilent avec la page | **collées en haut** (matériau translucide `--d-materiau`, opaque si transparence réduite) |
-| N° tapé | ne trouvait pas l'achat (la recherche lisait le N° de la fiche de VENTE) | trouve l'achat relié à la fiche de ce N° **par son n° de transaction** (`buyFromId`, une identité, §5) — mesuré 67–260 ms à 1 000 achats |
-| carte héros | carte sombre + 3 grandes cases en bento (411 px, 49 % de l'écran) | la même carte (« Dépensé », même chiffre, même règle) + **la pile des photos** des paires achetées ce mois (chacune par SON achat, `orderPhoto`) ; les trois chiffres sur **une ligne** (263 px, 31 %) |
-| Tes meilleures sources | titre dans la carte, chiffres dans des phrases, 4 paragraphes, montant en bleu | **titre hors carte** (20/700) ; une carte = les sources ; chaque source : nom · chiffre **à l'encre** · **tuiles** (Investi en large, Marge, Pour revendre — chiffre 28/700, libellé 13) ; **une** ligne de couverture (§5, la même phrase « 45 revendus sur 824 achetés · … ») ; hors de toute source : une ligne courte (« 180 ventes sans achat relié ») ; **toutes** les phrases d'avant dans « Comment c'est calculé » (repli) |
-| hors plateforme, reçus | cadre 1 px rayon 12 ; « Reçus d'achat par e-mail · 179 › » en texte 12 px | cartes du système (rayon 20, ombre douce, aucun cadre), l'icône dans une tuile neutre ; les reçus en **rangée iOS** 17 px + chevron |
-| ligne de retrait | « Date limite inconnue » sous une **barre vide** ; « Code sur Vinted » en faux code gras | pas de barre quand on ne sait pas (inconnue, vérification, point changé) — la phrase seule, le `progressbar` reste pour les lecteurs ; « Code sur Vinted » en note du système (13/400 gris) |
-| mouvement | — | les **12 premières** rangées arrivent en ressort court (`--d-m-rangee` 240 ms, décalage 24 ms, `--d-ressort`), jamais 1 000 ; `prefers-reduced-motion` : rien ne bouge ; la ligne d'une source s'enfonce au toucher |
-
-Dark : mêmes formes, surfaces plus claires que le fond, aucune ombre.
+| N° tapé | ne trouvait pas l'achat | trouve l'achat relié à la fiche de ce N° **par son n° de transaction** (`buyFromId`, §5) — 67–260 ms à 1 000 achats |
+| rangée d'achat | 114 px, vignette 60, ≤ 5–6 achats par écran | **68 px**, vignette 52 (jetons §4) : titre sur une ligne ; état, date et **prix** sur la seconde ; `…` DANS la carte ; **8 achats** entiers par écran de 390 |
+| liste par compte | une carte, en-têtes en phrase, rangées 44 px / 15 px | **liste groupée iOS** : un groupe = une carte, en-tête court au-dessus (13 px, le nom à gauche, les nombres à droite), rangées **52 px**, nom **17**, filets indentés |
+| Achetés pas en ligne · Achats hors plateforme | entre les outils et la liste | **sous la liste** (mêmes blocs, mêmes gestes) |
+| Tes meilleures sources | titre dans la carte, chiffres dans des phrases, 4 paragraphes, montant en bleu | **titre hors carte** (20/700) ; une carte = les sources ; chaque source : nom · chiffre **à l'encre** · **tuiles** (Investi, Marge, Pour revendre — 28/700 ; une tuile « — » n'est pas dessinée) ; **une** ligne de couverture (§5, la même phrase) ; hors de toute source : une ligne courte ; **toutes** les phrases d'avant dans « Comment c'est calculé » |
+| reçus, hors plateforme | cadres 1 px rayon 12, texte 12 px | cartes du système (rayon 20, ombre douce), reçus en rangée iOS 17 px + chevron |
+| ligne de retrait | « Date limite inconnue » sous une barre VIDE ; « Code sur Vinted » en faux code gras | pas de barre quand on ne sait pas (la phrase seule ; le `progressbar` reste pour les lecteurs) ; « Code sur Vinted » en note 13/400 grise |
+| mouvement | — | les **12 premières** rangées arrivent en ressort court (`--d-m-rangee`, décalage 24 ms), jamais 1 000 ; `prefers-reduced-motion` respecté |
 
 ## Un défaut trouvé en chemin (le « énorme padding »)
 
-La carte des sources avait une enveloppe `.vrm-ms` ; « Ma semaine » (`styles-ma-semaine.css`) style
-`.vrm-ms` avec `padding: 16px !important; max-width: 980px`. D'où la marge intérieure énorme de la
-capture et la carte rognée à 980 px sur ordinateur. L'enveloppe s'appelle maintenant `vrm-ms-corps`.
+L'enveloppe de la carte des sources s'appelait `.vrm-ms` — le nom que « Ma semaine »
+(`styles-ma-semaine.css`) style avec `padding: 16px !important; max-width: 980px`. D'où la marge
+intérieure énorme de sa capture et la carte rognée à 980 px sur ordinateur. Renommée `vrm-ms-corps`.
 
 ## Fichiers
 
-- `src/styles-achats-photos.css` — §1 à §8 « REFONTE D'ACHATS » (rangée, carte, comptes, recherche
-  collée, héros, entrée, retrait, hors plateforme / reçus), spécificité `:root:root:root`, dans
-  `@layer vrm-premium`. Jetons §4 Atelier (`--d-ombre-douce`, `--d-materiau`, `--d-h-rangee`…) lus
-  avec un repli : ils arrivent par `claude/refonte-coque`.
+- `src/styles-achats-photos.css` — sections 1 à 8 « REFONTE D'ACHATS », `@layer vrm-premium`,
+  spécificité `:root:root:root`. Jetons §4 Atelier (`--d-ombre-douce`, `--d-materiau`,
+  `--d-h-rangee`, `--d-vignette-rangee`…) lus avec un repli (ils arrivent par `claude/refonte-coque`).
 - `src/MeilleuresSources.jsx`, `src/styles-meilleures-sources.css` — la carte refaite.
-- `src/GroupesComptes.jsx` — `court` (facultatif, défaut éteint : Ventes inchangé).
-- `src/App.jsx` — Achats seulement : `teteGroupe(…, 'achat')` passe `court` ; la recherche par N°
-  d'achat ; `pile` + `data-achats-hero` sur la carte d'Achats ; la marge de la section des sources.
-- `src/i18n/langues/{fr,en,es,it,de}/achats.js` — `achats.ms.*` (5 clés).
+- `src/GroupesComptes.jsx` — `court` (facultatif, éteint par défaut : Ventes inchangé).
+- `src/App.jsx` — `RepliRetirerAchats` + `demanderRetirer` (chemins de retrait) ; Achats : `court`
+  pour ses en-têtes, la recherche par N° d'achat, `data-achats-hero`, la calculette et
+  « Sélectionner » dans les barres, hors plateforme / pas en ligne sous la liste.
+- `src/i18n/langues/*/achats.js` — `achats.ms.*`, `achats.selectionner` (5 langues).
 - `src/nouveautes.js` — « Achats plus dense, plus net ».
-- `scripts/audit-meilleures-sources.cjs` (E5 et la mutation « ecran-rouge » : l'encre, plus l'accent),
-  `scripts/bancs/meilleures-sources.cjs` (7 : la source en tête par sa place, chiffres à l'encre ;
-  2 : « au moins » posé au-dessus du chiffre, `\s+`).
+- `scripts/audit-meilleures-sources.cjs` (E5 + mutation : l'encre), `scripts/bancs/meilleures-sources.cjs`
+  (7 : la source en tête par sa place ; 2 : « au moins » posé au-dessus du chiffre).
 
 ## Preuves
 
@@ -58,19 +61,19 @@ Banc `scripts/bancs/refonte-achats.cjs` (base inventée : 10 comptes dont un nom
 1 000 achats, 240 ventes dont 60 reliées, 4 achats hors plateforme ; 390 tactile clair ET sombre,
 1512) :
 
-- **origin/main** (`dist` de 9236d48b) : F1 (le `…` touche le bord), F2 ×2, F3, F4, F5, F6
-  (« au plus +2 250 € » en bleu), F7 (114 px, vignette 60), F8 (pas de héros ≤ 40 %), P4 (5–6
-  achats visibles), P5 (le N° ne trouve rien) **rouges** ;
-- **après** : tout vert (35/35) ; P1 premier rendu pas plus lent, P3 nœuds DOM 1 218 ⇒ 1 038,
-  P2 CLS 0–0,002.
+- **origin/main** : 25 rouges — F1 (`…` au bord), F2, F3, F4, F5, F6 (« au plus +2 250 € » en
+  bleu), F7 (114 px / 60), F8 (pas de bande), F9 (Achats pose 2 164 px avant sa liste), P4 (5),
+  P5 (le N° ne trouve rien) ;
+- **après** : vert. P1 pas plus lent, P3 nœuds DOM 1 218 ⇒ 1 038, P2 CLS 0.
 
 Captures (390 iPhone, dsf 2) : `docs/design/avant-apres/achats-*-avant.png` / `-apres.png`.
 
-## Ce qui reste
+## Ce qui reste (hors de ce chantier)
 
-- La carte héros ne se **compacte pas au défilement** en une ligne : elle tient 31 % du premier
-  écran et part avec la page ; la recherche, elle, reste collée. (Une ligne de chiffres collée
-  redirait « Dépensé » à côté de la carte : à faire en lisant LA même valeur, pas une copie.)
-- Le chiffre de la carte héros reste à 40 px (44 à l'ordinateur) : l'échelle d'affiche 48–64 (§4)
-  attend que `design-passe` l'admette (chantier coque).
-- Pas de mini-courbe : aucune série d'achats n'existe déjà (la consigne : seulement si elle existe).
+- **L'écran entier** : la 1re ligne est à ~500 px sur 844 (visé ≤ 422). Au-dessus d'Achats, la coque
+  pose « Vérification de tes données… », la phrase sous le titre (AJOUT 3 point 8) et la rangée de
+  pilules des comptes (point 4 : un menu « compte ▾ ») — `claude/refonte-coque` / `refonte-listes`.
+  Achats lui-même n'occupe plus que ~190 px au-dessus de sa liste (F9).
+- La ligne « À faire · N › » (AJOUT 3 point 5) regroupant à confirmer / à renvoyer / doublons : pas
+  faite ici (ces blocs n'apparaissent que s'ils ont un contenu).
+- Pas de mini-courbe : aucune série d'achats n'existe déjà.

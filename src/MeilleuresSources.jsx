@@ -119,7 +119,9 @@ export default function MeilleuresSources({ owner = '', Retour = null, ici = 'ar
     const hors = texteHorsSources(r);
     // Une tuile : le gros chiffre, le libellé dessous. « — » reste « — » (pas su ≠ 0, §5).
     // « au moins 300 € » : « au moins » en petit AU-DESSUS du chiffre (les mêmes mots ; le chiffre tient dans sa tuile).
-    const tuile = (cle, val, lib) => { const m = /^(au moins|au plus) (.+)$/.exec(val);
+    // (AJOUT 3 : jamais une case pour « — ») Une tuile sans valeur n'est pas dessinée : le « — » de la source le dit
+    // déjà sur sa ligne, et « Comment c'est calculé » dit pourquoi.
+    const tuile = (cle, val, lib) => { if (val === '—') return null; const m = /^(au moins|au plus) (.+)$/.exec(val);
       return <span className="vrm-ms-tuile" data-ms-tuile={cle}><b className={val === '—' ? 'is-vide' : undefined}>{m ? <><span className="vrm-ms-pre">{m[1]} </span>{m[2]}</> : val}</b><small>{lib}</small></span>; };
     corps = (
       <div className="vrm-ms-corps" data-ms-etat="lu" data-ms-n={sources.length}>

@@ -339,9 +339,9 @@
 :root:root:root body .vrm-main .vrm-achats .vrm-recus-email > summary::after {
   content: '›' !important; margin-left: auto !important; font-size: var(--d-t-20, 20px) !important; line-height: 1 !important; color: var(--d-glyphe, #AEAEB2) !important;
   transition: transform 150ms var(--d-sortie, ease-out); display: inline-block !important;
-  border: 0 !important; width: auto !important; height: auto !important; vertical-align: baseline !important; transform: none;
+  border: 0 !important; width: auto !important; height: auto !important; vertical-align: baseline !important; transform: none !important;
 }
-:root:root:root body .vrm-main .vrm-achats .vrm-recus-email[open] > summary::after { transform: rotate(90deg); }
+:root:root:root body .vrm-main .vrm-achats .vrm-recus-email[open] > summary::after { transform: rotate(90deg) !important; }
 :root:root:root body .vrm-main .vrm-achats .vrm-recus-email[open] { padding-bottom: 12px !important; }
 @media (hover: hover) and (pointer: fine) { :root:root:root body .vrm-main .vrm-achats .vrm-recus-email > summary { min-height: 44px !important; } }
 @media (prefers-reduced-motion: reduce) { :root:root:root body .vrm-main .vrm-achats .vrm-recus-email > summary::after { transition: none; } }

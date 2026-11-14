@@ -217,7 +217,7 @@ async function blocF(nav, W, sombre) {
       const rgb = (c) => { const m = /color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)/.exec(c); if (m) return [m[1], m[2], m[3]].map((x) => +x * 255); const n = /rgba?\((\d+), (\d+), (\d+)/.exec(c); return n ? [+n[1], +n[2], +n[3]] : null; };
       const bleu = (c) => { const v = rgb(c); return !!v && v[2] - v[0] > 80 && v[2] > 150; };
       out.accent = [];
-      const w2 = document.createTreeWalker(document.querySelector('.vrm-achats') || document.body, NodeFilter.SHOW_TEXT);
+      const w2 = document.createTreeWalker([...document.querySelectorAll('.vrm-achats')].find(vis) || document.body, NodeFilter.SHOW_TEXT);
       for (let n = w2.nextNode(); n; n = w2.nextNode()) {
         if (!/€/.test(n.nodeValue || '')) continue; const el = n.parentElement; if (!el || !vis(el) || el.closest('a, summary, button:not([data-ms-source]):not(.vrm-fu-case)')) continue;
         if (bleu(getComputedStyle(el).color)) out.accent.push((el.innerText || '').trim().slice(0, 40));
