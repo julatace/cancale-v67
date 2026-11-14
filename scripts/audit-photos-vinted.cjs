@@ -210,6 +210,9 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
       'Comptabilite :: qi': 'QR de retrait (transporteur)',
       'QrRetraitImage :: local || src': 'QR de retrait (12 nov.) : la copie locale (data:image gardée après une lecture) ou `qrImage` (data:image du QR lu, ou l’adresse de QR du transporteur) — jamais une photo d’annonce',
       'Comptabilite :: qrView.img': 'QR de retrait (transporteur)',
+      // (14 nov., lots 119 et 128) deux <img> lus un à un (aucun n'affiche une photo Vinted lue par l'<img>) :
+      'QrOrdinateur :: qrDe(lien)': 'QR de connexion par l’iPhone : data:image dessinée dans la page par qrcode-generator (src/ConnexionQr.jsx), aucune adresse distante',
+      'ApercuAnnonce :: u': 'aperçu avant « Créer sur Vinted » : les MÊMES photos que la feuille (CreerSurVinted :: u) — data:image réduites dans la page ou celles de SA fiche, filtrées par apercuAnnonce (data:, blob:, https:)',
       'SettingsScreen :: customLogo': 'logo choisi sur l’appareil (data:)',
       'DoubleVerification :: cours.qr': 'QR de la double vérification : data:image/svg+xml rendu par GoTrue (qrEnSrc refuse toute autre forme)',
       'AbonnementRequis :: "/logo-vrm-96.png"': 'logo de l’app',
