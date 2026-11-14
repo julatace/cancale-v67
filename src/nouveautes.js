@@ -26,6 +26,12 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  { id: 'infos-paire-reponse', date: '2026-11-14', titre: 'Taille réelle et défauts dans ta réponse', phrase: 'Un toucher les met dans le message ; tu envoies.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  { id: 'questions-frequentes', date: '2026-11-14', titre: '« Dispo ? » repéré, réponse proposée', phrase: 'Cinq langues, sans IA ; ton clic envoie.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  { id: 'catalogue-prive', date: '2026-11-14', titre: 'Catalogue privé en un lien', phrase: 'Photos, tailles, prix ; jamais ton prix d’achat. Expire seul.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'liste-recherche', date: '2026-11-14', titre: 'Ta liste de recherche sur Vinted', phrase: 'L’encart VRM te dit quand l’annonce ouverte correspond.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'carnet-vendeurs', date: '2026-11-14', titre: 'Carnet des vendeurs chez qui tu achètes', phrase: 'Ce que leurs paires ont rapporté, délais, soucis.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'achat-meme-annonce', date: '2026-11-14', titre: 'Annonce déjà achetée signalée', phrase: 'Par son identifiant Vinted, dans Achats et sur Vinted.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'carte-logo-favoris', date: '2026-11-14', titre: 'Messages aux favoris lancés depuis Vinted', phrase: 'Sur vinted.fr, le logo VRM montre à qui écrire et lance l’envoi.', tab: 'favoris', pour: 'tous', mode: 'tous' },
   { id: 'carte-logo-site', date: '2026-11-14', titre: 'Le logo ouvre tes pages Vinted', phrase: 'Ventes, messages, dressing du compte ouvert, sans quitter Vinted.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'creer-vinted-guide', date: '2026-11-14', titre: 'Créer sur Vinted, étape par étape', phrase: 'Ce qui va se passer avant, le brouillon ou la raison après.', tab: 'annonces', pour: 'tous', mode: 'tous' },

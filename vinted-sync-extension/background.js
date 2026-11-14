@@ -5488,7 +5488,9 @@ async function donneesInfosPage(uid) {
   const owner = String((await loadSession())?.user_id || '');
   if (!owner || !uid) return null;
   if (_infosPage && _infosPage.owner === owner && _infosPage.uid === uid && Date.now() - _infosPage.at < 120000) return _infosPage;
-  const main = await lireMain(['vinted_annonce_numeros', 'vinted_buyprice_by_num', 'vrm_numero_ecrit', 'vrm_je_vends']);
+  // (14 nov., 5.376) + SA liste de recherche et les annonces qu'il a achetées (publiées par
+  // l'écran Achats) : lues dans la base VRM, dans la MÊME lecture — aucune requête Vinted.
+  const main = await lireMain(['vinted_annonce_numeros', 'vinted_buyprice_by_num', 'vrm_numero_ecrit', 'vrm_je_vends', 'vrm_liste_recherche', 'vrm_annonces_achetees']);
   if (main === null) return null;
   await rafraichirVendExt(main.vrm_je_vends, owner);   // (5.347) « paire » / « article »
   const dates = await sbGet('app_data?id=eq.vinted_listing_dates&select=data');
@@ -5499,6 +5501,8 @@ async function donneesInfosPage(uid) {
   for (const it of ((dr && dr[0] && Array.isArray(dr[0].items)) ? dr[0].items : [])) if (it && it.id != null) parId[String(it.id)] = it;
   if (String((await loadSession())?.user_id || '') !== owner) return null;
   _infosPage = { owner, uid, at: Date.now(), fiches: main.vinted_annonce_numeros || {}, buyByNum: main.vinted_buyprice_by_num || {},
+    recherche: Array.isArray(main.vrm_liste_recherche) ? main.vrm_liste_recherche.slice(0, 50) : [],
+    achetees: main.vrm_annonces_achetees && typeof main.vrm_annonces_achetees === 'object' && main.vrm_annonces_achetees.ids && typeof main.vrm_annonces_achetees.ids === 'object' ? main.vrm_annonces_achetees.ids : null,
     ecrit: numeroEcritAllume(main), dates: (dates && dates[0] && dates[0].data) || {}, parId };
   return _infosPage;
 }
@@ -5560,6 +5564,14 @@ async function infosVintedPage(sender, msg) {
   if (article && !infos[article[1]]) {
     const profils = await sesProfils();
     achat = annonceDUnAutre(msg && msg.membres, profils, pid, d.fiches, article[1]);
+  }
+  // (14 nov., 5.376, lot messages-achats-plus) Sur l'annonce d'un AUTRE vendeur : SA liste de
+  // recherche (la page la compare à l'annonce DÉJÀ ouverte, `correspondances`) et SES achats de
+  // CETTE annonce — par l'identifiant exact de la page, jamais un titre (`achatsDeLAnnonce`).
+  // `achetees` absente (jamais publiée) ⇒ `achete` absent : pas su, aucun signal.
+  if (achat === true) {
+    const l = d.achetees && Array.isArray(d.achetees[article[1]]) ? d.achetees[article[1]].slice(0, 10) : (d.achetees ? [] : null);
+    return { ok: true, portee: 'compte', infos, achat, recherche: d.recherche || [], ...(l ? { achete: l } : {}) };
   }
   return { ok: true, portee: 'compte', infos, achat };
 }

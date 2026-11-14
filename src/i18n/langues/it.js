@@ -13,6 +13,8 @@ import ecran_compta from './it/compta.js';
 import ecran_fiche from './it/fiche.js';
 import ecran_tarifs from './it/tarifs.js';
 import ecran_nouveaux from './it/nouveaux.js';
+import ecran_listes from './it/listes.js';
+import ecran_plus from './it/plus.js';
 import ecran_argent from './it/argent.js';
 import ecran_fraiscarte from './it/fraiscarte.js';   // (14 nov., frais-carte)
 import ecran_atelier from './it/atelier.js';
@@ -22,6 +24,8 @@ export default {
   ...ecran_tarifs,
   ...ecran_nouveaux,
   ...ecran_atelier,
+  ...ecran_listes,
+  ...ecran_plus,
   ...ecran_compta,
   ...ecran_argent,
   ...ecran_stats,
