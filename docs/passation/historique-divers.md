@@ -1872,3 +1872,8 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **14 nov. · Retrait Vinted Go réacheminé** : l'e-mail « Nouveau relais : il est temps de récupérer » est une arrivée (son QR Vinted Go atteint À retirer, montré seulement s'il porte le n° et le code du colis, `api/_lib/qr-retrait.js`) ; le point lu le plus récent gagne, l'ancien nom ne reste pas ; AUCUN colis sans code dans « À retirer » (⇒ « À vérifier ») ; un retour ouvert (440) sur l'achat = retiré. `docs/passation/2026-11-14-retrait-vinted-go.md`. Geste : aucun.
 - **14 nov. · Ouverture instantanée (84)** : l'instantané de Ma journée peint AVANT l'app (porte hors ligne, uid, daté, inerte), gardé hors ligne et en panne ; SW : coquille rangée dès la 1re ouverture, `/demarrage-*.js` en cache. `2026-11-14-ouverture-instantanee.md`. Geste : aucun.
 - **14 nov. · Colis plus (96-101) + impression guidée** : carton PROPOSÉ par modèle, fournitures « à chaque colis », Tout imprimer guidé (imprimante classique / 4 par A4 / thermique, tampon par bordereau, « Tout est sorti ? »), douchette (identité exacte), mains libres, temps par colis. `2026-11-14-colis-plus.md`. Geste : aucun.
+
+
+## Déplacé tel quel de CLAUDE.md §9 (14 nov., lot accompagnement)
+
+- **14 nov. · Dates de versement, quatre sources** : mesuré, 0 des 1 741 avait une source en base ; LA règle `datesDeVersement` (transaction 450 > relevé > conversation « Ta vente est finalisée. » > e-mail, par n° seulement, recopiée au serveur) ; extension 5.376.0 lit la conversation (plus anciennes d'abord) ; Ma journée : « … en cours de lecture · N datées ✓ · environ 7 jours ». `docs/passation/2026-11-14-dates-versement.md`. Geste : 5.376 puis vinted.fr ouvert sur le grand compte.
