@@ -22,6 +22,9 @@ import AnnoncesLeboncoin from '../AnnoncesLeboncoin.jsx';
 import QuoiRepublier from '../design/QuoiRepublier.jsx';
 import { quoiRepublier, ageDepuis, lireReglage as lireReglageQR, CLE_REGLAGE as CLE_REGLAGE_QR } from '../quoiRepublier.js';
 import LbcBaissePrix from '../LbcBaissePrix.jsx';
+import { AFaireSite } from '../plateformes/AFaireSite.jsx';   // (14 nov., refonte visible) « À faire · N › »
+import { IconePlus } from '../plateformes/IconePlus.jsx';
+import { BoutonIcone } from '../ui/index.js';
 import { limiteRepub, noterRepub, joursRepub, JOURS_REPUB_DEFAUT, CHOIX_JOURS_REPUB, espacementPropre, ESP_DEFAUT, delaiEspacement, attenteTotale, deplacer } from '../lbcPlus.js';
 import { useLangue } from '../i18n/react.js';   // (11 nov., lot lbc-plus) baisser le prix en série, sur son clic
 import { tr } from '../i18n/index.js';
@@ -1954,16 +1957,21 @@ function LeboncoinScreen() {
     }, ms));
     return () => { ids.forEach(clearTimeout); evts.forEach((e) => window.removeEventListener(e, stop)); };
   }, [data]);
+  // (14 nov.) La porte « Republier » se montre quand il y a quelque chose à republier, ou quand on
+  // ne sait pas (lecture ratée, `null`) — la même condition qu'avant, nommée une fois.
+  const porteRepubLbc = !!(data && (data.repub === null || (data.repub && (data.repub.length || Object.keys(data.repubKO || {}).length))));
   return (
-    <div className="vrm-lbc-ecran" style={{ padding: '16px 14px 40px', maxWidth: 920, margin: '0 auto' }}>
+    <div className="vrm-lbc-ecran" style={{ padding: '12px 16px 40px', maxWidth: 920, margin: '0 auto' }}>
       {fiche && <FicheLbc q={fiche} compteLbc={data && data.lbcConnecte} onClose={() => setFiche(null)} onMarquer={marquer}/>}
-      <div className="vrm-lbc-tete" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-        {/* Revue du 16 octobre : ce titre redisait l'onglet « Annonces » juste
-            au-dessus. Il reste pour un lecteur d'écran, plus à l'œil. */}
-        <h2 className="vrm-sr">Tes annonces Leboncoin</h2>
-        <button type="button" onClick={reload} style={{ marginLeft: 'auto', minWidth: 44, background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 999, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: C.text }}>{loading ? '…' : '↻ Actualiser'}</button>
-      </div>
+      {/* Revue du 16 octobre : ce titre redisait l'onglet « Annonces » juste
+          au-dessus. Il reste pour un lecteur d'écran, plus à l'œil. */}
+      <h2 className="vrm-sr">Tes annonces Leboncoin</h2>
       {erreurReception && <LignePanne>Relecture Leboncoin ratée (ancien affichage gardé) : touche Actualiser.</LignePanne>}
+      {/* (14 nov., refonte visible — AJOUT 3 « la liste d'abord ») Les conseils, « Republier » et
+          « Baisser le prix » étaient trois cartes de 120 px AVANT la liste : ils vivent dans UNE ligne
+          « • À faire · N › » qui ouvre leur feuille (src/plateformes/AFaireSite.jsx), chacun avec SON
+          geste, inchangé. Les alertes de double vente restent dans la page, dessous (seul geste urgent). */}
+      <AFaireSite site="leboncoin" n={conseilsLbc.length + (porteRepubLbc ? 1 : 0) + (data && Array.isArray(data.baisse) && data.baisse.length ? 1 : 0)}>
       {conseilsLbc.length > 0 && (
         <Card data-lbc-conseils={conseilsLbc.length} style={{ marginBottom: 12 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>À faire sur Leboncoin</div>
@@ -1972,11 +1980,24 @@ function LeboncoinScreen() {
               {/* (6 nov., v36-visuel-2) Une icône de Réglages par geste (au lieu d'un point bleu) ; l'ambre au geste pressé. */}
               <span aria-hidden="true" className="vrm-lbc-conseil-icone" data-urgent={c.urg ? '1' : undefined}><Icon name={{ publier: 'tag', 'relier-ventes': 'link', doublons: 'alert' }[c.k] || 'trash'} size={16}/></span>
               <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.text, lineHeight: 1.4 }}>{c.txt}</span>
-              <button type="button" data-lbc-conseil-go={c.k} onClick={allerLbc(c)} style={{ border: `1px solid ${C.border}`, background: 'transparent', borderRadius: 12, padding: '4px 11px', fontSize: 12, fontWeight: 600, color: C.text, cursor: 'pointer', flexShrink: 0 }}>Voir</button>
+              <button type="button" data-lbc-conseil-go={c.k} data-afaire-ferme="" onClick={allerLbc(c)} style={{ border: `1px solid ${C.border}`, background: 'transparent', borderRadius: 12, padding: '4px 11px', fontSize: 12, fontWeight: 600, color: C.text, cursor: 'pointer', flexShrink: 0 }}>Voir</button>
             </div>
           ))}
         </Card>
       )}
+      {/* (29 oct.) « Un outil de republication comme pour Vinted » : une porte,
+          au-dessus de ses annonces ; l'outil dit lui-même ce qu'il ne peut pas faire. */}
+      {porteRepubLbc ? (
+        <div data-repub-lbc-porte={data.repub === null ? 'pas-su' : String(data.repub.length)} style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '12px 16px', marginBottom: 14 }}>
+          <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Republier sur Leboncoin</div>
+            <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>{data.repub === null ? "Pas vérifié (lecture ratée) : touche « ↻ Actualiser »." : <>{`${data.repub.length} annonce${data.repub.length > 1 ? 's' : ''} peu${data.repub.length > 1 ? 'vent' : 't'} l'être`}{' '}<Pourquoi titre="Republier sur Leboncoin">Supprimer puis remettre une annonce comme neuve, une à la fois.</Pourquoi></>}</div>
+          </div>
+          {data.repub !== null && <button type="button" data-repub-lbc-ouvrir="" onClick={() => setRepubOuvert(true)} style={{ minHeight: 44, padding: '0 16px', borderRadius: 12, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Choisir les annonces…</button>}
+        </div>
+      ) : null}
+      {data && Array.isArray(data.baisse) && data.baisse.length ? <LbcBaissePrix annonces={data.baisse} onFini={reload}/> : null}
+      </AFaireSite>
       {/* ── ANTI DOUBLE VENTE : EN PREMIER, C'EST LE SEUL GESTE URGENT DE L'ÉCRAN ──
           Une paire vendue ici et encore en vente sur Vinted peut être achetée
           une deuxième fois. On le dit avec le N° et le lien ; VRM ne retire pas
@@ -2031,20 +2052,13 @@ function LeboncoinScreen() {
           ))}
         </Card>
       )}
-      {/* (29 oct.) « Un outil de republication comme pour Vinted » : une porte,
-          au-dessus de ses annonces ; l'outil dit lui-même ce qu'il ne peut pas faire. */}
-      {data && (data.repub === null || (data.repub && (data.repub.length || Object.keys(data.repubKO || {}).length))) ? (
-        <div data-repub-lbc-porte={data.repub === null ? 'pas-su' : String(data.repub.length)} style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '12px 16px', marginBottom: 14 }}>
-          <div style={{ flex: '1 1 220px', minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Republier sur Leboncoin</div>
-            <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>{data.repub === null ? "Pas vérifié (lecture ratée) : touche « ↻ Actualiser »." : <>{`${data.repub.length} annonce${data.repub.length > 1 ? 's' : ''} peu${data.repub.length > 1 ? 'vent' : 't'} l'être`}{' '}<Pourquoi titre="Republier sur Leboncoin">Supprimer puis remettre une annonce comme neuve, une à la fois.</Pourquoi></>}</div>
-          </div>
-          {data.repub !== null && <button type="button" data-repub-lbc-ouvrir="" onClick={() => setRepubOuvert(true)} style={{ minHeight: 44, padding: '0 16px', borderRadius: 12, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Choisir les annonces…</button>}
-        </div>
-      ) : null}
-      {data && Array.isArray(data.baisse) && data.baisse.length ? <LbcBaissePrix annonces={data.baisse} onFini={reload}/> : null}
       {repubOuvert && data && Array.isArray(data.repub) && <RepublierLeboncoin liste={data.repub} exclues={data.repubKO || {}} onClose={() => setRepubOuvert(false)} onFini={reload}/>}
-      {data && <AnnoncesLeboncoin owner={AUTH.user?.id||''} compteOuvert={lbcOuvert} floute={(ad) => lbcFloute(lbcOuvert, ad && (ad.account || ad.lbcUser))} aConfirmerDe={(ad) => !!(data.lbcAConfirmer && data.lbcAConfirmer.ids.includes(String(ad && ad.id)))} confirmer={nAConf > 0 ? (() => {
+      {data && <AnnoncesLeboncoin outils={<>
+          {/* (14 nov.) « Actualiser » et « Publier sur Leboncoin » : deux icônes de la barre de la liste
+              (l'entrée « Publier » garde son attribut et son événement, src/App.jsx `EntreePublierAilleurs`). */}
+          <BoutonIcone label={loading ? tr('plateformes.actualisation') : tr('plateformes.actualiser')} data-lbc-actualiser="" onClick={reload} disabled={!!loading}><Icon name="sync" size={18}/></BoutonIcone>
+          <span className="vrm-pa-entree is-outil" data-pa-entree="leboncoin"><BoutonIcone label={tr('plateformes.publierSur', { site: 'Leboncoin' })} onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:publier-ailleurs', { detail: { site: 'leboncoin' } })); } catch (_) {} }}><IconePlus/></BoutonIcone></span>
+        </>} owner={AUTH.user?.id||''} compteOuvert={lbcOuvert} floute={(ad) => lbcFloute(lbcOuvert, ad && (ad.account || ad.lbcUser))} aConfirmerDe={(ad) => !!(data.lbcAConfirmer && data.lbcAConfirmer.ids.includes(String(ad && ad.id)))} confirmer={nAConf > 0 ? (() => {
         const pe = pauseEtat(), A = data.lbcAConfirmer;
         return <>{A.jamais ? 'Ta liste « Mes annonces » n’a jamais été lue en entier' : `Ta liste « Mes annonces » a été ${quandLectureLbc(A.lu)}`} : « à confirmer », pas comptées, rien effacé.{' '}
           {pe === 'absente'

@@ -33,6 +33,9 @@ import PhotosVestiaire, { textePhotosManquantes } from "../PhotosVestiaire.jsx";
 const BaissePrixVestiaire = aLaDemande(() => import("../BaissePrixVestiaire.jsx"));
 import { photosExigeesVc } from "../photosVestiaire.js";
 import { tr } from "../i18n/index.js";
+import { AFaireSite } from '../plateformes/AFaireSite.jsx';   // (14 nov., refonte visible) « À faire · N › »
+import { IconePlus } from '../plateformes/IconePlus.jsx';
+import { BarreOutils, BoutonIcone } from '../ui/index.js';
 // ⟦← App.jsx #2⟧
 // (6 nov., vitesse 2) OffresVestiaire : à la demande.
 import { offresVestiaire, euros } from "../offresVestiaire.js";
@@ -266,6 +269,8 @@ function AnnoncesVestiaire() {
   const [d, setD] = useState(undefined);   // undefined en cours · null pas su · objet
   const [recettePrix, setRecettePrix] = useState(undefined);
   const [baisseOuverte, setBaisseOuverte] = useState(false);
+  // (14 nov., refonte visible) La recherche de la liste : le N° tapé trouve l'annonce (identité : son N°), le titre aussi.
+  const [q, setQ] = useState('');
   const vcOuvert = useCompteVcOuvert();
   // (2 nov., soir) Un N° par annonce, comme Vinted et Leboncoin (src/numerosVestiaire.js).
   const vcLoc = useVcLocal();
@@ -305,6 +310,8 @@ function AnnoncesVestiaire() {
     });
     const ordre = { 'en-ligne': 0, attente: 1, autre: 2, 'pas-dit': 3, 'a-confirmer': 4, vendue: 5, retiree: 6 };
     liste.sort((a, z) => (ordre[a.etat] - ordre[z.etat]) || (z.num ? 1 : 0) - (a.num ? 1 : 0) || String(a.num || '').localeCompare(String(z.num || ''), 'fr', { numeric: true }));
+    const qn = q.trim().toLowerCase().replace(/^n°\s*/, '');
+    const visibles = !qn ? liste : liste.filter(({ it, num }) => (num && String(num).toLowerCase() === qn) || [it.titre, num ? 'n°' + num : ''].filter(Boolean).some((x) => String(x).toLowerCase().includes(q.trim().toLowerCase())));
     const age = Date.now() - Date.parse(d.capturedAt);
     const vieille = !(age <= 24 * 3600e3);
     const sansFiche = liste.length > 0 && liste.every(({ it }) => !it.titre && !it.photo && !it.prix && !it.statut);
@@ -312,6 +319,55 @@ function AnnoncesVestiaire() {
     if (!n) corps = <div data-vc-annonces="vide" style={style}>Aucune annonce Vestiaire à la dernière lecture ({ageCourtVc(d.capturedAt)}). Tu viens d'en publier ? {geste}.</div>;
     else corps = (
       <div data-vc-annonces="lu" data-vc-annonces-n={n} data-vc-annonces-vieille={vieille ? '1' : '0'}>
+        {/* (11 nov., lot vestiaire-plus) Baisser le prix en série, sur SON clic (ext. 5.364) : la feuille dit
+            d'abord si le geste est appris de son propre changement de prix sur Vestiaire. */}
+        {/* (14 nov., refonte visible) La porte « Baisser des prix » vit dans « • À faire › » (sa feuille, son geste) ;
+            la feuille de la série reste montée ici, hors de la feuille « À faire ». */}
+        {liste.some((l) => l.etat === 'en-ligne') ? <AFaireSite site="vestiaire" n={1}><div data-vc-baisse-porte="" className="vrm-pf-porte"><Bouton variante="secondaire" icone="tag" data-vc-baisse-ouvrir="" data-afaire-ferme="" onClick={() => setBaisseOuverte(true)}>{tr('vcBaisse.ouvrir')}</Bouton></div></AFaireSite> : null}
+        <div className="vrm-pf-collant" data-pf-outils="vestiaire">
+          <BarreOutils valeur={q} onChange={setQ} placeholder={tr('plateformes.vc.chercher')} label={tr('plateformes.vc.chercherLabel')}>
+            <span className="vrm-pa-entree is-outil" data-pa-entree="vestiaire"><BoutonIcone label={tr('plateformes.publierSur', { site: 'Vestiaire' })} onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:publier-ailleurs', { detail: { site: 'vestiaire' } })); } catch (_) {} }}><IconePlus/></BoutonIcone></span>
+          </BarreOutils>
+        </div>
+        {baisseOuverte ? <BaissePrixVestiaire annonces={liste.filter((l) => l.etat === 'en-ligne').map(({ id, it, num }) => ({ id, it, num, compte: it.compte || '', titre: it.titre || '', photo: it.photo || '' }))}
+          compteOnglet={vcOuvert || null} recette={recettePrix} cap={extSait('vcprix')} Photo={PhotoBaisseVc} Retour={FermeAuRetour}
+          onBaisser={async (l) => { const r = await vmrCmd({ cmd: 'vcPrix', produit: String(l.id), avantCents: l.avant, apresCents: l.apres }, 60000); return r || { sansReponse: true }; }}
+          onFermer={() => { setBaisseOuverte(false); relire(); }}/> : null}
+        {/* (2 nov., soir) « c'est beaucoup zoomé sur le produit » : la photo ENTIÈRE
+            (contenue sur fond blanc, `vrm-vc-catalog`), aux proportions des fiches. */}
+        <section className="vrm-pf-liste vrm-vc-catalog" aria-label="Mes annonces Vestiaire" data-pf-liste="vestiaire" style={{ margin: 0 }}>
+          {/* (11 nov.) Regroupées par compte quand un compte Vestiaire est ouvert (src/regroupeComptes.js, suit le flou). */}
+          {!visibles.length ? <p className="vrm-pf-vide" data-vc-annonces-rien="">{tr('plateformes.rien')}</p> : null}
+          <ul className="vrm-pf-rangees"><ListeParCompte enLi unite="annonce" libelle="Compte ouvert sur Vestiaire" lignes={visibles} ouvert={vcOuvert} floute={(l) => vcFloute(vcOuvert, l.it.compte)} compteDe={(l) => String(l.it.compte == null ? '' : l.it.compte).trim()} nomDe={(id) => nomCompteVente('vestiaire', { compte: id }, {})} rendre={({ id, it, num, etat, label, brut }) => {
+            const flou = vcFloute(vcOuvert, it.compte);
+            const prix = it.prix && isFinite(Number(it.prix.valeur)) ? (it.prix.devise && it.prix.devise !== 'EUR' ? `${Number(it.prix.valeur).toFixed(2).replace('.', ',')} ${it.prix.devise}` : fmt(it.prix.valeur)) : '—';
+            const extra = [it.boost === true ? 'boostée' : '', typeof it.favoris === 'number' ? `${it.favoris} favori${it.favoris > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ');
+            return (
+              <li key={id} className="vrm-ui-ligne vrm-pf-rangee" data-vc-annonce={id} data-vc-annonce-num={num || ''} data-vc-annonce-etat={etat} data-flou={flou ? '1' : '0'} style={flou ? STYLE_FLOU : undefined}>
+                {/* (14 nov., refonte visible) Une RANGÉE (photo 52, le N° et le nom, une ligne d'état, le prix),
+                    plus une carte photo de 300 px : on voit 8 annonces par écran d'iPhone. */}
+                <span className="vrm-ui-ligne-photo vrm-pf-photo-vc" aria-hidden="true"><PhotoVc src={it.photo}/></span>
+                <div className="vrm-ui-ligne-textes vrm-pf-textes">
+                  <strong className="vrm-ui-ligne-titre">{num ? <span className="vrm-pf-num" data-vc-annonce-numtxt="">N°{num}</span> : null}<span>{it.titre || (num ? `N°${num}` : 'Annonce sans titre lu')}</span></strong>
+                  <span className="vrm-ui-ligne-sous"><span data-etat={etat === 'en-ligne' ? 'active' : etat === 'vendue' ? 'vendue' : 'autre'} title={brut ? 'État lu sur Vestiaire' : undefined}>{label}</span>{num ? '' : etat === 'retiree' ? ' · Sans N° (retirée)' : ' · N° en attente'}{extra ? ` · ${extra}` : ''}</span>
+                </div>
+                <b className="vrm-ui-ligne-valeur" data-vc-annonce-prix={it.prix ? String(it.prix.valeur) : ''} title={it.prix && it.prix.cle ? 'Prix lu sur Vestiaire' : undefined}>{prix}</b>
+                <span className="vrm-pf-gestes">
+                  {/* (3 nov.) Un seul N° pour l'article aussi en ligne sur Vinted : SON toucher relie. */}
+                  {lienDe(vcLoc.liens, id)
+                    ? <button type="button" className="vrm-lvc-geste" data-vc-delier={id} onClick={() => defaireVc(id)}>Délier Vinted</button>
+                    : etat !== 'retiree' && etat !== 'vendue' && vcReliable({ productId: id, item: it, liensPub: d.liens, liens: vcLoc.liens, cleNum })
+                      ? <button type="button" className="vrm-lvc-geste" data-vc-relier={id} onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:lien-vc', { detail: { sens: 'vc', id, num: num || '', titre: it.titre || '', photo: it.photo || '', site: 'Vestiaire' } })); } catch (_) {} }}>Relier à Vinted</button>
+                      : null}
+                </span>
+              </li>
+            );
+          }}/></ul>
+        </section>
+        {/* (2 nov., soir) Chaque annonce reçoit un N° (comme Vinted et Leboncoin) : celui de
+            la paire publiée depuis VRM ou de sa référence VRM-n°, sinon un N° neuf — par
+            l'identifiant Vestiaire du produit, jamais par le titre. */}
+        <div className="vrm-pf-pied vrm-pf-pied-vc">
         {/* (9 nov., lot AI) UNE ligne courte (« au moins 3 annonces · lu il y a 7 j · à confirmer »),
             ambre si la lecture est à refaire ; la phrase d'avant, entière, dans la pop-up. */}
         <InfoPop nom="vc-fraicheur" titre="Tes annonces Vestiaire" ton={vieille || sansFiche ? 'ambre' : 'neutre'}
@@ -324,54 +380,20 @@ function AnnoncesVestiaire() {
           {sansFiche ? <> Photo, titre et prix arrivent avec l'extension {EXT_CAPACITES.vcfiche}{extSait('vcfiche') === 'ok' ? <> : {geste} une fois</> : <> — mets-la à jour depuis Paramètres → État des connexions, puis {geste}</>}.</> : null}
           </p>
         </InfoPop>
-        {/* (11 nov., lot vestiaire-plus) Baisser le prix en série, sur SON clic (ext. 5.364) : la feuille dit
-            d'abord si le geste est appris de son propre changement de prix sur Vestiaire. */}
-        {liste.some((l) => l.etat === 'en-ligne') ? <div style={{ margin: '8px 0' }}><Bouton variante="secondaire" icone="tag" data-vc-baisse-ouvrir="" onClick={() => setBaisseOuverte(true)}>{tr('vcBaisse.ouvrir')}</Bouton></div> : null}
-        {baisseOuverte ? <BaissePrixVestiaire annonces={liste.filter((l) => l.etat === 'en-ligne').map(({ id, it, num }) => ({ id, it, num, compte: it.compte || '', titre: it.titre || '', photo: it.photo || '' }))}
-          compteOnglet={vcOuvert || null} recette={recettePrix} cap={extSait('vcprix')} Photo={PhotoBaisseVc} Retour={FermeAuRetour}
-          onBaisser={async (l) => { const r = await vmrCmd({ cmd: 'vcPrix', produit: String(l.id), avantCents: l.avant, apresCents: l.apres }, 60000); return r || { sansReponse: true }; }}
-          onFermer={() => { setBaisseOuverte(false); relire(); }}/> : null}
-        {/* (2 nov., soir) « c'est beaucoup zoomé sur le produit » : la photo ENTIÈRE
-            (contenue sur fond blanc, `vrm-vc-catalog`), aux proportions des fiches. */}
-        <section className="vrm-lbc-catalog vrm-vc-catalog" aria-label="Mes annonces Vestiaire" style={{ margin: 0 }}>
-          {/* (11 nov.) Regroupées par compte quand un compte Vestiaire est ouvert (src/regroupeComptes.js, suit le flou). */}
-          <ul><ListeParCompte enLi unite="annonce" libelle="Compte ouvert sur Vestiaire" lignes={liste} ouvert={vcOuvert} floute={(l) => vcFloute(vcOuvert, l.it.compte)} compteDe={(l) => String(l.it.compte == null ? '' : l.it.compte).trim()} nomDe={(id) => nomCompteVente('vestiaire', { compte: id }, {})} rendre={({ id, it, num, etat, label, brut }) => {
-            const flou = vcFloute(vcOuvert, it.compte);
-            const prix = it.prix && isFinite(Number(it.prix.valeur)) ? (it.prix.devise && it.prix.devise !== 'EUR' ? `${Number(it.prix.valeur).toFixed(2).replace('.', ',')} ${it.prix.devise}` : fmt(it.prix.valeur)) : '—';
-            const extra = [it.boost === true ? 'boostée' : '', typeof it.favoris === 'number' ? `${it.favoris} favori${it.favoris > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ');
-            return (
-              <li key={id} data-vc-annonce={id} data-vc-annonce-num={num || ''} data-vc-annonce-etat={etat} data-flou={flou ? '1' : '0'} style={flou ? STYLE_FLOU : undefined}>
-                <PhotoVc src={it.photo}/>
-                <div className="vrm-lbc-catalog-info">
-                  <strong>{it.titre || (num ? `N°${num}` : 'Annonce sans titre lu')}</strong>
-                  <small>{num ? <span data-vc-annonce-numtxt="">N°{num}</span> : etat === 'retiree' ? 'Sans N° (retirée)' : 'N° en attente'}{extra ? ` · ${extra}` : ''}</small>
-                  <div><span data-etat={etat === 'en-ligne' ? 'active' : etat === 'vendue' ? 'vendue' : 'autre'} title={brut ? 'État lu sur Vestiaire' : undefined}>{label}</span></div>
-                  {/* (3 nov.) Un seul N° pour l'article aussi en ligne sur Vinted : SON toucher relie. */}
-                  {lienDe(vcLoc.liens, id)
-                    ? <button type="button" className="vrm-lvc-geste" data-vc-delier={id} onClick={() => defaireVc(id)}>Délier Vinted</button>
-                    : etat !== 'retiree' && etat !== 'vendue' && vcReliable({ productId: id, item: it, liensPub: d.liens, liens: vcLoc.liens, cleNum })
-                      ? <button type="button" className="vrm-lvc-geste" data-vc-relier={id} onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:lien-vc', { detail: { sens: 'vc', id, num: num || '', titre: it.titre || '', photo: it.photo || '', site: 'Vestiaire' } })); } catch (_) {} }}>Relier à Vinted</button>
-                      : null}
-                </div>
-                <b data-vc-annonce-prix={it.prix ? String(it.prix.valeur) : ''} title={it.prix && it.prix.cle ? 'Prix lu sur Vestiaire' : undefined}>{prix}</b>
-              </li>
-            );
-          }}/></ul>
-        </section>
-        {/* (2 nov., soir) Chaque annonce reçoit un N° (comme Vinted et Leboncoin) : celui de
-            la paire publiée depuis VRM ou de sa référence VRM-n°, sinon un N° neuf — par
-            l'identifiant Vestiaire du produit, jamais par le titre. */}
+        </div>
         {liste.some((l) => !l.num && l.etat !== 'retiree') ? <div data-vc-annonces-attente="" style={{ ...style, marginTop: 8 }}>« N° en attente » : il arrive dans quelques secondes (connexion nécessaire).</div> : null}
         <div style={{ marginTop: 12 }}><BlocBarrerVc titres={Object.fromEntries(Object.entries(d.items).map(([k, v]) => [k, (v && v.titre) || '']))}/></div>
         {d.ventesKO ? <div style={{ ...style, marginTop: 4 }}>Ventes Vestiaire pas relues : « vendue » seulement si l'annonce le dit.</div> : null}
       </div>
     );
   }
+  // (14 nov., refonte visible) Plus de carte autour de la liste ni de titre redit sous l'onglet « Annonces » :
+  // le titre reste pour un lecteur d'écran ; la liste commence tout de suite.
   return (
-    <Card style={{ padding: 16, width: '100%', boxSizing: 'border-box' }}>
-      <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 6 }}>Tes annonces Vestiaire</div>
+    <div className="vrm-pf-vc" data-pf-vc="">
+      <h2 className="vrm-sr">Tes annonces Vestiaire</h2>
       {corps}
-    </Card>
+    </div>
   );
 }
 // ⟦← App.jsx #9⟧

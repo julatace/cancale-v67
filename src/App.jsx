@@ -78,6 +78,8 @@ import { STYLE_FLOU, compteLbcOuvert, lbcFloute, compteVcOuvert, vcFloute } from
 import { grouperParCompte, entreesGroupees } from './regroupeComptes.js'; // (11 nov., agent2-regroupe-comptes) lignes floutées regroupées par compte
 import { TeteGroupeCompte, useDepliesComptes, ListeParCompte } from './GroupesComptes.jsx';
 import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
+import { BandeChiffres } from './ui/index.js';   // (14 nov., refonte des sites) la bande de chiffres des listes
+import './plateformes/plateformes.css';   // (14 nov., refonte visible) Leboncoin, eBay, Vestiaire, Paramètres, connexion
 import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './auth/liaisonOAuth.js';
 import {poserIntention as poserIntentionOAuth,lireIntention as lireIntentionOAuth,CLE_INTENTION as CLE_INTENTION_OAUTH} from './auth/compteNeuf.js';
 import {messageErreurOAuth} from './auth/erreursOAuth.js';   // (11 nov., lot connexions-oauth)
@@ -23528,20 +23530,17 @@ function lbcArgent(lbcVentes) {
 // Une valeur inconnue s'écrit « — », jamais 0 (§7).
 function PlatResume({ cases, note, dark, baseKO }) {
   if (baseKO) return null;   // la coque dit déjà la panne (§7)
-  const T = dark ? EBAY_SKIN : C;
-  const eti = { fontSize: 11, color: T.muted, textTransform: 'uppercase', letterSpacing: 0.7, fontWeight: 600 };
+  // (14 nov., refonte visible — AJOUT 3) Plus de repli « Chiffres » ni de carte encadrée en tête des sites :
+  // UNE bande de chiffres (src/ui/BandeChiffres, ≤ 72 px, sur le fond de la page). Un montant PAS SU
+  // n'a pas de case (jamais une carte « — ») ; la note (un compte illisible) reste, en une ligne.
+  // Les valeurs sont celles d'avant (`cases`, calculées par l'écran) : rien de recalculé.
+  const items = (cases || []).map(([lib, val], i) => ({ cle: 'c' + i, n: val == null ? null : val, l: lib }));
+  if (!items.some((x) => x.n != null) && !note) return null;
   return (
-    <ResumePlateforme><div style={{ padding: '12px 16px 0', background: dark ? EBAY_SKIN.bg : 'transparent' }} data-plat-resume="1">
-      <div className="vrm-summary-strip" style={{ display: 'flex', gap: 14, flexWrap: 'wrap', border: `1px solid ${T.border}`, background: T.card, borderRadius: 12, padding: '12px 15px', boxShadow: dark ? 'none' : (C.shadow || 'none') }}>
-        {cases.map(([lib, val, sourd]) => (
-          <div key={lib} style={{ flex: '1 1 90px', minWidth: 0 }}>
-            <div style={eti}>{lib}</div>
-            <div className="vrm-display" style={{ fontSize: 20, fontWeight: 700, color: (val == null || sourd) ? T.muted : T.text }}>{val == null ? '—' : val}</div>
-          </div>
-        ))}
-      </div>
-      {note && <div style={{ fontSize: 12, color: T.muted, marginTop: 6, lineHeight: 1.45 }}>{note}</div>}
-    </div></ResumePlateforme>
+    <div className="vrm-pf-resume" data-plat-resume="1" data-plat-resume-dark={dark ? '1' : undefined}>
+      <BandeChiffres items={items}/>
+      {note && <div className="vrm-pf-note" style={{ color: C.muted }}>{note}</div>}
+    </div>
   );
 }
 function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0}, sansTotaux = false }) {
@@ -59791,12 +59790,12 @@ function AppCoeur() {
   // jamais dans les Paramètres, sa décision du 17 oct. — et le dernier passage
   // de l'extension).
   const rendreVestiaire=(t)=>(
-    <section className="vrm-market-space" aria-label="Vestiaire" data-tache-vestiaire={t} style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
+    <section className="vrm-market-space" aria-label="Vestiaire" data-tache-vestiaire={t} style={{padding:'12px 16px 16px',display:'flex',flexDirection:'column',gap:t==='annonces'?12:18}}>
       <ExtVestiaireCompte/>
       {baseKO ? <LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>
         : t==='ventes' ? <><CarteStatsApp page="vestiaire" aide className="vrm-fu-ecran" ici="cat_ventes" onNav={setTab} sel={{ site: 'vestiaire', compte: null, periode: null }}/><VentesVestiaire comptes={vintedAccounts}/></>
         : t==='annonces' ? <>
-            <EntreePublierAilleurs site="vestiaire"/>
+            {/* (14 nov.) « Publier sur Vestiaire » : le « + » de la barre de la liste (Vestiaire.jsx). */}
             <AnnoncesVestiaire/>
             <PublierVestiaire comptes={vintedAccounts}/>
             <Card style={{padding:16}}>
@@ -59982,7 +59981,7 @@ function AppCoeur() {
           {/* ⚠️ Les quatre sous-onglets voisins se gardaient de la panne, celui-ci
               non : pendant une panne il disait sa lecture ratée en quatre
               messages, plus « ouvre leboncoin.fr » — le mauvais geste (§7). */}
-          {sec==='annonces'&&!baseKO&&<EntreePublierAilleurs site="leboncoin"/>}
+          {/* (14 nov.) « Publier sur Leboncoin » : le « + » de la barre de la liste (Leboncoin.jsx), plus une carte en tête. */}
           {sec==='annonces'&&(baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<LeboncoinScreen/>)}
           {/* (27 oct.) Le diagnostic est une aide en cas de souci : en bas de
               l'espace, plus une ligne en tête de chaque section. */}

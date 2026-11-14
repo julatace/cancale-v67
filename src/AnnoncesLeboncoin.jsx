@@ -5,6 +5,7 @@ import './annonces-leboncoin.css';
 import {STYLE_FLOU} from './flouCompte.js';
 import {ListeParCompte} from './GroupesComptes.jsx'; // (11 nov.) annonces des autres comptes regroupées, repliées
 import {montant} from './format.js';
+import {BarreOutils,Filtres} from './ui/index.js';   // (14 nov.) les briques communes des listes
 // (6 nov., v36-visuel-2) La règle unique des euros (`montant`) : « 90 € », jamais « 90,00 € ».
 const euros = n => n != null && n !== '' && /^\d+(\.\d+)?$/.test(String(n)) && Number.isFinite(Number(n)) ? montant(Number(n)) : '—';
 function Photo({src}) {
@@ -38,7 +39,7 @@ export function chiffresAnnonceLbc(ad) {
 // (6 nov.) `aConfirmerDe(ad)` : la règle « en ligne » de Leboncoin
 // (src/enLigneLbc.js) ; `confirmer` : la raison et le geste (rendus par l'écran,
 // qui sait l'état de l'extension), dits UNE fois en tête de la liste (§7).
-export default function AnnoncesLeboncoin({annonces=[],ventes={},lectureKO=false,numeroDe=null,owner='',sortieDe=null,onSupprimer=null,enVol=null,floute=null,aConfirmerDe=null,confirmer=null,compteOuvert=''}) {
+export default function AnnoncesLeboncoin({outils=null,annonces=[],ventes={},lectureKO=false,numeroDe=null,owner='',sortieDe=null,onSupprimer=null,enVol=null,floute=null,aConfirmerDe=null,confirmer=null,compteOuvert=''}) {
  // (31 oct.) `floute(ad)` : l'annonce d'un AUTRE compte que le compte Leboncoin
  // ouvert reste visible, estompée (le même STYLE_FLOU que Vinted, §11).
  const estFloute=ad=>typeof floute==='function'&&!!floute(ad);
@@ -54,20 +55,35 @@ export default function AnnoncesLeboncoin({annonces=[],ventes={},lectureKO=false
  const compteDe=ad=>String(ad?.account||ad?.lbcUser||'non-attribue');
  const comptesBilan=[...new Map(annonces.map(ad=>[compteDe(ad),{uid:compteDe(ad),nom:ad.accountName||(compteDe(ad)==='non-attribue'?'Compte Leboncoin non attribué':compteDe(ad))}])).values()];
  const bilan=[{id:'lbc-annonces',libelle:'Annonces Leboncoin',comptes:comptesBilan,items:annonces.map(ad=>({id:ad.id,compte:compteDe(ad),titre:ad.subject||ad.title,valeurs:[ad.price,ad.status,ad.pauseAt,ad.plusVueAt,ad.images?.[0],ad.images?.length]})),erreur:lectureKO,partiel:true,revision:annonces.map(ad=>ad.seenAt)}];
- return <section className="vrm-lbc-catalog" aria-label="Mes annonces Leboncoin">
-  <BilanSynchronisation owner={owner} sources={bilan}/>
-  <header><div><h2>Mes annonces</h2>{!lectureKO?<details className="vrm-pourquoi vrm-lbc-catalog-note" data-pourquoi><summary aria-label="D’où viennent ces états ?" title="D’où viennent ces états ?">ⓘ</summary><div>Les états reflètent la dernière lecture. « Gérer » ouvre l’annonce sur Leboncoin ; une annonce absente d’une page n’est pas supprimée de ton historique.</div></details>:null}</div><span>{lectureKO?'Lecture indisponible':`${lignes.length} reçue${lignes.length>1?'s':''}`}</span></header>
-  {lectureKO?<p role="status">Impossible de relire tes annonces. L’historique reste conservé.</p>:<>
-   {confirmer&&lignes.some(l=>l.etat==='aconfirmer')&&<p className="vrm-lbc-catalog-confirmer" data-lbc-confirmer-phrase="">{confirmer}</p>}
-   <input type="search" aria-label="Rechercher une annonce Leboncoin" placeholder="Rechercher un article, un compte…" value={recherche} onChange={e=>setRecherche(e.target.value)}/>
-   <div className="vrm-lbc-catalog-filtres" role="group" aria-label="État des annonces Leboncoin">{choix.filter(([id])=>id!=='aconfirmer'||lignes.some(l=>l.etat==='aconfirmer')).map(([id,nom])=><button key={id} type="button" aria-pressed={filtre===id} onClick={()=>setFiltre(id)}>{nom}<span>{id==='toutes'?lignes.length:lignes.filter(l=>id==='autres'?!CONNUS.includes(l.etat):l.etat===id).length}</span></button>)}</div>
-   {!visibles.length?<p className="vrm-lbc-catalog-vide">{lignes.length?'Aucune annonce dans cette sélection.':'Aucune annonce'}</p>:
-    <ul><ListeParCompte enLi unite="annonce" libelle="Compte ouvert sur Leboncoin" lignes={visibles} ouvert={compteOuvert} floute={(l)=>estFloute(l.ad)} compteDe={(l)=>idCompteAnn(l.ad)} nomDe={nomCompte} rendre={({ad,num,etat,label,livraison,suivi})=>{const lien=lienAnnonceLeboncoin(ad);return <li key={ad.id} data-lbc-catalog-id={ad.id} data-lbc-catalog-etat={etat} data-flou={estFloute(ad)?'1':'0'} style={estFloute(ad)?STYLE_FLOU:undefined}>
-     <Photo key={ad.images?.[0]||ad.id} src={ad.images?.[0]}/><div className="vrm-lbc-catalog-info"><strong>{ad.subject||ad.title||'Annonce sans titre'}</strong><small>{ad.accountName||'Compte sans nom'}{num?<span data-lbc-catalog-num={num}>{` · N°${num}`}</span>:''}{etat==='active'&&dateCourte(ad.publieeLe)?<span data-lbc-catalog-depuis="">{` · en ligne depuis le ${dateCourte(ad.publieeLe)}`}</span>:''}</small><div><span data-etat={etat}>{label}</span>{suivi&&<small>{livraison?'Livraison':'Vente'} · {suivi}</small>}{chiffresAnnonceLbc(ad)&&<small data-lbc-catalog-chiffres="">{chiffresAnnonceLbc(ad)}</small>}</div></div>
-     <b>{euros(ad.price)}</b><div className="vrm-lbc-catalog-gestes">{lien&&<a href={lien} target="_blank" rel="noreferrer" aria-label={`Gérer l’annonce : ${ad.subject||ad.title||ad.id}`}>Gérer <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M7 17 17 7M7 7h10v10"/></svg></a>}
-     {typeof onSupprimer==='function'&&SUPPRIMABLE.has(etat)&&ad.status!=='deleted'&&<button type="button" data-lbc-supprimer={ad.id} disabled={!!enVol} onClick={()=>onSupprimer({id:String(ad.id),numero:num,title:ad.subject||ad.title||'',prix:ad.price})} aria-label={`Supprimer de Leboncoin : ${ad.subject||ad.title||ad.id}`}>{enVol===String(ad.id)?'Suppression…':'Supprimer'}</button>}</div>
+ // (14 nov., refonte visible — Julien : « la liste arrive après un écran et demi ») LA LISTE D'ABORD :
+ // une barre (le champ de recherche + les outils de l'écran, `outils`), de petites capsules de filtre,
+ // puis des RANGÉES denses (photo 52, le N° et le nom, une ligne d'état, le prix) au lieu de grandes
+ // cartes photo de 300 px. Les briques communes (`src/ui`) : la même forme que Annonces · Vinted.
+ // « Mes annonces » et « N reçues » ne prennent plus une ligne : le nombre est dans « Toutes »,
+ // la note « D'où viennent ces états ? » et « Données » passent sous la liste. Rien de retiré.
+ const nDe=id=>id==='toutes'?lignes.length:lignes.filter(l=>id==='autres'?!CONNUS.includes(l.etat):l.etat===id).length;
+ return <section className="vrm-pf-liste" aria-label="Mes annonces Leboncoin" data-pf-liste="leboncoin">
+  <h2 className="vrm-sr">Mes annonces</h2>
+  {lectureKO?<p role="status" className="vrm-pf-note">Impossible de relire tes annonces. L’historique reste conservé.</p>:<>
+   {confirmer&&lignes.some(l=>l.etat==='aconfirmer')&&<p className="vrm-lbc-catalog-confirmer vrm-pf-note" data-lbc-confirmer-phrase="">{confirmer}</p>}
+   <div className="vrm-pf-collant" data-pf-outils="leboncoin">
+    <BarreOutils valeur={recherche} onChange={setRecherche} placeholder="Rechercher un article, un compte…" label="Rechercher une annonce Leboncoin">{outils}</BarreOutils>
+    <Filtres label="État des annonces Leboncoin" valeur={filtre} onChange={setFiltre}
+     options={choix.filter(([id])=>(id!=='aconfirmer'||lignes.some(l=>l.etat==='aconfirmer'))&&(id==='toutes'||id===filtre||nDe(id)>0)).map(([id,nom])=>({v:id,l:nom,n:nDe(id)}))}/>
+   </div>
+   {!visibles.length?<p className="vrm-lbc-catalog-vide vrm-pf-vide">{lignes.length?'Aucune annonce dans cette sélection.':'Aucune annonce'}</p>:
+    <ul className="vrm-pf-rangees"><ListeParCompte enLi unite="annonce" libelle="Compte ouvert sur Leboncoin" lignes={visibles} ouvert={compteOuvert} floute={(l)=>estFloute(l.ad)} compteDe={(l)=>idCompteAnn(l.ad)} nomDe={nomCompte} rendre={({ad,num,etat,label,livraison,suivi})=>{const lien=lienAnnonceLeboncoin(ad);const ch=chiffresAnnonceLbc(ad);const depuis=etat==='active'&&dateCourte(ad.publieeLe);return <li key={ad.id} className="vrm-ui-ligne vrm-pf-rangee" data-lbc-catalog-id={ad.id} data-lbc-catalog-etat={etat} data-flou={estFloute(ad)?'1':'0'} style={estFloute(ad)?STYLE_FLOU:undefined}>
+     <span className="vrm-ui-ligne-photo" aria-hidden="true"><Photo key={ad.images?.[0]||ad.id} src={ad.images?.[0]}/></span>
+     <span className="vrm-ui-ligne-textes vrm-pf-textes">
+      <strong className="vrm-ui-ligne-titre">{num?<span className="vrm-pf-num" data-lbc-catalog-num={num}>{`N°${num}`}</span>:null}<span>{ad.subject||ad.title||'Annonce sans titre'}</span></strong>
+      <span className="vrm-ui-ligne-sous"><span data-etat={etat}>{label}</span>{` · ${ad.accountName||'Compte sans nom'}`}{depuis?<span data-lbc-catalog-depuis="">{` · en ligne depuis le ${depuis}`}</span>:''}{suivi?<span>{` · ${livraison?'Livraison':'Vente'} · ${suivi}`}</span>:null}{ch?<span data-lbc-catalog-chiffres="">{` · ${ch}`}</span>:null}</span>
+     </span>
+     <b className="vrm-ui-ligne-valeur">{euros(ad.price)}</b>
+     <span className="vrm-pf-gestes">{lien&&<a href={lien} target="_blank" rel="noreferrer" aria-label={`Gérer l’annonce : ${ad.subject||ad.title||ad.id}`} title="Gérer sur Leboncoin"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 17 17 7M7 7h10v10"/></svg></a>}
+     {typeof onSupprimer==='function'&&SUPPRIMABLE.has(etat)&&ad.status!=='deleted'&&<button type="button" data-lbc-supprimer={ad.id} disabled={!!enVol} onClick={()=>onSupprimer({id:String(ad.id),numero:num,title:ad.subject||ad.title||'',prix:ad.price})} aria-label={`Supprimer de Leboncoin : ${ad.subject||ad.title||ad.id}`}>{enVol===String(ad.id)?'Suppression…':'Supprimer'}</button>}</span>
     </li>;}}/></ul>}
-
+   <div className="vrm-pf-pied"><span>{`${lignes.length} reçue${lignes.length>1?'s':''}`}</span><details className="vrm-pourquoi vrm-lbc-catalog-note" data-pourquoi><summary aria-label="D’où viennent ces états ?" title="D’où viennent ces états ?">ⓘ</summary><div>Les états reflètent la dernière lecture. « Gérer » ouvre l’annonce sur Leboncoin ; une annonce absente d’une page n’est pas supprimée de ton historique.</div></details></div>
   </>}
+  <BilanSynchronisation owner={owner} sources={bilan}/>
  </section>;
 }
