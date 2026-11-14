@@ -87,7 +87,39 @@ L'environnement de la session est le « Default » (réseau limité, aucune hôt
 
 ## Preuves
 
-Voir la fin de ce fichier (mise à jour après les bancs).
+- `npm run build` vert (après le vrai `git merge origin/main`).
+- **Audit `audit-exemple-photos`** (nouveau) : C1-C2 crédits (licence permise, page source sur le
+  site de SA licence), F1-F2 fichiers (WebP 400/120, < 40 Ko, crédités), L1 liste, B1-B2 branchement
+  sur 20 entrées SIMULÉES dans une copie temporaire (19 paires, jamais deux sur la même photo, titre =
+  ce que montre la photo, vente ⇔ bordereau, rien sans origine ni avec le catalogue de l'accueil, liste
+  vide = jeu d'avant), S1 aucune image en dur ni hôte externe. **Vert** ; `--prouve` : témoin (photo en
+  règle) vert, **10/10 mutations rouges** (licence CC BY-SA, page source d'un autre site, image sans
+  crédit, image de 41 Ko, mauvaise taille, photo prêtée par modulo, titre qui ne suit pas la photo,
+  vente sans photo, hôte externe, photo sans origine). Sur origin/main : rouge (module absent).
+  `--complet` (≥ 20 photos) : rouge tant que la liste est vide — c'est voulu.
+- **Banc `exemple-photos`** (nouveau ; 390 tactile et 1512, clair et sombre, 4 passes de < 9 min) :
+  B1 bandeau + cadre + languette au-dessus de tout sur 9 écrans, B2 loupe ouverte, B3 « exemple » sur
+  codes et adresses (Achats « À retirer », une ligne ouverte), B4 plus de « Le Fournil » ni « rue de la
+  Paix », « Relais Exemple », C1 « Me connecter » (44 px, libre, mène à `?connexion`, l'exemple
+  disparaît, aucune session réelle), W1 **0 requête vers la base ni /api, 0 écriture sortie**, rien ne
+  déborde, 0 erreur JS : **66 OK par passe, tous verts** ; seuls rouges : **P1 (4 par passe : Annonces,
+  Ventes, Achats, Colis — « 0 photo d'exemple pour 9 articles »)**, attendus tant que les photos
+  manquent. Sur **origin/main** (390 clair) : **47 KO** (B1 × 36, B2, B3, B4, C1, P1). Mutations sur le
+  `dist` (CSS du cadre à z 1, marque `content: none`) : B1 × 9, B2, B3 rouges.
+- Bancs touchés, verts : `exemple-accueil` (52 OK, 390 + 1512 clair), `mode-exemple` (116 OK).
+- Audits verts : `traduction` (45 ; `BandeauExemple`/`CadreExemple` ajoutés aux écrans migrés),
+  `tdz`, `csp`, `mode-exemple`, `quoi-de-neuf`, `textes-courts`, `violet`, `boutons`.
+- **Captures regardées** (390 et 1512, clair et sombre) : bandeau au téléphone (phrase + « Créer mon
+  compte », lien dessous), à l'ordinateur (étiquette EXEMPLE, phrase, gestes à gauche de l'île), la
+  languette (haut gauche au téléphone, bas centre à l'ordinateur), le cadre hachuré, la loupe ouverte
+  (languette au-dessus), la fiche d'un colis à retirer, l'écran de connexion après « Me connecter ».
+- Le banc attend la fin de l'écran de démarrage (`#vrm-demarrage`, z 2147483000) sur une condition :
+  sans cela, « rien ne couvre » jugeait le chargement (machine chargée : 4 s).
+
+## Limite connue
+- Dans la fiche d'un colis (« Une seule fiche partout »), le code est écrit DANS la phrase du haut
+  (« Colis à retirer · 582913 ») : pas d'élément propre, donc pas de marque « exemple » à côté. Le cadre
+  et la languette restent au-dessus de la fiche.
 
 ## Restes
 - **Les photos** (§1) : bloquées par le réseau. Geste de Julien : ouvrir les hôtes, puis une
