@@ -33,7 +33,7 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'dossier-litige-echanges', date: '2026-11-14', titre: 'Dossier de litige avec les échanges', phrase: 'Photos, suivi, messages et dates de la vente dans un PDF.', tab: 'litiges', pour: 'tous', mode: 'tous' },
   { id: 'code-ouverture', date: '2026-11-14', titre: 'Code à 4 chiffres à l’ouverture', phrase: 'Gardé sur ton téléphone uniquement, redemandé après quelques minutes.', tab: 'settings', pour: 'tous', mode: 'tous' },
   { id: 'apercu-annonce', date: '2026-11-14', titre: 'Aperçu de l’annonce avant Créer sur Vinted', phrase: 'Telle que l’acheteur la verra, dessinée ici, rien envoyé.', tab: 'annonces', pour: 'tous', mode: 'tous' },
-  { id: 'inventaire-tournant', date: '2026-11-14', titre: 'Chaque jour, 10 N° à vérifier', phrase: 'Vu ou pas trouvé : aucun numéro changé, rien supprimé.', tab: 'stockvinted', pour: 'tous', mode: 'tous' },
+  { id: 'inventaire-tournant', date: '2026-11-14', titre: 'Chaque jour, 10 N° à vérifier', phrase: 'Vu ou pas trouvé : aucun numéro changé, rien supprimé.', tab: 'garage', pour: 'tous', mode: 'tous' },
   { id: 'carte-merci', date: '2026-11-14', titre: 'Carte de remerciement à glisser dans le colis', phrase: 'À ton nom, quatre par page, sans rien de l’acheteur.', tab: 'settings', pour: 'tous', mode: 'tous' },
   { id: 'design-passe-reglages', date: '2026-11-14', titre: 'Paramètres et Notifications plus simples', phrase: 'Choix en un toucher, cartes sans cadre, plus de barre vide.', tab: 'settings', pour: 'tous', mode: 'tous' },
   { id: 'design-passe-autres-ecrans', date: '2026-11-14', titre: 'E-mails, Achats et Leboncoin plus nets', phrase: 'Mêmes cartes, mêmes boutons, un seul N° par ligne de recherche.', tab: 'achats', pour: 'tous', mode: 'tous' },
