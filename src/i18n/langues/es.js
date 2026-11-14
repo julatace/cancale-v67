@@ -12,12 +12,13 @@ import ecran_stats from './es/stats.js';
 import ecran_compta from './es/compta.js';
 import ecran_listes from './es/listes.js';
 import ecran_refonte_ms from './es/refonte-ms.js';
+import ecran_argent from './es/argent.js';
 import ecran_fiche from './es/fiche.js';
+import ecran_ergonomie from './es/ergonomie.js';
 import ecran_tarifs from './es/tarifs.js';
 import ecran_nouveaux from './es/nouveaux.js';
 import ecran_plus from './es/plus.js';
 import ecran_plateformes from './es/plateformes.js';
-import ecran_argent from './es/argent.js';
 import ecran_colisplus from './es/colisplus.js';   // (14 nov., lot colis-plus)
 import ecran_accueilReste from './es/accueilReste.js';
 import ecran_fraiscarte from './es/fraiscarte.js';   // (14 nov., frais-carte)
@@ -27,13 +28,14 @@ import ecran_rechliste from './es/rechliste.js';
 export default {
   ...ecran_accueilReste,
   ...ecran_refonte_ms,
+  ...ecran_listes,
   ...ecran_fiche,
+  ...ecran_ergonomie,
   ...ecran_fraiscarte,
   ...ecran_tarifs,
   ...ecran_nouveaux,
   ...ecran_atelier,
   ...ecran_rechliste,
-  ...ecran_listes,
   ...ecran_plus,
   ...ecran_argentprix,
   ...ecran_plateformes,
