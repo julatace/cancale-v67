@@ -84,12 +84,14 @@ vérifié par un contrôle qui EXÉCUTE la règle, chaque contrôle est prouvé 
 - `scripts/bancs/idees-paires.cjs` (harnais esbuild, vrais composants, données inventées), 390 px tactile
   et 1512 px, clair et sombre : ligne de temps, N° en double, autre taille, « Je numérote moi-même »,
   meilleure heure, lecture partielle ; rien ne déborde, cibles ≥ 44 px, ni violet ni rouge, aucune clé de
-  traduction brute à l'écran. Rouge sur `main` et sur trois mutations (prix sous l'achat… retiré depuis ;
-  date Vinted d'une jumelle ; couverture absente). Captures regardées.
+  traduction brute à l'écran. Rouge sur `main` et sur quatre mutations (garde du N° en double retirée ;
+  date Vinted d'une jumelle ; couverture absente ; « Je numérote moi-même » ignoré). Captures regardées
+  (390 et 1512, clair et sombre).
 - Audits relancés verts : traduction, tdz, variables, coherence, identite, violet, rouge-doublon,
   quoi-de-neuf, numero-ecrit, numero-etiquette, numero-vinted, numeros-clenum, numeros-lettres,
   numeros-vestiaire, numerotation-lecteurs, annonces-a-completer, annonces-outils, annonce-vinted,
-  stats-ventes, fiche-modif, republier-programme, recherche-fiche, fournisseurs. `npm run build` vert.
+  stats-ventes, fiche-modif, republier-programme, recherche-fiche, fournisseurs. `npm run build` vert
+  (après un vrai `git merge origin/main`).
   (`politique-hotes` et `stockage-sur` sont rouges sur `main` pour d'autres fichiers ; aucun fichier de
   ce lot n'y est cité.)
 
