@@ -1403,7 +1403,7 @@ async function exporterMesDonnees() {
     const zip = zipStocke([...fichiersExport(feuillesExport(src)), ...complet]);
     telechargerFichier(new Blob([zip], { type: 'application/zip' }), nomExport(), 'application/zip');
     // Une partie pas lue : le zip part quand même (tes tableaux, et INCOMPLET.txt), et l'échec le DIT, avec « Réessayer ».
-    if (!tout.ok) acc.echec({ raison: tr('acc.export.donnees.incomplet') }, { reessayer: () => exporterMesDonnees() });
+    if (!tout.ok) acc.echec({ acc: 'reseau', raison: tr('acc.export.donnees.incomplet') }, { reessayer: () => exporterMesDonnees() });
     else acc.fini({ nom: nomExport() });
   } catch (e) { acc.echec(e, { reessayer: () => exporterMesDonnees() }); }
 }

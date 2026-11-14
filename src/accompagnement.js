@@ -407,6 +407,8 @@ export function phraseTechnique(t) {
 }
 export function raisonEchec(x, { enLigne = (typeof navigator !== 'undefined' ? navigator.onLine !== false : true) } = {}) {
   if (x && typeof x === 'object' && x.horsLigne) return 'horsligne';
+  // L'écran connaît déjà la raison : `{ acc: 'reseau', raison }` (une des RAISONS_ACC) la donne telle quelle.
+  if (x && typeof x === 'object' && RAISONS_ACC.includes(x.acc)) return x.acc;
   if (!enLigne) return 'horsligne';
   const st = x && typeof x === 'object' ? Number(x.status || x.statut || x.code) : NaN;
   const t = texteDe(x);

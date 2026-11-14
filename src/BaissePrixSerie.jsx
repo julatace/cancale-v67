@@ -242,7 +242,7 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
             <button type="button" className="vrm-ao-second" data-bp-arreter="" disabled={arretDemande} onClick={() => { arret.current = true; setArretDemande(true); }}>Arrêter</button>
           </div>
         ) : phase === 'fini' && programme ? (
-          <div className="vrm-bp-bas is-fini" data-bp-programme={programme.n}>
+          <div className="vrm-bp-bas is-fini" data-bp-programme={programme.n} data-acc-apres={geste}>
             <p className="vrm-bp-progres" role="status">{programme.n} baisse{programme.n > 1 ? 's' : ''} prévue{programme.n > 1 ? 's' : ''} entre {heureFr(programme.de)} et {heureFr(programme.a)}. Garde vinted.fr ouvert.</p>
             <div className="vrm-bp-boutons">
               {onAnnulerProgramme ? <button type="button" className="vrm-ao-second" data-bp-annuler-programme="" onClick={async () => { let r = null; try { r = await onAnnulerProgramme(); } catch (_) { r = null; } if (r && r.accepte) { setProgramme(null); setEtats(Object.fromEntries(Object.keys(etats).map((k) => [k, { etat: 'pas-envoye', raison: 'Annulée par toi' }]))); } }}>Annuler</button> : null}
@@ -268,7 +268,7 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
           </div>
         ) : (
           <div className="vrm-bp-bas">
-            {choisies.length && !etale ? <AccAvant geste={geste} vars={{ n: choisies.length }}/> : null}
+            {choisies.length ? <AccAvant geste={geste} vars={{ n: choisies.length }}/> : null}
             <button type="button" className="vrm-ao-principal" data-bp-lancer={choisies.length} disabled={!baisse.ok || !choisies.length || !!extRaison} onClick={demanderConfirmation}>
               {choisies.length ? (etale ? `Programmer ${choisies.length} baisse${choisies.length > 1 ? 's' : ''}` : `Baisser ${choisies.length} prix`) : 'Coche au moins une annonce'}
             </button>

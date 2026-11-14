@@ -300,6 +300,9 @@ async function ouvrirBaisse(o) {
   await toucher(o.pg, '[data-qd-baisser]');
   await o.pg.waitForSelector('[data-baisse-serie]', { timeout: 15000 });
   await o.pg.locator('[data-bp-varier]').uncheck().catch(() => {});
+  // « Maintenant » (pas « dans les 24 h ») : la baisse part tout de suite, une commande à la fois.
+  if (await o.pg.locator('[data-bp-quand="maintenant"]').count()) await o.pg.locator('[data-bp-quand="maintenant"]').first().click();
+  await o.pg.waitForTimeout(200);
 }
 action('prix.baisser', async (nav) => {
   const o = await ouvrir(nav, { url: '/?tab=journee' });
@@ -331,7 +334,7 @@ action('export.donnees', async (nav) => {
   // La lecture serveur de « toutes tes données » (`/api/compte?mode=mes-donnees`) : TENUE (pendant), servie (après),
   // coupée par le réseau (échec : le zip part quand même, l'échec le dit).
   let mode = 'tenir', lacher = null; const tenue = new Promise((ok) => { lacher = ok; });
-  const servie = (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, morceaux: [{ nom: 'banc.txt', texte: 'banc' }] }) });
+  const servie = (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, fini: true, morceaux: [{ nom: 'banc.txt', texte: 'banc' }] }) });
   const panne = (u) => (/mode=mes-donnees/.test(u) ? (mode === 'couper' ? (r) => r.abort('internetdisconnected') : mode === 'tenir' ? (r) => tenue.then(() => servie(r)) : servie) : null);
   const o = await ouvrir(nav, { url: '/?tab=settings', panne });
   try {
