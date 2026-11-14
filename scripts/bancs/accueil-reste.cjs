@@ -176,7 +176,7 @@ async function scenarioA(nav, W, sombre, suffixe) {
   dit(vu, `A1 ${suffixe} « Tes N° sont déjà sur tes cartons ? » est posée`);
   dit(!Object.keys(numeros(base)).length && !(ligneMain(base).vinted_used_numeros || []).length, `A2 ${suffixe} AUCUN N° neuf donné tant qu’elle n’a pas répondu`, numeros(base));
   if (vu) {
-    const etat = await pg.evaluate(() => { const c = document.querySelector('[data-cartons]'); const d = c.querySelector('[data-cartons-doublon="12"]'); const lus = [...c.querySelectorAll('[data-cartons-lu]')].map((x) => [x.getAttribute('data-cartons-lu'), x.getAttribute('data-cartons-num')]); return { n: c.getAttribute('data-cartons-a-adopter'), doublon: !!d, rouge: d ? getComputedStyle(d.closest('.vrm-ar-doublons')).color : '', lus }; });
+    const etat = await pg.evaluate(() => { const c = document.querySelector('[data-cartons]'); const d = c.querySelector('[data-cartons-doublon="12"]'); const lus = [...c.querySelectorAll('[data-cartons-lu]')].map((x) => [x.getAttribute('data-cartons-lu'), x.getAttribute('data-cartons-num')]); return { n: c.getAttribute('data-cartons-a-adopter'), doublon: !!d, rouge: d ? getComputedStyle(d.closest('.vrm-ar-double')).color : '', lus }; });
     dit(etat.n === '4' && JSON.stringify(etat.lus) === JSON.stringify([['9003', '4'], ['9004', '5'], ['9005', '9'], ['9008', '15']]), `A3 ${suffixe} les N° lus, chacun sur SON annonce (12 exclu)`, etat);
     dit(etat.doublon && /rgb\((2[0-5]\d|1[5-9]\d), \d{1,3}, \d{1,3}/.test(etat.rouge), `A4 ${suffixe} N° 12 sur deux annonces : en ROUGE`, etat.rouge);
     if (tel) dit(!(await ciblesPetites(pg)).length, `A5 ${suffixe} cibles ≥ 44 px`, await ciblesPetites(pg));

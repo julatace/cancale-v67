@@ -19,16 +19,16 @@
 .vrm-ar-carte-liste .vrm-ar-note { padding: 0 16px; }
 
 /* Les N° lus (134) : une rangée par annonce, le N° en pastille d'encre. */
-.vrm-ar-liste, .vrm-ar-doublons, .vrm-ar-rangs { list-style: none; margin: 0; padding: 0; }
-.vrm-ar-liste li, .vrm-ar-doublons li { display: flex; align-items: center; gap: 12px; min-height: 44px; border-top: .5px solid var(--d-filet, rgba(60,60,67,.18)); }
+.vrm-ar-liste, .vrm-ar-double, .vrm-ar-rangs { list-style: none; margin: 0; padding: 0; }
+.vrm-ar-liste li, .vrm-ar-double li { display: flex; align-items: center; gap: 12px; min-height: 44px; border-top: .5px solid var(--d-filet, rgba(60,60,67,.18)); }
 .vrm-ar-liste li:first-child { border-top: 0; }
 .vrm-ar-num { flex: none; min-width: 56px; font-size: var(--d-t-17, 17px); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
 .vrm-ar-quoi { flex: 1; min-width: 0; font-size: var(--d-t-15, 15px); color: var(--d-gris, #6e6e73); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* ROUGE : deux annonces sous le même N° (le seul rouge justifié, §7). */
-.vrm-ar-doublons { margin: 0 0 var(--d-e-3, 12px); padding: 4px 12px; border-radius: var(--d-r-case, 12px); border: 1px solid var(--vrm-doublon, #D70015); color: var(--vrm-doublon, #D70015); }
-.vrm-ar-doublons li { border-top: 0; font-size: var(--d-t-15, 15px); font-weight: 600; }
+.vrm-ar-double { margin: 0 0 var(--d-e-3, 12px); padding: 4px 12px; border-radius: var(--d-r-case, 12px); border: 1px solid var(--vrm-doublon, #D70015); color: var(--vrm-doublon, #D70015); }
+.vrm-ar-double li { border-top: 0; font-size: var(--d-t-15, 15px); font-weight: 600; }
 .vrm-ar-num.is-double { color: var(--vrm-doublon, #D70015); }
-:root[data-theme="dark"] .vrm-ar-doublons, :root[data-theme="dark"] .vrm-ar-num.is-double { --vrm-doublon: #FF6961; }
+:root[data-theme="dark"] .vrm-ar-double, :root[data-theme="dark"] .vrm-ar-num.is-double { --vrm-doublon: #FF6961; }
 .vrm-ar-plus { margin-top: 4px; }
 .vrm-ar-gestes { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: var(--d-e-4, 16px); }
 .vrm-ar-carte-liste .vrm-ar-gestes { padding: 0 16px; margin-top: var(--d-e-2, 8px); }
