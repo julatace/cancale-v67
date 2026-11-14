@@ -50,6 +50,10 @@ function Segment({ label, options, value, onChange, disabled, attr }) {
 export default function PageFavoris(p) {
   useLangue();
   const [recapOuvert, setRecapOuvert] = React.useState(false);
+  // (5.376, Julien 14 nov. : « il ne doit pas se sentir seul ») le guide en 3 temps : ouvert
+  // tout seul la première fois (ce navigateur seulement, une commodité), puis derrière « ? ».
+  const [guide, setGuide] = React.useState(() => { try { return localStorage.getItem('vrm_favoris_guide_vu') !== '1'; } catch (_) { return false; } });
+  const fermerGuide = () => { setGuide(false); try { localStorage.setItem('vrm_favoris_guide_vu', '1'); } catch (_) {} };
   const { choix, recap, PhotoVinted } = p;
   const verrou = p.fileActive || p.occupe;
   const peutOuvrir = choix.ids.length > 0 && !p.erreurMessage && !p.erreurRythme && !verrou && p.reglagesPrets;
@@ -69,6 +73,7 @@ export default function PageFavoris(p) {
       <p>{p.nomCompte ? tr('favoris.sousTitreCompte', { compte: p.nomCompte }) : tr('favoris.sousTitre')}</p>
     </div>
     {!p.sansCompte && <div className="vrm-fc-ronds">
+      <button type="button" className="vrm-fc-rond vrm-fc-rond-aide" aria-label={tr('favoris.guide.bouton')} title={tr('favoris.guide.bouton')} aria-expanded={guide ? 'true' : 'false'} data-fav-guide-bouton onClick={() => (guide ? fermerGuide() : setGuide(true))}>?</button>
       <button type="button" className="vrm-fc-rond" aria-label={tr('favoris.actualiser')} title={tr('favoris.actualiser')} data-fav-actualiser onClick={p.actualiser} disabled={p.lectureEnCours || verrou}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={p.lectureEnCours ? 'is-tourne' : ''}><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5" /></svg></button>
       <button type="button" className="vrm-fc-rond" aria-label={tr('favoris.outils')} title={tr('favoris.outils')} data-favoris-ouvrir onClick={p.ouvrirOutils}><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg></button>
     </div>}
@@ -199,9 +204,21 @@ export default function PageFavoris(p) {
     </div>
   </div>;
 
+  const guideBloc = guide && <section className="vrm-fc-guide vrm-fu-blanc" data-fav-guide aria-label={tr('favoris.guide.titre')}>
+    <h3>{tr('favoris.guide.titre')}</h3>
+    <ol>
+      <li><span aria-hidden="true">1</span>{tr('favoris.guide.qui')}</li>
+      <li><span aria-hidden="true">2</span>{tr('favoris.guide.quoi')}</li>
+      <li><span aria-hidden="true">3</span>{tr('favoris.guide.quand')}</li>
+    </ol>
+    <p className="vrm-fc-guide-carte" data-fav-guide-carte>{tr('favoris.guide.carte')}</p>
+    <button type="button" className="vrm-fc-bouton" data-fav-guide-compris onClick={fermerGuide}>{tr('favoris.guide.compris')}</button>
+  </section>;
+
   return <div className="vrm-fc" data-fc-page>
     {tete}
     {p.alertes}
+    {guideBloc}
     {p.sansVente || null}{qui}{quoi}{quand}{histo}
     {pied}
     {feuille && (typeof document !== 'undefined' ? createPortal(feuille, document.body) : feuille)}

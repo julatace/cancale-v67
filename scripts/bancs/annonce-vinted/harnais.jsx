@@ -29,6 +29,7 @@ window.__envois = [];
 const envoyer = async (p) => {
   window.__envois.push(JSON.parse(JSON.stringify(p)));
   await new Promise((r) => setTimeout(r, 400));
+  if (/refus/.test(location.hash)) return { accepte: false, code: 'refuse', raison: 'Vinted demande une photo plus nette' };   // (5.376) un refus dit sur la ligne
   if (!p.reponses.catalog_id) return { accepte: false, code: 'question', question: { champ: 'catalog_id', nom: 'la catégorie', options: OPTIONS, num: p.fiche.numero, texte: '' } };
   return { accepte: true, etape: 'fait', draftId: '88001', lie: true, aFinir: ['la taille du colis'] };
 };
