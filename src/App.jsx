@@ -450,6 +450,7 @@ import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLie
 import { lignesFraicheur, quandRelu } from './fraicheurComptes.js';
 import { FRAICHEUR_ACHATS_J } from './fraicheur.js';   // (9 nov., lot AG) le seuil des achats vit avec la ligne de fraîcheur unique
 import { ventesEmailFraiches, avecVentesEmail, requeteVentesEmail, gesteVenteEmail, STATUT_VENTE_EMAIL, groupesVentesEmailEnTete, statutVentesEmail } from './venteEmailFraiche.js';
+import { TAMPONS as TAMPONS_IMPR } from './impression/thermique.js';   // (14 nov.) le tampon par bordereau dans « Tout imprimer »
 import { CLE_IMPRESSION, reglageImpression, papierThermique, placementEtiquette, contenuTampon, carteEncre, boiteEncre, decouperFeuille, fusionnerProches, moduleDuCode, moduleImprimeMm, codeAssezGros, seuillerNoir, tramerNoir, zonesAdresse, CONTRASTES, MODULE_MIN_MM, BANDE_CONTINU_MM } from './impression/thermique.js';
 import { decisionNumeroVenteEmail, numeroEcritDansArticle, colisVentesEmail, MENTION_SANS_NUM, CLE_IMPRIMES_SANS_NUM, phraseImprimeSansNumero } from './bordereauVenteEmail.js';
 import { premiereCaseLibre as premiereCaseMeubles, achatsArrives, notifsOuRanger, caseEnMots } from './ouRanger.js';
@@ -14071,7 +14072,11 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
       // ne SAIT pas où elle est, la page part ENTIÈRE — jamais un code-barres
       // coupé au hasard (`poserBordereau`, la même règle partout).
       // La position mémorisée de la forme de CE bordereau (`positionTampon`), sinon le choix automatique.
-      const r1 = await poserBordereau(PL, out, src, { numero: it.numero, title: it.title, pos, thermique, impression: extrasImpression(it.numero, it.title, { photo: it.photo || (it.ligne && it.ligne.photo) || null }), choisir: choisirTampon({ PL, src, numero: it.numero, titre: it.title, apercu: opts.apercu === undefined ? false : opts.apercu, deja: dejaLot, thermique }) });
+      // (14 nov., Julien : « modifier un par un chaque bordereau avec le tamponnage ») le tampon choisi pour CE
+      // bordereau dans l'aperçu (`it.tampon` : N° seul, N° + titre, + taille, rien) remplace le réglage, pour lui seul.
+      const impIt = extrasImpression(it.numero, it.title, { photo: it.photo || (it.ligne && it.ligne.photo) || null });
+      if (it.tampon && TAMPONS_IMPR.includes(it.tampon)) { const rg0 = reglageImpressionChoisi(); impIt.reg = { ...rg0, tamponA4: it.tampon, tamponTh: it.tampon }; }
+      const r1 = await poserBordereau(PL, out, src, { numero: it.numero, title: it.title, pos, thermique, impression: impIt, choisir: it.tampon === 'rien' ? null : choisirTampon({ PL, src, numero: it.numero, titre: it.title, apercu: opts.apercu === undefined ? false : opts.apercu, deja: dejaLot, thermique }) });
       for (const t of r1.tampons || []) { if (t === 'fiche') fiches++; else if (t === 'bande') bandes++; }
       details.push(...(r1.details || []));
       if (r1.isole) { isoles++; nEtiquettes += r1.etiquettes; }
@@ -42884,6 +42889,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // échec se relance seul (« Réessayer les échecs »).
   const VENTE_LOT_MAX_J = 14;
   const [lot, setLot] = useState(null);   // null · { coches: Set(cle), echecs: [cle] }
+  // (14 nov.) Le tampon choisi pour chaque bordereau dans l’aperçu de « Tout imprimer » (lu par `batchBordereaux`).
+  const tamponsLotRef = React.useRef({}); tamponsLotRef.current = (lot && lot.tampons) || {};
   const ageVenteJ = (o) => { const t = Date.parse(o && o.date); return Number.isFinite(t) ? (Date.now() - t) / 864e5 : null; };
   const lignesLot = () => expeditions()
     .filter(e => ((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn])) && !(e.o && isShipDone(e.o)))
@@ -43523,7 +43530,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (!buf) { echecs.push(l.cle); continue; }   // pas d'octets : on saute, on n'imprime pas du vide — et on le DIT après
         faits.push(l.cle);
         // Numéro et titre : même dérivation que la carte (identité, jamais le titre — §5).
-        items.push({ numero: l.num || '', title: l.titre || '', pdfBuf: buf, invBytes, cle: l.cle, site: l.site, ligne: l });
+        items.push({ numero: l.num || '', title: l.titre || '', pdfBuf: buf, invBytes, cle: l.cle, site: l.site, ligne: l, tampon: (tamponsLotRef.current || {})[l.cle] || null });
       }
       verifierContexte();
       if (!items.length) { finSuiviB(''); if(choisis&&(AUTH.user?.id||null)===proprietaire)setLot(x=>x?{...x,coches:new Set(echecs),echecs}:x); libererOngletPdf(); toast(pasLus ? "La base n'a pas répondu — réessaie dans un instant." : (sansLignes.length ? texteSansBordereau(sansLignes) + '.' : "Ces bordereaux n'ont plus leur PDF — retélécharge-les depuis les ventes sur Vinted.")); setBatchBusy(false); return; }
@@ -43547,7 +43554,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       (r.rates || []).forEach(i => echecs.push(items[i].cle));
       const reussiesVinted = (r.reussis || []).filter(i => items[i].site === 'vinted').map(i => items[i].cle);
       const differe = parcours && !echecs.length && choisis;
-      if (differe && (AUTH.user?.id||null)===proprietaire) setLot(x => x ? { ...x, fait: { n: imprimes, url: r.url, nom: r.filename, vinted: reussiesVinted, vestiaire: (r.reussis || []).filter(i => items[i].site === 'vestiaire').map(i => items[i].ligne.v.id) } } : x);
+      if (differe && (AUTH.user?.id||null)===proprietaire) setLot(x => x ? { ...x, fait: { planche: r.planche || null, n: imprimes, url: r.url, nom: r.filename, vinted: reussiesVinted, vestiaire: (r.reussis || []).filter(i => items[i].site === 'vestiaire').map(i => items[i].ligne.v.id) } } : x);
       if (!differe && reussiesVinted.length) setBordsPrinted(prev => { const u = { ...prev }; const at = new Date().toISOString(); reussiesVinted.forEach(k => { u[k] = at; }); save('vinted_bords_printed', u); return u; });
       noterImprimeSansNum((r.reussis || []).filter(i => items[i].site === 'vinted' && !String(items[i].numero || '').trim()).map(i => items[i].ligne && items[i].ligne.e && items[i].ligne.e.txn));
       if (!differe) (r.reussis || []).filter(i => items[i].site === 'vestiaire').forEach(i => { try { marquerVc('vrm_vc_imprimes', items[i].ligne.v.id, true); } catch (_) {} });
@@ -51022,18 +51029,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {/* 2 · L'APERÇU : une page A4 par colis coché — l'étiquette du transporteur, le tampon N° + titre en bas. */}
                         {/* (11 nov., lot thermique) Le papier et le tampon CHOISIS (Paramètres → Impression des bordereaux,
                             `vrm_impression`) : l'aperçu dit ce qui sortira, et « Changer » y mène. */}
-                        {choisis.length > 0 && (()=>{ const pl4 = imprimanteChoisie() === 'planche4', th = imprimanteChoisie() === 'thermique' || pl4, rg = reglageImpressionChoisi(), pp = papierThermique(rg), mt = th ? rg.tamponTh : rg.tamponA4;
+                        {choisis.length > 0 && (()=>{ const pl4 = imprMode(imprimante) === 'planche4', th = imprMode(imprimante) === 'thermique' || pl4, rg = reglageImpressionChoisi(), pp = papierThermique(rg), mt = th ? rg.tamponTh : rg.tamponA4;
+                          // (14 nov., Julien : « laisse la possibilité de sélectionner imprimante classique ou thermique ») le choix,
+                          // visible AU MOMENT d'imprimer : le même réglage `vrm_imprimante` que Réglages (mémorisé, jamais deviné).
+                          const tampons = lot.tampons || {};
+                          const poserTampon = (cle, m) => setLot((x) => x ? { ...x, tampons: { ...(x.tampons || {}), [cle]: m } } : x);
                           const papierLot = th ? (pp.id === 'autre' ? pp.nom : tr(`impression.format.${pp.id}`)) : 'A4';
                           // (14 nov., lot colis-plus 98) 4 par page : au plus ⌈n/4⌉ feuilles (une page pas découpable part seule).
                           return <section className="vrm-tip-groupe" data-lot-section="apercu" data-lot-papier={pl4 ? 'planche4' : th ? rg.format : 'a4'} data-lot-tampon={mt} aria-label={tr('impression.lot.apercu')}>
                           <h3>{tr('impression.lot.apercu')} <span>{pl4 ? tr('cp.planche.lotPages', { n: Math.ceil(choisis.length / 4) }) : tr('impression.lot.pages', { n: choisis.length, papier: papierLot })}</span></h3>
+                          <div className="vrm-cp-imprimante" data-lot-imprimante={imprMode(imprimante)}>
+                            <Segmente label={tr('cp.lot.imprimante')} plein value={imprMode(imprimante)} onChange={(v)=>{ if (!batchBusy) choisirImprimante(v); }}
+                              options={IMPR_MODES.map((v) => ({ v, l: v === 'thermique' ? tr('cp.lot.thermique') : v === 'planche4' ? tr('cp.planche.choix') : tr('cp.lot.classique'), data: { 'data-lot-imprimante-choix': v } }))}/>
+                          </div>
                           <button type="button" className="vrm-tip-lien" data-lot-reglage-impression="" disabled={batchBusy} onClick={()=>{ setLot(null); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=settings&reglage=imprimante' })); } catch (_) {} }}>{tr('impression.lot.changer')}</button>
                           <div className="vrm-tip-pages">
-                            {choisis.slice(0, 8).map((l) => { const c = contenuTampon(mt, { numero: l.num || '', titre: l.titre || '' }); return <figure key={l.cle} className="vrm-tip-a4" data-lot-apercu={l.cle}>
+                            {choisis.map((l) => { const m = TAMPONS_IMPR.includes(tampons[l.cle]) ? tampons[l.cle] : mt; const c = contenuTampon(m, { numero: l.num || '', titre: l.titre || '' }); return <div key={l.cle} className="vrm-cp-apercu" data-lot-apercu-carte={l.cle}><figure className="vrm-tip-a4" data-lot-apercu={l.cle} data-lot-apercu-tampon={m}>
                               <span className="vrm-tip-a4-etiquette">{logo(l)}<i/><i/><i/></span>
-                              <figcaption className="vrm-tip-a4-tampon">{mt === 'rien' ? <b>{tr('impression.lot.sansTampon')}</b> : <><b>{l.num ? `N° ${l.num}` : 'sans N°'}</b>{c.titre ? <span>{c.titre}</span> : null}</>}</figcaption>
-                            </figure>; })}
-                            {choisis.length > 8 ? <span className="vrm-tip-plus">+{choisis.length - 8}</span> : null}
+                              <figcaption className="vrm-tip-a4-tampon">{m === 'rien' ? <b>{tr('impression.lot.sansTampon')}</b> : <><b>{l.num ? `N° ${l.num}` : 'sans N°'}</b>{c.titre ? <span>{c.titre}</span> : null}</>}</figcaption>
+                              </figure>
+                              {/* (14 nov.) CE bordereau : son tampon (ou aucun), ou le retirer du lot — avant d'imprimer. */}
+                              <select className="vrm-cp-tampon" aria-label={tr('cp.lot.tamponDe', { qui: l.num ? `N°${l.num}` : (l.titre || '') })} data-lot-tampon-choix={l.cle} value={m} disabled={batchBusy} onChange={(e)=>poserTampon(l.cle, e.target.value)}>
+                                {TAMPONS_IMPR.map((t) => <option key={t} value={t}>{tr(`impression.tampon.${t}`)}</option>)}
+                              </select>
+                              <button type="button" className="vrm-tip-lien vrm-cp-retirer" data-lot-retirer={l.cle} disabled={batchBusy} onClick={()=>basculer(l.cle)}>{tr('cp.lot.retirer')}</button>
+                            </div>; })}
                           </div>
                         </section>; })()}
                         <div className="vrm-lot-pied vrm-tip-pied">
@@ -51046,6 +51066,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {fait && !fait.confirme && <div className="vrm-tip-temps vrm-tip-fin" key="imprime" data-lot-question="">
                         <ol className="vrm-tip-pas" aria-label="Étapes"><li className="is-fait">Choisir</li><li className="is-la">Imprimer</li><li>Déposer</li></ol>
                         <p className="vrm-tip-grand"><b>{fait.n}</b> bordereau{fait.n>1?'x':''} dans le PDF.</p>
+                        {fait.planche ? <p className="vrm-tip-sous" data-planche-resultat={`${fait.planche.etiquettes}/${fait.planche.feuilles}/${fait.planche.echelle}`}>{tr('cp.planche.resultat', { etiquettes: fait.planche.etiquettes, feuilles: fait.planche.feuilles, echelle: fait.planche.echelle })}{fait.planche.entieres ? <> {tr('cp.planche.entieres', { n: fait.planche.entieres })}</> : null}</p> : null}
                         {fait.url ? <a className="vrm-tip-lien vrm-tip-pdf" data-lot-ouvrir-pdf="" href={fait.url} target="_blank" rel="noopener">Ouvrir le PDF</a> : null}
                         <div className="vrm-tip-pied">
                           <Bouton variante="secondaire" data-lot-pas-imprime="" onClick={()=>setLot((x)=>x?{...x,fait:null}:x)}>Pas encore</Bouton>

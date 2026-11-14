@@ -52,3 +52,13 @@
 .vrm-cp-temps details { margin-top: 8px; font-size: var(--d-t-13, 13px); color: var(--d-gris, var(--vrm-muted, #6E6E73)); }
 .vrm-cp-temps summary { cursor: pointer; min-height: 44px; display: inline-flex; align-items: center; color: var(--d-accent-texte, #0066CC); font-weight: 600; }
 .vrm-cp-temps-vide { margin: 0; font-size: var(--d-t-13, 13px); color: var(--d-gris, var(--vrm-muted, #6E6E73)); }
+
+/* (14 nov., Julien : « modifier un par un chaque bordereau avec le tamponnage ») « Tout imprimer » :
+   l'imprimante choisie au moment d'imprimer, et sous chaque aperçu SON tampon et « Retirer du lot ». */
+.vrm-cp-imprimante { padding: 4px 14px 2px; }
+.vrm-cp-apercu { flex: none; width: 132px; display: flex; flex-direction: column; gap: 6px; scroll-snap-align: start; }
+.vrm-cp-apercu .vrm-tip-a4 { width: 100%; }
+.vrm-cp-tampon { width: 100%; min-height: 44px; border-radius: var(--d-r-ctrl, 10px); border: 0; padding: 0 8px;
+  background: var(--d-remplir, rgba(120,120,128,.12)); color: var(--d-encre, var(--vrm-ink, #1D1D1F)); font: 400 var(--d-t-13, 13px) var(--vrm-police, inherit); }
+.vrm-cp-tampon:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 2px; }
+.vrm-cp-retirer { min-height: 44px; font-size: var(--d-t-13, 13px); }

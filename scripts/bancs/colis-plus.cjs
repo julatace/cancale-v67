@@ -151,7 +151,8 @@ const deborde = (pg, racine) => pg.evaluate((r) => { const s = document.querySel
 const petites = (pg, racine) => pg.evaluate((r) => [...document.querySelectorAll(`${r} button, ${r} a, ${r} summary`)].filter((e) => e.getBoundingClientRect().width > 0 && !e.disabled).map((e) => ({ q: (e.getAttribute('aria-label') || e.textContent || '').trim().slice(0, 24), h: Math.round(e.getBoundingClientRect().height) })).filter((x) => x.h < 44), racine);
 
 // ── A · 98 : 4 bordereaux par page A4 ─────────────────────────────────────────
-async function lot(b, nom, vue, LIGNES) {
+async function lot(b, nom, vue, LIGNES) { try { return await lotBrut(b, nom, vue, LIGNES); } catch (e) { dit(false, `${nom} : A le lot s’exécute`, String(e.message).slice(0, 200)); } }
+async function lotBrut(b, nom, vue, LIGNES) {
   console.log(`\n— A. 4 par page A4 · ${nom}`);
   const { ctx, pg, errs, consoleErrs } = await ouvrir(b, vue, LIGNES, { imprimante: process.env.CP_IMPR || 'planche4' });
   try {
@@ -160,13 +161,21 @@ async function lot(b, nom, vue, LIGNES) {
     if (!btn) { dit(false, `${nom} : « Tout imprimer » est là`); return; }
     await btn.click();
     await pg.waitForSelector('[data-lot-ligne]', { timeout: 8000 }).catch(() => {});
-    const ap = await pg.evaluate(() => [...document.querySelectorAll('[data-lot-ligne]')].map((e) => ({ cle: e.getAttribute('data-lot-ligne'), coche: e.getAttribute('data-coche') === '1' })));
+    const ap = await pg.evaluate(() => [...document.querySelectorAll('[data-lot-ligne]')].map((e) => ({ cle: e.getAttribute('data-lot-ligne'), num: e.getAttribute('data-lot-num'), coche: e.getAttribute('data-coche') === '1' })));
     for (const x of ap) { if (!x.coche) await pg.locator(`[data-lot-ligne="${x.cle}"] input`).first().check().catch(() => {}); }
     await pg.waitForTimeout(300);
     const papier = await pg.evaluate(() => { const s = document.querySelector('[data-lot-section="apercu"]'); return s ? { p: s.getAttribute('data-lot-papier'), t: (s.querySelector('h3 span') || {}).textContent || '' } : null; });
     dit(ap.length === 9 && papier && papier.p === 'planche4' && /\b3\b/.test(papier.t), `${nom} : A1 l'aperçu des 9 bordereaux dit « 3 feuilles A4, 4 par page »`, JSON.stringify({ n: ap.length, papier }));
+    // A8 · l'imprimante se choisit ICI, au moment d'imprimer (le réglage `vrm_imprimante`, mémorisé).
+    const choix = await pg.evaluate(() => [...document.querySelectorAll('[data-lot-imprimante-choix]')].map((e) => e.getAttribute('data-lot-imprimante-choix')));
+    await cliquer(pg, '[data-lot-imprimante-choix="thermique"]'); await pg.waitForTimeout(900);
+    const apresTh = await pg.evaluate(() => ({ seg: (document.querySelector('[data-lot-imprimante]') || {}).getAttribute && document.querySelector('[data-lot-imprimante]').getAttribute('data-lot-imprimante'), papier: (document.querySelector('[data-lot-section="apercu"]') || { getAttribute: () => null }).getAttribute('data-lot-papier'), ls: localStorage.getItem('vrm_imprimante') }));
+    await cliquer(pg, '[data-lot-imprimante-choix="planche4"]'); await pg.waitForTimeout(900);
+    const apresPl = await pg.evaluate(() => localStorage.getItem('vrm_imprimante'));
+    dit(JSON.stringify(choix) === JSON.stringify(['normale', 'thermique', 'planche4']) && apresTh.seg === 'thermique' && apresTh.papier === '10x15' && /thermique/.test(apresTh.ls || '') && /planche4/.test(apresPl || ''),
+      `${nom} : A8 « Tout imprimer » montre le choix Classique · 4 par page · Thermique, et le retient`, JSON.stringify({ choix, apresTh, apresPl }));
     await shot(pg, `${nom}-lot-apercu`);
-    await pg.click('button[data-lot-imprimer]');
+    await cliquer(pg, 'button[data-lot-imprimer]');
     for (let i = 0; i < 1000; i++) {   // (thermique : chaque étiquette est rendue par pdf.js ; jusqu’à 4 min sur une machine chargée)
       const etat = await pg.evaluate(() => {
         if (window.__pdfs && window.__pdfs.length) return 'pdf';
@@ -184,17 +193,69 @@ async function lot(b, nom, vue, LIGNES) {
     if (b64) {
       const pages = await pagesDuPdf(b64);
       const a4 = pages.every((p) => Math.abs(p.w - 595.28) < 1 && Math.abs(p.h - 841.89) < 1);
-      const ordre = pages.flatMap((p) => [...p.texte.matchAll(/ETIQUETTE (\d+)/g)].map((m) => m[1]));
-      const attendu = ap.map((x) => x.cle.replace(/^v:/, ''));
+      // L'étiquette isolée est une IMAGE noir et blanc (« noir pur », lot thermique) : on lit le TAMPON de chacune (« N° 31 »).
+      const ordre = pages.flatMap((p) => [...p.texte.matchAll(/N°\s*(\d+)/g)].map((m) => m[1]));
+      const attendu = ap.map((x) => x.num);
       dit(pages.length === 3 && a4, `${nom} : A3 9 bordereaux ⇒ 3 pages A4`, JSON.stringify(pages.map((p) => [Math.round(p.w), Math.round(p.h)])));
       dit(ordre.length === 9 && JSON.stringify(ordre) === JSON.stringify(attendu), `${nom} : A4 les 9 étiquettes, dans l'ordre de l'aperçu (4 + 4 + 1)`, JSON.stringify({ pdf: ordre, apercu: attendu }));
-      dit(pages.map((p) => (p.texte.match(/ETIQUETTE/g) || []).length).join(',') === '4,4,1', `${nom} : A5 quatre par feuille, la dernière entamée`, pages.map((p) => (p.texte.match(/ETIQUETTE/g) || []).length).join(','));
+      const parPage = pages.map((p) => (p.texte.match(/N°\s*\d+/g) || []).length).join(',');
+      dit(parPage === '4,4,1', `${nom} : A5 quatre par feuille, la dernière entamée (chacune tamponnée de SON N°)`, parPage);
     }
     await pg.waitForTimeout(500);
     const res = await pg.evaluate(() => { const e = document.querySelector('[data-planche-resultat]'); return e ? e.getAttribute('data-planche-resultat') : null; });
     dit(res && /^9\/3\/(9[0-9])$/.test(res), `${nom} : A6 le résultat dit ce qui a été posé (9 étiquettes, 3 feuilles, l'échelle)`, String(res));
     await shot(pg, `${nom}-lot-resultat`);
     dit(errs.length === 0, `${nom} : A7 aucune erreur d'app`, errs.join(' | ').slice(0, 200));
+  } finally { await ctx.close(); }
+}
+
+// ── F · Classique A4 : chaque bordereau se règle un par un (tampon, retirer) et le tampon est TOUJOURS là ──
+async function lotClassique(b, nom, vue, LIGNES) { try { return await lotClassiqueBrut(b, nom, vue, LIGNES); } catch (e) { dit(false, `${nom} : F le lot classique s’exécute`, String(e.message).slice(0, 200)); } }
+async function lotClassiqueBrut(b, nom, vue, LIGNES) {
+  console.log(`\n— F. Imprimante classique, un par un · ${nom}`);
+  const { ctx, pg, errs } = await ouvrir(b, vue, LIGNES, { imprimante: 'normale' });
+  try {
+    await pg.waitForSelector('button[data-lot-ouvrir="1"]', { timeout: 20000 }).catch(() => {});
+    if (!(await cliquer(pg, 'button[data-lot-ouvrir="1"]'))) { dit(false, `${nom} : « Tout imprimer » est là`); return; }
+    await pg.waitForSelector('[data-lot-ligne]', { timeout: 8000 }).catch(() => {});
+    const ap = await pg.evaluate(() => [...document.querySelectorAll('[data-lot-ligne]')].map((e) => ({ cle: e.getAttribute('data-lot-ligne'), num: e.getAttribute('data-lot-num'), coche: e.getAttribute('data-coche') === '1' })));
+    for (const x of ap) { if (!x.coche) await pg.locator(`[data-lot-ligne="${x.cle}"] input`).first().check().catch(() => {}); }
+    await pg.waitForTimeout(300);
+    const sansTampon = ap[1], titreTaille = ap[0], retire = ap[ap.length - 1];
+    await pg.selectOption(`[data-lot-tampon-choix="${sansTampon.cle}"]`, 'rien');
+    await pg.selectOption(`[data-lot-tampon-choix="${titreTaille.cle}"]`, 'num');
+    await cliquer(pg, `[data-lot-retirer="${retire.cle}"]`);
+    await pg.waitForTimeout(400);
+    const etat = await pg.evaluate(([a, r]) => ({ apercuA: (document.querySelector(`[data-lot-apercu="${a}"]`) || { getAttribute: () => null }).getAttribute('data-lot-apercu-tampon'), retireCoche: (document.querySelector(`[data-lot-ligne="${r}"]`) || { getAttribute: () => null }).getAttribute('data-coche'), n: (document.querySelector('[data-lot-imprimer]') || { getAttribute: () => null }).getAttribute('data-lot-imprimer'), choisi: (document.querySelector('[data-lot-imprimante]') || { getAttribute: () => null }).getAttribute('data-lot-imprimante') }), [sansTampon.cle, retire.cle]);
+    dit(etat.apercuA === 'rien' && etat.retireCoche === '0' && etat.n === String(ap.length - 1) && etat.choisi === 'normale', `${nom} : F1 dans l'aperçu, CE bordereau : « sans tampon » ; un autre retiré du lot (${ap.length - 1} restent) ; Classique choisi`, JSON.stringify(etat));
+    await shot(pg, `${nom}-lot-classique`);
+    await cliquer(pg, 'button[data-lot-imprimer]');
+    for (let i = 0; i < 600; i++) {
+      const e = await pg.evaluate(() => {
+        if (window.__pdfs && window.__pdfs.length) return 'pdf';
+        const clic = (l) => { const bs = [...document.querySelectorAll('button')].filter((x) => x.innerText.trim() === l && x.offsetParent); if (bs.length) { bs[bs.length - 1].click(); return true; } return false; };
+        if (clic("J'ai vérifié, imprimer") || clic('Préparer quand même les PDF')) return 'clic';
+        const f = document.querySelector('[data-placeur-tampon]:not([data-placeur-tampon="charge"]) [data-tampon-imprimer]'); if (f) { f.click(); return 'clic'; }
+        return 'attente';
+      });
+      if (e === 'pdf') break;
+      await pg.waitForTimeout(250);
+    }
+    const b64 = await pg.evaluate(async () => { const bl = window.__pdfs[window.__pdfs.length - 1]; if (!bl) return null; const u = new Uint8Array(await bl.arrayBuffer()); let s = ''; for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s); });
+    dit(!!b64, `${nom} : F2 UN PDF est produit`);
+    if (!b64) return;
+    const pages = await pagesDuPdf(b64);
+    // Le bordereau et, s'il n'a pas de blanc sûr, sa fiche juste après : la « zone » de chaque bordereau.
+    const zones = []; pages.forEach((p) => { const m = /ETIQUETTE (\d+)/.exec(p.texte); if (m) zones.push({ tx: m[1], t: p.texte }); else if (zones.length) zones[zones.length - 1].t += ' ' + p.texte; });
+    const txs = zones.map((z) => z.tx), attendu = ap.slice(0, -1).map((x) => x.cle.replace(/^v:/, ''));
+    dit(JSON.stringify(txs) === JSON.stringify(attendu), `${nom} : F3 le bordereau retiré n'est pas dans le PDF, les autres dans l'ordre`, JSON.stringify({ txs, attendu }));
+    const num = (tx) => (ap.find((x) => x.cle === 'v:' + tx) || {}).num;
+    const juge = zones.map((z) => ({ tx: z.tx, n: new RegExp(`N°\\s*${num(z.tx)}(\\D|$)`).test(z.t.replace(/ETIQUETTE \d+/g, '')), titre: /Nike Air Force/.test(z.t), taille: /\b42\b/.test(z.t.replace(/ETIQUETTE \d+/g, '')) }));
+    const sans = juge.find((j) => 'v:' + j.tx === sansTampon.cle), tt = juge.find((j) => 'v:' + j.tx === titreTaille.cle), autres = juge.filter((j) => j !== sans && j !== tt);
+    dit(autres.length === ap.length - 3 && autres.every((j) => j.n && j.titre), `${nom} : F4 CLASSIQUE A4 : chaque bordereau porte SON tampon (N° + titre, le réglage)`, JSON.stringify(autres.filter((j) => !j.n || !j.titre)));
+    dit(sans && !sans.n && !sans.titre, `${nom} : F5 le bordereau réglé « sans tampon » n'a ni N° ni titre`, JSON.stringify(sans));
+    dit(tt && tt.n && !tt.titre, `${nom} : F6 le bordereau réglé « N° seul » porte son N°, sans le titre`, JSON.stringify(tt));
+    dit(errs.length === 0, `${nom} : F7 aucune erreur d'app`, errs.join(' | ').slice(0, 200));
   } finally { await ctx.close(); }
 }
 
@@ -314,7 +375,8 @@ async function sansVoix(b, nom, vue, LIGNES) {
 }
 
 // ── E · 99 la douchette ──────────────────────────────────────────────────────
-async function douchette(b, nom, vue, LIGNES) {
+async function douchette(b, nom, vue, LIGNES) { try { return await douchetteBrut(b, nom, vue, LIGNES); } catch (e) { dit(false, `${nom} : E la douchette s’exécute`, String(e.message).slice(0, 200)); } }
+async function douchetteBrut(b, nom, vue, LIGNES) {
   console.log(`\n— E. La douchette · ${nom}`);
   const { ctx, pg, errs } = await ouvrir(b, vue, LIGNES);
   try {
@@ -346,11 +408,12 @@ async function douchette(b, nom, vue, LIGNES) {
     await bip(String(V[6].tx));
     dit((await etat()) === `trouve:v:${V[6].tx}`, `${nom} : E3 son n° de transaction aussi`, String(await etat()));
     await pg.evaluate(() => document.documentElement.setAttribute('data-douchette', 'avant'));
+    const marquesAvant = await pg.evaluate(() => document.querySelectorAll('[data-cible-notif]').length);
     await bip('XA999999999FR');
     const e4 = await etat();
     const toast = await pg.evaluate(() => document.body.innerText.includes('XA999999999FR'));
     await shot(pg, `${nom}-douchette-inconnu`);
-    dit(e4 === 'inconnu' && toast && !(await pg.$('[data-cible-notif]')), `${nom} : E4 un code inconnu ⇒ rien d'ouvert, et c'est dit`, String(e4));
+    dit(e4 === 'inconnu' && toast && (await pg.evaluate(() => document.querySelectorAll('[data-cible-notif]').length)) === marquesAvant, `${nom} : E4 un code inconnu ⇒ rien d'ouvert, et c'est dit`, String(e4));
     await pg.evaluate(() => document.documentElement.setAttribute('data-douchette', 'avant'));
     await bip(V[2].suivi, 160);
     dit((await etat()) === 'avant', `${nom} : E5 une frappe lente (160 ms) n'est pas une douchette`, String(await etat()));
@@ -379,6 +442,7 @@ async function douchette(b, nom, vue, LIGNES) {
     if (VUES.includes('390')) { await preparer(b, '390', tel, LIGNES, false); await sansVoix(b, '390', tel, LIGNES); }
     if (VUES.includes('390-sombre')) await preparer(b, '390-sombre', tel, LIGNES, true);
     if (VUES.includes('1512') || VUES.includes('lot')) await lot(b, '1512', ordi, LIGNES);
+    if (VUES.includes('1512') || VUES.includes('classique')) await lotClassique(b, '1512', ordi, LIGNES);
     if (VUES.includes('1512') || VUES.includes('douchette')) await douchette(b, '1512', ordi, LIGNES);
     if (VUES.includes('1512')) await preparer(b, '1512', ordi, LIGNES, false);
     if (VUES.includes('390-lot')) await lot(b, '390', tel, LIGNES);

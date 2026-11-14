@@ -16,6 +16,11 @@ export default {
   "cp.four.plusDe": "Plus de {nom}",
   "cp.four.racheter": "Pense à en racheter.",
   // 98 · 4 bordereaux par page A4
+  "cp.lot.imprimante": "Imprimante",
+  "cp.lot.classique": "Classique · A4",
+  "cp.lot.thermique": "Thermique · 10×15",
+  "cp.lot.tamponDe": "Tampon de {qui}",
+  "cp.lot.retirer": "Retirer du lot",
   "cp.planche.choix": "4 par page A4",
   "cp.planche.applique": "Format appliqué sur cet appareil : 4 bordereaux par page A4.",
   "cp.planche.phrase": "Quatre étiquettes par feuille A4, dans l’ordre, un trait de coupe entre elles ; une page pas découpable part entière.",
