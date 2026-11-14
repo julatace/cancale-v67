@@ -123,7 +123,8 @@ export function notesPropres(v) {
 // ({ itemId: { numero, recreeDe?, repriseDe? } }), `presents` = Set des id d'annonces
 // présentes (ou null : pas su ⇒ toutes comptent, prudence). Une chaîne de
 // republication (recreeDe / repriseDe) est UNE paire.
-export function numerosAmbigus(fiches, { presents = null, cleNum = cleNumNote } = {}) {
+// (14 nov., proposition 107) `memes` : les paires d'annonces qu'IL a fusionnées (src/fusionFiches.js) — une paire.
+export function numerosAmbigus(fiches, { presents = null, cleNum = cleNumNote, memes = null } = {}) {
   const parNum = new Map();
   for (const [id, f] of Object.entries(fiches || {})) {
     if (!f || f.numero == null) continue;
@@ -140,6 +141,7 @@ export function numerosAmbigus(fiches, { presents = null, cleNum = cleNumNote } 
     const racine = new Map(l.map((x) => [x.id, x.id]));
     const trouve = (x) => { while (racine.get(x) !== x) x = racine.get(x); return x; };
     for (const x of l) for (const d of x.de) if (ids.has(d)) racine.set(trouve(x.id), trouve(d));
+    for (const m of Array.isArray(memes) ? memes : []) { if (Array.isArray(m) && m.length === 2 && ids.has(String(m[0])) && ids.has(String(m[1]))) racine.set(trouve(String(m[0])), trouve(String(m[1]))); }
     if (new Set(l.map((x) => trouve(x.id))).size > 1) out.add(k);
   }
   return out;
