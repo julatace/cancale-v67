@@ -90,7 +90,7 @@ export function histoireArticle(rn, d = {}, o = {}) {
     for (const id of ids) {
       const f = fiches[id]; if (!f) continue;
       if (f.numberedAt) ev.push({ at: iso(f.numberedAt), texte: `N°${p.num}${f.auto ? '' : ' · posé à la main'}`, preuve: `fiche ${id}`, cle: 'numero' });
-      if (f.reattribue && str(f.reattribue.de)) ev.push({ at: iso(f.reattribue.at), texte: `remplace le N°${str(f.reattribue.de)}`, preuve: `fiche ${id}`, cle: 'numero' });
+      if (f.reattribue && str(f.reattribue.de)) ev.push({ at: iso(f.reattribue.at), texte: `remplace le N°${str(f.reattribue.de)}`, preuve: `fiche ${id}`, cle: 'numero', sorte: 'reattribue' });
     }
     pose('numero', ev.length ? 'fait' : 'absent', 'Numéroté', ev, ev.length ? null : 'date de numérotage pas écrite');
   }
@@ -126,14 +126,18 @@ export function histoireArticle(rn, d = {}, o = {}) {
     // Republier (« modifier sur place ») range déjà ses prix changés par annonce
     // (`vinted_prix_historique`, { item, avant, apres, at }) : lus par l'identifiant.
     const evR = (d.prixVinted || []).filter((x) => x && idsSet.has(str(x.item)) && Number.isFinite(Number(x.apres)))
-      .map((x) => ({ at: iso(x.at), texte: `Vinted · ${Number.isFinite(Number(x.avant)) ? eur(Number(x.avant)) + ' → ' : ''}${eur(Number(x.apres))}`, preuve: `annonce ${str(x.item)} · Republier`, cle: 'prix' }));
+      .map((x) => ({ at: iso(x.at), texte: `Vinted · ${Number.isFinite(Number(x.avant)) ? eur(Number(x.avant)) + ' → ' : ''}${eur(Number(x.apres))}`, preuve: `annonce ${str(x.item)} · Republier`, cle: 'prix',
+        // (14 nov., idées 154) Les deux prix en NOMBRES : la ligne de temps dit « baisse » ou « hausse » sans relire le texte.
+        avant: Number.isFinite(Number(x.avant)) ? Number(x.avant) : null, apres: Number(x.apres), site: 'vinted' }));
     const ev = evR.concat(d.journalPrix.filter((j) => j && Array.isArray(j.sites) && j.sites.length && Number.isFinite(Number(j.prix)))
-      .map((j) => ({ at: iso(j.at), texte: `${j.sites.map((s) => NOM[s.site] || s.site).join(', ')} · ${j.sites[0].avant != null ? eur(j.sites[0].avant) + ' → ' : ''}${eur(Number(j.prix))}`, preuve: 'changé depuis VRM', cle: 'prix' })));
+      .map((j) => ({ at: iso(j.at), texte: `${j.sites.map((s) => NOM[s.site] || s.site).join(', ')} · ${j.sites[0].avant != null ? eur(j.sites[0].avant) + ' → ' : ''}${eur(Number(j.prix))}`, preuve: 'changé depuis VRM', cle: 'prix',
+        avant: j.sites[0].avant != null && Number.isFinite(Number(j.sites[0].avant)) ? Number(j.sites[0].avant) : null, apres: Number(j.prix), site: j.sites.map((s) => NOM[s.site] || s.site).join(', ') })));
     // (10 nov., lot L) LES PRIX LUS dans le dressing (`vrm_prix_lus`, src/historiquePrix.js) :
     // datés par LEUR lecture, par l'identifiant de l'annonce ; un prix lu égal au précédent
     // n'ajoute rien. La série (escalier de la fiche) mêle lus et changés depuis VRM.
     const serie = seriePrix(ids, { lus: d.prixLus, prixVinted: d.prixVinted });
-    for (const pt of serie.points) if (pt.source === 'lu') ev.push({ at: pt.at, texte: `Vinted · ${eur(pt.prix / 100)}`, preuve: `annonce ${pt.item} · lu dans le dressing`, cle: 'prix-lu' });
+    serie.points.forEach((pt, i) => { if (pt.source === 'lu') ev.push({ at: pt.at, texte: `Vinted · ${eur(pt.prix / 100)}`, preuve: `annonce ${pt.item} · lu dans le dressing`, cle: 'prix-lu',
+      avant: i > 0 ? serie.points[i - 1].prix / 100 : null, apres: pt.prix / 100, site: 'vinted' }); });
     const depuis = serie.depuis ? `prix lus depuis le ${new Date(serie.depuis + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}` : null;
     pose('prix', ev.length ? 'fait' : 'absent', 'Prix', ev, ev.length ? depuis : (depuis ? `aucun prix lu ni changé · ${depuis}` : 'aucun changement fait depuis VRM'));
     etapes[etapes.length - 1].serie = serie.points;

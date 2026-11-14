@@ -7,6 +7,7 @@
 import ecran_journee from './fr/journee.js';
 import ecran_confort from './fr/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_capte from './fr/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
+import ecran_idees from './fr/idees.js';   // (14 nov., idées 154-158) ligne de temps, note, modèles, autre taille, meilleure heure
 import ecran_ventes from './fr/ventes.js';
 import ecran_commun from './fr/commun.js';
 import ecran_achats from './fr/achats.js';
@@ -2230,4 +2231,5 @@ export default {
   "instantane.arret.panne": "Pas relu : la base ne répond pas. Ces chiffres sont ceux de ta dernière visite.",
   ...ecran_confort,
   ...ecran_capte,
+  ...ecran_idees,
 };

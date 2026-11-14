@@ -237,6 +237,7 @@ import { brancherVeille, noterReleveVeille } from './veilleLigne.js';
 import { prochainGesteAnnonces } from './prochainGesteAnnonces.js';
 import AnnoncesMasquees from "./AnnoncesMasquees.jsx";
 import VueACompleter from "./AnnoncesACompleter.jsx";
+import { notesAnnonces } from "./noteAnnonce/noteAnnonce.js";   // (14 nov., idée 155) la note de chaque annonce
 import AvisVente from "./AvisVente.jsx";
 import { annoncesACompleter } from "./annoncesACompleter.js";
 import { BoutonCentreNotifs, FeuilleCentreNotifs } from "./CentreNotifs.jsx";
@@ -330,6 +331,8 @@ const ModeEmballage = aLaDemande(() => import('./ModeEmballage.jsx'), true);
 // (9 nov., lot AD) « Préparer mes colis » pas à pas : à la demande (sa feuille de style reste ICI).
 const PreparerColis = aLaDemande(() => import('./PreparerColis.jsx'), true);
 const FichePaire = aLaDemande(() => import('./FichePaire.jsx'), true);
+const OutilsFicheIdeesP = lazy(() => import('./autreTaille/OutilsFiche.jsx'));   // (14 nov., idées 156-157) autre taille, modèle
+const OutilsFicheIdees = (props) => <Suspense fallback={null}><OutilsFicheIdeesP {...props}/></Suspense>;
 // (14 nov., proposition 62 — « Une seule fiche partout ») L'HÔTE DE LA FICHE OUVERTE PAR UNE LIGNE.
 // Un toucher sur le corps d'une rangée qui porte `attrsFicheLigne` (src/ficheLigne.js) ouvre LA fiche de
 // la paire (FichePaire), désignée PAR IDENTITÉ (`numeroDeLigne` : N° de la liste, id d'annonce, n° de
@@ -4294,6 +4297,19 @@ function fichesPourPasEnLigne(lignes) {
 }
 // (3 nov.) Mes modèles de description (src/modelesDescription.js), synchronisés.
 const lireModelesRanges = () => lireModeles(load(CLE_MODELES, []));
+// (14 nov., idée 156) La description d'une fiche « À publier » remplie depuis un modèle (SON clic) :
+// écrite sur CETTE fiche (par son id), rien d'autre. Rend la fiche écrite, ou null (fiche absente).
+function poserDescriptionNeuve(id, description) {
+  const t = load('vrm_fiches_neuves', {}) || {};
+  if (!id || !t[id]) return null;
+  const fiche = { ...t[id], description: String(description || '').slice(0, 5000) };
+  save('vrm_fiches_neuves', { ...t, [id]: fiche });
+  emettreClesRelues(['vrm_fiches_neuves']);
+  return fiche;
+}
+// (14 nov., idée 154) Les dates des photos du studio d'UN N° — projection scalaire (jamais `select=data` :
+// la ligne porte les images). null : la base n'a pas répondu (« pas su »).
+const lireStudioDates = (num) => lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent('studio_photos_' + cleNum(num))}&select=${selectStudio()}`);
 // ⟦→ ecrans/Reglages.jsx #21⟧
 // La rangée de chips au-dessus d'une description (Leboncoin, eBay, brouillon de Republier).
 function ChipsModeles({ valeur, surChange, champ, vars }) {
@@ -17683,27 +17699,32 @@ const ENVOIS_PRIX = envoisPrix({ appelEbay: (c) => appelEbay(c), resultatReviseE
 // DUPLIQUER : une fiche neuve (`vrm_fiches_neuves`), un N° neuf (`prochainLibre`
 // sur TOUS les numéros servis, réservés compris), aucune photo, aucune identité.
 // Rend { ok, numero } ou { ok:false, raison }. Rien sur « pas su ».
-async function dupliquerNumero(rn, extra) {
-  if (!numerotationPermise() || !isCloudReady()) return { ok: false, raison: 'numéros pas encore chargés' };
-  if (!(await assurerVersionNumerotation())) return { ok: false, raison: 'recharge l’app' };
-  let jr = null; try { jr = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`); } catch (_) { jr = null; }
-  if (!Array.isArray(jr)) return { ok: false, raison: 'numéros réservés pas lus' };
+// (14 nov., idée 157) Les champs copiés (la fiche de l'annonce en ligne de CE N°, sa sauvegarde coffre, ou la
+// fiche « À publier » de ce N°) — par identité, jamais par titre. null : rien à copier. Lu aussi par la
+// feuille « Dans une autre taille » (src/autreTaille/AutreTaille.jsx) pour son aperçu.
+function champsADupliquer(rn, extra) {
   const fiches = load('vinted_annonce_numeros', {}) || {};
   const a = ((rn && rn.annonces) || []).find((x) => x.etat === 'en-ligne') || ((rn && rn.annonces) || [])[0] || null;
   const f = a ? fiches[a.id] : null;
   const c = a && extra && extra.coffres ? extra.coffres[a.id] : null;
   const neuveSrc = Object.values(load('vrm_fiches_neuves', {}) || {}).find((x) => x && cleNum(x.numero) === (rn && rn.cle));
-  if (!f && !c && !neuveSrc) return { ok: false, raison: 'aucune fiche à copier' };
-  const champs = neuveSrc && !f && !c ? neuveSrc : champsSource(f, c);
-  const pris = new Set(), prisK = new Set();
-  const add = (v) => { const k = cleNum(v); if (!k) return; prisK.add(k); if (/^\d+$/.test(k)) pris.add(Number(k)); };
-  (load('vinted_used_numeros', []) || []).forEach(add);
-  Object.values(fiches).forEach((e) => add(e && e.numero));
-  Object.values(load('vinted_sale_overrides', {}) || {}).forEach((e) => add(e && e.numero));
-  Object.values(load('vrm_lbc_liens', {}) || {}).forEach(add);
-  Object.values(load('vrm_fiches_neuves', {}) || {}).forEach((e) => add(e && e.numero));
-  ajouterNumerosHorsEcran(pris, prisK);
-  numerosReserves(jr[0] ? jr[0].data : null).cles.forEach(add);
+  if (!f && !c && !neuveSrc) return null;
+  return neuveSrc && !f && !c ? neuveSrc : champsSource(f, c);
+}
+// `remplace` (14 nov., idée 157 « Dans une autre taille ») : { taille, titre, description } qu'IL a relus dans la
+// feuille ; seulement ces trois champs de la liste blanche — le N° reste celui de `prochainLibre`.
+async function dupliquerNumero(rn, extra, remplace = null) {
+  if (!numerotationPermise() || !isCloudReady()) return { ok: false, raison: 'numéros pas encore chargés' };
+  if (!(await assurerVersionNumerotation())) return { ok: false, raison: 'recharge l’app' };
+  const champs0 = champsADupliquer(rn, extra);
+  if (!champs0) return { ok: false, raison: 'aucune fiche à copier' };
+  const champs = remplace ? { ...champs0, ...Object.fromEntries(['taille', 'titre', 'description'].filter((k) => typeof remplace[k] === 'string').map((k) => [k, remplace[k]])) } : champs0;
+  // (14 nov., idée 157) TOUS les N° servis : LA liste de `numerosServisLus` (pool, fiches, ventes corrigées,
+  // Leboncoin, fiches neuves, achats hors plateforme, cases du Stock, hors écran, réservés RELUS en base) —
+  // avant, cette copie oubliait les achats hors plateforme et les cases du Stock (un N° écrit sur un carton).
+  const ns = await numerosServisLus();
+  if (!ns) return { ok: false, raison: 'numéros réservés pas lus' };
+  const pris = ns.int, prisK = ns.cles;
   const id = 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   let r; try { r = dupliquerFiche(champs, { pris: { int: pris, cles: prisK }, pref: prefixeNumeros(), prochainLibre, cleNum, id }); } catch (e) { return { ok: false, raison: 'numéro pas sûr' }; }
   // Le pool d'abord (append-only), puis la fiche.
@@ -41974,7 +41995,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const ouN = ouNumeroEcrit();
     const enLigne = listings.items.filter((it) => it && !acctOffOf(it));
     const unCompte = new Set(enLigne.map((x) => String((x._acc && x._acc.vinted_user_id) || ''))).size <= 1;
-    return annoncesACompleter(enLigne.map((it) => { const e = numeros[it.id] || {}; const a = prixAchatDe(e, buyByNum);
+    // (14 nov., idée 155) LA NOTE de chaque annonce : les manques d'« À compléter » + description courte + prix sous l'achat.
+    return notesAnnonces(enLigne.map((it) => { const e = numeros[it.id] || {}; const a = prixAchatDe(e, buyByNum);
       return { id: it.id, titre: it.title, photo: photoArticle(it) || '', num: e.numero ? String(e.numero) : '', compte: unCompte ? '' : ((it._acc && (it._acc.login || it._acc.username)) || ''),
         domaine: it._acc && it._acc.domain, prix: it.price, ts: it.createdTs, nPhotos: it.champsLus && it.champsLus.photos ? it.photoCount : null, marque: it.brand, taille: it.size, etat: it.condition, champsLus: it.champsLus,
         descNumero: it.numEcritDesc, desc: typeof it.desc === 'string' ? it.desc : typeof it.description === 'string' ? it.description : undefined, descLen: it.descLen, prixAchat: a != null && !isNaN(a) ? a : null }; }),
@@ -61384,6 +61406,15 @@ function AppCoeur() {
               setTab(src.tab); }}
             onCopier={async(f)=>{ try { await navigator.clipboard.writeText(texteAColler(f)); toast('Texte copié'); } catch (_) { toast('Copie impossible ici'); } }}
             onDupliquer={async()=>{ const r=await dupliquerNumero(rn, ex); if(!r.ok){ toast(`Pas dupliqué : ${r.raison}`); return; } toast(`N°${r.numero} créé`); setNeuveRecente(r.fiche); fermer(); setFicheNum(String(r.numero)); }}
+            // (14 nov., idée 154) La ligne de temps : la réception de l'achat relié, les dates Vinted des annonces, les photos du studio (projection scalaire).
+            extraTemps={{ reception: ex ? ex.reception : undefined, crees: numData ? (numData.crees === undefined ? null : numData.crees) : undefined, lireStudio: lireStudioDates }}
+            // (14 nov., idées 156-157) « Dans une autre taille » (N° neuf par `dupliquerNumero`) et « Remplir avec un modèle ».
+            outilsIdees={p && !p.ancienNumero ? <OutilsFicheIdees numero={p.num} neuve={neuve} source={champsADupliquer(rn, ex)} modeles={lireModelesRanges()}
+              reglages={{ etiquette: load('vrm_num_vinted', null), numeroEcrit: load('vrm_numero_ecrit', null) }} Retour={FermeAuRetour}
+              onCreerTaille={async (champs, finir) => { const r = await dupliquerNumero(rn, ex, champs); if (!r.ok) return { ok: false, raison: tr('at.pasCree', { raison: r.raison }) };
+                let fiche = r.fiche; const d = finir ? finir(r.fiche) : null; if (d != null) fiche = poserDescriptionNeuve(r.id, d) || fiche;
+                toast(tr('at.cree', { num: r.numero })); setNeuveRecente(fiche); fermer(); setFicheNum(String(r.numero)); return r; }}
+              onPoserDescription={(f, d) => { const x = poserDescriptionNeuve(f.id, d); if (!x) { toast(tr('md.pasPose')); return; } setNeuveRecente(x); toast(tr('md.pose')); }}/> : null}
             ligne={depuis} ligneRes={ligneRes} onChoisirNum={choisir}
             Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>} Icon={Icon} Retour={FermeAuRetour}/>;
   };

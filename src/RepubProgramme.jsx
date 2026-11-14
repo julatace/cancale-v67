@@ -14,7 +14,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { tr, date as dateLoc, heure as heureLoc } from './i18n/index.js';
-import { AUTH, CLOISONNE, SUPABASE_URL, sbAuth, withOwner, lireTout, extSait, vintedDeChrome, __vmrEtat, onVmrExt, askConfirm, toast, pushNotif, EXT_CAPACITES } from './App.jsx';
+import { AUTH, CLOISONNE, SUPABASE_URL, sbAuth, withOwner, lireTout, extSait, vintedDeChrome, __vmrEtat, onVmrExt, askConfirm, toast, pushNotif, EXT_CAPACITES, LiveStatsCarte } from './App.jsx';
+import MeilleureHeure, { useMeilleureHeure } from './meilleureHeure/MeilleureHeure.jsx';   // (14 nov., idée 158) une suggestion, jamais un départ
 import { suivi } from './suiviTravail.js';
 import { finDemarrage } from './demarrage.js';
 import { jaugeDuCompte } from './jaugeActions.js';
@@ -88,6 +89,9 @@ export function ProgrammerRepub({ uid, compte, action, ids, reglages, verifier, 
   const [erreur, setErreur] = React.useState('');
   const [enCours, setEnCours] = React.useState(false);
   const capOk = extSait('repubdepart') === 'ok';
+  // (14 nov., idée 158) Ses ventes datées à l'heure (la règle de Statistiques) ⇒ le moment où elles partent le plus.
+  const ls = React.useContext(LiveStatsCarte);
+  const mh = useMeilleureHeure(!ls ? undefined : ls.venduPasSu ? null : (Array.isArray(ls.venduLignes) ? ls.venduLignes : undefined));
   const at = Date.parse(val);
   const n = (ids || []).length;
   if (!ouvert) return (
@@ -121,6 +125,7 @@ export function ProgrammerRepub({ uid, compte, action, ids, reglages, verifier, 
         <span>{tr('rp.prog.heure')}</span>
         <input type="datetime-local" data-rp-heure="" value={val} onChange={(e) => setVal(e.target.value)} />
       </label>
+      <MeilleureHeure r={mh} onChoisir={(ms) => setVal(valeurLocale(ms))}/>
       <div className="vrm-rp-cond" data-rp-conditions="">
         <p>{tr('rp.cond.titre')}</p>
         <ul>
