@@ -35,6 +35,10 @@ export const NOUVEAUTES = Object.freeze([
   // (14 nov., soir — « je n'ai plus les retraits d'achat ») « À retirer » ouvert en tête d'Achats dès qu'un colis attend.
   { id: 'retraits-achats-en-tete', date: '2026-11-14', titre: 'Tes colis à retirer, en tête d’Achats', phrase: 'Ouverts dès qu’un colis attend, avec ses codes.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'accompagnement', date: '2026-11-14', titre: 'Chaque geste dit ce qu’il fait', phrase: 'Avant, pendant, après ; et si ça bloque, pourquoi et quoi faire.', tab: 'cat_bord', pour: 'tous', mode: 'tous' },
+  // (14 nov., idées 154, 157, 158) docs/passation/2026-11-14-idees-paires.md
+  { id: 'ligne-de-temps-paire', date: '2026-11-14', titre: 'L’histoire d’une paire, dans l’ordre', phrase: 'Achetée, publiée, baissée, vendue, livrée : chaque date avec sa preuve.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'dupliquer-autre-taille', date: '2026-11-14', titre: 'Dupliquer une annonce dans une autre taille', phrase: 'Mêmes textes, nouvelle taille, N° neuf ; puis Créer sur Vinted.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'meilleure-heure-republier', date: '2026-11-14', titre: 'La meilleure heure pour republier', phrase: 'Tirée de tes ventes datées, proposée quand tu programmes.', tab: 'republier', pour: 'tous', mode: 'tous' },
   // (14 nov., extension 5.377) « L'extension a capté » et la carte du logo en trois onglets.
   { id: 'extension-capte', date: '2026-11-14', titre: 'L’extension dit ce qu’elle vient de capter', phrase: 'Un petit message près du logo VRM : ventes, bordereaux, messages captés.', tab: 'settings', pour: 'tous', mode: 'tous' },
   { id: 'carte-favoris-annonces-ventes', date: '2026-11-14', titre: 'Favoris, annonces, ventes dans la carte VRM', phrase: 'Le compte connecté d’abord ; les autres floutés, sans action possible.', tab: 'favoris', pour: 'tous', mode: 'tous' },

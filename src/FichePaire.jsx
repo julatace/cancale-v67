@@ -14,6 +14,7 @@ import { escalierPrix, eurosPrix } from './historiquePrix.js';
 import { motsInsecables } from './motsInsecables.jsx';
 import { tr } from './i18n/index.js';
 import { poserSlot } from './ficheLigne.js';
+import LigneDeTemps, { OngletsFiche, useVueFiche } from './paireHistoire/LigneDeTemps.jsx';   // (14 nov., idée 154) « Dans l'ordre »
 
 // (14 nov., proposition 62) Ouverte DEPUIS une ligne de liste : ce que la ligne est (le titre de sa partie).
 const CLE_CTX = { vente: 'fiche.ctx.vente', colis: 'fiche.ctx.colis', achat: 'fiche.ctx.achat', annonce: 'fiche.ctx.annonce', stock: 'fiche.ctx.stock', retrait: 'fiche.ctx.retrait', journee: 'fiche.ctx.journee' };
@@ -165,7 +166,7 @@ const dateCourte = (iso) => {
   return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', ...(d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) });
 };
 
-export default function FichePaire({ owner = '', p, etat = null, histoNum = null, lecture = false, num, onFermer, onRetour, onBordereau, onEmballer, onPrix, onPrixAchat = null, onDupliquer, onPublierAilleurs, onSource, neuve = null, onCopier, Photo, Icon, Retour, note = null, ligne = null, ligneRes = null, onChoisirNum = null }) {
+export default function FichePaire({ owner = '', p, etat = null, histoNum = null, lecture = false, num, onFermer, onRetour, onBordereau, onEmballer, onPrix, onPrixAchat = null, onDupliquer, onPublierAilleurs, onSource, neuve = null, onCopier, Photo, Icon, Retour, note = null, ligne = null, ligneRes = null, onChoisirNum = null, extraTemps = null, outilsIdees = null }) {
   React.useEffect(() => {
     const k = (e) => { if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); onFermer(); } };
     window.addEventListener('keydown', k, true);
@@ -173,6 +174,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
   }, [onFermer]);
   const racine = React.useRef(null), cadre = React.useRef(null);
   useGlisserPourFermer(racine, cadre, onFermer);
+  const [vueFiche, setVueFiche] = useVueFiche();
   // (14 nov., proposition 62) Les deux places où la LIGNE touchée range ses gestes (src/DansFiche.jsx) :
   // « contexte » (en haut : la vente elle-même) et « actions » (au pouce, sous la carte héros).
   const slotCtx = React.useCallback((el) => poserSlot('contexte', el), []);
@@ -250,6 +252,8 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
     {onPrix && !neuve ? <button type="button" className="vrm-ao-second" data-fiche-prix="" onClick={() => onPrix(p.num)}>Changer le prix</button> : null}
     {onPublierAilleurs && !neuve && p.etat !== 'rien' ? <button type="button" className="vrm-ao-second" data-fiche-publier-ailleurs="" onClick={() => onPublierAilleurs(p.num)}>Publier ailleurs</button> : null}
     {onDupliquer && p.etat !== 'rien' ? <button type="button" className="vrm-ao-second" data-fiche-dupliquer="" onClick={() => onDupliquer(p.num)}>Dupliquer</button> : null}
+    {/* (14 nov., idée 157) « Dans une autre taille » : fourni par l'écran (src/autreTaille/OutilsFiche.jsx). */}
+    {outilsIdees && p.etat !== 'rien' ? outilsIdees : null}
     {neuve && onCopier ? <button type="button" className="vrm-ao-second" data-fiche-copier="" onClick={() => onCopier(neuve)}>Copier le texte</button> : null}
   </>) : null;
   const poster = p && p.aPoster && (onBordereau || onEmballer) ? (
@@ -301,10 +305,11 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
       </div>}
       {etat && !double ? <EtatArticle etat={etat}/> : null}
       {!depuis && outils ? <div className="vrm-fp-outils">{outils}</div> : null}
-      <nav className="vrm-fp-raccourcis" aria-label="Rubriques de cet article">{p.etapes.map(e=><button key={e.cle} type="button" onClick={()=>document.getElementById(`vrm-fiche-etape-${e.cle}`)?.scrollIntoView({block:'start',behavior:window.matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'})}>{e.titre}</button>)}</nav>
+      <OngletsFiche vue={vueFiche} onVue={setVueFiche}/>
+      {vueFiche === 'temps' ? null : <nav className="vrm-fp-raccourcis" aria-label="Rubriques de cet article">{p.etapes.map(e=><button key={e.cle} type="button" onClick={()=>document.getElementById(`vrm-fiche-etape-${e.cle}`)?.scrollIntoView({block:'start',behavior:window.matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'})}>{e.titre}</button>)}</nav>}
       {histoNum ? <HistoireNumero h={histoNum}/> : null}
       <HistoriqueModifications owner={owner} numero={p.num}/>
-      <ol className="vrm-fp-parcours">
+      {vueFiche === 'temps' ? <LigneDeTemps h={p} extra={extraTemps || {}}/> : <ol className="vrm-fp-parcours">
         {p.etapes.map((e) => (
           <li key={e.cle} id={`vrm-fiche-etape-${e.cle}`} className={'vrm-fp-etape is-' + e.etat} data-fiche-etape={e.cle} data-fiche-etat={e.etat}>
             <span className="vrm-fp-pastille" aria-hidden="true">{I(ICONE[e.cle] || 'info', 17)}</span>
@@ -318,7 +323,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
             </span>
           </li>
         ))}
-      </ol>
+      </ol>}
       {lecture ? <p className="vrm-fp-note" data-fiche-lecture="">Lecture en cours…</p>
         : p.manques.length ? <p className="vrm-fp-note" data-fiche-manques={p.manques.length}>Pas pu lire : {p.manques.join(', ')}.</p> : null}
       {!depuis ? poster : null}
