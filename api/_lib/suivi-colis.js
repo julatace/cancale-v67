@@ -87,6 +87,14 @@ export function relireLigneSuivi(d) {
     return { ...d, status: 'transit', statusLabel: 'Point relais changé', relaisChange: true, retireLe: null,
       ...(autrePreuve ? { aVerifierTransporteur: 'Retiré puis « changé de plan » : VRM le vérifie chez le transporteur' } : {}) };
   }
+  // (14 nov., capture de Julien : Vinted Go « Nouveau relais : il est temps de récupérer ton colis ! ») Une ligne
+  // rangée « en route · point changé » AVANT la règle du sujet qui invite à récupérer (etat-colis-email.js,
+  // `SUJET_RECUPERER_AU_NOUVEAU`) : son propre sujet dit le colis ARRIVÉ au nouveau point (la règle commune du sujet,
+  // plus bas, le ferait aussi, sans dire qu'il a été redirigé). Elle redevient « à retirer » — avec SON QR (il
+  // n'atteignait jamais la liste), notée « redirigée ».
+  if (d.status === 'transit' && d.relaisChange && etat === 'available') {
+    return { ...d, status: 'available', statusLabel: 'Arrivé au nouveau point relais', relaisChange: false, redirige: true };
+  }
   if (d.status === 'transit' && d.relaisChange && !d.statusLabel) return { ...d, statusLabel: 'Point relais changé' };
   // (10 nov., retraits irréprochables) « Action requise : le colis semble avoir été perdu » rangé
   // « livré / retiré » avant la règle du 3 nov. (mesuré : une ligne du 2 nov. l'est encore) : un colis
@@ -126,12 +134,20 @@ export function relireLigneMeta(x) {
 // retiré. `etat` = l'état de la transaction ({ s: code, ss: état de
 // l'expédition }) ; `auRelais` = le statut dit « au point relais » (la règle
 // `isAtRelayStatus` de l'app, ou le résumé de l'extension, la même — §11).
+const RETOUR_OUVERT = /retour\s+(?:initi|demand|en\s+cours)/i;
 export function finDeCommandeAchat({ statut = '', etat = null, auRelais = false } = {}) {
   if (etat && /non\s+r[ée]clam/i.test(etat.ss || '')) return 'reparti';
   if (etat && etat.s >= 500 && etat.s < 600) return 'reparti';
   if (etat && etat.s === 450) return 'retire';
+  // (14 nov., Julien : « j'ai fait un litige dessus car la taille n'était pas bonne, elle a donc été retirée ») UN
+  // RETOUR OUVERT SUR CET ACHAT (transaction 440 « Retour initié », mesurée ; ou son libellé) prouve que l'acheteur a
+  // le colis : il n'est plus à retirer — même si la liste des achats, plus ancienne, le dit encore « au point relais ».
+  // Par la transaction de CET achat seulement (jamais le titre). La suspension 430 (« en attente de vérification »)
+  // n'en est pas une : une réclamation peut dire « pas reçu ».
+  if (etat && (etat.s === 440 || RETOUR_OUVERT.test(etat.ss || ''))) return 'retire';
   if (auRelais === true) return null;
   const st = String(statut || '');
+  if (RETOUR_OUVERT.test(st)) return 'retire';
   if (/non\s+r[ée]clam|rembours|annul/i.test(st)) return 'reparti';
   if (/finalis|termin|commande\s+livr|a\s+[ée]t[ée]\s+livr|re[çc]u\s+(?:sa|ta|la)\s+commande/i.test(st)) return 'retire';
   return null;

@@ -12,7 +12,7 @@ Julien, sur son iPhone, le 14 nov. 2026 : « C'est moche », « rien n'a changé
 **Ordre de priorité quand deux règles se contredisent : AJOUT 3 (liste d'abord) > AJOUT 2 (1 000 articles)
 > direction Atelier > le reste.** Les règles de CLAUDE.md (§2, §3, §5, §7) restent au-dessus de tout.
 
-Charger aussi : `references-design` (15 analyses de design de marques, pour l’inspiration), `impeccable`, `apple-design`, `taste-skill`, `emil-design-eng`, `animate`, `mobile-native`.
+Charger aussi : `web-design-guidelines` (relecture Vercel), `bencium-impact-designer` (audace) ou `bencium-controlled-ux-designer` (rigueur), `design-audit`, `ui-typography`, `references-design` (15 analyses de design de marques, pour l’inspiration), `impeccable`, `apple-design`, `taste-skill`, `emil-design-eng`, `animate`, `mobile-native`.
 
 
 Julien, sur son iPhone, après trois passes « système » (jetons, graisses, gris, contrastes) :

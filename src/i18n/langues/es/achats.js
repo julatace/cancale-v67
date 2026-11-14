@@ -33,6 +33,8 @@ export default {
   "achats.colisEtaitDeja": "El paquete ya estaba en el punto de recogida ese día; no se sabe la fecha exacta de llegada.",
   "achats.suivre": "Seguir ↗",
   "achats.chercher": "Buscar ↗",
+  "achats.sansCodeVinted": "Código no leído: abre la conversación de Vinted (el paquete solo cuenta «por recoger» con su código)",
+  "achats.sansCodeEmail": "Código no leído en el e-mail del transportista: ábrelo (el paquete solo cuenta «por recoger» con su código)",
   "achats.transporteurEncoreConnu": "Transportista aún desconocido: su estado no se ha leído",
   "achats.confirmeChez": "Confirmado por",
   "achats.texte": "hace {ageCourtMs}",

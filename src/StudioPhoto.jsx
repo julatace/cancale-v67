@@ -29,6 +29,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { RATIO_CADRE, PHOTOS_MAX_PAR_PAIRE, recadrer, recadrerFichier, lireStudio, modifierStudio, detourerLocal } from './studioPhoto.js';
 import { motsVendeur } from './profilVendeur.js';
 import { lirePhotoroom, cleUtilisable, raisonSansPhotoroom, detourerAvecPhotoroom } from './photoroomCle.js';
+// (14 nov., proposition 102) Chaque photo prise est mesurée sur le téléphone (worker) : « floue ? » / « sombre ? »
+// s'affiche sur sa vignette et se range AVEC elle (`qualite`). Un simple avertissement : la photo est rangée quoi qu'il dise.
+import { analyserPhoto } from './qualitePhotoClient.js';
+import { resumeQualite } from './qualitePhoto.js';
+import AvisPhoto from './AvisPhoto.jsx';
 
 const damier = 'repeating-conic-gradient(#d9dde3 0% 25%, #ffffff 0% 50%) 50% / 16px 16px';
 
@@ -48,9 +53,10 @@ function Cadre({ C }) {
   );
 }
 
-export default function StudioPhoto({ C, paires, base, onClose }) {
+export default function StudioPhoto({ C, paires, base, onClose, initiale = null, onRange = null, z = 130 }) {
   const [q, setQ] = useState('');
-  const [sel, setSel] = useState(null);               // { num, cle, titre }
+  // (14 nov., proposition 103) Ouvert depuis la séance photo ou la fiche : directement sur CETTE paire (par son N°).
+  const [sel, setSel] = useState(() => (initiale != null ? (paires || []).find((p) => String(p.cle) === String(initiale) || String(p.num) === String(initiale)) || null : null)); // { num, cle, titre }
   const [photos, setPhotos] = useState(undefined);    // undefined lecture · null pas su · []
   const [mode, setMode] = useState('choix');          // choix · camera · fichier
   const [camRaison, setCamRaison] = useState('');
@@ -114,12 +120,15 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
     if (!img) { setMsg('La photo n’a pas pu être lue — rien n’a été rangé. Réessaie.'); return; }
     const p = sel;
     setOccupe('rangement');
-    const ph = { id: 'sp' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), at: new Date().toISOString(), img, cadre: mode === 'camera' ? 'camera' : 'fichier' };
+    let qualite = null; try { qualite = resumeQualite(await analyserPhoto(img)); } catch (_) { qualite = null; }
+    const ph = { id: 'sp' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), at: new Date().toISOString(), img, cadre: mode === 'camera' ? 'camera' : 'fichier', ...(qualite ? { qualite } : {}) };
     const r = await modifierStudio(base, p.cle, p.num, (l) => (l.length >= PHOTOS_MAX_PAR_PAIRE ? false : [...l, ph]));
     setOccupe('');
     if (!r.ok) { setMsg(r.raison === 'lecture' ? 'La base n’a pas répondu : je n’ai rien rangé (pour ne pas effacer les photos déjà là). Réessaie.' : 'La photo n’a pas pu être enregistrée — réessaie.'); return; }
     if (r.rien) { setMsg(`${motsVendeur().Ce} a déjà ${PHOTOS_MAX_PAR_PAIRE} photos : retire-en une pour en ranger une autre.`); return; }
     appliquer(p, r.photos, `Photo rangée pour ${motsVendeur().le} N°${p.num}.`);
+    try { window.dispatchEvent(new CustomEvent('vrm:studio-range', { detail: { num: String(p.num), cle: String(p.cle) } })); } catch (_) {}
+    if (onRange) { try { onRange(p); } catch (_) {} }
   };
 
   const declencher = () => {
@@ -176,7 +185,7 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
   const B = { p: 'vrm-b vrm-b-primaire', s: 'vrm-b vrm-b-secondaire', sp: 'vrm-b vrm-b-secondaire vrm-b-petit', d: 'vrm-b vrm-b-discret' };
 
   return (
-    <div data-studio onClick={fermer} data-noswipe style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 130, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+    <div data-studio onClick={fermer} data-noswipe style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: z, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: C.bg, borderRadius: '18px 18px 0 0', width: '100%', maxWidth: 620, maxHeight: '92vh', overflowY: 'auto', padding: '16px 14px calc(20px + env(safe-area-inset-bottom))' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
           <span style={{ flex: 1, fontSize: 17, fontWeight: 700, color: C.text }}>Studio photo{sel ? ` · N°${sel.num}` : ''}</span>
@@ -235,7 +244,8 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
                 {photos.map((ph, i) => (
                   <div key={ph.id} data-studio-photo={ph.id} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: 6, background: C.card }}>
-                    <div style={{ display: 'flex', gap: 4 }}>
+                    <div style={{ display: 'flex', gap: 4, position: 'relative' }}>
+                      <span style={{ position: 'absolute', left: 6, bottom: 6, zIndex: 1, maxWidth: 'calc(100% - 12px)' }}><AvisPhoto src={ph.img} qualite={ph.qualite && ph.qualite.v ? ph.qualite : null}/></span>
                       <img src={ph.img} alt={`Photo ${i + 1} ${motsVendeur().de} N°${sel.num}`} style={{ width: ph.detoure ? '50%' : '100%', aspectRatio: `${RATIO_CADRE}`, objectFit: 'cover', borderRadius: 6 }} />
                       {ph.detoure && <img src={ph.detoure} data-studio-detoure alt="Détourée" style={{ width: '50%', aspectRatio: `${RATIO_CADRE}`, objectFit: 'contain', borderRadius: 6, background: damier }} />}
                     </div>

@@ -33,6 +33,8 @@ export default {
   "achats.colisEtaitDeja": "The parcel was already at the pickup point that day; its exact arrival date isn’t known.",
   "achats.suivre": "Track ↗",
   "achats.chercher": "Search ↗",
+  "achats.sansCodeVinted": "Code not read: open the Vinted conversation (the parcel only counts as “to collect” with its code)",
+  "achats.sansCodeEmail": "Code not read in the carrier’s e-mail: open it (the parcel only counts as “to collect” with its code)",
   "achats.transporteurEncoreConnu": "Carrier not known yet: its status hasn’t been read",
   "achats.confirmeChez": "Confirmed by",
   "achats.texte": "{ageCourtMs} ago",
