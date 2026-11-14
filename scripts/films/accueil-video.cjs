@@ -97,21 +97,34 @@ const PLANS = [
   } },
 ];
 
-async function tourner(nav) {
+// Un plan, dans SON processus (un navigateur neuf : l'horloge figée d'un tournage ne se
+// rembobine pas pour le suivant). Rend { duree, cues, erreurs } dans `plan-{i}.json`.
+async function tournerPlan(i) {
   const dossier = sortie('accueil');
-  const fichier = path.join(dossier, 'film-45s.mp4');
-  const cues = []; const morceaux = []; let decalage = 0; const erreurs = [];
-  for (const [i, p] of PLANS.entries()) {
+  const p = PLANS[i]; const cues = [];
+  const nav = await lancerNavigateur();
+  try {
     const f = new Film({ nom: 'accueil-45s-' + i, format: 'portrait', monde: monde(), tab: p.tab });
     await f.demarrer(nav);
     await f.app.evaluate(() => { window.print = () => {}; });
-    const morceau = path.join(dossier, `plan-${i}.mp4`);
-    await f.enregistrer(morceau);
-    try { await p.jouer(f, (cle) => cues.push({ cle, t: decalage + f.t })); }
+    await f.enregistrer(path.join(dossier, `plan-${i}.mp4`));
+    try { await p.jouer(f, (cle) => cues.push({ cle, t: f.t })); }
     catch (e) { try { f.ff.kill('SIGKILL'); } catch (_) {} try { await f.ctx.close(); } catch (_) {} throw e; }
     const r = await f.finir();
-    decalage += r.duree; morceaux.push(morceau); erreurs.push(...r.erreurs);
     if (i === 0) { const cles = fs.readdirSync(dossier).filter((x) => x.startsWith('plan-0-cle') && x.endsWith('.png')).sort(); if (cles.length) execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', path.join(dossier, cles[0]), '-vf', 'scale=360:640', '-q:v', '6', path.join(dossier, 'film-45s.jpg')]); }
+    fs.writeFileSync(path.join(dossier, `plan-${i}.json`), JSON.stringify({ duree: r.duree, cues, erreurs: r.erreurs }));
+  } finally { await nav.close(); fermerServeur(); }
+}
+
+async function tourner() {
+  const dossier = sortie('accueil');
+  const fichier = path.join(dossier, 'film-45s.mp4');
+  const cues = []; const morceaux = []; let decalage = 0; const erreurs = [];
+  for (let i = 0; i < PLANS.length; i++) {
+    execFileSync(process.execPath, [__filename], { env: { ...process.env, PLAN_SEUL: String(i) }, stdio: 'inherit' });
+    const j = JSON.parse(fs.readFileSync(path.join(dossier, `plan-${i}.json`), 'utf8'));
+    for (const c of j.cues) cues.push({ cle: c.cle, t: decalage + c.t });
+    decalage += j.duree; erreurs.push(...j.erreurs); morceaux.push(path.join(dossier, `plan-${i}.mp4`));
   }
   const liste = path.join(dossier, 'plans.txt');
   fs.writeFileSync(liste, morceaux.map((m) => `file '${m.replace(/'/g, "'\\''")}'`).join('\n') + '\n');
@@ -133,10 +146,8 @@ async function tourner(nav) {
 
 if (require.main === module) {
   (async () => {
-    const nav = await lancerNavigateur();
-    let ok = false;
-    try { ok = await tourner(nav); } finally { await nav.close(); fermerServeur(); }
-    if (!ok) process.exitCode = 1;
+    if (process.env.PLAN_SEUL != null) { await tournerPlan(Number(process.env.PLAN_SEUL)); return; }
+    if (!(await tourner())) process.exitCode = 1;
   })().catch((e) => { console.error(e); process.exit(1); });
 }
 module.exports = { PHRASES, LANGUES };
