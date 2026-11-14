@@ -42977,8 +42977,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Le lieu d'un e-mail : complété par le suivi du MÊME n°, puis par la conversation de SON
     // achat (relié par identité) quand elle nomme le même point avec une adresse plus complète,
     // puis par le même point déjà connu.
-    const lieuDeLigne = (t, a) => { const k = suiviDeLigne(t); let lu = lieuCompleteParTransporteur(lieuDe(t && t.lieu), (t && t.transp) || (tpmC && k ? tpmC.get(k) : null), Date.parse((t && (t.emailAt || t.receivedAt)) || '') || null);
-      const ra = a ? relaisDe(a) : null; if (ra && ra.lieu) lu = lieuLePlusComplet(lu, lieuDe(ra.lieu));
+    // (14 nov., Vinted Go réacheminé) Un e-mail qui ne nomme pas le point reçoit le lieu du TRANSPORTEUR (rue + ville,
+    // sans nom ni code postal : `lieuDuTransporteur`). Ce lieu-là n'est pas un nom : la conversation de SON achat (même
+    // identité) qui nomme le point part en premier, et le transporteur la complète ou la contredit (règle datée,
+    // `lieuCompleteParTransporteur`) — sinon « 12 Rue X » devenait le NOM du point et l'enseigne disparaissait.
+    const lieuDeLigne = (t, a) => { const k = suiviDeLigne(t); const ra = a ? relaisDe(a) : null;
+      const base = t && t.lieuDuTransporteur && ra && ra.lieu ? ra.lieu : (t && t.lieu);
+      let lu = lieuCompleteParTransporteur(lieuDe(base), (t && t.transp) || (tpmC && k ? tpmC.get(k) : null), Date.parse((t && (t.emailAt || t.receivedAt)) || '') || null);
+      if (ra && ra.lieu && base !== ra.lieu) lu = lieuLePlusComplet(lu, lieuDe(ra.lieu));
       return completer(lu, t && t.carrier, t && t.account); };
     const codeDeLigne = (t) => codeRetrait(t && t.code) || '';
     // (5 nov.) L'ACHAT LEBONCOIN OU VESTIAIRE D'UN COLIS, PAR SON N° DE SUIVI (src/retraitQr.js, §5) :
@@ -43024,8 +43030,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         etat: [lu.lieuNom || nomTr(t.carrier), dernierJour(ej) || (code ? code : (qrImage(t) ? 'QR code' : 'code pas encore lu'))].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
         ...lu, lieuType: typeCasier(t.lieu), transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code && !(scE && scE.code && scE.code.desaccord), jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), arrivee: arriveeLueRetrait({ t }), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), ...champsSources(scE), src: { t } });
     }
+    // (14 nov., Vinted Go réacheminé) LE LIEU D'UN ACHAT VINTED SANS E-MAIL : celui de la conversation de SA commande,
+    // confronté au suivi du transporteur du MÊME n° (son achat → son n° de suivi, une identité). Le plus RÉCENT prouvé
+    // gagne : le transporteur qui le dit disponible AILLEURS par un événement daté APRÈS le premier message d'arrivée
+    // (`arriveLe`) donne la nouvelle adresse, l'ancienne n'est plus un lieu de retrait ; sans date d'arrivée, rien
+    // n'est choisi et le désaccord est dit (`lieuConflit`, la règle de `lieuCompleteParTransporteur`).
+    const lieuDeVinted = (o, r) => {
+      const lu0 = completer(lieuDe(r && r.lieu), r && r.transporteur, '');
+      if (!r || !r.lieu || !tpmC) return lu0;
+      const k = normaliserSuivi(suivisAchat(o, indexSuivisAchats)[0] || ''); const tr = k ? tpmC.get(k) : null;
+      if (!tr) return lu0;
+      const ref = Date.parse(String(r.arriveLe || ''));
+      return lieuCompleteParTransporteur(lu0, tr, Number.isFinite(ref) ? ref : null);
+    };
     for (const o of (pickupUnion.extra || [])) {
-      const r = relaisDe(o); const lu = completer(lieuDe(r && r.lieu), r && r.transporteur, ''); const scV = sourcesCarte({ o }); const code = codeDesSources(scV, r ? codeRetrait(r.code) : ''); const eV = etatColisVinted(o, maintenant, tpmC); const ej = eV.jours;
+      const r = relaisDe(o); const lu = lieuDeVinted(o, r); const scV = sourcesCarte({ o }); const code = codeDesSources(scV, r ? codeRetrait(r.code) : ''); const eV = etatColisVinted(o, maintenant, tpmC); const ej = eV.jours;
       const suV = suivisAchat(o, indexSuivisAchats)[0] || ''; const eSV = entreeSuiviAchat(o); const trInconnu = !!suV && !((r && r.transporteur) || (eSV && eSV.transporteur) || transporteurDeForme(suV) || colisInternational(suV));
       L.push({ cle: 'r:v:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), num: '', trInconnu,
         etat: [lu.lieuNom || 'au point relais', dernierJour(ej) || (code || 'code pas encore lu')].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
@@ -43036,7 +43055,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // (2 nov.) Même fait que les cartes « extra » : un n° vu sans transporteur nommé.
       const suX = x.kind === 'email' ? (suiviDeLigne(x.t) || '') : (suivisAchat(x.o, indexSuivisAchats)[0] || ''); const eSX = x.kind === 'email' ? null : entreeSuiviAchat(x.o);
       const trInconnu = !!suX && !((x.kind === 'email' ? (x.t && x.t.carrier) : (relaisDe(x.o) || {}).transporteur) || (eSX && eSX.transporteur) || transporteurDeForme(suX) || colisInternational(suX));
-      const lu = x.kind === 'email' ? lieuDeLigne(x.t, o) : completer(lieuDe((relaisDe(x.o) || {}).lieu), (relaisDe(x.o) || {}).transporteur, '');
+      const lu = x.kind === 'email' ? lieuDeLigne(x.t, o) : lieuDeVinted(x.o, relaisDe(x.o));
       const scX = sourcesCarte(x.kind === 'email' ? { t: x.t, o } : { o: x.o });
       const code = codeDesSources(scX, scX && scX.code && scX.code.desaccord ? '' : (x.kind === 'email' ? codeDeLigne(x.t) : codeRetrait((relaisDe(x.o) || {}).code)));
       L.push({ cle: x.kind === 'email' ? 'r:e:' + (suiviDeLigne(x.t) || (x.t && (x.t.id || x.t.cleLigne)) || colisKey(x.t) || '') : 'r:v:' + (x.o && x.o.transaction_id), groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o ? o.title : (x.t && nomTr(x.t.carrier) ? 'Colis ' + nomTr(x.t.carrier) : 'Colis à retirer'), o), photo: o ? photoAchat(o) : ((x.t && x.t.photo) || null), trInconnu,
