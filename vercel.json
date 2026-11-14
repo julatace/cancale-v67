@@ -53,6 +53,10 @@
       "destination": "/api/compte?mode=agenda&f=:fichier"
     },
     {
+      "source": "/catalogue/:jeton",
+      "destination": "/api/compte?mode=catalogue&j=:jeton"
+    },
+    {
       "source": "/etat",
       "destination": "/etat.html"
     },

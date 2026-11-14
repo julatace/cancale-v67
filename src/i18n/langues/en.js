@@ -9,7 +9,11 @@ import ecran_messages from './en/messages.js';
 import ecran_emails from './en/emails.js';
 import ecran_stats from './en/stats.js';
 import ecran_compta from './en/compta.js';
+import ecran_listes from './en/listes.js';
+import ecran_plus from './en/plus.js';
 export default {
+  ...ecran_listes,
+  ...ecran_plus,
   ...ecran_compta,
   ...ecran_stats,
   ...ecran_emails,
