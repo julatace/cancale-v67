@@ -176,6 +176,49 @@ const ECRANS = {
 // Ce que l'écran vrai expose comme chiffre frais (jamais visible pendant l'instantané).
 const FRAIS = '[data-fu-case], [data-carte-valeur], [data-bord-card], [data-toutes-id], [data-colis-onglet-n], [data-a-venir-total], [data-colis-prochain]';
 
+// C. Colis vit dans Ventes : `?tab=cat_bord` ⇒ l'écran Ventes, « À expédier » y porte les 3 colis (N° dans
+//    l'ordre du lot AJ), une seule carte (jamais celle de Colis en plus) ; un instantané de Colis rangé par une
+//    version d'avant pour CE compte (même valide, même récent) n'est JAMAIS rendu, du premier rendu jusqu'à
+//    l'écran vrai (guetté par un observateur posé avant le chargement, base TENUE puis rendue).
+async function colisDansVentes(b, vp, theme, T) {
+  const E = ECRANS.colis;
+  await essaie('C ' + T, async () => {
+    const { ctx, etat, rendre } = await contexte(b, vp, { theme });
+    const t0 = Date.now() - 120000; const d = new Date(t0); const jour = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const carte = { classes: 'vrm-fu-carte vrm-carte-stats', portee: 'jour', surtitre: 'Aujourd’hui', grand: { texte: '987 654', valeur: '987654', vide: false, sous: 'à envoyer' }, spark: null, cases: [] };
+    const vieux = { v: 1, ecran: 'colis', uid: UID, t: t0, jour, mois: jour.slice(0, 7), largeur: 0, onglet: 'envoyer', sites: null, phrase: '', prochain: null, carte,
+      onglets: [{ cle: 'envoyer', l: 'À envoyer', n: 987654 }, { cle: 'envoyes', l: 'Envoyés', n: 0 }, { cle: 'retirer', l: 'À retirer', n: 0 }], liste: [] };
+    await ctx.addInitScript(([k, a]) => {
+      try { localStorage.setItem('vrm_local_owner', '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b'); localStorage.setItem(k, JSON.stringify(a)); } catch (_) {}
+      window.__instColisVu = false;
+      const guette = () => { if (document.querySelector('[data-inst-ecran="colis"]') || /987\s?654/.test((document.body && document.body.innerText) || '')) window.__instColisVu = true; };
+      new MutationObserver(guette).observe(document, { childList: true, subtree: true, characterData: true });
+    }, [E.cle(UID), vieux]);
+    etat.tenir = true;
+    const pg = await ctx.newPage(); const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+    await pg.goto(`http://localhost:${PORT}/?tab=${E.tab}`, { waitUntil: 'domcontentloaded' });
+    await pg.waitForSelector('[data-attente-ecran]', { timeout: 15000 }).catch(() => {});
+    // La base revient : l'écran vrai (Ventes) se pose.
+    rendre();
+    await pg.waitForSelector('[data-attente-ecran="ventes"][data-attente="pret"] [data-bord-card][data-colis-num]', { timeout: 30000 });
+    await pg.waitForFunction(() => document.querySelectorAll('[data-attente-ecran="ventes"][data-attente="pret"] [data-bord-card][data-colis-num]').length >= 3, null, { timeout: 15000 }).catch(() => {});
+    const r = await pg.evaluate(() => {
+      const racine = document.querySelector('[data-attente-ecran="ventes"][data-attente="pret"]');
+      const main = document.querySelector('.vrm-main');
+      const nums = racine ? [...racine.querySelectorAll('[data-bord-card][data-colis-num]')].filter((c) => c.getClientRects().length).map((c) => c.getAttribute('data-colis-num')) : [];
+      return { ecran: main && main.getAttribute('data-ecran'), nums: nums.join(' '), cartesColis: document.querySelectorAll('[data-carte-stats="colis"]').length,
+        cartes: racine ? racine.querySelectorAll('[data-carte-stats]').length : 0, inst: window.__instColisVu, instMaintenant: !!document.querySelector('[data-inst-ecran]') };
+    });
+    dit(r.ecran === 'ventes', `C ${T} « Colis » ouvre Ventes (Colis vit dans « À expédier » depuis le 11 nov.)`, JSON.stringify({ ecran: r.ecran }));
+    dit(r.nums === E.attendu.nums, `C ${T} « À expédier » : les 3 colis, N° dans l'ordre (${E.attendu.nums})`, JSON.stringify({ nums: r.nums }));
+    dit(r.cartesColis === 0 && r.cartes <= 1, `C ${T} une seule carte (jamais celle de Colis en plus)`, JSON.stringify({ colis: r.cartesColis, cartes: r.cartes }));
+    dit(!r.inst && !r.instMaintenant, `C ${T} l'instantané d'un écran Colis rangé avant n'est JAMAIS montré (du premier rendu à l'écran vrai)`, JSON.stringify({ vu: r.inst }));
+    dit(!errs.length, `C ${T} aucune erreur d'app`, errs.join(' | ').slice(0, 200));
+    await shot(pg, `cvi-colis-dans-ventes-${vp.width}-${theme}`);
+    await ctx.close();
+  });
+}
+
 async function main() {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   const temps = [];
@@ -185,6 +228,11 @@ async function main() {
       if (ECRAN_SEUL && ECRAN_SEUL !== nomE) continue;
       const E = ECRANS[nomE];
       const T = `${nomE} ${vp.width}px ${theme === 'dark' ? 'sombre' : 'clair'}`;
+      // (14 nov., bancs au vert) Depuis le 11 nov. (lot DJ3), Colis n'est plus un écran : `?tab=cat_bord` ouvre
+      // Ventes, dont « À expédier » porte les colis (Achats porte « À retirer »). L'instantané de Colis décrivait
+      // un écran qui n'existe plus : il ne se range plus et ne doit JAMAIS être montré (des chiffres d'un écran
+      // disparu). Le banc juge donc, pour Colis, la forme d'aujourd'hui (C) ; Ventes garde A · I · U · V · S.
+      if (nomE === 'colis') { await colisDansVentes(b, vp, theme, T); continue; }
       const { ctx, etat, rendre } = await contexte(b, vp, { theme });
       let ref = null;
       // ── A : 1re ouverture, l'instantané se range ───────────────────────────
