@@ -74,6 +74,8 @@ async function capture(pg, nom) {
   await pg.waitForTimeout(300);
   await pg.screenshot({ path: path.join(SHOTS, nom + '.png') });
 }
+// Une navigation qu'un geste précédent de la page (Échap, loupe) interrompt (ERR_ABORTED) : on la refait une fois.
+const aller = async (pg, url, o) => { try { return await pg.goto(url, o); } catch (e) { if (!/ERR_ABORTED|interrupted/.test(String(e))) throw e; await pg.waitForTimeout(500); return pg.goto(url, o); } };
 const attendre = async (pg, f, ms = 8000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await f().catch(() => false)) return true; await pg.waitForTimeout(250); } return false; };
 
 // Le bandeau, le cadre et sa languette : visibles, et le cadre au-dessus de TOUT.
@@ -126,7 +128,7 @@ async function parcours(nav, W, theme) {
   if (!actif) { await o.ctx.close(); return; }
 
   for (const tab of ECRANS) {
-    await o.pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
+    await aller(o.pg, `http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
     await o.pg.waitForSelector('[data-exemple-bandeau]', { timeout: 20000 }).catch(() => {});
     await o.pg.waitForSelector('.vrm-main', { timeout: 20000 }).catch(() => {});
     await o.pg.waitForTimeout(2200);
@@ -160,7 +162,7 @@ async function parcours(nav, W, theme) {
   }
 
   // B2 : une feuille ouverte (la loupe, Ctrl/⌘ K sur ordinateur, l'icône au téléphone).
-  await o.pg.goto(`http://localhost:${PORT}/?tab=ventes`, { waitUntil: 'domcontentloaded' });
+  await aller(o.pg, `http://localhost:${PORT}/?tab=ventes`, { waitUntil: 'domcontentloaded' });
   await o.pg.waitForSelector('[data-exemple-bandeau]', { timeout: 20000 }).catch(() => {});
   await o.pg.waitForTimeout(1800);
   if (o.tel) await o.pg.click('[data-recherche-loupe]').catch(() => {}); else await o.pg.keyboard.press('Control+k').catch(() => {});
@@ -177,7 +179,7 @@ async function parcours(nav, W, theme) {
   dit(ecrites.length === 0, `${T} W1 AUCUNE écriture (POST/PATCH/PUT/DELETE) n'est sortie de la page`, JSON.stringify(ecrites.slice(0, 5)));
 
   // C1 : « J'ai déjà un compte · Me connecter ».
-  await o.pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+  await aller(o.pg, `http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
   await o.pg.waitForSelector('[data-exemple-bandeau]', { timeout: 20000 }).catch(() => {});
   await o.pg.waitForTimeout(1500);
   const lien = await o.pg.evaluate(() => {
