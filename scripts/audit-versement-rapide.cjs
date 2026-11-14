@@ -8,8 +8,8 @@
 //
 //  On EXÉCUTE le vrai `background.js` (`_fond-vm.cjs`) et on COMPTE ce qui part
 //  chez Vinted :
-//   1. une visite : 10 détails au plus, la vente la plus RÉCENTE d'abord (2026
-//      avant 2025), une pause ALÉATOIRE de 2 à 5 s entre deux détails, des GET ;
+//   1. une visite : 10 détails au plus, la plus ANCIENNE d'abord hors des 45
+//      derniers jours (5.376 ; 2025 avant 2026), une pause ALÉATOIRE de 2 à 5 s entre deux détails, des GET ;
 //   2. le budget horaire : 15 lectures d'argent au plus dans l'heure, le total
 //      des lectures jamais au-dessus de 20 ;
 //   3. « quand rien d'autre n'attend » : au-delà de la part ordinaire, jamais la
@@ -55,10 +55,12 @@ async function controles(SRC, dit) {
     await f.ctx.capterDatesVersement(UID);
     const lus = txLus(f.j);
     dit(lus.length === 10, '1. une visite lit 10 détails, pas plus (40 à dater)', `${lus.length} lu(s)`);
+    // (14 nov., 5.376, lot dates-versement) Hors des 45 derniers jours : la plus ANCIENNE
+    // d'abord (l'URSSAF se déclare mois après mois ; audit-versement-sources juge les 45 jours).
     const d = (tx) => Date.parse(VENTES.find((v) => String(v.transaction_id) === tx).date);
-    const recents = [...VENTES].sort((a, b) => Date.parse(b.date) - Date.parse(a.date)).slice(0, 10).map((v) => String(v.transaction_id));
-    dit(lus.length > 0 && lus.every((tx, i) => i === 0 || d(lus[i - 1]) >= d(tx)) && lus.every((tx) => recents.includes(tx)),
-      '1. la plus récente d’abord (2026 avant 2025)', lus.map((tx) => VENTES.find((v) => String(v.transaction_id) === tx).date.slice(0, 10)).join(' '));
+    const anciennes = [...VENTES].sort((a, b) => Date.parse(a.date) - Date.parse(b.date)).slice(0, 10).map((v) => String(v.transaction_id));
+    dit(lus.length > 0 && lus.every((tx, i) => i === 0 || d(lus[i - 1]) <= d(tx)) && lus.every((tx) => anciennes.includes(tx)),
+      '1. la plus ancienne d’abord (2025 avant 2026, hors 45 derniers jours)', lus.map((tx) => VENTES.find((v) => String(v.transaction_id) === tx).date.slice(0, 10)).join(' '));
     const p = (f.ctx.__vrmPausesVues || []).filter((x) => x[0] === 'versement').map((x) => x[1]);
     dit(p.length === Math.max(0, lus.length - 1) && p.length > 0 && p.every((ms) => ms >= 2000 && ms <= 5000) && new Set(p).size > 1,
       '1. une pause ALÉATOIRE de 2 à 5 s entre deux détails', JSON.stringify(p));
