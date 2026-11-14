@@ -104,6 +104,7 @@ export default {
   "accueil.offre.solo.supplement": "1 account venditore Vinted incluso · +{prix}/mese per ogni account in più",
   "accueil.offres.bientot": " · a breve",
   "accueil.offres.cgv": "Condizioni di vendita",
+  "accueil.offres.tarifs": "Tutti i dettagli dei prezzi ›",
   "accueil.offres.essai": ", una volta per e-mail e per account Vinted. Senza vincoli: disdici dall’app.",
   "accueil.offres.ouverture": " Apertura a breve.",
   "accueil.offres.paiement": "Nessun pagamento senza che tu abbia visto il prezzo e accettato le ",
