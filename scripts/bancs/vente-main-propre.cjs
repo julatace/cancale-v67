@@ -147,31 +147,30 @@ const pret = async (pg, tel) => {
         dit(c.length === 0, `${TT} cibles ≥ 44 px`, c.join(' ; '));
         dit((await debord(pg)) <= 1, `${TT} aucun débordement`);
         await toucher('[data-ia-valider]');
-        const ok = await attendre(pg, ([a]) => { try { const d = JSON.parse(localStorage.getItem('vrm_cycle_decisions') || '{}')['9124']; const v = JSON.parse(localStorage.getItem('vinted_annonces_vendues') || '[]'); const s = JSON.parse(localStorage.getItem('vrm_slots') || '{}'); return d && d.choix === 'vendu-main' && d.montant === 45 && d.paiement === 'especes' && d.date === a && d.numero === '124' && v.includes('9124') && !s['124']; } catch (_) { return false; } }, [AUJ], 10000);
-        const n = await pg.evaluate(() => window.__touchers);
-        dit(ok, `${TT} vendue en main propre : 45 €, espèces, datée du jour, sortie du stock (case libérée, N° gardé)`, await lireLS(pg, 'vrm_cycle_decisions'));
-        dit(n === 2, `${TT} DEUX touchers mesurés (l’action, « Vendue »)`, String(n));
-        await attendre(pg, () => !!document.querySelector('[data-ia-vente-faite="9124"]'));
-        const jour = await attendre(pg, () => { const v = document.querySelector('[data-jv2-vendu]'), r = document.querySelector('[data-jv2-verse]'); return v && v.getAttribute('data-jv2-vendu') === '4500' && r && r.getAttribute('data-jv2-verse') === '4500'; }, null, 3500);
-        dit(jour, `${TT} Ma journée : vendu 45 € et versé 45 € aujourd’hui (encaissée le jour saisi)`, await venduJour(pg) + ' / avant : ' + jourAvant + ' / sonde : ' + await pg.evaluate(() => JSON.stringify({ mois: [...document.querySelectorAll('[data-vendu-mois]')].map((e) => e.getAttribute('data-vendu-mois')), jc: document.querySelectorAll('.vrm-jc').length, t: [...document.querySelectorAll('main *, #root *')].filter((e) => !e.children.length && /45\s*€/.test(e.textContent || '')).slice(0, 4).map((e) => e.outerHTML.slice(0, 160)) })));
-        await pg.screenshot({ path: path.join(SHOTS, `faite-${suf}.png`) });
-        // « Annuler » (la pilule, 5 s) : l'état d'avant EXACT, le chiffre du jour revient, la feuille le dit.
+        // « Annuler » TOUT DE SUITE (la pilule dure 5 s) : l'état d'avant EXACT, la feuille le dit.
         const annuler = pg.locator('[data-pilule-annuler]').first();
         await annuler.waitFor({ timeout: 4000 }).catch(() => {});
+        const n = await pg.evaluate(() => window.__touchers);
+        const ecrit = await attendre(pg, ([a]) => { try { const d = JSON.parse(localStorage.getItem('vrm_cycle_decisions') || '{}')['9124']; const v = JSON.parse(localStorage.getItem('vinted_annonces_vendues') || '[]'); const s = JSON.parse(localStorage.getItem('vrm_slots') || '{}'); return !!(d && d.choix === 'vendu-main' && d.montant === 45 && d.paiement === 'especes' && d.date === a && d.numero === '124' && v.includes('9124') && !s['124']); } catch (_) { return false; } }, [AUJ], 3000);
         if (await annuler.count()) { if (tel) await annuler.tap(); else await annuler.click(); }
+        dit(n === 2, `${TT} DEUX touchers mesurés (l’action, « Vendue »)`, String(n));
+        dit(ecrit, `${TT} vendue en main propre : 45 €, espèces, datée du jour, sortie du stock (case libérée, N° gardé)`, await lireLS(pg, 'vrm_cycle_decisions'));
         const revenu = await attendre(pg, ([d0, v0, s0]) => { const eg = (k, x) => { const vide = k === 'vinted_annonces_vendues' ? '[]' : '{}'; /* une clé absente = vide (aucun lecteur ne les distingue) */ return JSON.stringify(JSON.parse(localStorage.getItem(k) || vide)) === JSON.stringify(JSON.parse(x || vide)); }; return eg('vrm_cycle_decisions', d0) && eg('vinted_annonces_vendues', v0) && eg('vrm_slots', s0); }, [avantD, avantV, avantS], 10000);
         dit(revenu, `${TT} « Annuler » ⇒ décisions, marque « vendue » et case : l’état d’avant EXACT`, [avantD, await lireLS(pg, 'vrm_cycle_decisions'), avantS, await lireLS(pg, 'vrm_slots')].join(' | '));
-        const retour = await attendre(pg, (j0) => { const v = document.querySelector('[data-jv2-vendu]'), r = document.querySelector('[data-jv2-verse]'); return ((v ? v.getAttribute('data-jv2-vendu') : '-') + '/' + (r ? r.getAttribute('data-jv2-verse') : '-')) === j0; }, jourAvant, 8000);
-        dit(retour, `${TT} et les chiffres du jour reviennent`, String(await venduJour(pg)) + ' / avant : ' + jourAvant);
         const dite = await attendre(pg, () => document.querySelector('[data-ia-etape]')?.getAttribute('data-ia-etape') === 'prix' && /Vente annulée/.test(document.querySelector('[data-ia-note]')?.textContent || ''), null, 8000);
         dit(dite, `${TT} la feuille dit « Vente annulée » et revient au prix (jamais « vendu » affiché pour rien)`);
+        const retour = await attendre(pg, (j0) => { const v = document.querySelector('[data-jv2-vendu]'), r = document.querySelector('[data-jv2-verse]'); return ((v ? v.getAttribute('data-jv2-vendu') : '-') + '/' + (r ? r.getAttribute('data-jv2-verse') : '-')) === j0; }, jourAvant, 8000);
+        dit(retour, `${TT} les chiffres du jour de Ma journée sont ceux d’avant`, String(await venduJour(pg)) + ' / avant : ' + jourAvant);
         await pg.screenshot({ path: path.join(SHOTS, `annulee-${suf}.png`) });
-        // Revendue (virement) : le reçu PDF.
+        // Revendue (virement) : Ma journée la compte (vendu ET versé le jour saisi), puis le reçu PDF.
         await taper('[data-ia-prix]', '45');
         await toucher('[data-ia-paiement-choix="virement"]');
         await toucher('[data-ia-valider]');
         dit(await attendre(pg, () => { try { const d = JSON.parse(localStorage.getItem('vrm_cycle_decisions') || '{}')['9124']; return d && d.paiement === 'virement' && d.montant === 45; } catch (_) { return false; } }), `${TT} revendue : virement rangé avec la décision`);
         await attendre(pg, () => !!document.querySelector('[data-ia-vente-faite="9124"]'));
+        const jour = await attendre(pg, () => { const v = document.querySelector('[data-jv2-vendu]'), r = document.querySelector('[data-jv2-verse]'); return v && v.getAttribute('data-jv2-vendu') === '4500' && r && r.getAttribute('data-jv2-verse') === '4500'; }, null, 10000);
+        dit(jour, `${TT} Ma journée : vendu 45 € et versé 45 € aujourd’hui (encaissée le jour saisi)`, await venduJour(pg) + ' / avant : ' + jourAvant);
+        await pg.screenshot({ path: path.join(SHOTS, `faite-${suf}.png`) });
         const dl = pg.waitForEvent('download', { timeout: 20000 }).catch(() => null);
         await toucher('[data-ia-recu]');
         const d = await dl; let entete = '';
