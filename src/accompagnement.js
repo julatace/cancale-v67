@@ -348,8 +348,11 @@ export const GESTES_ACC = {
   'prix.baisserLbc':  { ecran: 'leboncoin', ensuite: { lien: '?tab=plat_leboncoin' } },
   'prix.baisserVc':   { ecran: 'vestiaire', sorte: 'baisse-prix-vestiaire', ensuite: { lien: '?tab=plat_vestiaire' } },
   'ebay.soldes':      { ecran: 'ebay',      ensuite: { lien: '?tab=plat_ebay' } },
-  'republier':        { ecran: 'annonces',  sorte: 'republier-lbc',         ensuite: { lien: '?tab=annonces' } },
-  'creer.vinted':     { ecran: 'annonces',  ensuite: { lien: 'https://www.vinted.fr/items/drafts', dehors: true } },
+  'republier':        { ecran: 'annonces',  ensuite: { lien: '?tab=annonces' } },
+  'republier.lbc':    { ecran: 'leboncoin', sorte: 'republier-lbc',         ensuite: { lien: '?tab=plat_leboncoin' } },
+  'publier.lbc':      { ecran: 'leboncoin', sorte: 'publier-lbc',           ensuite: { lien: '?tab=plat_leboncoin' } },
+  'publier.vinted':   { ecran: 'annonces',  sorte: 'publier-fiche-vinted',  ensuite: { lien: '?tab=annonces' } },
+  'creer.vinted':     { ecran: 'annonces',  sorte: 'creer-vinted',          ensuite: { lien: 'https://www.vinted.fr/items/drafts', dehors: true } },
   'publier.partout':  { ecran: 'annonces',  sorte: 'publier-partout',       ensuite: { lien: '?tab=annonces' } },
   'publier.ebay':     { ecran: 'ebay',      sorte: 'publier-ebay',          ensuite: { lien: '?tab=plat_ebay' } },
   'lbc.supprimer':    { ecran: 'leboncoin', ensuite: { lien: '?tab=plat_leboncoin' } },
@@ -366,7 +369,8 @@ export const GESTES_ACC = {
 export const IDS_GESTES_ACC = Object.keys(GESTES_ACC);
 export const gesteAcc = (id) => GESTES_ACC[id] || null;
 // La sorte d'un travail suivi ⇒ son geste (la feuille « VRM travaille » porte `data-acc-pendant`).
-const PAR_SORTE = { bordereaux: 'colis.imprimer', 'retirer-ailleurs': 'colis.retire', 'baisse-prix': 'prix.baisser', 'baisse-prix-vestiaire': 'prix.baisserVc', 'republier-lbc': 'republier', 'publier-partout': 'publier.partout', 'publier-ebay': 'publier.ebay', vacances: 'vacances' };
+const PAR_SORTE = { bordereaux: 'colis.imprimer', 'retirer-ailleurs': 'colis.retire', 'baisse-prix': 'prix.baisser', 'baisse-lbc': 'prix.baisserLbc', 'baisse-prix-vestiaire': 'prix.baisserVc',
+  'republier-lbc': 'republier.lbc', 'publier-lbc': 'publier.lbc', 'publier-partout': 'publier.partout', 'publier-ebay': 'publier.ebay', 'creer-vinted': 'creer.vinted', 'publier-fiche-vinted': 'publier.vinted', vacances: 'vacances' };
 export const gesteDeSorte = (sorte) => PAR_SORTE[String(sorte || '')] || '';
 
 // ── LA RAISON D'UN ÉCHEC, EN MOTS SIMPLES ────────────────────────────────────

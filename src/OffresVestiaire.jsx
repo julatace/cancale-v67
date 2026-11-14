@@ -15,6 +15,7 @@ import { GESTES_OFFRE, etatGeste, prixContre, euros, resteAvant, etiquetteOffre,
 import { PhotoVide } from './composants/PhotoVide.jsx';
 import { tr } from './i18n/index.js';
 import { Numero } from './composants/Numero.jsx';
+import { AccAvant, AccApres, AccEchec } from './ui/Accompagne.jsx';   // (14 nov.) les quatre moments du geste
 
 // (11 nov., lot vestiaire-plus) Les textes passent par tr() (src/i18n/langues/*.js, le français mot pour mot).
 const NOM = { accepter: () => tr('vcOffres.accepter'), refuser: () => tr('vcOffres.refuser'), contre: () => tr('vcOffres.contre') };
@@ -54,7 +55,7 @@ function CarteOffre({ o, recettes, cap, numDe, envoyer, Photo, maintenant }) {
         <span className="vrm-of-prix" data-vc-offre-cents={o.offre == null ? '' : String(o.offre)}>{euros(o.offre)}</span>
       </div>
       {prets.length > 0 && (
-        <div className="vrm-of-gestes" role="group" aria-label={tr('vcOffres.repondreOffre')}>
+        <div className="vrm-of-gestes" role="group" aria-label={tr('vcOffres.repondreOffre')} data-acc-pendant={enCours ? 'offre.vestiaire' : undefined}>
           {prets.filter((g) => g !== 'contre').map((g) => (
             <button key={g} type="button" className={'vrm-of-btn' + (confirme === g ? ' is-confirme' : '')} data-vc-offre-geste={g} data-vc-offre-confirme={confirme === g ? '1' : undefined}
               disabled={!!enCours} onClick={() => (confirme === g ? faire(g) : setConfirme(g))}>{enCours === g ? '…' : (confirme === g ? CONFIRME[g]() : NOM[g]())}</button>
@@ -73,7 +74,7 @@ function CarteOffre({ o, recettes, cap, numDe, envoyer, Photo, maintenant }) {
       {prets.length < GESTES_OFFRE.length && (
         <a className="vrm-of-lien vrm-pied-lien" data-pied-lien="repondre-vc" data-vc-offre-ailleurs={GESTES_OFFRE.filter((g) => !prets.includes(g)).map((g) => g + ':' + etats[g].etat).join(',')} href={lien} target="_blank" rel="noreferrer">{tr('vcOffres.repondreVestiaire')}</a>
       )}
-      {res ? <div className="vrm-of-resultat" role="status" data-vc-offre-resultat={res.ton}>{res.texte}</div> : null}
+      {res ? <div className="vrm-of-resultat" data-vc-offre-resultat={res.ton}>{res.ton === 'ok' ? <AccApres geste="offre.vestiaire" texte={res.texte} ensuite={null}/> : <AccEchec geste="offre.vestiaire" erreur={res.ton === 'muet' ? { sansReponse: true, raison: res.texte } : res.texte}/>}</div> : null}
     </li>
   );
 }
@@ -89,6 +90,7 @@ export default function OffresVestiaire({ etat, recettes, cap, numDe, envoyer, P
     <section className="vrm-of" data-vc-offres={A.length} data-vc-offres-attente={W.length}>
       {A.length > 0 && <>
         <h3 className="vrm-of-titre">{tr('vcOffres.offresRecues')}<span className="vrm-of-n">{A.length}</span></h3>
+        <AccAvant geste="offre.vestiaire"/>
         <ul className="vrm-of-liste">{A.map((o) => <CarteOffre key={o.id} o={o} recettes={recettes} cap={cap} numDe={numDe} envoyer={envoyer} Photo={Photo} maintenant={maintenant}/>)}</ul>
       </>}
       {W.length > 0 && (<>

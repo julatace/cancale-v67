@@ -18,6 +18,7 @@ import { useLectureCamera, phraseSansCamera, vibrer, creerBip } from './ScannerC
 import { useEcranAllume } from './ModeRelais.jsx';
 import { LogoTransporteur, LogoInconnu } from './PastilleTransporteur.jsx';
 import { ordreDeSeance } from './preparerRelais.js';
+import { tr } from './i18n/index.js';
 import { progressionDepot, groupesDepot, trouverDepot, enFileDepot, estDepose, heureVue } from './modeDepot.js';
 import './styles-mode-depot.css';
 
@@ -99,7 +100,7 @@ export default function ModeDepot({ colis, etatDe = () => '', onDeposer, onAnnul
         {horsLigne ? <p className="vrm-depot-hl" data-depot-vue={vueA || ''}>Hors ligne · liste {vue || 'gardée ici'}</p> : null}
         {nFile ? <p className="vrm-depot-file" data-depot-file={nFile} role="status">{nFile} dépôt{nFile > 1 ? 's' : ''} à envoyer</p> : null}
         {prog.total ? (
-          <div className="vrm-depot-progres" role="progressbar" aria-valuemin={0} aria-valuemax={prog.total} aria-valuenow={prog.deposes} aria-label={`${prog.deposes} sur ${prog.total} déposés`}>
+          <div className="vrm-depot-progres" data-acc-pendant="colis.depose" role="progressbar" aria-valuemin={0} aria-valuemax={prog.total} aria-valuenow={prog.deposes} aria-label={`${prog.deposes} sur ${prog.total} déposés`}>
             <span className="vrm-depot-progres-n" data-depot-compte=""><b>{prog.deposes}</b> sur {prog.total} déposés</span>
             <span className="vrm-depot-barre" aria-hidden="true"><span style={{ width: `${Math.round((prog.deposes / prog.total) * 100)}%` }}/></span>
           </div>
@@ -110,7 +111,7 @@ export default function ModeDepot({ colis, etatDe = () => '', onDeposer, onAnnul
             {camera === 'sans' ? <p className="vrm-depot-sans" data-depot-sans-camera="">{phraseSansCamera('Pas de caméra : tape le n° du bordereau.')}</p> : <span className="vrm-depot-viseur" aria-hidden="true"/>}
           </div>
           <div className="vrm-depot-res" role="status" aria-live="assertive" data-depot-resultat={res ? res.etat : ''} data-depot-res-cle={rc ? rc.cle : ''} data-depot-n={res ? res.n : 0}>
-            {!res ? <span className="vrm-depot-attente">Scanne chaque bordereau.</span>
+            {!res ? <span className="vrm-depot-attente" data-acc-avant="colis.depose">{tr('acc.colis.depose.scan')}</span>
               : rc && (res.etat === 'trouve' || res.etat === 'deja') ? (
                 <span className="vrm-depot-res-paire">
                   {rc.num ? <b className="vrm-depot-res-num">N°{rc.num}</b> : null}
@@ -118,7 +119,7 @@ export default function ModeDepot({ colis, etatDe = () => '', onDeposer, onAnnul
                   <span className={'vrm-depot-res-etat' + (res.etat === 'deja' ? ' is-deja' : '')}>{res.etat === 'deja' ? 'Déjà déposé' : 'Déposé ✓'}</span>
                   {rcEtat === 'attente' && !horsLigne ? <button type="button" className="vrm-depot-b" data-depot-res-annuler={rc.cle} onClick={() => annuler(rc)}>Annuler</button> : null}
                 </span>)
-              : <span className="vrm-depot-res-non" data-depot-message="">{res.etat === 'ambigu' ? `${Array.isArray(res.colis) ? res.colis.length : 2} colis portent ce n° : vérifie` : 'Pas dans tes colis à déposer'}<small>{res.lu} · rien n’est coché</small></span>}
+              : <span className="vrm-depot-res-non" data-depot-message="" data-acc-echec="colis.depose" data-acc-raison={res.etat === 'ambigu' ? 'ambigu' : 'introuvable'}>{res.etat === 'ambigu' ? `${Array.isArray(res.colis) ? res.colis.length : 2} colis portent ce n° : vérifie` : 'Pas dans tes colis à déposer'}<small>{res.lu} · {tr('acc.colis.depose.introuvable')}</small></span>}
           </div>
           <form className="vrm-depot-saisie" onSubmit={valider}>
             <input ref={saisieRef} data-depot-saisie="" value={saisie} onChange={(e) => setSaisie(e.target.value)} placeholder="N° du bordereau" inputMode="text" autoCapitalize="characters" autoComplete="off" spellCheck={false} aria-label="N° de suivi du bordereau"/>
@@ -156,10 +157,10 @@ export default function ModeDepot({ colis, etatDe = () => '', onDeposer, onAnnul
         ))}
       </div>
       {tout ? (
-        <div className="vrm-depot-tout" role="alertdialog" aria-label="Tout est déposé" data-depot-tout={prog.total}>
+        <div className="vrm-depot-tout" role="alertdialog" aria-label="Tout est déposé" data-depot-tout={prog.total} data-acc-apres="colis.depose">
           <span className="vrm-depot-tout-coche" aria-hidden="true">✓</span>
           <p className="vrm-depot-tout-t">Tout est déposé</p>
-          {nFile ? <p className="vrm-depot-tout-s">{nFile} dépôt{nFile > 1 ? 's' : ''} à envoyer au retour du réseau</p> : null}
+          {nFile ? <p className="vrm-depot-tout-s">{nFile} dépôt{nFile > 1 ? 's' : ''} à envoyer au retour du réseau</p> : <p className="vrm-depot-tout-s" data-acc-ensuite="">{tr('acc.colis.depose.suite')}</p>}
           <div className="vrm-depot-tout-gestes">
             <button type="button" className="vrm-depot-b" data-depot-revoir="" onClick={() => setMasqueTout(true)}>Revoir</button>
             <button type="button" className="vrm-depot-b vrm-depot-b-plein" data-depot-fini="" onClick={onFermer}>Fermer</button>

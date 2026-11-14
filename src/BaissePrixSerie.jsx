@@ -18,6 +18,7 @@ import JaugeActions from './JaugeActions.jsx';   // (10 nov., lot G) les 50 acti
 import { facteursBaisse, heuresEtalees, ETALEMENT_H } from './discretion.js';
 import { heureFr } from './jaugeActions.js';
 import { tr } from './i18n/index.js';
+import { AccAvant, AccApres, AccEchec } from './ui/Accompagne.jsx';   // (14 nov.) les quatre moments du geste
 
 const ETAT = { prevue: 'Prévue', envoi: 'Envoi…', fait: 'Fait', ecart: 'Autre prix', incertain: 'Pas relu', echec: 'Refusé', refus: 'Pas envoyée', 'pas-envoye': 'Pas envoyée' };
 const pauseEntre = () => {
@@ -153,6 +154,8 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
     if (onFini) onFini(file.map((l) => ({ ligne: l, issue: res[l.id] || null })));
   };
   const bilan = bilanBaisse(etats);
+  const geste = site === 'leboncoin' ? 'prix.baisserLbc' : 'prix.baisser';
+  const refus1 = Object.values(etats).find((e) => e && ['echec', 'refus', 'pas-envoye'].includes(e.etat) && e.raison);
   const unite = mode === 'pct' ? '%' : '€';
   if (typeof document === 'undefined') return null;
   return createPortal(
@@ -190,7 +193,7 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
         </div> : null}
         {compteOnglet && site === 'vinted' ? <div className="vrm-bp-plafond"><JaugeActions uid={compteOnglet} /></div> : null}
         {!baisse.ok ? <p className="vrm-ao-mini" role="alert" data-bp-erreur="">{baisse.erreur}</p> : null}
-        {extRaison ? <p className="vrm-ao-mini" role="status" data-bp-ext="">{extRaison}</p> : null}
+        {extRaison ? <div className="vrm-ao-mini" data-bp-ext=""><AccEchec geste={geste} erreur={extRaison}/></div> : null}
         {ouvrir.map((o) => <p key={o.texte} className="vrm-bp-compte" data-bp-ouvrir={o.n}>{o.texte} pour baisser {o.n > 1 ? `ses ${o.n} annonces` : 'son annonce'}.</p>)}
         {nSous && baisse.ok ? <p className="vrm-ao-mini" data-bp-sous-plancher-n={nSous}>{nSous} sous ton plancher : décochée{nSous > 1 ? 's' : ''}.</p> : null}
         <ul className="vrm-bp-liste" data-bp-n={lignes.length}>
@@ -233,7 +236,7 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
           })}
         </ul>
         {phase === 'envoi' ? (
-          <div className="vrm-bp-bas" data-bp-progres={`${progres.i}/${progres.n}`}>
+          <div className="vrm-bp-bas" data-bp-progres={`${progres.i}/${progres.n}`} data-acc-pendant={geste}>
             <span className="vrm-bp-jauge" aria-hidden="true"><i style={{ width: `${progres.n ? Math.round((progres.i / progres.n) * 100) : 0}%` }}/></span>
             <span className="vrm-bp-progres" role="status" aria-live="polite">{progres.i} sur {progres.n}{arretDemande ? ' · arrêt après celle-ci' : ''}</span>
             <button type="button" className="vrm-ao-second" data-bp-arreter="" disabled={arretDemande} onClick={() => { arret.current = true; setArretDemande(true); }}>Arrêter</button>
@@ -248,7 +251,11 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
           </div>
         ) : phase === 'fini' ? (
           <div className="vrm-bp-bas is-fini" data-bp-bilan={`${bilan.fait}/${bilan.ecart}/${bilan.incertain}/${bilan.echec + bilan.refus}/${bilan.pasEnvoye}`}>
-            <p className="vrm-bp-progres" role="status">{[bilan.fait ? `${bilan.fait} baissé${bilan.fait > 1 ? 's' : ''}` : '', bilan.ecart ? `${bilan.ecart} autre prix` : '', bilan.incertain ? `${bilan.incertain} pas relu${bilan.incertain > 1 ? 's' : ''}` : '', (bilan.echec + bilan.refus + bilan.pasEnvoye) ? `${bilan.echec + bilan.refus + bilan.pasEnvoye} pas fait${(bilan.echec + bilan.refus + bilan.pasEnvoye) > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ') || 'Rien envoyé'}</p>
+            {(() => { const txt = [bilan.fait ? `${bilan.fait} baissé${bilan.fait > 1 ? 's' : ''}` : '', bilan.ecart ? `${bilan.ecart} autre prix` : '', bilan.incertain ? `${bilan.incertain} pas relu${bilan.incertain > 1 ? 's' : ''}` : '', (bilan.echec + bilan.refus + bilan.pasEnvoye) ? `${bilan.echec + bilan.refus + bilan.pasEnvoye} pas fait${(bilan.echec + bilan.refus + bilan.pasEnvoye) > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ') || 'Rien envoyé';
+              // (14 nov.) Le bilan dit le résultat et la suite ; rien de baissé ⇒ la raison et le geste.
+              return bilan.fait || bilan.ecart || bilan.incertain
+                ? <AccApres geste={geste} texte={txt} onEnsuite={(suite) => { onFermer(); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: suite.lien })); } catch (_) {} }}/>
+                : <AccEchec geste={geste} erreur={refus1 ? refus1.raison : txt}/>; })()}
             <button type="button" className="vrm-ao-principal" data-bp-fermer-fin="" onClick={onFermer}>Fermer</button>
           </div>
         ) : phase === 'confirmer' ? (
@@ -261,6 +268,7 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
           </div>
         ) : (
           <div className="vrm-bp-bas">
+            {choisies.length && !etale ? <AccAvant geste={geste} vars={{ n: choisies.length }}/> : null}
             <button type="button" className="vrm-ao-principal" data-bp-lancer={choisies.length} disabled={!baisse.ok || !choisies.length || !!extRaison} onClick={demanderConfirmation}>
               {choisies.length ? (etale ? `Programmer ${choisies.length} baisse${choisies.length > 1 ? 's' : ''}` : `Baisser ${choisies.length} prix`) : 'Coche au moins une annonce'}
             </button>

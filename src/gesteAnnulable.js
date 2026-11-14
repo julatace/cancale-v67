@@ -166,7 +166,7 @@ export function creerGestes({ minuterie = (f, ms) => setTimeout(f, ms), arreter 
   const instantane = () => {
     const g = visible != null ? gestes.get(visible) : null;
     if (!g) return { visible: null };
-    return { visible: { id: g.id, etat: g.etat, texte: g.texte, raison: g.raison || '', peutAnnuler: ['envoi', 'enregistre', 'garde'].includes(g.etat), peutReessayer: g.etat === 'echec' || g.etat === 'echec-annulation' } };
+    return { visible: { id: g.id, etat: g.etat, texte: g.texte, raison: g.raison || '', acc: g.acc || '', peutAnnuler: ['envoi', 'enregistre', 'garde'].includes(g.etat), peutReessayer: g.etat === 'echec' || g.etat === 'echec-annulation' } };
   };
   const emettre = () => { const s = instantane(); for (const f of abonnes) { try { f(s); } catch (_) {} } };
   const dureeDe = (g) => (g.etat === 'annule' ? dureeAnnule : (g.etat === 'echec' || g.etat === 'echec-annulation') ? dureeEchec : dureePilule);
@@ -248,9 +248,11 @@ export function creerGestes({ minuterie = (f, ms) => setTimeout(f, ms), arreter 
 
   const api = {
     // Lance un geste : l'écran change TOUT DE SUITE, l'écriture part.
-    lancer({ texte, cles, vue, ecrire }) {
+    // `acc` (14 nov., lot accompagnement) : le nom du geste (src/accompagnement.js §9) — la pilule
+    // le porte (data-acc-apres / data-acc-echec) et propose sa suite ; rien d'autre ne change ici.
+    lancer({ texte, cles, vue, ecrire, acc = '' }) {
       const id = ++suivant;
-      const g = { id, texte: String(texte || ''), cles: [...new Set((cles || []).map(String))], vue, ecrire, etat: 'envoi', gen: 1, raison: '', enCours: 0, job: null };
+      const g = { id, texte: String(texte || ''), cles: [...new Set((cles || []).map(String))], vue, ecrire, etat: 'envoi', gen: 1, raison: '', enCours: 0, job: null, acc: String(acc || '') };
       gestes.set(id, g);
       try { vue('apres'); } catch (_) {}
       g.job = enfiler(g, 'apres', g.gen, issueGeste);

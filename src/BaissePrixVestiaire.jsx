@@ -10,6 +10,7 @@ import { createPortal } from 'react-dom';
 import { baisseTapee, eurosBaisse as eur } from './baissePrix.js';
 import { lignesBaisseVc, issueBaisseVc, etatRecettePrixVc } from './baissePrixVestiaire.js';
 import { tr } from './i18n/index.js';
+import { AccAvant, AccApres, AccEchec } from './ui/Accompagne.jsx';   // (14 nov.) les quatre moments du geste
 import { suivi } from './suiviTravail.js';   // VRM figé, détail et barre pendant la série (lot suivi-travail)
 import './styles-annonces-outils.css';
 import './styles-baisse-prix.css';
@@ -150,13 +151,15 @@ export default function BaissePrixVestiaire({ annonces = [], compteOnglet, recet
           })}
         </ul>
         {phase === 'envoi' ? (
-          <div className="vrm-bp-bas" data-bp-progres={`${progres.i}/${progres.n}`}>
+          <div className="vrm-bp-bas" data-bp-progres={`${progres.i}/${progres.n}`} data-acc-pendant="prix.baisserVc">
             <span className="vrm-bp-progres" role="status" aria-live="polite">{tr('vcBaisse.progres', { i: progres.i, n: progres.n })}</span>
             <button type="button" className="vrm-ao-second" data-bp-arreter="" onClick={() => { arret.current = true; }}>{tr('vcBaisse.arreter')}</button>
           </div>
         ) : phase === 'fini' ? (
           <div className="vrm-bp-bas is-fini" data-bp-bilan={`${n('fait')}/${n('ecart')}/${n('incertain')}/${n('echec') + n('refus') + n('pas-envoye')}`}>
-            <p className="vrm-bp-progres" role="status">{tr('vcBaisse.bilan', { fait: n('fait'), pasRelu: n('incertain') + n('ecart'), pasFait: n('echec') + n('refus') + n('pas-envoye') })}</p>
+            {(() => { const txt = tr('vcBaisse.bilan', { fait: n('fait'), pasRelu: n('incertain') + n('ecart'), pasFait: n('echec') + n('refus') + n('pas-envoye') });
+              const r1 = Object.values(etats).find((e) => e && ['echec', 'refus', 'pas-envoye'].includes(e.etat) && e.raison);
+              return n('fait') + n('ecart') + n('incertain') ? <AccApres geste="prix.baisserVc" texte={txt}/> : <AccEchec geste="prix.baisserVc" erreur={r1 ? r1.raison : txt}/>; })()}
             <button type="button" className="vrm-ao-principal" data-bp-fermer-fin="" onClick={onFermer}>{tr('commun.fermer')}</button>
           </div>
         ) : phase === 'confirmer' ? (
@@ -169,6 +172,7 @@ export default function BaissePrixVestiaire({ annonces = [], compteOnglet, recet
           </div>
         ) : (
           <div className="vrm-bp-bas">
+            {pret && choisies.length ? <AccAvant geste="prix.baisserVc" vars={{ n: choisies.length }}/> : null}
             <button type="button" className="vrm-ao-principal" data-bp-lancer={choisies.length} disabled={!pret || !baisse.ok || !choisies.length} onClick={() => setPhase('confirmer')}>
               {!pret ? tr('vcBaisse.pasAppris') : choisies.length ? tr('vcBaisse.lancer', { n: choisies.length }) : tr('vcBaisse.cocher')}
             </button>

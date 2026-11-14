@@ -4763,8 +4763,9 @@ const _ecrivainVrm = creerEcrivainLocal({
 });
 // `ops` : les sous-valeurs posées (src/gesteAnnulable.js) ; `setters` : { [clé]: setState }
 // de l'écran (optionnel : un écran qui relit la clé à sa sauvegarde suit seul).
-const gesteVrm = (texte, ops, setters = {}, apres = null) => _gestes.lancer({
-  texte, cles: clesDe(ops),
+// `acc` (14 nov., lot accompagnement) : le nom du geste, porté par la pilule (data-acc-apres / -echec).
+const gesteVrm = (texte, ops, setters = {}, apres = null, acc = '') => _gestes.lancer({
+  texte, cles: clesDe(ops), acc,
   vue: (sens) => { vueDesOps(ops, setters)(sens); if (typeof apres === 'function') { try { apres(sens); } catch (_) {} } },
   ecrire: (sens) => ecrireOps({ ops, sens, lire: _ecrivainVrm.lire, ecrire: _ecrivainVrm.ecrire }),
 });
@@ -5475,7 +5476,7 @@ function AtelierPaireCoque({ num, itemId = '', idFiche = '' }) {
       vendus={(() => { try { return new Set((load('vinted_annonces_vendues', []) || []).map(String)); } catch (_) { return null; } })()}
       caseDe={(x) => rangementDuNum(x) || ''} cleNum={cleNum} proposer={proposerFusion}
       Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy"/>} Feuille={SheetShellSurFiche} Bouton={Bouton} Segmente={Segmente}
-      onFusionner={(res) => { setFusionOuverte(false); gesteVrm(tr('atelier.fusion.faite'), res.ops, { [CLE_FUSIONS]: MAG_FUSIONS.poser }); }}
+      onFusionner={(res) => { setFusionOuverte(false); gesteVrm(tr('atelier.fusion.faite'), res.ops, { [CLE_FUSIONS]: MAG_FUSIONS.poser }, null, 'fiches.fusion'); }}
       onClose={() => setFusionOuverte(false)}/> : null}
   </>;
 }
@@ -32976,7 +32977,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const ops = [{ k: 'vrm_colis_collected', type: 'ensemble', id: k, apres: oui, avant: collected.has(k) },
       { k: 'vrm_colis_collected_at', type: 'cle', id: k, apres: oui ? new Date().toISOString() : undefined, avant: collectedAt[k] }];
     // (9 nov., lot AD) L'identifiant du geste est rendu : le mode relais offre son « Annuler » dans sa feuille.
-    return gesteVrm(oui ? 'Colis retiré' : 'Colis remis dans « à retirer »', ops, { vrm_colis_collected: setCollected, vrm_colis_collected_at: setCollectedAt });
+    return gesteVrm(oui ? 'Colis retiré' : 'Colis remis dans « à retirer »', ops, { vrm_colis_collected: setCollected, vrm_colis_collected_at: setCollectedAt }, null, oui ? 'colis.retire' : '');
   };
   // (11 nov., lot rangement-guide) « J'ai retiré » ⇒ « Ranger cet achat » : l'achat de CE colis par
   // identité seulement (`achatDuColis` : son n° de suivi ou de transaction, jamais le titre) ; sans achat
@@ -33008,7 +33009,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!ops.length) return;
     // (11 nov., lot rangement-guide) Leurs achats (par identité) attendent dans Ma journée.
     try { proposerRangement((list || []).map((t) => entreeRangementColis(t)).filter((e) => e && e.tx)); } catch (_) {}
-    gesteVrm(vus.size > 1 ? `${vus.size} colis retirés` : 'Colis retiré', ops, { vrm_colis_collected: setCollected });
+    gesteVrm(vus.size > 1 ? `${vus.size} colis retirés` : 'Colis retiré', ops, { vrm_colis_collected: setCollected }, null, 'colis.retire');
   };
   const isCollected = (t) => collected.has(colisKey(t));
   // Un colis « à retirer » (available) qui traîne depuis > 14 j est forcément
@@ -34131,7 +34132,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Vinted, pas un rapprochement (§24). On ouvre donc toujours SA conversation,
   // même quand l'extension n'est pas encore passée.
   const lienConv = (o) => { const c = o && o.conversation_id; return c ? `https://www.vinted.fr/inbox/${c}` : ''; };
-  const markPickupDone = (o) => { const k = String(o.transaction_id||''); if(!k) return; try { apresRetrait(entreeRangementVinted(o)); } catch (_) {} return gesteVrm('Colis retiré', [{ k: 'vinted_pickup_done', type: 'cle', id: k, apres: new Date().toISOString(), avant: pickupDone[k] }], { vinted_pickup_done: setPickupDone }); };
+  const markPickupDone = (o) => { const k = String(o.transaction_id||''); if(!k) return; try { apresRetrait(entreeRangementVinted(o)); } catch (_) {} return gesteVrm('Colis retiré', [{ k: 'vinted_pickup_done', type: 'cle', id: k, apres: new Date().toISOString(), avant: pickupDone[k] }], { vinted_pickup_done: setPickupDone }, null, 'colis.retire'); };
   const unmarkPickupDone = (o) => { const k = String(o.transaction_id||''); if(!k) return; setPickupDone(prev=>{ const u={...prev}; delete u[k]; save('vinted_pickup_done',u); return u; }); };
   const markAllPickupDone = (list) => { setPickupDone(prev=>{ const u={...prev}; (list||[]).forEach(o=>{ if(o.transaction_id!=null) u[String(o.transaction_id)]=new Date().toISOString(); }); save('vinted_pickup_done',u); return u; }); };
   // Bordereaux masqués à la main (ex. doublon / non relié qu'on ne veut plus voir).
@@ -35206,7 +35207,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (k && (oui ? !shipDone[k] : !!shipDone[k])) ops.push({ k: 'vinted_ship_done', type: 'cle', id: k, apres: oui ? Date.now() : undefined, avant: shipDone[k] });
     if (kb && (oui || isBordShippedManual(b))) ops.push({ k: 'vinted_bords_shipped', type: 'cle', id: kb, apres: oui ? 1 : undefined, avant: bordsShipped[kb] });
     if (!ops.length) return;
-    gesteVrm(oui ? 'Colis déposé' : 'Colis remis dans « à envoyer »', ops, { vinted_ship_done: setShipDone, vinted_bords_shipped: setBordsShipped });
+    gesteVrm(oui ? 'Colis déposé' : 'Colis remis dans « à envoyer »', ops, { vinted_ship_done: setShipDone, vinted_bords_shipped: setBordsShipped }, null, oui ? 'colis.depose' : '');
   };
   // (voir isBordDone plus bas : « colis fait » à la main, ou expédié d'après
   // Vinted (auto), OU marqué « expédié » à la main (statut Vinted en retard).
@@ -36632,7 +36633,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (!shipDone[k]) ops.push({ k: 'vinted_ship_done', type: 'cle', id: k, apres: Date.now(), avant: shipDone[k] });
           if (kb) ops.push({ k: 'vinted_bords_shipped', type: 'cle', id: kb, apres: 1, avant: bordsShipped[kb] });
         }
-        if (ops.length) gesteVrm(ok.length > 1 ? `${ok.length} colis déposés` : 'Colis déposé', ops, { vinted_ship_done: setShipDone, vinted_bords_shipped: setBordsShipped });
+        if (ops.length) gesteVrm(ok.length > 1 ? `${ok.length} colis déposés` : 'Colis déposé', ops, { vinted_ship_done: setShipDone, vinted_bords_shipped: setBordsShipped }, null, 'colis.depose');
         return resumeSerie({ faits: ok, pasFaits }, { un: 'déposée', plusieurs: 'déposées' });
       } },
       { k: 'exporter', libelle: 'Exporter', icone: 'doc', faire: (cles) => {
@@ -39565,7 +39566,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const t = new Date().toISOString();
     // (11 nov., lot rangement-guide) Plusieurs à la fois : ils attendent dans Ma journée (« N achats à ranger »).
     try { proposerRangement(L.map((o) => entreeRangementVinted(o)).filter(Boolean)); } catch (_) {}
-    gesteVrm(L.length > 1 ? `${L.length} colis retirés` : 'Colis retiré', L.map(o => ({ k: 'vinted_pickup_done', type: 'cle', id: String(o.transaction_id), apres: t, avant: pickupDone[String(o.transaction_id)] })), { vinted_pickup_done: setPickupDone });
+    gesteVrm(L.length > 1 ? `${L.length} colis retirés` : 'Colis retiré', L.map(o => ({ k: 'vinted_pickup_done', type: 'cle', id: String(o.transaction_id), apres: t, avant: pickupDone[String(o.transaction_id)] })), { vinted_pickup_done: setPickupDone }, null, 'colis.retire');
     return L.length;
   };
   const achatsAffiches = useMemo(() => {
