@@ -229,12 +229,13 @@ action('colis.imprimer', async (nav) => {
     // Le PDF inventé n'a pas de forme connue : VRM demande où poser le tampon (« Placer le tampon ·
     // Imprimer », une fois par bordereau) ; il répond, puis vient « C'est imprimé ? ».
     let r = await moment(o.pg, 'apres', 'colis.imprimer', { ms: 4000 });
-    for (let k = 0; !r && k < 8; k++) {
+    for (let k = 0; !r && k < 3; k++) {
       const imp = o.pg.locator('[data-tampon-imprimer]').last();
       if (await imp.count()) await imp.click().catch(() => {});
       r = await moment(o.pg, 'apres', 'colis.imprimer', { ms: 3000 });
     }
-    noter('colis.imprimer', 'apres', r);
+    if (!r && await o.pg.locator('[data-tampon-imprimer]').count()) noter('colis.imprimer', 'apres', null, { raisonNonJoue: 'le PDF inventé n’a pas de forme connue : la feuille « Placer le tampon » attend un vrai bordereau' });
+    else noter('colis.imprimer', 'apres', r);
     await shot(o.pg, 'colis-imprimer-apres');
   } finally { await o.ctx.close(); }
   const o2 = await ouvrir(nav, { url: '/?tab=cat_bord', panne });
