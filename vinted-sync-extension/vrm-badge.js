@@ -513,6 +513,14 @@
     if (r.etat === 'attente') return { k: 'attente', t: r.texte };
     return { k: 'normal', t: 'Normal', coche: true };
   }
+  // 5.376 : ce qui est capté et ce qui manque pour CE compte et CE site — une phrase, un geste.
+  function ligneCapture(e) {
+    const c = e && e.capture;
+    if (!c || !c.phrase) return '';
+    const lien = c.lien && /^https:\/\/www\.vinted\.fr\//.test(String(c.lien)) ? String(c.lien) : '';
+    const geste = c.geste ? (lien ? ` · <a href="${esc(lien)}" target="_blank" rel="noopener" data-capture-geste>${esc(c.geste)}</a>` : ` · <span data-capture-geste>${esc(c.geste)}</span>`) : '';
+    return `<div class="q4" data-capture="${esc(c.k || '')}" data-capture-n="${Number(c.n) || 0}" role="status"><span class="k">Capté</span><span class="v${c.k === 'ok' ? '' : ''}">${esc(c.phrase)}${c.k === 'ok' ? '<span class="coche" aria-label="vérifié">✓</span>' : ''}${geste}</span></div>`;
+  }
   function quatreLignes(e, r) {
     const site = e.site || {}, f = e.flux || {};
     let compte = site.nom || (site.id && e.plateforme !== 'leboncoin' ? 'compte n° ' + site.id : '');
@@ -529,7 +537,7 @@
       + ligne('Lu', 'lu', lu ? esc(depuis(lu)) : '—', lu ? '' : 'gris', ` data-q4-at="${lu || ''}"`)
       + (jauge ? ligne('Jauge', 'jauge', esc(jauge), '', ` data-q4-h="${Number(j.h) || 0}" data-q4-maxh="${Number(j.maxH) || 0}" data-q4-j="${Number(j.j) || 0}" data-q4-maxj="${Number(j.maxJ) || ''}" data-q4-complet="${j.complet ? '1' : '0'}"`) : '')
       + ligne('État', 'etat', esc(et.t) + (et.coche ? '<span class="coche" aria-label="vérifié">✓</span>' : ''), et.k === 'geste' ? '' : (et.k === 'normal' ? '' : 'gris'), ` data-q4-etat="${esc(et.k)}"`)
-      + '</div>';
+      + '</div>' + ligneCapture(e);
   }
   // « Nouvelle version disponible » : seulement installée À LA MAIN (zip, fichier
   // Orion) et plus ancienne que celle servie. Boutique ⇒ rien (elle se met à jour).
@@ -790,7 +798,7 @@
     ].filter(Boolean).join('');
     carte.classList.toggle('doigt', doigt || formulaire);
     poserHtml(contenu, `${doigt || formulaire ? '<button class="fermer" data-fermer-carte title="Fermer" aria-label="Fermer">×</button>' : ''}<div class="tete"><b>VRM</b><span class="ver">${e.version ? 'extension ' + esc(e.version) : ''}</span></div>
-      ${lbcVisible ? `<div class="ligne lbc-tete"><div class="lib">Compte ${esc(nomSite)}</div>${compteSite}</div>${lbcLignes}` : quatreLignes(e, resume)}
+      ${lbcVisible ? `<div class="ligne lbc-tete"><div class="lib">Compte ${esc(nomSite)}</div>${compteSite}</div>${lbcLignes}${ligneCapture(e)}` : quatreLignes(e, resume)}
       ${majHtml(e.maj)}
       ${Array.isArray(e.aReparer) && e.aReparer.length && v && v.connecte !== false ? `<button class="b sec" data-reparer data-a-reparer="${esc(e.aReparer.join(' '))}">Réparer</button>` : ''}${repHtml()}
       ${progression}

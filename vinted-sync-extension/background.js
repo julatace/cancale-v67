@@ -18196,9 +18196,48 @@ async function etatSite(url,tabId) {
   const maj = await etatMiseAJour().catch(() => null);
   const aReparer = vrm ? await avecDelai(problemesAReparer(plateforme === 'vinted' ? tabId : null), 1500, []).catch(() => []) : [];
   const enAttenteReseau = (await lireFileReseau()).length;
+  // 5.376 : ce qui est capté et ce qui manque, pour CE compte et CE site — une phrase, un geste.
+  const capture = vrm && vrm.connecte === true ? await capturePourCarte(plateforme, plateforme === 'vinted' && site ? site.id : null, vcCapte).catch(() => null) : null;
   // 5.366 : la sécurité du compte de l'onglet, en UNE phrase (la règle de Paramètres → Mes comptes).
   const secu = plateforme === 'vinted' || plateforme === 'vestiaire' ? await secuPourCarte(plateforme, plateforme === 'vinted' && site ? site.id : null) : null;
-  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, lbc, mois, oauthFenetre: oauthFenetrePossible(), oauthRevenu, toutArrete, maj, aReparer, enAttenteReseau, secu };
+  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, lbc, mois, oauthFenetre: oauthFenetrePossible(), oauthRevenu, toutArrete, maj, aReparer, enAttenteReseau, secu, capture };
+}
+// ══ 5.376 — « PLUS SIMPLE POUR TOUT LE MONDE » : CE QUI MANQUE, EN UNE PHRASE ══
+// Julien : « que ce soit beaucoup mieux et beaucoup plus simple pour tout le
+// monde ». La carte du logo dit, pour CE compte et CE site, ce qui n'est pas
+// encore dans VRM et LE geste qui le fait venir — jamais un mot technique.
+// Tout est lu dans CE navigateur (aucune requête) : ce que la dernière passe a
+// MESURÉ. Pas su (rien noté, ou noté il y a plus de 24 h) ⇒ `null`, la carte ne
+// dit rien (« pas su » ne vaut pas « tout va bien », §5).
+const VINTED_VENTES_URL = 'https://www.vinted.fr/my_orders/sold';
+const pluriel = (n, un, plusieurs) => (n > 1 ? plusieurs : un);
+async function capturePourCarte(plateforme, uid, vcCapte) {
+  const owner = await proprietaireConnu();
+  const file = (await lireFileCaptures()) || [];
+  const prefixe = plateforme === 'vinted' ? (uid ? `harvest_${uid}_` : null) : plateforme === 'vestiaire' ? 'vc_' : plateforme === 'leboncoin' ? 'lbc_' : null;
+  let enFile = 0;
+  if (prefixe) for (const e of file) if (!owner || String(e.owner) === owner) enFile += e.rows.filter((r) => String(r.id).startsWith(prefixe)).length;
+  if (plateforme === 'vinted' && uid) {
+    const bm = ((await lireBordManquants()) || {})[String(uid)];
+    const frais = bm && Date.now() - Number(bm.at || 0) < 24 * 3600000;
+    const n = frais ? Math.max(0, Number(bm.n) || 0) : null;
+    if (n > 0) return { k: 'manque', n, phrase: `${n} ${pluriel(n, 'bordereau pas encore récupéré', 'bordereaux pas encore récupérés')}`, geste: 'Ouvre tes ventes à expédier', lien: VINTED_VENTES_URL, enFile };
+    if (enFile) return { k: 'attente', n: enFile, phrase: `${enFile} ${pluriel(enFile, 'lecture pas encore envoyée', 'lectures pas encore envoyées')} à VRM`, geste: 'Elles repartent seules dès que le réseau revient', enFile };
+    if (n === 0) return { k: 'ok', n: 0, phrase: 'Bordereaux : tous récupérés', geste: '', enFile };
+    return null;
+  }
+  if (plateforme === 'vestiaire') {
+    const vc = vcCapte || {};
+    if (Object.keys(vc).some((k) => vc[k] && vc[k].inconnu)) return { k: 'forme', n: 0, phrase: 'Vestiaire a changé sa page : VRM ne la lit plus', geste: 'Rien n’est écrit à sa place — on corrige', enFile };
+    if (enFile) return { k: 'attente', n: enFile, phrase: `${enFile} ${pluriel(enFile, 'lecture pas encore envoyée', 'lectures pas encore envoyées')} à VRM`, geste: 'Elles repartent seules dès que le réseau revient', enFile };
+    const v = vc.ventes;
+    if (!v || !Number(v.at)) return { k: 'manque', n: 0, phrase: 'Tes ventes Vestiaire ne sont pas encore lues', geste: 'Ouvre Mon compte → Mes ventes', enFile };
+    const j = Math.floor((Date.now() - Number(v.at)) / 86400000);
+    if (j >= 3) return { k: 'manque', n: 0, phrase: `Ventes Vestiaire lues il y a ${j} jours`, geste: 'Ouvre Mon compte → Mes ventes', enFile };
+    return null;
+  }
+  if (plateforme === 'leboncoin' && enFile) return { k: 'attente', n: enFile, phrase: `${enFile} ${pluriel(enFile, 'lecture pas encore envoyée', 'lectures pas encore envoyées')} à VRM`, geste: 'Elles repartent seules dès que le réseau revient', enFile };
+  return null;
 }
 // 5.330 : l'onglet revient de Google / Discord (même onglet, Orion) ⇒ la carte
 // s'ouvre UNE fois et dit le résultat. Lu une fois (`vu`), 5 minutes au plus,
