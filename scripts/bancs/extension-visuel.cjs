@@ -174,16 +174,12 @@ const mots = (t) => String(t || '').replace(/[✓·:—]/g, ' ').trim().split(/\
     }
   });
 
-  console.log('B. Le geste le plus fréquent à un clic');
+  console.log('B. La carte n’ouvre plus VRM (5.376, décision de Julien du 14 nov.)');
   await essaie('B', async () => {
     const { ctx, pg } = await ouvrir(nav, ETATS.ok, { scheme: 'light' });
     const l0 = await lire(pg); await survoler(pg, l0.btn); const l = await lire(pg);
-    dit(l.ouvrirVrm && JSON.stringify(l.ecrans) === '["colis","messages","offres"]', 'connecté : « Ouvrir VRM » puis Colis · Messages · Offres', JSON.stringify(l.ecrans));
-    dit(l.hauteursRaccourcis.length === 3 && l.hauteursRaccourcis.every((h) => h >= 44), 'raccourcis ≥ 44 px', JSON.stringify(l.hauteursRaccourcis));
-    await pg.evaluate(() => document.getElementById('vrm-badge').shadowRoot.querySelector('[data-ouvrir-ecran="colis"]').click());
-    await pg.waitForTimeout(80);
-    const l2 = await lire(pg);
-    dit(l2.envoyes.some((m) => m.action === 'ouvrirVRM' && m.ecran === 'colis'), 'un clic sur « Colis » demande VRM sur les colis (écran nommé, pas une adresse)', JSON.stringify(l2.envoyes));
+    dit(!l.ouvrirVrm && !l.ecrans.length, 'connecté : plus de « Ouvrir VRM » ni de « Colis · Messages · Offres » (ils ouvraient VRM)', JSON.stringify(l.ecrans));
+    dit(!l.envoyes.some((m) => m.action === 'ouvrirVRM'), 'ouvrir la carte ne demande jamais VRM', JSON.stringify(l.envoyes));
     await ctx.close();
     const d = await ouvrir(nav, ETATS.deco, { scheme: 'light' });
     const m0 = await lire(d.pg); await survoler(d.pg, m0.btn); const m = await lire(d.pg);
@@ -319,12 +315,16 @@ const mots = (t) => String(t || '').replace(/[✓·:—]/g, ' ').trim().split(/\
     const ouverts = [];
     f.ctx.chrome.tabs.query = (q, cb) => { cb([]); };
     f.ctx.chrome.tabs.create = (o) => { ouverts.push(o.url); };
+    // 5.376 : venu de la CARTE, `ouvrirVRM` n'ouvre rien ; la fenêtre de l'icône (popup) garde sa liste blanche.
+    for (const ecran of ['colis', 'messages', '']) await f.envoyer({ from: 'vrm-badge', action: 'ouvrirVRM', ecran }, { tab: { id: 7, url: 'https://www.vinted.fr/' } });
+    await new Promise((r) => setTimeout(r, 30));
+    dit(ouverts.length === 0, 'ouvrirVRM venu de la carte : rien ne s’ouvre (5.376)', JSON.stringify(ouverts));
     for (const ecran of ['colis', 'messages', 'offres', 'journee', 'javascript:alert(1)', '__proto__', '']) {
-      await f.envoyer({ from: 'vrm-badge', action: 'ouvrirVRM', ecran }, { tab: { id: 7, url: 'https://www.vinted.fr/' } });
+      await f.envoyer({ from: 'cancale-popup', action: 'ouvrirVRM', ecran }, { tab: { id: 7, url: 'https://www.vinted.fr/' } });
     }
     await new Promise((r) => setTimeout(r, 30));
     const att = ['https://vrm.center/?tab=cat_bord', 'https://vrm.center/?tab=messages', 'https://vrm.center/?tab=messages&vue=favoris', 'https://vrm.center/?tab=journee', 'https://vrm.center/?tab=plat_vinted', 'https://vrm.center/?tab=plat_vinted', 'https://vrm.center/?tab=plat_vinted'];
-    dit(JSON.stringify(ouverts) === JSON.stringify(att), 'ouvrirVRM : écrans en liste blanche ; inconnu ⇒ VRM comme avant', JSON.stringify(ouverts));
+    dit(JSON.stringify(ouverts) === JSON.stringify(att), 'ouvrirVRM depuis la fenêtre de l’icône : écrans en liste blanche ; inconnu ⇒ VRM comme avant', JSON.stringify(ouverts));
   });
 
   await nav.close();

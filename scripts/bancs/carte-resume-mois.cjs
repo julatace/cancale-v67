@@ -7,7 +7,7 @@
 //  1512 px à la souris, clair et sombre, captures dans `captures/carte-resume-mois`.
 //  Ce que le banc juge (data-* et nombres rendus, §6.4) :
 //   · replié sous UNE ligne discrète (« Ce mois dans VRM »), ouvert : les trois
-//     chiffres de VRM, « Voir dans VRM » (écran journee), « Masquer ce résumé » ;
+//     chiffres de VRM, « Masquer ce résumé » (5.376 : plus de « Voir dans VRM », la carte n'ouvre pas VRM) ;
 //   · « pas su » ⇒ « — », jamais « 0 € » ; « au moins » quand VRM le dit, jamais
 //     « au moins 0 € » ;
 //   · aucune couleur sur les chiffres (§7 : rien à rattraper ici) ;
@@ -86,7 +86,7 @@ const lire = (pg) => pg.evaluate(() => {
     couleurs: l ? Array.from(l.querySelectorAll('b')).map((b) => getComputedStyle(b).color) : [], couleurTexte: carte ? getComputedStyle(carte).color : '',
     hauteurs: m && m.open ? Array.from(m.querySelectorAll('summary, button')).map((b) => Math.round(b.getBoundingClientRect().height)) : [],
     voir: !!q('[data-mois-voir]'), masquer: !!q('[data-mois-masquer]'), afficher: !!q('[data-mois-afficher]'),
-    ordre: (() => { const g = q('[data-ouvrir-vrm]'), d = q('details[data-detail]'); if (!m || !g || !d) return null; return !!(g.compareDocumentPosition(m) & Node.DOCUMENT_POSITION_FOLLOWING) && !!(m.compareDocumentPosition(d) & Node.DOCUMENT_POSITION_FOLLOWING); })(),
+    ordre: (() => { const g = q('[data-q4-bloc]'), d = q('details[data-detail]'); if (!m || !g || !d) return null; return !!(g.compareDocumentPosition(m) & Node.DOCUMENT_POSITION_FOLLOWING) && !!(m.compareDocumentPosition(d) & Node.DOCUMENT_POSITION_FOLLOWING); })(),
     envoyes: window.__envoyes.filter((x) => x.action !== 'etat'),
     debord: document.documentElement.scrollWidth > window.innerWidth,
   };
@@ -114,7 +114,7 @@ const clic = async (pg, sel) => { await pg.evaluate((s) => { const b = document.
       const a = await lire(t.pg);
       await cap(t.pg, `replie-${largeur}-${scheme}`);
       dit(a.mois && !a.ouvert && a.resume === 'Ce mois dans VRM' && !a.ligneVisible, `${largeur} ${scheme} : replié sous « Ce mois dans VRM »`, JSON.stringify({ m: a.mois, o: a.ouvert, r: a.resume }));
-      dit(a.ordre === true, `${largeur} ${scheme} : sous « Ouvrir VRM », au-dessus de « Détails »`, String(a.ordre));
+      dit(a.ordre === true, `${largeur} ${scheme} : sous les 4 lignes, au-dessus de « Détails »`, String(a.ordre));
       await deplier(t.pg);
       const b = await lire(t.pg);
       await cap(t.pg, `ouvert-${largeur}-${scheme}`);
@@ -122,22 +122,20 @@ const clic = async (pg, sel) => { await pg.evaluate((s) => { const b = document.
       dit(b.ca === '1340' && b.ventes === '42' && b.expedier === '3', `${largeur} ${scheme} : les nombres rendus sont ceux du service worker`, `${b.ca}/${b.ventes}/${b.expedier}`);
       dit(/^Chiffres de VRM, publiés il y a 2 h\.$/.test(b.note), `${largeur} ${scheme} : l'âge des chiffres est dit`, b.note);
       dit(b.couleurs.length === 3 && b.couleurs.every((c) => c === b.couleurTexte), `${largeur} ${scheme} : aucune couleur sur les chiffres`, JSON.stringify([b.couleurs, b.couleurTexte]));
-      dit(b.voir && b.masquer, `${largeur} ${scheme} : « Voir dans VRM » et « Masquer ce résumé »`, '');
-      if (mobile) dit(b.hauteurs.length >= 3 && b.hauteurs.every((x) => x >= 44), '390 au doigt : chaque cible ≥ 44 px', JSON.stringify(b.hauteurs));
+      dit(!b.voir && b.masquer, `${largeur} ${scheme} : « Masquer ce résumé », et plus de « Voir dans VRM » (5.376)`, '');
+      if (mobile) dit(b.hauteurs.length >= 2 && b.hauteurs.every((x) => x >= 44), '390 au doigt : chaque cible ≥ 44 px (le repli, « Masquer »)', JSON.stringify(b.hauteurs));
       dit(dedans(b.carte, largeur, hauteur) && !b.debord, `${largeur} ${scheme} : la carte reste dans l'écran, rien ne déborde`, JSON.stringify(b.carte));
       dit(!t.erreurs.length, `${largeur} ${scheme} : aucune erreur de page`, t.erreurs.join(' | '));
       await t.ctx.close();
     });
   }
 
-  console.log('B. Voir dans VRM, masquer, afficher');
+  console.log('B. Masquer, afficher — et jamais VRM ouvert');
   await essaie('B', async () => {
     const t = await ouvrir(nav, base());
     await montrer(t.pg, false); await deplier(t.pg);
-    await clic(t.pg, '[data-mois-voir]');
     let a = await lire(t.pg);
-    dit(a.envoyes.some((m) => m.action === 'ouvrirVRM' && m.ecran === 'journee'), '« Voir dans VRM » ouvre VRM sur Ma journée (écran de la liste blanche)', JSON.stringify(a.envoyes));
-    await montrer(t.pg, false); await deplier(t.pg);
+    dit(!a.voir && !a.envoyes.some((m) => m.action === 'ouvrirVRM'), 'le résumé déplié ne propose plus d’ouvrir VRM (5.376, sa décision)', JSON.stringify(a.envoyes));
     await clic(t.pg, '[data-mois-masquer]');
     await t.pg.waitForTimeout(200);
     a = await lire(t.pg);
