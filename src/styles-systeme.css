@@ -193,7 +193,7 @@
 /* ── 2.2 LES SURFACES : rayon 20, l'ombre posée, aucun cadre ─────────────── */
 :root:root body .vrm-main :is(.vrm-toutes-liste, .vrm-day-task-list, .vrm-buy-list, .vrm-msg-list, .vrm-colis-carte, .vrm-a-venir,
   .vrm-colis-prochain, .vrm-ann-geste, details.vrm-quick-settings, .vrm-ann-card, .vrm-ios-groupe, .vrm-reglages-groupe,
-  .vrm-set-liste, .vrm-settings-todo, .vrm-fu-panneau, .vrm-set-groupe,
+  .vrm-set-liste, .vrm-settings-todo, .vrm-fu-panneau,
   .vrm-sv-tuile, .vrm-sv-carte, .vrm-onglet-manque, .vrm-d7-carte, .vrm-fp-section, .vrm-boite-liste-col, .vrm-rpf-point,
   .vrm-sx, .vrm-guide.vrm-pa-carte, .vrm-carte-mfa, .vrm-sp-rec, .vrm-compta-replis) {
   border-radius: var(--d-r-carte) !important; border: 0 !important; box-shadow: var(--d-ombre-carte) !important;
@@ -385,7 +385,6 @@
 :root:root body .vrm-main .vrm-ann-card [data-prix][data-prix] { font-size: var(--d-t-20) !important; }
 :root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-titre][data-titre] { font-size: var(--d-t-15) !important; }
 :root:root body .vrm-main :is(.vrm-fu-jour, .vrm-jv2-jour) > b { font-size: var(--d-t-15) !important; }
-:root:root body .vrm-main :is(.vrm-roule, .vrm-jv2-grand:not(.is-zero):not(.is-vide)) { font-size: var(--d-t-44) !important; }
 :root:root body .vrm-main .vrm-argent-w .vrm-argent-w-n:not([data-argent-pas-su]) { font-size: var(--d-t-28) !important; }
 :root:root body .vrm-main .vrm-argent-w .vrm-argent-w-n[data-argent-pas-su] { font-size: var(--d-t-20) !important; font-weight: 400 !important; }
 
@@ -398,6 +397,10 @@
 :root:root body .vrm-app-shell .vrm-sidebar .vrm-rail-section-label { color: var(--n2-titre) !important; opacity: 1 !important; }
 :root:root body .vrm-app-shell .vrm-barre-kbd.vrm-barre-kbd { background: var(--d-carte) !important; border: 0 !important; }
 :root:root body .vrm-app-shell .vrm-nav-offre { color: var(--d-encre) !important; background: var(--d-remplir) !important; }
+
+/* Paramètres : la SECTION (titre + groupe) n'est pas une carte — seule la liste l'est. L'ombre posée sur la section
+   (transparente) dessinait un liseré autour du titre « Mes comptes » : une carte dans une carte. */
+:root:root body .vrm-main .vrm-set-groupe { box-shadow: none !important; border-radius: 0 !important; }
 
 /* La colonne de gauche : ses libellés au texte d'un contrôle (13 à la souris, 15 au doigt), plus 14. */
 :root:root body .vrm-app-shell .vrm-sidebar .vrm-rail-lib { font-size: var(--d-t-ctrl) !important; }

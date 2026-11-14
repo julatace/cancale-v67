@@ -174,11 +174,12 @@ html body, .vrm-app-shell, :root:root body .vrm-app-shell .vrm-main { background
   /* Trois widgets étroits : pas de chevron (le widget entier se touche), le libellé garde toute la largeur. */
   :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete .vrm-fu-cases > button.vrm-fu-case::after { content: none !important; display: none !important; }
 }
-/* Le grand chiffre de la carte sombre : 44/800 (52 à l'ordinateur). */
+/* Le grand chiffre de la carte sombre : LE chiffre du système, 40/700 au téléphone, 44 à l'ordinateur
+   (`--d-t-44` ; 14 nov. : plus 44 et 52, hors de l'échelle). */
 :root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) :is(.vrm-fu-grand, .vrm-jv2-grand:not(.is-zero)) {
-  font-size: 44px !important; font-weight: 700 !important; letter-spacing: -.035em !important; line-height: 1.02 !important; font-variant-numeric: tabular-nums !important;
+  font-size: var(--d-t-44, 40px) !important; font-weight: 700 !important; letter-spacing: -.035em !important; line-height: 1.02 !important; font-variant-numeric: tabular-nums !important;
 }
-@media (min-width: 1024px) { :root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) :is(.vrm-fu-grand, .vrm-jv2-grand:not(.is-zero)) { font-size: 52px !important; } }
+@media (min-width: 1024px) { :root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) :is(.vrm-fu-grand, .vrm-jv2-grand:not(.is-zero)) { font-size: var(--d-t-44, 44px) !important; } }
 /* Ma journée : la tête n'est plus bord à bord, c'est un widget comme les autres. */
 @media (min-width: 768px) { :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete { margin: 8px 0 0 !important; width: auto !important; } }
 @media (min-width: 1024px) { :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete { margin-top: 0 !important; } }

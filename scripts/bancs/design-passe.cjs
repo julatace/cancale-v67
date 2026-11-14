@@ -19,7 +19,8 @@ require('./_porte-banc.cjs');
 //    F. coupures : aucun mot (≤ 20 lettres) coupé sur deux lignes, aucun `hyphens:auto`
 //       (« XT-/6 ») — mesuré par Range, mot par mot ;
 //    G. la carte « Protège ton compte » : aucun cadre (bord), ni le jour ni la nuit ;
-//    H. aucune couleur violette ; le logo Chronopost n'est jamais jaune.
+//    H. aucune couleur violette ; le logo Chronopost n'est jamais jaune ;
+//    I. aucun chiffre rogné (un montant coupé « 1 47… » dans une tuile trop étroite).
 //
 //  Écrans : Ma journée, Ventes, Colis, Annonces, Stock, Argent, Paramètres, la loupe
 //  (« Tout sur le N° ») et la fiche « Tout sur le N° » — 390 tactile ET 1512, clair ET
@@ -126,7 +127,7 @@ const pret = async (pg) => { await pg.waitForSelector('.vrm-main', { timeout: 25
 function mesurer({ tactile, sombre, racines }) {
   const seuil = tactile ? 44 : 36;
   const ECHELLE = [11, 12, 13, 15, 17, 20, 28, 34, 40, 44];
-  const out = { cibles: [], graisses: [], tailles: [], gris: [], contraste: [], coupes: [], hyphens: [], mfa: [], violet: [], chrono: [], nTextes: 0, nCibles: 0 };
+  const out = { cibles: [], graisses: [], tailles: [], gris: [], contraste: [], coupes: [], hyphens: [], rognes: [], mfa: [], violet: [], chrono: [], nTextes: 0, nCibles: 0 };
   const roots = [...new Set(racines.flatMap((s) => [...document.querySelectorAll(s)]))].filter((r) => !roots0(r));
   function roots0(r) { return racines.some((s) => r.parentElement && r.parentElement.closest(s)); }
   const vis = (el) => {
@@ -207,7 +208,10 @@ function mesurer({ tactile, sombre, racines }) {
         if (![400, 600, 700].includes(g)) out.graisses.push({ g, quoi: lib() });
         // La barre d'onglets du téléphone garde ses 10 pt (la taille des libellés d'onglet d'iOS ; Julien doit encore
         // trancher « libellés à 9 px », CLAUDE.md §9) : hors de l'échelle exprès.
-        if (!ECHELLE.includes(fs_) && !el.closest('.vrm-nav-label') && !/^[\s›‹×✓✕·•…—–\-+−⋯▾▸]+$/.test(el.innerText || '')) out.tailles.push({ t: fs_, quoi: lib() });
+        // Le chiffre d'une tuile de Ma journée au téléphone se RESSERRE pour tenir (Julien, 10 nov. : « l'euro dépasse » ;
+        // styles-widgets-ios.css, `--nc`) : une taille fluide entre 14 et 28, exprès — jamais rogné (I le vérifie).
+        const ajuste = el.closest('[data-ecran="journee"] .vrm-fu-tete .vrm-fu-case') && fs_ >= 14 && fs_ <= 28;
+        if (!ECHELLE.includes(fs_) && !ajuste && !el.closest('.vrm-nav-label') && !/^[\s›‹×✓✕·•…—–\-+−⋯▾▸]+$/.test(el.innerText || '')) out.tailles.push({ t: fs_, quoi: lib() });
         const col = rgba(cs.color);
         const enSombre = sombreCarte(el);
         if (col && !enSombre) {
@@ -231,6 +235,11 @@ function mesurer({ tactile, sombre, racines }) {
           }
         }
         if (/auto/.test(cs.hyphens || '') || /auto/.test(cs.webkitHyphens || '')) out.hyphens.push({ quoi: lib() });
+        // I. Un CHIFFRE n'est jamais rogné (« 1 47… » : un montant coupé ment) — sur lui ou sur le parent qui le borne.
+        if (/\d/.test(el.innerText || '')) for (const x of [el, el.parentElement]) {
+          if (!x) continue; const c2 = getComputedStyle(x);
+          if (c2.overflow !== 'visible' && c2.textOverflow !== 'ellipsis' && x.scrollWidth > x.clientWidth + 1 && /nowrap/.test(c2.whiteSpace) && x.clientWidth > 0) { out.rognes.push({ quoi: lib(), de: x.scrollWidth, dans: x.clientWidth }); break; }
+        }
       }
       // F. mots coupés
       if (/nowrap|pre$/.test(cs.whiteSpace)) continue;
@@ -272,7 +281,7 @@ const ECRANS = [
   ['stock', '/?tab=garage'], ['argent', '/?tab=argent'], ['parametres', '/?tab=settings'], ['loupe', '/?tab=journee'], ['fiche', '/?tab=journee'],
 ];
 const RACINES = ['.vrm-main', '.vrm-fs', '.vrm-fp', '[data-recherche-panneau]'];
-const CLES = ['cibles', 'graisses', 'tailles', 'gris', 'contraste', 'coupes', 'hyphens', 'mfa', 'violet', 'chrono'];
+const CLES = ['cibles', 'graisses', 'tailles', 'gris', 'contraste', 'coupes', 'hyphens', 'rognes', 'mfa', 'violet', 'chrono'];
 
 (async () => {
   await new Promise((ok) => srv.listen(PORT, ok));
