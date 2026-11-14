@@ -22,6 +22,6 @@
     var d = sombreAuDemarrage(lire('vrm_apparence'), lire('vinted_dark'), new Date().getHours(), sys);
     document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light');
     var m = document.querySelector('meta[name="theme-color"]');
-    if (m) m.setAttribute('content', d ? '#000000' : '#F2F2F7');
+    if (m) m.setAttribute('content', d ? '#15263D' : '#EEF6FD');   // (14 nov., Studio bleu clair) le haut de la lumière
   } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
 })();

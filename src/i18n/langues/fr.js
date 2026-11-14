@@ -6,6 +6,7 @@
 // Pluriel : { one: '…', other: '…' } choisi par `n` (Intl.PluralRules).
 import ecran_journee from './fr/journee.js';
 import ecran_confort from './fr/confort.js';   // (14 nov., lots 117–130) confort et sécurité
+import ecran_studio from './fr/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
 import ecran_capte from './fr/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_ventes from './fr/ventes.js';
 import ecran_commun from './fr/commun.js';
@@ -2246,5 +2247,6 @@ export default {
   "instantane.arret.horsLigne": "Hors ligne : ces chiffres sont ceux de ta dernière visite. Ils seront relus au retour du réseau.",
   "instantane.arret.panne": "Pas relu : la base ne répond pas. Ces chiffres sont ceux de ta dernière visite.",
   ...ecran_confort,
+  ...ecran_studio,
   ...ecran_capte,
 };

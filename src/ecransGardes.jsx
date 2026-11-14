@@ -35,6 +35,7 @@
 //  Hors de ce mécanisme (tout autre écran), rien ne change.
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
+import { espaceDe } from './design/espace.js';
 import { createPortal } from 'react-dom';
 
 // ⚠️ Pas Annonces (mesuré le 8 nov., CPU ×4) : sa grille rattachée d'un bloc (style et mise
@@ -137,7 +138,7 @@ export function egalRendu(a, b, budget = { n: 20000 }, pile = null) {
   return true;
 }
 
-function Vivant({ actif, hote, evincer, children }) {
+function Vivant({ tab = '', actif, hote, evincer, children }) {
   const dernier = React.useRef(null);
   let rendu = children;
   if (actif) {
@@ -150,7 +151,8 @@ function Vivant({ actif, hote, evincer, children }) {
     const retours = new Set();
     vivant.current = { actif, retours, surRetour(fn) { retours.add(fn); return () => retours.delete(fn); } };
   }
-  const [conteneur] = React.useState(() => { const d = document.createElement('div'); d.className = 'vrm-ecran-vivant'; return d; });
+  // (14 nov., Studio bleu clair) La racine de l'écran gardé porte son ESPACE (src/design/espace.js) : studio.css y règle l'aplat.
+  const [conteneur] = React.useState(() => { const d = document.createElement('div'); d.className = 'vrm-ecran-vivant'; if (tab) d.setAttribute('data-espace', espaceDe(tab)); return d; });
   const [fige, setFige] = React.useState(false);
   const dejaMontre = React.useRef(false);
   return (
@@ -250,7 +252,7 @@ export function EcransGardes({ ecran, cle = '', pret = true, children }) {
   return (
     <>
       <div ref={hote} className="vrm-ecrans-gardes" data-ecrans-gardes={e.liste.map((x) => x.tab).join(' ')}/>
-      {e.liste.map((x) => <Vivant key={x.cle} actif={x.tab === montre} hote={hote} evincer={() => evincer(x.cle)}>{x.tab === montre ? children : null}</Vivant>)}
+      {e.liste.map((x) => <Vivant key={x.cle} tab={x.tab} actif={x.tab === montre} hote={hote} evincer={() => evincer(x.cle)}>{x.tab === montre ? children : null}</Vivant>)}
       {!gardable && children}
     </>
   );

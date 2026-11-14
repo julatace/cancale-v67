@@ -1,6 +1,7 @@
 // DEUTSCH — Übersetzung von fr.js (der Quelle). Gleiche Schlüssel, gleiche {Variablen}.
 import ecran_journee from './de/journee.js';
 import ecran_confort from './de/confort.js';   // (14 nov., lots 117–130) confort et sécurité
+import ecran_studio from './de/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
 import ecran_capte from './de/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_ventes from './de/ventes.js';
 import ecran_commun from './de/commun.js';
@@ -2241,5 +2242,6 @@ export default {
   "instantane.arret.horsLigne": "Offline: Diese Zahlen stammen von deinem letzten Besuch. Sie werden neu geladen, sobald das Netz zurück ist.",
   "instantane.arret.panne": "Nicht neu geladen: Die Datenbank antwortet nicht. Diese Zahlen stammen von deinem letzten Besuch.",
   ...ecran_confort,
+  ...ecran_studio,
   ...ecran_capte,
 };

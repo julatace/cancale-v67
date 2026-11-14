@@ -138,6 +138,10 @@ function mesurer({ tactile, sombre, racines, ciblesEnPlus = '' }) {
   const seuil = tactile ? 44 : 36;
   // (14 nov., §4 Atelier) + l'AFFICHE : le chiffre d'un écran en 48, 56 ou 64 (`--d-t-affiche-*`, styles-systeme.css §4).
   const ECHELLE = [11, 12, 13, 15, 17, 20, 28, 34, 40, 44, 48, 56, 64];
+  // (14 nov., Studio bleu clair — docs/design/studio-bleu-clair.md §4) L'échelle du STUDIO : libellés 10,5 · 11,5 · 12,5 · 14 ·
+  // 16 · 18 ; l'affiche (Urbanist) 19 · 21 · 22 · 24 · 26 · 27 · 32 · 38 · 42 · 56 · 68 · 72 · 88 · 96 · 104 ; l'euro remonté (0,44 / 0,56 / 0,68 em).
+  const ECHELLE_STUDIO = [10.5, 11.5, 12.5, 14, 16, 18, 19, 21, 22, 24, 26, 27, 32, 38, 42, 68, 72, 88, 96, 104];
+  const studioTexte = (el, cs) => /Urbanist VRM|Inter VRM/.test(cs.fontFamily) || !!el.closest('[class*="sb-"]');
   const out = { cibles: [], graisses: [], tailles: [], gris: [], contraste: [], coupes: [], hyphens: [], rognes: [], mfa: [], violet: [], chrono: [], nTextes: 0, nCibles: 0 };
   const roots = [...new Set(racines.flatMap((s) => [...document.querySelectorAll(s)]))].filter((r) => !roots0(r));
   function roots0(r) { return racines.some((s) => r.parentElement && r.parentElement.closest(s)); }
@@ -168,7 +172,7 @@ function mesurer({ tactile, sombre, racines, ciblesEnPlus = '' }) {
   // Les gris PERMIS (un texte) : l'encre, LE gris, le glyphe, le blanc, le noir, le fond (texte sur encre).
   // (14 nov., passe 2) Un texte posé sur une surface SOMBRE (le panneau de marque de la connexion, au jour) se lit
   // avec la palette de la nuit : c'est le fond effectif qui choisit, pas seulement le thème de l'app.
-  const PERMIS_NUIT = new Set(['#F5F5F7', '#98989D', '#5A5A5E', '#FFFFFF', '#000000', '#1C1C1E', '#1D1D1F', '#F2F2F7', '#2C2C2E']);
+  const PERMIS_NUIT = new Set(['#F5F5F7', '#98989D', '#5A5A5E', '#FFFFFF', '#000000', '#1C1C1E', '#1D1D1F', '#F2F2F7', '#2C2C2E', '#EAF2FB']);
   const PERMIS_JOUR = new Set(['#1D1D1F', '#6E6E73', '#AEAEB2', '#FFFFFF', '#000000', '#F2F2F7', '#F5F5F7', '#1C1C1E']);
   const sombreCarte = (el) => {
     for (let x = el; x && x !== document.body; x = x.parentElement) {
@@ -187,7 +191,8 @@ function mesurer({ tactile, sombre, racines, ciblesEnPlus = '' }) {
       if (c && c.a > 0) { couches.push(c); if (c.a >= 1) break; }
     }
     let f = { r: 255, g: 255, b: 255, a: 1 };
-    if (!couches.length || couches[couches.length - 1].a < 1) f = sombre ? { r: 0, g: 0, b: 0, a: 1 } : { r: 242, g: 242, b: 247, a: 1 };
+    // (14 nov.) Le fond sous tout : l'aplat du Studio bleu clair (#D6E8F5 · nuit #0C1829), la lumière de la coque.
+    if (!couches.length || couches[couches.length - 1].a < 1) f = sombre ? { r: 12, g: 24, b: 41, a: 1 } : { r: 214, g: 232, b: 245, a: 1 };
     for (let i = couches.length - 1; i >= 0; i--) f = melange(couches[i], f);
     return f;
   };
@@ -218,7 +223,8 @@ function mesurer({ tactile, sombre, racines, ciblesEnPlus = '' }) {
         vus.add(el); out.nTextes++;
         const g = Number(cs.fontWeight), fs_ = Math.round(parseFloat(cs.fontSize) * 2) / 2;
         const lib = () => nom(el);
-        if (![400, 600, 700].includes(g)) out.graisses.push({ g, quoi: lib() });
+        // (14 nov., Studio) + l'affiche Urbanist (200 · 300) et la méta Inter du studio (500).
+        if (![400, 600, 700].includes(g) && !(studioTexte(el, cs) && [200, 300, 500].includes(g))) out.graisses.push({ g, quoi: lib() });
         // La barre d'onglets du téléphone garde ses 10 pt (la taille des libellés d'onglet d'iOS ; Julien doit encore
         // trancher « libellés à 9 px », CLAUDE.md §9) : hors de l'échelle exprès.
         // Le chiffre d'une tuile de Ma journée au téléphone se RESSERRE pour tenir (Julien, 10 nov. : « l'euro dépasse » ;
@@ -227,7 +233,7 @@ function mesurer({ tactile, sombre, racines, ciblesEnPlus = '' }) {
         // tenir (« au moins 87,65 € » : 38 px, la taille posée en ligne) — entre son plancher (22) et 44.
         const ajuste = (el.closest('[data-ecran="journee"] .vrm-fu-tete .vrm-fu-case') && fs_ >= 14 && fs_ <= 28)
           || (el.closest('.vrm-fu-grand[style*="font-size"]') && fs_ >= 22 && fs_ <= 44);
-        if (fs_ > 0 && !ECHELLE.includes(fs_) && !ajuste && !el.closest('.vrm-nav-label') && !/^[\s›‹×✓✕·•…—–\-+−⋯▾▸]+$/.test(el.innerText || '')) out.tailles.push({ t: fs_, quoi: lib() });
+        if (fs_ > 0 && !ECHELLE.includes(fs_) && !(studioTexte(el, cs) && ECHELLE_STUDIO.includes(fs_)) && !ajuste && !el.closest('.vrm-nav-label') && !/^[\s›‹×✓✕·•…—–\-+−⋯▾▸]+$/.test(el.innerText || '')) out.tailles.push({ t: fs_, quoi: lib() });
         const col = rgba(cs.color);
         const enSombre = sombreCarte(el);
         // Un texte de couleur TRANSPARENTE (un « — » de remplacement sous un dessin) ne se voit pas : ni gris ni contraste.

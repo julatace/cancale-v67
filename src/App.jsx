@@ -455,6 +455,10 @@ import { montant, fmt as fmtMontant, fmtE as fmtEMontant, fmtE0 as fmtE0Montant,
 import { SheetShell as SheetShellBase } from "./composants/SheetShell.jsx";
 import { BoutonBase, SegmenteBase } from "./composants/Bouton.jsx";
 import { ID_PAIRES, ECRANS_PAIRES, estPaires, dernierePaire, noterPaire, groupeBarre, badgePaires } from "./navPaires.js";   // (14 nov., n° 61) l'onglet « Paires »
+// (14 nov., Studio bleu clair) L'espace d'un écran, le disque et son éventail, l'ondulation au changement d'espace.
+import { espaceDe } from "./design/espace.js";
+import { DisqueEventail } from "./design/DisqueEventail.jsx";
+import { onduler } from "./design/ondulation.js";
 // Importés ICI une fois pour les chantiers C à H (aucun n'a à retoucher cette ligne).
 import { ChampRecherche } from "./composants/ChampRecherche.jsx";
 import { SuitePaquets, groupesBornes, PAQUET_LISTE } from "./composants/SuitePaquets.jsx";   // (11 nov., limites-client) longues listes par paquets
@@ -882,6 +886,11 @@ import { retirerPublie as retirerPubliePhrase } from '../api/_lib/retrait-colis.
 import { NOM_TRANSPORTEUR as NOM_TRANSPORTEUR_PHRASE, filtreApplicable as filtreApplicablePhrase } from './recherchePhrase.js';
 import "./styles-tablette.css";   // (11 nov., iPad) la coque ordinateur AU DOIGT : 44 px, rien au survol, rail libellé — sous `data-tablette` seulement, EN DERNIER
 import "./styles-refonte-ms.css";   // (14 nov., refonte) Messages, E-mails, Stock : la liste d'abord, des rangées denses, le fil comme Messages d'iPhone — portée par leurs classes seulement
+// (14 nov., décision de Julien) STUDIO BLEU CLAIR — les deux polices, puis LE studio : EN DERNIER (après styles-vitrine,
+// styles-systeme et styles-tablette). Jetons --sb-*, quatre formes de bouton, la coque (docs/design/studio-bleu-clair.md).
+import "./design/studio-polices.css";
+import "./design/studio.css";
+import "./design/polices.js";   // le préchargement des deux polices, avec le morceau de l'app seulement
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
@@ -18078,6 +18087,8 @@ const texteSansBalises = (t) => String(t == null ? '' : t).replace(/<br\s*\/?>/g
 const CIBLE_NOTIF = { c: null, tab: null, at: 0 };
 // (11 nov., lot DJ3) L'onglet de colis demandé juste avant un `setTab` (« À trancher », recherche…).
 const DEMANDE_COLIS = { o: null, at: 0 };
+// (14 nov., Studio bleu clair) « Scanner » demandé par le disque de la barre du bas (lu par Ventes → À expédier).
+const DEMANDE_SCAN = { at: 0 };
 const poserCible = (c, tab) => {
   // (11 nov., lot DJ3) Une cible de colis À RETIRER vit dans Achats (src/colisPlace.js).
   CIBLE_NOTIF.c = c || null; CIBLE_NOTIF.tab = ecranDeCible(tab || null, c) || null; CIBLE_NOTIF.at = Date.now();
@@ -19007,8 +19018,13 @@ function SelecteurPaires({ tab, setTab, badges, sites }) {
     <Segmente label={tr('nav.paires')} options={options} value={tab} plein onChange={(id) => { if (id === tab) { remonterEnHaut(); return; } noterNavigationSimple(id); setTab(id); }}/>
   </div>;
 }
-function BottomBar({tab,setTab,sites,badges}) {
+const lireColisPretsBarre = () => { try { const v = load('vrm_colis_prets', null); return v && typeof v === 'object' ? v : null; } catch (_) { return null; } };
+function BottomBar({tab,setTab,sites,badges,gestes=null}) {
   const [plusOuvert,setPlusOuvert]=React.useState(false);
+  // (14 nov., Studio bleu clair) « Imprimer N » de l'éventail : ce que « Tout imprimer (N) » de Ventes ferait partir, tel que
+  // Ventes le publie (`vrm_colis_prets.lot`, §11 : le même nombre que son bouton) ; pas su ⇒ undefined (jamais un 0 deviné).
+  const [colisPrets]=useLigneSynchro('vrm_colis_prets', lireColisPretsBarre);
+  const nImprimer=colisPrets&&Number.isFinite(colisPrets.lot)?colisPrets.lot:undefined;
   // (7 nov., fluidité) L'ONGLET TOUCHÉ S'ALLUME TOUT DE SUITE. Avant, toucher un
   // onglet gelait la barre jusqu'à ce que le nouvel écran soit calculé (jusqu'à
   // une seconde au téléphone) : on retouchait, croyant que rien ne s'était passé.
@@ -19021,7 +19037,8 @@ function BottomBar({tab,setTab,sites,badges}) {
   React.useEffect(()=>{ if(!enCours) setVise(null); },[enCours,tab]);
   // (8 nov.) Un toucher de la barre est un simple changement d'écran : un écran GARDÉ
   // (déjà vu, src/ecransGardes.jsx) revient tel quel, sans calcul.
-  const allerA=(id)=>{ noterNavigationSimple(id); setVise(id); demarrer(()=>setTab(id)); };
+  // (14 nov., Studio bleu clair) Changer d'ESPACE : l'ondulation de lumière part de l'onglet touché (src/design/ondulation.js).
+  const allerA=(id,depuis)=>{ if(depuis&&espaceDe(id,BAR_GROUPE)!==espaceDe(tab,BAR_GROUPE)) onduler(depuis); noterNavigationSimple(id); setVise(id); demarrer(()=>setTab(id)); };
   const tabMontre=vise||tab;
   const navRef=React.useRef(null);
   // (8 nov.) LA PASTILLE DE L'ONGLET CHOISI GLISSE vers l'onglet touché (Julien : « vraiment
@@ -19035,9 +19052,11 @@ function BottomBar({tab,setTab,sites,badges}) {
     const p=pastilleRef.current; if(!p) return;
     const pl=placesRef.current.get(id);
     if(!pl){ p.style.opacity='0'; return; }
-    // Une capsule DANS l'onglet (6 px de chaque côté, 4 px en haut et en bas).
-    p.style.width=Math.max(0,pl.w-12)+'px'; p.style.top=(pl.y+4)+'px'; p.style.height=Math.max(0,pl.h-8)+'px';
-    p.style.transform=`translateX(${pl.x+6}px)`; p.style.opacity='';
+    // (14 nov., Studio bleu clair) La pastille ENFONCÉE de l'espace actif : 46 × 30, centrée sur l'ICÔNE
+    // de l'onglet (sa diode est dessinée par studio.css). Sans mesure de l'icône : la capsule d'avant.
+    if(pl.cx!=null){ p.style.width='46px'; p.style.height='30px'; p.style.top=(pl.cy-15)+'px'; p.style.transform=`translateX(${pl.cx-23}px)`; p.style.opacity=''; }
+    else { p.style.width=Math.max(0,pl.w-12)+'px'; p.style.top=(pl.y+4)+'px'; p.style.height=Math.max(0,pl.h-8)+'px';
+    p.style.transform=`translateX(${pl.x+6}px)`; p.style.opacity=''; }
     if(!p.hasAttribute('data-prete')) requestAnimationFrame(()=>{ try{ p.setAttribute('data-prete',''); }catch(_){} });
   },[]);
   const ouPastille=React.useRef(null);
@@ -19050,7 +19069,7 @@ function BottomBar({tab,setTab,sites,badges}) {
     const el=navRef.current; if(!el||typeof ResizeObserver==='undefined') return undefined;
     // Les places sont relevées par rapport à l'ANCRE de la pastille (premier enfant de la barre) :
     // elles restent justes quand la barre se déplace sans changer de taille.
-    const relever=()=>{ const m=new Map(); try{ const a=pastilleRef.current&&pastilleRef.current.parentNode; if(!a) return; for(const b of el.querySelectorAll(':scope > .vrm-tab, :scope > .vrm-nav-more')){ const id=b.classList.contains('vrm-nav-more')?'__plus':b.getAttribute('data-nav-entree'); if(id&&b.offsetWidth>0) m.set(id,{x:b.offsetLeft-a.offsetLeft,w:b.offsetWidth,y:b.offsetTop-a.offsetTop,h:b.offsetHeight}); } }catch(_){} placesRef.current=m; poserPastille(ouPastille.current); };
+    const relever=()=>{ const m=new Map(); try{ const a=pastilleRef.current&&pastilleRef.current.parentNode; if(!a) return; for(const b of el.querySelectorAll(':scope > .vrm-tab, :scope > .vrm-nav-more')){ const id=b.classList.contains('vrm-nav-more')?'__plus':b.getAttribute('data-nav-entree'); if(id&&b.offsetWidth>0){ const ic=b.querySelector('.vrm-tab-ic'); const x=b.offsetLeft-a.offsetLeft, y=b.offsetTop-a.offsetTop; m.set(id,{x,w:b.offsetWidth,y,h:b.offsetHeight,...(ic&&ic.offsetWidth>0?{cx:x+ic.offsetLeft+ic.offsetWidth/2,cy:y+ic.offsetTop+ic.offsetHeight/2}:{})}); } } }catch(_){} placesRef.current=m; poserPastille(ouPastille.current); };
     const ro=new ResizeObserver(relever); ro.observe(el);
     return ()=>ro.disconnect();
   },[poserPastille]);
@@ -19097,14 +19116,20 @@ function BottomBar({tab,setTab,sites,badges}) {
       {/* (31 oct.) PAR TÂCHE : Journée · Annonces · Ventes · Colis · Plus. Icône
           d'accent et libellé d'encre à l'actif (styles-vitrine.css), 52 px. */}
       <span className="vrm-tab-pastille-ancre" aria-hidden="true"><span ref={pastilleRef} className="vrm-tab-pastille" style={{opacity:0}}/></span>
-      {BOTTOM_TABS.map(t=>{ const on=groupeBarre(tabMontre,BAR_GROUPE)===t.id; const lib=t.court||t.label; const n=badgesBarre&&typeof badgesBarre[t.id]==='number'&&badgesBarre[t.id]>0?badgesBarre[t.id]:0; return (
-        <button key={t.id} type="button" className="vrm-tab" data-nav-entree={t.id} onClick={()=>{ setPlusOuvert(false);
+      {BOTTOM_TABS.map((t,i)=>{ const on=groupeBarre(tabMontre,BAR_GROUPE)===t.id; const lib=t.court||t.label; const n=badgesBarre&&typeof badgesBarre[t.id]==='number'&&badgesBarre[t.id]>0?badgesBarre[t.id]:0; return (
+        <React.Fragment key={t.id}>
+        {/* (14 nov., Studio bleu clair) Le DISQUE « + » au centre de la barre : l'éventail des gestes globaux
+            (Chercher · Scanner · Publier · Imprimer N), chacun branché sur un geste qui existait déjà. */}
+        {i===2&&gestes ? <DisqueEventail gestes={gestes} nImprimer={nImprimer} Retour={FermeAuRetour} ecran={tab}/> : null}
+        <button type="button" className="vrm-tab" data-nav-entree={t.id} onClick={(e)=>{ setPlusOuvert(false);
+          const ic=e.currentTarget.querySelector('.vrm-tab-ic')||e.currentTarget;
           // (14 nov., n° 61) « Paires » ouvre le dernier de ses trois écrans ; retouché sur l'un d'eux, il remonte en haut.
-          if(t.id===ID_PAIRES){ if(!vise&&estPaires(tab)) remonterEnHaut(); else allerA(dernierePaire()); return; }
-          if(!vise&&(BAR_GROUPE[tab]||tab)===t.id&&t.id===tab) remonterEnHaut(); else allerA(t.id); }} aria-current={on?'page':undefined}>
+          if(t.id===ID_PAIRES){ if(!vise&&estPaires(tab)) remonterEnHaut(); else allerA(dernierePaire(),ic); return; }
+          if(!vise&&(BAR_GROUPE[tab]||tab)===t.id&&t.id===tab) remonterEnHaut(); else allerA(t.id,ic); }} aria-current={on?'page':undefined}>
           <span aria-hidden="true" className="vrm-tab-ic" style={{position:'relative'}}><NavigationIcon item={t} size={22} style={{strokeWidth:on?2:1.6}}/><BadgeNav t={t} badges={badgesBarre} place="barre"/></span>
           <span className="vrm-nav-label">{lib}</span>{n ? <span className="vrm-sr-seul"> · {n} à faire</span> : null}
         </button>
+        </React.Fragment>
       );})}
       {/* (14 nov., n° 61) Plus de « Plus » dans la barre : tout ce qu'il portait est dans le menu du haut (☰ de l'en-tête). */}
     </nav>
@@ -39591,8 +39616,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // (6 nov., audit des chiffres) + `aImprimer` : les prêts PAS ENCORE imprimés, la case
       // « À imprimer » de Colis (`bordereauxAImprimer`) — ce que Ma journée doit redire.
       const v = { prets: aPoster.filter(e => e.pret).length, aImprimer: bordereauxAImprimer(lignesLot()).length, total: aPoster.length, at: Date.now() };
+      // (14 nov., Studio bleu clair) + `lot` : ce que « Tout imprimer (N) » ferait partir (`resumeLot`, le MÊME compte que
+      // le bouton de Ventes) — le plein « Imprimer N » du disque de la barre du bas dit ce nombre-là, jamais un autre.
+      try { const r = resumeLot(lignesLotTous()); if (r && Number.isFinite(r.partent)) v.lot = r.partent; } catch (_) {}
       const avant = load('vrm_colis_prets', null);
-      if (!avant || avant.prets !== v.prets || avant.aImprimer !== v.aImprimer || avant.total !== v.total) save('vrm_colis_prets', v);
+      if (!avant || avant.prets !== v.prets || avant.aImprimer !== v.aImprimer || avant.total !== v.total || avant.lot !== v.lot) save('vrm_colis_prets', v);
     } catch (_) {}
   /* eslint-disable-next-line */ }, [sub, labelsPrets, sales.items, emailBords, labelsCaptes, numeros, bordsPrinted, shipDone]);
   // Identité certaine des ventes (transaction → annonce). Une seule lecture, en
@@ -44577,6 +44605,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     window.addEventListener('vrm:tout-imprimer', f); return ()=>window.removeEventListener('vrm:tout-imprimer', f);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[emailBords, only, labelsPrets, sales.items]);
+  // (14 nov., Studio bleu clair) « Scanner » du disque de la barre du bas : le scanner de bordereau de CET écran
+  // (Ventes → À expédier), le même que son bouton « Scanner » — une fois par demande (`DEMANDE_SCAN`, 8 s au plus).
+  React.useEffect(()=>{
+    if(only!=='bordereaux' || colisDans==='achats') return undefined;
+    const prendre=()=>{ if(!prendImpression() || !DEMANDE_SCAN.at || Date.now()-DEMANDE_SCAN.at>8000) return; DEMANDE_SCAN.at=0; setScanOuvert('envoi'); };
+    prendre();
+    window.addEventListener('vrm:scanner', prendre); return ()=>window.removeEventListener('vrm:scanner', prendre);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[only, colisDans]);
   // « Déplacer le tampon » (depuis « Bordereau prêt ») : l'aperçu s'ouvre toujours.
   const adjustBordPlacement = async () => {
     const r = bordResult; if (!r?.pdfBuf) return;
@@ -58515,7 +58552,7 @@ function AppCoeur() {
       document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
       for (const [nom,valeur] of Object.entries(variablesTheme(t,dark))) document.documentElement.style.setProperty(nom,valeur);
       const m = document.querySelector('meta[name="theme-color"]');
-      if (m) m.setAttribute('content', t.bg);
+      if (m) m.setAttribute('content', t.haut || t.bg);   // (14 nov., Studio) la barre d'état prend le HAUT de la lumière
     } catch (_) { /* un navigateur sans <head> accessible ne doit rien casser */ }
   }, [dark]);
   // (17 oct., revue) Une « bascule Minéral » remettait ici le thème CLAIR une
@@ -61757,10 +61794,19 @@ function AppCoeur() {
             Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>} Icon={Icon} Retour={FermeAuRetour}/>;
   };
 
+  // (14 nov., Studio bleu clair) LES GESTES DU DISQUE (barre du bas, téléphone) — chacun est un geste qui existait :
+  // la loupe ; le scanner de bordereau de Ventes ; « Publier ailleurs » (choisir la paire, puis le site) ;
+  // « Imprimer les bordereaux du jour » de ⌘K (la feuille « Tout imprimer » : rien n'est imprimé avant SON clic).
+  const gestesDisque = {
+    chercher: () => ouvrirRecherche(),
+    scanner: () => { DEMANDE_SCAN.at = Date.now(); setPlatSub(null); choisirOngletColis('envoyer'); setTab('ventes'); for (const ms of [0, 250, 700]) setTimeout(() => { try { window.dispatchEvent(new Event('vrm:scanner')); } catch (_) {} }, ms); },
+    publier: () => { try { window.dispatchEvent(new CustomEvent('vrm:publier-ailleurs', { detail: {} })); } catch (_) {} },
+    imprimer: () => lancerActionRecherche({ id: 'imprimer-jour' }),
+  };
   return (
     <LiveStatsCarte.Provider value={liveStatsVus || null}>
     <SansCompteCarte.Provider value={sansAucunCompte}>
-    <div className="vrm-app-shell" data-tablette={(ordi && tablette) || undefined} style={{...variablesTheme(C,dark),height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'}}
+    <div className="vrm-app-shell" data-tablette={(ordi && tablette) || undefined} data-espace={espaceDe(tab, BAR_GROUPE)} style={{...variablesTheme(C,dark),height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'}}
       // (9 nov., Julien : « je ne veux pas que ça glisse entre les onglets quand je zoome à deux
       // doigts ou que je glisse ») PLUS AUCUN CHANGEMENT D'ONGLET AU DOIGT. On change d'écran par la
       // barre du bas (ou les flèches ← → du clavier sur ordinateur). Ne pas remettre de balayage.
@@ -61881,7 +61927,7 @@ function AppCoeur() {
           (au-dessus des feuilles, par un portail) : l'exemple ne se confond plus avec ses vraies données. */}
       {exempleActif() && <BandeauExemple sansCompte={exempleSansCompte()} style={ordi ? { marginLeft: NAV_LARGEUR + 36 } : undefined} onBrancher={() => (exempleSansCompte() ? sortirModeExemple(window, '/?inscription') : sortirModeExemple())} onConnexion={() => sortirModeExemple(window, '/?connexion')}/>}
       {exempleActif() && createPortal(<CadreExemple/>, document.body)}
-      <main className="vrm-main" data-ecran={tab} data-defile="1" style={{
+      <main className="vrm-main" data-ecran={tab} data-espace={espaceDe(tab, BAR_GROUPE)} data-defile="1" style={{
         // ⚠️ COQUE APP-SHELL : c'est `<main>` qui défile, pas le document. La
         // barre du bas est un frère HORS de ce conteneur → elle ne bouge plus
         // jamais pendant le scroll (bug iOS « barre au milieu de l'écran »).
@@ -62346,7 +62392,7 @@ function AppCoeur() {
       <MemoireDefilement ecran={`${tab}:${(tab.startsWith('plat_')||estTacheSite(tab))?platSub:''}`}/>
       {/* Une seule navigation à la fois : latérale sur ordinateur, en bas sur
           téléphone. Jamais les deux — c'est la même liste d'écrans. */}
-      {ordi ? <SideBar tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesRail}/> : <BottomBar tab={tab} setTab={setTab} sites={sitesPresents} badges={badgesNav}/>}
+      {ordi ? <SideBar tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesRail}/> : <BottomBar tab={tab} setTab={setTab} sites={sitesPresents} badges={badgesNav} gestes={gestesDisque}/>}
       {showBackup&&<GardeEcran nom="sauvegarde" feuille onFermer={()=>setShowBackup(false)}><BackupModal
         catalog={catalog} sales={sales} garageGrid={garageGrid} blockedCells={blockedCells}
         onClose={()=>setShowBackup(false)}

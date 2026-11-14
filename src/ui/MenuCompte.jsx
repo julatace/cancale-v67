@@ -1,3 +1,4 @@
+// (14 nov., Studio bleu clair) « compte_1 ▾ » est une TOUCHE du studio (`sb-touche`) ; chaque compte de la feuille, une rangée.
 // ── src/ui/MenuCompte.jsx — le choix du compte, en UN bouton « compte_1 ▾ » ─────
 // Julien (AJOUT 3) : plus de rangée de pilules géantes (« Tous · compte_1 · compte_2 · … »).
 // Un bouton texte (15/600, 44 px au doigt) qui dit le compte choisi, ou « Tous les comptes »,
@@ -21,7 +22,7 @@ export function MenuCompte({ comptes = [], valeur = '', onChange, tous = true, t
   const lignes = [...(tous ? [{ id: '', nom: tr('listes.tousComptes') }] : []), ...(comptes || [])];
   return (
     <>
-      <button type="button" className={'vrm-ui-menu-compte' + (className ? ' ' + className : '')} aria-haspopup="dialog" aria-expanded={ouvert}
+      <button type="button" className={'vrm-ui-menu-compte sb-touche' + (className ? ' ' + className : '')} aria-haspopup="dialog" aria-expanded={ouvert}
         aria-label={tr('listes.choisirCompte', { nom })} data-ui-menu-compte={valeur || 'tous'} onClick={() => setOuvert(true)} {...attrs}>
         <span translate={choisi ? 'no' : undefined}>{nom}</span><Chevron/>
       </button>
@@ -32,7 +33,7 @@ export function MenuCompte({ comptes = [], valeur = '', onChange, tous = true, t
               const oui = String(c.id) === String(valeur || '');
               return (
                 <li key={c.id || '__tous'}>
-                  <button type="button" role="radio" aria-checked={oui} data-ui-compte-choix={c.id || 'tous'} onClick={() => { setOuvert(false); if (!oui && onChange) onChange(c.id); }}>
+                  <button type="button" className="sb-rangee" role="radio" aria-checked={oui} data-ui-compte-choix={c.id || 'tous'} onClick={() => { setOuvert(false); if (!oui && onChange) onChange(c.id); }}>
                     <span><span translate={c.id ? 'no' : undefined}>{c.nom}</span>{c.connecte ? ' · ' + tr('listes.ouvertVinted') : ''}</span>
                     {c.n != null ? <span className="vrm-ui-choix-n">{c.n}</span> : null}
                     <span className="vrm-ui-choix-coche" style={{ visibility: oui ? 'visible' : 'hidden' }}><Coche/></span>

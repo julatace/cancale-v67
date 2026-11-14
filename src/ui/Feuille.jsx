@@ -1,3 +1,4 @@
+// (14 nov., Studio bleu clair) La feuille est PORCELAINE (`sb-feuille`, rayon 28) ; « OK » est un LIEN (`sb-lien`).
 // ── src/ui/Feuille.jsx — la petite feuille des briques de liste ─────────────────
 // Une carte qui monte du bas (au centre à l'ordinateur), un voile, un titre, « OK ».
 // Portail sur <body> (au-dessus de tout : z 20000, celui des confirmations), Échap et
@@ -21,10 +22,10 @@ export function Feuille({ titre, onClose, children, ...attrs }) {
   if (typeof document === 'undefined') return null;
   return createPortal(
     <div className="vrm-ui-voile" onClick={(e) => { if (e.target === e.currentTarget && onClose) onClose(); }}>
-      <div ref={ref} tabIndex={-1} className="vrm-ui-feuille" role="dialog" aria-modal="true" aria-label={typeof titre === 'string' ? titre : undefined} data-noswipe="" {...attrs}>
+      <div ref={ref} tabIndex={-1} className="vrm-ui-feuille sb-feuille" role="dialog" aria-modal="true" aria-label={typeof titre === 'string' ? titre : undefined} data-noswipe="" {...attrs}>
         <div className="vrm-ui-feuille-tete">
           <h2 className="vrm-ui-feuille-titre">{titre}</h2>
-          <button type="button" className="vrm-ui-feuille-fermer" onClick={onClose}>{tr('listes.ok')}</button>
+          <button type="button" className="vrm-ui-feuille-fermer sb-lien" onClick={onClose}>{tr('listes.ok')}</button>
         </div>
         {children}
       </div>

@@ -34,34 +34,41 @@
 // LE ROUGE : `danger` prend la valeur de l'ambre (`warn`) — 88 usages « danger » rougissaient
 // des erreurs, des annulations, des pertes ; le rouge n'est plus qu'au jeton `doublon`, deux
 // paires présentes sous un même N° (§5, §7). `scripts/audit-rouge-doublon.cjs` l'interdit ailleurs.
+// ⚠️⚠️ (14 nov., décision de Julien) STUDIO BLEU CLAIR — remplace Vitrine/Apple. Un seul bleu clair
+// partout (la nuit, un bleu-nuit profond), la porcelaine posée dessus, l'encre bleu nuit, UN accent rare
+// (#0060CC diode/aplat, #0055B8 texte de lien), l'ambre pour un geste, le rouge au seul doublon de N°.
+// Les VALEURS sont celles de src/design/studio.css (jetons `--sb-*`) — docs/design/studio-bleu-clair.md.
+// `bg` = l'aplat (la coque peint la lumière haut → bas par-dessus, studio.css §7.1) ; `haut` = le haut
+// de la lumière (la barre d'état du téléphone). Contrastes mesurés (AA, 4,5:1) : encre ≥ 12,2 ; muted
+// ≥ 5,6 sur l'aplat ET le bas du dégradé ; ambre ≥ 5,8 ; lien ≥ 5,0 ; blanc sur l'accent 5,9.
+// Les noms des exports (MINERAL, MINERAL_DARK) ne changent pas : tout App.jsx les lit déjà.
 export const MINERAL = Object.freeze({
- bg:'#F2F2F7',surface:'#FFFFFF',card:'#FFFFFF',card2:'#F2F2F7',
- border:'#E5E5EA',text:'#1D1D1F',muted:'#6E6E73',faint:'#6E6E73',
- accent:'#0071E3',accentTexte:'#0066CC',accentSoft:'#0066CC',onAccent:'#FFFFFF',
- danger:'#B25000',doublon:'#D70015',warn:'#B25000',onWarn:'#FFFFFF',warnSoft:'#FFF4E5',gold:'#B25000',blue:'#6E6E73',purple:'#6E6E73',
+ bg:'#D6E8F5',haut:'#EEF6FD',surface:'#FFFFFF',card:'#FFFFFF',card2:'#E4EEF7',
+ border:'#CBDCEB',text:'#0C1D30',muted:'#3F5468',faint:'#3F5468',
+ accent:'#0060CC',accentTexte:'#0055B8',accentSoft:'#0055B8',onAccent:'#FFFFFF',
+ danger:'#764300',doublon:'#B8261A',warn:'#764300',onWarn:'#FFFFFF',warnSoft:'#F8EBD8',gold:'#764300',blue:'#3F5468',purple:'#3F5468',
  shadow:'none',
- shadowMd:'0 1px 2px rgba(0,0,0,.04), 0 6px 20px rgba(0,0,0,.05)',
- shadowLg:'0 6px 16px rgba(0,0,0,.08), 0 24px 56px rgba(0,0,0,.14)',
- ring:'rgba(0,113,227,.20)',glass:'#FFFFFF',bar:'#F2F2F7',hair:'rgba(0,0,0,.06)',
- sidebar:'#F2F2F7',chrome:'#F2F2F7',onChrome:'#1D1D1F',chromeMuted:'#6E6E73',chromeLine:'#E5E5EA',
- chromeGradient:'#F2F2F7',photo:'#F2F2F7',
- s1:'#0071E3',s2:'#8DB8F2',selection:'#0071E3',
+ shadowMd:'inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgba(18,52,96,.07), 0 1px 2px rgba(18,52,96,.07), 0 12px 26px -14px rgba(18,52,96,.30)',
+ shadowLg:'inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgba(18,52,96,.06), 0 2px 5px rgba(18,52,96,.07), 0 34px 60px -26px rgba(18,52,96,.48)',
+ ring:'rgba(0,96,204,.22)',glass:'#FFFFFF',bar:'#D6E8F5',hair:'rgba(18,52,96,.10)',
+ sidebar:'#D6E8F5',chrome:'#D6E8F5',onChrome:'#0C1D30',chromeMuted:'#3F5468',chromeLine:'#CBDCEB',
+ chromeGradient:'#D6E8F5',photo:'#F1F5F9',
+ s1:'#0060CC',s2:'#8DB8F2',selection:'#0060CC',
  carteSombre:'radial-gradient(120% 90% at 100% 0%, #1f3a5f 0%, #1d1d1f 55%)',carteSombreClair:'#1F3A5F',
  caseSombre:'rgba(255,255,255,.1)',surSombre:'#FFFFFF',surSombre2:'rgba(255,255,255,.7)'
 });
-// Le sombre d'iOS : noir pur, cartes #1C1C1E, cases #2C2C2E, filets #38383A ; l'aplat
-// #0A84FF au texte BLANC (comme iOS ; 3,65:1, AA grand texte), les liens #409CFF
-// (5,8:1 sur #1C1C1E), l'ambre clair. Le gris secondaire #98989D tient 4,5:1 sur #2C2C2E.
+// La nuit du studio : bleu-nuit profond (#0C1829), la porcelaine #16273C, le creux #091320, l'encre
+// #EAF2FB, le gris #9CB0C6 (≥ 6,8:1), l'aplat d'accent #1F6FD6 au texte blanc (5,0:1), les liens #6CB4FF.
 export const MINERAL_DARK = Object.freeze({
- bg:'#000000',surface:'#1C1C1E',card:'#1C1C1E',card2:'#2C2C2E',
- border:'#38383A',text:'#F5F5F7',muted:'#98989D',faint:'#98989D',
- accent:'#0071E3',accentTexte:'#409CFF',accentSoft:'#409CFF',onAccent:'#FFFFFF',
- danger:'#FFB340',doublon:'#FF6961',warn:'#FFB340',onWarn:'#1D1D1F',warnSoft:'#2E2412',gold:'#FFB340',blue:'#98989D',purple:'#98989D',
- shadow:'none',shadowMd:'0 0 0 1px rgba(255,255,255,.05)',shadowLg:'0 0 0 1px rgba(255,255,255,.07), 0 16px 48px rgba(0,0,0,.6)',
- ring:'rgba(10,132,255,.28)',glass:'#1C1C1E',bar:'#000000',hair:'rgba(255,255,255,.08)',
- sidebar:'#000000',chrome:'#000000',onChrome:'#F5F5F7',chromeMuted:'#98989D',chromeLine:'#38383A',
- chromeGradient:'#000000',photo:'#2C2C2E',
- s1:'#0A84FF',s2:'#64B0FF',selection:'#0A84FF',
+ bg:'#0C1829',haut:'#15263D',surface:'#16273C',card:'#16273C',card2:'#091320',
+ border:'#243A55',text:'#EAF2FB',muted:'#9CB0C6',faint:'#9CB0C6',
+ accent:'#1F6FD6',accentTexte:'#6CB4FF',accentSoft:'#6CB4FF',onAccent:'#FFFFFF',
+ danger:'#F2B65E',doublon:'#FF6B5E',warn:'#F2B65E',onWarn:'#0C1D30',warnSoft:'#2A2213',gold:'#F2B65E',blue:'#9CB0C6',purple:'#9CB0C6',
+ shadow:'none',shadowMd:'inset 0 .5px 0 rgba(255,255,255,.09), 0 0 0 .5px rgba(0,0,0,.5), 0 12px 26px -12px rgba(0,0,0,.8)',shadowLg:'inset 0 .5px 0 rgba(255,255,255,.12), 0 0 0 .5px rgba(0,0,0,.5), 0 34px 60px -22px rgba(0,0,0,.95)',
+ ring:'rgba(74,163,255,.30)',glass:'#16273C',bar:'#0C1829',hair:'rgba(255,255,255,.08)',
+ sidebar:'#0C1829',chrome:'#0C1829',onChrome:'#EAF2FB',chromeMuted:'#9CB0C6',chromeLine:'#243A55',
+ chromeGradient:'#0C1829',photo:'#1C2E46',
+ s1:'#4AA3FF',s2:'#6CB4FF',selection:'#4AA3FF',
  carteSombre:'radial-gradient(120% 90% at 100% 0%, #2a5385 0%, #1b2d45 50%, #15233a 100%)',carteSombreClair:'#2A5385',
  caseSombre:'rgba(255,255,255,.1)',surSombre:'#FFFFFF',surSombre2:'rgba(255,255,255,.82)'
 });

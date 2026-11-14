@@ -162,3 +162,101 @@
   :root:root:root:root:root:root body .vrm-ui-choix button:hover { background: var(--d-remplir, rgba(118,118,128,.12)) !important; }
 }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   STUDIO BLEU CLAIR (14 nov., décision de Julien) — les briques de liste passent aux
+   quatre formes du studio (src/design/studio.css, docs/design/studio-bleu-clair.md) :
+     filtre, menu du compte, « À faire » capsule → la TOUCHE (posée ; choisie = enfoncée + diode) ;
+     BoutonIcone → le ROND (44) ; « À faire · N › » et « OK » de la feuille → le LIEN ;
+     le champ → CREUSÉ ; la feuille → PORCELAINE (rayon 28) sous un voile de bleu ;
+     la bande → l'affiche (Urbanist 300) ; la rangée → titre Inter 600, chiffre Urbanist, vignette posée.
+   Même couche, même poids de sélecteur que plus haut, ÉCRIT APRÈS : ces valeurs l'emportent.
+   ════════════════════════════════════════════════════════════════════════════ */
+@layer vrm-premium {
+/* La bande : grands chiffres fins, libellé 12,5 gris. */
+:root:root:root:root:root:root body .vrm-ui-bande-n { font: 300 27px/1 var(--sb-police-affiche) !important; letter-spacing: -.03em !important; font-feature-settings: var(--sb-chiffres) !important; color: var(--sb-encre) !important; }
+:root:root:root:root:root:root body .vrm-ui-bande-n.is-vide { font: 500 15px/1.2 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; }
+:root:root:root:root:root:root body .vrm-ui-bande-l { font: 500 12.5px/1.25 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; }
+:root:root:root:root:root:root body .vrm-ui-bande { align-items: baseline !important; }
+:root:root:root:root:root:root body .vrm-ui-bande-item { flex-direction: row !important; align-items: baseline !important; gap: 5px !important; }
+
+/* Le menu du compte : une touche « compte_1 ▾ ». */
+:root:root:root:root:root:root body .vrm-ui-menu-compte {
+  padding: 0 13px !important; border-radius: var(--sb-r-touche) !important; background: var(--sb-touche-fond) !important; box-shadow: var(--sb-touche-ombre) !important;
+  font: 600 14px/1.1 var(--sb-police-texte) !important; color: var(--sb-encre) !important; transition: transform 90ms var(--sb-courbe), box-shadow 90ms !important;
+}
+:root:root:root:root:root:root body .vrm-ui-menu-compte:is(:active, [aria-expanded="true"]) { background: var(--sb-creux) !important; box-shadow: var(--sb-enfonce) !important; transform: translateY(1px) !important; }
+:root:root:root:root:root:root body .vrm-ui-menu-compte > svg { color: var(--sb-encre-2) !important; }
+@media (hover: hover) and (pointer: fine) { :root:root:root:root:root:root body .vrm-ui-menu-compte { min-height: 40px !important; } :root:root:root:root:root:root body .vrm-ui-menu-compte:hover > span:first-child { text-decoration: none !important; } }
+
+/* La feuille : porcelaine, rayon 28 en haut ; l'écran derrière sous un voile de bleu. */
+:root:root:root:root:root:root body .vrm-ui-voile { background: color-mix(in oklab, var(--sb-aplat) 60%, transparent) !important; }
+:root:root:root:root:root:root body .vrm-ui-feuille { background: var(--sb-porcelaine-degrade) !important; background-color: var(--sb-porcelaine-2) !important; border-radius: var(--sb-r-plan) var(--sb-r-plan) 0 0 !important; box-shadow: var(--sb-ombre-avant) !important; color: var(--sb-encre) !important; }
+@media (min-width: 768px) { :root:root:root:root:root:root body .vrm-ui-feuille { border-radius: var(--sb-r-plan) !important; } }
+:root:root:root:root:root:root body .vrm-ui-feuille-titre { font: 400 26px/1.1 var(--sb-police-affiche) !important; letter-spacing: -.03em !important; color: var(--sb-encre) !important; }
+:root:root:root:root:root:root body .vrm-ui-feuille-fermer { color: var(--sb-lien) !important; font: 600 14px/1 var(--sb-police-texte) !important; }
+:root:root:root:root:root:root body .vrm-ui-feuille-fermer:active { opacity: .55 !important; }
+:root:root:root:root:root:root body .vrm-ui-choix { background: var(--sb-porcelaine) !important; border-radius: 16px !important; box-shadow: var(--sb-ombre-plan) !important; }
+:root:root:root:root:root:root body .vrm-ui-choix > li + li { box-shadow: inset 0 .5px 0 rgb(var(--sb-o) / .10) !important; }
+:root:root:root:root:root:root body .vrm-ui-choix button { font: 500 16px/1.25 var(--sb-police-texte) !important; color: var(--sb-encre) !important; }
+:root:root:root:root:root:root body .vrm-ui-choix button > .vrm-ui-choix-n { color: var(--sb-encre-2) !important; }
+:root:root:root:root:root:root body .vrm-ui-choix button[aria-checked="true"] > .vrm-ui-choix-coche { color: var(--sb-encre) !important; }
+:root:root:root:root:root:root body .vrm-ui-choix button:active { background: var(--sb-creux) !important; }
+
+/* La barre d'outils : le champ creusé (44), les icônes en ronds posés. */
+:root:root:root:root:root:root body .vrm-ui-outils { gap: 8px !important; }
+:root:root:root:root:root:root body .vrm-ui-outils-champ { height: 44px !important; padding: 0 14px !important; gap: 9px !important; border-radius: var(--sb-r-champ) !important; background: var(--sb-puits) !important; box-shadow: var(--sb-puits-ombre) !important; color: var(--sb-encre-2) !important; }
+:root:root:root:root:root:root body .vrm-ui-outils-champ > input { height: 44px !important; font: 500 16px/1 var(--sb-police-texte) !important; color: var(--sb-encre) !important; }
+:root:root:root:root:root:root body .vrm-ui-outils-champ > input::placeholder { color: var(--sb-encre-2) !important; }
+:root:root:root:root:root:root body .vrm-ui-outils-champ:focus-within { box-shadow: var(--sb-puits-ombre), 0 0 0 2px color-mix(in oklab, var(--sb-diode) 45%, transparent) !important; }
+:root:root:root:root:root:root body .vrm-ui-icone { border-radius: 50% !important; background: var(--sb-touche-fond) !important; box-shadow: var(--sb-touche-ombre) !important; color: var(--sb-encre) !important; }
+:root:root:root:root:root:root body .vrm-ui-icone:is(:active, [aria-pressed="true"]) { background: var(--sb-creux) !important; box-shadow: var(--sb-enfonce) !important; transform: translateY(1px) !important; color: var(--sb-encre) !important; }
+:root:root:root:root:root:root body .vrm-ui-icone[aria-pressed="true"]::after { content: '' !important; position: absolute !important; top: 5px !important; right: 5px !important; width: 5px !important; height: 5px !important; border-radius: 50% !important; background: var(--sb-diode) !important; box-shadow: 0 0 5px color-mix(in oklab, var(--sb-diode) 55%, transparent) !important; }
+:root:root:root:root:root:root body .vrm-ui-icone { position: relative !important; }
+@media (hover: hover) and (pointer: fine) { :root:root:root:root:root:root body .vrm-ui-icone { width: 44px !important; height: 44px !important; } :root:root:root:root:root:root body .vrm-ui-icone:hover { background: linear-gradient(180deg, #FFFFFF, #EAF1F8) !important; } :root[data-theme="dark"] body .vrm-ui-icone:hover { background: linear-gradient(180deg, #23395A, #1B2F4A) !important; } }
+
+/* Les filtres : des touches posées ; la choisie enfoncée avec sa diode. */
+:root:root:root:root:root:root body .vrm-ui-filtres { gap: 8px !important; padding-top: 2px !important; padding-bottom: 6px !important; }
+:root:root:root:root:root:root body .vrm-ui-filtre {
+  border: 0 !important; background-clip: border-box !important; padding: 0 14px !important; border-radius: var(--sb-r-touche) !important;
+  background: var(--sb-touche-fond) !important; box-shadow: var(--sb-touche-ombre) !important; color: var(--sb-encre) !important;
+  font: 600 14px/1 var(--sb-police-texte) !important; transition: transform 90ms var(--sb-courbe), box-shadow 90ms !important;
+}
+:root:root:root:root:root:root body .vrm-ui-filtre:active { transform: translateY(1px) !important; background: var(--sb-creux) !important; box-shadow: var(--sb-enfonce) !important; }
+:root:root:root:root:root:root body .vrm-ui-filtre[aria-pressed="true"] { color: var(--sb-encre) !important; background: var(--sb-creux) !important; box-shadow: var(--sb-enfonce) !important; transform: translateY(1px) !important; padding-right: 20px !important; }
+:root:root:root:root:root:root body .vrm-ui-filtre[aria-pressed="true"]::after { content: '' !important; position: absolute !important; top: 6px !important; right: 7px !important; width: 5px !important; height: 5px !important; border-radius: 50% !important; background: var(--sb-diode) !important; box-shadow: 0 0 0 1.5px color-mix(in oklab, var(--sb-diode) 14%, transparent), 0 0 5px color-mix(in oklab, var(--sb-diode) 55%, transparent) !important; }
+:root:root:root:root:root:root body .vrm-ui-filtre-n { opacity: 1 !important; color: var(--sb-encre-2) !important; font-weight: 500 !important; }
+@media (hover: hover) and (pointer: fine) { :root:root:root:root:root:root body .vrm-ui-filtre { min-height: 40px !important; } :root:root:root:root:root:root body .vrm-ui-filtre:not([aria-pressed="true"]):hover { background: linear-gradient(180deg, #FFFFFF, #EAF1F8) !important; } :root[data-theme="dark"] body .vrm-ui-filtre:not([aria-pressed="true"]):hover { background: linear-gradient(180deg, #23395A, #1B2F4A) !important; } }
+
+/* « À faire · N › » : un LIEN (aller voir plus), son point ambre devant. */
+:root:root:root:root:root:root body .vrm-ui-afaire {
+  width: auto !important; max-width: 100% !important; display: inline-flex !important; gap: 7px !important; padding: 0 !important; border-radius: 0 !important;
+  background: none !important; box-shadow: none !important; color: var(--sb-lien) !important; font: 600 14px/1.2 var(--sb-police-texte) !important;
+}
+:root:root:root:root:root:root body .vrm-ui-afaire:active { transform: none !important; opacity: .55 !important; }
+:root:root:root:root:root:root body .vrm-ui-afaire-point { width: 6px !important; height: 6px !important; background: var(--sb-ambre-point) !important; }
+:root:root:root:root:root:root body .vrm-ui-afaire-n { color: inherit !important; font-weight: 600 !important; }
+:root:root:root:root:root:root body .vrm-ui-afaire > svg { color: currentColor !important; width: 7px !important; }
+/* La variante capsule : une touche, le nombre en ambre. */
+:root:root:root:root:root:root body .vrm-ui-afaire-capsule { border: 0 !important; background-clip: border-box !important; padding: 0 14px !important; border-radius: var(--sb-r-touche) !important; background: var(--sb-touche-fond) !important; box-shadow: var(--sb-touche-ombre) !important; font: 600 14px/1 var(--sb-police-texte) !important; color: var(--sb-encre) !important; }
+:root:root:root:root:root:root body .vrm-ui-afaire-capsule:active { transform: translateY(1px) !important; background: var(--sb-creux) !important; box-shadow: var(--sb-enfonce) !important; }
+:root:root:root:root:root:root body .vrm-ui-afaire-capsule .vrm-ui-afaire-n { color: var(--sb-ambre) !important; }
+
+/* La rangée : 64 px, vignette posée 44, titre Inter 600, méta gris, chiffre à l'affiche. Ni ombre ni flou (1 000 rangées). */
+:root:root:root:root:root:root body .vrm-ui-ligne { min-height: 64px !important; padding: 8px 20px 8px 16px !important; background: var(--sb-porcelaine) !important; color: var(--sb-encre) !important; font-family: var(--sb-police-texte) !important; contain-intrinsic-size: auto 64px; }
+:root:root:root:root:root:root body .vrm-ui-ligne + .vrm-ui-ligne::before { left: 72px !important; background: rgb(var(--sb-o) / .10) !important; }
+:root[data-theme="dark"] body .vrm-ui-ligne + .vrm-ui-ligne::before { background: rgb(255 255 255 / .07) !important; }
+:root:root:root:root:root:root body .vrm-ui-ligne:active { background: var(--sb-creux) !important; }
+:root:root:root:root:root:root body .vrm-ui-ligne-photo { width: 44px !important; height: 44px !important; border-radius: 12px !important; background: var(--sb-socle) !important; box-shadow: var(--sb-ombre-pose) !important; position: relative !important; }
+:root:root:root:root:root:root body .vrm-ui-ligne-photo::after { content: '' !important; position: absolute !important; inset: 0 !important; border-radius: inherit !important; pointer-events: none !important; box-shadow: inset 0 0 0 .5px rgb(var(--sb-o) / .10), inset 0 1px 0 rgb(255 255 255 / .7) !important; }
+:root[data-theme="dark"] body .vrm-ui-ligne-photo::after { box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .07) !important; }
+:root:root:root:root:root:root body .vrm-ui-ligne-titre { font: 600 15px/1.2 var(--sb-police-texte) !important; letter-spacing: -.008em !important; }
+:root:root:root:root:root:root body .vrm-ui-ligne-sous { font: 500 12.5px/1.3 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; }
+:root:root:root:root:root:root body .vrm-ui-ligne-sous.is-geste { color: var(--sb-ambre) !important; font-weight: 600 !important; }
+:root:root:root:root:root:root body .vrm-ui-ligne-sous.is-geste::before { width: 6px !important; height: 6px !important; background: var(--sb-ambre-point) !important; }
+:root:root:root:root:root:root body .vrm-ui-ligne-valeur { font: 400 20px/1 var(--sb-police-affiche) !important; letter-spacing: -.02em !important; font-feature-settings: var(--sb-chiffres) !important; color: var(--sb-encre) !important; }
+:root:root:root:root:root:root body .vrm-ui-ligne > svg.vrm-ui-chevron { color: var(--sb-encre-2) !important; opacity: .6; }
+@media (hover: hover) and (pointer: fine) { :root:root:root:root:root:root body :is(.vrm-ui-afaire, .vrm-ui-ligne):hover { background-color: color-mix(in srgb, var(--sb-porcelaine) 92%, #6F8FB0) !important; } :root:root:root:root:root:root body .vrm-ui-afaire:hover { background: none !important; text-decoration: underline !important; text-underline-offset: 3px !important; } }
+:root:root:root:root:root:root body :is(.vrm-ui-filtre, .vrm-ui-afaire, .vrm-ui-afaire-capsule, .vrm-ui-ligne, .vrm-ui-choix button, .vrm-ui-feuille-fermer, .vrm-ui-menu-compte, .vrm-ui-icone):focus-visible { outline-color: var(--sb-diode) !important; }
+}
+@media (prefers-reduced-motion: reduce) { :root:root body :is(.vrm-ui-filtre, .vrm-ui-icone, .vrm-ui-menu-compte, .vrm-ui-afaire-capsule) { transform: none !important; transition: none !important; } }
