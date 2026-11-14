@@ -734,7 +734,7 @@
   :root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab { background: transparent !important; box-shadow: none !important; flex: 1 1 0 !important; min-width: 0 !important; }
   :root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab::before, :root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab::after { display: none !important; }
   :root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-tab-ic { color: var(--d-gris) !important; transition: transform var(--d-m-appui) ease-out !important; }
-  :root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-nav-label { color: var(--d-gris) !important; font-size: 11px !important; font-weight: 600 !important; letter-spacing: 0 !important; }
+  :root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-nav-label { color: var(--d-gris) !important; font-size: 10px !important; font-weight: 600 !important; letter-spacing: 0 !important; }
   :root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] :is(.vrm-tab-ic, .vrm-nav-label) { color: var(--d-accent-texte) !important; }
   :root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab:active .vrm-tab-ic { transform: scale(.9) !important; }
   /* Pastilles : un nombre ambre net (un geste), cerclé du fond de la barre ; le point sans chiffre. */
@@ -794,6 +794,25 @@
   html:has(.vrm-maj) body .vrm-app-shell > .vrm-main { padding-top: 36px !important; }
 }
 
+
+/* ── 3.9 LA MAQUETTE DE JULIEN (clair.html, 14 nov.) ─────────────────────────
+   En haut : loupe · cloche (un POINT ambre) · avatar ; le reste des écrans s'ouvre par l'avatar (son menu
+   commence par eux). En bas : la pastille d'un onglet à l'ENCRE (jamais rouge). */
+@media (max-width: 743px), (max-width: 767px) and (hover: hover) and (pointer: fine), (max-width: 1023px) and (max-height: 599px) and (hover: none), (max-width: 1023px) and (max-height: 599px) and (pointer: coarse), (max-width: 1023px) and (max-height: 599px) and (pointer: none) {
+  :root:root body .vrm-app-shell > .vrm-app-header .vrm-header-brand > .vrm-hdr-menu.vrm-hdr-menu { display: none !important; }
+  :root:root body .vrm-app-shell > .vrm-app-header .vrm-header-actions button[data-recherche-loupe] { order: -1 !important; }
+  /* La cloche : le nombre reste lu (aria-label, et dans la feuille) ; à l'œil, un point ambre. */
+  :root:root body .vrm-app-shell > .vrm-app-header .vrm-cn-cloche .vrm-cn-pastille.vrm-cn-pastille {
+    min-width: 0 !important; width: 9px !important; height: 9px !important; padding: 0 !important; top: 9px !important; left: auto !important; right: 10px !important;
+    font-size: 0 !important; line-height: 0 !important; color: transparent !important; background: var(--d-point-ambre) !important;
+  }
+  :root:root body .vrm-app-shell > .vrm-app-header .vrm-cn-cloche .vrm-cn-alerte { left: auto; right: 10px; top: 9px; bottom: auto; }
+  :root:root body .vrm-app-shell .vrm-tabbar .vrm-nav-badge-barre.vrm-nav-badge-n { background: var(--d-encre) !important; color: var(--d-carte) !important; }
+}
+:root:root body .vrm-fs .vrm-profil-ecrans .vrm-profil-ligne { min-height: 48px !important; width: 100% !important; }
+:root:root body .vrm-fs .vrm-profil-ecrans .vrm-nav-badge-n { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--d-encre); color: var(--d-carte); font: 700 12px/20px var(--vrm-police, -apple-system, system-ui, sans-serif); text-align: center; font-variant-numeric: tabular-nums; }
+:root:root body .vrm-fs .vrm-profil-ecrans .vrm-nav-badge-point { margin-left: auto; width: 8px; height: 8px; border-radius: 50%; background: var(--d-point-ambre); }
+
 } /* fin §3 COQUE (@layer vrm-premium) */
 
 /* ══ §4 ATELIER — la direction artistique commune (14 nov.) ═══════════════════
@@ -811,9 +830,9 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 :root:root {
   /* Fond : très légèrement chaud, pas le gris plat d'iOS (#F2F2F7). */
-  --d-fond-atelier: #F4F3EF;
+  --d-fond-atelier: #F2F2F7;            /* (14 nov., maquette de Julien) fond clair UNI : le gris d'iOS */
   --d-surface-atelier: #FFFFFF;          /* la carte posée sur ce fond */
-  --d-surface-atelier-2: #FAF9F6;        /* une case dans une carte */
+  --d-surface-atelier-2: #F7F7F9;        /* une case dans une carte */
 
   /* Profondeur, pas de traits : une ombre diffuse à deux couches ; la nuit, aucune. */
   --d-ombre-douce: 0 1px 2px rgb(0 0 0 / .04), 0 8px 24px rgb(0 0 0 / .06);
@@ -850,8 +869,8 @@
   --d-t-grand-titre: 34px; --d-ap-grand-titre: -.026em; --d-g-grand-titre: 700;
 
   /* Le matériau translucide (barres du haut et du bas, iOS). */
-  --d-materiau: rgb(249 248 245 / .72);
-  --d-materiau-plein: #F9F8F5;              /* transparence réduite : opaque */
+  --d-materiau: rgb(249 249 251 / .82);
+  --d-materiau-plein: #F9F9FB;              /* transparence réduite : opaque */
   --d-materiau-flou: saturate(180%) blur(20px);
   --d-materiau-filet: rgb(0 0 0 / .08);
 
@@ -890,7 +909,7 @@
   --d-filet-indente: rgb(84 84 88 / .45);
   --d-heros-fond: #1C1C1E;
   --d-heros-degrade: radial-gradient(120% 90% at 100% 0%, rgb(64 120 220 / .30) 0%, rgb(64 120 220 / 0) 60%), linear-gradient(150deg, #1C1C1E 0%, #151E33 58%, #10284F 100%);
-  --d-materiau: rgb(22 22 24 / .72);
+  --d-materiau: rgb(22 22 24 / .82);
   --d-materiau-plein: #161618;
   --d-materiau-filet: rgb(255 255 255 / .10);
   --d-pastille-neutre-fond: rgb(118 118 128 / .24);  --d-pastille-neutre: #E5E5EA;

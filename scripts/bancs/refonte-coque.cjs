@@ -83,7 +83,8 @@ async function regles(nav) {
         fr: f ? f.getAttribute('data-fraicheur-unique') : null, frH: hote ? Math.round(hote.getBoundingClientRect().height) : 0, debord: document.documentElement.scrollWidth > innerWidth + 1 };
     });
     dit(h.droite.length <= 3, `${url} · H1 à droite, trois icônes au plus (cloche · loupe · compte)`, h.droite.join(' | '));
-    dit(h.menu && h.gauche.length === 1, `${url} · H1 à gauche, le ☰ du menu du haut (choix n° 61), seul`, h.gauche.join(' | '));
+    // (14 nov., maquette de Julien) Rien à gauche : le reste des écrans s'ouvre par l'avatar (H1 « menu » ci-dessous).
+    dit(h.gauche.length === 0, `${url} · H1 à gauche, rien (le menu du haut s'ouvre par l'avatar)`, h.gauche.join(' | '));
     dit(!(h.fr === 'a-jour' || h.fr === 'encours') || h.frH <= 1, `${url} · H5 « Tout est à jour » ne prend aucune place en tête de page`, `${h.fr} · ${h.frH} px`);
     dit(!h.debord, `${url} · D aucun débordement horizontal`);
     dit(!o.erreurs.length, `${url} · aucune erreur d'app`, o.erreurs.join(' | ').slice(0, 200));
@@ -100,8 +101,10 @@ async function regles(nav) {
     });
     dit(haut.grand.length >= 1, `${url} · H2 un grand titre (≥ 30 px) dans la page, en haut`, haut.grand.join(' | ') || 'aucun');
     dit(haut.op < 0.1, `${url} · H2 le petit titre de la barre est caché en haut de page (jamais deux fois)`, String(haut.op));
-    await o.pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 500; });
-    await o.pg.waitForTimeout(700);
+    // Défiler (deux fois : un écran qui finit d'arriver peut ramener le défilement en haut).
+    await o.pg.waitForTimeout(1500);
+    for (let i = 0; i < 2; i++) { await o.pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) { m.scrollTop = 500; m.dispatchEvent(new Event('scroll')); } }); await o.pg.waitForTimeout(900); }
+    await attendre(o.pg, () => o.pg.evaluate(() => { const t = document.querySelector('.vrm-hdr-titre'); return t && +getComputedStyle(t).opacity > .9; }), 5000);
     const bas = await o.pg.evaluate(() => { const t = document.querySelector('.vrm-hdr-titre'); if (!t) return null; const r = t.getBoundingClientRect(); return { op: +getComputedStyle(t).opacity, centre: Math.round(r.left + r.width / 2), txt: t.textContent.trim() }; });
     dit(!!bas && bas.op > 0.9 && Math.abs(bas.centre - 195) <= 8, `${url} · H2 défilé : le petit titre arrive, CENTRÉ dans la barre`, JSON.stringify(bas));
     await o.ctx.close();
@@ -149,7 +152,8 @@ async function regles(nav) {
     await toucher(pg, '[data-profil-tete]'); await pg.waitForTimeout(900);
     const lignes = await pg.evaluate(() => [...document.querySelectorAll('[data-menu-profil] [data-profil-menu]')].map((e) => e.getAttribute('data-profil-menu')));
     dit(['parametres', 'etat-actions', 'montants'].every((x) => lignes.includes(x)) && lignes[0] === 'parametres', 'F le menu du compte : Paramètres d\'abord, puis « Actions Vinted » et l\'œil des montants', lignes.join(','));
-    await toucher(pg, '[data-profil-menu="etat-actions"]'); await pg.waitForTimeout(900);
+    await toucher(pg, '[data-profil-menu="etat-actions"]');
+    await attendre(pg, async () => (await visibles(pg, '[data-etat-panneau]')) >= 1, 5000);
     dit(await visibles(pg, '[data-etat-panneau]') >= 1, 'F « Actions Vinted » ouvre le panneau d\'état de la pastille d\'hier');
     await toucher(pg, '[data-etat-fermer]'); await pg.waitForTimeout(400);
     await toucher(pg, '[data-profil-tete]'); await pg.waitForTimeout(900);
@@ -169,16 +173,17 @@ async function regles(nav) {
     const pg = o.pg;
     const onglets = await pg.evaluate(() => [...document.querySelectorAll('.vrm-tabbar > button')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => b.getAttribute('data-nav-entree') || (b.classList.contains('vrm-nav-more') ? 'plus' : '?')));
     dit(onglets.join(',') === 'journee,paires,ventes,compta', 'N la barre du bas : quatre onglets — Aujourd\'hui · Paires · Ventes · Argent', onglets.join(','));
+    await attendre(pg, () => pg.evaluate(() => !!document.querySelector('.vrm-tabbar [data-badge-nav="paires"]')), 12000);
     const pastilles = await pg.evaluate(() => { const b = document.querySelector('.vrm-tabbar [data-badge-nav="paires"]'); return b ? b.getAttribute('data-badge-n') : null; });
     dit(pastilles != null && Number(pastilles) > 0, 'N l\'onglet Paires porte la somme de ses écrans (ailleurs que sur Paires)', String(pastilles));
     // Les écrans d'hier : barre (journee, annonces, ventes, achats) + « Plus » (messages, garage, emails, compta, communaute) + Paramètres.
     const chemins = {
       journee: [['.vrm-tabbar [data-nav-entree="journee"]']], ventes: [['.vrm-tabbar [data-nav-entree="ventes"]']], compta: [['.vrm-tabbar [data-nav-entree="compta"]']],
-      annonces: [['.vrm-tabbar [data-nav-entree="paires"]'], ['.vrm-tabbar [data-nav-entree="paires"]', '[data-paires-segment="annonces"]'], ['[data-menu-ecrans]', '.vrm-sheet-haut [data-nav-entree="annonces"]']],
-      garage: [['.vrm-tabbar [data-nav-entree="paires"]', '[data-paires-segment="garage"]'], ['[data-menu-ecrans]', '.vrm-sheet-haut [data-nav-entree="garage"]']],
-      achats: [['.vrm-tabbar [data-nav-entree="paires"]', '[data-paires-segment="achats"]'], ['[data-menu-ecrans]', '.vrm-sheet-haut [data-nav-entree="achats"]']],
-      messages: [['[data-menu-ecrans]', '.vrm-sheet-haut [data-nav-entree="messages"]']], emails: [['[data-menu-ecrans]', '.vrm-sheet-haut [data-nav-entree="emails"]']],
-      communaute: [['[data-menu-ecrans]', '.vrm-sheet-haut [data-nav-entree="communaute"]']], settings: [['[data-profil-tete]', '[data-profil-menu="parametres"]']],
+      annonces: [['.vrm-tabbar [data-nav-entree="paires"]'], ['.vrm-tabbar [data-nav-entree="paires"]', '[data-paires-segment="annonces"]'], ['[data-profil-tete]', '[data-menu-profil] [data-nav-entree="annonces"]']],
+      garage: [['.vrm-tabbar [data-nav-entree="paires"]', '[data-paires-segment="garage"]'], ['[data-profil-tete]', '[data-menu-profil] [data-nav-entree="garage"]']],
+      achats: [['.vrm-tabbar [data-nav-entree="paires"]', '[data-paires-segment="achats"]'], ['[data-profil-tete]', '[data-menu-profil] [data-nav-entree="achats"]']],
+      messages: [['[data-profil-tete]', '[data-menu-profil] [data-nav-entree="messages"]']], emails: [['[data-profil-tete]', '[data-menu-profil] [data-nav-entree="emails"]']],
+      communaute: [['[data-profil-tete]', '[data-menu-profil] [data-nav-entree="communaute"]']], settings: [['[data-profil-tete]', '[data-profil-menu="parametres"]']],
     };
     for (const [cible, essais] of Object.entries(chemins)) {
       let atteint = null;
@@ -186,7 +191,8 @@ async function regles(nav) {
         // Le départ : Ma journée (un lien rechargé peut rouvrir le dernier écran : on y retourne par la barre).
         await pg.goto(pg.url().replace(/\?.*$/, '?tab=journee')); await pret(pg);
         if ((await ecran(pg)) !== 'journee') { await toucher(pg, '.vrm-tabbar [data-nav-entree="journee"]'); await pg.waitForTimeout(900); }
-        let n = 0; for (const s of ch) { if (await toucher(pg, s)) n++; await pg.waitForTimeout(900); }
+        let n = 0; for (const s of ch) { await pg.locator(s).filter({ visible: true }).first().waitFor({ timeout: 5000 }).catch(() => {}); if (await toucher(pg, s)) n++; await pg.waitForTimeout(900); }
+        await attendre(pg, async () => (await ecran(pg)) === cible, 4000);
         if ((await ecran(pg)) === cible) { atteint = `${n} toucher(s) : ${ch.join(' → ')}`; break; }
       }
       dit(!!atteint, `N « ${cible} » joignable en ≤ 2 touchers depuis Ma journée`, atteint || 'introuvable');
@@ -198,9 +204,9 @@ async function regles(nav) {
     dit(/\d/.test(surPaires.seg) && !surPaires.onglet, 'N sur Achats : le segment porte le nombre d\'Achats, l\'onglet Paires se tait', JSON.stringify(surPaires));
     dit(surPaires.actif === 'paires', 'N sur Achats, l\'onglet allumé est Paires', String(surPaires.actif));
     // Le menu du haut : tout ce que « Plus » portait, groupé ; il ne répète pas les onglets de la barre.
-    await toucher(pg, '[data-menu-ecrans]'); await pg.waitForTimeout(800);
-    const menu = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sheet-haut [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
-    dit(['messages', 'garage', 'emails', 'communaute'].every((x) => menu.includes(x)) && !['journee', 'ventes', 'compta'].some((x) => menu.includes(x)), 'N le menu du haut porte tout ce que « Plus » portait, sans répéter la barre', menu.join(','));
+    await toucher(pg, '[data-profil-tete]'); await pg.waitForSelector('[data-menu-profil] [data-nav-entree]', { timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(400);
+    const menu = await pg.evaluate(() => [...document.querySelectorAll('[data-menu-profil] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
+    dit(['messages', 'garage', 'emails', 'communaute'].every((x) => menu.includes(x)) && !['journee', 'ventes', 'compta'].some((x) => menu.includes(x)), 'N le menu de l\'avatar porte tout ce que « Plus » portait, sans répéter la barre', menu.join(','));
     if (CAPTURES) await pg.screenshot({ path: path.join(CAPTURES, `coque-menu-${SUFFIXE}.png`) });
     dit(!o.erreurs.length, 'N aucune erreur d\'app', o.erreurs.join(' | ').slice(0, 200));
     await o.ctx.close();
@@ -321,7 +327,9 @@ async function captures(nav) {
   if (!CAPTURES) return;
   fs.mkdirSync(CAPTURES, { recursive: true });
   const shot = async (url, nom, jouer) => {
-    const o = await ouvrir(nav, { W: 390, sombre: false, b: baseCloche(), url, dsf: 2 }); await pret(o.pg); await o.pg.waitForTimeout(1500);
+    const o = await ouvrir(nav, { W: 390, sombre: false, b: baseCloche(), url, dsf: 2 }); await pret(o.pg);
+    // La pastille « Mis à jour » (2 s) : on attend qu'elle soit passée, et que l'écran ait ses nombres.
+    await o.pg.waitForSelector('[data-temps-reel-neuf]', { timeout: 9000 }).catch(() => {}); await o.pg.waitForTimeout(3500);
     if (jouer) await jouer(o.pg);
     await o.pg.screenshot({ path: path.join(CAPTURES, `coque-${nom}-${SUFFIXE}.png`) });
     await o.ctx.close();
