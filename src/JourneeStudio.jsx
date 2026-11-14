@@ -106,9 +106,19 @@ export function BentoJournee({ tuiles, ordi = false, FermeAuRetour = null, avant
     window.addEventListener('keydown', echap);
     return () => { clearTimeout(t); window.removeEventListener('keydown', echap); };
   }, [tuileOuverte && tuileOuverte.id, ordi, fermer]);
+  // L'écran entier sait qu'une tuile est ouverte (`data-sj-ouverte` sur `.sj-journee`) : au téléphone l'affiche
+  // s'efface (CSS) pour que la tuile monte sous la rangée tassée — rien n'est démonté, ses compteurs restent.
+  const racine = React.useRef(null);
+  const idOuvert = tuileOuverte ? tuileOuverte.id : '';
+  React.useEffect(() => {
+    const ecran = racine.current && racine.current.closest ? racine.current.closest('.sj-journee') : null;
+    if (!ecran) return undefined;
+    if (idOuvert) ecran.setAttribute('data-sj-ouverte', idOuvert); else ecran.removeAttribute('data-sj-ouverte');
+    return () => { try { ecran.removeAttribute('data-sj-ouverte'); } catch (_) {} };
+  }, [idOuvert]);
   const autres = tuiles.filter((t) => !tuileOuverte || t.id !== tuileOuverte.id);
   return (
-    <div className="sj-bento" data-sj-bento="" data-sj-ouverte={tuileOuverte ? tuileOuverte.id : ''} data-sj-ordi={ordi ? '1' : '0'}>
+    <div ref={racine} className="sj-bento" data-sj-bento="" data-sj-ouverte={tuileOuverte ? tuileOuverte.id : ''} data-sj-ordi={ordi ? '1' : '0'}>
       {/* La rangée tassée (téléphone, une tuile ouverte) : les AUTRES tuiles en chiffres ; une touche
           ouvre la sienne à la place. Pas de compteur `data-*` ici : ils restent sur la grille. */}
       {tuileOuverte && !ordi ? (

@@ -47361,7 +47361,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   return pj ? <p className="vrm-phrase-ecran vrm-fu-phrase-tete" data-phrase-jour={pj} data-phrase-jour-env={T[0].pasSu ? '' : String(T[0].t ? T[0].t.n : 0)} data-phrase-jour-ret={T[1].pasSu ? '' : String(T[1].t ? T[1].t.n : 0)}>{pj}{AIDE_ECRANS.journee ? <AideEcran cle="journee"/> : null}</p>
                     : <PhraseEcran cle="journee" className="vrm-fu-phrase-tete"/>; })()}
                 <AccPremiereFois ecran="journee"/>
-                <AccPremiereFois ecran="journee"/>
                 </>),
                 frise: (<>
                 {!premierJour && (
@@ -47549,7 +47548,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {codes.length ? <div className="sj-liste" role="list">{codes.map((c, k) => (
                       <div key={k} role="listitem" className="sj-code-rangee" data-sj-code={c.code || ''} data-sj-compte={c.compte ? '1' : '0'}>
                         {plaque(c)}
-                        <span className="sj-r-txt"><span className="sj-r-titre">{c.titre || nomTr(c) || tr('sj.colis', { n: 1 })}</span>
+                        <span className="sj-r-txt"><span className="sj-r-titre">{c.titre || tr('sj.colisSansTitre')}</span>
                           <span className="sj-r-meta">{[nomTr(c), c.lieu].filter(Boolean).join(' · ')}{c.compte ? '' : ' · ' + tr('sj.aVerifier')}</span></span>
                       </div>
                     ))}</div> : <p className="sj-vide">{xR.pasSu ? (xR.titrePasSu || tr('sj.pasLu')) : n === 0 ? tr('sj.rienARetirer') : tr('sj.codesPasLus')}</p>}
@@ -47573,7 +47572,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     }}/>
                 )}
               </>);
-              if (visT('chiffres').montree) out.mois = { id: 'mois', lib: '', interactif: true, aria: tr('sj.l.mois'), face: chiffresMois, tasse: null };
+              if (visT('chiffres').montree) out.mois = { id: 'mois', lib: (() => { const m = new Date().toLocaleDateString(localeCourante(), { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1); })(), interactif: true, aria: tr('sj.l.mois'), face: chiffresMois, tasse: null };
               const tuilesJ = placerTuiles(out);
               return (<>
                 <BentoJournee tuiles={tuilesJ} ordi={ordiJournee} FermeAuRetour={FermeAuRetour}/>
