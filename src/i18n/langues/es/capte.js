@@ -1,0 +1,23 @@
+// es · «La extensión ha captado» (14 nov., extensión 5.377) — fuente: fr/capte.js.
+export default {
+  "capte.titre": "La extensión ha captado",
+  "capte.relie": "Cuenta vinculada",
+  "capte.voir": "Ver",
+  "capte.fermer": "Cerrar",
+  "capte.s.ventes": {"one": "{n} venta nueva", "other": "{n} ventas nuevas"},
+  "capte.s.achats": {"one": "{n} compra nueva", "other": "{n} compras nuevas"},
+  "capte.s.bordereaux": {"one": "{n} etiqueta de envío", "other": "{n} etiquetas de envío"},
+  "capte.s.codes": {"one": "{n} código de recogida", "other": "{n} códigos de recogida"},
+  "capte.s.versements": {"one": "{n} fecha de pago", "other": "{n} fechas de pago"},
+  "capte.s.messages": {"one": "{n} mensaje", "other": "{n} mensajes"},
+  "capte.s.offres": {"one": "{n} oferta recibida", "other": "{n} ofertas recibidas"},
+  "capte.s.annonces": {"one": "{n} anuncio nuevo", "other": "{n} anuncios nuevos"},
+  "capte.lu.ventes": {"one": "{n} venta leída", "other": "{n} ventas leídas"},
+  "capte.lu.achats": {"one": "{n} compra leída", "other": "{n} compras leídas"},
+  "capte.lu.annonces": {"one": "{n} anuncio leído", "other": "{n} anuncios leídos"},
+  "capte.lu.messages": {"one": "{n} mensaje leído", "other": "{n} mensajes leídos"},
+  "capte.lu.offres": {"one": "{n} oferta leída", "other": "{n} ofertas leídas"},
+  "capte.reglage.lib": "Avisar de lo que capta la extensión",
+  "capte.reglage.desc": "Un pequeño mensaje junto al logo de VRM en el sitio, y aquí con la app abierta: ventas nuevas, etiquetas, mensajes…",
+  "capte.reglage.pasSu": "La extensión aún no ha respondido: el ajuste se aplicará en su próximo paso.",
+};
