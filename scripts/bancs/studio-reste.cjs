@@ -73,6 +73,7 @@ const RANGES = [
 // selon que la lecture a répondu avant la mesure, sur une machine chargée) :
 const VOLATILS = [
   /^repli:texte:Points à vérifier/,   // Paramètres → Suivi des comptes : le repli naît quand la capture des comptes est lue
+  /^texte:V?vendeur_#/,   // la jauge du compte (pseudo inventé « vendeur_N ») : son libellé DIT un état lu à la volée (« Calme · N gestes », « … »), même bouton
 ];
 const VOULUS = String(process.env.ECRANS || Object.keys(ECRANS).join(',')).split(',');
 let ok = 0, ko = 0;

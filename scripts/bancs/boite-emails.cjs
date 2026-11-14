@@ -370,8 +370,10 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
         }
         if (w > 1000) {
           // L'accent DU THÈME (--vrm-accent, src/themeMineral.js), résolu par le navigateur.
-          const [accent, duTheme] = await objet.evaluate((n) => { const t = document.createElement('i'); t.style.color = 'var(--vrm-accent)'; document.body.appendChild(t); const c = getComputedStyle(t).color; t.remove(); return [getComputedStyle(n).backgroundColor, c]; });
-          dit(accent === duTheme && /^rgb\(\d+, \d+, 2\d\d\)$/.test(accent), `${nom} : l’accent bleu du thème, rare, sur le seul bouton qui mène à l’objet`, `${accent} / ${duTheme}`);
+          // (14 nov., Studio bleu clair — décision de Julien) Plus de bouton bleu plein : le seul bouton qui mène à
+          // l'objet est LE plein d'ENCRE du Studio (--sb-encre) ; sans le Studio, l'accent du thème comme avant.
+          const [accent, duTheme, studio] = await objet.evaluate((n) => { const sb = !!getComputedStyle(document.documentElement).getPropertyValue('--sb-encre').trim(); const t = document.createElement('i'); t.style.color = sb ? 'var(--sb-encre)' : 'var(--vrm-accent)'; document.body.appendChild(t); const c = getComputedStyle(t).color; t.remove(); return [getComputedStyle(n).backgroundColor, c, sb]; });
+          dit(accent === duTheme && (studio || /^rgb\(\d+, \d+, 2\d\d\)$/.test(accent)), `${nom} : ${studio ? 'le plein d’encre du Studio' : 'l’accent bleu du thème'}, rare, sur le seul bouton qui mène à l’objet`, `${accent} / ${duTheme}`);
           // La page défilée, le haut de la lecture (« Fermer », le titre) n'est pas caché sous la barre du haut.
           await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 500; window.scrollTo(0, 500); });
           await pg.waitForTimeout(200);
