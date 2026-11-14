@@ -239,6 +239,9 @@ async function scenario(b, vp, sombre) {
     await shot(pg, `colis-envoi-${nom}-outils`);
     await pg.click('[data-colis-barre-btn="outils"]').catch(() => {});
     // ── T : la tournée de dépôt.
+    // (14 nov., refonte des listes — AJOUT 3) Au téléphone, dans Ventes, la tournée vit dans « • À faire · N » : on l'ouvre comme lui.
+    const aFaireT = await pg.$('[data-ui-afaire]');
+    if (aFaireT && await aFaireT.isVisible()) { await aFaireT.click().catch(() => {}); await pg.waitForSelector('[data-ui-afaire-feuille] [data-tournee-ouvrir]', { timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(300); }
     const ouvrirT = await pg.$('[data-tournee-ouvrir]');
     dit(!!ouvrirT, `${nom} : T « Préparer la tournée de dépôt » est dans « À envoyer »`);
     if (ouvrirT) {

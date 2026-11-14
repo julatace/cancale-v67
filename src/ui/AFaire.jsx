@@ -31,7 +31,13 @@ export function AFaireHote({ children }) {
     compter();
     const mo = new MutationObserver(compter);
     mo.observe(conteneur, { childList: true, subtree: true, characterData: true });
-    return () => mo.disconnect();
+    // Un geste qui OUVRE autre chose (une feuille, une saisie : « Préparer la tournée », « Compléter »…) referme
+    // « À faire » juste après son clic — sinon la feuille demandée s'ouvrirait derrière celle-ci. Un geste qui
+    // déplie sur place (« 2 nouveaux N° · Vérifier ») la laisse ouverte.
+    const ouvreAilleurs = (b) => b && ([...b.attributes].some((a) => /^data-[a-z-]*(ouvrir|completer)/.test(a.name)) || b.getAttribute('aria-haspopup'));
+    const clic = (e) => { const b = e.target && e.target.closest && e.target.closest('button, a'); if (ouvreAilleurs(b)) setTimeout(() => conteneur.dispatchEvent(new CustomEvent('vrm-afaire-fermer')), 0); };
+    conteneur.addEventListener('click', clic);
+    return () => { mo.disconnect(); conteneur.removeEventListener('click', clic); };
   }, [conteneur]);
   const v = useMemo(() => ({ conteneur, n }), [conteneur, n]);
   return <Ctx.Provider value={v}>{children}</Ctx.Provider>;
@@ -48,6 +54,12 @@ export function AFaireLigne({ titre, className = '', capsule = false, seulement 
   const [tel, setTel] = useState(telephone);
   const [ouvert, setOuvert] = useState(false);
   const place = useRef(null), corps = useRef(null);
+  React.useEffect(() => {
+    if (!c || !c.conteneur) return undefined;
+    const f = () => setOuvert(false);
+    c.conteneur.addEventListener('vrm-afaire-fermer', f);
+    return () => c.conteneur.removeEventListener('vrm-afaire-fermer', f);
+  }, [c && c.conteneur]);
   React.useEffect(() => {
     let mq = null; const f = () => setTel(telephone());
     try { mq = window.matchMedia('(max-width: 767px)'); mq.addEventListener('change', f); } catch (_) {}
