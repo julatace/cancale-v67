@@ -364,6 +364,41 @@ async function ouvrirTesDonnees(pg) {
   return pg.waitForSelector('[data-td-exporter]', { timeout: 10000 }).then(() => true).catch(() => false);
 }
 
+// 6. « J'AI DÉCLARÉ CE MOIS » (Argent → Déclarer) — avant (le formulaire), après (la pilule et sa suite).
+action('urssaf.declarer', async (nav) => {
+  const o = await ouvrir(nav, { url: '/?tab=argent_declarer' });
+  try {
+    const la = await o.pg.waitForSelector('[data-urssaf-cest-declare]', { timeout: 15000 }).then(() => true).catch(() => false);
+    if (!la) { for (const s of ['avant', 'apres']) noter('urssaf.declarer', s, null, { raisonNonJoue: 'aucun mois à noter dans cette base' }); return; }
+    await toucher(o.pg, '[data-urssaf-cest-declare]');
+    await o.pg.waitForSelector('[data-decl-form]', { timeout: 20000 }).catch(() => {});
+    noter('urssaf.declarer', 'avant', await moment(o.pg, 'avant', 'urssaf.declarer', { ms: 15000 }));
+    await shot(o.pg, 'urssaf-avant');
+    const bloque = await o.pg.locator('[data-acc-echec="urssaf.declarer"]').count();
+    await toucher(o.pg, '[data-decl-enregistrer]');
+    if (bloque) noter('urssaf.declarer', 'echec', await moment(o.pg, 'echec', 'urssaf.declarer'));
+    else noter('urssaf.declarer', 'apres', await moment(o.pg, 'apres', 'urssaf.declarer', { ms: 8000 }), { exigerEnsuite: true });
+    await shot(o.pg, 'urssaf-apres');
+  } finally { await o.ctx.close(); }
+});
+
+// 7. MODE VACANCES (Paramètres) — avant ; échec : l'extension refuse (aucune recette apprise / 429).
+action('vacances', async (nav) => {
+  const o = await ouvrir(nav, { url: '/?tab=settings&reglage=vacances' });
+  try {
+    const la = await o.pg.waitForSelector('[data-mode-vacances]', { timeout: 15000 }).then(() => true).catch(() => false);
+    if (!la) { noter('vacances', 'avant', null, { raisonNonJoue: 'panneau Mode vacances pas atteint' }); return; }
+    noter('vacances', 'avant', await moment(o.pg, 'avant', 'vacances'));
+    await shot(o.pg, 'vacances-avant');
+  } finally { await o.ctx.close(); }
+  const o2 = await ouvrir(nav, { url: '/?tab=settings&reglage=vacances', pont: false });
+  try {
+    await o2.pg.waitForSelector('[data-mode-vacances]', { timeout: 15000 }).catch(() => {});
+    noter('vacances', 'echec', await moment(o2.pg, 'echec', 'vacances', { ms: 10000 }));
+    await shot(o2.pg, 'vacances-echec');
+  } finally { await o2.ctx.close(); }
+});
+
 // ── LES LISTES VIDES ET LES PREMIÈRES FOIS ──────────────────────────────────
 async function vides(nav) {
   console.log('\n── listes vides (base neuve) ──');
