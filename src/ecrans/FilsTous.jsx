@@ -25,6 +25,7 @@ import { FilLeboncoin } from './MessagesLeboncoin.jsx';
 import { FilVestiaire, ficheDuNumero } from './Vestiaire.jsx';
 import { CLE_FILS_RELIES, convVinted, convLeboncoin, convVestiaire, convEbay, regrouperFils, suggestionsFils, relierFils, refuserFils, delierFil, messagesDuFil, conversationDeReponse } from '../filUnique.js';
 import { trj } from '../i18n/react.js';
+import { BarreOutils, LigneAFaire } from '../ui/index.js';   // (14 nov., refonte) les briques communes des écrans de liste
 
 const NOM_SITE = { vinted: 'Vinted', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire', ebay: 'eBay' };
 const lireRelies = () => { try { const v = load(CLE_FILS_RELIES, {}); return v && typeof v === 'object' ? v : {}; } catch (_) { return {}; } };
@@ -197,6 +198,9 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
   const ecrire = (n) => { setRelies(n); save(CLE_FILS_RELIES, n); };
   const [ouvert, setOuvert] = React.useState('');      // la clé du fil ouvert
   const [via, setVia] = React.useState('');            // la conversation ouverte pour répondre (fil fusionné)
+  // (14 nov., refonte — AJOUT 2 : « imagine si j'ai 1000 ») Retrouver un fil : le pseudo, le modèle, le N°
+  // ou un mot du dernier message, filtré ICI (rien n'est relu ni écrit ; l'ordre reste celui des fils).
+  const [cherche, setCherche] = React.useState('');
 
   const parCle = new Map();
   const entrees = [];
@@ -206,6 +210,12 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
   for (const x of ((ebayTous && ebayTous.items) || [])) { const e = convEbay(x.m, x.compte); if (e) { parCle.set(e.cle, { e }); entrees.push(e); } }
   const fils = regrouperFils(entrees, relies.liens);
   const propositions = suggestionsFils(fils, relies.liens, relies.refus);
+  const motCherche = cherche.trim().toLowerCase().replace(/^n°\s*/, '');
+  const filsVus = motCherche ? fils.filter((f) => {
+    const d = f.dernier || f.convs[f.convs.length - 1];
+    const t = [f.num ? 'n°' + f.num : '', f.num || '', ...f.convs.map((c) => [c.nom, c.titre, c.compteNom].join(' ')), d ? d.apercu : ''].join(' ').toLowerCase();
+    return t.includes(motCherche);
+  }) : fils;
   const filDe = (cle) => fils.find((f) => f.cle === cle) || null;
   const vintedDe = (e) => (parCle.get(e.cle) || {}).c || null;
   const nomDe = (f) => {
@@ -252,34 +262,42 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
     <div data-fils-tous={chargement ? 'charge' : String(fils.length)} data-fils-sources={sources.map(([p, s]) => p + ':' + s).join(',')}>
       <div className="vrm-message-workspace">
         <div className="vrm-inbox-column">
+          {/* (14 nov., refonte — AJOUT 3) Les questions « Peut-être la même paire ? » passent dans UNE ligne
+              « À faire · N › » : la feuille montre la question du moment avec SES deux gestes (Oui / Non),
+              la suivante vient après. Rien n'est relié sans son clic. */}
+          {fils.length ? <BarreOutils className="vrm-ms-msg-outils" valeur={cherche} onChange={setCherche} placeholder={tr('ms.msg.chercher')} label={tr('ms.msg.chercher')}
+            data-msg-recherche="" champAttrs={{ 'data-msg-recherche': '', autoComplete: 'off' }}/> : null}
+          <LigneAFaire n={propositions.length} titre={tr('ms.msg.aFaire')} className="vrm-ms-msg-afaire" data-msg-afaire={propositions.length}>
           {/* Une question à la fois (la liste reste au premier écran) ; « Non » ou « Oui » fait venir la suivante. */}
-          {propositions.slice(0, 1).map((p) => {
-            const A = filDe(p.a), B = filDe(p.b); if (!A || !B) return null;
-            return (
-              <div key={p.cle} data-fil-proposition={p.sorte} data-fil-a={p.a} data-fil-b={p.b} style={{ border: `1px solid ${C.border}`, borderRadius: 16, background: C.card, padding: 12, marginBottom: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 600, color: C.text }}>
-                  <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 999, background: C.warn, flexShrink: 0 }}/>
-                  {p.sorte === 'paire' ? `Peut-être ${motsVendeur().meme} ?` : tr('messages.peutEtreMeme2')}
+            {propositions.slice(0, 1).map((p) => {
+              const A = filDe(p.a), B = filDe(p.b); if (!A || !B) return null;
+              return (
+                <div key={p.cle} data-fil-proposition={p.sorte} data-fil-a={p.a} data-fil-b={p.b} style={{ border: `1px solid ${C.border}`, borderRadius: 16, background: C.card, padding: 12, marginBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 600, color: C.text }}>
+                    <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 999, background: C.warn, flexShrink: 0 }}/>
+                    {p.sorte === 'paire' ? `Peut-être ${motsVendeur().meme} ?` : tr('messages.peutEtreMeme2')}
+                  </div>
+                  <div style={{ ...muted, marginTop: 4 }}>
+                    {[A, B].map((f, i) => <div key={f.cle} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}><Marques plateformes={f.plateformes}/><span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{nomDe(f)}{f.num ? ` · N°${f.num}` : ''}</span></div>)}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                    <Bouton variante="secondaire" data-fil-relier="" onClick={() => ecrire(relierFils(relies, p.a, p.b))}>{tr('messages.ouiMemeFil')}</Bouton>
+                    <Bouton variante="secondaire" data-fil-refuser="" onClick={() => ecrire(refuserFils(relies, p.a, p.b))}>{tr('messages.non')}</Bouton>
+                  </div>
                 </div>
-                <div style={{ ...muted, marginTop: 4 }}>
-                  {[A, B].map((f, i) => <div key={f.cle} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}><Marques plateformes={f.plateformes}/><span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{nomDe(f)}{f.num ? ` · N°${f.num}` : ''}</span></div>)}
-                </div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-                  <Bouton variante="secondaire" data-fil-relier="" onClick={() => ecrire(relierFils(relies, p.a, p.b))}>{tr('messages.ouiMemeFil')}</Bouton>
-                  <Bouton variante="secondaire" data-fil-refuser="" onClick={() => ecrire(refuserFils(relies, p.a, p.b))}>{tr('messages.non')}</Bouton>
-                </div>
-              </div>
-            );
-          })}
-          {propositions.length > 1 ? <p data-fil-propositions-autres={propositions.length - 1} style={{ ...muted, margin: '-4px 0 10px' }}>{tr('messages.encore')} {propositions.length - 1} {tr('messages.question')}{propositions.length > 2 ? 's' : ''} {tr('messages.apresCelleCi')}</p> : null}
+              );
+            })}
+            {propositions.length > 1 ? <p data-fil-propositions-autres={propositions.length - 1} style={{ ...muted, margin: '-4px 0 10px' }}>{tr('messages.encore')} {propositions.length - 1} {tr('messages.question')}{propositions.length > 2 ? 's' : ''} {tr('messages.apresCelleCi')}</p> : null}
+          </LigneAFaire>
           {chargement && !fils.length ? <div role="status" style={{ ...muted, padding: '12px 0' }}>{tr('messages.lecture')}</div>
             : !fils.length ? <div data-fils-vide="" style={{ ...muted, padding: '12px 0' }}>{tr('messages.aucuneConversationLue')}</div>
+            : motCherche && !filsVus.length ? <div data-fils-rien="" className="vrm-ms-rien">{tr('ms.msg.rien', { x: cherche.trim() })}</div>
             : <><CompteurArnaque n={fils.filter((f) => { const d = f.dernier || f.convs[f.convs.length - 1]; return d && motifDeLApercu(d.apercu, d.deMoi); }).length}/><div className="vrm-msg-list" style={{ border: `1px solid ${C.border}`, background: C.card }}>
-                {fils.slice(0, 80).map((f) => {
+                {filsVus.slice(0, 80).map((f, i) => {
                   const d = f.dernier || f.convs[f.convs.length - 1];
                   const titre = f.convs.find((c) => c.titre);
                   return (
-                    <LigneConv key={f.cle} actif={ouvert === f.cle}
+                    <LigneConv key={f.cle} actif={ouvert === f.cle} style={i < 12 ? { '--i': i } : undefined}
                       attrs={{ 'data-fil': f.cle, 'data-fil-convs': String(f.convs.length), 'data-fil-sites': f.plateformes.join(','), 'data-fil-num': f.num || undefined, 'data-nonlu': f.nonLu === true ? '1' : undefined }}
                       onClick={() => ouvrir(f)} ariaLabel={`Ouvrir le fil ${nomDe(f)}`}
                       photo={(f.convs.find((c) => c.photo) || {}).photo || null} nom={nomDe(f)} sensible={f.convs.some((c) => c.plateforme === 'vinted')}

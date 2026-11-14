@@ -816,6 +816,7 @@ import "./styles-listes.css";
 import { AFaireHote, VersAFaire, AFaireLigne } from "./ui/AFaire.jsx";   // (14 nov., refonte des listes) les alertes d'un écran en « À faire · N »
 import { MenuCompte } from "./ui/MenuCompte.jsx";   // (14 nov., refonte des listes) Ma journée, Ventes, Annonces : une carte héros, des rangées denses, rien qui déborde — après le système, avant la tablette
 import "./styles-tablette.css";   // (11 nov., iPad) la coque ordinateur AU DOIGT : 44 px, rien au survol, rail libellé — sous `data-tablette` seulement, EN DERNIER
+import "./styles-refonte-ms.css";   // (14 nov., refonte) Messages, E-mails, Stock : la liste d'abord, des rangées denses, le fil comme Messages d'iPhone — portée par leurs classes seulement
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
