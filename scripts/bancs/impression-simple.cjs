@@ -270,12 +270,14 @@ async function scenarioB(b, nom, sombre) {
     await toucher(o, '[data-impr-corrige] [data-impr-tampon-choix="rien"]');
     const prU = await attendre(pg, () => { const e = document.querySelector('[data-impr-reimprimer-un]'); return e && e.getAttribute('data-impr-pret') === '1'; }, null, 15000);
     await shot(pg, `${nom}-corriger`);
+    // (Le bouton est ACTIF : une transition d'opacité peut rester figée dans Chromium sans tête après la visionneuse PDF — l'opacité n'est pas jugée.)
+    const etatUn = await pg.evaluate(() => { const e = document.querySelector('[data-impr-reimprimer-un]'); return e ? { actif: !e.disabled } : null; });
     await toucher(o, '[data-impr-reimprimer-un]');
     await attendre(pg, (n) => { const v = document.querySelector('[data-visionneuse-cadre]'); return v && window.__pdfs.length > n; }, avantCorr, 8000);
     const b2 = await b64DeVisionneuse(pg);
     const p2 = b2 ? await lirePdf(b2) : [];
     const cn2 = codesEtNums(p2);
-    dit(prU && cn2.length === 1 && cn2[0].code === '9303' && cn2[0].nums.length === 0 && !/Charlie Asics/.test(p2.map((p) => p.texte).join(' ')), `${nom} : B5 le tampon d'UN bordereau se corrige APRÈS : N°23 ⇒ « Rien » ⇒ une page, son étiquette, sans N° ni titre`, JSON.stringify({ prU, cn2 }));
+    dit(prU && etatUn && etatUn.actif && cn2.length === 1 && cn2[0].code === '9303' && cn2[0].nums.length === 0 && !/Charlie Asics/.test(p2.map((p) => p.texte).join(' ')), `${nom} : B5 le tampon d'UN bordereau se corrige APRÈS : N°23 ⇒ « Rien » ⇒ une page, son étiquette, sans N° ni titre`, JSON.stringify({ prU, etatUn, cn2 }));
     await toucher(o, '[data-visionneuse-fermer]');
     await attendre(pg, () => !!document.querySelector('[data-impr-feuille]'), null, 5000);
     await toucher(o, '[data-impr-oui]');
