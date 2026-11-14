@@ -36,7 +36,10 @@
   font-weight: 700 !important; font-variant-numeric: tabular-nums !important; color: var(--d-heros-encre, #F5F5F7) !important;
 }
 :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete.vrm-day-greeting .vrm-fu-grand.is-vide { font-size: 28px !important; font-weight: 400 !important; }
-:root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete.vrm-day-greeting .vrm-fu-sous { margin-top: 4px !important; font-size: 13px !important; font-weight: 600 !important; color: var(--d-heros-gris, rgba(235,235,245,.64)) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+:root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete.vrm-day-greeting .vrm-fu-sous:not(.vrm-fu-case .vrm-fu-sous) { margin-top: 4px !important; font-size: 13px !important; font-weight: 600 !important; color: var(--d-heros-gris, rgba(235,235,245,.64)) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+/* (14 nov., capture finale) Dans une case (« Bénéfice · mois — prix d’achat manquants »), la raison du « — » garde ses deux lignes : coupée, elle ne dit plus rien. */
+:root:root:root:root:root body .vrm-main[data-ecran="journee"] .vrm-fu-case > .vrm-fu-case-raison { display: -webkit-box !important; -webkit-box-orient: vertical !important; white-space: normal !important; overflow: hidden !important; text-overflow: clip !important; -webkit-line-clamp: 2 !important; }
+:root:root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete .vrm-fu-case .vrm-fu-sous { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; -webkit-line-clamp: 2 !important; }
 @media (min-width: 1024px) {
   :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete.vrm-day-greeting :is(.vrm-fu-grand, .vrm-jv2-grand:not(.is-zero)) { font-size: var(--d-t-affiche-64, 64px) !important; }
 }
@@ -387,6 +390,17 @@
   /* La bande : trois chiffres au plus au téléphone ; « ⋯ » au bout de la même rangée (jamais seul au-dessus). */
   :root:root:root body .vrm-main .vrm-fu-bande > .vrm-ui-bande-item:not(.vrm-sr-seul) ~ .vrm-ui-bande-item:not(.vrm-sr-seul) ~ .vrm-ui-bande-item:not(.vrm-sr-seul) ~ .vrm-ui-bande-item { display: none !important; }
   :root:root:root body .vrm-main[data-ecran="annonces"] .vrm-fu-bande > .vrm-fu-bande-action { position: static !important; }
+  /* (14 nov., capture finale) Le premier chiffre ne rétrécit plus (« 36 en li… ») : chaque case garde sa largeur, l'écart
+     se resserre (8 + 10). Sous le nom, les chiffres de la paire passent à la ligne suivante, cachée, plutôt que d'être
+     coupés au milieu d'un caractère (« 2… ») : ce qui ne tient pas est dans la fiche ouverte. */
+  :root:root:root:root body .vrm-main .vrm-fu-bande { column-gap: 8px !important; }
+  :root:root:root:root body .vrm-main .vrm-fu-bande > .vrm-ui-bande-item:not(.vrm-sr-seul) { flex-shrink: 0 !important; white-space: nowrap !important; }
+  :root:root:root:root body .vrm-main .vrm-fu-bande > .vrm-sr-seul { position: absolute !important; }
+  :root:root:root:root:root body .vrm-main .vrm-fu-bande.vrm-ui-bande { padding: 0 0 2px !important; }
+  :root:root:root:root:root body .vrm-main .vrm-fu-bande .vrm-fu-bande-grand > .vrm-fu-grand { margin: 0 !important; line-height: 1.1 !important; }
+  :root:root:root:root:root body .vrm-main .vrm-fu-bande .vrm-fu-bande-grand > .vrm-fu-sous { margin: 0 !important; }
+  :root:root:root:root body .vrm-main .vrm-fu-bande > .vrm-ui-bande-item + .vrm-ui-bande-item { padding-left: 10px !important; }
+  :root:root:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] [data-stats-annonce] { flex-wrap: wrap !important; column-gap: 6px !important; row-gap: 0 !important; height: 18px !important; line-height: 18px !important; overflow: hidden !important; -webkit-mask-image: none !important; mask-image: none !important; }
   /* « À expédier » : N° + titre de la paire sur UNE ligne. */
   :root:root:root body .vrm-main .vrm-colis-section .vrm-colis-carte[data-bord-card] .vrm-colis-titre { -webkit-line-clamp: 1 !important; line-clamp: 1 !important; white-space: nowrap !important; display: block !important; text-overflow: ellipsis !important; }
   :root:root:root body .vrm-main .vrm-colis-section .vrm-colis-onglets { display: flex !important; align-items: center !important; gap: 6px !important; }

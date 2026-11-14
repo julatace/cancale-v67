@@ -89,6 +89,17 @@ textes `listes.*` (5 langues, `src/i18n/langues/<l>/listes.js`). La carte régla
 | annonces-actions | 2 | 4 | F 1512 (cibles 36 px souris) : de main |
 | design-passe-2 | 8 coupes (« Tout imprimer » secondaire, corrigé) + 26 écrans non mesurés (délai) | — | relancé en fin de lot |
 
+## Dernière passe (captures finales, 14 nov. soir)
+
+- Les captures avant/après de Ma journée étaient identiques : le « bilan en une minute » (accueil des nouveaux)
+  couvrait l'écran des deux côtés. L'outil de capture clique « Passer » ; les deux images montrent Ma journée.
+- Vu sur les captures et corrigé : « 36 en li… » (la première case de la bande rétrécissait), les chiffres d'une
+  rangée d'Annonces coupés au milieu d'un caractère (« 2… » : ce qui ne tient pas passe maintenant à une ligne
+  cachée), la raison « prix d'achat manquants » coupée dans la case Bénéfice de Ma journée (deux lignes).
+- La bande d'Annonces perd 17 px (texte réservé aux lecteurs d'écran sorti du flux, marges du grand chiffre) :
+  1re rangée à 408 px sous la coque (max 422), Ventes 391 px. `refonte-listes` forme VERT, `design-passe`
+  (journée, ventes, colis, annonces) VERT, build OK.
+
 ## Restes (honnêtes)
 - La maquette met le **site et le compte dans UN menu** (« Vinted · tous ▾ ») sur la rangée de la recherche,
   et le segment « Annonces | Stock | Achats » : ce sont la coque (onglets « Paires ») et le filtre des sites —
