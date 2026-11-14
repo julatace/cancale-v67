@@ -26,6 +26,7 @@ const MUTATIONS = {
   'qr-autre-code-montre': ['api/_lib/qr-retrait.js', "  if ((s && s !== id.suivi) || (c && c !== id.code)) return 'contredit';\n", ''],
   'qr-sans-identite-montre': ['api/_lib/qr-retrait.js', "  if (j === 'contredit' || j === 'inconnu') return '';", "  if (j === 'contredit') return '';"],
   'qr-amp-garde': ['api/_lib/qr-retrait.js', ".replace(/&amp;/gi, '&')", ''],
+  'deplace-garde-ancien-nom': ['src/relaisColis.js', "? { lieuNom: String(tr.lieuNom || ''), lieuAdresse:", "? { lieuNom: String(tr.lieuNom || '') || base.lieuNom, lieuAdresse:"],
   'app-qr-sans-regle': ['src/App.jsx', "const u = t.qrUrl ? urlQrDuColis(t.qrUrl, t) : '';", "const u = t.qrUrl || '';"],
 };
 if (process.argv.includes('--prouve')) {
@@ -141,6 +142,7 @@ const TEXTE_MR = "Bonjour,\nLe Point Relais prévu est temporairement indisponib
     const tr = { etat: 'disponible', carrier: 'vinted', lieuRue: '12 Rue de la Fontaine', lieuCp: '', lieuVille: 'Ville-Exemple', etatAt: '2026-11-13T11:01:16.000Z' };
     const apres = lieuCompleteParTransporteur(ancien, tr, Date.parse('2026-11-12T08:00:00Z'));
     dit(/Ville-Exemple/.test(apres.lieuAdresse) && !/Ville-Avant/.test(apres.lieuAdresse) && apres.lieuDeplace && /Tabac du Port/.test(apres.lieuDeplace.avant), 'F modifiée APRÈS l’arrivée lue : la nouvelle adresse partout, l’ancienne seulement dite « avant »', JSON.stringify(apres));
+    dit(!/Tabac du Port/.test(apres.lieuNom || ''), 'F …et le NOM de l’ancien point ne reste pas au-dessus de la nouvelle adresse', apres.lieuNom);
     const sansDate = lieuCompleteParTransporteur(ancien, tr, null);
     dit(!!sansDate.lieuConflit && /Ville-Avant/.test(sansDate.lieuAdresse), 'F message sans date : rien n’est écrasé ni deviné, le désaccord est dit', JSON.stringify(sansDate.lieuConflit));
     const plusVieux = lieuCompleteParTransporteur(ancien, { ...tr, etatAt: '2026-11-11T08:00:00Z' }, Date.parse('2026-11-12T08:00:00Z'));
