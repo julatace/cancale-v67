@@ -390,6 +390,7 @@ import { createPortal, flushSync } from "react-dom";
 import { montant, fmt as fmtMontant, fmtE as fmtEMontant, fmtE0 as fmtE0Montant, prixTxt as prixTxtMontant } from "./format.js";
 import { SheetShell as SheetShellBase } from "./composants/SheetShell.jsx";
 import { BoutonBase, SegmenteBase } from "./composants/Bouton.jsx";
+import { ID_PAIRES, ECRANS_PAIRES, estPaires, dernierePaire, noterPaire, groupeBarre, badgePaires } from "./navPaires.js";   // (14 nov., n° 61) l'onglet « Paires »
 // Importés ICI une fois pour les chantiers C à H (aucun n'a à retoucher cette ligne).
 import { ChampRecherche } from "./composants/ChampRecherche.jsx";
 import { SuitePaquets, groupesBornes, PAQUET_LISTE } from "./composants/SuitePaquets.jsx";   // (11 nov., limites-client) longues listes par paquets
@@ -448,7 +449,7 @@ import {colisLbcAPoster,lbcColisAPoster,totalColis,colisLbcVendeur} from '../api
 import {CLE_COMPTES_EXCLUS,SANS_COMPTE_VC,excluAutreDe,estExclu,basculerExclu,compteDeVente,exclusNormes} from '../api/_lib/comptes-exclus.js';
 import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLies,comptesEbayLies,refDeLigneEbay,nomCompteLie,LIBELLE_ETAT} from './comptesLies.js';
 import { lignesFraicheur, quandRelu } from './fraicheurComptes.js';
-import { FRAICHEUR_ACHATS_J } from './fraicheur.js';   // (9 nov., lot AG) le seuil des achats vit avec la ligne de fraîcheur unique
+import { FRAICHEUR_ACHATS_J, fraicheurPubliee, suivreFraicheur } from './fraicheur.js';   // (9 nov., lot AG) le seuil des achats vit avec la ligne de fraîcheur unique
 import { ventesEmailFraiches, avecVentesEmail, requeteVentesEmail, gesteVenteEmail, STATUT_VENTE_EMAIL, groupesVentesEmailEnTete, statutVentesEmail } from './venteEmailFraiche.js';
 import { CLE_IMPRESSION, reglageImpression, papierThermique, placementEtiquette, contenuTampon, carteEncre, boiteEncre, decouperFeuille, fusionnerProches, moduleDuCode, moduleImprimeMm, codeAssezGros, seuillerNoir, tramerNoir, zonesAdresse, CONTRASTES, MODULE_MIN_MM, BANDE_CONTINU_MM } from './impression/thermique.js';
 import { decisionNumeroVenteEmail, numeroEcritDansArticle, colisVentesEmail, MENTION_SANS_NUM, CLE_IMPRIMES_SANS_NUM, phraseImprimeSansNumero } from './bordereauVenteEmail.js';
@@ -16565,19 +16566,33 @@ const entreeNav=(o)=>{ const court=!!o.court; delete o.label; delete o.court;
   if(court) Object.defineProperty(o,'court',{get(){ return tr('nav.'+(o.cle||o.id)+'.court'); },enumerable:true,configurable:true});
   return o; };
 const groupeNav=(o)=>{ Object.defineProperty(o,'titre',{get(){ return tr('nav.groupe.'+o.cle); },enumerable:true,configurable:true}); return o; };
+// ⚠️⚠️ (14 nov., choix n° 61 de Julien) QUATRE ONGLETS EN BAS : Aujourd'hui · Paires · Ventes · Argent,
+// et « un menu qui s'ouvre en haut avec le reste des onglets » (le bouton ☰ de l'en-tête, `MenuEcrans`).
+// « Paires » réunit Annonces, Stock et Achats (src/navPaires.js) : les trois écrans restent tels quels,
+// mêmes identifiants (liens profonds, ⌘K, reprise) ; un sélecteur segmenté en tête au téléphone.
+// « Plus » quitte la barre : tout ce qu'il portait est dans le menu du haut. Aucun écran perdu (§4.11).
+const ONGLET_PAIRES=entreeNav({id:ID_PAIRES, icon:'box', label:'Paires'});
+const ONGLET_ARGENT=entreeNav({id:'compta', icon:'euro', label:'Argent'});
 const BOTTOM_TABS=[
-  entreeNav({id:'journee',  icon:'soleilLevant', label:'Ma journée', court:'Journée'}),
-  entreeNav({id:'annonces', icon:'vitrine', label:'Annonces'}),
+  entreeNav({id:'journee',  icon:'soleilLevant', label:'Ma journée', court:'Aujourd’hui'}),
+  ONGLET_PAIRES,
   entreeNav({id:'ventes',   icon:'bag',  label:'Ventes'}),
-  // (11 nov., lot DJ3 — Julien : « regrouper les colis à expédier dans les ventes, les colis à retirer
-  // dans achats ») Plus d'onglet Colis : « À expédier » est en tête de Ventes, « À retirer » en tête
-  // d'Achats, qui prend sa place dans la barre (src/colisPlace.js : les anciens chemins y mènent).
+  // (10 nov.) UNE entrée « Argent » (Résumé · Statistiques · Déclarer · Factures, src/argent.js) ; (14 nov.) dans la barre.
+  ONGLET_ARGENT,
+];
+// Les trois écrans de « Paires », dans l'ordre du sélecteur.
+const ENTREES_PAIRES=[
+  entreeNav({id:'annonces', icon:'vitrine', label:'Annonces'}),
+  entreeNav({id:'garage',   icon:'home', label:'Stock'}),
+  // (11 nov., lot DJ3) Plus d'onglet Colis : « À expédier » est en tête de Ventes, « À retirer » en tête
+  // d'Achats (src/colisPlace.js : les anciens chemins y mènent).
   entreeNav({id:'achats',   icon:'cart', label:'Achats'}),
 ];
-// Messages : dans la colonne de l'ordinateur ; sur téléphone, dans « Plus »
-// (cinq places dans la barre, la cinquième est « Plus »).
+// Messages : dans le menu du haut (téléphone) et dans la colonne (ordinateur), groupe « Gérer ».
 const ONGLET_MESSAGES=entreeNav({id:'messages', icon:'chat', label:'Messages'});
-const NAV_TACHES=[BOTTOM_TABS[0],BOTTOM_TABS[1],BOTTOM_TABS[2],ONGLET_MESSAGES,BOTTOM_TABS[3]];
+// Les tâches de la colonne de l'ordinateur : celles de la barre, sans l'alias « Paires » (ses trois écrans
+// ont leur groupe, juste dessous).
+const NAV_TACHES=[BOTTOM_TABS[0],BOTTOM_TABS[2],ONGLET_ARGENT];
 // (31 oct., soir — Julien, mot pour mot : « je veux qu'il y ait Achats à côté
 // de À retirer », « que dans les deux onglets il n'y ait pas la même chose »,
 // « enlever Plateforme en bas des onglets glissants… répartis avec les onglets
@@ -16596,9 +16611,9 @@ const GROUPES_PLUS=[
   // chemins (`?tab=republier`, `?tab=favoris`, `vue=republier|favoris`, `demanderVue`)
   // mènent au nouvel endroit (`VUES_DEPLACEES`). Sur l'ordinateur, le groupe « Vendre »
   // devient vide et disparaît (Messages est dans les tâches) ; au téléphone, il garde Messages.
-  groupeNav({ cle:'vendre', nom:'Vendre', items:[
-    entreeNav({...ONGLET_MESSAGES, label:'Messages', tel:true}),
-  ]}),
+  // (14 nov., n° 61) « Paires » : Annonces · Stock · Achats (l'onglet de la barre en ouvre le dernier).
+  // (Le groupe « Vendre » — Messages seul — rejoint « Gérer ».)
+  groupeNav({ cle:'paires', nom:'Paires', items:ENTREES_PAIRES }),
   // (31 oct., soir — Julien : « l'onglet Colis à retirer sert à rien si dans Colis
   // on a les codes de retrait ») Plus d'entrée « Colis à retirer » ni de groupe
   // « Expédier » : les colis à retirer vivent dans Colis (colonne « À retirer »,
@@ -16607,14 +16622,13 @@ const GROUPES_PLUS=[
     // (9 nov., lot AC — Julien : « tu ne peux pas avoir d'hésitation ») UN endroit pour
     // tout ce que VRM n'a pas pu décider, une ligne = un geste (src/aTrancher.js).
     // (11 nov., lot DJ4) « À trancher » n'est plus un onglet : sa carte s'ouvre en tête de Ma journée.
-    entreeNav({id:'garage',     icon:'home', label:'Stock'}),
+    // (14 nov., n° 61) Stock rejoint « Paires » ; Messages rejoint ce groupe (téléphone : menu du haut).
+    ONGLET_MESSAGES,
     // (5 nov., Julien : « un onglet dédié aux e-mails… une vraie boîte de réception »)
     entreeNav({id:'emails',     icon:'mail', label:'E-mails'}),
     // (10 nov., Julien : « L'onglet Compta est trop flou, tu peux peut-être le relier avec
-    // Stats ») UNE entrée « Argent » remplace « Statistiques » et « Compta » : un écran à quatre
-    // segments (Résumé · Statistiques · Déclarer · Factures, src/argent.js). Les deux écrans
-    // restent (`dashboard`, `compta`) : leurs liens mènent à leur segment.
-    entreeNav({id:'compta',    icon:'euro',  label:'Argent'}),
+    // Stats ») UNE entrée « Argent » remplace « Statistiques » et « Compta » (src/argent.js) ;
+    // depuis le 14 nov. c'est un onglet de la barre du bas (`ONGLET_ARGENT`).
   ]}),
   // (11 nov., lot DJ6 — Julien : « qu'on ne voie pas les Paramètres mais que quand on
   // clique sur le profil ils apparaissent ») Paramètres n'est plus une entrée : la photo
@@ -17643,7 +17657,10 @@ function PhraseEcran({ cle, className = '' }) {
   const t = cle && phraseEcranPour(cle, p.vend || vendActuel());
   const aide = cle && AIDE_ECRANS[cle] ? <AideEcran cle={cle}/> : null;
   if (!t) return aide ? <p className={'vrm-phrase-ecran vrm-phrase-ecran-seule' + (className ? ' ' + className : '')}>{aide}</p> : null;
-  return <p className={'vrm-phrase-ecran' + (className ? ' ' + className : '')} data-phrase-ecran={cle}>{t}{aide}</p>;
+  // ⚠️ (14 nov., refonte de la coque — Julien, capture d'Annonces : « Annonces » + deux lignes d'explication + « ? »)
+  // La phrase n'est plus ÉCRITE sous le titre : le « ? » reste, à côté du titre, et ouvre l'aide de l'écran. La
+  // phrase reste dans la page pour les lecteurs d'écran (`vrm-sr-seul`) : rien de supprimé, rien de deviné.
+  return <p className={'vrm-phrase-ecran vrm-phrase-ecran-aide' + (className ? ' ' + className : '')} data-phrase-ecran={cle}><span className="vrm-sr-seul">{t}</span>{aide}</p>;
 }
 function ScreenHead({ icon, title, desc, right, principal, sous, phrase, date = '' }) {
   const line = typeof icon === 'string' && ICON_PATHS[icon];
@@ -18018,20 +18035,53 @@ function MenuProfilCoque({ setTab, entreprise }) {
   React.useEffect(() => { const f = () => setOuvert(true); window.addEventListener('vrm:profil-ouvrir', f); return () => window.removeEventListener('vrm:profil-ouvrir', f); }, []);
   const [, rafraichir] = React.useState(0);
   React.useEffect(() => suivreAbonnement(() => rafraichir((n) => n + 1)), []);
+  const ordiMenu = useOrdinateur();
+  const etatVu = useEtatActionsVu();
+  const montantsCachesMenu = useMontantsCaches();
   if (!ouvert || !AUTH.user || !AUTH.user.id) return null;
   const planLu = (reglePlanCourante() || {}).plan;
+  // (14 nov., refonte de la coque) Au téléphone, la barre du haut ne porte que loupe · cloche · compte :
+  // l'état « Actions Vinted » (son panneau entier) et l'œil des montants vivent ICI, après Paramètres.
+  // À l'ordinateur, l'île les montre déjà : rien en double.
+  const enPlus = ordiMenu ? null : <>
+    {MULTI_USER ? <button type="button" className="vrm-profil-ligne" data-profil-menu="etat-actions" data-etat-ton={etatVu ? etatVu.ton : undefined}
+      onClick={() => { setOuvert(false); setTimeout(ouvrirEtatActions, 0); }}>
+      <span className="vrm-profil-ligne-ic" aria-hidden="true"><Icon name="shop" size={18}/></span>
+      <span className="vrm-profil-ligne-lib">{tr('coque.actionsVinted')}{etatVu && etatVu.nom ? <span className="vrm-profil-ligne-etat"> · {etatVu.nom}</span> : null}</span>
+      {etatVu ? <span className="vrm-hdr-profil-etat vrm-profil-ligne-point" data-etat-point={etatVu.ton} aria-hidden="true" style={{ '--etat-point': etatVu.point }}/> : null}
+      <span aria-hidden="true" className="vrm-profil-ligne-fin"><Icon name="chevron" size={15}/></span>
+    </button> : null}
+    <label className="vrm-profil-ligne vrm-profil-bascule" data-profil-menu="montants">
+      <span className="vrm-profil-ligne-ic" aria-hidden="true"><Icon name={montantsCachesMenu ? 'eyeOff' : 'eye'} size={18}/></span>
+      <span className="vrm-profil-ligne-lib">{tr('coque.cacherMontants')}</span>
+      <input type="checkbox" role="switch" data-bouton-montants-menu="" checked={!!montantsCachesMenu} onChange={() => poserMontants(!montantsCachesMenu)} aria-label={tr('coque.cacherMontants')}/>
+    </label>
+  </>;
   const aller = (sous) => { setOuvert(false); if (sous) { DEMANDE_REGLAGE_SOUS.id = sous; try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} } setTab('settings'); };
   return <MenuProfil owner={AUTH.user.id} headers={enTeteSession} email={String(AUTH.user.email || '')} nom={(entreprise && entreprise.nom) || ''}
     offre={planLu === 'pro' ? 'Pro' : planLu === 'solo' ? 'Solo' : ''} theme={C} Feuille={SheetShell} Icon={Icon}
     onFermer={() => setOuvert(false)} onParametres={() => aller('')} onAppareils={() => aller('appareils')}
-    onDeconnexion={async () => { setOuvert(false); await seDeconnecter(); }}/>;
+    onDeconnexion={async () => { setOuvert(false); await seDeconnecter(); }} enPlus={enPlus}/>;
 }
+// (14 nov., refonte de la coque) L'ÉTAT DE « Puis-je agir sur Vinted ? » (EtatActions), publié pour
+// la photo du compte au téléphone : `ton` ok · attention (ambre, un geste) · neutre (lecture). Rien n'est
+// recalculé ici : c'est la pastille qui décide, la photo ne fait que montrer son point.
+let ETAT_ACTIONS_VU = null;
+const _etatActionsSubs = new Set();
+const publierEtatActions = (e) => { ETAT_ACTIONS_VU = e; _etatActionsSubs.forEach((f) => { try { f(); } catch (_) {} }); };
+const useEtatActionsVu = () => React.useSyncExternalStore((f) => { _etatActionsSubs.add(f); return () => _etatActionsSubs.delete(f); }, () => ETAT_ACTIONS_VU);
+const ouvrirEtatActions = () => { try { window.dispatchEvent(new Event('vrm:etat-actions-ouvrir')); } catch (_) {} };
 // La photo du profil dans l'en-tête du téléphone (à droite) : ouvre le même menu.
+// (14 nov.) Elle porte le point d'état de la pastille « Actions Vinted » (qui ne tient plus dans la barre) :
+// ambre = un geste à faire, encre = tu peux agir, gris = lecture seule — jamais rouge (§7).
 function BoutonProfilTete() {
   const uid = (AUTH.user && AUTH.user.id) || '';
+  const etat = useEtatActionsVu();
   if (!uid) return null;
-  return <button type="button" className="vrm-hbtn vrm-hdr-profil" data-profil-tete="" aria-haspopup="dialog" aria-label="Mon profil" onClick={ouvrirMenuProfil}>
+  const lib = etat && etat.nom ? `${tr('coque.monProfil')} · ${etat.nom}` : tr('coque.monProfil');
+  return <button type="button" className="vrm-hbtn vrm-hdr-profil" data-profil-tete="" data-etat-ton={etat ? etat.ton : undefined} aria-haspopup="dialog" aria-label={lib} onClick={ouvrirMenuProfil}>
     <PastilleProfil owner={uid} headers={enTeteSession} nom="" email={String(AUTH.user.email || '')} taille={30} className="vrm-sensible"/>
+    {etat ? <span className="vrm-hdr-profil-etat" data-etat-point={etat.ton} aria-hidden="true" style={{ '--etat-point': etat.point }}/> : null}
   </button>;
 }
 // Le nom de l'entreprise dans l'en-tête : rien quand il est masqué (ou pas encore lu).
@@ -18206,6 +18256,8 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false, sites = null, b
   const groupes = groupesVisibles(sites, () => true);
   const dansBarre = BOTTOM_TABS.some(t => t.id === (BAR_GROUPE[tab] || tab));
   const pointPlus = !!(badges && badges.messages === true);
+  // (14 nov., n° 61) Le point du ☰ : un écran du menu (hors Paires, que la barre porte) a un geste ou du nouveau.
+  const pointMenu = !bottom && !!badges && groupes.some(g => g.cle !== 'paires' && g.items.some(t => { const v = badges[cleEntree(t)]; return v === true || (typeof v === 'number' && v > 0); }));
   const rangee = (t) => {
     const on = entreeActive(t, tab);
     return (
@@ -18259,8 +18311,11 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false, sites = null, b
   );
   return (
     <>
-      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className="vrm-hbtn" aria-label={tr('coque.tousLesEcrans')} aria-expanded={open}>
-        <span aria-hidden="true" style={{display:'flex',position:'relative'}}><Icon name={open?'close':'menu'} size={22} style={{strokeWidth:1.6}}/></span>
+      {/* (14 nov., n° 61 — Julien : « un menu qui s'ouvre en haut avec le reste des onglets ») Le bouton ☰ revient
+          dans l'en-tête du téléphone, à gauche, au pouce : il porte un POINT quand un écran du menu a un geste
+          (Messages non lus, un nombre ambre) — le nombre lui-même est dans le menu, une seule fois. */}
+      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className="vrm-hbtn vrm-hdr-menu" data-menu-ecrans="" aria-label={pointMenu ? `${tr('coque.tousLesEcrans')} · ${tr('coque.nouveau')}` : tr('coque.tousLesEcrans')} aria-haspopup="menu" aria-expanded={open}>
+        <span aria-hidden="true" style={{display:'flex',position:'relative'}}><Icon name={open?'close':'menu'} size={22} style={{strokeWidth:1.6}}/>{pointMenu ? <span className="vrm-nav-badge vrm-nav-badge-point vrm-nav-badge-barre" data-badge-nav="menu" data-badge-n="point" aria-hidden="true"/> : null}</span>
       </button>
       {/* (23 oct.) La feuille d'en-tête part dans document.body : rendue DANS
           l'en-tête (sticky, z-index 50), elle restait SOUS la barre du bas
@@ -18273,9 +18328,8 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false, sites = null, b
               <span className="vrm-sheet-titre">{tr('coque.tonEspace')}</span>
               <button className="vrm-icon-control vrm-sheet-fermer" type="button" aria-label={tr('coque.fermerMenu')} onClick={()=>setOpen(false)}><Icon name="close" size={18}/></button>
             </div>
-            <div className="vrm-menu-group vrm-sheet-groupe" data-nav-groupe="Tâches">
-              <div className="vrm-sheet-carte">{NAV_TACHES.map(rangee)}</div>
-            </div>
+            {/* (14 nov., n° 61) Les tâches sont toutes dans la barre du bas (Aujourd'hui · Paires · Ventes · Argent) :
+                le menu ne les répète pas (Julien, 21 sept.) ; il porte TOUT le reste, groupé. */}
             {groupes.map(g => (
               <div className="vrm-menu-group vrm-sheet-groupe" key={g.nom} data-nav-groupe={g.nom}>
                 <div className="vrm-sheet-label">{g.titre}</div>
@@ -18358,6 +18412,24 @@ function remonterEnHaut() {
 // quatre tâches + une 5ᵉ place qui dit où l'on est ; « Plus » = un panneau de
 // tuiles AU-DESSUS de la barre ; retour = fermer ; toucher l'onglet courant =
 // remonter en haut ; un nombre une seule fois.
+// (14 nov., choix n° 61) LE SÉLECTEUR DE « PAIRES » (téléphone) : Annonces | Stock | Achats, en tête des trois
+// écrans. Il ne fait que changer d'onglet (les écrans restent tels quels) ; chaque segment porte le nombre de
+// son écran (l'onglet « Paires » se tait alors : un nombre une seule fois). Stock suit la règle du menu
+// (`groupesVisibles` : en affichage Simple, sans meuble, il ne prend pas de place — sauf s'il est ouvert).
+// `data-nav-entree` : le même repère que la barre d'hier (bancs, cibles de notification).
+function SelecteurPaires({ tab, setTab, badges, sites }) {
+  useProfilVendeur();
+  const g = groupesVisibles(sites, () => true).find((x) => x.cle === 'paires');
+  const vus = new Set(g ? g.items.map((t) => t.id) : ECRANS_PAIRES);
+  vus.add(tab);
+  const options = ENTREES_PAIRES.filter((t) => vus.has(t.id)).map((t) => {
+    const v = badges && badges[t.id];
+    return { v: t.id, l: t.label, n: typeof v === 'number' && v > 0 ? (v > 99 ? '99+' : v) : undefined, data: { 'data-nav-entree': t.id, 'data-paires-segment': t.id } };
+  });
+  return <div className="vrm-paires-selecteur" data-paires-selecteur="">
+    <Segmente label={tr('nav.paires')} options={options} value={tab} plein onChange={(id) => { if (id === tab) { remonterEnHaut(); return; } noterNavigationSimple(id); setTab(id); }}/>
+  </div>;
+}
 function BottomBar({tab,setTab,sites,badges}) {
   const [plusOuvert,setPlusOuvert]=React.useState(false);
   // (7 nov., fluidité) L'ONGLET TOUCHÉ S'ALLUME TOUT DE SUITE. Avant, toucher un
@@ -18395,7 +18467,7 @@ function BottomBar({tab,setTab,sites,badges}) {
   // La hauteur de la barre (zone sûre comprise), pour poser le panneau « Plus »
   // juste au-dessus d'elle : `--vrm-barre-bas` sur la racine.
   // L'onglet qui porte la pastille : celui de la barre, ou « Plus » pour un écran rangé dedans.
-  ouPastille.current=BOTTOM_TABS.some(t=>t.id===(BAR_GROUPE[tabMontre]||tabMontre))?(BAR_GROUPE[tabMontre]||tabMontre):'__plus';
+  ouPastille.current=BOTTOM_TABS.some(t=>t.id===groupeBarre(tabMontre,BAR_GROUPE))?groupeBarre(tabMontre,BAR_GROUPE):'__plus';
   React.useLayoutEffect(()=>{ poserPastille(ouPastille.current); },[tabMontre,poserPastille]);
   React.useEffect(()=>{
     const el=navRef.current; if(!el||typeof ResizeObserver==='undefined') return undefined;
@@ -18415,7 +18487,8 @@ function BottomBar({tab,setTab,sites,badges}) {
   },[]);
   // (11 nov., lot DJ3) Colis n'est plus dans la barre : le nombre de colis à poster
   // (`vrm_colis_aposter`) est porté par Ventes, là où on les poste désormais.
-  const badgesBarre=badges;
+  // (14 nov., n° 61) « Paires » porte la somme de ses écrans, sauf sur l'un d'eux (le sélecteur la porte déjà).
+  const badgesBarre=badges?{...badges,[ID_PAIRES]:badgePaires(badges,tabMontre)}:badges;
   // Se cache quand le clavier est ouvert (saisie dans un champ) : sinon iOS la
   // pousse au milieu de l'écran au-dessus du clavier et la mise en page saute.
   const [kbOpen,setKbOpen]=React.useState(false);
@@ -18447,13 +18520,16 @@ function BottomBar({tab,setTab,sites,badges}) {
       {/* (31 oct.) PAR TÂCHE : Journée · Annonces · Ventes · Colis · Plus. Icône
           d'accent et libellé d'encre à l'actif (styles-vitrine.css), 52 px. */}
       <span className="vrm-tab-pastille-ancre" aria-hidden="true"><span ref={pastilleRef} className="vrm-tab-pastille" style={{opacity:0}}/></span>
-      {BOTTOM_TABS.map(t=>{ const on=(BAR_GROUPE[tabMontre]||tabMontre)===t.id; const lib=t.court||t.label; const n=badgesBarre&&typeof badgesBarre[t.id]==='number'&&badgesBarre[t.id]>0?badgesBarre[t.id]:0; return (
-        <button key={t.id} type="button" className="vrm-tab" data-nav-entree={t.id} onClick={()=>{ setPlusOuvert(false); if(!vise&&(BAR_GROUPE[tab]||tab)===t.id&&t.id===tab) remonterEnHaut(); else allerA(t.id); }} aria-current={on?'page':undefined}>
+      {BOTTOM_TABS.map(t=>{ const on=groupeBarre(tabMontre,BAR_GROUPE)===t.id; const lib=t.court||t.label; const n=badgesBarre&&typeof badgesBarre[t.id]==='number'&&badgesBarre[t.id]>0?badgesBarre[t.id]:0; return (
+        <button key={t.id} type="button" className="vrm-tab" data-nav-entree={t.id} onClick={()=>{ setPlusOuvert(false);
+          // (14 nov., n° 61) « Paires » ouvre le dernier de ses trois écrans ; retouché sur l'un d'eux, il remonte en haut.
+          if(t.id===ID_PAIRES){ if(!vise&&estPaires(tab)) remonterEnHaut(); else allerA(dernierePaire()); return; }
+          if(!vise&&(BAR_GROUPE[tab]||tab)===t.id&&t.id===tab) remonterEnHaut(); else allerA(t.id); }} aria-current={on?'page':undefined}>
           <span aria-hidden="true" className="vrm-tab-ic" style={{position:'relative'}}><NavigationIcon item={t} size={22} style={{strokeWidth:on?2:1.6}}/><BadgeNav t={t} badges={badgesBarre} place="barre"/></span>
           <span className="vrm-nav-label">{lib}</span>{n ? <span className="vrm-sr-seul"> · {n} à faire</span> : null}
         </button>
       );})}
-      <MenuEcrans tab={tab} setTab={setTab} bottom sites={sites} badges={badgesBarre} ouvert={plusOuvert} setOuvert={setPlusOuvert}/>
+      {/* (14 nov., n° 61) Plus de « Plus » dans la barre : tout ce qu'il portait est dans le menu du haut (☰ de l'en-tête). */}
     </nav>
     </>
   );
@@ -21115,8 +21191,14 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
   const precisionPastille = !court && st.niveau === 'ok' && loginVinted && (st.relais || st.exception) ? `· ${st.relais ? 'via ton ordinateur' : 'sauf publier'}` : '';
   const tetePastille = `${texteCourt}${precisionPastille ? ' ' + precisionPastille : ''}`;
   const nomPastille = String(libelle).toLowerCase().includes(String(tetePastille).toLowerCase()) ? libelle : `${tetePastille} — ${libelle}`;
+  // (14 nov., refonte de la coque) Au téléphone, la pastille ne prend plus de place dans la barre du haut
+  // (loupe · cloche · compte, trois icônes au plus) : son ÉTAT est publié (`ETAT_ACTIONS_VU`) pour le point
+  // posé sur la photo du compte, et son panneau s'ouvre depuis le menu du compte (`vrm:etat-actions-ouvrir`).
+  // Même information, même panneau, même geste : rien de retiré.
+  React.useEffect(() => { publierEtatActions({ ton, point, nom: nomPastille }); }, [ton, point, nomPastille]);
+  React.useEffect(() => { const f = () => setOuvert(true); window.addEventListener('vrm:etat-actions-ouvrir', f); return () => window.removeEventListener('vrm:etat-actions-ouvrir', f); }, []);
   return (
-    <div ref={boite} style={{ position: 'relative', flexShrink: 0 }}>
+    <div ref={boite} className="vrm-hdr-etat" style={{ position: 'relative', flexShrink: 0 }}>
       <button type="button" className="vrm-etat-pastille" aria-label={nomPastille} data-etat-relais={st.relais ? 'vivant' : (rl.niveau !== 'hors' ? rl.niveau : undefined)} data-etat-actions={st.niveau} data-etat-code={code} data-etat-ton={ton} data-etat-exception={st.exception ? 'publication' : undefined} onClick={() => setOuvert((o) => !o)}
         aria-expanded={ouvert ? 'true' : 'false'}
         title={st.relais ? `Actions via ton ordinateur · ${loginVinted}` : st.niveau === 'ok' ? `Actions Vinted possibles, au nom de ${loginVinted}${st.exception ? ` — sauf publier sur Leboncoin : ${st.exception.texte}` : ''}` : st.glob ? st.glob.texte : ''}
@@ -55095,8 +55177,13 @@ async function calculerOuRanger() {
   const vivants = new Set(achatsARanger({ proposes: out, fiches: load(CLE_FICHES_RANGEES, {}) || {} }).map((p) => String(p.tx)));
   return notifsOuRanger({ proposes: Object.fromEntries(Object.entries(out).filter(([k]) => vivants.has(k))), caseLibre });
 }
-function CentreNotifsCoque({ onReglages }) {
+function CentreNotifsCoque({ onReglages, enTete = null }) {
   const [nonLues, setNonLues] = useState(null);
+  // (14 nov., refonte de la coque) La ligne de fraîcheur (« N choses à revoir ») ne s'écrit plus en tête de page :
+  // la cloche porte son point ambre, sa feuille porte la ligne (détail et geste inchangés, src/LigneFraicheur.jsx).
+  const [fraicheurVue, setFraicheurVue] = useState(() => fraicheurPubliee());
+  useEffect(() => suivreFraicheur((f) => setFraicheurVue(f)), []);
+  const alerteFraicheur = !!fraicheurVue && (fraicheurVue.etat === 'retard' || fraicheurVue.etat === 'passu');
   const [ouvert, setOuvert] = useState(false);
   const [aRanger, setARanger] = useState(null);
   const relireRanger = React.useCallback(() => { calculerOuRanger().then((l) => setARanger(l)).catch(() => setARanger(null)); }, []);
@@ -55139,9 +55226,9 @@ function CentreNotifsCoque({ onReglages }) {
   const aller = React.useCallback((q) => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: q })); } catch (_) {} }, []);
   return (
     <>
-      <BoutonCentreNotifs nonLues={nonLues} enPlus={Array.isArray(aRanger) ? aRanger.length : 0} onOuvrir={() => setOuvert(true)} Icon={Icon}/>
+      <BoutonCentreNotifs nonLues={nonLues} enPlus={Array.isArray(aRanger) ? aRanger.length : 0} onOuvrir={() => setOuvert(true)} Icon={Icon} alerte={alerteFraicheur} alerteNom={alerteFraicheur ? tr('coque.aRevoir') : ''}/>
       {ouvert && <FeuilleCentreNotifs onFermer={fermer} charger={chargerCentreNotifs} ecrireLu={ecrireLuNotifs} onAller={aller} onReglages={onReglages} Fermer={FermeAuRetour} Icon={Icon}
-        aRanger={aRanger} onRanger={ranger} onRangeFait={rangeFait}/>}
+        aRanger={aRanger} onRanger={ranger} onRangeFait={rangeFait} enTete={alerteFraicheur && typeof enTete === 'function' ? enTete(fermer) : null}/>}
     </>
   );
 }
@@ -56877,6 +56964,8 @@ function AppCoeur() {
   const tabCourant=React.useRef(tab); tabCourant.current=tab;
   const setTab=React.useCallback((v)=>{
     if(typeof v==='function'){ setTabBrut(v); return; }
+    // (14 nov., n° 61) « Paires » n'est pas un écran : l'alias ouvre le dernier de ses trois écrans (src/navPaires.js).
+    if(v===ID_PAIRES) v=dernierePaire();
     // (11 nov., lot DJ3) Les anciens chemins vers Colis : « À expédier » de Ventes ou « À retirer » d'Achats.
     if(typeof v==='string'){ const frais=(x)=>x&&Date.now()-x.at<3000;
       const pl=placeDesColis({ tab:v, sub:subVoulue.current, onglet:frais(DEMANDE_COLIS)?DEMANDE_COLIS.o:null, cible:frais(CIBLE_NOTIF)?CIBLE_NOTIF.c:null });
@@ -56895,6 +56984,8 @@ function AppCoeur() {
   },[]);
   // L'écran où une photo Vinted a échoué en premier (le bilan `diag_photos`).
   React.useEffect(()=>{ photosVinted.ecranActuel(tab); },[tab]);
+  // (14 nov., n° 61) Le dernier écran de « Paires » ouvert (l'onglet de la barre y ramène).
+  React.useEffect(()=>{ noterPaire(tab); },[tab]);
   // ⚠️ UN SEUL ONGLET PAR PLATEFORME QUI CONTIENT TOUT (Julien, 25 sept. : « tu
   //    peux directement tout mettre dans l'onglet Vinted… sans avoir besoin
   //    d'avoir vente, achat »). Le hub Vinted/Leboncoin porte une sous-navigation
@@ -60467,9 +60558,12 @@ function AppCoeur() {
                 pendant un stream, l'œil se tait (le stream cache déjà les montants :
                 une seule porte à la fois dans l'en-tête). */}
             {(reglesStream.bouton || streamOn) ? <BoutonStream/> : null}
-            {((!reglesStream.bouton && !streamOn) || montantsCaches) ? <BoutonMontants/> : null}
+            {/* (14 nov., refonte de la coque) Au téléphone, l'œil vit dans le menu du compte (trois icônes au
+                plus dans la barre : loupe · cloche · compte) ; il revient dans la barre tant que les montants
+                SONT cachés (un mode allumé garde son interrupteur sous le pouce). */}
+            {((!reglesStream.bouton && !streamOn) || montantsCaches) && (ordi || montantsCaches) ? <BoutonMontants/> : null}
             {/* (5 nov.) La cloche : ce que VRM a envoyé (src/CentreNotifs.jsx). */}
-            {AUTH.user && <CentreNotifsCoque onReglages={()=>setTab('settings')}/>}
+            {AUTH.user && <CentreNotifsCoque onReglages={()=>setTab('settings')} enTete={(fermer)=>!baseKO && !horsLigne ? <Suspense fallback={null}><LigneFraicheurParesseuse baseKO={baseKO} comptes={vintedAccounts} publier={false} onNav={(t)=>{ fermer(); setTab(t); }}/></Suspense> : null}/>}
             {!ordi && <button className="vrm-hbtn" type="button" data-recherche-zone="" data-recherche-loupe="" data-recherche-loupe-voix={DICTEE_OK && !VOIX.refus ? '1' : '0'}
               onPointerDown={(e)=>{ if(!DICTEE_OK || VOIX.refus || (e.button!=null && e.button!==0)) return; clearTimeout(appuiLoupe.current.t); appuiLoupe.current.long=false;
                 appuiLoupe.current.t=setTimeout(()=>{ appuiLoupe.current.long=true; flushSync(()=>setGsOpen(true)); if(!ecouteEnCours('loupe')) dicterLoupe(); }, 550); }}
@@ -60694,6 +60788,8 @@ function AppCoeur() {
             invisible, son squelette à sa place, puis il arrive d'un bloc — au plus ~2,5 s. */}
         {/* (8 nov.) Ma journée, Colis, Ventes, Annonces déjà vues restent montées, gelées et hors de
             la page, et reviennent telles quelles au toucher de la barre (src/ecransGardes.jsx). */}
+        {/* (14 nov., n° 61) « Paires » au téléphone : Annonces | Stock | Achats, en tête des trois écrans. */}
+        {!ordi && estPaires(tab) && <SelecteurPaires tab={tab} setTab={setTab} badges={badgesNav} sites={sitesPresents}/>}
         <EcransGardes ecran={tab} cle={(authState.user && authState.user.id) || ''} pret={subPose===tab}>
         <AttenteEcran key={tab} ecran={tab} memoire={((authState.user && authState.user.id) || '') + ':' + tab} ordi={ordi} attendus={ESSENTIELS_ECRAN[tab] || []} donnees={essentielsCoque} instantane={instantaneEcranIci}>
         {tab==='journee'&&uidInstantane&&<GardeEcran nom="capture-journee"><CaptureJournee uid={uidInstantane}/></GardeEcran>}

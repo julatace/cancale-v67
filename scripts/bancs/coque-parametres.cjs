@@ -65,18 +65,29 @@ const jeu = ({ meubles = true, arrive = true } = {}) => {
 };
 const VUS = { 73000: 'autre', 73001: 'autre', 73002: 'autre' };
 
+// (14 nov., refonte de la coque) Au téléphone, la pastille « Actions Vinted » ne tient plus dans la barre du haut
+// (loupe · cloche · compte) : son panneau s'ouvre par le menu du compte. À l'ordinateur, l'île la montre.
+const ouvrirEtatActions = async (pg) => {
+  const b = pg.locator('.vrm-app-header [data-etat-actions]').first();
+  if (await b.isVisible().catch(() => false)) { await b.click().catch(() => {}); return; }
+  await pg.locator('[data-profil-tete]').first().click().catch(() => {}); await pg.waitForTimeout(800);
+  await pg.locator('[data-profil-menu="etat-actions"]').first().click().catch(() => {}); await pg.waitForTimeout(400);
+};
 const sonde = (pg) => pg.evaluate(() => {
   const vis = (e) => { if (!e || !e.getClientRects().length) return false; const r = e.getBoundingClientRect(); if (r.width < 1 || r.height < 1) return false; for (let p = e; p && p !== document.documentElement; p = p.parentElement) { const s = getComputedStyle(p); if (s.visibility === 'hidden' || s.display === 'none' || Number(s.opacity) < 0.05) return false; } return true; };
   const tete = document.querySelector('.vrm-app-header');
   const boutons = tete ? [...tete.querySelectorAll('button')].filter(vis) : [];
   const etat = tete && tete.querySelector('[data-etat-actions]');
   const apres = etat ? getComputedStyle(etat, '::after').content : '';
-  const point = etat && etat.querySelector('.vrm-etat-point');
+  // (14 nov.) Au téléphone l'état est un point sur la photo du compte (ambre/gris ; rien quand tu peux agir).
+  const profil = tete && tete.querySelector('[data-profil-tete]');
+  const point = (etat && vis(etat) ? etat.querySelector('.vrm-etat-point') : null) || (profil && profil.querySelector('.vrm-hdr-profil-etat'));
   const ps = point ? getComputedStyle(point) : null;
   return {
     boutons: boutons.map((b) => b.getAttribute('aria-label') || b.innerText.trim()).slice(0, 12),
     iEnCss: /["']i["']/.test(apres || ''),
-    point: point ? { vis: vis(point), w: Math.round(point.getBoundingClientRect().width), fond: ps.backgroundColor } : null,
+    point: point ? { vis: vis(point), w: Math.round(point.getBoundingClientRect().width), fond: ps.backgroundColor, ton: point.getAttribute('data-etat-point') } : null,
+    oeilTete: tete ? [...tete.querySelectorAll('[data-bouton-montants]')].filter(vis).length : 0,
     nuage: tete ? [...tete.querySelectorAll('.vrm-sync-status')].filter(vis).map((b) => b.getAttribute('data-sync-etat')) : [],
     stream: document.querySelectorAll('[data-bouton-stream]').length, oeil: document.querySelectorAll('[data-bouton-montants]').length,
   };
@@ -89,16 +100,17 @@ async function enTete(nav, { W, theme }) {
   const s = await sonde(pg);
   if (W < 600) {
     dit(!s.iEnCss, 'H1', `${T} aucune icône « ⓘ » pour l'état au téléphone`, JSON.stringify(s));
-    dit(s.point && s.point.vis && s.point.w >= 8 && !/rgba\(0, 0, 0, 0\)/.test(s.point.fond), 'H1', `${T} l'état est un point de couleur visible`, JSON.stringify(s.point));
+    dit(s.point && ((s.point.vis && s.point.w >= 8 && !/rgba\(0, 0, 0, 0\)/.test(s.point.fond)) || s.point.ton === 'ok'), 'H1', `${T} l'état est un point de couleur visible (sur la photo du compte ; rien quand tu peux agir)`, JSON.stringify(s.point));
     dit(s.boutons.length <= 4, 'H1', `${T} au plus 4 commandes dans l'en-tête quand tout va bien (${s.boutons.length})`, s.boutons.join(' | '));
   }
   dit(!s.nuage.length, 'H1', `${T} le nuage n'est pas dans l'en-tête quand rien n'a raté`, JSON.stringify(s.nuage));
   // (6 nov.) « Stream » n'est dans l'en-tête que s'il est choisi dans les réglages
   // (éteint par défaut) ; sans lui, l'œil des montants (un seul des deux).
-  dit(s.stream === 0 && s.oeil === 1, 'H1', `${T} par défaut : l'œil des montants, pas de bouton « Stream » (un seul bouton)`, JSON.stringify({ stream: s.stream, oeil: s.oeil }));
+  // (14 nov.) Au téléphone, l'œil vit dans le menu du compte (trois icônes au plus dans la barre).
+  dit(s.stream === 0 && (W < 600 ? s.oeilTete === 0 : s.oeil === 1), 'H1', `${T} par défaut : ${W < 600 ? 'ni œil ni « Stream » dans la barre (l’œil est dans le menu du compte)' : 'l’œil des montants, pas de bouton « Stream »'}`, JSON.stringify({ stream: s.stream, oeil: s.oeil, oeilTete: s.oeilTete }));
   await capture(pg, `ch-entete-${W}-${theme}`);
   // H2 — le panneau de la pastille.
-  await pg.locator('.vrm-app-header [data-etat-actions]').first().click().catch(() => {});
+  await ouvrirEtatActions(pg);
   await pg.waitForFunction(() => { const d = document.querySelector('[data-etat-derniere]'); return d && d.getAttribute('data-etat-derniere') !== 'encours'; }, null, { timeout: 8000 }).catch(() => {});
   await attendre(400);
   const p = await pg.evaluate(() => {
