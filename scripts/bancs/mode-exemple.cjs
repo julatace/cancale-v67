@@ -160,7 +160,7 @@ async function parcoursExemple(nav, W, theme) {
     const b = await taille(o.pg, '[data-exemple-bandeau]');
     const txt = await o.pg.evaluate(() => (document.querySelector('[data-exemple-bandeau]') || {}).innerText || '');
     dit(b && b.vis && b.top >= -1 && b.bottom <= (o.tel ? 844 : 950), `${T} E2 ${tab} : le bandeau est visible`, JSON.stringify(b));
-    dit(/Exemple — rien n’est enregistré/.test(txt) && /Passer à mes vraies données/.test(txt), `${T} E2 ${tab} : « Exemple — rien n’est enregistré » et « Passer à mes vraies données »`, txt);
+    dit(/Exemple — données inventées/.test(txt) && /Passer à mes vraies données/.test(txt), `${T} E2 ${tab} : « Exemple — données inventées » et « Passer à mes vraies données »`, txt);
     const bb = await taille(o.pg, '[data-exemple-brancher]');
     dit(bb && (!o.tel || bb.h >= 43.5), `${T} E2 ${tab} : « Brancher mes comptes » fait 44 px au doigt`, JSON.stringify(bb));
     // Rien ne le couvre (sur ordinateur, l'île flottante des actions du haut l'a couvert au premier essai).
