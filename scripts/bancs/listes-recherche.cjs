@@ -84,7 +84,13 @@ async function ouvrir(nav, { b, url = '/?tab=annonces', sombre = false, mainKo =
     const req = route.request(), m = req.method(); const u = decodeURIComponent(req.url());
     if (/\/rest\/v1\/rpc\//.test(u)) return route.fulfill({ status: 200, contentType: 'application/json', body: 'null' });
     if (m !== 'GET' && m !== 'HEAD') {
-      if (/app_data/.test(u)) ecrits.push({ m, u, corps: req.postData() || '' });
+      if (/app_data/.test(u)) {
+        ecrits.push({ m, u, corps: req.postData() || '' });
+        // La base GARDE ce qu'on lui écrit (comme la vraie) : sans ça, la relecture suivante
+        // (nuage sans la clé) défait l'écriture par la fusion à trois voies, à juste titre.
+        try { const j = JSON.parse(req.postData() || 'null'); const d = Array.isArray(j) ? j[0] : j;
+          if (d && d.data && typeof d.data === 'object' && (d.id === 'main' || /id=eq\.main(&|$)/.test(u))) b.main[0].data = d.data; } catch (_) {}
+      }
       return route.fulfill({ status: m === 'POST' ? 201 : 200, contentType: 'application/json', body: m === 'PATCH' ? '[{"id":"main"}]' : '[]' });
     }
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b.accounts.map((a) => ({ ...a, owner: UID }))) });
