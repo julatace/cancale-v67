@@ -166,7 +166,7 @@ function prouver() {
     fs.writeFileSync(path.join(d, `public/exemple/${nom}-120.webp`), webp(cote === 400 ? 120 : cote));
     const c = path.join(d, 'public/exemple/CREDITS.md');
     fs.writeFileSync(c, fs.readFileSync(c, 'utf8').replace('|---|---|---|---|---|---|\n', `|---|---|---|---|---|---|\n| ${nom} | Nike Air Max 90 blanche | Auteur | ${source} | ${licence} | 2026-11-14 |\n`));
-    remplacer(d, 'src/exemplePhotos.js', 'export const PHOTOS_EXEMPLE = [];', `export const PHOTOS_EXEMPLE = [{ fichier: '${nom}', marque: 'Nike', modele: 'Air Max 90', couleur: 'blanche' }];`);
+    remplacer(d, 'src/exemplePhotos.js', 'export const PHOTOS_EXEMPLE = [', `export const PHOTOS_EXEMPLE = [{ fichier: '${nom}', marque: 'Nike', modele: 'Air Max 90', couleur: 'blanche' },`);
   }
   let rates = 0;
   // Le TÉMOIN : une photo en règle (CC0, Commons, 400/120, < 40 Ko, créditée) garde l'audit VERT —

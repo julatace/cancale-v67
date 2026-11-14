@@ -7,29 +7,38 @@ Julien, devant le mode « Découvrir avec des exemples » sur ordinateur : « fa
 photos pour les annonces ». Et il a cru que « Le Fournil, Rennes » (le point relais d'exemple) était un
 de SES colis : l'exemple ne se voyait pas assez.
 
-## 1. Les photos — PAS FAITES : le réseau du conteneur les bloque
+## 1. Les photos — 21 vraies photos (Wikimedia Commons)
 
 Consigne : 20 à 30 vraies photos de sneakers d'occasion sous licence CC0 / domaine public
 (Wikimedia Commons, Openverse filtré CC0), Unsplash License ou Pexels License, licence vérifiée sur
 la page source, crédit par photo, WebP 400×400 et 120×120 < 40 Ko.
 
-**Mesuré le 14 nov.** : le proxy de la session refuse le tunnel (`CONNECT … 403 Forbidden`) vers
-**tous** les hôtes des sources permises :
+**Premier essai (14 nov., matin)** : le proxy refusait le tunnel (`CONNECT … 403`) vers tous les hôtes
+des sources permises ; rien de faux n'a été mis. **Après ouverture des hôtes** par le coordinateur
+(`commons.wikimedia.org`, `upload.wikimedia.org`, `api.openverse.org`, `unsplash.com`,
+`images.unsplash.com`, `www.pexels.com`, `images.pexels.com`) :
 
-| hôte | réponse |
-|---|---|
-| `commons.wikimedia.org` | 403 au CONNECT (WebFetch : hôte hors des domaines permis) |
-| `upload.wikimedia.org` | 403 au CONNECT |
-| `api.openverse.org`, `openverse.org` | 403 au CONNECT |
-| `unsplash.com`, `images.unsplash.com` | 403 au CONNECT |
-| `www.pexels.com`, `images.pexels.com`, `api.pexels.com` | 403 au CONNECT |
-| (aussi essayés) `www.flickr.com`, `live.staticflickr.com`, `pixabay.com`, `cdn.pixabay.com`, `huggingface.co` | 403 au CONNECT |
+- Recherche par l'API de Commons (`generator=search`, `extmetadata`), 18 requêtes (Nike, Adidas, New
+  Balance, Converse, Vans, Air Max, Samba…) ⇒ 118 fichiers CC0 / domaine public ; ~44 regardés sur une
+  planche ; **22 retenus** (profil, paire seule, aucune personne, aucun pied ni jambe, aucune vraie
+  annonce), puis **un retiré** (« Womens New Balance shoes (Unsplash) » : modèle `{{Unsplash}}` en
+  catégorie « review needed » — doute ⇒ dehors). Restent **21**.
+- **Licence relue sur la page source** (le wikitexte de chaque fichier) : 18 × `{{self|cc-zero}}`
+  (l'auteur verse lui-même sa photo en CC0), 3 × domaine public versé par l'auteur (`{{PD-self}}`,
+  `{{PD-user}}`, `{{PD-user-w}}`). Aucune demande de suppression sur aucun fichier. Auteurs : LeDroider
+  (17), Xanor, Kyntömies, Mr. Carter4 (2).
+- `thumb.wikimedia.org` n'est pas ouvert : les vignettes 960 px sont prises par le même chemin sur
+  `upload.wikimedia.org`. Commons répond 429 aux clients pressés : requêtes espacées, reprises.
+- Recadrage carré **sans couper la paire** (contenue entière, sur un fond tiré de la même photo,
+  flou), WebP qualité ≤ 72, `-strip` : 400 px de 13 à 23 Ko, 120 px de 2 à 4 Ko (`public/exemple/`,
+  420 Ko en tout). Paires « portées » comprises (Air Force 1, Superstar, Air Max 90).
+- `PHOTOS_EXEMPLE` : l'entrée n° k est la photo de la paire n° k (annonces 0-11, ventes 12-15, achats
+  16-18) ; les deux dernières (Campus 00s, Air Max LTD 2) sont de réserve. La vente à expédier est la
+  Nike Cortez ; l'annonce Leboncoin `VRM-2` est la même paire que l'annonce n° 2 de Vinted (Nike Air
+  Force 1) : même titre (« … T39 ») et même photo. Les marques visibles sur les chaussures restent
+  celles de leurs fabricants (dit dans CREDITS.md).
 
-Seuls les registres de paquets passent (npm, PyPI) : aucune photo vérifiable par sa page source.
-L'environnement de la session est le « Default » (réseau limité, aucune hôte ajouté).
-**Rien de faux n'a été mis** : aucune photo d'origine inconnue, aucune image générée.
-
-### Ce qui est prêt pour le jour où le réseau les laisse passer
+### Le branchement
 - `src/exemplePhotos.js` — `PHOTOS_EXEMPLE` (vide), `LICENCES_PERMISES` (licence ⇒ site de la page
   source), `photoDeLaPaire(k, origine)`, `descriptionDeLaPaire(k)`.
 - `src/exempleDonnees.js` — chaque paire d'exemple a un numéro fixe `k` (annonces 0-11, ventes
@@ -45,7 +54,7 @@ L'environnement de la session est le « Default » (réseau limité, aucune hôt
   même origine, CSP `img-src 'self'`).
 - `public/exemple/CREDITS.md` — les règles et le tableau (vide).
 
-### Pour ajouter les photos (session suivante, réseau ouvert)
+### Pour ajouter ou remplacer une photo
 1. Ouvrir les hôtes (Julien : environnement de la session → réseau → hôtes permis
    `commons.wikimedia.org`, `upload.wikimedia.org`, et/ou `unsplash.com`, `images.unsplash.com`,
    `www.pexels.com`, `images.pexels.com`).
@@ -96,15 +105,16 @@ L'environnement de la session est le « Default » (réseau limité, aucune hôt
   règle) vert, **10/10 mutations rouges** (licence CC BY-SA, page source d'un autre site, image sans
   crédit, image de 41 Ko, mauvaise taille, photo prêtée par modulo, titre qui ne suit pas la photo,
   vente sans photo, hôte externe, photo sans origine). Sur origin/main : rouge (module absent).
-  `--complet` (≥ 20 photos) : rouge tant que la liste est vide — c'est voulu.
+  **`--complet` (20 à 30 photos) : vert, 21 photos** (rouge au premier passage, liste vide).
 - **Banc `exemple-photos`** (nouveau ; 390 tactile et 1512, clair et sombre, 4 passes de < 9 min) :
   B1 bandeau + cadre + languette au-dessus de tout sur 9 écrans, B2 loupe ouverte, B3 « exemple » sur
   codes et adresses (Achats « À retirer », une ligne ouverte), B4 plus de « Le Fournil » ni « rue de la
   Paix », « Relais Exemple », C1 « Me connecter » (44 px, libre, mène à `?connexion`, l'exemple
   disparaît, aucune session réelle), W1 **0 requête vers la base ni /api, 0 écriture sortie**, rien ne
-  déborde, 0 erreur JS : **66 OK par passe, tous verts** ; seuls rouges : **P1 (4 par passe : Annonces,
-  Ventes, Achats, Colis — « 0 photo d'exemple pour 9 articles »)**, attendus tant que les photos
-  manquent. Sur **origin/main** (390 clair) : **47 KO** (B1 × 36, B2, B3, B4, C1, P1). Mutations sur le
+  déborde, 0 erreur JS, **P1 chaque rangée d'article a sa photo chargée (Annonces 12/12, Ventes 4/4,
+  Achats 3/3, Colis 4/4 ; les vignettes chargées à l'approche sont parcourues ; un colis SANS article,
+  lu dans un e-mail du transporteur, n'a pas à avoir de photo)** : **70 OK, 0 KO par passe** (4 passes).
+  Au premier passage, sans photos : P1 rouge × 4 par passe. Sur **origin/main** (390 clair) : **47 KO** (B1 × 36, B2, B3, B4, C1, P1). Mutations sur le
   `dist` (CSS du cadre à z 1, marque `content: none`) : B1 × 9, B2, B3 rouges.
 - Bancs touchés, verts : `exemple-accueil` (52 OK, 390 + 1512 clair), `mode-exemple` (116 OK).
 - Audits verts : `traduction` (45 ; `BandeauExemple`/`CadreExemple` ajoutés aux écrans migrés),
@@ -112,18 +122,25 @@ L'environnement de la session est le « Default » (réseau limité, aucune hôt
 - **Captures regardées** (390 et 1512, clair et sombre) : bandeau au téléphone (phrase + « Créer mon
   compte », lien dessous), à l'ordinateur (étiquette EXEMPLE, phrase, gestes à gauche de l'île), la
   languette (haut gauche au téléphone, bas centre à l'ordinateur), le cadre hachuré, la loupe ouverte
-  (languette au-dessus), la fiche d'un colis à retirer, l'écran de connexion après « Me connecter ».
+  (languette au-dessus), la fiche d'un colis à retirer (code marqué « EXEMPLE »), l'écran de connexion
+  après « Me connecter », Annonces en grille avec les 12 photos, la vente à expédier (Nike Cortez), la
+  nouvelle capture « À retirer » de l'accueil (clair, sombre), la planche des 21 photos.
 - Le banc attend la fin de l'écran de démarrage (`#vrm-demarrage`, z 2147483000) sur une condition :
   sans cela, « rien ne couvre » jugeait le chargement (machine chargée : 4 s).
 
-## Limite connue
-- Dans la fiche d'un colis (« Une seule fiche partout »), le code est écrit DANS la phrase du haut
-  (« Colis à retirer · 582913 ») : pas d'élément propre, donc pas de marque « exemple » à côté. Le cadre
-  et la languette restent au-dessus de la fiche.
+## Les deux limites du premier passage, corrigées
+- **Le code dans la fiche d'un colis** (« Colis à retirer · 582913 ») : sur une ligne « À retirer », la
+  fiche (`src/FichePaire.jsx`) écrit le code dans son propre élément, marqué comme un code
+  (`data-stream-type="code"`) : il porte « EXEMPLE » dans l'exemple (et il est masqué en mode direct,
+  comme les autres codes).
+- **« Le Fournil » sur la page d'accueil** : la capture `public/accueil/retirer-{clair,sombre}.webp`
+  est REFAITE par `scripts/accueil-captures.cjs` (« À retirer » vit maintenant dans Achats : onglet
+  `achats`, défilement 430) avec « Relais Exemple, 12 rue Imaginaire » ; le script retire aussi le
+  cadre hachuré et les marques « exemple » de la capture (la page écrit « Données d'exemple » dessous) ;
+  `captures.json` est réécrit par le script. Le texte alternatif `accueil.moment.colis.alt` (5 langues)
+  décrit la nouvelle capture.
+- Restent « Le Fournil » dans des FIXTURES de bancs (`nouveau-vendeur`, `photos-achats`, `mode-stream`,
+  `onglets-c`) : jamais montrées à un vendeur, laissées telles quelles.
 
 ## Restes
-- **Les photos** (§1) : bloquées par le réseau. Geste de Julien : ouvrir les hôtes, puis une
-  session les pose (méthode ci-dessus).
-- Les captures de la page d'accueil (`public/accueil/`) montrent encore « Le Fournil » (prises avant
-  ce lot, et leurs textes alternatifs `accueil.moment.colis.alt` le nomment) : à reprendre avec
-  `scripts/accueil-captures.cjs` dans un lot qui touche l'accueil.
+- Geste de Julien : aucun.
