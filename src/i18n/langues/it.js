@@ -22,7 +22,7 @@ import ecran_accueilReste from './it/accueilReste.js';
 import ecran_fraiscarte from './it/fraiscarte.js';   // (14 nov., frais-carte)
 import ecran_atelier from './it/atelier.js';
 import ecran_argentprix from './it/argentprix.js';   // (14 nov., argent-prix)
-import ecran_idees from './it/idees.js';   // (14 nov., idées argent 159-162)
+import ecran_idees from './it/idees.js';   // (14 nov., 160) vente en main propre
 export default {
   ...ecran_accueilReste,
   ...ecran_fiche,

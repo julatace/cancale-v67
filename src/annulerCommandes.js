@@ -87,10 +87,8 @@ export const ACTIONS_RECHERCHE = [
   { id: 'calculette', libelle: 'Calculette d’achat', sous: 'Combien je gagne si je l’achète X € ?', icone: 'euro', mots: ['calculette', 'calculer', 'calcul', 'combien', 'gagner', 'gagne', 'benefice', 'marge', 'rentable', 'acheter'] },
   { id: 'achats', libelle: 'Mes achats', sous: 'Achats', icone: 'bag', mots: ['achats', 'achat', 'acheter'] },
   { id: 'reglages', libelle: 'Réglages', sous: 'Paramètres de VRM', icone: 'gear', mots: ['reglages', 'parametres', 'preferences', 'settings', 'options'] },
-  // (14 nov., idées argent) Deux feuilles qui n'écrivent rien avant SON clic : la vente en main propre
-  // (N° puis prix) et la dépense en photo (le ticket lu sur le téléphone, il confirme).
+  // (14 nov., 160) La vente en main propre : une feuille qui n'écrit rien avant SON clic (N° puis prix).
   { id: 'vente-main', libelle: 'Vente en main propre', sous: 'N° puis prix : la paire sort du stock', icone: 'euro', mots: ['vente', 'vendu', 'vendre', 'main', 'propre', 'main propre', 'especes', 'cash', 'liquide', 'remise'] },
-  { id: 'depense-photo', libelle: 'Dépense en photo', sous: 'Le ticket lu sur ton téléphone ; tu confirmes', icone: 'camera', mots: ['depense', 'depenses', 'ticket', 'frais', 'charge', 'charges', 'photo', 'carton', 'cartons', 'essence', 'scotch', 'emballage'] },
   { id: 'vente-main-num', num: true, libelle: (n) => `N°${n} vendu en main propre`, sous: 'Le prix, et elle sort du stock', icone: 'euro', mots: ['vente', 'vendu', 'vendre', 'main', 'propre', 'especes', 'cash', 'liquide'] },
   { id: 'ouvrir-num', num: true, libelle: (n) => `Ouvrir N°${n}`, get sous() { return `La fiche ${motsVendeur().de}`; }, icone: 'tag', mots: ['ouvrir', 'fiche', 'voir', 'histoire', 'paire', 'article'] },
   { id: 'baisser-prix', num: true, libelle: (n) => `Baisser le prix de N°${n}`, sous: 'La feuille du prix — rien n’est envoyé avant « Appliquer »', icone: 'euro', mots: ['baisser', 'prix', 'changer', 'modifier', 'promo', 'reduire', 'diminuer'] },
@@ -168,7 +166,6 @@ export function destinationAction(a) {
     case 'stock-num': return a.num ? { tab: 'garage', stock: a.num } : null;
     case 'vente-main': return { feuille: 'vente-main' };
     case 'vente-main-num': return a.num ? { feuille: 'vente-main', num: a.num } : null;
-    case 'depense-photo': return { feuille: 'depense-photo' };
     default: return null;
   }
 }

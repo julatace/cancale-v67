@@ -8,8 +8,6 @@ import React from 'react';
 import './design/sms-colis.css';
 import { BoutonBase as Bouton } from './composants/Bouton.jsx';
 import { RACCOURCIS_SIRI, ORIGINE_VRM } from './raccourcisSiri.js';
-// (14 nov., idées argent 161) « Siri répond » : un jeton personnel, trois questions (src/ideesArgent/SiriJeton.jsx).
-import SiriJeton from './ideesArgent/SiriJeton.jsx';
 
 export default function RaccourcisSiri({ toast = () => {}, origine = ORIGINE_VRM }) {
   const copier = async (lien) => {
@@ -17,7 +15,6 @@ export default function RaccourcisSiri({ toast = () => {}, origine = ORIGINE_VRM
   };
   return (
     <div className="vrm-sc" data-raccourcis-siri="">
-      <SiriJeton/>
       <p className="vrm-sc-intro">Parle à Siri : VRM s’ouvre au bon endroit.</p>
       {RACCOURCIS_SIRI.map((r) => {
         const lien = r.lien(origine);

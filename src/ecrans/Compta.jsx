@@ -79,7 +79,6 @@ import { DEMANDE_BILAN_MOIS, attrCible } from "../cibleNotif.js";   // (13 nov.,
 import { delaisPaiement, texteDelai } from "../delaiPaiement.js";
 // ⟦← App.jsx #8⟧
 import { CATEGORIES_DEPENSE, idTicket, montantDuTicket, texteMontantSaisie, texteDuTicket } from "../depensesTicket.js";
-import { ouvrirIdee } from "../ideesArgent/Racine.jsx";   // (14 nov., idées argent 159)
 
 // ⟦← App.jsx #3⟧
 const Dac7Comptes = aLaDemande(() => import('../Dac7Comptes.jsx'));
@@ -4276,8 +4275,6 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
     try { const d = load('vrm_compta', null); if (d && typeof d === 'object') setData(cur => comptaVide(cur) ? { ...COMPTA_DEFAUT, ...d } : cur); } catch (_) {}
   }), []);
   const maj = (next) => { setData(next); try { save('vrm_compta', next); } catch (_) {} };
-  // (14 nov., idées argent 159) Une dépense rangée par la feuille « Dépense en photo » : la liste se relit.
-  React.useEffect(() => { const f = () => setData(lireComptaSynchro()); window.addEventListener('vrm:depense-ajoutee', f); return () => window.removeEventListener('vrm:depense-ajoutee', f); }, []);
   const depenses = data.depenses || [], fixes = data.fixes || [], packs = data.packs || [], abonnements = data.abonnements || [];
 
   // ── Totaux, tous OWNED (aucun CA recalculé ici) ───────────────────────────
@@ -4634,8 +4631,6 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
               </div>
             </div>, document.body)}
             <ComptaAjout ouvert={ouvert === 'dep'} onClick={() => basculer('dep')} libelle="Ajouter une dépense" data={{ 'data-dep-ouvrir': '' }} />
-            {/* (14 nov., idées argent 159) Le ticket en photo, lu sur le téléphone (src/ideesArgent/). */}
-            <button type="button" className="vrm-lien-action sb-lien" data-depense-photo-ouvrir="" onClick={() => ouvrirIdee('depense-photo')} style={{ background: 'none', border: 0, padding: 0, minHeight: 44, color: C.accentTexte, fontWeight: 600, cursor: 'pointer', fontSize: 14, fontFamily: 'inherit' }}>{tr('ia.dep.ouvrirCompta')}</button>
             {ouvert === 'dep' && <div style={formBox} data-dep-form>
               <div className="vrm-dep-ticket" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 {dPhoto ? <img data-dep-ticket-apercu="" src={dPhoto} alt="" style={{ width: 56, height: 56, borderRadius: 12, objectFit: 'cover', flexShrink: 0, border: `1px solid ${C.border}` }} /> : null}

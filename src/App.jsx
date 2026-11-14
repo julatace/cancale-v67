@@ -847,9 +847,9 @@ import { PREFIXE_POINT, slotDe, idPoint, instantane as instantaneRestauration, i
 import "./styles-restauration.css";
 // (9 nov., lot B) « Annuler » au lieu des confirmations réversibles + ⌘K qui agit (src/annulerCommandes.js).
 import { champsAvant, actionsPour, destinationAction, DEMANDE_COMMANDE } from "./annulerCommandes.js";
-// (14 nov., idées argent 159-162) Dépense en photo, vente en main propre, partager en image : une racine, feuilles à la demande.
+// (14 nov., 160) La vente en main propre en deux touchers : une racine, la feuille chargée à la demande (src/ideesArgent/).
 import IdeesArgentRacine, { ouvrirIdee } from "./ideesArgent/Racine.jsx";
-import { vendusDuJourPublies } from "../api/_lib/siri-reponses.js";   // (161) « vendu aujourd'hui » publié dans widget_stats
+import { verdictVenteMain } from "./ideesArgent/venteMain.js";
 import { PiluleAnnuler } from "./PiluleAnnuler.jsx";
 import Visionneuse from "./Visionneuse.jsx";
 import { useFacturesAchat, PastilleFacture } from "./FactureAchat.jsx";   // (10 nov., lot AN) facture d'achat jointe
@@ -58413,7 +58413,8 @@ function AppCoeur() {
   // (14 nov., proposition 62) Une fiche ouverte DEPUIS une ligne (`HoteFicheLigne`) : son N° (par identité), posé
   // APRÈS son premier dessin — la fiche paraît d'abord, les lectures suivent (1 000 articles : ouverture < 150 ms).
   const [ficheLigneActive,setFicheLigneActive]=useState(null);
-  const besoinNumData=gsOpen||!!ficheNum||!!ficheLigneActive||!!prixNum||!!(pubAil&&pubAil.num)||!!pubPartout||!!ecartsOuvert;   // (14 nov., argent-prix) « Prix d’un site à l’autre » lit les sites de chaque N°
+  const [venteMainOuverte,setVenteMainOuverte]=useState(false);   // (14 nov., 160) la feuille lit l'histoire des N° comme la fiche
+  const besoinNumData=venteMainOuverte||gsOpen||!!ficheNum||!!ficheLigneActive||!!prixNum||!!(pubAil&&pubAil.num)||!!pubPartout||!!ecartsOuvert;   // (14 nov., argent-prix) « Prix d’un site à l’autre » lit les sites de chaque N°
   // Les lectures en plus (coffre, offres, reçu, Leboncoin, Vestiaire) du N° ouvert.
   const [ficheExtra,setFicheExtra]=useState(null);
   const numOutil=ficheNum||(ficheLigneActive&&ficheLigneActive.num)||prixNum||(pubAil&&pubAil.num)||null;
@@ -59917,7 +59918,7 @@ function AppCoeur() {
     // seulement complet ; sinon la valeur d'avant reste (jamais un minimum présenté complet).
     const aV = aVenirPour(liveStatsVus.aVenir);
     if (aV.valeur != null && !aV.partiel) base0.enAttente = Math.round(aV.valeur);
-    const data = { ...base0, caMois: Math.round(liveStatsVus.caMois || 0), ventesMois: liveStatsVus.ventesMois || 0, caMoisNonComptees: liveStatsVus.venduNonCompteesMois || 0, ...(vendusDuJourPublies({ caJour: liveStatsVus.caJour, ventesJour: liveStatsVus.ventesJour, nonComptees: (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return nonCompteesDe(liveStatsVus.venduNonComptees || [], d.getTime()).length; })() }) || {}), ...(onlinePasSu ? { onlineRaison: onlinePasSu } : { onlineAt: jourParis() }), aExpedier: aExpedierPourCarte(load('vrm_colis_aposter', null)) };
+    const data = { ...base0, caMois: Math.round(liveStatsVus.caMois || 0), ventesMois: liveStatsVus.ventesMois || 0, caMoisNonComptees: liveStatsVus.venduNonCompteesMois || 0, ...(onlinePasSu ? { onlineRaison: onlinePasSu } : { onlineAt: jourParis() }), aExpedier: aExpedierPourCarte(load('vrm_colis_aposter', null)) };
     const cle = JSON.stringify(data);
     if (cle === widgetEcrit.current) return;
     widgetEcrit.current = cle;
@@ -60739,17 +60740,15 @@ function AppCoeur() {
   // (11 nov., saisie rapide) « Vendu ailleurs » sur la fiche d'une paire du stock : seulement
   // quand la vente est SUE et qu'il n'y en a pas, et qu'UNE annonce porte ce N° (identité ;
   // deux ⇒ rien, mieux vaut un blanc qu'un faux, §5).
+  // (14 nov., 160) Le verdict est `verdictVenteMain` (src/ideesArgent/venteMain.js) : la MÊME règle que la feuille
+  // « Vente en main propre ». Sur la fiche : une seule paire, possible (ou déjà vendue en main propre) ; sinon rien.
   const blocVenduAilleurs=(p,rn,etat)=>{
     if(!p||!p.num||p.ancienNumero||!rn||!Array.isArray(rn.annonces)||!etat) return null;
-    const eV=Array.isArray(p.etapes)?p.etapes.find((e)=>e.cle==='vente'):null;
-    const dec=lireObjet(CYCLE_DECISIONS);
-    const presentes=rn.annonces.filter((a)=>a&&(a.etat==='en-ligne'||a.etat==='a-confirmer'||a.etat==='masquee'));
-    const l=presentes.length?presentes:rn.annonces;
-    if(l.length!==1) return null;
-    const a=l[0]; const d=dec[String(a.id)];
-    if(d&&d.choix==='vendu-main') return <VenduAilleurs carte={{ id:a.id, numero:p.num }} deja={d} Bouton={Bouton}/>;
-    if(!eV||eV.etat==='passu'||etat.vendue) return null;
-    return <VenduAilleurs key={a.id} carte={{ id:a.id, numero:p.num }} Bouton={Bouton} onValider={(x)=>venduAilleursGeste({ id:a.id, numero:p.num, title:a.title||'' },x)}/>;
+    const hAcc=new Set((load('vinted_accounts_hidden',[])||[]).map(String));
+    const v=verdictVenteMain({ rn, p, decisions:lireObjet(CYCLE_DECISIONS), vendues:load('vinted_annonces_vendues',[])||[], ecarte:(uid)=>compteEcarte(uid,hAcc,panelOffCoque) });
+    if(v.etat==='deja-main') return <VenduAilleurs carte={{ id:v.decision.id, numero:p.num }} deja={v.decision} Bouton={Bouton}/>;
+    if(v.etat!=='possible'||v.double) return null;
+    return <VenduAilleurs key={v.carte.id} carte={{ id:v.carte.id, numero:p.num }} Bouton={Bouton} onValider={(x)=>venduAilleursGeste({ id:v.carte.id, numero:p.num, title:v.carte.titre||'' },x)}/>;
   };
   const questionChezToiFiche=(num)=>{
     const l=aTrancherEtat&&Array.isArray(aTrancherEtat.lignes)?aTrancherEtat.lignes.find((x)=>x.cle==='supprimes-vinted'):null;
@@ -61039,7 +61038,7 @@ function AppCoeur() {
     const d = destinationAction(a); if (!d) return;
     if (qBrut && String(qBrut).trim()) setGsRecents(noterRecent(String(qBrut).trim()));
     setGsOpen(false);
-    if (d.feuille === 'vente-main' || d.feuille === 'depense-photo') { ouvrirIdee(d.feuille, { num: d.num || '' }); return; }   // (14 nov., idées argent)
+    if (d.feuille === 'vente-main') { ouvrirIdee('vente-main', { num: d.num || '' }); return; }   // (14 nov., 160) vente en main propre
     if (d.feuille === 'fiche') { setFicheNum(String(d.num)); return; }
     if (d.feuille === 'calculette') { setCalcOuverte(true); return; }
     if (d.feuille === 'prix') { setPrixNum(String(d.num)); return; }
@@ -61343,32 +61342,46 @@ function AppCoeur() {
   // (14 nov., proposition 62) LA FICHE DE LA PAIRE, rendue par la loupe (`ficheNum`) ET par une ligne de
   // liste (`HoteFicheLigne`, src/ficheLigne.js) : le MÊME composant, les mêmes lectures. `numF` : le N° désigné
   // PAR IDENTITÉ (null : la ligne n'a pas de paire sûre) ; `depuis` : la ligne touchée (contexte, identité, résumé).
+  // (14 nov., 160) L'HISTOIRE D'UNE PAIRE (la fiche « Tout sur le N° ») — sortie de `rendreFichePaire` pour
+  // que la fiche ET la feuille « Vente en main propre » lisent LA MÊME chose d'un N° (§5, une règle).
+  const histoirePaire=(numF, avecExtra=true)=>{
+    // (1er nov.) LA FICHE COMPLÈTE D'UNE PAIRE : la même lecture que « Tout
+    // sur le N° » (`rechercheParNumero`), racontée en parcours (`parcoursPaire`).
+    const { rn, numeros } = rechercheParNumero(numF, numData, vintedAccounts);
+    const nomCompte = (uid) => { const a = (vintedAccounts || []).find(x => String(x.vinted_user_id) === String(uid)); if (!a) return null; const labels = load('vinted_account_labels', {}) || {}; return labels[a.vinted_user_id] || a.login || `#${a.vinted_user_id}`; };
+    const shipDone = load('vinted_ship_done', {}) || {};
+    // (3 nov.) L'HISTOIRE COMPLÈTE (`histoireArticle`) : le parcours + les
+    // lectures en plus (`ficheExtra`), chaque étape lue et datée par sa donnée.
+    const ex = avecExtra && ficheExtra && ficheExtra.num === numF ? ficheExtra : null;
+    const autresEnLigne = ex && ex.lbcItems != null && ex.vcItems != null ? sitesPrixDe(numF, rn, ex).sites.filter((x) => x.site === 'leboncoin' || x.site === 'vestiaire') : null;
+    const neuve = (neuveRecente && cleNum(neuveRecente.numero) === rn.cle ? neuveRecente : null) || Object.values(load('vrm_fiches_neuves', {}) || {}).find((x) => x && !x.retireeAt && cleNum(x.numero) === rn.cle) || null;
+    const p = histoireArticle(rn, { fiches: numeros, saleOv: load('vinted_sale_overrides', {}) || {}, buyByNum: load('vinted_buyprice_by_num', {}) || {},
+      stats: numData ? (numData.stats === undefined ? null : numData.stats) : null, versements: numData ? (numData.versements === undefined ? null : numData.versements) : null, nomCompte,
+      coffres: ex ? ex.coffres : null, offres: ex ? ex.offres : null, recus: ex ? ex.recus : null, autresEnLigne, colisVente: ex ? ex.colisVente : undefined,
+      journalPrix: (load('vrm_prix_journal', {}) || {})[rn.cle] || [], prixVinted: load('vinted_prix_historique', []) || [], prixLus: load(CLE_PRIX_LUS, null),
+      sortieStock: (load('vrm_stock_sortis', {}) || {})[rn.cle] || null }, {
+      etapeVente: (o) => etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }),
+      venteAnnulee: (o) => classifyOrderStatus(o && o.status) === 'cancelled' || (o && o.transaction_id != null && txnAnnuleeAvantEnvoi(o.transaction_id)),
+      montantRecuEbay, commandeEbayEngagee, lbcAnnulee, lbcFinalisee,
+    });
+    // (5 nov.) « Voir l'état » : ce qui se calcule (`etatArticle`), depuis
+    // l'histoire ci-dessus et deux lectures en plus (dates Vinted, réception).
+    const etat = p ? etatArticle(p, { fiches: numeros, ids: (rn.annonces || []).map((a) => a.id),
+      crees: numData ? (numData.crees === undefined ? null : numData.crees) : undefined,
+      reception: ex ? ex.reception : undefined, receptionRaison: ex ? ex.receptionRaison : '' }) : null;
+    return { rn, numeros, nomCompte, ex, p, etat, neuve };
+  };
+  // (14 nov., 160) LA VENTE EN MAIN PROPRE depuis un N° tapé : le verdict de « Vendu ailleurs » de la fiche
+  // (`verdictVenteMain`, src/ideesArgent/venteMain.js), sur la MÊME histoire. `numData` pas lu ⇒ « lecture ».
+  const verdictVenteMainCoque=(q, choisie=null)=>{
+    if(!numData) return { etat:'lecture' };
+    const { rn, p } = histoirePaire(String(q||''), false);
+    const hAcc=new Set((load('vinted_accounts_hidden',[])||[]).map(String));
+    return verdictVenteMain({ rn, p, decisions:lireObjet(CYCLE_DECISIONS), vendues:load('vinted_annonces_vendues',[])||[], choisie, ecarte:(uid)=>compteEcarte(uid,hAcc,panelOffCoque) });
+  };
   const rendreFichePaire=(numF, depuis, fermerF, ligneRes=null, choisir=null)=>{
           if (!numF) return <FichePaire owner={AUTH.user?.id||''} p={null} num={''} lecture={!!ligneRes && ligneRes.etat==='lecture'} ligne={depuis} ligneRes={ligneRes} onChoisirNum={choisir} onFermer={fermerF} onRetour={fermerF} Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>} Icon={Icon} Retour={FermeAuRetour}/>;
-          // (1er nov.) LA FICHE COMPLÈTE D'UNE PAIRE : la même lecture que « Tout
-          // sur le N° » (`rechercheParNumero`), racontée en parcours (`parcoursPaire`).
-          const { rn, numeros } = rechercheParNumero(numF, numData, vintedAccounts);
-          const nomCompte = (uid) => { const a = (vintedAccounts || []).find(x => String(x.vinted_user_id) === String(uid)); if (!a) return null; const labels = load('vinted_account_labels', {}) || {}; return labels[a.vinted_user_id] || a.login || `#${a.vinted_user_id}`; };
-          const shipDone = load('vinted_ship_done', {}) || {};
-          // (3 nov.) L'HISTOIRE COMPLÈTE (`histoireArticle`) : le parcours + les
-          // lectures en plus (`ficheExtra`), chaque étape lue et datée par sa donnée.
-          const ex = ficheExtra && ficheExtra.num === numF ? ficheExtra : null;
-          const autresEnLigne = ex && ex.lbcItems != null && ex.vcItems != null ? sitesPrixDe(numF, rn, ex).sites.filter((x) => x.site === 'leboncoin' || x.site === 'vestiaire') : null;
-          const neuve = (neuveRecente && cleNum(neuveRecente.numero) === rn.cle ? neuveRecente : null) || Object.values(load('vrm_fiches_neuves', {}) || {}).find((x) => x && !x.retireeAt && cleNum(x.numero) === rn.cle) || null;
-          const p = histoireArticle(rn, { fiches: numeros, saleOv: load('vinted_sale_overrides', {}) || {}, buyByNum: load('vinted_buyprice_by_num', {}) || {},
-            stats: numData ? (numData.stats === undefined ? null : numData.stats) : null, versements: numData ? (numData.versements === undefined ? null : numData.versements) : null, nomCompte,
-            coffres: ex ? ex.coffres : null, offres: ex ? ex.offres : null, recus: ex ? ex.recus : null, autresEnLigne, colisVente: ex ? ex.colisVente : undefined,
-            journalPrix: (load('vrm_prix_journal', {}) || {})[rn.cle] || [], prixVinted: load('vinted_prix_historique', []) || [], prixLus: load(CLE_PRIX_LUS, null),
-            sortieStock: (load('vrm_stock_sortis', {}) || {})[rn.cle] || null }, {
-            etapeVente: (o) => etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }),
-            venteAnnulee: (o) => classifyOrderStatus(o && o.status) === 'cancelled' || (o && o.transaction_id != null && txnAnnuleeAvantEnvoi(o.transaction_id)),
-            montantRecuEbay, commandeEbayEngagee, lbcAnnulee, lbcFinalisee,
-          });
-          // (5 nov.) « Voir l'état » : ce qui se calcule (`etatArticle`), depuis
-          // l'histoire ci-dessus et deux lectures en plus (dates Vinted, réception).
-          const etat = p ? etatArticle(p, { fiches: numeros, ids: (rn.annonces || []).map((a) => a.id),
-            crees: numData ? (numData.crees === undefined ? null : numData.crees) : undefined,
-            reception: ex ? ex.reception : undefined, receptionRaison: ex ? ex.receptionRaison : '' }) : null;
+          const { rn, numeros, nomCompte, ex, p, etat, neuve } = histoirePaire(numF);
           // (9 nov., lot AF) L'HISTOIRE DU N° (src/historiqueNumero.js) : lecture seule, depuis les
           // traces qui existent (fiches, ventes, marqueur 013, Stock, journal des N°) — jamais devinée.
           const histoNum = p && rn && rn.cle ? historiqueNumero({ cle: rn.cle, fiches: numeros, saleOv: load('vinted_sale_overrides', {}) || {},
@@ -61408,8 +61421,8 @@ function AppCoeur() {
       <CentreAide/>
       <PiluleAnnulerCoque/>
       {AUTH.user && <RangerAchatCoque/>}
-      {/* (14 nov., idées argent) Dépense en photo · Vente en main propre · Partager en image (src/ideesArgent/). */}
-      {AUTH.user && <IdeesArgentRacine/>}
+      {/* (14 nov., 160) Vente en main propre (src/ideesArgent/) : le verdict et l'histoire de la fiche. */}
+      {AUTH.user && <IdeesArgentRacine pret={!!numData} verdict={verdictVenteMainCoque} surOuverture={setVenteMainOuverte}/>}
       {/* (11 nov.) « Me le rappeler » : la feuille et le bandeau ouvert par la notification (api/_lib/rappels-perso.js). */}
       <HoteRappels/>
       {/* (10 nov., lot P) Raccourcis clavier : « g » + lettre, « n », « ? » (src/RaccourcisClavier.jsx) — naviguer ou ouvrir, jamais écrire. */}
