@@ -218,9 +218,13 @@ async function vueSelection(pg) {
           dit(caseAchat.length === 0, `P ${T} la case « prix d'achat » de la carte est grise (ni bord ni libellé ambre)`, JSON.stringify(caseAchat.slice(0, 2)));
 
           // ── N : Numero et PhotoVide sur les cartes ──
-          const nums = await pg.evaluate(() => [...document.querySelectorAll('[data-carte-annonce] [data-fiche-num]')].filter((x) => x.getAttribute('data-fiche-num')).map((x) => { const n = x.querySelector('.vrm-num'); if (!n) return { n: x.getAttribute('data-fiche-num'), num: false }; const c = getComputedStyle(n).backgroundColor; const m = c.match(/\d+(\.\d+)?/g).map(Number); const lum = (0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2]) / 255; return { n: x.getAttribute('data-fiche-num'), num: true, lum: Math.round(lum * 100) / 100, rad: getComputedStyle(n).borderTopLeftRadius }; }));
+          const nums = await pg.evaluate(() => [...document.querySelectorAll('[data-carte-annonce] [data-fiche-num]')].filter((x) => x.getAttribute('data-fiche-num')).map((x) => { const n = x.querySelector('.vrm-num'); if (!n) return { n: x.getAttribute('data-fiche-num'), num: false }; const c = getComputedStyle(n).backgroundColor; const m = c.match(/\d+(\.\d+)?/g).map(Number); const lum = (0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2]) / 255; const t = getComputedStyle(n).color.match(/\d+(\.\d+)?/g).map(Number); const lt = (0.2126 * t[0] + 0.7152 * t[1] + 0.0722 * t[2]) / 255; return { n: x.getAttribute('data-fiche-num'), num: true, lum: Math.round(lum * 100) / 100, ecart: Math.round(Math.abs(lum - lt) * 100) / 100, rad: getComputedStyle(n).borderTopLeftRadius }; }));
+          // (14 nov., « Studio bleu clair ») Le N° est la PLAQUE GRAVÉE du studio : un creux clair, le chiffre à l'encre (la nuit,
+          // l'inverse). La règle reste « on la lit » : un écart franc entre le fond de la plaque et son chiffre.
+          const plaqueStudio = await pg.evaluate(() => !!document.querySelector('[data-sb-liste]'));
           dit(nums.length >= 5 && nums.every((x) => x.num), `N ${T} chaque N° de carte est la pastille partagée Numero`, JSON.stringify(nums.slice(0, 3)));
-          dit(nums.every((x) => !x.num || x.lum < 0.5), `N ${T} la pastille N° n'est jamais claire (encre en clair, gris élevé en sombre)`, JSON.stringify(nums.map((x) => x.lum)));
+          if (plaqueStudio) dit(nums.every((x) => !x.num || x.ecart >= 0.5), `N ${T} la plaque N° (studio) se lit : chiffre à l'encre sur un creux (écart franc)`, JSON.stringify(nums.map((x) => x.ecart)));
+          else dit(nums.every((x) => !x.num || x.lum < 0.5), `N ${T} la pastille N° n'est jamais claire (encre en clair, gris élevé en sombre)`, JSON.stringify(nums.map((x) => x.lum)));
           const vides = await pg.evaluate(() => [...document.querySelectorAll('[data-carte-annonce] [data-fiche-photo]')].map((a) => !!a.querySelector('[data-photo-vide]') || !!a.querySelector('img')));
           dit(vides.length >= 6 && vides.every(Boolean), `N ${T} chaque carte sans photo porte PhotoVide`, JSON.stringify(vides));
 

@@ -157,6 +157,8 @@ function EscalierPrix({ points }) {
     </figure>
   );
 }
+// Ordinateur (la même borne que le téléphone de src/ui/AFaire.jsx, inversée).
+const planOrdinateur = () => { try { return window.matchMedia('(min-width: 768px)').matches; } catch (_) { return false; } };
 const dateCourte = (iso) => {
   const t = Date.parse(iso || ''); if (!Number.isFinite(t)) return '—';
   const d = new Date(t);
@@ -323,8 +325,11 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
     </>
   ) : null;
   const nomFiche = (p && p.num) || num || '';
+  // (14 nov., « Studio bleu clair ») Sur ordinateur, la fiche ouverte depuis une annonce ou le Stock se pose en PLAN À
+  // DROITE (src/design/studio-paires.css) : la liste reste à gauche, visible et touchable (une autre rangée ouvre sa fiche).
+  const enPlan = !!depuis && (ctx === 'annonce' || ctx === 'stock') && planOrdinateur();
   return createPortal(
-    <div ref={racine} className={'vrm-fp' + (depuis ? ' is-depuis-ligne' : '')} role="dialog" aria-modal="true" aria-label={nomFiche ? `Tout sur le N°${nomFiche}` : tr('fiche.heros')} data-fiche-paire={nomFiche} data-fiche-contexte-ouvert={ctx || undefined}
+    <div ref={racine} className={'vrm-fp' + (depuis ? ' is-depuis-ligne' : '') + (enPlan ? ' sb-plan' : '')} role="dialog" aria-modal={enPlan ? 'false' : 'true'} data-sb-plan={enPlan ? '1' : undefined} aria-label={nomFiche ? `Tout sur le N°${nomFiche}` : tr('fiche.heros')} data-fiche-paire={nomFiche} data-fiche-contexte-ouvert={ctx || undefined}
       data-fiche-ligne-cle={depuis ? depuis.cle : undefined} data-fiche-identite={depuis ? (ligneRes ? ligneRes.etat + ':' + (ligneRes.par || '') : '') : 'numero'} data-fiche-lecture-en-cours={lecture ? '1' : '0'} data-noswipe="1">
       {Retour ? <Retour fermer={onFermer}/> : null}
       <div className="vrm-fp-cadre" ref={cadre}>

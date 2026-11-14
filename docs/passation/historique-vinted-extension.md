@@ -1082,3 +1082,23 @@ Récit : `historique-interface-stock.md` (« LES QUATRE OUTILS DES ANNONCES »).
 | `lbcstats` | `noterStatsAnnonceLbc` | **5.291.0** (30 oct.) | « favoris, vues et messages relevés sur tes annonces Leboncoin » |
 | `favorisouvrir` | `ouvrirFavoriNatif` | **5.225.0** | (ajoutée à la table le 30 oct.) |
 | `favorisliste` | `lirePageFavoris` | **5.218.0** | (ajoutée à la table le 30 oct.) |
+
+## Lignes du tableau §8 de CLAUDE.md déplacées telles quelles le 14 nov. (sous 59 000 octets)
+
+| capacité | fonction de l'extension | arrivée en | ce que l'app promet |
+|---|---|---|---|
+| `favoris` | `executerMessageFavori` | **5.217.0** | (ajoutée à la table le 30 oct.) |
+| `offresauto` | `autoAccepterOffres` | **5.234.0** | (ajoutée à la table le 30 oct.) |
+| `vcauto` | `rangerVcAnnonces` | **5.236.0** | (ajoutée à la table le 30 oct.) |
+| `vcventes` | `rangerVcVentes` | **5.237.0** | (ajoutée à la table le 30 oct.) |
+| `republier` | `republierVinted` | **5.240.0** | (ajoutée à la table le 30 oct.) |
+| `republiermodif` | `corpsAvecPrixBaisse` | **5.247.0** | (ajoutée à la table le 30 oct.) |
+| `recreer` | `recreerVinted` | **5.248.0** | (ajoutée à la table le 30 oct.) |
+| `lettre` | `recreerVinted` | **5.250.0** | (ajoutée à la table le 30 oct.) |
+| `brouillon` | `publierBrouillon` | **5.251.0** | (ajoutée à la table le 30 oct.) |
+| `versbrouillon` | `recreerVinted` | **5.253.0** | (ajoutée à la table le 30 oct.) |
+| `republierbrouillon` | `recreerVinted` | **5.254.0** | (ajoutée à la table le 30 oct.) |
+| `refaire` | `refaireBrouillon` | **5.255.0** | (ajoutée à la table le 30 oct.) |
+| `republierpage` | `vintedPage` | **5.277.0** | (ajoutée à la table le 30 oct.) |
+| `republierfile` | `miseEnLigneTick` | **5.279.0** | (ajoutée à la table le 30 oct.) |
+| `favorisperso` | `erreurVariablesFavori` | **5.281.0** | (ajoutée à la table le 30 oct.) |

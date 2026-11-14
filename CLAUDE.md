@@ -447,22 +447,7 @@ sans la fonction.
 | `importpasse` | `importerAnnonces` | **5.375.0** (13 nov.) | « Import de ton passé · 340 / ~1 200 ventes » : 12 mois (horizon par date), annonces d'un trait, état noté après chaque page, souci dit ; `import_vinted_{uid}` v 2 |
 | `favoriattente` | `attendreOffreMessage` | **5.372.0** (12 nov.) | favoris : après l'offre ACCEPTÉE, 8 à 20 s au hasard (jamais deux fois la même valeur) puis le temps d'écriture ; attente dans `chrome.storage.local` (`vrmFavoriAttente`), reprise par un worker neuf (`reprendreMessagesFavoris`) ; Tout arrêter, captcha, pause, autre compte, onglet fermé ⇒ le message ne part pas, dit |
 | `suivinumero` | `suiviDeTransaction` | **5.372.0** (12 nov.) | chaque achat en cours (payé, en attente de livraison, expédié, au point, livré sans n°) reçoit n° de suivi + transporteur + point de destination (détail de la transaction quand le suivi ne les porte pas), 6 lectures/h ; codes de retrait cherchés aussi quand Vinted demande son geste ou que le suivi dit « disponible » |
-| … | … | … | les capacités de la 5.45 à la `lbcfiche` (12 nov.), puis `confirmer` à `favorisliste` (13 nov.) : déplacées telles quelles dans `docs/passation/historique-vinted-extension.md` — `EXT_CAPACITES` reste la vérité |
-| `favoris` | `executerMessageFavori` | **5.217.0** | (ajoutée à la table le 30 oct.) |
-| `offresauto` | `autoAccepterOffres` | **5.234.0** | (ajoutée à la table le 30 oct.) |
-| `vcauto` | `rangerVcAnnonces` | **5.236.0** | (ajoutée à la table le 30 oct.) |
-| `vcventes` | `rangerVcVentes` | **5.237.0** | (ajoutée à la table le 30 oct.) |
-| `republier` | `republierVinted` | **5.240.0** | (ajoutée à la table le 30 oct.) |
-| `republiermodif` | `corpsAvecPrixBaisse` | **5.247.0** | (ajoutée à la table le 30 oct.) |
-| `recreer` | `recreerVinted` | **5.248.0** | (ajoutée à la table le 30 oct.) |
-| `lettre` | `recreerVinted` | **5.250.0** | (ajoutée à la table le 30 oct.) |
-| `brouillon` | `publierBrouillon` | **5.251.0** | (ajoutée à la table le 30 oct.) |
-| `versbrouillon` | `recreerVinted` | **5.253.0** | (ajoutée à la table le 30 oct.) |
-| `republierbrouillon` | `recreerVinted` | **5.254.0** | (ajoutée à la table le 30 oct.) |
-| `refaire` | `refaireBrouillon` | **5.255.0** | (ajoutée à la table le 30 oct.) |
-| `republierpage` | `vintedPage` | **5.277.0** | (ajoutée à la table le 30 oct.) |
-| `republierfile` | `miseEnLigneTick` | **5.279.0** | (ajoutée à la table le 30 oct.) |
-| `favorisperso` | `erreurVariablesFavori` | **5.281.0** | (ajoutée à la table le 30 oct.) |
+| … | … | … | les capacités de la 5.45 à la `lbcfiche` (12 nov.), puis `confirmer` à `favorisliste` (13 nov.), puis `favoris` à `favorisperso` (14 nov.) : déplacées telles quelles dans `docs/passation/historique-vinted-extension.md` — `EXT_CAPACITES` reste la vérité |
 | `vcsession` | `noterSessionVc` | **5.295.0** (31 oct.) | le compte Vestiaire ouvert dans l'onglet (`vc_session`) — si Vestiaire charge `/users/me` |
 | `vcfil` | `rangerVcFil` | **5.317.0** (3 nov. ; la 5.295 ne lisait pas la messagerie Stream) | « lire tes conversations Vestiaire » (messagerie Stream + fil des notifications ; texte, date, « de toi », jamais un nom) |
 | `vcrepondre` | `repondreVestiaire` | **5.295.0** | « Envoyer sur Vestiaire » sur son clic — seulement après une recette APPRISE de son propre envoi (`vc_envoi.appris`) |
@@ -529,6 +514,7 @@ sans la fonction.
 ## 9. État actuel et décisions récentes
 - **14 nov. · Studio bleu clair — la fondation** : jetons `--sb-*`, quatre formes de bouton, coque (lumière, barre en verre, pastille enfoncée + diode, disque « + » ⇒ Chercher · Scanner · Publier · Imprimer N), polices Urbanist/Inter embarquées, `src/ui` migré ; `docs/passation/2026-11-14-studio-fondation.md`. Geste : regarder sur iPhone, dire ce qui gêne.
 - **14 nov. · Extension 5.377.0 : « VRM a capté » + carte Favoris · Annonces · Ventes** : bulle près du logo et toast dans l'app quand une écriture RÉUSSIE range du nouveau (par identité, `vrmCapteVu`), « Compte relié · … » à la connexion, réglage partagé carte ↔ Paramètres ; carte : compte de l'onglet d'abord, favoris du plus récent cochés ⇒ « Envoyer le message (N) », autres comptes floutés `inert`, lecture seule. `docs/passation/2026-11-14-popup-capte.md`. Geste : installer la 5.377.0.
+- **14 nov. · Studio bleu clair : Paires (Annonces, Stock, la fiche)** : rangées 64 px sur plan de verre (plaque N° · vignette · titre/méta · prix), la paire touchée MONTE à sa place (prix, acheté, jours, favoris, Baisser · Republier · ⋯ ⇒ la fiche), ordinateur : fiche en plan à droite ; grille au choix ; aucun geste perdu (inventaire). `docs/passation/2026-11-14-studio-paires.md`, banc `studio-paires`.
 
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).

@@ -33,7 +33,9 @@ import ecran_atelier from './fr/atelier.js';
 import ecran_accompagnement from './fr/accompagnement.js';   // (14 nov.) les quatre moments d'un geste
 import ecran_argentprix from './fr/argentprix.js';   // (14 nov., argent-prix)
 import ecran_rechliste from './fr/rechliste.js';
+import ecran_studio_paires from './fr/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
 export default {
+  ...ecran_studio_paires,
   ...ecran_accueilReste,
   ...ecran_refonte_ms,
   ...ecran_listes,
