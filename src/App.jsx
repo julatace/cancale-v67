@@ -461,6 +461,13 @@ import { GardeEcran, Differe } from "./composants/GardeEcran.jsx";
 import { L, Lbas, VERBES, PAS_SU } from "./libelles.js";
 import Bienvenue from "./Bienvenue.jsx";
 import VisiteBulles from "./VisiteBulles.jsx";
+// (14 nov., accueil des nouveaux, le reste : idées 133 134 136 139 140 145 147) — src/accueilReste/.
+import { poserOutilsAccueil } from "./accueilReste/deps.js";
+import { AccueilResteJournee, VisiteEcranHote } from "./accueilReste/AccueilReste.jsx";
+import { retenirNumerosNeufs, clesLuesEnDouble } from "./accueilReste/cartonsNumeros.js";
+import { publierSansNumero } from "./accueilReste/trouveChezToi.js";
+import { CLE_AIDES } from "./accueilReste/aides.js";
+import { CLE_APPEL } from "./accueilReste/appelBienvenue.js";
 import { CLE_VISITE } from "./visiteBulles.js";
 // (6 nov.) L'ACCOMPAGNEMENT : une bulle, au plus, sur le vrai bouton d'un geste utile,
 // quand un chiffre que l'écran affiche déjà le justifie (src/accompagnement.js).
@@ -2239,6 +2246,11 @@ const makeChallenge = async (v) => b64url(await crypto.subtle.digest('SHA-256', 
 const OAUTH_PROVIDERS = [
   { id: 'google',  label: 'Google' },
   { id: 'discord', label: 'Discord' },
+  // (14 nov., idée d'accueil 143) « Continuer avec Apple » : PRÊT et ÉTEINT. Comme les deux autres,
+  // le bouton n'existe que si Supabase dit le fournisseur ACTIVÉ (`providerEnabled`, lu dans
+  // /auth/v1/settings) — tant que Julien n'a pas de compte développeur Apple (99 €/an) et ne
+  // l'a pas activé chez Supabase, rien ne s'affiche. Geste : docs/passation/2026-11-14-accueil-reste.md.
+  { id: 'apple',   label: 'Apple' },
 ];
 
 // ── CE QUE LA BASE ACCEPTE VRAIMENT ───────────────────────────────────────
@@ -2266,7 +2278,7 @@ const loadAuthSettings = () => {
       if(!r.ok)throw Error('Lecture indisponible');
       const j=await r.json();
       if(!j||!j.external||typeof j.external!=='object'||Array.isArray(j.external)
-        ||['google','discord'].some(id=>j.external[id]!==undefined&&typeof j.external[id]!=='boolean')
+        ||['google','discord','apple'].some(id=>j.external[id]!==undefined&&typeof j.external[id]!=='boolean')
         ||(j.mailer_autoconfirm!==undefined&&typeof j.mailer_autoconfirm!=='boolean'))throw Error('Réponse incomplète');
       AUTH_SETTINGS=j;AUTH_SETTINGS_ETAT='pret';
     }catch(_){AUTH_SETTINGS=null;AUTH_SETTINGS_ETAT='erreur';}
@@ -2336,7 +2348,7 @@ const compteOAuthNeuf=(u)=>{
   try{
     const ids=Array.isArray(u?.identities)?u.identities.map(i=>i?.provider).filter(Boolean):[];
     if(!ids.length||ids.includes('email'))return'';
-    const fourn=ids.find(p=>p==='discord'||p==='google');if(!fourn)return'';
+    const fourn=ids.find(p=>p==='discord'||p==='google'||p==='apple');if(!fourn)return'';
     const cree=Date.parse(u?.created_at||'');if(!Number.isFinite(cree))return'';
     return Date.now()-cree<10*60*1000?fourn:'';
   }catch(_){return'';}
@@ -2345,7 +2357,7 @@ const compteOAuthNeuf=(u)=>{
 // vieux (> 10 min) : la liaison automatique de Supabase par adresse vérifiée. Sinon ''.
 const identiteRelieeAuto=(u,f)=>{
   try{
-    if(f!=='google'&&f!=='discord')return'';
+    if(f!=='google'&&f!=='discord'&&f!=='apple')return'';
     const cree=Date.parse(u?.created_at||'');if(!Number.isFinite(cree)||Date.now()-cree<10*60*1000)return'';
     const id=(Array.isArray(u?.identities)?u.identities:[]).find(i=>i&&i.provider===f);
     const t=Date.parse(id?.created_at||'');return Number.isFinite(t)&&Date.now()-t>=-60000&&Date.now()-t<10*60*1000?f:'';
@@ -3020,6 +3032,11 @@ const SYNC_KEYS = [
   // (2 nov.) La visite en bulles a été vue (ou passée) : elle ne revient ni après
   // un rechargement ni sur un autre appareil (src/visiteBulles.js, CLE_VISITE).
   'vrm_visite_vue',
+  // (14 nov., accueil, le reste) Les aides des premiers jours, PAR COMPTE (src/accueilReste/aides.js) :
+  // visite des écrans vue, mots expliqués, conseil du jour — coupées ou non, sur tous ses appareils.
+  // Et le lien de l'appel de bienvenue que Julien range (src/accueilReste/appelBienvenue.js) : le serveur
+  // le relit dans SA ligne `main` pour les comptes Pro (api/_lib/appel-bienvenue.js).
+  CLE_AIDES, CLE_APPEL,
   // (6 nov.) « Masquer le guide » de démarrage (src/guideDemarrage.js) : le même choix sur tous ses appareils.
   'vrm_guide_masque',
   // (11 nov.) « Quoi de neuf » (src/nouveautes.js) : les nouveautés vues ({ vues: { [id]: iso } }), par compte VRM.
@@ -18950,7 +18967,13 @@ function Sparkline({data,color=C.accent,h=60}) {
 // chose qu'un nouveau vendeur voit — s'il hésite ici, il n'ira pas plus loin.
 // Marques Google et Discord, en SVG : un bouton de connexion sans le logo du
 // service inspire moins confiance qu'un bouton qui montre où on va.
-const BrandMark = ({ id }) => id === 'google' ? (
+// (14 nov., 143) La pomme d'Apple : au trait de l'encre courante (Apple demande son logo noir
+// sur clair, blanc sur sombre — jamais une couleur), comme les boutons « Sign in with Apple ».
+const BrandMark = ({ id }) => id === 'apple' ? (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style={{flexShrink:0}} data-marque="apple">
+    <path d="M16.37 12.6c-.02-2.2 1.8-3.26 1.88-3.31-1.03-1.5-2.62-1.7-3.19-1.73-1.36-.14-2.65.8-3.34.8-.69 0-1.75-.78-2.88-.76-1.48.02-2.85.86-3.61 2.19-1.54 2.67-.39 6.62 1.1 8.79.73 1.06 1.6 2.25 2.74 2.2 1.1-.04 1.51-.71 2.84-.71 1.32 0 1.7.71 2.86.69 1.18-.02 1.93-1.08 2.65-2.14.84-1.23 1.18-2.42 1.2-2.48-.03-.01-2.3-.88-2.32-3.5zM14.18 6.13c.6-.73 1.01-1.75.9-2.76-.87.04-1.92.58-2.54 1.31-.56.65-1.05 1.69-.92 2.68.97.08 1.96-.49 2.56-1.23z"/>
+  </svg>
+) : id === 'google' ? (
   <svg width="17" height="17" viewBox="0 0 48 48" aria-hidden="true" style={{flexShrink:0}}>
     <path fill="#8DB8F2" d="M45.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11.8c-.5 2.7-2 5-4.4 6.6v5.5h7.1c4.1-3.8 6.6-9.4 6.6-16.1z"/>
     <path fill="#34A853" d="M24 46c5.9 0 10.9-2 14.5-5.4l-7.1-5.5c-2 1.3-4.5 2.1-7.4 2.1-5.7 0-10.5-3.8-12.2-9H4.5v5.7C8.1 41.1 15.5 46 24 46z"/>
@@ -32846,6 +32869,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // relance les deux effets qui numérotent.
   const [verNumTick, setVerNumTick] = useState(0);
   useEffect(() => onVersionNumerotation(() => setVerNumTick(t => t + 1)), []);
+  // (14 nov., 134) SA réponse à « J'ai déjà mes N° sur mes cartons » : la numérotation repasse.
+  // `save` range après 500 ms : la numérotation repasse quand le réglage est RANGÉ (`vrm:save`), pas avant.
+  useEffect(() => { const f = (e) => { const d = e && e.detail; if (!d || d.k === CLE_NUMERO_ECRIT) setVerNumTick(t => t + 1); }; window.addEventListener('vrm-cartons', f); window.addEventListener('vrm:save', f); return () => { window.removeEventListener('vrm-cartons', f); window.removeEventListener('vrm:save', f); }; }, []);
   // ⚠️⚠️ CET EFFET RELIT CE QUE LE CLOUD VIENT D'ÉCRIRE DANS LE LOCALSTORAGE.
   // Tout état initialisé par `load(...)` et RÉÉCRIT ENSUITE PAR UN EFFET
   // AUTOMATIQUE doit être ici — sinon, sur un appareil neuf (localStorage vide
@@ -38284,6 +38310,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return { n:arr.length, val, valConnus, favs, views, hasFav, hasView, sansNum, sleeping, sleepingVal, datesKnown, surLbc, surEbay, pretLbc, aRecapturer, boostees, aussiLbc, prepaCompte, prepaCommun: prepaCommunDe(prepaCompte) };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [annBase, numeros, listingDates, lbcAussi]);
+  // (14 nov., idée 133) « Ce que VRM a trouvé chez toi » CONSOMME ce nombre (la base même de la grille) :
+  // Annonces le publie, Ma journée le lit (src/accueilReste/trouveChezToi.js). Liste pas lue ⇒ rien publié.
+  useEffect(() => { if (Array.isArray(listings.items) && !listings.error && !listings.incomplet) { try { if (publierSansNumero(localStorage, AUTH.user && AUTH.user.id, annStats.sansNum)) window.dispatchEvent(new CustomEvent('vrm:save', { detail: { k: 'vrm_trouve_sans_numero' } })); } catch (_) {} } }, [annStats.sansNum, listings.items, listings.error, listings.incomplet]);
   // (9 nov., « vendre plus ») Les deux nombres de la vue « À relancer », sur la MÊME
   // base que la grille (`annBase`) : qui dorment au seuil choisi, favoris sans vente.
   // Annonces pas lues ⇒ `null` (le bouton ne dit pas 0).
@@ -40077,6 +40106,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // date que celle qui décide si l'annonce se numérote.
     const sorted = [...items].sort((a, b) => (dateMiseEnLigneMs(a, listingDates) || 0) - (dateMiseEnLigneMs(b, listingDates) || 0));
     const ecritOn = numeroEcritActif();
+    // (14 nov., idée d'accueil 134) « J'AI DÉJÀ MES N° SUR MES CARTONS » (src/accueilReste/cartonsNumeros.js) :
+    // un compte SANS AUCUN N° encore (pool, fiches, ventes), qui n'a jamais dit qui numérote, et dont des
+    // annonces sans N° portent un N° écrit lisible ⇒ AUCUN N° neuf tant qu'il n'a pas répondu (Ma journée
+    // lui montre les N° lus). Ses identités (vente de la même annonce, même photo) restent prises.
+    const lecturesSansNum = sorted.filter((it) => !String((nextNum[it.id] || {}).numero || '').trim() && annonceNumerotable(it, listingDates)).map((it) => lectureEcriteVinted(it));
+    const retenueCartons = retenirNumerosNeufs({ reglage: load(CLE_NUMERO_ECRIT, null), poolVide: nextUsed.size === 0 && taken.size === 0 && !Object.values(nextNum).some((e) => e && String(e.numero || '').trim()), lectures: lecturesSansNum, reprenable: (k) => !!numeroReprenable(k) });
+    // §5 : un N° ÉCRIT dans deux annonces ou plus n'est pris pour AUCUNE (deux paires sous un N°,
+    // le bloc rouge le montre) ; ni un N° déjà porté par une autre fiche.
+    const ecritsEnDouble = ecritOn ? clesLuesEnDouble(items.map((it) => lectureEcriteVinted(it))) : new Set();
     for (const it of sorted) {
       const cur = nextNum[it.id];
       const pk = photoKey(it.photo);
@@ -40103,6 +40141,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const dec = decisionEcrite({ lecture: lectureEcriteVinted(it), ident: num || numeroReprenable(pk && byPhoto[pk]) || '', reprenable: (k) => !!numeroReprenable(k) });
         if (!dec) continue;
         const n = dec.numero;
+        if (dec.ecrit && (ecritsEnDouble.has(cleNum(n)) || Object.keys(nextNum).some((k) => k !== String(it.id) && nextNum[k] && cleNum(nextNum[k].numero) === cleNum(n)))) continue;
         nextNum[it.id] = ficheEcrite(cur, it, pk, dec);
         { const ep = entreePool(n); if (ep != null) nextUsed.add(ep); }
         if (pk && !byPhoto[pk]) byPhoto[pk] = n;
@@ -40119,6 +40158,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // pas. C'est voulu — elle compte les paires passées, pas le stock.
       // (11 nov.) Hors ligne : jamais un N° neuf (réservé au serveur seul) — l'annonce le reçoit au retour.
       if (!num && horsLigneMaintenant()) continue;
+      if (!num && retenueCartons) continue;   // (14 nov., 134) il n'a pas encore dit si ses cartons portent déjà leurs N°
       if (!num) num = prochainLibre(taken, takenK, prefNum);
       nextNum[it.id] = { ...(cur || {}), numero: String(num), title: it.title, photo: it.photo || null, photoK: pk || (cur && cur.photoK) || null, price: it.price ?? null, size: it.size ?? (cur && cur.size) ?? null, accountId: it._acc?.vinted_user_id, numberedAt: (cur && cur.numberedAt) || new Date().toISOString(), auto: true };
       { const ep = entreePool(num); if (ep != null) nextUsed.add(ep); }
@@ -44750,6 +44790,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if(only==='annonces' && prendreVue('quoirepublier')) setAnnSort('republier');
       // (6 nov., vague 2) Ma journée : « N annonces sans achat relié » et « N ventes annulées avant l'envoi ».
       if(only==='annonces' && prendreVue('sansachat')) setAnnSort('sansachat');
+      if(only==='annonces' && prendreVue('nonum')) setAnnSort('nonum');   // (14 nov., 133) « N annonces sans N° » → la vue « Sans numéro »
       if(only==='ventes' && prendreVue('annulees')) setVFilter('annulees');
       // (12 nov., finitions) Comme « offresauto » : le fil « Tous » (sans section Favoris) ne PREND pas la demande —
       // monté le premier, il la consommait et Messages · Vinted restait sur « Conversations » (banc navigation-fusion L).
@@ -47137,6 +47178,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               ? <GuideDemarrageApp onNav={onNav} comptes={accounts} plein/>
               : null
             )}
+            {/* (14 nov., accueil des nouveaux, le reste) EN BAS, sous tout geste : « J'ai déjà mes N° sur mes
+                cartons » (134), « Ce que VRM a trouvé chez toi » (133), « Ton essai » + l'appel de bienvenue
+                (145, 147), le conseil du jour (140). Chaque carte suit SA règle (src/accueilReste/). */}
+            {!loading && !baseKO ? <AccueilResteJournee apercu={apercuEcrit} uid={AUTH.user && AUTH.user.id} comptes={accounts} exemple={exempleActif()}
+              dressingLu={Array.isArray(listings.items) && !listings.error}
+              poolVide={!usedNumeros.length && !Object.values(numeros).some((e) => e && String(e.numero || '').trim()) && !Object.values(saleOv).some((e) => e && String(e.numero || '').trim())}
+              reprenable={(k) => !!numeroReprenable(k)}
+              porteurs={(k, id) => Object.keys(numeros).some((x) => x !== String(id) && numeros[x] && cleNum(numeros[x].numero) === cleNum(k))}
+              onAller={(g) => { if (onAllerTrancher) onAllerTrancher({ geste: g }); else if (onNav && g && g.tab) onNav(g.tab); }}/> : null}
             {/* (6 nov.) Un compte relié : le guide reste tant qu'une étape est à faire
                 (boîte e-mail, numéros), et se masque d'un geste. */}
             {/* (11 nov., lot journee-perso) « En bas » : les notifications coupées et le guide de démarrage, dans
@@ -56102,6 +56152,10 @@ async function lireAbonnement() {
     return j && j.ok ? j : null;
   } catch (_) { return null; }
 }
+// (14 nov., accueil, le reste) Les outils de l'app prêtés aux cartes de src/accueilReste/ (sans import
+// circulaire d'App.jsx) : lectures et écritures par les mêmes chemins que le reste de l'app.
+poserOutilsAccueil({ load, save, onCloudReady, lireTout: (q) => lireTout(q), lireAbonnement, creeLe: () => String((AUTH.user && AUTH.user.created_at) || ''), exemple: () => exempleActif(),
+  aller: (t) => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=' + encodeURIComponent(t) })); } catch (_) {} } });
 // ── QUI EST LE PROPRIÉTAIRE DE L'INSTALLATION ? (1er nov., VRM vendu à d'autres) ──
 // Les CONSIGNES D'ADMINISTRATEUR (redémarrer le projet Supabase, poser une
 // variable sur Vercel, configurer eBay Developer, la clé VAPID, la clé IA) ne
@@ -61880,6 +61934,9 @@ function AppCoeur() {
         if(!seule){ const pc=lirePositionParcours(load(CLE_PARCOURS,null)); if(etatFin==='fait'&&(auto||(pc&&pc.ouvert))) ecrireParcoursIci({ ouvert:true, etape:'extension' }); else if(etatFin!=='fait'&&pc&&pc.ouvert) ecrireParcoursIci({ ouvert:false }); }
         if(!seule&&tab!=='journee'&&!load(CLE_VISITE,null)) setTab('journee'); }}/></GardeEcran>}
       {nuagePret && !baseKO && accountsLoaded && <ParcoursArriveeApp comptes={vintedAccounts} retenu={!!(bienvenue||configOuverte)} onNav={setTab} onOuvert={setParcoursOuvert}/>}
+      {/* (14 nov., idée 136) La visite d'un écran : la première ouverture de Ma journée, Annonces, Ventes,
+          Achats par un compte neuf, ou sur SON geste (« Revoir la visite »). Jamais avec la visite d'arrivée. */}
+      {!bienvenue && !configOuverte && !parcoursOuvert && !visite ? <GardeEcran nom="visite-ecran"><VisiteEcranHote tab={tab} z={Z_CONFIRMATION}/></GardeEcran> : null}
       {nuagePret && !baseKO && <GardeEcran nom="accueil-nouveaux"><AccueilNouveauxCoque tab={tab} retenu={!!(bienvenue||configOuverte||parcoursOuvert||visite)} deps={DEPS_ACCUEIL_NOUVEAUX}
         donnees={{ vendu: liveStatsVus ? { lignes: liveStatsVus.venduPasSu ? null : liveStatsVus.venduLignes, pasSu: !!liveStatsVus.venduPasSu, enAttente: !!liveStatsVus.venduEnAttente, manque: liveStatsVus.venduManque || [], nonCompteesAnnee: nonCompteesDe(liveStatsVus.venduNonComptees, new Date(new Date().getFullYear(), 0, 1).getTime()).length } : undefined,
           caParMois: liveStatsVus && liveStatsVus.caParMois, enLigne: widgetBase || undefined, parcours: lirePositionParcours(load(CLE_PARCOURS, null)),

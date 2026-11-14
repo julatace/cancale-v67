@@ -21,6 +21,8 @@ import { phraseVendeur } from '../profilVendeur.js';
 import { AideAnimation } from './AideAnimation.jsx';
 import { AideVideo } from './AideVideo.jsx';
 import './aide-ecran.css';
+// (14 nov., idées 136 et 139) « Revoir la visite de cet écran » et « Les mots de VRM ».
+import { RevoirVisite, GlossaireListe } from '../accueilReste/AccueilReste.jsx';
 
 export const NOMS_ECRANS_AIDE = {
   journee: 'Ma journée', annonces: 'Annonces', ventes: 'Ventes', colis: 'Colis', messages: 'Messages', achats: 'Achats',
@@ -82,6 +84,8 @@ export function AideEcranFeuille({ cle, onClose, onSignaler, Feuille = SheetShel
           {etapes.map((e, i) => <li key={i} data-aide-etape={i + 1} data-aide-etape-actif={etape === i ? '1' : undefined} aria-current={etape === i ? 'step' : undefined}><span className="vrm-aide-etape-n" aria-hidden="true">{i + 1}</span><span>{e}</span></li>)}
         </ol>
       ) : null}
+      {/* (14 nov., idée 136) « Revoir la visite de cet écran » : sur SON geste, la feuille se ferme d'abord. */}
+      <RevoirVisite cle={cle} onAvant={onClose}/>
       {/* (11 nov.) « Comment faire… ? » : toutes les fiches, sans IA (src/aideFiches.js). */}
       <label className="vrm-aide-cherche" data-aide-cherche="">
         <svg width="17" height="17" viewBox="0 0 17 17" aria-hidden="true" focusable="false"><circle cx="7.3" cy="7.3" r="5.6" fill="none" stroke="currentColor" strokeWidth="1.7"/><path d="M11.6 11.6l3.8 3.8" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>
@@ -100,6 +104,7 @@ export function AideEcranFeuille({ cle, onClose, onSignaler, Feuille = SheetShel
           {faqAide(fiches).map((f) => <FicheAide key={'faq-' + f.id} f={f} ouverte={false} avecEcran={false} onEmmener={allerA} Bouton={Bouton}/>)}
         </ul>
       </> : null}
+      <GlossaireListe groupe/>
       <h3 className="vrm-aide-tete">Questions fréquentes</h3>
       <ul className="vrm-aide-groupe" data-aide-questions={a.questions.length}>
         {a.questions.map(([qq, r], i) => (

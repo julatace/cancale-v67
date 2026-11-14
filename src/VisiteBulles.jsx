@@ -10,11 +10,14 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { etapesPour, etapeMontrable, elementVisible, placerBulle } from './visiteBulles.js';
+import { tr } from './i18n/index.js';
 
 const telephoneMaintenant = () => { try { return !window.matchMedia('(min-width: 1024px)').matches; } catch (_) { return true; } };
 
-export default function VisiteBulles({ onTerminer, z = 20000 }) {
-  const [etapes] = useState(() => etapesPour(telephoneMaintenant()));
+// (14 nov., idée d'accueil 136) `etapes` : la visite d'un ÉCRAN (src/accueilReste/visiteEcrans.js),
+// la même bulle ; sans elles, la visite d'arrivée de toujours.
+export default function VisiteBulles({ onTerminer, z = 20000, etapes: etapesDonnees = null, ecran = '' }) {
+  const [etapes] = useState(() => (Array.isArray(etapesDonnees) && etapesDonnees.length ? etapesDonnees : etapesPour(telephoneMaintenant())));
   const [i, setI] = useState(() => etapeMontrable(etapes, 0, 1));
   const [pos, setPos] = useState(null);       // { cote, x, y, flecheX, flecheY, trou }
   const bulle = useRef(null);
@@ -73,7 +76,7 @@ export default function VisiteBulles({ onTerminer, z = 20000 }) {
   const suivant = () => { if (derniere) fermer('fin'); else setI(suivanteI); };
 
   return createPortal(
-    <div className="vrm-visite" data-visite={etape.cle} data-visite-cible={etape.cible} style={{ zIndex: z }}>
+    <div className="vrm-visite" data-visite={etape.cle} data-visite-cible={etape.cible} data-visite-ecran={ecran || undefined} style={{ zIndex: z }}>
       {/* Le voile : un toucher en dehors de la bulle la ferme. Le trou laisse
           voir l'onglet montré (un simple découpage, aucune lueur). */}
       <div className="vrm-visite-voile" data-visite-dehors="" onClick={() => fermer('dehors')} aria-hidden="true"/>
@@ -85,11 +88,11 @@ export default function VisiteBulles({ onTerminer, z = 20000 }) {
         <h2 id="vrm-visite-titre" className="vrm-visite-titre">{etape.titre}</h2>
         <p id="vrm-visite-texte" className="vrm-visite-texte" aria-live="polite" data-visite-texte="">{etape.texte}</p>
         <div className="vrm-visite-pied">
-          <div className="vrm-visite-points" role="img" aria-label={`Étape ${rang + 1} sur ${montrables.length}`} data-visite-rang={rang + 1} data-visite-total={montrables.length}>
+          <div className="vrm-visite-points" role="img" aria-label={tr('visite.etape', { i: rang + 1, n: montrables.length })} data-visite-rang={rang + 1} data-visite-total={montrables.length}>
             {montrables.map((k) => <span key={k} data-fait={k === i ? 'ici' : k < i ? '1' : '0'}/>)}
           </div>
-          <button type="button" className="vrm-visite-passer" data-visite-passer="" onClick={() => fermer('passer')}>Passer</button>
-          <button type="button" className="vrm-visite-suivant" data-visite-suivant="" onClick={suivant}>{derniere ? 'Terminer' : 'Suivant'}</button>
+          <button type="button" className="vrm-visite-passer" data-visite-passer="" onClick={() => fermer('passer')}>{tr('visite.passer')}</button>
+          <button type="button" className="vrm-visite-suivant" data-visite-suivant="" onClick={suivant}>{derniere ? tr('visite.terminer') : tr('visite.suivant')}</button>
         </div>
       </div>
     </div>,

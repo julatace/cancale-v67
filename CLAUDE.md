@@ -524,12 +524,12 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **14 nov. · Accueil, le reste (133 134 136 139 140 143 145 146 147)** : « J'ai déjà mes N° sur mes cartons » (aucun N° neuf avant sa réponse, N° écrit en double ⇒ rouge, rien adopté), « Ce que VRM a trouvé », visite de 4 écrans, mots expliqués, conseil du jour 30 j, essai en chiffres prouvés, vidéo 45 s, Apple prêt et ÉTEINT, appel de bienvenue Pro ; « À trancher » ne recouvre plus Ma journée. `docs/passation/2026-11-14-accueil-reste.md`. Geste : coller son lien de réservation (Paramètres → Aide) ; Apple si voulu (99 €/an).
+
 - **14 nov. · Extension 5.376.0 consolidée** : quatre branches en UNE version (carte du logo + capture, messages-achats-plus, argent-prix `remiseprix`, dates-versement `versementconv`), zips refaits une fois. `docs/passation/2026-11-14-extension-5376.md`. Geste : installer la 5.376.0 sur chaque navigateur.
 - **14 nov. · Carte du logo (5.376.0)** : la carte n'ouvre plus VRM (liens du MÊME site : ventes, messages, dressing du compte de l'onglet ; Vestiaire aucun) ; « N favoris à qui écrire · Voir » ⇒ aperçu calculé par le serveur (règles de l'app) ⇒ « Lancer » = la file d'avant conduite par le fond (15/h, 50/h, pause, autre compte ⇒ rien) ; app : guide des favoris, Créer sur Vinted guidé. `docs/passation/2026-11-14-extension-carte.md`. Geste : installer la 5.376.
 - **14 nov. · Dates de versement, quatre sources** : mesuré, 0 des 1 741 avait une source en base ; LA règle `datesDeVersement` (transaction 450 > relevé > conversation « Ta vente est finalisée. » > e-mail, par n° seulement, recopiée au serveur) ; extension 5.376.0 lit la conversation (plus anciennes d'abord) ; Ma journée : « … en cours de lecture · N datées ✓ · environ 7 jours ». `docs/passation/2026-11-14-dates-versement.md`. Geste : 5.376 puis vinted.fr ouvert sur le grand compte.
 
-- **14 nov. · Ouverture instantanée (84)** : l'instantané de Ma journée peint AVANT l'app (porte hors ligne, uid, daté, inerte), gardé hors ligne et en panne ; SW : coquille rangée dès la 1re ouverture, `/demarrage-*.js` en cache. `2026-11-14-ouverture-instantanee.md`. Geste : aucun.
-- **14 nov. · Colis plus (96-101) + impression guidée** : carton PROPOSÉ par modèle, fournitures « à chaque colis », Tout imprimer guidé (imprimante classique / 4 par A4 / thermique, tampon par bordereau, « Tout est sorti ? »), douchette (identité exacte), mains libres, temps par colis. `2026-11-14-colis-plus.md`. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).

@@ -126,6 +126,7 @@ import { codeDe, suiviDe, parrainageOuvert, rattacher, factureFilleulPayee, aper
 // (9 nov.) Solo et Pro : la règle (api/_lib/plan-regle.js, la même que l'app).
 import { planDeLAbonnement, prochainChangement, uidValide, PLAN_PRO, PLAN_SOLO, CLE_PRIX_SOLO, PLATEFORMES_SOLO, NOMS_PLATEFORMES_SOLO, META_VENDEUR, idCompteVendeur, PRIX_COMPTE_SUP_CENTIMES, CLE_PRIX_COMPTE_SUP, COMPTES_INCLUS_SOLO, META_COMPTES_SUP, MAX_COMPTES_SUP, estPrixCompteSup } from './_lib/plan-regle.js';
 import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
+import { lienAppelPour } from './_lib/appel-bienvenue.js';   // (14 nov., idée 147) le lien de l'appel de bienvenue, aux comptes Pro
 import { routeQrConnexion, depotPostgrest, cleSignature } from './_lib/qr-connexion.js';   // (14 nov., lot 119) connexion par QR
 import { routeLienAide, depotLienAide } from './_lib/lien-aide.js';   // (14 nov., lot 120) lien temporaire pour l'aide
 import { empreinte } from './_lib/empreinte.js';   // (11 nov.) clé d'idempotence avec les paramètres
@@ -703,6 +704,9 @@ async function abonnement(req, res) {
   // manque ne part qu'au propriétaire, le seul qui peut la remplir.
   const lues = await lireMentions();
   const manque = mentionsManquantes(lues);
+  // (14 nov., idée 147) L'appel de bienvenue : le lien que Julien a rangé, rendu à un compte PRO seul
+  // (le plan lu chez Stripe, jamais un champ du navigateur) ; '' sinon — rien n'apparaît.
+  const appelBienvenue = plan === PLAN_PRO && !acc.proprietaire ? await lienAppelPour({ plan: 'pro', proprietaire: acc.proprietaire, proprio: await proprioAlertes().catch(() => null) }) : '';
   // Essai gratuit encore disponible ? Jamais si propriétaire ou déjà abonné ;
   // `null` d'éligibilité ⇒ false (on n'annonce pas un essai qu'on ne pourrait
   // pas honorer). Une seule fois par e-mail ET par compte Vinted.
@@ -768,6 +772,7 @@ async function abonnement(req, res) {
     // La fin de l'ESSAI : pendant « trialing », la période en cours EST l'essai
     // (Stripe : current_period_end = trial_end). Rien d'autre n'est deviné.
     finEssai: ligne && ligne.statut === 'trialing' ? (ligne.fin_periode || null) : null,
+    appelBienvenue,
     // (9 nov.) Solo / Pro. `plan` : 'solo' · 'pro' · null (pas su ⇒ rien bridé).
     // `planRaison` dit pourquoi `null` (prix inconnu, CGV d'avant Solo…).
     plan,

@@ -17,10 +17,12 @@ import ecran_listes from './de/listes.js';
 import ecran_plus from './de/plus.js';
 import ecran_argent from './de/argent.js';
 import ecran_colisplus from './de/colisplus.js';   // (14 nov., lot colis-plus)
+import ecran_accueilReste from './de/accueilReste.js';
 import ecran_fraiscarte from './de/fraiscarte.js';   // (14 nov., frais-carte)
 import ecran_atelier from './de/atelier.js';
 import ecran_argentprix from './de/argentprix.js';   // (14 nov., argent-prix)
 export default {
+  ...ecran_accueilReste,
   ...ecran_fiche,
   ...ecran_fraiscarte,
   ...ecran_tarifs,

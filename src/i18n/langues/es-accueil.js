@@ -171,4 +171,9 @@ export default {
   "accueil.temps.rien": "nada",
   "accueil.temps.moinsDUne": "< 1 min",
   "accueil.temps.note": "Estimación: duraciones de referencia razonadas gesto a gesto (a mano → con VRM), no resultados de clientes. Tu tiempo real puede ser menor o mayor.",
+  // (14 nov., idée d’accueil 146) la vidéo de 45 s en tête de la page
+  "accueil.video.voir": "Ver VRM en 45 s",
+  "accueil.video.legende": "La app real, con datos de ejemplo. Sin sonido, subtitulada.",
+  "accueil.video.titre": "VRM en 45 segundos",
+  "accueil.video.fermer": "Cerrar el vídeo",
 };
