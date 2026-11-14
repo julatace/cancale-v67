@@ -89,4 +89,42 @@ parfait, tu peux changer les dispositions », mais **aucune fonction ne dispara�
 
 ## Preuves
 
-Voir la fin du fichier (mise à jour au dernier tour) : audits, bancs, captures.
+**Machine du banc** : partagée par plusieurs sessions (charge 30 à 55 sur 4 cœurs pendant tout le chantier) ; les temps
+sont lus DANS la page et les captures d'écran peuvent rester partielles (tuiles pas encore dessinées) — un écran
+blanc se vérifie par les styles calculés avant d'accuser la page.
+
+- `npm run build` : vert.
+- Audits : `audit-traduction` (45 verts), `audit-tdz`, `audit-variables`, `audit-coherence`, `audit-composants`,
+  `audit-violet`, `audit-rouge-doublon` (les replis rouges de `studio-paires.css` sont posés SUR la plaque en double),
+  `audit-identite`, `audit-quoi-de-neuf` : tous verts.
+- **Banc `studio-paires`** (nouveau) : forme 390 / 1512 × clair / sombre (1re rangée 397 px ; rangées 60–72 px,
+  plaque en 1re colonne ; ≤ 1 plein ; aucun débord ; contraste AA de la rangée, de la plaque et de la bande ; rouge
+  seulement en doublon ; la paire monte et redescend ; fiche en plan à droite à 1512, liste visible à gauche ;
+  chaque geste de l'inventaire joignable — tête, carte montée, fiche, menu « ⋯ ») et volume 1 000 annonces
+  (9 rangées entières visibles, carte montée en 3 ms dans le DOM) : **tout vert**.
+  - Il ÉCHOUE sur le code d'avant (`da660492`) : 3 rouges (aucune rangée, gestes absents, pas de plan) ;
+  - et par MUTATION (le toucher n'ouvre plus la carte : `clicAvant` sans `preventDefault` ni `ouvrirAvant`) :
+    « la paire ne monte pas ».
+- `refonte-listes` : **vert** (1re rangée 397 / 422 ; volume : 9 visibles, CLS 0, recherche 241 ms).
+- `exemple-photos` : vert (281). `garde-ecrans` : vert.
+- `annonces-grille` : **84 verts, 1 rouge** (un toucher « stable » à 1512 clair, au hasard de la charge ; le même
+  pas passe en sombre). Avant le chantier : 64 verts, **12 rouges** (G7 : la vignette ne s'ouvrait plus en place
+  depuis la fiche unique). **Adapté, et dit** : au téléphone il juge la LISTE (titre sur une ligne, prix dans sa
+  colonne à droite) ; à l'ordinateur il choisit la GRILLE (le choix « Grille ») ; G7 suit les gestes à leur
+  nouvelle place (la paire montée, puis la fiche et son « … ») ; « Même paire ? Oui » reste sur la rangée.
+- `annonces-coherence` : adapté (la plaque gravée du studio : « chiffre à l'encre sur un creux », au lieu de
+  « pastille sombre ») ; « Trier » passe en rond (les trois gestes de la barre ont une forme) ; le lien de la photo
+  à l'encre (son texte lu n'est plus « bleu »). Reste le rouge commun avec le code d'avant : « cibles ≥ 44 px dans
+  la feuille Actions » à 1512 (pas de ce chantier).
+- `annonces-actions` : 117 verts ; les rouges sont ceux du code d'avant (« cibles ≥ 44 px dans le carré » à 1512)
+  plus un parcours coupé par la charge (une attente de 4 s, une largeur différente à chaque passage).
+- `baisse-prix` : voir la dernière ligne.
+
+## Ce qui reste (dit, pas caché)
+- Leboncoin, eBay, Vestiaire : leurs rangées sont dans la matière du studio, mais toucher l'une d'elles ouvre encore
+  la fiche (proposition 62) au lieu de la faire monter à sa place — l'hôte (`PaireAvantHote`) est prêt, il leur
+  faut leur `rendre` (prix, acheté, jours, favoris lus par CETTE plateforme).
+- Le Stock garde son toucher d'hier (« Ranger » / « Voir » en lien) ; sa rangée ne monte pas.
+- Les briques communes (`src/ui`, la coque, la barre du bas, le disque) sont à la fondation ; ce fichier ne fait que
+  lire ses jetons. À la fusion avec `claude/studio-fondation`, regarder la plaque (deux règles se rejoignent :
+  la sienne `.vrm-num`, la mienne plus précise sur les rangées).

@@ -337,18 +337,18 @@
 }
 :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-fiche-numero > button { min-width: 0 !important; min-height: 0 !important; padding: 0 !important; background: none !important; box-shadow: none !important; }
 :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-fiche-numero > button > span { border: 0 !important; }
-:root:root:root:root:root body :is([data-espace="paires"], .vrm-fp) :is(.vrm-fiche-numero, .sb-plaque-hote) .vrm-num,
+:root:root:root:root:root:root:root:root:root body :is([data-espace="paires"], .vrm-fp) :is(.vrm-fiche-numero, .sb-plaque-hote) .vrm-num,
 :root:root:root:root:root body [data-espace="paires"] .vrm-fiche-num-vide {
   display: inline-flex !important; align-items: baseline !important; justify-content: center !important; min-width: 46px !important; height: 22px !important; padding: 0 6px !important;
   border-radius: 6px !important; border: 0 !important; background: var(--sbp-creux) !important; box-shadow: var(--sbp-pl-sh) !important; text-shadow: var(--sbp-pl-ts) !important;
   font: 600 12.5px/22px var(--sbp-texte) !important; color: var(--sbp-encre) !important; letter-spacing: .01em !important; font-variant-numeric: tabular-nums !important; white-space: nowrap !important;
 }
-:root:root:root:root:root body :is([data-espace="paires"], .vrm-fp) :is(.vrm-fiche-numero, .sb-plaque-hote) .vrm-num > span { color: inherit !important; font: inherit !important; }
-:root:root:root:root:root body :is([data-espace="paires"], .vrm-fp) :is(.vrm-fiche-numero, .sb-plaque-hote) .vrm-num > .vrm-num-prefixe { font-size: 9.5px !important; color: var(--sbp-encre2) !important; margin-right: 1.5px !important; letter-spacing: .02em !important; }
+:root:root:root:root:root:root:root:root:root body :is([data-espace="paires"], .vrm-fp) :is(.vrm-fiche-numero, .sb-plaque-hote) .vrm-num > span { color: inherit !important; font: inherit !important; }
+:root:root:root:root:root:root:root:root:root body :is([data-espace="paires"], .vrm-fp) :is(.vrm-fiche-numero, .sb-plaque-hote) .vrm-num > .vrm-num-prefixe { font-size: 9.5px !important; color: var(--sbp-encre2) !important; margin-right: 1.5px !important; letter-spacing: .02em !important; }
 :root:root:root:root:root body [data-espace="paires"] .vrm-fiche-num-vide { color: var(--sbp-encre2) !important; font-weight: 500 !important; }
 /* LE SEUL ROUGE : deux paires présentes sous ce N° (§5). */
-:root:root:root:root:root body :is([data-espace="paires"], .vrm-fp) .vrm-num[data-num-etat="doublon"] { color: var(--sbp-doublon) !important; box-shadow: var(--sbp-pl-sh), inset 0 0 0 1px var(--sbp-doublon) !important; }
-:root:root:root:root:root body :is([data-espace="paires"], .vrm-fp) .vrm-num[data-num-etat="doublon"] > span { color: var(--sbp-doublon) !important; }
+:root:root:root:root:root:root:root:root:root body :is([data-espace="paires"], .vrm-fp) .vrm-num[data-num-etat="doublon"] { color: var(--sbp-doublon) !important; box-shadow: var(--sbp-pl-sh), inset 0 0 0 1px var(--sbp-doublon) !important; }
+:root:root:root:root:root:root:root:root:root body :is([data-espace="paires"], .vrm-fp) .vrm-num[data-num-etat="doublon"] > span { color: var(--sbp-doublon) !important; }
 /* La vignette posée (colonne 2). Fermée, elle ne se touche pas seule : la rangée l'ouvre. */
 :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) a.vrm-fiche-photo {
   grid-column: 2 !important; grid-row: 1 / 3 !important; width: 44px !important; height: 44px !important; min-width: 44px !important; aspect-ratio: auto !important; margin: 0 !important; padding: 0 !important;
@@ -461,9 +461,9 @@
 }
 :root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] .vrm-fiche-numero > button { min-height: 44px !important; min-width: 44px !important; padding: 0 !important; background: none !important; box-shadow: none !important; display: inline-flex !important; align-items: center !important; }
 :root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] .vrm-fiche-numero > button > span { border: 0 !important; }
-:root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] .vrm-fiche-numero .vrm-num,
+:root:root:root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] .vrm-fiche-numero .vrm-num,
 :root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] .vrm-fiche-num-vide { height: 28px !important; line-height: 28px !important; padding: 0 9px !important; border-radius: 8px !important; font-size: 16px !important; min-width: 0 !important; }
-:root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] .vrm-fiche-numero .vrm-num > .vrm-num-prefixe { font-size: 11px !important; }
+:root:root:root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] .vrm-fiche-numero .vrm-num > .vrm-num-prefixe { font-size: 11px !important; }
 :root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] .vrm-ann-ledger-info { display: contents !important; }
 :root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] .vrm-ann-ledger-info > * { grid-column: 2 !important; min-width: 0 !important; }
 :root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] [data-titre] {

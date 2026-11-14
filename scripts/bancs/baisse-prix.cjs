@@ -314,7 +314,7 @@ const attendreCmds = (pg, n) => pg.waitForFunction((k) => window.__cmds.length >
             await pg.locator('[data-action-sel="baisser"] button').click();
             await pg.waitForSelector('[data-baisse-serie]', { timeout: 15000 }).catch(() => {});
             const s = await lireBP(pg);
-            dit(s && s.L['900001'] && s.L['900001'].nouveau === '75', 'G2 la même feuille s’ouvre depuis Sélectionner (900001 : 80 → 75)', s && JSON.stringify(Object.keys(s.L)));
+            dit(s && s.L['900001'] && s.L['900001'].nouveau === '75', 'G2 la même feuille s’ouvre depuis Sélectionner (900001 : 80 → 75)', s && JSON.stringify(s.L['900001'] ? { ...s.L['900001'], texte: undefined } : Object.keys(s.L)));
             await capture(pg, 'feuille-depuis-selection-1512');
           }
           await ctx.close();
