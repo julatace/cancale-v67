@@ -61,8 +61,9 @@ function mesurerForme({ tactile, sombre, liste }) {
   if (!root) { out.heros.push('pas de .vrm-main'); return out; }
   const rgba = (s) => { const m = String(s || '').match(/rgba?\(([^)]+)\)/); if (!m) return null; const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }; };
   const hex = (c) => '#' + [c.r, c.g, c.b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('').toUpperCase();
-  const GRIS = new Set(['#6E6E73', '#98989D']);
-  const ACCENT = new Set(['#0071E3', '#0066CC', '#0A84FF', '#409CFF', '#007AFF']);
+  // (14 nov., Studio bleu clair) + le gris du Studio (encre 2 : #3F5468 · nuit #9CB0C6) et ses bleus (diode, lien).
+  const GRIS = new Set(['#6E6E73', '#98989D', '#3F5468', '#9CB0C6']);
+  const ACCENT = new Set(['#0071E3', '#0066CC', '#0A84FF', '#409CFF', '#007AFF', '#0060CC', '#0055B8', '#4AA3FF', '#6CB4FF', '#1F6FD6']);
   const CARTE = new Set(sombre ? ['#1C1C1E'] : ['#FFFFFF']);
   const vis = (el) => {
     if (!el || !el.isConnected) return false;
@@ -112,7 +113,8 @@ function mesurerForme({ tactile, sombre, liste }) {
     // accent : un montant dans le bleu des actions.
     if (ACCENT.has(h) && /\d[\d\s  .,]*\s?€/.test(t) && !el.closest('button, a, [role="button"]')) out.accent.push({ couleur: h, quoi: nom(el) });
     // une PHRASE (note grise ou ambre), pas un nom de paire : deux paires peuvent porter le même titre.
-    if (t.length >= 28 && !/^#(1D1D1F|F5F5F7|FFFFFF|000000)$/.test(h)) vus.set(t, (vus.get(t) || 0) + 1);
+    // (14 nov.) L'encre du Studio (#0C1D30 · nuit #EAF2FB) est l'encre d'un nom de paire, comme #1D1D1F hier.
+    if (t.length >= 28 && !/^#(1D1D1F|F5F5F7|FFFFFF|000000|0C1D30|EAF2FB)$/.test(h)) vus.set(t, (vus.get(t) || 0) + 1);
   }
   for (const [t, n] of vus) if (n >= 3) out.repetes.push({ n, t: t.slice(0, 80) });
   // cartes et débords

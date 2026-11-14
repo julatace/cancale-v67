@@ -85,8 +85,8 @@ async function telephone(nav, sombre, b) {
     const f = K.sur(verre, bas); const lab = [...document.querySelectorAll('.vrm-tabbar .vrm-nav-label')].map((l) => K.ratio(K.rgba(getComputedStyle(l).color), f));
     const titre = document.querySelector('.vrm-main :is(.vrm-screen-head .vrm-display, .vrm-tache-tete h1, h1)'); const haut = K.jeton('--sb-haut');
     return { lab: lab.map((x) => Math.round(x * 100) / 100), titre: titre ? Math.round(K.ratio(K.rgba(getComputedStyle(titre).color), haut) * 100) / 100 : null }; }, CONTRASTE);
-  dit(cBarre.lab.length === 4 && cBarre.lab.every((x) => x >= 4.5), 'C libellés de la barre ≥ 4,5:1 sur le verre posé sur le bas', cBarre.lab);
-  dit(cBarre.titre == null || cBarre.titre >= 4.5, 'C le titre d’écran ≥ 4,5:1 sur le haut de la lumière', cBarre.titre);
+  dit(cBarre.lab.length === 4 && cBarre.lab.every((x) => x >= 4.5), `C libellés de la barre ≥ 4,5:1 sur le verre posé sur le bas (${cBarre.lab.join(' · ')})`, cBarre.lab);
+  dit(cBarre.titre == null || cBarre.titre >= 4.5, `C le titre d’écran ≥ 4,5:1 sur le haut de la lumière (${cBarre.titre})`, cBarre.titre);
   dit(nLot != null, 'E Ventes dit combien « Tout imprimer (N) » ferait partir', nLot);
   await pg.screenshot({ path: path.join(SHOTS, `ventes-390-${th}.png`) });
   // D — rien ne déborde.
@@ -117,8 +117,8 @@ async function telephone(nav, sombre, b) {
   dit(ev.dedans, 'D toutes les lames sont dans l’écran', ev.places);
   dit(ev.recul && ev.expanded === 'true', 'E l’écran recule sous le voile, le disque est enfoncé (aria-expanded)');
   dit(String(ev.nImprimer) === String(nLot), 'E « Imprimer N » redit le nombre de « Tout imprimer (N) » de Ventes', { lame: ev.nImprimer, ventes: nLot });
-  dit(ev.contrastes.length === 4 && ev.contrastes.every((x) => x >= 4.5), 'C les mots de l’éventail ≥ 4,5:1 sur le voile', ev.contrastes);
-  dit(ev.plein == null || ev.plein >= 4.5, 'C le mot du plein ≥ 4,5:1 sur l’encre', ev.plein);
+  dit(ev.contrastes.length === 4 && ev.contrastes.every((x) => x >= 4.5), `C les mots de l’éventail ≥ 4,5:1 sur le voile (${ev.contrastes.join(' · ')})`, ev.contrastes);
+  dit(ev.plein == null || ev.plein >= 4.5, `C le mot du plein ≥ 4,5:1 sur l’encre (${ev.plein})`, ev.plein);
   await pg.screenshot({ path: path.join(SHOTS, `eventail-390-${th}.png`) });
   // Le voile referme.
   await pg.mouse.click(195, 140); await pg.waitForTimeout(400);
@@ -212,7 +212,7 @@ async function ordinateur(nav, sombre, b) {
   dit(/blur/.test(r.flou) && r.rayon >= 20, 'N la navigation de gauche est en verre (flou, rayon ≥ 20)', r);
   dit(/inset/.test(r.ind) && !!r.diode, 'N l’entrée active est ENFONCÉE avec sa diode', { ind: r.ind.slice(0, 60), diode: r.diode });
   dit(!r.disque, 'N pas de disque à l’ordinateur (la colonne montre tout)');
-  dit(r.lib.length >= 4 && r.lib.every((x) => x >= 4.5), 'C libellés de la navigation ≥ 4,5:1 sur le verre', r.lib);
+  dit(r.lib.length >= 4 && r.lib.every((x) => x >= 4.5), `C libellés de la navigation ≥ 4,5:1 sur le verre (min ${Math.min(...r.lib)})`, r.lib);
   dit(r.deb <= 1, 'D rien ne déborde à 1512', r.deb);
   dit(r.pleins <= 1, 'P au plus un .sb-btn-plein sur Ventes (1512)', r.pleins);
   dit(!erreurs.length, 'aucune erreur JS', erreurs);
