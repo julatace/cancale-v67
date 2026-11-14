@@ -170,4 +170,25 @@ export function instantaneMontrable(s, maintenant = Date.now()) {
 
 // ── ÉCRITURE ───────────────────────────────────────────────────────────────
 // Un seul compte sur l'appareil : écrire pour un uid efface les instantanés des autres (tous écrans).
-export const ecrireInstantane = (snap, opts) => ecrireInstantaneEcran('journee', snap, opts);
+// (14 nov., ouverture instantanée) §4.2 : UNE CAPTURE PLUS PAUVRE N'ÉCRASE PAS UNE PLUS RICHE. Le même jour,
+// un instantané de moins de 6 h qui connaissait plus de chiffres (une case lue au lieu de « — », un jour de la
+// frise, la prochaine chose, l'objectif) est GARDÉ, avec SA date : montrer « 3 340 € · il y a 2 h » vaut mieux
+// que « — · à l'instant » quand la relecture d'après n'a pas tout su. Un autre jour, ou plus vieux : remplacé.
+export const GARDE_PLUS_RICHE_MS = 6 * 3600000;
+export function chiffresConnus(s) {
+  if (!s || typeof s !== 'object') return 0;
+  let n = 0;
+  for (const c of Array.isArray(s.cases) ? s.cases : []) if (c && !c.vide && String(c.b || '').trim() && String(c.b).trim() !== '—') n++;
+  for (const j of (s.frise && Array.isArray(s.frise.jours)) ? s.frise.jours : []) if (j && j.v != null) n++;
+  if (s.frise && s.frise.panneau && s.frise.panneau.vendu !== '') n++;
+  if (s.prochain) n++;
+  if (s.objectif && s.objectif.valeur !== '') n++;
+  return n;
+}
+export const ecrireInstantane = (snap, opts = {}) => {
+  if (snap && snap.uid) {
+    const ancien = lireInstantane(snap.uid, { ...opts, maintenant: Number(snap.t) || Date.now() });
+    if (ancien && ancien.jour === snap.jour && (Number(snap.t) - Number(ancien.t)) < GARDE_PLUS_RICHE_MS && chiffresConnus(snap) < chiffresConnus(ancien)) return false;
+  }
+  return ecrireInstantaneEcran('journee', snap, opts);
+};

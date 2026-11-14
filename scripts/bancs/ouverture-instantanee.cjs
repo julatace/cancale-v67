@@ -68,75 +68,92 @@ function delai(octets) {
 }
 
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.svg': 'image/svg+xml', '.png': 'image/png', '.webmanifest': 'application/json', '.json': 'application/json', '.woff2': 'font/woff2', '.mp4': 'video/mp4' };
+// ⚠️ AUCUNE ROUTE PLAYWRIGHT. Une route (même celle de la garde réseau) coupe le cache HTTP du
+// navigateur : le service worker voyait alors CHAQUE ouverture comme un rechargement forcé
+// (`request.cache === 'reload'`) et allait au réseau — mesuré : 650 ms de plus, une fiction.
+// Ici tout est servi par de VRAIS serveurs locaux : l'app et /api/ (http://localhost), la base sous
+// son vrai nom (https, `--host-resolver-rules` vers 127.0.0.1, certificat jetable) — comme session.cjs.
+const HOTE_BASE = 'lgonxzrzjcqthjtbdpzo.supabase.co';
+const PORT_BASE = PORT + 1;
 const statiques = [];
+const journal = [];
+const etat = { panne: false };
+const servi = (r, statut, entetes, corps) => { try { r.writeHead(statut, entetes); r.end(corps); } catch (_) {} };
 const srv = http.createServer((q, r) => {
   if (reseau.coupe) { r.destroy(); return; }
-  let f = q.url.split('?')[0]; if (f === '/' || !path.extname(f)) f = '/index.html';
+  let f = q.url.split('?')[0];
+  if (f === '/__diag') { if (process.env.DIAG) console.log('  SW ' + decodeURIComponent(q.url.slice(8))); return servi(r, 204, {}, ''); }
+  if (f.startsWith('/api/')) {
+    // La forme des routes que le démarrage lit (src/App.jsx : lireEquipe, l'abonnement) ; le reste : `{ok:true}`.
+    // `mode=confidentialite` : la porte de banc (_porte-banc.cjs) y répond l'uid de la session.
+    journal.push({ t: Date.now(), m: q.method, u: 'api:' + q.url.slice(5), o: 0 });
+    const corps = /mode=equipe/.test(q.url) ? { ok: true, equipe: [], invitations: [], membreDe: [], aBoutique: true }
+      : /mode=abonnement/.test(q.url) ? { ok: true, acces: true, statut: 'active', configure: true }
+      : { ok: true, pret: true };
+    q.resume();
+    return setTimeout(() => servi(r, 200, { 'content-type': 'application/json', 'cache-control': 'no-store' }, JSON.stringify(corps)), delai(300));
+  }
+  if (f === '/' || !path.extname(f)) f = '/index.html';
   const p = path.join(DIST, f);
-  if (!p.startsWith(DIST) || !fs.existsSync(p) || fs.statSync(p).isDirectory()) { r.writeHead(404); return r.end(); }
+  if (!p.startsWith(DIST) || !fs.existsSync(p) || fs.statSync(p).isDirectory()) return servi(r, 404, {}, '');
   const t = types[path.extname(p)] || 'application/octet-stream'; let b = fs.readFileSync(p);
   const gz = /javascript|css|html|json|svg/.test(t);
   if (gz) b = zlib.gzipSync(b, { level: 6 });
-  statiques.push({ u: f, o: b.length, t: Date.now() });
-  setTimeout(() => { r.writeHead(200, { 'content-type': t, ...(gz ? { 'content-encoding': 'gzip' } : {}), 'cache-control': f.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache' }); r.end(b); }, delai(b.length));
+  // `fond` : une relecture DERRIÈRE l'ouverture (le service worker relit la coquille en `no-store`, le
+  // navigateur vérifie `sw.js`) — rien que la page attende pour se peindre.
+  statiques.push({ u: f, o: b.length, t: Date.now(), fond: /no-cache|no-store/.test(String(q.headers['cache-control'] || '') + String(q.headers.pragma || '')) || f === '/sw.js' || f === '/hors-ligne-assets.json' });
+  // Les en-têtes de Vercel (vercel.json) : `/assets/` immuables, le reste revalidé.
+  setTimeout(() => servi(r, 200, { 'content-type': t, ...(gz ? { 'content-encoding': 'gzip' } : {}), 'cache-control': f.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'public, max-age=0, must-revalidate' }, b), delai(b.length));
 });
 srv.on('error', (e) => { console.log('KO  le port ' + PORT + ' est pris (' + e.code + ') — relance avec BANC_PORT=…'); process.exit(1); });
 
-// ── La base (PostgREST inventé) et /api/ : servies avec le même réseau ─────────
-function contexteRoutes(ctx, journal) {
-  const etat = { panne: false };
-  const servirBase = async (route) => {
-    const rq = route.request(); const u = rq.url(); const m = rq.method();
-    const rec = { t: Date.now(), m, u: decodeURIComponent(u.replace(/^.*\/rest\/v1\//, '')), o: 0 };
-    journal.push(rec);
-    if (reseau.coupe) return route.abort('internetdisconnected').catch(() => {});
-    if (etat.panne) { await attendre(delai(60)); return route.fulfill({ status: 503, contentType: 'application/json', body: '{"message":"indisponible"}' }).catch(() => {}); }
-    if (m !== 'GET' && m !== 'HEAD') {
-      let d = []; try { const x = JSON.parse(rq.postData() || '[]'); d = Array.isArray(x) ? x : [x]; } catch (_) {}
-      await attendre(delai(200));
-      return route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) }).catch(() => {});
-    }
-    const h = await rq.allHeaders().catch(() => ({}));
-    const rep = repondre(u, h.range, base);
-    const body = JSON.stringify(rep.body);
-    rec.o = zlib.gzipSync(body).length; rec.brut = Buffer.byteLength(body);
-    await attendre(delai(rec.o));
-    rec.f = Date.now();
-    return route.fulfill({ status: rep.status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', ...(rep.headers || {}) }, body }).catch(() => {});
-  };
-  return Promise.all([
-    ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
-      const u = r.request().url();
-      if (/\/rest\/v1\//.test(u)) return servirBase(r);
-      if (/\/auth\/v1\//.test(u)) return reseau.coupe ? r.abort('internetdisconnected') : r.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
-      return r.abort();
-    }),
-    ctx.route('**/api/**', async (r) => {
-      journal.push({ t: Date.now(), m: r.request().method(), u: 'api:' + r.request().url().replace(/^.*\/api\//, ''), o: 0 });
-      if (reseau.coupe) return r.abort('internetdisconnected').catch(() => {});
-      await attendre(delai(300));
-      // La forme des routes que le démarrage lit (src/App.jsx : lireEquipe, l'abonnement) ; le reste : `{ok:true}`.
-      const u = r.request().url();
-      const corps = /mode=equipe/.test(u) ? { ok: true, equipe: [], invitations: [], membreDe: [], aBoutique: true }
-        : /mode=abonnement/.test(u) ? { ok: true, acces: true, statut: 'active', configure: true }
-        : { ok: true, pret: true };
-      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(corps) }).catch(() => {});
-    }),
-  ]).then(() => etat);
+// ── La base (PostgREST inventé, _base-volume.cjs) sous son vrai nom, servie avec le même réseau ──
+const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, apikey, content-type, prefer, range, range-unit, x-client-info, accept-profile, content-profile, x-vrm-equipe', 'access-control-allow-methods': 'GET, POST, PATCH, DELETE, OPTIONS, HEAD', 'access-control-expose-headers': 'Content-Range' };
+function certificat() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'banc-oi-'));
+  const k = path.join(dir, 'cle.pem'), c = path.join(dir, 'cert.pem');
+  require('child_process').execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', k, '-out', c, '-days', '2', '-subj', '/CN=' + HOTE_BASE, '-addext', 'subjectAltName=DNS:' + HOTE_BASE], { stdio: 'ignore' });
+  const x = { key: fs.readFileSync(k), cert: fs.readFileSync(c) };
+  try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+  return x;
 }
+const srvBase = require('https').createServer(certificat(), (q, r) => {
+  if (reseau.coupe) { r.destroy(); return; }
+  if (q.method === 'OPTIONS') return servi(r, 204, CORS, '');
+  const u = 'https://' + HOTE_BASE + q.url;
+  if (/\/auth\/v1\//.test(q.url)) { q.resume(); return servi(r, 200, { ...CORS, 'content-type': 'application/json' }, '{}'); }
+  if (!/\/rest\/v1\//.test(q.url)) { q.resume(); return servi(r, 404, CORS, ''); }
+  const rec = { t: Date.now(), m: q.method, u: decodeURIComponent(q.url.replace(/^.*\/rest\/v1\//, '')), o: 0 };
+  journal.push(rec);
+  let corpsRecu = ''; q.on('data', (d) => { corpsRecu += d; });
+  q.on('end', () => {
+    if (etat.panne) return setTimeout(() => servi(r, 503, { ...CORS, 'content-type': 'application/json' }, '{"message":"indisponible"}'), delai(60));
+    if (q.method !== 'GET' && q.method !== 'HEAD') {
+      let d = []; try { const x = JSON.parse(corpsRecu || '[]'); d = Array.isArray(x) ? x : [x]; } catch (_) {}
+      return setTimeout(() => servi(r, 201, { ...CORS, 'content-type': 'application/json' }, JSON.stringify(d)), delai(200));
+    }
+    const rep = repondre(u, q.headers.range, base);
+    const body = zlib.gzipSync(JSON.stringify(rep.body));
+    rec.o = body.length;
+    setTimeout(() => { rec.f = Date.now(); servi(r, rep.status, { ...CORS, ...(rep.headers || {}), 'content-type': 'application/json', 'content-encoding': 'gzip' }, body); }, delai(body.length));
+  });
+});
 
 // Posé avant l'app : l'heure du premier écran utile, mesurée DANS la page (rAF), et les tâches longues.
 const SONDE = () => {
-  window.__oi = { inst: null, vrai: null, demarrageParti: null, mention: null, panne: null };
+  window.__oi = { inst: null, vrai: null, demarrageParti: null, mention: null, panne: null, dansDemarrage: false };
   window.__lt = [];
   try { new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__lt.push([Math.round(e.startTime), Math.round(e.duration)]); }).observe({ type: 'longtask', buffered: true }); } catch (_) {}
   const tick = () => {
     const o = window.__oi; const t = Math.round(performance.now());
     const d = document.getElementById('vrm-demarrage');
-    const parti = !d || d.hasAttribute('data-sortie');
+    const parti = document.readyState !== 'loading' && !!document.getElementById('root') && (!d || d.hasAttribute('data-sortie'));
     if (parti && o.demarrageParti == null) o.demarrageParti = t;
-    const caseInst = document.querySelector('[data-journee-instantane] [data-ji-case] b');
-    if (parti && o.inst == null && caseInst && caseInst.textContent.trim()) o.inst = t;
+    // L'instantané est À L'ÉCRAN : dans la coque une fois l'écran de démarrage parti, ou peint DANS
+    // l'écran de démarrage (src/OuvertureInstantanee.jsx, `#vrm-apercu`) tant qu'il est là.
+    const dedans = d && !d.hasAttribute('data-sortie') ? d.querySelector('#vrm-apercu [data-journee-instantane] [data-ji-case] b') : null;
+    const caseInst = dedans || (parti ? document.querySelector('[data-journee-instantane] [data-ji-case] b') : null);
+    if (o.inst == null && caseInst && caseInst.textContent.trim()) { o.inst = t; o.dansDemarrage = !!dedans; }
     if (o.mention == null && document.querySelector('[data-journee-instantane] [data-ji-mention]')) o.mention = t;
     const vrai = document.querySelector('[data-attente-ecran="journee"][data-attente="pret"] [data-fu-case="vendu-mois"] b');
     if (parti && o.vrai == null && vrai && vrai.textContent.trim()) o.vrai = t;
@@ -185,16 +202,31 @@ const stockage = (pg) => pg.evaluate(async () => {
   return { cles, valeurs: cles.map((k) => localStorage.getItem(k) || ''), idb };
 });
 
-async function ouvrir(ctx, { cpu = 4, attendrePret = true, delaiMax = 60000 } = {}) {
+async function ouvrir(ctx, { cpu = 4, attendrePret = true, delaiMax = 60000, photo = '' } = {}) {
   const pg = await ctx.newPage();
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(String(e.message).slice(0, 200)));
   const cdp = await ctx.newCDPSession(pg);
   if (cpu > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: cpu });
   await pg.addInitScript(SONDE);
+  // PROFIL=1 : profil CPU de la page jusqu'au premier écran utile, agrégé par fichier (diagnostic).
+  if (process.env.PROFIL && photo) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 200 }); await cdp.send('Profiler.start'); }
+  ouvrir.vu = false;
   await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'commit', timeout: 60000 }).catch(() => {});
   const fin = Date.now() + delaiMax;
   while (Date.now() < fin) {
     const o = await pg.evaluate(() => window.__oi).catch(() => null);
+    if (photo && o && o.inst != null && !ouvrir.vu) {
+      ouvrir.vu = true;
+      if (process.env.PROFIL) {
+        const { profile } = await cdp.send('Profiler.stop');
+        const parId = new Map(profile.nodes.map((n) => [n.id, n])); const par = new Map(); const fn = new Map(); const dt = profile.timeDeltas || [];
+        let t = profile.startTime; const fin = profile.startTime + o.inst * 1000 + 50000;
+        profile.samples.forEach((id, i) => { t += dt[i] || 0; if (t > fin) return; const n = parId.get(id); const f = (n.callFrame.url || '').replace(/^.*\//, '') || n.callFrame.functionName || '?'; par.set(f, (par.get(f) || 0) + (dt[i + 1] || dt[i] || 0) / 1000); const k = f + ':' + (n.callFrame.functionName || '?') + ':' + n.callFrame.lineNumber; fn.set(k, (fn.get(k) || 0) + (dt[i + 1] || dt[i] || 0) / 1000); });
+        console.log('  PROFIL (ms, par fichier) : ' + [...par].sort((a, b) => b[1] - a[1]).slice(0, 14).map(([f, ms]) => f + '=' + Math.round(ms)).join(' '));
+        console.log('  PROFIL (ms, par fonction) : ' + [...fn].sort((a, b) => b[1] - a[1]).slice(0, 14).map(([f, ms]) => f + '=' + Math.round(ms)).join(' '));
+      }
+      await shot(pg, photo + (o.dansDemarrage ? '-avant-app' : '-coque'));
+    }
     if (o && (attendrePret ? o.vrai != null : (o.inst != null || o.vrai != null))) break;
     await attendre(150);
   }
@@ -209,12 +241,17 @@ const lourde = (u) => /select=data(&|$)/.test(u) && !/id=eq\.(vinted_|vrm_|ext_|
 
 (async () => {
   await new Promise((r) => srv.listen(PORT, r));
+  await new Promise((r) => srvBase.listen(PORT_BASE, '127.0.0.1', r));
   if (!fs.existsSync(path.join(DIST, 'index.html'))) { console.log('KO  pas de build dans ' + DIST); process.exit(1); }
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader'] });
+  // La base sous son vrai nom vers le serveur local ; tout autre nom réel ne se résout pas (garde réseau).
+  const regles = `MAP ${HOTE_BASE} 127.0.0.1:${PORT_BASE}, MAP *.supabase.co ~NOTFOUND, MAP *.supabase.in ~NOTFOUND, MAP vrm.center ~NOTFOUND, MAP *.vrm.center ~NOTFOUND, MAP * ~NOTFOUND, EXCLUDE localhost`;
+  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--no-proxy-server', '--ignore-certificate-errors', `--host-resolver-rules=${regles}`, '--use-angle=swiftshader'] });
   const ctx = await nav.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+  // La route de la garde réseau coupe le cache HTTP (voir plus haut) : retirée. La garde reste : les noms
+  // réels ne se résolvent pas (règles ci-dessus) et toute réponse d'un hôte réel la rend rouge.
+  await ctx.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
   await ctx.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vrm_visite_bulles_vue', '1'); } catch (_) {} });
-  const journal = [];
-  const routes = await contexteRoutes(ctx, journal);
+  const routes = etat;
   const mesures = {};
 
   // ── 1. Première ouverture (réseau normal) : l'instantané se range, le SW s'installe ──
@@ -231,6 +268,20 @@ const lourde = (u) => /select=data(&|$)/.test(u) && !/id=eq\.(vinted_|vrm_|ext_|
     dit(tout.includes(UID) && /journee/.test(tout), '1 un instantané de Ma journée est rangé pour CET uid', s.cles.join(',') + ' · idb ' + s.idb.map((x) => x.base + '/' + x.store + ':' + x.cles.length).join(','));
     const m = await lire(p1.pg);
     dit(m.sw, '1 le service worker contrôle la page (app installée)');
+    // La coquille rangée par le service worker : la page `/`, son script principal et sa feuille.
+    await attendre(3000);
+    const coq = await p1.pg.evaluate(async () => {
+      const noms = await caches.keys(); const out = { reserves: noms };
+      for (const n of noms.filter((x) => /^vrm-shell/.test(x))) {
+        const c = await caches.open(n); const cles = (await c.keys()).map((r) => new URL(r.url).pathname);
+        const page = await c.match('/'); const html = page ? await page.text() : '';
+        const req = (html.match(/\/assets\/[A-Za-z0-9._-]+\.(?:js|css)/g) || []).filter((x) => /\/assets\/index-/.test(x));
+        out[n] = { n: cles.length, page: !!page, requis: req, manquent: req.filter((x) => !cles.includes(x)), demarrage: cles.filter((x) => /^\/demarrage-/.test(x)) };
+      }
+      return out;
+    }).catch((e) => ({ erreur: String(e) }));
+    const r6 = Object.entries(coq).find(([k]) => /^vrm-shell/.test(k));
+    dit(!!(r6 && r6[1].page && r6[1].requis.length && !r6[1].manquent.length), '1 la coquille de l’app est rangée dès la 1re ouverture (page, script principal, feuille)', JSON.stringify(r6 ? r6[1] : coq).slice(0, 300));
     mesures.premiere = { utile_ms: m.vrai, jsAnalyseKo: m.jsAnalyseKo, lectures: journal.filter((r) => r.m === 'GET').length };
     await shot(p1.pg, '1-premiere');
     if (process.env.DIAG_CADRE) { console.log(await p1.pg.evaluate(() => { const out = []; let e = document.querySelector('.vrm-fu-journee'); while (e && e !== document.body) { const r = e.getBoundingClientRect(); out.push(e.tagName + (e.id ? '#' + e.id : '') + ' .' + String(e.className || '').slice(0, 120) + ' ' + [...e.attributes].filter((a) => /^data-|style/.test(a.name)).map((a) => a.name + '=' + a.value.slice(0, 60)).join(' ') + ' @' + Math.round(r.top) + ',' + Math.round(r.left) + ' w' + Math.round(r.width)); e = e.parentElement; } return out.join('\n'); })); process.exit(0); }
@@ -245,7 +296,8 @@ const lourde = (u) => /select=data(&|$)/.test(u) && !/id=eq\.(vinted_|vrm_|ext_|
     await essaie('2 ouverture n°' + (k + 2), async () => {
       journal.length = 0; statiques.length = 0; reseau.lent = true; reseau.tuyau = 0;
       const t0 = Date.now();
-      const o = await ouvrir(ctx, { cpu: 4, delaiMax: 90000 });
+      // RAPIDE=1 : seulement jusqu'au premier écran utile (comparer deux builds vite, sans l'écran vrai).
+      const o = await ouvrir(ctx, { cpu: Number(process.env.CPU_MESURE || 4), delaiMax: 90000, photo: k === 0 ? '2-instantane' : '', attendrePret: !process.env.RAPIDE });
       const m = await lire(o.pg);
       const utile = m.inst != null && m.vrai != null ? Math.min(m.inst, m.vrai) : (m.inst != null ? m.inst : m.vrai);
       const borne = utile == null ? Infinity : t0 + utile;
@@ -253,19 +305,22 @@ const lourde = (u) => /select=data(&|$)/.test(u) && !/id=eq\.(vinted_|vrm_|ext_|
       const lec = journal.filter((r) => r.m === 'GET');
       const avant = lec.filter((r) => r.t <= borne);
       const e = await etatEcran(o.pg);
-      await calme(journal, 60000);
+      if (process.env.RAPIDE) await attendre(1500); else await calme(journal, 60000);
       const lec2 = journal.filter((r) => r.m === 'GET');
       const p = {
         n: k + 2, utile_ms: utile, instantane_ms: m.inst, vrai_ms: m.vrai, fcp_ms: m.fcp, demarrageParti_ms: m.demarrageParti,
         mention: m.mention != null, jsN: m.jsN, jsReseauKo: m.jsReseauKo, jsAnalyseKo: m.jsAnalyseKo, cssAnalyseKo: m.cssAnalyseKo,
         statiquesReseau: statiques.length, statiquesReseauKo: Math.round(statiques.reduce((a, x) => a + x.o, 0) / 1024),
+        // Ce que la PAGE a demandé au réseau avant de se peindre (hors relectures de fond) : la coquille, ses scripts, l'écran d'ouverture.
+        bloquants: statiques.filter((x) => !x.fond && x.t <= borne && /\.(js|css|html)$/.test(x.u)).map((x) => x.u),
         lecturesAvantUtile: avant.length, KoAvantUtile: Math.round(avant.reduce((a, r) => a + r.o, 0) / 1024),
         lectures: lec2.length, Ko: Math.round(lec2.reduce((a, r) => a + r.o, 0) / 1024), ecritures: journal.filter((r) => r.m !== 'GET' && r.m !== 'HEAD' && !/^api:/.test(r.u)).length,
         lourdes: lec2.filter((r) => lourde(r.u)).map((r) => r.u.slice(0, 120)),
         longuesAvantUtile_ms: m.lt.filter((x) => utile == null || x[0] < utile).reduce((a, x) => a + x[1], 0),
         longuesAvantUtile_n: m.lt.filter((x) => utile == null || x[0] < utile).length,
         plusLongueAvantUtile_ms: Math.max(0, ...m.lt.filter((x) => utile == null || x[0] < utile).map((x) => x[1])),
-        mentionTexte: e.mention,
+        mentionTexte: e.mention, dansDemarrage: m.dansDemarrage,
+        decision: await o.pg.evaluate(() => window.__vrmApercu || '').catch(() => ''),
       };
       passes.push(p);
       if (k === 0) await shot(o.pg, '2-deuxieme-vrai');
@@ -275,6 +330,8 @@ const lourde = (u) => /select=data(&|$)/.test(u) && !/id=eq\.(vinted_|vrm_|ext_|
         console.log('  requêtes : ' + journal.slice(0, 40).map((r) => (r.t - t0) + '→' + ((r.f || r.t) - t0) + ' ' + r.m + ' ' + r.u.slice(0, 70)).join('\n    '));
         console.log('  tâches longues : ' + m.lt.map((x) => x.join('+')).join(' '));
         console.log('  marques : ' + (await o.pg.evaluate(() => performance.getEntriesByType('mark').map((x) => x.name + '@' + Math.round(x.startTime)).join(' ')).catch(() => '')));
+        console.log('  navigation : ' + (await o.pg.evaluate(() => { const n = performance.getEntriesByType('navigation')[0] || {}; return ['workerStart', 'fetchStart', 'responseStart', 'responseEnd', 'domInteractive', 'domContentLoadedEventEnd', 'loadEventEnd'].map((k) => k + '=' + Math.round(n[k] || 0)).join(' '); }).catch(() => '')));
+        console.log('  ressources : ' + (await o.pg.evaluate(() => performance.getEntriesByType('resource').filter((r) => /\.(js|css)/.test(r.name) && r.startTime < 3000).map((r) => r.name.replace(/^.*\//, '').slice(0, 30) + ' ' + Math.round(r.startTime) + '→' + Math.round(r.responseEnd)).join(' | ')).catch(() => '')));
       }
       reseau.lent = false;
       await o.pg.close();
@@ -289,20 +346,25 @@ const lourde = (u) => /select=data(&|$)/.test(u) && !/id=eq\.(vinted_|vrm_|ext_|
     dit(p2 && p2.mention, '2 l’instantané dit sa date (« Mis à jour il y a … »)', p2 && p2.mentionTexte);
     dit(passes.every((p) => p.vrai_ms != null), '2 l’écran vrai prend la place ensuite', passes.map((p) => p.vrai_ms).join(' · '));
     dit(passes.every((p) => !p.lourdes.length), '2 aucune lecture `select=data` sur une ligne lourde au démarrage', passes.flatMap((p) => p.lourdes).slice(0, 3).join(' | '));
-    dit(p2 && p2.statiquesReseau <= 3, '2 la coque et l’écran d’ouverture viennent du cache du service worker (≤ 3 fichiers demandés au réseau)', p2 && `${p2.statiquesReseau} fichiers, ${p2.statiquesReseauKo} Ko`);
+    dit(p2 && !p2.bloquants.length, '2 la coque et l’écran d’ouverture viennent du cache du service worker (aucun fichier attendu du réseau avant la 1re image)', p2 && (p2.bloquants.join(' ') || `${p2.statiquesReseau} relectures de fond`));
   });
 
   // ── 3. Hors ligne : le service worker seul, la base coupée ──
   await essaie('3 hors ligne', async () => {
     reseau.coupe = true; await ctx.setOffline(true); journal.length = 0;
-    const o = await ouvrir(ctx, { cpu: 4, attendrePret: false, delaiMax: 30000 });
-    await attendre(3000);
-    const m = await lire(o.pg); const e = await etatEcran(o.pg);
-    mesures.horsLigne = { utile_ms: m.inst != null ? m.inst : m.vrai, instantane_ms: m.inst, mention: e.mention, demarrage: e.demarrage };
-    dit(e.inst && e.cases > 0 && !e.demarrage, '3 hors ligne : Ma journée est peinte (chiffres de l’instantané)', e.inst ? `${e.cases} cases en ${m.inst} ms` : e.texte.slice(0, 200));
-    dit(/Mis à jour|il y a|à l’instant/.test(e.mention), '3 hors ligne : la date de l’instantané est dite', e.mention || '(aucune mention)');
+    const o = await ouvrir(ctx, { cpu: 4, attendrePret: false, delaiMax: 30000, photo: '3-hors-ligne' });
+    const m = await lire(o.pg);
+    // Puis l'app elle-même (porte hors ligne, Ma journée hors connexion) : l'écran de démarrage parti.
+    await o.pg.waitForFunction(() => { const d = document.getElementById('vrm-demarrage'); return !d || d.hasAttribute('data-sortie'); }, null, { timeout: 40000 }).catch(() => {});
+    await attendre(1500);
+    const e = await etatEcran(o.pg);
+    const hl = await o.pg.evaluate(() => { const x = document.querySelector('[data-journee-instantane][data-ji-etat="hors-ligne"]'); return x ? { cases: x.querySelectorAll('[data-ji-case]').length, panne: (x.querySelector('[data-instantane-panne]') || {}).textContent || '', mention: (x.querySelector('[data-ji-mention]') || {}).textContent || '', inerte: x.hasAttribute('inert') } : null; }).catch(() => null);
+    mesures.horsLigne = { utile_ms: m.inst, mention: hl && hl.mention };
+    dit(m.inst != null && m.inst < 1500, '3 hors ligne : les chiffres de Ma journée sont peints tout de suite (instantané)', m.inst != null ? `${m.inst} ms` : e.texte.slice(0, 200));
+    dit(!!hl && hl.cases > 0 && !e.demarrage, '3 hors ligne : l’app ouverte GARDE l’instantané (daté, inerte)', hl ? `${hl.cases} cases` : e.texte.slice(0, 200));
+    dit(!!hl && /Mis à jour|il y a|à l’instant/.test(hl.mention) && /Hors ligne/.test(hl.panne) && hl.inerte, '3 hors ligne : la date de l’instantané et « Hors ligne » sont dits', hl ? `${hl.mention.trim()} · ${hl.panne}` : '(rien)');
     dit(journal.filter((r) => !/^api:/.test(r.u) && r.m !== 'GET').length === 0, '3 hors ligne : aucune écriture tentée vers la base');
-    await shot(o.pg, '3-hors-ligne');
+    await shot(o.pg, '3-hors-ligne-app');
     await o.pg.close();
     await ctx.setOffline(false); reseau.coupe = false;
   });
@@ -350,7 +412,7 @@ const lourde = (u) => /select=data(&|$)/.test(u) && !/id=eq\.(vinted_|vrm_|ext_|
 
   console.log('MESURES ' + JSON.stringify(mesures));
   console.log(`\n${ok} verts, ${ko} rouges — captures : ${SHOTS}`);
-  await nav.close(); srv.close();
+  await nav.close(); srv.close(); srvBase.close();
   process.exit(ko ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });
 async function shot(pg, nom) { try { await pg.screenshot({ path: path.join(SHOTS, nom + '.png') }); } catch (_) {} }

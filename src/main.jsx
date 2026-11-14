@@ -16,7 +16,6 @@ import { tr, preparerLangue } from './i18n/index.js';
 import { useLangue } from './i18n/react.js';
 import { DemarrageVRM } from './Chargement.jsx';
 import { suivreDemarrage } from './demarrage.js';
-import { apercuOuverture } from './ouvertureInstantanee.js';
 import { ecouterPlantages, ecouterViolationsCsp, noterPlantage, compterMorceauPerime } from './plantages.js';
 // Le journal des plantages écoute dès le démarrage : une erreur AVANT que l'app
 // soit montée est justement celle qu'aucun écran ne montre (src/plantages.js).
@@ -160,17 +159,24 @@ const filmDemande = /[?&]film(=|&|$)/.test(window.location.search || '');
 // compte, sur CET appareil) ; src/OuvertureInstantanee.jsx peint l'instantané dans l'écran de
 // démarrage. L'app (5 Mo à analyser et exécuter : une longue tâche) ne part qu'APRÈS cette image.
 // Aucun instantané ⇒ rien ne change (l'app part tout de suite, comme avant).
-let decisionApercu = null;
-try { if (!filmDemande && aUneSession() && !exempleActif()) decisionApercu = apercuOuverture({ stock: window.localStorage, search: window.location.search || '' }); } catch (_) { decisionApercu = null; }
-const apercuPeint = decisionApercu && decisionApercu.snap
-  ? import('./OuvertureInstantanee.jsx').then((m) => m.peindreApercu(decisionApercu)).catch(() => false)
+// Ici, seulement le PREMIER tri (une session, et un instantané rangé pour son uid) : la décision et
+// ses règles vivent dans le morceau à part (rien de plus à télécharger pour la page d'accueil).
+const apercuPossible = (() => {
+  try {
+    if (filmDemande || exempleActif()) return false;
+    const s = JSON.parse(window.localStorage.getItem('vrm_session') || 'null');
+    const uid = s && s.user && typeof s.user.id === 'string' ? s.user.id : '';
+    return !!uid && !!window.localStorage.getItem('vrm_journee_instantane:' + uid);
+  } catch (_) { return false; }
+})();
+const apercuPeint = apercuPossible
+  ? import('./OuvertureInstantanee.jsx').then((m) => m.ouvrirAvecInstantane({ stock: window.localStorage, search: window.location.search || '' })).catch(() => false)
   : Promise.resolve(false);
-if (typeof window !== 'undefined') window.__vrmApercu = decisionApercu ? (decisionApercu.snap ? 'oui' : decisionApercu.raison || 'non') : 'non';
 // Une session existe : on lance le téléchargement de l'app TOUT DE SUITE, avant
 // même le premier rendu, pour ne pas ajouter un aller-retour à son ouverture
 // (après l'instantané quand il y en a un : le fichier est déjà préchargé par
 // public/demarrage-app.js, seule son exécution attend la peinture).
-if (!filmDemande && versApp()) { if (decisionApercu && decisionApercu.snap) apercuPeint.then(() => { try { import('./App.jsx'); } catch (_) {} }); else { try { import('./App.jsx'); } catch (_) {} } }
+if (!filmDemande && versApp()) { if (apercuPossible) apercuPeint.then(() => { try { import('./App.jsx'); } catch (_) {} }); else { try { import('./App.jsx'); } catch (_) {} } }
 
 const FondApp = DemarrageVRM;
 function Racine() {

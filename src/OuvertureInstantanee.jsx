@@ -21,6 +21,7 @@ import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { JourneeInstantanee } from './JourneeInstantanee.jsx';
 import { fmt } from './format.js';
+import { apercuOuverture } from './ouvertureInstantanee.js';
 
 const DELAI_FEUILLE_MS = 1500;
 
@@ -102,4 +103,15 @@ export async function peindreApercu(decision) {
     });
     return true;
   } catch (_) { return false; }
+}
+
+// Ce que src/main.jsx appelle : décider (src/ouvertureInstantanee.js), puis peindre. `true` = peint.
+export async function ouvrirAvecInstantane({ stock, search }) {
+  let d = null;
+  try { d = apercuOuverture({ stock, search }); } catch (_) { d = null; }
+  try { window.__vrmApercu = d ? (d.snap ? 'oui' : d.raison || 'non') : 'non'; } catch (_) {}
+  if (!d || !d.snap) return false;
+  const peint = await peindreApercu(d);
+  try { if (!peint) window.__vrmApercu = 'pas-peint'; } catch (_) {}
+  return peint;
 }

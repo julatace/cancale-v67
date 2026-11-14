@@ -109,6 +109,16 @@ async function coquilleComplete(cache) {
 // Relit la coquille au réseau, sans rien servir : rangée pour la prochaine ouverture.
 // Ses fichiers (`/assets/`, immuables) sont rangés AVANT elle : la prochaine
 // ouverture est instantanée ET à jour. Un fichier qui manque ⇒ coquille pas rangée.
+// (14 nov., ouverture instantanée) UNE RÉPONSE SE RANGE ENTIÈRE. `cache.put` d'un corps qui arrive encore
+// du réseau tient la réserve pendant tout le téléchargement (Chromium sérialise les écritures d'une même
+// réserve) : la coquille de l'ouverture suivante attendait derrière un morceau en cours de réchauffage
+// (mesuré : 650 ms avant le premier octet de la page, en 3G, processeur ×4). Le corps est d'abord lu en
+// entier, HORS de la réserve, puis rangé d'un coup. Le corps lu est déjà décodé : l'en-tête d'encodage part.
+async function ranger(cache, cle, res) {
+  const corps = await res.arrayBuffer();
+  const h = new Headers(res.headers); h.delete('content-encoding'); h.delete('content-length');
+  await cache.put(cle, new Response(corps, { status: res.status, statusText: res.statusText, headers: h }));
+}
 async function relireCoquille(req, cache) {
   const fresh = await fetch(req.url, { cache: 'no-store', credentials: 'same-origin' });
   if (!fresh || !fresh.ok || fresh.type !== 'basic') return;
@@ -118,16 +128,16 @@ async function relireCoquille(req, cache) {
     if (await cache.match(n)) continue;
     const r = await fetch(n, { credentials: 'same-origin' });
     if (!r || r.status !== 200 || r.type !== 'basic') return;
-    await cache.put(n, r);
+    await ranger(cache, n, r);
   }
   // (14 nov., ouverture instantanée) Les scripts de démarrage que la page lit AVANT de s'afficher
   // (`/demarrage-*.js` : thème, densité, préchargement) : rangés AVEC la coquille qui les nomme. Servis
   // au réseau d'abord, ils coûtaient un aller-retour entier avant la première image (≈ 0,6 s en 3G).
   for (const n of nomsDemarrage(html)) {
     const r = await fetch(n, { cache: 'no-store', credentials: 'same-origin' }).catch(() => null);
-    if (r && r.status === 200 && r.type === 'basic') await cache.put(n, r);
+    if (r && r.status === 200 && r.type === 'basic') await ranger(cache, n, r);
   }
-  await cache.put('/', fresh);
+  await ranger(cache, '/', fresh);
 }
 // Les scripts classiques de démarrage nommés par la coquille (jamais plus de 6, jamais autre chose).
 const RE_DEMARRAGE = /^\/demarrage-[a-z-]{1,24}\.js$/;
@@ -162,7 +172,7 @@ function rechaufferMorceaux(cache) {
       if (await cache.match(n)) continue;
       const x = await fetch(n, { credentials: 'same-origin' });   // réseau coupé : lève, on s'arrête là
       if (!x || x.status !== 200 || x.type !== 'basic') continue;  // un fichier absent n'arrête pas les autres
-      await cache.put(n, x);
+      await ranger(cache, n, x);
     }
   })().catch(() => {}).finally(() => { _rechauffe = null; });
   return _rechauffe;
@@ -461,7 +471,7 @@ self.addEventListener('fetch', event => {
       try {
         const fresh = await fetch(req);
         if (fresh.ok) {
-          cache.put('/', fresh.clone()).catch(() => {});
+          ranger(cache, '/', fresh.clone()).catch(() => {});
           event.waitUntil(purgerAncienneVersion(fresh.clone()).then(() => rechaufferPlusTard(cache)).catch(() => {}));
         }
         return fresh;
@@ -504,7 +514,7 @@ self.addEventListener('fetch', event => {
       if (hit) return hit;
       try {
         const res = await fetch(req);
-        if (res && res.status === 200 && res.type === 'basic' && !url.search) cache.put(url.pathname, res.clone()).catch(() => {});
+        if (res && res.status === 200 && res.type === 'basic' && !url.search) ranger(cache, url.pathname, res.clone()).catch(() => {});
         return res;
       } catch (_) { return Response.error(); }
     })());
@@ -528,7 +538,7 @@ self.addEventListener('fetch', event => {
       // ⚠️ Une adresse AVEC paramètres n'entre pas dans le cache : la vérification
       // de version (`/?_v=<horodatage>`, main.jsx, chaque minute) y laissait une
       // copie de la page à chaque fois, jamais relue ni purgée.
-      if (res && res.status === 200 && res.type === 'basic' && !url.search) cache.put(req, res.clone()).catch(() => {});
+      if (res && res.status === 200 && res.type === 'basic' && !url.search) ranger(cache, req, res.clone()).catch(() => {});
       return res;
     } catch (_) {
       return hit || Response.error();
