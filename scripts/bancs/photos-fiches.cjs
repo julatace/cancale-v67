@@ -197,7 +197,8 @@ async function main() {
       // on retente le même geste (un vrai clic à l'endroit de l'élément) sans l'attente de stabilité.
       const tap = async (pg, loc) => { const l = typeof loc === 'string' ? pg.locator(loc).first() : loc;
         try { await l.scrollIntoViewIfNeeded({ timeout: 6000 }); if (vp.width < 600) await l.tap({ timeout: 6000 }); else await l.click({ timeout: 6000 }); }
-        catch (_) { if (vp.width < 600) await l.tap({ force: true }); else await l.click({ force: true }); } };
+        catch (_) { if (!(await l.count())) return;                 // le geste a eu lieu (l'élément est parti avec lui)
+          if (vp.width < 600) await l.tap({ force: true, timeout: 8000 }); else await l.click({ force: true, timeout: 8000 }); } };
 
       // ── 102 · 105 · 106 : la fiche du N°205, puis du N°202 ──────────────────
       await essaie(`${T} fiche : photos, avis, dictée, certificat`, async () => {
