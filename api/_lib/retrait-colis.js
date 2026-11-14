@@ -479,10 +479,14 @@ export function urgenceTri(e) {
 // `sortiParSuivis`). Avant, il était compté sorti et disparaissait du widget.
 // L'entrée publiée : [limite, arrivée, transporteur, identité, arrivée sûre
 // (1 · 0 = une borne · absent = publication d'avant), n° de suivi (achat Vinted),
-// heure de la limite (ISO, `limiteAt`)].
+// heure de la limite (ISO, `limiteAt`), (13 nov., lot 7) NOM de la paire (le titre de l'achat relié par
+// identité, ou l'article de l'e-mail de CE colis ; '' = pas de nom : « Colis {transporteur} »)].
+// (13 nov., lot 7) + `liste` : les colis COMPTÉS, un par un ({ nom, transporteur, jours, limite }), pour que le
+// widget de l'iPhone dise quelle paire attend. `nom` vide ⇒ le lecteur écrit « Colis {transporteur} ».
 export function retirerPublie(pub, maintenant = Date.now(), aujourdhui = null, sorti = null, leve = null) {
   if (!pub || typeof pub !== 'object' || !Array.isArray(pub.colis)) return null;
   let n = 0, aVerifier = Number.isFinite(pub.aVerifier) ? pub.aVerifier : 0, urgents = 0, sortis = 0, nonRelus = 0, devenusAVerifier = 0;
+  const liste = [];
   // (29 oct., tour 2 n° 7) LES « À VÉRIFIER » PUBLIÉS AVEC LEUR IDENTITÉ (`verif`,
   // la forme de `colis`) : relus par la même règle (`sorti`) — un colis que le
   // transporteur dit retiré ou reparti depuis sort aussi de « à vérifier », sans
@@ -510,10 +514,11 @@ export function retirerPublie(pub, maintenant = Date.now(), aujourdhui = null, s
     if (estAVerifier(e)) { aVerifier++; continue; }
     n++;
     if (Number.isFinite(e.jours) && e.jours <= 1) urgents++;
+    liste.push({ nom: typeof c[7] === 'string' ? c[7].replace(/\s+/g, ' ').trim().slice(0, 60) : '', transporteur: typeof c[2] === 'string' ? c[2] : '', jours: Number.isFinite(e.jours) ? e.jours : null, limite: typeof c[0] === 'string' && c[0] ? c[0] : null });
   }
   // (29 oct.) Les achats « au point relais » qu'aucune identité ne relie encore
   // (ni code, ni n° de suivi, compte pas encore relu) : l'app ne les compte pas
   // dans le total, elle les dit à part. Le widget le dit (« au moins »).
   const enVerification = Number.isFinite(pub.enVerification) && pub.enVerification > 0 ? pub.enVerification : 0;
-  return { n, aVerifier, urgents, sortis, nonRelus, devenusAVerifier, enVerification, at: Number.isFinite(pub.at) ? pub.at : null };
+  return { n, aVerifier, urgents, sortis, nonRelus, devenusAVerifier, enVerification, liste, at: Number.isFinite(pub.at) ? pub.at : null };
 }

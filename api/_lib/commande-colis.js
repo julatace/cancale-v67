@@ -68,3 +68,16 @@ export function achatsDesLignes(rows) {
 // celui que l'e-mail de CE colis donne, sinon '' (le texte dit alors « Colis {transporteur} »).
 export const titreDuColis = (commande, article = '') =>
   String((commande && commande.title) || article || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+
+// ── (13 nov., lot 7) LE NOM D'UN COLIS À RETIRER, PARTOUT LE MÊME ─────────────
+// Julien : « chaque colis à retirer porte le nom de la paire qui est dedans ». Deux chemins
+// d'identité cherchent la commande d'une ligne (le n° de suivi seul, `achatDuColis`, et la
+// jonction complète conversation / n° / code, `commandeDuColisRegle`) : ils doivent DIRE LA
+// MÊME commande. Deux commandes différentes ⇒ personne (mieux vaut « Colis {transporteur} »
+// qu'un faux nom, §5). Les absents ne comptent pas.
+export function commandeUnique(...cands) {
+  const vus = cands.filter((o) => o && o.transaction_id != null);
+  if (!vus.length) return null;
+  const tx = String(vus[0].transaction_id);
+  return vus.every((o) => String(o.transaction_id) === tx) ? vus[0] : null;
+}

@@ -99,6 +99,7 @@ export default {
   "journee.dontAujourdHui": "davon {nAuj} heute",
   "journee.dontDemain": "davon {x} morgen",
   "journee.verifier2": "+ {aVerifier} zu prüfen",
+  "journee.nomsEtAutres": { one: "{noms} und {n} weiteres", other: "{noms} und {n} weitere" },
   "journee.emballer": "Packen",
   "journee.faire": "Zu tun",
   "journee.vendu": "Verkauft im",
