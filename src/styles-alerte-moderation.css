@@ -27,7 +27,7 @@
 }
 /* Le geste : teinte ambre douce, texte ambre — lisible en clair ET en sombre, sans trois aplats d'accent. */
 .vrm-moderation-geste { background: color-mix(in srgb, var(--vrm-warn, #B25000) 14%, transparent); color: var(--vrm-warn, #B25000); border: none; }
-.vrm-moderation-vu { background: transparent; color: var(--w-gris, #6E6E73); border: none; font-weight: 500; }
+.vrm-moderation-vu { background: transparent; color: var(--w-gris, #6E6E73); border: none; font-weight: 400; }
 @media (max-width: 560px) {
   .vrm-moderation-ligne { flex-direction: column; gap: 8px; }
   .vrm-moderation-gestes { flex-direction: row; width: 100%; }

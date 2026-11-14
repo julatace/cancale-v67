@@ -36,8 +36,8 @@ export function OuvrirPaiements({ entetes = () => ({}), proAccueil = PRO_OUVERT,
   return (
     <div data-ouvrir-paiements={r.ouvertClients ? 'ouvert' : r.ouvertTest ? 'test' : 'ferme'} data-paiements-ok={r.ok} data-paiements-total={r.total}>
       <div style={{ margin: '4px 16px 12px' }}>
-        <div style={{ fontSize: 20, fontWeight: 650, color: 'var(--vrm-ink, var(--vrm-text))' }}>{titre}</div>
-        <div className="vrm-tnum" style={{ fontSize: 14, color: 'var(--vrm-muted)', marginTop: 4 }}>
+        <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--vrm-ink, var(--vrm-text))' }}>{titre}</div>
+        <div className="vrm-tnum" style={{ fontSize: 15, color: 'var(--vrm-muted)', marginTop: 4 }}>
           {r.pasSu ? 'Pas pu relire : réessaie.' : `${r.ok} sur ${r.total} prêts`}
         </div>
         <div aria-hidden="true" style={{ display: 'flex', gap: 3, marginTop: 10 }}>

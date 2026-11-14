@@ -133,7 +133,7 @@ export function TableauProprietaire({ entetes, fetcher = (typeof fetch === 'func
 
   const tete = (
     <header style={{ marginBottom: 4 }}>
-      <h2 style={{ fontSize: 22, fontWeight: 700, margin: '4px 0', color: 'var(--vrm-ink)' }}>Ton entreprise</h2>
+      <h2 style={{ fontSize: 20, fontWeight: 700, margin: '4px 0', color: 'var(--vrm-ink)' }}>Ton entreprise</h2>
       <p style={S.muet}>Les vendeurs de VRM en comptes et en totaux — jamais un nom, jamais une adresse.</p>
     </header>
   );
@@ -198,7 +198,7 @@ export function TableauProprietaire({ entetes, fetcher = (typeof fetch === 'func
         <div style={S.carte} data-pilotage-usage={d.usage.lignes.length} data-usage-vendeurs={d.usage.vendeurs == null ? '' : d.usage.vendeurs}>
           <p style={S.lib}>Les plus gros d’abord · {d.usage.vendeurs == null ? '—' : nombre(d.usage.vendeurs)} vendeurs · {d.usage.octetsTotal == null ? '—' : mo(d.usage.octetsTotal)} en tout</p>
           {d.usage.lignes.length ? (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, fontVariantNumeric: 'tabular-nums', marginTop: 6 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 15, fontVariantNumeric: 'tabular-nums', marginTop: 6 }}>
               <thead><tr>{['Vendeur', 'Lignes', 'Stocké', 'Part'].map((t, k) => <th key={t} style={{ textAlign: k ? 'right' : 'left', fontWeight: 600, color: 'var(--vrm-muted)', padding: '4px 0' }}>{t}</th>)}</tr></thead>
               <tbody>{d.usage.lignes.map((u) => (
                 <tr key={u.vendeur} data-usage-ligne={u.vendeur} data-usage-octets={u.octets == null ? '' : u.octets} style={{ borderTop: '.5px solid var(--vrm-line)' }}>

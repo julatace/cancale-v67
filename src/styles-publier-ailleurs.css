@@ -85,4 +85,4 @@
   padding: 0 14px; cursor: pointer; text-align: left;
 }
 .vrm-pa-entree button > span:nth-child(2) { flex: 1; min-width: 0; }
-.vrm-pa-entree small { display: block; font-size: 12px; font-weight: 500; color: var(--fu-gris, #6e6e73); }
+.vrm-pa-entree small { display: block; font-size: 12px; font-weight: 400; color: var(--fu-gris, #6e6e73); }

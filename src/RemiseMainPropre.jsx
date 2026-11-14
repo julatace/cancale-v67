@@ -80,7 +80,7 @@ function FeuilleRemise({ o, num, avant, lieux, onFermer }) {
         </div>
         <label style={{ display: 'block', fontSize: 12, color: C.muted, marginTop: 10 }}>{tr('lbcplus.remise.lieu')}
           <input type="text" data-remise-lieu="" value={lieu} maxLength={LIEU_MAX} placeholder={tr('lbcplus.remise.lieuExemple')} onChange={(e) => { setLieu(e.target.value); setErr(''); }} style={{ ...champ, marginTop: 4 }}/></label>
-        {lieux.length ? <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>{lieux.map((l) => <button key={l} type="button" data-remise-lieu-rapide="" onClick={() => setLieu(l)} style={{ ...btn(false), minHeight: 36, fontWeight: 500 }}>{l}</button>)}</div> : null}
+        {lieux.length ? <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>{lieux.map((l) => <button key={l} type="button" data-remise-lieu-rapide="" onClick={() => setLieu(l)} style={{ ...btn(false), minHeight: 36, fontWeight: 400 }}>{l}</button>)}</div> : null}
         <p style={{ fontSize: 12, color: C.muted, margin: '10px 0 0', lineHeight: 1.45 }}>{tr('lbcplus.remise.rappel')}</p>
         {err ? <p role="alert" data-remise-erreur="" style={{ fontSize: 13, color: C.warn, margin: '8px 0 0' }}>{err}</p> : null}
         <div style={{ display: 'flex', gap: 8, marginTop: 14, justifyContent: 'flex-end' }}>

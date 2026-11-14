@@ -114,6 +114,8 @@ const RISQUE = 'Paie par PayPal stp, mon 06 12 34 56 78';
     b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     for (const sombre of [false, true]) for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 900 }]) {
       const L = `${vp.width} px ${sombre ? 'sombre' : 'clair'}`, suf = `${vp.width}-${sombre ? 'sombre' : 'clair'}`;
+      // (14 nov., système de design) une cible fait 44 px au doigt (390, tactile) et 36 à la souris (1512) — DESIGN.md §6.
+      const CIBLE = vp.width < 600 ? 44 : 36;
       console.log(`\n══ ${L} — A. message risqué sur Leboncoin`);
       {
         const { ctx, pg, errs } = await ouvrir(b, vp, sombre, '?tab=messages&site=leboncoin');
@@ -158,7 +160,7 @@ const RISQUE = 'Paie par PayPal stp, mon 06 12 34 56 78';
         await pg.waitForSelector('[data-carte-mfa]', { timeout: 30000 }).catch(() => {});
         const b1 = await pg.evaluate(() => { const c = document.querySelector('[data-carte-mfa]'); if (!c) return null; const r = c.getBoundingClientRect(); return { t: c.innerText, h: [...c.querySelectorAll('button')].map((x) => x.getBoundingClientRect().height), w: r.width, droite: r.right <= innerWidth + 1 }; });
         dit(b1 && /Protège ton compte VRM/.test(b1.t) && /2 minutes/.test(b1.t) && /Activer/.test(b1.t) && b1.droite, `${L} : B1 la carte, le pas à pas, « Activer »`, JSON.stringify(b1));
-        dit(b1 && b1.h.length === 2 && b1.h.every((h) => h >= 44), `${L} : B1 boutons 44 px`, b1 && b1.h.join(','));
+        dit(b1 && b1.h.length === 2 && b1.h.every((h) => h >= CIBLE), `${L} : B1 boutons ${CIBLE} px`, b1 && b1.h.join(','));
         await pg.locator('[data-carte-mfa]').scrollIntoViewIfNeeded().catch(() => {});
         await capture(pg, `securite-carte-mfa-${suf}`);
         // « Plus tard » : rangée, et pas de retour au rechargement.
@@ -175,7 +177,7 @@ const RISQUE = 'Paie par PayPal stp, mon 06 12 34 56 78';
         if (!(await pg.locator('[data-copie-annonces]').first().isVisible().catch(() => false))) await sous.click().catch(() => {});
         await pg.waitForSelector('[data-copie-compte="111"]', { timeout: 15000 }).catch(() => {});
         const b2 = await pg.evaluate(() => { const l = document.querySelector('[data-copie-compte="111"]'); const btn = l && l.querySelector('[data-copie-telecharger]'); return l ? { t: l.innerText, h: btn ? btn.getBoundingClientRect().height : 0 } : null; });
-        dit(b2 && /atelier_test/.test(b2.t) && b2.h >= 44, `${L} : B2 une ligne par compte, « Télécharger » 44 px`, JSON.stringify(b2));
+        dit(b2 && /atelier_test/.test(b2.t) && b2.h >= CIBLE, `${L} : B2 une ligne par compte, « Télécharger » ${CIBLE} px`, JSON.stringify(b2));
         await capture(pg, `securite-copie-${suf}`);
         const avant = ecrits.length;
         const [dl] = await Promise.all([pg.waitForEvent('download', { timeout: 20000 }).catch(() => null), pg.click('[data-copie-telecharger="111"]').catch(() => {})]);

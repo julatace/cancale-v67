@@ -52,7 +52,7 @@ export function ReventeModele({ cible, lireReleve, lireExtras = null, dateEnLign
   const fig = (cle, titre, valeur, sous) => (
     <div data-revente-fig={cle} style={{ flex: '1 1 0', minWidth: 0, background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '8px 10px' }}>
       <div style={{ fontSize: 11, color: C.muted, fontWeight: 600 }}>{titre}</div>
-      <div className="vrm-display" style={{ fontSize: 18, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: C.text, whiteSpace: 'nowrap' }}>{valeur}</div>
+      <div className="vrm-display" style={{ fontSize: 17, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: C.text, whiteSpace: 'nowrap' }}>{valeur}</div>
       <div style={{ fontSize: 11, color: C.muted, lineHeight: 1.3 }}>{sous}</div>
     </div>
   );

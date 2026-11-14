@@ -179,7 +179,9 @@ const lireFiche = (pg) => pg.evaluate(() => {
     txs: [...el.querySelectorAll('[data-fiche-etape="vente"] [data-fiche-tx]')].map((x) => x.getAttribute('data-fiche-tx')),
     sources: [...el.querySelectorAll('[data-fiche-source]')].map((x) => x.getAttribute('data-fiche-source')),
     benef: (el.querySelector('[data-fiche-resume-benefice]') || { getAttribute: () => null }).getAttribute('data-fiche-resume-benefice'),
-    petits: [...el.querySelectorAll('button')].filter((x) => x.getClientRects().length && x.getBoundingClientRect().height < 43.5).map((x) => x.textContent.slice(0, 30)),
+    // (14 nov., système de design) 44 px au doigt, 36 à la souris (DESIGN.md §6 : une hauteur de contrôle par pointeur).
+    seuil: matchMedia('(hover: hover) and (pointer: fine) and (min-width: 768px)').matches ? 36 : 44,
+    petits: [...el.querySelectorAll('button')].filter((x) => x.getClientRects().length && x.getBoundingClientRect().height < (matchMedia('(hover: hover) and (pointer: fine) and (min-width: 768px)').matches ? 36 : 44) - 0.5).map((x) => x.textContent.slice(0, 30)),
     sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
   };
 });
@@ -286,7 +288,7 @@ const ouvrirFiche = async (pg, n, attendre = null) => {
         dit(f.txs.join() === '22999990226', `E ${TT} SA vente : la transaction 22999990226`, f.txs);
         dit(f.etats.benefice === 'fait' && f.benef === '3400' && /\+34/.test(f.textes.benefice) && /vente 70/.test(f.textes.benefice) && /achat 36/.test(f.textes.benefice), `E ${TT} bénéfice +34 € = vente 70 € − achat 36 €`, [f.benef, f.textes.benefice]);
         dit(f.sources.includes('vente') && f.sources.includes('colis'), `E ${TT} « Ouvrir dans … » sur la vente et le colis`, f.sources);
-        dit(f.petits.length === 0, `G ${TT} chaque bouton de la fiche fait au moins 44 px`, f.petits);
+        dit(f.petits.length === 0, `G ${TT} chaque bouton de la fiche fait au moins ${f.seuil} px (44 au doigt, 36 à la souris)`, f.petits);
         dit(f.sw <= f.cw + 1, `G ${TT} aucun débordement horizontal (fiche)`, `${f.sw} > ${f.cw}`);
         await pg.screenshot({ path: path.join(SHOTS, `rf-fiche-227-${suf}.png`) });
         await pg.evaluate(() => { const c = document.querySelector('[data-fiche-etape="colis"]'); if (c) c.scrollIntoView({ block: 'start' }); });

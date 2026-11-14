@@ -10,7 +10,7 @@
 .vrm-colis-prochain-sous { font-weight: 400; color: var(--vrm-muted, #6E6E73); }
 .vrm-colis-prochain.is-ambre .vrm-colis-prochain-txt { color: var(--vrm-warn, #B25000); }
 .vrm-colis-prochain.is-second { margin-top: -6px; padding-top: 8px; padding-bottom: 8px; font-size: 14px; }
-.vrm-colis-prochain.is-second .vrm-colis-prochain-txt { font-weight: 500; }
+.vrm-colis-prochain.is-second .vrm-colis-prochain-txt { font-weight: 400; }
 .vrm-colis-prochain > button { flex: 0 0 auto; }
 @media (max-width: 520px) {
   .vrm-colis-prochain { padding: 10px 12px; }

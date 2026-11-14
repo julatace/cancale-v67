@@ -25,7 +25,7 @@
 .vrm-emb-corps { flex: 1; padding: 8px 0 20px; }
 .vrm-emb-sur { margin: 4px 0 0; text-align: center; font-size: 15px; color: var(--vrm-muted, #6E6E73); }
 .vrm-emb-num {
-  font-family: var(--vrm-police-mono, ui-monospace, monospace) !important; font-weight: 500 !important;
+  font-family: var(--vrm-police-mono, ui-monospace, monospace) !important; font-weight: 400 !important;
   font-size: clamp(88px, 30vw, 168px); line-height: .95; letter-spacing: -.04em; word-spacing: -.2em;
   text-align: center; margin: 4px 0 6px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
 }
@@ -35,7 +35,7 @@
 .vrm-emb-alerte { margin: 0 0 12px; text-align: center; font-size: 15px; font-weight: 600; line-height: 1.35; }
 .vrm-emb-alerte.is-double { color: var(--vrm-danger, #B42318); }
 .vrm-emb-alerte.is-a-verifier { color: var(--vrm-warn, #B25000); }
-.vrm-emb-alerte.is-sans { color: var(--vrm-muted, #6E6E73); font-weight: 500; }
+.vrm-emb-alerte.is-sans { color: var(--vrm-muted, #6E6E73); font-weight: 400; }
 .vrm-emb-produit { display: flex; align-items: center; gap: 16px; margin: 10px 0 14px; min-width: 0; }
 .vrm-emb-photo { flex: none; width: 96px; height: 96px; border-radius: 12px; overflow: hidden; background: var(--vrm-card2, #F2F2F7); display: block; }
 .vrm-emb-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -82,7 +82,7 @@
   width: 100%; min-height: 56px; display: flex; align-items: center; gap: 12px; padding: 10px 14px; box-sizing: border-box;
   border: 0; border-radius: 12px; background: var(--vrm-surface, #FFFFFF); color: inherit; font: inherit; text-align: left; cursor: pointer;
 }
-.vrm-emb-recap-num { flex: none; font-family: var(--vrm-police-mono, ui-monospace, monospace) !important; font-weight: 500; font-size: 17px; min-width: 64px; }
+.vrm-emb-recap-num { flex: none; font-family: var(--vrm-police-mono, ui-monospace, monospace) !important; font-weight: 600; font-size: 17px; min-width: 64px; }
 .vrm-emb-recap-num.is-double { color: var(--vrm-danger, #B42318); }
 .vrm-emb-recap-num.is-a-verifier { color: var(--vrm-warn, #B25000); }
 .vrm-emb-recap-nom { flex: 1; min-width: 0; font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

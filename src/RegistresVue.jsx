@@ -74,13 +74,13 @@ export default function RegistresVue({ type, setType, periode, setPeriode, perio
         {R === undefined ? <p style={{ margin: 0, fontSize: 15, color: C.muted }}>{tr('registres.lecture')}</p>
           : R === null ? <p data-registres-vue-passu="" style={{ margin: 0, fontSize: 15, color: C.muted }}>— {tr('registres.pasLu')}</p>
           : <>
-            {total && <div className="vrm-display" data-registres-vue-entete="" style={{ fontSize: 22, fontWeight: 700, color: C.text, fontVariantNumeric: 'tabular-nums', letterSpacing: -0.4 }}>
+            {total && <div className="vrm-display" data-registres-vue-entete="" style={{ fontSize: 20, fontWeight: 700, color: C.text, fontVariantNumeric: 'tabular-nums', letterSpacing: -0.4 }}>
               {total.partiel ? <span style={{ fontSize: 15, fontWeight: 600, color: C.muted }}>{tr('registres.auMoins')} </span> : null}{fmt(total.total)}
-              <span style={{ fontSize: 15, fontWeight: 500, color: C.muted }}> · {tr(type === 'recettes' ? 'registres.nRecettes' : 'registres.nAchats', { n: R.n })}</span>
+              <span style={{ fontSize: 15, fontWeight: 600, color: C.muted }}> · {tr(type === 'recettes' ? 'registres.nRecettes' : 'registres.nAchats', { n: R.n })}</span>
             </div>}
             {manques.length > 0 && <ul data-registres-vue-manques={manques.length} style={{ margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
               {manques.map((m) => (
-                <li key={m.cle} data-registres-manque={m.cle} data-registres-manque-n={m.n} style={{ listStyle: 'none', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 14, color: m.n ? C.warn : C.muted }}>
+                <li key={m.cle} data-registres-manque={m.cle} data-registres-manque-n={m.n} style={{ listStyle: 'none', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 15, color: m.n ? C.warn : C.muted }}>
                   <span style={{ flex: '1 1 200px' }}>{m.cle === 'pas-lu' ? tr('registres.mq.pasLu', { quoi: m.texte.replace(/^Pas lu : /, '') }) : tr(`registres.mq.${type}.${m.cle}`, { n: m.n })}{m.geste === 'fichier' ? <span style={{ color: C.muted }}> · {tr('registres.geste.fichier')}</span> : null}</span>
                   {GESTES[m.geste] && <Bouton variante="discret" data-registres-geste={m.geste} onClick={GESTES[m.geste].faire}>{tr(GESTES[m.geste].cle)}</Bouton>}
                 </li>))}
@@ -104,7 +104,7 @@ export default function RegistresVue({ type, setType, periode, setPeriode, perio
               <ul style={{ margin: 0, padding: 0 }}>{hors.map((l) => <Ligne key={l.id} l={l} type={type} />)}</ul>
             </section>}
             <details className="vrm-repli" data-registres-sources="">
-              <summary style={{ fontSize: 14, color: C.muted, minHeight: 44, display: 'flex', alignItems: 'center' }}>{tr('registres.loi')}</summary>
+              <summary style={{ fontSize: 13, color: C.muted, minHeight: 44, display: 'flex', alignItems: 'center' }}>{tr('registres.loi')}</summary>
               <ul style={{ margin: '4px 0 0', padding: 0 }}>
                 {OBLIGATIONS[type].map((o) => (
                   <li key={o.cle} data-registres-obligation={o.cle} style={{ listStyle: 'none', padding: '8px 0', borderTop: `1px solid ${C.border}`, fontSize: 13, color: C.muted, lineHeight: 1.45 }}>

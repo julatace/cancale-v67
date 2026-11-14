@@ -147,7 +147,7 @@
 }
 .vrm-sante-haut { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .vrm-sante-titre { margin: 0; font-size: var(--d-t-17) !important; font-weight: 600 !important; letter-spacing: var(--d-ap-17) !important; line-height: 1.25; }
-.vrm-sante-periode { font-size: var(--d-t-13); color: var(--d-gris); font-weight: 500; }
+.vrm-sante-periode { font-size: var(--d-t-13); color: var(--d-gris); font-weight: 400; }
 .vrm-sante-detail { display: flex; flex-direction: column; gap: 2px; margin: 12px 0 16px; min-height: 76px; }
 .vrm-sante-lib { font-size: var(--d-t-13); font-weight: 600; color: var(--d-gris); }
 .vrm-sante-chiffre { font-size: var(--d-t-34); font-weight: 700; letter-spacing: var(--d-ap-34); line-height: 1.08; font-variant-numeric: tabular-nums; white-space: nowrap; }

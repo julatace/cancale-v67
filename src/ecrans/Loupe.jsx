@@ -14,23 +14,23 @@ function ToutSurLeNumero({ q, numData, comptes, onNav, onStock, onChercher, onFi
   const lien = { minHeight: 44, background: 'transparent', border: 0, padding: 0, color: C.text, textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13 };
   const ligne = (cle, attrs, titre, detail, onClick) => (
     <button key={cle} type="button" className="vrm-tout-num-ligne" {...attrs} onClick={onClick}
-      style={{ width: '100%', minHeight: 44, display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', marginTop: 6, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: C.text }}>
+      style={{ width: '100%', minHeight: 44, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', margin: 0, background: 'transparent', border: 0, borderTop: '0.5px solid var(--d-filet)', borderRadius: 0, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: C.text }}>
       <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: 'block', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{titre}</span>
-        {detail && <span style={{ display: 'block', fontSize: 12, color: C.muted, marginTop: 2 }}>{detail}</span>}
+        <span style={{ display: 'block', fontSize: 15, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{titre}</span>
+        {detail && <span style={{ display: 'block', fontSize: 13, fontWeight: 400, color: C.muted, marginTop: 2 }}>{detail}</span>}
       </span>
-      <span aria-hidden="true" style={{ fontSize: 17, color: C.muted }}>›</span>
+      <span aria-hidden="true" style={{ fontSize: 20, lineHeight: 1, color: 'var(--d-glyphe)' }}>›</span>
     </button>
   );
-  const titreSec = (t) => <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.4, margin: '12px 2px 2px' }}>{t}</div>;
+  const titreSec = (t) => <div style={{ fontSize: 13, fontWeight: 600, color: C.muted, margin: '16px 0 4px' }}>{t}</div>;
   const ETAT_ANN = { 'en-ligne': 'En ligne sur Vinted', 'a-confirmer': 'À confirmer (dernière lecture ancienne)', masquee: 'Masquée par Vinted, toujours chez toi', 'plus-en-ligne': 'Plus en ligne', passu: 'Annonces pas encore lues' };
   const ETAT_BORD = { pret: 'Prêt à imprimer', imprime: 'Imprimé', poste: 'Posté', attente: 'En attente du PDF' };
   const { vinted, lbc, ebay } = rn.ventes;
   const rien = rn.etat === 'rien';
   const rienDautre = !rn.annonces.length && !vinted.length && !lbc.length && !ebay.length && !rn.annoncesEbay.length && !rn.stock && !rn.reattribues.length;
   return (
-    <div data-tout-num={k} data-tout-etat={lecture && rn.etat !== 'trouve' ? 'lecture' : rn.etat} data-tout-lecture={lecture ? '1' : '0'} style={{ marginTop: 10, padding: '10px 12px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12 }}>
-      <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Tout sur le N°{k}</div>
+    <div data-tout-num={k} data-tout-etat={lecture && rn.etat !== 'trouve' ? 'lecture' : rn.etat} data-tout-lecture={lecture ? '1' : '0'} style={{ marginTop: 12, padding: '12px 16px 8px', background: 'var(--d-carte)', border: 0, borderRadius: 'var(--d-r-carte)', boxShadow: 'var(--d-ombre-carte)' }}>
+      <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-.012em', color: C.text, marginBottom: 4 }}>Tout sur le N°{k}</div>
       {/* (1er nov.) La fiche complète : le parcours de CETTE paire, par identité. */}
       {onFiche && rn.etat === 'trouve' && ligne('parcours', { 'data-tout-parcours': k }, `Toute l'histoire du N°${k}`, 'Achat, stock, annonces, vente, colis, argent', () => onFiche(k))}
       {rn.ancienNumero && <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Un ancien numéro (d'avant la remise à zéro) : il ne désigne que l'histoire.</div>}

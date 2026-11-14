@@ -69,8 +69,8 @@
 :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-detail-txt { display: flex !important; flex-direction: column !important; gap: 4px !important; font-size: 13px !important; line-height: 18px !important; color: var(--p-gris, #6E6E73) !important; }
 :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-fiche { display: flex; flex-direction: column; gap: 4px; }
 :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-fiche-l { display: grid !important; grid-template-columns: 112px minmax(0, 1fr) !important; column-gap: 10px !important; align-items: baseline !important; margin: 0 !important; font-size: 13px !important; line-height: 18px !important; white-space: normal !important; }
-:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-fiche-k { color: var(--p-gris, #6E6E73); font-weight: 500; }
-:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-fiche-v { color: var(--p-encre, #1D1D1F); font-weight: 500; font-variant-numeric: tabular-nums; min-width: 0; overflow-wrap: anywhere; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-fiche-k { color: var(--p-gris, #6E6E73); font-weight: 400; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-fiche-v { color: var(--p-encre, #1D1D1F); font-weight: 400; font-variant-numeric: tabular-nums; min-width: 0; overflow-wrap: anywhere; }
 :root[data-theme="dark"]:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-fiche-v { color: #F5F5F7; }
 :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-fiche-v .is-ambre { color: var(--p-ambre-texte, #B25000); font-weight: 600; }
 :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-fiche-v .vrm-rpf-source:has(+ *)::after { content: ' · '; }

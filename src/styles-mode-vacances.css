@@ -17,6 +17,6 @@
 .vrm-vac .vrm-ios-valeur[data-ton="vacances"] { font-weight: 600; }
 .vrm-vac-issue { font-size: 12px; color: var(--vrm-muted, #6E6E73); font-weight: 400; }
 .vrm-vac a.vrm-ios-rangee-zone { text-decoration: none; color: inherit; }
-.vrm-vac a.vrm-ios-rangee-zone .vrm-ios-valeur { color: var(--vrm-accent, #0071E3); }
+.vrm-vac a.vrm-ios-rangee-zone .vrm-ios-valeur { color: var(--d-accent-texte, #0066CC); }   /* un lien : le texte bleu (l’aplat ne tenait que 3,6:1 la nuit) */
 /* La règle de design-2026 force le gris sur `.vrm-ios-detail` (!important) : le geste reste ambre. */
 :root:root body .vrm-app-shell .vrm-main .vrm-vac .vrm-ios-detail[data-ton="geste"] { color: var(--vrm-warn, #B25000) !important; }

@@ -6,8 +6,8 @@
    ════════════════════════════════════════════════════════════════════════════ */
 @layer vrm-premium {
 :root:root body .vrm-ca-cloture .vrm-ca-compte { font: 600 15px/1 var(--mb-police) !important; color: var(--mb-gris) !important; font-variant-numeric: tabular-nums !important; }
-:root:root body .vrm-ca-cloture .vrm-ca-phrase { margin: 0 !important; font: 500 13px/1.45 var(--mb-police) !important; color: var(--mb-gris) !important; }
-:root:root body .vrm-ca-cloture .vrm-ca-sous { font: 500 13px/1.35 var(--mb-police) !important; color: var(--mb-gris) !important; overflow-wrap: anywhere !important; }
+:root:root body .vrm-ca-cloture .vrm-ca-phrase { margin: 0 !important; font: 400 13px/1.45 var(--mb-police) !important; color: var(--mb-gris) !important; }
+:root:root body .vrm-ca-cloture .vrm-ca-sous { font: 400 13px/1.35 var(--mb-police) !important; color: var(--mb-gris) !important; overflow-wrap: anywhere !important; }
 :root:root body .vrm-ca-cloture .vrm-ca-note { margin: 0 0 8px 42px !important; font: 400 12px/1.45 var(--mb-police) !important; color: var(--mb-gris) !important; }
 :root:root body .vrm-ca-cloture .vrm-ca-pied .vrm-ca-note { margin: 0 !important; }
 :root:root body .vrm-ca-cloture .vrm-ca-mois {
@@ -16,10 +16,10 @@
 }
 @media (min-width: 1024px) { :root:root body .vrm-ca-cloture .vrm-ca-mois { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; } }
 :root:root body .vrm-ca-cloture .vrm-ca-mois li { display: flex !important; justify-content: space-between !important; gap: 6px !important; padding: 4px 0 !important; border-bottom: 1px solid var(--mb-sep) !important; min-width: 0 !important; }
-:root:root body .vrm-ca-cloture .vrm-ca-mois span { font: 500 12px/1.3 var(--mb-police) !important; color: var(--mb-gris) !important; }
+:root:root body .vrm-ca-cloture .vrm-ca-mois span { font: 400 12px/1.3 var(--mb-police) !important; color: var(--mb-gris) !important; }
 :root:root body .vrm-ca-cloture .vrm-ca-mois b { font: 600 12px/1.3 var(--mb-police) !important; color: var(--mb-encre) !important; font-variant-numeric: tabular-nums !important; white-space: nowrap !important; }
 :root:root body .vrm-ca-cloture .vrm-ca-raisons { list-style: none !important; margin: 0 0 10px 42px !important; padding: 0 !important; display: flex !important; flex-direction: column !important; gap: 2px !important; }
-:root:root body .vrm-ca-cloture .vrm-ca-raisons > li { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 10px !important; flex-wrap: wrap !important; min-height: 44px !important; font: 500 13px/1.35 var(--mb-police) !important; color: var(--mb-encre) !important; }
+:root:root body .vrm-ca-cloture .vrm-ca-raisons > li { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 10px !important; flex-wrap: wrap !important; min-height: 44px !important; font: 400 13px/1.35 var(--mb-police) !important; color: var(--mb-encre) !important; }
 :root:root body .vrm-ca-cloture .vrm-ca-raisons > li.vrm-ca-note { min-height: 0 !important; margin: 0 !important; color: var(--mb-gris) !important; }
 :root:root body .vrm-ca-cloture .vrm-ca-raisons a { min-height: 44px !important; display: flex !important; align-items: center !important; }
 :root:root body .vrm-ca-cloture .vrm-ca-pied { display: flex !important; align-items: center !important; gap: 12px !important; flex-wrap: wrap !important; padding-top: 4px !important; }

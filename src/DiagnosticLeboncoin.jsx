@@ -20,7 +20,7 @@ export default function DiagnosticLeboncoin({lire,couleurs}) {
   };
   const bouton={border:`1px solid ${couleurs.border}`,borderRadius:12,background:couleurs.card,color:couleurs.text,padding:'8px 12px',font:'inherit',cursor:'pointer'};
   return <details style={{marginBottom:14,fontSize:12,color:couleurs.muted}}>
-    <summary style={{cursor:'pointer',padding:'8px 0'}}>Un problème de synchronisation Leboncoin ?</summary>
+    <summary style={{cursor:'pointer',padding:0,lineHeight:'var(--d-h-ctrl)'}}>Un problème de synchronisation Leboncoin ?</summary>
     <p>Vérifie ce qui est enregistré dans VRM. Le résumé partageable contient uniquement des compteurs et la structure technique reçue.</p>
     {suivi===null&&<p role="status">Le suivi par compte n’a pas pu être lu : aucun compte n’est supposé vide.</p>}
     {Array.isArray(suivi)&&<div className="vrm-suivi-comptes"><p>Seuls les comptes dont une session a été observée sont listés. Les ventes sans correspondance exacte avec une annonce ne sont pas attribuées au hasard.</p>{suivi.map(c=><section key={c.id}><h4>{c.nom}</h4><p>{c.annonces} annonce(s) attribuée(s) · {c.avecPhoto} avec une photo fournie · {c.ventes} vente(s) reliée(s) par identifiant.</p>{c.sansPhoto>0&&<p>{c.sansPhoto} annonce(s) capturée(s) sans URL de photo reçue. Ouvre « Mes annonces » sur le bon compte Leboncoin puis actualise. Une URL présente ne garantit pas le chargement de la photo.</p>}</section>)}</div>}

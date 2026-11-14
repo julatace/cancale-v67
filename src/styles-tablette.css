@@ -31,7 +31,7 @@
   }
   .vrm-app-shell[data-tablette][data-tablette] > nav.vrm-sidebar[data-nav-v2] .vrm-rail-lib {
     display: block !important; flex: 0 0 auto !important; max-width: 100%;
-    font: 500 10.5px/12px var(--vrm-police) !important; letter-spacing: -.01em !important; text-align: center !important;
+    font: 400 10.5px/12px var(--vrm-police) !important; letter-spacing: -.01em !important; text-align: center !important;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .vrm-app-shell[data-tablette][data-tablette] > nav.vrm-sidebar[data-nav-v2] .vrm-rail-button[aria-current="page"] .vrm-rail-lib { font-weight: 600 !important; }

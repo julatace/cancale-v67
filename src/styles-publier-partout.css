@@ -35,7 +35,7 @@
 .vrm-pp-case[data-pp-cochable="0"] .vrm-pp-coche { cursor: default; color: var(--fu-gris, #6e6e73); }
 .vrm-pp-resume { flex: none; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .vrm-pp-etat { flex: 1 1 100%; display: flex; flex-direction: column; font-size: 15px; font-weight: 700; color: var(--fu-encre, #1d1d1f); }
-.vrm-pp-etat small { font-weight: 500; font-size: 13px; color: var(--fu-gris, #6e6e73); overflow-wrap: anywhere; line-height: 1.35; }
+.vrm-pp-etat small { font-weight: 400; font-size: 13px; color: var(--fu-gris, #6e6e73); overflow-wrap: anywhere; line-height: 1.35; }
 .vrm-pp-etat.is-refuse, .vrm-pp-etat.is-pas-envoye, .vrm-pp-etat.is-a-finir { color: var(--fu-ambre-txt, #b25000); }
 .vrm-pp-etat.is-envoi, .vrm-pp-etat.is-attente { color: var(--fu-gris, #6e6e73); }
 .vrm-pp-raison { margin: 0 0 6px; font-size: 13px; color: var(--fu-gris, #6e6e73); line-height: 1.4; overflow-wrap: anywhere; }

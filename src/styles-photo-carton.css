@@ -3,7 +3,7 @@
 .vrm-pc { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .vrm-pc-b { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 52px; width: 100%; padding: 0 16px; border-radius: 12px; border: 0;
   font-family: inherit; font-size: 17px; font-weight: 600; cursor: pointer; box-sizing: border-box; }
-.vrm-pc-b em { font-style: normal; font-weight: 500; font-size: 13px; opacity: .62; }
+.vrm-pc-b em { font-style: normal; font-weight: 400; font-size: 13px; opacity: .62; }
 .vrm-pc-b:disabled { opacity: .6; cursor: progress; }
 .vrm-pc-b.is-discret { width: auto; min-height: 44px; min-width: 44px; padding: 0 12px; font-size: 15px; background: transparent !important; }
 .vrm-pc.is-sombre .vrm-pc-b { background: #2c2c2e; color: #fff; }

@@ -87,13 +87,13 @@ html .vrm-app-shell .vrm-atelier-rail .vrm-sidebar-entreprise { text-align: left
 html .vrm-app-shell .vrm-atelier-rail :is(.vrm-rail-platforms, .vrm-rail-management, .vrm-rail-bottom) { align-items: stretch; gap: 2px; }
 html .vrm-app-shell .vrm-atelier-rail .vrm-rail-management-group { align-items: stretch; border-top: 0; margin-top: 22px; padding-top: 0; }
 html .vrm-app-shell .vrm-atelier-rail .vrm-rail-section-label {
-  text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 500;
+  text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 400;
   color: var(--vrm-muted); opacity: 1; padding: 0 12px 6px;
 }
 html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button {
   width: 100%; min-height: 44px; justify-content: flex-start; gap: 10px; padding: 4px 12px;
   border: 0; border-radius: 12px; background: transparent; color: var(--vrm-muted);
-  font-size: 15px; font-weight: 500; letter-spacing: -.005em; text-align: left;
+  font-size: 15px; font-weight: 600; letter-spacing: -.005em; text-align: left;
 }
 html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button > :first-child { flex-shrink: 0; width: 22px; display: flex; justify-content: center; }
 /* Un nom long (« Vestiaire Collective ») passe sur deux lignes plutôt que d'être coupé. */
@@ -133,7 +133,7 @@ html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button:focus-visible { outline: 
     padding-bottom: max(6px, env(safe-area-inset-bottom)) !important;
   }
   html .vrm-app-shell .vrm-tabbar > .vrm-tab { color: var(--vrm-muted); border-radius: 0; min-height: 52px; background: transparent !important; box-shadow: none !important; }
-  html .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-nav-label { font-size: 12px; font-weight: 500; letter-spacing: 0; }
+  html .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-nav-label { font-size: 12px; font-weight: 400; letter-spacing: 0; }
   html .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] { color: var(--vrm-ink); }
   html .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] .vrm-tab-ic { color: var(--vrm-accent-texte, var(--vrm-accent)); }
   html .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] .vrm-nav-label { font-weight: 700; }
@@ -153,7 +153,7 @@ html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button:focus-visible { outline: 
   html .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-hello {
     font-size: 34px !important; font-weight: 700 !important; letter-spacing: -.025em !important; line-height: 1.05 !important; color: var(--vrm-ink) !important;
   }
-  html .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-date { color: var(--vrm-muted) !important; font-weight: 500; font-size: 15px !important; }
+  html .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-date { color: var(--vrm-muted) !important; font-weight: 600; font-size: 15px !important; }
   html .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-todo { color: var(--vrm-muted) !important; font-size: 15px !important; }
   html .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-todo b { color: var(--vrm-ink) !important; }
 
@@ -270,7 +270,7 @@ html .vrm-app-shell .vrm-day-layout .vrm-day-recu-n { font-weight: 700 !importan
      teignait le N° en cobalt ; une pastille d'étiquette s'écrit à l'encre. */
   position: relative; display: flex; align-items: center; min-height: 28px !important; height: 28px; margin: 0 !important; padding: 0 !important;
   background: transparent !important; border: 0 !important; color: inherit !important;
-  font-family: var(--vrm-police-mono) !important; font-size: 15px !important; font-weight: 500 !important; letter-spacing: 0 !important; cursor: pointer;
+  font-family: var(--vrm-police-mono) !important; font-size: 15px !important; font-weight: 600 !important; letter-spacing: 0 !important; cursor: pointer;
 }
 /* Le prix est désormais seul sur sa ligne : la pastille que les couches d'avant
    posaient sur le DERNIER élément de la ligne (le N°, styles-annonces-pro) ne
@@ -327,7 +327,7 @@ body > :not(#root) [style*="text-transform: uppercase"] {
 }
 html .vrm-app-shell .vrm-label,
 html .vrm-app-shell .vrm-day-k {
-  text-transform: none !important; letter-spacing: 0 !important; font-size: 13px !important; font-weight: 500 !important;
+  text-transform: none !important; letter-spacing: 0 !important; font-size: 13px !important; font-weight: 400 !important;
   color: var(--vrm-muted);
 }
 html .vrm-app-shell .vrm-mobile-eyebrow { letter-spacing: 0; font-size: 12px; }
@@ -482,7 +482,7 @@ html body .vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-nom {
   font-size: 15px !important; font-weight: 600 !important; line-height: 1.3 !important; color: var(--vrm-ink) !important; letter-spacing: -.005em;
 }
 html body .vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-sous {
-  white-space: normal !important; overflow: visible !important; font-size: 13px !important; color: var(--vrm-muted) !important; font-weight: 500 !important;
+  white-space: normal !important; overflow: visible !important; font-size: 13px !important; color: var(--vrm-muted) !important; font-weight: 400 !important;
 }
 html body .vrm-app-shell .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-amount {
   grid-column: 3; grid-row: 1; align-self: end; text-align: right; white-space: nowrap;
@@ -599,7 +599,7 @@ html .vrm-app-shell .vrm-tache .vrm-tache-tete { padding: 18px 16px 6px; }
 html .vrm-app-shell .vrm-tache .vrm-tache-tete h1 { margin: 0; font-size: 34px; line-height: 1.05; color: var(--vrm-ink); }
 html .vrm-app-shell .vrm-filtre-site { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 6px 0 10px; margin: 0; }
 html .vrm-app-shell .vrm-filtre-site::-webkit-scrollbar { display: none; }
-html .vrm-app-shell .vrm-filtre-site > button[aria-pressed] { flex-shrink: 0; min-height: 44px; padding: 0 18px; font-size: 15px; font-weight: 500; white-space: nowrap; border-radius: 999px !important; }
+html .vrm-app-shell .vrm-filtre-site > button[aria-pressed] { flex-shrink: 0; min-height: 44px; padding: 0 18px; font-size: 15px; font-weight: 600; white-space: nowrap; border-radius: 999px !important; }
 html .vrm-app-shell .vrm-main .vrm-filtre-site > button[aria-pressed="true"] { background: var(--vrm-ink) !important; border-color: var(--vrm-ink) !important; color: var(--vrm-bg) !important; }
 @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
   html .vrm-app-shell .vrm-tache .vrm-tache-tete h1 { font-size: 38px; }

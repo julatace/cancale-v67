@@ -46,7 +46,7 @@
 .vrm-boite-rubriques[data-bord-droite="1"]{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 44px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 44px),transparent)}
 .vrm-boite-rubriques[data-bord-gauche="1"]{-webkit-mask-image:linear-gradient(to right,transparent,#000 44px);mask-image:linear-gradient(to right,transparent,#000 44px)}
 .vrm-boite-rubriques[data-bord-gauche="1"][data-bord-droite="1"]{-webkit-mask-image:linear-gradient(to right,transparent,#000 44px,#000 calc(100% - 44px),transparent);mask-image:linear-gradient(to right,transparent,#000 44px,#000 calc(100% - 44px),transparent)}
-.vrm-boite .vrm-boite-rubriques button{flex:0 0 auto;display:flex;align-items:center;gap:6px;white-space:nowrap;font-weight:500;border-radius:999px;padding:0 14px;background:var(--bx-gris);border-color:transparent}
+.vrm-boite .vrm-boite-rubriques button{flex:0 0 auto;display:flex;align-items:center;gap:6px;white-space:nowrap;font-weight:400;border-radius:999px;padding:0 14px;background:var(--bx-gris);border-color:transparent}
 .vrm-boite .vrm-boite-rubriques button[aria-pressed=true]{background:var(--bx-encre);color:var(--bx-carte);border-color:var(--bx-encre)}
 .vrm-boite .vrm-boite-rubriques .vrm-boite-averif-pastille[aria-pressed=false]{color:var(--bx-ambre)}
 .vrm-boite-n{font-variant-numeric:tabular-nums;font-size:13px;font-weight:600;opacity:.7}
@@ -56,10 +56,10 @@
 .vrm-boite-compte{position:relative;display:block;flex:0 1 auto;min-width:0;max-width:100%}
 .vrm-boite-ligne-outils>.vrm-boite-compte{max-width:calc(100% - 136px)}
 .vrm-boite .vrm-boite-ligne-outils>button{flex:0 0 auto;white-space:nowrap}
-.vrm-boite .vrm-boite-compte select{-webkit-appearance:none;appearance:none;width:auto;max-width:100%;overflow:hidden;white-space:nowrap;border-radius:999px;border-color:transparent;background:var(--bx-gris);padding:0 36px 0 14px;font-weight:500;text-overflow:ellipsis}
+.vrm-boite .vrm-boite-compte select{-webkit-appearance:none;appearance:none;width:auto;max-width:100%;overflow:hidden;white-space:nowrap;border-radius:999px;border-color:transparent;background:var(--bx-gris);padding:0 36px 0 14px;font-weight:400;text-overflow:ellipsis}
 .vrm-boite-compte-chevron{position:absolute;right:14px;top:50%;margin-top:-6px;pointer-events:none;color:var(--bx-doux)}
 .vrm-boite .vrm-boite-lien{border:0;background:transparent;padding:0 8px;color:var(--bx-accent-texte);font-weight:600;margin-left:auto}
-.vrm-boite .vrm-boite-actualiser{display:flex;align-items:center;gap:6px;border:0;background:transparent;padding:0 8px;color:var(--bx-doux);font-weight:500}
+.vrm-boite .vrm-boite-actualiser{display:flex;align-items:center;gap:6px;border:0;background:transparent;padding:0 8px;color:var(--bx-doux);font-weight:400}
 .vrm-boite-actualiser svg{display:block}
 .vrm-boite-tourne{display:block;animation:vrm-boite-tourne .8s linear infinite}
 @keyframes vrm-boite-tourne{to{transform:rotate(360deg)}}
@@ -115,7 +115,7 @@
 /* Gras tant que l'état lu n'est pas su (rien n'est présenté comme déjà lu) ; un e-mail
    lu passe en graisse normale, un non-lu en gras appuyé (comme Mail). */
 .vrm-boite-quoi{flex:1 1 auto;min-width:0;font-size:17px;font-weight:600;line-height:1.3;color:var(--bx-encre);overflow-wrap:anywhere;letter-spacing:-.01em}
-.vrm-boite-ligne[data-lu="1"] .vrm-boite-quoi{font-weight:500}
+.vrm-boite-ligne[data-lu="1"] .vrm-boite-quoi{font-weight:400}
 .vrm-boite-ligne[data-lu="0"] .vrm-boite-quoi{font-weight:700}
 .vrm-boite-ligne-haut time{flex:0 0 auto;margin-left:auto;font-size:13px;color:var(--bx-doux);font-variant-numeric:tabular-nums}
 .vrm-boite-ligne[data-lu="0"] .vrm-boite-ligne-haut time{color:var(--bx-encre);font-weight:600}
@@ -128,7 +128,7 @@
 .vrm-boite-qui>*+*::before{content:"·";margin-right:8px;color:var(--bx-doux);font-weight:400}
 .vrm-boite-geste{font-weight:600;color:var(--bx-encre)}
 .vrm-boite-geste[data-ambre="1"]{color:var(--bx-ambre)}
-.vrm-boite-geste[data-passe="1"]{font-weight:500;color:var(--bx-doux)}
+.vrm-boite-geste[data-passe="1"]{font-weight:400;color:var(--bx-doux)}
 .vrm-boite-exp{display:flex;align-items:baseline;min-width:0}
 .vrm-boite-qui>.vrm-boite-exp{flex:0 1 auto}
 .vrm-boite-exp-nom{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -136,7 +136,7 @@
 .vrm-boite-pj-ic{flex:0 0 auto}
 /* « Rien à faire » : atténué, jamais caché. */
 .vrm-boite .vrm-boite-ligne[data-boite-rien="1"]{min-height:64px;padding-top:10px;padding-bottom:10px}
-.vrm-boite .vrm-boite-ligne[data-boite-rien="1"] .vrm-boite-quoi{color:var(--bx-doux);font-weight:500}
+.vrm-boite .vrm-boite-ligne[data-boite-rien="1"] .vrm-boite-quoi{color:var(--bx-doux);font-weight:400}
 .vrm-boite-ligne[data-boite-rien="1"] .vrm-boite-marque{opacity:.72}
 .vrm-boite-ligne[data-boite-rien="1"] .vrm-boite-essentiel{color:var(--bx-doux)}
 /* La photo de la paire (reliée par identité) et le code de retrait, à droite. */
@@ -198,7 +198,7 @@
 .vrm-boite-lecture{border-radius:20px;background:var(--bx-carte);padding:6px 28px 28px;min-width:0;overflow-wrap:anywhere;box-shadow:var(--bx-ombre);animation:vrm-boite-entre .22s var(--bx-sortie)}
 @keyframes vrm-boite-entre{from{transform:translateY(6px)}to{transform:none}}
 .vrm-boite-lecture-barre{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-top:6px}
-.vrm-boite .vrm-boite-retour,.vrm-boite-feuille .vrm-boite-retour{border:0;background:transparent;padding:0 6px;color:var(--bx-accent-texte);font-weight:500}
+.vrm-boite .vrm-boite-retour,.vrm-boite-feuille .vrm-boite-retour{border:0;background:transparent;padding:0 6px;color:var(--bx-accent-texte);font-weight:400}
 .vrm-boite-lecture-attente{display:grid;gap:10px;padding:16px 0}
 .vrm-boite-lecture-attente i{display:block;height:14px;border-radius:6px;background:var(--bx-gris);animation:vrm-boite-pouls 1.2s ease-in-out infinite alternate}
 .vrm-boite-lecture-attente i:first-of-type{height:28px;width:60%}
@@ -285,7 +285,7 @@
 .vrm-boite-piece-ic{grid-row:span 2;display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:var(--bx-carte);font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--bx-doux)}
 .vrm-boite-pieces li small{grid-column:2;color:var(--bx-doux);font-size:13px}
 .vrm-boite-pieces>.vrm-boite-doux:first-child{margin-top:0}
-.vrm-boite-piece-nom{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.vrm-boite-piece-nom{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:400}
 .vrm-boite-meta{margin:0;padding-top:12px;border-top:.5px solid var(--bx-filet);font-size:12px;line-height:1.5;color:var(--bx-doux)}
 .vrm-boite-meta b{font-weight:600;color:var(--bx-doux)}
 
@@ -313,7 +313,7 @@
 .vrm-boite-feuille .vrm-boite-etat-bloc{padding-top:48px}
 @media(prefers-reduced-transparency:reduce){.vrm-boite-feuille .vrm-boite-lecture-barre{background:var(--bx-sol);-webkit-backdrop-filter:none;backdrop-filter:none}}
 /* Le petit mot après un geste (« Tout est marqué lu », « pas enregistré »). */
-.vrm-boite-avis{position:fixed;z-index:20001;left:50%;bottom:calc(92px + env(safe-area-inset-bottom));transform:translateX(-50%);max-width:min(420px,calc(var(--vrm-vw100, 100vw) - 32px));padding:12px 18px;border-radius:999px;background:var(--bx-encre);color:var(--bx-carte);font-size:15px;font-weight:500;line-height:1.3;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.18);animation:vrm-boite-avis .28s var(--bx-sortie)}
+.vrm-boite-avis{position:fixed;z-index:20001;left:50%;bottom:calc(92px + env(safe-area-inset-bottom));transform:translateX(-50%);max-width:min(420px,calc(var(--vrm-vw100, 100vw) - 32px));padding:12px 18px;border-radius:999px;background:var(--bx-encre);color:var(--bx-carte);font-size:15px;font-weight:600;line-height:1.3;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.18);animation:vrm-boite-avis .28s var(--bx-sortie)}
 @keyframes vrm-boite-avis{from{transform:translate(-50%,12px);opacity:0}to{transform:translateX(-50%);opacity:1}}
 @media(min-width:900px){.vrm-boite-avis{bottom:28px}}
 
@@ -512,7 +512,7 @@
    l'emporte jamais sur un `!important` d'une couche. */
 @layer vrm-premium{
   @media(min-width:900px){
-    :root:root body .vrm-main[data-ecran="emails"] :is(.vrm-tache-tete h1,.vrm-market-heading h1){font-size:26px!important;letter-spacing:-.02em!important;line-height:1.15!important}
+    :root:root body .vrm-main[data-ecran="emails"] :is(.vrm-tache-tete h1,.vrm-market-heading h1){font-size:var(--d-t-28,28px)!important;letter-spacing:-.02em!important;line-height:1.15!important}
     :root:root body .vrm-app-shell .vrm-main[data-ecran="emails"] :is(.vrm-tache-tete,[data-titre-ecran-grand]){padding:4px 0 2px!important}
     :root:root body .vrm-main[data-ecran="emails"] :is(.vrm-tache-tete,.vrm-market-heading) .vrm-phrase-ecran{font-size:13px}
   }
@@ -522,21 +522,21 @@
 @media(min-width:900px) and (hover:hover) and (pointer:fine){
   html .vrm-boite{font-size:13px;line-height:1.4}
   /* `:where` : cette règle de base ne doit jamais battre celles des lignes, puces et pastilles ci-dessous. */
-  html .vrm-boite:where([data-vue="boite"]) button,html .vrm-boite:where([data-vue="boite"]) select{min-height:30px;border-radius:8px;padding:0 12px;font-size:13px}
-  html .vrm-boite .vrm-boite-vues{max-width:300px;margin:0 0 10px;padding:2px;border-radius:12px}
-  html .vrm-boite .vrm-boite-vues button{min-height:26px;border-radius:7px;font-size:13px}
-  /* Les outils de la liste : recherche 30 px, pastilles 26 px, compte 26 px. */
+  html .vrm-boite:where([data-vue="boite"]) button,html .vrm-boite:where([data-vue="boite"]) select{min-height:36px;border-radius:999px;padding:0 14px;font-size:13px}
+  html .vrm-boite .vrm-boite-vues{max-width:300px;margin:12px 0 12px;padding:2px;border-radius:999px}
+  html .vrm-boite .vrm-boite-vues button{min-height:36px;border-radius:999px;font-size:13px}
+  /* Les outils de la liste : recherche, pastilles et compte à la hauteur d'un contrôle à la souris (36 px, le système). */
   html .vrm-boite .vrm-boite-filtres{padding:10px 12px 6px}
-  html .vrm-boite .vrm-boite-cherche{min-height:30px;padding:0 9px;gap:6px;margin:0 0 8px;border-radius:8px}
+  html .vrm-boite .vrm-boite-cherche{min-height:36px;padding:0 12px;gap:6px;margin:0 0 8px;border-radius:999px}
   html .vrm-boite .vrm-boite-cherche svg{width:14px;height:14px}
-  :root body .vrm-app-shell .vrm-main .vrm-boite-cherche input[type=search]:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=hidden]){min-height:30px!important;font-size:13px!important}
+  :root body .vrm-app-shell .vrm-main .vrm-boite-cherche input[type=search]:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=hidden]){min-height:36px!important;font-size:13px!important}
   html .vrm-boite .vrm-boite-rubriques{gap:4px;margin:0 -12px;padding:0 12px 2px}
-  html .vrm-boite .vrm-boite-rubriques button{min-height:26px;padding:0 10px;gap:5px;font-size:12px}
+  html .vrm-boite .vrm-boite-rubriques button{min-height:36px;padding:0 12px;gap:5px;font-size:13px}
   html .vrm-boite .vrm-boite-n{font-size:11px}
   html .vrm-boite .vrm-boite-ligne-outils{margin-top:6px}
-  html .vrm-boite .vrm-boite-compte select{min-height:26px;padding:0 28px 0 10px;font-size:12px}
+  html .vrm-boite .vrm-boite-compte select{min-height:36px;padding:0 28px 0 12px;font-size:13px}
   html .vrm-boite .vrm-boite-compte-chevron{right:10px}
-  html .vrm-boite .vrm-boite-lien,html .vrm-boite .vrm-boite-actualiser{min-height:26px;font-size:12px}
+  html .vrm-boite .vrm-boite-lien,html .vrm-boite .vrm-boite-actualiser{min-height:36px;font-size:13px}
   html .vrm-boite .vrm-boite-couverture,html .vrm-boite .vrm-boite-aide-recherche{font-size:12px}
   html .vrm-boite .vrm-boite-arelier{margin:8px 12px 2px;padding:10px 12px;border-radius:12px}
   html .vrm-boite .vrm-boite-arelier-titre{font-size:13px}
@@ -553,21 +553,21 @@
   html .vrm-boite .vrm-boite-ligne .vrm-boite-mono{font-size:10px}
   html .vrm-boite .vrm-boite-ligne .vrm-boite-marque [data-transporteur-logo]{width:22px!important;height:22px!important}
   html .vrm-boite .vrm-boite-pile-n{min-width:16px;height:16px;line-height:16px;font-size:10px;right:-5px;bottom:-3px;padding:0 4px}
-  html .vrm-boite .vrm-boite-quoi{font-size:14px;line-height:1.3;letter-spacing:-.006em}
+  html .vrm-boite .vrm-boite-quoi{font-size:15px;line-height:1.3;letter-spacing:-.006em}
   html .vrm-boite .vrm-boite-ligne-haut time{font-size:12px}
   html .vrm-boite .vrm-boite-essentiel{font-size:13px;line-height:1.35}
   html .vrm-boite .vrm-boite-ligne-pied{font-size:12px;line-height:1.4;margin-top:0;gap:0 10px}
   html .vrm-boite .vrm-boite-vignette{width:34px;height:34px;border-radius:8px;margin-top:0}
-  /* Le code de retrait sur la ligne : une puce de 26 px, plus un pavé de 44. */
-  html .vrm-boite .vrm-boite-ligne[data-boite-a-code="1"]{padding-bottom:40px}
-  html .vrm-boite .vrm-boite-puce-code{left:48px;bottom:8px;min-height:26px;padding:0 8px 0 10px;gap:6px;border-radius:7px}
-  html .vrm-boite .vrm-boite-puce-chiffres{font-size:14px}
+  /* Le code de retrait sur la ligne : une puce de 36 px (un contrôle à la souris), plus un pavé de 44. */
+  html .vrm-boite .vrm-boite-ligne[data-boite-a-code="1"]{padding-bottom:50px}
+  html .vrm-boite .vrm-boite-puce-code{left:48px;bottom:8px;min-height:36px;padding:0 12px 0 14px;gap:6px;border-radius:999px}
+  html .vrm-boite .vrm-boite-puce-chiffres{font-size:15px}
   html .vrm-boite .vrm-boite-puce-ic svg{width:13px;height:13px}
   html .vrm-boite .vrm-boite-plus{margin:8px 12px 12px;width:calc(100% - 24px)}
   html .vrm-boite .vrm-boite-fin{font-size:12px;padding:10px 12px 14px}
   html .vrm-boite .vrm-boite-sq-ligne{padding-top:8px;padding-bottom:8px}
   /* La lecture : en-tête sobre, carte compacte, corps en 14 px. */
-  html .vrm-boite .vrm-boite-lecture-barre button{min-height:28px;font-size:13px}
+  html .vrm-boite .vrm-boite-lecture-barre button{min-height:36px;font-size:13px}
   html .vrm-boite .vrm-boite-haut{margin:12px 0 18px;gap:10px}
   html .vrm-boite .vrm-boite-haut-tete{grid-template-columns:36px minmax(0,1fr);gap:10px}
   html .vrm-boite .vrm-boite-marque.is-grande{width:36px;height:36px}
@@ -579,46 +579,46 @@
   html .vrm-boite .vrm-boite-billet-qui{font-size:13px}
   html .vrm-boite .vrm-boite-billet-etiq,html .vrm-boite .vrm-boite-billet-bas dt{font-size:11px}
   html .vrm-boite .vrm-boite-billet-code{padding:4px 14px 12px}
-  html .vrm-boite .vrm-boite-billet-chiffres{font-size:30px}
+  html .vrm-boite .vrm-boite-billet-chiffres{font-size:28px}
   html .vrm-boite .vrm-boite-billet-trou{margin:0 14px}
   html .vrm-boite .vrm-boite-billet-trou::before{left:-26px}
   html .vrm-boite .vrm-boite-billet-trou::after{right:-26px}
   html .vrm-boite .vrm-boite-billet-bas{padding:12px 14px 14px;gap:10px}
-  html .vrm-boite .vrm-boite-billet-bas dd b{font-size:14px}
+  html .vrm-boite .vrm-boite-billet-bas dd b{font-size:15px}
   html .vrm-boite .vrm-boite-billet-bas dd span,html .vrm-boite .vrm-boite-billet-sans{font-size:13px}
-  html .vrm-boite .vrm-boite-puce-code.is-grande{min-width:30px;min-height:30px;padding:0 8px}
+  html .vrm-boite .vrm-boite-puce-code.is-grande{min-width:36px;min-height:36px;padding:0 12px}
   html .vrm-boite .vrm-boite-heros{padding:12px 14px;border-radius:12px;gap:12px}
   html .vrm-boite .vrm-boite-heros-photo{width:56px;height:56px;border-radius:12px}
-  html .vrm-boite .vrm-boite-heros-montant b{font-size:24px}
+  html .vrm-boite .vrm-boite-heros-montant b{font-size:28px}
   html .vrm-boite .vrm-boite-heros-montant span,html .vrm-boite .vrm-boite-heros-limite{font-size:13px}
-  html .vrm-boite .vrm-boite-heros-article{font-size:14px}
+  html .vrm-boite .vrm-boite-heros-article{font-size:15px}
   html .vrm-boite .vrm-boite-heros-num{font-size:12px}
   html .vrm-boite .vrm-boite-details{font-size:13px}
   html .vrm-boite .vrm-boite-averif{padding:10px 12px;border-radius:12px;font-size:13px}
   html .vrm-boite .vrm-boite-gestes{gap:6px}
-  html .vrm-boite .vrm-boite-gestes button{min-height:30px;padding:0 14px;border-radius:8px;font-size:13px}
+  html .vrm-boite .vrm-boite-gestes button{min-height:36px;padding:0 14px;border-radius:999px;font-size:13px}
   html .vrm-boite .vrm-boite-fait,html .vrm-boite .vrm-boite-doux,html .vrm-boite .vrm-boite-sous{font-size:12px}
   html .vrm-boite .vrm-boite-corps-bloc{padding-top:14px;margin-bottom:16px}
   html .vrm-boite .vrm-boite-sujet{font-size:15px;margin-bottom:10px}
-  html .vrm-boite .vrm-boite-msg{max-width:34em;font-size:14px;line-height:1.5}
+  html .vrm-boite .vrm-boite-msg{max-width:34em;font-size:15px;line-height:1.5}
   html .vrm-boite .vrm-boite-msg .vrm-boite-msg-etiq{font-size:11px}
   html .vrm-boite .vrm-boite-msg .vrm-boite-msg-note{font-size:12px}
   html .vrm-boite .vrm-boite-pieces li{grid-template-columns:32px minmax(0,1fr);padding:7px 10px;border-radius:12px;font-size:13px}
   html .vrm-boite .vrm-boite-pieces li small{font-size:12px}
   html .vrm-boite .vrm-boite-meta{font-size:11px}
   html .vrm-boite .vrm-boite-cadre-images{font-size:12px}
-  html .vrm-boite .vrm-boite-cadre-images .vrm-boite-second{min-height:28px;padding:0 10px;border-radius:7px}
+  html .vrm-boite .vrm-boite-cadre-images .vrm-boite-second{min-height:36px;padding:0 12px;border-radius:999px}
   html .vrm-boite .vrm-boite-etat-titre{font-size:15px}
   html .vrm-boite .vrm-boite-etat-texte{font-size:13px}
-  html .vrm-boite .vrm-boite-vue-filtree>button{min-height:28px}
+  html .vrm-boite .vrm-boite-vue-filtree>button{min-height:36px}
   :root:root body .vrm-app-shell .vrm-main .vrm-boite-corps-ecran[data-boite-large="1"] .vrm-boite-vide-lecture{padding-top:24px!important}
   :root:root body .vrm-app-shell .vrm-main .vrm-boite-corps-ecran[data-boite-large="1"] .vrm-boite-vide-lecture p{font-size:13px!important}
 }
 
 /* ── Au téléphone et sous 900 px : confortable, plus énorme ─────────────────── */
 @media(max-width:899px){
-  html .vrm-boite .vrm-boite-quoi{font-size:16px}
-  html .vrm-boite .vrm-boite-essentiel{font-size:14px}
+  html .vrm-boite .vrm-boite-quoi{font-size:17px}
+  html .vrm-boite .vrm-boite-essentiel{font-size:15px}
   html .vrm-boite .vrm-boite-ligne{grid-template-columns:8px 36px minmax(0,1fr) auto;padding-top:10px;padding-bottom:10px;min-height:64px}
   html .vrm-boite .vrm-boite-ligne[data-boite-rien="1"]{min-height:56px;padding-top:8px;padding-bottom:8px}
   html .vrm-boite .vrm-boite-point{width:8px;height:8px}
@@ -630,12 +630,12 @@
   html .vrm-boite .vrm-boite-cherche input{font-size:16px}
 }
 /* La feuille de lecture (portail, téléphone). */
-.vrm-boite-feuille .vrm-boite-titre{font-size:22px;line-height:1.2}
+.vrm-boite-feuille .vrm-boite-titre{font-size:20px;line-height:1.2}
 .vrm-boite-feuille .vrm-boite-marque.is-grande{width:40px;height:40px}
 .vrm-boite-feuille .vrm-boite-haut-tete{grid-template-columns:40px minmax(0,1fr)}
-.vrm-boite-feuille .vrm-boite-billet-chiffres{font-size:36px}
+.vrm-boite-feuille .vrm-boite-billet-chiffres{font-size:34px}
 .vrm-boite-feuille .vrm-boite-heros-montant b{font-size:28px}
-.vrm-boite-feuille .vrm-boite-heros-article{font-size:16px}
-.vrm-boite-feuille .vrm-boite-gestes button{font-size:16px;min-height:48px}
-.vrm-boite-feuille .vrm-boite-sujet{font-size:16px}
-.vrm-boite-feuille .vrm-boite-msg{font-size:16px;line-height:1.5}
+.vrm-boite-feuille .vrm-boite-heros-article{font-size:15px}
+.vrm-boite-feuille .vrm-boite-gestes button{font-size:15px;min-height:48px;border-radius:999px}
+.vrm-boite-feuille .vrm-boite-sujet{font-size:17px}
+.vrm-boite-feuille .vrm-boite-msg{font-size:15px;line-height:1.5}

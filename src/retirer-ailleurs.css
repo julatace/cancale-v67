@@ -9,17 +9,17 @@
 .vrm-ra-photo { width: 44px; height: 58px; flex-shrink: 0; }
 .vrm-ra-photo img, .vrm-ra-photo > .vrm-photo-vide { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
 .vrm-ra-corps { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.vrm-ra-phrase { display: block; font-weight: 500; line-height: 1.35; }
+.vrm-ra-phrase { display: block; font-weight: 400; line-height: 1.35; }
 .vrm-ra-titre { display: block; font-size: 12px; color: var(--vrm-muted, inherit); line-height: 1.4; }
 .vrm-ra-sites { list-style: none; margin: 6px 0 0; padding: 0; }
 .vrm-ra-sites li { display: flex; align-items: center; gap: 8px; padding: 4px 0; min-width: 0; }
 .vrm-ra-site-txt { flex: 1; min-width: 0; }
-.vrm-ra-site-txt b { display: block; font-weight: 500; font-size: 13px; }
+.vrm-ra-site-txt b { display: block; font-weight: 400; font-size: 13px; }
 .vrm-ra-site-txt small { display: block; font-size: 12px; color: var(--vrm-muted, inherit); line-height: 1.4; }
 .vrm-ra-sites li.is-ok .vrm-ra-site-txt small { color: var(--vrm-ink, inherit); }
 .vrm-ra-sites li.is-ko .vrm-ra-site-txt small { color: var(--vrm-warn, #B25000); }
 .vrm-ra-lien { flex-shrink: 0; min-height: 44px; display: flex; align-items: center; padding: 0 12px; border-radius: 12px;
-  border: 1px solid var(--vrm-line, #E5E5EA); color: var(--vrm-ink, inherit); text-decoration: none; font-weight: 500; font-size: 13px; box-sizing: border-box; }
+  border: 1px solid var(--vrm-line, #E5E5EA); color: var(--vrm-ink, inherit); text-decoration: none; font-weight: 400; font-size: 13px; box-sizing: border-box; }
 .vrm-ra-note { margin: 8px 0 0; font-size: 12px; color: var(--vrm-muted, inherit); line-height: 1.4; }
 /* Ma journée : la carte « Vendus ailleurs » porte le geste à côté de « Voir ». */
 .vrm-va-carte { display: flex; align-items: center; gap: 10px; }

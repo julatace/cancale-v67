@@ -41,7 +41,7 @@
 .vrm-depot-res-etat { font-size: 17px; font-weight: 700; }
 .vrm-depot-res-etat.is-deja { color: var(--vrm-muted, #6E6E73); }
 .vrm-depot-res-non { display: flex; flex-direction: column; gap: 2px; font-size: 17px; font-weight: 700; color: var(--vrm-warn, #B25000); }
-.vrm-depot-res-non small { font-size: 13px; font-weight: 500; color: var(--vrm-muted, #6E6E73); overflow-wrap: anywhere; }
+.vrm-depot-res-non small { font-size: 13px; font-weight: 400; color: var(--vrm-muted, #6E6E73); overflow-wrap: anywhere; }
 .vrm-depot-saisie { display: flex; gap: 8px; }
 .vrm-depot-saisie input {
   flex: 1; min-width: 0; min-height: 48px; box-sizing: border-box; border-radius: 12px; padding: 0 14px; font: inherit; font-size: 17px;

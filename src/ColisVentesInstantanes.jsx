@@ -108,7 +108,7 @@ export function ColisInstantane({ snap, maintenant = null, fmt = null, Icon = nu
                     </div>
                     {l.limite || l.attente ? (
                       <div style={{ fontSize: 12, marginTop: 6, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                        <span data-colis-dates="" style={{ flex: '0 1 auto', minWidth: 0 }}>{l.limite ? <span data-colis-limite-texte="" style={{ overflowWrap: 'anywhere', fontWeight: 500 }}>{l.limite}</span> : null}{l.attente ? <span>{l.attente}</span> : null}</span>
+                        <span data-colis-dates="" style={{ flex: '0 1 auto', minWidth: 0 }}>{l.limite ? <span data-colis-limite-texte="" style={{ overflowWrap: 'anywhere', fontWeight: 400 }}>{l.limite}</span> : null}{l.attente ? <span>{l.attente}</span> : null}</span>
                       </div>
                     ) : null}
                   </div>

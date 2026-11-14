@@ -64,7 +64,7 @@
   transition: transform .12s cubic-bezier(.23, 1, .32, 1), background-color .15s ease, color .15s ease;
 }
 .vrm-conseil-geste { grid-column: 1 / -1; background: var(--c-accent); color: #fff; margin-bottom: 2px; }
-.vrm-conseil-tard, .vrm-conseil-jamais { background: transparent; color: var(--c-doux); font-weight: 500; }
+.vrm-conseil-tard, .vrm-conseil-jamais { background: transparent; color: var(--c-doux); font-weight: 400; }
 @media (hover: hover) and (pointer: fine) {
   .vrm-conseil-tard:hover, .vrm-conseil-jamais:hover { color: var(--c-encre); }
 }

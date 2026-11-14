@@ -72,7 +72,7 @@ export function BlocGrosLot({ lot, setLot, totalTexte, C, Icon, Bouton, moiMeme 
   const nSansCase = casesP ? casesP.filter((c) => !c).length : 0;
   const premiere = casesP ? casesP.find(Boolean) : null, derniere = casesP ? [...casesP].reverse().find(Boolean) : null;
   const majArt = (i, patch) => setLot((l) => ({ ...l, articles: l.articles.map((a, j) => (j === i ? { ...a, ...patch } : a)) }));
-  const inp = { border: `1px solid ${C.border}`, borderRadius: 12, padding: '0 10px', height: 44, fontSize: 16, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box', minWidth: 0 };
+  const inp = { border: `1px solid ${C.border}`, borderRadius: 12, padding: '0 10px', height: 44, fontSize: 15, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box', minWidth: 0 };
   const lab = { fontSize: 12, color: C.muted, fontWeight: 600 };
   const choisirPhoto = async (i, ev) => {
     const f = ev.target.files && ev.target.files[0]; ev.target.value = '';

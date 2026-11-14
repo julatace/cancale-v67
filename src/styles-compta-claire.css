@@ -65,7 +65,7 @@
 .vrm-main .vrm-compta-replis > :is(.vrm-compta-repli, .vrm-micro-repli) > summary { min-height: 60px; padding-block: 10px; }
 .vrm-main .vrm-compta-repli-tete { display: flex; flex-direction: column; gap: 3px; flex: 1 1 auto; min-width: 0; }
 .vrm-main .vrm-compta-repli-titre { font-size: 15px; font-weight: 600; color: var(--vrm-ink); }
-.vrm-main .vrm-compta-repli-resume { font-size: 13px; font-weight: 500; color: var(--vrm-muted); line-height: 1.4; }
+.vrm-main .vrm-compta-repli-resume { font-size: 13px; font-weight: 400; color: var(--vrm-muted); line-height: 1.4; }
 .vrm-main .vrm-compta-repli[open] > .vrm-compta-repli-corps,
 .vrm-main .vrm-compta-replis > .vrm-micro-repli[open] > [data-micro-entreprise] { padding-bottom: 14px; }
 .vrm-main .vrm-compta-avance > .vrm-compta-repli-corps,

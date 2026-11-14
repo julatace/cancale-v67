@@ -28,7 +28,7 @@ function Ligne({ cle, C, children, aide = true, payant = false, attr = {} }) {
     <div data-ebay-param={cle} {...attr} style={{ padding: '12px 14px', borderTop: `1px solid ${C.border}`, marginTop: -1 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div style={{ flex: '1 1 160px', minWidth: 0 }}>
-          <div style={{ fontSize: 15, color: C.text, fontWeight: 500 }}>{tr(`ebay.param.${cle}`)}{payant ? <span data-ebay-param-payant style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 999, padding: '1px 7px' }}>{tr('ebay.param.payant')}</span> : null}</div>
+          <div style={{ fontSize: 15, color: C.text, fontWeight: 600 }}>{tr(`ebay.param.${cle}`)}{payant ? <span data-ebay-param-payant style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 999, padding: '1px 7px' }}>{tr('ebay.param.payant')}</span> : null}</div>
           {aide ? <div style={{ fontSize: 12, color: C.muted, marginTop: 2, lineHeight: 1.4 }}>{tr(`ebay.param.${cle}.aide`)}</div> : null}
         </div>
         <div style={{ flex: '0 1 auto', minWidth: 0, maxWidth: '100%' }}>{children}</div>
@@ -50,7 +50,7 @@ function Choix({ valeur, options, onChange, C, label, attr = {} }) {
     <div role="group" aria-label={label} {...attr} style={{ display: 'inline-flex', gap: 4, padding: 3, borderRadius: 12, background: C.card2 || C.bg, flexWrap: 'wrap' }}>
       {options.map(([v, lib]) => (
         <button key={String(v)} type="button" aria-pressed={valeur === v} data-ebay-choix={String(v)} onClick={() => onChange(v)}
-          style={{ minHeight: 44, minWidth: 44, border: 'none', borderRadius: 10, background: valeur === v ? C.card : 'transparent', boxShadow: valeur === v ? '0 1px 3px rgba(0,0,0,.12)' : 'none', color: C.text, fontSize: 14, fontWeight: valeur === v ? 600 : 500, padding: '0 12px', cursor: 'pointer', fontFamily: 'inherit' }}>{lib}</button>
+          style={{ minHeight: 44, minWidth: 44, border: 'none', borderRadius: 10, background: valeur === v ? C.card : 'transparent', boxShadow: valeur === v ? '0 1px 3px rgba(0,0,0,.12)' : 'none', color: C.text, fontSize: 15, fontWeight: valeur === v ? 600 : 500, padding: '0 12px', cursor: 'pointer', fontFamily: 'inherit' }}>{lib}</button>
       ))}
     </div>
   );
@@ -159,7 +159,7 @@ export default function FeuilleParametresEbay({ Feuille, C, mode = 'annonce', va
         </Ligne>}
         {!enchere && v.sponsorisee && (
           <div style={{ padding: '0 14px 12px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: C.text }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, color: C.text }}>
               {tr('ebay.param.sponsorisee.taux')}
               <input aria-label={tr('ebay.param.sponsorisee.taux')} data-ebay-sponsor-taux inputMode="decimal" value={String(v.tauxSponsor == null ? '' : v.tauxSponsor)} onChange={(e) => set({ tauxSponsor: e.target.value })} style={{ ...inp, width: 80 }}/>%
             </label>

@@ -8,15 +8,15 @@
 .vrm-vis .vrm-vis-pastille span { width: 28px; height: 28px; border-radius: 999px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); }
 .vrm-vis .vrm-vis-pastille[aria-checked="true"] span { box-shadow: 0 0 0 2px var(--fu-carte, #fff), 0 0 0 4px var(--fu-encre, #1d1d1f); }
 .vrm-vis .vrm-vis-boutique { display: flex; flex-direction: column; gap: 6px; font: 600 13px/1.3 var(--vrm-police); color: var(--fu-gris, #6e6e73); }
-.vrm-vis .vrm-vis-boutique input { width: 100%; box-sizing: border-box; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: var(--fu-case, rgba(118,118,128,.12)); color: var(--fu-encre, inherit); font: 500 16px/1.2 var(--vrm-police); }
+.vrm-vis .vrm-vis-boutique input { width: 100%; box-sizing: border-box; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: var(--fu-case, rgba(118,118,128,.12)); color: var(--fu-encre, inherit); font: 600 16px/1.2 var(--vrm-police); }
 .vrm-vis .vrm-vis-apercu { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 2px; min-height: 120px; }
 .vrm-vis .vrm-vis-img { flex: none; scroll-snap-align: center; border-radius: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 8px 24px rgba(0,0,0,.10); background: var(--fu-piste, #e5e5ea); }
 .vrm-vis .vrm-vis-img-carre { width: min(100%, 360px); aspect-ratio: 1 / 1; }
 .vrm-vis .vrm-vis-img-story { width: min(62%, 240px); aspect-ratio: 9 / 16; }
 .vrm-vis .vrm-vis-apercu:has(.vrm-vis-img:only-child) { justify-content: center; }
-.vrm-vis .vrm-vis-attente, .vrm-vis .vrm-vis-vide { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 24px 12px; border-radius: 12px; background: var(--fu-case, rgba(118,118,128,.12)); font: 500 14px/1.4 var(--vrm-police); color: var(--fu-gris2, #6e6e73); }
+.vrm-vis .vrm-vis-attente, .vrm-vis .vrm-vis-vide { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 24px 12px; border-radius: 12px; background: var(--fu-case, rgba(118,118,128,.12)); font: 400 14px/1.4 var(--vrm-police); color: var(--fu-gris2, #6e6e73); }
 .vrm-vis .vrm-vis-vide b { color: var(--fu-encre, inherit); font-weight: 600; font-size: 15px; }
-.vrm-vis .vrm-vis-manques { margin: 0; padding: 0 2px; list-style: none; display: flex; flex-direction: column; gap: 4px; font: 500 13px/1.4 var(--vrm-police); color: var(--fu-ambre-txt, #b25000); overflow-wrap: anywhere; }
-.vrm-vis .vrm-vis-note { margin: 0 2px; font: 500 13px/1.4 var(--vrm-police); color: var(--fu-gris2, #6e6e73); }
+.vrm-vis .vrm-vis-manques { margin: 0; padding: 0 2px; list-style: none; display: flex; flex-direction: column; gap: 4px; font: 400 13px/1.4 var(--vrm-police); color: var(--fu-ambre-txt, #b25000); overflow-wrap: anywhere; }
+.vrm-vis .vrm-vis-note { margin: 0 2px; font: 400 13px/1.4 var(--vrm-police); color: var(--fu-gris2, #6e6e73); }
 .vrm-vis .vrm-vis-pied { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
 :root:not([data-theme="dark"]) .vrm-vis .vrm-vis-boutique input { background: var(--fu-carte, #fff); }

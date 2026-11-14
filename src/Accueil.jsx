@@ -111,11 +111,11 @@ const LEGAL = [
 //   · Tablette et petit ordinateur.
 //   · Téléphone.
 const CSS = `
-.av{--fond:#FFFFFF;--fond2:#F5F5F7;--encre:#1D1D1F;--gris:#6E6E73;--accent:#0071E3;--accent-texte:#0066CC;--nuit:#1D1D1F;--nuit-encre:#F5F5F7;--nuit-gris:#A1A1A6;--cadre:#1D1D1F;--ombre:0 1px 2px rgba(0,0,0,.06),0 24px 48px -12px rgba(0,0,0,.18);
+.av{--fond:#FFFFFF;--fond2:#F5F5F7;--encre:#1D1D1F;--gris:#6E6E73;--accent:#0071E3;--accent-texte:#0066CC;--nuit:#1D1D1F;--nuit-encre:#F5F5F7;--nuit-gris:#98989D;--cadre:#1D1D1F;--ombre:0 1px 2px rgba(0,0,0,.06),0 24px 48px -12px rgba(0,0,0,.18);
   position:relative;background:var(--fond);color:var(--encre);min-height:100vh;overflow-x:clip;
   font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display','Inter','Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
   -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;font-size:17px;line-height:1.5;letter-spacing:-.01em}
-@media (prefers-color-scheme:dark){.av{--fond:#000000;--fond2:#161617;--encre:#F5F5F7;--gris:#A1A1A6;--accent-texte:#2997FF;--nuit:#1C1C1E;--cadre:#2C2C2E;--ombre:0 0 0 .5px rgba(255,255,255,.12),0 24px 48px -12px rgba(0,0,0,.6)}}
+@media (prefers-color-scheme:dark){.av{--fond:#000000;--fond2:#161617;--encre:#F5F5F7;--gris:#98989D;--accent-texte:#2997FF;--nuit:#1C1C1E;--cadre:#2C2C2E;--ombre:0 0 0 .5px rgba(255,255,255,.12),0 24px 48px -12px rgba(0,0,0,.6)}}
 @supports not (overflow-x:clip){.av{overflow-x:hidden}}
 .av *{box-sizing:border-box}
 .av ::selection{background:rgba(0,113,227,.24)}
@@ -130,9 +130,9 @@ const CSS = `
 .av-nav .av-in{display:flex;align-items:center;gap:8px;height:56px}
 .av-marque{display:flex;align-items:center;gap:8px;text-decoration:none;flex-shrink:0;min-height:44px}
 .av-marque img{width:28px;height:28px;border-radius:8px;display:block;background:#1D1D1F;padding:2px;object-fit:contain}
-.av-marque b{font-size:19px;font-weight:700;letter-spacing:.02em}
+.av-marque b{font-size:20px;font-weight:700;letter-spacing:.02em}
 .av-liens{display:flex;gap:4px;margin-left:24px}
-.av-liens a{font-size:14px;color:var(--gris);text-decoration:none;padding:12px 10px;border-radius:8px;transition:color 150ms ease}
+.av-liens a{font-size:15px;color:var(--gris);text-decoration:none;padding:12px 10px;border-radius:8px;transition:color 150ms ease}
 @media (hover:hover) and (pointer:fine){.av-liens a:hover{color:var(--encre)}}
 .av-droite{margin-left:auto;display:flex;align-items:center;gap:4px}
 .av .av-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:48px;padding:0 24px;border-radius:999px;border:none;cursor:pointer;font:inherit;font-size:17px;font-weight:600;letter-spacing:-.01em;text-decoration:none;white-space:nowrap;background:var(--accent);color:#FFFFFF;transition:transform 120ms cubic-bezier(.23,1,.32,1),background-color 150ms ease}
@@ -140,16 +140,16 @@ const CSS = `
 @media (hover:hover) and (pointer:fine){.av .av-btn:hover{background:#0077ED}}
 .av .av-btn.av-btn-exemple{background:var(--fond2);color:var(--encre)}
 @media (hover:hover) and (pointer:fine){.av .av-btn.av-btn-exemple:hover{background:var(--fond2);filter:brightness(.96)}}
-.av .av-lien{display:inline-flex;align-items:center;min-height:44px;padding:0 8px;font-size:17px;color:var(--accent-texte);text-decoration:none;font-weight:500}
+.av .av-lien{display:inline-flex;align-items:center;min-height:44px;padding:0 8px;font-size:17px;color:var(--accent-texte);text-decoration:none;font-weight:400}
 .av .av-lien span{transition:transform 150ms cubic-bezier(.23,1,.32,1);display:inline-block;margin-left:3px}
 @media (hover:hover) and (pointer:fine){.av .av-lien:hover{text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:1px}.av .av-lien:hover span{transform:translateX(2px)}}
-.av-nav .av-btn{min-height:36px;padding:0 16px;font-size:14px;opacity:0;pointer-events:none;transform:translateY(4px);transition:opacity 160ms ease,transform 160ms ease}
+.av-nav .av-btn{min-height:36px;padding:0 16px;font-size:15px;opacity:0;pointer-events:none;transform:translateY(4px);transition:opacity 160ms ease,transform 160ms ease}
 .av-nav .av-btn.la{opacity:1;pointer-events:auto;transform:none}
-.av-nav .av-lien{font-size:14px}
+.av-nav .av-lien{font-size:15px}
 .av-hero{padding:72px 0 0;text-align:center}
 .av-pour{font-size:clamp(15px,1.2vw,17px);font-weight:600;color:var(--gris);margin:0 auto 14px;max-width:30em;text-wrap:balance}
 .av-h1{font-size:clamp(36px,5.2vw,76px);line-height:1.04;letter-spacing:-.035em;font-weight:700;max-width:16em;margin:0 auto;text-wrap:balance}
-.av-sous{font-size:clamp(19px,1.7vw,24px);line-height:1.4;color:var(--gris);max-width:34em;margin:24px auto 0;text-wrap:balance;letter-spacing:-.015em}
+.av-sous{font-size:clamp(20px,1.7vw,24px);line-height:1.4;color:var(--gris);max-width:34em;margin:24px auto 0;text-wrap:balance;letter-spacing:-.015em}
 .av-actions{display:flex;align-items:center;justify-content:center;gap:12px 20px;margin-top:32px;flex-wrap:wrap}
 .av-prix-ligne{margin-top:20px;font-size:15px;color:var(--gris);line-height:1.5}
 .av-prix-ligne b{color:var(--encre);font-weight:600}
@@ -166,7 +166,7 @@ const CSS = `
 .av-journee{padding:160px 0 40px}
 .av-journee-tete{max-width:780px}
 .av-h2{font-size:clamp(30px,3.6vw,48px);line-height:1.08;letter-spacing:-.03em;font-weight:700;text-wrap:balance}
-.av-chapo{font-size:clamp(18px,1.5vw,21px);color:var(--gris);margin-top:16px;max-width:36em;line-height:1.45}
+.av-chapo{font-size:clamp(17px,1.4vw,20px);color:var(--gris);margin-top:16px;max-width:36em;line-height:1.45}
 .av-split{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:96px;margin-top:72px;align-items:start}
 .av-plateau{position:sticky;top:max(80px,calc(50vh - 330px));height:640px;display:flex;justify-content:center}
 .av-plateau .av-tel{position:relative;width:300px;height:fit-content}
@@ -176,9 +176,9 @@ const CSS = `
 .av-pile img{width:100%;height:100%;object-fit:cover;border-radius:0}
 .av-moment{min-height:72vh;display:flex;flex-direction:column;justify-content:center;padding:40px 0}
 .av-moment h3{font-size:clamp(26px,2.6vw,36px);line-height:1.12;letter-spacing:-.028em;font-weight:700;text-wrap:balance;max-width:16em}
-.av-moment p{margin-top:16px;max-width:34em;font-size:19px;line-height:1.5;color:var(--encre)}
+.av-moment p{margin-top:16px;max-width:34em;font-size:20px;line-height:1.5;color:var(--encre)}
 .av-moment ul{list-style:none;padding:0;margin-top:24px;display:flex;flex-direction:column;gap:12px;max-width:34em}
-.av-moment li{position:relative;padding-left:20px;font-size:16px;color:var(--gris);line-height:1.45}
+.av-moment li{position:relative;padding-left:20px;font-size:17px;color:var(--gris);line-height:1.45}
 .av-moment li:before{content:"";position:absolute;left:2px;top:.6em;width:6px;height:6px;border-radius:50%;background:var(--gris)}
 .av-moment .av-tel-seul{display:none}
 .av-temps{padding:120px 0 0}
@@ -190,8 +190,8 @@ const CSS = `
 .av-etapes{list-style:none;padding:0;margin-top:32px;display:flex;flex-direction:column;gap:28px;counter-reset:e}
 .av-etapes li{display:grid;grid-template-columns:36px 1fr;gap:16px;align-items:start}
 .av-etapes .n{width:32px;height:32px;border-radius:50%;background:var(--encre);color:var(--fond);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;font-variant-numeric:tabular-nums}
-.av-etapes h3{font-size:19px;font-weight:600;letter-spacing:-.015em;line-height:1.3}
-.av-etapes p{margin-top:4px;font-size:16px;color:var(--gris)}
+.av-etapes h3{font-size:20px;font-weight:600;letter-spacing:-.015em;line-height:1.3}
+.av-etapes p{margin-top:4px;font-size:17px;color:var(--gris)}
 .av-note{font-size:15px!important;color:var(--gris)}
 .av-prix{padding:160px 0 0}
 .av-prix-tete{max-width:780px}
@@ -202,7 +202,7 @@ const CSS = `
 .av-offre-pro{background:var(--nuit);color:var(--nuit-encre)}
 .av-montant{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 12px;margin-top:16px;font-variant-numeric:tabular-nums}
 .av-montant b{font-size:clamp(56px,6vw,88px);font-weight:700;letter-spacing:-.045em;line-height:.95}
-.av-montant span{white-space:nowrap;font-size:19px;color:var(--gris)}
+.av-montant span{white-space:nowrap;font-size:20px;color:var(--gris)}
 .av-offre-pro .av-montant span{color:var(--nuit-gris)}
 .av-prix-pied{margin-top:40px;max-width:40em}
 .av-prix-pied p{font-size:17px;line-height:1.55}
@@ -214,9 +214,9 @@ const CSS = `
 .av-faq{padding:160px 0 0}
 .av-faq-grille{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,8fr);gap:64px;align-items:start}
 .av-faq-texte{columns:2;column-gap:56px}
-.av-faq-texte p{break-inside:avoid;margin:0 0 24px;font-size:16px;line-height:1.55;color:var(--gris)}
+.av-faq-texte p{break-inside:avoid;margin:0 0 24px;font-size:17px;line-height:1.55;color:var(--gris)}
 .av-faq-q{break-inside:avoid;margin:0 0 24px}
-.av-faq-q>h3{font-size:16px;line-height:1.55;color:var(--encre);font-weight:600}
+.av-faq-q>h3{font-size:17px;line-height:1.55;color:var(--encre);font-weight:600}
 .av-faq-texte .av-faq-q p{margin:0}
 .av-auto{margin:8px 0 0;padding-left:1.2em;font-size:17px;line-height:1.55;max-width:34em}
 .av-faq-texte a{color:var(--accent-texte);text-underline-offset:3px}

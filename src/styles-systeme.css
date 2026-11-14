@@ -67,7 +67,7 @@
 
   /* Hauteur d'un contrôle : 44 au doigt ; 36 à la souris (plus bas). */
   --d-h-ctrl: 44px;
-  --d-h-filtre: 44px;              /* une pilule de filtre, une puce : 44 au doigt, 32 à la souris */
+  --d-h-filtre: 44px;              /* une pilule de filtre, une puce : 44 au doigt, 36 à la souris (14 nov. : plus de 32) */
   --d-t-ctrl: 15px;
 
   /* Surfaces — le « groupé » d'iOS. */
@@ -139,6 +139,7 @@
   --w-ombre-tete: 0 1px 2px rgba(0,0,0,.06), 0 12px 32px -16px rgba(16,24,40,.40);
   /* La colonne de gauche (DA 5) */
   --n2-encre: var(--d-encre); --n2-accent: var(--d-accent);
+  --n2-libelle: var(--d-encre);    /* (14 nov.) le libellé de la colonne est l'ENCRE (#2C2C2E / #E5E5EA : deux gris de plus) */
   --n2-b-reflet: none;             /* plus de reflet en dégradé sur un bouton */
 }
 :root:root[data-theme="dark"] {
@@ -161,11 +162,12 @@
   --d-ombre-carte: none;
   --d-ombre-flottant: 0 0 0 .5px rgba(255,255,255,.09), 0 24px 56px rgba(0,0,0,.6);
   --w-ombre-tete: 0 0 0 .5px rgba(255,255,255,.08);
+  --n2-libelle: var(--d-encre);
 }
 /* À la souris (ordinateur), les contrôles sont plus bas : un écran d'ordinateur n'est pas
    un téléphone agrandi (règle 4 de la revue du 11 nov.). Au doigt (iPad compris), 44. */
 @media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  :root:root { --d-h-ctrl: 36px; --d-h-filtre: 32px; --d-t-ctrl: 13px; --d-t-44: 44px; }
+  :root:root { --d-h-ctrl: 36px; --d-h-filtre: 36px; --d-t-ctrl: 13px; --d-t-44: 44px; }
 }
 
 /* ══ 2. LES FORMES ═══════════════════════════════════════════════════════════ */
@@ -190,8 +192,8 @@
 
 /* ── 2.2 LES SURFACES : rayon 20, l'ombre posée, aucun cadre ─────────────── */
 :root:root body .vrm-main :is(.vrm-toutes-liste, .vrm-day-task-list, .vrm-buy-list, .vrm-msg-list, .vrm-colis-carte, .vrm-a-venir,
-  .vrm-colis-prochain, .vrm-ann-geste, details.vrm-quick-settings, .vrm-ann-card, .vrm-ios-groupe, .vrm-reglages-groupe,
-  .vrm-set-liste, .vrm-settings-todo, .vrm-fu-panneau, .vrm-set-groupe,
+  .vrm-colis-prochain, .vrm-ann-geste, details.vrm-quick-settings, .vrm-ann-card, .vrm-ios-carte, .vrm-reglages-groupe,
+  .vrm-set-liste, .vrm-settings-todo, .vrm-fu-panneau,
   .vrm-sv-tuile, .vrm-sv-carte, .vrm-onglet-manque, .vrm-d7-carte, .vrm-fp-section, .vrm-boite-liste-col, .vrm-rpf-point,
   .vrm-sx, .vrm-guide.vrm-pa-carte, .vrm-carte-mfa, .vrm-sp-rec, .vrm-compta-replis) {
   border-radius: var(--d-r-carte) !important; border: 0 !important; box-shadow: var(--d-ombre-carte) !important;
@@ -297,7 +299,7 @@
 }
 /* Le compte d'un segment choisi, la nuit : #98989D sur #636366 ne tenait que 2,1:1 (mesuré) — l'encre (5,8:1). */
 :root:root[data-theme="dark"] body .vrm-main :is(.vrm-seg, .vrm-sel-sites, .vrm-messages-sections) > button:is([aria-pressed="true"], .is-actif, [aria-current="page"]) .vrm-seg-n { color: var(--d-encre) !important; opacity: .85 !important; }
-/* Les filtres (pilules) : 44 au doigt, 32 à la souris ; l'actif à l'encre pleine. */
+/* Les filtres (pilules) : 44 au doigt, 36 à la souris ; l'actif à l'encre pleine. */
 :root:root body .vrm-main :is(.vrm-filtres:not(.vrm-filtre-site) button, .vrm-stock-views > button, .vrm-inbox-filters > button, .vrm-compte-puce, .vrm-pop-chip) {
   border-radius: var(--d-r-pilule) !important; font-weight: 600 !important; min-height: var(--d-h-filtre) !important;
 }
@@ -359,5 +361,138 @@
   :root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b:active { transform: none !important; }
   :root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b { transition: background-color var(--d-m-court) ease, color var(--d-m-court) ease, opacity var(--d-m-court) ease !important; }
 }
+
+/* ── 2.10 LA PASSE ÉCRAN PAR ÉCRAN (14 nov.) ──────────────────────────────────
+   Ce que `scripts/bancs/design-passe.cjs` a MESURÉ hors du système sur Ma journée, Ventes,
+   Colis, Annonces, Stock, Argent, Paramètres (390 tactile et 1512, clair et sombre).
+   Récit : docs/passation/2026-11-14-design-passe.md. Aucun texte, chiffre ni geste ne change. */
+
+/* Trois graisses : le 500 des feuilles d'avant (DA 1-4) redescend à 400 pour une note, monte à
+   600 pour un libellé ou un titre de rangée. (Les styles EN LIGNE ont été ramenés à la source.) */
+:root:root body :is(.vrm-app-shell, .vrm-fs, .vrm-fp) [style*="font-weight: 500"] { font-weight: 400 !important; }
+:root:root body .vrm-main :is([data-colis-limite-texte]:not([style*="font-weight: 600"]), .vrm-fu-sous-nom, .vrm-argent-w-note, .vrm-ap-ligne-t, [data-fu-gestes], .vrm-phrase-ecran, .vrm-set b, .vrm-ios-rangee b) { font-weight: 400 !important; }
+:root:root body :is(.vrm-app-shell, .vrm-fs) :is(.vrm-set-titre, .vrm-compta-repli-titre, .vrm-rail-section-label, .vrm-nav-label, .vrm-argent-w-l) { font-weight: 600 !important; }
+
+/* Le compte d'un segment ou d'un filtre (« Envoyés · 18 », « À compléter 36 ») : le gris sur la
+   piste grise ne tenait que 3,1 à 4,4:1 (mesuré) — l'encre du libellé, en 400 : la graisse
+   sépare le compte du mot, sans un gris de plus. */
+:root:root body .vrm-main :is(.vrm-seg-n, .vrm-filtres .vrm-of-n, .vrm-stock-views .vrm-of-n) { color: inherit !important; opacity: 1 !important; font-weight: 400 !important; }
+:root:root body .vrm-main .vrm-seg-n.vrm-seg-n[style*="color"] { color: inherit !important; }
+
+/* L'échelle des tailles (11 · 12 · 13 · 15 · 17 · 20 · 28 · 34 · 40/44). */
+:root:root body .vrm-main .vrm-colis-section-titre { font-size: var(--d-t-20) !important; letter-spacing: var(--d-ap-22) !important; }
+:root:root body .vrm-main :is(.vrm-lib-court.vrm-lib-court, .vrm-ann-compte-n, .vrm-pop-chip) { font-size: var(--d-t-13) !important; }
+:root:root body .vrm-main .vrm-ann-card [data-prix][data-prix] { font-size: var(--d-t-20) !important; }
+:root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-titre][data-titre] { font-size: var(--d-t-15) !important; }
+:root:root body .vrm-main :is(.vrm-fu-jour, .vrm-jv2-jour) > b { font-size: var(--d-t-15) !important; }
+:root:root body .vrm-main .vrm-argent-w .vrm-argent-w-n:not([data-argent-pas-su]) { font-size: var(--d-t-28) !important; }
+:root:root body .vrm-main .vrm-argent-w .vrm-argent-w-n[data-argent-pas-su] { font-size: var(--d-t-20) !important; font-weight: 400 !important; }
+
+/* UN gris de texte : les gris « un cran plus sombres » écrits pour une tuile grise (#5E5E63) et
+   ceux de la colonne (#636366) lisent LE gris ; la tuile est blanche depuis le 13 nov. (5,1:1). */
+:root:root body .vrm-main .vrm-argent-w { --w-gris: var(--d-gris) !important; }
+:root:root body .vrm-app-shell .vrm-barre-kbd { color: var(--d-gris) !important; opacity: 1 !important; }
+/* (La colonne de gauche garde SON gris, `--n2-titre` #636366 : sur le panneau #E5E5EA, LE gris ne tiendrait que
+   4,1:1 — mesuré. C'est le seul autre gris de texte, et il ne vit que sur ce panneau.) */
+:root:root body .vrm-app-shell .vrm-sidebar .vrm-rail-section-label { color: var(--n2-titre) !important; opacity: 1 !important; }
+:root:root body .vrm-app-shell .vrm-barre-kbd.vrm-barre-kbd { background: var(--d-carte) !important; border: 0 !important; }
+:root:root body .vrm-app-shell .vrm-nav-offre { color: var(--d-encre) !important; background: var(--d-remplir) !important; }
+
+/* Paramètres : la SECTION (titre + groupe) n'est pas une carte — seule la liste l'est. L'ombre posée sur la section
+   (transparente) dessinait un liseré autour du titre « Mes comptes » : une carte dans une carte. */
+:root:root body .vrm-main .vrm-set-groupe { box-shadow: none !important; border-radius: 0 !important; }
+
+/* La colonne de gauche : ses libellés au texte d'un contrôle (13 à la souris, 15 au doigt), plus 14. */
+:root:root body .vrm-app-shell .vrm-sidebar .vrm-rail-lib { font-size: var(--d-t-ctrl) !important; }
+
+/* Les cibles à la souris : 36 px au moins (« Choisir la vente », la feuille du rappel). */
+:root:root body .vrm-main .vrm-colis-choisir { min-height: var(--d-h-ctrl) !important; font-size: var(--d-t-13) !important; }
+
+/* ── 2.11 LA PASSE, SECONDE MOITIÉ (14 nov.) ─────────────────────────────────
+   Ce que `scripts/bancs/design-passe-2.cjs` a MESURÉ (et ce qui s'est VU sur ses captures) sur
+   Messages, E-mails, Achats, eBay, Leboncoin, Vestiaire, les sous-pages de Paramètres, les
+   feuilles, la connexion, l'accueil, l'exemple et la carte de démarrage.
+   Récit : docs/passation/2026-11-14-design-passe-2.md. Aucun texte, chiffre ni geste ne change. */
+
+/* Achats · À retirer : `.vrm-rp` est AUSSI la carte du programme de Republier (repub-programme.css,
+   bord 1 px, rayon 12, intérieur 12) — la liste des retraits la recevait : chaque point devenait
+   une carte DANS une carte. La liste n'est qu'un contenant ; les points sont les cartes. */
+:root:root body .vrm-main .vrm-rp.vrm-rpf { background: transparent !important; border: 0 !important; border-radius: 0 !important; padding: 0 !important; box-shadow: none !important; }
+
+/* Un groupe de Réglages (`GroupeIos` : titre + carte) n'est PAS une carte : seule `.vrm-ios-carte` l'est.
+   Le groupe en carte dessinait le titre (« Réglages eBay ») DANS un cadre, et la liste en second cadre. */
+:root:root body .vrm-main section.vrm-ios-groupe.vrm-ios-groupe { background: transparent !important; box-shadow: none !important; border-radius: 0 !important; border: 0 !important; }
+:root:root body .vrm-main section.vrm-ios-groupe > .vrm-ios-carte { background: var(--d-carte) !important; border-radius: var(--d-r-carte) !important; box-shadow: var(--d-ombre-carte) !important; border: 0 !important; }
+:root:root body .vrm-main section.vrm-ios-groupe > .vrm-ios-groupe-titre { margin-left: var(--d-e-4) !important; color: var(--d-gris) !important; }
+
+/* La rangée de Réglages : 17 (le corps d'iOS), plus 16 ; sa tuile d'initiale 13. */
+:root:root body :is(.vrm-main, .vrm-fs) .vrm-ios-titre { font-size: var(--d-t-17) !important; }
+:root:root body :is(.vrm-main, .vrm-fs) .vrm-ios-icone:is(.vrm-secu-initiale, .vrm-vac-initiale) { font-size: var(--d-t-13) !important; }
+:root:root body .vrm-main :is([data-secu-jour-n], [data-secu-jour-n] ~ td, table:has([data-secu-jour-n]) th, .vrm-vac-note, .vrm-rp-vide p) { font-size: var(--d-t-13) !important; }
+:root:root body .vrm-main select.vrm-np-soir { min-height: var(--d-h-ctrl) !important; border-radius: var(--d-r-pilule) !important; }
+/* Les cartes d'une sous-page de Paramètres écrites en ligne (« Ce que tu reçois sur ton téléphone », « Heures calmes »…) :
+   un cadre 1 px et un rayon 12 — des cartes du système (rayon 20, l'ombre posée, aucun cadre). Une carte DANS une carte
+   devient une case (rayon 12, pas d'ombre). */
+:root:root body .vrm-main .vrm-set [data-sous-ecran] :is(div, details)[style*="border: 1px solid"][style*="border-radius: 12px"][style*="background"] {
+  border: 0 !important; border-radius: var(--d-r-carte) !important; box-shadow: var(--d-ombre-carte) !important; background-color: var(--d-carte) !important;
+}
+:root:root body .vrm-main .vrm-set [data-sous-ecran] :is(div, details)[style*="border: 1px solid"][style*="border-radius: 12px"][style*="background"] :is(div, details)[style*="border: 1px solid"][style*="border-radius: 12px"][style*="background"] {
+  border-radius: var(--d-r-case) !important; box-shadow: none !important; background-color: var(--d-case) !important;
+}
+
+/* Le retour d'une sous-page : 17 au doigt (iOS), le texte d'un contrôle à la souris (plus 14). */
+:root:root body .vrm-app-shell .vrm-set .vrm-set-retour { font-size: var(--d-t-17) !important; }
+@media (hover: hover) and (pointer: fine) and (min-width: 768px) { :root:root body .vrm-app-shell .vrm-set .vrm-set-retour { font-size: var(--d-t-15) !important; border: 0 !important; background: transparent !important; } }
+
+/* Achats : la rangée d'un achat — titre 15/600, montant 15/600 tabulaire (sa pastille d'état : 12/600, à la source) ; « ⋯ » à l'encre
+   (le gris sur le rond gris ne tenait que 4,4:1) ; le chevron d'un retrait à 17. */
+:root:root body .vrm-app-shell .vrm-main .vrm-buy-title.vrm-buy-title { font-size: var(--d-t-15) !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-buy-price.vrm-buy-price { font-size: var(--d-t-15) !important; font-weight: 600 !important; font-variant-numeric: tabular-nums; }
+:root:root body .vrm-main .vrm-rpf-chevron.vrm-rpf-chevron { font-size: var(--d-t-17) !important; }
+:root:root body .vrm-main .vrm-buy-more.vrm-buy-more { color: var(--d-encre) !important; }
+:root:root body .vrm-main details.vrm-recus-email > summary { min-height: var(--d-h-ctrl) !important; display: flex !important; align-items: center !important; }
+
+/* Le compte d'un filtre CHOISI (eBay « Toutes 4 », E-mails « Tout 6 ») : à l'encre de son libellé, la nuit
+   (le gris à .75 sur #636366 ne tenait que 3,9 à 4,2:1). */
+:root:root body .vrm-main :is([data-ebay-filtre], [data-boite-rubrique]) > span { opacity: 1 !important; color: inherit !important; }
+:root:root body .vrm-main .vrm-boite-n { opacity: 1 !important; color: inherit !important; }
+
+/* Leboncoin : l'écran suit la colonne des autres écrans (bord gauche), plus une colonne de 920 px centrée
+   dont rien ne s'alignait avec le titre ni avec « Publier sur Leboncoin ». */
+@media (min-width: 1024px) {
+  :root:root body .vrm-main .vrm-lbc-ecran { max-width: none !important; margin-left: 0 !important; margin-right: 0 !important; align-self: stretch !important; padding-left: var(--d-e-4) !important; padding-right: var(--d-e-4) !important; }
+}
+
+/* La carte « Démarrer avec VRM » : ses liens d'action s'alignent sur le texte (plus 8 px de retrait sous la phrase). */
+:root:root body .vrm-main .vrm-pa-carte :is(.vrm-pa-carte-note, .vrm-pa-carte-pied) .vrm-b.vrm-b-discret { padding-left: 0 !important; padding-right: 0 !important; }
+
+/* Leboncoin : « Republier » et « Baisser le prix » sont deux cartes du système (l'une avait un cadre 1 px, l'autre pas),
+   leur geste le bouton secondaire (l'un était une capsule grise 15, l'autre un rectangle encadré 13) ; la recherche
+   de « Mes annonces » est la capsule remplie de toute recherche. */
+:root:root body .vrm-main :is([data-repub-lbc-porte], [data-lbc-baisse-porte]) { background: var(--d-carte) !important; border: 0 !important; border-radius: var(--d-r-carte) !important; box-shadow: var(--d-ombre-carte) !important; }
+:root:root body .vrm-main :is([data-repub-lbc-ouvrir], [data-lbc-baisse-ouvrir]) { background: var(--d-remplir) !important; color: var(--d-encre) !important; border: 0 !important; border-radius: var(--d-r-pilule) !important; min-height: var(--d-h-ctrl) !important; font-size: var(--d-t-ctrl) !important; font-weight: 600 !important; }
+:root:root body .vrm-main .vrm-lbc-ecran.vrm-lbc-ecran input[type="search"][type="search"] { background: var(--d-remplir) !important; border: 0 !important; border-radius: var(--d-r-pilule) !important; min-height: var(--d-h-ctrl) !important; padding-left: var(--d-e-4) !important; }
+
+/* « Publier sur Leboncoin » : son écran n'a pas de marge à lui — l'entrée allait bord à bord au téléphone (0 → 390)
+   et débordait la colonne à l'ordinateur ; elle prend la marge de la page. Sur Vestiaire (l'écran a sa marge), aucune
+   de plus (elle était rentrée de 8 px par rapport à la carte du dessous). */
+:root:root body .vrm-app-shell .vrm-main .vrm-pa-entree.vrm-pa-entree[data-pa-entree="leboncoin"] { margin-left: var(--d-marge) !important; margin-right: var(--d-marge) !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-pa-entree.vrm-pa-entree[data-pa-entree="vestiaire"] { margin-left: 0 !important; margin-right: 0 !important; }
+
+/* Leboncoin · « Mes annonces » : la section est TRANSPARENTE (ses vignettes sont les cartes) ; son ombre posée y dessinait
+   un cadre vide autour de « Données », une carte dans ce cadre. Plus d'ombre ; « Données » au bord de la colonne. */
+:root:root body .vrm-app-shell .vrm-main section.vrm-lbc-catalog { box-shadow: none !important; border: 0 !important; }
+:root:root body .vrm-app-shell .vrm-main section.vrm-lbc-catalog > .vrm-bilan-sync.vrm-bilan-sync { margin-left: 0 !important; margin-right: 0 !important; }
+:root:root body .vrm-app-shell .vrm-main section.vrm-lbc-catalog > details.vrm-bilan-sync > summary { min-height: var(--d-h-ctrl) !important; align-items: center !important; }
+
+/* Les feuilles : le lien d'une feuille est le texte bleu, jamais l'aplat (#0071E3 sur le fond : 4,2:1). */
+:root:root body .vrm-fs a[href^="mailto:"] { color: var(--d-accent-texte) !important; }
+/* La confirmation : un mot par ligne, jamais « Se déconnecter / partout » sur deux lignes à 390 px — les deux
+   gestes prennent chacun sa place (le principal d'abord, la largeur de son texte). */
+:root:root body .vrm-fs.vrm-confirmation .vrm-b.vrm-b { white-space: nowrap !important; flex: 1 1 auto !important; }
+:root:root body .vrm-fs.vrm-confirmation .vrm-b.vrm-b-discret { flex: 0 1 auto !important; }
+
+/* Messages (« Choisis une conversation ») : la note est LE gris plein — à 80 % d'opacité, 3,1:1 sur le fond. */
+:root:root body .vrm-main .vrm-message-workspace .vrm-chat-empty small { opacity: 1 !important; color: var(--d-gris) !important; }
 
 } /* fin @layer vrm-premium */

@@ -974,10 +974,10 @@ export default function CarteRelaisColis({ donnees, C, compacte = false, sansLis
     <div className="vrm-relais-carte" data-relais-carte={ouverte ? 'ouverte' : 'fermee'} data-relais-points={groupes.length} data-relais-arrives={nArr} data-relais-attendus={nAtt} style={{ marginBottom: 14, border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, overflow: 'hidden' }}>
       <button type="button" onClick={() => setOuverte((o) => !o)} aria-expanded={ouverte} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', minHeight: 44, padding: '10px 14px', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
         <span style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ display: 'block', fontSize: 14, fontWeight: 700, color: C.text }}>Par point relais</span>
+          <span style={{ display: 'block', fontSize: 15, fontWeight: 700, color: C.text }}>Par point relais</span>
           <span style={{ display: 'block', ...muted }}>{groupes.length ? `${groupes.length} point${groupes.length > 1 ? 's' : ''} · ${nArr} déjà arrivé${nArr > 1 ? 's' : ''}${nAtt ? ` · ${nAtt} attendu${nAtt > 1 ? 's' : ''}` : ''}` : 'Aucune destination encore connue'}</span>
         </span>
-        <span aria-hidden="true" style={{ fontSize: 16, color: C.muted }}>{ouverte ? '▴' : '▾'}</span>
+        <span aria-hidden="true" style={{ fontSize: 15, color: C.muted }}>{ouverte ? '▴' : '▾'}</span>
       </button>
       {ouverte && (
         <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -987,7 +987,7 @@ export default function CarteRelaisColis({ donnees, C, compacte = false, sansLis
             return (
               <div key={g.cle} data-relais-point={g.cle} data-relais-point-arrives={g.nArrives} data-relais-point-attendus={g.nAttendus} data-relais-repere={er}
                 style={{ borderTop: `1px solid ${C.border}`, paddingTop: 10, outline: choisi === g.cle ? `2px solid ${C.accent}` : 'none', outlineOffset: 2, borderRadius: 4 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{nomDe(g)}</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{nomDe(g)}</div>
                 {g.adresse ? <div style={muted}>{g.adresse}</div> : null}
                 {er === 'non' && !g.inconnu && <div data-relais-sans-repere="" style={{ ...muted, fontSize: 11.5 }}>{!g.geocode ? "Pas sur la carte : l'adresse lue est incomplète (il faut la rue et le code postal)." : "Pas sur la carte : cette adresse n'a pas été trouvée sûrement."}</div>}
                 {g.nArrives > 0 && <div data-relais-ligne="arrives" style={{ fontSize: 13, color: C.text, marginTop: 4 }}><b>{g.nArrives}</b> déjà arrivé{g.nArrives > 1 ? 's' : ''}{(() => { const sc = g.arrives.filter((c) => !c.aCode).length; return sc ? ` · ${sc} sans code pour l'instant` : ''; })()}</div>}

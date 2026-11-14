@@ -35,7 +35,7 @@ html body .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-hello {
   letter-spacing: -.02em !important; color: var(--vrm-ink) !important; white-space: normal !important; overflow: visible !important; margin: 0 !important;
 }
 html body .vrm-app-shell .vrm-day-layout .vrm-day-greeting :is(.vrm-day-date, .vrm-day-todo) {
-  display: inline !important; flex: 0 0 auto !important; font-size: 15px !important; font-weight: 500 !important; line-height: 1.4 !important;
+  display: inline !important; flex: 0 0 auto !important; font-size: 15px !important; font-weight: 600 !important; line-height: 1.4 !important;
   color: var(--vrm-muted) !important; margin: 0 !important; grid-column: auto !important; white-space: nowrap;
 }
 /* (2 nov.) Le point sépare la date et le nombre de choses à faire quand ils sont
@@ -105,8 +105,8 @@ html body .vrm-app-shell .vrm-day-layout .vrm-une-ligne[data-lignes="2"] { white
 html body .vrm-app-shell .vrm-day-layout .vrm-day-task-title.vrm-une-ligne[data-lignes="2"] { max-height: 2.7em; }
 html body .vrm-app-shell .vrm-day-layout .vrm-day-task-title { font-size: 15px !important; font-weight: 600 !important; line-height: 1.35 !important; color: var(--vrm-ink) !important; margin: 0 !important; }
 html body .vrm-app-shell .vrm-day-layout .vrm-day-task-note { font-size: 13px !important; font-weight: 400 !important; line-height: 1.4 !important; color: var(--vrm-muted) !important; margin: 0 !important; }
-html body .vrm-app-shell .vrm-day-layout .vrm-day-task-note.is-urgent { color: var(--vrm-warn) !important; font-weight: 500 !important; }
-html body .vrm-app-shell .vrm-day-layout .vrm-day-task-action { font-size: 15px; font-weight: 500; color: var(--vrm-muted); white-space: nowrap; flex-shrink: 0; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-task-note.is-urgent { color: var(--vrm-warn) !important; font-weight: 400 !important; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-task-action { font-size: 15px; font-weight: 600; color: var(--vrm-muted); white-space: nowrap; flex-shrink: 0; }
 html body .vrm-app-shell .vrm-day-layout .vrm-day-task-geste { flex-shrink: 0; }
 @media (max-width: 767px) {
   html body .vrm-app-shell .vrm-day-layout .vrm-day-task-list > .vrm-day-task,
@@ -143,17 +143,17 @@ html body .vrm-app-shell .vrm-day-layout .vrm-day-bar > .vrm-day-case > button[d
 html body .vrm-app-shell .vrm-day-layout .vrm-day-bar > .vrm-day-case > button[data-tuile]:focus-visible { outline: 2px solid var(--vrm-focus, var(--vrm-accent)); outline-offset: -2px; }
 html body .vrm-app-shell .vrm-day-layout .vrm-day-bar .vrm-day-bar-ic { display: grid; place-items: center; width: 20px; height: 20px; margin: 0 !important; flex: 0 0 auto; }
 html body .vrm-app-shell .vrm-day-layout .vrm-day-bar .vrm-day-bar-n {
-  font-family: var(--vrm-police-mono) !important; font-weight: 500 !important; font-size: 20px !important; line-height: 1 !important; letter-spacing: -.02em !important;
+  font-family: var(--vrm-police-mono) !important; font-weight: 600 !important; font-size: 20px !important; line-height: 1 !important; letter-spacing: -.02em !important;
   font-variant-numeric: tabular-nums; margin: 0 !important; flex: 0 0 auto; position: static !important;
 }
 html body .vrm-app-shell .vrm-day-layout .vrm-day-bar .vrm-day-bar-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
 html body .vrm-app-shell .vrm-day-layout :is(.vrm-day-bar, .vrm-w-tuile) .vrm-day-bar-l {
-  display: block; flex: 0 1 auto !important; flex-basis: auto !important; max-width: 100%; font-size: 15px !important; font-weight: 500 !important; line-height: 1.3 !important;
+  display: block; flex: 0 1 auto !important; flex-basis: auto !important; max-width: 100%; font-size: 15px !important; font-weight: 600 !important; line-height: 1.3 !important;
   color: var(--vrm-muted) !important; margin: 0 !important; text-align: left !important;
   white-space: normal !important; overflow: visible !important; text-overflow: clip !important; overflow-wrap: normal; hyphens: none;
 }
 html body .vrm-app-shell .vrm-day-layout :is(.vrm-day-bar, .vrm-w-tuile) .vrm-day-bar-sous {
-  display: block; font-size: 13px; font-weight: 500; line-height: 1.35; color: var(--vrm-muted); white-space: normal; overflow: visible; text-overflow: clip;
+  display: block; font-size: 13px; font-weight: 400; line-height: 1.35; color: var(--vrm-muted); white-space: normal; overflow: visible; text-overflow: clip;
 }
 html body .vrm-app-shell .vrm-day-layout :is(.vrm-day-bar, .vrm-w-tuile) .vrm-day-bar-sous.is-ambre { color: var(--vrm-warn); }
 html body .vrm-app-shell .vrm-day-layout .vrm-day-case-geste { align-self: flex-start; margin: 0 20px 12px 52px !important; min-height: 44px !important; }
@@ -211,7 +211,7 @@ html body .vrm-app-shell .vrm-day-layout .vrm-bilan-sync[data-vendus-ailleurs] {
   background: var(--vrm-bg) !important; border: 1px solid var(--vrm-line) !important; border-radius: 12px !important; box-shadow: none !important; margin-top: 0 !important;
 }
 html body .vrm-app-shell .vrm-day-layout .vrm-bilan-sync[data-vendus-ailleurs] > summary { min-height: 56px; display: flex; align-items: center; gap: 12px; padding: 8px 20px !important; font-size: 15px !important; font-weight: 600 !important; }
-html body .vrm-app-shell .vrm-day-layout .vrm-bilan-sync[data-vendus-ailleurs] > summary > span { margin-left: auto; font-size: 15px !important; font-weight: 500 !important; color: var(--vrm-muted) !important; }
+html body .vrm-app-shell .vrm-day-layout .vrm-bilan-sync[data-vendus-ailleurs] > summary > span { margin-left: auto; font-size: 15px !important; font-weight: 600 !important; color: var(--vrm-muted) !important; }
 html body .vrm-app-shell .vrm-day-layout .vrm-day-greeting { width: 100% !important; max-width: none !important; box-sizing: border-box; position: relative; }
 
 /* ── 8. LA COLONNE DE GAUCHE : aucune entrée n'a l'air désactivée ───────────

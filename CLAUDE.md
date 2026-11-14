@@ -523,6 +523,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **14 nov. · Design, passe 2** : Messages, E-mails, Achats, eBay, Leboncoin, Vestiaire, 15 sous-pages de Paramètres, feuilles, connexion, accueil, exemple, démarrage au système (banc `design-passe-2.cjs` : 1 766 défauts ⇒ 0) ; la loupe n'écrit le N° qu'une fois. `docs/passation/2026-11-14-design-passe-2.md`. Geste : aucun.
+- **14 nov. · Design, passe écran par écran** : fiche « Tout sur le N° » et loupe au système, 500 → 400/600, tailles à l'échelle, un gris, contrastes ≥ 4,5 (« 36 »), 44 doigt / 36 souris (filtres compris), titres insécables au trait d'union ; banc `design-passe` (avant 1 839 défauts, après 0). `docs/passation/2026-11-14-design-passe.md`. Geste : aucun.
 - **13 nov. · Lot 7 : le nom de la paire sur chaque colis à retirer** : une jonction par IDENTITÉ (`commandeRetrait` ; `commandeUnique` dans `api/_lib/commande-colis.js`, deux commandes ⇒ personne) pour Colis (nom + photo), mode relais, Ma journée (les noms dans la case), hors ligne, codes, et le widget (`pickupColis`, nom publié en [7]) ; mesuré 8/12 reliables, les 4 autres n'ont aucune identité en base (attendent la 5.372). `docs/passation/2026-11-13-lot7-nom-paire.md`. Geste : installer la 5.372 ; le script du widget lit `pickupColis`.
 
 - **13 nov. · Design système** : jetons `--d-*` (`src/styles-systeme.css`) lus par toutes les familles ; contient 20 · se touche capsule · montre 12 · N° 6 ; 400/600/700 ; 44 doigt / 36 souris. `docs/design/DESIGN.md`, `2026-11-13-design-systeme.md`. Geste : aucun.
@@ -530,9 +532,6 @@ sans la fonction.
 
 - **13 nov. · Démarrage en 3 étapes + exemple (lot 46/48)** : compte · extension reliée à CE compte · Vinted lu (ventes, sinon dressing), cochées sur preuve, geste exact, carte disparue à 3/3, jamais chez un installé ; « Découvrir avec des exemples » sur l'accueil et la connexion, bandeau « Créer mon compte ». `docs/passation/2026-11-13-lot4648.md`. Geste : aucun.
 
-- **13 nov. · Lot 49 (vidéos du « ? »)** : 10 vidéos 720p tournées dans la vraie app, données inventées (`scripts/films/aide-videos.cjs`), ≤ 0,8 Mo, demandées au toucher seulement. `docs/passation/2026-11-13-lot49.md`. Geste : les regarder sur l’iPhone.
-
-- **13 nov. · Vente Vestiaire sur Orion (5.374)** : capteur en ligne + rattrapage, compte lu dans la page, date = `soldDate` de « Mes ventes » (Paris), jamais l'heure de lecture. `docs/passation/2026-11-13-vestiaire-vente-orion.md`. Geste : 5.374 dans Orion, ouvrir Mes ventes.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 

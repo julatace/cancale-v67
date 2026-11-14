@@ -147,7 +147,7 @@ function Scene({ photos, index, lien = '', titre = '', sous = '', article = '', 
       <div className="vrm-visionneuse-haut" style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'max(10px, env(safe-area-inset-top)) 12px 0', pointerEvents: 'none' }}>
         {titre ? (
           <span data-visionneuse-legende="" style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, padding: '0 6px', textShadow: '0 1px 2px rgba(0,0,0,.6)' }}>
-            <b style={{ fontSize: 17, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{titre}{n > 1 ? <span data-visionneuse-compteur="" style={{ fontWeight: 500, opacity: 0.8, fontVariantNumeric: 'tabular-nums' }}>{` · ${i + 1}/${n}`}</span> : null}</b>
+            <b style={{ fontSize: 17, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{titre}{n > 1 ? <span data-visionneuse-compteur="" style={{ fontWeight: 400, opacity: 0.8, fontVariantNumeric: 'tabular-nums' }}>{` · ${i + 1}/${n}`}</span> : null}</b>
             {sous ? <small style={{ fontSize: 13, color: '#c7c7cc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sous}</small> : null}
           </span>
         ) : <span data-visionneuse-compteur="" aria-live="polite" style={{ minWidth: 44, fontSize: 15, fontWeight: 600, fontVariantNumeric: 'tabular-nums', opacity: n > 1 ? 0.9 : 0, padding: '0 6px' }}>{n > 1 ? `${i + 1}/${n}` : ''}</span>}

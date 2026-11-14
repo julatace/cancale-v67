@@ -1299,7 +1299,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
                 <div style={{fontSize:15,fontWeight:700,color:C.text}}>Supprimer les données de « {accountName(acc)} »</div>
                 <div style={{fontSize:12,color:C.muted}}>Choisis ce que tu effaces. Rien ne part tant que tu n'as pas confirmé.</div>
               </div>
-              <button type="button" onClick={()=>!delBusy&&setDelCible(null)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+              <button type="button" onClick={()=>!delBusy&&setDelCible(null)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
             <div style={{flex:1,overflow:'auto',padding:'14px 16px'}}>
               {/* Tout sélectionner / désélectionner */}
@@ -1337,7 +1337,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
                 );
                 return (
                 <div style={{border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px'}}>
-                  <div style={{fontSize:13,fontWeight:700,color:C.text}}>Pour de bon <span style={{fontWeight:500,color:C.muted}}>— ne revient jamais, même recapté</span></div>
+                  <div style={{fontSize:13,fontWeight:700,color:C.text}}>Pour de bon <span style={{fontWeight:400,color:C.muted}}>— ne revient jamais, même recapté</span></div>
                   <div className="vrm-aide" style={{fontSize:11,color:C.muted,lineHeight:1.45,margin:'3px 0 8px'}}>Compte bloqué ? Sors annonces ou messages. Ventes, compta et achats restent.</div>
                   <div style={{display:'flex',gap:8}}>
                     <BtnPDB retire={annR} onRetirer={retirerAnnoncesPourDeBon} onRemettre={remettreAnnonces} label="Annonces" attr={{'data-retirer-annonces':true}}/>
@@ -1345,7 +1345,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
                   </div>
                 </div>
                 ); })()}
-              <button type="button" onClick={bloquerDefinitif} disabled={delBusy} style={{border:'none',background:'transparent',color:C.muted,borderRadius:12,padding:'4px',fontSize:12,fontWeight:500,cursor:delBusy?'default':'pointer',fontFamily:'inherit',textDecoration:'underline'}}>Compte fermé par Vinted ? Le bloquer définitivement</button>
+              <button type="button" onClick={bloquerDefinitif} disabled={delBusy} style={{border:'none',background:'transparent',color:C.muted,borderRadius:12,padding:'4px',fontSize:12,fontWeight:400,cursor:delBusy?'default':'pointer',fontFamily:'inherit',textDecoration:'underline'}}>Compte fermé par Vinted ? Le bloquer définitivement</button>
             </div>
           </div>
         </div>
@@ -1598,7 +1598,7 @@ function PushPrefsSetting({ comptes, onMuets }) {
   return (
     <>
     <details style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 14px'}} onToggle={(e) => setOuvert(e.currentTarget.open)}>
-      <summary style={{cursor:'pointer',listStyle:'none',display:'flex',alignItems:'center',gap:8}}>
+      <summary style={{cursor:'pointer',listStyle:'none',display:'flex',alignItems:'center',gap:8,minHeight:'var(--d-h-ctrl)'}}>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:13,fontWeight:600,color:C.text}}>Ce que tu reçois sur ton téléphone</div>
           <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>
@@ -2018,7 +2018,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       <b style={{color:C.text}}>{tr('reglages.donnees.exporter')}</b>{tr('commun.deuxPoints')}{tr(ongletsCompte ? 'reglages.donnees.exporterOu.reglages' : 'reglages.donnees.exporterOu.dessous')}{AUTH.user ? <> · <b style={{color:C.text}}>{tr('reglages.donnees.supprimer')}</b>{tr('commun.deuxPoints')}{tr('reglages.donnees.supprimerOu')}</> : null}. {tr('reglages.donnees.droits')} <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accentTexte}}>{tr('reglages.donnees.confidentialite')}</a>.
       <LigneContact/>
       <div style={{display:'flex',flexWrap:'wrap',gap:'4px 16px',marginTop:10}}>
-        {DOCS_LEGAUX.map(([h,t]) => <a key={h} href={h} target="_blank" rel="noopener" style={{color:C.accentTexte,fontWeight:500,textDecoration:'none',minHeight:44,minWidth:44,display:'inline-flex',alignItems:'center'}}>{t}</a>)}
+        {DOCS_LEGAUX.map(([h,t]) => <a key={h} href={h} target="_blank" rel="noopener" style={{color:C.accentTexte,fontWeight:400,textDecoration:'none',minHeight:44,minWidth:44,display:'inline-flex',alignItems:'center'}}>{t}</a>)}
       </div>
     </div>
   );
@@ -3028,7 +3028,7 @@ function FermerCompte({ onExporter }) {
     if (r.ok) { setInfo((x) => (x && !x.proprietaire ? { ...x, prevue: null } : x)); signalerSuppression(); }
   };
   const txt = { fontSize: 13, color: C.muted, lineHeight: 1.55 };
-  const champ = { width: '100%', boxSizing: 'border-box', marginTop: 6, border: `1px solid ${C.border}`, borderRadius: 12, padding: '11px 12px', fontSize: 16, minHeight: 44, background: C.bg, color: C.text, outline: 'none', fontFamily: 'inherit' };
+  const champ = { width: '100%', boxSizing: 'border-box', marginTop: 6, border: `1px solid ${C.border}`, borderRadius: 12, padding: '11px 12px', fontSize: 15, minHeight: 44, background: C.bg, color: C.text, outline: 'none', fontFamily: 'inherit' };
   const titreBloc = { display: 'block', fontSize: 13, fontWeight: 600, color: C.text, marginTop: 14 };
   const n = info && info.nombres;
   const nb = (x, un, plusieurs) => `${x} ${x > 1 ? plusieurs : un}`;
@@ -3169,7 +3169,7 @@ function LigneContact() {
   return (
     <div data-contact="" style={{ marginTop: 9, fontSize: 13 }}>
       Contact : {e
-        ? <a href={`mailto:${e}`} style={{ color: C.accentTexte, fontWeight: 500, textDecoration: 'none' }}>{e}</a>
+        ? <a href={`mailto:${e}`} style={{ color: C.accentTexte, fontWeight: 400, textDecoration: 'none' }}>{e}</a>
         : <span data-contact-absent="" style={{ color: C.muted }}>{CONTACT_A_VENIR}</span>}
     </div>
   );
@@ -3927,7 +3927,7 @@ function ObjectifMoisSetting() {
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         <input id="vrm-objectif-mois-saisie" type="text" inputMode={eur ? 'decimal' : 'numeric'} placeholder={eur ? '2 000' : '40'} value={saisie} data-reglage-objectif-saisie=""
           onChange={(e) => setSaisie(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') enregistrer(); }}
-          style={{ flex: '1 1 auto', minWidth: 0, minHeight: 44, boxSizing: 'border-box', padding: '0 12px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, font: 'inherit', fontSize: 16, fontVariantNumeric: 'tabular-nums' }}/>
+          style={{ flex: '1 1 auto', minWidth: 0, minHeight: 44, boxSizing: 'border-box', padding: '0 12px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, font: 'inherit', fontSize: 15, fontVariantNumeric: 'tabular-nums' }}/>
         <span aria-hidden="true" style={{ color: C.muted }}>{eur ? '€' : 'ventes'}</span>
         <Bouton variante="principal" disabled={lu == null} onClick={enregistrer} data-reglage-objectif-ok="">Enregistrer</Bouton>
       </div>
@@ -4118,7 +4118,7 @@ function NumeroEcritSetting({ onAnnonces }) {
           <label key={k} data-numero-ou-case={k} style={{display:'flex',alignItems:'center',gap:10,minHeight:44,cursor:'pointer',borderTop:`1px solid ${C.border}`}}>
             <input type="checkbox" checked={r.ou.includes(k)} onChange={() => cocher(k)} style={{width:20,height:20,accentColor:C.accent,flexShrink:0}}/>
             <span style={{flex:1,minWidth:0}}>
-              <span style={{display:'block',fontSize:14,color:C.text}}>{NOM_OU[k]}</span>
+              <span style={{display:'block',fontSize:15,color:C.text}}>{NOM_OU[k]}</span>
               <span style={{display:'block',fontSize:12,color:C.muted,lineHeight:1.45}}>{k === 'description' ? '« N° 123 » sur la dernière ligne. Vinted, Leboncoin.' : k === 'titre' ? 'Une seule fois, n’importe où dans le titre. Vinted, Leboncoin, Vestiaire, eBay.' : 'eBay : le SKU · Leboncoin pro : la référence.'}</span>
             </span>
           </label>
@@ -4132,7 +4132,7 @@ function NumeroEcritSetting({ onAnnonces }) {
       <div data-numero-essai={lectureEssai ? lectureEssai.etat : 'vide'} style={{marginTop:12}}>
         <label htmlFor="vrm-numero-essai" style={{display:'block',fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>Essaie : colle une description</label>
         <textarea id="vrm-numero-essai" value={essai} onChange={(e) => setEssai(e.target.value)} rows={3} placeholder={exemples.essaiNumero}
-          style={{width:'100%',boxSizing:'border-box',fontSize:16,lineHeight:1.4,padding:'8px 10px',borderRadius:10,border:`1px solid ${C.border}`,background:C.bg,color:C.text,resize:'vertical',fontFamily:'inherit'}}/>
+          style={{width:'100%',boxSizing:'border-box',fontSize:15,lineHeight:1.4,padding:'8px 10px',borderRadius:10,border:`1px solid ${C.border}`,background:C.bg,color:C.text,resize:'vertical',fontFamily:'inherit'}}/>
         {lectureEssai && <div role="status" data-numero-essai-cle={lectureEssai.etat === 'lu' ? lectureEssai.cle : ''} style={{fontSize:13,marginTop:6,lineHeight:1.5,color:lectureEssai.etat === 'lu' ? C.text : C.muted}}>
           {lectureEssai.etat === 'lu' ? <>VRM lit <b>N°{lectureEssai.cle}</b> ({lectureEssai.ou}, « {lectureEssai.brut} »).</>
             : lectureEssai.etat === 'ambigu' ? <>Deux numéros ({lectureEssai.cles.join(' et ')}) : VRM ne choisit pas. Garde-en un seul.</>
@@ -4270,7 +4270,7 @@ function surligneEtiquette(texte, etiq, aLaFin) {
 }
 function PuceChoix({ actif, onClick, children, data }) {
   return <button type="button" aria-pressed={!!actif} onClick={onClick} {...(data || {})}
-    style={{minHeight:44,padding:'0 14px',borderRadius:999,border:`1px solid ${actif?C.accent:C.border}`,background:actif?`${C.accent}14`:C.card,color:C.text,fontSize:14,fontWeight:actif?700:500,cursor:'pointer',fontFamily:'inherit',fontVariantNumeric:'tabular-nums'}}>{children}</button>;
+    style={{minHeight:44,padding:'0 14px',borderRadius:999,border:`1px solid ${actif?C.accent:C.border}`,background:actif?`${C.accent}14`:C.card,color:C.text,fontSize:15,fontWeight:actif?700:500,cursor:'pointer',fontFamily:'inherit',fontVariantNumeric:'tabular-nums'}}>{children}</button>;
 }
 function NumeroSurVinted() {
   const ANNONCE_EXEMPLE = useExemplesVendeur().annonce;   // (11 nov., lot DJ2) l'annonce d'exemple suit ce qu'il vend
@@ -4321,7 +4321,7 @@ function NumeroSurVinted() {
           <button key={p.v} type="button" role="radio" aria-checked={on} data-num-vinted-place={p.v} onClick={() => poser({ place: p.v })}
             style={{display:'flex',alignItems:'flex-start',gap:10,textAlign:'left',minHeight:44,padding:'10px 12px',borderRadius:12,border:`1px solid ${on?C.accent:C.border}`,background:on?`${C.accent}0F`:C.card,color:C.text,cursor:'pointer',fontFamily:'inherit'}}>
             <span aria-hidden="true" style={{flexShrink:0,width:18,height:18,marginTop:1,borderRadius:999,border:`2px solid ${on?C.accent:C.border}`,boxSizing:'border-box',display:'flex',alignItems:'center',justifyContent:'center'}}>{on && <span style={{width:8,height:8,borderRadius:999,background:C.accent}}/>}</span>
-            <span style={{minWidth:0}}><b style={{display:'block',fontSize:14}}>{p.l}</b><span style={{display:'block',fontSize:12,color:C.muted,lineHeight:1.45,marginTop:2}}>{p.d}</span></span>
+            <span style={{minWidth:0}}><b style={{display:'block',fontSize:15}}>{p.l}</b><span style={{display:'block',fontSize:12,color:C.muted,lineHeight:1.45,marginTop:2}}>{p.d}</span></span>
           </button>); })}
       </div>
 
@@ -4339,7 +4339,7 @@ function NumeroSurVinted() {
           <div aria-hidden="true" style={{width:72,height:90,flexShrink:0,borderRadius:8,background:C.bg,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted}}><Icon name="image" size={22}/></div>
           <div style={{minWidth:0,flex:1}}>
             <div style={{fontSize:17,fontWeight:700,color:C.text,fontVariantNumeric:'tabular-nums'}}>{ANNONCE_EXEMPLE.prix}</div>
-            <div data-apercu-titre={ap.titre} style={{fontSize:14,color:C.text,lineHeight:1.4,marginTop:2,overflowWrap:'anywhere'}}>{enTitre ? surligneEtiquette(ap.titre, etiq, aLaFin) : ap.titre}</div>
+            <div data-apercu-titre={ap.titre} style={{fontSize:15,color:C.text,lineHeight:1.4,marginTop:2,overflowWrap:'anywhere'}}>{enTitre ? surligneEtiquette(ap.titre, etiq, aLaFin) : ap.titre}</div>
             <div style={{fontSize:12,color:C.muted,marginTop:2}}>42 · Très bon état</div>
           </div>
         </div>
@@ -4678,7 +4678,7 @@ function EmailStartSetting({ nu = false }) {
       </div>
       {reprise&&<p role="status" className="vrm-settings-draft" style={{color:C.warn}}>Une modification non enregistrée a été reprise. En ligne : {base?base.split('-').reverse().join('/'):'non définie'} tant que tu ne valides pas.</p>}
       <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-        <span style={{fontSize:12,fontWeight:500,color:C.text}}>À partir du</span>
+        <span style={{fontSize:12,fontWeight:400,color:C.text}}>À partir du</span>
         <input type="date" value={date} onChange={e=>{setDate(e.target.value);setStatus('modifie');}} disabled={status==='load'||status==='pasLu'||status==='saving'}
           style={{border:`1px solid ${C.border}`,borderRadius:12,padding:'6px 10px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none',opacity:status==='pasLu'?0.45:1}}/>
         <span style={{fontSize:11,color:status==='err'?C.danger:C.muted}}>
@@ -4985,7 +4985,7 @@ function SecuriteSetting() {
         <Icon name={ok == null ? 'clock' : ok ? 'check' : 'alert'} size={14}/>
       </span>
       <div style={{minWidth:0,flex:'1 1 140px'}}>
-        <div style={{fontSize:13,fontWeight:600,color:C.text}}>{t} <span style={{fontWeight:500,color: ok == null ? C.muted : ok ? C.text : C.warn}}>· {etat}</span></div>
+        <div style={{fontSize:13,fontWeight:600,color:C.text}}>{t} <span style={{fontWeight:400,color: ok == null ? C.muted : ok ? C.text : C.warn}}>· {etat}</span></div>
         <div style={{fontSize:12,color:C.muted,lineHeight:1.45,marginTop:2}}>{d}</div>
         {action}
       </div>
@@ -5770,7 +5770,7 @@ function RegimeSetting({ nu = false }) {
       {regime==='micro' && (
         <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
           <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-            <span style={{fontSize:12,fontWeight:500,color:C.text}}>Taux de cotisations</span>
+            <span style={{fontSize:12,fontWeight:400,color:C.text}}>Taux de cotisations</span>
             <input type="text" inputMode="decimal" value={txUrs}
               onChange={e=>setTxUrs(e.target.value)}
               onBlur={()=>{ const v=parseFloat(String(txUrs).replace(',','.')); const ok=(isFinite(v)&&v>=0&&v<=50)?v:TAUX_URSSAF_DEFAUT; const avant=Number(load('vinted_urssaf_taux', TAUX_URSSAF_DEFAUT)); setTxUrs(virgule(ok)); save('vinted_urssaf_taux', ok);
@@ -5789,8 +5789,8 @@ function RegimeSetting({ nu = false }) {
       )}
       {regime==='marge' && (
         <div style={{display:'flex',alignItems:'center',gap:8,marginTop:10}}>
-          <span style={{fontSize:12,fontWeight:500,color:C.text}}>Taux de TVA</span>
-          <input type="number" value={tva} onChange={e=>setRate(e.target.value)} style={{width:64,border:`1px solid ${C.border}`,borderRadius:12,padding:'4px 8px',fontSize:13,fontWeight:500,background:C.bg,color:C.text,outline:'none'}}/>
+          <span style={{fontSize:12,fontWeight:400,color:C.text}}>Taux de TVA</span>
+          <input type="number" value={tva} onChange={e=>setRate(e.target.value)} style={{width:64,border:`1px solid ${C.border}`,borderRadius:12,padding:'4px 8px',fontSize:13,fontWeight:400,background:C.bg,color:C.text,outline:'none'}}/>
           <span style={{fontSize:12,color:C.muted}}>%</span>
         </div>
       )}

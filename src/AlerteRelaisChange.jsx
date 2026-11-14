@@ -36,10 +36,10 @@ export default function AlerteRelaisChange({ lignes, C, transp = null, headers =
             style={{ display: 'flex', gap: 10, alignItems: 'flex-start', border: `1px solid ${C.border}`, background: C.card, borderRadius: 14, padding: '10px 12px' }}>
             <PastilleTransporteur t={t} C={C} seul taille={22}/>
             <div style={{ flex: '1 1 auto', minWidth: 0 }}>
-              <div data-relais-change-titre="" style={{ fontSize: 14, fontWeight: 700, color: g.lieu ? C.warn : C.text }}>{titre}</div>
+              <div data-relais-change-titre="" style={{ fontSize: 15, fontWeight: 700, color: g.lieu ? C.warn : C.text }}>{titre}</div>
               {g.lieu ? (
                 <div data-relais-change-lieu="" style={{ fontSize: 13, color: C.text, marginTop: 4, lineHeight: 1.35 }}>
-                  → <strong style={{ fontWeight: 650 }}>{g.nom}</strong>{g.adresse ? <>, {g.adresse}</> : null}
+                  → <strong style={{ fontWeight: 600 }}>{g.nom}</strong>{g.adresse ? <>, {g.adresse}</> : null}
                 </div>
               ) : null}
               <details className="vrm-repli" data-relais-change-detail="" open={n === 1} style={{ marginTop: 4 }}>
@@ -53,7 +53,7 @@ export default function AlerteRelaisChange({ lignes, C, transp = null, headers =
                       {x.code ? (
                         <button type="button" data-relais-change-code={x.code} data-relais-change-code-de={x.codeDe} aria-label={`Copier le code ${x.code}`}
                           onClick={() => { try { navigator.clipboard && navigator.clipboard.writeText(x.code); } catch (_) {} setCopie(x.suivi); }}
-                          style={{ marginTop: 4, minHeight: 44, padding: '0 14px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 22, fontWeight: 700, letterSpacing: '0.06em', fontVariantNumeric: 'tabular-nums', cursor: 'pointer' }}>
+                          style={{ marginTop: 4, minHeight: 44, padding: '0 14px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 20, fontWeight: 700, letterSpacing: '0.06em', fontVariantNumeric: 'tabular-nums', cursor: 'pointer' }}>
                           {copie === x.suivi ? 'Copié' : x.code}
                         </button>
                       ) : <div data-relais-change-code="" data-relais-change-code-de={x.codeDe || ''} style={{ marginTop: 2 }}>{x.codeDe === 'a-confirmer' ? 'Code à confirmer : le seul reçu date d’avant le changement de point' : 'Code pas encore reçu'}</div>}

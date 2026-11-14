@@ -38,7 +38,7 @@ html body .vrm-fu-frise > .vrm-fu-seg[data-fait="1"][data-derniere] > i { backgr
 html body .vrm-fu-frise > .vrm-fu-seg[data-cours][data-ton="urgent"] > i { background: var(--fu-ambre, #ff9f0a) !important; }
 html body .vrm-fu-frise > .vrm-fu-legende {
   display: block !important; grid-column: 1 / -1 !important; min-width: 0 !important;
-  font: 500 12px/1.25 var(--vrm-police, -apple-system, BlinkMacSystemFont, sans-serif) !important;
+  font: 400 12px/1.25 var(--vrm-police, -apple-system, BlinkMacSystemFont, sans-serif) !important;
   color: var(--fu-gris, #6e6e73) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important;
   font-variant-numeric: tabular-nums;
 }
@@ -88,7 +88,7 @@ html body .vrm-fu-frise > .vrm-fu-seg { position: relative !important; }
 :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > .vrm-rangee-bord > .vrm-puce-transp {
   all: unset; box-sizing: border-box !important; display: inline-flex !important; align-items: center !important; gap: 6px !important;
   flex: 0 1 auto !important; min-width: 0 !important; max-width: none !important; height: auto !important; min-height: 0 !important; padding: 0 !important;
-  background: none !important; border: 0 !important; color: var(--fu-gris, #6e6e73) !important; font: 500 12px/1.2 var(--vrm-police, sans-serif) !important;
+  background: none !important; border: 0 !important; color: var(--fu-gris, #6e6e73) !important; font: 400 12px/1.2 var(--vrm-police, sans-serif) !important;
 }
 :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > .vrm-rangee-bord > .vrm-puce-transp :is(svg, img, [data-transporteur-logo]) { width: 20px !important; height: 20px !important; min-width: 20px !important; flex: none !important; border-radius: 5px !important; }
 :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > .vrm-rangee-bord > :not(.vrm-puce-transp) { flex: none !important; width: auto !important; min-width: 0 !important; max-width: none !important; }
@@ -154,7 +154,7 @@ html body .vrm-fu-frise > .vrm-fu-seg { position: relative !important; }
   :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-state { grid-column: 3 !important; grid-row: 1 !important; align-self: end !important; font-size: 13px !important; font-weight: 600 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
   :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-frise { display: block !important; grid-column: 3 !important; grid-row: 2 !important; align-self: start !important; min-width: 0 !important; }
   :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-amount { grid-column: 4 !important; grid-row: 1 / 3 !important; text-align: right !important; font-size: 15px !important; font-weight: 600 !important; }
-  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-benef { grid-column: 5 !important; grid-row: 1 / 3 !important; text-align: right !important; font-size: 15px !important; font-weight: 500 !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-benef { grid-column: 5 !important; grid-row: 1 / 3 !important; text-align: right !important; font-size: 15px !important; font-weight: 600 !important; }
   /* « Bénéf. », « Achat » : dits UNE fois, dans l'en-tête des colonnes (§7). Le prix d'achat est dans la vente. */
   :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] .vrm-ledger-sale-benef::before { content: none !important; display: none !important; }
   :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-achat { display: none !important; }

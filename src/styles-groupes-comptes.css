@@ -28,7 +28,7 @@
 }
 .vrm-gc-compte:focus-visible, .vrm-gc-suite:focus-visible { outline: 2px solid var(--w-accent, #0071E3); outline-offset: -2px; }
 .vrm-gc-nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vrm-gc-compte .vrm-gc-n { color: var(--w-gris, #6E6E73); font-weight: 500; font-size: 14px; flex-shrink: 0; }
+.vrm-gc-compte .vrm-gc-n { color: var(--w-gris, #6E6E73); font-weight: 400; font-size: 14px; flex-shrink: 0; }
 .vrm-gc-chevron { color: var(--w-gris-2, #AEAEB2); font-size: 20px; line-height: 1; flex-shrink: 0; transition: transform 160ms ease-out; }
 .vrm-gc-compte[aria-expanded="true"] .vrm-gc-chevron { transform: rotate(90deg); }
 .vrm-gc-suite {
