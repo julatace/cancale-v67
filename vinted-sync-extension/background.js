@@ -3963,6 +3963,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       capteLotPourOnglet(sender && sender.tab && sender.tab.url, sender && sender.tab ? sender.tab.id : null).then(sendResponse, () => sendResponse({ ok: false }));
       return true;
     }
+    // 5.377 : Favoris · Annonces · Ventes du compte de l'onglet (lecture seule ; autres comptes floutés).
+    if (msg && (msg.from === 'vrm-badge' || msg.from === 'cancale-popup') && msg.action === 'carteListes') {
+      carteListes(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
+      return true;
+    }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'capteVu') {
       capteLotVu(sender && sender.tab && sender.tab.url, sender && sender.tab ? sender.tab.id : null, msg.lot).then(sendResponse, () => sendResponse({ ok: false }));
       return true;
@@ -18767,6 +18772,125 @@ async function capteLotVu(url, tabId, lotId) {
       return { ok: true };
     } catch (_) { return { ok: false }; }
   }, () => ({ ok: false })));
+}
+// ══ 5.377 (14 nov.) — LA CARTE : FAVORIS · ANNONCES · VENTES DU COMPTE DE L'ONGLET ══
+// Julien : « que l'on puisse voir les favoris du plus récent au plus vieux pour
+// envoyer des messages aux favoris, voir les annonces et ventes à chaque fois sur le
+// compte connecté ; les autres comptes sont floutés sauf si la personne met tous les
+// comptes sélectionnés, mais aucune action n'est possible dessus ».
+//   · Le compte est celui du COOKIE de l'onglet (`compteConnecte`, la garde) — jamais
+//     un compte nommé par le message. Les Favoris passent par `favorisCarte` (sa garde :
+//     un autre uid ⇒ refusé, rien ne part).
+//   · Annonces : le dressing RANGÉ (`donneesInfosPage`, déjà lu par l'encart du
+//     dressing), « en ligne » par `<enligne-regle>` (`enLigneDuCompte`) ; lecture de
+//     plus de 24 h ⇒ « à confirmer » (jamais « en ligne ») ; N° par identité
+//     (`infosDuCompte`). Lecture de plus d'une heure ⇒ une relecture dans le budget de
+//     LECTURE (`retourSurVinted` : garde, 20/h, une requête à la fois).
+//   · Ventes : les 40 plus récentes, PROJETÉES une par une (§4.4 : jamais la liste
+//     entière), l'état par les règles de l'extension (`A_EXPEDIER`, `PAS_UNE_VENTE`),
+//     « vendue » seulement avec un état de commande qui ne la fait pas revenir
+//     (`<preuve-vente-regle>`), le bordereau rangé par n° de transaction.
+//   · « Tous les comptes » : les autres comptes, 4 lignes chacun, rendus en LECTURE
+//     SEULE (`lectureSeule`) — la carte les floute, `inert`, sans aucune commande.
+// Aucune écriture, aucune requête Vinted (hors la relecture bornée ci-dessus).
+const CARTE_LISTE_MAX = 40, CARTE_AUTRES_MAX = 6, CARTE_AUTRES_LIGNES = 4, CARTE_RELIRE_MS = 3600000;
+function prixCarte(p) {
+  const v = p && typeof p === 'object' ? p.amount : p;
+  const n = Number(String(v == null ? '' : v).replace(',', '.'));
+  return isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
+}
+const photoCarte = (x) => { const u = String((x && x.photo && (x.photo.url || x.photo.thumb)) || ''); return /^https:\/\/[\w.-]*vinted\.net\//.test(u) ? u : ''; };
+function etatVenteCarte(o) {
+  const s = String((o && o.status) || '');
+  if (!s) return 'pas_su';                       // une conversation n'est pas une vente (§5)
+  if (PAS_UNE_VENTE.test(s)) return 'annulee';
+  if (A_EXPEDIER(o)) return 'a_expedier';
+  if (/finalis/i.test(s)) return 'finalisee';
+  return 'en_route';
+}
+// Le compte que la carte (ou la fenêtre de l'extension) regarde : l'onglet qui demande.
+function ongletCarte(sender) {
+  const tab = sender && sender.tab;
+  if (tab && tab.url) return { url: String(tab.url), fenetre: false };
+  let ext = ''; try { ext = chrome.runtime.getURL(''); } catch (_) {}
+  const u = String((sender && sender.url) || '');
+  return ext && u.startsWith(ext) ? { url: 'https://www.vinted.fr/', fenetre: true } : null;
+}
+const idxCarte = (pre, chemin, n) => Array.from({ length: n }, (_, i) => `${pre}${i}:${chemin}->${i}`).join(',');
+async function lignesComptesCarte(uid, n) {
+  const [l, v] = await Promise.all([
+    sbGet(`app_data?id=eq.harvest_${uid}_listings&select=cap:data->>capturedAt,n:data->>nItems,${idxCarte('i', 'data->payload->items', n)}`),
+    sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=cap:data->>capturedAt,n:data->>nItems,${idxCarte('o', 'data->payload->my_orders', n)}`),
+  ]);
+  if (l === null || v === null) return null;                                // pas su
+  const rl = (l && l[0]) || null, rv = (v && v[0]) || null;
+  const prendre = (r, pre) => (r ? Array.from({ length: n }, (_, i) => r[pre + i]).filter((x) => x && typeof x === 'object') : []);
+  return { listings: { cap: rl ? Date.parse(rl.cap || '') : NaN, n: rl ? Number(rl.n) : NaN, items: prendre(rl, 'i') }, ventes: { cap: rv ? Date.parse(rv.cap || '') : NaN, n: rv ? Number(rv.n) : NaN, items: prendre(rv, 'o') } };
+}
+async function carteListes(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o) return { ok: false, code: 'origine' };
+  const plateforme = plateformeDe(o.url);
+  if (plateforme !== 'vinted') return { ok: true, plateforme, pasDeListe: true };
+  const s = await loadSession().catch(() => null);
+  if (!(s && s.user_id && !s.mort)) return { ok: true, plateforme, connecte: false };
+  let dom = 'www.vinted.fr'; try { dom = new URL(o.url).hostname || dom; } catch (_) {}
+  const uid = await compteConnecte(dom);
+  if (!uid) return { ok: true, plateforme, compte: null };
+  const u = String(uid), maintenant = Date.now();
+  const nom = (await loginDe(u, { attendreMs: 300 }).catch(() => '')) || (await loginVu(u)) || '';
+  // ── annonces
+  const d = await donneesInfosPage(u);
+  const cap = await sbGet(`app_data?id=eq.harvest_${u}_listings&select=cap:data->>capturedAt`);
+  let annonces = null;
+  if (d && cap !== null) {
+    const capL = cap && cap[0] ? Date.parse(cap[0].cap || '') : NaN;
+    const items = Object.values(d.parId || {});
+    const r = enLigneDuCompte({ items, cap: isFinite(capL) ? capL : '' }, null, new Set(), maintenant);
+    const aConfirmer = !r.enLigne.length && r.aConfirmer.length > 0;
+    const liste = (aConfirmer ? r.aConfirmer : r.enLigne).slice();
+    const infos = infosDuCompte(d, u, liste.map((it) => String(it.id)));
+    const ligne = (it) => { const inf = infos[String(it.id)] || {}; const dep = Number(inf.depuis) || null;
+      return { id: String(it.id), titre: String(it.title || '').slice(0, 120), prix: prixCarte(it.price), photo: photoCarte(it), num: inf.numero || '', jours: dep ? Math.max(0, Math.floor((maintenant - dep) / 86400000)) : null, favoris: Number.isFinite(Number(it.favourite_count)) ? Number(it.favourite_count) : null, depuis: dep }; };
+    const lignes = liste.map(ligne).sort((a, b) => (Number(b.depuis) || 0) - (Number(a.depuis) || 0));
+    annonces = { lu: isFinite(capL) ? capL : null, aConfirmer, total: lignes.length, liste: lignes.slice(0, CARTE_LISTE_MAX) };
+    // Lue il y a plus d'une heure ⇒ relue, dans le budget de LECTURE, depuis l'onglet.
+    if (!o.fenetre && (!isFinite(capL) || maintenant - capL > CARTE_RELIRE_MS)) { annonces.relecture = true; retourSurVinted(sender).catch(() => {}); }
+  }
+  // ── ventes
+  let ventes = null;
+  const lv = await sbGet(`app_data?id=eq.harvest_${u}_orders_sold&select=cap:data->>capturedAt,n:data->>nItems,${idxCarte('o', 'data->payload->my_orders', CARTE_LISTE_MAX)}`);
+  const bords = lv === null ? null : await sbGetTout(`app_data?id=like.harvest_${u}_label_*&select=tx:meta->>tx`);
+  if (lv !== null && bords !== null) {
+    const r0 = (lv && lv[0]) || null;
+    const avecPdf = new Set((bords || []).map((b) => String((b && b.tx) || '')).filter(Boolean));
+    const os = r0 ? Array.from({ length: CARTE_LISTE_MAX }, (_, i) => r0['o' + i]).filter((x) => x && typeof x === 'object' && x.transaction_id != null) : [];
+    const fiches = (d && d.fiches) || {};
+    const lignes = os.map((x) => {
+      const etat = etatVenteCarte(x), it = x.item_id != null ? String(x.item_id) : '';
+      const f = it && fiches[it] && typeof fiches[it] === 'object' && String(fiches[it].accountId || '') === u ? fiches[it] : null;
+      return { tx: String(x.transaction_id), titre: String(x.title || '').slice(0, 120), prix: prixCarte(x.price), photo: photoCarte(x), date: Date.parse(x.date || '') || null, etat,
+        vendue: etat === 'a_expedier' || etat === 'en_route' || etat === 'finalisee', num: f && f.numero != null ? String(f.numero) : '', bordereau: etat === 'a_expedier' ? avecPdf.has(String(x.transaction_id)) : null };
+    }).sort((a, b) => (Number(b.date) || 0) - (Number(a.date) || 0));
+    ventes = { lu: r0 ? (Date.parse(r0.cap || '') || null) : null, total: r0 ? Number(r0.n) || lignes.length : 0, liste: lignes };
+  }
+  // ── les autres comptes (lecture seule)
+  let autres = null;
+  if (msg && msg.tous === true) {
+    const accts = await avecDelai(getStoredAccounts(), 8000, null).catch(() => null);
+    if (Array.isArray(accts)) {
+      autres = [];
+      for (const a of accts.filter((x) => x && String(x.vinted_user_id) !== u && x.owner === s.user_id).slice(0, CARTE_AUTRES_MAX)) {
+        const id = String(a.vinted_user_id);
+        if (!/^\d{1,20}$/.test(id)) continue;
+        const l = await lignesComptesCarte(id, CARTE_AUTRES_LIGNES);
+        autres.push({ id, nom: String(a.login || ''), lectureSeule: true,
+          annonces: l ? { n: isFinite(l.listings.n) ? l.listings.n : null, liste: l.listings.items.filter(ouverteSurVinted).map((it) => ({ titre: String(it.title || '').slice(0, 80), prix: prixCarte(it.price) })) } : null,
+          ventes: l ? { n: isFinite(l.ventes.n) ? l.ventes.n : null, liste: l.ventes.items.filter((x) => x && x.transaction_id != null).map((x) => ({ titre: String(x.title || '').slice(0, 80), prix: prixCarte(x.price), etat: etatVenteCarte(x) })) } : null });
+      }
+    }
+  }
+  return { ok: true, plateforme, compte: { id: u, nom }, annonces, ventes, autres, fenetre: o.fenetre };
 }
 // 5.330 : l'onglet revient de Google / Discord (même onglet, Orion) ⇒ la carte
 // s'ouvre UNE fois et dit le résultat. Lu une fois (`vu`), 5 minutes au plus,
