@@ -26,27 +26,28 @@ module.exports = ({ vu, BARRE }) => {
       ] },
     { id: 'prixachat', nom: 'Saisir un prix d’achat', plafond: 3,
       // Le champ du prix est OUVERT, le curseur dedans : il tape le prix (une saisie, pas un toucher), puis Entrée.
-      but: (pg) => pg.evaluate(() => { const a = document.activeElement; return !!a && a.tagName === 'INPUT' && !!a.closest('[data-ar-ligne], [data-ar-saisie], .vrm-ar') || !!document.querySelector('[data-ar-ligne] input:not([type=checkbox]), [data-ar-saisie] input'); }),
+      but: vu('[data-ask-champ], .vrm-confirmation input'),
       chemins: [
         { nom: 'Ma journée → prix manquants → Saisir', pas: [['t', 'button[data-job="achat-a-relier"]'], ['t', '[data-ar-saisir]']] },
       ] },
     { id: 'trouvernum', nom: 'Trouver la paire N°x', plafond: 3,
       but: vu('[data-fiche-paire]'),
       chemins: [
-        { nom: 'Loupe → N° → résultat', pas: [['t', loupe], ['s', champ, '169'], ['t', '[data-recherche-resultat][data-recherche-num="169"], [data-recherche-resultat][data-recherche-num]']] },
+        { nom: 'Loupe → N° → résultat', pas: [['t', loupe], ['s', champ, '169'], ['t', '[data-recherche-resultat][data-recherche-num="169"]:not([data-recherche-resultat="action"])']] },
       ] },
     { id: 'offre', nom: 'Répondre à une offre', plafond: 3,
       // Le fil de l'offre ouvert, son geste de réponse à l'écran (Accepter avec l'extension ; sans elle, VRM le dit et
       // renvoie sur Vinted : la place du geste est la même).
       but: vu('.vrm-chat-panel'),
       chemins: [
-        { nom: 'Ma journée → messages → offre', pas: [['t', 'button[data-tuile="messages"]'], ['t', '[data-filtre-offres]'], ['t', '[data-conv="18999000001"]'], ['d', '[data-offre-geste="accepter"], .vrm-chat-panel [data-plancher-saisir], .vrm-chat-panel a[href*="vinted"]']] },
+        { nom: 'Ma journée → messages → l’offre (en tête)', pas: [['t', 'button[data-tuile="messages"]'], ['t', '[data-conv="18999000001"]'], ['d', '[data-offre-geste="accepter"], .vrm-chat-panel [data-plancher-saisir], .vrm-chat-panel a[href*="vinted"]']] },
+        { nom: 'Ma journée → messages → Offres reçues → offre', pas: [['t', 'button[data-tuile="messages"]'], ['t', '[data-filtre-offres]'], ['t', '[data-conv="18999000001"]'], ['d', '[data-offre-geste="accepter"], .vrm-chat-panel [data-plancher-saisir], .vrm-chat-panel a[href*="vinted"]']] },
         { nom: '☰ → Messages → offre', pas: [['t', menu], ['t', entreeMenu('messages')], ['t', '[data-conv="18999000001"]'], ['d', '[data-offre-geste="accepter"], .vrm-chat-panel [data-plancher-saisir], .vrm-chat-panel a[href*="vinted"]']] },
       ] },
     { id: 'baisserprix', nom: 'Baisser un prix', plafond: 3,
-      but: vu('[data-prix-partout]'),
+      but: vu('[data-prix-champ]'),
       chemins: [
-        { nom: 'Loupe → N° → Baisser', pas: [['t', loupe], ['s', champ, '169'], ['t', '[data-recherche-action="baisser-prix"]'], ['d', '[data-prix-partout] [data-prix-proposer], [data-prix-partout] button[type=submit], [data-prix-partout] .vrm-b-primaire']] },
+        { nom: 'Loupe → N° → Baisser', pas: [['t', loupe], ['s', champ, '169'], ['t', '[data-recherche-action="baisser-prix"]'], ['d', '[data-prix-appliquer]']] },
       ] },
     { id: 'republier', nom: 'Republier (à la main, conseillé)', plafond: 3,
       // Le kit « à la main » ouvert pour la paire CHOISIE (c'est lui qui choisit et qui publie, §3) ; le toucher décisif :
@@ -76,9 +77,9 @@ module.exports = ({ vu, BARRE }) => {
         { nom: 'Argent → Déclarer → J’ai déclaré', pas: [['t', onglet('compta')], ['t', '[data-section="declarer"]'], ['d', '[data-urssaf-cest-declare]']] },
       ] },
     { id: 'compte', nom: 'Changer de compte', plafond: 3,
-      but: vu('[data-ui-menu-compte="3150001111"], [data-compte-puce="3150001111"][data-actif="1"]'),
+      but: vu('[data-ui-menu-compte="3150001111"]'),
       chemins: [
-        { nom: 'Paires → compte ▾ → vendeur_2', pas: [['t', onglet('paires')], ['t', '[data-ui-menu-compte]'], ['t', '[role="dialog"] [data-ui-menu-compte-choix="3150001111"], [data-menu-compte-choix="3150001111"], .vrm-ui-feuille button:nth-of-type(3)']] },
+        { nom: 'Paires → compte ▾ → vendeur_2', pas: [['t', onglet('paires')], ['t', '[data-ui-menu-compte]'], ['t', '[data-ui-compte-choix="3150001111"]']] },
       ] },
     { id: 'message', nom: 'Lire un message', plafond: 3,
       but: vu('.vrm-chat-panel'),
@@ -91,7 +92,7 @@ module.exports = ({ vu, BARRE }) => {
       but: vu('[data-publier-partout]'),
       chemins: [
         { nom: 'Loupe → N° → Publier partout', pas: [['t', loupe], ['s', champ, '169'], ['t', '[data-recherche-action="partout-num"]'], ['d', '[data-publier-partout]']] },
-        { nom: 'Paires → la paire → Publier partout', pas: [['t', onglet('paires')], ['t', '[data-fiche-plus-bouton]'], ['t', '[data-fiche-partout]'], ['d', '[data-publier-partout]']] },
+        { nom: 'Paires → la paire → Publier partout', pas: [['t', onglet('paires')], ['t', '[data-fiche-plus-bouton]'], ['t', '[data-fiche-partout], [data-fiche-publier-ailleurs]'], ['d', '[data-publier-partout]']] },
       ] },
     { id: 'benefice', nom: 'Voir le bénéfice du mois', plafond: 1,
       but: vu('[data-fu-case="benefice-mois"], [data-benef-notion="benefice"]'),

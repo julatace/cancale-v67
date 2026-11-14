@@ -26,6 +26,7 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  { id: 'ergonomie-gestes', date: '2026-11-14', titre: 'Republier ou publier partout depuis la loupe', phrase: 'Tape le N° : « Republier à la main » ou « Publier partout ».', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'argent-choix', date: '2026-11-14', titre: 'Coller tes prix, quoi racheter, déclaration prête', phrase: 'Un tableau « N° ; prix » collé, le bénéfice par modèle et taille.', tab: 'stats', pour: 'tous', mode: 'tous' },
   { id: 'refonte-coque', date: '2026-11-14', titre: 'Quatre onglets et un menu en haut', phrase: 'Paires réunit Annonces, Stock, Achats ; le reste sous ☰.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'refonte-listes', date: '2026-11-14', titre: 'Annonces et Ventes : la liste d’abord', phrase: 'Chiffres en une bande, compte en menu, alertes dans « À faire ».', tab: 'annonces', pour: 'tous', mode: 'tous' },

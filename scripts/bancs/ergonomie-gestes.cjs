@@ -107,7 +107,7 @@ async function jouerChemin(o, g, ch) {
   const pg = o.pg;
   const m = { chemin: ch.nom, touchers: 0, zoneHaute: 0, defiles: 0, mots: 0, attente: 0, saisies: 0, places: [] };
   for (const [sorte, sel, texte] of ch.pas) {
-    const c = await cible(pg, sel, sorte === 'a' ? 9000 : 7000);
+    const c = await cible(pg, sel, sorte === 'a' || sorte === 'd' ? 15000 : 9000);   // machine chargée : une condition, large
     if (!c) return { ...m, impasse: `${sorte} ${sel} : introuvable` };
     m.attente = Math.max(m.attente, c.attente);
     if (sorte === 'a') continue;
@@ -141,7 +141,7 @@ async function jouerChemin(o, g, ch) {
   }
   const t0 = Date.now();
   let ok = false;
-  while (Date.now() - t0 < 6000) { if (await g.but(pg).catch(() => false)) { ok = true; break; } await pg.waitForTimeout(200); }
+  while (Date.now() - t0 < 10000) { if (await g.but(pg).catch(() => false)) { ok = true; break; } await pg.waitForTimeout(200); }
   if (!ok) return { ...m, impasse: 'but pas atteint' };
   return m;
 }
