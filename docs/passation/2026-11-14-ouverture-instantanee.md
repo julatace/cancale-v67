@@ -58,6 +58,8 @@ Ce que coûtait l'ouverture (avant) — voir le tableau §4 :
 - `src/main.jsx` — un premier tri minuscule (une session et un instantané rangé pour son uid), puis le
   morceau à part ; l'app (5 Mo) n'est exécutée qu'APRÈS cette image (elle est déjà préchargée). Sans
   instantané : rien ne change. La page d'accueil ne télécharge rien de plus (index : 102,7 → 103,6 Ko).
+  Le morceau n'est demandé que si TOUTES les traces exigées sont là (instantané, laissez-passer, abonnement,
+  cache de l'équipe, `?tab=` absent ou Ma journée) : un « non » ne retarde jamais l'app.
 - Pourquoi `localStorage` et pas IndexedDB : ≈ 1,5 Ko lus d'un trait avant tout, sans l'aller-retour
   asynchrone d'IndexedDB (parfois long au lancement sur iPhone). Même cloisonnement qu'avant : clé ET
   valeur par uid, un seul compte sur l'appareil, effacé à la déconnexion et au changement de vendeur
@@ -107,7 +109,70 @@ boutiques soit confirmée, ni pour un aide) : non touchés. L'instantané, lui, 
 
 ## 4. Preuves
 
-RÉSULTATS_A_REMPLIR
+### Les temps (banc `ouverture-instantanee.cjs`, 390 px, Fast 3G, 2 000 / 2 500 / 1 000, 10 comptes)
+
+« Premier écran utile » = des chiffres de Ma journée À L'ÉCRAN (l'instantané peint dans l'écran de
+démarrage, ou dans la coque une fois celui-ci parti) — jamais le squelette. La machine des bancs était
+saturée toute la journée (charge 40 à 82 sur 4 cœurs, plusieurs agents) : chaque mesure porte son
+encombrement ; « ramené à ×4 » = un processeur 4 fois plus lent que la machine au repos (§1).
+
+| | avant (origin/main) | après |
+|---|---|---|
+| 2e ouverture, premier écran utile, brut (même machine, même heure) | **7,4 s** | **1,9 s** |
+| ouvertures suivantes, brut | 4,0 · 6,4 · 5,7 s | 1,7 · 0,64 · 1,8 s |
+| idem ramené à ×4 (4 ouvertures) | 4,4 · 1,9 · 4,7 · 3,9 s (médiane ≈ 4,2 s) | 1,08 · 1,16 · 0,38 · 1,24 s (médiane ≈ 1,1 s) |
+| au calme relatif (charge ≈ 12, ×4 posé tel quel, 2e et 3e ouvertures) | — | **0,76 s · 0,90 s** |
+| ce que la page attend du réseau avant sa 1re image (2e ouverture) | la page, 3 scripts de démarrage, et 72 fichiers (2,4 Mo) à la 2e | **rien** (seulement des relectures de fond) |
+| coquille rangée dès la 1re ouverture | non | oui |
+| lectures de la base avant le premier écran utile | 3 à 46 | **0** |
+| JS exécuté avant l'écran utile | 5,2 Mo (l'app entière, puis son premier rendu) | ≈ 0,4 Mo (index, React, le morceau de l'instantané) ; l'app, préchargée du cache, s'exécute APRÈS l'image |
+| tâches longues avant l'écran utile | 2,4 à 3,3 s (plus longue 1 à 2 s) | 0,4 à 1 s (plus longue 0,2 à 0,5 s) |
+| hors ligne : chiffres de Ma journée | jamais (vue « hors connexion » seule) | **0,8 s brut**, datés, « Hors ligne », gardés quand l'app s'ouvre |
+| base en panne (503) | « Je n'arrive pas à joindre… » et un écran vide | le même bloc + l'instantané daté « Pas relu », aucune écriture |
+| écran vrai (« puis se met à jour ») | 16 à 18 s (charge ≈ 20) | 29 à 33 s (charge ≈ 62) : même chemin, il suit la charge (§5) |
+
+⚠️ Le seuil « < 1 s » est **tenu au calme relatif** (0,76 / 0,90 s à ×4 posé) et **pas sous la charge
+62-68** (médiane 1,1 s ramenée à ×4) : la règle de trois sur l'encombrement est grossière (une partie du
+temps n'est pas du calcul). Le gain, lui, est net à charge égale : ≈ 4 fois plus tôt.
+
+### Le banc et les preuves
+- `scripts/bancs/ouverture-instantanee.cjs` — **après : 18 verts, 2 rouges** (les deux seuils « < 1 s »
+  sous charge 62-68 ; verts à charge ≈ 12). **Sur origin/main** (banc et `_base-volume.cjs` copiés dans
+  l'arbre `git archive`) : **10 rouges** — coquille pas rangée, 7,4 s, la page attend 4 à 7 fichiers du
+  réseau, hors ligne sans chiffres (×3), panne sans instantané (×2), médiane.
+- **Mutation** (service worker sans `VRM_RANGER_COQUILLE`, build d'après) : **5 rouges** — coquille pas
+  rangée, 2e ouverture 3,9 s brut, la page attend `/index.html` et les 3 scripts de démarrage du réseau.
+- `scripts/tests/ouverture-instantanee.test.mjs` : **11/11** (cas normal, aucune écriture, autre compte,
+  porte hors ligne ×4, double vérification, abonnement, équipe, écran d'ouverture, instantané trop vieux,
+  §4.2, cadre). **Mutations 7/7 rouges** (double vérification, laissez-passer, équipe, écran, abonnement,
+  §4.2, autre thème). `journee-instantanee.test.mjs` 6/6, `colis-ventes-instantanes.test.mjs` vert.
+- Captures regardées : l'instantané peint dans l'écran de démarrage (390 : à la place de l'écran vrai, barre
+  du haut neutre, libellés « Vendu · mois »), hors ligne (instantané + vue hors connexion), panne (bloc +
+  instantané « Pas relu »), autre compte (rien).
+
+### Audits et bancs
+- `npm run build` vert ; audits **tdz, variables, coherence, csp, traduction (45), quoi-de-neuf** verts ;
+  app-installable (61), journee-hors-ligne, inventaire-hors-ligne (37), stock-hors-ligne (33), morceau-perime,
+  vapid, push, composants, mesures-terrain, notifs-belles, avis-negatif, aide-signalement, lot5355,
+  confiance-publique, import-partage-aide, verifier-production, copie-annonces, lbc-catalogue, aide-videos :
+  verts. `gestes-hors-ligne` : son §15 jugeait l'orthographe (`.then(() => rechaufferMorceaux(cache))`) ; il
+  accepte `rechaufferPlusTard` (qui appelle `rechaufferMorceaux`) — même règle, vert.
+  `stockage-sur` et `signalement` : 1 rouge chacun, **les mêmes sur origin/main**.
+- Bancs, sur une machine saturée (charge 40 à 82 ; « avant » = l'arbre d'origin/main, même banc) :
+  - verts : **garde-ecrans**, **gestes-hors-ligne** (113/0), codes-hors-ligne (vert ; la garde réseau note
+    `/auth/v1/settings` et `/auth/v1/user` — les mêmes sur origin/main) ;
+  - rouges aussi sur origin/main : hors-ligne (après 7, avant 36), hors-ligne-froid (D ×2, K), hors-reseau (2,
+    « l'écran est COLIS » — la coque a retiré l'onglet Colis), demarrage (2), ouverture-legere-2 (après 10,
+    avant 6 — délais de rangement des copies sous charge), chargement (CLS, « pas su » transitoires ; délai) ;
+  - tombés sur la machine (navigateur fermé « CreatePlatformSocket », délai de 540 s) : design-passe (3 écrans
+    1512 sombre, vert sur origin/main hors charge), etats-vides, inventaire, photos-vinted ;
+  - rouges de délai seulement, comparés DOS À DOS à la même charge : **journee-instantanee** avant 1 rouge
+    (5,1 s, charge 37) / après **0 rouge** (charge 42, 107 verts) ; **colis-ventes-instantanes** avant 3 rouges
+    (4,5 à 7,0 s, charge 39) / après 3 rouges (4,4 à 6,0 s) — les mêmes seuils « < 4 s base tenue » ;
+    demarrage-vitesse (D1/D2, 12,4 s ; vert sur origin/main ce matin, hors charge) ;
+  - pas comparés (les arbres « avant » ont été effacés du dossier de travail partagé en cours de route) :
+    stock-hors-reseau (2 KO : un `tap` qui dépasse 8 s), fraicheur-unique (4), mode-depot (3), accueil (3),
+    recherche-photo (1), vitesse.
 
 ## 5. Ce qui reste
 - L'écran vrai (« puis se met à jour ») reste lent sur 2 000 ventes : vérification + équipe en série, puis
