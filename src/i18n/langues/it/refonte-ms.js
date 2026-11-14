@@ -10,7 +10,7 @@ export default {
   "ms.stock.af.pasVerifiees": { one: "{n} vano non verificato", other: "{n} vani non verificati" },
   "ms.stock.af.sortis": { one: "{n} vano liberato", other: "{n} vani liberati" },
   "ms.stock.af.aRanger": { one: "{n} da mettere in un vano", other: "{n} da mettere in un vano" },
-  "ms.msg.chercher": "Acquirente, modello o N°",
+  "ms.msg.chercher": "Acquirente, modello o N°…",
   "ms.msg.aFaire": "Da collegare",
   "ms.msg.rien": "Nessuna conversazione per «{x}»",
 };

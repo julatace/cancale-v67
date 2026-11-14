@@ -123,6 +123,10 @@ async function ouvrir(b, vp, { sombre = false, url = '/?tab=messages&site=toutes
 const lignes = (pg) => pg.$$eval('[data-fil]', (l) => l.map((x) => ({ cle: x.getAttribute('data-fil'), n: x.getAttribute('data-fil-convs'), sites: x.getAttribute('data-fil-sites'), num: x.getAttribute('data-fil-num') })));
 const attendreFils = async (pg) => { await pg.waitForFunction(() => { const e = document.querySelector('[data-fils-tous]'); return e && e.getAttribute('data-fils-tous') !== 'charge' && document.querySelectorAll('[data-fil]').length >= 5; }, null, { timeout: 20000 }).catch(() => {}); await pg.waitForTimeout(400); };
 
+// (14 nov., refonte Messages · E-mails · Stock — AJOUT 3) Les questions « Peut-être la même paire ? » vivent
+// dans la ligne « À relier · N › » au-dessus de la liste : la feuille s'ouvre avant de les lire. La RÈGLE jugée
+// (une question à la fois, ses deux gestes, rien relié sans son clic) est la même.
+const ouvrirAFaire = async (pg) => { if (await pg.$('[data-fil-proposition]')) return; if (await pg.$('[data-msg-afaire]')) { await pg.$eval('[data-msg-afaire]', (b) => b.click()); await pg.waitForTimeout(350); } };   // un clic DOM : au téléphone le fil ouvert couvre la liste
 (async () => {
   fs.mkdirSync(CAP, { recursive: true });
   let b;
@@ -175,6 +179,7 @@ const attendreFils = async (pg) => { await pg.waitForFunction(() => { const e = 
         dit(await r.pg.$$eval('[data-fil] [data-fil-marques] [data-logo-site]', (l) => l.length) >= 6, 'C · chaque ligne porte la marque de sa plateforme');
         // Une question à la fois : on lit chacune en répondant « Non » sur une copie, puis on recharge.
         const props = [];
+        await ouvrirAFaire(r.pg);
         dit(await r.pg.$$eval('[data-fil-proposition]', (l) => l.length) === 1 && await r.pg.$('[data-fil-propositions-autres="2"]') != null, 'D · une question à la fois (« encore 2 »)');
         for (let i = 0; i < 3; i++) { const s = await r.pg.$('[data-fil-proposition]'); if (!s) break; props.push(await s.getAttribute('data-fil-proposition')); await r.pg.click('[data-fil-proposition] [data-fil-refuser]'); await r.pg.waitForTimeout(200); }
         await r.pg.evaluate(() => localStorage.removeItem('vrm_fils_relies')); await r.pg.reload(); await attendreFils(r.pg);
@@ -193,10 +198,13 @@ const attendreFils = async (pg) => { await pg.waitForFunction(() => { const e = 
         dit(await r.pg.$('[data-fil-fusionne]') == null && await r.pg.$('.vrm-chat-panel') != null, 'F · Répondre ouvre LE fil Vinted');
         // E — relier Vinted N°12 + Vestiaire
         const avant = (await lignes(r.pg)).length;
+        await ouvrirAFaire(r.pg);
         const sel = '[data-fil-proposition="acheteur"]';
+        if (process.env.DEBUG) console.log("DBG E", await r.pg.evaluate(() => JSON.stringify({ p: [...document.querySelectorAll("[data-fil-proposition]")].map((x) => x.getAttribute("data-fil-proposition")), af: (document.querySelector("[data-msg-afaire]") || {}).outerHTML ? document.querySelector("[data-msg-afaire]").getAttribute("data-msg-afaire") : null, feuille: !!document.querySelector("[data-ui-afaire-feuille]"), chat: !!document.querySelector(".vrm-chat-panel") })));
         const a = await r.pg.$eval(sel, (x) => x.getAttribute('data-fil-a') + '|' + x.getAttribute('data-fil-b'));
         await r.pg.click(sel + ' [data-fil-relier]');
         await r.pg.waitForTimeout(500);
+        await r.pg.keyboard.press('Escape'); await r.pg.waitForTimeout(200);   // la feuille « À relier » se ferme (la question suivante y attend)
         const L2 = await lignes(r.pg);
         const relie = L2.find((x) => x.sites === 'vinted,vestiaire');
         dit(L2.length === avant - 1 && relie && relie.n === '2', 'E · « Oui, même fil » relie (une ligne de moins, Vinted + Vestiaire)', a);
@@ -218,6 +226,7 @@ const attendreFils = async (pg) => { await pg.waitForFunction(() => { const e = 
         await r.pg.waitForTimeout(400);
         dit((await lignes(r.pg)).length === avant, 'G · « délier » défait');
         // « Non » : chaque réponse fait partir SA question
+        await ouvrirAFaire(r.pg);
         let n0 = await r.pg.$$eval('[data-fil-proposition]', (l) => l.length), nNon = 0;
         while (await r.pg.$('[data-fil-proposition]') && nNon < 5) { await r.pg.click('[data-fil-proposition] [data-fil-refuser]'); await r.pg.waitForTimeout(200); nNon++; }
         dit(n0 === 1 && await r.pg.$('[data-fil-proposition]') == null, 'E · « Non » fait partir la proposition', String(nNon));
@@ -237,8 +246,10 @@ const attendreFils = async (pg) => { await pg.waitForFunction(() => { const e = 
       const deborde = await r.pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
       dit(deborde <= 1, `J · ${nom} : rien ne déborde`, String(deborde));
       if (vp.width < 600) {
+        await ouvrirAFaire(r.pg);
         const petits = await r.pg.$$eval('[data-fil-proposition] button, [data-fil]', (l) => l.filter((x) => x.getBoundingClientRect().height < 43.5).map((x) => x.textContent.slice(0, 20) + ':' + Math.round(x.getBoundingClientRect().height)));
         dit(!petits.length, `J · ${nom} : 44 px au doigt`, petits.join(' | '));
+        await r.pg.keyboard.press('Escape'); await r.pg.waitForTimeout(200);   // referme « À relier » (ouverte pour mesurer ses boutons)
       }
       await r.pg.screenshot({ path: path.join(CAP, 'fil-unique-' + nom + '.png'), fullPage: false });
       if (vp.width < 600) {
