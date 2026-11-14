@@ -41783,7 +41783,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for (const x of autres) { if (x.ou === 'vente') setSaleOverride(x.cle, x.patch); else setNumeros((prev) => { const u = { ...prev, [x.cle]: { ...(prev[x.cle] || {}), ...x.patch } }; save('vinted_annonce_numeros', u); return u; }); }
     if (cible._saleTx) setSaleOverride(cible._saleTx, w); else updatePair(cible, w);
     setPickerFor(null);
-    toast(`Achat relié${w.buyPrice ? ` · ${String(w.buyPrice).replace('.', ',')}\u00a0€` : ''}`);
+    // (14 nov., lot accompagnement) APRÈS : « Achat relié · 45 € » et la suite (le bénéfice se complète).
+    accompagner('achat.relier', { vars: { prix: w.buyPrice ? `${String(w.buyPrice).replace('.', ',')}\u00a0€` : '—' } }).fini();
   };
   // « Délier » (la feuille, quand CET article a déjà son achat) : le lien part, le prix posé par lui aussi.
   const entreePicker = (cible) => (cible ? (cible._saleTx ? saleOv[String(cible._saleTx)] : numeros[cible.id]) : null);
@@ -41797,7 +41798,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const relierAchatAnnonce = async (it, a) => {
     const w = await ecritureRelierAchat(a); if (!w) return;
     updatePair(it, w);
-    toast(`Achat relié${w.buyPrice ? ` · ${String(w.buyPrice).replace('.', ',')}\u00a0€` : ''}`);
+    accompagner('achat.relier', { vars: { prix: w.buyPrice ? `${String(w.buyPrice).replace('.', ',')}\u00a0€` : '—' } }).fini();
   };
   // « Saisir » : le prix qu'il tape (jamais deviné), sans achat relié — l'écriture de la case de la carte.
   const saisirPrixAnnonce = async (it) => {
@@ -44633,7 +44634,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <ResumeOffre affiche={afficheCompare} offre={off.prix} mini={mini} fmt={fmtE} titre={pc?.titre||''} photo={pc?.photo?<PhotoVinted src={pc.photo} size={44}/>:null}/>
                           {/* (9 nov., lot F) Le plancher : prix d'achat SAISI + frais connus — jamais un prix conseillé. */}
                           <LignePlancher plancher={plancherDeItem(itemF,pc?.devise)} offre={off.prix} mini={mini} ambre={C.warn} onSaisir={annonceParId.get(String(itemF))?()=>saisirPrixAnnonce(annonceParId.get(String(itemF))):null}/>
-                          <div className="vrm-chat-offre-actions">
+                          <AccAvant geste="offre.vinted"/>
+                          <div className="vrm-chat-offre-actions" data-acc-pendant={offreBusy ? 'offre.vinted' : undefined}>
                             <button type="button" className="vrm-chat-btn" data-offre-geste="refuser" disabled={offreBusy||ro||offreBloquee} onClick={()=>actionOffre('reject', off)} style={{opacity:(offreBusy||offreBloquee)?0.6:1}}>Refuser</button>
                             {contre!=null
                               ? <button type="button" className="vrm-chat-btn" data-offre-geste="proposer" data-offre-proposer={String(contre)} disabled={!tx||ro||offreBusy||offreBloquee} aria-label={`Proposer ${eurCourt(contre)}`} onClick={()=>actionOffre('offre', off, contre)} style={{opacity:(offreBusy||offreBloquee)?0.6:1}}>Proposer {eurCourt(contre)}</button>
@@ -44650,7 +44652,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <button type="button" className="vrm-chat-btn" disabled={offreBusy||ro||offreBloquee||!prixOffre.trim()} onClick={()=>actionOffre('offre')} style={{border:`1px solid ${C.border}`,background:C.card,color:ro?C.muted:C.text,opacity:(offreBusy||ro||offreBloquee||!prixOffre.trim())?0.5:1}}>Envoyer l'offre</button>
                         </div></details>
                       )}
-                      {offreMsg && <div role={offreMsg.err?'alert':'status'} aria-live="polite" style={{fontSize:12,marginTop:6,color:offreMsg.err?C.danger:C.text}}>{offreMsg.err||('✓ '+offreMsg.ok)}</div>}
+                      {/* (14 nov., lot accompagnement) Le résultat en mots, ou la raison et le geste — plus de rouge (§7 : le rouge est au doublon de N°). */}
+                      {offreMsg && (offreMsg.err ? <AccEchec geste="offre.vinted" erreur={offreMsg.err}/> : <AccApres geste="offre.vinted" texte={offreMsg.ok} ensuite={null}/>)}
                     </div>
                   );
                 })()}
@@ -52362,6 +52365,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <button type="button" onClick={()=>setPickerFor(null)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer'}}>×</button>
             </div>
             <div data-relier-achat-corps style={{flex:1,overflow:'auto',padding:'4px 14px 14px'}}>
+              <AccAvant geste="achat.relier"/>
               <RelierAchatCorps C={C} cible={cibleRelier} achats={purchasesPick.loading ? null : purchasesPick.items} liens={liensAchats}
                 curTx={(entreePicker(pickerFor) || {}).buyFromId || ''} compteDe={(a)=>accNameOf(a._acc)||''} prixDe={prixPayeAchat} onRelier={relierAchat}
                 autre={!!pickerFor._autre} actuel={achatRelie(entreePicker(pickerFor))} onDelier={delierAchatPicker}
