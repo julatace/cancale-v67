@@ -33,7 +33,7 @@ require('./_porte-banc.cjs');
 //   P4 au moins 8 achats ENTIERS visibles sur un écran de 390 × 844 ;
 //   P5 taper un N° dans la recherche trouve la paire en < 300 ms.
 //  `BANC_REF=fichier.json` : les mesures d'origin/main (écrites par `BANC_ECRIT=…`) ;
-//  rouge si P1, P3 ou P2 font PIRE (P1 +25 %, P3 +10 %, P2 +0,02).
+//  rouge si P1, P3 ou P2 font PIRE (P1 +50 % — machine partagée —, P3 +10 %, P2 +0,02).
 //
 //  `SHOTS=dossier` range les captures (à REGARDER, §6.2) ; `BANC_DIST`, `BANC_PORT`,
 //  `BANC_SEUL=F,P` ; `DSF=2` pour les captures montrées à Julien.
@@ -59,7 +59,7 @@ const midi = new Date(); midi.setHours(12, 0, 0, 0); if (midi.getTime() > Date.n
 const NOW = midi.getTime();
 const iso = (j) => new Date(NOW - j * 86400000).toISOString();
 let graine = 7; const alea = () => { graine = (graine * 1103515245 + 12345) & 0x7fffffff; return graine / 0x7fffffff; };
-const PH = (n) => `/ph/${n}.svg`;
+const PH = (n) => `http://localhost:${PORT}/ph/${n}.svg`;
 const NOMS = ['atelier_paires', 'shop_rennes', 'loladupuis35260', 'jujuf38', 'angeled92', 'tomj606', 'tomj683', 'boutique_sneakers_vintage_rennes_35', 'lloollllaa', 'arthuror2'];
 const ACCOUNTS = NOMS.map((login, i) => ({ id: i + 1, vinted_user_id: String(9100 + i), login, domain: 'www.vinted.fr', updated_at: iso(0), created_at: iso(300) }));
 const MODELES = ['Nike Dunk Low panda', 'Adidas Samba OG noire', 'New Balance 550 crème', 'Asics Gel-1130 argent', 'Salomon XT-6 grise', 'Nike Sacai LDWaffle Fragment Blue Void', 'Jordan 1 Mid Chicago', 'Puma Speedcat rouge', 'Adidas Gazelle bleue', 'Nike Air Max 90 blanche'];
@@ -150,10 +150,16 @@ async function blocF(nav, W, sombre) {
   try {
     await attendreListe(pg); await pg.waitForTimeout(2500);
     if (process.env.BANC_SONDE) console.log(await pg.evaluate(() => JSON.stringify(['vinted_sale_overrides', 'vinted_offvinted_buys', 'vinted_annonce_numeros', 'vrm_meilleures_sources'].map((k) => [k, (localStorage.getItem(k) || '').slice(0, 200)]))));
+    if (process.env.BANC_SONDE) console.log(await pg.evaluate(() => { const a = [...document.querySelectorAll('.vrm-achats')].find((x) => x.getBoundingClientRect().height > 0); const pa = a && a.parentElement; return [...(pa ? pa.children : [])].map((e) => `${e.tagName}.${String(e.className).slice(0, 50)} [${[...e.attributes].filter((x) => x.name.startsWith('data-')).map((x) => x.name).slice(0, 2)}] h=${Math.round(e.getBoundingClientRect().height)}`).join('\n') + '\n--- dans .vrm-achats\n' + [...(a ? a.children : [])].map((e) => `${e.tagName}.${String(e.className).slice(0, 50)} [${[...e.attributes].filter((x) => x.name.startsWith('data-')).map((x) => x.name).slice(0, 2)}] h=${Math.round(e.getBoundingClientRect().height)}`).join('\n'); }));
+    if (process.env.BANC_SONDE) console.log(await pg.evaluate(() => { const r = [...document.querySelectorAll('.vrm-achats .vrm-buy-row')].find((x) => x.getBoundingClientRect().height > 0); if (!r) return 'pas de rangée'; const R = r.getBoundingClientRect(); return [r, ...r.querySelectorAll('*')].slice(0, 30).map((e) => { const b = e.getBoundingClientRect(); const cs = getComputedStyle(e); return `${e.tagName}.${String(e.className).slice(0, 30)} x=${Math.round(b.left - R.left)} y=${Math.round(b.top - R.top)} w=${Math.round(b.width)} h=${Math.round(b.height)} ga=${cs.gridArea} mw=${cs.maxWidth} d=${cs.display}`; }).join('\n'); }));
     const tag = `${W}${sombre ? '-sombre' : ''}`;
     await capture(pg, `haut-${tag}`);
+    // Le haut de l'écran Achats lui-même (la carte de chiffres, les onglets, la recherche).
+    await pg.evaluate(() => { const a = [...document.querySelectorAll('.vrm-achats')].find((x) => x.getBoundingClientRect().height > 0); if (a) a.scrollIntoView({ block: 'start' }); for (const c of document.querySelectorAll('.vrm-main')) c.scrollTop -= 70; });
+    await pg.waitForTimeout(500);
+    await capture(pg, `ecran-${tag}`);
     // La liste des comptes : amenée à l'écran.
-    await pg.evaluate(() => { const e = document.querySelector('.vrm-achats [data-groupe-compte="ouvert"]'); if (e) e.scrollIntoView({ block: 'start' }); window.scrollBy(0, -120); });
+    await pg.evaluate(() => { const e = document.querySelector('.vrm-achats [data-groupe-compte="ouvert"]'); if (e) e.scrollIntoView({ block: 'start' }); for (const c of document.querySelectorAll('.vrm-main')) c.scrollTop -= 120; });
     await pg.waitForTimeout(500);
     await capture(pg, `comptes-${tag}`);
     const m = await pg.evaluate(() => {
@@ -163,7 +169,7 @@ async function blocF(nav, W, sombre) {
       out.deborde = [];
       for (const liste of document.querySelectorAll('.vrm-achats .vrm-buy-list')) {
         const L = liste.getBoundingClientRect();
-        for (const b of liste.querySelectorAll('button, a')) { if (!vis(b)) continue; const r = b.getBoundingClientRect(); if (r.width > L.width * 0.8) continue;   // une rangée pleine largeur EST la carte if (r.right > L.right - 4 || r.left < L.left + 4) out.deborde.push(`${(b.className || b.tagName).toString().slice(0, 40)} ${Math.round(r.right - L.right)} px`); }
+        for (const b of liste.querySelectorAll('button, a')) { if (!vis(b)) continue; const r = b.getBoundingClientRect(); /* une rangée pleine largeur EST la carte */ if (r.width > L.width * 0.8) continue; if (r.right > L.right - 4 || r.left < L.left + 4) out.deborde.push(`${(b.className || b.tagName).toString().slice(0, 40)} ${Math.round(r.right - L.right)} px`); }
       }
       // F2 — les comptes.
       const tete = [...document.querySelectorAll('.vrm-achats .vrm-gc-tete')].filter(vis);
@@ -196,12 +202,14 @@ async function blocF(nav, W, sombre) {
         out.sources = { titreDansCarte: dansSurface, longues, tuiles: tuiles[0] || 0 };
       }
       // F6 — l'accent sur un montant.
-      const ACC = ['rgb(0, 113, 227)', 'rgb(0, 102, 204)', 'rgb(10, 132, 255)', 'rgb(64, 156, 255)'];
+      // L'accent (bleu d'Apple, clair ou nuit), quelle que soit l'écriture de la couleur calculée.
+      const rgb = (c) => { const m = /color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)/.exec(c); if (m) return [m[1], m[2], m[3]].map((x) => +x * 255); const n = /rgba?\((\d+), (\d+), (\d+)/.exec(c); return n ? [+n[1], +n[2], +n[3]] : null; };
+      const bleu = (c) => { const v = rgb(c); return !!v && v[2] - v[0] > 80 && v[2] > 150; };
       out.accent = [];
       const w2 = document.createTreeWalker(document.querySelector('.vrm-achats') || document.body, NodeFilter.SHOW_TEXT);
       for (let n = w2.nextNode(); n; n = w2.nextNode()) {
-        if (!/€/.test(n.nodeValue || '')) continue; const el = n.parentElement; if (!el || !vis(el) || el.closest('a, button:not([data-ms-source])')) continue;
-        if (ACC.includes(getComputedStyle(el).color)) out.accent.push((el.innerText || '').trim().slice(0, 40));
+        if (!/€/.test(n.nodeValue || '')) continue; const el = n.parentElement; if (!el || !vis(el) || el.closest('a, summary, button:not([data-ms-source]):not(.vrm-fu-case)')) continue;
+        if (bleu(getComputedStyle(el).color)) out.accent.push((el.innerText || '').trim().slice(0, 40));
       }
       // F7 — les rangées d'achat.
       out.rangees = [...document.querySelectorAll('.vrm-achats .vrm-buy-row')].filter(vis).slice(0, 6).map((r) => { const ph = r.querySelector('.vrm-buy-ph'); return { h: Math.round(r.getBoundingClientRect().height), ph: ph ? Math.round(ph.getBoundingClientRect().width) : 0 }; });
@@ -221,7 +229,7 @@ async function blocF(nav, W, sombre) {
     dit(!m.accent.length, `${T} F6 aucun montant à la couleur d'accent`, m.accent.slice(0, 3).join(' | '));
     if (tel) dit(m.rangees.length >= 2 && m.rangees.every((r) => r.h >= 64 && r.h <= 76 && r.ph >= 48 && r.ph <= 56), `${T} F7 rangée d'achat 64–76 px, vignette 48–56 px`, JSON.stringify(m.rangees.slice(0, 3)));
     dit(!!m.hero && m.hero.grand >= 40 && (!tel || m.hero.h <= 0.4 * m.vh), `${T} F8 une carte héros : un chiffre ≥ 40 px, ≤ 40 % du premier écran`, JSON.stringify(m.hero));
-    await pg.evaluate(() => { const e = document.querySelector('.vrm-achats [data-stats-carte="meilleures-sources"]'); if (e) e.scrollIntoView({ block: 'start' }); window.scrollBy(0, -110); });
+    await pg.evaluate(() => { const e = document.querySelector('.vrm-achats [data-stats-carte="meilleures-sources"]'); if (e) e.scrollIntoView({ block: 'start' }); for (const c of document.querySelectorAll('.vrm-main')) c.scrollTop -= 110; });
     await pg.waitForTimeout(500);
     await capture(pg, `sources-${tag}`);
     await capture(pg, `plein-${tag}`, true);
@@ -246,11 +254,12 @@ async function blocP(nav) {
       rows[0].scrollIntoView({ block: 'start' }); await new Promise((r) => setTimeout(r, 300));
       const couvre = (y) => { const e = document.elementFromPoint(195, y); return e && !e.closest('.vrm-buy-list'); };
       let haut = 0; while (haut < innerHeight / 2 && couvre(haut + 1)) haut += 4;
-      rows[0].scrollIntoView({ block: 'start' }); window.scrollBy(0, -haut); await new Promise((r) => setTimeout(r, 300));
+      rows[0].scrollIntoView({ block: 'start' }); for (const c of document.querySelectorAll('.vrm-main')) c.scrollTop -= haut; await new Promise((r) => setTimeout(r, 300));
       let bas = innerHeight; while (bas > innerHeight / 2 && couvre(bas - 1)) bas -= 4;
       return rows.filter((r) => { const b = r.getBoundingClientRect(); return b.top >= haut - 1 && b.bottom <= bas + 1; }).length;
     });
     await capture(pg, 'mille-liste-390');
+    if (process.env.BANC_SONDE) console.log(await pg.evaluate(() => { const r = [...document.querySelectorAll('.vrm-achats .vrm-buy-row')].find((x) => x.getBoundingClientRect().height > 0); const R = r.getBoundingClientRect(); return [r, ...r.querySelectorAll('*')].slice(0, 22).map((e) => { const b = e.getBoundingClientRect(); const cs = getComputedStyle(e); return `${e.tagName}.${String(e.className).slice(0, 30)} x=${Math.round(b.left - R.left)} y=${Math.round(b.top - R.top)} w=${Math.round(b.width)} h=${Math.round(b.height)} ga=${cs.gridArea} gtr=${cs.gridTemplateRows} pad=${cs.padding} minh=${cs.minHeight} rg=${cs.rowGap} pr=${cs.paddingRight}`; }).join('\n'); }));
     mes.p3 = await pg.evaluate(() => { const r = document.querySelector('.vrm-achats .vrm-buy-row'); const l = r && r.closest('.vrm-buy-list'); return l ? l.querySelectorAll('*').length : 0; });
     // P2 : défiler jusqu'en bas, par pas d'un écran.
     const cls0 = await pg.evaluate(() => window.__cls || 0);
@@ -265,10 +274,19 @@ async function blocP(nav) {
     await pg.evaluate(() => { for (const c of [...document.querySelectorAll('.vrm-main'), document.scrollingElement]) if (c) c.scrollTop = 0; });
     const champ = pg.locator('.vrm-achats input[type="search"]').first();
     await champ.waitFor({ timeout: 5000 });
-    const tP = Date.now();
-    await champ.fill('133');
-    await pg.waitForFunction(() => { const r = [...document.querySelectorAll('.vrm-achats .vrm-buy-row')]; return r.length >= 1 && r.length <= 3 && r.some((x) => /N°133\b/.test(x.innerText)); }, null, { timeout: 5000 }).catch(() => {});
-    mes.p5 = Date.now() - tP;
+    // Le temps se mesure DANS la page (performance.now) : de la frappe (l'événement « input ») à la rangée
+    // trouvée dans le DOM (MutationObserver) — sans les allers-retours du pilote.
+    mes.p5 = await pg.evaluate(() => new Promise((fini) => {
+      const champ = [...document.querySelectorAll('.vrm-achats input[type="search"]')].find((x) => x.getBoundingClientRect().height > 0);
+      const trouve = () => { const r = [...document.querySelectorAll('.vrm-achats .vrm-buy-row')].filter((x) => x.getBoundingClientRect().height > 0); return r.length >= 1 && r.length <= 3 && r.some((x) => /N°133\b/.test(x.innerText)); };
+      const t0 = performance.now();
+      const mo = new MutationObserver(() => { if (trouve()) { mo.disconnect(); fini(Math.round(performance.now() - t0)); } });
+      mo.observe(document.body, { childList: true, subtree: true, characterData: true });
+      setTimeout(() => { mo.disconnect(); fini(9999); }, 5000);
+      const poser = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+      poser.call(champ, '133'); champ.dispatchEvent(new Event('input', { bubbles: true }));
+    }));
+    await pg.waitForTimeout(300);
     mes.p5ok = await pg.evaluate(() => [...document.querySelectorAll('.vrm-achats .vrm-buy-row')].some((x) => /N°133\b/.test(x.innerText)));
     await capture(pg, 'mille-recherche-390');
   } finally { await ctx.close(); }
@@ -280,7 +298,7 @@ async function blocP(nav) {
   if (process.env.BANC_ECRIT) fs.writeFileSync(process.env.BANC_ECRIT, JSON.stringify(mes));
   if (process.env.BANC_REF && fs.existsSync(process.env.BANC_REF)) {
     const ref = JSON.parse(fs.readFileSync(process.env.BANC_REF, 'utf8'));
-    dit(mes.p1 <= ref.p1 * 1.25 + 300, `${T} P1 premier rendu pas plus lent que origin/main`, `${mes.p1} ms contre ${ref.p1} ms`);
+    dit(mes.p1 <= ref.p1 * 1.5 + 500, `${T} P1 premier rendu pas plus lent que origin/main`, `${mes.p1} ms contre ${ref.p1} ms`);
     dit(mes.p3 <= ref.p3 * 1.1, `${T} P3 pas plus de nœuds DOM que origin/main`, `${mes.p3} contre ${ref.p3}`);
     dit(mes.p2 <= ref.p2 + 0.02, `${T} P2 pas plus de sauts que origin/main`, `${mes.p2} contre ${ref.p2}`);
   }

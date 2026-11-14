@@ -24,13 +24,22 @@ export function useDepliesComptes() {
 // Un repère de `entreesGroupees` → son en-tête. `libelle` : d'où vient le compte
 // ouvert (« Compte ouvert dans Chrome », « Compte choisi », « Compte ouvert sur
 // Leboncoin »…) ; `geste` : un bouton facultatif posé à droite de cet en-tête.
-export function TeteGroupeCompte({ e, unite = 'vente', libelle = 'Compte ouvert', nomOuvert = '', nomDe = (c) => c, onBasculer, onSuite, geste = null }) {
+// (14 nov., refonte Achats) `court` : l'en-tête façon Réglages d'iOS — le nom du groupe à gauche, les nombres
+// calés à droite (`vrm-gc-n` seul dans sa colonne). Les MÊMES mots et nombres ; sans `court`, rien ne change.
+export function TeteGroupeCompte({ e, unite = 'vente', libelle = 'Compte ouvert', nomOuvert = '', nomDe = (c) => c, onBasculer, onSuite, geste = null, court = false }) {
   if (!e) return null;
   if (e.sansDate != null) return null; // dit par l'écran (sa phrase « sans date »)
   if (e.suite != null) {
     return <button type="button" className="vrm-gc-suite" data-groupe-suite={e.suite} onClick={() => onSuite && onSuite(e.suite)}>
       Afficher {e.n > 1 ? `les ${Math.min(120, e.n)} suivantes` : 'la suivante'}
     </button>;
+  }
+  if (court && (e.tete === 'ouvert' || e.tete === 'sans' || e.tete === 'autres')) {
+    return <div className={'vrm-gc-tete is-court' + (e.tete === 'autres' ? ' vrm-gc-autres' : '')} data-groupe-compte={e.tete} data-groupe-n={e.n} {...(e.tete === 'autres' ? { 'data-groupe-comptes': e.comptes } : {})}>
+      <span className="vrm-gc-titre">{e.tete === 'ouvert' ? <><span className="vrm-gc-libelle">{libelle}</span> · <b>{nomOuvert || '—'}</b></> : <span className="vrm-gc-libelle">{e.tete === 'sans' ? 'Compte pas relevé' : 'Autres comptes'}</span>}</span>
+      <span className="vrm-gc-n">{e.tete === 'autres' && e.comptes > 1 ? `${e.comptes} comptes · ` : ''}{nombreDe(e.n, unite)}</span>
+      {geste}
+    </div>;
   }
   if (e.tete === 'ouvert') {
     return <div className="vrm-gc-tete" data-groupe-compte="ouvert" data-groupe-n={e.n}>
@@ -65,7 +74,7 @@ export function TeteGroupeCompte({ e, unite = 'vente', libelle = 'Compte ouvert'
 // `rendre(ligne, i)` dessine une ligne (l'écran garde son flou) ; `SansDate` :
 // la phrase « sans date » de l'écran, posée en bas de chaque groupe. `enLi` : la
 // liste est un <ul> (annonces en fiches) ⇒ chaque en-tête est un <li> pleine largeur.
-export function ListeParCompte({ lignes, ouvert, floute, compteDe, rendre, unite = 'vente', libelle = 'Compte ouvert', nomDe = (c) => c, quand = null, SansDate = null, geste = null, enLi = false }) {
+export function ListeParCompte({ lignes, ouvert, floute, compteDe, rendre, unite = 'vente', libelle = 'Compte ouvert', nomDe = (c) => c, quand = null, SansDate = null, geste = null, enLi = false, court = false }) {
   const dep = useDepliesComptes();
   const L = Array.isArray(lignes) ? lignes : [];
   const g = grouperParCompte(L, { ouvert, floute, compteDe });
@@ -77,7 +86,7 @@ export function ListeParCompte({ lignes, ouvert, floute, compteDe, rendre, unite
     if (e.sansDate != null) return SansDate ? <SansDate key={'gc-sd-' + k} n={e.sansDate}/> : null;
     const cle = 'gc-' + k + '-' + (e.compte || e.tete || 'suite');
     const t = <TeteGroupeCompte key={cle} e={e} unite={unite} libelle={libelle} nomOuvert={nomDe(g.ouvert) || g.ouvert} nomDe={nomDe}
-      onBasculer={dep.basculer} onSuite={dep.plus} geste={e.tete === 'ouvert' ? geste : null}/>;
+      onBasculer={dep.basculer} onSuite={dep.plus} geste={e.tete === 'ouvert' ? geste : null} court={court}/>;
     return enLi ? <li key={cle} className="vrm-gc-li">{t}</li> : t;
   })}</>;
 }

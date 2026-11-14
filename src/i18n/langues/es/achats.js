@@ -348,4 +348,9 @@ export default {
   "achats.rienRelieEncore": { one: "Nada lo vincula todavía a un paquete de arriba (ni código de recogida, ni n.º de seguimiento). No cuenta en «por recoger» hasta conocer su n.º de seguimiento.", other: "Nada los vincula todavía a un paquete de arriba (ni código de recogida, ni n.º de seguimiento). No cuentan en «por recoger» hasta conocer su n.º de seguimiento." },
   "achats.commandeJours": { one: " · pedido hace {n} día", other: "· pedido hace {n} días" },
   "achats.autresIlsSont": { one: "y {n} más — están todos en la pestaña «Todos».", other: "y {n} más — están todos en la pestaña «Todos»." },
+  "achats.ms.benefice": "Beneficio",
+  "achats.ms.vitesse": "Rapidez",
+  "achats.ms.investi": "Invertido",
+  "achats.ms.marge": "Margen",
+  "achats.ms.pourRevendre": "Para revender",
 };

@@ -36203,7 +36203,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // le compte ouvert dans Chrome. Choisi ≠ Chrome ⇒ un geste pour passer au compte de Chrome.
   const nomUidGroupe = (u) => { const a = (accounts || []).find(x => String(x.vinted_user_id) === String(u)); return a ? accNameOf(a) : ''; };
   const groupeChoisi = !!compteSel && compteSel !== '*' && String(compteSel) === selEff;
-  const teteGroupe = (e, k, unite) => <TeteGroupeCompte key={'gc-' + k + '-' + (e.compte || e.tete || e.suite || '')} e={e} unite={unite}
+  // (14 nov., refonte Achats) Sur Achats, l'en-tête est COURT (le nom à gauche, les nombres calés à droite, iOS) ;
+  // les mêmes mots, les mêmes nombres (src/GroupesComptes.jsx, `court`). Ventes garde son en-tête.
+  const teteGroupe = (e, k, unite) => <TeteGroupeCompte key={'gc-' + k + '-' + (e.compte || e.tete || e.suite || '')} e={e} unite={unite} court={unite === 'achat'}
     libelle={groupeChoisi ? 'Compte choisi' : `Compte ouvert ${NAV.dansNu}`} nomOuvert={nomUidGroupe(selEff)} nomDe={nomUidGroupe}
     onBasculer={depComptes.basculer} onSuite={depComptes.plus}
     geste={e.tete === 'ouvert' && groupeChoisi && compteConnecte && String(compteConnecte) !== selEff && typeof setCompteSel === 'function'
@@ -39174,13 +39176,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return L.length;
   };
   const achatsAffiches = useMemo(() => {
+    // (14 nov., refonte Achats — Julien : « imagine si j'ai 1000 articles ») Le N° tapé trouve la paire ACHETÉE :
+    // le N° de la fiche reliée à CET achat par son n° de transaction (`buyFromId`, une identité — §5), jamais un
+    // titre. Un N° seul (« 133 », « B125 ») ; le reste de la recherche ne change pas (`matchOrd`).
+    const qNum = /^[a-z]?\d{1,6}$/i.test(ordSearchDiff.trim()) ? cleNum(ordSearchDiff.trim()) : '';
+    const numDeTx = qNum ? (() => { const m = new Map(); for (const k in numeros) { const e = numeros[k]; if (e && e.buyFromId && e.numero != null && String(e.numero).trim()) m.set(String(e.buyFromId), cleNum(e.numero)); } return m; })() : null;
     let arr = buysBase
     .filter(o => { const p = phaseReception(o);
       if (aFilter === 'attente') return false;
       if (aFilter === 'route') return p === 'route';
       if (aFilter === 'recus') return p === 'recu';
       return true; })
-    .filter(o => matchOrd(o))
+    .filter(o => matchOrd(o) || (!!numDeTx && dansPeriode(o, periode) && numDeTx.get(String(o.transaction_id)) === qNum))
     .map(o => { const tk = trackForBuy(o); return { o, tk, st: achatStage(o, tk) }; });
     // ⚠️⚠️ (5 nov., Julien : « dans achat en route c'est le plus récent qui s'affiche en haut peu importe
     // le compte et le filtre ») puis (9 nov., soir, lot AJ — « du plus récent en haut au plus vieux en bas,
@@ -47271,7 +47278,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const depense = depS ? depS.total : null;
           const depPartiel = !!(depS && (depS.partiel || comptesKO > 0));
           const n = { route: 0, recu: 0 }; if (lu) buysBase.forEach((o) => { const ph = phaseReception(o); if (n[ph] != null) n[ph]++; });
-          return <CarteStatsApp page="achats" aide liveStats={liveStats} className="vrm-fu-ecran" ici="achats" onNav={onNav} sel={{ site: 'toutes', compte: null, periode: null }}
+          // (14 nov., refonte Achats — direction « Atelier ») LA carte héros d'Achats : le même chiffre, et les PHOTOS des
+          // paires achetées ce mois-ci en pile (chacune par SON achat, `orderPhoto` — jamais un titre ; §5).
+          const pileMois = lu ? { srcs: ordreRecent(mois, quandCommandeVinted).map((o) => orderPhoto(o)), n: mois.length, Photo: PhotoVinted, mortes: imgMortes, onMorte: noterImgMorte } : null;
+          return <CarteStatsApp page="achats" aide liveStats={liveStats} className="vrm-fu-ecran vrm-achats-hero" ici="achats" onNav={onNav} sel={{ site: 'toutes', compte: null, periode: null }}
+            attrs={{ 'data-achats-hero': '' }} pile={pileMois}
             locaux={{
               depense: { nom: 'Dépensé du mois', court: tr('achats.depense'), type: 'eur', aide: tr('achats.achatsMoisHors'), valeur: depense, partiel: depPartiel, manque: depPartiel ? [...(depS.partiel ? [`${depS.manque} prix pas lu${depS.manque > 1 ? 's' : ''}`] : []), ...(comptesKO ? [`${comptesKO} compte${comptesKO > 1 ? 's' : ''} pas relu${comptesKO > 1 ? 's' : ''}`] : [])] : [], couverture: depS && depS.partiel ? `${depS.connus} sur ${depS.n}` : '', ...enLecture, quand: (() => { const m = m0.toLocaleDateString('fr-FR', { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1); })(), attrs: { 'data-n': lu ? String(mois.length) : '' } },
               enroute: { nom: 'En route', court: tr('achats.route'), type: 'n', aide: tr('achats.achatsPayesExpedies'), valeur: lu ? n.route : null, ...enLecture, attrs: { 'data-n': lu ? String(n.route) : '' } },
@@ -48685,7 +48696,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* (11 nov.) Où acheter ce qui se revend le mieux : la carte lit la publication faite plus haut
             (`publierMeilleures`), la même qu'Argent → Statistiques. (Intégration colis, demande g) APRÈS la liste :
             posée avant, elle repoussait les achats et leurs colis (689 ⇒ 973 px sur ordinateur). */}
-        {dansPlateforme && !modeRetraits && !baseKO && <div className="vrm-achats-sources" data-achats-sources="" style={{ margin: '12px 16px 0' }}><MeilleuresSources owner={AUTH.user?.id || ''} Retour={FermeAuRetour} ici="achats"/></div>}
+        {dansPlateforme && !modeRetraits && !baseKO && <div className="vrm-achats-sources" data-achats-sources="" style={{ margin: '32px 0 0' }}><MeilleuresSources owner={AUTH.user?.id || ''} Retour={FermeAuRetour} ici="achats"/></div>}
         {/* (26 oct.) Les reçus par email sont une archive, pas le geste du jour :
             sous la liste, plus en tête (une carte « · 0 » poussait les colis vers le bas). */}
         {/* (31 oct., soir) Les reçus d'achat : sur « Achats », pas sur « Colis à retirer ». */}

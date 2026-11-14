@@ -101,3 +101,137 @@
 @media (hover: hover) and (pointer: fine) { .vrm-main :is(.vrm-photo-open, [data-sans-visionneuse], .vrm-ventes-liste) img[data-vrm-vignette] { cursor: pointer; } }
 
 } /* fin @layer vrm-premium */
+
+/* ════════════════════════════════════════════════════════════════════════════
+   REFONTE D'ACHATS (14 nov.) — docs/passation/2026-11-14-refonte-achats.md
+   Julien, captures d'iPhone : « c'est moche » ; « sortir des classiques » ;
+   « il faut que ça soit pratique, imagine si j'ai 1000 articles ».
+   1. une rangée d'achat DENSE : 72 px, vignette 56, titre sur une ligne, l'état
+      et la date sur la seconde ; ≥ 8 achats par écran d'iPhone ;
+   2. rien ne sort de sa carte (le « … » touchait/dépassait le bord droit) ;
+   3. les comptes en liste groupée iOS : en-têtes courts (13 px, le nombre calé
+      à droite), rangées de 52 px, nom en 17 ;
+   4. la recherche et la période COLLÉES en haut de la liste (au pouce) ;
+   5. la carte héros d'Achats compacte (≤ 40 % du premier écran) : les trois
+      chiffres sur UNE ligne, les photos des paires du mois en pile ;
+   6. l'apparition des 12 premières rangées en ressort court (jamais 1 000).
+   Spécificité :root:root:root : passe devant les couches d'avant. Rien de
+   métier : aucun texte, chiffre ni data-* n'est décidé ici.
+   ════════════════════════════════════════════════════════════════════════════ */
+@layer vrm-premium {
+
+/* 1 · LA RANGÉE D'ACHAT, dense — iOS : le titre sur toute la ligne du haut ; l'état, la date et le PRIX sur la
+   ligne du bas ; le « … » à droite. `.vrm-buy-main` se fond dans la grille de la rangée (display: contents). */
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-list > .vrm-buy-row {
+  display: grid !important; grid-template-columns: 56px auto minmax(0, 1fr) auto 44px !important;
+  grid-template-areas: "ph . . . act" "ph titre titre titre act" "ph etat meta prix act" "ph plus plus plus act" "ph . . . act" !important;
+  grid-template-rows: minmax(0, 1fr) auto auto auto minmax(0, 1fr) !important; align-items: center !important;
+  column-gap: 8px !important; row-gap: 0 !important; padding: 8px 6px 8px 12px !important; min-height: 72px !important;
+}
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-list > .vrm-buy-row + .vrm-buy-row::before { left: 80px !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-ph { grid-area: ph !important; width: 56px !important; height: 56px !important; margin-right: 4px !important; border-radius: var(--d-r-case, 12px) !important; align-self: center !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-main { display: contents !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-title {
+  grid-area: titre !important; font-size: var(--d-t-15, 15px) !important; font-weight: 600 !important; line-height: 1.3 !important; min-width: 0 !important; padding: 0 0 2px !important;
+  -webkit-line-clamp: 1 !important; display: block !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important;
+}
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-pastilles { grid-area: etat !important; flex-wrap: nowrap !important; margin: 0 !important; gap: 0 4px !important; min-width: 0 !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-meta {
+  grid-area: meta !important; display: flex !important; flex-wrap: nowrap !important; overflow: hidden !important; white-space: nowrap !important;
+  gap: 0 6px !important; min-width: 0 !important; font-size: var(--d-t-13, 13px) !important; line-height: 22px !important;
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 14px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 14px), transparent);
+}
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-meta > * { flex: none !important; white-space: nowrap !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-row :is(.vrm-buy-transp, .vrm-buy-retour) { grid-area: plus !important; margin: 2px 0 0 !important; min-width: 0 !important; }
+/* L'état : une pastille de 22 px (le même mot) ; le reçu et la facture : une pilule de 22 px dessinée DANS une
+   cible de 44 px (la marge négative rend 22 px à la ligne : la rangée reste à 72). */
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-statut { height: 22px !important; padding: 0 8px !important; font-size: var(--d-t-12, 12px) !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-chip { margin: -11px 0 !important; padding: 0 8px !important; font-size: var(--d-t-12, 12px) !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-chip::before { height: 22px !important; border-radius: 999px !important; }
+/* Le prix sur la ligne du bas, calé à droite ; le « … » DANS la rangée (6 px du bord), centré. */
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-price { grid-area: prix !important; align-self: center !important; justify-self: end !important; padding: 0 0 0 4px !important; line-height: 22px !important; font-size: var(--d-t-15, 15px) !important; font-weight: 600 !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-act { grid-area: act !important; align-self: center !important; margin: 0 !important; justify-self: end !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-more { width: 44px !important; height: 44px !important; min-width: 44px !important; margin: 0 !important; }
+/* Au téléphone, la rangée garde UN geste (« … ») : note, suivre et code sont dedans. */
+@media (max-width: 599px) {
+  :root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-quick { display: none !important; }
+}
+
+/* 2 · RIEN NE SORT DE SA CARTE. */
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-list:not(:has(> .vrm-gc-tete)) { overflow: clip !important; }
+
+/* 3 · LES COMPTES, liste groupée d'iOS. Quand la liste est groupée par compte (elle porte des en-têtes), elle ne
+   peint plus UNE carte : chaque groupe est sa carte (rangées sur fond carte, coins arrondis au début et à la fin
+   du groupe), l'en-tête court posé AU-DESSUS, sur le fond. */
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-list:has(> .vrm-gc-tete) { background: transparent !important; box-shadow: none !important; overflow: visible !important; border-radius: 0 !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-list:has(> .vrm-gc-tete) > :is(.vrm-buy-row, .vrm-gc-compte, .vrm-gc-suite) { background: var(--d-carte, #fff) !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-list:has(> .vrm-gc-tete) > .vrm-gc-tete + :is(.vrm-buy-row, .vrm-gc-compte, .vrm-gc-suite) { border-top-left-radius: var(--d-r-carte, 20px) !important; border-top-right-radius: var(--d-r-carte, 20px) !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-list:has(> .vrm-gc-tete) > :is(.vrm-buy-row, .vrm-gc-compte, .vrm-gc-suite):is(:has(+ .vrm-gc-tete), :last-child) { border-bottom-left-radius: var(--d-r-carte, 20px) !important; border-bottom-right-radius: var(--d-r-carte, 20px) !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-list:has(> .vrm-gc-tete) > .vrm-gc-tete + .vrm-buy-row::before { display: none !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-gc-tete.is-court {
+  display: flex !important; align-items: baseline !important; justify-content: space-between !important; gap: 12px !important; flex-wrap: nowrap !important;
+  padding: 24px 16px 8px !important; margin: 0 !important; border: 0 !important; background: transparent !important;
+  font-size: var(--d-t-13, 13px) !important; font-weight: 400 !important; line-height: 1.3 !important; color: var(--d-gris, #6E6E73) !important;
+}
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-list > .vrm-gc-tete.is-court:first-child { padding-top: 4px !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-gc-tete.is-court .vrm-gc-titre { min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-gc-tete.is-court b { font-weight: 600 !important; color: var(--d-encre, #1D1D1F) !important; overflow-wrap: normal !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-gc-tete.is-court .vrm-gc-n { flex: none !important; margin-left: auto !important; white-space: nowrap !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-gc-compte {
+  min-height: 52px !important; padding: 0 12px 0 16px !important; gap: 8px !important; border-top: 0 !important; position: relative !important;
+  font-size: var(--d-t-17, 17px) !important; font-weight: 400 !important; letter-spacing: -.012em !important; color: var(--d-encre, #1D1D1F) !important;
+  transition: background-color 150ms ease !important;
+}
+:root:root:root body .vrm-main .vrm-achats .vrm-gc-compte + .vrm-gc-compte::before { content: '' !important; position: absolute !important; top: 0 !important; left: 16px !important; right: 0 !important; height: .5px !important; background: var(--d-filet, rgba(60,60,67,.18)) !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-gc-compte:active { background: var(--d-survol, #EDEDF0) !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-gc-compte .vrm-gc-nom { font-size: var(--d-t-17, 17px) !important; font-weight: 400 !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-gc-compte .vrm-gc-n { font-size: var(--d-t-17, 17px) !important; font-weight: 400 !important; color: var(--d-gris, #6E6E73) !important; font-variant-numeric: tabular-nums !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-gc-compte .vrm-gc-chevron { font-size: var(--d-t-20, 20px) !important; color: var(--d-glyphe, #AEAEB2) !important; width: 14px !important; text-align: right !important; }
+@media (hover: hover) and (pointer: fine) {
+  :root:root:root body .vrm-main .vrm-achats .vrm-gc-compte { min-height: 44px !important; }
+  :root:root:root body .vrm-main .vrm-achats .vrm-gc-compte:hover { background: var(--d-survol, #F5F5F7) !important; }
+}
+
+/* 4 · LA RECHERCHE ET LA PÉRIODE, collées en haut de la liste (un matériau translucide, comme une barre d'iOS). */
+:root:root:root body .vrm-main .vrm-achats .vrm-achats-filtres {
+  position: sticky !important; top: var(--a-colle, 0px) !important; z-index: 6 !important;
+  margin: 0 -16px 8px !important; padding: 8px 16px !important; flex-wrap: nowrap !important;
+  background: color-mix(in srgb, var(--d-fond, #F2F2F7) 82%, transparent) !important;
+  -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+}
+@media (prefers-reduced-transparency: reduce) { :root:root:root body .vrm-main .vrm-achats .vrm-achats-filtres { background: var(--d-fond, #F2F2F7) !important; -webkit-backdrop-filter: none; backdrop-filter: none; } }
+
+/* 5 · LA CARTE HÉROS d'Achats, compacte : les trois chiffres sur UNE ligne sous la carte sombre. */
+:root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-cases { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 8px !important; }
+:root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-cases > .vrm-fu-case:nth-child(n):nth-last-child(n) {
+  grid-column: auto !important; min-height: 0 !important; padding: 10px 12px 12px !important; gap: 2px !important;
+}
+:root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-cases > .vrm-fu-case:nth-child(n):nth-last-child(n) > b { font-size: var(--d-t-28, 28px) !important; margin-top: 2px !important; white-space: nowrap !important; max-width: 100% !important; }
+:root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-cases > .vrm-fu-case > span { font-size: var(--d-t-12, 12px) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; max-width: 100% !important; }
+:root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-cases > button.vrm-fu-case::after { top: 13px !important; right: 12px !important; }
+@media (max-width: 599px) {
+  :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-cases > button.vrm-fu-case::after { content: none !important; display: none !important; }
+}
+
+/* 6 · LES PREMIÈRES RANGÉES ARRIVENT (ressort court, 12 au plus, 24 ms de décalage) — jamais 1 000 rangées. */
+@keyframes vrm-achats-entree { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: no-preference) {
+  :root:root:root body .vrm-main .vrm-achats .vrm-buy-list > .vrm-buy-row:nth-child(-n + 12) { animation: vrm-achats-entree 260ms var(--d-sortie, cubic-bezier(.23,1,.32,1)) both; }
+  :root:root:root body .vrm-main .vrm-achats .vrm-buy-list > .vrm-buy-row:nth-child(2) { animation-delay: 24ms; }
+  :root:root:root body .vrm-main .vrm-achats .vrm-buy-list > .vrm-buy-row:nth-child(3) { animation-delay: 48ms; }
+  :root:root:root body .vrm-main .vrm-achats .vrm-buy-list > .vrm-buy-row:nth-child(4) { animation-delay: 72ms; }
+  :root:root:root body .vrm-main .vrm-achats .vrm-buy-list > .vrm-buy-row:nth-child(5) { animation-delay: 96ms; }
+  :root:root:root body .vrm-main .vrm-achats .vrm-buy-list > .vrm-buy-row:nth-child(6) { animation-delay: 120ms; }
+  :root:root:root body .vrm-main .vrm-achats .vrm-buy-list > .vrm-buy-row:nth-child(7) { animation-delay: 144ms; }
+  :root:root:root body .vrm-main .vrm-achats .vrm-buy-list > .vrm-buy-row:nth-child(n + 8):nth-child(-n + 12) { animation-delay: 168ms; }
+}
+
+} /* fin @layer vrm-premium — refonte d'Achats */
+
+/* 7 · LA LIGNE DE RETRAIT (Achats → À retirer, et Colis : la même ligne, src/CarteRelais.jsx).
+   « Date limite inconnue », « Vérification en cours », « point changé » : on ne sait pas le délai, donc PAS de
+   barre vide — la phrase seule (le progressbar reste dans le DOM pour les lecteurs, caché à l’œil). « Code sur
+   Vinted » : une note du système (13/400 grise), pas un faux code en gras. */
+:root:root:root body .vrm-main .vrm-rpf-delai:is([data-rp-delai="inconnue"], [data-rp-delai="verif-transporteur"], [data-rp-delai="point-change"]) .vrm-rpf-delai-piste { display: none !important; }
+:root:root:root body .vrm-main .vrm-rpf-delai:is([data-rp-delai="inconnue"], [data-rp-delai="verif-transporteur"], [data-rp-delai="point-change"]) { gap: 0 !important; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-code-venir.vrm-rpf-code-venir { font-size: var(--d-t-13, 13px) !important; font-weight: 400 !important; line-height: 26px !important; letter-spacing: 0 !important; color: var(--d-gris, #6E6E73) !important; font-family: inherit !important; }
