@@ -38,10 +38,10 @@
 .vrm-at-heure { font-size: clamp(28px, 4vw, 44px); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
 .vrm-at-bande { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 24px; }
 .vrm-at-chiffre { background: var(--d-carte, #fff); border-radius: 20px; box-shadow: var(--d-ombre-carte); padding: 16px 20px; min-width: 0; }
-.vrm-at-chiffre b { display: block; font-size: clamp(40px, 7vw, 72px); font-weight: 700; line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.vrm-at-chiffre b { display: block; font-size: clamp(30px, 7vw, 72px); font-weight: 700; line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
 .vrm-at-chiffre span { display: block; margin-top: 6px; font-size: clamp(13px, 1.4vw, 17px); font-weight: 600; color: var(--d-gris, #6e6e73); }
 .vrm-at-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
-@media (max-width: 760px) { .vrm-at-cols { grid-template-columns: 1fr; } .vrm-at-bande { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 760px) { .vrm-at-cols { grid-template-columns: minmax(0, 1fr); } .vrm-at-bande { gap: 8px; } .vrm-at-chiffre { padding: 12px 14px; } }
 .vrm-at h2 { margin: 0 0 8px 4px; font-size: 13px; font-weight: 600; color: var(--d-gris, #6e6e73); }
 .vrm-at .vrm-cf-liste > li { min-height: 64px; }
 .vrm-at .vrm-cf-txt b { font-size: clamp(15px, 1.6vw, 20px); }
@@ -79,3 +79,5 @@
 .vrm-la-col { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
 .vrm-la h1 { margin: 0; font-size: 34px; font-weight: 700; letter-spacing: -.024em; }
 .vrm-la h2 { margin: 0 0 8px 4px; font-size: 13px; font-weight: 600; color: var(--d-gris, #6e6e73); }
+/* Un lien posé dans une rangée (« Bordereau », « Couper ») : la même cible de 44 px que les boutons. */
+.vrm-cf-liste a.vrm-cf-lien { display: flex; align-items: center; flex: none; text-decoration: none; }

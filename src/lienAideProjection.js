@@ -9,7 +9,7 @@
 export const MAX_LIGNES = 80;
 export const PDF_OK = /^(email_bord_\d{4,20}|harvest_\d{1,20}_label_\d{4,20})$/;
 // Un montant ne passe JAMAIS, même glissé dans un titre (« Air Max 90 € »).
-const SANS_MONTANT = /(?:\d[\d\s.,]*\s?(?:€|eur\b|euros?\b|\$|£))|(?:(?:€|\$|£)\s?\d[\d\s.,]*)/gi;
+const SANS_MONTANT = /(?:\s*[—–-]\s*)?(?:(?:\d[\d\s.,]*\s?(?:€|eur\b|euros?\b|\$|£))|(?:(?:€|\$|£)\s?\d[\d\s.,]*))/gi;   // le séparateur qui le précède part avec lui
 export const txtSansMontant = (v, n = 90) => String(v == null ? '' : v).replace(SANS_MONTANT, '').replace(/[\u0000-\u001f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, n);
 const jour = (j) => (/^\d{4}-\d{2}-\d{2}$/.test(String(j || '').slice(0, 10)) ? String(j).slice(0, 10) : '');
 const heure = (h) => (/^\d{2}:\d{2}$/.test(String(h || '')) ? String(h) : '');

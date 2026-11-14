@@ -13,6 +13,8 @@ import { tr } from './i18n/index.js';
 import { useLangue } from './i18n/react.js';
 import { vueAtelier, ATELIER_RELECTURE_MS } from './atelierEcran.js';
 import './styles-confort.css';
+// « 2026-11-15 » ⇒ « sam. 15 nov. » (la langue de l'appareil).
+export const jourCourt = (j) => { try { return /^\d{4}-\d{2}-\d{2}$/.test(j) ? new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(j + 'T12:00:00')) : ''; } catch (_) { return j; } };
 
 const lireJson = (k) => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (_) { return null; } };
 const euros = (v) => { try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v); } catch (_) { return `${Math.round(v)} €`; } };
@@ -80,14 +82,14 @@ export default function EcranAtelier({ uid, onFermer }) {
             {v.envoyer.lignes.length ? <ul className="vrm-cf-liste">{v.envoyer.lignes.map((l, i) => (
               <li key={i} data-atelier-colis={l.numero || ''}>
                 <span className="vrm-cf-num">{l.numero ? `N°${l.numero}` : '—'}</span>
-                <span className="vrm-cf-txt"><b>{l.titre || tr('confort.sansTitre')}</b><small>{l.retard ? <><i className="vrm-cf-point"/>{tr('confort.atelier.enRetard')}</> : l.limite ? tr('confort.atelier.avant', { jour: l.limite, heure: l.heure || '' }) : ''}{l.transporteur ? ` · ${l.transporteur}` : ''}</small></span>
+                <span className="vrm-cf-txt"><b>{l.titre || tr('confort.sansTitre')}</b><small>{l.retard ? <><i className="vrm-cf-point"/>{tr('confort.atelier.enRetard')}</> : l.limite ? tr('confort.atelier.avant', { jour: jourCourt(l.limite), heure: l.heure || '' }) : ''}{l.transporteur ? ` · ${l.transporteur}` : ''}</small></span>
               </li>))}</ul> : <p className="vrm-cf-doux">{tr('confort.atelier.rienEnvoyer')}</p>}
           </section>
           <section>
             <h2>{tr('confort.atelier.retirerTitre')}</h2>
             {v.retirer.lignes.length ? <ul className="vrm-cf-liste">{v.retirer.lignes.map((l, i) => (
               <li key={i} data-atelier-retrait="">
-                <span className="vrm-cf-txt"><b>{l.titre || l.transporteur || tr('confort.sansTitre')}</b><small>{l.dernierJour ? <><i className="vrm-cf-point"/>{tr('confort.atelier.dernierJour')}</> : l.limite ? tr('confort.atelier.jusquau', { jour: l.limite }) : ''}{l.lieu ? ` · ${l.lieu}` : ''}</small></span>
+                <span className="vrm-cf-txt"><b>{l.titre || l.transporteur || tr('confort.sansTitre')}</b><small>{l.dernierJour ? <><i className="vrm-cf-point"/>{tr('confort.atelier.dernierJour')}</> : l.limite ? tr('confort.atelier.jusquau', { jour: jourCourt(l.limite) }) : ''}{l.lieu ? ` · ${l.lieu}` : ''}</small></span>
                 {l.code ? <span className="vrm-at-code">{l.code}</span> : null}
               </li>))}</ul> : <p className="vrm-cf-doux">{tr('confort.atelier.rienRetirer')}</p>}
           </section>

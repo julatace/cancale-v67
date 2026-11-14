@@ -14,6 +14,8 @@ import { useLangue } from './i18n/react.js';
 import { projectionLienAide } from './lienAideProjection.js';
 import { lirePhoto } from './journeeHorsLigne.js';
 import './styles-confort.css';
+// « 2026-11-15 » ⇒ « sam. 15 nov. » (la langue de l'appareil).
+export const jourCourt = (j) => { try { return /^\d{4}-\d{2}-\d{2}$/.test(j) ? new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(j + 'T12:00:00')) : ''; } catch (_) { return j; } };
 
 const ROUTE = '/api/compte?mode=lien-aide';
 export const PARAM_AIDE = 'aide';
@@ -135,7 +137,7 @@ export function VueLienAide({ jeton }) {
               {p.envoyer.length ? <ul className="vrm-cf-liste">{p.envoyer.map((e, i) => (
                 <li key={i} data-aide-envoyer={e.numero}>
                   <span className="vrm-cf-num">{e.numero ? `N°${e.numero}` : '—'}</span>
-                  <span className="vrm-cf-txt"><b>{e.titre || tr('confort.sansTitre')}</b><small>{[e.limite ? tr('confort.atelier.avant', { jour: e.limite, heure: e.heure }) : '', e.transporteur].filter(Boolean).join(' · ')}</small></span>
+                  <span className="vrm-cf-txt"><b>{e.titre || tr('confort.sansTitre')}</b><small>{[e.limite ? tr('confort.atelier.avant', { jour: jourCourt(e.limite), heure: e.heure }) : '', e.transporteur].filter(Boolean).join(' · ')}</small></span>
                   {e.pdf && e.pdf[0] ? <a className="vrm-cf-lien" href={`${ROUTE}&t=${encodeURIComponent(jeton)}&bord=${encodeURIComponent(e.pdf[0])}`} target="_blank" rel="noopener noreferrer" data-aide-bordereau="">{tr('confort.aide.bordereau')}</a> : null}
                 </li>))}</ul> : <p className="vrm-cf-doux">{tr('confort.atelier.rienEnvoyer')}</p>}
             </section>
@@ -143,7 +145,7 @@ export function VueLienAide({ jeton }) {
               <h2>{tr('confort.aide.aRetirer', { n: p.nRetirer })}</h2>
               {p.retirer.length ? <ul className="vrm-cf-liste">{p.retirer.map((r, i) => (
                 <li key={i} data-aide-retirer="">
-                  <span className="vrm-cf-txt"><b>{r.titre || r.transporteur || tr('confort.sansTitre')}</b><small>{[r.lieu, r.limite ? tr('confort.atelier.jusquau', { jour: r.limite }) : ''].filter(Boolean).join(' · ')}</small></span>
+                  <span className="vrm-cf-txt"><b>{r.titre || r.transporteur || tr('confort.sansTitre')}</b><small>{[r.lieu, r.limite ? tr('confort.atelier.jusquau', { jour: jourCourt(r.limite) }) : ''].filter(Boolean).join(' · ')}</small></span>
                   {r.code ? <span className="vrm-at-code">{r.code}</span> : null}
                 </li>))}</ul> : <p className="vrm-cf-doux">{tr('confort.atelier.rienRetirer')}</p>}
             </section>
