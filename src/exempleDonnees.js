@@ -45,7 +45,7 @@ export function jeuExemple(now = Date.now(), { catalogue = null, origine = '' } 
   const MODELES = ['Air Max 90 blanche', 'Samba OG noire', '550 crème', 'Gel-1130 argent', 'XT-6 grise', 'Dunk Low panda'];
   // La paire n° k : sa photo (ou null) et son titre tiré de la photo (ou celui d'avant).
   const photo = (k) => (varie ? null : photoDeLaPaire(k, origine));
-  const vu = (k) => (varie ? null : descriptionDeLaPaire(k));
+  const vu = (k) => (photo(k) ? descriptionDeLaPaire(k) : null);   // le titre suit la photo, seulement quand elle est là
   const titreVu = (k, taille, avant) => { const d = vu(k); return d ? `${d.marque} ${d.modele} ${d.couleur} taille ${taille}` : avant; };
   const kAnnonce = (i) => (i < 10 ? i : i - 2);   // A1 : 0-7, A2 (10-13) : 8-11
   const annonce = (i) => ({ id: 51000 + i, title: varie ? article(i).titre : titreVu(kAnnonce(i), 38 + (i % 7), `${MARQUES[i % 5]} ${MODELES[i % 6]} taille ${38 + (i % 7)}`), price: { amount: String(45 + i * 5) + '.0', currency_code: 'EUR' }, is_closed: false, is_draft: false, is_hidden: false, photo: photo(kAnnonce(i)), brand_title: varie ? article(i).marque : (vu(kAnnonce(i)) ? vu(kAnnonce(i)).marque : MARQUES[i % 5]), size_title: varie ? article(i).taille : String(38 + (i % 7)), status: i % 3 ? 'Très bon état' : 'Bon état', view_count: 12 + i * 7, favourite_count: i % 4, created_at_ts: ts(1 + i * 3) });
