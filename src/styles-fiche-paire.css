@@ -219,7 +219,7 @@
 .vrm-fp-actions-ligne:empty { display: none; }
 .vrm-fp-depuis-ligne { min-width: 0; display: flex; flex-direction: column; }
 .vrm-fp-depuis-ligne > *, .vrm-fp-depuis-ligne :is(.vrm-rangee-bord, .vrm-colis-actions, .vrm-fiche-gestes, .vrm-fiche-plus, .vrm-fiche-menu, .vrm-rp-gestes, .vrm-recap-grille, .vrm-buy-act) { display: flex !important; flex-direction: column !important; align-items: stretch !important; gap: 0 !important; flex-wrap: nowrap !important; border: 0 !important; background: none !important; padding: 0 !important; margin: 0 !important; width: 100%; }
-.vrm-fp :is(.vrm-fp-actions-carte, .vrm-fp-contexte .vrm-recap-gestes) :is(.vrm-b, .vrm-fp-b, .vrm-ao-second, .vrm-fiche-geste, .vrm-buy-quick, .vrm-buy-more, [role="menuitem"], .vrm-lvc-geste, .vrm-rpf-retire, .vrm-fu-imprimer-ligne, [data-bouton-bord]):not([data-fiche-principal]):not(.vrm-serie-case) {
+.vrm-fp :is(.vrm-fp-actions-carte, .vrm-fp-contexte .vrm-recap-gestes) :is(.vrm-b, .vrm-fp-b, .vrm-ao-second, .vrm-fiche-geste, .vrm-colis-sec, .vrm-colis-ter, .vrm-buy-quick, .vrm-buy-more, [role="menuitem"], .vrm-lvc-geste, .vrm-rpf-retire, .vrm-fu-imprimer-ligne, [data-bouton-bord]):not([data-fiche-principal]):not(.vrm-serie-case) {
   display: flex !important; align-items: center !important; justify-content: flex-start !important; gap: 10px !important; width: 100% !important; min-height: 48px !important; height: auto !important;
   padding: 0 !important; margin: 0 !important; border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important;
   color: var(--d-accent-texte, #0066CC) !important; font-size: var(--d-t-17, 17px) !important; font-weight: 400 !important; text-align: left !important; white-space: normal !important;
@@ -264,3 +264,18 @@
 .vrm-fp .vrm-fp-heros.a-photo .vrm-fp-heros-prix { grid-area: prix; }
 .vrm-fp .vrm-fp-heros.a-photo .vrm-fp-sous { grid-area: sous; }
 @media (min-width: 700px) { .vrm-fp .vrm-fp-heros.a-photo .vrm-fp-heros-photo { max-height: 360px; } }
+
+/* « Changer le prix » : celui de la ligne (son annonce) suffit — jamais deux fois la même rangée. */
+.vrm-fp .vrm-fp-actions-carte:has([data-annonce-prix-partout]) [data-fiche-prix] { display: none !important; }
+/* Un geste en icône seule (« … Autres gestes ») devient une rangée qui DIT son nom (son aria-label, déjà traduit). */
+.vrm-fp .vrm-fp-actions-carte .vrm-fiche-geste-plus::after { content: attr(aria-label); }
+/* « Actions » sans rien dedans : pas de carte vide. */
+.vrm-fp .vrm-fp-actions-sec:has(.vrm-fp-actions-ligne:empty):not(:has(.vrm-fp-outils, .vrm-fp-actions)) { display: none; }
+/* Le détail d'un colis à retirer, hors de sa ligne : une étiquette à gauche, la valeur à droite, un filet fin. */
+.vrm-fp .vrm-fp-contexte .vrm-rpf-detail { display: flex; flex-direction: column; }
+.vrm-fp .vrm-fp-contexte .vrm-rpf-fiche-l { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; min-height: 44px; padding: 10px 0; box-sizing: border-box; }
+.vrm-fp .vrm-fp-contexte .vrm-rpf-fiche-l + .vrm-rpf-fiche-l { box-shadow: inset 0 .5px 0 var(--d-filet-indente, var(--fp-filet)); }
+.vrm-fp .vrm-fp-contexte .vrm-rpf-fiche-k { flex: none; font-size: var(--d-t-15, 15px); color: var(--d-gris, #6E6E73); }
+.vrm-fp .vrm-fp-contexte .vrm-rpf-fiche-v { text-align: right; font-size: var(--d-t-15, 15px); color: var(--d-encre, #1D1D1F); overflow-wrap: anywhere; }
+/* Le transporteur d'un colis (sa pastille) dans les actions : discret, à sa taille. */
+.vrm-fp .vrm-fp-actions-carte [data-colis-transporteur] { align-self: flex-start; margin: 8px 0 0; }

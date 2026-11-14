@@ -51538,7 +51538,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const grp = groupeDe(e);
                 // (14 nov., proposition 62) Toucher la carte ouvre LA fiche de la paire (son N° trouvé par identité, sa
                 // transaction), le bordereau et les gestes du colis rendus dans « Actions » (`DansFiche`).
-                const flColis = attrsFicheLigne({ contexte: 'colis', site: 'vinted', cle: 'c' + (e.txn || e.key), nums: num ? [num] : [], tx: e.txn || '', photo: typeof ph === 'string' ? ph : '', titre: typeof titre === 'string' ? titre : '', sous: e.lim && e.lim.limite ? String(e.lim.limite).slice(0, 10) : '' });
+                const flColis = attrsFicheLigne({ contexte: 'colis', site: 'vinted', cle: 'c' + (e.txn || e.key), nums: num ? [num] : [], tx: e.txn || '', photo: typeof ph === 'string' ? ph : '', titre: typeof titre === 'string' ? titre : '', sous: '' });
                 // (2 nov.) Toujours l'intertitre (« Prêts à imprimer », « En attente du
                 // bordereau ») : le résumé en colonnes qui les nommait est retiré.
                 return (

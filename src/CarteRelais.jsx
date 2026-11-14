@@ -534,9 +534,9 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
         {/* (12 nov., finitions) La dernière ligne de la fiche : « Vérifié · e-mail · par Mondial Relay à 14:26 », étiquetée comme les autres. */}
         {marquesVues.length || verifie ? <div className="vrm-rpf-fiche-l vrm-rpf-sources is-detail" data-rp-sources-ligne=""><span className="vrm-rpf-fiche-k">Vérifié</span><span className="vrm-rpf-fiche-v">{marquesVues.map((m) => <span key={m} className="vrm-rpf-source" data-rp-source={m}>{NOMS_SOURCES[m] || m}</span>)}{verifie ? <span className={'vrm-rpf-verifie' + (ancien ? ' is-ambre' : '')} data-rp-verifie-texte="">{verifieCourt(verifie, marquesVues.length > 0)}</span> : null}</span></div> : null}
         {gestes ? <div className="vrm-rp-gestes">{gestes(x)}</div> : null}
-        {/* (14 nov., proposition 62) « J'ai retiré », le geste de la ligne, aussi dans la fiche (le même appel). */}
-        {retirer && !ouvert ? <button type="button" className="vrm-rpf-retire" data-colis-retire="" data-fiche-retire="" onClick={(ev) => { ev.stopPropagation(); retirer(x); }}>J’ai retiré</button> : null}
       </div></DansFiche> : null}
+      {/* (14 nov., proposition 62) « J'ai retiré », le geste de la ligne, dans « Actions » de la fiche (le même appel). */}
+      {retirer && fl['data-fiche-ligne'] ? <DansFiche cle={fl['data-fiche-ligne']} seulementFiche><button type="button" className="vrm-rpf-retire vrm-b-primaire" data-colis-retire="" data-fiche-retire="" onClick={(ev) => { ev.stopPropagation(); retirer(x); }}>J’ai retiré</button></DansFiche> : null}
       {tiroirG}
     </div>
     )}</LigneGlissable>
