@@ -189,7 +189,9 @@ async function main() {
         await attendreJournee(pg);
         const e0 = await etat(pg);
         await shot(pg, `jp-origine-${vp.width}-${theme}`);
-        dit(e0.cartes.includes('envoyer') && e0.cachees.envoyer === undefined && e0.nCachees === 0 && e0.ordreTete.join() === 'phrase,frise,chiffres,prochain', `D ${T} sans réglage : Ma journée d'avant (« à envoyer » affichée, tête dans l'ordre d'origine, rien de caché)`, JSON.stringify({ cartes: e0.cartes, tete: e0.ordreTete, nc: e0.nCachees }));
+        // (14 nov., Studio) La phrase et l'affiche suivent l'ordre du moment (`ordreJourneeHeure`, lot 117) ; puis la tuile
+        // du mois ; puis la prochaine chose, s'il y a une carte dans « À faire ».
+        dit(e0.cartes.includes('envoyer') && e0.cachees.envoyer === undefined && e0.nCachees === 0 && /^(phrase,frise|frise,phrase),chiffres(,prochain)?$/.test(e0.ordreTete.join()), `D ${T} sans réglage : Ma journée d'avant (« à envoyer » affichée, tête dans l'ordre d'origine, rien de caché)`, JSON.stringify({ cartes: e0.cartes, tete: e0.ordreTete, nc: e0.nCachees }));
         await pg.locator('[data-jp-modifier]').scrollIntoViewIfNeeded();
         const mb = await pg.locator('[data-jp-modifier]').boundingBox();
         dit(mb && mb.height >= 44, `D ${T} « Modifier ma journée » se touche (44 px)`, mb ? String(Math.round(mb.height)) : 'absent');

@@ -99,6 +99,7 @@ export function BentoJournee({ tuiles: tuilesBrutes, ordi = false, FermeAuRetour
   const fermerRef = React.useRef(null);
   const termineRef = React.useRef(null);
   const panneauRef = React.useRef(null);
+  const racine = React.useRef(null);   // la grille entière (rangée tassée + déplié), pour la mettre en vue
   const appui = React.useRef(null);      // l'appui long en cours { id, x, y, minuterie }
   const apresLong = React.useRef(false);  // le clic qui suit un appui long ne déplie rien
   const glisse = React.useRef(null);      // le glisser en cours { id, x0, y0, pointerId, cible }
@@ -129,7 +130,7 @@ export function BentoJournee({ tuiles: tuilesBrutes, ordi = false, FermeAuRetour
       // Au téléphone la grille se tasse : le panneau doit être en vue, sous la rangée tassée.
       if (!ordi && panneauRef.current && typeof panneauRef.current.getBoundingClientRect === 'function') {
         const r = panneauRef.current.getBoundingClientRect();
-        if (r.top < 0 || r.top > window.innerHeight * 0.6) { try { panneauRef.current.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {} }
+        if (r.top < 0 || r.top > window.innerHeight * 0.6) { try { (racine.current || panneauRef.current).scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {} }
       }
     }, 30);
     const echap = (e) => { if (e.key === 'Escape') fermer(); };
@@ -138,7 +139,6 @@ export function BentoJournee({ tuiles: tuilesBrutes, ordi = false, FermeAuRetour
   }, [tuileOuverte && tuileOuverte.id, ordi, fermer]);
   // L'écran entier sait qu'une tuile est ouverte (`data-sj-ouverte` sur `.sj-journee`) : au téléphone l'affiche
   // s'efface (CSS) pour que la tuile monte sous la rangée tassée — rien n'est démonté, ses compteurs restent.
-  const racine = React.useRef(null);
   const idOuvert = tuileOuverte ? tuileOuverte.id : '';
   React.useEffect(() => {
     const ecran = racine.current && racine.current.closest ? racine.current.closest('.sj-journee') : null;
@@ -326,9 +326,11 @@ export function placerTuiles({ envoyer, retirer, mois, simples }) {
     if (S.length) poser(S.shift(), '1x1', 2);
   }
   let deuxieme = 0;   // colonnes d'ordinateur prises sur la seconde rangée
+  const simplesHaut = envoyer ? out.length - 1 : 0;   // les simples posées à côté de « À envoyer » (rangée 1)
   if (retirer) {
     const avec = S.length > 0;
-    poser(retirer, avec ? '2x1' : '3x1', 4);
+    // Sur ordinateur, « À retirer » ferme la première rangée : ce qui reste des douze colonnes (jamais un trou).
+    poser(retirer, avec ? '2x1' : '3x1', envoyer ? Math.max(4, 8 - 2 * simplesHaut) : 4);
     if (avec) { poser(S.shift(), '1x1', 2); deuxieme += 2; }
   }
   const apres = S.length ? S.shift() : null;   // la simple qui ferme la seconde rangée d'ordinateur
