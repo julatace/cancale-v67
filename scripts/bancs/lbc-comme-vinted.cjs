@@ -223,6 +223,7 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
       dit(a.depuis && /en ligne depuis le/.test(a.depuis), '… et depuis quand elle est en ligne', a.depuis);
       dit(a.sansStats === true, '… une annonce jamais relevée n’affiche AUCUN chiffre (jamais 0)', String(a.sansStats));
       dit(a.porte === '1', 'Republier : une seule annonce peut l’être (la N°13 ; ni la vendue sur Vinted, ni la non reliée)', a.porte);
+      await o3.pg.click('[data-pf-afaire]').catch(() => {});   // (14 nov., refonte des sites) La porte vit dans « • À faire › » : on l'ouvre d'abord (un toucher de plus).
       await o3.pg.click('[data-repub-lbc-ouvrir]').catch(() => {});
       await o3.pg.waitForSelector('[data-repub-lbc]', { timeout: 8000 }).catch(() => {});
       const c = await o3.pg.evaluate(() => ({ lignes: [...document.querySelectorAll('[data-repub-lbc-ligne]')].map((x) => x.getAttribute('data-repub-lbc-ligne') + ':' + x.getAttribute('data-num')), exclues: (document.querySelector('[data-repub-lbc-exclues]') || { getAttribute: () => null }).getAttribute('data-repub-lbc-exclues') }));
@@ -269,7 +270,8 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
 
       console.log(`── ${vp.width} px · Republier : Leboncoin refuse la suppression`);
       const o4 = await ouvrir(b, vp, { suppr: 'refuse' }, '?tab=leboncoin');
-      await o4.pg.waitForSelector('[data-repub-lbc-ouvrir]', { timeout: 15000 }).catch(() => {});
+      await o4.pg.waitForSelector('[data-repub-lbc-ouvrir]', { state: 'attached', timeout: 15000 }).catch(() => {});
+      await o4.pg.click('[data-pf-afaire]').catch(() => {});   // (14 nov., refonte des sites) La porte vit dans « • À faire › » : on l'ouvre d'abord (un toucher de plus).
       await o4.pg.click('[data-repub-lbc-ouvrir]').catch(() => {});
       await o4.pg.click('[data-repub-lbc-ligne="3290000002"] input').catch(() => {});
       await o4.pg.click('[data-repub-lbc-suivant]').catch(() => {});

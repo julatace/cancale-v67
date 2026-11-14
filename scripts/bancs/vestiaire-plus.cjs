@@ -223,8 +223,9 @@ const sain = async (pg, ecran) => {
       });
       await essaie('D. Baisser des prix', async () => {
         await pg.goto(`http://localhost:${PORT}/?tab=annonces&site=vestiaire`, { waitUntil: 'domcontentloaded' });
-        await pg.waitForSelector('[data-vc-baisse-ouvrir]', { timeout: 20000 });
+        await pg.waitForSelector('[data-vc-baisse-ouvrir]', { state: 'attached', timeout: 20000 });
         await degeler(pg);
+        await pg.click('[data-pf-afaire]').catch(() => {});   // (14 nov., refonte des sites) La porte vit dans « • À faire › » : on l'ouvre d'abord (un toucher de plus).
         await pg.click('[data-vc-baisse-ouvrir]');
         await pg.waitForSelector('[data-vc-baisse]', { timeout: 8000 });
         const r0 = await pg.evaluate(() => ({ rec: document.querySelector('[data-vc-baisse]').getAttribute('data-vc-baisse-recette'), lancer: document.querySelector('[data-bp-lancer]').disabled, t: document.querySelector('[data-vc-baisse]').innerText }));
@@ -233,8 +234,9 @@ const sain = async (pg, ecran) => {
         await pg.click('[data-bp-fermer]');
         LIGNES = lignes(true);
         await pg.goto(`http://localhost:${PORT}/?tab=annonces&site=vestiaire`, { waitUntil: 'domcontentloaded' });
-        await pg.waitForSelector('[data-vc-baisse-ouvrir]', { timeout: 20000 });
+        await pg.waitForSelector('[data-vc-baisse-ouvrir]', { state: 'attached', timeout: 20000 });
         await degeler(pg);
+        await pg.click('[data-pf-afaire]').catch(() => {});   // (14 nov., refonte des sites) La porte vit dans « • À faire › » : on l'ouvre d'abord (un toucher de plus).
         await pg.click('[data-vc-baisse-ouvrir]');
         await pg.waitForSelector('[data-vc-baisse-recette="pret"]', { timeout: 8000 });
         const l = await pg.evaluate(() => [...document.querySelectorAll('[data-bp-ligne]')].map((x) => [x.getAttribute('data-bp-ligne'), x.getAttribute('data-bp-ancien'), x.getAttribute('data-bp-nouveau'), x.getAttribute('data-bp-coche')].join(':')));

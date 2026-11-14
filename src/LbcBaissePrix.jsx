@@ -77,7 +77,7 @@ export default function LbcBaissePrix({ annonces = [], onFini }) {
             {prop.nPasSu ? ` · ${tr('lbcplus.baisse.statsManquent', { n: prop.nPasSu })}` : ''}
           </div>
         </div>
-        <button type="button" data-lbc-baisse-ouvrir="" onClick={() => setOuvert(true)} style={{ minHeight: 44, padding: '0 16px', borderRadius: 12, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>{tr('lbcplus.baisse.ouvrir')}</button>
+        <button type="button" data-lbc-baisse-ouvrir="" data-afaire-ferme="" onClick={() => setOuvert(true)} style={{ minHeight: 44, padding: '0 16px', borderRadius: 12, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>{tr('lbcplus.baisse.ouvrir')}</button>
       </div>
       {ouvert ? <BaissePrixSerie site="leboncoin" modeDefaut="pct" texteDefaut={String(PCT_PROPOSE)} annonces={lignes} compteOnglet={compteOnglet}
         extRaison={extRaison} onBaisser={onBaisser} onRelire={onRelire} Photo={PhotoVinted}

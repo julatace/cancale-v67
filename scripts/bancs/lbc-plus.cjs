@@ -155,6 +155,7 @@ const capture = (pg, nom, vp) => pg.screenshot({ path: path.join(SORTIE, `lbc-pl
       await o.pg.waitForSelector('[data-lbc-baisse-porte]', { timeout: 15000 }).catch(() => {});
       const porte = await o.pg.evaluate(() => { const e = document.querySelector('[data-lbc-baisse-porte]'); return e ? { n: e.getAttribute('data-lbc-baisse-porte'), t: e.innerText } : null; });
       dit(porte && porte.n === '1' && /1 annonce sans favori en 30 jours/.test(porte.t) && /1 sans statistiques lues/.test(porte.t), 'la porte : 1 proposée (0 favori en 30 j), 1 sans statistiques — dits', JSON.stringify(porte));
+      await o.pg.click('[data-pf-afaire]').catch(() => {});   // (14 nov., refonte des sites) La porte vit dans « • À faire › » : on l'ouvre d'abord (un toucher de plus).
       await o.pg.click('[data-lbc-baisse-ouvrir]').catch(() => {});
       await o.pg.waitForSelector('[data-baisse-serie]', { timeout: 8000 }).catch(() => {});
       await o.pg.waitForTimeout(700);
@@ -168,7 +169,8 @@ const capture = (pg, nom, vp) => pg.screenshot({ path: path.join(SORTIE, `lbc-pl
       await o.ctx.close();
       console.log(`── ${vp.width} px · baisser le prix (recette apprise)`);
       o = await ouvrir(b, vp, { mode: 'ok' }, { appris: true });
-      await o.pg.waitForSelector('[data-lbc-baisse-ouvrir]', { timeout: 15000 }).catch(() => {});
+      await o.pg.waitForSelector('[data-lbc-baisse-ouvrir]', { state: 'attached', timeout: 15000 }).catch(() => {});
+      await o.pg.click('[data-pf-afaire]').catch(() => {});   // (14 nov., refonte des sites) La porte vit dans « • À faire › » : on l'ouvre d'abord (un toucher de plus).
       await o.pg.click('[data-lbc-baisse-ouvrir]').catch(() => {});
       await o.pg.waitForSelector('[data-bp-lancer]', { timeout: 8000 }).catch(() => {});
       await o.pg.waitForTimeout(800);
@@ -225,7 +227,8 @@ const capture = (pg, nom, vp) => pg.screenshot({ path: path.join(SORTIE, `lbc-pl
       // ── 3. Republier ─────────────────────────────────────────────────────
       console.log(`── ${vp.width} px · republier (à la main)`);
       o = await ouvrir(b, vp, { mode: 'ok' });
-      await o.pg.waitForSelector('[data-repub-lbc-ouvrir]', { timeout: 15000 }).catch(() => {});
+      await o.pg.waitForSelector('[data-repub-lbc-ouvrir]', { state: 'attached', timeout: 15000 }).catch(() => {});
+      await o.pg.click('[data-pf-afaire]').catch(() => {});   // (14 nov., refonte des sites) La porte vit dans « • À faire › » : on l'ouvre d'abord (un toucher de plus).
       await o.pg.click('[data-repub-lbc-ouvrir]').catch(() => {});
       await o.pg.waitForSelector('[data-repub-lbc-ligne]', { timeout: 8000 }).catch(() => {});
       const l0 = await o.pg.evaluate(() => [...document.querySelectorAll('[data-repub-lbc-ligne]')].map((e) => e.getAttribute('data-num') + ':' + e.getAttribute('data-repub-lbc-permis') + ':' + (e.querySelector('[data-repub-lbc-trop-tot]') ? e.querySelector('[data-repub-lbc-trop-tot]').innerText : '')));
@@ -264,7 +267,8 @@ const capture = (pg, nom, vp) => pg.screenshot({ path: path.join(SORTIE, `lbc-pl
       console.log(`── ${vp.width} px · republier (par l'extension)`);
       ECRITS.length = 0;
       o = await ouvrir(b, vp, { mode: 'ok' });
-      await o.pg.waitForSelector('[data-repub-lbc-ouvrir]', { timeout: 15000 }).catch(() => {});
+      await o.pg.waitForSelector('[data-repub-lbc-ouvrir]', { state: 'attached', timeout: 15000 }).catch(() => {});
+      await o.pg.click('[data-pf-afaire]').catch(() => {});   // (14 nov., refonte des sites) La porte vit dans « • À faire › » : on l'ouvre d'abord (un toucher de plus).
       await o.pg.click('[data-repub-lbc-ouvrir]').catch(() => {});
       await o.pg.waitForSelector('[data-repub-lbc-ligne]', { timeout: 8000 }).catch(() => {});
       await o.pg.click('[data-repub-lbc-ligne="3290000002"] input').catch(() => {});
