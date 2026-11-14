@@ -52,7 +52,18 @@ prix »). 1 000 lignes collées : 200 rangées dessinées, le reste compté.
   mutations, toutes rouges (`--mutation=cle|deux|conflit|colonnes|forme|lu|remplacer|cas|app|reliees|
   racheter|recu|parjour|source|regime`).
 - Banc `scripts/bancs/argent-choix.cjs` (390 tactile / 1512, clair / sombre, base inventée : 126 ventes,
-  184 fiches, une ligne publiée 2026) : voir le récit de la fin de session ci-dessous.
+  184 fiches, une ligne publiée 2026) : 124 verts. Statistiques (96 reliées / 126, Dunk · 42 = 600 €,
+  « à racheter » = Dunk · 42, tri « Vite »), objectif sur le reçu (700 € / 2 000 €, 77 €/jour, 17 jours,
+  mesure dite), Déclarer (12 340 € case 5KO, 340 ventes, sites, 12 hors total, la carte repliée ne redit
+  pas le montant), Coller (aperçu ligne par ligne, 4 prix écrits sur les bonnes fiches, N°7 garde 50 €,
+  parti au nuage par le PATCH de `main` ; 1 000 lignes : aperçu en ~15 ms, 200 rangées dessinées), base
+  injoignable (« pas chargées », bouton éteint, AUCUNE écriture), touchers (déclaration 3 · ~2 écrans ;
+  modèle et taille 3 · ~4,4 ; objectif 3 · ~0,9), rien ne sort des cartes, aucun montant en bleu, aucun
+  débordement, aucune erreur. Sur l'arbre d'`origin/main` : 16 rouges (390 clair). Mutation « ventes
+  reliées ⇒ toutes » dans l'app construite : 2 rouges. Captures regardées (390/1512, clair/sombre).
+- Bancs gardes : compta-stats-coherence 186 verts, argent-mois 104, objectifs-mois 68 ; compta-simple
+  159 verts et 1 rouge (« C 390 clair — goto ERR_ABORTED ?tab=settings ») : le MÊME rouge sur l'arbre
+  d'`origin/main`, pas lié à ce lot.
 - Gardés verts : build, audits traduction, tdz, coherence, variables, urssaf, quoi-de-neuf,
   objectif-mois, ce-qui-rapporte, micro-entreprise, cloture-annee, icones, textes-courts, identite,
   fonctions-api ; `audit-benefice` : le même rouge connu (« joursAvant »), pas aggravé.
