@@ -112,7 +112,7 @@ import { routePilotage } from './_lib/pilotage.js';
 import { recevoirMesures, listerMesures } from './_lib/mesures-terrain.js';
 import { etatPublic } from './_lib/etat-public.js';
 // (9 nov.) L'état rangé par les sondes automatiques (projection publique, api/_lib/statut-sondes.js).
-import { statutPourSante } from './_lib/statut-sondes.js';
+import { statutPourSante, relancerSondesSiVieilles, oublierStatutPublic } from './_lib/statut-sondes.js';
 import { sendPushToAll, pushConfigure } from './_lib/push.js';
 import { contexteVendeur } from './_lib/owner.js';
 import { freinFork } from './_lib/frein-fork.js';   // (12 nov., M54)
@@ -2085,7 +2085,12 @@ async function sante(req, res) {
   const config = await configPourProprietaire(req);
   res.setHeader('Cache-Control', config ? 'private, no-store' : 'public, max-age=0, s-maxage=30');
   if (config) res.setHeader('Vary', 'Authorization');
-  const [etat, statut] = await Promise.all([etatPublic({ pushPret: pushConfigure(), anon: ANON }), statutPourSante().catch(() => null)]);
+  const [etat, statut0] = await Promise.all([etatPublic({ pushPret: pushConfigure(), anon: ANON }), statutPourSante().catch(() => null)]);
+  // (14 nov., fiabilité prod) GitHub ne lance les sondes que 3 à 4 fois par jour : un état de plus
+  // de 15 min est relancé ICI (api/_lib/statut-sondes.js `relancerSondesSiVieilles`), puis relu.
+  let statut = statut0;
+  const relance = await relancerSondesSiVieilles({ statut: statut0 }).catch(() => null);
+  if (relance && relance.ok) { oublierStatutPublic(); statut = await statutPourSante().catch(() => statut0); }
   return repondre(res, 200, {
     ok: true,
     serviceKey: !!process.env.SUPABASE_SERVICE_KEY,
