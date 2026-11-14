@@ -440,6 +440,7 @@ sans la fonction.
 
 | capacité | fonction de l'extension | arrivée en | ce que l'app promet |
 |---|---|---|---|
+| `popupcapte` `cartelistes` `favoriscoches` | `annoncerCapte` · `carteListes` · `listeFavTriee` (vrm-badge.js) | **5.377.0** (14 nov.) | « VRM a capté · 2 nouvelles ventes » près du logo et dans l'app (par identité, une fois, réglage partagé) ; carte Favoris · Annonces · Ventes du compte de l'onglet, autres comptes floutés `inert` ; favoris du plus récent, cochés |
 | `remiseprix` | `remisePermise` | **5.376.0** (14 nov.) | « Remettre les prix » d'un solde : la seule hausse des chemins de baisse (Vinted, Leboncoin, Vestiaire), `remise` + `confirme` + prix = l'origine mémorisée, sur son clic |
 | `importpasse` | `importerAnnonces` | **5.375.0** (13 nov.) | « Import de ton passé · 340 / ~1 200 ventes » : 12 mois (horizon par date), annonces d'un trait, état noté après chaque page, souci dit ; `import_vinted_{uid}` v 2 |
 | `favoriattente` | `attendreOffreMessage` | **5.372.0** (12 nov.) | favoris : après l'offre ACCEPTÉE, 8 à 20 s au hasard (jamais deux fois la même valeur) puis le temps d'écriture ; attente dans `chrome.storage.local` (`vrmFavoriAttente`), reprise par un worker neuf (`reprendreMessagesFavoris`) ; Tout arrêter, captcha, pause, autre compte, onglet fermé ⇒ le message ne part pas, dit |
@@ -526,19 +527,18 @@ sans la fonction.
 ## 9. État actuel et décisions récentes
 - **14 nov. · Ma journée « Studio bleu clair » + « Tes tuiles à toi » (148)** : tête + affiche (vendu du jour fin, € remonté, semaine), grille Bento (chaque tuile son geste ; « Imprimer » seul plein, parcours inchangé ; codes en plaques), déplier sur place, « À faire » dessous ; appui long ⇒ ranger / cacher / agrandir (`vrm_tuiles_journee`, l'urgent revient). `docs/passation/2026-11-14-studio-journee.md`. Geste : aucun.
 - **14 nov. · Accompagnement des gestes** : chaque action dit avant (ce qui va se passer ET ce qui ne se passera pas), pendant (« 3 / 8 », Tout arrêter), après (résultat + « Ensuite › »), échec (raison en mots + geste) — brique `src/ui/Accompagne.jsx` + `src/accompagnement.js` §9 ; listes vides et premières fois ; aucun « Annuler »/confirmation/« ? » ajouté (sa décision). `docs/passation/2026-11-14-accompagnement.md`. Geste : aucun.
+- **14 nov. · Extension 5.377.0 : « VRM a capté » + carte Favoris · Annonces · Ventes** : bulle près du logo et toast dans l'app quand une écriture RÉUSSIE range du nouveau (par identité, `vrmCapteVu`), « Compte relié · … » à la connexion, réglage partagé carte ↔ Paramètres ; carte : compte de l'onglet d'abord, favoris du plus récent cochés ⇒ « Envoyer le message (N) », autres comptes floutés `inert`, lecture seule. `docs/passation/2026-11-14-popup-capte.md`. Geste : installer la 5.377.0.
 
-- **14 nov. · Ergonomie des gestes (mesurée)** : banc `ergonomie-gestes` joue 15 gestes au pouce (390 tactile) depuis l'ouverture ; ⌘K « Republier N°x à la main » (kit, 5 → 3 touchers) et « Publier N°x partout » (4 → 3) ; les 15 dans leur plafond. `docs/passation/2026-11-14-ergonomie-gestes.md`. Geste : aucun.
-- **14 nov. · Refonte des listes** : Annonces et Ventes « la liste d'abord » (bande de chiffres au lieu de la carte sombre, compte en menu, barre + petites capsules, alertes dans « • À faire · N », phrase sous le titre retirée), Annonces en liste groupée de 70 px, colis en rangées, Ma journée : héros atelier ; briques communes `src/ui/` ; banc `refonte-listes`. `docs/passation/2026-11-14-refonte-listes.md`. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.376.0** (14 nov., consolidée : carte, capture, messages-achats-plus, argent-prix, dates-versement — `2026-11-14-extension-5376.md`). **À lire en premier : `docs/passation/2026-11-10-passation-finale.md`** (état exact, gestes de Julien, ce qui reste, base), puis `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
+**Extension servie : 5.377.0** (14 nov. : « VRM a capté », carte en trois onglets — `2026-11-14-popup-capte.md` ; la 5.376.0 : `2026-11-14-extension-5376.md`). **À lire en premier : `docs/passation/2026-11-10-passation-finale.md`** (état exact, gestes de Julien, ce qui reste, base), puis `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
 - Facture Pro : compléter « Ma facture » (Argent → Factures : SIRET, forme, régime de TVA, son e-mail) ; poser `RELANCES_SMTP_*` + `RELANCES_EXPEDITEUR` (SPF/DKIM, Brevo 300/j) — VRM envoie par défaut.
-- Installer l’extension **5.376.0** (consolidée le 14 nov. : remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip` ; chez lui : Chrome en 5.329, iPhone en 5.368). La liste complète et à jour des gestes : `docs/passation/2026-11-09-passation-generale.md` §5.
+- Installer l’extension **5.377.0** (14 nov. : remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip` ; chez lui : Chrome en 5.329, iPhone en 5.368). La liste complète et à jour des gestes : `docs/passation/2026-11-09-passation-generale.md` §5.
 - Sur leboncoin.fr, ouvrir « Mes annonces » sur CHACUN de ses comptes Leboncoin.
 - Recoller `scripts/gmail-forwarder.gs` (avec sa clé) dans la boîte qui fait tourner le
   script, puis poser `EMAIL_INBOUND_SECRET` sur Vercel (l'ancien script lit encore la

@@ -3582,4 +3582,4 @@ autres onglets sont inchangés. Banc `scripts/bancs/achats-en-route-ordre.cjs`
 
 ## Déplacé de CLAUDE.md §9 le 14 nov. (taille du fichier), tel quel
 
-- **14 nov. · Listes : phrase, glisser, épingles, comparer (92–95)** : « nike 42 pas vendue depuis 2 mois » ⇒ capsules modifiables sans IA (5 langues, Annonces + ⌘K, `src/recherchePhrase.js`) ; cocher en glissant depuis la case ; 20 épingles par identité (`vrm_epingles`, synchronisées) ; comparer deux cochées. `docs/passation/2026-11-14-listes-recherche.md`. Geste : aucun.
+- **14 nov. · Ergonomie des gestes (mesurée)** : banc `ergonomie-gestes` joue 15 gestes au pouce (390 tactile) depuis l'ouverture ; ⌘K « Republier N°x à la main » (kit, 5 → 3 touchers) et « Publier N°x partout » (4 → 3) ; les 15 dans leur plafond. `docs/passation/2026-11-14-ergonomie-gestes.md`. Geste : aucun.

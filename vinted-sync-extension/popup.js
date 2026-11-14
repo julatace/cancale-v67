@@ -543,7 +543,20 @@ function cadreAutorise() {
 if ((REPARER || CARTE) && !cadreAutorise()) { try { document.body.setAttribute('data-cadre', 'refuse'); document.body.replaceChildren(); } catch (_) {} }
 else if (REPARER) reparerSiPerime().then((r) => { try { document.body.setAttribute('data-reparation', r); } catch (_) {} });
 else if (CARTE) lancerCadre();
-else { chargerAuth(); montrerMiseAJour(); }
+else { chargerAuth(); montrerMiseAJour(); lancerListes(); }
+// 5.377 : la fenêtre de l'extension (ouverte dans un onglet : clic droit sur l'icône) montre
+// aussi Favoris · Annonces · Ventes du compte Vinted connecté dans ce navigateur — le MÊME
+// code que la carte du logo (vrm-badge.js en mode « listes », §11), lecture seule ; les
+// messages aux favoris, eux, partent de l'onglet vinted.fr (la carte du logo).
+function lancerListes() {
+  if (!/[?&]mode=onglet\b/.test(location.search)) return;
+  try {
+    globalThis.__vrmListes = true;
+    const s = document.createElement('script');
+    s.src = 'vrm-badge.js';
+    (document.head || document.documentElement).appendChild(s);
+  } catch (_) {}
+}
 
 // ── 5.371 : « NOUVELLE VERSION DISPONIBLE » DANS LA FENÊTRE ───────────────────
 // La même règle que la carte du logo (le service worker compare la version

@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.376.0';
+const CODE_VERSION = '5.377.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -206,6 +206,8 @@ async function saveSession(sess) {
   // des renouvellements : la pause portait sur l'ancien jeton. La même session
   // renvoyée, elle, ne lève rien (sinon chaque « ready » relancerait un essai).
   if (!s || (!s.mort && (!avant || avant.refresh_token !== s.refresh_token))) await effacerPauseRenouv(!s);
+  // 5.377 : une session VRM qui ARRIVE ⇒ la première lecture de chaque site se dit « Compte relié · … ».
+  if (s && !s.mort && s.user_id && (!avant || avant.mort || avant.user_id !== s.user_id)) await marquerSessionCapte().catch(() => {});
   majIcone(!!s && !s.mort);
 }
 
@@ -1205,6 +1207,7 @@ try {
         if (msg.type === 'liaison') { sendResponse(await demanderLiaison(msg)); return; }
         if (msg.type === 'session') { sendResponse(await recevoirSessionAdressee(msg)); return; }
         if (msg.type === 'deconnexion') { sendResponse(await deconnexionAdressee(msg)); return; }
+        if (msg.type === 'reglageCapte') { sendResponse(await poserCapteCoupe(msg.coupe === true)); return; }   // 5.377
         if(msg.type==='favorisEtat'){const e=await etatPourApp();sendResponse(e);if(Date.now()-dernierPontFavoris>60000){dernierPontFavoris=Date.now();reinjecterPont().catch(()=>{});}return;}
         if(msg.type==='favorisExec'&&msg.endpoint==='/vrm/favoris'){sendResponse(await executerPourApp({...msg,method:'POST'},sender));return;}
         if(msg.type==='favorisOuvrir'){sendResponse(await executerPourApp({...msg,method:'POST',endpoint:'/vrm/favoris/ouvrir'},sender));return;}
@@ -2052,6 +2055,7 @@ function unComptePushALaFois(fn) {
 // `premiere` : la ligne de CE compte n'existait pas avant cette écriture.
 // Rend une promesse (les audits l'attendent ; l'appelant n'a pas à le faire).
 function signalerCompteRelie(plateforme, id, premiere) {
+  if (premiere) marquerConnexionCapte(plateforme, id).catch(() => {});   // 5.377 : « Compte relié · … »
   return unComptePushALaFois(async () => {
     try {
       const cle = `${plateforme}:${String(id == null ? '' : id)}`;
@@ -3548,6 +3552,7 @@ async function storeHarvest(domain, type, id, body, sourceUrl=null,tabId=null,so
   // le coffre — une ligne par annonce, lue seulement quand on republie.
   const brut = parsed;
   parsed = alleger(type, parsed);
+  const lusCapte = parsed;   // 5.377 : la RÉPONSE lue (jamais la liste fusionnée) — « L'extension a capté »
   let fenetreCmd = null;   // 5.323 : l'empreinte de la fenêtre de commandes fusionnée (notée une fois rangée)
 
   // ⚠️⚠️ ON NE REMPLACE JAMAIS UN DRESSING PAR UN PLUS PAUVRE.
@@ -3585,7 +3590,7 @@ async function storeHarvest(domain, type, id, body, sourceUrl=null,tabId=null,so
     // 5.326 : envoyée LÉGÈRE (`commandesParServeur`) — la fusion se fait chez vrm.center.
     const lg = await commandesParServeur(uid, type, parsed, domain);
     if (lg === 'inchange' || lg === 'forme') return;
-    if (lg === 'ecrit' || lg === 'partiel' || lg === null) { await apresCommandesServeur(uid, type, lg, true); return; }
+    if (lg === 'ecrit' || lg === 'partiel' || lg === null) { await apresCommandesServeur(uid, type, lg, true); if (lg === 'ecrit') await capteVinted(uid, type, lusCapte); return; }
     // 'absent' (route pas encore déployée) ou 'direct' (complète et petite) : la voie d'avant.
     // 5.327 : 'secours' (vrm.center muet N fois de suite) : la même voie, BORNÉE.
     const c = lg === 'secours' ? await commandesSecours(rowId, type, parsed) : await commandesARanger(rowId, type, parsed);
@@ -3636,6 +3641,7 @@ async function storeHarvest(domain, type, id, body, sourceUrl=null,tabId=null,so
   // sinon « rien en base » resterait indiscernable de « jamais reçu ».
   noterDiag(`${ecrit === false ? 'ecriture_ratee' : 'ecrit'}_${type || 'inconnu'}`);
   if (ecrit !== false && fenetreCmd) await noterFenetreRangee(rowId, fenetreCmd);
+  if (ecrit === true) await capteVinted(uid, type, lusCapte);   // 5.377 : seulement RANGÉ
   noterFlux('vinted', ecrit !== false);
   // Des ventes viennent d'être rangées : l'app ouverte les relit TOUT DE SUITE
   // (« presque instantanément dès que je fais une vente », 2 octobre).
@@ -3952,6 +3958,24 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       poserToutArrete(msg.on === true).then(sendResponse, () => sendResponse({ ok: false }));
       return true;
     }
+    // 5.377 : « L'extension a capté » — le lot du compte de L'ONGLET (sender.tab), vu une fois ; le réglage.
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'capteLot') {
+      capteLotPourOnglet(sender && sender.tab && sender.tab.url, sender && sender.tab ? sender.tab.id : null).then(sendResponse, () => sendResponse({ ok: false }));
+      return true;
+    }
+    // 5.377 : Favoris · Annonces · Ventes du compte de l'onglet (lecture seule ; autres comptes floutés).
+    if (msg && (msg.from === 'vrm-badge' || msg.from === 'cancale-popup') && msg.action === 'carteListes') {
+      carteListes(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
+      return true;
+    }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'capteVu') {
+      capteLotVu(sender && sender.tab && sender.tab.url, sender && sender.tab ? sender.tab.id : null, msg.lot).then(sendResponse, () => sendResponse({ ok: false }));
+      return true;
+    }
+    if (msg && (msg.from === 'vrm-badge' || msg.from === 'cancale-popup') && msg.action === 'capteReglage') {
+      poserCapteCoupe(msg.coupe === true).then(sendResponse, () => sendResponse({ ok: false }));
+      return true;
+    }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'resumeMasque') {
       poserMoisMasque(msg.masque === true).then(sendResponse, () => sendResponse({ ok: false }));
       return true;
@@ -4044,6 +4068,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (m.type === 'liaison') { sendResponse(await demanderLiaison(m)); return; }
           if (m.type === 'session') { sendResponse(await recevoirSessionAdressee(m)); return; }
           if (m.type === 'deconnexion') { sendResponse(await deconnexionAdressee(m)); return; }
+          if (m.type === 'reglageCapte') { sendResponse(await poserCapteCoupe(m.coupe === true)); return; }   // 5.377
           if (m.type === 'code') { let ext = ''; try { ext = String(chrome.runtime.id || ''); } catch (_) {} sendResponse({ ok: true, code: CODE_VERSION, ext }); return; }
           sendResponse({ ok: false, code: 'inconnu' });
         } catch (e) { sendResponse({ ok: false, code: 'erreur' }); }
@@ -5862,6 +5887,7 @@ async function storeLabel(domain, url, b64) {
   const range = await supabaseUpsert('app_data', lignes, 'id');
   if (range === false) { await noterDiag('label_ecriture_ratee'); logActivity('⚠️ Bordereau lu, mais la base ne l\'a pas enregistré'); return false; }
   logActivity(tx ? '📎 Bordereau capté et relié à sa vente' : '📄 Bordereau capté (prêt à imprimer)');
+  if (tx && range === true) await annoncerCapte('vinted', String(uid), 'bordereaux', [String(tx)]).catch(() => null);   // 5.377
   return true;
 }
 // ══════════════════════════════════════════════════════════════════════════════
@@ -8908,6 +8934,7 @@ async function noterRetrait(r, uid) {
     noterDiag('retrait_conv_ecrit');
     if (uid) notifierApp({ type: 'maj', quoi: 'retrait', uid: String(uid), tx: String(r.tx) });
     if (codeNeuf) { await mettreNotifRetrait(r.tx); await envoyerNotifsRetrait(); }
+    if (codeNeuf && uid && ok === true) await annoncerCapte('vinted', String(uid), 'codes', [`${r.tx}:${String(r.code).replace(/[^\w-]/g, '')}`]).catch(() => null);   // 5.377
     return true;
   } catch (_) { return null; }
 }
@@ -9927,6 +9954,7 @@ async function storeHarvestRow(uid, type, payload, domain, opts) {
   verifFormeObjet(type, brut, '');
   if (type === 'profile') { try { await noterEtatCompte(uid, brut); } catch (_) {} noterLoginVu(uid, brut); try { await noterVacancesVues(String(uid), vacancesDuProfil(brut)); } catch (_) {} }   // 5.181 : actif / banni ; 5.191 : login ; 5.350 : vacances (alerte modération)
   payload = alleger(type, payload);
+  const lusCapte = payload;   // 5.377 : la réponse lue, pour « L'extension a capté »
   // ⚠️ MÊME GARDE QUE LA VOIE PASSIVE, ICI AUSSI. Le test `estPorteMonnaie`
   // n'existait que chez l'APPELANT (la moisson active) : n'importe quel autre
   // chemin pouvait donc écrire un porte-monnaie vide par-dessus le vrai solde.
@@ -9960,7 +9988,7 @@ async function storeHarvestRow(uid, type, payload, domain, opts) {
     const lg = await commandesParServeur(uid, type, payload, domain || 'www.vinted.fr');
     if (lg === 'inchange') return 'inchange';
     if (lg === 'forme') return 'forme-inconnue';
-    if (lg === 'ecrit' || lg === 'partiel' || lg === null) return apresCommandesServeur(uid, type, lg, false);
+    if (lg === 'ecrit' || lg === 'partiel' || lg === null) { const rr = await apresCommandesServeur(uid, type, lg, false); if (lg === 'ecrit') await capteVinted(uid, type, lusCapte); return rr; }
     // 'absent' (route pas encore déployée) ou 'direct' (complète et petite) : la voie d'avant.
     // 5.327 : 'secours' (vrm.center muet N fois de suite) : la même voie, BORNÉE.
     const c = lg === 'secours' ? await commandesSecours(`harvest_${uid}_${type}`, type, payload) : await commandesARanger(`harvest_${uid}_${type}`, type, payload);
@@ -10005,6 +10033,7 @@ async function storeHarvestRow(uid, type, payload, domain, opts) {
   // 5.350 : deux lectures COMPLÈTES comparées (masquée / disparue) — aucune requête Vinted de plus.
   if (capturePrevue && ecritRow !== false && type === 'listings') { try { await guetterDressing(uid, (brut && brut.items) || [], Date.parse(maintenant)); } catch (_) {} }
   if (fenetreCmd && ecritRow !== false) await noterFenetreRangee(`harvest_${uid}_${type}`, fenetreCmd);
+  if (ecritRow === true) await capteVinted(uid, type, lusCapte);   // 5.377
   if (ecritRow !== false && type === 'orders_sold') notifierApp({ type: 'maj', quoi: 'ventes', uid: String(uid) });
   if (ecritRow !== false && type === 'orders_purchased') notifierApp({ type: 'maj', quoi: 'achats', uid: String(uid) });
   if (ecritRow !== false && type === 'listings') notifierApp({ type: 'maj', quoi: 'annonces', uid: String(uid) });   // 5.165 (voir storeHarvest)
@@ -18454,7 +18483,9 @@ async function etatSite(url,tabId) {
   // 5.376 : les liens du site pour le compte de l'onglet (jamais VRM) et les favoris de CE compte.
   const liens = liensCartePour(url, plateforme, site);
   if (plateforme === 'vinted' && site && site.id && vrm && vrm.connecte === true && site.choix !== 'non') site.favoris = await favorisPourCarte(String(site.id), true).catch(() => null);
-  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, lbc, mois, oauthFenetre: oauthFenetrePossible(), oauthRevenu, toutArrete, maj, aReparer, enAttenteReseau, secu, liens, capture };
+  // 5.377 : le réglage « Dire ce que l'extension capte » (true · false · null = pas su).
+  const capteCoupeEtat = await capteCoupe();
+  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, lbc, mois, oauthFenetre: oauthFenetrePossible(), oauthRevenu, toutArrete, maj, aReparer, enAttenteReseau, secu, liens, capture, capteCoupe: capteCoupeEtat };
 }
 // ══ 5.376 — « PLUS SIMPLE POUR TOUT LE MONDE » : CE QUI MANQUE, EN UNE PHRASE ══
 // Julien : « que ce soit beaucoup mieux et beaucoup plus simple pour tout le
@@ -18492,6 +18523,374 @@ async function capturePourCarte(plateforme, uid, vcCapte) {
   }
   if (plateforme === 'leboncoin' && enFile) return { k: 'attente', n: enFile, phrase: `${enFile} ${pluriel(enFile, 'lecture pas encore envoyée', 'lectures pas encore envoyées')} à VRM`, geste: 'Elles repartent seules dès que le réseau revient', enFile };
   return null;
+}
+// ══ 5.377 (14 nov.) — « L'EXTENSION A CAPTÉ ÇA » ════════════════════════════
+// Julien, mot pour mot : « quand on se connecte dans un compte par exemple,
+// l'extension capte des nouvelles choses, on a un petit popup qui dit que
+// l'extension a capté ça ». Un petit message près du logo (vrm-badge.js) et, dans
+// l'app ouverte, un toast du même genre (src/capteNotif/).
+// ⚠️ Rien n'est lu pour ça : on ANNONCE ce qu'une écriture RÉUSSIE vient de
+//    ranger (aucune requête Vinted, Leboncoin ou Vestiaire de plus ; aucun
+//    garde-fou touché). Appelé seulement après un `supabaseUpsert` qui a rendu
+//    `true` — une lecture ratée, partielle ou refusée n'arrive jamais ici, donc
+//    « 0 » ne se dit jamais (pas su ≠ rien).
+// « NOUVEAU » SE COMPTE PAR IDENTITÉ (n° de transaction, id d'annonce, n° de
+//    bordereau, id de conversation + date de son dernier message), jamais par
+//    ressemblance : `vrmCapteVu` garde, par compte et par sorte, les identités
+//    déjà rangées par CETTE extension (chrome.storage.local, §4.9). Une sorte
+//    jamais vue pour un compte (première lecture après la mise à jour) sert de
+//    point de départ, en SILENCE : on ne sait pas ce qui est nouveau. Ensuite,
+//    une identité inconnue n'est « nouvelle » que si elle est née après ce point
+//    de départ (sa date, lue dans la réponse) — sans date lisible, rien n'est
+//    annoncé. Les bordereaux, codes de retrait et dates de versement sont des
+//    ÉVÉNEMENTS : la fonction qui les range a déjà prouvé qu'ils manquaient.
+// À LA CONNEXION (changement de compte dans le navigateur, première écriture
+//    d'un compte ici, session VRM qui arrive) : pendant 3 min, la première
+//    lecture de chaque sorte se dit en entier — « Compte relié · 14 annonces ·
+//    3 ventes lues ».
+// Un lot par compte (`vrmCapteLots`) : la carte le montre UNE fois (`vu`), il ne
+//    revient pas ; l'app reçoit le même lot (`notifierApp({ type: 'capte' })`).
+// Réglage « Dire ce que l'extension capte » (`vrmCapteReglage.coupe`) : coupé ⇒
+//    les identités sont quand même notées (rien ne déferle quand on le rallume),
+//    aucun lot n'est posé, rien n'est dit.
+const CAPTE_VU = 'vrmCapteVu', CAPTE_LOTS = 'vrmCapteLots', CAPTE_ETAT = 'vrmCapteEtat', CAPTE_REGLAGE = 'vrmCapteReglage';
+const CAPTE_MAX_IDS = 6000, CAPTE_MAX_COMPTES = 40;
+const CAPTE_LOT_MS = 2 * 60000;          // un lot non montré se périme (la page n'était pas ouverte)
+const CAPTE_CONNEXION_MS = 3 * 60000;    // la fenêtre « Compte relié »
+const CAPTE_SESSION_MS = 10 * 60000;
+const CAPTE_MARGE_MS = 6 * 3600000;      // une date un peu avant le point de départ (horloges, fuseaux)
+const CAPTE_SORTES = ['ventes', 'achats', 'bordereaux', 'codes', 'versements', 'messages', 'offres', 'annonces'];
+const CAPTE_EVENEMENT = new Set(['bordereaux', 'codes', 'versements']);
+const CAPTE_PLATEFORMES = ['vinted', 'leboncoin', 'vestiaire'];
+const RE_ID_CAPTE = /^[\w:.@+-]{1,120}$/;
+let _chaineCapte = Promise.resolve();
+// `items` : des identités (chaîne) ou { id, t } (t = date de naissance, ms).
+function annoncerCapte(plateforme, compte, sorte, items) {
+  const run = _chaineCapte.then(() => annoncerCapteUn(plateforme, compte, sorte, items), () => annoncerCapteUn(plateforme, compte, sorte, items));
+  _chaineCapte = run.then(() => {}, () => {});
+  return run;
+}
+function capteMs(v) {
+  if (v == null || v === '') return null;
+  if (typeof v === 'number' && isFinite(v)) return v < 1e12 ? v * 1000 : v;
+  if (/^\d{9,13}$/.test(String(v))) { const n = Number(v); return n < 1e12 ? n * 1000 : n; }
+  const t = Date.parse(String(v));
+  return isFinite(t) ? t : null;
+}
+const cleCompteCapte = (c) => String(c == null ? '' : c).replace(/^lbc-account:/i, '');
+async function annoncerCapteUn(plateforme, compte, sorte, items) {
+  try {
+    if (!CAPTE_PLATEFORMES.includes(plateforme) || !CAPTE_SORTES.includes(sorte)) return null;
+    const c = cleCompteCapte(compte);
+    if (!/^[\w:.-]{1,80}$/.test(c)) return null;
+    const parId = new Map();
+    for (const x of Array.isArray(items) ? items : []) {
+      const id = x != null && typeof x === 'object' ? String(x.id == null ? '' : x.id) : String(x == null ? '' : x);
+      if (!RE_ID_CAPTE.test(id) || parId.has(id)) continue;
+      parId.set(id, x != null && typeof x === 'object' ? capteMs(x.t) : null);
+    }
+    if (!parId.size) return null;
+    let g;
+    try { g = await chrome.storage.local.get([CAPTE_VU, CAPTE_LOTS, CAPTE_ETAT, CAPTE_REGLAGE]); } catch (_) { return null; }   // pas su : rien n'est dit
+    const objet = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+    const now = Date.now();
+    const memo = objet(g[CAPTE_VU]), lots = objet(g[CAPTE_LOTS]), etat = objet(g[CAPTE_ETAT]);
+    const coupe = !!(g[CAPTE_REGLAGE] && g[CAPTE_REGLAGE].coupe === true);
+    const cle = plateforme + ':' + c;
+    etat.actif = objet(etat.actif); etat.connexion = objet(etat.connexion);
+    // ── la connexion : un autre compte que le dernier vu, un compte écrit ici pour la
+    //    première fois (`marquerConnexionCapte`), une session VRM qui arrive.
+    let cx = etat.connexion[cle] && typeof etat.connexion[cle] === 'object' ? etat.connexion[cle] : null;
+    if (cx && !(now - Number(cx.depuis || 0) < CAPTE_CONNEXION_MS)) cx = null;
+    const avant = etat.actif[plateforme];
+    if (!cx && avant && avant !== c) cx = { depuis: now, lu: {} };
+    const ses = etat.session && typeof etat.session === 'object' ? etat.session : null;
+    if (!cx && ses && now - Number(ses.at || 0) < CAPTE_SESSION_MS && !(ses.vu && ses.vu[plateforme])) { cx = { depuis: now, lu: {} }; ses.vu = Object.assign({}, ses.vu, { [plateforme]: true }); }
+    etat.actif[plateforme] = c;
+    for (const k of Object.keys(etat.connexion)) { const v = etat.connexion[k]; if (!v || !(now - Number(v.depuis || 0) < CAPTE_CONNEXION_MS)) delete etat.connexion[k]; }
+    // ── ce qui est nouveau, par identité
+    const entree = memo[cle] && typeof memo[cle] === 'object' ? memo[cle] : { s: {}, d: {} };
+    entree.s = objet(entree.s); entree.d = objet(entree.d);
+    const connu = Array.isArray(entree.s[sorte]) ? entree.s[sorte] : null;
+    const depart = Number(entree.d[sorte]) || 0;
+    const vus = new Set(connu || []);
+    const evenement = CAPTE_EVENEMENT.has(sorte);
+    const nouveaux = [];
+    for (const [id, t] of parId) {
+      if (vus.has(id)) continue;
+      if (evenement || (connu && depart > 0 && t != null && t >= depart - CAPTE_MARGE_MS)) nouveaux.push(id);
+    }
+    let n = 0;
+    if (cx && !evenement && !(cx.lu && cx.lu[sorte])) { n = parId.size; cx.lu = Object.assign({}, cx.lu, { [sorte]: true }); }   // « Compte relié · 14 annonces lues »
+    else n = nouveaux.length;
+    if (cx) etat.connexion[cle] = cx;
+    entree.s[sorte] = (connu || []).concat([...parId.keys()].filter((id) => !vus.has(id))).slice(-CAPTE_MAX_IDS);
+    if (!depart) entree.d[sorte] = now;
+    entree.at = now;
+    memo[cle] = entree;
+    const cles = Object.keys(memo);
+    if (cles.length > CAPTE_MAX_COMPTES) for (const k of cles.sort((a, b) => Number((memo[a] || {}).at || 0) - Number((memo[b] || {}).at || 0)).slice(0, cles.length - CAPTE_MAX_COMPTES)) delete memo[k];
+    // ── le lot
+    let lot = null;
+    if (n > 0 && !coupe) {
+      const l = lots[cle] && typeof lots[cle] === 'object' ? lots[cle] : null;
+      const relie = !!cx;
+      if (l && !l.vu && now - Number(l.maj || 0) < CAPTE_LOT_MS) {
+        l.n = Object.assign({}, l.n, { [sorte]: (Number((l.n || {})[sorte]) || 0) + n });
+        l.relie = !!l.relie || relie; l.maj = now; lot = l;
+      } else {
+        // (Ce qui arrive pendant que le popup est affiché, la carte l'AJOUTE à ce qu'elle montre.)
+        lot = { lot: now.toString(36) + Math.floor(Math.random() * 1e6).toString(36), p: plateforme, compte: c, relie, n: { [sorte]: n }, at: now, maj: now, vu: false };
+      }
+      lots[cle] = lot;
+    }
+    for (const k of Object.keys(lots)) { const v = lots[k]; if (!v || !(now - Number(v.maj || 0) < 3600000)) delete lots[k]; }
+    try { await chrome.storage.local.set({ [CAPTE_VU]: memo, [CAPTE_LOTS]: lots, [CAPTE_ETAT]: etat }); } catch (_) { return null; }
+    if (lot) { noterDiag('capte_lot'); notifierApp({ type: 'capte', lot: await lotCaptePublic(lot) }); }
+    return lot ? JSON.parse(JSON.stringify(lot)) : null;
+  } catch (_) { return null; }
+}
+// Ce qui sort d'un lot (vers la carte et l'app) : des nombres, le compte et son nom.
+async function lotCaptePublic(l) {
+  const n = {};
+  for (const s of CAPTE_SORTES) { const v = Number((l.n || {})[s]) || 0; if (v > 0) n[s] = v; }
+  return { lot: String(l.lot), p: l.p, compte: String(l.compte), nom: await nomCompteCapte(l.p, l.compte), relie: !!l.relie, n, at: Number(l.at) || 0, maj: Number(l.maj) || 0 };
+}
+async function nomCompteCapte(p, compte) {
+  try {
+    if (p === 'vinted') return (await loginDe(String(compte), { attendreMs: 0 }).catch(() => '')) || (await loginVu(String(compte))) || '';
+    if (p === 'leboncoin') { const a = (await chrome.storage.local.get('vrmLbcCompte')).vrmLbcCompte; return a && cleCompteCapte(a.id) === String(compte) ? String(a.name || '') : ''; }
+  } catch (_) {}
+  return '';
+}
+// Le premier compte écrit ici (5.331 `signalerCompteRelie`), une session VRM qui arrive.
+async function marquerConnexionCapte(plateforme, compte) {
+  return (_chaineCapte = _chaineCapte.then(async () => {
+    try {
+      const c = cleCompteCapte(compte); if (!CAPTE_PLATEFORMES.includes(plateforme) || !/^[\w:.-]{1,80}$/.test(c)) return;
+      const e = (await chrome.storage.local.get(CAPTE_ETAT))[CAPTE_ETAT] || {};
+      e.connexion = Object.assign({}, e.connexion, { [plateforme + ':' + c]: { depuis: Date.now(), lu: {} } });
+      await chrome.storage.local.set({ [CAPTE_ETAT]: e });
+    } catch (_) {}
+  }, () => {}));
+}
+async function marquerSessionCapte() {
+  return (_chaineCapte = _chaineCapte.then(async () => {
+    try { const e = (await chrome.storage.local.get(CAPTE_ETAT))[CAPTE_ETAT] || {}; e.session = { at: Date.now(), vu: {} }; await chrome.storage.local.set({ [CAPTE_ETAT]: e }); } catch (_) {}
+  }, () => {}));
+}
+async function capteCoupe() { try { const r = (await chrome.storage.local.get(CAPTE_REGLAGE))[CAPTE_REGLAGE]; return !!(r && r.coupe === true); } catch (_) { return null; } }
+async function poserCapteCoupe(coupe) {
+  try { await chrome.storage.local.set({ [CAPTE_REGLAGE]: { coupe: coupe === true, at: Date.now() } }); } catch (_) { return { ok: false }; }
+  notifierApp({ type: 'maj', quoi: 'capteReglage', coupe: coupe === true });
+  return { ok: true, coupe: coupe === true };
+}
+// Vinted : les identités d'une lecture rangée (la RÉPONSE lue, jamais la liste
+// fusionnée avec la base — elle porte des ventes anciennes que la réponse n'avait pas).
+const SORTE_CAPTE_VINTED = { orders_sold: 'ventes', orders_purchased: 'achats', listings: 'annonces', inbox: 'messages' };
+function itemsCapteVinted(type, p) {
+  if (type === 'orders_sold' || type === 'orders_purchased') return ((p && p.my_orders) || []).filter((o) => o && o.transaction_id != null).map((o) => ({ id: String(o.transaction_id), t: o.date }));
+  if (type === 'listings') return ((p && p.items) || []).filter((it) => it && it.id != null && !it.is_draft).map((it) => ({ id: String(it.id), t: it.created_at_ts }));
+  // Un message : la conversation NON LUE et la date de son dernier message (une identité d'événement).
+  if (type === 'inbox') return ((p && p.conversations) || []).filter((c) => c && c.id != null && c.unread === true && c.updated_at).map((c) => ({ id: String(c.id) + '@' + String(c.updated_at), t: c.updated_at }));
+  return [];
+}
+function capteVinted(uid, type, lus) {
+  const sorte = SORTE_CAPTE_VINTED[type];
+  if (!sorte || !uid) return Promise.resolve(null);
+  return annoncerCapte('vinted', String(uid), sorte, itemsCapteVinted(type, lus)).catch(() => null);
+}
+// Leboncoin : seulement le compte de la SESSION de l'onglet (`vrmLbcCompte` v2) —
+// une annonce d'un autre vendeur vue en passant n'est jamais « à toi ».
+async function capteLbc(sorte, liste, compteDe, idDe, dateDe) {
+  try {
+    const a = (await chrome.storage.local.get('vrmLbcCompte')).vrmLbcCompte;
+    if (!a || a.v !== 2 || !a.id) return null;
+    const moi = cleCompteCapte(a.id);
+    const items = (Array.isArray(liste) ? liste : []).filter((x) => x && cleCompteCapte(compteDe(x)) === moi).map((x) => ({ id: idDe(x), t: dateDe ? dateDe(x) : null }));
+    return items.length ? annoncerCapte('leboncoin', moi, sorte, items) : null;
+  } catch (_) { return null; }
+}
+// Vestiaire : le compte nommé par la lecture, sinon celui de l'onglet Vestiaire le plus récent (< 30 min).
+async function compteVcCapte(compte) {
+  if (/^[\w-]{1,40}$/.test(String(compte || ''))) return String(compte);
+  try {
+    const m = (await chrome.storage.local.get(VC_ONGLETS))[VC_ONGLETS] || {};
+    const r = Object.values(m).filter((x) => x && x.compte && Date.now() - Number(x.at || 0) < 30 * 60000).sort((a, b) => Number(b.at) - Number(a.at))[0];
+    return r ? String(r.compte) : '';
+  } catch (_) { return ''; }
+}
+async function capteVc(sorte, compte, items) {
+  const c = await compteVcCapte(compte);
+  return c && items && items.length ? annoncerCapte('vestiaire', c, sorte, items) : null;
+}
+// Le compte de L'ONGLET qui demande (jamais un compte nommé par le message).
+async function compteOngletCapte(url, tabId) {
+  const p = plateformeDe(url);
+  if (p === 'vinted') { let dom = 'www.vinted.fr'; try { dom = new URL(url).hostname || dom; } catch (_) {} const uid = await compteConnecte(dom); return uid ? { p, id: String(uid) } : { p, id: '' }; }
+  if (p === 'leboncoin') {
+    let l = {}; try { l = await chrome.storage.local.get(['vrmLbcTransport', 'vrmLbcCompte']); } catch (_) {}
+    const vu = l.vrmLbcTransport && l.vrmLbcTransport[tabId];
+    const c = vu && vu.compte && !vu.ambigue ? cleCompteCapte(vu.compte) : (l.vrmLbcCompte && l.vrmLbcCompte.v === 2 ? cleCompteCapte(l.vrmLbcCompte.id) : '');
+    return { p, id: c };
+  }
+  if (p === 'vestiaire') { try { const m = (await chrome.storage.local.get(VC_ONGLETS))[VC_ONGLETS] || {}; const e = m[String(tabId)]; return { p, id: e && e.compte ? String(e.compte) : '' }; } catch (_) { return { p, id: '' }; } }
+  return { p, id: '' };
+}
+// Le lien « Voir » : la page du SITE (jamais VRM, 5.376), la première sorte qui en a une.
+const VOIR_CAPTE = { ventes: 'ventes', bordereaux: 'ventes', versements: 'ventes', messages: 'messages', offres: 'messages', annonces: ['dressing', 'annonces'] };
+function voirCapte(lot, liens) {
+  const parCle = new Map((liens || []).map((x) => [x.cle, x.url]));
+  for (const s of CAPTE_SORTES) {
+    if (!(lot.n && lot.n[s] > 0)) continue;
+    for (const k of [].concat(VOIR_CAPTE[s] || [])) if (parCle.has(k)) return parCle.get(k);
+  }
+  return '';
+}
+async function capteLotPourOnglet(url, tabId) {
+  const coupe = await capteCoupe();
+  if (coupe !== false) return { ok: true, coupe: coupe === true, lot: null };
+  const o = await compteOngletCapte(url, tabId);
+  if (!o.id) return { ok: true, coupe: false, lot: null };
+  let lots = {}; try { lots = (await chrome.storage.local.get(CAPTE_LOTS))[CAPTE_LOTS] || {}; } catch (_) { return { ok: true, coupe: false, lot: null }; }
+  const l = lots[o.p + ':' + o.id];
+  if (!l || l.vu || !(Date.now() - Number(l.maj || 0) < CAPTE_LOT_MS)) return { ok: true, coupe: false, lot: null };
+  const pub = await lotCaptePublic(l);
+  pub.voir = voirCapte(pub, liensCartePour(url, o.p, { id: o.id }));
+  return { ok: true, coupe: false, lot: pub };
+}
+async function capteLotVu(url, tabId, lotId) {
+  return (_chaineCapte = _chaineCapte.then(async () => {
+    try {
+      const o = await compteOngletCapte(url, tabId);
+      if (!o.id) return { ok: false };
+      const lots = (await chrome.storage.local.get(CAPTE_LOTS))[CAPTE_LOTS] || {};
+      const l = lots[o.p + ':' + o.id];
+      if (!l || String(l.lot) !== String(lotId || '')) return { ok: false };
+      l.vu = true; l.vuAt = Date.now();
+      await chrome.storage.local.set({ [CAPTE_LOTS]: lots });
+      return { ok: true };
+    } catch (_) { return { ok: false }; }
+  }, () => ({ ok: false })));
+}
+// ══ 5.377 (14 nov.) — LA CARTE : FAVORIS · ANNONCES · VENTES DU COMPTE DE L'ONGLET ══
+// Julien : « que l'on puisse voir les favoris du plus récent au plus vieux pour
+// envoyer des messages aux favoris, voir les annonces et ventes à chaque fois sur le
+// compte connecté ; les autres comptes sont floutés sauf si la personne met tous les
+// comptes sélectionnés, mais aucune action n'est possible dessus ».
+//   · Le compte est celui du COOKIE de l'onglet (`compteConnecte`, la garde) — jamais
+//     un compte nommé par le message. Les Favoris passent par `favorisCarte` (sa garde :
+//     un autre uid ⇒ refusé, rien ne part).
+//   · Annonces : le dressing RANGÉ (`donneesInfosPage`, déjà lu par l'encart du
+//     dressing), « en ligne » par `<enligne-regle>` (`enLigneDuCompte`) ; lecture de
+//     plus de 24 h ⇒ « à confirmer » (jamais « en ligne ») ; N° par identité
+//     (`infosDuCompte`). Lecture de plus d'une heure ⇒ une relecture dans le budget de
+//     LECTURE (`retourSurVinted` : garde, 20/h, une requête à la fois).
+//   · Ventes : les 40 plus récentes, PROJETÉES une par une (§4.4 : jamais la liste
+//     entière), l'état par les règles de l'extension (`A_EXPEDIER`, `PAS_UNE_VENTE`),
+//     « vendue » seulement avec un état de commande qui ne la fait pas revenir
+//     (`<preuve-vente-regle>`), le bordereau rangé par n° de transaction.
+//   · « Tous les comptes » : les autres comptes, 4 lignes chacun, rendus en LECTURE
+//     SEULE (`lectureSeule`) — la carte les floute, `inert`, sans aucune commande.
+// Aucune écriture, aucune requête Vinted (hors la relecture bornée ci-dessus).
+const CARTE_LISTE_MAX = 40, CARTE_AUTRES_MAX = 6, CARTE_AUTRES_LIGNES = 4, CARTE_RELIRE_MS = 3600000;
+function prixCarte(p) {
+  const v = p && typeof p === 'object' ? p.amount : p;
+  const n = Number(String(v == null ? '' : v).replace(',', '.'));
+  return isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
+}
+const photoCarte = (x) => { const u = String((x && x.photo && (x.photo.url || x.photo.thumb)) || ''); return /^https:\/\/[\w.-]*vinted\.net\//.test(u) ? u : ''; };
+function etatVenteCarte(o) {
+  const s = String((o && o.status) || '');
+  if (!s) return 'pas_su';                       // une conversation n'est pas une vente (§5)
+  if (PAS_UNE_VENTE.test(s)) return 'annulee';
+  if (A_EXPEDIER(o)) return 'a_expedier';
+  if (/finalis/i.test(s)) return 'finalisee';
+  return 'en_route';
+}
+// Le compte que la carte (ou la fenêtre de l'extension) regarde : l'onglet qui demande.
+function ongletCarte(sender) {
+  const tab = sender && sender.tab;
+  if (tab && tab.url) return { url: String(tab.url), fenetre: false };
+  let ext = ''; try { ext = chrome.runtime.getURL(''); } catch (_) {}
+  const u = String((sender && sender.url) || '');
+  return ext && u.startsWith(ext) ? { url: 'https://www.vinted.fr/', fenetre: true } : null;
+}
+const idxCarte = (pre, chemin, n) => Array.from({ length: n }, (_, i) => `${pre}${i}:${chemin}->${i}`).join(',');
+async function lignesComptesCarte(uid, n) {
+  const [l, v] = await Promise.all([
+    sbGet(`app_data?id=eq.harvest_${uid}_listings&select=cap:data->>capturedAt,n:data->>nItems,${idxCarte('i', 'data->payload->items', n)}`),
+    sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=cap:data->>capturedAt,n:data->>nItems,${idxCarte('o', 'data->payload->my_orders', n)}`),
+  ]);
+  if (l === null || v === null) return null;                                // pas su
+  const rl = (l && l[0]) || null, rv = (v && v[0]) || null;
+  const prendre = (r, pre) => (r ? Array.from({ length: n }, (_, i) => r[pre + i]).filter((x) => x && typeof x === 'object') : []);
+  return { listings: { cap: rl ? Date.parse(rl.cap || '') : NaN, n: rl ? Number(rl.n) : NaN, items: prendre(rl, 'i') }, ventes: { cap: rv ? Date.parse(rv.cap || '') : NaN, n: rv ? Number(rv.n) : NaN, items: prendre(rv, 'o') } };
+}
+async function carteListes(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o) return { ok: false, code: 'origine' };
+  const plateforme = plateformeDe(o.url);
+  if (plateforme !== 'vinted') return { ok: true, plateforme, pasDeListe: true };
+  const s = await loadSession().catch(() => null);
+  if (!(s && s.user_id && !s.mort)) return { ok: true, plateforme, connecte: false };
+  let dom = 'www.vinted.fr'; try { dom = new URL(o.url).hostname || dom; } catch (_) {}
+  const uid = await compteConnecte(dom);
+  if (!uid) return { ok: true, plateforme, compte: null };
+  const u = String(uid), maintenant = Date.now();
+  const nom = (await loginDe(u, { attendreMs: 300 }).catch(() => '')) || (await loginVu(u)) || '';
+  // ── annonces
+  const d = await donneesInfosPage(u);
+  const cap = await sbGet(`app_data?id=eq.harvest_${u}_listings&select=cap:data->>capturedAt`);
+  let annonces = null;
+  if (d && cap !== null) {
+    const capL = cap && cap[0] ? Date.parse(cap[0].cap || '') : NaN;
+    const items = Object.values(d.parId || {});
+    const r = enLigneDuCompte({ items, cap: isFinite(capL) ? capL : '' }, null, new Set(), maintenant);
+    const aConfirmer = !r.enLigne.length && r.aConfirmer.length > 0;
+    const liste = (aConfirmer ? r.aConfirmer : r.enLigne).slice();
+    const infos = infosDuCompte(d, u, liste.map((it) => String(it.id)));
+    const ligne = (it) => { const inf = infos[String(it.id)] || {}; const dep = Number(inf.depuis) || null;
+      return { id: String(it.id), titre: String(it.title || '').slice(0, 120), prix: prixCarte(it.price), photo: photoCarte(it), num: inf.numero || '', jours: dep ? Math.max(0, Math.floor((maintenant - dep) / 86400000)) : null, favoris: Number.isFinite(Number(it.favourite_count)) ? Number(it.favourite_count) : null, depuis: dep }; };
+    const lignes = liste.map(ligne).sort((a, b) => (Number(b.depuis) || 0) - (Number(a.depuis) || 0));
+    annonces = { lu: isFinite(capL) ? capL : null, aConfirmer, total: lignes.length, liste: lignes.slice(0, CARTE_LISTE_MAX) };
+    // Lue il y a plus d'une heure ⇒ relue, dans le budget de LECTURE, depuis l'onglet.
+    if (!o.fenetre && (!isFinite(capL) || maintenant - capL > CARTE_RELIRE_MS)) { annonces.relecture = true; retourSurVinted(sender).catch(() => {}); }
+  }
+  // ── ventes
+  let ventes = null;
+  const lv = await sbGet(`app_data?id=eq.harvest_${u}_orders_sold&select=cap:data->>capturedAt,n:data->>nItems,${idxCarte('o', 'data->payload->my_orders', CARTE_LISTE_MAX)}`);
+  const bords = lv === null ? null : await sbGetTout(`app_data?id=like.harvest_${u}_label_*&select=tx:meta->>tx`);
+  if (lv !== null && bords !== null) {
+    const r0 = (lv && lv[0]) || null;
+    const avecPdf = new Set((bords || []).map((b) => String((b && b.tx) || '')).filter(Boolean));
+    const os = r0 ? Array.from({ length: CARTE_LISTE_MAX }, (_, i) => r0['o' + i]).filter((x) => x && typeof x === 'object' && x.transaction_id != null) : [];
+    const fiches = (d && d.fiches) || {};
+    const lignes = os.map((x) => {
+      const etat = etatVenteCarte(x), it = x.item_id != null ? String(x.item_id) : '';
+      const f = it && fiches[it] && typeof fiches[it] === 'object' && String(fiches[it].accountId || '') === u ? fiches[it] : null;
+      return { tx: String(x.transaction_id), titre: String(x.title || '').slice(0, 120), prix: prixCarte(x.price), photo: photoCarte(x), date: Date.parse(x.date || '') || null, etat,
+        vendue: etat === 'a_expedier' || etat === 'en_route' || etat === 'finalisee', num: f && f.numero != null ? String(f.numero) : '', bordereau: etat === 'a_expedier' ? avecPdf.has(String(x.transaction_id)) : null };
+    }).sort((a, b) => (Number(b.date) || 0) - (Number(a.date) || 0));
+    ventes = { lu: r0 ? (Date.parse(r0.cap || '') || null) : null, total: r0 ? Number(r0.n) || lignes.length : 0, liste: lignes };
+  }
+  // ── les autres comptes (lecture seule)
+  let autres = null;
+  if (msg && msg.tous === true) {
+    const accts = await avecDelai(getStoredAccounts(), 8000, null).catch(() => null);
+    if (Array.isArray(accts)) {
+      autres = [];
+      for (const a of accts.filter((x) => x && String(x.vinted_user_id) !== u && x.owner === s.user_id).slice(0, CARTE_AUTRES_MAX)) {
+        const id = String(a.vinted_user_id);
+        if (!/^\d{1,20}$/.test(id)) continue;
+        const l = await lignesComptesCarte(id, CARTE_AUTRES_LIGNES);
+        autres.push({ id, nom: String(a.login || ''), lectureSeule: true,
+          annonces: l ? { n: isFinite(l.listings.n) ? l.listings.n : null, liste: l.listings.items.filter(ouverteSurVinted).map((it) => ({ titre: String(it.title || '').slice(0, 80), prix: prixCarte(it.price) })) } : null,
+          ventes: l ? { n: isFinite(l.ventes.n) ? l.ventes.n : null, liste: l.ventes.items.filter((x) => x && x.transaction_id != null).map((x) => ({ titre: String(x.title || '').slice(0, 80), prix: prixCarte(x.price), etat: etatVenteCarte(x) })) } : null });
+      }
+    }
+  }
+  return { ok: true, plateforme, compte: { id: u, nom }, annonces, ventes, autres, fenetre: o.fenetre };
 }
 // 5.330 : l'onglet revient de Google / Discord (même onglet, Orion) ⇒ la carte
 // s'ouvre UNE fois et dit le résultat. Lu une fois (`vu`), 5 minutes au plus,
@@ -18563,6 +18962,8 @@ async function etatPourApp() {
     //    que l'app montre « en attente de réseau » avec « Annuler » ; et d'où vient
     //    l'extension (boutique ⇒ l'app ne propose plus le zip pour la mettre à jour).
     { fileReseau: vueFileReseau(await avecDelai(lireFileReseau(), 300, []).catch(() => [])), rapport: true, origine: origineInstallation() },
+    // 5.377 : « Dire ce que l'extension capte » (présent = cette extension sait le dire ; `coupe` null = pas su).
+    { capte: { coupe: await avecDelai(capteCoupe(), 300, null).catch(() => null) } },
     repub ? { repub } : {});
 }
 // `remplace` : l'API manque, un autre chemin garde la fonction (rien à faire).
@@ -20369,6 +20770,7 @@ async function rangerVersementConversation(uid, v, domain) {
     type: 'versement', uid: String(uid), domain: domain || 'www.vinted.fr', capturedAt: new Date().toISOString(),
     tx: String(v.tx), at: String(v.at), source: 'conversation', ...(v.cid ? { cid: v.cid } : {}) } }], 'id');
   noterDiag(ok === false ? 'versement_conv_ecriture_ratee' : 'versement_conv_ecrit');
+  if (ok === true) await annoncerCapte('vinted', String(uid), 'versements', [String(v.tx)]).catch(() => null);   // 5.377
   return ok === false ? null : true;
 }
 let _versementEnCours = null;
@@ -21363,6 +21765,8 @@ async function rangerTransaction(uid, acc, tx, json, quoi) {
     const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_txn_${tx}`, data }], 'id');
     if (ok === false) { await noterDiag(`${quoi}_txn_ecriture_ratee`); return null; }
     await noterDiag(`${quoi}_txn_rangee`);
+    // 5.377 : une date de versement rangée (« Commande finalisée », 450) — « L'extension a capté ».
+    if (ok === true && String(t.status) === '450' && t.status_updated_at) await annoncerCapte('vinted', String(uid), 'versements', [String(tx)]).catch(() => null);
     return true;
   } catch (_) { return null; }
 }
@@ -21811,6 +22215,7 @@ async function recupererLabel(acc, uid, tx, connu) {
     //    n'acquitte pas ce qu'on n'a pas rangé »).
     if (range === false) { await noterDiag('label_ecriture_ratee'); return { ok: false, raison: "PDF récupéré mais la base ne l'a pas enregistré — il repart tout seul" }; }
     await supabaseUpsert('app_data', [{ id: `harvest_${uid}_label_latest`, data }], 'id');   // gardée : d'anciens écrans la lisent
+    if (range === true) await annoncerCapte('vinted', String(uid), 'bordereaux', [String(tx)]).catch(() => null);   // 5.377
     await noterUrlLabel(url, true);
     await noterDiag('label_envoye');
     logActivity('📎 Bordereau envoyé dans l\'application');
@@ -23369,6 +23774,7 @@ async function rangerVcVentesMaintenant(m) {
   if (Array.isArray(m.forme) && m.forme.length) forme[source] = m.forme.slice(0, 120);
   const ok = await supabaseUpsert('app_data', [{ id: 'vc_ventes', data: { ventes, lectures, forme, capturedAt: now } }], 'id');
   if (ok === true) notifierApp({ type: 'maj', quoi: 'vestiaire' });
+  if (ok === true) await capteVc('ventes', compteM, [...lus].map((id) => ({ id, t: (ventes[id] || {}).date || null })));   // 5.377
   return ok === true;
 }
 // ── VESTIAIRE : TES MESSAGES (5.238) ────────────────────────────────────────
@@ -23499,6 +23905,7 @@ async function rangerVcAchatsMaintenant(m) {
   const data = { achats, lecture: { at: now, total, complet: entier, page }, forme: Array.isArray(m.forme) && m.forme.length ? m.forme.slice(0, 120) : (cur.forme || []), capturedAt: now };
   const ok = await supabaseUpsert('app_data', [{ id: 'vc_achats', data }], 'id');
   if (ok === true) notifierApp({ type: 'maj', quoi: 'vestiaire' });
+  if (ok === true) await capteVc('achats', m.compte, (Array.isArray(m.achats) ? m.achats : []).slice(0, 200).filter((x) => x && /^[\w-]{1,40}$/.test(String(x.id || ''))).map((x) => ({ id: String(x.id), t: x.date })));   // 5.377
   return ok === true;
 }
 // 5.296 (1er nov.) — UNE ANNONCE VESTIAIRE RANGÉE : boost, référence, favoris
@@ -23615,6 +24022,7 @@ async function rangerVcAnnoncesMaintenant(patch) {
   if (!change) return true;
   const ok = await supabaseUpsert('app_data', [{ id: 'vc_listings', data }], 'id');
   if (ok === true && Array.isArray(patch.items)) notifierApp({ type: 'maj', quoi: 'vestiaire' });
+  if (ok === true && Array.isArray(patch.items)) await capteVc('annonces', compte, patch.items.slice(0, 200).filter((x) => x && /^[\w-]{1,40}$/.test(String(x.id || ''))).map((x) => ({ id: String(x.id), t: x.date || x.creeLe || null })));   // 5.377
   return ok === true;
 }
 
@@ -23760,6 +24168,7 @@ async function rangerVcFilMaintenant(m, compte, deVrm) {
     page: /^[\w/{}.-]{1,160}$/.test(String(m.page || '')) ? String(m.page) : ((cur && cur.page) || ''), forme: Array.isArray(m.forme) && m.forme.length ? m.forme.slice(0, 80) : ((cur && cur.forme) || []), capturedAt: now };
   const ok = await supabaseUpsert('app_data', [{ id, data }], 'id');
   if (ok === true) notifierApp({ type: 'maj', quoi: 'vestiaire' });
+  if (ok === true && deVrm !== true) await capteVc('messages', compteFil, neufs.filter((x) => x.deMoi === false && x.id).map((x) => ({ id: conv + ':' + x.id, t: x.at })));   // 5.377
   return ok === true;
 }
 // La recette reçue d'une page : refaite champ par champ (rien d'autre ne passe).
@@ -23954,6 +24363,8 @@ async function rangerVcOffresMaintenant(m, compte) {
   const data = { v: 1, offres: garde, lecture, capturedAt: change || !cur.capturedAt ? now : cur.capturedAt };
   const ok = await supabaseUpsert('app_data', [{ id: 'vc_offres', data }], 'id');
   if (ok === true) notifierApp({ type: 'maj', quoi: 'vestiaire' });
+  // 5.377 : une offre REÇUE qui t'attend (son id + la date du dernier geste de l'acheteur).
+  if (ok === true) await capteVc('offres', compte, Object.values(garde).filter((o) => o && o.aToi && o.dernier && o.dernier.at).map((o) => ({ id: String(o.id) + '@' + String(o.dernier.at), t: o.dernier.at })));
   return ok === true;
 }
 // La recette d'UN geste reçue d'une page : refaite champ par champ.
@@ -24260,6 +24671,7 @@ async function rangerLbcFilMaintenant(m, compte, deVrm) {
     page: /^\/[\w/.-]{0,160}$/.test(String(m.page || '')) ? String(m.page) : ((cur && cur.page) || ''), forme: Array.isArray(m.forme) && m.forme.length ? m.forme.slice(0, 80).map(String) : ((cur && cur.forme) || []), capturedAt: now };
   const ok = await supabaseUpsert('app_data', [{ id, data }], 'id');
   if (ok === true) notifierApp({ type: 'maj', quoi: 'lbc' });
+  if (ok === true && deVrm !== true) await capteLbc('messages', neufs.filter((x) => x.deMoi === false && x.id), () => compteFil, (x) => conv + ':' + x.id, (x) => x.at);   // 5.377
   return ok === true;
 }
 // La recette reçue d'une page : refaite champ par champ (rien d'autre ne passe).
@@ -24852,6 +25264,7 @@ async function storeLbcListingsUneFois(url, listings,owner) {
     const _okFlux = await supabaseUpsert('app_data', [{ id: 'lbc_listings', data: Object.assign({}, (prevRows[0] && prevRows[0].data) || {}, { items: merged, updatedAt: new Date().toISOString(), lastUrl: url }) }], 'id',owner);
     await noterFlux('leboncoin', _okFlux === true);
     if(_okFlux===true)notifierApp({type:'maj',quoi:'lbc'});
+    if(_okFlux===true)await capteLbc('annonces',listings,(l)=>l.account||l.lbcUser,(l)=>String(l.id),(l)=>l.publieeLe||l.first_publication_date||null);   // 5.377
     return {ok:_okFlux===true,etat:_okFlux===true?'enregistre':'ecriture-refusee',nombre:listings.length,photos:listings.filter(l=>photosAnnonceLbc(merged[String(l.id)]).length>0).length};
   } catch (_) {return {ok:false,etat:'ecriture-refusee'};}
 }
@@ -26165,6 +26578,7 @@ async function rangerLbcVentesUneFois(list,owner) {
   const _okFlux = await supabaseUpsert('app_data', [{ id: 'lbc_ventes', data: { ventes, updatedAt: new Date().toISOString() } }], 'id',owner);
   await noterFlux('leboncoin', _okFlux === true);
   if(_okFlux===true)notifierApp({type:'maj',quoi:'lbc'});
+  if(_okFlux===true)await capteLbc('ventes',list,(v)=>v.account,(v)=>String(v.txId||''),(v)=>v.dateVente||null);   // 5.377
   return _okFlux===true;
 }
 // ══════════════════════════════════════════════════════════════════════════════
