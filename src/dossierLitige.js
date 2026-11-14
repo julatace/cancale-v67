@@ -61,7 +61,7 @@ export function echangesDossier(convs, tx) {
       out.push({ de: !auteur ? 'vinted' : !opp ? 'inconnu' : auteur === opp ? 'acheteur' : 'toi', at, texte: corps.replace(/\s+/g, ' ').slice(0, 600) });
     }
   }
-  out.sort((a, b) => (a.at || 0) - (b.at || 0));
+  out.sort((a, b) => (a.at == null ? Infinity : a.at) - (b.at == null ? Infinity : b.at));   // sans date : à la fin
   return out.slice(-ECHANGES_MAX).map((x) => ({ de: x.de, quand: x.at ? jourHeure(x.at) : 'date non lue', texte: x.texte }));
 }
 
