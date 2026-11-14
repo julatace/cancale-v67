@@ -119,17 +119,17 @@ export function ApprouverQr({ ticket, entetes, onFin }) {
   };
   const fin = etat === 'approuve' || etat === 'refuse' || etat === 'deja' || etat === 'expire' || (v && v.erreur);
   const corps = (
-    <div className="vrm-cf-voile vrm-cf" role="dialog" aria-modal="true" aria-label={tr('confort.qr.approuverTitre')} data-qr-approuver={etat || (v === undefined ? 'lecture' : v.erreur || 'question')}>
+    <div className="vrm-cf-voile vrm-cf" role="dialog" aria-modal="true" aria-label={tr('confort.qr.approuverTitre')} data-qr-approuver={etat || (v === undefined ? 'lecture' : v.erreur || 'question')} data-acc-pendant={etat === 'envoi' ? 'connexion.qr' : undefined}>
       <div className="vrm-cf-feuille">
         {v === undefined ? <p className="vrm-cf-doux">{tr('confort.lecture')}</p>
-          : v.erreur ? <p className="vrm-cf-doux" data-qr-approuver-erreur={v.erreur}>{tr(v.erreur === 'expire' ? 'confort.qr.expire' : v.erreur === 'deja' ? 'confort.qr.deja' : 'confort.qr.erreur')}</p>
-          : etat === 'approuve' ? <p className="vrm-cf-titre" data-qr-approuve="">{tr('confort.qr.approuve', { nom: v.appareil })}</p>
+          : v.erreur ? <p className="vrm-cf-doux" data-qr-approuver-erreur={v.erreur} data-acc-echec="connexion.qr" data-acc-raison={v.erreur}>{tr(v.erreur === 'expire' ? 'confort.qr.expire' : v.erreur === 'deja' ? 'confort.qr.deja' : 'confort.qr.erreur')}</p>
+          : etat === 'approuve' ? <p className="vrm-cf-titre" data-qr-approuve="" data-acc-apres="connexion.qr">{tr('confort.qr.approuve', { nom: v.appareil })}</p>
           : etat === 'refuse' ? <p className="vrm-cf-doux">{tr('confort.qr.refuseIci')}</p>
           : <>
             <h2 className="vrm-cf-titre">{tr('confort.qr.question', { nom: v.appareil })}</h2>
-            <p className="vrm-cf-doux">{tr('confort.qr.prudence')}</p>
+            <p className="vrm-cf-doux" data-acc-avant="connexion.qr">{tr('confort.qr.prudence')} {tr('acc.connexion.qr.pas')}</p>
             {etat === 'mfa' ? <p className="vrm-cf-doux vrm-cf-geste" data-qr-mfa="">{tr('confort.qr.mfa')}</p> : null}
-            {etat === 'erreur' || etat === 'deja' || etat === 'expire' ? <p className="vrm-cf-doux vrm-cf-geste">{tr(etat === 'deja' ? 'confort.qr.deja' : etat === 'expire' ? 'confort.qr.expire' : 'confort.qr.erreur')}</p> : null}
+            {etat === 'erreur' || etat === 'deja' || etat === 'expire' ? <p className="vrm-cf-doux vrm-cf-geste" data-acc-echec="connexion.qr" data-acc-raison={etat}>{tr(etat === 'deja' ? 'confort.qr.deja' : etat === 'expire' ? 'confort.qr.expire' : 'confort.qr.erreur')}</p> : null}
             <button type="button" className="vrm-cf-primaire" disabled={etat === 'envoi'} onClick={() => repondre('approuver')} data-qr-oui="">{tr('confort.qr.oui')}</button>
             <button type="button" className="vrm-cf-second" disabled={etat === 'envoi'} onClick={() => repondre('refuser')} data-qr-non="">{tr('confort.qr.non')}</button>
           </>}

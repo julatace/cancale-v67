@@ -22,6 +22,7 @@ import {
 import { SUPABASE_URL, sbAuth, lireTout, load, vintedDeChrome, raisonExtGlobale, onVmrExt, vmrCmd, vmrExtPresent, askConfirm, Bouton } from './App.jsx';
 import './styles-mode-vacances.css';
 import { motsNavigateur } from './navigateurExtension.js';   // (11 nov.) « dans Orion » sur Orion, jamais « Chrome » en dur
+import { AccAvant, AccEchec } from './ui/Accompagne.jsx';   // (14 nov.) ce qui va se passer ; l'échec en mots simples
 
 const lireLigne = async (id, select) => {
   try {
@@ -129,18 +130,19 @@ export default function ModeVacances({ comptes = [] }) {
   return (
     <div className="vrm-vac" data-mode-vacances={lignes.length} data-vac-voulu={voulu === null ? '' : (voulu ? 'on' : 'off')}>
       <p className="vrm-vac-phrase">Un compte à la fois : celui ouvert sur vinted.fr.</p>
+      <AccAvant geste="vacances"/>
       <div className="vrm-vac-boutons">
         <Bouton variante="primaire" icone="sun" data-vac-tout="on" disabled={occupe || !!rx || !lignes.length} onClick={() => lancer(true)}>Tout mettre en vacances</Bouton>
         <Bouton variante="secondaire" data-vac-tout="off" disabled={occupe || !!rx || !lignes.length} onClick={() => lancer(false)}>Tout rouvrir</Bouton>
       </div>
-      {rx ? <p className="vrm-vac-note vrm-vac-geste" role="status" data-vac-ext="">{rx.texte}</p> : null}
+      {rx ? <div className="vrm-vac-note vrm-vac-geste" data-vac-ext=""><AccEchec geste="vacances" erreur={rx.texte}/></div> : null}
       {apprendre ? (
         <p className="vrm-vac-note vrm-vac-geste" role="status" data-vac-apprendre={voulu ? 'on' : 'off'}>
           {voulu ? 'Mets ce compte en vacances une fois à la main sur vinted.fr : VRM apprend.' : 'Rouvre ce compte une fois à la main sur vinted.fr : VRM apprend.'}{' '}
           <a href="https://www.vinted.fr/" target="_blank" rel="noreferrer" className="vrm-lien-action">Ouvrir Vinted ↗</a>
         </p>
       ) : null}
-      {tousFait ? <p className="vrm-vac-note" role="status" data-vac-tous="">{voulu ? 'Tous tes comptes sont en vacances.' : 'Tous tes comptes sont ouverts.'}</p> : null}
+      {tousFait ? <p className="vrm-vac-note" role="status" data-vac-tous="" data-acc-apres="vacances">{voulu ? 'Tous tes comptes sont en vacances.' : 'Tous tes comptes sont ouverts.'}</p> : null}
       {onglet ? <div className="vrm-vac-jauge"><JaugeActions uid={onglet} /></div> : null}
 
       <GroupeIos titre="Vinted" pied={nPasSu ? `${nPasSu} compte${nPasSu > 1 ? 's' : ''} pas lu${nPasSu > 1 ? 's' : ''} : passe sur Vinted connecté dessus.` : (nOui ? `${nOui} sur ${lignes.length} en vacances.` : undefined)} data-vac-groupe="vinted">

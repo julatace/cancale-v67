@@ -11,6 +11,7 @@ import React from 'react';
 import { tr } from '../i18n/index.js';
 import { apercuCollage, ecrituresCollage } from '../collerPrixAchat.js';
 import '../argent-choix.css';
+import { AccAvant, AccApres, AccEchec } from '../ui/Accompagne.jsx';   // (14 nov.) les quatre moments du geste
 
 const LIGNES_AFFICHEES = 200;
 const eur = (c) => `${(c / 100).toFixed(2).replace('.', ',')} €`;
@@ -49,17 +50,19 @@ export function CollerPrixAchatFeuille({ onClose, onEnregistrer, fichesDe, lu, F
     <Feuille onClose={onClose} titre={tr('ac.coller.titre')} sousTitre={tr('ac.coller.sous')} maxWidth={620} z={2100} data-coller-prix={fait ? 'fait' : A ? 'apercu' : 'vide'}>
       <div className="vrm-ac-coller">
         {fait ? (
-          <div className="vrm-ac-fait" data-coller-ecrits={fait.ecrits} data-coller-changees={fait.changees}>
+          <div className="vrm-ac-fait" data-coller-ecrits={fait.ecrits} data-coller-changees={fait.changees} data-acc-apres="prix.achat">
             <p className="vrm-ac-affiche">{fait.ecrits}</p>
             <p className="vrm-ac-libelle">{tr('ac.coller.ecrits', { n: fait.ecrits })}</p>
             {fait.changees > 0 ? <p className="vrm-ac-note is-ambre" data-coller-changees-texte="">{tr('ac.coller.changees', { n: fait.changees })}</p> : null}
+            {/* (14 nov.) La suite : le bénéfice se complète avec ces prix. */}
+            <AccApres geste="prix.achat" texte={tr('acc.prix.achat.suite')} onEnsuite={(suite) => { onClose(); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: suite.lien })); } catch (_) {} }}/>
           </div>
         ) : (
           <>
             <textarea className="vrm-ac-zone" data-coller-zone="" value={texte} onChange={(e) => setTexte(e.target.value)} rows={6}
               aria-label={tr('ac.coller.zone')} placeholder={'12 ; 60\nB125 ; 45,50\n7 60 €'} spellCheck={false} autoCapitalize="off" autoCorrect="off" />
             {!A ? <p className="vrm-ac-note">{tr('ac.coller.aide')}</p> : null}
-            {A && !A.lu ? <p className="vrm-ac-note is-ambre" role="alert" data-coller-lecture="ko">{tr('ac.coller.pasLu')}</p> : null}
+            {A && !A.lu ? <div className="vrm-ac-note" data-coller-lecture="ko"><AccEchec geste="prix.achat" erreur={tr('ac.coller.pasLu')} lu={{ code: 'pasSu', texte: tr('ac.coller.pasLu').replace(/[.\s]+$/, '') }}/></div> : null}
             {A && A.lu ? (
               <div className="vrm-ac-tuiles" data-coller-resume="" data-ok={R.ok} data-different={R.different} data-identique={R.identique} data-refusees={refusees} data-vides={R.vide}>
                 <div className="vrm-ac-tuile"><b className="vrm-ac-chiffre">{ecritures.length}</b><span className="vrm-ac-libelle">{tr('ac.coller.tuile.ecrire')}</span></div>
@@ -95,6 +98,7 @@ export function CollerPrixAchatFeuille({ onClose, onEnregistrer, fichesDe, lu, F
           </>
         )}
       </div>
+      {!fait && A && A.lu && ecritures.length ? <AccAvant geste="prix.achat" vars={{ n: ecritures.length }}/> : null}
       <div className="vrm-fs-pied vrm-ac-pied">
         {fait
           ? <Bouton variante="primaire" plein onClick={onClose} data-coller-fermer="">{tr('ac.coller.fermer')}</Bouton>

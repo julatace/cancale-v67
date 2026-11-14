@@ -19,6 +19,7 @@ import { tr, date } from './i18n/index.js';
 import { useLangue } from './i18n/react.js';
 import './design/favoris-clair.css';
 import AutresVersions from './AutresVersions.jsx';   // (12 nov., ext. 5.369) les autres versions du message
+import { AccAvant } from './ui/Accompagne.jsx';   // (14 nov.) ce qui va se passer, et ce qui ne se passera pas
 
 const eur = (x) => (x == null || !Number.isFinite(Number(x)) ? '—' : Number(x).toFixed(2).replace('.', ',').replace(/,00$/, '') + ' €');
 export function texteDuree(sec) {
@@ -187,6 +188,7 @@ export default function PageFavoris(p) {
           <b>{tr('favoris.marge.bloquees', { n: p.bloquees.length })}</b>
           <label className="vrm-fc-case"><input type="checkbox" data-fc-confirme-marge checked={!!p.confirmeMarge} onChange={(e) => p.setConfirmeMarge(e.target.checked)} />{tr('favoris.marge.confirmer')}</label>
         </div>}
+        <AccAvant geste="favoris.messages" sansPas={false} vars={{ n: r.messages }}/>
         <p className="vrm-fc-recap-quand">{p.rythme === 'vintex' ? tr('favoris.quand.rapidePhrase') : tr('favoris.recap.espace')}</p>
         <p className="vrm-fc-avertissement" data-fc-avertissement><b>{tr('favoris.recap.garantie')}</b> {tr('favoris.recap.onglet')}</p>
         {p.refus && <p role="alert" className="vrm-fc-alerte" data-fc-refus-plancher>{p.refus}</p>}

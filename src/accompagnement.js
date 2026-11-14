@@ -343,7 +343,7 @@ export const GESTES_ACC = {
   'offre.vinted':     { ecran: 'messages',  ensuite: { lien: '?tab=messages' } },
   'offre.vestiaire':  { ecran: 'vestiaire', ensuite: { lien: '?tab=plat_vestiaire' } },
   'offre.ebay':       { ecran: 'ebay',      ensuite: { lien: '?tab=plat_ebay' } },
-  'favoris.messages': { ecran: 'messages',  ensuite: { lien: '?tab=messages' } },
+  'favoris.messages': { ecran: 'messages',  sorte: 'favoris',               ensuite: { lien: '?tab=messages' } },
   'prix.baisser':     { ecran: 'annonces',  sorte: 'baisse-prix',           ensuite: { lien: '?tab=annonces' } },
   'prix.baisserLbc':  { ecran: 'leboncoin', ensuite: { lien: '?tab=plat_leboncoin' } },
   'prix.baisserVc':   { ecran: 'vestiaire', sorte: 'baisse-prix-vestiaire', ensuite: { lien: '?tab=plat_vestiaire' } },
@@ -370,7 +370,7 @@ export const IDS_GESTES_ACC = Object.keys(GESTES_ACC);
 export const gesteAcc = (id) => GESTES_ACC[id] || null;
 // La sorte d'un travail suivi ⇒ son geste (la feuille « VRM travaille » porte `data-acc-pendant`).
 const PAR_SORTE = { bordereaux: 'colis.imprimer', 'retirer-ailleurs': 'colis.retire', 'baisse-prix': 'prix.baisser', 'baisse-lbc': 'prix.baisserLbc', 'baisse-prix-vestiaire': 'prix.baisserVc',
-  'republier-lbc': 'republier.lbc', 'publier-lbc': 'publier.lbc', 'publier-partout': 'publier.partout', 'publier-ebay': 'publier.ebay', 'creer-vinted': 'creer.vinted', 'publier-fiche-vinted': 'publier.vinted', vacances: 'vacances' };
+  'republier-lbc': 'republier.lbc', 'publier-lbc': 'publier.lbc', 'publier-partout': 'publier.partout', 'publier-ebay': 'publier.ebay', 'creer-vinted': 'creer.vinted', 'publier-fiche-vinted': 'publier.vinted', vacances: 'vacances', favoris: 'favoris.messages' };
 export const gesteDeSorte = (sorte) => PAR_SORTE[String(sorte || '')] || '';
 
 // ── LA RAISON D'UN ÉCHEC, EN MOTS SIMPLES ────────────────────────────────────

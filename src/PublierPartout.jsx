@@ -10,6 +10,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { tr } from './i18n/index.js';
+import { AccAvant, AccApres, AccEchec } from './ui/Accompagne.jsx';   // (14 nov.) les quatre moments du geste
 import { useLangue } from './i18n/react.js';
 import { LogoSite } from './SelecteurSites.jsx';
 import { SITES_PARTOUT, NOM_PARTOUT, TITRE_MAX_PARTOUT, PRIX_REGLABLE, MODES_PRIX, texteReglage, cleCase, etatAffiche, resumePartout, CHAMPS_PARTOUT, sousCategoriesLbc, AU_DEPOT, PROFIL } from './publierPartout.js';
@@ -317,18 +318,22 @@ export default function PublierPartout({ lignes, lecture = false, exclues = 0, r
             {enCours && total ? (() => {
               const faits = Object.values(res).filter((r) => r && r.etat !== 'envoi' && r.etat !== 'attente').length;
               return (
-                <div className="vrm-pp-progres" data-pp-progres={faits} data-pp-total={total}>
+                <div className="vrm-pp-progres" data-pp-progres={faits} data-pp-total={total} data-acc-pendant="publier.partout">
                   <span role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={faits} aria-label={tr('partout.progres', { n: faits, total })}><i style={{ width: `${Math.round((faits / total) * 100)}%` }}/></span>
                   <small>{tr('partout.progres', { n: faits, total })}</small>
                 </div>
               );
             })() : null}
             {fini ? (
-              <p className="vrm-pp-bilan" data-pp-bilan="" data-pp-publies={resume.publie} data-pp-a-finir={resume['a-finir']} data-pp-refuses={resume.refuse + resume['pas-envoye']} role="status">
-                {tr('partout.bilan', { publies: resume.publie, aFinir: resume['a-finir'], refuses: resume.refuse + resume['pas-envoye'] })}
-              </p>
+              <div className="vrm-pp-bilan" data-pp-bilan="" data-pp-publies={resume.publie} data-pp-a-finir={resume['a-finir']} data-pp-refuses={resume.refuse + resume['pas-envoye']}>
+                {/* (14 nov.) Le bilan + la suite ; rien de publié ⇒ la raison (du premier refus) et le geste. */}
+                {resume.publie + resume['a-finir'] > 0
+                  ? <AccApres geste="publier.partout" texte={tr('partout.bilan', { publies: resume.publie, aFinir: resume['a-finir'], refuses: resume.refuse + resume['pas-envoye'] })} onEnsuite={(suite) => { onFermer(); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: suite.lien })); } catch (_) {} }}/>
+                  : <AccEchec geste="publier.partout" erreur={(Object.values(res).find((r) => r && r.raison) || {}).raison || tr('partout.bilan', { publies: resume.publie, aFinir: resume['a-finir'], refuses: resume.refuse + resume['pas-envoye'] })}/>}
+              </div>
             ) : null}
             <p className="vrm-pp-garde" data-pp-garde="">{tr('partout.garde')}</p>
+            {n && !enCours && !fini ? <AccAvant geste="publier.partout" vars={{ n, sites: nSites }}/> : null}
             <button type="button" className="vrm-ao-principal" data-pp-lancer={n} disabled={!n || enCours} onClick={lancer}>
               {enCours ? tr('partout.enCours') : n ? tr('partout.lancer', { n, sites: nSites }) : tr('partout.rienCoche')}
             </button>

@@ -146,6 +146,7 @@ import { ligneEmailsCompte } from "../emailsCompteLie.js";
 import { tr, monnaie, LANGUES, NOMS_LANGUES, langueCourante, choisirLangue } from '../i18n/index.js';
 import { useLangue } from '../i18n/react.js';
 import MIGRATION_SQL from "../../supabase/migrations/001-multi-utilisateurs.sql?raw";
+import { accompagner } from '../accompagnement.js';   // (14 nov.) pendant, après, échec d'un geste (src/ui/Accompagne.jsx)
 
 // ⟦← App.jsx #10⟧
 const SuiviReceptionEmails = aLaDemande(() => import('../ReceptionEmails.jsx'));
@@ -1387,6 +1388,7 @@ async function sourcesExportDonnees() {
   };
 }
 async function exporterMesDonnees() {
+  const acc = accompagner('export.donnees');
   // (9 nov., Julien) Sans abonnement, l'export de SES données reste ouvert (RGPD, portabilité,
   // art. 20) : il ne sert pas à utiliser VRM, seulement à repartir avec ses données. La
   // « Sauvegarde complète » (restaurer VRM) reste, elle, fermée sans abonnement.
@@ -1394,13 +1396,15 @@ async function exporterMesDonnees() {
     const src = await sourcesExportDonnees();
     // (12 nov., RGPD) + TOUTES ses données, générées par le serveur pour SA session
     // (src/exportRgpd.js) ; une page ratée ⇒ le zip le DIT (INCOMPLET.txt).
-    toast('Export en préparation…');
+    // (14 nov., lot accompagnement) PENDANT « Export en préparation… », APRÈS « Fichier téléchargé », ÉCHEC en mots simples.
+    acc.pendant(0);
     const tout = await toutesMesDonnees({ entetes: enTeteSession });
     const complet = tout.ok ? tout.fichiers : [{ nom: 'INCOMPLET.txt', texte: "Tes tableaux sont là, mais le reste de tes données n'a pas pu être lu.\r\nRelance « Exporter mes données » dans un instant.\r\n" }];
     if (!tout.ok) toast('Export incomplet : relance-le dans un instant.');
     const zip = zipStocke([...fichiersExport(feuillesExport(src)), ...complet]);
     telechargerFichier(new Blob([zip], { type: 'application/zip' }), nomExport(), 'application/zip');
-  } catch (e) { toast('Export pas créé : ' + (e && e.message || e)); }
+    acc.fini({ nom: nomExport() });
+  } catch (e) { acc.echec(e, { reessayer: () => exporterMesDonnees() }); }
 }
 // ⟦← App.jsx #35⟧
 
