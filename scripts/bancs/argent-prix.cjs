@@ -77,6 +77,8 @@ const ROWS = [
   { id: 'ebay_comptes', data: { rev: 1, comptes: [{ cle: 'aaaaaaaaaaaaaaa1', pseudo: 'ma_boutique_ebay', principal: true, deconnecteLe: null }] } },
   { id: 'ebay_orders', data: { rev: 1, orders: EBAY, total: EBAY.length, complet: true, capturedAt: iso(NOW - 60e3) } },
   { id: 'lbc_ventes', data: { ventes: {} } },
+  // Leboncoin : le N°2 en ligne à 95 € (identité = la référence VRM), Vinted à 80 € ⇒ un écart ; le N°3 au même prix ⇒ rien.
+  { id: 'lbc_listings', data: { capturedAt: '2026-11-14T08:00:00Z', items: { 3001002: { status: 'active', price: 95, subject: 'Paire inventée N°2 taille 42', customRef: 'VRM-2' }, 3001003: { status: 'active', price: 80, subject: 'Paire inventée N°3 taille 42', customRef: 'VRM-3' } }, lectures: {} } },
 ];
 // La page du comptable : ce que le serveur sert (déjà réduit par `vueComptable`).
 const VUE_COMPTABLE = { ok: true, exp: NOW + 30 * J, vues: [{ periode: '2026-10', libelle: 'octobre 2026', etabliLe: '14/11/2026', entreprise: { nom: 'Atelier inventé', siret: '123 456 789 00012' }, regime: 'micro', regimeTexte: 'Micro-entrepreneur', taux: 12.3,
@@ -226,6 +228,8 @@ const regles7 = (pg, sel) => pg.evaluate((s) => {
         await pg.waitForFunction(() => { const e = document.querySelector('[data-ecarts-feuille]'); return e && e.getAttribute('data-ecarts-feuille') !== ''; }, null, { timeout: 20000 }).catch(() => {});
         const ec = await pg.evaluate(() => { const e = document.querySelector('[data-ecarts-feuille]'); return e ? e.getAttribute('data-ecarts-feuille') : null; });
         dit(ec !== null && ec !== '', '121 : « Vérifier mes prix » ouvre la feuille, lue (par identité)', String(ec));
+        const ecN = await pg.evaluate(() => [...document.querySelectorAll('[data-ecart-num]')].map((e) => `${e.getAttribute('data-ecart-num')}:${e.getAttribute('data-ecart-cts')}:${e.getAttribute('data-ecart-voulu')}`).join(' '));
+        dit(ecN === '2:1500:0', '121 : le N°2 (Vinted 80 €, Leboncoin 95 €) est signalé, 15 € ; le N°3 au même prix ne l’est pas', ecN);
         await shot('[data-ecarts-feuille]', 'ecarts');
         await pg.keyboard.press('Escape').catch(() => {});
         await pg.waitForTimeout(500);
@@ -280,7 +284,8 @@ const regles7 = (pg, sel) => pg.evaluate((s) => {
 
       await essaie('E. Litiges', async () => {
         console.log('── E. Ventes → Litiges : deux taux par modèle');
-        await aller(pg, 'litiges', '[data-retours-modeles]', 3000);
+        await pg.waitForTimeout(1500);
+        try { await aller(pg, 'litiges', '[data-retours-modeles]', 3000); } catch (_) { await pg.waitForTimeout(2000); await aller(pg, 'litiges', '[data-retours-modeles]', 3000); }
         await pg.waitForFunction(() => { const e = document.querySelector('[data-retours-modeles]'); return e && e.getAttribute('data-retours-modeles') === 'lu'; }, null, { timeout: 25000 }).catch(() => {});
         const d = await attrs(pg, '[data-retours-modele="nike|dunk"]', 'data-');
         dit(d && d['ventes-n'] === '10' && d['n-retours'] === '2' && d['n-litiges'] === '1' && d['taux-retour'] === '20' && d['taux-litige'] === '10', '112 : Dunk — 2 retours (20 %) et 1 litige (10 %) sur 10 ventes, chacun à part', JSON.stringify(d));
@@ -297,7 +302,7 @@ const regles7 = (pg, sel) => pg.evaluate((s) => {
         const { ctx: c2, pg: p2, errs: e2 } = await contexte(b, vp, sombre, { main: mainDe() });
         await p2.goto(`http://localhost:${PORT}/?comptable=${JETON}`, { waitUntil: 'domcontentloaded' });
         await p2.waitForSelector('[data-vue-comptable="lu"]', { timeout: 20000 }).catch(() => {});
-        const v = await attrs(p2, '[data-vue-comptable]', 'data-');
+        const v = { ...(await attrs(p2, '[data-vue-comptable]', 'data-')), ...(await attrs(p2, '[data-vc-ca]', 'data-')) };
         const t = await p2.evaluate(() => document.body.innerText);
         dit(v && v['vue-comptable'] === 'lu' && v['vc-ca'] === '24500' && /Atelier inventé/.test(t), '115 : la page lit la compta (CA 245 €), sans l’app ni session', JSON.stringify(v));
         dit(!/atelier_inventé_aux_longs_noms|ma_boutique_ebay/.test(t), '115 : aucun pseudo de compte sur la page');
