@@ -2,7 +2,9 @@
 export default {
   "plateformes.actualisation": "Aggiornamento…",
   "plateformes.actualiser": "Aggiorna",
+  "plateformes.mfa.comment": "Come?",
   "plateformes.publierSur": "Pubblica su {site}",
+  "plateformes.reglages.avances": "Impostazioni avanzate",
   "plateformes.reglagesEbay": "Impostazioni eBay",
   "plateformes.rien": "Nessun risultato per questa ricerca.",
   "plateformes.vc.chercher": "N°, titolo…",

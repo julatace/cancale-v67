@@ -197,7 +197,7 @@ export function BandeauExemple({ onBrancher, style, sansCompte = false }) {
         <b>Exemple — rien n’est enregistré</b>
         <span>Ces données sont inventées. Rien n’est envoyé.</span>
       </div>
-      <button type="button" className="vrm-b vrm-b-primaire" data-exemple-brancher="" onClick={onBrancher}>{sansCompte ? 'Créer mon compte' : 'Passer à mes vraies données'}</button>
+      <button type="button" className="vrm-b vrm-b-secondaire vrm-pf-exemple-cta" data-exemple-brancher="" onClick={onBrancher}>{sansCompte ? 'Créer mon compte' : 'Passer à mes vraies données'}</button>
     </div>
   );
 }

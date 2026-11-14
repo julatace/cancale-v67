@@ -138,8 +138,9 @@ const CSS = `
 .av .av-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:48px;padding:0 24px;border-radius:999px;border:none;cursor:pointer;font:inherit;font-size:17px;font-weight:600;letter-spacing:-.01em;text-decoration:none;white-space:nowrap;background:var(--accent);color:#FFFFFF;transition:transform 120ms cubic-bezier(.23,1,.32,1),background-color 150ms ease}
 .av .av-btn:active{transform:scale(.97)}
 @media (hover:hover) and (pointer:fine){.av .av-btn:hover{background:#0077ED}}
-.av .av-btn.av-btn-exemple{background:var(--fond2);color:var(--encre)}
-@media (hover:hover) and (pointer:fine){.av .av-btn.av-btn-exemple:hover{background:var(--fond2);filter:brightness(.96)}}
+/* (14 nov., refonte visible) Le second appel n'est plus une capsule GRISE à côté du bleu : une teinte très légère de l'accent, texte à l'accent (un seul bouton plein par écran). */
+.av .av-btn.av-btn-exemple{background:color-mix(in srgb,var(--accent) 10%,transparent);color:var(--accent-texte)}
+@media (hover:hover) and (pointer:fine){.av .av-btn.av-btn-exemple:hover{background:color-mix(in srgb,var(--accent) 15%,transparent);filter:none}}
 .av .av-lien{display:inline-flex;align-items:center;min-height:44px;padding:0 8px;font-size:17px;color:var(--accent-texte);text-decoration:none;font-weight:400}
 .av .av-lien span{transition:transform 150ms cubic-bezier(.23,1,.32,1);display:inline-block;margin-left:3px}
 @media (hover:hover) and (pointer:fine){.av .av-lien:hover{text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:1px}.av .av-lien:hover span{transform:translateX(2px)}}

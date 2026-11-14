@@ -2,7 +2,9 @@
 export default {
   "plateformes.actualisation": "Refreshing…",
   "plateformes.actualiser": "Refresh",
+  "plateformes.mfa.comment": "How?",
   "plateformes.publierSur": "List on {site}",
+  "plateformes.reglages.avances": "Advanced settings",
   "plateformes.reglagesEbay": "eBay settings",
   "plateformes.rien": "Nothing matches this search.",
   "plateformes.vc.chercher": "No., title…",

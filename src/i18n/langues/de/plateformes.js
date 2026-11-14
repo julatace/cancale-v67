@@ -2,7 +2,9 @@
 export default {
   "plateformes.actualisation": "Wird aktualisiert…",
   "plateformes.actualiser": "Aktualisieren",
+  "plateformes.mfa.comment": "Wie?",
   "plateformes.publierSur": "Auf {site} einstellen",
+  "plateformes.reglages.avances": "Erweiterte Einstellungen",
   "plateformes.reglagesEbay": "eBay-Einstellungen",
   "plateformes.rien": "Nichts passt zu dieser Suche.",
   "plateformes.vc.chercher": "Nr., Titel…",

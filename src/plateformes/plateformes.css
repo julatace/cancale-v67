@@ -152,7 +152,21 @@
 @media (hover: hover) and (pointer: fine) { :root:root body .vrm-main .vrm-pf-collant .vrm-ui-filtre[aria-pressed="true"] { padding: 2px 0 !important; } }
 :root:root body .vrm-main .vrm-pf-barre-ebay.vrm-pf-barre-ebay > .vrm-ui-outils-champ { flex: 1 1 0 !important; min-width: 120px !important; }
 :root:root body .vrm-main .vrm-pf-barre-ebay.vrm-pf-barre-ebay > .vrm-eb-vendre > button[data-poster] { background: none !important; border: 0 !important; box-shadow: none !important; min-height: 0 !important; padding: 0 !important; }
-:root:root body .vrm-main .vrm-ebay-annonces { padding-top: 8px !important; }
+:root:root body .vrm-main .vrm-ebay-annonces { padding-top: 0 !important; }
+:root:root body .vrm-main .vrm-ebay-annonces > .vrm-pf-afaire { margin: 0 0 6px !important; }
+:root:root body .vrm-main .vrm-ebay-annonces .vrm-pf-collant { padding-top: 0 !important; padding-bottom: 2px !important; margin-bottom: 6px !important; }
+:root:root body .vrm-main .vrm-pf-barre-ebay.vrm-pf-barre-ebay > :not(label):not(div):is(button, span) { background: none !important; border: 0 !important; box-shadow: none !important; }
+:root:root body .vrm-main .vrm-pf-barre-ebay.vrm-pf-barre-ebay button:not([data-poster]) { background: none !important; box-shadow: none !important; border: 0 !important; color: var(--d-accent-texte, #0066CC) !important; }
+:root:root body .vrm-main .vrm-set[data-reglages-disposition] .vrm-set-tete > h2 { flex: none !important; margin: 0 !important; }
+:root:root body .vrm-main .vrm-pf-collant { padding-top: 0 !important; }
+:root:root body .vrm-main .vrm-pf-afaire + .vrm-pf-collant, :root:root body .vrm-main .vrm-pf-vc > .vrm-pf-collant { margin-top: -4px !important; }
+/* L'MFA : « Activer · Plus tard · Comment ? » sur une ligne ; les étapes dépliées passent dessous. */
+:root:root body .vrm-main .vrm-set .vrm-pf-mfa-gestes { flex-wrap: wrap !important; align-items: center !important; }
+:root:root body .vrm-main .vrm-set .vrm-pf-mfa-gestes > details { flex: 0 1 auto !important; }
+:root:root body .vrm-main .vrm-set .vrm-pf-mfa-gestes > details[open] { flex: 1 1 100% !important; padding: 0 0 8px 10px !important; }
+:root:root body .vrm-main .vrm-set .vrm-pf-mfa-gestes > details > summary { padding: 0 10px !important; color: var(--d-gris, #6E6E73) !important; font-weight: 400 !important; }
+:root:root body .vrm-main .vrm-set .vrm-pf-set-afaire .vrm-settings-todo > h3 { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip-path: inset(50%) !important; margin: 0 !important; }
+:root:root body .vrm-main .vrm-set .vrm-pf-set-afaire .vrm-settings-todo > div > button { white-space: nowrap !important; }
 
 /* ── 9. eBay : la rangée d'une annonce — le titre sur UNE ligne, « Relier » et « ⋯ » en mots/glyphes
    (plus deux capsules grises par rangée), la photo à 52 comme toutes les rangées de liste. ── */
@@ -169,5 +183,113 @@
 }
 :root:root body .vrm-main .vrm-ebay-annonces .vrm-eb-carte .vrm-eb-gestes > button[data-ebay-carte-plus] { color: var(--d-gris, #6E6E73) !important; }
 :root:root body .vrm-main .vrm-ebay-annonces .vrm-eb-carte .vrm-eb-gestes > button:active { background: var(--d-remplir, rgb(118 118 128 / .12)) !important; border-radius: 10px !important; }
+
+/* ══ 10. PARAMÈTRES, FAÇON RÉGLAGES D'iOS ══════════════════════════════════════
+   Le titre et son « ? », la recherche juste dessous, les onglets ; puis des GROUPES : un intertitre
+   court (13, gris) hors de la carte, des rangées de 52 px — une pastille d'icône teintée (12 %), le
+   libellé (17), sa phrase sur UNE ligne, la valeur à droite (gris), un chevron fin. Les réglages
+   avancés derrière une rangée. Le panneau « Sécurité des données » garde ses mots (§5) : seule la
+   rangée qui y mène change de forme. */
+:root:root body .vrm-main .vrm-set[data-reglages-disposition] .vrm-set-tete { display: flex !important; align-items: center !important; gap: 8px !important; margin-bottom: 8px !important; }
+:root:root body .vrm-main .vrm-set[data-reglages-disposition] .vrm-pf-set-aide { display: inline-flex !important; align-items: center !important; flex: none !important; }
+:root:root body .vrm-main .vrm-set[data-reglages-disposition] .vrm-set-tete > :last-child:not(.vrm-pf-set-aide):not(h2) { margin-left: auto !important; }
+:root:root body .vrm-main .vrm-set[data-reglages-disposition] .vrm-set-recherche { margin: 0 0 12px !important; }
+:root:root body .vrm-main .vrm-set[data-reglages-disposition] .vrm-set-onglets { margin: 0 0 20px !important; }
+:root:root body .vrm-main .vrm-set[data-reglages-disposition] .vrm-set-groupe { margin: 0 0 28px !important; }
+:root:root body .vrm-main .vrm-set[data-reglages-disposition] .vrm-set-titre {
+  font: 400 13px/1.3 var(--vrm-police) !important; color: var(--d-gris, #6E6E73) !important; text-transform: none !important; letter-spacing: 0 !important; margin: 0 0 6px 16px !important;
+}
+:root:root body .vrm-main .vrm-set[data-reglages-disposition] .vrm-set-liste { border: 0 !important; box-shadow: none !important; border-radius: 12px !important; background: var(--d-carte, #fff) !important; overflow: hidden !important; }
+:root:root body .vrm-main .vrm-set[data-reglages-disposition] .vrm-set-liste > .vrm-set-ligne { min-height: 52px !important; padding: 8px 14px 8px 12px !important; column-gap: 12px !important; border: 0 !important; }
+:root:root body .vrm-main .vrm-set[data-reglages-disposition] .vrm-set-liste > .vrm-set-ligne + .vrm-set-ligne::before { left: 54px !important; height: .5px !important; background: var(--d-filet, rgb(60 60 67 / .18)) !important; }
+/* La pastille d'icône teintée : bleu nuit à 10 % (le jour), une teinte neutre pour les groupes de l'outil. */
+:root:root body .vrm-main .vrm-set[data-reglages-disposition] .vrm-set-ic {
+  width: 30px !important; height: 30px !important; border-radius: var(--d-r-pastille-icone, 10px) !important; flex: none !important;
+  background: var(--d-pastille-nuit-fond, rgb(23 33 58 / .10)) !important; color: var(--d-pastille-nuit, #17213A) !important;
+}
+:root:root body .vrm-main .vrm-set[data-reglages-disposition] :is([data-groupe-reglages="annonces-reglages"], [data-groupe-reglages="impression"], [data-groupe-reglages="affichage"], [data-groupe-reglages="sauvegarde"], [data-groupe-reglages="aide"], [data-groupe-reglages="stock"], .vrm-pf-set-avances-ligne) .vrm-set-ic {
+  background: var(--d-pastille-neutre-fond, rgb(118 118 128 / .12)) !important; color: var(--d-pastille-neutre, #3A3A3C) !important;
+}
+:root:root body .vrm-main .vrm-set[data-reglages-disposition] .vrm-set-lib > b { font: 400 17px/1.25 var(--vrm-police) !important; letter-spacing: -.01em !important; }
+:root:root body .vrm-main .vrm-set[data-reglages-disposition] .vrm-set-desc {
+  display: block !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; -webkit-line-clamp: unset !important;
+  font: 400 13px/1.3 var(--vrm-police) !important; color: var(--d-gris, #6E6E73) !important; margin-top: 1px !important;
+}
+:root:root body .vrm-main .vrm-set[data-reglages-disposition] .vrm-set-lib { min-width: 0 !important; overflow: hidden !important; }
+:root:root body .vrm-main .vrm-set[data-reglages-disposition] .vrm-set-val { font: 400 17px/1.25 var(--vrm-police) !important; color: var(--d-gris, #6E6E73) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+:root:root body .vrm-main .vrm-set[data-reglages-disposition] .vrm-set-chev { stroke: var(--d-glyphe, #AEAEB2) !important; width: 8px !important; height: 14px !important; flex: none !important; }
+
+/* « À faire » de Paramètres : « À terminer » et « Protège ton compte » en rangées, pastille ambre. */
+:root:root body .vrm-main .vrm-set .vrm-pf-set-afaire { display: flex !important; flex-direction: column !important; gap: 8px !important; margin: 0 0 28px !important; }
+:root:root body .vrm-main .vrm-set .vrm-pf-set-afaire:empty { display: none !important; }
+:root:root body .vrm-main .vrm-set .vrm-pf-set-afaire .vrm-settings-todo { border: 0 !important; padding: 0 !important; margin: 0 !important; background: none !important; box-shadow: none !important; }
+:root:root body .vrm-main .vrm-set .vrm-pf-set-afaire .vrm-settings-todo > h3 { font: 400 13px/1.3 var(--vrm-police) !important; color: var(--d-gris, #6E6E73) !important; margin: 0 0 6px 16px !important; }
+:root:root body .vrm-main .vrm-set .vrm-pf-set-afaire .vrm-settings-todo > div {
+  display: flex !important; align-items: center !important; gap: 12px !important; padding: 8px 8px 8px 14px !important; min-height: 52px !important;
+  background: var(--d-carte, #fff) !important; border-radius: 12px !important; box-shadow: none !important;
+}
+:root:root body .vrm-main .vrm-set .vrm-pf-set-afaire .vrm-settings-todo > div + div { margin-top: 1px !important; }
+:root:root body .vrm-main .vrm-set .vrm-pf-set-afaire .vrm-settings-todo > div::before { content: '' !important; flex: none !important; width: 8px !important; height: 8px !important; border-radius: 50% !important; background: var(--d-point-ambre, #FF9F0A) !important; }
+:root:root body .vrm-main .vrm-set .vrm-pf-set-afaire .vrm-settings-todo > div > span { font: 400 15px/1.3 var(--vrm-police) !important; color: var(--d-encre, #1D1D1F) !important; }
+:root:root body .vrm-main .vrm-set .vrm-pf-set-afaire .vrm-settings-todo > div > span b { font-weight: 600 !important; }
+:root:root body .vrm-main .vrm-set .vrm-pf-set-afaire :is(.vrm-settings-todo > div > button, .vrm-pf-mfa-gestes > button) {
+  background: none !important; border: 0 !important; box-shadow: none !important; padding: 0 10px !important; min-height: 44px !important;
+  color: var(--d-accent-texte, #0066CC) !important; font: 600 15px/1.2 var(--vrm-police) !important; flex: none !important;
+}
+:root:root body .vrm-main .vrm-set .vrm-pf-set-afaire .vrm-pf-mfa-gestes > button[data-carte-mfa-plus-tard] { color: var(--d-gris, #6E6E73) !important; font-weight: 400 !important; }
+:root:root body .vrm-main .vrm-set .vrm-pf-mfa {
+  display: flex !important; align-items: flex-start !important; gap: 12px !important; margin: 0 !important; padding: 12px 8px 4px 14px !important;
+  background: var(--d-carte, #fff) !important; border: 0 !important; border-radius: 12px !important; box-shadow: none !important;
+}
+:root:root body .vrm-main .vrm-set .vrm-pf-mfa > .vrm-at-pastille { width: 30px !important; height: 30px !important; margin-top: 1px !important; }
+:root:root body .vrm-main .vrm-set .vrm-pf-mfa-corps { flex: 1 1 auto !important; min-width: 0 !important; display: flex !important; flex-direction: column !important; gap: 2px !important; }
+:root:root body .vrm-main .vrm-set .vrm-pf-mfa-corps > strong { font: 600 17px/1.25 var(--vrm-police) !important; color: var(--d-encre, #1D1D1F) !important; }
+:root:root body .vrm-main .vrm-set .vrm-pf-mfa-ligne { font: 400 13px/1.35 var(--vrm-police) !important; color: var(--d-gris, #6E6E73) !important; }
+:root:root body .vrm-main .vrm-set .vrm-pf-mfa-etapes > summary { display: inline-flex !important; align-items: center !important; min-height: 44px !important; cursor: pointer !important; font: 600 15px/1.2 var(--vrm-police) !important; color: var(--d-accent-texte, #0066CC) !important; list-style: none !important; }
+:root:root body .vrm-main .vrm-set .vrm-pf-mfa-etapes > summary::-webkit-details-marker { display: none !important; }
+:root:root body .vrm-main .vrm-set .vrm-pf-mfa-gestes { display: flex !important; gap: 4px !important; margin: 0 0 0 -10px !important; }
+
+/* Les réglages avancés : une rangée qui se déplie. */
+:root:root body .vrm-main .vrm-set .vrm-pf-set-avances { margin: 0 0 28px !important; }
+:root:root body .vrm-main .vrm-set .vrm-pf-set-avances > summary.vrm-pf-set-avances-ligne {
+  list-style: none !important; display: flex !important; align-items: center !important; gap: 12px !important; min-height: 52px !important; padding: 8px 14px 8px 12px !important;
+  background: var(--d-carte, #fff) !important; border-radius: 12px !important; cursor: pointer !important; position: relative !important;
+}
+:root:root body .vrm-main .vrm-set .vrm-pf-set-avances > summary::-webkit-details-marker { display: none !important; }
+:root:root body .vrm-main .vrm-set .vrm-pf-set-avances > summary .vrm-set-lib { flex: 1 1 auto !important; display: flex !important; flex-direction: column !important; }
+:root:root body .vrm-main .vrm-set .vrm-pf-set-avances[open] > summary { margin-bottom: 20px !important; }
+:root:root body .vrm-main .vrm-set .vrm-pf-set-avances[open] > summary .vrm-set-chev { transform: rotate(90deg) !important; }
+:root:root body .vrm-main .vrm-set .vrm-pf-set-avances > summary .vrm-set-chev { transition: transform var(--d-m-appui, 100ms) ease-out !important; }
+
+/* ══ 11. LA PREMIÈRE IMPRESSION : connexion, mode exemple, démarrage ══════════════
+   Ce que voit un nouveau client. Une identité VRM forte mais sobre : le panneau de marque prend
+   l'encre profonde qui glisse vers le bleu nuit (§4 Atelier, la carte Wallet), le titre en grand
+   titre d'iOS (34/700 serré), le formulaire flotte (une ombre douce, aucune bordure) ; le second
+   appel n'est plus une capsule grise mais un lien à l'accent. Un seul bouton plein : « Se connecter ». */
+:root:root body .vrm-cx .vrm-cx-marque { background: var(--d-heros-fond, #1D1D1F) !important; background-image: var(--d-heros-degrade) !important; }
+:root:root body .vrm-cx .vrm-cx-titre { font-size: 34px !important; line-height: 1.08 !important; letter-spacing: -.03em !important; }
+:root:root body .vrm-cx .vrm-cx-titre span { color: var(--d-heros-gris, rgb(235 235 245 / .64)) !important; }
+:root:root body .vrm-cx .vrm-cx-retour { color: var(--d-heros-gris, rgb(235 235 245 / .64)) !important; }
+:root:root body .vrm-cx .vrm-cx-logo img { width: 40px !important; height: 40px !important; border-radius: 11px !important; }
+:root:root body .vrm-cx .vrm-cx-form { box-shadow: var(--d-ombre-douce-haute, 0 2px 6px rgb(0 0 0 / .05), 0 16px 40px rgb(0 0 0 / .09)) !important; border-radius: 24px !important; padding: 24px 20px 18px !important; }
+:root:root body .vrm-cx .vrm-cx-exemple { margin: 20px 0 4px !important; }
+:root:root body .vrm-cx .vrm-cx-exemple > p { font-size: 13px !important; color: var(--d-gris, #6E6E73) !important; margin: 0 0 2px !important; }
+:root:root body .vrm-cx .vrm-cx-exemple > a {
+  display: inline-flex !important; width: auto !important; padding: 0 12px !important; background: none !important; box-shadow: none !important; border: 0 !important;
+  color: var(--d-accent-texte, #0066CC) !important; font: 600 17px/1.2 var(--vrm-police) !important; gap: 4px !important;
+}
+:root:root body .vrm-cx .vrm-cx-exemple > a::after { content: '›' !important; font-weight: 400 !important; font-size: 20px !important; line-height: 1 !important; }
+@media (min-width: 900px) {
+  :root:root body .vrm-cx .vrm-cx-titre { font-size: 44px !important; }
+  :root:root body .vrm-cx .vrm-cx-form { padding: 28px 28px 22px !important; }
+}
+
+/* Le mode exemple : le bandeau est une ligne d'information, son geste une teinte légère (pas un 2e bouton plein). */
+:root:root body .vrm-exemple-bandeau .vrm-pf-exemple-cta {
+  background: var(--d-pastille-accent-fond, rgb(0 113 227 / .12)) !important; color: var(--d-pastille-accent, #0066CC) !important; border: 0 !important; box-shadow: none !important;
+}
+
+/* La carte « Démarrer avec VRM » : posée (ombre douce, aucune bordure), le pas en cours en avant. */
+:root:root body .vrm-main [data-parcours-carte] { border: 0 !important; box-shadow: var(--d-ombre-douce) !important; border-radius: 20px !important; }
 
 } /* fin @layer vrm-premium */

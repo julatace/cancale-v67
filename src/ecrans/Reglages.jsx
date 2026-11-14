@@ -2006,13 +2006,23 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     if (g.brut) corps = items.map((it) => <React.Fragment key={it.id}>{it.el}</React.Fragment>);
     else corps = liste(items);
 
-    return (
+    const section = (
       <section key={g.id} id={`reglages-${g.id}`} className="vrm-set-groupe" data-groupe-reglages={g.id}>
         {g.titre && <h3 className="vrm-set-titre" style={{color:C.muted}}>{g.titre}</h3>}
         {corps}
         {g.pied && <div className="vrm-set-pied" style={{color:C.muted}}>{g.pied}</div>}
       </section>
     );
+    // (14 nov., refonte visible) LES OPTIONS AVANCÉES REPLIÉES : un groupe `avance` (Sécurité et sauvegarde)
+    // se range derrière UNE rangée « Réglages avancés › » ; une recherche qui y trouve un réglage le montre
+    // déplié. Les panneaux restent montés (plus bas, `panneaux`) : rien ne cesse de lire sa ligne.
+    if (g.avance && !rechercheReglage.trim()) return (
+      <details key={g.id} className="vrm-pf-set-avances" data-reglages-avances={g.id}>
+        <summary className="vrm-set-ligne vrm-pf-set-avances-ligne"><IconeReglage name="gear"/><span className="vrm-set-lib"><b style={{color:C.text}}>{tr('plateformes.reglages.avances')}</b><small className="vrm-set-desc" style={{color:C.muted}}>{g.titre}</small></span><svg className="vrm-set-chev" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke={C.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m1.5 1.5 6 6-6 6"/></svg></summary>
+        {section}
+      </details>
+    );
+    return section;
   };
 
   // ── TES DONNÉES ET LES CONDITIONS
@@ -2172,7 +2182,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (10 nov., lot P) Les raccourcis clavier (src/raccourcisClavier.js) : la même feuille que « ? ».
       { id:'raccourcis-clavier', type:'action', ic:'key', lib:tr('reglages.raccourcis-clavier.lib'), desc:tr('reglages.raccourcis-clavier.desc'), onClick:()=>{ try { window.dispatchEvent(new Event('vrm:raccourcis-clavier')); } catch (_) {} }, data:{ 'data-reglage-raccourcis-clavier':'' } },
     ]},
-    { id:'sauvegarde', titre:tr('reglages.groupe.sauvegarde'), items:[
+    { id:'sauvegarde', avance:true, titre:tr('reglages.groupe.sauvegarde'), items:[
       { id:'securite', type:'panneau', ic:'shield', lib:tr('reglages.securite.lib'), desc:tr('reglages.securite.desc'), el:<SecuriteSetting/> },
       { id:'donnees', type:'action', ic:'doc', lib:tr('reglages.donnees.lib'), desc:tr('reglages.donnees.desc'), onClick:exporterMesDonnees, data:{ 'data-exporter-donnees':'' } },
       // (11 nov.) Il arrive d'un tableur ou d'un autre logiciel : son stock (N°, emplacement, prix d'achat) et ses ventes passées.
@@ -2354,8 +2364,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         {/* (5 nov., chantier H — revue 2.31) « Enregistrement en cours… » vit dans la
             ligne du titre, à droite : il ne prend plus la place d'un surtitre (le
             titre ne saute plus de 26 px à chaque réglage touché). */}
-        <div className="vrm-set-tete"><h2 className="vrm-set-h1" style={{color:C.text}}>{tr('ecran.settings')}</h2><StatutSauvegardeReglages/></div>
-        {PHRASES_ECRAN.settings ? <p className="vrm-phrase-ecran vrm-phrase-reglages" data-phrase-ecran="settings">{PHRASES_ECRAN.settings}<AideEcran cle="settings"/></p> : null}
+        {/* (14 nov., refonte visible — AJOUT 3.8) Le titre et son « ? » : la phrase de deux lignes sous le titre
+            disparaît (le « ? » la dit, `AideEcran`). Puis la RECHERCHE, en haut, comme les Réglages d'iOS. */}
+        <div className="vrm-set-tete"><h2 className="vrm-set-h1" style={{color:C.text}}>{tr('ecran.settings')}</h2>{PHRASES_ECRAN.settings ? <span className="vrm-pf-set-aide" data-phrase-ecran="settings" title={PHRASES_ECRAN.settings}><AideEcran cle="settings"/></span> : null}<StatutSauvegardeReglages/></div>
+        {voirReglages && <ChampRecherche valeur={rechercheReglage} onChange={setRechercheReglage} placeholder={tr('reglages.recherche.placeholder')} label={tr('reglages.recherche.label')} micro voix="brut" className="vrm-set-recherche" data-recherche-reglages=""/>}
         <ReglagesPasLus/>
         {ongletsCompte && (
           // (5 nov., chantier H) Les trois onglets ont LA forme du contrôle segmenté de
@@ -2375,11 +2387,14 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
 
       {!ouvert && <>
         {profil}
-        {voirReglages && <ActionsReglages comptes={comptes||[]} onOuvrir={id=>id==='comptes'?setTab('vintedaccounts'):id==='adresses'?(ouvrirEmailsRelier('reception'),setTab('emails')):ouvrirSous(id)}/>}
-        {/* (12 nov., sécurité des comptes) Double vérification pas activée : UNE carte discrète, jamais forcée. */}
-        {voirReglages && AUTH.user && !rechercheReglage.trim() && <CarteDoubleVerif/>}
-        {/* (5 nov., chantier H) LE champ de recherche de l'app (`ChampRecherche`). */}
-        {voirReglages && <ChampRecherche valeur={rechercheReglage} onChange={setRechercheReglage} placeholder={tr('reglages.recherche.placeholder')} label={tr('reglages.recherche.label')} micro voix="brut" className="vrm-set-recherche" data-recherche-reglages=""/>}
+        {/* (14 nov., refonte visible) « À terminer » et « Protège ton compte VRM » : UN groupe « À faire » de
+            rangées (pastille ambre, le geste en mot) — plus deux cartes de 120 et 250 px avant la liste. */}
+        {voirReglages && !rechercheReglage.trim() && <div className="vrm-pf-set-afaire" data-pf-set-afaire="">
+          <ActionsReglages comptes={comptes||[]} onOuvrir={id=>id==='comptes'?setTab('vintedaccounts'):id==='adresses'?(ouvrirEmailsRelier('reception'),setTab('emails')):ouvrirSous(id)}/>
+          {/* (12 nov., sécurité des comptes) Double vérification pas activée : UNE carte discrète, jamais forcée. */}
+          {AUTH.user && <CarteDoubleVerif/>}
+        </div>}
+        {/* (5 nov., chantier H) LE champ de recherche de l'app (`ChampRecherche`) — (14 nov.) monté sous le titre. */}
         {(() => {
           const filtres=filtrerReglages(groupes,voirReglages?rechercheReglage:'');
           return filtres.length ? <>{rechercheReglage.trim()&&<p className="vrm-settings-search-info" role="status" style={{color:C.muted}}>{tr('reglages.recherche.trouves', { n: filtres.reduce((n,g)=>n+g.items.length,0) })}</p>}{filtres.map(groupe)}</> : <div role="status" className="vrm-set-rien" style={{color:C.muted,fontSize:13}}><p style={{margin:'0 0 4px'}}>{tr('reglages.recherche.rien', { q: rechercheReglage.trim() })}</p><Bouton variante="discret" onClick={()=>setRechercheReglage('')}>{tr('reglages.recherche.effacer')}</Bouton></div>;

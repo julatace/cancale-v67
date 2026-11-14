@@ -49,7 +49,9 @@ const LISTES = {
   'leboncoin-annonces': '[data-lbc-catalog-id]',
   'ebay-annonces': '[data-ebay-annonce]',
   'vestiaire-annonces': '[data-vc-annonce]',
-  reglages: '[data-onglets-reglages] ~ * .vrm-set-ligne, .vrm-set-groupe .vrm-set-ligne',
+  // Paramètres : la liste, ce sont ses rangées — celles des groupes, et celles du groupe « À faire »
+  // (« À terminer », « Protège ton compte VRM »), des rangées de la même liste depuis le 14 nov.
+  reglages: '.vrm-pf-set-afaire .vrm-settings-todo > div, .vrm-pf-set-afaire [data-carte-mfa], .vrm-set-groupe .vrm-set-ligne, .vrm-settings-todo > div',
 };
 const CLES = ['liste', 'carteVide', 'plein', 'capsules', 'bandeau', 'reglages'];
 
@@ -61,7 +63,7 @@ function mesurerAjout3({ selListe, mutation }) {
   const rgba = (s) => { const t = String(s || ''); const c = t.match(/color\(srgb ([^)]+)\)/); if (c) { const p = c[1].split(/[ ,/]+/).filter(Boolean).map(Number); return { r: p[0] * 255, g: p[1] * 255, b: p[2] * 255, a: p.length > 3 ? p[3] : 1 }; } const m = t.match(/rgba?\(([^)]+)\)/); if (!m) return null; const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }; };
   const hsl = (c) => { const r = c.r / 255, g = c.g / 255, b = c.b / 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b); const l = (mx + mn) / 2; if (mx === mn) return { h: 0, s: 0, l }; const d = mx - mn; const s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn); const h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; return { h: h * 60, s, l }; };
   const nom = (el) => `${el.tagName.toLowerCase()}${typeof el.className === 'string' && el.className ? '.' + el.className.split(/\s+/).slice(0, 2).join('.') : ''} « ${(el.innerText || el.getAttribute('aria-label') || '').trim().replace(/\s+/g, ' ').slice(0, 40)} »`;
-  const fondDe = (el) => { const cs = getComputedStyle(el); let c = rgba(cs.backgroundColor); if (c && c.a > 0.05) return c; const av = getComputedStyle(el, '::before'); if (av && av.content !== 'none') { c = rgba(av.backgroundColor); if (c && c.a > 0.05) return c; } return null; };
+  const fondDe = (el) => { const cs = getComputedStyle(el); let c = rgba(cs.backgroundColor); if (c && c.a > 0.05) return c; const av = getComputedStyle(el, '::before'); if (av && av.content !== 'none' && av.display !== 'none' && av.visibility !== 'hidden') { c = rgba(av.backgroundColor); if (c) c.a *= Number(av.opacity || 1); if (c && c.a > 0.05) return c; } return null; };
   // L. La 1re ligne de la liste.
   if (selListe) {
     const l = [...document.querySelectorAll(selListe)].find(vis);
@@ -75,6 +77,9 @@ function mesurerAjout3({ selListe, mutation }) {
     if ((n.nodeValue || '').trim() !== '—') continue;
     const el = n.parentElement; if (!el || !vis(el)) continue;
     if (el.closest('.vrm-ui-voile, .vrm-fs, [role="dialog"]')) continue;
+    // La carte des chiffres PARTAGÉE (`CarteStatsApp`, ses cases `.vrm-fu-*` : Ma journée, Ventes, Annonces · Vinted)
+    // est le chantier `claude/refonte-listes` ; elle n'est pas jugée ici (ses Ventes · site comprises).
+    if (el.closest('.vrm-fu-carte, .vrm-fu-tete, .vrm-fu-cases, [data-ventes-kpi]')) continue;
     const fs = parseFloat(getComputedStyle(el).fontSize);
     if (fs >= 20 && dansEcran(el.getBoundingClientRect())) out.carteVide.push({ fs, quoi: nom(el.parentElement || el) });
   }
