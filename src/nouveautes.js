@@ -26,6 +26,7 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  { id: 'extension-capture', date: '2026-11-14', titre: 'Bordereaux Vinted récupérés, même un peu tard', phrase: 'L’extension relance seule et renvoie ce qui n’était pas parti.', tab: 'colis', pour: 'tous', mode: 'tous' },
   { id: 'argent-choix', date: '2026-11-14', titre: 'Coller tes prix, quoi racheter, déclaration prête', phrase: 'Un tableau « N° ; prix » collé, le bénéfice par modèle et taille.', tab: 'stats', pour: 'tous', mode: 'tous' },
   { id: 'design-passe-reglages', date: '2026-11-14', titre: 'Paramètres et Notifications plus simples', phrase: 'Choix en un toucher, cartes sans cadre, plus de barre vide.', tab: 'settings', pour: 'tous', mode: 'tous' },
   { id: 'design-passe-autres-ecrans', date: '2026-11-14', titre: 'E-mails, Achats et Leboncoin plus nets', phrase: 'Mêmes cartes, mêmes boutons, un seul N° par ligne de recherche.', tab: 'achats', pour: 'tous', mode: 'tous' },
