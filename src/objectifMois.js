@@ -26,13 +26,17 @@ export const CLE_OBJECTIF = 'vrm_objectif_mois';
 // (11 nov., lot objectifs-mois) + le BÉNÉFICE : la case « Bénéfice brut » du mois
 // (`brut` : la somme des seules ventes au prix d'achat connu, `chiffreBrut`), dite
 // « au moins … · sur N » quand des prix manquent (§5). Ordre = ordre des boutons.
+// (14 nov., lot argent-choix — proposition 81) + le REÇU : la case « Reçu » du mois (l'argent
+// versé, daté au jour du VERSEMENT, `recuPublie` sur `vinted_urssaf_mois`) — c'est ce qu'il
+// déclare. Vendu OU reçu, son choix, et la barre le dit (« … reçus ce mois »).
 export const TYPES_OBJECTIF = {
   ca: { nom: 'Vendu', chiffre: 'vendu', type: 'eur', ceMois: 'vendus ce mois' },
+  recu: { nom: 'Reçu', chiffre: 'recu', type: 'eur', ceMois: 'reçus ce mois' },
   benefice: { nom: 'Bénéfice', chiffre: 'brut', type: 'eur', ceMois: 'de bénéfice ce mois' },
   ventes: { nom: 'Ventes', chiffre: 'ventes', type: 'n', ceMois: 'ce mois' },
 };
 // Un objectif en euros (vendu, bénéfice) ou en nombre de ventes.
-export const estEuros = (type) => type === 'ca' || type === 'benefice';
+export const estEuros = (type) => type === 'ca' || type === 'benefice' || type === 'recu';
 
 // Le réglage rangé → { type, valeur, cache } ou null (aucun objectif).
 export const lireObjectif = (brut) => {
@@ -130,7 +134,9 @@ export const progressionObjectif = (obj, x) => {
   const val = x && x.valeur != null && Number.isFinite(Number(x.valeur)) ? Number(x.valeur) : null;
   if (val == null) return { type: obj.type, objectif: obj.valeur, valeur: null, pct: null, partiel: false, atteint: false, manque: (x && x.manque) || [] };
   const pct = Math.max(0, Math.min(100, Math.floor((val / obj.valeur) * 100)));
-  return { type: obj.type, objectif: obj.valeur, valeur: val, pct, partiel: !!(x && x.partiel), atteint: val >= obj.valeur, manque: (x && x.manque) || [], couverture: (x && x.couverture) || '' };
+  return { type: obj.type, objectif: obj.valeur, valeur: val, pct, partiel: !!(x && x.partiel), atteint: val >= obj.valeur, manque: (x && x.manque) || [], couverture: (x && x.couverture) || '',
+    // (14 nov.) Le reçu : les ventes SANS date de versement ne sont dans aucun mois (§5) — dites à côté, hors total.
+    aDater: x && Number(x.aDater) > 0 ? Number(x.aDater) : 0 };
 };
 
 // ── CE QUI RESTE, ET LE RYTHME (9 nov., Julien) ─────────────────────────────
@@ -158,7 +164,7 @@ export const resteObjectif = (prog, maintenant = Date.now()) => {
 export const phraseResteObjectif = (prog, montre, maintenant = Date.now()) => {
   const r = resteObjectif(prog, maintenant);
   if (!prog) return '';
-  if (!r) return prog.type === 'benefice' ? 'Bénéfice du mois pas su' : 'Vendu du mois pas lu';
+  if (!r) return prog.type === 'benefice' ? 'Bénéfice du mois pas su' : prog.type === 'recu' ? 'Reçu du mois pas lu' : 'Vendu du mois pas lu';
   if (r.atteint) return 'Objectif atteint ✓';
   const eur = estEuros(prog.type);
   const ap = r.auPlus ? 'au plus ' : '';
