@@ -16,6 +16,7 @@ import { BarreObjectif } from './design/CarteStats.jsx';
 import { SqLignes } from './Squelette.jsx';
 // (9 nov., soir) Le rendu commun des instantanés (Ma journée, Colis, Ventes).
 import { useInerte, useMaintenant, MentionInstantane, CasesInstantanees, progObjectif } from './InstantaneCommun.jsx';
+import { tr } from './i18n/index.js';
 
 const LETTRES = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
 const majuscule = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
@@ -26,7 +27,10 @@ const nomJour = (d) => {
   return majuscule(d.getDate() === 1 ? t.replace(/\b1\b/, '1er') : t);
 };
 
-export function JourneeInstantanee({ snap, maintenant = null, ScreenHead = null, Icon = null, fmt = null }) {
+// (14 nov., ouverture instantanée) `etat` : 'hors-ligne' (réseau coupé) ou 'panne' (la base n'a pas répondu) —
+// l'instantané RESTE, daté, et dit pourquoi rien n'est relu (`data-instantane-panne`) ; ni « Vérification… »
+// ni lignes qui chargent : rien ne se relit tant que le réseau ou la base ne revient pas. Sans `etat` : avant.
+export function JourneeInstantanee({ snap, maintenant = null, ScreenHead = null, Icon = null, fmt = null, etat = '' }) {
   const ref = React.useRef(null);
   // L'âge avance pendant qu'on attend ; `inert` : ni focus, ni clic (src/InstantaneCommun.jsx).
   const now = useMaintenant(maintenant);
@@ -50,9 +54,11 @@ export function JourneeInstantanee({ snap, maintenant = null, ScreenHead = null,
   const pr = M.prochain;
   // « Mis à jour il y a N min » : à la place (et à la taille) de « Modifier ».
   const mention = (cls) => <MentionInstantane age={M.age} className={cls}/>;
+  const arret = etat === 'hors-ligne' || etat === 'panne';
+  const motGeste = etat === 'hors-ligne' ? tr('instantane.geste.horsLigne') : etat === 'panne' ? tr('instantane.geste.panne') : 'Vérification…';
   return (
     // Le cadre de l'écran vrai (la racine de `Comptabilite` : 16 px en haut), puis sa mise en page.
-    <div ref={ref} style={{ padding: '16px 14px 40px' }} data-journee-instantane="" data-ji-t={String(M.t)} data-ji-age={String(Math.floor(M.age / 60000))} aria-busy="true">
+    <div ref={ref} style={{ padding: '16px 14px 40px' }} data-journee-instantane="" data-ji-t={String(M.t)} data-ji-age={String(Math.floor(M.age / 60000))} data-ji-etat={etat || undefined} aria-busy={arret ? undefined : 'true'}>
     <div className="vrm-day-layout vrm-fu-ecran vrm-fu-journee vrm-ji">
       {ScreenHead ? <ScreenHead icon="soleilLevant" title="Ma journée"/> : null}
       <section className="vrm-day-greeting vrm-w-tete vrm-fu-tete" aria-label="Ta journée — derniers chiffres connus" style={largeurOk && M.hauteur ? { minHeight: M.hauteur } : undefined}>
@@ -60,6 +66,7 @@ export function JourneeInstantanee({ snap, maintenant = null, ScreenHead = null,
         <h1 className="vrm-fu-titre-tete">Ma journée</h1>
         {M.cases ? null : mention('vrm-ji-age vrm-ji-age-seule')}
         <p className="vrm-phrase-ecran vrm-fu-phrase-tete" data-ji-phrase="">{M.phrase && M.phrase.texte ? M.phrase.texte : 'Tes derniers chiffres, le temps de tout relire'}</p>
+        {arret ? <p className="vrm-ji-arret" role="status" data-instantane-panne={etat}>{etat === 'hors-ligne' ? tr('instantane.arret.horsLigne') : tr('instantane.arret.panne')}</p> : null}
         {pr ? (
           <div className="vrm-jv2-prochain">
             <div className={'vrm-day-task vrm-fu-tache is-prochain' + (pr.urgent ? ' is-urgent' : '')} data-ji-prochain={pr.tuile || pr.job || ''} aria-disabled="true">
@@ -68,8 +75,8 @@ export function JourneeInstantanee({ snap, maintenant = null, ScreenHead = null,
                 <span className="vrm-day-task-title">{pr.titre}</span>
                 {pr.note ? <span className="vrm-day-task-note">{pr.note}</span> : null}
               </span>
-              <span className={'vrm-day-task-action vrm-ji-geste' + (pr.principal ? ' is-principal' : '')} data-ji-geste="verification" title="Les chiffres se vérifient : ce geste s’ouvre dès que tout est relu.">
-                <span className="vrm-day-task-action-mot">Vérification…</span>
+              <span className={'vrm-day-task-action vrm-ji-geste' + (pr.principal ? ' is-principal' : '')} data-ji-geste={arret ? etat : 'verification'} title={arret ? undefined : 'Les chiffres se vérifient : ce geste s’ouvre dès que tout est relu.'}>
+                <span className="vrm-day-task-action-mot">{motGeste}</span>
               </span>
             </div>
           </div>
@@ -114,7 +121,7 @@ export function JourneeInstantanee({ snap, maintenant = null, ScreenHead = null,
           </section>
         ) : null}
       </section>
-      {M.gestes ? (
+      {M.gestes && !arret ? (
         <section className="vrm-fu-afaire" aria-label="À faire" aria-busy="true" data-ji-gestes={String(M.gestes)}>
           {/* Le titre de l'écran vrai : « Ensuite » s'il reste des gestes après la prochaine chose. */}
           <div className="vrm-fu-titre-section"><h2 className="vrm-day-titre-section">{M.gestes - (pr ? 1 : 0) > 0 && pr ? 'Ensuite' : 'À faire'}</h2><span>{M.gestes} geste{M.gestes > 1 ? 's' : ''}</span></div>

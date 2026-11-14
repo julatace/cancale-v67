@@ -350,4 +350,10 @@ export default {
   "achats.rienRelieEncore": { one: "Noch verbindet es nichts mit einem Paket oben (kein Abholcode, keine Sendungsnummer). Es zählt nicht zu „abzuholen“, solange die Sendungsnummer unbekannt ist.", other: "Noch verbindet sie nichts mit einem Paket oben (kein Abholcode, keine Sendungsnummer). Sie zählen nicht zu „abzuholen“, solange die Sendungsnummer unbekannt ist." },
   "achats.commandeJours": { one: " · vor {n} Tag bestellt", other: "· vor {n} Tagen bestellt" },
   "achats.autresIlsSont": { one: "und {n} weiteres — alle im Tab „Alle“.", other: "und {n} weitere — alle im Tab „Alle“." },
+  "achats.ms.benefice": "Gewinn",
+  "achats.ms.vitesse": "Tempo",
+  "achats.ms.investi": "Investiert",
+  "achats.ms.marge": "Marge",
+  "achats.ms.pourRevendre": "Bis Verkauf",
+  "achats.selectionner": "Auswählen",
 };

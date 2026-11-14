@@ -26,12 +26,22 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (14 nov., lot colis-plus : propositions 96 à 101, puis l'impression guidée)
+  { id: 'impression-guidee', date: '2026-11-14', titre: 'Tout imprimer, guidé pas à pas', phrase: 'Ton imprimante, le tampon de chaque bordereau, puis « Tout est sorti ? ».', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  { id: 'colis-format-modele', date: '2026-11-14', titre: 'Le bon carton proposé pour chaque modèle', phrase: 'Ton dernier choix pour ce modèle revient ; tu le prends d’un toucher.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  { id: 'colis-fournitures', date: '2026-11-14', titre: 'Scotch et cartons décomptés à chaque colis', phrase: 'Alerte au seuil que tu choisis, avant d’en manquer.', tab: 'garage', pour: 'tous', mode: 'tous' },
+  { id: 'bordereaux-4-par-page', date: '2026-11-14', titre: '4 bordereaux par feuille A4', phrase: 'Sans imprimante thermique : dans l’ordre, avec un trait de coupe.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  { id: 'douchette-ordinateur', date: '2026-11-14', titre: 'Bipe un bordereau, la vente s’ouvre', phrase: 'Une douchette USB ou Bluetooth sur ordinateur suffit.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  { id: 'mains-libres-emballage', date: '2026-11-14', titre: 'Emballe sans toucher l’écran', phrase: '« Suivant », « imprimer », « fait » à la voix dans Préparer mes colis.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  { id: 'temps-par-colis', date: '2026-11-14', titre: 'Ton temps par colis et ton gain', phrase: 'Mesuré dans Préparer mes colis : au moins, jamais deviné.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  { id: 'ouverture-instantanee', date: '2026-11-14', titre: 'VRM s’ouvre tout de suite, même sans réseau', phrase: 'Tes derniers chiffres de Ma journée, datés, puis tout se relit.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'photo-floue', date: '2026-11-14', titre: 'Photo floue ou sombre signalée', phrase: 'Mesuré sur ton téléphone, avant la mise en ligne. Jamais bloquant.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
   { id: 'seance-photo', date: '2026-11-14', titre: 'Séance photo, dans l’ordre des N°', phrase: 'Les paires sans photo ou à reprendre, cochées une à une.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
   { id: 'recherche-couleur', date: '2026-11-14', titre: 'Chercher tes paires par couleur', phrase: 'Tape « bleu » dans la loupe : la couleur vient de tes photos.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
   { id: 'note-dictee', date: '2026-11-14', titre: 'Dicter une note sur une paire', phrase: 'Ton téléphone écrit ce que tu dis dans sa note.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
   { id: 'certificat-paire', date: '2026-11-14', titre: 'Le certificat d’authenticité rangé avec la paire', phrase: 'PDF ou photo, dans sa fiche, prêt à envoyer à un acheteur.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
   { id: 'fusion-fiches', date: '2026-11-14', titre: 'Fusionner deux fiches de la même paire', phrase: 'Sur ton clic, avec un aperçu ; aucun N° perdu, réversible 30 jours.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
+  { id: 'refonte-achats', date: '2026-11-14', titre: 'Achats plus dense, plus net', phrase: 'Huit achats par écran, tes sources en chiffres, recherche par N°.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'journee-selon-heure', date: '2026-11-14', titre: 'Ma journée change selon l’heure', phrase: 'Les colis le matin, le bilan le soir. Ton ordre reste prioritaire.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'ecran-atelier', date: '2026-11-14', titre: 'Écran d’atelier toujours allumé', phrase: 'Colis du jour et chiffre du jour, mis à jour tout seuls.', tab: 'settings', pour: 'tous', mode: 'tous' },
   { id: 'connexion-qr', date: '2026-11-14', titre: 'Connexion à l’ordinateur avec ton iPhone', phrase: 'Un QR, ton clic sur l’iPhone, sans retaper ton mot de passe.', tab: 'settings', pour: 'tous', mode: 'tous' },

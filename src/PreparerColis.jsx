@@ -17,6 +17,10 @@ import React from 'react';
 import { motsVendeur } from './profilVendeur.js';
 import { createPortal } from 'react-dom';
 import { ordreDeSeance, indexDeReprise, progression, lireSeancePreparer, ecrireSeancePreparer, oublierSeancePreparer } from './preparerRelais.js';
+// (14 nov., propositions 100 et 101) Mains libres (la voix du NAVIGATEUR, commandes fermées) et
+// le temps par colis (mesuré entre deux « Colis fait » de CETTE ouverture, sur l'appareil).
+import { MainsLibres } from './MainsLibres.jsx';
+import { TempsColis, useJournalTemps } from './TempsColis.jsx';
 
 const PHRASE_NUM = {
   double: (n) => `Deux articles portent le N°${n} : vérifie là où ils sont rangés avant de fermer le colis.`,
@@ -26,7 +30,9 @@ const PHRASE_NUM = {
 
 // (10 nov., lot AZ + M) `photoCarton(c)` : le geste « Photo du carton » (facultatif) d'un colis FAIT, rangé avec
 // SA vente (src/photoCarton.js) — le même que celui du scanner ; l'écran le fournit, rien n'est décidé ici.
-export default function PreparerColis({ colis, uid = '', attente = '', onFait, onAnnuler, onImprimer, onScanner, onFermer, Retour, Icon, Photo, zIndex, photoCarton = null, note = null, emballage = null }) {
+export default function PreparerColis({ colis, uid = '', attente = '', onFait, onAnnuler, onImprimer, onScanner, onFermer, Retour, Icon, Photo, zIndex, photoCarton = null, note = null, emballage = null, beneficeDe = null }) {
+  // (14 nov., 101) L'heure de CETTE ouverture : le 1er colis se mesure depuis elle.
+  const [ouverture] = React.useState(() => Date.now());
   const vivants = Array.isArray(colis) ? colis : [];
   // Ce que la séance a vu (un colis fait sort de « À envoyer » après ses 5 s : la
   // séance le garde, montré fait). Le dernier état vivant l'emporte.
@@ -100,6 +106,16 @@ export default function PreparerColis({ colis, uid = '', attente = '', onFait, o
   const fermer = () => { if (n && ordre.every((k) => seance.faits[k])) oublierSeancePreparer(uid); onFermer(); };
 
   const nFaits = prog.faits;
+  // (14 nov., 101) La séance mesurée est rangée à chaque « Colis fait » (et recalculée à chaque « Annuler »).
+  useJournalTemps(uid, ouverture, seance.faits);
+  // (14 nov., 100) Ce que fait une commande dite ; false = rien à faire ici (c'est dit).
+  const commande = (cm) => {
+    if (cm === 'suivant') { if (!n || fin) return false; suivant(); return true; }
+    if (cm === 'precedent') { if (!n || (!fin && idx === 0)) return false; precedent(); return true; }
+    if (cm === 'imprimer') { if (fin || !c || !c.pdf || impression) return false; imprimer(); return true; }
+    if (cm === 'fait') { if (fin || !c || fait || !c.peutFaire || sorti || enAttente) return false; colisFait(); return true; }
+    return false;
+  };
   const titreTete = fin ? 'Récapitulatif' : n ? `Colis ${prog.position} sur ${prog.total}` : 'Préparer mes colis';
 
   const contenu = (() => {
@@ -123,6 +139,7 @@ export default function PreparerColis({ colis, uid = '', attente = '', onFait, o
             </li>); })}
         </ul>
         {nFaits < n ? <p className="vrm-emb-aide">Les autres restent dans « À envoyer ».</p> : null}
+        <TempsColis uid={uid} ouverture={ouverture} beneficeDe={beneficeDe} rendu={nFaits}/>
       </div>
     );
     const sure = c.paire === 'sure';
@@ -189,6 +206,7 @@ export default function PreparerColis({ colis, uid = '', attente = '', onFait, o
           {n && !fin ? <button type="button" className="vrm-emb-rond" aria-label="Voir tous les colis de la séance" data-preparer-liste="" onClick={() => setFin(true)}>{Icon ? <Icon name="menu" size={20}/> : '≡'}</button> : <span className="vrm-emb-rond-vide" aria-hidden="true"/>}
         </header>
         {n && !fin ? <div className="vrm-prep-barre" aria-hidden="true"><span style={{ width: `${Math.round((nFaits / n) * 100)}%` }}/></div> : null}
+        {n ? <MainsLibres onCommande={commande}/> : null}
         <div className="vrm-emb-corps">{contenu}</div>
         <div className="vrm-emb-pied">{pied}</div>
       </div>

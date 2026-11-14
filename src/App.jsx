@@ -506,6 +506,7 @@ import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLie
 import { lignesFraicheur, quandRelu } from './fraicheurComptes.js';
 import { FRAICHEUR_ACHATS_J } from './fraicheur.js';   // (9 nov., lot AG) le seuil des achats vit avec la ligne de fraîcheur unique
 import { ventesEmailFraiches, avecVentesEmail, requeteVentesEmail, gesteVenteEmail, STATUT_VENTE_EMAIL, groupesVentesEmailEnTete, statutVentesEmail } from './venteEmailFraiche.js';
+import { TAMPONS as TAMPONS_IMPR } from './impression/thermique.js';   // (14 nov.) le tampon par bordereau dans « Tout imprimer »
 import { CLE_IMPRESSION, reglageImpression, papierThermique, placementEtiquette, contenuTampon, carteEncre, boiteEncre, decouperFeuille, fusionnerProches, moduleDuCode, moduleImprimeMm, codeAssezGros, seuillerNoir, tramerNoir, zonesAdresse, CONTRASTES, MODULE_MIN_MM, BANDE_CONTINU_MM } from './impression/thermique.js';
 import { decisionNumeroVenteEmail, numeroEcritDansArticle, colisVentesEmail, MENTION_SANS_NUM, CLE_IMPRIMES_SANS_NUM, phraseImprimeSansNumero } from './bordereauVenteEmail.js';
 import { premiereCaseLibre as premiereCaseMeubles, achatsArrives, notifsOuRanger, caseEnMots } from './ouRanger.js';
@@ -684,7 +685,11 @@ import { CLE_PRIX_LUS, noterPrixLus } from "./historiquePrix.js";
 import { conseilBaisse, derniereBaisseLue, baisseProportion, noterConseils, fusionConseils, CLE_CONSEIL_PRIX } from "./conseilPrix.js";   // (12 nov.) le conseil de baisse, mesuré   // (10 nov., lot L) les prix lus dans le dressing
 import CalculetteAchat from "./CalculetteAchat.jsx";   // (10 nov., lot L) la calculette d'achat (Achats, ⌘K)
 import { ChoixEmballageColis } from "./EmballagesCarte.jsx";   // (10 nov., lot L) l'emballage d'un colis (facultatif)
-import { CLE_EMBALLAGES } from "./emballages.js";
+import { CLE_EMBALLAGES, colisFaits as colisFaitsEmb } from "./emballages.js";
+// (14 nov., lot colis-plus 99, 101) La douchette (un code lu ⇒ LA vente, par identité) et le bénéfice par colis.
+import { DouchetteGlobale } from "./Douchette.jsx";
+import { venteDuCode, enregistrerResolveur, prendreDemande as prendreDemandeDouchette, codeCourt, DEMANDE_DOUCHETTE } from "./douchette.js";
+import { beneficesParColis } from "./tempsColis.js";
 import { listeInventaire, publierInventaireAnnuel } from "./inventaireAnnuel.js";   // (10 nov., lot W) l'inventaire de fin d'année
 import { BarreCoutVente, PointCout, SaisieEmballage } from "./CascadeVente.jsx";
 import { etatNumeroColis } from "./emballage.js";
@@ -13426,7 +13431,10 @@ const tamponnerBordereau = async (PL, pdf, { numero, titre, thermique = false, c
 // bas. D'où les deux repères ci-dessous, et JAMAIS une position écrite en dur :
 // une zone devinée de travers, c'est un code-barres coupé, donc un colis qui ne
 // part pas. Quand on ne SAIT pas, la page part entière — et l'écran le dit.
-const IMPR_MODES = ['normale', 'thermique'];
+// (14 nov., lot colis-plus 98) 'planche4' : sans imprimante thermique, « Tout imprimer » range les
+// étiquettes isolées QUATRE par feuille A4, dans l'ordre (src/impression/planche4.js) ; ailleurs
+// (un bordereau seul) c'est l'A4 normale.
+const IMPR_MODES = ['normale', 'thermique', 'planche4'];
 const imprMode = (v) => (IMPR_MODES.includes(String(v)) ? String(v) : 'normale');
 
 // Mots qui NE SONT PAS l'étiquette : la fiche à glisser dans le colis, la notice
@@ -14299,8 +14307,13 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
   if (!(await confirmerNumerosAVerifier((items || []).map((it) => it && it.numero)))) throw new Error(NUM_A_VERIFIER_ANNULE);
   const PL = await import('pdf-lib');
   const { PDFDocument, rgb, StandardFonts } = PL;
+  const modeLot = imprMode(opts.imprimante || imprimanteChoisie());
+  // (14 nov., lot colis-plus 98) 4 PAR PAGE A4 : la MÊME isolation que la thermique (les mêmes PDF, le
+  // même tampon, la page entière quand on ne sait pas), posée dans un document à part, puis rangée
+  // quatre par feuille dans l'ordre (`imposerPlanche`). Les factures restent des pages entières.
+  const planche = modeLot === 'planche4';
+  const thermique = modeLot === 'thermique' || planche;
   const out = await PDFDocument.create();
-  const thermique = imprMode(opts.imprimante || imprimanteChoisie()) === 'thermique';
   let count = 0, nInv = 0, isoles = 0, nEtiquettes = 0, fiches = 0, bandes = 0;
   const entiers = [];   // ce qu'on n'a PAS su isoler — l'écran doit le dire
   const details = [];   // (11 nov., lot thermique) ce qui a été mesuré, étiquette par étiquette
@@ -14318,7 +14331,11 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
       // ne SAIT pas où elle est, la page part ENTIÈRE — jamais un code-barres
       // coupé au hasard (`poserBordereau`, la même règle partout).
       // La position mémorisée de la forme de CE bordereau (`positionTampon`), sinon le choix automatique.
-      const r1 = await poserBordereau(PL, out, src, { numero: it.numero, title: it.title, pos, thermique, impression: extrasImpression(it.numero, it.title, { photo: it.photo || (it.ligne && it.ligne.photo) || null }), choisir: choisirTampon({ PL, src, numero: it.numero, titre: it.title, apercu: opts.apercu === undefined ? false : opts.apercu, deja: dejaLot, thermique }) });
+      // (14 nov., Julien : « modifier un par un chaque bordereau avec le tamponnage ») le tampon choisi pour CE
+      // bordereau dans l'aperçu (`it.tampon` : N° seul, N° + titre, + taille, rien) remplace le réglage, pour lui seul.
+      const impIt = extrasImpression(it.numero, it.title, { photo: it.photo || (it.ligne && it.ligne.photo) || null });
+      if (it.tampon && TAMPONS_IMPR.includes(it.tampon)) { const rg0 = reglageImpressionChoisi(); impIt.reg = { ...rg0, tamponA4: it.tampon, tamponTh: it.tampon }; }
+      const r1 = await poserBordereau(PL, out, src, { numero: it.numero, title: it.title, pos, thermique, impression: impIt, choisir: it.tampon === 'rien' ? null : choisirTampon({ PL, src, numero: it.numero, titre: it.title, apercu: opts.apercu === undefined ? false : opts.apercu, deja: dejaLot, thermique }) });
       for (const t of r1.tampons || []) { if (t === 'fiche') fiches++; else if (t === 'bande') bandes++; }
       details.push(...(r1.details || []));
       if (r1.isole) { isoles++; nEtiquettes += r1.etiquettes; }
@@ -14331,15 +14348,23 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
     } catch (e) { if (estTamponAnnule(e)) throw e; rates.push(index); }
   }
   if (!count) throw new Error('Aucun bordereau exploitable.');
-  posePrefsImpression(PL, out);   // une feuille par bordereau (§ recto-verso)
-  const bytes = await out.save();
+  let docFinal = out, infoPlanche = null;
+  if (planche) {
+    const { imposerPlanche } = await import('./impression/planche4.js');
+    const { doc, plan } = await imposerPlanche(PL, out);
+    docFinal = doc;
+    infoPlanche = { feuilles: doc.getPageCount(), etiquettes: plan.etiquettes, entieres: plan.entieres, echelle: Math.round(plan.echelle * 100) };
+  }
+  posePrefsImpression(PL, docFinal);   // une feuille par bordereau (§ recto-verso)
+  const bytes = await docFinal.save();
   if(opts.avantOuverture)opts.avantOuverture();
   const blob = new Blob([bytes], { type:'application/pdf' });
   const url = URL.createObjectURL(blob);
-  const filename = `bordereaux-${count}${nInv?'-'+nInv+'factures':''}${thermique?'-thermique':''}-a-la-suite.pdf`;
+  const filename = `bordereaux-${count}${nInv?'-'+nInv+'factures':''}${planche?'-4-par-page':thermique?'-thermique':''}-a-la-suite.pdf`;
   // Ouvert dans un onglet (ordinateur) ; sinon la modale propose « Ouvrir ».
   const printed = ouvrirPdfOnglet(url, filename);
   signalerBordereauImprime(true, null);
+  if (planche) return { url, filename, count, nInv, printed, ouvert: printed, thermique: false, planche: infoPlanche, isoles, etiquettes: nEtiquettes, entiers: [], reussis, rates, fiches, bandes };
   return { url, filename, count, nInv, printed, ouvert: printed, thermique, isoles, etiquettes: nEtiquettes, entiers, reussis, rates, fiches, bandes, ...bilanThermique(details) };
 };
 // Un échec (annulé, PDF illisible) referme la visionneuse « préparation… ».
@@ -30948,6 +30973,37 @@ function useObjectifMois() {
 // ⟦→ ecrans/Stats.jsx #19⟧
 const lirePub = (cle) => () => { try { const v = load(cle, null); return v && typeof v === 'object' ? v : null; } catch (_) { return null; } };
 const lireColisAPoster = lirePub('vrm_colis_aposter'), lireColisARetirer = lirePub('vrm_colis_retirer'), lirePairesDorment = lirePub('vrm_paires_dorment');
+// (14 nov., refonte Achats — AJOUT 3 de Julien : « la liste arrive après 1,5 écran ») Sur Achats, « À retirer »
+// (points relais, codes, QR, Mode relais, ses outils) se range dans UNE ligne « À retirer · N › » qui l'ouvre sur
+// place : la liste des achats arrive sur le premier écran. RIEN n'est démonté (la section reste montée, `hidden`) :
+// ses publications (`vrm_colis_retirer`, codes, rappels) continuent. Elle s'OUVRE seule quand on vient pour un
+// retrait (anciens chemins Colis / À retirer, notification d'un colis, Ma journée : `DEMANDE_RETIRER`), et reste
+// ouverte si on l'a ouverte (`vrm_achats_retirer_ouvert`, cet appareil). Le nombre est LA publication
+// (`pickupUnion.total`, la même que Ma journée) ; pas lue ⇒ « — ». Point ambre : un retrait pressé (`urgents`).
+const DEMANDE_RETIRER = { at: 0 };
+const demanderRetirer = () => { DEMANDE_RETIRER.at = Date.now(); try { window.dispatchEvent(new Event('vrm:retirer-ouvrir')); } catch (_) {} };
+const CLE_RETIRER_OUVERT = 'vrm_achats_retirer_ouvert';
+// `sansLigne` (Achats · Vinted) : la bande de chiffres porte déjà « À retirer · N » (sa case mène ici : `retraits`) ;
+// la ligne ne se montre alors qu'OUVERTE, pour refermer — jamais le même nombre deux fois à l'écran (§7).
+function RepliRetirerAchats({ children, sansLigne = false }) {
+  const [pub] = useLigneSynchro('vrm_colis_retirer', lireColisARetirer);
+  const [ouvert, setOuvert] = React.useState(() => { if (Date.now() - DEMANDE_RETIRER.at < 8000) return true; try { return localStorage.getItem(CLE_RETIRER_OUVERT) === '1'; } catch (_) { return false; } });
+  React.useEffect(() => { const o = () => setOuvert(true); window.addEventListener('vrm:retirer-ouvrir', o); return () => window.removeEventListener('vrm:retirer-ouvrir', o); }, []);
+  const basculer = () => setOuvert((o) => { const v = !o; try { localStorage.setItem(CLE_RETIRER_OUVERT, v ? '1' : '0'); } catch (_) {} return v; });
+  const n = pub && Number.isFinite(pub.total) ? pub.total : null;
+  const presse = !!(pub && Number(pub.urgents) > 0);
+  return (
+    <div className="vrm-achats-retirer-repli" data-retirer-repli={ouvert ? 'ouvert' : 'ferme'}>
+      <button type="button" className="vrm-achats-retirer-ligne" hidden={sansLigne && !ouvert} aria-expanded={ouvert} aria-controls="vrm-achats-retirer-corps" onClick={basculer} data-retirer-n={n == null ? '' : String(n)} data-retirer-presse={presse ? '1' : '0'}>
+        {presse ? <span className="vrm-achats-retirer-point" aria-hidden="true"/> : null}
+        <span className="vrm-achats-retirer-titre">{tr('journee.retirer')}</span>
+        <span className="vrm-achats-retirer-n">{n == null ? '—' : n}</span>
+        <span className="vrm-achats-retirer-chevron" aria-hidden="true">›</span>
+      </button>
+      <div id="vrm-achats-retirer-corps" hidden={!ouvert}>{children}</div>
+    </div>
+  );
+}
 // (9 nov., lot AC) « À TRANCHER » : les lignes (src/aTrancher.js), lues des publications
 // des écrans propriétaires — la coque (badge, écran) et Ma journée (sa ligne) lisent ce
 // MÊME calcul. Relu à chaque publication et toutes les 5 min (une publication vieillit).
@@ -36549,7 +36605,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // le compte ouvert dans Chrome. Choisi ≠ Chrome ⇒ un geste pour passer au compte de Chrome.
   const nomUidGroupe = (u) => { const a = (accounts || []).find(x => String(x.vinted_user_id) === String(u)); return a ? accNameOf(a) : ''; };
   const groupeChoisi = !!compteSel && compteSel !== '*' && String(compteSel) === selEff;
-  const teteGroupe = (e, k, unite) => <TeteGroupeCompte key={'gc-' + k + '-' + (e.compte || e.tete || e.suite || '')} e={e} unite={unite}
+  // (14 nov., refonte Achats) Sur Achats, l'en-tête est COURT (le nom à gauche, les nombres calés à droite, iOS) ;
+  // les mêmes mots, les mêmes nombres (src/GroupesComptes.jsx, `court`). Ventes garde son en-tête.
+  const teteGroupe = (e, k, unite) => <TeteGroupeCompte key={'gc-' + k + '-' + (e.compte || e.tete || e.suite || '')} e={e} unite={unite} court={unite === 'achat'}
     libelle={groupeChoisi ? 'Compte choisi' : `Compte ouvert ${NAV.dansNu}`} nomOuvert={nomUidGroupe(selEff)} nomDe={nomUidGroupe}
     onBasculer={depComptes.basculer} onSuite={depComptes.plus}
     geste={e.tete === 'ouvert' && groupeChoisi && compteConnecte && String(compteConnecte) !== selEff && typeof setCompteSel === 'function'
@@ -39520,13 +39578,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return L.length;
   };
   const achatsAffiches = useMemo(() => {
+    // (14 nov., refonte Achats — Julien : « imagine si j'ai 1000 articles ») Le N° tapé trouve la paire ACHETÉE :
+    // le N° de la fiche reliée à CET achat par son n° de transaction (`buyFromId`, une identité — §5), jamais un
+    // titre. Un N° seul (« 133 », « B125 ») ; le reste de la recherche ne change pas (`matchOrd`).
+    const qNum = /^[a-z]?\d{1,6}$/i.test(ordSearchDiff.trim()) ? cleNum(ordSearchDiff.trim()) : '';
+    const numDeTx = qNum ? (() => { const m = new Map(); for (const k in numeros) { const e = numeros[k]; if (e && e.buyFromId && e.numero != null && String(e.numero).trim()) m.set(String(e.buyFromId), cleNum(e.numero)); } return m; })() : null;
     let arr = buysBase
     .filter(o => { const p = phaseReception(o);
       if (aFilter === 'attente') return false;
       if (aFilter === 'route') return p === 'route';
       if (aFilter === 'recus') return p === 'recu';
       return true; })
-    .filter(o => matchOrd(o))
+    .filter(o => matchOrd(o) || (!!numDeTx && dansPeriode(o, periode) && numDeTx.get(String(o.transaction_id)) === qNum))
     .map(o => { const tk = trackForBuy(o); return { o, tk, st: achatStage(o, tk) }; });
     // ⚠️⚠️ (5 nov., Julien : « dans achat en route c'est le plus récent qui s'affiche en haut peu importe
     // le compte et le filtre ») puis (9 nov., soir, lot AJ — « du plus récent en haut au plus vieux en bas,
@@ -43218,6 +43281,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // échec se relance seul (« Réessayer les échecs »).
   const VENTE_LOT_MAX_J = 14;
   const [lot, setLot] = useState(null);   // null · { coches: Set(cle), echecs: [cle] }
+  // (14 nov.) Le tampon choisi pour chaque bordereau dans l’aperçu de « Tout imprimer » (lu par `batchBordereaux`).
+  const tamponsLotRef = React.useRef({}); tamponsLotRef.current = (lot && lot.tampons) || {};
   const ageVenteJ = (o) => { const t = Date.parse(o && o.date); return Number.isFinite(t) ? (Date.now() - t) / 864e5 : null; };
   const lignesLot = () => expeditions()
     .filter(e => ((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn])) && !(e.o && isShipDone(e.o)))
@@ -43577,6 +43642,48 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const trouverScan = (brut) => { const r = trouverParScan(brut, colisScannables());
     if (r.etat === 'trouve' && attenteScan.current && attenteScan.current.cle === String(r.colis.cle)) return { ...r, etat: 'deja' };
     return r; };
+  // ── (14 nov., lot colis-plus 99) LA DOUCHETTE : un code lu ⇒ LA vente, PAR IDENTITÉ (§5) ──────────
+  // Les identités de chaque vente : SON n° de transaction, le n° de suivi de SON bordereau (e-mail et
+  // étiquette lue), Vestiaire par son n° de suivi. Égalité exacte (`venteDuCode`) ; deux ventes ⇒ rien.
+  // Trouvée ⇒ elle s'ouvre dans Ventes (la cible `vente:{tx}`, le chemin des notifications).
+  const lignesDouchette = () => {
+    const L = [];
+    for (const o of (Array.isArray(sales.items) ? sales.items : [])) {
+      if (!o || o.transaction_id == null) continue;
+      const tx = String(o.transaction_id), b = bordsParTxn[tx];
+      L.push({ cle: 'v:' + tx, site: 'vinted', tx, suivis: [b && b.suivi, b && b.suiviPdf].filter(Boolean), num: (b ? numForBord(b) : '') || ((effEntry(o) || {}).numero || ''), titre: o.title || '' });
+    }
+    for (const c of colisScannables()) {
+      if (c.site === 'vestiaire') L.push({ cle: c.cle, site: 'vestiaire', suivis: c.suivis, num: c.num, titre: c.titre, vc: c.v && c.v.id });
+      else if (c.site === 'vinted' && !c.o) L.push({ cle: c.cle, site: 'vinted', suivis: c.suivis, num: c.num, titre: c.titre, sansVente: true });
+    }
+    return L;
+  };
+  const douchettePrete = colisDans === 'ventes' && curSub === 'bordereaux' && Array.isArray(sales.items) && emailBords !== null;
+  const resoudreDouchette = React.useRef(null);
+  resoudreDouchette.current = (code, relu = false) => {
+    if (!douchettePrete) { DEMANDE_DOUCHETTE.code = code; DEMANDE_DOUCHETTE.at = Date.now(); toast(tr('cp.douchette.pasLu'), 'info'); return; }
+    const r = venteDuCode(code, lignesDouchette());
+    if (!(r.etat === 'inconnu' && !relu)) { try { document.documentElement.setAttribute('data-douchette', r.etat + (r.ligne ? ':' + r.ligne.cle : '')); } catch (_) {} }
+    if (r.etat === 'trouve' && !r.ligne.sansVente) {
+      const l = r.ligne;
+      toast(tr('cp.douchette.trouve', { qui: [l.num ? `N°${l.num}` : '', l.titre].filter(Boolean).join(' · ') || tr('cp.douchette.sansNum') }), 'ok');
+      const q = l.site === 'vestiaire' ? `?tab=ventes&site=vestiaire&cible=vcvente&vc=${encodeURIComponent(l.vc || '')}` : `?tab=ventes&site=vinted&cible=vente&tx=${encodeURIComponent(l.tx)}`;
+      try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: q })); } catch (_) {}
+      return;
+    }
+    if (r.etat === 'trouve') { toast(tr('cp.douchette.sansVente', { code: codeCourt(code) }), 'info'); return; }
+    if (r.etat === 'ambigu') { toast(tr('cp.douchette.ambigu', { n: r.lignes.length, code: codeCourt(code) }), 'err'); return; }
+    // Les bordereaux peuvent encore arriver (lecture en cours) : on relit UNE fois 2 s plus tard avant de dire « inconnu ».
+    if (!relu) { setTimeout(() => { try { resoudreDouchette.current(code, true); } catch (_) {} }, 2000); return; }
+    toast(tr('cp.douchette.inconnu', { code: codeCourt(code) }), 'err');
+  };
+  useEffect(() => {
+    if (colisDans !== 'ventes' || curSub !== 'bordereaux') return undefined;
+    return enregistrerResolveur((code) => resoudreDouchette.current(code));
+  }, [colisDans, curSub]);
+  // Un code lu avant que Ventes soit prêt (l'app y menait) : repris une fois les ventes lues.
+  useEffect(() => { if (!douchettePrete) return; const c = prendreDemandeDouchette(); if (c) resoudreDouchette.current(c); }, [douchettePrete]);
   const [emballage, setEmballage] = useState(() => {
     if (curSub !== 'bordereaux' || !DEMANDE_EMBALLAGE.at || Date.now() - DEMANDE_EMBALLAGE.at > 60000) return false;
     DEMANDE_EMBALLAGE.at = 0; return true;
@@ -43718,6 +43825,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const retirerRelais = (x) => { const t = (x && x.src && x.src.t) || null, o = (x && x.src && x.src.o) || null; if (t) return markCollected(t); if (o) return markPickupDone(o); return null; };
   const [preparerOuvert, setPreparerOuvert] = useState(false);
+  // (14 nov., lot colis-plus 97, 101) Les « Colis fait » datés (le stock de fournitures, comme au Stock) et le
+  // bénéfice de chaque colis lu dans le relevé de Ventes, PAR SA TRANSACTION (src/tempsColis.js) — rien d'écrit.
+  const lireFaitsEmb = React.useCallback(() => colisFaitsEmb({ vinted: load('vinted_ship_done', {}), leboncoin: load('vrm_lbc_colis_done', {}), vestiaire: load('vrm_vc_colis_done', {}) }), []);
+  const beneficeColisPrep = useMemo(() => (preparerOuvert ? beneficesParColis(lireReleveVentes()) : null), [preparerOuvert]);
   const [relaisOuvert, setRelaisOuvert] = useState(false);
   // (11 nov., lot rangement-guide) Scanner ou mode relais refermé : les achats retirés au comptoir, en série.
   useEffect(() => { if (scanOuvert || relaisOuvert || !retraitsARanger.current.length) return; const l = retraitsARanger.current; retraitsARanger.current = []; ouvrirRangement(l); }, [scanOuvert, relaisOuvert]);
@@ -43832,7 +43943,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (!buf) { echecs.push(l.cle); continue; }   // pas d'octets : on saute, on n'imprime pas du vide — et on le DIT après
         faits.push(l.cle);
         // Numéro et titre : même dérivation que la carte (identité, jamais le titre — §5).
-        items.push({ numero: l.num || '', title: l.titre || '', pdfBuf: buf, invBytes, cle: l.cle, site: l.site, ligne: l });
+        items.push({ numero: l.num || '', title: l.titre || '', pdfBuf: buf, invBytes, cle: l.cle, site: l.site, ligne: l, tampon: (tamponsLotRef.current || {})[l.cle] || null });
       }
       verifierContexte();
       if (!items.length) { finSuiviB(''); if(choisis&&(AUTH.user?.id||null)===proprietaire)setLot(x=>x?{...x,coches:new Set(echecs),echecs}:x); libererOngletPdf(); toast(pasLus ? "La base n'a pas répondu — réessaie dans un instant." : (sansLignes.length ? texteSansBordereau(sansLignes) + '.' : "Ces bordereaux n'ont plus leur PDF — retélécharge-les depuis les ventes sur Vinted.")); setBatchBusy(false); return; }
@@ -43856,7 +43967,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       (r.rates || []).forEach(i => echecs.push(items[i].cle));
       const reussiesVinted = (r.reussis || []).filter(i => items[i].site === 'vinted').map(i => items[i].cle);
       const differe = parcours && !echecs.length && choisis;
-      if (differe && (AUTH.user?.id||null)===proprietaire) setLot(x => x ? { ...x, fait: { n: imprimes, url: r.url, nom: r.filename, vinted: reussiesVinted, vestiaire: (r.reussis || []).filter(i => items[i].site === 'vestiaire').map(i => items[i].ligne.v.id) } } : x);
+      if (differe && (AUTH.user?.id||null)===proprietaire) setLot(x => x ? { ...x, fait: { planche: r.planche || null, lignes: (r.reussis || []).map(i => ({ cle: items[i].cle, num: items[i].numero || '', titre: items[i].title || '' })), n: imprimes, url: r.url, nom: r.filename, vinted: reussiesVinted, vestiaire: (r.reussis || []).filter(i => items[i].site === 'vestiaire').map(i => items[i].ligne.v.id) } } : x);
       if (!differe && reussiesVinted.length) setBordsPrinted(prev => { const u = { ...prev }; const at = new Date().toISOString(); reussiesVinted.forEach(k => { u[k] = at; }); save('vinted_bords_printed', u); return u; });
       noterImprimeSansNum((r.reussis || []).filter(i => items[i].site === 'vinted' && !String(items[i].numero || '').trim()).map(i => items[i].ligne && items[i].ligne.e && items[i].ligne.e.txn));
       if (!differe) (r.reussis || []).filter(i => items[i].site === 'vestiaire').forEach(i => { try { marquerVc('vrm_vc_imprimes', items[i].ligne.v.id, true); } catch (_) {} });
@@ -47646,7 +47757,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             déjà « Scanner » en tête de l'onglet (mode retrait) ; il ne reste que dans l'espace plateforme → Achats. */}
         {/* (11 nov., lot DJ3) « Scanner » au point relais vit dans la barre de la section « À retirer », en tête
             d'Achats (une fois) : ici, la calculette seule. */}
-        {dansPlateforme && !modeRetraits ? <div className="vrm-achats-scan" data-achats-scan="" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>{boutonCalculette}</div> : null}
+        {/* (14 nov., refonte Achats) La calculette vit dans la barre de recherche quand la liste a des achats (une barre d'outils). */}
+        {dansPlateforme && !modeRetraits && !(buysBase.length>0 && aFilter!=='attente') ? <div className="vrm-achats-scan" data-achats-scan="" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>{boutonCalculette}</div> : null}
         {/* (3 nov.) LA carte d'Achats parle d'ACHATS (jamais « Vendu · mois ») : Dépensé du mois (la règle de la
             case « Dépensé » plus bas — hors annulés, `montantCommande` — sur le mois en cours), En route et Reçus
             (les nombres des onglets, `phaseReception`), À retirer (`vrm_colis_retirer`). Aucun nombre recalculé. */}
@@ -47665,7 +47777,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const depense = depS ? depS.total : null;
           const depPartiel = !!(depS && (depS.partiel || comptesKO > 0));
           const n = { route: 0, recu: 0 }; if (lu) buysBase.forEach((o) => { const ph = phaseReception(o); if (n[ph] != null) n[ph]++; });
-          return <CarteStatsApp page="achats" aide liveStats={liveStats} className="vrm-fu-ecran" ici="achats" onNav={onNav} sel={{ site: 'toutes', compte: null, periode: null }}
+          // (14 nov., refonte Achats — AJOUT 3 de Julien : pas de carte sombre hors de Ma journée) LA même carte réglable,
+          // dessinée en BANDE de chiffres compacte (styles-achats-photos.css §5) : mêmes chiffres, « Modifier », « ? ».
+          return <CarteStatsApp page="achats" aide liveStats={liveStats} className="vrm-fu-ecran vrm-achats-hero" ici="achats" onNav={onNav} sel={{ site: 'toutes', compte: null, periode: null }}
+            attrs={{ 'data-achats-hero': '' }}
             locaux={{
               depense: { nom: 'Dépensé du mois', court: tr('achats.depense'), type: 'eur', aide: tr('achats.achatsMoisHors'), valeur: depense, partiel: depPartiel, manque: depPartiel ? [...(depS.partiel ? [`${depS.manque} prix pas lu${depS.manque > 1 ? 's' : ''}`] : []), ...(comptesKO ? [`${comptesKO} compte${comptesKO > 1 ? 's' : ''} pas relu${comptesKO > 1 ? 's' : ''}`] : [])] : [], couverture: depS && depS.partiel ? `${depS.connus} sur ${depS.n}` : '', ...enLecture, quand: (() => { const m = m0.toLocaleDateString('fr-FR', { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1); })(), attrs: { 'data-n': lu ? String(mois.length) : '' } },
               enroute: { nom: 'En route', court: tr('achats.route'), type: 'n', aide: tr('achats.achatsPayesExpedies'), valeur: lu ? n.route : null, ...enLecture, attrs: { 'data-n': lu ? String(n.route) : '' } },
@@ -47725,6 +47840,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <button type="button" key={id} className="vrm-seg-btn" data-achats-onglet={id} data-n={cnt==null?undefined:String(cnt)} onClick={()=>setAFilter(id)} aria-pressed={aFilter===id} aria-label={cnt?`${label} ${cnt}`:undefined} style={{whiteSpace:'nowrap'}}>{label}{cnt&&!dejaDit(id)?<span className="vrm-seg-n" title={String(cnt)}> {cnt>=1000?`${(Math.floor(cnt/100)/10).toLocaleString('fr-FR')} k`:cnt}</span>:null}</button>
           )); })()}
         </div>
+        {achatsAffiches.length>1 && !serieAchats.actif && serieAchats.total ? <button type="button" className="vrm-icon-control vrm-achats-selection" data-serie-ouvrir={serieAchats.nom} aria-label={tr('achats.selectionner')} title={tr('achats.selectionner')} onClick={()=>serieAchats.ouvrir()}><Icon name="check" size={20}/></button> : null}
         {!baseKO && <button type="button" className="vrm-icon-control vrm-achats-plus" data-achats-plus={achatsOutilsOuverts?'ouvert':'ferme'} aria-expanded={achatsOutilsOuverts} aria-controls="vrm-achats-outils" aria-label={tr('achats.plusFournisseursDelai')} title={tr('achats.fournisseursDelaiLots')} onClick={()=>setAchatsOutilsOuverts(v=>!v)}><Icon name="more" size={20}/></button>}
         </div>}
         {/* (31 oct., soir) Achats ne montre plus les colis à retirer : une ligne mène
@@ -47824,7 +47940,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <label className="vrm-msg-search vrm-achats-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label={tr('achats.rechercherAchat')} value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder={tr('achats.titreVendeur')}
             style={{color:C.text,background:'transparent',border:0,boxShadow:'none'}}/><MicDictee nu titre={tr('achats.chercherVoixNumero')} onDirect={setOrdSearch} onText={(t)=>setOrdSearch(requeteDeLaVoix(t).requete)}/></label>
         )}
-        <PeriodePicker value={periode} onChange={setPeriode} titre={tr('achats.periodeAchats')} datation="Date d’achat"/></div>}
+        <PeriodePicker value={periode} onChange={setPeriode} titre={tr('achats.periodeAchats')} datation="Date d’achat"/>{dansPlateforme && !modeRetraits ? boutonCalculette : null}</div>}
         {/* ── LES CHIFFRES DE L'ACHAT (l'écran n'en avait AUCUN) ─────────────────
             « C'est mon métier, fais ça comme un pro. » L'écran Ventes porte
             quatre chiffres depuis toujours ; Achats, zéro — alors que l'achat,
@@ -48854,30 +48970,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           onGarder={garderAchatDouble} onReafficher={reafficherHorsDouble} Photo={PhotoVinted} Icon={Icon} photo={(a) => (a.source === 'vinted' ? orderPhoto(a.achat) || '' : '')} prixAchat={(a) => (a.source === 'vinted' ? (a.achat && a.achat.price && a.achat.price.amount != null ? Number(a.achat.price.amount) : null) : prixAchatHorsNombre(a.achat))}
           compte={(a) => (a.source === 'vinted' && a.achat && a.achat._acc ? accNameOf(a.achat._acc) : '')} quand={(a) => (a.source === 'vinted' ? quandCommandeVinted(a.achat) : (a.achat && a.achat.date ? Date.parse(String(a.achat.date).length === 10 ? a.achat.date + 'T12:00:00' : a.achat.date) : null))}/>}
         {!modeRetraits && <AchatsParEmail lireTout={lireTout} offBuys={offBuysTous || []} onAjouter={addOffBuy} onModifier={updOffBuy} C={C}/>}
-        {/* (11 nov., lot pas-en-ligne) « Achetés, pas en ligne » : l'entrée de la liste sur l'écran Achats,
-            seulement quand il y a quelque chose (prouvé ou à confirmer). Le nombre écrit est le PROUVÉ. */}
-        {!modeRetraits && pasEnLigneJ && (pasEnLigneJ.liste.length || pasEnLigneJ.aConfirmer.length) ? (
-          <button type="button" className="vrm-pel-entree" data-pel-entree={String(pasEnLigneJ.liste.length)} onClick={() => setFeuillePasEnLigne(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', minHeight: 52, padding: '8px 14px', marginBottom: 12, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, color: C.text, fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}>
-            <Icon name="box" size={18} style={{ color: C.muted, flexShrink: 0 }}/>
-            <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600 }}>{tr('pasEnLigne.titre')}</span>
-            <span style={{ fontSize: 13, color: C.muted, whiteSpace: 'nowrap' }}>{[pasEnLigneJ.liste.length ? String(pasEnLigneJ.liste.length) : null, pasEnLigneJ.aConfirmer.length ? tr('pasEnLigne.aConfirmer', { n: pasEnLigneJ.aConfirmer.length }) : null].filter(Boolean).join(' · ')} ›</span>
-          </button>
-        ) : null}
-        {curSub === 'achats' && feuillePasEnLigne ? (
-          <SheetShell titre={tr('pasEnLigne.titre')} sousTitre={tr('pasEnLigne.sousTitre')} onClose={() => setFeuillePasEnLigne(false)} maxWidth={620} data-feuille-pas-en-ligne="">
-            {detailPasEnLigne}
-          </SheetShell>
-        ) : null}
-        {curSub === 'achats' ? feuilleCreerPel : null}
-        {!modeRetraits && <AchatsHorsPlateforme achats={offBuys} ouvert={offSecOpen} onBasculer={setOffSecOpen} facture={facturesAchat} importer={importAchats}
-          onAjouter={addOffBuy} onModifier={updOffBuy} onSupprimer={delOffBuy}
-          paires={annBase.filter(it=>String((numeros[it.id]||{}).numero||'').trim()).map(it=>({ id: it.id, num: String((numeros[it.id]||{}).numero), title: it.title||'' })).sort((a,b)=>String(a.num).localeCompare(String(b.num),'fr',{numeric:true}))}
-          prochainNumero={horsLigneVue ? null : nextNumero} onReserverNumero={recordUsed} horsLigne={horsLigneVue} garderPhotoHorsLigne={garderPhotoHorsLigne}
-          lot={horsLigneVue ? null : { creer: (d) => creerGrosLot(d, { vinted_offvinted_buys: setOffBuys, vinted_buyprice_by_num: setBuyByNum }), moiMeme: numeroEcritActif(), apercu: apercuNumerosLot, cases: casesLotApercu, cleNum }}
-          stock={Array.isArray(listings.items)&&!listings.error?stockPourModele:null}
-          chargerStock={()=>{ if (accounts.length && listings.items===null && !listings.loading) loadListings(false, true); }}
-          onPrixParNumero={(nm,pr)=>setBuyByNum(prev=>{ const u={...prev,[nm]:pr}; save('vinted_buyprice_by_num',u); return u; })}/>}
         {/* (Ancien bloc « Colis en route » retiré : le suivi est maintenant DANS
             chaque ligne d'achat ci-dessous — photo + statut + progression + Suivre.) */}
         {/* (la barre d'outils est remontée sous le titre, comme sur Ventes) */}
@@ -48919,7 +49011,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const unCompte = cptes.length===1 ? (tranche.find(({o})=>o._acc)||{}).o._acc : null;
           return (<>
         {unCompte && tranche.length>1 && <div className="vrm-buy-compte" style={{color:C.muted}}>{tr('achats.tous')} <AcctTag acc={unCompte} name={accNameOf(unCompte)}/></div>}
-        {tranche.length>1 && <div className="vrm-serie-entree" style={{display:'flex',justifyContent:'flex-end'}}><OuvrirSerie serie={serieAchats}/></div>}
+        {/* (14 nov., refonte Achats — AJOUT 3) « Sélectionner » vit dans la barre des étapes (une icône), plus sur sa ligne. */}
         <BarreSerie serie={serieAchats} actions={actionsSerieAchats()} rendreIcone={iconeApp}/>
         <div className="vrm-buy-list" style={{background:C.card,border:tranche.length?`1px solid ${C.border}`:'none'}}>
           {tranche.map((x,i)=>{
@@ -49088,10 +49180,39 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </Bouton>
         )}
         </>}
+        {/* (14 nov., refonte Achats — AJOUT 3 de Julien : « la liste d'abord ») « Achetés, pas en ligne » et « Achats hors
+            plateforme » (avec « + Ajouter ») passent SOUS la liste : les mêmes blocs, les mêmes gestes, la liste arrive
+            sur le premier écran. */}
+        <div className="vrm-achats-apres-liste" data-achats-apres-liste="">
+        {/* (11 nov., lot pas-en-ligne) « Achetés, pas en ligne » : l'entrée de la liste sur l'écran Achats,
+            seulement quand il y a quelque chose (prouvé ou à confirmer). Le nombre écrit est le PROUVÉ. */}
+        {!modeRetraits && pasEnLigneJ && (pasEnLigneJ.liste.length || pasEnLigneJ.aConfirmer.length) ? (
+          <button type="button" className="vrm-pel-entree" data-pel-entree={String(pasEnLigneJ.liste.length)} onClick={() => setFeuillePasEnLigne(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', minHeight: 52, padding: '8px 14px', marginBottom: 12, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, color: C.text, fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}>
+            <Icon name="box" size={18} style={{ color: C.muted, flexShrink: 0 }}/>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600 }}>{tr('pasEnLigne.titre')}</span>
+            <span style={{ fontSize: 13, color: C.muted, whiteSpace: 'nowrap' }}>{[pasEnLigneJ.liste.length ? String(pasEnLigneJ.liste.length) : null, pasEnLigneJ.aConfirmer.length ? tr('pasEnLigne.aConfirmer', { n: pasEnLigneJ.aConfirmer.length }) : null].filter(Boolean).join(' · ')} ›</span>
+          </button>
+        ) : null}
+        {curSub === 'achats' && feuillePasEnLigne ? (
+          <SheetShell titre={tr('pasEnLigne.titre')} sousTitre={tr('pasEnLigne.sousTitre')} onClose={() => setFeuillePasEnLigne(false)} maxWidth={620} data-feuille-pas-en-ligne="">
+            {detailPasEnLigne}
+          </SheetShell>
+        ) : null}
+        {curSub === 'achats' ? feuilleCreerPel : null}
+        {!modeRetraits && <AchatsHorsPlateforme achats={offBuys} ouvert={offSecOpen} onBasculer={setOffSecOpen} facture={facturesAchat} importer={importAchats}
+          onAjouter={addOffBuy} onModifier={updOffBuy} onSupprimer={delOffBuy}
+          paires={annBase.filter(it=>String((numeros[it.id]||{}).numero||'').trim()).map(it=>({ id: it.id, num: String((numeros[it.id]||{}).numero), title: it.title||'' })).sort((a,b)=>String(a.num).localeCompare(String(b.num),'fr',{numeric:true}))}
+          prochainNumero={horsLigneVue ? null : nextNumero} onReserverNumero={recordUsed} horsLigne={horsLigneVue} garderPhotoHorsLigne={garderPhotoHorsLigne}
+          lot={horsLigneVue ? null : { creer: (d) => creerGrosLot(d, { vinted_offvinted_buys: setOffBuys, vinted_buyprice_by_num: setBuyByNum }), moiMeme: numeroEcritActif(), apercu: apercuNumerosLot, cases: casesLotApercu, cleNum }}
+          stock={Array.isArray(listings.items)&&!listings.error?stockPourModele:null}
+          chargerStock={()=>{ if (accounts.length && listings.items===null && !listings.loading) loadListings(false, true); }}
+          onPrixParNumero={(nm,pr)=>setBuyByNum(prev=>{ const u={...prev,[nm]:pr}; save('vinted_buyprice_by_num',u); return u; })}/>}
+        </div>
         {/* (11 nov.) Où acheter ce qui se revend le mieux : la carte lit la publication faite plus haut
             (`publierMeilleures`), la même qu'Argent → Statistiques. (Intégration colis, demande g) APRÈS la liste :
             posée avant, elle repoussait les achats et leurs colis (689 ⇒ 973 px sur ordinateur). */}
-        {dansPlateforme && !modeRetraits && !baseKO && <div className="vrm-achats-sources" data-achats-sources="" style={{ margin: '12px 16px 0' }}><MeilleuresSources owner={AUTH.user?.id || ''} Retour={FermeAuRetour} ici="achats"/></div>}
+        {dansPlateforme && !modeRetraits && !baseKO && <div className="vrm-achats-sources" data-achats-sources="" style={{ margin: '32px 0 0' }}><MeilleuresSources owner={AUTH.user?.id || ''} Retour={FermeAuRetour} ici="achats"/></div>}
         {/* (26 oct.) Les reçus par email sont une archive, pas le geste du jour :
             sous la liste, plus en tête (une carte « · 0 » poussait les colis vers le bas). */}
         {/* (31 oct., soir) Les reçus d'achat : sur « Achats », pas sur « Colis à retirer ». */}
@@ -51307,18 +51428,30 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const choisis = L.filter((l) => lot.coches.has(l.cle) && l.cochable !== false);
                   const fait = lot.fait || null;
                   // 3 · « C'est imprimé ? » — les colis passent « prêts à déposer » (la date d'impression), annulable.
+                  // (14 nov., Julien : « l'impression beaucoup mieux guidée ») 5 · « Tout est sorti correctement ? » : il
+                  // peut cocher ceux qui ont RATÉ ; les autres seuls passent « imprimés », les ratés repartent à l'impression.
+                  const rates = new Set((fait && fait.rates) || []);
+                  const basculerRate = (cle) => setLot((x) => { if (!x || !x.fait) return x; const s = new Set(x.fait.rates || []); if (s.has(cle)) s.delete(cle); else s.add(cle); return { ...x, fait: { ...x.fait, rates: [...s] } }; });
                   const confirmerImprime = () => {
                     const at = new Date().toISOString(), ops = [];
-                    for (const k of (fait && fait.vinted) || []) ops.push({ k: 'vinted_bords_printed', type: 'cle', id: k, apres: at, avant: bordsPrinted[k] });
+                    for (const k of (fait && fait.vinted) || []) if (!rates.has(k)) ops.push({ k: 'vinted_bords_printed', type: 'cle', id: k, apres: at, avant: bordsPrinted[k] });
                     if (ops.length) gesteVrm(`${ops.length} prêt${ops.length>1?'s':''} à déposer`, ops, { vinted_bords_printed: setBordsPrinted });
-                    for (const id of (fait && fait.vestiaire) || []) { try { marquerVc('vrm_vc_imprimes', id, true); } catch (_) {} }
+                    for (const id of (fait && fait.vestiaire) || []) { if (rates.has('vc:' + id) || rates.has(id)) continue; try { marquerVc('vrm_vc_imprimes', id, true); } catch (_) {} }
+                    if (rates.size) { const encore = [...rates]; setLot((x) => x ? { ...x, fait: null, coches: new Set(encore) } : x); setTimeout(() => batchBordereaux(new Set(encore), false, true), 0); return; }
                     setLot((x) => x ? { ...x, fait: { ...x.fait, confirme: true } } : x);
                   };
                   return (
                     <SheetShell onClose={()=>setLot(null)} maxWidth={620} z={9000} className="vrm-lot vrm-tip" data-noswipe="1" data-lot={L.length} data-lot-etape={fait ? (fait.confirme ? 'depot' : 'imprime') : 'choix'} aria-label="Tout imprimer"
-                      titre={fait ? (fait.confirme ? 'Prêts à déposer' : 'C’est imprimé ?') : lot.echecs.length ? `${lot.echecs.length} pas imprimé${lot.echecs.length>1?'s':''}` : 'Tout imprimer'}>
+                      titre={fait ? (fait.confirme ? 'Prêts à déposer' : tr('cp.guide.sortiTitre')) : lot.echecs.length ? `${lot.echecs.length} pas imprimé${lot.echecs.length>1?'s':''}` : 'Tout imprimer'}>
                       {!fait && <div className="vrm-tip-temps" key="choix">
                         <ol className="vrm-tip-pas" aria-label="Étapes"><li className="is-la">Choisir</li><li>Imprimer</li><li>Déposer</li></ol>
+                        {/* (14 nov., Julien : « l'impression beaucoup mieux guidée ») ce qui se passe, ce qu'on attend de lui. */}
+                        <p className="vrm-cp-guide" data-lot-guide="choix">{tr('cp.guide.choix')}</p>
+                        <div className="vrm-cp-imprimante" data-lot-imprimante={imprMode(imprimante)}>
+                          <Segmente label={tr('cp.lot.imprimante')} plein value={imprMode(imprimante)} onChange={(v)=>{ if (!batchBusy) choisirImprimante(v); }}
+                            options={IMPR_MODES.map((v) => ({ v, l: v === 'thermique' ? tr('cp.lot.thermique') : v === 'planche4' ? tr('cp.planche.choix') : tr('cp.lot.classique'), data: { 'data-lot-imprimante-choix': v } }))}/>
+                          <p className="vrm-cp-guide-sous" data-lot-imprimante-phrase={imprMode(imprimante)}>{tr(`cp.guide.imprimante.${imprMode(imprimante)}`)}</p>
+                        </div>
                         {lot.erreur&&<p className="vrm-tip-alerte" role="alert" data-lot-erreur="">{lot.erreur}</p>}
                         {(nSansBord || resL.dejaImprimes || resL.anciennes || resL.decoches) ? <div className="vrm-tip-pourquoi" data-lot-pourquoi="">
                           <b>Pas dans ce lot</b>
@@ -51349,17 +51482,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {/* 2 · L'APERÇU : une page A4 par colis coché — l'étiquette du transporteur, le tampon N° + titre en bas. */}
                         {/* (11 nov., lot thermique) Le papier et le tampon CHOISIS (Paramètres → Impression des bordereaux,
                             `vrm_impression`) : l'aperçu dit ce qui sortira, et « Changer » y mène. */}
-                        {choisis.length > 0 && (()=>{ const th = imprimanteChoisie() === 'thermique', rg = reglageImpressionChoisi(), pp = papierThermique(rg), mt = th ? rg.tamponTh : rg.tamponA4;
+                        {choisis.length > 0 && (()=>{ const pl4 = imprMode(imprimante) === 'planche4', th = imprMode(imprimante) === 'thermique' || pl4, rg = reglageImpressionChoisi(), pp = papierThermique(rg), mt = th ? rg.tamponTh : rg.tamponA4;
+                          // (14 nov., Julien : « laisse la possibilité de sélectionner imprimante classique ou thermique ») le choix,
+                          // visible AU MOMENT d'imprimer : le même réglage `vrm_imprimante` que Réglages (mémorisé, jamais deviné).
+                          const tampons = lot.tampons || {};
+                          const poserTampon = (cle, m) => setLot((x) => x ? { ...x, tampons: { ...(x.tampons || {}), [cle]: m } } : x);
                           const papierLot = th ? (pp.id === 'autre' ? pp.nom : tr(`impression.format.${pp.id}`)) : 'A4';
-                          return <section className="vrm-tip-groupe" data-lot-section="apercu" data-lot-papier={th ? rg.format : 'a4'} data-lot-tampon={mt} aria-label={tr('impression.lot.apercu')}>
-                          <h3>{tr('impression.lot.apercu')} <span>{tr('impression.lot.pages', { n: choisis.length, papier: papierLot })}</span></h3>
+                          // (14 nov., lot colis-plus 98) 4 par page : au plus ⌈n/4⌉ feuilles (une page pas découpable part seule).
+                          return <section className="vrm-tip-groupe" data-lot-section="apercu" data-lot-papier={pl4 ? 'planche4' : th ? rg.format : 'a4'} data-lot-tampon={mt} aria-label={tr('impression.lot.apercu')}>
+                          <h3>{tr('impression.lot.apercu')} <span>{pl4 ? tr('cp.planche.lotPages', { n: Math.ceil(choisis.length / 4) }) : tr('impression.lot.pages', { n: choisis.length, papier: papierLot })}</span></h3>
+                          <p className="vrm-cp-guide" data-lot-guide="apercu">{tr('cp.guide.apercu')}</p>
                           <button type="button" className="vrm-tip-lien" data-lot-reglage-impression="" disabled={batchBusy} onClick={()=>{ setLot(null); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=settings&reglage=imprimante' })); } catch (_) {} }}>{tr('impression.lot.changer')}</button>
                           <div className="vrm-tip-pages">
-                            {choisis.slice(0, 8).map((l) => { const c = contenuTampon(mt, { numero: l.num || '', titre: l.titre || '' }); return <figure key={l.cle} className="vrm-tip-a4" data-lot-apercu={l.cle}>
+                            {choisis.map((l) => { const m = TAMPONS_IMPR.includes(tampons[l.cle]) ? tampons[l.cle] : mt; const c = contenuTampon(m, { numero: l.num || '', titre: l.titre || '' }); return <div key={l.cle} className="vrm-cp-apercu" data-lot-apercu-carte={l.cle}><figure className="vrm-tip-a4" data-lot-apercu={l.cle} data-lot-apercu-tampon={m}>
                               <span className="vrm-tip-a4-etiquette">{logo(l)}<i/><i/><i/></span>
-                              <figcaption className="vrm-tip-a4-tampon">{mt === 'rien' ? <b>{tr('impression.lot.sansTampon')}</b> : <><b>{l.num ? `N° ${l.num}` : 'sans N°'}</b>{c.titre ? <span>{c.titre}</span> : null}</>}</figcaption>
-                            </figure>; })}
-                            {choisis.length > 8 ? <span className="vrm-tip-plus">+{choisis.length - 8}</span> : null}
+                              <figcaption className="vrm-tip-a4-tampon">{m === 'rien' ? <b>{tr('impression.lot.sansTampon')}</b> : <><b>{l.num ? `N° ${l.num}` : 'sans N°'}</b>{c.titre ? <span>{c.titre}</span> : null}</>}</figcaption>
+                              </figure>
+                              {/* (14 nov.) CE bordereau : son tampon (ou aucun), ou le retirer du lot — avant d'imprimer. */}
+                              <select className="vrm-cp-tampon" aria-label={tr('cp.lot.tamponDe', { qui: l.num ? `N°${l.num}` : (l.titre || '') })} data-lot-tampon-choix={l.cle} value={m} disabled={batchBusy} onChange={(e)=>poserTampon(l.cle, e.target.value)}>
+                                {TAMPONS_IMPR.map((t) => <option key={t} value={t}>{tr(`impression.tampon.${t}`)}</option>)}
+                              </select>
+                              <button type="button" className="vrm-tip-lien vrm-cp-retirer" data-lot-retirer={l.cle} disabled={batchBusy} onClick={()=>basculer(l.cle)}>{tr('cp.lot.retirer')}</button>
+                            </div>; })}
                           </div>
                         </section>; })()}
                         <div className="vrm-lot-pied vrm-tip-pied">
@@ -51372,10 +51516,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {fait && !fait.confirme && <div className="vrm-tip-temps vrm-tip-fin" key="imprime" data-lot-question="">
                         <ol className="vrm-tip-pas" aria-label="Étapes"><li className="is-fait">Choisir</li><li className="is-la">Imprimer</li><li>Déposer</li></ol>
                         <p className="vrm-tip-grand"><b>{fait.n}</b> bordereau{fait.n>1?'x':''} dans le PDF.</p>
+                        <p className="vrm-cp-guide" data-lot-guide="sorti">{tr('cp.guide.sorti')}</p>
+                        {fait.planche ? <p className="vrm-tip-sous" data-planche-resultat={`${fait.planche.etiquettes}/${fait.planche.feuilles}/${fait.planche.echelle}`}>{tr('cp.planche.resultat', { etiquettes: fait.planche.etiquettes, feuilles: fait.planche.feuilles, echelle: fait.planche.echelle })}{fait.planche.entieres ? <> {tr('cp.planche.entieres', { n: fait.planche.entieres })}</> : null}</p> : null}
                         {fait.url ? <a className="vrm-tip-lien vrm-tip-pdf" data-lot-ouvrir-pdf="" href={fait.url} target="_blank" rel="noopener">Ouvrir le PDF</a> : null}
+                        {(fait.lignes || []).length > 1 ? <ul className="vrm-cp-rates" data-lot-rates={rates.size}>
+                          {(fait.lignes || []).map((l) => <li key={l.cle}><label className="vrm-cp-rate" data-lot-rate={l.cle} data-lot-rate-coche={rates.has(l.cle) ? '1' : '0'}>
+                            <input type="checkbox" checked={rates.has(l.cle)} onChange={()=>basculerRate(l.cle)}/>
+                            <span>{l.num ? <b>N°{l.num}</b> : null} {l.titre}</span><small>{tr('cp.guide.rate')}</small></label></li>)}
+                        </ul> : null}
                         <div className="vrm-tip-pied">
-                          <Bouton variante="secondaire" data-lot-pas-imprime="" onClick={()=>setLot((x)=>x?{...x,fait:null}:x)}>Pas encore</Bouton>
-                          <Bouton variante="primaire" icone="check" data-lot-imprime-oui="" onClick={confirmerImprime}>Oui, imprimé</Bouton>
+                          <Bouton variante="secondaire" data-lot-pas-imprime="" onClick={()=>setLot((x)=>x?{...x,fait:null}:x)}>{tr('cp.guide.rienSorti')}</Bouton>
+                          <Bouton variante="primaire" icone="check" data-lot-imprime-oui="" onClick={confirmerImprime}>{rates.size ? tr('cp.guide.reimprimer', { n: rates.size }) : tr('cp.guide.toutSorti')}</Bouton>
                         </div>
                       </div>}
                       {fait && fait.confirme && <div className="vrm-tip-temps vrm-tip-fin" key="depot" data-lot-depot="">
@@ -52251,7 +52402,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           onFait={(c) => { if (c && c.geste) deposeScan.demander(c.cle, c.geste, c.num ? `N°${c.num}` : c.titre); }} onAnnuler={deposeScan.annuler}
           onImprimer={(c) => (c && c.site === 'vinted' && c.x ? imprimerColisVinted(c.x) : null)} onScanner={(c) => { setScanAttendu(c.cle); setScanOuvert('envoi'); }}
           onFermer={() => setPreparerOuvert(false)} Retour={FermeAuRetour} Icon={Icon} zIndex={Z_CONFIRMATION - 4}
-          emballage={(c) => <ChoixEmballageColis reglage={emballagesR} cle={c.cle} ecrire={(r) => { setEmballagesR(r); save(CLE_EMBALLAGES, r); }}/>}
+          emballage={(c) => <ChoixEmballageColis reglage={emballagesR} cle={c.cle} titre={c.titre || ''} lireFaits={lireFaitsEmb} ecrire={(r) => { setEmballagesR(r); save(CLE_EMBALLAGES, r); }}/>}
+          beneficeDe={beneficeColisPrep}
           Photo={(src) => imgMortes.has(src) ? null : <PhotoVinted src={src} alt="" decoding="async" onError={() => noterImgMorte(src)}/>}
           photoCarton={(c) => { const v = c && venteDuColis(c.geste); return v ? <BoutonPhotoCarton vente={{ ...v, num: c.num || '' }} ton="clair"/> : null; }}
           note={(c) => (c && c.num ? <NotePaireCoque numero={c.num} variante="bloc" ajout/> : null)}/> : null}
@@ -52368,7 +52520,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:12,padding:'13px 16px',fontSize:15,fontWeight:600,textDecoration:'none',marginBottom:8}}>📄 {bordResult.batch?'Ouvrir les bordereaux':bordResult.withInvoice?'Ouvrir bordereau + facture':'Ouvrir le bordereau'}</a>
             {/* (3 nov.) « Déplacer le tampon » : l'aperçu s'ouvre, la place choisie s'imprime (et se mémorise pour la forme). */}
             {bordResult.pdfBuf && !bordResult.batch && <button type="button" data-imprime="1" data-tampon-deplacer="1" onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:12,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:400,padding:'11px',marginBottom:8}}>Déplacer le tampon</button>}
-            {bordResult.batch && !bordResult.thermique && <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Ton N° est tamponné sur chaque PDF, sinon sur une fiche juste après.</div>}
+            {bordResult.batch && !bordResult.thermique && !bordResult.planche && <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Ton N° est tamponné sur chaque PDF, sinon sur une fiche juste après.</div>}
+            {/* (14 nov., lot colis-plus 98) 4 par page A4 : ce qui a VRAIMENT été posé (étiquettes, feuilles, échelle, pages entières). */}
+            {bordResult.batch && bordResult.planche ? <div className="vrm-aide" data-planche-resultat={`${bordResult.planche.etiquettes}/${bordResult.planche.feuilles}/${bordResult.planche.echelle}`} style={{fontSize:13,color:C.text,marginBottom:8,lineHeight:1.4}}>
+              {tr('cp.planche.resultat', { etiquettes: bordResult.planche.etiquettes, feuilles: bordResult.planche.feuilles, echelle: bordResult.planche.echelle })}
+              {bordResult.planche.entieres ? <> {tr('cp.planche.entieres', { n: bordResult.planche.entieres })}</> : null}</div> : null}
             {/* ── CE QUE L'IMPRESSION THERMIQUE A VRAIMENT FAIT ────────────────
                 LE CHIFFRE, JAMAIS LA PROMESSE. « Ton étiquette est prête » sur
                 un bordereau qu'on n'a pas su découper, c'est le défaut le plus
@@ -57258,7 +57414,7 @@ function AppCoeur() {
   const [search0]=useState(()=>{ try{ return window.location.search||''; }catch(_){ return ''; } });
   const [reprise0]=useState(()=>{ try{ const owner=AUTH.user?.id||readSession()?.user?.id||''; const st=stockageParcours(); return ecranAOuvrir({ carte:carteReprise(), locale:st?repriseLocale(st,owner):null, ongletsOk:ONGLETS_LIENS, search:search0 }); }catch(_){ return null; } });
   // (11 nov., lot DJ3) Une reprise sur l'ancien onglet Colis rouvre sa moitié : Ventes ou Achats.
-  const [tab,setTabBrut]=useState(()=>{ if(!reprise0) return 'journee'; const pl=placeDesColis({ tab:reprise0.tab, sub:reprise0.sub, onglet:reprise0.colis }); return pl?pl.tab:reprise0.tab; });
+  const [tab,setTabBrut]=useState(()=>{ if(!reprise0) return 'journee'; const pl=placeDesColis({ tab:reprise0.tab, sub:reprise0.sub, onglet:reprise0.colis }); if(pl&&pl.onglet==='retirer') demanderRetirer(); return pl?pl.tab:reprise0.tab; });
   // (6 nov.) L'écran ouvert et celui d'avant, pour « Signaler un problème ».
   noterEcranVu(tab);
   // (6 nov., v36) Et pour les temps réels : une visite d'écran par onglet ouvert.
@@ -57293,7 +57449,7 @@ function AppCoeur() {
     // (11 nov., lot DJ3) Les anciens chemins vers Colis : « À expédier » de Ventes ou « À retirer » d'Achats.
     if(typeof v==='string'){ const frais=(x)=>x&&Date.now()-x.at<3000;
       const pl=placeDesColis({ tab:v, sub:subVoulue.current, onglet:frais(DEMANDE_COLIS)?DEMANDE_COLIS.o:null, cible:frais(CIBLE_NOTIF)?CIBLE_NOTIF.c:null });
-      if(pl){ v=pl.tab; subVoulue.current=pl.sub; if(pl.tab==='ventes') setOngletColis(pl.onglet);
+      if(pl){ v=pl.tab; subVoulue.current=pl.sub; if(pl.tab==='ventes') setOngletColis(pl.onglet); if(pl.onglet==='retirer') demanderRetirer();
         const id=ID_SECTION_COLIS[pl.tab==='achats'?'achats':'ventes']; const t0=Date.now();
         const aller=()=>{ const el=document.getElementById(id); if(el&&el.getClientRects().length){ try{ el.scrollIntoView({block:'start'}); }catch(_){} return; } if(Date.now()-t0<6000) setTimeout(aller,200); };
         if(!(frais(CIBLE_NOTIF)&&CIBLE_NOTIF.c)) setTimeout(aller,150); } }
@@ -60021,7 +60177,12 @@ function AppCoeur() {
   const vueAnnoncesOuverture = tab === 'annonces' && siteDeTache('annonces', platSub) === 'vinted' && sectionDeTache('annonces', platSub) === 'annonces'
     && compteEffectif(compteSel, compteConnecte, (u) => (comptesChoisissables || []).some((a) => String(a.vinted_user_id) === u)) === '';
   const snapAnnonces = React.useMemo(() => (vueAnnoncesOuverture && uidInstantane ? lireInstantaneAnnonces(uidInstantane) : null), [vueAnnoncesOuverture, uidInstantane]);
-  const instantanePermis = !baseKO && !!uidInstantane && !(() => { try { const a = abonnementPublie(); return etatAbonnement(a === null ? undefined : a).lectureSeule; } catch (_) { return false; } })();
+  // (14 nov., ouverture instantanée) Hors ligne ou base injoignable, l'instantané de Ma journée RESTE, daté, et dit
+  // pourquoi rien n'est relu (`etat` de src/JourneeInstantanee.jsx) — jamais présenté comme frais, aucune écriture.
+  const instantaneAuMoinsPermis = !!uidInstantane && !(() => { try { const a = abonnementPublie(); return etatAbonnement(a === null ? undefined : a).lectureSeule; } catch (_) { return false; } })();
+  const instantanePermis = !baseKO && instantaneAuMoinsPermis;
+  const snapJourneeArret = instantaneAuMoinsPermis && tab === 'journee' && snapJournee && (horsLigne || baseKO)
+    ? <JourneeInstantanee snap={snapJournee} ScreenHead={ScreenHead} Icon={Icon} fmt={REGLES_CARTE.fmt} etat={horsLigne ? 'hors-ligne' : 'panne'}/> : null;
   const instantaneEcranIci = !instantanePermis ? null
     : tab === 'journee' && snapJournee ? <JourneeInstantanee snap={snapJournee} ScreenHead={ScreenHead} Icon={Icon} fmt={REGLES_CARTE.fmt}/>
     : vueColisOuverture && snapColis && (!ongletColis || ongletColis === snapColis.onglet) && (platSub !== 'retirer' || snapColis.onglet === 'retirer')
@@ -60271,6 +60432,7 @@ function AppCoeur() {
           ongletColis={ongletColis} onOngletColis={choisirOngletColis} onOngletVu={setOngletColisMontre}/></GardeEcran>
       </section>);
     if(t==='achats') return (
+      <RepliRetirerAchats sansLigne={site==='vinted'}>
       <section className="vrm-colis-section" data-colis-hote="achats" aria-label="À retirer">
         {/* (11 nov., revue colis) Le filtre de site d'Achats vaut pour « À retirer » (un seul filtre, comme Ventes) :
             Achats · eBay ne montre plus les colis Vinted et leurs codes (banc achats-retirer-site). Achats n'a pas
@@ -60285,7 +60447,8 @@ function AppCoeur() {
             portent (à confirmer, à vérifier, e-mails de suivi, argent à vérifier) vient des achats Vinted et des e-mails —
             montrés sur Vinted (l'écran d'arrivée, qui montre tout), jamais sous eBay, Leboncoin ou Vestiaire. */}
         {site==='toutes'||site==='vinted' ? <GardeEcran nom="achats:retirer"><div data-colis-retraits="outils"><Comptabilite key="colis_achats_outils" {...commun} only="achats" vueAchats="retraits" retraitsOutils dansPlateforme/></div></GardeEcran> : null}
-      </section>);
+      </section>
+      </RepliRetirerAchats>);
     return null;
   };
   const rendreTache=(t)=>{
@@ -60999,6 +61162,8 @@ function AppCoeur() {
         <RepriseRetenue tab={tab} compteChoisi={!!compteSel&&compteSel!=='*'} effacerCompte={()=>setCompteSel('')}/>
         <BarreHautSlot.Provider value={ordi ? slotBarre : null}>
         <CibleNotif tab={tab} sub={platSub}/>
+        {/* (14 nov., lot colis-plus 99) La douchette : un code lu hors des champs ⇒ LA vente (par identité, src/douchette.js). */}
+        <DouchetteGlobale ouvrirVentes={()=>setTab('ventes')}/>
         {rpOuvert && <React.Suspense fallback={null}>
           <RecherchePhoto C={C} Feuille={SheetShell} Bouton={Bouton} PhotoVinted={PhotoVinted}
             lireCandidats={()=>lireCandidatsPhoto(vintedAccounts)} lireOctets={(u)=>chargerPhotoBoite(u)}
@@ -61089,11 +61254,12 @@ function AppCoeur() {
             seuls Ma journée et les outils du colis (relais, dépôt, codes) gardent leur vue hors ligne dédiée.
             La pastille dit « Hors ligne · vu à hh:mm » ou « N gestes en attente » (src/gestesHorsLigne.js). */}
         <GestesHorsLigneCoque tab={tab} ongletDedie={horsLigne && ONGLETS_HL_DEDIES.includes(tab)}/>
-        {horsLigne && ONGLETS_HL_DEDIES.includes(tab) ? <JourneeHorsLigne tab={tab} uid={(authState.user && authState.user.id) || (MULTI_USER ? '' : 'local')}/> : (<>
+        {horsLigne && ONGLETS_HL_DEDIES.includes(tab) ? <>{snapJourneeArret}<JourneeHorsLigne tab={tab} uid={(authState.user && authState.user.id) || (MULTI_USER ? '' : 'local')}/></> : (<>
         {/* (13 nov., point 45) Le Stock se dessine hors réseau avec son dernier état (et son propre inventaire) : ce bloc ne
             sert plus qu'à un appareil où le Stock n'a pas encore été gardé (la liste de l'inventaire du 9 nov. suffit). */}
         {horsLigne && tab === 'garage' && !lireStockHl((authState.user && authState.user.id) || (MULTI_USER ? '' : 'local'), localStorage) ? <div data-hors-ligne="stock-inventaire"><BlocInventaireHorsLigne uid={(authState.user && authState.user.id) || (MULTI_USER ? '' : 'local')}/></div> : null}
         {baseKO && !horsLigne && <BaseInjoignable/>}
+        {baseKO && !horsLigne && snapJourneeArret}
         {!baseKO && !horsLigne && <MentionCopie/>}   {/* (11 nov.) hors ligne, la pastille dit déjà « vu à hh:mm » */}
         {/* (11 nov., temps réel) La veille des lignes écrites par l'extension (src/tempsReel.js) : ce qui
             change chez le serveur est relu par l'écran qui le montre, sans recharger ; pastille flottante. */}
@@ -61122,10 +61288,12 @@ function AppCoeur() {
             la page, et reviennent telles quelles au toucher de la barre (src/ecransGardes.jsx). */}
         <EcransGardes ecran={tab} cle={(authState.user && authState.user.id) || ''} pret={subPose===tab}>
         <AttenteEcran key={tab} ecran={tab} memoire={((authState.user && authState.user.id) || '') + ':' + tab} ordi={ordi} attendus={ESSENTIELS_ECRAN[tab] || []} donnees={essentielsCoque} instantane={instantaneEcranIci}>
-        {tab==='journee'&&uidInstantane&&<GardeEcran nom="capture-journee"><CaptureJournee uid={uidInstantane}/></GardeEcran>}
+        {/* (14 nov., ouverture instantanée) Jamais de capture pendant une panne ou hors ligne : un écran lu à moitié
+            (« — » partout) remplacerait le dernier instantané COMPLET (§4.2). */}
+        {tab==='journee'&&uidInstantane&&!baseKO&&!horsLigne&&<GardeEcran nom="capture-journee"><CaptureJournee uid={uidInstantane}/></GardeEcran>}
         {/* (11 nov., lot DJ3) Plus d'onglet Colis : son instantané (`CaptureColis`) n'a plus d'écran à photographier. */}
-        {tab==='ventes'&&uidInstantane&&<GardeEcran nom="capture-ventes"><CaptureVentes uid={uidInstantane}/></GardeEcran>}
-        {tab==='annonces'&&uidInstantane&&<GardeEcran nom="capture-annonces"><CaptureAnnonces uid={uidInstantane}/></GardeEcran>}
+        {tab==='ventes'&&uidInstantane&&!baseKO&&!horsLigne&&<GardeEcran nom="capture-ventes"><CaptureVentes uid={uidInstantane}/></GardeEcran>}
+        {tab==='annonces'&&uidInstantane&&!baseKO&&!horsLigne&&<GardeEcran nom="capture-annonces"><CaptureAnnonces uid={uidInstantane}/></GardeEcran>}
         {tab==='settings'&&<GardeEcran nom="settings" resetKey={platSub}><SettingsScreen setTab={setTab} onPlateforme={plat=>{subVoulue.current=plat==='plat_leboncoin'?'annonces':'compte';setTab(plat);}} ebayCompte={ebayCompteReglage} ouvrir={platSub==='ebay'?'ebay':null} onOuvert={()=>setPlatSub('reglages')} comptes={vintedAccounts}
 
           notifEnabled={notifEnabled}

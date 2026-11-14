@@ -19,6 +19,7 @@ import ecran_fiche from './fr/fiche.js';
 import ecran_tarifs from './fr/tarifs.js';
 import ecran_nouveaux from './fr/nouveaux.js';
 import ecran_argent from './fr/argent.js';
+import ecran_colisplus from './fr/colisplus.js';   // (14 nov., lot colis-plus)
 import ecran_fraiscarte from './fr/fraiscarte.js';   // (14 nov., frais-carte)
 import ecran_atelier from './fr/atelier.js';
 export default {
@@ -29,6 +30,7 @@ export default {
   ...ecran_atelier,
   ...ecran_compta,
   ...ecran_argent,
+  ...ecran_colisplus,
   ...ecran_stats,
   ...ecran_emails,
   ...ecran_messages,
@@ -2183,5 +2185,9 @@ export default {
   "rh.vuesPasSu": "vues —",
   "rh.vendue": "vendue",
   "rh.enLigne": "en ligne",
+  "instantane.geste.horsLigne": "Hors ligne",
+  "instantane.geste.panne": "Pas relu",
+  "instantane.arret.horsLigne": "Hors ligne : ces chiffres sont ceux de ta dernière visite. Ils seront relus au retour du réseau.",
+  "instantane.arret.panne": "Pas relu : la base ne répond pas. Ces chiffres sont ceux de ta dernière visite.",
   ...ecran_confort,
 };

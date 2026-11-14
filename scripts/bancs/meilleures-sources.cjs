@@ -144,14 +144,17 @@ const juger = async (pg, carte, nom, ou) => {
   const L = (k) => r.lignes.find((l) => l.k === k) || {};
   const v = L('vinted'), br = L('brocante'), eb = L('ebay'), ns = L('non-saisie');
   dit(v.articles === 3 && v.revendus === 2 && /2 revendus sur 3 achetés/.test(v.txt), `${ou}1 Vinted : 3 achats (l’annulé n’en est pas un), 2 revendus — reliés par LEUR transaction`, JSON.stringify(v));
-  dit(br.articles === 2 && br.revendus === 1 && br.sansPrix === 1 && /au moins 20\s?€/.test(br.txt) && /1 revendu sur 2 achetés · 1 sans prix d’achat/.test(br.txt), `${ou}2 Brocante : « au moins 20 € » investi, la couverture dite`, br.txt);
+  dit(br.articles === 2 && br.revendus === 1 && br.sansPrix === 1 && /au moins\s+20\s?€/.test(br.txt) && /1 revendu sur 2 achetés · 1 sans prix d’achat/.test(br.txt), `${ou}2 Brocante : « au moins 20 € » investi, la couverture dite`, br.txt);
   dit(eb.articles === 1 && eb.revendus === 1 && /^eBay/.test(eb.txt), `${ou}3 « Ebay » écrit à la main : la source eBay`, eb.txt);
   dit(r.lignes.length && r.lignes[r.lignes.length - 1].k === 'non-saisie' && ns.articles === 1, `${ou}4 « Source pas saisie » comptée, en dernier`, r.lignes.map((l) => l.k).join(','));
   dit(r.hors.some((t) => /1 vente sans achat relié/.test(t)), `${ou}5 la vente sans achat relié : dans aucune source, DITE`, JSON.stringify(r.hors));
   const benefs = r.lignes.filter((l) => l.benef !== '').map((l) => +l.benef);
   dit(r.lignes[0].k === 'vinted' && benefs.length >= 3 && benefs.every((b, i) => !i || b <= benefs[i - 1]), `${ou}6 par bénéfice : le plus haut d’abord`, r.lignes.map((l) => l.k + ':' + l.benef).join(','));
   const tetes = r.lignes.filter((l) => l.tete);
-  dit(tetes.length === 1 && tetes[0].rang === 1 && tetes[0].couleur !== r.lignes[1].couleur && !r.rouge, `${ou}7 la source en tête seule à l’accent, aucun rouge`, tetes.map((t) => t.couleur).join(',') + ' / ' + (r.lignes[1] || {}).couleur);
+  // (14 nov., refonte Achats) Les montants sont à l'ENCRE (§7 : le bleu est pour les gestes) — la source en tête se
+  // dit par sa PLACE (rang 1, `data-ms-tete`), plus par l'accent ; aucun chiffre bleu, aucun rouge.
+  const BLEU = (c) => { const m = /rgba?\((\d+), (\d+), (\d+)/.exec(c || ''); return !!m && +m[3] - +m[1] > 80; };
+  dit(tetes.length === 1 && tetes[0].rang === 1 && r.lignes.every((l) => !BLEU(l.couleur)) && tetes[0].couleur === r.lignes[1].couleur && !r.rouge, `${ou}7 la source en tête à sa place (1re), chiffres à l’encre, aucun rouge`, tetes.map((t) => t.couleur).join(',') + ' / ' + (r.lignes[1] || {}).couleur);
   dit(r.deb <= 1 && r.dehors === 0, `${ou}8 rien ne déborde`, `${r.deb}px · ${r.dehors}`);
   dit(r.boutons.every((h) => h >= 44), `${ou}9 cibles au doigt ≥ 44 px`, r.boutons.join(','));
   dit(!/NaN|undefined|Invalid Date|null/.test(r.txt), `${ou}10 ni NaN, ni undefined, ni null à l’écran`);

@@ -350,4 +350,10 @@ export default {
   "achats.rienRelieEncore": { one: "Nothing links it to a parcel above yet (no pickup code, no tracking number). It doesn’t count in “to pick up” until its tracking number is known.", other: "Nothing links them to a parcel above yet (no pickup code, no tracking number). They don’t count in “to pick up” until their tracking number is known." },
   "achats.commandeJours": { one: " · ordered {n} day ago", other: "· ordered {n} days ago" },
   "achats.autresIlsSont": { one: "and {n} other — they’re all in the “All” tab.", other: "and {n} others — they’re all in the “All” tab." },
+  "achats.ms.benefice": "Profit",
+  "achats.ms.vitesse": "Speed",
+  "achats.ms.investi": "Invested",
+  "achats.ms.marge": "Margin",
+  "achats.ms.pourRevendre": "To resell",
+  "achats.selectionner": "Select",
 };
