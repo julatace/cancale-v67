@@ -36,7 +36,28 @@ e-mail ouvert · un fil de Messages ouvert · **28 sous-pages de Paramètres** q
 
 ## 2. Avant / après
 
-AVANT_APRES
+Le banc final, sur `dist` d'`origin/main` (63268bd9, construit à part) puis sur la branche (après le vrai
+`git merge origin/main`, 9236d48b), quatre lancements séparés (< 9 min chacun), 48 rendus chacun :
+
+| mesure | avant (390 + 1512, clair + sombre) | après |
+|---|---|---|
+| A cibles sous 44 / 36 | 6 (« Synchronisation par compte » 15 px, « Solde et paramètres » 31) | 0 |
+| C tailles hors échelle | 480 (feuille d'aide 14/16, Ma journée 14/16, Historique, Santé des comptes, SMS, Siri, Importer, Corbeille 14) | 0 |
+| E contraste < 4,5:1 | 20 (coche bleue de « Mes plateformes » 4,3, gris du fil sur le remplissage 4,4) | 0 |
+| F mots coupés | 2 (« Enregi / strer » à 390) | 0 |
+| K bande flottante | 4 (Leboncoin 977 px, eBay 1 091 px contre un titre à 288) | 0 |
+| L `<select>` nu | 12 (résumé du soir, avis négatif, filtre de compte du Stock) | 0 |
+| M rectangles | 192 (« Imprimer », « Générer le bordereau », jours calmes, « Conversation ↗ », croix…) | 0 |
+| N barre vide | 244 (« Date limite inconnue » × 60 par rendu) | 0 |
+| O gris gras | 428 (« Code sur Vinted » 15/600 × 60, initiales des acheteurs 20/600, « Masquer cet achat ») | 0 |
+| P fraîcheur encadrée | 22 (le jour : l'ombre posée) | 0 |
+| Q cadres | 114 (cartes des sous-pages, Leboncoin, historique, parcours la nuit, barre d'outils d'Annonces…) | 0 |
+| R carte dans carte | 7 (billet d'un e-mail, sondes de Sécurité, « Données » eBay) | 0 |
+| **total** | **1 531 défauts, 158 rendus rouges sur 192** | **0** (voir §4 pour le dernier) |
+
+**Mutation** (build à part, depuis la branche) : la piste toujours dessinée (`sansBarre = false`) et les règles K
+(bande) et P (fraîcheur) retirées de `styles-systeme.css` ⇒ ROUGE (`barreVide` 61, `bande` 1, `fraicheur` 3 sur
+journee / leboncoin-annonces / achats à 1512).
 
 ## 3. Ce qui change
 
@@ -92,8 +113,33 @@ AVANT_APRES
 
 ## 4. Vérifications
 
-VERIFS
+- `npm run build` vert ; audits `traduction` (45), `tdz`, `icones`, `coherence`, `variables`, `composants`, `violet`,
+  `rouge-doublon`, `quoi-de-neuf`, `avis-negatif`, `boutons` (un rayon écrit `var(--d-r-carte)`, pas 20, pour garder
+  l'échelle courte), `objectif-mois`, `retraits-irreprochables`, `sante-comptes`, `import-depart`, `corbeille`,
+  `sms-colis`, `raccourcis-siri`, `journee-perso`, `textes-courts`, `comptes-securite` verts ; les ~70 audits qui lisent
+  un fichier touché verts sauf trois rouges IDENTIQUES sur main (`photos-vinted`, `stockage-sur`, `vocabulaire-article`).
+- Bancs voisins (fichiers touchés) : `retirer-carte-delai` (79/0), `retirer-ligne-unique`, `retirer-scene-julien`,
+  `recap-vente` (80/0), `fraicheur-unique` verts. Rouges IDENTIQUES sur `origin/main` (même liste de ❌, lancés sur un
+  arbre de main construit à part) : `centre-notifs` (F1 « huit types » — il y en a onze ; F11), `cout-vente` (« paires »
+  / « articles »), `boite-emails` (4 : la marque de l'expéditeur), `colis-retirer-propre` (l'air de 15 px avant « argent »),
+  `feuilles-coque` (16 : clics hors délai). Les C8 de `centre-notifs` (le choix au segmenté) verts.
+- `design-passe.cjs` et `design-passe-2.cjs` relancés sur le build final (390 et 1512 séparés) : DPRES.
+- Captures REGARDÉES (deviceScaleFactor 1, défilées `SUITE=1–2`) : Leboncoin (1512 clair/sombre), Notifications (390,
+  1512), Achats et un retrait ouvert (390 clair/sombre, 1512), la feuille d'une vente (390, 1512 clair/sombre), un
+  e-mail ouvert, un fil ouvert (390, 1512), Ma journée (réglage), Mon historique, Comptes eBay, Mes plateformes, Mode
+  stream, Objectif du mois, Annonces (390), le parcours (390/1512 sombre).
 
 ## 5. Ce qui reste
 
-RESTES
+- **Périmètre repris par d'autres agents (14 nov., en cours de passe)** : l'écran Achats (ligne de retrait comprise),
+  la coque (barre du haut, ligne « Tout est à jour », pastille « Mis à jour à … ») et les listes. Ce qui est commité ici
+  sur ces sujets (barre de délai, « Code sur Vinted », fraîcheur sans cadre, colis à 16 px, « ⋯ », note interne) reste ;
+  rien de plus n'y a été touché. À regarder par eux : la ligne de fraîcheur s'aligne sur 16 px du bord de `.vrm-main`
+  (bonne sur les écrans à titre de tâche, 16 px de trop sur E-mails dont le titre est au bord) ; « Lieu à confirmer »
+  4 px plus à droite que « À retirer ».
+- Mes plateformes : la tuile choisie porte un cadre et un fond bleus (l'état choisi d'iOS) — plus de bleu que « rare » ;
+  à trancher.
+- Mode équipe : y passer change le stockage lu par la page (le thème choisi revient au clair) — le banc la mesure en
+  dernier ; non creusé (comportement de `choisirVueEquipe` ?).
+- Non mesurés : les autres feuilles d'Achats et de Ventes (reçu, « revendu combien », passeport), un fil Vestiaire /
+  Leboncoin ouvert, l'iPad.
