@@ -13,10 +13,12 @@ import ecran_argent from './it/argent.js';
 import ecran_listes from './it/listes.js';
 import ecran_fiche from './it/fiche.js';
 import ecran_refonte_ms from './it/refonte-ms.js';
+import ecran_ergonomie from './it/ergonomie.js';
 export default {
   ...ecran_listes,
   ...ecran_fiche,
   ...ecran_refonte_ms,
+  ...ecran_ergonomie,
   ...ecran_compta,
   ...ecran_argent,
   ...ecran_stats,

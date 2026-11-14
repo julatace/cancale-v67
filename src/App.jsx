@@ -16757,6 +16757,9 @@ const ONGLETS_DEPLACES = {
 // La vue demandée par une entrée de « Plus » (Republier, Favoris…),
 // consommée UNE fois par l'écran qui s'ouvre (même motif que DEMANDE_EBAY_CIBLE).
 const DEMANDE_VUE={ quoi:null, at:0 };
+// (14 nov., ergonomie des gestes) ⌘K « Republier N°x à la main » : le N° tapé, consommé UNE fois par Annonces
+// (30 s au plus) quand ses annonces sont lues. Le N° désigne l'annonce par IDENTITÉ (son numéro exact, `cleNum`).
+const DEMANDE_REPUB_MAIN={ num:null, at:0 };
 const demanderVue=(quoi)=>{ DEMANDE_VUE.quoi=quoi; DEMANDE_VUE.at=Date.now(); };
 // (9 nov., lot AC) Le geste d'« À trancher » rejoint le BLOC où il tranche : un éventuel
 // bouton à toucher d'abord (`clic`, un onglet de l'écran), puis la cible défilée au
@@ -44197,6 +44200,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return ()=>window.removeEventListener('vrm:vue',f);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[only]);
+  // (14 nov., ergonomie des gestes) ⌘K « Republier N°x à la main » : le kit « à la main » de l'annonce EN LIGNE qui
+  // porte CE N° (identité exacte, `cleNum` — jamais une ressemblance, §5), par la même règle que le bouton « À la main »
+  // de la vue Republier (`actionsPossibles`, k 'main'). Rien ne part chez Vinted : c'est lui qui publie (§3).
+  // Annonces pas encore lues ⇒ la demande attend (30 s) ; aucune ou plusieurs annonces sous ce N° ⇒ la vue
+  // Republier, et la phrase qui dit pourquoi (il coche lui-même).
+  React.useEffect(()=>{
+    if(only!=='annonces') return undefined;
+    const appliquer=()=>{
+      const d=DEMANDE_REPUB_MAIN;
+      if(!d.num || Date.now()-d.at>30000 || cache()) return;
+      if(listings.items==null) return;
+      const n=String(d.num), k=cleNum(n);
+      const c=(annSelectionnables||[]).filter(a=>a.etat==='en-ligne' && a.numero && cleNum(a.numero)===k);
+      d.num=null;
+      setAnnSort('republier');
+      if(!c.length){ toast(tr('ergonomie.republierAucune', { n })); return; }
+      if(c.length>1){ toast(tr('ergonomie.republierPlusieurs', { n })); return; }
+      const r=actionsPossibles({ selection: c.map(a=>({ id:a.id, uid:a.uid, etat:a.etat })), chrome: undefined, capOk: ()=>true }).find(x=>x.k==='main');
+      if(!r || !r.ok){ toast((r && r.raison) || tr('annonces.mainPossibleSelection')); return; }
+      setKitMain(c.map(a=>{ const fl = prixAchatDe(numeros[a.id]||{}, buyByNum); return { ...a, floor: fl!=null && !isNaN(fl) ? Number(fl) : null }; }));
+    };
+    appliquer();
+    const f=()=>setTimeout(appliquer,0);
+    window.addEventListener('vrm:repub-main',f);
+    return ()=>window.removeEventListener('vrm:repub-main',f);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[only, annSelectionnables, listings.items]);
 
   const msgPeutAgir = msgRelais || (vmrExtPresent() && extSait('messagerie')==='ok' && !__vmrPlusieurs);
   const msgLectureSeule = (acc) => (msgRelais && !msgCompteActif) || (!!msgCompteActif && String((acc && acc.vinted_user_id) || '') !== msgCompteActif);
@@ -60346,6 +60376,10 @@ function AppCoeur() {
     if (d.feuille === 'fiche') { setFicheNum(String(d.num)); return; }
     if (d.feuille === 'calculette') { setCalcOuverte(true); return; }
     if (d.feuille === 'prix') { setPrixNum(String(d.num)); return; }
+    // (14 nov., ergonomie des gestes) La feuille « Publier partout » de CE N° (l'évènement du geste de la fiche).
+    if (d.feuille === 'partout') { try { window.dispatchEvent(new CustomEvent('vrm:publier-partout', { detail: { nums: [String(d.num)] } })); } catch (_) {} return; }
+    // Le kit « à la main » de CE N° : Annonces le lit à l'ouverture (ou à l'évènement, déjà ouvert).
+    if (d.feuille === 'repub-main') { DEMANDE_REPUB_MAIN.num = String(d.num); DEMANDE_REPUB_MAIN.at = Date.now(); setTab('annonces'); setTimeout(() => { try { window.dispatchEvent(new Event('vrm:repub-main')); } catch (_) {} }, 0); return; }
     if (d.feuille === 'configuration') { try { window.dispatchEvent(new Event('vrm:configuration')); } catch (_) {} return; }
     if (d.stock) { setGarageLocate(String(d.stock)); DEMANDE_STOCK_CHERCHE.nums=[String(d.stock)]; DEMANDE_STOCK_CHERCHE.at=Date.now(); setTab('garage'); return; }
     if (d.colis) { setPlatSub(null); choisirOngletColis(d.colis); }
@@ -60522,9 +60556,9 @@ function AppCoeur() {
         // (11 nov., saisie rapide) « vendues en octobre » : une action en tête (Ventes sur ce mois).
         { const vm = ventesDuMois(qBrut); if (vm) actionsGs.unshift({ id: 'ventes-mois', libelle: `Ventes de ${vm.label.toLowerCase()}`, sous: 'Ventes · Vinted, sur ce mois', icone: 'calendar', num: null, mois: vm }); }
         const ligneAction = (a) => (
-          <button key={'action-' + a.id + (a.num || '')} type="button" className="vrm-recherche-ligne" onClick={()=>lancerActionRecherche(a, qBrut)} data-recherche-resultat="action" data-recherche-action={a.id} data-recherche-num={a.num || undefined} title={a.sous} style={styleLigne}>
+          <button key={'action-' + a.id + (a.num || '')} type="button" className="vrm-recherche-ligne" onClick={()=>lancerActionRecherche(a, qBrut)} data-recherche-resultat="action" data-recherche-action={a.id} data-recherche-num={a.num || undefined} title={a.cleSous ? tr(a.cleSous) : a.sous} style={styleLigne}>
             {thumb(null, <Icon name={a.icone} size={18} style={{color:C.text}}/>)}
-            {ligneTexte(a.libelle, a.sous)}
+            {ligneTexte(a.cle ? tr(a.cle, { n: String(a.num || '') }) : a.libelle, a.cleSous ? tr(a.cleSous) : a.sous)}
             <span style={{fontSize:17,color:C.muted}}>›</span>
           </button>);
         // (11 nov., lot centre-aide) « Comment faire » : les fiches d'aide (src/aideFiches.js), trois au plus ;

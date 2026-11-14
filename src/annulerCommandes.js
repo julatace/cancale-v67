@@ -90,11 +90,18 @@ export const ACTIONS_RECHERCHE = [
   { id: 'ouvrir-num', num: true, libelle: (n) => `Ouvrir N°${n}`, get sous() { return `La fiche ${motsVendeur().de}`; }, icone: 'tag', mots: ['ouvrir', 'fiche', 'voir', 'histoire', 'paire', 'article'] },
   { id: 'baisser-prix', num: true, libelle: (n) => `Baisser le prix de N°${n}`, sous: 'La feuille du prix — rien n’est envoyé avant « Appliquer »', icone: 'euro', mots: ['baisser', 'prix', 'changer', 'modifier', 'promo', 'reduire', 'diminuer'] },
   { id: 'stock-num', num: true, libelle: (n) => `Voir N°${n} au Stock`, sous: 'Où il est rangé', icone: 'grid', mots: ['stock', 'ranger', 'rangement', 'garage', 'case', 'ou'] },
+  // (14 nov., ergonomie des gestes — docs/passation/2026-11-14-ergonomie-gestes.md) Deux gestes fréquents qui
+  // demandaient 4 à 5 touchers depuis Annonces : ils partent du N° tapé (c'est LUI qui choisit la paire, §3) et
+  // OUVRENT ce qui existe — le kit « à la main » (rien ne part chez Vinted) et la feuille « Publier partout »
+  // (rien ne part avant « Publier »). `cle`/`cleSous` : le texte affiché passe par tr() (src/i18n, 5 langues) ;
+  // `libelle`/`sous` restent le repli français lu par les audits.
+  { id: 'republier-num', num: true, cle: 'ergonomie.republierNum', cleSous: 'ergonomie.republierNumSous', libelle: (n) => `Republier N°${n} à la main`, sous: 'Le kit de cette paire : photos, texte, N° — c’est toi qui publies', icone: 'sync', mots: ['republier', 'republication', 'relancer', 'remettre', 'repost', 'main'] },
+  { id: 'partout-num', num: true, cle: 'ergonomie.partoutNum', cleSous: 'ergonomie.partoutNumSous', libelle: (n) => `Publier N°${n} partout`, sous: 'Leboncoin, eBay, Vestiaire — rien ne part avant « Publier »', icone: 'shop', mots: ['partout', 'publier', 'ailleurs', 'leboncoin', 'ebay', 'vestiaire', 'diffuser'] },
 ];
 // Les actions proposées SUR LE CHAMP VIDE (après les suggestions).
 export const ACTIONS_VIDE = ['imprimer-jour', 'colis-retirer', 'export-comptable', 'ma-configuration'];
 // Un N° tapé SEUL : ce qui s'ajoute à « Tout sur le N° » (qui ouvre déjà la fiche).
-export const ACTIONS_NUM_SEUL = ['baisser-prix', 'stock-num'];
+export const ACTIONS_NUM_SEUL = ['baisser-prix', 'republier-num', 'partout-num', 'stock-num'];
 
 const VIDES = new Set(['de', 'du', 'des', 'le', 'la', 'les', 'l', 'd', 'un', 'une', 'mon', 'ma', 'mes', 'a', 'au', 'aux', 'pour', 'sur', 'en', 'et', 'n', 'no', 'num', 'numero', 'paire', 'article']);
 export const normaliser = (s) => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[’']/g, ' ').replace(/[^a-z0-9°#\s]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -119,7 +126,7 @@ export function numeroDansRequete(q, lireNumero) {
 export function actionsPour(q, { lireNumero, max = 4 } = {}) {
   const brut = String(q == null ? '' : q).trim();
   const parId = (id) => ACTIONS_RECHERCHE.find((a) => a.id === id);
-  const forme = (a, n) => ({ id: a.id, libelle: typeof a.libelle === 'function' ? a.libelle(n) : a.libelle, sous: a.sous, icone: a.icone, num: n || null });
+  const forme = (a, n) => ({ id: a.id, libelle: typeof a.libelle === 'function' ? a.libelle(n) : a.libelle, sous: a.sous, icone: a.icone, num: n || null, ...(a.cle ? { cle: a.cle, cleSous: a.cleSous } : {}) });
   if (!brut) return ACTIONS_VIDE.map(parId).filter(Boolean).map((a) => forme(a, null));
   const num = numeroDansRequete(brut, lireNumero);
   if (num && num.seul) return ACTIONS_NUM_SEUL.map(parId).filter(Boolean).map((a) => forme(a, num.cle));
@@ -161,6 +168,8 @@ export function destinationAction(a) {
     case 'ouvrir-num': return a.num ? { feuille: 'fiche', num: a.num } : null;
     case 'baisser-prix': return a.num ? { feuille: 'prix', num: a.num } : null;
     case 'stock-num': return a.num ? { tab: 'garage', stock: a.num } : null;
+    case 'republier-num': return a.num ? { tab: 'annonces', feuille: 'repub-main', num: a.num } : null;
+    case 'partout-num': return a.num ? { feuille: 'partout', num: a.num } : null;
     default: return null;
   }
 }
