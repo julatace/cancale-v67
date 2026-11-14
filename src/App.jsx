@@ -34406,7 +34406,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // vérifier » avec la raison et le geste (§5 : jamais cachés en silence). Les fins prouvées, elles, sont déjà
     // sorties plus haut (rien n'est montré).
     for (const o of sansCodeList) aVerifier.push({ kind: 'vinted', o, e: { ...etatColisVinted(o, maintenant, tpm), etat: 'sans_code' } });
-    const emailSansCode = emailList.filter(t => !codeRetrait(t.code) && !qrImage(t));
+    // Un e-mail sans code dont la conversation de SA commande (par identité : `cmdParColis`, `commandeDuColis`)
+    // donne le code reste à retirer : la carte montre ce code (source « message », banc retraits-irreprochables R5).
+    const codeDeSaCommande = (t) => { let o = null; try { o = (cmdParColis && cmdParColis.get(colisKey(t))) || commandeDuColis(t); } catch (_) { o = null; } const r = o ? relaisDe(o) : null; return !!(r && codeRetrait(r.code)); };
+    const emailSansCode = emailList.filter(t => !codeRetrait(t.code) && !qrImage(t) && !codeDeSaCommande(t));
     for (const t of emailSansCode) aVerifier.push({ kind: 'email', t, o: commandeDuColis(t), e: { ...etatColisEmail(t, maintenant), etat: 'sans_code' } });
     if (sansCodeList.length) { const sv = new Set(sansCodeList); extra.splice(0, extra.length, ...extra.filter((o) => !sv.has(o))); }
     if (emailSansCode.length) { const se = new Set(emailSansCode); emailList.splice(0, emailList.length, ...emailList.filter((t) => !se.has(t))); }
