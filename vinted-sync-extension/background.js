@@ -1462,8 +1462,143 @@ const SB_DELAI_LECTURE_MS = 10000, SB_DELAI_ECRITURE_MS = 20000;
 function signalDelai(ms) {
   try { const c = new AbortController(); const t = setTimeout(() => { try { c.abort(); } catch (_) {} }, ms); if (t && typeof t.unref === 'function') t.unref(); return c.signal; } catch (_) { return undefined; }
 }
-async function supabaseUpsert(table, rows, onConflict, ownerAttendu = null) {
+// ══ 5.376 (14 nov.) — LA FILE DES CAPTURES QUI N'ONT PAS PU PARTIR ══════════
+// Julien : « l'extension capte mal, sur Orion comme sur le navigateur ». MESURÉ
+// (`panel_diag_capture`, cumul) : des captures LUES puis perdues à l'envoi —
+// `ecriture_ratee_*_reseau` (ventes 13, achats 10, boîte 14, profil 10,
+// dressing 10), `*_sans_session` (Vestiaire sur l'iPhone 24+, ventes 4, achats
+// 6, profil 13, bordereau Vestiaire 1). Rien ne les rejouait : la ligne n'était
+// rangée qu'à la prochaine page qui redemandait la même chose — et sur
+// Vestiaire (fil, ventes) la page ne redemande pas.
+// RÈGLES :
+//  · seulement les lignes de CAPTURE nommées (`RE_FILE_CAPTURE`), datées
+//    (`capturedAt` / `updatedAt` / `at`) — sans date, impossible de juger
+//    « plus frais » : pas gardée ;
+//  · seulement si RIEN n'est parti à coup sûr ou si la base n'a pas répondu
+//    (réseau, sans session, 408/425/429/5xx) — jamais un refus net (400/401/403) ;
+//  · gardée AU NOM du compte VRM qui l'a lue (session, ou la dernière session
+//    connue de CE navigateur) ; sans propriétaire connu ⇒ pas gardée (jamais
+//    rangée chez quelqu'un d'autre) ; rejouée seulement sous CE compte ;
+//  · rejouée seulement si la base n'a RIEN de plus frais pour cette ligne
+//    (lecture projetée `meta->>`, §4.4) ; lecture ratée ⇒ rien écrit (§5) ;
+//  · une capture plus fraîche de la même ligne (même navigateur) la remplace ;
+//  · bornée : 40 envois, 2,5 Mo, 24 h ; le stockage refuse ⇒ noté, rien de plus.
+const FILE_CAPTURES = 'vrmFileCaptures';
+const FILE_CAPTURES_MAX = 40;
+const FILE_CAPTURES_OCTETS = 2500000;
+const FILE_CAPTURES_MS = 24 * 3600000;
+const RE_FILE_CAPTURE = /^(?:harvest_\d+_(?:profile|listings|orders_sold|orders_purchased|inbox|billing|label_\d+|txn_\d+|feedbacks|enligne)|vc_(?:ventes|listings|messages|achats|session|label_\d+)|lbc_(?:listings|ventes|messages))$/;
+const STATUT_REJOUABLE = /^(?:reseau|sans_session|408|425|429|5\d\d)$/;
+let _rejeuCaptures = false;
+let _idsFileCaptures = null;   // ids en file (cache du worker ; null = pas encore lu)
+function tamponCapture(d) {
+  if (!d || typeof d !== 'object') return 0;
+  let best = 0;
+  for (const k of ['capturedAt', 'updatedAt', 'at']) { const t = Date.parse(String(d[k] || '')); if (isFinite(t) && t > best) best = t; }
+  return best;
+}
+async function lireFileCaptures() {
+  try { const l = (await chrome.storage.local.get(FILE_CAPTURES))[FILE_CAPTURES]; return Array.isArray(l) ? l.filter((e) => e && Array.isArray(e.rows) && e.rows.length && e.owner) : []; } catch (_) { return null; }
+}
+async function ecrireFileCaptures(l) {
+  try { await chrome.storage.local.set({ [FILE_CAPTURES]: l }); _idsFileCaptures = new Set(l.flatMap((e) => e.rows.map((r) => String(r.id)))); return true; } catch (_) { _idsFileCaptures = null; return false; }
+}
+// Le compte VRM de CE navigateur, même quand sa session est expirée (jamais deviné).
+async function proprietaireConnu() {
+  try { const s = (await chrome.storage.local.get(SESSION_STORE))[SESSION_STORE]; return s && s.user_id ? String(s.user_id) : null; } catch (_) { return null; }
+}
+let _chaineFileCaptures = Promise.resolve();
+function surFileCaptures(fn) { const p = _chaineFileCaptures.then(fn, fn); _chaineFileCaptures = p.then(() => {}, () => {}); return p; }
+async function mettreCaptureEnFile(rows, owner) {
+  const gardees = (rows || []).filter((r) => r && RE_FILE_CAPTURE.test(String(r.id || '')) && tamponCapture(r.data) > 0)
+    .map((r) => ({ id: String(r.id), data: r.data }));
+  if (!gardees.length) return false;
+  if (!owner) { noterDiag('file_captures_sans_proprietaire'); return false; }
+  return surFileCaptures(async () => {
+    const l = await lireFileCaptures();
+    if (l === null) { noterDiag('file_captures_stockage'); return false; }
+    // La capture la plus FRAÎCHE d'une ligne gagne : une plus vieille sort de la file,
+    // une plus vieille que celle déjà gardée n'y entre pas.
+    const neuves = [];
+    for (const g of gardees) {
+      const tg = tamponCapture(g.data);
+      if (l.some((e) => e.rows.some((r) => String(r.id) === g.id && tamponCapture(r.data) >= tg))) continue;
+      for (const e of l) e.rows = e.rows.filter((r) => String(r.id) !== g.id);
+      neuves.push(g);
+    }
+    let reste = l.filter((e) => e.rows.length);
+    if (!neuves.length) return ecrireFileCaptures(reste);
+    const t = Date.now();
+    const e = { id: 'c' + t.toString(36) + Math.random().toString(36).slice(2, 6), owner: String(owner), at: t, exp: t + FILE_CAPTURES_MS, essais: 0, rows: neuves };
+    const poids = (x) => JSON.stringify(x).length;
+    if (poids(e) > FILE_CAPTURES_OCTETS) { noterDiag('file_captures_trop_lourd'); return ecrireFileCaptures(reste); }
+    reste.push(e);
+    while (reste.length > FILE_CAPTURES_MAX || poids(reste) > FILE_CAPTURES_OCTETS) { reste.shift(); noterDiag('file_captures_pleine'); }
+    if (!(await ecrireFileCaptures(reste))) { noterDiag('file_captures_stockage'); return false; }
+    noterDiag('file_captures_gardee');
+    try { chrome.alarms && typeof chrome.alarms.create === 'function' && alarmeSiAbsente('vrm-reseau', { periodInMinutes: 1 }); } catch (_) {}
+    return true;
+  });
+}
+// Après une écriture réussie : la même ligne en attente (plus vieille) sort ; et
+// s'il reste quelque chose pour CE compte VRM, ça repart (la base répond).
+function apresEcritureReussie(list, owner) {
+  const ids = (list || []).map((r) => String((r && r.id) || '')).filter((id) => RE_FILE_CAPTURE.test(id));
+  if (_idsFileCaptures && !_idsFileCaptures.size) return;
+  sansRejet(surFileCaptures(async () => {
+    const l = await lireFileCaptures();
+    if (!l || !l.length) { if (l) _idsFileCaptures = new Set(); return; }
+    _idsFileCaptures = new Set(l.flatMap((e) => e.rows.map((r) => String(r.id))));
+    const fraiches = new Map((list || []).filter((r) => r && ids.includes(String(r.id))).map((r) => [String(r.id), tamponCapture(r.data)]));
+    let change = false;
+    for (const e of l) { const n = e.rows.length; e.rows = e.rows.filter((r) => !(fraiches.has(String(r.id)) && fraiches.get(String(r.id)) >= tamponCapture(r.data))); if (e.rows.length !== n) change = true; }
+    if (change) await ecrireFileCaptures(l.filter((e) => e.rows.length));
+  }).then(() => (owner ? viderFileCaptures() : null)), 'file_captures');
+}
+// Rejoue ce qui attend. Rend { parti, reste } ; jamais d'écriture sans relecture.
+async function viderFileCaptures() {
+  if (_rejeuCaptures || horsLigne()) return { ok: true, parti: 0 };
+  return surFileCaptures(async () => {
+    let l = await lireFileCaptures();
+    if (!l || !l.length) return { ok: true, parti: 0, reste: 0 };
+    const s = await authToken().catch(() => null);
+    if (!(s && s.access_token && s.user_id)) return { ok: true, parti: 0, reste: l.length, attente: 'session' };
+    _rejeuCaptures = true;
+    const t = Date.now(), garde = [];
+    let parti = 0, arret = false;
+    try {
+      for (const e of l) {
+        if (arret) { garde.push(e); continue; }
+        if (!(Number(e.exp) > t)) { noterDiag('file_captures_echue'); continue; }
+        // Un autre compte VRM est connecté ici : elle attend le sien (jamais rangée chez un autre).
+        if (String(e.owner) !== String(s.user_id)) { garde.push(e); continue; }
+        const ids = e.rows.map((r) => String(r.id));
+        const base = await sbGet(`app_data?id=in.(${ids.join(',')})&select=id,c:meta->>capturedAt,u:meta->>updatedAt,a:meta->>at`);
+        if (!Array.isArray(base)) { garde.push(e); arret = true; continue; }   // lecture ratée : RIEN écrit
+        const enBase = new Map(base.map((b) => [String(b.id), tamponCapture({ capturedAt: b.c, updatedAt: b.u, at: b.a })]));
+        const aEcrire = e.rows.filter((r) => { const b = enBase.get(String(r.id)); if (b && b >= tamponCapture(r.data)) { noterDiag('file_captures_plus_frais_en_base'); return false; } return true; });
+        if (!aEcrire.length) continue;
+        const ok = await supabaseUpsert('app_data', aEcrire, 'id', e.owner, { rejeu: true });
+        if (ok === true) { parti += aEcrire.length; noterDiag('file_captures_rejouee'); continue; }
+        garde.push(Object.assign({}, e, { rows: aEcrire, essais: (Number(e.essais) || 0) + 1 }));
+        arret = true;   // la base ne prend toujours pas : la suite attend le prochain réveil
+      }
+    } finally { _rejeuCaptures = false; }
+    await ecrireFileCaptures(garde);
+    if (parti) { logActivity(`📶 ${parti} capture${parti > 1 ? 's' : ''} en attente envoyée${parti > 1 ? 's' : ''} à VRM`); notifierApp({ type: 'maj', quoi: 'captures' }); }
+    return { ok: true, parti, reste: garde.length };
+  });
+}
+// Les deux files d'attente (gestes demandés par l'app, captures) — le réveil d'une
+// minute, le retour du réseau, et (sans `chrome.alarms`, Orion) la minuterie.
+async function viderFilesEnAttente() {
+  const a = await viderFileCaptures().catch(() => null);
+  const b = (await lireFileReseau()).length ? await viderFileReseau().catch(() => null) : null;
+  return { captures: a, gestes: b };
+}
+async function supabaseUpsert(table, rows, onConflict, ownerAttendu = null, opts = null) {
   const list = Array.isArray(rows) ? rows : [rows];
+  const rejeu = !!(opts && opts.rejeu);
   // ⚠️⚠️ 19 octobre (5.193) — LA SESSION SE LIT UNE FOIS PAR ENVOI, ET SANS
   //    ELLE UNE BASE CLOISONNÉE NE REÇOIT RIEN. Mesuré chez Julien :
   //    `ecriture_ratee_vinted_accounts_400` ×82, `ecriture_ratee_harvest_*_400`
@@ -1479,6 +1614,7 @@ async function supabaseUpsert(table, rows, onConflict, ownerAttendu = null) {
     const s = await authToken();
     if (!(s && s.access_token && s.user_id)) return 'sans_session';
     if(ownerAttendu!=null&&String(s.user_id)!==String(ownerAttendu))return 'sans_session';
+    ownerEnvoi = String(s.user_id);
     const owned = list.map((r) => Object.assign({}, r, { owner: s.user_id }));
     const corps = JSON.stringify(owned);
     octets = corps.length;
@@ -1492,7 +1628,7 @@ async function supabaseUpsert(table, rows, onConflict, ownerAttendu = null) {
       signal: signalDelai(SB_DELAI_ECRITURE_MS),
     });
   };
-  let statut = 'reseau', octets = 0;
+  let statut = 'reseau', octets = 0, ownerEnvoi = null;
   try {
     let res = await envoyer();
     if (res === 'sans_session') throw Object.assign(new Error('sans_session'), { statut: 'sans_session' });
@@ -1513,6 +1649,9 @@ async function supabaseUpsert(table, rows, onConflict, ownerAttendu = null) {
       // (`effacerReculBase`). Jamais sur une ligne de diagnostic ou de réglage,
       // qui peut passer quand les captures, elles, sont refusées.
       if (table === 'app_data' && list.some((r) => r && RE_LIGNE_CAPTURE.test(String(r.id || '')))) await effacerReculBase();
+      // 5.376 : une capture plus fraîche vient d'être rangée — la même ligne en
+      //    attente sort de la file ; et la base répond : ce qui attendait repart.
+      if (table === 'app_data' && !rejeu) { try { apresEcritureReussie(list, ownerEnvoi); } catch (_) {} }
       return true;
     }
     statut = String(res.status || 'inconnu');
@@ -1530,6 +1669,11 @@ async function supabaseUpsert(table, rows, onConflict, ownerAttendu = null) {
       for (const r of list) if (r && r.vinted_user_id != null) _refusComptes.set(String(r.vinted_user_id), code);
     }
   } catch (e) { statut = (e && e.statut) || 'reseau'; }
+  // 5.376 : une CAPTURE qui n'a pas pu partir (réseau, session, base qui ne
+  //    répond pas) est gardée et rejouée — jamais sur plus frais (`viderFileCaptures`).
+  if (table === 'app_data' && !rejeu && STATUT_REJOUABLE.test(String(statut))) {
+    try { await mettreCaptureEnFile(list, statut === 'sans_session' ? (ownerAttendu != null ? String(ownerAttendu) : await proprietaireConnu()) : (ownerEnvoi || (ownerAttendu != null ? String(ownerAttendu) : null))); } catch (_) {}
+  }
   // 5.328 : pas connecté ⇒ rien n'est parti, ce n'est pas un refus.
   if (statut === 'sans_session') return sessionAbsente();
   // ⚠️ JAMAIS `await` ici : `viderTampon` écrit lui-même par `supabaseUpsert`
@@ -10571,7 +10715,7 @@ function surAlarme(a) {
   if (a.name === 'cancale-sync') lance('sync', () => captureAllAccounts());
   else if (a.name === 'cancale-active') lance('active', () => runActive());
   else if (a.name === 'vrm-session') lance('session', () => loadSession().then(s => { if (s) return authToken(); }));
-  else if (a.name === 'vrm-reseau') lance('reseau', () => viderFileReseau());   // 5.371 : la file « en attente de réseau »
+  else if (a.name === 'vrm-reseau') lance('reseau', () => viderFilesEnAttente());   // 5.376 : et les captures en attente   // 5.371 : la file « en attente de réseau »
   else if (a.name === 'vrm-photos') lance('photos', () => tickPhotos());
   else if (a.name === 'vrm-relais') lance('relais', () => relaisTick('alarme'));
   else if (a.name === 'vrm-lbc') lance('lbc', () => relireLbcEnFond());
@@ -10579,7 +10723,7 @@ function surAlarme(a) {
   // 5.290 : le statut des colis chez le transporteur (voir `transpTick`).
   else if (a.name === 'vrm-transp') lance('transp', () => transpTick('alarme'));
   // 5.341 : les dates de versement, onglet Vinted ouvert (voir `tickVersements`).
-  else if (a.name === 'vrm-versement') lance('versement', () => tickVersements());
+  else if (a.name === 'vrm-versement') { lance('versement', () => tickVersements()); lance('bordereaux', () => tickBordereaux()); }   // 5.376 : les bordereaux qui manquent
   // 5.344 : l'historique de départ, onglet Vinted ouvert (voir `tickImport`).
   else if (a.name === 'vrm-import') { lance('import', () => tickImport()); lance('importsites', () => tickImportSites()); }   // 5.365 : et Leboncoin / Vestiaire
   // 5.358 : l'empreinte des photos de ses annonces (voir `tickEmpreintes`).
@@ -10681,6 +10825,11 @@ async function rattraperMinuteries(force) {
   if (CAP.alarms || _rattrapageEnCours) return;
   if (!force && Date.now() - _rattrapageA < 15000) return;
   _rattrapageEnCours = true; _rattrapageA = Date.now();
+  // 5.376 — SANS `chrome.alarms` (Orion iPhone), le réveil « vrm-reseau » n'existe
+  //    pas : ni les gestes en attente de réseau ni les captures gardées ne
+  //    repartaient (seul l'événement `online` les relançait). La minuterie et
+  //    chaque réveil du fond les reprennent ici.
+  sansRejet(viderFilesEnAttente(), 'files_minuterie');
   try {
     let vus = {};
     try { vus = (await chrome.storage.local.get(MINUTERIES_STORE))[MINUTERIES_STORE] || {}; } catch (_) { return; }   // stockage illisible : on ne rejoue rien
@@ -17971,12 +18120,13 @@ async function viderFileReseau() {
       logActivity(`⚠️ Geste en attente refusé au départ (${x.sorte}) : ${String((r && (r.error || r.code)) || 'refus').slice(0, 120)}`);
     }
     await ecrireFileReseau(garde);
-    if (!garde.length) { try { chrome.alarms && chrome.alarms.clear('vrm-reseau'); } catch (_) {} }
+    // 5.376 : le réveil d'une minute sert aussi la file des captures — gardé tant qu'elle attend.
+    if (!garde.length && !((await lireFileCaptures()) || []).length) { try { chrome.alarms && chrome.alarms.clear('vrm-reseau'); } catch (_) {} }
     notifierApp({ type: 'maj', quoi: 'fileReseau' });
     return { ok: true, parti, reste: garde.length };
   });
 }
-try { self.addEventListener('online', () => { sansRejet(viderFileReseau(), 'file_reseau'); }); } catch (_) {}
+try { self.addEventListener('online', () => { sansRejet(viderFilesEnAttente(), 'file_reseau'); }); } catch (_) {}
 
 async function etatSite(url,tabId) {
   const plateforme = plateformeDe(url);
@@ -19375,6 +19525,41 @@ async function genererBordereau(uid, tx, opts = {}) {
 // Les requêtes restent envoyées UNE PAR UNE, jamais en rafale (§5.36).
 const BORD_MAX_PAR_VISITE = 6;
 const BORD_RETRY_MS = 6 * 60 * 60 * 1000;
+// ⚠️⚠️ 5.376 (14 nov., « l'extension capte mal les bordereaux ») — MESURÉ chez
+//    Julien (`panel_diag_capture`, cumul) : `label_url_introuvable` 48 contre
+//    `label_url_trouve` 72, dont 42 « 200 200 200 » (Vinted répond, le PDF n'est
+//    pas encore prêt) ; `label_abandon_apres_essais` 13. Ventes du 1er au 14 nov.
+//    au statut « Bordereau envoyé au vendeur » : 9, dont 3 PDF captés par
+//    l'extension, 5 arrivés par e-mail seulement (un 23 h après la vente) et 1
+//    sans rien — l'extension était passée le lendemain sur ce compte (détail de
+//    la transaction relu), et ne l'a pas repris : un essai raté posait 6 h de
+//    silence, et rien ne revenait sans une nouvelle visite. Désormais, une vente
+//    qui ATTEND SON ENVOI est relancée de plus en plus loin (10 min, 30 min,
+//    1 h, 3 h, puis toutes les 6 h), à chaque visite ET par le passage de fond
+//    (`tickBordereaux`, onglet vinted.fr ouvert sur CE compte) — chaque lecture
+//    passe par `gardeLecture` (compte de l'onglet, budget de LECTURE 20/h,
+//    classe « colis »), une requête à la fois.
+const BORD_RELANCES_MS = [10, 30, 60, 180].map((m) => m * 60000);
+function bordProchainEssai(m, attendEnvoi) {
+  if (!m || !Number(m.t)) return 0;
+  const n = Math.max(1, Number(m.n) || 1);
+  const att = attendEnvoi ? (BORD_RELANCES_MS[n - 1] != null ? BORD_RELANCES_MS[n - 1] : BORD_RETRY_MS) : BORD_RETRY_MS;
+  return Number(m.t) + att;
+}
+// Ce que la carte du logo et le passage de fond lisent : pour CHAQUE compte, les
+// ventes qui attendent l'envoi dont le bordereau existe chez Vinted et n'est ni
+// capté ni reçu par e-mail (`n`), et l'heure du prochain essai (`prochain`).
+// Calculé à chaque passe (jamais deviné) ; plus de 24 h ⇒ « pas su ».
+const BORD_MANQUANTS = 'vrmBordManquants';
+async function lireBordManquants() {
+  try { const v = (await chrome.storage.local.get(BORD_MANQUANTS))[BORD_MANQUANTS]; return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch (_) { return null; }
+}
+async function noterBordManquants(uid, n, prochain) {
+  const cur = await lireBordManquants();
+  if (cur === null) return false;
+  cur[String(uid)] = { n: Math.max(0, Number(n) || 0), prochain: Number(prochain) || 0, at: Date.now() };
+  try { await chrome.storage.local.set({ [BORD_MANQUANTS]: bornerRegistre(cur, 7 * 86400000, 60) }); return true; } catch (_) { return false; }
+}
 // ⚠️ Le récap ne DEMANDE plus rien (§5.88) : il annonce. Donc quand la
 // génération s'arrête sur un garde-fou, il faut pouvoir DIRE pourquoi, sinon
 // « il reste 2 bordereaux » est un mur sans explication. Mémoire volatile : un
@@ -19935,6 +20120,28 @@ async function tickVersements() {
     try { d = (((await chrome.storage.local.get(LECTURES_DUES))[LECTURES_DUES] || {})[String(uid)] || {}).versement || null; } catch (_) { return 0; }
     if (d && Date.now() - Number(d.at || 0) < LECTURES_DUES_VALIDITE_MS && !(Number(d.reste) > 0)) return 0;
     return await capterDatesVersement(uid, { fond: true });
+  } catch (_) { return 0; }
+}
+// 5.376 : LES BORDEREAUX QUI MANQUENT, REPRIS EN FOND (onglet vinted.fr ouvert
+// sur CE compte). Ne lit la base que si la dernière passe a NOTÉ un bordereau
+// manquant dont la relance est due (`vrmBordManquants`, aucune requête sinon) ;
+// puis la même 2ᵉ passe que la visite, en lecture seule (rien n'est généré),
+// sous `gardeLecture` (compte de l'onglet, budget de LECTURE, pause, prudence).
+async function tickBordereaux() {
+  try {
+    const tabs = await chrome.tabs.query({ url: ['https://*.vinted.fr/*'] });
+    if (!tabs || !tabs.length) return 0;
+    const uid = await activeUidForDomain(await domaineVintedOuvert());
+    if (!uid) return 0;
+    const m = ((await lireBordManquants()) || {})[String(uid)];
+    if (!m || !(Number(m.n) > 0)) return 0;
+    if (Number(m.prochain) && Date.now() < Number(m.prochain)) return 0;
+    if (await pauseVinted()) return 0;
+    if (await sansSessionPourEcrire()) return 0;
+    if (await reculBase()) return 0;
+    if (await compteNonCapte(uid)) return 0;
+    noterDiag('label_relance_fond');
+    return await avecVinted(() => genererBordereauxEnAttente(uid, { lectureSeule: true }));
   } catch (_) { return 0; }
 }
 // Ce que la carte dit (5.341) : les dates encore à lire sur CE compte, et une
@@ -21082,9 +21289,18 @@ const urlDeLabel = (o, prof = 0) => {
 // (l'identifiant d'expédition, et la transaction elle-même). Ils ne changent
 // pas d'un essai à l'autre — les redemander était trois allers-retours Vinted
 // pour rien, sur le chemin dont Julien dit qu'il est lent.
+// 5.376 : chaque lecture du bordereau passe par `gardeLecture` (compte de
+// l'onglet, budget de LECTURE, classe « colis ») — un refus rend `garde` :
+// RIEN n'est parti, l'essai n'est pas compté (il repart au passage suivant).
+async function lireLabelVinted(acc, uid, chemin) {
+  const g = await gardeLecture(uid, acc, 'colis');
+  if (g) return { garde: g };
+  return vintedGet(acc, chemin);
+}
 async function recupererLabel(acc, uid, tx, connu) {
   try {
-    const t = (connu && connu.t) || await vintedGet(acc, `/api/v2/transactions/${tx}`);
+    const t = (connu && connu.t) || await lireLabelVinted(acc, uid, `/api/v2/transactions/${tx}`);
+    if (t && t.garde) { noterDiag('label_garde_' + String(t.garde.code || 'refus').replace(/[^a-z0-9_-]/gi, '_')); return { ok: false, garde: t.garde.code || 'refus', pause: t.garde.code === 'vinted-pause', raison: t.garde.error || 'lecture pas permise maintenant' }; }
     if (t && (t.pause || freinVinted(t.status))) return { ok: false, pause: true, raison: t.raison || 'Vinted demande de ralentir' };   // 5.162
     // ⚠️⚠️ 5.169 — LA TRANSACTION LUE ICI ÉTAIT JETÉE. C'est pourtant la PREUVE
     //    de vente que lit l'anti double vente (`harvest_{uid}_txn_{tx}` →
@@ -21124,8 +21340,16 @@ async function recupererLabel(acc, uid, tx, connu) {
     //    répondu sans URL » ne se corrigent pas de la même façon.
     let url = null, via = '';
     const statuts = [];
+    // ⚠️ 5.376 — MESURÉ : `label_via_label_url` 66, AUCUNE autre voie n'a jamais
+    //    rendu l'URL, et 42 essais « 200 200 200 » (les deux autres chemins
+    //    lus pour rien, deux lectures du budget à chaque fois). `label_url` qui
+    //    répond 200 sans URL ⇒ le PDF n'est pas encore prêt : on s'arrête là et
+    //    on relance plus tard. Les deux autres ne servent plus que si `label_url`
+    //    lui-même ne répond pas 200.
     for (const chemin of [`/api/v2/shipments/${shipId}/label_url`, `/api/v2/shipments/${shipId}`, `/api/v2/shipments/${shipId}/label_options`]) {
-      const l = await vintedGet(acc, chemin);
+      if (statuts.length && statuts[0] === '200') break;
+      const l = await lireLabelVinted(acc, uid, chemin);
+      if (l && l.garde) { noterDiag('label_garde_' + String(l.garde.code || 'refus').replace(/[^a-z0-9_-]/gi, '_')); return { ok: false, garde: l.garde.code || 'refus', pause: l.garde.code === 'vinted-pause', raison: l.garde.error || 'lecture pas permise maintenant' }; }
       if (l && (l.pause || freinVinted(l.status))) return { ok: false, pause: true, raison: l.raison || 'Vinted demande de ralentir' };   // 5.162
       const brut = l && l.json ? JSON.stringify(l.json) : '';
       // ⚠️ L'ÉCHANTILLON EST UN DIAGNOSTIC, PAS UNE MESURE PAR ESSAI. Il passe
@@ -21189,14 +21413,18 @@ async function recupererLabel(acc, uid, tx, connu) {
     const items = Array.isArray(trx.order && trx.order.items)
       ? trx.order.items.map(x => x && x.id != null ? String(x.id) : '').filter(Boolean) : [];
     const data = { uid, url, tx: String(tx), item, items, capturedAt: new Date().toISOString(), pdfB64: btoa(bin) };
-    const range = await supabaseUpsert('app_data', [
-      { id: `harvest_${uid}_label_${tx}`, data },
-      { id: `harvest_${uid}_label_latest`, data },   // gardée : d'anciens écrans la lisent
-    ], 'id');
+    // ⚠️ 5.376 — UN PDF PAR ENVOI. Les deux lignes partaient dans le MÊME corps :
+    //    le PDF deux fois (mesuré : jusqu'à 493 Ko la ligne, donc ~1,3 Mo envoyés
+    //    d'un coup, sur le réseau d'un iPhone). La ligne de la vente d'abord,
+    //    seule ; `label_latest` ensuite, à part (son échec ne coûte rien). Un
+    //    envoi raté (réseau, session, 5xx) est GARDÉ et rejoué
+    //    (`mettreCaptureEnFile`) — jamais perdu, jamais rejoué sur plus frais.
+    const range = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_label_${tx}`, data }], 'id');
     // ⚠️ « Envoyé dans l'application » ne se dit que si la base l'a RANGÉ : une
     //    écriture ratée ne doit pas devenir un « fait » côté app (§ « on
     //    n'acquitte pas ce qu'on n'a pas rangé »).
-    if (range === false) { await noterDiag('label_ecriture_ratee'); return { ok: false, raison: "PDF récupéré mais la base ne l'a pas enregistré — réessaie" }; }
+    if (range === false) { await noterDiag('label_ecriture_ratee'); return { ok: false, raison: "PDF récupéré mais la base ne l'a pas enregistré — il repart tout seul" }; }
+    await supabaseUpsert('app_data', [{ id: `harvest_${uid}_label_latest`, data }], 'id');   // gardée : d'anciens écrans la lisent
     await noterUrlLabel(url, true);
     await noterDiag('label_envoye');
     logActivity('📎 Bordereau envoyé dans l\'application');
@@ -21225,6 +21453,7 @@ async function recupererLabelInsiste(acc, uid, tx) {
     dernier = await recupererLabel(acc, uid, tx, connu);
     if (dernier.ok) { if (i) await noterDiag('label_ok_apres_' + i + '_essai'); return dernier; }
     if (dernier.pause) return dernier;                       // 5.162 : Vinted freine, on n'insiste pas
+    if (dernier.garde) return dernier;                       // 5.376 : budget de lecture / autre compte : rien n'est parti, on reprend plus tard
     // On n'insiste que sur les échecs TRANSITOIRES (le PDF n'est pas encore là).
     // Un refus dur (permissions, PDF vide, 4xx) ne s'arrangera pas en attendant.
     const transitoire = /pas donné l'URL|n'expose pas encore|pas encore le PDF/i.test(dernier.raison || '');
@@ -21356,7 +21585,7 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
     // récentes. Le plafond de 3 par visite et le mémo de 6 h restent : c'est
     // une limite de volume, pas un rythme déguisé (§32).
     const limite = Date.now() - BORD_RATTRAPAGE_J * 86400000;
-    const aRecuperer = ventes.filter(o => {
+    const aRecupererTout = ventes.filter(o => {
       if (!o || o.transaction_id == null) return false;
       const tx = String(o.transaction_id);
       if (dejaMail.has(tx) || dejaCapte.has(tx)) return false;   // on a déjà le PDF
@@ -21364,32 +21593,51 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
       if (/annul|cancel|refus|rembours/i.test(String(o.status || ''))) return false;
       const d = Date.parse(o.date || '') || 0;
       if (!d || d < limite) return false;                        // trop vieux : le lien n'existe plus
-      const mk = 'get' + tx;
-      if (memo[mk] && Date.now() - Number(memo[mk].t || 0) < BORD_RETRY_MS) return false;
+      return true;
+    });
+    // 5.376 : ce qui MANQUE (attend l'envoi, étiquette chez Vinted, pas de PDF) —
+    //    noté pour la carte et le passage de fond, avant le filtre des relances.
+    const manquent = aRecupererTout.filter((o) => A_EXPEDIER(o));
+    const aRecuperer = aRecupererTout.filter((o) => {
+      const mk = 'get' + String(o.transaction_id);
+      if (memo[mk] && Date.now() < bordProchainEssai(memo[mk], A_EXPEDIER(o))) return false;
       return true;
     }).sort((a, b) => {
       const pa = A_EXPEDIER(a) ? 0 : 1, pb = A_EXPEDIER(b) ? 0 : 1;
       if (pa !== pb) return pa - pb;                             // ce qui attend TON envoi d'abord
       return (Date.parse(b.date || '') || 0) - (Date.parse(a.date || '') || 0);
     });
-    let recup = 0;
+    let recup = 0, eus = 0;
+    const repris = new Set();
     for (const o of aRecuperer) {
       if (recup >= BORD_MAX_PAR_VISITE) break;
       if (await pauseVinted()) break;                            // 5.162 : rien ne part, aucun mémo posé pour rien
       const tx = String(o.transaction_id);
-      memo['get' + tx] = { t: Date.now() };
+      const avant = memo['get' + tx];
+      // 5.376 : le n° de l'essai (la relance suivante en dépend) — posé AVANT
+      //    (un worker tué en route ne relance pas en rafale), retiré si rien
+      //    n'est parti (garde, budget, pause).
+      memo['get' + tx] = { t: Date.now(), n: (Number(avant && avant.n) || (avant ? 1 : 0)) + 1 };
       // ⚠️ ON N'INSISTE QUE QUAND ÇA A UN SENS. L'insistance (§5.48) sert à
       // attendre un PDF que Vinted est en train de fabriquer — donc uniquement
       // sur une vente qui attend encore l'envoi. Sur une vente déjà partie, un
       // « pas d'expédition exposée » ne s'arrangera pas : réessayer 4 fois, ce
       // serait 4 requêtes pour rien dans l'empreinte du compte (§5, §48).
-      const eu = A_EXPEDIER(o)
-        ? (await recupererLabelInsiste(acc, uid, tx)).ok
-        : (await recupererLabel(acc, uid, tx)).ok;
+      // 5.376 : l'insistance (4 essais en 15 s) seulement juste après la vente
+      //    (premier essai) ; les relances suivantes lisent UNE fois.
+      const r = A_EXPEDIER(o) && !avant
+        ? await recupererLabelInsiste(acc, uid, tx)
+        : await recupererLabel(acc, uid, tx);
+      if (r && (r.garde || r.pause)) { if (avant) memo['get' + tx] = avant; else delete memo['get' + tx]; break; }
       recup++;
-      if (eu) logActivity(`📎 Bordereau récupéré chez Vinted — ${String(o.title || '').slice(0, 40)}`);
+      if (r && r.ok) { eus++; repris.add(tx); logActivity(`📎 Bordereau récupéré chez Vinted — ${String(o.title || '').slice(0, 40)}`); }
     }
     await chrome.storage.local.set({ vrmBordFaits: memo });
+    const reste = manquent.filter((o) => !repris.has(String(o.transaction_id)));
+    let prochain = 0;
+    for (const o of reste) { const p = bordProchainEssai(memo['get' + String(o.transaction_id)], true) || Date.now(); prochain = prochain ? Math.min(prochain, p) : p; }
+    await noterBordManquants(uid, reste.length, prochain);
+    if (eus) notifierApp({ type: 'maj', quoi: 'label', uid: String(uid) });
     return faits + recup;
   } catch (_) { return 0; }
 }
