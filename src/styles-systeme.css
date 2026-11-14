@@ -473,6 +473,18 @@
 :root:root body .vrm-main :is([data-repub-lbc-ouvrir], [data-lbc-baisse-ouvrir]) { background: var(--d-remplir) !important; color: var(--d-encre) !important; border: 0 !important; border-radius: var(--d-r-pilule) !important; min-height: var(--d-h-ctrl) !important; font-size: var(--d-t-ctrl) !important; font-weight: 600 !important; }
 :root:root body .vrm-main .vrm-lbc-ecran.vrm-lbc-ecran input[type="search"][type="search"] { background: var(--d-remplir) !important; border: 0 !important; border-radius: var(--d-r-pilule) !important; min-height: var(--d-h-ctrl) !important; padding-left: var(--d-e-4) !important; }
 
+/* « Publier sur Leboncoin » : son écran n'a pas de marge à lui — l'entrée allait bord à bord au téléphone (0 → 390)
+   et débordait la colonne à l'ordinateur ; elle prend la marge de la page. Sur Vestiaire (l'écran a sa marge), aucune
+   de plus (elle était rentrée de 8 px par rapport à la carte du dessous). */
+:root:root body .vrm-app-shell .vrm-main .vrm-pa-entree.vrm-pa-entree[data-pa-entree="leboncoin"] { margin-left: var(--d-marge) !important; margin-right: var(--d-marge) !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-pa-entree.vrm-pa-entree[data-pa-entree="vestiaire"] { margin-left: 0 !important; margin-right: 0 !important; }
+
+/* Leboncoin · « Mes annonces » : la section est TRANSPARENTE (ses vignettes sont les cartes) ; son ombre posée y dessinait
+   un cadre vide autour de « Données », une carte dans ce cadre. Plus d'ombre ; « Données » au bord de la colonne. */
+:root:root body .vrm-app-shell .vrm-main section.vrm-lbc-catalog { box-shadow: none !important; border: 0 !important; }
+:root:root body .vrm-app-shell .vrm-main section.vrm-lbc-catalog > .vrm-bilan-sync.vrm-bilan-sync { margin-left: 0 !important; margin-right: 0 !important; }
+:root:root body .vrm-app-shell .vrm-main section.vrm-lbc-catalog > details.vrm-bilan-sync > summary { min-height: var(--d-h-ctrl) !important; align-items: center !important; }
+
 /* Les feuilles : le lien d'une feuille est le texte bleu, jamais l'aplat (#0071E3 sur le fond : 4,2:1). */
 :root:root body .vrm-fs a[href^="mailto:"] { color: var(--d-accent-texte) !important; }
 /* La confirmation : un mot par ligne, jamais « Se déconnecter / partout » sur deux lignes à 390 px — les deux
