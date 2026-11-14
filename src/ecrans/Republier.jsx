@@ -36,6 +36,7 @@ const VoileAtelier = ({ onClick, children }) => {
 import { CLE_REGLAGES_REPUB, TITRE_VINTED_MAX, PHOTO_NEUTRE, CURSEURS_PHOTO, REDUCTIONS_RAPIDES, MODES_TITRE, bornerPhoto, photoNeutre, cssApercuPhoto, dessinerPhotoReglee, appliquerCouleursPixels, nomPhotoReglee, lotAppliquePrix, lotAppliqueTitre, lireReglagesRepub, reglagesGardes, reglagesAOuverture, resumeGardes, apercuRepub, annonceRepubliee, resumeReglages, tirerLettre, prixChange, titreChange } from "../republierReglages.js";
 
 // ⟦← App.jsx #2⟧
+import { AccAvant, AccApres, AccEchec } from '../ui/Accompagne.jsx';   // (14 nov.) les quatre moments du geste
 
 // ── ÉDITEUR DE PHOTO (recadrer / zoomer / redresser / éclaircir) ──────────────
 // Julien choisit une photo DEPUIS SON TÉLÉPHONE (sa photo d'origine, meilleure
@@ -1735,7 +1736,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
               const erreur = (nPasFaites || nDouble) ? <>{[nPasFaites ? `${pl(nPasFaites, 'pas faite', 'pas faites')}${nRefaire ? ` (dont ${pl(nRefaire, 'brouillon à refaire', 'brouillons à refaire')} : bouton sur sa ligne)` : ''} : rien n'a changé sur Vinted${onReessayer && nEchec ? ' — « Réessayer » en bas' : ''}` : null, nDouble ? `${pl(nDouble, 'à vérifier', 'à vérifier')} : ouvre l'ancienne annonce sur Vinted (lien sur sa ligne)` : null].filter(Boolean).join(' · ')}.</> : null;
               const compte = [bilan, enCours ? '1 en cours' : null, nPasFaites ? pl(nPasFaites, 'pas faite', 'pas faites') : null, nDouble ? pl(nDouble, 'à vérifier', 'à vérifier') : null, nPlanif ? pl(nPlanif, 'prévue') : null, pasCommencees ? pl(pasCommencees, 'restante') : null].filter(Boolean).join(' · ');
               return <Avancement titre={titre} phrase={phrase} part={part} partRate={partRate} label={`${nFait} sur ${total} ${motF(nFait)}`} erreur={erreur}
-                data={{ 'data-republier-total': `${finies}/${total}`, 'data-republier-reussies': `${nFait}/${total}`, 'data-republier-bilan': '' }}
+                data={{ 'data-republier-total': `${finies}/${total}`, 'data-republier-reussies': `${nFait}/${total}`, 'data-republier-bilan': '', ...(mode === 'run' || mode === 'pause' ? { 'data-acc-pendant': 'republier', 'data-acc-n': `${finies}/${total}` } : {}) }}
                 compte={<span>{compte}</span>}>
                 {peEnCours && <div data-republier-progression={enCours.id} data-republier-etape={peEnCours.etape || 'attente'}>
                   <BarreGeste p={prog[String(enCours.id)]} liste={lstEnCours} label={`${motsVendeur().Nom} ${aFaire.indexOf(enCours) + 1}`} barre={false} />
@@ -1960,6 +1961,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                   </div>
                 </>}
               </div>
+              <AccAvant geste="republier" vars={{ n: aFaire.length }}/>
               <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13, color: C.text, cursor: 'pointer' }}>
                 <input type="checkbox" data-republier-confirme checked={ok} onChange={(ev) => setOk(ev.target.checked)} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0, marginTop: 1 }} />
                 <span>Je confirme : ces {aFaire.length} {action === 'enLigne' ? `brouillon${aFaire.length > 1 ? 's' : ''}` : `annonce${aFaire.length > 1 ? 's' : ''}`} {A.confirme(aFaire.length)}</span>
@@ -2015,6 +2017,10 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
             )}
           </>}
         </div>
+        {/* (14 nov., lot accompagnement) APRÈS : combien sont parties et la suite ; rien de parti ⇒ la raison et le geste. */}
+        {mode === 'fini' && (() => { const nF = aFaire.filter((a) => { const x = st[a.id] || {}; return x.etat === 'fait' || x.etat === 'planifiee'; }).length;
+          const r1 = aFaire.map((a) => st[a.id] || {}).find((x) => x.etat === 'echec' && x.raison);
+          return <div style={{ padding: '0 16px' }}>{nF ? <AccApres geste="republier" vars={{ n: nF }} onEnsuite={(suite) => { onClose(); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: suite.lien })); } catch (_) {} }}/> : <AccEchec geste="republier" erreur={r1 ? (r1.code ? { raison: r1.raison, status: r1.code === 'vinted-pause' ? 429 : undefined } : r1.raison) : ''}/>}</div>; })()}
         <div className="vrm-b-rangee" style={{ padding: '10px 16px 12px', borderTop: `1px solid ${C.border}`, flexShrink: 0, flexWrap: 'nowrap' }}>
           {etape === 'choix' && <Bouton variante="primaire" data-republier-suivant disabled={!sel.size} title={!sel.size ? 'Choisis au moins un article' : undefined} onClick={() => setEtape(action === 'enLigne' ? 'envoi' : 'modif')}>Continuer ({sel.size})</Bouton>}
           {etape === 'modif' && <>

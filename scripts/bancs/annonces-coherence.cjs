@@ -202,8 +202,12 @@ async function vueSelection(pg) {
           // « Prix d'achat N/M » se dit UNE fois — dans la ligne du geste quand c'est lui
           // (`data-ann-prochain-geste="prix"`), sinon dans le bandeau `data-ann-achats`. On compte
           // les deux endroits : exactement un, qui dit 2/6 et porte « Compléter ».
+          // (14 nov., refonte des listes — AJOUT 3) Au téléphone les alertes vivent dans la feuille « • À faire · N » : on l'ouvre comme lui.
+          const aFaire = await pg.$('[data-ui-afaire]');
+          if (aFaire) { await aFaire.click().catch(() => {}); await pg.waitForSelector('[data-ui-afaire-feuille] [data-ui-afaire-corps]', { timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(300); }
           const achats = await pg.evaluate(() => [...document.querySelectorAll('[data-ann-achats], [data-ann-prochain-geste="prix"]')].filter((x) => x.getBoundingClientRect().height > 0).map((x) => (x.getAttribute('data-ann-achats') || 'geste') + '|' + x.innerText.replace(/\s+/g, ' ')));
           dit(achats.length === 1 && /(^|\D)2\/6(\D|$)/.test(achats[0]) && /Compléter/.test(achats[0]) && (achats[0].startsWith('2/6|') || achats[0].startsWith('geste|')), `P ${T} UN bandeau « Prix d'achat · ${'2/6'} → Compléter »`, JSON.stringify(achats));
+          if (aFaire) { await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForSelector('[data-ui-afaire-feuille]', { state: 'detached', timeout: 5000 }).catch(() => {}); }
           if (achats.length === 1) {
             await clic(pg, achats[0].startsWith('geste|') ? '[data-ann-prochain-geste="prix"] [data-ann-prochain-geste-bouton]' : '[data-ann-achats-completer]');
             const saisie = await pg.waitForSelector('[data-fillbuy-feuille]', { timeout: 4000 }).then(() => true).catch(() => false);

@@ -38,6 +38,7 @@ import { listeAEnvoyer, autoAllume, lignesRegistre, periodesRegistre, dansPeriod
 import { useRechercheEntreprise, CarteVerifEntreprise, CarteMentionsForme } from './RechercheEntreprise.jsx';
 import { comptesConnus, avecCompte } from './facturePro/comptes.js';
 import { comptesProFacture } from './vintedPro.js';   // (11 nov., lot vinted-pro)
+import { AccAvant, AccPendant } from './ui/Accompagne.jsx';   // (14 nov.) ce qui va se passer, et ce qui ne se passera pas
 
 const ID_CFG = 'vrm_pro_facture';
 const VIDE = { nom: '', forme: '', siret: '', adresse: '', codePostal: '', ville: '', tva_regime: '', tva_taux: '', tva: '', rcs: '', capital: '', email: '', telephone: '', prefixe: 'FA', couleur: COULEURS[0], logo: '', note: '', message: '', mentionPaiement: '', envoiPar: 'vrm', copie: true, envoiAuto: false };
@@ -945,7 +946,7 @@ function FeuilleFactureVente({ vente, preuve, facture, avoir, deps, fermer }) {
       {cfg === undefined ? <p className="vrm-fp-muet">Lecture de ta fiche…</p>
         : cfg === null ? <p className="vrm-fp-muet">Ta fiche n'a pas pu être lue — réessaie dans un instant.</p>
         : emise ? <>
-          <div className="vrm-fp-etat" data-fp-envoi={(envoi && envoi.etat) || 'aucun'}>
+          <div className="vrm-fp-etat" data-fp-envoi={(envoi && envoi.etat) || 'aucun'} data-acc-apres={envoi && envoi.etat === 'envoyee' ? 'facture.pro' : undefined}>
             <b>{avoir && avoir.emiseLe ? `Annulée par l'avoir ${avoir.numero}` : envoi && envoi.etat === 'envoyee' ? `Facture envoyée le ${jourParis(envoi.at)} à ${heureParis(envoi.at)}` : envoi && envoi.etat === 'incertaine' ? 'Envoi incertain' : envoi && envoi.etat === 'refusee' ? 'Pas envoyée' : 'Émise, pas encore envoyée'}</b>
             <span>{envoi && envoi.etat === 'envoyee' ? <>à <span className="vrm-sensible" data-stream-type="acheteur">{envoi.a}</span>{envoi.via === 'vrm' ? ', par VRM, toi en copie' : ''}{envoi.retour ? ', avec le formulaire de retour de Vinted' : ''}.</> : envoi && envoi.message ? envoi.message : 'Une facture émise ne se modifie plus.'}</span>
           </div>
@@ -986,6 +987,7 @@ function FeuilleFactureVente({ vente, preuve, facture, avoir, deps, fermer }) {
           </section> : null}
           {apercu ? <section className="vrm-fp-section"><h3>Aperçu de la facture</h3><MiniatureFacture ouvrir={() => ouvrirPdf(apercuEnGrand(apercu), deps)}><ApercuFacture contenu={apercu} provisoire sensible numeroLibelle={etat && Number.isInteger(etat.prochain) && !numero ? `N° ${apercu.numero} (donné à l’émission)` : ''}/></MiniatureFacture></section> : null}
           {!mv.length && mvt.length ? <p className="vrm-fp-muet" data-fp-manque-vente="">Il manque {mvt.map((m) => m.l).join(', ')}.</p> : null}
+          <AccAvant geste="facture.pro"/>
           <div className="vrm-fp-gestes is-bas">
             {bloque && bloque.vrm ? <><p className="vrm-fp-muet" data-fp-bloque="">Ta boîte n’est pas connectée. <button type="button" className="vrm-lien-action" data-fp-geste-manque="boite" onClick={() => setFiche('boite')}>Connecter ma boîte</button></p>
               <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" data-fp-envoyer-vrm="" disabled={!!occupe || !!mv.length || !!mvt.length} onClick={() => emettre(true, 'vrm')}>{occupe ? 'Un instant…' : 'Envoyer avec VRM'}</button></>
@@ -994,7 +996,8 @@ function FeuilleFactureVente({ vente, preuve, facture, avoir, deps, fermer }) {
             <button type="button" className="vrm-b vrm-b-secondaire vrm-b-plein" data-fp-emettre="" disabled={!!occupe || !!mv.length || !!manquantsVente(donnees).length} onClick={() => emettre(false)}>Émettre sans envoyer</button>
           </div>
         </>}
-      {retour ? <p className={`vrm-fp-retour-msg${retour.ko ? ' is-ko' : ''}`} role="status" data-fp-retour={retour.ko ? 'ko' : 'ok'}>{retour.t}</p> : null}
+      {retour ? <p className={`vrm-fp-retour-msg${retour.ko ? ' is-ko' : ''}`} role="status" data-fp-retour={retour.ko ? 'ko' : 'ok'} {...{ [retour.ko ? 'data-acc-echec' : 'data-acc-apres']: 'facture.pro' }}>{retour.t}</p> : null}
+      {occupe === 'envoyer' || occupe === 'emettre' ? <AccPendant geste="facture.pro"/> : null}
     </Feuille>
   );
 }

@@ -216,6 +216,7 @@ const lireQR = (pg, site) => pg.evaluate((site) => { const s = document.querySel
         await essaie('C' + suf, async () => {
           const { ctx, pg, errs } = await page(b, T, { sombre, pont: true });
           await aller(pg, 'leboncoin', '[data-repub-lbc-porte]', 2000);
+          await pg.locator('[data-pf-afaire]').first().click().catch(() => {});   // (14 nov., refonte des sites) La porte vit dans « • À faire › » : on l'ouvre d'abord (un toucher de plus).
           await pg.locator('[data-repub-lbc-ouvrir]').first().click().catch(() => {});
           await pg.waitForSelector('[data-quoi-republier="leboncoin"]', { timeout: 10000 }).catch(() => {});
           const r = await lireQR(pg, 'leboncoin');

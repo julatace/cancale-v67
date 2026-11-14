@@ -39,6 +39,9 @@ const attendre = async (pg, f, ms = 8000) => { const t0 = Date.now(); while (Dat
 const toucher = async (o, sel) => {
   const l = o.pg.locator(sel).first();
   if (!(await l.count())) return false;
+  // (14 nov., refonte des réglages) Une ligne rangée dans un repli fermé (« Réglages avancés ») : on touche
+  // d'abord le repli, comme lui (un geste de plus, rien de caché).
+  await l.evaluate((el) => { const d = el.closest('details:not([open])'); const s = d && d.querySelector(':scope > summary'); if (s) s.click(); }).catch(() => {});
   await l.scrollIntoViewIfNeeded().catch(() => {});
   if (o.tel) await l.tap({ timeout: 4000 }).catch(() => l.click({ timeout: 4000, force: true }).catch(() => {}));
   else await l.click({ timeout: 4000 }).catch(() => {});

@@ -10,6 +10,7 @@
 //   · à l'ordinateur : le conteneur est posé tel quel à la place de la ligne (la place y est).
 // N = le nombre d'alertes qui ont rendu quelque chose (une alerte qui rend `null` ne compte pas).
 //   <AFaireHote> … <AFaireLigne/> … <VersAFaire>{alerte1}</VersAFaire> … </AFaireHote>
+// `seulement` : 'telephone' ou 'ordinateur' — deux places dans l'écran, une par appareil.
 // `capsule` : la ligne prend la forme d'une capsule de filtre (posée en tête de la rangée des vues : aucune ligne de plus).
 import React, { createContext, useContext, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -30,7 +31,13 @@ export function AFaireHote({ children }) {
     compter();
     const mo = new MutationObserver(compter);
     mo.observe(conteneur, { childList: true, subtree: true, characterData: true });
-    return () => mo.disconnect();
+    // Un geste qui OUVRE autre chose (une feuille, une saisie : « Préparer la tournée », « Compléter »…) referme
+    // « À faire » juste après son clic — sinon la feuille demandée s'ouvrirait derrière celle-ci. Un geste qui
+    // déplie sur place (« 2 nouveaux N° · Vérifier ») la laisse ouverte.
+    const ouvreAilleurs = (b) => b && ([...b.attributes].some((a) => /^data-[a-z-]*(ouvrir|completer)/.test(a.name)) || b.getAttribute('aria-haspopup'));
+    const clic = (e) => { const b = e.target && e.target.closest && e.target.closest('button, a'); if (ouvreAilleurs(b)) setTimeout(() => conteneur.dispatchEvent(new CustomEvent('vrm-afaire-fermer')), 0); };
+    conteneur.addEventListener('click', clic);
+    return () => { mo.disconnect(); conteneur.removeEventListener('click', clic); };
   }, [conteneur]);
   const v = useMemo(() => ({ conteneur, n }), [conteneur, n]);
   return <Ctx.Provider value={v}>{children}</Ctx.Provider>;
@@ -42,11 +49,17 @@ export function VersAFaire({ children }) {
   return createPortal(<div data-ui-afaire-item="">{children}</div>, c.conteneur);
 }
 
-export function AFaireLigne({ titre, className = '', capsule = false }) {
+export function AFaireLigne({ titre, className = '', capsule = false, seulement = '' }) {
   const c = useContext(Ctx);
   const [tel, setTel] = useState(telephone);
   const [ouvert, setOuvert] = useState(false);
   const place = useRef(null), corps = useRef(null);
+  React.useEffect(() => {
+    if (!c || !c.conteneur) return undefined;
+    const f = () => setOuvert(false);
+    c.conteneur.addEventListener('vrm-afaire-fermer', f);
+    return () => c.conteneur.removeEventListener('vrm-afaire-fermer', f);
+  }, [c && c.conteneur]);
   React.useEffect(() => {
     let mq = null; const f = () => setTel(telephone());
     try { mq = window.matchMedia('(max-width: 767px)'); mq.addEventListener('change', f); } catch (_) {}
@@ -59,6 +72,8 @@ export function AFaireLigne({ titre, className = '', capsule = false }) {
     if (cible && c.conteneur.parentNode !== cible) cible.appendChild(c.conteneur);
   });
   if (!c || !c.conteneur) return null;
+  if (seulement === 'telephone' && !tel) return null;
+  if (seulement === 'ordinateur' && tel) return null;
   if (!tel) return <div ref={place} className={'vrm-ui-afaire-place' + (className ? ' ' + className : '')} data-ui-afaire-place="ordinateur"/>;
   return (
     <>
@@ -66,7 +81,7 @@ export function AFaireLigne({ titre, className = '', capsule = false }) {
         <button type="button" className={(capsule ? 'vrm-ui-afaire-capsule' : 'vrm-ui-afaire') + (className ? ' ' + className : '')} aria-haspopup="dialog" aria-expanded={ouvert} data-ui-afaire={c.n} onClick={() => setOuvert(true)}>
           <span className="vrm-ui-afaire-point" aria-hidden="true"/>
           <span className="vrm-ui-afaire-mots">{titre || tr('listes.afaire')} <span className="vrm-ui-afaire-n">· {c.n}</span></span>
-          <Chevron/>
+          {capsule ? null : <Chevron/>}
         </button>) : null}
       <div ref={place} hidden data-ui-afaire-place="telephone"/>
       {ouvert ? <Feuille titre={titre || tr('listes.afaire')} onClose={() => setOuvert(false)} data-ui-afaire-feuille=""><div ref={corps}/></Feuille> : null}

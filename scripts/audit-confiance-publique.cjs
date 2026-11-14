@@ -65,7 +65,7 @@ const PREUVES = {
   'jamais-prix-achat': [['src/prixAchatPropose.js', 'rien n\'est écrit sans son tap']],
   'jamais-vendre': [['public/legal/confidentialite.html', 'VRM ne vend aucune donnée']],
   'donnees-ou': [['public/legal/confidentialite.html', 'région eu-west-1'], ['supabase/migrations/001-multi-utilisateurs.sql', 'using (owner = auth.uid())']],
-  'donnees-journal': [['src/i18n/langues/fr.js', '"reglages.tes-donnees.lib": "Ce que VRM lit et fait"']],
+  'donnees-journal': [['src/i18n/langues/fr.js', '"reglages.tes-donnees.lib": "Confidentialité : ce que VRM lit et garde"']],
   'donnees-exporter': [['src/composants/TesDonnees.jsx', 'titre="Exporter mes données"'], ['public/legal/confidentialite.html', 'Seuls les PDF de bordereau, les pièces jointes et les jetons de connexion n’y sont pas']],
   'donnees-supprimer': [['src/ecrans/Reglages.jsx', 'Supprimer mon compte'], ['public/legal/confidentialite.html', 'après la suppression de ton compte, sans accès'], ['public/legal/confidentialite.html', 'si tu veux qu’une suppression les couvre aussi, écris-nous']],
 };

@@ -32,7 +32,12 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? 'OK  ' : 'KO
   dit(ids('Exporter pour mon comptable')[0] === 'export-comptable' && ids('export')[0] === 'export-comptable', 'A4 export comptable');
   dit(ids('ma configuration')[0] === 'ma-configuration', 'A5 Ma configuration');
   dit(ids('baisser le prix de N°88').join() === 'baisser-prix:88' && ids('prix 88').join() === 'baisser-prix:88' && ids('baisser b125')[0] === 'baisser-prix:B125', 'A6 « baisser le prix de N°88 » ⇒ baisser-prix:88 (et B125)', ids('baisser le prix de N°88').join());
-  dit(ids('88').join() === 'baisser-prix:88,stock-num:88', 'A7 un N° seul : prix et Stock (la fiche est déjà « Tout sur le N° »)', ids('88').join());
+  // (14 nov., ergonomie des gestes) + « Republier N°x à la main » et « Publier N°x partout » : ils OUVRENT (kit, feuille),
+  // rien n'est envoyé (docs/passation/2026-11-14-ergonomie-gestes.md).
+  dit(ids('88').join() === 'baisser-prix:88,republier-num:88,partout-num:88,stock-num:88', 'A7 un N° seul : prix, republier à la main, publier partout, Stock (la fiche est déjà « Tout sur le N° »)', ids('88').join());
+  { const d1 = M.destinationAction({ id: 'republier-num', num: '88' }), d2 = M.destinationAction({ id: 'partout-num', num: '88' });
+    dit(d1 && d1.feuille === 'repub-main' && d1.num === '88' && d2 && d2.feuille === 'partout' && d2.num === '88' && M.destinationAction({ id: 'republier-num' }) === null,
+      'A7b « Republier N° » ouvre le kit à la main, « Publier N° partout » la feuille — jamais sans N°', JSON.stringify([d1, d2])); }
   dit(ids('ouvrir 124').join() === 'ouvrir-num:124', 'A8 « ouvrir 124 » ⇒ la fiche du N°124');
   dit(!ids('nike dunk').length && !ids('nike 42').length && !ids('Air Max 90').length && !ids('a').length, 'A9 un titre, une taille, une lettre : aucune action (la recherche reste la recherche)');
   dit(!ids('baisser').some((x) => /baisser-prix/.test(x)), 'A10 une action à N° n’apparaît jamais sans N°');

@@ -168,6 +168,13 @@ const LIRE = () => {
         photoCarree: pr.width > 40 && Math.abs(pr.width - pr.height) <= 2,
         num: vis(c.querySelector('[data-fiche-num] .vrm-num, [data-fiche-num] .vrm-fiche-num-vide')),
         prix: vis(c.querySelector('[data-prix]')), titre: vis(t), titreLignes: ts ? ts.webkitLineClamp : '', titreBlanc: ts ? ts.whiteSpace : '',
+        // (14 nov., refonte des listes) la rangée du téléphone : le titre rendu (lignes de son texte), la place du prix,
+        // et le nom lui-même (la taille en fin de titre passe dans la sous-ligne, « T. 37 »).
+        titreRendu: t ? lignes(t) : 0, titreCoupe: t ? t.scrollWidth > t.clientWidth + 1 : false,
+        titreBas: t ? Math.round(t.getBoundingClientRect().bottom) : 0, prixHaut: (() => { const e = c.querySelector('[data-prix]'); return e ? Math.round(e.getBoundingClientRect().top) : 0; })(),
+        tailleSous: vis(c.querySelector('[data-etat-taille]')) ? c.querySelector('[data-etat-taille]').textContent.trim() : '',
+        tailleAuTitre: vis(c.querySelector('[data-titre-taille-fin]')),
+        finTaille: t ? /\b(?:taille|t\.?)\s*\d{2}(?:[.,]5)?\s*$/i.test(t.textContent.trim()) : false,
         caches: ['[data-chiffres]', '[data-fiche-duo]', '[data-fiche-plus]', '[data-marque="vinted"]', '[data-stats-compte]', '.vrm-note-ajout'].filter((s) => vis(c.querySelector(s))),
         visibles: ['[data-edition="achat"]', '[data-edition="min"]', '[data-edition="refuse"]', '[data-edition="boost"]', '[data-marge]', '[data-fiche-gestes]', '[data-fiche-menu-ouvrir]', '[data-annonce-prix-partout], [data-annonce-prix-vinted]'].filter((s) => vis(c.querySelector(s))),
         coupes: coupes(c), libellesDeuxLignes: deuxLignes(c, '.vrm-fiche-cell > span:first-child, .vrm-fiche-etat-haut > span:first-child, .vrm-fiche-geste'),
@@ -190,7 +197,9 @@ async function scenario(b, largeur, sombre) {
     await pg.waitForTimeout(800);
     let L = await pg.evaluate(LIRE);
     // G1 — un en-tête par compte
-    dit(L.tetes.length === 2 && L.tetes.some((t) => /^C compte_test 4 annonces$/.test(t.txt)) && L.tetes.some((t) => /^S second_banc 3 annonces$/.test(t.txt)), `${tag} G1 : un en-tête par compte (initiale, nom, nombre)`, JSON.stringify(L.tetes));
+    // (14 nov., refonte des listes — AJOUT 3 de Julien) Au téléphone l'en-tête d'un compte est la ligne grise d'iOS
+    // (nom, nombre ; le rond de l'initiale n'y est plus) ; à l'ordinateur, initiale + nom + nombre comme avant.
+    dit(L.tetes.length === 2 && L.tetes.some((t) => (mobile ? /^compte_test 4 annonces$/ : /^C compte_test 4 annonces$/).test(t.txt)) && L.tetes.some((t) => (mobile ? /^second_banc 3 annonces$/ : /^S second_banc 3 annonces$/).test(t.txt)), `${tag} G1 : un en-tête par compte (${mobile ? 'nom, nombre' : 'initiale, nom, nombre'})`, JSON.stringify(L.tetes));
     // G2 — chaque annonce une fois ; chaque compte d'un bloc, ses annonces de la plus ancienne à la plus récente (l'ordre de l'écran)
     const attendus = TOUS.map((x) => String(x.id)).sort();
     dit(L.n === TOUS.length && [...L.ids].sort().join() === attendus.join(), `${tag} G2 : chaque annonce une fois (n en entrée = n en sortie)`, L.ids.join(','));
@@ -199,12 +208,16 @@ async function scenario(b, largeur, sombre) {
     const bienRanges = blocs.length === 2 && blocs.every((bl) => bl.ids.every((id) => (bl.uid === '111' ? ITEMS_111 : ITEMS_222).some((x) => String(x.id) === id)) && bl.ids.every((id, i) => i === 0 || age(bl.ids[i - 1]) <= age(id)));
     dit(bienRanges, `${tag} G2 : chaque compte en un bloc, ses annonces dans l'ordre « les plus anciennes »`, JSON.stringify(blocs));
     // G3 — colonnes
-    dit(mobile ? L.colonnes === 2 : (L.colonnes >= 4 && L.colonnes <= 6), `${tag} G3 : ${mobile ? '2 colonnes' : '4 à 6 colonnes'}`, String(L.colonnes));
+    // (14 nov., AJOUT 2 « imagine si j'ai 1000 articles ») Au téléphone : une LISTE, une colonne, des rangées de 64 à 76 px.
+    const hautsF = L.cartes.filter((c) => !c.ouverte).map((c) => c.h);
+    const hautsR = L.cartes.filter((c) => !c.ouverte && !c.remise).map((c) => c.h);   // une proposition « Même paire ? » posée sur la rangée l'agrandit : elle n'est pas une rangée simple
+    dit(mobile ? (L.colonnes === 1 && hautsR.length > 0 && hautsR.every((h) => h >= 64 && h <= 76)) : (L.colonnes >= 4 && L.colonnes <= 6), `${tag} G3 : ${mobile ? 'une liste, rangées de 64 à 76 px' : '4 à 6 colonnes'}`, mobile ? `${L.colonnes} colonne(s) · ${hautsR.join(',')}` : String(L.colonnes));
     // G4 — vignette fermée
     const fermees = L.cartes.filter((c) => !c.ouverte);
     dit(fermees.length === L.n && fermees.every((c) => c.photoCarree && c.num && c.prix && c.titre), `${tag} G4 : photo carrée, N° en pastille, titre, prix sur chaque vignette`, JSON.stringify(fermees.filter((c) => !(c.photoCarree && c.num && c.prix && c.titre)).map((c) => c.id)));
     dit(fermees.every((c) => c.caches.length === 0 && c.visibles.length === 0), `${tag} G4 : fermée, rien d'autre (ni achat/mini/refuse/boost/marge/gestes, ni le « V », ni le compte, ni l'icône note seule)`, JSON.stringify(fermees.filter((c) => c.caches.length || c.visibles.length).map((c) => [c.id, c.caches, c.visibles])));
-    dit(fermees.every((c) => String(c.titreLignes) === '2' && c.titreBlanc === 'normal'), `${tag} G4 : le titre tient sur deux lignes (jamais une ligne coupée « … »)`, JSON.stringify(fermees.map((c) => [c.titreLignes, c.titreBlanc])));
+    if (mobile) dit(fermees.every((c) => c.titreRendu === 1 && c.prixHaut >= c.titreBas - 1 && (!c.finTaille || (!c.tailleAuTitre && /^T\. \d/.test(c.tailleSous)))), `${tag} G4 : le nom tient sa ligne (jamais coupé au profit du prix, qui est dessous) ; la taille dans la sous-ligne`, JSON.stringify(fermees.map((c) => [c.id, c.titreRendu, c.prixHaut - c.titreBas, c.finTaille, c.tailleSous])));
+    else dit(fermees.every((c) => String(c.titreLignes) === '2' && c.titreBlanc === 'normal'), `${tag} G4 : le titre tient sur deux lignes (jamais une ligne coupée « … »)`, JSON.stringify(fermees.map((c) => [c.titreLignes, c.titreBlanc])));
     // G5 — un seul gabarit (hors la vignette qui porte une proposition « Même paire ? »)
     const hs = fermees.filter((c) => !c.remise).map((c) => c.h);
     dit(hs.length > 3 && Math.max(...hs) - Math.min(...hs) <= 2, `${tag} G5 : un seul gabarit de vignette (même hauteur)`, JSON.stringify(fermees.map((c) => [c.id, c.h])));
@@ -250,7 +263,9 @@ async function scenario(b, largeur, sombre) {
     const menu = await pg.waitForSelector('[data-fiche-menu="9402"]', { timeout: 5000 }).then(() => true).catch(() => false);
     const gestes = menu ? await pg.evaluate(() => ['[data-fiche-relier-achat]', '[data-fiche-passeport]', '[data-fiche-vendue]', '[data-annonce-histoire]'].filter((s) => document.querySelector(s)).length) : 0;
     dit(menu && gestes === 4, `${tag} G7 : « … » ouvre ses gestes (relier un achat, passeport, histoire, marquer vendue)`, `menu ${menu} · ${gestes}/4`);
-    if (menu) { await capture(pg, `grille-${nom}-menu`); await pg.keyboard.press('Escape'); await pg.waitForTimeout(400); }
+    // (14 nov.) Le menu se ferme, puis on ATTEND qu'il soit parti (sur une machine chargée, 400 ms ne suffisaient pas :
+    // son voile prenait encore le clic de « Moins de détails » — un délai fixe n'est pas une preuve, règle 5 du §6).
+    if (menu) { await capture(pg, `grille-${nom}-menu`); await pg.keyboard.press('Escape'); await pg.waitForSelector('[data-fiche-menu="9402"]', { state: 'detached', timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(200); }
     // « Moins de détails » la referme.
     await toucher(pg, '[data-carte-annonce="9402"] [data-fiche-plus-bouton]', mobile);
     await pg.waitForTimeout(400);

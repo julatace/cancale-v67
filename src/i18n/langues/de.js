@@ -11,27 +11,37 @@ import ecran_messages from './de/messages.js';
 import ecran_emails from './de/emails.js';
 import ecran_stats from './de/stats.js';
 import ecran_compta from './de/compta.js';
+import ecran_listes from './de/listes.js';
+import ecran_refonte_ms from './de/refonte-ms.js';
+import ecran_argent from './de/argent.js';
 import ecran_fiche from './de/fiche.js';
+import ecran_ergonomie from './de/ergonomie.js';
 import ecran_tarifs from './de/tarifs.js';
 import ecran_nouveaux from './de/nouveaux.js';
-import ecran_listes from './de/listes.js';
 import ecran_plus from './de/plus.js';
-import ecran_argent from './de/argent.js';
+import ecran_plateformes from './de/plateformes.js';
 import ecran_colisplus from './de/colisplus.js';   // (14 nov., lot colis-plus)
 import ecran_accueilReste from './de/accueilReste.js';
 import ecran_fraiscarte from './de/fraiscarte.js';   // (14 nov., frais-carte)
 import ecran_atelier from './de/atelier.js';
+import ecran_accompagnement from './de/accompagnement.js';   // (14 nov.) les quatre moments d'un geste
 import ecran_argentprix from './de/argentprix.js';   // (14 nov., argent-prix)
+import ecran_rechliste from './de/rechliste.js';
 export default {
   ...ecran_accueilReste,
+  ...ecran_refonte_ms,
+  ...ecran_listes,
   ...ecran_fiche,
+  ...ecran_ergonomie,
   ...ecran_fraiscarte,
   ...ecran_tarifs,
   ...ecran_nouveaux,
   ...ecran_atelier,
-  ...ecran_listes,
+  ...ecran_rechliste,
+  ...ecran_accompagnement,
   ...ecran_plus,
   ...ecran_argentprix,
+  ...ecran_plateformes,
   ...ecran_compta,
   ...ecran_argent,
   ...ecran_colisplus,
@@ -218,11 +228,18 @@ export default {
   "nav.journee.court": "Heute",
   "nav.messages": "Nachrichten",
   "nav.plus": "Mehr",
+  "nav.paires": "Paare",
+  "nav.groupe.paires": "Paare",
   "nav.trancher": "Zu entscheiden",
   "nav.ventes": "Verkäufe",
   // ── coque
   "coque.fermerMenu": "Menü schließen",
   "coque.monProfil": "Mein Profil",
+  "coque.aRevoir": "zu prüfen",
+  "coque.actionsVinted": "Vinted-Aktionen",
+  "coque.cacherMontants": "Beträge ausblenden",
+  "coque.nouveau": "neu",
+  "coque.misAJour": "Aktualisiert um {h}",
   "coque.navigationPrincipale": "Hauptnavigation",
   "coque.ouvrirProfil": "mein Profil öffnen",
   "coque.tonEspace": "Dein Bereich",
@@ -470,7 +487,7 @@ export default {
   "reglages.imprimante.thermique": "Thermo · {papier}",
   "reglages.je-vends.desc": "Was du verkaufst: Wörter und Beispiele passen sich an.",
   "reglages.je-vends.lib": "Ich verkaufe",
-  "reglages.journal-vrm.lib": "Was VRM getan hat",
+  "reglages.journal-vrm.lib": "Protokoll: was VRM getan hat",
   "reglages.langue.chargement": "Wird geladen…",
   "reglages.langue.desc": "Die Sprache von VRM, gleich auf all deinen Geräten.",
   "reglages.langue.rate": "Sprache nicht geladen — versuch es nochmal.",
@@ -552,7 +569,7 @@ export default {
   "reglages.stream.desc": "Wörter, Marken und Konten zum Verbergen wählen.",
   "reglages.stream.lib": "Was der Stream verbirgt",
   "reglages.tes-donnees.desc": "Pro Website: wo es liegt, wer Zugriff hat.",
-  "reglages.tes-donnees.lib": "Was VRM liest und tut",
+  "reglages.tes-donnees.lib": "Datenschutz: was VRM liest und speichert",
   "reglages.toutvabien.desc": "Jedes Konto, sein letztes Lesen und die Erweiterung jedes Geräts.",
   "reglages.toutvabien.lib": "Alles okay?",
   "reglages.discretion.desc": "Tageslimit und Vinted-Bremsen, Konto für Konto.",

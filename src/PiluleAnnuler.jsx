@@ -67,6 +67,7 @@ export function PiluleAnnuler({ gestes, enHaut = false }) {
     <div ref={zone} className="vrm-pil-zone" data-pilule-place={enHaut ? 'haut' : 'bas'} role="status" aria-live="polite" aria-atomic="true">
       {montree ? (
         <div key={montree.id} className={'vrm-pil' + (v ? '' : ' is-sortie') + (t.alerte ? ' is-alerte' : '')} data-pilule={montree.id} data-pilule-etat={montree.etat}
+          data-acc-apres={montree.acc && !t.alerte && montree.etat !== 'annule' ? montree.acc : undefined} data-acc-echec={montree.acc && t.alerte ? montree.acc : undefined}
           onPointerEnter={(e) => { if (e.pointerType === 'mouse') { raisons.current.survol = true; suspendre(); } }}
           onPointerLeave={(e) => { if (e.pointerType === 'mouse') { raisons.current.survol = false; suspendre(); } }}
           onFocus={() => { raisons.current.focus = true; suspendre(); }}

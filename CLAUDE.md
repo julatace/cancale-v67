@@ -525,11 +525,9 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **14 nov. · Intégration des refontes** : coque, listes (Annonces, Ventes, Ma journée), Messages/Stock, plateformes/Réglages, recherche, gestes et accompagnement réunis en une version (vrais merges, 44 écrans montés avant/après) ; loupe : pas un bug (la feuille « bilan en une minute » couvrait le banc). `git log origin/claude/integration-refonte`. Geste : aucun.
+- **14 nov. · Accompagnement des gestes** : chaque action dit avant (ce qui va se passer ET ce qui ne se passera pas), pendant (« 3 / 8 », Tout arrêter), après (résultat + « Ensuite › »), échec (raison en mots + geste) — brique `src/ui/Accompagne.jsx` + `src/accompagnement.js` §9 ; listes vides et premières fois ; aucun « Annuler »/confirmation/« ? » ajouté (sa décision). `docs/passation/2026-11-14-accompagnement.md`. Geste : aucun.
 - **14 nov. · Extension 5.377.0 : « VRM a capté » + carte Favoris · Annonces · Ventes** : bulle près du logo et toast dans l'app quand une écriture RÉUSSIE range du nouveau (par identité, `vrmCapteVu`), « Compte relié · … » à la connexion, réglage partagé carte ↔ Paramètres ; carte : compte de l'onglet d'abord, favoris du plus récent cochés ⇒ « Envoyer le message (N) », autres comptes floutés `inert`, lecture seule. `docs/passation/2026-11-14-popup-capte.md`. Geste : installer la 5.377.0.
-- **14 nov. · Mode exemple : photos et impossible à confondre** : 21 vraies photos (Commons, CC0 / domaine public, crédits `public/exemple/CREDITS.md`, une par paire, titre = la photo) ; bandeau « Exemple — données inventées » + « J’ai déjà un compte · Me connecter », cadre hachuré au-dessus de tout, « exemple » sur codes et adresses, « Relais Exemple, rue Imaginaire » (capture d’accueil refaite). `2026-11-14-exemple-photos.md`. Geste : aucun.
-
-- **14 nov. · Accueil, le reste (133 134 136 139 140 143 145 146 147)** : « J'ai déjà mes N° sur mes cartons » (aucun N° neuf avant sa réponse, N° écrit en double ⇒ rouge, rien adopté), « Ce que VRM a trouvé », visite de 4 écrans, mots expliqués, conseil du jour 30 j, essai en chiffres prouvés, vidéo 45 s, Apple prêt et ÉTEINT, appel de bienvenue Pro ; « À trancher » ne recouvre plus Ma journée. `docs/passation/2026-11-14-accueil-reste.md`. Geste : coller son lien de réservation (Paramètres → Aide) ; Apple si voulu (99 €/an).
-
 
 
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier

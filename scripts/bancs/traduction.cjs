@@ -122,9 +122,9 @@ async function avecSession(nav, l, W, D, cles) {
     dit(!r2.debord, `${T} ${tab} : rien ne déborde à droite`);
     await capture(pg, `trad-${l}-${W}-${tab}`);
   }
-  // Le menu « Plus » (téléphone) / la colonne (ordinateur).
+  // Le menu « Plus » (téléphone) / la colonne (ordinateur). (14 nov., choix n° 61) « Plus » est devenu le ☰ du haut.
   if (o.tel) {
-    const plus = pg.locator('.vrm-nav-more').first();
+    const plus = pg.locator('[data-menu-ecrans], .vrm-nav-more').first();
     if (await plus.count()) { await plus.click().catch(() => {}); await attendre(700); s = await sondeLangue(pg, cles); dit(!s.brutes.length && !s.debord, `${T} menu « Plus » : aucune clé brute, rien ne déborde`, s.brutes.join(', ') + ' ' + s.dehors.join(' ¦ ')); await capture(pg, `trad-${l}-${W}-plus`); await pg.keyboard.press('Escape').catch(() => {}); await attendre(300); }
     else dit(false, `${T} le bouton « Plus » existe`);
   }

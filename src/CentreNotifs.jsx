@@ -61,14 +61,19 @@ function GroupeNotifs({ g, lu, onOuvrir, Icon }) {
 // pas su — « pas su » n'affiche jamais « 0 »).
 // `enPlus` : les notifications LOCALES (« Où ranger », src/ouRanger.js) — comptées
 // dans la pastille, jamais envoyées au téléphone.
-export function BoutonCentreNotifs({ nonLues, onOuvrir, Icon, enPlus = 0 }) {
+// (14 nov., refonte de la coque) `alerte` : la ligne de fraîcheur a quelque chose à revoir (un compte pas relu,
+// l'extension muette…) — elle ne s'écrit plus en tête de page (jamais au-dessus du titre) : un POINT ambre sur
+// la cloche, et la ligne entière (son détail, son geste) en tête de la feuille.
+export function BoutonCentreNotifs({ nonLues, onOuvrir, Icon, enPlus = 0, alerte = false, alerteNom = '' }) {
   const n = (Number.isSafeInteger(nonLues) && nonLues > 0 ? nonLues : 0) + (Number.isSafeInteger(enPlus) && enPlus > 0 ? enPlus : 0);
-  const lib = n ? `Notifications : ${n} non lue${n > 1 ? 's' : ''}` : 'Notifications';
+  const lib = (n ? `Notifications : ${n} non lue${n > 1 ? 's' : ''}` : 'Notifications') + (alerte && alerteNom ? ` · ${alerteNom}` : '');
   return (
     <button className="vrm-hbtn vrm-cn-cloche" type="button" data-centre-notifs-cloche="" data-non-lues={Number.isSafeInteger(nonLues) ? String(nonLues) : ''}
-      aria-label={lib} title={lib} onClick={onOuvrir}>
+      aria-label={lib} title={lib} onClick={onOuvrir} data-cn-alerte={alerte ? '1' : undefined}>
       <Icon name="bell2" size={21}/>
-      {n ? <span className="vrm-cn-pastille" aria-hidden="true">{n > 99 ? '99+' : n}</span> : null}
+      {/* (14 nov., refonte de la coque) « 9+ » au plus : au-delà, le nombre exact est dans la feuille (et lu dans `aria-label`). */}
+      {alerte ? <span className="vrm-cn-alerte" data-cn-point-alerte="" aria-hidden="true"/> : null}
+      {n ? <span className="vrm-cn-pastille" data-cn-pastille={String(n)} aria-hidden="true">{n > 9 ? '9+' : n}</span> : null}
     </button>
   );
 }
@@ -79,7 +84,7 @@ export function BoutonCentreNotifs({ nonLues, onOuvrir, Icon, enPlus = 0 }) {
 // titre, la même croix, portail, retour du navigateur). `aRanger` : les achats qui
 // viennent d'arriver et LA case proposée (src/ouRanger.js) — locales, jamais
 // envoyées au téléphone ; `undefined` = en cours, `null` = pas su (rien n'est dit).
-export function FeuilleCentreNotifs({ onFermer, charger, ecrireLu, onAller, onReglages, Fermer, Icon, z = 9500, aRanger = null, onRanger = null, onRangeFait = null }) {
+export function FeuilleCentreNotifs({ onFermer, charger, ecrireLu, onAller, onReglages, Fermer, Icon, z = 9500, aRanger = null, onRanger = null, onRangeFait = null, enTete = null }) {
   const [etat, setEtat] = React.useState({ entrees: undefined, lu: null });
   const [filtre, setFiltre] = React.useState('');
   const vivant = React.useRef(true);
@@ -109,6 +114,7 @@ export function FeuilleCentreNotifs({ onFermer, charger, ecrireLu, onAller, onRe
   return (
     <SheetShell onClose={onFermer} titre="Notifications" maxWidth={560} z={z} FermeAuRetour={Fermer}
       className="vrm-cn-feuille" aria-label="Notifications" data-centre-notifs="" data-centre-etat={etatListe} data-noswipe="1">
+      {enTete ? <div className="vrm-cn-entete" data-centre-fraicheur="">{enTete}</div> : null}
       {(nonLues > 0 && lu !== null) || types.length > 1 ? (
         <div className="vrm-cn-barre">
           {types.length > 1 ? (

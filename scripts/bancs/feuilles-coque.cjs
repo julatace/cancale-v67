@@ -151,6 +151,14 @@ srv.listen(PORT);
 // les fixtures n'en gardent que 4 caractères. Servi seulement quand le contexte
 // le demande (`etat.pdf`) — sinon « Tout imprimer » dit « plus leur PDF ».
 let PDF_B64 = null;
+// (14 nov., refonte de la coque) Au téléphone, la pastille « Actions Vinted » ne tient plus dans la barre du haut
+// (loupe · cloche · compte) : son panneau s'ouvre par le menu du compte. À l'ordinateur, l'île la montre.
+const ouvrirEtatActions = async (pg) => {
+  const b = pg.locator('.vrm-app-header [data-etat-actions]').first();
+  if (await b.isVisible().catch(() => false)) { await b.click().catch(() => {}); return; }
+  await pg.locator('[data-profil-tete]').first().click().catch(() => {}); await pg.waitForTimeout(800);
+  await pg.locator('[data-profil-menu="etat-actions"]').first().click().catch(() => {}); await pg.waitForTimeout(400);
+};
 async function fabriquerPdf() {
   if (PDF_B64) return PDF_B64;
   const PL = require(path.join(__dirname, '..', '..', 'node_modules', 'pdf-lib', 'cjs', 'index.js'));
@@ -581,7 +589,7 @@ const attendre = async (pg, fn, arg, ms = 8000) => { const t0 = Date.now(); whil
       const btn = await pg.$('[data-etat-actions]');
       if (!btn) dit(false, `[${tag}] État des actions : le bouton existe`, 'introuvable');
       else {
-        await btn.click(); await pg.waitForTimeout(900);
+        await ouvrirEtatActions(pg); await pg.waitForTimeout(900);
         const e = await pg.evaluate(`(${BAS_DE})('[data-etat-panneau]')`);
         if (avecExt) { const nv = await pg.evaluate(() => { const p = document.querySelector('[data-etat-panneau]'); return p ? Math.round(p.getBoundingClientRect().height) + ' px · ' + (p.innerText || '').split('\n')[0].slice(0, 40) : ''; }); dit(/Actions|ordinateur|extension/i.test(nv) || parseInt(nv, 10) > 0, `[${tag}] le banc sert une extension qui répond (panneau de ${nv})`, nv); }
         if (!e.trouve) dit(false, `[${tag}] État des actions : le panneau s'ouvre`, 'introuvable');

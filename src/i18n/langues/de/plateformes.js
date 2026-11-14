@@ -1,0 +1,20 @@
+// de · plateformes et réglages (14 nov., refonte visible : Leboncoin, eBay, Vestiaire, Paramètres, connexion) — la source : fr/plateformes.js.
+export default {
+  "plateformes.actualisation": "Wird aktualisiert…",
+  "plateformes.actualiser": "Aktualisieren",
+  "plateformes.mfa.comment": "Wie?",
+  "plateformes.proprio.detail": "Technische Details",
+  "plateformes.proprio.intro": "Dein Konto bleibt kostenlos. Diese Schritte lassen nur deine Kunden bezahlen.",
+  "plateformes.proprio.mentions": "Impressum vervollständigen",
+  "plateformes.proprio.mentionsPasSu": "Impressum prüfen",
+  "plateformes.proprio.ouvrir": "Zahlungen öffnen",
+  "plateformes.proprio.prix": "Den richtigen Preis bei Stripe setzen",
+  "plateformes.proprio.pro": "Pro-Angebot öffnen",
+  "plateformes.publierSur": "Auf {site} einstellen",
+  "plateformes.reglages.avances": "Erweiterte Einstellungen",
+  "plateformes.reglagesEbay": "eBay-Einstellungen",
+  "plateformes.rien": "Nichts passt zu dieser Suche.",
+  "plateformes.vc.chercher": "Nr., Titel…",
+  "plateformes.vc.chercherLabel": "Vestiaire-Anzeige suchen (Nr., Titel)",
+  "plateformes.vendreEbay": "Auf eBay verkaufen",
+};
