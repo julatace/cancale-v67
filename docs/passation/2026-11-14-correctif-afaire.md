@@ -43,5 +43,48 @@ gauche (« Mettre en vente » coupé au bord). « OK », le voile : rien ne ferm
 - `src/ui/ui.css` : `[hidden]` et la classe de repos gagnent sur tout `display` posé sur ces classes (0,8,1).
 - `src/App.jsx` : `alignItems:'stretch'` sur la section Vestiaire ; `poserFermeAuRetour(FermeAuRetour)`.
 
-## Preuves
-Voir le rapport chiffré en bas (mis à jour à la fin de la session).
+- `src/plateformes/plateformes.css` : une porte d'un seul bouton (« Baisser des prix ») devient la rangée
+  entière (plus de capsule grise dans une rangée blanche à moitié vide).
+
+## Les autres pièges du même genre (trouvés par le banc, corrigés)
+- **Un geste d'« À faire » ouvrait sa feuille DERRIÈRE le voile** : Annonces, « Prochain geste · Compléter »
+  ouvre la saisie des prix d'achat (z 1000) sous « À faire » (z 20000) — invisible ; de même tout ⓘ
+  (`Pourquoi` : une `SheetShell` z 12000) posé dans « À faire » (Colis : « à envoyer en priorité ⓘ »,
+  « Préparer la tournée ⓘ »). Correction générale : `Feuille fermeSiAutreCouche` (« À faire » d'Annonces, de
+  Colis, des sites, `LigneAFaire`) — toute couche modale qui apparaît après un toucher dans la feuille (1,5 s)
+  la referme, marquée ou non ; `data-afaire-ferme` compris par `AFaire.jsx` ; un bouton qui DÉPLIE sur place
+  (`aria-expanded`, « 2 nouveaux N° · Vérifier ») la laisse ouverte (avant, `data-num-neufs-ouvrir` la fermait
+  et cachait ce qu'il dépliait).
+- **La page glissait de 2 px** : au téléphone, des bandes « bord à bord » (`margin: 0 -16px` : la barre collée
+  d'Annonces, la recherche d'Achats) posées dans une gouttière de 14 px dépassaient de 2 px de chaque côté ;
+  `.vrm-main` (overflow-x hidden, donc défilable par un focus / `scrollIntoView`) avait 392 px à faire défiler
+  sur 390, et le toucher d'un « ⋯ » d'Achats le décalait de 2 px — pour de bon. Correction : au téléphone,
+  chaque enfant de `.vrm-main` coupe en largeur (`overflow-x: clip`, spécificité nulle : un enfant qui pose son
+  propre `overflow-x` le garde ; le collé reste collé ; une couche fixe n'est pas coupée).
+- Balayage de 29 écrans au téléphone (chaque ouvreur visible : aides, comptes, « À faire », « ⋯ », périodes…) :
+  rien d'autre (aucun voile laissé, aucun `[hidden]` dessiné, aucun débord, un balayage horizontal du doigt ne
+  décale rien).
+
+## Preuves (banc `afaire-feuille`)
+- **Avant** (`git archive origin/claude/integration-refonte`, build, banc copié dedans) : 19 rouges sur
+  Annonces · Vestiaire, Annonces · Vinted et Colis (390 tactile, clair) — voile dessiné à l'arrivée,
+  `[hidden]` dessiné, « OK » / voile / glisser ne ferment pas, « retour » change d'écran, carte élargie par une
+  ligne longue (H2), « Baisser des prix » ouvre derrière, « Compléter » ouvre derrière ; balayage avant la coupe
+  en largeur : 20 rouges sur Achats + Annonces (`.vrm-main` 392/390, décalé de 2 px après « ⋯ »).
+- **Mutation** (la feuille fermée garde `vrm-ui-voile`, sans la classe de repos ni la règle `[hidden]`) :
+  23 rouges (Vestiaire + eBay).
+- **Après** : feuilles 390 tactile + 1512 souris, clair + sombre, 7 cas au téléphone (Annonces · Vinted /
+  Vestiaire / Leboncoin / eBay, Colis, l'exemple × 2) et 3 à l'ordinateur : **575 verts, 0 rouge** ; dernier
+  build, 390 clair + sombre : **388 verts, 0 rouge**. Balayage des 29 écrans : 169 verts, 15 rouges sur le build
+  intermédiaire (13 = Achats, la coupe ne passait pas sous les gardes d'écran en `display: contents` — corrigé ;
+  2 = machine : un navigateur tombé sur Paramètres, une erreur du service worker « Failed to access storage »,
+  disque plein à 98 %) ; Achats, Annonces, Paramètres, Communauté, Ventes rejoués sur le dernier build :
+  **52 verts, 0 rouge**.
+- Audits verts : traduction, tdz, variables, coherence, composants, violet, rouge-doublon, identite, csp.
+- Bancs (dernier build) : garde-ecrans, accompagnement (28 moments), achats-retraits (84/0), tout-imprimer
+  (28 conformes), exemple-photos verts ; accueil-reste et refonte-listes rouges sur la passe chargée (un délai de
+  3 s, une recherche à 328–399 ms pour 300) puis **verts relancés seuls** (recherche 189 ms).
+  refonte-plateformes-reglages : 4 rouges, tous « tailles » 14 px du bandeau du mode exemple (« Exemple —
+  données inventées », « J'ai déjà un compte · Me connecter ») — **les mêmes sur `origin/claude/integration-refonte`**
+  (relancé sur son build : 2 défauts par thème) : préexistant, rien à voir avec ce correctif, à reprendre à part.
+- `PARTIES=feuilles|balayage`, `CAS=`, `LARGEURS=`, `THEMES=`, `ECRANS=`, `BANC_DIST=`, `SHOTS=`.
