@@ -104,7 +104,7 @@ function FeuilleRecherche({ liste, onChanger, extEtat, extVersion, onClose }) {
       {extEtat && extEtat !== 'ok' ? <p className="vrm-plus-couv" data-recherche-ext={extEtat}><span className="vrm-plus-point" aria-hidden="true"/>{tr('plus.recherche.ext', { v: extVersion })}</p> : null}
       {propre.length ? <div className="vrm-plus-groupe" data-recherche-liste="">
         {propre.map((r) => (
-          <Ligne key={r.id} titre={[r.marque, r.modele].filter(Boolean).join(' · ')} sous={resumeRecherche({ ...r, marque: '', modele: '' }).replace(/^ · /, '') || ' '} data-recherche-id={r.id}
+          <Ligne key={r.id} titre={[r.marque, r.modele].filter(Boolean).join(' · ')} sous={[r.tailles.map((k) => k.replace('.', ',')).join(' / '), r.prixMax != null ? `≤ ${String(r.prixMax).replace('.', ',')} €` : ''].filter(Boolean).join(' · ') || resumeRecherche(r)} data-recherche-id={r.id}
             chevron={false}>
             <button type="button" className="vrm-plus-lien" data-recherche-retirer={r.id} onClick={() => onChanger(propre.filter((x) => x.id !== r.id))}>{tr('plus.recherche.retirer')}</button>
           </Ligne>

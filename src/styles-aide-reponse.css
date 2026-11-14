@@ -73,3 +73,11 @@
 :root:root:root body .vrm-plus-feuille .vrm-plus-groupe { background: var(--d-carte, #fff) !important; box-shadow: none !important; }
 :root:root:root body h2.vrm-plus-entete, :root:root:root body h3.vrm-plus-entete { font: 400 13px/18px var(--vrm-police, system-ui) !important; color: var(--d-gris, #6E6E73) !important; letter-spacing: 0 !important; margin: 24px 4px 6px !important; text-transform: none !important; }
 :root:root:root body .vrm-ui-feuille.vrm-plus-feuille { background: var(--d-fond, #F2F2F7) !important; }
+/* Le coin arrondi est aussi porté par la première et la dernière rangée : une rangée en
+   `content-visibility:auto` (src/ui/ui.css) peut peindre hors du découpage arrondi du groupe. */
+:root:root:root body .vrm-plus-groupe { isolation: isolate !important; }
+:root:root:root body .vrm-plus-groupe > :first-child { border-top-left-radius: 16px !important; border-top-right-radius: 16px !important; }
+:root:root:root body .vrm-plus-groupe > :last-child { border-bottom-left-radius: 16px !important; border-bottom-right-radius: 16px !important; }
+/* Dans une feuille (fond gris), un champ est une case BLANCHE (sinon il disparaît dans le fond). */
+:root:root:root body .vrm-plus-feuille .vrm-plus-champ input { background: var(--d-carte, #fff) !important; min-height: 44px !important; border-radius: 12px !important; padding: 0 12px !important; }
+:root:root:root body .vrm-plus-feuille .vrm-plus-url { background: var(--d-carte, #fff) !important; }
