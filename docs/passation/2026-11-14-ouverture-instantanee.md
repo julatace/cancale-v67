@@ -135,6 +135,10 @@ encombrement ; « ramené à ×4 » = un processeur 4 fois plus lent que la mach
 62-68** (médiane 1,1 s ramenée à ×4) : la règle de trois sur l'encombrement est grossière (une partie du
 temps n'est pas du calcul). Le gain, lui, est net à charge égale : ≈ 4 fois plus tôt.
 
+**Relancé après le dernier `git merge origin/main`** (charge 35-44) : **19 verts, 1 rouge** — 2e ouverture
+3,1 s ramenée à ×4 (une seule mesure lente : machine ×4,2 à cet instant), puis **0,83 s et 0,53 s** ;
+médiane < 1 s verte ; hors ligne 0,67 s à ×4 ; panne, autre compte, coquille, lectures : verts.
+
 ### Le banc et les preuves
 - `scripts/bancs/ouverture-instantanee.cjs` — **après : 18 verts, 2 rouges** (les deux seuils « < 1 s »
   sous charge 62-68 ; verts à charge ≈ 12). **Sur origin/main** (banc et `_base-volume.cjs` copiés dans
