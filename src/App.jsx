@@ -759,6 +759,8 @@ import "./styles-popups.css";       // (9 nov., lot AI) l'avatar du compte Vinte
 import {ChoixReponses,ResumeOffre} from "./ActionsClaires.jsx";
 import {LignePlancher} from "./LignePlancher.jsx";
 import { CLE_NOTES_PAIRES, NOTE_MAX, noteDe, opsNote, notesPropres, numerosAmbigus } from './notePaire.js';
+import { CLE_FUSIONS, pairesFusionnees, aliasDuNumero } from './fusionFiches.js';
+import { CLE_SEANCE } from './seancePhoto.js';
 // (11 nov.) « Me le rappeler » : la règle (api/_lib/rappels-perso.js, la même que le serveur) et la forme (src/Rappels.jsx).
 import { CLE_RAPPELS, lireRappels, nouveauRappel, reporterRappel, marquerFait, supprimerRappel, purgerRappels, rappelsDuJour, rappelsAVenir, rappelsFaits, rappelDeCible, etatCible, lienRappel, cibleRappel, quandEnMots as quandRappel } from '../api/_lib/rappels-perso.js';
 import { lienNotif as lienNotifRappel } from '../api/_lib/lien-notif.js';
@@ -2995,6 +2997,10 @@ const SYNC_KEYS = [
   // src/notePaire.js) — à lui seul, jamais envoyée à une plateforme. (lot BH) Les achats
   // hors plateforme masqués comme DOUBLE d'un autre (« Garder celle-ci », src/achatsDoubles.js).
   'vrm_notes_paires', 'vrm_achats_hors_masques',
+  // (14 nov., propositions 103 et 107) La SÉANCE PHOTO en cours ({ seance: { at, n, cles }, 'c:<N°>': ISO },
+  // src/seancePhoto.js) et les FICHES FUSIONNÉES sur son clic ({ [id]: { ids, nums, carton, copies, at, annuleeAt? } },
+  // src/fusionFiches.js) — aucun N° n'y change.
+  'vrm_seance_photo', 'vrm_fusions_fiches',
   // (11 nov.) Les RAPPELS qu'il a posés (« Me le rappeler », api/_lib/rappels-perso.js) :
   // { [id]: { sorte, num|item|tx, jour, note, etat… } } — lus PROJETÉS par le cron (9 h) et l'agenda.
   'vrm_rappels',
@@ -5294,12 +5300,12 @@ let _notesVue = null, _ambigusVue = null, _notesEcoute = false;
 const _notesAbonnes = new Set();
 const notifierNotes = () => { [..._notesAbonnes].forEach((f) => { try { f(); } catch (_) {} }); };
 const lireNotesPaires = () => { if (_notesVue == null) _notesVue = notesPropres(load(CLE_NOTES_PAIRES, {})); return _notesVue; };
-const lireNumerosAmbigus = () => { if (_ambigusVue == null) _ambigusVue = numerosAmbigus(load('vinted_annonce_numeros', {}) || {}, { cleNum }); return _ambigusVue; };
+const lireNumerosAmbigus = () => { if (_ambigusVue == null) _ambigusVue = numerosAmbigus(load('vinted_annonce_numeros', {}) || {}, { cleNum, memes: pairesFusionnees(load(CLE_FUSIONS, {}) || {}) }); return _ambigusVue; };
 const abonnerNotes = (fn) => {
   if (!_notesEcoute) {
     _notesEcoute = true;
     window.addEventListener('vrm:save', (e) => { const k = e && e.detail && e.detail.k;
-      if (k === CLE_NOTES_PAIRES) { _notesVue = null; notifierNotes(); } else if (k === 'vinted_annonce_numeros') { _ambigusVue = null; notifierNotes(); } });
+      if (k === CLE_NOTES_PAIRES) { _notesVue = null; notifierNotes(); } else if (k === 'vinted_annonce_numeros' || k === CLE_FUSIONS) { _ambigusVue = null; notifierNotes(); } });
     onCloudReady(() => { _notesVue = null; _ambigusVue = null; notifierNotes(); });
   }
   _notesAbonnes.add(fn);
@@ -28907,7 +28913,7 @@ let GROUPES_DEUX_FOIS = [];
 //    (décision de Julien, voir conflitsDeNumeros) : seule avec une annonce, ce
 //    n'est plus un conflit, donc ça n'arrive jamais jusqu'ici.
 // Rend [{ id, ancien }] — les annonces à renuméroter. Fonction PURE.
-function doublonsAReattribuer(conflits, fiches) {
+function doublonsAReattribuer(conflits, fiches, memes = null) {
   const out = [];
   for (const c of (conflits || [])) {
     const p = c.porteurs || [];
@@ -28923,6 +28929,9 @@ function doublonsAReattribuer(conflits, fiches) {
     // un carton. On ne renumérote rien ; Ma journée dit d'en supprimer une
     // (src/enLigneDeuxFois.js).
     if (annonces.length === 2) { const pk = annonces.map((x) => String((fiches[x.id] || {}).photoK || '')); if (pk[0] && pk[0] === pk[1]) continue; }
+    // (14 nov., proposition 107) Deux fiches qu'IL a fusionnées (SON clic, src/fusionFiches.js) : la même paire,
+    // un carton — rien n'est renuméroté.
+    if (annonces.length === 2 && Array.isArray(memes) && memes.some((m) => Array.isArray(m) && annonces.every((x) => m.map(String).includes(String(x.id))))) continue;
     const ventes = p.filter((x) => x.type === 'vente');
     const autres = p.filter((x) => x.type !== 'annonce' && x.type !== 'vente');
     if (autres.length) continue;                       // garage / annulée : pas deviné
@@ -35289,7 +35298,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // (9 nov., lot AF) `dateDe` : depuis quand chaque annonce est en ligne (la date que
     // l'écran Annonces affiche, `dateMiseEnLigneMs`) — l'alerte la montre, null = pas lue.
     // Coût : un passage par annonce, un index par clé photo (union-find) — jamais O(n²).
-    return enLigneDeuxFois({ vinted, fiches: numeros, clePhoto: photoKey, cle: cleNum, dateDe: (it) => dateMiseEnLigneMs(it, listingDates) });
+    // (14 nov., proposition 107) Les fiches qu'IL a fusionnées sont la même paire (src/fusionFiches.js).
+    return enLigneDeuxFois({ vinted, fiches: numeros, clePhoto: photoKey, cle: cleNum, dateDe: (it) => dateMiseEnLigneMs(it, listingDates), memes: pairesFusionnees(load(CLE_FUSIONS, {}) || {}) });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listings, numeros, accounts, cleComptes, hiddenAccts, panelAcctOff, listingDates]);
   // (11 nov., lot photos-comptes) LA MÊME PHOTO SUR DEUX DE SES COMPTES VINTED (src/photoEmpreinte.js) :
@@ -36760,7 +36770,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (numeroEcritActif()) return;
     if (!listings.items || listings.loading || listings.incomplet || listings.error) return;
     if (!sales.items || (Array.isArray(sales.failedUids) && sales.failedUids.length)) return;
-    const a = doublonsAReattribuer(conflitsNum, numeros).filter((x) => !DOUBLONS_FAITS.has(x.id + ':' + cleNum(x.ancien)));
+    const a = doublonsAReattribuer(conflitsNum, numeros, pairesFusionnees(load(CLE_FUSIONS, {}) || {})).filter((x) => !DOUBLONS_FAITS.has(x.id + ':' + cleNum(x.ancien)));
     if (!a.length) return;
     // (11 nov.) Hors ligne : aucun N° neuf (réservé au serveur seul) — les doublons se règlent au retour.
     if (horsLigneMaintenant()) return;
