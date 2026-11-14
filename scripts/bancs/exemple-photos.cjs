@@ -9,7 +9,7 @@ require('./_porte-banc.cjs');
 //      le cadre hachuré et sa languette « Exemple · données inventées » au-dessus
 //      de TOUT (aucun élément de la page plus haut), sans prendre un toucher ;
 //  B2  une feuille ouverte (la loupe) : le cadre reste au-dessus ;
-//  B3  Colis et Achats : chaque code et chaque adresse inventés portent la marque
+//  B3  Achats « À retirer » (où vivent les colis à retirer) : chaque code et chaque adresse inventés portent la marque
 //      « exemple » (posée par la feuille de style, hors du texte copié) ;
 //  B4  le lieu est manifestement fictif : « Relais Exemple », plus aucun
 //      « Le Fournil » ni « rue de la Paix » ;
@@ -93,18 +93,24 @@ const marques = (pg) => pg.evaluate(() => {
   return { bandeau: vis(band), texte: band ? band.innerText.replace(/\s+/g, ' ').trim() : '', cadre: vis(cadre), mot: vis(mot), motTexte: mot ? mot.textContent : '',
     zCadre: zc, zMax, plusHaut, toucher: cs ? cs.pointerEvents : '', fixe: cs ? cs.position : '', dansBody: !!cadre && cadre.parentElement === document.body, vw: innerWidth, vh: innerHeight };
 });
-// Les rangées d'article de l'écran : chacune a-t-elle une image chargée ?
+// Les rangées d'article de l'écran : chacune a-t-elle une image chargée ? On compte les
+// TITRES d'article affichés (« … taille 42 », la forme des titres de l'exemple) et les
+// photos d'exemple chargées, distinctes : il faut au moins une photo par titre, et
+// aucune vignette neutre (`data-sans-photo`).
 const rangees = (pg) => pg.evaluate(() => {
-  const m = document.querySelector('.vrm-main'); if (!m) return { n: 0, sans: 0, chargees: 0, exemple: 0 };
-  const sans = [...m.querySelectorAll('[data-sans-photo]')].filter((e) => e.getBoundingClientRect().width > 0).length;
-  const imgs = [...m.querySelectorAll('img')].filter((i) => i.getBoundingClientRect().width > 0 && /\/exemple\//.test(i.currentSrc || i.src));
-  return { sans, exemple: imgs.length, chargees: imgs.filter((i) => i.complete && i.naturalWidth > 0).length };
+  const m = document.querySelector('.vrm-main'); if (!m) return { titres: 0, sans: 0, chargees: 0, exemple: 0 };
+  const vis = (e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0; };
+  const sans = [...m.querySelectorAll('[data-sans-photo]')].filter(vis).length;
+  const imgs = [...m.querySelectorAll('img')].filter((i) => vis(i) && /\/exemple\//.test(i.currentSrc || i.src));
+  const titres = new Set([...m.querySelectorAll('*')].filter((e) => !e.children.length && vis(e) && /^.{3,90} taille \d\d$/.test(e.textContent.trim())).map((e) => e.textContent.trim()));
+  const ok = new Set(imgs.filter((i) => i.complete && i.naturalWidth > 0).map((i) => i.currentSrc || i.src));
+  return { titres: titres.size, sans, exemple: imgs.length, chargees: ok.size };
 });
 // La marque « exemple » posée sur les codes et les adresses inventés (::after).
 const marquesCodes = (pg) => pg.evaluate(() => {
   const els = [...document.querySelectorAll('[data-stream-type="code"], [data-stream-type="adresse"], .vrm-rp-code, [data-relais-adresse]')]
     .filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0; });
-  return els.map((e) => ({ quoi: (e.getAttribute('data-stream-type') || e.className || '').toString().slice(0, 30), txt: e.textContent.trim().slice(0, 40), apres: getComputedStyle(e, '::after').content }));
+  return els.map((e) => ({ quoi: (e.getAttribute('data-stream-type') || e.className || '').toString().slice(0, 30), txt: e.textContent.trim().slice(0, 40), apres: getComputedStyle(e, (e.matches('[data-stream-type="adresse"], [data-relais-adresse]') ? '::before' : '::after')).content }));
 });
 
 async function parcours(nav, W, theme) {
@@ -133,15 +139,22 @@ async function parcours(nav, W, theme) {
     if (AVEC_PHOTOS.includes(tab) && !process.env.SANS_PHOTOS) {
       await o.pg.waitForTimeout(800);
       const r = await rangees(o.pg);
-      dit(r.sans === 0 && r.exemple > 0 && r.chargees === r.exemple, `${T} P1 ${tab} : chaque rangée a une image chargée (${r.chargees}/${r.exemple} photos d'exemple, ${r.sans} vignette(s) neutre(s))`, JSON.stringify(r));
+      dit(r.titres > 0 && r.sans === 0 && r.chargees >= r.titres, `${T} P1 ${tab} : chaque rangée a une image chargée (${r.chargees} photos d’exemple chargées pour ${r.titres} articles, ${r.sans} vignette(s) neutre(s))`, JSON.stringify(r));
     }
-    if (tab === 'cat_bord' || tab === 'achats') {
+    if (tab === 'achats') {   // (Colis vit dans Ventes « À envoyer » et Achats « À retirer » : les codes et les points sont ici)
+      // Le code ne s'écrit qu'à l'ouverture de la ligne : on ouvre le premier colis « à retirer ».
+      await o.pg.evaluate(() => { const b = document.querySelector('.vrm-rpf-ouvrir'); if (b) b.scrollIntoView({ block: 'center' }); });
+      await o.pg.click('.vrm-rpf-ouvrir').catch(() => {});
+      await o.pg.waitForTimeout(700);
       const c = await marquesCodes(o.pg);
+      const codes = c.filter((x) => !/adresse|vrm-rpf-adr/.test(x.quoi));
       dit(c.length > 0 && c.every((x) => /exemple/i.test(x.apres)), `${T} B3 ${tab} : chaque code et chaque adresse inventés portent « exemple » (${c.length})`, JSON.stringify(c.slice(0, 6)));
+      dit(codes.length > 0, `${T} B3 ${tab} : un code de retrait ouvert est bien à l'écran (${codes.length})`, JSON.stringify(c.slice(0, 6)));
+      await capture(o.pg, `ph-${W}-${theme}-${tab}-code`);
     }
     const corps = await o.pg.evaluate(() => document.body.innerText);
     dit(!/Fournil|rue de la Paix/i.test(corps), `${T} B4 ${tab} : aucun lieu qui ressemble à un vrai commerce`);
-    if (tab === 'cat_bord') dit(/Relais Exemple/.test(corps), `${T} B4 Colis : le point relais s'appelle « Relais Exemple »`, corps.slice(0, 300));
+    if (tab === 'achats') dit(/Relais Exemple/.test(corps), `${T} B4 Achats « À retirer » : le point relais s'appelle « Relais Exemple »`, corps.slice(0, 300));
     dit(!(await o.pg.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)), `${T} ${tab} : rien ne déborde`);
     await capture(o.pg, `ph-${W}-${theme}-${tab}`);
   }

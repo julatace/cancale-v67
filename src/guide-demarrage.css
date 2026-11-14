@@ -179,15 +179,16 @@
     display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "texte geste" "lien lien";
     align-items: center; gap: 0 10px; padding: 8px 12px 10px;
   }
+  /* Au téléphone, la languette du cadre dit déjà « EXEMPLE » en haut de l'écran :
+     le bandeau garde sa phrase sur UNE ligne et son geste, le lien dessous. */
   .vrm-exemple-texte { grid-area: texte; gap: 8px; }
+  .vrm-exemple-etiquette { display: none; }
   .vrm-exemple-gestes { display: contents; }
-  .vrm-exemple-bandeau .vrm-b { grid-area: geste; padding: 0 14px; }
-  .vrm-exemple-connexion { grid-area: lien; justify-self: start; margin: -4px 0 -8px; font-size: 14px; }
-  .vrm-exemple-etiquette { height: 22px; padding: 0 7px; font-size: 10px; }
-  .vrm-exemple-phrases b { font-size: 13px; }
-  .vrm-exemple-phrases span { font-size: 12px; }
+  .vrm-exemple-bandeau .vrm-b { grid-area: geste; padding: 0 14px; font-size: 15px; }
+  .vrm-exemple-connexion { grid-area: lien; justify-self: start; margin: -2px 0 -8px; font-size: 14px; }
+  .vrm-exemple-phrases b { font-size: 14px; line-height: 1.25; }
+  .vrm-exemple-phrases span { display: none; }
 }
-@media (max-width: 380px) { .vrm-exemple-phrases span { display: none; } }
 
 /* ── (14 nov.) Le CADRE de l'exemple : un filet hachuré de 3 px tout autour de l'écran
    et une languette « Exemple · données inventées » qui pend du bord haut. Au-dessus de
@@ -205,16 +206,22 @@
   background: var(--d-encre, #1D1D1F); color: var(--d-carte, #fff); white-space: nowrap;
   font: 700 10px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase;
 }
+/* Au téléphone, le milieu de l'en-tête porte le compte et les icônes : la languette va à gauche, où il est vide. */
+@media (max-width: 560px) { .vrm-exemple-cadre-mot { left: 12px; transform: none; } }
 @media print { .vrm-exemple-cadre { display: none; } }
 
 /* ── (14 nov.) « exemple » sur chaque code et chaque adresse inventés : les éléments que
    l'app marque déjà comme sensibles (`data-stream-type`, le mode « en direct ») et les
    points relais. Posé par la feuille de style (`content`) : absent du texte que l'app
-   copie ou que les bancs lisent ; le mot vient de tr() (`--vrm-exemple-mot`). ── */
-:root[data-vrm-exemple] :is([data-stream-type="code"], [data-stream-type="adresse"], .vrm-rp-code, [data-relais-adresse])::after {
+   copie ou que les bancs lisent ; le mot vient de tr() (`--vrm-exemple-mot`).
+   Un code : la marque APRÈS lui. Une adresse : AVANT elle (une adresse longue finit en « … »
+   et emporterait la marque avec elle). */
+:root[data-vrm-exemple] :is([data-stream-type="code"], .vrm-rp-code)::after,
+:root[data-vrm-exemple] :is([data-stream-type="adresse"], [data-relais-adresse])::before {
   content: var(--vrm-exemple-mot, "exemple");
   display: inline-block; margin-left: .5em; padding: 2px 6px; border-radius: 5px; vertical-align: .15em;
   background: var(--d-remplir, rgba(118,118,128,.12)); color: var(--d-gris, #6E6E73);
   font: 600 10px/1.2 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase;
   text-decoration: none; white-space: nowrap; filter: none;
 }
+:root[data-vrm-exemple] :is([data-stream-type="adresse"], [data-relais-adresse])::before { margin: 0 .5em 0 0; }
