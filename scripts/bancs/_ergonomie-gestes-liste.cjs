@@ -10,6 +10,9 @@ module.exports = ({ vu, BARRE }) => {
   const entreeMenu = (id) => `[role="menu"] [data-nav-entree="${id}"]`;
   const loupe = 'button[data-recherche-loupe]';
   const champ = '[data-recherche-champ]';
+  // Un N° EN LIGNE de la base inventée (le premier de la vue Republier, numéroté par l'app au chargement) ;
+  // « 169 » y est une paire VENDUE (la fiche de toute son histoire).
+  const EN_LIGNE = '203';
   return [
     { id: 'imprimer', nom: 'Imprimer les bordereaux du jour', plafond: 2,
       but: vu('[data-lot-imprimer]'),
@@ -33,7 +36,7 @@ module.exports = ({ vu, BARRE }) => {
     { id: 'trouvernum', nom: 'Trouver la paire N°x', plafond: 3,
       but: vu('[data-fiche-paire]'),
       chemins: [
-        { nom: 'Loupe → N° → résultat', pas: [['t', loupe], ['s', champ, '169'], ['t', '[data-recherche-resultat][data-recherche-num="169"]:not([data-recherche-resultat="action"])']] },
+        { nom: 'Loupe → N° → résultat', pas: [['t', loupe], ['s', champ, EN_LIGNE], ['a', '[data-tout-parcours]'], ['t', `[data-tout-parcours="${EN_LIGNE}"]`]] },
       ] },
     { id: 'offre', nom: 'Répondre à une offre', plafond: 3,
       // Le fil de l'offre ouvert, son geste de réponse à l'écran (Accepter avec l'extension ; sans elle, VRM le dit et
@@ -47,14 +50,14 @@ module.exports = ({ vu, BARRE }) => {
     { id: 'baisserprix', nom: 'Baisser un prix', plafond: 3,
       but: vu('[data-prix-champ]'),
       chemins: [
-        { nom: 'Loupe → N° → Baisser', pas: [['t', loupe], ['s', champ, '169'], ['t', '[data-recherche-action="baisser-prix"]'], ['d', '[data-prix-appliquer]']] },
+        { nom: 'Loupe → N° → Baisser', pas: [['t', loupe], ['s', champ, EN_LIGNE], ['t', '[data-recherche-action="baisser-prix"]'], ['d', '[data-prix-appliquer]']] },
       ] },
     { id: 'republier', nom: 'Republier (à la main, conseillé)', plafond: 3,
       // Le kit « à la main » ouvert pour la paire CHOISIE (c'est lui qui choisit et qui publie, §3) ; le toucher décisif :
       // « Tout copier » / « Ouvrir Vinted ».
       but: vu('[data-kit-main]'),
       chemins: [
-        { nom: 'Loupe → N° → Republier', pas: [['t', loupe], ['s', champ, '169'], ['t', '[data-recherche-action="republier-num"]'], ['d', '[data-kit-tout-copier], [data-kit-ouvrir-vinted]']] },
+        { nom: 'Loupe → N° → Republier', pas: [['t', loupe], ['s', champ, EN_LIGNE], ['t', '[data-recherche-action="republier-num"]'], ['d', '[data-kit-tout-copier], [data-kit-ouvrir-vinted]']] },
         { nom: 'Paires → Republier → coche → À la main', pas: [['t', onglet('paires')], ['t', '[data-vue-republier]'], ['t', '[data-selection-annonce] input[type=checkbox]'], ['t', '[data-republier-main-lancer]'], ['d', '[data-kit-tout-copier], [data-kit-ouvrir-vinted]']] },
       ] },
     { id: 'depose', nom: 'Marquer un colis déposé', plafond: 3,
@@ -91,7 +94,7 @@ module.exports = ({ vu, BARRE }) => {
       // La feuille « Publier partout » de la paire choisie ; le toucher décisif : « Publier ».
       but: vu('[data-publier-partout]'),
       chemins: [
-        { nom: 'Loupe → N° → Publier partout', pas: [['t', loupe], ['s', champ, '169'], ['t', '[data-recherche-action="partout-num"]'], ['d', '[data-publier-partout]']] },
+        { nom: 'Loupe → N° → Publier partout', pas: [['t', loupe], ['s', champ, EN_LIGNE], ['t', '[data-recherche-action="partout-num"]'], ['d', '[data-publier-partout]']] },
         { nom: 'Paires → la paire → Publier partout', pas: [['t', onglet('paires')], ['t', '[data-fiche-plus-bouton]'], ['t', '[data-fiche-partout], [data-fiche-publier-ailleurs]'], ['d', '[data-publier-partout]']] },
       ] },
     { id: 'benefice', nom: 'Voir le bénéfice du mois', plafond: 1,

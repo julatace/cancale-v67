@@ -44224,7 +44224,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     appliquer();
     const f=()=>setTimeout(appliquer,0);
     window.addEventListener('vrm:repub-main',f);
-    return ()=>window.removeEventListener('vrm:repub-main',f);
+    // L'écran arrive (chargé à la demande, encore caché au premier rendu) : la demande en attente est relue
+    // toutes les 400 ms tant qu'elle vit (30 s), jamais au-delà.
+    const t=setInterval(()=>{ if(DEMANDE_REPUB_MAIN.num) appliquer(); },400);
+    return ()=>{ window.removeEventListener('vrm:repub-main',f); clearInterval(t); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[only, annSelectionnables, listings.items]);
 
