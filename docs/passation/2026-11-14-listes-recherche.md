@@ -53,7 +53,12 @@ Textes : `listes.phrase.*`, `listes.epingle.*`, `listes.comparer.*`, `listes.gli
   depuis la 1re case jusqu'au bord, défilement auto, arrêt sur la 30e : exactement les 30 premières) ;
   E épingles (écriture `vrm_epingles` par identité, en tête de leur compte, relues par un autre
   appareil, base injoignable ⇒ rien écrit) ; C comparer (prix de la base, « — » pour l'achat).
-  **Rouge sur origin/main** (aucune capsule, aucune poignée, aucun bouton), vert après.
+  Vert après (build fusionné avec refonte-listes + refonte-coque). **Sur origin/main** : aucun des
+  sélecteurs jugés n'existe (`git grep` de `data-phrase-filtre`, `data-glisse-poignee`, `data-epingler`,
+  `data-comparer-ouvrir` : 0) ⇒ chaque partie tombe rouge à sa première mesure ; le build d'origin/main
+  pour le jouer réellement n'a PAS pu être fait (disque du conteneur plein à 100 %, 180 Mo libres) —
+  la preuve par mutation est celle de l'audit (14/14). À rejouer : `BANC_DIST=<dist d'origin/main>`.
+  Le banc sert une base qui GARDE ce qu'on lui écrit (sinon la relecture, à juste titre, défait l'épingle).
   Captures regardées : `$SHOTS/phrase-*.png`, `glisser-30.png`, `epingles-annonces.png`, `comparer.png`.
 - Verts : `npm run build`, audits traduction, tdz, coherence, variables, identite, quoi-de-neuf, icônes.
 
