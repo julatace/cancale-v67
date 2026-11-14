@@ -63,7 +63,7 @@ async function densite(nav, b) {
   if (await ligne.count()) {
     await ligne.scrollIntoViewIfNeeded().catch(() => {}); await ligne.click(); await pg.waitForTimeout(600);
     const btn = pg.locator('[data-densite-choix] [data-densite="serree"]').first();
-    if (await btn.count()) { await btn.click(); await pg.waitForTimeout(300); choisi = await pg.evaluate(() => ({ racine: document.documentElement.getAttribute('data-densite'), stock: localStorage.getItem('vrm_densite'), coche: document.querySelector('[data-densite="serree"]').getAttribute('aria-checked') })); }
+    if (await btn.count()) { await btn.click(); await pg.waitForTimeout(300); choisi = await pg.evaluate(() => ({ racine: document.documentElement.getAttribute('data-densite'), stock: localStorage.getItem('vrm_densite'), coche: document.querySelector('[data-densite-choix] [data-densite="serree"]').getAttribute('aria-checked') })); }
   }
   dit(choisi && choisi.racine === 'serree' && choisi.stock === '"serree"' && choisi.coche === 'true', 'D3 Paramètres → Densité des listes → « Serrées » : la racine et CET appareil (localStorage)', choisi);
   await ctx.close();
@@ -76,12 +76,14 @@ async function soir(nav, b) {
     await pret(pg);
     await pg.evaluate(() => { localStorage.setItem('vrm_apparence', JSON.stringify('soir')); });
     await pg.clock.install({ time: new Date(`2026-11-08T${heureParis}:00+01:00`) });
-    // Le journal des teintes depuis le tout premier instant du document.
-    await pg.addInitScript(() => { const vus = window.__teintes = []; const noter = () => { const t = document.documentElement.getAttribute('data-theme'); if (t && vus[vus.length - 1] !== t) vus.push(t); };
-      new MutationObserver(noter).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] }); });
+    // Le journal des teintes depuis le tout premier instant : le script de démarrage servi est SUIVI d'un témoin
+    // (la teinte qu'il vient de poser, puis chaque changement). Rien de la règle n'est touché.
+    await pg.route('**/demarrage-theme.js', async (r) => { const rep = await r.fetch(); const corps = await rep.text();
+      await r.fulfill({ response: rep, body: corps + ';(function(){var v=window.__teintes=[document.documentElement.getAttribute("data-theme")];new MutationObserver(function(){var t=document.documentElement.getAttribute("data-theme");if(v[v.length-1]!==t)v.push(t);}).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});})();' }); });
     await pg.reload({ waitUntil: 'domcontentloaded' }); await pret(pg);
-    if (avancer) { await pg.clock.runFor(avancer); await pg.waitForTimeout(800); }
-    const r = await pg.evaluate(() => ({ teintes: window.__teintes, maintenant: document.documentElement.getAttribute('data-theme') }));
+    // L'app revoit la teinte chaque minute (minuterie) et au retour au premier plan.
+    if (avancer) { await pg.clock.runFor(avancer); await pg.waitForTimeout(1200); await pg.evaluate(() => document.dispatchEvent(new Event('visibilitychange'))); await pg.waitForTimeout(1200); }
+    const r = await pg.evaluate(() => ({ teintes: window.__teintes || [], maintenant: document.documentElement.getAttribute('data-theme') }));
     await pg.screenshot({ path: path.join(SHOTS, `soir-${heureParis.replace(':', 'h')}${avancer ? '-avance' : ''}.png`) });
     await ctx.close();
     return r;

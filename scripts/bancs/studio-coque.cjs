@@ -99,19 +99,22 @@ async function telephone(nav, sombre, b) {
   await pg.locator('.vrm-tabbar [data-nav-entree="journee"]').click(); await pg.waitForSelector('.vrm-main[data-ecran="journee"]'); await pg.waitForTimeout(2500);
   const ondes = await pg.evaluate(() => document.querySelectorAll('[data-sb-onde]').length);
   await toucher(pg, '[data-sb-disque]'); await pg.waitForTimeout(500);
+  // Les lames finissent leur entrée (300 ms + décalage) avant d'être mesurées.
+  await pg.waitForFunction(() => document.getAnimations().filter((a) => a.effect && a.effect.target && a.effect.target.closest && a.effect.target.closest('[data-sb-eventail]')).every((a) => a.playState !== 'running'), null, { timeout: 8000 }).catch(() => {});
   const ev = await pg.evaluate((src) => { const K = eval(src); const lames = [...document.querySelectorAll('[data-sb-lame]')];
     const voile = document.querySelector('[data-sb-voile]'); const fv = voile ? K.sur(K.rgba(getComputedStyle(voile).backgroundColor), K.jeton('--sb-aplat')) : null;
     const plein = document.querySelector('[data-sb-lame] .sb-btn-plein'); const pc = plein && getComputedStyle(plein);
     const cs = (e) => getComputedStyle(e);
     return { n: lames.length, ids: lames.map((l) => l.getAttribute('data-sb-lame')), pleins: document.querySelectorAll('[data-sb-eventail] .sb-btn-plein').length,
       dedans: lames.every((l) => { const r = l.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight; }),
+      places: lames.map((l) => { const r = l.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom)]; }),
       nImprimer: (lames.find((l) => l.getAttribute('data-sb-lame') === 'imprimer') || { getAttribute: () => null }).getAttribute('data-sb-n'),
       recul: document.documentElement.hasAttribute('data-sb-eventail'), expanded: document.querySelector('[data-sb-disque]').getAttribute('aria-expanded'),
       contrastes: fv ? lames.map((l) => Math.round(K.ratio(K.rgba(cs(l.querySelector('.sb-lame-mot')).color), fv) * 100) / 100) : [],
       plein: pc ? Math.round(K.ratio(K.rgba(pc.color), K.jeton('--sb-encre')) * 100) / 100 : null }; }, CONTRASTE);
   dit(ev.n === 4 && ev.ids.join() === 'chercher,scanner,publier,imprimer', 'E le disque ouvre l’éventail : Chercher · Scanner · Publier · Imprimer', ev.ids);
   dit(ev.pleins === 1, 'E UN seul plein dans l’éventail (Imprimer)', ev.pleins);
-  dit(ev.dedans, 'D toutes les lames sont dans l’écran');
+  dit(ev.dedans, 'D toutes les lames sont dans l’écran', ev.places);
   dit(ev.recul && ev.expanded === 'true', 'E l’écran recule sous le voile, le disque est enfoncé (aria-expanded)');
   dit(String(ev.nImprimer) === String(nLot), 'E « Imprimer N » redit le nombre de « Tout imprimer (N) » de Ventes', { lame: ev.nImprimer, ventes: nLot });
   dit(ev.contrastes.length === 4 && ev.contrastes.every((x) => x >= 4.5), 'C les mots de l’éventail ≥ 4,5:1 sur le voile', ev.contrastes);
