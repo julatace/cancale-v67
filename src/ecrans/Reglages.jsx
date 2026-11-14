@@ -81,6 +81,7 @@ import { PanneauDiscretion } from '../Discretion.jsx';   // (12 nov., ext. 5.370
 import { etatExtensionAffichage, etatDerniereLecture } from '../etatConnexions.js';
 // ⟦← App.jsx #2⟧
 import { filtrerReglages } from '../rechercheReglages.js';
+import { AFaireSite } from '../plateformes/AFaireSite.jsx';   // (14 nov.) « Ouvrir le paiement · N › » du propriétaire
 import { preparerApercusModes } from '../apercusBordereaux.js';
 import { CLE_IMPRESSION, FORMATS_THERMIQUES, TAMPONS, ENCRES, CONTRASTES, MARGE_MAX_MM, AUTRE_MIN_MM, AUTRE_MAX_MM, reglageImpression, papierThermique, fmtMm } from '../impression/thermique.js';   // (11 nov., lot thermique)
 import { fabriquerBordereau } from '../impression/bordereauExemple.js';
@@ -2277,14 +2278,16 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // Double vérification (TOTP) — facultative, sur SON clic (16 octobre).
       // (4 nov.) Les appareils où VRM est ouvert, et « Se déconnecter partout ».
       AUTH.user && { id:'appareils', type:'panneau', ic:'device', lib:tr('reglages.appareils.lib'), el:<AppareilsConnectes/> },
-      // (4 nov.) Tout ce que VRM a envoyé en son nom, lu de ce qui est noté en base.
-      AUTH.user && { id:'journal-vrm', type:'panneau', ic:'clock', lib:tr('reglages.journal-vrm.lib'), el:<JournalVrm/> },
       AUTH.user && { id:'double', type:'panneau', nu:true, ic:'lock', lib:tr('reglages.double.lib'), val: Array.isArray(AUTH.session && AUTH.session.totp) ? (AUTH.session.totp.length > 1 ? tr('reglages.double.activeN', { n: AUTH.session.totp.length }) : AUTH.session.totp.length ? tr('reglages.double.active') : tr('reglages.double.inactive')) : '', el:<DoubleVerification/> },
     ]},
     AUTH.user && { id:'sortir', titre:null, items:[
       { id:'deconnexion', type:'action', ic:'door', lib:tr('reglages.deconnexion.lib'), danger:true, onClick:()=>{ setAcct({ mode:'out', val:'', err:'', busy:false }); } },
     ], pied:tr('reglages.deconnexion.pied') },
     { id:'donnees', titre:tr('reglages.groupe.donnees'), items:[
+      // (4 nov.) Tout ce que VRM a envoyé en son nom, lu de ce qui est noté en base.
+      // (14 nov., Julien : « il y a 2 “ce que VRM a fait” ») Le JOURNAL quitte « Connexion » : il vit ici, à côté
+      // de la confidentialité, avec un libellé qui ne se confond plus avec elle (« Journal : … » / « Confidentialité : … »).
+      AUTH.user && { id:'journal-vrm', type:'panneau', ic:'clock', lib:tr('reglages.journal-vrm.lib'), el:<JournalVrm/> },
       // (8 nov., confiance) Ce que VRM lit, garde et fait — chaque phrase tenue par le code (src/tesDonnees.js).
       { id:'tes-donnees', type:'panneau', ic:'shield', lib:tr('reglages.tes-donnees.lib'), desc:tr('reglages.tes-donnees.desc'), data:{ 'data-reglage-tes-donnees':'' },
         el:<TesDonnees cloisonne={!!CLOISONNE} onExporter={exporterMesDonnees} onJournal={AUTH.user ? ()=>ouvrirSous('journal-vrm') : undefined} onFermer={AUTH.user ? ()=>ouvrirSous('fermer') : undefined}/> },
@@ -2304,7 +2307,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   ];
   // L'onglet Abonnement : la carte de l'abonnement, d'un bloc (statut, prix,
   // carte, factures, résilier) — le MÊME composant qu'avant (§11).
-  const GROUPES_ABONNEMENT = [{ id:'abonnement', titre:null, brut:true, items:[{ id:'abonnement', type:'el', el:<div key="abonnement" data-onglet-abonnement=""><MonAbonnement/><Parrainage/></div> }] }];
+  const GROUPES_ABONNEMENT = [{ id:'abonnement', titre:null, brut:true, items:[{ id:'abonnement', type:'el', el:<div key="abonnement" data-onglet-abonnement=""><MonAbonnement/>{proprioInst === true ? null : <Parrainage/>}</div> }] }];
   const groupes = [...(voirCompte ? GROUPES_COMPTE : []), ...(voirReglages ? GROUPES_REGLAGES : []), ...(voirAbonnement ? GROUPES_ABONNEMENT : [])].filter(Boolean)
     .map((g) => ({ ...g, items: g.items.filter(Boolean) }));
   const panneaux = groupes.flatMap((g) => g.items.filter((it) => it.type === 'panneau'));
@@ -3354,9 +3357,29 @@ function MonAbonnement() {
   const mentionsAremplir = e.proprietaire && e.mentionsCompletes === false && Array.isArray(e.mentionsManquantes) && e.mentionsManquantes.length ? e.mentionsManquantes : null;
   const texteStripe = prixAcorriger && typeof e.prixStripe.texte === 'string' && e.prixStripe.texte.trim() ? e.prixStripe.texte : 'un prix différent';
   const note = { fontSize: 13, color: C.text, marginTop: 10, lineHeight: 1.5 };
-  if (e.proprietaire) return (
-    <div data-abonnement="proprietaire" data-abonnement-etat="proprietaire">
-      <Tete etat="Ton abonnement" titre="Compte propriétaire" phrase="Compte propriétaire de VRM : gratuit, aucun abonnement.">
+  // (14 nov., Julien : « dans parrainage je ne sais pas pourquoi il y a mon compte, c'est bizarre ») LE COMPTE
+  // PROPRIÉTAIRE : une carte simple « Compte propriétaire · gratuit ». Les offres Solo/Pro et le parrainage sont
+  // pour les clients : ils ne s'affichent pas ici. Ce qu'il reste à faire pour laisser les clients payer (mentions
+  // légales, prix Stripe, offre Pro) tient en UNE ligne « Ouvrir le paiement · N › » ; sa feuille le dit en mots
+  // simples, le détail technique d'avant (mêmes textes, mêmes `data-*`) au bout, replié, pour lui seul.
+  if (e.proprietaire) {
+    const etapes = [
+      mentionsAremplir && { k: 'mentions', l: tr('plateformes.proprio.mentions') },
+      e.mentionsCompletes === null && { k: 'mentions-pas-su', l: tr('plateformes.proprio.mentionsPasSu') },
+      prixAcorriger && { k: 'prix', l: tr('plateformes.proprio.prix') },
+      e.offres && e.offres.pro && !e.offres.pro.ouvert && { k: 'pro', l: tr('plateformes.proprio.pro') },
+    ].filter(Boolean);
+    return (<>
+      <div data-abonnement="proprietaire" data-abonnement-etat="proprietaire">
+        <Tete etat="Ton abonnement" titre="Compte propriétaire" phrase="Compte propriétaire de VRM : gratuit, aucun abonnement."/>
+      </div>
+      {etapes.length ? (
+        <div className="vrm-pf-proprio" data-proprio-paiement={etapes.length}>
+          <AFaireSite site="proprio-paiement" n={etapes.length} titre={tr('plateformes.proprio.ouvrir')}>
+            <p className="vrm-pf-proprio-intro">{tr('plateformes.proprio.intro')}</p>
+            <ol className="vrm-pf-proprio-etapes">{etapes.map((x) => <li key={x.k} data-proprio-etape={x.k}>{x.l}</li>)}</ol>
+            <details className="vrm-pf-proprio-detail" data-proprio-detail="">
+              <summary>{tr('plateformes.proprio.detail')}</summary>
         {mentionsAremplir && (
           <div data-mentions-manquantes={mentionsAremplir.length} style={note}>
             Paiement <b>fermé</b> : mentions légales incomplètes ({mentionsAremplir.join(', ')}). À remplir dans <b>public/legal/editeur.js</b>.{' '}
@@ -3384,10 +3407,12 @@ function MonAbonnement() {
                 : <>Pro ({PRIX_PRO_MOIS} € / mois) : « bientôt ». Pour l'ouvrir : prix Stripe « vrm_pro_mensuel », son price_… dans <b>STRIPE_PRIX_PRO</b> (Vercel).</>}
           </div>
         )}
-      </Tete>
-      {groupeOffres}
-    </div>
-  );
+            </details>
+          </AFaireSite>
+        </div>
+      ) : null}
+    </>);
+  }
   // Stripe pas branché (`STRIPE_SECRET_KEY` absente) : dit calmement, aucun bouton.
   if (!e.configure && !et.lectureSeule) return <div data-abonnement="non-branche" data-abonnement-etat="non-branche"><Tete etat="Ton abonnement" titre="Paiement pas encore ouvert" phrase="Le paiement n'est pas encore ouvert : VRM reste gratuit pour l'instant. Rien ne t'est demandé."/></div>;
   const test = e.modeTest ? <div data-mode-test="" className="vrm-ios-groupe-pied" style={{ margin: '8px 16px 0' }}>Paiement en <b style={{ color: C.text }}>mode test</b> : aucune vraie carte n'est débitée. <Pourquoi label="Carte d’essai">Carte d'essai 4242 4242 4242 4242.</Pourquoi></div> : null;

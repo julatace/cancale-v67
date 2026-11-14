@@ -265,6 +265,14 @@
 :root:root body .vrm-main .vrm-set .vrm-pf-set-avances[open] > summary .vrm-set-chev { transform: rotate(90deg) !important; }
 :root:root body .vrm-main .vrm-set .vrm-pf-set-avances > summary .vrm-set-chev { transition: transform var(--d-m-appui, 100ms) ease-out !important; }
 
+/* Le compte propriétaire : « Ouvrir le paiement · N › », sa feuille en mots simples, le détail technique replié. */
+:root:root body .vrm-main .vrm-pf-proprio { margin: 12px 0 0 !important; }
+:root:root body .vrm-pf-feuille .vrm-pf-proprio-intro { margin: 0 !important; font: 400 15px/1.45 var(--vrm-police) !important; color: var(--d-encre, #1D1D1F) !important; }
+:root:root body .vrm-pf-feuille .vrm-pf-proprio-etapes { margin: 0 !important; padding: 4px 16px 4px 36px !important; background: var(--d-carte, #fff) !important; border-radius: 12px !important; }
+:root:root body .vrm-pf-feuille .vrm-pf-proprio-etapes > li { font: 400 17px/1.3 var(--vrm-police) !important; color: var(--d-encre, #1D1D1F) !important; padding: 12px 0 !important; }
+:root:root body .vrm-pf-feuille .vrm-pf-proprio-etapes > li + li { box-shadow: inset 0 .5px 0 var(--d-filet, rgb(60 60 67 / .18)) !important; }
+:root:root body .vrm-pf-feuille .vrm-pf-proprio-detail > summary { min-height: 44px !important; display: flex !important; align-items: center !important; cursor: pointer !important; font: 600 15px/1.2 var(--vrm-police) !important; color: var(--d-accent-texte, #0066CC) !important; }
+
 /* ══ 11. LA PREMIÈRE IMPRESSION : connexion, mode exemple, démarrage ══════════════
    Ce que voit un nouveau client. Une identité VRM forte mais sobre : le panneau de marque prend
    l'encre profonde qui glisse vers le bleu nuit (§4 Atelier, la carte Wallet), le titre en grand
