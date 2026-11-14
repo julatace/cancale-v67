@@ -632,7 +632,7 @@
   let vueFav = null, apercuFav = null, favErreur = '', favOccupe = false, aideFav = false, minuteurFav = null;
   // 5.377 : ce qu'il a coché (identifiants de l'aperçu), du plus récent au plus ancien.
   let selFav = new Set();
-  const listeFavTriee = (a) => (a && Array.isArray(a.liste) ? a.liste.map((x, i) => [x, i]).sort((p, q) => ((Date.parse(q[0].date || '') || 0) - (Date.parse(p[0].date || '') || 0)) || (p[1] - q[1])).map((p) => p[0]) : []);
+  function listeFavTriee(a) { return a && Array.isArray(a.liste) ? a.liste.map((x, i) => [x, i]).sort((p, q) => ((Date.parse(q[0].date || '') || 0) - (Date.parse(p[0].date || '') || 0)) || (p[1] - q[1])).map((p) => p[0]) : []; }
   const photoFav = (u) => (u && /^https:\/\/[\w.-]*vinted\.net\//.test(String(u)) ? `<img class="vig" src="${esc(u)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : '<span class="vig" aria-hidden="true"></span>');
   const ATTENTES_FAV = {
     tout_arrete: '« Tout arrêter » est posé : rien ne part. Touche « Reprendre » dans Détails.',
