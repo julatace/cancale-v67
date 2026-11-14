@@ -5,7 +5,7 @@
 //     « aujourd'hui 45 € » de Ma journée (`data-vendu-jour`) ; « Annuler » (5 s) ⇒ l'état d'avant EXACT (stockage relu),
 //     le chiffre revient, la feuille dit « Vente annulée » ; revendue en virement ⇒ le reçu PDF ;
 //   · refus clairs : N° inconnu, N° d'archive (proposé, son toucher le prend), déjà vendue sur Vinted (à envoyer) ;
-//   · N° porté par deux paires (l'une rangée au Stock : la règle des doublons ne renumérote pas) ⇒ la question,
+//   · N° porté par deux paires (une vente annulée à côté : la règle des doublons ne devine pas, le rouge reste) ⇒ la question,
 //     plaques rouges, aucun prix avant son toucher ;
 //   · le reçu PDF se télécharge ; cibles ≥ 44 px ; aucun débordement ; aucune erreur.
 // Captures : $TMPDIR/vrm-bancs/vente-main-propre/*.png (À REGARDER).
@@ -32,10 +32,11 @@ const NUMEROS = {
 const ITEMS = [item(9124, 'Asics Gel-Kayano 14 argent', 90), item(9881, 'Air Max 90 blanche', 70), item(9882, 'Air Max 90 noire', 75), { ...item(9125, 'Adidas Samba OG blanche', 70), id: '9b25' }];
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_a', domain: 'www.vinted.fr', updated_at: ilYaH(0) }];
 const ROWS = () => [
-  { id: 'main', data: { vinted_annonce_numeros: JSON.parse(JSON.stringify(NUMEROS)), vinted_dark: false, vrm_meubles: [{ id: 'm1', name: 'Étagère', cols: 4, rows: 3 }], vrm_slots: { '124': { m: 'm1', i: 3 }, '88': { m: 'm1', i: 5 } }, vrm_numerotation: { version: 1, archive: 'B', coupure: '2026-10-09T00:00:00Z' } } },
+  { id: 'main', data: { vinted_annonce_numeros: JSON.parse(JSON.stringify(NUMEROS)), vinted_dark: false, vrm_meubles: [{ id: 'm1', name: 'Étagère', cols: 4, rows: 3 }], vrm_slots: { '124': { m: 'm1', i: 3 } }, vrm_numerotation: { version: 1, archive: 'B', coupure: '2026-10-09T00:00:00Z' } } },
   { id: 'harvest_111_listings', data: { capturedAt: ilYaH(0.2), payload: { items: ITEMS } } },
-  { id: 'harvest_111_orders_sold', data: { capturedAt: ilYaH(0.2), nItems: 1, payload: { my_orders: [{ transaction_id: 7130, title: 'New Balance 550 blanche', price: { amount: '80.0', currency_code: 'EUR' }, date: ilYaH(30), status: 'Bordereau envoyé', transaction_user_status: 'needs_action', _acc: { vinted_user_id: '111' } }] } } },
+  { id: 'harvest_111_orders_sold', data: { capturedAt: ilYaH(0.2), nItems: 2, payload: { my_orders: [{ transaction_id: 7130, title: 'New Balance 550 blanche', price: { amount: '80.0', currency_code: 'EUR' }, date: ilYaH(30), status: 'Bordereau envoyé', transaction_user_status: 'needs_action', _acc: { vinted_user_id: '111' } }, { transaction_id: 7088, title: 'Air Max 90 blanche', price: { amount: '70.0', currency_code: 'EUR' }, date: ilYaH(50), status: 'Commande annulée', _acc: { vinted_user_id: '111' } }] } } },
   { id: 'harvest_111_orders_purchased', data: { capturedAt: ilYaH(0.2), nItems: 0, payload: { my_orders: [] } } },
+  { id: 'harvest_111_txn_7088', data: { capturedAt: ilYaH(1), payload: { transaction: { id: 7088, item_id: 9881, status: 900, status_title: 'Commande annulée' } } } },
   { id: 'harvest_111_txn_7130', data: { capturedAt: ilYaH(1), payload: { transaction: { id: 7130, item_id: 9130, status: 300, status_title: 'Bordereau envoyé' } } } },
 ];
 
@@ -104,7 +105,8 @@ const attendre = (pg, f, arg, ms = 10000) => pg.waitForFunction(f, arg, { timeou
 const debord = (pg) => pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 const lireLS = (pg, k) => pg.evaluate((k) => localStorage.getItem(k), k);
 const cibles = (pg) => pg.evaluate(() => { const f = document.querySelector('[data-ia-feuille]'); if (!f) return ['pas de feuille']; return [...f.querySelectorAll('button, input, summary')].filter((e) => e.getClientRects().length).map((e) => { const r = e.getBoundingClientRect(); const cs = getComputedStyle(e); return r.height >= 43.5 ? null : `${e.tagName.toLowerCase()}[${(e.textContent || e.getAttribute('aria-label') || '').trim().slice(0, 24)}] ${r.height.toFixed(1)} px (min ${cs.minHeight}, transform ${cs.transform})`; }).filter(Boolean); });
-const venduJour = (pg) => pg.evaluate(() => { const e = document.querySelector('[data-vendu-jour]'); return e ? e.getAttribute('data-vendu-jour') : null; });
+// Le « vendu » et le « versé » du jour dans Ma journée (`data-jv2-vendu`, `data-jv2-verse`, en centimes).
+const venduJour = (pg) => pg.evaluate(() => { const v = document.querySelector('[data-jv2-vendu]'), r = document.querySelector('[data-jv2-verse]'); return (v ? v.getAttribute('data-jv2-vendu') : '-') + '/' + (r ? r.getAttribute('data-jv2-verse') : '-'); });
 const pret = async (pg, tel) => {
   const sel = tel ? 'button[data-recherche-loupe]' : '[data-barre-recherche]';
   for (let i = 0; i < 80; i++) { const ok = await pg.evaluate((sel) => { const e = document.querySelector(sel); if (!e) return false; const r = e.getBoundingClientRect(); if (!r.width) return false; const t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!(t && (e === t || e.contains(t))); }, sel); if (ok) return true; await pg.waitForTimeout(250); }
@@ -150,16 +152,17 @@ const pret = async (pg, tel) => {
         dit(ok, `${TT} vendue en main propre : 45 €, espèces, datée du jour, sortie du stock (case libérée, N° gardé)`, await lireLS(pg, 'vrm_cycle_decisions'));
         dit(n === 2, `${TT} DEUX touchers mesurés (l’action, « Vendue »)`, String(n));
         await attendre(pg, () => !!document.querySelector('[data-ia-vente-faite="9124"]'));
-        const jour = await attendre(pg, () => { const e = document.querySelector('[data-vendu-jour]'); return e && e.getAttribute('data-vendu-jour') === '4500'; }, null, 8000);
-        dit(jour, `${TT} Ma journée : « aujourd’hui 45 € » (vendu du jour)`, await venduJour(pg) + ' / avant : ' + jourAvant);
+        const jour = await attendre(pg, () => { const v = document.querySelector('[data-jv2-vendu]'), r = document.querySelector('[data-jv2-verse]'); return v && v.getAttribute('data-jv2-vendu') === '4500' && r && r.getAttribute('data-jv2-verse') === '4500'; }, null, 3500);
+        dit(jour, `${TT} Ma journée : vendu 45 € et versé 45 € aujourd’hui (encaissée le jour saisi)`, await venduJour(pg) + ' / avant : ' + jourAvant + ' / sonde : ' + await pg.evaluate(() => JSON.stringify({ mois: [...document.querySelectorAll('[data-vendu-mois]')].map((e) => e.getAttribute('data-vendu-mois')), jc: document.querySelectorAll('.vrm-jc').length, t: [...document.querySelectorAll('main *, #root *')].filter((e) => !e.children.length && /45\s*€/.test(e.textContent || '')).slice(0, 4).map((e) => e.outerHTML.slice(0, 160)) })));
         await pg.screenshot({ path: path.join(SHOTS, `faite-${suf}.png`) });
         // « Annuler » (la pilule, 5 s) : l'état d'avant EXACT, le chiffre du jour revient, la feuille le dit.
-        const annuler = pg.getByRole('button', { name: /^Annuler$/ }).first();
+        const annuler = pg.locator('[data-pilule-annuler]').first();
+        await annuler.waitFor({ timeout: 4000 }).catch(() => {});
         if (await annuler.count()) { if (tel) await annuler.tap(); else await annuler.click(); }
-        const revenu = await attendre(pg, ([d0, v0, s0]) => { const eg = (k, x) => JSON.stringify(JSON.parse(localStorage.getItem(k) || 'null')) === JSON.stringify(JSON.parse(x || 'null')); return eg('vrm_cycle_decisions', d0) && eg('vinted_annonces_vendues', v0) && eg('vrm_slots', s0); }, [avantD, avantV, avantS], 10000);
+        const revenu = await attendre(pg, ([d0, v0, s0]) => { const eg = (k, x) => { const vide = k === 'vinted_annonces_vendues' ? '[]' : '{}'; /* une clé absente = vide (aucun lecteur ne les distingue) */ return JSON.stringify(JSON.parse(localStorage.getItem(k) || vide)) === JSON.stringify(JSON.parse(x || vide)); }; return eg('vrm_cycle_decisions', d0) && eg('vinted_annonces_vendues', v0) && eg('vrm_slots', s0); }, [avantD, avantV, avantS], 10000);
         dit(revenu, `${TT} « Annuler » ⇒ décisions, marque « vendue » et case : l’état d’avant EXACT`, [avantD, await lireLS(pg, 'vrm_cycle_decisions'), avantS, await lireLS(pg, 'vrm_slots')].join(' | '));
-        const retour = await attendre(pg, (j0) => { const e = document.querySelector('[data-vendu-jour]'); return (e ? e.getAttribute('data-vendu-jour') : null) === j0; }, jourAvant, 8000);
-        dit(retour, `${TT} et le chiffre du jour revient`, String(await venduJour(pg)));
+        const retour = await attendre(pg, (j0) => { const v = document.querySelector('[data-jv2-vendu]'), r = document.querySelector('[data-jv2-verse]'); return ((v ? v.getAttribute('data-jv2-vendu') : '-') + '/' + (r ? r.getAttribute('data-jv2-verse') : '-')) === j0; }, jourAvant, 8000);
+        dit(retour, `${TT} et les chiffres du jour reviennent`, String(await venduJour(pg)) + ' / avant : ' + jourAvant);
         const dite = await attendre(pg, () => document.querySelector('[data-ia-etape]')?.getAttribute('data-ia-etape') === 'prix' && /Vente annulée/.test(document.querySelector('[data-ia-note]')?.textContent || ''), null, 8000);
         dit(dite, `${TT} la feuille dit « Vente annulée » et revient au prix (jamais « vendu » affiché pour rien)`);
         await pg.screenshot({ path: path.join(SHOTS, `annulee-${suf}.png`) });
@@ -187,7 +190,7 @@ const pret = async (pg, tel) => {
         await pg.screenshot({ path: path.join(SHOTS, `archive-${suf}.png`) });
         await toucher('[data-ia-archive="B125"]');
         dit(await attendre(pg, () => document.querySelector('[data-ia-verdict]')?.getAttribute('data-ia-verdict') === 'possible' && !!document.querySelector('[data-ia-paire="9b25"]'), null, 15000), `${TT} SON toucher prend B125`);
-        dit(await essai('88', 'plusieurs') && await pg.evaluate(() => document.querySelectorAll('[data-ia-paire]').length === 2 && document.querySelectorAll('.sb-plaque.is-double').length === 2 && !document.querySelector('[data-ia-prix]')), `${TT} N°88 porté par deux paires ⇒ la question, plaques rouges, aucun prix`);
+        dit(await essai('88', 'plusieurs') && await pg.evaluate(() => document.querySelectorAll('[data-ia-paire]').length === 2 && document.querySelectorAll('.sb-plaque.is-double').length === 2 && !document.querySelector('[data-ia-prix]')), `${TT} N°88 porté par deux paires ⇒ la question, plaques rouges, aucun prix`, await pg.evaluate(() => JSON.stringify({ v: document.querySelector('[data-ia-verdict]')?.getAttribute('data-ia-verdict'), f: (() => { try { const f = JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}'); return [f['9881'] && f['9881'].numero, f['9882'] && f['9882'].numero, f['9882'] && f['9882'].reattribue]; } catch (_) { return null; } })() })));
         const c = await cibles(pg);
         dit(c.length === 0, `${TT} cibles ≥ 44 px (la question)`, c.join(' ; '));
         await pg.screenshot({ path: path.join(SHOTS, `double-${suf}.png`) });
