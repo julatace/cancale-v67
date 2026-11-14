@@ -164,13 +164,13 @@ function regle(nom, f) {
     const lignes = { [`harvest_${UID}_orders_sold`]: { capturedAt: new Date().toISOString(), payload: { my_orders: V } } };
     const at = Date.now();
     const store = { vrmLecturesDues: { [UID]: { preuve: { reste: 0, at }, retrait: { reste: 0, at }, releve: { reste: 0, at } } } };
-    // Le détail répond 404 ; la conversation répond — celle de 9300005 porte une AUTRE transaction.
+    // Le détail répond 404 ; la conversation répond — celle de 9300000 porte une AUTRE transaction.
     const vinted = (r) => {
       if (/\/api\/v2\/transactions\/\d+$/.test(r.chemin)) return { status: 404, body: {} };
       const m = /\/api\/v2\/conversations\/(\d+)$/.exec(r.chemin);
       if (!m) return { status: 404, body: {} };
       const tx = String(Number(m[1]) - 8800000 + 9300000);
-      return { status: 200, body: conv(tx === '9300005' ? '9399999' : tx) };
+      return { status: 200, body: conv(tx === '9300000' ? '9399999' : tx) };   // la plus ancienne : lue la 1re
     };
     const f = faireFond({ src: bgSrc, lignes, vinted, store });
     f.ctx.__vrmPausesVues = [];
@@ -184,7 +184,7 @@ function regle(nom, f) {
     const l = rang.length ? f.lignes[rang[0]] : null;
     dit(!!l && l.source === 'conversation' && /^\d+$/.test(l.tx) && l.at === J3 && !JSON.stringify(l).includes('acheteuse_x') && !JSON.stringify(l).includes('Paire secrète') && !JSON.stringify(l).includes('45'),
       '3. la ligne rangée : n°, date, source — jamais un pseudo, un titre ni un montant', JSON.stringify(l));
-    dit(!f.lignes['harvest_111_versement_9300005'] && !f.lignes['harvest_111_versement_9399999'], '3. une conversation qui porte une AUTRE transaction n’écrit rien (l’identité prime)');
+    dit(f.j.vinted.some((x) => /\/conversations\/8800000$/.test(x.chemin)) && !f.lignes['harvest_111_versement_9300000'] && !f.lignes['harvest_111_versement_9399999'],'3. une conversation qui porte une AUTRE transaction n’écrit rien (l’identité prime)');
   });
 
   // ── 4. Le contrôle de nuit ──
