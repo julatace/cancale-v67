@@ -595,7 +595,8 @@ export const valeurObjectif = (obj, sources, regles, maintenant = Date.now()) =>
 };
 // (11 nov., lot objectifs-mois) Le chiffre de chaque mesure : vendu (date de vente),
 // bénéfice brut (seulement les ventes au prix d'achat connu), nombre de ventes.
-export const CHIFFRE_OBJECTIF = { ca: 'vendu', benefice: 'brut', ventes: 'ventes' };
+// (14 nov., lot argent-choix) + le reçu : la case « Reçu · mois » (date de VERSEMENT).
+export const CHIFFRE_OBJECTIF = { ca: 'vendu', benefice: 'brut', ventes: 'ventes', recu: 'recu' };
 // La MÊME valeur pour un mois PLEIN passé [de, a) — la proposition (3 derniers mois)
 // et le bilan de fin de mois. `couvert` : une vente au moins est lue AVANT ce mois
 // (sinon l'historique commence peut-être au milieu : un « 0 » n'y prouve rien) ;
@@ -604,8 +605,14 @@ export const valeurObjectifMois = (type, sources, regles, bornes, maintenant = D
   const id = CHIFFRE_OBJECTIF[type];
   if (!id || !bornes) return null;
   const p = { de: bornes.de, a: bornes.a };
-  const x = valeurChiffre(id, { id, p }, sources, { ...SEL_OBJECTIF, periode: p }, regles, maintenant);
   const S = sources || {};
+  // (14 nov.) Le reçu d'un mois PLEIN passé : `recu[ym]` de la MÊME ligne (`recuPublieEntre`,
+  // « Comparer deux mois ») — la case « Reçu » ne se calcule pas sur une plage quelconque.
+  const ymB = bornes.ym || `${new Date(bornes.de).getFullYear()}-${String(new Date(bornes.de).getMonth() + 1).padStart(2, '0')}`;
+  const x = id === 'recu'
+    ? { hors: '', p, ...recuPublieEntre(S.ligneUrssaf, { de: bornes.de, a: bornes.a, ym: ymB, complet: true }, maintenant) }
+    : valeurChiffre(id, { id, p }, sources, { ...SEL_OBJECTIF, periode: p }, regles, maintenant);
+  if (id === 'recu' && x.manque == null) x.manque = [];
   const L = S.vendu && Array.isArray(S.vendu.lignes) ? S.vendu.lignes : [];
   let couvert = L.some((l) => Number(l.ts) < bornes.de);
   if (id === 'brut') couvert = couvert && new Date(bornes.de).getFullYear() >= new Date(maintenant).getFullYear() - 1 && !!(S.joursBenef && S.joursBenef.jours);
