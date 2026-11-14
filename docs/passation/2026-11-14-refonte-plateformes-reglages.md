@@ -98,6 +98,11 @@ Banc `scripts/bancs/refonte-plateformes-reglages.cjs` (la mesure des passes desi
 - ⚠️ Un premier passage avait rougi `design-passe-3` (sous-pages) : la copie du §4 prise le matin sur
   `claude/refonte-coque` datait d'avant la passe 3 et effaçait sa section 2.12. Corrigé (`styles-systeme.css` =
   main + §3/§4 de la coque, 0 ligne retirée à main), relancé vert.
+- Après « compte propriétaire / Journal » (fin de journée, la machine a redémarré, charge ≈ 50) : ce banc
+  (Paramètres 390 clair + sombre) VERT ; `audit-traduction`, `audit-confiance-publique` (libellé suivi), tdz,
+  variables, composants VERTS. `reglages.cjs` et `abonnement.cjs` rouges PAR LA CHARGE : la sonde montre l'écran
+  encore en squelettes de chargement après leurs 3,5–5 s d'attente fixe (aucune carte rendue, même pour un client ;
+  `reglages.cjs` était VERT sur le même code juste avant le dernier lot). À relancer machine calme.
 - Pas relancés jusqu'au bout ici (pages qui « crashent » sous la charge, pas une règle) : `lbc-plus`,
   `vestiaire-plus`, `lbc-comme-vinted`, `lbc-supprimer`, `quoi-republier`, `abonnement`, `parrainage-lot54` — à
   relancer machine calme.
