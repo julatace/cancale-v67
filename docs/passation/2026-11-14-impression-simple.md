@@ -96,7 +96,7 @@ phrases-guides, l'aperçu schématique, « Placer le tampon », la frise « Choi
 ## Preuves
 
 - **Banc `scripts/bancs/impression-simple.cjs`** (390 tactile iPhone clair et sombre, 1512 clair et sombre, N° à
-  vérifier) : **53 verts** (54 avec A0 bis). Touchers jusqu'au PDF : **2 la première fois** (A3), **1 ensuite** (B1) ;
+  vérifier) : **57 verts**. Touchers jusqu'au PDF : **2 la première fois** (A3), **1 ensuite** (B1) ;
   la feuille de partage s'ouvre **dans le geste** (`window.event` = le clic : A2, A12, C3) ; PDF relu par pdf.js :
   **4 pages A4, chaque page SON « ETIQUETTE » et SON « N° »** (A4-A6, B3) ; papier retenu (A7, B6) ; « Il en manque » ⇒
   **une page, la sienne** (A12) ; tampon corrigé après ⇒ une page sans N° ni titre (B5) ; l'absent nommé (A9) ;
@@ -111,11 +111,19 @@ phrases-guides, l'aperçu schématique, « Placer le tampon », la frise « Choi
 - Bancs d'impression gardés verts, **adaptés parce qu'ils jugeaient l'ancien parcours** (dit dans chacun) :
   `tout-imprimer` (28 : la question du papier une fois), `tout-imprimer-garde` (8, inchangé), `tout-imprimer-compte`
   (18 : « Imprimer (2) » et « 2 autres · Choisir »), `colis-plus` A et F (le papier à côté du bouton, le tampon APRÈS,
-  « Il en manque »), `selection-bordereaux` (16 : plus de feuille d'office ; « Déplacer le tampon » + « Toujours ici »
+  « Il en manque »), `selection-bordereaux` (48 sur 390, 1512, 1512 sombre : plus de feuille d'office ; « Déplacer le tampon » + « Toujours ici »
   ⇒ les deux Mondial Relay du lot suivant à la place posée).
 - Audits : traduction, tdz, variables, coherence, identite, impression, impression-carton, colis-plus, quoi-de-neuf,
   rouge-doublon, violet, colis-trois (son 2g était rouge AVANT ce lot : réparé), selection-bordereaux,
-  annuler-commandes, actions-serie — verts (résultat final en bas).
+  annuler-commandes, actions-serie — verts.
+
+## Résultat final (après la fusion d'`origin/claude/integration-refonte`, dist reconstruit)
+
+`impression-simple` 57 verts · `tout-imprimer` 28 · `tout-imprimer-garde` 8 · `tout-imprimer-compte` 18 ·
+`colis-plus` (A, F) 16 · `selection-bordereaux` 48 · `npm run build` vert · audits traduction, tdz, variables,
+coherence, identite, impression, impression-carton, colis-plus (72, `--prouve` 29/29), quoi-de-neuf, rouge-doublon,
+violet, colis-trois, selection-bordereaux, annuler-commandes, actions-serie : tous verts. Captures regardées
+(390 clair/sombre, 1512 clair/sombre : écran, papier, partage, feuille d'après, « Il en manque », tampon corrigé).
 
 ## Ce qui n'est pas fait (dit)
 
