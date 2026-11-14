@@ -27,6 +27,7 @@ import { useLangue } from '../i18n/react.js';   // (11 nov., lot lbc-plus) baiss
 import { tr } from '../i18n/index.js';
 
 // ⟦← App.jsx #2⟧
+import { accompagner } from '../accompagnement.js';   // (14 nov.) pendant, après, échec d'un geste
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PUBLIER DEPUIS L'APP (5.130) — « c'est l'application qui contrôle l'extension »
@@ -1842,13 +1843,15 @@ function LeboncoinScreen() {
     });
     if (!ok) return;
     setPauseEnVol(r.id);
+    // (14 nov., lot accompagnement) PENDANT, puis APRÈS (et sa suite) ou ÉCHEC (la raison en mots, le geste).
+    const acc = accompagner('lbc.supprimer', { total: 1, arretable: false }).pendant(0);
     let rep = null;
     try { rep = await vmrCmd({ cmd: 'lbcSupprime', id: String(r.id), confirme: true }, 70000); } catch (_) { rep = null; }
     setPauseEnVol(null);
     const res = { id: r.id, numero: r.numero || '', titre: r.title || '', rep, at: Date.now() };
     setSupprRes((l) => [res, ...l.filter((x) => x.id !== r.id)].slice(0, 6));
     // Le résultat se dit AUSSI là où il a cliqué (la carte de résultat est plus bas).
-    try { const ph = phraseSuppr(res); toast(`${res.numero ? 'N°' + res.numero + ' · ' : ''}${res.titre || 'Annonce'} — ${ph.t}`, ph.etape === 'fait' ? 'ok' : 'err'); } catch (_) {}
+    try { const ph = phraseSuppr(res); if (ph.etape === 'fait') acc.fini({ n: 1 }); else acc.echec(!rep ? { sansReponse: true, raison: ph.t } : rep.accepte === false ? (rep.raison || rep) : { status: rep.statut, raison: ph.t }); } catch (_) {}
     if (rep && rep.accepte && rep.etape === 'fait') reload();
   };
   const phraseSuppr = (x) => {

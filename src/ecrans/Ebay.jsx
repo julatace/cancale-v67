@@ -2548,7 +2548,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           ))}
         </div>
       )}
-      {info && <div data-ebay-info={it.itemId} data-ebay-info-ton={infoTon || (/^✓/.test(info) ? 'ok' : 'warn')} style={{ fontSize: 12, color: (infoTon ? infoTon === 'ok' : /^✓/.test(info)) ? E.text : E.warn, margin: '0 16px 11px', lineHeight: 1.45 }}>{info}{lienEbayInfo && url ? <> <a href={url} target="_blank" rel="noreferrer" style={{ color: E.accentSoft, fontWeight: 700 }}>Voir sur eBay ↗</a></> : null}</div>}
+      {info && <div data-ebay-info={it.itemId} data-ebay-info-ton={infoTon || (/^✓/.test(info) ? 'ok' : 'warn')} {...((infoTon ? infoTon === 'ok' : /^✓/.test(info)) ? { 'data-acc-apres': 'offre.ebay' } : { 'data-acc-echec': 'offre.ebay' })} style={{ fontSize: 12, color: (infoTon ? infoTon === 'ok' : /^✓/.test(info)) ? E.text : E.warn, margin: '0 16px 11px', lineHeight: 1.45 }}>{info}{lienEbayInfo && url ? <> <a href={url} target="_blank" rel="noreferrer" style={{ color: E.accentSoft, fontWeight: 700 }}>Voir sur eBay ↗</a></> : null}</div>}
       {open && (<DansFiche cle={flEb['data-fiche-ligne']} place="contexte" seulementFiche>
         <div className="vrm-eb-fiche" data-ebay-fiche={it.itemId}>
           {/* La référence VRM d'une annonce « à vérifier » : dite ICI, sur la fiche
@@ -2588,10 +2588,10 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
         );
       })()}
       {regleOuverte && et && (
-        <div data-regle-panneau={it.itemId} {...(regleSignal === 'prix-change' ? { 'data-regle-prix-change': '1' } : {})} {...(regleSignal === 'existante' ? { 'data-regle-existante': '1' } : {})}
+        <div data-regle-panneau={it.itemId} data-acc-pendant={envoiRegle ? 'offre.ebay' : undefined} {...(regleSignal === 'prix-change' ? { 'data-regle-prix-change': '1' } : {})} {...(regleSignal === 'existante' ? { 'data-regle-existante': '1' } : {})}
           style={{ margin: '0 0 12px', background: E.card2, borderRadius: 12, padding: '11px 12px' }}>
           <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 8 }}>
-            {prixVuN ? <>Prix de l'annonce : <b style={{ color: E.text }}>{eurEbay(prixVuN)}</b>. </> : null}Offre ≥ ce montant : eBay l'accepte seul, l'article est vendu. En dessous, elle t'arrive.
+            <span data-acc-avant="offre.ebay">{prixVuN ? <>Prix de l'annonce : <b style={{ color: E.text }}>{eurEbay(prixVuN)}</b>. </> : null}Offre ≥ ce montant : eBay l'accepte seul, l'article est vendu. En dessous, elle t'arrive. {tr('acc.offre.ebay.pas')}</span>
             {et.etat === 'pas-su' && et.raison === 'offres-inconnues' && et.lu
               ? <span data-regle-panneau-offres-inconnues={it.itemId}>{` Règle actuelle : eBay montre un seuil${et.lu.accepte != null ? ` dès ${eurEbay(et.lu.accepte)}` : ''}${et.lu.refuse != null ? ` (refus sous ${eurEbay(et.lu.refuse)})` : ''}, offres peut-être éteintes : enregistrer les active.`}</span>
               : (et.etat === 'pas-su' ? ' Règle actuelle pas lue : rien remplacé sans te redemander.' : '')}

@@ -32194,19 +32194,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const l = (Array.isArray(liste) ? liste : []).filter((r) => r && r.id);
     if (!l.length || lbcSupprEnVol) return;
     const ok = await askConfirm({ title: l.length > 1 ? `Supprimer ${l.length} annonces de Leboncoin ?` : `Supprimer le N°${l[0].numero} de Leboncoin ?`,
-      desc: l.map((r) => `N°${r.numero} · ${String(r.titre || '').slice(0, 50)} — vendu sur ${r.ou}`).join('\n'),
+      desc: l.map((r) => `N°${r.numero} · ${String(r.titre || '').slice(0, 50)} — vendu sur ${r.ou}`).join('\n') + '\n\n' + tr('acc.lbc.supprimer.pas'),
       ok: 'Oui, supprimer de Leboncoin', cancel: 'Annuler', danger: true, irreversible: true });
     if (!ok) return;
     setLbcSupprEnVol(true);
     let faites = 0;
+    // (14 nov., lot accompagnement) PENDANT « 2 / 5 » ; APRÈS le nombre et la suite ; ÉCHEC la raison et le geste.
+    const acc = accompagner('lbc.supprimer', { total: l.length, arretable: false });
     try {
       for (const r of l) {
+        acc.pendant(faites);
         let rep = null; try { rep = await vmrCmd({ cmd: 'lbcSupprime', id: String(r.id), confirme: true }, 70000); } catch (_) { rep = null; }
         if (rep && rep.accepte && rep.etape === 'fait') { faites++; continue; }
-        toast(`N°${r.numero} : ${!rep ? "je ne sais pas si elle est supprimée — regarde l'annonce sur Leboncoin" : rep.accepte === false ? `pas fait — ${rep.raison || 'refusé par l’extension'}` : rep.etape === 'refuse' ? `pas fait — Leboncoin a répondu ${rep.statut}` : `je ne sais pas si elle est supprimée — ${rep.raison || 'pas de réponse de Leboncoin'}`}`, 'err');
+        acc.echec(!rep ? { sansReponse: true, raison: tr('acc.lbc.supprimer.pasSu', { n: r.numero }) } : rep.accepte === false ? (rep.raison || rep) : (rep.raison || tr('acc.lbc.supprimer.refus', { n: r.numero })));
         break;
       }
-      if (faites) toast(faites > 1 ? `${faites} annonces supprimées de Leboncoin` : `N°${l[0].numero} supprimé de Leboncoin`, 'ok');
+      if (faites && faites === l.length) acc.fini({ n: faites });
+      else if (faites) toast(faites > 1 ? `${faites} annonces supprimées de Leboncoin` : `N°${l[0].numero} supprimé de Leboncoin`, 'ok');
     } finally { setLbcSupprEnVol(false); if (faites && onCycle) onCycle(); }
   };
   const repondreCycle = async (c, choix) => {
