@@ -239,8 +239,8 @@ export default {
   "nav.journee.court": "Heute",
   "nav.messages": "Nachrichten",
   "nav.plus": "Mehr",
-  "nav.paires": "Paare",
-  "nav.groupe.paires": "Paare",
+  "nav.paires": "Anzeigen",
+  "nav.groupe.paires": "Anzeigen",
   "nav.trancher": "Zu entscheiden",
   "nav.ventes": "Verkäufe",
   // ── coque

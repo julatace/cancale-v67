@@ -4,6 +4,7 @@ export default {
   "listes.urgence.titre": "Les colis à envoyer en priorité",
   "listes.ok": "OK",
   "listes.tousComptes": "Tous les comptes",
+  "listes.tousComptesCourt": "Tous",
   "listes.choisirCompte": "Compte : {nom} — changer",
   "listes.comptes": "Comptes",
   "listes.ouvertVinted": "ouvert sur Vinted",

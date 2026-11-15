@@ -77,7 +77,7 @@
 .sj-journee .sj-tete::before, .sj-journee .sj-tete::after { content: none !important; display: none !important; }
 .sj-journee .sj-bonjour { font: 500 13px/1.2 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; margin: 0 0 7px !important; letter-spacing: 0 !important; opacity: 1 !important; text-transform: none !important; }
 .sj-journee .sj-titre {
-  font: 400 34px/1 var(--sb-police-affiche) !important; letter-spacing: -.03em !important; color: var(--sb-encre) !important; margin: 0 !important; padding: 0 !important;
+  font: 600 34px/1 var(--sb-police-affiche) !important; letter-spacing: -.03em !important; color: var(--sb-encre) !important; margin: 0 !important; padding: 0 !important;
 }
 .sj-journee .sj-phrase { margin: 8px 0 0 !important; }
 .sj-journee .sj-phrase .vrm-phrase-ecran, .sj-journee .sj-phrase p { font: 500 14px/1.35 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; margin: 0 !important; max-width: 46ch !important; }
@@ -109,12 +109,12 @@
 .sj-journee .vrm-jv2-corps { display: grid !important; grid-template-columns: minmax(0, 1fr) auto !important; align-items: end !important; gap: 12px !important; margin: 0 !important; }
 .sj-journee .vrm-jv2-chiffre { min-width: 0 !important; }
 .sj-journee .vrm-jv2-grand, .sj-journee .vrm-jv2-grand.vrm-fu-grand {
-  font: 200 96px/.8 var(--sb-police-affiche) !important; letter-spacing: -.065em !important; color: var(--sb-encre) !important;
+  font: 500 96px/.8 var(--sb-police-affiche) !important; letter-spacing: -.035em !important; color: var(--sb-encre) !important;
   margin: 6px 0 0 -4px !important; padding: 0 !important; white-space: nowrap !important; background: none !important; -webkit-text-fill-color: currentColor !important;
 }
-.sj-journee .vrm-jv2-grand.is-zero, .sj-journee .vrm-jv2-grand.is-vide { font: 300 44px/1 var(--sb-police-affiche) !important; letter-spacing: -.03em !important; color: var(--sb-encre-2) !important; margin: 10px 0 0 !important; }
+.sj-journee .vrm-jv2-grand.is-zero, .sj-journee .vrm-jv2-grand.is-vide { font: 500 44px/1 var(--sb-police-affiche) !important; letter-spacing: -.03em !important; color: var(--sb-encre-2) !important; margin: 10px 0 0 !important; }
 .sj-journee .vrm-jv2-grand .vrm-fu-borne { display: block !important; font: 600 13px/1.2 var(--sb-police-texte) !important; letter-spacing: 0 !important; color: var(--sb-encre-2) !important; margin: 0 0 6px 4px !important; }
-.sj-journee .sb-eur { vertical-align: baseline !important; line-height: 1 !important; display: inline-block !important; font-size: .44em !important; font-weight: 300 !important; letter-spacing: 0 !important; margin-left: .08em !important; transform: translateY(-.92em) !important; position: static !important; }
+.sj-journee .sb-eur { vertical-align: baseline !important; line-height: 1 !important; display: inline-block !important; font-size: .44em !important; font-weight: 500 !important; letter-spacing: 0 !important; margin-left: .08em !important; transform: translateY(-.92em) !important; position: static !important; }
 .sj-journee .sb-nb { white-space: nowrap !important; }
 .sj-journee .vrm-jv2-faits { font: 600 14px/1.35 var(--sb-police-texte) !important; color: var(--sb-encre) !important; margin: 16px 0 0 !important; }
 .sj-journee .vrm-jv2-faits > span + span { color: var(--sb-encre-2) !important; font-weight: 500 !important; }
@@ -171,7 +171,7 @@
 .sj-journee .sj-lib { display: -webkit-box !important; -webkit-box-orient: vertical !important; -webkit-line-clamp: 2 !important; font: 600 13px/1.2 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; padding-right: 18px !important; overflow: hidden !important; overflow-wrap: anywhere !important; hyphens: auto !important; }
 .sj-journee .sb-tuile-plus { position: absolute !important; top: 14px !important; right: 14px !important; color: var(--sb-encre-2) !important; pointer-events: none !important; }
 .sj-journee .sj-face { position: absolute !important; inset: 34px 14px 14px 16px !important; display: flex !important; flex-direction: column !important; justify-content: flex-end !important; align-items: flex-start !important; min-width: 0 !important; }
-.sj-journee .sj-n { display: flex !important; align-items: center !important; gap: 8px !important; font: 300 38px/.8 var(--sb-police-affiche) !important; letter-spacing: -.03em !important; color: var(--sb-encre) !important; white-space: nowrap !important; }
+.sj-journee .sj-n { display: flex !important; align-items: center !important; gap: 8px !important; font: 500 38px/.8 var(--sb-police-affiche) !important; letter-spacing: -.03em !important; color: var(--sb-encre) !important; white-space: nowrap !important; }
 .sj-journee .is-calme .sj-n { color: var(--sb-encre-2) !important; }
 .sj-journee .sj-point { width: 6px !important; height: 6px !important; border-radius: 50% !important; background: var(--sb-ambre-point) !important; display: inline-block !important; flex: none !important; }
 .sj-journee .sj-sous { display: block !important; margin-top: 8px !important; font: 600 13px/1.3 var(--sb-police-texte) !important; color: var(--sb-encre) !important; min-width: 0 !important; max-width: 100% !important; }
@@ -185,7 +185,7 @@
 
 /* « À envoyer » 2 × 2 : le chiffre d'affiche, la pile, le rond d'encre « Imprimer » */
 .sj-journee .sj-t-envoyer .sj-face { inset: 38px 100px 14px 16px !important; justify-content: space-between !important; }
-.sj-journee .sj-t-envoyer .sj-n-grand, .sj-journee .sj-deplie .sj-n-grand { font: 200 70px/.8 var(--sb-police-affiche) !important; letter-spacing: -.05em !important; margin-left: -3px !important; }
+.sj-journee .sj-t-envoyer .sj-n-grand, .sj-journee .sj-deplie .sj-n-grand { font: 500 70px/.8 var(--sb-police-affiche) !important; letter-spacing: -.03em !important; margin-left: -3px !important; }
 .sj-journee .sj-t-envoyer .sj-face .sj-sous { font-size: 13px !important; color: var(--sb-encre) !important; }
 .sj-journee .sj-t-envoyer .sj-pile { position: absolute !important; left: 82px !important; top: 4px !important; }
 .sj-journee .sj-plein-place { position: absolute !important; right: 14px !important; bottom: 14px !important; z-index: 2 !important; }
@@ -213,7 +213,7 @@
   display: flex !important; flex-direction: column !important; align-items: flex-start !important; justify-content: flex-end !important; gap: 0 !important; min-width: 0 !important; min-height: 44px !important;
   height: auto !important; margin: 0 !important; padding: 0 !important; border: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important; text-align: left !important; color: var(--sb-encre) !important;
 }
-.sj-journee .sj-t-mois .vrm-fu-case > b { display: block !important; font: 300 26px/.95 var(--sb-police-affiche) !important; letter-spacing: -.03em !important; color: var(--sb-encre) !important; white-space: nowrap !important; max-width: 100% !important; }
+.sj-journee .sj-t-mois .vrm-fu-case > b { display: block !important; font: 500 26px/.95 var(--sb-police-affiche) !important; letter-spacing: -.03em !important; color: var(--sb-encre) !important; white-space: nowrap !important; max-width: 100% !important; }
 .sj-journee .sj-t-mois .vrm-fu-case > b.is-vide { color: var(--sb-encre-2) !important; }
 .sj-journee .sj-t-mois .vrm-fu-case > span:not(.vrm-sr-seul) { display: block !important; margin-top: 7px !important; font: 550 12px/1.2 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; max-width: 100% !important; }
 .sj-journee .sj-t-mois .vrm-fu-case > small { display: block !important; margin-top: 2px !important; font: 500 11px/1.2 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; max-width: 100% !important; opacity: 1 !important; }
@@ -231,7 +231,7 @@
 .sj-journee .sj-tasse::-webkit-scrollbar { display: none !important; }
 .sj-journee .sj-tasse-t { height: 64px !important; min-height: 64px !important; padding: 11px 12px !important; border-radius: 17px !important; cursor: pointer !important; overflow: hidden !important; }
 .sj-journee .sj-tasse-t:active { background: var(--sb-creux) !important; box-shadow: var(--sj-k-in) !important; }
-.sj-journee .sj-tasse-n { display: block !important; font: 300 24px/1 var(--sb-police-affiche) !important; letter-spacing: -.03em !important; color: var(--sb-encre) !important; }
+.sj-journee .sj-tasse-n { display: block !important; font: 500 24px/1 var(--sb-police-affiche) !important; letter-spacing: -.03em !important; color: var(--sb-encre) !important; }
 .sj-journee .sj-tasse-l { display: block !important; font: 550 11.5px/1.2 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; margin-top: 5px !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
 .sj-journee .sj-deplie {
   margin: 12px 0 0 !important; padding: 18px 0 6px !important; overflow: visible !important;
@@ -266,8 +266,8 @@
 /* ── 9. « À FAIRE » (la liste d'avant, en rangées sur une porcelaine) ──────────── */
 .sj-journee .sj-afaire { margin: 26px 0 0 !important; padding: 0 !important; background: none !important; border: 0 !important; box-shadow: none !important; }
 .sj-journee .sj-titre-section { display: flex !important; align-items: baseline !important; gap: 10px !important; margin: 0 4px 10px !important; padding: 0 !important; border: 0 !important; }
-.sj-journee .sj-titre-section h2 { font: 400 24px/1.1 var(--sb-police-affiche) !important; letter-spacing: -.02em !important; color: var(--sb-encre) !important; margin: 0 !important; }
-.sj-journee .sj-compte { font: 300 20px/1 var(--sb-police-affiche) !important; color: var(--sb-encre-2) !important; }
+.sj-journee .sj-titre-section h2 { font: 600 24px/1.1 var(--sb-police-affiche) !important; letter-spacing: -.02em !important; color: var(--sb-encre) !important; margin: 0 !important; }
+.sj-journee .sj-compte { font: 500 20px/1 var(--sb-police-affiche) !important; color: var(--sb-encre-2) !important; }
 .sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-day-task-list {
   display: block !important; margin: 0 !important; padding: 4px 0 !important; gap: 0 !important; border: 0 !important;
   border-radius: var(--sb-r-tuile) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-plan) !important;
@@ -324,7 +324,7 @@
 .sj-journee [data-ji-cases] { position: relative !important; margin: 18px 0 0 !important; padding: 44px 16px 14px !important; border: 0 !important; border-radius: var(--sb-r-tuile) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important; }
 .sj-journee [data-ji-cases] .vrm-fu-cases { display: grid !important; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)) !important; gap: 10px !important; margin: 0 !important; padding: 0 !important; background: none !important; }
 .sj-journee [data-ji-cases] .vrm-fu-case { display: flex !important; flex-direction: column !important; align-items: flex-start !important; margin: 0 !important; padding: 0 !important; border: 0 !important; background: none !important; box-shadow: none !important; color: var(--sb-encre) !important; text-align: left !important; min-height: 0 !important; }
-.sj-journee [data-ji-cases] .vrm-fu-case > b { display: block !important; font: 300 26px/.95 var(--sb-police-affiche) !important; letter-spacing: -.03em !important; color: var(--sb-encre) !important; white-space: nowrap !important; }
+.sj-journee [data-ji-cases] .vrm-fu-case > b { display: block !important; font: 500 26px/.95 var(--sb-police-affiche) !important; letter-spacing: -.03em !important; color: var(--sb-encre) !important; white-space: nowrap !important; }
 .sj-journee [data-ji-cases] .vrm-fu-case > span:not(.vrm-sr-seul), .sj-journee [data-ji-cases] .vrm-fu-case > small { display: block !important; margin-top: 6px !important; font: 550 12px/1.2 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; max-width: 100% !important; }
 .sj-journee [data-ji-cases] .vrm-ji-age { position: absolute !important; top: 14px !important; right: 16px !important; left: auto !important; color: var(--sb-encre-2) !important; font: 500 12px/1.2 var(--sb-police-texte) !important; background: none !important; }
 .sj-journee .vrm-ji-age, .sj-journee [data-ji-cases] :is(.vrm-fu-objectif-ligne, .vrm-fu-objectif-bas, .vrm-fu-objectif-reste, .vrm-fu-objectif-rythme) { color: var(--sb-encre-2) !important; }
@@ -367,3 +367,12 @@
 @keyframes sj-fondu { from { opacity: 0; } to { opacity: 1; } }
 
 } /* fin @layer sj-studio */
+
+/* (15 nov., Julien : « j'aime pas trop les écritures… enlève les écritures ») Sous le grand chiffre du jour, le
+   nombre de ventes SEUL : « versé » et « colis » restent pour les lecteurs d'écran (et dans la tuile du mois,
+   « Reçu · mois »), plus écrits. */
+.sj-journee .vrm-jv2-faits > span + span { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; white-space: nowrap !important; margin: -1px !important; padding: 0 !important; border: 0 !important; }
+.sj-journee .vrm-jv2-faits > span::after { content: none !important; }
+/* (15 nov.) Une tuile d'une rangée (« À retirer · 2 · Nike Terminator Low… ») : son titre tient sur UNE ligne
+   (points de suspension), sinon la 2e ligne passait sous les plaques des codes, posées à 34 px du haut. */
+.sj-journee .sj-t[data-taille="3x1"] .sj-lib, .sj-journee .sj-t[data-taille="2x1"] .sj-lib { -webkit-line-clamp: 1 !important; }

@@ -435,24 +435,18 @@ async function vides(nav) {
       await shot(o.pg, 'vide-' + nom);
     } finally { await o.ctx.close(); }
   }
-  console.log('\n── première fois sur un écran ──');
-  for (const [nom, url] of [['ventes', '/?tab=ventes'], ['colis', '/?tab=cat_bord'], ['garage', '/?tab=garage']]) {
+  // (15 nov., Julien : « enlève les écritures ») Plus AUCUNE aide « première fois » : même aides allumées,
+  // aucun écran ne l'écrit (le « ? » de l'écran suffit). La règle s'inverse : présente = rouge.
+  console.log('\n── aucune aide « première fois » ──');
+  for (const [nom, url] of [['journee', '/'], ['ventes', '/?tab=ventes'], ['colis', '/?tab=cat_bord'], ['garage', '/?tab=garage']]) {
     const o = await ouvrir(nav, { url, aides: true });
     try {
-      const vu = await o.pg.waitForSelector('[data-acc-premiere]', { timeout: 8000 }).then(() => true).catch(() => false);
-      let range = false;
-      if (vu) {
-        await shot(o.pg, 'premiere-' + nom);
-        await o.pg.locator('[data-acc-premiere-vu]').first().click();
-        await o.pg.waitForTimeout(300);
-        range = !(await o.pg.locator('[data-acc-premiere]').count());
-        await o.pg.reload({ waitUntil: 'domcontentloaded' }); await o.pg.waitForTimeout(2500);
-        range = range && !(await o.pg.locator('[data-acc-premiere]').count());
-      }
-      const ok = vu && range;
+      await o.pg.waitForTimeout(4000);
+      const n = await o.pg.locator('[data-acc-premiere]').count();
+      const ok = n === 0;
       TABLEAU['premiere.' + nom] = { premiere: ok ? 1 : 0 };
       if (ok) verts++; else rouges++;
-      console.log(`  ${ok ? '✅' : '❌'} première fois · ${nom}${ok ? ' — une phrase, rangée par « Compris », absente au retour' : vu ? ' — ne se range pas' : ' — absente'}`);
+      console.log(`  ${ok ? '✅' : '❌'} pas d’aide « première fois » · ${nom}${ok ? '' : ' — encore écrite'}`);
     } finally { await o.ctx.close(); }
   }
 }

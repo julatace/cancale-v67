@@ -141,7 +141,7 @@ html body, .vrm-app-shell, :root:root body .vrm-app-shell .vrm-main { background
   order: 0 !important; font-size: 34px !important; font-weight: 700 !important; letter-spacing: -.03em !important; line-height: 1.05 !important;
   font-variant-numeric: tabular-nums !important; color: var(--w-encre) !important; margin: 6px 0 0 !important;
 }
-:root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) .vrm-fu-cases > .vrm-fu-case > b.is-vide { font-weight: 300 !important; color: var(--w-gris) !important; }
+:root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) .vrm-fu-cases > .vrm-fu-case > b.is-vide { font-weight: 500 !important; color: var(--w-gris) !important; }
 :root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) .vrm-fu-cases > .vrm-fu-case > small {
   order: 1 !important; font: 400 13px/1.3 var(--vrm-police) !important; color: var(--w-gris) !important; margin: auto 0 0 !important; padding-top: 6px !important;
 }

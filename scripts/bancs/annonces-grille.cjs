@@ -158,7 +158,8 @@ const LIRE = () => {
     .map((e) => e.textContent.trim().slice(0, 30));
   // Un libellé passé sur deux lignes (« Accepter / dès ») : plus haut qu'une ligne de sa police.
   // (le nombre de lignes du TEXTE, lu sur ses rectangles — la hauteur d'un bouton de 55 px n'en dit rien)
-  const lignes = (e) => { const tops = new Set(); const w = document.createTreeWalker(e, NodeFilter.SHOW_TEXT); let t; while ((t = w.nextNode())) { if (!t.textContent.trim()) continue; const r = document.createRange(); r.selectNodeContents(t); for (const x of r.getClientRects()) if (x.width > 1) tops.add(Math.round(x.top / 4)); } return tops.size; };
+  // (15 nov., Annonces propre) Les lignes VUES : une ligne cachée sous un `line-clamp` (sous le bas de la boîte) ne compte pas.
+  const lignes = (e) => { const tops = new Set(); const bas = e.getBoundingClientRect().bottom; const w = document.createTreeWalker(e, NodeFilter.SHOW_TEXT); let t; while ((t = w.nextNode())) { if (!t.textContent.trim()) continue; const r = document.createRange(); r.selectNodeContents(t); for (const x of r.getClientRects()) if (x.width > 1 && x.top < bas - 2) tops.add(Math.round(x.top / 4)); } return tops.size; };
   const deuxLignes = (racine, sel) => [...racine.querySelectorAll(sel)].filter(vis).filter((e) => e.textContent.trim() && lignes(e) > 1).map((e) => e.textContent.trim());
   return {
     n: cartes.length, ids: cartes.map((c) => c.getAttribute('data-carte-annonce')),
@@ -281,7 +282,9 @@ async function scenario(b, largeur, sombre) {
     const fermees = L.cartes.filter((c) => !c.ouverte);
     dit(fermees.length === L.n && fermees.every((c) => c.photoCarree && c.num && c.prix && c.titre), `${tag} G4 : photo carrée, N° en pastille, titre, prix sur chaque vignette`, JSON.stringify(fermees.filter((c) => !(c.photoCarree && c.num && c.prix && c.titre)).map((c) => c.id)));
     dit(fermees.every((c) => c.caches.length === 0 && c.visibles.length === 0), `${tag} G4 : fermée, rien d'autre (ni achat/mini/refuse/boost/marge/gestes, ni le « V », ni le compte, ni l'icône note seule)`, JSON.stringify(fermees.filter((c) => c.caches.length || c.visibles.length).map((c) => [c.id, c.caches, c.visibles])));
-    if (mobile && L.studio) dit(fermees.every((c) => c.titreRendu === 1 && c.prixGauche >= c.titreDroite - 1 && (!c.finTaille || (!c.tailleAuTitre && /^T\. \d/.test(c.tailleSous)))), `${tag} G4 : le nom sur UNE ligne, le prix dans SA colonne à droite (studio) ; la taille dans la sous-ligne`, JSON.stringify(fermees.map((c) => [c.id, c.titreRendu, c.prixGauche - c.titreDroite, c.finTaille, c.tailleSous])));
+    // (15 nov., Annonces propre — « plus pratique ») Au téléphone, un nom long se lit sur DEUX lignes au plus plutôt que
+    // coupé après 15 lettres (la rangée garde 64 px) ; le prix reste dans SA colonne, la taille dans la sous-ligne.
+    if (mobile && L.studio) dit(fermees.every((c) => c.titreRendu >= 1 && c.titreRendu <= 2 && c.prixGauche >= c.titreDroite - 1 && (!c.finTaille || (!c.tailleAuTitre && /^T\. \d/.test(c.tailleSous)))), `${tag} G4 : le nom sur deux lignes au plus, le prix dans SA colonne à droite (studio) ; la taille dans la sous-ligne`, JSON.stringify(fermees.map((c) => [c.id, c.titreRendu, c.prixGauche - c.titreDroite, c.finTaille, c.tailleSous])));
     else if (mobile) dit(fermees.every((c) => c.titreRendu === 1 && c.prixHaut >= c.titreBas - 1 && (!c.finTaille || (!c.tailleAuTitre && /^T\. \d/.test(c.tailleSous)))), `${tag} G4 : le nom tient sa ligne (jamais coupé au profit du prix, qui est dessous) ; la taille dans la sous-ligne`, JSON.stringify(fermees.map((c) => [c.id, c.titreRendu, c.prixHaut - c.titreBas, c.finTaille, c.tailleSous])));
     else dit(fermees.every((c) => String(c.titreLignes) === '2' && c.titreBlanc === 'normal'), `${tag} G4 : le titre tient sur deux lignes (jamais une ligne coupée « … »)`, JSON.stringify(fermees.map((c) => [c.titreLignes, c.titreBlanc])));
     // G5 — un seul gabarit (hors la vignette qui porte une proposition « Même paire ? »)

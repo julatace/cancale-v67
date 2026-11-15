@@ -2,6 +2,7 @@
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import DansFiche from '../DansFiche.jsx';
 import { attrsFicheLigne } from '../ficheLigne.js';
+import { poserNombreAnnonces, compterVcEnLigne } from '../plateformes/nombresAnnonces.js';
 import { problemesAnnonce } from '../verifAnnonce.js';
 import { AlerteArnaque, CompteurArnaque, PastilleArnaque } from '../AlerteArnaque.jsx';
 import { motifDeLApercu } from '../antiArnaque.js';
@@ -285,6 +286,9 @@ function AnnoncesVestiaire() {
       lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_prix_recette&select=appris:data->appris,raison:data->>raison,at:data->>at`),
     ]);
     setRecettePrix(Array.isArray(rp) ? (rp[0] ? { appris: rp[0].appris === true ? true : rp[0].appris === false ? false : null, raison: rp[0].raison || '' } : {}) : null);
+    // (15 nov., Annonces propre) Le nombre d'annonces « En ligne » de CETTE liste, pour la touche Vestiaire du sélecteur
+    // (src/plateformes/nombresAnnonces.js) : la même règle que les lignes ci-dessous ; lecture ratée ⇒ pas su.
+    poserNombreAnnonces('vestiaire', Array.isArray(rl) ? compterVcEnLigne(rl[0] || null, Array.isArray(rv) && rv[0] ? rv[0].ventes : null) : null);
     if (!Array.isArray(rl)) { setD(null); return; }
     const r = rl[0] || {};
     // Les ventes ne servent qu'à PROUVER « vendue » ; illisibles ⇒ on n'en tire rien.
@@ -354,17 +358,22 @@ function AnnoncesVestiaire() {
                 <span className="vrm-ui-ligne-photo vrm-pf-photo-vc" aria-hidden="true"><PhotoVc src={it.photo}/></span>
                 <div className="vrm-ui-ligne-textes vrm-pf-textes">
                   <strong className="vrm-ui-ligne-titre">{num ? <span className="vrm-pf-num" data-vc-annonce-numtxt="">N°{num}</span> : null}<span>{it.titre || (num ? `N°${num}` : 'Annonce sans titre lu')}</span></strong>
-                  <span className="vrm-ui-ligne-sous"><span data-etat={etat === 'en-ligne' ? 'active' : etat === 'vendue' ? 'vendue' : 'autre'} title={brut ? 'État lu sur Vestiaire' : undefined}>{label}</span>{num ? '' : etat === 'retiree' ? ' · Sans N° (retirée)' : ' · N° en attente'}{extra ? ` · ${extra}` : ''}</span>
+                  {/* (15 nov., Annonces propre — Julien : « horriblement moche ») « Relier à Vinted » n'est plus un gros
+                      bloc sous la rangée : un lien court AU BOUT de la ligne d'état (« • En ligne · Relier à Vinted »),
+                      le même bouton, le même `data-vc-relier`, le même geste ; la fiche ouverte le porte toujours (DansFiche). */}
+                  <span className="vrm-ui-ligne-sous vrm-pf-sous-geste">
+                    <span className="vrm-pf-sous-texte"><span data-etat={etat === 'en-ligne' ? 'active' : etat === 'vendue' ? 'vendue' : 'autre'} title={brut ? 'État lu sur Vestiaire' : undefined}>{label}</span>{num ? '' : etat === 'retiree' ? ' · Sans N° (retirée)' : ' · N° en attente'}{extra ? ` · ${extra}` : ''}</span>
+                    <DansFiche cle={flVc['data-fiche-ligne']}><span className="vrm-pf-gestes">
+                      {/* (3 nov.) Un seul N° pour l'article aussi en ligne sur Vinted : SON toucher relie. */}
+                      {lienDe(vcLoc.liens, id)
+                        ? <button type="button" className="vrm-lvc-geste sb-lien" data-vc-delier={id} onClick={() => defaireVc(id)}>Délier Vinted</button>
+                        : etat !== 'retiree' && etat !== 'vendue' && vcReliable({ productId: id, item: it, liensPub: d.liens, liens: vcLoc.liens, cleNum })
+                          ? <button type="button" className="vrm-lvc-geste sb-lien" data-vc-relier={id} onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:lien-vc', { detail: { sens: 'vc', id, num: num || '', titre: it.titre || '', photo: it.photo || '', site: 'Vestiaire' } })); } catch (_) {} }}>Relier à Vinted</button>
+                          : null}
+                    </span></DansFiche>
+                  </span>
                 </div>
                 <b className="vrm-ui-ligne-valeur" data-vc-annonce-prix={it.prix ? String(it.prix.valeur) : ''} title={it.prix && it.prix.cle ? 'Prix lu sur Vestiaire' : undefined}>{prix}</b>
-                <DansFiche cle={flVc['data-fiche-ligne']}><span className="vrm-pf-gestes">
-                  {/* (3 nov.) Un seul N° pour l'article aussi en ligne sur Vinted : SON toucher relie. */}
-                  {lienDe(vcLoc.liens, id)
-                    ? <button type="button" className="vrm-lvc-geste" data-vc-delier={id} onClick={() => defaireVc(id)}>Délier Vinted</button>
-                    : etat !== 'retiree' && etat !== 'vendue' && vcReliable({ productId: id, item: it, liensPub: d.liens, liens: vcLoc.liens, cleNum })
-                      ? <button type="button" className="vrm-lvc-geste" data-vc-relier={id} onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:lien-vc', { detail: { sens: 'vc', id, num: num || '', titre: it.titre || '', photo: it.photo || '', site: 'Vestiaire' } })); } catch (_) {} }}>Relier à Vinted</button>
-                      : null}
-                </span></DansFiche>
               </li>
             );
           }}/></ul>

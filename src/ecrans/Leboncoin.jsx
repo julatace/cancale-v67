@@ -2,6 +2,7 @@
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { problemesAnnonce } from '../verifAnnonce.js';
 import { bilanEnLigneLbc, quandLectureLbc, LIEN_MES_ANNONCES_LBC } from '../enLigneLbc.js';
+import { poserNombreAnnonces } from '../plateformes/nombresAnnonces.js';
 import { suivreReceptionLeboncoin } from '../rafraichissementLeboncoin.js';
 import { lbcFloute } from '../flouCompte.js';
 import React, { useState, useEffect, useRef } from 'react';
@@ -1775,6 +1776,9 @@ function LeboncoinScreen() {
     // (capture de la page) : `lbcUser` seul comptait 0 annonce par compte.
     for (const ad of liveAds) { const k = String(ad.account || ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
     if (!estActif()) return;
+    // (15 nov., Annonces propre) La touche Leboncoin du sélecteur d'Annonces : SES annonces en ligne (la règle
+    // `bilanEnLigneLbc`, le même nombre que `lbcCount`) ; lecture ratée ⇒ pas su (src/plateformes/nombresAnnonces.js).
+    poserNombreAnnonces('leboncoin', lbcRows === null ? null : bilanLbc.enLigne.length);
     setData({ retirerAConfirmer, catalogueAds: lbcAds.filter(aLui), catalogueVentes: ventesLbc, sortiesLbc: sortiesLbc.map((a) => { const q = lbcSortieDe(a); return { id: String(a.id), plusVueAt: q === 'plusvue' ? a.plusVueAt : null, pauseAt: q === 'pause' ? a.pauseAt : null, compte: String(a.account || a.lbcUser || '') }; }), lecturesLbc, pasRevues: pasRevues.length, pasRevuesJours: pasRevues.length ? Math.floor(Math.min(...pasRevues.map(lbcJoursSansVoir))) : 0, liensPoses, liensMain: liens, preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, postedKO, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked: unlinkedAsk, nonRelieesSansJumelle, ventesSansJumelle, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, repub: (preuveKO || ventesLbcKO || postedRows === null || lbcRows === null) ? null : repub, repubKO, baisse: lbcRows === null ? null : baisse, lbcAccounts, lbcConnecte, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: bilanLbc.enLigne.length, lbcAConfirmer: { n: bilanLbc.aConfirmer.length, ids: bilanLbc.aConfirmer.map((a) => String(a.id)), lu: bilanLbc.comptes.reduce((m, c) => (Number.isFinite(c.lu) && (m == null || c.lu < m) ? c.lu : m), null), jamais: bilanLbc.comptes.some((c) => !Number.isFinite(c.lu)) }, limit: pd.limit, plan: pd.plan, prep });
     setLoading(false);
   };

@@ -491,7 +491,7 @@ import { CLE_VISITE } from "./visiteBulles.js";
 import Conseils, { ChiffreConseil, useReglageConseils } from "./Conseils.jsx";
 import { LIGNE_ACCOMPAGNEMENT, accompagner } from "./accompagnement.js";
 // (14 nov., lot accompagnement) Les quatre moments d'un geste : avant, pendant, après, échec (src/ui/Accompagne.jsx).
-import { AccAvant, AccApres, AccEchec, AccPendant, AccHote, AccVide, AccPremiereFois } from "./ui/Accompagne.jsx";
+import { AccAvant, AccApres, AccEchec, AccPendant, AccHote, AccVide } from "./ui/Accompagne.jsx";
 import { estIphoneSafari, estInstallee } from "./guideIphone.js";
 // (6 nov.) VRM ouvert à des clients : le mode exemple (données inventées, en mémoire
 // seulement) et le guide de démarrage (quatre étapes cochées sur une preuve lue).
@@ -800,6 +800,7 @@ import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroTexte, lireNumeroEc
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, FORMES as FORMES_ETIQUETTE, QUESTIONS as QUESTIONS_ETIQUETTE, ANNONCE_EXEMPLE, lireReglageEtiquette, etiquetteDe, poserEtiquette, retirerEtiquette, proposition as propositionEtiquette } from "./etiquetteNumero.js";
 // (6 nov., vitesse 2) PrixPartout : à la demande (sa feuille de style est déjà plus haut).
 import SelecteurSites, { LogoSite } from "./SelecteurSites.jsx";
+import { abonnerNombresAnnonces, lireNombresAnnonces, viderNombresAnnonces, poserNombreAnnonces, compterVcEnLigne } from "./plateformes/nombresAnnonces.js";
 // (6 nov., vitesse 2) PublierAilleurs : à la demande ; sa feuille de style reste ICI (même ordre).
 import "./styles-publier-ailleurs.css";
 import "./styles-ios.css";       // (6 nov., v36-visuel) rangées « Réglages » d'iOS, « ⓘ » en feuille
@@ -2568,6 +2569,7 @@ const authSetPassword = async (password) => {
 // toute seule, elle, ne fait plus rien oublier à l'extension (11 octobre).
 const authSignOut = () => {
   const uid = AUTH.user && AUTH.user.id;
+  try { viderNombresAnnonces(); } catch (_) {}
   try { if (uid) deconnecterExtension(String(uid)); } catch (_) {}
   // ⚠️ Revue du 11 octobre : une extension d'avant la 5.171 n'entend pas le
   //    canal adressé — après « Se déconnecter », elle continuait d'écrire sous
@@ -17224,7 +17226,7 @@ const groupeNav=(o)=>{ Object.defineProperty(o,'titre',{get(){ return tr('nav.gr
 // « Paires » réunit Annonces, Stock et Achats (src/navPaires.js) : les trois écrans restent tels quels,
 // mêmes identifiants (liens profonds, ⌘K, reprise) ; un sélecteur segmenté en tête au téléphone.
 // « Plus » quitte la barre : tout ce qu'il portait est dans le menu du haut. Aucun écran perdu (§4.11).
-const ONGLET_PAIRES=entreeNav({id:ID_PAIRES, icon:'box', label:'Paires'});
+const ONGLET_PAIRES=entreeNav({id:ID_PAIRES, icon:'box', label:'Annonces'});   // (15 nov., Julien : « ne mets pas paires, tu mets annonces ») le TEXTE seul change (tr('nav.paires')) ; l'identifiant reste « paires »
 const ONGLET_ARGENT=entreeNav({id:'compta', icon:'euro', label:'Argent'});
 const BOTTOM_TABS=[
   entreeNav({id:'journee',  icon:'soleilLevant', label:'Ma journée', court:'Aujourd’hui'}),
@@ -17266,7 +17268,7 @@ const GROUPES_PLUS=[
   // devient vide et disparaît (Messages est dans les tâches) ; au téléphone, il garde Messages.
   // (14 nov., n° 61) « Paires » : Annonces · Stock · Achats (l'onglet de la barre en ouvre le dernier).
   // (Le groupe « Vendre » — Messages seul — rejoint « Gérer ».)
-  groupeNav({ cle:'paires', nom:'Paires', items:ENTREES_PAIRES }),
+  groupeNav({ cle:'paires', nom:'Annonces', items:ENTREES_PAIRES }),
   // (31 oct., soir — Julien : « l'onglet Colis à retirer sert à rien si dans Colis
   // on a les codes de retrait ») Plus d'entrée « Colis à retirer » ni de groupe
   // « Expédier » : les colis à retirer vivent dans Colis (colonne « À retirer »,
@@ -18331,9 +18333,9 @@ function PhraseEcran({ cle, className = '' }) {
   const p = useProfilVendeur();   // (11 nov., lot DJ2) « paires » seulement pour Sneakers
   const t = cle && phraseEcranPour(cle, p.vend || vendActuel());
   const aide = cle && AIDE_ECRANS[cle] ? <AideEcran cle={cle}/> : null;
-  // (14 nov., lot accompagnement) La PREMIÈRE fois sur l'écran : une phrase d'aide discrète, sous la phrase de
-  // l'écran, désactivable (« Compris » · « Ne plus afficher ces aides ») — src/ui/Accompagne.jsx.
-  const premiere = cle && cle !== 'journee' ? <AccPremiereFois ecran={cle}/> : null;
+  // (15 nov., Julien : « j'aime pas trop les écritures… enlève les écritures ») Plus d'aide « première fois »
+  // sous la phrase de l'écran (« Compris » · « Ne plus afficher ces aides ») : le « ? » suffit.
+  const premiere = null;
   if (!t) return aide ? <><p className={'vrm-phrase-ecran vrm-phrase-ecran-seule' + (className ? ' ' + className : '')}>{aide}</p>{premiere}</> : premiere;
   // ⚠️ (14 nov., refonte de la coque — Julien, capture d'Annonces : « Annonces » + deux lignes d'explication + « ? »)
   // La phrase n'est plus ÉCRITE sous le titre : le « ? » reste, à côté du titre, et ouvre l'aide de l'écran. La
@@ -32620,7 +32622,7 @@ try { document.addEventListener('visibilitychange', ()=>{ if(document.visibility
 // avant d'abord ». Une rangée de puces : « Tous » + un compte par puce, le
 // compte connecté en TÊTE avec 📍. Un seul compte ⇒ rien à filtrer, on n'affiche
 // pas la rangée (§7, pas de bruit).
-function SelecteurCompte({ accounts, sel, setSel, connecte, messages = false, compact = false }) {
+function SelecteurCompte({ accounts, sel, setSel, connecte, messages = false, compact = false, court = false }) {
   const labels = (typeof load === 'function' ? (load('vinted_account_labels', {}) || {}) : {});
   const nom = (a) => labels[a.vinted_user_id] || a.login || `#${a.vinted_user_id}`;
   const list = (accounts || []).filter(a => a && a.vinted_user_id != null);
@@ -32662,7 +32664,7 @@ function SelecteurCompte({ accounts, sel, setSel, connecte, messages = false, co
   if (compact) return (
     <div className="vrm-compte-menu-hote" data-compte-menu="vrm-sel-compte" data-compte-menu-val={val}>
       <MenuCompte comptes={tri.map(a => { const uid = String(a.vinted_user_id); return { id: uid, nom: nom(a), connecte: uid === coVu }; })}
-        valeur={val === '*' ? '' : val} onChange={(v) => setSel(v ? String(v) : '*')}/>
+        valeur={val === '*' ? '' : val} onChange={(v) => setSel(v ? String(v) : '*')} court={court}/>
       <select id="vrm-sel-compte" className="vrm-compte-select-cache" tabIndex={-1} aria-hidden="true" value={val} onChange={(e) => setSel(e.target.value)}>
         <option value="*">Tous les comptes</option>
         {tri.map(a => <option key={a.vinted_user_id} value={String(a.vinted_user_id)}>{nom(a)}</option>)}
@@ -47736,9 +47738,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const blocsTete = {
                 phrase: (<>
                 {(() => { const pj = loading ? null : phraseDuJour({ envoyer: { n: T[0].t ? T[0].t.n : 0, pasSu: !!T[0].pasSu, presses: T[0].t && T[0].t.presses }, retirer: { n: T[1].t ? T[1].t.n : 0, pasSu: !!T[1].pasSu } }, h);
-                  return pj ? <p className="vrm-phrase-ecran vrm-fu-phrase-tete" data-phrase-jour={pj} data-phrase-jour-env={T[0].pasSu ? '' : String(T[0].t ? T[0].t.n : 0)} data-phrase-jour-ret={T[1].pasSu ? '' : String(T[1].t ? T[1].t.n : 0)}>{pj}{AIDE_ECRANS.journee ? <AideEcran cle="journee"/> : null}</p>
+                  return pj ? <p className="vrm-phrase-ecran vrm-fu-phrase-tete" data-phrase-jour={pj} data-phrase-jour-env={T[0].pasSu ? '' : String(T[0].t ? T[0].t.n : 0)} data-phrase-jour-ret={T[1].pasSu ? '' : String(T[1].t ? T[1].t.n : 0)}><span className="vrm-sr-seul">{pj}</span>{AIDE_ECRANS.journee ? <AideEcran cle="journee"/> : null}</p>
                     : <PhraseEcran cle="journee" className="vrm-fu-phrase-tete"/>; })()}
-                <AccPremiereFois ecran="journee"/>
                 </>),
                 frise: (<>
                 {!premierJour && (
@@ -58118,7 +58119,7 @@ function AncreDefilement() {
 // les sites où il a un compte (`sites` : Set, ou `null` = pas su ⇒ tous). Le
 // site choisi reste toujours montré, même si son compte n'est plus lu. La forme
 // est celle des pastilles de filtre de l'app (`vrm-filtres`, §7).
-function FiltreSites({ tache, site, sites, onSite, onChoix = null }) {
+function FiltreSites({ tache, site, sites, onSite, onChoix = null, enLigneVinted = undefined }) {
   // (5 nov.) Le sélecteur À LOGOS (`SelecteurSites`, règles `src/plateformes.js`) :
   // Les sites choisis ou reliés, dans le même ordre ; « Tous » sur Ventes.
   // Un site choisi avant sa connexion dit ce qui manque et le geste (`OngletManque`).
@@ -58130,8 +58131,32 @@ function FiltreSites({ tache, site, sites, onSite, onChoix = null }) {
   // (9 nov., zéro banc rouge) Ses plateformes PAS ENCORE SUES (le nuage pas lu) : aucune rangée.
   // Avant, les quatre sites s'affichaient puis la rangée disparaissait (un seul site affiché) :
   // la barre du haut passait de 82 à 60 px et tout l'écran remontait (banc chargement, Annonces).
+  // (15 nov., Annonces propre) Annonces : chaque touche de site dit son nombre d'annonces, tel que SA règle le compte
+  // (src/plateformes/nombresAnnonces.js ; Vinted : `online` des chiffres de l'app, la valeur « en ligne » de la bande).
+  const nbPublies = React.useSyncExternalStore(abonnerNombresAnnonces, lireNombresAnnonces, lireNombresAnnonces);
+  // Vestiaire compté sans ouvrir son écran : les deux lignes que SA liste lit (projetées), la même règle (`compterVcEnLigne`).
+  const vcMontre = tache === 'annonces' && Array.isArray(p.plateformes) && p.plateformes.includes('vestiaire');
+  React.useEffect(() => {
+    if (!vcMontre) return undefined;
+    let vivant = true;
+    const lire = async () => {
+      try {
+        const [rl, rv] = await Promise.all([
+          fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,capturedAt:data->>capturedAt`, { headers: sbAuth() }).then((r) => (r.ok ? r.json() : null)),
+          fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_ventes&select=ventes:data->ventes`, { headers: sbAuth() }).then((r) => (r.ok ? r.json() : null)),
+        ]);
+        if (!vivant) return;
+        poserNombreAnnonces('vestiaire', Array.isArray(rl) ? compterVcEnLigne(rl[0] || null, Array.isArray(rv) && rv[0] ? rv[0].ventes : null) : null);
+      } catch (_) { if (vivant) poserNombreAnnonces('vestiaire', null); }
+    };
+    lire();
+    const f = (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'vestiaire') lire(); };
+    window.addEventListener('vrm:ext', f);
+    return () => { vivant = false; window.removeEventListener('vrm:ext', f); };
+  }, [vcMontre]);
+  const nombres = tache === 'annonces' ? { ...nbPublies, ...(Number.isFinite(enLigneVinted) ? { vinted: enLigneVinted } : {}) } : null;
   if (!Array.isArray(p.plateformes)) return null;
-  return <SelecteurSites id={tache} options={optionsSelecteur({ site, sites: null, toutes: !!t.toutes }).filter((o) => siteMontre(o.id, ctx)).map((o) => (o.id !== 'toutes' && sites && !sites.has(o.id) ? { ...o, sansCompte: true } : o))} valeur={site} onChoix={(v) => { onSite(v); if (onChoix) onChoix(v); }}/>;
+  return <SelecteurSites id={tache} nombres={nombres} options={optionsSelecteur({ site, sites: null, toutes: !!t.toutes }).filter((o) => siteMontre(o.id, ctx)).map((o) => (o.id !== 'toutes' && sites && !sites.has(o.id) ? { ...o, sansCompte: true } : o))} valeur={site} onChoix={(v) => { onSite(v); if (onChoix) onChoix(v); }}/>;
 }
 // (5 nov.) UN ONGLET SANS DONNÉE : ce qui manque et le geste (`ONGLET_SANS_DONNEE`,
 // src/plateformes.js). Montré quand le site choisi n'a aucun compte relevé
@@ -61744,10 +61769,10 @@ function AppCoeur() {
           <PhraseEcran cle={t}/>
         </header>
         <div className="vrm-tache-filtres" style={{padding:'0 16px'}}>
-          <DansBarreHaut><FiltreSites tache={t} site={site} sites={sitesPresents} onSite={(s)=>setPlatSub(s)} onChoix={(s)=>{ retenirFiltre(t,s,true); noterReprise({ sites:{ [t]:{ valeur:s, at:Date.now() } } }); }}/></DansBarreHaut>
+          <DansBarreHaut><FiltreSites tache={t} site={site} sites={sitesPresents} enLigneVinted={t==='annonces' && liveStatsVus ? liveStatsVus.online : undefined} onSite={(s)=>setPlatSub(s)} onChoix={(s)=>{ retenirFiltre(t,s,true); noterReprise({ sites:{ [t]:{ valeur:s, at:Date.now() } } }); }}/></DansBarreHaut>
           {/* (14 nov., « Studio bleu clair ») Annonces Vinted : le choix du compte sur la MÊME ligne que les sites (une ligne de
               moins avant la liste). Le même composant, les mêmes états qu'avant dans l'espace Vinted. */}
-          {t==='annonces' && site==='vinted' && !baseKO && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} compact/>}
+          {t==='annonces' && site==='vinted' && !baseKO && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} compact court/>}
           {/* Les sections propres du site, sous son filtre (31 oct., soir) : la
               même forme que les rubriques de l'app (`PlatSubNav`). */}
           {sous && <div className="vrm-tache-sous" data-tache-sous={t+'.'+site}><PlatSubNav sub={sec} setSub={(x)=>{ setEbayCible(null); setPlatSub(subDeTache(site,x)); }} sections={sous}/></div>}

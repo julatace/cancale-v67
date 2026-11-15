@@ -3,10 +3,9 @@
 // de la page d'accueil). Les deux fichiers sont ceux que studio-polices.css nomme (même
 // fichier, même nom calculé par Vite : un seul téléchargement). Précharger évite le saut de
 // police au premier écran ; `crossorigin` est exigé pour une police, même servie d'ici.
-import urbanist from './polices/urbanist-latin-wght-normal.woff2?url';
 import inter from './polices/inter-latin-wght-normal.woff2?url';
 
-export const POLICES = Object.freeze([urbanist, inter]);
+export const POLICES = Object.freeze([inter]);   // (15 nov.) Inter seule : Urbanist retirée
 
 export function prechargerPolices(doc = typeof document !== 'undefined' ? document : null) {
   if (!doc || !doc.head) return 0;

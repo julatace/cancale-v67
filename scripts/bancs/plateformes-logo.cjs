@@ -161,7 +161,9 @@ const selecteur = (pg, id) => pg.evaluate((id) => {
     const l = b.querySelector('[data-logo-site]'); const cs = l ? getComputedStyle(l) : null;
     const m = cs ? (cs.maskImage || cs.webkitMaskImage || '') : '';
     const bb = b.getBoundingClientRect(), lb = l ? l.getBoundingClientRect() : { width: 0, height: 0 };
-    return { site: b.getAttribute('data-site'), presse: b.getAttribute('aria-pressed'), masque: m, logoW: lb.width, logoH: lb.height, h: bb.height, w: bb.width, sansCompte: b.hasAttribute('data-sans-compte'), label: b.getAttribute('aria-label') };
+    // (15 nov.) La marque est un <svg> en ligne (src/plateformes/marques.js) : `marque` = le site qu'il dessine.
+    const sv = l ? l.querySelector('svg[data-marque]') : null;
+    return { site: b.getAttribute('data-site'), presse: b.getAttribute('aria-pressed'), masque: m, marque: sv ? sv.getAttribute('data-marque') : '', logoW: lb.width, logoH: lb.height, h: bb.height, w: bb.width, sansCompte: b.hasAttribute('data-sans-compte'), label: b.getAttribute('aria-label') };
   }) };
 }, id);
 const aller = async (pg, q) => { await pg.goto(`http://localhost:${PORT}/?${q}`, { waitUntil: 'domcontentloaded' }); };
@@ -186,7 +188,7 @@ const aller = async (pg, q) => { await pg.goto(`http://localhost:${PORT}/?${q}`,
         const sites = s ? s.boutons.map((x) => x.site).join() : '';
         dit(sites === 'toutes,vinted,leboncoin,ebay,vestiaire', `${nomVp} · A · « Tous » puis les quatre sites, l’ordre de Vinted`, sites);
         const logos = s ? s.boutons.filter((x) => x.site !== 'toutes') : [];
-        dit(logos.length === 4 && logos.every((x) => new RegExp('brands/' + x.site + '\\.svg').test(x.masque) && x.logoW >= 14 && x.logoH >= 14), `${nomVp} · A · chaque site porte SON logo (masque /brands/{site}.svg), dessiné`, JSON.stringify(logos.map((x) => [x.site, x.masque.slice(-30), Math.round(x.logoW)])));
+        dit(logos.length === 4 && logos.every((x) => (x.marque === x.site || new RegExp('brands/' + x.site + '\\.svg').test(x.masque)) && x.logoW >= 14 && x.logoH >= 14), `${nomVp} · A · chaque site porte SA marque (svg en ligne, src/plateformes/marques.js), dessinée`, JSON.stringify(logos.map((x) => [x.site, x.marque || x.masque.slice(-30), Math.round(x.logoW)])));
         if (doigt) dit(s.boutons.every((x) => x.h >= 43.5), `${nomVp} · A · segments ≥ 44 px au doigt`, JSON.stringify(s.boutons.map((x) => Math.round(x.h))));
         await capture(pg, `ventes-tous-${nomVp}`);
       });

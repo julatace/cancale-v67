@@ -27,6 +27,10 @@ const { execFileSync } = require('child_process');
 const R = path.join(__dirname, '..');
 const MUTS = {
   'logo-manquant': ['src/plateformes.js', "{ id: 'vestiaire', nom: 'Vestiaire', logo: '/brands/vestiaire.svg' }", "{ id: 'vestiaire', nom: 'Vestiaire', logo: '' }"],
+  // (15 nov., Annonces propre) Les marques : une source (src/plateformes/marques.js), à l'encre, fichiers fabriqués.
+  'marque-couleur': ['src/plateformes/Marque.jsx', ': <path key={i} d={e.d} fill="currentColor"/>)}', ': <path key={i} d={e.d} fill="#FF6E00"/>)}'],
+  'fichier-a-la-main': ['src/plateformes/marques.js', "vb: [2, 2, 20, 20],", "vb: [2, 2, 20, 21],"],
+  'selecteur-masque': ['src/SelecteurSites.jsx', '<MarquePlateforme site={o.id} taille={18}/>', '<span/>'],
   'tous-partout': ['src/plateformes.js', "const out = toutes ? [{ id: 'toutes'", "const out = true ? [{ id: 'toutes'"],
   'compte-devine': ['src/plateformes.js', "  const id = identiteCompteVente(site, vente);\n  if (!id) return '';", "  const id = identiteCompteVente(site, vente) || 'principal';"],
   'lbc-prefixe': ['src/plateformes.js', ".replace(/^lbc-account:/i, '')", ''],
@@ -91,6 +95,13 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   // ── A. Les plateformes ──
   dit(P.IDS_PLATEFORMES.join() === 'vinted,leboncoin,ebay,vestiaire', 'A1 quatre sites, l’ordre de Vinted', P.IDS_PLATEFORMES.join());
   dit(P.PLATEFORMES.every((p) => /^\/brands\/[a-z]+\.svg$/.test(p.logo) && fs.existsSync(path.join(R, 'public', p.logo))), 'A2 un logo servi localement par site (public/brands/)', JSON.stringify(P.PLATEFORMES.map((p) => p.logo)));
+  // (15 nov.) A2b–A2d : les marques des plateformes, UNE source (src/plateformes/marques.js).
+  const MQ = await import(path.join(SRC, 'plateformes', 'marques.js'));
+  dit(P.IDS_PLATEFORMES.every((id) => MQ.marque(id) && fs.readFileSync(path.join(R, 'public', 'brands', id + '.svg'), 'utf8') === MQ.svgTexte(id)), 'A2b public/brands/*.svg = src/plateformes/marques.js (fabriqués, node scripts/marques-svg.cjs --ecrire)');
+  const MJ = sansCommentaires(fs.readFileSync(path.join(SRC, 'plateformes', 'Marque.jsx'), 'utf8'));
+  dit(!/#[0-9a-f]{3,8}\b|rgb\(|hsl\(/i.test(MJ) && /fill="currentColor"/.test(MJ) && /stroke="currentColor"/.test(MJ), 'A2c chaque marque à l’encre (currentColor), aucune couleur de marque');
+  const SS = sansCommentaires(fs.readFileSync(path.join(SRC, 'SelecteurSites.jsx'), 'utf8'));
+  dit(/<MarquePlateforme site=\{o\.id\}/.test(SS) && /<MarquePlateforme site=\{site\} carre/.test(SS), 'A2d le sélecteur et le logo en ligne dessinent la marque en SVG (plus de masque pour les quatre sites)');
   dit(P.ONGLETS_PLATEFORME.join() === 'annonces,ventes,achats,messages,colis', 'A3 les mêmes onglets pour chaque site');
   dit(P.IDS_PLATEFORMES.filter((s) => s !== 'vinted').every((s) => P.ONGLETS_PLATEFORME.every((o) => { const m = P.ongletSansDonnee(s, o); return m && m.manque && m.geste; })), 'A4 chaque onglet sans donnée dit ce qui manque ET le geste');
   const o1 = P.optionsSelecteur({ site: 'vinted', sites: new Set(['vinted', 'vestiaire']), toutes: false });
