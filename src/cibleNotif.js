@@ -46,7 +46,7 @@
 import { motsVendeur } from './profilVendeur.js';
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 const COLONNES = ['prets', 'attente', 'retirer', 'partis'];
-const TYPES = ['conv', 'offre', 'offres', 'vente', 'vcvente', 'colis', 'retrait', 'colonne', 'achat', 'retour', 'urssaf', 'doublon', 'case', 'bilanmois', 'ailleurs'];
+const TYPES = ['conv', 'offre', 'offres', 'vente', 'vcvente', 'colis', 'retrait', 'colonne', 'achat', 'retour', 'urssaf', 'doublon', 'case', 'bilanmois', 'ailleurs', 'seuils'];   // (15 nov., lot argent-plus) + « seuils » : l'alerte d'un seuil de l'année
 const MOIS = /^\d{4}-(0[1-9]|1[0-2])$/;
 // (13 nov., lot 53) Le mois demandé par l'e-mail du bilan mensuel : la carte « Bilan du
 // mois » (Compta) le lit à son montage pour montrer CE mois (s'il est l'un des deux qu'elle sait).
@@ -113,6 +113,7 @@ export function jetonsCible(c) {
     // (15 nov.) La carte d'un bordereau de retour d'achat (src/RetoursLitiges.jsx), par SON n°.
     case 'retour': return [`retour:${c.tx}`];
     case 'urssaf': return ['urssaf'];
+    case 'seuils': return ['seuils'];
     case 'bilanmois': return c.mois ? [`bilanmois:${c.mois}`] : ['bilanmois'];
     case 'doublon': { const n = c.num ? cleNumCible(c.num) : ''; return n ? [`doublon:${c.plat || 'ebay'}:${n}`] : [`doublon:${c.plat || 'ebay'}`]; }
     case 'case': return c.meuble && c.i ? [`case:${c.meuble}:${c.i}`] : [];
@@ -168,6 +169,7 @@ function selecteursAnciens(c) {
     case 'colonne': return { essais: [`[data-cc-colonne="${q(c.colonne)}"]`], ouvrir: null, deplier: [] };
     case 'achat': return { essais: [`.vrm-buy-row[data-achat-tx="${q(c.tx)}"]`], ouvrir: null, deplier: [] };
     case 'urssaf': return { essais: ['[data-compta-urssaf]', '#compta-urssaf'], ouvrir: null, deplier: [] };
+    case 'seuils': return { essais: ['[data-alertes-seuils]', '[data-dac7]'], ouvrir: null, deplier: [] };
     case 'bilanmois': return { essais: c.mois ? [`.vrm-bilan-mois[data-bilan-mois="${q(c.mois)}"]`] : ['.vrm-bilan-mois'], ouvrir: null, deplier: [] };
     // ⚠️ (1er nov., audit A5) Avec un N°, SEULE la ligne de ce N° répond —
     // jamais un repli sur « la première ligne » : la notification parlait du
@@ -216,6 +218,7 @@ export function phraseAbsente(c) {
     case 'achat': return "Cet achat n'est pas dans la liste affichée.";
     case 'retour': return "Ce retour n'est pas dans la liste affichée : le bordereau n'est peut-être pas encore relu, ou le retour est fini.";
     case 'urssaf': return 'La carte URSSAF ne s\u2019affiche pas pour ton statut.';
+    case 'seuils': return 'Les seuils de l\u2019année se lisent dans Argent, quand l\u2019écran Ventes a calculé ton chiffre d\u2019affaires.';
     case 'bilanmois': return 'Le « Bilan du mois » montre ce mois-ci et le mois dernier : pour un mois plus ancien, « Rapport du mois » le donne en PDF.';
     // Ne promet pas « réglée » : la ligne peut manquer parce que la liste n'est
     // pas encore relue. Le geste est dit.

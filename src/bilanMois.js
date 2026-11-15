@@ -52,7 +52,10 @@ export const meilleurCompte = (lignes, nomDe) => {
 //   depense  : nombre | null
 //   benefice : { valeur, raison } | null ; B : { n, nCout } | null
 //   meilleur : sortie de `meilleurCompte` | null
-export function bilanDuMois({ ym, vendu = null, recu = null, depense = null, benefice = null, B = null, meilleur = null, maintenant = Date.now(), enCours = false } = {}) {
+// (15 nov., lot argent-plus) `enPlus` : les lignes « URSSAF du mois » et « Articles qui dorment »
+// fabriquées par `lignesFinMois` (src/bilanFinMois.js), déjà calculées par LEURS règles —
+// ajoutées après les autres ; la carte, le PDF et le tableur les écrivent tels quels.
+export function bilanDuMois({ ym, vendu = null, recu = null, depense = null, benefice = null, B = null, meilleur = null, maintenant = Date.now(), enCours = false, enPlus = [] } = {}) {
   const partielVendu = !!(vendu && vendu.manque && vendu.manque.length);
   const venduOk = vendu && Number.isFinite(Number(vendu.eur)) && !(partielVendu && !(vendu.eur > 0));
   const lignes = [
@@ -62,6 +65,7 @@ export function bilanDuMois({ ym, vendu = null, recu = null, depense = null, ben
     { cle: 'benefice', nom: 'Bénéfice', valeur: benefice && benefice.valeur != null ? un(benefice.valeur) : null, auMoins: false,
       note: B && Number.isFinite(B.n) && B.n > 0 ? `prix d’achat connus ${B.nCout}/${B.n}` : (benefice && benefice.raison === 'rien' ? 'aucune vente finalisée ni dépense' : benefice && benefice.raison === 'achats' ? 'il manque des prix d’achat' : 'pas encore calculé'), type: 'eur' },
     { cle: 'paires', nom: `${motsVendeur().Noms} vendu${motsVendeur().e}s`, valeur: venduOk ? Number(vendu.n) : null, auMoins: venduOk && partielVendu, note: '', type: 'n' },
+    ...(Array.isArray(enPlus) ? enPlus.filter((l) => l && l.cle) : []),
   ];
   return {
     ym, mois: libelleMoisBilan(ym), enCours: !!enCours,

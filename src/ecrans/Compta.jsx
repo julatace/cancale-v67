@@ -75,6 +75,10 @@ import { CHIFFRES as CHIFFRES_CARTE } from "../design/carteChiffres.js";
 import { donneesRecapMois, csvRecapMois, pdfRecapMois, libelleMois, nomFichierRecap } from "../recapMois.js";
 import { pageRecapImprimable } from '../recapImprimable.js';   // (13 nov., point 16) le récap d'UNE page, imprimé par le navigateur
 import { bilanDuMois, meilleurCompte, pdfBilanMois, nomFichierBilan, texteBilan } from "../bilanMois.js";
+import { urssafDuBilan, lignesFinMois } from "../bilanFinMois.js";   // (15 nov., lot argent-plus) URSSAF du mois et articles qui dorment
+import { ExportBilanMois } from "../BilanFinMois.jsx";
+import { AlertesSeuils } from "../AlertesSeuils.jsx";   // (15 nov., lot argent-plus) les seuils à 80 % puis 100 %, une fois chacun
+import { dormentDe } from "../../api/_lib/bilan-semaine.js";
 import { DEMANDE_BILAN_MOIS, attrCible } from "../cibleNotif.js";   // (13 nov., lot 53) le mois demandé par l'e-mail du bilan mensuel
 import { delaisPaiement, texteDelai } from "../delaiPaiement.js";
 // ⟦← App.jsx #8⟧
@@ -2075,7 +2079,7 @@ function ExportComptableCarte(props) {
   // demandée (rien n'est lu ni téléchargé avant son clic sur Tableur / PDF).
   const [periodeVoulue, setPeriodeVoulue] = React.useState('');
   React.useEffect(() => {
-    const f = () => { const p = DEMANDE_COMMANDE.exportPeriode; if (p && /^\d{4}$/.test(p)) { DEMANDE_COMMANDE.exportPeriode = ''; setPeriodeVoulue(p); setOuvert(true); } };
+    const f = () => { const p = DEMANDE_COMMANDE.exportPeriode; if (p && /^\d{4}(-\d{2})?$/.test(p)) { DEMANDE_COMMANDE.exportPeriode = ''; setPeriodeVoulue(p); setOuvert(true); } };   // (15 nov.) + un mois (« Pour ton comptable » du bilan)
     f(); window.addEventListener('vrm:export-comptable', f); return () => window.removeEventListener('vrm:export-comptable', f);
   }, []);
   return (
@@ -2099,9 +2103,10 @@ function ExportComptableCorps({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, 
   // (11 nov.) Défaut : le dernier mois BOUCLÉ ; changer de type choisit la dernière période bouclée.
   // (11 nov.) « Clôturer l'année » → l'export s'ouvre sur l'année demandée (`anneeVoulue`).
   const anneeOk = anneeVoulue && periodesExport('annee').includes(anneeVoulue) ? anneeVoulue : '';
+  const moisOk = anneeVoulue && periodesExport('mois').includes(anneeVoulue) ? anneeVoulue : '';   // (15 nov.) le mois du bilan
   const [type, setTypeBrut] = React.useState(anneeOk ? 'annee' : 'mois');
   const choix = React.useMemo(() => periodesExport(type), [type]);
-  const [periode, setPeriode] = React.useState(() => anneeOk || periodeBouclee('mois'));
+  const [periode, setPeriode] = React.useState(() => anneeOk || moisOk || periodeBouclee('mois'));
   const setType = (t) => { setTypeBrut(t); setPeriode(periodeBouclee(t)); };
   React.useEffect(() => { if (!choix.includes(periode)) setPeriode(periodeBouclee(type)); }, [choix, periode, type]);
   const [achats, setAchats] = React.useState(undefined);
@@ -4047,7 +4052,11 @@ function PorteMonnaieCompta({ accounts, panelOff }) {
 // (11 nov., lot rapport-mois) L'ASSEMBLAGE DU BILAN D'UN MOIS, sorti de la carte telle quelle :
 // la carte « Bilan du mois » et le « Rapport du mois » le partagent (les mêmes chiffres, §11).
 // Chaque valeur vient de SA règle (src/bilanMois.js le dit) : rien n'est recalculé ici.
-const assembleBilanMois = ({ ym, enCours, liveStats, compta, pub, ligneUrssaf, regime, maintenant = Date.now() }) => {
+// (15 nov., lot argent-plus) + `dorment` (la publication `vrm_paires_dorment` de l'écran Annonces) :
+// le bilan dit aussi l'URSSAF du mois (régime CHOISI, `montantPeriodeUrssaf` sur le mois) et les
+// articles qui dorment (`dormentDe`, la règle du bilan de la semaine) — src/bilanFinMois.js.
+const lireDormentBilan = () => { try { const v = load('vrm_paires_dorment', null); return v && typeof v === 'object' ? v : null; } catch (_) { return null; } };
+const assembleBilanMois = ({ ym, enCours, liveStats, compta, pub, ligneUrssaf, regime, maintenant = Date.now(), dorment = undefined }) => {
   const [y, m] = ym.split('-').map(Number);
   const de = new Date(y, m - 1, 1).getTime(), finMois = new Date(y, m, 1).getTime();
   const a = enCours ? maintenant : finMois;
@@ -4065,8 +4074,10 @@ const assembleBilanMois = ({ ym, enCours, liveStats, compta, pub, ligneUrssaf, r
   const CB = Bm ? chiffreBenefice(Bm, 'lu') : { valeur: null, raison: pub ? tr('stats.moisCouvert') : 'publication' };
   const nomGroupe = (l) => (l.plateforme === 'Vinted' ? (l.compte || 'Vinted') : (l.compte ? `${l.compte} (${l.plateforme})` : l.plateforme));
   const meilleur = V ? meilleurCompte(V.filter((l) => l.ts >= de && l.ts < a), nomGroupe) : null;
-  const D = bilanDuMois({ ym, vendu, recu, depense: charges, benefice: CB, B: Bm, meilleur, maintenant, enCours });
-  return { D, vendu, recu, Bm, CB, V, de, a, nomGroupe };
+  const urssaf = urssafDuBilan({ regime, montant: regime === 'micro' ? montantPeriodeUrssaf(bornesPeriodeExport(ym), ligneUrssaf, tauxUrssaf()) : null });
+  const enPlus = lignesFinMois({ urssaf, dorment: dorment === undefined ? null : dormentDe(dorment, maintenant) }, tr);
+  const D = bilanDuMois({ ym, vendu, recu, depense: charges, benefice: CB, B: Bm, meilleur, maintenant, enCours, enPlus });
+  return { D, vendu, recu, Bm, CB, V, de, a, nomGroupe, urssaf };
 };
 // (13 nov., lot 53) Le mois que demande le bouton de l'e-mail du bilan mensuel
 // (`?tab=compta&cible=bilanmois&mois=AAAA-MM`, src/cibleNotif.js) : « Mois dernier »
@@ -4094,7 +4105,8 @@ function BilanMoisCarte({ liveStats, compta }) {
   const ymA = ymCourant(maintenant);
   const ym = quel === 'courant' ? ymA : ymPrecedent(ymA);
   const enCours = quel === 'courant';
-  const { D, vendu } = assembleBilanMois({ ym, enCours, liveStats, compta, pub, ligneUrssaf, regime, maintenant });
+  const [dorment] = useLigneSynchro('vrm_paires_dorment', lireDormentBilan);
+  const { D, vendu } = assembleBilanMois({ ym, enCours, liveStats, compta, pub, ligneUrssaf, regime, maintenant, dorment });
   const telecharger = async () => {
     if (envoi) return;
     setEnvoi(true);
@@ -4102,6 +4114,8 @@ function BilanMoisCarte({ liveStats, compta }) {
     catch (_) { toast(tr('compta.pdfPuEtre')); }
     setEnvoi(false);
   };
+  // (15 nov., lot argent-plus) « Pour ton comptable » : l'export complet (zip), ouvert sur CE mois.
+  const ouvrirComptable = (m) => { DEMANDE_COMMANDE.export = Date.now(); DEMANDE_COMMANDE.exportPeriode = String(m); try { window.dispatchEvent(new Event('vrm:export-comptable')); } catch (_) {} setTimeout(() => { const el = document.querySelector('[data-export-comptable]'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 60); };
   return (
     <div className="vrm-bilan-mois" data-bilan-mois={ym} data-bilan-en-cours={enCours ? '1' : '0'} data-cible={attrCible(['bilanmois', ym])}>
       <div className="vrm-bilan-tete">
@@ -4109,8 +4123,8 @@ function BilanMoisCarte({ liveStats, compta }) {
           options={[{ v: 'courant', l: 'Ce mois-ci', data: { 'data-bilan-choix': 'courant' } }, { v: 'precedent', l: 'Mois dernier', data: { 'data-bilan-choix': 'precedent' } }]} />
       </div>
       {D.lignes.map((l) => (
-        <div key={l.cle} className="vrm-bilan-ligne" data-bilan-ligne={l.cle} data-valeur={l.valeur == null ? '' : String(l.valeur)} data-au-moins={l.auMoins ? '1' : undefined}>
-          <span><b>{l.nom}</b>{l.note ? <small>{l.note}</small> : null}</span>
+        <div key={l.cle} className="vrm-bilan-ligne" data-bilan-ligne={l.cle} data-valeur={l.valeur == null ? '' : String(l.valeur)} data-au-moins={l.auMoins ? '1' : undefined} data-bilan-etat={l.etat || undefined}>
+          <span><b>{l.nom}</b>{l.note ? <small>{l.note}</small> : null}{l.geste === 'regime' ? <button type="button" className="vrm-lien-action" data-bilan-regime="" onClick={() => { const el = document.getElementById('compta-avance'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); }}>{tr('argentPlus.bilan.choisirRegime')}</button> : null}</span>
           <span className="vrm-bilan-val" data-vide={l.valeur == null ? '1' : undefined}>{texteBilan(l, fmt)}</span>
         </div>
       ))}
@@ -4118,9 +4132,7 @@ function BilanMoisCarte({ liveStats, compta }) {
         <span><b>{tr('compta.meilleurCompte')}</b><small>{D.meilleur ? tr('compta.ventesVendus', { n: String(D.meilleur.n), fmt: String(fmt(D.meilleur.eur)) }) : (vendu && vendu.manque.length ? tr('compta.designeVentesSont') : vendu && vendu.n ? tr('compta.egalite') : tr('compta.aucuneVenteMois'))}</small></span>
         <span className="vrm-bilan-val" data-vide={D.meilleur ? undefined : '1'}>{D.meilleur ? D.meilleur.nom : '—'}</span>
       </div>
-      <div className="vrm-bilan-pied">
-        <Bouton variante="secondaire" icone="save" occupe={envoi} data-bilan-pdf="" onClick={telecharger}>{tr('compta.telechargerPdf2')}</Bouton>
-      </div>
+      <ExportBilanMois D={D} ym={ym} Bouton={Bouton} telechargerPdf={telecharger} telecharger={telechargerFichier} ouvrirComptable={ouvrirComptable} />
     </div>
   );
 }

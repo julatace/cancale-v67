@@ -66,6 +66,10 @@ export const DESTINATIONS = {
   retour: ({ tx } = {}) => lienNotif('achats', { vue: 'achats', ...(tx ? { cible: 'retour', tx } : {}) }),
   // Comptabilité · « Ta déclaration URSSAF ».
   urssaf: () => lienNotif('compta', { cible: 'urssaf' }),
+  // (15 nov., lot argent-plus) Le bilan de fin de mois : Argent → « Bilan du mois », CE mois-là.
+  bilanMois: ({ mois } = {}) => lienNotif('compta', { cible: 'bilanmois', mois: /^\d{4}-\d{2}$/.test(String(mois || '')) ? mois : '' }),
+  // (15 nov., lot argent-plus) Un seuil de l'année à 80 % ou 100 % : Argent, l'alerte en tête.
+  seuil: () => lienNotif('compta', { cible: 'seuils' }),
   // (13 nov., point 17) La veille de l'échéance : Argent → « Déclarer », la section URSSAF
   // en évidence, où la carte de la période porte « Copier » (`PrevisionUrssafCarte`).
   urssafDeclarer: () => lienNotif('compta', { section: 'declarer', cible: 'urssaf' }),
