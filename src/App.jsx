@@ -128,7 +128,7 @@ import { TeteStudio, BoutonPlein, Rond, TuilesFiltres } from './design/StudioVen
 import {achatDuColis,suivisAchat,entreeIndexAchat} from './liensColis.js';
 import {sourcesDuColis,codeLuDeLigne,verdictCode,codesDesLignes,NOMS_SOURCES,texteVerifie} from './sourcesRetrait.js';
 import { dateLocale } from './formatsDate.js';
-import {achatParConversation, regrouperArrivees, temoinsDe} from '../api/_lib/achat-arrive-relais.js';
+import {achatParConversation, regrouperArrivees, temoinsDe, texteDuBrut} from '../api/_lib/achat-arrive-relais.js';
 import { transporteurRelu, ligneRelueDe, ID_BORD_TRANSPORTEURS } from '../api/_lib/transporteur-anciens.js';
 import InfosSms from './InfosSms.jsx';
 import {indexCodesSuivis, finParIdentite, fusionnerParCode, suivisLiesDuColis} from './retraitPreuves.js';
@@ -176,8 +176,9 @@ import ATrancher, { QuestionChezToi } from "./ATrancher.jsx";
 import MaSemaine from "./MaSemaine.jsx";
 import { maSemaine } from "./maSemaine.js";
 import LitigesEnCours, { EntreeLitiges } from "./LitigesEnCours.jsx";
-import { RetoursAchatBloc, RetoursAImprimer, PasAPasRetour } from "./RetoursLitiges.jsx";
-import { retoursAchat, avecRemboursementsProuves, remboursementsParTx } from "./retoursAchat.js";
+import { RetoursAchatBloc, RetoursAImprimer, PasAPasRetour, ARenvoyerJournee } from "./RetoursLitiges.jsx";
+import { retoursAchat, avecRemboursementsProuves, remboursementsParTx, ACHAT_A_RENVOYER, bordereauDuGarde, quandLimite as quandRetour } from "./retoursAchat.js";
+import { lireBordereauRetour, lireDemandeRetourAchat, estBordereauRetour, PREFIXE_DEMANDE_RETOUR } from '../api/_lib/retour-email.js';   // (15 nov., lot retours) LA règle du serveur, relue ici
 import { pasAPasVente } from "./retourPasAPas.js";
 import { litigesDesVentes, retoursParModele, preuvesVente, nombreLitigesPublie } from "./litigesEcran.js";
 // (14 nov., lot argent-prix — 114 soldes, 121 écarts) règles pures : src/soldes.js, src/ecartsPrix.js
@@ -3206,6 +3207,8 @@ const SYNC_KEYS = [
   // (11 nov., lot ventes-lot) Les articles d'un lot reliés par SON clic « Relier » : { [tx]: { [item]: N° } }.
   'vrm_lot_liens',
   'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed','vinted_retours_remis',
+  // (15 nov., lot retours) « Déposé » posé sur SON clic sur une carte « À renvoyer » (src/retoursAchat.js).
+  'vrm_retours_deposes',
   // (9 nov., lot AF) LE JOURNAL DES N° (src/historiqueNumero.js) : APPEND-ONLY, une ligne par
   // changement de N° d'une fiche, écrite au moment du changement (`noterJournalNumeros`) ;
   // lu par la fiche d'une paire (« L'histoire du N° »). Ne change jamais un N°.
@@ -9362,7 +9365,7 @@ const isAtRelayStatus = (s) => !!(s) && !/livr[ée]\s+(?:chez|à\s+(?:ton|votre|
 // retour sur Vinted). Une règle (§11) : l'étiquette de la carte (`achatStage`),
 // le bloc en tête d'Achats et la ligne de Ma journée la lisent. Motif précis,
 // pour ne pas attraper « Retournée à l'expéditeur », qui est autre chose.
-const ACHAT_A_RENVOYER = /retour\s*initi|retour\s+en\s+cours|retour\s+demand/i;
+// (15 nov., lot retours) La règle vit dans src/retoursAchat.js (« À renvoyer ») : importée, une seule.
 // Fenêtre pendant laquelle une vente mérite encore un numéro de boîte : la paire
 // est passée par le garage récemment, donc le numéro a un sens pour l'historique.
 // ⚠️ C'est CETTE borne qui empêche de renuméroter tout l'historique (140 ventes
@@ -13121,7 +13124,7 @@ const CHAMPS_NUMERO_VENTE = ['numero', 'autoAssigned', 'autoShip', 'manuelAt'];
 // Les clés « gestes » rejouées telles quelles (objets fusionnés, listes unies).
 const CLES_GESTES = ['vinted_ship_done', 'vinted_bords_printed', 'vinted_bords_hidden', 'vinted_bords_shipped', 'vinted_pickup_done',
   'vinted_offers_done', 'vinted_sales_hidden', 'vinted_purchases_hidden', 'vinted_annonces_vendues', 'vinted_retours_recus',
-  'vinted_retours_dismissed', 'vinted_retours_remis', 'vrm_colis_collected', 'vrm_colis_collected_at', 'vrm_colis_qr_poses', 'vinted_achat_notes', 'vrm_notes_paires', 'vrm_infos_paires', 'vrm_rappels', 'vrm_remises', 'vrm_lbc_repub_journal', 'vrm_achats_hors_masques', 'vrm_urssaf_declare', 'vrm_cloture_annee', 'vrm_cloture_vue', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_imprimes'];
+  'vinted_retours_dismissed', 'vinted_retours_remis', 'vrm_retours_deposes', 'vrm_colis_collected', 'vrm_colis_collected_at', 'vrm_colis_qr_poses', 'vinted_achat_notes', 'vrm_notes_paires', 'vrm_infos_paires', 'vrm_rappels', 'vrm_remises', 'vrm_lbc_repub_journal', 'vrm_achats_hors_masques', 'vrm_urssaf_declare', 'vrm_cloture_annee', 'vrm_cloture_vue', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_imprimes'];
 const SAISIES_A_REJOUER = 'vrm_saisies_a_rejouer';
 const memoriserSaisies = () => {
   const avant = _instantaneCharge; if (!avant) return 0;
@@ -34979,7 +34982,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (11 nov., lot retours-litiges) Les retours d'achat reçus par e-mail ({ bords, remb }) : lus une
   // fois (5 min de cache), en projection. AVANT `buysBase` (il les lit, §4.6).
   const [retoursAchatLus, setRetoursAchatLus] = useState(RETOURS_ACHAT_CACHE.v);
-  useEffect(() => { let vivant = true; fetchRetoursAchat().then((v) => { if (vivant) setRetoursAchatLus(v); }, () => { if (vivant) setRetoursAchatLus({ bords: null, remb: null }); }); return () => { vivant = false; }; }, [curSub]);
+  // (15 nov., lot retours) Monté après un reclassement qui a rangé quelque chose : les deux lectures repartent.
+  const [retoursVersion, setRetoursVersion] = useState(0);
+  useEffect(() => { let vivant = true; fetchRetoursAchat().then((v) => { if (vivant) setRetoursAchatLus(v); }, () => { if (vivant) setRetoursAchatLus({ bords: null, remb: null }); }); return () => { vivant = false; }; }, [curSub, retoursVersion]);
   const rembAchatsParTx = useMemo(() => (retoursAchatLus ? remboursementsParTx(retoursAchatLus.remb) : undefined), [retoursAchatLus]);
   // Un achat REMBOURSÉ prouvé par e-mail (même n° de transaction, montant ≥ ce qu'il a payé) sort
   // des coûts tout de suite (`achatAnnule` le voit), sans attendre la relecture de ses achats.
@@ -38611,7 +38616,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Trois états : `undefined` en cours · `null` pas su · la liste.
   const [emailsLitiges, setEmailsLitiges] = useState(EMAILS_LITIGES_CACHE.v);
   useEffect(() => {
-    if (only !== 'journee' && only !== 'ventes' && only !== 'bordereaux' && only !== 'litiges') return undefined;
+    if (only !== 'journee' && only !== 'ventes' && only !== 'bordereaux' && only !== 'litiges' && only !== 'achats') return undefined;
     let vivant = true;
     (async () => {
       const c = EMAILS_LITIGES_CACHE;
@@ -38622,7 +38627,56 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     })();
     return () => { vivant = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [only, retoursVersion]);
+  // (15 nov., lot retours) LE RECLASSEMENT DES E-MAILS DE RETOUR GARDÉS « INCONNU » : à l'ouverture
+  // d'Achats et de Ma journée, au plus une fois par heure et par appareil, le SERVEUR relit SES e-mails
+  // gardés dont le sujet est maintenant reconnu et les range (api/_lib/reclasser-retours.js) ; rien n'est
+  // supprimé. Rangé ⇒ les lectures repartent. Pas su ⇒ rien (réessayé à la prochaine ouverture).
+  useEffect(() => {
+    if (only !== 'achats' && only !== 'journee') return undefined;
+    if (!(AUTH.session && AUTH.session.access_token)) return undefined;
+    let dernier = 0; try { dernier = Number(localStorage.getItem('vrm_reclasse_retours_at')) || 0; } catch (_) {}
+    if (Date.now() - dernier < 3600000) return undefined;
+    let vivant = true;
+    (async () => {
+      try {
+        const r = await fetch('/api/email-rattacher?mode=reclasser', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: '{}' });
+        if (!r.ok) return;
+        const j = await r.json().catch(() => null);
+        try { localStorage.setItem('vrm_reclasse_retours_at', String(Date.now())); } catch (_) {}
+        if (vivant && j && Array.isArray(j.faits) && j.faits.length) {
+          RETOURS_ACHAT_CACHE.v = undefined; RETOURS_ACHAT_CACHE.at = 0; EMAILS_LITIGES_CACHE.v = undefined; EMAILS_LITIGES_CACHE.at = 0;
+          setRetoursVersion((n) => n + 1);
+        }
+      } catch (_) {}
+    })();
+    return () => { vivant = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [only]);
+  // (15 nov., lot retours) Les retours lus dans les e-mails : avis « Retourne ta commande » (rangés, ou
+  // encore gardés « inconnu » : relus par LA règle du serveur) et bordereaux encore gardés (relus, PDF
+  // compris, en attendant le reclassement). Trois états pour les avis.
+  const retoursEmails = useMemo(() => {
+    if (emailsLitiges === undefined) return { demandes: undefined, gardes: [] };
+    if (emailsLitiges === null) return { demandes: null, gardes: [] };
+    const demandes = [], gardes = [];
+    for (const r of emailsLitiges) {
+      if (!r || r.type === 'reclasse') continue;
+      const id = String(r.id || '');
+      if (id.startsWith(PREFIXE_DEMANDE_RETOUR)) { if (r.limiteIso) demandes.push({ id, article: r.article || '', limiteIso: r.limiteIso, limiteJour: r.limiteJour || '', conv: r.conv || '', uid: r.uid || '', account: r.account || '', recuLe: r.receivedAt || '' }); continue; }
+      if (!id.startsWith('email_inconnu_')) continue;
+      if (estBordereauRetour(r.subject)) { const b = bordereauDuGarde(r, lireBordereauRetour); if (b) gardes.push(b); continue; }
+      const lu = lireDemandeRetourAchat({ subject: r.subject, text: texteDuBrut(r.brut), recuLe: r.receivedAt });
+      if (lu.ok) demandes.push({ id, article: lu.article, limiteIso: lu.limiteIso, limiteJour: lu.limiteJour, conv: lu.conv || '', uid: '', account: '', recuLe: r.receivedAt || '' });
+    }
+    return { demandes, gardes };
+  }, [emailsLitiges]);
+  // (15 nov., lot retours) « Déposé » : SON clic (une carte « À renvoyer » ⇒ { cle: date }), synchronisé.
+  const [retoursDeposes, setRetoursDeposes] = useStateCle('vrm_retours_deposes', () => load('vrm_retours_deposes', {}));
+  const basculerRetourDepose = (cle) => {
+    const k = cle ? String(cle) : ''; if (!k) return;
+    setRetoursDeposes((prev) => { const u = { ...(prev || {}) }; if (u[k]) delete u[k]; else u[k] = new Date().toISOString(); save('vrm_retours_deposes', u); return u; });
+  };
   const litigesSuivis = useMemo(() => {
     const lu = (st, base) => st.items === null ? undefined : (st.error ? null : base);
     return litigesEnCours({
@@ -40135,6 +40189,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     setRetoursRecus(n => vide(n) ? load('vinted_retours_recus', {}) : n);
     setRetoursDismissed(n => vide(n) ? load('vinted_retours_dismissed', {}) : n);
     setRetoursRemis(n => vide(n) ? load('vinted_retours_remis', {}) : n);
+    setRetoursDeposes(n => vide(n) ? load('vrm_retours_deposes', {}) : n);
     setAchatNotes(n => vide(n) ? load('vinted_achat_notes', {}) : n);
     setOffBuys(n => vide(n) ? load('vinted_offvinted_buys', []) : n);
   }), []);
@@ -41617,20 +41672,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (11 nov., lot retours-litiges) UNE CARTE PAR BORDEREAU DE RETOUR (src/retoursAchat.js) : l'achat
   // par SON n° de transaction, le N° de la paire reliée à CET achat (son clic), la limite lue, le
   // suivi (trois états), le remboursement prouvé. Achats → « Retours » et « Tout imprimer ».
+  // (15 nov., lot retours) + les avis « Retourne ta commande », les bordereaux encore gardés « inconnu »
+  // (relus, PDF compris), les achats « à renvoyer » sans bordereau, « Déposé » (SON clic) : UNE carte par
+  // retour (src/retoursAchat.js). Même liste dans Achats et dans Ma journée (« À renvoyer »).
   const retoursAchatRes = useMemo(() => {
     if (!retoursAchatLus) return retoursAchat({ bords: undefined });
     const achatsLus = buys.items === null ? undefined : (buys.error ? null : buysBase);
-    const bords = Array.isArray(retoursAchatLus.bords) ? retoursAchatLus.bords.map((b) => ({ ...b, suivi: normaliserSuivi(b.suivi || '') })) : retoursAchatLus.bords;
-    const res = retoursAchat({ bords, achats: achatsLus, remb: retoursAchatLus.remb, transp: transp === undefined ? undefined : transpMap,
-      numeroDe: (tx) => (buyNumByTxn[tx] != null ? String(buyNumByTxn[tx]) : ''), montantDe: montantCommandeLu });
-    for (const c of [...res.cartes, ...res.anciennes]) { try { c.photo = c.achat ? orderPhoto(c.achat) || '' : ''; } catch (_) { c.photo = ''; } }
+    const bords = Array.isArray(retoursAchatLus.bords) ? [...retoursAchatLus.bords, ...retoursEmails.gardes].map((b) => ({ ...b, suivi: normaliserSuivi(b.suivi || '') })) : retoursAchatLus.bords;
+    const ventesTx = Array.isArray(sales.items) ? new Set(sales.items.map((o) => String(o.transaction_id))) : null;
+    const res = retoursAchat({ bords, demandes: retoursEmails.demandes === undefined ? [] : retoursEmails.demandes, achats: achatsLus, remb: retoursAchatLus.remb, transp: transp === undefined ? undefined : transpMap,
+      deposes: retoursDeposes, ventesTx, numeroDe: (tx) => (buyNumByTxn[tx] != null ? String(buyNumByTxn[tx]) : ''), montantDe: montantCommandeLu });
+    for (const c of [...res.cartes, ...res.anciennes]) {
+      try { c.photo = c.achat ? orderPhoto(c.achat) || '' : ''; } catch (_) { c.photo = ''; }
+      // Le compte : par l'achat (identité), sinon le compte que l'e-mail nomme.
+      const acc = c.achat && c.achat._acc ? c.achat._acc : (accounts || []).find((a) => c.uid && String(a.vinted_user_id) === String(c.uid));
+      c.nomCompte = acc ? accNameOf(acc) : c.compte || '';
+    }
     return res;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [retoursAchatLus, buys.items, buys.error, buysBase, transp, transpMap, buyNumByTxn]);
+  }, [retoursAchatLus, retoursEmails, retoursDeposes, sales.items, buys.items, buys.error, buysBase, transp, transpMap, buyNumByTxn, accounts]);
   // Imprimer le bordereau de retour : SON PDF (par son n°), tamponné « RETOUR · N°… » (src/tamponRetour.js),
   // ouvert dans la visionneuse (téléchargé sur iPhone). Rend 'ok' · 'passu' (dit sous le bouton).
   const imprimerRetourAchat = async (c) => {
-    const lu = await lirePdfLigne(`email_bordretour_${c.tx}`);
+    // (15 nov.) Un bordereau encore gardé « inconnu » : son PDF vient du corps gardé (relu par la règle du serveur).
+    const lu = c.pdfGarde ? (() => { try { const b = atob(c.pdfGarde); const o = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) o[i] = b.charCodeAt(i); return { octets: o }; } catch (_) { return null; } })()
+      : await lirePdfLigne(`email_bordretour_${c.tx}`);
     if (!lu || !lu.octets) { libererOngletPdf(); return 'passu'; }
     try {
       const { tamponnerRetour } = await import('./tamponRetour.js');
@@ -46515,27 +46581,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // être le même colis qu'un e-mail) : ni comptés ni cachés — dits.
         { const nc = (pickupUnion.aConfirmer||[]).length;
           if (nc) tuiles.retirer = { ...tuiles.retirer, sub: `${pickupCount ? `${tuiles.retirer.sub} · ` : ''}${nc} achat${nc>1?'s':''} au point relais en cours de vérification`, enVerification: nc }; }
-        // ⚠️ UN ACHAT EN LITIGE À RENVOYER (revue du 9 octobre) : il ne
-        //    s'affichait que sous Achats → « Tous ». Même règle que la carte et
-        //    le bloc d'Achats (`ACHAT_A_RENVOYER`, §11) ; le compte est nommé
-        //    (le bordereau de retour se fait sur CELUI-LÀ).
-        { const ar = (buysBase||[]).filter(o=>ACHAT_A_RENVOYER.test(String(o.status||'')));
-          if (ar.length) { const cs=[...new Set(ar.map(o=>o._acc?accNameOf(o._acc):'').filter(Boolean))];
-            jobs.push({id:'a-renvoyer',n:ar.length,icon:'box',color:C.warn,photos:ar.map(o=>orderPhoto(o)),title:tr('journee.renvoyerArticlesLitige', { n: String(ar.length) }),
-              sub:`Étiquette de retour sur Vinted${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,tab:'achats',prio:0.8}); } }
+        // (15 nov., lot retours) Un ACHAT à renvoyer n'a plus de ligne ici : il est une carte « À renvoyer »
+        //    EN TÊTE de Ma journée (src/retoursAchat.js, la même liste qu'Achats), avec son bordereau.
+        // (15 nov., lot retours) CÔTÉ VENTE : un acheteur te renvoie une paire. La règle d'avant
+        //    (src/retoursStock.js, `retoursSuivis` : transaction 440, étape du colis de retour) n'avait
+        //    aucune ligne ici — on ne la voyait que dans Colis. Une ligne : « 1 retour en route vers toi »,
+        //    le N° par identité, la ligne ouvre Colis (« Reçu », remise en stock sous SON N°).
+        { const rv = retoursSuivis && retoursSuivis.etat === 'lu' ? retoursSuivis.lignes.filter((l) => !l.ancien && !l.recu && (l.etape === 'initie' || l.etape === 'en-route')) : [];
+          if (rv.length) {
+            const noms = rv.slice(0, 2).map((l) => [l.num ? `N°${l.num}` : '', l.titre || ''].filter(Boolean).join(' ')).filter(Boolean);
+            jobs.push({ id: 'retours-vente', n: rv.length, icon: 'restore', color: C.text, photos: rv.map((l) => (l.vente ? orderPhoto(l.vente) : null)).filter(Boolean),
+              court: tr('renv.vente.titre', { n: rv.length }), detail: noms.join(' · '), title: tr('renv.vente.titre', { n: rv.length }), tab: 'cat_bord', prio: 0.7,
+              attrs: { 'data-retours-vente': String(rv.length) } }); } }
         // (3 nov.) LITIGES, RETOURS, RÉCLAMATIONS EN COURS (src/litiges.js) : une carte
         // par IDENTITÉ (transaction, conversation, retour eBay), la date limite seulement
         // si elle est LUE, sinon « délai non lu » ; le geste = un lien vers le site. Le
         // retour d'achat sans e-mail est déjà dit par « Renvoyer … (litige) » (§7).
         if (litigesSuivis.etat === 'lu') {
-          const cartes = litigesSuivis.lignes.filter(l => !l.ancien && !(l.sens === 'achat' && l.genre === 'retour' && l.source === 'commande')).slice(0, 8);
+          // (15 nov., lot retours) Le retour d'ACHAT (commande OU e-mail) vit dans « À renvoyer » : plus de ligne ici.
+          const cartes = litigesSuivis.lignes.filter(l => !l.ancien && !(l.sens === 'achat' && l.genre === 'retour')).slice(0, 8);
           for (const l of cartes) {
             const lim = texteLimiteLitige(l);
             const compte = l.compte ? accNameOf(l.compte) : '';
             jobs.push({ id: 'litige', litige: l, n: 1, icon: 'alert', color: l.presse ? C.warn : C.text, urgent: !!l.presse,
               photos: l.commande ? [orderPhoto(l.commande)] : null,
-              court: `${LIBELLE_LITIGE[l.genre] || 'Litige'}${l.num ? ` · N°${l.num}` : ''}`,
-              detail: [lim ? `avant le ${lim}` : 'délai non lu', compte].filter(Boolean).join(' · '),
+              // (15 nov.) Le titre de la paire (par identité : la commande) ; « transaction suspendue » dit ce qui se passe
+              //    (Vinted vérifie, aucun délai pour lui) au lieu de « délai non lu » ; le compte est nommé comme un compte.
+              court: `${LIBELLE_LITIGE[l.genre] || 'Litige'}${l.num ? ` · N°${l.num}` : ''}${l.commande && l.titre ? ` · ${l.titre}` : ''}`,
+              detail: [lim ? `avant le ${lim}` : l.genre === 'suspendue' ? tr('litige.suspendue.detail') : 'délai non lu', compte ? tr('litige.compte', { c: compte }) : ''].filter(Boolean).join(' · '),
               plein: [l.titre, l.qui, l.raison ? `« ${l.raison} »` : ''].filter(Boolean).join(' · '),
               tab: l.sens === 'achat' ? 'achats' : 'cat_ventes', prio: l.presse ? 0.1 : 0.6 });
           }
@@ -47959,6 +48032,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div className="vrm-day-hello vrm-fu-bonjour sj-bonjour">{hello}{prenomLisible(prenom) ? ' ' + prenomLisible(prenom) : ''}<span className="sj-date"> · {dateStr}</span></div>
                 <h1 className="vrm-fu-titre-tete sj-titre">{tr('reglages.ma-journee.lib')}</h1>
                 {AF.alertes || null}
+                {/* (15 nov., lot retours) « À RENVOYER (N) » : UNE place, en tête, tant qu'un retour attend son dépôt
+                    (le plus pressé d'abord) — la même carte qu'Achats (photo + titre par identité, compte, « avant demain
+                    10 h », « Imprimer le bordereau », « Déposé »). Plus aucune ligne « Retour » ailleurs dans la journée. */}
+                <ARenvoyerJournee r={retoursAchatRes} onImprimer={imprimerRetourAchat} onDepose={basculerRetourDepose} Photo={PhotoVinted}
+                  onVoir={() => { if (onNav) onNav('achats'); }}/>
                 {/* SON ordre (« Modifier ma journée ») entre la phrase et l'affiche ; « Les chiffres du mois » sont une
                     tuile de la grille, « la prochaine chose » la première carte de « À faire » (`data-prochain`). */}
                 {ordreJourneeHeure('tete', persoJ).filter((id) => id === 'phrase' || id === 'frise').map((id) => id === 'phrase'
@@ -49289,36 +49367,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
-        {/* (31 oct., soir) Le litige est un ACHAT à renvoyer, pas un colis à aller
-            chercher : sur « Achats », en tête de chaque étape (Tous compris : c'est
-            désormais l'écran par défaut), jamais sur « Colis à retirer ». */}
-        {!modeRetraits && (aFilter!=='all' || modeListeAchats) && (()=>{
-          // (11 nov., lot retours-litiges) Un achat dont le bordereau de retour est DÉJÀ arrivé par e-mail (même n°) est
-          // dans « Retours » juste dessous, avec « Imprimer » : pas deux fois (§7).
-          const avecBordRetour = new Set(retoursAchatRes && retoursAchatRes.etat === 'lu' ? [...retoursAchatRes.cartes, ...retoursAchatRes.anciennes].map((c) => c.tx) : []);
-          const l = buysBase.filter(o=>ACHAT_A_RENVOYER.test(String(o.status||'')) && !avecBordRetour.has(String(o.transaction_id)));
-          if (!l.length) return null;
-          const comptes = [...new Set(l.map(o=>o._acc?accNameOf(o._acc):"").filter(Boolean))];
-          const unSeul = comptes.length===1;
-          return (
-            <div className="vrm-achats-bloc" data-a-renvoyer={l.length} style={{background:C.card,border:`1px solid ${C.border}`}}>
-              <div className="vrm-achats-bloc-t" style={{color:C.text}}><span style={{color:C.warn}}>↩</span> {l.length} {tr('achats.article')}{l.length>1?'s':''} {tr('achats.renvoyerLitige')}{unSeul?<span style={{fontWeight:400,color:C.muted}}>{trj('achats.compte4', { x: comptes[0] })}</span>:null} <Pourquoi label={tr('achats.pourquoiVinted')}>{tr('achats.etiquetteRetourGenere')}</Pourquoi></div>
-              {l.map(o=>{ const ph=orderPhoto(o); return (
-                <div key={o.transaction_id} style={{display:'flex',alignItems:'center',gap:10,marginTop:9,flexWrap:'wrap'}}>
-                  {ph && !imgMortes.has(ph) ? <PhotoVinted src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:38,height:38,borderRadius:12,objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/> : null}
-                  <div style={{flex:'1 1 160px',minWidth:0}}>
-                    <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={o.title}>{o.title}</div>
-                    {!unSeul && o._acc && <div style={{fontSize:12,color:C.muted}}>{trj('achats.compte5', { accNameOf: accNameOf(o._acc) })}</div>}
-                  </div>
-                  <Bouton variante="secondaire" data-retour-tx={o.transaction_id} href={`https://www.vinted.fr/member/transactions/${encodeURIComponent(o.transaction_id)}`} target="_blank" rel="noreferrer" style={{flexShrink:0,minHeight:44}}>{tr('achats.bordereauRetour')}</Bouton>
-                </div>
-              ); })}
-            </div>
-          );
-        })()}
+        {/* (15 nov., lot retours) Les achats « à renvoyer » (litige) n'ont plus leur bloc à part : ils sont des
+            cartes « À renvoyer » juste dessous (src/retoursAchat.js, source « achat »), une seule liste. */}
         {/* (11 nov., lot retours-litiges) LES BORDEREAUX DE RETOUR reçus par e-mail : une carte par n° de
             transaction, « Imprimer le bordereau » tamponné « RETOUR · N°… », limite, suivi, remboursement. */}
-        {!modeRetraits && <RetoursAchatBloc r={retoursAchatRes} onImprimer={imprimerRetourAchat} Photo={PhotoVinted} Bouton={Bouton}/>}
+        {/* Sur « Tous » (la liste des achats montrée), un achat « à renvoyer » SANS bordereau a déjà sa carte et son lien
+            dans la liste : il n'est pas redit ici (§7, un geste une fois) — ses bordereaux et avis, eux, le sont. */}
+        {!modeRetraits && <RetoursAchatBloc r={retoursAchatRes} sansAchatsSeuls={aFilter==='all' && !modeListeAchats}
+          onImprimer={imprimerRetourAchat} onDepose={basculerRetourDepose} Photo={PhotoVinted}/>}
         {/* ⚠️ SUR « À RETIRER », CES TROIS COMMANDES N'AGISSENT SUR RIEN.
             Cet onglet n'affiche AUCUNE liste de commandes (`aFilter==='attente'`
             renvoie faux dans le filtre plus bas) : il montre les colis groupés
