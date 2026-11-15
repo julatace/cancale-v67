@@ -484,4 +484,12 @@
   :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-cadre > .vrm-fp-outils { grid-template-columns: 1fr 1fr !important; }
 }
 
+@media (min-width: 1024px) {
+  /* Paramètres à l'ordinateur : toute la largeur (maquette), les verres de groupe prennent leur colonne. */
+  :root:root:root:root:root:root:root body .vrm-main .vrm-pm[data-reglages-disposition="ordinateur"] { max-width: none !important; }
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] :is(.vrm-pm-contenu, .vrm-pm-cat) { width: 100% !important; max-width: none !important; }
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat > .vrm-set-groupe { width: auto !important; max-width: none !important; min-width: 0; }
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat .vrm-set-lib { min-width: 0; flex: 1 1 auto; }
+}
+
 } /* fin de @layer vrm-verre */
