@@ -36,6 +36,17 @@ export const TYPES_MAX_JOUR = 100;        // la ligne du jour reste petite
 export const EVENEMENTS_MAX_APPAREIL_JOUR = 200;
 export const APPAREILS_MAX_TYPE = 50;
 export const PREFIXE_TERRAIN = 'plantages_terrain_';
+// (15 nov., lot fiabilite-auto) Julien : « notification seulement si un même plantage touche
+// 3 personnes ou plus, ou bloque l'ouverture ». Le reste se lit dans le rapport, sans bruit.
+// Une « personne » = une empreinte DU JOUR (HMAC du vendeur et du jour, jamais un identifiant) ;
+// le propriétaire de l'installation n'est jamais compté (api/_lib/mesures-terrain.js).
+export const PERSONNES_MIN = 3;
+// L'appareil, en deux mots et dans une liste FERMÉE (« iOS Safari ») : rien d'autre ne sort.
+const RE_APPAREIL = /^(?:(iOS|Android|Mac|Windows) )?(Edge|Chrome|Firefox|Safari|autre)$/;
+export const appareilAlerte = (v) => { const s = String(v == null ? '' : v).trim(); return RE_APPAREIL.test(s) ? s : ''; };
+const bloquante = (origine) => origine === 'demarrage' || origine === 'ouverture';
+// Un type à DIRE : il touche `PERSONNES_MIN` personnes ou plus ce jour-là, ou il bloque l'ouverture.
+export const typeADire = (t) => !!t && ((Array.isArray(t.appareils) ? t.appareils.length : Number(t.appareils) || 0) >= PERSONNES_MIN || Number(t.bloque) > 0);
 
 export const ecranAlerte = (v) => { const s = String(v || ''); const e = ECRANS.includes(s) ? s : s.split(':')[0]; return ECRANS.includes(e) ? e : ''; };
 const garde = (origine) => origine === 'ecran' || origine === 'feuille';
@@ -58,6 +69,8 @@ export function compterErreur(etat, e, { maintenant = Date.now(), masque } = {})
   out[cle] = {
     message, ecran: ecranAlerte(e.ecran) || avant.ecran || '', version: versionApp(e.version) || avant.version || '',
     n: Math.min(N_MAX, (Number(avant.n) || 0) + 1), garde: (Number(avant.garde) || 0) + (garde(String(e.origine || '')) ? 1 : 0),
+    // (15 nov.) l'ouverture bloquée, et l'appareil (liste fermée).
+    bloque: (Number(avant.bloque) || 0) + (bloquante(String(e.origine || '')) ? 1 : 0), appareil: appareilAlerte(e.appareil) || avant.appareil || '',
     envoye: Math.min(Number(avant.envoye) || 0, N_MAX), at: new Date(maintenant).toISOString(),
   };
   const cles = Object.keys(out).sort((a, b) => String(out[b].at || '').localeCompare(String(out[a].at || ''))).slice(0, TYPES_MAX_APPAREIL);
@@ -71,8 +84,8 @@ export function evenementsAEnvoyer(etat) {
     if (!x || typeof x !== 'object') continue;
     const n = Number(x.n) || 0, envoye = Number(x.envoye) || 0;
     if (n <= envoye) continue;
-    if (!(Number(x.garde) > 0) && n < REPETITION_MIN) continue;
-    out.push({ cle, ecran: x.ecran || '', message: x.message, version: x.version || '', n: n - envoye, garde: Number(x.garde) > 0 });
+    if (!(Number(x.garde) > 0) && !(Number(x.bloque) > 0) && n < REPETITION_MIN) continue;
+    out.push({ cle, ecran: x.ecran || '', message: x.message, version: x.version || '', n: n - envoye, garde: Number(x.garde) > 0, bloque: Number(x.bloque) > 0, appareil: x.appareil || '' });
   }
   return normaliserEvenements(out.slice(0, EVENEMENTS_MAX_LOT)).map((ev, i) => ({ ...ev, cle: out[i].cle }));
 }
@@ -92,7 +105,8 @@ export function normaliserEvenements(liste) {
     const message = messageAlerte(x.message);
     const n = Number(x.n);
     if (!message || !Number.isInteger(n) || n < 1) continue;
-    out.push({ ecran: ecranAlerte(x.ecran), message, version: versionApp(x.version), n: Math.min(N_MAX, n), garde: x.garde === true });
+    out.push({ ecran: ecranAlerte(x.ecran), message, version: versionApp(x.version), n: Math.min(N_MAX, n), garde: x.garde === true,
+      ...(x.bloque === true ? { bloque: true } : {}), ...(appareilAlerte(x.appareil) ? { appareil: appareilAlerte(x.appareil) } : {}) });
   }
   return out;
 }
@@ -118,6 +132,8 @@ export function jourApresEvenements(avant, evts, empreinte, maintenant = Date.no
     if (e.garde) t.garde = (Number(t.garde) || 0) + e.n;
     if (e.ecran) t.ecrans = { ...t.ecrans, [e.ecran]: ((t.ecrans && t.ecrans[e.ecran]) || 0) + e.n };
     if (e.version) t.versions = { ...t.versions, [e.version]: ((t.versions && t.versions[e.version]) || 0) + e.n };
+    if (e.bloque) t.bloque = (Number(t.bloque) || 0) + e.n;
+    if (e.appareil) { const nav = t.navigateurs && typeof t.navigateurs === 'object' ? t.navigateurs : {}; if (nav[e.appareil] || Object.keys(nav).length < 8) t.navigateurs = { ...nav, [e.appareil]: (nav[e.appareil] || 0) + e.n }; }
     const ap = Array.isArray(t.appareils) ? t.appareils : [];
     t.appareils = ap.includes(empreinte) || ap.length >= APPAREILS_MAX_TYPE ? ap : [...ap, empreinte];
     t.dernier = at;
@@ -127,28 +143,35 @@ export function jourApresEvenements(avant, evts, empreinte, maintenant = Date.no
 }
 
 // Les types pas encore dits, et si l'heure de la notification groupée est venue.
+// (15 nov., lot fiabilite-auto) Seul un type À DIRE (`typeADire` : ≥ 3 personnes, ou l'ouverture
+// bloquée) attend une notification, et UNE fois par jour (`notifie` posé ⇒ dit). Les autres
+// restent dans le rapport (Réglages → Tout va bien ? → Plantages chez les vendeurs).
 export function alerteDue(data, maintenant = Date.now()) {
   const types = data && data.types && typeof data.types === 'object' ? data.types : {};
-  const enAttente = Object.entries(types).filter(([, t]) => t && (Number(t.n) || 0) > (Number(t.notifie) || 0))
-    .map(([cle, t]) => ({ cle, message: t.message, ecrans: Object.keys(t.ecrans || {}), n: (Number(t.n) || 0) - (Number(t.notifie) || 0), appareils: (t.appareils || []).length, garde: Number(t.garde) > 0 }))
-    .sort((a, b) => b.n - a.n);
+  const enAttente = Object.entries(types).filter(([, t]) => t && typeADire(t) && !((Number(t.notifie) || 0) > 0))
+    .map(([cle, t]) => ({ cle, message: t.message, ecrans: Object.keys(t.ecrans || {}), n: Number(t.n) || 0, appareils: (t.appareils || []).length, garde: Number(t.garde) > 0, bloque: Number(t.bloque) > 0 }))
+    .sort((a, b) => (b.bloque - a.bloque) || (b.appareils - a.appareils) || (b.n - a.n));
   const derniere = Date.parse((data && data.notifieA) || '') || 0;
   return { enAttente, due: enAttente.length > 0 && (!derniere || maintenant - derniere >= GROUPE_MS) };
 }
-// La ligne après l'envoi : chaque type « dit » jusqu'à son compte actuel.
+// La ligne après l'envoi : chaque type DIT (à dire) le reste pour la journée ; les autres ne
+// sont pas marqués (ils seront dits s'ils atteignent le seuil).
 export function apresNotification(data, maintenant = Date.now()) {
   const types = {};
-  for (const [k, t] of Object.entries((data && data.types) || {})) types[k] = { ...t, notifie: Number(t.n) || 0 };
+  for (const [k, t] of Object.entries((data && data.types) || {})) types[k] = typeADire(t) ? { ...t, notifie: Number(t.n) || 0 } : { ...t };
   return { ...data, types, notifieA: new Date(maintenant).toISOString(), rev: (Number.isSafeInteger(data.rev) ? data.rev : 0) + 1 };
 }
 
 // « VRM : 2 écrans ont planté chez des vendeurs depuis 1 h — Colis ×3 (2 appareils), Ventes ×1. »
+// (15 nov.) « L'app ne s'ouvre plus chez 1 personne » / « Un plantage touche 4 personnes » ;
+// le corps : où, combien de fois, où regarder (≤ 90 caractères).
 export function texteAlerte(enAttente, nomEcran = (e) => e) {
   if (!enAttente || !enAttente.length) return null;
-  const total = enAttente.reduce((a, t) => a + t.n, 0);
-  const un = (t) => `${t.ecrans.length ? t.ecrans.slice(0, 2).map(nomEcran).join(', ') : 'l’app'} ×${t.n}${t.appareils > 1 ? ` (${t.appareils} appareils)` : ''}`;
-  const tombe = enAttente.some((t) => t.garde);
-  const quoi = enAttente.length === 1 ? (tombe ? 'un écran est tombé' : 'une erreur se répète') : `${enAttente.length} soucis`;
-  // (8 nov.) Le titre dit le fait (≤ 40 caractères), le corps où regarder.
-  return { title: `${quoi.charAt(0).toUpperCase() + quoi.slice(1)} chez des vendeurs`, body: `${total} fois — ${enAttente.slice(0, 3).map(un).join(' · ')}${enAttente.length > 3 ? ' …' : ''}. Détail : Réglages → Sécurité des données.` };
+  const pers = (n) => `${n} personne${n > 1 ? 's' : ''}`;
+  const t0 = enAttente[0];
+  const ou = (t) => (t.ecrans.length ? t.ecrans.slice(0, 2).map(nomEcran).join(', ') : 'l’app');
+  const title = enAttente.length > 1 ? `${enAttente.length} plantages chez des vendeurs`
+    : t0.bloque ? `L’app ne s’ouvre plus chez ${pers(Math.max(1, t0.appareils))}` : `Un plantage touche ${pers(t0.appareils)}`;
+  const corps = `${ou(t0)} ×${t0.n}${enAttente.length > 1 ? ` · +${enAttente.length - 1} autre${enAttente.length > 2 ? 's' : ''}` : ''}. Détail : Réglages → Tout va bien ?`;
+  return { title: title.length <= 40 ? title : title.slice(0, 39) + '…', body: corps.length <= 90 ? corps : corps.slice(0, 89) + '…' };
 }

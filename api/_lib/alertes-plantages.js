@@ -123,7 +123,9 @@ export function terrainPourPanneau(rows) {
       cle, message: String(t.message || '').slice(0, 200), n: Number(t.n) || 0, garde: Number(t.garde) || 0,
       appareils: Array.isArray(t.appareils) ? t.appareils.length : 0,
       ecrans: Object.entries(t.ecrans || {}).map(([e, n]) => ({ ecran: e, nom: nomEcran(e), n: Number(n) || 0 })).sort((a, b) => b.n - a.n),
-      versions: Object.keys(t.versions || {}).slice(0, 5), premier: t.premier || null, dernier: t.dernier || null, dit: (Number(t.notifie) || 0) >= (Number(t.n) || 0),
+      versions: Object.keys(t.versions || {}).slice(0, 5), premier: t.premier || null, dernier: t.dernier || null, dit: (Number(t.notifie) || 0) > 0,
+      // (15 nov., lot fiabilite-auto) l'ouverture bloquée et les navigateurs (liste fermée, nombres).
+      bloque: Number(t.bloque) || 0, navigateurs: Object.fromEntries(Object.entries(t.navigateurs && typeof t.navigateurs === 'object' ? t.navigateurs : {}).filter(([k]) => /^[\w ]{1,30}$/.test(k)).map(([k, n]) => [k, Number(n) || 0])),
     })).sort((a, b) => b.n - a.n);
     return { jour, notifieA: d.notifieA || null, types };
   }).filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x.jour)).sort((a, b) => b.jour.localeCompare(a.jour));

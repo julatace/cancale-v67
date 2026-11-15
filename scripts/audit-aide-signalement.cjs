@@ -217,7 +217,7 @@ const SECRETS = {
     process.env.SUPABASE_SERVICE_KEY = 'cle-de-service-de-banc';
     delete process.env.VRM_OWNER_UID;
     let rows = [], reglages = { proprietaire: JULIEN }, panne = false;
-    const JETONS = { 'j.a.x': { id: A }, 'j.b.x': { id: B }, 'j.julien.x': { id: JULIEN } };
+    const JETONS = { 'j.a.x': { id: A }, 'j.b.x': { id: B }, 'j.c.x': { id: 'cccccccc-0000-4000-8000-00000000000c' }, 'j.d.x': { id: 'dddddddd-0000-4000-8000-00000000000d' }, 'j.julien.x': { id: JULIEN } };
     const rep = (c, st = 200) => new Response(typeof c === 'string' ? c : JSON.stringify(c), { status: st, headers: { 'content-type': 'application/json' } });
     global.fetch = async (url, o = {}) => {
       const s = String(url); const u = new URL(s); const p = u.pathname; const m = (o.method || 'GET').toUpperCase();
@@ -244,19 +244,30 @@ const SECRETS = {
     const lot = (evts) => JSON.stringify({ v: 1, h: {}, p: evts, jeton: 'j.a.x' });
     const evA = [{ ecran: 'cat_bord', message: "Cannot read properties of undefined (reading 'n')", version: '8 novembre à 10:00', n: 10, garde: false }];
     const evB = [{ ecran: 'compta', message: `Minified React error #31 ${SECRETS.email} 87,50 €`, version: '8 novembre à 10:00', n: 1, garde: true }];
+    // (15 nov., lot fiabilite-auto) LA RÈGLE DE JULIEN : une notification SEULEMENT si un même plantage
+    // touche 3 personnes ou plus, ou bloque l'ouverture ; le propriétaire n'est jamais compté.
     let r1 = await MT.recevoirMesures({ corps: lot(evA), verifierJeton, pousser, maintenant: T0 });
-    dit(r1.code === 200 && envois.length === 1, 'premier lot : rangé, UNE notification (rien n’avait été dit)', JSON.stringify(r1.corps) + ' ' + envois.length);
+    dit(r1.code === 200 && envois.length === 0, 'premier lot (1 personne) : rangé, AUCUNE notification', JSON.stringify(r1.corps) + ' ' + envois.length);
     const r2 = await MT.recevoirMesures({ corps: JSON.stringify({ v: 1, h: {}, p: evB, jeton: 'j.b.x' }), verifierJeton, pousser, maintenant: T0 + 10 * 60e3 });
     const r3 = await MT.recevoirMesures({ corps: lot(evA), verifierJeton, pousser, maintenant: T0 + 20 * 60e3 });
-    dit(r2.code === 200 && r3.code === 200 && envois.length === 1, 'deux autres lots dans l’heure : rangés, AUCUNE notification de plus (groupées)', envois.length);
+    const rj = await MT.recevoirMesures({ corps: JSON.stringify({ v: 1, h: {}, p: evA, jeton: 'j.julien.x' }), verifierJeton, pousser, maintenant: T0 + 21 * 60e3 });
+    dit(r2.code === 200 && r3.code === 200 && rj.code === 200 && envois.length === 0, 'deux personnes (et le propriétaire, jamais compté) : rangés, AUCUNE notification', envois.length);
     const ligne = rows.find((x) => /^plantages_terrain_2026-11-08$/.test(x.id));
     dit(ligne && ligne.owner === JULIEN, 'la ligne du jour est chez le PROPRIÉTAIRE de l’installation', ligne && ligne.owner);
     const brut = JSON.stringify(rows);
     dit(!brut.includes(A) && !brut.includes(B) && !brut.includes(SECRETS.email) && !brut.includes('87,50'), 'aucun identifiant de vendeur ni donnée dans la base (empreintes du jour, message masqué)');
     const types = ligne ? Object.values(ligne.data.types) : [];
-    dit(types.length === 2 && types.find((t) => t.n === 20) && types.find((t) => t.garde === 1), 'additionnés par type : 20 fois la même erreur, un écran tombé', types.map((t) => ({ n: t.n, g: t.garde, ap: t.appareils.length })));
-    const r4 = await MT.recevoirMesures({ corps: lot([{ ...evA[0], n: 2 }]), verifierJeton, pousser, maintenant: T0 + 61 * 60e3 });
-    dit(r4.code === 200 && envois.length === 2 && /2 soucis/.test(envois[1].n.title + ' ' + envois[1].n.body) /* (8 nov.) le fait est dans le titre */ && envois[1].proprio === JULIEN && envois[1].n.tag === 'vrm-alerte-plantages', 'une heure après : UNE notification groupée, qui dit tout ce qui attendait', envois[1] && envois[1].n.body);
+    dit(types.length === 2 && types.find((t) => t.n === 20 && t.appareils.length === 1) && types.find((t) => t.garde === 1), 'additionnés par type : 20 fois la même erreur (1 personne : le propriétaire exclu), un écran tombé', types.map((t) => ({ n: t.n, g: t.garde, ap: t.appareils.length })));
+    const rc = await MT.recevoirMesures({ corps: JSON.stringify({ v: 1, h: {}, p: evA, jeton: 'j.c.x' }), verifierJeton, pousser, maintenant: T0 + 30 * 60e3 });
+    const rd = await MT.recevoirMesures({ corps: JSON.stringify({ v: 1, h: {}, p: evA, jeton: 'j.d.x' }), verifierJeton, pousser, maintenant: T0 + 31 * 60e3 });
+    dit(rc.code === 200 && rd.code === 200 && envois.length === 1 && /3 personnes/.test(envois[0].n.title) && envois[0].proprio === JULIEN && envois[0].n.tag === 'vrm-alerte-plantages', 'la TROISIÈME personne : UNE notification « Un plantage touche 3 personnes » ; la quatrième : rien de plus (dit pour la journée)', envois[0] && envois[0].n.title);
+    const evO = [{ ecran: 'journee', message: 'Failed to fetch dynamically imported module: https://vrm.center/assets/App-abc.js', version: '8 novembre à 10:00', n: 1, garde: false, bloque: true, appareil: 'iOS Safari' }];
+    const r4a = await MT.recevoirMesures({ corps: JSON.stringify({ v: 1, h: {}, p: evO, jeton: 'j.b.x' }), verifierJeton, pousser, maintenant: T0 + 40 * 60e3 });
+    dit(r4a.code === 200 && envois.length === 1, 'une ouverture bloquée dans l’heure qui suit une notification : rangée, elle attend (une par heure au plus)', envois.length);
+    const r4 = await MT.recevoirMesures({ corps: lot([{ ...evA[0], n: 2 }]), verifierJeton, pousser, maintenant: T0 + 92 * 60e3 });
+    dit(r4.code === 200 && envois.length === 2 && /ne s’ouvre plus chez 1 personne/.test(envois[1].n.title) && envois[1].n.title.length <= 40 && envois[1].n.body.length <= 90, 'une heure après : « L’app ne s’ouvre plus chez 1 personne » (1 personne suffit : l’ouverture est bloquée)', envois[1] && envois[1].n.title + ' / ' + envois[1].n.body);
+    const tO = ligne ? Object.values(ligne.data.types).find((t) => t.bloque > 0) : null;
+    dit(tO && tO.navigateurs && tO.navigateurs['iOS Safari'] === 1, 'l’appareil est rangé en deux mots (« iOS Safari »), rien d’autre', tO && tO.navigateurs);
     dit(!/87,50|perso\.julien|aaaa/.test(JSON.stringify(envois)), 'la notification ne porte aucune donnée');
     panne = true;
     const avant = JSON.stringify(rows);
@@ -265,12 +276,13 @@ const SECRETS = {
     panne = false;
     const r6 = await MT.recevoirMesures({ corps: JSON.stringify({ v: 1, h: {}, p: evA, jeton: 'inconnu.x.y' }), verifierJeton, pousser, maintenant: T0 });
     dit(r6.code === 401, 'un jeton inconnu ne range rien', r6.code);
-    // La veille du matin dit ce qui attend.
+    // La veille du matin dit ce qui attend (un type À DIRE arrivé pendant l'heure de repos).
     const AL = await imp('api/_lib/alertes-plantages.js');
-    await MT.recevoirMesures({ corps: lot([{ ...evA[0], message: 'Une autre erreur qui attend', n: 4 }]), verifierJeton, pousser, maintenant: T0 + 70 * 60e3 });
+    await MT.recevoirMesures({ corps: lot([{ ...evO[0], message: 'Une autre erreur qui bloque l’ouverture', n: 1 }]), verifierJeton, pousser, maintenant: T0 + 100 * 60e3 });
+    await MT.recevoirMesures({ corps: lot([{ ...evA[0], message: 'Une erreur d’une seule personne', n: 4 }]), verifierJeton, pousser, maintenant: T0 + 101 * 60e3 });
     const n0 = envois.length;
-    const v = await AL.vidangerAlertesPlantages({ proprio: JULIEN, pousser: (n) => pousser(n, JULIEN), maintenant: T0 + 140 * 60e3 });
-    dit(envois.length === n0 + 1 && v.fait, 'la veille du matin dit les types en attente (une notification)', JSON.stringify(v));
+    const v = await AL.vidangerAlertesPlantages({ proprio: JULIEN, pousser: (n) => pousser(n, JULIEN), maintenant: T0 + 160 * 60e3 });
+    dit(envois.length === n0 + 1 && v.fait && /ne s’ouvre plus/.test(envois[n0].n.title), 'la veille du matin dit le type à dire qui attendait (une notification), pas l’erreur d’une seule personne', JSON.stringify(v) + ' ' + (envois[n0] && envois[n0].n.title));
     // Le panneau, au propriétaire seul, par la vraie route.
     const compte = await imp('api/compte.js');
     const faireRes = () => { const x = { code: null, corps: null }; x.status = (c) => { x.code = c; return x; }; x.json = (b) => { x.corps = b; return x; }; x.send = (b) => { x.corps = b; return x; }; x.setHeader = () => {}; x.end = () => x; return x; };
