@@ -36769,8 +36769,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [choixDeux, setChoixDeux] = useState({});
   const [feuilleDeuxComptes, setFeuilleDeuxComptes] = useState(false);
   const [fusionDeux, setFusionDeux] = useState(null);       // [idA, idB] : « C'est la même paire » ouvre la fusion existante
-  const refusDeux = useMemo(() => load(CLE_REFUS_DEUX_COMPTES, {}) || {}, [verDeux]); // eslint-disable-line react-hooks/exhaustive-deps
-  const marquesDeux = useMemo(() => marquesUtiles(load(CLE_RETRAITS_DEUX_COMPTES, {}) || {}), [verDeux]); // eslint-disable-line react-hooks/exhaustive-deps
+  // `save` part après un court délai : l'écran garde SA copie (posée au geste), relue du nuage à `onCloudReady`.
+  const [refusDeux, setRefusDeux] = useState(() => load(CLE_REFUS_DEUX_COMPTES, {}) || {});
+  const [marquesDeux, setMarquesDeux] = useState(() => marquesUtiles(load(CLE_RETRAITS_DEUX_COMPTES, {}) || {}));
+  useEffect(() => { if (verDeux) { setRefusDeux(load(CLE_REFUS_DEUX_COMPTES, {}) || {}); setMarquesDeux(marquesUtiles(load(CLE_RETRAITS_DEUX_COMPTES, {}) || {})); } }, [verDeux]);
   const infoDeuxParId = useMemo(() => {
     const m = new Map();
     for (const it of (Array.isArray(listings.items) ? listings.items : [])) {
@@ -36790,13 +36792,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const deuxComptesRegles = useMemo(() => retraitsRegles(marquesDeux, { enLigne: (id) => onlineAnnonceIds.has(String(id)), luDe: luCompletDe }), [marquesDeux, onlineAnnonceIds, luCompletDe]);
   const ouvrirRetraitDeux = React.useCallback((a, g) => {
     // SON clic ouvre l'annonce sur vinted.fr (le lien lui-même) ; on note l'heure pour dire ensuite ce que la lecture voit.
-    const m = marquesUtiles(load(CLE_RETRAITS_DEUX_COMPTES, {}) || {});
-    m[String(a.id)] = { at: Date.now(), uid: String(a.uid || ''), nom: String(a.nom || ''), numero: String((g && g.numeros && g.numeros[0]) || a.numero || '') };
-    save(CLE_RETRAITS_DEUX_COMPTES, m); setVerDeux((n) => n + 1);
+    setMarquesDeux((avant) => {
+      const m = { ...marquesUtiles(avant), [String(a.id)]: { at: Date.now(), uid: String(a.uid || ''), nom: String(a.nom || ''), numero: String((g && g.numeros && g.numeros[0]) || a.numero || '') } };
+      save(CLE_RETRAITS_DEUX_COMPTES, m);
+      return m;
+    });
   }, []);
   const refuserDeux = React.useCallback((g) => {
-    const r = { ...(load(CLE_REFUS_DEUX_COMPTES, {}) || {}), [g.id]: new Date().toISOString() };
-    save(CLE_REFUS_DEUX_COMPTES, r); setVerDeux((n) => n + 1); toast(tr('deuxComptes.pasMemeNote'));
+    setRefusDeux((avant) => { const r = { ...(avant || {}), [g.id]: new Date().toISOString() }; save(CLE_REFUS_DEUX_COMPTES, r); return r; });
+    toast(tr('deuxComptes.pasMemeNote'));
   }, []);
   const deuxComptesTexte = deuxComptes && deuxComptes.groupes.length ? texteDeuxComptes(deuxComptes.groupes, tr, texteEtDe) : null;
   // UN endroit : un groupe dit ici sort des cartes voisines (« en ligne deux fois », « photos en double »).
