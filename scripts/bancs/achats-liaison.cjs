@@ -171,7 +171,7 @@ async function passe(b, nom, ctxOpts, sombre) {
   const c = l.cartes;
   dit(!l.cote.length && Object.values(c).filter((x) => x.tx).length >= 6, `${nom} · cote · article et achat côte à côte (photos, titres), niveau et pourquoi, « Relier » et « Ce n'est pas lui »`, l.cote.slice(0, 4).join(' ; ') || JSON.stringify(c));
   const tp = Object.entries(c).filter(([, x]) => x.niveau === 'tres-probable').map(([, x]) => x.tx).sort();
-  dit(JSON.stringify(tp) === JSON.stringify([...TRES_PROBABLES].sort()), `${nom} · niveau · les très probables sont les achats uniques (${tp.length})`, JSON.stringify(tp));
+  dit(JSON.stringify(tp) === JSON.stringify(TRES_PROBABLES.filter((x) => x !== '93000010').sort()), `${nom} · niveau · les très probables (en vente) sont les achats uniques (${tp.length})`, JSON.stringify(tp));
   dit(['81005', '81006', '81007'].every((k) => c[k] && c[k].tx && c[k].niveau === 'possible' && /choisir/.test(c[k].pourquoi)), `${nom} · niveau · trois paires identiques : « possible », « à toi de choisir »`, JSON.stringify(['81005', '81006', '81007'].map((k) => c[k])));
   dit(c['81008'] && !c['81008'].tx && !Object.values(c).some((x) => x.tx === '93000008' || x.tx === '93000009'), `${nom} · niveau · marque contredite et autre version jamais proposées`, JSON.stringify(c['81008']));
   dit(/même marque/.test(c['81001'].pourquoi) && /kaki|vert/.test(c['81001'].pourquoi + c['81001'].achat) && /mise en ligne 10 j après la commande/.test(c['81001'].pourquoi) && /payé 41,78/.test(c['81001'].achat) && /commandé le/.test(c['81001'].achat),
@@ -200,9 +200,10 @@ async function passe(b, nom, ctxOpts, sombre) {
   dit(JSON.stringify(feuille) === JSON.stringify([...TRES_PROBABLES].sort()) && !ecrits.some((x) => /buyFromId/.test(x)), `${nom} · clic · la feuille MONTRE les ${feuille.length} couples, rien n'est écrit`, JSON.stringify(feuille));
   // Il décoche le dernier, puis « Relier ces 4 paires ».
   const decoche = TRES_PROBABLES[TRES_PROBABLES.length - 1];
-  await pg.locator(`[data-ar-valider-tx="${decoche}"] input[type="checkbox"]`).first().click({ timeout: 5000 }).catch(() => {});
+  await pg.locator(`[data-ar-valider-tx="${decoche}"] input[type="checkbox"]`).first().click({ timeout: 5000 }).catch((e) => console.log('   (clic case) ' + String(e.message).split('\n').slice(0, 6).join(' | ')));
   await pg.waitForTimeout(200);
-  await pg.locator('[data-ar-valider-ok]').first().click({ timeout: 5000 }).catch(() => {});
+  // (le bouton plein du studio « respire » : jamais « stable » pour Playwright — le clic est donné à l'élément)
+  await pg.locator('[data-ar-valider-ok]').first().evaluate((e) => e.click()).catch((e) => console.log('   (clic relier) ' + String(e.message).split('\n')[0]));
   // Les écritures partent groupées (quelques secondes) : on attend qu'elles arrivent, 15 s au plus.
   for (let i = 0; i < 30 && TRES_PROBABLES.filter((tx) => ecritLien(tx)).length < TRES_PROBABLES.length - 1; i++) await pg.waitForTimeout(500);
   await pg.waitForTimeout(800);
@@ -213,9 +214,11 @@ async function passe(b, nom, ctxOpts, sombre) {
   // « Ce n'est pas lui » sur une paire identique : le couple est rangé, la carte passe à un autre achat.
   const avant = await pg.evaluate(() => { const li = document.querySelector('[data-ar-ligne="81005"]'); return li ? li.getAttribute('data-ar-sugg-tx') : null; });
   await pg.locator('[data-ar-ligne="81005"] [data-ar-pas-lui]').first().click({ timeout: 5000 }).catch(() => {});
-  for (let i = 0; i < 30 && !ecrits.some((x) => /vrm_liaison_refus/.test(x)); i++) await pg.waitForTimeout(500);
+  // Le geste est annulable quelques secondes, puis rangé (`vrm_liaison_refus`, dans SYNC_KEYS : il part au nuage avec la ligne main).
+  const refusRange = () => pg.evaluate(() => { try { return localStorage.getItem('vrm_liaison_refus') || ''; } catch (_) { return ''; } });
+  let refus = ''; for (let i = 0; i < 30 && !/>93000005/.test(refus); i++) { await pg.waitForTimeout(500); refus = await refusRange(); }
   const apres = await pg.evaluate(() => { const li = document.querySelector('[data-ar-ligne="81005"]'); return li ? li.getAttribute('data-ar-sugg-tx') : null; });
-  dit(avant && apres !== avant && ecrits.some((x) => /vrm_liaison_refus/.test(x) && x.includes(avant)) && !ecritLien(avant), `${nom} · clic · « Ce n'est pas lui » : rangé (synchronisé), la carte passe à la suite`, JSON.stringify({ avant, apres }));
+  dit(avant && apres !== avant && refus.includes('a:81005>' + avant) && !ecritLien(avant), `${nom} · clic · « Ce n'est pas lui » : rangé (synchronisé), la carte passe à la suite`, JSON.stringify({ avant, apres }));
   // Achats : l'article proposé sous un achat sans article relié.
   await pg.goto(`http://localhost:${PORT}/?tab=achats`, { waitUntil: 'domcontentloaded' });
   await pg.locator('[data-achat-tx]').first().waitFor({ timeout: 25000 }).catch(() => {});

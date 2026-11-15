@@ -121,13 +121,15 @@
 
 /* La feuille « Valider les N très probables » : la liste montrée, cochée, et SON toucher. */
 .vrm-aar-feuille-aide { margin: 0 0 10px; font: 500 13px/18px var(--sb-police-texte, inherit); color: var(--sb-encre-2, #3F5468); }
-.vrm-aar-feuille { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; max-height: 56vh; overflow: auto; }
+/* La liste défile DANS la feuille ; « Relier ces N » reste toujours visible dessous (mesuré : à 1512 × 950, la
+   feuille de 6 couples sortait de l'écran et son bouton avec). */
+.vrm-aar-feuille { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; max-height: min(44vh, 360px); overflow: auto; overscroll-behavior: contain; }
 .vrm-aar-feuille-ligne { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 6px 4px; cursor: pointer; min-width: 0; }
 .vrm-aar-feuille-ligne > input { width: 22px; height: 22px; flex: none; accent-color: var(--sb-encre, #0C1D30); }
 .vrm-aar-mini { width: 40px; height: 40px; border-radius: 12px; object-fit: cover; flex: none; display: block; }
 .vrm-aar-feuille-ligne .vrm-aar-centre { min-width: 0; }
 .vrm-aar-feuille-ligne .vrm-aar-sugg-titre, .vrm-aar-feuille-ligne .vrm-aar-sous { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
-.vrm-aar-feuille-pied { display: flex; justify-content: flex-end; padding-top: 12px; }
+.vrm-aar-feuille-pied { display: flex; justify-content: flex-end; padding-top: 12px; position: sticky; bottom: 0; }
 .vrm-aar-feuille-pied .sb-btn-plein { min-height: 48px; gap: 8px; }
 
 /* Achats : l'article proposé sous un achat sans article relié — une rangée fine dans la liste. */
