@@ -44,6 +44,7 @@ const ICI = path.join(__dirname, '..', '..');
 const RACINE = process.env.BANC_RACINE ? path.resolve(process.env.BANC_RACINE) : ICI;
 const EXT = path.join(RACINE, 'vinted-sync-extension');
 const BADGE = fs.readFileSync(path.join(EXT, 'vrm-badge.js'), 'utf8');
+const VERSION = JSON.parse(fs.readFileSync(path.join(EXT, 'manifest.json'), 'utf8')).version;
 const LOGO = fs.readFileSync(path.join(ICI, 'vinted-sync-extension', 'logo-vrm-96.png'));
 const { faireFond } = require(path.join(ICI, 'scripts', '_fond-vm.cjs'));
 const SORTIE = process.env.BANC_CAPTURES ? path.join(process.env.BANC_CAPTURES, 'carte-extension') : path.join(__dirname, 'captures', 'carte-extension');
@@ -184,7 +185,7 @@ const lire = (pg) => pg.evaluate(() => {
   const L1 = await f.envoyer({ from: 'vrm-badge', action: 'carteListes', tous: true }, ONGLET);
   const liens = typeof f.ctx.liensCartePour === 'function' ? f.ctx.liensCartePour('https://www.vinted.fr/catalog', 'vinted', { id: UID }) : [];
   const AP = await apercus();
-  const etat = (apercu) => ({ ok: true, plateforme: 'vinted', capte: true, version: '5.379.0', code: '5.379.0', vrm: { ok: true, connecte: true, email: 'banc@exemple.fr', cloisonne: true },
+  const etat = (apercu) => ({ ok: true, plateforme: 'vinted', capte: true, version: VERSION, code: VERSION, vrm: { ok: true, connecte: true, email: 'banc@exemple.fr', cloisonne: true },
     site: { id: UID, nom: NOM, choix: 'oui', jauge: { h: 0, maxH: 50, j: 0, maxJ: 200, complet: true }, favoris: { apercu: { at: T0 - MIN, etat: apercu.etat, total: Number(apercu.total) || 0, raison: apercu.raison || '' }, file: null } },
     flux: { okAt: T0 - MIN }, liens, capteCoupe: false, secu: { niveau: 'ok', texte: 'Calme · 0 gestes de VRM aujourd’hui', arrete: false },
     capture: { k: 'ok', n: 0, phrase: 'Bordereaux : tous récupérés', geste: '' } });
