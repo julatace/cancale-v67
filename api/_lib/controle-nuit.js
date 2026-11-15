@@ -15,7 +15,7 @@
 import { annoncesVintedParNumero } from './double-vente.js';
 import { comptesARelire, dernieresCaptures, SELECT_CAPTURES } from './comptes-a-relire.js';
 import { PROPRIETAIRE_NEUTRE } from './proprietaire-email.js';
-import { CLE_CONTROLE, CLE_CONTROLE_INSTALLATION, numerosEnDouble, comptesPasRelus, versementsEnRetard, detailVersement, incoherencesStripe, resultatControle } from '../../src/controleNuit.js';
+import { CLE_CONTROLE, CLE_CONTROLE_INSTALLATION, numerosEnDouble, comptesPasRelus, incoherencesStripe, resultatControle } from '../../src/controleNuit.js';
 
 const objetJson = (v) => {
   if (typeof v === 'string') { try { v = JSON.parse(v); } catch (_) { return undefined; } }
@@ -29,7 +29,7 @@ const objet = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 // `ecrire(id, data)` : l'`ecrireDedup` du cron (vrai si la base a confirmé).
 export async function controleVendeur({ lireTout, ecrire, maintenant = Date.now() }) {
   const [mainL, vL, vP, vS, comptesL, panneau, etats, noirs, captures] = await Promise.all([
-    lireTout('app_data?id=eq.main&select=fiches:data->vinted_annonce_numeros,retirees:data->vrm_annonces_retirees,masques:data->vinted_accounts_hidden,aDater:data->vinted_urssaf_mois->aDater'),
+    lireTout('app_data?id=eq.main&select=fiches:data->vinted_annonce_numeros,retirees:data->vrm_annonces_retirees,masques:data->vinted_accounts_hidden'),
     lireTout('app_data?id=like.harvest_%25_listings&select=id,cap:data->>capturedAt,uid:data->uid,items:data->payload->items'),
     lireTout('app_data?id=like.harvest_%25_enligne&select=id,cap:data->>capturedAt,complet:data->complet,ids:data->ids,items:data->items'),
     lireTout('app_data?id=like.harvest_%25_supprimees&select=id,ids:data->ids'),
@@ -56,12 +56,9 @@ export async function controleVendeur({ lireTout, ecrire, maintenant = Date.now(
       valeurs['numeros-double'] = numerosEnDouble(annoncesVintedParNumero(lignesL, lignesP, supp, fiches || {}, retirees || {}, maintenant));
     }
   }
-  // 2. Ventes sans versement depuis 30 jours : le nombre publié par l'écran Ventes.
-  valeurs['versement-30j'] = m0 ? versementsEnRetard(objetJson(m0.aDater)) : null;
-  if (valeurs['versement-30j'] == null) raisons['versement-30j'] = m0 ? 'ouvre Ventes pour le compter' : 'pas lu';
-  // (14 nov., lot dates-versement) + combien sont déjà datées et pourquoi le reste attend.
+  // 2. (15 nov., extension 5.390) « Ventes sans versement depuis 30 jours » n'est plus un contrôle :
+  //    Julien ne date rien lui-même, l'extension récupère ces dates (src/controleNuit.js).
   const details = {};
-  if (valeurs['versement-30j'] != null) { const d = detailVersement(objetJson(m0.aDater)); if (d) details['versement-30j'] = d; }
   // 3. Comptes pas relus depuis 48 h : la règle de « Tout va bien ? ».
   valeurs['comptes-48h'] = null;
   if (!m0 || !Array.isArray(comptesL) || !Array.isArray(panneau) || !Array.isArray(etats) || !Array.isArray(noirs) || !Array.isArray(captures)) raisons['comptes-48h'] = 'tes comptes n’ont pas pu être lus';

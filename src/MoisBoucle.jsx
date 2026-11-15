@@ -22,7 +22,7 @@ const libelleMois = (ym) => `${NomMois(ym)} ${String(ym).slice(0, 4)}`;
 
 // Les mots de chaque ligne : le nom, ce qui s'affiche réglé, la raison d'un « — ».
 const NOMS = {
-  adater: 'Ventes à dater',
+  adater: 'Dates de versement en lecture',   // (15 nov., 5.390) l’extension les récupère : aucune porte
   prix: 'Prix d’achat à saisir',
   comptes: 'Comptes à relire',
   frais: 'Frais inconnus',
@@ -118,7 +118,8 @@ export default function MoisBoucle({ portes = {} }) {
 
 // Les portes de la liste, telles que Comptabilité les branche (l'endroit où régler chaque ligne).
 export const portesMoisBoucle = ({ onNav, ouvrirRepli }) => ({
-  adater: () => ouvrirRepli && ouvrirRepli('compta-ca'),
+  // (15 nov., extension 5.390) Plus de porte « à dater » : Julien ne date rien lui-même, l’extension
+  // récupère les dates de versement (la ligne reste dite, inerte : le mois n’est pas « prêt » d’ici là).
   prix: () => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); },
   comptes: () => onNav && onNav('vintedaccounts'),
   frais: () => onNav && onNav('cat_ventes'),

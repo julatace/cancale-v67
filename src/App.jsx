@@ -47646,7 +47646,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // « 1 sur 3 », « — ») ; l'explication longue passe en infobulle (title).
         // Aucune règle de calcul n'a changé : mêmes variables qu'avant.
         const libMois = moisNom;
-        const aDaterTitre = adVinted > 0 ? ` ${adVinted} vente${adVinted>1?'s':''} Vinted sans date de versement : ${extSait('versement')==='ok' ? `l'extension ${adVinted>1?'les':'la'} cherche à tes prochaines visites sur Vinted` : extSait('versement')==='retard' ? `mets l'extension à jour (${EXT_CAPACITES.versement}) pour ${adVinted>1?'les':'la'} récupérer` : `l'extension, ${ouExtensionIci()}, ${adVinted>1?'les':'la'} récupère`}.` : '';
+        // (15 nov., extension 5.390) Plus de geste (« mets l’extension à jour… pour les récupérer ») : l’extension récupère les dates.
+        const aDaterTitre = '';
         const auMoinsRecu = adTous > 0 || nomsVentesKO.length > 0 || !!phraseNcRecu;
         W.vendu = vuHero ? (
           <div className="vrm-day-money vrm-day-card vrm-jc" style={{border:`1px solid ${C.border}`,background:C.card}}>
@@ -47666,13 +47667,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* (2 nov., Fusion) Le bénéfice est dans la tête sombre : plus redit ici (§7). */}
             <div className="vrm-jc-rangee">
               <div className="vrm-jc-cell" data-recu-mois={recuMois==null?'':Math.round(recuMois*100)} data-recu-sans={recuSans ? nomsVentesKO.join(',') : ''} data-recu-non-comptees={recuNonComptees.length || undefined}
-                title={`Reçu en ${libMois} : tes ventes versées ce mois (date du versement).${recuSans ? ` Sans ${nomsVentesKO.join(', ')} (ventes pas lues).` : ''}${adTous > 0 ? ` ${adTous} vente${adTous>1?'s':''} finalisée${adTous>1?'s':''} sans date de versement : dans aucun mois pour l'instant.` : ''}${phraseNcRecu ? ` Comptées nulle part : ${phraseNcRecu}.` : ''}${aDaterTitre}`}>
+                title={`Reçu en ${libMois} : tes ventes versées ce mois (date du versement).${recuSans ? ` Sans ${nomsVentesKO.join(', ')} (ventes pas lues).` : ''}${adTous > 0 ? ` Des dates de versement sont en lecture par l’extension : ces ventes ne sont dans aucun mois d’ici là.` : ''}${phraseNcRecu ? ` Comptées nulle part : ${phraseNcRecu}.` : ''}${aDaterTitre}`}>
                 <div className="vrm-jc-l">{trj('journee.recu2', { libMois: libMois })}</div>
                 {/* (2 nov.) « Au moins 0 € » ne se dit jamais (§5) : un minimum nul
                     s'écrit « — », et la ligne dessous dit ce qui manque. */}
                 <div className="vrm-jc-v">{declarables === undefined ? <span className="vrm-jc-montant vrm-jc-vide">…</span> : <Montant v={auMoinsRecu && !(recuMois > 0) ? null : recuMois}/>}</div>
                 {declarables === null ? <div className="vrm-jc-sous">{tr('journee.lu')}</div>
-                  : auMoinsRecu ? <div className="vrm-jc-sous" data-recu-adater={adTous > 0 ? adTous : undefined} data-a-dater={adVinted > 0 ? adVinted : undefined}>{[recuMois > 0 ? 'au moins' : '', adTous > 0 ? `${adTous} à dater` : '', recuNonComptees.length ? `${recuNonComptees.length} non comptée${recuNonComptees.length>1?'s':''}` : '', nomsVentesKO.length && !(recuMois > 0) && !adTous && !recuNonComptees.length ? 'pas lu' : ''].filter(Boolean).join(' · ')}</div> : null}
+                  : auMoinsRecu ? <div className="vrm-jc-sous" data-recu-adater={adTous > 0 ? adTous : undefined} data-a-dater={adVinted > 0 ? adVinted : undefined}>{[recuMois > 0 ? 'au moins' : '', adTous > 0 && !(recuMois > 0) ? tr('versement.court') : '', recuNonComptees.length ? `${recuNonComptees.length} non comptée${recuNonComptees.length>1?'s':''}` : '', nomsVentesKO.length && !(recuMois > 0) && !adTous && !recuNonComptees.length ? 'pas lu' : ''].filter(Boolean).join(' · ')}</div> : null}
               </div>
               {cotisMois != null && (
                 <div className="vrm-jc-cell" data-cotis-mois={Math.round(cotisMois*100)} data-cotis-aumoins={cotisAuMoins?'1':''}

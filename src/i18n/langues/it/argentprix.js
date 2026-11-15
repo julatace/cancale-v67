@@ -132,7 +132,7 @@ export default {
   "ap.vc.article": "Articolo",
   "ap.vc.montant": "Importo",
   "ap.vc.frais": "Commissioni lette",
-  "ap.vc.aDater": "Vendite da datare · {n}",
+  "ap.vc.aDater": "Vendite senza data di versamento · {n}",
   "ap.vc.achats": "Registro degli acquisti · {n}",
   "ap.vc.coutSaisi": "Costo d’acquisto inserito: {m}",
   "ap.vc.date": "Data",

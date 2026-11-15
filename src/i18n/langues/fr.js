@@ -1853,7 +1853,7 @@ export default {
   "registres.nRecettes": {"one": "{n} recette", "other": "{n} recettes"},
   "registres.nAchats": {"one": "{n} achat", "other": "{n} achats"},
   "registres.aucune": "Aucune ligne sur la période.",
-  "registres.horsRecettes": {"one": "Dans aucun mois · à dater ({n})", "other": "Dans aucun mois · à dater ({n})"},
+  "registres.horsRecettes": {"one": "Dans aucun mois · sans date de versement ({n})", "other": "Dans aucun mois · sans date de versement ({n})"},
   "registres.horsAchats": {"one": "Sans date ({n})", "other": "Sans date ({n})"},
   "registres.loi": "Ce que dit la loi",
   "registres.aVerifier": "à vérifier",

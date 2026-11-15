@@ -21060,9 +21060,33 @@ async function capterSuivisAchats(uid) {
 //    déclare), puis LES PLUS ANCIENNES d'abord : l'URSSAF se déclare mois après mois,
 //    le plus ancien mois incomplet est celui à compléter en premier.
 // Sans date lisible : en dernier.
-const VERSEMENT_MAX_PAR_VISITE = 10;
+// ══ 5.390 (15 nov.) — TOUTE SEULE, ET AUSSI VITE QUE LE BUDGET LE PERMET ═══════
+// Julien : « Enlève les 1741 ventes à dater, cela n'a aucun sens. Le but est que
+// l'extension récupère ces infos, pas que ça soit à nous de le faire. »
+// MESURÉ (base de prod, lecture seule, 15 nov.) : son grand compte a 1 790 ventes
+// finalisées dans la liste, 58 ont leur détail 450, **1 732 n'ont JAMAIS eu leur détail
+// lu** (aucune n'est « figée à 230 » : les 21 détails à 230 de ce compte sont des ventes
+// que la liste ne dit pas finalisées) ; vendues de mai 2025 à juin 2026. Aucune source
+// en lot n'existe pour elles : relevé du porte-monnaie (`history` vide, aucun mois
+// listé), `my_orders[].date` (0 / 476 le jour de la finalisation, 30 % dans un autre
+// mois), la boîte (`description` = le titre de l'annonce), les notifications (le rappel
+// « laisser une évaluation » arrive 2 jours APRÈS la 450), la liste des commandes en
+// séquestre (adresse vue, forme jamais captée). ⇒ Le détail, vente par vente, reste la
+// seule date PROUVÉE ; ce qui la freinait : 10 par visite et 15 par heure, alors que
+// ses visites sur ce compte sont COURTES (10 lues le 15 nov. en deux minutes, puis rien).
+// Ce qui change, et SEULEMENT ça :
+//  · une visite (ou un passage de fond) lit jusqu'à 20 détails, et l'argent a TOUT le
+//    budget de lecture de l'heure (20, comme la classe 'argent' l'a toujours eu) —
+//    jamais au-dessus : `gardeLecture` compte chaque lecture, tous Chrome confondus ;
+//  · la réserve des codes de retrait, preuves et relevés reste ENTIÈRE (« pas su » ⇒
+//    réserve entière) : au-delà de la part ordinaire, rien ne prend leur place ;
+//  · L'ORDRE : la vente la plus RÉCENTE d'abord, partout (le mois en cours et le
+//    précédent se déclarent, puis l'historique en remontant) ;
+//  · une requête à la fois, pause 2–5 s, 429/403 ⇒ pause et arrêt, compte de l'onglet,
+//    « pas su » ⇒ pas daté : inchangés.
+const VERSEMENT_MAX_PAR_VISITE = 20;
 const VERSEMENT_PART_VISITE = 5;                  // la part ordinaire d'une visite (et la réserve des photos)
-const VERSEMENT_MAX_HEURE = 15;                   // DANS les 20 lectures/h, jamais en plus
+const VERSEMENT_MAX_HEURE = 20;                   // = le budget de lecture (20/h), jamais en plus
 const VERSEMENT_RETRY_MS = 24 * 60 * 60 * 1000;
 const VERSEMENT_PAUSE_MS = [2000, 5000];
 const VERSEMENT_LUS = 'vrmVersementLus';          // { [uid]: [ms, …] } — les lectures d'argent de l'heure (§4.9)
@@ -21088,18 +21112,16 @@ async function noterVersementLu(uid) {
     await chrome.storage.local.set({ [VERSEMENT_LUS]: cur });
   } catch (_) {}
 }
-// 5.376 : les 45 derniers jours (la plus récente d'abord), puis la plus ANCIENNE
-// d'abord ; sans date lisible, en dernier (ordre d'arrivée gardé).
-const VERSEMENT_RECENT_MS = 45 * 864e5;
-function ordreVersements(liste, maintenant = Date.now()) {
+// 5.390 (15 nov.) : la plus RÉCENTE d'abord, partout — le mois en cours et le précédent
+// (ceux qui se déclarent) passent les premiers, puis l'historique en remontant (5.376
+// lisait les plus ANCIENNES d'abord hors des 45 derniers jours). Sans date lisible : en
+// dernier (ordre d'arrivée gardé).
+function ordreVersements(liste) {
   const d = (o) => { const t = Date.parse((o && (o.date || o.created_at)) || ''); return Number.isFinite(t) ? t : null; };
-  const rang = (t) => (t == null ? 2 : maintenant - t <= VERSEMENT_RECENT_MS ? 0 : 1);
   return liste.map((o, i) => [o, i, d(o)]).sort((a, b) => {
-    const ra = rang(a[2]), rb = rang(b[2]);
-    if (ra !== rb) return ra - rb;
-    if (ra === 0) return (b[2] - a[2]) || (a[1] - b[1]);
-    if (ra === 1) return (a[2] - b[2]) || (a[1] - b[1]);
-    return a[1] - b[1];
+    if ((a[2] == null) !== (b[2] == null)) return a[2] == null ? 1 : -1;
+    if (a[2] == null) return a[1] - b[1];
+    return (b[2] - a[2]) || (a[1] - b[1]);
   }).map((x) => x[0]);
 }
 // 5.376 — LA DATE DU VERSEMENT DANS LA CONVERSATION D'UNE VENTE. Rend { tx, at, cid }
@@ -21308,7 +21330,10 @@ async function tickBordereaux() {
 //    grand compte n'avait pas été ouvert depuis deux jours. La même règle que l'app
 //    (`heuresPourDater`, src/versementRaisons.js). + les mois du relevé que Vinted liste
 //    sans recette apprise (`releveSansRecette`) : la carte dit le geste qui les débloque.
-const VERSEMENT_PAR_HEURE_ESTIME = 12;
+// ⚠️ 5.390 (15 nov.) — 18 PAR HEURE : l'argent a tout le budget (20) ; 2 de marge pour la
+//    réserve des codes, preuves et relevés quand ils ont à lire. La même règle que l'app
+//    (`VERSEMENTS_PAR_HEURE`, src/versementRaisons.js — audit-versements-auto les compare).
+const VERSEMENT_PAR_HEURE_ESTIME = 18;
 async function datesPourCarte(uid) {
   try {
     const d = (((await chrome.storage.local.get(LECTURES_DUES))[LECTURES_DUES] || {})[String(uid)] || {}).versement;

@@ -15,8 +15,6 @@ import React from 'react';
 import { BoutonBase } from './composants/Bouton.jsx';
 import { CLE_VEILLE, alertesAMontrer, texteAlerte } from './veilleChiffres.js';
 import { etatControle } from './controleNuit.js';
-import { tr } from './i18n/index.js';
-import { heuresPourDater } from './versementRaisons.js';   // (15 nov.) en heures de Vinted ouvert
 import { lireLigneVeille, lireControleNuit, lireControleInstallation, marquerAlerteVue } from './veilleLigne.js';
 import './styles-veille.css';
 
@@ -56,24 +54,8 @@ function CarteAlerte({ a, onVue }) {
   );
 }
 
-// (14 nov., lot dates-versement) « 1741 ventes sans date de versement depuis 30 jours » ne
-// disait ni ce qui est déjà daté, ni pourquoi le reste attend, ni quoi faire (§2.7). Quand la
-// cause est UNE (`vinted-detail` : Vinted ne donne la date qu'en ouvrant chaque vente, et
-// l'extension les lit), la ligne le dit, avec le délai estimé (src/versementRaisons.js) — ton
-// neutre : rien n'est en faute. Une autre cause, ou une ligne d'avant ce lot : la phrase d'avant.
-function texteVersement(l) {
-  const d = l.detail || {};
-  if (d.cause !== 'vinted-detail') return null;
-  const reste = Number.isInteger(d.total) ? d.total : l.n;
-  const h = heuresPourDater(reste);
-  return {
-    titre: tr('veille.versement.titre', { n: l.n }),
-    datees: Number.isInteger(d.datees) && d.datees > 0 ? tr('veille.versement.datees', { n: d.datees }) : '',
-    pourquoi: tr(d.comptes > 1 ? 'veille.versement.pourquoiN' : 'veille.versement.pourquoi1'),
-    heures: h ? tr('veille.versement.heures', { n: h }) : '',
-    geste: tr('veille.versement.geste'),
-  };
-}
+// (15 nov., extension 5.390) Le contrôle « ventes sans date de versement depuis 30 jours » est
+// retiré (src/controleNuit.js) : Julien ne date rien lui-même, l'extension récupère ces dates.
 
 export function VeilleJournee() {
   const { chiffres, vendeur, installation, relire } = useVeille();
@@ -91,21 +73,13 @@ export function VeilleJournee() {
       {ctl.etat === 'probleme' || ctl.etat === 'passu' ? (
         <div className="vrm-veille-controle" data-controle-n={ctl.lignes.length}>
           <p className="vrm-veille-sous">Contrôle de cette nuit</p>
-          {ctl.lignes.map((l) => {
-            const v = l.cle === 'versement-30j' ? texteVersement(l) : null;
-            return (
-            <div key={l.cle} className="vrm-veille-ligne" data-controle-ligne={l.cle} data-ton={l.ton} data-versement-cause={v ? 'vinted-detail' : undefined}>
+          {ctl.lignes.map((l) => (
+            <div key={l.cle} className="vrm-veille-ligne" data-controle-ligne={l.cle} data-ton={l.ton}>
               <span className="vrm-veille-n">{l.n}</span>
-              {v ? (
-                <span className="vrm-veille-txt" data-versement-texte="">{v.titre}{v.datees ? <> · <b data-versement-datees={l.detail.datees}>{v.datees}</b></> : null}
-                  <small className="vrm-veille-explique" data-versement-pourquoi="">{v.pourquoi}{v.heures ? <> <span data-versement-heures="">{v.heures}</span></> : null}</small></span>
-              ) : (
-                <span className="vrm-veille-txt">{l.phrase.replace(/^\d+\s/, '')}{l.cle === 'numeros-double' && l.ids.length ? <small> · N°{l.ids.slice(0, 4).join(', N°')}</small> : null}</span>
-              )}
-              <BoutonBase variante="secondaire" data-controle-geste={l.cle} onClick={() => aller(l.geste.aller)}>{v ? v.geste : l.geste.libelle}</BoutonBase>
+              <span className="vrm-veille-txt">{l.phrase.replace(/^\d+\s/, '')}{l.cle === 'numeros-double' && l.ids.length ? <small> · N°{l.ids.slice(0, 4).join(', N°')}</small> : null}</span>
+              <BoutonBase variante="secondaire" data-controle-geste={l.cle} onClick={() => aller(l.geste.aller)}>{l.geste.libelle}</BoutonBase>
             </div>
-            );
-          })}
+          ))}
           {ctl.passu.length ? <p className="vrm-veille-passu" data-controle-passu={ctl.passu.length}>Pas vérifié : {ctl.passu.map((p) => `${p.nom.charAt(0).toLowerCase()}${p.nom.slice(1)} (${p.raison})`).join(' · ')}.</p> : null}
         </div>
       ) : null}

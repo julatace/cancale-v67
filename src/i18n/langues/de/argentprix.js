@@ -132,7 +132,7 @@ export default {
   "ap.vc.article": "Artikel",
   "ap.vc.montant": "Betrag",
   "ap.vc.frais": "Gelesene Gebühren",
-  "ap.vc.aDater": "Zu datierende Verkäufe · {n}",
+  "ap.vc.aDater": "Verkäufe ohne Auszahlungsdatum · {n}",
   "ap.vc.achats": "Einkaufsregister · {n}",
   "ap.vc.coutSaisi": "Eingetragene Einkaufskosten: {m}",
   "ap.vc.date": "Datum",

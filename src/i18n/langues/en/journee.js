@@ -89,7 +89,7 @@ export default {
   "journee.republierPreparerAilleurs": "Relist, prepare elsewhere or change the price yourself: you choose, nothing goes out on its own",
   "journee.inventaireCours": "Inventory in progress",
   "journee.vusReprendsT": { one: "{n} number seen — pick up where you left off", other: "{n} numbers seen — pick up where you left off" },
-  "journee.listeGuideeVentes": "A guided list: sales to date, inventory, turnover, URSSAF, taxes, export",
+  "journee.listeGuideeVentes": "A guided list: payout dates, inventory, turnover, URSSAF, taxes, export",
   "journee.venteVestiaire": "Vestiaire sale",
   "journee.supprimerLeboncoin": "Delete from Leboncoin",
   "journee.supprimer": "Delete",

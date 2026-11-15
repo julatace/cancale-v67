@@ -596,7 +596,9 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
       const d = await pg.evaluate(() => { const x = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-dates-versement]'); return x ? { n: x.getAttribute('data-dates-versement'), t: x.innerText } : null; });
       dit(!!d && d.n === '1751' && /1\s?751 restantes · environ 146 h avec Vinted ouvert sur ce compte/.test(d.t) && !/jour/.test(d.t), `${scheme} ${mobile ? 390 : 1512} : « 1 751 restantes · environ 146 h avec Vinted ouvert sur ce compte »`, JSON.stringify(d));
       const r = await pg.evaluate(() => { const x = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-releve-sans-recette]'); return x ? x.innerText : null; });
-      dit(!!r && /3 mois à lire/.test(r) && /Porte-monnaie → Historique/.test(r), `${scheme} ${mobile ? 390 : 1512} : « Relevé : 3 mois à lire · ouvre Porte-monnaie → Historique »`, String(r));
+      // 5.390 (15 nov.) : plus aucun geste demandé sur la carte (« ouvre Porte-monnaie → Historique » retiré).
+      dit(r === null, `${scheme} ${mobile ? 390 : 1512} : aucune ligne « ouvre Porte-monnaie → Historique » (aucun geste demandé)`, String(r));
+      dit(!!d && /l'extension les récupère/.test(d.t), `${scheme} ${mobile ? 390 : 1512} : « Dates de versement : l’extension les récupère »`, JSON.stringify(d));
       await pg.screenshot({ path: path.join(SORTIE, `badge-dates-${mobile ? 390 : 1512}-${scheme}.png`) });
       await ctx.close();
     }

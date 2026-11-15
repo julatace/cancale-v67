@@ -86,7 +86,7 @@ export const AIDE_CHIFFRES = {
   vendu: 'Tes ventes de la période, à la date de la vente, sur tous tes sites. Les annulées et les comptes que tu as écartés ne comptent pas.',
   ventes: 'Le nombre de ces mêmes ventes (la règle de « vendu »).',
   panier: 'Le montant moyen de tes ventes des 30 derniers jours.',
-  recu: 'L’argent versé par tes sites, au jour du versement : c’est ce que tu déclares. Une vente finalisée sans date de versement n’est dans aucun mois (« à dater ») — l’extension relève ces dates quand tu ouvres Vinted.',
+  recu: 'L’argent versé par tes sites, au jour du versement : c’est ce que tu déclares. Une vente finalisée dont la date de versement n’est pas encore lue n’est dans aucun mois — l’extension récupère ces dates toute seule, onglet vinted.fr ouvert.',
   benefice: 'Tes ventes finalisées moins leurs prix d’achat, les frais, tes dépenses et l’URSSAF : le calcul de Compta.',
   brut: 'Tes ventes finalisées moins leurs prix d’achat — sans dépenses ni URSSAF.',
   declarer: 'Le chiffre d’affaires à déclarer à l’URSSAF : l’argent reçu (le calcul de Compta).',
@@ -490,7 +490,7 @@ export const valeurChiffre = (id, place, sources, sel, regles, maintenant = Date
     if (U && U.hors) return vide('hors', { hors: U.hors });
     if (!U || U.apayer == null) return vide(S.enPreparation && S.enPreparation.urssaf ? 'encours' : 'absente');
     if (U.partiel && !(U.apayer > 0)) return vide('partiel');
-    return { valeur: U.apayer, partiel: !!U.partiel, manque: U.partiel ? ['période pas finie ou ventes à dater'] : [], hors: '', p: null, raison: '', echeance: U.label || '' };
+    return { valeur: U.apayer, partiel: !!U.partiel, manque: U.partiel ? ['période pas finie ou dates de versement en lecture'] : [], hors: '', p: null, raison: '', echeance: U.label || '' };
   }
   if (id === 'dorment') {
     const pub = S.dorment;
@@ -519,6 +519,9 @@ export const RAISON_COURTE = {
   colis: 'ouvre Colis',
   // (11 nov., lot stats-plus) La valeur du stock pas encore publiée : le geste.
   annonces: 'ouvre Annonces',
+  // (15 nov., extension 5.390) Rien de daté ce mois et des dates de versement pas encore lues :
+  // l’extension les récupère — « — · dates en lecture », jamais « N ventes à dater » ni un geste.
+  'a-dater': 'dates en lecture',
 };
 // (6 nov., onglets A) Un nombre de ventes s'écrit comme les autres (« 1 772 », jamais « 1772 »).
 const nFr = (n) => Number(n).toLocaleString('fr-FR');
@@ -528,12 +531,14 @@ export const raisonCourte = (x) => {
   // un nombre de VENTES sans date de versement, jamais un montant.
   // (12 nov., revue fin) Un montant PARTIEL le dit sous son libellé (« au moins ») : sur une case, le titre
   // (survol) ne se voit pas au doigt — « Vendu · mois 30 € » se lisait complet avec une vente au prix inconnu.
-  if (x.valeur != null) return x.aDater > 0 ? `+ ${nFr(x.aDater)} vente${x.aDater > 1 ? 's' : ''} à dater` : x.partiel ? 'au moins' : '';
+  // (15 nov., extension 5.390) Julien : « Enlève les 1741 ventes à dater ». Un montant qui laisse
+  // des ventes sans date de versement est un MINIMUM : « au moins » (§5), sans compteur ni geste.
+  if (x.valeur != null) return x.aDater > 0 || x.partiel ? 'au moins' : '';
   if (x.hors) return x.hors;
   // Une case PROPRE à la page dit sa raison elle-même (Compta : « À déclarer » sans statut).
   if (x.raison === 'sansCompte') return RAISON_COURTE.sansCompte;
   if (x.def && x.def.local && x.def.raisonCourte) return x.def.raisonCourte;
-  if (x.raison === 'a-dater') return `${nFr(x.aDater)} vente${x.aDater > 1 ? 's' : ''} à dater`;
+  if (x.raison === 'a-dater') return RAISON_COURTE['a-dater'];
   if (x.raison === 'partiel') return x.manque && x.manque.length ? `sans ${x.manque[0]}` : 'pas tout lu';
   return RAISON_COURTE[x.raison] || 'pas lu';
 };

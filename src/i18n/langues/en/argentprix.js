@@ -132,7 +132,7 @@ export default {
   "ap.vc.article": "Item",
   "ap.vc.montant": "Amount",
   "ap.vc.frais": "Fees read",
-  "ap.vc.aDater": "Sales to date · {n}",
+  "ap.vc.aDater": "Sales without a payout date · {n}",
   "ap.vc.achats": "Purchase register · {n}",
   "ap.vc.coutSaisi": "Purchase cost entered: {m}",
   "ap.vc.date": "Date",
