@@ -194,7 +194,10 @@ function mesurer() {
     for (const x of textesVus) for (const t of rectsTexte(x)) {
       const vert = t.bottom > r.top + 2 && t.top < r.bottom - 2;
       const ecart = t.right <= r.left ? r.left - t.right : t.left >= r.right ? t.left - r.right : -1;
-      if (vert && ecart < 8) { out.colle.push(`${nom(x).split(' > ').pop()} « ${x.textContent.trim().slice(0, 20)} » à ${Math.round(ecart)} px`); break; }
+      // un texte VU seulement (le point au centre de sa ligne le désigne : pas caché sous autre chose, ni rogné, ni transparent)
+      const cx = (t.left + t.right) / 2, cy = (t.top + t.bottom) / 2;
+      const vu = cx >= 0 && cy >= 0 && cx < innerWidth && cy < innerHeight && (() => { const h = document.elementFromPoint(cx, cy); return h && (h === x || x.contains(h)); })();
+      if (vert && ecart < 8 && vu) { out.colle.push(`${nom(x).split(' > ').pop()} « ${x.textContent.trim().slice(0, 20)} » à ${Math.round(ecart)} px`); break; }
     }
   }
   // V8 — un texte coupé au milieu d'un mot (points de suspension) hors d'une rangée de liste (un titre d'article dans une
