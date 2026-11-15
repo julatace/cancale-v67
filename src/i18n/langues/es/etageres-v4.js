@@ -43,7 +43,7 @@ export default {
   "etag4.loinSansPhoto": "De lejos, la etiqueta se lee sin foto.",
   "etag4.meuble": "El mueble",
   "etag4.ordre": "Orden en la habitación",
-  "etag4.ordreAide": "cámbialo en «Personalizar»",
+  "etag4.ordreAide": "con «Personalizar»",
   "etag4.personnaliser": "Personalizar",
   "etag4.personnaliserNom": "Personalizar {nom}",
   "etag4.piece": "La habitación",

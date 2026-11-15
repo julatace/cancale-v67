@@ -43,7 +43,7 @@ export default {
   "etag4.loinSansPhoto": "Von weitem liest sich das Etikett ohne Foto.",
   "etag4.meuble": "Das Möbel",
   "etag4.ordre": "Reihenfolge im Raum",
-  "etag4.ordreAide": "ändere sie unter „Anpassen“",
+  "etag4.ordreAide": "über „Anpassen“",
   "etag4.personnaliser": "Anpassen",
   "etag4.personnaliserNom": "{nom} anpassen",
   "etag4.piece": "Der Raum",

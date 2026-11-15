@@ -718,11 +718,12 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         {inf.plats.map((x) => <MarquePlateforme key={x.plat} site={x.plat} taille={taille} carre className="vrm-etag-site" style={x.etat === 'enligne' ? undefined : { opacity: .45 }} />)}
       </span> : null);
   const ligneEti = (occ, inf, et, sold, hors, dbl, cls) => {
-    const l = ligneEtiquette({ etat: sold ? 'vendue' : '', double: dbl, compte: inf.pseudos[0] ? inf.pseudos[0] + (inf.pseudos.length > 1 ? ' +' + (inf.pseudos.length - 1) : '') : '', horsLigne: hors || !inf.plats.length, taille: inf.taille, prix: inf.prix }, et);
+    // Le compte : le premier (celui où la paire est en ligne), comme la maquette ; tous dans l'aide (title) et la fiche.
+    const l = ligneEtiquette({ etat: sold ? 'vendue' : '', double: dbl, compte: inf.pseudos[0] || '', horsLigne: hors || !inf.plats.length, taille: inf.taille, prix: inf.prix }, et);
     if (l.sorte === 'sortir') return <span className={cls + ' is-sortir'} data-case-ligne="sortir">{tr('etag4.aSortir')}</span>;
     if (l.sorte === 'double') return <span className={cls + ' is-double'} data-case-ligne="double">{tr('etag4.enDouble')}</span>;
     if (!l.bits.length) return null;
-    return <span className={cls + ' vrm-etag-compte'} data-case-ligne="texte">{l.bits.map((b) => (typeof b === 'string' ? b : b.horsLigne ? tr('etag4.horsLigne') : monnaie(b.prix))).join(' · ')}</span>;
+    return <span className={cls + ' vrm-etag-compte'} data-case-ligne="texte" title={inf.pseudos.length > 1 ? inf.pseudos.join(' · ') : undefined}>{l.bits.map((b) => (typeof b === 'string' ? b : b.horsLigne ? tr('etag4.horsLigne') : monnaie(b.prix, 'EUR', Number.isInteger(Number(b.prix)) ? { maximumFractionDigits: 0, minimumFractionDigits: 0 } : undefined))).join(' · ')}</span>;
   };
   const photoMini = (occ, t) => (occ.photo
     ? <span className="vrm-ph4" style={{ width: t, height: t }}>{etatHl ? <PhotoStockHl src={occ.photo} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <PhotoVinted src={occ.photo} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onLoad={() => retenirPhoto(occ.photo)} />}</span>
@@ -925,7 +926,9 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           ecrireMeubles(u); ecrireSlots(us, u, [modal.id]);
         } else {
           const ordre = meubles.reduce((mx, x) => Math.max(mx, Number.isFinite(Number(x && x.ordre)) && x.ordre !== null ? Number(x.ordre) : -1), meubles.length - 1) + 1;
-          ecrireMeubles([...meubles, { id: 'm' + Date.now().toString(36), name: nom, cols, rows, planches, gravite, ...plus, ordre }]);
+          const idNeuf = 'm' + Date.now().toString(36);
+          ecrireMeubles([...meubles, { id: idNeuf, name: nom, cols, rows, planches, gravite, ...plus, ordre }]);
+          choisirMeuble(idNeuf);   // (15 nov., v4) le meuble neuf vient sous les yeux (au centre, à l'ordinateur)
         }
         fermerModal();
       }} onDelete={modal.id ? async () => {

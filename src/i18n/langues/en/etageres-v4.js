@@ -43,7 +43,7 @@ export default {
   "etag4.loinSansPhoto": "From afar, the label reads without a photo.",
   "etag4.meuble": "The unit",
   "etag4.ordre": "Order in the room",
-  "etag4.ordreAide": "change it in “Customise”",
+  "etag4.ordreAide": "via “Customise”",
   "etag4.personnaliser": "Customise",
   "etag4.personnaliserNom": "Customise {nom}",
   "etag4.piece": "The room",
