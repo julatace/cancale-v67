@@ -228,6 +228,8 @@ async function retirerCase(pg, n) {
         const fichesApres = await pg.evaluate(() => { try { const f = JSON.parse(localStorage.getItem('vinted_annonce_numeros')); return Object.values(f).filter((x) => x && x.numero).length; } catch (_) { return -1; } });
         dit(fichesApres === N + 1, `${t} · E : aucun N° touché (1 001 fiches, mêmes numéros)`, fichesApres);
         if (CAPT) { await pg.evaluate((P) => document.querySelector(`[data-meuble="${P}"]`).scrollIntoView({ block: 'center' }), P); await pg.screenshot({ path: path.join(CAPT, `etag-${v}-5-descente.png`) }); }
+        const fondu = await pg.evaluate(() => { const l = [...document.querySelectorAll('.vrm-s2d-case img')].filter((x) => x.complete && x.naturalWidth > 0); return { n: l.length, invisibles: l.filter((x) => Number(getComputedStyle(x).opacity) < 0.9).length }; });
+        dit(fondu.n > 0 && fondu.invisibles === 0, `${t} · V2 : après les gestes, les photos des cases restent VISIBLES (aucune recréée à chaque rendu)`, fondu);
         // ── G : chercher un N°, réordonner ──
         await pg.fill('[data-stock-recherche] input', '12');
         await pg.waitForSelector('[data-stock-res="12"]', { timeout: 8000 }).catch(() => {});

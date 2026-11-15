@@ -603,6 +603,10 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   // (5 nov.) Le N° en bas à gauche, lisible sur toute photo (pastille encre) ;
   // « Vendue » en haut, à l'accent — jamais rouge (§7 : rien d'irréversible).
   // (5 nov.) Rangée mais plus une annonce actuelle : « Plus en ligne », à l'ambre.
+  // ⚠️ (15 nov., étagères) APPELÉE comme une fonction (`{Vignette({ … })}`), jamais `<Vignette/>` : déclarée dans le
+  //    rendu, elle était un composant NEUF à chaque rendu — React recréait chaque photo, dont le fondu d'arrivée
+  //    (`img[loading=lazy]`, index.html) repartait de l'opacité 0 : à l'ordinateur, les photos des cases restaient
+  //    invisibles (mesuré : 35 sur 35 à 0, fondu « en cours »), et 1 000 photos recréées à chaque geste.
   const Vignette = ({ f, sold, hors = false, mini = false }) => (
     <>
       {/* (13 nov., point 45) Sans réseau : la photo gardée par le service worker (déjà vue), sinon l'initiale.
@@ -699,7 +703,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
                 data-case-num={kOcc || undefined} data-case-notee={notee || undefined} data-case-double={dbl ? '' : undefined} data-couleur={cc.couleur || undefined} data-couleur-propre={cc.propre ? '' : undefined} data-case-vise={vise ? '' : undefined} data-case-choisie={estChoisie ? '' : undefined} aria-current={estChoisie ? 'location' : undefined} data-cible={attrCible(['case', m.id, i])} data-case-etat={etat} data-case-ici={m.id + ':' + i} data-tombe={kOcc && tombes[kOcc] ? tombes[kOcc] : undefined} className={classes}
                 {...(occ ? dragProps(kOcc) : {})} {...dropProps(m.id, i)}
                 style={kOcc && tombes[kOcc] ? { '--vrm-tombe': `calc(${-tombes[kOcc]} * (100% + ${gap}px))` } : undefined}>
-                {occ ? <Vignette f={occ} sold={sold} hors={hors} /> : (notee ? <span className="vrm-s2d-num vrm-etag-notee" aria-hidden="true">N°{notee}</span> : <span className="vrm-s2d-plus" aria-hidden="true">+</span>)}
+                {occ ? Vignette({ f: occ, sold: sold, hors: hors }) : (notee ? <span className="vrm-s2d-num vrm-etag-notee" aria-hidden="true">N°{notee}</span> : <span className="vrm-s2d-plus" aria-hidden="true">+</span>)}
               </button>
               {pl.colonne === m.cols && pl.rangee < m.rows && (() => {
                 const ks = Array.from({ length: m.cols }, (_, c) => casesPl.has(pl.rangee + ':' + (c + 1)));
@@ -772,7 +776,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         {aRanger.length ? <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: '52vh', overflowY: 'auto' }}>
           {aRanger.map((f) => (
             <button type="button" key={f.id} onClick={() => { poser(cleDeFiche(f), modal.m, modal.i); fermerModal(); }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 8px', borderRadius: 12, border: 'none', background: 'transparent', color: C.text, cursor: 'pointer', textAlign: 'left', width: '100%' }}>
-              <span style={{ position: 'relative', width: 46, height: 46, borderRadius: 12, overflow: 'hidden', flex: 'none', background: C.card2 }}><Vignette f={f} sold={estVendu(f)} /></span>
+              <span style={{ position: 'relative', width: 46, height: 46, borderRadius: 12, overflow: 'hidden', flex: 'none', background: C.card2 }}>{Vignette({ f: f, sold: estVendu(f) })}</span>
               <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.title || '—'}</span>
               <span style={{ fontWeight: 700, color: estVendu(f) ? C.accent : C.muted }}>N°{f.numero}</span>
             </button>
@@ -785,7 +789,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       const hors = !sold && rangeeEtat(f) === 'plusenligne';
       corps = (<>
         <div data-stock-fiche-tete="" style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 10 }}>
-          <span style={{ position: 'relative', width: 72, height: 72, borderRadius: 12, overflow: 'hidden', flex: 'none', background: C.card2 }}><Vignette f={f} sold={sold} hors={hors} /></span>
+          <span style={{ position: 'relative', width: 72, height: 72, borderRadius: 12, overflow: 'hidden', flex: 'none', background: C.card2 }}>{Vignette({ f: f, sold: sold, hors: hors })}</span>
           <div><div style={{ fontSize: 17, fontWeight: 700, color: C.text, lineHeight: 1.25 }}>{f.title || '—'}</div><div data-fiche-statut={sold ? 'vendue' : (hors ? 'plusenligne' : (f.actuelle ? 'actuelle' : (rangeeEtat(f) === 'arrivee' ? 'arrivee' : (f.retour ? 'retour' : 'autre'))))} style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>{sold ? tr('stock.venduSortirStock') : (hors ? tr('stock.plusLignePlus') : (!f.actuelle && rangeeEtat(f) === 'arrivee' ? tr('ranger.stock.arrivee') : f.actuelle ? `En ligne${(f.plateformes || []).length ? ' sur ' + f.plateformes.map((x) => NOM_PLAT_FILTRE[x] || x).join(' et ') : ''}` : (f.retour ? libelleRetour(f.retour) : tr('stock.stock'))))} · N°{f.numero}</div></div>
         </div>
         <div style={{ textAlign: 'center', background: C.card2, border: `1px solid ${sold ? C.accent : C.line}`, borderRadius: 14, padding: 14, margin: '12px 0' }}>
@@ -968,7 +972,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   // ── Vendues à sortir · Plus en ligne : rangées, plus des annonces actuelles ──
   const ligneRangee = (f, gestes, sous = null) => { const ou = ouEst(f); const sold = estVendu(f); return (
     <div key={f.id} {...serieStock.ligne(cleDeFiche(f))} className="vrm-s2d-liste-ligne" data-stock-rangee={cleDeFiche(f)} style={{ flexWrap: 'wrap' }}>
-      <span className="vrm-s2d-vig"><CaseSerie serie={serieStock} cle={cleDeFiche(f)} etiquette={'N°' + f.numero} surPhoto/><Vignette f={f} sold={sold} hors={!sold && rangeeEtat(f) === 'plusenligne'} mini /></span>
+      <span className="vrm-s2d-vig"><CaseSerie serie={serieStock} cle={cleDeFiche(f)} etiquette={'N°' + f.numero} surPhoto/>{Vignette({ f: f, sold: sold, hors: !sold && rangeeEtat(f) === 'plusenligne', mini: true })}</span>
       <span className="vrm-s2d-txt"><span className="vrm-s2d-txt-t"><b>N°{f.numero}</b> · {f.title || '—'}</span>
         {sous ? <span className="vrm-s2d-txt-s" data-stock-retour-libelle="">{sous}</span> : null}
         <span className="vrm-s2d-txt-s">{ou ? <><b>{ou.meuble.name}</b> {tr('stock.rangee4')} {ou.rangee}{tr('stock.colonne')} {ou.colonne}</> : (f.retour && !slots[cleDeFiche(f)] ? 'pas encore rangé — à mettre dans une case' : tr('stock.caseIntrouvable'))}</span></span>
@@ -1036,7 +1040,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           const ou = fOu ? ouEst(fOu) : null;
           return (
             <div key={a.ids[0]} className="vrm-s2d-liste-ligne vrm-ms-rangee vrm-at-entree" style={{ '--i': i }} data-stock-annonce={a.cle || 'sans:' + a.ids[0]} data-stock-annonce-etat={a.etat} data-stock-annonce-plats={a.plateformes.join(',')} data-stock-annonce-place={ou ? `${ou.meuble.name}|${ou.rangee}|${ou.colonne}` : (a.cle ? 'non-range' : 'sans-numero')}>
-              <span className="vrm-s2d-vig"><Vignette f={{ numero: a.numero || '—', title: a.titre, photo: a.photo }} sold={false} mini /></span>
+              <span className="vrm-s2d-vig">{Vignette({ f: { numero: a.numero || '—', title: a.titre, photo: a.photo }, sold: false, mini: true })}</span>
               <span className="vrm-s2d-txt">
                 <span className="vrm-s2d-txt-t">{a.cle ? <b className="vrm-ms-num">N°{a.numero}</b> : null}<span className="vrm-ms-titre">{a.titre || '—'}</span></span>
                 {/* UNE sous-ligne en texte (1 000 rangées : le moins de nœuds possible) : sites · comptes · état · aussi · où. */}
@@ -1071,7 +1075,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   })();
   const ligneAPart = (a, sous) => (
     <div key={a.ids ? a.ids[0] : a.id} className="vrm-s2d-liste-ligne" data-stock-a-part={a.cle || cleNum(a.numero) || 'sans'}>
-      <span className="vrm-s2d-vig"><Vignette f={{ numero: a.numero || '—', title: a.titre, photo: a.photo }} sold={false} mini /></span>
+      <span className="vrm-s2d-vig">{Vignette({ f: { numero: a.numero || '—', title: a.titre, photo: a.photo }, sold: false, mini: true })}</span>
       <span className="vrm-s2d-txt"><span className="vrm-s2d-txt-t">{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre || '—'}</span><span className="vrm-s2d-txt-s">{sous}</span></span>
     </div>);
   const repliAPart = (cle, titre, liste, rendu, pied = null) => (liste.length ? (
@@ -1226,7 +1230,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
               return (
                 <button type="button" key={f.id} data-stock-res={cleDeFiche(f)} onClick={() => { if (ou) montrer(f); else setModal({ type: 'fiche', cle: cleDeFiche(f) }); }}
                   style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 12px', width: '100%', minHeight: 64, border: 'none', borderBottom: `1px solid ${C.line}`, background: 'transparent', color: C.text, cursor: 'pointer', textAlign: 'left' }}>
-                  <span style={{ position: 'relative', width: 48, height: 48, borderRadius: 12, overflow: 'hidden', flex: 'none', background: C.card2 }}><Vignette f={f} sold={sold} /></span>
+                  <span style={{ position: 'relative', width: 48, height: 48, borderRadius: 12, overflow: 'hidden', flex: 'none', background: C.card2 }}>{Vignette({ f: f, sold: sold })}</span>
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ display: 'block', fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><b>N°{f.numero}</b> · {f.title || '—'}</span>
                     <span data-stock-ou={ou ? `${ou.meuble.name}|${ou.rangee}|${ou.colonne}` : 'non-range'} style={{ display: 'block', fontSize: 13, marginTop: 2, color: ou ? C.text : C.muted, fontWeight: ou ? 700 : 500 }}>
@@ -1329,7 +1333,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           {aRanger.slice(0, BANDE_MAX).map((f) => { const sold = estVendu(f); const sel = place === cleDeFiche(f);
             return (
               <button type="button" key={f.id} data-a-ranger={cleDeFiche(f)} data-paire-a-ranger={String(f.numero)} data-paire-plateformes={(f.plateformes || []).join(',')} data-paire-aussi={(f.aussi || []).join(',')} {...dragProps(cleDeFiche(f))} onClick={() => setPlace(sel ? null : cleDeFiche(f))} aria-pressed={sel} aria-label={`Ranger l’article N°${f.numero}${(f.aussi || []).length ? ' (aussi N°' + f.aussi.join(', N°') + ')' : ''}${f.title ? ' · ' + f.title : ''}${(f.plateformes || []).length && !f.plateformes.includes('vinted') ? ' · seulement sur ' + f.plateformes.map((x) => NOM_PLAT_STOCK[x] || x).join(' et ') : ''}${sold ? ' (vendue)' : ''}`} style={{ position: 'relative', flex: 'none', width: 70, height: 88, borderRadius: 12, overflow: 'hidden', cursor: 'pointer', padding: 0, background: C.card2, border: sel ? `2px solid ${C.accent}` : (sold ? `2px solid ${C.accent}` : `1px solid ${C.border}`), opacity: filtre && !correspond(f) ? 0.3 : 1 }}>
-                <Vignette f={f} sold={sold} />
+                {Vignette({ f: f, sold: sold })}
                 {/* (5 nov.) Une paire vue seulement sur eBay ou Leboncoin le dit ; une
                     même paire sous deux N° (même photo) dit l'autre N° (`unParArticle`). */}
                 {(f.plateformes || []).length && !f.plateformes.includes('vinted') ? <span className="vrm-s2d-plat">{f.plateformes.map((x) => NOM_PLAT_STOCK[x] || x).join(' · ')}</span> : null}
