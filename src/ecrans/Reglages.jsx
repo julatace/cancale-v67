@@ -2150,7 +2150,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     ], pied: <button type="button" className="vrm-lien-action vrm-set-lien" data-reglage-organisation="" onClick={()=>setTab('organisation')}>{tr('ecran.organisation')}<Icon name="chevron" size={13}/></button>},
     // (3 nov.) Les textes types insérés en un tap dans une description.
     { id:'annonces-reglages', titre:tr('reglages.groupe.annonces-reglages'), items:[
-      { id:'modeles', type:'panneau', nu:true, ic:'pencil', lib:tr('reglages.modeles.lib'), desc:tr('reglages.modeles.desc'), val:String(lireModelesRanges().length || ''), data:{ 'data-reglage-modeles':'' }, el:<ModelesSetting/> },
+      { id:'modeles', type:'panneau', nu:true, ic:'gabarit', lib:tr('reglages.modeles.lib'), desc:tr('reglages.modeles.desc'), val:String(lireModelesRanges().length || ''), data:{ 'data-reglage-modeles':'' }, el:<ModelesSetting/> },
     ]},
     { id:'impression', titre:tr('reglages.groupe.impression'), items:[
       { id:'imprimante', type:'panneau', nu:true, ic:'printer', lib:tr('reglages.imprimante.lib'), desc:tr('reglages.imprimante.desc'), val: imprimanteChoisie() === 'thermique' ? tr('reglages.imprimante.thermique', { papier: nomPapier(papierThermique(reglageImpression(load(CLE_IMPRESSION, null)))) }) : tr('reglages.imprimante.normale'), el:<ImprimanteSetting nu/> },

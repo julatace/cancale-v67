@@ -145,10 +145,58 @@ joignable) parcourt maintenant les dix catégories au lieu des trois vues.
 Audits mis à la nouvelle forme (même règle) : `audit-coque-parametres` (bloc « Mon compte »),
 `audit-centre-aide` (liste fermée = `REGLAGES_AIDE` + `LIENS_PROFONDS`), `audit-onglets-d` (C1, C3, C4).
 
-## 5. Preuves
+## 5. Preuves (15 nov., machine très chargée : charge 30–60 sur 4 cœurs, bancs un à la fois)
 
-RÉSULTATS — voir §6 (rempli après les bancs).
+**Audits** (tous verts) : `audit-parametres` 19/19 (+ `--prouve` : 5/5 mutations rougissent),
+`audit-coque-parametres` 32/32 (**le rouge connu « une icône par ligne » est corrigé** : 9 doublons
+d'icônes d'avant + 7 entre « Mon compte » et le reste, dix dessins neufs dans `ICON_PATHS` : revoir,
+ampoule, pave, invite, arobase, journal, confidentiel, ecrans, clavier, compteMoins, balance, gabarit),
+`audit-traduction` 45/45, `audit-tdz`, `audit-variables`, `audit-studio`, `audit-csp`, `audit-composants`,
+`audit-icones`, `audit-centre-aide` 27/27 (10/10 mutations), `audit-onglets-d` 47/47, `audit-quoi-de-neuf`.
 
-## 6. Résultats
+**Banc `parametres-refonte.cjs`** (390 tactile et 1512, clair et sombre) : **292 ✅ · 0 ❌**.
+- S : 390 = dix catégories, aucune rangée de réglage sur le premier écran, la dernière catégorie finit
+  à 961 px (≤ 1,25 écran ; 58 px par catégorie) ; 1512 = sommaire (10) + dix catégories dépliées ;
+- C : 10 catégories ouvertes au doigt, **54 panneaux** ouverts un par un, « ‹ » revient à la catégorie,
+  « ‹ Paramètres » au premier écran ; D / V / T : aucun débordement, aucun chevauchement, cibles ≥ 44 px ;
+- L : **45/45 liens profonds** (35 `reglage=`, 10 `section=`) ouvrent le bon réglage ;
+- R : **13/13 mots de vendeur** trouvent leur réglage (papier, URSSAF, numéro, mot de passe, supprimer
+  mon compte, double vérification, facture, vacances, langue, sombre, notification, extension,
+  sauvegarde), le toucher l'ouvre, « ‹ » revient aux résultats, un mot sans réponse le dit ;
+- A : « Tout va bien ? Pas tout à fait » en tête (base du banc : extension 5.375 < attendue), un geste,
+  qui ouvre « Tout va bien ? ».
+- **Rouge sur origin/main** (même banc, build d'avant) : 2/22 — structure (pas de catégories, 12
+  rangées sur le premier écran), alerte absente, et la recherche ne trouve ni « mot de passe », ni
+  « supprimer mon compte », ni « double vérification », ni « facture ». **Mutation** (`MUTATION=1` :
+  « mot de passe » introuvable) : rouge.
 
-(voir ci-dessous)
+**Bancs Réglages d'avant**, sur le build final, comparés au même banc sur origin/main :
+
+| banc | origin/main | après |
+|---|---|---|
+| `refonte-plateformes-reglages` (ECRANS=reglages ; R = chaque réglage d'avant joignable, parcouru catégorie par catégorie) | — | ✓ VERT, 0 manque, 4 rendus |
+| `reglages-premium` (adapté : catégorie par catégorie au téléphone) | — | 515 ✅ · 10 ❌ (voir ci-dessous) |
+| `detourage-reglage` | 25 ✅ · 0 ❌ (3 ❌ au 1er passage : l'écran pas encore rendu en 4 s) | 25 ✅ · 0 ❌ deux fois (il attend maintenant que Paramètres soit rendu au lieu de 4 s fixes) |
+| `coque-parametres` | 92 ✅ · 21 ❌ | 94 ✅ · 19 ❌ — les rouges qui restent sont ceux d'avant : H4 « Plus » / colonne, H6 « Ranger », Discord compté deux fois par `ConnexionsCompte` (le même composant), « E-mails » (le libellé de la rangée `adresses`, d'avant) ; « Prénom = Mes modèles » (même crayon) corrigé après ce passage (`gabarit`) |
+| `parametres-guides` | 9 ✅ · 1 ❌ | 9 ✅ · 1 ❌ — le même rouge d'avant : le banc lit `vrm_imprimante` en JSON, l'app le range en texte |
+
+`reglages-premium` · les 10 rouges : 6 interrupteurs DANS des panneaux d'avant (Ma journée, Ce que le
+stream cache, Notifications du téléphone) recouverts par la barre du bas après `scrollIntoView` ;
+« SMS de colis » dont le titre est écrit deux fois (le panneau porte son propre titre) ; 1512 : un clic
+d'interrupteur qui attend « stable » plus de 4 s sous la charge (mesuré : la position ne bouge pas).
+Aucun ne vient du rangement ; à reprendre avec la machine moins chargée.
+
+Captures : `docs/design/avant-apres/parametres-avant.png` (l'onglet Réglages d'avant, 4 premiers
+écrans sur 6), `parametres-apres.png`, `parametres-apres-sombre.png`, `parametres-apres-mon-compte.png`,
+`parametres-apres-1512.png`. Le banc range les siennes dans `SHOTS` (par défaut `/tmp/banc-parametres`).
+
+## 6. Pour la suite
+
+- **« Verre dépoli »** (décision de Julien, autre chantier, `src/design/studio-verre.css`) :
+  `studio-parametres.css` ne lit que des jetons `--sb-*` (aucune couleur codée), et les listes neuves
+  n'ont aucun fond en ligne — la couche verre s'y applique sans conflit.
+- Chantiers parallèles (« Qui numérote ? », partenaires, retours, notifications) : ajouter l'`id` de la
+  rangée dans le bon groupe de `CATEGORIES` ; oubliée, le filet la range dans la catégorie de son groupe.
+- Le centre d'aide public (`scripts/aide-contenu.cjs`) dit encore « Réglages → Mon abonnement » :
+  à régénérer avec les nouveaux chemins (les fiches de l'app sont à jour, `src/aideFiches.js`).
+- Pas de PR ouverte (consigne). Geste de Julien : aucun ; regarder Paramètres sur l'iPhone et dire.

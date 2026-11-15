@@ -70,7 +70,9 @@ async function rendre(nav, largeur, vue = '') {
   const erreurs = [];
   pg.on('pageerror', (e) => erreurs.push(String(e).slice(0, 140)));
   await pg.goto(`http://localhost:${PORT}/?tab=settings${vue ? '&vue=' + vue : ''}`, { waitUntil: 'domcontentloaded' });
-  await pg.waitForTimeout(4000);
+  // (15 nov.) Pas un délai fixe seul (§6.5) : on attend que Paramètres soit RENDU (ses catégories), 20 s au plus — sous charge, 4 s ne suffisaient pas.
+  await pg.waitForFunction(() => !!document.querySelector('.vrm-set [data-categorie-ouvrir], .vrm-set [data-categorie-ecran], [data-onglets-reglages]'), null, { timeout: 20000 }).catch(() => {});
+  await pg.waitForTimeout(1500);
   const r = await pg.evaluate(() => ({
     cartes: document.querySelectorAll('[data-detourage-etat],[data-detourage-choix],[data-detourage-mode]').length,
     texte: document.body.innerText,
