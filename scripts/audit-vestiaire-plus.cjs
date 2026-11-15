@@ -94,6 +94,16 @@ const etats = (p) => p.etapes.map((x) => x.etat).join(',');
   dit(p1.argent.etat === 'estime' && p1.argent.texte === MES.paiementEstime && !p1.argent.mois, 'V4 · paiement ESTIMÉ par Vestiaire ⇒ dit tel quel, dans AUCUN mois du CA', p1.argent);
   const fr = P.friseParcoursVc(pp, { envoye: 'E' });
   dit(Array.isArray(fr) && fr.length === 5 && fr.every((x) => x.fait) && fr[4].derniere === true, 'V4 · la frise existante reçoit les 5 étapes (la dernière faite marquée)', fr);
+  // (15 nov., rouges-connus) L'ENVOI DIRECT mesuré (docs/passation/2026-11-15-vestiaire-ventes.md : `sellerShipment: done`,
+  // `sellerDelivery: ongoing`, `statutVc: deliveryInProgress`) : le parcours suit les étapes LUES — jamais « arrivé chez
+  // Vestiaire » ni « authentification » pour un colis qui va droit à l'acheteur.
+  const DIR = { etat: 'IN_PROGRESS', statutVc: 'deliveryInProgress', aExpedier: true, etapesVc: { sellerSale: 'done', sellerShipment: 'done', sellerConformity: 'upcoming', sellerDelivery: 'ongoing', sellerPayment: 'upcoming' }, paiementEstime: 'Paiement estimé 23 novembre' };
+  const pd = P.parcoursVenteVc(DIR);
+  const cles = (p) => p.etapes.map((x) => x.cle).join(',');
+  dit(pd.direct === true && cles(pd) === 'envoye,livraison,verdict,paye' && etats(pd) === 'fait,encours,avenir,avenir', 'V5 · envoi DIRECT (livraison à l’acheteur en cours, contrôle pas commencé) ⇒ envoyé · livraison EN COURS · validé · payé — ni « arrivé chez Vestiaire » ni « authentification »', [cles(pd), etats(pd)]);
+  const pd2 = P.parcoursVenteVc({ ...DIR, statutVc: '', etapesVc: { ...DIR.etapesVc } });
+  dit(pd2.direct === true && pd2.etapes[1].etat === 'encours', 'V5 · la frise seule (`sellerDelivery: ongoing`) suffit, sans le statut', [cles(pd2), etats(pd2)]);
+  dit(!P.parcoursVenteVc(MES).direct && !P.parcoursVenteVc(ctl).direct, 'V5 · une vente à envoyer, ou au contrôle chez Vestiaire, garde le parcours par Vestiaire', [cles(P.parcoursVenteVc(MES)), cles(P.parcoursVenteVc(ctl))]);
 
   const f1 = Ph.photosExigeesVc({ famille: 'chaussures', nPhotos: 2, etiquette: 'pas-choisie', photoroom: true });
   dit(f1.manque.includes('etiquette2') && f1.manque.includes('nombre') && f1.liste === 'faq', 'F1 · chaussures, 2 photos, étiquette pas choisie ⇒ manquent : l’étiquette en 2ᵉ, le nombre (au moins 4)', f1.manque);
