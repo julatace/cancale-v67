@@ -139,6 +139,7 @@ const capture = async (pg, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, { rec
     const aDater = { n: 1741, plus30: { n: 1741, ca: 1 }, datees: { n: 356, releve: 0 }, raisons: [{ cle: 'vinted-detail', n: 1741, ca: 1, comptes: [{ uid: '111', nom: 'atelier_test', n: 1741 }] }] };
     return { id: C.CLE_CONTROLE, data: C.resultatControle({ 'numeros-double': [], 'versement-30j': C.versementsEnRetard(aDater), 'comptes-48h': [] }, {}, auj - 2 * 3600e3, { 'versement-30j': C.detailVersement(aDater) }) };
   };
+  const document_a_dater = (t) => /à dater|ventes sans versement|Voir le détail/.test(String(t || ''));
   let b;
   try {
     b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
@@ -180,7 +181,9 @@ const capture = async (pg, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, { rec
           dit(L['numeros-double'] && L['numeros-double'].ton === 'rouge' && L['numeros-double'].couleur === s.rouge && /N°12/.test(L['numeros-double'].texte), 'B2 deux paires sous le N°12 : en ROUGE, le N° nommé', L['numeros-double'] && JSON.stringify([L['numeros-double'].couleur, L['numeros-double'].texte]));
           dit(L['comptes-48h'] && L['comptes-48h'].ton === 'geste' && L['comptes-48h'].n === '1' && L['comptes-48h'].couleur === s.ambre, 'B3 un compte pas relu depuis 48 h : ambre, « 1 »', L['comptes-48h'] && JSON.stringify(L['comptes-48h']));
           dit(L['emails-quarantaine'] && L['emails-quarantaine'].n === '1', 'B4 la quarantaine (ligne de l’installation) est dite à qui la lit', JSON.stringify(Object.keys(L)));
-          dit(s && s.passu && /ventes sans versement \(ouvre Ventes pour le compter\)/.test(s.texte) && !L['versement-30j'], 'B5 le contrôle pas lu est dit à part avec sa raison, jamais compté 0', s && s.texte.slice(-160));
+          // (15 nov., extension 5.390) « Ventes sans versement » n'est plus un contrôle (Julien ne date rien lui-même) :
+          // même une ligne d'avant qui le porte n'en dit plus rien.
+          dit(s && !/ventes sans versement|à dater/.test(s.texte) && !L['versement-30j'], 'B5 (5.390) plus aucun contrôle « ventes sans versement » ni « à dater »', s && s.texte.slice(-160));
           dit(s && s.lignes.every((l) => l.btn && l.btn.height >= CIBLE), 'B6 chaque geste fait 44 px', s && JSON.stringify(s.lignes.map((l) => l.btn && l.btn.height)));
           dit(s && s.deb <= 0, 'B7 aucun défilement horizontal', s && s.deb);
           dit(!errs.length, 'B8 aucune erreur de page', errs.join(' | ').slice(0, 200));
@@ -196,16 +199,11 @@ const capture = async (pg, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, { rec
           const { ctx, pg, errs } = await page(b, T, { sombre });
           await ouvrir(pg);
           const s = await lire(pg);
+          // (15 nov., extension 5.390) Julien : « Enlève les 1741 ventes à dater » — une ligne rangée avant ce lot
+          // (le cron d'hier) ne montre plus rien : ni ligne, ni « à dater », ni geste.
           const l = s && s.lignes.find((x) => x.cle === 'versement-30j');
-          const d = await pg.evaluate(() => { const e = document.querySelector('[data-controle-ligne="versement-30j"]'); if (!e) return null;
-            const q = (k) => e.querySelector(k); return { cause: e.getAttribute('data-versement-cause'), datees: q('[data-versement-datees]') && q('[data-versement-datees]').getAttribute('data-versement-datees'),
-              heures: q('[data-versement-heures]') ? q('[data-versement-heures]').innerText : '', pourquoi: q('[data-versement-pourquoi]') ? q('[data-versement-pourquoi]').innerText : '' }; });
-          dit(l && l.n === '1741' && d && d.cause === 'vinted-detail', 'F1 la ligne des ventes à dater : 1741, cause « pas encore lue »', JSON.stringify(d));
-          dit(l && l.ton === 'info' && l.couleur !== s.ambre && l.couleur !== s.rouge, 'F2 ton NEUTRE (ni ambre ni rouge) : rien n’est en faute, la lecture est en cours', l && `${l.ton} ${l.couleur} / ${s.ambre}`);
-          dit(d && d.datees === '356' && /356 déjà datées ✓/.test(l.texte), 'F3 elle dit combien sont DÉJÀ datées', l && l.texte);
-          dit(d && /ouvrant chaque vente/.test(d.pourquoi) && /vinted\.fr est ouvert sur ce compte/.test(d.pourquoi) && /aucune n’est devinée/.test(d.pourquoi), 'F4 elle dit POURQUOI et le geste (Vinted ouvert sur ce compte), jamais devinée', d && d.pourquoi);
-          dit(d && /Environ 146 h avec vinted\.fr ouvert/.test(d.heures) && !/jour/.test(d.heures), 'F5 et combien de temps : « environ 146 h avec vinted.fr ouvert » (1 741 ÷ 12 par heure)', d && d.heures);
-          dit(l && !/sans date de versement depuis 30 jours/.test(l.texte) && /Voir le détail/.test(l.texte) && l.btn && l.btn.height >= CIBLE, 'F6 plus l’ancienne phrase alarmante ; « Voir le détail » à 44 px', l && l.texte.slice(0, 120));
+          const texte = await pg.evaluate(() => (document.querySelector('[data-veille]') || { innerText: '' }).innerText);
+          dit(!l && !document_a_dater(texte), 'F1 (5.390) plus de ligne « ventes à dater » dans Ma journée, même rangée par un ancien contrôle', texte.slice(0, 160));
           dit(s && s.deb <= 0 && !errs.length, 'F7 aucun défilement horizontal, aucune erreur', `${s && s.deb} ${errs.join(' | ').slice(0, 120)}`);
           await capture(pg, `journee-versement-${suf}`);
           await ctx.close();
