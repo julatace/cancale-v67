@@ -3,7 +3,7 @@
 // Source : le français.
 export default {
   "partenaires.titre": "Partenaires",
-  "partenaires.pied": "{m} par mois et par client payant, à vie, Solo ou Pro. Due {j} jours après le paiement ; un remboursement l’annule. VRM ne verse rien : tu notes « Versé ».",
+  "partenaires.pied": "{m} par mois et par client payant, à vie, Solo ou Pro. Due {j} jours après le paiement ; un remboursement l’annule. VRM ne verse rien : tu notes « Versé ».",
   "partenaires.pasInstalle": "Programme pas encore installé",
   "partenaires.pasInstalleDetail": "Passer la migration 043 (pas à pas dans le récit du 15 novembre).",
   "partenaires.pasLu": "Partenaires pas lus",
@@ -55,7 +55,7 @@ export default {
   "partenaires.verse.date": "Date du versement",
   "partenaires.verse.montant": "Montant (€)",
   "partenaires.verse.aide": "VRM ne verse rien : tu notes ce que tu lui as versé toi-même.",
-  "partenaires.verse.confirmer": "Noter « Versé »",
+  "partenaires.verse.confirmer": "Noter « Versé »",
   "partenaires.verse.ok": "Versement noté",
   "partenaires.verse.erreur": "Une date passée et un montant supérieur à 0.",
   "partenaires.pause.mettre": "Mettre en pause",
@@ -79,7 +79,7 @@ export default {
   "partenaires.page.tonLien": "Ton lien",
   "partenaires.page.ton.code": "Code {code}",
   "partenaires.page.regle": "{m} par mois et par client payant, à vie, tant qu’il paie, Solo ou Pro. Une commission est due {j} jours après le paiement (délai de rétractation) ; un remboursement l’annule.",
-  "partenaires.page.loi": "Chaque publication qui parle de VRM porte la mention « Publicité » ou « Collaboration commerciale » (loi du 9 juin 2023 sur l’influence commerciale).",
+  "partenaires.page.loi": "Chaque publication qui parle de VRM porte la mention « Publicité » ou « Collaboration commerciale » (loi du 9 juin 2023 sur l’influence commerciale).",
   "partenaires.page.pause": "Ton code est en pause : il n’attache plus de nouveaux inscrits. Tes clients déjà venus comptent toujours.",
   "partenaires.page.lienMort": "Ce lien n’est plus valable. Demande un nouveau lien à VRM.",
   "partenaires.page.panne": "Chiffres pas lus. Réessaie dans un instant.",
