@@ -196,6 +196,10 @@ const remonter = async (pg) => { for (let i = 0; i < 3; i++) { const b = pg.loca
           const panneau = await o2.pg.locator(`[data-sous-ecran="${id}"]`).first().isVisible().catch(() => false);
           const rangee = await o2.pg.locator(`[data-reglage-id="${id}"]:visible`).count();
           const ok = (e.sous === id && panneau) || (!e.sous && rangee > 0);
+          // Un réglage que CE vendeur n'a pas (propriétaire seul, eBay pas relié, widget sans clé) n'existe nulle
+          // part dans la page : le lien ouvre Paramètres, rien d'autre — dit, pas compté rouge.
+          const existe = await o2.pg.locator(`[data-sous-ecran="${id}"], [data-reglage-id="${id}"], [data-categorie-contient~="${id}"]`).count();
+          if (!ok && !existe) { console.log(`   · L ${lien} : « ${id} » n’est pas offert à ce vendeur (pas mesuré)`); continue; }
           if (ok) bons++;
           dit(ok, `L ${lien} ouvre « ${id} »`, e);
         }
