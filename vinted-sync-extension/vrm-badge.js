@@ -239,7 +239,7 @@
   :host([data-gauche]) .carte, :host([data-gauche]) .question { right: auto; left: 0; }
   .carte.on, .question.on { animation: vrm-entree .18s cubic-bezier(.23,1,.32,1); transform-origin: bottom right; }
   :host([data-haut]) .carte.on, :host([data-haut]) .question.on { transform-origin: top right; }
-  @keyframes vrm-entree { from { opacity: 0; transform: translateY(4px) scale(.98); } to { opacity: 1; transform: none; } }
+  @keyframes vrm-entree { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }   /* 5.379 : sans mise à l’échelle (les cibles gardent leurs 44 px pendant l’entrée) */
   @media (prefers-reduced-motion: reduce) { .carte.on, .question.on { animation: none; } .detail > summary::after { transition: none; } .btn.glisse { transform: none; } }
   @media (prefers-reduced-motion: reduce) { .b, .btn { transition: none; } }
   /* 5.371 : la carte en 4 lignes (compte · lu · jauge · état) — neutre, l'ambre seulement pour un geste. */

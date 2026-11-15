@@ -98,8 +98,15 @@ fois, pause 429/403, `garde`/`gardeStricte`, envoi aux favoris sur SON clic seul
   `carte-logo-boutique` (ambre du studio), `carte-orion-sans-onglet` (plein d'encre).
 - Audits : `audit-carte-extension` (liens : plus de `/my_orders/sold` ; mutation du dressing
   ancien suivie), `audit-popup-capte` (« Voir » vide pour les ventes Vinted).
-- ⚠️ Disque du conteneur plein (« 163 Mo libres ») pendant la session : bancs lancés avec
-  `TMPDIR=/dev/shm/...` et captures dans `/dev/shm` (tmpfs vide).
+- `audit-carte-listes --prouve` : deux règles neuves (favoris lus sans message ; n° de
+  conversation des ventes) — rouge sur `origin/main`, chaque mutation rouge.
+- Entrée de la carte sans mise à l'échelle (`vrm-entree` : fondu + 6 px) : les cibles gardent leurs
+  44 px pendant l'animation (le banc `badge` mesurait 43 px sous charge).
+- ⚠️ Conteneur saturé pendant la session (disque plein un temps, charge ~50, mémoire) : bancs lancés
+  avec un `TMPDIR` court (`/dev/shm/ce-t`, vidé entre deux bancs). Sous charge, `carte-orion-sans-onglet`
+  (cadre « repli » au-delà de 1,5 s) et `lbc-clair-carte` ont été rouges une fois puis verts relancés.
+  `popup-capte` (34 rouges) et `popup` (« ⟳ = chrome.runtime.reload ») sont rouges AUSSI sur
+  `origin/main` (mesuré pour `popup-capte`) : pas de cette session.
 
 ## Geste de Julien
 Installer l'extension **5.380.0** (Chrome : remplacer le dossier puis ⟳ ; Orion :
