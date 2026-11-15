@@ -82,6 +82,7 @@ async function verifier(racine) {
 const MUTATIONS = {
   'verse-sans-statut': ['src/ebay/tableau.js', "    if (p.statut !== 'SUCCEEDED' || moisParisDe(p.date) !== ym) continue;", '    if (moisParisDe(p.date) !== ym) continue;'],
   'verse-utc': ['src/ebay/tableau.js', "const moisParisDe = (iso) => { const t = Date.parse(iso || ''); return Number.isFinite(t) ? moisParis(t) : moisDe(iso); };", 'const moisParisDe = (iso) => moisDe(iso);'],
+  'mois-utc': ['src/ebay/tableau.js', 'export const moisParis = (maintenant = Date.now()) => moisParisApp(maintenant);', 'export const moisParis = (maintenant = Date.now()) => new Date(maintenant).toISOString().slice(0, 7);'],
   'devises-melangees': ['src/ebay/tableau.js', "    if (p.montant.c !== 'EUR') { autres[p.montant.c]", "    if (false) { autres[p.montant.c]"],
   'verse-pas-su-zero': ['src/ebay/tableau.js', '  if (!Array.isArray(versements)) return null;\n  const ym', "  if (!Array.isArray(versements)) return { eur: 0, n: 0, autres: [], enRoute: { eur: 0, n: 0 } };\n  const ym"],
   'litiges-rien-vaut-aucun': ['src/ebay/tableau.js', '  if (ko.length === 3) return null;', ''],

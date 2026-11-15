@@ -5,7 +5,7 @@
    (--sv-lien). Aucun flou ici (1 000 annonces : jamais de backdrop-filter sur une rangée),
    aucune couleur en ligne. Sans le verre, les replis --sb-* / --d-* gardent l'écran lisible.
    Cibles au doigt 44 px au moins ; rien ne déborde d'une carte (textes coupés en ligne). */
-.ebt { display: grid; gap: 22px; padding: 4px 16px 28px; min-width: 0; }
+.ebt { display: grid; gap: 22px; padding: 14px 16px 28px; min-width: 0; }
 .ebt * { box-sizing: border-box; }
 .ebt-groupe { display: grid; gap: 8px; min-width: 0; }
 .ebt-titre { display: flex; align-items: baseline; gap: 8px; margin: 0 4px; font-size: 13px; font-weight: 600; letter-spacing: .01em;

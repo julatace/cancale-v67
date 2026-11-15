@@ -7,16 +7,14 @@
 //   · « pas su » ≠ 0 partout : une partie que la route n'a pas lue rend `null`.
 // Trois états d'une partie : `undefined` en cours · `{ ko }` pas su (avec sa raison) · lue.
 
+import { moisParis as moisParisApp } from '../dateParis.js';
+
 export const etatPartie = (p) => (p === undefined ? 'en-cours' : !p || p.ko ? 'ko' : 'lu');
 
 const moisDe = (iso) => (typeof iso === 'string' && iso.length >= 7 ? iso.slice(0, 7) : null);
-// Le mois courant à Paris (« AAAA-MM ») : un versement du 1er à 0 h 30 de Paris est de ce mois.
-export function moisParis(maintenant = Date.now()) {
-  try {
-    const p = new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit' }).formatToParts(new Date(maintenant));
-    return `${p.find((x) => x.type === 'year').value}-${p.find((x) => x.type === 'month').value}`;
-  } catch (_) { return new Date(maintenant).toISOString().slice(0, 7); }
-}
+// Le mois courant à Paris (« AAAA-MM ») : un versement du 1er à 0 h 30 de Paris est de ce mois
+// (la règle de src/dateParis.js, la seule de l'app).
+export const moisParis = (maintenant = Date.now()) => moisParisApp(maintenant);
 const moisParisDe = (iso) => { const t = Date.parse(iso || ''); return Number.isFinite(t) ? moisParis(t) : moisDe(iso); };
 
 // « Versé ce mois » : { eur, n, autres: [{ c, v }], enRoute: { eur, n } } ; null si pas su.

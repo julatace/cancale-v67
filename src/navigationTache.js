@@ -125,6 +125,10 @@ export function redirigerOnglet(id, sub, deplaces) {
     const p = PLACE_SECTION[site] && sub ? PLACE_SECTION[site][sub] : null;
     if (p) return { tab: p[0], sub: p[1] };
     const s = SECTIONS_TACHE.includes(sub) ? sub : DEFAUT_SITE[site];
+    // (15 nov., eBay complet 2) Un ANCIEN lien vers l'espace eBay (`?tab=plat_ebay`, la notification
+    // « N ventes eBay à expédier », les rappels) visait ses commandes : il y mène toujours. Le Tableau
+    // s'ouvre quand il choisit eBay dans Ventes (le filtre des sites), et par « Tableau ».
+    if (site === 'ebay' && s === 'ventes' && sub == null) return { tab: 'ventes', sub: 'ebay.ventes' };
     return { tab: s, sub: site };
   }
   return { tab: id, sub: sub == null ? null : sub };

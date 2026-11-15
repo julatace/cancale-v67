@@ -4,7 +4,7 @@
 // captures scripts/bancs/captures/ebay-tableau-*.png (à REGARDER, §6.2).
 //   NODE_OPTIONS="--require=./scripts/bancs/_porte-banc.cjs --require=./scripts/bancs/_garde-reseau.cjs" BANC_PORT=… node scripts/bancs/ebay-tableau.cjs
 // On exige :
-//   N. Ventes · eBay s'ouvre sur le Tableau ; les sous-sections Tableau · Commandes · À traiter · Offres ·
+//   N. Ventes · eBay (choisi dans le filtre des sites) s'ouvre sur le Tableau ; un ancien lien `?tab=plat_ebay` sur les Commandes ; les sous-sections Tableau · Commandes · À traiter · Offres ·
 //      Argent · Santé (Annonces · eBay : Annonces · Trafic · Promotion) ; un lien qui visait les
 //      commandes (`section=ventes`) y mène toujours ;
 //   T. la bande : 1 à expédier (la règle colisEbay), 2 offres, 3 messages, 145,40 € versés ce mois ;
@@ -155,7 +155,7 @@ async function ouvrir(b, vp, sombre) {
   });
   return { ctx, pg, errs };
 }
-const capt = async (pg, nom) => { try { fs.mkdirSync(CAPT, { recursive: true }); await pg.screenshot({ path: path.join(CAPT, `ebay-tableau-${nom}.png`) }); } catch (_) {} };
+const capt = async (pg, nom) => { try { await pg.waitForTimeout(800); fs.mkdirSync(CAPT, { recursive: true }); await pg.screenshot({ path: path.join(CAPT, `ebay-tableau-${nom}.png`) }); } catch (_) {} };
 const aller = async (pg, q) => { await pg.goto(`http://localhost:${PORT}/?${q}`, { waitUntil: 'domcontentloaded' }); };
 const attendre = (pg, sel, t = 25000) => pg.waitForSelector(sel, { timeout: t });
 // Mise en page à 390 : rien ne sort de l'écran ni de sa carte, cibles ≥ 44 px, un plein au plus.
@@ -176,7 +176,7 @@ const mesures = (pg) => pg.evaluate(() => {
     remettre();
     let { ctx, pg, errs } = await ouvrir(b, { width: 390, height: 844 }, false);
     await essaie('N/T tableau', async () => {
-      await aller(pg, 'tab=plat_ebay');
+      await aller(pg, 'tab=ventes&site=ebay');
       await attendre(pg, '[data-ebt="tableau"][data-ebt-etat="lu"]');
       await pg.waitForTimeout(600);
       const sous = await pg.$$eval('[data-tache-sous="ventes.ebay"] [data-section]', (l) => l.map((x) => x.getAttribute('data-section') + ':' + x.textContent.trim()));
@@ -200,7 +200,7 @@ const mesures = (pg) => pg.evaluate(() => {
       await attendre(pg, '[data-ebt-afaire-ligne="litiges"]');
       await capt(pg, '390-afaire');
       await pg.keyboard.press('Escape').catch(() => {});
-      await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`, { waitUntil: 'domcontentloaded' }).catch(() => {});
+      await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay&section=tableau`, { waitUntil: 'domcontentloaded' }).catch(() => {});
       await attendre(pg, '[data-ebt="tableau"] [data-ebt-chiffre="expedier"]');
       await pg.click('[data-ebt-chiffre="expedier"]');
       await pg.waitForSelector('[data-tache-section="ventes"]', { timeout: 15000 });
@@ -210,6 +210,9 @@ const mesures = (pg) => pg.evaluate(() => {
       await aller(pg, 'tab=plat_ebay&section=ventes');
       await attendre(pg, '[data-tache-section="ventes"][data-tache-site="ebay"]');
       dit(true, 'N2. `section=ventes` mène toujours aux Commandes');
+      await aller(pg, 'tab=plat_ebay');
+      await attendre(pg, '[data-tache-section="ventes"][data-tache-site="ebay"]');
+      dit(true, 'N4. un ancien lien `?tab=plat_ebay` (notification « à expédier ») mène toujours aux Commandes');
     });
     await essaie('A argent', async () => {
       await aller(pg, 'tab=plat_ebay&section=argent');
@@ -268,7 +271,7 @@ const mesures = (pg) => pg.evaluate(() => {
     remettre({ scope: true, signature: true });
     ({ ctx, pg, errs } = await ouvrir(b, { width: 390, height: 844 }, false));
     await essaie('P pannes', async () => {
-      await aller(pg, 'tab=plat_ebay');
+      await aller(pg, 'tab=ventes&site=ebay');
       await attendre(pg, '[data-ebt="tableau"][data-ebt-etat="lu"]');
       dit(await pg.$('[data-ebt-groupe="trafic"] [data-ebt-panne="scope"] [data-ebt-reconnecter]') != null, 'P1. droit Analytics manquant ⇒ la raison + « Reconnecter eBay »');
       const sig = await pg.$('[data-ebt-groupe="argent"] [data-ebt-panne="signature"]');
@@ -283,10 +286,12 @@ const mesures = (pg) => pg.evaluate(() => {
     remettre();
     ({ ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 982 }, true));
     await essaie('1512 sombre', async () => {
-      await aller(pg, 'tab=plat_ebay');
+      await aller(pg, 'tab=ventes&site=ebay');
       await attendre(pg, '[data-ebt="tableau"][data-ebt-etat="lu"]');
       await pg.waitForTimeout(600);
       const m = await mesures(pg);
+      const vis = await pg.evaluate(() => { const e = document.querySelector('[data-ebt="tableau"]'); if (!e) return 'absent'; const b = e.getBoundingClientRect(); let o = 1, x = e; while (x) { o *= Number(getComputedStyle(x).opacity || 1); x = x.parentElement; } const h = document.elementFromPoint(b.left + 40, Math.max(b.top + 20, 130)); return { top: Math.round(b.top), h: Math.round(b.height), o, sur: h ? (h.className || h.tagName).toString().slice(0, 60) : null }; });
+      console.log('    1512 :', JSON.stringify(vis));
       dit(m.horiz <= 0 && m.hors.length === 0 && m.coupes.length === 0 && m.petits.length === 0, 'V6. 1512 sombre : rien ne déborde, rien de coupé, cibles ≥ 44 px', JSON.stringify(m));
       await capt(pg, '1512-sombre-tableau');
       await aller(pg, 'tab=plat_ebay&section=argent');
