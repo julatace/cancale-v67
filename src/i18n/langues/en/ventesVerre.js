@@ -27,6 +27,7 @@ export default {
   "vv.propose.autre": "Another purchase",
   "vv.propose.relier": "Link a purchase",
   "vv.propose.saisir": "Enter the purchase price",
+  "vv.recap.aSaisir": "purchase price to enter",
   "vv.taille": "S{t}",
   "vv.ech.avantLe": "before {date}",
   "vv.ech.dans": "in {n} d",

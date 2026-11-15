@@ -27,6 +27,7 @@ export default {
   "vv.propose.autre": "Anderer Kauf",
   "vv.propose.relier": "Kauf verknüpfen",
   "vv.propose.saisir": "Kaufpreis eingeben",
+  "vv.recap.aSaisir": "Kaufpreis fehlt",
   "vv.taille": "Gr. {t}",
   "vv.ech.avantLe": "bis {date}",
   "vv.ech.dans": "in {n} T.",

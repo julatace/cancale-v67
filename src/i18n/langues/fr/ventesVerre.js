@@ -27,6 +27,7 @@ export default {
   "vv.propose.autre": "Autre achat",
   "vv.propose.relier": "Relier un achat",
   "vv.propose.saisir": "Saisir le prix d’achat",
+  "vv.recap.aSaisir": "prix d’achat à saisir",
   "vv.taille": "T{t}",
   "vv.ech.avantLe": "avant le {date}",
   "vv.ech.dans": "dans {n} j",

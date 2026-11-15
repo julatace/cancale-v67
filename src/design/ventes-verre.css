@@ -338,6 +338,17 @@
 :root:root:root:root:root:root:root:root body [data-recap-vente] :is(.vrm-b-primaire, [data-variante="primaire"]) * { color: inherit !important; }
 :root:root:root:root:root:root:root:root body [data-recap-vente] .vrm-recap-etat { padding-right: 16px !important; }
 :root:root:root:root:root:root:root:root body [data-recap-vente] .vrm-recap-etat * { min-width: 0; }
+/* « L'argent » : un titre de section comme les autres, aligné sur ses lignes (plus un mot de 13 px collé à la frise). */
+:root:root:root:root:root:root:root:root body [data-recap-vente] .vrm-recap-argent > .vrm-recap-titre { font: 700 17px/1.25 Inter, system-ui, sans-serif !important; letter-spacing: -.02em !important; color: var(--sv-encre) !important; margin: 18px 0 6px !important; padding: 0 !important; text-transform: none !important; }
+/* Le bénéfice pas su : « — · prix d'achat à saisir », sans le point bleu seul (le point ne sert qu'à la barre des coûts). */
+:root:root:root:root:root:root:root:root body [data-recap-vente] .vrm-recap-benef:not([data-benef-vente]) .vrm-cv-point { display: none !important; }
+:root:root:root:root:root:root:root:root body [data-recap-vente] .vrm-recap-benef:not([data-benef-vente]) dd { display: flex !important; align-items: baseline !important; gap: 6px !important; flex-wrap: wrap !important; justify-content: flex-end !important; }
+:root:root:root:root:root:root:root:root body [data-recap-vente] .vrm-recap-benef:not([data-benef-vente]) dd small { font-size: 13px !important; font-weight: 550 !important; color: var(--sv-encre-2) !important; }
+:root:root:root:root:root:root:root:root body [data-recap-vente] .vrm-recap-benef:not([data-benef-vente]) dd small::before { content: "· "; }
+/* L'emballage non saisi ne bloque rien : discret (l'ambre reste aux gestes qui pressent). */
+:root:root:root:root:root:root:root:root body [data-recap-vente] [data-recap-emballage="non-saisi"] dd :is(button, span) { color: var(--sv-encre-2) !important; font-weight: 500 !important; }
+/* « Saisir le prix d'achat · ou relier un achat » : un seul geste sur une rangée (le bouton, puis son lien). */
+:root:root:root:root:root:root:root:root body [data-recap-vente] [data-recap-achat] dd { display: flex !important; flex-wrap: wrap !important; align-items: center !important; justify-content: flex-end !important; gap: 4px 10px !important; }
 :root:root:root:root:root:root:root:root body .vv-propose { display: flex !important; flex-direction: column !important; gap: 10px !important; margin: 12px 0 4px !important; padding: 12px !important; border-radius: 18px !important; background: rgb(255 255 255 / .55) !important; border: 1px solid rgb(255 255 255 / .8) !important; }
 :root:root:root:root:root:root:root:root[data-theme="dark"] body .vv-propose { background: rgb(255 255 255 / .06) !important; border-color: rgb(255 255 255 / .10) !important; }
 :root:root:root:root:root:root:root:root body .vv-propose-achat { display: flex !important; gap: 12px !important; align-items: center !important; min-width: 0 !important; }
@@ -350,6 +361,9 @@
 :root:root:root:root:root:root:root:root body .vv-propose-gestes .vv-touche { display: inline-flex !important; align-items: center !important; gap: 6px !important; }
 :root:root:root:root:root:root:root:root body .vv-propose-relier { flex: 1 1 160px !important; justify-content: center !important; font-weight: 700 !important; color: var(--sv-lien) !important; }
 :root:root:root:root:root:root:root:root body .vv-propose-saisir { min-height: 44px !important; padding: 0 6px !important; color: var(--sv-lien) !important; font-weight: 650 !important; background: transparent !important; border: 0 !important; }
+
+/* (15 nov., banc verre) Les mots d'attente de « Toutes les ventes » sont posés sur le FOND : l'encre claire. */
+:root:root:root:root:root:root:root:root body .vrm-tache[data-tache="ventes"] .vrm-ventes-toutes :is(.vrm-toutes-etats > div, .vrm-toutes-vide > p) { color: var(--sv-clair-2) !important; }
 
 /* ── 10. ACHATS À L'ORDINATEUR (maquette achats-1512 / 1280) : les codes à retirer en colonne à gauche, un chiffre par
    case ; les achats à droite. Le rail est celui de la coque (claude/refonte-journee). ── */

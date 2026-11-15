@@ -27,6 +27,7 @@ export default {
   "vv.propose.autre": "Altro acquisto",
   "vv.propose.relier": "Collega un acquisto",
   "vv.propose.saisir": "Inserisci il prezzo d’acquisto",
+  "vv.recap.aSaisir": "prezzo d’acquisto da inserire",
   "vv.taille": "T{t}",
   "vv.ech.avantLe": "entro il {date}",
   "vv.ech.dans": "tra {n} g",

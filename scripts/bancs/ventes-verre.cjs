@@ -251,7 +251,10 @@ async function scenario(b, vp, sombre) {
     dit(t2.seg && t2.colis === 0, `${nom} : T « Toutes » replie les colis, garde le segment`, JSON.stringify(t2));
     // ── V : la fiche d'une vente ouverte depuis « Toutes » (le récapitulatif) : le plein à l'ENCRE, aucun « à dater »,
     //       les dates des étapes jamais coupées au bord droit.
-    await pg.evaluate(() => { const l = [...document.querySelectorAll('.vrm-tache[data-tache="ventes"] [data-fu-ligne], .vrm-tache[data-tache="ventes"] .vrm-ledger-sale')].find((x) => /Terminator/.test(x.innerText || '')); if (l) { l.scrollIntoView({ block: 'center' }); (l.querySelector('.vrm-ledger-sale-toggle, button') || l).click(); } });
+    await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=ventes&site=vinted' })));
+    await pg.waitForFunction(() => [...document.querySelectorAll('[data-fu-ligne]')].some((x) => /Terminator/.test(x.innerText || '')), null, { timeout: 25000 }).catch(() => {});
+    await pg.waitForTimeout(600);
+    await pg.evaluate(() => { const l = [...document.querySelectorAll('[data-fu-ligne]')].find((x) => /Terminator/.test(x.innerText || '')); if (l) { l.scrollIntoView({ block: 'center' }); (l.querySelector('.vrm-ledger-sale-toggle') || l).click(); } });
     await pg.waitForSelector('[data-recap-vente] [data-recap-phrase]', { timeout: 10000 }).catch(() => {});
     await pg.waitForTimeout(700);
     await shot(pg, `ventes-verre-${nom}-recap`);
@@ -262,8 +265,8 @@ async function scenario(b, vp, sombre) {
       const coupes = [...z.querySelectorAll('.vrm-frise *, [class*="frise"] *')].filter((x) => x.children.length === 0 && (x.textContent || '').trim() && x.getBoundingClientRect().width > 0 && (x.getBoundingClientRect().right > zr.right - 8 || x.scrollWidth > x.clientWidth + 1)).map((x) => x.textContent.trim().slice(0, 20));
       const pr = z.querySelector('[data-vv-achat-propose]');
       return { pleins: p.map((x) => { const c = rgb(getComputedStyle(x).backgroundColor); return c.slice(0, 3).join(','); }), aDater: /à dater/i.test(z.innerText), coupes,
-        propose: pr ? pr.getAttribute('data-vv-achat-propose') : null, relier: !!z.querySelector('[data-vv-relier="7001"]'), autre: !!z.querySelector('[data-vv-autre-achat]'), saisir: !!z.querySelector('[data-vv-saisir-prix]') }; });
-    dit(!!rv && rv.pleins.length <= 1 && rv.pleins.every((c) => !/^0,96,204$|^0,74,159$/.test(c)) && !rv.aDater && !rv.coupes.length && rv.propose === '7001' && rv.relier && rv.autre && rv.saisir, `${nom} : V la fiche d'une vente : le plein à l'encre (jamais le bleu), l'achat PROPOSÉ et « Relier · prix », « Autre achat », « Saisir le prix » ; aucun « à dater », aucune date coupée`, JSON.stringify(rv));
+        propose: pr ? pr.getAttribute('data-vv-achat-propose') : null, relier: !!z.querySelector('[data-vv-relier="7001"]'), autre: !!z.querySelector('[data-vv-autre-achat]'), saisir: !!z.querySelector('[data-cout-vente]'), unSeul: z.querySelectorAll('[data-vv-saisir-prix]').length === 0 }; });
+    dit(!!rv && rv.pleins.length <= 1 && rv.pleins.every((c) => !/^0,96,204$|^0,74,159$/.test(c)) && !rv.aDater && !rv.coupes.length && rv.propose === '7001' && rv.relier && rv.autre && rv.saisir && rv.unSeul, `${nom} : V la fiche d'une vente : le plein à l'encre (jamais le bleu), l'achat PROPOSÉ et « Relier · prix », « Autre achat », « Saisir le prix » ; aucun « à dater », aucune date coupée`, JSON.stringify(rv));
     await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(400);
     // ── A : Achats · le code de retrait lisible, la feuille « Montre ce code au comptoir »
     await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' })));

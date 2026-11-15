@@ -49360,7 +49360,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const cv = cascadeVente(o.price?.amount, e, { annulee: st === 'cancelled', autreDevise });
               const fraisConnus = !autreDevise && cv.frais != null && cv.frais > 0 ? cv.frais / 100 : null;
               const benefTexte = lb.benefice == null ? '—' : eurosRecap(lb.benefice);
-              const benefAide = st === 'cancelled' ? '' : lb.etat === 'partiel' ? 'frais pas confirmés' : lb.etat === 'illisible' ? 'un montant saisi est illisible' : lb.etat === 'prix' ? (autreDevise ? 'vente dans une autre devise' : 'prix de vente pas lu') : '';
+              const benefAide = st === 'cancelled' ? '' : lb.etat === 'partiel' ? 'frais pas confirmés' : lb.etat === 'illisible' ? 'un montant saisi est illisible' : lb.etat === 'prix' ? (autreDevise ? 'vente dans une autre devise' : 'prix de vente pas lu') : (lb.benefice == null && coutManque ? tr('vv.recap.aSaisir') : '');
               // (10 nov., lot BE) « Versé sur ton porte-monnaie » est l'étape « Versée » de la frise (sa date, une fois).
               const acheteur = o.user_login || (o.buyer && o.buyer.login) || (o.opposite_user && o.opposite_user.login) || '';
               const aRelie = !hidden && st !== 'cancelled' && e && e.buyFromId ? achatRelie(e) : null;
@@ -49444,7 +49444,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       l'achat PROPOSÉ par la règle de liaison (src/liaisonAchat.js, la même qu'Annonces → « Sans achat relié »), montré
                       tout de suite — photo, titre, retrait, prix payé, pourquoi — et « Relier · 52 € » (SON toucher, la règle de prix
                       du reçu `propositionSuggestion`) ; « Autre achat » et « Saisir le prix » en secondaires. Rien n'est relié seul (§5). */}
-                  {coutManque && !aRelie ? (() => {
+                  {coutManque && !aRelie && !hidden ? (() => {
                     const k = cleArticleVente(o.transaction_id);
                     let p = null;
                     try {
@@ -49456,11 +49456,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           receptionDe: (a) => dateReception(a, { infosTx: infosReception, recuClic: pickupDone }) }) || [])[0] || null; }
                     } catch (_) { p = null; }
                     const l = { o, idf: identiteAnnonce(o) ? String(identiteAnnonce(o)) : null };
-                    const saisir = () => askText({ title: tr('ventes.prixAchat'), desc: `${num ? `N°${num} · ` : ''}${o.title || ''}`, decimal: true, value: '' }).then((t) => { if (t != null && String(t).trim()) setSaleOverride(o.transaction_id, { buyPrice: String(t).trim() }); });
                     const jourP = (t) => { const d = typeof t === 'number' ? t : Date.parse(t || ''); return Number.isFinite(d) ? new Date(d).toLocaleDateString(localeCourante(), { day: 'numeric', month: 'short' }) : ''; };
                     const a = p ? p.achat : null; const prop = a ? propositionSuggestion(a) : null;
                     const prixTxt = prop && prop.centimes != null ? montant(prop.centimes / 100) : '';
                     const recu = p && p.recu ? tr(p.recu.source === 'clic' ? 'liaison.recu.retrait' : 'liaison.recu.livraison', { date: jourP(p.recu.ms) }) : (a && a.date ? tr('liaison.commandeLe', { date: jourP(a.date) }) : '');
+                    if (!a) return null;   // sans proposition : « Saisir le prix d'achat · ou relier un achat » de la ligne « Prix d'achat » suffit
                     return (
                       <div className="vv-propose" data-vv-achat-propose={a ? String(a.transaction_id || '') : ''} data-niveau={p ? p.niveau : ''}>
                         {a ? <div className="vv-propose-achat">
@@ -49474,8 +49474,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         </div> : null}
                         <div className="vv-propose-gestes">
                           {a ? <button type="button" className="sb-touche vv-touche vv-propose-relier" data-vv-relier={String(a.transaction_id || '')} onClick={() => relierAchatVente(l, a)}><Icon name="link" size={16}/><span>{prixTxt ? tr('liaison.relierPrix', { prix: prixTxt }) : VERBES.relier}</span></button> : null}
-                          <button type="button" className="sb-touche vv-touche" data-vv-autre-achat="" onClick={() => choisirAchatVente(l, a)}>{a ? tr('vv.propose.autre') : tr('vv.propose.relier')}</button>
-                          <button type="button" className="sb-lien vv-propose-saisir" data-vv-saisir-prix="" onClick={saisir}>{tr('vv.propose.saisir')}</button>
+                          <button type="button" className="sb-lien vv-propose-saisir" data-vv-autre-achat="" onClick={() => choisirAchatVente(l, a)}>{tr('vv.propose.autre')}</button>
                         </div>
                       </div>);
                   })() : null}
