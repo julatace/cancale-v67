@@ -43,7 +43,7 @@ import { achatVenteManuelle, beneficeVenteManuelle, totauxVentesManuelles } from
 // (9 nov.) Le profil fiscal (src/profilFiscal.js) : le statut, l'activité du micro, la TVA d'une société.
 import { useProfilFiscal, vendActuel, exemplesActuels } from '../App.jsx';   // (11 nov., lot DJ2) l'exemple suit ce qu'il vend
 import { gesteCorbeille, lireVentesImportees } from '../App.jsx';   // (10 nov., lot Y) la corbeille 30 jours
-import { LiveStatsCarte, REGLES_CARTE, useSourcesCarte } from '../App.jsx';
+import { LiveStatsCarte, REGLES_CARTE, useSourcesCarte, ArgentAVenirCarte } from '../App.jsx';
 // (11 nov., lot rapport-mois) « Rapport du mois » : le PDF (src/rapportMois.js), les lectures de catégories partagées.
 import { AUTH, lireExtrasRepartition } from '../App.jsx';
 import { oublierReglageMontage } from '../App.jsx';   // (11 nov., intégration) l'écriture directe de la fiche oublie la lecture gardée
@@ -3627,6 +3627,13 @@ function usePrevisionUrssaf() {
 // Toucher un widget = son détail : Statistiques, « Vendu et reçu », « Ton bénéfice »,
 // « Déclarer ».
 const dateArgentCourte = (t) => new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+// (15 nov.) Le résumé « À venir » sur Argent : la règle de la coque (`liveStats.aVenir`), le même
+// composant que Ventes ; toucher ouvre l'écran « Argent à venir ».
+function AVenirArgent({ liveStats }) {
+  const liveCoque = React.useContext(LiveStatsCarte);
+  const L = liveStats || liveCoque;
+  return <div className="vrm-a-venir-hote vrm-a-venir-argent" style={{ margin: '12px 0 0' }}><ArgentAVenirCarte A={L && L.aVenir}/></div>;
+}
 function ArgentQuestions({ liveStats, onNav, allerVue }) {
   const liveCoque = React.useContext(LiveStatsCarte);
   const S = useSourcesCarte(liveStats || liveCoque);
@@ -4572,6 +4579,8 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
       <div className="vrm-argent-partie" data-argent-vue="resume" hidden={vue !== 'resume'}>
         {/* Les quatre réponses : vendu, reçu, bénéfice, à déclarer. Toucher = le détail. */}
         <ArgentQuestions liveStats={liveStats} onNav={onNav} allerVue={allerVue} />
+        {/* (15 nov.) L'argent à venir, en résumé : un toucher ouvre son écran (src/ArgentAVenirEcran.jsx). */}
+        <AVenirArgent liveStats={liveStats}/>
       {/* (2 nov., style « Fusion ») L'anneau et les six mois — des parts et des hauteurs, aucun montant redit. */}
       <ComptaFusion compta={data} onNav={onNav}/>
         <section id="compta-detail" className="vrm-compta-q" data-compta-q="detail" style={{ scrollMarginTop: 72 }}>

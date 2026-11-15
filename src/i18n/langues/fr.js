@@ -9,6 +9,7 @@ import ecran_confort from './fr/confort.js';   // (14 nov., lots 117–130) conf
 import ecran_studio from './fr/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
 import ecran_correspondances from './fr/correspondances.js';   // (15 nov.) Publier partout : catégories qui correspondent
 import ecran_capte from './fr/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
+import ecran_avenir from './fr/avenir.js';   // (15 nov.) « Argent à venir »
 import ecran_renvoyer from './fr/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_retrait_ailleurs from './fr/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
 import ecran_finition from './fr/finition.js';   // (15 nov.) la finition écran par écran
@@ -2271,4 +2272,5 @@ export default {
   ...ecran_renvoyer,
   ...ecran_finition,
   ...ecran_parametres,
+  ...ecran_avenir,
 };

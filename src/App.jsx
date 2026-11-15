@@ -200,6 +200,8 @@ import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.j
 // (11 nov., lot ventes-lot) Une vente de plusieurs articles = UNE vente, chaque article à sa place.
 import { resumeVenteLot, titreDitLot } from "./venteLot.js";
 import {argentAVenir,aVenirPour,texteDatePrevue} from './argentAVenir.js';
+import { parcoursVenteVc } from './parcoursVestiaire.js';   // (15 nov.) l'étape d'une vente Vestiaire à venir (une règle)
+import { ArgentAVenirEcran, resumeEtapes, couvertureAVenir, ouvrirArgentAVenir } from './ArgentAVenirEcran.jsx';   // (15 nov.) l'écran « Argent à venir »
 import { motEtatVente, lignesAVenir, comptesQuiAnnulent, fenetreAnnulations, bandeauPrixAchat } from './ventesEcran.js';
 import './ventes-e2.css';
 // ⟦→ ecrans/Stats.jsx #2⟧
@@ -710,7 +712,7 @@ import CarteMois, { GrandChiffre } from "./design/CarteMois.jsx";
 import CarteStats from "./design/CarteStats.jsx";
 // ⟦→ ecrans/Stats.jsx #5⟧
 import { poserPastilleIcone } from "./pastilleIcone.js";
-import { CLE_CARTE_STATS, raisonCourte, recuPublieEntre, valeurObjectif, reglageDePage, publicationColisFraiche } from "./design/carteChiffres.js";
+import { CLE_CARTE_STATS, raisonCourte, recuPublieEntre, valeurObjectif, reglageDePage, publicationColisFraiche, valeurChiffre, sansCompteSur } from "./design/carteChiffres.js";
 import { aExpedierPourCarte } from "./resumeCarte.js";
 // ⟦→ ecrans/Compta.jsx #6⟧
 import { detailFraisFiche } from "./coutPlateformes.js";
@@ -23246,68 +23248,58 @@ const PORTE_MONNAIE_VINTED = 'https://www.vinted.fr/wallet/balance';
 // site l'écrit (eBay, Vestiaire) ; « au moins » et le manque NOMMÉ si une lecture
 // manque ; une vente au montant illisible est nommée, jamais 0 €.
 const NOM_SITE_AVENIR = { Vinted: 'Vinted', eBay: 'eBay', Vestiaire: 'Vestiaire', Leboncoin: 'Leboncoin' };
-function ArgentAVenirCarte({ A, plateforme = null, reserve = false }) {
-  // (6 nov., Julien : « le montant en attente mais pas tout d'un coup ») Le total
-  // reste en tête ; le détail par compte est REPLIÉ, il s'ouvre au toucher.
-  const [detail, setDetail] = useState(false);
+export function ArgentAVenirCarte({ A, plateforme = null, reserve = false }) {
+  // (15 nov., Julien : « je veux que les stats des montants en attente soient mieux affichées »)
+  // LE RÉSUMÉ COMPACT : le total et sa couverture, les sites, les étapes en une ligne ; toute la
+  // carte se touche et ouvre l'écran « Argent à venir » (src/ArgentAVenirEcran.jsx, monté par la
+  // coque) — le détail par étape, par site, par compte et les ventes y vivent. Rien n'est calculé
+  // ici : la règle `argentAVenir`, sa part (`aVenirPour`), ses étapes (`resumeEtapes`).
   // (6 nov., v36-raccords · banc chargement) `reserve` : pendant la lecture, la carte
-  // garde SA place (la carte repliée : 70 px + 12 px de marge, en squelette) — sans quoi
-  // elle arrivait en poussant la liste des ventes de 82 px (CLS 0,036 en réseau lent).
+  // garde SA place (70 px + 12 px de marge, en squelette) — sans quoi elle arrivait en
+  // poussant la liste des ventes de 82 px (CLS 0,036 en réseau lent).
   if (!A || A.enCours) return reserve ? (
-    <div data-a-venir-attente="" aria-hidden="true" style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 20, padding: '12px 16px', marginBottom: 12, boxShadow: C.shadow || 'none' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 44 }}>
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 7 }}><SqBarre l={64} h={13}/><SqBarre l={150} h={10}/></div>
-        <SqBarre l={88} h={22} r={8}/>
-      </div>
+    <div data-a-venir-attente="" aria-hidden="true" className="vrm-av-resume" style={{ marginBottom: 12, cursor: 'default' }}>
+      <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 7 }}><SqBarre l={64} h={13}/><SqBarre l={150} h={10}/></div>
+      <SqBarre l={88} h={22} r={8}/>
     </div>
   ) : null;
   // Sur une plateforme (Ventes · Vinted) : sa part seulement, par la même règle.
   const T = aVenirPour(A, { plateforme });
   const groupes = A.parCompte.filter((g) => !plateforme || g.plateforme === plateforme);
-  if (!groupes.length && !T.partiel) return null;
+  const etapes = resumeEtapes(A, plateforme);
+  if (!groupes.length && !T.partiel && !etapes.length) return null;
   const nc = (A.nonComptees || []).filter((x) => !plateforme || x.plateforme === plateforme);
   const manque = T.manque.filter((m) => !nc.some((x) => x.plateforme === m) || A.manque.includes(m));
-  // (5 nov., revue 2.12) UN MONTANT, UNE FOIS : un seul groupe (un site, un compte) ⇒ sa
-  // ligne redisait le total. Il devient la phrase sous le titre, sans montant
-  // (`lignesAVenir`, src/ventesEcran.js) ; plusieurs groupes ⇒ une ligne chacun.
-  const { lignes, resume } = lignesAVenir(groupes);
-  const quand = (g) => `${g.n} vente${g.n > 1 ? 's' : ''}${g.prevu != null ? ` · ${texteDatePrevue(g.prevu)}` : ''}`;
+  // (5 nov., revue 2.12) UN MONTANT, UNE FOIS : un seul groupe (un site, un compte) ⇒ la phrase
+  // sous le titre le nomme, sans montant (`lignesAVenir`, src/ventesEcran.js).
+  const { resume } = lignesAVenir(groupes);
+  const sites = [...new Set(groupes.map((g) => g.plateforme))];
   const attrsGroupe = (g) => ({ 'data-a-venir-ligne': g.plateforme, 'data-a-venir-compte': g.compte, 'data-a-venir-eur': String(Math.round(g.eur * 100)), 'data-a-venir-prevu': g.prevu != null ? jourParis(g.prevu) : '' });
+  const nDe = (p) => groupes.filter((g) => g.plateforme === p).reduce((t, g) => t + g.n, 0);
+  const nComptes = (p) => groupes.filter((g) => g.plateforme === p).length;
   return (
     <section className="vrm-a-venir" data-a-venir={T.valeur == null ? '' : String(Math.round(T.valeur * 100))} data-a-venir-n={String(T.n)} data-a-venir-site={plateforme || 'toutes'} data-a-venir-partiel={T.partiel ? '1' : undefined} data-a-venir-groupes={String(groupes.length)}
-      style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 20, padding: '12px 16px', marginBottom: 12, boxShadow: C.shadow || 'none' }}>
-      <div {...(lignes.length > 0 ? { role: 'button', tabIndex: 0, 'aria-expanded': detail, 'data-a-venir-replier': detail ? 'ouvert' : 'ferme', onClick: () => setDetail((v) => !v), onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetail((v) => !v); } } } : {})}
-        style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 44, cursor: lignes.length > 0 ? 'pointer' : undefined }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{tr('journee.venir')}</div>
-          {lignes.length > 0 && !detail ? <div data-a-venir-replie="" style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>{trj('journee.ventesDetailCompte', { n: T.n })}</div> : null}
-          {/* Le groupe unique : qui doit l'argent, en une phrase (aucun montant redit). */}
-          {resume ? <div data-a-venir-resume="" {...attrsGroupe(resume)} style={{ fontSize: 13, color: C.muted, marginTop: 2, overflowWrap: 'anywhere' }}>{NOM_SITE_AVENIR[resume.plateforme] || resume.plateforme}{resume.compte && resume.plateforme === 'Vinted' ? <span className="vrm-sensible"> · {resume.compte}</span> : null} · {quand(resume)}</div> : null}
-        </div>
-        <span className="vrm-display" data-a-venir-total="" style={{ fontSize: 20, fontWeight: 700, color: C.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }} title={T.partiel ? tr('journee.moinsSans2', { x: String(T.manque.join(', ')) }) : undefined}>
-          {T.partiel && T.valeur != null ? <span style={{ fontSize: 13, fontWeight: 400, color: C.muted }}>{tr('journee.moins')} </span> : null}{T.valeur == null ? '—' : montant(T.valeur)}
+      style={{ marginBottom: 12 }}>
+      <button type="button" className="vrm-av-resume" data-a-venir-ouvrir="" onClick={ouvrirArgentAVenir} aria-label={`${tr('avenir.ouvrir')} — ${T.partiel && T.valeur != null ? tr('journee.moins') + ' ' : ''}${T.valeur == null ? '—' : montant(T.valeur)}`}>
+        <span className="vrm-av-resume-txt">
+          <span className="vrm-av-resume-titre">{tr('journee.venir')}</span>
+          {resume
+            ? <span className="vrm-av-resume-meta" data-a-venir-resume="" {...attrsGroupe(resume)}>{NOM_SITE_AVENIR[resume.plateforme] || resume.plateforme}{resume.compte && resume.plateforme === 'Vinted' ? <span className="vrm-sensible"> · {resume.compte}</span> : null} · {tr('avenir.ventes', { n: resume.n })}{resume.prevu != null ? ` · ${texteDatePrevue(resume.prevu)}` : ''}</span>
+            : <span className="vrm-av-resume-meta">{tr('avenir.ventes', { n: T.n })}{sites.map((p) => <span key={p} data-a-venir-ligne={p} data-a-venir-n={nDe(p)}> · {NOM_SITE_AVENIR[p] || p}{nComptes(p) > 1 ? ` (${tr('avenir.comptes', { n: nComptes(p) })})` : ''}</span>)}</span>}
+          {etapes.length ? <span className="vrm-av-resume-meta" data-a-venir-etapes={etapes.map((e) => e.cle + '=' + e.n).join(' ')}>{etapes.map((e) => e.texte).join(' · ')}</span> : null}
+          {(manque.length > 0 || nc.length > 0) ? (
+            <span className="vrm-av-resume-meta" data-a-venir-manque={manque.join(',')} data-a-venir-nc={String(nc.length)}>
+              {manque.length > 0 ? <>{tr('compta.sans')} {manque.join(', ')} {tr('ventes.lu2')}</> : null}
+              {manque.length > 0 && nc.length > 0 ? ' · ' : null}
+              {nc.length > 0 ? couvertureAVenir({ nonComptees: nc }).map((c) => c.texte).join(' · ') : null}
+            </span>
+          ) : null}
         </span>
-        {lignes.length > 0 ? <span aria-hidden="true" style={{ color: C.muted, transform: detail ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }}>›</span> : null}
-      </div>
-      {lignes.length > 0 && detail && <div role="list" style={{ marginTop: 6 }}>
-        {lignes.map((g) => (
-          <div role="listitem" key={g.plateforme + '|' + g.compte} {...attrsGroupe(g)}
-            style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44, borderTop: `1px solid ${C.border}` }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{NOM_SITE_AVENIR[g.plateforme] || g.plateforme}{g.compte && g.plateforme === 'Vinted' ? <span className="vrm-sensible" style={{ fontWeight: 400, color: C.muted }}> · {g.compte}</span> : null}</div>
-              <div style={{ fontSize: 13, color: C.muted }}>{quand(g)}</div>
-            </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: C.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{montant(g.eur)}</span>
-          </div>
-        ))}
-      </div>}
-      {(manque.length > 0 || nc.length > 0) && (
-        <div data-a-venir-manque={manque.join(',')} data-a-venir-nc={String(nc.length)} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, marginTop: 8, fontSize: 13, color: C.muted, lineHeight: 1.45 }}>
-          {manque.length > 0 ? <>{tr('compta.sans')} {manque.join(', ')} {tr('ventes.lu2')}</> : null}
-          {manque.length > 0 && nc.length > 0 ? ' · ' : null}
-          {nc.length > 0 ? <>{nc.length} {tr('journee.vente')}{nc.length > 1 ? 's' : ''} {tr('ventes.montantLu')}{[...new Set(nc.map((x) => x.plateforme))].join(', ')})</> : null}
-        </div>
-      )}
+        <span className="vrm-av-resume-total vrm-display" data-a-venir-total="" title={T.partiel ? tr('journee.moinsSans2', { x: String(T.manque.join(', ')) }) : undefined}>
+          {T.partiel && T.valeur != null ? <small>{tr('journee.moins')} </small> : null}{T.valeur == null ? '—' : montant(T.valeur)}
+        </span>
+        <span className="vrm-av-chev" aria-hidden="true">›</span>
+      </button>
     </section>
   );
 }
@@ -31904,6 +31896,35 @@ function CarteStatsApp({ page, liveStats, sel = null, locaux = null, ici = null,
   const avecPlus = React.useMemo(() => ({ ...base, valeurStock, objectif: objectif || null }), [base, valeurStock, objectif]);
   const sources = locaux ? { ...avecPlus, locaux } : avecPlus;
   return <CarteStats owner={AUTH.user?.id||''} page={page} sel={sel || { site: 'toutes', compte: null, periode: null }} sources={sources} regles={REGLES_CARTE} reglage={reglage} poser={poser} objectif={objectif} objectifBrut={objectifBrut} poserObjectif={poserObjectif} FermeAuRetour={FermeAuRetour} extra={{ ici, attrs, pile, tete, bande }} {...rest}/>;
+}
+// ═══════════════════════════════════════════════════════════════════════════
+// (15 nov.) L'ÉCRAN « ARGENT À VENIR », MONTÉ PAR LA COQUE — un toucher depuis Ma journée,
+// Ventes et Argent (`ouvrirArgentAVenir`, l'événement `vrm:argent-a-venir`). Il lit trois
+// sommes, chacune de SA règle, jamais additionnées : l'argent à venir (`liveStats.aVenir`,
+// src/argentAVenir.js), le porte-monnaie Vinted (`walletDispo`, déjà versé) et le reçu du mois
+// (`valeurChiffre('recu')`, la case de la carte des chiffres : daté au versement).
+// ═══════════════════════════════════════════════════════════════════════════
+function ArgentAVenirOuvert({ liveStats, onClose }) {
+  const S = useSourcesCarte(liveStats);
+  const sel = { site: 'toutes', compte: null, periode: null };
+  const r = sansCompteSur(valeurChiffre('recu', { id: 'recu', p: 'mois' }, S, sel, REGLES_CARTE), S);
+  const mois = new Date().toLocaleDateString(localeCourante(), { month: 'long' });
+  const recu = r && r.valeur != null ? { valeur: r.valeur, partiel: !!r.partiel, mois } : { valeur: null, mois, raison: r ? raisonCourte(r) : '' };
+  const L = liveStats || {};
+  const porteMonnaie = L.walletDispo != null || Array.isArray(L.walletParCompte)
+    ? { dispo: L.walletDispo != null ? L.walletDispo : null, attente: L.walletAttente != null ? L.walletAttente : null, comptes: Array.isArray(L.walletParCompte) ? L.walletParCompte : [] }
+    : null;
+  return <ArgentAVenirEcran A={L.aVenir || null} porteMonnaie={porteMonnaie} recu={recu} Feuille={SheetShell} onClose={onClose}/>;
+}
+function ArgentAVenirHote() {
+  const liveStats = React.useContext(LiveStatsCarte);
+  const [ouvert, setOuvert] = React.useState(false);
+  React.useEffect(() => {
+    const f = () => setOuvert(true);
+    window.addEventListener('vrm:argent-a-venir', f);
+    return () => window.removeEventListener('vrm:argent-a-venir', f);
+  }, []);
+  return ouvert ? <ArgentAVenirOuvert liveStats={liveStats} onClose={() => setOuvert(false)}/> : null;
 }
 // Le compte choisi, dit pour la carte : { uid, login, nom } ou null (tous).
 const compteCarte = (uid, accounts) => {
@@ -48172,6 +48193,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const tuilesPlacees = placerTuiles(out);
               return (<>
                 <BentoJournee tuiles={tuilesPlacees} ordi={ordiJournee} FermeAuRetour={FermeAuRetour}/>
+                {/* (15 nov.) L'argent à venir, en résumé sous la grille : un toucher ouvre son écran (src/ArgentAVenirEcran.jsx). */}
+                {!baseKO && !premierJour ? <div className="vrm-a-venir-hote vrm-a-venir-journee" style={{ margin: "12px 0 0" }}><ArgentAVenirCarte A={liveStats && liveStats.aVenir}/></div> : null}
                 {!out.mois ? <div hidden data-jp-cachee="chiffres">{chiffresMois}</div> : null}
               </>);
             })() : null}
@@ -56591,9 +56614,20 @@ const commandeEbayEngagee = (o) => !!o
   && !/FAILED|FULLY_REFUNDED/i.test(String(o.orderPaymentStatus || ''));
 // (4 nov.) L'argent à venir avec les règles PROPRIÉTAIRES de l'app (§11) : le
 // module ne recopie aucune d'elles, il les reçoit ici.
+// (15 nov.) L'ÉTAPE d'une vente Vinted à venir : l'étiquette de la vente (`etapeVente`, la règle de
+// Ventes, de la recherche et des cartes), traduite en étape d'argent — jamais une seconde lecture du statut.
+const etapeVintedAVenir = (o) => {
+  const e = etapeVente(o);
+  if (!e) return 'autre';
+  if (e.label === 'À expédier') return 'envoyer';
+  if (e.step === 2 || e.label === 'Au relais') return 'route';
+  if (e.label === 'Livrée') return 'livree';
+  if (e.label === 'Vendue') return 'versement';
+  return 'autre';
+};
 const REGLES_A_VENIR = { classer: (st) => classifyOrderStatus(st), montantVinted: (o) => montantCommandeLu(o), lbcAnnulee: (v) => lbcAnnulee(v), lbcFinalisee: (v) => lbcFinalisee(v),
   commandeEbayEngagee: (o) => commandeEbayEngagee(o), montantRecuEbay: (o) => montantRecuEbay(o), etapeVc: (v) => etapeMotVc(v), vcAnnulee: (v) => vcVenteAnnulee(v),
-  montantRecuVc: (v) => montantRecuVc(v), dateVersementVc: (v) => dateVersementVc(v) };
+  montantRecuVc: (v) => montantRecuVc(v), dateVersementVc: (v) => dateVersementVc(v), etapeVinted: (o) => etapeVintedAVenir(o), parcoursVc: (v) => parcoursVenteVc(v) };
 const aVenirCoque = (x) => argentAVenir({ ...x, etatTx: TXN_ETATS_LU === false ? null : etatTxn, R: REGLES_A_VENIR });
 // `programmees` (5 octobre) : les annonces PROGRAMMÉES sur eBay
 // (`ebay_programmees.items`, et celles que VRM vient de programmer). Une paire
@@ -60944,7 +60978,7 @@ function AppCoeur() {
         walletComptes:(walletEsc&&walletEsc.accounts)||0,
         // (17 oct.) Le disponible COMPTE PAR COMPTE, pour « Retirer » (il faut
         // savoir sur quel compte aller : il en a plusieurs).
-        walletParCompte:(walletEsc&&Array.isArray(walletEsc.parCompte))?walletEsc.parCompte.map(x=>({uid:x.uid,login:(()=>{const a=(vintedAccounts||[]).find(y=>String(y.vinted_user_id)===String(x.uid));return a?String(a.login||''):'';})(),dispo:x.dispo,jours:x.jours})):null,
+        walletParCompte:(walletEsc&&Array.isArray(walletEsc.parCompte))?walletEsc.parCompte.map(x=>({uid:x.uid,login:(()=>{const a=(vintedAccounts||[]).find(y=>String(y.vinted_user_id)===String(x.uid));return a?String(a.login||''):'';})(),dispo:x.dispo,attente:x.attente,jours:x.jours})):null,
         walletAgeJours:(walletEsc&&walletEsc.plusVieuxJours!=null)?walletEsc.plusVieuxJours:null});
         // Photo des chiffres pour le WIDGET écran d'accueil : l'app publie ce
         // qu'elle affiche → le widget montre EXACTEMENT la même chose. « Vendu ce
@@ -63406,6 +63440,7 @@ function AppCoeur() {
         html, body, #root { max-width: 100%; overflow-x: hidden; margin: 0; }
         * { box-sizing: border-box; }
       `}</style>
+      <ArgentAVenirHote/>
     </div>
     </SansCompteCarte.Provider>
     </LiveStatsCarte.Provider>
