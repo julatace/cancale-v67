@@ -789,6 +789,12 @@ import { LIGNE_AVIS_BAS, LIGNE_AVIS_BAS_VUS } from "./avisNegatif.js";
 // (11 nov., lot photos-comptes) La même PHOTO sur deux de ses comptes Vinted (empreintes de l'extension 5.358).
 import { annoncesPourPhotos, calculerPhotosComptes, publierPhotosComptes, cibleRepublier } from "./photosComptes.js";
 import { PhotosEntreComptesDetail, textePhotosComptes } from "./PhotosEntreComptes.jsx";
+// (15 nov., lot meme-photo) « La même photo » : une annonce d'ailleurs sans lien, à la photo d'une paire Vinted.
+import { propositionsMemePhoto, cleRefusMemePhoto } from "./memePhoto.js";
+import { publierMemePhoto, lireMemePhoto, ouvrirMemePhoto } from "./memePhotoEtat.js";
+import { MemePhotoHote, LigneMemePhoto, LigneMemePhotoNumero, texteMemePhoto, useMemePhoto } from "./MemePhoto.jsx";
+import { clePhotoEmpreinte, SEUIL_PHOTO } from "./photoEmpreinte.js";
+import { empreinteImageLocale } from "./photosComptes.js";
 import { groupesParCompte, initialeCompte, remisesSurVignettes } from "./annoncesGrille.js";   // (10 nov., lot AM) Annonces en grille, par compte
 import { EnLigneDeuxFoisDetail, EnLigneDeuxFoisAlerte } from "./EnLigneDeuxFois.jsx";
 import { CLE_JOURNAL_NUMEROS, evenementsNumeroFiches, ajouterAuJournal, historiqueNumero } from "./historiqueNumero.js";
@@ -974,7 +980,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.380.0';
+const EXT_ATTENDUE = '5.382.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -1401,7 +1407,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
+const EXT_CAPACITES = { memephoto: '5.382.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -3148,6 +3154,8 @@ const SYNC_KEYS = [
   'vrm_brouillons_refaire_ecartes',
   // (19 oct.) Annonce eBay → paire, par IDENTITÉ (publication, brouillon, « Relier »).
   'vrm_ebay_liens',
+  // (15 nov., lot meme-photo) Ses « Ce n'est pas la même » : { 'Site:annonce|N°': date }, écrits sur SON toucher.
+  'vrm_meme_photo_non',
   // Le marqueur de la remise à zéro (migration 013) : ÉCRIT PAR LE SERVEUR SEUL
   // (le garde-fou de la base le recopie depuis la ligne d'avant, quoi que le
   // navigateur envoie). Synchronisé pour être LU : série d'archive, version.
@@ -25681,6 +25689,214 @@ async function defaireVc(productId) {
   vcPoser('vrm_vc_liens', defaireLienVc(vcCarte('vrm_vc_liens'), productId));
   return true;
 }
+// ══ « LA MÊME PHOTO » : UNE ANNONCE D'AILLEURS, SANS LIEN, À LA PHOTO D'UNE PAIRE VINTED (15 nov.) ══
+// Julien : « je veux que VRM propose que c'est exactement la même — on ne parle pas du tout de
+// titre, mais vraiment exactement la même photo ». Règle : src/memePhoto.js (pure) ; empreintes :
+// `photo_emprunte_{uid}` (Vinted, extension 5.358), `photo_empreinte_lbc` / `_vc` (extension 5.382),
+// `photo_empreinte_ebay` (calculées ICI, dans la page : `empreintesEbayPage`). Projections seulement
+// (§4.4), lecture ratée ⇒ `null` (« pas vérifié », jamais « rien à relier »).
+// ⚠️ §5 : la photo PROPOSE, SON toucher relie. `relierParPhoto` pose le MÊME lien que ses gestes
+// à la main (`vrm_lbc_liens` · `vrm_ebay_liens` · `vrm_vc_liens`) : l'identité que lisent déjà le
+// retrait ailleurs, les ventes croisées et la garde des offres. Un N° d'avant la remise à zéro
+// garde sa règle (`numeroExterne`) : le N° posé est celui de la fiche Vinted, tel quel.
+const LIGNES_EMPREINTES_SITES = { photo_empreinte_lbc: 'Leboncoin', photo_empreinte_vc: 'Vestiaire', photo_empreinte_ebay: 'eBay' };
+const CLE_REFUS_MEME_PHOTO = 'vrm_meme_photo_non';
+const lireEmpreintesSites = async () => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(${Object.keys(LIGNES_EMPREINTES_SITES).join(',')})${filtreProprio()}&select=id,a:data->payload->annonces`, { headers: sbAuth() });
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (!Array.isArray(j)) return null;
+    const out = { Leboncoin: {}, Vestiaire: {}, eBay: {} };
+    for (const l of j) { const site = LIGNES_EMPREINTES_SITES[String(l && l.id)]; if (site && l.a && typeof l.a === 'object') out[site] = l.a; }
+    return out;
+  } catch (_) { return null; }
+};
+// Ses annonces des autres sites, à la forme de la règle. Chaque site lu À PART : un site
+// illisible est NOMMÉ (`illisibles`), les autres comptent. `relie` = déjà une identité
+// (lien posé, référence VRM, SKU sûr, « pas d'article à relier » dit par lui).
+async function annoncesAutresMemePhoto() {
+  const autres = [], illisibles = [];
+  // Leboncoin
+  try {
+    const ls = await lbcListingsSession();
+    if (!ls || !ls.items) illisibles.push('Leboncoin');
+    else {
+      const liens = { ...(load('vrm_lbc_liens', {}) || {}) }, sans = load('vrm_lbc_pas_de_paire', {}) || {};
+      for (const ad of Object.values(ls.items || {})) {
+        if (!ad || ad.id == null || !annonceLbcEnVente(ad, new Set())) continue;
+        const id = String(ad.id);
+        const n = numeroLbcIdentite({ itemId: ad.id }, ls.items, liens);
+        autres.push({ plateforme: 'Leboncoin', id, compte: idCompteLbcApp(ad.account || ad.lbcUser || ''), compteNom: ad.accountName || '', titre: ad.subject || ad.title || '',
+          photo: (Array.isArray(ad.images) && typeof ad.images[0] === 'string' && ad.images[0]) || null, lien: lienAnnonceLeboncoin(ad) || null, relie: !!n || !!sans['ad:' + id], numero: n || '' });
+      }
+    }
+  } catch (_) { illisibles.push('Leboncoin'); }
+  // eBay
+  try {
+    const lu = await lireEbayTous('ebay_listings', SEL_EBAY_ANNONCES, 'items');
+    if (!lu) illisibles.push('eBay');
+    else {
+      if (lu.illisibles && lu.illisibles.length) illisibles.push('eBay');
+      for (const a of lu.items || []) {
+        if (!a || a.itemId == null || /(ended|sold|inactive|supprim)/i.test(String(a.listingStatus || a.status || ''))) continue;
+        const n = numEbayLu(a.sku, a.itemId, null, a.depuis);
+        autres.push({ plateforme: 'eBay', id: String(a.itemId), compte: a._compte || 'principal', compteNom: a._compteNom || '', titre: a.title || '', photo: a.photo || null,
+          lien: /^\d+$/.test(String(a.itemId)) ? 'https://www.ebay.fr/itm/' + a.itemId : null, relie: !!n, numero: n || '' });
+      }
+    }
+  } catch (_) { illisibles.push('eBay'); }
+  // Vestiaire : reliable = le N° de l'annonce est celui que VRM lui a donné (ou aucun).
+  try {
+    const rows = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt`);
+    if (!Array.isArray(rows)) illisibles.push('Vestiaire');
+    else {
+      const d = rows[0] || {}, liens = vcCarte('vrm_vc_liens');
+      for (const [id, it] of Object.entries((d.items && typeof d.items === 'object') ? d.items : {})) {
+        if (!it || typeof it !== 'object' || etatAnnonceVcBrut(it, false, d.capturedAt) === 'retiree') continue;
+        const relie = !vcReliable({ productId: id, item: it, liensPub: d.liens || {}, liens, cleNum });
+        autres.push({ plateforme: 'Vestiaire', id: String(id), compte: String(it.compte || ''), compteNom: 'Vestiaire', titre: String(it.titre || ''), photo: it.photo || null, lien: null, relie,
+          numero: relie ? (numVcAnnonce(id, it, d.liens || {}, numerosVcEffectifs()) || '') : '' });
+      }
+    }
+  } catch (_) { illisibles.push('Vestiaire'); }
+  return { autres, illisibles };
+}
+// Ses annonces Vinted qui ont une empreinte : N°, titre, photo de leur FICHE (identifiant d'annonce).
+function annoncesVintedMemePhoto(empVinted) {
+  const fiches = load('vinted_annonce_numeros', {}) || {};
+  const out = [];
+  for (const [cc, parId] of Object.entries(empVinted || {})) {
+    const uid = String(cc).replace(/^vinted:/, '');
+    for (const [id, photos] of Object.entries(parId || {})) {
+      const f = fiches[String(id)] || {};
+      const ph = typeof f.photo === 'string' ? f.photo : (f.photo && f.photo.url) || Object.keys(photos || {})[0] || '';
+      out.push({ id: String(id), compte: uid, compteNom: '', numero: f.numero != null ? String(f.numero) : '', titre: f.title || '', photo: ph || null, lien: /^\d+$/.test(String(id)) ? `https://www.vinted.fr/items/${id}` : null });
+    }
+  }
+  return out;
+}
+// L'empreinte des photos eBay, DANS la page (une image lisible sans droit d'hôte — sinon
+// « pas vérifiée ») : une à la fois, 1,5 s entre deux, 30 au plus par ouverture, les annonces
+// SANS lien d'abord ; rangées dans `photo_empreinte_ebay`, relue avant (une lecture ratée
+// n'écrit rien). Jamais l'image : l'empreinte seule.
+let _ebayEmpEnCours = null; let _ebayEmpFaites = 0;
+const EBAY_EMP_PAR_OUVERTURE = 30;
+function empreintesEbayPage(autres, deja) {
+  if (_ebayEmpEnCours || _ebayEmpFaites >= EBAY_EMP_PAR_OUVERTURE) return _ebayEmpEnCours || Promise.resolve(0);
+  const aFaire = (autres || []).filter((a) => a.plateforme === 'eBay' && a.photo && /^https:\/\//.test(a.photo))
+    .filter((a) => { const k = clePhotoEmpreinte(a.photo); return k && !((deja || {})[a.id] || {})[k]; })
+    .sort((x, y) => Number(x.relie) - Number(y.relie)).slice(0, EBAY_EMP_PAR_OUVERTURE - _ebayEmpFaites);
+  if (!aFaire.length) return Promise.resolve(0);
+  _ebayEmpEnCours = (async () => {
+    const calc = {};
+    for (const a of aFaire) {
+      if (!AUTH.user?.id) break;
+      const h = await empreinteImageLocale(a.photo);
+      _ebayEmpFaites++;
+      if (h) calc[a.id] = { ...(calc[a.id] || {}), [clePhotoEmpreinte(a.photo)]: h };
+      await new Promise((ok) => setTimeout(ok, 1500));
+    }
+    if (!Object.keys(calc).length) return 0;
+    const owner = AUTH.user?.id;
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.photo_empreinte_ebay${filtreProprio()}&select=a:data->payload->annonces`, { headers: sbAuth() });
+      if (!r.ok) return 0;
+      const j = await r.json(); if (!Array.isArray(j) || AUTH.user?.id !== owner) return 0;
+      const annonces = { ...((j[0] && j[0].a && typeof j[0].a === 'object') ? j[0].a : {}) };
+      for (const [id, ph] of Object.entries(calc)) annonces[id] = { ...(annonces[id] || {}), ...ph };
+      const enLigne = new Set((autres || []).filter((a) => a.plateforme === 'eBay').map((a) => a.id));
+      if (enLigne.size) for (const id of Object.keys(annonces)) if (!enLigne.has(id)) delete annonces[id];
+      const n = Object.values(annonces).reduce((t, x) => t + Object.keys(x || {}).length, 0);
+      const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, { method: 'POST', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+        body: JSON.stringify([withOwner({ id: 'photo_empreinte_ebay', data: { type: 'photo_empreintes_site', site: 'ebay', capturedAt: new Date().toISOString(), nItems: n, payload: { version: 1, seuil: SEUIL_PHOTO, annonces } } })]) });
+      return w.ok ? Object.keys(calc).length : 0;
+    } catch (_) { return 0; }
+  })().finally(() => { _ebayEmpEnCours = null; });
+  return _ebayEmpEnCours;
+}
+// Tout calculer une fois (relu au plus toutes les 2 min, ou sur demande), publié dans
+// src/memePhotoEtat.js : la feuille, Ma journée et les écrans des sites LISENT.
+let _memePhotoEnCours = null, _memePhotoAt = 0;
+async function chargerMemePhoto(force = false) {
+  if (!AUTH.user?.id || !isCloudReady()) return null;
+  if (_memePhotoEnCours) return _memePhotoEnCours;
+  if (!force && Date.now() - _memePhotoAt < 120000 && lireMemePhoto()) return lireMemePhoto();
+  _memePhotoEnCours = (async () => {
+    const owner = AUTH.user?.id;
+    const [empV, empS, ext] = await Promise.all([lireEmpreintesPhotos(), lireEmpreintesSites(), annoncesAutresMemePhoto()]);
+    if (AUTH.user?.id !== owner) return null;
+    const vinted = empV ? annoncesVintedMemePhoto(empV) : [];
+    const empreintes = empV && empS ? { vinted: Object.fromEntries(Object.entries(empV).map(([cc, v]) => [cc.replace(/^vinted:/, ''), v])), ...empS } : null;
+    let douteux = new Set(); try { douteux = lireNumerosAmbigus(); } catch (_) {}
+    const res = propositionsMemePhoto({ vinted, autres: ext.autres, empreintes, refus: load(CLE_REFUS_MEME_PHOTO, {}) || {}, numerosDouteux: douteux, cle: cleNum });
+    const etat = { ...res, illisibles: ext.illisibles, vinted, at: Date.now() };
+    _memePhotoAt = Date.now();
+    publierMemePhoto(etat);
+    // eBay : les photos sans empreinte se calculent ICI, puis tout est relu une fois.
+    if (empS) empreintesEbayPage(ext.autres, empS.eBay).then((n) => { if (n > 0) chargerMemePhoto(true); });
+    return etat;
+  })().catch(() => null).finally(() => { _memePhotoEnCours = null; });
+  return _memePhotoEnCours;
+}
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  // Un lien posé, défait, ou un « pas la même » (ici ou sur un autre appareil) : tout est relu.
+  window.addEventListener('vrm:save', (e) => { const k = e && e.detail && e.detail.k; if (['vrm_lbc_liens', 'vrm_ebay_liens', 'vrm_vc_liens', CLE_REFUS_MEME_PHOTO, 'vrm_lbc_pas_de_paire'].includes(k) && lireMemePhoto()) setTimeout(() => chargerMemePhoto(true), 50); });
+}
+// RELIER, sur SON toucher (proposition ou choix dans un cas ambigu). Le N° est celui de la
+// fiche Vinted ; `vintedId` l'annonce Vinted de cette fiche. Rend true si le lien est posé.
+async function relierParPhoto({ annonce, numero, vintedId }) {
+  if (!isCloudReady()) { toast(tr('memePhoto.pasPret')); return false; }
+  const n = String(numero || '').trim(), id = String((annonce && annonce.id) || '');
+  if (!n || !id) return false;
+  const relu = () => { _memePhotoAt = 0; setTimeout(() => chargerMemePhoto(true), 50); };
+  if (annonce.plateforme === 'Leboncoin') {
+    const avant = (load('vrm_lbc_liens', {}) || {})[id];
+    if (avant != null && String(avant).trim()) { toast(tr('memePhoto.dejaRelie')); return false; }
+    gesteVrm(tr('memePhoto.relie', { numero: n }), [{ k: 'vrm_lbc_liens', type: 'cle', id, apres: n, avant }], {}, (sens) => {
+      try { const l = { ...(load('vrm_lbc_liens', {}) || {}) }; if (sens === 'apres') l[id] = n; else if (avant === undefined) delete l[id]; else l[id] = avant; ecrireCopieLocale('vrm_lbc_liens', l); } catch (_) {}
+      relu();
+    });
+    return true;
+  }
+  if (annonce.plateforme === 'eBay') {
+    if (!vintedId) return false;
+    const avant = (load(LIENS_EBAY, {}) || {})[id];
+    if (avant && avant.pairId) { toast(tr('memePhoto.dejaRelie')); return false; }
+    const lien = { pairId: String(vintedId), numero: n, at: Date.now(), par: 'photo' };
+    gesteVrm(tr('memePhoto.relie', { numero: n }), [{ k: LIENS_EBAY, type: 'cle', id, apres: lien, avant }], {}, (sens) => {
+      try { const l = { ...(load(LIENS_EBAY, {}) || {}) }; if (sens === 'apres') l[id] = lien; else if (avant === undefined) delete l[id]; else l[id] = avant; ecrireCopieLocale(LIENS_EBAY, l); } catch (_) {}
+      _fichesEbayMemo.at = 0; relu();
+    });
+    return true;
+  }
+  if (annonce.plateforme === 'Vestiaire') {
+    if (!vintedId) return false;
+    const ok = await relierVc({ productId: id, item: String(vintedId), numVinted: n, titre: annonce.titre });
+    if (ok) relu();
+    return ok;
+  }
+  return false;
+}
+// « Ce n'est pas la même » : rangé par identité (site:annonce|N°), la proposition ne revient
+// plus pour ce couple. Annulable 5 s, comme ses autres gestes.
+function refuserMemePhoto({ annonce, numero }) {
+  const k = cleRefusMemePhoto(annonce.plateforme, annonce.id, numero, cleNum);
+  const avant = (load(CLE_REFUS_MEME_PHOTO, {}) || {})[k];
+  const at = new Date().toISOString();
+  gesteVrm(tr('memePhoto.refuse'), [{ k: CLE_REFUS_MEME_PHOTO, type: 'cle', id: k, apres: at, avant }], {}, (sens) => {
+    try { const l = { ...(load(CLE_REFUS_MEME_PHOTO, {}) || {}) }; if (sens === 'apres') l[k] = at; else delete l[k]; ecrireCopieLocale(CLE_REFUS_MEME_PHOTO, l); } catch (_) {}
+    _memePhotoAt = 0; setTimeout(() => chargerMemePhoto(true), 50);
+  });
+}
+// La photo d'une annonce, quel que soit son site (Vestiaire : son propre lecteur).
+const photoMemePhoto = (src) => (/vestiairecollective\./i.test(String(src || '')) ? <PhotoVc src={src} style={{ width: '100%', height: '100%' }}/> : <PhotoVinted src={src} alt="" loading="lazy" decoding="async"/>);
+const chargerMemePhotoUI = (force) => { chargerMemePhoto(force === true); };
+// L'hôte de la feuille « Même photo · à relier », monté une fois dans la coque.
+function MemePhotoCoque() {
+  return <MemePhotoHote charger={chargerMemePhotoUI} SheetShell={SheetShell} Photo={photoMemePhoto} onRelier={relierParPhoto} onRefuser={refuserMemePhoto}
+    extension={extSait('memephoto') === 'retard' ? 'retard' : 'ok'} versionExt={EXT_CAPACITES.memephoto.replace(/\.0$/, '')}/>;
+}
 // Les N° à barrer (une liaison a remplacé un N° déjà donné), jusqu'à « C'est écrit ».
 function BlocBarrerVc({ titres = {} }) {
   const vcLoc = useVcLocal();
@@ -36302,6 +36518,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // annonces EN LIGNE que `enLigneDeux` ; compte pas lu ⇒ « pas vérifié ». `undefined` = en cours.
   const [empreintesPhotos, setEmpreintesPhotos] = useState(undefined);
   const [photosComptesOuvert, setPhotosComptesOuvert] = useState(false);
+  // (15 nov., lot meme-photo) « Même photo · à relier » (src/memePhoto.js), lu par Ma journée.
+  const memePhotoJ = useMemePhoto(only === 'journee' || only === 'annonces' ? chargerMemePhotoUI : null);
   const relireEmpreintes = React.useCallback(() => { const owner = AUTH.user?.id; lireEmpreintesPhotos().then((e) => { if (AUTH.user?.id === owner) setEmpreintesPhotos(e); }); }, []);
   useEffect(() => { if (AUTH.user?.id && cleComptes) relireEmpreintes(); }, [cleComptes, relireEmpreintes]);
   const photosComptes = useMemo(() => {
@@ -47389,12 +47607,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const aVerifier = commandesAVerifier();
               // (11 nov., lot photos-comptes) LA MÊME PHOTO SUR DEUX DE SES COMPTES : une carte AMBRE, seulement s'il y en a.
               const photosDouble = photosComptes && photosComptes.groupes.length ? photosComptes.groupes : [];
+              // (15 nov., lot meme-photo) UNE annonce d'ailleurs à la photo d'une paire Vinted : une carte AMBRE, seulement s'il y en a.
+              const memeJ = texteMemePhoto(memePhotoJ);
               // (11 nov., lot journee-perso) Les cartes qu'il a cachées ne comptent pas dans « N gestes »
               // (elles ne sont pas à l'écran) ; leur nombre est dit à part (`nCacheesAF`).
-              const nParCarteAF = { ailleurs: carteAilleurs ? 1 : 0, 'deux-fois': deuxFois.length ? 1 : 0, 'photos-comptes': photosDouble.length ? 1 : 0, 'a-relier': comptesARelierJour.length ? 1 : 0, 'stock-sortie': sortiesStock.length ? 1 : 0, 'pas-en-ligne': pasEnLigneJ && pasEnLigneJ.liste.length ? 1 : 0, 'sante-comptes': santeSurv.length ? 1 : 0, favoris: nouveauxFav && nouveauxFav.annonces > 0 ? 1 : 0, trancher: jobTrancher ? 1 : 0, republier: jobRepublier ? 1 : 0, autres: autres.length, urssaf: urssafJob ? 1 : 0, 'avis-bas': avisBasListe.length ? 1 : 0, suivi: aVerifier.n ? 1 : 0 };
+              const nParCarteAF = { ailleurs: carteAilleurs ? 1 : 0, 'deux-fois': deuxFois.length ? 1 : 0, 'photos-comptes': photosDouble.length ? 1 : 0, 'meme-photo': memeJ.n ? 1 : 0, 'a-relier': comptesARelierJour.length ? 1 : 0, 'stock-sortie': sortiesStock.length ? 1 : 0, 'pas-en-ligne': pasEnLigneJ && pasEnLigneJ.liste.length ? 1 : 0, 'sante-comptes': santeSurv.length ? 1 : 0, favoris: nouveauxFav && nouveauxFav.annonces > 0 ? 1 : 0, trancher: jobTrancher ? 1 : 0, republier: jobRepublier ? 1 : 0, autres: autres.length, urssaf: urssafJob ? 1 : 0, 'avis-bas': avisBasListe.length ? 1 : 0, suivi: aVerifier.n ? 1 : 0 };
               const cacheesHorsCases = Object.keys(nParCarteAF).filter((id) => nParCarteAF[id] > 0 && !visJ(id).montree);
               const nCacheesAF = casesCachees.length + cacheesHorsCases.reduce((t, id) => t + nParCarteAF[id], 0);
-              const nGestesTout = cases.length + alertesArgent.length + autres.length + jobsTuile.length + (nouveauxFav && nouveauxFav.annonces > 0 ? 1 : 0) + (cyclesJ.length ? 1 : 0) + (jobTrancher ? 1 : 0) + (jobRepublier ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (pasEnLigneJ && pasEnLigneJ.liste.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (photosDouble.length ? 1 : 0) + (comptesARelierJour.length ? 1 : 0) + (santeSurv.length ? 1 : 0) + (avisBasListe.length ? 1 : 0) + (aVerifier.n ? 1 : 0);
+              const nGestesTout = cases.length + alertesArgent.length + autres.length + jobsTuile.length + (nouveauxFav && nouveauxFav.annonces > 0 ? 1 : 0) + (cyclesJ.length ? 1 : 0) + (jobTrancher ? 1 : 0) + (jobRepublier ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (pasEnLigneJ && pasEnLigneJ.liste.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (photosDouble.length ? 1 : 0) + (memeJ.n ? 1 : 0) + (comptesARelierJour.length ? 1 : 0) + (santeSurv.length ? 1 : 0) + (avisBasListe.length ? 1 : 0) + (aVerifier.n ? 1 : 0);
               const nGestes = nGestesTout - (nCacheesAF - casesCachees.length);
               const carteAVerifier = () => {
                 const tous = [...aVerifier.ventes, ...aVerifier.achats];
@@ -47470,6 +47690,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     title={`${t.titre}\n${t.detail}`} aria-label={`${t.titre} — ${t.detail}`} onClick={() => { relireEmpreintes(); setFeuillePhotosJ(true); }}>
                     <PileVignettes srcs={photosDouble.flatMap((g) => g.annonces.map((a) => a.photo))} n={photosDouble.length} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="image" size={20}/>}/>
                     <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{t.titre}</span><span className="vrm-day-task-note is-urgent" data-sous-ligne="photos-comptes">{t.detail}</span></span>
+                    <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{VERBES.voir}</span></span>
+                  </button>
+                );
+              };
+              const carteMemePhoto = () => {
+                const l = memePhotoJ && memePhotoJ.lu ? [...memePhotoJ.propositions, ...memePhotoJ.ambigus.filter((x) => x.raison !== 'sans-numero')] : [];
+                return (
+                  <button key="meme-photo" type="button" className="vrm-day-task vrm-fu-tache" data-journee-meme-photo={l.map((x) => x.id).join(' ')} data-n={String(memeJ.n)}
+                    title={`${memeJ.titre}\n${memeJ.detail}`} aria-label={`${memeJ.titre} — ${memeJ.detail}`} onClick={() => ouvrirMemePhoto(null)}>
+                    <PileVignettes srcs={l.map((x) => x.annonce.photo)} n={memeJ.n} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="image" size={20}/>}/>
+                    <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{memeJ.titre}</span><span className="vrm-day-task-note is-urgent" data-sous-ligne="meme-photo">{memeJ.detail}</span></span>
                     <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{VERBES.voir}</span></span>
                   </button>
                 );
@@ -47642,6 +47873,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 'deux-fois': deuxFois.length ? [carteDeuxFois()] : [],
                 'avis-bas': avisBasListe.length ? [carteAvisBas()] : [],
                 'photos-comptes': photosDouble.length ? [cartePhotosComptes()] : [],
+                'meme-photo': memeJ.n ? [carteMemePhoto()] : [],
                 // (14 nov., Studio) Les quatre cases sont des TUILES de la grille (src/JourneeStudio.jsx) : plus des cartes ici.
                 ...Object.fromEntries(['envoyer', 'retirer', 'messages', 'prix'].map((id) => [id, []])),
                 republier: jobRepublier ? [tache(jobRepublier, 97)] : [],
@@ -50559,6 +50791,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                        remettre sans sa demande. Les prix d'un achat groupé : Achats → Fournisseurs. */
                     /* (11 nov., lot photos-comptes) La même photo sur deux de ses comptes Vinted : la feuille. */
                     {k:'photos-comptes', icon:'image', lab:tr('photosComptes.outil'), n:photosComptes ? photosComptes.groupes.length : 0, desc:tr('photosComptes.outilDesc'), on:()=>{ setAnnToolsOpen(false); relireEmpreintes(); setPhotosComptesOuvert(true); }},
+                    /* (15 nov., lot meme-photo) Une annonce d'ailleurs avec la photo d'une paire Vinted : la feuille « à relier ». */
+                    {k:'meme-photo', icon:'image', lab:tr('memePhoto.outil'), n:texteMemePhoto(memePhotoJ).n, desc:tr('memePhoto.outilDesc'), on:()=>{ setAnnToolsOpen(false); ouvrirMemePhoto(null); }},
                     {k:'studio', icon:'camera', lab:'Studio photo', desc:tr('annonces.cadreGuidePrise'), on:()=>{ setAnnToolsOpen(false); setStudioOpen(true); }},
                     {k:'seance-photo', icon:'camera', lab:tr('atelier.seance.titre'), desc:tr('atelier.seance.outil'), on:()=>{ setAnnToolsOpen(false); ouvrirAtelier('seance'); }},
                     /* (14 nov., lot messages-achats-plus, 110) Une sélection en un lien, lecture seule, révocable, qui expire. */
@@ -61707,6 +61941,7 @@ function AppCoeur() {
         : t==='ventes' ? <><CarteStatsApp page="vestiaire" aide className="vrm-fu-ecran" ici="cat_ventes" onNav={setTab} sel={{ site: 'vestiaire', compte: null, periode: null }}/><VentesVestiaire comptes={vintedAccounts}/></>
         : t==='annonces' ? <>
             {/* (14 nov.) « Publier sur Vestiaire » : le « + » de la barre de la liste (Vestiaire.jsx). */}
+            <LigneMemePhoto site="Vestiaire" charger={chargerMemePhotoUI}/>
             <AnnoncesVestiaire/>
             <PublierVestiaire comptes={vintedAccounts}/>
             <Card style={{padding:16}}>
@@ -61900,7 +62135,7 @@ function AppCoeur() {
               non : pendant une panne il disait sa lecture ratée en quatre
               messages, plus « ouvre leboncoin.fr » — le mauvais geste (§7). */}
           {/* (14 nov.) « Publier sur Leboncoin » : le « + » de la barre de la liste (Leboncoin.jsx), plus une carte en tête. */}
-          {sec==='annonces'&&(baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<LeboncoinScreen/>)}
+          {sec==='annonces'&&(baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<><LigneMemePhoto site="Leboncoin" charger={chargerMemePhotoUI}/><LeboncoinScreen/></>)}
           {/* (27 oct.) Le diagnostic est une aide en cas de souci : en bas de
               l'espace, plus une ligne en tête de chaque section. */}
           <div data-diag-lbc="" style={{padding:'0 16px'}}><DiagnosticLeboncoin key={AUTH.user?.id||'sans-session'} lire={q=>lireBaseRelue(`${SUPABASE_URL}/rest/v1/${q}`)} couleurs={C}/></div>
@@ -61940,6 +62175,7 @@ function AppCoeur() {
           {sec==='promo'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayPromotion key={'pr-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/><EbayRemises key={'rm-'+ref} compte={ref}/></>}</EbayActionCompte></div>}
           {sec==='achats'&&<EbayAchatsOnglet headers={enTeteSession} panelOff={panelOffCoque} vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue} contexte={ctxCalculette}/>}
           {sec==='offres'&&<div style={{padding:16}}><GuidesEbay ids={['offre']}/><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayOffres key={ref} cible={ebayCible?.compte===ref && ebayCible.section==='offres'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onAnnonces={()=>allerSec('annonces')}/>}</EbayActionCompte></div>}
+          {sec==='annonces'&&!baseKO&&<LigneMemePhoto site="eBay" charger={chargerMemePhotoUI}/>}
           {sec==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts} vue={ebayVueEff} comptesEbay={comptesEbay}/>}
         </section>); };
   // Compte eBay : un panneau des Paramètres (« Comptes eBay »), dans le skin eBay.
@@ -62387,7 +62623,7 @@ function AppCoeur() {
             journal: load(CLE_JOURNAL_NUMEROS, []) || [], marqueur: marqueurNumerotation(), sortieStock: (load('vrm_stock_sortis', {}) || {})[rn.cle] || null,
             estArchive: (n) => estArchive(n), cleNum }) : null;
           const fermer = fermerF;
-          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={numF} lecture={!numData} note={p && p.num && !p.ancienNumero ? <>{questionChezToiFiche(p.num)}{blocVenduAilleurs(p, rn, etat)}<NotePaireCoque numero={p.num} variante="bloc" ajout dicter/><InfosPaireCoque numero={p.num}/><AtelierPaireCoque num={p.num} idFiche={p.idFiche || ''} itemId={(rn.annonces || []).length === 1 ? String(rn.annonces[0].id || '') : ''}/><BlocHistoriqueRepub ids={(rn.annonces || []).map((x) => String(x.id))} d={{ numeros, stats: Object.fromEntries((rn.annonces || []).map((x) => [String(x.id), { favoris: Number.isFinite(x.favourites) ? x.favourites : null, vues: Number.isFinite(x.views) ? x.views : null }])) }}/><BoutonRappel cible={{ sorte: 'article', num: p.num, item: (rn.annonces || []).length === 1 ? String(rn.annonces[0].id || '') : '' }} libelle={`N°${p.num}`}/></> : null} onFermer={fermer} onRetour={depuis ? fermer : ()=>{ fermer(); setGsQ(String((p && p.num) || numF)); setGsOpen(true); }}
+          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={numF} lecture={!numData} note={p && p.num && !p.ancienNumero ? <>{questionChezToiFiche(p.num)}{blocVenduAilleurs(p, rn, etat)}<LigneMemePhotoNumero numero={p.num} cle={cleNum} charger={chargerMemePhotoUI}/><NotePaireCoque numero={p.num} variante="bloc" ajout dicter/><InfosPaireCoque numero={p.num}/><AtelierPaireCoque num={p.num} idFiche={p.idFiche || ''} itemId={(rn.annonces || []).length === 1 ? String(rn.annonces[0].id || '') : ''}/><BlocHistoriqueRepub ids={(rn.annonces || []).map((x) => String(x.id))} d={{ numeros, stats: Object.fromEntries((rn.annonces || []).map((x) => [String(x.id), { favoris: Number.isFinite(x.favourites) ? x.favourites : null, vues: Number.isFinite(x.views) ? x.views : null }])) }}/><BoutonRappel cible={{ sorte: 'article', num: p.num, item: (rn.annonces || []).length === 1 ? String(rn.annonces[0].id || '') : '' }} libelle={`N°${p.num}`}/></> : null} onFermer={fermer} onRetour={depuis ? fermer : ()=>{ fermer(); setGsQ(String((p && p.num) || numF)); setGsOpen(true); }}
             onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}
             onEmballer={()=>{ fermer(); setGsOpen(false); DEMANDE_EMBALLAGE.at = Date.now(); setTab('cat_bord'); try { window.dispatchEvent(new Event('vrm:emballer')); } catch (_) {} }}
             onPrix={(n)=>setPrixNum(String(n))} onPublierAilleurs={(n)=>setPubAil({ num: String(n), site: null })} neuve={neuve}
@@ -62438,6 +62674,8 @@ function AppCoeur() {
       {/* (11 nov., lot centre-aide) L'aide ouverte depuis la loupe. Rien ne s'ouvre seul. */}
       <CentreAide/>
       <PiluleAnnulerCoque/>
+      {/* (15 nov., lot meme-photo) « Même photo · à relier » : la feuille, ouverte par Ma journée, Annonces → Outils, les écrans des sites et la fiche. */}
+      {AUTH.user && <MemePhotoCoque/>}
       {AUTH.user && <RangerAchatCoque/>}
       {/* (14 nov., 160) Vente en main propre (src/ideesArgent/) : le verdict et l'histoire de la fiche. */}
       {AUTH.user && <IdeesArgentRacine pret={!!numData} verdict={verdictVenteMainCoque} surOuverture={setVenteMainOuverte}/>}

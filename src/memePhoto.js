@@ -139,14 +139,16 @@ export function propositionsMemePhoto({ vinted = [], autres = [], empreintes = n
         if (q.cote !== 'vinted') continue;
         const n = cle(q.a.numero || '');
         const kp = n ? `n:${n}` : `a:${q.a.id}`;
-        const x = paires.get(kp);
-        if (!x || d < x.distance) paires.set(kp, { numero: n, q, distance: d });
+        const x = paires.get(kp) || { numero: n, q, distance: d, toutes: new Map() };
+        x.toutes.set(String(q.a.id), q.a);
+        if (d < x.distance) { x.q = q; x.distance = d; }
+        paires.set(kp, x);
       }
       // Générique : vue sur plus de N annonces (elle comprise), ou sur 3 paires et plus.
       if (annoncesVues.size + 1 > GENERIQUE_ANNONCES || paires.size >= GENERIQUE_PAIRES) { nGeneriques++; continue; }
       for (const [kp, x] of paires) {
         const e = parPaire.get(kp) || { numero: x.numero, vinted: new Map(), photoAutre: p.k, photoVinted: x.q.k, distance: x.distance };
-        e.vinted.set(String(x.q.a.id), x.q.a);
+        for (const [vid, va] of x.toutes) e.vinted.set(vid, va);
         if (x.distance < e.distance) { e.distance = x.distance; e.photoAutre = p.k; e.photoVinted = x.q.k; }
         parPaire.set(kp, e);
       }

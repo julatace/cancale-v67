@@ -33,6 +33,7 @@ import ecran_accompagnement from './es/accompagnement.js';   // (14 nov.) les qu
 import ecran_argentprix from './es/argentprix.js';   // (14 nov., argent-prix)
 import ecran_rechliste from './es/rechliste.js';
 import ecran_studio_paires from './es/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
+import ecran_memePhoto from './es/memePhoto.js';   // (15 nov., lot meme-photo)
 export default {
   ...ecran_studio_paires,
   ...ecran_accueilReste,
@@ -2254,4 +2255,5 @@ export default {
   ...ecran_confort,
   ...ecran_studio,
   ...ecran_capte,
+  ...ecran_memePhoto,
 };
