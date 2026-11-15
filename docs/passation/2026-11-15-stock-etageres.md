@@ -126,13 +126,16 @@ ne touche un N° : `vinted_annonce_numeros` reste 1 000 fiches intactes dans le 
 
 ## 7. Preuves
 
-- `node scripts/audit-stock-etageres.cjs` : **46/46** ; `--prouve` : **13/13 mutations** rougissent
+- `node scripts/audit-stock-etageres.cjs` : **48/48** ; `--prouve` : **14/14 mutations** rougissent
   (sans gravité, ordre inversé, un cran au plus, planche traversée, sortie sans tasser, paire remise
-  sortie, toutes les colonnes au lieu de celles choisies, « Annuler » partiel, ordre ignoré, déplacement
-  qui recopie le meuble, couleurs par index, écran qui ne tasse que les paires montrées, gravité au
-  montage). **Sur `origin/main`** (git archive, l'audit copié DEDANS) : **20 rouges sur 31** — dont la
-  règle de l'écran d'avant EXÉCUTÉE (`tasserMeuble` extrait) : « N°32 descend dans la case de N°31 »,
-  et la sortie automatique sans descente.
+  sortie, toutes les colonnes au lieu de celles choisies, pose dite « descente », « Annuler » partiel,
+  ordre ignoré, déplacement qui recopie le meuble, couleurs par index, écran qui ne tasse que les paires
+  montrées, gravité au montage). **Sur `origin/main`** (git archive, l'audit copié DEDANS) : **20 rouges
+  sur 31** — dont la règle de l'écran d'avant EXÉCUTÉE (`tasserMeuble` extrait) : « N°32 descend dans la
+  case de N°31 », et la sortie automatique sans descente.
+- Trouvé en REGARDANT la capture (390) : poser une paire en haut d'une pile disait « N°1 est descendu de
+  4 crans » — la paire qu'il pose n'est pas « descendue » : `tasserApres` sépare `chutes` (la paire posée,
+  dont la case finale est dite par la pose) et `descentes` (les cartons déjà là). Audit P8.
 - `audit-stock-2d` 49/49 (13/13 mutations), `audit-coque-parametres` 31/32 (le rouge « une icône par
   ligne » est le MÊME sur origin/main), `cycle-article` 57, `stock-juste`, `stock-annonces` 54,
   `stock-hors-ligne` 33, `vague3-ecrans`. Les deux premiers copient désormais src/stockEtageres.js à côté
