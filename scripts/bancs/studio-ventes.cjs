@@ -266,7 +266,7 @@ async function scenario(b, vp, sombre) {
     await pg.locator('[data-bord-card][data-tx-colis="9304"] .vrm-colis-titre').click().catch(() => {});
     await pg.waitForSelector('.vrm-fp-depuis-ligne [data-imprime="1"]', { timeout: 8000 }).catch(() => {});
     await pg.waitForTimeout(500);
-    const fiche = await pg.evaluate(() => { const z = document.querySelector('.vrm-fp-depuis-ligne'); if (!z) return null; const vis = (s) => [...z.querySelectorAll(s)].some((x) => x.offsetParent && x.getBoundingClientRect().width > 0);
+    const fiche = await pg.evaluate(() => { /* (15 nov.) la fiche porte DEUX places depuis la ligne : « contexte » (la fiche de la vente) et « actions » */ const zs = [...document.querySelectorAll('.vrm-fp-depuis-ligne')]; if (!zs.length) return null; const vis = (s) => zs.flatMap((z) => [...z.querySelectorAll(s)]).some((x) => x.offsetParent && x.getBoundingClientRect().width > 0);
       return { imprimer: vis('[data-imprime="1"]'), depose: vis('[data-geste="fait"]'), imprime: vis('[data-geste="imprime"]'), suivre: vis('[data-geste="suivre"]'), masquer: vis('[data-geste="masquer"]'), plus: vis('[data-colis-plus]') }; });
     dit(!!fiche && fiche.imprimer && fiche.depose && fiche.imprime && fiche.suivre && fiche.masquer, `${nom} : O la rangée ouverte porte ses gestes (imprimer ce bordereau, déposé, imprimé, suivre, masquer)`, JSON.stringify(fiche));
     await shot(pg, `studio-ventes-${nom}-ouverte`);

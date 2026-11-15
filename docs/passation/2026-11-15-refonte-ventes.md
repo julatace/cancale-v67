@@ -73,6 +73,25 @@ une rangée par colis (`.vv-cols`, mêmes valeurs que le téléphone), la case, 
 - **À renvoyer** : la carte d'Achats (pas celle, compacte, de Ma journée) montre les étapes Retour accepté · Bordereau
   prêt · À déposer (ambre) · En route · Remboursé (`etapesRetour`, de l'étape PROUVÉE de src/retoursAchat.js).
 
+### Achats à l'ordinateur (maquettes `ordi/vues/achats-1512.png` et `achats-1280.png`, validées ensuite)
+Au-dessus de 1 100 px : la colonne « À retirer » à gauche (380–440 px), le reste d'Achats à droite (grille sur
+`.vrm-tache[data-tache="achats"]`) ; le code de chaque colis **un chiffre par case** (44 × 62, 34/750 ; le texte du code
+est inchangé : `<i class="va-c">` par caractère dans `.vrm-rpf-code-gros`) ; la rangée d'un colis passe sur deux étages
+(texte et code, puis « J'ai retiré » / le code en grand). Le RAIL est celui de `claude/refonte-journee` (fusionné, pas refait).
+
+### La fiche d'une vente ouverte depuis la liste (le récapitulatif — capture de Julien, « 62 €, Bordereau prêt »)
+- « Imprimer le bordereau » à l'**encre** (`[data-bouton-bord="pdf"]`, plus le bleu de l'accent) ;
+- « L'argent » : un titre de section (17/700) aligné sur ses lignes ;
+- bénéfice pas su : « — · prix d'achat à saisir », **sans le point bleu seul** ;
+- « Emballage · non saisi » discret (il ne bloque rien) ;
+- « Saisir le prix d'achat · ou relier un achat » sur une rangée (un geste) ;
+- **l'achat PROPOSÉ** (règle de liaison `src/liaisonAchat.js`, `origin/claude/achats-liaison` fusionnée) juste sous le plein :
+  photo, titre, « commandé / retiré le … · payé 70 € », pourquoi (« même marque · « terminator » · même taille 36 · … »),
+  **« Relier · 70 € »** (la règle de prix du reçu `propositionSuggestion`, SON toucher, `relierAchatVente`) et « Autre achat »
+  (le sélecteur sans ce candidat). Pas de proposition ⇒ rien de plus (la ligne « Prix d'achat » porte le geste). Les achats
+  sont lus aussi sur Ventes (`curSub === 'ventes'`) pour que la proposition existe. Aucun « à dater », aucune date coupée.
+- « Transporteur toujours nommé » : la règle est le chantier `claude/transporteur-connu` (pas touchée ici).
+
 ## 2. Ce qui n'est PAS fait (écarts avec les maquettes, dits)
 - **« À vérifier · Tout est bon / Un problème » (Achats)** : aucune source dans l'app pour la date limite de
   vérification d'un achat livré (« Vérifie-la avant le 16 nov. · 13 h ») : la construire serait l'inventer (§5).
@@ -80,6 +99,9 @@ une rangée par colis (`.vv-cols`, mêmes valeurs que le téléphone), la case, 
 - **Ordinateur : la fiche à droite en permanence** : au clic, la fiche de la paire s'ouvre en panneau centré (son
   dessin appartient à `claude/ecrans-verre-2`). Filtres « sites + Compte : tous » en tête : le filtre des sites reste
   celui de la coque (« Tous · V »), commun à Annonces/Achats.
+- **Achats ordinateur** : le tableau « Tous les achats en cours » (État · Article · Vendeur · Prix · Date · Détail), les
+  chiffres de tête (« 2 à retirer · 1 à vérifier · 1 à renvoyer ») et le plein « Imprimer le bordereau du retour » : la liste
+  des achats de droite est celle d'avant (le composant des achats n'a pas été réécrit dans ce lot).
 - **Achats** : le segment « Annonces · Stock · Achats », le regroupement PAR POINT RELAIS (une carte par point, ses
   colis dessous — CarteRelais) et la ligne « 1 sans QR » sont ceux d'avant ; la maquette montre une carte par colis.
 - La coque (date, « Ventes », « ? », trois ronds, « Tous · V ») n'est pas de ce chantier.
