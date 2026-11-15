@@ -62,7 +62,10 @@ async function telephone(nav, sombre, b) {
   const nLot = await pg.evaluate(() => { const x = document.querySelector('[data-imprimer-prets]'); return x ? Number(x.getAttribute('data-imprimer-prets')) : null; });
   // F — le fond.
   const fond = await pg.evaluate(() => { const s = document.querySelector('.vrm-app-shell'), m = document.querySelector('.vrm-main'); const cs = getComputedStyle(s);
-    return { img: cs.backgroundImage, esp: s.getAttribute('data-espace'), espMain: m && m.getAttribute('data-espace'), vivant: [...document.querySelectorAll('.vrm-ecran-vivant[data-espace]')].map((x) => x.getAttribute('data-espace')) }; });
+    // (15 nov., « Verre dépoli ») La règle : la COQUE porte la lumière — sur elle, ou sur son ::before fixe (posé une fois,
+    // sans background-attachment:fixed, cassé sur iOS). Le contrôle juge la règle, pas l'endroit où elle est peinte.
+    const avant = getComputedStyle(s, '::before'); const imgAvant = avant.content !== 'none' && avant.position === 'fixed' ? avant.backgroundImage : '';
+    return { img: /gradient/.test(cs.backgroundImage) ? cs.backgroundImage : (imgAvant || cs.backgroundImage), esp: s.getAttribute('data-espace'), espMain: m && m.getAttribute('data-espace'), vivant: [...document.querySelectorAll('.vrm-ecran-vivant[data-espace]')].map((x) => x.getAttribute('data-espace')) }; });
   dit(/linear-gradient/.test(fond.img) && /radial-gradient/.test(fond.img), 'F la coque porte la lumière du studio (halo + dégradé haut → bas)', fond.img.slice(0, 90));
   dit(fond.esp === 'ventes' && fond.espMain === 'ventes' && fond.vivant.includes('ventes'), 'F data-espace="ventes" sur la coque, <main> et la racine de l’écran', fond);
   // B — la barre en verre.
