@@ -14,6 +14,7 @@
 // d'écrire (montant, état, taux) ; une coupure ou un 5xx après l'envoi rend
 // « incertain » (504), jamais « refusé » ni « fait ». Rien n'est automatique.
 import {lireXmlEbay} from './ebay-gestion.js';
+import {entetesSignes} from './ebay-signature.js';   // (15 nov.) remboursement et annulation signés (vendeurs de l'UE)
 import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const liste=v=>v==null?[]:Array.isArray(v)?v:[v];
@@ -115,14 +116,19 @@ export function annulerCommandeRangee(d,orderId,at=new Date().toISOString()){
   const orders=d.orders.map(o=>{if(o && (o.orderId===orderId || o.legacyOrderId===orderId)){vu=true;return {...o,cancelStatus:{...(o.cancelStatus || {}),cancelState:'CANCELED'},_annuleeParVrm:at};}return o;});
   return vu?{...d,orders}:undefined;
 }
-export function creerApresVenteEbay({accessToken,tradingCall,apiOrigin,fetcher=(...a)=>fetchAvecDelai(...a),marketplace:marche='EBAY_FR',lireAnnonces,marquerCommandeAnnulee}){
+export function creerApresVenteEbay({accessToken,tradingCall,apiOrigin,fetcher=(...a)=>fetchAvecDelai(...a),marketplace:marche='EBAY_FR',lireAnnonces,marquerCommandeAnnulee,signe=()=>null}){
   // (26 oct.) Le marché peut être une FONCTION : celui du compte de la requête.
   const mk=()=>typeof marche==='function'?marche():marche;
   const jeton=async ctx=>{const r=await accessToken(ctx);return r.ok && r.token?r:echec(r.error || 'Compte eBay indisponible.',r.status || 502,r.reason);};
   // Une requête JSON. `post` : un 5xx ou une coupure ⇒ `incertain:true`.
-  async function json(url,token,{method='GET',body,iaf=false}={}){
+  // (15 nov., eBay complet 2) `signer` : pour un vendeur de l'UE, eBay exige une signature
+  // numérique sur le remboursement d'un retour et la décision sur une annulation (guide
+  // « Digital Signatures for APIs ») ; sans clé posée, rien ne change (`entetesSignes` rend {}).
+  async function json(url,token,{method='GET',body,iaf=false,signer=false}={}){
     try{
-      const r=await fetcher(url,{method,headers:{Authorization:(iaf?'IAF ':'Bearer ')+token,Accept:'application/json','Content-Type':'application/json','X-EBAY-C-MARKETPLACE-ID':mk()},...(body!==undefined?{body:JSON.stringify(body)}:{})});
+      const corps=body!==undefined?JSON.stringify(body):undefined;
+      const sig=signer?entetesSignes(signe(),{methode:method,url,corps}):{};
+      const r=await fetcher(url,{method,headers:{Authorization:(iaf?'IAF ':'Bearer ')+token,Accept:'application/json','Content-Type':'application/json','X-EBAY-C-MARKETPLACE-ID':mk(),...sig},...(corps!==undefined?{body:corps}:{})});
       const txt=await r.text().catch(()=>'');let data=null;try{data=txt?JSON.parse(txt):null;}catch(_){}
       return {status:r.status,ok:r.status>=200 && r.status<300,data,headers:r.headers};
     }catch(_){return {status:0,ok:false,data:null,coupure:true};}
@@ -178,7 +184,7 @@ export function creerApresVenteEbay({accessToken,tradingCall,apiOrigin,fetcher=(
     const m=v.retour.remboursementPrevu;
     if(!m)return echec('eBay n’annonce pas de montant à rembourser pour ce retour — rien n’a été envoyé.',409,'montant-inconnu');
     if(enCentimes(m.value)!==enCentimes(b.montantVu) || m.currency!==b.devise)return echec(`Le montant a changé chez eBay (${m.value} ${m.currency}). Relis-le avant de rembourser.`,409,'montant-change');
-    const r=await json(`${PO}/return/${encodeURIComponent(b.returnId)}/issue_refund`,a.token,{method:'POST',iaf:true,body:{refundDetail:{itemizedRefundDetail:[{refundAmount:{value:m.value,currency:m.currency},refundFeeType:'PURCHASE_PRICE'}],totalAmount:{value:m.value,currency:m.currency}},comments:{content:'Remboursement du retour'}}});
+    const r=await json(`${PO}/return/${encodeURIComponent(b.returnId)}/issue_refund`,a.token,{method:'POST',iaf:true,signer:true,body:{refundDetail:{itemizedRefundDetail:[{refundAmount:{value:m.value,currency:m.currency},refundFeeType:'PURCHASE_PRICE'}],totalAmount:{value:m.value,currency:m.currency}},comments:{content:'Remboursement du retour'}}});
     if(!r.ok)return ecritureRatee(r,'le remboursement est parti','eBay a refusé le remboursement.');
     return succes({montant:m});
   }
@@ -198,7 +204,7 @@ export function creerApresVenteEbay({accessToken,tradingCall,apiOrigin,fetcher=(
     const v=await relireAnnulation(b.cancelId,a.token);if(v.ko)return v.ko;
     if(!ANNULATION_A_DECIDER.test(v.annulation.etat))return echec('eBay n’attend plus ta décision sur cette annulation (état : '+(v.annulation.etat || 'inconnu')+'). Actualise.',409,'etat');
     if(b.orderId!=null && String(b.orderId)!==v.annulation.orderId)return echec('La commande de cette annulation a changé — actualise.',409,'commande');
-    const r=await json(`${PO}/cancellation/${encodeURIComponent(b.cancelId)}/${decision==='accepter'?'approve':'reject'}`,a.token,{method:'POST',iaf:true,body:{}});
+    const r=await json(`${PO}/cancellation/${encodeURIComponent(b.cancelId)}/${decision==='accepter'?'approve':'reject'}`,a.token,{method:'POST',iaf:true,signer:true,body:{}});
     if(!r.ok)return ecritureRatee(r,'ta décision est partie','eBay a refusé cette décision sur l’annulation.');
     let commandeRangee=null;
     if(decision==='accepter' && v.annulation.orderId && marquerCommandeAnnulee)commandeRangee=await marquerCommandeAnnulee(v.annulation.orderId,ctx).catch(()=>false);

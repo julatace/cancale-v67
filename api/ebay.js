@@ -39,6 +39,9 @@ import { traiterSuppressionEbay } from './_lib/ebay-suppression.js';
 import { lireItemRelance, jugerRelance, xmlRelance, ID_ANNONCE_EBAY } from './_lib/ebay-relance.js';
 import { televerserPhotoEbay } from './_lib/ebay-photo.js';
 import { creerRemisesEbay } from './_lib/ebay-remises.js';
+// (15 nov., eBay complet 2) L'argent réel (Finances, signé), le trafic, la santé du compte, les litiges.
+import { creerTableauEbay } from './_lib/ebay-tableau.js';
+import { cleSignature } from './_lib/ebay-signature.js';
 import { optionsPublication, aspectsPropres, xmlOptions, appelTrading, lireAspects, lireConditions, lirePolitiques, lireEmplacements, lirePolitiquesActivees, lireCategories, etatJeton } from './_lib/ebay-parametres.js';
 import { sbCle } from './_lib/cle.js';
 import { lireEtatJeton, keysReady, canConsent, ruName, authUrl, appToken, jetonApplication, oublierJetonApplication, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
@@ -1589,15 +1592,20 @@ async function handleRetirer(b, ctx) {
 // `sell.finances` : un jeton accordé avant que ce droit existe répond 403 →
 // on dit « reconnecte-toi », on n'invente rien.
 async function handleFinances(ctx) {
+  // (15 nov., eBay complet 2) La Finances API vit sur `apiz.ebay.com` et, pour un vendeur de
+  // l'UE (eBay.fr), chaque appel doit être SIGNÉ. Mesuré en base : aucune ligne
+  // `ebay_finances` n'avait jamais été écrite (l'appel partait vers api.ebay.com, sans
+  // signature). Un refus de signature n'est plus pris pour un droit manquant.
   const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
-  const r = await ebayJson(`${EBAY_API}/sell/finances/v1/seller_funds_summary`, at.token, { 'Accept-Language': 'fr-FR' });
-  if (r.status === 403) return { status: 200, body: { ok: false, reason: 'scope', error: 'Reconnecte-toi à eBay pour voir ton solde à virer (l\'accès « paiements » n\'a pas encore été autorisé).' } };
-  if (r.status === 0) return { status: 503, body: { ok: false, error: 'eBay injoignable' } };
-  if (!r.ok || !r.data) return { status: r.status >= 400 ? r.status : 502, body: { ok: false, error: 'eBay n\'a pas renvoyé le solde.' } };
-  const amt = (o) => (o && o.value != null && isFinite(Number(o.value))) ? Number(o.value) : null;
-  const d = r.data;
-  const out = { ok: true, dispo: amt(d.availableFunds), enAttente: amt(d.processingFunds), retenu: amt(d.fundsOnHold), total: amt(d.totalFunds), devise: (d.totalFunds && d.totalFunds.currency) || (d.availableFunds && d.availableFunds.currency) || marcheCourant().devise, capturedAt: Date.now() };
+  const r = await tableauEbay.lireArgent(at.token, { leger: true });
+  if (!r.solde) {
+    if (r.raison === 'injoignable') return { status: 503, body: { ok: false, error: 'eBay injoignable' } };
+    return { status: 200, body: { ok: false, reason: r.raison || 'pas-su', error: r.erreur || 'eBay n\'a pas renvoyé le solde.' } };
+  }
+  const v = (m) => (m ? m.v : null);
+  const s = r.solde;
+  const out = { ok: true, dispo: v(s.dispo), enAttente: v(s.enCours), retenu: v(s.retenu), total: v(s.total), devise: (s.total && s.total.c) || (s.dispo && s.dispo.c) || marcheCourant().devise, capturedAt: Date.now() };
   await storeData(ligneDe('ebay_finances', ctx), out, ctx.owner);
   return { status: 200, body: out };
 }
@@ -2047,10 +2055,17 @@ const gestionEbay=creerGestionEbay({accessToken:jetonDe,ebayJson,tradingCall,api
 // (11 nov., ebay-complet) Les REMISES (période, quantité) posées et retirées sur SON clic.
 const remisesEbay=creerRemisesEbay({accessToken:jetonDe,apiOrigin:EBAY_API,marketplace:()=>marcheCourant().marketplace,
   lireAnnonces:async(ctx)=>{const d=await lireDonnee(ligneDe('ebay_listings',ctx),ctx.owner);if(d===undefined)return undefined;return Array.isArray(d?.items)?d.items.map(x=>({itemId:String(x.itemId||'')})).filter(x=>x.itemId):[];}});
-const apresVenteEbay=creerApresVenteEbay({accessToken:jetonDe,tradingCall,apiOrigin:EBAY_API,marketplace:()=>marcheCourant().marketplace,
+const apresVenteEbay=creerApresVenteEbay({accessToken:jetonDe,tradingCall,apiOrigin:EBAY_API,marketplace:()=>marcheCourant().marketplace,signe:()=>cleSignature(),
   lireAnnonces:async(ctx)=>{const d=await lireDonnee(ligneDe('ebay_listings',ctx),ctx.owner);if(d===undefined)return undefined;return Array.isArray(d?.items)?d.items.map(x=>({itemId:String(x.itemId||''),titre:String(x.title||''),prix:x.price??null})).filter(x=>x.itemId):[];},
   marquerCommandeAnnulee:async(orderId,ctx)=>{let vu=false;const r=await modifierDonnee(ligneDe('ebay_orders',ctx),ctx.owner,(d)=>{const n=annulerCommandeRangee(d,orderId);vu=!!n;return n;});return r===true?vu:(r===null?null:false);},
 });
+
+// (15 nov., eBay complet 2) Lecture seule : argent (Finances API, apiz + signature), trafic,
+// santé, évaluations reçues, litiges. La date de versement de chaque commande est rangée
+// dans `ebay_versements{suffixe}` (dates et montants seulement, par n° de commande).
+const tableauEbay=creerTableauEbay({accessToken:jetonDe,tradingCall,lireXml:lireXmlEbay,apiOrigin:EBAY_API,marketplace:()=>marcheCourant().marketplace,signe:()=>cleSignature(),
+  ranger:(ctx,fn)=>modifierDonnee(ligneDe('ebay_versements',ctx),ctx.owner,fn),
+  lire:async(ctx)=>{const d=await lireDonnee(ligneDe('ebay_listings',ctx),ctx.owner);if(d===undefined)return undefined;return Array.isArray(d?.items)?d.items.map(x=>({itemId:String(x.itemId||''),debut:x.depuis||''})).filter(x=>x.itemId):[];}});
 
 const rechercheEbay = creerRechercheEbay({ jetonApplication, oublierJetonApplication, modifierDonnee });
 // (11 nov., lot alertes-ebay) La liste « Nouvelles annonces pour tes recherches » : lecture projetée, « écarter ».
@@ -2270,6 +2285,13 @@ async function handleApp(req, res) {
       parametres: (ctx) => handleParametres(b, ctx),
       pubverify: (ctx) => handleVerify(b, ctx),
       finances: (ctx) => handleFinances(ctx),
+      // (15 nov., eBay complet 2) LECTURE SEULE — api/_lib/ebay-tableau.js.
+      argent: (ctx) => tableauEbay.argent(b, ctx),
+      trafic: (ctx) => tableauEbay.trafic(b, ctx),
+      sante: (ctx) => tableauEbay.sante(b, ctx),
+      evaluationsrecues: (ctx) => tableauEbay.evaluationsrecues(b, ctx),
+      litiges: (ctx) => tableauEbay.litiges(b, ctx),
+      tableau: (ctx) => tableauEbay.tableau(b, ctx),
       publish: (ctx) => handlePublish(b, ctx),
       // (5 nov.) Une photo prise ou choisie sur le téléphone, confiée à
       // l'hébergement d'images d'eBay : rend son adresse i.ebayimg.com, que
