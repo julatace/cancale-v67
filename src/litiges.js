@@ -126,7 +126,7 @@ export function conversationDuCorps(texte) {
 export function litigeDEmail(row) {
   const r = row || {};
   const sujet = espaces(r.subject);
-  if (!sujet) return null;
+  if (!sujet || r.type === 'reclasse') return null;   // (15 nov.) reclassé : sa ligne rangée compte, une fois
   const recu = str(r.receivedAt);
   const texte = espaces(texteDuBrut(r.brut) || '');
   const conv = conversationDuCorps(texteDuBrut(r.brut) || r.brut || '');
@@ -149,12 +149,17 @@ export function litigeDEmail(row) {
 // La requête des e-mails (projection, lecture seule) : ceux gardés entiers ou
 // rangés en achat, des 90 derniers jours, aux trois sujets mesurés.
 export const MAX_EMAILS_LITIGES = 80;
+// (15 nov., lot retours) + les avis rangés (`email_retourdemande_*`, leurs scalaires) et les
+// bordereaux de retour encore gardés « inconnu » (src/retoursAchat.js `bordereauDuGarde` les relit
+// en attendant leur reclassement) ; `type` dit une ligne déjà reclassée (sautée : sa ligne rangée compte).
 export const requeteEmailsLitiges = (maintenant = Date.now()) => {
   const depuis = new Date(maintenant - 90 * 86400000).toISOString();
-  return 'or=(id.like.email_inconnu_*,id.like.email_achat_*)'
+  return 'or=(id.like.email_inconnu_*,id.like.email_achat_*,id.like.email_retourdemande_*)'
     + `&data->>receivedAt=gte.${encodeURIComponent(depuis)}`
-    + '&data->>subject=match.' + encodeURIComponent('(Action requise.{1,4}probl|souhaite annuler son achat|Retourne ta commande)')
-    + `&select=id,subject:data->>subject,receivedAt:data->>receivedAt,brut:data->>brut&order=id.asc&limit=${MAX_EMAILS_LITIGES}`;
+    + '&data->>subject=match.' + encodeURIComponent('(Action requise.{1,4}probl|souhaite annuler son achat|Retourne ta commande|Bordereau de retour)')
+    + '&select=id,subject:data->>subject,receivedAt:data->>receivedAt,brut:data->>brut,type:data->>type'
+    + ',article:data->>article,limiteIso:data->>limiteIso,limiteJour:data->>limiteJour,conv:data->>conv,uid:data->>uid,account:data->>account'
+    + `&order=id.asc&limit=${MAX_EMAILS_LITIGES}`;
 };
 
 // ── L'état d'une commande Vinted (liste « Mes ventes / Mes achats ») ───────

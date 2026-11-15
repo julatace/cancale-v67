@@ -13,6 +13,10 @@
   --ret-ambre: #A35200;
 }
 :root[data-theme="dark"] { --ret-carte: var(--w-carte, #1C1C1E); --ret-encre: var(--w-encre, #F5F5F7); --ret-gris: var(--w-gris, #98989D); --ret-ambre: #FFB340; }
+/* (15 nov., lot retours) « Studio bleu clair » : la carte « À renvoyer » prend les jetons du studio
+   (porcelaine posée, une lumière, ambre = le geste à faire) quand ils existent ; sinon ceux d'avant. */
+:root:root { --ret-carte: var(--sb-porcelaine, var(--w-carte, #FFFFFF)); --ret-encre: var(--sb-encre, var(--w-encre, #1D1D1F)); --ret-gris: var(--sb-encre-2, var(--w-gris, #6E6E73));
+  --ret-ombre: var(--sb-ombre-pose, var(--w-ombre, 0 1px 2px rgba(0,0,0,.04), 0 6px 20px -8px rgba(0,0,0,.10))); --ret-tuile: var(--sb-creux, var(--w-remplir, rgba(118,118,128,.12))); --ret-ambre: var(--sb-ambre, #A35200); }
 
 @layer vrm-premium {
 :root:root body .vrm-ret { display: flex; flex-direction: column; gap: 12px; margin: 4px 0 18px; min-width: 0; }
@@ -40,6 +44,19 @@
 :root:root body .vrm-ret-note { margin: 0 2px; color: var(--ret-gris); font: 400 14px/1.4 var(--vrm-police, system-ui, sans-serif); }
 :root:root body .vrm-ret-note.is-ok { color: var(--ret-encre); font-weight: 650; }
 :root:root body .vrm-ret-anciens > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font: 600 15px/1.2 var(--vrm-police, system-ui, sans-serif); color: var(--ret-gris); }
+/* (15 nov., lot retours) La carte « À renvoyer » : titre en tête, méta (N° · compte), quand ; gestes en touches. */
+:root:root body .vrm-renv-carte { border-radius: var(--sb-r-tuile, 22px); }
+:root:root body .vrm-renv-carte .vrm-ret-titre { font: 650 16px/1.3 var(--sb-police-affiche, var(--vrm-police, system-ui, sans-serif)); letter-spacing: -.01em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+:root:root body .vrm-ret-meta { font: 500 13px/1.3 var(--sb-police-texte, var(--vrm-police, system-ui, sans-serif)); color: var(--ret-gris); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+:root:root body .vrm-renv-carte .vrm-ret-limite { font-size: 15px; }
+:root:root body .vrm-renv-carte .sb-touche, :root:root body .vrm-ret-tip .sb-touche { min-height: 44px; display: inline-flex; align-items: center; gap: 8px; }
+:root:root body .vrm-renv-carte a.sb-lien { min-height: 44px; display: inline-flex; align-items: center; color: var(--sb-lien, var(--ret-encre)); }
+:root:root body .vrm-renv-carte > .vrm-ret-note { margin: 0; }
+:root:root body .vrm-renv-carte.is-compact { padding: 12px 14px; gap: 10px; }
+:root:root body .vrm-renv-carte.is-compact .vrm-ret-photo, :root:root body .vrm-renv-carte.is-compact .vrm-ret-tuile { flex-basis: 56px; width: 56px; height: 56px; border-radius: var(--sb-r-vignette, 11px); }
+:root:root body .vrm-renv-journee { margin: 14px 0 6px; }
+:root:root body .vrm-renv-journee .vrm-ret-h2 { font-family: var(--sb-police-affiche, var(--vrm-police, system-ui, sans-serif)); }
+:root:root body button.vrm-renv-voir { align-self: flex-start; min-height: 44px; }
 /* « Tout imprimer » → Retours : une ligne par bordereau de retour. */
 :root:root body .vrm-ret-tip-ligne { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; min-width: 0; border-top: 1px solid var(--ret-tuile); }
 :root:root body .vrm-ret-tip-ligne:first-of-type { border-top: 0; }
