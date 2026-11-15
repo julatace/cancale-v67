@@ -105,6 +105,10 @@ const MESURE = (pg, tel) => pg.evaluate((tel) => {
   if (tel && bloc) for (const e of bloc.querySelectorAll('button, a')) { if (!vis(e)) continue; const r = e.getBoundingClientRect(); if (r.height < 43.5) petits.push(`${txt(e).slice(0, 30)} ${Math.round(r.width)}×${Math.round(r.height)}`); }
   const rouge = (c) => { const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(c || ''); return !!m && +m[1] > 150 && +m[2] < 70 && +m[3] > 20 && +m[3] < 90; };
   const rouges = bloc ? [...bloc.querySelectorAll('*')].filter((e) => vis(e) && rouge(getComputedStyle(e).color)).map((e) => txt(e).slice(0, 30)) : [];
+  // Un lien ou un bouton du bloc doit se LIRE : contraste de luminance avec le fond de sa rangée (≥ 3).
+  const lum = (c) => { const m = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/.exec(c || ''); if (!m) return null; const f = (v) => { v = +v / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(m[1]) + 0.7152 * f(m[2]) + 0.0722 * f(m[3]); };
+  const fond = (e) => { for (let p = e; p; p = p.parentElement) { const b = getComputedStyle(p).backgroundColor; if (b && !/rgba\(0, 0, 0, 0\)|transparent/.test(b)) return b; } return 'rgb(255, 255, 255)'; };
+  const illisibles = bloc ? [...bloc.querySelectorAll('a, button')].filter(vis).filter((e) => { if (e.disabled) return false; const a1 = lum(getComputedStyle(e).color), b1 = lum(fond(e)); if (a1 == null || b1 == null) return false; return (Math.max(a1, b1) + 0.05) / (Math.min(a1, b1) + 0.05) < 3; }).map((e) => txt(e).slice(0, 30)) : [];
   const doublons = [...document.querySelectorAll('[data-job="double-vente"]')].filter(vis).map(txt).filter((t) => /retirer (de Leboncoin|d'eBay|d’eBay|de Vestiaire)/i.test(t));
   return {
     bloc: bloc ? {
@@ -115,7 +119,7 @@ const MESURE = (pg, tel) => pg.evaluate((tel) => {
           lien: (s.querySelector('a[href]') || {}).href || '', t: txt(s.querySelector('[data-rx-phrase]')) })) })),
     } : null,
     chiffreTop: chiffre ? Math.round(chiffre.getBoundingClientRect().top + scrollY) : null,
-    doublons, petits, rouges,
+    doublons, petits, rouges, illisibles,
     debord: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
   };
 }, tel);
@@ -160,6 +164,7 @@ async function tournee(nav, { W, scenario, sombre }) {
   await shot('journee');
   dit(!!m0.bloc, 'T1', `${T} « À retirer ailleurs » est sur Ma journée`, JSON.stringify(m0).slice(0, 300));
   dit(!m0.debord && !m0.petits.length && !m0.rouges.length, 'T0', `${T} aucun débordement, 44 px, aucun rouge`, JSON.stringify({ d: m0.debord, p: m0.petits, r: m0.rouges }));
+  dit(!m0.illisibles.length, 'T0', `${T} chaque lien et bouton du bloc se lit (contraste ≥ 3)`, JSON.stringify(m0.illisibles));
   if (!m0.bloc) { dit(!o.journal.erreurs.length, 'T0', `${T} aucune erreur JS`, o.journal.erreurs.join(' ¦ ')); await o.ctx.close(); return; }
   dit(m0.chiffreTop == null || m0.bloc.top < m0.chiffreTop, 'T1', `${T} EN TÊTE : au-dessus du chiffre du jour`, JSON.stringify({ bloc: m0.bloc.top, chiffre: m0.chiffreTop }));
   dit(m0.bloc.articles.length === 1 && m0.bloc.articles[0].n === '42' && m0.bloc.articles[0].plaque, 'T2', `${T} une seule paire, la N°42 (plaque), jamais les N°43/44 au même titre`, JSON.stringify(m0.bloc.articles.map((a) => a.n)));
@@ -262,7 +267,13 @@ async function tournee(nav, { W, scenario, sombre }) {
   await new Promise((ok) => NV.srv.listen(PORT, ok));
   const nav = await chromium.launch({ executablePath: process.env.BANC_CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
   try {
-    for (const scenario of SCENARIOS) for (const W of LARGEURS) for (const th of THEMES) await tournee(nav, { W, scenario, sombre: th === 'sombre' });
+    for (const scenario of SCENARIOS) for (const W of LARGEURS) for (const th of THEMES) {
+      // Un onglet de Chromium qui plante (mémoire du conteneur) est REJOUÉ une fois, puis dit — jamais tu.
+      for (let essai = 1; essai <= 2; essai++) {
+        try { await tournee(nav, { W, scenario, sombre: th === 'sombre' }); break; }
+        catch (e) { if (essai === 2 || !/crash|closed/i.test(String(e && e.message))) { dit(false, 'T0', `[${scenario} ${W}px ${th}] la tournée a pu aller au bout`, String(e && e.stack).slice(0, 400)); break; } }
+      }
+    }
   } catch (e) { dit(false, 'T0', 'le banc a pu aller au bout', String(e && e.stack).slice(0, 400)); }
   await nav.close(); NV.srv.close();
   console.log('\n── Touchers (après)');

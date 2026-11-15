@@ -54,3 +54,6 @@
   .rx-gestes > .rx-lien { flex: 0 1 auto; }
   .rx-tout { width: 100%; }
 }
+/* Un lien de Ma journée prend sinon la couleur de la carte sombre d’à côté (mesuré au banc : illisible en clair). */
+.rx a.rx-lien { color: var(--sb-lien, #0055B8) !important; }
+.rx a.sb-touche.rx-geste { color: var(--sb-encre, #0C1D30) !important; text-decoration: none; }

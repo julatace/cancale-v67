@@ -46007,7 +46007,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const ownerRA = AUTH.user?.id || '';
   React.useEffect(() => {
     if (only !== 'journee' && only !== 'ventes') return;
-    majRA({ plan: planAilleurs, v: vendusAilleurs.v, relire: vendusAilleurs.lire, owner: ownerRA, ...(RA.owner && RA.owner !== ownerRA ? { resultats: {}, attente: {}, gardes: {}, touches: new Set() } : {}) });
+    majRA({ plan: planAilleurs, v: vendusAilleurs.v, relire: vendusAilleurs.lire, owner: ownerRA, ...(RA.owner && RA.owner !== ownerRA ? { resultats: {}, attente: {}, gardes: {}, touches: new Set(), marques: {} } : {}) });
   // ⚠️ Pas `vendusAilleurs.v` lui-même : avant la première lecture c'est un objet NEUF à chaque rendu
   // (`{}`), et la publication fait re-rendre cet écran (`useRA`) — une boucle sans fin (page figée, mesuré
   // au banc). Ses morceaux stables seulement.
@@ -56566,13 +56566,15 @@ const retirerEbayAuto = async (liste, continuer) => {
 // UNE confirmation (celle qui existait : `texteConfirmation`), une fois par geste ou par série.
 // Chaque geste : les quatre moments (`accompagner('annonce.retirer')`) et « Ce que VRM a fait »
 // (un travail suivi archivé sans figer l'écran).
-const RA = { plan: null, v: null, relire: null, owner: '', resultats: {}, enCours: null, attente: {}, serie: null, gardes: {}, touches: new Set(), rev: 0 };
+const RA = { plan: null, v: null, relire: null, owner: '', resultats: {}, enCours: null, attente: {}, serie: null, gardes: {}, touches: new Set(), marques: {}, rev: 0 };
 const _abonnesRA = new Set();
 const majRA = (f) => { Object.assign(RA, typeof f === 'function' ? f(RA) : f); RA.rev++; for (const g of [..._abonnesRA]) { try { g(); } catch (_) {} } };
 const abonnerRA = (g) => { _abonnesRA.add(g); return () => _abonnesRA.delete(g); };
 const lireRARev = () => RA.rev;
 function useRA() { React.useSyncExternalStore(abonnerRA, lireRARev, lireRARev); return RA; }
-const marquesRA = () => { const m = load('vrm_retraits_main', {}); return m && typeof m === 'object' && !Array.isArray(m) ? m : {}; };
+// Les marques rangées (synchronisées) + celles posées CETTE session (un rechargement de `main` venu du nuage
+// avant que l'écriture y soit arrivée ne les efface pas de l'écran).
+const marquesRA = () => { const m = load('vrm_retraits_main', {}); return { ...(m && typeof m === 'object' && !Array.isArray(m) ? m : {}), ...RA.marques }; };
 // La liste rendue (état de chaque site), pour tous les écrans.
 function listeRA(numero = null) {
   const v = RA.v || {};
@@ -56701,7 +56703,7 @@ function marquerRA(site, art) {
   // Les 200 plus récentes (une marque démentie ou confirmée n'a plus d'effet : l'annonce sort du plan).
   const garde = Object.fromEntries(Object.entries(m).sort((x, y) => (Number(y[1] && y[1].at) || 0) - (Number(x[1] && x[1].at) || 0)).slice(0, 200));
   save('vrm_retraits_main', garde);
-  majRA((r) => ({ gardes: { ...r.gardes, [site.cle]: { art: { numero: art.numero, venduSur: art.venduSur, titre: art.titre, photo: art.photo, douteuse: art.douteuse }, site: { ...site } } }, touches: new Set([...r.touches, String(art.numero)]) }));
+  majRA((r) => ({ marques: { ...r.marques, [site.cle]: m[site.cle] }, gardes: { ...r.gardes, [site.cle]: { art: { numero: art.numero, venduSur: art.venduSur, titre: art.titre, photo: art.photo, douteuse: art.douteuse }, site: { ...site } } }, touches: new Set([...r.touches, String(art.numero)]) }));
   toast(tr('rx.marque', { n: art.numero, site: site.plateforme }), 'ok');
 }
 // La reprise « Ouvre leboncoin.fr » : sur un signe qu'il est revenu, une à la fois, bornée.
