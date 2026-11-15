@@ -224,6 +224,14 @@ async function controles() {
     const b = await MT.listerMesures({ utilisateur: { id: '22222222-2222-4222-8222-222222222222' }, quoi: 'rapport-plantages', fetcher });
     dit(a.code === 200 && a.corps.ok && Array.isArray(a.corps.types) && a.corps.types[0] && a.corps.types[0].personnes === 1, 'C13 la route rend le rapport au propriétaire (lui-même jamais compté)', a);
     dit(b.code === 403, 'C14 un autre compte : 403', b.code);
+    // Les plantages du PROPRIÉTAIRE ne comptent pour aucune personne : rien n'est rangé pour eux.
+    const ecritsT = [];
+    const fetcherT = async (url, o = {}) => { const u = decodeURIComponent(String(url)); if ((o.method || 'GET') !== 'GET' && /plantages_terrain_|on_conflict/.test(u)) ecritsT.push(u); if (/vrm_reglages/.test(u)) return rep([{ valeur: JULIEN }]); if (/rpc\//.test(u)) return rep(true); if ((o.method || 'GET') === 'GET') return rep([]); return rep([{ id: 'x' }], 201); };
+    const corps = JSON.stringify({ v: 1, h: {}, p: [{ ecran: 'ventes', message: 'Erreur du propriétaire', version: '15 novembre à 10:00', n: 4, garde: true }], jeton: 'a.b.c' });
+    const rp = await MT.recevoirMesures({ corps, verifierJeton: async () => ({ id: JULIEN }), fetcher: fetcherT, maintenant: T0 });
+    dit(rp.code === 200 && ecritsT.length === 0, 'C14b le propriétaire : ses plantages ne sont rangés nulle part comme « personne touchée »', { rp, ecritsT });
+    const rv = await MT.recevoirMesures({ corps, verifierJeton: async () => ({ id: '33333333-3333-4333-8333-333333333333' }), fetcher: fetcherT, maintenant: T0 });
+    dit(rv.code === 200 && ecritsT.length >= 1, 'C14c un autre vendeur : rangé', { rv, ecritsT });
     // Le morceau périmé qui revient APRÈS le rechargement : il bloque l'ouverture.
     const store = {}, sess = {};
     global.localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } };
