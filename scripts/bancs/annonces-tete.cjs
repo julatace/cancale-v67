@@ -100,6 +100,8 @@ function mesurer({ tel }) {
   // Le choix du compte (Vinted) se lit en entier : jamais « T… » (c'est la rangée des sites qui défile, pas lui).
   const cm = sec.querySelector('.vrm-tache-filtres .vrm-ui-menu-compte > span');
   if (cm && vis(cm) && cm.scrollWidth > cm.clientWidth + 1) out.ordre.push(`le compte est coupé (« ${cm.textContent} » en ${cm.clientWidth} px)`);
+  // … et il reste sur la ligne des sites (une ligne de moins avant la liste), jamais renvoyé dessous.
+  if (tel && cm && vis(cm) && s) { const c = cm.getBoundingClientRect(); if (Math.abs((c.top + c.bottom) / 2 - (s.top + s.bottom) / 2) > 6) out.ordre.push(`le compte n'est plus sur la ligne des sites (${Math.round(c.top)} / ${Math.round(s.top)})`); }
   // « Relier à Vinted » : jamais un bloc sous la rangée.
   for (const b of sec.querySelectorAll('[data-vc-relier], [data-vc-delier]')) {
     if (!vis(b)) continue;
