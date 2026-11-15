@@ -26,6 +26,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (15 nov., étagère v4 — maquettes validées par Julien) docs/passation/2026-11-15-stock-v4.md
+  { id: 'stock-v4', date: '2026-11-15', titre: 'Personnalise chaque meuble : cartons, rayonnage ou plan', phrase: 'Teintes, étiquette, densité ; l’ordinateur montre pièce, meuble et fiche.', tab: 'garage', pour: 'tous', mode: 'tous' },
   // (15 nov., refonte-journee) docs/passation/2026-11-15-refonte-journee.md — la maquette validée par Julien.
   { id: 'paire-a-sortir', date: '2026-11-15', titre: 'Une vente tombe : VRM montre où est le carton', phrase: 'Le meuble, la case allumée, puis « Je l’ai sortie ».', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'journee-verre', date: '2026-11-15', titre: 'Ma journée refaite comme la maquette', phrase: 'Le mois en un verre, les colis avec leurs N°, codes et messages.', tab: 'journee', pour: 'tous', mode: 'tous' },

@@ -42,13 +42,16 @@ export default function Piece({ meubles, choisi, onChoisir, bureau = false, mots
     <section className="vrm-p4-piece" data-piece-vue={vue} aria-label={tr('etag4.piece')}>
       <div className="vrm-p4-piece-tete">
         <div>
-          <span className="vrm-p4-sur" data-piece-resume={`${meubles.length}|${nCases}|${nArt}`}>{tr('etag4.pieceResume', { meubles: meubles.length, cases: nCases, n: nArt, articles: mots && mots.noms ? mots.noms : tr('etag4.articles') })}</span>
+          {bureau ? null : <span className="vrm-p4-sur" data-piece-resume={`${meubles.length}|${nCases}|${nArt}`}>{tr(meubles.length > 1 ? 'etag4.pieceResume' : 'etag4.pieceResume1', { meubles: meubles.length, cases: nCases, n: nArt, articles: mots && mots.noms ? mots.noms : tr('etag4.articles') })}</span>}
           <h3>{tr('etag4.piece')}</h3>
         </div>
-        <div className="vrm-p4-seg vrm-p4-seg-piece" role="radiogroup" aria-label={tr('etag4.piece')}>
-          <button type="button" role="radio" aria-checked={vue === 'face'} data-piece-choix="face" onClick={() => setVue('face')}>{tr('etag4.deFace')}</button>
-          <button type="button" role="radio" aria-checked={vue === 'iso'} data-piece-choix="iso" onClick={() => setVue('iso')}>{tr('etag4.iso')}</button>
-        </div>
+        {/* À l'ordinateur, l'autre vue est un lien (« Isométrique » / « De face ») ; au téléphone, deux choix. */}
+        {bureau
+          ? <button type="button" className="sb-lien vrm-p4-lien" data-piece-choix={vue === 'iso' ? 'face' : 'iso'} onClick={() => setVue(vue === 'iso' ? 'face' : 'iso')}>{vue === 'iso' ? tr('etag4.deFace') : tr('etag4.iso')}</button>
+          : <div className="vrm-p4-seg vrm-p4-seg-piece" role="radiogroup" aria-label={tr('etag4.piece')}>
+              <button type="button" role="radio" aria-checked={vue === 'face'} data-piece-choix="face" onClick={() => setVue('face')}>{tr('etag4.deFace')}</button>
+              <button type="button" role="radio" aria-checked={vue === 'iso'} data-piece-choix="iso" onClick={() => setVue('iso')}>{tr('etag4.iso')}</button>
+            </div>}
       </div>
       <div className="vrm-p4-sol">
         {meubles.map((x) => (
@@ -58,12 +61,12 @@ export default function Piece({ meubles, choisi, onChoisir, bureau = false, mots
             <b>{x.nom}</b><span className="vrm-p4-t2">{x.occupees}/{x.cols * x.rows}</span>
           </button>))}
       </div>
-      <div className="vrm-p4-ordre-tete"><b>{tr('etag4.ordre')}</b></div>
+      {bureau ? null : <div className="vrm-p4-ordre-tete"><b>{tr('etag4.ordre')}</b><span>{tr('etag4.ordreAide')}</span></div>}
       <div className="vrm-p4-liste">
         {meubles.map((x, k) => (
           <button key={x.id} type="button" className="vrm-p4-rangee" data-piece-rangee={x.id} aria-current={choisi === x.id ? 'true' : undefined} onClick={() => onChoisir && onChoisir(x.id)}>
             <i className="vrm-p4-pastille" data-meuble-teinte={couleurMeuble(x.m)} aria-hidden="true" />
-            <span className="vrm-p4-mid"><b>{k + 1}. {x.nom}</b><span>{x.cols} × {x.rows} · {x.pile ? tr('etag4.pile') : tr('etag4.affichage.' + x.affichage)}</span></span>
+            <span className="vrm-p4-mid"><b>{bureau ? '' : (k + 1) + '. '}{x.nom}</b><span>{x.cols} × {x.rows}{x.pile ? ' · ' + tr('etag4.pile') : (bureau ? '' : ' · ' + tr('etag4.affichage.' + x.affichage).toLowerCase())}</span></span>
             {x.aSortir ? <span className="vrm-p4-badge" data-piece-a-sortir={x.aSortir} aria-label={tr('etag4.aSortirN', { n: x.aSortir })}>{x.aSortir}</span> : null}
             <span className="vrm-p4-chev" aria-hidden="true">›</span>
           </button>))}

@@ -24,7 +24,7 @@ export default function Personnaliser({ meuble, Feuille, apercu, nArticles = 0, 
     <div className="vrm-p4-seg" role="radiogroup">
       {valeurs.map((v) => <button key={v} type="button" role="radio" aria-checked={actuelle === v} {...{ [attr]: v }} onClick={() => surChoix(v)}>{tr(cle + v)}</button>)}
     </div>);
-  const resume = [tr('etag4.affichage.' + reg.affichage), reg.teinte === TEINTE_MELEES ? tr('etag4.teinte.melees') : tr('etag4.teinteDe', { teinte: tr('etag.couleur.' + reg.teinte) }), tr('etag4.densite.' + reg.densite)];
+  const resume = [tr('etag4.affichage.' + reg.affichage), reg.teinte === TEINTE_MELEES ? tr('etag4.teinte.melees') : tr('etag4.teinteDe', { teinte: tr('etag.couleur.' + reg.teinte).toLowerCase() }), tr('etag4.densite.' + reg.densite)];
   return (
     <Feuille onClose={onFermer} titre={tr('etag4.personnaliser')} sousTitre={(meuble && meuble.name) || ''} className="vrm-p4" data-perso-meuble={meuble && meuble.id} maxWidth={520}>
       <div className="vrm-p4-corps">
@@ -66,8 +66,8 @@ export default function Personnaliser({ meuble, Feuille, apercu, nArticles = 0, 
             {COULEURS_MEUBLE.map((c) => <button key={c} type="button" role="radio" aria-checked={couleur === c} data-perso-couleur={c} onClick={() => setCouleur(c)} aria-label={tr('etag.couleur.' + c)}><i data-meuble-teinte={c} /></button>)}
           </div>
           <div className="vrm-p4-pas2">
-            <div className="vrm-p4-pas"><button type="button" onClick={() => setCols(borne(cols - 1, COLS_MAX))} disabled={cols <= 1} aria-label={tr('etag.moins', { quoi: tr('stock.colonnes') })}>−</button><b data-perso-cols={cols}>{cols}<small> {tr('etag4.colonnes', { n: cols })}</small></b><button type="button" onClick={() => setCols(borne(cols + 1, COLS_MAX))} disabled={cols >= COLS_MAX} aria-label={tr('etag.plus', { quoi: tr('stock.colonnes') })}>+</button></div>
-            <div className="vrm-p4-pas"><button type="button" onClick={() => setRows(borne(rows - 1, RANGEES_MAX))} disabled={rows <= 1} aria-label={tr('etag.moins', { quoi: tr('etag.rangees') })}>−</button><b data-perso-rows={rows}>{rows}<small> {tr('etag4.rangees', { n: rows })}</small></b><button type="button" onClick={() => setRows(borne(rows + 1, RANGEES_MAX))} disabled={rows >= RANGEES_MAX} aria-label={tr('etag.plus', { quoi: tr('etag.rangees') })}>+</button></div>
+            <div className="vrm-p4-pas"><button type="button" onClick={() => setCols(borne(cols - 1, COLS_MAX))} disabled={cols <= 1} aria-label={tr('etag.moins', { quoi: tr('stock.colonnes') })}>−</button><b data-perso-cols={cols}>{cols}<small> {tr(cols > 1 ? 'etag4.colonnes' : 'etag4.colonne')}</small></b><button type="button" onClick={() => setCols(borne(cols + 1, COLS_MAX))} disabled={cols >= COLS_MAX} aria-label={tr('etag.plus', { quoi: tr('stock.colonnes') })}>+</button></div>
+            <div className="vrm-p4-pas"><button type="button" onClick={() => setRows(borne(rows - 1, RANGEES_MAX))} disabled={rows <= 1} aria-label={tr('etag.moins', { quoi: tr('etag.rangees') })}>−</button><b data-perso-rows={rows}>{rows}<small> {tr(rows > 1 ? 'etag4.rangees' : 'etag4.rangee')}</small></b><button type="button" onClick={() => setRows(borne(rows + 1, RANGEES_MAX))} disabled={rows >= RANGEES_MAX} aria-label={tr('etag.plus', { quoi: tr('etag.rangees') })}>+</button></div>
           </div>
         </div>
 
@@ -84,8 +84,8 @@ export default function Personnaliser({ meuble, Feuille, apercu, nArticles = 0, 
           {onPlus ? <button type="button" className="sb-lien vrm-p4-plus" data-meuble-modifier={meuble && meuble.id} aria-label={tr('stock.modifierMeuble')} onClick={onPlus}>{tr('etag4.plusReglages')}</button> : null}
         </div>
       </div>
-      <div className="vrm-p4-pied">
-        <button type="button" className="sb-btn-plein sb-btn-plein--barre" data-perso-enregistrer="" onClick={() => onEnregistrer && onEnregistrer(brouillon)}><I name="check" size={20} />{tr('lbcplus.remise.enregistrer')}</button>
+      <div className="vrm-fs-pied vrm-p4-pied">
+        <button type="button" className="sb-btn-plein sb-btn-plein--barre" data-perso-enregistrer="" onClick={() => onEnregistrer && onEnregistrer(brouillon)}><I name="check" size={20} />{tr('etag4.enregistrer')}</button>
       </div>
     </Feuille>
   );

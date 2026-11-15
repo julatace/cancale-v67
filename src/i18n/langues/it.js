@@ -43,11 +43,13 @@ import ecran_studio_paires from './it/studio-paires.js';   // (14 nov., Studio b
 import ecran_republier_guide from './it/republierGuide.js';   // (15 nov.) republier / publier à la main, guidés
 import ecran_memePhoto from './it/memePhoto.js';   // (15 nov., lot meme-photo)
 import ecran_etageres from './it/etageres.js';   // (15 nov.) le Stock en étagères
+import ecran_etageres_v4 from './it/etageres-v4.js';   // (15 nov.) l'étagère v4
 import ecran_journee_verre from './it/journee-verre.js';   // (15 nov.) Ma journée verre, la paire à sortir
 export default {
   ...ecran_studio_paires,
   ...ecran_republier_guide,
   ...ecran_etageres,
+  ...ecran_etageres_v4,
   ...ecran_journee_verre,
   ...ecran_accueilReste,
   ...ecran_refonte_ms,
