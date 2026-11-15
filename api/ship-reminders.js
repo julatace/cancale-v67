@@ -57,7 +57,7 @@ import { ventesPartiesParPreuve, lirePreuvesDepart } from './_lib/depart-vente.j
 import { colisVentesEmailServeur, reqVentesEmail, txsDeCommandes } from './_lib/colis-ventes-email.js';
 import { relireCommandesVendeur } from './_lib/ebay-relecture.js';
 import { avecSuiviDuSujet, relireLigneMeta } from './_lib/suivi-colis.js';
-import { rappelsRetraitDuJour, texteRappelRetrait, SELECT_SUIVI_META, txDuColis, liensDesLignes, finDesTransactions, SELECT_TRANSP_META, ligneTranspDeMeta } from './_lib/suivi-colis.js';
+import { rappelsRetraitDuJour, texteRappelRetrait, SELECT_SUIVI_META, txDuColis, liensDesLignes, finDesTransactions, txAchatsEnRetour, SELECT_TRANSP_META, ligneTranspDeMeta } from './_lib/suivi-colis.js';
 import { commandeDuColisRegle, achatsDesLignes, indexDesLiens, txParCodeDe, titreDuColis } from './_lib/commande-colis.js';   // (13 nov.) le nom de la paire
 // (24 oct.) Le statut des colis lu chez leur transporteur (C1, C5).
 import { passageTransporteurs, MAX_CRON, BUDGET_CRON_MS, MAX_DEPARTS_CRON } from './_lib/transporteurs-lecture.js';
@@ -540,20 +540,24 @@ async function retraitsDuJour(maintenant = Date.now(), jourCible = 0) {
   const txsPar = new Map();
   for (const x of candidats) { const t = txDuColis({ suivi: x.suivi, code: x.code }, relais, liens); txsPar.set(x.suivi, t); }
   const tousTx = [...new Set([...txsPar.values()].flatMap((t) => (t ? [...t] : [])))].filter((t) => /^\d{3,20}$/.test(t));
-  let achats = [], etats = new Map();
+  let achats = [], etats = new Map(), retours = null;
   // (13 nov.) La conversation d'une commande est aussi une identité (la jonction de l'écran) :
   // les commandes sont lues pour elle aussi, pour le nom de la paire.
   if (tousTx.length || candidats.some((x) => x.conv)) {
-    const [a, e] = await Promise.all([
+    // (15 nov.) + les BORDEREAUX DE RETOUR de ces achats (`email_bordretour_{tx}`, scalaires `meta->>` seulement) :
+    // un achat en retour n'est jamais « à retirer » (api/_lib/suivi-colis.js `txAchatsEnRetour`, la règle de l'app).
+    const [a, e, br, dm] = await Promise.all([
       fetchPaginated(scoped('app_data?id=like.harvest_%25_orders_purchased&select=id,orders:data->payload->my_orders,txns:data->resume->txns')),
       fetchPaginated(scoped(`app_data?id=like.harvest_%25_txn_%25&meta->>id=in.(${tousTx.join(',')})&select=tx:meta->>id,s:meta->>status,ss:meta->>ship_status_title`)),
+      fetchPaginated(scoped('app_data?id=like.email_bordretour_%25&select=transaction:meta->>transaction,sens:meta->>sens')),
+      fetchPaginated(scoped('app_data?id=like.email_retourdemande_%25&select=conv:meta->>conv,sens:meta->>sens')),
     ]);
-    if (!Array.isArray(a) || !Array.isArray(e)) return 'lecture ratée — rien envoyé';
-    achats = a;
+    if (!Array.isArray(a) || !Array.isArray(e) || !Array.isArray(br) || !Array.isArray(dm)) return 'lecture ratée — rien envoyé';
+    achats = a; retours = txAchatsEnRetour(br, { demandes: dm, achats: a.flatMap((row) => (Array.isArray(row && row.orders) ? row.orders : [])) });
     for (const r of e) if (r && r.tx && r.s != null && Number.isFinite(Number(r.s))) etats.set(String(r.tx), { s: Number(r.s), ss: String(r.ss || '') });
   }
   const liste = rappelsRetraitDuJour({ ...entree, liens, jourCible,
-    finParCommande: ({ suivi, code }) => finDesTransactions(txDuColis({ suivi, code }, relais, liens), achats, etats) });
+    finParCommande: ({ suivi, code }) => finDesTransactions(txDuColis({ suivi, code }, relais, liens), achats, etats, retours) });
   // (13 nov., Julien : « avec le n° de suivi on va voir quelle paire est à l'intérieur ») LE NOM DE
   // LA PAIRE : la commande reliée par IDENTITÉ — la jonction de l'écran (api/_lib/commande-colis.js :
   // conversation, n° de suivi, code de retrait), jamais le titre, le lieu ou la date (§5). Les
