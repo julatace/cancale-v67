@@ -7,6 +7,7 @@ import ecran_capte from './en/capte.js';   // (14 nov., extension 5.377) « L'ex
 import ecran_avenir from './en/avenir.js';
 import ecran_verre2 from './en/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
 import ecran_renvoyer from './en/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
+import ecran_liaison from './en/liaison.js';   // (15 nov.) La liaison achat ⇄ article
 import ecran_retrait_ailleurs from './en/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
 import ecran_finition from './en/finition.js';   // (15 nov.) la finition écran par écran
 import ecran_parametres from './en/parametres.js';   // (15 nov.) Paramètres rangés en dix catégories
@@ -2275,6 +2276,7 @@ export default {
   ...ecran_memePhoto,
   ...ecran_correspondances,
   ...ecran_renvoyer,
+  ...ecran_liaison,
   ...ecran_finition,
   ...ecran_parametres,
   ...ecran_avenir,

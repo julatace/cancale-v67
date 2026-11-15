@@ -16,7 +16,8 @@
 //
 // Règles PURES, exécutées par scripts/audit-achats-a-relier.cjs.
 // ─────────────────────────────────────────────────────────────────────────────
-import { suggestionsAchat, lotDe } from './suggestionsAchat.js';
+import { lotDe } from './suggestionsAchat.js';
+import { propositionsArticle } from './liaisonAchat.js';
 
 const prixNum = (p) => { const v = p && typeof p === 'object' ? p.amount : p; const n = Number(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null; };
 
@@ -80,8 +81,12 @@ export function cibleAnnonce(it) {
 
 // LA meilleure suggestion (ou null) : la première de `suggestionsAchat`, la même
 // règle que « Relier un achat ». Rien n'est proposé sans marque ET taille.
-export function meilleureSuggestion({ item, achats, liens, marqueDe, couleursDe, modeleDe = null } = {}) {
-  const s = suggestionsAchat({ cible: cibleAnnonce(item), achats, liens, marqueDe, couleursDe, modeleDe, max: 1 });
+// (15 nov., liaison) La règle PONDÉRÉE de src/liaisonAchat.js (`propositionsArticle`) : la même que la file
+// « Sans achat relié » et « Relier un achat » — mots du modèle pesés par rareté, taille et couleur quand elles
+// sont écrites, jours entre la commande (ou le retrait) et la mise en ligne. `receptionDe` (facultatif) : la
+// date de retrait / livraison LUE d'un achat.
+export function meilleureSuggestion({ item, achats, liens, marqueDe, couleursDe, modeleDe = null, receptionDe = null, refus = null } = {}) {
+  const s = propositionsArticle({ cible: { ...cibleAnnonce(item), key: item && item.id != null ? `a:${item.id}` : '_', prix: item && item.price }, achats, liens, marqueDe, couleursDe, modeleDe, receptionDe, refus, max: 1 });
   return s.length ? s[0] : null;
 }
 

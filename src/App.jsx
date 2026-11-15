@@ -171,7 +171,7 @@ import { etatAncienne } from "./republierGuide.js";   // (15 nov.) « Republier 
 // ⟦→ ecrans/Republier.jsx #1⟧
 // (6 nov., vague 2) Remettre en vente une vente annulée avant l'envoi ; relier l'achat des annonces numérotées.
 import { annuleesChezToi, paireARemettre, fichesAnciennesAnnulees, ligneJournee as ligneAnnuleesJournee, etatRemise, VERDICT_MOTEUR as VERDICT_REMISE } from "./annuleesChezToi.js";
-import { fileSansAchat, aRelierJournee, meilleureSuggestion, texteSuggestion } from "./achatsARelier.js";
+import { fileSansAchat, aRelierJournee, meilleureSuggestion, texteSuggestion, cibleAnnonce } from "./achatsARelier.js";
 import { lignesManquantes as lignesPrixMiniManquants, carteJournee as carteJourneePrixMini } from "./prixMiniManquants.js";
 import { CLE_A_TRANCHER, publierSource as publierSourceTrancher, lirePublications as lirePubsTrancher, lignesATrancher, comptesARelireDe, badgeATrancher, phraseJournee as phraseATrancher, appliquerTranches, photosJournee as photosATrancher, typesJournee as typesATrancher, BINAIRES as BINAIRES_TRANCHER } from "./aTrancher.js";
 import { CLE_SANTE, publierSante } from "./santeDonnees.js";   // (11 nov., lot sante-donnees)
@@ -213,6 +213,8 @@ import { poserLienVc, defaireLienVc, numerosABarrer, marquerBarre, lienDe, produ
 import FeuilleLienVc from "./LienVestiaire.jsx";
 // ⟦→ ecrans/Vestiaire.jsx #1⟧
 import { suggestionsAchat, tousAchatsLibres, tousAchatsLibresDetail, filtresAchats, etiquetteLot, liensParAchat, lotDe, prixIndicatifLot, ecritureLot, suggestionsSaisieSerie } from "./suggestionsAchat.js";
+// (15 nov.) La liaison achat ⇄ article : l'affectation pondérée et globale (src/liaisonAchat.js).
+import { affecterPropositions, aValider, morceauxPourquoi, couleursTexte, lectureAchat, cleArticleAnnonce, cleArticleVente, cleRefusLiaison } from "./liaisonAchat.js";
 // (6 nov., vitesse 2) AchatsOutils : à la demande ; ses feuilles de style restent ICI, à la même place (même ordre).
 import './styles-annonces-outils.css';
 import './styles-baisse-prix.css';
@@ -3165,6 +3167,8 @@ const SYNC_KEYS = [
   // avant l'envoi ({ [tx]: at }), et les annonces « Plus tard » de « Sans achat relié »
   // ({ [itemId]: at }) : le même état sur tous ses appareils. Aucun prix, aucun N°.
   'vrm_annulees_reglees', 'vrm_achat_plus_tard',
+  // (15 nov., liaison) « Ce n'est pas lui » : { '<article>><tx achat>': at } — ce couple n'est plus proposé.
+  'vrm_liaison_refus',
   // (10 nov., lot BD) La NOTE PRIVÉE d'une paire ({ 'n:<N°>' | 'a:<id annonce>': { t, at } },
   // src/notePaire.js) — à lui seul, jamais envoyée à une plateforme. (lot BH) Les achats
   // hors plateforme masqués comme DOUBLE d'un autre (« Garder celle-ci », src/achatsDoubles.js).
@@ -16812,87 +16816,188 @@ function PrixMiniFeuille({ choisies, onPoser, onClose }) {
     </SheetShell>
   );
 }
-// ══ « SANS ACHAT RELIÉ » : UNE SUGGESTION PAR ANNONCE (6 nov., vague 2 · point 4) ══
-// La file (src/achatsARelier.js) : chaque annonce numérotée en ligne sans achat relié, avec
-// LA meilleure suggestion de `suggestionsAchat` (marque et taille obligatoires, achat
-// antérieur à la mise en ligne, lots). « Relier » écrit au prix du reçu (`propositionDe`),
-// « Saisir » le prix qu'il tape, « Plus tard » la range en fin de file. SON tap, toujours.
-function AchatsARelier({ file, achats, liens, propositionDe, onRelier, onSaisir, onPlusTard, onChoisir, compteDe, onSerie = null }) {
-  const lignes = useMemo(() => (Array.isArray(file) ? file.map((x) => {
-    const sugg = Array.isArray(achats) ? meilleureSuggestion({ item: x.item, achats, liens, marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel }) : null;
-    const p = sugg ? propositionDe(sugg.achat) : null;
-    return { ...x, sugg, texte: texteSuggestion(sugg, p) };
-  }) : null), [file, achats, liens, propositionDe]);
-  // (15 nov., Julien : « c'est moche et il y a des bugs ») La carte dont les gestes rares (« ⋯ ») sont montrés.
-  const [plusOuvert, setPlusOuvert] = useState(null);
-  if (lignes == null) return <div className="vrm-ar-vide" data-ar-etat="lecture">{PAS_SU.enCours}</div>;
-  if (!lignes.length) return <div className="vrm-ar-vide" data-ar-etat="vide">{tr('annonces.chaqueAnnonceNumerotee')}</div>;
-  const nSugg = lignes.filter((l) => l.sugg).length;
-  const jour = (d) => { const t = Date.parse(d || ''); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: new Date(t).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' }) : ''; };
-  // (15 nov., studio) Les classes sont `vrm-aar-*` : les `vrm-ar-*` d'avant étaient AUSSI celles de l'accueil des
-  // nouveaux (accueil-reste.css : `.vrm-ar-liste li` en rangée centrée, `.vrm-ar-titre` en 20 px gras) et de « Ton
-  // adresse VRM » — la carte héritait de leurs règles : contenu centré plus large que la carte (N° et photo coupés
-  // au bord gauche, titres sous le bord droit), titres énormes. Rien de métier ne change : mêmes `data-*`, mêmes
-  // gestes ; une suggestion reste une SUGGESTION, c'est SON toucher sur « Relier » qui relie (§5).
-  // Styles : src/design/studio-achats-relier.css.
+// ══ « SANS ACHAT RELIÉ » : L'ARTICLE ET SON ACHAT PROPOSÉ, CÔTE À CÔTE (15 nov., liaison) ══
+// Julien (15 nov.) : « Je veux que tu améliores la liaison entre les achats et les articles en vente ou
+// vendus, avec les titres, dates de retrait, couleur de l'article, etc. »
+// La file (src/achatsARelier.js) : chaque annonce numérotée en ligne sans achat relié, puis (onglet
+// « Vendus ») chaque vente récente sans achat relié. La PROPOSITION vient de l'affectation globale
+// (src/liaisonAchat.js, `affecterPropositions` : marque, mots du modèle pesés par rareté, taille, couleur,
+// jours entre le retrait et la mise en ligne, prix ; « très probable » seulement si rien d'autre ne lui
+// ressemble, dans les deux sens). Chaque carte montre l'article ET l'achat (deux photos, titre, taille,
+// couleur, date de retrait ou de commande, prix payé), le niveau et POURQUOI. « Relier » écrit au prix du
+// reçu (`propositionDe`), « Ce n'est pas lui » range le couple (synchronisé), « Valider les N très
+// probables » MONTRE la liste et c'est SON toucher qui relie. SON tap, toujours (§5).
+// Styles : src/design/studio-achats-relier.css.
+const COULEURS_LIAISON = ['noir', 'blanc', 'gris', 'bleu', 'vert', 'rouge', 'rose', 'jaune', 'orange', 'violet', 'beige', 'marron'];
+const motCouleur = (c) => (COULEURS_LIAISON.includes(c) ? tr(`liaison.couleur.${c}`) : '');
+function phrasePourquoi(p) {
+  return morceauxPourquoi(p).filter((m) => m.cle !== 'tailleInconnue').map((m) => {
+    if (m.cle === 'couleur') return motCouleur(m.vars.couleur);
+    if (m.cle.startsWith('jours.')) return tr(`liaison.p.${m.cle}`, { n: Number(m.vars.n) });
+    return tr(`liaison.p.${m.cle}`, m.vars);
+  }).filter(Boolean).join(' · ');
+}
+// Achats → sous un achat sans article relié : l'article proposé (photo, N°, titre, niveau), « Relier », « Ce n'est pas lui ».
+function PropositionAchat({ p, art, onRelier, onRefus }) {
+  const it = art.genre === 'vente' ? art.o : art.item;
+  const photo = art.genre === 'vente' ? orderPhoto(it) : it && it.photo;
+  const num = art.fiche && art.fiche.numero;
   return (
-    <section className="vrm-aar" data-ar={lignes.length} data-ar-sugg={achats === undefined ? '' : String(nSugg)} aria-label={tr('annonces.annoncesSansAchat')}>
+    <div className="vrm-buy-propose" data-achat-propose={p.key} data-niveau={p.niveau}>
+      {photo ? <PhotoVinted src={photo} alt="" className="vrm-buy-propose-photo" loading="lazy" decoding="async"/> : <PhotoVide taille={32} className="vrm-buy-propose-photo"/>}
+      <span className="vrm-buy-propose-centre">
+        <span className="vrm-buy-propose-mot">{art.genre === 'vente' ? tr('liaison.venteProposee') : tr('liaison.annonceProposee')} · <b data-niveau={p.niveau}>{p.niveau === 'tres-probable' ? tr('liaison.niveau.tresProbable') : tr('liaison.niveau.possible')}</b></span>
+        <span className="vrm-buy-propose-titre">{num ? <Numero n={num} taille="petit"/> : null} {(it && it.title) || ''}</span>
+      </span>
+      <button type="button" className="sb-lien" data-achat-propose-relier={p.key} onClick={onRelier}><Icon name="link" size={16}/><span>{VERBES.relier}</span></button>
+      <button type="button" className="sb-rond vrm-buy-propose-non" data-achat-propose-pas-lui={p.key} aria-label={tr('liaison.pasLui')} title={tr('liaison.pasLui')} onClick={onRefus}><Icon name="close" size={16}/></button>
+    </div>
+  );
+}
+function AchatsARelier({ file, vendus = null, liaison, achats, propositionDe, onRelier, onRelierSerie = null, onRelierVente = null, onSaisir, onPlusTard, onChoisir, onChoisirVente = null, onRefus = null, compteDe, onSerie = null }) {
+  // Deux files : les annonces en vente, puis les ventes récentes (bénéfice réel).
+  const [onglet, setOnglet] = useState('vente');
+  const [plusOuvert, setPlusOuvert] = useState(null);
+  const [valider, setValider] = useState(null);   // null · { coches: Set(key) }
+  const [enCours, setEnCours] = useState(false);
+  const jour = (d) => { const t = typeof d === 'number' ? d : Date.parse(d || ''); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: new Date(t).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' }) : ''; };
+  const lignesVente = useMemo(() => (Array.isArray(file) ? file.map((x) => ({ ...x, key: cleArticleAnnonce(x.id), genre: 'annonce', cible: cibleAnnonce(x.item) })) : null), [file]);
+  const lignesVendus = useMemo(() => (Array.isArray(vendus) ? vendus.map((x) => ({ ...x, genre: 'vente' })) : null), [vendus]);
+  const propsDe = (k) => (liaison && liaison.parArticle && liaison.parArticle[k]) || [];
+  const toutes = [...(lignesVente || []), ...(lignesVendus || [])];
+  const parCle = new Map(toutes.map((l) => [l.key, l]));
+  const tp = liaison ? aValider(liaison.parArticle).filter((v) => parCle.has(v.key)) : [];
+  const lignes = onglet === 'vendus' ? lignesVendus : lignesVente;
+  if (lignesVente == null) return <div className="vrm-ar-vide" data-ar-etat="lecture">{PAS_SU.enCours}</div>;
+  if (!lignesVente.length && !(lignesVendus && lignesVendus.length)) return <div className="vrm-ar-vide" data-ar-etat="vide">{tr('annonces.chaqueAnnonceNumerotee')}</div>;
+  const lecture = achats === undefined || liaison === undefined;
+  const nSugg = (lignes || []).filter((l) => propsDe(l.key).length).length;
+  const relierUne = (l, a, opts = {}) => (l.genre === 'vente' ? onRelierVente && onRelierVente(l, a, opts) : (opts.silencieux && onRelierSerie ? onRelierSerie(l.item, a) : onRelier(l.item, a)));
+  // « Valider les N très probables » : la liste est MONTRÉE, chaque ligne cochée par défaut ; SON toucher relie.
+  const validerCoches = async () => {
+    if (!valider) return;
+    const liste = tp.filter((v) => valider.coches.has(v.key));
+    setEnCours(true);
+    let n = 0;
+    for (const v of liste) { const l = parCle.get(v.key); if (!l) continue; try { const r = await relierUne(l, v.achat, { silencieux: true }); if (r === true) n++; } catch (_) {} }
+    setEnCours(false); setValider(null);
+    if (n) toast(tr('liaison.feuille.fait', { n }));
+  };
+  // (15 nov.) Classes `vrm-aar-*` (seulement cet écran) ; mêmes `data-ar-*` qu'avant pour les bancs.
+  return (
+    <section className="vrm-aar" data-ar={lignesVente.length} data-ar-vendus={lignesVendus ? lignesVendus.length : ''} data-ar-sugg={lecture ? '' : String(nSugg)} data-ar-tp={lecture ? '' : String(tp.length)} aria-label={tr('annonces.annoncesSansAchat')}>
       <div className="vrm-aar-tete">
-        <p className="vrm-aar-compte">{achats === undefined ? tr('annonces.annonces2', { n: String(lignes.length), toLowerCase: String(PAS_SU.enCours.toLowerCase()) }) : tr('annonces.annoncesAvecSuggestion', { n: String(lignes.length), nSugg: String(nSugg) })}
-          {/* La règle d'une suggestion : derrière le « ⓘ » (une phrase fixe ne prend pas une ligne de la file). */}
-          {achats !== undefined ? <Pourquoi label={tr('annonces.suggestionQuoi')}>{tr('annonces.suggestionRegle')}</Pourquoi> : null}</p>
+        <p className="vrm-aar-compte">{lecture ? tr('annonces.annonces2', { n: String((lignes || []).length), toLowerCase: String(PAS_SU.enCours.toLowerCase()) }) : tr('liaison.tete', { n: (lignes || []).length, nSugg })}
+          {!lecture ? <Pourquoi label={tr('annonces.suggestionQuoi')}>{tr('liaison.regle')}</Pourquoi> : null}</p>
         {onSerie ? <button type="button" className="sb-lien vrm-aar-serie" data-ar-serie="" onClick={onSerie}><Icon name="pencil" size={16}/><span>{tr('annonces.saisieSeriePrix')}</span></button> : null}
       </div>
+      <div className="vrm-aar-barre">
+        <div className="vrm-aar-onglets" role="tablist" aria-label={tr('liaison.quoi')}>
+          <button type="button" role="tab" aria-selected={onglet === 'vente'} data-ar-onglet="vente" onClick={() => setOnglet('vente')}>{tr('liaison.enVente')}<span className="vrm-aar-n">{lignesVente.length}</span></button>
+          <button type="button" role="tab" aria-selected={onglet === 'vendus'} data-ar-onglet="vendus" onClick={() => setOnglet('vendus')}>{tr('liaison.vendus')}<span className="vrm-aar-n">{lignesVendus ? lignesVendus.length : '—'}</span></button>
+        </div>
+        {tp.length ? <button type="button" className="sb-btn-plein sb-btn-plein--barre vrm-aar-valider" data-ar-valider={tp.length} onClick={() => setValider({ coches: new Set(tp.map((v) => v.key)) })}><Icon name="check" size={16}/><span>{tr('liaison.validerN', { n: tp.length })}</span></button> : null}
+      </div>
+      {lignes == null ? <div className="vrm-ar-vide" data-ar-etat="lecture">{PAS_SU.enCours}</div>
+        : !lignes.length ? <div className="vrm-ar-vide" data-ar-etat="vide">{onglet === 'vendus' ? tr('liaison.vendusVide') : tr('annonces.chaqueAnnonceNumerotee')}</div> : (
       <ul className="vrm-aar-liste">
-        {lignes.map((l) => {
-          const it = l.item, t = l.texte, num = l.fiche && l.fiche.numero;
-          const prix = (() => { const v = it.price && typeof it.price === 'object' ? it.price.amount : it.price; const n = Number(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null; })();
-          const relierTxt = t && t.proposition ? `${VERBES.relier} · ${montant(t.proposition.centimes / 100)}` : VERBES.relier;
-          const photoAchat = l.sugg ? orderPhoto(l.sugg.achat) : null;
-          // Les gestes rares derrière « ⋯ » : « Saisir le prix » (quand une suggestion tient la place) et « Plus tard ».
-          const rares = !!l.sugg || !l.plusTard;
-          const ouvert = plusOuvert === l.id;
-          const idPlus = `vrm-aar-plus-${l.id}`;
+        {lignes.map((l0) => {
+          const ps = propsDe(l0.key); const p = ps[0] || null;
+          const l = { ...l0, sugg: p };
+          const it = l.genre === 'vente' ? l.o : l.item;
+          const num = l.fiche && l.fiche.numero;
+          const prix = (() => { const v = it && it.price && typeof it.price === 'object' ? it.price.amount : it && it.price; const n = Number(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null; })();
+          const photoArt = l.genre === 'vente' ? (l.photo || orderPhoto(it)) : it.photo;
+          const a = p ? p.achat : null;
+          const prop = a ? propositionDe(a) : null;
+          const t = p ? texteSuggestion({ achat: a, rang: p.rang }, prop) : null;
+          const relierTxt = t && t.proposition ? tr('liaison.relierPrix', { prix: montant(t.proposition.centimes / 100) }) : VERBES.relier;
+          const photoAchat = a ? orderPhoto(a) : null;
+          const lu = a ? lectureAchat(a, extractBrand, extractColors) : null;
+          const tailleArt = l.cible && l.cible.taille ? String(l.cible.taille).replace('.', ',') : '';
+          const couleursArt = l.cible ? couleursTexte([l.cible.couleur || '', l.cible.titre || ''].join(' '), extractColors).map(motCouleur).filter(Boolean) : [];
+          const ouvert = plusOuvert === l.key;
+          const idPlus = `vrm-aar-plus-${String(l.key).replace(/[^a-z0-9]/gi, '')}`;
+          const sousArt = [tailleArt ? tr('liaison.taille', { taille: tailleArt }) : '', couleursArt.slice(0, 2).join(' / '), prix != null ? montant(prix) : '',
+            l.genre === 'vente' ? (l.o && l.o.date ? tr('liaison.venduLe', { date: jour(l.o.date) }) : '') : (l.ts ? tr('liaison.enLigneLe', { date: jour(l.ts) }) : ''),
+            l.reporteLe ? `reportée le ${jour(l.reporteLe)}${l.plusTard && l.revientLe ? ` · revient le ${jour(l.revientLe)}` : ''}` : ''].filter(Boolean).join(' · ');
+          const recu = p && p.recu ? tr(p.recu.source === 'clic' ? 'liaison.recu.retrait' : 'liaison.recu.livraison', { date: jour(p.recu.ms) }) : (a && a.date ? tr('liaison.commandeLe', { date: jour(a.date) }) : '');
+          const payeTxt = t ? (t.lot ? 'lot : le prix de cet article te sera demandé' : t.proposition ? tr('liaison.paye', { prix: montant(t.proposition.centimes / 100) }) : (t.prixLu != null ? tr('liaison.paye', { prix: montant(t.prixLu) }) : '')) : '';
+          const sousAchat = lu ? [lu.taille ? tr('liaison.taille', { taille: lu.taille.replace('.', ',') }) : '', lu.couleurs.map(motCouleur).filter(Boolean).slice(0, 2).join(' / '), recu, payeTxt, compteDe(a)].filter(Boolean).join(' · ') : '';
           return (
-            <li key={l.id} className="vrm-aar-carte" data-ar-ligne={l.id} data-ar-plus-tard={l.plusTard ? '1' : undefined} data-ar-reportee={l.reporteLe ? String(l.reporteLe).slice(0, 10) : undefined} data-ar-sugg-tx={l.sugg ? String(l.sugg.achat.transaction_id) : ''} data-ar-plus-ouvert={ouvert ? '1' : undefined}>
-              <div className="vrm-aar-annonce">
-                {it.photo ? <PhotoVinted src={it.photo} alt="" className="vrm-aar-photo" loading="lazy"/> : <PhotoVide taille={52} className="vrm-aar-photo"/>}
-                <span className="vrm-aar-centre">
-                  <span className="vrm-aar-titre" data-ar-titre="">{num ? <Numero n={num} taille="petit"/> : null}<span>{it.title || tr('annonces.sansTitre')}</span></span>
-                  {/* (6 nov., finitions) La date de SON « Plus tard » est dite ; au bout de 7 jours l'annonce revient. */}
-                  <span className="vrm-aar-sous" data-ar-sous="">{[prix != null ? montant(prix) : '', l.reporteLe ? `reportée le ${jour(l.reporteLe)}${l.plusTard && l.revientLe ? ` · revient le ${jour(l.revientLe)}` : ''}` : ''].filter(Boolean).join(' · ')}
-                    {/* Pas de suggestion : DIT sur la ligne du prix (« pas su » pendant la lecture des achats), jamais un bloc vide. */}
-                    {!l.sugg ? <span className="vrm-aar-sans" data-ar-sans-sugg="">{prix != null || l.reporteLe ? ' · ' : ''}{achats === undefined ? PAS_SU.enCours : tr('annonces.aucuneSuggestion')}</span> : null}</span>
-                </span>
-              </div>
-              {l.sugg ? (
-                <div className="vrm-aar-sugg" data-ar-rang={l.sugg.rang}>
-                  {/* La photo de l'achat quand on la connaît ; sinon rien (jamais une vignette vide). */}
-                  {photoAchat ? <PhotoVinted src={photoAchat} alt="" className="vrm-aar-photo-achat" loading="lazy"/> : null}
-                  <span className="vrm-aar-centre">
-                    <span className="vrm-aar-sugg-titre"><span className="vrm-aar-mot">{tr('annonces.suggestion')}</span>{t.titre || tr('annonces.achatSansTitre')}</span>
-                    <span className="vrm-aar-sous">{[jour(t.date), compteDe(l.sugg.achat), t.lot ? 'lot : le prix de cet article te sera demandé' : t.proposition ? (t.proposition.source === 'recu' ? 'prix du reçu' : 'article seul') : (t.prixLu != null ? `payé ${montant(t.prixLu)}` : '')].filter(Boolean).join(' · ')}</span>
-                  </span>
+            <li key={l.key} className={p ? 'vrm-aar-carte' : 'vrm-aar-carte vrm-aar-carte-seule'} data-ar-ligne={l.genre === 'vente' ? l.key : l.id} data-ar-genre={l.genre} data-ar-plus-tard={l.plusTard ? '1' : undefined} data-ar-reportee={l.reporteLe ? String(l.reporteLe).slice(0, 10) : undefined}
+              data-ar-sugg-tx={a ? String(a.transaction_id) : ''} data-ar-niveau={p ? p.niveau : ''} data-ar-plus-ouvert={ouvert ? '1' : undefined}>
+              <div className="vrm-aar-duo">
+                <div className="vrm-aar-cote" data-ar-cote="article">
+                  {photoArt ? <PhotoVinted src={photoArt} alt="" className="vrm-aar-photo" loading="lazy" decoding="async"/> : <PhotoVide taille={64} className="vrm-aar-photo"/>}
+                  <span className="vrm-aar-titre" data-ar-titre="">{num ? <Numero n={num} taille="petit"/> : null}<span>{(it && it.title) || tr('annonces.sansTitre')}</span></span>
+                  <span className="vrm-aar-sous" data-ar-sous="">{sousArt}</span>
                 </div>
+                <span className="vrm-aar-trait" aria-hidden="true"><Icon name="link" size={14}/></span>
+                {p ? (
+                  <div className="vrm-aar-cote vrm-aar-sugg" data-ar-cote="achat" data-ar-rang={p.rang}>
+                    {photoAchat ? <PhotoVinted src={photoAchat} alt="" className="vrm-aar-photo" loading="lazy" decoding="async"/> : <span className="vrm-aar-photo vrm-aar-photo-ico" aria-hidden="true"><Icon name="bag" size={22}/></span>}
+                    <span className="vrm-aar-titre vrm-aar-sugg-titre">{(t && t.titre) || tr('annonces.achatSansTitre')}</span>
+                    <span className="vrm-aar-sous" data-ar-achat-sous="">{sousAchat}</span>
+                  </div>
+                ) : (
+                  <div className="vrm-aar-cote vrm-aar-cote-vide" data-ar-cote="vide">
+                    <span className="vrm-aar-photo vrm-aar-photo-ico" aria-hidden="true"><Icon name="bag" size={22}/></span>
+                    <span className="vrm-aar-sans" data-ar-sans-sugg="">{lecture ? PAS_SU.enCours : tr('annonces.aucuneSuggestion')}</span>
+                  </div>
+                )}
+              </div>
+              {p ? (
+                <p className="vrm-aar-pourquoi" data-ar-pourquoi="">
+                  <span className="vrm-aar-niveau" data-niveau={p.niveau}>{p.niveau === 'tres-probable' ? tr('liaison.niveau.tresProbable') : tr('liaison.niveau.possible')}</span>
+                  <span>{p.ambigu ? tr('liaison.ambigu') : phrasePourquoi(p)}</span>
+                </p>
               ) : null}
               <div className="vrm-aar-gestes">
-                {l.sugg ? <button type="button" className="sb-touche vrm-aar-principal" data-ar-relier={String(l.sugg.achat.transaction_id)} onClick={() => onRelier(it, l.sugg.achat)}><Icon name="link" size={16}/><span>{relierTxt}</span></button>
-                  : <button type="button" className="sb-touche vrm-aar-principal" data-ar-saisir="" onClick={() => onSaisir(it)}><Icon name="pencil" size={16}/><span>{tr('annonces.saisirPrix')}</span></button>}
-                {/* (11 nov., lot DJ5) La suggestion n'est qu'une proposition : un AUTRE achat se choisit ici, à côté. */}
-                {l.sugg ? <button type="button" className="sb-lien vrm-aar-lien" data-ar-autre={String(l.sugg.achat.transaction_id)} onClick={() => onChoisir(it, l.sugg.achat)}><span>{tr('annonces.autreAchat')}</span></button>
-                  : <button type="button" className="sb-lien vrm-aar-lien" data-ar-choisir="" disabled={achats === undefined} onClick={() => onChoisir(it)}><span>{tr('annonces.choisirAchat')}</span></button>}
-                {rares ? <button type="button" className="sb-rond vrm-aar-plus" data-ar-plus="" aria-expanded={ouvert} aria-controls={idPlus} aria-label={tr('annonces.autresGestes')} title={tr('annonces.autresGestes')} onClick={() => setPlusOuvert((v) => (v === l.id ? null : l.id))}><Icon name="more" size={18}/></button> : null}
+                {p ? <button type="button" className="sb-touche vrm-aar-principal" data-ar-relier={String(a.transaction_id)} onClick={() => relierUne(l, a)}><Icon name="link" size={16}/><span>{relierTxt}</span></button>
+                  : <button type="button" className="sb-touche vrm-aar-principal" data-ar-saisir="" onClick={() => (l.genre === 'vente' ? (onChoisirVente && onChoisirVente(l)) : onSaisir(it))}><Icon name={l.genre === 'vente' ? 'link' : 'pencil'} size={16}/><span>{l.genre === 'vente' ? tr('annonces.choisirAchat') : tr('annonces.saisirPrix')}</span></button>}
+                {p && onRefus ? <button type="button" className="sb-lien vrm-aar-lien" data-ar-pas-lui={String(a.transaction_id)} onClick={() => onRefus(l.key, String(a.transaction_id))}><span>{tr('liaison.pasLui')}</span></button>
+                  : !p && l.genre !== 'vente' ? <button type="button" className="sb-lien vrm-aar-lien" data-ar-choisir="" disabled={achats === undefined} onClick={() => onChoisir(it)}><span>{tr('annonces.choisirAchat')}</span></button> : null}
+                <button type="button" className="sb-rond vrm-aar-plus" data-ar-plus="" aria-expanded={ouvert} aria-controls={idPlus} aria-label={tr('annonces.autresGestes')} title={tr('annonces.autresGestes')} onClick={() => setPlusOuvert((v) => (v === l.key ? null : l.key))}><Icon name="more" size={18}/></button>
               </div>
-              {rares ? (
-                <div className="vrm-aar-rares" id={idPlus} hidden={!ouvert}>
-                  {l.sugg ? <button type="button" className="sb-lien" data-ar-saisir="" onClick={() => onSaisir(it)}><Icon name="pencil" size={16}/><span>{tr('annonces.saisirPrix')}</span></button> : null}
-                  {!l.plusTard ? <button type="button" className="sb-lien" data-ar-plus-tard-geste="" onClick={() => { setPlusOuvert(null); onPlusTard(l.id); }}><span>{tr('annonces.plusTard')}</span></button> : null}
-                </div>
-              ) : null}
+              <div className="vrm-aar-rares" id={idPlus} hidden={!ouvert}>
+                {/* (11 nov., lot DJ5) La proposition n'est qu'une proposition : un AUTRE achat se choisit ici. */}
+                {p ? <button type="button" className="sb-lien" data-ar-autre={String(a.transaction_id)} onClick={() => { setPlusOuvert(null); if (l.genre === 'vente') { if (onChoisirVente) onChoisirVente(l, a); } else onChoisir(it, l.sugg.achat); }}><span>{tr('annonces.autreAchat')}</span></button> : null}
+                {l.genre !== 'vente' && p ? <button type="button" className="sb-lien" data-ar-saisir="" onClick={() => { setPlusOuvert(null); onSaisir(it); }}><Icon name="pencil" size={16}/><span>{tr('annonces.saisirPrix')}</span></button> : null}
+                {l.genre !== 'vente' && !l.plusTard ? <button type="button" className="sb-lien" data-ar-plus-tard-geste="" onClick={() => { setPlusOuvert(null); onPlusTard(l.id); }}><span>{tr('annonces.plusTard')}</span></button> : null}
+                {ps.length > 1 ? <span className="vrm-aar-autres" data-ar-autres={ps.length - 1}>{tr('liaison.autresPossibles', { n: ps.length - 1 })}</span> : null}
+              </div>
             </li>
           );
         })}
-      </ul>
+      </ul>)}
+      {valider ? (
+        <SheetShell onClose={() => (enCours ? null : setValider(null))} titre={tr('liaison.validerN', { n: tp.length })} data-ar-feuille-valider={tp.length}>
+          <p className="vrm-aar-feuille-aide">{tr('liaison.feuille.aide')}</p>
+          <ul className="vrm-aar-feuille">
+            {tp.map((v) => {
+              const l = parCle.get(v.key); const it = l.genre === 'vente' ? l.o : l.item; const coche = valider.coches.has(v.key);
+              const prop = propositionDe(v.achat);
+              return (
+                <li key={v.key} data-ar-valider-ligne={v.key} data-ar-valider-tx={String(v.achat.transaction_id)}>
+                  <label className="vrm-aar-feuille-ligne">
+                    <input type="checkbox" checked={coche} onChange={() => setValider((s) => { const c = new Set(s.coches); if (c.has(v.key)) c.delete(v.key); else c.add(v.key); return { coches: c }; })}/>
+                    {(l.genre === 'vente' ? (l.photo || orderPhoto(it)) : it.photo) ? <PhotoVinted src={l.genre === 'vente' ? (l.photo || orderPhoto(it)) : it.photo} alt="" className="vrm-aar-mini" loading="lazy" decoding="async"/> : <PhotoVide taille={40} className="vrm-aar-mini"/>}
+                    {orderPhoto(v.achat) ? <PhotoVinted src={orderPhoto(v.achat)} alt="" className="vrm-aar-mini" loading="lazy" decoding="async"/> : <span className="vrm-aar-mini vrm-aar-photo-ico" aria-hidden="true"><Icon name="bag" size={18}/></span>}
+                    <span className="vrm-aar-centre">
+                      <span className="vrm-aar-sugg-titre">{l.fiche && l.fiche.numero ? <Numero n={l.fiche.numero} taille="petit"/> : null} {(it && it.title) || ''}</span>
+                      <span className="vrm-aar-sous">{v.achat.title || ''}{prop ? ` · ${montant(prop.centimes / 100)}` : ''}</span>
+                    </span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="vrm-aar-feuille-pied">
+            <button type="button" className="sb-btn-plein sb-btn-plein--barre" data-ar-valider-ok={valider.coches.size} disabled={!valider.coches.size || enCours} onClick={validerCoches}><Icon name="link" size={16}/><span>{tr('liaison.feuille.relier', { n: valider.coches.size })}</span></button>
+          </div>
+        </SheetShell>
+      ) : null}
     </section>
   );
 }
@@ -37089,6 +37194,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const poserAnnuleeReglee = (tx) => gesteVrm('Noté : VRM ne la propose plus', [{ k: 'vrm_annulees_reglees', type: 'cle', id: String(tx), apres: new Date().toISOString(), avant: (annuleesReglees || {})[String(tx)] }], { vrm_annulees_reglees: setAnnuleesReglees });
   // (6 nov., vague 2 · point 4) « Plus tard » dans « Sans achat relié » : { [itemId]: at }.
   const [achatPlusTard, setAchatPlusTard] = useStateCle('vrm_achat_plus_tard', () => { const v = load('vrm_achat_plus_tard', {}); return v && typeof v === 'object' ? v : {}; });
+  // (15 nov., liaison) « Ce n'est pas lui » (SON clic) : { [`${article}>${tx}`]: at }, synchronisé (src/liaisonAchat.js).
+  const [liaisonRefus, setLiaisonRefus] = useStateCle('vrm_liaison_refus', () => { const v = load('vrm_liaison_refus', {}); return v && typeof v === 'object' ? v : {}; });
+  const refuserLiaison = (article, tx) => gesteVrm(tr('liaison.pasLuiFait'), [{ k: 'vrm_liaison_refus', type: 'cle', id: cleRefusLiaison(article, tx), apres: new Date().toISOString(), avant: (liaisonRefus || {})[cleRefusLiaison(article, tx)] }], { vrm_liaison_refus: setLiaisonRefus });
   const poserAchatPlusTard = (id) => gesteVrm('Mise de côté — elle revient dans 7 jours', [{ k: 'vrm_achat_plus_tard', type: 'cle', id: String(id), apres: new Date().toISOString(), avant: (achatPlusTard || {})[String(id)] }], { vrm_achat_plus_tard: setAchatPlusTard });
   // (6 nov., finitions) Sur un appareil NEUF, ces deux clés arrivent du nuage APRÈS le montage : sans cette
   // relecture, « Plus tard » et « Déjà remise en vente » posés ailleurs restaient vides ici (mesuré au banc
@@ -37097,6 +37205,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const lu = (k) => { const w = load(k, {}); return w && typeof w === 'object' ? w : {}; };
     setAnnuleesReglees((v) => (v && Object.keys(v).length) ? v : lu('vrm_annulees_reglees'));
     setAchatPlusTard((v) => (v && Object.keys(v).length) ? v : lu('vrm_achat_plus_tard'));
+    setLiaisonRefus((v) => (v && Object.keys(v).length) ? v : lu('vrm_liaison_refus'));
   }), []);
   // (revue du 5 nov.) Un lien posé à la main n'entre pas tant que l'ancienne est
   // ENCORE chez lui sur Vinted sous une autre forme (masquée, à confirmer,
@@ -43230,7 +43339,70 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const w = await ecritureRelierAchat(a); if (!w) return;
     updatePair(it, w);
     accompagner('achat.relier', { vars: { prix: w.buyPrice ? `${String(w.buyPrice).replace('.', ',')}\u00a0€` : '—' } }).fini();
+    return true;
   };
+  // (15 nov., liaison) La même écriture, sans l'accompagnement à chaque paire : « Valider les N très probables ».
+  const relierAchatAnnonceSerie = async (it, a) => {
+    const w = await ecritureRelierAchat(a); if (!w) return false;
+    updatePair(it, w);
+    return true;
+  };
+  // ── (15 nov., liaison) LES VENDUS SANS ACHAT RELIÉ, ET L'AFFECTATION (src/liaisonAchat.js) ──
+  // Julien : « améliore la liaison entre les achats et les articles en vente ou vendus ». Les ventes des
+  // 12 derniers mois, ni annulées ni masquées, sans prix d'achat ni achat relié (la ligne de la vente,
+  // `effEntry`) : le bénéfice réel attend leur achat. La cible : le titre de la vente, la taille et la
+  // date de mise en ligne de SA fiche (par identité, `identiteAnnonce`), sinon la date de vente.
+  const fileVendus = useMemo(() => {
+    if (!Array.isArray(sales.items)) return null;
+    const borne = Date.now() - 365 * 86400e3, out = [];
+    for (const o of sales.items) {
+      if (!o || o.transaction_id == null || isHidden(o) || classifyOrderStatus(o.status) === 'cancelled') continue;
+      const t = Date.parse(o.date || ''); if (!Number.isFinite(t) || t < borne) continue;
+      const e = effEntry(o) || {};
+      if ((e.buyFromId != null && String(e.buyFromId) !== '') || (e.buyGros && e.buyGros.id) || (e.buyPrice != null && String(e.buyPrice).trim() !== '')) continue;
+      const idf = identiteAnnonce(o); const fiche = idf ? numeros[String(idf)] || null : null;
+      const key = cleArticleVente(o.transaction_id);
+      const enLigneLe = fiche && fiche.numberedAt && Date.parse(fiche.numberedAt) <= t ? fiche.numberedAt : null;
+      out.push({ key, id: key, o, idf: idf ? String(idf) : null, fiche: fiche || (e.numero ? e : null), ts: t,
+        cible: { key, titre: o.title || '', marque: '', taille: (fiche && fiche.size) || '', couleur: '', dateRef: enLigneLe || o.date, dateRefSource: enLigneLe ? 'en-ligne' : 'vente', prix: o.price } });
+    }
+    return out.sort((x, y) => y.ts - x.ts);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, numeros, saleOv]);
+  // L'affectation n'est calculée que sur les écrans qui la montrent, après le rendu (2 500 articles × 2 600
+  // achats : environ une seconde) ; undefined pendant le calcul, null si elle a échoué (« pas su »).
+  const vueLiaison = (curSub === 'annonces' && annSort === 'sansachat') || curSub === 'achats';
+  // Achats : « l'article proposé » a besoin des annonces (relues de la base, comme le délai d'achat).
+  useEffect(() => { if (curSub === 'achats' && accounts.length && listings.items === null && !listings.loading) loadListings(); /* eslint-disable-next-line */ }, [curSub, accounts.length]);
+  // Les articles par clé (Achats : « article proposé » sous un achat).
+  const articlesLiaison = useMemo(() => { const m = new Map(); for (const x of (fileAchat || [])) m.set(cleArticleAnnonce(x.id), { ...x, genre: 'annonce' }); for (const x of (fileVendus || [])) m.set(x.key, { ...x, genre: 'vente' }); return m; }, [fileAchat, fileVendus]);
+  const achatsLiaison = Array.isArray(fillBuyAchats.items) ? fillBuyAchats.items : (Array.isArray(buys.items) ? buys.items : undefined);
+  const [liaison, setLiaison] = useState(undefined);
+  useEffect(() => {
+    if (!vueLiaison) return undefined;
+    if (!fileAchat || achatsLiaison === undefined) { setLiaison(undefined); return undefined; }
+    const id = setTimeout(() => {
+      try {
+        const cibles = fileAchat.map((x) => { const c = cibleAnnonce(x.item); return { ...c, key: cleArticleAnnonce(x.id), prix: x.item.price, dateRef: c.dateRef || (x.fiche && x.fiche.numberedAt) || null }; })
+          .concat((fileVendus || []).map((x) => x.cible));
+        setLiaison(affecterPropositions({ cibles, achats: achatsLiaison, liens: liensAchats, refus: liaisonRefus, marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel,
+          receptionDe: (a) => dateReception(a, { infosTx: infosReception, recuClic: pickupDone }) }));
+      } catch (_) { setLiaison(null); }
+    }, 30);
+    return () => clearTimeout(id);
+  }, [vueLiaison, fileAchat, fileVendus, achatsLiaison, liensAchats, liaisonRefus, infosReception, pickupDone]);
+  // « Relier » une VENTE : l'écriture de « Relier un achat » ; sur la fiche de SON annonce (par identité),
+  // sinon sur la ligne de la vente — le même chemin que le sélecteur ouvert depuis Ventes.
+  const relierAchatVente = async (l, a, opts = {}) => {
+    const w = await ecritureRelierAchat(a); if (!w) return;
+    const o = l.o;
+    if (l.idf) updatePair({ id: l.idf, title: o.title, photo: orderPhoto(o), price: o.price && o.price.amount, _acc: o._acc }, w);
+    else setSaleOverride(String(o.transaction_id), w);
+    if (!opts.silencieux) accompagner('achat.relier', { vars: { prix: w.buyPrice ? `${String(w.buyPrice).replace('.', ',')}\u00a0€` : '—' } }).fini();
+    return true;
+  };
+  const choisirAchatVente = (l, propose) => { const o = l.o; const photo = orderPhoto(o); const sell = o.price && o.price.amount; const _autre = propose ? String(propose.transaction_id || '1') : undefined;
+    openPicker(l.idf ? { id: l.idf, title: o.title, photo, price: sell, _acc: o._acc, _dateRef: o.date, _autre } : { id: '_v' + o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo, price: sell, _acc: o._acc, _dateRef: o.date, _autre }); };
   // « Saisir » : le prix qu'il tape (jamais deviné), sans achat relié — l'écriture de la case de la carte.
   const saisirPrixAnnonce = async (it) => {
     const e = numeros[it.id] || {};
@@ -51129,6 +51301,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 );
               })()}
             </div>
+            {/* (15 nov., liaison) Dans l'autre sens : un achat sans article relié ⇒ L'ARTICLE PROPOSÉ (src/liaisonAchat.js,
+                la même affectation qu'Annonces → « Sans achat relié ») ; SON toucher relie, « Ce n'est pas lui » le range. */}
+            {!cancelled && (numA == null || numA === '') && liaison && liaison.parAchat && liaison.parAchat[String(o.transaction_id)] ? (() => {
+              const lp = liaison.parAchat[String(o.transaction_id)][0]; const art = articlesLiaison.get(lp.key);
+              return art ? <PropositionAchat p={lp} art={art} onRelier={() => (art.genre === 'vente' ? relierAchatVente(art, o) : relierAchatAnnonce(art.item, o))} onRefus={() => refuserLiaison(lp.key, String(o.transaction_id))}/> : null;
+            })() : null}
             </React.Fragment>
           );})}
         </div>
@@ -51674,6 +51852,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             onDetailBrouillons={()=>setBrouillonsOpen(true)}/>
         ) : annSort==='sansachat' ? (
           <AchatsARelier file={fileAchat} achats={fillBuyAchats.loading && !fillBuyAchats.items ? undefined : (fillBuyAchats.items || (accounts.length ? undefined : []))} liens={liensAchats}
+            vendus={fileVendus} liaison={liaison} onRelierVente={relierAchatVente} onRelierSerie={relierAchatAnnonceSerie} onChoisirVente={choisirAchatVente} onRefus={refuserLiaison}
             propositionDe={propositionSuggestion} onRelier={relierAchatAnnonce} onSaisir={saisirPrixAnnonce} onPlusTard={poserAchatPlusTard} onSerie={()=>setFillBuyOpen(true)}
             onChoisir={(it, propose)=>openPicker({ ...it, _autre: propose ? String(propose.transaction_id || '1') : undefined, _dateRef: (()=>{ const t=Number(it.createdTs); return Number.isFinite(t)&&t>0 ? new Date(t<1e12?t*1000:t).toISOString() : null; })() })} compteDe={(a)=>a&&a._acc?accNameOf(a._acc):''}/>
         ) : annSort==='acompleter' ? (
