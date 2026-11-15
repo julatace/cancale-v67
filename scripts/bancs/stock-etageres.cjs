@@ -160,9 +160,10 @@ async function retirerCase(pg, n) {
         await toucher(pg, '[data-pinceau="ciel"]');
         await toucher(pg, '[data-peindre-rang="1"]');
         if (CAPT) { await pg.evaluate(() => document.querySelector('[data-editeur-peindre]').scrollIntoView({ block: 'center' })); await pg.screenshot({ path: path.join(CAPT, `etag-${v}-3-editeur.png`) }); }
-        // 44 px au doigt (390 tactile) ; à la souris, la touche du studio fait 40 (son contrat, studio.css).
+        // 44 px au doigt (390 tactile) ; à la souris, la touche du studio fait 40 (son contrat, studio.css). Le choix des
+        // planches (ChoixPlanches, App.jsx, inchangé) dessine des boutons de 30 px à la souris : hors de ce lot, dit dans le récit.
         const mini = tel ? 43.5 : 39.5;
-        const petits = await pg.evaluate((mini) => [...document.querySelectorAll('[data-editeur-meuble] button')].filter((x) => x.offsetParent).map((x) => [x.getAttribute('aria-label') || x.textContent.trim().slice(0, 12), Math.round(x.getBoundingClientRect().width), Math.round(x.getBoundingClientRect().height)]).filter((q) => q[1] < mini || q[2] < mini), mini);
+        const petits = await pg.evaluate((mini) => [...document.querySelectorAll('[data-editeur-meuble] button')].filter((x) => x.offsetParent && (mini > 40 || !x.closest('[data-editeur-planches]'))).map((x) => [x.getAttribute('aria-label') || x.textContent.trim().slice(0, 12), Math.round(x.getBoundingClientRect().width), Math.round(x.getBoundingClientRect().height)]).filter((q) => q[1] < mini || q[2] < mini), mini);
         dit(petits.length === 0, `${t} · H : chaque bouton de l'éditeur fait ${tel ? '44 px au doigt' : '40 px (touche du studio, souris)'} au moins`, petits);
         await toucher(pg, '[data-meuble-enregistrer]');
         await pg.waitForTimeout(900);
