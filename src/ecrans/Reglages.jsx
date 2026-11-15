@@ -2173,7 +2173,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (9 nov.) « Ma configuration » EN TÊTE du groupe : la configuration de départ, plein écran,
       // rejouable (src/ConfigurationDepart.jsx) — tes choix pré-sélectionnés, rien n'est écrasé.
       { id:'configuration', type:'action', ic:'gear', lib:tr('reglages.configuration.lib'), desc:tr('reglages.configuration.desc'), onClick:()=>{ try { window.dispatchEvent(new Event('vrm:configuration')); } catch (_) {} }, data:{ 'data-reglage-configuration':'' } },
-      { id:'mes-plateformes', type:'panneau', nu:true, ic:'grid', lib:tr('reglages.mes-plateformes.lib'), desc:tr('reglages.mes-plateformes.desc'), el:<PlateformesSetting/> },
+      { id:'mes-plateformes', type:'panneau', nu:true, ic:'grid', lib:tr('parametres.plateformesAffichees.lib'), desc:tr('reglages.mes-plateformes.desc'), el:<PlateformesSetting/> },
       // (8 nov.) Simple / Complet et « Je vends » (src/profilVendeur.js).
       { id:'affichage-mode', type:'panneau', nu:true, ic:'eye', lib:tr('reglages.affichage-mode.lib'), desc:tr('reglages.affichage-mode.desc'), val: profilV.mode === 'simple' ? tr('reglages.affichage.simple') : tr('reglages.affichage.complet'), data:{ 'data-reglage-affichage': profilV.mode }, el:<AffichageSetting/> },
       // (9 nov., Julien) L'objectif du mois : un montant de VENDU à viser (vide par défaut). La barre fine de
@@ -2220,7 +2220,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     )},
     // (14 nov., lots 118, 119, 120, 127, 130) Confort et sécurité : un groupe à lui, chaque geste dans son panneau.
     {id:'confort',titre:tr('confort.groupe'),items:[
-      { id:'code-local', type:'panneau', nu:true, ic:'lock', lib:tr('confort.code.lib'), desc:tr('confort.code.desc'), data:{ 'data-reglage-code-local':'' }, el:<ReglageCodeLocal toast={toast}/> },
+      { id:'code-local', type:'panneau', nu:true, ic:'pave', lib:tr('confort.code.lib'), desc:tr('confort.code.desc'), data:{ 'data-reglage-code-local':'' }, el:<ReglageCodeLocal toast={toast}/> },
       { id:'connexion-qr', type:'panneau', nu:true, ic:'qr', lib:tr('confort.qr.lib'), desc:tr('confort.qr.desc'), data:{ 'data-reglage-connexion-qr':'' }, el:<p className="vrm-cf-doux" style={{margin:0,fontSize:15,lineHeight:1.5}}>{tr('confort.qr.mode')}</p> },
       AUTH.user && { id:'lien-aide', type:'panneau', nu:true, ic:'users', lib:tr('confort.aide.lib'), desc:tr('confort.aide.desc'), data:{ 'data-reglage-lien-aide':'' }, el:<ReglageLienAide uid={AUTH.user.id} entetes={enTeteSession} toast={toast}/> },
       { id:'atelier', type:'action', ic:'image', lib:tr('confort.atelier.lib'), desc:tr('confort.atelier.desc'), onClick:()=>{ try { window.dispatchEvent(new Event('vrm:atelier')); } catch (_) {} }, data:{ 'data-reglage-atelier':'' } },
@@ -2306,7 +2306,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     ]},
     AUTH.user && { id:'boutique', titre:tr('reglages.groupe.boutique'), items:[
       // (30 oct.) « Abonnement et factures » retiré : l'onglet « Abonnement » du haut fait la même chose.
-      { id:'equipe', type:'panneau', ic:'users', lib:tr('reglages.equipe.lib'), desc:tr('reglages.equipe.desc'), el:<EquipeSetting/> },
+      { id:'equipe', type:'panneau', ic:'invite', lib:tr('reglages.equipe.lib'), desc:tr('reglages.equipe.desc'), el:<EquipeSetting/> },
     ]},
     { id:'connexion', titre:tr('reglages.groupe.connexion'), items:[
       AUTH.user && { id:'email', type:'nav', ic:'mail', lib:tr('reglages.email.lib'), onClick:()=>{ setAcct({ mode:'email', val:'', err:'', busy:false }); } },
@@ -2325,9 +2325,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // de la confidentialité, avec un libellé qui ne se confond plus avec elle (« Journal : … » / « Confidentialité : … »).
       AUTH.user && { id:'journal-vrm', type:'panneau', ic:'clock', lib:tr('reglages.journal-vrm.lib'), el:<JournalVrm/> },
       // (8 nov., confiance) Ce que VRM lit, garde et fait — chaque phrase tenue par le code (src/tesDonnees.js).
-      { id:'tes-donnees', type:'panneau', ic:'shield', lib:tr('reglages.tes-donnees.lib'), desc:tr('reglages.tes-donnees.desc'), data:{ 'data-reglage-tes-donnees':'' },
+      { id:'tes-donnees', type:'panneau', ic:'eye', lib:tr('reglages.tes-donnees.lib'), desc:tr('reglages.tes-donnees.desc'), data:{ 'data-reglage-tes-donnees':'' },
         el:<TesDonnees cloisonne={!!CLOISONNE} onExporter={exporterMesDonnees} onJournal={AUTH.user ? ()=>ouvrirSous('journal-vrm') : undefined} onFermer={AUTH.user ? ()=>ouvrirSous('fermer') : undefined}/> },
-      { id:'conditions', type:'panneau', nu:true, ic:'doc', lib:tr('reglages.conditions.lib'), el:donnees },
+      { id:'conditions', type:'panneau', nu:true, ic:'info', lib:tr('reglages.conditions.lib'), el:donnees },
     ]},
     // (9 nov., RGPD) « Supprimer mon compte » : TOUT EN BAS de Mon compte, seul, discret
     // (le libellé dans la couleur `danger` du thème — le rouge est réservé aux doublons, §7).
@@ -2336,9 +2336,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     ]},
   ] : [
     { id:'donnees', titre:tr('reglages.groupe.donnees'), items:[
-      { id:'tes-donnees', type:'panneau', ic:'shield', lib:tr('reglages.tes-donnees.lib'), desc:tr('reglages.tes-donnees.desc'), data:{ 'data-reglage-tes-donnees':'' },
+      { id:'tes-donnees', type:'panneau', ic:'eye', lib:tr('reglages.tes-donnees.lib'), desc:tr('reglages.tes-donnees.desc'), data:{ 'data-reglage-tes-donnees':'' },
         el:<TesDonnees cloisonne={!!CLOISONNE} onExporter={exporterMesDonnees}/> },
-      { id:'conditions', type:'panneau', nu:true, ic:'doc', lib:tr('reglages.conditions.lib'), el:donnees },
+      { id:'conditions', type:'panneau', nu:true, ic:'info', lib:tr('reglages.conditions.lib'), el:donnees },
     ]},
   ];
   // (15 nov.) Plus d'onglets : TOUS les groupes, rangés en dix catégories (src/parametres/categories.js).

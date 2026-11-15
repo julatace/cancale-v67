@@ -147,4 +147,4 @@ export const rangeeDuLien = (id) => { const k = String(id || ''); return ALIAS_L
 // ── L'ÉTAT DIT À DROITE D'UNE CATÉGORIE ─────────────────────────────────────
 // La valeur d'UNE rangée de la catégorie, lue telle qu'elle est déjà dite sur sa ligne (§11 : une
 // source). `null` ⇒ rien d'écrit (jamais « — » ni « n/d »).
-export const VALEUR_DE_CATEGORIE = { compte: 'double', ventes: 'imprimante', stock: 'numeros', argent: 'regime', apparence: 'langue' };
+export const VALEUR_DE_CATEGORIE = { ventes: 'imprimante', stock: 'numeros', argent: 'regime', apparence: 'langue' };

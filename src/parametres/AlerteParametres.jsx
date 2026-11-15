@@ -41,7 +41,7 @@ export function AlerteParametres({ onVoir }) {
       <span className="vrm-pm-alerte-point" aria-hidden="true"/>
       <span className="vrm-set-lib">
         <b>{tr('parametres.alerte.titre')}</b>
-        <small className="vrm-set-desc">{choses.map(texte).join(' · ')}</small>
+        <small className="vrm-set-desc">{(() => { const t = choses.map(texte).join(' · '); return t.charAt(0).toLocaleUpperCase() + t.slice(1); })()}</small>
       </span>
       <span className="vrm-pm-alerte-geste">{tr('parametres.alerte.voir')}</span>
     </button>

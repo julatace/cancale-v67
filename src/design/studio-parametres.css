@@ -17,6 +17,7 @@
 /* Une catégorie : 64 px, son nom, ce qu'on y trouve en UNE ligne, son état à droite. */
 :root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-cat-ligne { min-height: 64px !important; padding-top: 10px !important; padding-bottom: 10px !important; }
 :root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-cat-ligne .vrm-set-lib { min-width: 0 !important; overflow: hidden !important; }
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-cat-ligne .vrm-set-lib > b { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
 :root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-cat-ligne .vrm-set-desc { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; margin-top: 3px !important; }
 :root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-cat-ligne .vrm-set-val { max-width: 38% !important; font-size: 15px !important; }
 :root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-cat-ligne .vrm-set-ic { width: 32px !important; height: 32px !important; border-radius: 10px !important; }
@@ -36,7 +37,7 @@
 
 /* ── Ordinateur : le sommaire collant, toutes les catégories à droite ── */
 :root:root:root:root:root:root body .vrm-main [data-espace="autres"].vrm-pm[data-reglages-disposition="ordinateur"] { max-width: 1080px !important; }
-:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-bureau { display: grid; grid-template-columns: minmax(250px, 300px) minmax(0, 1fr); gap: 36px; align-items: start; }
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-bureau { display: grid; grid-template-columns: minmax(240px, 280px) minmax(0, 1fr); gap: 32px; align-items: start; }
 :root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-sommaire { position: sticky; top: 16px; }
 :root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-sommaire .vrm-pm-cat-ligne { min-height: 56px !important; }
 :root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-sommaire .vrm-pm-cat-ligne .vrm-set-val { display: none !important; }

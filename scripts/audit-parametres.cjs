@@ -86,6 +86,12 @@ const dit = (bon, quoi, detail) => { n++; if (!bon) ko++; console.log(`${bon ? '
   const fantomes = [...nommees.keys()].filter((id) => !rangees.includes(id) && id !== 'abonnement-ouvrir');
   dit(!fantomes.length, 'chaque nom d’une catégorie désigne une rangée qui existe', fantomes);
 
+  // Une icône par rangée DANS une catégorie (deux rangées voisines au même dessin se confondent).
+  const icDe = {}; for (const m of (bReg + bCompte).matchAll(/\{\s*id:\s*'([a-z0-9-]+)',\s*type:\s*'[a-z]+',(?:\s*nu:\s*true,)?(?:\s*paresseux:\s*true,)?\s*ic:\s*'([a-zA-Z0-9]+)'/g)) icDe[m[1]] = m[2];
+  const memeDessin = [];
+  for (const c of C.CATEGORIES) { const vus = {}; for (const g of c.groupes) for (const id of g.items) { const x = icDe[id]; if (!x) continue; if (vus[x]) memeDessin.push(`${c.id}: ${vus[x]} = ${id} (${x})`); else vus[x] = id; } }
+  dit(Object.keys(icDe).length >= 70 && !memeDessin.length, `une icône par rangée dans chaque catégorie (${Object.keys(icDe).length} rangées dessinées)`, memeDessin);
+
   // ── Le filet.
   const it = (id) => ({ id, type: 'panneau', lib: id });
   const groupesAvant = [

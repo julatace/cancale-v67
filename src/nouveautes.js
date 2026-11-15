@@ -26,6 +26,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (15 nov., Julien : « pratique et compréhensible ») docs/passation/2026-11-15-parametres.md
+  { id: 'parametres-categories', date: '2026-11-15', titre: 'Paramètres rangés en dix catégories', phrase: 'Cherche « papier » ou « URSSAF » : le bon réglage s’ouvre.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (15 nov., extension 5.378) Dates de versement : relevé vérifié avant de dater, délai en heures de Vinted ouvert.
   { id: 'versements-releve-verifie', date: '2026-11-15', titre: 'Dates de versement : relevé vérifié, délai honnête', phrase: 'Le relevé ne date rien avant cinq accords ; délai en heures.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « horriblement moche », « ne mets pas paires, tu mets annonces ») docs/passation/2026-11-15-annonces-propre.md
