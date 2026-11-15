@@ -134,7 +134,15 @@ aucun identifiant, aucune date au jour près.
   213 requêtes du cadre interceptées : 0 vers la base, 0 vers /api, 0 écriture ; son stockage et sa base
   intacts ; tableau = calcul serveur, sans e-mail ni identifiant) ; S un signalement d'un autre compte
   arrive chez le propriétaire, le notifie, il répond, l'auteur est notifié et lit la réponse ; un autre
-  compte ne liste ni ne répond (403). Résultat et rouge sur l'arbre de départ : voir la fin de ce récit.
+  compte ne liste ni ne répond (403).
+  **Résultat : 375 OK, 0 KO** (390 + 1512, clair + sombre, un passage complet ; machine chargée à 42 :
+  deux passages précédents avaient un onglet tombé à 1512, rejoués seuls : verts). Après la fusion finale
+  d'`origin/claude/project-review-nsk5su` : 390 clair rejoué, 99 OK, 0 KO.
+  **Rouge sur l'arbre de départ** (`git archive` de f782040f, banc copié DEDANS, son propre `dist` et son
+  propre code serveur) : 5 KO (le parcours ne s'ouvre pas, pas d'onglet, pas de « Reçu », la réponse
+  n'existe pas).
+  **Mutation** (bac à sable retiré, `demandeBacASable` ⇒ `null`, arbre reconstruit) : 8 KO — le cadre
+  rouvre l'app avec la VRAIE session de Julien et part vers la base (« GET …/rest/v1/app_data… »).
 - Audits verts : `traduction` (+ deux écrans migrés), `tdz`, `variables`, `studio`, `csp`,
   `fonctions-api` (12), `centre-aide`, `quoi-de-neuf`, `identite`, `entetes`, `aide-generer --verifier`.
   `audit-aide-signalement` : 1 rouge DÉJÀ présent avant ce lot (« Réglages pose le sien » : la ligne du
