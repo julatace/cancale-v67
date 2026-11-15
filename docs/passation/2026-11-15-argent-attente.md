@@ -103,7 +103,15 @@ jamais devinée). **Total = somme des étapes = somme des sites**, au centime.
   sombre) : résumé de Ventes, écran (étapes, ventes dépliées, bloquée, frise, sites, comptes, deux
   autres sommes jamais additionnées, total écrit une fois), Ma journée et Argent ouvrent le même
   écran, compte écarté, débordement et cibles 44 px.
-- Le résultat de la passe (verts/rouges) : voir le rapport du lot.
+- Passe du 15 nov. : `audit-argent-a-venir` 71 verts (sur l'arbre d'avant : 18 rouges, la règle
+  d'avant comptait la vente Vestiaire refusée et laissait de côté les commandes eBay à retenue sans
+  montant) ; banc `argent-a-venir` 91 verts sur 4 tailles × thèmes (sur le build d'avant : 7 rouges) ;
+  verts aussi : `traduction`, `quoi-de-neuf`, `tdz`, `variables`, `studio`, `urssaf`, `identite`,
+  `carte-chiffres`, `chiffres`, `une-regle`, `journee-coherence`, `vente-email-fraiche`, `coherence`,
+  `composants`, `icones` ; bancs `argent` (268 verts), `studio-journee`, `colis-ventes-instantanes`. `ventes-e2` : V1 (« À
+  venir », un montant une fois) vert ; ses 7 rouges V2/V5/G (l'état de chaque vente de « Tous » vide,
+  un titre long) sont **les mêmes sur le build d'avant** (vérifié : arbre de
+  `claude/project-review-nsk5su` construit et passé) — un défaut de la liste studio, pas de ce lot.
 
 ## 5. Ce qui reste / gestes de Julien
 
