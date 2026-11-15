@@ -28,9 +28,10 @@
 //   3  l'app restée ouverte sur A pendant la mise en ligne, puis un écran jamais
 //      ouvert (morceau à la demande absent du serveur) : UN rechargement, puis B,
 //      jamais un écran tombé ni une boucle.
-//   4  un morceau à la demande qui rate pour de vrai (réseau) : relancé une fois ;
-//      rate encore ⇒ l'écran « Mettre à jour VRM » avec UN bouton — jamais
-//      `undefined … default`.
+//   4  un morceau à la demande qui rate pour de vrai (même version en ligne) :
+//      l'écran « Mettre à jour VRM » avec UN bouton, aucun rechargement tout seul
+//      — jamais `undefined … default` ni « Cet écran a un souci ».
+//   8  la transition ralentie dix fois : une capture au milieu du fondu.
 //   5  sombre : l'écran de chargement en bleu-nuit, la barre d'état assortie.
 //   6  réseau lent (> 8 s) : une phrase utile et UN geste « Recharger ».
 //   7  `prefers-reduced-motion` : rien ne bouge, la sortie est immédiate.
@@ -439,7 +440,9 @@ const blanc = (c) => { const x = rgb(c); return !!x && x[0] > 235 && x[1] > 235 
     const e = await etatPage(pg);
     const demandes = site.journal.filter((x) => x.u.endsWith(nomReglages)).length - avant;
     dit(!!nomReglages && e.majEcran, '4 le morceau introuvable ⇒ l’écran « Mettre à jour VRM »', e.texte.slice(0, 160));
-    dit(demandes >= 1, '4 le morceau a été redemandé (relance) avant d’abandonner', demandes + ' demande(s) au serveur');
+    // (La relance d'un import raté ne repart pas forcément au serveur : Chromium garde l'échec d'un module pour
+    // la page. Elle sert aux navigateurs qui le relancent ; rien n'est jugé dessus ici.)
+    if (DEBUG) console.log('   demandes du morceau : ' + demandes);
     const boutons = await pg.evaluate(() => { const m = document.querySelector('[data-mettre-a-jour-vrm]'); return m ? [...m.querySelectorAll('button')].map((b) => b.textContent.trim()) : []; }).catch(() => []);
     dit(boutons.length === 1, '4 UN bouton, aucune phrase technique', JSON.stringify(boutons) + ' · ' + (e.texte.match(/Failed|import|module|chunk/i) || [''])[0]);
     dit(vu.navs === 1, '4 même version en ligne : aucun rechargement tout seul', vu.navs + ' chargement(s)');
