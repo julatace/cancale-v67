@@ -328,7 +328,7 @@
   font: 600 12.5px/22px var(--sbp-texte) !important; color: var(--sbp-encre) !important; letter-spacing: .01em !important; font-variant-numeric: tabular-nums !important; white-space: nowrap !important;
 }
 :root:root:root:root:root:root:root:root:root body :is([data-espace="paires"], .vrm-fp) :is(.vrm-fiche-numero, .sb-plaque-hote) .vrm-num > span { color: inherit !important; font: inherit !important; }
-:root:root:root:root:root:root:root:root:root body :is([data-espace="paires"], .vrm-fp) :is(.vrm-fiche-numero, .sb-plaque-hote) .vrm-num > .vrm-num-prefixe { font-size: 9.5px !important; color: var(--sbp-encre2) !important; margin-right: 1.5px !important; letter-spacing: .02em !important; }
+:root:root:root:root:root:root:root:root:root body :is([data-espace="paires"], .vrm-fp) :is(.vrm-fiche-numero, .sb-plaque-hote) .vrm-num > .vrm-num-prefixe { font-size: 11px !important; color: var(--sbp-encre2) !important; margin-right: 1.5px !important; letter-spacing: .02em !important; }
 :root:root:root:root:root body [data-espace="paires"] .vrm-fiche-num-vide { color: var(--sbp-encre2) !important; font-weight: 500 !important; }
 /* LE SEUL ROUGE : deux paires présentes sous ce N° (§5). */
 :root:root:root:root:root:root:root:root:root body :is([data-espace="paires"], .vrm-fp) .vrm-num[data-num-etat="doublon"] { color: var(--sbp-doublon) !important; box-shadow: var(--sbp-pl-sh), inset 0 0 0 1px var(--sbp-doublon) !important; }
@@ -812,4 +812,15 @@
   :root:root:root:root:root body [data-espace="paires"] .vrm-ann-grid.sb-liste[data-sb-vue="liste"] { background: var(--sbp-feuille) !important; }
 }
 
+}
+
+/* (15 nov., rouges-connus) design-passe A : au doigt, une cible fait 44 px. Le sélecteur Annonces · Stock · Achats et les
+   sites (Vinted, Leboncoin…) avaient des pastilles de 40 et 38 px dans leur plateau : les pastilles passent à 44, le
+   plateau grandit d'autant (mêmes couleurs, mêmes fonds). Le « N° » de la plaque passe de 9,5 à 11 px (texte < 11 px). */
+@media (pointer: coarse) {
+  :root:root:root:root:root:root body .vrm-paires-selecteur .vrm-seg { height: 52px !important; }
+  :root:root:root:root:root:root body .vrm-paires-selecteur .vrm-seg-btn { height: 44px !important; min-height: 44px !important; }
+  :root:root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-filtre-site { height: 50px !important; }
+  :root:root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-filtre-site > button,
+  :root:root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-filtre-site > button .vrm-ss-in { height: 44px !important; min-height: 44px !important; }
 }
