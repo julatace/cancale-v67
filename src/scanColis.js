@@ -227,8 +227,9 @@ export function suiviCorrespond(lu, n) {
   if (!lu || !lu.suivi) return false;
   const s = normaliserN(n);
   if (!s) return false;
-  if (s === lu.suivi) return true;
-  return !!lu.sansCle && /^[6-9][A-Z]\d{11}$/.test(s) && s.slice(0, 12) === lu.suivi;
+  // Lu sans sa clé : seul un ID13 complet répond (le début lu n'est pas, à lui seul, un n° de suivi).
+  if (lu.sansCle) return /^[6-9][A-Z]\d{11}$/.test(s) && s.slice(0, 12) === lu.suivi;
+  return s === lu.suivi;
 }
 
 // `enregistrements` : [{ sorte: 'vente'|'achat'|'retour'|'colis'…, cle, suivis: [n°…], … }].
