@@ -41,12 +41,12 @@
   /* Le verre : le panneau (où l'on lit), la barre (plus claire, elle flotte), le fin (pastilles sur le fond). */
   --sv-verre: rgb(247 250 253 / .80);
   --sv-verre-2: rgb(241 246 251 / .80);
-  --sv-verre-barre: rgb(247 250 253 / .86);
+  --sv-verre-barre: rgb(247 250 253 / .80);
   --sv-verre-fin: rgb(255 255 255 / .16);
   --sv-verre-fin-bord: rgb(255 255 255 / .32);
   --sv-bord: rgb(255 255 255 / .75);
   --sv-flou: blur(26px) saturate(125%);
-  --sv-ombre: inset 0 1px 0 rgb(255 255 255 / .9), 0 0 0 .5px rgb(255 255 255 / .55), 0 18px 40px -18px rgb(8 26 50 / .55);
+  --sv-ombre: inset 0 1px 0 rgb(255 255 255 / .9), 0 0 0 1px rgb(255 255 255 / .75), 0 18px 40px -18px rgb(8 26 50 / .55);   /* le bord blanc d'1 px de la maquette */
   /* L'encre posée sur le VERRE (sombre le jour) : le gris et le lien assombris pour tenir 4,5:1 sur le verre au-dessus du bas. */
   --sv-encre: #0C1D30;
   --sv-encre-2: #3F5468;
@@ -57,6 +57,10 @@
   --sv-clair-2: #EDF4FC;
   --sv-clair-lien: #FFFFFF;
   --sv-clair-ambre: #FFE0A8;
+  /* La feuille (maquette : verre presque opaque) et son bord ; la couleur d'un onglet au repos. */
+  --sv-feuille: rgb(247 250 253 / .95);
+  --sv-feuille-bord: rgb(255 255 255 / .9);
+  --sv-onglet: #34495E;
   /* La porcelaine opaque : feuilles, confirmations, champs. */
   --sv-porcelaine: #FFFFFF;
   --sv-porcelaine-2: #F7FAFD;
@@ -69,7 +73,7 @@
   --sv-reflet-2: rgb(60 110 190 / .06);
   --sv-verre: rgb(16 30 50 / .62);
   --sv-verre-2: rgb(13 25 43 / .62);
-  --sv-verre-barre: rgb(20 36 58 / .82);
+  --sv-verre-barre: rgb(16 30 50 / .72);
   --sv-colle: #142F55;
   --sv-brume: #0F2038;
   --sv-verre-fin: rgb(255 255 255 / .08);
@@ -86,17 +90,21 @@
   --sv-clair-ambre: #F2B65E;
   --sv-porcelaine: #16273C;
   --sv-porcelaine-2: #122135;
+  --sv-feuille: rgb(16 30 50 / .92);
+  --sv-feuille-bord: rgb(255 255 255 / .14);
+  --sv-onglet: #AFC0D3;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     --sv-haut: #133460; --sv-milieu: #0C2240; --sv-bas: #050E1D;
     --sv-reflet: rgb(90 140 210 / .08); --sv-reflet-2: rgb(60 110 190 / .06);
-    --sv-verre: rgb(16 30 50 / .62); --sv-verre-2: rgb(13 25 43 / .62); --sv-verre-barre: rgb(20 36 58 / .82); --sv-colle: #142F55; --sv-brume: #0F2038;
+    --sv-verre: rgb(16 30 50 / .62); --sv-verre-2: rgb(13 25 43 / .62); --sv-verre-barre: rgb(16 30 50 / .72); --sv-colle: #142F55; --sv-brume: #0F2038;
     --sv-verre-fin: rgb(255 255 255 / .08); --sv-verre-fin-bord: rgb(255 255 255 / .16); --sv-bord: rgb(255 255 255 / .10);
     --sv-ombre: inset 0 .5px 0 rgb(255 255 255 / .10), 0 0 0 .5px rgb(0 0 0 / .45), 0 18px 40px -16px rgb(0 0 0 / .8);
     --sv-encre: #EAF2FB; --sv-encre-2: #9CB0C6; --sv-lien: #6CB4FF; --sv-ambre: #F2B65E;
     --sv-clair: #F2F7FD; --sv-clair-2: #B9CADD; --sv-clair-lien: #8CC4FF; --sv-clair-ambre: #F2B65E;
     --sv-porcelaine: #16273C; --sv-porcelaine-2: #122135;
+    --sv-feuille: rgb(16 30 50 / .92); --sv-feuille-bord: rgb(255 255 255 / .14); --sv-onglet: #AFC0D3;
   }
 }
 /* Sans flou (vieux navigateur) ou transparence réduite : le verre devient opaque (il garde sa teinte). */
@@ -184,7 +192,8 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
   .vrm-colis-prochain, .vrm-ann-geste, details.vrm-quick-settings, .vrm-ann-card, .vrm-ios-carte, .vrm-reglages-groupe,
   .vrm-set-liste, .vrm-settings-todo, .vrm-fu-panneau, .vrm-sv-tuile, .vrm-sv-carte, .vrm-onglet-manque, .vrm-d7-carte, .vrm-fp-section,
   .vrm-boite-liste-col, .vrm-rpf-point, .vrm-sx, .vrm-guide.vrm-pa-carte, .vrm-carte-mfa, .vrm-sp-rec, .vrm-compta-replis, .vrm-argent-w, .vrm-at-carte) {
-  background-color: var(--sv-verre) !important; background-image: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important;
+  /* UNE couche de verre (la couleur ET le dégradé translucides se superposaient : un verre à .96, presque opaque). */
+  background-color: transparent !important; background-image: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important;
   box-shadow: var(--sv-ombre) !important;
 }
 
@@ -391,5 +400,61 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
 :root:root:root:root { --a-ambre-encre: var(--sv-ambre) !important; }
 /* Le nombre d'une vue (« Toutes 1 024 ») : plein, pas estompé — il se lit sur le champ. */
 :root:root:root body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button .vrm-of-n { opacity: 1 !important; }
+
+/* ══ 10. LES CODES DE LA MAQUETTE (Julien : « ça doit être beau, pas designé simplement ») ══════════
+   Repris de la maquette 9 et de celle du Stock en verre (feuilles, plaques, pastilles fumées, bandeaux). */
+
+/* La PLAQUE N° : une plaquette blanche en relief (dégradé, filet, ombre portée), l'encre en 750 — partout. */
+:root:root:root:root body :is(.vrm-app-shell, .vrm-fs, [data-recherche-panneau], .vrm-fp) :is(.sb-plaque, .vrm-num) {
+  background: linear-gradient(#FFFFFF, #EDF2F7) !important; border: 1px solid rgb(12 29 48 / .18) !important;
+  box-shadow: 0 1px 2px rgb(8 26 50 / .30), inset 0 -1px 0 rgb(12 29 48 / .05) !important;
+  color: #0C1D30 !important; text-shadow: 0 1px 0 #FFFFFF !important; font-weight: 750 !important;
+}
+:root:root:root:root body :is(.vrm-app-shell, .vrm-fs, [data-recherche-panneau], .vrm-fp) :is(.sb-plaque small, .sb-plaque .sb-plaque-n, .vrm-num .vrm-num-prefixe) { color: #3F5468 !important; }
+/* Le doublon de N° : le seul rouge (§5, §7), sur la même plaque ; « à vérifier sur son carton » : l'ambre. */
+:root:root:root:root body :is(.vrm-app-shell, .vrm-fs, [data-recherche-panneau], .vrm-fp) :is(.sb-plaque.is-double, .vrm-num[data-num-etat="doublon"]) { color: #B42020 !important; border-color: #B42020 !important; }
+:root:root:root:root body :is(.vrm-app-shell, .vrm-fs, [data-recherche-panneau], .vrm-fp) .vrm-num[data-num-etat="aVerifier"] { color: #764300 !important; border-color: #E08A12 !important; }
+
+/* Les FEUILLES : un verre presque opaque (.95), flouté, bordé de blanc en haut, une ombre qui monte ; le voile bleu nuit. */
+:root:root:root:root:root:root:root body .vrm-fs:not(.vrm-fs-sombre) {
+  background: var(--sv-feuille) !important; background-image: none !important;
+  -webkit-backdrop-filter: blur(30px) saturate(140%) !important; backdrop-filter: blur(30px) saturate(140%) !important;
+  border-top: 1px solid var(--sv-feuille-bord) !important; box-shadow: 0 -24px 60px -16px rgb(4 12 26 / .6) !important;
+  border-top-left-radius: 30px !important; border-top-right-radius: 30px !important;
+}
+@media (min-width: 768px) { :root:root:root:root:root:root:root body .vrm-fs:not(.vrm-fs-sombre) { border: 1px solid var(--sv-feuille-bord) !important; border-radius: 30px !important; } }
+:root:root:root:root:root:root:root body .vrm-fs-voile { background: rgb(4 12 26 / .46) !important; }
+:root:root:root:root:root:root:root body .vrm-fs .vrm-fs-poignee { background: rgb(12 29 48 / .2) !important; width: 38px !important; }
+:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-fs .vrm-fs-poignee { background: rgb(255 255 255 / .22) !important; }
+:root:root:root:root:root:root:root body .vrm-fs .vrm-fs-croix-rond { background: rgb(255 255 255 / .72) !important; background-image: none !important; border: 1px solid rgb(12 29 48 / .12) !important; box-shadow: none !important; }
+:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-fs .vrm-fs-croix-rond { background: rgb(255 255 255 / .08) !important; border-color: rgb(255 255 255 / .14) !important; }
+
+/* Les MOMENTS d'accompagnement (pendant · après · échec), les messages de la coque : un bandeau de verre, son icône dans
+   une pastille teintée, l'encre sombre — comme « Les 3 boîtes du dessus sont descendues d'un cran · Compris ». */
+:root:root:root:root body :is(.vrm-acc:is(.vrm-acc-pendant, .vrm-acc-apres, .vrm-acc-echec), .vrm-toasts .vrm-toast) {
+  background: var(--sv-verre-barre) !important; background-image: none !important; color: var(--sv-encre) !important;
+  -webkit-backdrop-filter: var(--sv-flou) !important; backdrop-filter: var(--sv-flou) !important;
+  border: 1px solid var(--sv-bord) !important; border-radius: 22px !important;
+  box-shadow: 0 18px 40px -18px rgb(8 26 50 / .55), inset 0 1px 0 rgb(255 255 255 / .9) !important;
+}
+:root:root:root:root[data-theme="dark"] body :is(.vrm-acc:is(.vrm-acc-pendant, .vrm-acc-apres, .vrm-acc-echec), .vrm-toasts .vrm-toast) { box-shadow: 0 18px 40px -18px rgb(0 0 0 / .7), inset 0 1px 0 rgb(255 255 255 / .10) !important; }
+:root:root:root:root body .vrm-acc .vrm-acc-icone {
+  display: inline-grid !important; place-items: center !important; flex: none !important; width: 32px !important; height: 32px !important; border-radius: 50% !important;
+  background: rgb(0 96 204 / .12) !important; color: var(--sv-lien) !important;
+}
+:root:root:root:root body .vrm-acc .vrm-acc-barre > i { background: var(--sv-encre) !important; }
+
+/* Les PASTILLES FUMÉES : ce qui se touche posé sur le fond (les ronds de la tête du téléphone, au repos). */
+@media (max-width: 743px) {
+  :root:root:root:root:root body .vrm-app-shell > .vrm-app-header:not(.is-defile) .vrm-header-actions :is(button.vrm-hbtn, .vrm-cn-cloche > button, button.vrm-cn-cloche) {
+    background: rgb(10 38 76 / .24) !important; background-image: none !important; box-shadow: none !important; border: 1px solid rgb(255 255 255 / .32) !important; color: #FFFFFF !important;
+    -webkit-backdrop-filter: blur(18px) !important; backdrop-filter: blur(18px) !important;
+  }
+}
+
+/* La BARRE du bas : le verre à .80, les onglets à l'encre (#34495E au repos, l'encre pleine pour l'actif). */
+:root:root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab :is(.vrm-tab-ic, .vrm-nav-label) { color: var(--sv-onglet) !important; }
+:root:root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] :is(.vrm-tab-ic, .vrm-nav-label) { color: var(--sv-encre) !important; }
+:root:root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] .vrm-nav-label { font-weight: 700 !important; }
 
 } /* fin de @layer vrm-verre */
