@@ -160,9 +160,9 @@ const carte = (pg, racine, tx) => pg.evaluate(([rac, t]) => {
   const q = (s) => x.querySelector(s);
   const bande = q('[data-retour-bande]');
   const etapes = [...x.querySelectorAll('[data-retour-et]')].map((e) => ({ cle: e.getAttribute('data-retour-et'), etat: e.getAttribute('data-retour-et-etat'), lib: (e.querySelector('b') || {}).innerText || '', det: (e.querySelector('[data-retour-et-detail]') || {}).innerText || '' }));
-  const ctr = (() => {
-    if (!bande) return null;
-    const b = bande.querySelector('b'); const lum = (c) => { const v = (/rgba?\(([^)]+)\)/.exec(c) || [, '0,0,0'])[1].split(',').map(Number); const f = (u) => { u /= 255; return u <= 0.03928 ? u / 12.92 : Math.pow((u + 0.055) / 1.055, 2.4); }; return [0.2126 * f(v[0]) + 0.7152 * f(v[1]) + 0.0722 * f(v[2]), v[3] == null ? 1 : v[3], v]; };
+  const contraste = (b) => {
+    if (!b) return null;
+    const bande = b; const lum = (c) => { const v = (/rgba?\(([^)]+)\)/.exec(c) || [, '0,0,0'])[1].split(',').map(Number); const f = (u) => { u /= 255; return u <= 0.03928 ? u / 12.92 : Math.pow((u + 0.055) / 1.055, 2.4); }; return [0.2126 * f(v[0]) + 0.7152 * f(v[1]) + 0.0722 * f(v[2]), v[3] == null ? 1 : v[3], v]; };
     // Le fond réel : les couches translucides recomposées jusqu'à une couche opaque (ou le bas du dégradé).
     let el = bande, couches = [];
     while (el) { const c = getComputedStyle(el).backgroundColor; const v = (/rgba?\(([^)]+)\)/.exec(c) || [, '0,0,0,0'])[1].split(',').map(Number); const a = v[3] == null ? 1 : v[3]; if (a > 0) couches.push([v, a]); if (a >= 0.999) break; el = el.parentElement; }
@@ -173,10 +173,13 @@ const carte = (pg, racine, tx) => pg.evaluate(([rac, t]) => {
     const t = lum(getComputedStyle(b).color);
     const l1 = t[0], l2 = L(fond);
     return Math.round(((Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)) * 100) / 100;
-  })();
+  };
+  const ctr = bande ? contraste(bande.querySelector('b')) : null;
+  // L'encre de la carte elle-même (titre, compte, n° de suivi, liens) : jamais une encre claire sur le verre clair.
+  const ctrCarte = ['.vrm-ret-titre', '.vrm-ret-meta', '[data-retour-copier]', '[data-retour-suivre]', '[data-retour-vinted]'].map((s) => [s, contraste(q(s))]).filter(([, v]) => v != null);
   const copier = q('[data-retour-copier]'), suivre = q('[data-retour-suivre]'), logo = q('[data-retour-suivi-ligne] [data-transporteur-logo]');
   return { etape: x.getAttribute('data-retour-etape'), fait: x.getAttribute('data-retour-fait'), titre: (q('.vrm-ret-titre') || {}).innerText || '', meta: (q('.vrm-ret-meta') || {}).innerText || '', photo: !!q('.vrm-ret-photo'),
-    bande: bande ? (bande.querySelector('b') || {}).innerText : null, sous: bande ? (bande.querySelector('[data-retour-bande-sous]') || {}).innerText || '' : null, contraste: ctr,
+    bande: bande ? (bande.querySelector('b') || {}).innerText : null, sous: bande ? (bande.querySelector('[data-retour-bande-sous]') || {}).innerText || '' : null, contraste: ctr, ctrCarte,
     etapes, source: (q('[data-retour-source-fait]') || {}).innerText || '', imprimer: q('[data-retour-imprimer]') ? Math.round(q('[data-retour-imprimer]').getBoundingClientRect().height) : 0,
     depose: q('[data-retour-depose]') ? Math.round(q('[data-retour-depose]').getBoundingClientRect().height) : 0,
     copier: copier ? { txt: copier.innerText, h: Math.round(copier.getBoundingClientRect().height) } : null, suivre: suivre ? suivre.getAttribute('href') : null, logo: logo ? logo.getAttribute('data-marque') : (q('[data-retour-suivi-ligne]') || { getAttribute: () => null }).getAttribute('data-retour-transporteur') };
@@ -218,6 +221,7 @@ const dernierPdf = async (pg, viaPartage) => {
         const reBande = new RegExp(`^À déposer avant ${motsJour(DANS8.j).replace(/\./g, '\\.')} 10 h$`);
         dit(a && reBande.test(a.bande || '') && /^dans 8 jours · sinon tu gardes l’article et le vendeur est payé$/.test(a.sous || ''), `${nom} : la bande « ${a && a.bande} · ${a && a.sous} » (date en clair, heure de Paris)`, JSON.stringify(a && [a.bande, a.sous]));
         dit(a && a.contraste >= 4.5, `${nom} : la bande se lit (contraste ${a && a.contraste}:1 ≥ 4,5)`, JSON.stringify(a && a.contraste));
+        dit(a && a.ctrCarte.length >= 4 && a.ctrCarte.every(([, v]) => v >= 4.5), `${nom} : la carte se lit en tête de Ma journée (titre, compte, n°, liens ≥ 4,5:1 : ${a && a.ctrCarte.map(([k, v]) => v).join(' · ')})`, JSON.stringify(a && a.ctrCarte));
         dit(a && a.titre === AUTRY && a.photo && /banc_cancale/.test(a.meta), `${nom} : photo + titre (par SON n° de transaction) + compte`, JSON.stringify(a && [a.titre, a.meta, a.photo]));
         dit(a && a.imprimer >= (vp.width < 600 ? 44 : 40) && a.depose >= (vp.width < 600 ? 44 : 40) && a.logo === 'chronopost' && a.copier && a.copier.txt.includes(SA) && a.copier.h >= 44 && a.suivre === `https://www.chronopost.fr/tracking-no-cms/suivi-page?listeNumerosLT=${SA}`,
           `${nom} : Imprimer, Déposé, logo Chronopost, n° copiable, « Suivre ↗ » vers la page publique de Chronopost`, JSON.stringify(a && { i: a.imprimer, d: a.depose, logo: a.logo, c: a.copier, s: a.suivre }));
@@ -235,6 +239,7 @@ const dernierPdf = async (pg, viaPartage) => {
           `${nom} : Nike — « Déposé · ${n && n.etapes[1] && n.etapes[1].det} » ✓, « En route vers le vendeur » ici, puis livré, remboursé`, JSON.stringify(n && n.etapes));
         dit(n && /lu dans l’e-mail Mondial Relay/.test(n.source) && n.bande === null && !n.imprimer && !n.depose && n.logo === 'mondialrelay' && /^https:\/\/www\.mondialrelay\.fr\/suivi-de-colis\/\?numeroExpedition=81230048/.test(n.suivre || ''),
           `${nom} : Nike — source dite, plus de bande ni d’Imprimer ni de Déposé (le fait les remplace), logo et suivi Mondial Relay`, JSON.stringify(n && { s: n.source, b: n.bande, i: n.imprimer, d: n.depose, l: n.logo, u: n.suivre }));
+        dit(n && a && [...n.ctrCarte, ...a.ctrCarte].every(([, v]) => v >= 4.5), `${nom} : les cartes d’Achats se lisent (≥ 4,5:1)`, JSON.stringify(n && a && [n.ctrCarte, a.ctrCarte]));
         dit(a && etats(a) === 'bordereau:fait deposer:ici route:avenir livre:avenir rembourse:avenir' && a.etapes[0].det === 'Chronopost' && a.etapes[0].lib === 'Bordereau reçu',
           `${nom} : Autry — « Bordereau reçu · Chronopost » ✓, « À déposer » ici`, JSON.stringify(a && a.etapes));
         const txt = await pg.evaluate(() => (document.querySelector('[data-retours-achat]') || {}).innerText || '');

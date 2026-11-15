@@ -52,7 +52,9 @@ async function lignes() {
     { id: 'email_bordretour_9501', data: { type: 'bordereau-retour', sens: 'achat', transaction: '9501', suivi: '82000501', dateLimite: '', dateLimiteIso: dansH(30), article: T, uid: '111', account: 'compte_a', filename: 'Bon-Retour-Vinted-9501.pdf', pdfB64: await pdf('RETOUR9501'), receivedAt: ilYaH(20) } },
     { id: 'email_bordretour_9502', data: { type: 'bordereau-retour', sens: 'achat', transaction: '9502', suivi: '82000502', dateLimite: '', dateLimiteIso: dansH(200), article: 'Adidas Samba OG blanc 41', uid: '111', account: 'compte_a', filename: 'Bon-Retour-Vinted-9502.pdf', pdfB64: await pdf('RETOUR9502'), receivedAt: ilYaH(100) } },
     { id: 'email_rembachat_9502', data: { type: 'remboursement-achat', transaction: '9502', montant: 45.9, estime: '2026-11-14', receivedAt: ilYaH(5) } },
-    { id: 'transp_mondialrelay_82000501', data: { suivi: '82000501', carrier: 'mondialrelay', etat: 'en_route', libelle: 'Déposé en point relais', etatAt: ilYaH(3), lu: ilYaH(2) } },
+    // (15 nov., lot retour-parfait) « Déposé en point relais » faisait avancer 9501 (règle retours-suivi : un libellé de dépôt du n° de
+    // retour ⇒ en route) alors que le banc veut 9501 À DÉPOSER : un libellé d'avant le dépôt (rouge sur l'arbre de départ, mesuré).
+    { id: 'transp_mondialrelay_82000501', data: { suivi: '82000501', carrier: 'mondialrelay', etat: 'en_route', libelle: 'Étiquette créée', etatAt: ilYaH(3), lu: ilYaH(2) } },
   ];
 }
 
