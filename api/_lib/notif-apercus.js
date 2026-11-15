@@ -33,6 +33,7 @@ import { texteCompteRelie } from '../../src/compteRelie.js';
 import { texteNotifModeration } from '../../src/moderationVinted.js';
 import { texteAvisBas } from '../../src/avisNegatif.js';
 import { notifAlertes } from './ebay-alertes-texte.js';
+import { rediger } from './notif-redaction.js';
 
 const court = (t, n) => { const x = String(t || ''); return x.length > n ? x.slice(0, n - 1).trimEnd() + '…' : x; };
 
@@ -42,44 +43,42 @@ const court = (t, n) => { const x = String(t || ''); return x.length > n ? x.sli
 const euros = (x) => { const s = String(x == null ? '' : x).trim().replace('.', ','); return s ? `${s} €` : ''; };
 const joindre = (...xs) => xs.filter((x) => x && String(x).trim()).join(' · ');
 
-// Une vente Vinted (e-mail « Ton article s'est vendu »).
+// (15 nov., Julien : « fais de plus belles notifications ») Les textes des ventes,
+// versements, bordereaux, offres, messages et annulations viennent de LA RÈGLE DE
+// RÉDACTION (api/_lib/notif-redaction.js) : titre ≤ 40 (« Vendu 62 € · Nike Air Max
+// 1 »), corps ≤ 90 avec le geste, dates en clair (heure de Paris), jamais le pseudo
+// d'un acheteur ni un identifiant. Chaque fabrique rend le texte français ET
+// `redaction` ({ sorte, …données }) : `sendPushToAll` le refait dans la langue du compte.
+const fabrique = (sorte, donnees) => {
+  const redaction = { sorte, ...donnees };
+  const r = rediger(redaction) || { title: '', body: '' };
+  return { title: r.title, body: r.body, redaction };
+};
+
+// Une vente Vinted (e-mail « Ton article s'est vendu »). `compte` : SON pseudo.
 // (6 nov.) `verification` : la vente « avec Vérification de l'article » (l'e-mail
 // ne donne pas de prix — il n'est jamais deviné) ; le colis part au centre de Vinted.
-export const texteVendu = ({ article = '', prix = '', compte = '', verification = false } = {}) => ({
-  title: prix ? `Vendu · ${euros(prix)}` : 'Vendu',
-  body: joindre(article || 'Article', compte, verification ? 'avec Vérification de l’article : envoi au centre de vérification de Vinted' : 'Prépare le colis, le bordereau suit par e-mail'),
-});
+export const texteVendu = ({ article = '', prix = '', compte = '', verification = false } = {}) => fabrique('vendu', { article, prix, compte, verification: !!verification });
 // L'argent d'une vente arrive (e-mail « Transaction finalisée »).
-export const texteArgentRecu = ({ montant = '', article = '', compte = '' } = {}) => ({
-  title: montant ? `${euros(montant)} reçus` : 'Argent reçu',
-  body: joindre(article ? String(article).slice(0, 50) : 'Transaction finalisée', compte, 'sur ton porte-monnaie Vinted'),
-});
-// Vendu sur Vestiaire (e-mail de vente Vestiaire). `montant` en euros (nombre).
-export const texteVenduVestiaire = ({ titre = '', montant = null, limite = '' } = {}) => ({
-  title: 'Vendu sur Vestiaire',
-  body: joindre(titre || 'Ton article', Number.isFinite(montant) ? `tu reçois ${String(montant.toFixed(2)).replace('.', ',')} €` : '', limite ? `à envoyer avant le ${String(limite).slice(8, 10)}/${String(limite).slice(5, 7)}` : 'à envoyer'),
-});
-// Le bordereau d'une vente est arrivé (e-mail « Bordereau d'envoi »).
-export const texteBordereau = ({ modele = '', numero = '', tamponne = false, dateLimite = '' } = {}) => ({
-  title: tamponne ? 'Bordereau prêt à imprimer' : 'Bordereau reçu',
-  body: joindre(modele || 'Article', numero ? `N°${numero}` : '', tamponne ? 'déjà tamponné' : '', dateLimite ? `à déposer avant le ${dateLimite}` : 'à déposer'),
-});
-// Une offre reçue (e-mail « Nouvelle offre »). `conseil` : la phrase du copilote, déjà formée.
-export const texteOffre = ({ montant = '', qui = '', article = '', compte = '', conseil = '' } = {}) => ({
-  title: montant ? `Offre de ${euros(montant)}` : 'Nouvelle offre',
-  body: joindre(article ? `« ${String(article).trim().slice(0, 40)} »` : 'Un acheteur t\'a fait une offre', qui, compte) + (conseil ? conseil : ' — accepte, refuse ou contre-propose.'),
-});
-// Un message reçu (e-mail « Nouveau message »).
-export const texteMessage = ({ paire = '', qui = '', compte = '', extrait = '' } = {}) => ({
-  title: qui ? `Message de ${qui}` : (paire ? court(paire, 40) : 'Message Vinted'),
-  body: joindre(qui && paire ? court(paire, 60) : '', compte ? `Nouveau message sur ${compte}` : 'Nouveau message', extrait ? `« ${extrait} »` : 'réponds dans Messages'),
-});
+export const texteArgentRecu = ({ montant = '', article = '', compte = '' } = {}) => fabrique('argent', { montant, article, compte });
+// Vendu sur Vestiaire (e-mail de vente Vestiaire). `montant` en euros (nombre) ; `limite` AAAA-MM-JJ.
+export const texteVenduVestiaire = ({ titre = '', montant = null, limite = '' } = {}) => fabrique('venduVestiaire', { titre, montant, limite });
+// Le bordereau d'une vente est arrivé (e-mail « Bordereau d'envoi »). `dateLimite` : lue
+// dans l'e-mail (« JJ/MM[/AAAA] [HH:MM] », heure de Paris), dite en clair.
+export const texteBordereau = ({ modele = '', numero = '', tamponne = false, dateLimite = '' } = {}) => fabrique('bordereau', { modele, numero, tamponne: !!tamponne, dateLimite });
+// Une offre reçue (e-mail « Nouvelle offre »). ⚠️ `qui` (le pseudo de l'acheteur) n'est
+// PLUS dit (15 nov.) : accepté pour les anciens appelants, jamais rangé ni envoyé.
+// `juge` : le copilote ({ etat: 'unique' | 'ambigu', prix }), reconnu AU TITRE (« à vérifier »).
+export const texteOffre = ({ montant = '', qui: _qui = '', article = '', compte: _compte = '', juge = null } = {}) =>
+  fabrique('offre', { montant, article, juge: juge && typeof juge === 'object' ? { etat: juge.etat || '', prix: juge.prix != null ? juge.prix : null } : null });
+// Un message reçu (e-mail « Nouveau message »). Le pseudo de l'acheteur n'est plus dit (15 nov.).
+export const texteMessage = ({ paire = '', qui: _qui = '', compte = '', extrait = '' } = {}) => fabrique('message', { paire, compte, extrait });
+// Une annulation demandée (e-mail « … souhaiterait annuler l'achat … »). Sans pseudo (15 nov.).
+export const texteAnnulation = ({ qui: _qui = '', article = '', raison = '', compte: _compte = '' } = {}) => fabrique('annulation', { article, raison });
+// (15 nov.) Le bordereau de retour d'un ACHAT (api/email-inbound.js) : « À renvoyer : <article> ».
+// `limite` : l'instant LU dans l'e-mail (ISO), dit en clair heure de Paris.
+export const texteRetourAchat = ({ article = '', limite = '' } = {}) => fabrique('retourAchat', { article, limite });
 
-// Une annulation demandée (e-mail « … souhaiterait annuler l'achat … »).
-export const texteAnnulation = ({ qui = '', article = '', raison = '', compte = '' } = {}) => ({
-  title: 'Annulation demandée',
-  body: `${joindre(article ? court(article, 60) : '', compte)}${article || compte ? ' · ' : ''}${qui || "L'acheteur"} veut annuler${raison ? ` (« ${court(raison, 70)} »)` : ''} — accepte ou refuse dans la conversation Vinted.`,
-});
 // Le rappel du cron « offres au-dessus de ton prix mini » (api/ship-reminders.js).
 export const texteOffresMini = (n) => ({
   title: n > 1 ? `${n} offres au-dessus de ton prix mini` : 'Une offre au-dessus de ton prix mini',
@@ -151,7 +150,7 @@ export const APERCUS_NOTIF = {
   poster: {
     quoi: 'Un bordereau reçu.',
     exemples: [
-      { ...texteBordereau({ modele: 'Air Max 90', numero: '124', tamponne: true, dateLimite: '12/11' }), mene: 'Colis · À envoyer · la carte du colis' },
+      { ...texteBordereau({ modele: 'Air Max 90', numero: '124', tamponne: true, dateLimite: '12/11 12:00' }), mene: 'Colis · À envoyer · la carte du colis' },
     ],
   },
   arrives: {
@@ -164,7 +163,7 @@ export const APERCUS_NOTIF = {
   offres: {
     quoi: 'Une offre reçue, une offre au-dessus de ton prix mini.',
     exemples: [
-      { ...texteOffre({ montant: '55', qui: 'acheteur_92', article: EX.article, compte: EX.compte }), mene: 'Messages · la conversation, l’offre en évidence' },
+      { ...texteOffre({ montant: '55', article: EX.article }), mene: 'Messages · la conversation, l’offre en évidence' },
       { ...texteOffresMini(1), mene: 'Messages · la conversation, l’offre en évidence (plusieurs offres : le filtre « Offres »)' },
     ],
   },
