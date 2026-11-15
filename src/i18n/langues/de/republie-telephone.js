@@ -20,4 +20,5 @@ export default {
   "acc.numero.republie.apres": "Nr. {numero} behalten · der Karton bleibt gleich",
   "acc.numero.autre.apres": "Notiert: ein anderer Artikel · er bekommt eine neue Nummer",
   "acc.numero.carton.apres": "Nr. {numero} für diesen Karton notiert",
+  "rt.consequence": "Ja: sein Karton behält Nr. {numero}, nichts zu schreiben. Nein: er bekommt eine neue Nummer.",
 };

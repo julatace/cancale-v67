@@ -3928,8 +3928,10 @@ function RepublieeHost() {
   const fermer = () => setQ(null);
   const suite = () => { const reste = l.filter((_, j) => j !== k); if (!reste.length) { setQ(null); return; } setQ({ ...q, propositions: reste }); setI(Math.min(k, reste.length - 1)); };
   const repondre = (cand) => { try { q.onRepondre(pr, cand); } catch (_) {} suite(); };
-  const cadre = { position: 'relative', aspectRatio: '3 / 4', borderRadius: 16, overflow: 'hidden', background: 'var(--sb-porcelaine, ' + C.card2 + ')', boxShadow: 'var(--sb-ombre-tuile, 0 1px 2px rgba(0,0,0,.06))' };
-  const legende = { fontSize: 12, fontWeight: 600, color: C.muted, letterSpacing: '.02em', marginBottom: 6 };
+  // (15 nov., codes « verre » : porcelaine, plaque gravée, bandeau ambre pour le geste, un plein d'encre) Les deux
+  // photos au MÊME cadrage (3:4), la plaque N° gravée sur celle d'avant ; jetons `--sb-*` (clair et sombre).
+  const cadre = { position: 'relative', aspectRatio: '3 / 4', borderRadius: 'var(--sb-r-plateau, 16px)', overflow: 'hidden', background: 'var(--sb-porcelaine, ' + C.card2 + ')', boxShadow: 'var(--sb-ombre-pose, 0 1px 2px rgba(0,0,0,.08))' };
+  const legende = { fontSize: 13, fontWeight: 600, color: 'var(--sb-encre-2, ' + C.muted + ')', marginBottom: 6 };
   const plusieurs = pr.candidats.length > 1;
   return createPortal(
     <SheetShell onClose={fermer} z={Z_CONFIRMATION} className="vrm-confirmation vrm-rt-feuille" aria-label={tr('rt.feuille.titre')}>
@@ -3938,7 +3940,10 @@ function RepublieeHost() {
           <div style={{ fontSize: 19, fontWeight: 600, color: C.text, letterSpacing: '-0.02em', lineHeight: 1.3 }}>{tr('rt.feuille.titre')}</div>
           {l.length > 1 ? <span data-rt-rang="" style={{ fontSize: 13, color: C.muted, flexShrink: 0 }}>{tr('rt.rang', { i: k + 1, n: l.length })}</span> : null}
         </div>
-        <div style={{ fontSize: 14, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>{tr('rt.feuille.sous')}</div>
+        <div data-rt-bandeau="" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 12, padding: '12px 14px', borderRadius: 'var(--sb-r-plateau, 16px)', background: 'color-mix(in srgb, var(--sb-ambre-point, #E08A12) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--sb-ambre-point, #E08A12) 45%, transparent)', color: 'var(--sb-ambre, #764300)' }}>
+          <span aria-hidden="true" style={{ display: 'flex', flexShrink: 0, marginTop: 1 }}><Icon name="box" size={20}/></span>
+          <span style={{ fontSize: 14, lineHeight: 1.45 }}><b style={{ fontWeight: 600 }}>{tr('rt.job.detail')}</b><br/>{tr('rt.feuille.sous')}</span>
+        </div>
         {pr.candidats.map((c) => (
           <div key={c.id + ':' + c.numero} data-rt-candidat={c.numero} style={{ marginTop: 16 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -3959,13 +3964,14 @@ function RepublieeHost() {
             <div style={{ fontSize: 13, color: C.text, marginTop: 8, overflowWrap: 'anywhere', lineHeight: 1.4 }}>{pr.titre || c.title || ''}</div>
             {c.enLigne
               ? <div data-rt-en-ligne={c.numero} style={{ fontSize: 13, color: C.muted, marginTop: 8 }}>{tr('rt.enLigne', { numero: c.numero })}</div>
-              : <Bouton variante={plusieurs ? 'secondaire' : 'primaire'} plein data-rt-oui={c.numero} onClick={() => repondre(c)} style={{ marginTop: 12, minHeight: 48 }}>{tr('rt.oui', { numero: c.numero })}</Bouton>}
+              : <Bouton variante={plusieurs ? 'secondaire' : 'primaire'} plein icone="check" data-rt-oui={c.numero} onClick={() => repondre(c)} style={{ marginTop: 14, minHeight: 56, fontSize: 17 }}>{tr('rt.oui', { numero: c.numero })}</Bouton>}
           </div>
         ))}
         <div style={{ display: 'flex', gap: 9, marginTop: 12 }}>
           <Bouton variante="discret" onClick={fermer} style={{ flex: 1, minHeight: 44 }}>{tr('rt.plusTard')}</Bouton>
           <button type="button" className="sb-touche" data-rt-non={pr.id} onClick={() => repondre(null)} style={{ flex: 2, minHeight: 44 }}>{tr(plusieurs ? 'rt.nonPlusieurs' : 'rt.non')}</button>
         </div>
+        <div data-rt-consequence="" style={{ fontSize: 13, color: 'var(--sb-encre-2, ' + C.muted + ')', textAlign: 'center', marginTop: 12, lineHeight: 1.5 }}>{tr('rt.consequence', { numero: String((pr.candidats[0] || {}).numero || '') })}</div>
       </div>
     </SheetShell>, document.body
   );

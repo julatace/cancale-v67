@@ -20,4 +20,5 @@ export default {
   "acc.numero.republie.apres": "N°{numero} tenuto · la scatola non cambia",
   "acc.numero.autre.apres": "Annotato: un altro articolo · riceve un N° nuovo",
   "acc.numero.carton.apres": "N°{numero} annotato per questa scatola",
+  "rt.consequence": "Sì: la sua scatola tiene il N°{numero}, niente da scrivere. No: riceve un N° nuovo.",
 };

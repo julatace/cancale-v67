@@ -20,4 +20,5 @@ export default {
   "acc.numero.republie.apres": "No. {numero} kept · the box stays the same",
   "acc.numero.autre.apres": "Noted: another item · it gets a new number",
   "acc.numero.carton.apres": "No. {numero} noted for this box",
+  "rt.consequence": "Yes: its box keeps No. {numero}, nothing to write. No: it gets a new number.",
 };

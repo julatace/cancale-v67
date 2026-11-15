@@ -20,4 +20,5 @@ export default {
   "acc.numero.republie.apres": "N°{numero} conservado · la caja no cambia",
   "acc.numero.autre.apres": "Anotado: otro artículo · recibe un N° nuevo",
   "acc.numero.carton.apres": "N°{numero} anotado para esta caja",
+  "rt.consequence": "Sí: su caja conserva el N°{numero}, nada que escribir. No: recibe un N° nuevo.",
 };

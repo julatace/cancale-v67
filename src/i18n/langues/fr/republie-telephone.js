@@ -20,4 +20,5 @@ export default {
   "acc.numero.republie.apres": "N°{numero} gardé · le carton ne change pas",
   "acc.numero.autre.apres": "Noté : un autre article · il reçoit un N° neuf",
   "acc.numero.carton.apres": "N°{numero} noté pour ce carton",
+  "rt.consequence": "Oui : son carton garde N°{numero}, rien à écrire. Non : elle reçoit un N° neuf.",
 };
