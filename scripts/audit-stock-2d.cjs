@@ -86,7 +86,9 @@ if (arg.includes('--prouve')) {
   }
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stock2d-'));
   const fS = path.join(dir, 'stockSortie.mjs'); fs.writeFileSync(fS, srcS);
-  fs.copyFileSync(path.join(__dirname, '..', 'src', 'profilVendeur.js'), path.join(dir, 'profilVendeur.js'));   // (lot vocabulaire-article) le mot du vendeur, importé par la règle
+  fs.copyFileSync(path.join(__dirname, '..', 'src', 'profilVendeur.js'), path.join(dir, 'profilVendeur.js'));
+  // (15 nov., étagères) la sortie tasse les piles : la règle des étagères et ses planches, copiées à côté.
+  for (const n of ['stockEtageres.js', 'stockRegles.js']) fs.copyFileSync(path.join(__dirname, '..', 'src', n), path.join(dir, n));   // (lot vocabulaire-article) le mot du vendeur, importé par la règle
   const fE = path.join(dir, 'etatArticle.mjs'); fs.writeFileSync(fE, srcE);
   let S, E;
   try { S = await import(pathToFileURL(fS).href); E = await import(pathToFileURL(fE).href); } catch (e) { console.log('❌ une règle ne se charge pas : ' + e.message); process.exit(1); }

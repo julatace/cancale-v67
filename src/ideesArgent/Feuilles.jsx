@@ -14,7 +14,7 @@ import React from 'react';
 import './idees-argent.css';
 import { tr, langueCourante, LOCALES } from '../i18n/index.js';
 import { useLangue } from '../i18n/react.js';
-import { SheetShell, load, toast, gesteVrm, cleNum, lireObjet, emettreClesRelues, PhotoVinted, telechargerFichier, onCloudReady } from '../App.jsx';
+import { SheetShell, load, toast, gesteVrm, cleNum, lireObjet, emettreClesRelues, PhotoVinted, telechargerFichier, onCloudReady, sortieCaseStock, texteAvecDescentes } from '../App.jsx';
 import { chercherParMots, estUnNumero, opsVenteMain, opsAnnulerVenteMain, ventesMainRecentes, lignesRecu, PAIEMENTS, aujourdhui, dateValide } from './venteMain.js';
 
 const CLE_DECISIONS = 'vrm_cycle_decisions';
@@ -139,11 +139,11 @@ function FeuilleVenteMain({ num0 = '', pret = false, verdict = null, onFermer })
     // Le verdict RELU au clic : une vente lue, une décision posée entre-temps ⇒ rien n'est écrit.
     const v2 = typeof refVerdict.current === 'function' ? refVerdict.current(brut, choisie) : null;
     if (!v2 || v2.etat !== 'possible' || v2.carte.id !== carte.id) { setFaux('change'); setTick((t) => t + 1); return; }
-    const r = opsVenteMain({ carte: v2.carte, montant: m, date, paiement, decisions: lireObjet(CLE_DECISIONS), vendues: load('vinted_annonces_vendues', []) || [], slots: lireObjet('vrm_slots'), cle: cleNum });
+    const r = opsVenteMain({ carte: v2.carte, montant: m, date, paiement, decisions: lireObjet(CLE_DECISIONS), vendues: load('vinted_annonces_vendues', []) || [], slots: lireObjet('vrm_slots'), sortieCase: sortieCaseStock, cle: cleNum });
     if (!r) { setFaux('compris'); return; }
     setFaux(''); vibrer();
     // Le MÊME geste que « Vendu ailleurs » de la fiche (venduAilleursGeste, App.jsx) : annulable 5 s.
-    gesteVrm(r.texte, r.ops, {}, () => { setTimeout(() => { try { window.dispatchEvent(new Event('vrm:stock-slots')); } catch (_) {} emettreClesRelues(['vinted_annonces_vendues', CLE_DECISIONS, 'vrm_slots']); setTick((t) => t + 1); }, 700); });
+    gesteVrm(texteAvecDescentes(r.texte, r.ops), r.ops, {}, () => { setTimeout(() => { try { window.dispatchEvent(new Event('vrm:stock-slots')); } catch (_) {} emettreClesRelues(['vinted_annonces_vendues', CLE_DECISIONS, 'vrm_slots']); setTick((t) => t + 1); }, 700); });
     const at = (r.ops.find((o) => o.k === CLE_DECISIONS) || {}).apres;
     setFait({ carte: v2.carte, montant: m, date, paiement, at: at ? at.at : null, vu: false });
   };

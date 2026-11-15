@@ -396,7 +396,7 @@ module.exports = {
   "data-num-vinted-reponse=ou:vrm",
   "data-num-vinted-reponse=vu:discret",
   "data-num-vinted-reponse=vu:egal",
-  "data-numero-ecrit-bascule=off",
+  "data-qui-numerote-choix=moi",   // (15 nov., numeros-nouvelles) l'interrupteur « Je numérote moi-même » est devenu « Qui numérote ? » en deux choix
   "data-numero-ecrit-ouvrir-annonces",
   "data-orion-dossier",
   "data-paiements-relire",
@@ -741,7 +741,7 @@ module.exports = {
   "data-num-vinted-reponse=ou:vrm",
   "data-num-vinted-reponse=vu:discret",
   "data-num-vinted-reponse=vu:egal",
-  "data-numero-ecrit-bascule=off",
+  "data-qui-numerote-choix=moi",   // (15 nov., numeros-nouvelles) l'interrupteur « Je numérote moi-même » est devenu « Qui numérote ? » en deux choix
   "data-numero-ecrit-ouvrir-annonces",
   "data-orion-dossier",
   "data-paiements-relire",
