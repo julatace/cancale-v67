@@ -26,6 +26,9 @@ import VendusAilleurs, { useVerifVendusAilleurs, VendusAilleursDetail } from './
 // (11 nov., anti double vente) « Retirer des autres sites » en un toucher (src/retirerAilleurs.js).
 import { RetirerAilleursBloc } from './RetirerAilleurs.jsx';
 import { planRetirerAilleurs, texteConfirmation, executerRetraits, avecRelecture, issueLbc, issueEbay, enListe } from './retirerAilleurs.js';
+// (15 nov., retrait-ailleurs) « À retirer ailleurs » : un endroit, un geste par site (src/aRetirerAilleurs.js).
+import ARetirerAilleurs from './ARetirerAilleurs.jsx';
+import { listeARetirer, fusionPlan, veutOnglet, aReprendre, alerteCouverte } from './aRetirerAilleurs.js';
 import { articlesVendusAilleurs } from './bilanSynchronisation.js';
 import { gardeOffres, avisAcceptationManuelle } from './offresGarde.js';
 import { noterPause, montantSeuil } from './offresSures.js';   // (11 nov., lot DJ8) offres auto sûres
@@ -3167,6 +3170,9 @@ const SYNC_KEYS = [
   // Retirer d'eBay, sans demander, une paire PROUVÉE vendue sur Vinted
   // (proposition 8). Éteint par défaut ; la route le relit elle-même.
   'vrm_ebay_retrait_auto',
+  // (15 nov., retrait-ailleurs) « C'est retiré » posé par SON clic sur une annonce que VRM ne sait pas
+  // retirer (Vinted, Vestiaire, Leboncoin sans extension) : { [plateforme:compte:id]: { at, numero, plateforme } }.
+  'vrm_retraits_main',
   // (11 nov.) Les identifiants des gestes faits hors ligne déjà appliqués (src/gestesHorsLigne.js) :
   // écrits par le rejeu seul (400 au plus), lus pour ne jamais appliquer deux fois le même geste.
   'vrm_gestes_faits',
@@ -45871,10 +45877,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (annonces.some((a) => a.plateforme === "Leboncoin" && a.active === null))
       manques.push("état de certaines annonces Leboncoin non confirmé");
     const ventesVintedProuvees = new Set(venduesVinted);
+    // (15 nov., retrait-ailleurs) §5 « Vendue se PROUVE » : une commande SANS état (titre vide)
+    // n'est pas une preuve — elle est dite « peut-être vendue · à vérifier », jamais retirée ailleurs.
+    const sansEtatVinted = (o) => !String(o && o.status != null ? o.status : "").trim();
     for (const o of sales.items || [])
       if (
         !acctOffOf(o) &&
         classifyOrderStatus(o.status) !== "cancelled" &&
+        !sansEtatVinted(o) &&
         txnItem[String(o.transaction_id)]
       )
         ventesVintedProuvees.add(String(txnItem[String(o.transaction_id)]));
@@ -45913,7 +45923,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           id,
           numero: numeros[id]?.numero,
           plateforme: "Vinted",
-          engagee: true,
+          engagee: sansEtatVinted(o) && !venduesVinted.has?.(id) ? null : true,
+          ...(sansEtatVinted(o) ? { pourquoi: "commande Vinted sans état de commande", pourquoiCode: "sans-etat" } : {}),
         });
       }
     // ── (1er nov., audit A1) VESTIAIRE, DANS LES DEUX SENS ───────────────────
@@ -45986,67 +45997,32 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const planAilleurs = planRetirerAilleurs(vendusAilleurs.v, {
     lbcOk: lbcSaitSuppr === 'ok',
     lbcPourquoi: lbcSaitSuppr === 'absente' ? `à faire sur Leboncoin — ici, pas d’extension VRM (ouvre VRM ${NAV.dansNu} pour que VRM la supprime)` : 'à faire sur Leboncoin — ton extension est trop ancienne pour supprimer depuis VRM (mets-la à jour)',
+    lbcCode: lbcSaitSuppr === 'absente' ? 'absente' : 'retard',
     ebayOk: !!(AUTH.session && AUTH.session.access_token),
   });
-  const [retraitsAilleurs, setRetraitsAilleurs] = useState(null);   // { plan, res } : le plan tel qu'exécuté, les issues
-  const [retraitAilleursEnVol, setRetraitAilleursEnVol] = useState(false);
-  const retirerDesAutresSites = async () => {
-    const plan = planAilleurs;
-    if (retraitAilleursEnVol || !plan.nAuto) return;
-    const t = texteConfirmation(plan);
-    const ok = await askConfirm({ title: t.titre, desc: t.desc, ok: 'Oui, retirer', cancel: 'Annuler', danger: true, irreversible: true });
-    if (!ok) return;
-    const owner = AUTH.user?.id || '';
-    setRetraitAilleursEnVol(true);
-    // (11 nov., lot suivi-travail) La feuille « VRM travaille » : une ligne par site à retirer (jamais un pseudo).
-    const sitesAuto = plan.articles.flatMap((a) => a.sites.filter((x) => x.voie === 'auto').map((x) => ({ id: x.cle, num: a.numero || '', titre: x.plateforme === 'lbc' || /leboncoin/i.test(String(x.plateforme)) ? 'Leboncoin' : /ebay/i.test(String(x.plateforme)) ? 'eBay' : String(x.plateforme || '') })));
-    const suiviR = suiviTravail.demarrer({ sorte: 'retirer-ailleurs', titre: 'Retirer des autres sites', etapes: [['envoi', 'Demande de retrait au site'], ['accepte', 'Retrait accepté par le site']], articles: sitesAuto });
-    const suivre = (f) => async (site, art) => {
-      if (suiviR && !(await suiviR.continuer())) return { statut: 'arrete', texte: 'pas tenté — arrêté' };
-      if (suiviR) suiviR.etape(site.cle, 'envoi');
-      const r = await f(site, art);
-      if (suiviR) {
-        if (r.statut === 'retire') suiviR.etape(site.cle, 'accepte');
-        suiviR.fin(site.cle, r.statut === 'retire' ? { etat: 'ok' } : r.statut === 'incertain' ? { etat: 'main', raison: r.texte, geste: 'Regarde l’annonce sur le site avant de recommencer' } : r.statut === 'arrete' ? { etat: 'saute', raison: r.texte } : { etat: 'refus', raison: r.texte });
-      }
-      return r;
-    };
-    try {
-      const res = await executerRetraits(plan, {
-        lbc: suivre(async (site) => { let rep = null; try { rep = await vmrCmd({ cmd: 'lbcSupprime', id: String(site.id), confirme: true }, 70000); } catch (_) { rep = null; } return issueLbc(rep); }),
-        ebay: suivre(async (site) => {
-          // Le retrait automatique (allumé chez lui) a peut-être déjà pris cette annonce : on ne la double pas.
-          if (__retraitEbayAutoTentes.has(String(site.id))) return { statut: 'incertain', texte: 'le retrait automatique d’eBay s’en occupe déjà — regarde sur eBay' };
-          let code = 0, j = null;
-          try {
-            const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'retirer', itemId: String(site.id), confirme: true, ...corpsCompteEbay(site.compte) }) });
-            code = r && Number.isFinite(r.status) ? r.status : 0; j = await r.json().catch(() => null);
-          } catch (_) { code = 0; j = null; }
-          return issueEbay(code, j);
-        }),
-      }, () => (AUTH.user?.id || '') === owner && !(suiviR && suiviR.etat() && suiviR.etat().demande === 'arret'));
-      // Les sites pas tentés (la précédente du même site n'est pas passée) : dits dans la feuille aussi.
-      if (suiviR) { for (const [cle, r] of Object.entries(res)) if (r.statut === 'arrete' && r.texte !== 'pas tenté — arrêté') suiviR.fin(cle, { etat: 'saute', raison: r.texte }); suiviR.terminer(''); }
-      setRetraitsAilleurs({ plan, res });
-      if (only === 'journee') setFeuilleAilleurs(true);   // le résultat par site se lit dans la feuille
-      const nOk = Object.values(res).filter((r) => r.statut === 'retire').length, nKo = Object.values(res).length - nOk;
-      toast(nKo ? `${nOk} retirée${nOk > 1 ? 's' : ''} · ${nKo} pas faite${nKo > 1 ? 's' : ''} — le détail est sur la carte` : `${nOk} annonce${nOk > 1 ? 's' : ''} retirée${nOk > 1 ? 's' : ''} des autres sites`, nKo ? 'err' : 'ok');
-      if (nOk && onCycle) onCycle();
-      // La relecture : eBay se relit chez eBay (la synchro, une lecture — sur SON clic), compte par
-      // compte retiré ; puis la même vérification, refaite APRÈS les retraits. Leboncoin se relit à sa
-      // prochaine lecture complète de « Mes annonces » (l'extension) : d'ici là, « pas encore relu ».
-      for (const ref of [...new Set(Object.values(res).filter((r) => r.statut === 'retire' && r.plateforme === 'eBay').map((r) => r.compte || 'principal'))]) {
-        try { await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'relire', ...corpsCompteEbay(ref) }) }); } catch (_) { /* pas relu : dit */ }
-      }
-      try { await vendusAilleurs.lire(); } catch (_) { /* « pas encore relu » reste dit */ }
-    } finally { setRetraitAilleursEnVol(false); }
-  };
-  const blocRetirerAilleurs = (compact) => {
-    const affiche = retraitsAilleurs ? retraitsAilleurs.plan : planAilleurs;
-    if (!affiche.articles.length) return null;
-    return <RetirerAilleursBloc plan={affiche} resultats={retraitsAilleurs ? avecRelecture(retraitsAilleurs.res, vendusAilleurs.v) : null} enVol={retraitAilleursEnVol}
-      onRetirer={retirerDesAutresSites} onFini={() => setRetraitsAilleurs(null)} PhotoVinted={PhotoVinted} compact={compact}/>;
-  };
+  // (15 nov., retrait-ailleurs) « À RETIRER AILLEURS » remplace « Retirer des autres sites » : le plan
+  // (même règle, même identité) est PUBLIÉ dans le magasin du module (`RA`) ; Ma journée le pose en
+  // tête, Ventes aussi, la fiche de la paire montre SON N°. Les gestes : `gesteRA`, `toutRetirerRA`,
+  // `marquerRA` (src/aRetirerAilleurs.js pour les états).
+  const ownerRA = AUTH.user?.id || '';
+  React.useEffect(() => {
+    if (only !== 'journee' && only !== 'ventes') return;
+    majRA({ plan: planAilleurs, v: vendusAilleurs.v, relire: vendusAilleurs.lire, owner: ownerRA, ...(RA.owner && RA.owner !== ownerRA ? { resultats: {}, attente: {}, gardes: {}, touches: new Set() } : {}) });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [only, ownerRA, vendusAilleurs.v, lbcSaitSuppr]);
+  // La reprise « Ouvre leboncoin.fr » et la relecture : sur un signe qu'il est revenu (l'onglet VRM
+  // redevenu visible) ou que l'extension vient de lire leboncoin.fr (`maj · lbc`).
+  React.useEffect(() => {
+    if (only !== 'journee' && only !== 'ventes') return undefined;
+    let t = null;
+    const relireBientot = () => { clearTimeout(t); t = setTimeout(() => { if (typeof RA.relire === 'function' && Object.values(RA.resultats).some((r) => r && r.statut === 'retire' && r.plateforme === 'Leboncoin')) RA.relire(); }, 2500); };
+    const vis = () => { if (document.visibilityState === 'visible') reprendreRA(); };
+    const ext = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && d.quoi === 'lbc') { reprendreRA(); relireBientot(); } };
+    document.addEventListener('visibilitychange', vis); window.addEventListener('focus', vis); window.addEventListener('vrm:ext', ext);
+    return () => { clearTimeout(t); document.removeEventListener('visibilitychange', vis); window.removeEventListener('focus', vis); window.removeEventListener('vrm:ext', ext); };
+  }, [only]);
+  useRA();
+  const blocRetirerAilleurs = (tete) => <BlocARetirerAilleurs PhotoVinted={PhotoVinted} tete={!!tete}/>;
   // (11 nov., lot journee-perso) SA Ma journée : l'ordre et les cartes cachées (src/journeePerso.js),
   // et la feuille « Modifier ma journée ».
   const [persoJ] = useJourneePerso();
@@ -46449,6 +46425,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         //    passent ici, après les tuiles (§4.11 : rien ne disparaît en silence).
         if (Array.isArray(alertes)) for (const a of alertes) {
           if (!a || !(a.dv || a.jr)) continue;
+          // (15 nov., retrait-ailleurs) Déjà dans « À retirer ailleurs » (en tête, avec son geste) : pas redite ici.
+          if (a.dv && a.retrait && alerteCouverte(RA.plan, a.retrait.plat, a.retrait.nums, cleNum)) continue;
           if (a.dv) jobs.push({id:'double-vente', n:a.n, icon:a.ic||'alert', color:a.dv==='num'?C.doublon:C.warn, urgent:true, title:a.text, tab:a.tab, prio:-1, avant:a.avant, lbcSuppr:Array.isArray(a.lbcSuppr)&&a.lbcSuppr.length?a.lbcSuppr:null, photos:a.photos});
           else jobs.push({id:a.job||('a-faire-'+a.ic), n:a.n, icon:a.ic||'info', color:a.urssaf&&a.urssaf.proche?C.warn:C.text, title:a.text, sub:a.sub, tab:a.tab, prio:3, urssaf:a.urssaf,
             // (1er nov., « très répétitif ») Le rappel URSSAF en court : « Déclarer
@@ -47473,23 +47451,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const court = carteAilleurs.erreur && !carteAilleurs.n ? 'Vendus ailleurs : pas vérifié' : `${carteAilleurs.n} annonce${carteAilleurs.n > 1 ? 's' : ''} vendue${carteAilleurs.n > 1 ? 's' : ''} ailleurs`;
                 const detail = carteAilleurs.erreur && !carteAilleurs.n ? 'La lecture n’a pas répondu' : `Encore en ligne sur ${plats.join(', ')}`;
                 const reessayer = carteAilleurs.erreur && !carteAilleurs.n;
-                // (11 nov., anti double vente) Quelque chose que VRM peut retirer : la carte porte le
-                // geste lui-même, « Retirer des autres sites » (confirmation, puis site par site).
-                if (planAilleurs.nAuto > 0 && !reessayer && !retraitsAilleurs) {
-                  const un = planAilleurs.articles.length === 1 ? planAilleurs.articles[0] : null;
-                  const titreR = un ? `N°${un.numero} vendu sur ${enListe(un.venduSur)}` : `${planAilleurs.articles.length} articles vendus ailleurs`;
-                  const encore = [...new Set(planAilleurs.articles.flatMap((a) => a.sites.filter((s) => s.voie !== 'verifier').map((s) => s.plateforme)))];
-                  const detailR = encore.length ? `Encore en ligne sur ${enListe(encore)}` : detail;
-                  return (
-                    <div key="vendus-ailleurs" className="vrm-day-task vrm-fu-tache vrm-va-carte" data-vendus-ailleurs="" data-n={String(carteAilleurs.n)} data-ra-carte={String(planAilleurs.nAuto)}>
-                      <button type="button" className="vrm-va-voir" title={`${titreR}\n${detailR}`} aria-label={`${titreR} — ${detailR}`} onClick={() => setFeuilleAilleurs(true)}>
-                        <PileVignettes srcs={lignesA.map((a) => a.photo)} n={carteAilleurs.n} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="sync" size={20}/>}/>
-                        <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{titreR}</span><span className="vrm-day-task-note is-urgent" data-sous-ligne="vendus-ailleurs">{detailR}</span></span>
-                      </button>
-                      <Bouton variante="danger" className="vrm-b-petit vrm-ra-bouton" data-retirer-ailleurs="" occupe={retraitAilleursEnVol} onClick={retirerDesAutresSites}>{tr('journee.retirerAutresSites')}</Bouton>
-                    </div>
-                  );
-                }
+                // (15 nov., retrait-ailleurs) Le geste de retrait vit dans « À retirer ailleurs », EN TÊTE de Ma
+                // journée (`BlocARetirerAilleurs`) : cette carte ne reste que quand le bloc n'a rien à montrer
+                // (vérification qui n'a pas abouti — « pas su » n'est pas « rien »).
                 return (
                   <button key="vendus-ailleurs" type="button" className="vrm-day-task vrm-fu-tache" data-vendus-ailleurs="" data-n={String(carteAilleurs.n)} data-va-erreur={carteAilleurs.erreur ? '1' : undefined}
                     title={`${court}\n${detail}`} aria-label={`${court} — ${detail}`} onClick={() => { if (reessayer) vendusAilleurs.lire(); else setFeuilleAilleurs(true); }}>
@@ -47632,7 +47596,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // qu'elles sont urgentes (« Affichée car urgent »), puis les cartes dans l'ordre qu'il a choisi.
               // Sans réglage, l'ordre d'origine (`CARTES_JOURNEE`) : celui d'avant, carte pour carte.
               const blocsAF = {
-                ailleurs: carteAilleurs ? [carteVendusAilleurs()] : [],
+                ailleurs: carteAilleurs && !articlesTeteRA().length ? [carteVendusAilleurs()] : [],
                 'deux-fois': deuxFois.length ? [carteDeuxFois()] : [],
                 'avis-bas': avisBasListe.length ? [carteAvisBas()] : [],
                 'photos-comptes': photosDouble.length ? [cartePhotosComptes()] : [],
@@ -47670,9 +47634,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 if (iP >= 0) resteAF[iP] = { ...resteAF[iP], el: React.cloneElement(resteAF[iP].el, { className: ((resteAF[iP].el.props && resteAF[iP].el.props.className) || '') + ' is-prochain', 'data-prochain': '' }) }; }
               const trancherVu = !!(jobTrancher && visJ('trancher').montree);
               const nListe = resteAF.length + (trancherVu ? 1 : 0);
-              const alertesHaut = alertesAF.length ? (
+              // (15 nov., retrait-ailleurs) « À retirer ailleurs » EN TÊTE, au-dessus des autres alertes d'argent.
+              const raTete = articlesTeteRA().length > 0;
+              const alertesHaut = alertesAF.length || raTete ? (
                 <section className="sj-alertes" aria-label={tr('sj.alertes')} data-sj-alertes={alertesAF.length}>
-                  <div className="vrm-day-task-list" data-alertes-argent="">{alertesAF}</div>
+                  {raTete ? blocRetirerAilleurs(true) : null}
+                  {alertesAF.length ? <div className="vrm-day-task-list" data-alertes-argent="">{alertesAF}</div> : null}
                 </section>
               ) : null;
               return { prochain: null, alertes: alertesHaut, jobsTuile, section: (
@@ -47691,7 +47658,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {feuilleAilleurs ? (
                     <SheetShell titre={tr('journee.vendusAilleurs')} sousTitre={carteAilleurs && carteAilleurs.n ? tr('journee.annoncesRetirer', { n: String(carteAilleurs.n) }) : undefined} onClose={() => setFeuilleAilleurs(false)} maxWidth={560} data-feuille-ailleurs="">
                       <div className="vrm-bilan-sync vrm-va-feuille">
-                        {blocRetirerAilleurs(true)}
+                        {blocRetirerAilleurs(false)}
                         <VendusAilleursDetail v={vA} lire={vendusAilleurs.lire} onNav={(t) => { setFeuilleAilleurs(false); if (onNav) onNav(t); }} PhotoVinted={PhotoVinted}/>
                       </div>
                     </SheetShell>
@@ -56581,6 +56548,187 @@ const retirerEbayAuto = async (liste, continuer) => {
     }
   } finally { __retraitEbayAutoEnVol = false; }
 };
+// ── (15 nov., lot retrait-ailleurs) « À RETIRER AILLEURS » : L'ÉTAT ET LES GESTES ──────────────
+// Un magasin de MODULE (pas un état d'écran) : Ma journée, Ventes et la fiche de la paire montrent
+// le MÊME état, et un geste lancé depuis la fiche continue si l'écran change. La règle des états :
+// src/aRetirerAilleurs.js ; le plan (identité seulement) : src/retirerAilleurs.js.
+//   · Leboncoin : `lbcSupprime` de l'extension (compte de l'onglet, 50/h, une à la fois, pause
+//     429/403 — garde-fous de l'extension, intouchés). Pas d'onglet connecté sur le bon compte ⇒
+//     « Ouvre leboncoin.fr » ; VRM reprend TOUT SEUL quand il revient (onglet VRM redevenu
+//     visible, ou l'extension qui vient de lire leboncoin.fr), sans redemander.
+//   · eBay : la route `retirer` (jamais `auto` : c'est son clic) ; le retrait automatique allumé
+//     garde la main, « Retirer maintenant » reste à son doigt (jamais doublé : `__retraitEbayAutoTentes`).
+//   · Vestiaire / Vinted / Leboncoin sans extension : l'annonce + « C'est retiré » (SON clic,
+//     `vrm_retraits_main`, démenti par la prochaine lecture complète qui la voit encore).
+// UNE confirmation (celle qui existait : `texteConfirmation`), une fois par geste ou par série.
+// Chaque geste : les quatre moments (`accompagner('annonce.retirer')`) et « Ce que VRM a fait »
+// (un travail suivi archivé sans figer l'écran).
+const RA = { plan: null, v: null, relire: null, owner: '', resultats: {}, enCours: null, attente: {}, serie: null, gardes: {}, touches: new Set(), rev: 0 };
+const _abonnesRA = new Set();
+const majRA = (f) => { Object.assign(RA, typeof f === 'function' ? f(RA) : f); RA.rev++; for (const g of [..._abonnesRA]) { try { g(); } catch (_) {} } };
+const abonnerRA = (g) => { _abonnesRA.add(g); return () => _abonnesRA.delete(g); };
+const lireRARev = () => RA.rev;
+function useRA() { React.useSyncExternalStore(abonnerRA, lireRARev, lireRARev); return RA; }
+const marquesRA = () => { const m = load('vrm_retraits_main', {}); return m && typeof m === 'object' && !Array.isArray(m) ? m : {}; };
+// La liste rendue (état de chaque site), pour tous les écrans.
+function listeRA(numero = null) {
+  const v = RA.v || {};
+  const plan = fusionPlan(RA.plan, RA.gardes);
+  return listeARetirer(plan, {
+    resultats: avecRelecture(RA.resultats, v), enCours: RA.enCours, attente: RA.attente, marques: marquesRA(), completes: v.completes || [],
+    ebayAuto: load('vrm_ebay_retrait_auto', false) === true, ebayTentes: __retraitEbayAutoTentes,
+  }, numero);
+}
+const sitesRA = () => { const out = {}; for (const a of fusionPlan(RA.plan, RA.gardes).articles || []) for (const s of a.sites || []) out[s.cle] = { a, s }; return out; };
+// UN site, sans confirmation (déjà donnée). Rend l'issue ({ statut }) ou { statut: 'onglet' }.
+async function retirerUnSiteRA(site, art) {
+  const owner = RA.owner;
+  if (!owner || (AUTH.user?.id || '') !== owner) return { statut: 'arrete', texte: 'pas tenté — arrêté' };
+  majRA((r) => ({ enCours: site.cle, gardes: { ...r.gardes, [site.cle]: { art: { numero: art.numero, venduSur: art.venduSur, titre: art.titre, photo: art.photo, douteuse: art.douteuse }, site: { ...site } } }, touches: new Set([...r.touches, String(art.numero)]) }));
+  let issue;
+  try {
+    if (site.moyen === 'lbc') {
+      let rep = null; try { rep = await vmrCmd({ cmd: 'lbcSupprime', id: String(site.id), confirme: true }, 70000); } catch (_) { rep = null; }
+      if (veutOnglet(rep)) {
+        const avant = RA.attente[site.cle];
+        majRA((r) => ({ enCours: null, attente: { ...r.attente, [site.cle]: { raison: String(rep.raison || ''), at: Date.now(), n: ((avant && avant.n) || 0) + 1 } } }));
+        return { statut: 'onglet', texte: String(rep.raison || '') };
+      }
+      issue = issueLbc(rep);
+    } else if (site.moyen === 'ebay') {
+      if (__retraitEbayAutoTentes.has(String(site.id))) issue = { statut: 'incertain', texte: 'le retrait automatique d’eBay s’en occupe déjà — regarde sur eBay' };
+      else {
+        __retraitEbayAutoTentes.add(String(site.id));   // le passage automatique ne la doublera pas
+        let code = 0, j = null;
+        try {
+          const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'retirer', itemId: String(site.id), confirme: true, ...corpsCompteEbay(site.compte) }) });
+          code = r && Number.isFinite(r.status) ? r.status : 0; j = await r.json().catch(() => null);
+        } catch (_) { code = 0; j = null; }
+        issue = issueEbay(code, j);
+        if (issue.statut === 'refuse') __retraitEbayAutoTentes.delete(String(site.id));   // rien n'est parti : la place est rendue
+      }
+    } else issue = { statut: 'refuse', texte: 'pas de voie pour ce site' };
+  } catch (_) { issue = { statut: 'incertain', texte: 'la demande a été coupée — regarde sur le site avant de recommencer' }; }
+  majRA((r) => { const att = { ...r.attente }; delete att[site.cle]; return { enCours: null, attente: att, resultats: { ...r.resultats, [site.cle]: { ...issue, plateforme: site.plateforme, compte: site.compte, at: Date.now() } } }; });
+  return issue;
+}
+// La relecture après un retrait : eBay se relit chez eBay (une lecture par compte retiré, sur SON
+// clic), puis la vérification « Vendus ailleurs » est refaite. Leboncoin se relit à la prochaine
+// lecture complète de « Mes annonces » par l'extension (l'écran relit quand elle arrive).
+async function relireApresRA(issues) {
+  for (const ref of [...new Set(issues.filter((x) => x.r.statut === 'retire' && x.s.plateforme === 'eBay').map((x) => x.s.compte || 'principal'))]) {
+    try { await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'relire', ...corpsCompteEbay(ref) }) }); } catch (_) { /* pas relu : dit */ }
+  }
+  try { if (typeof RA.relire === 'function') await RA.relire(); } catch (_) { /* « la prochaine lecture le confirmera » reste dit */ }
+}
+// Le journal « Ce que VRM a fait » : un travail suivi, sans figer l'écran (seuil d'une demi-heure),
+// archivé dès la fin. Un autre travail en cours ⇒ pas de journal (le geste, lui, part quand même).
+function journalRA(items) {
+  const t = suiviTravail.demarrer({ sorte: 'retirer-annonces', titre: tr('rx.titre'), uid: RA.owner, seuilMs: 30 * 60e3, etapes: [['envoi', 'Demande de retrait au site'], ['accepte', 'Retrait accepté par le site']],
+    articles: items.map(({ a, s }) => ({ id: s.cle, num: a.numero || '', titre: s.plateforme })) });
+  return t;
+}
+const finJournalRA = (t, s, r) => {
+  if (!t) return;
+  if (r.statut === 'retire') { t.etape(s.cle, 'envoi'); t.etape(s.cle, 'accepte'); t.fin(s.cle, { etat: 'ok' }); }
+  else if (r.statut === 'onglet') t.fin(s.cle, { etat: 'main', raison: r.texte || 'onglet leboncoin.fr à ouvrir', geste: 'Ouvre leboncoin.fr connecté sur le bon compte' });
+  else if (r.statut === 'incertain') t.fin(s.cle, { etat: 'main', raison: r.texte, geste: 'Regarde l’annonce sur le site avant de recommencer' });
+  else if (r.statut === 'arrete') t.fin(s.cle, { etat: 'saute', raison: r.texte });
+  else t.fin(s.cle, { etat: 'refus', raison: r.texte });
+};
+const clotJournalRA = (t) => { if (!t) return; try { t.terminer(''); suiviTravail.fermer(); } catch (_) {} };
+// La confirmation qui existait (`texteConfirmation`), sur les seuls sites qui partent.
+async function confirmerRA(items) {
+  const plan = { articles: items.map(({ a, s }) => ({ numero: a.numero, sites: [{ ...s, voie: 'auto' }] })) };
+  const t = texteConfirmation(plan);
+  return await askConfirm({ title: t.titre, desc: t.desc, ok: 'Oui, retirer', cancel: 'Annuler', danger: true, irreversible: true });
+}
+// SON clic sur le geste d'UN site.
+async function gesteRA(site, art) {
+  if (RA.enCours || RA.serie) return;
+  const reprise = !!RA.attente[site.cle];
+  if (!reprise && !(await confirmerRA([{ a: art, s: site }]))) return;
+  const acc = accompagner('annonce.retirer', { total: 1, arretable: false }).pendant(0);
+  const t = journalRA([{ a: art, s: site }]);
+  const r = await retirerUnSiteRA(site, art);
+  finJournalRA(t, site, r); clotJournalRA(t);
+  if (r.statut === 'retire') acc.fini({ n: 1 });
+  else if (r.statut === 'onglet') acc.oublier();   // la ligne dit « Ouvre leboncoin.fr » et reprend seule
+  else acc.echec(r.statut === 'incertain' ? { sansReponse: true, raison: r.texte } : { raison: r.texte, acc: /plafond|ralentir|pause/i.test(r.texte) ? 'limite' : 'refus' });
+  if (r.statut === 'retire') { await relireApresRA([{ s: site, r }]); try { window.dispatchEvent(new CustomEvent('vrm:ebay-maj')); } catch (_) {} }
+}
+// « Tout retirer (N) » : une confirmation, puis un par un ; « Tout arrêter » finit celui en cours.
+// Un site qui ne passe pas arrête CE site (la suivante échouerait pareil) ; les autres continuent.
+async function toutRetirerRA() {
+  if (RA.enCours || RA.serie) return;
+  const tous = sitesRA();
+  const items = listeRA().serie.map((x) => tous[x.cle]).filter(Boolean);
+  if (!items.length || !(await confirmerRA(items))) return;
+  const acc = accompagner('annonce.retirer', { total: items.length, arretable: true });
+  majRA({ serie: { fait: 0, total: items.length, arret: false } });
+  const t = journalRA(items);
+  const stop = new Set(), issues = [];
+  let ok = 0;
+  try {
+    for (let i = 0; i < items.length; i++) {
+      const { a, s } = items[i];
+      acc.pendant(i);
+      if (acc.arretDemande()) majRA((r) => ({ serie: { ...r.serie, arret: true } }));
+      let r;
+      if (RA.serie && RA.serie.arret) r = { statut: 'arrete', texte: 'pas tenté — arrêté' };
+      else if (stop.has(s.plateforme)) r = { statut: 'arrete', texte: 'pas tenté — la précédente sur ce site n’est pas passée' };
+      else r = await retirerUnSiteRA(s, a);
+      finJournalRA(t, s, r); issues.push({ s, r });
+      if (r.statut === 'retire') ok++; else if (r.statut !== 'arrete') stop.add(s.plateforme);
+      majRA((x) => ({ serie: { ...x.serie, fait: i + 1 } }));
+    }
+  } finally {
+    clotJournalRA(t);
+    majRA({ serie: null });
+  }
+  const pasFaits = issues.filter((x) => x.r.statut !== 'retire' && x.r.statut !== 'onglet' && x.r.statut !== 'arrete');
+  if (pasFaits.length) acc.echec({ raison: pasFaits[0].r.texte, acc: pasFaits[0].r.statut === 'incertain' ? 'pasSu' : 'refus' });
+  else if (ok) acc.fini({ n: ok }); else acc.oublier();
+  if (ok) { await relireApresRA(issues); try { window.dispatchEvent(new CustomEvent('vrm:ebay-maj')); } catch (_) {} }
+}
+const arreterRA = () => { if (RA.serie) majRA((r) => ({ serie: { ...r.serie, arret: true } })); };
+// « C'est retiré » : SA parole, notée (synchronisée) ; la prochaine lecture complète la confirme ou la dément.
+function marquerRA(site, art) {
+  const m = { ...marquesRA(), [site.cle]: { at: Date.now(), numero: String(art.numero || ''), plateforme: site.plateforme } };
+  // Les 200 plus récentes (une marque démentie ou confirmée n'a plus d'effet : l'annonce sort du plan).
+  const garde = Object.fromEntries(Object.entries(m).sort((x, y) => (Number(y[1] && y[1].at) || 0) - (Number(x[1] && x[1].at) || 0)).slice(0, 200));
+  save('vrm_retraits_main', garde);
+  majRA((r) => ({ gardes: { ...r.gardes, [site.cle]: { art: { numero: art.numero, venduSur: art.venduSur, titre: art.titre, photo: art.photo, douteuse: art.douteuse }, site: { ...site } } }, touches: new Set([...r.touches, String(art.numero)]) }));
+  toast(tr('rx.marque', { n: art.numero, site: site.plateforme }), 'ok');
+}
+// La reprise « Ouvre leboncoin.fr » : sur un signe qu'il est revenu, une à la fois, bornée.
+let _repriseRAEnVol = false;
+async function reprendreRA() {
+  if (_repriseRAEnVol || RA.enCours || RA.serie) return;
+  const cles = aReprendre(RA.attente);
+  if (!cles.length) return;
+  _repriseRAEnVol = true;
+  try {
+    const tous = sitesRA();
+    for (const cle of cles) {
+      const x = tous[cle]; if (!x) { majRA((r) => { const a = { ...r.attente }; delete a[cle]; return { attente: a }; }); continue; }
+      await gesteRA(x.s, x.a);
+      if (RA.attente[cle]) break;   // toujours pas d'onglet : on attend le prochain signe
+    }
+  } finally { _repriseRAEnVol = false; }
+}
+// En tête de Ma journée : ce qui reste à faire, et ce qu'il a touché cette session (le résultat se lit).
+const articlesTeteRA = (l = listeRA()) => l.articles.filter((a) => !l.regles.includes(a.numero) || RA.touches.has(String(a.numero)));
+// Le bloc, monté par Ma journée / Ventes (liste entière) et la fiche (son N°).
+function BlocARetirerAilleurs({ numero = null, PhotoVinted = null, tete = false }) {
+  useRA();
+  const l = listeRA(numero);
+  const articles = tete ? articlesTeteRA(l) : l.articles;
+  if (!articles.length) return null;
+  const plan = RA.plan || {};
+  return <ARetirerAilleurs liste={{ ...l, articles }} onGeste={gesteRA} onMarquer={marquerRA} onToutRetirer={toutRetirerRA} serie={RA.serie} onArreter={arreterRA}
+    PhotoVinted={PhotoVinted} numero={numero} ambigus={numero == null ? Number(plan.ambigus) || 0 : 0} manques={numero == null ? (plan.manques || []) : []}/>;
+}
 // ── UNE PAIRE DÉJÀ VENDUE, TOUTES PLATEFORMES, JUGÉE PAR SON N° (6 octobre) ──
 // Revue contradictoire du 6 octobre, PROUVÉE au rendu : le planificateur eBay
 // ne connaissait qu'UNE garde « vendue » — l'annonce Vinted du brouillon
@@ -61147,6 +61295,8 @@ function AppCoeur() {
       // (scope fulfillment, déjà accordé — aucune reconnexion). Une lecture
       // ratée/vide ⇒ 0, jamais un colis inventé (§5).
       let ebayARetirerAilleursOu='sur Leboncoin', vcARetirer=0, vcARetirerOu='ailleurs';
+      // (15 nov., retrait-ailleurs) les N° de ces alertes : une alerte déjà dans « À retirer ailleurs » n'est pas redite (`alerteCouverte`).
+      let ebayNumsRetirer=[], ebayNumsAilleurs=[];
       let ebayShipCount=0, ebayARetirer=0, ebayARetirerAilleurs=0, ebayARetirerVinted=0, ebayAAnnuler=0, ebayAAnnulerOu='sur Vinted';
       try{
         // §4.4 : la liste des commandes seulement, et les annonces eBay (petites).
@@ -61202,7 +61352,7 @@ function AppCoeur() {
             vcARetirer=ouVc.length; vcARetirerOu=ouVenduesTexte(ouVc);
           }
         }catch(_){}
-        ebayARetirer=dvE.aRetirerEbay.length; ebayARetirerAilleurs=(dvE.aRetirerEbayAilleurs||[]).length; ebayARetirerAilleursOu=ouVenduesTexte(dvE.aRetirerEbayAilleurs||[]); ebayARetirerVinted=dvE.aRetirerVinted.length; ebayAAnnuler=dvE.aAnnulerEbay.length; ebayAAnnulerOu=ouVenduesTexte(dvE.aAnnulerEbay);
+        ebayARetirer=dvE.aRetirerEbay.length; ebayARetirerAilleurs=(dvE.aRetirerEbayAilleurs||[]).length; ebayNumsRetirer=dvE.aRetirerEbay.map(d=>d&&d.numero); ebayNumsAilleurs=(dvE.aRetirerEbayAilleurs||[]).map(d=>d&&d.numero); ebayARetirerAilleursOu=ouVenduesTexte(dvE.aRetirerEbayAilleurs||[]); ebayARetirerVinted=dvE.aRetirerVinted.length; ebayAAnnuler=dvE.aAnnulerEbay.length; ebayAAnnulerOu=ouVenduesTexte(dvE.aAnnulerEbay);
         // ── CROISEMENT eBay → LEBONCOIN (26 oct.) : une paire PUBLIÉE sur LBC et
         //    VENDUE sur eBay, encore en ligne ici — le pendant du compte « vendue
         //    sur Vinted » juste au-dessus, avec le MÊME verdict que l'écran eBay
@@ -61355,14 +61505,14 @@ function AppCoeur() {
       if(vcARetirer>0) items.push({icon:'🟠', ic:'tag', text:`${motArticle(vcARetirer)} vendu${motsVendeur().e}${vcARetirer>1?'s':''} ${vcARetirerOu}, encore en ligne sur Vestiaire — à retirer de Vestiaire`, n:vcARetirer, tab:'plat_vestiaire', dv:true});
       if(vcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${vcDoubles} article${vcDoubles>1?'s':''} vendu${vcDoubles>1?'s':''} sur Vestiaire, encore en vente sur Vinted — à retirer de Vinted`, n:vcDoubles, tab:'plat_vestiaire', dv:true, annonces:true});
       if(lbcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${lbcDoubles} article${lbcDoubles>1?'s':''} vendu${lbcDoubles>1?'s':''} sur Leboncoin, encore en vente sur Vinted — à retirer de Vinted`, n:lbcDoubles, tab:'leboncoin', dv:true, annonces:true});
-      if(lbcRemoveCount>0){ const noms=(lbcARetirer||[]).slice(0,3).map(r=>r.numero?`N°${r.numero}`:'').filter(Boolean); const reste=lbcRemoveCount-noms.length; items.push({icon:'🟠', ic:'tag', text: noms.length ? `${lbcRemoveCount} à retirer de Leboncoin — ${noms.join(', ')}${reste>0?` et ${reste} autre${reste>1?'s':''}`:''} vendue${lbcRemoveCount>1?'s':''} sur Vinted` : `${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin', dv:true, lbcRetirer:true, photos:lbcRemovePhotos, lbcSuppr:(lbcARetirer||[]).filter(r=>r&&r.lbcId).map(r=>({ id:r.lbcId, numero:r.numero, titre:r.titre, ou:'Vinted' })), avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer]'; DEMANDE_LBC_CIBLE.at=Date.now(); }}); }
-      if(lbcRemoveVcCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveVcCount} à retirer de Leboncoin (vendue${lbcRemoveVcCount>1?'s':''} sur Vestiaire)`, n:lbcRemoveVcCount, tab:'leboncoin', dv:true, lbcRetirer:true, lbcSuppr:lbcSupprVc.map(r=>({ id:r.lbcId, numero:r.numero, titre:r.titre, ou:'Vestiaire' })), avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer-vestiaire]'; DEMANDE_LBC_CIBLE.at=Date.now(); }});
-      if(lbcRemoveEbayCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveEbayCount} à retirer de Leboncoin (vendue${lbcRemoveEbayCount>1?'s':''} sur eBay)`, n:lbcRemoveEbayCount, tab:'leboncoin', dv:true, lbcRetirer:true, lbcSuppr:lbcSupprEbay.map(r=>({ id:r.lbcId, numero:r.numero, titre:r.titre, ou:'eBay' })), avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer-ebay]'; DEMANDE_LBC_CIBLE.at=Date.now(); }});
+      if(lbcRemoveCount>0){ const noms=(lbcARetirer||[]).slice(0,3).map(r=>r.numero?`N°${r.numero}`:'').filter(Boolean); const reste=lbcRemoveCount-noms.length; items.push({icon:'🟠', ic:'tag', text: noms.length ? `${lbcRemoveCount} à retirer de Leboncoin — ${noms.join(', ')}${reste>0?` et ${reste} autre${reste>1?'s':''}`:''} vendue${lbcRemoveCount>1?'s':''} sur Vinted` : `${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin', dv:true, lbcRetirer:true, retrait:{ plat:'Leboncoin', nums:(lbcARetirer||[]).map(r=>r&&r.numero) }, photos:lbcRemovePhotos, lbcSuppr:(lbcARetirer||[]).filter(r=>r&&r.lbcId).map(r=>({ id:r.lbcId, numero:r.numero, titre:r.titre, ou:'Vinted' })), avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer]'; DEMANDE_LBC_CIBLE.at=Date.now(); }}); }
+      if(lbcRemoveVcCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveVcCount} à retirer de Leboncoin (vendue${lbcRemoveVcCount>1?'s':''} sur Vestiaire)`, n:lbcRemoveVcCount, tab:'leboncoin', dv:true, lbcRetirer:true, retrait:{ plat:'Leboncoin', nums:lbcSupprVc.map(r=>r&&r.numero) }, lbcSuppr:lbcSupprVc.map(r=>({ id:r.lbcId, numero:r.numero, titre:r.titre, ou:'Vestiaire' })), avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer-vestiaire]'; DEMANDE_LBC_CIBLE.at=Date.now(); }});
+      if(lbcRemoveEbayCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveEbayCount} à retirer de Leboncoin (vendue${lbcRemoveEbayCount>1?'s':''} sur eBay)`, n:lbcRemoveEbayCount, tab:'leboncoin', dv:true, lbcRetirer:true, retrait:{ plat:'Leboncoin', nums:lbcSupprEbay.map(r=>r&&r.numero) }, lbcSuppr:lbcSupprEbay.map(r=>({ id:r.lbcId, numero:r.numero, titre:r.titre, ou:'eBay' })), avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer-ebay]'; DEMANDE_LBC_CIBLE.at=Date.now(); }});
       // Une vente Leboncoin non reliée ne sonne plus (Julien, 16 oct. : « ça sert à
       // rien de relier une paire vendue ») : l'écran Leboncoin ne la demande que si
       // une paire qui y ressemble est encore en vente sur Vinted.
-      if(ebayARetirer>0) items.push({icon:'🔵', ic:'tag', text:`${motArticle(ebayARetirer)} vendu${motsVendeur().e}${ebayARetirer>1?'s':''} sur Vinted, encore en vente sur eBay — à retirer d'eBay`, n:ebayARetirer, tab:'ebay_annonces', dv:true});
-      if(ebayARetirerAilleurs>0) items.push({icon:'🔵', ic:'tag', text:`${motArticle(ebayARetirerAilleurs)} vendu${motsVendeur().e}${ebayARetirerAilleurs>1?'s':''} ${ebayARetirerAilleursOu}, encore en vente sur eBay — à retirer d'eBay`, n:ebayARetirerAilleurs, tab:'ebay_annonces', dv:true});
+      if(ebayARetirer>0) items.push({icon:'🔵', ic:'tag', text:`${motArticle(ebayARetirer)} vendu${motsVendeur().e}${ebayARetirer>1?'s':''} sur Vinted, encore en vente sur eBay — à retirer d'eBay`, n:ebayARetirer, tab:'ebay_annonces', dv:true, retrait:{ plat:'eBay', nums:ebayNumsRetirer }});
+      if(ebayARetirerAilleurs>0) items.push({icon:'🔵', ic:'tag', text:`${motArticle(ebayARetirerAilleurs)} vendu${motsVendeur().e}${ebayARetirerAilleurs>1?'s':''} ${ebayARetirerAilleursOu}, encore en vente sur eBay — à retirer d'eBay`, n:ebayARetirerAilleurs, tab:'ebay_annonces', dv:true, retrait:{ plat:'eBay', nums:ebayNumsAilleurs }});
       if(ebayAAnnuler>0) items.push({icon:'🔵', ic:'tag', text:`${motArticle(ebayAAnnuler)} vendu${motsVendeur().e}${ebayAAnnuler>1?'s':''} ${ebayAAnnulerOu}, programmé${motsVendeur().e}${ebayAAnnuler>1?'s':''} sur eBay — à annuler`, n:ebayAAnnuler, tab:'ebay_annonces', dv:true});
       if(ebayARetirerVinted>0) items.push({icon:'🔵', ic:'tag', text:`${motArticle(ebayARetirerVinted)} vendu${motsVendeur().e}${ebayARetirerVinted>1?'s':''} sur eBay, encore en vente sur Vinted — à retirer de Vinted`, n:ebayARetirerVinted, tab:'ebay_annonces', dv:true, annonces:true});
       // ⚠️ Retirés le 30 septembre, à la demande de Julien : « N messages non
