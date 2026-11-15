@@ -49,8 +49,8 @@ aussi le N° des masquées (même liste).
 ### 2. « N° à vérifier sur ton carton » : la réservation en désaccord (#4)
 `reserveEnDesaccord(id, fiche, parItem, cleNum)` : la fiche dit X, la réservation liée dit Y, pas
 déjà vérifié (`cartonVerifie`), pas expliqué par la règle des doublons (`reattribue` de Y vers X,
-déjà dit dans « à écrire »). Annonces → « N° à vérifier » : « La fiche dit N°7 · l'extension avait
-réservé N°3 », « C'est bien le N°7 » (le geste existant) ou « Le carton dit N°3 » (`prendreReserve` :
+déjà dit dans « à écrire »). Annonces → « N° à vérifier » : « La fiche dit N°7 · réservé N°3 » (court :
+la ligne de l'écran ne se coupe pas), « C'est bien le N°7 » (le geste existant) ou « Le carton dit N°3 » (`prendreReserve` :
 passe par `poserNumero`, ne prend que la réservation liée à CETTE annonce). Rien ne change seul.
 
 ### 3. Un achat en retour n'est jamais « à retirer »
@@ -92,7 +92,8 @@ Le dernier recours avant un N° neuf (mode « VRM numérote »), dans le bloc `<
    republiée ? »** ⇒ la feuille AVANT (photo de la disparue, plaque N° gravée) / MAINTENANT, au même
    cadrage ; « Oui, garder N°6 » (le plein : le lien de « Republier à la main », `vrm_repub_main`, la
    reprise `repriseNumerosRecreation` remet le N°) ; « Non, c'est un autre article » (N° neuf) ; une
-   ancienne encore en ligne ne se relie pas (dit). Les deux réponses passent par la pilule
+   ancienne encore en ligne ne se relie pas (dit). La carte « N°6 supprimé de Vinted » de l'ancienne ne
+   s'affiche pas en même temps (le même sujet, une fois). Les deux réponses passent par la pilule
    d'accompagnement (`numero.republie`, `numero.autre`, annulable 5 s).
    Photos différentes, toutes comparées ⇒ N° neuf. Empreinte pas encore captée ⇒ attente, au plus 24 h
    depuis la première fois que VRM a vu l'annonce sans N° (`vrm_republie_attente`, synchronisée).
@@ -152,7 +153,14 @@ Le dernier recours avant un N° neuf (mode « VRM numérote »), dans le bloc `<
   deux fois), comptes-exclus (copie d'arbre incomplète : `src/versementReleve.js`).
 - Banc `scripts/bancs/numeros-masquees.cjs` (390 tactile clair et sombre, 1512) : M (masquée N°5), V
   (« à vérifier », SON choix), R (« N°6 republiée ? », la feuille, « Oui »), P (« N°6 reconnu par sa
-  photo »). Voir le rapport de la session pour les chiffres et les captures.
+  photo »). **99 verts** (M, V, R, P × 390 clair, 390 sombre, 1512 clair), puis après les finitions V 27 ✅
+  et R/P/M 75 ✅. Captures regardées ; elles ont attrapé : la phrase « à vérifier » coupée par l'ellipse de
+  l'écran et « Le carton dit N°3 » tronqué (phrase raccourcie, bouton sous la phrase), une seconde carte
+  « N°6 supprimé de Vinted » et une ligne « 1 annonce sans numéro » pour la même annonce (retirées : le
+  même sujet, une fois), le bandeau qui redisait « même photo ». Pas rejoué sur le build d'avant (machine
+  à charge 40) : les trois audits ci-dessus sont rouges sur l'arbre de départ.
+- Non fait (dit) : le banc `accompagnement` (son monde `_base-volume`) n'a pas reçu ces moments ; le banc
+  de ce lot vérifie la pilule `data-acc-apres="numero.republie"`.
 
 ## Gestes de Julien
 - Aucun pour que ça marche. Au prochain passage de VRM (un écran qui lit les annonces ouvert) : les
