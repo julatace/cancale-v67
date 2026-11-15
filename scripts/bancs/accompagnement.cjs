@@ -219,7 +219,9 @@ action('colis.imprimer', async (nav) => {
     ? (couper ? (r) => r.abort('internetdisconnected') : tenue ? (r) => tenue.then(() => r.fallback()) : null) : null);
   const o = await ouvrir(nav, { url: '/?tab=cat_bord', panne });
   try {
-    await toucher(o.pg, '[data-colis-barre-btn="imprimer"]');
+    // (version studio) « Imprimer (N) » imprime désormais en un toucher (impression-simple, jugé par son banc) ;
+    // la feuille « Tout imprimer » et ses quatre moments s'ouvrent par « … · Choisir » (`ouvrirLot`).
+    await toucher(o.pg, 'button.vrm-impr-lien[data-lot-ouvrir]');
     noter('colis.imprimer', 'avant', await moment(o.pg, 'avant', 'colis.imprimer'));
     await shot(o.pg, 'colis-imprimer-avant');
     let lacher; tenue = new Promise((ok) => { lacher = ok; });
@@ -241,7 +243,7 @@ action('colis.imprimer', async (nav) => {
   const o2 = await ouvrir(nav, { url: '/?tab=cat_bord', panne });
   try {
     couper = true;
-    await toucher(o2.pg, '[data-colis-barre-btn="imprimer"]');
+    await toucher(o2.pg, 'button.vrm-impr-lien[data-lot-ouvrir]');
     await toucher(o2.pg, '[data-lot-imprimer]');
     noter('colis.imprimer', 'echec', await moment(o2.pg, 'echec', 'colis.imprimer', { ms: 20000 }));
     await shot(o2.pg, 'colis-imprimer-echec');
