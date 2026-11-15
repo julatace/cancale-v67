@@ -94,11 +94,22 @@ moyen) lisent tous **`montantRecuVc`** (= `sellerEarning`, ce que Vestiaire vers
 - `scripts/bancs/vestiaire-ventes.cjs` (NEUF) : 390 tactile et 1512, clair et sombre — aucun code machine, pas
   d'identifiant de compte, tête = lignes, prix de vente en principal et « pour toi » en second, bénéfice seulement
   s'il est su, aucun « — » nu, aucun geste sur la rangée, aucun titre coupé dans un mot, rien ne déborde, l'état
-  ÉCRIT, la fiche sans code.
-- Audits ajustés à la décision : `audit-plateformes-logo` D15 (pseudo ou rien), `audit-frais-vestiaire` (frais dans
-  la fiche).
-- Rouges trouvés **déjà rouges sur `origin/main`** (pas de ce lot) : `audit-plateformes-logo` D10,
-  `audit-extension-5340` P1, `audit-safari` (lookbehind et API d'un autre fichier).
+  ÉCRIT, la fiche sans code. **68 verts**. Captures regardées (390 clair/sombre, 1512 clair/sombre, fiche).
+- Verts : audits `traduction`, `tdz`, `variables`, `studio`, `identite`, `coherence`, `extension-zip`, `csp`,
+  `quoi-de-neuf`, `vestiaire-partout`, `frise-sites`, `vestiaire-plus`, `frais-vestiaire`, `argent-a-venir`,
+  `numeros-vestiaire`, `colis-sortants`, `bilan-semaine`, `suivi-commandes`, `onglets-a`, `parite-plateformes`,
+  `lien-vc`, `vestiaire-email`, `extension-navigateurs`, `export-zip` ; bancs `studio-ventes` (96), `frais-vestiaire` (40).
+- Audits et bancs ajustés à la décision (le vieux comportement y était écrit) : `audit-plateformes-logo` D15 et banc
+  `plateformes-logo` B (pseudo ou rien), `audit-frais-vestiaire` et banc `frais-vestiaire` L (frais dans la fiche),
+  banc `vestiaire-fiches` (date limite dans l'état ; « paid » ⇒ « État Vestiaire non reconnu », plus recopié).
+  `data-vc-vente-etape` garde la famille `a-expedier` (bancs d'avant) ; la clé précise est `data-vc-vente-etat`.
+- Rouges **déjà rouges sur `origin/main`** (mesurés sur un arbre `git archive origin/main`, pas de ce lot) :
+  `audit-plateformes-logo` D10, `audit-extension-5340` P1, `audit-safari` ; bancs `vestiaire-bout-en-bout`
+  (sélecteur « Vestiaire » sans rien de capté), `vestiaire-parite` (photos d'annonces, pastille du transporteur ;
+  « À expédier » y était ROUGE sur main, vert ici), `vestiaire-fiches` (Annonces), `vestiaire` (relevé, messages,
+  achats), `onglets-a` (« ? »), `plateformes-logo` (A, C), `vestiaire-plus` (A Ma journée · offres),
+  `vestiaire-colis` (messages). La machine était très chargée (charge 30 à 50) : plusieurs « Page crashed » se sont
+  dissipés en relançant.
 
 ## Geste de Julien
 
