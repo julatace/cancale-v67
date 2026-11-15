@@ -39,9 +39,10 @@ const MUTS = {
   'posterieur': ['src/liaisonAchat.js', 'if (!Number.isFinite(A.date) || (Number.isFinite(P.ref) && !(A.date < P.ref))) return null;', ''],
   'refus-ignore': ['src/liaisonAchat.js', "if (refus.size && refus.has(P.key + '>' + A.tx)) return null;", ''],
   'lot-tres-probable': ['src/liaisonAchat.js', 'const fort = !A.lot && score', 'const fort = score'],
-  'rarete-plate': ['src/liaisonAchat.js', 'return (w) => Math.log(1 + (n + 1) / (1 + (df.get(w) || 0)));', 'return () => 1;'],
+  'un-seul-sens': ['src/liaisonAchat.js', 'couv = ((tot > 0 ? com / tot : 0) + (totA > 0 ? com / totA : 0)) / 2;', 'couv = tot > 0 ? com / tot : 0;'],
   'sans-chrono': ['src/liaisonAchat.js', 'if (jours != null) score += POIDS.chrono * Math.exp(-jours / POIDS.chronoJours);', ''],
-  'mot-commun-ignore': ['src/liaisonAchat.js', 'if (!COMMUNS.length) return null;', ''],
+  // (deux gardes : l'index ne pèse que les achats qui partagent un mot, et `evaluer` exige un mot commun)
+  'mot-commun-ignore': ['src/liaisonAchat.js', 'if (!COMMUNS.length) return null;', '', 'for (const A of sansMots) {', 'for (const A of As) { if (A.vu === tampon) continue;'],
   'app-auto-relie': ['src/App.jsx', '  const vueLiaison = ', "  useEffect(() => { if (liaison) for (const v of aValider(liaison.parArticle)) { const x = articlesLiaison.get(v.key); if (x && x.item) relierAchatAnnonce(x.item, v.achat, { silencieux: true }); } }, [liaison]);\n  const vueLiaison = "],
   'app-valider-sans-feuille': ['src/App.jsx', 'onClick={() => setValider({ coches: new Set(tp.map((v) => v.key)) })}', 'onClick={() => { setValider({ coches: new Set(tp.map((v) => v.key)) }); setTimeout(validerCoches, 0); }}'],
   'app-refus-local': ['src/App.jsx', "  'vrm_liaison_refus',\n", ''],
@@ -60,10 +61,10 @@ const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').split(
 if (MUT) {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'liaison-achat-'));
   fs.cpSync(path.join(R, 'src'), path.join(d, 'src'), { recursive: true, filter: (s) => !/node_modules/.test(s) });
-  const [f, de, vers] = MUTS[MUT];
-  const p = path.join(d, f); const s = fs.readFileSync(p, 'utf8');
-  if (!s.includes(de)) { console.log('motif introuvable : ' + MUT); process.exit(2); }
-  fs.writeFileSync(p, s.replace(de, vers)); SRC = path.join(d, 'src');
+  const [f, ...paires] = MUTS[MUT];
+  const p = path.join(d, f); let s = fs.readFileSync(p, 'utf8');
+  for (let i = 0; i < paires.length; i += 2) { if (!s.includes(paires[i])) { console.log('motif introuvable : ' + MUT); process.exit(2); } s = s.replace(paires[i], paires[i + 1]); }
+  fs.writeFileSync(p, s); SRC = path.join(d, 'src');
   console.log('⚠️  MUTATION « ' + MUT + ' » — doit rougir');
 }
 let ok = 0, ko = 0;
@@ -130,7 +131,16 @@ function jeu() {
   let L = null, S0 = null;
   try { L = await import(require('url').pathToFileURL(path.join(SRC, 'liaisonAchat.js')).href); } catch (e) { dit(false, 'src/liaisonAchat.js se charge', e.message); }
   try { S0 = await import(require('url').pathToFileURL(path.join(SRC, 'suggestionsAchat.js')).href); } catch (_) {}
-  if (!L) { console.log(`\n${ok} contrôle(s) OK, ${ko} en échec`); process.exit(1); }
+  if (!L) {
+    // L'arbre d'avant : la règle de proposition était `suggestionsAchat` — sa précision sur le même jeu.
+    if (S0) {
+      const { achats, cibles, verite } = jeu(); let t1 = 0, t3 = 0;
+      for (const c of cibles) { const i = S0.suggestionsAchat({ cible: { titre: c.titre, marque: c.marque, taille: c.taille, dateRef: c.dateRef }, achats, liens: new Map(), ...regles, max: 3 }).map((s) => String(s.achat.transaction_id)).indexOf(verite[c.key]); if (i === 0) t1++; if (i >= 0) t3++; }
+      dit(t1 >= Math.ceil(0.75 * cibles.length), `P1 top-1 ≥ 75 % (règle d'avant : ${t1}/${cibles.length})`);
+      dit(t3 >= Math.ceil(0.85 * cibles.length), `P2 top-3 ≥ 85 % (règle d'avant : ${t3}/${cibles.length})`);
+    }
+    console.log(`\n${ok} contrôle(s) OK, ${ko} en échec`); process.exit(1);
+  }
 
   console.log('\n── P. La précision, sur un jeu inventé à la forme de sa vérité terrain');
   const { achats, cibles, verite } = jeu();
@@ -179,6 +189,20 @@ function jeu() {
   dit(L.tailleAchat('Nike Zoom Vomero 5 grau US 8', 'nike').taille === '41' && L.tailleAchat('Adidas samba us 9', 'adidas').taille === '42 2/3' && L.tailleAchat('Puma suede US 9', 'puma').taille === '', 'I10 une taille US se convertit par la table de SA marque (sinon : pas su)');
   dit(L.couleursTexte('Salomon xt-6 vert kaki', couleursDe).includes('vert') && L.couleursTexte('Nike dunkelblau', couleursDe).includes('bleu') && L.couleursTexte('Nike Shox schwarz', couleursDe).includes('noir'), 'I11 couleurs du titre en plusieurs langues (kaki, dunkelblau, schwarz)');
 
+  const ref = new Date(T0 + 30 * J).toISOString();
+  const un = (titre, taille, titresAchats, joursAvant = 10) => L.propositionsArticle({ cible: { titre, taille, dateRef: ref }, achats: titresAchats.map((t, i) => ({ transaction_id: 700 + i, title: t, date: new Date(T0 + (30 - (Array.isArray(joursAvant) ? joursAvant[i] : joursAvant)) * J).toISOString(), price: { amount: '30' } })), ...regles });
+  const deuxAchats = un('Nike Dunk Low panda noir taille 42', '42', ['Nike dunk low panda 42', 'Nike Dunk Low panda noir 42']);
+  dit(deuxAchats.length === 2 && deuxAchats[0].niveau === 'possible' && deuxAchats[0].ambigu, 'I12 un article, deux achats aussi proches ⇒ ni l’un ni l’autre « très probable » (à lui de choisir)', JSON.stringify(deuxAchats.map((p) => [p.score, p.niveau])));
+  dit(!un('Adidas samba noir taille 40', '40', ['Adidas samba noir 43']).length, 'I13 tailles écrites des deux côtés et différentes ⇒ écarté');
+  dit(!un('Nike dunk low vert taille 42', '42', ['Nike dunk low rouge 42']).length, 'I14 couleurs écrites des deux côtés et sans couleur commune ⇒ écarté');
+  dit(!un('Nike zoom fly 5 noir et rose taille 40', '40', ['Nike speakers maat 40']).length, 'I15 aucun mot du modèle en commun ⇒ écarté (« Nike speakers maat 40 »)');
+  const proche = un('Salomon speedcross 5 noir taille 43', '43', ['Salomon speedcross 5 noir 43'], 5)[0], loin = un('Salomon speedcross 5 noir taille 43', '43', ['Salomon speedcross 5 noir 43'], 170)[0];
+  dit(proche && loin && proche.score - loin.score >= 1.5, 'I16 la chronologie pèse : mise en ligne 5 j après la commande > 170 j après', JSON.stringify([proche && proche.score, loin && loin.score]));
+  // Un titre d'achat COURT (« Nike shox ») retrouve tous ses mots dans l'annonce : il reste devant un achat
+  // qui partage moins de ses mots (la part se lit dans les deux sens).
+  const court = un('Nike Shox TL Hyper Royal bleu taille 42', '42', ['Nike shox tl turbo custom spécial édition', 'Nike shox tl'], [8, 8]);
+  dit(court.length === 2 && court[0].achat.transaction_id === 701, 'I17 un titre d’achat court qui retrouve TOUS ses mots passe devant (la part des mots, dans les deux sens)', JSON.stringify(court.map((p) => [p.achat.title, p.score])));
+
   console.log('\n── R. Relier sans son clic : impossible');
   const src = fs.readFileSync(path.join(SRC, 'liaisonAchat.js'), 'utf8').replace(/\/\/.*$/gm, '');
   dit(!/fetch\(|localStorage|save\(|setNumeros|setSaleOverride|updatePair|buyFromId\s*=/.test(src), 'R1 le module n’écrit nulle part (ni base, ni navigateur, ni fiche)');
@@ -193,7 +217,7 @@ function jeu() {
   dit(/<input type="checkbox" checked=\{coche\}/.test(APPS), 'R5 la feuille montre chaque couple, cochable un par un');
 
   console.log('\n── S. Le branchement dans l’app');
-  dit(/'vrm_liaison_refus',/.test(APPS) && /setLiaisonRefus\(\(v\) => \(v && Object\.keys\(v\)\.length\) \? v : lu\('vrm_liaison_refus'\)\)/.test(APPS) && /k: 'vrm_liaison_refus', type: 'cle'/.test(APPS), 'S1 « Ce n’est pas lui » : synchronisé (SYNC_KEYS), relu quand le nuage arrive, posé par SON geste');
+  dit(/^\s*'vrm_liaison_refus',\s*$/m.test(APPS) && /setLiaisonRefus\(\(v\) => \(v && Object\.keys\(v\)\.length\) \? v : lu\('vrm_liaison_refus'\)\)/.test(APPS) && /k: 'vrm_liaison_refus', type: 'cle'/.test(APPS), 'S1 « Ce n’est pas lui » : synchronisé (SYNC_KEYS), relu quand le nuage arrive, posé par SON geste');
   dit(/const fileVendus = useMemo\(/.test(APPS) && /classifyOrderStatus\(o\.status\) === 'cancelled'/.test(APPS) && /365 \* 86400e3/.test(APPS) && /\.concat\(\(fileVendus \|\| \[\]\)\.map\(\(x\) => x\.cible\)\)/.test(APPS), 'S2 les VENDUS des 12 derniers mois, sans achat ni prix, entrent dans l’affectation');
   dit(/affecterPropositions\(\{ cibles, achats: achatsLiaison, liens: liensAchats, refus: liaisonRefus/.test(APPS) && /receptionDe: \(a\) => dateReception\(a,/.test(APPS), 'S3 l’affectation lit les liens posés, ses refus et la date de retrait LUE');
   dit(/<PropositionAchat p=\{lp\} art=\{art\}/.test(APPS) && /\(numA == null \|\| numA === ''\) && liaison/.test(APPS), 'S4 Achats : sous un achat sans article relié, l’article proposé');

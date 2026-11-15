@@ -29,9 +29,11 @@
 //     · un achat commandé APRÈS la mise en ligne (ou la vente) ; date de commande inconnue ;
 //     · remboursé / annulé ; déjà relié ailleurs (un LOT jusqu'à son nombre) ;
 //     · « Ce n'est pas lui » (`refus`, synchronisé) : ce couple ne revient plus.
-//   PESÉ (les poids sont MESURÉS sur sa vérité terrain, `scripts/audit-liaison-achat.cjs`) :
-//     · les MOTS DU MODÈLE en commun, chacun pesé par sa RARETÉ parmi ses achats (« lemonade »
-//       pèse plus que « air ») ; « xt-6 » = « xt 6 » = « xt6 » ;
+//   PESÉ (les poids sont MESURÉS sur sa vérité terrain : docs/passation/2026-11-15-achats-liaison.md) :
+//     · les MOTS DU MODÈLE en commun, dans les deux sens (part des mots de l'article retrouvés, part
+//       des mots de l'achat retrouvés) et leur nombre ; « xt-6 » = « xt 6 » = « xt6 » ; une VERSION
+//       différente (« novablast 4 » / « 3 ») écarte. (Mesuré : peser chaque mot par sa rareté parmi
+//       ses achats faisait MOINS bien — top-1 73 % contre 82 % sur ses 11 liaisons — : chaque mot pèse 1.)
 //     · la TAILLE (identique ; ou US écrite ⇒ EU par la table de la marque) ;
 //     · la COULEUR (champ de l'annonce, puis mots de couleur du titre en 7 langues) ;
 //     · la CHRONOLOGIE : jours entre le retrait / la livraison (lus) — sinon la commande —
@@ -63,9 +65,9 @@ const dateMs = (d) => { if (d == null || d === '') return NaN; const t = typeof 
 
 // ── Les poids (mesurés : voir l'en-tête et l'audit) ─────────────────────────
 export const POIDS = Object.freeze({
-  mots: 6,            // × la part (pesée par rareté) des mots de modèle de l'article retrouvés dans l'achat
+  mots: 6,            // × la part des mots du modèle retrouvés (moyenne des deux sens)
   motsBonus: 1,       // la part dépasse 60 %
-  raretes: 0.4,       // × la somme des raretés des mots communs (plafonnée)
+  raretes: 0.4,       // × le nombre de mots du modèle en commun (plafonné)
   raretesMax: 4,
   taille: 3,          // même taille EU
   tailleUs: 2,        // taille US de l'achat = taille EU de l'article (table de la marque)
@@ -94,7 +96,7 @@ const COULEURS_EN_PLUS = {
   jaune: ['jaunes', 'gelbe', 'gialli', 'gialle', 'amarillas'],
   violet: ['violets', 'violettes', 'mauve', 'lilas'],
   beige: ['beiges', 'ecru', 'creme', 'cremes', 'taupe', 'nude'],
-  marron: ['marrons', 'braune', 'bruine', 'camel', 'cognac', 'chocolat'],
+  marron: ['marrons', 'marroni', 'braune', 'bruine', 'camel', 'cognac', 'chocolat'],
 };
 const MOT_COULEUR = new Map();
 for (const [nom, mots] of Object.entries(COULEURS_EN_PLUS)) for (const m of mots) MOT_COULEUR.set(m, nom);
@@ -247,9 +249,8 @@ function evaluer(P, A, ctx) {
   if (generique && !(tailleOk && jours != null && jours <= 60)) return null;
   let score = 0, couv = 0;
   if (!generique) {
-    // La part des mots retrouvés, pesée par rareté, dans les DEUX sens (un titre d'achat court,
-    // « Nike shox », retrouve tout le sien dans l'annonce même s'il n'en dit pas autant), plus la
-    // somme des raretés retrouvées (un mot rare commun, « lemonade », prouve plus qu'une taille).
+    // La part des mots retrouvés dans les DEUX sens (un titre d'achat court, « Nike shox », retrouve
+    // tout le sien dans l'annonce même s'il n'en dit pas autant), plus le nombre de mots communs.
     couv = ((tot > 0 ? com / tot : 0) + (totA > 0 ? com / totA : 0)) / 2;
     score += POIDS.mots * couv + (couv >= 0.6 ? POIDS.motsBonus : 0) + Math.min(POIDS.raretesMax, POIDS.raretes * com);
   }
@@ -294,9 +295,9 @@ export function affecterPropositions({ cibles, achats, liens = null, refus = nul
   const lz = liens || new Map();
   const As = achats.filter((a) => a && txDe(a)).map((a) => preparerAchat(a, { marqueDe, couleursDe: couleursM, receptionDe, modeleDe }));
   for (const A of As) { A.motsArr = [...A.mots]; A.versions = versionsDe(A.mots); A.dispo = achatDisponible(A.a, lz, ''); }
-  // La rareté des mots, sur TOUS les achats (marque retirée de chaque titre).
-  const poidsBrut = poidsMots(As.map((A) => A.mots));
-  const pm = new Map(); const poids = (w) => { let v = pm.get(w); if (v == null) { v = poidsBrut(w); pm.set(w, v); } return v; };
+  // Le poids d'un mot : 1. (MESURÉ sur ses 11 liaisons : la rareté parmi ses achats, `poidsMots`, donnait
+  // top-1 73 % / top-3 73 % ; le poids plat 82 % / 91 %. `poidsMots` reste pour une mesure future.)
+  const poids = () => 1;
   const ctx = { refus: refusSet, poids, distancePhoto, seuilPhoto, marques: new Map() };
   // L'index des achats par mot du modèle (un achat ne se pèse que s'il partage un mot avec l'article).
   const index = new Map(), sansMots = [];

@@ -67,7 +67,7 @@ const listing = ([id, titre, marque, taille, prix, , jours, ph]) => ({ ...sc.ann
 // Les achats : trois rapprochables (même marque, même taille, achetés AVANT la mise en ligne), dont un sans photo.
 const achat = (tx, titre, prix, jours, ph) => ({ ...sc.ordre({ tx, titre, prix, statut: sc.STATUT_FINAL, dateMs: sc.NOW - jours * J }), ...(ph ? { photo: { url: photoUrl('h' + tx) } } : {}) });
 const ACHATS = [
-  achat('92000001', 'Adidas Handball Spezial nere usate 42', 43.67, 60, true),
+  achat('92000001', 'Adidas Handball Spezial marroni usate 42', 43.67, 60, true),   // (15 nov., liaison) « nere » (noir) contredit « Brown » : la règle pondérée l'écarte
   achat('92000002', 'Nike Air Max 1 Monarch 44', 19.05, 70, true),
   // (15 nov.) Deux achats que la règle §5 ÉCARTE (captures de Julien) : aucun mot de modèle commun, marque contredite.
   achat('92000005', 'Basket Nike 44', 15, 75, true),
