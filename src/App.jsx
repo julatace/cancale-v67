@@ -59494,7 +59494,10 @@ function AppCoeur() {
       document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
       for (const [nom,valeur] of Object.entries(variablesTheme(t,dark))) document.documentElement.style.setProperty(nom,valeur);
       const m = document.querySelector('meta[name="theme-color"]');
-      if (m) m.setAttribute('content', t.haut || t.bg);   // (14 nov., Studio) la barre d'état prend le HAUT de la lumière
+      // (15 nov., chantier « ouverture ») Tant que l'écran de démarrage couvre l'app (`data-vrm-boot`), la barre
+      // d'état garde le haut de SON dégradé (public/demarrage-theme.js) : elle prend celle de l'app à sa sortie.
+      const poser = () => { if (m) m.setAttribute('content', t.haut || t.bg); };   // (14 nov., Studio) la barre d'état prend le HAUT de la lumière
+      if (document.documentElement.hasAttribute('data-vrm-boot')) window.addEventListener('vrm:demarrage-fin', poser, { once: true }); else poser();
     } catch (_) { /* un navigateur sans <head> accessible ne doit rien casser */ }
   }, [dark]);
   // (17 oct., revue) Une « bascule Minéral » remettait ici le thème CLAIR une

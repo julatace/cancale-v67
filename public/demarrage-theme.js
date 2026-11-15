@@ -8,7 +8,7 @@
 // exécute les deux sur les mêmes entrées et exige le même verdict.
 (function () {
   // Le haut du dégradé de l'écran de démarrage (clair, bleu-nuit) — mesuré au centre-haut de l'écran rendu.
-  var BOOT_CLAIR = '#5F97D4', BOOT_NUIT = '#1A3A62';
+  var BOOT_CLAIR = '#5E96D1', BOOT_NUIT = '#1E406A';
   function lire(k) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
   function sombreAuDemarrage(mode, ancien, heure, systeme) {
     if (mode !== 'clair' && mode !== 'sombre' && mode !== 'auto' && mode !== 'soir') mode = ancien === true ? 'sombre' : 'clair';
