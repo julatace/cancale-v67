@@ -49,7 +49,7 @@ linear-gradient(170deg, var(--sv-haut) 0%, var(--sv-milieu) 45%, var(--sv-bas) 1
 | `--sv-reflet` | `rgb(120 175 235 / .10)` | `rgb(90 140 210 / .08)` |
 | `--sv-reflet-2` | `rgb(80 150 230 / .08)` | `rgb(60 110 190 / .06)` |
 | `--sv-verre` (panneau) | `rgb(247 250 253 / .80)` | `rgb(16 30 50 / .62)` |
-| `--sv-verre-barre` | `rgb(247 250 253 / .86)` | `rgb(20 36 58 / .82)` |
+| `--sv-verre-barre` | `rgb(247 250 253 / .80)` | `rgb(16 30 50 / .72)` |
 | `--sv-colle` (barre collée) | `#21599B` | `#142F55` |
 | `--sv-brume` (fond à plat) | `#D3DFEC` | `#0F2038` |
 | encre sur verre / gris / lien / ambre | `#0C1D30` / `#3F5468` / `#004A9F` / `#764300` | `#EAF2FB` / `#9CB0C6` / `#6CB4FF` / `#F2B65E` |
@@ -95,5 +95,31 @@ Retouches demandées après le premier rapport (Julien, via le coordinateur) : l
 va dans la tête, à gauche ; le titre de la tête s'efface le temps qu'il est là). La barre collée du Stock suit
 la classe réelle du nouveau Stock (`[data-stock-recherche]`, claude/stock-etageres).
 
-## Écrans et état
-Voir le rapport d'étape (captures) ; la finition écran par écran suit en commits séparés.
+## Les codes de la maquette (deuxième passe, Julien : « ça doit être beau, pas designé simplement »)
+Repris de la maquette 9 et de la maquette du Stock en verre (`scratchpad/stock-verre/style.cjs`), §10 de la feuille :
+- **plaque N°** en relief partout (`.sb-plaque`, `.vrm-num`, `.vrm-fp-num`, `.vrm-emb-num`) : dégradé blanc → #EDF2F7,
+  filet `rgb(12 29 48 / .18)`, ombre portée, encre 750 ; le doublon garde le seul rouge (#B42020) ; « à vérifier » l'ambre ;
+- **feuilles** (`.vrm-fs`) : verre `rgb(247 250 253 / .95)` (nuit `rgb(16 30 50 / .92)`), flou 30 px, bord blanc en haut,
+  ombre qui monte, rayon 30 ; voile `rgb(4 12 26 / .46)` ; la croix est un rond de verre ;
+- **moments d'accompagnement** (`.vrm-acc` pendant · après · échec) et **messages** (`.vrm-toast`) : un bandeau de verre
+  (bord blanc, rayon 22, ombre de la maquette), l'icône dans une pastille teintée `rgb(0 96 204 / .12)`, encre sombre ;
+- **pastilles fumées** `rgb(10 38 76 / .24)` + bord blanc .32 + icône blanche : les ronds de la tête du téléphone au repos ;
+- **barre du bas** à .80 (nuit .72), onglets #34495E au repos (nuit #AFC0D3), l'actif à l'encre en 700 ;
+- **une seule couche de verre** sur les cartes : la couleur ET le dégradé translucides se superposaient (verre réel ≈ .96,
+  presque de la porcelaine) — mesuré par le banc (mutation « verre .55 » : verte tant que les deux couches s'additionnaient).
+
+## Pièges trouvés en route (à ne pas refaire)
+- `isolation: isolate` sur la coque : la barre du bas (z-index 9402 quand l'éventail est ouvert) passait sous le voile de
+  l'éventail (9400, porté dans <body>) — le clic qui suit le toucher du disque refermait l'éventail (studio-coque E rouge).
+- un fond opaque sur `<body>` se peint PAR-DESSUS un `::before` à z-index -1 d'un descendant (la coque n'est pas un contexte
+  d'empilement) : tout l'écran devenait bleu foncé uni. `<body>` transparent, le document porte le bas du dégradé.
+- `.vrm-colis-recap-nu` est replié à 0 px (`overflow: hidden`) : un texte rogné par un ancêtre n'est pas jugé (banc).
+
+## Écrans
+Ma journée (chiffre blanc, le mois en premier verre au téléphone), Annonces (barre collée opaque, icônes claires),
+Ventes (tête « À expédier » posée sur le fond à toute largeur, « bordereaux déjà traités » sur un verre), Stock (recherche
+collée `[data-stock-recherche]`), Achats (pastille « Tous », ambre des pastilles), Argent, Paramètres, Messages, E-mails
+(nombres des rubriques pleins), Communauté, Leboncoin/eBay/Vestiaire, loupe, fiche, éventail du disque : passés au banc
+(390 clair/sombre ; 1512 clair pour les six écrans principaux). Les DISPOSITIONS ne changent pas dans ce lot : la refonte de
+Ma journée et d'Annonces « comme la proposition 9 » (carte « À envoyer » avec photo et Imprimer en barre, tuiles À retirer /
+Messages, liste d'Annonces en un verre) est le lot suivant.
