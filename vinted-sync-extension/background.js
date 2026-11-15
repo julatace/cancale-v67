@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.380.0';
+const CODE_VERSION = '5.381.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -19299,14 +19299,46 @@ const PUBLICATIONS_EN_VOL = new Set();
 function appliquerAnnonceLbc(ad, saisie) {
   const v = valideAnnonceLbc(saisie, { ref: ad.ref || ('VRM-' + ad.numero), photos: ad.photos, etat: ad.etat });
   if (!v.ok) return { ok: false, erreurs: v.erreurs, raison: (v.erreurs[0] && v.erreurs[0].raison) || 'fiche invalide' };
+  const cr = criteresFicheLbc(saisie);
+  if (!cr.ok) return { ok: false, erreurs: [{ champ: 'criteres', raison: cr.raison }], raison: cr.raison };
   // Les drapeaux disent à lbc.js quels champs POSER par-dessus ce que Leboncoin
   // aurait écrit : seulement ceux qu'il a vraiment changés dans la fiche.
-  return { ok: true, ad: Object.assign({}, ad, v.annonce, {
+  return { ok: true, ad: Object.assign({}, ad, v.annonce, cr.categorie ? { category: cr.categorie } : {}, cr.criteres ? { criteres: cr.criteres } : {}, {
     edite: true,
     titreEdite: v.annonce.title !== String(ad.title || ''),
     descriptionEditee: v.annonce.description !== String(ad.description || ''),
     prixEdite: Number(v.annonce.price) !== Number(String(ad.price).replace(',', '.')),
   }) };
+}
+// (15 nov., 5.381) LA CATÉGORIE ET SES CRITÈRES, DEPUIS LA FICHE DE VRM — capacité
+// `lbccriteres`. VRM les tire de la catégorie Vinted de l'annonce (table vérifiée,
+// src/correspondances.js) ou de SA réponse ; sans eux, Leboncoin DEVINAIT l'univers et
+// le type d'après la photo et le titre (sa prédiction), et la catégorie venait du titre.
+// Ne passent que : une catégorie du vocabulaire Leboncoin (libellés de son fdata), et
+// six critères nommés, en texte court. lbc.js ne clique qu'une option au libellé
+// EXACT (rien d'exact ⇒ rien, et le bandeau le dit). Rien d'envoyé ⇒ la règle d'avant.
+const LBC_CATEGORIES_FICHE = ['Vêtements', 'Chaussures', 'Accessoires & Bagagerie', 'Montres & Bijoux', 'Vêtements bébé', 'Vêtements enfants', 'Chaussures enfants', 'Montres & bijoux enfants', 'Accessoires & bagagerie enfants', 'Livres', 'Loisirs créatifs', 'Sport & Plein air'];
+function criteresFicheLbc(saisie) {
+  const s = saisie && typeof saisie === 'object' ? saisie : {};
+  const out = { ok: true, categorie: '', criteres: null };
+  if (s.categorie != null && String(s.categorie).trim() !== '') {
+    const c = String(s.categorie).replace(/\s+/g, ' ').trim();
+    if (LBC_CATEGORIES_FICHE.indexOf(c) < 0) return { ok: false, raison: 'catégorie inconnue de Leboncoin' };
+    out.categorie = c;
+  }
+  if (s.criteres != null) {
+    if (typeof s.criteres !== 'object' || Array.isArray(s.criteres)) return { ok: false, raison: 'critères illisibles' };
+    const crit = {};
+    for (const k of ['univers', 'type', 'taille', 'etat', 'couleur', 'marque']) {
+      const v = s.criteres[k];
+      if (v == null || v === '') continue;
+      const t = String(v).replace(/\s+/g, ' ').trim();
+      if (!t || t.length > 60 || /[<>\u0000-\u001f]/.test(t)) return { ok: false, raison: 'critère « ' + k + ' » illisible' };
+      crit[k] = t;
+    }
+    if (Object.keys(crit).length) out.criteres = crit;
+  }
+  return out;
 }
 // Ce que lbc.js dit de l'avancement d'un dépôt lancé depuis l'app : une étape
 // connue, des NOMBRES, et le libellé des champs obligatoires que VRM n'a pas pu
@@ -22940,7 +22972,8 @@ function lbcTitre(brand, base, size, max) {
 const LBC_DESC_MAX = 4000;
 const LBC_PRIX_MAX = 100000;
 const LBC_PHOTOS_MAX = 15;
-const LBC_ETATS = ['Neuf avec étiquette', 'Très bon état', 'Bon état', 'État satisfaisant'];
+// (15 nov.) « Neuf sans étiquette » : servi par Leboncoin (fdata du 8 nov., `clothing_condition_a`).
+const LBC_ETATS = ['Neuf avec étiquette', 'Neuf sans étiquette', 'Très bon état', 'Bon état', 'État satisfaisant'];
 function refLbcPresente(texte, ref) {
   if (!ref) return false;
   return new RegExp(String(ref).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![0-9A-Z])', 'i').test(String(texte || ''));
@@ -22971,6 +23004,8 @@ const SOUS_FAMILLES = [
   ['espadrilles', 'chaussures', /espadrille/],
   ['mocassins', 'chaussures', /(mocassin|loafer)/],
   ['derbies', 'chaussures', /(\bderby\b|derbies|richelieu|oxford)/],
+  // (15 nov.) « Chaussures et bottes de randonnée » (Vinted) n'est pas une botte : 305 de ses ventes.
+  ['randonnee', 'chaussures', /randonn[ée]e/],
   ['bottes', 'chaussures', /(\bbottes?\b|bottine|\bboots?\b|chelsea)/],
   ['baskets', 'chaussures', /(basket|sneaker|running|trainer|\brunners?\b)/],
   ['chaussures', 'chaussures', /chaussure/],
@@ -23020,7 +23055,9 @@ function familleArticle(o) {
   if (/^femmes?$/.test(seg[0] || '')) genre = 'femme';
   else if (/^hommes?$/.test(seg[0] || '')) genre = 'homme';
   else if (/^enfants?$/.test(seg[0] || '')) genre = 'enfant';
-  const deux = seg[1] || '';
+  // (15 nov.) Vinted range les chaussures d'enfant SOUS « Vêtements pour filles / garçons >
+  // Chaussures » : le segment suivant décide (une basket d'enfant partait en « Vêtements enfants »).
+  const deux = /^v[êe]tements pour (filles|gar[çc]ons)$/.test(seg[1] || '') && /chaussure/.test(seg[2] || '') ? seg[2] : (seg[1] || '');
   if (/chaussure/.test(deux)) famille = 'chaussures';
   else if (/v[êe]tement/.test(deux)) famille = 'vetements';
   else if (/^sacs?\b/.test(deux)) famille = 'sacs';

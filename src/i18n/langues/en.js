@@ -2,6 +2,7 @@
 import ecran_journee from './en/journee.js';
 import ecran_confort from './en/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_studio from './en/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
+import ecran_correspondances from './en/correspondances.js';   // (15 nov.) Publier partout : catégories qui correspondent
 import ecran_capte from './en/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_idees from './en/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './en/ventes.js';
@@ -30,6 +31,7 @@ import ecran_accueilReste from './en/accueilReste.js';
 import ecran_fraiscarte from './en/fraiscarte.js';   // (14 nov., frais-carte)
 import ecran_atelier from './en/atelier.js';
 import ecran_accompagnement from './en/accompagnement.js';   // (14 nov.) les quatre moments d'un geste
+import ecran_partenaires from './en/partenaires.js';   // (15 nov.) programme partenaire
 import ecran_argentprix from './en/argentprix.js';   // (14 nov., argent-prix)
 import ecran_rechliste from './en/rechliste.js';
 import ecran_studio_paires from './en/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
@@ -49,6 +51,7 @@ export default {
   ...ecran_accompagnement,
   ...ecran_plus,
   ...ecran_argentprix,
+  ...ecran_partenaires,
   ...ecran_plateformes,
   ...ecran_idees,
   ...ecran_compta,
@@ -2254,4 +2257,5 @@ export default {
   ...ecran_confort,
   ...ecran_studio,
   ...ecran_capte,
+  ...ecran_correspondances,
 };
