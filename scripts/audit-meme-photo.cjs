@@ -71,6 +71,21 @@ const MUTATIONS = {
   lecture: ['vinted-sync-extension/background.js', "const r = await sbGet(`app_data?id=eq.${ligne}&select=a:data->payload->annonces`);\n    if (r === null) { restent.push(...liste); noterDiag('empreintes_sites_lecture_ratee'); continue; }", "const r = (await sbGet(`app_data?id=eq.${ligne}&select=a:data->payload->annonces`)) || [];"],
   verrou: ['vinted-sync-extension/background.js', "      try { return await empreintesSitesUnTour(); } catch (_) { return 0; }\n    } finally { try { await chrome.storage.local.remove(EMPREINTES_TOUR); } catch (_) {} }", "      try { return await empreintesSitesUnTour(); } catch (_) { return 0; } finally { try { await chrome.storage.local.remove(EMPREINTES_TOUR); } catch (_) {} }\n    } finally { }"],
   ecart: ['vinted-sync-extension/background.js', '  if (depuis >= 0 && depuis < EMPREINTES_ECART_MS) return 0;\n  const plan = await planEmpreintesSites();', '  const plan = await planEmpreintesSites();'],
+  // (15 nov., lot meme-photo-sure) La deuxième mesure. Une mutation de src/photoFine.js est portée AUSSI
+  // dans la copie de l'extension (sinon F0 seul rougirait) : c'est la RÈGLE qu'on affaiblit.
+  sureSeule: ['src/memePhoto.js', "  const v = verdictFin(mesure);\n", "  const v = verdictFin(mesure);\n  if (typeof distance === 'number' && distance <= SEUIL_EMPREINTE_SUR) return 'sur';\n"],
+  sureSansEmpreinte: ['src/memePhoto.js', "if (v === 'sur' && typeof distance === 'number' && distance <= SEUIL_EMPREINTE_SUR) return 'sur';", "if (v === 'sur') return 'sur';"],
+  sureSansCorrel: [['src/photoFine.js', 'vinted-sync-extension/background.js'], 'if (m.s >= SEUIL_FINE_SUR && m.r >= SEUIL_CORREL_SUR) return', 'if (m.s >= SEUIL_FINE_SUR) return'],
+  fineFaible: [['src/photoFine.js', 'vinted-sync-extension/background.js'], 'SEUIL_FINE_SUR = 0.85;', 'SEUIL_FINE_SUR = 0.5;'],
+  correlFaible: [['src/photoFine.js', 'vinted-sync-extension/background.js'], 'SEUIL_CORREL_SUR = 0.998;', 'SEUIL_CORREL_SUR = 0.9;'],
+  ecartFin: ['src/memePhoto.js', "          if (etatCouple(d, fine) === 'non') { ecartes.add(c.a.id + '|' + q.a.id); continue; }\n", ''],
+  ambiguSur: ['src/memePhoto.js', "  const nSurs = propositions.filter((p) => p.etat === 'sur').length;", "  const nSurs = propositions.filter((p) => p.etat === 'sur').length + ambigus.filter((x) => x.paires.some((p) => p.etat === 'sur')).length;"],
+  relierSeul: ['src/App.jsx', '    publierMemePhoto(etat);\n', "    publierMemePhoto(etat);\n    for (const p of res.propositions) if (p.etat === 'sur') relierParPhoto({ annonce: p.annonce, numero: p.numero, vintedId: (p.vinted[0] || {}).id });\n"],
+  fineCookie: ['vinted-sync-extension/background.js', "    const res = await fetch(url, { credentials: 'omit', cache: 'no-store' });", "    const res = await fetch(url, { credentials: 'include', cache: 'no-store' });"],
+  fineBudget: ['vinted-sync-extension/background.js', "  const lu = await compterLecture(cleImpSite(pf, cible.compte), EMPREINTES_SITES_MAX_HEURE);\n  if (!lu.ok) { noterDiag('verif_fine_budget'); return 0; }", "  const lu = { ok: true };"],
+  fineOnglet: ['vinted-sync-extension/background.js', "    if ((await ongletImpSite(SITE_IMPORT[c.site], c.compte)) == null) continue;   // l'onglet de CE compte sur son site\n", ''],
+  fineLecture: ['vinted-sync-extension/background.js', "  if (r === null) { noterDiag('verif_fine_lecture_ratee'); return false; }\n  const couples = Object.assign({}, (r[0] && r[0].c && typeof r[0].c === 'object') ? r[0].c : {});", "  const couples = Object.assign({}, (r && r[0] && r[0].c && typeof r[0].c === 'object') ? r[0].c : {});"],
+  finePlafond: ['vinted-sync-extension/background.js', "  if (heure.length >= VERIF_FINE_MAX_HEURE) { noterDiag('verif_fine_plafond'); return 0; }\n", ''],
 };
 if (MUT) {
   const noms = MUT === 'toutes' ? Object.keys(MUTATIONS) : MUT.split(',');
@@ -80,9 +95,13 @@ if (MUT) {
     if (!f) { console.log(`❓ mutation inconnue : ${nom}`); continue; }
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mut-meme-photo-'));
     for (const d of ['src', 'vinted-sync-extension', 'scripts']) fs.cpSync(path.join(RACINE, d), path.join(tmp, d), { recursive: true });
-    const cible = path.join(tmp, f); const t = fs.readFileSync(cible, 'utf8');
-    if (!t.includes(avant)) { console.log(`❓ ${nom} : texte introuvable`); fs.rmSync(tmp, { recursive: true, force: true }); continue; }
-    fs.writeFileSync(cible, t.replace(avant, apres));
+    let manque = false;
+    for (const ff of Array.isArray(f) ? f : [f]) {
+      const cible = path.join(tmp, ff); const t = fs.readFileSync(cible, 'utf8');
+      if (!t.includes(avant)) { manque = true; break; }
+      fs.writeFileSync(cible, t.replace(avant, apres));
+    }
+    if (manque) { console.log(`❓ ${nom} : texte introuvable`); fs.rmSync(tmp, { recursive: true, force: true }); continue; }
     const r = spawnSync(process.execPath, [path.join(__dirname, 'audit-meme-photo.cjs'), '--src', tmp], { encoding: 'utf8' });
     const rouge = r.status !== 0; if (rouge) rouges++;
     console.log(`${rouge ? '✅' : '❌'} mutation ${nom} ⇒ ${rouge ? 'ROUGE' : 'reste vert'}${rouge ? ' — ' + (r.stdout.split('\n').find((l) => l.startsWith('❌')) || '').slice(0, 120) : ''}`);
@@ -298,6 +317,8 @@ function pixels(nom, w = 64, h = w) {
       const sMeme = F.comparerFine(P('fin-a'), P('fin-a~bruit')), sReduite = F.comparerFine(P('fin-a'), P('fin-a~bruit', 240, 320)), sAutre = F.comparerFine(P('fin-a'), P('fin-b'));
       dit(F.verdictFin(sMeme) === 'sur' && F.verdictFin(sReduite) !== 'non' && F.verdictFin(sAutre) === 'non', 'F1 · mesure fine exécutée : même image recompressée ⇒ « sûr » ; réduite ⇒ jamais écartée ; autre image ⇒ « non »', JSON.stringify({ sMeme, sReduite, sAutre }));
       dit(F.preparerFine(pixels('fin-a', 80, 100), 80, 100) === null && F.comparerFine(null, P('fin-a')) === null, 'F1 · vignette trop petite ⇒ « pas su » (null), jamais un score', '');
+      // Les seuils sont ceux MESURÉS par scripts/bancs/meme-photo-fiabilite.cjs : en changer un exige de relancer ce banc.
+      dit(F.SEUIL_FINE_SUR === 0.85 && F.SEUIL_CORREL_SUR === 0.998 && F.SEUIL_FINE_NON === 0.35 && F.SEUIL_EMPREINTE_SUR === 10 && F.COTE_FINE_MIN === 96, 'F1 · seuils = ceux mesurés par le banc de fiabilité (s 0,85 · r 0,998 · non 0,35 · empreinte 10 · 96 px) — en changer un, c’est relancer meme-photo-fiabilite', JSON.stringify([F.SEUIL_FINE_SUR, F.SEUIL_CORREL_SUR, F.SEUIL_FINE_NON, F.SEUIL_EMPREINTE_SUR, F.COTE_FINE_MIN]));
       dit(F.SEUIL_FINE_SUR > F.SEUIL_FINE_NON && F.SEUIL_CORREL_SUR < 1 && F.SEUIL_EMPREINTE_SUR < M.SEUIL_MEME_PHOTO, 'F1 · seuils ordonnés : non < sûr ; empreinte « sûre » plus stricte que le seuil de proposition', JSON.stringify([F.SEUIL_FINE_NON, F.SEUIL_FINE_SUR, F.SEUIL_CORREL_SUR, F.SEUIL_EMPREINTE_SUR, M.SEUIL_MEME_PHOTO]));
       // L'état d'un couple : les DEUX mesures nettes ⇒ sûr ; une seule, ou l'une proche ⇒ à vérifier ; fine nettement contraire ⇒ non.
       const sur = F.SEUIL_FINE_SUR, non = F.SEUIL_FINE_NON, entre = (sur + non) / 2, rs = F.SEUIL_CORREL_SUR;
