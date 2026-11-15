@@ -146,7 +146,9 @@ export function BentoJournee({ tuiles, ordi = false, FermeAuRetour = null, avant
                 aria-expanded={t.deplie ? actif : undefined} aria-controls={t.deplie ? 'sj-deplie' : undefined}
                 aria-label={t.aria || t.lib} data-sj-zone={t.id} onClick={() => ouvrir(t)}/>}
               {t.lib ? <span className="sj-lib" aria-hidden="true">{t.lib}</span> : null}
-              {t.deplie ? <SignePlus/> : null}
+              {/* (15 nov., refonte-journee) Le lien de la tuile (« Ventes › ») : un vrai bouton posé AU-DESSUS de la zone. */}
+              {t.lien ? <button type="button" className="sb-lien sj-lien-tuile" onClick={t.lien.faire} {...(t.lien.attrs || {})}>{t.lien.txt}<Chevron/></button> : null}
+              {t.deplie && !t.lien ? <SignePlus/> : null}
               {actif ? <span className="sb-diode sj-diode" aria-hidden="true"/> : null}
               <div className="sj-face" aria-hidden={t.interactif ? undefined : 'true'}>{t.face}</div>
               {t.plein ? <div className="sj-plein-place">{t.plein}</div> : null}

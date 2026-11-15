@@ -10,6 +10,8 @@ require('./_porte-banc.cjs');
 //
 //  A. FORME — base inventée (design-passe : 3 comptes, 36 annonces), 390 tactile ET 1512, clair ET sombre :
 //     premiere  la 1re rangée d'Annonces dans la moitié haute d'un iPhone (≤ 422 px sur 844) ;
+//     (15 nov., refonte-journee) rangée : la photo d'abord, la plaque N° sous le titre (maquette validée) ; « À faire » sur la
+//     ligne du TITRE (h1) — le sélecteur Annonces | Stock | Achats est maintenant dans la tête, sous le titre ;
 //     rangee    une rangée fait 60–72 px, porte sa plaque N° en 1re colonne, sa vignette, son prix ;
 //     pleins    au plus UN bouton plein (encre ou accent) dans le premier écran ;
 //     debord    rien ne déborde de l'écran (largeur) ;
@@ -89,7 +91,11 @@ function mesurer({ tel }) {
     const plaque = r.querySelector('.vrm-fiche-numero .vrm-num, .vrm-fiche-num-vide'), photo = r.querySelector('a.vrm-fiche-photo'), prix = r.querySelector('[data-prix]');
     const p = plaque && plaque.getBoundingClientRect(), ph = photo && photo.getBoundingClientRect();
     if (b.height < 59 || b.height > 73) out.rangee.push(`hauteur ${Math.round(b.height)} (${r.getAttribute('data-sb-avant-cle')})`);
-    if (!p || !ph || p.left > ph.left) out.rangee.push(`plaque pas en 1re colonne (${r.getAttribute('data-sb-avant-cle')})`);
+    // (15 nov., refonte-journee — la maquette « Annonces » validée par Julien) La rangée : la PHOTO d'abord, la plaque N°
+    // sous le titre (2e ligne), visible et dans la rangée ; au-delà du téléphone, la colonne N° d'avant (plaque à gauche).
+    const ti = r.querySelector('[data-titre]'), tb = ti && ti.getBoundingClientRect();
+    if (innerWidth < 768) { if (!p || !ph || !tb || p.width < 4 || p.left < ph.right || p.top < tb.bottom - 2 || p.bottom > b.bottom + 1) out.rangee.push(`plaque pas sous le titre, à droite de la photo (${r.getAttribute('data-sb-avant-cle')})`); }
+    else if (!p || !ph || p.left > ph.left) out.rangee.push(`plaque pas en 1re colonne (${r.getAttribute('data-sb-avant-cle')})`);
     if (!prix || prix.getBoundingClientRect().width < 4) out.rangee.push(`prix absent (${r.getAttribute('data-sb-avant-cle')})`);
     if (r.querySelectorAll('button:not(.vrm-fiche-plus-bouton):not([data-edition])').length) {
       const vis = [...r.querySelectorAll('button')].filter((x) => x.getBoundingClientRect().width > 2 && !x.closest('.vrm-fiche-numero') && !x.classList.contains('vrm-fiche-plus-bouton') && getComputedStyle(x).pointerEvents !== 'none');
@@ -161,7 +167,7 @@ async function forme(nav, W, theme) {
   if (m.rouge.length) fautes.push('rouge hors doublon : ' + m.rouge.slice(0, 3).join(' ; '));
   const tete = await joignables(o.pg, GESTES_TETE);
   // « À faire · N » : au téléphone sur la ligne du titre ; à l'ordinateur, les alertes posées sous les vues.
-  const afaire = await o.pg.evaluate((tel) => { const e = document.querySelector(tel ? '[data-espace="paires"] .vrm-ann-afaire[data-ui-afaire]' : '[data-espace="paires"] [data-ui-afaire-place="ordinateur"]'); if (!e) return 'absent'; if (!tel) return 'ok'; const t = document.querySelector('[data-espace="paires"] .vrm-tache-tete').getBoundingClientRect(), r = e.getBoundingClientRect(); return Math.abs((r.top + r.bottom) / 2 - (t.top + t.bottom) / 2) < 14 ? 'ok' : `hors de la ligne du titre (${Math.round(r.top)} / ${Math.round(t.top)})`; }, tel);
+  const afaire = await o.pg.evaluate((tel) => { const e = document.querySelector(tel ? '[data-espace="paires"] .vrm-ann-afaire[data-ui-afaire]' : '[data-espace="paires"] [data-ui-afaire-place="ordinateur"]'); if (!e) return 'absent'; if (!tel) return 'ok'; const t = (document.querySelector('[data-espace="paires"] .vrm-tache-tete h1') || document.querySelector('[data-espace="paires"] .vrm-tache-tete')).getBoundingClientRect(), r = e.getBoundingClientRect(); return Math.abs((r.top + r.bottom) / 2 - (t.top + t.bottom) / 2) < 14 ? 'ok' : `hors de la ligne du titre (${Math.round(r.top)} / ${Math.round(t.top)})`; }, tel);
   if (afaire !== 'ok' && !(afaire === 'absent' && !tel)) fautes.push('À faire : ' + afaire);
   if (tete.length) fautes.push('pas joignable en tête : ' + tete.join(', '));
   // Toucher une rangée (la 3e) : téléphone ⇒ elle monte ; ordinateur ⇒ la fiche en plan à droite.
