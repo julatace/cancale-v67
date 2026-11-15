@@ -389,7 +389,8 @@ export const textesNotif = (langue) => TXT[langueNotif(langue)];
 // le nom court prend toute la place qui reste (« Vendu 62 € · Nike Air Max 1 blanche
 // T42 » garde la marque, « Offre de 55 € · 9060 vert/blanc T38 » la retire).
 function titreAvecObjet(fait, objet, brut = '') {
-  const o = brut ? nomCourt(brut, Math.max(NOM_COURT_MAX, TITRE_MAX - fait.length - 3)) || objet : objet;
+  const place = TITRE_MAX - fait.length - 3;
+  const o = brut ? nomCourt(brut, place >= 12 ? place : NOM_COURT_MAX) || objet : objet;
   const t = o ? `${fait} · ${o}` : fait;
   return t.length <= TITRE_MAX ? { title: t, reste: '' } : { title: couperMot(fait, TITRE_MAX), reste: objet };
 }
