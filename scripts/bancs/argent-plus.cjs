@@ -129,7 +129,7 @@ const sansDebord = (pg) => pg.evaluate(() => { const d = document.scrollingEleme
           if (scen === 'B') dit(b.l.urssaf && b.l.urssaf.etat === 'su' && Number(b.l.urssaf.v) === apayer, `S2 ${T} : URSSAF du mois = ${caPrec} € × ${taux} % = ${apayer} € (la ligne publiée, au versement)`, JSON.stringify(b.l.urssaf));
           else dit(b.l.urssaf && b.l.urssaf.etat === 'regime' && b.l.urssaf.v === '' && b.regime, `S2 ${T} : aucun régime ⇒ « — » et le geste « Choisir mon régime »`, JSON.stringify(b.l.urssaf));
           dit(b.l.dorment && b.l.dorment.v === '5', `S2 ${T} : 5 articles qui dorment (la publication d’Annonces)`, JSON.stringify(b.l.dorment));
-          dit(b.csv && b.pdf && b.comptable && b.hBoutons.every((h) => h >= 44), `S2 ${T} : PDF, Tableur, « Pour mon comptable », ≥ 44 px`, JSON.stringify(b.hBoutons));
+          dit(b.csv && b.pdf && b.comptable && b.hBoutons.every((h) => h >= (W < 600 ? 44 : 36)), `S2 ${T} : PDF, Tableur, « Pour mon comptable » (≥ 44 px au doigt)`, JSON.stringify(b.hBoutons));
           dit(!/encaiss/i.test(b.texte) && !/au moins 0[,\s]*0?0?\s*€/i.test(b.texte), `S2 ${T} : jamais « encaissé », jamais « au moins 0 »`);
           await capture(pg, `S2-bilan-${scen}-${W}${sombre ? '-sombre' : ''}`, `.vrm-bilan-mois[data-bilan-mois="${prec}"]`);
           const [dl] = await Promise.all([pg.waitForEvent('download', { timeout: 15000 }).catch(() => null), pg.locator(`.vrm-bilan-mois[data-bilan-mois="${prec}"] [data-bilan-csv]`).click()]);
@@ -147,14 +147,14 @@ const sansDebord = (pg) => pg.evaluate(() => { const d = document.scrollingEleme
         await aller(pg, 'tab=settings', 3000);
         await pg.getByText('Sécurité des données', { exact: true }).first().click({ timeout: 8000 }).catch(() => {});
         await pg.waitForTimeout(1500);
-        const g = pg.locator('[data-sauvegarde-lancer]').first();
+        const g = pg.locator('[data-sauvegarde-lancer]:visible').first();
         const vu = await g.count();
         dit(vu > 0, `S4 ${T} : Paramètres → Sécurité des données → « Télécharger toutes mes données »`);
         if (vu) {
           await g.scrollIntoViewIfNeeded();
           const h = await g.evaluate((e) => Math.round(e.getBoundingClientRect().height));
-          dit(h >= 44, `S4 ${T} : le bouton fait ≥ 44 px`, `${h}`);
-          await capture(pg, `S4-sauvegarde-${scen}-${W}${sombre ? '-sombre' : ''}`, '[data-sauvegarde-toutes]');
+          dit(h >= (W < 600 ? 44 : 36), `S4 ${T} : le bouton (≥ 44 px au doigt)`, `${h}`);
+          await capture(pg, `S4-sauvegarde-${scen}-${W}${sombre ? '-sombre' : ''}`, '[data-sauvegarde-toutes]:visible');
           lectures.length = 0; const e0 = base.ecritures;
           // La liste de TOUTES ses lignes (sans filtre d'id) : la base du banc la sert ici (owner exigé).
           await pg.route(/\/rest\/v1\/app_data\?/, (route) => {
@@ -165,7 +165,7 @@ const sansDebord = (pg) => pg.evaluate(() => { const d = document.scrollingEleme
           });
           const [dz] = await Promise.all([pg.waitForEvent('download', { timeout: 30000 }).catch(() => null), g.click()]);
           await pg.waitForTimeout(800);
-          const fin = await pg.locator('[data-sauvegarde-fin]').first().getAttribute('data-sauvegarde-fin').catch(() => null);
+          const fin = await pg.locator('[data-sauvegarde-fin]:visible').first().getAttribute('data-sauvegarde-fin').catch(() => null);
           dit(!!dz && /^VRM-sauvegarde-\d{4}-\d{2}-\d{2}\.zip$/.test(dz.suggestedFilename()) && fin === 'complet', `S4 ${T} : un zip téléchargé, dit « complet »`, `${dz && dz.suggestedFilename()} · ${fin}`);
           if (dz) {
             const z = E.lireZipStocke(new Uint8Array(fs.readFileSync(await dz.path())));
@@ -183,7 +183,7 @@ const sansDebord = (pg) => pg.evaluate(() => { const d = document.scrollingEleme
           dit(lectures.length > 3 && sansOwner.length === 0, `S4 ${T} : chaque lecture porte \`owner=eq.\``, sansOwner.slice(0, 3).join(' | '));
           dit(lourdesData.length === 0, `S4 ${T} : jamais \`select=data\` sur une ligne lourde`, lourdesData.slice(0, 3).join(' | '));
           dit(base.ecritures === e0, `S4 ${T} : aucune écriture pendant la sauvegarde`);
-          await capture(pg, `S4-sauvegarde-fin-${scen}-${W}${sombre ? '-sombre' : ''}`, '[data-sauvegarde-toutes]');
+          await capture(pg, `S4-sauvegarde-fin-${scen}-${W}${sombre ? '-sombre' : ''}`, '[data-sauvegarde-toutes]:visible');
         }
         // ── S3. VENTES : LE BÉNÉFICE DE LA LISTE ──
         await aller(pg, 'tab=cat_ventes', 5000);

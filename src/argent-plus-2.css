@@ -30,3 +30,9 @@ html body .vrm-seuils-alertes button.vrm-seuils-compris { min-height: 44px; min-
 .vrm-svg-bloc { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--vrm-line, rgb(0 0 0 / .08)); display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .vrm-svg-bloc p { margin: 0; font-size: 12px; line-height: 1.45; color: var(--vrm-muted, #6E6E73); overflow-wrap: anywhere; }
 .vrm-svg-bloc .vrm-svg-fin { color: inherit; }
+/* La matière (`.vrm-surface`) pose son propre rembourrage : celui de la carte d'alertes et du résumé gagne
+   (au téléphone, « Compris » touchait le bord droit du verre). */
+html body .vrm-surface.vrm-seuils-alertes { padding: 14px 16px 6px !important; }
+html body .vrm-surface.vrm-bl { padding: 10px 14px !important; }
+/* « Choisir mon régime » dans une ligne du bilan : à gauche, sous la note, 44 px au doigt. */
+html body .vrm-bilan-ligne button.vrm-bilan-regime { align-self: flex-start; text-align: left; min-height: 44px; padding: 0; margin: 0; background: transparent; border: 0; }

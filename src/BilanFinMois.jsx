@@ -11,6 +11,7 @@ import React from 'react';
 import { tr } from './i18n/index.js';
 import { lignesTableurBilan, nomFichierTableurBilan } from './bilanFinMois.js';
 import { csvDe } from './exportDonnees.js';
+import './argent-plus-2.css';
 
 export function ExportBilanMois({ D, ym, Bouton, telechargerPdf, telecharger, ouvrirComptable = null }) {
   const [enCours, setEnCours] = React.useState('');

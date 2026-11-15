@@ -4137,7 +4137,7 @@ function BilanMoisCarte({ liveStats, compta }) {
       </div>
       {D.lignes.map((l) => (
         <div key={l.cle} className="vrm-bilan-ligne" data-bilan-ligne={l.cle} data-valeur={l.valeur == null ? '' : String(l.valeur)} data-au-moins={l.auMoins ? '1' : undefined} data-bilan-etat={l.etat || undefined}>
-          <span><b>{l.nom}</b>{l.note ? <small>{l.note}</small> : null}{l.geste === 'regime' ? <button type="button" className="vrm-lien-action" data-bilan-regime="" onClick={() => { const el = document.getElementById('compta-avance'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); }}>{tr('argentPlus.bilan.choisirRegime')}</button> : null}</span>
+          <span><b>{l.nom}</b>{l.note ? <small>{l.note}</small> : null}{l.geste === 'regime' ? <button type="button" className="vrm-lien-action vrm-bilan-regime" data-bilan-regime="" onClick={() => { const el = document.getElementById('compta-avance'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); }}>{tr('argentPlus.bilan.choisirRegime')}</button> : null}</span>
           <span className="vrm-bilan-val" data-vide={l.valeur == null ? '1' : undefined}>{texteBilan(l, fmt)}</span>
         </div>
       ))}
