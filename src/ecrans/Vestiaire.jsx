@@ -17,7 +17,9 @@ import { PAS_SU } from '../libelles.js';
 import { trierRecents } from '../ordreConversations.js';
 import { etatEnvoiExtension, dejaDansFil, filPasLu } from '../envoiFil.js';   // (12 nov.) l'envoi vu dans le fil
 import { EnvoiDansFil, FilPasLu, FilIllisible } from '../composants/EnvoiDansFil.jsx';
-import { VC_VENTE_ETAPES, VC_ANNONCE_ETATS, etapeMotVc, vcVenteAnnulee, numVcVente, numVcAnnonce, montantRecuVc, departsVc, etatAnnonceVcBrut, fraisVc } from '../../api/_lib/vestiaire-regle.js';
+import { VC_VENTE_ETAPES, VC_ANNONCE_ETATS, etapeMotVc, vcVenteAnnulee, numVcVente, numVcAnnonce, montantRecuVc, departsVc, etatAnnonceVcBrut, fraisVc, venteVcFraiche } from '../../api/_lib/vestiaire-regle.js';
+import { etatVenteVc, RANG_ETAT_VC } from '../etatVenteVc.js';   // (15 nov.) l'état d'une vente Vestiaire PAR SES ÉTAPES (jamais le code machine)
+import { texteEtatVc } from '../etatVenteVcTexte.js';
 import PastilleTransporteur from '../PastilleTransporteur.jsx';
 import { transporteurDuColis } from '../transporteursVisuels.js';
 import { texteBenefice, euros as eurosLigne } from '../beneficeLigne.js';
@@ -636,17 +638,15 @@ function PublierVestiaire({ comptes }) {
   );
 }
 // ⟦← App.jsx #10⟧
-function etapeVenteVc(v, depart = null) {
-  // (8 nov.) Encore « à expédier » chez Vestiaire (pas relu), mais le n° de suivi
-  // EXACT est pris en charge chez le transporteur : partie, la raison dite.
-  if (v && v.aExpedier === true && depart) return { etape: 'en-route', label: `Envoyée — ${depart.phrase}`, rang: 1, departLu: depart };
-  if (v && v.aExpedier === true) return { etape: 'a-expedier', label: 'À envoyer', rang: 0 };
-  const brut = String((v && v.etat) || '').trim();
-  const f = brut ? VC_VENTE_ETAPES.find(([, re]) => re.test(brut)) : null;
-  if (f) { const rang = { 'en-route': 1, controle: 1, livree: 2, terminee: 3, versee: 3 }[f[0]]; return { etape: f[0], label: f[2], rang: rang == null ? null : rang }; }
-  if (v && v.plusAExpedierDepuis) return { etape: 'plus-a-expedier', label: 'Plus dans « à expédier » (envoyée ou annulée — Vestiaire ne dit pas laquelle)', rang: null };
-  return { etape: brut ? 'autre' : 'pas-dit', label: brut ? `Vestiaire : « ${brut} »` : 'Étape non dite par Vestiaire', rang: null };
+// (15 nov.) L'ÉTAPE d'une vente : la règle partagée `etatVenteVc` (src/etatVenteVc.js) — « à expédier »
+// est `aExpedierVc` (l'état le plus frais gagne), les mots viennent des étapes LUES, jamais le code de
+// Vestiaire (« IN_PROGRESS » s'écrivait tel quel). `v` est déjà passée par `venteVcFraiche`.
+function etapeVenteVc(v, depart = null, fait = null) {
+  const ev = etatVenteVc(v, { fait, depart: v && v.aExpedier === true ? depart : null });
+  return { etape: ev.cle, rang: RANG_ETAT_VC[ev.cle] == null ? null : RANG_ETAT_VC[ev.cle], etatVc: ev, departLu: ev.cle === 'envoyeeTransporteur' ? depart : null };
 }
+// Les clés d'une vente qui attend SON geste d'envoi : la tête « N à expédier » les compte, la ligne les dit.
+const CLES_A_EXPEDIER_VC = new Set(['aExpedier', 'aExpedierSansDate', 'aExpedierPassee', 'aExpedierAujourdhui', 'aExpedierDemain']);
 // ⟦← App.jsx #11⟧
 // Le prix d'achat d'une vente Vestiaire : celui SAISI pour son N°
 // (`vinted_buyprice_by_num`, la source de Vinted et Leboncoin, §11) — seulement
@@ -679,32 +679,42 @@ function beneficeVc(v, fait) {
   if (achat == null) return { etat: 'achat', achat: null, benefice: null, verse };
   return { etat: 'ok', achat, benefice: Math.round((verse - achat) * 100) / 100, verse };
 }
-// L'ÉTAPE comme la ligne de Vinted la dit, et le ton (ambre = un geste à faire).
+// L'ÉTAPE comme la ligne de Vinted la dit, et le ton (ambre = un geste à faire) : la MÊME règle que la
+// tête « N à expédier » (`etatVenteVc`, §11), en mots (`texteEtatVc`, tr()).
 const etatLigneVc = (v, fait) => {
-  if (vcVenteAnnulee(v)) return { etat: 'Annulée', ton: 'annule' };
-  if (v.aExpedier && fait) return { etat: 'Colis fait', ton: '' };
-  if (v.aExpedier) return { etat: 'À envoyer', ton: 'action' };
-  return { etat: v.label || '', ton: '' };
+  const ev = etatVenteVc(v, { fait, depart: v.departLu || null });
+  return { etat: texteEtatVc(ev), ton: ev.ton, ev };
 };
+// (15 nov., Julien : « la botte n'est pas au bon prix, là c'est l'argent reçu ») Le PRIX DE VENTE
+// (`prixVente`, clé `sellerPrice`, en euros) en chiffre principal, comme Vestiaire ; ce que tu reçois
+// (`montantRecuVc`) en second. Aucun total ne lit ceci : l'affichage seulement.
+const prixVenteLu = (v) => { const p = v && v.prixVente; return p && typeof p === 'object' && p.cle === 'sellerPrice' && String(p.devise || '').toUpperCase() === 'EUR' && typeof p.valeur === 'number' && Number.isFinite(p.valeur) && p.valeur > 0 ? Math.round(p.valeur * 100) / 100 : null; };
 // ⟦← App.jsx #12⟧
 // UNE LIGNE DE VENTE VESTIAIRE (écran Ventes) — `LigneVenteCompacte`, comme Vinted.
 function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
   const lb = beneficeVc(v, fait);
-  const { etat, ton } = etatLigneVc(v, fait);
+  const { etat, ton, ev } = etatLigneVc(v, fait);
   const titre = v.titre || 'Article Vestiaire';
   const nomLigne = v.num ? `N°${v.num} · ${titre}` : titre;
+  // (15 nov.) Le repère d'une vente Vestiaire : SA réf. produit (« Réf. 72987282 », comme sur Vestiaire).
+  const refVc = /^\d{3,15}$/.test(String(v.productId || '')) ? tr('vcventes.ref', { ref: String(v.productId) }) : '';
+  const prixLu = vcVenteAnnulee(v) ? null : prixVenteLu(v);
+  const prixPrincipal = prixLu != null ? prixLu : lb.verse;
+  const pourToi = prixLu != null && lb.verse != null ? tr('vcventes.pourToi', { montant: `${eurosLigne(lb.verse)}\u00a0€` }) : '';
+  const benefSu = lb.etat === 'ok' && lb.benefice != null ? texteBenefice(lb) : '';
   // Comme Vinted : la date sur la ligne (et, à expédier, « à envoyer avant … » — le
   // « à poster avant » de la carte Colis) ; le transporteur à côté du bouton bordereau.
   // (11 nov. soir) Les frais que Vestiaire prend, LUS (prix affiché − versé, `fraisVc`) : sur la
   // ligne seulement quand ils sont lus ; la fiche dit « frais pas lus » sinon (jamais 0).
   const fv = vcVenteAnnulee(v) ? null : fraisVc(v);
-  const sous = [v.date ? dateCourteVc(v.date) : '', v.aExpedier && !fait ? limiteVcTexte(v) : '', fv && fv.lu ? `Frais Vestiaire ${eurosRecap(fv.frais)} (${String(fv.pct).replace('.', ',')}\u00a0%)` : ''].filter(Boolean).join(' · ');
+  // (15 nov.) Méta COURTE : la réf., la date, ce que tu reçois. La date limite est dans l'état (« À expédier
+  // avant le … »), les frais dans la fiche (« L'argent ») — plus sur la ligne (la colonne de texte se tassait).
+  const sous = [refVc, v.date ? dateCourteVc(v.date) : '', pourToi].filter(Boolean).join(' · ');
   const trV = transporteurDuColis({ declare: v.transporteur, suivi: v.suivi });
   const benef = lb.etat === 'annulee' ? null : { etat: lb.etat, achatCentimes: lb.achat != null ? Math.round(lb.achat * 100) : null, benefCentimes: lb.benefice != null ? Math.round(lb.benefice * 100) : null,
     achatTxt: lb.achat != null ? `${eurosLigne(lb.achat)}\u00a0€` : (v.num ? 'à saisir' : '—'), benefTxt: texteBenefice(lb),
     aria: lb.etat === 'achat' ? "Bénéfice : prix d'achat manquant" : undefined };
   const coutManque = lb.etat !== 'annulee' && lb.achat == null && !!v.num;
-  const gesteCout = coutManque ? <CoutAchatVente surLigne onSaisir={(p) => poserAchatVc(v.num, p)}/> : null;
   const photoNoeud = <PhotoVc src={v.photo || ''} style={{ width: 28, height: 36, borderRadius: 12, flexShrink: 0 }}/>;
   // (3 nov.) La frise de Vinted sur la ligne Vestiaire : chaque étape PROUVÉE par une donnée lue.
   const preuvesVc = preuvesFriseVc(v, fait);
@@ -723,7 +733,7 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
       : ici === 'livree' ? { gras: 'Livrée.', suite: 'L’argent arrive quand Vestiaire le verse.' }
       // (11 nov.) Un mot de Vestiaire non rangé (« IN_PROGRESS ») : l'étape EN COURS lue dans sa frise, s'il y en a une.
       : etapeEnCoursVc(v, fait || null) ? { gras: `${etapeEnCoursVc(v, fait || null)}.`, suite: '' }
-      : { gras: `${v.label || 'En cours'}.`, suite: '' };
+      : { gras: `${etat}.`, suite: '' };
     return <>
       <header className="vrm-recap-tete">
         <div className="vrm-sale-photo vrm-recap-photo"><PhotoVc src={v.photo || ''} style={{ width: '100%', height: '100%' }}/></div>
@@ -762,10 +772,10 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
       <section className="vrm-recap-details" aria-label="Détails">
         <dl>
           <div className="vrm-recap-ligne"><dt>Vendue</dt><dd>{v.date ? dateCourteVc(v.date) : '— date pas lue'}</dd></div>
+          {refVc ? <div className="vrm-recap-ligne" data-recap-ref-vc={v.productId}><dt>Vestiaire</dt><dd>{refVc}</dd></div> : null}
           {v.aExpedier ? <div className="vrm-recap-ligne"><dt>Envoi</dt><dd>{limiteVcTexte(v)}</dd></div> : null}
           {!(v.aExpedier && !fait && v.bordereau) && (trV.cle || trV.nom) ? <div className="vrm-recap-ligne"><dt>Transporteur</dt><dd><PastilleTransporteur t={trV} C={C} seul data-recap-transporteur=""/></dd></div> : null}
           {v.suivi ? <div className="vrm-recap-ligne"><dt>Suivi</dt><dd className="vrm-recap-mono">{v.suivi}</dd></div> : null}
-          {v.etat && v.etape === 'autre' ? <div className="vrm-recap-ligne"><dt>Vestiaire écrit</dt><dd>« {v.etat} »</dd></div> : null}
         </dl>
         {enV ? <p data-vc-vente-vinted="" className="vrm-recap-issue">Encore en ligne sur Vinted : retire-la, sinon double vente. <a href={`https://www.vinted.fr/items/${enV.id}`} target="_blank" rel="noreferrer">Ouvrir l'annonce ↗</a></p> : null}
       </section>
@@ -780,14 +790,18 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
       </section>
     </>;
   };
+  // (15 nov.) La rangée des ventes du studio (celle de Vinted, `fusion`) : vignette, titre sur deux lignes,
+  // N° · Vestiaire · réf., l'état en mots ; à droite le prix de vente, « pour toi … » et le bénéfice s'il est
+  // SU. Aucun geste sur la rangée : le prix d'achat manquant se saisit dans la fiche (« Prix d'achat »).
   return (
-    <LigneVenteCompacte compte={nomCompteVente('vestiaire', v, {}) || undefined} className="vrm-sale-row" data-tx={'vc:' + v.id} data-cible={attrCible(['vcvente', v.id], ['vcvente', v.productId])} data-vc-vente={v.id} data-vc-vente-num={v.num || ''} data-vc-vente-etape={v.etape} data-flou={flou ? '1' : '0'}
+    <LigneVenteCompacte compte={nomCompteVente('vestiaire', v, {}) || undefined} className="vrm-sale-row" data-tx={'vc:' + v.id} data-cible={attrCible(['vcvente', v.id], ['vcvente', v.productId])} data-vc-vente={v.id} data-vc-vente-num={v.num || ''} data-vc-vente-etape={CLES_A_EXPEDIER_VC.has(ev.cle) ? 'a-expedier' : ev.cle} data-vc-vente-etat={ev.cle} data-vc-vente-ton={ton || ''} data-vc-prix-principal={prixPrincipal != null ? Math.round(prixPrincipal * 100) : ''} data-vc-recu={lb.verse != null ? Math.round(lb.verse * 100) : ''} data-flou={flou ? '1' : '0'} data-fu-ligne=""
       style={{ borderTop: i > 0 ? `1px solid ${C.border}` : 'none', opacity: vcVenteAnnulee(v) ? 0.6 : 1, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10, ...(flou ? STYLE_FLOU : null) }}
-      montantCentimes={lb.verse != null ? Math.round(lb.verse * 100) : undefined} numerosArticle={v.num ? [v.num] : []} plateforme="vestiaire"
+      montantCentimes={prixPrincipal != null ? Math.round(prixPrincipal * 100) : undefined} numerosArticle={v.num ? [v.num] : []} plateforme="vestiaire"
       photo={v.photo || ''} photoNoeud={photoNoeud} titre={nomLigne} sous={sous} etat={etat} ton={ton}
-      montant={lb.verse != null ? `${eurosLigne(lb.verse)}\u00a0€` : '—'} benef={benef} recap={recap}
-      frise={fuVc ? <Frise etapes={fuVc} cle={'vc' + v.id} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null}
-      gestes={gesteCout ? <div className="vrm-gestes-pile">{gesteCout}</div> : null}/>
+      montant={prixPrincipal != null ? `${eurosLigne(prixPrincipal)}\u00a0€` : '—'} benef={benef} recap={recap}
+      fusion={{ nom: titre, num: v.num || '', site: 'vestiaire', siteNom: 'Vestiaire', transp: trV && trV.cle ? trV : null, taille: '', ref: refVc,
+        prix: prixPrincipal != null ? `${eurosLigne(prixPrincipal)}\u00a0€` : '', sousPrix: pourToi, benefSu, deuxLignes: true }}
+      frise={fuVc ? <Frise etapes={fuVc} cle={'vc' + v.id} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null}/>
   );
 }
 // ⟦← App.jsx #13⟧
@@ -831,15 +845,19 @@ function VentesVestiaire({ comptes }) {
   else if (d === null) corps = <div data-vc-ventes="pas-su" style={style}>Je n'ai pas pu lire tes ventes Vestiaire (rien perdu). <button type="button" className="vrm-lien-action" data-vc-ventes-relire="" onClick={() => { setD(undefined); relire(); }} style={{ background: 'none', border: 'none', color: C.accentTexte, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44, padding: 0 }}>Réessayer</button></div>;
   else if (!d.ventes) corps = <div data-vc-ventes="jamais" style={style}>Pas encore lues : {geste}{extSait('vcventes') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcventes}</b> d'abord</> : ''}.</div>;
   else {
-    const partisVc = departsVc({ ...d, departs: vcLoc.departs });
-    const liste = ordreRecent(Object.entries(d.ventes).filter(([, v]) => v && typeof v === 'object').map(([id, v]) => {
+    // (15 nov.) Chaque vente passe par `venteVcFraiche` : `aExpedier` = l'état le plus FRAIS (une frise
+    // « envoi fait » lue après la liste « à expédier » l'emporte), la même règle que Colis et Ma journée.
+    const partisFrais = departsVc({ ...d, departs: vcLoc.departs });
+    const liste = ordreRecent(Object.entries(d.ventes).filter(([, v]) => v && typeof v === 'object').map(([id, v0]) => {
+      const v = venteVcFraiche(v0, d.lectures);
       const num = numVcVente(v, d.liens, vcLoc.auto);
-      return { id, ...v, num, ...etapeVenteVc(v, partisVc.get(String(id)) || null) };
+      return { id, ...v, num, ...etapeVenteVc(v, partisFrais.get(String(id)) || null, vcLoc.fait[id] || null) };
     // ⚠️ (9 nov., soir, lot AJ — décision de Julien : « du plus récent en haut au plus vieux en bas ») La
     // plus RÉCENTE en haut, tous comptes mélangés (src/ordreRecent.js). Avant (31 oct.) : les ventes à
     // expédier d'abord, la limite la plus proche en tête — l'étape et la limite restent écrites sur chaque ligne.
     }), quandVestiaire);
-    const aExp = liste.filter((v) => v.aExpedier && !vcLoc.fait[v.id] && !v.departLu);
+    // (15 nov.) UNE règle pour la tête et la ligne (§11) : la tête compte les lignes qui DISENT « À expédier ».
+    const aExp = liste.filter((v) => CLES_A_EXPEDIER_VC.has(v.etape));
     const lue = d.lectures && d.lectures['a-expedier'];
     // (5.374) une lecture PARTIELLE plus fraîche que la lecture entière gardée est datée à côté (`partielleAt`).
     const derniere = [d.lectures && d.lectures.ventes && d.lectures.ventes.at, d.lectures && d.lectures.ventes && d.lectures.ventes.partielleAt, lue && lue.at, lue && lue.partielleAt].filter(Boolean).sort().pop() || '';
@@ -847,13 +865,13 @@ function VentesVestiaire({ comptes }) {
     else corps = (
       <div data-vc-ventes="lu">
         <div data-vc-ventes-resume="" style={{ ...style, marginBottom: 8 }}>
-          {liste.length} vente{liste.length > 1 ? 's' : ''} vue{liste.length > 1 ? 's' : ''} · <b style={{ color: C.text }}>{aExp.length} à expédier</b>{lue && !lue.complet ? ' (au moins)' : ''}{derniere ? `, lues ${ageCourtVc(derniere)}` : ''}.
+          {liste.length} vente{liste.length > 1 ? 's' : ''} vue{liste.length > 1 ? 's' : ''} · <b data-vc-a-expedier={aExp.length} style={{ color: C.text }}>{tr('vcventes.aExpedierTete', { n: aExp.length })}</b>{lue && !lue.complet ? ' ' + tr('vcventes.auMoins') : ''}{derniere ? `, lues ${ageCourtVc(derniere)}` : ''}.
           {!lue ? <> La liste « Articles à expédier » n'a pas encore été lue : {geste}.</> : null}
         </div>
         {/* La liste groupée de Vinted (`vrm-ventes-liste`) : une ligne par vente, filet fin. */}
         <div className="vrm-ventes-liste" data-vc-ventes-liste="" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
           <div className="vrm-ledger-heading" aria-hidden="true"><span>Article</span><span className="vrm-ledger-state-heading">État</span><span>Montant</span></div>
-          <div className="vrm-ventes-entete" aria-hidden="true" data-ventes-entete-cols=""><span/><span>Article</span><span>État</span><span className="is-droite">Versé</span><span className="is-droite">Achat</span><span className="is-droite">Bénéfice</span><span/></div>
+          <div className="vrm-ventes-entete" aria-hidden="true" data-ventes-entete-cols=""><span/><span>Article</span><span>État</span><span className="is-droite">{tr('vcventes.colPrix')}</span><span className="is-droite">Achat</span><span className="is-droite">Bénéfice</span><span/></div>
           {/* (11 nov.) Regroupées par compte quand un compte Vestiaire est ouvert (src/regroupeComptes.js, suit le flou). */}
           <ListeParCompte lignes={liste.slice(0, 30)} ouvert={vcOuvert} floute={(v) => vcFloute(vcOuvert, v.compte)} compteDe={(v) => String(v.compte == null ? '' : v.compte).trim()} unite="vente" libelle="Compte ouvert sur Vestiaire" nomDe={(id) => nomCompteVente('vestiaire', { compte: id }, {})}
             rendre={(v, i) => <LigneVenteVc key={v.id} i={i} v={v} fait={vcLoc.fait[v.id] || null} enV={v.num && enLigne ? enLigneParNum.get(v.num) : null} flou={vcFloute(vcOuvert, v.compte)}/>}/>

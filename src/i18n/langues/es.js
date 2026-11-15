@@ -9,6 +9,8 @@ import ecran_renvoyer from './es/renvoyer.js';   // (15 nov., lot retours) « À
 import ecran_retrait_ailleurs from './es/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
 import ecran_finition from './es/finition.js';   // (15 nov.) la finition écran par écran
 import ecran_parametres from './es/parametres.js';   // (15 nov.) Paramètres rangés en dix catégories
+import ecran_vcventes from './es/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
+import ecran_numeros_nouvelles from './es/numeros-nouvelles.js';   // (15 nov.) Les nouvelles annonces sans N°
 import ecran_idees from './es/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './es/ventes.js';
 import ecran_commun from './es/commun.js';
@@ -41,9 +43,14 @@ import ecran_argentprix from './es/argentprix.js';   // (14 nov., argent-prix)
 import ecran_rechliste from './es/rechliste.js';
 import ecran_studio_paires from './es/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
 import ecran_republier_guide from './es/republierGuide.js';   // (15 nov.) republier / publier à la main, guidés
+import ecran_memePhoto from './es/memePhoto.js';   // (15 nov., lot meme-photo)
 export default {
   ...ecran_studio_paires,
   ...ecran_republier_guide,
+import ecran_etageres from './es/etageres.js';   // (15 nov.) le Stock en étagères
+export default {
+  ...ecran_studio_paires,
+  ...ecran_etageres,
   ...ecran_accueilReste,
   ...ecran_refonte_ms,
   ...ecran_studio_journee,
@@ -2263,9 +2270,12 @@ export default {
   ...ecran_studio,
   ...ecran_capte,
   ...ecran_retrait_ailleurs,
+  ...ecran_vcventes,
+  ...ecran_memePhoto,
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_finition,
   ...ecran_parametres,
   ...ecran_avenir,
+  ...ecran_numeros_nouvelles,
 };

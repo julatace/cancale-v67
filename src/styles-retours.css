@@ -60,6 +60,10 @@
 :root:root body .vrm-renv-journee { margin: 14px 0 6px; }
 :root:root body .vrm-renv-journee .vrm-ret-h2 { font-family: var(--sb-police-affiche, var(--vrm-police, system-ui, sans-serif)); }
 :root:root body button.vrm-renv-voir { align-self: flex-start; min-height: 44px; }
+/* (15 nov., lot retours-suivi) Le n° de suivi du retour : logo · n° (un toucher = copié) · « Suivre ↗ ». */
+:root:root body .vrm-renv-suivi { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; }
+:root:root body .vrm-renv-logo { display: inline-flex; align-items: center; }
+:root:root body .vrm-renv-carte button.vrm-renv-copier { min-height: 44px !important; height: auto !important; padding: 0; background: none; color: var(--ret-encre) !important; font: 600 14px/1.2 var(--sb-police-texte, system-ui, sans-serif); font-variant-numeric: tabular-nums; letter-spacing: .01em; overflow-wrap: anywhere; text-align: left; }
 /* « Tout imprimer » → Retours : une ligne par bordereau de retour. */
 :root:root body .vrm-ret-tip-ligne { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; min-width: 0; border-top: 1px solid var(--ret-tuile); }
 :root:root body .vrm-ret-tip-ligne:first-of-type { border-top: 0; }

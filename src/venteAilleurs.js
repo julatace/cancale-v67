@@ -52,7 +52,16 @@ export function dateValide(s, maintenant = Date.now()) {
 //   montant nombre > 0 (déjà lu par `montantSaisi`) ; date « AAAA-MM-JJ »
 //   decisions, vendues (liste d'ids), slots : les valeurs COURANTES (pour « avant »)
 // Rend { ops, texte } ou null (rien n'est écrit).
-export function opsVenduAilleurs({ carte, montant, date, paiement = null, decisions = {}, vendues = [], slots = {}, cle = cleDefaut, maintenant = Date.now() } = {}) {
+// (15 nov., étagères) La case vidée, et — si l'app passe `sortieCase` (`opsSortieCases`, src/stockEtageres.js) —
+// la descente des cartons du dessus dans une pile. Des opérations sur `vrm_slots` seulement ; sans elles, la case seule.
+function casePlusPile(kn, S, sortieCase) {
+  const seule = [{ k: 'vrm_slots', type: 'cle', id: kn, apres: undefined, avant: S[kn] }];
+  if (typeof sortieCase !== 'function') return seule;
+  let o; try { o = sortieCase(kn); } catch (_) { o = null; }
+  o = Array.isArray(o) ? o.filter((x) => x && x.k === 'vrm_slots') : [];
+  return o.some((x) => String(x.id) === String(kn) && x.apres === undefined) ? o : seule;
+}
+export function opsVenduAilleurs({ carte, montant, date, paiement = null, decisions = {}, vendues = [], slots = {}, sortieCase = null, cle = cleDefaut, maintenant = Date.now() } = {}) {
   if (!carte || carte.id == null || str(carte.id) === '') return null;
   const m = Number(montant);
   if (!Number.isFinite(m) || m <= 0 || m >= 100000) return null;
@@ -65,7 +74,9 @@ export function opsVenduAilleurs({ carte, montant, date, paiement = null, decisi
   const dedans = (Array.isArray(vendues) ? vendues : [...(vendues || [])]).map(String).includes(id);
   if (!dedans) ops.push({ k: CLE_VENDUES, type: 'ensemble', id, apres: true, avant: false });
   const kn = numero ? cle(numero) : '';
-  if (kn && S[kn]) ops.push({ k: 'vrm_slots', type: 'cle', id: kn, apres: undefined, avant: S[kn] });
+  // (15 nov., étagères) `sortieCase` (passée par l'app : `opsSortieCases`, src/stockEtageres.js) rend la case vidée
+  // ET la descente des cartons du dessus dans une pile — « Annuler » rend tout ; absente : la case seule, comme avant.
+  if (kn && S[kn]) ops.push(...casePlusPile(kn, S, sortieCase));
   const e = (eur % 1 === 0 ? String(eur) : eur.toFixed(2).replace('.', ',')) + ' €';
   return { texte: `N°${numero || '?'} vendu ailleurs · ${e}`, ops };
 }

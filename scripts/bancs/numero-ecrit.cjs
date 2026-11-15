@@ -129,12 +129,12 @@ async function reglages(b, largeur, sombre) {
     dit(await pg.getAttribute('[data-numero-ecrit]', 'data-numero-ecrit') === 'eteint', `${tag} : éteint par défaut`);
     dit(await pg.locator('[data-numero-ecrit-exemple]').count() === 1 && /N° 123/.test(await pg.locator('[data-numero-ecrit-exemple]').innerText()), `${tag} : l'exemple « Termine ta description par : N° 123 »`);
     dit(await pg.locator('[data-numero-ecrit-passu="vinted"]').count() === 1, `${tag} : annonces Vinted pas encore lues ⇒ « pas encore lu », jamais « 0 »`);
-    const h = await pg.evaluate(() => { const e = document.querySelector('[data-numero-ecrit-bascule]'); return e ? e.getBoundingClientRect().height : 0; });
-    dit(h >= 43.5, `${tag} : la bascule fait au moins 44 px`, String(h));
+    const h = await pg.evaluate(() => { const e = document.querySelector('[data-qui-numerote-choix="moi"]'); return e ? e.getBoundingClientRect().height : 0; });
+    dit(h >= 43.5, `${tag} : le choix « Moi » (Qui numérote ?, 15 nov.) fait au moins 44 px`, String(h));
     await pg.locator('[data-numero-ecrit]').scrollIntoViewIfNeeded().catch(() => {});
     await capture(pg, `A-${nom}-eteint`);
-    await toucher(pg, '[data-numero-ecrit-bascule]', mobile);
-    dit(await pg.getAttribute('[data-numero-ecrit]', 'data-numero-ecrit') === 'actif', `${tag} : la bascule l'allume`);
+    await toucher(pg, '[data-qui-numerote-choix="moi"]', mobile);
+    dit(await pg.getAttribute('[data-numero-ecrit]', 'data-numero-ecrit') === 'actif', `${tag} : « Moi » l'allume`);
     await attendre(() => !!(base.main && base.main.vrm_numero_ecrit && base.main.vrm_numero_ecrit.actif === true), 10000);
     dit(ecritesMain(base).length > 0 && base.main && base.main.vrm_numero_ecrit && base.main.vrm_numero_ecrit.actif === true, `${tag} : le réglage part au nuage (vrm_numero_ecrit)`, JSON.stringify((base.main || {}).vrm_numero_ecrit || null));
     dit(await pasDeCote(pg), `${tag} : aucune page qui défile de côté`);

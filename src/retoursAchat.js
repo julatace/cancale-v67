@@ -14,6 +14,9 @@
 // attendre la prochaine lecture de ses achats. Remboursement partiel ⇒ rien ne
 // bouge (le coût reste ; la carte le dit).
 // Module PUR. Exécuté par scripts/audit-retours-litiges.cjs.
+// (15 nov., lot retours-suivi) Les faits du transporteur PAR LE N° EXACT du bordereau de retour
+// (api/_lib/retour-suivi.js, la règle partagée avec le serveur) font avancer la carte toute seule.
+import { faitsRetour, suivisPartages, normaliserSuiviRetour } from '../api/_lib/retour-suivi.js';
 
 const str = (v) => String(v == null ? '' : v);
 export const RETOUR_PRESSE_H = 48;
@@ -126,7 +129,9 @@ export function bordereauDuGarde(row, lireBordereauRetour) {
 // ventesTx: Set des n° de SES ventes (un n° de vente contredit un bordereau d'achat)
 // numeroDe(tx) : le N° de la paire reliée à CET achat (par SON clic), ou ''
 // montantDe(o) : ce qu'il a payé, ou null
-export function retoursAchat({ bords, demandes = [], achats, remb, transp, deposes = null, ventesTx = null, numeroDe = null, montantDe = null, maintenant } = {}) {
+// track   : lignes `email_track_*` projetées des n° de retour ({ suivi, status, emailAt, at, retire, carrier }) — `undefined` en cours · `null` pas su
+// departs : Map n° → ligne `depart_` (la lecture chez le transporteur d'un colis qu'il poste) — null pas su
+export function retoursAchat({ bords, demandes = [], achats, remb, transp, track = [], departs = null, deposes = null, ventesTx = null, numeroDe = null, montantDe = null, maintenant } = {}) {
   const now = isFinite(maintenant) ? maintenant : Date.now();
   if (bords === undefined) return { etat: 'encours', cartes: [], anciennes: [], aRenvoyer: [], manques: [] };
   if (bords === null && !Array.isArray(achats)) return { etat: 'passu', cartes: [], anciennes: [], aRenvoyer: [], manques: ['tes bordereaux de retour'] };
@@ -161,11 +166,21 @@ export function retoursAchat({ bords, demandes = [], achats, remb, transp, depos
     c.depassee = isFinite(lm) && now > lm;
     c.presse = isFinite(lm) && !c.depassee && lm - now < RETOUR_PRESSE_H * 3600000;
   };
+  // (15 nov., lot retours-suivi) Un n° porté par DEUX retours n'est rejoint par aucun fait (identité, §5).
+  const partages = suivisPartages((Array.isArray(bords) ? bords : []).filter(Boolean).reduce((acc, b) => {
+    const tx = str(b.tx || b.transaction).trim(); if (tx && !acc.some((x) => x.tx === tx)) acc.push({ tx, suivi: b.suivi }); return acc; }, []));
   const etape = (c) => {
     c.depose = dep[c.cle] ? { le: str(dep[c.cle]) } : null;
     const lib = c.statut && c.statut.etat === 'ok' ? str(c.statut.libelle) : '';
-    // L'étape : PROUVÉE (remboursement lu, transporteur lu), sinon SON clic « Déposé ».
+    // Les faits du transporteur, par le n° EXACT (e-mails du transporteur, lecture du départ) : `pas su` ⇒ rien.
+    const k = normaliserSuiviRetour(c.suivi);
+    c.suiviPartage = !!(k && partages.has(k));
+    c.faits = k && !c.suiviPartage ? faitsRetour(k, { track: Array.isArray(track) ? track : null, departs: departs instanceof Map ? departs : null }) : null;
+    c.faitsPasSu = !!(k && !c.suiviPartage && !c.faits && (track === null || departs === null));
+    if (c.faits && c.faits.carrier && !c.transporteur) c.transporteur = c.faits.carrier;
+    // L'étape : PROUVÉE (remboursement lu, fait du transporteur lu), sinon SON clic « Déposé ».
     c.etape = c.rembourse.etat === 'oui' ? 'rembourse'
+      : c.faits ? c.faits.etape
       : RE_ARRIVE_VENDEUR.test(lib) ? 'recu-vendeur'
       : RE_EN_ROUTE.test(lib) ? 'en-route'
       : c.depose ? 'depose' : 'a-deposer';
@@ -198,6 +213,7 @@ export function retoursAchat({ bords, demandes = [], achats, remb, transp, depos
       limiteIso, limiteJour: limiteIso ? jourParis(lm) : '', limiteTexte: jourCourt(limiteIso), heure: limiteIso && /\d\s*h/.test(str(b.dateLimite)) ? heureParis(limiteIso) : '',
       suivi, statut: etatSuivi(suivi), rembourse: remboursement(tx, o), uid: str(b.uid || (o && o._acc && o._acc.vinted_user_id) || ''), compte: str(b.account || ''),
       pdf: b.pdf !== false, pdfGarde: b.pdfGarde || '', garde: !!b.garde, emailId: str(b.emailId || ''), relie: !!o, avis: null,
+      transporteur: str(b.transporteurPdf || '').trim(),
     }, b.at || b.receivedAt));
   }
   // 2. Les achats « à renvoyer » sans bordereau (identité : le n°).
