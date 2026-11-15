@@ -131,14 +131,14 @@ const remonter = async (pg) => { for (let i = 0; i < 3; i++) { const b = pg.loca
       if (W < 600 && (PARTIES.has('C') || PARTIES.has('D'))) {
         const toutes = t === 'clair' ? e0.cats : e0.cats.slice(0, 4);
         for (const c of toutes) {
-          await pg.locator(`[data-categorie-ouvrir="${c}"]`).first().click();
+          { const ok = await pg.locator(`[data-categorie-ouvrir="${c}"]`).first().click({ timeout: 15000 }).then(() => true, (e) => { dit(false, `C ${tag} : toucher « ${c} »`, String(e.message).split('\n')[0]); return false; }); if (!ok) continue; }
           await att(pg, 500);
           const e = await etat(pg);
           dit(e.cat === c && e.rangees.length >= 1, `C ${tag} : « ${c} » s’ouvre au doigt (${e.rangees.length} rangées)`, e);
           await pg.screenshot({ path: path.join(SHOTS, `cat-${c}-${W}-${t}.png`), fullPage: false });
           await juger(`catégorie ${c}`);
           if (t === 'clair' && PARTIES.has('C')) for (const id of e.panneaux) {
-            await pg.locator(`[data-sous-ouvrir="${id}"]`).first().click();
+            { const ok = await pg.locator(`[data-sous-ouvrir="${id}"]`).first().click({ timeout: 15000 }).then(() => true, (e) => { dit(false, `C ${tag} : toucher ${c} › ${id}`, String(e.message).split('\n')[0]); return false; }); if (!ok) continue; }
             await att(pg, 550);
             const s = await etat(pg);
             const visible = await pg.locator(`[data-sous-ecran="${id}"]`).first().isVisible().catch(() => false);
