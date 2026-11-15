@@ -108,7 +108,24 @@ Règle : `src/numerosNouvelles.js` (JS pur). Texte : `src/i18n/langues/*/numeros
   notification, demande, « c'est écrit », Ma journée, Réglages, extension).
 - Banc `scripts/bancs/numeros-nouvelles.cjs` (données inventées, 390 tactile et 1512,
   clair et sombre) : A (Sneakers et « autre » : une paire + un sac), P (partielle),
-  B (« moi »), R (Réglages).
+  B (« moi »), R (Réglages). **181 verts.** Captures regardées (Ma journée, la feuille
+  « à écrire », la feuille « Quel N° », Réglages) ; il a attrapé deux défauts corrigés :
+  « 2 nouvelles articles numérotées » (Ma journée remplace « paires » par « articles »
+  après coup — la phrase est maintenant écrite en entier) et la ligne de la cloche
+  « 2 annonces sans numéro » dite en plus, déjà fausse (les deux venaient d'être numérotées).
+- Audits verts : identite, numero-ecrit, accueil-reste, fusion-nuage, numerotation-lecteurs,
+  garde-numeros-rapide, renum-b, coherence (capacité `numerotes`), extension-zip (5.379.0
+  neuve), traduction, tdz, variables, studio, quoi-de-neuf, et les ~60 audits qui lisent
+  `prochainLibre` / `vinted_annonce_numeros`. Rouges identiques sur `origin/main` :
+  audit-benefice (App.jsx ne se lit pas : `partageFichiersPossible` déclaré deux fois),
+  audit-infos-vinted (I10, copie `vrm-regles-achat.js`).
+- Bancs voisins rejoués sur `origin/main` ET sur la branche (dist construits des deux) :
+  numero-ecrit (2 rouges à 390 clair, les mêmes : le bloc « à vérifier » est passé dans
+  « À faire » avec le Studio), prix-numerotage (12 rouges / 54 verts des deux côtés : les
+  sélecteurs de la carte d'annonce d'avant le Studio ; le scénario C, celui qui dépend de la
+  numérotation au chargement, vert des deux côtés — sa liste porte maintenant `total_entries`),
+  accueil-reste (E3 « un toucher ailleurs la referme », rouge des deux côtés). Le banc
+  numero-ecrit touche désormais le choix « Moi ».
 
 ## Geste de Julien
 
