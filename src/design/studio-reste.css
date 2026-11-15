@@ -144,6 +144,13 @@
 :root:root:root:root:root:root body .vrm-cx [data-cx-fournisseurs] > div > span:nth-child(2) { color: var(--sb-encre-2) !important; }
 :root:root:root:root:root:root body .vrm-cx [data-cx-fournisseurs] > div > span:is(:first-child, :last-child) { background: rgb(var(--sb-o) / .14) !important; }
 :root:root:root:root:root:root body .vrm-cx .vrm-cx-qr summary { min-height: 44px !important; }
+:root:root:root:root:root:root body .vrm-cx .vrm-cx-apercu { display: none; }
+@media (min-width: 1180px) {
+  :root:root:root:root:root:root body .vrm-cx .vrm-cx-apercu { display: block; position: absolute; right: 48px; top: 50%; transform: translateY(-46%); width: 220px; margin: 0; }
+  :root:root:root:root:root:root body .vrm-cx .vrm-cx-apercu > span { display: block; background: #0C1D30; padding: 6px; border-radius: 40px; box-shadow: var(--sb-ombre-avant); }
+  :root:root:root:root:root:root body .vrm-cx .vrm-cx-apercu img { display: block; width: 100%; height: auto; border-radius: 34px; }
+  :root:root:root:root:root:root body .vrm-cx .vrm-cx-apercu figcaption { margin-top: 12px; font-size: 12px; line-height: 1.4; color: var(--sb-encre-2) !important; text-align: center; }
+}
 @media (min-width: 900px) {
   :root:root:root:root:root:root body .vrm-cx .vrm-cx-marque { justify-content: flex-start !important; }
   :root:root:root:root:root:root body .vrm-cx .vrm-cx-titre { margin-top: auto !important; }

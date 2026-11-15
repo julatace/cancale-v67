@@ -19805,6 +19805,12 @@ function AuthScreen() {
       <aside className="vrm-cx-marque">
         <div className="vrm-cx-aurore" aria-hidden="true" data-cx-aurore=""><i/><i/><i/></div>
         <div className="vrm-cx-etiquettes" aria-hidden="true"><span>{tr('auth.deco.colis')}</span><span>{tr('auth.deco.bordereau')}</span><span>{tr('auth.deco.vendu')}</span><span>{tr('auth.deco.retiree')}</span></div>
+        {/* (15 nov., lot site-public) Sur un grand écran, l'app elle-même à côté de la phrase : la capture de Ma journée
+            de la page d'accueil (mode exemple, au registre public/accueil/captures.json), dite « données d'exemple ». */}
+        <figure className="vrm-cx-apercu" data-cx-apercu="">
+          <span><picture><source srcSet="/accueil/journee-sombre.webp" media="(prefers-color-scheme: dark)" type="image/webp"/><img src="/accueil/journee-clair.webp" alt="" width="780" height="1688" loading="lazy" decoding="async"/></picture></span>
+          <figcaption>{tr('accueil.capture.legende')}</figcaption>
+        </figure>
         <div className="vrm-cx-haut">
           <a href="/" className="vrm-cx-logo" aria-label={tr('auth.logoAccueil')}>
             <img src="/vrm-logo-v5-192.png" alt="" width="36" height="36"/><b>VRM</b>

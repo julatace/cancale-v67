@@ -99,8 +99,8 @@
 
 /* ── Le premier écran : le texte à gauche, l'app à droite (au téléphone : l'un sous l'autre,
       le téléphone déjà visible en bas de l'écran). */
-.av-hero{position:relative;isolation:isolate;padding:56px 0 0}
-.av-hero-grille{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.08fr);gap:48px;align-items:center}
+.av-hero{position:relative;isolation:isolate;padding:36px 0 0}
+.av-hero-grille{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(0,1fr);gap:40px;align-items:center}
 .av-pour{display:flex;align-items:center;flex-wrap:wrap;gap:10px 12px;font-size:15px;font-weight:600;color:var(--gris);margin:0 0 18px}
 .av-pictos{display:inline-flex;align-items:center;gap:6px}
 .av-picto{display:inline-block;width:28px;height:28px;border-radius:9px;background:var(--porc);box-shadow:var(--ombre-pose);position:relative}
@@ -108,9 +108,10 @@
 .av-picto-vinted{--m:url(/brands/vinted.svg)}
 .av-picto-leboncoin{--m:url(/brands/leboncoin.svg)}
 .av-picto-ebay{--m:url(/brands/ebay.svg)}
-.av-picto-ebay:after{inset:9px 5px}
+.av-picto-ebay{width:44px}
+.av-picto-ebay:after{inset:8px 6px}
 .av-picto-vestiaire{--m:url(/brands/vestiaire.svg)}
-.av-h1{font-size:clamp(40px,4.4vw,64px);line-height:1.03;letter-spacing:-.038em;font-weight:700;max-width:12.5em;text-wrap:balance}
+.av-h1{font-size:clamp(40px,3.6vw,56px);line-height:1.04;letter-spacing:-.038em;font-weight:700;max-width:13em;text-wrap:balance}
 .av-sous{font-size:clamp(18px,1.45vw,21px);line-height:1.45;color:var(--gris);max-width:30em;margin-top:20px;text-wrap:pretty;letter-spacing:-.014em}
 .av-actions{display:flex;align-items:center;gap:12px;margin-top:30px;flex-wrap:wrap}
 .av-prix-ligne{margin-top:20px;font-size:15px;color:var(--gris);line-height:1.5}
@@ -119,7 +120,7 @@
 .av-prereq{margin-top:6px;font-size:15px;color:var(--gris);max-width:36em;line-height:1.5}
 
 /* La scène : l'ordinateur posé, le téléphone devant. Le studio : une lumière douce derrière. */
-.av-scene{position:relative;margin:0;padding:0 0 28px 40px}
+.av-scene{position:relative;margin:0;padding:0 0 28px 40px;width:calc(100% + 120px)}
 .av-scene:before{content:"";position:absolute;z-index:-1;inset:-12% -20% -6% 0;pointer-events:none;background:radial-gradient(48% 50% at 55% 45%,rgb(255 255 255 / .75),transparent 72%)}
 @media (prefers-color-scheme:dark){.av-scene:before{background:radial-gradient(48% 50% at 55% 45%,rgb(74 163 255 / .14),transparent 72%)}}
 .av-ecran-bureau{display:block;border-radius:16px;overflow:hidden;background:var(--porc);box-shadow:var(--ombre-avant);border:5px solid var(--porc)}
@@ -158,19 +159,18 @@
 
 /* Deux tuiles larges : le texte à gauche, la fenêtre à droite (ordinateur). */
 .av-tuile-numeros,.av-tuile-compta{grid-column:span 2;flex-direction:row;align-items:stretch;min-height:480px}
-.av-tuile-numeros .av-tuile-texte,.av-tuile-compta .av-tuile-texte{flex:1 1 52%;padding:40px 8px 40px 40px;align-self:center}
+.av-tuile-compta{grid-column:1/-1;min-height:440px}
+.av-tuile-numeros .av-tuile-texte,.av-tuile-compta .av-tuile-texte{flex:1 1 52%;padding:44px 8px 40px 44px;align-self:flex-start;max-width:560px}
 .av-tuile-numeros .av-tuile-texte h3,.av-tuile-compta .av-tuile-texte h3{font-size:clamp(26px,2.2vw,32px)}
 .av-tuile-numeros .av-tuile-texte p,.av-tuile-compta .av-tuile-texte p{font-size:17px}
 .av-tuile-numeros .av-fenetre,.av-tuile-compta .av-fenetre{flex:0 0 40%;width:auto;max-width:280px;margin:40px 40px 0 0;align-self:flex-end;max-height:440px}
 .av-pictos-grands{gap:8px;margin-bottom:16px}
 .av-pictos-grands .av-picto{width:40px;height:40px;border-radius:12px}
 .av-pictos-grands .av-picto:after{inset:10px}
-.av-pictos-grands .av-picto-ebay:after{inset:13px 7px}
+.av-pictos-grands .av-picto-ebay{width:62px}
+.av-pictos-grands .av-picto-ebay:after{inset:12px 8px}
 .av-tuile-extension{min-height:0}
 .av-tuile-extension .av-tuile-texte{padding:28px}
-.av .av-tuile .av-puces{flex-direction:row;flex-wrap:wrap;gap:8px;margin-top:18px}
-.av .av-tuile .av-puces li{padding:6px 12px;border-radius:999px;background:var(--creux);box-shadow:var(--grave);font-size:14px;font-weight:600;color:var(--encre)}
-.av .av-tuile .av-puces li:before{content:none}
 .av .av-lien-tuile{margin:14px 0 0 -10px}
 
 /* ── Le temps gagné (le calculateur garde ses propres styles). */
@@ -220,6 +220,7 @@
 .av-faq-texte p{break-inside:avoid;margin:0;font-size:15px;line-height:1.55;color:var(--gris)}
 .av-faq-q{break-inside:avoid;margin:0 0 28px}
 .av-faq-q>h3{font-size:17px;line-height:1.4;color:var(--encre);font-weight:600;margin-bottom:6px}
+.av-faq-q p + p{margin-top:6px}
 .av-faq-texte a{color:var(--lien);text-underline-offset:3px;font-weight:600}
 
 /* ── La fin : une plaque d'encre, une phrase, un geste. */
@@ -254,9 +255,9 @@
 @media (max-width:1023px){
   .av-hero-grille{grid-template-columns:1fr;gap:40px}
   .av-hero-texte{max-width:680px}
-  .av-scene{padding-left:56px;max-width:720px}
+  .av-scene{padding-left:56px;max-width:720px;width:auto}
   .av-bento{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .av-tuile-numeros,.av-tuile-compta{grid-column:span 2}
+  .av-tuile-numeros,.av-tuile-compta{grid-column:1/-1}
   .av-deux,.av-faq-grille{grid-template-columns:1fr;gap:20px}
   .av-faq-grille{gap:32px}
   .av-liens{display:none}
@@ -286,6 +287,7 @@
   .av-fonctions,.av-temps,.av-bande,.av-prix,.av-faq{padding-top:88px}
   .av-bento{grid-template-columns:1fr;gap:16px;margin-top:32px}
   .av-tuile,.av-tuile-numeros,.av-tuile-compta{grid-column:auto;flex-direction:column;min-height:0;border-radius:26px}
+  .av-tuile-numeros .av-tuile-texte,.av-tuile-compta .av-tuile-texte{max-width:none}
   .av-tuile-texte,.av-tuile-numeros .av-tuile-texte,.av-tuile-compta .av-tuile-texte{padding:26px 24px 0;align-self:stretch}
   .av-tuile-numeros .av-tuile-texte h3,.av-tuile-compta .av-tuile-texte h3{font-size:22px}
   .av-tuile-numeros .av-tuile-texte p,.av-tuile-compta .av-tuile-texte p{font-size:15px}

@@ -61,12 +61,13 @@ const TEL = { largeur: 390, hauteur: 844, mobile: true }, ORDI = { largeur: 1512
 async function ouvrir(nav, { largeur, hauteur, mobile = false, sombre = false, url = '/', auth = null }) {
   const ctx = await nav.newContext({ viewport: { width: largeur, height: hauteur }, isMobile: mobile, hasTouch: mobile, deviceScaleFactor: 1, colorScheme: sombre ? 'dark' : 'light', reducedMotion: 'reduce', serviceWorkers: 'block', locale: 'fr-FR' });
   const lectures = [];
+  // ⚠️ Playwright essaie la DERNIÈRE route posée en premier (§6.6) : la coupure d'Internet d'abord, la base ensuite.
+  await ctx.route(/^https?:\/\/(?!localhost)/, (rt) => rt.abort());
   await ctx.route(/supabase\.co|\/api\//, (rt) => {
     const u = rt.request().url();
     if (auth && /\/auth\/v1\/settings/.test(u)) return rt.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(auth) });
     lectures.push(u); return rt.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
   });
-  await ctx.route(/^https?:\/\/(?!localhost)/, (rt) => rt.abort());
   const pg = await ctx.newPage();
   const octets = { n: 0, liste: [] };
   pg.on('response', async (rs) => { try { const b = await rs.body(); octets.n += b.length; octets.liste.push([rs.url().replace(/^https?:\/\/[^/]+/, ''), b.length]); } catch (_) {} });
@@ -89,15 +90,15 @@ async function premierEcran(nav, nom, opt, registre) {
         const r = i.getBoundingClientRect();
         return { nom: i.closest('picture').getAttribute('data-capture'), src: (i.currentSrc || i.src).split('/').pop(), charge: i.complete && i.naturalWidth > 0, visible: Math.max(0, Math.min(r.bottom, H) - Math.max(r.top, 0)), w: r.width, alt: i.getAttribute('alt') || '' };
       }).filter((c) => c.w > 0);
+      // « plein » = un fond opaque qui TRANCHE sur le fond de la page (l'encre sur le bleu clair, la porcelaine
+      // claire sur le bleu-nuit) ; une touche en porcelaine reste proche du fond. On lit les couleurs rendues.
+      const lumDe = (s) => { const m = /rgba?\((\d+), (\d+), (\d+)(?:, ([\d.]+))?/.exec(s || ''); if (!m) return null; return { l: (Number(m[1]) * 0.2126 + Number(m[2]) * 0.7152 + Number(m[3]) * 0.0722) / 255, a: m[4] == null ? 1 : Number(m[4]) }; };
+      const page = lumDe(getComputedStyle(document.querySelector('[data-accueil]')).backgroundColor) || { l: 1 };
       const pleins = [...document.querySelectorAll('[data-accueil] a, [data-accueil] button')].filter((b) => {
         const r = b.getBoundingClientRect(), cs = getComputedStyle(b);
         if (!r.width || !r.height || r.bottom <= 0 || r.top >= H || Number(cs.opacity) < 0.5 || cs.visibility === 'hidden') return false;
-        // « plein » = un fond opaque d'encre (ou de porcelaine claire la nuit) — on lit la couleur rendue.
-        const m = /rgba?\((\d+), (\d+), (\d+)(?:, ([\d.]+))?/.exec(cs.backgroundColor); if (!m) return false;
-        const a = m[4] == null ? 1 : Number(m[4]); if (a < 0.9) return false;
-        const lum = (Number(m[1]) * 0.2126 + Number(m[2]) * 0.7152 + Number(m[3]) * 0.0722) / 255;
-        const texte = /rgba?\((\d+), (\d+), (\d+)/.exec(cs.color); const lt = texte ? (Number(texte[1]) * 0.2126 + Number(texte[2]) * 0.7152 + Number(texte[3]) * 0.0722) / 255 : 0;
-        return Math.abs(lum - lt) > 0.55;   // un fond franc qui porte un texte de l'autre extrême : un plein
+        const f = lumDe(cs.backgroundColor); if (!f || f.a < 0.9) return false;
+        return Math.abs(f.l - page.l) > 0.5;
       }).map((b) => (b.getAttribute('data-cta') || b.getAttribute('data-cta-nav') || b.innerText.trim()).slice(0, 30));
       const ex = document.querySelector('[data-section="hero"] [data-cta="exemple"]');
       return { h1: h1 ? { ...vis(h1), t: h1.innerText } : null, sous: (document.querySelector('[data-section="hero"]') || {}).innerText || '', caps, pleins, ex: ex ? { ...vis(ex), href: ex.getAttribute('href'), t: ex.innerText.trim() } : null,

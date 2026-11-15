@@ -265,7 +265,9 @@ export default function Accueil({ onEntrer }) {
               <p className="av-chapo">{tr('accueil.journee.chapo')}</p>
             </div>
             <div className="av-bento">
-              {MOMENTS.map((m) => (
+              {/* L'ordre de la grille (3 colonnes) : numéros (large) · bordereaux / retraits · comptes · extension /
+                  compta (toute la largeur). */}
+              {MOMENTS.filter((m) => m.id !== 'compta').map((m) => (
                 <article key={m.id} className={`av-tuile av-tuile-${m.id}`} data-moment={m.id} data-reveil="">
                   <div className="av-tuile-texte">
                     {m.id === 'comptes' && <span className="av-pictos av-pictos-grands" aria-hidden="true">{PLATEFORMES.map((p) => <Picto key={p} site={p} />)}</span>}
@@ -287,6 +289,16 @@ export default function Accueil({ onEntrer }) {
                   <a className="av-lien av-lien-tuile" href="/aide/extension">{tr('accueil.faq.extension.lien')}<span aria-hidden="true">›</span></a>
                 </div>
               </article>
+              {MOMENTS.filter((m) => m.id === 'compta').map((m) => (
+                <article key={m.id} className={`av-tuile av-tuile-${m.id}`} data-moment={m.id} data-reveil="">
+                  <div className="av-tuile-texte">
+                    <h3>{texteMoment(m.id, 'titre')}</h3>
+                    <p>{texteMoment(m.id, 'texte')}</p>
+                    <ul>{[texteMoment(m.id, 'point1'), texteMoment(m.id, 'point2')].map((x) => <li key={x}>{x}</li>)}</ul>
+                  </div>
+                  <span className="av-fenetre">{fonctionsPretes ? <Capture nom={m.capture} alt={texteMoment(m.id, 'alt')} /> : <span className="av-fenetre-vide" />}</span>
+                </article>
+              ))}
             </div>
           </div>
         </section>
