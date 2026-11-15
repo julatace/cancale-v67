@@ -88,7 +88,10 @@ cache HTTP et fausse le mode de cache que voit le service worker).
 - `node scripts/audit-ouverture.cjs` : 32 verts (règles exécutées) ; rouge sur l'arbre de départ.
 - Audits : csp, tdz, variables, traduction, studio, apparence (contrôle de la barre d'état mis à jour :
   pendant le démarrage elle suit l'écran de démarrage, le thème suivi est inchangé), app-installable,
-  quoi-de-neuf — verts. Bancs garde-ecrans, studio-coque, accueil-reste.
+  quoi-de-neuf — verts. Bancs garde-ecrans (vert), studio-coque (78 verts). accueil-reste : E2/E3 (la
+  bulle du glossaire) et D3 rouges par intermittence, **autant sur l'arbre de départ** (relancé seul,
+  `SCENARIOS=E LARGEURS=390`, deux fois chaque build : rouge 1 fois sur 2 des deux côtés) — machine à
+  charge 40-50 et disque à 99 % (navigateur qui plante en fin de banc complet) ; pas lié à ce lot.
 - Captures (390, à regarder) : `6-chargement-clair.png`, `6-chargement-sombre.png`, `6-lent-*.png`,
   `8-transition-claire.png` / `-sombre.png` (le fondu, ralenti ×30 pour être saisi), `4-mettre-a-jour.png`.
 
@@ -100,6 +103,11 @@ cache HTTP et fausse le mode de cache que voit le service worker).
   rechargement non marqué sans cache » dans le vrai `sw.js` servi (une ligne) — le comportement exact de
   Safari n'a pas été observé ; le correctif (oublier la coquille avant de relire) ne dépend plus de lui.
 - iOS choisit l'image de lancement claire/sombre selon le thème du SYSTÈME (pas `vinted_dark`).
+- Quand l'instantané de Ma journée est peint dans l'écran de démarrage (ouverture instantanée), la barre
+  d'état garde le bleu du démarrage jusqu'à la sortie de cet écran (~1 s), au-dessus de l'instantané clair.
+- La coque de l'app est encore « Studio bleu clair » : le fondu passe du dégradé à la coque claire (aucun
+  blanc pur, jugé image par image). Quand `claude/verre-app` posera le même jeton `--vrm-verre-fond` sur la
+  coque, le fondu ira d'un dégradé au même dégradé.
 
 ## Mesures — temps jusqu'à Ma journée
 
