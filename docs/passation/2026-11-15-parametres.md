@@ -60,7 +60,7 @@ URSSAF, numéro… »), **« Tout va bien ? Pas tout à fait »** en tête QUAND
 Une catégorie s'ouvre en sous-écran (« ‹ Paramètres », grand titre, ses groupes) ; un réglage
 dans le sien (« ‹ Mon compte ») ; un réglage trouvé par la recherche revient à la recherche.
 **Ordinateur** : le sommaire collant à gauche (la catégorie choisie enfoncée + diode), les dix
-catégories dépliées à droite. Design « Studio bleu clair » : rangées de porcelaine (64 px pour
+catégories dépliées à droite. Design « Studio bleu clair » : rangées de porcelaine (58 px pour
 une catégorie, 56 pour un réglage), icône gravée, aucun bouton plein ajouté.
 
 **Rien de perdu** : les 84 rangées d'avant gardent leur `id`, leurs `data-*` et leur panneau

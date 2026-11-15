@@ -24,6 +24,8 @@ const cible = (sel) => {
   if (typeof sel !== 'string') return null;
   const s = RE_SOUS.exec(sel); if (s) return s[1];
   const v = RE_VUE.exec(sel); if (v) return v[1] === 'compte' ? '@compte' : v[1] === 'abonnement' ? 'abonnement' : '@racine';
+  // Le champ de recherche vit sur le premier écran.
+  if (/Rechercher dans les param|data-recherche-reglages/.test(sel)) return '@racine';
   return null;
 };
 
