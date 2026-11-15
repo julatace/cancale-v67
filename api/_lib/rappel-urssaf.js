@@ -54,7 +54,13 @@ export function notificationUrssaf({ today, main }) {
   // La phrase et le montant de Ma journée, mot pour mot (`text`, `sub`).
   // (22 oct., revue) Une ligne publiée trop tôt (avant la période, ou sans aucun
   // de ses mois avant sa fin) ne donne AUCUN montant — jamais « au moins 0,00 € ».
-  return { envoyer: true, titre: TITRE_URSSAF, corps: `${r.text}. ${r.sub}`, url, montant: r.apayer, raison: r.apayer == null ? (ligne ? 'ligne publiée trop tôt pour cette période — rappel sans montant' : 'sans ligne publiée — rappel sans montant') : 'avec le montant publié' };
+  // (15 nov., notifications ≤ 40 / ≤ 90, api/_lib/notif-redaction.js) La notification dit les
+  // MÊMES mots dans un autre ordre : la période dans le titre, le montant d'abord dans le
+  // corps, puis l'échéance (« 1240,00 € reçus · à payer ≈ 153,76 € · avant le 30 novembre »).
+  // `corps` (la phrase de Ma journée, mot pour mot) reste ce que l'app et l'audit lisent.
+  const mU = /déclaration URSSAF (.+?) à faire (avant le [^(]+?)(?:\s*\(|$)/i.exec(r.text);
+  const court = mU ? { titre: `Déclaration URSSAF ${mU[1]}`.slice(0, 40), corps: `${r.sub.replace(/\.$/, '')} · ${mU[2].trim()}` } : null;
+  return { envoyer: true, titre: TITRE_URSSAF, corps: `${r.text}. ${r.sub}`, ...(court ? { court } : {}), url, montant: r.apayer, raison: r.apayer == null ? (ligne ? 'ligne publiée trop tôt pour cette période — rappel sans montant' : 'sans ligne publiée — rappel sans montant') : 'avec le montant publié' };
 }
 
 // ── LE RAPPEL LA VEILLE DE L'ÉCHÉANCE (13 nov., point 17 de Julien) ──────────

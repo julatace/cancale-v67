@@ -919,11 +919,11 @@ import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } fr
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
 import { fonduEntree } from "./passageOnglet.js";
 import { echelleTexte, marquerGrandTexte } from "./grandTexte.js";
-import { langueNavigateur, poserLangueUneFois } from "./langueCompte.js";
+import { langueNavigateur, poserLangueUneFois, alignerLangueCompte } from "./langueCompte.js";
 // (11 nov., lot traduction) Les textes visibles passent par `tr()` (src/i18n/index.js) :
 // `t` est pris partout dans ce fichier comme nom de variable, d'où l'alias `tr`.
 import ChoixLangue from "./i18n/ChoixLangue.jsx";
-import { tr, LANGUES, NOMS_LANGUES, choisirLangue, langueCourante, localeCourante, monnaie as monnaieI18n, ajouterSourceApp } from "./i18n/index.js";
+import { tr, LANGUES, NOMS_LANGUES, choisirLangue, langueCourante, localeCourante, monnaie as monnaieI18n, ajouterSourceApp, abonnerLangue } from "./i18n/index.js";
 import { offresVestiaire, offresJourneeVc, euros as eurosOffre, resteAvant as resteAvantOffre } from './offresVestiaire.js';
 // La partie « app » du dictionnaire français arrive AVEC l'app (le fichier d'entrée reste léger).
 import frApp from "./i18n/langues/fr.js";
@@ -2685,6 +2685,7 @@ const ensureLocalOwner = (uid) => {
 const RECHERCHE_OUVERTURE = (() => { try { return window.location.search || ''; } catch (_) { return ''; } })();
 // Restaure la session au démarrage, et renouvelle le jeton s'il a expiré.
 let AUTH_REDIRECT = null;   // résultat du retour OAuth / lien email, lu par l'écran de connexion
+let _langueAbonnee = false;   // (15 nov.) une seule écoute du changement de langue (alignerLangueCompte)
 const authBoot = async () => {
   // ⚠️ NE PAS BLOQUER LE PREMIER AFFICHAGE SUR LE RÉSEAU.
   // Avant, on attendait DEUX appels réseau ici : l'app restait sur un écran
@@ -2721,7 +2722,11 @@ const authBoot = async () => {
   // (8 nov.) Un compte créé avant que la langue soit rangée la reçoit une fois,
   // plus tard (rien ne doit retarder le premier écran). Raté ⇒ réessayé au
   // prochain chargement ; jamais par-dessus une langue déjà rangée.
-  setTimeout(() => { if (RECOVERY_PENDING) return; const s2 = AUTH.session; poserLangueUneFois({ url: SUPABASE_URL, cle: SUPABASE_KEY, jeton: s2 && s2.access_token, uid: s2 && s2.user && s2.user.id, stockage: (() => { try { return localStorage; } catch (_) { return null; } })() }).catch(() => {}); }, 8000);
+  // (15 nov.) Puis la langue de l'app (cinq langues) rangée sur le compte — celle des
+  // notifications push (api/_lib/push.js) ; et de nouveau à chaque changement de langue.
+  const alignerLangue = () => { if (RECOVERY_PENDING) return; const s3 = AUTH.session; alignerLangueCompte({ url: SUPABASE_URL, cle: SUPABASE_KEY, jeton: s3 && s3.access_token, uid: s3 && s3.user && s3.user.id, langue: langueCourante() }).catch(() => {}); };
+  setTimeout(() => { if (RECOVERY_PENDING) return; const s2 = AUTH.session; poserLangueUneFois({ url: SUPABASE_URL, cle: SUPABASE_KEY, jeton: s2 && s2.access_token, uid: s2 && s2.user && s2.user.id, stockage: (() => { try { return localStorage; } catch (_) { return null; } })() }).catch(() => {}).then(alignerLangue); }, 8000);
+  if (!_langueAbonnee) { _langueAbonnee = true; try { abonnerLangue(() => setTimeout(alignerLangue, 500)); } catch (_) {} }
 };
 // ── LE PREMIER ÉCRAN N'ATTEND PLUS SON PROPRE RENDU (16 octobre) ─────────────
 // Mesuré au banc `vitesse.cjs` (téléphone, processeur ×4) : Ma journée enchaînait

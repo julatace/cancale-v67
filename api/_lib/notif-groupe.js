@@ -29,6 +29,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 import { regrouper } from './notif-textes.js';
 import { GENRES, genreDe, couper, sansEmoji, TITRE_MAX, CORPS_MAX } from './notif-belle.js';
+import { phraseResume, corpsGroupe, langueNotif } from './notif-redaction.js';
 
 export const FENETRES = [15, 30, 60];
 // `0` posé à la main (bancs, ou un vendeur qui veut le regroupement par genre
@@ -78,14 +79,8 @@ export function cleDuJour({ cle = '', tag = '', title = '' } = {}, t = Date.now(
 // ── LE TEXTE DU RÉSUMÉ ──────────────────────────────────────────────────────
 // Une phrase par genre (dans cet ordre : ce qui presse d'abord). Les mêmes mots
 // que l'écran : « à poster » (Ventes · À expédier), « à retirer » (Achats).
-const PHRASE = {
-  bordereau: (k) => `${k} colis à poster`,
-  arrivee: (k) => `${k} colis à retirer`,
-  vente: (k) => `${k} vente${k > 1 ? 's' : ''}`,
-  argent: (k) => `${k} versement${k > 1 ? 's' : ''}`,
-  offre: (k) => `${k} offre${k > 1 ? 's' : ''}`,
-  message: (k) => `${k} message${k > 1 ? 's' : ''}`,
-};
+// (15 nov.) Les phrases viennent de la règle de rédaction (5 langues) : `phraseResume`.
+const PHRASE = Object.fromEntries(['bordereau', 'arrivee', 'vente', 'argent', 'offre', 'message'].map((g) => [g, (k, l) => phraseResume(g, k, l)]));
 const GESTE = { bordereau: 'Colis à poster', arrivee: 'Colis à retirer', vente: 'Ventes', argent: 'Ventes', offre: 'Offres', message: 'Messages' };
 export const ORDRE_GENRES = ['bordereau', 'arrivee', 'vente', 'argent', 'offre', 'message'];
 
@@ -96,7 +91,8 @@ export const ORDRE_GENRES = ['bordereau', 'arrivee', 'vente', 'argent', 'offre',
 //   · un seul genre ⇒ le titre du genre (« 3 bordereaux prêts à imprimer ») et sa liste ;
 //   · plusieurs genres ⇒ « 2 colis à poster · 1 colis à retirer », l'écran du
 //     premier genre, et un geste par genre (Android ; iOS ouvre le premier).
-export function resumeDeGroupe(entrees) {
+export function resumeDeGroupe(entrees, langue = 'fr') {
+  const lg = langueNotif(langue);
   const l = (Array.isArray(entrees) ? entrees : []).filter((e) => e && typeof e === 'object');
   if (!l.length) return null;
   if (l.length === 1) {
@@ -107,16 +103,17 @@ export function resumeDeGroupe(entrees) {
   for (const e of l) { const g = e.genre && PHRASE[e.genre] ? e.genre : 'autre'; par.set(g, (par.get(g) || 0) + 1); }
   const genres = [...ORDRE_GENRES.filter((g) => par.has(g)), ...(par.has('autre') ? ['autre'] : [])];
   const derniere = l.reduce((a, b) => ((b.seq || 0) > (a.seq || 0) ? b : a), l[0]);
-  const detail = `Dernier : ${[derniere.titre, derniere.texte].filter(Boolean).join(' · ')}`;
+  // (15 nov.) « La plus récente : <son titre> » — le titre dit déjà le fait (≤ 40).
+  const detail = corpsGroupe(derniere.titre || derniere.texte || '', lg);
   const parGenre = Object.fromEntries(par);
   const urlDe = (g) => { const G = GENRES.find((x) => x.id === g); return G ? G.url : (derniere.url || '/'); };
   if (genres.length === 1) {
     const g = genres[0], k = par.get(g);
     const G = GENRES.find((x) => x.id === g);
     const memeUrl = l.every((e) => e.url === l[0].url) ? l[0].url : null;
-    return { title: couper(G ? G.titre(k) : `${k} notifications`, TITRE_MAX), body: couper(detail, CORPS_MAX), url: memeUrl || urlDe(g), actions: [], n: l.length, parGenre };
+    return { title: couper(G ? G.titre(k, lg) : phraseResume('notifs', k, lg), TITRE_MAX), body: couper(detail, CORPS_MAX), url: memeUrl || urlDe(g), actions: [], n: l.length, parGenre };
   }
-  const phrases = genres.map((g) => (g === 'autre' ? `${par.get(g)} autre${par.get(g) > 1 ? 's' : ''}` : PHRASE[g](par.get(g))));
+  const phrases = genres.map((g) => (g === 'autre' ? phraseResume('autre', par.get(g), lg) : PHRASE[g](par.get(g), lg)));
   let title = '';
   for (let i = 0; i < phrases.length; i++) {
     const t = phrases.slice(0, i + 1).join(' · ');
@@ -124,7 +121,7 @@ export function resumeDeGroupe(entrees) {
     title = t;
   }
   const restes = phrases.slice(title ? title.split(' · ').length : 0);
-  if (!title) title = `${l.length} notifications`;
+  if (!title) title = phraseResume('notifs', l.length, lg);
   const body = couper([restes.join(' · '), detail].filter(Boolean).join(' · '), CORPS_MAX);
   const actions = genres.filter((g) => g !== 'autre').slice(0, 2).map((g) => ({ action: `g-${g}`, title: GESTE[g], url: urlDe(g) }));
   return { title, body, url: urlDe(genres.find((g) => g !== 'autre') || genres[0]), actions, n: l.length, parGenre };
