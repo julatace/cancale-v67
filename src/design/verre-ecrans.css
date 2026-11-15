@@ -492,4 +492,17 @@
   :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat .vrm-set-lib { min-width: 0; flex: 1 1 auto; }
 }
 
+@media (min-width: 1024px) {
+  /* La fiche à l'ordinateur, version stable : DEUX colonnes — la paire à gauche (elle couvre toutes les rangées), tout le
+     reste empilé à droite, chaque bloc à sa hauteur (aucune rangée partagée qui étire un bloc). */
+  :root:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-cadre { grid-template-columns: minmax(300px, .8fr) minmax(0, 1.6fr) !important; row-gap: 0 !important; align-items: start !important; grid-auto-flow: row !important; }
+  :root:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-cadre > * { grid-column: 2 !important; align-self: start !important; margin: 0 0 14px !important; }
+  :root:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-cadre > :is(.vrm-fp-poignee, .vrm-fp-tete, .vrm-fp-vide) { grid-column: 1 / -1 !important; }
+  :root:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-cadre > :is(.vrm-fp-heros, .vrm-fp-sans-paire) { grid-column: 1 !important; grid-row: 2 / span 40 !important; position: sticky; top: 0; }
+  :root:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-tuiles, :root:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-outils { align-items: start !important; }
+  :root:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-outils { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+  :root:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-raccourcis { align-items: flex-start !important; }
+  :root:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-raccourcis button { height: 36px !important; min-height: 36px !important; }
+}
+
 } /* fin de @layer vrm-verre */
