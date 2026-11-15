@@ -11100,7 +11100,7 @@ function surAlarme(a) {
   else if (a.name === 'vrm-photos') lance('photos', () => tickPhotos());
   else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); }   // 5.376 : les favoris lancés depuis la carte
   else if (a.name === 'vrm-lbc') lance('lbc', () => relireLbcEnFond());
-  else if (a.name === 'vrm-offres') { lance('offres', () => offresTick()); lance('baisses', () => baissesTick()); lance('favoriattente', () => reprendreMessagesFavoris()); lance('vcaimes', () => reprendreOffresAimesVc()); }   // 5.372 : un message au favori qui attendait après l'offre   // 5.370 : les baisses programmées
+  else if (a.name === 'vrm-offres') { lance('offres', () => offresTick()); lance('baisses', () => baissesTick()); lance('favoriattente', () => reprendreMessagesFavoris()); lance('vcaimes', () => reprendreOffresAimesVc()); lance('photosvrm', () => rangerPhotosVrm()); }   // 5.372 : un message au favori qui attendait après l'offre   // 5.370 : les baisses programmées
   // 5.290 : le statut des colis chez le transporteur (voir `transpTick`).
   else if (a.name === 'vrm-transp') lance('transp', () => transpTick('alarme'));
   // 5.341 : les dates de versement, onglet Vinted ouvert (voir `tickVersements`).
@@ -14651,7 +14651,7 @@ async function refaireBrouillon(msg) {
     { const fr = await lireFreinRepub(uid); if (fr) { if (recuR.at) await rendreActions(uid, recuR.at, 1); noterDiag('frein_repub_tenu_file'); return { accepte: false, code: 'frein-refus', jusqua: fr.jusqua, raison: phraseFreinRepub(fr) }; } }
     suiviRepub(id);
     const temp = uuidRecreer();
-    const tp = await televerserPhotosRecreer(acc, urls, [], reglagesPhotoSurs(vb.reglages), temp, (k, n) => etapeRepub(id, 'photos', { fait: k, total: n }));
+    const tp = await televerserPhotosRecreer(acc, urls, [], reglagesPhotoSurs(vb.reglages), temp, (k, n) => etapeRepub(id, 'photos', { fait: k, total: n }), { uid, src: id, n: msg && msg.num ? String(msg.num) : '' });
     if (tp.sansPage) return { accepte: false, code: 'onglet-vinted', raison: tp.erreur };
     if (!tp.ids) return { accepte: true, etape: 'echec', refaire: true, raison: `${tp.erreur} — aucun brouillon n'a été créé, tout reste enregistré dans VRM` };
     const assigned = tp.ids.map((pid) => ({ id: pid, orientation: 0 }));
@@ -14771,8 +14771,9 @@ function photosRefusees(rc) {
 // Les photos d'un brouillon fait par VRM, renvoyées depuis le coffre de
 // l'ancienne annonce (une par photo, avec ses réglages enregistrés).
 // Rend { ids } · { erreur } · {} (rien à renvoyer : pas de coffre).
-async function televerserPhotosRecreer(acc, urls, second, reglages, temp, suivi) {
+async function televerserPhotosRecreer(acc, urls, second, reglages, temp, suivi, origine = null) {
   const ids = [];
+  const produites = [];   // 5.392 : l'empreinte de chaque photo PRODUITE (réglée) par VRM — rangée après la boucle
   for (let i = 0; i < urls.length; i++) {
     if (i > 0) await pauseRepub('photo', acc && acc.vinted_user_id);
     if (typeof suivi === 'function') { try { suivi(i, urls.length); } catch (_) {} }
@@ -14782,6 +14783,8 @@ async function televerserPhotosRecreer(acc, urls, second, reglages, temp, suivi)
     for (const u of essais) { try { const r = await fetch(u, { signal: AbortSignal.timeout(30000) }); if (!r.ok) throw new Error('http ' + r.status); blob = await r.blob(); break; } catch (e) { err = e; blob = null; } }
     if (!blob) return { erreur: `la photo ${i + 1} n'a pas pu être lue (${String(err && err.message || err || 'photo absente').slice(0, 40)})` };
     try { blob = await photoReglee(blob, reglages); } catch (e) { return { erreur: String(e && e.message || e).slice(0, 80) }; }
+    // 5.392 (`photovrm`) : la MÊME empreinte que `tickEmpreintes` (`empreinteDeBlob`), sur le fichier PRODUIT.
+    if (origine) { try { const h = await empreinteDeBlob(blob); if (h) produites.push(h); } catch (_) {} }
     const rp = await vintedPagePhoto(acc, blob, `photo-${i + 1}.jpg`, temp);
     if (rp && rp.sansPage) return { erreur: raisonSansPage(rp), sansPage: rp.sansPage };
     const pid = rp && rp.ok ? idPhotoReponse(rp.json) : null;
@@ -14795,7 +14798,52 @@ async function televerserPhotosRecreer(acc, urls, second, reglages, temp, suivi)
     }
     ids.push(pid);
   }
+  // La file est posée tout de suite (stockage de l'extension) ; l'écriture en base suit sans retenir l'atelier.
+  if (origine && produites.length && await noterPhotosVrm(origine, produites)) rangerPhotosVrm().catch(() => {});
   return { ids };
+}
+// ══ 5.392 (15 nov., `photovrm`) — LA PHOTO FABRIQUÉE PAR L'ATELIER « REPUBLIER PAR VRM » ═══════════
+// Pour qu'une photo de l'atelier, republiée PLUS TARD à la main dans l'app Vinted, soit reconnue
+// (src/republieTelephone.js, registre `vrm_photos_vrm`, seuil SÛR `SEUIL_PHOTO_VRM`) : l'empreinte de
+// chaque photo RÉGLÉE (`photoReglee`) est rangée dans `photo_vrm_{uid}` (compte de l'onglet) :
+// `payload.photos = { [empreinte]: { h, n (N° de la fiche), src (l'annonce d'origine), uid, at } }`.
+// Jamais l'image. La file vit dans `chrome.storage.local` (§4.9) ; la ligne est lue-fusionnée-réécrite
+// (une lecture ratée n'écrit RIEN, la file reste), bornée (60 jours, 1 500 empreintes). Rien d'autre ne
+// change dans l'atelier : le rangement suit l'envoi des photos, il n'en retient aucune.
+const PHOTOS_VRM_FILE = 'vrmPhotosVrmFile';
+const PHOTOS_VRM_JOURS = 60, PHOTOS_VRM_MAX = 1500;
+async function noterPhotosVrm(origine, hexes) {
+  const uid = String((origine && origine.uid) || ''), src = String((origine && origine.src) || ''), n = String((origine && origine.n) || '').trim();
+  if (!/^\d{1,20}$/.test(uid) || !/^\d{1,20}$/.test(src)) return false;
+  const at = new Date().toISOString();
+  try {
+    const f = (await chrome.storage.local.get(PHOTOS_VRM_FILE))[PHOTOS_VRM_FILE] || [];
+    for (const h of hexes) if (empreinteValide(h)) f.push({ h, n, src, uid, at });
+    await chrome.storage.local.set({ [PHOTOS_VRM_FILE]: f.slice(-400) });
+  } catch (_) { return false; }
+  return true;
+}
+async function rangerPhotosVrm() {
+  let file = [];
+  try { file = (await chrome.storage.local.get(PHOTOS_VRM_FILE))[PHOTOS_VRM_FILE] || []; } catch (_) { return false; }
+  if (!file.length) return true;
+  const restent = [];
+  const parUid = {};
+  for (const e of file) if (e && /^\d{1,20}$/.test(String(e.uid || ''))) (parUid[e.uid] = parUid[e.uid] || []).push(e);
+  const limite = Date.now() - PHOTOS_VRM_JOURS * 864e5;
+  for (const [uid, liste] of Object.entries(parUid)) {
+    const r = await sbGet(`app_data?id=eq.photo_vrm_${uid}&select=p:data->payload->photos`);
+    if (r === null) { restent.push(...liste); noterDiag('photos_vrm_lecture_ratee'); continue; }
+    const photos = Object.assign({}, (r[0] && r[0].p && typeof r[0].p === 'object' && !Array.isArray(r[0].p)) ? r[0].p : {});
+    for (const e of liste) photos[e.h] = { h: e.h, n: String(e.n || ''), src: String(e.src || ''), uid: String(uid), at: e.at };
+    let garde = Object.entries(photos).filter(([h, e]) => empreinteValide(h) && e && Date.parse(e.at || '') >= limite);
+    garde.sort((a, b) => String(b[1].at).localeCompare(String(a[1].at)));
+    garde = garde.slice(0, PHOTOS_VRM_MAX);
+    const ok = await supabaseUpsert('app_data', [{ id: `photo_vrm_${uid}`, data: { type: 'photo_vrm', uid: String(uid), capturedAt: new Date().toISOString(), nItems: garde.length, payload: { version: 1, photos: Object.fromEntries(garde) } } }], 'id');
+    if (ok === false) { restent.push(...liste); noterDiag('photos_vrm_ecriture_ratee'); } else noterDiag('photos_vrm_ecrites');
+  }
+  try { await chrome.storage.local.set({ [PHOTOS_VRM_FILE]: restent }); } catch (_) {}
+  return !restent.length;
 }
 // (28 oct.) La fiche d'UNE annonce dans `vinted_item_details`. ⚠️ Mesuré dans
 // les journaux de la base : `select=f:data->10312441750` répond 400 — un nombre
@@ -15044,7 +15092,7 @@ async function recreerVinted(msg) {
     // 2. Les photos, une par une, depuis la page.
     await pauseRepub('lecture', uid);
     const temp = uuidRecreer();
-    const tp = await televerserPhotosRecreer(acc, urls, second, reglages, temp, (i, n) => etapeRepub(id, 'photos', { fait: i, total: n }));
+    const tp = await televerserPhotosRecreer(acc, urls, second, reglages, temp, (i, n) => etapeRepub(id, 'photos', { fait: i, total: n }), { uid, src: id, n: msg && msg.num ? String(msg.num) : '' });
     if (tp.sansPage) return { accepte: false, code: 'onglet-vinted', raison: tp.erreur };
     if (!tp.ids) return { accepte: true, etape: 'echec', raison: `${tp.erreur} — rien n'a été créé ni supprimé, ton annonce est intacte` };
     const ids = tp.ids;
