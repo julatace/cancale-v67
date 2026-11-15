@@ -30,7 +30,7 @@ export default {
   "rx.e.ongletSansCompte": "Open leboncoin.fr in this browser, signed in to the listing’s account: VRM resumes on its own when you come back.",
   "rx.e.encours": "Removing…",
   "rx.e.retire": "Removed · {site} said yes. The next read will confirm it.",
-  "rx.e.retireRelu": "Removed ✓ · read again: it’s no longer listed.",
+  "rx.e.retireRelu": "Removed · read again: it’s no longer listed.",
   "rx.e.incertain": "No clear answer: check the listing before trying again.",
   "rx.e.refuse": "Not done: {raison}.",
   "rx.v.douteuse": "To check: the sale isn’t proven ({pourquoi}). VRM removes nothing until it’s sure.",

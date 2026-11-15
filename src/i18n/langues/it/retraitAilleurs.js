@@ -30,7 +30,7 @@ export default {
   "rx.e.ongletSansCompte": "Apri leboncoin.fr in questo browser, con l’account dell’annuncio: VRM riprende da solo quando torni qui.",
   "rx.e.encours": "Ritiro in corso…",
   "rx.e.retire": "Ritirato · {site} ha detto sì. La prossima lettura lo confermerà.",
-  "rx.e.retireRelu": "Ritirato ✓ · riletto: non è più online.",
+  "rx.e.retireRelu": "Ritirato · riletto: non è più online.",
   "rx.e.incertain": "Nessuna risposta chiara: guarda l’annuncio prima di riprovare.",
   "rx.e.refuse": "Non fatto: {raison}.",
   "rx.v.douteuse": "Da verificare: la vendita non è provata ({pourquoi}). VRM non ritira nulla finché non è sicura.",

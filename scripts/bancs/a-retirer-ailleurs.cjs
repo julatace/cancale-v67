@@ -105,7 +105,7 @@ const MESURE = (pg, tel) => pg.evaluate((tel) => {
   if (tel && bloc) for (const e of bloc.querySelectorAll('button, a')) { if (!vis(e)) continue; const r = e.getBoundingClientRect(); if (r.height < 43.5) petits.push(`${txt(e).slice(0, 30)} ${Math.round(r.width)}×${Math.round(r.height)}`); }
   const rouge = (c) => { const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(c || ''); return !!m && +m[1] > 150 && +m[2] < 70 && +m[3] > 20 && +m[3] < 90; };
   const rouges = bloc ? [...bloc.querySelectorAll('*')].filter((e) => vis(e) && rouge(getComputedStyle(e).color)).map((e) => txt(e).slice(0, 30)) : [];
-  const doublons = [...document.querySelectorAll('[data-job="double-vente"]')].filter(vis).map(txt).filter((t) => /retirer (de Leboncoin|d'eBay|d’eBay)/i.test(t));
+  const doublons = [...document.querySelectorAll('[data-job="double-vente"]')].filter(vis).map(txt).filter((t) => /retirer (de Leboncoin|d'eBay|d’eBay|de Vestiaire)/i.test(t));
   return {
     bloc: bloc ? {
       top: Math.round(bloc.getBoundingClientRect().top + scrollY), tout: bloc.getAttribute('data-rx-serie'), texte: txt(bloc),
@@ -202,6 +202,7 @@ async function tournee(nav, { W, scenario, sombre }) {
     dit(!!lb1 && lb1.etat === 'retire' && /Leboncoin a dit oui/.test(lb1.t), 'T3', `${T} Leboncoin « Retirée · Leboncoin a dit oui » (la relecture le confirmera)`, JSON.stringify(lb1));
     dit(!!eb1 && eb1.statut === 'relu' && /relu/.test(eb1.t), 'T3', `${T} eBay « Retirée ✓ · relu »`, JSON.stringify(eb1));
     dit(!!vc1 && vc1.etat === 'note' && !vc1.gestes.includes('marquer'), 'T3', `${T} Vestiaire « notée retirée par toi »`, JSON.stringify(vc1));
+    dit(!m1.doublons.length, 'T1', `${T} après les retraits : la coque ne redit toujours rien à côté`, JSON.stringify(m1.doublons));
     dit(!m1.debord && !m1.petits.length && !m1.rouges.length, 'T0', `${T} après : aucun débordement, 44 px, aucun rouge`, JSON.stringify({ d: m1.debord, p: m1.petits, r: m1.rouges }));
     touchers[`plein ${W}`] = n;
     dit(n === 5, 'T3', `${T} 5 touchers pour les trois sites (Leboncoin 2, eBay 2, Vestiaire 1), sans quitter Ma journée`, String(n));

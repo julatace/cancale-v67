@@ -8,6 +8,7 @@
 .rx-entete { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .rx-titre { flex: 1 1 160px; margin: 0; font: 600 17px/1.2 var(--sb-police-affiche, inherit); letter-spacing: -.01em; color: var(--sb-encre, inherit); }
 .rx.is-fiche .rx-titre { font-size: 15px; }
+.rx-tout-rang { display: flex; justify-content: flex-end; margin: 2px 0 8px; }
 .rx-tout { flex: none; }
 .rx-sous { margin: 4px 0 8px; font-size: 13px; line-height: 1.4; color: var(--sb-encre-2, inherit); }
 .rx .rx-avant { margin: 0 0 6px; font-size: 12.5px; }
@@ -39,7 +40,7 @@
 .rx-gestes { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .rx-gestes:empty { display: none; }
 .rx-geste, .rx-lien { min-height: 44px; box-sizing: border-box; }
-.rx-lien { display: inline-flex; align-items: center; padding: 0 6px; font-size: 13.5px; }
+.rx-lien { display: inline-flex; align-items: center; padding: 0 6px; font-size: 13.5px; font-weight: 600; color: var(--sb-lien, #0060CC); }
 .rx-site.is-encours { opacity: .85; }
 .rx-site.is-encours .rx-marque { animation: rx-souffle 1.2s ease-in-out infinite; }
 @keyframes rx-souffle { 50% { opacity: .45; } }

@@ -30,7 +30,7 @@ export default {
   "rx.e.ongletSansCompte": "Öffne leboncoin.fr in diesem Browser, mit dem Konto der Anzeige: VRM macht von selbst weiter, wenn du zurückkommst.",
   "rx.e.encours": "Wird entfernt…",
   "rx.e.retire": "Entfernt · {site} hat ja gesagt. Das nächste Lesen bestätigt es.",
-  "rx.e.retireRelu": "Entfernt ✓ · neu gelesen: nicht mehr online.",
+  "rx.e.retireRelu": "Entfernt · neu gelesen: nicht mehr online.",
   "rx.e.incertain": "Keine klare Antwort: sieh dir die Anzeige an, bevor du es erneut versuchst.",
   "rx.e.refuse": "Nicht erledigt: {raison}.",
   "rx.v.douteuse": "Zu prüfen: der Verkauf ist nicht belegt ({pourquoi}). VRM entfernt nichts, bis er sicher ist.",

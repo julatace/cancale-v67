@@ -82,14 +82,14 @@ export default function ARetirerAilleurs({ liste, onGeste, onMarquer, onToutReti
       data-rx-reste={String(liste.nReste)} aria-label={tr('rx.titre')}>
       <div className="rx-entete">
         <h2 className="rx-titre">{tr('rx.titre')}</h2>
-        {!fiche && nTout >= 2 && !enSerie ? (
-          <button type="button" className="sb-touche rx-tout" data-rx-tout={String(nTout)} disabled={occupe} onClick={onToutRetirer}>{tr('rx.toutRetirer', { n: nTout })}</button>
-        ) : null}
       </div>
       {!fiche ? <p className="rx-sous">{tr('rx.sous', { n: liste.articles.length })}</p> : null}
       {enSerie
         ? <AccPendant geste="annonce.retirer" fait={serie.fait} total={serie.total} onArreter={onArreter} arretDemande={!!serie.arret}/>
         : nTout ? <AccAvant geste="annonce.retirer" className="rx-avant"/> : null}
+      {!fiche && nTout >= 2 && !enSerie ? (
+        <div className="rx-tout-rang"><button type="button" className="sb-touche rx-tout" data-rx-tout={String(nTout)} disabled={occupe} onClick={onToutRetirer}>{tr('rx.toutRetirer', { n: nTout })}</button></div>
+      ) : null}
       {liste.articles.map((art) => (
         <article key={art.numero} className="rx-article" data-ra-numero={art.numero} data-rx-douteuse={art.douteuse ? '1' : undefined}>
           {!fiche ? (
@@ -110,7 +110,7 @@ export default function ARetirerAilleurs({ liste, onGeste, onMarquer, onToutReti
                 aria-busy={s.etat === 'encours' ? 'true' : undefined}>
                 <span className="rx-marque" aria-hidden="true"><MarquePlateforme site={SITE_MARQUE[s.plateforme] || ''} taille={20} carre/></span>
                 <span className="rx-site-txt">
-                  <b>{s.plateforme}{s.compteNom ? <span className="rx-compte"> · {s.compteNom}</span> : null}</b>
+                  <b>{s.plateforme}{s.compteNom && s.compteNom !== s.plateforme ? <span className="rx-compte"> · {s.compteNom}</span> : null}</b>
                   <small data-rx-phrase="">{s.etat === 'retire' || s.etat === 'note' ? <span className="rx-ok" aria-hidden="true">✓ </span> : (s.etat === 'refuse' || s.etat === 'onglet' || s.etat === 'incertain') ? <span className="rx-point" aria-hidden="true"/> : null}{texteSite(s)}</small>
                   {s.dementieLe ? <small className="rx-dementie" data-rx-dementie="">{tr('rx.e.dementie', { date: jour(s.dementieLe) })}</small> : null}
                 </span>

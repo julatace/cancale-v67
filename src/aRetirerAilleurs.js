@@ -37,6 +37,7 @@ import { FRAIS_MS } from './retirerAilleurs.js';
 
 const arr = (a) => (Array.isArray(a) ? a : []);
 const fini = (x) => typeof x === 'number' && Number.isFinite(x);
+const ORDRE_SITES = ['Leboncoin', 'eBay', 'Vestiaire', 'Vinted'];   // l'ordre du plan (src/retirerAilleurs.js)
 export const SITE_MARQUE = { Leboncoin: 'leboncoin', eBay: 'ebay', Vestiaire: 'vestiaire', Vinted: 'vinted' };
 export const LIEN_SITE = {
   Leboncoin: 'https://www.leboncoin.fr/compte/part/mes-annonces',
@@ -151,7 +152,7 @@ export function fusionPlan(plan, gardes) {
     if (!g || !g.art || !g.site) continue;
     let a = parNum.get(String(g.art.numero));
     if (!a) { a = { numero: g.art.numero, venduSur: arr(g.art.venduSur), titre: g.art.titre || '', photo: g.art.photo || null, douteuse: !!g.art.douteuse, sites: [] }; articles.push(a); parNum.set(String(a.numero), a); }
-    if (!a.sites.some((s) => s.cle === g.site.cle)) a.sites.push(g.site);
+    if (!a.sites.some((s) => s.cle === g.site.cle)) { a.sites.push(g.site); a.sites.sort((x, y) => ORDRE_SITES.indexOf(x.plateforme) - ORDRE_SITES.indexOf(y.plateforme)); }
   }
   return { ...(plan || {}), articles };
 }

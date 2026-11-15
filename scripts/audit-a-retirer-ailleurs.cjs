@@ -53,7 +53,7 @@ const MUTATIONS = {
   'notif-ancienne': ['dv', 'const url = DESTINATIONS.retirerAilleurs({ num: h0.numero || nums[0] });', "const url = DESTINATIONS.journee();"],
   'app-sans-etat-prouve': ['app', '        !sansEtatVinted(o) &&\n', ''],
   'app-reprise-redemande': ['app', '  if (!reprise && !(await confirmerRA([{ a: art, s: site }]))) return;', '  if (!(await confirmerRA([{ a: art, s: site }]))) return;'],
-  'app-alertes-tues': ['app', '          if (a.dv && a.retrait && alerteCouverte(RA.plan, a.retrait.plat, a.retrait.nums, cleNum)) continue;', '          if (a.dv && a.retrait) continue;'],
+  'app-alertes-tues': ['app', '          if (a.dv && a.retrait && alerteCouverte(fusionPlan(RA.plan, RA.gardes), a.retrait.plat, a.retrait.nums, cleNum)) continue;', '          if (a.dv && a.retrait) continue;'],
 };
 
 const arg = process.argv.slice(2);
@@ -229,7 +229,7 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').m
     dit(/const sansEtatVinted = \(o\) => !String\(/.test(app) && /!sansEtatVinted\(o\) &&\s*\n\s*txnItem/.test(app) && /engagee: sansEtatVinted\(o\) && !venduesVinted\.has\?\.\(id\) \? null : true/.test(app), 'K1 · une commande Vinted sans état n’est PAS une preuve (`engagee: null`, « à vérifier »)');
     dit(/\{raTete \? blocRetirerAilleurs\(true\) : null\}/.test(app) && /<BlocARetirerAilleurs numero=\{p\.num\}/.test(app) && /\{!baseKO && blocRetirerAilleurs\(false\)\}/.test(app), 'K2 · le bloc : en tête de Ma journée, dans la fiche de la paire, en tête de Ventes');
     dit(/if \(!reprise && !\(await confirmerRA\(\[\{ a: art, s: site \}\]\)\)\) return;/.test(app), 'K3 · la confirmation existante, une fois — la reprise après « Ouvre leboncoin.fr » ne redemande pas');
-    dit(/alerteCouverte\(RA\.plan, a\.retrait\.plat, a\.retrait\.nums, cleNum\)/.test(app), 'K4 · une alerte de la coque n’est tue que couverte par le bloc (même règle)');
+    dit(/alerteCouverte\(fusionPlan\(RA\.plan, RA\.gardes\), a\.retrait\.plat, a\.retrait\.nums, cleNum\)/.test(app), 'K4 · une alerte de la coque n’est tue que couverte par le bloc (même règle)');
     dit(/'vrm_retraits_main',/.test(app), 'K5 · « C’est retiré » est synchronisé (sa parole suit d’un appareil à l’autre)');
   });
 

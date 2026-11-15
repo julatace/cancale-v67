@@ -46429,7 +46429,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (Array.isArray(alertes)) for (const a of alertes) {
           if (!a || !(a.dv || a.jr)) continue;
           // (15 nov., retrait-ailleurs) Déjà dans « À retirer ailleurs » (en tête, avec son geste) : pas redite ici.
-          if (a.dv && a.retrait && alerteCouverte(RA.plan, a.retrait.plat, a.retrait.nums, cleNum)) continue;
+          if (a.dv && a.retrait && alerteCouverte(fusionPlan(RA.plan, RA.gardes), a.retrait.plat, a.retrait.nums, cleNum)) continue;
           if (a.dv) jobs.push({id:'double-vente', n:a.n, icon:a.ic||'alert', color:a.dv==='num'?C.doublon:C.warn, urgent:true, title:a.text, tab:a.tab, prio:-1, avant:a.avant, lbcSuppr:Array.isArray(a.lbcSuppr)&&a.lbcSuppr.length?a.lbcSuppr:null, photos:a.photos});
           else jobs.push({id:a.job||('a-faire-'+a.ic), n:a.n, icon:a.ic||'info', color:a.urssaf&&a.urssaf.proche?C.warn:C.text, title:a.text, sub:a.sub, tab:a.tab, prio:3, urssaf:a.urssaf,
             // (1er nov., « très répétitif ») Le rappel URSSAF en court : « Déclarer
@@ -61212,7 +61212,7 @@ function AppCoeur() {
       // Leboncoin pèsent 5 Ko ; les annonces (226 Ko) ne sont lues que si une
       // vente ne se relie pas sans elles (sa clé est une référence portée par
       // l'annonce), et une fois par session au plus.
-      let lbcDoubles=0;
+      let lbcDoubles=0, lbcNumsDoubles=[], vcNumsDoubles=[];   // (15 nov., retrait-ailleurs) leurs N° (`alerteCouverte`)
       // (6 octobre) Gardées pour l'anti double vente eBay plus bas : une paire
       // vendue sur Leboncoin et PROGRAMMÉE sur eBay se dit aussi (§11).
       // `undefined` = pas lu · `null` = pas su · objet = lu.
@@ -61227,7 +61227,7 @@ function AppCoeur() {
           const calc=(items)=>doublesVenteLbc({ventes:ventesL, items, liens:liensL, numeros:nums, enLigne:lbcOnlineIds, vendusVinted:soldIdsN});
           let dv=calc(null);
           if(dv.aRelier.length){ const items=await lbcAnnoncesSession(); lbcItemsLu=items||null; if(items) dv=calc(items); }
-          lbcDoubles=dv.doublons.length; 
+          lbcDoubles=dv.doublons.length; lbcNumsDoubles=dv.doublons.map(d=>d&&d.numero); 
         }
       }catch(_){}
       // ── (1er nov., audit A1) VENDUE SUR VESTIAIRE, ENCORE EN VENTE SUR VINTED ──
@@ -61241,7 +61241,7 @@ function AppCoeur() {
           const parN=new Map();
           for(const id in nums){ const k=cleNum((nums[id]||{}).numero); if(!k) continue; if(!parN.has(k)) parN.set(k,[]); parN.get(k).push(String(id)); }
           const vusK=new Set();
-          for(const v of lv){ if(!v||!v.num||vcVenteAnnulee(v)) continue; const k=cleNum(v.num); if(vusK.has(k)) continue; if((parN.get(k)||[]).some(id=>lbcOnlineIds.has(id))){ vusK.add(k); vcDoubles++; } }
+          for(const v of lv){ if(!v||!v.num||vcVenteAnnulee(v)) continue; const k=cleNum(v.num); if(vusK.has(k)) continue; if((parN.get(k)||[]).some(id=>lbcOnlineIds.has(id))){ vusK.add(k); vcDoubles++; vcNumsDoubles.push(k); } }
         }
       }catch(_){}
       // (22 oct.) Une paire dont l'annonce Leboncoin est SORTIE (plus vue dans une
@@ -61299,7 +61299,7 @@ function AppCoeur() {
       // ratée/vide ⇒ 0, jamais un colis inventé (§5).
       let ebayARetirerAilleursOu='sur Leboncoin', vcARetirer=0, vcARetirerOu='ailleurs';
       // (15 nov., retrait-ailleurs) les N° de ces alertes : une alerte déjà dans « À retirer ailleurs » n'est pas redite (`alerteCouverte`).
-      let ebayNumsRetirer=[], ebayNumsAilleurs=[];
+      let ebayNumsRetirer=[], ebayNumsAilleurs=[], vcNumsRetirer=[];
       let ebayShipCount=0, ebayARetirer=0, ebayARetirerAilleurs=0, ebayARetirerVinted=0, ebayAAnnuler=0, ebayAAnnulerOu='sur Vinted';
       try{
         // §4.4 : la liste des commandes seulement, et les annonces eBay (petites).
@@ -61351,7 +61351,8 @@ function AppCoeur() {
             const pv=await lirePreuvesVenteVinted().catch(()=>null);
             const vd=numerosDejaVendus({numeros:nums, enLigne:lbcOnlineIds, vendusVinted:pv&&pv.vendus?pv.vendus:null, commandes:ords, ventesLbc:ventesLbcLu, itemsLbc:lbcItemsLu===undefined?null:lbcItemsLu, liensLbc:liensV});
             const ouVc=[];
-            for(const k of enLigneVc.keys()){ const ou=vd.vendus.get(k); if(ou&&ou!=='Vestiaire') ouVc.push({ou}); }
+            for(const k of enLigneVc.keys()){ const ou=vd.vendus.get(k); if(ou&&ou!=='Vestiaire') ouVc.push({ou, numero:k}); }
+            vcNumsRetirer=ouVc.map(x=>x.numero);
             vcARetirer=ouVc.length; vcARetirerOu=ouVenduesTexte(ouVc);
           }
         }catch(_){}
@@ -61505,9 +61506,9 @@ function AppCoeur() {
       }
       if(toShipCount>0)  items.push({icon:'⏰', ic:'truck', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_bord'});
       if(ebayShipCount>0) items.push({icon:'📮', ic:'truck', text:`${ebayShipCount} vente${ebayShipCount>1?'s':''} eBay à expédier`, n:ebayShipCount, tab:'plat_ebay', jr:true});
-      if(vcARetirer>0) items.push({icon:'🟠', ic:'tag', text:`${motArticle(vcARetirer)} vendu${motsVendeur().e}${vcARetirer>1?'s':''} ${vcARetirerOu}, encore en ligne sur Vestiaire — à retirer de Vestiaire`, n:vcARetirer, tab:'plat_vestiaire', dv:true});
-      if(vcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${vcDoubles} article${vcDoubles>1?'s':''} vendu${vcDoubles>1?'s':''} sur Vestiaire, encore en vente sur Vinted — à retirer de Vinted`, n:vcDoubles, tab:'plat_vestiaire', dv:true, annonces:true});
-      if(lbcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${lbcDoubles} article${lbcDoubles>1?'s':''} vendu${lbcDoubles>1?'s':''} sur Leboncoin, encore en vente sur Vinted — à retirer de Vinted`, n:lbcDoubles, tab:'leboncoin', dv:true, annonces:true});
+      if(vcARetirer>0) items.push({icon:'🟠', ic:'tag', text:`${motArticle(vcARetirer)} vendu${motsVendeur().e}${vcARetirer>1?'s':''} ${vcARetirerOu}, encore en ligne sur Vestiaire — à retirer de Vestiaire`, retrait:{ plat:'Vestiaire', nums:vcNumsRetirer }, n:vcARetirer, tab:'plat_vestiaire', dv:true});
+      if(vcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${vcDoubles} article${vcDoubles>1?'s':''} vendu${vcDoubles>1?'s':''} sur Vestiaire, encore en vente sur Vinted — à retirer de Vinted`, retrait:{ plat:'Vinted', nums:vcNumsDoubles }, n:vcDoubles, tab:'plat_vestiaire', dv:true, annonces:true});
+      if(lbcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${lbcDoubles} article${lbcDoubles>1?'s':''} vendu${lbcDoubles>1?'s':''} sur Leboncoin, encore en vente sur Vinted — à retirer de Vinted`, retrait:{ plat:'Vinted', nums:lbcNumsDoubles }, n:lbcDoubles, tab:'leboncoin', dv:true, annonces:true});
       if(lbcRemoveCount>0){ const noms=(lbcARetirer||[]).slice(0,3).map(r=>r.numero?`N°${r.numero}`:'').filter(Boolean); const reste=lbcRemoveCount-noms.length; items.push({icon:'🟠', ic:'tag', text: noms.length ? `${lbcRemoveCount} à retirer de Leboncoin — ${noms.join(', ')}${reste>0?` et ${reste} autre${reste>1?'s':''}`:''} vendue${lbcRemoveCount>1?'s':''} sur Vinted` : `${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin', dv:true, lbcRetirer:true, retrait:{ plat:'Leboncoin', nums:(lbcARetirer||[]).map(r=>r&&r.numero) }, photos:lbcRemovePhotos, lbcSuppr:(lbcARetirer||[]).filter(r=>r&&r.lbcId).map(r=>({ id:r.lbcId, numero:r.numero, titre:r.titre, ou:'Vinted' })), avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer]'; DEMANDE_LBC_CIBLE.at=Date.now(); }}); }
       if(lbcRemoveVcCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveVcCount} à retirer de Leboncoin (vendue${lbcRemoveVcCount>1?'s':''} sur Vestiaire)`, n:lbcRemoveVcCount, tab:'leboncoin', dv:true, lbcRetirer:true, retrait:{ plat:'Leboncoin', nums:lbcSupprVc.map(r=>r&&r.numero) }, lbcSuppr:lbcSupprVc.map(r=>({ id:r.lbcId, numero:r.numero, titre:r.titre, ou:'Vestiaire' })), avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer-vestiaire]'; DEMANDE_LBC_CIBLE.at=Date.now(); }});
       if(lbcRemoveEbayCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveEbayCount} à retirer de Leboncoin (vendue${lbcRemoveEbayCount>1?'s':''} sur eBay)`, n:lbcRemoveEbayCount, tab:'leboncoin', dv:true, lbcRetirer:true, retrait:{ plat:'Leboncoin', nums:lbcSupprEbay.map(r=>r&&r.numero) }, lbcSuppr:lbcSupprEbay.map(r=>({ id:r.lbcId, numero:r.numero, titre:r.titre, ou:'eBay' })), avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer-ebay]'; DEMANDE_LBC_CIBLE.at=Date.now(); }});
