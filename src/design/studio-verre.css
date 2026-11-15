@@ -148,7 +148,10 @@
 }
 
 /* ══ 2. LE FOND : posé UNE fois sur la coque (pas de background-attachment:fixed, cassé sur iOS) ══ */
-html:has(.vrm-app-shell[data-espace]), html:has(.vrm-app-shell[data-espace]) body { background: var(--sv-bas) !important; }
+/* Le document prend le bas du dégradé (aucun blanc au rebond) ; <body> reste TRANSPARENT : son fond se peindrait
+   par-dessus le ::before à z-index -1 (la coque n'est pas un contexte d'empilement, voir plus bas). */
+html:has(.vrm-app-shell[data-espace]) { background: var(--sv-bas) !important; }
+html:has(.vrm-app-shell[data-espace]) body { background: transparent !important; background-image: none !important; }
 /* ⚠️ PAS d'`isolation` ni de `z-index` sur la coque : elle deviendrait un contexte d'empilement, et la barre du bas
    (z-index 9402 quand l'éventail est ouvert) passerait SOUS le voile de l'éventail (porté dans <body>, 9400) — le clic
    qui suit le toucher du disque tombait sur le voile et refermait l'éventail (studio-coque, E). Le ::before à z-index -1

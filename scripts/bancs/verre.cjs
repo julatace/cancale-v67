@@ -81,7 +81,11 @@ function mesurer() {
     const jetons = [haut, milieu, bas, reflet, reflet2].filter(Boolean);
     const egal = (a, c) => a && c && Math.abs(a[0] - c[0]) < 1.5 && Math.abs(a[1] - c[1]) < 1.5 && Math.abs(a[2] - c[2]) < 1.5 && (c[3] === 0 || Math.abs(a[3] - c[3]) < .02);
     const etrangeres = cs.filter((c) => c[3] > 0 && !jetons.some((j) => egal(j, c)));
-    out.fond = { position: b.position, inset: [b.top, b.left, b.right, b.bottom].join(' '), z: b.zIndex, degrade: /gradient/.test(img), n: cs.length, etrangeres: etrangeres.length,
+    // Le ::before à z-index -1 se peint SOUS le fond de tout ancêtre qui n'est pas un contexte d'empilement : aucun
+    // ancêtre (body compris) ne doit peindre un fond par-dessus, sinon le dégradé est caché (vu le 15 nov. : body opaque).
+    const caches = [];
+    for (let a = coque; a && a !== document.documentElement; a = a.parentElement) { const ca = getComputedStyle(a); const c = parse(ca.backgroundColor); if ((c && c[3] > 0) || ca.backgroundImage !== 'none') caches.push(a.tagName.toLowerCase() + (a.className && typeof a.className === 'string' ? '.' + a.className.split(' ')[0] : '')); }
+    out.fond = { caches, position: b.position, inset: [b.top, b.left, b.right, b.bottom].join(' '), z: b.zIndex, degrade: /gradient/.test(img), n: cs.length, etrangeres: etrangeres.length,
       jetons: jetons.length === 5, profond: bas ? L(bas) < 0.05 : false, coqueFond: getComputedStyle(coque).backgroundColor };
   }
   // Les deux bouts du fond (le haut éclairé du reflet ; le bas). Sans jetons (arbre d'avant) : le fond calculé de la coque.
@@ -254,8 +258,8 @@ if (require.main === module) (async () => {
         await o.pg.screenshot({ path: path.join(SHOTS, suf + '.png') });
         const m = await o.pg.evaluate(mesurer);
         const f = m.fond;
-        dit(!!f && f.position === 'fixed' && f.inset === '0px 0px 0px 0px' && f.z === '-1' && f.degrade && f.jetons && f.etrangeres === 0 && f.profond,
-          `V1 ${suf} : le fond est le dégradé bleu profond, posé une fois`, f ? `${f.position} · inset ${f.inset} · z ${f.z} · dégradé ${f.degrade} · ${f.n} couleurs, ${f.etrangeres} hors jetons · profond ${f.profond}` : 'pas de coque');
+        dit(!!f && f.position === 'fixed' && f.inset === '0px 0px 0px 0px' && f.z === '-1' && f.degrade && f.jetons && f.etrangeres === 0 && f.profond && f.caches.length === 0,
+          `V1 ${suf} : le fond est le dégradé bleu profond, posé une fois`, f ? `${f.position} · inset ${f.inset} · z ${f.z} · dégradé ${f.degrade} · ${f.n} couleurs, ${f.etrangeres} hors jetons · profond ${f.profond}${f.caches.length ? ' · CACHÉ par ' + f.caches.join(', ') : ''}` : 'pas de coque');
         const verreOk = m.verre.panneaux > 0 && m.verre.alpha > 0 && m.verre.alpha < 1;
         const surDisque = e === 'disque' || e === 'loupe' || e === 'fiche';
         dit(surDisque || verreOk, `V2 ${suf} : des panneaux de verre`, `${m.verre.panneaux} panneau(x) à --sv-verre (alpha ${m.verre.alpha})`);
