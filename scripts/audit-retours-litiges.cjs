@@ -12,7 +12,7 @@
 //      jamais jeté, aucune ligne de retour ; E3 écriture ratée ⇒ 503 ;
 //   E4 « a été remboursée » : `email_rembachat_{tx}` (montant, date estimée), JAMAIS les
 //      chiffres de la carte ; illisible ⇒ la famille d'avant ; E5 « Retourne ta commande »
-//      (sans n°) reste gardé entier (src/litiges.js le lit) ;
+//      (sans n°) rangé `email_retourdemande_*` depuis le 15 nov. (audit-retours-emails.cjs) ;
 //   A  l'app (src/retoursAchat.js) : achat relié par SON n° jamais par le titre, N° par
 //      l'achat, remboursement PROUVÉ par n° sinon « pas encore », trois états ;
 //   C  compta : achat remboursé (e-mail, montant entier) sort des coûts ; partiel ⇒ reste ;
@@ -102,8 +102,9 @@ const CORPS_RB = (tx, montant = '45,90') => ['Bonjour banc_acheteur,', '', 'Le p
     // E5 — « Retourne ta commande » (aucun n° de transaction) : toujours gardé entier pour src/litiges.js.
     F.vider();
     await F.recoit({ from: DE, subject: "Retourne ta commande d'ici le 16 nov. : Nike Dunk banc 42", text: 'banc_vendeur a accepté le retour. Retourne la commande d’ici le 16 nov.' });
-    const g5 = F.ids(/^email_inconnu_/).map((x) => x.data);
-    dit(g5.length === 1 && g5[0].type === 'inconnu' && F.ids(/^email_bordretour_|^email_rembachat_/).length === 0, 'E5 « Retourne ta commande » : gardé entier, jamais relié à un achat (aucun n°)', JSON.stringify(g5.map((x) => x.type)));
+    // (15 nov., lot retours) Il est désormais RECONNU (`email_retourdemande_*`, sens lu) — toujours sans n° : jamais relié à un achat.
+    const g5 = F.ids(/^email_retourdemande_/).map((x) => x.data);
+    dit(g5.length === 1 && g5[0].sens === 'achat' && !g5[0].transaction && F.ids(/^email_bordretour_|^email_rembachat_|^email_inconnu_/).length === 0, 'E5 « Retourne ta commande » : rangé `email_retourdemande_*` (sens achat lu), jamais relié à un achat (aucun n°)', JSON.stringify(g5));
   });
 
   await essaie('A C P T règles de l’app', async () => {
