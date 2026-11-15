@@ -206,7 +206,9 @@ async function suiteAdresse(nav) {
   let M = null;
   try { const tmp = path.join(require('os').tmpdir(), `lienEntree-${process.pid}.mjs`); fs.writeFileSync(tmp, src); M = await import('file://' + tmp); fs.unlinkSync(tmp); } catch (_) { M = null; }
   dit(!!M && M.lienEntree('inscription', '') === '/?inscription' && M.lienEntree('inscription', '?utm_source=insta&code=AB12') === '/?inscription&utm_source=insta&code=AB12'
-    && M.lienEntree('connexion', '?inscription&ref=x') === '/?connexion&ref=x' && M.lienEntree('inscription', '?%E0%A4%A=1&a=b') === '/?inscription&%E0%A4%A=1&a=b',
+    && M.lienEntree('connexion', '?inscription&ref=x') === '/?connexion&ref=x'
+    // (15 nov.) Le lien d'un partenaire (`/p/CODE` → `/?partenaire=CODE`, branche claude/partenaires) : intact aussi.
+    && M.lienEntree('inscription', '?partenaire=LEO') === '/?inscription&partenaire=LEO' && M.lienEntree('inscription', '?%E0%A4%A=1&a=b') === '/?inscription&%E0%A4%A=1&a=b',
     'P6 lienEntree : la suite passe intacte (nos seuls mots retirés, rien décodé ni réécrit)');
   const { ctx, pg } = await ouvrir(nav, { ...ORDI, url: '/?utm_source=insta&ref=AB12' });
   try {
