@@ -24,7 +24,8 @@
 //     P5 ordre conservé, planche jamais traversée, colonne non empilée intacte ;
 //     P6 « Enlever du stock » (`opsChezToi` + `sortieCase`) : la case ET la descente en
 //        un geste ; « Annuler » rend tout (les cases d'avant, exactement) ;
-//     P7 colonnes en pile choisies une par une (`piles`) : seules elles se tassent.
+//     P7 colonnes en pile choisies une par une (`piles`) : seules elles se tassent ;
+//     P8 poser en haut d'une pile : la paire tombe sur la pile ; elle n'est pas dite « descendue ».
 //   M  LA REPRISE (« migration » sans drapeau) : l'ancienne forme est lue telle quelle
 //     M1 les deux meubles mesurés (4×8 sans gravité ; 7×10 `gravite: false`, `planches: []`)
 //        et leur case ⇒ mêmes places (rangée, colonne), rien ne bouge à la lecture ;
@@ -54,6 +55,7 @@ const MUTATIONS = {
   'sortie-sans-tasser': ['src/stockSortie.js', "  const t = tasserPiles(out, seulement(ms, sortis.map((x) => x.meubleId)));", "  const t = { slots: out, descentes: [] };"],
   'garder-ignore': ['src/stockSortie.js', "    if (garder && garder[k]) continue;\n", ""],
   'tout-le-meuble': ['src/stockEtageres.js', "  for (const x of (Array.isArray(m.piles) ? m.piles : [])) { const c = Math.floor(Number(x)); if (c >= 1 && c <= cols) out.add(c); }", "  if (Array.isArray(m.piles) && m.piles.length) for (let c = 1; c <= cols; c++) out.add(c);"],
+  'pose-dite-descente': ['src/stockEtageres.js', "descentes: r.descentes.filter((d) => !pose(d.cle)),", "descentes: r.descentes,"],
   'annuler-partiel': ['src/stockEtageres.js', "  for (const d of r.descentes) ops.push(", "  for (const d of []) ops.push("],
   'ordre-ignore': ['src/stockEtageres.js', "    .sort((a, b) => (a[1] - b[1]) || (a[2] - b[2])).map((x) => x[0]);", "    .map((x) => x[0]);"],
   'deplacer-recopie': ['src/stockEtageres.js', "place.has(String(m.id)) ? { ...m, ordre: place.get(String(m.id)) } : m));", "place.has(String(m.id)) ? { id: m.id, name: m.name, cols: m.cols, rows: m.rows, ordre: place.get(String(m.id)) } : m));"],
@@ -210,6 +212,14 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { ko++; n++; con
     dit(JSON.stringify(Object.entries(retour).sort()) === JSON.stringify(Object.entries(S0).sort()), 'P6 · « Annuler » rend toutes les cases d’avant, exactement', retour);
     const r2 = Y.opsChezToi({ carte: { id: 'a99', numero: '99', title: 'Sans case' }, reponse: 'enleve', decisions: {}, perdues: {}, slots: S0, plusTard: {}, sortieCase, cle: (x) => String(x) });
     dit(!(r2.ops || []).some((o) => o.k === 'vrm_slots'), 'P6 · un N° sans case : aucune case touchée');
+  });
+
+  // ── P8 : poser en haut d'une pile n'est pas une « descente » des autres ─────────
+  await essaie('P8', async () => {
+    const av = { '31': { m: 'p1', i: 4 } }; const ap = { ...av, '32': { m: 'p1', i: 0 } };
+    const r = E.tasserApres(av, ap, [PILE]);
+    dit(r.slots['32'].i === 3 && r.slots['31'].i === 4, 'P8 · N°32 posée en haut tombe sur N°31 (rangée 4)', r.slots);
+    dit(r.descentes.length === 0 && (r.chutes || []).length === 1, 'P8 · la paire posée n’est pas dite « descendue » (sa case finale est dite par la pose) ; N°31 ne bouge pas', r);
   });
 
   // ── P7 ─────────────────────────────────────────────────────────────────────

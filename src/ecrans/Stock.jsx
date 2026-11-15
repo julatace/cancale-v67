@@ -450,11 +450,9 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   const ecrireSlots = (u, ms, ids = []) => {
     const r = tasserApres(slots, u, ms || meubles, ids); ecrireSlotsBrut(r.slots);
     const phrase = phraseDescentes(r.descentes);
-    if (r.descentes.length) {
-      const b = {}; r.descentes.forEach((d) => { b[d.cle] = (b[d.cle] || 0) + d.crans; });
-      setTombes(b); setTimeout(() => setTombes({}), 700);
-      setDescente({ m: r.descentes[0].m, texte: phrase, cles: [...new Set(r.descentes.map((d) => d.cle))] });
-    }
+    const bougent = [...r.descentes, ...(r.chutes || [])];
+    if (bougent.length) { const b = {}; bougent.forEach((d) => { b[d.cle] = (b[d.cle] || 0) + d.crans; }); setTombes(b); setTimeout(() => setTombes({}), 700); }
+    if (r.descentes.length) setDescente({ m: r.descentes[0].m, texte: phrase, cles: [...new Set(r.descentes.map((d) => d.cle))] });
     return { ...r, phrase };
   };
   const cleDeFiche = (f) => cleNum(f.numero);

@@ -190,11 +190,16 @@ export function meublesTouches(avant, apres, ids = []) {
   }
   return out;
 }
-// Une écriture des cases par SON geste : on tasse les meubles qu'elle touche. Rend { slots, descentes }.
+// Une écriture des cases par SON geste : on tasse les meubles qu'elle touche. Rend { slots, descentes, chutes } :
+// `descentes` = les cartons qui étaient DÉJÀ là et sont descendus (à dire) ; `chutes` = la paire qu'il vient de poser
+// ou de déplacer, tombée jusqu'au carton du dessous (sa case finale est dite par le message de la pose).
 export function tasserApres(avant, apres, meubles, ids = []) {
   const t = meublesTouches(avant, apres, ids);
-  if (!t.size) return { slots: apres, descentes: [] };
-  return tasserPiles(apres, dansMeubles(meubles, [...t]));
+  if (!t.size) return { slots: apres, descentes: [], chutes: [] };
+  const r = tasserPiles(apres, dansMeubles(meubles, [...t]));
+  const A = estObjet(avant) ? avant : {};
+  const pose = (k) => { const a = A[k], b = apres[k]; return !a || !b || String(a.m) !== String(b.m) || Number(a.i) !== Number(b.i); };
+  return { slots: r.slots, descentes: r.descentes.filter((d) => !pose(d.cle)), chutes: r.descentes.filter((d) => pose(d.cle)) };
 }
 
 // Vider des cases (SON clic, ou une sortie PROUVÉE décidée ailleurs) puis tasser.
