@@ -55,8 +55,13 @@ function pasVersReglage(id) {
 async function versReglage(page, sel) {
   if (process.env.BANC_REGLAGES_SANS_AIDE === '1') return;
   const id = cible(sel); if (!id || !page || typeof page.evaluate !== 'function') return;
-  for (let i = 0; i < 4; i++) {
+  // Paramètres pas encore rendu (la page charge) alors que l'adresse le demande : on l'attend, 20 s au plus
+  // (un banc qui ATTEND une rangée — `waitForSelector` — l'attendait avant pour la même raison).
+  let url = ''; try { url = page.url(); } catch (_) {}
+  const attendre = /tab=settings/.test(url);
+  for (let i = 0, hors = 0; i < 6; i++) {
     let r; try { r = await page.evaluate(pasVersReglage, id); } catch (_) { return; }
+    if (r === 'hors' && attendre && hors < 40) { hors++; i--; try { await page.waitForTimeout(500); } catch (_) { return; } continue; }
     if (r !== 'retour' && r !== 'categorie') return;
     try { await page.waitForTimeout(250); } catch (_) { return; }
   }
