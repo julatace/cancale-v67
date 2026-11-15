@@ -82,7 +82,6 @@ export default {
   "arr.journee.court": {"one": "{n} par por terminar", "other": "{n} pares por terminar"},
   "arr.journee.detail": "Fotos, precio o ficha: sigue donde lo dejaste.",
   "arr.journee.action": "Seguir",
-  "acc.arrivee.ranger.apres": "N°{num} guardado",
   "acc.arrivee.prix.avant": "Este importe pasa a ser el precio de compra de este N°.",
   "acc.arrivee.prix.pas": "Un precio ya puesto nunca se sustituye.",
   "acc.arrivee.prix.apres": "Precio de compra del N°{num} puesto",
@@ -126,4 +125,7 @@ export default {
   "arr.journee.achats": {"one": "{n} compra recibida por numerar", "other": "{n} compras recibidas por numerar"},
   "arr.journee.achatsDetail": "Su N°, luego su hueco, fotos, precio y ficha.",
   "arr.journee.commencer": "Empezar",
+  "arr.geste.numero": "N°{num} asignado · ficha creada",
+  "arr.geste.numerosN": "N°{num} a N°{fin} asignados",
+  "acc.arrivee.ranger.apres": "N°{num} asignado",
 };

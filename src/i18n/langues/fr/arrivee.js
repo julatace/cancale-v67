@@ -83,7 +83,6 @@ export default {
   "arr.journee.court": {"one": "{n} paire à finir", "other": "{n} paires à finir"},
   "arr.journee.detail": "Photos, prix ou fiche : reprends là où tu t’es arrêté.",
   "arr.journee.action": "Reprendre",
-  "acc.arrivee.ranger.apres": "N°{num} rangé",
   "acc.arrivee.prix.avant": "Ce montant devient le prix d’achat de ce N°.",
   "acc.arrivee.prix.pas": "Un prix déjà posé n’est jamais remplacé.",
   "acc.arrivee.prix.apres": "Prix d’achat du N°{num} posé",
@@ -127,4 +126,7 @@ export default {
   "arr.journee.achats": {"one": "{n} achat arrivé à numéroter", "other": "{n} achats arrivés à numéroter"},
   "arr.journee.achatsDetail": "Son N°, puis sa case, ses photos, son prix et sa fiche.",
   "arr.journee.commencer": "Commencer",
+  "arr.geste.numero": "N°{num} donné · fiche créée",
+  "arr.geste.numerosN": "N°{num} à N°{fin} donnés",
+  "acc.arrivee.ranger.apres": "N°{num} donné",
 };

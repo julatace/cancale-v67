@@ -82,7 +82,6 @@ export default {
   "arr.journee.court": {"one": "{n} Paar fertigzumachen", "other": "{n} Paare fertigzumachen"},
   "arr.journee.detail": "Fotos, Preis oder Karte: mach dort weiter, wo du aufgehört hast.",
   "arr.journee.action": "Weitermachen",
-  "acc.arrivee.ranger.apres": "Nr. {num} eingeräumt",
   "acc.arrivee.prix.avant": "Dieser Betrag wird der Einkaufspreis dieser Nr.",
   "acc.arrivee.prix.pas": "Ein schon gesetzter Preis wird nie ersetzt.",
   "acc.arrivee.prix.apres": "Einkaufspreis der Nr. {num} gesetzt",
@@ -126,4 +125,7 @@ export default {
   "arr.journee.achats": {"one": "{n} angekommener Kauf zu nummerieren", "other": "{n} angekommene Käufe zu nummerieren"},
   "arr.journee.achatsDetail": "Seine Nr., dann Fach, Fotos, Preis und Karte.",
   "arr.journee.commencer": "Anfangen",
+  "arr.geste.numero": "Nr. {num} vergeben · Karte angelegt",
+  "arr.geste.numerosN": "Nr. {num} bis Nr. {fin} vergeben",
+  "acc.arrivee.ranger.apres": "Nr. {num} vergeben",
 };

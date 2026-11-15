@@ -18247,7 +18247,8 @@ async function preparerRangement(entree, n) {
   const cs = casesEnSerie({ meubles, slots, n, habitude: caseHabitude({ fiches, meubles }) });
   return { ok: true, numeros, numeroEcrit: ecrit, pris: pris.cles, archive: archiveNumeros(), cleNum, meubles, slots, cases: cs.cases || [], aucunMeuble: !!cs.aucunMeuble, marqueDe: (t) => extractBrand(t) || '', clavier: clavierNum() };
 }
-async function ecrireRangement(entree, lignes) {
+// (15 nov.) `texteDe(numeros)` : la phrase de la pilule quand l'appelant la connaît mieux (l'atelier : « N°13 donné »).
+async function ecrireRangement(entree, lignes, { texteDe = null } = {}) {
   if (!isCloudReady()) return { ok: false, raison: 'lecture' };
   if (!numerotationPermise() && !(await assurerVersionNumerotation())) return { ok: false, raison: 'lecture' };
   const pris = await numerosServisRangement();
@@ -18261,7 +18262,7 @@ async function ecrireRangement(entree, lignes) {
   for (const num of r.numeros) { const ep = entreePool(num); if (ep != null && !dans.has(cleNum(ep))) { pool.push(ep); dans.add(cleNum(ep)); } }
   save('vinted_used_numeros', pool.sort(triPool));
   emettreClesRelues(['vinted_used_numeros']);
-  const texte = r.numeros.length > 1 ? tr('ranger.gesteN', { n: r.numeros.length, num: r.numeros[0], fin: r.numeros[r.numeros.length - 1] }) : tr('ranger.geste1', { num: r.numeros[0] });
+  const texte = typeof texteDe === 'function' ? texteDe(r.numeros) : r.numeros.length > 1 ? tr('ranger.gesteN', { n: r.numeros.length, num: r.numeros[0], fin: r.numeros[r.numeros.length - 1] }) : tr('ranger.geste1', { num: r.numeros[0] });
   gesteVrm(texte, r.ops, {}, () => {
     // Après l'écriture locale : le Stock relit ses cases, les écrans leurs fiches et coûts.
     setTimeout(() => { try { window.dispatchEvent(new Event('vrm:stock-slots')); } catch (_) {} emettreClesRelues([CLE_FICHES_RANGEES, 'vrm_slots', 'vinted_buyprice_by_num']); try { window.dispatchEvent(new Event('vrm:a-ranger')); } catch (_) {} }, 300);
@@ -18389,7 +18390,7 @@ function AtelierArriveeCoque() {
     return () => { window.removeEventListener('vrm:ranger-achat', f); window.removeEventListener('vrm:atelier-arrivee', g); clearTimeout(t); };
   }, []);
   const coque = React.useMemo(() => ({
-    cleNum, preparer: preparerRangement, ranger: ecrireRangement, lireEtat: lireEtatAtelier,
+    cleNum, preparer: preparerRangement, ranger: (e, l) => ecrireRangement(e, l, { texteDe: (ns) => (ns.length > 1 ? tr('arr.geste.numerosN', { num: ns[0], fin: ns[ns.length - 1] }) : tr('arr.geste.numero', { num: ns[0] })) }), lireEtat: lireEtatAtelier,
     marqueDe: (t) => extractBrand(t) || '', couleursDe: (t) => extractColors(t),
     etatVinted: (f) => etatFicheVinted(f, null),
     lireStudio: (k) => import('./studioPhoto.js').then((m) => m.lireStudio(STUDIO_BASE, k)),

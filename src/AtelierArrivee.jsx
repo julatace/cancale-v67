@@ -16,7 +16,6 @@ import { useLangue } from './i18n/react.js';
 import { lignesDeLAchat, validerNumeroTape, LOT_MAX } from './rangementArrivee.js';
 import { ETAPES_ATELIER, etapesPaire, etapeReprise, progression, prixPayeArrivee, indicatifLot, ficheDepuisAchat, fichesDeLArrivee } from './atelierArrivee.js';
 import { AccAvant } from './ui/Accompagne.jsx';
-import { accompagner } from './accompagnement.js';
 import './atelier-arrivee.css';
 
 const CATEGORIES = ['baskets', 'vetements', 'sacs', 'accessoires', 'autre'];
@@ -289,12 +288,10 @@ function UnAchat({ entree, coque, onSuivant, onFermer, position, Bouton, Photo, 
   const ranger = async () => {
     if (!rangeOk || envoi) return;
     setEnvoi(true); setErreur('');
-    const g = accompagner('arrivee.ranger');
     let r = null; try { r = await coque.ranger(entree, lignes.map((l) => ({ ...l, prix: '', case: null }))); } catch (_) { r = { ok: false, raison: 'lecture' }; }
     setEnvoi(false);
-    // La fiche arrive par l'écriture locale (un instant) : on attend sur l'étape des photos, sans rien proposer.
-    if (r && r.ok) { setNumeros(r.numeros || []); setVue('case'); g.fini({ num: (r.numeros || [])[0] || '' }); return; }
-    g.oublier();
+    // La fiche arrive par l'écriture locale (un instant) : on attend sur l'étape de la case, sans rien proposer.
+    if (r && r.ok) { setNumeros(r.numeros || []); setVue('case'); return; }
     setErreur(r && r.raison ? r.raison : 'lecture');
     if (r && (r.raison === 'pris' || r.raison === 'case')) setTour((t) => t + 1);
   };

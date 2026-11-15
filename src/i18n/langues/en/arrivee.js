@@ -82,7 +82,6 @@ export default {
   "arr.journee.court": {"one": "{n} pair to finish", "other": "{n} pairs to finish"},
   "arr.journee.detail": "Photos, price or listing: pick up where you left off.",
   "arr.journee.action": "Resume",
-  "acc.arrivee.ranger.apres": "N°{num} stored",
   "acc.arrivee.prix.avant": "This amount becomes this N°'s purchase price.",
   "acc.arrivee.prix.pas": "A price already set is never replaced.",
   "acc.arrivee.prix.apres": "Purchase price of N°{num} set",
@@ -126,4 +125,7 @@ export default {
   "arr.journee.achats": {"one": "{n} purchase arrived to number", "other": "{n} purchases arrived to number"},
   "arr.journee.achatsDetail": "Its N°, then its slot, photos, price and listing.",
   "arr.journee.commencer": "Start",
+  "arr.geste.numero": "N°{num} given · listing created",
+  "arr.geste.numerosN": "N°{num} to N°{fin} given",
+  "acc.arrivee.ranger.apres": "N°{num} given",
 };

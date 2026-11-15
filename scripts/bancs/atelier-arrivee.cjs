@@ -174,6 +174,8 @@ async function passe(b, vp, sombre) {
   dit(!!w2 && !w2.l.slots['13'] && !w2.f.case && w2.l.couts['13'] == null && w2.f.prixAchat == null, `${T} W2 · ni case ni prix d’achat écrits avec le N° (chacun a son étape)`, w2 && { slot: w2.l.slots['13'], cout: w2.l.couts['13'] });
   const w2c = await attendre(() => pg.evaluate(() => { const c = document.querySelector('[data-aa-corps="case"]'); const p = document.querySelector('[data-aa-prog]'); return c && p ? { m: c.getAttribute('data-aa-case-m'), i: c.getAttribute('data-aa-case-i'), cour: p.getAttribute('data-aa-courante'), num: (document.querySelector('[data-aa-num]') || {}).getAttribute ? document.querySelector('[data-aa-num]').getAttribute('data-aa-num') : '' } : null; }), 10000);
   dit(!!w2c && w2c.cour === 'case' && w2c.num === '13' && w2c.m === 'mA' && w2c.i === '2', `${T} W2 · puis la case de l’ARTICLE N°13 : la première LIBRE (niveau 1 · case 3)`, w2c);
+  const pil2 = await attendre(() => pg.evaluate(() => { const p = document.querySelector('[data-pilule-annuler]'); return p ? (p.getAttribute('aria-label') || p.textContent || '') : null; }), 4000);
+  dit(!!pil2 && /13/.test(pil2) && /donn/i.test(pil2) && !/rang/i.test(pil2), `${T} W2 · la pilule dit « N°13 donné » (rien n’est « rangé » avant la case)`, pil2);
   await pg.locator('[data-ranger-case="0"]').click({ force: true }).catch(() => {});
   const apresPrise = await pg.getAttribute('[data-aa-corps="case"]', 'data-aa-case-i').catch(() => null);
   dit(apresPrise === '2', `${T} W2 · toucher une case prise ne change rien`, apresPrise);

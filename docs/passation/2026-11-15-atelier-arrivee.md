@@ -27,8 +27,13 @@ place). Julien a validé les quatre lots (« vas-y fais tout »). Poussée à ch
   plus montée (`<RangerAchatCoque/>` remplacé par `<AtelierArriveeCoque/>`) : une seule feuille.
 - **Six étapes, une progression** (six traits qu'on touche ; fait = encre, passé = pointillé, courant = accent) :
   1. **N°** — la plaque N° proposée (ou le champ « Je numérote moi-même ») ; lot : le compteur et les N° à la suite ;
-  2. **Case** — la case libre proposée, le plan ; « **Rangé** » = l'écriture de « Ranger cet achat » appelée
-     **SANS prix** (le prix a son étape) ; « Ranger sans case » ;
+     « **Donner ce N°** » = l'écriture de « Ranger cet achat » appelée **SANS case ni prix** : le N° entre au pool,
+     la fiche « À publier » de l'ARTICLE est créée (liée à l'achat par son n° de transaction) ;
+  2. **Case** — (Julien, via le coordinateur : « on range une ANNONCE, pas un achat ») seulement APRÈS le N° :
+     la case libre proposée À L'ARTICLE (`caseProposee`, lue sur les cases ACTUELLES — un lot passe article par
+     article, chaque case écrite avant la proposition suivante : jamais la même case pour deux articles), le plan
+     pour en toucher une autre ; « **Ranger ici** » (`opsCase` : refusée si la case a été prise entre-temps ou si
+     l'article est déjà dans une case) ; « Plus tard » ;
   3. **Photos** — « Prendre les photos » ouvre le studio sur CE N° ; l'étape est faite quand le studio a
      rangé une photo sous ce N° (preuve lue, pas un drapeau) ;
   4. **Prix d'achat** — le prix PAYÉ de CET achat : le reçu juste (« Payé sur Vinted · Article · Port ·
@@ -49,22 +54,25 @@ place). Julien a validé les quatre lots (« vas-y fais tout »). Poussée à ch
   « Reprendre » rouvre l'atelier à la première étape ni faite ni passée.
 - **Rien sans son geste** : chaque écriture passe par `gesteVrm` (pilule « Annuler » 5 s) ; l'accompagnement
   dit avant ce qui va se passer et ce qui ne se passera pas (`acc.arrivee.*` : `arrivee.ranger`,
-  `arrivee.prix`, `arrivee.fiche` dans `GESTES_ACC`).
+  `arrivee.case`, `arrivee.prix`, `arrivee.fiche` dans `GESTES_ACC`).
 - **Le prix payé arrive avec l'achat** : `entreeAvecPaye` (écran Achats) pose sur l'entrée la proposition
   calculée AVEC le reçu de CET achat (`indexRecusAchat`, par n° de transaction) ; `prixPayeArrivee` ne
   l'accepte que si elle porte le MÊME n° de transaction.
 
 ### Décisions prises seul
+- **Aucun « ranger » sur un achat** : la carte de Ma journée dit « N achats arrivés à numéroter » (« Commencer »),
+  l'en-tête de l'atelier « Nouvel article » ; la case n'existe qu'une fois le N° donné. La notification de la
+  cloche « Arrivé · Première case libre · Ranger » est retirée par l'autre chantier (`claude/pas-ranger-achat`).
 - **Ordre N° → case → photos** (et non photos en premier) : le studio range les photos sous le N°
   (`studio_photos_{N°}`). Photographier avant le N° voudrait une photo sans identité, ou un N° écrit avant
   son geste. Mieux vaut un blanc qu'un faux (§5).
-- **« Rangé » n'écrit plus le prix d'achat** quand il vient de l'atelier : le prix a sa propre étape, sur
+- **« Donner ce N° » n'écrit ni case ni prix d'achat** quand il vient de l'atelier : le prix a sa propre étape, sur
   SON tap (« Garder »), avec la source dite. La feuille d'avant écrivait le prix lu de l'article seul.
 - **Catégorie** : l'achat Vinted ne porte pas de catégorie lisible (mesuré dans le code : pas de
   `catalog_id` sur `my_orders`) ⇒ jamais pré-remplie ; cinq choix (Baskets, Vêtements, Sacs, Accessoires,
   Autre), son toucher.
-- Retour en arrière sur N° / case après « Rangé » : non (un N° servi ne se reprend pas ici ; la case se
-  change dans le Stock).
+- Retour en arrière sur le N° une fois donné : non (un N° servi ne se reprend pas ici). Une case « Plus tard »
+  se reprend ; une case posée se change dans le Stock.
 
 ## 2. L'historique complet sur la fiche
 
