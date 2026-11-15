@@ -62,7 +62,10 @@ async function telephone(nav, sombre, b) {
   const nLot = await pg.evaluate(() => { const x = document.querySelector('[data-imprimer-prets]'); return x ? Number(x.getAttribute('data-imprimer-prets')) : null; });
   // F — le fond.
   const fond = await pg.evaluate(() => { const s = document.querySelector('.vrm-app-shell'), m = document.querySelector('.vrm-main'); const cs = getComputedStyle(s);
-    return { img: cs.backgroundImage, esp: s.getAttribute('data-espace'), espMain: m && m.getAttribute('data-espace'), vivant: [...document.querySelectorAll('.vrm-ecran-vivant[data-espace]')].map((x) => x.getAttribute('data-espace')) }; });
+    // (15 nov., « Verre dépoli ») La règle : la COQUE porte la lumière — sur elle, ou sur son ::before fixe (posé une fois,
+    // sans background-attachment:fixed, cassé sur iOS). Le contrôle juge la règle, pas l'endroit où elle est peinte.
+    const avant = getComputedStyle(s, '::before'); const imgAvant = avant.content !== 'none' && avant.position === 'fixed' ? avant.backgroundImage : '';
+    return { img: /gradient/.test(cs.backgroundImage) ? cs.backgroundImage : (imgAvant || cs.backgroundImage), esp: s.getAttribute('data-espace'), espMain: m && m.getAttribute('data-espace'), vivant: [...document.querySelectorAll('.vrm-ecran-vivant[data-espace]')].map((x) => x.getAttribute('data-espace')) }; });
   dit(/linear-gradient/.test(fond.img) && /radial-gradient/.test(fond.img), 'F la coque porte la lumière du studio (halo + dégradé haut → bas)', fond.img.slice(0, 90));
   dit(fond.esp === 'ventes' && fond.espMain === 'ventes' && fond.vivant.includes('ventes'), 'F data-espace="ventes" sur la coque, <main> et la racine de l’écran', fond);
   // B — la barre en verre.
@@ -207,7 +210,8 @@ async function ordinateur(nav, sombre, b) {
   const r = await pg.evaluate((src) => { const K = eval(src); const s = document.querySelector('.vrm-app-shell'); const n = document.querySelector('.vrm-sidebar'); const cs = getComputedStyle(n);
     const ind = document.querySelector('.vrm-nav-indicateur'); const ia = ind && getComputedStyle(ind, '::after');
     const lib = [...n.querySelectorAll('.vrm-rail-button .vrm-rail-lib')].map((l) => Math.round(K.ratio(K.rgba(getComputedStyle(l).color), K.sur(K.rgba(cs.backgroundColor), K.jeton('--sb-aplat'))) * 100) / 100);
-    return { fond: getComputedStyle(s).backgroundImage, flou: cs.backdropFilter || cs.webkitBackdropFilter, rayon: parseFloat(cs.borderTopLeftRadius), ind: ind ? getComputedStyle(ind).boxShadow : '', diode: ia && ia.content !== 'none' ? ia.backgroundColor : null,
+    const avant = getComputedStyle(s, '::before');   // (15 nov., verre) la lumière sur la coque OU sur son ::before fixe
+    return { fond: /gradient/.test(getComputedStyle(s).backgroundImage) ? getComputedStyle(s).backgroundImage : (avant.content !== 'none' && avant.position === 'fixed' ? avant.backgroundImage : getComputedStyle(s).backgroundImage), flou: cs.backdropFilter || cs.webkitBackdropFilter, rayon: parseFloat(cs.borderTopLeftRadius), ind: ind ? getComputedStyle(ind).boxShadow : '', diode: ia && ia.content !== 'none' ? ia.backgroundColor : null,
       disque: !!document.querySelector('[data-sb-disque]'), lib, deb: document.documentElement.scrollWidth - innerWidth, pleins: [...document.querySelectorAll('.sb-btn-plein')].filter((e) => e.getClientRects().length).length }; }, CONTRASTE);
   dit(/linear-gradient/.test(r.fond), 'F 1512 : la lumière du studio sur la coque');
   dit(/blur/.test(r.flou) && r.rayon >= 20, 'N la navigation de gauche est en verre (flou, rayon ≥ 20)', r);
