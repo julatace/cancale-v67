@@ -1,7 +1,7 @@
 // fr · « À retirer ailleurs » (15 nov., lot retrait-ailleurs) — src/ARetirerAilleurs.jsx.
 export default {
   "rx.titre": "À retirer ailleurs",
-  "rx.sous": {"one": "Vendue sur un site, encore en ligne sur un autre : retire-la pour ne pas la vendre deux fois.", "other": "{n} paires vendues sur un site, encore en ligne sur un autre : retire-les pour ne pas les vendre deux fois."},
+  "rx.sous": {"one": "{n} paire vendue sur un site, encore en ligne sur un autre : retire-la pour ne pas la vendre deux fois.", "other": "{n} paires vendues sur un site, encore en ligne sur un autre : retire-les pour ne pas les vendre deux fois."},
   "rx.toutRetirer": "Tout retirer ({n})",
   "rx.venduSur": "Vendue sur {site}",
   "rx.peutEtreVendue": "Peut-être vendue sur {site}",

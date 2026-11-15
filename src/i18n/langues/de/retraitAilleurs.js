@@ -1,7 +1,7 @@
 // de · « À retirer ailleurs » (15 nov., lot retrait-ailleurs) — src/ARetirerAilleurs.jsx ; source : fr/retraitAilleurs.js.
 export default {
   "rx.titre": "Anderswo entfernen",
-  "rx.sous": {"one": "Auf einer Seite verkauft, auf einer anderen noch online: entferne es, damit du es nicht zweimal verkaufst.", "other": "{n} Paare auf einer Seite verkauft, auf einer anderen noch online: entferne sie, damit du sie nicht zweimal verkaufst."},
+  "rx.sous": {"one": "{n} Paar auf einer Seite verkauft, auf einer anderen noch online: entferne es, damit du es nicht zweimal verkaufst.", "other": "{n} Paare auf einer Seite verkauft, auf einer anderen noch online: entferne sie, damit du sie nicht zweimal verkaufst."},
   "rx.toutRetirer": "Alle entfernen ({n})",
   "rx.venduSur": "Verkauft auf {site}",
   "rx.peutEtreVendue": "Vielleicht verkauft auf {site}",

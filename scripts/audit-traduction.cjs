@@ -36,6 +36,7 @@ const LANGUES = ['fr', 'en', 'es', 'it', 'de'];
 const MIGRES = [
   ['src/Accueil.jsx', ['*']],
   ['src/JourneeStudio.jsx', ['*']],   // (14 nov., Studio) la grille Bento de Ma journée
+  ['src/ARetirerAilleurs.jsx', ['*']],   // (15 nov., retrait-ailleurs) « À retirer ailleurs »
   ['src/ui/Accompagne.jsx', ['*']],   // (14 nov., lot accompagnement) la brique commune des quatre moments
   ['src/ImpressionSimple.jsx', ['*']],   // (14 nov., impression-simple) « Imprimer » en un toucher : les deux feuilles
   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure.
