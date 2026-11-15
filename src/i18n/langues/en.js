@@ -45,6 +45,10 @@ import ecran_memePhoto from './en/memePhoto.js';   // (15 nov., lot meme-photo)
 export default {
   ...ecran_studio_paires,
   ...ecran_republier_guide,
+import ecran_etageres from './en/etageres.js';   // (15 nov.) le Stock en étagères
+export default {
+  ...ecran_studio_paires,
+  ...ecran_etageres,
   ...ecran_accueilReste,
   ...ecran_refonte_ms,
   ...ecran_studio_journee,

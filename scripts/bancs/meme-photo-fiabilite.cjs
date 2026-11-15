@@ -25,7 +25,7 @@
 //   F1  faux positifs « sûr » = 0 (obligatoire, sur TOUS les négatifs) ;
 //   F2  vrais positifs « sûr » ≥ 85 % (dit en %, par transformation) ;
 //   F3  aucun vrai positif « écarté » sur une transformation du cahier (vignette mise à part : « pas su ») ;
-//   F4  une vignette (contenu < 96 px) n'est jamais « sûr » ;
+//   F4  une photo trop petite pour la mesure fine (contenu < 96 px) : « pas su », jamais « sûr » ;
 //   F5  le monde complet (la règle `propositionsMemePhoto` + la sélection de l'extension
 //       `couplesAVerifier`) : 50 exemplaires au même endroit, 6 exemplaires + UNE photo reprise,
 //       les 200 paires distinctes reprises à moitié sur Leboncoin ⇒ 0 « sûr » faux ;
@@ -241,7 +241,8 @@ window.__famille = async (g, tranche, nTranches, nInst = 50) => {
   console.log(`   F3 · faux « à vérifier » : ${fpVer} sur ${sNeg.n} faux couples (${pct(fpVer, sNeg.n)}) — montrés avec les deux photos, jamais comptés sûrs ; écartés par la mesure fine : ${sNeg.non}`);
   const tpEcartes = tpCahier.filter((x) => x.e === 'non');
   dit(!tpEcartes.length, 'F3 · aucun vrai positif ÉCARTÉ par la mesure fine (une transformation du cahier ne fait jamais perdre la proposition)', tpEcartes.slice(0, 6).map((x) => `${x.id}/${x.nom} A${x.d} s${x.s} r${x.r}`).join(', '));
-  dit(tpVig.every((x) => x.e !== 'sur'), 'F4 · une vignette (contenu < 96 px) n’est jamais « sûr »', tpVig.filter((x) => x.e === 'sur').map((x) => x.id).join(','));
+  const pasSu = [...m.tp, ...negs].filter((x) => x.s === null);
+  dit(pasSu.every((x) => x.e !== 'sur'), `F4 · une photo trop petite pour la mesure fine (contenu < ${R.COTE_FINE_MIN} px) : « pas su », jamais « sûr » (${pasSu.length} couples)`, pasSu.filter((x) => x.e === 'sur').map((x) => x.id || x.a).join(','));
   const mondes = Object.values(m.mondes);
   dit(mondes.length === 4 && mondes.every((w) => w.surFaux === 0), 'F5 · le monde complet : AUCUN « sûr » faux (50 au même endroit, 6 + 1 reprise, paires distinctes, même modèle)', JSON.stringify(m.mondes));
   const w6 = m.mondes['6 au même endroit + 1 reprise'], wd = m.mondes['paires distinctes, moitié reprise'];
