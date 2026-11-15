@@ -260,7 +260,7 @@ async function scenario(b, vp, sombre) {
     await shot(pg, `ventes-verre-${nom}-recap`);
     if (SHOTS) { await pg.evaluate(() => { const x = document.querySelector('[data-recap-vente] .vrm-recap-argent'); if (x) x.scrollIntoView({ block: 'start' }); }); await pg.waitForTimeout(300); await shot(pg, `ventes-verre-${nom}-recap-argent`); await pg.evaluate(() => { const x = document.querySelector('[data-vv-achat-propose]'); if (x) x.scrollIntoView({ block: 'center' }); }); await pg.waitForTimeout(300); await shot(pg, `ventes-verre-${nom}-recap-relier`); }
     const rv = await pg.evaluate(() => { const z = [...document.querySelectorAll('[data-recap-vente]')].find((x) => x.getBoundingClientRect().height > 0); if (!z) return null;
-      const p = [...z.querySelectorAll('.vrm-b-primaire, [data-variante="primaire"], .sb-btn-plein')].filter((x) => x.getBoundingClientRect().width > 0);
+      const p = [...z.querySelectorAll('.vrm-b-primaire, [data-variante="primaire"], .sb-btn-plein, [data-bouton-bord="pdf"]')].filter((x) => x.getBoundingClientRect().width > 0);
       const rgb = (s) => (/rgba?\(([^)]+)\)/.exec(s) || [, ''])[1].split(/[ ,/]+/).map(Number);
       const zr = z.getBoundingClientRect();
       const coupes = [...z.querySelectorAll('.vrm-frise *, [class*="frise"] *')].filter((x) => x.children.length === 0 && (x.textContent || '').trim() && x.getBoundingClientRect().width > 0 && (x.getBoundingClientRect().right > zr.right - 8 || x.scrollWidth > x.clientWidth + 1)).map((x) => x.textContent.trim().slice(0, 20));

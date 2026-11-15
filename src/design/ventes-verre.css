@@ -334,15 +334,15 @@
 
 /* ── 11. LA FICHE D'UNE VENTE (le récapitulatif, maquette « ventes-fiche ») : le plein à l'ENCRE, l'achat proposé
    juste dessous, rien de coupé au bord droit. ── */
-:root:root:root:root:root:root:root:root body [data-recap-vente] :is(.vrm-b-primaire, [data-variante="primaire"]):not(:disabled) { background: var(--vv-plein) !important; color: var(--vv-plein-t) !important; border-color: var(--vv-plein) !important; }
-:root:root:root:root:root:root:root:root body [data-recap-vente] :is(.vrm-b-primaire, [data-variante="primaire"]) * { color: inherit !important; }
+:root:root:root:root:root:root:root:root body [data-recap-vente] :is(.vrm-b-primaire, [data-variante="primaire"], [data-bouton-bord="pdf"]):not(:disabled) { background: var(--vv-plein) !important; color: var(--vv-plein-t) !important; border-color: var(--vv-plein) !important; }
+:root:root:root:root:root:root:root:root body [data-recap-vente] :is(.vrm-b-primaire, [data-variante="primaire"], [data-bouton-bord="pdf"]) * { color: inherit !important; }
 :root:root:root:root:root:root:root:root body [data-recap-vente] .vrm-recap-etat { padding-right: 16px !important; }
 :root:root:root:root:root:root:root:root body [data-recap-vente] .vrm-recap-etat * { min-width: 0; }
 /* « L'argent » : un titre de section comme les autres, aligné sur ses lignes (plus un mot de 13 px collé à la frise). */
 :root:root:root:root:root:root:root:root body [data-recap-vente] .vrm-recap-argent > .vrm-recap-titre { font: 700 17px/1.25 Inter, system-ui, sans-serif !important; letter-spacing: -.02em !important; color: var(--sv-encre) !important; margin: 18px 0 6px !important; padding: 0 !important; text-transform: none !important; }
 /* Le bénéfice pas su : « — · prix d'achat à saisir », sans le point bleu seul (le point ne sert qu'à la barre des coûts). */
 :root:root:root:root:root:root:root:root body [data-recap-vente] .vrm-recap-benef:not([data-benef-vente]) .vrm-cv-point { display: none !important; }
-:root:root:root:root:root:root:root:root body [data-recap-vente] .vrm-recap-benef:not([data-benef-vente]) dd { display: flex !important; align-items: baseline !important; gap: 6px !important; flex-wrap: wrap !important; justify-content: flex-end !important; }
+:root:root:root:root:root:root:root:root body [data-recap-vente] .vrm-recap-benef:not([data-benef-vente]) dd { display: flex !important; align-items: baseline !important; gap: 6px !important; flex-wrap: nowrap !important; white-space: nowrap !important; justify-content: flex-end !important; }
 :root:root:root:root:root:root:root:root body [data-recap-vente] .vrm-recap-benef:not([data-benef-vente]) dd small { font-size: 13px !important; font-weight: 550 !important; color: var(--sv-encre-2) !important; }
 :root:root:root:root:root:root:root:root body [data-recap-vente] .vrm-recap-benef:not([data-benef-vente]) dd small::before { content: "· "; }
 /* L'emballage non saisi ne bloque rien : discret (l'ambre reste aux gestes qui pressent). */
