@@ -2,6 +2,7 @@
 // est demandé par cet onglet, le stockage et la base deviennent des copies en
 // mémoire (src/modeExemple.js) — rien de l'exemple n'est écrit nulle part.
 import { exempleActif } from './modeExemple.js';
+import { garderCodePartenaire } from './partenaires/lien.js';
 // (8 nov.) Les 30 dernières requêtes de la page (famille, code, durée — jamais une
 // adresse ni un contenu), pour « Signaler un problème » (src/lecturesRecentes.js).
 import { installerJournalLectures } from './lecturesRecentes.js';
@@ -10,6 +11,7 @@ import { cleVapid, abonnementAJour } from './vapid.js';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import Accueil from './Accueil.jsx';
+import { lienEntree } from './accueil/lienEntree.js';
 // (11 nov., lot traduction) La langue est prête AVANT le premier rendu (src/i18n/index.js) ;
 // la racine se redessine quand elle change (Paramètres → Langue, ou relue du nuage).
 import { tr, preparerLangue } from './i18n/index.js';
@@ -163,13 +165,22 @@ const veutLApp = () => {
   // en `/?inscription` avant que l'app ne le range).
   return /[?&](connexion|inscription|tab|code|error|error_description|type|lier-extension|confirmer-adresse|parrain)(=|&|$)/.test(q) || /(access_token|error|type)=/.test(h)
     || /^\/r\/[A-Za-z0-9]{8}\/?$/.test(window.location.pathname || '');
+  // (15 nov., décision : la vitrine d'abord) Le lien d'un PARTENAIRE (`/p/CODE` → `?partenaire=CODE`) montre la page
+  // d'accueil : l'abonné de l'influenceur voit ce qu'est VRM ; « Essayer gratuitement » garde la suite de l'adresse
+  // jusqu'à l'inscription (`src/accueil/lienEntree.js`), le code est rattaché à l'inscription.
 };
+// (15 nov.) Le code d'un partenaire est GARDÉ sur l'appareil dès l'arrivée (même règle que l'app : src/partenaires/lien.js),
+// pour survivre à un détour par la vitrine ou par « Découvrir avec des exemples » avant l'inscription.
+try { garderCodePartenaire(localStorage, window.location.search, window.location.pathname); } catch (_) {}
 const versApp = () => aUneSession() || veutLApp();
 const filmDemande = /[?&]film(=|&|$)/.test(window.location.search || '');
 // (14 nov., lot argent-prix — 115) Le lien de son COMPTABLE (`/c/<jeton>` → `?comptable=`) : une page en lecture
 // seule, SANS l'app ni session (src/VueComptable.jsx) — même quand une session existe sur ce navigateur.
 const comptableDemande = /[?&]comptable=/.test(window.location.search || '');
 const VueComptable = React.lazy(() => import('./VueComptable.jsx'));
+// (15 nov.) LA PAGE D'UN PARTENAIRE (`/pa/<jeton>` → `?espace-partenaire=`) : lecture seule, sans l'app ni session (src/VuePartenaire.jsx).
+const partenaireDemande = /[?&]espace-partenaire=/.test(window.location.search || '');
+const VuePartenaire = React.lazy(() => import('./VuePartenaire.jsx'));
 // (14 nov., ouverture instantanée) LES DERNIERS CHIFFRES DE MA JOURNÉE, PEINTS AVANT L'APP.
 // src/ouvertureInstantanee.js décide (rien que ce que la porte hors ligne laisserait voir, pour CE
 // compte, sur CET appareil) ; src/OuvertureInstantanee.jsx peint l'instantané dans l'écran de
@@ -179,7 +190,7 @@ const VueComptable = React.lazy(() => import('./VueComptable.jsx'));
 // ses règles vivent dans le morceau à part (rien de plus à télécharger pour la page d'accueil).
 const apercuPossible = (() => {
   try {
-    if (filmDemande || comptableDemande || pageTarifs() || exempleActif()) return false;
+    if (filmDemande || comptableDemande || partenaireDemande || pageTarifs() || exempleActif()) return false;
     const s = JSON.parse(window.localStorage.getItem('vrm_session') || 'null');
     const uid = s && s.user && typeof s.user.id === 'string' ? s.user.id : '';
     // Les traces que la décision exigera (src/ouvertureInstantanee.js) : sans l'une d'elles, aucun morceau
@@ -198,7 +209,7 @@ const apercuPeint = apercuPossible
 // même le premier rendu, pour ne pas ajouter un aller-retour à son ouverture
 // (après l'instantané quand il y en a un : le fichier est déjà préchargé par
 // public/demarrage-app.js, seule son exécution attend la peinture).
-if (!filmDemande && !comptableDemande && versApp()) { if (apercuPossible) apercuPeint.then(() => { try { import('./App.jsx'); } catch (_) {} }); else { try { import('./App.jsx'); } catch (_) {} } }
+if (!filmDemande && !comptableDemande && !partenaireDemande && versApp()) { if (apercuPossible) apercuPeint.then(() => { try { import('./App.jsx'); } catch (_) {} }); else { try { import('./App.jsx'); } catch (_) {} } }
 
 const FondApp = DemarrageVRM;
 function Racine() {
@@ -210,11 +221,14 @@ function Racine() {
     return () => window.removeEventListener('popstate', f);
   }, []);
   if (comptableDemande) return <React.Suspense fallback={null}><VueComptable /></React.Suspense>;
+  if (partenaireDemande) return <React.Suspense fallback={null}><VuePartenaire /></React.Suspense>;
   if (filmDemande) return <React.Suspense fallback={<FondApp />}><Film /></React.Suspense>;
   if (pageTarifs()) return <React.Suspense fallback={<FondApp />}><Tarifs /></React.Suspense>;
   if (vue === 'accueil') {
     return <Accueil onEntrer={(mode) => {
-      try { window.history.pushState({}, '', mode === 'up' ? '/?inscription' : '/?connexion'); } catch (_) {}
+      // (15 nov., lot site-public) La suite de l'adresse (code d'un partenaire, utm…) passe intacte
+      // jusqu'au formulaire (src/accueil/lienEntree.js) : on ne la lit pas ici.
+      try { window.history.pushState({}, '', lienEntree(mode === 'up' ? 'inscription' : 'connexion')); } catch (_) {}
       window.scrollTo(0, 0);
       setVue('app');
     }} />;

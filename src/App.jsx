@@ -635,6 +635,8 @@ import { installerFiltreSupprimes, sansComptesSupprimes, lireSupprimes, CLE_SUPP
 import { etatAbonnement, rappelEssai, publierAbonnement, abonnementPublie, suivreAbonnement, installerGardeEcriture, CLE_PARRAIN, CODE_PARRAIN_RE, codeParrainDe, codeParrainDuChemin } from "./abonnement/etatAbonnement.js";
 // (13 nov., lot 54) Le parrainage clair et visible : « Offert par … » à l'inscription, la ligne du menu « Plus ».
 import { lireApercuParrain, lireParrainageOuvert, parrainageOuvertConnu, suivreParrainageOuvert, demanderParrainage } from "./parrainage/parrainage.js";
+// (15 nov.) Le lien d'un PARTENAIRE (`/p/LEO`) : gardé, présenté une fois (src/partenaires/lien.js).
+import { garderCodePartenaire, codePartenaireGarde, presenterCodePartenaire } from "./partenaires/lien.js";
 import { marquerApercu, effacerApercu, bloquerGestes } from "./abonnement/apercu.js";
 // (9 nov.) Solo / Pro : la règle des ventes par offre (api/_lib/plan-regle.js) et son état (src/abonnement/planVentes.js).
 import { venteHorsPlanUid, demarrerPlan, signaturePlan, suivrePlan, reglePlanCourante } from "./abonnement/planVentes.js";
@@ -854,6 +856,7 @@ import Illustration, { depuisIcone } from "./composants/Illustration.jsx";   // 
 import { SITES_PUBLIER, apercuEnvoi, manquesEnvoi, etatsPaire, partoutLeMeme, lienVu, chercherPaires, enLigneSur } from "./publierAilleurs.js";
 import { CLE_PRIX_PARTOUT, reglagePrix, CLE_PARAMS_PARTOUT, reglageParams, lignePartout, planPartout, executerPartout, aussiSur, texteAussiSur } from "./publierPartout.js";
 import { suiviPourPartout } from "./publierPartoutSuivi.js";
+import { CLE_CORRESPONDANCES, lireMemoire as lireCorrespondances, retenir as retenirCorrespondance, TABLE_VINTED } from "./correspondances.js";   // (15 nov.) Vinted → Leboncoin · eBay · Vestiaire
 import { CLE_DEFAUTS_EBAY as CLE_DEFAUTS_EBAY_PP, defautsDepuis as defautsEbayDepuis, resume as resumeReglagesEbayPP } from "./ebay/parametres.js";
 import { chargerSuivi } from "./suiviBranchement.js";
 import { optionsSelecteur, nomCompteVente, identiteCompteVente, annuaireLbc, ongletSansDonnee, nomPlateforme, logoPlateforme } from "./plateformes.js";
@@ -918,11 +921,11 @@ import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } fr
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
 import { fonduEntree } from "./passageOnglet.js";
 import { echelleTexte, marquerGrandTexte } from "./grandTexte.js";
-import { langueNavigateur, poserLangueUneFois } from "./langueCompte.js";
+import { langueNavigateur, poserLangueUneFois, alignerLangueCompte } from "./langueCompte.js";
 // (11 nov., lot traduction) Les textes visibles passent par `tr()` (src/i18n/index.js) :
 // `t` est pris partout dans ce fichier comme nom de variable, d'où l'alias `tr`.
 import ChoixLangue from "./i18n/ChoixLangue.jsx";
-import { tr, LANGUES, NOMS_LANGUES, choisirLangue, langueCourante, localeCourante, monnaie as monnaieI18n, ajouterSourceApp } from "./i18n/index.js";
+import { tr, LANGUES, NOMS_LANGUES, choisirLangue, langueCourante, localeCourante, monnaie as monnaieI18n, ajouterSourceApp, abonnerLangue } from "./i18n/index.js";
 import { offresVestiaire, offresJourneeVc, euros as eurosOffre, resteAvant as resteAvantOffre } from './offresVestiaire.js';
 // La partie « app » du dictionnaire français arrive AVEC l'app (le fichier d'entrée reste léger).
 import frApp from "./i18n/langues/fr.js";
@@ -976,7 +979,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.381.0';
+const EXT_ATTENDUE = '5.382.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -1146,7 +1149,8 @@ const lbcTitre = (brand, base, size, max) => {
 const LBC_DESC_MAX = 4000;
 const LBC_PRIX_MAX = 100000;
 const LBC_PHOTOS_MAX = 15;
-const LBC_ETATS = ['Neuf avec étiquette', 'Très bon état', 'Bon état', 'État satisfaisant'];
+// (15 nov.) « Neuf sans étiquette » : servi par Leboncoin (fdata du 8 nov., `clothing_condition_a`).
+const LBC_ETATS = ['Neuf avec étiquette', 'Neuf sans étiquette', 'Très bon état', 'Bon état', 'État satisfaisant'];
 function refLbcPresente(texte, ref) {
   if (!ref) return false;
   return new RegExp(String(ref).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![0-9A-Z])', 'i').test(String(texte || ''));
@@ -1177,6 +1181,8 @@ const SOUS_FAMILLES = [
   ['espadrilles', 'chaussures', /espadrille/],
   ['mocassins', 'chaussures', /(mocassin|loafer)/],
   ['derbies', 'chaussures', /(\bderby\b|derbies|richelieu|oxford)/],
+  // (15 nov.) « Chaussures et bottes de randonnée » (Vinted) n'est pas une botte : 305 de ses ventes.
+  ['randonnee', 'chaussures', /randonn[ée]e/],
   ['bottes', 'chaussures', /(\bbottes?\b|bottine|\bboots?\b|chelsea)/],
   ['baskets', 'chaussures', /(basket|sneaker|running|trainer|\brunners?\b)/],
   ['chaussures', 'chaussures', /chaussure/],
@@ -1226,7 +1232,9 @@ function familleArticle(o) {
   if (/^femmes?$/.test(seg[0] || '')) genre = 'femme';
   else if (/^hommes?$/.test(seg[0] || '')) genre = 'homme';
   else if (/^enfants?$/.test(seg[0] || '')) genre = 'enfant';
-  const deux = seg[1] || '';
+  // (15 nov.) Vinted range les chaussures d'enfant SOUS « Vêtements pour filles / garçons >
+  // Chaussures » : le segment suivant décide (une basket d'enfant partait en « Vêtements enfants »).
+  const deux = /^v[êe]tements pour (filles|gar[çc]ons)$/.test(seg[1] || '') && /chaussure/.test(seg[2] || '') ? seg[2] : (seg[1] || '');
   if (/chaussure/.test(deux)) famille = 'chaussures';
   else if (/v[êe]tement/.test(deux)) famille = 'vetements';
   else if (/^sacs?\b/.test(deux)) famille = 'sacs';
@@ -1403,7 +1411,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
+const EXT_CAPACITES = { lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -1599,6 +1607,8 @@ installerGardeHorsLigne(SUPABASE_URL);
 // s'ouvre alors sur l'INSCRIPTION, avec « Offert par <nom choisi> ».
 let PARRAIN_DU_LIEN = '';
 try { const c = codeParrainDe(window.location.search) || codeParrainDuChemin(window.location.pathname); if (c) { localStorage.setItem(CLE_PARRAIN, c); PARRAIN_DU_LIEN = c; } } catch (_) {}   // (11 nov.) + le lien court `/r/CODE`
+let PARTENAIRE_DU_LIEN = '';
+try { PARTENAIRE_DU_LIEN = garderCodePartenaire(localStorage, window.location.search, window.location.pathname); } catch (_) {}   // (15 nov.) programme partenaire
 const codeParrainGarde = () => { try { const c = String(localStorage.getItem(CLE_PARRAIN) || ''); return CODE_PARRAIN_RE.test(c) ? c : ''; } catch (_) { return ''; } };
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -2254,7 +2264,8 @@ const authSignUp  = async (email, password) => {
   // (13 nov., lot 54) Le code de parrainage suit le COMPTE (`user_metadata.parrain`) : le lien de
   // confirmation ouvert sur un autre appareil ne le perd plus. Le serveur décide toujours tout.
   const parrain = codeParrainGarde();
-  const r = await authCall(avecRetour('signup'), { email: String(email).trim().toLowerCase(), password, data: { langue: langueNavigateur(), ...(parrain ? { parrain } : {}) } });
+  const partenaire = codePartenaireGarde(localStorage);   // (15 nov.) le code partenaire suit aussi le compte
+  const r = await authCall(avecRetour('signup'), { email: String(email).trim().toLowerCase(), password, data: { langue: langueNavigateur(), ...(parrain ? { parrain } : {}), ...(partenaire ? { partenaire } : {}) } });
   if (!r.ok) {
     if(r.captcha)return {ok:false,error:r.error};
     // On traduit les erreurs techniques de Supabase : « email rate limit
@@ -2676,6 +2687,7 @@ const ensureLocalOwner = (uid) => {
 const RECHERCHE_OUVERTURE = (() => { try { return window.location.search || ''; } catch (_) { return ''; } })();
 // Restaure la session au démarrage, et renouvelle le jeton s'il a expiré.
 let AUTH_REDIRECT = null;   // résultat du retour OAuth / lien email, lu par l'écran de connexion
+let _langueAbonnee = false;   // (15 nov.) une seule écoute du changement de langue (alignerLangueCompte)
 const authBoot = async () => {
   // ⚠️ NE PAS BLOQUER LE PREMIER AFFICHAGE SUR LE RÉSEAU.
   // Avant, on attendait DEUX appels réseau ici : l'app restait sur un écran
@@ -2712,7 +2724,11 @@ const authBoot = async () => {
   // (8 nov.) Un compte créé avant que la langue soit rangée la reçoit une fois,
   // plus tard (rien ne doit retarder le premier écran). Raté ⇒ réessayé au
   // prochain chargement ; jamais par-dessus une langue déjà rangée.
-  setTimeout(() => { if (RECOVERY_PENDING) return; const s2 = AUTH.session; poserLangueUneFois({ url: SUPABASE_URL, cle: SUPABASE_KEY, jeton: s2 && s2.access_token, uid: s2 && s2.user && s2.user.id, stockage: (() => { try { return localStorage; } catch (_) { return null; } })() }).catch(() => {}); }, 8000);
+  // (15 nov.) Puis la langue de l'app (cinq langues) rangée sur le compte — celle des
+  // notifications push (api/_lib/push.js) ; et de nouveau à chaque changement de langue.
+  const alignerLangue = () => { if (RECOVERY_PENDING) return; const s3 = AUTH.session; alignerLangueCompte({ url: SUPABASE_URL, cle: SUPABASE_KEY, jeton: s3 && s3.access_token, uid: s3 && s3.user && s3.user.id, langue: langueCourante() }).catch(() => {}); };
+  setTimeout(() => { if (RECOVERY_PENDING) return; const s2 = AUTH.session; poserLangueUneFois({ url: SUPABASE_URL, cle: SUPABASE_KEY, jeton: s2 && s2.access_token, uid: s2 && s2.user && s2.user.id, stockage: (() => { try { return localStorage; } catch (_) { return null; } })() }).catch(() => {}).then(alignerLangue); }, 8000);
+  if (!_langueAbonnee) { _langueAbonnee = true; try { abonnerLangue(() => setTimeout(alignerLangue, 500)); } catch (_) {} }
 };
 // ── LE PREMIER ÉCRAN N'ATTEND PLUS SON PROPRE RENDU (16 octobre) ─────────────
 // Mesuré au banc `vitesse.cjs` (téléphone, processeur ×4) : Ma journée enchaînait
@@ -3049,6 +3065,7 @@ const SYNC_KEYS = [
   'vrm_soldes',
   // (11 nov. soir) … et TOUS les paramètres de publication par défaut, par site (src/publierPartout.js).
   'vrm_partout_params',
+  'vrm_correspondances',   // (15 nov.) SES réponses « quelle catégorie chez Leboncoin / Vestiaire / eBay ? », par catégorie Vinted
   'vinted_accounts','vinted_account_labels','vinted_account_emails','vinted_account_phones',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
   'vinted_goal','vinted_regime','vrm_micro_options','vinted_tva','vinted_bordereau_formats',
@@ -19559,7 +19576,7 @@ function AuthScreen() {
   // ouvre directement le bon formulaire (un clic de plus pour s'inscrire, c'est
   // des inscriptions en moins).
   const [mode, setMode] = React.useState(() => (RECOVERY_PENDING || (AUTH_REDIRECT && AUTH_REDIRECT.recovery)) ? 'newpw'
-    : ((/[?&]inscription(=|&|$)/.test(window.location.search || '') || PARRAIN_DU_LIEN) ? 'up'
+    : ((/[?&]inscription(=|&|$)/.test(window.location.search || '') || PARRAIN_DU_LIEN || PARTENAIRE_DU_LIEN) ? 'up'
     // 5.328 : « Mot de passe oublié ? » dans la carte de l'extension.
     : /[?&]mot-de-passe-oublie(=|&|$)/.test(window.location.search || '') ? 'reset' : 'in')); // in · up · reset · newpw
   const [email, setEmail] = React.useState('');
@@ -19807,6 +19824,12 @@ function AuthScreen() {
       <aside className="vrm-cx-marque">
         <div className="vrm-cx-aurore" aria-hidden="true" data-cx-aurore=""><i/><i/><i/></div>
         <div className="vrm-cx-etiquettes" aria-hidden="true"><span>{tr('auth.deco.colis')}</span><span>{tr('auth.deco.bordereau')}</span><span>{tr('auth.deco.vendu')}</span><span>{tr('auth.deco.retiree')}</span></div>
+        {/* (15 nov., lot site-public) Sur un grand écran, l'app elle-même à côté de la phrase : la capture de Ma journée
+            de la page d'accueil (mode exemple, au registre public/accueil/captures.json), dite « données d'exemple ». */}
+        <figure className="vrm-cx-apercu" data-cx-apercu="">
+          <span><picture><source srcSet="/accueil/journee-sombre.webp" media="(prefers-color-scheme: dark)" type="image/webp"/><img src="/accueil/journee-clair.webp" alt="" width="780" height="1688" loading="lazy" decoding="async"/></picture></span>
+          <figcaption>{tr('accueil.capture.legende')}</figcaption>
+        </figure>
         <div className="vrm-cx-haut">
           <a href="/" className="vrm-cx-logo" aria-label={tr('auth.logoAccueil')}>
             <img src="/vrm-logo-v5-192.png" alt="" width="36" height="36"/><b>VRM</b>
@@ -19876,31 +19899,6 @@ function AuthScreen() {
             <button type="button" disabled={busy} onClick={()=>loadAuthSettings()} style={{display:'block',minHeight:44,padding:'8px 0 0',border:0,background:'transparent',color:C.accentTexte,font:'inherit',fontWeight:600,cursor:busy?'default':'pointer'}}>{tr('auth.moyens.reessayer')}</button>
           </div>}
 
-          {/* Connexion par Google / Discord, EN PREMIER : c'est le chemin le plus
-              court et le plus sûr (aucun mot de passe à créer, donc aucun mot de
-              passe à se faire voler ici). */}
-          {mode!=='newpw' && mode!=='reset' && (()=>{
-            // On n'affiche QUE les fournisseurs réellement activés côté Supabase.
-            // Un bouton qui mène à une page d'erreur JSON vaut moins que pas de
-            // bouton du tout.
-            const dispo = OAUTH_PROVIDERS.filter(p => providerEnabled(p.id));
-            if (!dispo.length) return null;
-            return (<>
-              {dispo.map(p => (
-                <button key={p.id} type="button" onClick={()=>oauth(p.id)} disabled={busy}
-                  style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:10,
-                    border:`1px solid ${C.border}`,background:C.bg,color:C.text,borderRadius:12,padding:'12px',
-                    fontSize:15,fontWeight:600,cursor:busy?'default':'pointer',marginBottom:9,fontFamily:'inherit'}}>
-                  <BrandMark id={p.id}/> {fournisseurEnCours===p.id ? tr('auth.fournisseur.ouverture', { nom: p.label }) : mode==='up' ? tr('auth.fournisseur.creer', { nom: p.label }) : tr('auth.fournisseur.continuer', { nom: p.label })}
-                </button>
-              ))}
-              <div style={{display:'flex',alignItems:'center',gap:10,margin:'4px 0 12px'}}>
-                <span style={{flex:1,height:1,background:C.border}}/>
-                <span style={{fontSize:11,color:C.muted,fontWeight:400}}>{tr('auth.ouEmail')}</span>
-                <span style={{flex:1,height:1,background:C.border}}/>
-              </div>
-            </>);
-          })()}
 
           {/* Création de compte alors que la confirmation par email est active :
               on prévient AVANT, sinon on tape son mot de passe pour rien. */}
@@ -20003,6 +20001,29 @@ function AuthScreen() {
             borderRadius:999,padding:'13px',fontSize:15,fontWeight:600,cursor:bloque?'default':'pointer',opacity:bloque?0.6:1,fontFamily:'inherit'}}>
             {busy ? (fournisseurEnCours?tr('auth.bouton.ouverture'):mode==='up'?tr('auth.bouton.creation'):mode==='reset'?tr('auth.bouton.envoiLien'):mode==='newpw'?tr('auth.bouton.enregistrement'):tr('auth.bouton.connexion')) : (enAttenteEmail && mode==='reset' && resetEnvoye) ? tr('auth.renvoyerDans', { s: resteAttente }) : (enAttenteEmail && (mode==='up'||mode==='reset')) ? tr('auth.reessaieDans', { s: resteAttente }) : attendCaptcha ? (captcha.statut==='erreur' ? tr('auth.captcha.indisponible') : captcha.statut==='interactif' ? tr('auth.captcha.coche') : tr('auth.captcha.enCours')) : mode==='up' ? tr('auth.bouton.creer') : mode==='reset' ? (resetEnvoye ? tr('auth.bouton.renvoyer') : tr('auth.bouton.envoyerLien')) : mode==='newpw' ? tr('commun.enregistrer') : tr('auth.titre.in')}
           </button>);})()}
+          {/* (15 nov., lot site-public) Google / Discord SOUS le formulaire, après un « ou » : l'e-mail et le
+              mot de passe d'abord (le chemin que tout le monde a). On n'affiche QUE les fournisseurs
+              réellement activés côté Supabase : un bouton qui mène à une page d'erreur JSON vaut moins
+              que pas de bouton du tout. */}
+          {mode!=='newpw' && mode!=='reset' && (()=>{
+            const dispo = OAUTH_PROVIDERS.filter(p => providerEnabled(p.id));
+            if (!dispo.length) return null;
+            return (<div data-cx-fournisseurs="">
+              <div style={{display:'flex',alignItems:'center',gap:10,margin:'14px 0 12px'}}>
+                <span style={{flex:1,height:1,background:C.border}}/>
+                <span style={{fontSize:13,color:C.muted,fontWeight:400}}>{tr('auth.ou')}</span>
+                <span style={{flex:1,height:1,background:C.border}}/>
+              </div>
+              {dispo.map(p => (
+                <button key={p.id} type="button" onClick={()=>oauth(p.id)} disabled={busy}
+                  style={{width:'100%',minHeight:48,display:'flex',alignItems:'center',justifyContent:'center',gap:10,
+                    border:`1px solid ${C.border}`,background:C.bg,color:C.text,borderRadius:999,padding:'12px',
+                    fontSize:15,fontWeight:600,cursor:busy?'default':'pointer',marginBottom:9,fontFamily:'inherit'}}>
+                  <BrandMark id={p.id}/> {fournisseurEnCours===p.id ? tr('auth.fournisseur.ouverture', { nom: p.label }) : mode==='up' ? tr('auth.fournisseur.creer', { nom: p.label }) : tr('auth.fournisseur.continuer', { nom: p.label })}
+                </button>
+              ))}
+            </div>);
+          })()}
           {/* Acceptation des conditions AVANT la création du compte (art. 1127-1
               C. civ., RGPD art. 13 : l'information est donnée au moment de la
               collecte). */}
@@ -20304,6 +20325,14 @@ function BandeauAbonnement({ setTab }) {
         // (13 nov., lot 54) Un refus définitif est DIT une fois (« Tu ne peux pas être ton propre parrain. »…).
         else if (j && typeof j.message === 'string' && j.message) toast(j.message);
       }).catch(() => {});
+  }, []);
+  // (15 nov.) Le code d'un PARTENAIRE gardé depuis son lien (ou posé sur le compte à l'inscription) :
+  // présenté UNE fois, le serveur décide (src/partenaires/lien.js) ; un refus définitif est dit une fois.
+  React.useEffect(() => {
+    if (!(AUTH.session && AUTH.session.access_token)) return;
+    presenterCodePartenaire({ fetcher: (u, o) => fetch(u, o), enTete: enTeteSession(), stock: localStorage, uid: (AUTH.user && AUTH.user.id) || '',
+      duCompte: (AUTH.user && AUTH.user.user_metadata && AUTH.user.user_metadata.partenaire) || '',
+      dire: (sorte, j) => { if (sorte === 'ok') toast(tr('partenaires.rattache.ok', { code: j.code || '' })); else if (j && typeof j.message === 'string' && j.message) toast(j.message); } }).catch(() => {});
   }, []);
   const uid = (AUTH.user && AUTH.user.id) || '';
   const e = etatAbonnement(x === null ? undefined : x);
@@ -25490,7 +25519,8 @@ function useEbayPaires(comptes) {
         const etatV = String(etatMap[String(id)] || cf.etat || '').trim();
         const tailleV = String(tailleMap[String(id)] || cf.size || '').trim();
         out.push({ id: String(id), num: n, photoK: f.photoK || null, title: titreP, taille: tailleV || extractSize(titreP) || '', tailleVinted: tailleV, marque, etat: etatV, cover, photos, desc, nPhotos: nPhotosMap[String(id)], prix: prixMap[String(id)] ?? null, uid: compteMap[String(id)] || '',
-          catalogId: catMap[String(id)] ?? (details[id] && details[id].catalogId) ?? null, couleur: couleurMap[String(id)] || '', cree: creeMap[String(id)] ?? null,
+          // (15 nov.) la catégorie Vinted lue sur la page de l'annonce est aussi rangée sous `codes.catalog_id` (mesuré : 56 fiches sur 330 l'ont, AUCUNE `catalogId`).
+          catalogId: catMap[String(id)] ?? (details[id] && details[id].catalogId) ?? (details[id] && details[id].codes && details[id].codes.catalog_id != null && details[id].codes.catalog_id !== '' ? String(details[id].codes.catalog_id) : null) ?? null, couleur: couleurMap[String(id)] || '', cree: creeMap[String(id)] ?? null,
           ...(chezMoi.has(String(id)) ? { chezMoi: true, prix: prixMap[String(id)] ?? (f.price != null && f.price !== '' ? f.price : null), uid: compteMap[String(id)] || String(f.accountId || '') } : {}) });
       }
       out.sort((a, b) => (parseInt(b.num, 10) || 0) - (parseInt(a.num, 10) || 0));
@@ -25954,6 +25984,10 @@ function HotePublierPartout({ comptes, nums, numData, onFermer }) {
   const [saisies, setSaisies] = React.useState({});
   // (11 nov. soir) Les paramètres de publication par défaut (Leboncoin, Vestiaire) : '' = auto.
   const [params, setParams] = React.useState(() => reglageParams(load(CLE_PARAMS_PARTOUT, null), { etatsLbc: LBC_ETATS }));
+  // (15 nov.) SES réponses aux correspondances, par catégorie Vinted (synchronisées) ; écrites sur SON clic seulement.
+  const [memoire, setMemoire] = React.useState(() => lireCorrespondances(load(CLE_CORRESPONDANCES, null)));
+  // Une extension qui porte catégorie et critères (5.381) — sinon Leboncoin les devinerait : la feuille le dit.
+  const lbcCriteres = (relaisVivant() ? 'ok' : extSait('lbccriteres')) === 'ok';
   // Les listes Leboncoin et Vestiaire (pour « déjà en ligne ») : trois états.
   const [autres, setAutres] = React.useState(undefined);
   const relire = React.useCallback(async () => {
@@ -25988,7 +26022,10 @@ function HotePublierPartout({ comptes, nums, numData, onFermer }) {
   const lignes = choisies === undefined ? undefined : choisies.map((p) => {
     const fiche = fiches[String(p.id)] || {};
     let achat = null; try { achat = prixAchatDe(fiche, load('vinted_buyprice_by_num', {}) || {}); } catch (_) { achat = null; }
-    return lignePartout(p, { enLigne: enLigneDe(p), ext, reglage, params, saisie: saisies[String(p.id)], regles, achat,
+    // Ce que la règle d'avant (la même dans l'extension) poserait d'elle-même, d'après le chemin Vinted connu.
+    const t = p.catalogId != null ? TABLE_VINTED[String(p.catalogId)] : null;
+    let categorieVoie = ''; try { categorieVoie = categorieLbcDe(p.title, p.desc, p.taille, t ? t.chemin : '', p.marque); } catch (_) { categorieVoie = ''; }
+    return lignePartout(p, { enLigne: enLigneDe(p), ext, reglage, params, saisie: saisies[String(p.id)], regles, achat, memoire, lbcCriteres, categorieVoie,
       famille: familleArticle({ titre: p.title, taille: p.taille, marque: p.marque }).famille, mpLbc: mpChoisi(fiche, 'lbc'), facultatifs: champsFacultatifs(vendActuel()) });
   });
   const vus = {};
@@ -26004,7 +26041,10 @@ function HotePublierPartout({ comptes, nums, numData, onFermer }) {
       // Une extension qui ne sait pas recevoir la fiche publierait SA version (prix Vinted) :
       // un prix réglé ne partirait pas — on le dit, rien ne part (jamais un autre prix en silence).
       if (saitFiche !== 'ok' && Number(e.apercu.prix) !== Number(p.prix)) return { accepte: false, code: 'fiche-retard', raison: `ton extension ne sait pas encore recevoir la fiche de VRM (${EXT_CAPACITES.lbcfiche}) : le prix réglé ne partirait pas` };
-      let r = null; try { r = await vmrCmd({ cmd: 'lbcPublier', id: String(e.id), ...(saitFiche === 'ok' ? { annonce: v.annonce } : {}) }, 30000); } catch (_) { r = null; }
+      // (15 nov.) La catégorie et ses critères (univers, type, taille, état, couleur, marque) de la correspondance :
+      // seulement à une extension qui sait les poser (`lbccriteres`) ; sinon la case est restée bloquée.
+      const crit = lbcCriteres && e.lbc ? { ...(e.lbc.categorie ? { categorie: e.lbc.categorie } : {}), ...(Object.keys(e.lbc.criteres || {}).length ? { criteres: e.lbc.criteres } : {}) } : {};
+      let r = null; try { r = await vmrCmd({ cmd: 'lbcPublier', id: String(e.id), ...(saitFiche === 'ok' ? { annonce: { ...v.annonce, ...crit } } : {}) }, 30000); } catch (_) { r = null; }
       if (r && !r.accepte && r.code === 'confirmer') return { accepte: false, code: 'confirmer', raison: 'VRM n’a pas vu la fin d’un dépôt précédent : si l’annonce est en ligne, rien à refaire ; sinon relance-la depuis sa fiche Leboncoin' };
       if (r && r.accepte && r.jobId) { __vmrJobs[r.jobId] = Object.assign({}, __vmrJobs[r.jobId] || {}, { etape: r.etape, at: Date.now() }); __vmrNotifier(); }
       return r;
@@ -26019,7 +26059,9 @@ function HotePublierPartout({ comptes, nums, numData, onFermer }) {
     },
     ebay: async (e) => {
       const p = parId.get(e.id); if (!p) return { accepte: false, code: 'absente', raison: 'annonce plus en ligne sur Vinted' };
-      try { const m = await import('./ecrans/Ebay.jsx'); return await m.preparerBrouillonPartout(p, { prix: e.apercu.prix, titre: e.apercu.titre }); }
+      // (15 nov.) LA catégorie eBay qu'il a choisie (parmi celles qu'eBay propose) ; sans elle, aucune n'est devinée.
+      const cat = e.corr && e.corr.valeurs && e.corr.valeurs.categorie ? e.corr.valeurs.categorie : null;
+      try { const m = await import('./ecrans/Ebay.jsx'); return await m.preparerBrouillonPartout(p, { prix: e.apercu.prix, titre: e.apercu.titre, categorie: cat }); }
       catch (_) { return { accepte: false, code: 'charge', raison: 'l’écran eBay n’a pas pu se charger — réessaie' }; }
     },
   };
@@ -26043,6 +26085,24 @@ function HotePublierPartout({ comptes, nums, numData, onFermer }) {
     exclues={choisies === undefined ? 0 : voulus.length - choisies.length}
     onReglage={(site, r) => setReglage((x) => { const n = reglagePrix({ ...x, [site]: r }); save(CLE_PRIX_PARTOUT, n); return n; })}
     onParam={(site, champ, val) => setParams((x) => { const n = reglageParams({ ...x, [site]: { ...((x && x[site]) || {}), [champ]: val } }, { etatsLbc: LBC_ETATS }); save(CLE_PARAMS_PARTOUT, n); return n; })}
+    memoire={memoire}
+    /* (15 nov.) SA réponse à une correspondance : pour CETTE annonce, et retenue pour sa catégorie Vinted. */
+    onRepondre={(id, site, champ, val) => {
+      setSaisies((x) => { const a = x[id] || {}; const c = a.corr || {}; return { ...x, [id]: { ...a, corr: { ...c, [site]: { ...(c[site] || {}), [champ]: val } } } }; });
+      const p = parId.get(String(id));
+      if (p && champ !== 'marque' && p.catalogId != null && p.catalogId !== '' && isCloudReady()) {
+        const n = retenirCorrespondance(load(CLE_CORRESPONDANCES, null), p.catalogId, site, champ, val);
+        save(CLE_CORRESPONDANCES, n); setMemoire(n);
+      }
+      if (p && site === 'leboncoin' && champ === 'marque' && p.marque && isCloudReady()) {
+        const n = retenirCorrespondance(load(CLE_CORRESPONDANCES, null), p.catalogId, 'leboncoin', 'marque', { vinted: p.marque, libelle: val });
+        save(CLE_CORRESPONDANCES, n); setMemoire(n);
+      }
+    }}
+    /* Les catégories qu'eBay propose (API Taxonomy, sur SON jeton, lecture seule) : `null` = pas su. */
+    onChercherEbay={async (q) => {
+      try { const { j } = await appelEbay({ action: 'parametres', q: String(q || '').slice(0, 80) }); return j && j.ok && Array.isArray(j.categories) ? j.categories : null; } catch (_) { return null; }
+    }}
     onParamAnnonce={(id, site, champ, val) => setSaisies((x) => { const a = x[id] || {}; const pr = a.params || {}; return { ...x, [id]: { ...a, params: { ...pr, [site]: { ...(pr[site] || {}), [champ]: val } } } }; })}
     onSaisie={(id, champ, val) => setSaisies((x) => {
       const a = x[id] || {};

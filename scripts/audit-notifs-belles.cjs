@@ -119,7 +119,7 @@ const EMOJI = /\p{Extended_Pictographic}/u;
     const [a, , c] = pushes;
     dit(pushes.length === 3 && a.tag === 'bord-901' && a.genre === 'bordereau' && !a.tagGroupe && c.tagGroupe === 'vrm-bordereau' && c.genre === 'bordereau', 'R1 seule, elle garde l’étiquette de SON colis ; à plusieurs, l’étiquette du genre « bordereau » (le téléphone n’en montre qu’une)', pushes.map((x) => x.tagGroupe || x.tag).join(','));
     dit(a.title === 'Bordereau prêt à imprimer' && a.url === L.DESTINATIONS.colis({ tx: '901' }), 'R2 la première reste elle-même (son colis)', `${a.title} ${a.url}`);
-    dit(c.title === '3 bordereaux prêts à imprimer' && c.url === L.DESTINATIONS.colis({}) && /^Dernier : Air Max de banc/.test(c.body), 'R3 la troisième dit « 3 bordereaux prêts à imprimer » et ouvre la LISTE des prêts', `${c.title} | ${c.body} | ${c.url}`);
+    dit(c.title === '3 bordereaux prêts à imprimer' && c.url === L.DESTINATIONS.colis({}) && /^La plus récente : Air Max de banc/.test(c.body) && c.body.length <= 90, 'R3 la troisième dit « 3 bordereaux prêts à imprimer » et ouvre la LISTE des prêts', `${c.title} | ${c.body} | ${c.url}`);
     dit(c.renotify === true, 'R4 un fait nouveau re-sonne (renotify)');
     prepare(null, {}); panne.add('push_journal_lu');
     for (const tx of ['911', '912']) await comme(() => P.sendPushToAll(BORD(tx)));

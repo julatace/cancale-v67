@@ -51,7 +51,8 @@ const MUTATIONS = {
   'valeur-hors-liste': ['regle', "if (liste && !liste.includes(s)) return '';", ''],
   'vc-publie-quand-meme': ['regle', "if (e.site === 'vestiaire' && finir.length) {", 'if (false) {'],
   'arret-ignore': ['regle', "if (!stop && typeof doitSArreter === 'function')", 'if (false)'],
-  'requis-invente': ['regle', "if (!sous || !categorieLbcDeSous(sous)) return null;", "if (!sous || !categorieLbcDeSous(sous)) return 'Chaussures';"],
+  // (15 nov.) la catégorie Leboncoin vient de la correspondance ; pas sûre ⇒ demandée (jamais d'après le titre)
+  'requis-invente': ['regle', "if (r.corrLbc && (champ === 'sousCategorie' || champ === 'categorie')) return null;", "if (r.corrLbc && (champ === 'sousCategorie' || champ === 'categorie')) return champ === 'categorie' ? 'Mode' : 'Chaussures';"],
   'suivi-main-ok': ['suivi', "'a-finir': 'main'", "'a-finir': 'ok'"],
   'vc-publier-app': ['app', "publier: !finir && extSait('vcauto') === 'ok'", "publier: extSait('vcauto') === 'ok'"],
   'params-sync-oublie': ['app', "  'vrm_partout_params',\n", ''],
@@ -117,8 +118,12 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').m
   const regles = { titreLbc: (m, t) => String(t || '').slice(0, 50), titreVc: (m, t) => String(t || '').slice(0, 80), titreEbay: (t) => String(t || '').slice(0, 80),
     descriptionLbc: (o) => `${o.texte || ''}\n\nRéf. ${o.ref}`, descriptionEbay: (p) => p.desc || '', etatsLbc: LBC_ETATS, categorieLbc: () => 'Chaussures' };
   const photos = ['https://images1.vinted.net/a/1.jpg', 'https://images1.vinted.net/a/2.jpg', 'https://images1.vinted.net/a/3.jpg'];
-  const paire = (i, o = {}) => ({ id: String(9000 + i), num: String(i), title: 'Nike Air Max 90 blanche', taille: '42', marque: 'Nike', etat: 'Très bon état', photos, desc: 'Très propre', prix: 60, cover: photos[0], ...o });
-  const ctx = (o = {}) => ({ enLigne: { leboncoin: false, vestiaire: false, ebay: false }, ext: { leboncoin: '', vestiaire: '', ebay: '' }, regles, ...o });
+  const paire = (i, o = {}) => ({ id: String(9000 + i), num: String(i), title: 'Nike Air Max 90 blanche', taille: '42', marque: 'Nike', etat: 'Très bon état', photos, desc: 'Très propre', prix: 60, cover: photos[0], catalogId: '1242', ...o });
+  // (15 nov.) La catégorie Vinted de la paire est LUE (1242 « Hommes > Chaussures > Baskets », table
+  // src/correspondances.js) et l'extension reçoit catégorie et critères (`lbccriteres`) : la règle
+  // d'avant est jugée telle quelle ; l'inconnu (catégorie pas lue, extension en retard) a son audit
+  // (scripts/audit-correspondances.cjs).
+  const ctx = (o = {}) => ({ enLigne: { leboncoin: false, vestiaire: false, ebay: false }, ext: { leboncoin: '', vestiaire: '', ebay: '' }, regles, lbcCriteres: true, memoire: null, ...o });
   const site = (l, s) => l.sites.find((x) => x.site === s);
 
   if (P) {
@@ -172,9 +177,10 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').m
       dit(l.sites.every((x) => !x.cochable && x.demandes.includes('prix')), 'E1 prix pas lu : demandé, aucune case ne part');
       const l2 = P.lignePartout(paire(4, { prix: null }), ctx({ saisie: { prix: '72,5' } }));
       dit(l2.sites.every((x) => x.cochable && x.apercu.prix === 72.5), 'E2 prix tapé ⇒ il part tel quel');
-      const l3 = P.lignePartout(paire(5, { etat: 'Neuf sans étiquette' }), ctx());
+      // (15 nov.) « Neuf sans étiquette » EXISTE chez Leboncoin (fdata du 8 nov.) : l'état inconnu est un autre mot.
+      const l3 = P.lignePartout(paire(5, { etat: 'Comme neuf' }), ctx());
       dit(!site(l3, 'leboncoin').cochable && site(l3, 'leboncoin').demandes.includes('etat-lbc') && site(l3, 'ebay').cochable, 'E3 état inconnu de Leboncoin : demandé pour Leboncoin seulement');
-      const l4 = P.lignePartout(paire(5, { etat: 'Neuf sans étiquette' }), ctx({ saisie: { etatLbc: 'Très bon état' } }));
+      const l4 = P.lignePartout(paire(5, { etat: 'Comme neuf' }), ctx({ saisie: { etatLbc: 'Très bon état' } }));
       dit(site(l4, 'leboncoin').cochable && site(l4, 'leboncoin').vocab.etat === 'Très bon état', 'E4 état choisi ⇒ Leboncoin part avec son choix');
       const l5 = P.lignePartout(paire(5, { title: 'x'.repeat(70) }), { ...ctx(), regles: { ...regles, titreLbc: (m, t) => t } });
       dit(!site(l5, 'leboncoin').cochable, 'E5 titre trop long pour Leboncoin ⇒ bloqué (la voie le refuserait)');
@@ -224,7 +230,7 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').m
       dit(site(l2, 'leboncoin').cochable && ch(l2, 'leboncoin', 'livraison').source === 'annonce', 'H6 l\'annonce passe avant le défaut', ch(l2, 'leboncoin', 'livraison'));
       const l3 = P.lignePartout(paire(1), ctx({ regles: r, params: { leboncoin: { livraison: 'peut-être', etat: 'Comme neuf' } } }));
       dit(ch(l3, 'leboncoin', 'livraison').source === 'auto' && ch(l3, 'leboncoin', 'etat').source === 'auto', 'H7 une valeur hors de la liste du site n\'est jamais rangée');
-      const l4 = P.lignePartout(paire(1, { title: 'Objet bizarre', taille: '' }), ctx({ regles: { ...r, categorieLbc: () => '' } }));
+      const l4 = P.lignePartout(paire(1, { title: 'Objet bizarre', taille: '', catalogId: null }), ctx({ regles: { ...r, categorieLbc: () => '' } }));
       dit(ch(l4, 'leboncoin', 'sousCategorie').valeur === null && ch(l4, 'leboncoin', 'sousCategorie').demande && ch(l4, 'leboncoin', 'sousCategorie').effet === 'sur-site', 'H8 catégorie introuvable ⇒ DEMANDÉE (jamais inventée), à choisir pendant le dépôt');
       dit(site(l4, 'leboncoin').demandes.includes('champ:sousCategorie') && site(l4, 'leboncoin').demandes.includes('champ:taille'), 'H9 la taille introuvable est demandée aussi', site(l4, 'leboncoin').demandes);
       const l5 = P.lignePartout(paire(1), ctx({ regles: r, params: { vestiaire: { matiere: 'Cuir', univers: 'Mode homme' } } }));

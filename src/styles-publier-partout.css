@@ -92,3 +92,31 @@
 .vrm-pp-progres > span > i { display: block; height: 100%; background: var(--fu-bleu, #0071e3); transition: width .3s ease; }
 .vrm-pp-progres small { font-size: 13px; color: var(--fu-gris, #6e6e73); font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) { .vrm-pp-progres > span > i { transition: none; } }
+
+/* ── (15 nov.) LA CORRESPONDANCE D'UN SITE — src/CorrespondancesPartout.jsx ──
+   D'où part l'annonce (sa catégorie Vinted) et où elle arrive sur ce site, dans
+   ses mots ; une correspondance pas sûre se demande (liste du site). Neutre ;
+   un ✓ discret pour « sûre » ; l'ambre reste celui des demandes bloquantes. */
+.vrm-pp-corr { margin: 0 0 6px 34px; padding: 8px 10px; border-radius: 12px; background: var(--fu-case, #f2f2f7); font-size: 13px; line-height: 1.4; min-width: 0; }
+.vrm-pp-corr p { margin: 0; overflow-wrap: anywhere; }
+.vrm-pp-corr-vinted { color: var(--fu-gris, #6e6e73); }
+.vrm-pp-corr-vinted b { font-weight: 600; color: inherit; }
+.vrm-pp-corr-cible { margin-top: 2px !important; font-size: 15px; }
+.vrm-pp-corr-cible > span:first-child { color: var(--fu-gris, #6e6e73); font-size: 13px; }
+.vrm-pp-corr-cible b { font-weight: 700; }
+.vrm-pp-corr-ok { color: var(--fu-encre, #1d1d1f); font-weight: 700; }
+.vrm-pp-corr-vals { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 2px 12px; }
+.vrm-pp-corr-vals li { white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.vrm-pp-corr-vals span { color: var(--fu-gris, #6e6e73); }
+.vrm-pp-corr-vals b { font-weight: 600; }
+.vrm-pp-corr .vrm-pp-aide { margin-top: 4px; }
+.vrm-pp-corr-demande { margin: 6px 0 0; }
+.vrm-pp-corr-demande select { max-width: 100%; background: var(--fu-carte, #fff); }
+.vrm-pp-corr .sb-lien { min-height: 44px; padding: 0; border: 0; background: none; color: var(--fu-bleu, #0060CC); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+.vrm-pp-corr-liste { list-style: none; margin: 4px 0 0; padding: 0; background: var(--fu-carte, #fff); border-radius: 12px; overflow: hidden; }
+.vrm-pp-corr-liste li + li { border-top: 1px solid var(--fu-filet, rgba(0,0,0,.06)); }
+.vrm-pp-corr-rangee { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; min-height: 48px; padding: 6px 10px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.vrm-pp-corr-rangee b { font-size: 15px; font-weight: 600; }
+.vrm-pp-corr-rangee small { font-size: 12px; color: var(--fu-gris, #6e6e73); overflow-wrap: anywhere; }
+@media (max-width: 480px) { .vrm-pp-corr { margin-left: 0; } }
+.vrm-pp-corr-demande .vrm-pp-demande-mot { margin-left: 6px; }

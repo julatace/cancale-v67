@@ -54,7 +54,9 @@ export function ventesDuCorps(body) {
     const tx = String((v && v.tx) || '').trim(), uid = String((v && v.uid) || '').trim(), num = String((v && v.num) || '').trim();
     if (!ID.test(tx) || !ID.test(uid) || !NUM.test(num) || vus.has(tx)) continue;
     const e = v && v.eur != null && Number.isFinite(Number(v.eur)) && Number(v.eur) > 0 && Number(v.eur) < 100000 ? Math.round(Number(v.eur) * 100) / 100 : null;
-    vus.add(tx); out.push({ tx, uid, num, eur: e });
+    // (15 nov.) Le nom de la paire (dit dans la notification, jamais une identité) : texte nu, court.
+    const titre = String((v && v.titre) || '').replace(/[\u0000-\u001f\u007f<>]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+    vus.add(tx); out.push({ tx, uid, num, eur: e, ...(titre ? { titre } : {}) });
   }
   return out;
 }

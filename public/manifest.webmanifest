@@ -2,7 +2,7 @@
   "id": "/",
   "name": "VRM",
   "short_name": "VRM",
-  "description": "Ton poste de pilotage de revendeur : annonces, ventes, achats, rangement, marge et comptabilité au même endroit.",
+  "description": "Tes ventes Vinted, Leboncoin, eBay et Vestiaire au même endroit : numéros de rangement, colis, codes de retrait et compta.",
   "lang": "fr",
   "dir": "ltr",
   "start_url": "/",
@@ -13,8 +13,8 @@
     "minimal-ui"
   ],
   "orientation": "portrait",
-  "background_color": "#F2F2F7",
-  "theme_color": "#F2F2F7",
+  "background_color": "#EEF6FD",
+  "theme_color": "#EEF6FD",
   "categories": [
     "business",
     "productivity",

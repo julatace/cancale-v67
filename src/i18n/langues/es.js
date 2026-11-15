@@ -2,6 +2,7 @@
 import ecran_journee from './es/journee.js';
 import ecran_confort from './es/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_studio from './es/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
+import ecran_correspondances from './es/correspondances.js';   // (15 nov.) Publier partout : catégories qui correspondent
 import ecran_capte from './es/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_vcventes from './es/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
 import ecran_idees from './es/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
@@ -31,6 +32,7 @@ import ecran_accueilReste from './es/accueilReste.js';
 import ecran_fraiscarte from './es/fraiscarte.js';   // (14 nov., frais-carte)
 import ecran_atelier from './es/atelier.js';
 import ecran_accompagnement from './es/accompagnement.js';   // (14 nov.) les quatre moments d'un geste
+import ecran_partenaires from './es/partenaires.js';   // (15 nov.) programme partenaire
 import ecran_argentprix from './es/argentprix.js';   // (14 nov., argent-prix)
 import ecran_rechliste from './es/rechliste.js';
 import ecran_studio_paires from './es/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
@@ -50,6 +52,7 @@ export default {
   ...ecran_accompagnement,
   ...ecran_plus,
   ...ecran_argentprix,
+  ...ecran_partenaires,
   ...ecran_plateformes,
   ...ecran_idees,
   ...ecran_compta,
@@ -378,14 +381,14 @@ export default {
   "auth.moyens.chargement": "Cargando otros métodos de inicio de sesión… Ya puedes usar tu email.",
   "auth.moyens.erreur": "No se pudieron cargar los otros métodos de inicio de sesión. El e-mail sigue disponible.",
   "auth.moyens.reessayer": "Reintentar los métodos de inicio de sesión",
-  "auth.ouEmail": "o por e-mail",
+  "auth.ou": "o",
   "auth.oublie": "¿Has olvidado la contraseña?",
   "auth.perime.1": "Más de 10 minutos: la extensión no está conectada.",
   "auth.perime.2": "Inicia sesión y vuelve a pulsar «Continuar con Google» (o Discord) en la extensión.",
   "auth.pied": "Nunca te pedimos tu contraseña de Vinted.",
   "auth.point1.texte": ", en el orden correcto, con su etiqueta.",
   "auth.point1.titre": "Tus paquetes del día",
-  "auth.point2.texte": ": Vinted, Leboncoin y eBay en un solo lugar.",
+  "auth.point2.texte": ": Vinted, Leboncoin, eBay y Vestiaire en un solo lugar.",
   "auth.point2.titre": "Vendido aquí, a retirar allí",
   "auth.point3.texte": ", listas para la URSSAF, mes a mes.",
   "auth.point3.titre": "Tus cifras",
@@ -2256,4 +2259,5 @@ export default {
   ...ecran_studio,
   ...ecran_capte,
   ...ecran_vcventes,
+  ...ecran_correspondances,
 };

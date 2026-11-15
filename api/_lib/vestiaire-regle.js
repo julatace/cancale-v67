@@ -78,7 +78,7 @@ export const vcVentePartie = (v) => !!v && !aExpedierVc(v) && (['en-route', 'con
 // « done » prouve, `pending`/`ongoing`/`upcoming` ne prouvent rien), ou le statut
 // de Vestiaire qui DIT la livraison en cours (`deliveryInProgress`, mesuré).
 // « shipmentInProgress » est l'état MESURÉ d'une vente À ENVOYER : jamais une preuve.
-// Datée par `etapesAt` (extension ≥ 5.381, l'heure où la frise a été lue).
+// Datée par `etapesAt` (extension ≥ 5.382, l'heure où la frise a été lue).
 //
 // LA RÈGLE (`aExpedierVc`) — une seule, lue par Ventes, Colis, Ma journée, le Stock,
 // le widget et les rappels (tous passent par ce module) :
@@ -87,11 +87,11 @@ export const vcVentePartie = (v) => !!v && !aExpedierVc(v) && (['en-route', 'con
 //    « pas su » : rien n'est déduit d'une absence, d'une date ou d'un délai) ;
 //  · `aExpedier: true` ET une preuve d'expédition : les DEUX datées ⇒ la plus
 //    fraîche gagne (une liste « à expédier » relue APRÈS la frise remet la vente
-//    à expédier). Une des deux sans date (lignes rangées avant la 5.381) ⇒ la
+//    à expédier). Une des deux sans date (lignes rangées avant la 5.382) ⇒ la
 //    preuve gagne : Vestiaire n'écrit « envoi fait » qu'APRÈS l'envoi, et ne
 //    range dans « à expédier » qu'AVANT — une frise « envoi fait » a donc été lue
 //    après toute liste où la vente attendait l'envoi.
-// L'heure de la liste « à expédier » : `aExpedierAt` (extension ≥ 5.381, par
+// L'heure de la liste « à expédier » : `aExpedierAt` (extension ≥ 5.382, par
 // vente), sinon la dernière lecture de cette liste (`lectures['a-expedier']`).
 // Fonctions PURES : scripts/audit-vestiaire-a-expedier.cjs les exécute.
 const ETAPES_APRES_ENVOI = ['sellerShipment', 'sellerDelivery', 'sellerConformity', 'sellerPayment'];
