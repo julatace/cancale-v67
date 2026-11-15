@@ -78,7 +78,7 @@ function ListeVentes({ lignes, attr, parentMontre = true }) {
 function Rangee({ id, gauche, titre, meta, eur, lignes, attrs = {}, ouvert, basculer, secondaire = false, sansMontant = false }) {
   return (
     <li className={'vrm-av-rangee' + (secondaire ? ' is-secondaire' : '')} {...attrs}>
-      <button type="button" className="vrm-av-rangee-tete" aria-expanded={ouvert ? 'true' : 'false'} onClick={() => basculer(id)}>
+      <button type="button" className={"vrm-av-rangee-tete" + (gauche ? "" : " sans-gauche")} aria-expanded={ouvert ? 'true' : 'false'} onClick={() => basculer(id)}>
         {gauche ? <span className="vrm-av-gauche" aria-hidden="true">{gauche}</span> : null}
         <span className="vrm-av-rangee-txt">
           <span className="vrm-av-rangee-titre">{titre}</span>
