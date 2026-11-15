@@ -36,6 +36,7 @@ const MIGRES = [
   'src/design/DisqueEventail.jsx',
   'src/ui/Filtres.jsx', 'src/ui/BarreOutils.jsx', 'src/ui/MenuCompte.jsx', 'src/ui/Feuille.jsx',
   'src/ui/LigneAFaire.jsx', 'src/ui/AFaire.jsx', 'src/ui/Ligne.jsx', 'src/ui/BandeChiffres.jsx',
+  'src/RetoursLitiges.jsx',   // (15 nov., lot retours) « À renvoyer »
 ];
 const FORMES = /\bsb-(btn-plein|touche|rond|lien|rangee|tuile|lame)\b/;
 

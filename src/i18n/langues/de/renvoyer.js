@@ -2,7 +2,7 @@
 export default {
   "renv.titre": "Zurückzusenden",
   "renv.titreN": {"one": "{n} Rücksendung offen", "other": "{n} Rücksendungen offen"},
-  "renv.voirTous": {"one": "Rücksendung ansehen", "other": "Alle {n} Rücksendungen ansehen"},
+  "renv.voirTous": "Alle Rücksendungen ({n})",
   "renv.quand.aujH": "heute vor {h}",
   "renv.quand.auj": "spätestens heute",
   "renv.quand.demainH": "vor morgen {h}",

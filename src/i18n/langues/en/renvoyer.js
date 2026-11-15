@@ -2,7 +2,7 @@
 export default {
   "renv.titre": "To send back",
   "renv.titreN": {"one": "{n} return to send back", "other": "{n} returns to send back"},
-  "renv.voirTous": {"one": "See the return", "other": "See the {n} returns"},
+  "renv.voirTous": "All returns ({n})",
   "renv.quand.aujH": "today before {h}",
   "renv.quand.auj": "today at the latest",
   "renv.quand.demainH": "before tomorrow {h}",

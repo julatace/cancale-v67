@@ -2,7 +2,7 @@
 export default {
   "renv.titre": "À renvoyer",
   "renv.titreN": {"one": "{n} retour à renvoyer", "other": "{n} retours à renvoyer"},
-  "renv.voirTous": {"one": "Voir le retour", "other": "Voir les {n} retours"},
+  "renv.voirTous": "Tous les retours ({n})",
   "renv.quand.aujH": "aujourd’hui avant {h}",
   "renv.quand.auj": "aujourd’hui au plus tard",
   "renv.quand.demainH": "avant demain {h}",

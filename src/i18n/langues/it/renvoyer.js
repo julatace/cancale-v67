@@ -2,7 +2,7 @@
 export default {
   "renv.titre": "Da rispedire",
   "renv.titreN": {"one": "{n} reso da rispedire", "other": "{n} resi da rispedire"},
-  "renv.voirTous": {"one": "Vedi il reso", "other": "Vedi i {n} resi"},
+  "renv.voirTous": "Tutti i resi ({n})",
   "renv.quand.aujH": "oggi entro le {h}",
   "renv.quand.auj": "oggi al più tardi",
   "renv.quand.demainH": "entro domani {h}",

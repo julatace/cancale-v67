@@ -2,7 +2,7 @@
 export default {
   "renv.titre": "Por devolver",
   "renv.titreN": {"one": "{n} devolución por enviar", "other": "{n} devoluciones por enviar"},
-  "renv.voirTous": {"one": "Ver la devolución", "other": "Ver las {n} devoluciones"},
+  "renv.voirTous": "Todas las devoluciones ({n})",
   "renv.quand.aujH": "hoy antes de las {h}",
   "renv.quand.auj": "hoy como muy tarde",
   "renv.quand.demainH": "antes de mañana {h}",
