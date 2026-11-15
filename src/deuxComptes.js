@@ -67,6 +67,7 @@ export function apparieParEmpreinte(photos, { seuil = SEUIL_MEME_PHOTO } = {}) {
   for (const a of arr(photos.annonces)) {
     if (!a || !a.id || !a.compte || (a.plateforme || 'vinted') !== 'vinted') continue;
     const cc = `vinted:${a.compte}`;
+    if (photos.comptesLus && photos.comptesLus[cc] === false) continue;   // compte pas relu : il ne conclut rien
     const emp = (photos.empreintes[cc] && photos.empreintes[cc][String(a.id)]) || {};
     for (const h of Object.values(emp)) { const w = motsEmpreinte(h); if (w) points.push({ id: String(a.id), compte: String(a.compte), w }); }
   }
