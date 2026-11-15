@@ -485,6 +485,8 @@ action('numero.carton', async (nav) => {
   const o = await ouvrir(nav, { url: '/?tab=annonces', b });
   try {
     await toucher(o.pg, `[data-verif-prendre-reserve="881"]`, { ms: 20000 });
+    // La question du prix d'achat au numérotage (le geste du champ N°) : « Plus tard ».
+    await o.pg.waitForSelector('[data-ask-champ="prix-numerotage"]', { timeout: 6000 }).then(() => o.pg.locator('div:has(> form [data-ask-champ="prix-numerotage"])').last().locator('button', { hasText: /^Plus tard$/ }).first().click()).catch(() => {});
     noter('numero.carton', 'apres', await moment(o.pg, 'apres', 'numero.carton', { ms: 10000 }));
     await shot(o.pg, 'numero-carton-apres');
   } finally { await o.ctx.close(); }
