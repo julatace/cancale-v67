@@ -42,6 +42,7 @@ import ecran_rechliste from './de/rechliste.js';
 import ecran_studio_paires from './de/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
 import ecran_republier_guide from './de/republierGuide.js';   // (15 nov.) republier / publier à la main, guidés
 import ecran_memePhoto from './de/memePhoto.js';   // (15 nov., lot meme-photo)
+import ecran_fiabilite from './de/fiabilite.js';   // (15 nov., lot fiabilite-auto)
 import ecran_etageres from './de/etageres.js';   // (15 nov.) le Stock en étagères
 export default {
   ...ecran_studio_paires,
@@ -2270,6 +2271,7 @@ export default {
   ...ecran_retrait_ailleurs,
   ...ecran_vcventes,
   ...ecran_memePhoto,
+  ...ecran_fiabilite,
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_finition,
