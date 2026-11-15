@@ -149,6 +149,30 @@ reste à peine visible ; passer cette valeur à 100 % se ferait dans la règle c
 Jetons : plaque, fonds et champs lisent `--sb-*` (prêts pour la couche « Verre dépoli », studio-verre.css) ; les
 couleurs de cases restent celles de la palette des étagères.
 
+### 5 ter. Les sites et le compte sur la case (Julien : « avec les numéros, mets les plateformes sur lesquelles la paire est et le compte »)
+
+- **La règle** (`src/stockAnnonces.js`, `sitesDe`) : chaque article RÉUNI par identité (annonce Vinted par id ; N° par
+  la référence/lien Leboncoin, le SKU `VRM-{n°}` eBay, le N° Vestiaire ; photo exacte — jamais le titre) porte
+  `sites` : une ligne par site et par compte — `etat` (en ligne · à confirmer · masquée par Vinted), `pseudo`, `prix`,
+  `depuis`. Un eBay lu il y a plus de 24 h est « à confirmer » ICI (affichage) ; l'état de l'article et les comptes
+  du Stock ne changent pas.
+- **Le pseudo** : le login du compte Vinted (`vinted_accounts.login`), le nom du compte Leboncoin (`lbc_accounts`,
+  projeté, par l'identifiant de compte de L'annonce), le pseudo eBay (`marquerEbay`). Inconnu ⇒ rien — jamais
+  l'identifiant (`pseudoLu` refuse « #… », « n° … », une suite de chiffres). Une lecture de plus sur l'écran Stock
+  (`lbc_accounts`, deux champs).
+- **La case** : en haut à gauche, une plaque (jetons `--sb-*`) : les logos (`src/plateformes/Marque.jsx`, 14 px ; en
+  ligne plein, sinon estompé) et le pseudo (11 px, 10,5 « De loin », tronqué « … » ; plusieurs comptes : le premier
+  et « +N »). L'aide vocale de la case le dit en clair. **La fiche** : une ligne par site (logo · site · compte ·
+  prix · depuis le … · état s'il n'est pas « en ligne »).
+- Le filtre « Plateforme / Compte » existait déjà en tête du Stock (il estompe les cases qui ne correspondent pas).
+- Preuves : `audit-stock-etageres` S1–S4 (56/56, **18/18 mutations** dont « rapprochement par titre », « pseudo =
+  identifiant », « uid comme pseudo », « eBay vieux dit en ligne ») ; banc K1–K5 (N°20 Vinted + Leboncoin par
+  `VRM-20` et « compte_invente » ; N°21 rien de l'annonce Leboncoin au MÊME titre d'une autre paire ; N°23, compte
+  sans login, aucun nom ; logos 14 px, compte ≥ 10 px dans la case ; fiche : deux lignes avec prix) — **96/96 verts**
+  aux quatre variantes ; sur `origin/main` : K1–K4 rouges ; build muté (titre) : K2 rouge.
+- Limite : « De loin » (cases de 64 px), le pseudo tient en 5–6 lettres (« compt… ») ; « Normale » ou la fiche le
+  disent en entier.
+
 ## 6. Les numéros
 
 Vérifiés, **aucune règle changée** : `prochainLibre` (part du plus haut, jamais d'un trou),
