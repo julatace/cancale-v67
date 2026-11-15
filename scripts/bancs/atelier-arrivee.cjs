@@ -88,7 +88,8 @@ function mesureEtape(tactile) {
   const vis = (e) => { const r = e.getBoundingClientRect(); const s = getComputedStyle(e); return r.width > 1 && r.height > 1 && s.visibility !== 'hidden' && s.display !== 'none'; };
   const nom = (e) => (e.getAttribute('data-aa-suivant') != null ? 'suivant' : '') + (e.className && typeof e.className === 'string' ? '.' + e.className.split(/\s+/).slice(0, 2).join('.') : '') + ' « ' + (e.innerText || e.getAttribute('aria-label') || '').trim().slice(0, 30) + ' »';
   const pleins = [...feuille.querySelectorAll('.vrm-b-plein, .sb-btn-plein')].filter(vis).map(nom);
-  const cibles = tactile ? [...feuille.querySelectorAll('button, a[href], input, textarea, select, [role="button"]')].filter(vis).filter((e) => { const r = e.getBoundingClientRect(); return Math.min(r.width, r.height) < 43.5 && !e.closest('.vrm-ra-grille') ? true : false; }).map((e) => `${nom(e)} ${Math.round(e.getBoundingClientRect().width)}×${Math.round(e.getBoundingClientRect().height)}`) : [];
+  const cibles = tactile ? [...feuille.querySelectorAll('button, a[href], input, textarea, select, [role="button"]')].filter(vis).filter((e) => { // taille de MISE EN PAGE (offset*) : un bouton sous le doigt (:active, scale .97) n'est pas une cible trop petite.
+    const r = { width: e.offsetWidth || e.getBoundingClientRect().width, height: e.offsetHeight || e.getBoundingClientRect().height }; return Math.min(r.width, r.height) < 43.5 && !e.closest('.vrm-ra-grille') ? true : false; }).map((e) => `${nom(e)} ${Math.round(e.getBoundingClientRect().width)}×${Math.round(e.getBoundingClientRect().height)}`) : [];
   const debord = [...feuille.querySelectorAll('*')].filter(vis).filter((e) => { const r = e.getBoundingClientRect(); return (r.right > R.right + 1.5 || r.left < R.left - 1.5) && !e.closest('.vrm-ra-defile, .vrm-ra-meubles'); }).slice(0, 5).map(nom);
   const texte = feuille.innerText || '';
   const cles = (texte.match(/\b(?:arr|acc|lt|ranger|atelier|reglages)\.[a-zA-Z.-]+\b/g) || []).slice(0, 5);
@@ -193,7 +194,9 @@ async function passe(b, vp, sombre) {
   await attendre(() => pg.evaluate(() => !document.querySelector('[data-atelier-arrivee]')), 5000);
 
   // W5 — Ma journée : « 1 paire à finir » ⇒ la reprise au prix.
-  await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+  // Fermer la feuille passe par l’historique (FermeAuRetour) : on laisse ce retour finir, puis on va à Ma journée (une fois de plus si la navigation a été coupée).
+  await pg.waitForTimeout(1200);
+  await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: "domcontentloaded" }).catch(async () => { await pg.waitForTimeout(1500); await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: "domcontentloaded" }); });
   const carte = await attendre(() => pg.evaluate(() => { const c = document.querySelector('[data-job="atelier-arrivee"]'); return c ? c.getAttribute('data-n') : null; }), 25000);
   dit(carte === '1', `${T} W5 · Ma journée : « 1 paire à finir »`, carte);
   await pg.waitForTimeout(600); await capture(pg, `atelier-${suf}-5-journee`);
@@ -208,7 +211,7 @@ async function passe(b, vp, sombre) {
 
   // W6 — « Garder 38 € », la fiche, « Enregistrer ».
   await clic('[data-aa-prix-garder]');
-  const w6 = await attendre(async () => { const l = await lireLocal(pg); return l.couts['13'] != null ? l : null; }, 8000);
+  const w6 = await attendre(async () => { const l = await lireLocal(pg); const f = Object.values(l.fiches)[0]; return l.couts['13'] != null && f && f.prixAchat != null ? l : null; }, 8000);
   dit(!!w6 && String(w6.couts['13']) === '38,00' && Object.values(w6.fiches)[0].prixAchat === 38, `${T} W6 · « Garder » : le coût de N°13 = 38,00, sur SON tap`, w6 && w6.couts);
   const fiche = await attendre(() => pg.evaluate(() => { const c = document.querySelector('[data-aa-corps="fiche"]'); if (!c) return null; const v = (k) => { const e = c.querySelector(`[data-aa-champ="${k}"] input, [data-aa-champ="${k}"] textarea`); return e ? e.value : null; };
     return { titre: v('titre'), marque: v('marque'), couleur: v('couleur'), prix: v('prix'), note: !!c.querySelector('[data-aa-note]') }; }), 8000);
