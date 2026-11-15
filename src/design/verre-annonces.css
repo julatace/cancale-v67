@@ -58,6 +58,15 @@
   :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]):has(.vrm-vignette-marque) .vrm-ann-fin { visibility: hidden !important; }
   :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) a.vrm-fiche-photo > .vrm-vignette-marque { inset: auto 14px 9px auto !important; font: 700 12px/1.2 Inter, system-ui, sans-serif !important; }
   :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]):has(.vrm-vignette-marque) .vrm-ann-price-line { align-self: end !important; margin-top: 0 !important; }
+  /* « Même article que N°7 ? » posé sur la rangée (sa question, Oui / Non) : la rangée grandit d'une 3e ligne, pleine
+     largeur sous la photo — jamais par-dessus la rangée voisine (banc annonces-grille G9). */
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]):has(.vrm-remise-carte.is-vignette) {
+    height: auto !important; grid-template-rows: 20px 19px auto !important; padding-top: 10px !important; padding-bottom: 10px !important; content-visibility: visible !important;
+  }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-remise-carte.is-vignette {
+    grid-column: 1 / -1 !important; grid-row: 3 !important; margin: 10px 0 0 !important; position: relative !important; inset: auto !important; transform: none !important;
+  }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]):has(.vrm-remise-carte.is-vignette) a.vrm-fiche-photo { grid-row: 1 / 3 !important; }
 }
 /* Ces deux lignes n'existent que dans la rangée du téléphone ; l'ordinateur garde ses colonnes (N° · photo · paire · sites · prix). */
 @media (min-width: 768px) {
