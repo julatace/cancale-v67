@@ -6,11 +6,12 @@
 //   · `EcranAtelier`(118) sur « Écran d'atelier » (événement `vrm:atelier`) ou `?atelier` ;
 //   · `useLienAideAJour` (120) renvoie la photo des colis tant qu'un lien d'aide est actif.
 import React, { Suspense } from 'react';
+import { lazySur } from './chargementSur.js';   // (15 nov.) un morceau qui rate : relancé, puis rechargement propre ou « Mettre à jour VRM »
 import { VerrouCode } from './VerrouCode.jsx';
 import { ApprouverQr } from './ConnexionQr.jsx';
 import { useLienAideAJour } from './LienAide.jsx';
 
-const EcranAtelier = React.lazy(() => import('./EcranAtelier.jsx'));
+const EcranAtelier = lazySur(() => import('./EcranAtelier.jsx'));
 export const atelierDansLAdresse = () => { try { return new URL(window.location.href).searchParams.has('atelier'); } catch (_) { return false; } };
 
 export default function ConfortCoque({ uid, entetes, onDeconnexion, ticketQr = '' }) {

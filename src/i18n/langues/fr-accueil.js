@@ -12,6 +12,14 @@ export default {
   "erreur.demarrage.titre": "L'application n'a pas pu démarrer",
   "erreur.recharger": "Recharger",
   "erreur.repartirPropre": "Repartir propre",
+  // ── maj (15 nov., ouverture) : un morceau introuvable, l'écran de démarrage
+  "maj.titre": "Mettre à jour VRM",
+  "maj.texte": "Une nouvelle version de VRM est en ligne. Cette partie de l’app vient d’elle : touche « Mettre à jour » pour la charger. Tes données ne bougent pas.",
+  "maj.texteHorsLigne": "Cette partie de l’app n’est pas encore sur ce téléphone. Reconnecte-toi à Internet, puis touche « Mettre à jour ».",
+  "maj.bouton": "Mettre à jour",
+  "demarrage.ouverture": "Ouverture de VRM…",
+  "demarrage.lent": "Ça prend plus de temps que d’habitude. La connexion est peut-être lente.",
+  "demarrage.recharger": "Recharger",
   // ── auth
   "auth.bouton.creer": "Créer mon compte",
   "auth.titre.in": "Se connecter",

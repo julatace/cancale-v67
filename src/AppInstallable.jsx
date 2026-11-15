@@ -6,6 +6,7 @@
 import React from 'react';
 import './design/app-installable.css';
 import { CLE_MAJ_REFUSEE } from './miseAJour.js';
+import { rechargerVersNouvelle } from './chargementSur.js';
 import { aideInstallationVisible, compterVisite, noterAideVue, plateformeIci, guideDejaFerme, DELAI_AIDE_MS } from './aideInstallation.js';
 
 // « Nouvelle version · Mettre à jour » : en haut, petit, une fois par version.
@@ -18,7 +19,9 @@ export function PiluleMiseAJour() {
   }, []);
   if (!version) return null;
   const plusTard = () => { try { localStorage.setItem(CLE_MAJ_REFUSEE, version); } catch (_) {} window.__vrmMajDispo = null; setVersion(null); };
-  const maintenant = () => { try { window.location.reload(); } catch (_) {} };
+  // (15 nov., chantier « ouverture ») La coquille gardée par le service worker est oubliée d'abord : « Mettre à
+  // jour » arrive sur la nouvelle version au premier toucher (src/chargementSur.js).
+  const maintenant = () => { rechargerVersNouvelle({ cible: version, raison: 'pilule', force: true }); };
   return (
     <div className="vrm-maj" role="status" data-maj-dispo={version}>
       <span className="vrm-maj-texte">Nouvelle version de VRM.</span>

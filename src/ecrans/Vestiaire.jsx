@@ -11,6 +11,7 @@ import { STYLE_FLOU, vcFloute } from '../flouCompte.js';
 import { ListeParCompte } from '../GroupesComptes.jsx'; // (11 nov.) lignes floutées regroupées par compte
 import { lienDe, vcReliable } from '../lienVestiaire.js';
 import React, { useState, useEffect } from 'react';
+import { lazySur } from '../chargementSur.js';   // (15 nov.) un morceau qui rate : relancé, puis rechargement propre ou « Mettre à jour VRM »
 import { suivi, suivreJob } from '../suiviTravail.js';   // (11 nov., lot suivi-travail) VRM figé, détail et barre
 import { EtatPanne } from '../composants/EtatPanne.jsx';
 import { PAS_SU } from '../libelles.js';
@@ -47,10 +48,10 @@ import { offresVestiaire, euros } from "../offresVestiaire.js";
 import { cleUtilisable, lirePhotoroom, appelPhotoroom, phraseVerif, phraseSansReponse, dateCourte, LIEN_CLE, LIEN_TARIFS } from "../photoroomCle.js";
 // (10 nov., lot S) La facture Pro : Vestiaire ne donne pas le prix payé par l'acheteur (src/FactureAutres.jsx).
 import { DEPS_FACTURE } from '../App.jsx';
-const FactureVcTeteParesseuse = React.lazy(() => import('../FactureAutres.jsx').then((m) => ({ default: m.FactureVcTete })));
+const FactureVcTeteParesseuse = lazySur(() => import('../FactureAutres.jsx').then((m) => ({ default: m.FactureVcTete })));
 const FactureVcTete = (props) => <React.Suspense fallback={null}><FactureVcTeteParesseuse {...props}/></React.Suspense>;
 // (11 nov., extension 5.340) La facture Pro d'UNE vente, quand l'extension a lu son prix de vente (`prixVente`).
-const FactureVcVenteParesseuse = React.lazy(() => import('../FactureAutres.jsx').then((m) => ({ default: m.FactureAutreVente })));
+const FactureVcVenteParesseuse = lazySur(() => import('../FactureAutres.jsx').then((m) => ({ default: m.FactureAutreVente })));
 const FactureVcVente = (props) => <React.Suspense fallback={null}><FactureVcVenteParesseuse {...props}/></React.Suspense>;
 
 // ⟦← App.jsx #3⟧
