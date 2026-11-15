@@ -52,10 +52,11 @@ ouverte ; une lecture publique non vide ; une lecture publique incomplète.
   `enLigneDesLignes` d'avant et d'après rendent une sortie **identique** (le compte au dressing
   de 72 h garde l'ancien comportement). À remettre à jour par le chantier de l'écran Annonces.
 
-Extension **5.383.0** (5.381 sur `main`, 5.382 prise par `claude/numeros-nouvelles` et
-`claude/meme-photo`), zips régénérés une fois (Chrome + Orion).
+Extension **5.385.0** (5.381 sur `main` ; 5.382 prise par `claude/numeros-nouvelles`, 5.383 par
+`claude/meme-photo` et `claude/vestiaire-ventes` ; 5.384 laissée libre pour un lot voisin),
+zips régénérés (Chrome + Orion).
 
-**Geste de Julien** : installer la 5.383.0 ; et **retrouver le navigateur qui fait encore tourner
+**Geste de Julien** : installer la 5.385.0 ; et **retrouver le navigateur qui fait encore tourner
 une extension 5.273** (aucun appareil connu ne la porte : un ancien profil Chrome, un autre
 ordinateur, une tablette) — la mettre à jour ou la retirer. Elle relit en public des comptes et
 range des lectures que plus rien ne vérifie.
@@ -67,7 +68,7 @@ faux · **D** = donnée en trop, confidentialité ou égress · **·** = cosmét
 
 | # | anomalie | mesure | depuis | cause (fichier) | gravité | statut |
 |---|---|---|---|---|---|---|
-| 1 | Lecture publique vide qui efface les annonces ouvertes d'un dressing frais | 1 compte (V1), 19 annonces rendues absentes, « en ligne » 20 au lieu de 39 | 15 nov. 13:53 (une seule ligne par compte : l'historique n'est pas gardé) | `enLigneDuCompte` (`<enligne-regle>`, App.jsx / background.js / api/_lib/enligne-regle.js) acceptait `ids: []` comme une preuve | P + C | **corrigé ici** (5.383.0) |
+| 1 | Lecture publique vide qui efface les annonces ouvertes d'un dressing frais | 1 compte (V1), 19 annonces rendues absentes, « en ligne » 20 au lieu de 39 | 15 nov. 13:53 (une seule ligne par compte : l'historique n'est pas gardé) | `enLigneDuCompte` (`<enligne-regle>`, App.jsx / background.js / api/_lib/enligne-regle.js) acceptait `ids: []` comme une preuve | P + C | **corrigé ici** (5.385.0) |
 | 2 | Une vieille extension 5.273 écrit encore | 1 lecture publique rangée aujourd'hui ; aucune ligne `ext_appareil` pour elle | inconnu | navigateur pas à jour (la 5.273 précède `publierAppareil`, 5.327) | P (indirecte) | **geste de Julien** |
 | 3 | Annonces MASQUÉES par Vinted, présentes, sans N° alors que l'extension leur avait lié un N° réservé | V1 : 4 masquées sans fiche, chacune avec une réservation `panel_num_reserves.items[id]` (6 réservations liées sans fiche au total, N° absents du pool) ; V2 : 5 masquées sans fiche ni réservation | réservations du 8 au 14 nov. | l'effet de numérotation de `Comptabilite` (App.jsx, « Numérotation AUTOMATIQUE », `const items = (listings.items \|\| [])`) ne parcourt que les annonces EN LIGNE ; les masquées (`listings.masquees`, présentes depuis le 22 oct.) n'y passent jamais. Elles sont protégées (la réservation compte dans `numerosReserves`) mais aucune fiche ne porte leur N° : écran sans N°, et une republication de la masquée partirait sans le N° du carton (`repriseNumerosRecreation` lit la fiche) | P (latente) | **confié à `claude/numeros-nouvelles`** (ils réécrivent exactement cet effet : y ajouter les masquées de `masqueesSurEtagere`, au minimum pour le N° réservé / l'identité de vente, jamais un N° deviné) |
 | 4 | Une réservation liée dont la fiche porte un AUTRE N° | V1 : 1 sur 45 | nov. | à regarder avec #3 (fiche numérotée par une autre voie avant la liaison) | P (1 cas) | **confié à `claude/numeros-nouvelles`** ; Julien : regarder le carton |
