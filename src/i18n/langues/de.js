@@ -1,7 +1,9 @@
 // DEUTSCH — Übersetzung von fr.js (der Quelle). Gleiche Schlüssel, gleiche {Variablen}.
 import ecran_journee from './de/journee.js';
 import ecran_confort from './de/confort.js';   // (14 nov., lots 117–130) confort et sécurité
+import ecran_studio from './de/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
 import ecran_capte from './de/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
+import ecran_idees from './de/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './de/ventes.js';
 import ecran_commun from './de/commun.js';
 import ecran_achats from './de/achats.js';
@@ -11,30 +13,49 @@ import ecran_messages from './de/messages.js';
 import ecran_emails from './de/emails.js';
 import ecran_stats from './de/stats.js';
 import ecran_compta from './de/compta.js';
+import ecran_listes from './de/listes.js';
+import ecran_refonte_ms from './de/refonte-ms.js';
+import ecran_studio_journee from './de/studio-journee.js';   // (14 nov.) Ma journée « Studio bleu clair »
+import ecran_argent from './de/argent.js';
 import ecran_fiche from './de/fiche.js';
+import ecran_ergonomie from './de/ergonomie.js';
 import ecran_tarifs from './de/tarifs.js';
 import ecran_nouveaux from './de/nouveaux.js';
-import ecran_listes from './de/listes.js';
 import ecran_plus from './de/plus.js';
-import ecran_argent from './de/argent.js';
+import ecran_plateformes from './de/plateformes.js';
 import ecran_colisplus from './de/colisplus.js';   // (14 nov., lot colis-plus)
+import ecran_studioventes from './de/studioventes.js';   // (14 nov., Studio bleu clair) Ventes et Achats
+import ecran_impression from './de/impression.js';   // (14 nov., impression-simple)
 import ecran_accueilReste from './de/accueilReste.js';
 import ecran_fraiscarte from './de/fraiscarte.js';   // (14 nov., frais-carte)
 import ecran_atelier from './de/atelier.js';
+import ecran_accompagnement from './de/accompagnement.js';   // (14 nov.) les quatre moments d'un geste
 import ecran_argentprix from './de/argentprix.js';   // (14 nov., argent-prix)
+import ecran_rechliste from './de/rechliste.js';
+import ecran_studio_paires from './de/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
 export default {
+  ...ecran_studio_paires,
   ...ecran_accueilReste,
+  ...ecran_refonte_ms,
+  ...ecran_studio_journee,
+  ...ecran_listes,
   ...ecran_fiche,
+  ...ecran_ergonomie,
   ...ecran_fraiscarte,
   ...ecran_tarifs,
   ...ecran_nouveaux,
   ...ecran_atelier,
-  ...ecran_listes,
+  ...ecran_rechliste,
+  ...ecran_accompagnement,
   ...ecran_plus,
   ...ecran_argentprix,
+  ...ecran_plateformes,
+  ...ecran_idees,
   ...ecran_compta,
   ...ecran_argent,
   ...ecran_colisplus,
+  ...ecran_studioventes,
+  ...ecran_impression,
   ...ecran_stats,
   ...ecran_emails,
   ...ecran_messages,
@@ -218,11 +239,18 @@ export default {
   "nav.journee.court": "Heute",
   "nav.messages": "Nachrichten",
   "nav.plus": "Mehr",
+  "nav.paires": "Paare",
+  "nav.groupe.paires": "Paare",
   "nav.trancher": "Zu entscheiden",
   "nav.ventes": "Verkäufe",
   // ── coque
   "coque.fermerMenu": "Menü schließen",
   "coque.monProfil": "Mein Profil",
+  "coque.aRevoir": "zu prüfen",
+  "coque.actionsVinted": "Vinted-Aktionen",
+  "coque.cacherMontants": "Beträge ausblenden",
+  "coque.nouveau": "neu",
+  "coque.misAJour": "Aktualisiert um {h}",
   "coque.navigationPrincipale": "Hauptnavigation",
   "coque.ouvrirProfil": "mein Profil öffnen",
   "coque.tonEspace": "Dein Bereich",
@@ -470,7 +498,7 @@ export default {
   "reglages.imprimante.thermique": "Thermo · {papier}",
   "reglages.je-vends.desc": "Was du verkaufst: Wörter und Beispiele passen sich an.",
   "reglages.je-vends.lib": "Ich verkaufe",
-  "reglages.journal-vrm.lib": "Was VRM getan hat",
+  "reglages.journal-vrm.lib": "Protokoll: was VRM getan hat",
   "reglages.langue.chargement": "Wird geladen…",
   "reglages.langue.desc": "Die Sprache von VRM, gleich auf all deinen Geräten.",
   "reglages.langue.rate": "Sprache nicht geladen — versuch es nochmal.",
@@ -552,7 +580,7 @@ export default {
   "reglages.stream.desc": "Wörter, Marken und Konten zum Verbergen wählen.",
   "reglages.stream.lib": "Was der Stream verbirgt",
   "reglages.tes-donnees.desc": "Pro Website: wo es liegt, wer Zugriff hat.",
-  "reglages.tes-donnees.lib": "Was VRM liest und tut",
+  "reglages.tes-donnees.lib": "Datenschutz: was VRM liest und speichert",
   "reglages.toutvabien.desc": "Jedes Konto, sein letztes Lesen und die Erweiterung jedes Geräts.",
   "reglages.toutvabien.lib": "Alles okay?",
   "reglages.discretion.desc": "Tageslimit und Vinted-Bremsen, Konto für Konto.",
@@ -2224,5 +2252,6 @@ export default {
   "instantane.arret.horsLigne": "Offline: Diese Zahlen stammen von deinem letzten Besuch. Sie werden neu geladen, sobald das Netz zurück ist.",
   "instantane.arret.panne": "Nicht neu geladen: Die Datenbank antwortet nicht. Diese Zahlen stammen von deinem letzten Besuch.",
   ...ecran_confort,
+  ...ecran_studio,
   ...ecran_capte,
 };

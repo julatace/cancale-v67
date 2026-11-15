@@ -82,16 +82,18 @@ export const quandTuVends = (lignes, maintenant = Date.now()) => {
   const de = minuitLocal(maintenant, -364), a = minuitLocal(maintenant, 1);
   const jours = Array.from({ length: 7 }, (_, i) => ({ i, n: 0, eur: 0 }));   // 0 = lundi
   const heures = Array.from({ length: 24 }, (_, h) => ({ h, n: 0 }));
+  // (14 nov., idée 158) Le croisement jour × heure (lundi = 0), pour « la meilleure heure » (src/meilleureHeure/).
+  const grille = Array.from({ length: 7 }, () => Array(24).fill(0));
   let n = 0, sansHeure = 0, c = Array(7).fill(0);
   for (const l of lignes) {
     if (!valide(l) || l.ts < de || l.ts >= a) continue;
     const d = new Date(l.ts); n += 1;
     const j = (d.getDay() + 6) % 7; jours[j].n += 1; c[j] += Math.round(Number(l.eur) * 100);
     if (l.heureLue === false || (d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0 && d.getMilliseconds() === 0)) sansHeure += 1;
-    else heures[d.getHours()].n += 1;
+    else { heures[d.getHours()].n += 1; grille[j][d.getHours()] += 1; }
   }
   jours.forEach((x, i) => { x.eur = c[i] / 100; });
-  return { n, jours, heures, avecHeure: n - sansHeure, sansHeure };
+  return { n, jours, heures, grille, avecHeure: n - sansHeure, sansHeure };
 };
 
 // ── BÉNÉFICE ET MARGE PAR GROUPE ───────────────────────────────────────────

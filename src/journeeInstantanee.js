@@ -58,7 +58,8 @@ export function capturerJournee(racine, { uid, maintenant = Date.now(), largeur 
   const ph = tete.querySelector('[data-phrase-jour]');
   snap.phrase = ph ? { texte: propre(attr(ph, 'data-phrase-jour')), env: attr(ph, 'data-phrase-jour-env') || '', ret: attr(ph, 'data-phrase-jour-ret') || '' } : null;
   // La prochaine chose : son titre et son geste ; la sous-ligne seulement pour une case de VRM (compteurs).
-  const pr = tete.querySelector('[data-prochain]');
+  // (14 nov., Studio) La prochaine chose est la première carte de « À faire » (sous la grille), plus dans la tête.
+  const pr = tete.querySelector('[data-prochain]') || racine.querySelector('[data-prochain]');
   if (pr) {
     const tuile = attr(pr, 'data-tuile');
     const titre = txt(pr.querySelector('.vrm-day-task-title'));
@@ -68,7 +69,16 @@ export function capturerJournee(racine, { uid, maintenant = Date.now(), largeur 
       note: enLecture(note) ? '' : note, action: txt(pr.querySelector('.vrm-day-task-action-mot')) || 'Voir',
       principal: !!pr.querySelector('.vrm-day-task-action.is-principal'), urgent: pr.classList.contains('is-urgent'),
     } : null;
-  } else snap.prochain = tete.querySelector('[data-jv2-prochain-attente]') ? undefined : null;
+  } else {
+    // (14 nov., Studio) Sans carte « À faire », le geste du jour est la tuile « À envoyer » (puis « À retirer ») qui porte
+    // quelque chose : son titre et son geste, rangés tels que l'écran les publie (`data-sj-titre`, `data-sj-geste`).
+    const tu = ['envoyer', 'retirer'].map((id) => racine.querySelector(`[data-sj-tuile="${id}"][data-tuile]`)).find((e) => e && /^[1-9]\d*$/.test(attr(e, 'data-n') || ''));
+    const titreT = tu ? propre(attr(tu, 'data-sj-titre') || '') : '';
+    snap.prochain = tu && titreT && !enLecture(titreT) ? {
+      tuile: attr(tu, 'data-tuile'), job: '', n: attr(tu, 'data-n') || '', titre: titreT, note: '',
+      action: propre(attr(tu, 'data-sj-geste') || '') || 'Voir', principal: !!tu.querySelector('.sb-btn-plein'), urgent: false,
+    } : (tete.querySelector('[data-jv2-prochain-attente]') ? undefined : null);
+  }
   // La frise des sept jours : le nombre de ventes et le vendu de chaque jour (`data-*` rendus).
   const ar = tete.querySelector('[data-jv2-argent]');
   if (ar) {
@@ -94,14 +104,18 @@ export function capturerJournee(racine, { uid, maintenant = Date.now(), largeur 
     snap.frise = jours.length === 7 ? { jours, panneau } : null;
   } else snap.frise = null;
   // Les cases du mois de la carte (son choix, « Modifier ») : le texte rendu et la valeur des `data-*`.
-  const carte = tete.querySelector('[data-carte-stats="journee"]');
+  // (14 nov., Studio) Les chiffres du mois sont une tuile de la grille : cherchés dans tout l'écran.
+  const carte = tete.querySelector('[data-carte-stats="journee"]') || racine.querySelector('[data-carte-stats="journee"]');
   snap.cases = capturerCases(carte);
   // L'objectif du mois (src/objectifMois.js) : les nombres de SA barre (la valeur = la case « Vendu · mois »).
   snap.objectif = capturerObjectif(carte);
   // « Ensuite · N gestes » : le nombre seulement (la liste arrive avec l'écran vrai).
   const g = racine.querySelector('[data-fu-gestes]');
   snap.gestes = g && /^\d+$/.test(attr(g, 'data-fu-gestes') || '') ? Number(attr(g, 'data-fu-gestes')) : null;
-  snap.hauteur = Math.round(tete.getBoundingClientRect ? tete.getBoundingClientRect().height : 0) || 0;
+  // (14 nov., Studio) La place de la tête ET de la grille (l'instantané la garde : rien ne saute au remplacement).
+  const bento = racine.querySelector('[data-sj-bento]');
+  const rT = tete.getBoundingClientRect ? tete.getBoundingClientRect() : null, rB = bento && bento.getBoundingClientRect ? bento.getBoundingClientRect() : null;
+  snap.hauteur = Math.round(rT ? (rB && rB.bottom > rT.top ? rB.bottom - rT.top : rT.height) : 0) || 0;
   // (14 nov., ouverture instantanée) LA PLACE de l'écran, pour le peindre avant l'app (src/OuvertureInstantanee.jsx).
   snap.cadre = cadreDe(racine);
   // Rien d'utile (aucun chiffre) : rien n'est rangé.

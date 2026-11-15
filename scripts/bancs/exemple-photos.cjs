@@ -111,7 +111,13 @@ const rangees = (pg) => pg.evaluate(() => {
   const rangeeDe = (e) => { let n = e; for (let i = 0; i < 6 && n && n !== m; i++) { if (n.matches('[data-fiche-ligne], .vrm-rpf-ligne, .vrm-cc-carte, li, [role="listitem"]')) return n; n = n.parentElement; } return e.parentElement; };
   const sans = [...m.querySelectorAll('[data-sans-photo]')].filter(vis).filter((e) => / taille \d\d/.test((rangeeDe(e) || e).textContent || '')).length;
   const imgs = [...m.querySelectorAll('img')].filter((i) => vis(i) && /\/exemple\//.test(i.currentSrc || i.src));
-  const titres = new Set([...m.querySelectorAll('*')].filter((e) => !e.children.length && vis(e) && /^.{3,90} taille \d\d$/.test(e.textContent.trim())).map((e) => e.textContent.trim()));
+  // (14 nov., intégration) Les rangées « la liste d'abord » écrivent la taille à part (« T. 42 ») : le titre n'est
+  // plus une feuille de texte. Une rangée qui porte la fiche (`data-fl-titre` « … taille 42 ») est un article elle
+  // aussi — même règle, autre forme ; un titre ne compte qu'une fois (clé = le titre, comme avant).
+  const titres = new Set([
+    ...[...m.querySelectorAll('*')].filter((e) => !e.children.length && vis(e) && /^.{3,90} taille \d\d$/.test(e.textContent.trim())).map((e) => e.textContent.trim()),
+    ...[...m.querySelectorAll('[data-fl-titre]')].filter((l) => vis(l) && /^.{3,90} taille \d\d$/.test((l.getAttribute('data-fl-titre') || '').trim())).map((l) => l.getAttribute('data-fl-titre').trim()),
+  ]);
   const ok = new Set(imgs.filter((i) => i.complete && i.naturalWidth > 0).map((i) => i.currentSrc || i.src));
   return { titres: titres.size, sans, exemple: imgs.length, chargees: ok.size };
 });

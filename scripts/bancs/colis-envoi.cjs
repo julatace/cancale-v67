@@ -239,6 +239,9 @@ async function scenario(b, vp, sombre) {
     await shot(pg, `colis-envoi-${nom}-outils`);
     await pg.click('[data-colis-barre-btn="outils"]').catch(() => {});
     // ── T : la tournée de dépôt.
+    // (14 nov., refonte des listes — AJOUT 3) Au téléphone, dans Ventes, la tournée vit dans « • À faire · N » : on l'ouvre comme lui.
+    const aFaireT = await pg.$('[data-ui-afaire]');
+    if (aFaireT && await aFaireT.isVisible()) { await aFaireT.click().catch(() => {}); await pg.waitForSelector('[data-ui-afaire-feuille] [data-tournee-ouvrir]', { timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(300); }
     const ouvrirT = await pg.$('[data-tournee-ouvrir]');
     dit(!!ouvrirT, `${nom} : T « Préparer la tournée de dépôt » est dans « À envoyer »`);
     if (ouvrirT) {
@@ -305,7 +308,11 @@ async function scenario(b, vp, sombre) {
     const sigB = (x) => JSON.stringify((x || []).map((y) => [y.k, y.h, y.r, y.k === 'imprimer' && memeTexte ? y.w : 0]).concat([[(x || []).slice(-1).map((y) => y.x + y.w)]]));
     dit(!!bE && bE.length >= 2 && sigB(bE) === sigB(bS), `${nom} : B la barre du haut est la même sur « À envoyer » et « Envoyés »`, JSON.stringify({ envoyer: bE, envoyes: bS }));
     dit(!!bR && bR.length >= 1 && !!bE && bR.every((y) => y.h === bE[0].h && y.r === bE[0].r), `${nom} : B la barre d'Achats · À retirer a la même forme de bouton`, JSON.stringify({ retirer: bR }));
-    dit(!!bE && new Set(bE.map((x) => x.h + '/' + x.r)).size === 1, `${nom} : B une seule forme de bouton (hauteur, rayon)`, JSON.stringify(bE));
+    // (14 nov., Studio bleu clair — décision de Julien : QUATRE formes de bouton, un seul plein) La barre n'a plus « une »
+    // forme : les ronds (44 px, 50 %) et LE plein, rond d'encre 72 (80 sur ordinateur) — « Imprimer N ». Jugé : chaque
+    // bouton est l'une de ces deux formes, et il n'y a qu'un plein (src/design/StudioVentes.jsx).
+    const formeB = (x) => (x.r === '50%' && x.w === x.h && (x.h === 44 || (x.k === 'imprimer' && x.h >= 72)));
+    dit(!!bE && bE.every(formeB) && bE.filter((x) => x.h >= 72).length === 1 && (bE.find((x) => x.h >= 72) || {}).k === 'imprimer', `${nom} : B quatre formes seulement : des ronds de 44 et UN plein (« Imprimer N »)`, JSON.stringify(bE));
     if (tel) dit(!!bE && bE.every((x) => x.h >= 44), `${nom} : B 44 px au doigt`, JSON.stringify(bE));
     const pl = await pg.$('[data-colis-plein-ecran]');
     if (pl) {

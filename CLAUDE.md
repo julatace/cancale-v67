@@ -105,7 +105,7 @@ Chaque refus a une raison technique ou une décision de Julien. Détail complet 
 | **Téléphone (vérification par SMS à l'inscription)** | Pas fait exprès (§2.9, payant sur sa clé). |
 | **International** | ⚠️ **11 nov. : décision de Julien du 11 nov. — VRM se TRADUIT en anglais, espagnol, italien, allemand, compta comprise** (remplace le refus du 28 oct.) : les TEXTES seulement, par `tr()` (`src/i18n/`, langue = Paramètres → Langue, `vrm_langue`) ; aucune règle de calcul ne change (compta par pays : lot d'étude `fiscalite-pays`). L'argent reste en euros (une commande en GBP/USD est écartée et dite, jamais convertie). Écrans traduits et ce qui reste en français : `2026-11-11-traduction.md`, `2026-11-13-integration-traduction.md`. |
 | **Détourage** | Vestiaire Collective SEUL (sa décision du 17 oct. : « pas du tout pour Leboncoin, ne le mets pas dans les paramètres »). La carte « Ta clé Photoroom » vit sur l'écran Vestiaire, **pas dans Paramètres** (`detourage-reglage.cjs` le refuse). Studio photo : détourage local gratuit (U²-Net, licences vérifiées). |
-| **Palette** | Violet **REFUSÉ** ; Vitrine (31 oct.) + **Apple (2 nov., sa demande)** : blanc, encre, accent **bleu Apple** `#0071E3`/`#0A84FF` rare, police système (SF Pro), chiffres alignés sans chasse fixe (`src/themeMineral.js`, `src/styles-vitrine.css`). |
+| **Palette** | ⚠️ 14 nov. (Julien) : **« Studio bleu clair »** — remplace Vitrine/Apple. UN bleu clair partout (nuit : bleu-nuit), lumière du haut, porcelaine/verre/plaque, accent `#0060CC` rare, Urbanist + Inter (`src/design/studio.css`, `docs/design/studio-bleu-clair.md`). Violet **REFUSÉ**, rouge = doublon de N° seulement (inchangés). |
 | **Sans abonnement** | ⛔ 8 nov. (Julien) : ni la lecture seule complète, ni la porte qui cache tout — **un extrait net (titres, 3 premières lignes de chaque liste), le reste flouté, `inert`, aucune action ni export, aucune écriture** ; rien n'est supprimé. Ne pas rendre le reste lisible (`src/abonnement/apercu.js`, banc `abonnement-propre`). |
 | **Ventes masquées** | ⚠️ 29 oct. : **on ne peut plus masquer une vente** (« on ne doit plus pouvoir les masquer ») ; `vinted_sales_hidden` n'est plus lu nulle part. Les ACHATS masqués restent. |
 | **Saisie « N° + Entrée »** | Retirée de Ventes, Colis, Annonces, Leboncoin, eBay (29 oct.) ; la loupe « Tout sur le N° » et la saisie du Stock restent. |
@@ -408,11 +408,13 @@ déploient pas (`vercel.json`) ; ne jamais « promouvoir » une prévisualisatio
 > chiffre ne porte une couleur que s'il y a vraiment quelque chose à rattraper ;
 > **ambre** pour un geste à faire, **rouge** seulement pour deux paires sous un N°.
 
-- Vitrine + Apple (police système, bleu Apple ; styles-vitrine.css en dernier), mode sombre CHOISI
-  (`vinted_dark`, estampillé sur la racine avant le premier rendu).
-- Une forme par fonction : boutons (une règle de base, jamais `display:inline-flex`),
-  `Segmente`, `vrm-filtres`, `vrm-repli`, `vrm-lien-action`, rangées défilantes.
-  Cibles au doigt **44 px** affichés.
+- **Studio bleu clair** (14 nov.) : `src/design/studio.css` EN DERNIER, jetons `--sb-*` (la famille
+  `--d-*` les lit), mode sombre CHOISI (`vinted_dark`, sur la racine avant le premier rendu).
+- **Quatre formes de bouton, aucune autre** : `.sb-btn-plein` (rond d'encre, **UN par écran** au plus),
+  `.sb-touche`, `.sb-rond`, `.sb-lien` ; une rangée ou une tuile entière se touche. Aucun bouton inutile
+  (navigation seule, doublon, explication, état) ; actif = enfoncé + diode. Matières : porcelaine
+  (tuiles), verre (barres, plan de liste), plaque gravée (N°). Gestes globaux : le disque « + »
+  (`audit-studio`, banc `studio-coque`). Cibles au doigt **44 px** affichés.
 - Une même phrase sur chaque ligne est UNE phrase (dans l'en-tête du groupe) ; le même
   nombre ne s'écrit jamais deux fois sur un écran ; pas de « n/d ».
 - Un nom d'icône absent de `ICON_PATHS` ne dessine rien sans erreur (`audit-icones`).
@@ -445,38 +447,7 @@ sans la fonction.
 | `importpasse` | `importerAnnonces` | **5.375.0** (13 nov.) | « Import de ton passé · 340 / ~1 200 ventes » : 12 mois (horizon par date), annonces d'un trait, état noté après chaque page, souci dit ; `import_vinted_{uid}` v 2 |
 | `favoriattente` | `attendreOffreMessage` | **5.372.0** (12 nov.) | favoris : après l'offre ACCEPTÉE, 8 à 20 s au hasard (jamais deux fois la même valeur) puis le temps d'écriture ; attente dans `chrome.storage.local` (`vrmFavoriAttente`), reprise par un worker neuf (`reprendreMessagesFavoris`) ; Tout arrêter, captcha, pause, autre compte, onglet fermé ⇒ le message ne part pas, dit |
 | `suivinumero` | `suiviDeTransaction` | **5.372.0** (12 nov.) | chaque achat en cours (payé, en attente de livraison, expédié, au point, livré sans n°) reçoit n° de suivi + transporteur + point de destination (détail de la transaction quand le suivi ne les porte pas), 6 lectures/h ; codes de retrait cherchés aussi quand Vinted demande son geste ou que le suivi dit « disponible » |
-| … | … | … | les capacités de la 5.45 à la `lbcfiche` (12 nov.), puis `confirmer` à `favorisliste` (13 nov.) : déplacées telles quelles dans `docs/passation/historique-vinted-extension.md` — `EXT_CAPACITES` reste la vérité |
-| `favoris` | `executerMessageFavori` | **5.217.0** | (ajoutée à la table le 30 oct.) |
-| `offresauto` | `autoAccepterOffres` | **5.234.0** | (ajoutée à la table le 30 oct.) |
-| `vcauto` | `rangerVcAnnonces` | **5.236.0** | (ajoutée à la table le 30 oct.) |
-| `vcventes` | `rangerVcVentes` | **5.237.0** | (ajoutée à la table le 30 oct.) |
-| `republier` | `republierVinted` | **5.240.0** | (ajoutée à la table le 30 oct.) |
-| `republiermodif` | `corpsAvecPrixBaisse` | **5.247.0** | (ajoutée à la table le 30 oct.) |
-| `recreer` | `recreerVinted` | **5.248.0** | (ajoutée à la table le 30 oct.) |
-| `lettre` | `recreerVinted` | **5.250.0** | (ajoutée à la table le 30 oct.) |
-| `brouillon` | `publierBrouillon` | **5.251.0** | (ajoutée à la table le 30 oct.) |
-| `versbrouillon` | `recreerVinted` | **5.253.0** | (ajoutée à la table le 30 oct.) |
-| `republierbrouillon` | `recreerVinted` | **5.254.0** | (ajoutée à la table le 30 oct.) |
-| `refaire` | `refaireBrouillon` | **5.255.0** | (ajoutée à la table le 30 oct.) |
-| `republierpage` | `vintedPage` | **5.277.0** | (ajoutée à la table le 30 oct.) |
-| `republierfile` | `miseEnLigneTick` | **5.279.0** | (ajoutée à la table le 30 oct.) |
-| `favorisperso` | `erreurVariablesFavori` | **5.281.0** | (ajoutée à la table le 30 oct.) |
-| `vcsession` | `noterSessionVc` | **5.295.0** (31 oct.) | le compte Vestiaire ouvert dans l'onglet (`vc_session`) — si Vestiaire charge `/users/me` |
-| `vcfil` | `rangerVcFil` | **5.317.0** (3 nov. ; la 5.295 ne lisait pas la messagerie Stream) | « lire tes conversations Vestiaire » (messagerie Stream + fil des notifications ; texte, date, « de toi », jamais un nom) |
-| `vcrepondre` | `repondreVestiaire` | **5.295.0** | « Envoyer sur Vestiaire » sur son clic — seulement après une recette APPRISE de son propre envoi (`vc_envoi.appris`) |
-| `vcfavoris` | `rangerVcAnnonces` | **5.295.0** | le NOMBRE de favoris par annonce Vestiaire (jamais qui) |
-| `relaisdest` | `relaisDestination` | **5.295.0** | « le point relais où arrivent tes achats (quand le suivi Vinted le donne) » |
-| `vcfiche` | `ficheVcAnnonce` | **5.296.0** (1er nov.) | annonces Vestiaire en fiches (photo, titre, prix, état) et le compte de l'onglet sur annonces/ventes/achats (flou par compte) |
-| `favorisauto` | `freinFavoriAuto` | **5.309.0** (2 nov.) | mode auto des favoris |
-| `plafondcompte` | `publierActions` | **5.312.0** (2 nov.) | le plafond de 50 actions/heure est celui du COMPTE, tous Chrome confondus |
-| `freinrepub` | `poserFreinRepub` | **5.311.0** (2 nov.) | un refus de Vinted freine la republication de CE compte (30 min ; 24 h si restreint) |
-| `numeroscompte` | `numerosDuCompte` | **5.311.0** (2 nov.) | sur Vinted, seuls les N° du compte connecté dans l'onglet |
-| `republierquestion` | `reglerAvant` | **5.310.0** (2 nov.) | Republier remplit un champ manquant depuis l'annonce elle-même, sinon DEMANDE (valeurs de Vinted) ; un refus nommé n'est jamais renvoyé tel quel |
-| `lbcfil` | `rangerLbcFil` | **5.318.0** (3 nov.) | « lire tes conversations Leboncoin » (texte, date, « de toi », jamais un nom ; rangé seulement quand la page et l'onglet disent le même compte privé) |
-| `lbcrepondre` | `repondreLeboncoin` | **5.318.0** (3 nov.) | « Envoyer sur Leboncoin » sur son clic, au nom du compte connecté dans l'onglet, dans les 50 actions/h — seulement après une recette APPRISE de son propre envoi (`lbc_envoi.appris`) |
-| `vcoffres` | `rangerVcOffres` | **5.319.0** (4 nov.) | « tes offres reçues sur Vestiaire » (article, prix, gestes datés, à toi de répondre ; jamais l'acheteur) |
-| `vcoffrerepondre` | `repondreOffreVestiaire` | **5.319.0** (4 nov.) | « Accepter / Refuser / Contre-offre » sur son clic, au nom du compte de l'onglet, dans les 50 actions/h — seulement après une recette APPRISE de son propre geste sur Vestiaire (`vc_offres_recette`) |
-| `avis` | `capterAvis` | **5.319.0** (4 nov.) | « tes avis Vinted reçus (note, date) » : la 1re page de `user_feedbacks`, compte connecté seulement, budget de LECTURE 20/h, une fois par 24 h, rangée dans `harvest_{uid}_feedbacks` ; forme pas encore mesurée (une forme inconnue n'écrit rien) ; aucun rappel d'évaluation |
+| … | … | … | les capacités de la 5.45 à la `lbcfiche` (12 nov.), puis `confirmer` à `favorisliste` (13 nov.), puis `favoris` à `favorisperso`, `vcsession` à `vcfiche`, `favorisauto` à `republierquestion` et `lbcfil` à `avis` (14 nov.) : déplacées telles quelles dans `docs/passation/historique-vinted-extension.md` — `EXT_CAPACITES` reste la vérité |
 | `ventesfusion` | `fusionnerCommandes` | **5.323.0** (6 nov.) | une lecture partielle des ventes/achats se FUSIONNE par n° de transaction (rien perdu) ; fenêtre inchangée < 1 h ni relue ni réécrite |
 | `releveidentite` | `txDeLigneReleve` | **5.323.0** (6 nov.) | relevé du porte-monnaie (`wallet/invoices/current`) rangé sans rien de personnel, `tx` si la ligne porte la vente ; forme inconnue ⇒ `harvest_{uid}_forme_releve` |
 | `numeroecrit` | `numeroEcritAllume` | **5.324.0** (7 nov.) | réglage « Je numérote moi-même » allumé : aucun N° réservé ni affiché à côté de « Publier » |
@@ -525,11 +496,17 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **15 nov. · Version « Studio bleu clair » en ligne** : les chantiers studio + impression en un toucher + idées 154/157/158/160 + correctif « À faire », intégrés ; passe complète (26 audits, 22 bancs) ; corrigé à la fusion : étiquette « Choisir » en double sur le plein, moments pendant/après/échec de l'impression rebranchés (`accompagner`), « Bénéfice : — ». `docs/passation/2026-11-15-version-studio.md`. Geste : fermer/rouvrir l'app, essayer « Imprimer » sur l'iPhone.
+- **14 nov. · Studio bleu clair — la fondation** : jetons `--sb-*`, quatre formes de bouton, coque (lumière, barre en verre, pastille enfoncée + diode, disque « + » ⇒ Chercher · Scanner · Publier · Imprimer N), polices Urbanist/Inter embarquées, `src/ui` migré ; `docs/passation/2026-11-14-studio-fondation.md`. Geste : regarder sur iPhone, dire ce qui gêne.
+- **14 nov. · Studio bleu clair, écrans « reste »** : Argent (Bento), Messages, Paramètres, Communauté, E-mails, connexion, accueil, tarifs, feuilles ; 4 formes de bouton, rien retiré (sauf un doublon). `2026-11-14-studio-reste.md`.
+- **14 nov. · Studio bleu clair : Paires (Annonces, Stock, la fiche)** : rangées 64 px sur plan de verre (plaque N° · vignette · titre/méta · prix), la paire touchée MONTE à sa place (prix, acheté, jours, favoris, Baisser · Republier · ⋯ ⇒ la fiche), ordinateur : fiche en plan à droite ; grille au choix ; aucun geste perdu (inventaire). `docs/passation/2026-11-14-studio-paires.md`, banc `studio-paires`.
+- **14 nov. · Studio bleu clair — Ventes (À expédier) et Achats (À retirer)** : grand chiffre « 5 colis à envoyer · 2 avant demain », UN plein « Imprimer N » (= `ouvrirLot`, parcours d'impression intouché), tuiles-filtres enfoncées + diode, rangées sans bouton (gestes dans la fiche), « À retirer » EN TÊTE et ouvert dès qu'un colis attend (« À vérifier » ouvert dessous), codes en grandes plaques ; couche CSS `vrm-studio` (ordre posé dans index.html). `docs/passation/2026-11-14-studio-ventes.md`. Geste : aucun.
+- **14 nov. · Imprimer en un toucher** : « Imprimer (N) » ouvre le PDF tamponné DANS le toucher (iPhone : partage, préparé d'avance ; ordinateur : visionneuse qui lance l'impression, rien lu avant) ; papier demandé une fois puis retenu (lien à côté) ; après : « Tout est sorti ? Oui / Il en manque », tampon corrigé sur la vignette ; plus de « Place du tampon » d'office. `docs/passation/2026-11-14-impression-simple.md`. Geste : essayer « Imprimer » sur son iPhone.
 - **14 nov. · Retraits d'achat cachés (« je n'ai plus les retraits d'achat »)** : mesuré, la règle comptait 3 colis à retirer AVEC code (publication), mais la refonte d'Achats les rangeait dans un repli fermé sans ligne ; règle `src/repliRetirer.js` : ≥ 1 colis ⇒ « À retirer » ouvert en tête, fermer ne vaut que pour la liste vue, « à vérifier » nommés. `docs/passation/2026-11-14-retraits-achats.md`. Geste : aucun.
-- **14 nov. · Extension 5.377.0 : « VRM a capté » + carte Favoris · Annonces · Ventes** : bulle près du logo et toast dans l'app quand une écriture RÉUSSIE range du nouveau (par identité, `vrmCapteVu`), « Compte relié · … » à la connexion, réglage partagé carte ↔ Paramètres ; carte : compte de l'onglet d'abord, favoris du plus récent cochés ⇒ « Envoyer le message (N) », autres comptes floutés `inert`, lecture seule. `docs/passation/2026-11-14-popup-capte.md`. Geste : installer la 5.377.0.
-- **14 nov. · Mode exemple : photos et impossible à confondre** : 21 vraies photos (Commons, CC0 / domaine public, crédits `public/exemple/CREDITS.md`, une par paire, titre = la photo) ; bandeau « Exemple — données inventées » + « J’ai déjà un compte · Me connecter », cadre hachuré au-dessus de tout, « exemple » sur codes et adresses, « Relais Exemple, rue Imaginaire » (capture d’accueil refaite). `2026-11-14-exemple-photos.md`. Geste : aucun.
-
-
+- **14 nov. · Idées 154, 157, 158 (155 et 156 retirées, sa décision)** : fiche de la paire « Dans l’ordre » (ligne de temps par identité ; rien sur un N° en double), « Dans une autre taille » (N° neuf par `numerosServisLus`, corrige l’oubli des cases du Stock dans Dupliquer), meilleure heure dans « Programmer » (suggestion, son clic). `docs/passation/2026-11-14-idees-paires.md`. Geste : aucun.
+- **14 nov. · Correctif « À faire » (iPhone bloqué)** : la feuille d'un site, montée fermée (`hidden`), restait dessinée (le `display:flex !important` du voile passait devant `[hidden]`) ; la section Vestiaire centrait ses cartes (`align-items:center` d'une grille) ⇒ page décalée. `Feuille` : 4 fermetures (OK, voile, glisser, retour), fermée = jamais dessinée, un geste qui ouvre une autre couche la referme. `docs/passation/2026-11-14-correctif-afaire.md`, banc `afaire-feuille`. Geste : aucun.
+- **14 nov. · Vente en main propre en 2 touchers (160 seule, choix de Julien ; 159/161/162 retirées)** : loupe « vendu 124 » ⇒ prix ⇒ « Vendue » ; UN verdict fiche + feuille (`verdictVenteMain` sur `histoirePaire` : N° exact, doublon ⇒ question, « B… » proposé, déjà vendue partout ⇒ refus, compte exclu, pas su ⇒ refus), écriture = « Vendu ailleurs » + paiement, reçu PDF. `docs/passation/2026-11-14-vente-main-propre.md`. Geste : aucun.
+- **14 nov. · Ma journée « Studio bleu clair »** : tête + affiche (vendu du jour fin, € remonté, semaine), grille Bento fixe (chaque tuile son geste ; « Imprimer » seul plein, parcours inchangé ; codes en plaques), déplier sur place (tassé au téléphone, dessous sur ordinateur), « À faire » dessous. Idée 148 (ranger les tuiles) NON retenue. `docs/passation/2026-11-14-studio-journee.md`. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).

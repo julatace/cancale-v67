@@ -11,7 +11,8 @@ require('./_porte-banc.cjs');
 //    A. cibles : tout bouton visible fait 44 px au doigt (390 tactile) et 36 px à la
 //       souris (1512) — hauteur RENDUE (getBoundingClientRect) ;
 //    B. graisses : 400 · 600 · 700 seulement (graisse CALCULÉE de chaque texte) ;
-//    C. tailles : l'échelle du système (11 · 12 · 13 · 15 · 17 · 20 · 28 · 34 · 40 · 44) ;
+//    C. tailles : l'échelle du système (11 · 12 · 13 · 15 · 17 · 20 · 28 · 34 · 40 · 44, et l'affiche 48 · 56 · 64) ;
+//       un texte de 0 px (une phrase repliée derrière son « ? ») ne se voit pas : pas jugé ;
 //    D. gris : un texte gris est LE gris du système (#6E6E73 · #98989D la nuit), jamais
 //       un gris écrit à la main (#8E8E93, #999, rgba(0,0,0,.5)…) — couleur CALCULÉE ;
 //    E. contraste : ≥ 4,5:1 (3:1 pour un grand texte), couleur du texte contre le fond
@@ -68,6 +69,9 @@ function base() {
   m.vrm_configuration = { etat: 'fait', at, statut: null, version: 1 };
   m.vrm_plateformes_affichees = { sites: ['vinted', 'leboncoin', 'ebay'], at };
   m.vrm_parcours = { etat: 'fini', at };
+  // (14 nov., intégration) Le « bilan en une minute » (accueil des nouveaux, main) déjà vu : sinon sa feuille modale
+  // couvre Ma journée au 1er chargement et prend chaque toucher (la loupe, la cloche…) d'un banc qui juge autre chose.
+  m.vrm_bilan_minute = { vu: at, fin: 'vu' };
   const vus = {}; for (const a of b.accounts) vus[a.vinted_user_id] = Date.now() - 120000;
   b.rows.push({ id: 'ext_appareil_0123456789abcdef', data: { appareil: { paquet: 'chromium', nav: 'chrome', systeme: 'mac' }, ver: '5.375.0', code: '5.375.0', atMs: Date.now() - 60000, flux: {}, vus: { vinted: vus } } });
   return b;
@@ -83,9 +87,9 @@ async function rest(route, b) {
   const r = servir(lignes, decodeURIComponent(metaVersData(req.url())), req.headers());
   return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': r.range || '0-0/0' }, body: JSON.stringify(r.body) });
 }
-async function ouvrir(nav, { W, sombre, b, url, sansSession = false, api = null }) {
+async function ouvrir(nav, { W, sombre, b, url, sansSession = false, api = null, dsf = 1 }) {
   const tel = W < 600;
-  const ctx = await nav.newContext({ ...(tel ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 } : { viewport: { width: 1512, height: 950 }, deviceScaleFactor: 1 }), colorScheme: sombre ? 'dark' : 'light', locale: 'fr-FR', timezoneId: 'Europe/Paris' });
+  const ctx = await nav.newContext({ ...(tel ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: dsf } : { viewport: { width: 1512, height: 950 }, deviceScaleFactor: dsf }), colorScheme: sombre ? 'dark' : 'light', locale: 'fr-FR', timezoneId: 'Europe/Paris' });
   const pg = await ctx.newPage();
   const erreurs = [];
   pg.on('pageerror', (e) => erreurs.push(String(e.message || e).slice(0, 200)));
@@ -103,14 +107,19 @@ async function ouvrir(nav, { W, sombre, b, url, sansSession = false, api = null 
       }
     } catch (_) {}
   }, [SESSION, sombre, sansSession]);
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
+  // (14 nov., intégration) La même route AUSSI sur le contexte : les images que le service worker de l'app va
+  // chercher (sw.js, sa propre requête) ne passent pas par les routes de la page — elles sortaient sur Internet
+  // (garde réseau : « hôte réel », images1.vinted.net). La route de la page reste servie la première.
+  const externe = (r) => {
     const u = r.request().url();
     if (/vinted\.net|vinted\.fr\/.*\.(jpe?g|png|webp)/i.test(u) || r.request().resourceType() === 'image') return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: vignette(u) });
     if (/\/auth\/v1\/settings/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ external: { email: true } }) });
     if (/\/auth\/v1\//.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: SESSION.access_token, refresh_token: 'r', expires_in: 3600, user: { ...SESSION.user, factors: [] }, id: UID, email: SESSION.user.email, factors: [] }) });
     if (/\/rest\/v1\//.test(u)) return rest(r, b);
     return r.abort();
-  });
+  };
+  await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, externe);
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, externe);
   await pg.route('**/api/**', (r) => {
     const u = r.request().url();
     if (/mode=confidentialite/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, uid: UID }) });
@@ -127,7 +136,12 @@ const pret = async (pg) => { await pg.waitForSelector('.vrm-main', { timeout: 25
 // ── La mesure, DANS la page : tout ce qui est rendu sous les racines voulues. ──
 function mesurer({ tactile, sombre, racines, ciblesEnPlus = '' }) {
   const seuil = tactile ? 44 : 36;
-  const ECHELLE = [11, 12, 13, 15, 17, 20, 28, 34, 40, 44];
+  // (14 nov., §4 Atelier) + l'AFFICHE : le chiffre d'un écran en 48, 56 ou 64 (`--d-t-affiche-*`, styles-systeme.css §4).
+  const ECHELLE = [11, 12, 13, 15, 17, 20, 28, 34, 40, 44, 48, 56, 64];
+  // (14 nov., Studio bleu clair — docs/design/studio-bleu-clair.md §4) L'échelle du STUDIO : libellés 10,5 · 11,5 · 12,5 · 14 ·
+  // 16 · 18 ; l'affiche (Urbanist) 19 · 21 · 22 · 24 · 26 · 27 · 32 · 38 · 42 · 56 · 68 · 72 · 88 · 96 · 104 ; l'euro remonté (0,44 / 0,56 / 0,68 em).
+  const ECHELLE_STUDIO = [10.5, 11.5, 12.5, 14, 16, 18, 19, 21, 22, 24, 26, 27, 32, 38, 42, 68, 72, 88, 96, 104];
+  const studioTexte = (el, cs) => /Urbanist VRM|Inter VRM/.test(cs.fontFamily) || !!el.closest('[class*="sb-"]');
   const out = { cibles: [], graisses: [], tailles: [], gris: [], contraste: [], coupes: [], hyphens: [], rognes: [], mfa: [], violet: [], chrono: [], nTextes: 0, nCibles: 0 };
   const roots = [...new Set(racines.flatMap((s) => [...document.querySelectorAll(s)]))].filter((r) => !roots0(r));
   function roots0(r) { return racines.some((s) => r.parentElement && r.parentElement.closest(s)); }
@@ -158,7 +172,7 @@ function mesurer({ tactile, sombre, racines, ciblesEnPlus = '' }) {
   // Les gris PERMIS (un texte) : l'encre, LE gris, le glyphe, le blanc, le noir, le fond (texte sur encre).
   // (14 nov., passe 2) Un texte posé sur une surface SOMBRE (le panneau de marque de la connexion, au jour) se lit
   // avec la palette de la nuit : c'est le fond effectif qui choisit, pas seulement le thème de l'app.
-  const PERMIS_NUIT = new Set(['#F5F5F7', '#98989D', '#5A5A5E', '#FFFFFF', '#000000', '#1C1C1E', '#1D1D1F', '#F2F2F7', '#2C2C2E']);
+  const PERMIS_NUIT = new Set(['#F5F5F7', '#98989D', '#5A5A5E', '#FFFFFF', '#000000', '#1C1C1E', '#1D1D1F', '#F2F2F7', '#2C2C2E', '#EAF2FB']);
   const PERMIS_JOUR = new Set(['#1D1D1F', '#6E6E73', '#AEAEB2', '#FFFFFF', '#000000', '#F2F2F7', '#F5F5F7', '#1C1C1E']);
   const sombreCarte = (el) => {
     for (let x = el; x && x !== document.body; x = x.parentElement) {
@@ -177,7 +191,8 @@ function mesurer({ tactile, sombre, racines, ciblesEnPlus = '' }) {
       if (c && c.a > 0) { couches.push(c); if (c.a >= 1) break; }
     }
     let f = { r: 255, g: 255, b: 255, a: 1 };
-    if (!couches.length || couches[couches.length - 1].a < 1) f = sombre ? { r: 0, g: 0, b: 0, a: 1 } : { r: 242, g: 242, b: 247, a: 1 };
+    // (14 nov.) Le fond sous tout : l'aplat du Studio bleu clair (#D6E8F5 · nuit #0C1829), la lumière de la coque.
+    if (!couches.length || couches[couches.length - 1].a < 1) f = sombre ? { r: 12, g: 24, b: 41, a: 1 } : { r: 214, g: 232, b: 245, a: 1 };
     for (let i = couches.length - 1; i >= 0; i--) f = melange(couches[i], f);
     return f;
   };
@@ -208,7 +223,8 @@ function mesurer({ tactile, sombre, racines, ciblesEnPlus = '' }) {
         vus.add(el); out.nTextes++;
         const g = Number(cs.fontWeight), fs_ = Math.round(parseFloat(cs.fontSize) * 2) / 2;
         const lib = () => nom(el);
-        if (![400, 600, 700].includes(g)) out.graisses.push({ g, quoi: lib() });
+        // (14 nov., Studio) + l'affiche Urbanist (200 · 300) et la méta Inter du studio (500).
+        if (![400, 600, 700].includes(g) && !(studioTexte(el, cs) && [200, 300, 500].includes(g))) out.graisses.push({ g, quoi: lib() });
         // La barre d'onglets du téléphone garde ses 10 pt (la taille des libellés d'onglet d'iOS ; Julien doit encore
         // trancher « libellés à 9 px », CLAUDE.md §9) : hors de l'échelle exprès.
         // Le chiffre d'une tuile de Ma journée au téléphone se RESSERRE pour tenir (Julien, 10 nov. : « l'euro dépasse » ;
@@ -217,7 +233,7 @@ function mesurer({ tactile, sombre, racines, ciblesEnPlus = '' }) {
         // tenir (« au moins 87,65 € » : 38 px, la taille posée en ligne) — entre son plancher (22) et 44.
         const ajuste = (el.closest('[data-ecran="journee"] .vrm-fu-tete .vrm-fu-case') && fs_ >= 14 && fs_ <= 28)
           || (el.closest('.vrm-fu-grand[style*="font-size"]') && fs_ >= 22 && fs_ <= 44);
-        if (!ECHELLE.includes(fs_) && !ajuste && !el.closest('.vrm-nav-label') && !/^[\s›‹×✓✕·•…—–\-+−⋯▾▸]+$/.test(el.innerText || '')) out.tailles.push({ t: fs_, quoi: lib() });
+        if (fs_ > 0 && !ECHELLE.includes(fs_) && !(studioTexte(el, cs) && ECHELLE_STUDIO.includes(fs_)) && !ajuste && !el.closest('.vrm-nav-label') && !/^[\s›‹×✓✕·•…—–\-+−⋯▾▸]+$/.test(el.innerText || '')) out.tailles.push({ t: fs_, quoi: lib() });
         const col = rgba(cs.color);
         const enSombre = sombreCarte(el);
         // Un texte de couleur TRANSPARENTE (un « — » de remplacement sous un dessin) ne se voit pas : ni gris ni contraste.

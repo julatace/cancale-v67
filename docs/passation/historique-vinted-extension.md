@@ -1082,3 +1082,48 @@ Récit : `historique-interface-stock.md` (« LES QUATRE OUTILS DES ANNONCES »).
 | `lbcstats` | `noterStatsAnnonceLbc` | **5.291.0** (30 oct.) | « favoris, vues et messages relevés sur tes annonces Leboncoin » |
 | `favorisouvrir` | `ouvrirFavoriNatif` | **5.225.0** | (ajoutée à la table le 30 oct.) |
 | `favorisliste` | `lirePageFavoris` | **5.218.0** | (ajoutée à la table le 30 oct.) |
+
+## Lignes du tableau §8 de CLAUDE.md déplacées telles quelles le 14 nov. (sous 59 000 octets)
+
+| capacité | fonction de l'extension | arrivée en | ce que l'app promet |
+|---|---|---|---|
+| `favoris` | `executerMessageFavori` | **5.217.0** | (ajoutée à la table le 30 oct.) |
+| `offresauto` | `autoAccepterOffres` | **5.234.0** | (ajoutée à la table le 30 oct.) |
+| `vcauto` | `rangerVcAnnonces` | **5.236.0** | (ajoutée à la table le 30 oct.) |
+| `vcventes` | `rangerVcVentes` | **5.237.0** | (ajoutée à la table le 30 oct.) |
+| `republier` | `republierVinted` | **5.240.0** | (ajoutée à la table le 30 oct.) |
+| `republiermodif` | `corpsAvecPrixBaisse` | **5.247.0** | (ajoutée à la table le 30 oct.) |
+| `recreer` | `recreerVinted` | **5.248.0** | (ajoutée à la table le 30 oct.) |
+| `lettre` | `recreerVinted` | **5.250.0** | (ajoutée à la table le 30 oct.) |
+| `brouillon` | `publierBrouillon` | **5.251.0** | (ajoutée à la table le 30 oct.) |
+| `versbrouillon` | `recreerVinted` | **5.253.0** | (ajoutée à la table le 30 oct.) |
+| `republierbrouillon` | `recreerVinted` | **5.254.0** | (ajoutée à la table le 30 oct.) |
+| `refaire` | `refaireBrouillon` | **5.255.0** | (ajoutée à la table le 30 oct.) |
+| `republierpage` | `vintedPage` | **5.277.0** | (ajoutée à la table le 30 oct.) |
+| `republierfile` | `miseEnLigneTick` | **5.279.0** | (ajoutée à la table le 30 oct.) |
+| `favorisperso` | `erreurVariablesFavori` | **5.281.0** | (ajoutée à la table le 30 oct.) |
+
+## Lignes du tableau §8 de CLAUDE.md déplacées telles quelles le 14 nov., version studio (sous 59 000 octets)
+
+| capacité | fonction de l'extension | arrivée en | ce que l'app promet |
+|---|---|---|---|
+| `vcsession` | `noterSessionVc` | **5.295.0** (31 oct.) | le compte Vestiaire ouvert dans l'onglet (`vc_session`) — si Vestiaire charge `/users/me` |
+| `vcfil` | `rangerVcFil` | **5.317.0** (3 nov. ; la 5.295 ne lisait pas la messagerie Stream) | « lire tes conversations Vestiaire » (messagerie Stream + fil des notifications ; texte, date, « de toi », jamais un nom) |
+| `vcrepondre` | `repondreVestiaire` | **5.295.0** | « Envoyer sur Vestiaire » sur son clic — seulement après une recette APPRISE de son propre envoi (`vc_envoi.appris`) |
+| `vcfavoris` | `rangerVcAnnonces` | **5.295.0** | le NOMBRE de favoris par annonce Vestiaire (jamais qui) |
+| `relaisdest` | `relaisDestination` | **5.295.0** | « le point relais où arrivent tes achats (quand le suivi Vinted le donne) » |
+| `vcfiche` | `ficheVcAnnonce` | **5.296.0** (1er nov.) | annonces Vestiaire en fiches (photo, titre, prix, état) et le compte de l'onglet sur annonces/ventes/achats (flou par compte) |
+| `favorisauto` | `freinFavoriAuto` | **5.309.0** (2 nov.) | mode auto des favoris |
+| `plafondcompte` | `publierActions` | **5.312.0** (2 nov.) | le plafond de 50 actions/heure est celui du COMPTE, tous Chrome confondus |
+| `freinrepub` | `poserFreinRepub` | **5.311.0** (2 nov.) | un refus de Vinted freine la republication de CE compte (30 min ; 24 h si restreint) |
+| `numeroscompte` | `numerosDuCompte` | **5.311.0** (2 nov.) | sur Vinted, seuls les N° du compte connecté dans l'onglet |
+| `republierquestion` | `reglerAvant` | **5.310.0** (2 nov.) | Republier remplit un champ manquant depuis l'annonce elle-même, sinon DEMANDE (valeurs de Vinted) ; un refus nommé n'est jamais renvoyé tel quel |
+| `lbcfil` | `rangerLbcFil` | **5.318.0** (3 nov.) | « lire tes conversations Leboncoin » (texte, date, « de toi », jamais un nom ; rangé seulement quand la page et l'onglet disent le même compte privé) |
+| `lbcrepondre` | `repondreLeboncoin` | **5.318.0** (3 nov.) | « Envoyer sur Leboncoin » sur son clic, au nom du compte connecté dans l'onglet, dans les 50 actions/h — seulement après une recette APPRISE de son propre envoi (`lbc_envoi.appris`) |
+| `vcoffres` | `rangerVcOffres` | **5.319.0** (4 nov.) | « tes offres reçues sur Vestiaire » (article, prix, gestes datés, à toi de répondre ; jamais l'acheteur) |
+| `vcoffrerepondre` | `repondreOffreVestiaire` | **5.319.0** (4 nov.) | « Accepter / Refuser / Contre-offre » sur son clic, au nom du compte de l'onglet, dans les 50 actions/h — seulement après une recette APPRISE de son propre geste sur Vestiaire (`vc_offres_recette`) |
+| `avis` | `capterAvis` | **5.319.0** (4 nov.) | « tes avis Vinted reçus (note, date) » : la 1re page de `user_feedbacks`, compte connecté seulement, budget de LECTURE 20/h, une fois par 24 h, rangée dans `harvest_{uid}_feedbacks` ; forme pas encore mesurée (une forme inconnue n'écrit rien) ; aucun rappel d'évaluation |
+
+## Déplacé tel quel de CLAUDE.md §9 (14 nov., version studio — fichier sous 59 000 octets)
+
+- **14 nov. · Extension 5.377.0 : « VRM a capté » + carte Favoris · Annonces · Ventes** : bulle près du logo et toast dans l'app quand une écriture RÉUSSIE range du nouveau (par identité, `vrmCapteVu`), « Compte relié · … » à la connexion, réglage partagé carte ↔ Paramètres ; carte : compte de l'onglet d'abord, favoris du plus récent cochés ⇒ « Envoyer le message (N) », autres comptes floutés `inert`, lecture seule. `docs/passation/2026-11-14-popup-capte.md`. Geste : installer la 5.377.0.

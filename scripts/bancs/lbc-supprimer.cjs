@@ -345,7 +345,8 @@ const cliquer = (pg, texte) => pg.evaluate((tx) => { const b = [...document.quer
       if (vp.width > 600) {
         console.log(`── ${vp.width} px · Republier sans extension, sur ordinateur`);
         const or = await ouvrir(b, vp, { mode: 'absente' }, { items: { '3290000005': Object.assign({}, ITEMS['3290000005'], { ref: '15' }) } });
-        await or.pg.waitForSelector('[data-repub-lbc-ouvrir]', { timeout: 8000 }).catch(() => {});
+        await or.pg.waitForSelector('[data-repub-lbc-ouvrir]', { state: 'attached', timeout: 8000 }).catch(() => {});
+        await or.pg.click('[data-pf-afaire]').catch(() => {});   // (14 nov., refonte des sites) La porte vit dans « • À faire › » : on l'ouvre d'abord (un toucher de plus).
         await or.pg.click('[data-repub-lbc-ouvrir]').catch(() => {});
         await or.pg.waitForTimeout(800);
         const tr = await or.pg.evaluate(() => document.body.innerText);

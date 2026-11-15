@@ -1,7 +1,9 @@
 // ENGLISH — translation of fr.js (the source). Same keys, same {variables}.
 import ecran_journee from './en/journee.js';
 import ecran_confort from './en/confort.js';   // (14 nov., lots 117–130) confort et sécurité
+import ecran_studio from './en/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
 import ecran_capte from './en/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
+import ecran_idees from './en/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './en/ventes.js';
 import ecran_commun from './en/commun.js';
 import ecran_achats from './en/achats.js';
@@ -11,30 +13,49 @@ import ecran_messages from './en/messages.js';
 import ecran_emails from './en/emails.js';
 import ecran_stats from './en/stats.js';
 import ecran_compta from './en/compta.js';
+import ecran_listes from './en/listes.js';
+import ecran_refonte_ms from './en/refonte-ms.js';
+import ecran_studio_journee from './en/studio-journee.js';   // (14 nov.) Ma journée « Studio bleu clair »
+import ecran_argent from './en/argent.js';
 import ecran_fiche from './en/fiche.js';
+import ecran_ergonomie from './en/ergonomie.js';
 import ecran_tarifs from './en/tarifs.js';
 import ecran_nouveaux from './en/nouveaux.js';
-import ecran_listes from './en/listes.js';
 import ecran_plus from './en/plus.js';
-import ecran_argent from './en/argent.js';
+import ecran_plateformes from './en/plateformes.js';
 import ecran_colisplus from './en/colisplus.js';   // (14 nov., lot colis-plus)
+import ecran_studioventes from './en/studioventes.js';   // (14 nov., Studio bleu clair) Ventes et Achats
+import ecran_impression from './en/impression.js';   // (14 nov., impression-simple)
 import ecran_accueilReste from './en/accueilReste.js';
 import ecran_fraiscarte from './en/fraiscarte.js';   // (14 nov., frais-carte)
 import ecran_atelier from './en/atelier.js';
+import ecran_accompagnement from './en/accompagnement.js';   // (14 nov.) les quatre moments d'un geste
 import ecran_argentprix from './en/argentprix.js';   // (14 nov., argent-prix)
+import ecran_rechliste from './en/rechliste.js';
+import ecran_studio_paires from './en/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
 export default {
+  ...ecran_studio_paires,
   ...ecran_accueilReste,
+  ...ecran_refonte_ms,
+  ...ecran_studio_journee,
+  ...ecran_listes,
   ...ecran_fiche,
+  ...ecran_ergonomie,
   ...ecran_fraiscarte,
   ...ecran_tarifs,
   ...ecran_nouveaux,
   ...ecran_atelier,
-  ...ecran_listes,
+  ...ecran_rechliste,
+  ...ecran_accompagnement,
   ...ecran_plus,
   ...ecran_argentprix,
+  ...ecran_plateformes,
+  ...ecran_idees,
   ...ecran_compta,
   ...ecran_argent,
   ...ecran_colisplus,
+  ...ecran_studioventes,
+  ...ecran_impression,
   ...ecran_stats,
   ...ecran_emails,
   ...ecran_messages,
@@ -218,11 +239,18 @@ export default {
   "nav.journee.court": "Today",
   "nav.messages": "Messages",
   "nav.plus": "More",
+  "nav.paires": "Pairs",
+  "nav.groupe.paires": "Pairs",
   "nav.trancher": "To decide",
   "nav.ventes": "Sales",
   // ── coque
   "coque.fermerMenu": "Close menu",
   "coque.monProfil": "My profile",
+  "coque.aRevoir": "to review",
+  "coque.actionsVinted": "Vinted actions",
+  "coque.cacherMontants": "Hide amounts",
+  "coque.nouveau": "new",
+  "coque.misAJour": "Updated at {h}",
   "coque.navigationPrincipale": "Main navigation",
   "coque.ouvrirProfil": "open my profile",
   "coque.tonEspace": "Your space",
@@ -470,7 +498,7 @@ export default {
   "reglages.imprimante.thermique": "Thermal · {papier}",
   "reglages.je-vends.desc": "What you sell: the wording and examples follow.",
   "reglages.je-vends.lib": "I sell",
-  "reglages.journal-vrm.lib": "What VRM did",
+  "reglages.journal-vrm.lib": "Log: what VRM did",
   "reglages.langue.chargement": "Loading…",
   "reglages.langue.desc": "VRM’s language, the same on all your devices.",
   "reglages.langue.rate": "Couldn’t load this language — try again.",
@@ -552,7 +580,7 @@ export default {
   "reglages.stream.desc": "Choose the words, brands and accounts to hide.",
   "reglages.stream.lib": "What streaming hides",
   "reglages.tes-donnees.desc": "Per site, where it’s stored, who has access.",
-  "reglages.tes-donnees.lib": "What VRM reads and does",
+  "reglages.tes-donnees.lib": "Privacy: what VRM reads and keeps",
   "reglages.toutvabien.desc": "Each account, its last reread and each device’s extension.",
   "reglages.toutvabien.lib": "All good?",
   "reglages.discretion.desc": "Daily cap and Vinted slowdowns, account by account.",
@@ -2224,5 +2252,6 @@ export default {
   "instantane.arret.horsLigne": "Offline: these figures are from your last visit. They will be reloaded when the network is back.",
   "instantane.arret.panne": "Not reloaded: the database is not responding. These figures are from your last visit.",
   ...ecran_confort,
+  ...ecran_studio,
   ...ecran_capte,
 };

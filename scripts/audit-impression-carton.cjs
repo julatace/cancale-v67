@@ -26,7 +26,7 @@ const code = [
   prend(/const ficheAVerifier = \(f\) => \{[\s\S]*?\n\};/, 'ficheAVerifier'),
   prend(/const reattribueAEcrire = [^\n]*;/, 'reattribueAEcrire'),
   prend(/const NUM_A_VERIFIER_ANNULE = [^\n]*;/, 'NUM_A_VERIFIER_ANNULE'),
-  prend(/const confirmerNumerosAVerifier = async \(numeros\) => \{[\s\S]*?\n\};/, 'confirmerNumerosAVerifier'),
+  prend(/const confirmerNumerosAVerifier = async \(numeros(?:, sonde = null)?\) => \{[\s\S]*?\n\};/, 'confirmerNumerosAVerifier'),
 ].join('\n') + '\n;({ confirmerNumerosAVerifier })';
 
 (async () => {
@@ -84,6 +84,20 @@ const code = [
     demandes = []; reponse = false;
     dit((await f(['13'])) === false && demandes.length === 1, 'un `recreeDe` vers une fiche d\'un AUTRE N° ne dispense rien', `${demandes.length} question(s)`);
   }
+  // (14 nov., impression-simple) LA SONDE : la même règle dit SANS DEMANDER si une question est due (synchrone), pour
+  // ouvrir le PDF dans le geste quand rien n'est dû — et demander sinon. Elle ne pose aucune question elle-même.
+  if (f) {
+    fiches = { a: { numero: '12', title: 'Nike Air Max 90 blanc 42' }, b: { numero: '12', title: 'Nike Air Max 90 blanc 42' } };
+    demandes = []; const s1 = { demande: false }; f(['12'], s1);
+    dit(s1.demande === true && demandes.length === 0, 'la sonde : deux fiches sous le N°12 ⇒ « une question est due », dite AVANT la fin de l’appel, sans rien demander', JSON.stringify({ s1, q: demandes.length }));
+    fiches = { a: { numero: '14', title: 'Z', auto: false, numberedAt: '2026-11-01T10:00:00Z' } };
+    demandes = []; const s2 = { demande: false }; f(['14'], s2);
+    dit(s2.demande === false && demandes.length === 0, 'la sonde : un N° sûr ⇒ rien de dû', JSON.stringify(s2));
+  }
+  // Le parcours « Imprimer » en un toucher : il n'ouvre DANS le geste que si la sonde ne doit rien ; sinon il DEMANDE.
+  const geste = (APP.match(/if \(pret && !numerosDemandent\(numeros\) && \(!numeros\.some\(Boolean\) \|\| versionFraiche\(\)\)\) \{/g) || []).length;
+  const attente = /const attendrePuisOuvrir = [\s\S]{0,900}if \(!\(await confirmerNumerosAVerifier\(numeros\)\)\) throw new Error\(NUM_A_VERIFIER_ANNULE\);/.test(APP);
+  dit(geste === 1 && attente, '« Imprimer » : le PDF ne s’ouvre dans le geste que si aucune question n’est due ; sinon la question passe AVANT', JSON.stringify({ geste, attente }));
   // Les trois chemins d'impression l'appellent, juste après la garde de version.
   const appels = (APP.match(/await confirmerNumerosAVerifier\(/g) || []).length;
   dit(appels >= 3, 'les trois chemins d\'impression (un bordereau, un lot, bordereau + facture) posent la question', `${appels} appel(s)`);

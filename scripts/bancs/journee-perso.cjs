@@ -129,7 +129,9 @@ const etat = (pg) => pg.evaluate(() => {
   const cartes = [...document.querySelectorAll('[data-tuile], [data-job], [data-vendus-ailleurs], [data-stock-sortie], [data-cycle-groupe]')].filter(vis)
     .map((e) => e.getAttribute('data-tuile') || e.getAttribute('data-job') || 'autre');
   const cachees = Object.fromEntries([...document.querySelectorAll('[hidden] [data-tuile]')].map((e) => [e.getAttribute('data-tuile'), e.getAttribute('data-n')]));
-  const tete = document.querySelector('.vrm-fu-tete');
+  // (14 nov., Studio) La tête porte la phrase et l'affiche (dans SON ordre) ; « Les chiffres du mois » sont une tuile de la
+  // grille, « la prochaine chose » la première carte de « À faire » : l'ordre se lit sur tout l'écran.
+  const tete = document.querySelector('.sj-journee') || document.querySelector('.vrm-fu-tete');
   // La carte des chiffres peut n'avoir aucune boîte à elle (ses cases sont posées par la grille) : « montrée » = pas dans un bloc caché.
   const ordreTete = tete ? [...tete.querySelectorAll('[data-jv2-prochain], [data-jv2-argent], [data-carte-stats="journee"], [data-phrase-jour], .vrm-fu-phrase-tete')].filter((e) => !e.closest('[hidden]') && (e.hasAttribute('data-carte-stats') || vis(e))).map((e) => e.hasAttribute('data-jv2-prochain') ? 'prochain' : e.hasAttribute('data-jv2-argent') ? 'frise' : e.hasAttribute('data-carte-stats') ? 'chiffres' : 'phrase') : [];
   const force = [...document.querySelectorAll('[data-jp-force]')].filter(vis).map((e) => ({ id: e.getAttribute('data-tuile'), texte: e.innerText, prochain: e.hasAttribute('data-prochain') }));
@@ -187,7 +189,9 @@ async function main() {
         await attendreJournee(pg);
         const e0 = await etat(pg);
         await shot(pg, `jp-origine-${vp.width}-${theme}`);
-        dit(e0.cartes.includes('envoyer') && e0.cachees.envoyer === undefined && e0.nCachees === 0 && e0.ordreTete.join() === 'phrase,prochain,frise,chiffres', `D ${T} sans réglage : Ma journée d'avant (« à envoyer » affichée, tête dans l'ordre d'origine, rien de caché)`, JSON.stringify({ cartes: e0.cartes, tete: e0.ordreTete, nc: e0.nCachees }));
+        // (14 nov., Studio) La phrase et l'affiche suivent l'ordre du moment (`ordreJourneeHeure`, lot 117) ; puis la tuile
+        // du mois ; puis la prochaine chose, s'il y a une carte dans « À faire ».
+        dit(e0.cartes.includes('envoyer') && e0.cachees.envoyer === undefined && e0.nCachees === 0 && /^(phrase,frise|frise,phrase),chiffres(,prochain)?$/.test(e0.ordreTete.join()), `D ${T} sans réglage : Ma journée d'avant (« à envoyer » affichée, tête dans l'ordre d'origine, rien de caché)`, JSON.stringify({ cartes: e0.cartes, tete: e0.ordreTete, nc: e0.nCachees }));
         await pg.locator('[data-jp-modifier]').scrollIntoViewIfNeeded();
         const mb = await pg.locator('[data-jp-modifier]').boundingBox();
         dit(mb && mb.height >= 44, `D ${T} « Modifier ma journée » se touche (44 px)`, mb ? String(Math.round(mb.height)) : 'absent');
@@ -228,8 +232,10 @@ async function main() {
         const e1 = await etat(pg);
         await shot(pg, `jp-modifiee-${vp.width}-${theme}`);
         dit(!e1.cartes.includes('envoyer') && e1.cachees.envoyer === '3' && e1.nCachees === 1, `D ${T} « à envoyer » cachée : plus à l'écran, son compteur reste publié (bloc caché, 3)`, JSON.stringify({ cartes: e1.cartes, cachees: e1.cachees, nc: e1.nCachees }));
-        dit(e0.gestes != null && e1.gestes === e0.gestes - 1, `D ${T} « N gestes » ne compte plus la carte cachée (${e0.gestes} ⇒ ${e0.gestes - 1})`, String(e1.gestes));
-        dit(e1.ordreTete.join() === 'phrase,frise,chiffres' || e1.ordreTete.join() === 'phrase,frise,prochain,chiffres', `D ${T} la tête suit SON ordre (la frise avant la prochaine chose)`, e1.ordreTete.join());
+        // (14 nov., Studio) « À envoyer » est une TUILE : « N gestes » ne compte que les cartes de la liste « À faire » —
+        // la cacher retire la tuile, le compte de la liste ne bouge pas (le nombre dit = les cartes vues, journee-coherence E1).
+        dit(e0.gestes != null && e1.gestes === e0.gestes, `D ${T} « N gestes » (les cartes de la liste) ne bouge pas quand la tuile est cachée (${e0.gestes})`, String(e1.gestes));
+        dit(e1.ordreTete.join() === 'phrase,frise,chiffres' || e1.ordreTete.join() === 'phrase,frise,chiffres,prochain', `D ${T} la tête suit SON ordre (la phrase, puis l'affiche ; la grille ; la liste)`, e1.ordreTete.join());
         // O — enregistré, synchronisé, et toujours là au rechargement.
         await pg.waitForFunction(() => { try { const p = JSON.parse(localStorage.getItem('vrm_journee_perso')); return p && p.choix && p.choix.envoyer === false; } catch (_) { return false; } }, null, { timeout: 8000 }).catch(() => {});
         const p = await lirePerso(pg);

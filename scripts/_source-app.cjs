@@ -113,7 +113,10 @@ function entreesVars(corps) {
     else if (c === ',' && prof === 0) { parts.push(corps.slice(debut, i)); debut = i + 1; }
   }
   parts.push(corps.slice(debut));
-  for (const p of parts) { const m = p.match(/^\s*(\w+)\s*:\s*([\s\S]*?)\s*$/); if (!m) return null; const e = m[2].match(/^String\(([\s\S]*)\)$/); out[m[1]] = e ? e[1] : m[2]; }
+  // (14 nov., version studio) `String(x)` n'est retiré que s'il ENVELOPPE toute la valeur : dans
+  // `String((e && e.message) || e).slice(0, 120)`, la parenthèse de String se ferme avant `.slice` — on garde tout.
+  const equilibre = (s) => { let p = 0, q = null; for (let i = 0; i < s.length; i++) { const c = s[i]; if (q) { if (c === '\\') { i++; continue; } if (c === q) q = null; continue; } if (c === "'" || c === '"' || c === '`') { q = c; continue; } if (c === '(') p++; else if (c === ')') { p--; if (p < 0) return false; } } return p === 0; };
+  for (const p of parts) { const m = p.match(/^\s*(\w+)\s*:\s*([\s\S]*?)\s*$/); if (!m) return null; const e = m[2].match(/^String\(([\s\S]*)\)$/); out[m[1]] = e && equilibre(e[1]) ? e[1] : m[2]; }
   return out;
 }
 function enFrancais(texte, racine) {

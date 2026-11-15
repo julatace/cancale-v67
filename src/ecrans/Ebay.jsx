@@ -43,7 +43,9 @@ import { ConnexionEbayGuidee, RetourConnexionEbay, EtatJetonEbay } from '../ebay
 // (10 nov., lot S) La facture Pro d'une commande eBay (src/FactureAutres.jsx), chargée à la demande.
 import { DEPS_FACTURE, MicDictee, DEMANDE_RETOUR_EBAY, lireComptesEbay, montantRecuEbay } from '../App.jsx';
 import { requeteDeLaVoix } from '../rechercheVocale.js';
-import { motsInsecables } from '../motsInsecables.jsx';   // (14 nov., passe 2) « Gel-1130 » ne se coupe pas au trait d'union
+import { motsInsecables } from '../motsInsecables.jsx';
+import { AFaireSite } from '../plateformes/AFaireSite.jsx';   // (14 nov., refonte visible) « À faire · N › »
+import { BarreOutils, Filtres } from '../ui/index.js';   // (14 nov., passe 2) « Gel-1130 » ne se coupe pas au trait d'union
 const FactureEbayParesseuse = React.lazy(() => import('../FactureAutres.jsx').then((m) => ({ default: m.FactureAutreVente })));
 const FactureEbayVente = (props) => <React.Suspense fallback={null}><FactureEbayParesseuse {...props}/></React.Suspense>;
 
@@ -2548,7 +2550,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           ))}
         </div>
       )}
-      {info && <div data-ebay-info={it.itemId} data-ebay-info-ton={infoTon || (/^✓/.test(info) ? 'ok' : 'warn')} style={{ fontSize: 12, color: (infoTon ? infoTon === 'ok' : /^✓/.test(info)) ? E.text : E.warn, margin: '0 16px 11px', lineHeight: 1.45 }}>{info}{lienEbayInfo && url ? <> <a href={url} target="_blank" rel="noreferrer" style={{ color: E.accentSoft, fontWeight: 700 }}>Voir sur eBay ↗</a></> : null}</div>}
+      {info && <div data-ebay-info={it.itemId} data-ebay-info-ton={infoTon || (/^✓/.test(info) ? 'ok' : 'warn')} {...((infoTon ? infoTon === 'ok' : /^✓/.test(info)) ? { 'data-acc-apres': 'offre.ebay' } : { 'data-acc-echec': 'offre.ebay' })} style={{ fontSize: 12, color: (infoTon ? infoTon === 'ok' : /^✓/.test(info)) ? E.text : E.warn, margin: '0 16px 11px', lineHeight: 1.45 }}>{info}{lienEbayInfo && url ? <> <a href={url} target="_blank" rel="noreferrer" style={{ color: E.accentSoft, fontWeight: 700 }}>Voir sur eBay ↗</a></> : null}</div>}
       {open && (<DansFiche cle={flEb['data-fiche-ligne']} place="contexte" seulementFiche>
         <div className="vrm-eb-fiche" data-ebay-fiche={it.itemId}>
           {/* La référence VRM d'une annonce « à vérifier » : dite ICI, sur la fiche
@@ -2588,10 +2590,10 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
         );
       })()}
       {regleOuverte && et && (
-        <div data-regle-panneau={it.itemId} {...(regleSignal === 'prix-change' ? { 'data-regle-prix-change': '1' } : {})} {...(regleSignal === 'existante' ? { 'data-regle-existante': '1' } : {})}
+        <div data-regle-panneau={it.itemId} data-acc-pendant={envoiRegle ? 'offre.ebay' : undefined} {...(regleSignal === 'prix-change' ? { 'data-regle-prix-change': '1' } : {})} {...(regleSignal === 'existante' ? { 'data-regle-existante': '1' } : {})}
           style={{ margin: '0 0 12px', background: E.card2, borderRadius: 12, padding: '11px 12px' }}>
           <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 8 }}>
-            {prixVuN ? <>Prix de l'annonce : <b style={{ color: E.text }}>{eurEbay(prixVuN)}</b>. </> : null}Offre ≥ ce montant : eBay l'accepte seul, l'article est vendu. En dessous, elle t'arrive.
+            <span data-acc-avant="offre.ebay">{prixVuN ? <>Prix de l'annonce : <b style={{ color: E.text }}>{eurEbay(prixVuN)}</b>. </> : null}Offre ≥ ce montant : eBay l'accepte seul, l'article est vendu. En dessous, elle t'arrive. {tr('acc.offre.ebay.pas')}</span>
             {et.etat === 'pas-su' && et.raison === 'offres-inconnues' && et.lu
               ? <span data-regle-panneau-offres-inconnues={it.itemId}>{` Règle actuelle : eBay montre un seuil${et.lu.accepte != null ? ` dès ${eurEbay(et.lu.accepte)}` : ''}${et.lu.refuse != null ? ` (refus sous ${eurEbay(et.lu.refuse)})` : ''}, offres peut-être éteintes : enregistrer les active.`}</span>
               : (et.etat === 'pas-su' ? ' Règle actuelle pas lue : rien remplacé sans te redemander.' : '')}
@@ -4525,7 +4527,9 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     else setRetraits((m) => ({ ...m, [id]: (j && j.error) || 'eBay a refusé le retrait.' }));
   };
   const wrap = (kids) => <div className="vrm-ebay-annonces" style={{ padding: 16, paddingBottom: 24 }}>{kids}</div>;
-  const head = (n) => <ScreenHead icon="tag" title={`Annonces eBay${n != null ? ` (${n})` : ''}`}/>;
+  // (14 nov., refonte visible) « Annonces eBay (4) » redisait l'onglet « Annonces » : il reste pour un lecteur
+  // d'écran ; le nombre est dans le filtre « Toutes ». La liste commence tout de suite.
+  const head = (n) => <h2 className="vrm-sr">{`Annonces eBay${n != null ? ` (${n})` : ''}`}</h2>;
   // Le publieur, EN HAUT de l'onglet Annonces (Julien : « poster plus naturel »).
   // Affiché seulement si le compte est relié ; sinon une ligne qui renvoie au
   // compte, jamais un bouton mort.
@@ -5140,12 +5144,14 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   );
   return wrap(<>
     {head(itemsVue.length)}
-    {(compteUnique || melangeAnnonces) && <div className="vrm-plat-intro" style={{ color: E.muted, fontSize: 12, marginBottom: 12 }}>{compteUnique ? `Sur ton compte eBay ${compteUnique}.` : `Sur tes ${new Set(itemsVue.map((a) => a._compte)).size} comptes eBay.`}</div>}
     {/* (6 nov., Julien : « eBay, c'est vraiment pas ouf ») « À FAIRE » : chaque
         ligne EST le geste (toute la ligne se touche) — elle filtre la liste
         (« À relier », « Qui dorment » : appuyée, elle le montre ; retouchée, tout
         revient) ou mène au bloc. Plus de boutons « Filtrer » / « Voir ». Le texte :
         ce qu'il faut faire, puis pourquoi, en petit. */}
+    {/* (14 nov., refonte visible — AJOUT 3) La carte « À faire sur eBay » (quatre lignes AVANT la liste) devient
+        UNE ligne « • À faire · N › » ; sa feuille garde chaque ligne et son geste (filtrer, aller au bloc). */}
+    <AFaireSite site="ebay" n={conseils.length}>
     {conseils.length > 0 && (
       <div className="vrm-eb-afaire" data-ebay-conseils={conseils.length}>
         <div className="vrm-eb-afaire-titre">À faire sur eBay</div>
@@ -5153,7 +5159,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
           const [tete, ...raison] = String(c.txt).split(' — ');
           const actif = !!c.filtre && filtreAnn === c.filtre;
           return (
-            <button key={c.k} type="button" className="vrm-eb-afaire-ligne" data-ebay-conseil={c.k} data-ebay-conseil-go={c.k} data-urgent={c.urg ? '1' : undefined}
+            <button key={c.k} type="button" className="vrm-eb-afaire-ligne" data-ebay-conseil={c.k} data-ebay-conseil-go={c.k} data-afaire-ferme="" data-urgent={c.urg ? '1' : undefined}
               {...(c.filtre ? { 'aria-pressed': actif } : {})}
               onClick={c.filtre && actif ? () => { setFiltreAnn('toutes'); setAnnMax(60); } : allerConseil(c)}>
               {/* (6 nov., v36-visuel-2) Une icône de Réglages par geste (lier, endormie, retirer…) au
@@ -5166,31 +5172,28 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
         })}
       </div>
     )}
-    {publier}
+    </AFaireSite>
     {alertes}
     {ligneComptesIllisibles}
     {lignePasSu}
     {ligneSansPreuve}
-    <div className="vrm-ebay-outils" style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '0 0 10px' }}>
-      <div className="vrm-ebay-recherche-ligne">
-        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Chercher (titre, N°, SKU)" aria-label="Chercher une annonce eBay" data-ebay-recherche
-          style={{ flex: '1 1 auto', minWidth: 0, boxSizing: 'border-box', padding: '9px 12px', borderRadius: 12, border: `1px solid ${E.border}`, background: E.card, color: E.text, fontSize: 13, fontFamily: 'inherit' }} />
+    <div className="vrm-ebay-outils vrm-pf-collant" data-pf-outils="ebay" style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: '0 0 10px' }}>
+      {/* (14 nov., refonte visible) UNE barre (src/ui/BarreOutils) : le champ, le micro, « Vendre sur eBay » (sa porte
+          devenue un « + » ; ouverte, la feuille de vente se déplie sous la barre) et les réglages de l'écran. */}
+      <BarreOutils className="vrm-ebay-recherche-ligne vrm-pf-barre-ebay" valeur={q} onChange={setQ} placeholder="Chercher (titre, N°, SKU)" label="Chercher une annonce eBay" champAttrs={{ 'data-ebay-recherche': '' }}>
         <MicDictee titre="Chercher à la voix (« numéro 124 », « chemise bleue »)" onDirect={setQ} onText={(t) => setQ(requeteDeLaVoix(t).requete)}/>
         {/* (6 nov.) Les réglages de l'écran, en feuille (règle d'offre, retrait automatique). */}
         <button type="button" className="vrm-icon-control vrm-ebay-reglages-bouton" aria-label="Réglages eBay" title="Réglages eBay" data-ebay-reglages-ouvrir="" data-geste={gesteRegle ? '1' : undefined} onClick={() => setReglagesEbay('liste')}>
           <Icon name="gear" size={20}/>
         </button>
-      </div>
+        {publier}
+      </BarreOutils>
       {/* (6 nov.) Pour le conseil « Annonces eBay à relier » : le compte du filtre « À relier ». */}
       <ChiffreConseil cle="ebay.aRelier" valeur={setRelierAnn.size}/>
       {chipsAnn.length > 1 && (
-        // (6 nov.) La forme UNIQUE des filtres de l'app (`.vrm-filtres`, celle de Ventes).
-        <div className="vrm-rangee vrm-filtres" role="group" aria-label="Filtrer les annonces eBay" style={{ display: 'flex', gap: 6 }}>
-          {chipsAnn.map(([k, label, n]) => (
-            <button key={k} type="button" data-ebay-filtre={k} aria-pressed={filtreAnn === k} onClick={() => setFiltreAnn(k)}
-              style={{ whiteSpace: 'nowrap', flexShrink: 0, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>{label} <span style={{ fontVariantNumeric: 'tabular-nums', opacity: 0.75 }}>{n}</span></button>
-          ))}
-        </div>
+        // (14 nov.) Les petites capsules communes des listes (src/ui/Filtres) ; mêmes `data-ebay-filtre`.
+        <Filtres label="Filtrer les annonces eBay" valeur={filtreAnn} onChange={setFiltreAnn}
+          options={chipsAnn.map(([k, label, n]) => ({ v: k, l: label, n, attrs: { 'data-ebay-filtre': k } }))}/>
       )}
     </div>
     <div className="vrm-ebay-liste" style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, overflow: 'hidden' }}>
@@ -5220,6 +5223,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
       <div style={{ color: E.muted, fontSize: 13, textAlign: 'center', padding: '16px 0' }}>Aucune annonce ne correspond{qnAnn ? ' à cette recherche' : ' à ce filtre'}. <button type="button" onClick={() => { setQ(''); setFiltreAnn('toutes'); }} style={{ ...lienE, padding: '3px 9px', marginLeft: 6 }}>Tout voir</button></div>
     )}
     <div className="vrm-ebay-suite">
+    {(compteUnique || melangeAnnonces) && <div className="vrm-plat-intro" style={{ color: E.muted, fontSize: 12, margin: '12px 2px 0' }}>{compteUnique ? `Sur ton compte eBay ${compteUnique}.` : `Sur tes ${new Set(itemsVue.map((a) => a._compte)).size} comptes eBay.`}</div>}
     {/* (6 nov., v36-visuel — Julien : « des murs de texte ») UNE ligne chacune ;
         la phrase entière derrière le « ⓘ » (le sens ne change pas, il se lit au toucher). */}
     {nSans > 0 && (

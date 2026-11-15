@@ -1,0 +1,72 @@
+/* L'accompagnement d'un geste (14 nov.) — src/ui/Accompagne.jsx.
+   Jetons du système seulement (src/styles-systeme.css) : encre, gris, accent RARE (le lien
+   du geste), ambre en POINT pour un échec, jamais le rouge (réservé au doublon de N°). */
+
+/* AVANT : une note sous le bouton — 13 px, gris ; « ce qui ne se passera pas » à la suite. */
+.vrm-acc-avant {
+  margin: var(--d-e-1, 4px) 0 0; font-size: var(--d-t-13, 13px); line-height: 1.4; font-weight: 400;
+  color: var(--d-gris, #6E6E73); text-wrap: pretty; max-width: 62ch;
+}
+.vrm-acc-avant .vrm-acc-pas { color: var(--d-gris, #6E6E73); }
+
+/* PENDANT / APRÈS / ÉCHEC : une pilule, la même forme que les messages de la coque. */
+.vrm-acc {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--d-e-1, 4px) var(--d-e-3, 12px);
+  width: 100%; box-sizing: border-box; margin: var(--d-e-2, 8px) 0 0;
+  padding: var(--d-e-2, 8px) var(--d-e-4, 16px); border-radius: var(--d-r-case, 12px);
+  background: var(--d-remplir, rgba(118,118,128,.12)); color: var(--d-encre, #1D1D1F);
+  font-size: var(--d-t-15, 15px); line-height: 1.35; font-weight: 400;
+}
+.vrm-acc-texte { flex: 1 1 14ch; min-width: 0; overflow-wrap: anywhere; }
+.vrm-acc-compte { font-weight: 600; font-variant-numeric: tabular-nums; }
+.vrm-acc-ligne { display: flex; align-items: center; gap: var(--d-e-3, 12px); width: 100%; flex-wrap: wrap; }
+.vrm-acc-icone { color: var(--d-encre, #1D1D1F); font-weight: 600; }
+.vrm-acc-point { width: 8px; height: 8px; border-radius: 50%; background: var(--d-point-ambre, #FF9F0A); flex: 0 0 auto; }
+
+/* Le lien d'un geste : texte accent, cible de 44 px au doigt (36 à la souris). */
+:is(.vrm-app-shell, .vrm-fs, body) button.vrm-acc-lien {
+  appearance: none; border: 0; background: transparent; padding: 0 var(--d-e-1, 4px); margin: 0;
+  min-height: 44px; display: inline-flex; align-items: center; cursor: pointer;
+  font: inherit; font-size: var(--d-t-15, 15px); font-weight: 600; color: var(--d-accent-texte, #0066CC);
+  text-align: left; border-radius: var(--d-r-pilule, 999px);
+}
+:is(.vrm-app-shell, .vrm-fs, body) button.vrm-acc-lien.is-discret { color: var(--d-gris, #6E6E73); font-weight: 400; }
+:is(.vrm-app-shell, .vrm-fs, body) button.vrm-acc-lien:disabled { opacity: .55; cursor: default; }
+.vrm-acc-geste { font-weight: 600; }
+:is(.vrm-app-shell, .vrm-fs, body) button.vrm-acc-x {
+  appearance: none; border: 0; background: transparent; color: var(--d-gris, #6E6E73); cursor: pointer;
+  min-width: 44px; min-height: 44px; margin: -6px -10px -6px auto; font-size: 20px; line-height: 1; border-radius: var(--d-r-pilule, 999px);
+}
+@media (hover: hover) and (pointer: fine) {
+  :is(.vrm-app-shell, .vrm-fs, body) button.vrm-acc-lien, :is(.vrm-app-shell, .vrm-fs, body) button.vrm-acc-x { min-height: 36px; }
+  :is(.vrm-app-shell, .vrm-fs, body) button.vrm-acc-x { min-width: 36px; }
+}
+:is(.vrm-app-shell, .vrm-fs, body) button.vrm-acc-lien:focus-visible, :is(.vrm-app-shell, .vrm-fs, body) button.vrm-acc-x:focus-visible { outline: 2px solid var(--d-accent, #0071E3); outline-offset: 2px; }
+
+/* La barre de progression : fine, à l'encre. */
+.vrm-acc-barre { width: 100%; height: 4px; border-radius: 2px; background: var(--d-filet, rgba(60,60,67,.18)); overflow: hidden; }
+.vrm-acc-barre > i { display: block; height: 100%; background: var(--d-encre, #1D1D1F); border-radius: inherit; transition: width var(--d-m-moyen, 200ms) ease-out; }
+.vrm-acc-barre.is-indetermine > i { width: 30%; animation: vrmAccVa 1.2s ease-in-out infinite; }
+@keyframes vrmAccVa { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+@media (prefers-reduced-motion: reduce) { .vrm-acc-barre.is-indetermine > i { animation: none; width: 100%; opacity: .35; } }
+
+/* L'hôte des gestes courts : dans la zone des messages de la coque (au-dessus de la barre du
+   bas, ou en haut quand une feuille est ouverte), la carte flottante des messages. */
+.vrm-acc-hote { display: flex; flex-direction: column; gap: var(--d-e-2, 8px); width: 100%; max-width: 520px; pointer-events: auto; }
+.vrm-acc-hote > .vrm-acc {
+  margin: 0; background: var(--d-carte, #FFFFFF); box-shadow: var(--d-ombre-flottant, 0 8px 24px rgba(0,0,0,.14));
+  border-radius: var(--d-r-pilule, 22px); padding: var(--d-e-1, 4px) var(--d-e-4, 16px); min-height: 48px;
+  animation: vrmAccEntre 220ms cubic-bezier(.23, 1, .32, 1) both;
+}
+.vrm-acc-hote > .vrm-acc-pendant { border-radius: var(--d-r-case, 14px); padding: var(--d-e-2, 8px) var(--d-e-4, 16px); }
+@keyframes vrmAccEntre { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .vrm-acc-hote > .vrm-acc { animation: none; } }
+
+/* Liste vide : pourquoi (gris), puis le premier geste. */
+.vrm-acc-vide { margin-top: var(--d-e-2, 8px); }
+.vrm-acc-vide > p { margin: 0; font-size: var(--d-t-15, 15px); line-height: 1.4; color: var(--d-gris, #6E6E73); text-wrap: pretty; }
+
+/* La première fois : une ligne sous le titre, sans cadre, deux liens. */
+.vrm-acc-premiere { margin: var(--d-e-1, 4px) 0 var(--d-e-2, 8px); }
+.vrm-acc-premiere > p { margin: 0; font-size: var(--d-t-15, 15px); line-height: 1.4; color: var(--d-encre, #1D1D1F); text-wrap: pretty; max-width: 62ch; }
+.vrm-acc-premiere-gestes { display: flex; flex-wrap: wrap; gap: 0 var(--d-e-4, 16px); }

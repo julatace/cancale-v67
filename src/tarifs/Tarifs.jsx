@@ -27,6 +27,7 @@ import es from '../i18n/langues/es/tarifs.js';
 import it from '../i18n/langues/it/tarifs.js';
 import de from '../i18n/langues/de/tarifs.js';
 import './tarifs.css';
+import '../design/studio-reste-public.css';   // (14 nov., Studio bleu clair) le bleu clair, le plein d'encre
 
 ajouterTextes({ fr, en, es, it, de });
 

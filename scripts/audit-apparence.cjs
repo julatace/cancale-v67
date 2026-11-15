@@ -55,7 +55,7 @@ async function verifier({ src, dem, app }, bavard = true) {
   }
   dit(ecarts.length === 0, `le script de démarrage et React donnent la MÊME teinte sur ${n} entrées (aucun flash)`, ecarts.slice(0, 3).join(' | '));
   const r0 = lanceDemarrage({ vrm_apparence: '"sombre"' }, 12, false);
-  dit(r0.meta === '#000000', 'la barre d’état suit (theme-color = le fond sombre #000000)', String(r0.meta));
+  dit(r0.meta === '#15263D', 'la barre d’état suit (theme-color = le haut de la lumière de nuit du Studio, #15263D)', String(r0.meta));
   // 2. La règle.
   const S = (mode, h, sys = false, ancien = false) => A.sombreEffectif(A.apparenceDe(mode, ancien), { date: new Date(2026, 10, 8, h, 0, 0), systemeSombre: sys });
   dit(S('soir', 19) && S('soir', 23) && S('soir', 0) && S('soir', 6), '« Le soir » : sombre de 19 h à 6 h 59');
