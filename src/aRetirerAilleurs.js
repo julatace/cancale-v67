@@ -95,7 +95,8 @@ export function etatSite(site, ctx = {}) {
 // `numero` (facultatif) : un seul N° (la fiche de la paire).
 export function listeARetirer(plan, ctx = {}, numero = null) {
   const articles = arr(plan && plan.articles)
-    .filter((a) => numero == null || String(a.numero) === String(numero))
+    // Un lot « 12+15 » répond à 12 ET à 15 (le N° du plan est déjà une clé `cleNum`).
+    .filter((a) => numero == null || String(a.numero) === String(numero) || String(a.numero).split('+').includes(String(numero)))
     .map((a) => {
       const sites = arr(a.sites).map((s) => ({ ...s, ...etatSite(s, ctx) }));
       return { ...a, douteuse: !!a.douteuse, sites };
