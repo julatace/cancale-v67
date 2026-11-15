@@ -107,6 +107,8 @@ const appComp = charge('src/App.jsx', ['etapeVente', 'phaseAchat', 'etapeAchat',
   partisVinted: new Map(), raisonDepartPubliee: () => null,
   // (5 nov.) `achatStage` lit les fins prouvées par `pickupUnion` (aucune ici).
   pickupUnion: { txFinis: new Set() },
+  // (15 nov.) … et les achats EN RETOUR (bordereau de retour reçu, api/_lib/suivi-colis.js) : aucun ici.
+  achatEnRetour: () => false, txRetourAchat: new Set(),
 }));
 const ext = charge('vinted-sync-extension/background.js', ['AWAITING_SHIP', 'AT_RELAY', 'PAS_UN_ENVOI', 'COLIS_DEJA_BOUGE', 'besoinBordereauTexte', 'A_EXPEDIER', 'resumeCommandes'], {}, { sourceType: 'script', plugins: [] });
 const wid = charge('api/widget.js', ['awaitingShip', 'PAS_UN_ENVOI', 'besoinBordereauTexte', 'COLIS_DEJA_BOUGE', 'aExpedier'], {});

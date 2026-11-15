@@ -93,6 +93,9 @@ function constante(app, nom) {
   const C = await imp('src/accueilReste/cartonsNumeros.js');
   const F = await imp('src/fusionNuage.js');
   const P = await imp('src/profilVendeur.js');
+  // (15 nov., lot numeros-masquees) La republication dans l'app Vinted (le dernier recours avant un N° neuf) : absente
+  // d'un arbre plus ancien (le bloc d'avant ne l'appelle pas).
+  const RT = require('fs').existsSync(path.join(RACINE, 'src/republieTelephone.js')) ? await imp('src/republieTelephone.js') : null;
 
   // ── Le bloc exécuté ─────────────────────────────────────────────────────────
   const f = APP_BRUT.indexOf('// </numerotation-passage>'), d = f > 0 ? APP_BRUT.lastIndexOf('<numerotation-passage>', f) : -1;
@@ -118,8 +121,11 @@ function constante(app, nom) {
       numeroEcritActif: () => moi, lectureEcriteVinted: lecture, annonceNumerotable: () => true, retenirNumerosNeufs: C.retenirNumerosNeufs,
       load: (k, dflt) => (k in store ? store[k] : dflt), CLE_NUMERO_ECRIT: 'vrm_numero_ecrit', clesLuesEnDouble: C.clesLuesEnDouble,
       nextNum, nextUsed, taken, takenK, byPhoto: {}, reservesNum: { parItem: {} }, horsLigneMaintenant: () => false, prefNum: '',
-      decisionEcrite: E.decisionEcrite, numeroNeufPermis: N.numeroNeufPermis, lectureCompleteDe: N.lectureCompleteDe, marquerNouveau: N.marquerNouveau,
+      decisionEcrite: E.decisionEcrite, numeroNeufPermis: N.numeroNeufPermis, lectureCompleteDe: N.lectureCompleteDe, lectureCompleteAnnonce: N.lectureCompleteAnnonce, marquerNouveau: N.marquerNouveau,
       listings: { items, complets, ko: koUids }, changed: false, ...A,
+      lireObjet: () => ({}), VUS_EN_LIGNE: 'vrm_vus_en_ligne', CYCLE_DECISIONS: 'vrm_cycle_decisions', CLE_PHOTOS_VRM: 'vrm_photos_vrm', CLE_EMPREINTES_FICHES: 'vrm_empreintes_fiches',
+      CLE_REPUB_REPONSES: 'vrm_republie_reponses', CLE_REPUB_ATTENTE: 'vrm_republie_attente', empreintesVinted: {}, venduesVinted: new Set(), annonceDeclareePartie: () => false, pairsLost: {},
+      disparuesDuCompte: RT && RT.disparuesDuCompte, decisionRepublie: RT && RT.decisionRepublie, empreintesDe: RT && RT.empreintesDe,
     };
     vm.createContext(ctx);
     const r = vm.runInContext(`(() => { with (this) { ${corps}\n return nouveauxNum; } }).call(this)`, ctx);
@@ -215,7 +221,7 @@ function constante(app, nom) {
   {
     const sk = (APP.match(/const SYNC_KEYS\s*=\s*\[[\s\S]*?\];/) || [''])[0];
     dit(/'vrm_numero_ecrit'/.test(sk) || /CLE_NUMERO_ECRIT/.test(sk), 'le choix « qui numérote » est synchronisé (SYNC_KEYS)');
-    dit(/if \(nouveauxNum\.length\) direNouveauxNumeros\(nouveauxNum\);/.test(APP) && /function direNouveauxNumeros\([^)]*\)\s*\{[\s\S]{0,900}toast\([\s\S]{0,300}alerteLocale\(/.test(APP), 'les N° neufs sont DITS : bandeau + notification (app en arrière-plan)');
+    dit(/if \(nouveauxNum\.length\) direNouveauxNumeros\(nouveauxNum\);/.test(APP) && /function direNouveauxNumeros\([^)]*\)\s*\{[\s\S]{0,1100}(?:toast|accompagner)\([\s\S]{0,300}alerteLocale\(/.test(APP), 'les N° neufs sont DITS : bandeau + notification (app en arrière-plan)');
     dit(/versExtension\(ext, \{ type: 'numerotes'/.test(APP), '… et envoyés à la carte de l’extension');
     dit(/id: 'numeros-nouveaux'[\s\S]{0,400}avant: ouvrirAEcrire/.test(APP) && /if \(modeNum === 'vrm' && nouveauxAEcrire\.length\)/.test(APP), 'Ma journée : « N nouveaux articles numérotés · N°… » ouvre « à écrire sur tes cartons »');
     dit(/id: 'numeros-a-donner'/.test(APP) && /if \(modeNum === 'moi' && numerosADemander\.length\)/.test(APP), 'Ma journée : « N articles sans numéro · Donne-leur un N° »');

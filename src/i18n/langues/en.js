@@ -6,9 +6,10 @@ import ecran_correspondances from './en/correspondances.js';   // (15 nov.) Publ
 import ecran_capte from './en/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_vcventes from './en/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
 import ecran_renvoyer from './en/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
+import ecran_numeros_nouvelles from './en/numeros-nouvelles.js';
+import ecran_republie_telephone from './en/republie-telephone.js';   // (15 nov.) Republiée dans l'app Vinted   // (15 nov.) Les nouvelles annonces sans N°
 import ecran_retrait_ailleurs from './en/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
 import ecran_finition from './en/finition.js';   // (15 nov.) la finition écran par écran
-import ecran_numeros_nouvelles from './en/numeros-nouvelles.js';   // (15 nov.) Les nouvelles annonces sans N°
 import ecran_idees from './en/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './en/ventes.js';
 import ecran_commun from './en/commun.js';
@@ -2276,6 +2277,7 @@ export default {
   ...ecran_favorisSites,
   ...ecran_correspondances,
   ...ecran_renvoyer,
-  ...ecran_finition,
   ...ecran_numeros_nouvelles,
+  ...ecran_republie_telephone,
+  ...ecran_finition,
 };
