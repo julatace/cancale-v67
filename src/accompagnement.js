@@ -360,6 +360,8 @@ export const GESTES_ACC = {
   // (15 nov., retrait-ailleurs) « À retirer ailleurs » : une annonce vendue ailleurs, retirée site par site.
   'annonce.retirer':  { ecran: 'journee',   sorte: 'retirer-annonces',      ensuite: null },
   'soldes.remettre':  { ecran: 'journee',   ensuite: null },
+  // (15 nov., refonte-journee) « Je l'ai sortie » de Ma journée : le geste du Stock (la case libérée, la pile tassée).
+  'stock.sortir':     { ecran: 'journee',   ensuite: { lien: '?tab=cat_bord' } },
   'vacances':         { ecran: 'settings',  sorte: 'vacances',              ensuite: { lien: '?tab=settings&reglage=vacances' } },
   'urssaf.declarer':  { ecran: 'compta',    ensuite: { lien: '?tab=argent_declarer' } },
   'facture.pro':      { ecran: 'compta',    ensuite: { lien: '?tab=invoices' } },
