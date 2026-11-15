@@ -29471,10 +29471,12 @@ function ChoixPlanches({ cols, rows, planches, setPlanches, plateau = false, fix
   return (<>
       <div style={{ fontSize: 13, color: C.muted, marginBottom: 4 }}><b style={{ color: C.text, fontSize: 15 }}>{cols * rows}</b> cases{rows > 1 ? <> · <b style={{ color: C.text }}>{nPlanches}</b> {nPlanches > 1 ? mots : mot}{nPartielles ? <> (dont {nPartielles} {plateau ? 'partiel' : 'partielle'}{nPartielles > 1 ? 's' : ''})</> : null}</> : null}</div>
       {rows > 1 && <div style={{ fontSize: 12, color: C.muted, marginBottom: 9 }}>Touche entre deux rangées pour poser ou enlever {plateau ? 'le plateau' : 'la planche'}. ⟷ : toute la largeur.</div>}
-      <div data-editeur-planches="" style={{ display: 'grid', gridTemplateColumns: '30px 1fr', columnGap: 6, maxWidth: 300, margin: '0 auto' }}>
+      {/* (15 nov., étagères) 44 px au doigt : le bouton ⟷ et chaque morceau de planche ; un meuble large défile de côté DANS son cadre. */}
+      <div style={{ overflowX: 'auto', overscrollBehaviorX: 'contain', maxWidth: '100%' }}>
+      <div data-editeur-planches="" style={{ display: 'grid', gridTemplateColumns: '44px 1fr', columnGap: 6, width: `max(min(100%, 340px), ${cols * 48 + 50}px)`, maxWidth: cols * 48 + 50 > 340 ? 'none' : 340, margin: '0 auto' }}>
         <span />
         <div style={{ background: C.line, padding: '5px 5px 0', borderRadius: '7px 7px 0 0' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},1fr)`, gap: 4 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},minmax(44px,1fr))`, gap: 4 }}>
             {Array.from({ length: cols }).map((_, c) => <div key={c} style={{ aspectRatio: '1 / 1', background: C.bg, borderRadius: 2 }} />)}
           </div>
         </div>
@@ -29483,17 +29485,17 @@ function ChoixPlanches({ cols, rows, planches, setPlanches, plateau = false, fix
             {r <= fixe ? <span data-plateau-fixe={r} title="Le dessus de la table" style={{ alignSelf: 'center', fontSize: 11, color: C.muted, fontWeight: 700, textAlign: 'center', lineHeight: 1.1 }}>dessus</span> : <button type="button" data-planche-choix={r} aria-pressed={plein} onClick={() => basculer(r)}
               aria-label={plein ? `Enlever la planche sous la rangée ${r}, sur toute la largeur` : `Poser une planche sous la rangée ${r}, sur toute la largeur`}
               title="Toute la largeur"
-              style={{ width: 30, height: 30, alignSelf: 'center', padding: 0, border: `1px solid ${plein ? C.text : C.line}`, background: plein ? C.text : 'transparent', color: plein ? C.bg : C.muted, borderRadius: 6, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>⟷</button>}
+              style={{ width: 44, height: 44, alignSelf: 'center', padding: 0, border: `1px solid ${plein ? C.text : C.line}`, background: plein ? C.text : 'transparent', color: plein ? C.bg : C.muted, borderRadius: 6, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>⟷</button>}
             <div style={{ background: C.line, padding: '0 5px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},1fr)`, gap: 4 }}>
-                {Array.from({ length: cols }).map((_, c) => { const on = cases.has(r + ':' + (c + 1)) || r <= fixe; return r <= fixe ? <span key={c} style={{ height: 30, display: 'flex', alignItems: 'center' }}><span style={{ display: 'block', width: '100%', height: 7, borderRadius: 3, background: C.text }} /></span> : (
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},minmax(44px,1fr))`, gap: 4 }}>
+                {Array.from({ length: cols }).map((_, c) => { const on = cases.has(r + ':' + (c + 1)) || r <= fixe; return r <= fixe ? <span key={c} style={{ height: 44, display: 'flex', alignItems: 'center' }}><span style={{ display: 'block', width: '100%', height: 7, borderRadius: 3, background: C.text }} /></span> : (
                   <button key={c} type="button" data-planche-case-choix={r + ':' + (c + 1)} aria-pressed={on} onClick={() => basculerCase(r, c + 1)}
                     aria-label={on ? `Enlever la planche sous la rangée ${r}, colonne ${c + 1}` : `Poser une planche sous la rangée ${r}, colonne ${c + 1}`}
-                    style={{ height: 30, margin: 0, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                    style={{ height: 44, minWidth: 44, margin: 0, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
                     <span style={{ display: 'block', width: '100%', height: on ? 7 : 2, borderRadius: 3, background: on ? C.text : 'transparent', borderTop: on ? 'none' : `2px dashed ${C.muted}`, opacity: on ? 1 : 0.5 }} />
                   </button>); })}
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},1fr)`, gap: 4 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},minmax(44px,1fr))`, gap: 4 }}>
                 {Array.from({ length: cols }).map((_, c) => <div key={c} style={{ aspectRatio: '1 / 1', background: C.bg, borderRadius: 2 }} />)}
               </div>
             </div>
@@ -29502,6 +29504,7 @@ function ChoixPlanches({ cols, rows, planches, setPlanches, plateau = false, fix
         <div style={{ background: C.line, padding: '4px 5px 5px', borderRadius: '0 0 7px 7px' }}>
           <span aria-hidden="true" style={{ display: 'block', height: 7, borderRadius: 3, background: C.text }} />
         </div>
+      </div>
       </div>
       {rows > 1 && <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 10 }}>
         <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" data-planches-toutes="" onClick={() => setPlanches(Array.from({ length: rows - 1 }, (_, i) => i + 1))}>Une à chaque rangée</button>

@@ -200,7 +200,9 @@ function useStockHorsLigne() {
 function PhotoStockHl({ src, style, initiale }) {
   const [ko, setKo] = React.useState(false);
   const a = adressePhotoHl(src);
-  if (!a || ko) return <span className="vrm-s2d-sansphoto" aria-hidden="true" data-photo-hl="absente">{initiale}</span>;
+  // (15 nov., étagères) Sans photo : une vignette NEUTRE (un carton dessiné), jamais une lettre — une initiale « B »
+  // au milieu d'une case se lisait comme un N° d'archive « B… ».
+  if (!a || ko) return <span className="vrm-s2d-sansphoto" aria-hidden="true" data-photo-hl="absente" data-sans-photo=""><Icon name="box" size={18} /></span>;
   return <img src={a} alt="" decoding="async" style={style} data-photo-hl="gardee" onError={() => setKo(true)} />;
 }
 function StockMeubles({ locate = null, placeNum = null, onPlaced = null, accounts = null, comptesLus = false } = {}) {
@@ -572,7 +574,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     // les mots du meuble (rangée, colonne) — la case qui clignote peut être
     // hors de l'écran sur téléphone. (15 nov.) Dans une pile, la case FINALE (elle a pu tomber), et qui est descendu.
     const fin = r.slots[cle] || { m: mid, i };
-    if (m) toast(tr('stock.rangee', { x: String(f ? f.numero : cle), ici: String(ici(m, fin.i)), x2: String((suite ? ' ' + suite : '') + (r.phrase ? ' ' + r.phrase : '')) }), 'ok');
+    if (m) toast(tr('stock.rangee', { x: String(f ? f.numero : cle), ici: String(ici(m, fin.i)), x2: String(suite ? ' ' + suite : '') }), 'ok');   // (15 nov.) la descente est dite UNE fois : le bandeau du meuble
     return true;
   };
   // Rend la phrase des descentes (vide si rien n'a bougé) : l'appelant l'ajoute à SON message.
@@ -580,8 +582,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   const sortir = (f) => {
     const cle = cleDeclarationPartie(f.numero, f.id, numeros);
     setPairsLost((prev) => { const u = { ...prev, [cle]: { id: String(f.id), at: new Date().toISOString(), title: f.title || '', from: 'stock' } }; save('vinted_pairs_lost', u); return u; });
-    const ph = retirerCase(cleDeFiche(f));
-    toast(tr('stock.sortieStockNumero', { numero: String(f.numero) }) + (ph ? ' ' + ph : ''), 'ok');
+    retirerCase(cleDeFiche(f));
+    toast(tr('stock.sortieStockNumero', { numero: String(f.numero) }), 'ok');
   };
   const cliquerCase = (mid, i) => {
     setChoisie(null);
@@ -609,7 +611,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         ? <PhotoStockHl src={f.photo} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} initiale={String(f.title || '').trim().slice(0, 1).toUpperCase() || '·'} />
         : f.photo
         ? <PhotoVinted src={f.photo} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} onLoad={() => retenirPhoto(f.photo)} />
-        : <span className="vrm-s2d-sansphoto" aria-hidden="true">{String(f.title || '').trim().slice(0, 1).toUpperCase() || '·'}</span>}
+        : <span className="vrm-s2d-sansphoto" aria-hidden="true" data-sans-photo=""><Icon name="box" size={18} /></span>}
       {/* (11 nov., lot accessibilité) Dans une vignette MINI (44–48 px), « N°12 » était coupé (« N°1… ») :
           la pastille y est resserrée (styles-stock-2d.css) et porte le N° entier en `title` ; la ligne
           l'écrit aussi en clair, d'où `aria-hidden` (lu une fois). */}
@@ -645,27 +647,32 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     const gap = zoom === 'loin' ? 4 : 6;
     // (15 nov., étagères) La forme, la couleur du meuble, ses colonnes en pile ; la dernière descente, DITE ici.
     const typeM = typeDe(m); const coulM = COULEURS.includes(m.couleur) ? m.couleur : undefined;
+    const cMax = typeM === 'pile' ? Math.min(caseMax, 56) : caseMax;   // une pile : des cartons, pas des cases géantes
     const piles = colonnesEnPile(m);
     const desc = descente && descente.m === String(m.id) ? descente : null;
     return (
       <section key={m.id} data-meuble={m.id} data-meuble-type={typeM} data-couleur={coulM} data-meuble-ici={cherche ? nIci : undefined} className="vrm-s2d-meuble vrm-etag" data-replie={replie ? '1' : undefined}>
         <div className="vrm-s2d-tete">
-          {coulM ? <i className="vrm-etag-pastille" data-couleur={coulM} aria-hidden="true" /> : null}
-          <span className="vrm-s2d-nom">{m.name}</span>
-          <span className="vrm-s2d-compte" data-meuble-plein={filled}>{filled}/{T} · {m.cols}×{m.rows}{piles.size ? (piles.size === m.cols ? tr('stock.empile') : tr('etag.colonnesPile', { n: piles.size })) : ''}</span>
+          {/* (15 nov.) Le titre (nom, puis « 3/5 · 1×5 · empilé ») et les gestes : la tête ne fixe pas la largeur du
+              meuble (une pile reste étroite) — elle passe sur deux lignes quand le meuble est étroit. */}
+          <span className="vrm-etag-titre-m">
+            <span className="vrm-etag-nom-l">{coulM ? <i className="vrm-etag-pastille" data-couleur={coulM} aria-hidden="true" /> : null}<span className="vrm-s2d-nom">{m.name}</span></span>
+            <span className="vrm-s2d-compte" data-meuble-plein={filled}>{filled}/{T} · {m.cols}×{m.rows}{piles.size ? (piles.size === m.cols ? tr('stock.empile') : tr('etag.colonnesPile', { n: piles.size })) : ''}</span>
+          </span>
           {nVenduesIci > 0 && !cherche && <span className="vrm-s2d-pastille" data-meuble-vendues={nVenduesIci}>{trj('stock.sortir', { nVenduesIci: nVenduesIci })}</span>}
           {cherche && <span className="vrm-s2d-pastille" data-vide={nIci ? undefined : '1'}>{nIci ? tr('stock.ici', { nIci: String(nIci) }) : tr('stock.rienIci')}</span>}
-          <span style={{ flex: 1 }} />
+          <span className="vrm-etag-actions">
           {meublesVus.length > 1 && <>
             <button className="sb-rond vrm-etag-rond" type="button" data-meuble-monter={m.id} disabled={rang === 0} onClick={() => deplacer(m.id, -1)} aria-label={tr('etag.monter', { nom: String(m.name) })}><Icon name="chevron" size={16} style={{ transform: 'rotate(-90deg)' }} /></button>
             <button className="sb-rond vrm-etag-rond" type="button" data-meuble-descendre={m.id} disabled={rang === meublesVus.length - 1} onClick={() => deplacer(m.id, 1)} aria-label={tr('etag.descendre', { nom: String(m.name) })}><Icon name="chevron" size={16} style={{ transform: 'rotate(90deg)' }} /></button>
           </>}
           <button className="sb-rond vrm-etag-rond" type="button" data-meuble-modifier={m.id} onClick={() => setModal({ type: 'meuble', id: m.id, name: m.name, cols: m.cols, rows: m.rows, planches: planchesDe(m), gravite: !!m.gravite, typeM: typeDe(m), couleur: coulM || null, couleurs: couleursDans(m.couleurs, m.cols, m.rows), piles: [...colonnesEnPile({ ...m, gravite: false, type: undefined })] })} aria-label={tr('stock.modifierMeuble')}><Icon name="pencil" size={15} /></button>
+          </span>
         </div>
         {desc && !replie ? <div className="vrm-etag-descente" data-descente={desc.cles.join(',')} role="status" aria-live="polite"><span>{desc.texte}</span><button className="sb-lien" type="button" onClick={() => setDescente(null)}>{tr('etag.compris')}</button></div> : null}
         {!replie && (
         <div className="vrm-s2d-defile">
-        <div className="vrm-s2d-etagere" data-meuble-grille="" data-zoom={zoom} data-glisse={glisse ? '1' : undefined} style={{ gridTemplateColumns: `16px repeat(${m.cols},minmax(44px,1fr))`, gap, maxWidth: `max(min(100%, ${m.cols * (caseMax + gap) + 34}px), ${m.cols * (44 + gap) + 34}px)` }}>
+        <div className="vrm-s2d-etagere" data-meuble-grille="" data-zoom={zoom} data-glisse={glisse ? '1' : undefined} style={{ gridTemplateColumns: `16px repeat(${m.cols},minmax(44px,${cMax}px))`, gap, maxWidth: `max(min(100%, ${m.cols * (cMax + gap) + 34}px), ${m.cols * (44 + gap) + 34}px)` }}>
           {/* Règle : colonnes numérotées au-dessus, rangées à gauche (comme sur le meuble). Une colonne en pile le dit. */}
           <span />
           {Array.from({ length: m.cols }).map((_, c) => <span key={'c' + c} data-regle-col={c + 1} data-pile={piles.has(c + 1) && piles.size < m.cols ? '' : undefined} className="vrm-s2d-regle" title={piles.has(c + 1) ? tr('etag.colonneEnPile') : undefined}>{c + 1}{piles.has(c + 1) && piles.size < m.cols ? <i className="vrm-etag-pile" aria-hidden="true">↓</i> : null}</span>)}
@@ -744,7 +751,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           const oc = Math.max(1, +ancien.cols || cols), us = { ...slots }; const dehors = [];
           Object.keys(us).forEach((c) => { const v = us[c]; if (!v || v.m !== modal.id) return; const r = Math.floor(v.i / oc), co = v.i % oc; if (r >= rows || co >= cols) { delete us[c]; dehors.push(c); } else us[c] = { ...v, m: modal.id, i: r * cols + co }; });
           if (dehors.length && !(await askConfirm({ title: tr('etag.retrecir', { n: dehors.length }), desc: tr('etag.retrecirDesc', { liste: listeNumeros(dehors.sort(triNum)) }), ok: tr('etag.retrecirOk') }))) return;
-          ecrireMeubles(u); const rs = ecrireSlots(us, u, [modal.id]); if (rs.phrase) toast(rs.phrase, 'ok');
+          ecrireMeubles(u); ecrireSlots(us, u, [modal.id]);
         } else {
           const ordre = meubles.reduce((mx, x) => Math.max(mx, Number.isFinite(Number(x && x.ordre)) && x.ordre !== null ? Number(x.ordre) : -1), meubles.length - 1) + 1;
           ecrireMeubles([...meubles, { id: 'm' + Date.now().toString(36), name: nom, cols, rows, planches, gravite, ...plus, ordre }]);
@@ -793,7 +800,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           {/* (1er nov.) Une paire PAS rangée : « Déplacer » et « Retirer de la case »
               ne voulaient rien dire. Le geste est de la ranger. */}
           <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-ranger={m ? 'deplacer' : 'ranger'} onClick={() => { setPlace(modal.cle); fermerModal(); }} style={btnSec}>{m ? tr('stock.deplacer') : tr('stock.rangerDansCase')}</button>
-          {m && <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-retirer="" onClick={() => { const n = f.numero; const ph = retirerCase(modal.cle); fermerModal(); toast(tr('stock.retireeRepasseDans', { x: String(n), name: String(m.name) }) + (ph ? ' ' + ph : '')); }} style={btnSec}>{tr('stock.retirerCase')}</button>}
+          {m && <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-retirer="" onClick={() => { const n = f.numero; retirerCase(modal.cle); fermerModal(); toast(tr('stock.retireeRepasseDans', { x: String(n), name: String(m.name) })); }} style={btnSec}>{tr('stock.retirerCase')}</button>}
         </div>
         {sold && <button className="vrm-b vrm-b-primaire" type="button" onClick={() => { sortir(f); fermerModal(); }} style={{ ...btnPri, width: '100%', marginTop: 9 }}>{tr('stock.jeAiSorti')}</button>}
         {hors && <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-encore-la="" onClick={() => { encoreLa(f); fermerModal(); }} style={{ width: '100%', marginTop: 9 }}>{tr('stock.encore')}</button>}
@@ -821,8 +828,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     toast(tr('stock.resteDansCase', { numero: String(f.numero) }), 'ok');
   };
   const sortirDeLaCase = (f) => {
-    const k = cleDeFiche(f); const ou = ouEst(f); const ph = retirerCase(k);
-    toast(`N°${f.numero} retirée${ou ? ' de ' + ou.meuble.name : ''} : la case est libre, le numéro reste pris (jamais redonné).` + (ph ? ' ' + ph : ''), 'ok');
+    const k = cleDeFiche(f); const ou = ouEst(f); retirerCase(k);
+    toast(`N°${f.numero} retirée${ou ? ' de ' + ou.meuble.name : ''} : la case est libre, le numéro reste pris (jamais redonné).`, 'ok');
   };
 
   // ── (5 nov.) LES CHIFFRES EN TÊTE : les annonces actuelles ─────────────────
@@ -944,7 +951,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         const u = { ...slots }; for (const f of ok) delete u[cleDeFiche(f)];
         const vendues = ok.filter((f) => rangeeEtat(f) === 'vendue');
         if (vendues.length) setPairsLost((prev) => { const n = { ...prev }; const at = new Date().toISOString(); for (const f of vendues) n[cleDeclarationPartie(f.numero, f.id, numeros)] = { id: String(f.id), at, title: f.title || '', from: 'stock' }; save('vinted_pairs_lost', n); return n; });
-        const rs = ecrireSlots(u); if (rs.phrase) toast(rs.phrase, 'ok');
+        ecrireSlots(u);
         return resumeSerie({ faits: ok, pasFaits }, { un: 'enlevée du stock', plusieurs: 'enlevées du stock' });
       } },
       { k: 'exporter', libelle: tr('reglages.donnees.exporter'), icone: 'doc', faire: (cles) => {
@@ -1347,15 +1354,19 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       {meubles.length > 0 && <div data-meubles-zoom={zoom}><Segmente label={tr('stock.tailleCases')} value={zoom} onChange={setZoom} options={[{ v: 'loin', l: 'De loin', data: { 'data-zoom-choix': 'loin' } }, { v: 'normal', l: 'Normale', data: { 'data-zoom-choix': 'normal' } }, { v: 'pres', l: 'De près', data: { 'data-zoom-choix': 'pres' } }]} /></div>}
     </div>
 
-    {/* De loin, les meubles se rangent côte à côte : toute la pièce d'un coup d'œil. */}
-    <div data-meubles-liste="" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', columnGap: zoom === 'pres' ? 0 : 28 }}>
-      {meublesVus.map((m, k) => <div key={m.id} style={{ flex: zoom === 'pres' ? '1 1 100%' : '0 1 auto', minWidth: 0, maxWidth: '100%' }}>{cadreMeuble(m, k)}</div>)}
+    {/* De loin, les meubles se rangent côte à côte : toute la pièce d'un coup d'œil. (15 nov., étagères) LA PIÈCE : un
+        plan où les meubles sont POSÉS au sol (alignés par le bas), côte à côte dès que la largeur le permet ; un meuble
+        étroit (une pile) prend la largeur de ses cartons, pas celle de l'écran. « De près » : un meuble par ligne. */}
+    <div data-meubles-liste="" className="vrm-etag-piece" data-zoom={zoom}>
+      {meublesVus.map((m, k) => <div key={m.id} className="vrm-etag-place" style={{ flex: zoom === 'pres' ? '1 1 100%' : '0 1 auto' }}>{cadreMeuble(m, k)}</div>)}
     </div>
-    {/* (30 oct.) Pièce vide : créer un meuble est LE geste de l'écran (primaire) ; ensuite il redevient secondaire. */}
-    <button className={`vrm-b ${meubles.length ? 'vrm-b-secondaire' : 'vrm-b-primaire'}`} type="button" data-creer-meuble="" onClick={() => setModal({ type: 'meuble' })} style={{ alignSelf: meubles.length ? 'stretch' : 'flex-start' }}>{tr('stock.ajouterMeuble')}</button>
-    {meubles.length > 0 && (explication
-      ? <StockExplication sneakers={motsStock.nom === 'paire'} onFermer={() => setExplication(false)} />
-      : <button className="vrm-b vrm-b-discret" type="button" data-stock-explication-ouvrir="" onClick={() => setExplication(true)} style={{ alignSelf: 'center' }}>{tr('stock.commentCaMarche')}</button>)}
+    {/* (30 oct.) Pièce vide : créer un meuble est LE geste de l'écran (primaire) ; ensuite il redevient une touche.
+        (15 nov.) UNE ligne : « + Ajouter un meuble » (l'action) et « Comment ça marche ? » (un lien discret). */}
+    <div className="vrm-etag-pied" data-meubles-pied="">
+      <button className={meubles.length ? 'sb-touche' : 'vrm-b vrm-b-primaire'} type="button" data-creer-meuble="" onClick={() => setModal({ type: 'meuble' })}>{tr('stock.ajouterMeuble')}</button>
+      {meubles.length > 0 && !explication && <button className="sb-lien" type="button" data-stock-explication-ouvrir="" onClick={() => setExplication(true)}>{tr('stock.commentCaMarche')}</button>}
+    </div>
+    {meubles.length > 0 && explication && <StockExplication sneakers={motsStock.nom === 'paire'} onFermer={() => setExplication(false)} />}
 
     </section>
 

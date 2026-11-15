@@ -661,26 +661,45 @@
 
 
 /* ── 16. Les barres COLLÉES en haut (recherche d'Annonces et du Stock) ─────────
-   Au repos elles sont posées sur le fond, sans rien autour ; dès que la liste défile dessous, un voile de
-   l'aplat les détache (défilement piloté, sans script). Sans cette possibilité : le voile, toujours. */
+   (15 nov., Julien, capture iPhone : « la recherche collée est transparente, les cartes passent dessous ») Le
+   voile était une animation pilotée par le défilement posée sur le FOND de la barre, mais la même règle posait
+   `background: transparent !important` — une déclaration !important passe devant une animation : sur un
+   navigateur qui sait piloter l'animation (Safari 26, Chrome), la barre restait transparente pour toujours.
+   La barre porte désormais son voile TOUJOURS : l'aplat du fond à 96 % (opaque assez pour lire ; au repos il a
+   la couleur du fond, seule l'ombre se voit), une ombre de séparation, et elle passe au-dessus de la liste
+   (z-index 30 ; la barre de titre est hors de `.vrm-main`, jamais couverte). Aucun flou : un `backdrop-filter`
+   ferait de la barre le cadre des éléments `fixed` qu'elle contient (le voile du menu « ⋯ Outils »).
+   ⚠️ Pas d'animation pilotée par le défilement sur un pseudo-élément de cette barre : essayée le 15 nov., elle
+   fait TOMBER l'onglet de Chromium (« Target crashed », scripts/bancs/annonces-achats.cjs).
+   La recherche d'Annonces n'est collée qu'au téléphone (styles-listes.css) : son voile aussi. */
 :root:root:root:root:root body :is([data-espace="paires"] .vrm-ann-workbar, .vrm-main[data-ecran="garage"] .vrm-ms-stock > div[style*="sticky"]) {
-  background: color-mix(in srgb, var(--sbp-aplat) 94%, transparent) !important; background-image: none !important;
-  -webkit-backdrop-filter: none !important; backdrop-filter: none !important; border: 0 !important;
+  background: transparent !important; background-image: none !important;
+  -webkit-backdrop-filter: none !important; backdrop-filter: none !important; border: 0 !important; box-shadow: none !important;
 }
-@supports (animation-timeline: scroll()) {
-  :root:root:root:root:root body :is([data-espace="paires"] .vrm-ann-workbar, .vrm-main[data-ecran="garage"] .vrm-ms-stock > div[style*="sticky"]) {
-    background: transparent !important; box-shadow: none !important;
-    animation: sbp-colle linear both !important; animation-timeline: --sbp-defile !important; animation-range: 0 140px !important;
+:root:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-stock > div[style*="sticky"] {
+  z-index: 30 !important;
+  background: color-mix(in srgb, var(--sbp-aplat) 96%, transparent) !important;
+  box-shadow: 0 .5px 0 rgb(var(--sbp-o) / .10), 0 10px 18px -12px rgb(var(--sbp-o) / .40) !important;
+}
+@media (max-width: 767px) {
+  :root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar {
+    z-index: 30 !important;
+    background: color-mix(in srgb, var(--sbp-aplat) 96%, transparent) !important;
+    box-shadow: 0 .5px 0 rgb(var(--sbp-o) / .10), 0 10px 18px -12px rgb(var(--sbp-o) / .40) !important;
   }
 }
-/* La frise du défilement : celle de la zone qui défile (`.vrm-main`), nommée (la plus proche « zone qui déborde »
-   peut être un conteneur qui ne défile jamais). */
-:root:root:root:root:root body .vrm-main:is([data-ecran="annonces"], [data-ecran="garage"]) { scroll-timeline: --sbp-defile block; }
-:root:root:root:root:root body :is([data-espace="paires"] .vrm-ann-workbar, .vrm-main[data-ecran="garage"] .vrm-ms-stock > div[style*="sticky"]) { z-index: 6 !important; }
-@keyframes sbp-colle {
-  0%, 60% { background-color: transparent; box-shadow: 0 0 0 transparent; }
-  100% { background-color: color-mix(in srgb, var(--sbp-aplat) 94%, transparent); box-shadow: 0 10px 18px -14px rgb(var(--sbp-o) / .35); }
+:root[data-theme="dark"]:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-stock > div[style*="sticky"] {
+  box-shadow: 0 .5px 0 rgb(255 255 255 / .06), 0 10px 18px -10px rgb(0 0 0 / .85) !important;
 }
+@media (max-width: 767px) {
+  :root[data-theme="dark"]:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar {
+    box-shadow: 0 .5px 0 rgb(255 255 255 / .06), 0 10px 18px -10px rgb(0 0 0 / .85) !important;
+  }
+}
+/* Les en-têtes de compte de la liste (« boutique_nord · 12 annonces ») : posés dans le plan de verre, ils ne
+   collent plus (styles-listes.css les collait sous une barre de 112 px qui n'existe plus : transparents, ils
+   passaient sur les rangées et sous la recherche). */
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-grid.sb-liste > .vrm-ann-compte-tete { position: static !important; }
 :root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-stock > div[style*="sticky"] { border-radius: 0 !important; }
 /* Au téléphone, les puces d'état défilent sur leur ligne ; le compte reste visible au bout. */
 @media (max-width: 767px) {

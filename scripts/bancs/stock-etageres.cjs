@@ -31,8 +31,10 @@ const N = 1000;
 const fiches = {}, enLigne = [];
 for (let k = 1; k <= N; k++) {
   const id = String(900000 + k);
-  fiches[id] = { numero: String(k), title: `Basket inventée ${k} taille ${36 + (k % 10)}`, accountId: '111' };
-  enLigne.push({ id, title: fiches[id].title, is_closed: false, is_hidden: false, is_draft: false, price: { amount: String(30 + (k % 50)) + '.0' } });
+  // Une PHOTO par paire (inventée, servie par le banc : une basket dessinée, couleur selon le N°) — la case montre la photo.
+  const photo = `http://localhost:${PORT}/banc-photo/${k}.svg`;
+  fiches[id] = { numero: String(k), title: `Basket inventée ${k} taille ${36 + (k % 10)}`, accountId: '111', photo };
+  enLigne.push({ id, title: fiches[id].title, is_closed: false, is_hidden: false, is_draft: false, price: { amount: String(30 + (k % 50)) + '.0' }, photo: { url: photo }, photos: [{ url: photo }] });
 }
 // N°9999 : la fiche d'un compte MASQUÉ (222) — sa paire n'est pas montrée dans le Stock, son carton est dans la pile d'hier.
 fiches['8009999'] = { numero: '9999', title: 'Basket d’un compte masqué', accountId: '222' };
@@ -50,7 +52,13 @@ const MAIN = {
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d !== undefined && !c ? ' — ' + String(typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 400) : '')); };
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2' };
+// La basket dessinée (aucune vraie photo : le dépôt est public).
+const TEINTES = ['#E8EEF5', '#F3E7DA', '#E3EFE6', '#EEE6F0', '#F6EED8', '#E6ECEF'];
+const COULS = ['#2E5E9E', '#B4532A', '#3E7D55', '#5B5F66', '#C08A1E', '#1F2A36'];
+const basket = (k) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><rect width="120" height="120" fill="${TEINTES[k % 6]}"/><path d="M14 78c0-6 4-10 10-11l22-4 14-16c3-3 8-4 12-1l10 8c4 3 9 5 14 5h4c6 0 10 5 10 11v8H14z" fill="${COULS[k % 6]}"/><rect x="12" y="86" width="98" height="9" rx="4" fill="#FFFFFF" stroke="#C9D2DC"/><path d="M52 62l6-7M60 64l6-7M68 66l6-7" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/></svg>`;
 const srv = http.createServer((q, r) => {
+  const bp = /^\/banc-photo\/(\d+)\.svg/.exec(q.url);
+  if (bp) { r.writeHead(200, { 'content-type': 'image/svg+xml', 'cache-control': 'max-age=3600' }); return r.end(basket(Number(bp[1]))); }
   let f = q.url.split('?')[0]; if (f === '/' || !path.extname(f)) f = '/index.html';
   const p = path.join(DIST, f);
   if (!fs.existsSync(p)) { r.writeHead(404); return r.end(); }
@@ -148,6 +156,18 @@ async function retirerCase(pg, n) {
         await retirerCase(pg, '62');
         const hier = [await ou(pg, '61'), await pg.evaluate(() => { const c = document.querySelector('[data-case-notee="9999"]'); return c ? c.getAttribute('data-case-ici') : null; })];
         dit(hier[0] === 'mQ:2' && hier[1] === 'mQ:3', `${t} · F : N°61 reste posé sur le carton N°9999 (pas montré) : personne ne passe au travers`, hier);
+        // ── V : le visuel (revue du 15 nov.) ──
+        await pg.evaluate(() => { const m = document.querySelector('[data-meuble="mA"]'); if (m) m.scrollIntoView({ block: 'center' }); });
+        await pg.waitForTimeout(1500);
+        const barre = await pg.evaluate(() => { const b = document.querySelector('[data-stock-recherche]'); if (!b) return null; const cs = getComputedStyle(b); const c = cs.backgroundColor; const m = /rgba?\(([^)]+)\)/.exec(c) || /color\(srgb ([^)]+)\)/.exec(c); let a = 1; if (m) { const p = m[1].split(/[\s,\/]+/).filter(Boolean); if (p.length >= 4) a = Number(p[3]); } if (/transparent/.test(c)) a = 0; const q = b.getBoundingClientRect(); const e = document.elementFromPoint(q.left + q.width - 70, q.top + q.height / 2); return { a, z: cs.zIndex, dessus: !!(e && b.contains(e)), pos: cs.position }; });
+        dit(!!barre && barre.a >= 0.9 && barre.dessus, `${t} · V1 : la recherche collée est opaque et passe AU-DESSUS des cases`, barre);
+        const vig = await pg.evaluate(() => { const cs = [...document.querySelectorAll('[data-meuble="mA"] .vrm-s2d-case[data-case-num]')].filter((c) => { const q = c.getBoundingClientRect(); return q.top >= 0 && q.bottom <= innerHeight; }); const im = cs.filter((c) => { const i = c.querySelector('img'); return i && i.complete && i.naturalWidth > 0; }).length; const lettres = cs.filter((c) => { const t = [...c.childNodes].filter((n) => !(n.classList && n.classList.contains('vrm-s2d-num'))).map((n) => n.textContent || '').join('').trim(); return t.length > 0; }).length; const pl = cs[0] && cs[0].querySelector('.vrm-s2d-num'); return { n: cs.length, im, lettres, plaque: pl ? parseFloat(getComputedStyle(pl).fontSize) : 0 }; });
+        dit(vig.n > 0 && vig.im === vig.n && vig.lettres === 0 && vig.plaque >= 11, `${t} · V2 : chaque case montre la PHOTO de sa paire, aucune lettre, le N° en plaque (≥ 11 px)`, vig);
+        const pied = await pg.evaluate(() => { const a = document.querySelector('[data-creer-meuble]'), b = document.querySelector('[data-stock-explication-ouvrir]'); if (!a || !b) return null; const p = a.getBoundingClientRect(), q = b.getBoundingClientRect(); const recouvre = !(p.right <= q.left || q.right <= p.left || p.bottom <= q.top || q.bottom <= p.top); return { recouvre, ligne: Math.abs((p.top + p.bottom) / 2 - (q.top + q.bottom) / 2) < 4, h: [Math.round(p.height), Math.round(q.height)] }; });
+        dit(!!pied && !pied.recouvre && pied.ligne && pied.h[0] >= (tel ? 44 : 40), `${t} · V3 : « Ajouter un meuble » et « Comment ça marche ? » sur une ligne, sans se chevaucher`, pied);
+        const pq = await pg.evaluate(() => { const s = document.querySelector('[data-meuble="mQ"]'); if (!s) return null; const c = s.querySelector('.vrm-s2d-case').getBoundingClientRect(); return { w: Math.round(s.getBoundingClientRect().width), ch: Math.round(c.height), cw: Math.round(c.width) }; });
+        dit(!!pq && pq.w <= 200 && pq.ch <= 56 && pq.cw <= 64, `${t} · V4 : une pile est compacte (meuble ≤ 200 px, cartons ≤ 64 × 56)`, pq);
+        if (CAPT) await pg.screenshot({ path: path.join(CAPT, `etag-${v}-1b-piece.png`) });
         // ── C : une étagère 4×3, « sauge », rangée 1 « ciel » ──
         await toucher(pg, '[data-creer-meuble]');
         await pg.waitForSelector('[data-editeur-meuble]', { timeout: 8000 });
@@ -160,10 +180,9 @@ async function retirerCase(pg, n) {
         await toucher(pg, '[data-pinceau="ciel"]');
         await toucher(pg, '[data-peindre-rang="1"]');
         if (CAPT) { await pg.evaluate(() => document.querySelector('[data-editeur-peindre]').scrollIntoView({ block: 'center' })); await pg.screenshot({ path: path.join(CAPT, `etag-${v}-3-editeur.png`) }); }
-        // 44 px au doigt (390 tactile) ; à la souris, la touche du studio fait 40 (son contrat, studio.css). Le choix des
-        // planches (ChoixPlanches, App.jsx, inchangé) dessine des boutons de 30 px à la souris : hors de ce lot, dit dans le récit.
+        // 44 px au doigt (390 tactile) ; à la souris, la touche du studio fait 40 (son contrat, studio.css) — planches comprises.
         const mini = tel ? 43.5 : 39.5;
-        const petits = await pg.evaluate((mini) => [...document.querySelectorAll('[data-editeur-meuble] button')].filter((x) => x.offsetParent && (mini > 40 || !x.closest('[data-editeur-planches]'))).map((x) => [x.getAttribute('aria-label') || x.textContent.trim().slice(0, 12), Math.round(x.getBoundingClientRect().width), Math.round(x.getBoundingClientRect().height)]).filter((q) => q[1] < mini || q[2] < mini), mini);
+        const petits = await pg.evaluate((mini) => [...document.querySelectorAll('[data-editeur-meuble] button')].filter((x) => x.offsetParent).map((x) => [x.getAttribute('aria-label') || x.textContent.trim().slice(0, 12), Math.round(x.getBoundingClientRect().width), Math.round(x.getBoundingClientRect().height)]).filter((q) => q[1] < mini || q[2] < mini), mini);
         dit(petits.length === 0, `${t} · H : chaque bouton de l'éditeur fait ${tel ? '44 px au doigt' : '40 px (touche du studio, souris)'} au moins`, petits);
         await toucher(pg, '[data-meuble-enregistrer]');
         await pg.waitForTimeout(900);
@@ -198,6 +217,12 @@ async function retirerCase(pg, n) {
         dit(ok && apres[0] === null && apres[1] === `${P}:4` && apres[2] === `${P}:3`, `${t} · E : celle du bas sort ⇒ les deux du dessus descendent d'un cran`, apres);
         const desc = await pg.evaluate((P) => { const d = document.querySelector(`[data-meuble="${P}"] [data-descente]`); return d ? { cles: d.getAttribute('data-descente'), texte: d.textContent } : null; }, P);
         dit(!!desc && desc.cles === `${aRanger[1]},${aRanger[2]}` && desc.texte.includes('N°' + aRanger[1]) && desc.texte.includes('N°' + aRanger[2]), `${t} · E : c'est DIT sur la pile (« N°… et N°… sont descendus d'un cran »)`, desc);
+        await pg.waitForTimeout(2500);
+        const fois = await pg.evaluate(() => [...document.querySelectorAll('body *')].filter((e) => e.children.length === 0 && /descendus? d/.test(e.textContent || '') && !e.closest('[data-descente]')).length);
+        const reste = await pg.evaluate(() => !!document.querySelector('[data-descente]'));
+        dit(fois === 0 && reste, `${t} · V5 : la descente est dite UNE fois (le bandeau du meuble, qui reste jusqu'à « Compris »), aucun message par-dessus`, { fois, reste });
+        const cote = await pg.evaluate(() => { const ss = [...document.querySelectorAll('[data-meuble]')]; const e = ss.find((x) => x.querySelector('.vrm-s2d-nom') && x.querySelector('.vrm-s2d-nom').textContent === 'Étagère test'); const p = ss.find((x) => x.querySelector('.vrm-s2d-nom') && x.querySelector('.vrm-s2d-nom').textContent === 'Pile test'); if (!e || !p) return null; const a = e.getBoundingClientRect(), b = p.getBoundingClientRect(); return { memeLigne: Math.abs(a.bottom - b.bottom) < 3 && b.left > a.right - 1, ew: Math.round(a.width), pw: Math.round(b.width) }; });
+        dit(!!cote && (tel ? cote.pw <= 200 : cote.memeLigne), `${t} · V4 : ${tel ? 'la pile garde la largeur de ses cartons' : 'l’étagère et la pile côte à côte, posées au même sol'}`, cote);
         const fichesApres = await pg.evaluate(() => { try { const f = JSON.parse(localStorage.getItem('vinted_annonce_numeros')); return Object.values(f).filter((x) => x && x.numero).length; } catch (_) { return -1; } });
         dit(fichesApres === N + 1, `${t} · E : aucun N° touché (1 001 fiches, mêmes numéros)`, fichesApres);
         if (CAPT) { await pg.evaluate((P) => document.querySelector(`[data-meuble="${P}"]`).scrollIntoView({ block: 'center' }), P); await pg.screenshot({ path: path.join(CAPT, `etag-${v}-5-descente.png`) }); }
