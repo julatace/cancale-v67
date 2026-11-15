@@ -651,6 +651,20 @@ html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > button.vrm-led
 .vrm-fu-vente-l3 { margin-top: 3px; font: 600 12px/1.3 var(--vrm-police); color: #6e6e73; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-fu-vente-l3[data-ton="action"] { color: #B25000; }
 :root[data-theme="dark"] .vrm-fu-vente-l3[data-ton="action"] { color: #ffb340; }
+/* (15 nov., ventes Vestiaire) Le titre sur DEUX lignes (coupé aux espaces, jamais au milieu d'un mot) ;
+   à droite le prix de vente, puis « pour toi … » et le bénéfice s'il est su, en petit. La réf. produit sur la
+   2e ligne se coupe en fin si la place manque. */
+.vrm-fu-vente-txt[data-fu-deux-lignes] .vrm-fu-vente-l1 { align-items: flex-start; }
+.vrm-fu-vente-txt[data-fu-deux-lignes] .vrm-fu-vente-nom { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: normal; word-break: normal; hyphens: manual; }
+.vrm-fu-vente-prixbloc { display: flex; flex-direction: column; align-items: flex-end; flex: none; text-align: right; }
+.vrm-fu-vente-recu, .vrm-fu-vente-benefsu { font: 500 12px/1.35 var(--vrm-police); color: #6e6e73; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.vrm-fu-vente-benefsu { font-weight: 600; }
+:root[data-theme="dark"] :is(.vrm-fu-vente-recu, .vrm-fu-vente-benefsu) { color: #98989d; }
+/* La ligne d'état d'une vente Vestiaire reste écrite sous la frise (« Expédiée · en livraison », « Paiement le
+   23 nov. », « État Vestiaire non reconnu ») : la frise ne dit que l'étape cochée. « Vendue » seule, la frise le dit. */
+:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme][data-plateforme-vente="vestiaire"]:not([data-vc-vente-etape="vendue"]) .vrm-fu-vente-l3 { display: block !important; }
+.vrm-fu-vente-l2 .vrm-fu-vente-ref { font: 400 12px/1.3 var(--vrm-police); color: #6e6e73; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; font-variant-numeric: tabular-nums; }
+:root[data-theme="dark"] .vrm-fu-vente-l2 .vrm-fu-vente-ref { color: #98989d; }
 html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] { gap: 12px !important; }
 /* Les gestes de la ligne (prix d'achat, relier, déposé) : une rangée compacte. */
 html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > .vrm-ledger-gestes :is(button, .vrm-b) { min-height: 36px !important; padding: 0 12px !important; font: 600 13px/1 var(--vrm-police) !important; border-radius: 12px !important; }
