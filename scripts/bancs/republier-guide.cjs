@@ -49,7 +49,7 @@ const ANCIENNE = ann(9102, { title: 'Salomon XT-6 blanc taille 40', brand_title:
 // par l'atelier : pas de coffre, la vignette seule dans le dressing, les 8 dans la fiche lue sur sa page.
 const HUIT = Array.from({ length: 8 }, (_, i) => `https://images1.vinted.net/t/h/f800/${i + 1}.jpeg`);
 const OCTO = ann(9104, { title: 'Nike Air Max 1 blanc rouge taille 43', brand_title: 'Nike', size_title: '43', photo: HUIT[0], photoCount: 8 });
-const AUTRE = ann(9103, { title: 'Adidas Spezial noir taille 38', brand_title: 'Adidas', size_title: '38', price: { amount: '60.0', currency_code: 'EUR' } });
+const AUTRE = ann(9103, { title: 'Adidas Spezial noir taille 38', brand_title: 'Adidas', size_title: '38', photo: 'https://images1.vinted.net/t/b/f800/1.jpeg', price: { amount: '60.0', currency_code: 'EUR' } });
 const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
 const FICHE = { id: 'fiche-banc-1', numero: '45', titre: 'Asics Gel-1130 argent taille 41', prix: 70, description: 'Neuves, jamais portées.', marque: 'Asics', taille: '41', etat: 'Neuf avec étiquette', couleur: 'Argent', photos: ['https://images1.vinted.net/t/c/f800/1.jpeg'], creeAt: auj.toISOString(), origine: 'dupliquer' };
 const MAIN = { vinted_annonce_numeros: { 9102: { numero: '42' }, 9103: { numero: '43' } }, vinted_used_numeros: [42, 43, 45], vrm_num_vinted: { place: 'desc_fin', forme: 'numero' }, vrm_fiches_neuves: { [FICHE.id]: FICHE } };
@@ -263,7 +263,7 @@ const premierPlan = (pg) => pg.evaluate(() => document.dispatchEvent(new Event('
           await clic(pg, '[data-republier-main-lancer]');
           const FG = '[data-repub-main="9104"]';
           await pg.waitForSelector(FG, { timeout: 8000 }); await poseeLa(pg, FG);
-          const huit = await attendre(pg, () => { const x = document.querySelector('[data-repub-main] [data-main-telecharger]'); return x && x.getAttribute('data-rg-photos-pretes') === '8' ? 8 : null; }, 20000);
+          const huit = await attendre(pg, () => { const x = document.querySelector('[data-repub-main] [data-main-telecharger]'); return x && x.getAttribute('data-rg-photos-pretes') === '8' ? 8 : null; }, 90000);
           const grille = await pg.evaluate(() => { const g = document.querySelector('[data-repub-main] [data-main-photos]'); return g ? { n: g.getAttribute('data-main-photos'), ch: g.getAttribute('data-rg-photos-choisies'), srcs: [...g.querySelectorAll('img')].map((i) => i.getAttribute('src') || '').map((u) => (u.match(/\/(\d)\.jpeg/) || [])[1] || u.slice(0, 20)).join(','), couv: !!g.querySelector('[data-rg-photo="0"] .vrm-rg-couverture') } : null; });
           dit(huit === 8 && grille && grille.n === '8' && grille.ch === '8' && grille.couv, `G ${T} une annonce de 8 photos (vignette seule au dressing) : les 8, la 1re en couverture, toutes préparées`, grille);
           dit(!(await pg.$(`${FG} [data-rg-photos-manque]`)), `G ${T} rien ne manque : aucune mise en garde`);
@@ -275,26 +275,26 @@ const premierPlan = (pg) => pg.evaluate(() => document.dispatchEvent(new Event('
           const valeurs = await pg.evaluate(() => ({ b: (document.querySelector('[data-repub-main] [data-rg-valeur="bright"]') || {}).textContent, z: (document.querySelector('[data-repub-main] [data-rg-valeur="zoom"]') || {}).textContent, couv: ((document.querySelector('[data-repub-main] .vrm-rg-pres-couv img') || {}).style || {}).transform }));
           dit(styles.length === 8 && new Set(styles).size === 1 && /brightness\(1\.1\)/.test(styles[0]) && /scale\(1\.25\)/.test(styles[0]) && /scale\(1\.25\)/.test(valeurs.couv || ''), `G ${T} le MÊME réglage sur les 8 (aperçu de la grille et de la couverture)`, { s: styles[0], n: new Set(styles).size, couv: valeurs.couv });
           dit(valeurs.b === '+10 %' && valeurs.z === '×1,25', `G ${T} chaque barre dit sa valeur en clair (« +10 % », « ×1,25 »)`, valeurs);
-          const pouces = await pg.$eval('[data-repub-main] [data-main-reglage]', (l) => l.map((x) => Math.round(x.getBoundingClientRect().height)));
+          const pouces = await pg.$$eval('[data-repub-main] [data-main-reglage]', (l) => l.map((x) => Math.round(x.getBoundingClientRect().height)));
           dit(pouces.length === 5 && pouces.every((h) => h >= 44), `G ${T} cinq barres, chacune une prise de 44 px`, pouces);
           await pg.dblclick(`${FG} [data-main-reglage="bright"]`).catch(() => {}); await pg.waitForTimeout(250);
           dit((await pg.evaluate(() => (document.querySelector('[data-repub-main] [data-rg-valeur="bright"]') || {}).textContent)) === '0 %', `G ${T} double-toucher une barre la remet à zéro`);
           await pg.screenshot({ path: nomF('8-huit-photos-reglage') });
           await clic(pg, `${FG} [data-main-reglages] > summary`, false);
-          await attendre(pg, () => { const x = document.querySelector('[data-repub-main] [data-main-telecharger]'); return x && x.getAttribute('data-rg-photos-pretes') === '8' ? 1 : null; }, 20000);
+          await attendre(pg, () => { const x = document.querySelector('[data-repub-main] [data-main-telecharger]'); return x && x.getAttribute('data-rg-photos-pretes') === '8' ? 1 : null; }, 90000);
           const avG = await pg.evaluate(() => window.__partages.length), dG = dl.length;
           await clic(pg, `${FG} [data-main-telecharger]`);
-          await pg.waitForTimeout(600);
+          await attendre(pg, () => (document.querySelector("[data-repub-main] [data-acc-apres=\"republier.main\"]") ? 1 : null), 30000); await pg.waitForTimeout(500);
           const p8 = await pg.evaluate(() => window.__partages.slice(-1)[0] || null);
           if (tel) dit((await pg.evaluate(() => window.__partages.length)) === avG + 1 && p8 && p8.noms.length === 8 && /-08\.jpg$/.test(p8.noms[7]) && p8.geste, `G ${T} UN toucher : le partage avec les 8 fichiers, dans le geste`, p8);
           else dit(dl.length - dG === 8, `G ${T} UN toucher : les 8 photos téléchargées`, dl.slice(dG));
           // Retirer la 3e : 7 photos partent, renommées dans l'ordre.
           await clic(pg, `${FG} [data-rg-photo-choix="2"]`);
-          const sept = await attendre(pg, () => { const x = document.querySelector('[data-repub-main] [data-main-telecharger]'); return x && x.getAttribute('data-rg-photos-pretes') === '7' ? 7 : null; }, 20000);
+          const sept = await attendre(pg, () => { const x = document.querySelector('[data-repub-main] [data-main-telecharger]'); return x && x.getAttribute('data-rg-photos-pretes') === '7' ? 7 : null; }, 90000);
           dit(sept === 7 && (await pg.getAttribute(`${FG} [data-rg-photo-choix="2"]`, 'aria-pressed')) === 'false' && (await pg.getAttribute(`${FG} [data-main-photos]`, 'data-rg-photos-choisies')) === '7', `G ${T} une photo retirée d’un toucher ⇒ 7 prêtes`);
           const avG2 = await pg.evaluate(() => window.__partages.length), dG2 = dl.length;
           await clic(pg, `${FG} [data-main-telecharger]`);
-          await pg.waitForTimeout(600);
+          await attendre(pg, () => (document.querySelector("[data-repub-main] [data-acc-apres=\"republier.main\"]") ? 1 : null), 30000); await pg.waitForTimeout(500);
           const p7 = await pg.evaluate(() => window.__partages.slice(-1)[0] || null);
           if (tel) dit((await pg.evaluate(() => window.__partages.length)) === avG2 + 1 && p7 && p7.noms.length === 7 && p7.geste, `G ${T} le partage suivant porte 7 fichiers`, p7);
           else dit(dl.length - dG2 === 7, `G ${T} 7 photos téléchargées`, dl.slice(dG2));

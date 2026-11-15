@@ -1293,10 +1293,12 @@ const lirePhotoGuide = async (u) => (/^data:image\//.test(String(u || '')) ? Str
 function usePhotosReglees(photos, reglage, numero, { auto = false } = {}) {
   const [ph, setPh] = useState(null);   // { fichiers, parIndice, unes, fait, rate, total, encours, envoi, envoyees, erreur, pour }
   const clePhoto = JSON.stringify(reglage || PHOTO_NEUTRE) + '|' + photos.join('|');
+  // (15 nov.) Une préparation par réglage : un réglage changé pendant qu’elle tourne en relance une, l’ancienne est jetée.
   const enCours = React.useRef(null);
+  const cleCourante = React.useRef(clePhoto); cleCourante.current = clePhoto;
   useEffect(() => { setPh((p) => (p && p.pour !== clePhoto ? null : p)); }, [clePhoto]);
   const preparer = async () => {
-    if (enCours.current) return enCours.current;
+    if (enCours.current && enCours.current.pour === clePhoto) return enCours.current.tache;
     const total = photos.length, pour = clePhoto, r = reglage || PHOTO_NEUTRE; const fichiers = []; const parIndice = []; let rate = 0;
     setPh({ fichiers: [], parIndice: [], unes: new Set(), fait: 0, rate: 0, total, encours: true, pour, envoyees: 0 });
     const tache = (async () => {
@@ -1314,12 +1316,13 @@ function usePhotosReglees(photos, reglage, numero, { auto = false } = {}) {
           const fi = new File([blob], nomPhotoReglee(numero, i), { type: 'image/jpeg' });
           fichiers.push(fi); parIndice[i] = fi;
         } catch (_) { rate++; parIndice[i] = null; }
+        if (cleCourante.current !== pour) return [];   // réglage ou choix changé : celle-ci est jetée
         setPh((p) => (p && p.pour !== pour ? p : { fichiers: fichiers.slice(), parIndice: parIndice.slice(), unes: new Set(), fait: fichiers.length, rate, total, encours: i < total - 1, pour, envoyees: 0 }));
       }
       return fichiers;
     })();
-    enCours.current = tache;
-    try { return await tache; } finally { enCours.current = null; }
+    enCours.current = { pour, tache };
+    try { return await tache; } finally { if (enCours.current && enCours.current.tache === tache) enCours.current = null; }
   };
   // Préparées d'avance (une fois la fiche lue) : le toucher « Enregistrer » partage tout de suite.
   useEffect(() => { if (auto && photos.length && !ph) preparer(); }, [auto, clePhoto, !ph]);   // eslint-disable-line react-hooks/exhaustive-deps
