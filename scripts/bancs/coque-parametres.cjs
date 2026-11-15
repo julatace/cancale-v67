@@ -23,10 +23,10 @@
 //   H4 NAVIGATION — une icône par entrée (colonne et « Plus ») ; le même colis ne
 //                   porte jamais deux badges (Ventes ET Colis) ;
 //   H5 CLOCHE     — la feuille est `SheetShell` (poignée, croix) ;
-//   H6 OÙ RANGER  — un achat vu « en route » puis « arrivé » : la cloche le compte, sa
-//                   ligne propose la PREMIÈRE CASE LIBRE (règles du Stock) et « Ranger »
-//                   ouvre le Stock ; rien n'est envoyé au téléphone ; meubles pas lus
-//                   ⇒ rien n'est proposé ; première lecture ⇒ rien non plus.
+//   H6 PAS D'ACHAT À RANGER (15 nov., Julien : « on range une ANNONCE, pas un achat ») — un
+//                   achat vu « en route » puis « arrivé » : la cloche ne propose RIEN (ni
+//                   ligne, ni pastille) ; rien n'est envoyé au téléphone ; meubles pas lus,
+//                   première lecture ⇒ rien non plus.
 //  Réglages : `BANC_PORT` (9300–9349, 9310 par défaut), `LARGEURS=390,1512`,
 //  `THEMES=clair,sombre`, `SHOTS=<dossier>` (captures à REGARDER), `BANC_DIST` (un
 //  autre dist/, pour juger la base). Un banc ne meurt pas : il rapporte.
@@ -229,9 +229,8 @@ async function cloche(nav, { W, theme, scenario }) {
   else await pg.evaluate(() => { try { localStorage.removeItem('vrm_ranger_vus'); localStorage.removeItem('vrm_ranger_proposes'); } catch (_) {} });
   await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
   await attendre(4000);
-  // La cloche lit les achats 4 s après le chargement du nuage : on attend la pastille (au plus 15 s).
-  if (scenario === 'arrive') await pg.waitForFunction(() => !!document.querySelector('[data-centre-notifs-cloche] .vrm-cn-pastille'), null, { timeout: 15000 }).catch(() => {});
-  else await attendre(6000);
+  // L'ancienne cloche lisait les achats 4 s après le chargement du nuage : on laisse le temps qu'elle aurait eu.
+  await attendre(6000);
   const pastille = await pg.evaluate(() => { const p = document.querySelector('[data-centre-notifs-cloche] .vrm-cn-pastille'); return p ? p.innerText.trim() : ''; });
   await pg.locator('[data-centre-notifs-cloche]').first().click().catch(() => {});
   await pg.waitForSelector('[data-centre-notifs]', { timeout: 6000 }).catch(() => {});
@@ -245,12 +244,9 @@ async function cloche(nav, { W, theme, scenario }) {
   });
   if (scenario === 'arrive') {
     dit(f && f.shell && f.poignee && f.croix, 'H5', `${T} la cloche est la feuille de l'app (SheetShell : poignée, croix)`, JSON.stringify(f && { shell: f.shell, poignee: f.poignee, croix: f.croix }));
-    dit(f && f.lignes.length === 1 && f.lignes[0].tx === '73001' && f.lignes[0].cas === 'mA:1', 'H6', `${T} l'achat 73001 « arrivé » propose la première case libre (Étagère A, case 2)`, JSON.stringify(f && f.lignes));
-    dit(pastille === '1', 'H6', `${T} la cloche le compte (pastille « 1 »)`, JSON.stringify(pastille));
+    dit(f && f.lignes.length === 0, 'H6', `${T} l'achat 73001 « arrivé » ne propose AUCUNE case (on range un article, pas un achat)`, JSON.stringify(f && f.lignes));
+    dit(pastille === '' || pastille === '0', 'H6', `${T} la cloche ne le compte pas (aucune pastille locale)`, JSON.stringify(pastille));
     await capture(pg, `ch-cloche-ranger-${W}-${theme}`);
-    await pg.locator('[data-centre-ranger-ouvrir="73001"]').first().click().catch(() => {}); await attendre(1500);
-    const ecran = await pg.evaluate(() => (document.querySelector('.vrm-main') || {}).getAttribute ? document.querySelector('.vrm-main').getAttribute('data-ecran') : null);
-    dit(ecran === 'garage', 'H6', `${T} « Ranger » ouvre le Stock`, String(ecran));
     dit(!envois.length, 'H6', `${T} rien n'est envoyé au téléphone (aucune écriture de notification)`, envois.join(' ¦ '));
   } else {
     dit(f && f.lignes.length === 0 && (pastille === '' || pastille === '0'), 'H6', `${T} ${scenario === 'premiere' ? 'première lecture sur cet appareil' : 'meubles pas lus'} ⇒ rien n'est proposé`, JSON.stringify({ lignes: f && f.lignes, pastille }));
