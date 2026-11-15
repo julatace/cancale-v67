@@ -139,7 +139,7 @@ export function histoireFiche(p, { sites = [] } = {}) {
   if (dLigne != null || (ann && ann.etat === 'fait')) out.push({ cle: 'annonces', titre: 'fd.h.miseEnLigne', at: dLigne, sites: nomsSites, ton: s === 'en-vente' ? '' : 'fait' });
   if (s === 'vendue') {
     const v = etape(p, 'vente'); const ev = evs(v)[0];
-    out.push({ cle: 'vente', titre: 'fd.h.vendue', at: ev ? ms(ev.at) : null, montant: p.resume ? p.resume.vente : null, compte: ev ? str(ev.texte).split(' · ').slice(2).join(' · ') : '', ton: 'fait' });
+    out.push({ cle: 'vente', titre: 'fd.h.vendue', at: ev ? ms(ev.at) : null, montant: null /* le prix est dans la ligne d'état : écrit une fois */, compte: ev ? str(ev.texte).split(' · ').slice(2).join(' · ') : '', ton: 'fait' });
     const c = etape(p, 'colis');
     if (p.aPoster) out.push({ cle: 'colis', titre: 'fd.h.aEnvoyer', detail: c && /prêt/.test(str(c.detail)) ? 'fd.h.bordereauPret' : '', ton: 'am' });
     else if (c && c.etat === 'fait') out.push({ cle: 'colis', titre: 'fd.h.colis', libre: c.titre, at: premiereDate(c), ton: 'fait' });

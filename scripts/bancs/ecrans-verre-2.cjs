@@ -37,8 +37,10 @@ const VUES = {
   // (15 nov., fiche D « fiche produit ») les trois cas de la maquette : vendue sans achat relié (un achat PROPOSÉ),
   // vendue reliée (colis à déposer), en vente sur deux sites (Vinted et Leboncoin).
   'fiche-vendue': '/?tab=journee', 'fiche-reliee': '/?tab=journee', 'fiche-2sites': '/?tab=journee',
+  // la vue Histoire de la vendue, et sa feuille « ⋯ » ouverte (tuiles + Tout voir)
+  'fiche-histoire': '/?tab=journee', 'fiche-plus': '/?tab=journee',
 };
-const NUM_FICHE = { 'fiche-paire': '1205', 'fiche-vendue': '3119', 'fiche-reliee': '3120', 'fiche-2sites': '3102' };
+const NUM_FICHE = { 'fiche-paire': '1205', 'fiche-vendue': '3119', 'fiche-reliee': '3120', 'fiche-2sites': '3102', 'fiche-histoire': '3119', 'fiche-plus': '3119' };
 // LES TROIS PAIRES DE LA FICHE D (inventées) ajoutées à la base de volume : le premier compte, ses lignes de toujours.
 const J = 86400000;
 function baseFiches() {
@@ -125,6 +127,8 @@ async function preparer(o, vue) {
     // la fiche a fini de lire (l'achat proposé, les sites) : plus de « lecture » sur la carte d'action
     await pg.waitForFunction(() => !document.querySelector('[data-fd-propose="lecture"], [data-fiche-lecture-en-cours="1"]'), null, { timeout: 12000 }).catch(() => {});
     await pg.waitForTimeout(1200);
+    if (vue === 'fiche-histoire') { await toucher('[data-fd-seg="histoire"]'); await pg.waitForTimeout(500); }
+    if (vue === 'fiche-plus') { await toucher('[data-fd-plus-ouvrir]'); await pg.waitForTimeout(700); }
   }
 }
 
@@ -240,6 +244,9 @@ function mesurer(vue) {
       petitTexte: textes.filter((e) => fs(e) < 15 && !e.closest('.fd-plaque')).map((e) => `${e.className || e.tagName} ${fs(e)} « ${(e.innerText || '').trim().slice(0, 16)} »`).slice(0, 5),
       chiffres: chiffres.map((e) => ({ fs: fs(e), txt: e.innerText })),
       plus: !!racine.querySelector('[data-fd-plus-ouvrir]'), plusFerme: (racine.querySelector('.fd-plus') || {}).hidden !== false,
+      tuilesVues: [...racine.querySelectorAll('[data-fd-tuile]')].filter(vis).map((t) => Math.round(t.getBoundingClientRect().height)),
+      feuille: (() => { const f = racine.querySelector('.fd-plus-f'); return f && vis(f) ? R(f) : null; })(),
+      histoire: [...racine.querySelectorAll('[data-fiche-hist-etape]')].filter(vis).map((x) => x.getAttribute('data-fiche-hist-etape') + (x.classList.contains('is-am') ? ':am' : '')),
       tuiles: [...racine.querySelectorAll('[data-fd-tuile]')].map((t) => t.getAttribute('data-fd-tuile')),
       toutVoir: !!racine.querySelector('.fd-plus [data-fiche-plus]'),
       jargon: (() => { const t = [...racine.querySelectorAll('.fd-s')].map((x) => x.innerText).join(' '); return (t.match(/\b(annonce|transaction|fiche) \d{6,}|journal des N°|vues par VRM|origine non enregistrée|lu dans le dressing|prix lus depuis|Modifications enregistrées sur cet appareil|à dater|même chaussure/gi) || []); })(),
@@ -325,7 +332,9 @@ function juger(m, suf, tel) {
     dit(F.segs.length === 3 && F.segs.filter((x) => x.on).length === 1 && F.segs.every((x) => x.h >= 44) && F.vues === 1, `F3 ${suf} : Argent · Sites · Histoire, une vue à la fois (44 px)`, JSON.stringify(F.segs));
     if (tel) dit(!F.petitTexte.length, `F3 ${suf} : texte ≥ 15 px`, F.petitTexte.join(' | '));
     dit(F.chiffres.every((c) => c.fs >= 22) && (!F.chiffres.length || Math.max(...F.chiffres.map((c) => c.fs)) >= 28), `F3 ${suf} : les chiffres 28–36 px`, JSON.stringify(F.chiffres));
-    dit(F.plus && F.plusFerme && F.toutVoir && F.tuiles.length >= 4, `F6 ${suf} : « ⋯ » fermé, ses tuiles (${F.tuiles.join(', ')}) et « Tout voir »`);
+    if (v !== 'fiche-plus') dit(F.plus && F.plusFerme && F.toutVoir && F.tuiles.length >= 4, `F6 ${suf} : « ⋯ » fermé, ses tuiles (${F.tuiles.join(', ')}) et « Tout voir »`);
+    else dit(!F.plusFerme && !!F.feuille && F.feuille.r <= m.W + 1 && F.tuilesVues.length >= 8 && F.tuilesVues.every((h) => h >= 44) && F.toutVoir, `F6 ${suf} : « ⋯ » ouvert : ${F.tuilesVues.length} tuiles (≥ 44 px) et « Tout voir », dans l'écran`, JSON.stringify({ feuille: F.feuille, t: F.tuilesVues }));
+    if (v === 'fiche-histoire') dit(F.vue === 'histoire' && F.histoire.length >= 3 && F.histoire.length <= 5 && F.histoire[0] === 'achat:am' && F.histoire.includes('vente') && F.histoire.includes('colis:am'), `F7 ${suf} : l'histoire en 3 à 5 lignes, l'achat à relier et l'envoi en ambre`, F.histoire.join(','));
     dit(!F.jargon.length, `F5 ${suf} : aucun identifiant ni mot technique à l'écran`, F.jargon.slice(0, 5).join(' | '));
     dit(!F.doublons.length, `F5 ${suf} : chaque geste, chaque titre UNE fois`, F.doublons.slice(0, 5).join(' | '));
     const deux = Object.entries(F.montants).filter(([, n]) => n > 1);
