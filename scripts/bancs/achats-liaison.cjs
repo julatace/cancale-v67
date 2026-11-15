@@ -156,7 +156,11 @@ async function passe(b, nom, ctxOpts, sombre) {
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true,"devices":1}' }));
   const tactile = !!ctxOpts.hasTouch;
-  const ecritLien = (tx) => ecrits.some((x) => /buyFromId/.test(x) && x.includes(tx));
+  // Un lien posé : l'écriture vers la base, ou la copie de l'appareil (fiches, ventes) — la seconde arrive tout de suite,
+  // la première part groupée plus tard.
+  let local = '';
+  const lireLocal = async () => { local = await pg.evaluate(() => { try { return (localStorage.getItem('vinted_annonce_numeros') || '') + (localStorage.getItem('vinted_sale_overrides') || ''); } catch (_) { return ''; } }).catch(() => local); };
+  const ecritLien = (tx) => ecrits.some((x) => /buyFromId/.test(x) && x.includes(tx)) || local.includes('"buyFromId":"' + tx + '"');
 
   await pg.goto(`http://localhost:${PORT}/?tab=annonces&site=vinted`, { waitUntil: 'domcontentloaded' });
   const vue = pg.locator('[data-vue-sans-achat]').first();
@@ -179,7 +183,8 @@ async function passe(b, nom, ctxOpts, sombre) {
   dit(!l.debord.length, `${nom} · forme · rien ne déborde, titres ≤ 2 lignes`, l.debord.slice(0, 4).join(' ; '));
   dit(l.pleins <= 1, `${nom} · forme · un bouton plein au plus (${l.pleins})`);
   if (tactile) dit(!l.cibles.length, `${nom} · forme · 44 px au doigt`, l.cibles.slice(0, 3).join(' ; '));
-  dit(!ecrits.some((x) => /buyFromId/.test(x)), `${nom} · clic · rien d'écrit avant son toucher`);
+  await lireLocal();
+  dit(!ecrits.some((x) => /buyFromId/.test(x)) && !TRES_PROBABLES.some(ecritLien), `${nom} · clic · rien d'écrit avant son toucher (base et appareil)`);
   // L'onglet « Vendus » (avant toute validation).
   await pg.locator('[data-ar-onglet="vendus"]').first().click({ timeout: 5000 }).catch(() => {});
   await pg.waitForTimeout(800);
@@ -192,7 +197,7 @@ async function passe(b, nom, ctxOpts, sombre) {
   await pg.waitForTimeout(600);
   // « Valider les N très probables » : la liste, puis SON toucher.
   dit(l.valider === TRES_PROBABLES.length, `${nom} · clic · « Valider les ${TRES_PROBABLES.length} très probables » visible`, String(l.valider));
-  await pg.locator('[data-ar-valider]').first().click({ timeout: 5000 }).catch(() => {});
+  await pg.locator('[data-ar-valider]').first().evaluate((e) => e.click()).catch(() => {});
   await pg.locator('[data-ar-feuille-valider]').first().waitFor({ timeout: 5000 }).catch(() => {});
   await pg.waitForTimeout(500);
   const feuille = await pg.evaluate(() => [...document.querySelectorAll('[data-ar-valider-tx]')].map((e) => e.getAttribute('data-ar-valider-tx')).sort());
@@ -200,12 +205,12 @@ async function passe(b, nom, ctxOpts, sombre) {
   dit(JSON.stringify(feuille) === JSON.stringify([...TRES_PROBABLES].sort()) && !ecrits.some((x) => /buyFromId/.test(x)), `${nom} · clic · la feuille MONTRE les ${feuille.length} couples, rien n'est écrit`, JSON.stringify(feuille));
   // Il décoche le dernier, puis « Relier ces 4 paires ».
   const decoche = TRES_PROBABLES[TRES_PROBABLES.length - 1];
-  await pg.locator(`[data-ar-valider-tx="${decoche}"] input[type="checkbox"]`).first().click({ timeout: 5000 }).catch((e) => console.log('   (clic case) ' + String(e.message).split('\n').slice(0, 6).join(' | ')));
+  await pg.locator(`[data-ar-valider-tx="${decoche}"] input[type="checkbox"]`).first().evaluate((e) => e.click()).catch((e) => console.log('   (clic case) ' + String(e.message).split('\n')[0]));
   await pg.waitForTimeout(200);
   // (le bouton plein du studio « respire » : jamais « stable » pour Playwright — le clic est donné à l'élément)
   await pg.locator('[data-ar-valider-ok]').first().evaluate((e) => e.click()).catch((e) => console.log('   (clic relier) ' + String(e.message).split('\n')[0]));
   // Les écritures partent groupées (quelques secondes) : on attend qu'elles arrivent, 15 s au plus.
-  for (let i = 0; i < 30 && TRES_PROBABLES.filter((tx) => ecritLien(tx)).length < TRES_PROBABLES.length - 1; i++) await pg.waitForTimeout(500);
+  for (let i = 0; i < 30 && TRES_PROBABLES.filter((tx) => ecritLien(tx)).length < TRES_PROBABLES.length - 1; i++) { await pg.waitForTimeout(500); await lireLocal(); }
   await pg.waitForTimeout(800);
   const relies = TRES_PROBABLES.filter((tx) => ecritLien(tx));
   dit(relies.length === TRES_PROBABLES.length - 1 && !ecritLien(decoche), `${nom} · clic · « Relier ces ${TRES_PROBABLES.length - 1} paires » relie exactement les couples cochés`, JSON.stringify(relies));
@@ -225,7 +230,9 @@ async function passe(b, nom, ctxOpts, sombre) {
   await pg.waitForTimeout(2500);
   const pa = await pg.evaluate(() => [...document.querySelectorAll('[data-achat-propose]')].map((e) => ({ k: e.getAttribute('data-achat-propose'), n: e.getAttribute('data-niveau'), tx: e.closest('[data-achat-tx]') ? '' : (e.previousElementSibling && e.previousElementSibling.getAttribute('data-achat-tx')) })));
   await capture(pg, nom, 'achats');
-  dit(pa.some((x) => x.tx === '93000011' && x.k === 'a:81009') || pa.some((x) => x.k === 'a:81009') || pa.some((x) => x.k === 'v:94000001'), `${nom} · achats · sous un achat sans article : l'article proposé`, JSON.stringify(pa.slice(0, 6)));
+  // (les liens posés plus haut restent dans l'appareil : l'achat décoché, 93000011, reste à relier ⇒ « N°209 » proposé ;
+  //  les trois Air Force identiques ⇒ « possible »)
+  dit(pa.some((x) => x.tx === decoche && x.k === 'a:81009' && x.n === 'tres-probable') && pa.filter((x) => /^9300000[567]$/.test(x.tx)).every((x) => x.n === 'possible'), `${nom} · achats · sous un achat sans article : l'article proposé (et son niveau)`, JSON.stringify(pa.slice(0, 6)));
   dit(!errs.length, `${nom} · aucune erreur de page`, errs.slice(0, 2).join(' | '));
   await ctx.close();
 }
