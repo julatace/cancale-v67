@@ -156,7 +156,7 @@
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plus { position: fixed; inset: 0; z-index: 9100; display: flex; flex-direction: column; justify-content: flex-end; }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plus-voile { position: absolute; inset: 0; border: 0; padding: 0; margin: 0; background: rgb(4 12 26 / .45) !important; cursor: pointer; }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plus-f {
-  position: relative; max-height: 88vh; overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; padding: 14px 16px calc(20px + env(safe-area-inset-bottom));
+  position: relative !important; max-height: 88vh; overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box !important; padding: 14px 16px calc(20px + env(safe-area-inset-bottom)) !important; margin: 0 !important; width: auto !important;
   border-radius: 28px 28px 0 0; background: var(--fd-feuille) !important; color: var(--sv-encre) !important; box-shadow: 0 -18px 40px -20px rgb(4 12 26 / .7);
   animation: fd-monte 260ms cubic-bezier(.32, .72, 0, 1) both;
 }

@@ -440,7 +440,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
           <span className="fd-ph-img" data-fiche-heros-photo={photo ? '1' : '0'}>{photo && Photo ? Photo(photo) : <Silhouette/>}</span>
           <i className="fd-scrim" aria-hidden="true"/>
           <div className="fd-top">
-            <Rond data-fiche-retour="" aria-label={depuis ? tr('fiche.retour') : tr('fd.retour')} onClick={onRetour || onFermer}><svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg></Rond>
+            <Rond data-fiche-retour="" data-fiche-fermer={depuis || !onRetour ? "" : undefined} aria-label={depuis ? tr('fiche.retour') : tr('fd.retour')} onClick={onRetour || onFermer}><svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg></Rond>
             {p ? <Rond data-fd-plus-ouvrir="" aria-label={tr('fd.plus.titre')} aria-expanded={plusOuvert} onClick={() => setPlusOuvert(true)}>{I('more', 20)}</Rond>
               : <Rond aria-label="Fermer la fiche" data-fiche-fermer="" onClick={onFermer}>{I('close', 20)}</Rond>}
           </div>
