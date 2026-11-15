@@ -25,7 +25,8 @@ require('./_porte-banc.cjs');
 //    tete      la phrase de la règle (« même marque, même taille… ») n'est pas une ligne de plus visible :
 //              elle vit derrière un « ? » ; « Saisie en série » reste là (`data-ar-serie`), en lien
 //              (pas un gros bouton : ≤ 44 px de haut, sans fond) ;
-//    identite  (§5) rien n'est relié avant SON clic : aucune écriture n'emporte un achat proposé.
+//    identite  (§5) rien n’est relié avant SON clic : aucune écriture n’emporte un achat proposé ; une marque
+//              contredite (« Autry … » marquée « adidas ») ou aucun mot de modèle commun (« Basket Nike 44 ») ⇒ aucune suggestion.
 //  Base INVENTÉE (titres génériques, identifiants inventés — dépôt PUBLIC) ; images servies localement.
 //  `PASSES=390,1512-sombre` pour un sous-ensemble ; `BANC_DIST=` le build jugé ; `SHOTS=` les captures.
 //  Un banc ne meurt pas, il rapporte.
@@ -58,14 +59,19 @@ const ANNONCES = [
   ['71010', 'Reebok Club C 85 vintage 42', 'Reebok', '42', 48, '164', 21, true],
   ['71011', 'Salomon XT-6 noir 44', 'Salomon', '44', 120, '165', 20, true],
   ['71012', 'Nike Dunk Low panda 42', 'Nike', '42', 90, '166', 19, true],
+  // (15 nov.) La marque choisie sur Vinted contredite par le titre (capture de Julien) : aucune suggestion.
+  ['71013', 'Autry reelwind low rose taille 36', 'adidas', '36', 68, '196', 18, true],
 ];
 const listing = ([id, titre, marque, taille, prix, , jours, ph]) => ({ ...sc.annonce({ id, titre, prix, taille, marque }), brand_title: marque, size_title: taille,
   created_at_ts: Math.floor((sc.NOW - jours * J) / 1000), photo: ph ? { url: photoUrl('a' + id) } : { url: '' } });
 // Les achats : trois rapprochables (même marque, même taille, achetés AVANT la mise en ligne), dont un sans photo.
 const achat = (tx, titre, prix, jours, ph) => ({ ...sc.ordre({ tx, titre, prix, statut: sc.STATUT_FINAL, dateMs: sc.NOW - jours * J }), ...(ph ? { photo: { url: photoUrl('h' + tx) } } : {}) });
 const ACHATS = [
-  achat('92000001', 'Adidas Special nere usate 42', 43.67, 60, true),
-  achat('92000002', 'Basket Nike 44', 19.05, 70, true),
+  achat('92000001', 'Adidas Handball Spezial nere usate 42', 43.67, 60, true),
+  achat('92000002', 'Nike Air Max 1 Monarch 44', 19.05, 70, true),
+  // (15 nov.) Deux achats que la règle §5 ÉCARTE (captures de Julien) : aucun mot de modèle commun, marque contredite.
+  achat('92000005', 'Basket Nike 44', 15, 75, true),
+  achat('92000006', '#Adidas Spezial, dunkelblau, Gr. 36', 21, 80, true),
   achat('92000003', 'New Balance 550 41', 52, 65, false),
   achat('92000004', 'Sac à dos en toile', 12, 50, true),
 ];
@@ -264,6 +270,10 @@ async function passe(b, nom, ctxOpts, sombre) {
   const f = await pg.evaluate(file, { tactile });
   await capture(pg, nom, 'sans-achat');
   dit(f.info.lignes >= 10 && f.info.sugg >= 3, `${nom} · la file : ${f.info.lignes} annonces, ${f.info.sugg} suggestions`, JSON.stringify(f.info));
+  // §5 (captures de Julien, 15 nov.) : une marque contredite ou aucun mot de modèle commun ⇒ AUCUNE suggestion.
+  const sug = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-ar-ligne]')].map((x) => [x.getAttribute('data-ar-ligne'), x.getAttribute('data-ar-sugg-tx')])));
+  dit(sug['71013'] === '' && sug['71002'] === '92000002' && sug['71001'] === '92000001' && !Object.values(sug).includes('92000005') && !Object.values(sug).includes('92000006'),
+    `${nom} · identite · « Autry … » marquée « adidas » : aucune suggestion ; « Basket Nike 44 » (aucun mot de modèle commun) jamais proposée`, JSON.stringify(sug));
   dit(!f.debord.length, `${nom} · debord · rien ne déborde (page, cartes, titres ≤ 2 lignes)`, f.debord.slice(0, 4).join(' ; '));
   dit(!f.hauteur.length, `${nom} · hauteur · cartes compactes`, f.hauteur.slice(0, 4).join(' ; '));
   dit(!f.gestes.length, `${nom} · gestes · chaque geste présent et joignable`, f.gestes.slice(0, 4).join(' ; '));
