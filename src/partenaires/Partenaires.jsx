@@ -165,7 +165,7 @@ function Fiche({ p, au, appel, recharger, toast, telecharger, lienNeuf, setLienN
               <div className="vrm-pt-mois-ligne">
                 <div className="vrm-pt-mois-texte">
                   <b>{libelleMois(m.mois)}</b>
-                  <span>{tr('partenaires.mois.detail', { n: m.nDues, v: eur(m.verseCentimes) })}</span>
+                  {m.nDues > 0 || m.verseCentimes > 0 ? <span>{tr('partenaires.mois.detail', { n: m.nDues, v: eur(m.verseCentimes) })}</span> : null}
                   {m.attenteCentimes > 0 ? <span>{tr('partenaires.mois.attente', { m: eur(m.attenteCentimes), j: 14 })}</span> : null}
                   {m.nAnnulees > 0 ? <span data-annulees={m.nAnnulees}>{tr('partenaires.mois.annulees', { n: m.nAnnulees })}</span> : null}
                 </div>

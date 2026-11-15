@@ -52,8 +52,14 @@ if (args.includes('--prouve')) {
     // Une copie minimale : api/, src/ (les règles que le serveur emprunte), public/legal, package.json.
     for (const d of ['api', 'src', 'public/legal']) fs.cpSync(path.join(RACINE_DEPOT, d), path.join(base, d), { recursive: true, filter: (s) => !/node_modules|\.png$|\.jpe?g$|\.woff2?$|\.mp4$/.test(s) });
     fs.copyFileSync(path.join(RACINE_DEPOT, 'package.json'), path.join(base, 'package.json'));
+    fs.symlinkSync(fs.realpathSync(path.join(RACINE_DEPOT, 'node_modules')), path.join(base, 'node_modules'), 'dir');
     const cible = path.join(base, 'api/_lib/partenaires.js');
     const origine = fs.readFileSync(cible, 'utf8');
+    // Le témoin : la copie NON mutée doit être verte, sinon une mutation « rouge » ne prouve rien.
+    const temoin = spawnSync(process.execPath, [__filename], { encoding: 'utf8', env: { ...process.env, BANC_RACINE: base }, maxBuffer: 64 << 20 });
+    const rougesTemoin = (temoin.stdout.match(/^❌ /gm) || []).length;
+    console.log(`${temoin.status === 0 && !rougesTemoin ? '✅' : '❌'} témoin : la copie non mutée est verte (${rougesTemoin} rouge(s))`);
+    if (temoin.status !== 0 || rougesTemoin) { console.log(temoin.stdout.split('\n').filter((x) => x.startsWith('❌ ')).slice(0, 3).join('\n')); fs.rmSync(base, { recursive: true, force: true }); process.exit(1); }
     for (const [nom, [a, b]] of Object.entries(MUTATIONS)) {
       const n = origine.split(a).length - 1;
       if (n !== 1) { console.log(`❌ mutation « ${nom} » → ancre introuvable (${n})`); continue; }

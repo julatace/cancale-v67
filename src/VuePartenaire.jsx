@@ -28,6 +28,10 @@ export default function VuePartenaire() {
       const m = document.createElement('meta'); m.name = 'referrer'; m.content = 'no-referrer'; document.head.appendChild(m);
       const r = document.createElement('meta'); r.name = 'robots'; r.content = 'noindex'; document.head.appendChild(r);
       document.title = tr('partenaires.page.titre');
+      // Le partenaire n'a pas réglé VRM sur ce navigateur : la page suit le clair / sombre de SON téléphone.
+      if (localStorage.getItem('vrm_apparence') == null && localStorage.getItem('vinted_dark') == null && window.matchMedia) {
+        document.documentElement.setAttribute('data-theme', window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      }
     } catch (_) {}
     const j = jetonDeLAdresse();
     if (!j) { setR({ etat: 'lien' }); return; }
@@ -74,8 +78,8 @@ export default function VuePartenaire() {
             <thead><tr><th>{tr('partenaires.page.mois')}</th><th className="n">{tr('partenaires.page.clients')}</th><th className="n">{tr('partenaires.page.dues')}</th><th className="n">{tr('partenaires.page.attente')}</th><th className="n">{tr('partenaires.page.versees')}</th><th className="n">{tr('partenaires.page.annulees')}</th></tr></thead>
             <tbody>{c.mois.map((m) => (
               <tr key={m.mois} data-mois={m.mois} data-due={m.dueCentimes} data-verse={m.verseCentimes}>
-                <td>{libelleMois(m.mois)}</td><td className="n">{m.clientsPayants}</td><td className="n">{eur(m.dueCentimes)}</td>
-                <td className="n">{eur(m.attenteCentimes)}</td><td className="n">{eur(m.verseCentimes)}</td><td className="n">{m.nAnnulees}</td>
+                <td>{libelleMois(m.mois)}</td><td className="n" data-l={tr('partenaires.page.clients')}>{m.clientsPayants}</td><td className="n" data-l={tr('partenaires.page.dues')}>{eur(m.dueCentimes)}</td>
+                <td className="n" data-l={tr('partenaires.page.attente')}>{eur(m.attenteCentimes)}</td><td className="n" data-l={tr('partenaires.page.versees')}>{eur(m.verseCentimes)}</td><td className="n" data-l={tr('partenaires.page.annulees')}>{m.nAnnulees}</td>
               </tr>))}</tbody>
           </table>
         </div>
