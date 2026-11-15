@@ -17,6 +17,10 @@
 //      à toi en premier, évaluations reçues ;
 //   P. pannes : droit Analytics manquant ⇒ « Reconnecter eBay » ; signature absente ⇒ dite, sans
 //      bouton (le geste n'est pas le sien) ; jamais « 0 » à la place de « pas su » ;
+//   G. (2e tour) les GESTES : « Pourquoi elle ne se voit pas » ouvre les raisons mesurées ; « Ajouter
+//      Pointure : 42 » ne part qu'après la confirmation (Annuler ⇒ rien), avec `confirme` ; « Ajouter les
+//      photos de ta fiche » envoie les photos de LA fiche du N° et le nombre vu ; « Compléter les
+//      évidentes » montre la liste AVANT ; le calendrier des versements ; la ligne de Ma journée ;
 //   V. 390 px : aucun défilement horizontal, aucune rangée hors de sa carte, cibles ≥ 44 px,
 //      au plus un bouton plein ; aucune erreur de page.
 const path = require('path');
@@ -53,7 +57,7 @@ const SANTE = {
   nonConforme: { note: 'HIGH', lignes: [{ nom: 'Baskets homme', note: 'HIGH', valeur: 0.04 }] },
   nonRecu: { note: null, lignes: [] },
   conformite: [{ type: 'ASPECTS_ADOPTION', n: 1 }],
-  aCorriger: [{ itemId: '110000000001', sku: 'VRM-12', type: 'ASPECTS_ADOPTION', problemes: [{ code: 'MISSING_OR_INVALID_REQUIRED_ASPECTS', message: 'Pointure manquante', manque: ['Pointure'], suggestions: [{ nom: 'Pointure', valeurs: ['42', '43'] }], etat: 'OUT_OF_COMPLIANCE' }] }],
+  aCorriger: [{ itemId: '110000000001', sku: 'VRM-12', type: 'ASPECTS_ADOPTION', problemes: [{ code: 'MISSING_OR_INVALID_REQUIRED_ASPECTS', message: 'Pointure manquante', manque: ['Pointure', 'Couleur'], suggestions: [{ nom: 'Pointure', valeurs: ['42', '43'] }, { nom: 'Couleur', valeurs: ['Blanc'] }], etat: 'OUT_OF_COMPLIANCE' }] }],
 };
 const LITIGES = {
   paiement: [{ id: '5000000001', orderId: '07-11111-22222', motif: 'ITEM_NOT_RECEIVED', etat: 'ACTION_NEEDED', ouvertLe: iso(MAINTENANT - 2 * JOUR), repondreAvant: iso(MAINTENANT + 5 * JOUR), montant: { v: 98, c: 'EUR' } }],
@@ -73,7 +77,8 @@ const remettre = (sc = {}) => {
     { id: 'ebay_listings', data: { items: [{ itemId: '110000000001', title: 'Nike Air Max 90 blanche', price: '95.0', sku: 'VRM-12' }], capturedAt: MAINTENANT } },
     { id: 'ebay_orders', data: { orders: [CMD('07-11111-22222', 'Nike Air Max 90 blanche', 'VRM-12'), CMD('07-33333-44444', 'Adidas Samba noire', 'VRM-13', 'FULFILLED')], capturedAt: MAINTENANT } },
     { id: 'ebay_messages', data: { nonLus: 3, complet: true, capturedAt: MAINTENANT } },
-    { id: 'ebay_versements', data: { dates: { '07-33333-44444': '2026-11-10' }, capturedAt: MAINTENANT } },
+    { id: 'ebay_versements', data: { dates: { '07-33333-44444': '2026-11-10' }, versements: ARGENT.versements, capturedAt: MAINTENANT } },
+    { id: 'vinted_item_details', data: { '7012': { photos: ['https://images1.vinted.net/t/12a.jpg', 'https://images1.vinted.net/t/12b.jpg', 'https://images1.vinted.net/t/12c.jpg'] } } },
   ];
   envois = [];
 };
@@ -109,6 +114,7 @@ async function ouvrir(b, vp, sombre) {
   await pg.clock.setFixedTime(new Date(MAINTENANT));
   await pg.addInitScript(([sombre]) => { try {
     localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_ebay_guide_vu', '1');
+    localStorage.setItem('vinted_annonce_numeros', JSON.stringify({ '7012': { numero: '12', title: 'Nike Air Max 90 blanche' } }));
     if (sombre) { localStorage.setItem('vinted_dark', 'true'); localStorage.setItem('vrm_bascule_mineral_v1', '1'); } } catch (_) {} }, [!!sombre]);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image'].includes(r.request().resourceType()) ? r.fulfill({ status: 200, contentType: 'image/png', body: PNG }) : r.abort()));
   await pg.route('**/rest/v1/**', (route) => {
@@ -151,12 +157,18 @@ async function ouvrir(b, vp, sombre) {
     if (body.action === 'sante') return j({ ok: true, ...SANTE });
     if (body.action === 'litiges') return j({ ok: true, ...LITIGES });
     if (body.action === 'evaluationsrecues') return j({ ok: true, ...EVAL });
+    if (body.action === 'diagnostic') return j({ ok: true, annonces: (body.itemIds || []).map((id) => ({ itemId: id, titre: 'Nike Air Max 90 blanche', prix: 120, devise: 'EUR', photos: 2, epid: '',
+      propositions: { manque: ['Pointure', 'Couleur'], suggestions: { Pointure: ['42'], Couleur: ['Blanc', 'Gris'] }, epid: '2254990123' }, evidentes: { Pointure: '42' },
+      comparables: { n: 8, mediane: 79, min: 70, max: 90, base: 'caracteristiques' }, comparablesBase: 'caracteristiques', conformiteLue: true,
+      raisons: [{ cle: 'caracteristiques', manque: ['Pointure', 'Couleur'] }, { cle: 'photos', n: 2 }, { cle: 'prix', prix: 120, mediane: 79, n: 8 }, { cle: 'catalogue', epid: '2254990123' }] })) });
+    if (body.action === 'corrigeraspects' || body.action === 'ajouterphotos' || body.action === 'lierproduit') return body.confirme === true ? j({ ok: true, relu: true }) : j({ ok: false, reason: 'confirmation', error: 'non confirmé' }, 400);
     return j({ ok: true });
   });
   return { ctx, pg, errs };
 }
 const capt = async (pg, nom) => { try { await pg.waitForTimeout(800); fs.mkdirSync(CAPT, { recursive: true }); await pg.screenshot({ path: path.join(CAPT, `ebay-tableau-${nom}.png`) }); } catch (_) {} };
-const aller = async (pg, q) => { await pg.goto(`http://localhost:${PORT}/?${q}`, { waitUntil: 'domcontentloaded' }); };
+// Un goto interrompu par la navigation de l'app (ERR_ABORTED) est relancé une fois.
+const aller = async (pg, q) => { try { await pg.goto(`http://localhost:${PORT}/?${q}`, { waitUntil: 'domcontentloaded' }); } catch (_) { await pg.waitForTimeout(500); await pg.goto(`http://localhost:${PORT}/?${q}`, { waitUntil: 'domcontentloaded' }); } };
 const attendre = (pg, sel, t = 25000) => pg.waitForSelector(sel, { timeout: t });
 // Mise en page à 390 : rien ne sort de l'écran ni de sa carte, cibles ≥ 44 px, un plein au plus.
 const mesures = (pg) => pg.evaluate(() => {
@@ -238,7 +250,7 @@ const mesures = (pg) => pg.evaluate(() => {
       const notes = await pg.$$eval('[data-ebt-note]', (l) => l.map((x) => x.getAttribute('data-ebt-note')));
       dit(notes.join() === 'nonConforme:HIGH,nonRecu:aucune', 'S2. « pas conforme » élevé, « pas reçu » : rien à comparer (pas « bon »)', notes.join());
       const c = await pg.$eval('[data-ebt-corriger="110000000001"]', (x) => [x.textContent, x.getAttribute('href')]);
-      dit(/Pointure/.test(c[0]) && /42, 43/.test(c[0]) && /\/itm\/110000000001$/.test(c[1]), 'S3. annonce à corriger : « Manque : Pointure », eBay propose 42, 43, lien vers l’annonce', JSON.stringify(c));
+      dit(/Pointure/.test(c[0]) && /42, 43/.test(c[0]) && c[1] == null, 'S3. annonce à corriger : « Manque : Pointure », eBay propose 42, 43 ; la rangée ouvre « pourquoi » et ses gestes', JSON.stringify(c));
       const li = await pg.$$eval('[data-ebt-litige]', (l) => l.map((x) => x.getAttribute('data-ebt-litige') + ':' + x.getAttribute('data-a-toi')));
       dit(li[0] === 'paiement:5000000001:1' && li.length === 2, 'S4. le litige qui attend ta réponse en premier', li.join());
       const ev = await pg.$$eval('[data-ebt-eval]', (l) => l.map((x) => x.getAttribute('data-ebt-eval')));
@@ -252,6 +264,52 @@ const mesures = (pg) => pg.evaluate(() => {
       dit(sous.join() === 'annonces,trafic,promo', 'N3. Annonces · eBay : Annonces · Trafic · Promotion', sous.join());
       dit((await pg.getAttribute('[data-ebt-invisibles]', 'data-ebt-invisibles')) === '1', 'R1. 1 annonce ne se voit pas');
       await capt(pg, '390-trafic');
+    });
+    await essaie('G gestes', async () => {
+      envois = [];
+      await aller(pg, 'tab=plat_ebay&section=trafic');
+      await attendre(pg, '[data-ebt-pourquoi="110000000001"]');
+      await pg.click('[data-ebt-pourquoi="110000000001"]');
+      await attendre(pg, '[data-ebt-diagnostic] [data-ebt-raisons]');
+      const rs = await pg.getAttribute('[data-ebt-raisons]', 'data-ebt-raisons');
+      dit(['caracteristiques', 'photos', 'prix', 'catalogue'].every((k) => (rs || '').includes(k)), 'G1. « Pourquoi elle ne se voit pas » : caractéristiques, photos, prix au-dessus des comparables, catalogue', rs);
+      const lum = await pg.$eval('[data-ebt-diagnostic] .ebt-titre', (e) => { const m = getComputedStyle(e).color.match(/[\d.]+/g).map(Number); const l = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }; return 0.2126 * l(m[0]) + 0.7152 * l(m[1]) + 0.0722 * l(m[2]); });
+      dit(lum < 0.25, 'G1b. dans la feuille (porcelaine), les titres de groupe sont à l’encre SOMBRE (lisibles)', String(lum));
+      await capt(pg, '390-pourquoi');
+      await pg.click('[data-ebt-ajouter="Pointure:42"]');
+      await attendre(pg, '.vrm-confirmation');
+      await pg.locator('.vrm-confirmation').getByRole('button', { name: 'Annuler', exact: true }).click();
+      await pg.waitForTimeout(400);
+      dit(!envois.some((e) => e.action === 'corrigeraspects'), 'G2. « Annuler » dans la confirmation : rien ne part');
+      await pg.click('[data-ebt-ajouter="Pointure:42"]');
+      await attendre(pg, '.vrm-confirmation');
+      await pg.locator('.vrm-confirmation').getByRole('button', { name: 'Ajouter', exact: true }).click();
+      await attendre(pg, '[data-ebt-issue="fait"]');
+      const e1 = envois.find((e) => e.action === 'corrigeraspects') || {};
+      dit(e1.itemId === '110000000001' && e1.confirme === true && JSON.stringify(e1.aspects) === '{"Pointure":"42"}', 'G3. confirmé : UNE caractéristique part, la valeur proposée par eBay, `confirme` posé', JSON.stringify(e1));
+      await attendre(pg, '[data-ebt-photos="3"]');
+      await pg.click('[data-ebt-photos="3"]');
+      await attendre(pg, '.vrm-confirmation');
+      await pg.locator('.vrm-confirmation').getByRole('button', { name: 'Ajouter les photos', exact: true }).click();
+      await pg.waitForTimeout(800);
+      const e2 = envois.find((e) => e.action === 'ajouterphotos') || {};
+      dit(e2.nVu === 2 && Array.isArray(e2.photos) && e2.photos.length === 3 && e2.photos[0] === 'https://images1.vinted.net/t/12a.jpg' && e2.confirme === true, 'G4. les photos de LA fiche du N°12 (par identité) et le nombre vu (2)', JSON.stringify(e2));
+      await pg.keyboard.press('Escape').catch(() => {});
+      await aller(pg, 'tab=plat_ebay&section=sante');
+      await attendre(pg, '[data-ebt-geste="evidentes"]');
+      await pg.click('[data-ebt-geste="evidentes"]');
+      await attendre(pg, '.vrm-confirmation');
+      const txt = await pg.locator('.vrm-confirmation').innerText();
+      dit(/VRM-12/.test(txt) && /Couleur Blanc/.test(txt) && !/Pointure 42/.test(txt), 'G5. « Compléter les évidentes » : la liste est montrée AVANT (VRM-12 : Couleur Blanc ; pas la Pointure, eBay propose deux valeurs)', txt.replace(/\s+/g, ' ').slice(0, 160));
+      await pg.locator('.vrm-confirmation').getByRole('button', { name: 'Annuler', exact: true }).click();
+      await aller(pg, 'tab=plat_ebay&section=argent');
+      await attendre(pg, '[data-ebt-calendrier]');
+      const cal = await pg.$$eval('[data-ebt-cal]', (l) => l.map((x) => x.getAttribute('data-ebt-cal')));
+      dit(cal.join() === 'en-route,prochain,arrive', 'G6. calendrier : en route (14 nov.), au prochain versement (disponible), arrivé (10 nov.)', cal.join());
+      await capt(pg, '390-calendrier');
+      await aller(pg, 'tab=journee');
+      await attendre(pg, '[data-ebt-journee]');
+      dit((await pg.getAttribute('[data-ebt-journee]', 'data-ebt-journee')) === 'en-route', 'G7. Ma journée : « eBay : 50,00 € en route » (lu en base, aucun appel eBay)');
     });
     await ctx.close();
     // ── 1 000 annonces : 40 rangées dessinées, la suite derrière « Tout afficher »
