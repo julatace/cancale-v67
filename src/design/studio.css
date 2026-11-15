@@ -198,7 +198,7 @@ html[data-theme="light"] body, html[data-theme="dark"] body { background: var(--
 .sb-prix { font-family: var(--sb-police-affiche); font-weight: 600; font-size: 21px; line-height: 1; letter-spacing: -.02em; font-feature-settings: var(--sb-chiffres); white-space: nowrap; }
 .sb-prix .sb-eur { font-size: .68em; transform: translateY(-.2em); margin-left: .16em; font-weight: 400; }
 /* Le titre d'écran et la ligne au-dessus. */
-.sb-ecran-titre { font-weight: 650; font-size: 34px; line-height: 1; letter-spacing: -.03em; color: var(--sb-encre); margin: 0; }
+.sb-ecran-titre { font-weight: 600; font-size: 34px; line-height: 1; letter-spacing: -.03em; color: var(--sb-encre); margin: 0; }
 .sb-surtitre { font: 500 13px/1 var(--sb-police-texte); color: var(--sb-encre-2); margin: 0 0 7px; }
 @media (min-width: 1024px) { .sb-ecran-titre { font-size: 38px; } .sb-chiffre-affiche { font-size: 104px; } }
 
