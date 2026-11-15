@@ -49,6 +49,36 @@ const MAIN = {
     Object.fromEntries(Array.from({ length: 30 }, (_, k) => [String(k + 20), { m: 'mA', i: k }]))),
   vrm_num_doublons: { nums: ['21'], at: Date.now() },
 };
+// (15 nov., sites sur la case) Par IDENTITÉ : N°23 vit sur un 2e compte Vinted SANS login connu (aucun pseudo ne doit
+// s'écrire, jamais l'identifiant « 333 ») ; N°20 est aussi sur Leboncoin par SA référence « VRM-20 » (compte « nord_lbc ») ;
+// une annonce Leboncoin au MÊME titre que N°21 porte la référence d'une autre paire (« VRM-999 ») : N°21 n'en reçoit rien.
+const i23 = enLigne.findIndex((x) => x.id === '900023');
+const enLigne333 = enLigne.splice(i23, 1);
+fiches['900023'].accountId = '333';
+const LIGNES = {
+  harvest_111_listings: { id: 'harvest_111_listings', data: { capturedAt: new Date().toISOString(), complet: true, payload: { items: enLigne } } },
+  harvest_333_listings: { id: 'harvest_333_listings', data: { capturedAt: new Date().toISOString(), complet: true, payload: { items: enLigne333 } } },
+  lbc_listings: { id: 'lbc_listings', data: { items: {
+    L20: { id: 'L20', account: 'lbc1', customRef: 'VRM-20', subject: 'Basket Leboncoin vingt', status: 'active', price: [95] },
+    L99: { id: 'L99', account: 'lbc1', customRef: 'VRM-999', subject: fiches['900021'].title, status: 'active', price: [70] },
+  }, lectures: { lbc1: { at: new Date(Date.now() - 3600000).toISOString(), total: 2, n: 2 } } } },
+  lbc_ventes: { id: 'lbc_ventes', data: { ventes: {} } },
+  lbc_accounts: { id: 'lbc_accounts', data: { accounts: { lbc1: { id: 'lbc1', name: 'nord_lbc' } } } },
+};
+// La VRAIE forme : projection `select=` (alias:data->x->>y), comme scripts/bancs/stock-annonces.cjs.
+const projette = (row, sel) => {
+  if (!sel || sel === '*') return row;
+  const out = {};
+  for (const part of sel.split(',')) {
+    const m = /^(?:([^:]+):)?(.+)$/.exec(part.trim()); if (!m) continue;
+    const src = m[2], alias = m[1] || src.split(/->>|->/).pop();
+    if (src === 'id') { out[alias] = row.id; continue; }
+    if (src === 'data') { out[alias] = row.data; continue; }
+    let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg];
+    out[alias] = v == null ? null : (src.includes('->>') && typeof v === 'object' ? JSON.stringify(v) : v);
+  }
+  return out;
+};
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d !== undefined && !c ? ' — ' + String(typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 400) : '')); };
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2' };
@@ -82,9 +112,11 @@ async function rendre(b, tel, sombre) {
       return j([]);
     }
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
-    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j([{ id: 1, vinted_user_id: '111', login: 'compte_invente', domain: 'www.vinted.fr', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }]);
+    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j([{ id: 2, vinted_user_id: '333', login: null, domain: 'www.vinted.fr', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { id: 1, vinted_user_id: '111', login: 'compte_invente', domain: 'www.vinted.fr', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }]);
     if (/id=eq\.main/.test(u)) return j([{ id: 'main', data: MAIN }]);
-    if (/id=eq\.harvest_111_listings/.test(u)) return j([{ id: 'harvest_111_listings', data: { capturedAt: new Date().toISOString(), complet: true, payload: { items: enLigne } } }]);
+    const eq = /id=eq\.([^&]*)/.exec(u);
+    const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
+    if (eq && LIGNES[eq[1]]) return j([sel && !/^id,data$|^data$/.test(sel) ? projette(LIGNES[eq[1]], sel) : LIGNES[eq[1]]]);
     return j([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
@@ -145,6 +177,21 @@ async function retirerCase(pg, n) {
         const autresRouges = await pg.evaluate(() => [...document.querySelectorAll('.vrm-s2d-case')].filter((c) => !c.classList.contains('is-double')).filter((c) => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(getComputedStyle(c).boxShadow + ' ' + getComputedStyle(c).backgroundColor); if (!m) return false; const [x, y, z] = m.slice(1).map(Number); return x > 170 && y < 90 && z < 90; }).length);
         dit(autresRouges === 0, `${t} · B : aucune autre case rouge`, autresRouges);
         if (CAPT) { await pg.evaluate(() => { const m = document.querySelector('[data-meuble="mA"]'); if (m) m.scrollIntoView({ block: 'start' }); }); await pg.waitForTimeout(300); await pg.screenshot({ path: path.join(CAPT, `etag-${v}-1-repris.png`), fullPage: false }); }
+        // ── K : les sites et le compte sur la case (par identité) ──
+        const K = await pg.evaluate(() => { const c = (n) => { const e = document.querySelector(`[data-case-num="${n}"]`); if (!e) return null; const b = e.querySelector('.vrm-etag-sites'); const t = b && b.querySelector('.vrm-etag-compte'); const sv = b ? [...b.querySelectorAll('svg[data-marque]')] : []; return { sites: b ? b.getAttribute('data-case-sites') : null, compte: b ? b.getAttribute('data-case-compte') : null, texte: t ? t.textContent : '', logos: sv.map((x) => Math.round(x.getBoundingClientRect().height)), police: t ? parseFloat(getComputedStyle(t).fontSize) : 0, coupe: t ? t.scrollWidth > t.clientWidth + 1 : false, dedans: b ? b.getBoundingClientRect().right <= e.getBoundingClientRect().right + 0.5 : true }; }; return { n20: c('20'), n21: c('21'), n23: c('23') }; });
+        dit(!!K.n20 && /vinted:enligne/.test(K.n20.sites || '') && /leboncoin:enligne/.test(K.n20.sites || '') && K.n20.compte === 'compte_invente', `${t} · K1 : N°20 montre Vinted ET Leboncoin (sa référence VRM-20) et son compte « compte_invente »`, K.n20);
+        dit(!!K.n21 && K.n21.sites === 'vinted:enligne', `${t} · K2 : N°21 — une annonce Leboncoin au MÊME titre (autre paire, VRM-999) ne lui donne aucun logo`, K.n21);
+        dit(!!K.n23 && K.n23.sites === 'vinted:enligne' && !K.n23.compte && K.n23.texte === '', `${t} · K3 : N°23, compte sans pseudo connu ⇒ aucun nom (jamais l'identifiant « 333 »)`, K.n23);
+        dit(!!K.n20 && K.n20.logos.length === 2 && K.n20.logos.every((h) => h >= 13 && h <= 16) && K.n20.police >= 10 && K.n20.dedans, `${t} · K4 : logos 14 px, compte ≥ 10 px, tenus dans la case`, K.n20);
+        if (CAPT) { await pg.evaluate(() => document.querySelector('[data-case-num="20"]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(300); await pg.screenshot({ path: path.join(CAPT, `etag-${v}-0-sites.png`) }); }
+        if (complet) {
+          await toucher(pg, '[data-case-num="20"]');
+          await pg.waitForSelector('[data-fiche-sites]', { timeout: 8000 }).catch(() => {});
+          const fs2 = await pg.evaluate(() => { const l = [...document.querySelectorAll('[data-fiche-site]')]; return l.map((x) => x.getAttribute('data-fiche-site') + ':' + (x.getAttribute('data-compte') || '') + ':' + x.textContent.replace(/\s+/g, ' ').trim()); });
+          dit(fs2.length === 2 && /^vinted:compte_invente:/.test(fs2[0]) && /^leboncoin:nord_lbc:.*95/.test(fs2[1]), `${t} · K5 : la fiche de N°20 dit une ligne par site (logo · compte · prix · depuis)`, fs2);
+          if (CAPT) await pg.screenshot({ path: path.join(CAPT, `etag-${v}-0b-fiche-sites.png`) });
+          await fermerFiche(pg); await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(400);
+        }
         if (!complet) {
           const x = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
           dit(x.sw <= x.cw + 1, `${t} · H : aucune page plus large que l'écran`, x);
@@ -163,7 +210,7 @@ async function retirerCase(pg, n) {
         const barre = await pg.evaluate(() => { const b = document.querySelector('[data-stock-recherche]'); if (!b) return null; const cs = getComputedStyle(b); const c = cs.backgroundColor; const m = /rgba?\(([^)]+)\)/.exec(c) || /color\(srgb ([^)]+)\)/.exec(c); let a = 1; if (m) { const p = m[1].split(/[\s,\/]+/).filter(Boolean); if (p.length >= 4) a = Number(p[3]); } if (/transparent/.test(c)) a = 0; const q = b.getBoundingClientRect(); const vue = q.bottom > 0 && q.top < innerHeight; const e = vue ? document.elementFromPoint(q.left + q.width - 70, q.top + q.height / 2) : null; const img = (() => { const c = document.querySelector('[data-meuble="mA"] .vrm-s2d-case[data-case-num] img'); if (!c) return null; const r = c.getBoundingClientRect(), k = getComputedStyle(c); return { vu: c.hasAttribute('data-vu'), pv: c.getAttribute('data-photo-vinted'), anim: k.animationName + ' ' + k.animationPlayState + ' ' + k.animationDelay, tr: k.transition.slice(0, 60), w: Math.round(r.width), h: Math.round(r.height), op: k.opacity, vis: k.visibility, src: (c.currentSrc || c.src || '').slice(-22), nat: c.naturalWidth, z: k.zIndex, pos: k.position, sous: (() => { const el = document.elementFromPoint(r.left + r.width / 2, r.top + 8); return el ? (el.tagName + '.' + String(el.className).slice(0, 40)) : null; })() }; })(); return { a, z: cs.zIndex, vue, top: Math.round(q.top), dessus: vue ? !!(e && b.contains(e)) : null, par: e ? (e.tagName + '.' + String(e.className).slice(0, 40)) : null, pos: cs.position, img }; });
         if (process.env.BANC_DEBUG) console.log('    (barre ' + JSON.stringify(barre) + ')');
         dit(!!barre && barre.a >= 0.9 && barre.dessus !== false, `${t} · V1 : la recherche collée est opaque et passe AU-DESSUS des cases`, barre);
-        const vig = await pg.evaluate(() => { const cs = [...document.querySelectorAll('[data-meuble="mA"] .vrm-s2d-case[data-case-num]')].filter((c) => { const q = c.getBoundingClientRect(); return q.top >= 0 && q.bottom <= innerHeight; }); const im = cs.filter((c) => { const i = c.querySelector('img'); return i && i.complete && i.naturalWidth > 0; }).length; const lettres = cs.filter((c) => { const t = [...c.childNodes].filter((n) => !(n.classList && n.classList.contains('vrm-s2d-num'))).map((n) => n.textContent || '').join('').trim(); return t.length > 0; }).length; const pl = cs[0] && cs[0].querySelector('.vrm-s2d-num'); return { n: cs.length, im, lettres, plaque: pl ? parseFloat(getComputedStyle(pl).fontSize) : 0 }; });
+        const vig = await pg.evaluate(() => { const cs = [...document.querySelectorAll('[data-meuble="mA"] .vrm-s2d-case[data-case-num]')].filter((c) => { const q = c.getBoundingClientRect(); return q.top >= 0 && q.bottom <= innerHeight; }); const im = cs.filter((c) => { const i = c.querySelector('img'); return i && i.complete && i.naturalWidth > 0; }).length; const lettres = cs.filter((c) => { const t = [...c.childNodes].filter((n) => !(n.classList && (n.classList.contains('vrm-s2d-num') || n.classList.contains('vrm-etag-sites')))).map((n) => n.textContent || '').join('').trim(); return t.length > 0; }).length; const pl = cs[0] && cs[0].querySelector('.vrm-s2d-num'); return { n: cs.length, im, lettres, plaque: pl ? parseFloat(getComputedStyle(pl).fontSize) : 0 }; });
         dit(vig.n > 0 && vig.im === vig.n && vig.lettres === 0 && vig.plaque >= 11, `${t} · V2 : chaque case montre la PHOTO de sa paire, aucune lettre, le N° en plaque (≥ 11 px)`, vig);
         const pied = await pg.evaluate(() => { const a = document.querySelector('[data-creer-meuble]'), b = document.querySelector('[data-stock-explication-ouvrir]'); if (!a || !b) return null; const p = a.getBoundingClientRect(), q = b.getBoundingClientRect(); const recouvre = !(p.right <= q.left || q.right <= p.left || p.bottom <= q.top || q.bottom <= p.top); return { recouvre, ligne: Math.abs((p.top + p.bottom) / 2 - (q.top + q.bottom) / 2) < 4, h: [Math.round(p.height), Math.round(q.height)] }; });
         dit(!!pied && !pied.recouvre && pied.ligne && pied.h[0] >= (tel ? 44 : 40), `${t} · V3 : « Ajouter un meuble » et « Comment ça marche ? » sur une ligne, sans se chevaucher`, pied);

@@ -42,7 +42,7 @@ const RANG_ETAT = { enligne: 0, masquee: 1, aconfirmer: 2 };
 // Leboncoin dans `lbc_accounts`, pseudo eBay ; jamais un identifiant — inconnu ⇒ ''), son prix et sa date de mise
 // en ligne s'ils sont lus. Un nombre ou rien (jamais 0 deviné).
 const pseudoLu = (x) => { const t = String(x == null ? '' : x).trim(); return t && !/^(#|n°\s)/i.test(t) && !/^\d{5,}$/.test(t) ? t.slice(0, 40) : ''; };
-const prixLu = (p) => { const v = p && typeof p === 'object' ? (p.amount != null ? p.amount : p.value) : (Array.isArray(p) ? p[0] : p); const n = Number(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null; };
+const prixLu = (p) => { const v = Array.isArray(p) ? p[0] : (p && typeof p === 'object' ? (p.amount != null ? p.amount : p.value) : p); const n = Number(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null; };
 const dateLue = (d) => { if (d == null || d === '') return null; const n = Number(d); const t = Number.isFinite(n) && n > 0 ? (n < 1e12 ? n * 1000 : n) : Date.parse(String(d)); return Number.isFinite(t) && t > 0 ? t : null; };
 
 // Les annonces Vestiaire telles que le Stock les compte (module PUR).
