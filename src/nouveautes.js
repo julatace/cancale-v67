@@ -26,7 +26,7 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
-  // (15 nov., extension 5.383, Julien : « vraiment exactement la même photo ») docs/passation/2026-11-15-meme-photo.md
+  // (15 nov., extension 5.384, Julien : « vraiment exactement la même photo ») docs/passation/2026-11-15-meme-photo.md
   { id: 'meme-photo', date: '2026-11-15', titre: 'Même photo qu’une paire Vinted : relier', phrase: 'Leboncoin, eBay, Vestiaire : la même photo est reconnue, tu relies.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., lot retours) docs/passation/2026-11-15-retours.md — « À renvoyer » : une carte par retour d'achat.
   { id: 'retours-a-renvoyer', date: '2026-11-15', titre: 'Retours : bordereau, date et heure, une carte', phrase: 'En tête de Ma journée : imprime, dépose, suis le remboursement.', tab: 'achats', pour: 'tous', mode: 'tous' },

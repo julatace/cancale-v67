@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.383.0';
+const CODE_VERSION = '5.384.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -8367,7 +8367,7 @@ function tickEmpreintes() {
       if (v && age >= 0 && age < PHOTOS_TOUR_MS) return 0;
       await chrome.storage.local.set({ [EMPREINTES_TOUR]: { at: Date.now() } });
     } catch (_) { return 0; }
-    // 5.383 : Vinted d'abord ; sans image Vinted à ce tour, une photo Leboncoin / Vestiaire.
+    // 5.384 : Vinted d'abord ; sans image Vinted à ce tour, une photo Leboncoin / Vestiaire.
     // ⚠️ Le verrou du tour se lève dans TOUS les cas (un `finally` pour les deux) : sinon une image
     //    Vinted laissait le tour verrouillé 3 min (vu par audit-photos-comptes, E2).
     try {
@@ -8381,7 +8381,7 @@ function tickEmpreintes() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 5.383 (15 nov.) — LA MÊME PHOTO SUR LEBONCOIN ET VESTIAIRE (lot meme-photo)
+// 5.384 (15 nov.) — LA MÊME PHOTO SUR LEBONCOIN ET VESTIAIRE (lot meme-photo)
 // ══════════════════════════════════════════════════════════════════════════════
 // Julien : « quand je poste une paire sur Vinted et que je la poste après sur Leboncoin
 // sans avoir dit que c'était la même, je veux que VRM propose que c'est exactement la

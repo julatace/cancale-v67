@@ -1,4 +1,4 @@
-# 15 nov. — « Même photo · à relier » (branche `claude/meme-photo`, extension 5.383.0)
+# 15 nov. — « Même photo · à relier » (branche `claude/meme-photo`, extension 5.384.0)
 
 Julien : « quand je poste une paire sur Vinted et que je la poste après sur Leboncoin sans avoir dit
 que c'était la même, je veux que VRM propose que c'est exactement la même — on ne parle pas du tout
@@ -46,7 +46,7 @@ côté). Une distance = meilleur dHash + meilleur pHash / 2 sur les 3 × 3 combi
   ⇒ AMBIGU (les deux montrées, il choisit) ; N° porté par deux paires ⇒ « à vérifier » ; annonce
   Vinted sans N° ⇒ rien. « Ce n'est pas la même » (`vrm_meme_photo_non`, SYNC_KEYS, clé
   `Site:annonce|N°`) ⇒ le couple ne revient plus. Aucun titre, marque, taille, prix.
-- **Extension 5.383.0** (`empreintesSitesUnTour`, après Vinted dans `tickEmpreintes`) : Leboncoin et
+- **Extension 5.384.0** (`empreintesSitesUnTour`, après Vinted dans `tickEmpreintes`) : Leboncoin et
   Vestiaire, seulement les annonces du compte CONNECTÉ dans un onglet de ce site (`ongletImpSite`),
   une image par tour, 45 s, `credentials:'omit'`, ≤ 900 Ko, budget de LECTURE du compte sur le site
   (`compterLecture('leboncoin:<compte>', 8)` : les photos s'arrêtent à 8 des 20 lectures/h, l'import
@@ -76,7 +76,7 @@ côté). Une distance = meilleur dHash + meilleur pHash / 2 sur les 3 × 3 combi
   `numeroExterne` n'est pas touché. Le retrait ailleurs, les ventes croisées et la garde des offres
   voient la liaison sans rien changer chez eux.
 - Textes `memePhoto.*` en 5 langues, « Quoi de neuf » `meme-photo`, `EXT_CAPACITES.memephoto =
-  5.383.0` (audit-coherence : `empreintesSitesUnTour`), `MIGRES` de audit-studio.
+  5.384.0` (audit-coherence : `empreintesSitesUnTour`), `MIGRES` de audit-studio.
 
 ## Preuves
 
@@ -101,7 +101,7 @@ côté). Une distance = meilleur dHash + meilleur pHash / 2 sur les 3 × 3 combi
 
 ## Ce qui reste à vérifier sur ses vraies annonces
 
-1. **Aucune empreinte n'existe encore chez lui** : il faut l'extension 5.383 dans SON Chrome, un
+1. **Aucune empreinte n'existe encore chez lui** : il faut l'extension 5.384 dans SON Chrome, un
    onglet vinted.fr et un onglet leboncoin.fr ouverts (sur chacun de ses comptes) ; à 8 images/h par
    compte Leboncoin, ses 11 annonces sont lues en ~2 h d'onglet ouvert.
 2. **Leboncoin recompresse-t-il plus fort que le jeu inventé ?** Le banc couvre WebP 60 + moitié ;

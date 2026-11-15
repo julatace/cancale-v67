@@ -9,7 +9,7 @@
 // • L'entrée : les EMPREINTES perceptuelles (src/photoEmpreinte.js : dHash + pHash à
 //   trois recadrages ; seuil de proposition MESURÉ `SEUIL_MEME_PHOTO`, plus strict) de ses annonces Vinted
 //   (`photo_emprunte_{uid}`, extension 5.358) et de ses annonces Leboncoin, eBay,
-//   Vestiaire (`photo_empreinte_{lbc|vc|ebay}`, extension 5.383 / page pour eBay).
+//   Vestiaire (`photo_empreinte_{lbc|vc|ebay}`, extension 5.384 / page pour eBay).
 //   Jamais un titre, une marque, une taille ou un prix : seule la photo compte.
 // • La sortie : des PROPOSITIONS. §5 « une proposition peut utiliser la
 //   ressemblance ; c'est toujours SON clic qui relie » : ce module ne relie rien,
