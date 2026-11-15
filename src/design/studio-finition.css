@@ -59,6 +59,7 @@
 .vrm-hdr-recherche :is(.vrm-micro, .vrm-hdr-recherche-fermer) { margin-left: 0 !important; }
 .vrm-hdr-recherche { gap: 4px !important; padding-right: max(12px, env(safe-area-inset-right)) !important; }
 .vrm-hdr-recherche .vrm-hdr-recherche-fermer { padding: 0 4px 0 6px !important; }
+.vrm-hdr-recherche .vrm-recherche-champ { flex: 1 1 0 !important; min-width: 0 !important; width: auto !important; }
 
 /* ── 5. LE DISQUE « + » : les quatre lames (100 px de large, 82 px d'écart) se chevauchaient ; 80 px chacune.
    Le voile un peu plus couvrant : les mots de l'éventail ne se lisent plus PAR-DESSUS les chiffres de l'écran. */
@@ -135,4 +136,24 @@
   [data-fe-vente]:has([data-spdp-envoyer], [data-spdp-relire]) { flex-wrap: wrap !important; }
   [data-fe-vente] [data-fe-facture] { flex: 0 0 auto !important; min-height: 44px !important; padding: 0 12px !important; }
 }
+
+/* ── 18. LES COLIS À RETIRER (Ma journée, la carte dépliée — Julien : « fais ça mieux pour les colis ») : la colonne des
+   codes a une largeur fixe (les vignettes et les noms s'alignent d'une rangée à l'autre, quel que soit le code) ; la
+   ligne du point passe sur deux lignes plutôt que de couper la date d'arrivée ; une vignette sans photo porte le LOGO
+   du transporteur (src : `data-sj-vignette="transporteur"`), posé plein cadre. */
+.sj-journee .sj-code-rangee { grid-template-columns: minmax(96px, max-content) 40px minmax(0, 1fr) !important; }
+.sj-journee .sj-code-rangee > .sb-plaque { justify-self: stretch !important; justify-content: center !important; text-align: center !important; }
+.sj-journee .sj-code-rangee .sj-r-meta { white-space: normal !important; display: -webkit-box !important; -webkit-line-clamp: 2 !important; -webkit-box-orient: vertical !important; overflow: hidden !important; line-height: 1.25 !important; }
+.sj-journee .sj-code-rangee .sb-vignette.is-logo { background: none !important; box-shadow: none !important; padding: 0 !important; overflow: hidden !important; }
+.sj-journee .sj-code-rangee .sb-vignette.is-logo > [data-transporteur-logo] { width: 100% !important; height: 100% !important; border-radius: inherit !important; }
+
+/* ── 19. LE NUAGE BARRÉ DE LA TÊTE : il dit son mot (« Pas enregistré », « À recharger ») — une pastille, plus un rond muet. */
+.vrm-hbtn.vrm-sync-status:has(.vrm-sync-mot) { width: auto !important; min-width: 44px !important; padding: 0 12px 0 10px !important; gap: 6px !important; border-radius: 22px !important; display: inline-flex !important; align-items: center !important; }
+.vrm-sync-mot { font: 600 13px/1 var(--sb-police-texte, inherit) !important; color: var(--sb-ambre, #965900) !important; white-space: nowrap !important; }
+
+/* ── 20. LA FICHE D'UN COLIS À RETIRER : « Point » — le nom, l'adresse entière dessous, alignés à droite comme les autres valeurs. */
+[data-rpf-point] .vrm-rpf-fiche-v { flex: 1 1 auto !important; min-width: 0 !important; background: none !important; box-shadow: none !important; padding: 0 !important; white-space: normal !important; }
+.vrm-rpf-lieu { display: block !important; text-align: right !important; background: none !important; box-shadow: none !important; padding: 0 !important; border-radius: 0 !important; white-space: normal !important; }
+.vrm-rpf-lieu-nom { display: block !important; font-weight: 600 !important; }
+.vrm-rpf-lieu-adr { display: block !important; margin-top: 2px !important; font-size: 13px !important; font-weight: 500 !important; color: var(--sb-encre-2, #4A5A6E) !important; overflow-wrap: anywhere !important; }
 }

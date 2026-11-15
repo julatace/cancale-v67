@@ -36,6 +36,25 @@ const VOULUS = liste('ECRANS', '');
 const CAPTURE = process.env.CAPTURE === '1';
 const PLEIN = process.env.PLEIN === '1';
 
+// ── La base : `_base-messages-stock` + des colis À RETIRER (inventés) — deux Mondial Relay qu'aucune commande ne
+// nomme (codes 975876, 866045, un point au nom long), un achat Vinted Go au point (son code dans la conversation,
+// SA photo, une adresse longue) — la carte « À retirer » de Ma journée et Achats → À retirer en ont besoin.
+const J = 864e5, ilYa = (j) => new Date(Date.now() - j * J).toISOString();
+const jourDans = (j) => { const d = new Date(Date.now() + j * J); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const DEPOSE = "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais";
+function base() {
+  const b = B.baseVolume();
+  const m = b.main[0].data;
+  m.vrm_plateformes_affichees = { sites: ['vinted', 'leboncoin', 'ebay', 'vestiaire'], at: '2026-11-01T10:00:00.000Z' };
+  const a0 = b.accounts[0]; const uid = a0.vinted_user_id;
+  const LIEU = 'INTERMARCHE SUPER, 43 RUE DU LIEUTENANT FERNAND DUPONT, 35000 VILLEA';
+  const mr = (n, code, j) => ({ id: `email_track_mondialrelay_${n}`, data: { type: 'suivi', carrier: 'mondialrelay', suivi: String(n), status: 'available', statusLabel: 'Arrivé au point de retrait', subject: `Votre colis ${n} est disponible`, receivedAt: ilYa(j), emailAt: ilYa(j), arriveLe: ilYa(j), code, lieu: LIEU, limite: jourDans(4), consigne: false, account: a0.login } });
+  b.rows.push(mr(91000001, '975876', 1), mr(91000002, '866045', 2));
+  const ach = b.rows.find((r) => r.id === `harvest_${uid}_orders_purchased`);
+  if (ach) ach.data.payload.my_orders.unshift({ transaction_id: 7700001, conversation_id: 'aaaa0000-0000-4000-8000-000000770001', title: 'Scarpe Nike ginnastica bianche taglia 42', price: { amount: '39.0', currency_code: 'EUR' }, status: DEPOSE, transaction_user_status: 'needs_action', date: ilYa(3), photo: { url: 'https://images1.vinted.net/t/r7700001/f800/x.jpeg?s=x' } });
+  b.rows.push({ id: 'panel_colis_relais', data: { 7700001: { tx: '7700001', code: '348094', lieu: 'Consigne Vinted Go, 43 Rue du Lieutenant Fernand Dupont, 35000 Villea', conv: 'aaaa0000-0000-4000-8000-000000770001', titre: 'Scarpe Nike ginnastica bianche taglia 42', at: ilYa(1), arriveLe: ilYa(1), transporteur: 'Vinted Go', qr: '', url: '', item: '', photo: '' } } });
+  return b;
+}
 const attendre = (pg, sel, t = 8000) => pg.waitForSelector(sel, { timeout: t }).catch(() => null);
 const toucher = async (o, sel) => {
   const l = o.pg.locator(sel).first();
@@ -49,11 +68,17 @@ const toucher = async (o, sel) => {
 // Chaque écran : son adresse, ce qu'il faut toucher pour l'atteindre, et la zone jugée.
 const ECRANS = [
   { nom: 'journee', url: '/?tab=journee' },
+  { nom: 'journee-retirer', url: '/?tab=journee', avant: async (o) => { await attendre(o.pg, '[data-sj-zone="retirer"]', 15000); await toucher(o, '[data-sj-zone="retirer"]'); return !!(await attendre(o.pg, '[data-sj-deplie="retirer"]', 6000)); } },
   { nom: 'ventes', url: '/?tab=cat_bord' },
   { nom: 'ventes-envoyes', url: '/?tab=cat_bord', avant: (o) => toucher(o, '[data-colis-onglet-choix="envoyes"]') },
   { nom: 'ventes-fiche', url: '/?tab=cat_bord', zone: ['.vrm-fp', '.vrm-fs'], avant: async (o) => { const ok = await toucher(o, '[data-bord-card] .vrm-colis-titre'); await attendre(o.pg, '.vrm-fp, .vrm-fs', 5000); return ok; } },
-  { nom: 'impression', url: '/?tab=cat_bord', zone: ['.vrm-fs', '.vrm-fp', '[data-lot]'], avant: async (o) => { await toucher(o, 'button[data-lot-ouvrir]'); return !!(await attendre(o.pg, '[data-lot]', 6000)); } },
+  { nom: 'impression', url: '/?tab=cat_bord', zone: ['.vrm-fs', '.vrm-fp', '[data-lot]'], avant: async (o) => {
+    // (la liste lue d'abord : un toucher sur « Choisir » avant elle ne fait rien ; un second, par le DOM, si la feuille n'est pas venue)
+    await attendre(o.pg, '[data-bord-card]', 15000); await toucher(o, 'button[data-lot-ouvrir]');
+    if (!(await attendre(o.pg, '[data-lot]', 6000))) { await o.pg.evaluate(() => { const b = document.querySelector('button[data-lot-ouvrir]'); if (b) b.click(); }); await attendre(o.pg, '[data-lot]', 10000); }
+    return !!(await o.pg.$('[data-lot]')); } },
   { nom: 'achats', url: '/?tab=achats' },
+  { nom: 'achats-fiche-colis', url: '/?tab=achats', zone: ['.vrm-fp', '.vrm-fs'], avant: async (o) => { await attendre(o.pg, '.vrm-rpf-code-gros, .vrm-rpf-titre', 15000); const ok = await toucher(o, '.vrm-rpf-titre'); await attendre(o.pg, '.vrm-fp, .vrm-fs', 5000); return ok; } },
   { nom: 'achats-verifier', url: '/?tab=achats', avant: async (o) => { await o.pg.evaluate(() => { const e = document.querySelector('[data-achats-averifier], [data-repli="averifier"], [data-retirer-verifier]'); if (e) e.scrollIntoView({ block: 'start' }); }); return true; } },
   { nom: 'annonces', url: '/?tab=annonces' },
   { nom: 'stock', url: '/?tab=garage' },
@@ -115,7 +140,7 @@ function mesurerPage({ tactile, zone, surveilles }) {
   const droiteVue = (el) => { let d = el.getBoundingClientRect().right; for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) { const cs = getComputedStyle(p); if (/(hidden|clip|auto|scroll)/.test(cs.overflowX)) d = Math.min(d, p.getBoundingClientRect().right); } return d; };
   const bandeDeCote = (el) => { for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) { const cs = getComputedStyle(p); if (/(auto|scroll)/.test(cs.overflowX) && p.scrollWidth > p.clientWidth + 1) return true; } return false; };
   const roots = [...new Set(zone.flatMap((s) => [...document.querySelectorAll(s)]))].filter(vis);
-  const out = { debordePage: null, deborde: [], chevauche: [], coupes: [], coupesAutres: [], cibles: [], typo: [], racines: roots.length };
+  const out = { debordePage: null, deborde: [], chevauche: [], coupes: [], coupesAutres: [], cibles: [], typo: [], racines: roots.length, doubles: [], vignettesVides: [] };
   const se = document.scrollingElement || document.documentElement;
   if (se.scrollWidth > vw + 1) out.debordePage = `${se.scrollWidth} > ${vw}`;
   const nom = (el) => {
@@ -204,8 +229,40 @@ function mesurerPage({ tactile, zone, surveilles }) {
   };
   chev(inter, 'boutons');
   chev(textes, 'textes');
+  // (15 nov., Julien : « fais ça mieux pour les colis ») N : un même fait porteur d'un nombre (« + 6 à vérifier »)
+  // écrit deux fois dans une même carte ouverte (le déplié de Ma journée, une fiche, une feuille).
+  for (const z of document.querySelectorAll('[data-sj-deplie], .vrm-fp, [data-lot]')) {
+    if (!vis(z)) continue;
+    const vus2 = new Map();
+    for (const e of z.querySelectorAll('*')) {
+      if (!vis(e) || e.closest('.vrm-sr-seul')) continue;
+      const t = [...e.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join('').replace(/\s+/g, ' ').trim();
+      if (!/\d/.test(t) || t.length < 4 || /^[\d\s:,.€%-]+$/.test(t)) continue;
+      vus2.set(t, (vus2.get(t) || 0) + 1);
+    }
+    for (const [t, n] of vus2) if (n > 1 && /\+|vérifier|retirer/.test(t)) out.doubles.push(`« ${t} » × ${n}`);
+  }
+  // V : une case d'image sans photo NI logo (une épingle dans une case grise ne dit pas quelle paire).
+  for (const v of document.querySelectorAll('.sb-vignette, [data-sj-vignette]')) if (vis(v) && (v.classList.contains('is-vide') || v.getAttribute('data-sj-vignette') === 'vide')) out.vignettesVides.push(nom(v.closest('[data-sj-code], [role="listitem"]') || v));
   for (const k of ['deborde', 'chevauche', 'coupes', 'coupesAutres', 'cibles', 'typo']) out[k] = [...new Set(out[k])];
   return out;
+}
+// B : mené tout en bas, ce qui est écrit en dernier finit-il AU-DESSUS de la barre du bas ?
+async function sousLaBarre(pg) {
+  await pg.evaluate(() => { for (const d of [document.scrollingElement, ...document.querySelectorAll('*')]) if (d && d.scrollHeight > d.clientHeight + 20 && (d === document.scrollingElement || /(auto|scroll)/.test(getComputedStyle(d).overflowY))) d.scrollTop = d.scrollHeight; });
+  await pg.waitForTimeout(700);
+  return pg.evaluate(() => {
+    const barre = document.querySelector('.vrm-tabbar'); const main = document.querySelector('.vrm-main'); if (!barre || !main) return [];
+    const haut = barre.getBoundingClientRect().top;
+    let bas = null;
+    for (const e of main.querySelectorAll('*')) {
+      if (![...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()) || e.closest('.vrm-sr-seul, [hidden]')) continue;
+      if (e.checkVisibility && !e.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })) continue;
+      const r = e.getBoundingClientRect(); if (r.height < 1 || r.width < 1) continue;
+      if (!bas || r.bottom > bas.r.bottom) bas = { e, r };
+    }
+    return bas && bas.r.bottom > haut + 1 && bas.r.top < window.innerHeight ? [`« ${bas.e.textContent.trim().slice(0, 40)} » finit à ${Math.round(bas.r.bottom)} px, la barre commence à ${Math.round(haut)} px`] : [];
+  });
 }
 
 (async () => {
@@ -221,7 +278,7 @@ function mesurerPage({ tactile, zone, surveilles }) {
       const tag = `${e.nom}-${W}-${t}`;
       let o;
       try {
-        o = await P.ouvrir(nav, { W, sombre: t === 'sombre', b: B.baseVolume(), url: e.url, api: B.apiVolume });
+        o = await P.ouvrir(nav, { W, sombre: t === 'sombre', b: base(), url: e.url, api: B.apiVolume });
         await P.pret(o.pg);
         let atteint = true;
         if (e.avant) atteint = await e.avant(o);
@@ -237,6 +294,9 @@ function mesurerPage({ tactile, zone, surveilles }) {
         dit(!m.coupes.length, `${tag} : E aucun libellé de la passe coupé par « … »`, m.coupes.slice(0, 8).join(' · '));
         if (o.tel) dit(!m.cibles.length, `${tag} : T cibles ≥ 44 px`, m.cibles.slice(0, 8).join(' · '));
         dit(!m.typo.length, `${tag} : F espaces insécables avant « : ; ? ! », « € », « N° »`, m.typo.slice(0, 6).join(' · '));
+        dit(!m.doubles.length, `${tag} : N un même fait n'est pas écrit deux fois dans une carte ouverte`, m.doubles.join(' · '));
+        dit(!m.vignettesVides.length, `${tag} : V aucune vignette vide (la photo par identité, sinon le logo du transporteur)`, m.vignettesVides.slice(0, 4).join(' · '));
+        if (o.tel && !e.zone && e.nom !== 'journee-retirer') { const sb = await sousLaBarre(o.pg); dit(!sb.length, `${tag} : B rien ne reste caché sous la barre du bas (mené tout en bas)`, sb.join(' · ')); }
         if (m.coupesAutres.length) autres.push(`${tag} : ${m.coupesAutres.length} coupe(s) hors passe — ${m.coupesAutres.slice(0, 4).join(' · ')}`);
       } catch (err) { dit(false, `${tag} : l'écran s'ouvre`, String(err && err.message || err).slice(0, 300)); }
       finally { if (o) await o.ctx.close().catch(() => {}); }
