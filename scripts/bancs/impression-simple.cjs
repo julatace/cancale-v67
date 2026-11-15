@@ -188,7 +188,8 @@ async function scenarioA(b, nom, sombre) {
   try {
     const pret = await attendre(pg, () => { const e = document.querySelector('[data-impr-lot]'); return e && e.getAttribute('data-impr-pret') === '1' && e.getAttribute('data-impr-lot') === '5'; }, null, 45000);
     const etat0 = await pg.evaluate(() => { const e = document.querySelector('[data-impr-lot]'); return e ? { n: e.getAttribute('data-impr-lot'), pret: e.getAttribute('data-impr-pret'), txt: e.innerText.trim() } : null; });
-    dit(pret && etat0 && /\(5\)/.test(etat0.txt), `${nom} : A0 « Imprimer (5) » est là, son PDF préparé d'avance (4 Vinted + 1 Vestiaire annoncé)`, JSON.stringify(etat0));
+    // (version studio) le plein du Studio dit « Imprimer 5 » (sans parenthèses, la place du rond d'encre) : le nombre suffit.
+    dit(pret && etat0 && /(^|\D)5(\D|$)/.test(etat0.txt), `${nom} : A0 « Imprimer (5) » est là, son PDF préparé d'avance (4 Vinted + 1 Vestiaire annoncé)`, JSON.stringify(etat0));
     dit(o.compte.pdf === 5, `${nom} : A0 au téléphone, seuls les 5 bordereaux qui PARTENT sont lus d'avance (une fois)`, String(o.compte.pdf));
     await shot(pg, `${nom}-ecran`);
     await toucher(o, '[data-impr-lot]');

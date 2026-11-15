@@ -105,7 +105,8 @@ async function telephone(nav, sombre, b) {
     const voile = document.querySelector('[data-sb-voile]'); const fv = voile ? K.sur(K.rgba(getComputedStyle(voile).backgroundColor), K.jeton('--sb-aplat')) : null;
     const plein = document.querySelector('[data-sb-lame] .sb-btn-plein'); const pc = plein && getComputedStyle(plein);
     const cs = (e) => getComputedStyle(e);
-    return { n: lames.length, ids: lames.map((l) => l.getAttribute('data-sb-lame')), pleins: document.querySelectorAll('[data-sb-eventail] .sb-btn-plein').length,
+    return { n: lames.length, ids: lames.map((l) => l.getAttribute('data-sb-lame')), pleins: document.querySelectorAll('[data-sb-lame] .sb-btn-plein').length,   // (version studio) DANS l'éventail : `data-sb-eventail` est posé sur <html>, il comptait aussi le plein de l'écran derrière (Ma journée en Bento)
+     
       dedans: lames.every((l) => { const r = l.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight; }),
       places: lames.map((l) => { const r = l.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom)]; }),
       nImprimer: (lames.find((l) => l.getAttribute('data-sb-lame') === 'imprimer') || { getAttribute: () => null }).getAttribute('data-sb-n'),

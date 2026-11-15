@@ -52308,10 +52308,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     attrs={{ 'data-colis-barre-btn': 'outils', 'data-colis-outils-bascule': '', 'aria-expanded': outilsColis ? 'true' : 'false' }}/>}
                 </>);
                 const plein = achatsSec ? null : (<>
-                  <BoutonPlein icone="printer" enCours={!!batchBusy} disabled={batchBusy || resLot.total === 0} onClick={ouvrirLot}
-                    libelle={batchBusy ? tr('sv.imprimer.enCours') : nLot > 0 ? tr('sv.imprimer.n', { n: nLot }) : tr('sv.imprimer.court')}
+                  {/* (14 nov., version studio) Le plein IMPRIME en un toucher (impression-simple) : le même geste que le
+                      bouton « Imprimer (N) » de la barre — le PDF du lot préparé d'avance s'ouvre DANS ce toucher ; plus rien
+                      de neuf ⇒ « Choisir » (`ouvrirLot`). Les data-* des deux chantiers sont portés ensemble. */}
+                  <BoutonPlein icone="printer" enCours={!!batchBusy || !!imprBusy} disabled={batchBusy || !!imprBusy || resLot.total === 0} onClick={() => { if (nLot > 0) imprimerLot(); else ouvrirLot(); }}
+                    libelle={batchBusy || imprBusy ? tr('sv.imprimer.enCours') : nLot > 0 ? tr('sv.imprimer.n', { n: nLot }) : tr('sv.imprimer.court')}
                     titre={nLot > 0 ? tr('sv.imprimer.titre', { n: nLot }) : resLot.total > 0 ? tr('sv.imprimer.rienDeNeuf') : tr('sv.imprimer.aucun')}
-                    attrs={{ 'data-colis-barre-btn': 'imprimer', 'data-lot-ouvrir': resLot.total > 0 ? '1' : '0', 'data-imprimer-prets': nLot }}/>
+                    attrs={{ 'data-colis-barre-btn': 'imprimer', 'data-lot-ouvrir': resLot.total > 0 ? '1' : '0', 'data-imprimer-prets': nLot, 'data-impr-lot': nLot, 'data-impr-pret': nLot > 0 && sigDefaut && pretPour(sigDefaut) ? '1' : '0', 'aria-pressed': imprBusy ? 'true' : undefined }}/>
                   {/* (6 nov.) Le conseil « Un envoi presse » (src/accompagnement.js) : le compte du bouton, inchangé. */}
                   <ChiffreConseil cle="colis.imprimer" valeur={baseKO ? null : { nLot, presse: !!gesteEnvoi({ aImprimer: bordereauxAImprimer(lignesImpr).map((l) => ({ jours: l.e && Number.isFinite(l.e.dl) ? l.e.dl : null })) }, { urgentSeul: true }) }}/>
                 </>);

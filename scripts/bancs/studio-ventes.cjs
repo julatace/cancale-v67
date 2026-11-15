@@ -259,7 +259,7 @@ async function scenario(b, vp, sombre) {
     await pg.keyboard.press('Escape').catch(() => {});
     await pg.waitForTimeout(500);
     // ── I : CHAQUE GESTE DE L'INVENTAIRE EST JOIGNABLE : Scanner, « … » (Emballer, Tout générer), Préparer mes colis,
-    //       Je dépose, la tournée, Envoyés, À faire (téléphone), Imprimer N ⇒ la feuille « Tout imprimer » (rien imprimé avant son clic).
+    //       Je dépose, la tournée, Envoyés, À faire (téléphone), « Choisir » ⇒ la feuille « Tout imprimer » (rien imprimé avant son clic).
     const joint = {};
     joint.scanner = await visibles(pg, '[data-colis-barre-btn="scanner"]') > 0;
     joint.outils = await visibles(pg, '[data-colis-barre-btn="outils"]') > 0;
@@ -269,7 +269,9 @@ async function scenario(b, vp, sombre) {
     joint.preparer = await dansAFaire('[data-preparer-ouvrir]');
     joint.depose = await dansAFaire('[data-depot-ouvrir]');
     joint.tournee = await dansAFaire('[data-tournee-ouvrir]');
-    await pg.click('[data-colis-barre-btn="imprimer"]').catch(() => {});
+    // (version studio) « Imprimer N » IMPRIME en un toucher (impression-simple, son banc le juge) : la feuille « Tout
+    // imprimer » (choisir, réimprimer) reste joignable par « … · Choisir » (`ouvrirLot`), à côté du papier.
+    await pg.click('button.vrm-impr-lien[data-lot-ouvrir]').catch(() => {});
     await pg.waitForSelector('[data-lot]', { timeout: 8000 }).catch(() => {});
     joint.toutImprimer = !!(await pg.$('[data-lot]'));
     await shot(pg, `studio-ventes-${nom}-imprimer`);
