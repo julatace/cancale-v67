@@ -58,10 +58,13 @@ const commande = (v, partie) => ({ transaction_id: v.tx, title: v.titre, price: 
   transaction_user_status: partie ? v.tus : 'needs_action', date: ilYa(v.age), size_title: v.taille || undefined, user_login: v.ach || 'acheteur_x', photo: { url: PHOTO } });
 const lignes = (sombre) => [
   { id: 'main', data: { vinted_dark: sombre, vinted_used_numeros: [...V, ...PARTIS].map((v) => Number(v.num)), vrm_meubles: MEUBLES, vrm_slots: SLOTS,
-    vinted_annonce_numeros: Object.fromEntries([...V, ...PARTIS].map((v) => [`i${v.tx}`, { numero: v.num, title: v.titre, auto: false, numberedAt: ilYa(30) }])) } },
+    vinted_annonce_numeros: Object.fromEntries([...V, ...PARTIS].map((v) => [`i${v.tx}`, { numero: v.num, title: v.titre, auto: false, numberedAt: ilYa(30), ...(v.taille ? { size: v.taille } : {}) }])) } },
   ...['111', '222'].map((u) => ({ id: `harvest_${u}_orders_sold`, data: { capturedAt: iso(MS - 600e3), payload: { my_orders: [
     ...V.filter((v) => v.uid === u).map((v) => commande(v, false)), ...PARTIS.filter((v) => v.uid === u).map((v) => commande(v, true)) ] } } })),
-  ...['111', '222'].map((u) => ({ id: `harvest_${u}_orders_purchased`, data: { capturedAt: iso(MS - 600e3), payload: { my_orders: [] } } })),
+  // Un achat INVENTÉ qui ressemble à la vente N°119 (même marque, mots du modèle, taille, acheté avant la mise en ligne) :
+  // la règle de liaison (src/liaisonAchat.js) le PROPOSE sur la fiche de la vente ; rien n'est relié sans son toucher.
+  { id: 'harvest_111_orders_purchased', data: { capturedAt: iso(MS - 600e3), payload: { my_orders: [{ transaction_id: 7001, title: 'Nike Terminator Low rose 36', price: { amount: '70.0', currency_code: 'EUR' }, status: 'Commande finalisée', transaction_user_status: 'completed', date: ilYa(40), photo: { url: PHOTO } }] } } },
+  { id: 'harvest_222_orders_purchased', data: { capturedAt: iso(MS - 600e3), payload: { my_orders: [] } } },
   ...[...V, ...PARTIS].map((v) => ({ id: `harvest_${v.uid}_txn_${v.tx}`, data: { capturedAt: ilYa(0.1), payload: { transaction: { id: v.tx, item_id: `i${v.tx}`, ...(v.tus === 'completed' ? { status: 450 } : {}) } } } })),
   ...V.map((v) => ({ id: 'email_bord_' + v.tx, data: { transaction: String(v.tx), uid: v.uid, filename: `bordereau-${v.tx}.pdf`, modele: v.titre, article: v.titre, receivedAt: ilYa(Math.max(0.1, v.age - 0.1)), pdfB64: PDF_B64, suivi: v.suivi, dateLimite: v.limite } })),
   { id: 'email_track_mondialrelay_81000001', data: { type: 'suivi', carrier: 'mondialrelay', suivi: '81000001', status: 'available', statusLabel: 'Arrivé au point de retrait', subject: 'Votre colis 81000001 est disponible dans votre Point Relais', receivedAt: ilYa(0.3), emailAt: ilYa(0.3), arriveLe: ilYa(0.3), code: 'K48291', lieu: 'TABAC DE LA GARE, 12 RUE EXEMPLE, 35000 RENNES', limite: '2026-11-19', consigne: false, account: 'shop_nord', recuSur: ['boite@exemple.fr'] } },
@@ -156,7 +159,9 @@ const contrastes = (pg, sels, sombre) => pg.evaluate(({ sels, sombre }) => {
     const c = rgb(getComputedStyle(el).color); if (!c) continue;
     const pile = []; for (let e = el; e && e !== document.documentElement; e = e.parentElement) { const k = rgb(getComputedStyle(e).backgroundColor); if (k && k.a > 0) { pile.push(k); if (k.a >= 0.99) break; } }
     const clair = lum(c) > 0.5;
-    const fonds = pile.length && pile[pile.length - 1].a >= 0.99 ? [pile.pop()] : [haut, bas];
+    // Un texte SOMBRE sans aucun fond peint (le verre se peint en dégradé, pas en couleur) est posé sur le VERRE : .80 sur le bas.
+    const verre = sombre ? { r: 16, g: 30, b: 50, a: .62 } : { r: 247, g: 250, b: 253, a: .80 };
+    const fonds = pile.length && pile[pile.length - 1].a >= 0.99 ? [pile.pop()] : (!clair && !pile.length ? [melange(verre, bas)] : [haut, bas]);
     let pireR = 99;
     for (const f0 of fonds) { let f = f0; for (const k of [...pile].reverse()) f = melange(k, f); const t = melange(c, f); const L1 = lum(t), L2 = lum(f); pireR = Math.min(pireR, (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05)); }
     out.push({ sel, t: (el.textContent || '').trim().slice(0, 24), r: Math.round(pireR * 100) / 100, clair });
@@ -244,6 +249,22 @@ async function scenario(b, vp, sombre) {
     await shot(pg, `ventes-verre-${nom}-toutes`);
     const t2 = await pg.evaluate(() => ({ seg: !!document.querySelector('[data-ventes-seg-choix="toutes"][aria-pressed="true"]'), colis: [...document.querySelectorAll('[data-bord-card][data-tx-colis]')].filter((c) => c.getBoundingClientRect().height > 0).length }));
     dit(t2.seg && t2.colis === 0, `${nom} : T « Toutes » replie les colis, garde le segment`, JSON.stringify(t2));
+    // ── V : la fiche d'une vente ouverte depuis « Toutes » (le récapitulatif) : le plein à l'ENCRE, aucun « à dater »,
+    //       les dates des étapes jamais coupées au bord droit.
+    await pg.evaluate(() => { const l = [...document.querySelectorAll('.vrm-tache[data-tache="ventes"] [data-fu-ligne], .vrm-tache[data-tache="ventes"] .vrm-ledger-sale')].find((x) => /Terminator/.test(x.innerText || '')); if (l) { l.scrollIntoView({ block: 'center' }); (l.querySelector('.vrm-ledger-sale-toggle, button') || l).click(); } });
+    await pg.waitForSelector('[data-recap-vente] [data-recap-phrase]', { timeout: 10000 }).catch(() => {});
+    await pg.waitForTimeout(700);
+    await shot(pg, `ventes-verre-${nom}-recap`);
+    const rv = await pg.evaluate(() => { const z = [...document.querySelectorAll('[data-recap-vente]')].find((x) => x.getBoundingClientRect().height > 0); if (!z) return null;
+      const p = [...z.querySelectorAll('.vrm-b-primaire, [data-variante="primaire"], .sb-btn-plein')].filter((x) => x.getBoundingClientRect().width > 0);
+      const rgb = (s) => (/rgba?\(([^)]+)\)/.exec(s) || [, ''])[1].split(/[ ,/]+/).map(Number);
+      const zr = z.getBoundingClientRect();
+      const coupes = [...z.querySelectorAll('.vrm-frise *, [class*="frise"] *')].filter((x) => x.children.length === 0 && (x.textContent || '').trim() && x.getBoundingClientRect().width > 0 && (x.getBoundingClientRect().right > zr.right - 8 || x.scrollWidth > x.clientWidth + 1)).map((x) => x.textContent.trim().slice(0, 20));
+      const pr = z.querySelector('[data-vv-achat-propose]');
+      return { pleins: p.map((x) => { const c = rgb(getComputedStyle(x).backgroundColor); return c.slice(0, 3).join(','); }), aDater: /à dater/i.test(z.innerText), coupes,
+        propose: pr ? pr.getAttribute('data-vv-achat-propose') : null, relier: !!z.querySelector('[data-vv-relier="7001"]'), autre: !!z.querySelector('[data-vv-autre-achat]'), saisir: !!z.querySelector('[data-vv-saisir-prix]') }; });
+    dit(!!rv && rv.pleins.length <= 1 && rv.pleins.every((c) => !/^0,96,204$|^0,74,159$/.test(c)) && !rv.aDater && !rv.coupes.length && rv.propose === '7001' && rv.relier && rv.autre && rv.saisir, `${nom} : V la fiche d'une vente : le plein à l'encre (jamais le bleu), l'achat PROPOSÉ et « Relier · prix », « Autre achat », « Saisir le prix » ; aucun « à dater », aucune date coupée`, JSON.stringify(rv));
+    await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(400);
     // ── A : Achats · le code de retrait lisible, la feuille « Montre ce code au comptoir »
     await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' })));
     await pg.waitForSelector('[data-va-code-grand]', { timeout: 25000 }).catch(() => {});

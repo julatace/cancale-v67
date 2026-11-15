@@ -212,7 +212,7 @@ import FeuilleLienVc from "./LienVestiaire.jsx";
 // ⟦→ ecrans/Vestiaire.jsx #1⟧
 import { suggestionsAchat, tousAchatsLibres, tousAchatsLibresDetail, filtresAchats, etiquetteLot, liensParAchat, lotDe, prixIndicatifLot, ecritureLot, suggestionsSaisieSerie } from "./suggestionsAchat.js";
 // (15 nov.) La liaison achat ⇄ article : l'affectation pondérée et globale (src/liaisonAchat.js).
-import { affecterPropositions, aValider, morceauxPourquoi, couleursTexte, lectureAchat, cleArticleAnnonce, cleArticleVente, cleRefusLiaison } from "./liaisonAchat.js";
+import { affecterPropositions, aValider, morceauxPourquoi, couleursTexte, lectureAchat, cleArticleAnnonce, cleArticleVente, cleRefusLiaison, propositionsArticle } from "./liaisonAchat.js";
 // (6 nov., vitesse 2) AchatsOutils : à la demande ; ses feuilles de style restent ICI, à la même place (même ordre).
 import './styles-annonces-outils.css';
 import './styles-baisse-prix.css';
@@ -40089,7 +40089,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => { if (accounts.length) loadOrders('sold', setSales); /* eslint-disable-next-line */ }, [cleComptes]);
   useEffect(() => { buysCharges.current = Array.isArray(buys.items); }, [buys.items]);
   // (31 oct.) Colis lit aussi les achats : sa colonne « À retirer » est la liste de `pickupUnion`.
-  useEffect(() => { if ((curSub==='achats'||curSub==='journee'||curSub==='bordereaux') && accounts.length && (buys.items===null || (buys.comptes && buys.comptes!==cleComptes) || !(Date.now() - (_commandesLuesA.purchased || 0) < _CACHE_TTL))) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [sub, cleComptes]);   // (13 nov.) copie partagée : relue (discrètement) si sa lecture a plus de 3 min, comme un écran neuf
+  useEffect(() => { if ((curSub==='achats'||curSub==='journee'||curSub==='bordereaux'||curSub==='ventes') && accounts.length && (buys.items===null || (buys.comptes && buys.comptes!==cleComptes) || !(Date.now() - (_commandesLuesA.purchased || 0) < _CACHE_TTL))) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [sub, cleComptes]);   // (13 nov.) copie partagée : relue (discrètement) si sa lecture a plus de 3 min, comme un écran neuf
 
   // AUTO-LOCK : dès qu'une vente finalisée correspond à UNE SEULE annonce
   // numérotée (titre non ambigu), on verrouille le lien vente↔paire par n° de
@@ -49440,6 +49440,45 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <section className="vrm-recap-gestes" aria-label={tr('ventes.actions')}>
                   {bordGeste ? <div className="vrm-recap-principal vrm-rangee-bord" data-rangee-bord=""><PastilleTransporteur t={trRecap} C={C} data-recap-transporteur=""/><BoutonBordereau grand uid={o._acc && o._acc.vinted_user_id} tx={String(o.transaction_id)} conv={o.conversation_id} login={accNameOf(o._acc)}
                     aGenerer pdf={!!(labelsCaptes[txL] || bordParTx[txL])} onImprimer={()=>imprimerBordereauVente(o)} onFait={(u)=>rechargerLabels(u)}/></div> : null}
+                  {/* (15 nov., Julien : « le bouton pour relier l'achat bien visible sur la vente ») Une vente SANS achat relié :
+                      l'achat PROPOSÉ par la règle de liaison (src/liaisonAchat.js, la même qu'Annonces → « Sans achat relié »), montré
+                      tout de suite — photo, titre, retrait, prix payé, pourquoi — et « Relier · 52 € » (SON toucher, la règle de prix
+                      du reçu `propositionSuggestion`) ; « Autre achat » et « Saisir le prix » en secondaires. Rien n'est relié seul (§5). */}
+                  {coutManque && !aRelie ? (() => {
+                    const k = cleArticleVente(o.transaction_id);
+                    let p = null;
+                    try {
+                      const l0 = liaison && liaison.parArticle ? liaison.parArticle[k] : null;
+                      if (l0 && l0.length) p = l0[0];
+                      else if (Array.isArray(achatsLiaison)) { const vx = (fileVendus || []).find((x) => x.key === k);
+                        const cible = vx ? vx.cible : { key: k, titre: o.title || '', marque: '', taille: '', couleur: '', dateRef: o.date, dateRefSource: 'vente', prix: o.price };
+                        p = (propositionsArticle({ cible, achats: achatsLiaison, liens: liensAchats, refus: liaisonRefus, marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel,
+                          receptionDe: (a) => dateReception(a, { infosTx: infosReception, recuClic: pickupDone }) }) || [])[0] || null; }
+                    } catch (_) { p = null; }
+                    const l = { o, idf: identiteAnnonce(o) ? String(identiteAnnonce(o)) : null };
+                    const saisir = () => askText({ title: tr('ventes.prixAchat'), desc: `${num ? `N°${num} · ` : ''}${o.title || ''}`, decimal: true, value: '' }).then((t) => { if (t != null && String(t).trim()) setSaleOverride(o.transaction_id, { buyPrice: String(t).trim() }); });
+                    const jourP = (t) => { const d = typeof t === 'number' ? t : Date.parse(t || ''); return Number.isFinite(d) ? new Date(d).toLocaleDateString(localeCourante(), { day: 'numeric', month: 'short' }) : ''; };
+                    const a = p ? p.achat : null; const prop = a ? propositionSuggestion(a) : null;
+                    const prixTxt = prop && prop.centimes != null ? montant(prop.centimes / 100) : '';
+                    const recu = p && p.recu ? tr(p.recu.source === 'clic' ? 'liaison.recu.retrait' : 'liaison.recu.livraison', { date: jourP(p.recu.ms) }) : (a && a.date ? tr('liaison.commandeLe', { date: jourP(a.date) }) : '');
+                    return (
+                      <div className="vv-propose" data-vv-achat-propose={a ? String(a.transaction_id || '') : ''} data-niveau={p ? p.niveau : ''}>
+                        {a ? <div className="vv-propose-achat">
+                          {orderPhoto(a) ? <PhotoVinted src={orderPhoto(a)} alt="" className="vv-propose-photo" loading="lazy" decoding="async"/> : <PhotoVide taille={48} className="vv-propose-photo"/>}
+                          <span className="vv-propose-mid">
+                            <span className="vv-propose-mot">{tr('vv.propose.titre')} · <b>{p.niveau === 'tres-probable' ? tr('liaison.niveau.tresProbable') : tr('liaison.niveau.possible')}</b></span>
+                            <b className="vv-propose-titre">{a.title || ''}</b>
+                            <span className="vv-propose-sous">{[recu, prixTxt ? tr('liaison.paye', { prix: prixTxt }) : ''].filter(Boolean).join(' · ')}</span>
+                            {phrasePourquoi(p) ? <span className="vv-propose-pourquoi">{phrasePourquoi(p)}</span> : null}
+                          </span>
+                        </div> : null}
+                        <div className="vv-propose-gestes">
+                          {a ? <button type="button" className="sb-touche vv-touche vv-propose-relier" data-vv-relier={String(a.transaction_id || '')} onClick={() => relierAchatVente(l, a)}><Icon name="link" size={16}/><span>{prixTxt ? tr('liaison.relierPrix', { prix: prixTxt }) : VERBES.relier}</span></button> : null}
+                          <button type="button" className="sb-touche vv-touche" data-vv-autre-achat="" onClick={() => choisirAchatVente(l, a)}>{a ? tr('vv.propose.autre') : tr('vv.propose.relier')}</button>
+                          <button type="button" className="sb-lien vv-propose-saisir" data-vv-saisir-prix="" onClick={saisir}>{tr('vv.propose.saisir')}</button>
+                        </div>
+                      </div>);
+                  })() : null}
                   <div className="vrm-recap-grille">
                     {o.conversation_id && onNav ? <Bouton variante="secondaire" icone="chat" data-recap-conversation="" onClick={()=>{ fermer(); poserCible({ type: 'conv', conv: String(o.conversation_id), compte: String((o._acc && o._acc.vinted_user_id) || '') }, redirigerOnglet('cat_msg', null, ONGLETS_DEPLACES).tab); onNav('cat_msg'); }}>{tr('ventes.conversation')}</Bouton> : null}
                     {num ? <Bouton variante="secondaire" icone="doc" data-recap-fiche={num} aria-label={`Fiche ${motsVendeur().de} N°${num}`} onClick={()=>{fermer();window.dispatchEvent(new CustomEvent('vrm:fiche-paire',{detail:String(num)}));}}>Fiche {motsVendeur().de}</Bouton> : null}

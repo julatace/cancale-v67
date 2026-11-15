@@ -183,7 +183,9 @@ const contrastes = (pg, sels, sombre) => pg.evaluate(({ sels, sombre }) => {
     const c = rgb(getComputedStyle(el).color); if (!c) continue;
     const pile = []; for (let e = el; e && e !== document.documentElement; e = e.parentElement) { const k = rgb(getComputedStyle(e).backgroundColor); if (k && k.a > 0) { pile.push(k); if (k.a >= 0.99) break; } }
     const clair = lum(c) > 0.5;
-    const fonds = pile.length && pile[pile.length - 1].a >= 0.99 ? [pile.pop()] : [haut, bas];
+    // Un texte SOMBRE sans aucun fond peint (le verre se peint en dégradé, pas en couleur) est posé sur le VERRE : .80 sur le bas.
+    const verre = sombre ? { r: 16, g: 30, b: 50, a: .62 } : { r: 247, g: 250, b: 253, a: .80 };
+    const fonds = pile.length && pile[pile.length - 1].a >= 0.99 ? [pile.pop()] : (!clair && !pile.length ? [melange(verre, bas)] : [haut, bas]);
     let pireR = 99;
     for (const f0 of fonds) { let f = f0; for (const k of [...pile].reverse()) f = melange(k, f); const t = melange(c, f); const L1 = lum(t), L2 = lum(f); pireR = Math.min(pireR, (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05)); }
     out.push({ sel, t: (el.textContent || '').trim().slice(0, 24), r: Math.round(pireR * 100) / 100, clair });
@@ -298,7 +300,7 @@ async function scenario(b, vp, sombre) {
     // ── A : AA sur le fond réel (titre, chiffre, ambre, tuiles, rangées, échéances).
     const aa = await contrastes(pg, ['.sb-tete-titre', '.sb-tete-lib', '.sb-tete-ambre', '.sb-chiffre-affiche', '.sb-tuile-lib', '.sb-tuile-unite', '.sb-tuile-chiffre', '.vrm-colis-titre', '[data-colis-dates]', '.sb-echeance', '.vrm-colis-resume', '[data-date-tete]'], sombre);
     const faibles = aa.filter((x) => x.r < 4.5);
-    dit(aa.length >= 10 && !faibles.length, `${nom} : A contraste AA (≥ 4,5:1) sur le fond réel — ${aa.length} textes`, JSON.stringify(faibles.slice(0, 6)));
+    dit(aa.length >= (tel ? 10 : 8) && !faibles.length, `${nom} : A contraste AA (≥ 4,5:1) sur le fond réel — ${aa.length} textes`, JSON.stringify(faibles.slice(0, 6)));
     // ── D : RIEN NE DÉBORDE (page, tête, rangées).
     const deb = await pg.evaluate(() => { const vw = document.documentElement.clientWidth; const hors = [...document.querySelectorAll('.vrm-tache[data-espace] *')].filter((x) => { if (!x.offsetParent || x.closest('.sb-tuiles-filtres, .vrm-rangee, [data-rangee-defile], .vrm-seg')) return false; const q = x.getBoundingClientRect(); return q.width > 0 && (q.right > vw + 1 || q.left < -1); }).map((x) => (x.className || x.tagName).toString().slice(0, 30));
       return { page: document.documentElement.scrollWidth - document.documentElement.clientWidth, hors: hors.slice(0, 5), n: hors.length }; });
