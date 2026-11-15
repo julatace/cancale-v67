@@ -25,6 +25,9 @@ catch (_) { ({ chromium } = require('playwright')); }
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
+// (15 nov., rouges-connus) Le mot de la notion « à envoyer » (un mot par notion depuis le 8 nov. : src/libelles.js,
+// docs/passation/2026-11-08-clarte.md — « à expédier » est ÉCARTÉ), lu là où l'app le range.
+const MOT_A_ENVOYER = (/aEnvoyer:\s*Object\.freeze\(\{ titre: '([^']+)'/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'libelles.js'), 'utf8')) || [])[1] || 'À envoyer';
 const PORT = Number(process.env.BANC_PORT) || 8573;
 const CAPTURES = process.env.BANC_CAPTURES || os.tmpdir();
 
@@ -174,17 +177,24 @@ const LIGNES = [
         const e = document.querySelector('[data-vc-annonces]'); if (!e) return null;
         const f = [...e.querySelectorAll('[data-vc-annonce]')].map((x) => ({ id: x.getAttribute('data-vc-annonce'), num: x.getAttribute('data-vc-annonce-num'), etat: x.getAttribute('data-vc-annonce-etat'), prix: (x.querySelector('[data-vc-annonce-prix]') || { getAttribute: () => null }).getAttribute('data-vc-annonce-prix'), img: (x.querySelector('img') || {}).src || '', t: x.innerText }));
         const fr = e.querySelector('[data-vc-annonces-fraicheur]');
-        return { etat: e.getAttribute('data-vc-annonces'), n: e.getAttribute('data-vc-annonces-n'), f, fr: fr ? fr.innerText : '' };
+        const tache = e.closest('[data-tache-vestiaire]') || document.querySelector('.vrm-main') || document.body;
+        return { etat: e.getAttribute('data-vc-annonces'), n: e.getAttribute('data-vc-annonces-n'), f, fr: fr ? fr.innerText : '', ecran: tache.innerText };
       });
       const P = (id) => an && an.f.find((x) => x.id === id);
       dit(an && an.etat === 'lu' && an.n === '3' && an.f.length === 3, 'Annonces : une fiche par annonce lue', JSON.stringify(an && an.f.map((x) => x.id)));
-      dit(P('P1') && P('P1').num === '41' && P('P1').prix === '99' && /99,00/.test(P('P1').t) && P('P1').etat === 'en-ligne' && /banc-P1\.jpg/.test(P('P1').img), 'Annonces : la fiche porte la photo, le N° relié par la référence, le prix lu et « en ligne »', JSON.stringify(P('P1')));
+      // (15 nov.) `montant()` n'écrit les centimes que s'ils existent (chantier B, 5 nov., src/format.js, `centimes: 'auto'`) :
+      // 99 € s'écrit « 99 € » (espace insécable), plus « 99,00 € ». La règle jugée : le prix LU (data-*) est celui écrit.
+      dit(P('P1') && P('P1').num === '41' && P('P1').prix === '99' && /(^|[^\d,])99[\s\u00a0]€/.test(P('P1').t) && P('P1').etat === 'en-ligne' && /banc-P1\.jpg/.test(P('P1').img), 'Annonces : la fiche porte la photo, le N° relié par la référence, le prix lu et « en ligne »', JSON.stringify(P('P1')));
       dit(P('P2') && P('P2').etat === 'vendue', 'Annonces : une annonce dont une VENTE est lue (même article) est « vendue », même si Vestiaire écrit encore on_sale', JSON.stringify(P('P2') && P('P2').etat));
       // (2 nov., soir, « un numéro par annonce ») Sans référence, l'annonce reçoit un N° NEUF
       // (par son productId, au-dessus de tout N° servi) — jamais celui d'une autre, jamais par le titre.
       dit(P('P3') && P('P3').etat === 'attente' && Number(P('P3').num) > 42 && P('P3').prix === '', 'Annonces : sans référence ⇒ un N° neuf (jamais deviné, jamais par le titre) ; sans prix ⇒ « — »', JSON.stringify(P('P3')));
       // (9 nov., lot AI) La ligne courte « 3 annonces · lues il y a 2 h » (la phrase entière est dans sa pop-up).
-      dit(an && /lues? (sur Vestiaire )?il y a 2 h/.test(an.fr) && !/confirmer/i.test(an.fr), 'Annonces : la fraîcheur de la lecture dite une fois, en tête', an && an.fr.slice(0, 140));
+      // (15 nov.) Depuis la refonte du 14 nov. (docs/passation/2026-11-14-refonte-plateformes-reglages.md : « les puces de
+      // fraîcheur sous la liste ») ce sont deux puces SOUS la liste : « 3 annonces » · « Lu il y a 2 h ». La règle :
+      // la fraîcheur dite, UNE fois sur l'écran, jamais « à confirmer » pour une lecture de 2 h.
+      const nFr = an ? (an.ecran.match(/il y a 2 h/g) || []).length : 0;
+      dit(an && /\blu(es?)? (sur Vestiaire )?il y a 2 h/i.test(an.fr) && !/confirmer/i.test(an.fr) && nFr === 1, 'Annonces : la fraîcheur de la lecture dite une fois (puces sous la liste)', an && `${an.fr.slice(0, 140)} · ${nFr} fois`);
       await o.pg.screenshot({ path: path.join(CAPTURES, `vc-fiches-annonces-${vp.width}.png`), fullPage: true }).catch(() => {});
       // 2. Les ventes.
       await aller(o.pg, 'ventes', '[data-vc-ventes="lu"]');
@@ -195,7 +205,7 @@ const LIGNES = [
         return { etat: e.getAttribute('data-vc-ventes'), v, txt: carte ? carte.innerText : '', phrase: document.querySelectorAll('[data-vc-ventes-montant]').length };
       });
       const V = (id) => ve && ve.v.find((x) => x.id === id);
-      dit(V('V1') && V('V1').etape === 'a-expedier' && /À expédier/.test(V('V1').t) && /à envoyer avant le/.test(V('V1').t), 'Ventes : « à expédier » en tête, avec la date limite', JSON.stringify(V('V1')));
+      dit(V('V1') && V('V1').etape === 'a-expedier' && V('V1').t.includes(MOT_A_ENVOYER) && /à envoyer avant le/.test(V('V1').t), `Ventes : « ${MOT_A_ENVOYER} » (le mot de la notion), avec la date limite`, JSON.stringify(V('V1')));
       dit(V('V2') && V('V2').etape === 'controle', 'Ventes : « authentication_in_progress » ⇒ l’étape « contrôle par Vestiaire »', JSON.stringify(V('V2') && V('V2').etape));
       dit(V('V3') && V('V3').etape === 'autre' && /« paid »/.test(V('V3').t), 'Ventes : « paid » (payée par qui ?) n’est pas rangé : recopié tel quel', JSON.stringify(V('V3')));
       // (2 nov., soir) Comme Vinted, la ligne montre ce que Vestiaire VERSE quand c'est sûr
