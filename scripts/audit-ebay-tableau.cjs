@@ -53,6 +53,7 @@ const remettre = () => {
       { itemId: '110000000003', title: 'Neuve', depuis: iso(MAINTENANT - 2 * JOUR) },
       { itemId: '110000000004', title: 'Absente du rapport', depuis: iso(MAINTENANT - 20 * JOUR) },
     ], capturedAt: MAINTENANT },
+    ebay_messages: { nonLus: 3, ids: ['1', '2', '3'], complet: true, capturedAt: MAINTENANT },
   };
   ECRITS = []; APPELS = [];
   EB = { finances: 'ok', payout: 'ok', analytics: 'ok', dispute: 'ok', conformite: 'ok' };
@@ -123,6 +124,7 @@ global.fetch = async (url, opts = {}) => {
         <NeutralFeedbackPeriodArray><FeedbackPeriod><PeriodInDays>365</PeriodInDays><Count>2</Count></FeedbackPeriod></NeutralFeedbackPeriodArray>
         <NegativeFeedbackPeriodArray><FeedbackPeriod><PeriodInDays>365</PeriodInDays><Count>1</Count></FeedbackPeriod></NegativeFeedbackPeriodArray>
       </FeedbackSummary></GetFeedbackResponse>`);
+    if (nom === 'GetBestOffers') return xml(`<GetBestOffersResponse xmlns="urn:ebay:apis:eBLBaseComponents"><Ack>Success</Ack><ItemBestOffersArray><ItemBestOffers><Item><ItemID>110000000002</ItemID><Title>Paire vue</Title></Item><BestOffers><BestOffer><BestOfferID>7001</BestOfferID><Price currencyID="EUR">70.00</Price><Status>Pending</Status><Quantity>1</Quantity></BestOffer><BestOffer><BestOfferID>7002</BestOfferID><Price currencyID="EUR">65.00</Price><Status>Pending</Status><Quantity>1</Quantity></BestOffer></BestOffers></ItemBestOffers></ItemBestOffersArray><PaginationResult><TotalNumberOfPages>1</TotalNumberOfPages></PaginationResult></GetBestOffersResponse>`);
     return xml(`<${nom}Response xmlns="urn:ebay:apis:eBLBaseComponents"><Ack>Success</Ack></${nom}Response>`);
   }
   if (/^https:\/\/apiz?\.ebay\.com\//.test(u)) {
@@ -280,6 +282,10 @@ async function verifier(racine) {
     const r = await route({ action: 'tableau' });
     const b = r.corps || {};
     dit(b.ok === true && b.argent && b.argent.solde && b.argent.solde.dispo.v === 120 && b.trafic && b.trafic.ko && b.evaluations && b.evaluations.score === 212 && b.litiges && Array.isArray(b.litiges.paiement), 'D1. `tableau` : tout en un aller-retour ; le trafic en panne porte `ko`, le reste est là', JSON.stringify({ a: !!b.argent, t: b.trafic, e: !!b.evaluations }));
+    dit(b.offres && b.offres.n === 2 && b.messages && b.messages.n === 3, 'D3. offres en attente (2, lues chez eBay) et messages sans réponse (3, le résumé rangé)', JSON.stringify([b.offres, b.messages]));
+    delete ROWS.ebay_messages;
+    const r2 = await route({ action: 'tableau' });
+    dit(r2.corps.messages && r2.corps.messages.ko && !('n' in r2.corps.messages), 'D4. messages jamais lus ⇒ « pas lu », jamais 0', JSON.stringify(r2.corps.messages));
     dit(b.sante && b.sante.niveau && b.sante.niveau.ko, 'D2. la santé en panne est dite (ko), jamais « bon niveau »', JSON.stringify(b.sante && b.sante.niveau));
   });
 
@@ -288,7 +294,7 @@ async function verifier(racine) {
     for (const a of ['argent', 'trafic', 'sante', 'evaluationsrecues', 'litiges', 'tableau']) await route({ action: a });
     const ecr = APPELS.filter((a) => a.hote !== 'trading' && a.methode !== 'GET');
     const tr = APPELS.filter((a) => a.hote === 'trading').map((a) => a.nom);
-    dit(ecr.length === 0 && tr.every((n) => n === 'GetFeedback'), 'W1. lecture seule : aucune requête autre que GET chez eBay, Trading : GetFeedback seul', JSON.stringify([ecr.map((a) => a.chemin), [...new Set(tr)]]));
+    dit(ecr.length === 0 && tr.every((n) => n === 'GetFeedback' || n === 'GetBestOffers'), 'W1. lecture seule : aucune requête autre que GET chez eBay, Trading : GetFeedback et GetBestOffers (lectures) seuls', JSON.stringify([ecr.map((a) => a.chemin), [...new Set(tr)]]));
     dit(!ECRITS.some((e) => e.id && !/^ebay_(versements|finances|tokens|acces|comptes)/.test(e.id)), 'W2. en base : seulement `ebay_versements` (et le jeton)', JSON.stringify(ECRITS.map((e) => e.id)));
   });
 
@@ -317,6 +323,7 @@ const MUTATIONS = {
   'pas-su-vide': ['api/_lib/ebay-tableau.js', "      if (!r.ok) { const x = raison(r, 'le détail de tes ventes eBay', true);", "      if (!r.ok) { out.transactions = []; break; const x = raison(r, 'le détail de tes ventes eBay', true);"],
   'acheteur-range': ['api/_lib/ebay-tableau.js', "    detail[id] = { net: c.net,", "    detail[id] = { acheteur: 'acheteur_secret', net: c.net,"],
   'retiree-gardee': ['api/_lib/ebay-tableau.js', ".filter((f) => f.id && /^(Positive|Neutral|Negative)$/.test(f.type))", '.filter((f) => f.id)'],
+  'messages-zero': ['api/_lib/ebay-tableau.js', ": { ko: { raison: 'pas-lu', erreur: 'Messages pas encore lus.' } },", ": { n: 0 },"],
   'remboursement-non-signe': ['api/_lib/ebay-apres-vente.js', '/issue_refund`,a.token,{method:\'POST\',iaf:true,signer:true,', '/issue_refund`,a.token,{method:\'POST\',iaf:true,'],
 };
 function copie(mut) {

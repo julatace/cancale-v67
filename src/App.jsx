@@ -871,6 +871,7 @@ import { CLE_PRIX_PARTOUT, reglagePrix, CLE_PARAMS_PARTOUT, reglageParams, ligne
 import { suiviPourPartout } from "./publierPartoutSuivi.js";
 import { CLE_CORRESPONDANCES, lireMemoire as lireCorrespondances, retenir as retenirCorrespondance, TABLE_VINTED } from "./correspondances.js";   // (15 nov.) Vinted → Leboncoin · eBay · Vestiaire
 import { CLE_DEFAUTS_EBAY as CLE_DEFAUTS_EBAY_PP, defautsDepuis as defautsEbayDepuis, resume as resumeReglagesEbayPP } from "./ebay/parametres.js";
+import { datesVersementEbay } from "./ebay/tableau.js";   // (15 nov., eBay complet 2) le CA eBay daté au versement
 import { chargerSuivi } from "./suiviBranchement.js";
 import { optionsSelecteur, nomCompteVente, identiteCompteVente, annuaireLbc, ongletSansDonnee, nomPlateforme, logoPlateforme } from "./plateformes.js";
 import { MR_SELECT, lireColisMondialRelay, suivisAvecMondialRelay, accordCodes, codeDuCompteMr, ouTrouverQr, ilYa as ilYaLecture, compteDuRetrait, indexAchatsAutresSites } from "./retraitQr.js";
@@ -941,7 +942,7 @@ import { langueNavigateur, poserLangueUneFois, alignerLangueCompte } from "./lan
 // (11 nov., lot traduction) Les textes visibles passent par `tr()` (src/i18n/index.js) :
 // `t` est pris partout dans ce fichier comme nom de variable, d'où l'alias `tr`.
 import ChoixLangue from "./i18n/ChoixLangue.jsx";
-import { tr, LANGUES, NOMS_LANGUES, choisirLangue, langueCourante, localeCourante, monnaie as monnaieI18n, ajouterSourceApp, abonnerLangue } from "./i18n/index.js";
+import { tr, aCle as aCleTr, LANGUES, NOMS_LANGUES, choisirLangue, langueCourante, localeCourante, monnaie as monnaieI18n, ajouterSourceApp, abonnerLangue } from "./i18n/index.js";
 import { offresVestiaire, offresJourneeVc, euros as eurosOffre, resteAvant as resteAvantOffre } from './offresVestiaire.js';
 // La partie « app » du dictionnaire français arrive AVEC l'app (le fichier d'entrée reste léger).
 import frApp from "./i18n/langues/fr.js";
@@ -10000,12 +10001,15 @@ const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu, exclu
     // « reçu », le CA déclaré et la carte URSSAF disent « au moins » et la nomment.
     if (recu.eur == null) { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'eBay', raison: recu.raison, titre: '', manque: true, ts: Date.parse(e.creationDate || '') || null }); } continue; }
     const eur = recu.eur;
-    const t = Date.parse(e.creationDate || '');
+    // (15 nov., eBay complet 2) DATÉE AU VERSEMENT quand eBay l'a dit (Finances API : le versement
+    // ARRIVÉ qui l'a payée, `_versementEbay`, AAAA-MM-JJ) ; sinon comme avant, à la date de la commande.
+    const tVers = /^\d{4}-\d{2}-\d{2}$/.test(String(e._versementEbay || '')) ? Date.parse(e._versementEbay + 'T12:00:00Z') : NaN;
+    const t = Number.isFinite(tVers) ? tVers : Date.parse(e.creationDate || '');
     if (!t) { if (!vus.has(id)) { vus.add(id); aDaterOuDeclaree({ id, plateforme: 'eBay', eur, titre: '', masquee: false }); } continue; }
     const titre = (Array.isArray(e.lineItems) && e.lineItems[0] && e.lineItems[0].title) || '';
     // (11 nov., export comptable) Les frais eBay LUS (`totalMarketplaceFee`, en euros : `montantRecuEbay` l'a vérifié).
     const frais = Math.round(Number(e.totalMarketplaceFee.value) * 100) / 100;
-    const l = { id, plateforme: 'eBay', ts: t, ym: ymDeTs(t), eur, frais, titre, masquee: false };
+    const l = { id, plateforme: 'eBay', ts: t, ym: ymDeTs(t), eur, frais, titre, masquee: false, dateeAu: Number.isFinite(tVers) ? 'versement' : 'commande' };
     if (garde(l)) lignes.push(place(l));
   }
   // (1er nov., audit A2) VESTIAIRE : une vente compte si son montant REÇU est
@@ -33569,7 +33573,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (only === 'journee') setEbayMsg(etatMessagesEbay(rm));
     // Contenu identique ⇒ même objet : aucun rendu de plus (banc `vitesse.cjs`).
     if (only === 'journee' || only === 'bordereaux') setVcEtat((v) => (v !== undefined && JSON.stringify(v) === JSON.stringify(rv)) ? v : rv);
-    setEbayCmd((!r || r.illisibles.length) ? null : r.items);
+    // (15 nov., eBay complet 2) La date du VERSEMENT de chaque commande (Finances API, rangée par la
+    // route : `ebay_versements{suffixe}`, la seule carte `dates`, §4.4) est posée sur la commande
+    // (`_versementEbay`, une annotation jamais réécrite en base) : le CA déclaré la date au versement.
+    // Une ligne illisible ou absente ⇒ la commande reste datée comme avant (sa date de commande).
+    let datesV = {};
+    if (r && !r.illisibles.length) { try { const rv2 = await lireEbayParCompte('ebay_versements', 'd:data->dates', r.comptes); datesV = datesVersementEbay(rv2 && rv2.lignes); } catch (_) { datesV = {}; } }
+    setEbayCmd((!r || r.illisibles.length) ? null : r.items.map((o) => (o && o.orderId && datesV[o.orderId]) ? { ...o, _versementEbay: datesV[o.orderId] } : o));
     if (r && !r.illisibles.length) {
       const ts = r.lignes.filter((x) => x.ligne).map((x) => Number(x.ligne.capturedAt) || Date.parse(x.ligne.capturedAt || '')).filter((t) => Number.isFinite(t) && t > 0);
       setEbayLuA(ts.length ? Math.min(...ts) : null);
@@ -62566,7 +62576,7 @@ function AppCoeur() {
           {t==='annonces' && site==='vinted' && !baseKO && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} compact court/>}
           {/* Les sections propres du site, sous son filtre (31 oct., soir) : la
               même forme que les rubriques de l'app (`PlatSubNav`). */}
-          {sous && <div className="vrm-tache-sous" data-tache-sous={t+'.'+site}><PlatSubNav sub={sec} setSub={(x)=>{ setEbayCible(null); setPlatSub(subDeTache(site,x)); }} sections={sous}/></div>}
+          {sous && <div className="vrm-tache-sous" data-tache-sous={t+'.'+site}><PlatSubNav sub={sec} setSub={(x)=>{ setEbayCible(null); setPlatSub(subDeTache(site,x)); }} sections={sous.map(([id,l,p])=>[id, aCleTr('nav.sous.'+site+'.'+id) ? tr('nav.sous.'+site+'.'+id) : l, p])}/></div>}
         </div>
         {/* (11 nov., lot DJ3) En tête : les colis à expédier (Ventes, section principale du site) ou à retirer (Achats). */}
         {/* (14 nov., refonte des listes) LA carte héros de Ventes EN HAUT (« une chose principale par écran ») : elle

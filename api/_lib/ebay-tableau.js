@@ -22,6 +22,7 @@
 // chaque lecteur) ; aucune réponse réelle n'a été vue (aucune commande eBay en base).
 import { entetesSignes, refusSignature } from './ebay-signature.js';
 import { fetchAvecDelai } from './fetch-delai.js';
+import { offresEbay } from './ebay-gestion.js';
 
 const liste = (v) => (v == null ? [] : Array.isArray(v) ? v : [v]);
 const texte = (v) => (v == null ? '' : typeof v === 'object' ? String(v['#text'] ?? v.value ?? '') : String(v));
@@ -167,6 +168,13 @@ export function traficEbay(d) {
 // « Annonces qui ne se voient pas » : en ligne depuis au moins 7 jours ET moins de
 // 50 affichages sur la période (ou 0 vue). Une annonce ABSENTE du rapport n'est pas
 // « 0 » (eBay peut ne pas l'avoir encore comptée) : elle est dite « pas de chiffres ».
+// Chaque ligne du rapport reçoit ce que VRM sait de l'annonce rangée (photo d'eBay, SKU
+// `VRM-{n°}`, date de mise en ligne) — par son n° d'annonce, jamais par le titre (§5).
+export function enrichirTrafic(trafic, enLigne) {
+  if (!trafic || !Array.isArray(trafic.annonces) || !Array.isArray(enLigne)) return trafic;
+  const par = new Map(enLigne.filter((a) => a && ID.test(String(a.itemId || ''))).map((a) => [String(a.itemId), a]));
+  return { ...trafic, annonces: trafic.annonces.map((t) => { const a = par.get(t.itemId); if (!a) return { ...t, enLigne: false }; return { ...t, enLigne: true, titre: t.titre || String(a.titre || '').slice(0, 120), photo: /^https:\/\/i\.ebayimg\.com\//.test(String(a.photo || '')) ? a.photo : '', sku: String(a.sku || '').slice(0, 40), debut: a.debut || '' }; }) };
+}
 export function annoncesInvisibles(trafic, enLigne, maintenant = Date.now()) {
   if (!trafic || !Array.isArray(trafic.annonces) || !Array.isArray(enLigne)) return null;
   const par = new Map(trafic.annonces.map((a) => [a.itemId, a]));
@@ -326,7 +334,7 @@ export function reclamationsEbay(d, sorte) {
 export const LITIGE_OUVERT = /^(OPEN|ACTION_NEEDED|UNDER_REVIEW|WAITING_SELLER_RESPONSE|WAITING_FOR_SELLER|PENDING|ESCALATED|CS_CLOSED_WAITING|WAITING_BUYER_RESPONSE)$/;
 
 // ═══ LA ROUTE (actions `argent`, `trafic`, `sante`, `evaluationsrecues`, `litiges`, `tableau`) ═
-export function creerTableauEbay({ accessToken, tradingCall, lireXml, apiOrigin = 'https://api.ebay.com', apizOrigin = 'https://apiz.ebay.com', marketplace = 'EBAY_FR', signe = () => null, fetcher = (...a) => fetchAvecDelai(...a), ranger = null, lire = null, maintenant = () => Date.now() }) {
+export function creerTableauEbay({ accessToken, tradingCall, lireXml, apiOrigin = 'https://api.ebay.com', apizOrigin = 'https://apiz.ebay.com', marketplace = 'EBAY_FR', signe = () => null, fetcher = (...a) => fetchAvecDelai(...a), ranger = null, lire = null, lireMessages = null, maintenant = () => Date.now() }) {
   const mk = () => (typeof marketplace === 'function' ? marketplace() : marketplace);
   const echec = (error, status, reason) => ({ status, body: { ok: false, error, ...(reason ? { reason } : {}) } });
   const jeton = async (ctx) => { const r = await accessToken(ctx); return r && r.ok && r.token ? r : { ko: echec((r && r.error) || 'Compte eBay indisponible.', (r && r.status) || 502, r && r.reason) }; };
@@ -400,7 +408,8 @@ export function creerTableauEbay({ accessToken, tradingCall, lireXml, apiOrigin 
     const r = await lireTrafic(a.token);
     if (r.ko) return { status: 200, body: { ok: false, reason: r.ko.raison, error: r.ko.erreur } };
     const enLigne = lire ? await lire(ctx).catch(() => undefined) : undefined;
-    return { status: 200, body: { ok: true, ...r.trafic, invisibles: Array.isArray(enLigne) ? annoncesInvisibles(r.trafic, enLigne, maintenant()) : null } };
+    const t = enrichirTrafic(r.trafic, enLigne);
+    return { status: 200, body: { ok: true, ...t, invisibles: Array.isArray(enLigne) ? annoncesInvisibles(t, enLigne, maintenant()) : null } };
   }
   // ── La santé : niveau vendeur, réclamations comparées, annonces à corriger.
   async function lireSante(token) {
@@ -448,25 +457,40 @@ export function creerTableauEbay({ accessToken, tradingCall, lireXml, apiOrigin 
     const a = await jeton(ctx); if (a.ko) return a.ko;
     return { status: 200, body: { ok: true, ...(await lireLitiges(a.token)) } };
   }
+  // Les offres d'acheteurs EN ATTENTE (Trading GetBestOffers, Active) : un nombre, lu.
+  async function lireOffres(token) {
+    const r = await tradingCall(token, 'GetBestOffers', '<BestOfferStatus>Active</BestOfferStatus><Pagination><EntriesPerPage>50</EntriesPerPage><PageNumber>1</PageNumber></Pagination>');
+    if (!r || !r.ok) return { ko: { raison: r && r.status === 0 ? 'injoignable' : 'pas-su', erreur: "eBay n'a pas rendu tes offres." } };
+    const root = lireXml(r.xml, 'GetBestOffers');
+    if (!root) return { ko: { raison: 'illisible', erreur: "Réponse d'eBay illisible pour les offres." } };
+    const l = offresEbay(root).filter((o) => /^(Pending|Active)$/.test(o.status || 'Active'));
+    const pages = Number(texte(root.PaginationResult && root.PaginationResult.TotalNumberOfPages));
+    return { n: l.length, auMoins: Number.isFinite(pages) && pages > 1 };
+  }
   // ── Le tableau de bord : tout en UN aller-retour, chaque partie avec son état
   //    (une partie ratée ne vide pas les autres ; elle porte `ko` et sa raison).
   async function tableau(b, ctx) {
     const a = await jeton(ctx); if (a.ko) return a.ko;
-    const [ar, tf, sa, ev, li] = await Promise.all([
+    const [ar, tf, sa, ev, li, of, ms] = await Promise.all([
       lireArgent(a.token, { leger: true }).catch(() => ({ raison: 'pas-su', erreur: "eBay n'a pas rendu ton argent." })),
       lireTrafic(a.token).catch(() => ({ ko: { raison: 'pas-su', erreur: "eBay n'a pas rendu le trafic." } })),
       lireSante(a.token).catch(() => null),
       lireEvaluations(a.token).catch(() => ({ ko: { raison: 'pas-su', erreur: "eBay n'a pas rendu tes évaluations." } })),
       lireLitiges(a.token).catch(() => null),
+      lireOffres(a.token).catch(() => ({ ko: { raison: 'pas-su', erreur: "eBay n'a pas rendu tes offres." } })),
+      // Les messages sans réponse : le résumé que `messages` a rangé (`ebay_messages`), jamais relu chez eBay ici.
+      lireMessages ? lireMessages(ctx).catch(() => undefined) : Promise.resolve(undefined),
     ]);
     const enLigne = lire ? await lire(ctx).catch(() => undefined) : undefined;
     return { status: 200, body: {
       ok: true,
       argent: ar.raison ? { ko: { raison: ar.raison, erreur: ar.erreur }, solde: ar.solde, versements: ar.versements } : { solde: ar.solde, versements: ar.versements },
-      trafic: tf.ko ? { ko: tf.ko } : { ...tf.trafic, invisibles: Array.isArray(enLigne) ? annoncesInvisibles(tf.trafic, enLigne, maintenant()) : null },
+      trafic: tf.ko ? { ko: tf.ko } : (() => { const t = enrichirTrafic(tf.trafic, enLigne); return { ...t, invisibles: Array.isArray(enLigne) ? annoncesInvisibles(t, enLigne, maintenant()) : null }; })(),
       sante: sa || { ko: { raison: 'pas-su', erreur: "eBay n'a pas rendu la santé du compte." } },
       evaluations: ev.ko ? { ko: ev.ko } : ev.evaluations,
       litiges: li || { ko: { raison: 'pas-su', erreur: "eBay n'a pas rendu les litiges." } },
+      offres: of,
+      messages: ms && Number.isFinite(Number(ms.nonLus)) && ms.nonLus !== '' && ms.nonLus != null ? { n: Number(ms.nonLus), auMoins: String(ms.complet) === 'false', lu: Number(ms.capturedAt) || null } : { ko: { raison: 'pas-lu', erreur: 'Messages pas encore lus.' } },
       capturedAt: maintenant(),
     } };
   }

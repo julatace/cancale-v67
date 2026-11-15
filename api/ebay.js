@@ -2065,7 +2065,8 @@ const apresVenteEbay=creerApresVenteEbay({accessToken:jetonDe,tradingCall,apiOri
 // dans `ebay_versements{suffixe}` (dates et montants seulement, par n° de commande).
 const tableauEbay=creerTableauEbay({accessToken:jetonDe,tradingCall,lireXml:lireXmlEbay,apiOrigin:EBAY_API,marketplace:()=>marcheCourant().marketplace,signe:()=>cleSignature(),
   ranger:(ctx,fn)=>modifierDonnee(ligneDe('ebay_versements',ctx),ctx.owner,fn),
-  lire:async(ctx)=>{const d=await lireDonnee(ligneDe('ebay_listings',ctx),ctx.owner);if(d===undefined)return undefined;return Array.isArray(d?.items)?d.items.map(x=>({itemId:String(x.itemId||''),debut:x.depuis||''})).filter(x=>x.itemId):[];}});
+  lireMessages:async(ctx)=>{const d=await lireDonnee(ligneDe('ebay_messages',ctx),ctx.owner);return d&&typeof d==='object'?{nonLus:d.nonLus,complet:d.complet,capturedAt:d.capturedAt}:undefined;},
+  lire:async(ctx)=>{const d=await lireDonnee(ligneDe('ebay_listings',ctx),ctx.owner);if(d===undefined)return undefined;return Array.isArray(d?.items)?d.items.map(x=>({itemId:String(x.itemId||''),debut:x.depuis||'',photo:x.photo||'',sku:x.sku||'',titre:x.title||''})).filter(x=>x.itemId):[];}});
 
 const rechercheEbay = creerRechercheEbay({ jetonApplication, oublierJetonApplication, modifierDonnee });
 // (11 nov., lot alertes-ebay) La liste « Nouvelles annonces pour tes recherches » : lecture projetée, « écarter ».

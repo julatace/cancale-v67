@@ -57,8 +57,13 @@ export const estTacheSite = (tab) => Object.prototype.hasOwnProperty.call(TACHES
 //   Annonces · eBay  : Annonces · Promotion.
 // Leboncoin · Colis va dans Colis (sous-rangée), eBay · Compte dans Paramètres.
 export const SOUS_SECTIONS = {
-  'ventes.ebay': [['ventes', 'Commandes'], ['agent', 'À traiter'], ['offres', 'Offres']],
-  'annonces.ebay': [['annonces', 'Annonces'], ['promo', 'Promotion']],
+  // (15 nov., eBay complet 2 — Julien : « tu peux faire 10 fois mieux ») Le TABLEAU de bord eBay
+  // ouvre Ventes · eBay (à expédier, offres, messages, versements, trafic, santé), puis Commandes,
+  // À traiter, Offres, Argent (versements et frais réels), Santé (niveau, annonces à corriger,
+  // évaluations reçues, litiges) ; Annonces · eBay gagne Trafic. Un lien qui visait les commandes
+  // (`ebay_ventes`, `?tab=plat_ebay&section=ventes`) y mène toujours (PLACE_SECTION).
+  'ventes.ebay': [['tableau', 'Tableau'], ['ventes', 'Commandes'], ['agent', 'À traiter'], ['offres', 'Offres'], ['argent', 'Argent'], ['sante', 'Santé']],
+  'annonces.ebay': [['annonces', 'Annonces'], ['trafic', 'Trafic'], ['promo', 'Promotion']],
 };
 export const sousSections = (tab, site) => SOUS_SECTIONS[tab + '.' + site] || null;
 
@@ -95,7 +100,9 @@ const PLACE_SECTION = {
   // (section « À expédier », `LeboncoinColis`). L'ancienne cible `cat_bord` ici n'était pas redirigée (`setTab`
   // applique `placeDesColis` AVANT cette table) : `?tab=plat_leboncoin&section=colis` ouvrait un écran BLANC.
   leboncoin: { colis: ['ventes', 'leboncoin'] },
-  ebay: { agent: ['ventes', 'ebay.agent'], offres: ['ventes', 'ebay.offres'], promo: ['annonces', 'ebay.promo'], compte: ['settings', 'ebay'] },
+  ebay: { agent: ['ventes', 'ebay.agent'], offres: ['ventes', 'ebay.offres'], promo: ['annonces', 'ebay.promo'], compte: ['settings', 'ebay'],
+    // (15 nov., eBay complet 2) les commandes restent joignables par leur nom ; les nouvelles sections aussi.
+    ventes: ['ventes', 'ebay.ventes'], tableau: ['ventes', 'ebay.tableau'], argent: ['ventes', 'ebay.argent'], sante: ['ventes', 'ebay.sante'], trafic: ['annonces', 'ebay.trafic'] },
 };
 // Sans section (ou une section inconnue), l'espace d'un site ouvrait sur ses
 // ventes ; Vestiaire (une page qui commençait par « Publier ») sur ses annonces.
