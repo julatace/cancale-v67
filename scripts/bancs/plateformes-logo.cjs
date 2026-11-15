@@ -53,8 +53,11 @@ const LBC_ID = '8442aaaa-0000-4000-8000-000000000001';
 const K1 = 'aaaaaaaaaaaaaaa1';
 const cmdEbay = (orderId, titre) => ({ orderId, orderPaymentStatus: 'PAID', orderFulfillmentStatus: 'NOT_STARTED', creationDate: ilYaH(30), cancelStatus: { cancelState: 'NONE_REQUESTED' }, lineItems: [{ sku: '', title: titre }],
   pricingSummary: { total: { value: '96.50', currency: 'EUR' }, priceSubtotal: { value: '90', currency: 'EUR' } }, paymentSummary: { totalDueSeller: { value: '95', currency: 'EUR' }, payments: [{ paymentStatus: 'PAID' }] }, totalMarketplaceFee: { value: '5', currency: 'EUR' } });
-const lignesDe = ({ ebay = true, lbc = true } = {}) => [
-  { id: 'main', data: { vinted_ship_done: {}, vinted_used_numeros: [12, 13, 14, 15], vinted_annonce_numeros: FICHES } },
+// (15 nov., rouges-connus) `choisis` : ses plateformes CHOISIES (Paramètres → Mes plateformes). Depuis le 8 nov.
+// (docs/passation/2026-11-08-navigation-plateformes.md) un site ni choisi ni relié n'est plus montré ; un site
+// CHOISI sans compte reste dans le sélecteur, estompé, et dit ce qui manque.
+const lignesDe = ({ ebay = true, lbc = true, choisis = null } = {}) => [
+  { id: 'main', data: { vinted_ship_done: {}, vinted_used_numeros: [12, 13, 14, 15], vinted_annonce_numeros: FICHES, ...(choisis ? { vrm_plateformes_affichees: { sites: choisis, at: new Date().toISOString() } } : {}) } },
   { id: 'harvest_111_listings', data: LISTINGS },
   { id: 'harvest_222_listings', data: { capturedAt: ilYaH(0.1), payload: { items: [] } } },
   { id: 'harvest_111_orders_sold', data: { capturedAt: ilYaH(0.2), payload: { my_orders: [{ transaction_id: 5501, id: 5501, title: 'Vans Old Skool inventée', price: { amount: '45', currency_code: 'EUR' }, status: 'Commande finalisée', date: ilYaH(30) }] } } },
@@ -227,13 +230,19 @@ const aller = async (pg, q) => { await pg.goto(`http://localhost:${PORT}/?${q}`,
           await aller(pg, 'tab=' + t);
           await pg.waitForSelector(`[data-filtre-site="${t}"]`, { timeout: 25000 });
           const s = await selecteur(pg, t);
-          dit(s && s.logos && s.boutons.map((x) => x.site).join() === 'vinted,leboncoin,ebay,vestiaire' && s.boutons.every((x) => x.logoW >= 14), `${nomVp} · A · ${t} : les quatre logos, sans « Tous »`, JSON.stringify(s && s.boutons.map((x) => x.site)));
+          // (15 nov.) Messages a « Tous » depuis le 10 nov. (lot AB, un fil par acheteur : src/filUnique.js ; défaut
+          // « Tous », décision C9 du 11 nov. — src/navigationTache.js `TACHES_SITE.messages`) ; Annonces et Achats non.
+          const attendu = t === 'messages' ? 'toutes,vinted,leboncoin,ebay,vestiaire' : 'vinted,leboncoin,ebay,vestiaire';
+          dit(s && s.logos && s.boutons.map((x) => x.site).join() === attendu && s.boutons.filter((x) => x.site !== 'toutes').every((x) => x.logoW >= 14), `${nomVp} · A · ${t} : les quatre logos${t === 'messages' ? ', et « Tous »' : ', sans « Tous »'}`, JSON.stringify(s && s.boutons.map((x) => x.site)));
         }
+        // (15 nov.) Colis n'est plus un onglet (11 nov., lot DJ3, docs/passation/2026-11-11-colis-a-leur-place.md :
+        // « À expédier » vit en tête de Ventes, « le filtre de Ventes / Achats, un seul ») : l'ancien lien Colis
+        // (`tab=cat_bord`) ouvre Ventes, dont le sélecteur à logos est VISIBLE (Tous + quatre sites).
         await aller(pg, 'tab=cat_bord');
-        await pg.waitForSelector('[data-filtre-site="colis"]', { timeout: 25000 });
+        await pg.waitForSelector('[data-filtre-site="ventes"]', { timeout: 25000 });
         await pg.waitForTimeout(800);
-        const s = await selecteur(pg, 'colis');
-        dit(s && s.logos && s.visible && s.boutons.length === 5 && s.boutons.filter((x) => x.site !== 'toutes').every((x) => x.logoW >= 14), `${nomVp} · A · Colis : le sélecteur à logos est VISIBLE (Tous + quatre sites)`, JSON.stringify(s && { v: s.visible, n: s.boutons.length }));
+        const s = await selecteur(pg, 'ventes');
+        dit(s && s.logos && s.visible && s.boutons.length === 5 && s.boutons.filter((x) => x.site !== 'toutes').every((x) => x.logoW >= 14), `${nomVp} · A · Colis (dans Ventes) : le sélecteur à logos est VISIBLE (Tous + quatre sites)`, JSON.stringify(s && { v: s.visible, n: s.boutons.length }));
         await capture(pg, `colis-${nomVp}`);
         await sain(pg, `${nomVp} · Colis`);
       });
@@ -348,7 +357,7 @@ const aller = async (pg, q) => { await pg.goto(`http://localhost:${PORT}/?${q}`,
       dit(!errs.length, `${nomVp} · aucune erreur de page`, errs.slice(0, 2).join(' | '));
       await ctx.close();
       // C. Sans compte eBay ni Leboncoin : l'onglet dit ce qui manque et le geste.
-      LIGNES = lignesDe({ ebay: false, lbc: false });
+      LIGNES = lignesDe({ ebay: false, lbc: false, choisis: ['vinted', 'leboncoin', 'ebay', 'vestiaire'] });
       const z = await preparer(b, vp, sombre);
       await essaie('C. Un site sans compte', async () => {
         await aller(z.pg, 'tab=achats');
@@ -364,11 +373,12 @@ const aller = async (pg, q) => { await pg.goto(`http://localhost:${PORT}/?${q}`,
         await z.pg.click('[data-onglet-geste-bouton="comptes"]');
         await z.pg.waitForSelector('[data-ebay-compte-section]', { timeout: 15000 }).catch(() => {});
         dit(!!(await z.pg.$('[data-ebay-compte-section]')), `${nomVp} · C · « Relier eBay » mène à Paramètres → Comptes eBay`);
+        // (15 nov.) Les colis à expédier vivent dans Ventes (11 nov., lot DJ3) : Ventes · Leboncoin sans compte.
         await aller(z.pg, 'tab=cat_bord');
-        await z.pg.waitForSelector('[data-filtre-site="colis"]', { timeout: 25000 });
-        await z.pg.click('[data-filtre-site="colis"] [data-site="leboncoin"]');
-        await z.pg.waitForSelector('[data-onglet-manque="leboncoin"][data-onglet="colis"]', { timeout: 10000 });
-        dit(true, `${nomVp} · C · Colis · Leboncoin sans compte : ce qui manque et le geste`);
+        await z.pg.waitForSelector('[data-filtre-site="ventes"]', { timeout: 25000 });
+        await z.pg.click('[data-filtre-site="ventes"] [data-site="leboncoin"]');
+        await z.pg.waitForSelector('[data-onglet-manque="leboncoin"]', { timeout: 10000 });
+        dit(true, `${nomVp} · C · Colis (Ventes) · Leboncoin sans compte : ce qui manque et le geste`);
         await sain(z.pg, `${nomVp} · Colis sans Leboncoin`);
       });
       dit(!z.errs.length, `${nomVp} · C · aucune erreur de page`, z.errs.slice(0, 2).join(' | '));
