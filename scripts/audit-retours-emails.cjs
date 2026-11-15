@@ -44,7 +44,7 @@ const MUTATIONS = {
   'reclasse-supprime': [['api/_lib/reclasser-retours.js', "const ok = await ecrire(r.id, { ...data, type: 'reclasse',", "const ok = await ecrire(r.id, { type: 'reclasse',"]],
   'reclasse-date-du-jour': [['api/email-rattacher.js', "__ownerForce: owner, __recuLe: recuLe || null };", "__ownerForce: owner, __recuLe: null };"]],
   'reclasse-sans-prevoir': [['api/_lib/reclasser-retours.js', "    if (!p.ok) { restes.push({ id: r.id, famille: p.famille, raison: p.raison }); continue; }\n", '']],
-  'reclasse-marque-ignoree': [['api/_lib/reclasser-retours.js', "    if (!data || data.reclasseVers || data.type !== 'inconnu') continue;", "    if (!data) continue;"]],
+  'reclasse-marque-ignoree': [['api/_lib/reclasser-retours.js', "    if (!data || data.reclasseVers || data.type !== 'inconnu') continue;", "    if (!data) continue;"], ['api/_lib/reclasser-retours.js', "!!r && !r.reclasse && (", "!!r && ("]],
   'regroupe-ambigu': [['src/retoursAchat.js', "    if (rivaux.length === 1 && autresBords.length === 1) poserAvis(cands[0], d);", "    poserAvis(cands[0], d);"], ['src/retoursAchat.js', "    if (cands.length !== 1) continue;", "    if (!cands.length) continue;"]],
   'heure-inventee': [['src/retoursAchat.js', "heure: limiteIso && /\\d\\s*h/.test(str(b.dateLimite)) ? heureParis(limiteIso) : '',", "heure: limiteIso ? heureParis(limiteIso) : '',"]],
   'achat-sans-carte': [['src/retoursAchat.js', "    if (vus.has(tx) || !ACHAT_A_RENVOYER.test(str(o.status))) continue;", "    if (true) continue;"]],
@@ -139,6 +139,10 @@ const CORPS_AV = (avecSens = true) => [' E-mail Vinted ', '<https://links.vinted
     F.base.set(`${A}|email_inconnu_news`, garde('Découvre les nouveautés', { subject: 'Découvre les nouveautés' }, '2026-11-09T10:00:00.000Z'));
     const coupe = JSON.stringify({ ...corpsBr, messageId: '<banc-br2@banc.test>', text: CORPS_BR('99000099988') }).slice(0, 900);
     F.base.set(`${A}|email_inconnu_br2`, garde(SUJET_BR, null, '2026-11-09T15:52:33.799Z', coupe));
+    // Un bordereau gardé dont le corps ne PROUVE pas le sens : la route le garderait encore ⇒ jamais rejoué.
+    const corpsBr3 = { ...corpsBr, messageId: '<banc-br3@banc.test>', text: CORPS_BR('99000044455', false), attachments: [pjGmail('99000044455')] };
+    F.base.set(`${A}|email_inconnu_br3`, garde(SUJET_BR, corpsBr3, '2026-11-10T08:00:00.000Z'));
+    const avant3 = JSON.stringify(F.base.get(`${A}|email_inconnu_br3`));
     const avant = JSON.stringify(F.base.get(`${A}|email_inconnu_br1`));
     // Une marque qui RATE : le rangé existe, la route dit 503, rien n'est doublé ensuite.
     F.panne((id) => id === 'email_inconnu_av1');
@@ -156,6 +160,7 @@ const CORPS_AV = (avecSens = true) => [' E-mail Vinted ', '<https://links.vinted
     const g3 = F.base.get(`${A}|email_inconnu_br2`) || {}, n = F.base.get(`${A}|email_inconnu_news`) || {};
     dit(g3.type === 'inconnu' && g3.brut === coupe && !F.base.get(`${A}|email_bordretour_99000099988`) && (r.corps.restes || []).some((x) => /coupé/.test(x.raison)), 'R un corps gardé COUPÉ n’est jamais rejoué amputé : il reste tel quel, la raison est dite', JSON.stringify(r.corps.restes));
     dit(n.type === 'inconnu' && !n.reclasseVers, 'R un e-mail sans rapport (newsletter) n’est pas touché');
+    dit(JSON.stringify(F.base.get(`${A}|email_inconnu_br3`)) === avant3 && F.ids(/^email_inconnu_/).length === 5 && (r.corps.restes || []).some((x) => /sens pas prouvé/.test(x.raison)), 'R un e-mail que la route garderait encore « à vérifier » n’est PAS rejoué (ni réécrit daté du jour, ni doublé) ; sa raison est dite', JSON.stringify({ n: F.ids(/^email_inconnu_/).length, restes: r.corps.restes }));
     const nLignes = F.base.size;
     r = await appeler();
     dit(r.code === 200 && (r.corps.faits || []).length === 0 && F.base.size === nLignes, 'R un 2e passage ne fait RIEN (idempotent)', JSON.stringify({ c: r.corps, avant: nLignes, apres: F.base.size }));
@@ -173,6 +178,8 @@ const CORPS_AV = (avecSens = true) => [' E-mail Vinted ', '<https://links.vinted
     dit(r.cartes.length === 2 && r.cartes.every((c) => c.source === 'bordereau' && c.avis), 'A1 deux retours (bordereau + avis chacun) ⇒ DEUX cartes, l’avis regroupé avec SON bordereau (tout concorde, seul candidat)', JSON.stringify(r.cartes.map((c) => [c.cle, c.source, c.avis && c.avis.id])));
     const c1 = r.cartes[0] || {};
     dit(c1.tx === TX && c1.presse === true && c1.heure === '10 h' && c1.pdf === true && c1.etape === 'a-deposer' && r.aRenvoyer.length === 2, 'A1 la plus pressée d’abord ; « 10 h » LUE ; < 48 h ⇒ pressée ; bordereau imprimable ; « à déposer »', JSON.stringify(c1));
+    const sansHeure = RA.retoursAchat({ bords: [bord(TX, ARTICLE, '2026-11-16T22:59:00.000Z', { dateLimite: '16/11/2026' })], achats: [], remb: [], maintenant: now }).cartes[0] || {};
+    dit(sansHeure.heure === '', 'A1 une date limite écrite SANS heure ⇒ aucune heure affichée (jamais inventée)', JSON.stringify(sansHeure.heure));
     const q = RA.quandLimite(c1, now);
     dit(q && q.cle === 'demain' && q.heure === '10 h', 'A1 « avant demain 10 h » (le 15 nov. à 14 h 15, Paris)', JSON.stringify(q));
     // Deux paires IDENTIQUES (même titre, même jour, même compte), un seul bordereau : rien n'est regroupé.
