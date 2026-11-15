@@ -98,8 +98,16 @@ const FROM_MR_DIRECT = 'Mondial Relay - Service Client <noreply@mondialrelay.fr>
 const FROM_VG = 'Vinted Go <no-reply_at_vinted_com_banc@icloud.com> (no-reply@vinted.com.banc)';
 const FROM_V = '"L\'équipe Vinted" <no-reply_at_vinted_fr_banc@icloud.com> (no-reply@vinted.fr.banc)';
 const mail = (from, subject, text, to = ADR) => ({ messageId: `<notif-${++n}@banc>`, from, to, subject, text, html: '', attachments: [], source: 'gmail-v2', sourceDate: new Date(Date.UTC(2026, 10, 3, 8, 0, n)).toISOString() });
+// (15 nov.) La date limite du faux e-mail est TOUJOURS dans 6 jours (heure de Paris) : une date
+// fixe (« 12/11 ») devient passée avec le calendrier, et une limite passée n'est plus dite (« à
+// vérifier »), le contrôle B3 rougissait sur un code juste. Le texte attendu est refait par Intl,
+// indépendamment de la règle (api/_lib/notif-redaction.js : « jusqu'au mer. 12 nov. »).
+const LIM_T = Date.now() + 6 * 864e5;
+const LIM_P = Object.fromEntries(new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit' }).formatToParts(new Date(LIM_T)).map((x) => [x.type, x.value]));
+const LIM_JJMM = `${LIM_P.day}/${LIM_P.month}`;
+const LIM_CLAIR = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(LIM_T));
 const MR_DISPO = (suivi, code) => mail(FROM_MR, `Votre colis ${suivi} est disponible 📦`,
-  `Bonjour,\n\nBonne nouvelle, votre colis n° ${suivi} est disponible dans votre Point Relais®.\n\nPoint Relais®\n\nTABAC DU QUAI\n\n12 RUE DES MOUETTES\n\n99990 PORTVILLE\n\nCode de retrait : ${code}\n\nRETRAIT JUSQU'AU 12/11\n`);
+  `Bonjour,\n\nBonne nouvelle, votre colis n° ${suivi} est disponible dans votre Point Relais®.\n\nPoint Relais®\n\nTABAC DU QUAI\n\n12 RUE DES MOUETTES\n\n99990 PORTVILLE\n\nCode de retrait : ${code}\n\nRETRAIT JUSQU'AU ${LIM_JJMM}\n`);
 const MR_RAPPEL = (suivi, code) => mail(FROM_MR, 'Le temps file : votre colis vous attend avec impatience ⏳',
   `Bonjour,\n\nVotre colis n° ${suivi} vous attend toujours.\n\nCode de retrait : ${code}\n\nPassé ce délai, il sera retourné à l'expéditeur.\n`);
 const MR_INDISPO = (suivi) => mail(FROM_MR, 'Où vous livrer en cas de point indisponible ?',
@@ -159,7 +167,7 @@ const V_COMMANDE = (titre, phrase, conv) => mail(FROM_V, `Commande mise à jour 
     const p = pushes[0] || {};
     dit(pushes.length === 1, 'B1 « Votre colis … est disponible » : UNE notification', resume());
     dit(p.title === "Ton colis Mondial Relay t'attend", 'B2 titre exact « Ton colis Mondial Relay t’attend » (8 nov. : sans emoji)', p.title);
-    dit(p.body === "Tabac du Quai, Portville · code 454602 · jusqu'au 12/11", 'B3 corps exact « Tabac du Quai, Portville · code 454602 · jusqu’au 12/11 »', p.body);
+    dit(p.body === `Tabac du Quai, Portville · code 454602 · jusqu'au ${LIM_CLAIR}`, `B3 corps exact « Tabac du Quai, Portville · code 454602 · jusqu’au ${LIM_CLAIR} »`, p.body);
     dit(p.url === '/?tab=achats&cible=retrait&suivi=84603328', 'B4 le toucher ouvre Achats → À retirer, SUR ce colis (11 nov.)', p.url);
     dit(p.tel === TEL_J, 'B5 sur le téléphone du vendeur de l’adresse de réception', p.tel);
     prepare();

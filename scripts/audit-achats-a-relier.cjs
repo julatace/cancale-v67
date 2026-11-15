@@ -109,7 +109,9 @@ const { extractBrand: marqueDe, extractColors: couleursDe, extractModel: modeleD
   const s1 = A.meilleureSuggestion({ item: annonces[0], achats, liens: new Map(), marqueDe, couleursDe, modeleDe });
   dit(s1 && s1.achat.transaction_id === 1 && s1.rang === 1, 'G1 marque + taille + couleur, achat ANTÉRIEUR à la mise en ligne (l’achat d’il y a 2 j est postérieur)', JSON.stringify(s1 && s1.achat.transaction_id));
   dit(A.meilleureSuggestion({ item: an('9', 'Adidas Spezial noir', 5), achats, liens: new Map(), marqueDe, couleursDe, modeleDe }) === null, 'G2 taille inconnue ⇒ aucune suggestion (jamais la marque seule)');
-  dit(A.meilleureSuggestion({ item: an('9', 'Spezial', 5, { brand: 'Adidas', size: '42,5', color1: 'Noir' }), achats, liens: new Map(), marqueDe, couleursDe, modeleDe }) !== null, 'G3 les CHAMPS de l’annonce (marque, taille, couleur) d’abord');
+  // (15 nov.) La marque du champ se PROUVE par le titre (« Autry … » marquée « adidas » sur Vinted) : le titre porte « adidas ».
+  dit(A.meilleureSuggestion({ item: an('9', 'adidas Spezial', 5, { brand: 'Adidas', size: '42,5', color1: 'Noir' }), achats, liens: new Map(), marqueDe, couleursDe, modeleDe }) !== null, 'G3 les CHAMPS de l’annonce (marque, taille, couleur) d’abord');
+  dit(A.meilleureSuggestion({ item: an('9', 'Autry reelwind low rose', 5, { brand: 'adidas', size: '42,5' }), achats: [ach(6, '#Adidas Spezial, dunkelblau, Gr. 42,5', 30)], liens: new Map(), marqueDe, couleursDe, modeleDe }) === null, 'G3b une marque du champ contredite par le titre (« Autry … » marquée « adidas ») : aucune suggestion');
   dit(A.meilleureSuggestion({ item: annonces[0], achats, liens: new Map([['1', 1]]), marqueDe, couleursDe, modeleDe }) === null, 'G4 l’achat déjà relié ailleurs n’est plus proposé');
   const cinquante = Array.from({ length: 50 }, (_, i) => an(String(100 + i), 'Adidas Spezial noir 42,5', 5));
   const pool = Array.from({ length: 50 }, (_, i) => ach(1000 + i, 'Adidas Spezial noire 42.5', 10 + i));

@@ -7,7 +7,7 @@
 //      main » s'ouvre avec la MÊME retouche et la MÊME lettre (une source) et le dit ;
 //      la baisse, elle, repart de « Garder » (décision du 6 nov. : jamais gardée d'une
 //      ouverture à l'autre, sa règle du 29 oct.) — la clé commune n'a ni prix ni titre ;
-//   E. cinq étapes numérotées, la progression en tête, « paire 1/2 » puis « Suivante » ;
+//   E. (15 nov.) quatre étapes guidées (photos · supprimer · créer · fini), la progression en tête, « paire 1/2 » puis « Suivante » ;
 //   P. les photos : l'aperçu porte le réglage (zoom 1,2) ;
 //   T. le texte tel qu'il partira : prix 44,10 (49 € − 10 %), description avec le N°42
 //      en bas (réglage `vrm_num_vinted`) puis la lettre ; « Copier » met CE texte dans le
@@ -201,35 +201,35 @@ const petitsDans = (pg, sel) => pg.$$eval(`${sel} button, ${sel} a[href], ${sel}
           dit(pose && pose.haut >= 0 && pose.haut < pose.vh - 200 && pose.bas <= pose.vh + 1, `F ${T} la feuille est à l’écran (entrée finie)`, JSON.stringify(pose));
           for (let i = 0; i < 20; i++) { if (!(await pg.$('[data-main-lecture]'))) break; await pg.waitForTimeout(200); }
           const tete = await pg.evaluate(() => { const f = document.querySelector('[data-repub-main]'); return { rang: f.getAttribute('data-main-rang'), etapes: [...f.querySelectorAll('[data-main-aller]')].map((x) => x.getAttribute('data-main-aller')), courante: (f.querySelector('[aria-current="step"]') || {}).getAttribute ? f.querySelector('[aria-current="step"]').getAttribute('data-main-aller') : '', sous: (f.querySelector('.vrm-fs-sous-titre') || {}).textContent || '', num: (f.querySelector('[data-main-num]') || {}).textContent || '' }; });
-          dit(tete.rang === '1/2' && /Paire 1\/2/.test(tete.sous), `E ${T} deux paires : « Paire 1/2 » en tête`, JSON.stringify(tete));
-          dit(tete.etapes.join(',') === 'reglages,photos,texte,vinted,relier' && tete.courante === 'reglages' && tete.num === 'N°42', `E ${T} cinq étapes numérotées, la première en cours, le N° de la paire dit une fois`, JSON.stringify(tete));
-          // R (suite) : les MÊMES réglages, lus à la main.
+          // (15 nov., parcours guidé) « Paire » ou « Article » selon ce qu'il vend (`motsVendeur`).
+          dit(tete.rang === '1/2' && /(Paire|Article) 1\/2/.test(tete.sous), `E ${T} deux paires : « Paire 1/2 » en tête`, JSON.stringify(tete));
+          dit(tete.etapes.join(',') === 'photos,supprimer,creer,fini' && tete.courante === 'photos' && tete.num === 'N°42', `E ${T} quatre étapes (photos · supprimer · créer · fini), la première en cours, le N° de la paire dit une fois`, JSON.stringify(tete));
+          // R (suite) : les MÊMES réglages, lus à la main (la présentation des photos, repliée à l'étape Photos).
           const mm = await pg.getAttribute('[data-main-memes-reglages]', 'data-main-memes-reglages').catch(() => null);
           dit(mm && /retouchées/.test(mm) && /Lettre/.test(mm) && !/Prix/.test(mm), `R ${T} « à la main » s’ouvre avec la retouche et la lettre de l’atelier et le dit (« Mêmes réglages que Republier »)`, mm);
+          const ph = await pg.evaluate(() => { const g = document.querySelector('[data-main-photos]'); const i = g && g.querySelector('img'); return { n: g && g.getAttribute('data-main-photos'), tf: i ? i.style.transform : '', vis: [...document.querySelectorAll('[data-main-section]')].filter((x) => !x.hidden).map((x) => x.getAttribute('data-main-section')).join(',') }; });
+          dit(ph.vis === 'photos' && ph.n === '2' && /scale\(1\.2\)/.test(ph.tf), `P ${T} étape 1 : les 2 photos, avec le zoom 1,2 de l’atelier`, JSON.stringify(ph));
+          dit(await pg.locator('[data-main-telecharger="2"]').count() === 1, `P ${T} un bouton pour enregistrer les 2 photos réglées`);
+          dit((await etapeVisible(pg)) === 'photos', `E ${T} une étape à la fois`, await etapeVisible(pg));
+          const p1 = await petitsDans(pg, '[data-repub-main]');
+          // (15 nov.) §7 : 44 px AU DOIGT ; à la souris (1512) le bouton fait 32 px depuis le Studio (rouge déjà sur ea152a4b).
+          if (vp.width < 600) dit(!p1.length, `F ${T} cibles ≥ 44 px (Photos)`, p1.join(' | '));
+          await feuillePosee(pg); await pg.screenshot({ path: nomF('1-photos') });
+          // ── T : créer la nouvelle — le texte tel qu'il partira ; prix et titre repliés ──
+          await clic(pg, '[data-main-aller="creer"]');
+          await pg.waitForTimeout(250);
+          await clic(pg, '[data-rg-repli-prix] > summary');
+          await pg.waitForTimeout(200);
           const regM = await pg.evaluate(() => ({ reduc: (document.querySelector('[data-main-reduc="aucun"]') || {}).getAttribute ? document.querySelector('[data-main-reduc="aucun"]').getAttribute('aria-pressed') : null, zoom: (document.querySelector('[data-main-reglage="zoom"]') || {}).value, lettre: (document.querySelector('[data-main-lettre]') || {}).checked, prix: (document.querySelector('[data-main-prix-resultat]') || {}).getAttribute ? document.querySelector('[data-main-prix-resultat]').getAttribute('data-main-prix-resultat') : null }));
           dit(regM.reduc === 'true' && regM.zoom === '1.2' && regM.lettre === true && regM.prix === '4900', `R ${T} à la main : zoom 1,2 et lettre repris de l’atelier ; le prix repart de « Garder » (49 €)`, JSON.stringify(regM));
           await clic(pg, '[data-main-reduc="-10"]');
           await pg.waitForTimeout(200);
           dit((await pg.getAttribute('[data-main-prix-resultat]', 'data-main-prix-resultat')) === '4410', `R ${T} à la main, SON clic « −10 % » ⇒ 44,10 €`);
-          dit((await etapeVisible(pg)) === 'reglages', `E ${T} une étape à la fois`, await etapeVisible(pg));
-          const p1 = await petitsDans(pg, '[data-repub-main]');
-          dit(!p1.length, `F ${T} cibles ≥ 44 px (Réglages)`, p1.join(' | '));
-          await feuillePosee(pg); await pg.screenshot({ path: nomF('1-reglages') });
-          // ── P : les photos ───────────────────────────────────────────────────
-          await clic(pg, '[data-main-suivant="photos"]');
-          await pg.waitForTimeout(250);
-          const ph = await pg.evaluate(() => { const g = document.querySelector('[data-main-photos]'); const i = g && g.querySelector('img'); return { n: g && g.getAttribute('data-main-photos'), tf: i ? i.style.transform : '', vis: [...document.querySelectorAll('[data-main-section]')].filter((x) => !x.hidden).map((x) => x.getAttribute('data-main-section')).join(',') }; });
-          dit(ph.vis === 'photos' && ph.n === '2' && /scale\(1\.2\)/.test(ph.tf), `P ${T} étape 2 : les 2 photos, avec le zoom 1,2 de l’atelier`, JSON.stringify(ph));
-          const faitR = await pg.getAttribute('[data-main-aller="reglages"]', 'data-main-etape-fait').catch(() => null);
-          dit(faitR === '1', `E ${T} l’étape passée est cochée dans la progression`, faitR);
-          dit(await pg.locator('[data-main-telecharger="2"]').count() === 1, `P ${T} un bouton pour enregistrer les 2 photos réglées`);
-          await feuillePosee(pg); await pg.screenshot({ path: nomF('2-photos') });
-          // ── T : le texte tel qu'il partira ────────────────────────────────────
-          await clic(pg, '[data-main-suivant="texte"]');
-          await pg.waitForTimeout(250);
-          const tx = await pg.evaluate(() => { const v = (k) => ((document.querySelector(`[data-main-champ="${k}"] .vrm-main-valeur`) || {}).textContent || ''); return { titre: v('titre'), desc: v('description'), prix: v('prix'), marque: v('marque'), taille: v('taille'), etat: v('etat'), final: (document.querySelector('[data-main-apercu]') || {}).getAttribute ? document.querySelector('[data-main-apercu]').getAttribute('data-main-prix-final') : null, apDesc: (document.querySelector('[data-main-apercu-desc]') || {}).textContent || '' }; });
-          dit(tx.prix === '44,10' && tx.final === '4410', `T ${T} le prix à copier est celui de l’atelier : 44,10`, JSON.stringify({ p: tx.prix, f: tx.final }));
-          dit(/boîte d’origine\.\n\nN°42\n\n[a-z]$/.test(tx.desc) && tx.apDesc === tx.desc, `T ${T} description : le N°42 en bas (Réglages → Numéros), puis la lettre ; l’aperçu dit la même`, JSON.stringify(tx.desc.slice(-24)));
+          const faitR = await pg.getAttribute('[data-main-aller="photos"]', 'data-rg-etat').catch(() => null);
+          dit(faitR === 'a-faire', `E ${T} une étape PASSÉE n’est pas cochée sans son geste (photos pas encore enregistrées)`, faitR);
+          const tx = await pg.evaluate(() => { const v = (k) => ((document.querySelector(`[data-main-champ="${k}"] .vrm-main-valeur`) || {}).textContent || ''); return { titre: v('titre'), desc: v('description'), prix: v('prix'), marque: v('marque'), taille: v('taille'), etat: v('etat') }; });
+          dit(tx.prix === '44,10', `T ${T} le prix à copier est celui de l’atelier : 44,10`, JSON.stringify({ p: tx.prix }));
+          dit(/boîte d’origine\.\n\nN°42\n\n[a-z]$/.test(tx.desc), `T ${T} description : le N°42 en bas (Réglages → Numéros), puis la lettre`, JSON.stringify(tx.desc.slice(-24)));
           dit(tx.titre === 'Salomon XT-6 blanc taille 40' && tx.marque === 'Salomon' && tx.taille === '40' && /Très bon état/.test(tx.etat), `T ${T} titre, marque, taille, état à recopier`, JSON.stringify([tx.titre, tx.marque, tx.taille, tx.etat]));
           dit(await pg.locator('[data-main-copier]').count() === 6, `T ${T} un « Copier » par champ (6)`, String(await pg.locator('[data-main-copier]').count()));
           await clic(pg, '[data-main-copier="prix"]');
@@ -237,29 +237,32 @@ const petitsDans = (pg, sel) => pg.$$eval(`${sel} button, ${sel} a[href], ${sel}
           const cp = await pg.evaluate(async () => { let t = null; try { t = await navigator.clipboard.readText(); } catch (_) {} return { t, lib: (document.querySelector('[data-main-copier="prix"]') || {}).textContent || '', marque: (document.querySelector('[data-main-champ="prix"]') || {}).getAttribute ? document.querySelector('[data-main-champ="prix"]').getAttribute('data-main-copie') : null }; });
           dit(cp.t === '44,10' && /Copié/.test(cp.lib) && cp.marque === '1', `T ${T} « Copier » met 44,10 dans le presse-papiers et dit « Copié »`, JSON.stringify(cp));
           const p3 = await petitsDans(pg, '[data-repub-main]');
-          dit(!p3.length, `F ${T} cibles ≥ 44 px (Texte)`, p3.join(' | '));
+          if (vp.width < 600) dit(!p3.length, `F ${T} cibles ≥ 44 px (Créer)`, p3.join(' | '));
           await feuillePosee(pg); await pg.screenshot({ path: nomF('3-texte') });
-          // ── V : mettre en ligne, relier ──────────────────────────────────────
-          await clic(pg, '[data-main-suivant="vinted"]');
-          await pg.waitForTimeout(250);
-          await feuillePosee(pg); await pg.screenshot({ path: nomF('4-vinted') });
+          // ── V : mettre en ligne ──────────────────────────────────────────────
           // §7 : UN bouton principal par écran (ici « Ouvrir Vinted »), le reste en second.
-          const prim = await pg.$$eval('[data-repub-main] .vrm-b-primaire', (l) => l.filter((x) => !x.closest('[hidden]') && x.getClientRects().length).map((x) => x.textContent.trim()));
-          dit(prim.length === 1 && /Ouvrir Vinted/.test(prim[0]), `F ${T} étape 4 : un seul bouton principal (« Ouvrir Vinted »)`, prim.join(' | '));
+          const prim = await pg.$$eval('[data-repub-main] .vrm-b-primaire', (l) => l.filter((x) => !x.closest('[hidden]') && !x.closest('details:not([open])') && x.getClientRects().length).map((x) => x.textContent.trim()));
+          dit(prim.length === 1 && /Ouvrir Vinted/.test(prim[0]), `F ${T} étape Créer : un seul bouton principal (« Ouvrir Vinted »)`, prim.join(' | '));
           const lien = await pg.evaluate(() => { const a = document.querySelector('[data-main-ouvrir-vinted]'); return a ? { href: a.getAttribute('href'), cible: a.getAttribute('target') } : null; });
           const [pop] = await Promise.all([pg.context().waitForEvent('page', { timeout: 5000 }).catch(() => null), clic(pg, '[data-main-ouvrir-vinted]')]);
           if (pop) await pop.close().catch(() => {});
           await pg.waitForTimeout(300);
-          dit((await etapeVisible(pg)) === 'relier' && lien && lien.href === 'https://www.vinted.fr/items/new' && lien.cible === '_blank', `V ${T} « Ouvrir Vinted » ouvre la page de dépôt Vinted (nouvel onglet) et mène à « Relier »`, JSON.stringify({ e: await etapeVisible(pg), lien, pop: !!pop }));
-          dit(await pg.locator('[data-main-suivante="2/2"]').count() === 1, `E ${T} à la dernière étape : « Paire suivante · 2/2 »`);
+          dit(lien && lien.href === 'https://www.vinted.fr/items/new' && lien.cible === '_blank', `V ${T} « Ouvrir Vinted » ouvre la page de dépôt Vinted (nouvel onglet)`, JSON.stringify({ e: await etapeVisible(pg), lien, pop: !!pop }));
+          await clic(pg, '[data-main-suivant="fini"]');
+          await pg.waitForTimeout(250);
+          dit((await etapeVisible(pg)) === 'fini' && await pg.locator('[data-main-suivante="2/2"]').count() === 1, `E ${T} à la dernière étape : « Paire 2/2 »`);
           await feuillePosee(pg); await pg.screenshot({ path: nomF('5-relier') });
           await clic(pg, '[data-main-suivante="2/2"]');
           await pg.waitForSelector('[data-repub-main="9103"]', { timeout: 5000 }).catch(() => {});
           for (let i = 0; i < 20; i++) { if (!(await pg.$('[data-main-lecture]'))) break; await pg.waitForTimeout(200); }
           const p2 = await pg.evaluate(() => { const f = document.querySelector('[data-repub-main]'); return { id: f && f.getAttribute('data-repub-main'), rang: f && f.getAttribute('data-main-rang'), et: f && f.getAttribute('data-main-etape'), prix: (document.querySelector('[data-main-prix-resultat]') || {}).getAttribute ? document.querySelector('[data-main-prix-resultat]').getAttribute('data-main-prix-resultat') : null, desc: (document.querySelector('[data-main-champ="description"] .vrm-main-valeur') || {}).textContent || '' }; });
-          dit(p2.id === '9103' && p2.rang === '2/2' && p2.et === 'reglages' && p2.prix === '5400', `E ${T} paire 2/2 : la suivante repart de l’étape 1, la baisse de la série gardée (60 € − 10 % = 54 €)`, JSON.stringify(p2));
+          dit(p2.id === '9103' && p2.rang === '2/2' && p2.et === 'photos' && p2.prix === '5400', `E ${T} paire 2/2 : la suivante repart de l’étape 1, la baisse de la série gardée (60 € − 10 % = 54 €)`, JSON.stringify(p2));
           dit(/semelle propre\.\n\nN°43\n\n[a-z]$/.test(p2.desc) && !/\n\nq\n\n/.test(p2.desc), `T ${T} l’ancienne lettre (« q ») est retirée : jamais deux lettres`, JSON.stringify(p2.desc.slice(-22)));
           // ── I : l'inverse — régler à la main règle l'atelier ─────────────────
+          await clic(pg, '[data-main-aller="creer"]');
+          await pg.waitForTimeout(200);
+          await clic(pg, '[data-rg-repli-prix] > summary');
+          await pg.waitForTimeout(200);
           await clic(pg, '[data-main-reduc="-20"]');
           await pg.waitForTimeout(200);
           dit((await pg.getAttribute('[data-main-prix-resultat]', 'data-main-prix-resultat')) === '4800', `I ${T} à la main : −20 % ⇒ 48 €`);

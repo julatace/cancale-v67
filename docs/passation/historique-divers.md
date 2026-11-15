@@ -1941,3 +1941,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 <!-- déplacé tel quel de CLAUDE.md §9 le 15 nov. 2026 -->
 - **14 nov. · Studio bleu clair — la fondation** : jetons `--sb-*`, quatre formes de bouton, coque (lumière, barre en verre, pastille enfoncée + diode, disque « + » ⇒ Chercher · Scanner · Publier · Imprimer N), polices Urbanist/Inter embarquées, `src/ui` migré ; `docs/passation/2026-11-14-studio-fondation.md`. Geste : regarder sur iPhone, dire ce qui gêne.
+
+<!-- déplacé tel quel de CLAUDE.md §9 le 15 nov. 2026 -->
+- **15 nov. · Version « Studio bleu clair » en ligne** : les chantiers studio + impression en un toucher + idées 154/157/158/160 + correctif « À faire », intégrés ; passe complète (26 audits, 22 bancs) ; corrigé à la fusion : étiquette « Choisir » en double sur le plein, moments pendant/après/échec de l'impression rebranchés (`accompagner`), « Bénéfice : — ». `docs/passation/2026-11-15-version-studio.md`. Geste : fermer/rouvrir l'app, essayer « Imprimer » sur l'iPhone.

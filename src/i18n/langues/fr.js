@@ -10,6 +10,8 @@ import ecran_studio from './fr/studio.js';   // (14 nov.) Studio bleu clair : le
 import ecran_correspondances from './fr/correspondances.js';   // (15 nov.) Publier partout : catégories qui correspondent
 import ecran_capte from './fr/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_renvoyer from './fr/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
+import ecran_retrait_ailleurs from './fr/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
+import ecran_finition from './fr/finition.js';   // (15 nov.) la finition écran par écran
 import ecran_idees from './fr/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './fr/ventes.js';
 import ecran_commun from './fr/commun.js';
@@ -41,8 +43,10 @@ import ecran_partenaires from './fr/partenaires.js';   // (15 nov.) programme pa
 import ecran_argentprix from './fr/argentprix.js';   // (14 nov., argent-prix)
 import ecran_rechliste from './fr/rechliste.js';
 import ecran_studio_paires from './fr/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
+import ecran_republier_guide from './fr/republierGuide.js';   // (15 nov.) republier / publier à la main, guidés
 export default {
   ...ecran_studio_paires,
+  ...ecran_republier_guide,
   ...ecran_accueilReste,
   ...ecran_refonte_ms,
   ...ecran_studio_journee,
@@ -416,10 +420,10 @@ export default {
   // ── reglages
   "reglages.abonnement-ouvrir.desc": "Ton offre, ta carte, tes factures, et l’arrêt si tu veux.",
   "reglages.abonnement-ouvrir.lib": "Mon abonnement",
-  "reglages.adresse-vrm.desc": "Une adresse à toi : tes e-mails Vinted y arrivent seuls.",
+  "reglages.adresse-vrm.desc": "Une adresse à toi : tes e-mails Vinted y arrivent seuls.",
   "reglages.adresse-vrm.lib": "Mon adresse VRM",
   "reglages.adresses.desc": "Relier ta boîte pour que VRM lise tes ventes, colis et codes de retrait.",
-  "reglages.affichage-mode.desc": "Simple : seulement ce qui te sert déjà. Complet : tout.",
+  "reglages.affichage-mode.desc": "Simple : seulement ce qui te sert déjà. Complet : tout.",
   "reglages.affichage-mode.lib": "Affichage",
   "reglages.affichage.complet": "Complet",
   "reglages.affichage.simple": "Simple",
@@ -434,9 +438,9 @@ export default {
   "reglages.centre-aide.desc": "Installer l’extension, relier ta boîte, les numéros, l’URSSAF.",
   "reglages.centre-aide.lib": "Centre d’aide",
   "reglages.conditions.lib": "Données et conditions",
-  "reglages.configuration.desc": "Ventes, plateformes, statut, numéro, affichage : tout en une fois.",
+  "reglages.configuration.desc": "Ventes, plateformes, statut, numéro, affichage : tout en une fois.",
   "reglages.configuration.lib": "Ma configuration",
-  "reglages.connexions.desc": "Pour chaque compte : ce qui est à jour, ce qui attend un geste de toi.",
+  "reglages.connexions.desc": "Pour chaque compte : ce qui est à jour, ce qui attend un geste de toi.",
   "reglages.connexions.lib": "État des connexions",
   "reglages.conseils-revoir.desc": "Ceux que tu as passés ou masqués pourront revenir.",
   "reglages.conseils-revoir.lib": "Revoir les conseils",
@@ -505,13 +509,13 @@ export default {
   "reglages.imprimante.lib": "Imprimante et bordereaux",
   "reglages.imprimante.normale": "Normale · A4",
   "reglages.imprimante.thermique": "Thermique · {papier}",
-  "reglages.je-vends.desc": "Ce que tu vends : les mots et les exemples suivent.",
+  "reglages.je-vends.desc": "Ce que tu vends : les mots et les exemples suivent.",
   "reglages.je-vends.lib": "Je vends",
   "reglages.journal-vrm.lib": "Journal : ce que VRM a fait",
   "reglages.langue.chargement": "Chargement…",
   "reglages.langue.desc": "La langue de VRM, la même sur tous tes appareils.",
   "reglages.langue.rate": "Pas pu charger cette langue — réessaie.",
-  "reglages.liens.desc": "Tes comptes Vinted, Leboncoin, Vestiaire et eBay : lesquels comptent dans tes chiffres.",
+  "reglages.liens.desc": "Tes comptes Vinted, Leboncoin, Vestiaire et eBay : lesquels comptent dans tes chiffres.",
   "reglages.masques.desc": "Les achats que tu as retirés de la compta, à réafficher.",
   "reglages.masques.lib": "Achats masqués",
   "reglages.mes-plateformes.desc": "Choisir les plateformes visibles dans tes onglets.",
@@ -524,7 +528,7 @@ export default {
   "reglages.numeros.lib": "Numéros de rangement",
   "reglages.ma-journee.desc": "Montrer, cacher et ranger les cartes de Ma journée.",
   "reglages.ma-journee.lib": "Ma journée",
-  "reglages.objectif-mois.desc": "Un montant de vendu à viser chaque mois : une barre fine dans Ma journée.",
+  "reglages.objectif-mois.desc": "Un montant de vendu à viser chaque mois : une barre fine dans Ma journée.",
   "reglages.objectif-mois.lib": "Objectif du mois",
   "reglages.objectif.benefice": "{montant} de bénéfice",
   "reglages.objectif.vendu": "{montant}",
@@ -536,7 +540,7 @@ export default {
   "reglages.paiements.lib": "Ouvrir les paiements",
   "reglages.pilotage.desc": "Vendeurs, abonnés, revenus, incidents et satisfaction — en totaux.",
   "reglages.pilotage.lib": "Ton entreprise",
-  "reglages.prixachat.desc": "Les saisir à la suite : sans eux, le bénéfice n’est qu’un minimum.",
+  "reglages.prixachat.desc": "Les saisir à la suite : sans eux, le bénéfice n’est qu’un minimum.",
   "reglages.prixachat.lib": "Compléter les prix d'achat",
   "reglages.profil.cloisonne": "Tes données ne sont visibles que par toi.",
   "reglages.profil.pasCloisonne": "Connecté — séparation des comptes pas encore activée.",
@@ -546,7 +550,7 @@ export default {
   "reglages.push.muets": { one: "{n} compte sans e-mail : pas de notification", other: "{n} comptes sans e-mail : pas de notification" },
   "reglages.push.soirAuto": "Auto",
   "reglages.push.soirAutoTitre": "19 h l’hiver, 20 h l’été",
-  "reglages.raccourcis-clavier.desc": "Sur ordinateur : « g » puis une lettre, « ? » pour la liste.",
+  "reglages.raccourcis-clavier.desc": "Sur ordinateur : « g » puis une lettre, « ? » pour la liste.",
   "reglages.raccourcis-clavier.lib": "Raccourcis clavier",
   "reglages.raccourcis-siri.desc": "Ajouter un achat ou trouver un N° en parlant à Siri.",
   "reglages.raccourcis-siri.lib": "Siri et Raccourcis",
@@ -555,7 +559,7 @@ export default {
   "reglages.recherche.placeholder": "Rechercher un réglage",
   "reglages.recherche.rien": "Aucun réglage pour « {q} ». Essaie « e-mail », « numéro » ou « impression ».",
   "reglages.recherche.trouves": { one: "{n} réglage trouvé", other: "{n} réglages trouvés" },
-  "reglages.regime.desc": "Ton statut fiscal : il fixe le taux de tes cotisations URSSAF.",
+  "reglages.regime.desc": "Ton statut fiscal : il fixe le taux de tes cotisations URSSAF.",
   "reglages.restaurer.desc": "Remettre VRM tel qu’il était dans une sauvegarde.",
   "reglages.restaurer.lib": "Restaurer une sauvegarde",
   "reglages.sansCompte.bouton": "Aller à l'écran de connexion",
@@ -569,7 +573,7 @@ export default {
   "reglages.signalements.lib": "Signalements reçus",
   "reglages.simulation.lib": "Simuler une création de compte",
   "reglages.simulation.desc": "Le parcours d’un nouveau vendeur, sur des comptes fictifs.",
-  "reglages.signaler.desc": "Dire ce qui ne va pas : tu vois tout ce qui part avant d’envoyer.",
+  "reglages.signaler.desc": "Dire ce qui ne va pas : tu vois tout ce qui part avant d’envoyer.",
   "reglages.signaler.lib": "Signaler un problème",
   "reglages.support.lib": "Écrire au support",
   "reglages.support.desc": "Ta question, avec la version de l’app et de l’extension, l’écran, le navigateur et l’heure. Rien d’autre.",
@@ -582,7 +586,7 @@ export default {
   "reglages.sms.coupe": "Coupé",
   "reglages.sombre.desc": "Fond sombre, plus doux le soir.",
   "reglages.sombre.lib": "Mode sombre",
-  "reglages.statut.desc": "La base, les e-mails et les notifications fonctionnent-ils ?",
+  "reglages.statut.desc": "La base, les e-mails et les notifications fonctionnent-ils ?",
   "reglages.statut.lib": "État de VRM",
   "reglages.stream-on.desc": "Cache tes montants, pseudos et adresses quand tu filmes ton écran.",
   "reglages.stream-on.lib": "Mode stream",
@@ -596,9 +600,9 @@ export default {
   "reglages.discretion.lib": "Discrétion",
   "reglages.vacances.desc": "Mettre tes comptes en pause pendant ton absence, puis rouvrir.",
   "reglages.vacances.lib": "Mode vacances",
-  "reglages.copieannonces.desc": "Télécharger un zip par compte : titres, prix, N°, photos.",
+  "reglages.copieannonces.desc": "Télécharger un zip par compte : titres, prix, N°, photos.",
   "reglages.copieannonces.lib": "Copie de mes annonces",
-  "reglages.verifier.desc": "Extension, comptes, boîte e-mail : ce qui manque, et le geste.",
+  "reglages.verifier.desc": "Extension, comptes, boîte e-mail : ce qui manque, et le geste.",
   "reglages.verifier.lib": "Vérifier mon installation",
   "reglages.visite.desc": "Les onglets de VRM présentés un par un.",
   "reglages.visite.lib": "Revoir la visite",
@@ -613,7 +617,7 @@ export default {
   "reglages.sante.desc": "Ce qui cloche (numéros, prix d’achat, ventes, e-mails, colis), et où le corriger.",
   // ── securite (11 nov., lot securite-vinted : sécurité des comptes)
   "reglages.securite.lib": "Sécurité des comptes",
-  "reglages.securite.desc": "Comme une personne : pas la nuit, pas en rafale, arrêt au premier refus.",
+  "reglages.securite.desc": "Comme une personne : pas la nuit, pas en rafale, arrêt au premier refus.",
   "securite.phrase.robot": "{site} vérifie ton compte · fais la vérification toi-même sur {hote}",
   "securite.phrase.arret": "Tout est arrêté depuis {heure} · rien d’automatique ne part",
   "securite.phrase.pause": "{site} demande de ralentir · reprise à {heure}",
@@ -660,9 +664,9 @@ export default {
   "reglages.importer.lib": "Importer",
   "reglages.importer.desc": "Ton stock et tes ventes passées, depuis un tableur ou un autre logiciel.",
   "reglages.revenir.lib": "Revenir en arrière",
-  "reglages.revenir.desc": "Après une fausse manip : voir ce qui changera, choisir quoi remettre.",
+  "reglages.revenir.desc": "Après une fausse manip : voir ce qui changera, choisir quoi remettre.",
   "reglages.rappels.lib": "Rappels",
-  "reglages.rappels.desc": "Ceux que tu as posés avec « Me le rappeler » : à 9 h le jour choisi.",
+  "reglages.rappels.desc": "Ceux que tu as posés avec « Me le rappeler » : à 9 h le jour choisi.",
   "reglages.quoi-de-neuf.lib": "Quoi de neuf",
   "reglages.quoi-de-neuf.desc": "Les nouveautés de VRM qui te concernent.",
   // ── publier partout (11 nov.)
@@ -1220,7 +1224,7 @@ export default {
   "sante.ps.etat": "État du compte pas encore lu.",
   "sante.ps.encours": "Lecture en cours…",
   "reglages.santecomptes.lib": "Santé des comptes",
-  "reglages.santecomptes.desc": "Pour chaque compte Vinted : note, envois, annulations, modération.",
+  "reglages.santecomptes.desc": "Pour chaque compte Vinted : note, envois, annulations, modération.",
   // ── photosComptes (11 nov., lot photos-comptes)
   "photosComptes.titre": "Photos en double entre comptes",
   "photosComptes.outil": "Photos en double",
@@ -2263,6 +2267,8 @@ export default {
   ...ecran_confort,
   ...ecran_studio,
   ...ecran_capte,
+  ...ecran_retrait_ailleurs,
   ...ecran_correspondances,
   ...ecran_renvoyer,
+  ...ecran_finition,
 };

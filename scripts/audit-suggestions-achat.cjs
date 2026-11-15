@@ -18,7 +18,11 @@ const fs = require('fs'), path = require('path'), vm = require('vm'), os = requi
 const { execFileSync } = require('child_process');
 const R = path.join(__dirname, '..');
 const MUTS = {
-  'marque-ignoree': ["if (bas(marqueDe(t)) !== marque) continue;", ''],
+  'marque-ignoree': ["if (ma ? !memeMarque(ma, marque) : !titrePorteMarque(t, marque)) continue;", ''],
+  // (15 nov., captures de Julien) La marque de l'annonce se prouve par son titre ; un mot de modèle commun est exigé.
+  'marque-du-champ-crue': ["if (reconnue) return '';", "if (reconnue) return champ;"],
+  'mot-modele-ignore': ["if (![...mots].some((w) => motsA.has(w))) continue;", ''],
+  'mots-vides-comptes': ["&& !MOTS_VIDES.has(w)", ''],
   'taille-ignoree': ["if (!ta || ta !== taille) continue;", ''],
   'couleur-ignoree': ["if (!cs.some((c) => couleurs.includes(c))) continue; rang = 1;", 'rang = 1;'],
   'posterieur': ["if (!Number.isFinite(da) || (Number.isFinite(ref) && !(da < ref))) continue;", ''],
@@ -82,7 +86,20 @@ const { extractBrand: marqueDe, extractColors: couleursDe, extractModel: modeleD
   const s2 = sugg(cible, [ach(2, 'Adidas spezial pointure 42,5'), ach(3, 'adidas spezial black 42.5', -20)]);
   dit(s2.length === 2 && s2[0].achat.transaction_id === 3 && s2[1].rang === 2, 'S2 les trois critères d’abord, puis marque + taille', JSON.stringify(s2.map((x) => [x.achat.transaction_id, x.rang])));
   dit(sugg(cible, [ach(4, 'Nike Spezial noire 42.5')]).length === 0, 'S3 marque différente ⇒ écartée');
-  dit(sugg({ titre: 'adidas spezial noir 35,5' }, [ach(14, 'Adidas samba 35,5')]).length === 0 && sugg({ titre: 'adidas spezial noir 35,5' }, [ach(15, 'Adidas baskets 35,5')]).length === 1, 'S3b deux modèles connus et différents (Spezial / Samba) ⇒ écartée ; modèle inconnu d’un côté ⇒ gardée');
+  // (15 nov.) « modèle inconnu d'un côté ⇒ gardée » ne vaut plus : il faut un MOT de modèle commun (« baskets » est un mot vide).
+  dit(sugg({ titre: 'adidas spezial noir 35,5' }, [ach(14, 'Adidas samba 35,5')]).length === 0 && sugg({ titre: 'adidas spezial noir 35,5' }, [ach(15, 'Adidas baskets 35,5')]).length === 0 && sugg({ titre: 'adidas spezial noir 35,5' }, [ach(16, 'Adidas spezial usate 35,5')]).length === 1, 'S3b deux modèles connus et différents (Spezial / Samba) ⇒ écartée ; aucun mot de modèle commun (« baskets ») ⇒ écartée ; « spezial » commun ⇒ gardée');
+
+  dit(sugg({ titre: 'Nike air max 90 noir taille 42' }, [ach(17, 'Nike air max 1 noir 42')]).length === 0, 'S3c des mots communs (air, max) mais deux modèles connus et différents (Air Max 90 / Air Max 1) ⇒ écartée');
+  console.log('\n── J. Les captures de Julien (15 nov.) : titres INVENTÉS de la même forme');
+  // J1 la marque du CHAMP (« adidas », choisie sur Vinted) contredite par le titre « Autry … » : pas su ⇒ aucune suggestion.
+  dit(sugg({ titre: 'Autry reelwind low rose taille 36', marque: 'adidas', taille: '36' }, [ach(40, '#Adidas Spezial, dunkelblau, Gr. 36')]).length === 0, 'J1 « Autry reelwind low rose » marquée « adidas » ⇏ « #Adidas Spezial, dunkelblau, Gr. 36 » (marque différente)');
+  dit(sugg({ titre: 'Autry reelwind blanc taille 41', marque: 'Autry', taille: '41' }, [ach(41, '#Adidas Spezial, weiss, Gr. 41')]).length === 0 && sugg({ titre: 'Autry reelwind blanc taille 41', marque: 'Autry', taille: '41' }, [ach(42, 'Autry Reelwind wit maat 41')]).length === 1, 'J1b une marque hors de la liste connue (« Autry ») se lit dans le titre de l’achat ; « #Adidas » n’est pas « Autry »');
+  // J2 même marque, aucun mot de modèle commun (« maat » est un mot vide néerlandais) ⇒ écartée.
+  dit(sugg({ titre: 'nike zoom fly 5 noir et rose taille 40', marque: 'Nike', taille: '40' }, [ach(43, 'Nike speakers maat 40')]).length === 0, 'J2 « nike zoom fly 5 noir et rose » ⇏ « Nike speakers maat 40 » (aucun mot de modèle commun)');
+  // J3 le bon cas : même marque, mots de modèle communs (air, max), même taille ⇒ proposée (une PROPOSITION).
+  dit(sugg({ titre: 'nike air max 1 bleu taille 43', marque: 'Nike', taille: '43' }, [ach(44, 'Nike Air Max 1 Alphabet 43 2007')]).length === 1, 'J3 « nike air max 1 bleu » ⇒ « Nike Air Max 1 Alphabet 43 2007 » reste proposée');
+  dit(S.motsModeleAchat('#Adidas Spezial, dunkelblau, Gr. 36', 'adidas', couleursDe).has('spezial') && !S.motsModeleAchat('Nike speakers maat 40 Größe taglia', 'nike', couleursDe).has('maat') && !S.motsModeleAchat('Schuhe Größe 40', 'nike', couleursDe).size, 'J4 mots vides multilingues (maat, Gr., Größe, taglia, Schuhe) et « # » écartés des mots de modèle');
+  dit(S.marqueAnnonce({ marque: 'Nike SB', titre: 'nike dunk low 42' }, marqueDe) === 'nike' && S.marqueAnnonce({ marque: 'no marque', titre: 'adidas spezial 40' }, marqueDe) === 'adidas' && S.marqueAnnonce({ marque: 'adidas', titre: 'Autry reelwind 36' }, marqueDe) === '', 'J5 la marque d’une annonce : « Nike SB » ⇒ nike, « no marque » + titre adidas ⇒ adidas, « adidas » sur « Autry … » ⇒ pas su');
   dit(sugg(cible, [ach(5, 'Adidas Spezial noire 43')]).length === 0, 'S4 taille différente ⇒ écartée');
   dit(sugg(cible, [ach(6, 'Adidas Spezial noire 42 2/3')]).length === 0, 'S5 « 42 2/3 » face à « 42,5 » ⇒ écartée');
   dit(sugg(cible, [ach(7, 'Adidas Spezial bleue 42.5')]).length === 0, 'S6 couleur différente ⇒ écartée');
@@ -137,7 +154,8 @@ const { extractBrand: marqueDe, extractColors: couleursDe, extractModel: modeleD
     // Avant (le barème `scoreAchatPrep`) : marque + couleur + titre identique passaient sans taille.
     dit(!serie([{ key: 'a', titre: 'Adidas Spezial noire', dateRef: ref }], [ach(20, 'Adidas Spezial noire')]).a, 'F1 le titre seul ne suffit plus : sans taille, aucune piste (même titre identique)');
     dit(!serie([{ key: 'b', titre: 'Adidas Spezial noire 42.5', dateRef: ref }], [ach(21, 'Adidas Spezial noire 42.5', +2)]).b, 'F2 un achat POSTÉRIEUR à l’article n’est jamais proposé');
-    const f3 = serie([{ key: 'c', titre: 'Spezial', marque: 'Adidas', taille: '42,5', dateRef: ref }], [ach(22, 'Adidas Spezial noire 42.5')]);
+    // (15 nov.) La marque du champ doit être écrite dans le titre (sinon pas su) : le titre porte « adidas ».
+    const f3 = serie([{ key: 'c', titre: 'adidas Spezial', marque: 'Adidas', taille: '42,5', dateRef: ref }], [ach(22, 'Adidas Spezial noire 42.5')]);
     dit(f3.c && f3.c.length === 1 && f3.c[0].rang === 2 && f3.c[0].sur === false, 'F3 la marque et la taille des CHAMPS de l’annonce comptent ; sans couleur commune lue ⇒ « à vérifier », jamais « C’est ça »', JSON.stringify(f3));
     const f4 = serie([{ key: 'd', titre: 'Adidas Spezial noire 42,5', dateRef: ref }], [ach(23, 'Adidas Spezial noire 42.5')]);
     dit(f4.d && f4.d[0].sur === true, 'F4 marque + taille + couleur ⇒ « C’est ça » (rang 1)');
