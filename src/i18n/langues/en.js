@@ -50,7 +50,6 @@ export default {
   ...ecran_studio_paires,
   ...ecran_republier_guide,
   ...ecran_etageres,
-  ...ecran_republier_guide,
   ...ecran_accueilReste,
   ...ecran_refonte_ms,
   ...ecran_studio_journee,
