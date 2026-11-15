@@ -132,11 +132,11 @@ export const TABLE_VINTED = Object.freeze({
   2719: T('Enfants > Vêtements pour filles > Chaussures > Baskets > Baskets à lacets', 'enfant',
     { sous: 'Chaussures enfants', type: 'Baskets & Sneakers' }, { univers: 'Mode fille', categorie: 'Chaussures', sous: 'Baskets', posee: false }, { requete: 'baskets fille' }),
   2752: T('Enfants > Vêtements pour garçons > Chaussures > Baskets > Baskets sans lacets', 'enfant',
-    { sous: 'Chaussures enfants', type: 'Baskets & Sneakers' }, { demande: ['univers', 'sous'] }, { requete: 'baskets garçon' }),
+    { sous: 'Chaussures enfants', type: 'Baskets & Sneakers' }, { demande: ['univers', 'categorie', 'sous'] }, { requete: 'baskets garçon' }),
   1662: T('Enfants > Vêtements pour garçons > Chemises et t-shirts > T-shirts', 'enfant',
-    { sous: 'Vêtements enfants', type: 'Hauts / T-Shirts / Polos' }, { demande: ['univers', 'sous'] }, { requete: 't-shirt garçon' }),
+    { sous: 'Vêtements enfants', type: 'Hauts / T-Shirts / Polos' }, { demande: ['univers', 'categorie', 'sous'] }, { requete: 't-shirt garçon' }),
   1697: T('Enfants > Vêtements pour garçons > Pantalons et shorts > Jeans slim', 'enfant',
-    { sous: 'Vêtements enfants', type: 'Jeans' }, { demande: ['univers', 'sous'] }, { requete: 'jean garçon' }),
+    { sous: 'Vêtements enfants', type: 'Jeans' }, { demande: ['univers', 'categorie', 'sous'] }, { requete: 'jean garçon' }),
   156: T('Femmes > Sacs > Sacs à main', 'femme',
     { sous: 'Accessoires & Bagagerie', univers: 'Femme', type: 'Sac à main' }, { univers: 'Mode femme', categorie: 'Sacs', sous: 'Sacs à main', posee: true }, { requete: 'sac à main femme' }),
   2614: T('Femmes > Vêtements > Manteaux et vestes > Vestes > Doudounes', 'femme',
@@ -350,7 +350,7 @@ export function ficheSite(site, paire, memoire, reponses) {
     out.requete = (t && t.ebay.requete) || '';
     const r = rep.categorie && /^\d{1,9}$/.test(str(rep.categorie.id)) ? { id: str(rep.categorie.id), nom: str(rep.categorie.nom), chemin: str(rep.categorie.chemin) } : null;
     if (r) { out.valeurs.categorie = r; out.origine.categorie = 'reponse'; }
-    else if (mc.ebay) { out.valeurs.categorie = mc.ebay; out.origine.categorie = 'memoire'; }
+    else if (mc.ebay && rep.categorie !== null) { out.valeurs.categorie = mc.ebay; out.origine.categorie = 'memoire'; }   // null : « Changer » ⇒ redemandée
     else demander('categorie', [], false);
     const e = etatEbayId(p.etat); if (e) { out.valeurs.etat = e; out.origine.etat = 'traduit'; }
     if (/^\d{2}(?:[.,]5)?$/.test(str(p.taille))) { out.valeurs.pointureEU = str(p.taille).replace('.', ','); out.origine.pointureEU = 'traduit'; }

@@ -852,6 +852,7 @@ import Illustration, { depuisIcone } from "./composants/Illustration.jsx";   // 
 import { SITES_PUBLIER, apercuEnvoi, manquesEnvoi, etatsPaire, partoutLeMeme, lienVu, chercherPaires, enLigneSur } from "./publierAilleurs.js";
 import { CLE_PRIX_PARTOUT, reglagePrix, CLE_PARAMS_PARTOUT, reglageParams, lignePartout, planPartout, executerPartout, aussiSur, texteAussiSur } from "./publierPartout.js";
 import { suiviPourPartout } from "./publierPartoutSuivi.js";
+import { CLE_CORRESPONDANCES, lireMemoire as lireCorrespondances, retenir as retenirCorrespondance, TABLE_VINTED } from "./correspondances.js";   // (15 nov.) Vinted → Leboncoin · eBay · Vestiaire
 import { CLE_DEFAUTS_EBAY as CLE_DEFAUTS_EBAY_PP, defautsDepuis as defautsEbayDepuis, resume as resumeReglagesEbayPP } from "./ebay/parametres.js";
 import { chargerSuivi } from "./suiviBranchement.js";
 import { optionsSelecteur, nomCompteVente, identiteCompteVente, annuaireLbc, ongletSansDonnee, nomPlateforme, logoPlateforme } from "./plateformes.js";
@@ -974,7 +975,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.378.0';
+const EXT_ATTENDUE = '5.379.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -1406,7 +1407,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
+const EXT_CAPACITES = { lbccriteres: '5.379.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -3052,6 +3053,7 @@ const SYNC_KEYS = [
   'vrm_soldes',
   // (11 nov. soir) … et TOUS les paramètres de publication par défaut, par site (src/publierPartout.js).
   'vrm_partout_params',
+  'vrm_correspondances',   // (15 nov.) SES réponses « quelle catégorie chez Leboncoin / Vestiaire / eBay ? », par catégorie Vinted
   'vinted_accounts','vinted_account_labels','vinted_account_emails','vinted_account_phones',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
   'vinted_goal','vinted_regime','vrm_micro_options','vinted_tva','vinted_bordereau_formats',
@@ -25493,7 +25495,8 @@ function useEbayPaires(comptes) {
         const etatV = String(etatMap[String(id)] || cf.etat || '').trim();
         const tailleV = String(tailleMap[String(id)] || cf.size || '').trim();
         out.push({ id: String(id), num: n, photoK: f.photoK || null, title: titreP, taille: tailleV || extractSize(titreP) || '', tailleVinted: tailleV, marque, etat: etatV, cover, photos, desc, nPhotos: nPhotosMap[String(id)], prix: prixMap[String(id)] ?? null, uid: compteMap[String(id)] || '',
-          catalogId: catMap[String(id)] ?? (details[id] && details[id].catalogId) ?? null, couleur: couleurMap[String(id)] || '', cree: creeMap[String(id)] ?? null,
+          // (15 nov.) la catégorie Vinted lue sur la page de l'annonce est aussi rangée sous `codes.catalog_id` (mesuré : 56 fiches sur 330 l'ont, AUCUNE `catalogId`).
+          catalogId: catMap[String(id)] ?? (details[id] && details[id].catalogId) ?? (details[id] && details[id].codes && details[id].codes.catalog_id != null && details[id].codes.catalog_id !== '' ? String(details[id].codes.catalog_id) : null) ?? null, couleur: couleurMap[String(id)] || '', cree: creeMap[String(id)] ?? null,
           ...(chezMoi.has(String(id)) ? { chezMoi: true, prix: prixMap[String(id)] ?? (f.price != null && f.price !== '' ? f.price : null), uid: compteMap[String(id)] || String(f.accountId || '') } : {}) });
       }
       out.sort((a, b) => (parseInt(b.num, 10) || 0) - (parseInt(a.num, 10) || 0));
@@ -25957,6 +25960,10 @@ function HotePublierPartout({ comptes, nums, numData, onFermer }) {
   const [saisies, setSaisies] = React.useState({});
   // (11 nov. soir) Les paramètres de publication par défaut (Leboncoin, Vestiaire) : '' = auto.
   const [params, setParams] = React.useState(() => reglageParams(load(CLE_PARAMS_PARTOUT, null), { etatsLbc: LBC_ETATS }));
+  // (15 nov.) SES réponses aux correspondances, par catégorie Vinted (synchronisées) ; écrites sur SON clic seulement.
+  const [memoire, setMemoire] = React.useState(() => lireCorrespondances(load(CLE_CORRESPONDANCES, null)));
+  // Une extension qui porte catégorie et critères (5.379) — sinon Leboncoin les devinerait : la feuille le dit.
+  const lbcCriteres = (relaisVivant() ? 'ok' : extSait('lbccriteres')) === 'ok';
   // Les listes Leboncoin et Vestiaire (pour « déjà en ligne ») : trois états.
   const [autres, setAutres] = React.useState(undefined);
   const relire = React.useCallback(async () => {
@@ -25991,7 +25998,10 @@ function HotePublierPartout({ comptes, nums, numData, onFermer }) {
   const lignes = choisies === undefined ? undefined : choisies.map((p) => {
     const fiche = fiches[String(p.id)] || {};
     let achat = null; try { achat = prixAchatDe(fiche, load('vinted_buyprice_by_num', {}) || {}); } catch (_) { achat = null; }
-    return lignePartout(p, { enLigne: enLigneDe(p), ext, reglage, params, saisie: saisies[String(p.id)], regles, achat,
+    // Ce que la règle d'avant (la même dans l'extension) poserait d'elle-même, d'après le chemin Vinted connu.
+    const t = p.catalogId != null ? TABLE_VINTED[String(p.catalogId)] : null;
+    let categorieVoie = ''; try { categorieVoie = categorieLbcDe(p.title, p.desc, p.taille, t ? t.chemin : '', p.marque); } catch (_) { categorieVoie = ''; }
+    return lignePartout(p, { enLigne: enLigneDe(p), ext, reglage, params, saisie: saisies[String(p.id)], regles, achat, memoire, lbcCriteres, categorieVoie,
       famille: familleArticle({ titre: p.title, taille: p.taille, marque: p.marque }).famille, mpLbc: mpChoisi(fiche, 'lbc'), facultatifs: champsFacultatifs(vendActuel()) });
   });
   const vus = {};
@@ -26007,7 +26017,10 @@ function HotePublierPartout({ comptes, nums, numData, onFermer }) {
       // Une extension qui ne sait pas recevoir la fiche publierait SA version (prix Vinted) :
       // un prix réglé ne partirait pas — on le dit, rien ne part (jamais un autre prix en silence).
       if (saitFiche !== 'ok' && Number(e.apercu.prix) !== Number(p.prix)) return { accepte: false, code: 'fiche-retard', raison: `ton extension ne sait pas encore recevoir la fiche de VRM (${EXT_CAPACITES.lbcfiche}) : le prix réglé ne partirait pas` };
-      let r = null; try { r = await vmrCmd({ cmd: 'lbcPublier', id: String(e.id), ...(saitFiche === 'ok' ? { annonce: v.annonce } : {}) }, 30000); } catch (_) { r = null; }
+      // (15 nov.) La catégorie et ses critères (univers, type, taille, état, couleur, marque) de la correspondance :
+      // seulement à une extension qui sait les poser (`lbccriteres`) ; sinon la case est restée bloquée.
+      const crit = lbcCriteres && e.lbc ? { ...(e.lbc.categorie ? { categorie: e.lbc.categorie } : {}), ...(Object.keys(e.lbc.criteres || {}).length ? { criteres: e.lbc.criteres } : {}) } : {};
+      let r = null; try { r = await vmrCmd({ cmd: 'lbcPublier', id: String(e.id), ...(saitFiche === 'ok' ? { annonce: { ...v.annonce, ...crit } } : {}) }, 30000); } catch (_) { r = null; }
       if (r && !r.accepte && r.code === 'confirmer') return { accepte: false, code: 'confirmer', raison: 'VRM n’a pas vu la fin d’un dépôt précédent : si l’annonce est en ligne, rien à refaire ; sinon relance-la depuis sa fiche Leboncoin' };
       if (r && r.accepte && r.jobId) { __vmrJobs[r.jobId] = Object.assign({}, __vmrJobs[r.jobId] || {}, { etape: r.etape, at: Date.now() }); __vmrNotifier(); }
       return r;
@@ -26022,7 +26035,9 @@ function HotePublierPartout({ comptes, nums, numData, onFermer }) {
     },
     ebay: async (e) => {
       const p = parId.get(e.id); if (!p) return { accepte: false, code: 'absente', raison: 'annonce plus en ligne sur Vinted' };
-      try { const m = await import('./ecrans/Ebay.jsx'); return await m.preparerBrouillonPartout(p, { prix: e.apercu.prix, titre: e.apercu.titre }); }
+      // (15 nov.) LA catégorie eBay qu'il a choisie (parmi celles qu'eBay propose) ; sans elle, aucune n'est devinée.
+      const cat = e.corr && e.corr.valeurs && e.corr.valeurs.categorie ? e.corr.valeurs.categorie : null;
+      try { const m = await import('./ecrans/Ebay.jsx'); return await m.preparerBrouillonPartout(p, { prix: e.apercu.prix, titre: e.apercu.titre, categorie: cat }); }
       catch (_) { return { accepte: false, code: 'charge', raison: 'l’écran eBay n’a pas pu se charger — réessaie' }; }
     },
   };
@@ -26046,6 +26061,24 @@ function HotePublierPartout({ comptes, nums, numData, onFermer }) {
     exclues={choisies === undefined ? 0 : voulus.length - choisies.length}
     onReglage={(site, r) => setReglage((x) => { const n = reglagePrix({ ...x, [site]: r }); save(CLE_PRIX_PARTOUT, n); return n; })}
     onParam={(site, champ, val) => setParams((x) => { const n = reglageParams({ ...x, [site]: { ...((x && x[site]) || {}), [champ]: val } }, { etatsLbc: LBC_ETATS }); save(CLE_PARAMS_PARTOUT, n); return n; })}
+    memoire={memoire}
+    /* (15 nov.) SA réponse à une correspondance : pour CETTE annonce, et retenue pour sa catégorie Vinted. */
+    onRepondre={(id, site, champ, val) => {
+      setSaisies((x) => { const a = x[id] || {}; const c = a.corr || {}; return { ...x, [id]: { ...a, corr: { ...c, [site]: { ...(c[site] || {}), [champ]: val } } } }; });
+      const p = parId.get(String(id));
+      if (p && champ !== 'marque' && p.catalogId != null && p.catalogId !== '' && isCloudReady()) {
+        const n = retenirCorrespondance(load(CLE_CORRESPONDANCES, null), p.catalogId, site, champ, val);
+        save(CLE_CORRESPONDANCES, n); setMemoire(n);
+      }
+      if (p && site === 'leboncoin' && champ === 'marque' && p.marque && isCloudReady()) {
+        const n = retenirCorrespondance(load(CLE_CORRESPONDANCES, null), p.catalogId, 'leboncoin', 'marque', { vinted: p.marque, libelle: val });
+        save(CLE_CORRESPONDANCES, n); setMemoire(n);
+      }
+    }}
+    /* Les catégories qu'eBay propose (API Taxonomy, sur SON jeton, lecture seule) : `null` = pas su. */
+    onChercherEbay={async (q) => {
+      try { const { j } = await appelEbay({ action: 'parametres', q: String(q || '').slice(0, 80) }); return j && j.ok && Array.isArray(j.categories) ? j.categories : null; } catch (_) { return null; }
+    }}
     onParamAnnonce={(id, site, champ, val) => setSaisies((x) => { const a = x[id] || {}; const pr = a.params || {}; return { ...x, [id]: { ...a, params: { ...pr, [site]: { ...(pr[site] || {}), [champ]: val } } } }; })}
     onSaisie={(id, champ, val) => setSaisies((x) => {
       const a = x[id] || {};
