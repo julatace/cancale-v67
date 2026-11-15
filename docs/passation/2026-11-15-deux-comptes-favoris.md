@@ -117,3 +117,37 @@ Extension **5.392.0** (zips régénérés). Aucune donnée réelle dans le dép�
    à cette personne. VRM apprend, puis « Faire une offre » marche depuis Messages → Vestiaire.
 3. Quand « Deux comptes, une paire » apparaît : « Retirer celle de … », supprimer sur Vinted (connecté au bon compte),
    puis « C'est fait · relire ».
+
+## Suite (coordinateur, même soir) — 5.392.0 alignée sur les favoris Vinted, et `photovrm`
+
+### Les offres aux « aimés » Vestiaire = les techniques des favoris Vinted (fonctions RÉUTILISÉES)
+- Écart entre deux offres : 8 à 20 s au hasard, **jamais deux fois de suite la même valeur** — `tirerSansRepeter`
+  (extrait de `tirerAttenteOffreMessage`, qui l'utilise désormais aussi ; dernière valeur dans `chrome.storage.local`).
+- Avant CHAQUE offre, la porte des favoris `porteDiscretion('vc:{id}', 'favori')` — élargie à un compte Vestiaire,
+  **site par site** (verrou `vrmVerrouCompteVc`, série `vc:favori` : un geste Vestiaire ne retient pas Vinted) :
+  « Tout arrêter », vérification jusqu'à « Reprendre », **15/h** (réglage commun `parHeure.favori`), **2 à 6 min après
+  l'ouverture** de vestiairecollective.com (notée par `noterSessionVc`), un compte à la fois, série décalée ; puis
+  `secuGeste('vestiaire', …, 'favori', 'serie')` (plafond du jour, par type, repos, prudence, arrêt anti-robot) ;
+  puis 45/h ; `noterGesteAuto`.
+- L'attente est TENUE par tranches en revérifiant tout (Tout arrêter, anti-robot, pause 429/403, onglet fermé ou
+  autre compte ⇒ rien ne part, dit).
+- §4.9 : la série est une FILE `vrmVcAimesFile` ; un worker neuf la reprend au réveil `vrm-offres`
+  (`reprendreOffresAimesVc`), 10 min trop tard ⇒ rien ne part, dit.
+- Journal « Ce que VRM a fait » : `noterJournal('vc:{id}', 'favori')` pour chaque offre FAITE.
+- **Pas de message** : l'offre de Vestiaire n'a pas de texte (mesuré ; un texte libre rend la recette non rejouable)
+  ⇒ ni temps d'écriture ni variantes. **Pas de rythme actif/calme** : Julien l'a REFUSÉ pour les favoris (§3), les
+  favoris Vinted ne le suivent pas non plus.
+- `audit-favoris-sites.cjs` étendu (horloge virtuelle) : écarts tirés et tenus, 300 tirages sans répétition, journal,
+  ouverture, 15/h, Tout arrêter (avant et pendant), un compte à la fois (et Vinted ne retient pas Vestiaire), autre
+  compte pendant la série, reprise par un worker neuf, trop tard. **Mutations 24/24** (délai fixe, même valeur deux
+  fois, plafond des favoris ignoré, porte ignorée, ouverture ignorée, autre compte, reprise absente, journal…).
+
+### `photovrm` (5.392.0) — la photo fabriquée par l'atelier « Republier par VRM »
+- `televerserPhotosRecreer` : après `photoReglee`, `empreinteDeBlob(blob)` (la même que `tickEmpreintes`) ; file
+  `vrmPhotosVrmFile` puis `photo_vrm_{uid}` (`payload.photos[h] = { h, n, src, uid, at }`, lue-fusionnée-réécrite,
+  60 jours, 1 500 au plus ; lecture ratée ⇒ rien écrit, reprise au réveil). L'atelier n'attend pas l'écriture.
+- App (`claude/numeros-masquees` fusionnée) : `verserPhotosVrmExtension` verse ces lignes au registre
+  `vrm_photos_vrm` (`ajouterAuRegistre`, mêmes champs) au chargement.
+- `scripts/audit-photo-vrm.cjs` : le VRAI `recreerVinted` range l'empreinte, l'atelier fait les mêmes requêtes,
+  lecture KO, fusion/borne, versement app — 12 contrôles, 6/6 mutations.
+- `EXT_CAPACITES.photovrm` = 5.392.0 (`noterPhotosVrm`, audit-coherence).
