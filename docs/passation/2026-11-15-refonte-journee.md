@@ -102,13 +102,23 @@ vente ensemble ici » ; « tu peux enlever ».
   clair verts ; ROUGE sur l'arbre de départ (A1 « pas sur Ma journée », A6).
 - `scripts/bancs/journee-retours.cjs` (NOUVEAU) : R1–R3 + 3 mutations ROUGES ; A1 UN bloc réunit achat et vente, A2 rien
   ailleurs, A3 les cartes retirées absentes hors feuille, A4 la ligne et sa feuille ; 390 et 1512 verts.
-- Bancs existants : `verre` (journee, annonces ; 390/1512, clair/sombre) 80/80 ; `studio-journee` 122 OK (dont ordinateur
-  en colonnes) ; `annonces-tete` vert ; `studio-coque` 78/78 ; `accompagnement` vert (26 moments, 6 non joués) ;
-  `studio-paires` vert à 390 (clair, sombre), à 1512 sombre et volume 1 000 ; 1512 clair « pas de fiche en plan à droite »
-  — ROUGE AUSSI sur l'arbre de départ rejoué au même moment (charge 75–82) : délai de la machine.
-- Deux bancs réécrits sur la RÈGLE (dit ici, §6) : `studio-paires` (au téléphone la plaque N° est SOUS le titre, à droite
-  de la photo — maquette validée ; « À faire » jugé sur la ligne du h1, le sélecteur étant dans la tête) ;
-  `studio-journee` (« À trancher » : sa porte sur Ma journée est la ligne « Tout va bien ? »).
+- Bancs existants, rejoués sur l'arbre FUSIONNÉ (`claude/project-review-nsk5su` amené par un vrai merge) : `verre`
+  (journee, annonces ; 390/1512, clair/sombre) 80/80 ; `studio-journee` tout vert (dont l'ordinateur en colonnes) ;
+  `annonces-tete` vert ; `studio-coque` 78/78 ; `accompagnement` vert (30 moments, 2 non joués) ; `studio-paires` tout
+  vert (forme 390/1512 clair/sombre + volume 1 000) ; `garde-ecrans` rien à signaler ; `annonces-grille` 92/92 ;
+  `afaire-feuille` 644 + 56 + 155 verts (la machine, chargée par d'autres sessions, a fait tomber Chromium deux fois :
+  les cas tombés ont été rejoués seuls, verts) ; `paire-a-sortir` et `journee-retours` tout verts.
+- Trois défauts trouvés par ces bancs, corrigés : (1) « Même article que N°7 ? » posé sur la rangée passait PAR-DESSUS
+  la rangée voisine (hauteur fixe de 72 px) ⇒ la rangée grandit d'une 3e ligne pleine largeur (`annonces-grille` G9) ;
+  (2) l'entrée active du rail avait perdu son creux et sa diode (§7 « actif = enfoncé + diode ») ⇒ la pastille blanche
+  de la maquette garde un creux à peine marqué et la diode 5 px (`studio-coque` N) ; (3) la paire montée répétait taille,
+  âge et compte sous sa ligne d'état ⇒ les deux lignes de la rangée se taisent quand elle est montée.
+- Bancs réécrits sur la RÈGLE (dit ici, §6) : `studio-paires` (au téléphone la plaque N° est SOUS le titre, à droite
+  de la photo ; à l'ordinateur la plaque est dans la colonne N° ENTRE la photo et le titre — les deux maquettes validées ;
+  « À faire » jugé sur la ligne du h1, le sélecteur étant dans la tête ; avant de toucher « ⋯ » de la carte montée on
+  attend que la notification passagère de la coque parte — mesuré, `elementFromPoint` tombait sur `.vrm-toast`) ;
+  `studio-journee` (« À trancher » : sa porte sur Ma journée est la ligne « Tout va bien ? ») ; `paire-a-sortir` attend
+  l'ÉCRITURE des cases après « Je l'ai sortie » au lieu de 900 ms fixes (rouge sous charge, §6 règle 5).
 - Disque plein en route (70 Mo libres) : 152 profils Playwright abandonnés (> 30 min, aucun Chrome vivant ne les
   utilisait) supprimés de /tmp.
 

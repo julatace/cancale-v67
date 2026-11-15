@@ -73,6 +73,8 @@
   :root:root:root:root:root:root:root body [data-espace="paires"] :is(.vrm-ann-l2, .vrm-ann-fin) { display: none !important; }
 }
 :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="grille"] :is(.vrm-ann-l2, .vrm-ann-fin) { display: none !important; }
+/* La paire MONTÉE (`data-sb-avant`) dit déjà taille, âge et compte dans sa ligne d'état : les deux lignes de la rangée se taisent. */
+:root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-avant] :is(.vrm-ann-l2, .vrm-ann-fin) { display: none !important; }
 
 /* ── LA RECHERCHE (`.cherche`) : un verre presque opaque, 48 px, rayon 24, la loupe à gauche ── */
 @media (max-width: 767px) {

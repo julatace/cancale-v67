@@ -92,10 +92,11 @@ function mesurer({ tel }) {
     const p = plaque && plaque.getBoundingClientRect(), ph = photo && photo.getBoundingClientRect();
     if (b.height < 59 || b.height > 73) out.rangee.push(`hauteur ${Math.round(b.height)} (${r.getAttribute('data-sb-avant-cle')})`);
     // (15 nov., refonte-journee — la maquette « Annonces » validée par Julien) La rangée : la PHOTO d'abord, la plaque N°
-    // sous le titre (2e ligne), visible et dans la rangée ; au-delà du téléphone, la colonne N° d'avant (plaque à gauche).
+    // sous le titre (2e ligne), visible et dans la rangée ; à l'ordinateur (maquette « ordi/annonces » validée) le tableau :
+    // photo, puis la plaque N° dans la colonne juste après, AVANT le titre, sur la même ligne.
     const ti = r.querySelector('[data-titre]'), tb = ti && ti.getBoundingClientRect();
     if (innerWidth < 768) { if (!p || !ph || !tb || p.width < 4 || p.left < ph.right || p.top < tb.bottom - 2 || p.bottom > b.bottom + 1) out.rangee.push(`plaque pas sous le titre, à droite de la photo (${r.getAttribute('data-sb-avant-cle')})`); }
-    else if (!p || !ph || p.left > ph.left) out.rangee.push(`plaque pas en 1re colonne (${r.getAttribute('data-sb-avant-cle')})`);
+    else if (!p || !ph || !tb || p.width < 4 || p.left < ph.right - 1 || p.right > tb.left + 1 || p.bottom < tb.top || p.top > tb.bottom) out.rangee.push(`plaque pas dans la colonne N° (entre la photo et le titre) (${r.getAttribute('data-sb-avant-cle')})`);
     if (!prix || prix.getBoundingClientRect().width < 4) out.rangee.push(`prix absent (${r.getAttribute('data-sb-avant-cle')})`);
     if (r.querySelectorAll('button:not(.vrm-fiche-plus-bouton):not([data-edition])').length) {
       const vis = [...r.querySelectorAll('button')].filter((x) => x.getBoundingClientRect().width > 2 && !x.closest('.vrm-fiche-numero') && !x.classList.contains('vrm-fiche-plus-bouton') && getComputedStyle(x).pointerEvents !== 'none');
@@ -193,6 +194,10 @@ async function forme(nav, W, theme) {
       if (av.length) fautes.push('pas joignable dans la carte : ' + av.join(', '));
       await o.pg.screenshot({ path: path.join(SHOTS, `paires-${W}-${theme}-avant.png`) }).catch(() => {});
       // ⋯ ⇒ la fiche, avec le reste ; puis son menu « ⋯ »
+      // (15 nov., refonte-journee) La notification passagère de la coque (« 36 nouvelles paires numérotées », ~2 s) se pose
+      // au-dessus de la barre du bas, là où tombe « ⋯ » de la carte montée : un clic forcé PENDANT la touchait elle
+      // (mesuré : elementFromPoint = .vrm-toast). On attend qu'elle parte — une condition, pas un délai.
+      await o.pg.waitForSelector('.vrm-toast', { state: 'detached', timeout: 15000 }).catch(() => {});
       await o.pg.locator('[data-sb-avant-plus]').click({ timeout: 5000, force: true, noWaitAfter: true }).catch(() => {});
       await o.pg.waitForSelector('.vrm-fp [data-fiche-menu-ouvrir]', { timeout: 8000 }).catch(() => {});
       await o.pg.waitForTimeout(600);
