@@ -173,3 +173,10 @@ relu après, journal « Ce que VRM a fait », dans §2.8/§2.9. Fusion d'abord d
 - `scripts/bancs/ebay-tableau.cjs` : G1–G7 (pourquoi, Annuler ⇒ rien, confirmé ⇒ une caractéristique avec
   `confirme`, photos de LA fiche + nombre vu, liste des évidentes montrée avant, calendrier, Ma journée) ;
   G1b (titres de la feuille lisibles) **rouge** sur la build d'avant la correction CSS.
+- Après le 2e tour (build neuve) : ebay-tableau **40/40** ; ebay-comptes 3 KO (« déconnecter le compte 3 » ×2,
+  « publier une paire libre » — les mêmes libellés que l'arbre de départ, qui en a donné 2 ou 3 selon la charge) ;
+  ebay-apres-vente-ecran 7 KO (= l'arbre de départ). Audits verts : variables, tdz, identite, urssaf, studio, csp,
+  icones, ebay-route (547), offres-auto, fonctions-api (12), quoi-de-neuf, traduction (45), coherence,
+  ebay-tableau (44), ebay-tableau-app (17), ebay-gestes (30), bilan-semaine (57).
+- Gestes de Julien inchangés (clé de signature, reconnecter eBay une fois) ; aucun nouveau droit OAuth au 2e tour
+  (Compliance et ReviseItem utilisent `sell.inventory` / le jeton Trading déjà accordés ; Browse : jeton d'application).
