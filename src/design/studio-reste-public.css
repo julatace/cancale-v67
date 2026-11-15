@@ -50,7 +50,7 @@
 :root:root .vt {
   --vt-bleu: #174C88;
   --vt-fond-bleu: radial-gradient(120% 60% at 12% 0%, rgb(120 180 240 / .16) 0%, rgb(120 180 240 / 0) 55%), radial-gradient(70% 45% at 100% 38%, rgb(61 139 224 / .16) 0%, rgb(61 139 224 / 0) 70%), linear-gradient(170deg, #1E5DA4 0%, #174C88 45%, #0F2F57 100%);
-  --vt-verre: rgb(247 250 253 / .86); --vt-verre-o: #D7DEE6; --vt-verre-bord: rgb(255 255 255 / .75);
+  --vt-verre: rgb(247 250 253 / .9); --vt-verre-o: #D7DEE6; --vt-verre-bord: rgb(255 255 255 / .75);
   --vt-verre-ombre: inset 0 1px 0 rgb(255 255 255 / .9), 0 18px 40px -18px rgb(8 26 50 / .55);
   --vt-encre: #FFFFFF; --vt-gris: #EEF4FB; --vt-lien: #FFFFFF; --vt-accent: #FFFFFF; --vt-filet: rgb(255 255 255 / .16); --vt-teinte: rgb(255 255 255 / .16);
   --vt-lumiere: none;
