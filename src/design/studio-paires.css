@@ -10,14 +10,14 @@
    .sb-touche, .sb-rond, .sb-lien, .sb-avant…). La fondation les définit dans
    src/design/studio.css ; ICI on ne fait que les LIRE (`var(--sb-x, repli)`) par des
    alias privés --sbp-* : aucune définition ne double la sienne. Les replis sont les
-   valeurs exactes de directions/_t25/tokens.cjs (provisoire : vient de studio.css).
+   valeurs exactes de directions/_t25/tokens.cjs (la fondation fait foi).
    Rien de métier : aucun texte, chiffre ni data-* n'est décidé ici. Rouge = la plaque
    d'un N° porté par deux paires (§5), nulle part ailleurs ; aucun violet.
    Même couche que les feuilles qu'on remplace (`vrm-premium`), importée EN DERNIER.
    ════════════════════════════════════════════════════════════════════════════ */
 @layer vrm-premium {
 
-/* ── 0. Les jetons, lus chez la fondation (provisoire : vient de studio.css) ─── */
+/* ── 0. Les jetons, LUS chez la fondation (alias --sbp-* ; les replis ne servent que si studio.css manquait) ─── */
 :is([data-espace="paires"], .vrm-paires-selecteur, .vrm-fp, .vrm-main[data-ecran="annonces"], .vrm-main[data-ecran="garage"], .vrm-main[data-ecran="inventory"]) {
   --sbp-haut: var(--sb-haut, #EEF6FD); --sbp-bas: var(--sb-bas, #C6DDF0); --sbp-aplat: var(--sb-aplat, #D5E8F6);
   --sbp-feuille: var(--sb-porcelaine, #FFFFFF); --sbp-feuille2: var(--sb-porcelaine-2, #F7FAFD);
@@ -96,39 +96,8 @@
 :root[data-theme="dark"] :is([data-espace="paires"], .vrm-fp) :is(.vrm-num[data-num-etat="doublon"], .is-double) { --sbp-doublon: var(--sb-doublon, #FF6B5E); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) :is([data-espace="paires"], .vrm-fp) :is(.vrm-num[data-num-etat="doublon"], .is-double) { --sbp-doublon: var(--sb-doublon, #FF6B5E); } }
 
-/* ── 1. Le fond de l'espace : un bleu clair éclairé du haut (provisoire : la coque le pose) ── */
-:root:root:root:root:root body .vrm-main:is([data-ecran="annonces"], [data-ecran="garage"], [data-ecran="inventory"]) {
-  background-color: var(--sbp-aplat) !important;
-  background-image: radial-gradient(90% 40% at 18% 0%, var(--sbp-halo), transparent 70%), linear-gradient(180deg, var(--sbp-haut) 0%, var(--sbp-aplat) 40%, var(--sbp-bas) 100%) !important;
-  background-attachment: local, scroll !important;
-  color: var(--sbp-encre) !important;
-}
-
-/* ── 2. Les quatre formes, là où cet espace les pose (provisoire : vient de studio.css) ── */
-:root:root:root:root:root body :is([data-espace="paires"], .vrm-fp, .vrm-paires-selecteur) .sb-touche {
-  display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 7px !important;
-  height: 44px !important; min-height: 44px !important; padding: 0 15px !important; border: 0 !important; border-radius: 13px !important;
-  background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important;
-  font: 600 14px/1 var(--sbp-texte) !important; letter-spacing: 0 !important; white-space: nowrap !important; cursor: pointer;
-  transition: transform var(--sbp-e-appui), box-shadow var(--sbp-e-appui) !important; position: relative;
-}
-:root:root:root:root:root body :is([data-espace="paires"], .vrm-fp) .sb-touche svg { color: var(--sbp-encre2) !important; flex: none; }
-:root:root:root:root:root body :is([data-espace="paires"], .vrm-fp, .vrm-paires-selecteur) :is(.sb-touche, .sb-rond):is(:active, [aria-pressed="true"], .is-actif) {
-  background: var(--sbp-creux) !important; box-shadow: var(--sbp-k-in) !important; transform: translateY(1px);
-}
-:root:root:root:root:root body :is([data-espace="paires"], .vrm-fp) .sb-rond {
-  display: inline-grid !important; place-items: center !important; width: 44px !important; height: 44px !important; min-width: 44px !important; min-height: 44px !important;
-  padding: 0 !important; border: 0 !important; border-radius: 50% !important; flex: none !important;
-  background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important; cursor: pointer;
-  transition: transform var(--sbp-e-appui), box-shadow var(--sbp-e-appui) !important; position: relative;
-}
-:root:root:root:root:root body :is([data-espace="paires"], .vrm-fp) .sb-rond > .vrm-annbar-mot { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; white-space: nowrap !important; }
-:root:root:root:root:root body :is([data-espace="paires"], .vrm-fp) :is(.sb-touche, .sb-rond):focus-visible { outline: 2px solid var(--sbp-diode) !important; outline-offset: 2px !important; }
-/* La diode d'un état actif (enfoncé + diode, jamais une autre couleur de fond). */
-:root:root:root:root:root body :is([data-espace="paires"], .vrm-fp) :is(.sb-touche, .sb-rond)[aria-pressed="true"]::after {
-  content: "" !important; position: absolute !important; top: 6px !important; right: 7px !important; width: 5px !important; height: 5px !important; border-radius: 50% !important;
-  background: var(--sbp-diode) !important; box-shadow: 0 0 0 1.5px color-mix(in oklab, var(--sbp-diode) 14%, transparent), 0 0 5px color-mix(in oklab, var(--sbp-diode) 55%, transparent) !important;
-}
+/* ── 1-2. (14 nov., version studio) Le fond de l'espace et les quatre formes copiés de studio.css
+   (« provisoire ») sont retirés : la fondation les porte (la coque pose le fond, studio.css les formes). */
 
 /* ── 3. Le sélecteur de l'espace (Annonces · Stock · Achats) : un plateau de touches ── */
 :root:root:root:root:root body .vrm-paires-selecteur { padding: 4px 16px 2px !important; background: transparent !important; }
@@ -699,7 +668,7 @@
 
 /* ── 17. LEBONCOIN, eBAY, VESTIAIRE dans l'espace Paires : la même liste (plan de verre, rangées 64 px,
    N° gravé en tête). Leurs briques communes (src/ui : recherche, filtres, rangée) sont passées au studio par
-   la fondation ; ici, ce qui est propre aux Annonces de ces sites (provisoire tant que studio.css n'est pas là). */
+   la fondation ; ici, ce qui est propre aux Annonces de ces sites (leur recherche et leurs filtres : ceux de la fondation). */
 :root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees {
   background: var(--sbp-plan) !important; border: 0 !important; border-radius: 28px !important; padding: 6px 0 !important; margin: 10px -2px 0 !important;
   box-shadow: inset 0 .5px 0 rgb(255 255 255 / .9), 0 -14px 30px -20px rgb(var(--sbp-o) / .35) !important; overflow: hidden !important;
@@ -724,14 +693,6 @@
 :root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-ui-ligne-valeur { font: 400 21px/1 var(--sbp-affiche) !important; letter-spacing: -.02em !important; color: var(--sbp-encre) !important; font-variant-numeric: tabular-nums !important; white-space: nowrap !important; }
 @media (max-width: 767px) { :root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-ui-ligne.vrm-pf-rangee { content-visibility: auto; contain-intrinsic-size: auto 64px; } }
 :root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-pf-gestes:empty { display: none !important; }
-/* Leur recherche, creusée ; leurs filtres, un plateau (actif = enfoncé + diode) — provisoire : la fondation passe src/ui. */
-:root:root:root:root:root body [data-espace="paires"] .vrm-pf-collant .vrm-ui-outils-champ { min-height: 44px !important; height: 44px !important; border-radius: 14px !important; border: 0 !important; background: var(--sbp-puits) !important; box-shadow: var(--sbp-puits-sh) !important; }
-:root:root:root:root:root body [data-espace="paires"] .vrm-pf-collant .vrm-ui-outils-champ input { background: transparent !important; color: var(--sbp-encre) !important; font: 500 15px/1 var(--sbp-texte) !important; }
-:root:root:root:root:root body [data-espace="paires"] .vrm-pf-collant .vrm-ui-icone { width: 44px !important; height: 44px !important; border-radius: 50% !important; background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important; border: 0 !important; }
-:root:root:root:root:root body [data-espace="paires"] .vrm-pf-collant .vrm-ui-filtres { display: inline-flex !important; gap: 2px !important; padding: 3px !important; border-radius: 14px !important; background: var(--sbp-puits) !important; box-shadow: var(--sbp-puits-sh) !important; margin-top: 8px !important; max-width: 100% !important; overflow-x: auto !important; scrollbar-width: none !important; }
-:root:root:root:root:root body [data-espace="paires"] .vrm-pf-collant .vrm-ui-filtre { height: 38px !important; min-height: 38px !important; padding: 0 13px !important; border: 0 !important; border-radius: 11px !important; background: transparent !important; box-shadow: none !important; color: var(--sbp-encre2) !important; font: 600 14px/1 var(--sbp-texte) !important; position: relative !important; }
-:root:root:root:root:root body [data-espace="paires"] .vrm-pf-collant .vrm-ui-filtre * { color: inherit !important; }
-:root:root:root:root:root body [data-espace="paires"] .vrm-pf-collant .vrm-ui-filtre[aria-pressed="true"] { background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important; }
 /* Les sous-rubriques d'un site (eBay : Annonces · Promotion) : sur leur propre ligne, un plateau creusé. */
 :root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres { flex-wrap: wrap !important; row-gap: 8px !important; }
 :root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-tache-sous { flex: 1 0 100% !important; }

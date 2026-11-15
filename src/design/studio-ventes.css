@@ -4,109 +4,16 @@
    actif = enfoncé + diode, quatre formes de bouton). Composants : src/design/StudioVentes.jsx.
    Portée : `.vrm-tache[data-espace="ventes"]` (Ventes et Achats, posé par `rendreTache`).
    Rien de métier ici : on habille et on range.
-   ⚠️ Les définitions marquées « provisoire : vient de studio.css » sont la copie
-   minimale du contrat (CONTRAT-STUDIO.md) tant que la fondation n'est pas fusionnée
-   chez nous — à retirer à la fusion (la fondation a le dernier mot).
+   (Les copies « provisoire » de studio.css d'avant la fusion de la fondation sont retirées :
+   la fondation a le dernier mot.)
    ════════════════════════════════════════════════════════════════════════════ */
 
-/* ── provisoire : vient de studio.css ─────────────────────────────────────── */
-:root {
-  --sb-haut: #EEF6FD; --sb-aplat: #D2E5F4; --sb-bas: #C6DDF0;
-  --sb-porcelaine: #FFFFFF; --sb-porcelaine-2: #F7FAFD; --sb-creux: #E4EEF7;
-  --sb-verre: rgb(255 255 255 / .80);
-  --sb-encre: #0C1D30; --sb-encre-2: #3F5468;
-  --sb-diode: #0060CC; --sb-lien: #0055B8;
-  --sb-ambre: #764300; --sb-ambre-point: #E08A12;
-  --sb-o: 18 52 96;
-  --sb-ombre-pose: 0 .5px 1px rgb(var(--sb-o) / .16), 0 3px 6px -3px rgb(var(--sb-o) / .28);
-  --sb-ombre-plan: inset 0 1px 0 #fff, 0 0 0 .5px rgb(var(--sb-o) / .07), 0 1px 2px rgb(var(--sb-o) / .07), 0 12px 26px -14px rgb(var(--sb-o) / .30);
-  --sb-ombre-avant: inset 0 1px 0 #fff, 0 0 0 .5px rgb(var(--sb-o) / .06), 0 2px 5px rgb(var(--sb-o) / .07), 0 34px 60px -26px rgb(var(--sb-o) / .48);
-  --sb-socle: #F1F5F9;
-  --sb-r-tuile: 22px; --sb-r-plan: 28px; --sb-r-barre: 26px; --sb-r-touche: 13px; --sb-r-plaque: 6px; --sb-r-vignette: 11px;
-  --sb-police-affiche: "Urbanist", "SF Pro Display", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --sb-police-texte: "Inter", "SF Pro Text", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --sb-e-appui: 90ms cubic-bezier(.2, .9, .25, 1); --sb-e-espace: 420ms cubic-bezier(.32, .72, 0, 1); --sb-e-avant: 360ms cubic-bezier(.2, .9, .25, 1);
-}
-[data-espace="ventes"] { --sb-aplat: #D2E5F4; }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --sb-haut: #15263D; --sb-aplat: #0B1727; --sb-bas: #060E19;
-    --sb-porcelaine: #16273C; --sb-porcelaine-2: #122135; --sb-creux: #091320;
-    --sb-verre: rgb(20 35 54 / .82);
-    --sb-encre: #EAF2FB; --sb-encre-2: #9CB0C6; --sb-diode: #4AA3FF; --sb-lien: #6CB4FF;
-    --sb-ambre: #F2B65E; --sb-ambre-point: #F2A33A; --sb-o: 0 0 0; --sb-socle: #1C2E46;
-    --sb-ombre-pose: 0 .5px 1px #0008, 0 3px 6px -3px #000b;
-    --sb-ombre-plan: inset 0 .5px 0 #ffffff17, 0 0 0 .5px #0008, 0 12px 26px -12px #000c;
-    --sb-ombre-avant: inset 0 .5px 0 #ffffff1f, 0 0 0 .5px #0008, 0 34px 60px -22px #000f;
-  }
-}
-:root[data-theme="dark"], html.vrm-dark, :root[data-sombre="1"] {
-  --sb-haut: #15263D; --sb-aplat: #0B1727; --sb-bas: #060E19;
-  --sb-porcelaine: #16273C; --sb-porcelaine-2: #122135; --sb-creux: #091320;
-  --sb-verre: rgb(20 35 54 / .82);
-  --sb-encre: #EAF2FB; --sb-encre-2: #9CB0C6; --sb-diode: #4AA3FF; --sb-lien: #6CB4FF;
-  --sb-ambre: #F2B65E; --sb-ambre-point: #F2A33A; --sb-o: 0 0 0; --sb-socle: #1C2E46;
-  --sb-ombre-pose: 0 .5px 1px #0008, 0 3px 6px -3px #000b;
-  --sb-ombre-plan: inset 0 .5px 0 #ffffff17, 0 0 0 .5px #0008, 0 12px 26px -12px #000c;
-  --sb-ombre-avant: inset 0 .5px 0 #ffffff1f, 0 0 0 .5px #0008, 0 34px 60px -22px #000f;
-}
-
-/* (a) le bouton plein — provisoire : vient de studio.css */
-.sb-btn-plein {
-  -webkit-appearance: none; appearance: none; box-sizing: border-box; flex: 0 0 auto;
-  width: 72px; height: 72px; min-height: 72px; padding: 0; border: 0; border-radius: 50%;
-  display: grid; place-items: center; align-content: center; gap: 2px; cursor: pointer;
-  background: radial-gradient(120% 120% at 50% 0%, #2A3D55 0%, var(--sb-encre) 62%); color: #fff;
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / .18), 0 1px 2px rgb(var(--sb-o) / .25), 0 14px 26px -12px rgb(var(--sb-o) / .55);
-  font: 650 11.5px/1.05 var(--sb-police-texte); letter-spacing: 0; text-align: center;
-  transition: transform var(--sb-e-appui), box-shadow var(--sb-e-appui);
-  -webkit-tap-highlight-color: transparent; position: relative;
-}
+/* (14 nov., version studio) Les copies « provisoire : vient de studio.css » (jetons, plein, rond, plaque, lumière
+   de l'espace) sont retirées : la fondation les porte. Restent les deux parties du plein propres à cet écran
+   et l'anneau de focus des tuiles-filtres. */
 .sb-btn-plein .sb-btn-plein-icone { display: block; line-height: 0; }
 .sb-btn-plein .sb-btn-plein-mot { display: block; max-width: 64px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sb-btn-plein:active:not(:disabled), .sb-btn-plein.is-en-cours { transform: translateY(1.5px) scale(.985); box-shadow: inset 0 2px 5px rgb(0 0 0 / .45), 0 0 0 .5px rgb(var(--sb-o) / .2); }
-.sb-btn-plein.is-en-cours::after { content: ""; position: absolute; top: 9px; right: 15px; width: 6px; height: 6px; border-radius: 50%; background: var(--sb-diode); box-shadow: 0 0 6px var(--sb-diode); }
-.sb-btn-plein:disabled { cursor: default; background: rgb(var(--sb-o) / .10); color: rgb(12 29 48 / .45); box-shadow: none; }
-.sb-btn-plein:focus-visible { outline: 2px solid var(--sb-diode); outline-offset: 3px; }
-@media (min-width: 1024px) { .sb-btn-plein { width: 80px; height: 80px; min-height: 80px; } }
-:root[data-theme="dark"] .sb-btn-plein:not(:disabled), html.vrm-dark .sb-btn-plein:not(:disabled) { background: radial-gradient(120% 120% at 50% 0%, #FFFFFF 0%, #DCE8F5 70%); color: #0C1D30; }
-:root[data-theme="dark"] .sb-btn-plein:disabled, html.vrm-dark .sb-btn-plein:disabled { background: rgb(255 255 255 / .10); color: rgb(234 242 251 / .45); }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .sb-btn-plein:not(:disabled) { background: radial-gradient(120% 120% at 50% 0%, #FFFFFF 0%, #DCE8F5 70%); color: #0C1D30; }
-  :root:not([data-theme="light"]) .sb-btn-plein:disabled { background: rgb(255 255 255 / .10); color: rgb(234 242 251 / .45); }
-}
-
-/* (c) le rond — provisoire : vient de studio.css */
-.sb-rond {
-  -webkit-appearance: none; appearance: none; box-sizing: border-box; flex: 0 0 auto;
-  width: 44px; height: 44px; min-height: 44px; padding: 0; border: 0; border-radius: 50%;
-  display: inline-grid; place-items: center; cursor: pointer; position: relative;
-  background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)); color: var(--sb-encre);
-  box-shadow: var(--sb-ombre-plan); transition: transform var(--sb-e-appui), box-shadow var(--sb-e-appui);
-  -webkit-tap-highlight-color: transparent;
-}
-.sb-rond:active, .sb-rond.is-actif, .sb-rond[aria-pressed="true"] { transform: translateY(1px); background: var(--sb-creux); box-shadow: inset 0 1px 3px rgb(var(--sb-o) / .28), inset 0 0 0 .5px rgb(var(--sb-o) / .10); }
-.sb-rond.is-actif::after, .sb-rond[aria-pressed="true"]::after { content: ""; position: absolute; top: 6px; right: 6px; width: 5px; height: 5px; border-radius: 50%; background: var(--sb-diode); box-shadow: 0 0 5px var(--sb-diode); }
-.sb-rond:focus-visible, .sb-tuile-filtre:focus-visible { outline: 2px solid var(--sb-diode); outline-offset: 2px; }
-
-/* la plaque N° et le code de retrait — provisoire : vient de studio.css */
-.sb-plaque { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-height: 22px; min-width: 46px; padding: 0 7px;
-  border-radius: var(--sb-r-plaque); background: var(--sb-creux); color: var(--sb-encre); font: 600 12.5px/1 var(--sb-police-texte); font-variant-numeric: tabular-nums;
-  box-shadow: inset 0 .5px 1px rgb(var(--sb-o) / .26), inset 0 0 0 .5px rgb(var(--sb-o) / .08), 0 .5px 0 rgb(255 255 255 / .9); }
-.sb-plaque.is-double { color: var(--sb-doublon); box-shadow: inset 0 0 0 1px var(--sb-doublon); }
-.sb-plaque--grande { min-height: 30px; padding: 0 10px; border-radius: 8px; font: 600 17px/1 var(--sb-police-texte); letter-spacing: .07em; }
-
-/* ════════════════════════════════════════════════════════════════════════════
-   LA LUMIÈRE DE L'ESPACE — provisoire : le fond bleu clair de la coque vient de studio.css.
-   ════════════════════════════════════════════════════════════════════════════ */
-html body:has(.vrm-tache[data-espace="ventes"]) .vrm-app-shell,
-html body:has(.vrm-tache[data-espace="ventes"]) .vrm-app-shell .vrm-main {
-  background: radial-gradient(90% 40% at 18% 0%, rgb(255 255 255 / .55), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 40%, var(--sb-bas) 100%) fixed !important;
-}
-:root[data-theme="dark"] body:has(.vrm-tache[data-espace="ventes"]) .vrm-app-shell, :root[data-theme="dark"] body:has(.vrm-tache[data-espace="ventes"]) .vrm-app-shell .vrm-main,
-html.vrm-dark body:has(.vrm-tache[data-espace="ventes"]) .vrm-app-shell, html.vrm-dark body:has(.vrm-tache[data-espace="ventes"]) .vrm-app-shell .vrm-main {
-  background: radial-gradient(90% 40% at 18% 0%, rgb(110 160 230 / .10), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 40%, var(--sb-bas) 100%) fixed !important;
-}
+.sb-tuile-filtre:focus-visible { outline: 2px solid var(--sb-diode); outline-offset: 2px; }
 
 /* Le texte posé à même le fond : encre 2 du studio (AA sur tout le dégradé), jamais le gris de la coque. */
 html:root:root:root:root body .vrm-app-shell .vrm-main .vrm-tache[data-espace="ventes"] :is(.vrm-colis-resume, .vrm-colis-note, .vrm-colis-verifie, [data-date-tete], .vrm-colis-vide-sous) { color: var(--sb-encre-2) !important; }

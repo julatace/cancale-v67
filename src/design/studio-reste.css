@@ -19,53 +19,12 @@
    à d'autres chantiers).
    ════════════════════════════════════════════════════════════════════════════ */
 
-/* ══ 0. JETONS — provisoire : vient de studio.css (à retirer à la fusion de la fondation) ══
-   Posés en `:where(...)` (spécificité nulle) : dès que studio.css est chargé, SES valeurs gagnent
-   (polices « Urbanist VRM », ombres de touche, plein). Les noms sont ceux du contrat. */
-:where(:root) {
-  --sb-haut: #EEF6FD; --sb-bas: #C6DDF0; --sb-aplat: #D6E8F5;
-  --sb-porcelaine: #FFFFFF; --sb-porcelaine-2: #F7FAFD; --sb-creux: #E4EEF7;
-  --sb-verre: rgb(255 255 255 / .64);
-  --sb-encre: #0C1D30; --sb-encre-2: #3F5468; --sb-sur-encre: #FFFFFF;
-  --sb-diode: #0060CC; --sb-lien: #0055B8;
-  --sb-ambre: #764300; --sb-ambre-point: #E08A12;
-  --sb-o: 18 52 96;
-  --sb-ombre-pose: 0 .5px 1px rgb(var(--sb-o) / .16), 0 3px 6px -3px rgb(var(--sb-o) / .28);
-  --sb-ombre-plan: inset 0 1px 0 #fff, 0 0 0 .5px rgb(var(--sb-o) / .07), 0 1px 2px rgb(var(--sb-o) / .07), 0 12px 26px -14px rgb(var(--sb-o) / .30);
-  --sb-ombre-avant: inset 0 1px 0 #fff, 0 0 0 .5px rgb(var(--sb-o) / .06), 0 2px 5px rgb(var(--sb-o) / .07), 0 34px 60px -26px rgb(var(--sb-o) / .48);
-  --sb-gravure: inset 0 .5px 1px rgb(var(--sb-o) / .26), inset 0 0 0 .5px rgb(var(--sb-o) / .08), 0 .5px 0 rgb(255 255 255 / .9);
-  --sb-r-tuile: 22px; --sb-r-plan: 28px; --sb-r-barre: 26px; --sb-r-touche: 13px; --sb-r-plaque: 6px; --sb-r-vignette: 11px; --sb-r-champ: 14px;
-  --sb-police-affiche: "Urbanist Variable", "Urbanist", "Inter Variable", "Inter", ui-rounded, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  --sb-police-texte: "Inter Variable", "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
-  --sb-e-appui: 90ms cubic-bezier(.2,.9,.25,1); --sb-e-espace: 420ms cubic-bezier(.32,.72,0,1); --sb-e-avant: 360ms cubic-bezier(.2,.9,.25,1);
-}
-:where(:root[data-theme="dark"]) {
-  --sb-haut: #15263D; --sb-bas: #060E19; --sb-aplat: #0D192A;
-  --sb-porcelaine: #16273C; --sb-porcelaine-2: #122135; --sb-creux: #091320;
-  --sb-verre: rgb(24 41 63 / .62);
-  --sb-encre: #EAF2FB; --sb-encre-2: #9CB0C6; --sb-sur-encre: #0C1D30;
-  --sb-diode: #4AA3FF; --sb-lien: #6CB4FF;
-  --sb-ambre: #F2B65E; --sb-ambre-point: #F2A33A;
-  --sb-o: 0 0 0;
-  --sb-ombre-pose: 0 .5px 1px rgb(0 0 0 / .5), 0 3px 6px -3px rgb(0 0 0 / .7);
-  --sb-ombre-plan: inset 0 .5px 0 rgb(255 255 255 / .09), 0 0 0 .5px rgb(0 0 0 / .5), 0 12px 26px -12px rgb(0 0 0 / .8);
-  --sb-ombre-avant: inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .5), 0 34px 60px -22px rgb(0 0 0 / .95);
-  --sb-gravure: inset 0 .5px 1px rgb(0 0 0 / .6), inset 0 0 0 .5px rgb(0 0 0 / .3), 0 .5px 0 rgb(255 255 255 / .06);
-}
+/* ══ 0. JETONS PROPRES À CE CHANTIER (la fondation, studio.css, porte tous les autres — les copies
+   « provisoire » d'avant la fusion sont retirées, 14 nov., version studio). `:where` : spécificité nulle. */
+:where(:root) { --sb-sur-encre: #FFFFFF; --sb-gravure: inset 0 .5px 1px rgb(var(--sb-o) / .26), inset 0 0 0 .5px rgb(var(--sb-o) / .08), 0 .5px 0 rgb(255 255 255 / .9); }
+:where(:root[data-theme="dark"]) { --sb-sur-encre: #0C1D30; --sb-gravure: inset 0 .5px 1px rgb(0 0 0 / .6), inset 0 0 0 .5px rgb(0 0 0 / .3), 0 .5px 0 rgb(255 255 255 / .06); }
 @media (prefers-color-scheme: dark) {
-  :where(:root:not([data-theme="light"])) {
-    --sb-haut: #15263D; --sb-bas: #060E19; --sb-aplat: #0D192A;
-    --sb-porcelaine: #16273C; --sb-porcelaine-2: #122135; --sb-creux: #091320;
-    --sb-verre: rgb(24 41 63 / .62);
-    --sb-encre: #EAF2FB; --sb-encre-2: #9CB0C6; --sb-sur-encre: #0C1D30;
-    --sb-diode: #4AA3FF; --sb-lien: #6CB4FF;
-    --sb-ambre: #F2B65E; --sb-ambre-point: #F2A33A;
-    --sb-o: 0 0 0;
-    --sb-ombre-pose: 0 .5px 1px rgb(0 0 0 / .5), 0 3px 6px -3px rgb(0 0 0 / .7);
-    --sb-ombre-plan: inset 0 .5px 0 rgb(255 255 255 / .09), 0 0 0 .5px rgb(0 0 0 / .5), 0 12px 26px -12px rgb(0 0 0 / .8);
-    --sb-ombre-avant: inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .5), 0 34px 60px -22px rgb(0 0 0 / .95);
-    --sb-gravure: inset 0 .5px 1px rgb(0 0 0 / .6), inset 0 0 0 .5px rgb(0 0 0 / .3), 0 .5px 0 rgb(255 255 255 / .06);
-  }
+  :where(:root:not([data-theme="light"])) { --sb-sur-encre: #0C1D30; --sb-gravure: inset 0 .5px 1px rgb(0 0 0 / .6), inset 0 0 0 .5px rgb(0 0 0 / .3), 0 .5px 0 rgb(255 255 255 / .06); }
 }
 /* L'aplat de chaque espace : ±2 points, jamais une autre teinte. */
 :where([data-espace="argent"]) { --sb-aplat: #D6E8F5; }
@@ -179,95 +138,8 @@
 
 @layer vrm-premium {
 
-/* ══ 1. LES QUATRE FORMES DE BOUTON — provisoire : vient de studio.css ══════════
-   (a) .sb-btn-plein  (b) .sb-touche  (c) .sb-rond  (d) .sb-lien — aucune autre. */
-:root:root:root:root:root:root body .sb-btn-plein {
-  display: inline-flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; gap: 3px !important;
-  width: 72px !important; height: 72px !important; min-width: 72px !important; min-height: 72px !important; padding: 0 !important;
-  border: 0 !important; border-radius: 50% !important; background: var(--sb-plein-fond, var(--sb-encre)) !important; color: var(--sb-plein-encre, var(--sb-sur-encre)) !important;
-  font: 650 11.5px/1.1 var(--sb-police-texte) !important; letter-spacing: 0 !important;
-  box-shadow: 0 1px 0 rgb(255 255 255 / .18) inset, 0 2px 4px rgb(var(--sb-o) / .18), 0 14px 26px -10px rgb(var(--sb-o) / .55) !important;
-  transition: transform var(--sb-e-appui), box-shadow var(--sb-e-appui) !important; cursor: pointer !important; filter: none !important;
-}
-@media (min-width: 900px) { :root:root:root:root:root:root body .sb-btn-plein:not(.sb-btn-plein--barre) { width: 80px !important; height: 80px !important; min-width: 80px !important; min-height: 80px !important; } }
-:root:root:root:root:root:root body .sb-btn-plein.sb-btn-plein--barre {
-  flex-direction: row !important; gap: 8px !important; width: auto !important; min-width: 0 !important; height: 52px !important; min-height: 52px !important;
-  padding: 0 24px !important; border-radius: 26px !important; font: 600 15px/1.2 var(--sb-police-texte) !important;
-}
-:root:root:root:root:root:root body .sb-btn-plein:not(:disabled):active { transform: translateY(1.5px) scale(.985) !important; }
-:root:root:root:root:root:root body .sb-btn-plein:disabled, :root:root:root:root:root:root body .sb-btn-plein[aria-disabled="true"] {
-  background: rgb(var(--sb-o) / .10) !important; color: rgb(var(--sb-o) / .45) !important; box-shadow: none !important; opacity: 1 !important; cursor: default !important;
-}
-:root[data-theme="dark"]:root:root:root:root:root body .sb-btn-plein:disabled { background: rgb(255 255 255 / .10) !important; color: rgb(255 255 255 / .40) !important; }
-
-:root:root:root:root:root:root body .sb-touche {
-  display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 7px !important;
-  height: 40px !important; min-height: 40px !important; padding: 0 15px !important; border: 0 !important; border-radius: var(--sb-r-touche) !important;
-  background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important;
-  font: 600 14px/1.2 var(--sb-police-texte) !important; letter-spacing: 0 !important; text-decoration: none !important; white-space: nowrap;
-  box-shadow: var(--sb-ombre-plan) !important; position: relative; transition: transform var(--sb-e-appui), box-shadow var(--sb-e-appui), background var(--sb-e-appui) !important; cursor: pointer !important; filter: none !important;
-}
-@media (pointer: coarse) { :root:root:root:root:root:root body .sb-touche { height: 44px !important; min-height: 44px !important; } }
-:root:root:root:root:root:root body .sb-touche:not(:disabled):active,
-:root:root:root:root:root:root body .sb-touche:is([aria-pressed="true"], [aria-current="page"], .is-actif) {
-  transform: translateY(1px) !important; background: var(--sb-creux) !important; box-shadow: var(--sb-gravure) !important;
-}
-:root:root:root:root:root:root body .sb-touche:is([aria-pressed="true"], [aria-current="page"], .is-actif)::after {
-  content: '' !important; position: absolute !important; top: 6px !important; right: 6px !important; width: 5px !important; height: 5px !important; border-radius: 50% !important;
-  background: var(--sb-diode) !important; box-shadow: 0 0 6px var(--sb-diode) !important; transition: opacity 120ms ease-out !important;
-}
-:root:root:root:root:root:root body .sb-touche:disabled, :root:root:root:root:root:root body .sb-touche[aria-disabled="true"] {
-  background: transparent !important; box-shadow: inset 0 0 0 .5px rgb(var(--sb-o) / .22) !important; color: color-mix(in srgb, var(--sb-encre-2) 70%, transparent) !important; opacity: 1 !important; cursor: default !important;
-}
-:root:root:root:root:root:root body .sb-touche--ambre { color: var(--sb-ambre) !important; }
-
-:root:root:root:root:root:root body .sb-rond {
-  display: inline-flex !important; align-items: center !important; justify-content: center !important;
-  width: 44px !important; height: 44px !important; min-width: 44px !important; min-height: 44px !important; padding: 0 !important; border: 0 !important; border-radius: 50% !important;
-  background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important;
-  box-shadow: var(--sb-ombre-plan) !important; position: relative; transition: transform var(--sb-e-appui) !important; cursor: pointer !important;
-}
-:root:root:root:root:root:root body .sb-rond.sb-rond--disque { width: 60px !important; height: 60px !important; min-width: 60px !important; min-height: 60px !important; }
-:root:root:root:root:root:root body .sb-rond:not(:disabled):active,
-:root:root:root:root:root:root body .sb-rond:is([aria-pressed="true"], [aria-expanded="true"], .is-actif) { transform: translateY(1px) !important; background: var(--sb-creux) !important; box-shadow: var(--sb-gravure) !important; }
-:root:root:root:root:root:root body .sb-rond svg { width: 21px; height: 21px; }
-
-:root:root:root:root:root:root body .sb-lien {
-  display: inline-flex !important; align-items: center !important; gap: 4px !important; min-height: 44px !important; padding: 0 2px !important;
-  border: 0 !important; background: transparent !important; box-shadow: none !important; color: var(--sb-lien) !important;
-  font: 600 14px/1.2 var(--sb-police-texte) !important; text-decoration: none !important; cursor: pointer !important; border-radius: 6px !important; filter: none !important;
-}
-:root:root:root:root:root:root body .sb-lien:not(:disabled):active { opacity: .55 !important; transform: none !important; }
-:root:root:root:root:root:root body .sb-lien:disabled { color: color-mix(in srgb, var(--sb-encre-2) 55%, transparent) !important; }
-
-/* ── Composants (provisoire : vient de studio.css) ── */
-:root:root:root:root:root:root body .sb-tuile {
-  position: relative !important; border: 0 !important; border-radius: var(--sb-r-tuile) !important;
-  background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important;
-  box-shadow: var(--sb-ombre-plan) !important; padding: 14px 14px 14px 16px !important; text-align: left !important;
-}
-:root:root:root:root:root:root body .sb-chiffre-affiche {
-  font-family: var(--sb-police-affiche) !important; font-weight: 200 !important; line-height: .8 !important; letter-spacing: -.05em !important;
-  font-feature-settings: "tnum", "lnum", "kern" !important; font-variant-numeric: tabular-nums lining-nums !important; color: var(--sb-encre) !important;
-}
-:root:root:root:root:root:root body .sb-chiffre-affiche .eur { font-size: .44em !important; font-weight: 300 !important; vertical-align: .92em !important; margin-left: .04em !important; letter-spacing: 0 !important; }
-:root:root:root:root:root:root body .sb-plaque {
-  display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 2px !important; min-width: 46px !important; height: 22px !important;
-  padding: 0 6px !important; border-radius: var(--sb-r-plaque) !important; background: var(--sb-creux) !important; box-shadow: var(--sb-gravure) !important;
-  font: 600 12.5px/1 var(--sb-police-texte) !important; color: var(--sb-encre) !important; font-variant-numeric: tabular-nums !important;
-}
-:root:root:root:root:root:root body .sb-plaque.is-double { color: var(--sb-doublon, var(--vrm-doublon)) !important; box-shadow: var(--sb-gravure), 0 0 0 1px var(--sb-doublon, var(--vrm-doublon)) !important; }
-
-/* ══ 2. LE FOND DES ÉCRANS DE CE CHANTIER — provisoire : la coque (studio.css) le posera ══
-   Le bleu clair éclairé du haut : un halo blanc à gauche, l'aplat de l'espace, le bas. */
-:root:root:root:root:root:root body:has(.vrm-main :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel)) :is(.vrm-app-shell, .vrm-main) {
-  background-color: var(--sb-aplat) !important;
-  background-image: radial-gradient(90% 40% at 18% 0%, rgb(255 255 255 / .55), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 40%, var(--sb-bas) 100%) !important;
-  background-attachment: fixed !important;
-}
-:root[data-theme="dark"]:root:root:root:root:root body:has(.vrm-main :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel)) :is(.vrm-app-shell, .vrm-main) {
-  background-image: radial-gradient(90% 40% at 18% 0%, rgb(110 160 230 / .10), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 40%, var(--sb-bas) 100%) !important;
-}
+/* ══ 1-2. (14 nov., version studio) Les quatre formes, les composants et le fond copiés de studio.css
+   (« provisoire ») sont retirés : la fondation les porte. */
 
 /* ══ 3. LA MATIÈRE COMMUNE DES ÉCRANS DU CHANTIER ══════════════════════════════
    Racine : [data-espace="argent"] · [data-espace="autres"] · la tâche Messages.

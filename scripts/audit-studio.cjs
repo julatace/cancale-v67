@@ -90,7 +90,11 @@ function juger(depot) {
   dit(/setAttribute\('data-espace', espaceDe\(tab\)\)/.test(gardes), 'S2 la racine de chaque écran gardé porte data-espace');
 
   // S3 — l'ordre de la cascade, le mouvement réduit.
-  const imports = [...app.matchAll(/^import\s+["']([^"']+\.css)["']/gm)].map((m) => m[1]);
+  // (14 nov., version studio) Les feuilles d'ÉCRAN du studio (`./design/studio-<écran>.css`, ex. studio-paires.css)
+  // se posent PAR-DESSUS la fondation : elles lisent ses jetons et peuvent la suivre. Rien d'autre ne passe après.
+  const tous = [...app.matchAll(/^import\s+["']([^"']+\.css)["']/gm)].map((m) => m[1]);
+  let fin = tous.length; while (fin > 0 && /^\.\/design\/studio-(?!polices)[a-z-]+\.css$/.test(tous[fin - 1])) fin--;
+  const imports = tous.slice(0, fin);
   dit(imports[imports.length - 1] === './design/studio.css', 'S3 studio.css est la DERNIÈRE feuille importée par App.jsx', imports.slice(-3).join(' · '));
   dit(imports.indexOf('./design/studio-polices.css') === imports.length - 2, 'S3 ses polices juste avant lui');
   dit(imports.indexOf('./styles-tablette.css') >= 0 && imports.indexOf('./styles-tablette.css') < imports.indexOf('./design/studio.css'), 'S3 après styles-tablette.css');

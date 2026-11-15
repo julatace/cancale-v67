@@ -1,9 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    LA FEUILLE « VENTE EN MAIN PROPRE » (14 nov., 160) — direction « Studio bleu clair »
-   Les classes `sb-*` sont celles du contrat commun (CONTRAT-STUDIO.md) :
-   « provisoire : vient de studio.css » — définies ici sous `:where(.ia)` (spécificité d'une seule classe, comme dans
-   src/design/studio.css) pour que la fondation les remplace à la fusion sans
-   conflit ; les couleurs lisent d'abord les variables `--sb-*` de la fondation.
+   Les classes `sb-*` sont celles du contrat commun (CONTRAT-STUDIO.md), définies par la fondation
+   (src/design/studio.css) ; ici, la mise en page de la feuille seulement.
    ═══════════════════════════════════════════════════════════════════════════ */
 :where(.ia) {
   --ia-encre: var(--sb-encre, #0C1D30);
@@ -37,65 +35,8 @@
   }
 }
 
-/* ── les quatre formes de bouton (provisoire : vient de studio.css) ───────── */
-:where(.ia) .sb-btn-plein {
-  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
-  min-height: 52px; border: 0; border-radius: 26px; padding: 0 22px; cursor: pointer;
-  background: var(--ia-encre); color: var(--ia-porcelaine); font: 650 16px/1.2 var(--ia-affiche);
-  box-shadow: 0 1px 0 rgb(255 255 255 / .18) inset, 0 6px 18px rgb(var(--ia-o) / .22);
-  transition: transform 90ms cubic-bezier(.2,.9,.25,1), box-shadow 90ms;
-}
-:where(.ia) .sb-btn-plein:active { transform: translateY(1.5px); box-shadow: 0 2px 8px rgb(var(--ia-o) / .18); }
-:where(.ia) .sb-btn-plein:disabled { background: rgb(var(--ia-o) / .18); color: var(--ia-encre-2); box-shadow: none; cursor: default; }
-:where(.ia) .sb-touche {
-  display: flex; align-items: center; justify-content: center; gap: 6px;
-  min-height: 44px; padding: 0 14px; border-radius: 13px; cursor: pointer;
-  border: 0.5px solid rgb(var(--ia-o) / .14); background: linear-gradient(var(--ia-porcelaine), var(--ia-porcelaine-2));
-  color: var(--ia-encre); font-family: inherit; font-size: 14px; font-weight: 600; line-height: 1.2;
-  box-shadow: 0 1px 2px rgb(var(--ia-o) / .12);
-}
-:where(.ia) .sb-touche:active, :where(.ia) .sb-touche[aria-pressed="true"], :where(.ia) .sb-touche.is-actif {
-  background: var(--ia-creux); box-shadow: inset 0 1px 3px rgb(var(--ia-o) / .2);
-}
-:where(.ia) .sb-touche[aria-pressed="true"]::before, :where(.ia) .sb-touche.is-actif::before {
-  content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--ia-diode); flex: none;
-}
-:where(.ia) .sb-touche:disabled { opacity: .55; cursor: default; }
-:where(.ia) .sb-rond {
-  display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%;
-  border: 0.5px solid rgb(var(--ia-o) / .14); background: var(--ia-porcelaine); color: var(--ia-encre); cursor: pointer;
-}
-:where(.ia) .sb-lien {
-  display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; background: none; cursor: pointer;
-  color: var(--ia-lien); font-family: inherit; font-size: 14px; font-weight: 600; line-height: 1.2; text-decoration: none;
-}
-:where(.ia) .sb-lien:active { opacity: .55; }
-:where(.ia) .sb-lien:disabled { color: var(--ia-encre-2); opacity: .55; }
-
-/* ── composants (provisoire : vient de studio.css) ───────────────────────── */
-:where(.ia) .sb-champ {
-  display: block; width: 100%; box-sizing: border-box; min-height: 48px; padding: 0 14px; border-radius: 13px;
-  border: 0; background: var(--ia-creux); color: var(--ia-encre); font-family: inherit; font-size: 17px; font-weight: 500; line-height: 1.2;
-  box-shadow: inset 0 1px 3px rgb(var(--ia-o) / .16); outline: none;
-}
-:where(.ia) .sb-champ:focus-visible { box-shadow: inset 0 1px 3px rgb(var(--ia-o) / .16), 0 0 0 2px var(--ia-diode); }
-:where(.ia) .sb-champ[aria-invalid="true"] { box-shadow: inset 0 1px 3px rgb(var(--ia-o) / .16), 0 0 0 2px var(--ia-ambre); }
-:where(.ia) .sb-segment { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; padding: 4px; border-radius: 16px; background: var(--ia-creux); }
-:where(.ia) .sb-segment .sb-touche { min-height: 44px; padding: 0 8px; }
-:where(.ia) .sb-plaque {
-  display: inline-flex; align-items: center; justify-content: center; min-width: 52px; height: 30px; padding: 0 8px; border-radius: 6px;
-  background: var(--ia-creux); color: var(--ia-encre); font: 700 15px/1 var(--ia-affiche); letter-spacing: .02em;
-  box-shadow: inset 0 1px 2px rgb(var(--ia-o) / .2); flex: none;
-}
-:where(.ia) .sb-plaque.is-double { color: var(--ia-rouge-double); box-shadow: inset 0 0 0 1.5px var(--ia-rouge-double); }
-:where(.ia) .sb-rangee {
-  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 8px 10px; box-sizing: border-box;
-  border: 0; border-radius: 16px; background: var(--ia-porcelaine); color: inherit; text-align: left; font: inherit; cursor: pointer;
-  box-shadow: 0 1px 2px rgb(var(--ia-o) / .1);
-}
-:where(.ia) .sb-rangee[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ia-diode); }
-:where(.ia) .sb-vignette { width: 48px; height: 48px; border-radius: 11px; object-fit: cover; background: var(--ia-creux); flex: none; }
-:where(.ia) .sb-chiffre-affiche { font: 300 40px/1 var(--ia-affiche); letter-spacing: -.01em; }
+/* (14 nov., version studio) Les quatre formes et les composants copiés de studio.css (« provisoire ») sont
+   retirés : la fondation les porte. */
 
 /* ── la mise en page des feuilles ────────────────────────────────────────── */
 .ia { display: grid; gap: 14px; padding: 4px 0 8px; }
@@ -112,4 +53,3 @@
 .ia-fait b { font: 600 17px/1.3 var(--ia-affiche); }
 .ia-gestes { display: flex; flex-wrap: wrap; gap: 4px 18px; align-items: center; }
 .ia-repli > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--ia-lien); font-weight: 600; font-size: 14px; }
-@media (prefers-reduced-motion: reduce) { :where(.ia) .sb-btn-plein { transition: none; } }
