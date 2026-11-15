@@ -182,7 +182,10 @@ export function baisseConseillee({ conseil = null, prix, ageJours, vues = null, 
   if (sugg * 100 >= pC) return auPlancherDit();
   const pct = Math.round((pC - sugg * 100) / pC * 100);
   const plAff = Math.max(plE || 0, Number(c.plancher) || 0) || null;
-  R.push({ cle: plPartiel ? 'bc.r.plancherAuMoins' : 'bc.r.plancherOk', v: { p: plAff } });
+  // Le plancher DIT est le plus haut des deux, nommé par ce qu'il est : achat + frais connus (la perte),
+  // ou achat + 10 % (la marge que le conseil garde toujours) quand celui-là est plus haut.
+  const parMarge = Number(c.plancher) > (plE || 0);
+  R.push({ cle: parMarge ? 'bc.r.plancherMarge' : plPartiel ? 'bc.r.plancherAuMoins' : 'bc.r.plancherOk', v: { p: plAff } });
   return { ...base, decision: 'baisser', sugg, pct, plancher: plAff, auPlancher, raisons: R, geste: 'baisser', nouveau: c.nouveau !== false, phrase: `Baisser à ${sugg} € ?` };
 }
 

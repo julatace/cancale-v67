@@ -38,6 +38,7 @@ export default {
   "bc.r.peuVue": {"one": "solo {n} visita: vuelve a publicarlo primero, el precio no es el problema", "other": "solo {n} visitas: vuelve a publicarlo primero, el precio no es el problema"},
   "bc.r.freine": "{n} visitas, ningún favorito: el precio frena",
   "bc.r.tresEnRetard": "{x} veces tu plazo habitual",
+  "bc.r.plancherMarge": "nunca por debajo de {p} € (tu compra + 10 %)",
   "bc.r.plancherOk": "nunca por debajo de {p} € (compra + gastos)",
   "bc.r.plancherAuMoins": "nunca por debajo de {p} € (como mínimo: faltan gastos)",
   "rf.titre": "Relanzar en el buen momento",

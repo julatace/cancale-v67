@@ -38,6 +38,7 @@ export default {
   "bc.r.peuVue": {"one": "nur {n} Aufruf: zuerst neu einstellen, der Preis ist nicht das Problem", "other": "nur {n} Aufrufe: zuerst neu einstellen, der Preis ist nicht das Problem"},
   "bc.r.freine": "{n} Aufrufe, kein Favorit: der Preis bremst",
   "bc.r.tresEnRetard": "{x}-mal deine übliche Verkaufszeit",
+  "bc.r.plancherMarge": "nie unter {p} € (dein Einkauf + 10 %)",
   "bc.r.plancherOk": "nie unter {p} € (Einkauf + Kosten)",
   "bc.r.plancherAuMoins": "nie unter {p} € (mindestens: nicht alle Kosten eingegeben)",
   "rf.titre": "Zum richtigen Zeitpunkt nachfassen",

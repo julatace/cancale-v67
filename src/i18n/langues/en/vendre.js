@@ -38,6 +38,7 @@ export default {
   "bc.r.peuVue": {"one": "only {n} view: relist it first, the price is not the issue", "other": "only {n} views: relist it first, the price is not the issue"},
   "bc.r.freine": "{n} views, no favourite: the price holds it back",
   "bc.r.tresEnRetard": "{x} times your usual selling time",
+  "bc.r.plancherMarge": "never below €{p} (your purchase + 10%)",
   "bc.r.plancherOk": "never below €{p} (purchase + costs)",
   "bc.r.plancherAuMoins": "never below €{p} (at least: not all costs entered)",
   "rf.titre": "Follow up at the right time",

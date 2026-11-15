@@ -38,6 +38,7 @@ export default {
   "bc.r.peuVue": {"one": "solo {n} visita: ripubblicalo prima, il prezzo non c’entra", "other": "solo {n} visite: ripubblicalo prima, il prezzo non c’entra"},
   "bc.r.freine": "{n} visite, nessun preferito: il prezzo frena",
   "bc.r.tresEnRetard": "{x} volte il tuo tempo abituale",
+  "bc.r.plancherMarge": "mai sotto {p} € (il tuo acquisto + 10 %)",
   "bc.r.plancherOk": "mai sotto {p} € (acquisto + spese)",
   "bc.r.plancherAuMoins": "mai sotto {p} € (almeno: spese non tutte inserite)",
   "rf.titre": "Ricontattare al momento giusto",

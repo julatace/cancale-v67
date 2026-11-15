@@ -74,6 +74,8 @@ async function controles(dir, parler) {
   dit(dPl2.decision === 'garder' && /bc\.r\.plancher\b/.test(cles(dPl2)) && dPl2.sugg == null, 'B3 déjà au plancher ⇒ garder, « plus bas, tu perds »', JSON.stringify(dPl2));
   const dPa = D({ prix: 100, ageJours: 60, achat: 40, vues: 80, plancher: { etat: 'partiel', plancher: 4500 } });
   dit(dPa.decision === 'baisser' && dPa.plancherPartiel === true && /bc\.r\.plancherAuMoins/.test(cles(dPa)), 'B4 frais pas tous saisis ⇒ plancher « au moins », dit');
+  const dMa = D({ prix: 100, ageJours: 60, achat: 40, vues: 80, plancher: { etat: 'ok', plancher: 4100 } });
+  dit(/bc\.r\.plancherMarge/.test(cles(dMa)) && dMa.plancher === 44, 'B5 le plancher dit est le plus haut, nommé : achat + 10 % (44 €) au-dessus d\'achat + frais (41 €)', JSON.stringify(dMa.raisons));
 
   // C — avant une baisse
   dit(D({ prix: 100, ageJours: 60, achat: 40, offres: 2 }).decision === 'garder' && D({ prix: 100, ageJours: 60, achat: 40, offres: 2 }).geste === 'offres', 'C1 deux offres reçues lues ⇒ garder (réponds-y)');

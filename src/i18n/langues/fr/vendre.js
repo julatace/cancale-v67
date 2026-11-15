@@ -39,6 +39,7 @@ export default {
   "bc.r.peuVue": {"one": "{n} vue seulement : republie-la d’abord, le prix n’est pas en cause", "other": "{n} vues seulement : republie-la d’abord, le prix n’est pas en cause"},
   "bc.r.freine": "{n} vues, aucun favori : le prix freine",
   "bc.r.tresEnRetard": "{x} fois ton délai habituel",
+  "bc.r.plancherMarge": "jamais sous {p} € (ton achat + 10 %)",
   "bc.r.plancherOk": "jamais sous {p} € (achat + frais)",
   "bc.r.plancherAuMoins": "jamais sous {p} € (au moins : frais pas tous saisis)",
   "rf.titre": "Relancer au bon moment",
