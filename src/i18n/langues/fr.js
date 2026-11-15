@@ -11,6 +11,7 @@ import ecran_correspondances from './fr/correspondances.js';   // (15 nov.) Publ
 import ecran_capte from './fr/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_avenir from './fr/avenir.js';
 import ecran_verre2 from './fr/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
+import ecran_fiched from './fr/fiched.js';   // (15 nov.) la fiche d'un article, direction D
 import ecran_renvoyer from './fr/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_liaison from './fr/liaison.js';   // (15 nov.) La liaison achat ⇄ article
 import ecran_retrait_ailleurs from './fr/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
@@ -2286,5 +2287,6 @@ export default {
   ...ecran_parametres,
   ...ecran_avenir,
   ...ecran_verre2,
+  ...ecran_fiched,
   ...ecran_numeros_nouvelles,
 };

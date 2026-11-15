@@ -214,7 +214,8 @@ import FeuilleLienVc from "./LienVestiaire.jsx";
 // ⟦→ ecrans/Vestiaire.jsx #1⟧
 import { suggestionsAchat, tousAchatsLibres, tousAchatsLibresDetail, filtresAchats, etiquetteLot, liensParAchat, lotDe, prixIndicatifLot, ecritureLot, suggestionsSaisieSerie } from "./suggestionsAchat.js";
 // (15 nov.) La liaison achat ⇄ article : l'affectation pondérée et globale (src/liaisonAchat.js).
-import { affecterPropositions, aValider, morceauxPourquoi, couleursTexte, lectureAchat, cleArticleAnnonce, cleArticleVente, cleRefusLiaison } from "./liaisonAchat.js";
+import { affecterPropositions, propositionsArticle, aValider, morceauxPourquoi, couleursTexte, lectureAchat, cleArticleAnnonce, cleArticleVente, cleRefusLiaison } from "./liaisonAchat.js";
+import { cibleVente, venteDeLaPaire } from "./ficheProduit.js";   // (15 nov.) la fiche d'un article, direction D : la cible de l'achat proposé
 // (6 nov., vitesse 2) AchatsOutils : à la demande ; ses feuilles de style restent ICI, à la même place (même ordre).
 import './styles-annonces-outils.css';
 import './styles-baisse-prix.css';
@@ -944,6 +945,7 @@ import "./design/studio-journee.css";
 import "./design/studio-finition.css";   // (15 nov.) La passe de finition écran par écran — `@layer vrm-finition`, la PREMIÈRE couche (index.html) : docs/passation/2026-11-15-finition-ecrans.md
 import "./design/studio-verre.css";   // (15 nov., Julien : « J'aime la 9 ») VERRE DÉPOLI — le fond bleu profond, le verre, l'encre claire sur le fond — `@layer vrm-verre`, la PREMIÈRE couche (index.html) : docs/passation/2026-11-15-verre-depoli.md
 import "./design/verre-ecrans.css";   // (15 nov., maquettes validées : « tout est parfait sauf étagères ») Argent, à venir, Messages, Paramètres, la fiche — des classes `vg-*` neuves, `@layer vrm-verre` : docs/passation/2026-11-15-ecrans-verre-2.md
+import "./design/fiche-d.css";   // (15 nov., Julien choisit la direction D « fiche produit ») la fiche d'un article en UN écran — `@layer vrm-verre`, classes `fd-*` : docs/passation/2026-11-15-fiche-d.md
 import "./design/verre-journee.css";   // (15 nov., refonte-journee) Ma journée comme la maquette validée, « La paire à sortir en premier » — docs/passation/2026-11-15-refonte-journee.md
 import "./design/verre-annonces.css";   // (15 nov., refonte-journee) Annonces comme la maquette validée : la rangée de 72 px, la recherche et les vues
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
@@ -18098,6 +18100,30 @@ const ouStockNumero = (plan, k) => { const m = ouDansMeubles(k); if (m) return {
 // Les lectures EN PLUS de `numData` quand la fiche d'un N° (ou la feuille
 // « Changer le prix ») est ouverte : projetées (§4.4), par identité (§5).
 // Chaque source rend `null` si elle n'a pas pu être lue (« pas su »).
+// (15 nov., fiche D) LES ACHATS, pour « l'achat proposé » d'une paire VENDUE sans achat relié (la carte d'action de la
+// fiche) : la liste `my_orders` de chaque compte, PROJETÉE (§4.4, la lecture de la loupe), le compte noté (`_uid`) ;
+// gardée 5 min pour la session. Une lecture ratée rend `null` (« pas su » : aucune proposition), jamais `[]`.
+let _achatsFiche = null;
+async function lireAchatsFiche() {
+  if (_achatsFiche && Date.now() - _achatsFiche.t < 5 * 60000) return _achatsFiche.l;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_orders_purchased&select=id,mo:data->payload->my_orders`, { headers: sbAuth() });
+    if (!r.ok) return null;
+    const rows = await r.json(); if (!Array.isArray(rows)) return null;
+    const l = [], vus = new Set();
+    for (const x of rows) { const uid = (/^harvest_(\d+)_orders_purchased$/.exec(String((x && x.id) || '')) || [])[1] || null; for (const o of (Array.isArray(x && x.mo) ? x.mo : [])) { const t = String((o && o.transaction_id) || ''); if (t && !vus.has(t)) { vus.add(t); l.push(uid ? { ...o, _uid: uid } : o); } } }
+    _achatsFiche = { t: Date.now(), l };
+    return l;
+  } catch (_) { return null; }
+}
+// Le reçu de CET achat (`email_achat_*`, par SON n° de transaction, scalaires + texte borné) : la ventilation que
+// la règle de prix (`propositionPrixAchat`) sait lire — sinon `null` (le prix de l'article seul, dit comme tel).
+async function ventilationRecuFiche(tx) {
+  if (!/^\d{4,20}$/.test(String(tx || ''))) return null;
+  const rows = await lireTout(`id=like.email_achat_*&meta->>transaction=eq.${tx}&select=id,texte:data->>texte`, { strict: true }).catch(() => null);
+  for (const r of (rows || [])) { const v = ventilationRecuAchat(r && r.texte); if (v && v.trouve) return v; }
+  return null;
+}
 async function lireExtraFiche(rn) {
   const sb = async (q) => { try { const r = await fetch(`${SUPABASE_URL}/rest/v1/${q}`, { headers: sbAuth() }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; } };
   const ids = ((rn && rn.annonces) || []).map((a) => String(a.id)).filter((x) => /^\d{4,15}$/.test(x)).slice(0, 20);
@@ -60526,10 +60552,40 @@ function AppCoeur() {
   const besoinNumData=venteMainOuverte||gsOpen||!!ficheNum||!!ficheLigneActive||!!prixNum||!!(pubAil&&pubAil.num)||!!pubPartout||!!ecartsOuvert;   // (14 nov., argent-prix) « Prix d’un site à l’autre » lit les sites de chaque N°
   // Les lectures en plus (coffre, offres, reçu, Leboncoin, Vestiaire) du N° ouvert.
   const [ficheExtra,setFicheExtra]=useState(null);
+  // (15 nov., fiche D) L'ACHAT PROPOSÉ d'une paire VENDUE sans achat relié : la règle de src/liaisonAchat.js
+  // (`propositionsArticle`, la même que Annonces → « Sans achat relié »), sur la cible de SA vente (`cibleVente`) ;
+  // le prix par la règle existante (`propositionPrixAchat`, le reçu s'il est lu). Une PROPOSITION : rien n'est relié
+  // avant SON toucher (« Relier · 52 € »). { num, tx, idf, prop } — prop : undefined lecture · null aucune/pas su.
+  const [propFiche,setPropFiche]=useState(null);
+  const [ficheTick,setFicheTick]=useState(0);
+
   const numOutil=ficheNum||(ficheLigneActive&&ficheLigneActive.num)||prixNum||(pubAil&&pubAil.num)||null;
   useEffect(()=>{ if(!numOutil||!numData){ setFicheExtra(null); return undefined; } let vivant=true; setFicheExtra(null);
     (async()=>{ const { rn }=rechercheParNumero(numOutil, numData, vintedAccounts); const x=await lireExtraFiche(rn); if(vivant) setFicheExtra({ ...x, num: numOutil }); })();
     return ()=>{ vivant=false; }; /* eslint-disable-next-line */ },[numOutil,numData]);
+  useEffect(()=>{ if(!numOutil||!numData){ setPropFiche(null); return undefined; } let vivant=true;
+    let rn=null, p=null; try{ ({ rn, p }=histoirePaire(numOutil, false)); }catch(_){ setPropFiche(null); return undefined; }
+    const vendue=p&&(p.etapes||[]).some((e)=>e.cle==='vente'&&e.etat==='fait');
+    if(!p||p.double||p.ancienNumero||!vendue||!p.resume||p.resume.achat!=null){ setPropFiche(null); return undefined; }
+    const v=venteDeLaPaire(rn, venteAnnuleeFiche);
+    if(!v){ setPropFiche(null); return undefined; }
+    const base={ num:String(numOutil), tx:String(v._tx), idf:v._item?String(v._item):null, idFiche:p.idFiche||null };
+    setPropFiche({ ...base, prop:undefined });
+    (async()=>{
+      const achats=await lireAchatsFiche(); if(!vivant) return;
+      if(!achats){ setPropFiche({ ...base, prop:null }); return; }
+      const fiches=load('vinted_annonce_numeros',{})||{};
+      const cible=cibleVente(v, base.idf?fiches[base.idf]:null, cleArticleVente);
+      let l=[]; try{ l=propositionsArticle({ cible, achats, liens:liensParAchat(fiches, load('vinted_sale_overrides',{})||{}), refus:load('vrm_liaison_refus',{})||{}, marqueDe:extractBrand, couleursDe:extractColors, modeleDe:extractModel, max:1 }); }catch(_){ l=[]; }
+      const pr=l[0];
+      if(!pr||!pr.achat||lotDe(pr.achat).lot||pr.achat.lot===true){ setPropFiche({ ...base, prop:null }); return; }
+      const tx=String(pr.achat.transaction_id);
+      const ventil=await ventilationRecuFiche(tx); if(!vivant) return;
+      const prix=propositionPrixAchat({ identite:{ achat:pr.achat, par:'suggestion' }, ventilationDe:ventil?()=>ventil:null, estLot:(a)=>lotDe(a).lot||!!(a&&a.lot===true) });
+      setPropFiche({ ...base, prop:{ tx, achat:{ title:pr.achat.title||'', photo:orderPhoto(pr.achat)||'', date:pr.achat.date||'' }, brut:pr.achat, titre:pr.achat.title||'', niveau:pr.niveau,
+        recuMs:pr.recu?pr.recu.ms:null, recuSource:pr.recu?pr.recu.source:null, centimes:prix?prix.centimes:null, texte:prix?prix.texte:null, proposition:prix } });
+    })();
+    return ()=>{ vivant=false; }; /* eslint-disable-next-line */ },[numOutil,numData,ficheTick]);
   useEffect(()=>{ if(!besoinNumData){ setNumData(null); return undefined; } if(numData) return undefined; let vivant=true; (async()=>{
     const sb=async(q)=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/${q}`,{headers:sbAuth()}); if(!r.ok) return null; const j=await r.json(); return Array.isArray(j)?j:null; }catch(_){ return null; } };
     let versementsLus=null;
@@ -63534,6 +63590,21 @@ function AppCoeur() {
   // PAR IDENTITÉ (null : la ligne n'a pas de paire sûre) ; `depuis` : la ligne touchée (contexte, identité, résumé).
   // (14 nov., 160) L'HISTOIRE D'UNE PAIRE (la fiche « Tout sur le N° ») — sortie de `rendreFichePaire` pour
   // que la fiche ET la feuille « Vente en main propre » lisent LA MÊME chose d'un N° (§5, une règle).
+  // (15 nov., fiche D) La vente annulée : la règle de l'histoire (une seule, §11).
+  const venteAnnuleeFiche=(o)=>classifyOrderStatus(o && o.status) === 'cancelled' || (o && o.transaction_id != null && txnAnnuleeAvantEnvoi(o.transaction_id));
+  // « Relier · 52 € » (SON toucher) : l'écriture de « Relier » (`ecritureProposition`, le prix proposé et le lien vers
+  // l'achat), sur la fiche de l'annonce VENDUE (par identité) sinon sur la vente — un geste annulable 5 s.
+  const relierAchatFiche=(st, pr)=>{
+    if(!st||!pr||!pr.proposition) return;
+    const nomC=(uid)=>{ const a=(vintedAccounts||[]).find(x=>String(x.vinted_user_id)===String(uid)); if(!a) return ''; const labels=load('vinted_account_labels',{})||{}; return labels[a.vinted_user_id]||a.login||''; };
+    const w=ecritureProposition(pr.proposition, { accNom: nomC(pr.brut && pr.brut._uid), photoDe: orderPhoto });
+    const fiches=load('vinted_annonce_numeros',{})||{}; const f=st.idf?fiches[st.idf]:null;
+    const ops=[]; const num=String((f&&f.numero)||st.num||'').trim();
+    if(f){ ops.push({ k:'vinted_annonce_numeros', type:'champs', id:st.idf, apres:w, avant:{ buyPrice:f.buyPrice, buyFromId:f.buyFromId, buyFrom:f.buyFrom } });
+      const buy=load('vinted_buyprice_by_num',{})||{}; if(String(f.numero||'').trim()) ops.push({ k:'vinted_buyprice_by_num', type:'cle', id:String(f.numero).trim(), apres:String(w.buyPrice), avant:buy[String(f.numero).trim()] }); }
+    else { const ov=(load('vinted_sale_overrides',{})||{})[st.tx]||{}; ops.push({ k:'vinted_sale_overrides', type:'champs', id:st.tx, apres:w, avant:{ buyPrice:ov.buyPrice, buyFromId:ov.buyFromId, buyFrom:ov.buyFrom } }); }
+    gesteVrm(tr('fd.relier.fait',{ n:num, prix:pr.texte||'' }), ops, {}, ()=>{ setTimeout(()=>{ emettreClesRelues(['vinted_annonce_numeros','vinted_buyprice_by_num','vinted_sale_overrides']); setFicheTick(t=>t+1); setPrixTick(t=>t+1); },700); }, 'achat.relier');
+  };
   const histoirePaire=(numF, avecExtra=true)=>{
     // (1er nov.) LA FICHE COMPLÈTE D'UNE PAIRE : la même lecture que « Tout
     // sur le N° » (`rechercheParNumero`), racontée en parcours (`parcoursPaire`).
@@ -63578,7 +63649,36 @@ function AppCoeur() {
             journal: load(CLE_JOURNAL_NUMEROS, []) || [], marqueur: marqueurNumerotation(), sortieStock: (load('vrm_stock_sortis', {}) || {})[rn.cle] || null,
             estArchive: (n) => estArchive(n), cleNum }) : null;
           const fermer = fermerF;
-          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={numF} lecture={!numData} note={p && p.num && !p.ancienNumero ? <>{questionChezToiFiche(p.num)}{blocVenduAilleurs(p, rn, etat)}<BlocARetirerAilleurs numero={p.num} PhotoVinted={PhotoVinted}/><LigneMemePhotoNumero numero={p.num} cle={cleNum} charger={chargerMemePhotoUI}/><NotePaireCoque numero={p.num} variante="bloc" ajout dicter/><InfosPaireCoque numero={p.num}/><AtelierPaireCoque num={p.num} idFiche={p.idFiche || ''} itemId={(rn.annonces || []).length === 1 ? String(rn.annonces[0].id || '') : ''}/><BlocHistoriqueRepub ids={(rn.annonces || []).map((x) => String(x.id))} d={{ numeros, stats: Object.fromEntries((rn.annonces || []).map((x) => [String(x.id), { favoris: Number.isFinite(x.favourites) ? x.favourites : null, vues: Number.isFinite(x.views) ? x.views : null }])) }}/><BoutonRappel cible={{ sorte: 'article', num: p.num, item: (rn.annonces || []).length === 1 ? String(rn.annonces[0].id || '') : '' }} libelle={`N°${p.num}`}/></> : null} onFermer={fermer} onRetour={depuis ? fermer : ()=>{ fermer(); setGsQ(String((p && p.num) || numF)); setGsOpen(true); }}
+          // (15 nov., fiche D) Ce que « ⋯ » range (chaque morceau d'avant, à sa place : rien de supprimé) et les SITES de la paire
+          // (une rangée par site : ses ventes lues, puis ses annonces en ligne par identité — `sitesPrixDe`, la règle de « Prix partout »).
+          const plusFiche = p && p.num && !p.ancienNumero ? {
+            questions: <>{questionChezToiFiche(p.num)}{blocVenduAilleurs(p, rn, etat)}<BlocARetirerAilleurs numero={p.num} PhotoVinted={PhotoVinted}/><LigneMemePhotoNumero numero={p.num} cle={cleNum} charger={chargerMemePhotoUI}/></>,
+            note: <NotePaireCoque numero={p.num} variante="bloc" ajout dicter/>,
+            infos: <InfosPaireCoque numero={p.num}/>,
+            atelier: <AtelierPaireCoque num={p.num} idFiche={p.idFiche || ''} itemId={(rn.annonces || []).length === 1 ? String(rn.annonces[0].id || '') : ''}/>,
+            repub: <BlocHistoriqueRepub ids={(rn.annonces || []).map((x) => String(x.id))} d={{ numeros, stats: Object.fromEntries((rn.annonces || []).map((x) => [String(x.id), { favoris: Number.isFinite(x.favourites) ? x.favourites : null, vues: Number.isFinite(x.views) ? x.views : null }])) }}/>,
+            rappel: <BoutonRappel cible={{ sorte: 'article', num: p.num, item: (rn.annonces || []).length === 1 ? String(rn.annonces[0].id || '') : '' }} libelle={`N°${p.num}`}/>,
+          } : null;
+          const sitesFiche = (() => { if (!p || !rn) return []; const out = [];
+            try {
+              const cts = (x) => (x == null || x === '' ? null : Math.round(Number(typeof x === 'object' ? x.amount : x) * 100));
+              for (const v of ((rn.ventes && rn.ventes.vinted) || [])) if (!venteAnnuleeFiche(v)) out.push({ site: 'vinted', etat: 'vendue', compte: nomCompte(v._uid) || '', date: Date.parse(v.date || '') || null, prix: cts(v.price) });
+              for (const v of ((rn.ventes && rn.ventes.lbc) || [])) if (!lbcAnnulee(v)) out.push({ site: 'leboncoin', etat: 'vendue', compte: '', date: Date.parse(v.dateVente || v.date || '') || null, prix: v.price != null && Number.isFinite(Number(v.price)) ? Number(v.price) : null });
+              for (const c of ((rn.ventes && rn.ventes.ebay) || [])) if (commandeEbayEngagee(c)) out.push({ site: 'ebay', etat: 'vendue', compte: '', date: Date.parse(c.creationDate || '') || null, prix: null });
+              const st = numData && numData.stats ? numData.stats : null;
+              for (const x of sitesPrixDe(numF, rn, ex).sites) out.push({ site: x.site, etat: 'en-ligne', compte: x.site === 'vinted' ? (nomCompte(x.compte) || '') : (x.compte || ''), prix: x.prix != null ? Math.round(x.prix * 100) : null,
+                favoris: x.site === 'vinted' && st && st[x.id] && Number.isFinite(st[x.id].favoris) ? st[x.id].favoris : undefined });
+            } catch (_) {}
+            return out; })();
+          const pf = propFiche && p && propFiche.num === String(numF) ? propFiche : null;
+          const relierFiche = p && pf ? { proposition: pf.prop, onRelier: (pr) => relierAchatFiche(pf, pr),
+            onAutre: async () => {
+              const c = await askChoix({ title: tr('fd.relier.choixTitre'), options: [['autre', tr('fd.relier.choixAutre')], ...(p.idFiche ? [['saisir', tr('fd.relier.choixSaisir')]] : [])], cancel: VERBES.annuler });
+              if (c === 'saisir' && p.idFiche) setAchatFiche({ tx: 'fiche:' + p.idFiche, item: p.idFiche, num: String(p.num || ''), sous: p.titre ? String(p.titre).slice(0, 34) : 'prix d’achat' });
+              // « Choisir un autre achat » : la vente, dans Ventes (où « Relier un achat » ouvre la liste des achats).
+              if (c === 'autre') { fermer(); setGsOpen(false); poserCible({ type: 'vente', tx: String(pf.tx), depuisFiche: true }, redirigerOnglet('ventes', null, ONGLETS_DEPLACES).tab); setTab('ventes'); }
+            } } : null;
+          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={numF} lecture={!numData} plus={plusFiche} sites={sitesFiche} relier={relierFiche} onFermer={fermer} onRetour={depuis ? fermer : ()=>{ fermer(); setGsQ(String((p && p.num) || numF)); setGsOpen(true); }}
             onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}
             onEmballer={()=>{ fermer(); setGsOpen(false); DEMANDE_EMBALLAGE.at = Date.now(); setTab('cat_bord'); try { window.dispatchEvent(new Event('vrm:emballer')); } catch (_) {} }}
             onPrix={(n)=>setPrixNum(String(n))} onPublierAilleurs={(n)=>setPubAil({ num: String(n), site: null })} neuve={neuve}
