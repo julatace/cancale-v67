@@ -257,7 +257,7 @@ membre, classement public sans accord, identifiant de compte rendu au créateur,
 plafond de message retiré, signalements ouverts, nouvelle SECURITY DEFINER non revue,
 search_path ouvert, fonction exposée à anon, 042 en SECURITY DEFINER, la 036 qui
 retire aussi la permissive gardée, RLS trop large, abonnement expiré qui écrit).
-Résultat : voir la fin de ce récit.
+**Résultat : 16/16 mutations attrapées** (chacune de 1 à 3 contrôles rouges ; ~14 min).
 
 Audits existants relancés, tous verts : `audit-communaute-sql` 206, `audit-accompagnement-sql`
 103, `audit-confidentialite-sql` 45, `audit-politiques-uniques-sql` 39,
