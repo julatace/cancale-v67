@@ -1480,8 +1480,8 @@ function EditeurMeuble({ modal, onSave, onDelete }) {
     <div style={{ background: C.card2, border: `1px solid ${C.line}`, borderRadius: 14, padding: 13, margin: '8px 0 4px', textAlign: 'center' }}>
       <ChoixPlanches cols={cols} rows={rows} planches={planches} setPlanches={setPlanches} />
     </div>
-    <button className="vrm-b vrm-b-primaire" type="button" data-meuble-enregistrer="" onClick={() => onSave((name || '').trim() || tr('etag.type.' + type), cols, rows, { planches: pl, gravite: toutEnPile, type, couleur, couleurs: couleursDans(couleurs, cols, rows), piles: toutEnPile ? [] : piles.filter((c) => c <= cols) })} style={{ width: '100%', marginTop: 9 }}>{modal.id ? tr('lbcplus.remise.enregistrer') : tr('stock.creerMeuble')}</button>
-    {onDelete && <button className="vrm-b vrm-b-secondaire" type="button" onClick={onDelete} style={{ width: '100%', marginTop: 9 }}>{tr('stock.supprimerMeuble2')}</button>}
+    <button className="sb-btn-plein sb-btn-plein--barre" type="button" data-meuble-enregistrer="" onClick={() => onSave((name || '').trim() || tr('etag.type.' + type), cols, rows, { planches: pl, gravite: toutEnPile, type, couleur, couleurs: couleursDans(couleurs, cols, rows), piles: toutEnPile ? [] : piles.filter((c) => c <= cols) })} style={{ width: '100%', marginTop: 9 }}>{modal.id ? tr('lbcplus.remise.enregistrer') : tr('stock.creerMeuble')}</button>
+    {onDelete && <button className="sb-touche" type="button" data-meuble-supprimer="" onClick={onDelete} style={{ width: '100%', marginTop: 9, minHeight: 44 }}>{tr('stock.supprimerMeuble2')}</button>}
   </div>);
 }
 

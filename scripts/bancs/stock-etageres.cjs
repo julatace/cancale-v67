@@ -104,9 +104,9 @@ async function fermerFiche(pg) {
 async function retirerCase(pg, n) {
   if (!(await toucher(pg, `[data-case-num="${n}"]`))) return false;
   await pg.waitForSelector('[data-fiche-retirer]', { timeout: 8000 }).catch(() => {});
-  const ok = await toucher(pg, '[data-fiche-retirer]');
+  await toucher(pg, '[data-fiche-retirer]');
   await pg.waitForTimeout(500); await fermerFiche(pg); await pg.waitForTimeout(300);
-  return ok;
+  return (await ou(pg, n)) === null;   // jugé sur la case (un clic qui se détache en partant n'est pas un échec)
 }
 
 (async () => {
