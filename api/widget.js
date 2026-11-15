@@ -17,7 +17,7 @@ import { bordsParTransaction, compterEcheances, lireDateLimite } from './_lib/li
 import { retirerPublie, etatRetrait } from './_lib/retrait-colis.js';
 // (6 nov.) Les SMS de Mondial Relay (POST ?mode=sms, jeton `vrm_sms_token`) : api/_lib/sms-mondialrelay.js.
 import { routeSms } from './_lib/sms-mondialrelay.js';
-import { avecSuiviDuSujet, suiviDeLigne, finDeLigne, finsDesLignes, sortiParSuivis, arriveesDeLigne, relireLigneMeta, SELECT_SUIVI_META, SELECT_TRANSP_META, ligneTranspDeMeta, leverGarde, nomTransporteurSuivi } from './_lib/suivi-colis.js';
+import { avecSuiviDuSujet, suiviDeLigne, finDeLigne, finsDesLignes, sortiParSuivis, arriveesDeLigne, relireLigneMeta, SELECT_SUIVI_META, SELECT_TRANSP_META, ligneTranspDeMeta, leverGarde, nomTransporteurSuivi, txAchatsEnRetour } from './_lib/suivi-colis.js';
 import { preuveDeTransp, contredit } from './_lib/etat-colis.js';
 import { ordreStable, finALaFrontiere } from './_lib/ordre-stable.js';
 import { prendreDebit, refuserTropVite } from './_lib/debit-vendeur.js';   // (11 nov.) un vendeur ne mange pas l'égress des autres
@@ -656,7 +656,16 @@ function sortisDepuisPhoto(pub, retires, pickupDone, txBuy, lu) {
 // qu'elle a vus au point relais, quelle que soit sa décision), avec la même
 // règle (`etatRetrait`, arrivée bornée par l'heure de la capture). Ni un compte
 // masqué, ni un coché « retiré ». Résumé illisible ⇒ null (« pas su »).
-function colisVintedDepuis(pub, txBuy, pickupDone, masques, today) {
+// (15 nov.) LES ACHATS EN RETOUR : leurs bordereaux de retour reçus par e-mail (`email_bordretour_{tx}`,
+// scalaires `meta->>` seulement, jamais le PDF) — la règle de l'app (api/_lib/suivi-colis.js
+// `txAchatsEnRetour`) : un achat en retour n'est jamais « à retirer ». Lecture ratée ⇒ `null` (rien écarté).
+async function txEnRetourDuWidget() {
+  try {
+    const j = await fetchPaginated(scoped('app_data?id=like.email_bordretour_%25&select=transaction:meta->>transaction,sens:meta->>sens'));
+    return txAchatsEnRetour(j);
+  } catch (_) { return null; }
+}
+function colisVintedDepuis(pub, txBuy, pickupDone, masques, today, enRetour = null) {
   const pubAt = pub && Number.isFinite(pub.at) ? pub.at : null;
   if (pubAt == null) return 0;
   if (!Array.isArray(txBuy)) return null;
@@ -665,6 +674,7 @@ function colisVintedDepuis(pub, txBuy, pickupDone, masques, today) {
   for (const t0 of txBuy) {
     const t = String(t0);
     if (pickupDone[t] || vusTx.has(t)) continue;
+    if (enRetour && enRetour.has(t)) continue;                        // (15 nov.) en retour : jamais à retirer
     const u = uidDeLigne((txBuy.ligneDe || {})[t]);
     if (u && masques.has(u)) continue;
     const cap = (txBuy.capDe || {})[t];
@@ -850,9 +860,11 @@ export default async function handler(req, res) {
     const venteEmail = await colisVentesEmailDuWidget({ txSold, sold, vivants, masques: m.vinted_accounts_hidden, bordsParTx: bordsTx0, preuves, departs, shipDone, bordsShipped });
     for (const t of venteEmail.txs) shipTxns.add(String(t));
     const shipTotal = shipTxns.size;
+    const enRetour = await txEnRetourDuWidget();
+    const pasEnRetour = (t) => !(enRetour && enRetour.has(String(t)));
     const pickupVinted = txBuy
-      ? txBuy.filter(t => !pickupDone[String(t)]).length
-      : purchased.filter(o => atRelay(o.status) && !pickupDone[String(o.transaction_id)]).length;
+      ? txBuy.filter(t => !pickupDone[String(t)] && pasEnRetour(t)).length
+      : purchased.filter(o => atRelay(o.status) && !pickupDone[String(o.transaction_id)] && pasEnRetour(o.transaction_id)).length;
     // (23 oct.) LE NOMBRE DE L'APP, RELU AVEC LA RÈGLE PARTAGÉE AU MOMENT DE
     // L'AFFICHAGE (api/_lib/retrait-colis.js) : une date limite qui passe pendant
     // que l'app est fermée sort le colis du compte (« à vérifier »). Sans
@@ -864,7 +876,7 @@ export default async function handler(req, res) {
     const pubRetirer = retirerPublie(pubBrute, Date.now(), today, sortisDepuisPhoto(pubBrute, retiresMain, pickupDone, txBuy, suivisLus), leveDepuisTransp(suivisLus));
     const nouveauxEmail = pubRetirer ? await colisEmailDepuis(pubBrute, retiresMain, today, suivisLus, Array.isArray(bords) ? new Set(bords.map((b) => normSuivi(b && b.suivi)).filter(Boolean)) : null) : 0;
     const masques = new Set(Array.isArray(m.vinted_accounts_hidden) ? m.vinted_accounts_hidden.map(String) : []);
-    const nouveauxVinted = pubRetirer ? colisVintedDepuis(m.vrm_colis_retirer, txBuy, pickupDone, masques, today) : 0;
+    const nouveauxVinted = pubRetirer ? colisVintedDepuis(m.vrm_colis_retirer, txBuy, pickupDone, masques, today, enRetour) : 0;
     const pickup = pubRetirer ? pubRetirer.n + (nouveauxEmail || 0) + (nouveauxVinted || 0) : pickupVinted;
     // ── URGENCE D'EXPÉDITION : LA RÈGLE DE L'APP ET DES RAPPELS (22 octobre) ──
     // ⚠️ Elle sautait un bordereau IMPRIMÉ (« imprimer ne suffit pas », a

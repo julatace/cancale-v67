@@ -140,7 +140,7 @@ import { finDatee, texteSortie, sortiRecent, pourquoiPasLu, SORTIS_JOURS, jourCo
 import {arriveesRelues} from './arriveesRelues.js';
 import { preuveDeLigne } from '../api/_lib/etat-colis.js';
 import { urlQrDuColis } from '../api/_lib/qr-retrait.js';
-import {avecSuiviDuSujet,finsDesLignes,sortiParSuivis,sortiParSuivi,suiviDeLigne,lienSuivi,codePostalLu,nouvelleVinted,transporteurDeForme,colisInternational,suiviValide,TRANSPORTEURS_SAISIE,normaliserCodePostal,idSuiviManuel,relireLigneSuivi,finDeCommandeAchat,fusionTransporteur,ligneDuTransporteur,ligneDeSuiviTransporteur,leverGarde,SELECT_TRANSP_META,ligneTranspDeMeta,sensDeLigne,incidentDeSuivis,incidentDeLigne,repartiAffichable,nomTransporteurSuivi} from '../api/_lib/suivi-colis.js';
+import {avecSuiviDuSujet,finsDesLignes,sortiParSuivis,sortiParSuivi,suiviDeLigne,lienSuivi,codePostalLu,nouvelleVinted,transporteurDeForme,colisInternational,suiviValide,TRANSPORTEURS_SAISIE,normaliserCodePostal,idSuiviManuel,relireLigneSuivi,finDeCommandeAchat,txAchatsEnRetour,achatEnRetour,fusionTransporteur,ligneDuTransporteur,ligneDeSuiviTransporteur,leverGarde,SELECT_TRANSP_META,ligneTranspDeMeta,sensDeLigne,incidentDeSuivis,incidentDeLigne,repartiAffichable,nomTransporteurSuivi} from '../api/_lib/suivi-colis.js';
 import {ligneTransporteur,texteCodePostalMr,carrierLisible,carrierNonLu,nomTransporteur,LECTURE_SERVEUR_TRANSP,heureParis,indexTranspParSuivi,carrierLuDeLigne,noterLecturesServeur,lecturesCle} from '../api/_lib/transporteurs.js';
 // ⟦→ ecrans/Reglages.jsx #6⟧
 import PorteConfidentialite from './PorteConfidentialite.jsx';
@@ -7422,7 +7422,7 @@ const fetchRetoursAchat = () => {
   return c.vol;
 };
 const lireRetoursAchat = async (c) => {
-  const champs = ['transaction', 'suivi', 'dateLimite', 'dateLimiteIso', 'article', 'uid', 'account', 'receivedAt'].map((k) => `${k}:meta->>${k}`).join(',');
+  const champs = ['transaction', 'suivi', 'dateLimite', 'dateLimiteIso', 'article', 'uid', 'account', 'receivedAt', 'sens'].map((k) => `${k}:meta->>${k}`).join(',');
   const [b, r] = await Promise.all([
     lireTout(`id=like.email_bordretour_*&select=id,${champs},pdf:meta->>_pdf`, { strict: true }).catch(() => null),
     lireTout('id=like.email_rembachat_*&select=id,tx:meta->>transaction,montant:meta->>montant,estime:meta->>estime,at:meta->>receivedAt', { strict: true }).catch(() => null),
@@ -10596,7 +10596,7 @@ function phaseAchat(status) {
   if (/finalis|livr[ée]|termin|re[çc]u|complet|arriv/i.test(s)) return 'completed';
   return 'pending';
 }
-function etapeAchat(o, tk, { fini = false } = {}) {
+function etapeAchat(o, tk, { fini = false, retour = false } = {}) {
   const s = o.status || '';
   // ⚠️ « Retour initié » sur un ACHAT = litige, tu dois RENVOYER la paire.
   //    Testé AVANT « annulé/remboursé » : ce n'est pas une commande morte,
@@ -10611,6 +10611,8 @@ function etapeAchat(o, tk, { fini = false } = {}) {
   // dit « livré au destinataire » (même n° de suivi) est ARRIVÉ (`fini`, §11).
   if (/finalis/i.test(s) || tusDe(o) === 'completed') return { label: 'Arrivé', step: 4, color: C.muted };
   if (/commande\s+livr/i.test(s)) return { label: 'Arrivé', step: 4, color: C.muted };
+  // (15 nov.) Un bordereau de retour reçu pour CET achat (par son n°) : il l'a, il le renvoie — jamais « À retirer ».
+  if (retour) return { label: 'À renvoyer', step: 1, color: C.warn, retour: true };
   if (fini && (isAtRelayStatus(s) || (tk && tk.status === 'available'))) return { label: 'Arrivé', step: 4, color: C.muted, parTransporteur: true };
   if (isAtRelayStatus(s) || (tk && tk.status === 'available')) return { label: 'À retirer', step: 3, color: C.warn };
   if (/\blivr[ée]|remis\b|r[ée]ceptionn/i.test(s) || phaseAchat(s) === 'completed') return { label: 'Arrivé', step: 4, color: C.muted };
@@ -35104,7 +35106,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return { ...b, ko };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recusAchat, buys.items, buys.error, buys.failedUids, buysBase, accounts, hiddenAccts, panelAcctOff]);
-  const vintedToPickup = useMemo(() => buysBase.filter(o => isAtRelayStatus(o.status) && !pickupDone[String(o.transaction_id)]), [buysBase, pickupDone]);
+  // (15 nov., audit de fiabilité) UN ACHAT EN RETOUR N'EST JAMAIS « À RETIRER » : son bordereau de retour
+  // reçu par e-mail (par SON n° de transaction, api/_lib/suivi-colis.js `achatEnRetour`) prouve qu'il a le
+  // colis — sa carte vit dans « À renvoyer ». `auRelaisVus` garde TOUS les achats vus « au point relais »
+  // (la publication `vusTx` : le widget n'ajoute jamais un achat que l'app a vu, quelle que soit sa décision).
+  // Pas su (bordereaux pas lus) ⇒ rien n'est écarté.
+  const txRetourAchat = useMemo(() => txAchatsEnRetour(retoursAchatLus ? retoursAchatLus.bords : null), [retoursAchatLus]);
+  const auRelaisVus = useMemo(() => buysBase.filter(o => isAtRelayStatus(o.status) && !pickupDone[String(o.transaction_id)]), [buysBase, pickupDone]);
+  const vintedToPickup = useMemo(() => auRelaisVus.filter(o => !achatEnRetour(o, txRetourAchat)), [auRelaisVus, txRetourAchat]);
   // (23 oct.) LES ACHATS QUI PEUVENT RELIER UN COLIS D'E-MAIL À SA COMMANDE (le
   // n° de suivi lu dans la transaction, une identité, §5) : ceux au point relais
   // ET — seulement s'il y a un colis d'e-mail en attente — ceux achetés depuis
@@ -35203,7 +35212,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // un état terminal : 450 finalisée, ≥ 500 annulée, expédition « non réclamée ».
   // (revue du 23 oct., n° 3) La règle vit dans api/_lib/suivi-colis.js
   // (`finDeCommandeAchat`) : le rappel du matin la lit aussi (§11).
-  const finCommandeAchat = (o) => (o ? finDeCommandeAchat({ statut: o.status, etat: etatTxn(o.transaction_id), auRelais: isAtRelayStatus(String(o.status || '')) }) : null);
+  const finCommandeAchat = (o) => (o ? finDeCommandeAchat({ statut: o.status, etat: etatTxn(o.transaction_id), auRelais: isAtRelayStatus(String(o.status || '')), retour: achatEnRetour(o, txRetourAchat) }) : null);
   // (5 nov.) LES LIGNES DE SUIVI DES COLIS À RETIRER = les e-mails + les colis lus dans
   // ses comptes Mondial Relay (src/retraitQr.js), de la MÊME forme, reliés par le n° de
   // suivi seulement (§5). Toute la règle d'en dessous s'applique telle quelle (§11) :
@@ -35592,6 +35601,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const k = String(o.transaction_id || ''); if (!k) return false;
       const quand = pickupDone[k]; if (!quand) return false;          // pas coché
       if (!isAtRelayStatus(o.status)) return false;                   // Vinted a confirmé → plus rien à montrer
+      if (achatEnRetour(o, txRetourAchat)) return false;              // (15 nov.) en retour : sa carte est « À renvoyer »
       const j = (Date.now() - new Date(quand).getTime()) / 86400000;
       return isFinite(j) && j <= PICKUP_CONFIRM_DAYS;                 // au-delà, on n'attend plus
     });
@@ -35694,7 +35704,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
              prets: (emailList.length - sansCodeEmail) + (extra.length - sansCode),
              total: emailList.length + extra.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trackingRetrait, transp, collected, collectedAt, vintedToPickup, buysBase, pickupDone, colisRelais, indexSuivisAchats, suivisVinted, suivisEnvoyes, txSuivisColis, suivisManuels]);
+  }, [trackingRetrait, transp, collected, collectedAt, vintedToPickup, buysBase, pickupDone, colisRelais, indexSuivisAchats, suivisVinted, suivisEnvoyes, txSuivisColis, suivisManuels, txRetourAchat]);
   // (13 nov., lot 7 — Julien : « chaque colis à retirer porte le nom de la paire qui est dedans ») L'ACHAT D'UNE
   // LIGNE « À RETIRER », LE MÊME PARTOUT : la jonction de `pickupUnion` (conversation de SA commande, n° de suivi,
   // code de retrait — `cmdParColis`) et le n° de suivi seul (`achatDuColis`) doivent dire la même commande
@@ -35844,7 +35854,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const vus = [...new Set((tracking || []).filter(t => t && t.status === 'available').map(colisKey).filter(Boolean))].slice(0, 300);
       // `vusTx` : les achats Vinted vus « au point relais » (quelle que soit la
       // décision) — le widget n'ajoute que ceux d'une capture POSTÉRIEURE.
-      const vusTx = [...new Set(vintedToPickup.map(o => String(o.transaction_id)))].slice(0, 300);
+      // (15 nov.) Les achats EN RETOUR y restent (`auRelaisVus`) : écartés par l'app, jamais ajoutés par le widget.
+      const vusTx = [...new Set(auRelaisVus.map(o => String(o.transaction_id)))].slice(0, 300);
       // (23 oct.) + `finis` : les colis d'e-mail que l'app sait retirés ou
       // repartis (identité : n° de suivi) — le rappel du matin ne les annonce pas.
       // ⚠️ (revue du 23 oct., n° 3) Seulement quand ce qui RELIE un colis à sa
@@ -40493,7 +40504,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // lieu, le code et le QR de retrait (ils ne s'affichent qu'à l'étape 3) —
   // 4 achats ce jour-là. `phaseReception` avait déjà la parade ; l'étiquette
   // ne l'avait jamais reprise.
-  const achatStage = (o, tk) => etapeAchat(o, tk && tk.horsRetrait ? { ...tk, status: 'fini' } : tk, { fini: !!(o && pickupUnion.txFinis && pickupUnion.txFinis.has(String(o.transaction_id))) });   // la règle : niveau module (§11)
+  const achatStage = (o, tk) => etapeAchat(o, tk && tk.horsRetrait ? { ...tk, status: 'fini' } : tk, { fini: !!(o && pickupUnion.txFinis && pickupUnion.txFinis.has(String(o.transaction_id))), retour: achatEnRetour(o, txRetourAchat) });   // la règle : niveau module (§11)
   // Statut précis d'une VENTE (pour l'afficher clairement) : à expédier → en
   // transit → livrée → vendue (finalisée). Se base sur le texte Vinted + l'enum
   // machine transaction_user_status. N'affecte PAS la compta (classifyOrderStatus).
