@@ -150,7 +150,12 @@ conteneur qui défile n'est lue que sur sa partie visible.
   `design-passe-2` (délai dépassé) — aucun fichier de ce lot dans ces écrans.
 - `carte-orion-sans-onglet` : 2 rouges sous la charge (« cadre détourné » : la fausse page cachée « dès
   son chargement » — attente fixe de 150 ms) ; vert sur l'arbre de départ à charge plus basse. Aucune
-  logique de la carte n'est touchée (CSS seulement) : comparaison à charge égale à la fin de ce fichier.
+  logique de la carte n'est touchée (CSS seulement). **À charge égale (≈ 80)**, l'arbre de départ rougit
+  AUSSI sur « la fausse page est CACHÉE » (69/1) ; la branche y ajoute des délais (repli en 9,6 s, photo
+  expirée) — des minuteries fixes sous une charge de 75 à 90, pas une règle.
+- Dernier passage seul de `verre-extension-site --carte` (charge 75) : 33/33. Captures :
+  `/tmp/claude-0/-home-user-cancale-v67/31464966-7138-5129-91cc-9bcff32ecc28/scratchpad/verre/captures-finales/`
+  (hors dépôt) ; e-mails : `…/scratchpad/verre/mails/`.
 
 ## Gestes de Julien
 - Installer l'extension **5.386.0** (Chrome : remplacer le dossier puis ⟳ ; Orion : `VRM-Orion-dossier.zip`).

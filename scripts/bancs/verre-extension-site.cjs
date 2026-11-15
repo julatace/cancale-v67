@@ -147,7 +147,7 @@ async function mesurer(pg, atelier, { racine = 'carte', dpr = 1, cadres = [] } =
   const deuxImages = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   await pg.evaluate(deuxImages);
   for (const fr of cadres) await fr.frame.evaluate(deuxImages).catch(() => {});
-  await pg.waitForTimeout(250);
+  await pg.waitForTimeout(700);
   const png = await pg.screenshot({ animations: 'disabled', timeout: 120000 });
   await pg.evaluate(CACHER, { racineSel: racine === 'document' ? 'document' : 'carte', oui: false });
   for (const fr of cadres) await fr.frame.evaluate(CACHER, { racineSel: 'carte', oui: false }).catch(() => {});
