@@ -1,0 +1,93 @@
+/* ── LE STOCK EN ÉTAGÈRES (15 nov. 2026) ──────────────────────────────────────
+   Des meubles qu'il dessine comme les siens : une FORME (étagère, armoire, casier,
+   pile, bac), une COULEUR par meuble ou par case (la palette nommée de
+   src/stockEtageres.js : ciel, lagon, sauge, sable, terre, ardoise — jamais le rouge,
+   réservé au doublon de N°, jamais le violet), les colonnes en pile marquées ↓.
+   Le jour et la nuit : chaque couleur a sa teinte claire et sa teinte bleu-nuit.
+   Studio bleu clair : boutons aux quatre formes (sb-touche, sb-rond, sb-lien), 44 px
+   au doigt, accent rare. Rien de métier ici : aucune règle, aucun chiffre. */
+
+/* La palette : un fond (la case, le meuble) et un bord (les montants, la bande). */
+[data-couleur="ciel"]    { --etag-fond: #DCEBFA; --etag-bord: #6FA6DD; }
+[data-couleur="lagon"]   { --etag-fond: #D4EFEB; --etag-bord: #4FAEA4; }
+[data-couleur="sauge"]   { --etag-fond: #E2EDDA; --etag-bord: #84AC70; }
+[data-couleur="sable"]   { --etag-fond: #F3EAD7; --etag-bord: #C8A66C; }
+[data-couleur="terre"]   { --etag-fond: #EDE0D6; --etag-bord: #A6826D; }
+[data-couleur="ardoise"] { --etag-fond: #E2E7ED; --etag-bord: #8493A3; }
+:root[data-theme="dark"] [data-couleur="ciel"]    { --etag-fond: #1B3550; --etag-bord: #4D8CCB; }
+:root[data-theme="dark"] [data-couleur="lagon"]   { --etag-fond: #15403C; --etag-bord: #3F9D93; }
+:root[data-theme="dark"] [data-couleur="sauge"]   { --etag-fond: #263B22; --etag-bord: #6F9A5D; }
+:root[data-theme="dark"] [data-couleur="sable"]   { --etag-fond: #3D3322; --etag-bord: #B08F55; }
+:root[data-theme="dark"] [data-couleur="terre"]   { --etag-fond: #3A2C24; --etag-bord: #9A7562; }
+:root[data-theme="dark"] [data-couleur="ardoise"] { --etag-fond: #2A323C; --etag-bord: #7A8797; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) [data-couleur="ciel"]    { --etag-fond: #1B3550; --etag-bord: #4D8CCB; }
+  :root:not([data-theme="light"]) [data-couleur="lagon"]   { --etag-fond: #15403C; --etag-bord: #3F9D93; }
+  :root:not([data-theme="light"]) [data-couleur="sauge"]   { --etag-fond: #263B22; --etag-bord: #6F9A5D; }
+  :root:not([data-theme="light"]) [data-couleur="sable"]   { --etag-fond: #3D3322; --etag-bord: #B08F55; }
+  :root:not([data-theme="light"]) [data-couleur="terre"]   { --etag-fond: #3A2C24; --etag-bord: #9A7562; }
+  :root:not([data-theme="light"]) [data-couleur="ardoise"] { --etag-fond: #2A323C; --etag-bord: #7A8797; }
+}
+
+/* ── Le meuble ───────────────────────────────────────────────────────────── */
+.vrm-etag .vrm-s2d-tete { gap: 6px; }
+.vrm-etag-pastille { display: inline-block; flex: none; width: 14px; height: 14px; border-radius: 50%; background: var(--etag-fond, transparent); box-shadow: inset 0 0 0 2px var(--etag-bord, var(--vrm-line, #C7CDD4)); }
+.vrm-etag-pastille.vrm-etag-gomme { background: linear-gradient(135deg, transparent 45%, var(--vrm-muted, #6E6E73) 45%, var(--vrm-muted, #6E6E73) 55%, transparent 55%); }
+.vrm-etag-rond { width: 44px; height: 44px; min-width: 44px; display: inline-grid; place-items: center; padding: 0; }
+.vrm-etag-rond:disabled { opacity: .32; cursor: default; }
+/* Un meuble coloré : ses montants, son chapeau et son fond prennent sa couleur. */
+.vrm-etag[data-couleur] .vrm-s2d-etagere {
+  background: color-mix(in srgb, var(--etag-fond) 70%, var(--vrm-surface, #FFFFFF));
+  box-shadow: inset 6px 0 0 var(--etag-bord), inset -6px 0 0 var(--etag-bord), inset 0 6px 0 var(--etag-bord);
+}
+.vrm-etag[data-couleur] .vrm-s2d-planche, .vrm-etag[data-couleur] .vrm-s2d-socle { background: var(--etag-bord); }
+/* Les formes : une armoire a des montants épais, une pile est un empilement de boîtes,
+   un bac est un contenant, un casier serre ses cases. */
+.vrm-etag[data-meuble-type="armoire"] .vrm-s2d-etagere { padding: 12px 14px 0 8px; box-shadow: inset 9px 0 0 var(--etag-bord, color-mix(in srgb, var(--vrm-muted, #8E8E93) 45%, transparent)), inset -9px 0 0 var(--etag-bord, color-mix(in srgb, var(--vrm-muted, #8E8E93) 45%, transparent)), inset 0 9px 0 var(--etag-bord, color-mix(in srgb, var(--vrm-muted, #8E8E93) 45%, transparent)); }
+.vrm-etag[data-meuble-type="pile"] .vrm-s2d-etagere { box-shadow: none; background: transparent; padding-top: 4px; }
+.vrm-etag[data-meuble-type="pile"] .vrm-s2d-case { border-radius: 5px; }
+.vrm-etag[data-meuble-type="pile"] .vrm-s2d-case:not(.is-vide)::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 5px; z-index: 1; background: rgb(0 0 0 / .10); pointer-events: none; }
+.vrm-etag[data-meuble-type="bac"] .vrm-s2d-etagere { border-radius: 16px; box-shadow: inset 0 0 0 2px var(--etag-bord, color-mix(in srgb, var(--vrm-muted, #8E8E93) 45%, transparent)); padding-top: 8px; }
+.vrm-etag[data-meuble-type="casier"] .vrm-s2d-case { border-radius: 4px; }
+/* Une colonne en pile (quand le meuble ne l'est pas tout entier) : la règle le dit. */
+.vrm-s2d-regle[data-pile] { color: var(--sb-diode, var(--vrm-accent, #0060CC)); gap: 1px; }
+.vrm-etag-pile { font-style: normal; font-size: 10px; line-height: 1; }
+
+/* ── La case ─────────────────────────────────────────────────────────────── */
+.vrm-s2d-case.is-vide[data-couleur] { background: var(--etag-fond); box-shadow: inset 0 0 0 1.5px var(--etag-bord); }
+.vrm-s2d-case.is-vide[data-couleur] .vrm-s2d-plus { color: var(--etag-bord); opacity: 1; }
+.vrm-s2d-case[data-couleur]:not(.is-vide)::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 5px; z-index: 1; background: var(--etag-bord); pointer-events: none; }
+/* Une case prise par un N° qui n'est pas montré ici (compte écarté, lecture pas encore arrivée) : jamais « libre ». */
+.vrm-s2d-case.is-notee { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--vrm-muted, #8E8E93) 14%, transparent) 0 6px, transparent 6px 12px), var(--vrm-surface, #FFFFFF); }
+.vrm-s2d-num.vrm-etag-notee { background: color-mix(in srgb, var(--vrm-muted, #6E6E73) 75%, transparent); }
+/* Deux paires présentes sous ce N° : le SEUL rouge (§5, §7). */
+.vrm-s2d-case.is-double { box-shadow: 0 0 0 3px var(--sb-doublon, var(--vrm-doublon)); z-index: 2; }
+.vrm-s2d-case.is-double .vrm-s2d-num { background: var(--sb-doublon, var(--vrm-doublon)); color: #FFFFFF; }
+
+/* La dernière descente d'une pile, dite sur son meuble. */
+.vrm-etag-descente { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 2px 8px; padding: 6px 4px 6px 12px; border-radius: 12px; font-size: 14px; color: var(--vrm-ink, inherit); background: color-mix(in srgb, var(--sb-diode, #0060CC) 9%, transparent); }
+.vrm-etag-descente > span { flex: 1 1 180px; min-width: 0; line-height: 1.4; }
+.vrm-etag-descente .sb-lien { min-height: 44px; }
+
+/* ── L'éditeur ───────────────────────────────────────────────────────────── */
+.vrm-etag-titre { font-size: 13px; font-weight: 700; color: var(--vrm-muted, #6E6E73); margin-bottom: 7px; }
+.vrm-etag-choix { display: flex; flex-wrap: wrap; gap: 8px; }
+.vrm-etag-choix .sb-touche { min-height: 44px; min-width: 44px; padding: 0 14px; }
+.vrm-etag-choix .sb-touche[aria-pressed="true"] { box-shadow: var(--sb-enfonce, inset 0 1px 2px rgb(0 0 0 / .2)); color: var(--sb-diode, #0060CC); font-weight: 700; }
+.vrm-etag-defile { overflow-x: auto; overscroll-behavior-x: contain; flex-wrap: nowrap; padding-bottom: 4px; max-width: 100%; }
+.vrm-etag-stepper { display: flex; align-items: center; gap: 6px; }
+.vrm-etag-stepper .sb-touche { width: 44px; height: 44px; min-width: 44px; padding: 0; font-size: 20px; display: inline-grid; place-items: center; }
+.vrm-etag-stepper .sb-touche:disabled { opacity: .35; }
+.vrm-etag-stepper input { width: 64px; min-width: 0; height: 44px; box-sizing: border-box; text-align: center; font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; border-radius: 12px; border: 1px solid var(--vrm-line, #D6DCE3); background: var(--vrm-surface, #FFFFFF); color: var(--vrm-ink, inherit); -moz-appearance: textfield; appearance: textfield; }
+.vrm-etag-stepper input::-webkit-outer-spin-button, .vrm-etag-stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.vrm-etag-palette { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+.vrm-etag-pastille-btn { width: 44px; height: 44px; min-width: 44px; display: inline-grid; place-items: center; padding: 0; }
+.vrm-etag-pastille-btn .vrm-etag-pastille { width: 24px; height: 24px; }
+.vrm-etag-pastille-btn[aria-checked="true"] { box-shadow: 0 0 0 2px var(--sb-diode, #0060CC); }
+.vrm-etag-peindre { margin: 12px 0 8px; }
+.vrm-etag-toile { display: grid; gap: 4px; width: max-content; padding: 6px 2px; }
+.vrm-etag-toile .vrm-etag-regle { width: 44px; height: 44px; min-width: 44px; padding: 0; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.vrm-etag-toile-case { width: 44px; height: 44px; padding: 0; border: 0; border-radius: 6px; cursor: pointer; background: var(--etag-fond, var(--vrm-surface, #FFFFFF)); box-shadow: inset 0 0 0 1.5px var(--etag-bord, var(--vrm-line, #D6DCE3)); -webkit-tap-highlight-color: transparent; }
+.vrm-etag-toile-case[data-couleur-propre] { box-shadow: inset 0 0 0 2.5px var(--etag-bord); }
+.vrm-etag-toile-case:focus-visible, .vrm-etag-stepper input:focus-visible { outline: 2px solid var(--sb-diode, #0060CC); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .vrm-etag-descente { transition: none; } }

@@ -31,6 +31,7 @@
 
 import { placeCase } from './stockSortie.js';
 import { planchesCases } from './stockRegles.js';
+import { colonneEnPile } from './stockEtageres.js';   // (15 nov.) une colonne peut être en pile sans tout le meuble
 
 const estListe = Array.isArray;
 const estObjet = (o) => !!o && typeof o === 'object' && !Array.isArray(o);
@@ -69,7 +70,7 @@ export function caseProposable(m, i, prises) {
   if (!Number.isInteger(i) || i < 0 || i >= cols * rows) return false;
   const prise = (j) => prises.has(String(m.id) + ':' + j);
   if (prise(i)) return false;
-  if (m.gravite) {
+  if (m.gravite || colonneEnPile(m, (i % cols) + 1)) {
     const planches = planchesCases(m.planches, cols, rows);
     const r = Math.floor(i / cols), c = i % cols;
     const fond = r === rows - 1 || planches.has((r + 1) + ':' + (c + 1));

@@ -175,6 +175,28 @@ export function tasserPiles(slots, meubles) {
   return { slots: out, descentes };
 }
 
+// Seuls les meubles TOUCHÉS se tassent : une case vidée dans l'un ne fait rien bouger ailleurs.
+const dansMeubles = (meubles, ids) => { const set = new Set(ids.filter((x) => x != null).map(String)); return (Array.isArray(meubles) ? meubles : []).filter((m) => m && set.has(String(m.id))); };
+// Les meubles qu'une écriture des cases touche : une entrée posée, retirée ou déplacée
+// (son ancien ET son nouveau meuble), et ceux nommés (`ids` : un meuble qu'il vient de régler).
+export function meublesTouches(avant, apres, ids = []) {
+  const A = estObjet(avant) ? avant : {}, B = estObjet(apres) ? apres : {};
+  const out = new Set((Array.isArray(ids) ? ids : []).filter((x) => x != null).map(String));
+  for (const k of new Set([...Object.keys(A), ...Object.keys(B)])) {
+    const a = A[k], b = B[k];
+    if (a && b && String(a.m) === String(b.m) && Number(a.i) === Number(b.i)) continue;
+    if (a && a.m != null) out.add(String(a.m));
+    if (b && b.m != null) out.add(String(b.m));
+  }
+  return out;
+}
+// Une écriture des cases par SON geste : on tasse les meubles qu'elle touche. Rend { slots, descentes }.
+export function tasserApres(avant, apres, meubles, ids = []) {
+  const t = meublesTouches(avant, apres, ids);
+  if (!t.size) return { slots: apres, descentes: [] };
+  return tasserPiles(apres, dansMeubles(meubles, [...t]));
+}
+
 // Vider des cases (SON clic, ou une sortie PROUVÉE décidée ailleurs) puis tasser.
 // Rend { slots, sortis: [{ cle, m, i }], descentes }.
 export function sortirDeCases({ slots, meubles, cles } = {}) {
@@ -187,7 +209,7 @@ export function sortirDeCases({ slots, meubles, cles } = {}) {
     sortis.push({ cle: k, m: s && s.m != null ? String(s.m) : null, i: s ? Number(s.i) : null });
   }
   if (!sortis.length) return { slots, sortis, descentes: [] };
-  const t = tasserPiles(u, meubles);
+  const t = tasserPiles(u, dansMeubles(meubles, sortis.map((x) => x.m)));
   return { slots: t.slots, sortis, descentes: t.descentes };
 }
 
@@ -197,7 +219,7 @@ export function opsSortieCases({ slots, meubles, cles } = {}) {
   const S = estObjet(slots) ? slots : {};
   const r = sortirDeCases({ slots: S, meubles, cles });
   const ops = r.sortis.map((x) => ({ k: 'vrm_slots', type: 'cle', id: x.cle, apres: undefined, avant: S[x.cle] }));
-  for (const d of r.descentes) ops.push({ k: 'vrm_slots', type: 'cle', id: d.cle, apres: r.slots[d.cle], avant: S[d.cle] });
+  for (const d of r.descentes) ops.push({ k: 'vrm_slots', type: 'cle', id: d.cle, apres: r.slots[d.cle], avant: S[d.cle], crans: d.crans });
   return { ops, descentes: r.descentes };
 }
 
