@@ -156,7 +156,7 @@ export default function CreerSurVinted({ fiches = [], compteOnglet, extRaison = 
             o.etape('brouillon');
             o.noter(`N°${f.numero} : brouillon prêt sur Vinted${r.lie === false ? ' (N° pas relié : ' + (r.lienRaison || 'pas su') + ')' : ''}`, 'ok');
             setFaits((x) => ({ ...x, [f.id]: { draftId: String(r.draftId), aFinir: r.aFinir || [] } }));
-            try { if (onCree) onCree(f, r, compte.uid); } catch (_) {}
+            try { if (onCree) onCree(f, r, compte.uid, photos[f.id] || []); } catch (_) {}
             return { ...iss, lien: lienBrouillon(r.draftId) };
           }
           return iss;

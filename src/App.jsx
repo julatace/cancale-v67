@@ -488,7 +488,7 @@ import VisiteBulles from "./VisiteBulles.jsx";
 import { poserOutilsAccueil } from "./accueilReste/deps.js";
 import { AccueilResteJournee, VisiteEcranHote } from "./accueilReste/AccueilReste.jsx";
 import { retenirNumerosNeufs, clesLuesEnDouble } from "./accueilReste/cartonsNumeros.js";
-import { decisionRepublie, disparuesDuCompte, empreintesDe, majEmpreintesFiches, majAttente as majAttenteRepub, CLE_PHOTOS_VRM, CLE_EMPREINTES_FICHES, CLE_REPUB_REPONSES, CLE_REPUB_ATTENTE } from "./republieTelephone.js";
+import { ajouterAuRegistre, decisionRepublie, disparuesDuCompte, empreintesDe, majEmpreintesFiches, majAttente as majAttenteRepub, CLE_PHOTOS_VRM, CLE_EMPREINTES_FICHES, CLE_REPUB_REPONSES, CLE_REPUB_ATTENTE } from "./republieTelephone.js";
 import { numeroNeufPermis, lectureCompleteAnnonce, annoncesANumeroter, reserveEnDesaccord, marquerNouveau, marquerEcrit, aEcrireNouveaux, listeNumeros, demandesNumero, propositionNumero, modeNumerotation } from "./numerosNouvelles.js";
 import { publierSansNumero } from "./accueilReste/trouveChezToi.js";
 import { CLE_AIDES } from "./accueilReste/aides.js";
@@ -797,7 +797,7 @@ import { enLigneDeuxFois, texteCarte as texteEnLigneDeuxFois, raisonPasSu as rai
 import { useAvisBas, AvisBasDetail, titreAvisBas, detailAvisBas } from "./AvisNegatifJournee.jsx";   // (11 nov., lot avis-negatif) la carte « Avis 2★ reçu »
 import { LIGNE_AVIS_BAS, LIGNE_AVIS_BAS_VUS } from "./avisNegatif.js";
 // (11 nov., lot photos-comptes) La même PHOTO sur deux de ses comptes Vinted (empreintes de l'extension 5.358).
-import { annoncesPourPhotos, calculerPhotosComptes, publierPhotosComptes, cibleRepublier } from "./photosComptes.js";
+import { annoncesPourPhotos, calculerPhotosComptes, publierPhotosComptes, cibleRepublier, empreinteImageLocale } from "./photosComptes.js";
 import { PhotosEntreComptesDetail, textePhotosComptes } from "./PhotosEntreComptes.jsx";
 import { groupesParCompte, initialeCompte, remisesSurVignettes } from "./annoncesGrille.js";   // (10 nov., lot AM) Annonces en grille, par compte
 import { EnLigneDeuxFoisDetail, EnLigneDeuxFoisAlerte } from "./EnLigneDeuxFois.jsx";
@@ -4485,6 +4485,20 @@ function noterFicheVinted(f, champs, saisis = null) {
   emettreClesRelues(['vrm_fiches_neuves']);
   return true;
 }
+// (15 nov., src/republieTelephone.js) « Créer sur Vinted » : l'extension envoie les photos de la fiche SANS réglage
+// (`reglagesPhotoSurs(null)` : neutre, ré-encodées seulement) — l'empreinte de chaque photo que VRM a remise est
+// donc celle du fichier produit. Elle entre au registre `vrm_photos_vrm` avec le N° et l'annonce rendue (le
+// brouillon : son identifiant est celui de l'annonce publiée). Une photo illisible ici (CORS) n'entre pas.
+async function enregistrerPhotosProduites(photos, numero, src, uid) {
+  try {
+    if (!String(numero == null ? '' : numero).trim() || !Array.isArray(photos) || !photos.length) return;
+    const entrees = [];
+    for (const u of photos.slice(0, 8)) { const h = await empreinteImageLocale(u); if (h) entrees.push({ h, n: String(numero), src: String(src || ''), uid: String(uid || '') }); }
+    if (!entrees.length) return;
+    const r = ajouterAuRegistre(load(CLE_PHOTOS_VRM, {}), entrees);
+    if (r) save(CLE_PHOTOS_VRM, r);
+  } catch (_) {}
+}
 function FeuilleCreerVinted({ fiches, onFermer, onFait = null, saisie = false }) {
   const vc = vintedDeChrome();
   const rx = raisonExtGlobale(false, { cap: 'creervinted', role: 'prépare tes annonces sur Vinted' });
@@ -4492,7 +4506,7 @@ function FeuilleCreerVinted({ fiches, onFermer, onFait = null, saisie = false })
     extRaison={rx ? rx.texte : ''} reglages={{ etiquette: load('vrm_num_vinted', null), numeroEcrit: load('vrm_numero_ecrit', null) }}
     envoyer={(p) => vmrCmdSuivi(p, 480000)} saisie={saisie}
     onSaisie={(f, t) => { noterFicheVinted(f, null, t); if (onFait) onFait(); }}
-    onCree={(f, r, uid) => { noterFicheVinted(f, { draftId: String(r.draftId), uid: String(uid), at: new Date().toISOString() }, f); if (onFait) onFait(); }}
+    onCree={(f, r, uid, photos) => { noterFicheVinted(f, { draftId: String(r.draftId), uid: String(uid), at: new Date().toISOString() }, f); enregistrerPhotosProduites(photos, f.numero, r.draftId, uid); if (onFait) onFait(); }}
     onFermer={onFermer} Retour={FermeAuRetour}/>;
 }
 // (intégration 11nov-g2) « Achetés, pas en ligne » → « Créer sur Vinted » : la fiche « À publier » de CE N°
