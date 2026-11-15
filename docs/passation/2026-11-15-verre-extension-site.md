@@ -53,8 +53,9 @@ ramenés à 16 % pour que le blanc du titre garde l'AA partout.
   iPhone compris) ; titres, chiffre et phrases du haut en blanc ; tuiles des fonctions, panneaux,
   offre Solo, calculateur du temps gagné, questions et plaque de fin sur du verre (texte à l'encre) ;
   l'offre Pro garde sa carte d'encre ; barre du haut en verre BLEU quand on défile. Un seul plein par
-  vue : « Essayer gratuitement » blanc sur le bleu (la touche « Découvrir avec des exemples » : du
-  verre à l'encre). Contenu, captures, prix : inchangés.
+  vue : « Essayer gratuitement » blanc sur le bleu ; la touche « Découvrir avec des exemples » est du
+  verre FUMÉ (fond bleu-nuit translucide, mot blanc, bord blanc) — un verre clair comptait comme un
+  second plein ; posée sur une plaque (la fin de page), elle redevient la porcelaine à l'encre. Contenu, captures, prix : inchangés.
 - **Tarifs** (`src/design/studio-reste-public.css`, bloc final) : la même chose (offres, tableau,
   frise, cartes sur verre ; Pro sur l'encre).
 - **Pages légales** (`public/legal/legal.css`), **centre d'aide** (`public/aide/aide.css`), **la
@@ -65,6 +66,40 @@ ramenés à 16 % pour que le blanc du titre garde l'AA partout.
 - **Image de partage** (`scripts/accueil-og.cjs` → `public/og-vrm.jpg`) : refaite au dégradé, la
   promesse en blanc, « vrm.center » sur le plein blanc ; même capture du mode exemple, mêmes mots.
 - L'écran de connexion (`AuthScreen`, dans `src/App.jsx`) vit dans l'app : laissé à `claude/verre-app`.
+
+### Les e-mails (ajout du coordinateur : « intègre les e-mails à l'agent design »)
+- **Une forme commune** : `api/_lib/mail-verre.js` (jetons `VERRE`, `styleVerre`, `teteVerre`,
+  `boutonVerre`, `codeVerre`, `enveloppeVerre`). Un e-mail n'a pas de `backdrop-filter` : le verre se
+  rend par un FOND bleu profond (couleur unie `#174C88` — ce que montre une boîte qui retire les images
+  de fond — et le dégradé en image de fond), le logo HÉBERGÉ (`https://vrm.center/vrm-logo-v5-192.png`,
+  jamais en base64) + le mot « VRM », le TITRE en blanc sur le bleu, une CARTE blanche arrondie (22) à
+  l'ombre douce où le texte est à l'encre, UN plein d'encre de 48 px, le pied en clair sur le bleu.
+  Tableaux, styles en ligne, 600 px (table fantôme d'Outlook), Inter puis la police du système, aucune
+  feuille externe ; sombre par `prefers-color-scheme` ET `[data-ogsc]`/`[data-ogsb]` (bleu-nuit, carte
+  `#0E2139`, texte clair, plein blanc).
+- **Les e-mails de VRM** (`api/_lib/mail-gabarit.js`, `gabaritMail` — même contrat d'appel) : essai
+  j1/j3/j6, bilan du mois, preuve d'adresse, facture Pro (le NOM de la boutique en tête, rien de VRM, ni
+  logo), essai de la boîte des factures, e-mail d'essai, suppression prévue / faite, fin d'abonnement.
+  Contenu, liens, échappement, pied (« ne plus recevoir », « Gérer mes e-mails », éditeur seulement
+  s'il est rempli) : inchangés.
+- **Les six modèles de compte Supabase** (`supabase/templates/*.html` + `sujets.json`, fabriqués par
+  `node scripts/modeles-email.cjs --ecrire`) : la même forme ; un document entier par langue
+  (`{{ if $en }}…{{ else }}…{{ end }}`, `lang` juste) ; le code `{{ .Token }}` EN GRAND (38 px, chiffres
+  espacés par l'interlettrage, sélectionnable). Variables vérifiées contre la doc Supabase (Auth → Email
+  Templates) : `{{ .ConfirmationURL }}`, `{{ .Token }}`, `{{ .TokenHash }}` (récupération, page
+  `recuperation.html`), `{{ .Email }}`, `{{ .NewEmail }}` (changement d'adresse seulement),
+  `.Data.langue`. **PAS collés dans Supabase** (geste de Julien, avec sa clé) : Authentication → Emails →
+  Templates, un onglet par fichier (`sujets.json` donne l'onglet et le sujet).
+- Preuves : **`scripts/audit-emails-verre.cjs --prouve`** EXÉCUTE chaque gabarit (11 e-mails de VRM + 6
+  modèles × fr/en) : forme commune telle quelle (F1), un plein (F2), styles en ligne et 600 px (F3),
+  logo hébergé seulement (F4), < 100 Ko (F5, le plus lourd : ~16 Ko), sombre (F6), variables Supabase et
+  code en grand (F7), contrastes AA des jetons (F8 : encre/blanc 17,0 · gris 7,8 · lien 7,0 · titre blanc
+  sur le bleu 8,7 (haut du dégradé 6,7) · pied 6,7 (5,1) · nuit 14,4 / 8,3 / 7,4 / 11,5), aucun violet
+  (F9) ; 12 mutations, toutes vues. `audit-modeles-email --prouve` (rendu par le vrai moteur de Go,
+  10 mutations) et `audit-mails-envoyes` (92/0) passés à la nouvelle forme (leurs contrôles « bouton bleu
+  Apple 44 px / 520 px / aucune image » jugent désormais la forme commune).
+- Rendus : `node scripts/mails-apercus.cjs <dossier>` (24 e-mails dont les 12 modèles Supabase fr/en ;
+  390 et 600, clair et sombre, et 600 SANS IMAGES).
 
 ## Preuves
 

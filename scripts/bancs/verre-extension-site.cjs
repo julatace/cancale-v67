@@ -82,8 +82,10 @@ const COLLECTER = (racineSel) => {
       }
       if (v.r - v.l < q.width * 0.7 || v.b - v.t < q.height * 0.7) continue;
       const cx = q.left + q.width / 2, cy = q.top + q.height / 2;
-      const haut = (racine.elementFromPoint ? racine.elementFromPoint(cx, cy) : document.elementFromPoint(cx, cy));
-      if (!haut || !(el.contains(haut) || haut.contains(el))) continue;   // caché sous autre chose (défilement, recouvrement)
+      // Caché sous autre chose (une barre collante, un recouvrement) : le haut, le centre ET le bas du texte
+      // doivent être le texte lui-même — une ligne à moitié sous la barre du haut n'est pas jugée.
+      const ici = (x, yy) => { const h = racine.elementFromPoint ? racine.elementFromPoint(x, yy) : document.elementFromPoint(x, yy); return !!h && (el.contains(h) || h.contains(el)); };
+      if (!ici(cx, cy) || !ici(cx, Math.max(v.t, q.top) + 1.5) || !ici(cx, Math.min(v.b, q.bottom) - 1.5)) continue;
       out.push({ x: v.l, y: v.t, w: v.r - v.l, h: v.b - v.t, c: cs.color, fs: parseFloat(cs.fontSize), fw: Number(cs.fontWeight) || 400, t: t.slice(0, 48) });
     }
   }
@@ -111,7 +113,8 @@ async function analyser(atelier, png, runs, dpr) {
     const coul = (s) => { const m = /rgba?\(([\d.]+),? ([\d.]+),? ([\d.]+)(?:,? ?\/? ?([\d.]+))?/.exec(s) || /color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)(?: \/ ([\d.]+))?/.exec(s); if (!m) return null; let [r, g, b] = [Number(m[1]), Number(m[2]), Number(m[3])]; if (/srgb/.test(s)) { r *= 255; g *= 255; b *= 255; } return { r, g, b, a: m[4] == null ? 1 : Number(m[4]) }; };
     return runs.map((u) => {
       const tc = coul(u.c); if (!tc) return Object.assign({}, u, { ratio: null });
-      const x0 = Math.max(0, Math.floor(u.x * dpr)), y0 = Math.max(0, Math.floor(u.y * dpr)), w = Math.max(1, Math.floor(u.w * dpr)), h = Math.max(1, Math.floor(u.h * dpr));
+      // La boîte d'une ligne porte l'interligne au-dessus et au-dessous : on lit son cœur (70 % de la hauteur).
+      const x0 = Math.max(0, Math.floor(u.x * dpr)), y0 = Math.max(0, Math.floor((u.y + u.h * 0.15) * dpr)), w = Math.max(1, Math.floor(u.w * dpr)), h = Math.max(1, Math.floor(u.h * 0.7 * dpr));
       const d = cx.getImageData(x0, y0, Math.min(w, cv.width - x0), Math.min(h, cv.height - y0)).data;
       const pas = Math.max(1, Math.floor(Math.sqrt((d.length / 4) / 300)));
       const rs = [];
@@ -149,7 +152,7 @@ async function mesurer(pg, atelier, { racine = 'carte', dpr = 1, cadres = [] } =
   await pg.evaluate(CACHER, { racineSel: racine === 'document' ? 'document' : 'carte', oui: false });
   for (const fr of cadres) await fr.frame.evaluate(CACHER, { racineSel: 'carte', oui: false }).catch(() => {});
   const res = await analyser(atelier, png, runs, dpr);
-  return { n: res.length, faibles: res.filter((u) => u.ratio != null && u.ratio < u.seuil), min: res.reduce((m, u) => (u.ratio != null && u.ratio < m ? u.ratio : m), 99) };
+  return { png, n: res.length, faibles: res.filter((u) => u.ratio != null && u.ratio < u.seuil), min: res.reduce((m, u) => (u.ratio != null && u.ratio < m ? u.ratio : m), 99) };
 }
 const resumeFaibles = (f) => f.slice(0, 8).map((u) => `« ${u.t} » ${u.ratio}:1 < ${u.seuil} (${u.c}, ${u.fs}px)`).join(' · ');
 
@@ -409,20 +412,7 @@ async function partieSite(nav, atelier) {
         dit(bleuProfond(coin) && bleuProfond(coinBas) && (bleuVif(coin) || bleuVif(coinBas)), `${T} : S le fond de la page est le bleu profond (haut ${coin}, bas ${coinBas})`);
         dit(v.plaques >= 1 && v.verre === v.plaques, `${T} : S les sections sont des plaques de verre (${v.verre}/${v.plaques})`);
         if (P.phare) dit(v.phare === 'rgb(255, 255, 255)', `${T} : S le titre phare est BLANC sur le bleu (${v.phare})`);
-        // S : AA de chaque texte, écran par écran, toute la page.
-        const Ht = await pg.evaluate(() => document.documentElement.scrollHeight);
-        let faibles = [], n = 0, min = 99, ecrans = 0;
-        for (let y = 0; y < Ht && ecrans < 14; y += Math.round(hauteur * 0.85), ecrans++) {
-          await pg.evaluate((y) => window.scrollTo(0, y), y); await pg.waitForTimeout(160);
-          const m = await mesurer(pg, atelier, { racine: 'document', dpr: 1 });
-          n += m.n; min = Math.min(min, m.min); faibles = faibles.concat(m.faibles.map((u) => Object.assign(u, { t: u.t + ` @${y}` })));
-          if (y === 0) fs.writeFileSync(path.join(SORTIE, `site-${P.nom}-${largeur}-${scheme === 'light' ? 'clair' : 'sombre'}.png`), await pg.screenshot());
-        }
-        // Dédoublonné (un texte vu sur deux écrans).
-        const vus = new Set(); faibles = faibles.filter((u) => { const k = u.t.replace(/ @\d+$/, ''); if (vus.has(k)) return false; vus.add(k); return true; });
-        dit(n >= 10 && faibles.length === 0, `${T} : S contraste AA de chaque texte visible (${n} mesures sur ${ecrans} écrans, le plus faible ${min}:1)`, resumeFaibles(faibles));
         if (P.nom === 'accueil') {
-          await pg.evaluate(() => window.scrollTo(0, 0)); await pg.waitForTimeout(200);
           const pleins = await pg.evaluate((H) => {
             const lumDe = (s) => { const m = /rgba?\((\d+), (\d+), (\d+)(?:, ([\d.]+))?/.exec(s || ''); if (!m) return null; return { l: (Number(m[1]) * 0.2126 + Number(m[2]) * 0.7152 + Number(m[3]) * 0.0722) / 255, a: m[4] == null ? 1 : Number(m[4]) }; };
             const page = lumDe(getComputedStyle(document.querySelector('[data-accueil]')).backgroundColor) || { l: 1 };
@@ -430,6 +420,19 @@ async function partieSite(nav, atelier) {
           }, hauteur);
           dit(pleins.length === 1 && pleins[0] === 'inscription', `${T} : S un seul bouton plein au premier écran : « Essayer gratuitement »`, JSON.stringify(pleins));
         }
+        // S : AA de chaque texte, écran par écran, toute la page.
+        const Ht = await pg.evaluate(() => document.documentElement.scrollHeight);
+        let faibles = [], n = 0, min = 99, ecrans = 0;
+        for (let y = 0; y < Ht && ecrans < 14; y += Math.round(hauteur * 0.85), ecrans++) {
+          await pg.evaluate((y) => window.scrollTo(0, y), y); await pg.waitForTimeout(160);
+          const m = await mesurer(pg, atelier, { racine: 'document', dpr: 1 });
+          if (m.faibles.length && process.env.BANC_DEBUG) fs.writeFileSync(path.join(SORTIE, `debug-${P.nom}-${largeur}-${scheme}-${y}.png`), m.png), console.log('     debug', y, JSON.stringify(m.faibles.slice(0, 3).map((u) => [u.t, u.x, u.y, u.w, u.h, u.ratio])));
+          n += m.n; min = Math.min(min, m.min); faibles = faibles.concat(m.faibles.map((u) => Object.assign(u, { t: u.t + ` @${y}` })));
+          if (y === 0) fs.writeFileSync(path.join(SORTIE, `site-${P.nom}-${largeur}-${scheme === 'light' ? 'clair' : 'sombre'}.png`), await pg.screenshot());
+        }
+        // Dédoublonné (un texte vu sur deux écrans).
+        const vus = new Set(); faibles = faibles.filter((u) => { const k = u.t.replace(/ @\d+$/, ''); if (vus.has(k)) return false; vus.add(k); return true; });
+        dit(n >= 10 && faibles.length === 0, `${T} : S contraste AA de chaque texte visible (${n} mesures sur ${ecrans} écrans, le plus faible ${min}:1)`, resumeFaibles(faibles));
         const deb = await pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
         dit(deb <= 1 && erreurs.length === 0, `${T} : rien ne déborde, aucune erreur de page`, `${deb} px · ${erreurs.join(' | ')}`);
         await ctx.close();
