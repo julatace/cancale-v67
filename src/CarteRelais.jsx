@@ -510,7 +510,7 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
           <span className="vrm-rpf-comptoir" data-rp-comptoir="">
             {x.code && !desaccord ? <span className="va-code-lib">{trVA('va.code.lib')}</span> : null}
             {desaccord ? <span className="vrm-rpf-code-gros is-ambre" data-rp-code-visible="desaccord" data-rp-code-desaccord="">2 codes</span>
-              : x.code ? <span className="vrm-rpf-code-gros sb-plaque sb-plaque--grande" data-rp-code-visible={x.code}>{x.code}{x.code2 ? <span className="vrm-rpf-code2"> · {x.code2}</span> : null}</span>
+              : x.code ? <span className="vrm-rpf-code-gros sb-plaque sb-plaque--grande" data-rp-code-visible={x.code}>{/* (15 nov., verre) un chiffre par case à l’ordinateur (maquette), le texte du code inchangé */}{String(x.code).split('').map((c, i) => <i key={i} className="va-c">{c}</i>)}{x.code2 ? <span className="vrm-rpf-code2"> · {x.code2}</span> : null}</span>
               : (x.qr ? <span className="vrm-rpf-code-gros is-qr" data-rp-code-visible="qr">QR</span>
               : <span className="vrm-rpf-code-venir" data-rp-code-a-venir="" data-rp-code-ou={codeSurVinted ? 'vinted' : 'email'}>{sansCodeCourt}</span>)}
             {/* Le QR : une petite icône à côté du code, au doigt ⇒ le QR en grand (le reste de la ligne ouvre la fiche). */}

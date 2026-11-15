@@ -331,4 +331,19 @@
 
 /* Le lien « Vinted » d'une carte « À renvoyer » est posé sur le VERRE : l'encre du lien, plus le blanc du fond (4,5:1). */
 :root:root:root:root:root:root:root:root body .vrm-ret-carte .vrm-ret-lien { color: var(--sv-lien) !important; }
+
+/* ── 10. ACHATS À L'ORDINATEUR (maquette achats-1512 / 1280) : les codes à retirer en colonne à gauche, un chiffre par
+   case ; les achats à droite. Le rail est celui de la coque (claude/refonte-journee). ── */
+:root:root:root:root:root:root:root:root body .vrm-rpf-code-gros .va-c { font-style: normal !important; }
+@media (min-width: 1100px) {
+  :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] { display: grid !important; grid-template-columns: minmax(360px, 440px) minmax(0, 1fr) !important; column-gap: 20px !important; row-gap: 0 !important; align-items: start !important; }
+  :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] > * { grid-column: 1 / -1 !important; min-width: 0 !important; }
+  :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] > .vrm-achats-retirer-repli[data-retirer-repli="ouvert"] { grid-column: 1 !important; grid-row: 3 / 40 !important; }
+  :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"]:has(> .vrm-achats-retirer-repli[data-retirer-repli="ouvert"]) > .vrm-achats-retirer-repli ~ * { grid-column: 2 !important; }
+  :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] .vrm-rpf-code-gros.sb-plaque--grande { display: flex !important; gap: 6px !important; letter-spacing: 0 !important; min-height: 62px !important; margin: 6px 0 4px !important; }
+  :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] .vrm-rpf-code-gros .va-c {
+    width: 44px !important; height: 62px !important; border-radius: 12px !important; display: grid !important; place-items: center !important; background: #FFFFFF !important;
+    border: 1px solid rgb(12 29 48 / .14) !important; box-shadow: 0 2px 0 rgb(12 29 48 / .06) !important; font: 750 34px/1 Inter, system-ui, sans-serif !important; color: #0C1D30 !important;
+  }
+}
 }
