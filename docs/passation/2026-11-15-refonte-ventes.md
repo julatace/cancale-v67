@@ -122,4 +122,12 @@ est inchangé : `<i class="va-c">` par caractère dans `.vrm-rpf-code-gros`) ; l
   ≥ 48 (56 dans la maquette, plus ≥ 80), le plein est la barre (plus le rond d'encre 72), les tuiles-filtres se
   jugent après « … », les rangées à quatre lignes ≤ 112 px au téléphone, le contraste se juge sur le BLEU du verre
   (sa fonction venait du studio bleu clair : sur l'arbre de départ il était déjà rouge, 3 rouges).
-- Les bancs demandés, résultats dans le rapport de session.
+- Résultats (dist construit après les fusions de `origin/claude/project-review-nsk5su`, `origin/claude/refonte-journee`
+  — le rail commun — et `origin/claude/achats-liaison`) : **ventes-verre 70 verts · studio-ventes 96 verts · garde-ecrans
+  vert** ; passe précédente (même code Ventes/Achats) : impression-simple 57 conformes, tout-imprimer 28, achats-retirer-visible
+  54, retours-renvoyer vert, retours-suivi vert, vestiaire-ventes 68, accompagnement vert ; verre 677 ✅ · 3 ❌ (deux « Lecture
+  en cours… » de Toutes les ventes, corrigés ensuite ici et sur la base ; « Choisis un e-mail » d'E-mails, pas de ce lot).
+- Rouges hérités, pas de ce lot : `audit-traduction` (clés `sortir.*` de refonte-journee : variables `{e}` absentes des
+  traductions) et `audit-quoi-de-neuf` (deux lignes de refonte-journee trop longues, « la carte en haut de Ma journée »).
+- Piège de fusion : refonte-journee importe aussi un `emplacementDe` (src/paireASortir.js) ⇒ celui de src/ventesVerre.js est
+  importé sous le nom `emplacementVente`.
