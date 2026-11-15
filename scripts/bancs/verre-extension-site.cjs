@@ -148,7 +148,7 @@ async function mesurer(pg, atelier, { racine = 'carte', dpr = 1, cadres = [] } =
   await pg.evaluate(deuxImages);
   for (const fr of cadres) await fr.frame.evaluate(deuxImages).catch(() => {});
   await pg.waitForTimeout(250);
-  const png = await pg.screenshot({ animations: 'disabled' });
+  const png = await pg.screenshot({ animations: 'disabled', timeout: 120000 });
   await pg.evaluate(CACHER, { racineSel: racine === 'document' ? 'document' : 'carte', oui: false });
   for (const fr of cadres) await fr.frame.evaluate(CACHER, { racineSel: 'carte', oui: false }).catch(() => {});
   const res = await analyser(atelier, png, runs, dpr);
@@ -275,7 +275,7 @@ async function partieCarte(nav, atelier) {
         await clicCarte(t.pg, '[data-onglet-b="ventes"]');
         const b = await boiteCarte(t.pg);
         const dpr = mobile ? 2 : 1;
-        prises[fond] = { png: await t.pg.screenshot(), b, dpr };
+        prises[fond] = { png: await t.pg.screenshot({ timeout: 120000 }), b, dpr };
         const nomFond = fond === '#ffffff' ? 'page-blanche' : 'page-noire';
         fs.writeFileSync(path.join(SORTIE, `carte-${largeur}-${scheme === 'light' ? 'clair' : 'sombre'}-${nomFond}.png`), prises[fond].png);
         if (fond === '#ffffff') {
@@ -286,7 +286,7 @@ async function partieCarte(nav, atelier) {
           // C1 : le fond, contenu caché.
           await t.pg.evaluate(() => { const s = document.createElement('style'); s.setAttribute('data-banc-fond', ''); s.textContent = '.carte > *, .question > * { visibility: hidden !important; }'; window.__racine.appendChild(s); });
           await t.pg.waitForTimeout(50);
-          const nu = await t.pg.screenshot();
+          const nu = await t.pg.screenshot({ timeout: 120000 });
           await t.pg.evaluate(() => { const s = window.__racine.querySelector('[data-banc-fond]'); if (s) s.remove(); });
           const cxm = (b.x + b.w / 2) * dpr;
           const [hautP, basP] = await lirePixels(atelier, nu, [[cxm, (b.y + 14) * dpr], [cxm, (b.y + b.h - 14) * dpr]]);
@@ -331,7 +331,7 @@ async function partieCarte(nav, atelier) {
       if (!orion) { const el = await t.pg.evaluateHandle(() => window.__racine.querySelector('.connexion iframe')); const fr = t.pg.frames().find((x) => /ext\.test\/popup\.html\?mode=carte/.test(x.url())); if (fr && el) cadres.push({ el: el.asElement(), frame: fr }); }
       const m = await mesurer(t.pg, atelier, { dpr: 2, cadres });
       dit(m.n >= 5 && m.faibles.length === 0, `${T} : C6 contraste AA du formulaire (${m.n} textes${cadres.length ? ', cadre compris' : ''}, le plus faible ${m.min}:1)`, resumeFaibles(m.faibles));
-      fs.writeFileSync(path.join(SORTIE, `connexion-${nom}-${scheme === 'light' ? 'clair' : 'sombre'}.png`), await t.pg.screenshot());
+      fs.writeFileSync(path.join(SORTIE, `connexion-${nom}-${scheme === 'light' ? 'clair' : 'sombre'}.png`), await t.pg.screenshot({ timeout: 120000 }));
       await t.ctx.close();
     });
   }
@@ -350,7 +350,7 @@ async function partieFenetre(nav, atelier) {
       await t.pg.waitForTimeout(300);
       const fond = await t.pg.evaluate(() => { const b = getComputedStyle(document.body); const a = getComputedStyle(document.getElementById('auth')); return { img: b.backgroundImage, flou: a.backdropFilter || a.webkitBackdropFilter || 'none', bg: a.backgroundColor }; });
       dit(/linear-gradient/.test(fond.img) && /blur/.test(fond.flou), `${T} : F le fond de la fenêtre est le dégradé, la connexion sur une plaque de verre`, JSON.stringify(fond));
-      const nu = await t.pg.screenshot();
+      const nu = await t.pg.screenshot({ timeout: 120000 });
       const [p] = await lirePixels(atelier, nu, [[8, 8]]);
       dit(bleuProfond(p) && bleuVif(p), `${T} : F le bleu profond se voit autour de la plaque (${p})`);
       const m = await mesurer(t.pg, atelier, { racine: 'document', dpr: 1 });
@@ -401,7 +401,7 @@ async function partieSite(nav, atelier) {
         await pg.evaluate(() => document.fonts && document.fonts.ready);
         await pg.waitForTimeout(700);
         // S1 : le fond est le bleu profond (pixel du coin, sous rien).
-        const png0 = await pg.screenshot();
+        const png0 = await pg.screenshot({ timeout: 120000 });
         const [coin, coinBas] = await lirePixels(atelier, png0, [[2, 2], [2, hauteur - 3]]);
         const v = await pg.evaluate(({ plaques, phare }) => {
           const els = Array.from(document.querySelectorAll(plaques)).filter((e) => e.getClientRects().length);
@@ -428,7 +428,7 @@ async function partieSite(nav, atelier) {
           const m = await mesurer(pg, atelier, { racine: 'document', dpr: 1 });
           if (m.faibles.length && process.env.BANC_DEBUG) fs.writeFileSync(path.join(SORTIE, `debug-${P.nom}-${largeur}-${scheme}-${y}.png`), m.png), console.log('     debug', y, JSON.stringify(m.faibles.slice(0, 3).map((u) => [u.t, u.x, u.y, u.w, u.h, u.ratio])));
           n += m.n; min = Math.min(min, m.min); faibles = faibles.concat(m.faibles.map((u) => Object.assign(u, { t: u.t + ` @${y}` })));
-          if (y === 0) fs.writeFileSync(path.join(SORTIE, `site-${P.nom}-${largeur}-${scheme === 'light' ? 'clair' : 'sombre'}.png`), await pg.screenshot());
+          if (y === 0) fs.writeFileSync(path.join(SORTIE, `site-${P.nom}-${largeur}-${scheme === 'light' ? 'clair' : 'sombre'}.png`), await pg.screenshot({ timeout: 120000 }));
         }
         // Dédoublonné (un texte vu sur deux écrans).
         const vus = new Set(); faibles = faibles.filter((u) => { const k = u.t.replace(/ @\d+$/, ''); if (vus.has(k)) return false; vus.add(k); return true; });

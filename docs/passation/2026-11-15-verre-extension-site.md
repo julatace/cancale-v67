@@ -114,4 +114,47 @@ conteneur qui défile n'est lue que sur sa partie visible.
   (390 et 1512, clair et sombre) : fond, plaques, titre blanc, AA de chaque texte en défilant toute la
   page, un seul plein au premier écran.
 
-RÉSULTATS : voir la fin de ce fichier.
+### Résultats (machine saturée : charge 40 à 80 pendant toute la session)
+- **`verre-extension-site`** sur la branche : `--carte` 33/33 (390 et 1512, clair et sombre ; C3 écart 0 pixel
+  page blanche / page noire ; texte de la carte le plus faible 5,6:1 le jour, 7,0:1 la nuit ; formulaire de
+  connexion iframe et dessiné ≥ 4,7:1), `--fenetre` 6/6 (5,7:1 et 7,9:1), `--site` 86/86 (accueil, tarifs,
+  CGV, aide, confiance ; le texte le plus faible de tout le site : 4,87:1). Un `page.screenshot` a expiré
+  une fois sous la charge (relancé seul : voir la fin).
+- **Sur l'arbre de départ** (`git archive origin/claude/project-review-nsk5su`, son propre build) :
+  **78 rouges sur 125** (aucun dégradé, aucun verre, fond clair, titre à l'encre ; et des contrastes déjà
+  sous l'AA : « extension 5.381.0 » 3,75:1 sur la carte claire, « Me connecter » 3,65:1 et « Mot de passe
+  oublié ? » 4,21:1 dans la fenêtre, « Se connecter » 3,62:1 sur l'accueil).
+- **Mutations** : carte translucide sans dégradé ⇒ 12 rouges (C1, C3 écart 102, C4) ; gris trop pâle
+  `#8A9AAD` sur le verre ⇒ 4 rouges (C4, C6 : 2,38:1).
+- `audit-emails-verre` : vert ; sur l'arbre de départ (avec la seule forme commune copiée) : 176 fautes.
+- Bancs existants verts : `carte-extension` 72, `carte-favoris` 79, `carte-listes` 72, `carte-logo-boutique`
+  59, `carte-resume-mois` 63, `lbc-clair-carte` 136, `lbc-orion-page` 102, `badge` 144, `extension-visuel`
+  63, `site-public` 93, `exemple-accueil`, `accueil-temps` 44, `partenaires-ecran` 104, `ouverture-clients`
+  25, `confiance-etat` 94. Audits verts : `extension-zip`, `coherence`, `extension-navigateurs`,
+  `quoi-de-neuf`, `violet`, `csp`, `confiance`, `carte-extension`, `popup-capte`, `studio`, `traduction`,
+  `fonctions-api`, `chrome-en-dur`, `accueil-navigateurs`, `modeles-email --prouve`, `mails-envoyes`,
+  `emails-html`, `email-formes`.
+- **Contrôles réécrits sur la RÈGLE** (ils figeaient une couleur d'avant) : `badge` (« la carte suit le
+  système » : dégradé propre à chaque teinte, plein qui se détache), `extension-visuel` (la teinte choisie
+  se lit sur le verre et le texte, le fond étant bleu dans les deux), `popup` (fond = dégradé bleu propre
+  à la teinte, plein d'encre / blanc, rond), `confiance-etat` (le fond suit la teinte — il attendait
+  `#000`/`#F2F2F7`, déjà rouge sur l'arbre de départ), `audit-modeles-email` et `audit-mails-envoyes`
+  (la forme commune au lieu de « bouton bleu Apple 44 px / 520 px / aucune image »).
+- **Rouges déjà présents sur l'arbre de départ** (mêmes contrôles, pas de ce lot) : `popup-capte` 33/51
+  (« Voir » → `/my_orders/sold`), `popup` 1 (« ⟳ = chrome.runtime.reload »), `centre-aide` 13 (écrans de
+  l'app), `csp` 12 au départ / 9 ici (reçu, QR Vinted Go : app), `accueil` 2 (poids du fichier d'entrée,
+  `?film`), `accueil-reste` (E2/E3, contextes fermés sous la charge), `audit-confiance-publique` G5/G10,
+  `audit-mails-envoyes --mutations` « au moins 0 » (texte introuvable dans bilan-mois.js).
+- **Pas jugés ici, écrans de l'app** : `accueil-nouveaux` V/N/L (scénarios dans l'app, clics expirés sous
+  la charge) et T2 « côte à côte » 1512 sombre, `aide-signalement` 11, `abonnement` (plantage), 
+  `design-passe-2` (délai dépassé) — aucun fichier de ce lot dans ces écrans.
+- `carte-orion-sans-onglet` : 2 rouges sous la charge (« cadre détourné » : la fausse page cachée « dès
+  son chargement » — attente fixe de 150 ms) ; vert sur l'arbre de départ à charge plus basse. Aucune
+  logique de la carte n'est touchée (CSS seulement) : comparaison à charge égale à la fin de ce fichier.
+
+## Gestes de Julien
+- Installer l'extension **5.386.0** (Chrome : remplacer le dossier puis ⟳ ; Orion : `VRM-Orion-dossier.zip`).
+- Supabase → Authentication → Emails → Templates : coller les six modèles `supabase/templates/*.html`
+  (un onglet chacun, sujet dans `sujets.json`) — avec sa clé, plus tard.
+- Après la mise en ligne : coller `https://vrm.center` dans WhatsApp pour voir la nouvelle image de partage
+  (les messageries gardent l'ancienne en cache quelques jours).
