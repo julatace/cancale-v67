@@ -131,6 +131,24 @@ Banc `stock-etageres` (contrôles V1–V5 ajoutés : recherche opaque et au-dess
 pied sur une ligne, pile compacte et N° entier, côte à côte à l'ordinateur, descente dite une fois, photos visibles
 après les gestes) : **78/78 verts** aux quatre variantes (390 et 1512, clair et sombre).
 
+Bancs Stock relancés UN À LA FOIS sur le build final, puis sur `origin/main` (70fbef70, git archive rebâti) pour
+chaque rouge :
+
+| banc | branche | origin/main | jugement |
+|---|---|---|---|
+| `stock-etageres` | 78/78 vert | (rouge : règle et écran absents) | — |
+| `stock-planches` | **vert** | 1 rouge (390 : la fiche couvre la case suivante) | corrigé : la fiche se referme après Retirer / Déplacer / Je l'ai sortie, planches 44 px |
+| `stock-2d` | 5 rouges | 4 rouges, les MÊMES (« Voir l'état » attendu dans l'ancienne feuille ×2, clics 390 ×2) | + « V explication animée » à 1512 clair seulement (vert à 1512 sombre et 390 : échantillonnage d'une animation sous la charge) |
+| `stock-retrouver` | 1 rouge | 1 rouge, le MÊME (case qui clignote hors écran à 1512) | un 2ᵉ rouge (« la fiche dit rangée 2 ») au 1er passage, vert au 2ᵉ : délai sous la charge |
+| `stock-juste` | 4 rouges | 4 rouges, les MÊMES (pastilles par site d'une ligne de liste) | hors lot |
+| `stock-hors-reseau` | 5 KO | 5 KO, la même famille (A emplacement, D « 1 » attendu, O morceaux 160/163, E délai) | hors lot |
+| `tout-imprimer` | 28 conformes | — | l'emplacement imprimé |
+
+La recherche collée prend la valeur commune des barres collées (aplat à 96 %) : un texte foncé passé dessous
+reste à peine visible ; passer cette valeur à 100 % se ferait dans la règle commune (studio-paires.css §16).
+Jetons : plaque, fonds et champs lisent `--sb-*` (prêts pour la couche « Verre dépoli », studio-verre.css) ; les
+couleurs de cases restent celles de la palette des étagères.
+
 ## 6. Les numéros
 
 Vérifiés, **aucune règle changée** : `prochainLibre` (part du plus haut, jamais d'un trou),
