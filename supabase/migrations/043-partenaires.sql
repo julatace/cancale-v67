@@ -103,8 +103,9 @@ alter table public.partenaire_versements force row level security;
 -- Aucune policy : ni un vendeur, ni un partenaire connecté à VRM, ni un visiteur
 -- ne lit une ligne (les droits par défaut du schéma public, ouverts, sont retirés).
 revoke all on public.partenaires, public.partenaire_filleuls, public.partenaire_commissions,
-  public.partenaire_annulations, public.partenaire_versements from public, anon, authenticated;
--- Le serveur : ce dont il a besoin, rien de plus (aucune suppression).
+  public.partenaire_annulations, public.partenaire_versements from public, anon, authenticated, service_role;
+-- Le serveur : ce dont il a besoin, rien de plus (aucune suppression : une commission annulée est
+-- MARQUÉE, jamais effacée — les droits par défaut du schéma lui donnaient tout, ils sont retirés).
 grant select, insert, update on public.partenaires to service_role;
 grant select, insert on public.partenaire_filleuls to service_role;
 grant select, insert, update on public.partenaire_commissions to service_role;
