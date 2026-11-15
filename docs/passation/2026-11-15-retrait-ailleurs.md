@@ -141,6 +141,14 @@ et ouvre `/?tab=journee&cible=ailleurs&num=124` : Ma journée, la paire éclair�
   coherence, extension-zip, fonctions-api, csp, quoi-de-neuf, double-vente-ailleurs, cibles-notif,
   icones, preuve-vente, notifs-belles, notifs-centre, vestiaire-partout. `textes-courts` : 1 rouge
   préexistant dans `src/ecrans/Ebay.jsx` (pas touché ici).
+- Bancs voisins (build de la branche) : `studio-journee` vert, `lbc-supprimer` vert,
+  `double-vente-push` 34/34, `accompagnement` vert (30 moments), `journee-coherence` vert sur E1-E11
+  (E2 réécrit : le bloc en tête remplace la carte « Vendus ailleurs » ; un « Modifier » hors d'une
+  carte faisait mourir le banc — gardé). `double-vente` : **déjà rouge sur `ea152a4b`** (28 rouges,
+  écran Leboncoin) ; avec la branche, sa ligne « Ma journée annonce les mêmes 2 articles » passe de
+  « 1 » à « absent » parce que l'alerte « à retirer de Vinted » est désormais dite dans « À retirer
+  ailleurs » (voulu) — banc à reprendre par le chantier qui le répare.
+- Après fusion d'`origin/main` (70 commits) : 17 audits verts, banc (plein, onglet, douteuse) vert.
 - **Vu et corrigé au banc** : une boucle de rendu (la publication du plan dépendait d'un objet neuf
   à chaque rendu — page figée) ; le lien « Ouvrir Vestiaire » illisible en clair ; les alertes de la
   coque revenues après les retraits (couverture calculée sur le plan + ce qu'il a touché).
