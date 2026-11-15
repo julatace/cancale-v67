@@ -2303,7 +2303,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     // (17 oct.) L'abonnement a SON onglet (« Abonnement ») ; ici, un renvoi.
     AUTH.user && { id:'abonnement', titre:tr('reglages.groupe.abonnement-lien'), items:[
       { id:'abonnement', type:'panneau', nu:true, paresseux:true, ic:'wallet', lib:tr('reglages.abonnement-ouvrir.lib'), desc:tr('reglages.abonnement-ouvrir.desc'), data:{ 'data-reglage-abonnement':'', 'data-vue':'abonnement' },
-        el:<div key="abonnement" data-onglet-abonnement=""><MonAbonnement/>{proprioInst === true ? null : <Parrainage/>}</div> },
+        el:<div key="abonnement" data-onglet-abonnement=""><MonAbonnement/>{proprioInst === true ? <Partenaires enTete={enTeteSession} toast={toast}/> : <Parrainage/>}</div> },
     ]},
     AUTH.user && { id:'boutique', titre:tr('reglages.groupe.boutique'), items:[
       // (30 oct.) « Abonnement et factures » retiré : l'onglet « Abonnement » du haut fait la même chose.
@@ -2342,16 +2342,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'conditions', type:'panneau', nu:true, ic:'balance', lib:tr('reglages.conditions.lib'), el:donnees },
     ]},
   ];
-<<<<<<< HEAD
-  // L'onglet Abonnement : la carte de l'abonnement, d'un bloc (statut, prix,
-  // carte, factures, résilier) — le MÊME composant qu'avant (§11).
-  const GROUPES_ABONNEMENT = [{ id:'abonnement', titre:null, brut:true, items:[{ id:'abonnement', type:'el', el:<div key="abonnement" data-onglet-abonnement=""><MonAbonnement/>{proprioInst === true ? <Partenaires enTete={enTeteSession} toast={toast}/> : <Parrainage/>}</div> }] }];
-  const groupes = [...(voirCompte ? GROUPES_COMPTE : []), ...(voirReglages ? GROUPES_REGLAGES : []), ...(voirAbonnement ? GROUPES_ABONNEMENT : [])].filter(Boolean)
-=======
   // (15 nov.) Plus d'onglets : TOUS les groupes, rangés en dix catégories (src/parametres/categories.js).
   // L'abonnement (l'ancien 3e onglet) est un panneau de « Mon compte », monté seulement ouvert.
   const groupes = [...GROUPES_COMPTE, ...GROUPES_REGLAGES].filter(Boolean)
->>>>>>> origin/claude/parametres
     .map((g) => ({ ...g, items: g.items.filter(Boolean) }));
   const categories = rangerParCategorie(groupes);
   rangementRef.current = categories;
