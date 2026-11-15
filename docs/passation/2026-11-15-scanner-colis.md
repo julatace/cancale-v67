@@ -119,6 +119,9 @@ Le banc fait passer de vraies images par la vraie caméra de Chromium et le vrai
   **8 rouges** sur 390-clair (aucun bouton « Retrouver » ; le disque ouvre l'ancien scanner de dépôt, dont la
   caméra reste ouverte). Avant les deux corrections de ZXing (même banc, ce code) : Code 128 et EAN-13 jamais lus
   (scènes A, D, E, F rouges), les codes 2D lus.
+- Le scanner de dépôt (lot V) après les deux corrections de ZXing : `scanner-colis-achats` 390-clair **49 verts,
+  1 rouge** (« sans caméra » : le clic sur Scanner n'aboutit pas en 30 s) — **le même rouge sur l'arbre de départ**
+  (94e1391, banc lancé depuis son arbre) : défaut d'avant, pas de ce lot.
 - Audits verts : identite, csp, traduction, tdz, variables, studio, quoi-de-neuf, accompagnement, icones,
   coherence, colis-trois, colis-plus ; `npm run build`.
 - Captures (scratchpad de la session, hors dépôt) : `scan-colis-{390,1512}-{clair,sombre}-{1-vente,2-ouverte,
