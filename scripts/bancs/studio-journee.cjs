@@ -125,12 +125,22 @@ const mesure = (pg) => pg.evaluate(() => {
   const rgbDe = (s) => { const m = /rgba?\(\s*([\d.]+)[ ,]+([\d.]+)[ ,]+([\d.]+)/.exec(s); return m ? [+m[1], +m[2], +m[3]] : hexRgb(s); };
   const lum = (c) => { const f = (x) => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
   const ratio = (a, b) => { const A = lum(a), B = lum(b); return (Math.max(A, B) + 0.05) / (Math.min(A, B) + 0.05); };
-  const fonds = ['--sb-porcelaine', '--sb-porcelaine-2', '--sb-creux', '--sb-haut', '--sb-aplat', '--sb-bas'];
+  // (15 nov., « Verre dépoli ») Le contrôle juge la RÈGLE — l'encre sur CE SUR QUOI ELLE EST POSÉE — et plus une
+  // matière figée : la porcelaine peut être un VERRE (translucide) ; elle se juge alors recomposée sur le haut ET
+  // le bas du fond (le pire des deux). L'encre sombre ne se pose sur le fond que si le fond est clair : avec un
+  // fond profond (le verre), ce qui est posé sur le fond est à l'encre CLAIRE (--sv-clair*), jugée sur le haut et le bas.
+  const rgbaDe = (s) => { s = String(s || '').trim(); const h = hexRgb(s); if (h) return [...h, 1]; const m = /rgba?\(\s*([\d.]+)[ ,]+([\d.]+)[ ,]+([\d.]+)(?:\s*[,/]\s*([\d.]+))?/.exec(s); return m ? [+m[1], +m[2], +m[3], m[4] == null ? 1 : +m[4]] : null; };
+  const sur = (h, b) => [0, 1, 2].map((i) => h[i] * h[3] + b[i] * (1 - h[3]));
+  const bouts = ['--sb-haut', '--sb-aplat', '--sb-bas'].map((n) => hexRgb(v(n))).filter(Boolean);
+  const pose = (n) => { const c = rgbaDe(v(n)); if (!c) return []; return c[3] >= 0.999 ? [c.slice(0, 3)] : bouts.map((b) => sur(c, b)); };
+  const fondClair = bouts.length && Math.min(...bouts.map(lum)) > 0.18;
+  const fonds = ['--sb-porcelaine', '--sb-porcelaine-2', '--sb-creux'].concat(fondClair ? ['--sb-haut', '--sb-aplat', '--sb-bas'] : []);
   const encres = ['--sb-encre', '--sb-encre-2', '--sb-ambre', '--sb-lien'];
   const paires = [];
-  for (const e of encres) for (const f of fonds) { const a = hexRgb(v(e)), b = hexRgb(v(f)); paires.push({ e, f, r: a && b ? Math.round(ratio(a, b) * 100) / 100 : 0 }); }
-  // Chaque texte visible d'une tuile, contre le fond le plus clair (clair) / le plus sombre (nuit) de la porcelaine.
-  const porc = [hexRgb(v('--sb-porcelaine')), hexRgb(v('--sb-porcelaine-2'))].filter(Boolean);
+  for (const e of encres) for (const f of fonds) { const a = hexRgb(v(e)), bs = pose(f); paires.push({ e, f, r: a && bs.length ? Math.round(Math.min(...bs.map((b) => ratio(a, b))) * 100) / 100 : 0 }); }
+  if (!fondClair) for (const e of ['--sv-clair', '--sv-clair-2']) for (const f of ['--sb-haut', '--sb-aplat', '--sb-bas']) { const a = hexRgb(v(e)), b = hexRgb(v(f)); paires.push({ e, f, r: a && b ? Math.round(ratio(a, b) * 100) / 100 : 0 }); }
+  // Chaque texte visible d'une tuile, contre le fond le plus clair (clair) / le plus sombre (nuit) de la porcelaine (recomposée si verre).
+  const porc = [...pose('--sb-porcelaine'), ...pose('--sb-porcelaine-2')];
   const textes = [];
   for (const t of ecran.querySelectorAll('[data-sj-tuile]')) {
     if (t.classList.contains('is-actif')) continue;

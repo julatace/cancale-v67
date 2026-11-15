@@ -34,7 +34,8 @@ import { colisPerdu, normaliserSuivi } from './_lib/etat-colis-email.js';
 import { DESTINATIONS, conversationDeLEmail } from './_lib/lien-notif.js';
 import { estSuppressionLbc, lireSuppressionLbc, texteSuppressionLbc, jourParis, CAT_LBC_SUPPRESSION, FAMILLE_LBC_SUPPRESSION } from './_lib/lbc-suppression.js';
 // (5 nov.) Les textes des notifications : fabriqués là où l'aperçu de Paramètres → Notifications les lit.
-import { texteVendu, texteArgentRecu, texteVenduVestiaire, texteBordereau, texteOffre, texteMessage, texteAnnulation, texteRetourAchat } from './_lib/notif-apercus.js';
+import { texteVendu, texteArgentRecu, texteVenduVestiaire, texteBordereau, texteOffre, texteMessage, texteAnnulation, texteRetourAchat, texteRetourDepose, texteRetourLivre, texteRembourse } from './_lib/notif-apercus.js';
+import { retourDuSuivi, etapeRetourDuSuivi, ID_RETOURS_DEPOSES_CHAMP } from './_lib/retour-suivi.js';   // (15 nov., lot retours-suivi)
 import { stampBordereau } from './_lib/stamp.js';
 // (9 nov., transporteurs inconnus) Le transporteur NOMMÉ dans le PDF du bordereau (sans IA, api/_lib/transporteur-pdf.js).
 import { transporteurDuPdf, champsPdf } from './_lib/transporteur-pdf.js';
@@ -2504,8 +2505,12 @@ export async function traiterEmail(req, res) {
         await repondre(res, 200, { ok: false, type: 'bordereau-retour', garde: true, raison: lu.raison });
         return;
       }
+      // (15 nov., lot retours-suivi) Le transporteur ÉCRIT sur l'étiquette (le PDF de CETTE transaction) :
+      // la même lecture que les bordereaux d'envoi (un nom ⇒ sa clé, deux ⇒ rien) ; le texte n'est jamais gardé.
+      let luPdf = null;
+      try { luPdf = await transporteurDuPdf(lu.pdf.contentB64); } catch (_) { luPdf = null; }
       const ok = await supabaseUpsert([{ id: `email_bordretour_${lu.transaction}`, data: {
-        type: 'bordereau-retour', sens: lu.sens, transaction: lu.transaction, suivi: lu.suivi,
+        type: 'bordereau-retour', sens: lu.sens, transaction: lu.transaction, suivi: lu.suivi, ...(luPdf ? champsPdf(luPdf) : {}),
         dateLimite: lu.dateLimite, dateLimiteJour: lu.dateLimiteJour, dateLimiteIso: lu.dateLimiteIso, article: lu.article,
         account: acc.login || '', uid: acc.uid || '', pdfB64: lu.pdf.contentB64, filename: lu.pdf.filename || `Bon-Retour-Vinted-${lu.transaction}.pdf`,
         receivedAt: now } }]);
@@ -2550,6 +2555,8 @@ export async function traiterEmail(req, res) {
         await supabaseUpsert([{ id: `email_rembachat_${lu.transaction}`, data: {
           type: 'remboursement-achat', sens: 'achat', transaction: lu.transaction, montant: lu.montant, estime: lu.estime,
           article: lu.article, account: acc.login || '', uid: acc.uid || '', receivedAt: now } }]);
+        // (15 nov., lot retours-suivi) « Remboursé · 34,32 € · <article> » — une fois par n° de transaction.
+        if (!ecritureRatee()) try { await pushOnce({ ...texteRembourse({ montant: lu.montant, article: lu.article }), tag: `rembourse-${lu.transaction}`, url: DESTINATIONS.retour({ tx: lu.transaction }) }, 'colis'); } catch (_) {}
         await logEmail({ type: 'remboursement-achat', subject, from: mail.from, transaction: lu.transaction });
         await repondre(res, 200, { ok: true, type: 'remboursement-achat', transaction: lu.transaction, montant: lu.montant });
         return;
@@ -2769,6 +2776,18 @@ export async function traiterEmail(req, res) {
           if ((Array.isArray(bordsK) && bordsK.length) || (Array.isArray(sortantsK) && sortantsK.length)) sensLigne = 'sortant';
         }
       }
+      // (15 nov., lot retours-suivi) LE COLIS D'UN RETOUR qu'il a posté : son n° est celui d'UN bordereau de
+      // retour (égalité exacte, n° normalisé ; deux bordereaux au même n° ⇒ personne). Il est SORTANT (jamais
+      // « à retirer » chez lui, même arrivé au relais du vendeur). Lecture ratée ⇒ pas su : rien ne change.
+      let retourLie = null;
+      if (track.suivi) {
+        const k = String(track.suivi).toUpperCase().replace(/[\s\u00a0-]+/g, '');
+        if (/^[A-Z0-9]{6,30}$/.test(k)) {
+          const rl = await lireLignes(`id=like.email_bordretour_*&meta->>suivi=eq.${encodeURIComponent(k)}&select=tx:meta->>transaction,article:meta->>article,suivi:meta->>suivi,transporteurPdf:meta->>transporteurPdf`);
+          retourLie = retourDuSuivi(k, rl);
+          if (retourLie) sensLigne = 'sortant';
+        }
+      }
       if (sensLigne) track.sens = sensLigne;
       await supabaseUpsert([{ id: rowId, data: {
         type: 'suivi', carrier, suivi: track.suivi || '', status: track.status,
@@ -2864,8 +2883,20 @@ export async function traiterEmail(req, res) {
         await pushOnce({ title: `⚠️ Colis peut-être perdu${art ? ` · ${court(art, 50)}` : ''}`, body: 'Vinted te demande une action : ouvre la conversation.',
           tag: `perdu-${conv || shortHash(subject)}`, url: DESTINATIONS.message({ conv }) }, 'action');
       } catch (_) {}
+      // (15 nov., lot retours-suivi) « Retour déposé · <article> » au premier fait (sauf s'il a touché « Déposé »
+      // lui-même), « Retour livré au vendeur » à la livraison — une fois chacune (le n° de transaction en clé).
+      if (retourLie && !ecritureRatee()) try {
+        const et = etapeRetourDuSuivi(track.status);
+        if (et === 'depose') {
+          const dep = await lireLignes(`id=eq.main&select=d:data->${ID_RETOURS_DEPOSES_CHAMP}`);
+          const lui = Array.isArray(dep) && dep[0] && dep[0].d && typeof dep[0].d === 'object' && dep[0].d['r:' + retourLie.tx];
+          if (Array.isArray(dep) && !lui) await pushOnce({ ...texteRetourDepose({ article: retourLie.article, transporteur: nomTransporteur(carrier) }), tag: `retour-depose-${retourLie.tx}`, url: DESTINATIONS.retour({ tx: retourLie.tx }) }, 'colis');
+        } else if (et === 'livre') {
+          await pushOnce({ ...texteRetourLivre({ article: retourLie.article }), tag: `retour-livre-${retourLie.tx}`, url: DESTINATIONS.retour({ tx: retourLie.tx }) }, 'colis');
+        }
+      } catch (_) {}
       { const st = contexteVendeur.getStore(); if (st) st.resumeExtra = { code: track.code, lieu: track.lieu, limite: track.limite, sens: sensLigne }; }
-      await logEmail({ type: 'suivi', subject, from: mail.from, carrier, suivi: track.suivi, statut: track.label });
+      await logEmail({ type: 'suivi', subject, from: mail.from, carrier, suivi: track.suivi, statut: track.label, ...(retourLie ? { retour: retourLie.tx } : {}) });
       await repondre(res, 200, { ok: true, type: 'suivi', carrier, suivi: track.suivi, status: track.status });
       return;
     }

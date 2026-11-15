@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.382.0';
+const CODE_VERSION = '5.385.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -5700,6 +5700,20 @@ function dateLectureDressing(ligne) {
 //    `ENLIGNE_SUR_MS` : l'extension ne relit jamais en public un compte lu depuis
 //    moins de 30 min (`ENLIGNE_DELAI_MS`), donc aucune lecture plus récente ne
 //    peut exister. Au-delà, ses annonces sont « à confirmer ».
+// ⚠️⚠️ 15 NOV. (audit fiabilité) — UNE LECTURE PUBLIQUE VIDE QUI CONTREDIT UN
+//    DRESSING FRAIS N'EST PAS UNE RÉPONSE (§4.1). Mesuré en lecture seule sur sa
+//    base : le dressing du plus gros compte, capté connecté à 13:08, portait 19
+//    annonces ouvertes ; 45 min plus tard une lecture publique (extension 5.273,
+//    un autre navigateur) rangeait « complet, 0 annonce, total 0 ». Plus récente,
+//    elle faisait foi : les 19 paires passaient ABSENTES (rendues fermées) — hors
+//    du compteur « en ligne » (20 au lieu de 39), hors des paires présentes qui
+//    protègent un N° et décident du rouge (§5), et « disparues ». Une vue publique
+//    à zéro arrive sans que les annonces soient parties (compte limité par
+//    Vinted, vue en retard, lecteur ancien). ⇒ Lecture publique VIDE + dressing
+//    lu moins de 24 h AVANT elle qui montre au moins une annonce ouverte ⇒ « pas
+//    su » (comme un hoquet) : le dressing ne décide que s'il a moins de 30 min,
+//    sinon « à confirmer » (présentes, jamais disparues). Un dressing de plus de
+//    24 h face à une lecture publique vide : elle fait foi, comme avant (11 oct.).
 const ENLIGNE_FRAIS_MS = 24 * 60 * 60 * 1000;
 const ENLIGNE_SUR_MS = 30 * 60 * 1000;
 function ouverteSurVinted(it) { return !!(it && !it.is_closed && !it.is_hidden && !it.is_draft); }
@@ -5707,7 +5721,10 @@ function venduePourSonVendeur(it) { return !!(it && it.is_closed && /sold/i.test
 function enLigneDuCompte(liste, pub, suppIds, maintenant) {
   const itemsL = (liste && Array.isArray(liste.items)) ? liste.items : null;
   const capL = itemsL && liste.cap != null && liste.cap !== '' ? Number(liste.cap) : NaN;
-  const pubPasSu = !!(pub && pub.passu === true);
+  const capPub = pub && pub.cap != null && pub.cap !== '' ? Number(pub.cap) : NaN;
+  const pubVideContredit = !!(pub && pub.passu !== true && (pub.complet === true || pub.complet === 'true') && Array.isArray(pub.ids) && pub.ids.length === 0
+    && (itemsL || []).some(ouverteSurVinted) && isFinite(capL) && !(isFinite(capPub) && capPub - capL >= ENLIGNE_FRAIS_MS));
+  const pubPasSu = !!(pub && pub.passu === true) || pubVideContredit;
   const pubLisible = !pubPasSu && !!(pub && (pub.complet === true || pub.complet === 'true') && Array.isArray(pub.ids));
   const capP = pubLisible && pub.cap != null && pub.cap !== '' ? Number(pub.cap) : NaN;
   const r = { enLigne: [], aConfirmer: [], fermees: [], absentes: [], supprimees: [], lu: NaN, source: '', pubPasSu };
@@ -8368,10 +8385,193 @@ function tickEmpreintes() {
       if (v && age >= 0 && age < PHOTOS_TOUR_MS) return 0;
       await chrome.storage.local.set({ [EMPREINTES_TOUR]: { at: Date.now() } });
     } catch (_) { return 0; }
-    try { return await empreintesUnTour(); } catch (_) { return 0; }
-    finally { try { await chrome.storage.local.remove(EMPREINTES_TOUR); } catch (_) {} }
+    // 5.384 : Vinted d'abord ; sans image Vinted à ce tour, une photo Leboncoin / Vestiaire.
+    // ⚠️ Le verrou du tour se lève dans TOUS les cas (un `finally` pour les deux) : sinon une image
+    //    Vinted laissait le tour verrouillé 3 min (vu par audit-photos-comptes, E2).
+    try {
+      let n = 0;
+      try { n = await empreintesUnTour(); } catch (_) { n = 0; }
+      if (n) return n;
+      try { return await empreintesSitesUnTour(); } catch (_) { return 0; }
+    } finally { try { await chrome.storage.local.remove(EMPREINTES_TOUR); } catch (_) {} }
   })().finally(() => { _tourEmpreintes = null; });
   return _tourEmpreintes;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 5.384 (15 nov.) — LA MÊME PHOTO SUR LEBONCOIN ET VESTIAIRE (lot meme-photo)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « quand je poste une paire sur Vinted et que je la poste après sur Leboncoin
+// sans avoir dit que c'était la même, je veux que VRM propose que c'est exactement la
+// même — vraiment exactement la même photo ». L'app compare les empreintes (src/memePhoto.js) ;
+// l'extension les calcule pour ses annonces Leboncoin et Vestiaire, avec la MÊME règle
+// (<empreinte-photo-regle>, `empreinteDeBlob`) — SANS IA (§2.9), dans le service worker.
+// Rangées dans `photo_empreinte_lbc` / `photo_empreinte_vc` : { annonces: { [id]: { [clé]: empreinte } } }.
+// JAMAIS l'image, jamais un pixel : l'empreinte seule. (eBay : la page VRM calcule les
+// siennes — l'extension ne demande aucun droit d'hôte de plus.)
+// Bornes (§3), les mêmes que pour Vinted :
+//   · l'annonce du compte CONNECTÉ dans un onglet de CE site (`ongletImpSite`) — jamais
+//     une photo d'un autre compte, jamais sans onglet ;
+//   · UNE image par tour, `EMPREINTES_ECART_MS` entre deux (un tour à la fois : le verrou
+//     de `tickEmpreintes`) ;
+//   · chaque image compte sur le budget de LECTURE de ce compte (`compterLecture`,
+//     `site:compte`, celui de l'import), et s'arrête à `EMPREINTES_SITES_MAX_HEURE` des 20 ;
+//   · vérification anti-robot du compte, pause Vestiaire / Leboncoin ⇒ rien ;
+//   · sans cookie (`credentials: 'omit'`), au plus `EMPREINTES_SITES_MAX_OCTETS` ;
+//   · un 403/429 du site des images ⇒ 24 h sans empreinte pour CE site (rien d'autre freiné) ;
+//   · la couverture d'abord, puis les deux suivantes (Leboncoin) ; lire-fusionner-réécrire :
+//     une lecture ratée de la ligne n'écrit rien (la file reste).
+const EMPREINTES_SITES_MAX_HEURE = 8;
+const EMPREINTES_SITES_MAX_OCTETS = 900 * 1024;
+const EMPREINTES_SITES_PAR_ANNONCE = 3;
+const EMPREINTES_SITES_PLAN = 'vrmEmpreintesSitesPlan';     // { at, photos: [{ site, compte, id, k, url }], ids: { lbc: [id], vc: [id] } }
+const EMPREINTES_SITES_FILE = 'vrmEmpreintesSitesFile';     // [{ site, id, k, h, at }]
+const EMPREINTES_SITES_MEMO = 'vrmEmpreintesSitesMemo';     // { [site|id|k]: ms }
+const EMPREINTES_SITES_DERNIERE = 'vrmEmpreintesSitesDerniere';
+const EMPREINTES_SITES_FREIN = 'vrmEmpreintesSitesFrein';   // { [site]: ms }
+const LIGNE_EMPREINTES_SITE = { lbc: 'photo_empreinte_lbc', vc: 'photo_empreinte_vc' };
+const SITE_IMPORT = { lbc: 'leboncoin', vc: 'vestiaire' };
+const urlImageSite = (site, u) => typeof u === 'string' && (site === 'lbc' ? /^https:\/\/([\w-]+\.)*leboncoin\.fr\//i : /^https:\/\/([\w-]+\.)*vestiairecollective\.com\//i).test(u);
+// La liste à calculer : ses annonces Leboncoin et Vestiaire EN VENTE (ni supprimées, ni
+// vendues, ni en pause), compte connu ; moins ce qui est déjà rangé. `null` = pas su.
+async function planEmpreintesSites() {
+  let st = {};
+  try { st = await chrome.storage.local.get(EMPREINTES_SITES_PLAN); } catch (_) { return null; }
+  const p = st[EMPREINTES_SITES_PLAN];
+  const age = Date.now() - Number(p && p.at || 0);
+  if (p && Array.isArray(p.photos) && age >= 0 && age < (p.photos.length ? EMPREINTES_PLAN_MS : EMPREINTES_PLAN_VIDE_MS)) return p;
+  const lbc = await sbGetLbc('app_data?id=eq.lbc_listings&select=i:data->items');
+  const vc = await sbGet('app_data?id=eq.vc_listings&select=i:data->items');
+  const faites = await sbGet('app_data?id=in.(photo_empreinte_lbc,photo_empreinte_vc)&select=id,a:data->payload->annonces');
+  if (lbc === null || vc === null || faites === null) return null;
+  const deja = new Set();
+  for (const r of faites || []) {
+    const site = r && r.id === 'photo_empreinte_lbc' ? 'lbc' : r && r.id === 'photo_empreinte_vc' ? 'vc' : '';
+    if (!site) continue;
+    for (const [id, ph] of Object.entries((r && r.a) || {})) for (const k of Object.keys(ph || {})) deja.add(`${site}|${id}|${k}`);
+  }
+  const couvertures = [], autres = [], ids = { lbc: [], vc: [] };
+  const ajoute = (site, compte, id, liste, url, vues) => {
+    const k = clePhotoEmpreinte(url);
+    if (!k || !urlImageSite(site, url) || vues.has(k) || vues.size >= EMPREINTES_SITES_PAR_ANNONCE) return;
+    vues.add(k);
+    if (!deja.has(`${site}|${id}|${k}`)) liste.push({ site, compte, id, k, url });
+  };
+  const itemsLbc = (lbc && lbc[0] && lbc[0].i && typeof lbc[0].i === 'object') ? lbc[0].i : {};
+  for (const [cle, ad] of Object.entries(itemsLbc)) {
+    if (!ad || typeof ad !== 'object') continue;
+    const id = String(ad.id != null ? ad.id : cle);
+    if (!/^\d{1,15}$/.test(id)) continue;
+    if (ad.supprimeeAt || ad.plusVueAt || ad.pauseAt || LBC_ANNONCE_MORTE.test(String(ad.status || ''))) continue;
+    const compte = String(ad.account || ad.lbcUser || '').replace(/^lbc-account:/, '');
+    if (!compteImpOk(compte)) continue;
+    ids.lbc.push(id);
+    const vues = new Set();
+    (Array.isArray(ad.images) ? ad.images : []).forEach((u, i) => ajoute('lbc', compte, id, i === 0 ? couvertures : autres, u, vues));
+  }
+  const itemsVc = (vc && vc[0] && vc[0].i && typeof vc[0].i === 'object') ? vc[0].i : {};
+  for (const [id, it] of Object.entries(itemsVc)) {
+    if (!it || typeof it !== 'object' || !/^[\w-]{1,40}$/.test(id)) continue;
+    if (/vend|sold|retir|suppr|delet|expir|refus/i.test(String(it.etat || it.statut || ''))) continue;
+    const compte = String(it.compte || '');
+    if (!compteImpOk(compte)) continue;
+    ids.vc.push(id);
+    ajoute('vc', compte, id, couvertures, it.photo, new Set());
+  }
+  const plan = { at: Date.now(), photos: couvertures.concat(autres), ids };
+  try { await chrome.storage.local.set({ [EMPREINTES_SITES_PLAN]: plan }); } catch (_) {}
+  return plan;
+}
+// La file des empreintes calculées part dans `photo_empreinte_{site}` (une écriture par
+// site), fusionnée sur la ligne RELUE ; une lecture ratée n'écrit rien (la file reste).
+async function rangerEmpreintesSites(force = false) {
+  let file = [];
+  try { file = (await chrome.storage.local.get(EMPREINTES_SITES_FILE))[EMPREINTES_SITES_FILE] || []; } catch (_) { return false; }
+  if (!file.length) return true;
+  const plusVieille = Math.min(...file.map((e) => Number(e.at) || Date.now()));
+  if (!force && file.length < EMPREINTES_LOT && Date.now() - plusVieille < EMPREINTES_LOT_MS) return true;
+  let plan = null;
+  try { plan = (await chrome.storage.local.get(EMPREINTES_SITES_PLAN))[EMPREINTES_SITES_PLAN] || null; } catch (_) {}
+  const restent = [], parSite = {};
+  for (const e of file) if (LIGNE_EMPREINTES_SITE[e.site]) (parSite[e.site] = parSite[e.site] || []).push(e);
+  for (const [site, liste] of Object.entries(parSite)) {
+    const ligne = LIGNE_EMPREINTES_SITE[site];
+    const r = await sbGet(`app_data?id=eq.${ligne}&select=a:data->payload->annonces`);
+    if (r === null) { restent.push(...liste); noterDiag('empreintes_sites_lecture_ratee'); continue; }
+    const annonces = Object.assign({}, (r[0] && r[0].a && typeof r[0].a === 'object') ? r[0].a : {});
+    for (const e of liste) annonces[e.id] = Object.assign({}, annonces[e.id] || {}, { [e.k]: e.h });
+    // Une annonce qui n'est plus en vente sort (la ligne reste bornée).
+    const enVente = plan && plan.ids && Array.isArray(plan.ids[site]) ? new Set(plan.ids[site]) : null;
+    if (enVente && enVente.size) for (const id of Object.keys(annonces)) if (!enVente.has(id)) delete annonces[id];
+    const n = Object.values(annonces).reduce((t, a) => t + Object.keys(a || {}).length, 0);
+    const ok = await supabaseUpsert('app_data', [{ id: ligne, data: { type: 'photo_empreintes_site', site, capturedAt: new Date().toISOString(), nItems: n, payload: { version: 1, seuil: SEUIL_PHOTO, annonces } } }], 'id');
+    if (ok === false) { restent.push(...liste); noterDiag('empreintes_sites_ecriture_ratee'); } else noterDiag('empreintes_sites_ecrites');
+  }
+  try { await chrome.storage.local.set({ [EMPREINTES_SITES_FILE]: restent }); } catch (_) {}
+  return !restent.length;
+}
+// UN tour : une image au plus, d'une annonce du compte connecté dans un onglet de son site.
+async function empreintesSitesUnTour() {
+  const st = await chrome.storage.local.get([EMPREINTES_SITES_DERNIERE, EMPREINTES_SITES_FREIN, EMPREINTES_SITES_MEMO]);
+  const t = Date.now();
+  const depuis = t - Number(st[EMPREINTES_SITES_DERNIERE] || 0);
+  if (depuis >= 0 && depuis < EMPREINTES_ECART_MS) return 0;
+  const plan = await planEmpreintesSites();
+  if (!plan) return 0;
+  const frein = st[EMPREINTES_SITES_FREIN] || {};
+  const memo = st[EMPREINTES_SITES_MEMO] || {};
+  let file = [];
+  try { file = (await chrome.storage.local.get(EMPREINTES_SITES_FILE))[EMPREINTES_SITES_FILE] || []; } catch (_) { return 0; }
+  const enFile = new Set(file.map((e) => `${e.site}|${e.id}|${e.k}`));
+  // Les comptes ouverts dans un onglet de leur site (une recherche par compte et par tour).
+  const ouverts = new Map();
+  const ouvert = async (site, compte) => {
+    const c = `${site}:${compte}`;
+    if (!ouverts.has(c)) ouverts.set(c, (await ongletImpSite(SITE_IMPORT[site], compte)) != null);
+    return ouverts.get(c);
+  };
+  let cible = null, reste = 0;
+  for (const p of plan.photos) {
+    const c = `${p.site}|${p.id}|${p.k}`;
+    if (enFile.has(c) || (memo[c] && t - Number(memo[c]) < EMPREINTES_RETRY_MS)) continue;
+    reste++;
+    const f = Number(frein[p.site] || 0);
+    if (f && t - f >= 0 && t - f < EMPREINTES_RETRY_MS) continue;
+    if (!(await ouvert(p.site, p.compte))) continue;
+    cible = p; break;
+  }
+  if (!cible) { if (!reste) await rangerEmpreintesSites(true); return 0; }
+  const pf = SITE_IMPORT[cible.site];
+  { const rb = await secuRobotDit(pf, cible.compte); if (rb) { noterDiag('empreintes_sites_robot'); return 0; } }
+  if (cible.site === 'vc' && await pauseVc()) return 0;
+  if (cible.site === 'lbc' && ((await pauseLbcMsg()) || (await pauseLbcPrix()))) return 0;
+  // Le budget de LECTURE de CE compte sur CE site (le même que l'import) ; les photos s'arrêtent à 8 des 20.
+  const lu = await compterLecture(cleImpSite(pf, cible.compte), EMPREINTES_SITES_MAX_HEURE);
+  if (!lu.ok) { noterDiag('empreintes_sites_budget'); return 0; }
+  const cle = `${cible.site}|${cible.id}|${cible.k}`;
+  memo[cle] = Date.now();
+  try { await chrome.storage.local.set({ [EMPREINTES_SITES_MEMO]: memo, [EMPREINTES_SITES_DERNIERE]: Date.now() }); } catch (_) {}
+  let rep;
+  try {
+    const res = await fetch(cible.url, { credentials: 'omit', cache: 'no-store' });
+    const type = String((res.headers && res.headers.get && res.headers.get('content-type')) || '');
+    const taille = Number((res.headers && res.headers.get && res.headers.get('content-length')) || 0);
+    if (!res.ok || !/^image\//i.test(type) || taille > EMPREINTES_SITES_MAX_OCTETS) rep = { ok: false, http: res.status || 0 };
+    else { const blob = await res.blob(); rep = (!blob || blob.size > EMPREINTES_SITES_MAX_OCTETS) ? { ok: false, http: 413 } : { ok: true, blob }; }
+  } catch (_) { rep = { ok: false, http: 0 }; }
+  try { await chrome.storage.local.set({ [EMPREINTES_SITES_DERNIERE]: Date.now() }); } catch (_) {}
+  if (!rep.ok) {
+    noterDiag(`empreintes_sites_image_refusee_${cible.site}_${rep.http || 0}`);
+    if ([403, 429].includes(Number(rep.http))) { try { await chrome.storage.local.set({ [EMPREINTES_SITES_FREIN]: Object.assign({}, frein, { [cible.site]: Date.now() }) }); } catch (_) {} }
+    return 0;
+  }
+  const h = await empreinteDeBlob(rep.blob);
+  if (!h) { noterDiag('empreintes_sites_image_illisible'); return 0; }
+  file.push({ site: cible.site, id: cible.id, k: cible.k, h, at: Date.now() });
+  try { await chrome.storage.local.set({ [EMPREINTES_SITES_FILE]: file }); } catch (_) { return 0; }
+  noterDiag('empreintes_sites_calculee');
+  await rangerEmpreintesSites(false);
+  return 1;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -23915,6 +24115,12 @@ async function rangerVcVentesMaintenant(m) {
       // 5.316 : le titre affiché et la photo ; et ce que la page « suivi » a appris (gardé).
       titre: x.titre || prev.titre || '', photo: x.photo || prev.photo || '',
       ...(prev.bordereau ? { bordereau: prev.bordereau } : {}), ...(prev.statutVc ? { statutVc: prev.statutVc } : {}), ...(prev.paiementEstime ? { paiementEstime: prev.paiementEstime } : {}), ...(prev.etapesVc ? { etapesVc: prev.etapesVc } : {}),
+      // 5.383 (15 nov.) — L'ÉTAT LE PLUS FRAIS GAGNE (§5) : chaque fait porte SON heure. `aExpedierAt` = la
+      // dernière lecture de « à expédier » qui la LISTAIT ; `etapesAt` (posé par la frise, `rangerVcTimeline`)
+      // gardé. L'app (api/_lib/vestiaire-regle.js `aExpedierVc`) compare les deux : une frise « envoi fait »
+      // plus fraîche l'emporte sur un « à expédier » plus ancien, et l'inverse. Rien n'est remis à faux ici.
+      ...(source === 'a-expedier' ? { aExpedierAt: now } : (prev.aExpedierAt ? { aExpedierAt: prev.aExpedierAt } : {})),
+      ...(prev.etapesAt ? { etapesAt: prev.etapesAt } : {}),
       etiquette: x.etiquette === true || x.etiquette === false ? x.etiquette : (prev.etiquette === true || prev.etiquette === false ? prev.etiquette : null),
       aExpedier: source === 'a-expedier' ? true : (prev.aExpedier === true),
       sources, vuAt: now, premiereVue: prev.premiereVue || now,
@@ -24144,6 +24350,8 @@ async function rangerVcTimeline(m, compte) {
     ventes[pid] = { ...prev, productId: pid,
       transporteur: m.transporteur || prev.transporteur || '', suivi: m.suivi || prev.suivi || '',
       statutVc: m.statut || prev.statutVc || '', etapesVc: m.etapes && Object.keys(m.etapes).length ? m.etapes : (prev.etapesVc || null),
+      // 5.383 : l'heure où CETTE frise a été lue (comparée à `aExpedierAt` par l'app : l'état le plus frais gagne).
+      ...((m.etapes && Object.keys(m.etapes).length) || m.statut ? { etapesAt: new Date().toISOString() } : {}),
       paiementEstime: m.paiementEstime || prev.paiementEstime || '',
       ...(bord ? { bordereau: bord } : {}),
       compte: prev.compte || (compte && /^[\w-]{1,40}$/.test(compte) ? compte : '') };

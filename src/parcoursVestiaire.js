@@ -39,11 +39,13 @@
 // Module PUR : scripts/audit-parcours-vestiaire.cjs l'exécute.
 // ════════════════════════════════════════════════════════════════════════════
 
-import { etapeMotVc, vcVentePartie } from '../api/_lib/vestiaire-regle.js';
+import { etapeMotVc, vcVentePartie, aExpedierVc } from '../api/_lib/vestiaire-regle.js';
 
 const objet = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : null);
 const mot = (e, k) => { const o = objet(e); return o && o[k] != null ? String(o[k]).trim().toLowerCase() : ''; };
-const ETATS_CONNUS = new Set(['done', 'pending', 'upcoming']);
+// (15 nov.) « ongoing » MESURÉ sur une vente en livraison (`sellerDelivery: ongoing`) : la même chose que « pending » (en cours).
+const ETATS_CONNUS = new Set(['done', 'pending', 'ongoing', 'upcoming']);
+const enCoursMot = (x) => x === 'pending' || x === 'ongoing';
 // Un mot de Vestiaire qui DIT un refus au contrôle (jamais déduit d'une absence).
 export const MOT_REFUS_VC = /refus|reject|non.?conform|not.?conform|not.?authentic|unauthentic|fake|contrefa|failed|declin/i;
 export const MOT_ARRIVE_VC = /received.?by|arriv|reception|warehouse|entrep/i;
@@ -64,9 +66,9 @@ export function parcoursVenteVc(v, colisFait = null) {
   const paye = fait('sellerPayment') || etapeMotVc(v) === 'versee';
   const livre = fait('sellerDelivery');
   const valide = fait('sellerConformity');
-  const controleEnCours = s('sellerConformity') === 'pending';
+  const controleEnCours = enCoursMot(s('sellerConformity'));
   // Encore « à expédier » chez Vestiaire : aucun mot ne dit l'arrivée (« shipmentInProgress » est l'état MESURÉ d'une vente à envoyer).
-  const arriveMot = v.aExpedier !== true && MOT_ARRIVE_VC.test(brut);
+  const arriveMot = !aExpedierVc(v) && MOT_ARRIVE_VC.test(brut);
   // Le mot de Vestiaire ne prouve l'envoi que hors « à expédier » (`vcVentePartie`, la règle partagée).
   const envoyeLu = !!colisFait || fait('sellerShipment') || vcVentePartie(v);
   const plusLoin = paye || livre || valide || refus || controleEnCours || arriveMot;
@@ -77,14 +79,14 @@ export function parcoursVenteVc(v, colisFait = null) {
     return { cle, etat: e || brut || colisFait ? 'avenir' : 'passu', t: null, preuve: '' };
   };
   const etapes = [
-    etape('envoye', envoyeLu || plusLoin, s('sellerShipment') === 'pending',
+    etape('envoye', envoyeLu || plusLoin, enCoursMot(s('sellerShipment')),
       colisFait ? 'colis-fait' : fait('sellerShipment') ? 'vestiaire' : envoyeLu ? 'mot' : 'deduit', inconnu('sellerShipment') ? s('sellerShipment') : '', colisFait || null),
     etape('arrive', controleEnCours || valide || refus || arriveMot || livre || paye, false,
       controleEnCours || valide ? 'controle' : arriveMot ? 'mot' : 'deduit', ''),
     etape('authentification', valide || refus || livre || paye, controleEnCours, valide ? 'vestiaire' : controleEnCours ? 'vestiaire' : 'deduit', inconnu('sellerConformity') && !refus ? s('sellerConformity') : ''),
     refus ? { cle: 'verdict', etat: 'refuse', t: null, preuve: 'mot', mot: brut }
       : etape('verdict', valide || livre || paye, false, valide ? 'vestiaire' : 'deduit', ''),
-    etape('paye', paye, s('sellerPayment') === 'pending', fait('sellerPayment') ? 'vestiaire' : 'mot', inconnu('sellerPayment') ? s('sellerPayment') : '', v.verseLe || null),
+    etape('paye', paye, enCoursMot(s('sellerPayment')), fait('sellerPayment') ? 'vestiaire' : 'mot', inconnu('sellerPayment') ? s('sellerPayment') : '', v.verseLe || null),
   ];
   // Sans aucune donnée de suivi (ni frise, ni mot, ni « Colis fait ») : tout est « pas su ».
   if (!e && !brut && !colisFait) for (const x of etapes) if (x.etat !== 'fait') x.etat = 'passu';

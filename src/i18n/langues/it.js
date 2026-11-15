@@ -4,6 +4,7 @@ import ecran_confort from './it/confort.js';   // (14 nov., lots 117–130) conf
 import ecran_studio from './it/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
 import ecran_correspondances from './it/correspondances.js';   // (15 nov.) Publier partout : catégories qui correspondent
 import ecran_capte from './it/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
+import ecran_vcventes from './it/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
 import ecran_renvoyer from './it/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_numeros_nouvelles from './it/numeros-nouvelles.js';
 import ecran_republie_telephone from './it/republie-telephone.js';   // (15 nov.) Republiée dans l'app Vinted   // (15 nov.) Les nouvelles annonces sans N°
@@ -41,9 +42,12 @@ import ecran_argentprix from './it/argentprix.js';   // (14 nov., argent-prix)
 import ecran_rechliste from './it/rechliste.js';
 import ecran_studio_paires from './it/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
 import ecran_republier_guide from './it/republierGuide.js';   // (15 nov.) republier / publier à la main, guidés
+import ecran_memePhoto from './it/memePhoto.js';   // (15 nov., lot meme-photo)
+import ecran_etageres from './it/etageres.js';   // (15 nov.) le Stock en étagères
 export default {
   ...ecran_studio_paires,
   ...ecran_republier_guide,
+  ...ecran_etageres,
   ...ecran_accueilReste,
   ...ecran_refonte_ms,
   ...ecran_studio_journee,
@@ -2265,6 +2269,8 @@ export default {
   ...ecran_studio,
   ...ecran_capte,
   ...ecran_retrait_ailleurs,
+  ...ecran_vcventes,
+  ...ecran_memePhoto,
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_numeros_nouvelles,
