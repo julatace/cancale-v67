@@ -206,7 +206,8 @@ export function propositionsMemePhoto({ vinted = [], autres = [], empreintes = n
       etat: seule.etat, fine: seule.fine, raison: seule.raison, couples: seule.couples });
   }
   const ordre = (x, y) => SITES_MEME_PHOTO.indexOf(x.annonce.plateforme) - SITES_MEME_PHOTO.indexOf(y.annonce.plateforme) || String(x.id).localeCompare(String(y.id));
-  propositions.sort((x, y) => x.distance - y.distance || ordre(x, y));
+  // « Sûr » d'abord (les deux mesures concordent), puis les plus proches.
+  propositions.sort((x, y) => (x.etat === 'sur' ? 0 : 1) - (y.etat === 'sur' ? 0 : 1) || x.distance - y.distance || ordre(x, y));
   ambigus.sort(ordre);
   // L'autre sens (la fiche de la paire) : N° ⇒ les annonces d'ailleurs à relier.
   const parNumero = new Map();

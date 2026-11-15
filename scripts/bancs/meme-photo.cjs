@@ -238,7 +238,7 @@ const ecrit = (ecritures, re) => ecritures.some((e) => re.test(e.corps));
     dit(d.P1 <= seuil && d.P2 <= seuil && d.P3 <= seuil && d.autreVue > seuil, 'le jeu : la même photo passée par un autre site est PROCHE, une autre photo de la même paire LOIN', JSON.stringify(d));
     if (CAPT) for (const n of ['P1', 'P1cdn', 'P1v3']) fs.writeFileSync(path.join(CAPT, `photo-${n}.${F[n].type === 'image/webp' ? 'webp' : 'jpg'}`), Buffer.from(F[n].b64, 'base64'));
     const fineP1 = await gen.evaluate(([a, c]) => window.__fine(a, c), [`data:${F.P1.type};base64,${F.P1.b64}`, `data:${F.P1cdn.type};base64,${F.P1cdn.b64}`]);
-    console.log(`── deuxième mesure (src/photoFine.js) : P1 ~ P1 passée par un autre site ${fineP1}`);
+    console.log(`── deuxième mesure (src/photoFine.js) : P1 ~ P1 passée par un autre site ${JSON.stringify(fineP1)}`);
     await gen.close();
     const A = scenario(F, { fine: fineP1 }), C = scenario(F, { empreintesKO: true });
 

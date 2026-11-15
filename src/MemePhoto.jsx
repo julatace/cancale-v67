@@ -80,10 +80,10 @@ const photoVintedDe = (paire) => { const v = (paire.vinted || [])[0] || {}; retu
 // L'état d'une proposition (ou d'une paire d'un cas ambigu) : « sûr » (diode) ou « à vérifier »
 // (point ambre + la raison). Lu par le banc sur `data-mph-verdict` / `data-mph-raison`, jamais sur le texte.
 const raisonVerifier = (x, plateforme) => (x.raison === 'pas-mesure' && plateforme === 'eBay' ? 'ebay' : x.raison === 'proche' ? 'proche' : x.raison === 'doute' ? 'doute' : 'pasMesure');
-function Etat({ x, plateforme }) {
+function Etat({ x, plateforme, court = false }) {
   if (x.etat === 'sur') return <p className="vrm-mph-sur" data-mph-verdict="sur" data-mph-fine={x.fine == null ? '' : String(x.fine)}><span className="vrm-mph-diode" aria-hidden="true"/>{tr('memePhoto.sur')}</p>;
   const r = raisonVerifier(x, plateforme);
-  return <p className="vrm-mph-averifier" data-mph-verdict="verifier" data-mph-raison={r} data-mph-fine={x.fine == null ? '' : String(x.fine)}><span className="sb-point-ambre" aria-hidden="true"/><b>{tr('memePhoto.aVerifier')}</b> · {tr('memePhoto.pourquoi.' + r)}</p>;
+  return <p className="vrm-mph-averifier" data-mph-verdict="verifier" data-mph-raison={r} data-mph-fine={x.fine == null ? '' : String(x.fine)}><span className="sb-point-ambre" aria-hidden="true"/><b>{tr('memePhoto.aVerifier')}</b>{court ? null : <span className="vrm-mph-raison">{tr('memePhoto.pourquoi.' + r)}</span>}</p>;
 }
 
 function Proposition({ p, Photo, onRelier, onRefuser }) {
@@ -117,7 +117,7 @@ function Ambigu({ x, Photo, onRelier, onRefuser }) {
           const v = (p.vinted || [])[0] || {};
           return (
             <div key={p.numero || v.id} className="vrm-mph-choix" data-etat={p.etat === 'sur' ? 'sur' : 'verifier'}>
-              <Etat x={p} plateforme={x.annonce.plateforme}/>
+              <Etat x={p} plateforme={x.annonce.plateforme} court/>
               <Cote src={photoVintedDe(p)} Photo={Photo} legende={p.numero ? `N°${p.numero} · Vinted` : tr('memePhoto.sansNumero')} sous={v.titre} lien={v.lien} attrs={{ 'data-mph-vinted': v.id || '' }}/>
               {p.numero && x.raison !== 'numero-double' ? <button type="button" className="sb-touche" data-meme-photo-choisir={`${x.id}|${p.numero}`} onClick={() => onRelier({ annonce: x.annonce, numero: p.numero, vintedId: v.id })}>{tr('memePhoto.cestLui', { numero: p.numero })}</button> : null}
             </div>
