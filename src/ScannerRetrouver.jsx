@@ -23,7 +23,7 @@ import { createPortal } from 'react-dom';
 import { tr } from './i18n/index.js';
 import { useLangue } from './i18n/react.js';
 import { lireCodeColis, retrouverParSuivi, normaliserN } from './scanColis.js';
-import { useLectureCamera, phraseSansCamera, raisonCamera, vibrer, creerBip } from './ScannerColis.jsx';
+import { useLectureCamera, raisonCamera, vibrer, creerBip } from './ScannerColis.jsx';
 import { lireSourcesColis } from './retrouverColis.js';
 import './design/scanner-retrouver.css';
 
@@ -32,6 +32,11 @@ const ATTENTE_SOURCES_MS = 10000;
 const ZONE = { x: 0.04, y: 0.18, l: 0.92, h: 0.64 };
 const SORTES = ['vente', 'achat', 'retour', 'colis'];
 
+// La phrase quand la caméra manque : un refus dit OÙ l'autoriser (la raison gardée par la caméra du scanner).
+const phraseCamera = () => {
+  const r = raisonCamera();
+  return r === 'refus' ? tr('scan.r.camRefus') : r === 'occupee' ? tr('scan.r.camOccupee') : r === 'lecteur' ? tr('scan.r.camLecteur') : tr('scan.r.sansCamera');
+};
 const court = (s) => { const n = normaliserN(s); return n.length > 18 ? `${n.slice(0, 8)}…${n.slice(-6)}` : n; };
 
 function Icone({ d, taille = 22 }) {
@@ -202,7 +207,7 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
         </div>
       ) : null}
       <div className="vrm-sr-aide" role="status" aria-live="polite">
-        {sansCam ? <p className="vrm-sr-aide-txt" data-scan-r-sans-camera={raisonCamera() || ''}>{phraseSansCamera(tr('scan.r.sansCamera'))}</p>
+        {sansCam ? <p className="vrm-sr-aide-txt" data-scan-r-sans-camera={raisonCamera() || ''}>{phraseCamera()}</p>
           : indice ? <p className="vrm-sr-aide-txt is-indice" data-acc-echec="colis.retrouver" data-acc-raison="pasReconnu" data-scan-r-indice={indice}>{tr('scan.r.indice')}</p>
           : !res ? <p className="vrm-sr-aide-txt" data-acc-avant="colis.retrouver">{camera === 'demarrage' ? tr('scan.r.demarrage') : tr('acc.colis.retrouver.avant')}</p> : null}
       </div>
