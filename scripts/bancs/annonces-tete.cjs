@@ -97,6 +97,9 @@ function mesurer({ tel }) {
   if (tel && s && out.info.titreBas != null && s.top < out.info.titreBas - 1) out.ordre.push(`la rangée des sites (haut ${Math.round(s.top)}) commence avant le bas du titre (${out.info.titreBas})`);
   if (tel && s && premiere && s.bottom > premiere.getBoundingClientRect().top + 1) out.ordre.push(`la rangée des sites (bas ${Math.round(s.bottom)}) déborde sur la liste (${Math.round(premiere.getBoundingClientRect().top)})`);
   out.info.premiere = premiere ? Math.round(premiere.getBoundingClientRect().top) : null;
+  // Le choix du compte (Vinted) se lit en entier : jamais « T… » (c'est la rangée des sites qui défile, pas lui).
+  const cm = sec.querySelector('.vrm-tache-filtres .vrm-ui-menu-compte > span');
+  if (cm && vis(cm) && cm.scrollWidth > cm.clientWidth + 1) out.ordre.push(`le compte est coupé (« ${cm.textContent} » en ${cm.clientWidth} px)`);
   // « Relier à Vinted » : jamais un bloc sous la rangée.
   for (const b of sec.querySelectorAll('[data-vc-relier], [data-vc-delier]')) {
     if (!vis(b)) continue;

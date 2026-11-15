@@ -164,6 +164,11 @@
   background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important;
 }
 :root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-compte-menu-hote { flex: 1 1 0 !important; min-width: 0 !important; display: flex !important; justify-content: flex-end !important; padding: 0 !important; margin: 0 !important; }
+/* (15 nov., Annonces propre) Le compte ne se coupe plus en « T… » : il garde sa largeur (« 👤 Tous ▾ », au plus 46 %),
+   c'est la rangée des sites qui défile si les quatre touches et leurs nombres ne tiennent pas. */
+:root:root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-compte-menu-hote { flex: 0 0 auto !important; max-width: 46% !important; margin-left: auto !important; }
+:root:root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-filtre-site { flex: 0 1 auto !important; min-width: 0 !important; }
+:root:root:root:root:root:root body [data-espace="paires"] .vrm-compte-menu-hote > .vrm-ui-menu-compte .vrm-ui-menu-compte-ic { flex: none !important; }
 :root:root:root:root:root body [data-espace="paires"] .vrm-compte-menu-hote > .vrm-ui-menu-compte {
   height: 44px !important; min-height: 44px !important; max-width: 100% !important; padding: 0 14px !important; border: 0 !important; border-radius: 13px !important;
   background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important;
