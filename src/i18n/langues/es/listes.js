@@ -4,6 +4,7 @@ export default {
   "listes.urgence.titre": "Paquetes que enviar primero",
   "listes.ok": "OK",
   "listes.tousComptes": "Todas las cuentas",
+  "listes.tousComptesCourt": "Todas",
   "listes.choisirCompte": "Cuenta: {nom} — cambiar",
   "listes.comptes": "Cuentas",
   "listes.ouvertVinted": "abierta en Vinted",

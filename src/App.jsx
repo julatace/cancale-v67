@@ -32622,7 +32622,7 @@ try { document.addEventListener('visibilitychange', ()=>{ if(document.visibility
 // avant d'abord ». Une rangée de puces : « Tous » + un compte par puce, le
 // compte connecté en TÊTE avec 📍. Un seul compte ⇒ rien à filtrer, on n'affiche
 // pas la rangée (§7, pas de bruit).
-function SelecteurCompte({ accounts, sel, setSel, connecte, messages = false, compact = false }) {
+function SelecteurCompte({ accounts, sel, setSel, connecte, messages = false, compact = false, court = false }) {
   const labels = (typeof load === 'function' ? (load('vinted_account_labels', {}) || {}) : {});
   const nom = (a) => labels[a.vinted_user_id] || a.login || `#${a.vinted_user_id}`;
   const list = (accounts || []).filter(a => a && a.vinted_user_id != null);
@@ -32664,7 +32664,7 @@ function SelecteurCompte({ accounts, sel, setSel, connecte, messages = false, co
   if (compact) return (
     <div className="vrm-compte-menu-hote" data-compte-menu="vrm-sel-compte" data-compte-menu-val={val}>
       <MenuCompte comptes={tri.map(a => { const uid = String(a.vinted_user_id); return { id: uid, nom: nom(a), connecte: uid === coVu }; })}
-        valeur={val === '*' ? '' : val} onChange={(v) => setSel(v ? String(v) : '*')}/>
+        valeur={val === '*' ? '' : val} onChange={(v) => setSel(v ? String(v) : '*')} court={court}/>
       <select id="vrm-sel-compte" className="vrm-compte-select-cache" tabIndex={-1} aria-hidden="true" value={val} onChange={(e) => setSel(e.target.value)}>
         <option value="*">Tous les comptes</option>
         {tri.map(a => <option key={a.vinted_user_id} value={String(a.vinted_user_id)}>{nom(a)}</option>)}
@@ -61772,7 +61772,7 @@ function AppCoeur() {
           <DansBarreHaut><FiltreSites tache={t} site={site} sites={sitesPresents} enLigneVinted={t==='annonces' && liveStatsVus ? liveStatsVus.online : undefined} onSite={(s)=>setPlatSub(s)} onChoix={(s)=>{ retenirFiltre(t,s,true); noterReprise({ sites:{ [t]:{ valeur:s, at:Date.now() } } }); }}/></DansBarreHaut>
           {/* (14 nov., « Studio bleu clair ») Annonces Vinted : le choix du compte sur la MÊME ligne que les sites (une ligne de
               moins avant la liste). Le même composant, les mêmes états qu'avant dans l'espace Vinted. */}
-          {t==='annonces' && site==='vinted' && !baseKO && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} compact/>}
+          {t==='annonces' && site==='vinted' && !baseKO && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} compact court/>}
           {/* Les sections propres du site, sous son filtre (31 oct., soir) : la
               même forme que les rubriques de l'app (`PlatSubNav`). */}
           {sous && <div className="vrm-tache-sous" data-tache-sous={t+'.'+site}><PlatSubNav sub={sec} setSub={(x)=>{ setEbayCible(null); setPlatSub(subDeTache(site,x)); }} sections={sous}/></div>}

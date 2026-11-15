@@ -352,6 +352,16 @@
   white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; display: block !important; -webkit-line-clamp: unset !important;
 }
 :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-titre] * { white-space: nowrap !important; font: inherit !important; color: inherit !important; }
+/* (15 nov., Annonces propre — « plus pratique ») Au téléphone, un titre long se lit sur DEUX lignes au lieu d'être coupé
+   après 15 lettres : 40 + 4 + 18 = 62 px, la rangée garde ses 64 px (1 000 rangées : aucune hauteur ne bouge). */
+@media (max-width: 767px) {
+  :root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) { grid-template-rows: minmax(22px, auto) 18px !important; }
+  :root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-titre] {
+    height: auto !important; max-height: 40px !important; white-space: normal !important; text-overflow: clip !important;
+    display: -webkit-box !important; -webkit-box-orient: vertical !important; -webkit-line-clamp: 2 !important; line-clamp: 2 !important; overflow: hidden !important; overflow-wrap: anywhere !important;
+  }
+  :root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-titre] * { white-space: normal !important; }
+}
 :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-titre] :is(.vrm-titre-taille-fin, [data-titre-taille]) { display: none !important; }
 :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-titre] > * { display: inline !important; }
 :root:root:root:root:root body [data-espace="paires"] .sb-rangee[data-sb-alerte] [data-titre]::before { content: "" !important; display: inline-block !important; width: 6px !important; height: 6px !important; border-radius: 50% !important; background: var(--sbp-point) !important; margin: 0 6px 2px 0 !important; vertical-align: middle !important; }

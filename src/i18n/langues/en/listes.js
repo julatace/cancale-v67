@@ -4,6 +4,7 @@ export default {
   "listes.urgence.titre": "Parcels to send first",
   "listes.ok": "OK",
   "listes.tousComptes": "All accounts",
+  "listes.tousComptesCourt": "All",
   "listes.choisirCompte": "Account: {nom} — change",
   "listes.comptes": "Accounts",
   "listes.ouvertVinted": "open on Vinted",

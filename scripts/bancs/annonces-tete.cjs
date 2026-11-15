@@ -20,6 +20,13 @@ require('./_porte-banc.cjs');
 //    logos      chaque segment de site porte une marque SVG en ligne (`svg[data-marque]`), à l'encre
 //               (couleur = couleur du texte, jamais une couleur de marque), de 16 à 22 px de haut ;
 //    nom        la barre du bas (390) et le menu (1512) disent « Annonces », jamais « Paires ».
+//    phrase     la tête porte UNE LIGNE DE PLUS (le banc y pose la phrase d'aide que Julien voyait sur sa capture,
+//               « Chaque annonce porte son N° de rangement… ») : elle ne passe JAMAIS sous la rangée des sites —
+//               c'est la panne de la capture (une tête de hauteur FIXE, 44 px, que son texte débordait) ;
+//    nombres    (Vinted, Vestiaire) la touche d'un site NON choisi dit son nombre d'annonces (`data-site-n`), le même
+//               que sa règle : Vinted = « en ligne » de la bande, Vestiaire = ses rangées « En ligne » ;
+//    pratique   (390, Vinted) la recherche reste collée sous la tête quand la liste défile (900 px), et un N°
+//               exact tapé met SA ligne en premier.
 //  Base INVENTÉE (design-passe : 3 comptes Vinted) + 3 annonces Vestiaire inventées ; garde réseau.
 //  `LARGEURS=390` `THEMES=clair` `SITES=vestiaire` ; `BANC_DIST=` le build jugé ; `SHOTS=` les captures.
 //  Un banc ne meurt pas, il rapporte.
@@ -135,6 +142,28 @@ async function juger(nav, W, theme) {
   await pret(o.pg); await o.pg.waitForTimeout(1000);
   const n = await o.pg.evaluate(nomNav, { tel });
   if (n.paires || !n.annonces) fautes.push(`navigation : ${n.paires ? '« Paires » écrit' : ''}${!n.annonces ? ' « Annonces » absent' : ''} (${n.txt})`);
+  let enLigneVinted = null;
+  if (tel) {
+    // Pratique (Vinted, au doigt) : la recherche collée sous la tête, et un N° exact amène SA ligne en premier.
+    await o.pg.waitForSelector('[data-sb-liste] > [data-sb-avant-cle]', { timeout: 20000 }).catch(() => {});
+    const colle = await o.pg.evaluate(async () => {
+      const m = document.querySelector('.vrm-main'); m.scrollTop = 900; await new Promise((r) => setTimeout(r, 600));
+      const champ = document.querySelector('[data-espace="paires"] [data-ann-recherche]');
+      const h = document.querySelector('.vrm-app-header').getBoundingClientRect().bottom;
+      const r = champ ? champ.getBoundingClientRect() : null;
+      const ok = !!r && r.top >= h - 2 && r.top <= h + 24 && r.height >= 40;
+      m.scrollTop = 0; await new Promise((r) => setTimeout(r, 300));
+      return ok ? 'ok' : `recherche à ${r ? Math.round(r.top) : '—'} px (tête ${Math.round(h)})`;
+    });
+    if (colle !== 'ok') fautes.push('pratique : la recherche ne reste pas en haut (' + colle + ')');
+    const cible = await o.pg.evaluate(() => { const l = [...document.querySelectorAll('[data-sb-liste] > [data-sb-avant-cle]')][5]; const t = l && l.querySelector('.vrm-num, .vrm-fiche-numero'); return t ? String(t.innerText).replace(/\D/g, '') : ''; });
+    await o.pg.locator('[data-espace="paires"] [data-ann-recherche] input').first().fill(cible).catch(() => {});
+    await o.pg.waitForTimeout(900);
+    const premier = await o.pg.evaluate(() => { const l = [...document.querySelectorAll('[data-sb-liste] > [data-sb-avant-cle]')].find((x) => x.getBoundingClientRect().height > 8); const t = l && l.querySelector('.vrm-num, .vrm-fiche-numero'); return t ? String(t.innerText).replace(/\D/g, '') : ''; });
+    if (!cible || premier !== cible) fautes.push(`pratique : N° ${cible} tapé, 1re ligne N° ${premier || '—'}`);
+    await o.pg.locator('[data-espace="paires"] [data-ann-recherche] input').first().fill('').catch(() => {});
+    await o.pg.waitForTimeout(500);
+  }
   for (const site of SITES) {
     const b = o.pg.locator(`[data-filtre-site="annonces"] button[data-site="${site}"]`);
     if (!(await b.count())) { fautes.push(`${site} : pas de segment dans la rangée des sites`); continue; }
@@ -142,6 +171,8 @@ async function juger(nav, W, theme) {
     await o.pg.waitForTimeout(site === 'vestiaire' ? 2200 : 1400);
     if (site === 'vestiaire') await o.pg.waitForSelector('[data-vc-annonce]', { timeout: 8000 }).catch(() => fautes.push('vestiaire : aucune annonce rendue'));
     await o.pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 0; window.scrollTo(0, 0); });
+    // La ligne de plus dans la tête (la phrase d'aide de la capture) : posée par le banc, jamais par l'app.
+    await o.pg.evaluate(() => { const t = document.querySelector('section.vrm-tache[data-espace="paires"] .vrm-tache-tete'); if (t && !t.querySelector('[data-banc-phrase]')) { const p = document.createElement('p'); p.setAttribute('data-banc-phrase', ''); p.style.cssText = 'margin:4px 0 0;font-size:15px;line-height:1.4'; p.textContent = 'Chaque annonce porte son N° de rangement. Coche-en plusieurs pour agir en série.'; t.appendChild(p); } });
     await o.pg.waitForTimeout(300);
     const m = await o.pg.evaluate(mesurer, { tel });
     await o.pg.screenshot({ path: path.join(SHOTS, `annonces-${site}-${W}-${theme}.png`) }).catch(() => {});
@@ -151,6 +182,14 @@ async function juger(nav, W, theme) {
     if (m.ordre.length) fautes.push(`${site} : ordre — ` + m.ordre.join(' ; '));
     if (m.relier.length) fautes.push(`${site} : Relier à Vinted — ` + [...new Set(m.relier)].slice(0, 3).join(' ; '));
     if (m.logos.length) fautes.push(`${site} : logos — ` + m.logos.slice(0, 4).join(' ; '));
+    // Les nombres : la touche d'un site non choisi dit le nombre de SA règle.
+    const nb = await o.pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-filtre-site="annonces"] button[data-site]')].map((b) => [b.getAttribute('data-site'), b.getAttribute('data-site-n')])));
+    if (site !== 'vinted') {
+      if (nb.vinted == null) fautes.push(`${site} : la touche Vinted ne dit pas son nombre`);
+      else if (enLigneVinted != null && Number(nb.vinted) !== enLigneVinted) fautes.push(`${site} : Vinted ${nb.vinted} ≠ « en ligne » de la bande ${enLigneVinted}`);
+    }
+    if (site !== 'vestiaire' && String(nb.vestiaire) !== '3') fautes.push(`${site} : la touche Vestiaire dit ${nb.vestiaire} (3 en ligne attendues)`);
+    if (site === 'vinted') enLigneVinted = await o.pg.evaluate(() => { const e = [...document.querySelectorAll('[data-espace="paires"] .vrm-ui-bande-item')].find((x) => /en ligne/i.test(x.innerText || '')); const n = e ? parseInt(String(e.innerText).replace(/\s/g, ''), 10) : NaN; return Number.isFinite(n) ? n : null; });
     if (site === 'vestiaire') {
       // Le geste reste joignable : toucher la rangée ⇒ la fiche le porte (même data-vc-relier).
       const id = await o.pg.evaluate(() => { const l = document.querySelector('[data-vc-annonce]'); return l ? l.getAttribute('data-vc-annonce') : ''; });
