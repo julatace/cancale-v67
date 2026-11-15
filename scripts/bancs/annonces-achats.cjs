@@ -104,7 +104,13 @@ function colle() {
   const tete = document.querySelector('.vrm-app-header');
   const hb = tete ? tete.getBoundingClientRect() : null;
   const mt = main.getBoundingClientRect().top;
-  const alpha = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c || ''); if (!m) return 0; const p = m[1].split(/[ ,/]+/).filter(Boolean); return p.length >= 4 ? parseFloat(p[3]) : 1; };
+  // L'alpha d'une couleur CALCULÉE : rgb()/rgba(), et color(srgb … / a), oklab(… / a)… (color-mix rend `color(srgb …)`).
+  const alpha = (c) => {
+    c = String(c || '').trim(); if (!c || c === 'transparent') return 0;
+    const m = /rgba?\(([^)]+)\)/.exec(c); if (m) { const p = m[1].split(/[ ,/]+/).filter(Boolean); return p.length >= 4 ? parseFloat(p[3]) : 1; }
+    const f = /^[a-z-]+\(([^)]*)\)$/i.exec(c); if (!f) return 0;
+    const sl = f[1].split('/'); return sl.length > 1 ? parseFloat(sl[1]) : 1;
+  };
   const fautes = []; let vues = 0;
   for (const el of main.querySelectorAll('*')) {
     const cs = getComputedStyle(el);
