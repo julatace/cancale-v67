@@ -108,18 +108,25 @@ garde l'ancienne règle (ses audits portent sur son texte) — à basculer par u
   montre avant SON toucher), S (branchement), V (1 000 × 1 000).
   - **Sur l'arbre de départ** (`git archive origin/claude/project-review-nsk5su`) : **rouge** (module
     absent ; la règle d'avant fait 12/20 et 13/20 sur le même jeu).
-  - `--prouve` : 16 mutations (marque, unicité article, unicité achat, version, taille, couleur,
-    postérieur, refus, lot, un seul sens, chronologie, mot commun, effet qui relie, valider sans feuille,
-    refus local, vendus oubliés) — voir le rapport de la session pour le compte.
+  - `--prouve` : **16/16 mutations attrapées** (marque, unicité article, unicité achat, version, taille,
+    couleur, postérieur, refus, lot, un seul sens, chronologie, mot commun, effet qui relie, valider sans
+    feuille, refus local, vendus oubliés). Les copies de mutation sont effacées à la sortie (le disque du
+    conteneur est partagé : 50 copies de `src/` l'avaient rempli, bancs « Page crashed »).
 - Audits voisins verts : `identite`, `suggestions-achat` (50), `achats-a-relier` (30), `achats-relier`,
   `traduction` (45), `tdz`, `variables`, `studio`, `quoi-de-neuf`.
-- Banc `scripts/bancs/achats-liaison.cjs` (390 tactile ×2, 1512, clair et sombre) : côte à côte,
+- Banc `scripts/bancs/achats-liaison.cjs` (390 tactile ×2, 1512, clair et sombre) — **70 verts, 0 rouge** : côte à côte,
   niveaux (5 très probables attendus, 3 identiques « possible »), marque contredite et autre version
   jamais proposées, pourquoi, rien d'écrit avant son toucher, la feuille, « Relier ces 4 » écrit
   exactement les 4 cochés, « Ce n'est pas lui », Vendus, Achats, forme (débord, 1 plein, 44 px).
-- Banc `annonces-achats` : l'achat inventé « … nere … » (noir) proposé à « … Brown … » est devenu
+- Banc `annonces-achats` (390, 1512-sombre) : **28 verts, 0 rouge** après deux retouches. L'achat inventé « … nere … » (noir) proposé à « … Brown … » est devenu
   « … marroni … » (la règle pondérée écarte une couleur contraire écrite) ; ses hauteurs de carte (≤ 136 /
-  188 px) datent de la carte d'avant : la carte côte à côte est plus haute par construction.
+  188 px) dataient de la carte d'une ligne : la carte côte à côte est plus haute par construction (≤ 310 px
+  avec un achat proposé ; sans, l'article tient en une rangée, ≤ 200 px).
+- Note banc : le bouton plein du studio « respire » (jamais « stable » pour Playwright) — le banc lui donne
+  le clic par l'élément ; les liens se lisent dans la copie de l'appareil (`vinted_annonce_numeros`,
+  `vinted_sale_overrides`), l'écriture vers la base partant groupée plus tard.
+- Pas rejoué : le banc sur un build de l'arbre de départ (disque presque plein) ; ses sélecteurs
+  (`data-ar-cote`, `data-ar-valider`, `data-achat-propose`) n'existent pas avant ce lot.
 
 ## Geste de Julien
 
