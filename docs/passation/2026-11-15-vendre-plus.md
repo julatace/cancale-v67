@@ -65,7 +65,7 @@ par leur meilleur résultat, `ordre`), et la **vitesse** (`normaliser` saute NFD
 
 ## Preuves
 
-- `scripts/audit-baisse-conseillee.cjs --prouve` (35 contrôles + 12 mutations, 50 annonces
+- `scripts/audit-baisse-conseillee.cjs --prouve` (une quarantaine de contrôles + 12 mutations, 50 annonces
   identiques), `audit-relance-favoris.cjs --prouve` (23 + 8), `audit-loupe-vendre-plus.cjs --prouve`
   (17 + 7 ; 5 370 entrées : index + recherche ≈ 20 ms de calcul, une frappe ≈ 1 ms). Les trois
   sont ROUGES sur l'arbre de départ (`git archive origin/claude/project-review-nsk5su`).
@@ -74,7 +74,7 @@ par leur meilleur résultat, `ordre`), et la **vitesse** (`normaliser` saute NFD
 - Banc `scripts/bancs/baisses-conseillees.cjs` (390 tactile et 1512, clair et sombre) : 78 verts.
 - Non régressés : audit-conseil-mesure, audit-dormantes, audit-baisse-prix, audit-recherche-unique,
   -exacte, -numero, audit-traduction, audit-quoi-de-neuf, audit-studio, audit-icones,
-  audit-favoris-sans-vente, audit-robustesse-metier ; bancs baisse-prix et vendre-plus.
+  audit-favoris-sans-vente, audit-robustesse-metier. Bancs : `vendre-plus` (2 rouges « Agir… Leboncoin · eBay · Vestiaire ») et `baisse-prix` G2 (le hasard de « Varier » laissé coché) sont rouges AUSSI sur le build de départ — pas ce lot.
   `audit-recherche-universelle` : ses deux contrôles de temps à l'horloge murale rougissent sur
   cette machine chargée AVANT comme APRÈS ce lot (mesuré sur les deux arbres).
 
