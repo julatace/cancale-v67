@@ -54,7 +54,8 @@ async function lireT(chemin) {
     const r = await fetchAvecDelai(`${SUPABASE_URL()}/rest/v1/${chemin}`, { headers: sbCle(service()) });
     if (!r.ok) {
       const t = await r.text().catch(() => '');
-      return { ok: false, absent: (r.status === 404 || r.status === 400) && /PGRST205|42P01|does not exist|schema cache/i.test(t) };
+      // PostgREST ne répond 404 que pour une table inconnue (PGRST205) : la 043 pas passée.
+      return { ok: false, absent: r.status === 404 || (r.status === 400 && /PGRST205|42P01|does not exist|schema cache/i.test(t)) };
     }
     const j = await r.json().catch(() => null);
     return Array.isArray(j) ? { ok: true, lignes: j } : { ok: false, absent: false };
@@ -225,7 +226,7 @@ export async function annulerCommissions(type, obj, maintenant = Date.now()) {
   const cles = Object.values(a.cles).filter(Boolean);
   const m = await ecrire('POST', 'partenaire_annulations?on_conflict=cle', cles.map((cle) => ({ cle, raison: a.raison, le })), 'resolution=ignore-duplicates,return=minimal');
   if (!m.ok) {
-    if (/PGRST205|42P01|does not exist|schema cache/i.test(m.texte)) return { ok: true, rien: 'non-installe' };
+    if (m.status === 404 || /PGRST205|42P01|does not exist|schema cache/i.test(m.texte)) return { ok: true, rien: 'non-installe' };
     return { ok: false };
   }
   let n = 0;
