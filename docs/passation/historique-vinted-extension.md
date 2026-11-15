@@ -1127,3 +1127,14 @@ Récit : `historique-interface-stock.md` (« LES QUATRE OUTILS DES ANNONCES »).
 ## Déplacé tel quel de CLAUDE.md §9 (14 nov., version studio — fichier sous 59 000 octets)
 
 - **14 nov. · Extension 5.377.0 : « VRM a capté » + carte Favoris · Annonces · Ventes** : bulle près du logo et toast dans l'app quand une écriture RÉUSSIE range du nouveau (par identité, `vrmCapteVu`), « Compte relié · … » à la connexion, réglage partagé carte ↔ Paramètres ; carte : compte de l'onglet d'abord, favoris du plus récent cochés ⇒ « Envoyer le message (N) », autres comptes floutés `inert`, lecture seule. `docs/passation/2026-11-14-popup-capte.md`. Geste : installer la 5.377.0.
+
+<!-- lignes du §8 de CLAUDE.md déplacées telles quelles le 15 nov. 2026 -->
+| `ventesfusion` | `fusionnerCommandes` | **5.323.0** (6 nov.) | une lecture partielle des ventes/achats se FUSIONNE par n° de transaction (rien perdu) ; fenêtre inchangée < 1 h ni relue ni réécrite |
+| `releveidentite` | `txDeLigneReleve` | **5.323.0** (6 nov.) | relevé du porte-monnaie (`wallet/invoices/current`) rangé sans rien de personnel, `tx` si la ligne porte la vente ; forme inconnue ⇒ `harvest_{uid}_forme_releve` |
+| `numeroecrit` | `numeroEcritAllume` | **5.324.0** (7 nov.) | réglage « Je numérote moi-même » allumé : aucun N° réservé ni affiché à côté de « Publier » |
+| `lieroauth` | `fournisseursConnexion` | **5.325.0** (8 nov.) | la fenêtre de l'extension propose « Continuer avec Google / Discord » (fournisseur ACTIVÉ chez Supabase seulement) ; l'app nomme ce bouton à un compte créé ainsi |
+| `ventesleger` | `commandesParServeur` | **5.326.0** (8 nov.) | ventes/achats envoyés LÉGERS : la fenêtre en abrégé (n° : empreinte) + ce que la base n'a pas, fusionnés chez vrm.center (`api/_lib/commandes-leger.js`, même règle que l'extension) ; chaque envoi < 200 Ko ; route absente ⇒ voie d'avant |
+| `appareil` | `publierAppareil` | **5.327.0** (8 nov.) | chaque navigateur publie `ext_appareil_{id}` (nom, version, envois réussis/refusés, comptes lus) : Paramètres → « Tout va bien ? » et l'alerte « compte pas relu » (`api/_lib/garde-capture.js`) |
+| `secoursenvoi` | `commandesSecours` | **5.327.0** (8 nov.) | 3 échecs réseau/5xx de suite vers vrm.center ⇒ voie directe bornée (< 256 Ko, fusion par n°) ; trop lourd ⇒ rien écrit, dit sur la carte |
+| `connexioncarte` | `sessionDepuis` | **5.328.0** (8 nov.) | la fenêtre et la carte du logo commencent par « Me connecter » (email + mot de passe VRM), sans ouvrir VRM |
+| `cartesansonglet` | `prendreVerrouRenouv` | **5.329.0** (8 nov.) | la carte du logo porte elle-même e-mail + mot de passe (shadow root fermée, aucun onglet, plus d'iframe) ; un seul renouvellement de session pour toute l'extension |

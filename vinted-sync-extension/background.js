@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.381.0';
+const CODE_VERSION = '5.382.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -1208,6 +1208,7 @@ try {
         if (msg.type === 'session') { sendResponse(await recevoirSessionAdressee(msg)); return; }
         if (msg.type === 'deconnexion') { sendResponse(await deconnexionAdressee(msg)); return; }
         if (msg.type === 'reglageCapte') { sendResponse(await poserCapteCoupe(msg.coupe === true)); return; }   // 5.377
+        if (msg.type === 'numerotes') { sendResponse(await annoncerNumerotes(msg)); return; }   // 5.382
         if(msg.type==='favorisEtat'){const e=await etatPourApp();sendResponse(e);if(Date.now()-dernierPontFavoris>60000){dernierPontFavoris=Date.now();reinjecterPont().catch(()=>{});}return;}
         if(msg.type==='favorisExec'&&msg.endpoint==='/vrm/favoris'){sendResponse(await executerPourApp({...msg,method:'POST'},sender));return;}
         if(msg.type==='favorisOuvrir'){sendResponse(await executerPourApp({...msg,method:'POST',endpoint:'/vrm/favoris/ouvrir'},sender));return;}
@@ -18677,8 +18678,8 @@ const CAPTE_LOT_MS = 2 * 60000;          // un lot non montré se périme (la pa
 const CAPTE_CONNEXION_MS = 3 * 60000;    // la fenêtre « Compte relié »
 const CAPTE_SESSION_MS = 10 * 60000;
 const CAPTE_MARGE_MS = 6 * 3600000;      // une date un peu avant le point de départ (horloges, fuseaux)
-const CAPTE_SORTES = ['ventes', 'achats', 'bordereaux', 'codes', 'versements', 'messages', 'offres', 'annonces'];
-const CAPTE_EVENEMENT = new Set(['bordereaux', 'codes', 'versements']);
+const CAPTE_SORTES = ['ventes', 'achats', 'bordereaux', 'codes', 'versements', 'messages', 'offres', 'annonces', 'numerotes'];
+const CAPTE_EVENEMENT = new Set(['bordereaux', 'codes', 'versements', 'numerotes']);
 const CAPTE_PLATEFORMES = ['vinted', 'leboncoin', 'vestiaire'];
 const RE_ID_CAPTE = /^[\w:.@+-]{1,120}$/;
 let _chaineCapte = Promise.resolve();
@@ -18813,6 +18814,20 @@ function itemsCapteVinted(type, p) {
   if (type === 'inbox') return ((p && p.conversations) || []).filter((c) => c && c.id != null && c.unread === true && c.updated_at).map((c) => ({ id: String(c.id) + '@' + String(c.updated_at), t: c.updated_at }));
   return [];
 }
+// 5.382 (15 nov.) « VRM A NUMÉROTÉ » : l'app (vrm.center, canal adressé, jamais une page) dit les N°
+// NEUFS qu'elle vient de donner à des annonces publiées hors de VRM (src/numerosNouvelles.js de l'app).
+// Rien n'est numéroté ici : l'extension le DIT sur la carte du compte de l'onglet, une fois par identité
+// (`id:N°`, un événement, `annoncerCapte`). Forme stricte : compte Vinted en chiffres, 60 identités au plus.
+const RE_NUMEROTE = /^\d{4,15}:[A-Z0-9]{1,9}$/;
+async function annoncerNumerotes(msg) {
+  const uid = String((msg && msg.uid) || '');
+  if (!/^\d{1,15}$/.test(uid)) return { ok: false, code: 'compte' };
+  const ids = (Array.isArray(msg.ids) ? msg.ids : []).map((x) => String(x == null ? '' : x).toUpperCase()).filter((x) => RE_NUMEROTE.test(x)).slice(0, 60);
+  if (!ids.length) return { ok: false, code: 'invalide' };
+  const lot = await annoncerCapte('vinted', uid, 'numerotes', ids).catch(() => null);
+  noterDiag(lot ? 'numerotes_lot' : 'numerotes_rien');
+  return { ok: true, dit: !!lot };
+}
 function capteVinted(uid, type, lus) {
   const sorte = SORTE_CAPTE_VINTED[type];
   if (!sorte || !uid) return Promise.resolve(null);
@@ -18856,7 +18871,7 @@ async function compteOngletCapte(url, tabId) {
   return { p, id: '' };
 }
 // Le lien « Voir » : la page du SITE (jamais VRM, 5.376), la première sorte qui en a une.
-const VOIR_CAPTE = { ventes: 'ventes', bordereaux: 'ventes', versements: 'ventes', messages: 'messages', offres: 'messages', annonces: ['dressing', 'annonces'] };
+const VOIR_CAPTE = { ventes: 'ventes', bordereaux: 'ventes', versements: 'ventes', messages: 'messages', offres: 'messages', annonces: ['dressing', 'annonces'], numerotes: ['dressing', 'annonces'] };
 function voirCapte(lot, liens) {
   const parCle = new Map((liens || []).map((x) => [x.cle, x.url]));
   for (const s of CAPTE_SORTES) {

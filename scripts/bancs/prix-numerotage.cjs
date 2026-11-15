@@ -83,7 +83,9 @@ const projette = (row, sel) => {
 async function ouvrir(b, { url, largeur, sombre }) {
   const base = { main: MAIN(), maj: new Date(Date.now() - 86400e3).toISOString(), ecritures: [] };
   const rows = [
-    { id: 'harvest_111_listings', data: { capturedAt: auj.toISOString(), payload: { items: ITEMS } } },
+    // (15 nov.) Une lecture COMPLÈTE (Vinted annonce autant d'articles que lus) : sans elle, VRM ne
+    // donne plus de N° neuf (src/numerosNouvelles.js) — les trois annonces sans N° en reçoivent un au chargement.
+    { id: 'harvest_111_listings', data: { capturedAt: auj.toISOString(), payload: { items: ITEMS, pagination: { total_entries: ITEMS.length, total_pages: 1, current_page: 1 } } } },
     { id: 'harvest_111_orders_purchased', data: { capturedAt: auj.toISOString(), payload: { my_orders: ACHATS } } },
     { id: 'harvest_111_orders_sold', data: { capturedAt: auj.toISOString(), payload: { my_orders: [] } } },
   ];
