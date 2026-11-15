@@ -252,6 +252,11 @@ const TXT = {
     annulation: 'Annulation demandée',
     annulationCorps: (r) => `L’acheteur veut annuler${r ? ` (« ${r} »)` : ''} · accepte ou refuse sur Vinted`,
     laPlusRecente: 'la plus récente',
+    // (15 nov., lot fiabilite-auto) Le contrôle de nuit : un écart réel, avec son geste.
+    ctlTitre: (n) => (n > 1 ? `Tout va bien ? · ${n} points à voir` : 'Tout va bien ? · 1 point à voir'),
+    ctlVoir: 'Touche pour voir.',
+    ctl: { 'numeros-double': (n) => `${n} N° ${n > 1 ? 'portés' : 'porté'} par deux articles`, 'vente-sans-numero': (n) => `${n} vente${n > 1 ? 's' : ''} récente${n > 1 ? 's' : ''} sans N°`,
+      'pool-retreci': (n) => `${n} N° ${n > 1 ? 'manquent' : 'manque'} dans ta liste`, 'enligne-24h': (n) => `${n} compte${n > 1 ? 's' : ''} pas relu${n > 1 ? 's' : ''} depuis 24 h` },
     groupe: { bordereau: (k) => `${k} bordereaux prêts à imprimer`, vente: (k) => `${k} ventes`, argent: (k) => `${k} versements reçus`, arrivee: (k) => `${k} colis t'attendent`, offre: (k) => `${k} offres à trancher`, rappel: (k) => `${k} rappels`, message: (k) => `${k} nouveaux messages` },
     resume: { bordereau: (k) => `${k} colis à poster`, arrivee: (k) => `${k} colis à retirer`, vente: (k) => `${k} vente${k > 1 ? 's' : ''}`, argent: (k) => `${k} versement${k > 1 ? 's' : ''}`, offre: (k) => `${k} offre${k > 1 ? 's' : ''}`, message: (k) => `${k} message${k > 1 ? 's' : ''}`, autre: (k) => `${k} autre${k > 1 ? 's' : ''}`, notifs: (k) => `${k} notifications` },
   },
@@ -291,6 +296,10 @@ const TXT = {
     annulation: 'Cancellation requested',
     annulationCorps: (r) => `The buyer wants to cancel${r ? ` (“${r}”)` : ''} · accept or decline on Vinted`,
     laPlusRecente: 'latest',
+    ctlTitre: (n) => (n > 1 ? `All good? · ${n} things to check` : 'All good? · 1 thing to check'),
+    ctlVoir: 'Tap to see.',
+    ctl: { 'numeros-double': (n) => `${n} N° used by two items`, 'vente-sans-numero': (n) => `${n} recent sale${n > 1 ? 's' : ''} without a N°`,
+      'pool-retreci': (n) => `${n} N° missing from your list`, 'enligne-24h': (n) => `${n} account${n > 1 ? 's' : ''} not read for 24 h` },
     groupe: { bordereau: (k) => `${k} labels ready to print`, vente: (k) => `${k} sales`, argent: (k) => `${k} payments received`, arrivee: (k) => `${k} parcels waiting for you`, offre: (k) => `${k} offers to answer`, rappel: (k) => `${k} reminders`, message: (k) => `${k} new messages` },
     resume: { bordereau: (k) => `${k} to ship`, arrivee: (k) => `${k} to pick up`, vente: (k) => `${k} sale${k > 1 ? 's' : ''}`, argent: (k) => `${k} payment${k > 1 ? 's' : ''}`, offre: (k) => `${k} offer${k > 1 ? 's' : ''}`, message: (k) => `${k} message${k > 1 ? 's' : ''}`, autre: (k) => `${k} other${k > 1 ? 's' : ''}`, notifs: (k) => `${k} notifications` },
   },
@@ -330,6 +339,10 @@ const TXT = {
     annulation: 'Cancelación solicitada',
     annulationCorps: (r) => `El comprador quiere cancelar${r ? ` («${r}»)` : ''} · acepta o rechaza en Vinted`,
     laPlusRecente: 'la más reciente',
+    ctlTitre: (n) => (n > 1 ? `¿Todo bien? · ${n} puntos que ver` : '¿Todo bien? · 1 punto que ver'),
+    ctlVoir: 'Toca para ver.',
+    ctl: { 'numeros-double': (n) => `${n} N° en dos artículos`, 'vente-sans-numero': (n) => `${n} venta${n > 1 ? 's' : ''} reciente${n > 1 ? 's' : ''} sin N°`,
+      'pool-retreci': (n) => `Faltan ${n} N° en tu lista`, 'enligne-24h': (n) => `${n} cuenta${n > 1 ? 's' : ''} sin leer desde hace 24 h` },
     groupe: { bordereau: (k) => `${k} etiquetas listas`, vente: (k) => `${k} ventas`, argent: (k) => `${k} pagos recibidos`, arrivee: (k) => `${k} paquetes te esperan`, offre: (k) => `${k} ofertas por responder`, rappel: (k) => `${k} recordatorios`, message: (k) => `${k} mensajes nuevos` },
     resume: { bordereau: (k) => `${k} por enviar`, arrivee: (k) => `${k} por recoger`, vente: (k) => `${k} venta${k > 1 ? 's' : ''}`, argent: (k) => `${k} pago${k > 1 ? 's' : ''}`, offre: (k) => `${k} oferta${k > 1 ? 's' : ''}`, message: (k) => `${k} mensaje${k > 1 ? 's' : ''}`, autre: (k) => `${k} más`, notifs: (k) => `${k} notificaciones` },
   },
@@ -369,6 +382,10 @@ const TXT = {
     annulation: 'Annullamento richiesto',
     annulationCorps: (r) => `L’acquirente vuole annullare${r ? ` («${r}»)` : ''} · accetta o rifiuta su Vinted`,
     laPlusRecente: 'la più recente',
+    ctlTitre: (n) => (n > 1 ? `Tutto bene? · ${n} punti da vedere` : 'Tutto bene? · 1 punto da vedere'),
+    ctlVoir: 'Tocca per vedere.',
+    ctl: { 'numeros-double': (n) => `${n} N° su due articoli`, 'vente-sans-numero': (n) => `${n} vendit${n > 1 ? 'e' : 'a'} recent${n > 1 ? 'i' : 'e'} senza N°`,
+      'pool-retreci': (n) => `${n} N° mancanti nella tua lista`, 'enligne-24h': (n) => `${n} account non lett${n > 1 ? 'i' : 'o'} da 24 h` },
     groupe: { bordereau: (k) => `${k} etichette da stampare`, vente: (k) => `${k} vendite`, argent: (k) => `${k} pagamenti ricevuti`, arrivee: (k) => `${k} pacchi ti aspettano`, offre: (k) => `${k} offerte da valutare`, rappel: (k) => `${k} promemoria`, message: (k) => `${k} nuovi messaggi` },
     resume: { bordereau: (k) => `${k} da spedire`, arrivee: (k) => `${k} da ritirare`, vente: (k) => `${k} vendit${k > 1 ? 'e' : 'a'}`, argent: (k) => `${k} pagament${k > 1 ? 'i' : 'o'}`, offre: (k) => `${k} offert${k > 1 ? 'e' : 'a'}`, message: (k) => `${k} messagg${k > 1 ? 'i' : 'io'}`, autre: (k) => `${k} altr${k > 1 ? 'i' : 'o'}`, notifs: (k) => `${k} notifiche` },
   },
@@ -408,6 +425,10 @@ const TXT = {
     annulation: 'Stornierung angefragt',
     annulationCorps: (r) => `Der Käufer möchte stornieren${r ? ` („${r}“)` : ''} · annehmen oder ablehnen auf Vinted`,
     laPlusRecente: 'das neueste',
+    ctlTitre: (n) => (n > 1 ? `Alles gut? · ${n} Punkte prüfen` : 'Alles gut? · 1 Punkt prüfen'),
+    ctlVoir: 'Tippe zum Ansehen.',
+    ctl: { 'numeros-double': (n) => `${n} N° auf zwei Artikeln`, 'vente-sans-numero': (n) => `${n} neue${n > 1 ? '' : 'r'} Verkauf${n > 1 ? 'e' : ''} ohne N°`,
+      'pool-retreci': (n) => `${n} N° fehlen in deiner Liste`, 'enligne-24h': (n) => `${n} Konto${n > 1 ? 'en' : ''} seit 24 h nicht gelesen` },
     groupe: { bordereau: (k) => `${k} Etiketten druckbereit`, vente: (k) => `${k} Verkäufe`, argent: (k) => `${k} Zahlungen erhalten`, arrivee: (k) => `${k} Pakete warten auf dich`, offre: (k) => `${k} offene Angebote`, rappel: (k) => `${k} Erinnerungen`, message: (k) => `${k} neue Nachrichten` },
     resume: { bordereau: (k) => `${k} zu versenden`, arrivee: (k) => `${k} abzuholen`, vente: (k) => `${k} Verkä${k > 1 ? 'ufe' : 'uf'}`, argent: (k) => `${k} Zahlung${k > 1 ? 'en' : ''}`, offre: (k) => `${k} Angebot${k > 1 ? 'e' : ''}`, message: (k) => `${k} Nachricht${k > 1 ? 'en' : ''}`, autre: (k) => `${k} weitere`, notifs: (k) => `${k} Benachrichtigungen` },
   },
@@ -525,6 +546,14 @@ const SORTES = {
     const { title, reste } = titreAvecObjet(T.annulation, a, d.article);
     return { title, body: joindre(reste, T.annulationCorps(d.raison ? couperMot(d.raison, 30) : '')), ligne: a };
   },
+};
+// (15 nov., lot fiabilite-auto) Le contrôle de nuit : `lignes` = [{ cle, n }] — des clés et des
+// nombres seulement (jamais un N°, un n° de transaction, un pseudo). Le plus grave d'abord.
+SORTES.controleNuit = (d, T) => {
+  const l = (Array.isArray(d.lignes) ? d.lignes : []).filter((x) => x && T.ctl[x.cle] && Number.isInteger(x.n) && x.n > 0);
+  if (!l.length) return null;
+  const phrases = l.slice(0, 2).map((x) => T.ctl[x.cle](x.n));
+  return { title: T.ctlTitre(l.length), body: `${phrases.join(' · ')}. ${T.ctlVoir}`, ligne: phrases[0] };
 };
 export const SORTES_NOTIF = Object.keys(SORTES);
 
