@@ -27,9 +27,14 @@
 .avc-champ { flex: 1 1 110px; min-width: 0; min-height: 44px; box-sizing: border-box; padding: 0 12px; font: inherit; font-size: 17px; font-variant-numeric: tabular-nums; border-radius: var(--sb-r-champ, 14px); border: 0; background: var(--sb-puits, #F3F6F9); box-shadow: var(--sb-puits-ombre); color: inherit; }
 .avc-remise { min-height: 44px; padding: 4px 12px; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; }
 .avc-remise small { font-weight: 400; font-size: 12px; color: var(--sb-encre-2, inherit); }
-.avc-envoyer { min-height: 48px; width: 100%; }
+.avc-envoyer { width: 100%; height: auto; min-height: 50px; padding: 0 20px; border-radius: 999px; flex-direction: row; font-size: 16px; line-height: 1.2; letter-spacing: 0; }
+.avc-envoyer:disabled { opacity: .45; }
 .avc-apprendre p { margin: 0; }
 .avc-apprendre ol { margin: 6px 0 0; padding-left: 20px; font-size: 14px; line-height: 1.45; }
 .avc-refus { margin: 0; font-size: 14px; color: var(--sb-ambre, #764300); }
 .avc-suivi { margin: 0; font-size: 14px; font-variant-numeric: tabular-nums; }
 .avc-suivi small { color: var(--sb-encre-2, inherit); }
+/* Posé DIRECTEMENT sur le fond (le titre, la phrase d'aide, « personne pour l'instant ») : l'encre claire du
+   « Verre dépoli » (`--sv-clair`, src/design/studio-verre.css) quand il est là ; sinon l'encre du thème. */
+.avc > .avc-titre { color: var(--sv-clair, var(--sb-encre, inherit)); }
+.avc > .avc-titre .avc-n, .avc > .avc-aide, .avc > .avc-note { color: var(--sv-clair-2, var(--sb-encre-2, inherit)); }
