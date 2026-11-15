@@ -243,7 +243,7 @@ const actif = (pg) => pg.evaluate(() => {
   const ATTENDU_G = {
     'numeros-double': { ecran: 'cat_bord', onglet: 'envoyer' }, 'colis-postes': { ecran: 'cat_bord', onglet: 'envoyes' },
     'colis-retirer': { ecran: 'cat_bord', onglet: 'retirer' }, 'numeros-a-ecrire': { ecran: 'cat_bord', onglet: 'envoyer' },
-    'numeros-a-verifier': { ecran: 'annonces' }, 'sms-vestiaire': { ecran: 'cat_bord', onglet: 'envoyer' }, 'sms-pickup': { ecran: 'cat_bord', onglet: 'retirer' },
+    'numeros-a-verifier': { ecran: 'annonces' }, 'sms-vestiaire': { ecran: 'ventes', onglet: 'envoyer' }, 'sms-pickup': { ecran: 'achats' },   // (15 nov., rouges-connus) Colis n'est plus un onglet (11 nov., DJ3) : « À expédier » en tête de Ventes, « À retirer » en tête d'Achats
     'supprimes-vinted': { ecran: 'journee' }, 'remise-en-ligne': { ecran: 'annonces' }, 'achats-sans-prix': { ecran: 'annonces', tri: 'sansachat' },
     'comptes-a-relire': { comptes: true }, 'ventes-a-dater': { ecran: 'compta' }, 'adresses-sans-compte': { ecran: 'emails', relier: true },
   };
@@ -281,8 +281,13 @@ const actif = (pg) => pg.evaluate(() => {
     // les autres lignes écrites (SMS reliés, adresses…).
     await pg.waitForTimeout(1500);
     // Les PUBLICATIONS d'écran (nombres dérivés, src/fileEnvoi.js `CLES_PUBLIEES`) et `rev` ne sont pas des données.
-    const changees = Object.keys({ ...avantMain, ...MAIN }).filter((k) => k !== 'rev' && !PUBLIEES.includes(k) && JSON.stringify(avantMain[k]) !== JSON.stringify(MAIN[k]));
-    const autres = ecritures.slice(e0).filter((w) => !w.ids.includes('main') && !/id=eq\.main/.test(w.url)).map((w) => w.ids.join(','));
+    // (15 nov., rouges-connus) Ni données non plus, écrites par l'app sans geste : l'écran OUVERT et ses filtres
+    // (`vrm_reprise_ecrans`, reprise synchronisée du 11 nov., afbf9ec2), le point de restauration automatique
+    // (`restore_*`, « Revenir en arrière » du 11 nov., 61f40545), le relevé de veille des chiffres (`vrm_veille_chiffres`,
+    // 11 nov., ba680d1a — des nombres seuls). Toute autre clé ou ligne écrite reste rouge.
+    const NON_DONNEES = (k) => k === 'vrm_reprise_ecrans' || k === 'vrm_veille_chiffres' || /^restore_\d+$/.test(k);
+    const changees = Object.keys({ ...avantMain, ...MAIN }).filter((k) => k !== 'rev' && !PUBLIEES.includes(k) && !NON_DONNEES(k) && JSON.stringify(avantMain[k]) !== JSON.stringify(MAIN[k]));
+    const autres = ecritures.slice(e0).filter((w) => !w.ids.includes('main') && !/id=eq\.main/.test(w.url)).map((w) => w.ids.filter((i) => !NON_DONNEES(i)).join(',')).filter(Boolean);
     dit(!changees.length && !autres.length, `G ${cle} : le geste n'écrit aucune donnée (il ouvre)`, JSON.stringify({ changees, autres }));
     await shot(pg, 'G-' + cle);
     await ctx.close();
