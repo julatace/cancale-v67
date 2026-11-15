@@ -2485,17 +2485,17 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
           catOuverte ? ecranCategorie(catOuverte, { avecTitre: false }) : (
             // ── LE PREMIER ÉCRAN (téléphone) : les catégories, « Sécurité des données » (expert) à part ──
             <section className="vrm-set-groupe vrm-pm-racine">
-              <div className="vrm-set-liste" data-categories-reglages="" data-onglets-reglages="" style={{background:C.card,border:`1px solid ${C.border}`}}>
+              <div className="vrm-set-liste" data-categories-reglages="" data-onglets-reglages="">
                 {categories.filter((c) => !c.expert).map((c) => ligneCategorie(c, { surClic: () => ouvrirCategorie(c.id) }))}
               </div>
-              {categories.filter((c) => c.expert).map((c) => <div key={c.id} className="vrm-set-liste vrm-pm-expert-liste" style={{background:C.card,border:`1px solid ${C.border}`}}>{ligneCategorie(c, { surClic: () => ouvrirCategorie(c.id) })}</div>)}
+              {categories.filter((c) => c.expert).map((c) => <div key={c.id} className="vrm-set-liste vrm-pm-expert-liste">{ligneCategorie(c, { surClic: () => ouvrirCategorie(c.id) })}</div>)}
             </section>
           )
         ) : (
           // ── ORDINATEUR : le sommaire collant à gauche, toutes les catégories à droite ──
           <div className="vrm-pm-bureau">
             <nav className="vrm-pm-sommaire" aria-label={tr('ecran.settings')}>
-              <div className="vrm-set-liste" data-categories-reglages="" data-onglets-reglages="" style={{background:C.card,border:`1px solid ${C.border}`}}>
+              <div className="vrm-set-liste" data-categories-reglages="" data-onglets-reglages="">
                 {categories.map((c) => ligneCategorie(c, { actif: catActive === c.id, surClic: () => { setCatActive(c.id); try { const el = document.getElementById(`parametres-${c.id}`); if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {} } }))}
               </div>
             </nav>
