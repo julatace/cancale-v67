@@ -78,6 +78,7 @@ import { bilanDuMois, meilleurCompte, pdfBilanMois, nomFichierBilan, texteBilan 
 import { urssafDuBilan, lignesFinMois } from "../bilanFinMois.js";   // (15 nov., lot argent-plus) URSSAF du mois et articles qui dorment
 import { ExportBilanMois } from "../BilanFinMois.jsx";
 import { AlertesSeuils } from "../AlertesSeuils.jsx";   // (15 nov., lot argent-plus) les seuils à 80 % puis 100 %, une fois chacun
+import { vuesAvec, CLE_SEUILS_VUS } from "../alertesSeuils.js";
 import { dormentDe } from "../../api/_lib/bilan-semaine.js";
 import { DEMANDE_BILAN_MOIS, attrCible } from "../cibleNotif.js";   // (13 nov., lot 53) le mois demandé par l'e-mail du bilan mensuel
 import { delaisPaiement, texteDelai } from "../delaiPaiement.js";
@@ -4055,6 +4056,18 @@ function PorteMonnaieCompta({ accounts, panelOff }) {
 // (15 nov., lot argent-plus) + `dorment` (la publication `vrm_paires_dorment` de l'écran Annonces) :
 // le bilan dit aussi l'URSSAF du mois (régime CHOISI, `montantPeriodeUrssaf` sur le mois) et les
 // articles qui dorment (`dormentDe`, la règle du bilan de la semaine) — src/bilanFinMois.js.
+// (15 nov., lot argent-plus) LES ALERTES DE SEUILS (src/AlertesSeuils.jsx) : la ligne publiée par Ventes,
+// le régime CHOISI, l'activité de « Ma configuration », et le registre « Compris » (`vrm_seuils_vus`, synchronisé).
+// Rien d'atteint, ou tout déjà compris ⇒ rien n'est rendu (aucune place prise).
+const lireSeuilsVus = () => { try { const v = load(CLE_SEUILS_VUS, null); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch (_) { return {}; } };
+const lireActiviteMicro = () => { try { const v = load('vrm_micro_options', null); return v && v.activite === 'services' ? 'services' : 'vente'; } catch (_) { return 'vente'; } };
+function AlertesSeuilsArgent() {
+  const ligne = useLigneUrssaf();
+  const regime = useRegimeFiscal();
+  const [activite] = useLigneSynchro('vrm_micro_options', lireActiviteMicro);
+  const [vues, vuesPretes] = useLigneSynchro(CLE_SEUILS_VUS, lireSeuilsVus);
+  return <AlertesSeuils ligne={ligne} regime={regime} activite={activite || 'vente'} vues={vuesPretes ? vues : undefined} onCompris={(cles) => save(CLE_SEUILS_VUS, vuesAvec(lireSeuilsVus(), cles))} />;
+}
 const lireDormentBilan = () => { try { const v = load('vrm_paires_dorment', null); return v && typeof v === 'object' ? v : null; } catch (_) { return null; } };
 const assembleBilanMois = ({ ym, enCours, liveStats, compta, pub, ligneUrssaf, regime, maintenant = Date.now(), dorment = undefined }) => {
   const [y, m] = ym.split('-').map(Number);
@@ -4582,6 +4595,8 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         </>)}
       </div>}
       <div className="vrm-argent-partie" data-argent-vue="resume" hidden={vue !== 'resume'}>
+        {/* (15 nov., lot argent-plus) Un seuil de l'année à 80 % ou 100 % : en tête, jusqu'à « Compris » (rien sinon). */}
+        <AlertesSeuilsArgent />
         {/* Les quatre réponses : vendu, reçu, bénéfice, à déclarer. Toucher = le détail. */}
         <ArgentQuestions liveStats={liveStats} onNav={onNav} allerVue={allerVue} />
       {/* (2 nov., style « Fusion ») L'anneau et les six mois — des parts et des hauteurs, aucun montant redit. */}

@@ -747,6 +747,8 @@ import { venteDuCode, enregistrerResolveur, prendreDemande as prendreDemandeDouc
 import { beneficesParColis } from "./tempsColis.js";
 import { listeInventaire, publierInventaireAnnuel } from "./inventaireAnnuel.js";   // (10 nov., lot W) l'inventaire de fin d'année
 import { BarreCoutVente, PointCout, SaisieEmballage } from "./CascadeVente.jsx";
+import { BeneficeListeResume } from "./BeneficeArticle.jsx";   // (15 nov., lot argent-plus) le bénéfice réel d'une liste de ventes
+import { beneficeArticle, beneficeListe } from "./beneficeArticle.js";
 import { etatNumeroColis } from "./emballage.js";
 // (6 nov., vitesse 2) ModeEmballage : à la demande ; sa feuille de style reste ICI (même ordre).
 import "./styles-emballage.css";
@@ -3087,6 +3089,8 @@ const SYNC_KEYS = [
   'vinted_accounts','vinted_account_labels','vinted_account_emails','vinted_account_phones',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
   'vinted_goal','vinted_regime','vrm_micro_options','vinted_tva','vinted_bordereau_formats',
+  // (15 nov., lot argent-plus) Les alertes de seuils déjà dites (« Compris », src/alertesSeuils.js) : une fois chacune, sur tous ses appareils.
+  'vrm_seuils_vus',
   // (3 nov.) La place du tampon choisie à la main, par FORME de bordereau (« Toujours ici »).
   'vrm_tampon_positions','vinted_bords_printed',
   // (8 nov.) Les bordereaux imprimés SANS N° (src/bordereauVenteEmail.js) : la carte le redit.
@@ -48955,6 +48959,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
+        {/* (15 nov., lot argent-plus) Le bénéfice réel des ventes affichées, frais inclus (src/beneficeArticle.js, la règle de
+            chaque ligne) : la somme des calculables « sur N de M », « au plus » s'il reste des frais à confirmer, le manque nommé. */}
+        {Array.isArray(sales.items) && !sales.error && ventesAffichees.length > 0 && <BeneficeListeResume s={beneficeListe(ventesAffichees.filter(o => o && !isHidden(o)).map(o => {
+          const devise = o.price && o.price.currency_code;
+          return beneficeArticle({ plateforme: 'Vinted', vente: o.price?.amount, entree: effEntry(o), annulee: classifyOrderStatus(o.status) === 'cancelled', autreDevise: !!(devise && devise !== 'EUR') });
+        }))}/>}
         <RaisonBordereauxGrises ventes={ventesAffichees.filter(o=>o && o.transaction_id!=null && !isHidden(o) && classifyOrderStatus(o.status)!=='cancelled' && aExpedier(o) && !estParti(o) && !labelsCaptes[String(o.transaction_id)] && !bordParTx[String(o.transaction_id)])}/>
         {/* (9 nov.) Solo : les ventes des comptes d'achat, en aperçu (3 nettes, le reste flouté, aucun geste), jamais supprimées. */}
         {!dansPlateforme && <VentesHorsPlan ventes={Array.isArray(sales.items) ? sales.items.filter(o => o && !acctOffOf(o) && classifyOrderStatus(o.status) !== 'cancelled') : null}

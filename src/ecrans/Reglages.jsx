@@ -120,7 +120,9 @@ import {conflitAdresseCompte} from '../receptionEmail.js';
 import EspaceEmails from '../EspaceEmails.jsx';
 // ⟦← App.jsx #9⟧
 import { feuillesExport, fichiersExport, zipStocke, nomExport } from "../exportDonnees.js";
-import { toutesMesDonnees } from "../exportRgpd.js";   // (12 nov.) RGPD : toutes ses données
+import { toutesMesDonnees } from "../exportRgpd.js";
+import { SauvegardeDonnees } from '../SauvegardeDonnees.jsx';
+import { lecteurPdfBordereau } from '../sauvegardeDonnees.js';   // (15 nov., lot argent-plus) « Télécharger toutes mes données »   // (12 nov.) RGPD : toutes ses données
 // ⟦← App.jsx #11⟧
 import { MesuresTerrain } from "../composants/MesuresTerrain.jsx";
 import { PlantagesTerrain } from "../composants/PlantagesTerrain.jsx";
@@ -5148,6 +5150,9 @@ function SecuriteSetting() {
         d={!ext ? "Normal sur téléphone. Sur l'ordinateur, ouvre l'app dans le navigateur de l'extension."
           : ext.connecte ? "Elle écrira sous ce compte."
           : `Icône de l'extension ${NAV.dansNu} → Compte VRM → ton e-mail et ton mot de passe.`}/>
+      {/* (15 nov., lot argent-plus) « Télécharger toutes mes données » : un zip fait ICI, depuis SES lignes (src/SauvegardeDonnees.jsx). */}
+      <SauvegardeDonnees Bouton={Bouton} lireTout={lireTout} lirePdf={lecteurPdfBordereau({ fetcher: (u, o) => fetch(u, o), url: SUPABASE_URL, auth: () => sbAuth(), owner: (AUTH.user && AUTH.user.id) || '' })} owner={(AUTH.user && AUTH.user.id) || ''} sources={sourcesExportDonnees}
+        telecharger={telechargerFichier} nomCompte={(uid) => { try { return (load('vinted_account_labels', {}) || {})[uid] || uid; } catch (_) { return uid; } }}/>
       {/* (6 nov., v36) Les temps réels des vendeurs, anonymes et agrégés (src/composants/MesuresTerrain.jsx) :
           au propriétaire de l'installation seulement (la route refuse les autres). */}
       {proprio ? <MesuresTerrain entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne} nomEcran={nomEcranVeille}/> : null}

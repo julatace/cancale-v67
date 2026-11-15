@@ -26,6 +26,11 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (15 nov., lot argent-plus) docs/passation/2026-11-15-argent-plus.md — bilan de fin de mois, seuils, bénéfice, sauvegarde.
+  { id: 'bilan-fin-mois', date: '2026-11-15', titre: 'Ton bilan du mois, le 1er', phrase: 'Vendu, reçu, URSSAF, qui dorment : en notification, PDF et tableur.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  { id: 'alertes-seuils', date: '2026-11-15', titre: 'Prévenu à 80 % de tes seuils', phrase: 'Plafond micro, TVA, DAC7 : une alerte, une phrase sourcée.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  { id: 'benefice-article', date: '2026-11-15', titre: 'Le vrai bénéfice de chaque article', phrase: 'Frais du site et frais notés déduits, le manque nommé.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  { id: 'sauvegarde-toutes-donnees', date: '2026-11-15', titre: 'Télécharger toutes tes données en un zip', phrase: 'Tableaux, données par catégorie et bordereaux, faits dans ton navigateur.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « J'aime la 9 ») docs/passation/2026-11-15-verre-depoli.md — le thème « Verre dépoli ».
   { id: 'verre-depoli', date: '2026-11-15', titre: 'Nouveau thème : verre dépoli sur bleu profond', phrase: 'Le chiffre du jour en blanc, tout se lit sur le verre.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « c'est moche et il y a des bugs ») docs/passation/2026-11-15-annonces-achats.md

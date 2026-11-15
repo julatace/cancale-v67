@@ -13,6 +13,7 @@ import { texteDuree } from './etatArticle.js';
 import { escalierPrix, eurosPrix } from './historiquePrix.js';
 import { motsInsecables } from './motsInsecables.jsx';
 import { tr } from './i18n/index.js';
+import { BeneficeArticleDetail } from './BeneficeArticle.jsx';   // (15 nov., lot argent-plus) le bénéfice réel, frais du site inclus
 import { poserSlot } from './ficheLigne.js';
 import LigneDeTemps, { OngletsFiche, useVueFiche } from './paireHistoire/LigneDeTemps.jsx';   // (14 nov., idée 154) « Dans l'ordre »
 
@@ -303,6 +304,9 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
           </div>
         </>)}
       </div>}
+      {/* (15 nov., lot argent-plus) Ce que le site et les frais saisis retirent (src/beneficeArticle.js) — seulement
+          ce que les tuiles ne disent pas déjà (le même nombre ne s'écrit jamais deux fois, §7). */}
+      {!double && !sv && r.detail ? <BeneficeArticleDetail b={r.detail} seulement={r.detail.plateforme === 'eBay' ? ['vente', 'site', 'saisis'] : ['site', 'saisis']}/> : null}
       {etat && !double ? <EtatArticle etat={etat}/> : null}
       {!depuis && outils ? <div className="vrm-fp-outils">{outils}</div> : null}
       <OngletsFiche vue={vueFiche} onVue={setVueFiche}/>

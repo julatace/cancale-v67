@@ -38,6 +38,7 @@ import ecran_atelier from './es/atelier.js';
 import ecran_accompagnement from './es/accompagnement.js';   // (14 nov.) les quatre moments d'un geste
 import ecran_partenaires from './es/partenaires.js';   // (15 nov.) programme partenaire
 import ecran_argentprix from './es/argentprix.js';   // (14 nov., argent-prix)
+import ecran_argentPlus from './es/argentPlus.js';   // (15 nov., lot argent-plus)
 import ecran_rechliste from './es/rechliste.js';
 import ecran_studio_paires from './es/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
 import ecran_republier_guide from './es/republierGuide.js';   // (15 nov.) republier / publier à la main, guidés
@@ -61,6 +62,7 @@ export default {
   ...ecran_accompagnement,
   ...ecran_plus,
   ...ecran_argentprix,
+  ...ecran_argentPlus,
   ...ecran_partenaires,
   ...ecran_plateformes,
   ...ecran_idees,
