@@ -255,8 +255,8 @@ async function scenario(b, vp, sombre) {
     if (!tel) {   // maquette ordinateur achats-1512 : les codes en colonne à gauche, un chiffre par case ; les achats à droite
       const o = await pg.evaluate(() => { const r = document.querySelector('.vrm-tache[data-tache="achats"] > .vrm-achats-retirer-repli'); const s = r && r.nextElementSibling;
         const cases = [...document.querySelectorAll('.vrm-rpf-code-gros[data-rp-code-visible="K48291"] .va-c')].map((x) => Math.round(x.getBoundingClientRect().height));
-        return { cases, gauche: r ? Math.round(r.getBoundingClientRect().right) : null, droite: s ? Math.round(s.getBoundingClientRect().left) : null }; });
-      dit(o.cases.length === 6 && o.cases.every((h) => h >= 56) && o.gauche != null && o.droite != null && o.droite >= o.gauche, `${nom} : A ordinateur : les codes à gauche (un chiffre par case), les achats à droite`, JSON.stringify(o));
+        const t = document.querySelector('.vrm-tache[data-tache="achats"] .vrm-rpf-titre'); return { cases, titreW: t ? Math.round(t.getBoundingClientRect().width) : 0, gauche: r ? Math.round(r.getBoundingClientRect().right) : null, droite: s ? Math.round(s.getBoundingClientRect().left) : null }; });
+      dit(o.cases.length === 6 && o.cases.every((h) => h >= 56) && o.titreW >= 120 && o.gauche != null && o.droite != null && o.droite >= o.gauche, `${nom} : A ordinateur : les codes à gauche (un chiffre par case), les achats à droite`, JSON.stringify(o));
     }
     await pg.click('[data-va-code-grand="K48291"]').catch(() => {});
     await pg.waitForSelector('[data-va-comptoir]', { timeout: 6000 }).catch(() => {});
