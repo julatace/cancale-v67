@@ -74,7 +74,10 @@ export function LienJ({ children, onClick, attrs = null }) {
 // ordinateur), attrs (data-* de la tuile : ses compteurs), face (le corps de la tuile), plein (le
 // bouton plein posé SUR la tuile, au-dessus de sa zone), tasse ({ n, l } : la tuile tassée),
 // deplie (ce qui s'ouvre ; null ⇒ `toucher` est son geste), toucher, aria (nom de la tuile) }].
-export function BentoJournee({ tuiles, ordi = false, FermeAuRetour = null, avant = null }) {
+// `colonnes` (15 nov., refonte-journee — la maquette ORDINATEUR validée) : [{ cle, avant, ids, apres }] — la grille se
+// range en colonnes (Ma journée à l'ordinateur : le chiffre du jour et « À sortir en premier » puis le mois · À envoyer ·
+// À retirer, Messages, À faire). Les MÊMES tuiles, le même dépliage ; une tuile qu'aucune colonne ne nomme suit dans la 2ᵉ.
+export function BentoJournee({ tuiles, ordi = false, FermeAuRetour = null, avant = null, colonnes = null }) {
   const [ouverte, setOuverte] = React.useState(null);
   const zones = React.useRef({});
   const fermerRef = React.useRef(null);
@@ -132,8 +135,8 @@ export function BentoJournee({ tuiles, ordi = false, FermeAuRetour = null, avant
           ))}
         </div>
       ) : null}
-      <div className="sj-grille" data-sj-grille="" hidden={!!(tuileOuverte && !ordi)}>
-        {tuiles.map((t) => {
+      {(() => {
+        const rendre = (t) => {
           const actif = !!(tuileOuverte && tuileOuverte.id === t.id);
           return (
             <div key={t.id} className={'sb-tuile sj-t sj-t-' + t.id + (actif ? ' is-actif' : '') + (t.vide ? ' is-calme' : '')}
@@ -154,8 +157,23 @@ export function BentoJournee({ tuiles, ordi = false, FermeAuRetour = null, avant
               {t.plein ? <div className="sj-plein-place">{t.plein}</div> : null}
             </div>
           );
-        })}
-      </div>
+        };
+        if (!(colonnes && ordi)) return <div className="sj-grille" data-sj-grille="" hidden={!!(tuileOuverte && !ordi)}>{tuiles.map(rendre)}</div>;
+        const nommees = new Set(colonnes.flatMap((c) => c.ids || []));
+        const reste = tuiles.filter((t) => !nommees.has(t.id));
+        return (
+          <div className="sj-grille sj-grille-colonnes" data-sj-grille="" data-sj-colonnes={String(colonnes.length)}>
+            {colonnes.map((c, k) => (
+              <div key={c.cle} className={'sj-col sj-col-' + c.cle} data-sj-col={c.cle}>
+                {c.avant || null}
+                {(c.ids || []).map((id) => tuiles.find((t) => t.id === id)).filter(Boolean).map(rendre)}
+                {k === 1 ? reste.map(rendre) : null}
+                {c.apres || null}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
       {avant}
       {tuileOuverte ? (
         <section id="sj-deplie" ref={panneauRef} className="sb-tuile sb-avant sj-deplie" data-sj-deplie={tuileOuverte.id}

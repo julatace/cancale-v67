@@ -89,7 +89,9 @@ const MARQUEURS = {
   'case Prix à baisser': '[data-tuile="prix"]',
   'imprimer les prêts': '[data-sj-imprimer], [data-fu-principal]',
   'liste À faire et son compte': '[data-fu-gestes]',
-  'À trancher (en place)': '[data-at-journee], [data-job="a-trancher"]',
+  // (15 nov., refonte-journee — Julien : « tu peux enlever ») « À trancher » vit dans la feuille « Tout va bien ? » : sa
+  // ligne (`data-tvb-ligne`) est la porte sur Ma journée.
+  'À trancher (en place)': '[data-at-journee], [data-job="a-trancher"], [data-tvb-ligne]',
   'prévision du mois': '[data-argent-plus="prevision-ligne"]',
   'Modifier ma journée': '[data-jp-modifier]',
 };
