@@ -123,7 +123,7 @@ function regle(nom, f) {
     const fus = C.fusionnerVersements(avant, m);
     dit(A.sourcesDeVersement(fus).get('13') === 'conversation' && fus.__vrmParReleve instanceof Set && fus.__vrmParReleve.has('12'), 'la fusion « une date connue ne redevient jamais pas lue » GARDE d’où vient chaque date', JSON.stringify([...A.sourcesDeVersement(fus)]));
     // (15 nov.) En HEURES de Vinted ouvert (12 lectures/h) : « 7 jours » supposait l'onglet ouvert 24 h sur 24.
-    dit(A.heuresPourDater(1741) === 146 && A.heuresPourDater(0) === 0 && A.heuresPourDater(10) === 1 && typeof A.joursPourDater !== 'function', '« environ X h avec vinted.fr ouvert » : 1 741 ventes ⇒ 146 h (12 par heure) — plus de « jours » de 24 h', String(A.heuresPourDater && A.heuresPourDater(1741)));
+    dit(A.heuresPourDater(1741) === 97 && A.heuresPourDater(0) === 0 && A.heuresPourDater(10) === 1 && typeof A.joursPourDater !== 'function', '« environ X h avec vinted.fr ouvert » : 1 741 ventes ⇒ 97 h (18 par heure, 5.390) — plus de « jours » de 24 h', String(A.heuresPourDater && A.heuresPourDater(1741)));
   });
 
   // ── 3. L'extension ──
@@ -172,7 +172,7 @@ function regle(nom, f) {
       const m = /\/api\/v2\/conversations\/(\d+)$/.exec(r.chemin);
       if (!m) return { status: 404, body: {} };
       const tx = String(Number(m[1]) - 8800000 + 9300000);
-      return { status: 200, body: conv(tx === '9300000' ? '9399999' : tx) };   // la plus ancienne : lue la 1re
+      return { status: 200, body: conv(tx === '9300008' ? '9399999' : tx) };   // (5.390) la plus RÉCENTE : lue la 1re
     };
     const f = faireFond({ src: bgSrc, lignes, vinted, store });
     f.ctx.__vrmPausesVues = [];
@@ -186,7 +186,7 @@ function regle(nom, f) {
     const l = rang.length ? f.lignes[rang[0]] : null;
     dit(!!l && l.source === 'conversation' && /^\d+$/.test(l.tx) && l.at === J3 && !JSON.stringify(l).includes('acheteuse_x') && !JSON.stringify(l).includes('Paire secrète') && !JSON.stringify(l).includes('45'),
       '3. la ligne rangée : n°, date, source — jamais un pseudo, un titre ni un montant', JSON.stringify(l));
-    dit(f.j.vinted.some((x) => /\/conversations\/8800000$/.test(x.chemin)) && !f.lignes['harvest_111_versement_9300000'] && !f.lignes['harvest_111_versement_9399999'],'3. une conversation qui porte une AUTRE transaction n’écrit rien (l’identité prime)');
+    dit(f.j.vinted.some((x) => /\/conversations\/8800008$/.test(x.chemin)) && !f.lignes['harvest_111_versement_9300008'] && !f.lignes['harvest_111_versement_9399999'],'3. une conversation qui porte une AUTRE transaction n’écrit rien (l’identité prime)');
   });
 
   // ── 4. Le contrôle de nuit ──
@@ -226,7 +226,8 @@ function regle(nom, f) {
   { const v = (re, t) => ((re.exec(t) || [])[1] || ''); const num = (x) => x.split('.').map(Number); const sup = (a, b) => { const A = num(a), B = num(b); for (let i = 0; i < 3; i++) if ((A[i] || 0) !== (B[i] || 0)) return (A[i] || 0) > (B[i] || 0); return true; };
     const cv = v(/CODE_VERSION = '([\d.]+)'/, bg), mv = v(/"version": "([\d.]+)"/, lire('vinted-sync-extension/manifest.json')), ea = v(/EXT_ATTENDUE = '([\d.]+)'/, app);
     dit(!!cv && cv === mv && mv === ea && sup(cv, '5.376.0') && /versementconv: '5\.376\.0'/.test(app), `extension ${cv} (≥ 5.376.0), \`EXT_CAPACITES.versementconv\` = 5.376.0`); }
-  dit(/heuresPourDater\(c\.n\)/.test(sans(lire('src/ecrans/Compta.jsx'))) && /data-adater-conversation/.test(lire('src/ecrans/Compta.jsx')) && /data-adater-raison="releve-non-verifie"/.test(lire('src/ecrans/Compta.jsx')), 'Déclarer : « dont N par la conversation », « environ X h avec vinted.fr ouvert » et « dates du relevé pas encore vérifiées »');
+  // (15 nov., extension 5.390) « Déclarer » : une ligne discrète, « environ X h avec vinted.fr ouvert » par la même règle (`heuresPourDater`).
+  dit(/<LigneDatesVersement /.test(sans(lire('src/ecrans/Compta.jsx'))) && /heuresPourDater\(lues\)/.test(sans(lire('src/versementRaisons.js'))) && !/data-adater-raison/.test(lire('src/ecrans/Compta.jsx')), 'Déclarer : la ligne discrète, « environ X h avec vinted.fr ouvert » par `heuresPourDater`, plus la carte des raisons');
 
   console.log(ko ? `\n❌ dates de versement, quatre sources : ${ok} vert(s), ${ko} rouge(s)` : `\n✅ dates de versement, quatre sources : ${ok} vert(s), 0 rouge(s)`);
   process.exit(ko ? 1 : 0);

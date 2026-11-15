@@ -77,14 +77,16 @@ const lireArgent = async (pg) => {
   await pg.locator('[data-argent-q="declarer"]').click().catch(() => {});
   await pg.waitForTimeout(1500);
   return pg.evaluate((hautTexte) => {
-    const l = document.querySelector('[data-dates-versement-ligne]');
+    // La ligne de « Déclarer » (la même ligne vit aussi, repliée, dans « Vendu et reçu » et la carte du mois).
+    const l = document.querySelector('.vrm-urssaf-manque [data-dates-versement-ligne]');
+    const toutes = document.querySelectorAll('[data-dates-versement-ligne]').length;
     const m = document.querySelector('.vrm-urssaf-manque');
     const r = l ? l.getBoundingClientRect() : null;
     return {
       haut: hautTexte, page: (document.querySelector('.vrm-main') || document.body).innerText,
       ligne: l ? { n: l.getAttribute('data-dates-versement-ligne'), h: l.getAttribute('data-dates-versement-heures'), t: l.innerText, gestes: l.querySelectorAll('button,a,[role="button"]').length, vis: !!(r && r.width > 0 && r.height > 0) } : null,
       manqueGestes: m ? m.querySelectorAll('button,a,[role="button"]').length : null, manque: m ? m.innerText : null,
-      anciennes: document.querySelectorAll('[data-adater-raisons],[data-adater-geste],[data-urssaf-dater],[data-dater-lbc]').length,
+      toutes, anciennes: document.querySelectorAll('[data-adater-raisons],[data-adater-geste],[data-urssaf-dater],[data-dater-lbc]').length,
       ca: (document.querySelector('[data-urssaf-ligne="ca"] .vrm-urssaf-val') || { innerText: '' }).innerText,
     };
   }, haut);
@@ -143,7 +145,7 @@ const lireArgent = async (pg) => {
         const pub = await publie(pg);
         dit(!!(pub && pub.aDater && pub.aDater.n === 0), `L4 ${T} : rien à dater publié`, JSON.stringify(pub && pub.aDater && pub.aDater.n));
         const K = await lireArgent(pg);
-        dit(K.ligne === null && !/Dates de versement : l’extension/.test(K.page), `L4 ${T} : la ligne n’existe pas`, JSON.stringify(K.ligne));
+        dit(K.ligne === null && K.toutes === 0 && !/Dates de versement : l’extension/.test(K.page), `L4 ${T} : la ligne n’existe nulle part`, `${JSON.stringify(K.ligne)} · ${K.toutes}`);
         dit(!INTERDIT.test(K.page), `L4 ${T} : aucun « à dater »`, (INTERDIT.exec(K.page) || [''])[0]);
         await capture(pg, `argent-declarer-tout-date-${W}`);
         dit(!o.journal.erreurs.length, `T ${T} : aucune erreur de page`, o.journal.erreurs.slice(0, 3).join(' | '));

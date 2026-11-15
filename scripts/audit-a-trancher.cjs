@@ -41,7 +41,8 @@ const memoire = () => { const m = new Map(); return { getItem: (k) => (m.has(k) 
   dit(Object.keys(A.lirePublications(S, U)).length === 0 && A.lirePublications(S, 'autre')['colis-postes'].n === 9, '3 · un autre compte remplace la ligne, il ne la mélange jamais');
   // 1
   const r = A.lignesATrancher({ pubs, colisRetirer: { aVerifier: 2, enVerification: 1, at: T }, urssafMois: { aDater: { n: 5 }, at: T }, comptes: [{ login: 'a', jours: 3 }], maintenant: T + 2 * 3600e3 });
-  dit(r.total === 2 + 4 + 3 + 5 + 1, '1 · total = somme des sources sues', r.total);
+  // (15 nov., extension 5.390) Les 5 ventes sans date ne sont plus à trancher (l'extension les date).
+  dit(r.total === 2 + 4 + 3 + 1 && !r.lignes.some((l) => l.cle === 'ventes-a-dater'), '1 · total = somme des sources sues (plus « ventes à dater »)', r.total);
   dit(r.partiel === true && r.manque.every((l) => l.n === null && l.raison), '1 · les autres sont « pas su » avec leur raison, jamais 0', r.manque.map((l) => l.cle).join(','));
   dit(r.lignes.find((l) => l.cle === 'colis-retirer').n === 3, '1 · colis à retirer à vérifier = aVerifier + enVerification (la publication de Colis)');
   const r0 = A.lignesATrancher({ pubs: {}, colisRetirer: null, urssafMois: null, comptes: undefined, maintenant: T });
@@ -50,7 +51,7 @@ const memoire = () => { const m = new Map(); return { getItem: (k) => (m.has(k) 
   const vieux = A.lignesATrancher({ pubs, colisRetirer: { aVerifier: 2, at: T - 13 * 3600e3 }, urssafMois: { aDater: { n: 5 }, at: T - 2 * 86400e3 }, comptes: [], maintenant: T + 2 * 3600e3 + 13 * 3600e3 });
   dit(vieux.lignes.find((l) => l.cle === 'numeros-double').n === null, '2 · une publication de plus de 12 h redevient « pas su »');
   dit(vieux.lignes.find((l) => l.cle === 'colis-retirer').n === null, '2 · `vrm_colis_retirer` de plus de 12 h : « pas su »');
-  dit(vieux.lignes.find((l) => l.cle === 'ventes-a-dater').n === 5, '2 · le CA déclaré se croit 3 jours (règle du widget)');
+  dit(!vieux.lignes.some((l) => l.cle === 'ventes-a-dater'), '2 · (5.390) plus de « ventes à dater » à trancher, même avec une publication d’il y a 2 jours');
   // 5
   const ancienne = (liveStats) => { const ls = liveStats && Number(liveStats.dataAgeJours) > 1 ? liveStats : null; return ls ? ((Array.isArray(ls.dataAgeComptes) && ls.dataAgeComptes.filter((x) => x && x.login).length) ? ls.dataAgeComptes.filter((x) => x && x.login) : [{ login: ls.dataAgeCompte || '', jours: ls.dataAgeJours }]) : []; };
   const cas = [null, {}, { dataAgeJours: 0 }, { dataAgeJours: 1, dataAgeComptes: [] }, { dataAgeJours: 3, dataAgeCompte: 'x', dataAgeComptes: [{ login: 'x', jours: 3 }, { login: 'y', jours: 2 }] }, { dataAgeJours: 4, dataAgeCompte: 'z', dataAgeComptes: null }, { dataAgeJours: 4, dataAgeComptes: [{ jours: 4 }] }, { dataAgeJours: null, dataAgeComptes: null }];
@@ -58,10 +59,10 @@ const memoire = () => { const m = new Map(); return { getItem: (k) => (m.has(k) 
   dit(A.comptesARelireDe(null) === undefined && A.comptesARelireDe({ dataAgeJours: null, dataAgeComptes: null }) === null, '5 · « À trancher » distingue en cours (undefined) et pas su (null)');
   // 6
   dit(A.badgeATrancher(r0) === null && A.phraseJournee(r0) === '', '6 · rien à 0 : ni badge, ni ligne dans Ma journée');
-  dit(A.badgeATrancher(r) === r.total && /^Au moins 15 choses à trancher$/.test(A.phraseJournee(r)), '6 · partiel : « Au moins N »', A.phraseJournee(r));
+  dit(A.badgeATrancher(r) === r.total && /^Au moins 10 choses à trancher$/.test(A.phraseJournee(r)), '6 · partiel : « Au moins N » (10 : plus les 5 « à dater », 5.390)', A.phraseJournee(r));
   // 7
   const ordre = A.SOURCES.map((s) => s.cle);
-  dit(ordre.indexOf('numeros-double') === 0 && ordre.indexOf('colis-postes') < ordre.indexOf('achats-sans-prix') && ordre.indexOf('ventes-a-dater') === ordre.length - 1, '7 · ce qui coûte un colis d’abord, le CA à dater en dernier');
+  dit(ordre.indexOf('numeros-double') === 0 && ordre.indexOf('colis-postes') < ordre.indexOf('achats-sans-prix') && !ordre.includes('ventes-a-dater'), '7 · ce qui coûte un colis d’abord ; plus de « CA à dater » (5.390)');
   dit(A.SOURCES.every((s) => s.geste && s.geste.tab && s.geste.libelle && !('ecrit' in s.geste)), '7 · chaque source : un geste qui ouvre un écran');
   dit(A.SOURCES.every((s) => A.NOMS[s.cle]), '7 · chaque source a un nom pour « pas su »');
   // 8

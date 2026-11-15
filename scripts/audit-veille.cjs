@@ -171,13 +171,14 @@ const H = 3600e3, JOUR = 864e5;
   const ec = c.ecrits[0];
   vrai(c.ecrits.length === 1 && ec.id === C.CLE_CONTROLE, 'C2 UNE écriture : sa ligne vrm_controle_nuit');
   vrai(ec && ec.data.controles['numeros-double'].n === 1 && JSON.stringify(ec.data.controles['numeros-double'].ids) === '["12"]', `C2 N°12 porté par deux annonces EN LIGNE (deux comptes) ⇒ 1 (${JSON.stringify(ec && ec.data.controles['numeros-double'])})`);
-  vrai(ec && ec.data.controles['versement-30j'].n === 3, 'C2 3 ventes sans versement depuis 30 jours (le nombre publié par Ventes)');
+  // (15 nov., extension 5.390) Plus un contrôle de la nuit : Julien ne date rien lui-même.
+  vrai(ec && !ec.data.controles['versement-30j'], 'C2 « ventes sans versement depuis 30 jours » n’est plus contrôlé (5.390)');
   vrai(ec && ec.data.controles['comptes-48h'].n === 1 && JSON.stringify(ec.data.controles['comptes-48h'].ids) === '["333"]', `C2 le compte 333 pas relu depuis 72 h (${JSON.stringify(ec && ec.data.controles['comptes-48h'])})`);
   vrai(jour.filter((p) => /id=eq\.main|harvest_/.test(p)).length >= 5 && !jour.some((p) => /id=eq\.main|harvest_/.test(p) && /select=([^&]*[:,])?data(,|&|$)/.test(p)), 'C2 main et dressings lus projetés : jamais select=data');
   vrai(!/Paire|title/.test(JSON.stringify(ec && ec.data)), 'C2 rien de personnel rangé (ni titre ni pseudo)');
   c = await controler(['app_data?id=like.harvest_%25_listings']);
   const ec2 = c.ecrits[0];
-  vrai(ec2 && ec2.data.controles['numeros-double'].n === null && /annonces/.test(ec2.data.controles['numeros-double'].raison) && ec2.data.controles['versement-30j'].n === 3, 'C2 dressings illisibles ⇒ « pas su » avec sa raison (jamais 0), les autres contrôles continuent');
+  vrai(ec2 && ec2.data.controles['numeros-double'].n === null && /annonces/.test(ec2.data.controles['numeros-double'].raison) && !ec2.data.controles['versement-30j'], 'C2 dressings illisibles ⇒ « pas su » avec sa raison (jamais 0), les autres contrôles continuent');
   // L'installation.
   const proprio = uuid(9);
   const abos = [
@@ -207,10 +208,10 @@ const H = 3600e3, JOUR = 864e5;
   vrai(ci.ecrits[0] && ci.ecrits[0].data.controles.stripe.n === null, 'C3 abonnements illisibles ⇒ « pas su »');
   // Ce que Ma journée montre.
   const vend = (ctl, at = maintenant - 2 * H) => ({ at: new Date(at).toISOString(), controles: ctl });
-  const tout0 = { 'numeros-double': { n: 0 }, 'versement-30j': { n: 0 }, 'comptes-48h': { n: 0 } };
+  const tout0 = { 'numeros-double': { n: 0 }, 'comptes-48h': { n: 0 } };
   let e = C.etatControle(vend(tout0), null, maintenant);
   vrai(e.etat === 'ok', 'C4 chaque contrôle lu et à 0 ⇒ « Tout est en ordre »');
-  e = C.etatControle(vend({ ...tout0, 'versement-30j': { n: null, raison: 'pas lu' } }), null, maintenant);
+  e = C.etatControle(vend({ ...tout0, 'comptes-48h': { n: null, raison: 'pas lu' } }), null, maintenant);
   vrai(e.etat === 'passu' && e.passu.length === 1, 'C4 un contrôle pas lu ⇒ jamais « Tout est en ordre »');
   e = C.etatControle(vend({ ...tout0, 'numeros-double': { n: 2, ids: ['12', '40'] }, 'comptes-48h': { n: 1, ids: ['333'] } }), vend({ 'emails-quarantaine': { n: 2 }, stripe: { n: 0 } }), maintenant);
   vrai(e.etat === 'probleme' && e.lignes.length === 3 && e.lignes[0].cle === 'numeros-double' && e.lignes[0].ton === 'rouge' && e.lignes.slice(1).every((l) => l.ton === 'geste'), 'C4 problèmes par gravité : rouge seulement pour deux paires sous un N°, ambre pour le reste');
