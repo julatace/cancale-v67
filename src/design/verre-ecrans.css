@@ -126,9 +126,8 @@
 :root:root:root body .vg-av .vg-av-carte { gap: 0 !important; padding: 14px 14px 6px !important; color: var(--sv-encre) !important;
   background-color: transparent !important; background-image: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; box-shadow: var(--sv-ombre) !important; border-radius: 22px !important; }
 :root:root:root body .vg-av-groupes { margin: 0; padding: 0; list-style: none; }
-:root:root:root body .vg-av-groupe { margin-top: 14px; }
-:root:root:root body .vg-av-groupe-tete { display: flex !important; align-items: center; gap: 8px; width: 100%; padding: 0 0 6px !important; min-height: 32px !important; color: var(--sv-encre) !important; position: relative; }
-:root:root:root body .vg-av-groupe-tete::after { content: ""; position: absolute; inset: -6px 0; }
+:root:root:root body .vg-av-groupe { margin-top: 6px; }
+:root:root:root body .vg-av-groupe-tete { display: flex !important; align-items: center; gap: 8px; width: 100%; padding: 0 !important; min-height: 44px !important; color: var(--sv-encre) !important; position: relative; }
 :root:root:root body .vg-av-groupe-tete.is-fixe { cursor: default; }
 :root:root:root body .vg-av-pastille-hote { display: grid; place-items: center; width: 10px; flex: none; }
 :root:root:root body .vg-av-groupe-titre { flex: 1; min-width: 0; font: 700 14px/1.25 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre) !important; }
