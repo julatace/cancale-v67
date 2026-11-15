@@ -64,6 +64,42 @@ suggéré dans un bloc gris avec une vignette vide.
 - Laissé tel quel (hors du lot) : les règles `.vrm-ar-*` de `src/vague2-ventes.css`, qui ne servent
   plus cette carte mais touchent encore l'accueil des nouveaux par collision de noms.
 
+## Les suggestions d'achat qui violaient §5 (deuxième lot de captures, 16 h 36)
+
+Julien : « Regarde comment c'est arrivé » — « Autry reelwind low rose » ⇒ suggestion « #Adidas Spezial,
+dunkelblau, Gr. 36 » (marque différente) ; « nike zoom fly 5 noir et rose » ⇒ « Nike speakers maat 40 »
+(aucun mot de modèle commun) ; « nike air max 1 bleu » ⇒ « Nike Air Max 1 Alphabet 43 2007 » (juste).
+
+**Mesuré sur la vraie base (lecture seule)** : l'annonce 10715110806 « Autry reelwind low rose taille 36 »
+porte le champ marque **« adidas »** sur Vinted (choisie à la main) ; « Autry » n'est pas dans
+`KNOWN_BRANDS` : la règle prenait le champ tel quel, et l'achat « #Adidas » était « de la même marque ».
+Sur 691 annonces marquées, 81 ont un champ absent du titre (« Nike SB », « Nike x Sacai » — reconnues
+Nike, écrites —, « no marque », vêtements Okaïdi…) : la seule marque RECONNUE absente de son titre était
+ce cas (et une faute de frappe « adidias »). Pour « zoom fly » : modèle reconnu d'un côté, inconnu de
+l'autre (« speakers ») — l'ancienne règle n'écartait que deux modèles CONNUS et différents.
+
+**La règle (`src/suggestionsAchat.js`, `suggestionsAchat` — la même pour « Sans achat relié », la
+saisie en série et « Relier un achat »)** :
+- `marqueAnnonce` : la marque de l'annonce se PROUVE par son titre — le champ (ramené à la marque
+  reconnue, « Nike SB » ⇒ nike) écrit dans le titre ⇒ lui ; un champ reconnu ABSENT du titre ⇒ pas su
+  ⇒ aucune suggestion ; sinon la marque reconnue dans le titre (« no marque » + « adidas … » ⇒ adidas).
+- l'achat porte CETTE marque : reconnue (`memeMarque`, « air jordan » = « jordan ») ou écrite dans son
+  titre (une marque hors de la liste, « Autry », se lit ainsi) ; une autre ⇒ écartée. Normalisation
+  `normMots` : casse, accents, « ß », « # » et ponctuation.
+- `motsModeleAchat` : au moins UN mot de modèle commun — hors marque, couleurs (`extractColors`),
+  tailles et nombres d'un ou deux chiffres, lettres seules, et `MOTS_VIDES` en six langues (taille,
+  maat, gr, größe, taglia, talla, schuhe, sneakers, homme, neuf, low/mid/high…). Aucun mot de modèle
+  dans l'annonce ⇒ aucune suggestion (jamais la marque seule). « Adidas baskets 35,5 » n'est donc plus
+  proposé à « adidas spezial noir 35,5 » (audit S3b mis à jour : c'est la règle voulue).
+- inchangé : deux modèles connus et différents ⇒ écartée (S3c le prouve encore : « air max 90 » /
+  « air max 1 ») ; taille obligatoire ; achat antérieur ; couleur contraire écartée ; rien n'est relié
+  sans SON toucher (le module n'écrit rien).
+- Les nouveautés sont des tableaux littéraux : esbuild ne les embarque pas dans la copie de l'extension
+  (`vinted-sync-extension/vrm-regles-achat.js` inchangée — elle était déjà en retard sur main pour
+  d'autres règles, `coutVente` : à refabriquer par la session qui les a changées).
+- Laissé tel quel : `src/dejaEnStock.js` (« déjà N paires de ce modèle ») a sa propre liste de mots
+  vides, plus courte — même idée, autre notion.
+
 ## Les preuves
 
 - **Banc `scripts/bancs/annonces-achats.cjs`** (390 tactile + 1512, clair + sombre ; base INVENTÉE,
@@ -76,11 +112,27 @@ suggéré dans un bloc gris avec une vignette vide.
   sans son clic.
   - **Avant (build de 70fbef70) : 26 verts, 22 rouges** (colle ×6, debord ×8, hauteur ×4, tete ×4) —
     les captures reproduisent celles de Julien à l'identique.
-  - **Après : 52 verts, 0 rouge.**
+  - **Après : 56 verts, 0 rouge** (avec la règle §5 ci-dessus).
   - **Mutations** (CSS du build modifié) : barre remise transparente ⇒ colle rouge (Toutes, Sans
     achat, Stock) ; titre à 4 lignes ⇒ debord + hauteur rouges.
-- Audits : `traduction`, `tdz`, `variables`, `studio`, `identite`, `achats-a-relier`, `achats-relier`,
-  `prix-numerotage`, `actions-serie`, `quoi-de-neuf` verts.
+- **Audit `audit-suggestions-achat`** : J1 (marque contredite), J1b (marque hors liste lue dans le
+  titre ; « #Adidas » ≠ « Autry »), J2 (aucun mot de modèle commun), J3 (le bon cas reste proposé), J4
+  (mots vides multilingues, « # »), J5 (la marque d'une annonce) ; **sur le code d'avant : J1, J1b, J2
+  rouges, J3 vert** ; 50/50 verts après ; `--prouve` : 16/16 mutations attrapées (dont
+  `marque-du-champ-crue`, `mot-modele-ignore`, `mots-vides-comptes` ; S3c ajouté pour que
+  `modele-ignore` reste attrapée). `audit-achats-a-relier` G3b (la carte « Autry … » marquée « adidas »).
+- Le banc `annonces-achats` juge aussi la règle rendue : « Autry … » marquée « adidas » sans suggestion,
+  « Basket Nike 44 » et « #Adidas Spezial, dunkelblau, Gr. 36 » jamais proposés — rouge sur le build d'avant.
+- Audits : `traduction`, `tdz`, `variables`, `studio`, `identite` (50 paires identiques), `achats-a-relier`,
+  `achats-relier`, `prix-numerotage`, `actions-serie`, `quoi-de-neuf`, `plancher-stock` verts.
+
+- Bancs voisins (build de cette branche) : `annonces-tete`, `studio-paires`, `annonces-grille` (92/92),
+  `ergonomie-gestes` (prixachat, relierachat : 2 touchers) **verts** ; `achats-relier` D1-D2 (« Autre
+  achat », SON clic relie l'achat choisi) verts. Rouges DÉJÀ rouges sur le build d'avant (70fbef70), à
+  l'identique, hors de ce lot : `achats-relier` B0 (reçu sur la vente) puis E5/F1/F2 (icônes),
+  `vague2-ventes` M (ambre « sous ton prix d'achat ») et R (remise), `prix-numerotage` scénarios A/B
+  (12 rouges, `[data-edition="numero"]` des cartes d'Annonces). `vague2-ventes` A (« aucune suggestion
+  (dit) ») : vert — le « Aucune suggestion » est dit sur la ligne du prix (`data-ar-sans-sugg`).
 
 ## Geste de Julien
 
