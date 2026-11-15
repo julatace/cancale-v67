@@ -258,6 +258,7 @@ async function scenario(b, vp, sombre) {
     await pg.waitForSelector('[data-recap-vente] [data-recap-phrase]', { timeout: 10000 }).catch(() => {});
     await pg.waitForTimeout(700);
     await shot(pg, `ventes-verre-${nom}-recap`);
+    if (SHOTS) { await pg.evaluate(() => { const x = document.querySelector('[data-recap-vente] .vrm-recap-argent'); if (x) x.scrollIntoView({ block: 'start' }); }); await pg.waitForTimeout(300); await shot(pg, `ventes-verre-${nom}-recap-argent`); await pg.evaluate(() => { const x = document.querySelector('[data-vv-achat-propose]'); if (x) x.scrollIntoView({ block: 'center' }); }); await pg.waitForTimeout(300); await shot(pg, `ventes-verre-${nom}-recap-relier`); }
     const rv = await pg.evaluate(() => { const z = [...document.querySelectorAll('[data-recap-vente]')].find((x) => x.getBoundingClientRect().height > 0); if (!z) return null;
       const p = [...z.querySelectorAll('.vrm-b-primaire, [data-variante="primaire"], .sb-btn-plein')].filter((x) => x.getBoundingClientRect().width > 0);
       const rgb = (s) => (/rgba?\(([^)]+)\)/.exec(s) || [, ''])[1].split(/[ ,/]+/).map(Number);
@@ -281,6 +282,7 @@ async function scenario(b, vp, sombre) {
         const cases = [...document.querySelectorAll('.vrm-rpf-code-gros[data-rp-code-visible="K48291"] .va-c')].map((x) => Math.round(x.getBoundingClientRect().height));
         const t = document.querySelector('.vrm-tache[data-tache="achats"] .vrm-rpf-titre'); return { cases, titreW: t ? Math.round(t.getBoundingClientRect().width) : 0, gauche: r ? Math.round(r.getBoundingClientRect().right) : null, droite: s ? Math.round(s.getBoundingClientRect().left) : null }; });
       dit(o.cases.length === 6 && o.cases.every((h) => h >= 56) && o.titreW >= 120 && o.gauche != null && o.droite != null && o.droite >= o.gauche, `${nom} : A ordinateur : les codes à gauche (un chiffre par case), les achats à droite`, JSON.stringify(o));
+      if (process.env.BANC_SONDE2) console.log(await pg.evaluate(() => { const t = document.querySelector('.vrm-tache[data-tache="achats"] .vrm-rpf-titre'); const out = []; for (let x = t; x && !x.classList.contains('vrm-tache'); x = x.parentElement) { const s = getComputedStyle(x); out.push(x.tagName + '.' + String(x.className).slice(0, 40) + ' d=' + s.display + ' fd=' + s.flexDirection + ' fw=' + s.flexWrap + ' w=' + Math.round(x.getBoundingClientRect().width) + ' fl=' + s.flex + ' gtc=' + s.gridTemplateColumns.slice(0, 40)); } return out.join('\n'); }));
     }
     await pg.click('[data-va-code-grand="K48291"]').catch(() => {});
     await pg.waitForSelector('[data-va-comptoir]', { timeout: 6000 }).catch(() => {});

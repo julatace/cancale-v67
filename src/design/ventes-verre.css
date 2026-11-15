@@ -374,7 +374,7 @@
   :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] > .vrm-achats-retirer-repli[data-retirer-repli="ouvert"] { grid-column: 1 !important; grid-row: 3 / 40 !important; }
   :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"]:has(> .vrm-achats-retirer-repli[data-retirer-repli="ouvert"]) > .vrm-achats-retirer-repli ~ * { grid-column: 2 !important; }
   /* La colonne des codes est étroite : la ligne d'un colis passe sur deux étages (le texte et le code ; puis les gestes). */
-  :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] .vrm-rpf-rang { flex-wrap: wrap !important; row-gap: 10px !important; }
+  :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] .vrm-rpf-rang { display: flex !important; flex-wrap: wrap !important; row-gap: 10px !important; column-gap: 10px !important; align-items: center !important; }
   :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] .vrm-rpf-ouvrir { flex: 1 1 100% !important; min-width: 0 !important; }
   :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] .vrm-rpf-quoi { flex: 1 1 auto !important; min-width: 0 !important; }
   :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] .vrm-rpf-rang > .vrm-rpf-retire { flex: 1 1 auto !important; }
