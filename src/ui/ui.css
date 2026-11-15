@@ -196,6 +196,12 @@
 :root:root:root:root:root:root body .vrm-ui-bande-l { font: 500 12.5px/1.25 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; }
 :root:root:root:root:root:root body .vrm-ui-bande { align-items: baseline !important; }
 :root:root:root:root:root:root body .vrm-ui-bande-item { flex-direction: row !important; align-items: baseline !important; gap: 5px !important; }
+/* (15 nov., Inter) Au téléphone, la bande tient sur sa ligne AVEC son « ⋯ » : chiffres 23 px, écarts resserrés
+   (Inter est plus large qu'Urbanist : le « ⋯ » sortait de l'écran à 390 px, banc studio-ventes D). */
+@media (max-width: 480px) {
+  :root:root:root:root:root:root body .vrm-ui-bande-n { font-size: 23px !important; }
+  :root:root:root:root:root:root:root body .vrm-main .vrm-fu-bande { column-gap: 14px !important; }
+}
 
 /* Le menu du compte : une touche « compte_1 ▾ ». */
 :root:root:root:root:root:root body .vrm-ui-menu-compte {
