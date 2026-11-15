@@ -50,7 +50,10 @@
 :root:root body .vrm-ret-meta { font: 500 13px/1.3 var(--sb-police-texte, var(--vrm-police, system-ui, sans-serif)); color: var(--ret-gris); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 :root:root body .vrm-renv-carte .vrm-ret-limite { font-size: 15px; }
 :root:root body .vrm-renv-carte .sb-touche, :root:root body .vrm-ret-tip .sb-touche { min-height: 44px; display: inline-flex; align-items: center; gap: 8px; }
-:root:root body .vrm-renv-carte a.sb-lien { min-height: 44px; display: inline-flex; align-items: center; color: var(--sb-lien, var(--ret-encre)); }
+/* `!important` DANS la couche : la tête de Ma journée (ancienne carte sombre) peint ses liens en blanc
+   (`jetons.css`, hors couche, !important) — ici sur porcelaine claire, il serait invisible (mesuré au banc). */
+:root:root body .vrm-renv-carte a.sb-lien { min-height: 44px; display: inline-flex; align-items: center; color: var(--sb-lien, var(--ret-encre)) !important; }
+:root:root body .vrm-renv-carte .vrm-ret-gestes { gap: 8px 10px; }
 :root:root body .vrm-renv-carte > .vrm-ret-note { margin: 0; }
 :root:root body .vrm-renv-carte.is-compact { padding: 12px 14px; gap: 10px; }
 :root:root body .vrm-renv-carte.is-compact .vrm-ret-photo, :root:root body .vrm-renv-carte.is-compact .vrm-ret-tuile { flex-basis: 56px; width: 56px; height: 56px; border-radius: var(--sb-r-vignette, 11px); }
