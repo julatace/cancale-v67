@@ -115,6 +115,22 @@ de `main` au montage, N°12 dans SA case, ordre d'hier).
 - Textes : `etag.*` dans `src/i18n/langues/<l>/etageres.js` (5 langues ; `audit-traduction` 45 verts).
   « Quoi de neuf » : `stock-etageres`.
 
+### 5 bis. Reprise du visuel (revue du coordinateur, captures `etag-390c-3b-etagere`, `etag-390c-5-descente`)
+
+| défaut vu | correction |
+|---|---|
+| la recherche collée « N°, marque, taille… » était transparente, les cases passaient dessous ; à l'ordinateur elle se collait SOUS la barre de l'app (top 6 px, cachée) | la règle commune des barres collées d'Annonces (`src/design/studio-paires.css` §16, reprise telle quelle de `claude/annonces-achats` : voile de l'aplat 96 %, ombre, z-index 30) ; à l'ordinateur, `top: 74px` sous `.vrm-barre-haut` (même valeur que la boîte e-mails), dans la couche `vrm-studio` pour passer devant le `top: 0 !important` de styles-refonte-ms.css |
+| un gros « B » au milieu des cases | c'était l'INITIALE du titre (« Basket… ») quand la photo manque — elle se lisait comme un N° d'archive « B ». La case montre la photo ; sans photo, un carton dessiné neutre (`data-sans-photo`). Plaque du N° en porcelaine (encre sur blanc, 12 px ; nuit : blanc sur bleu-nuit) |
+| **photos invisibles à l'ordinateur** (trouvé en regardant 1512 sombre) | `Vignette` était déclarée DANS le rendu et utilisée en `<Vignette/>` : un composant neuf à chaque rendu, chaque photo recréée, son fondu (`img[loading=lazy]`, index.html) repartait de 0 — mesuré 35/35 à l'opacité 0. Appelée comme fonction (`{Vignette({…})}`) |
+| « Comment ça marche ? » chevauchait « + Ajouter un meuble » | une ligne : `sb-touche` « + Ajouter un meuble » (l'action), `sb-lien` « Comment ça marche ? » à droite |
+| pile 1×5 : cases énormes, grand vide | une pile (forme « Pile », ou un meuble d'une colonne empilée) = cartons 64 × 48, N° entier ; au téléphone elle se lit de côté (cartons à gauche, nom, gestes, descente à droite) ; les meubles sont POSÉS au sol (alignés par le bas), côte à côte ; la tête d'un meuble ne fixe plus sa largeur ; à l'ordinateur la pièce est un plan de verre avec son sol |
+| le message de descente deux fois (bandeau + toast) | UNE fois : le bandeau du meuble, jusqu'à « Compris » ; aucun toast ne la répète ; la fiche de la paire se referme après Retirer / Déplacer / Je l'ai sortie (il voit la pile bouger) |
+| boutons des planches à 30 px | 44 px (`ChoixPlanches`, App.jsx : ⟷ et chaque morceau ; le meuble large défile dans son cadre) |
+
+Banc `stock-etageres` (contrôles V1–V5 ajoutés : recherche opaque et au-dessus, photo + aucune lettre + plaque ≥ 11 px,
+pied sur une ligne, pile compacte et N° entier, côte à côte à l'ordinateur, descente dite une fois, photos visibles
+après les gestes) : **78/78 verts** aux quatre variantes (390 et 1512, clair et sombre).
+
 ## 6. Les numéros
 
 Vérifiés, **aucune règle changée** : `prochainLibre` (part du plus haut, jamais d'un trou),
