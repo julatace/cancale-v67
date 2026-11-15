@@ -167,6 +167,9 @@ async function scenario(nav, { W, th, sortir }) {
   if (sortir) {
     await o.pg.click('[data-sortir-premier] [data-sortir-geste="sortie"]');
     await o.pg.waitForSelector('[data-sortir-apres]', { timeout: 8000 }).catch(() => {});
+    // Les cases s'écrivent par le geste du Stock (après la déclaration) : on attend l'ÉCRITURE elle-même, jamais un délai
+    // fixe (sous charge, 900 ms ne suffisaient pas) ; pas écrite en 12 s ⇒ le contrôle d'en dessous dit son rouge.
+    await o.pg.waitForFunction(() => { try { const s = JSON.parse(localStorage.getItem('vrm_slots') || 'null'); return !!s && !s['501']; } catch (_) { return false; } }, null, { timeout: 12000 }).catch(() => {});
     await o.pg.waitForTimeout(900);
     const a = await mesurer(o.pg);
     await o.pg.screenshot({ path: path.join(SHOTS, `sortir-${W}-${th}-apres.png`) }).catch(() => {});
