@@ -40,7 +40,7 @@
 :root:root:root:root:root:root:root:root body .vrm-fp.fd::before { content: none !important; display: none !important; }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-cadre { position: relative; min-height: 100%; box-sizing: border-box; background: var(--fd-feuille); display: flex; flex-direction: column; }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-ph { flex: none; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-fond { display: none; }
+:root:root:root:root:root:root:root:root body .fd-fond { display: none; }
 
 /* ══ 2. LA PHOTO, les deux ronds, la plaque ══ */
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-ph { position: relative; height: 310px; overflow: hidden; background: var(--sv-bas, #0E2C52); }
@@ -53,7 +53,7 @@
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-rond {
   width: 44px !important; height: 44px !important; min-width: 44px; min-height: 44px; border-radius: 50% !important; display: grid !important; place-items: center; padding: 0 !important; margin: 0 !important;
   background: rgb(8 24 46 / .5) !important; background-image: none !important; -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); color: #FFFFFF !important;
-  border: 1px solid rgb(255 255 255 / .3) !important; box-shadow: none !important; cursor: pointer; transition: transform 120ms ease;
+  border: 1px solid rgb(255 255 255 / .3) !important; box-shadow: none !important; cursor: pointer; transition: transform 120ms ease !important;
 }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-rond:active { transform: scale(.94); }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-rond.is-clair { background: var(--fd-creux) !important; color: var(--sv-encre) !important; border-color: transparent !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
@@ -97,7 +97,7 @@
   display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; justify-content: center !important; gap: 10px; padding: 0 16px !important;
   background: var(--fd-plein) !important; background-image: none !important; color: var(--fd-plein-t) !important;
   font: 700 16px/1 var(--sb-police-texte, Inter, sans-serif) !important; letter-spacing: -.01em !important; box-shadow: 0 10px 20px -10px rgb(8 26 50 / .7) !important; cursor: pointer;
-  transition: transform 120ms ease;
+  transition: transform 120ms ease !important;
 }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plein:active { transform: scale(.98); }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plein svg { color: currentColor !important; }
@@ -110,7 +110,7 @@
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-seg { display: flex; margin-top: 14px; padding: 3px; border-radius: 15px; background: var(--fd-creux) !important; }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-seg-b {
   flex: 1; height: 44px !important; min-height: 44px !important; display: grid !important; place-items: center; border-radius: 12px !important; border: 0 !important; padding: 0 4px !important;
-  background: transparent !important; background-image: none !important; box-shadow: none !important; cursor: pointer;
+  background: transparent !important; background-image: none !important; box-shadow: none !important; cursor: pointer; transition: none !important;
   font: 600 15px/1 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important;
 }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-seg-b[aria-selected="true"] { background: var(--fd-seg-on) !important; color: var(--sv-encre) !important; font-weight: 700 !important; box-shadow: 0 3px 8px -3px rgb(8 26 50 / .35) !important; }
@@ -168,7 +168,7 @@
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tuile {
   min-height: 76px !important; height: auto !important; display: flex !important; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 8px 4px !important;
   border-radius: 16px !important; border: 1px solid var(--fd-filet) !important; background: var(--fd-carte) !important; background-image: none !important; box-shadow: none !important; cursor: pointer;
-  font: 600 13px/1.15 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre) !important; text-align: center; transition: transform 120ms ease;
+  font: 600 13px/1.15 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre) !important; text-align: center; transition: transform 120ms ease !important;
 }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tuile:active { transform: scale(.97); }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tuile[aria-pressed="true"] { border-color: var(--sv-encre) !important; }
@@ -195,7 +195,7 @@
     background: transparent !important; box-shadow: 0 30px 80px -30px rgb(4 12 26 / .7) !important;
   }
   :root:root:root:root:root:root:root:root body .vrm-fp.fd.fd-ordi .fd-cadre { border-radius: 28px; overflow: hidden; }
-  :root:root:root:root:root:root:root:root body .vrm-fp.fd.fd-ordi .fd-fond { display: block; position: fixed; inset: 0; z-index: -1; border: 0; padding: 0; background: rgb(4 12 26 / .35) !important; cursor: pointer; }
+  :root:root:root:root:root:root:root:root body .fd-fond { display: block !important; position: fixed !important; inset: 0 !important; z-index: 8999 !important; border: 0 !important; padding: 0 !important; margin: 0 !important; border-radius: 0 !important; background: rgb(4 12 26 / .35) !important; box-shadow: none !important; transition: none !important; cursor: pointer; }
   :root:root:root:root:root:root:root:root body .vrm-fp.fd.fd-ordi.sb-plan { z-index: 60 !important; }
   :root:root:root:root:root:root:root:root body .vrm-fp.fd.fd-ordi .fd-ph { height: 300px; }
   :root:root:root:root:root:root:root:root body .vrm-fp.fd.fd-ordi .fd-top { top: 14px; }

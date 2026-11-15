@@ -429,11 +429,12 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
       <section className="vrm-fp-actions-sec" data-fiche-actions={ctx} aria-label={tr('fiche.actions')}><div className="vrm-fp-actions-ligne" ref={slotAct} data-fiche-actions-ligne=""/></section>
     </section>
   ) : null;
-  return createPortal(
+  // Ordinateur : un voile derrière le panneau (hors de lui : il couvre la page, un clic ferme la fiche) — sauf en plan.
+  return createPortal(<>
+    {!enPlan && ordi ? <button type="button" className="fd-fond" data-fd-fond="" aria-label="Fermer la fiche" tabIndex={-1} onClick={onFermer}/> : null}
     <div ref={racine} className={'vrm-fp fd' + (depuis ? ' is-depuis-ligne' : '') + (enPlan ? ' sb-plan fd-plan' : '') + (ordi ? ' fd-ordi' : '')} role="dialog" aria-modal={enPlan ? 'false' : 'true'} data-sb-plan={enPlan ? '1' : undefined} aria-label={nomFiche ? `Tout sur le N°${nomFiche}` : tr('fiche.heros')} data-fiche-paire={nomFiche} data-fiche-contexte-ouvert={ctx || undefined}
       data-fiche-ligne-cle={depuis ? depuis.cle : undefined} data-fiche-identite={depuis ? (ligneRes ? ligneRes.etat + ':' + (ligneRes.par || '') : '') : 'numero'} data-fiche-lecture-en-cours={lecture ? '1' : '0'} data-fd-vue={p ? vueOuverte : undefined} data-noswipe="1">
       {Retour ? <Retour fermer={onFermer}/> : null}
-      {!enPlan && ordi ? <button type="button" className="fd-fond" aria-label="Fermer la fiche" tabIndex={-1} onClick={onFermer}/> : null}
       <div className="fd-cadre" ref={cadre}>
         <div className={'fd-ph' + (photo ? '' : ' is-sans-photo')} data-fiche-heros={ctx || 'numero'} data-fiche-photo-vedette={photo ? '1' : '0'}>
           <span className="fd-ph-img" data-fiche-heros-photo={photo ? '1' : '0'}>{photo && Photo ? Photo(photo) : <Silhouette/>}</span>
@@ -476,5 +477,5 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
         </div>
         {feuillePlus}
       </div>
-    </div>, document.body);
+    </div></>, document.body);
 }

@@ -358,7 +358,7 @@ function juger(m, suf, tel) {
   }
 }
 
-module.exports = { VUES, preparer, mesurer };
+module.exports = { VUES, preparer, mesurer, baseFiches };
 if (require.main === module) (async () => {
   // M7 (sur le code) — sans l'extension dans ce navigateur, l'offre ne se tranche pas ici : la règle du plein est lue
   // dans le code de la carte d'offre (App.jsx) — « Proposer N € » est LE plein quand une contre-offre est calculée,
