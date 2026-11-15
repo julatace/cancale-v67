@@ -1,3 +1,4 @@
+require('./_reglages-compat.cjs');   // (15 nov.) Paramètres en catégories : la catégorie d'une rangée touchée avant elle
 // Banc : LES COLIS ANNONCÉS PAR SMS (6 nov.) — Colis → À retirer, et la carte
 // Réglages → Notifications → « SMS Mondial Relay ».
 // Les lignes sont fabriquées par la VRAIE règle du serveur (api/_lib/sms-mondialrelay.js :

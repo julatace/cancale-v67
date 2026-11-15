@@ -129,9 +129,13 @@ function mesurerAjout3({ selListe, mutation }) {
 // R. Les réglages d'avant, joignables (les trois vues).
 async function reglagesJoignables(o) {
   const vus = new Set();
-  for (const vue of ['reglages', 'compte', 'abonnement']) {
+  // (15 nov., Paramètres en dix catégories) Plus de trois vues : le premier écran, puis CHAQUE catégorie
+  // (src/parametres/categories.js) — au téléphone une à une, au bureau elles sont toutes dépliées.
+  const cats = await o.pg.evaluate(() => [...document.querySelectorAll('[data-categorie-ouvrir]')].filter((e) => e.getClientRects().length).map((e) => e.getAttribute('data-categorie-ouvrir')));
+  for (const vue of ['', ...cats]) {
     await toucher(o, '[data-sous-retour]'); await o.pg.waitForTimeout(200);
-    await toucher(o, `[data-onglets-reglages] [data-vue="${vue}"]`); await o.pg.waitForTimeout(500);
+    await toucher(o, '[data-categorie-retour]'); await o.pg.waitForTimeout(200);
+    if (vue) { await toucher(o, `[data-categorie-ouvrir="${vue}"]`); await o.pg.waitForTimeout(500); }
     const l = await o.pg.evaluate(() => {
       const r = new Set();
       for (const el of document.querySelectorAll('[data-sous-ouvrir]')) r.add('sous:' + el.getAttribute('data-sous-ouvrir'));
@@ -141,7 +145,7 @@ async function reglagesJoignables(o) {
     });
     l.forEach((x) => vus.add(x));
   }
-  await toucher(o, '[data-onglets-reglages] [data-vue="reglages"]');
+  await toucher(o, '[data-categorie-retour]');
   return vus;
 }
 

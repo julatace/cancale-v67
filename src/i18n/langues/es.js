@@ -7,6 +7,7 @@ import ecran_capte from './es/capte.js';   // (14 nov., extension 5.377) « L'ex
 import ecran_renvoyer from './es/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_retrait_ailleurs from './es/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
 import ecran_finition from './es/finition.js';   // (15 nov.) la finition écran par écran
+import ecran_parametres from './es/parametres.js';   // (15 nov.) Paramètres rangés en dix catégories
 import ecran_idees from './es/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './es/ventes.js';
 import ecran_commun from './es/commun.js';
@@ -467,10 +468,10 @@ export default {
   "reglages.donnees.droits": "Tus otros derechos:",
   "reglages.donnees.exporter": "Exportar",
   "reglages.donnees.exporterOu.dessous": "«Copia completa» aquí abajo",
-  "reglages.donnees.exporterOu.reglages": "«Copia completa» (Ajustes)",
+  "reglages.donnees.exporterOu.reglages": "«Copia completa», más arriba",
   "reglages.donnees.lib": "Exportar mis datos",
   "reglages.donnees.supprimer": "Eliminar tu cuenta",
-  "reglages.donnees.supprimerOu": "«Eliminar mi cuenta», al final del todo",
+  "reglages.donnees.supprimerOu": "«Eliminar mi cuenta», al final de Mi cuenta",
   "reglages.double.active": "Activada",
   "reglages.double.activeN": { one: "Activada · {n} dispositivo", other: "Activada · {n} dispositivos" },
   "reglages.double.inactive": "Desactivada",
@@ -565,8 +566,6 @@ export default {
   "reglages.sauvegarde.aRefaire": " · por rehacer",
   "reglages.sauvegarde.derniere": "Última copia: {quand}",
   "reglages.sauvegarde.jamais": "Nunca guardado — toca «Copia completa»",
-  "reglages.securite.desc": "Comprobar que solo tú puedes leer y escribir tus datos.",
-  "reglages.securite.lib": "Seguridad de los datos",
   "reglages.signalements.lib": "Informes recibidos",
   "reglages.simulation.lib": "Simular la creación de una cuenta",
   "reglages.simulation.desc": "El recorrido de un nuevo vendedor, con cuentas ficticias.",
@@ -2268,4 +2267,5 @@ export default {
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_finition,
+  ...ecran_parametres,
 };

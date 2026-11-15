@@ -1,3 +1,4 @@
+require('./_reglages-compat.cjs');   // (15 nov.) Paramètres en catégories : la catégorie d'une rangée touchée avant elle
 // ── BANC : SÉCURITÉ DES COMPTES (12 nov.) — l'avertissement avant un message risqué,
 //    la carte « Protège ton compte VRM », la copie des annonces par compte.
 //        BANC_PORT=… node scripts/bancs/securite-comptes-avertir.cjs   (captures : SHOTS=dossier)

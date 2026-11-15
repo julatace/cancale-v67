@@ -141,7 +141,9 @@ const remplacer = (src, a, b) => { if (!src.includes(a)) { console.error('ancre 
     const gi = app.indexOf('const GROUPES_REGLAGES = ['), gj = app.indexOf('const GROUPES_COMPTE', gi);
     const reg = gi > 0 && gj > gi ? app.slice(gi, gj) : '';
     const titres = [...reg.matchAll(/titre:'([^']+)'/g)].map((m) => m[1]);
-    const voulus = ['Mes comptes', 'Mes e-mails', 'Notifications', 'Mon abonnement', 'Sécurité et sauvegarde', 'Aide'];
+    // (15 nov., Paramètres en dix catégories) « Mon abonnement » n'est plus un groupe-renvoi de cet onglet : c'est un
+    // panneau de « Mon compte » (GROUPES_COMPTE, C3). Les groupes d'avant restent (le filet de src/parametres/categories.js).
+    const voulus = ['Mes comptes', 'Mes e-mails', 'Notifications', 'Sécurité et sauvegarde', 'Aide'];
     dit(voulus.every((t) => titres.includes(t)), 'C1 · les groupes d’intention : ' + voulus.join(' · '), titres.join(' · '));
     dit(titres.indexOf('Mes comptes') === 0 && titres.indexOf('Aide') === titres.length - 1, 'C1 · « Mes comptes » en premier, « Aide » en dernier', titres.join(' · '));
     const lignesReg = [...reg.matchAll(/\{ ?id:'([a-z-]+)', ?type:'(nav|panneau|switch|action)'([^\n]*)/g)].filter((m) => !/^(signalements)$/.test(m[1]));
@@ -149,9 +151,11 @@ const remplacer = (src, a, b) => { if (!src.includes(a)) { console.error('ancre 
     const corpsDe = (m) => { const i = m.index, j = reg.indexOf("{ id:'", i + 6); return reg.slice(i, j > i ? j : i + 600); };
     const sansPhrase = lignesReg.filter((m) => !/desc ?:/.test(corpsDe(m))).map((m) => m[1]);
     dit(lignesReg.length >= 18 && !sansPhrase.length, `C2 · chaque réglage dit en une phrase ce qu’il fait (${lignesReg.length} lignes)`, sansPhrase.join(', '));
-    dit(/data-reglage-abonnement/.test(reg) && /setVue\('abonnement'\)/.test(reg), 'C3 · « Mon abonnement » mène à l’onglet Abonnement (le même écran)');
+    const gc = app.indexOf('const GROUPES_COMPTE'), gd = app.indexOf('const groupes = [...GROUPES_COMPTE', gc);
+    const compte = gc > 0 && gd > gc ? app.slice(gc, gd) : '';
+    dit(/\{ id:'abonnement', type:'panneau'[^\n]*data-reglage-abonnement[^\n]*\n\s*el:<div key="abonnement" data-onglet-abonnement=""><MonAbonnement\/>/.test(compte), 'C3 · « Mon abonnement » ouvre l’abonnement (le même composant), dans « Mon compte »');
     const rech = sans(lire('src/rechercheReglages.js'));
-    dit(/typeof it\.desc==='string'\?it\.desc/.test(rech) && /'abonnement-ouvrir':/.test(rech), 'C4 · la recherche lit les phrases et trouve l’abonnement');
+    dit(/typeof it\.desc==='string'\?it\.desc/.test(rech) && /\babonnement:'[^']*facture/.test(rech), 'C4 · la recherche lit les phrases et trouve l’abonnement');
 
     // ── D. ANNONCES : LE PROCHAIN GESTE ───────────────────────────────────────
     if (G) {

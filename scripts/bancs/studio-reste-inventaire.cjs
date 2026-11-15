@@ -1,3 +1,4 @@
+require('./_reglages-compat.cjs');   // (15 nov.) Paramètres en catégories : la catégorie d'une rangée touchée avant elle
 // L'inventaire des gestes relevé sur le build d'AVANT (origin/claude/integration-refonte, 14 nov.), base INVENTÉE
 // (_base-messages-stock.cjs) : par écran, l'union des rendus 390/1512 clair/sombre. Refait par :
 //   BANC_DIST=<dist d'avant> BANC_INVENTAIRE=<f.json> node scripts/bancs/studio-reste.cjs

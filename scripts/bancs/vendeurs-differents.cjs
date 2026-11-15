@@ -1,3 +1,4 @@
+require('./_reglages-compat.cjs');   // (15 nov.) Paramètres en catégories : la catégorie d'une rangée touchée avant elle
 // Banc : VRM POUR DES VENDEURS DIFFÉRENTS DE JULIEN (8 nov.) — l'app RENDUE.
 //
 // Données INVENTÉES (celles de `nouveau-vendeur.cjs`, un seul compte Vinted, trois
