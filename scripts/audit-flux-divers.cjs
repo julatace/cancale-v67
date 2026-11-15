@@ -151,7 +151,8 @@ const faireRes = () => { const r = { code: null, corps: null }; r.status = (n) =
     const { notificationDoubleVente } = await importer('api/_lib/double-vente.js');
     const n = notificationDoubleVente([{ numero: '40', plateforme: 'leboncoin', annonces: [{ id: '329' }] }], 'Paire');
     const p = new URLSearchParams(n.url.split('?')[1]);
-    dit(p.get('cible') === 'doublon' && p.get('plat') === 'leboncoin' && p.get('num') === '40', 'A5 l’adresse de la notification porte le N° (clé), que la cible lit', n.url);
+    // (15 nov., retrait-ailleurs) La notification mène à « À retirer ailleurs » (Ma journée), la paire par SON N°.
+    dit(p.get('tab') === 'journee' && p.get('cible') === 'ailleurs' && p.get('num') === '40', 'A5 l’adresse de la notification porte le N° (clé), que la cible lit', n.url);
   });
 
   // ── A6. « Vendus ailleurs » par la clé du N° ───────────────────────────────

@@ -13,6 +13,16 @@
 //     normalisation d'écriture (« 42,5 » = « 42.5 » = « 42½ » ; « 42 2/3 » ≠ « 42,5 ») ;
 //   · MODÈLE (§5) : connu des deux côtés et différent ⇒ écartée (mesuré le 3 nov. :
 //     « adidas spezial noir 35,5 » se voyait proposer « Adidas samba 35,5 ») ;
+//   · (15 nov., captures de Julien) au moins UN MOT DE MODÈLE COMMUN (hors marque,
+//     couleurs, tailles, petits nombres et mots vides en six langues : « maat »,
+//     « Gr. », « taille », « Größe »…) — sinon écartée : « nike zoom fly 5 noir et
+//     rose » se voyait proposer « Nike speakers maat 40 » (modèle inconnu d'un côté :
+//     l'ancienne règle laissait passer) ;
+//   · la MARQUE se lit des deux côtés, normalisée (casse, accents, « # ») : le champ
+//     « marque » de l'annonce CONTREDIT par la marque de son titre ⇒ marque pas sue ⇒
+//     aucune suggestion (mesuré : « Autry reelwind low rose » portait la marque
+//     « adidas » sur Vinted et recevait « #Adidas Spezial, dunkelblau, Gr. 36 ») ;
+//     l'achat doit porter CETTE marque (reconnue, ou écrite dans son titre) ;
 //   · COULEUR : connue des deux côtés et sans couleur commune ⇒ écartée ;
 //     commune ⇒ rang 1 (les trois critères) ; inconnue d'un côté ⇒ rang 2
 //     (marque + taille). Jamais la marque seule.
@@ -110,22 +120,76 @@ export function prixIndicatifLot(achat) {
 // vente), curTx? } · achats : la liste captée · liens : `liensParAchat`.
 // marqueDe(texte) → nom | null ; couleursDe(texte) → [noms].
 // Rend [{ achat, rang: 1|2, marque, taille, couleurs }] (au plus `max`).
+// ── La marque et les mots de modèle, normalisés (15 nov.) ─────────────────────
+// Normalisation : minuscules, sans accents, tout ce qui n'est ni lettre ni chiffre
+// devient une espace (« #Adidas » = « adidas », « Größe » = « grosse »).
+export const normMots = (s) => String(s == null ? '' : s).toLowerCase().replace(/ß/g, 'ss').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^a-z0-9]+/g, ' ').trim();
+// Le titre porte-t-il cette marque (mots entiers) ? « new balance » dans « New-Balance 550 ».
+export const titrePorteMarque = (titre, marque) => { const m = normMots(marque); return !!m && (' ' + normMots(titre) + ' ').includes(' ' + m + ' '); };
+// Deux marques sont la même quand l'une contient l'autre en mots entiers (« air jordan » / « jordan »).
+export const memeMarque = (a, b) => { const x = normMots(a), y = normMots(b); return !!x && !!y && (x === y || (' ' + x + ' ').includes(' ' + y + ' ') || (' ' + y + ' ').includes(' ' + x + ' ')); };
+// La marque d'une ANNONCE se PROUVE par son titre (mesuré le 15 nov. : 81 annonces sur 691 ont un
+// champ « marque » absent du titre — « Nike SB », « Nike x Sacai » (reconnues : Nike, écrite),
+// « no marque », et « adidas » sur une « Autry reelwind low rose ») :
+//   · le champ (choisi sur Vinted, ramené à la marque reconnue) écrit dans le titre ⇒ lui ;
+//   · le champ est une marque RECONNUE mais absente du titre ⇒ '' (pas su : le titre la contredit
+//     ou ne la confirme pas — « Autry … » marquée « adidas ») ;
+//   · sinon la marque reconnue dans le titre (« no marque » + « adidas spezial… » ⇒ adidas), ou ''.
+export function marqueAnnonce({ marque, titre } = {}, marqueDe) {
+  const reconnue = marque ? marqueDe(String(marque)) : null;
+  const champ = normMots(reconnue || marque);
+  if (champ && titrePorteMarque(titre, champ)) return champ;
+  if (reconnue) return '';
+  return normMots(marqueDe(String(titre || '')));
+}
+// Les mots vides d'un titre, en six langues (fr, en, nl, de, it, es) : tailles, genres,
+// « chaussures », état, liaisons. Un mot vide ne fait jamais une ressemblance de modèle.
+export const MOTS_VIDES = new Set([
+  'taille', 'tailles', 'pointure', 'pointures', 'size', 'maat', 'gr', 'groesse', 'grosse', 'gross', 'talla', 'taglia', 'numero', 'nr',
+  'no', 'tg', 'eu', 'eur', 'fr', 'us', 'uk', 'it', 't', 'n', 'et', 'and', 'und', 'en',
+  'de', 'du', 'des', 'le', 'la', 'les', 'un', 'une', 'une', 'of', 'the', 'for', 'pour', 'avec',
+  'with', 'met', 'mit', 'con', 'y', 'e', 'o', 'ou', 'or', 'sur', 'van', 'der', 'die', 'das',
+  'el', 'los', 'il', 'lo', 'homme', 'femme', 'enfant', 'mixte', 'men', 'man', 'women', 'woman', 'kids', 'unisex',
+  'unisexe', 'herren', 'damen', 'heren', 'dames', 'uomo', 'donna', 'hombre', 'mujer', 'chaussures', 'chaussure', 'baskets', 'basket', 'sneakers',
+  'sneaker', 'schoenen', 'schuhe', 'scarpe', 'zapatillas', 'zapatos', 'shoes', 'shoe', 'trainers', 'trainer', 'neuf', 'neuve', 'neufs', 'neuves',
+  'new', 'nieuw', 'neu', 'nuovo', 'nuova', 'nuevo', 'nueva', 'comme', 'etat', 'bon', 'bonne', 'tres', 'tbe', 'be',
+  'excellent', 'parfait', 'low', 'mid', 'high', 'basse', 'basses', 'montante', 'montantes', 'paire', 'paires', 'pair', 'lot', 'boite',
+  'box', 'original', 'originale', 'originals', 'authentique', 'vintage', 'rare',
+]);
+// Les mots de MODÈLE d'un titre : hors marque, couleurs, mots vides, tailles (34-52, demi-tailles)
+// et petits nombres (« 5 » de « zoom fly 5 » ne suffit pas à lui seul). « air max 1 » ⇒ air, max.
+export function motsModeleAchat(titre, marque, couleursDe) {
+  const mq = new Set(normMots(marque).split(' ').filter(Boolean));
+  return new Set(normMots(titre).split(' ').filter((w) => w && !mq.has(w) && !MOTS_VIDES.has(w)
+    && !(/^\d+$/.test(w) && w.length <= 2) && !(/^[a-z]$/.test(w))
+    && !(typeof couleursDe === 'function' && (couleursDe(w) || []).length)));
+}
+
 export function suggestionsAchat({ cible, achats, liens, marqueDe, couleursDe, modeleDe = null, max = 3 } = {}) {
   if (!cible || typeof marqueDe !== 'function' || typeof couleursDe !== 'function' || !Array.isArray(achats)) return [];
   const bas = (s) => String(s || '').trim().toLowerCase();
   const titre = String(cible.titre || '');
-  const marque = bas(cible.marque && marqueDe(String(cible.marque)) || cible.marque || marqueDe(titre));
+  const marque = marqueAnnonce({ marque: cible.marque, titre }, marqueDe);
   const taille = cible.taille ? tailleNorm(cible.taille) : tailleDuTitre(titre);
   const couleurs = (couleursDe([cible.couleur || '', titre].join(' ')) || []).map(bas);
   if (!marque || !taille) return [];
   const ref = dateMs(cible.dateRef);
   // §5 : deux MODÈLES connus et différents (« Spezial » / « Samba ») ⇒ écartée.
   const modele = typeof modeleDe === 'function' ? modeleDe(titre) : null;
+  // (15 nov.) Les mots de modèle de l'annonce : aucun ⇒ aucune suggestion (jamais la marque seule).
+  const mots = motsModeleAchat(titre, marque, couleursDe);
+  if (!mots.size) return [];
   const out = [];
   for (const a of achats) {
     if (!a || !txDe(a) || achatAnnule(a) || !achatDisponible(a, liens, cible.curTx)) continue;
     const t = String(a.title || '');
-    if (bas(marqueDe(t)) !== marque) continue;
+    // La marque de l'achat : CELLE de l'annonce, reconnue ou écrite dans son titre ; une autre ⇒ écartée.
+    const ma = normMots(marqueDe(t));
+    if (ma ? !memeMarque(ma, marque) : !titrePorteMarque(t, marque)) continue;
+    // Au moins un mot de modèle commun.
+    const motsA = motsModeleAchat(t, marque, couleursDe);
+    if (![...mots].some((w) => motsA.has(w))) continue;
     const ta = tailleDuTitre(t);
     if (!ta || ta !== taille) continue;
     const mo = modele ? modeleDe(t) : null;

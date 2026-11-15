@@ -6,6 +6,8 @@ import ecran_correspondances from './de/correspondances.js';   // (15 nov.) Publ
 import ecran_capte from './de/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_renvoyer from './de/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_numeros_nouvelles from './de/numeros-nouvelles.js';   // (15 nov.) Les nouvelles annonces sans N°
+import ecran_retrait_ailleurs from './de/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
+import ecran_finition from './de/finition.js';   // (15 nov.) la finition écran par écran
 import ecran_idees from './de/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './de/ventes.js';
 import ecran_commun from './de/commun.js';
@@ -37,8 +39,10 @@ import ecran_partenaires from './de/partenaires.js';   // (15 nov.) programme pa
 import ecran_argentprix from './de/argentprix.js';   // (14 nov., argent-prix)
 import ecran_rechliste from './de/rechliste.js';
 import ecran_studio_paires from './de/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
+import ecran_republier_guide from './de/republierGuide.js';   // (15 nov.) republier / publier à la main, guidés
 export default {
   ...ecran_studio_paires,
+  ...ecran_republier_guide,
   ...ecran_accueilReste,
   ...ecran_refonte_ms,
   ...ecran_studio_journee,
@@ -2259,7 +2263,9 @@ export default {
   ...ecran_confort,
   ...ecran_studio,
   ...ecran_capte,
+  ...ecran_retrait_ailleurs,
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_numeros_nouvelles,
+  ...ecran_finition,
 };

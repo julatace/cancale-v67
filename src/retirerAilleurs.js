@@ -50,7 +50,20 @@ export function lignesPeutEtre(data, sures) {
   const vues = new Set(arr(sures).map(cleSite));
   const d = data && typeof data === 'object' ? data : {};
   const annonces = arr(d.annonces).map((a) => (a && a.active === null ? { ...a, active: true, _pasConfirme: true } : a));
-  return articlesVendusAilleurs({ ...d, annonces }).lignes.filter((a) => a._pasConfirme && !vues.has(cleSite(a)));
+  const lignes = articlesVendusAilleurs({ ...d, annonces }).lignes.filter((a) => a._pasConfirme && !vues.has(cleSite(a)));
+  // (15 nov., retrait-ailleurs) Une vente « PEUT-ÊTRE » (preuve manquante : `engagee: null`, par exemple une
+  // commande Vinted sans état — §5 « Vendue se PROUVE ») passée dans la MÊME règle, avec SES identités : la paire
+  // est dite « à vérifier » avec pourquoi, jamais proposée au retrait. Une vente prouvée du même N° l'emporte
+  // (la ligne sûre est déjà dans `sures`).
+  const douteuses = arr(d.ventes).filter((v) => v && v.engagee === null);
+  if (!douteuses.length) return lignes;
+  const deja = new Set([...vues, ...lignes.map(cleSite)]);
+  const pourquoi = (a) => { const v = arr(a.ventes).find((x) => x && x.pourquoi); return v ? String(v.pourquoi) : ''; };
+  const pourquoiCode = (a) => { const v = arr(a.ventes).find((x) => x && x.pourquoiCode); return v ? String(v.pourquoiCode) : ''; };
+  const parVente = articlesVendusAilleurs({ ...d, ventes: douteuses.map((v) => ({ ...v, engagee: true })) }).lignes
+    .filter((a) => !deja.has(cleSite(a)))
+    .map((a) => ({ ...a, _venteDouteuse: true, _pourquoi: pourquoi(a), _pourquoiCode: pourquoiCode(a) }));
+  return [...lignes, ...parVente];
 }
 
 // `v` : la sortie du crochet « Vendus ailleurs » ({ lignes, peutEtre, ambigus, manques, at }).
@@ -77,22 +90,24 @@ export function planRetirerAilleurs(v, o = {}) {
     if (!art.photo && a.photo) art.photo = a.photo;
     const t = tsDe(a.capture);
     const vieille = !(Number.isFinite(t) && maintenant - t <= FRAIS_MS);
-    let voie, moyen = null, raison;
-    if (a.aConfirmer) { voie = 'verifier'; raison = `${motsVendeur().le} semble remis${motsVendeur().e} en vente — vérifie avant de retirer`; }
-    else if (parNumSite.get(`${a.numero}|${a.plateforme}`) > 1) { voie = 'verifier'; raison = `deux annonces sous ce N° sur ${NOM[a.plateforme] || a.plateforme} — VRM ne choisit pas`; }
-    else if (a._peutEtre || vieille) { voie = 'verifier'; raison = Number.isFinite(t) ? `lu le ${dateCourte(t)} — peut-être déjà retirée` : 'état pas confirmé — peut-être déjà retirée'; }
-    else if (a.plateforme === 'Vinted') { voie = 'main'; raison = 'à retirer toi-même sur Vinted — VRM ne supprime jamais une annonce Vinted'; }
-    else if (a.plateforme === 'Vestiaire') { voie = 'main'; raison = 'à faire sur Vestiaire — VRM n’a pas de voie pour la retirer'; }
+    let voie, moyen = null, raison, code = 'autre';
+    if (a._venteDouteuse) { voie = 'verifier'; code = 'douteuse'; raison = `vente pas prouvée${a._pourquoi ? ` (${a._pourquoi})` : ''} — VRM ne retire rien tant que la vente n’est pas sûre`; }
+    else if (a.aConfirmer) { voie = 'verifier'; code = 'remise'; raison = `${motsVendeur().le} semble remis${motsVendeur().e} en vente — vérifie avant de retirer`; }
+    else if (parNumSite.get(`${a.numero}|${a.plateforme}`) > 1) { voie = 'verifier'; code = 'deux'; raison = `deux annonces sous ce N° sur ${NOM[a.plateforme] || a.plateforme} — VRM ne choisit pas`; }
+    else if (a._peutEtre || vieille) { voie = 'verifier'; code = Number.isFinite(t) ? 'vieille' : 'pasConfirme'; raison = Number.isFinite(t) ? `lu le ${dateCourte(t)} — peut-être déjà retirée` : 'état pas confirmé — peut-être déjà retirée'; }
+    else if (a.plateforme === 'Vinted') { voie = 'main'; code = 'vinted'; raison = 'à retirer toi-même sur Vinted — VRM ne supprime jamais une annonce Vinted'; }
+    else if (a.plateforme === 'Vestiaire') { voie = 'main'; code = 'vestiaire'; raison = 'à faire sur Vestiaire — VRM n’a pas de voie pour la retirer'; }
     else if (a.plateforme === 'Leboncoin') {
-      if (!/^\d{6,12}$/.test(String(a.id))) { voie = 'main'; raison = 'annonce Leboncoin sans identifiant lisible — à faire sur Leboncoin'; }
-      else if (o.lbcOk) { voie = 'auto'; moyen = 'lbc'; raison = 'supprimée par l’extension, au nom du compte connecté dans l’onglet'; }
-      else { voie = 'main'; raison = o.lbcPourquoi || 'l’extension de ce navigateur ne sait pas supprimer sur Leboncoin — à faire sur Leboncoin'; }
+      if (!/^\d{6,12}$/.test(String(a.id))) { voie = 'main'; code = 'sansId'; raison = 'annonce Leboncoin sans identifiant lisible — à faire sur Leboncoin'; }
+      else if (o.lbcOk) { voie = 'auto'; moyen = 'lbc'; code = 'lbc'; raison = 'supprimée par l’extension, au nom du compte connecté dans l’onglet'; }
+      else { voie = 'main'; code = o.lbcCode === 'absente' ? 'lbcAbsente' : 'lbcRetard'; raison = o.lbcPourquoi || 'l’extension de ce navigateur ne sait pas supprimer sur Leboncoin — à faire sur Leboncoin'; }
     } else if (a.plateforme === 'eBay') {
-      if (!/^\d{1,19}$/.test(String(a.id))) { voie = 'main'; raison = 'annonce eBay sans identifiant lisible — à faire sur eBay'; }
-      else if (o.ebayOk !== false) { voie = 'auto'; moyen = 'ebay'; raison = 'annonce terminée chez eBay (sans retour : il faudrait la republier)'; }
-      else { voie = 'main'; raison = 'eBay pas joignable depuis ici — à faire sur eBay'; }
+      if (!/^\d{1,19}$/.test(String(a.id))) { voie = 'main'; code = 'sansId'; raison = 'annonce eBay sans identifiant lisible — à faire sur eBay'; }
+      else if (o.ebayOk !== false) { voie = 'auto'; moyen = 'ebay'; code = 'ebay'; raison = 'annonce terminée chez eBay (sans retour : il faudrait la republier)'; }
+      else { voie = 'main'; code = 'ebayHors'; raison = 'eBay pas joignable depuis ici — à faire sur eBay'; }
     } else { voie = 'main'; raison = 'à faire sur le site'; }
-    art.sites.push({ cle: cleSite(a), plateforme: a.plateforme, id: String(a.id), compte: a.compte, compteNom: a.compteNom && a.compteNom !== 'principal' ? a.compteNom : '', lien: a.lien || null, onglet: a.onglet || null, voie, moyen, raison, titre: a.titre || '' });
+    if (a._venteDouteuse) art.douteuse = art.douteuse !== false; else art.douteuse = false;
+    art.sites.push({ cle: cleSite(a), douteuse: !!a._venteDouteuse, plateforme: a.plateforme, id: String(a.id), compte: a.compte, compteNom: a.compteNom && a.compteNom !== 'principal' ? a.compteNom : '', lien: a.lien || null, onglet: a.onglet || null, voie, moyen, raison, code, pourquoiCode: a._pourquoiCode || '', lu: Number.isFinite(t) ? t : null, titre: a.titre || '' });
   }
   const liste = [...articles.values()].map((art) => ({ ...art, sites: art.sites.sort((x, y) => ORDRE.indexOf(x.plateforme) - ORDRE.indexOf(y.plateforme)) }))
     .sort((a, b) => String(a.numero).localeCompare(String(b.numero), 'fr', { numeric: true }));

@@ -46,7 +46,7 @@
 import { motsVendeur } from './profilVendeur.js';
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 const COLONNES = ['prets', 'attente', 'retirer', 'partis'];
-const TYPES = ['conv', 'offre', 'offres', 'vente', 'vcvente', 'colis', 'retrait', 'colonne', 'achat', 'retour', 'urssaf', 'doublon', 'case', 'bilanmois'];
+const TYPES = ['conv', 'offre', 'offres', 'vente', 'vcvente', 'colis', 'retrait', 'colonne', 'achat', 'retour', 'urssaf', 'doublon', 'case', 'bilanmois', 'ailleurs'];
 const MOIS = /^\d{4}-(0[1-9]|1[0-2])$/;
 // (13 nov., lot 53) Le mois demandé par l'e-mail du bilan mensuel : la carte « Bilan du
 // mois » (Compta) le lit à son montage pour montrer CE mois (s'il est l'un des deux qu'elle sait).
@@ -116,6 +116,8 @@ export function jetonsCible(c) {
     case 'bilanmois': return c.mois ? [`bilanmois:${c.mois}`] : ['bilanmois'];
     case 'doublon': { const n = c.num ? cleNumCible(c.num) : ''; return n ? [`doublon:${c.plat || 'ebay'}:${n}`] : [`doublon:${c.plat || 'ebay'}`]; }
     case 'case': return c.meuble && c.i ? [`case:${c.meuble}:${c.i}`] : [];
+    // (15 nov., retrait-ailleurs) « À retirer ailleurs » de Ma journée : la paire (son N°), sinon le bloc.
+    case 'ailleurs': { const n = c.num ? cleNumCible(c.num) : ''; return n ? [`ailleurs:${n}`] : []; }
     case 'annonce': return c.id ? [`annonce:${c.id}`] : [];
     default: return [];
   }
@@ -183,6 +185,9 @@ function selecteursAnciens(c) {
           : (n ? [`[data-ebay-doublon="${q(n)}"]`, `[data-ebay-doublon-ailleurs="${q(n)}"]`] : ['[data-ebay-a-retirer]', '[data-ebay-a-retirer-ailleurs]']),
         ouvrir: null, deplier: [] };
     }
+    // (15 nov., retrait-ailleurs) La paire dans « À retirer ailleurs » (par SON N°, jamais une autre) ;
+    // sans N° : le bloc. Paire absente ⇒ la phrase le dit (déjà retirée, ou pas encore relue).
+    case 'ailleurs': { const n = c.num ? cleNumCible(c.num) : ''; return { essais: n ? [`[data-retirer-ailleurs-liste] [data-ra-numero="${q(n)}"]`] : ['[data-retirer-ailleurs-liste]'], ouvrir: null, deplier: [] }; }
     // (6 nov., vague 3) La case du Stock : son repli d'ancien attribut est `data-case-ici`.
     case 'case': return { essais: c.meuble && c.i ? [`[data-case-ici="${q(c.meuble)}:${q(c.i)}"]`] : [], ouvrir: null, deplier: [] };
     // (6 nov., recherche) Une annonce sans N° : SA carte dans Annonces (l'id Vinted de l'annonce).
@@ -215,6 +220,7 @@ export function phraseAbsente(c) {
     // Ne promet pas « réglée » : la ligne peut manquer parce que la liste n'est
     // pas encore relue. Le geste est dit.
     case 'doublon': return `${motsVendeur().Ce} n\u2019est plus dans la liste « à retirer » : la double vente est sans doute déjà réglée. Vérifie dans tes annonces de la plateforme si tu as un doute.`;
+    case 'ailleurs': return `${motsVendeur().Ce} n\u2019est plus dans « À retirer ailleurs » : elle est sans doute déjà retirée partout — ou la vérification n\u2019est pas encore passée. Regarde dans tes annonces de la plateforme si tu as un doute.`;
     case 'case': return 'Cette case n\u2019est plus sur tes meubles : le meuble a peut-être été modifié ou supprimé.';
     case 'annonce': return "Cette annonce n'est pas dans la liste affichée : regarde le compte et les filtres choisis, ou repasse sur Vinted.";
     default: return '';

@@ -44,7 +44,8 @@ const MUTATIONS = {
   'continuer-ignore': ['regle', "if (!continuer()) {", 'if (false) {'],
   'incertain-retire': ['regle', "if (!j || code === 0 || code === 504 || j.reason === 'incertain') return { statut: 'incertain'", "if (!j || code === 0 || code === 504 || j.reason === 'incertain') return { statut: 'retire'"],
   'lbc-sans-ext': ['regle', 'else if (o.lbcOk) {', 'else if (true) {'],
-  'app-sans-confirmation': ['app', "    const ok = await askConfirm({ title: t.titre, desc: t.desc, ok: 'Oui, retirer', cancel: 'Annuler', danger: true, irreversible: true });\n    if (!ok) return;\n", ''],
+  // (15 nov., retrait-ailleurs) Le geste vit dans `gesteRA` / `toutRetirerRA` (« À retirer ailleurs ») : la MÊME confirmation.
+  'app-sans-confirmation': ['app', "  if (!reprise && !(await confirmerRA([{ a: art, s: site }]))) return;\n", ''],
   'app-ebay-auto': ['app', "body: JSON.stringify({ action: 'retirer', itemId: String(site.id), confirme: true, ...corpsCompteEbay(site.compte) })", "body: JSON.stringify({ action: 'retirer', itemId: String(site.id), confirme: true, auto: true, ...corpsCompteEbay(site.compte) })"],
   'app-sans-regle': ['app', '  const planAilleurs = planRetirerAilleurs(vendusAilleurs.v, {', '  const planAilleurs = ((v) => ({ articles: [], nAuto: 0, nMain: 0, nVerifier: 0, ambigus: 0, manques: [] }))(vendusAilleurs.v, {'],
 };
@@ -220,17 +221,21 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').m
   }
 
   // L'app : la règle, la confirmation AVANT, les voies existantes.
+  // (15 nov., retrait-ailleurs) « Retirer des autres sites » est devenu « À retirer ailleurs » : un geste
+  // par site (`gesteRA`), « Tout retirer » (`toutRetirerRA`), l'envoi d'UN site (`retirerUnSiteRA`).
   await essaie('I · app', () => {
     const app = sansCommentaires(appSrc);
-    const deb = app.indexOf('const retirerDesAutresSites = async () => {');
-    const corps = deb >= 0 ? app.slice(deb, app.indexOf('\n  };\n', deb)) : '';
+    const corpsDe = (debut) => { const d = app.indexOf(debut); return d >= 0 ? app.slice(d, app.indexOf('\n}\n', d)) : ''; };
+    const geste = corpsDe('async function gesteRA('), tout = corpsDe('async function toutRetirerRA('), un = corpsDe('async function retirerUnSiteRA(');
     dit(/planRetirerAilleurs\(vendusAilleurs\.v,/.test(app), 'I1 · Ma journée / Ventes passent par la règle (`planRetirerAilleurs`)');
-    const iConf = corps.indexOf('await askConfirm('), iNon = corps.indexOf('if (!ok) return;'), iExe = corps.indexOf('executerRetraits(');
-    dit(iConf >= 0 && iNon > iConf && iExe > iNon, 'I2 · confirmation AVANT tout envoi (refusée ⇒ rien ne part)');
-    dit(/cmd: 'lbcSupprime', id: String\(site\.id\), confirme: true/.test(corps), 'I3 · Leboncoin : la voie existante de l’extension (`lbcSupprime`, confirmé)');
-    dit(/action: 'retirer', itemId: String\(site\.id\), confirme: true/.test(corps) && !/auto:\s*true/.test(corps), 'I4 · eBay : la route `retirer`, jamais en `auto` (c’est SON clic)');
-    dit(/data-retirer-ailleurs=""/.test(app) && /blocRetirerAilleurs\(false\)/.test(app) && /blocRetirerAilleurs\(true\)/.test(app), 'I5 · le bouton est rendu sur Ma journée (carte + feuille) et en tête de Ventes');
-    dit(!/vinted\.fr[^\n]*(delete|supprim)/i.test(corps), 'I6 · aucun appel de suppression Vinted');
+    const iConf = geste.indexOf('confirmerRA('), iExe = geste.indexOf('retirerUnSiteRA(');
+    const tConf = tout.indexOf('confirmerRA(items)'), tExe = tout.indexOf('retirerUnSiteRA(');
+    dit(iConf >= 0 && iExe > iConf && tConf >= 0 && tExe > tConf && /askConfirm\(/.test(corpsDe('async function confirmerRA(')), 'I2 · confirmation AVANT tout envoi (refusée ⇒ rien ne part), un geste comme une série');
+    dit(/cmd: 'lbcSupprime', id: String\(site\.id\), confirme: true/.test(un), 'I3 · Leboncoin : la voie existante de l’extension (`lbcSupprime`, confirmé)');
+    dit(/action: 'retirer', itemId: String\(site\.id\), confirme: true/.test(un) && !/auto:\s*true/.test(un), 'I4 · eBay : la route `retirer`, jamais en `auto` (c’est SON clic)');
+    const jsx = sansCommentaires(fs.readFileSync(path.join(RACINE, 'src', 'ARetirerAilleurs.jsx'), 'utf8'));
+    dit(/data-retirer-ailleurs-liste=""/.test(jsx) && /blocRetirerAilleurs\(false\)/.test(app) && /blocRetirerAilleurs\(true\)/.test(app), 'I5 · le bloc est rendu en tête de Ma journée, dans la feuille et en tête de Ventes');
+    dit(!/vinted\.fr[^\n]*(delete|supprim)/i.test(un), 'I6 · aucun appel de suppression Vinted');
   });
 
   console.log(`\n${n - ko}/${n} contrôles verts${mut ? ` (mutation « ${mut} »)` : ''}.`);

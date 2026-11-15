@@ -77,6 +77,9 @@ export const DESTINATIONS = {
   agentEbay: () => lienNotif('plat_ebay', { section: 'agent' }),
   facture: () => lienNotif('compta', { section: 'factures' }),
   journee: () => lienNotif('journee'),
+  // (15 nov., retrait-ailleurs) Une paire vendue, encore en ligne ailleurs : Ma journée, « À retirer
+  // ailleurs » (en tête), la paire par SON N° — un geste par site.
+  retirerAilleurs: ({ num } = {}) => lienNotif('journee', { cible: 'ailleurs', num }),
   // (10 nov., lot BC) Le bilan de la semaine ouvre « Ma semaine » sur SA semaine (le lundi).
   semaine: ({ lundi } = {}) => lienNotif('semaine', { lundi: /^\d{4}-\d{2}-\d{2}$/.test(String(lundi || '')) ? lundi : '' }),
   // (5 nov.) Paramètres → Comptes liés : chaque compte, sa dernière relecture.
