@@ -962,9 +962,14 @@ import { sommeConnue, texteSomme, medianeSue, valeurSue } from "./sommeConnue.js
 import { lireLocal, lireJSON, stockageDispo } from "./stockageSur.js";   // (11 nov.) stockage protégé (Safari privé, quota)
 import { creerMagasinPartage } from "./magasinPartage.js";
 import { fusionnerVersements, garderDatesConnues } from "./versementsConnus.js";   // (13 nov.) une date de versement connue ne redevient jamais « pas lue »   // (13 nov., source unique) une copie des données lues pour tous les moteurs
-import { trj } from './i18n/react.js';
+import { trj, useLangue } from './i18n/react.js';
 import { CollerPrixAchatFeuille } from "./composants/CollerPrixAchat.jsx";   // (14 nov., lot argent-choix — proposition 75)
 import { verifierAvantEcriture } from "./collerPrixAchat.js";
+// (15 nov., parcours nouveau) Le parcours d'un nouveau en huit étapes, un écran plein (src/parcoursNouveau/).
+import { CLE_PARCOURS_NOUVEAU, parcoursNouveauAOuvrir, lireParcoursNouveau, positionApres as positionParcoursNouveau, etatsEtapes as etatsParcoursNouveau, appareilIci as appareilParcoursNouveau, dansOrionIci, reglageNumerotation, reglagePlateformes, ETAPES_NOUVEAU } from "./parcoursNouveau/regle.js";
+import { bacASableActif, bacASableEtape, bacASableAppareil } from "./modeExemple.js";
+import { ACCES_OFFERT as ACCES_OFFERT_PN, PRIX_MOIS as PRIX_MOIS_PN, PRIX_PRO_MOIS as PRIX_PRO_MOIS_PN, PRO_OUVERT as PRO_OUVERT_PN } from "./accueil-reglages.js";
+const ParcoursNouveau = aLaDemande(() => import('./parcoursNouveau/ParcoursNouveau.jsx'));
 // ⟦→ ecrans/Reglages.jsx #16⟧
 
 // Version visible, pour vérifier d'un coup d'œil si l'app a bien chargé la
@@ -3138,6 +3143,9 @@ const SYNC_KEYS = [
   // (11 nov.) Le parcours d'arrivée (src/parcoursArrivee.js) : { v, etape, ouvert, fini, at } —
   // on reprend à la même étape, écran ouvert ou non, sur n'importe quel appareil.
   'vrm_parcours',
+  // (15 nov., parcours nouveau) Le parcours d'un nouveau en huit étapes (src/parcoursNouveau/regle.js) :
+  // { etape, vues, fini, finiLe, plusTard, at } — repris à la même étape sur n'importe quel appareil.
+  'vrm_parcours_nouveau',
   // (14 nov., accueil des nouveaux) Par compte VRM, vu sur un appareil, vu partout : les écrans
   // déjà ouverts (« Nouveau », src/ecransVus.js), le bilan en une minute vu (src/bilanMinute.js),
   // le premier colis accompagné vu (src/premierColis.js), la réponse à la question des
@@ -22663,6 +22671,65 @@ function GuideDemarrageApp(props) {
   return <><LangueDetecteeCarte save={save}/><AlerteDejaRelie lire={lireLitigesVinted} comptes={props.comptes} contact={contactEmail()} onChangerCompte={changerCompteVrm} ou="journee"/>
     <CarteParcoursApp comptes={props.comptes} plein={!!props.plein} sinon={relierListe}/></>;
 }
+// ── LE PARCOURS D'UN NOUVEAU, BRANCHÉ (15 nov., src/parcoursNouveau/) ───────────
+// Les PREUVES de chaque étape, lues par les chemins de toujours (aucune nouvelle requête
+// d'écriture) : la session, « Où vends-tu ? » (`vrm_plateformes_affichees`), le pont et
+// la première lecture (`useParcoursArrivee`, la même règle que la carte « Démarrer »),
+// « qui numérote » (`vrm_numero_ecrit`), l'import des 12 mois (`import_vinted_{uid}`,
+// projeté), l'abonnement LU du serveur. L'écran (ParcoursNouveau.jsx) ne fait que dessiner.
+// Écritures : seulement sur SES gestes — la position (`vrm_parcours_nouveau`), ses sites,
+// sa numérotation — par `save`, comme partout. Dans le bac à sable du propriétaire
+// (src/modeExemple.js) le même code tourne, en mémoire : rien ne sort.
+function useAbonnementLu() {
+  const [x, setX] = React.useState(() => abonnementPublie());
+  React.useEffect(() => {
+    const off = suivreAbonnement((v) => setX(v));
+    if (abonnementPublie() === undefined) lireAbonnement().then((v) => { setX((avant) => (avant === undefined ? (v || null) : avant)); }).catch(() => setX(null));
+    return () => { try { off(); } catch (_) {} };
+  }, []);
+  return x;
+}
+function ParcoursNouveauApp({ comptes, onFermer, etapeForcee = null }) {
+  const [, maj] = React.useReducer((n) => n + 1, 0);
+  React.useEffect(() => {
+    const f = (e) => { const k = e && e.detail && e.detail.k; if (!k || [CLE_PARCOURS_NOUVEAU, CLE_PLATEFORMES, CLE_NUMERO_ECRIT].includes(k)) maj(); };
+    window.addEventListener('vrm:save', f);
+    const off = onCloudReady(maj);
+    return () => { window.removeEventListener('vrm:save', f); if (typeof off === 'function') off(); };
+  }, []);
+  const pret = isCloudReady();
+  const pos = pret ? lireParcoursNouveau(load(CLE_PARCOURS_NOUVEAU, null)) : null;
+  const [ici, setIci] = React.useState(() => etapeForcee || (pos && pos.etape) || 'bienvenue');
+  React.useEffect(() => { if (etapeForcee) setIci(etapeForcee); }, [etapeForcee]);
+  const { etat: arrivee } = useParcoursArrivee({ comptes, actif: true });
+  const abo = useAbonnementLu();
+  const [imports, setImports] = React.useState(undefined);
+  const uids = (Array.isArray(comptes) ? comptes : []).map((a) => String((a && a.vinted_user_id) || '')).filter(Boolean).join(',');
+  React.useEffect(() => {
+    let mort = false;
+    lireImportDepart(uids ? uids.split(',') : [], (q) => lireTout(q)).then((r) => { if (!mort) setImports(r); }).catch(() => { if (!mort) setImports(null); });
+    return () => { mort = true; };
+  }, [uids, ici]);
+  const plateformes = pret ? lirePlateformes(load(CLE_PLATEFORMES, null)) : undefined;
+  const numerotation = pret ? load(CLE_NUMERO_ECRIT, null) : undefined;
+  const etats = etatsParcoursNouveau({ session: !!(AUTH.user && AUTH.user.id), plateformes, arrivee, numerotation, imports, abonnement: etatAbonnement(abo) });
+  const ranger = (geste, etape) => save(CLE_PARCOURS_NOUVEAU, positionParcoursNouveau(load(CLE_PARCOURS_NOUVEAU, null), geste, { etape }));
+  const aller = (e) => { if (!ETAPES_NOUVEAU.includes(e)) return; setIci(e); ranger('aller', e); try { window.dispatchEvent(new Event('vrm:parcours')); } catch (_) {} };
+  const ecrire = (cle, v) => new Promise((res) => save(cle, v, (ok) => res(ok !== false)));
+  const sombre = (() => { try { return document.documentElement.getAttribute('data-theme') === 'dark'; } catch (_) { return false; } })();
+  const prenom = String(load('vrm_prenom', '') || '').trim().slice(0, 30);
+  return <><FermeAuRetour fermer={() => { ranger('plusTard'); if (onFermer) onFermer('plusTard'); }}/>
+    <Suspense fallback={null}><ParcoursNouveau etape={ici} etats={etats} appareil={appareilParcoursNouveau(undefined, bacASableAppareil())} dansOrion={dansOrionIci()} sombre={sombre} prenom={prenom} vend={vendActuel()}
+      prix={{ solo: PRIX_MOIS_PN, pro: PRIX_PRO_MOIS_PN, proOuvert: PRO_OUVERT_PN, accesOffert: ACCES_OFFERT_PN }}
+      plateformesDepart={plateformes && plateformes.sites ? plateformes.sites : []} numerosDepart={etats.numeros.choix || null}
+      onAller={aller}
+      onPlusTard={() => { ranger('plusTard'); if (onFermer) onFermer('plusTard'); }}
+      onFin={() => { save(CLE_PARCOURS_NOUVEAU, positionParcoursNouveau(load(CLE_PARCOURS_NOUVEAU, null), 'fin')); if (onFermer) onFermer('fin'); }}
+      onChoisirPlateformes={(sites) => { const v = reglagePlateformes(sites); return v ? ecrire(CLE_PLATEFORMES, v) : Promise.resolve(false); }}
+      onChoisirNumeros={(choix) => { const v = reglageNumerotation(choix, new Date().toISOString(), load(CLE_NUMERO_ECRIT, null)); return v ? ecrire(CLE_NUMERO_ECRIT, v) : Promise.resolve(false); }}
+      onOuvrirReglage={(id) => { ranger('aller', ici); if (onFermer) onFermer('plusTard'); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: id === 'ebay' ? '?tab=plat_ebay&section=compte' : '?tab=settings' })); } catch (_) {} }}
+    /></Suspense></>;
+}
 // Préférences synchronisées et cloisonnées par le stockage du compte VRM.
 function PlateformesSetting({ initial = false }) {
   const p = useProfilVendeur();
@@ -22878,6 +22945,25 @@ function gesteCarteParcours(c, sansSouris) {
   if (c.cle === 'extension' && c.detail === 'absente') { const lien = lienInstallerIci(sansSouris); return lien ? { libelle: 'Télécharger l’extension', href: lien, telecharger: /\.zip(\?|$)/.test(lien) } : null; }
   return null;
 }
+// (15 nov., parcours nouveau) La carte de Ma journée d'un parcours commencé : l'étape où il
+// s'est arrêté, les huit segments, « Reprendre » (rouvre l'écran plein à cette étape).
+function CarteParcoursNouveau({ pos }) {
+  useLangue();
+  const i = Math.max(0, ETAPES_NOUVEAU.indexOf(pos.etape));
+  return (
+    <section className="vrm-choix-plateformes vrm-pn-carte" data-pn-carte={pos.etape} aria-label={tr('pn.dialogue')}>
+      <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:12}}>
+        <h2 style={{fontSize:20,letterSpacing:-0.4,margin:0}}>{tr('pn.dialogue')}</h2>
+        <span style={{fontSize:13,fontWeight:600,fontVariantNumeric:'tabular-nums',opacity:.75}}>{tr('pn.rang', { n: i + 1, total: ETAPES_NOUVEAU.length })}</span>
+      </div>
+      <div aria-hidden="true" style={{display:'grid',gridTemplateColumns:`repeat(${ETAPES_NOUVEAU.length},1fr)`,gap:5,margin:'12px 0 10px'}}>
+        {ETAPES_NOUVEAU.map((e, k) => <span key={e} style={{height:5,borderRadius:3,background:'currentColor',opacity:k < i ? .8 : k === i ? 1 : .18}}/>)}
+      </div>
+      <p className="vrm-cp-note" style={{margin:'0 0 10px'}}>{tr('pn.court.' + pos.etape)}</p>
+      <Bouton variante="primaire" data-pn-reprendre="" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:parcours-nouveau', { detail: pos.etape })); } catch (_) {} }}>{tr('pn.continuer')}</Bouton>
+    </section>
+  );
+}
 // La petite carte de Ma journée : l'étape courante, son geste exact ou « Continuer » (qui
 // ouvre l'écran plein). « Ma configuration » mise de côté garde sa carte « Reprendre ».
 function CarteParcoursApp({ comptes, plein = false, sinon = null }) {
@@ -22886,6 +22972,10 @@ function CarteParcoursApp({ comptes, plein = false, sinon = null }) {
   React.useEffect(() => onCloudReady(() => setMasque(!!load(CLE_GUIDE_MASQUE, null))), []);
   const { etat, pret, parcours, parcoursBrut } = useParcoursArrivee({ comptes, actif: !masque || plein });
   if (!pret) return null;
+  // (15 nov., parcours nouveau) Commencé et pas fini : UNE carte « Reprendre » (plus « Configure VRM »
+  // ET « Démarrer avec VRM » côte à côte, deux pleins pour le même chemin).
+  const pn = lireParcoursNouveau(load(CLE_PARCOURS_NOUVEAU, null));
+  if (pn && !pn.fini && !exempleActif()) return <><CarteParcoursNouveau pos={pn}/>{sinon}</>;
   const mode = carteParcours(etat, parcoursBrut, { masque: masque && !plein, exemple: exempleActif(), comptes });
   if (mode === 'cachee') return <><ReprendreConfiguration/>{sinon}</>;
   const sansCompte = Array.isArray(comptes) && comptes.length === 0;
@@ -60403,7 +60493,16 @@ function AppCoeur() {
   const [bienvenue,setBienvenue]=useState(false);
   useEffect(()=>{
     if(!premierJour) return undefined;
-    return onCloudReady(()=>{ if(!load('vrm_bienvenue_vue',null)) setBienvenue(true); });
+    // (15 nov., parcours nouveau) Un compte NEUF reçoit le parcours en huit étapes À LA PLACE de
+    // Bienvenue (src/parcoursNouveau/regle.js) : on attend de savoir s'il est le propriétaire.
+    let vivant=true;
+    const stop=onCloudReady(()=>{ if(load('vrm_bienvenue_vue',null)) return;
+      if(bacASableEtape()) return;
+      lireProprietaire().then((proprio)=>{ if(!vivant) return;
+        if(parcoursNouveauAOuvrir({ pret:true, exemple:exempleActif(), proprietaire:proprio, premierJour:true, valeur:load(CLE_PARCOURS_NOUVEAU,null), bienvenueVue:false })) return;
+        setBienvenue(true);
+      }).catch(()=>{ if(vivant) setBienvenue(true); }); });
+    return ()=>{ vivant=false; if(typeof stop==='function') stop(); };
   },[premierJour]);
   useEffect(()=>{ const o=()=>setBienvenue(true); window.addEventListener('vrm:bienvenue',o); return ()=>window.removeEventListener('vrm:bienvenue',o); },[]);
   // (2 nov.) LA VISITE EN BULLES (src/VisiteBulles.jsx) : après Bienvenue, une
@@ -60434,18 +60533,40 @@ function AppCoeur() {
   // attendent qu'il soit fermé.
   const configAuto=useRef(false);
   const [parcoursOuvert,setParcoursOuvert]=useState(false);
+  // (15 nov., parcours nouveau) LE PARCOURS D'UN NOUVEAU (src/parcoursNouveau/) : plein écran, huit
+  // étapes, à la place de Bienvenue + visite + Ma configuration pour un compte NEUF (jamais le
+  // propriétaire, jamais en mode exemple, « pas su » ⇒ rien). Repris à son étape (`vrm_parcours_nouveau`).
+  // Dans le bac à sable du propriétaire (Réglages → Nouveaux comptes), ouvert à l'étape demandée.
+  const [pnOuvert,setPnOuvert]=useState(()=>!!bacASableEtape());
+  const [pnEtape,setPnEtape]=useState(()=>bacASableEtape());
+  useEffect(()=>{
+    if(!accountsLoaded||baseKO||bacASableEtape()) return undefined;
+    let vivant=true;
+    const stop=onCloudReady(()=>{ lireProprietaire().then((proprio)=>{ if(!vivant) return;
+      if(parcoursNouveauAOuvrir({ pret:true, exemple:exempleActif(), proprietaire:proprio, premierJour, valeur:load(CLE_PARCOURS_NOUVEAU,null), bienvenueVue:!!load('vrm_bienvenue_vue',null) })) { setBienvenue(false); setPnOuvert(true); }
+    }).catch(()=>{}); });
+    return ()=>{ vivant=false; if(typeof stop==='function') stop(); };
+  },[accountsLoaded,baseKO]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(()=>{ const o=(e)=>{ setPnEtape(e && typeof e.detail === 'string' ? e.detail : null); setPnOuvert(true); }; window.addEventListener('vrm:parcours-nouveau',o); return ()=>window.removeEventListener('vrm:parcours-nouveau',o); },[]);
+  const fermerParcoursNouveau=(comment)=>{ setPnOuvert(false); setPnEtape(null);
+    // Le parcours REMPLACE Bienvenue et la visite en bulles : ils ne s'empilent plus derrière.
+    if(!load('vrm_bienvenue_vue',null)) save('vrm_bienvenue_vue',{at:new Date().toISOString(),par:'parcours-nouveau'});
+    if(!load(CLE_VISITE,null)) save(CLE_VISITE,{at:new Date().toISOString(),par:'parcours-nouveau'});
+    if(comment==='fin'&&tab!=='journee') setTab('journee'); };
   const [configSeule,setConfigSeule]=useState(null);   // (11 nov., lot DJ2) 'vends' : la question seule
   useEffect(()=>{
-    if(bienvenue||!accountsLoaded||baseKO) return undefined;
+    if(bienvenue||pnOuvert||!accountsLoaded||baseKO||bacASableEtape()) return undefined;
     let vivant=true;
     const stop=onCloudReady(()=>{ lireProprietaire().then((proprio)=>{
       if(!vivant) return;
+      // (15 nov., parcours nouveau) Un parcours commencé, ou qui va s'ouvrir, pose déjà « Où vends-tu ? » et « qui numérote ».
+      if(lireParcoursNouveau(load(CLE_PARCOURS_NOUVEAU,null)) || parcoursNouveauAOuvrir({ pret:true, exemple:exempleActif(), proprietaire:proprio, premierJour, valeur:null, bienvenueVue:!!load('vrm_bienvenue_vue',null) })) return;
       if(configurationAOuvrir({ pret:true, baseKO, exemple:exempleActif(), bienvenue, proprietaire:proprio, configuration:load(CLE_CONFIGURATION,null), plateformes:load(CLE_PLATEFORMES,null) })) { configAuto.current=true; setConfigSeule(null); setConfigOuverte(true); }
       // (11 nov., lot DJ2) Un compte déjà installé (Julien compris) : « Tu vends quoi ? », seule, une fois.
       else if(questionVendsAOuvrir({ pret:true, baseKO, exemple:exempleActif(), bienvenue, proprietaire:proprio, configuration:load(CLE_CONFIGURATION,null), plateformes:load(CLE_PLATEFORMES,null), jeVends:load(CLE_JE_VENDS,null) })) { setConfigSeule('vends'); setConfigOuverte(true); }
     }).catch(()=>{}); });
     return ()=>{ vivant=false; if(typeof stop==='function') stop(); };
-  },[bienvenue,accountsLoaded,baseKO]); // eslint-disable-line react-hooks/exhaustive-deps
+  },[bienvenue,pnOuvert,accountsLoaded,baseKO]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(()=>{ const o=(e)=>{ setConfigSeule(e && e.detail && e.detail.seule === 'vends' ? 'vends' : null); setConfigOuverte(true); }; window.addEventListener('vrm:configuration',o); return ()=>window.removeEventListener('vrm:configuration',o); },[]);
 
   const [liveStats,setLiveStats]=useState(null); // résumé Vinted en direct pour l'accueil
@@ -63784,28 +63905,29 @@ function AppCoeur() {
         </GardeEcran>
         </BarreHautSlot.Provider>
       </main>
+      {pnOuvert && <GardeEcran nom="parcours-nouveau" feuille onFermer={()=>fermerParcoursNouveau('plusTard')}><ParcoursNouveauApp comptes={vintedAccounts} etapeForcee={pnEtape} onFermer={fermerParcoursNouveau}/></GardeEcran>}
       {bienvenue && <GardeEcran nom="bienvenue" feuille onFermer={()=>{ save('vrm_bienvenue_vue',{at:new Date().toISOString()}); setBienvenue(false); }}><Bienvenue prenom={String(load('vrm_prenom','')||'').trim()} dark={!!dark} vend={vendActuel()} ouInstaller={ouExtensionIci()}
         onTheme={(d)=>{ if(!!d!==!!dark) toggleDark(); }}
         onTerminer={()=>{ save('vrm_bienvenue_vue',{at:new Date().toISOString()}); setBienvenue(false); if(tab!=='journee') setTab('journee'); }}/></GardeEcran>}
-      {configOuverte && !bienvenue && <GardeEcran nom="configuration" feuille onFermer={()=>setConfigOuverte(false)}><ConfigurationDepartApp key={configSeule || 'tout'} seule={configSeule} onFin={(etatFin)=>{ setConfigOuverte(false); const seule=configSeule; setConfigSeule(null); const auto=configAuto.current; configAuto.current=false;
+      {configOuverte && !bienvenue && !pnOuvert && <GardeEcran nom="configuration" feuille onFermer={()=>setConfigOuverte(false)}><ConfigurationDepartApp key={configSeule || 'tout'} seule={configSeule} onFin={(etatFin)=>{ setConfigOuverte(false); const seule=configSeule; setConfigSeule(null); const auto=configAuto.current; configAuto.current=false;
         // (11 nov.) Le parcours d'arrivée prend la suite d'une configuration COMPLÈTE terminée (pas de la question seule).
         if(!seule){ const pc=lirePositionParcours(load(CLE_PARCOURS,null)); if(etatFin==='fait'&&(auto||(pc&&pc.ouvert))) ecrireParcoursIci({ ouvert:true, etape:'extension' }); else if(etatFin!=='fait'&&pc&&pc.ouvert) ecrireParcoursIci({ ouvert:false }); }
         if(!seule&&tab!=='journee'&&!load(CLE_VISITE,null)) setTab('journee'); }}/></GardeEcran>}
-      {nuagePret && !baseKO && accountsLoaded && <ParcoursArriveeApp comptes={vintedAccounts} retenu={!!(bienvenue||configOuverte)} onNav={setTab} onOuvert={setParcoursOuvert}/>}
+      {nuagePret && !baseKO && accountsLoaded && <ParcoursArriveeApp comptes={vintedAccounts} retenu={!!(bienvenue||pnOuvert||configOuverte)} onNav={setTab} onOuvert={setParcoursOuvert}/>}
       {/* (14 nov., idée 136) La visite d'un écran : la première ouverture de Ma journée, Annonces, Ventes,
           Achats par un compte neuf, ou sur SON geste (« Revoir la visite »). Jamais avec la visite d'arrivée. */}
-      {!bienvenue && !configOuverte && !parcoursOuvert && !visite ? <GardeEcran nom="visite-ecran"><VisiteEcranHote tab={tab} z={Z_CONFIRMATION}/></GardeEcran> : null}
-      {nuagePret && !baseKO && <GardeEcran nom="accueil-nouveaux"><AccueilNouveauxCoque tab={tab} retenu={!!(bienvenue||configOuverte||parcoursOuvert||visite)} deps={DEPS_ACCUEIL_NOUVEAUX}
+      {!bienvenue && !pnOuvert && !configOuverte && !parcoursOuvert && !visite ? <GardeEcran nom="visite-ecran"><VisiteEcranHote tab={tab} z={Z_CONFIRMATION}/></GardeEcran> : null}
+      {nuagePret && !baseKO && <GardeEcran nom="accueil-nouveaux"><AccueilNouveauxCoque tab={tab} retenu={!!(bienvenue||pnOuvert||configOuverte||parcoursOuvert||visite)} deps={DEPS_ACCUEIL_NOUVEAUX}
         donnees={{ vendu: liveStatsVus ? { lignes: liveStatsVus.venduPasSu ? null : liveStatsVus.venduLignes, pasSu: !!liveStatsVus.venduPasSu, enAttente: !!liveStatsVus.venduEnAttente, manque: liveStatsVus.venduManque || [], nonCompteesAnnee: nonCompteesDe(liveStatsVus.venduNonComptees, new Date(new Date().getFullYear(), 0, 1).getTime()).length } : undefined,
           caParMois: liveStatsVus && liveStatsVus.caParMois, enLigne: widgetBase || undefined, parcours: lirePositionParcours(load(CLE_PARCOURS, null)),
           uids: (Array.isArray(vintedAccounts) ? vintedAccounts : []).map((a) => String((a && a.vinted_user_id) || '')).filter(Boolean),
           luUneFois: premiereLectureFaite({ comptes: vintedAccounts, liveStats: liveStatsVus, sitesLus, comptesEbay }) }}/></GardeEcran>}
-      {visite && !bienvenue && !configOuverte && !parcoursOuvert && <GardeEcran nom="visite" feuille onFermer={()=>setVisite(false)}><VisiteBulles z={Z_CONFIRMATION}
+      {visite && !bienvenue && !pnOuvert && !configOuverte && !parcoursOuvert && <GardeEcran nom="visite" feuille onFermer={()=>setVisite(false)}><VisiteBulles z={Z_CONFIRMATION}
         onTerminer={(raison)=>{ setVisite(false); if(raison!=='rien') save(CLE_VISITE,{at:new Date().toISOString(),fin:raison}); }}/></GardeEcran>}
       {/* (6 nov.) L'ACCOMPAGNEMENT (src/Conseils.jsx) : une bulle au plus, jamais pendant
           Bienvenue ni la visite (ni pour une personne neuve qui ne l'a pas encore vue). */}
       <GardeEcran nom="conseils"><Conseils ecran={tab} lire={lireLigneAccompagnement} ecrire={ecrireLigneAccompagnement} z={8500}
-        contexte={{ pret: !!accountsLoaded && nuagePret && !baseKO, tour: !!(bienvenue || visite || configOuverte || parcoursOuvert || (premierJour && !load(CLE_VISITE,null))), exemple: exempleActif(), stream: !!streamOn, telephone: !ordi, vend: PROFIL_VENDEUR.vend || vendActuel() }}
+        contexte={{ pret: !!accountsLoaded && nuagePret && !baseKO, tour: !!(bienvenue || pnOuvert || visite || configOuverte || parcoursOuvert || (premierJour && !load(CLE_VISITE,null))), exemple: exempleActif(), stream: !!streamOn, telephone: !ordi, vend: PROFIL_VENDEUR.vend || vendActuel() }}
         onEchec={(m)=>toast(m)}
         onAction={(a)=>{ if(String(a).startsWith('reglages:')){ DEMANDE_REGLAGE_SOUS.id=String(a).slice(9); if(tab==='settings'){ try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} } else setTab('settings'); } }}/></GardeEcran>
       {/* (8 nov.) UN COMPTE RELIÉ POUR LA PREMIÈRE FOIS (src/CompteRelie.jsx) : la feuille, une fois par
@@ -63813,7 +63935,7 @@ function AppCoeur() {
           ni en mode exemple, hors ligne ou base injoignable ; rattrapable dans Comptes liés. */}
       <GardeEcran nom="compte-relie"><Suspense fallback={null}><AccueilComptesReliesParesseux comptesVinted={vintedAccounts}
         pret={!!accountsLoaded && nuagePret && !baseKO && !horsLigne && !exempleActif() && !!(authState.user && authState.user.id)}
-        silence={!!(bienvenue || visite || configOuverte || parcoursOuvert)} onNav={setTab}/></Suspense></GardeEcran>
+        silence={!!(bienvenue || pnOuvert || visite || configOuverte || parcoursOuvert)} onNav={setTab}/></Suspense></GardeEcran>
       {/* Les chiffres que la COQUE publie pour les conseils (la même règle que leurs bandeaux). */}
       {ordi ? <ChiffreConseilExtension/> : <ChiffreConseil cle="coque.iphone" valeur={estIphoneSafari() ? (estInstallee() ? 'installee' : 'a-installer') : 'autre'}/>}
       <MemoireDefilement ecran={`${tab}:${(tab.startsWith('plat_')||estTacheSite(tab))?platSub:''}`}/>

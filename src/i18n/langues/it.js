@@ -9,7 +9,8 @@ import ecran_renvoyer from './it/renvoyer.js';   // (15 nov., lot retours) « À
 import ecran_retrait_ailleurs from './it/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
 import ecran_finition from './it/finition.js';   // (15 nov.) la finition écran par écran
 import ecran_numeros_nouvelles from './it/numeros-nouvelles.js';   // (15 nov.) Les nouvelles annonces sans N°
-import ecran_parametres from './it/parametres.js';   // (15 nov.) Paramètres rangés en dix catégories
+import ecran_parametres from './it/parametres.js';
+import ecran_parcours_nouveau from './it/parcoursNouveau.js';   // (15 nov.) le parcours d'un nouveau, « Nouveaux comptes », le suivi d'un signalement   // (15 nov.) Paramètres rangés en dix catégories
 import ecran_idees from './it/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './it/ventes.js';
 import ecran_commun from './it/commun.js';
@@ -2272,4 +2273,5 @@ export default {
   ...ecran_finition,
   ...ecran_numeros_nouvelles,
   ...ecran_parametres,
+  ...ecran_parcours_nouveau,
 };

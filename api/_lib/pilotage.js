@@ -61,7 +61,7 @@ const objet = (x) => (x && typeof x === 'object' && !Array.isArray(x) ? x : {});
 
 // Une lecture REST paginée par `Range` (Supabase plafonne à 1 000 lignes sans le
 // dire). `null` = pas su (statut, réseau, page illisible, au début OU au milieu).
-async function lireTout(env, fetcher, chemin) {
+export async function lireTout(env, fetcher, chemin) {
   const { url, service } = cfg(env);
   const out = [];
   for (let p = 0; p < PAGES_MAX; p++) {
@@ -79,7 +79,7 @@ async function lireTout(env, fetcher, chemin) {
 
 // Les comptes VRM (Supabase Auth, clé de service). Ne garde QUE ce qui sert à
 // compter : { id, cree, connecte }. `null` = pas su.
-async function lireComptes(env, fetcher) {
+export async function lireComptes(env, fetcher) {
   const { url, service } = cfg(env);
   const out = [];
   for (let p = 1; p <= PAGES_MAX; p++) {
