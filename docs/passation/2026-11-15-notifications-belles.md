@@ -23,7 +23,9 @@ worker, sur le code d'avant (`--sur`, `origin/main` 70fbef70) et sur celui-ci. D
 | Message | « Message de <pseudo> » / « Air Max 90 blanche taille 42 · Nouveau message sur boutique · « … » » (96) | « Nouveau message · Air Max 90 blanche T42 » / « boutique · « Bonjour, toujours dispo ? » » |
 | Annulation | « Annulation demandée » / « Air Max 90 · <pseudo> veut annuler (« … ») — accepte ou refuse dans la conversation Vinted. » (113) | « Annulation demandée · Air Max 90 » / « L'acheteur veut annuler (« … ») · accepte ou refuse sur Vinted » |
 | Vendu sur Vestiaire | « … tu reçois 84,00 € · à envoyer avant le 19/11 » | « Vendu sur Vestiaire · Sac Longchamp Le… » / « tu reçois 84 € · à envoyer avant le jeu. 19 nov. » |
-| Résumé du soir | corps de 145 caractères | « 2 colis à déposer, le premier avant 12 h. 1 déjà en retard : dépose-le d'abord. … » (phrases entières, ≤ 90 ; le titre « Demain : 3 colis, 1 retrait » dit le reste) |
+| Résumé du soir | « 2 colis à déposer demain, le premier avant 12 h. 1 déjà en retard : dépose-le en premier. Dernier jour pour retirer ton colis à Tabac des Halles. » (145) | « 2 à déposer, le premier avant 12 h · 1 déjà en retard · dernier jour pour retirer à Tabac des Halles » (le titre dit « Demain : 3 colis, 1 retrait ») |
+| Rappel du matin (colis) | « 3 colis à envoyer (…). Date estimée pour 1 (vente + 7 j : bordereau pas reçu par email ; la vraie limite peut tomber jusqu'à 3 j plus tard). Ouvre l'app pour les préparer. » | « 3 colis à envoyer (1 en retard · 1 aujourd'hui · 1 demain avant 10 h · 1 estimée). » |
+| Colis arrivé au point | « … · code 454602 · jusqu'au 12/11 » | « Tabac des Halles, Nantes · code 454602 · jusqu'au jeu. 12 nov. » ; un article trop long passe EN QUEUE du corps (le lieu, le code, la date et le n° ne sont jamais coupés) |
 | URSSAF du 1er | « Déclaration URSSAF » / « Nouveau mois : déclaration URSSAF octobre 2026 à faire avant le 30 novembre. 1240,00 € reçus · à payer ≈ 153,76 € » (113, le montant aurait été coupé) | « Déclaration URSSAF octobre 2026 » / « 1240,00 € reçus · à payer ≈ 153,76 € · avant le 30 novembre » (les mêmes mots, autre ordre ; la phrase de Ma journée reste mot pour mot dans `corps`) |
 | Comptes Vinted pas relus | 111 caractères | « rallume, vieux_compte et 2 autres : ouvre vinted.fr sur chacun, là où est l'extension VRM. » (les noms qui ne tiennent pas sont comptés) |
 
@@ -86,18 +88,19 @@ seule façon de le changer : le nom donné à l'app à l'ajout sur l'écran d'ac
 
 | preuve | résultat |
 |---|---|
-| `scripts/audit-notifs-redaction.cjs` (nouveau) — EXÉCUTE `api/push.js` (`comptes`, `prixachat`), `api/email-inbound.js` (bordereau de retour, 8 offres), la vraie porte `sendPushToAll` (vente, versement, bordereau, message, annulation, Vestiaire, soir, long corps) et le VRAI `public/sw.js` (machine virtuelle : ce qui s'affiche, ce qu'ouvre le toucher) ; fausse base `src/exempleBase.js`, horloge fixée (14 h 28 à Paris) | **121/121** |
-| le même sur `origin/main` (`--sur`) | **25 rouges** : les quatre notifications de la capture reproduites mot pour mot (« n° 37451417 est relié à VRM », « Vendu 62 € · N°215 / Combien tu l'avais payée ? », « … avant le 23/11/2026 », « Dernier : … · <pseudo> — expire en 24h. ») |
-| `--mutations` (10 : compte nommé par son identifiant, identifiants pas retirés, paire oubliée, date de machine, pseudo de l'acheteur, nom pas raccourci, corps 170, langue ignorée, retour vers la ligne d'achat, regroupement « Dernier ») | voir §6 |
-| `scripts/tests/langue-compte.test.mjs` | 3/3 (la langue rangée seulement si elle diffère ; lecture ratée ⇒ rien écrit) |
-| audits remis à la règle | `audit-cibles-notif` (vente, message sans pseudo), `audit-notifs-belles` R3, `audit-notifs-groupees` G8, `audit-compte-pas-relu` A17-A19/B3, `audit-saisie-rapide` P3/P3b/S1, banc `rappel-soir` (deux phrases) |
+| `scripts/audit-notifs-redaction.cjs` (nouveau banc) — EXÉCUTE `api/push.js` (`comptes`, `prixachat`, en fr, en, de), `api/email-inbound.js` (bordereau de retour, 8 offres), la vraie porte `sendPushToAll` (vente, n° dans un titre, versement, bordereau, message, annulation, Vestiaire, arrivée au point, soir, long corps) et le VRAI `public/sw.js` (machine virtuelle : ce qui s'affiche, ce qu'ouvre le toucher) ; fausse base `src/exempleBase.js`, horloge fixée (14 h 28 à Paris) ; icône 192 px < 50 Ko, badge 96 px RGBA | **139/139** |
+| le même sur `origin/main` 70fbef70 (`--sur`) | **27 rouges** : les quatre notifications de la capture reproduites mot pour mot (« n° 37451417 est relié à VRM », « Vendu 62 € · N°215 / Combien tu l'avais payée ? », « Bordereau de retour reçu / Autry donna · à déposer avant le 23/11/2026 », « 8 offres à trancher / Dernier : Offre de 57 € · « New balance 9060 vert et blanc taille 38 » · <pseudo> — expire en 24h. » (105)) |
+| `--mutations` (10 : texte d'avant du compte relié, identifiants pas retirés, paire oubliée, date de machine, pseudo de l'acheteuse remis, nom pas raccourci, corps 170, langue ignorée, retour vers la ligne d'achat, regroupement « Dernier ») | **10/10 rouges** (un banc qui LÈVE ne compte pas comme rouge : il doit tourner jusqu'au bout) |
+| `scripts/tests/langue-compte.test.mjs` | 3/3 |
+| audits remis à la règle (textes plus courts, sans pseudo, insécable avant « € ») | `audit-cibles-notif`, `audit-notifs-belles` R3, `audit-notifs-groupees` G8, `audit-compte-pas-relu` A17-A19/B3, `audit-saisie-rapide` P3/P3b/S1/K1, `audit-suivi-colis`, `audit-rappels-paire`, `audit-colis-heure`, banc `rappel-soir` (39/39, ses rouges « 503 » d'avant ont disparu) |
+| verts | `notifs-redaction`, `notifs-belles` 41, `notifs-groupees` 41, `notifs-centre` 28, `reveil-calme` 13, `cibles-notif`, `vente-verification`, `flux-divers`, `traduction` 45, `csp`, `identite`, `fonctions-api` (12/12), `saisie-rapide`, `compte-pas-relu` 51, `rappel-urssaf`, `alerte-moderation` 65, `retours-litiges`, `statut-transporteurs`, `transp-notif`, `suivi-colis`, `colis-heure` 32, `rappels-paire` 14, `avis-negatif` 70, `double-vente`, `double-vente-ailleurs`, `suites-serveur`, `quoi-de-neuf`, `rappels-perso` 43, `abonnement` 103, `familles-serveur` 34, `horaires-mondialrelay`, `lbc-plus` 56, `mondialrelay-serveur`, `nom-paire-retrait`, `push`, `suivi-cles`, `suivi-vinted` 133, `veille-plantages` 33, `lbc-suppression`, `sans-bruit` 44, `vapid`, `transp-ext` 129, `retrait-fiable`, `retraits-fiables` 95 ; bancs `notifs-apercus` 30/30 (capture regardée), `rappel-soir` 39/39 |
+| `npm run build` | vert |
 
-## 6. Résultats des audits (voir le rapport final de la session)
+## 6. Rouges qui ne sont pas de ce chantier
 
-Rouges identiques sur `origin/main` avant ce chantier (pas de lui) : `audit-notifications` B3
-(« jusqu'au 12/11 » attendu avec une apostrophe typographique), `audit-signalement` (écran
-« parrainage » pas dans la liste), `audit-vocabulaire-article` (2), `audit-lus-deux-appareils`
-(ne finit pas dans ce conteneur chargé).
+Identiques sur `origin/main` avant ce chantier : `audit-notifications` B3 (le corps de l'arrivée de
+l'exemple n'a pas de date sur main non plus), `audit-signalement` (écran « parrainage » pas dans la
+liste), `audit-vocabulaire-article` (2), `audit-lus-deux-appareils` (ne finit pas dans ce conteneur).
 
 ## 7. Gestes de Julien
 
