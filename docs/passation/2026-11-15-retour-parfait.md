@@ -115,19 +115,28 @@ colis du retour est SORTANT (e-mail « disponible » au relais du vendeur rangé
 ## 7. Preuves
 
 - `scripts/audit-retour-parfait.cjs` (EXÉCUTE la lecture du PDF, la vraie route `email-rattacher` sur la
-  fausse base — filtres `meta->>` maintenant servis sur demande par `_faux-inbound.cjs` —, le choix des
-  départs, la règle de la carte, la passe des notifications, les textes 5 langues) : **vert** ; **9 rouges
-  sur l'arbre de départ** (`git archive origin/claude/project-review-nsk5su`) ; mutations `--prouve` : voir
-  le rapport (13 mutations).
-- `scripts/bancs/retour-parfait.cjs` (390 tactile iPhone et 1512, clair et sombre ; pdf.js local pour la
-  zone blanche) : les deux cartes, la bande (contraste ≥ 4,5:1), l'impression ouvre LE PDF inventé de
-  l'Autry à sa taille d'origine (feuille de partage DANS le toucher sur iPhone ; visionneuse sur
-  ordinateur), l'avancement sur un faux e-mail Chronopost puis livré + remboursé.
-- Bancs voisins mis à jour (la phrase est devenue les étapes) : `retours-suivi`, `retours-renvoyer`,
-  `retours-litiges`.
+  fausse base — filtres `meta->>` maintenant servis sur demande par `_faux-inbound.cjs` —, la clé S10 et la
+  règle du scanner, le choix des départs, la règle de la carte, la passe des notifications, les textes
+  5 langues) : **vert** ; **rouge sur l'arbre de départ** (`git archive origin/claude/project-review-nsk5su`) ;
+  **14/14 mutations attrapées** (`--prouve`).
+- `scripts/bancs/retour-parfait.cjs` (390 tactile iPhone et 1512, clair et sombre ; pdf.js local) : **86
+  verts** — les deux cartes, la bande (≥ 4,5:1), l'encre de la carte (titre, compte, n°, liens ≥ 4,5:1 en tête
+  de Ma journée ET dans Achats), l'impression ouvre LE PDF inventé de l'Autry à sa taille d'origine 842×595
+  (feuille de partage DANS le toucher sur iPhone ; visionneuse sur ordinateur : étiquette intacte + fiche
+  10×15 après elle), l'avancement sur un faux e-mail Chronopost puis livré + remboursé.
+- Trouvé et corrigé en route : (1) dans la tête de Ma journée en mode clair, la carte « À renvoyer »
+  héritait de l'ENCRE CLAIRE du fond (titre, compte, « Sur Vinted ↗ » blancs sur le verre clair) — rouge
+  aussi sur l'arbre de départ (`retours-renvoyer`) : `.vrm-ret-carte` ajoutée aux surfaces qui remettent
+  l'encre sombre (`studio-verre.css` §7) ; (2) un retour déjà déposé ressortait « à déposer » le temps de
+  relire les e-mails du transporteur (une lecture faite pour la liste vide du premier rendu) : la lecture
+  porte désormais SA liste de n° (`retoursTrackLu`) et rien n'est pressé pendant la lecture (`trackEnCours`).
+- Bancs voisins : `retours-suivi` vert, `retours-renvoyer` vert (2 rouges sur l'arbre de départ, corrigés),
+  `retours-litiges` 1 rouge DÉJÀ rouge au départ (« Paire revenue » à 36 px sur ordinateur, feuille Pas à
+  pas, hors de ce lot) ; son fixture 9501 portait un libellé « Déposé en point relais » qui, depuis la règle
+  retours-suivi, fait avancer le retour (rouge au départ) : libellé d'avant le dépôt.
 - Audits verts : retour-parfait, retour-pas-a-retirer, retour-vinted, retours-emails, retours-litiges,
   retours-stock, retours-suivi, notifs-redaction, notifications, notifs-belles, suivi-colis, fonctions-api
-  (12), identite, traduction, tdz, variables, studio, quoi-de-neuf.
+  (12), identite, traduction, tdz, variables, studio, quoi-de-neuf, csp.
 
 ## 8. Geste de Julien
 
