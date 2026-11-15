@@ -382,9 +382,12 @@ const TXT = {
 export const textesNotif = (langue) => TXT[langueNotif(langue)];
 
 // Un titre « fait · objet » : l'objet n'y entre que s'il tient en 40 caractères ;
-// sinon le fait seul (l'objet descend dans le corps).
-function titreAvecObjet(fait, objet) {
-  const t = objet ? `${fait} · ${objet}` : fait;
+// sinon le fait seul (l'objet descend dans le corps). `brut` (le titre de l'annonce) :
+// le nom court prend toute la place qui reste (« Vendu 62 € · Nike Air Max 1 blanche
+// T42 » garde la marque, « Offre de 55 € · 9060 vert/blanc T38 » la retire).
+function titreAvecObjet(fait, objet, brut = '') {
+  const o = brut ? nomCourt(brut, Math.max(NOM_COURT_MAX, TITRE_MAX - fait.length - 3)) || objet : objet;
+  const t = o ? `${fait} · ${o}` : fait;
   return t.length <= TITRE_MAX ? { title: t, reste: '' } : { title: couperMot(fait, TITRE_MAX), reste: objet };
 }
 const num = (n) => { const s = str(n).trim(); return /^[A-Za-z]?\d{1,6}$/.test(s) ? `N°${s.toUpperCase()}` : ''; };
@@ -410,7 +413,7 @@ const SORTES = {
   // Une vente Vinted (e-mail « Ton article s'est vendu »). Le compte : SON pseudo.
   vendu: (d, T, ctx) => {
     const a = nomCourt(d.article), e = montantClair(d.prix, ctx.langue);
-    const { title, reste } = titreAvecObjet(T.vendu(e), a);
+    const { title, reste } = titreAvecObjet(T.vendu(e), a, d.article);
     return { title, body: joindre(reste, espaces(d.compte).slice(0, 24), d.verification ? T.venduVerif : T.venduCorps), ligne: joindre(e, a) };
   },
   // « Vendu 62 € · Nike Air Max 1 / N°215 · touche pour saisir ton prix d'achat. »
@@ -420,7 +423,7 @@ const SORTES = {
     if (!l.length) return null;
     if (l.length === 1) {
       const v = l[0], n = num(v.num), a = nomCourt(v.titre), e = montantClair(v.eur, ctx.langue);
-      const { title, reste } = titreAvecObjet(T.vendu(e), a || n);
+      const { title, reste } = titreAvecObjet(T.vendu(e), a || n, v.titre);
       const nCorps = n && !title.includes(n) ? n : '';
       const geste = T.prixCorps(nCorps).replace(/^\s*·\s*/, '');
       return { title, body: joindre(reste && reste !== n ? reste : '', nCorps ? geste : geste.charAt(0).toUpperCase() + geste.slice(1)), ligne: joindre(e, a || n) };
@@ -437,7 +440,7 @@ const SORTES = {
   // copilote, reconnu AU TITRE seulement : « à vérifier »).
   offre: (d, T, ctx) => {
     const a = nomCourt(d.article), e = montantClair(d.montant, ctx.langue);
-    const { title, reste } = titreAvecObjet(T.offre(e), a);
+    const { title, reste } = titreAvecObjet(T.offre(e), a, d.article);
     const j = d.juge && typeof d.juge === 'object' ? d.juge : null;
     const conseil = j && j.etat === 'ambigu' ? T.conseilAmbigu : j && j.etat === 'unique' && montantClair(j.prix, ctx.langue) ? T.conseilPrix(montantClair(j.prix, ctx.langue)) : '';
     const corps = joindre(reste, conseil ? conseil.charAt(0).toUpperCase() + conseil.slice(1) : T.offreCorps, T.expire24);
@@ -451,7 +454,7 @@ const SORTES = {
   },
   venduVestiaire: (d, T, ctx) => {
     const a = nomCourt(d.titre), e = montantClair(d.montant, ctx.langue);
-    const { title, reste } = titreAvecObjet(T.venduVc, a);
+    const { title, reste } = titreAvecObjet(T.venduVc, a, d.titre);
     return { title, body: joindre(reste, T.venduVcCorps(e, avantClair(d.limite, ctx))), ligne: joindre(a, e) };
   },
   bordereau: (d, T, ctx) => {
@@ -461,13 +464,13 @@ const SORTES = {
   // Un message : l'article, jamais le pseudo de l'acheteur ; le compte = SON pseudo.
   message: (d, T) => {
     const a = nomCourt(d.paire);
-    const { title, reste } = titreAvecObjet(T.message, a);
+    const { title, reste } = titreAvecObjet(T.message, a, d.paire);
     const ex = espaces(d.extrait);
     return { title, body: joindre(reste, espaces(d.compte).slice(0, 24), ex ? `« ${couperMot(ex, 50)} »` : T.messageCorps), ligne: a };
   },
   annulation: (d, T) => {
     const a = nomCourt(d.article);
-    const { title, reste } = titreAvecObjet(T.annulation, a);
+    const { title, reste } = titreAvecObjet(T.annulation, a, d.article);
     return { title, body: joindre(reste, T.annulationCorps(d.raison ? couperMot(d.raison, 30) : '')), ligne: a };
   },
 };
