@@ -808,6 +808,8 @@ import { clePhotoEmpreinte, SEUIL_PHOTO } from "./photoEmpreinte.js";
 import { empreinteImageLocale } from "./photosComptes.js";
 import { groupesParCompte, initialeCompte, remisesSurVignettes } from "./annoncesGrille.js";   // (10 nov., lot AM) Annonces en grille, par compte
 import { EnLigneDeuxFoisDetail, EnLigneDeuxFoisAlerte } from "./EnLigneDeuxFois.jsx";
+import { groupesDeuxComptes, memesPairesFiches, CLE_REFUS_DEUX_COMPTES, CLE_RETRAITS_DEUX_COMPTES, marquesUtiles, reglees as retraitsRegles, texteDeuxComptes } from "./deuxComptes.js";
+import { DeuxComptesDetail, DeuxComptesAlerte, texteEtDe } from "./DeuxComptes.jsx";
 import { CLE_JOURNAL_NUMEROS, evenementsNumeroFiches, ajouterAuJournal, historiqueNumero } from "./historiqueNumero.js";
 import { carteArgentJournee } from "./journeeArgent.js";
 import { CLE_MODELES, lireModeles } from "./modelesDescription.js";
@@ -3185,6 +3187,8 @@ const SYNC_KEYS = [
   'vrm_ebay_liens',
   // (15 nov., lot meme-photo) Ses « Ce n'est pas la même » : { 'Site:annonce|N°': date }, écrits sur SON toucher.
   'vrm_meme_photo_non',
+  // (15 nov., lot deux-comptes) « Ce n'est pas la même paire » et les annonces ouvertes pour être retirées (src/deuxComptes.js).
+  'vrm_deux_comptes_non', 'vrm_deux_comptes_retraits',
   // Le marqueur de la remise à zéro (migration 013) : ÉCRIT PAR LE SERVEUR SEUL
   // (le garde-fou de la base le recopie depuis la ligne d'avant, quoi que le
   // navigateur envoie). Synchronisé pour être LU : série d'archive, version.
@@ -36714,6 +36718,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // de même PHOTO EXACTE ou reliées par `recreeDe` — risque de double vente. Un compte
   // pas lu, sans heure ou lu il y a plus de 24 h ne conclut rien. Jamais le titre ; le
   // même N° seul est le bloc rouge (déjà dit). `null` = lecture pas prête (aucune carte).
+  // (15 nov., lot deux-comptes) Le registre des fusions (SON clic « C'est la même paire ») : la règle se refait aussitôt.
+  const fusionsRegistre = React.useSyncExternalStore(MAG_FUSIONS.abonner, MAG_FUSIONS.lire);
   const enLigneDeux = useMemo(() => {
     if (!Array.isArray(listings.items) || listings.loading || listings.comptes !== cleComptes) return null;
     const ko = new Set((listings.ko || []).map(String));
@@ -36728,7 +36734,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // (14 nov., proposition 107) Les fiches qu'IL a fusionnées sont la même paire (src/fusionFiches.js).
     return enLigneDeuxFois({ vinted, fiches: numeros, clePhoto: photoKey, cle: cleNum, dateDe: (it) => dateMiseEnLigneMs(it, listingDates), memes: pairesFusionnees(load(CLE_FUSIONS, {}) || {}) });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings, numeros, accounts, cleComptes, hiddenAccts, panelAcctOff, listingDates]);
+  }, [listings, numeros, accounts, cleComptes, hiddenAccts, panelAcctOff, listingDates, fusionsRegistre]);
   // (11 nov., lot photos-comptes) LA MÊME PHOTO SUR DEUX DE SES COMPTES VINTED (src/photoEmpreinte.js) :
   // les empreintes calculées par l'extension (5.358), comparées entre comptes DIFFÉRENTS. Un RISQUE
   // (Vinted relie les comptes), jamais une identité (§5 : rien n'est relié ni renuméroté). Mêmes
@@ -36754,6 +36760,47 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [empreintesPhotos, listings, numeros, accounts, cleComptes, hiddenAccts, panelAcctOff]);
   // Publié pour les encarts « avant de publier » (Republier, Publier ailleurs) — un propriétaire (§11).
   useEffect(() => { publierPhotosComptes(photosComptes); }, [photosComptes]);
+  // (15 nov., lot deux-comptes) « DEUX COMPTES, UNE PAIRE » (src/deuxComptes.js) : la même paire en vente sur DEUX
+  // de ses comptes Vinted — sûr par IDENTITÉ (`enLigneDeux` : photo exacte, `recreeDe`, fusion), à vérifier par
+  // INDICE (empreinte au seuil strict, unique et mutuelle ; le même N° sur deux comptes). Jamais le titre (§5).
+  // LE geste : il ouvre l'annonce en trop sur vinted.fr et la retire (§3) ; la lecture complète suivante le dit.
+  const [verDeux, setVerDeux] = useState(0);
+  useEffect(() => onCloudReady(() => setVerDeux((n) => n + 1)), []);
+  const [choixDeux, setChoixDeux] = useState({});
+  const [feuilleDeuxComptes, setFeuilleDeuxComptes] = useState(false);
+  const [fusionDeux, setFusionDeux] = useState(null);       // [idA, idB] : « C'est la même paire » ouvre la fusion existante
+  const refusDeux = useMemo(() => load(CLE_REFUS_DEUX_COMPTES, {}) || {}, [verDeux]); // eslint-disable-line react-hooks/exhaustive-deps
+  const marquesDeux = useMemo(() => marquesUtiles(load(CLE_RETRAITS_DEUX_COMPTES, {}) || {}), [verDeux]); // eslint-disable-line react-hooks/exhaustive-deps
+  const infoDeuxParId = useMemo(() => {
+    const m = new Map();
+    for (const it of (Array.isArray(listings.items) ? listings.items : [])) {
+      if (!it || it.id == null) continue;
+      const f = numeros[String(it.id)] || {};
+      const prix = Number(it.price);
+      m.set(String(it.id), { uid: String((it._acc && it._acc.vinted_user_id) || ''), nom: accNameOf(it._acc || {}), titre: it.title || '', photo: it.photo || null, url: it.url || '',
+        numero: f.numero != null ? String(f.numero) : '', prix: Number.isFinite(prix) && prix > 0 ? prix : null, depuis: dateMiseEnLigneMs(it, listingDates), favoris: Number.isFinite(it.favourites) ? it.favourites : null });
+    }
+    return m;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listings.items, numeros, listingDates]);
+  const deuxComptes = useMemo(() => (enLigneDeux ? groupesDeuxComptes({ enLigneDeux, photos: photosComptes, infoDe: (id) => infoDeuxParId.get(String(id)) || null, refus: refusDeux, choix: choixDeux, cle: cleNum }) : null),
+    [enLigneDeux, photosComptes, infoDeuxParId, refusDeux, choixDeux]);
+  // La dernière lecture COMPLÈTE d'un compte (la preuve de « retirée ✓ relu » et de « encore en ligne »).
+  const luCompletDe = React.useCallback((uid) => (listings.complets && listings.complets[uid] && Number(listings.lues && listings.lues[uid])) || null, [listings.complets, listings.lues]);
+  const deuxComptesRegles = useMemo(() => retraitsRegles(marquesDeux, { enLigne: (id) => onlineAnnonceIds.has(String(id)), luDe: luCompletDe }), [marquesDeux, onlineAnnonceIds, luCompletDe]);
+  const ouvrirRetraitDeux = React.useCallback((a, g) => {
+    // SON clic ouvre l'annonce sur vinted.fr (le lien lui-même) ; on note l'heure pour dire ensuite ce que la lecture voit.
+    const m = marquesUtiles(load(CLE_RETRAITS_DEUX_COMPTES, {}) || {});
+    m[String(a.id)] = { at: Date.now(), uid: String(a.uid || ''), nom: String(a.nom || ''), numero: String((g && g.numeros && g.numeros[0]) || a.numero || '') };
+    save(CLE_RETRAITS_DEUX_COMPTES, m); setVerDeux((n) => n + 1);
+  }, []);
+  const refuserDeux = React.useCallback((g) => {
+    const r = { ...(load(CLE_REFUS_DEUX_COMPTES, {}) || {}), [g.id]: new Date().toISOString() };
+    save(CLE_REFUS_DEUX_COMPTES, r); setVerDeux((n) => n + 1); toast(tr('deuxComptes.pasMemeNote'));
+  }, []);
+  const deuxComptesTexte = deuxComptes && deuxComptes.groupes.length ? texteDeuxComptes(deuxComptes.groupes, tr, texteEtDe) : null;
+  // UN endroit : un groupe dit ici sort des cartes voisines (« en ligne deux fois », « photos en double »).
+  const idsDeuxComptes = useMemo(() => new Set((deuxComptes ? deuxComptes.groupes : []).flatMap((g) => g.annonces.map((a) => String(a.id)))), [deuxComptes]);
   // (29 oct.) La lecture des annonces telle que la règle de l'offre la juge
   // (`annonceOffreEnVente`) : la MÊME que l'écran Annonces (§11) — en ligne, à
   // confirmer, masquées, brouillons, l'heure de la lecture qui fait foi par compte
@@ -46519,7 +46566,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for(const l of ea?.lignes||[])if(l.ligne?.complet===true&&Number(l.ligne.capturedAt)>0)completes.push({plateforme:'eBay',compte:String(l.compte.ref),at:Number(l.ligne.capturedAt)});
     if(Array.isArray(listings.items)&&!listings.incomplet)for(const a of accounts)if(!acctOff(a.vinted_user_id)&&Number(listings.lues?.[a.vinted_user_id])>0)completes.push({plateforme:'Vinted',compte:String(a.vinted_user_id),at:Number(listings.lues[a.vinted_user_id])});
     for(const [compte,l] of Object.entries(Array.isArray(rows)?rows.find(r=>r.id==='lbc_listings'&&r.owner===owner)?.lectures||{}:{})){const id=idCompteLbcApp(compte),at=Date.parse(l?.at||'');if(comptesProuves.has(id)&&Number.isFinite(at))completes.push({plateforme:'Leboncoin',compte:id,at});}
-    return { numeros, annonces, ventes, manques, completes };
+    // (15 nov., lot deux-comptes) Les IDENTITÉS qui disent « deux annonces Vinted, une paire » (photo exacte de
+    // fiche, `recreeDe`, fusion faite sur SON clic) : la vente de l'une sur un compte fait « à retirer » l'autre,
+    // encore en ligne sur un autre compte Vinted (src/deuxComptes.js `memesPairesFiches`) — jamais l'indice.
+    const memes = memesPairesFiches(numeros, pairesFusionnees(load(CLE_FUSIONS, {}) || {}));
+    return { numeros, annonces, ventes, manques, completes, memes };
   };
   // (2 nov., audit « plateformes » P2, GRAVE) LA GARDE DES OFFRES AUTOMATIQUES.
   // Moteur allumé ⇒ l'app publie les annonces Vinted vendues AILLEURS (eBay,
@@ -47972,20 +48023,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // (6 nov., vague 3) LA MÊME PAIRE EN LIGNE DEUX FOIS SUR VINTED (`enLigneDeux`, src/enLigneDeuxFois.js) :
               // une carte AMBRE (c'est un geste), seulement s'il y en a. Le geste : supprimer celle en trop sur
               // vinted.fr, SON clic — VRM ne supprime rien tout seul (§3).
-              const deuxFois = enLigneDeux && enLigneDeux.vinted.length ? enLigneDeux.vinted : [];
+              // (15 nov., lot deux-comptes) Les groupes sur DEUX comptes vont dans « Deux comptes, une paire » (UN endroit) ;
+              // « en ligne deux fois » garde ceux d'un même compte.
+              const deuxComptesJ = deuxComptes && deuxComptes.groupes.length ? deuxComptes.groupes : [];
+              const deuxFois = (enLigneDeux && enLigneDeux.vinted.length ? enLigneDeux.vinted : []).filter((g) => !(g.comptes && g.comptes.length >= 2 && g.annonces.filter((a) => a.plat === 'vinted').every((a) => idsDeuxComptes.has(String(a.id)))));
               // (11 nov., lot suivi-commandes) LES COMMANDES À VÉRIFIER : une incohérence PROUVÉE entre Vinted,
               // les e-mails et le transporteur (api/_lib/suivi-commandes.js). Ambre : c'est un geste.
               const aVerifier = commandesAVerifier();
               // (11 nov., lot photos-comptes) LA MÊME PHOTO SUR DEUX DE SES COMPTES : une carte AMBRE, seulement s'il y en a.
-              const photosDouble = photosComptes && photosComptes.groupes.length ? photosComptes.groupes : [];
+              const photosDouble = (photosComptes && photosComptes.groupes.length ? photosComptes.groupes : []).filter((g) => !g.annonces.every((a) => (a.plateforme || 'vinted') !== 'vinted' || idsDeuxComptes.has(String(a.id))));
               // (15 nov., lot meme-photo) UNE annonce d'ailleurs à la photo d'une paire Vinted : une carte AMBRE, seulement s'il y en a.
               const memeJ = texteMemePhoto(memePhotoJ);
               // (11 nov., lot journee-perso) Les cartes qu'il a cachées ne comptent pas dans « N gestes »
               // (elles ne sont pas à l'écran) ; leur nombre est dit à part (`nCacheesAF`).
-              const nParCarteAF = { ailleurs: carteAilleurs ? 1 : 0, 'deux-fois': deuxFois.length ? 1 : 0, 'photos-comptes': photosDouble.length ? 1 : 0, 'meme-photo': memeJ.n ? 1 : 0, 'a-relier': comptesARelierJour.length ? 1 : 0, 'stock-sortie': sortiesStock.length ? 1 : 0, 'pas-en-ligne': pasEnLigneJ && pasEnLigneJ.liste.length ? 1 : 0, 'sante-comptes': santeSurv.length ? 1 : 0, favoris: nouveauxFav && nouveauxFav.annonces > 0 ? 1 : 0, trancher: jobTrancher ? 1 : 0, republier: jobRepublier ? 1 : 0, autres: autres.length, urssaf: urssafJob ? 1 : 0, 'avis-bas': avisBasListe.length ? 1 : 0, suivi: aVerifier.n ? 1 : 0 };
+              const nParCarteAF = { ailleurs: carteAilleurs ? 1 : 0, 'deux-fois': deuxFois.length || deuxComptesJ.length ? 1 : 0, 'photos-comptes': photosDouble.length ? 1 : 0, 'meme-photo': memeJ.n ? 1 : 0, 'a-relier': comptesARelierJour.length ? 1 : 0, 'stock-sortie': sortiesStock.length ? 1 : 0, 'pas-en-ligne': pasEnLigneJ && pasEnLigneJ.liste.length ? 1 : 0, 'sante-comptes': santeSurv.length ? 1 : 0, favoris: nouveauxFav && nouveauxFav.annonces > 0 ? 1 : 0, trancher: jobTrancher ? 1 : 0, republier: jobRepublier ? 1 : 0, autres: autres.length, urssaf: urssafJob ? 1 : 0, 'avis-bas': avisBasListe.length ? 1 : 0, suivi: aVerifier.n ? 1 : 0 };
               const cacheesHorsCases = Object.keys(nParCarteAF).filter((id) => nParCarteAF[id] > 0 && !visJ(id).montree);
               const nCacheesAF = casesCachees.length + cacheesHorsCases.reduce((t, id) => t + nParCarteAF[id], 0);
-              const nGestesTout = cases.length + alertesArgent.length + autres.length + jobsTuile.length + (nouveauxFav && nouveauxFav.annonces > 0 ? 1 : 0) + (cyclesJ.length ? 1 : 0) + (jobTrancher ? 1 : 0) + (jobRepublier ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (pasEnLigneJ && pasEnLigneJ.liste.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (photosDouble.length ? 1 : 0) + (memeJ.n ? 1 : 0) + (comptesARelierJour.length ? 1 : 0) + (santeSurv.length ? 1 : 0) + (avisBasListe.length ? 1 : 0) + (aVerifier.n ? 1 : 0);
+              const nGestesTout = cases.length + alertesArgent.length + autres.length + jobsTuile.length + (nouveauxFav && nouveauxFav.annonces > 0 ? 1 : 0) + (cyclesJ.length ? 1 : 0) + (jobTrancher ? 1 : 0) + (jobRepublier ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (pasEnLigneJ && pasEnLigneJ.liste.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (deuxComptesJ.length ? 1 : 0) + (photosDouble.length ? 1 : 0) + (memeJ.n ? 1 : 0) + (comptesARelierJour.length ? 1 : 0) + (santeSurv.length ? 1 : 0) + (avisBasListe.length ? 1 : 0) + (aVerifier.n ? 1 : 0);
               const nGestes = nGestesTout - (nCacheesAF - casesCachees.length);
               const carteAVerifier = () => {
                 const tous = [...aVerifier.ventes, ...aVerifier.achats];
@@ -48050,6 +48104,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     title={t.complet} aria-label={t.complet} onClick={() => setFeuilleDeux(true)}>
                     <PileVignettes srcs={deuxFois.flatMap((g) => g.annonces.map((a) => a.photo))} n={deuxFois.length} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="alert" size={20}/>}/>
                     <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{t.titre}</span><span className="vrm-day-task-note is-urgent" data-sous-ligne="deux-fois">{t.detail}</span></span>
+                    <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{VERBES.voir}</span></span>
+                  </button>
+                );
+              };
+              // (15 nov., lot deux-comptes) « N°42 est en vente sur shop_nord et kicks_sud » : AMBRE (un geste), ouvre la feuille.
+              const carteDeuxComptes = () => {
+                const t = deuxComptesTexte || { titre: '', detail: '' };
+                return (
+                  <button key="deux-comptes" type="button" className="vrm-day-task vrm-fu-tache" data-journee-deux-comptes={deuxComptesJ.map((g) => g.id).join(' ')} data-n={String(deuxComptesJ.length)}
+                    title={`${t.titre}\n${t.detail}`} aria-label={`${t.titre} — ${t.detail}`} aria-haspopup="dialog" onClick={() => setFeuilleDeuxComptes(true)}>
+                    <PileVignettes srcs={deuxComptesJ.flatMap((g) => g.annonces.map((a) => a.photo))} n={deuxComptesJ.length} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="alert" size={20}/>}/>
+                    <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{t.titre}</span><span className="vrm-day-task-note is-urgent" data-sous-ligne="deux-comptes">{t.detail}</span></span>
                     <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{VERBES.voir}</span></span>
                   </button>
                 );
@@ -48227,7 +48293,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // Sans réglage, l'ordre d'origine (`CARTES_JOURNEE`) : celui d'avant, carte pour carte.
               const blocsAF = {
                 ailleurs: carteAilleurs && !articlesTeteRA().length ? [carteVendusAilleurs()] : [],
-                'deux-fois': deuxFois.length ? [carteDeuxFois()] : [],
+                'deux-fois': [...(deuxComptesJ.length ? [carteDeuxComptes()] : []), ...(deuxFois.length ? [carteDeuxFois()] : [])],
                 'avis-bas': avisBasListe.length ? [carteAvisBas()] : [],
                 'photos-comptes': photosDouble.length ? [cartePhotosComptes()] : [],
                 'meme-photo': memeJ.n ? [carteMemePhoto()] : [],
@@ -51138,6 +51204,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                        et les données (prix d'achat posés, numéros) restent ; plus rien ne les ouvre. Ne pas les
                        remettre sans sa demande. Les prix d'un achat groupé : Achats → Fournisseurs. */
                     /* (11 nov., lot photos-comptes) La même photo sur deux de ses comptes Vinted : la feuille. */
+                    {k:'deux-comptes', icon:'alert', lab:tr('deuxComptes.outil'), n:deuxComptes ? deuxComptes.groupes.length : 0, desc:tr('deuxComptes.outilDesc'), on:()=>{ setAnnToolsOpen(false); relireEmpreintes(); setFeuilleDeuxComptes(true); }},
                     {k:'photos-comptes', icon:'image', lab:tr('photosComptes.outil'), n:photosComptes ? photosComptes.groupes.length : 0, desc:tr('photosComptes.outilDesc'), on:()=>{ setAnnToolsOpen(false); relireEmpreintes(); setPhotosComptesOuvert(true); }},
                     /* (15 nov., lot meme-photo) Une annonce d'ailleurs avec la photo d'une paire Vinted : la feuille « à relier ». */
                     {k:'meme-photo', icon:'image', lab:tr('memePhoto.outil'), n:texteMemePhoto(memePhotoJ).n, desc:tr('memePhoto.outilDesc'), on:()=>{ setAnnToolsOpen(false); ouvrirMemePhoto(null); }},
@@ -51347,7 +51414,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             mêmes groupes que la carte de Ma journée (§11) — même PHOTO EXACTE ou `recreeDe`, lectures
             de moins de 24 h, jamais le titre. AMBRE, avant la double vente ; le geste est le sien,
             sur vinted.fr (VRM ne supprime rien, §3). */}
-        {enLigneDeux && enLigneDeux.vinted.length > 0 && <VersAFaire><EnLigneDeuxFoisAlerte groupes={enLigneDeux.vinted} manque={enLigneDeux.manque} PhotoVinted={PhotoVinted} Feuille={SheetShell}/></VersAFaire>}
+        {/* (15 nov., lot deux-comptes) « Deux comptes, une paire » : une ligne dans « À faire », la feuille porte le geste. */}
+        {deuxComptesTexte && <VersAFaire><DeuxComptesAlerte res={deuxComptes} texte={deuxComptesTexte} onOuvrir={()=>setFeuilleDeuxComptes(true)}/></VersAFaire>}
+        {(()=>{ const g = enLigneDeux ? enLigneDeux.vinted.filter((x)=>!(x.comptes && x.comptes.length >= 2 && x.annonces.filter((a)=>a.plat==='vinted').every((a)=>idsDeuxComptes.has(String(a.id))))) : [];
+          return g.length > 0 ? <VersAFaire><EnLigneDeuxFoisAlerte groupes={g} manque={enLigneDeux.manque} PhotoVinted={PhotoVinted} Feuille={SheetShell}/></VersAFaire> : null; })()}
         {listings.loading && !listings.items && <Skeleton variant="card" count={6}/>}
         {listings.error && <EtatPanne quoi="Tes annonces Vinted" data-ann-panne="" onReessayer={()=>loadListings(true)}/>}
         {/* Aucune annonce en ligne MAIS des annonces à confirmer : la ligne du
@@ -55880,6 +55950,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <CataloguePrive onClose={()=>setCatalogueOuvert(false)} appeler={appelerCatalogue} preselection={selAnn.map((x)=>String(x.id))}
           annonces={annBase.map((it)=>({ id: String(it.id), titre: it.title || '', photo: typeof it.photo === 'string' ? it.photo : (it.photo && it.photo.url) || null, taille: it.size || it.size_title || '',
             prix: it.price != null && it.price !== '' && isFinite(Number(it.price)) ? fmtE(Number(it.price)) : '', numero: (numeros[String(it.id)] || {}).numero != null ? String(numeros[String(it.id)].numero) : '' }))}/>
+      )}
+      {feuilleDeuxComptes && deuxComptes && (
+        // (15 nov., lot deux-comptes) « Deux comptes, une paire » (src/DeuxComptes.jsx) : ouverte de Ma journée ou d'Annonces → À faire.
+        <SheetShell titre={tr('deuxComptes.titre')} sousTitre={tr('deuxComptes.sousTitre')} onClose={()=>setFeuilleDeuxComptes(false)} maxWidth={560} data-feuille-deux-comptes="">
+          <DeuxComptesDetail res={deuxComptes} regles={deuxComptesRegles} PhotoVinted={PhotoVinted} marques={marquesDeux} luDe={luCompletDe}
+            onOuvrir={ouvrirRetraitDeux} onChoisir={(g, id)=>setChoixDeux((c)=>({ ...c, [g.id]: id }))} onRefus={refuserDeux}
+            onMemePaire={(g)=>setFusionDeux(g.annonces.map((a)=>String(a.id)))} onRelire={()=>{ try { loadListings(true); } catch (_) {} toast(tr('deuxComptes.relu')); }}/>
+        </SheetShell>
+      )}
+      {fusionDeux && (
+        // « C'est la même paire » : la fusion EXISTANTE (src/fusionFiches.js), aperçu puis SON clic — elle devient une identité.
+        <FeuilleFusionLazy idFiche={fusionDeux[0]} autreInitial={fusionDeux[1]} fiches={load('vinted_annonce_numeros', {}) || {}} registre={MAG_FUSIONS.lire()}
+          vendus={(()=>{ try { return new Set((load('vinted_annonces_vendues', []) || []).map(String)); } catch (_) { return null; } })()}
+          caseDe={(x)=>rangementDuNum(x) || ''} cleNum={cleNum} proposer={proposerFusion}
+          Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>} Feuille={SheetShell} Bouton={Bouton} Segmente={Segmente}
+          onFusionner={(res)=>{ setFusionDeux(null); gesteVrm(tr('atelier.fusion.faite'), res.ops, { [CLE_FUSIONS]: MAG_FUSIONS.poser }, null, 'fiches.fusion'); }}
+          onClose={()=>setFusionDeux(null)}/>
       )}
       {photosComptesOuvert && (
         // (11 nov., lot photos-comptes) « Photos en double entre comptes » (src/PhotosEntreComptes.jsx) :
