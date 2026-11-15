@@ -73,7 +73,7 @@ import { estConfirmationTransfert, lireConfirmationTransfert, authentifieGoogle,
 import { ordreStable, finALaFrontiere } from './_lib/ordre-stable.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
 import { transporteurDeTexteBordereau, suiviMondialRelayDuTexte } from './_lib/transporteur-bordereau.js';
-import { estBordereauRetour, lireBordereauRetour, estRemboursementAchat, lireRemboursementAchat } from './_lib/retour-email.js';
+import { estBordereauRetour, lireBordereauRetour, estRemboursementAchat, lireRemboursementAchat, estDemandeRetourAchat, lireDemandeRetourAchat, PREFIXE_DEMANDE_RETOUR } from './_lib/retour-email.js';
 import { domaineReception, enveloppeDe, jetonsDesAdresses, vendeurDeJeton, adresseDeJeton, lireCodeTransfert, RAISON_QUARANTAINE, ID_CODE, ID_VU, ID_ESSAI, codeEssaiDe } from './_lib/adresse-reception.js';
 import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
@@ -807,6 +807,24 @@ function familleConnue(subject, from) {
   if (/^Suppression de vos annonces/i.test(s) && /leboncoin/i.test(f + ' ' + s)) return 'annonce Leboncoin supprimée';
   return '';
 }
+
+// (15 nov., lot retours) LE RECLASSEMENT SAIT-IL RANGER CET E-MAIL GARDÉ ? Les mêmes lectures que
+// la route (normalisation, texte utile, règles de api/_lib/retour-email.js) : rend
+// { famille: 'bordereau-retour' | 'retour-demande', ok, raison } ou null (pas un retour).
+// Un e-mail que la route garderait encore « à vérifier » n'est PAS rejoué (le rejeu le
+// réécrirait daté d'aujourd'hui) : il reste tel quel, sa raison dite.
+export function prevoirRetour(corpsBrut, recuLe) {
+  let mail; try { mail = normalizeInbound(corpsBrut); } catch (_) { return null; }
+  const subject = (mail && mail.subject) || '';
+  if (estBordereauRetour(subject)) { const lu = lireBordereauRetour({ subject, text: texteUtile(mail), attachments: mail.attachments }); return { famille: 'bordereau-retour', ok: !!lu.ok, raison: lu.ok ? '' : lu.raison, transaction: lu.transaction || '' }; }
+  if (estDemandeRetourAchat(subject)) { const lu = lireDemandeRetourAchat({ subject, text: texteUtile(mail), html: mail.html, recuLe }); return { famille: 'retour-demande', ok: !!lu.ok, raison: lu.ok ? '' : lu.raison }; }
+  return null;
+}
+
+// (15 nov., lot retours) La ligne d'un avis « Retourne ta commande » : SON Message-ID (sinon sujet +
+// expéditeur + début du texte) — un rejeu (collecteur, reclassement) réécrit la même ligne.
+export const idDemandeRetour = ({ messageId, subject, from, texte } = {}) =>
+  PREFIXE_DEMANDE_RETOUR + empreinte(String(messageId || '').trim() ? 'mid|' + String(messageId).trim() : [String(subject || ''), String(from || ''), String(texte || '').slice(0, 600)].join('|'));
 
 async function garderInconnu(corpsBrut, mail, raison, famille) {
   try {
@@ -2487,7 +2505,7 @@ export async function traiterEmail(req, res) {
         return;
       }
       const ok = await supabaseUpsert([{ id: `email_bordretour_${lu.transaction}`, data: {
-        type: 'bordereau-retour', sens: 'achat', transaction: lu.transaction, suivi: lu.suivi,
+        type: 'bordereau-retour', sens: lu.sens, transaction: lu.transaction, suivi: lu.suivi,
         dateLimite: lu.dateLimite, dateLimiteJour: lu.dateLimiteJour, dateLimiteIso: lu.dateLimiteIso, article: lu.article,
         account: acc.login || '', uid: acc.uid || '', pdfB64: lu.pdf.contentB64, filename: lu.pdf.filename || `Bon-Retour-Vinted-${lu.transaction}.pdf`,
         receivedAt: now } }]);
@@ -2495,6 +2513,29 @@ export async function traiterEmail(req, res) {
         tag: `bordretour-${lu.transaction}`, url: DESTINATIONS.achat({ tx: lu.transaction }) }, 'colis'); } catch (_) {}
       await logEmail({ type: 'bordereau-retour', subject, from: mail.from, transaction: lu.transaction });
       await repondre(res, 200, { ok: true, type: 'bordereau-retour', transaction: lu.transaction, suivi: lu.suivi, dateLimite: lu.dateLimiteIso || null, pdf: true });
+      return;
+    }
+    // 000a) (15 nov., lot retours) « Retourne ta commande d'ici le 16 nov. : <article> » — l'avis
+    // Vinted à l'ACHETEUR (lui) : par le SUJET d'abord, le sens LU dans le corps (« tu devras la
+    // garder et ton paiement sera transféré au vendeur »), la date du sujet (jour, heure de Paris).
+    // Aucune identité dans l'e-mail : rangé par SON Message-ID (`email_retourdemande_{empreinte}`,
+    // un rejeu réécrit la même ligne), l'article n'est qu'un libellé. Avant : « aucune règle ne le
+    // reconnaît ». Illisible ⇒ gardé entier « à vérifier » ; écriture ratée ⇒ 503.
+    if (estDemandeRetourAchat(subject)) {
+      const lu = lireDemandeRetourAchat({ subject, text: corpsTexte, html: mail.html, recuLe: now });
+      if (!lu.ok) {
+        await garderInconnu(corpsBrut, mail, 'retour à renvoyer : ' + lu.raison, '');
+        await repondre(res, 200, { ok: false, type: 'retour-demande', garde: true, raison: lu.raison });
+        return;
+      }
+      const id = idDemandeRetour({ messageId: mail.messageId, subject, from: mail.from, texte: corpsTexte });
+      const ok = await supabaseUpsert([{ id, data: {
+        type: 'retour-demande', sens: lu.sens, subject: court(subject, 300), article: lu.article, limiteJour: lu.limiteJour, limiteIso: lu.limiteIso,
+        conv: lu.conv || '', account: acc.login || '', uid: acc.uid || '', receivedAt: now } }]);
+      if (ok) try { await pushOnce({ title: '↩️ Retour à renvoyer', body: `${lu.article ? court(lu.article, 50) + ' · ' : ''}avant le ${lu.limiteJour.split('-').reverse().slice(0, 2).join('/')} — le bordereau arrive par e-mail`,
+        tag: `retourdemande-${id}`, url: DESTINATIONS.achat({}) }, 'colis'); } catch (_) {}
+      await logEmail({ type: 'retour-demande', subject, from: mail.from, article: lu.article });
+      await repondre(res, 200, { ok: true, type: 'retour-demande', id, sens: lu.sens, limiteJour: lu.limiteJour });
       return;
     }
     // 000b) « La commande "…" a été remboursée ! » — un de SES achats : la PREUVE du
