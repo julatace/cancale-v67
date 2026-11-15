@@ -135,7 +135,7 @@ async function retirerCase(pg, n) {
         dit(!!(rouge && rouge.dbl && rr && rr[0] > 150 && rr[1] < 120 && rr[2] < 110), `${t} · B : la case du N° en doublon est rouge (le seul rouge)`, rouge);
         const autresRouges = await pg.evaluate(() => [...document.querySelectorAll('.vrm-s2d-case')].filter((c) => !c.classList.contains('is-double')).filter((c) => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(getComputedStyle(c).boxShadow + ' ' + getComputedStyle(c).backgroundColor); if (!m) return false; const [x, y, z] = m.slice(1).map(Number); return x > 170 && y < 90 && z < 90; }).length);
         dit(autresRouges === 0, `${t} · B : aucune autre case rouge`, autresRouges);
-        if (CAPT) await pg.screenshot({ path: path.join(CAPT, `etag-${v}-1-repris.png`), fullPage: false });
+        if (CAPT) { await pg.evaluate(() => { const m = document.querySelector('[data-meuble="mA"]'); if (m) m.scrollIntoView({ block: 'start' }); }); await pg.waitForTimeout(300); await pg.screenshot({ path: path.join(CAPT, `etag-${v}-1-repris.png`), fullPage: false }); }
         if (!complet) {
           const x = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
           dit(x.sw <= x.cw + 1, `${t} · H : aucune page plus large que l'écran`, x);
@@ -156,11 +156,14 @@ async function retirerCase(pg, n) {
         await toucher(pg, '[data-pinceau="ciel"]');
         await toucher(pg, '[data-peindre-rang="1"]');
         if (CAPT) { await pg.evaluate(() => document.querySelector('[data-editeur-peindre]').scrollIntoView({ block: 'center' })); await pg.screenshot({ path: path.join(CAPT, `etag-${v}-3-editeur.png`) }); }
-        const petits = await pg.evaluate(() => [...document.querySelectorAll('[data-editeur-meuble] button')].filter((x) => x.offsetParent).map((x) => x.getBoundingClientRect()).filter((q) => q.width < 43.5 || q.height < 43.5).length);
-        dit(petits === 0, `${t} · H : chaque bouton de l'éditeur fait 44 px au moins`, petits);
+        // 44 px au doigt (390 tactile) ; à la souris, la touche du studio fait 40 (son contrat, studio.css).
+        const mini = tel ? 43.5 : 39.5;
+        const petits = await pg.evaluate((mini) => [...document.querySelectorAll('[data-editeur-meuble] button')].filter((x) => x.offsetParent).map((x) => [x.getAttribute('aria-label') || x.textContent.trim().slice(0, 12), Math.round(x.getBoundingClientRect().width), Math.round(x.getBoundingClientRect().height)]).filter((q) => q[1] < mini || q[2] < mini), mini);
+        dit(petits.length === 0, `${t} · H : chaque bouton de l'éditeur fait ${tel ? '44 px au doigt' : '40 px (touche du studio, souris)'} au moins`, petits);
         await toucher(pg, '[data-meuble-enregistrer]');
         await pg.waitForTimeout(900);
         const nouv = await pg.evaluate(() => { const s = [...document.querySelectorAll('[data-meuble]')].find((x) => x.querySelector('.vrm-s2d-nom') && x.querySelector('.vrm-s2d-nom').textContent === 'Étagère test'); if (!s) return null; const cs = [...s.querySelectorAll('.vrm-s2d-case')]; return { id: s.getAttribute('data-meuble'), coul: s.getAttribute('data-couleur'), type: s.getAttribute('data-meuble-type'), n: cs.length, ciel: cs.filter((c) => c.getAttribute('data-couleur') === 'ciel' && c.hasAttribute('data-couleur-propre')).map((c) => c.getAttribute('data-case-ici').split(':')[1]).join(','), sauge: cs.filter((c) => c.getAttribute('data-couleur') === 'sauge').length }; });
+        if (CAPT && nouv) { await pg.evaluate((id) => document.querySelector(`[data-meuble="${id}"]`).scrollIntoView({ block: 'center' }), nouv.id); await pg.screenshot({ path: path.join(CAPT, `etag-${v}-3b-etagere.png`) }); }
         dit(!!nouv && nouv.coul === 'sauge' && nouv.type === 'etagere' && nouv.n === 12 && nouv.ciel === '0,1,2,3' && nouv.sauge === 8, `${t} · C : l'étagère 4×3 « sauge » est dessinée, sa rangée 1 en « ciel »`, nouv);
         // ── D : une pile de 5 ──
         await toucher(pg, '[data-creer-meuble]');
@@ -210,8 +213,8 @@ async function retirerCase(pg, n) {
         await pg.waitForTimeout(500);
         const ordre2 = await pg.evaluate(() => [...document.querySelectorAll('[data-meuble]')].map((x) => x.getAttribute('data-meuble')).slice(0, 2).join(','));
         dit(ordre2 === 'mB,mA', `${t} · G : « Descendre » le Garage le met après le Bureau`, ordre2);
-        const rondPetit = await pg.evaluate(() => [...document.querySelectorAll('[data-meuble-monter],[data-meuble-descendre],[data-meuble-modifier]')].map((x) => x.getBoundingClientRect()).filter((q) => q.width < 43.5 || q.height < 43.5).length);
-        dit(rondPetit === 0, `${t} · H : monter / descendre / modifier font 44 px`, rondPetit);
+        const rondPetit = await pg.evaluate((mini) => [...document.querySelectorAll('[data-meuble-monter],[data-meuble-descendre],[data-meuble-modifier]')].map((x) => x.getBoundingClientRect()).filter((q) => q.width < mini || q.height < mini).length, tel ? 43.5 : 39.5);
+        dit(rondPetit === 0, `${t} · H : monter / descendre / modifier font ${tel ? 44 : 40} px au moins`, rondPetit);
         // ── H ──
         await pg.waitForTimeout(1500);
         const garde = await pg.evaluate(() => { try { const l = JSON.parse(localStorage.getItem('vrm_meubles')); const b = l.find((m) => m.id === 'mB'); return b && b.gravite === false && Array.isArray(b.planches) && b.cols === 7 && b.rows === 10 && b.name === 'Bureau' && l.length === 5; } catch (_) { return false; } });
