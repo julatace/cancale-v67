@@ -1026,6 +1026,16 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, ancienne, onDebu
   const aller = (k) => setEtape(k);
   const suivante = l[iE + 1];
   const debut = () => { if (!suivi) onDebut(); };
+  // De retour de Vinted (l'onglet revient au premier plan) sur « Supprimer » ou « Fini » : VRM relit
+  // ses annonces tout seul (une LECTURE de ses données, rien ne part) — deux touchers « Relire » de moins.
+  const etapeRef = React.useRef(etape); etapeRef.current = etape;
+  const relireRef = React.useRef(onRelire); relireRef.current = onRelire;
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    const f = () => { if (document.visibilityState === 'visible' && (etapeRef.current === 'supprimer' || etapeRef.current === 'fini') && typeof relireRef.current === 'function') relireRef.current(); };
+    document.addEventListener('visibilitychange', f);
+    return () => document.removeEventListener('visibilitychange', f);
+  }, []);
   // « C'est republié », relu : une ligne dans « Ce que VRM a fait » (une fois par nouvelle annonce).
   useEffect(() => {
     if (nouvelle !== 'fait' || typeof onFini !== 'function') return;
