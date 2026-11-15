@@ -78,6 +78,10 @@ export const texteAnnulation = ({ qui: _qui = '', article = '', raison = '', com
 // (15 nov.) Le bordereau de retour d'un ACHAT (api/email-inbound.js) : « À renvoyer : <article> ».
 // `limite` : l'instant LU dans l'e-mail (ISO), dit en clair heure de Paris.
 export const texteRetourAchat = ({ article = '', limite = '' } = {}) => fabrique('retourAchat', { article, limite });
+// (15 nov., lot retours-suivi) Le colis du retour, lu chez le transporteur par SON n° (exact) ; le remboursement.
+export const texteRetourDepose = ({ article = '', transporteur = '' } = {}) => fabrique('retourDepose', { article, transporteur });
+export const texteRetourLivre = ({ article = '' } = {}) => fabrique('retourLivre', { article });
+export const texteRembourse = ({ montant = null, article = '' } = {}) => fabrique('rembourse', { montant, article });
 
 // Le rappel du cron « offres au-dessus de ton prix mini » (api/ship-reminders.js).
 export const texteOffresMini = (n) => ({
