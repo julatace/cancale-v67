@@ -95,7 +95,7 @@ export const texteOffresMini = (n) => ({
 //              (Vinted : aucune, ses offres n'expirent pas — Julien, 5 nov.) ;
 //   manque   : les sources de colis pas relues ⇒ « au moins », nommées.
 const pl = (n, un, plusieurs) => (n > 1 ? plusieurs : un);
-const lieuCourt = (l) => String(l || '').split(',')[0].trim().slice(0, 40);
+const lieuCourt = (l) => String(l || '').split(',')[0].trim().slice(0, 30);
 export function texteSoir({ colis = null, retraits = null, offres = null, manque = null } = {}) {
   const c = colis || {};
   const nDemain = c.demain || 0, nRetard = c.retard || 0, nVerif = c.aVerifier || 0;
@@ -111,12 +111,13 @@ export function texteSoir({ colis = null, retraits = null, offres = null, manque
         : `Demain : ${nOffres} ${pl(nOffres, 'offre Vestiaire expire', 'offres Vestiaire expirent')}`;
   const H = c.heure ? heureCourte(c.heure) : '';
   const phrases = [];
-  if (nDemain) phrases.push(nDemain === 1 ? `1 colis à déposer${H ? ` avant ${H}` : ''} demain.` : `${nDemain} colis à déposer demain${H ? `, le premier avant ${H}` : ''}.`);
-  if (nRetard) phrases.push(`${nRetard} déjà en retard : ${pl(nRetard, 'dépose-le', 'dépose-les')} en premier.`);
-  if (nVerif) phrases.push(`${nVerif} ${pl(nVerif, 'date estimée passée', 'dates estimées passées')} : vérifie sur Vinted.`);
-  if (nRetraits) phrases.push(nRetraits === 1 && lieuCourt(retraits.lieu) ? `Dernier jour pour retirer ton colis à ${lieuCourt(retraits.lieu)}.` : `Dernier jour pour retirer ${nRetraits} colis.`);
-  if (nOffres) phrases.push(`${nOffres} ${pl(nOffres, 'offre Vestiaire expire', 'offres Vestiaire expirent')} avant demain soir.`);
-  if (manques.length && nColis) phrases.push(`${manques.join(' et ')} pas ${pl(manques.length, 'relu', 'relus')} : il peut y en avoir plus.`);
+  // (15 nov.) Corps ≤ 90 (api/_lib/notif-redaction.js) : le titre dit déjà « Demain ».
+  if (nDemain) phrases.push(nDemain === 1 ? `1 colis à déposer${H ? ` avant ${H}` : ''}.` : `${nDemain} colis à déposer${H ? `, le premier avant ${H}` : ''}.`);
+  if (nRetard) phrases.push(`${nRetard} déjà en retard : ${pl(nRetard, 'dépose-le', 'dépose-les')} d’abord.`);
+  if (nVerif) phrases.push(`${nVerif} ${pl(nVerif, 'date estimée passée', 'dates estimées passées')} : vois Vinted.`);
+  if (nRetraits) phrases.push(nRetraits === 1 && lieuCourt(retraits.lieu) ? `Dernier jour pour retirer à ${lieuCourt(retraits.lieu)}.` : `Dernier jour pour retirer ${nRetraits} colis.`);
+  if (nOffres) phrases.push(`${nOffres} ${pl(nOffres, 'offre Vestiaire expire', 'offres Vestiaire expirent')} demain soir.`);
+  if (manques.length && nColis) phrases.push(`${manques.join(' et ')} pas ${pl(manques.length, 'relu', 'relus')} : peut-être plus.`);
   return { title, body: phrases.join(' ') };
 }
 

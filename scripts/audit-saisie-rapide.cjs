@@ -93,7 +93,7 @@ async function audit(mut, bavard) {
     const sansPreuve = P.ventesSansPrix({ ...args, paires: paires.filter((p) => p.tx !== '7001') });
     dit(!sansPreuve.some((v) => v.tx === '7001'), 'P2 une vente lue mais NON prouvée n\'est jamais demandée');
     const t1 = P.texteDemande([l[0]]);
-    dit(t1 && t1.title === 'Vendu 80 € · N°124' && /Combien tu l’avais payée/.test(t1.body), 'P3 « Vendu 80 € · N°124 » + « Combien tu l’avais payée ? »', JSON.stringify(t1));
+    dit(t1 && t1.title === 'Vendu 80 € · N°124' && /saisir ton prix d’achat/.test(t1.body), 'P3 « Vendu 80 € · N°124 » + « Combien tu l’avais payée ? »', JSON.stringify(t1));
     const t2 = P.texteDemande(l);
     dit(t2 && /^2 ventes sans prix d’achat$/.test(t2.title) && /N°124, N°B12/.test(t2.body), 'P4 deux ventes en même temps ⇒ UN texte qui les regroupe', JSON.stringify(t2));
     dit(P.estNuitParis(Date.parse(NUIT)) === true && P.estNuitParis(Date.parse('2026-11-11T06:30:00Z')) === true && P.estNuitParis(MAINT) === false && P.estNuitParis(Date.parse('2026-07-11T20:30:00Z')) === true,
@@ -145,7 +145,7 @@ async function audit(mut, bavard) {
       process.env.VRM_NOTIF_HORLOGE = JOUR;
       remettre([txn(111, 7001, 501, 'Bordereau envoyé')]);
       const r1 = await appel([V1]);
-      dit(r1.status === 200 && pushes.length === 1 && pushes[0].title === 'Vendu 80 € · N°124' && /Combien tu l’avais payée/.test(pushes[0].body) && /cible=prixachat&tx=7001/.test(pushes[0].url), 'S1 vente prouvée sans prix ⇒ UNE notification « Vendu 80 € · N°124 »', JSON.stringify([r1, pushes]));
+      dit(r1.status === 200 && pushes.length === 1 && pushes[0].title === 'Vendu 80 € · N°124' && /saisir ton prix d’achat/.test(pushes[0].body) && /cible=prixachat&tx=7001/.test(pushes[0].url), 'S1 vente prouvée sans prix ⇒ UNE notification « Vendu 80 € · N°124 »', JSON.stringify([r1, pushes]));
       dit(!!(memo() && memo().demandes && memo().demandes['7001']), 'S1 la vente est notée « demandée » dans SA ligne');
       const r2 = await appel([V1]);
       dit(r2.raison === 'déjà demandé' && pushes.length === 1, 'S2 rappelée (autre appareil, rechargement) ⇒ rien de plus', String(pushes.length));

@@ -35,7 +35,7 @@ import { DESTINATIONS, lienNotif } from './lien-notif.js';
 // (15 nov.) LA RÈGLE DE RÉDACTION (api/_lib/notif-redaction.js) : titre ≤ 40, corps ≤ 90,
 // coupe sur un mot, aucun identifiant technique ; le texte d'un regroupement dans la
 // langue du vendeur.
-import { TITRE_MAX as TITRE_R, CORPS_MAX as CORPS_R, couperMot, sansIdentifiant, titreGroupe, corpsGroupe } from './notif-redaction.js';
+import { TITRE_MAX as TITRE_R, CORPS_MAX as CORPS_R, couperMot, couperPhrases, sansIdentifiant, titreGroupe, corpsGroupe } from './notif-redaction.js';
 
 export const ICONE_NOTIF = '/vrm-icon-v5-192.png';
 // Monochrome (blanc sur transparent, 96 px) : Android le dessine dans la barre d'état.
@@ -73,7 +73,8 @@ export function embellir({ title = '', body = '' } = {}, cat = null) {
     const f = FAMILLES.find((x) => x.id === familleDe(cat));
     t = f ? f.titre : 'VRM';
   }
-  return { title: t, body: couper(b, CORPS_MAX) };
+  // (15 nov.) Corps ≤ 90 : les phrases entières qui tiennent, jamais une phrase coupée au milieu.
+  return { title: t, body: couperPhrases(b, CORPS_MAX) };
 }
 
 // ── LES GENRES : ce qui se regroupe, et comment ────────────────────────────

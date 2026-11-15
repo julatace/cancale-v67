@@ -177,7 +177,7 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     console.log(`     sur le téléphone de A : « ${p.title} » / « ${p.body} »`);
     dit(a.length === 1, 'A reçoit UN rappel du soir sur son appareil', `A=${a.length} · HTTP ${r.code}`);
     dit(p.title === 'Demain : 2 colis à déposer', 'le titre dit « Demain : 2 colis à déposer » (1 limite lue demain + 1 en retard ; l’eBay dû dans 4 jours, la limite ESTIMÉE de demain et le colis coché « posté » ne sont pas dits)', p.title);
-    dit(/^1 colis à déposer avant 23 h 59 demain\./.test(p.body || '') && /1 déjà en retard/.test(p.body || '') && !/2 déjà en retard|à poster/.test(p.body || ''), 'le corps : l’heure LUE de la limite de demain, puis 1 déjà en retard — le bordereau du colis coché « posté » n’est pas compté', p.body);
+    dit(/^1 colis à déposer avant 23 h 59\./.test(p.body || '') && /1 déjà en retard/.test(p.body || '') && !/2 déjà en retard|à poster/.test(p.body || ''), 'le corps : l’heure LUE de la limite de demain, puis 1 déjà en retard — le bordereau du colis coché « posté » n’est pas compté', p.body);
     dit((p.title || '').length <= 40 && (p.body || '').length <= 170, 'la forme passe par api/_lib/push.js (titre ≤ 40, corps ≤ 170)');
     dit(p.url === '/?tab=ventes&cible=colonne&colonne=prets', 'le clic ouvre Ventes · À expédier, sur la colonne « Prêts à imprimer » (31 oct. ; 11 nov.)', p.url);
     dit(b.length === 0, 'B n’a rien à poster ⇒ rien pour B', `B=${b.length}`);
@@ -227,7 +227,7 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     console.log(`     sur le téléphone de B : « ${p.title} » / « ${p.body} » → ${p.url}`);
     dit(b.length === 1, 'B (aucun colis à poster) reçoit UNE notification du soir', `${b.length}`);
     dit(p.title === 'Demain : 1 retrait, 1 offre Vestiaire', 'le titre : 1 retrait (dernier jour LU demain), 1 offre (Vestiaire, reçue, expire demain ; 6ef2983d : « offres Vestiaire », celles de Vinted n’expirent pas)', p.title);
-    dit(/Dernier jour pour retirer ton colis à Tabac des Halles\./.test(p.body || '') && !/Vannes|Bar Test/.test(p.body || ''), 'le corps nomme le point du colis de demain — pas celui dont le dernier jour est aujourd’hui (le matin l’a dit)', p.body);
+    dit(/Dernier jour pour retirer à Tabac des Halles\./.test(p.body || '') && !/Vannes|Bar Test/.test(p.body || ''), 'le corps nomme le point du colis de demain — pas celui dont le dernier jour est aujourd’hui (le matin l’a dit)', p.body);
     dit(/1 offre Vestiaire expire avant demain soir\./.test(p.body || '') && !/Vinted/.test(p.body || ''), 'l’offre envoyée par lui et celle qui expire dans 3 jours ne sont pas dites ; aucune offre Vinted (elles n’expirent pas)', p.body);
     dit(p.url === '/?tab=achats&cible=retrait&suivi=30000077', 'le toucher ouvre la carte de CE colis à retirer (son n° de suivi)', p.url);
     reset();

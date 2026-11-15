@@ -44,23 +44,43 @@ export function couperMot(s, n) {
   return (i >= Math.floor(n * 0.6) ? tete.slice(0, i) : tete).replace(/[\s·,:;—–-]+$/, '') + '…';
 }
 
+// Un corps de plusieurs phrases trop long : on garde les phrases ENTIÈRES qui tiennent
+// (« Vendu : 9 ventes · 412 €. Reçu : 380 €. … »), jamais une phrase coupée au milieu ;
+// une seule phrase trop longue ⇒ coupée sur un mot.
+export function couperPhrases(s, n) {
+  const x = espaces(s);
+  if (x.length <= n) return x;
+  const phrases = x.split(/(?<=[.!?])\s+/);
+  let out = '';
+  for (const p of phrases) { const t = out ? `${out} ${p}` : p; if (t.length > n - 2) break; out = t; }
+  return out && out.length >= n * 0.4 ? `${out} …` : couperMot(x, n);
+}
+
 // ── LES IDENTIFIANTS TECHNIQUES ─────────────────────────────────────────────
-// « n° 37451417 » (un compte), un n° de transaction (10 à 20 chiffres), un uuid,
-// une clé de ligne (`harvest_…`, `email_…`). Le N° de rangement (« N°215 »,
-// « B125 ») et un code de retrait (4 à 8 caractères) restent : ce sont des gestes.
+// Deux niveaux :
+//   · PARTOUT (`sansIdentifiant`, appliqué par notif-belle.js à tout ce qui sonne) :
+//     un uuid, une clé de ligne (`harvest_…`, `email_…`) — jamais un geste ;
+//   · dans les textes de CETTE règle (`sansIdentifiant(s, { strict: true })`) : en
+//     plus « n° 37451417 » (un compte) et un nombre nu de 9 chiffres ou plus (un n°
+//     de transaction). Un n° de SUIVI d'un transporteur (« XW000000051TS »,
+//     « Mondial Relay n°87654321 ») reste ailleurs : il est imprimé sur le colis et
+//     le point relais le demande. Le N° de rangement (« N°215 », « B125 ») et un code
+//     de retrait restent toujours : ce sont des gestes.
 const RE_IDS = [
-  /\bn[°ºo]\s*\d{6,}\b/gi,
   /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,
   /\b(?:harvest|email|vinted|push|vc|lbc|ebay)_[A-Za-z0-9_]{3,}\b/g,
-  /(?<![\d,.])\d{9,}(?![\d,.])/g,
 ];
-export function sansIdentifiant(s) {
+const RE_IDS_STRICTS = [
+  /\bn[°ºo]\s*\d{6,}\b/gi,
+  /(?<![\w,.])\d{9,}(?![\w,.])/g,
+];
+export function sansIdentifiant(s, { strict = false } = {}) {
   let x = str(s);
-  for (const re of RE_IDS) x = x.replace(re, ' ');
+  for (const re of strict ? [...RE_IDS, ...RE_IDS_STRICTS] : RE_IDS) x = x.replace(re, ' ');
   return x.replace(/\(\s*\)/g, ' ').replace(/(?:\s*·\s*){2,}/g, ' · ').replace(/\s+,/g, ',')
     .replace(/\s+/g, ' ').replace(/^[\s·:—–-]+/, '').replace(/[\s·:—–-]+$/, '').trim();
 }
-export const aUnIdentifiant = (s) => RE_IDS.some((re) => { re.lastIndex = 0; const ok = re.test(str(s)); re.lastIndex = 0; return ok; });
+export const aUnIdentifiant = (s, { strict = true } = {}) => (strict ? [...RE_IDS, ...RE_IDS_STRICTS] : RE_IDS).some((re) => { re.lastIndex = 0; const ok = re.test(str(s)); re.lastIndex = 0; return ok; });
 
 // ── LES MONTANTS ────────────────────────────────────────────────────────────
 // « 62 € », « 61,20 € » (« €62 » en anglais). Illisible ⇒ '' (jamais « 0 € »).
@@ -93,7 +113,7 @@ export const NOM_COURT_MAX = 24;
 export function nomCourt(titre, max = NOM_COURT_MAX) {
   let t = espaces(titre).replace(/^[«"“'\s]+|[»"”'\s]+$/g, '');
   if (!t) return '';
-  t = sansIdentifiant(t);
+  t = sansIdentifiant(t, { strict: true });
   const compacter = (x) => x
     .replace(/\b(?:taille|pointure|size|talla|taglia|größe|groesse|gr\.?|t\.)\s*:?\s*(\d{2}(?:[.,]5)?|\d{1,2}(?:[.,]5)?\s?(?:us|uk|eu))\b/gi, (m, n) => `T${n.replace(/\s/g, '').toUpperCase()}`)
     .replace(/(\p{L}+)\s+(?:et|and|y|e|und)\s+(\p{L}+)/gu, '$1/$2');
@@ -201,7 +221,7 @@ const TXT = {
     comptesCorps: (noms) => `${noms} · première lecture en cours.`,
     vendu: (e) => (e ? `Vendu ${e}` : 'Vendu'),
     venduCorps: 'Prépare le colis : le bordereau suit par e-mail.',
-    venduVerif: 'Avec Vérification : envoi au centre de Vinted.',
+    venduVerif: 'Avec Vérification : envoi au centre de vérification de Vinted.',
     prixCorps: (num) => `${num} · touche pour saisir ton prix d’achat.`,
     prixN: (n) => `${n} ventes sans prix d’achat`,
     prixNCorps: (nums) => `${nums} : touche pour saisir les prix d’achat.`,
@@ -377,7 +397,7 @@ const SORTES = {
   compteRelie: (d, T) => {
     const l = (Array.isArray(d.comptes) ? d.comptes : []).filter(Boolean);
     if (!l.length) return null;
-    const nomDe = (c) => { const n = sansIdentifiant(espaces(c.nom)).slice(0, 24); return n && !/^\d+$/.test(n) ? n : ''; };
+    const nomDe = (c) => { const n = sansIdentifiant(espaces(c.nom), { strict: true }).slice(0, 24); return n && !/^\d+$/.test(n) ? n : ''; };
     if (l.length === 1) {
       const c = l[0], n = nomDe(c), p = PLATEFORME_COURTE[c.plateforme] || '';
       const t = n ? T.compteNomme(n) : T.compteSansNom(p);
@@ -462,9 +482,9 @@ export function rediger(r, { langue = 'fr', maintenant = Date.now(), relatif = t
   try { out = SORTES[r.sorte](r, TXT[l], { langue: l, maintenant, relatif }); } catch (_) { out = null; }
   if (!out || !out.title) return null;
   return {
-    title: couperMot(sansIdentifiant(out.title), TITRE_MAX),
-    body: couperMot(sansIdentifiant(out.body || ''), CORPS_MAX),
-    ligne: couperMot(sansIdentifiant(out.ligne || ''), CORPS_MAX - 20),
+    title: couperMot(sansIdentifiant(out.title, { strict: true }), TITRE_MAX),
+    body: couperMot(sansIdentifiant(out.body || '', { strict: true }), CORPS_MAX),
+    ligne: couperMot(sansIdentifiant(out.ligne || '', { strict: true }), CORPS_MAX - 20),
   };
 }
 
@@ -473,7 +493,7 @@ export function rediger(r, { langue = 'fr', maintenant = Date.now(), relatif = t
 export const titreGroupe = (genre, k, langue = 'fr') => { const f = TXT[langueNotif(langue)].groupe[genre]; return f ? couperMot(f(k), TITRE_MAX) : ''; };
 export function corpsGroupe(derniere, langue = 'fr') {
   const T = TXT[langueNotif(langue)];
-  const d = sansIdentifiant(derniere);
+  const d = sansIdentifiant(derniere, { strict: true });
   if (!d) return '';
   const tete = T.laPlusRecente.charAt(0).toUpperCase() + T.laPlusRecente.slice(1);
   return couperMot(`${tete} : ${d}`, CORPS_MAX);

@@ -114,9 +114,12 @@ const APP = ['src/App.jsx', 'src/CarteRelais.jsx'].map((f) => sansCommentaires(l
     const v = A.texteVendu({ article: 'X', prix: '10', compte: 'c' });
     // (8 nov., « de belles notifications ») Les textes ont été refaits : le titre dit le
     // fait, le corps l'objet et le geste (docs/passation/2026-11-08-notifications.md).
-    dit(v.title === 'Vendu · 10 €' && v.body === 'X · c · Prépare le colis, le bordereau suit par e-mail', 'texte « Vendu » : le fait (le prix), l’objet, le geste', JSON.stringify(v));
+    // (15 nov., « de plus belles notifications ») La règle de rédaction (api/_lib/notif-redaction.js) :
+    // le fait ET l'objet dans le titre (« Vendu 10 € · X »), le geste dans le corps ; jamais le
+    // pseudo de l'acheteur (docs/passation/2026-11-15-notifications-belles.md).
+    dit(v.title === 'Vendu 10 € · X' && v.body === 'c · Prépare le colis : le bordereau suit par e-mail.', 'texte « Vendu » : le fait (le prix) et l’objet, puis le geste', JSON.stringify(v));
     const m = A.texteMessage({ paire: 'P', qui: 'q', compte: 'c', extrait: '' });
-    dit(m.title === 'Message de q' && m.body === 'P · Nouveau message sur c · réponds dans Messages', 'texte « Message » : qui écrit, la paire, le geste', JSON.stringify(m));
+    dit(m.title === 'Nouveau message · P' && m.body === 'c · Réponds dans Messages' && !/\bq\b/.test(m.title + ' ' + m.body), 'texte « Message » : la paire, le geste — jamais qui écrit (pseudo de l’acheteur)', JSON.stringify(m));
   }
 
   // (revue du 5 nov.) Aucun aperçu rédigé à la main : chacun sort de la fabrique du vrai texte.

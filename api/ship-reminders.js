@@ -907,7 +907,7 @@ async function traiterVendeurApresRelecture() {
           let res = { reserve: false, raison: '' };
           if (n.envoyer) {
             res = await reserverDedup('urssaf_reminder_dedup', (d) => !!d && d.mois === mois, (d) => ({ ...(d || {}), mois }));
-            if (res.reserve) await sendPushToAll({ cat: 'urssaf', title: n.titre, body: n.corps, tag: 'urssaf-' + mois, url: n.url });
+            if (res.reserve) await sendPushToAll({ cat: 'urssaf', title: (n.court && n.court.titre) || n.titre, body: (n.court && n.court.corps) || n.corps, tag: 'urssaf-' + mois, url: n.url });   // (15 nov.) ≤ 40 / ≤ 90
           }
           urssaf = !n.envoyer ? n.raison : res.reserve ? 'envoyé · ' + n.raison : res.raison === 'deja' ? 'déjà rappelé ce mois' : 'mémo illisible — rien';
         }
