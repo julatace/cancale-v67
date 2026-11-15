@@ -1287,7 +1287,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     {blocResume}
     {blocCherche}
     {place && (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '11px 14px', borderRadius: 12, background: C.accent, color: C.onAccent, fontSize: 15, fontWeight: 700, position: 'sticky', top: 8, zIndex: 20, boxShadow: '0 3px 12px rgba(0,0,0,0.18)' }}>
+      <div data-stock-place-barre="" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '11px 14px', borderRadius: 12, background: C.accent, color: C.onAccent, fontSize: 15, fontWeight: 700, position: 'sticky', top: 8, zIndex: 20, boxShadow: '0 3px 12px rgba(0,0,0,0.18)' }}>
         <span>{tr('stock.ranger4')} <b>N°{(ficheParCle[place] || {}).numero || place}</b> {tr('stock.toucheCase')}</span>
         <button type="button" onClick={() => setPlace(null)} style={{ background: 'rgba(0,0,0,0.18)', border: 'none', color: C.onAccent, borderRadius: 999, padding: '5px 11px', fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>{tr('achats.annuler')}</button>
       </div>

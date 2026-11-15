@@ -123,6 +123,11 @@
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vrm-etag .vrm-s2d-case .vrm-s2d-num:not([data-vendue]):not([data-hors-ligne]):not(.vrm-etag-notee) { background: rgb(12 29 48 / .92); color: #EAF2FB; } }
 /* Sans photo : un carton dessiné, discret, jamais une lettre. */
 .vrm-s2d-sansphoto[data-sans-photo] { color: color-mix(in srgb, var(--vrm-muted, #8E8E93) 70%, transparent); }
+/* À l'ordinateur, la barre de recherche de l'app (`.vrm-barre-haut`, 74 px) est collée en haut de `.vrm-main` :
+   la recherche du Stock se colle SOUS elle (la même valeur que la boîte e-mails), jamais dessous. Son voile opaque
+   et son ombre sont ceux des barres collées d'Annonces (src/design/studio-paires.css §16, une règle). */
+.vrm-main:has(> .vrm-barre-haut) [data-stock-recherche] { top: 74px !important; }
+.vrm-main:has(> .vrm-barre-haut) [data-stock-place-barre] { top: 146px !important; }
 /* Le pied : l'action, et le lien discret, sur UNE ligne. */
 .vrm-etag-pied { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
 .vrm-etag-pied .sb-touche { min-height: 44px; padding: 0 18px; }
