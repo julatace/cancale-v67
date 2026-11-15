@@ -44,5 +44,7 @@ export function adopterJetonsDuLien({ demandeIci, sessionId, jetonId }) {
   return demandeIci ? 'oui' : 'pas_demande';
 }
 
-export const MSG_LIEN_PAS_DEMANDE = 'Ce lien de connexion n’a pas été demandé depuis ce navigateur : par prudence, VRM ne l’ouvre pas. Si tu viens de confirmer ton adresse, elle est confirmée — connecte-toi avec ton e-mail et ton mot de passe.';
+// (15 nov., Julien : capture d'un lien ouvert depuis Gmail) Court, et le geste d'abord. La règle (un lien ouvert ailleurs
+// que là où il a été demandé n'ouvre rien) ne change pas.
+export const MSG_LIEN_PAS_DEMANDE = 'Ce lien s’est ouvert dans un autre navigateur que celui où tu l’as demandé. Connecte-toi ici avec ton e-mail et ton mot de passe.';
 export const MSG_LIEN_AUTRE_COMPTE = 'Ce lien ouvre un autre compte VRM que celui connecté ici : VRM ne change pas de compte tout seul. Ta session est conservée.';

@@ -17,6 +17,18 @@
   // rien jusqu'à la fermeture de l'onglet, à côté de la nouvelle copie.
   const extVivante = () => { try { return !!(chrome.runtime && chrome.runtime.id); } catch (_) { return false; } };
   const minuterieVivante = (fn, ms) => { const id = setInterval(() => { if (!extVivante()) { clearInterval(id); return; } try { const r = fn(); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch (_) {} }, ms); return id; };
+  // 5.379 (15 nov., page Leboncoin noire sur Orion) : rien dans un cadre posé par un AUTRE
+  // site, et rien du tout quand VRM s'est mis de côté sur cet onglet (le disjoncteur de
+  // lbc-relay.js, `vrm_lbc_de_cote`, 30 min) — la page se charge comme sans VRM.
+  try {
+    const t = window.top;
+    if (t && typeof t === 'object' && t !== window) {
+      const ao = location.ancestorOrigins;
+      if (ao && typeof ao.length === 'number' && ao.length) { for (let i = 0; i < ao.length; i++) if (!/^https:\/\/([a-z0-9-]+\.)*leboncoin\.fr$/i.test(String(ao[i]))) return; }
+      else if (!/(^|\.)leboncoin\.fr$/i.test(String(t.location.hostname))) return;
+    }
+  } catch (_) { return; }
+  try { const v = JSON.parse(sessionStorage.getItem('vrm_lbc_de_cote') || 'null'); const age = Date.now() - Number(v && v.t); if (v && typeof v === 'object' && age >= 0 && age < 1800000) return; } catch (_) {}
   if (window.__vrmLbcLoaded) return; window.__vrmLbcLoaded = true;
   // (intégration 11nov-g2, sécurité des comptes 5.366) « n'agir que si tu es là » — le bloc de vc.js :
   // un VRAI geste (isTrusted) dans la page du haut de leboncoin.fr est signalé au fond, au plus une
