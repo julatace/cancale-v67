@@ -1688,7 +1688,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
               {!calc.manque.length && calc.attente && <div>{tr('compta.leboncoinEbayLit')}</div>}
               {versements === null && <div>{tr('compta.datesVersementVinted')}</div>}
               {/* (15 nov., 5.390) Plus « N ventes finalisées sans date de versement » : la ligne discrète, sans geste. */}
-              {calc.aDater.length > 0 && <LigneDatesVersement as="div" ad={{ n: calc.aDater.length, raisons: [{ cle: 'vinted-detail', n: calc.aDater.filter((l) => l && l.plateforme === 'Vinted').length }] }} style={{ fontSize: 'inherit' }}/>}
+              {calc.aDater.length > 0 && <LigneDatesVersement avecDelai={extSait('versementsauto') === 'ok'} as="div" ad={{ n: calc.aDater.length, raisons: [{ cle: 'vinted-detail', n: calc.aDater.filter((l) => l && l.plateforme === 'Vinted').length }] }} style={{ fontSize: 'inherit' }}/>}
               {calc.venduSansDate > 0 && <div>{tr('versement.lbcSans', { n: calc.venduSansDate })}</div>}
               {/* (2 nov., audit des données G1) La commande eBay au montant pas lu est dans « non comptées » ci-dessous (une phrase, §7). */}
               {/* (1er nov., audits A2/A10) Des ventes faites dont l'argent ne se lit pas : dans AUCUNE colonne, dites (jamais 0 €). */}
@@ -2729,7 +2729,7 @@ function Dac7Plateformes({ ligne, annee }) {
         const pct = p.etat !== 'lu' ? 0 : Math.min(100, Math.max(p.n / 30, p.centimes / 200000) * 100);
         const droite = p.etat !== 'lu' ? '—'
           : p.verdict === 'atteint' ? <b style={{ color: C.text }}>{tr('compta.atteint')}</b>
-          : p.verdict === 'atteintSi' ? <>{tr('compta.atteint2')} {p.nAd} {tr('compta.dater')}</>
+          : p.verdict === 'atteintSi' ? <>{tr('compta.atteint2')} {p.nAd} {tr('versement.dac7Si')}</>
           // (11 nov., restes) Aucune vente sur cette plateforme : le reste EST le seuil, déjà écrit dans
           // l'en-tête — le redire sur chaque ligne l'écrivait trois fois (§7). La jauge vide le dit.
           : p.verdict === 'sous' ? (p.n === 0 && p.centimes === 0 ? null : <>{tr('compta.encore')} {p.reste.n} {tr('journee.vente')}{p.reste.n > 1 ? 's' : ''} {tr('annonces.texte5')} {eur(p.reste.centimes)}</>)
@@ -3194,7 +3194,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
           // ici, des mêmes lignes que le total — le chiffre est un minimum (§5).
           if (ncInfo && ncInfo.n > 0) morceaux.push(<Puce key="nc" warn><span data-urssaf-non-comptees={ncInfo.n}>{trj('compta.dansAucunChiffre', { phraseNonCompteesPar: phraseNonCompteesPar(ncInfo.par) })}</span>{ncInfo.par && Object.keys(ncInfo.par).some(k => k.startsWith('Vestiaire|')) ? <>{tr('compta.vrmSaitEncore')}</> : null}</Puce>);
           // (15 nov., 5.390) Les ventes sans date de versement : UNE ligne, sans geste (ni « mets l’extension à jour », ni renvoi pour dater à la main).
-          if (ad && Number(ad.n) > 0) morceaux.push(<Puce key="av"><LigneDatesVersement as="span" ad={ad} style={{fontSize:'inherit',color:'inherit'}}/></Puce>);
+          if (ad && Number(ad.n) > 0) morceaux.push(<Puce key="av"><LigneDatesVersement avecDelai={extSait('versementsauto') === 'ok'} as="span" ad={ad} style={{fontSize:'inherit',color:'inherit'}}/></Puce>);
           // (29 oct.) « Vestiaire Co : pas encore relié » retiré : affiché à tous, même sans compte Vestiaire, il n'apprenait rien.
         }
         return (
@@ -3711,7 +3711,7 @@ function PrevisionUrssafCarte({ onNav }) {
       {(P.ca == null || P.partiel || P.aDater > 0) ? (
         <div className="vrm-urssaf-manque" data-urssaf-manque={P.aDater > 0 ? String(P.aDater) : P.ca == null ? 'passu' : 'partiel'}>
           {P.ca == null ? <><span>{tr('stats.encoreCalculeOuvre')}</span>{onNav ? <Bouton variante="discret" data-urssaf-ventes="" onClick={() => onNav('cat_ventes')}>{tr('compta.ouvrirVentes')}</Bouton> : null}</>
-            : P.aDater > 0 ? <LigneDatesVersement ad={ligne && ligne.aDater && Number(ligne.aDater.n) > 0 ? ligne.aDater : { n: P.aDater }}/>
+            : P.aDater > 0 ? <LigneDatesVersement avecDelai={extSait('versementsauto') === 'ok'} ad={ligne && ligne.aDater && Number(ligne.aDater.n) > 0 ? ligne.aDater : { n: P.aDater }}/>
             : <>{tr('compta.manqueVentesEncore')}</>}
         </div>
       ) : <div className="vrm-urssaf-manque" data-urssaf-rien-manque="">{tr('compta.rienToutesVentes')}</div>}

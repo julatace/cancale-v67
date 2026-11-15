@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.385.0';
+const CODE_VERSION = '5.390.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -21116,7 +21116,7 @@ async function noterVersementLu(uid) {
 // (ceux qui se déclarent) passent les premiers, puis l'historique en remontant (5.376
 // lisait les plus ANCIENNES d'abord hors des 45 derniers jours). Sans date lisible : en
 // dernier (ordre d'arrivée gardé).
-function ordreVersements(liste) {
+function ordrePlusRecentes(liste) {
   const d = (o) => { const t = Date.parse((o && (o.date || o.created_at)) || ''); return Number.isFinite(t) ? t : null; };
   return liste.map((o, i) => [o, i, d(o)]).sort((a, b) => {
     if ((a[2] == null) !== (b[2] == null)) return a[2] == null ? 1 : -1;
@@ -21178,7 +21178,7 @@ async function capterDatesVersementUn(uid, opts) {
     const rows = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=v:data->payload->my_orders`);
     if (!Array.isArray(rows)) return 0;                                   // pas su
     const ventes = (rows[0] && Array.isArray(rows[0].v)) ? rows[0].v : [];
-    const finalisees = ordreVersements(ventes.filter(o => o && o.transaction_id != null
+    const finalisees = ordrePlusRecentes(ventes.filter(o => o && o.transaction_id != null
       && /finalis/i.test(String(o.status || '')) && !/annul|cancel|refus|rembours|retour|suspend/i.test(String(o.status || ''))));
     if (!finalisees.length) { await noterLecturesDues(uid, 'versement', 0, { nonDatees: 0 }); return 0; }
     const det = await sbGetTout(`app_data?id=like.harvest_${uid}_txn_*&select=id,s:meta->>status,su:meta->>status_updated_at`);

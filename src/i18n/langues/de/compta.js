@@ -722,4 +722,5 @@ export default {
   "versement.court": "Daten werden gelesen",
   "versement.lbcReleve": "die Erweiterung liest ihr Verkaufsdatum nebenbei auf leboncoin.fr",
   "versement.lbcSans": { one: "{n} Leboncoin-Verkauf ohne Verkaufsdatum: vorerst in keinem Zeitraum (die Erweiterung liest es auf leboncoin.fr).", other: "{n} Leboncoin-Verkäufe ohne Verkaufsdatum: vorerst in keinem Zeitraum (die Erweiterung liest sie auf leboncoin.fr)." },
+  "versement.dac7Si": "ohne Auszahlungsdatum mitzählen",
 };

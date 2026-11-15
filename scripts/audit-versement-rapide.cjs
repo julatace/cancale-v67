@@ -8,9 +8,9 @@
 //
 //  On EXÉCUTE le vrai `background.js` (`_fond-vm.cjs`) et on COMPTE ce qui part
 //  chez Vinted :
-//   1. une visite : 10 détails au plus, la plus ANCIENNE d'abord hors des 45
-//      derniers jours (5.376 ; 2025 avant 2026), une pause ALÉATOIRE de 2 à 5 s entre deux détails, des GET ;
-//   2. le budget horaire : 15 lectures d'argent au plus dans l'heure, le total
+//   1. une visite : 20 détails au plus (5.390 ; 10 avant), la plus RÉCENTE d'abord
+//      partout (5.390 ; la 5.376 lisait les plus anciennes d'abord), une pause ALÉATOIRE de 2 à 5 s entre deux détails, des GET ;
+//   2. le budget horaire : 20 lectures d'argent au plus dans l'heure (5.390 ; 15 avant), le total
 //      des lectures jamais au-dessus de 20 ;
 //   3. « quand rien d'autre n'attend » : au-delà de la part ordinaire, jamais la
 //      place des codes, preuves et relevés (« pas su » ⇒ leur réserve entière) ;
@@ -19,7 +19,7 @@
 //   6. une requête à la fois, et jamais deux passages en même temps (aucune
 //      transaction lue deux fois) ;
 //   7. le passage de fond : rien sans onglet vinted.fr ;
-//   8. la carte dit « N restantes · environ X h avec Vinted ouvert » (5.378 : plus des jours de 24 h).
+//   8. la carte dit « N restantes · environ X h avec Vinted ouvert » (5.378 : plus des jours de 24 h ; 5.390 : 18 par heure).
 //  §6.1 : rouge sur origin/main (`--src <copie>`), et par MUTATION (`--mutations`).
 //  Données inventées. Usage : node scripts/audit-versement-rapide.cjs [--src f] [--mutations]
 // ════════════════════════════════════════════════════════════════════════════
@@ -54,13 +54,12 @@ async function controles(SRC, dit) {
     const f = fond({ store: autresRien() });
     await f.ctx.capterDatesVersement(UID);
     const lus = txLus(f.j);
-    dit(lus.length === 10, '1. une visite lit 10 détails, pas plus (40 à dater)', `${lus.length} lu(s)`);
-    // (14 nov., 5.376, lot dates-versement) Hors des 45 derniers jours : la plus ANCIENNE
-    // d'abord (l'URSSAF se déclare mois après mois ; audit-versement-sources juge les 45 jours).
+    dit(lus.length === 20, '1. une visite lit 20 détails, pas plus (40 à dater ; 5.390)', `${lus.length} lu(s)`);
+    // (15 nov., 5.390) La plus RÉCENTE d'abord, partout (le mois en cours et le précédent se déclarent).
     const d = (tx) => Date.parse(VENTES.find((v) => String(v.transaction_id) === tx).date);
-    const anciennes = [...VENTES].sort((a, b) => Date.parse(a.date) - Date.parse(b.date)).slice(0, 10).map((v) => String(v.transaction_id));
-    dit(lus.length > 0 && lus.every((tx, i) => i === 0 || d(lus[i - 1]) <= d(tx)) && lus.every((tx) => anciennes.includes(tx)),
-      '1. la plus ancienne d’abord (2025 avant 2026, hors 45 derniers jours)', lus.map((tx) => VENTES.find((v) => String(v.transaction_id) === tx).date.slice(0, 10)).join(' '));
+    const recentes = [...VENTES].sort((a, b) => Date.parse(b.date) - Date.parse(a.date)).slice(0, 20).map((v) => String(v.transaction_id));
+    dit(lus.length > 0 && lus.every((tx, i) => i === 0 || d(lus[i - 1]) >= d(tx)) && lus.every((tx) => recentes.includes(tx)),
+      '1. la plus récente d’abord (2026 avant 2025)', lus.map((tx) => VENTES.find((v) => String(v.transaction_id) === tx).date.slice(0, 10)).join(' '));
     const p = (f.ctx.__vrmPausesVues || []).filter((x) => x[0] === 'versement').map((x) => x[1]);
     dit(p.length === Math.max(0, lus.length - 1) && p.length > 0 && p.every((ms) => ms >= 2000 && ms <= 5000) && new Set(p).size > 1,
       '1. une pause ALÉATOIRE de 2 à 5 s entre deux détails', JSON.stringify(p));
@@ -71,7 +70,7 @@ async function controles(SRC, dit) {
     const f = fond({ store: autresRien() });
     for (let i = 0; i < 4; i++) { Object.assign(f.store, autresRien()); await f.ctx.capterDatesVersement(UID); }
     const n = txLus(f.j).length;
-    dit(n === 15, '2. quatre visites dans l’heure : 15 lectures d’argent, pas une de plus', `${n} lue(s)`);
+    dit(n === 20, '2. quatre visites dans l’heure : 20 lectures d’argent (tout le budget de lecture), pas une de plus', `${n} lue(s)`);
     dit(lect(f.store) <= 20 && lect(f.store) === n, '2. comptées sur le budget de LECTURE (20/h), jamais au-dessus', `lectures=${lect(f.store)}`);
     const g = fond({ store: Object.assign(autresRien(), { vrmLectures: { [UID]: Array.from({ length: 12 }, () => Date.now()) } }) });
     await g.ctx.capterDatesVersement(UID);
@@ -116,7 +115,7 @@ async function controles(SRC, dit) {
     await Promise.all([f.ctx.capterDatesVersement(UID), f.ctx.tickVersements(), f.ctx.capterDatesVersement(UID)]);
     const lus = txLus(f.j);
     dit(f.j.maxEnVol === 1, '6. jamais deux requêtes Vinted en vol', `jusqu'à ${f.j.maxEnVol}`);
-    dit(lus.length > 0 && new Set(lus).size === lus.length && lus.length <= 10, '6. un seul passage à la fois : aucune transaction lue deux fois', `${lus.length} lue(s), ${new Set(lus).size} distincte(s)`);
+    dit(lus.length > 0 && new Set(lus).size === lus.length && lus.length <= 20, '6. un seul passage à la fois : aucune transaction lue deux fois', `${lus.length} lue(s), ${new Set(lus).size} distincte(s)`);
   });
 
   await essaie('7. sans onglet', async () => {
@@ -125,7 +124,7 @@ async function controles(SRC, dit) {
     dit(txLus(f.j).length === 0, '7. le passage de fond ne lit rien sans onglet vinted.fr');
     const g = fond({ store: autresRien() });
     const n = await g.ctx.tickVersements();
-    dit(n === 10 && txLus(g.j).length === 10, '7. avec l’onglet ouvert, le passage de fond lit (10)', `${txLus(g.j).length} lu(s)`);
+    dit(n === 20 && txLus(g.j).length === 20, '7. avec l’onglet ouvert, le passage de fond lit (20)', `${txLus(g.j).length} lu(s)`);
   });
 
   await essaie('8. la carte', async () => {
@@ -134,7 +133,7 @@ async function controles(SRC, dit) {
     await f.ctx.capterDatesVersement(UID);
     const e = await f.ctx.etatSite('https://www.vinted.fr/member/1', 7);
     const dt = e && e.site && e.site.dates;
-    dit(!!dt && dt.reste === 30 && dt.heures === 3 && dt.jours === undefined, '8. la carte reçoit « 30 restantes · environ 3 h avec Vinted ouvert » (5.378 : en heures, 12 par heure)', JSON.stringify(dt));
+    dit(!!dt && dt.reste === 20 && dt.heures === 2 && dt.jours === undefined, '8. la carte reçoit « 20 restantes · environ 2 h avec Vinted ouvert » (5.390 : en heures, 18 par heure)', JSON.stringify(dt));
     const g = fond({ store: {} });
     g.ctx.compteConnecte = async () => UID;
     const e2 = await g.ctx.etatSite('https://www.vinted.fr/', 7);
@@ -149,11 +148,11 @@ async function lancer(SRC) {
 }
 
 const MUTATIONS = [
-  ['10 par visite → 40', 'const VERSEMENT_MAX_PAR_VISITE = 10;', 'const VERSEMENT_MAX_PAR_VISITE = 40;'],
-  ['plafond horaire retiré', 'const VERSEMENT_MAX_HEURE = 15;', 'const VERSEMENT_MAX_HEURE = 99;'],
+  ['20 par visite → 40', 'const VERSEMENT_MAX_PAR_VISITE = 20;', 'const VERSEMENT_MAX_PAR_VISITE = 40;'],
+  ['plafond horaire retiré', 'const VERSEMENT_MAX_HEURE = 20;', 'const VERSEMENT_MAX_HEURE = 99;'],
   ['réserve des autres ignorée', "const plafond = rattrapage ? LECTURES_MAX_HEURE - (await reserveAutresQueVersement(uid)) : LECTURES_MAX_HEURE;", 'const plafond = LECTURES_MAX_HEURE;'],
   ['pause retirée', 'if (n > 0) await pauseLectureArgent();', ''],
-  ['ordre retiré', 'const finalisees = ordreVersements(ventes.filter(', 'const finalisees = (ventes.filter('],
+  ['ordre retiré', 'const finalisees = ordrePlusRecentes(ventes.filter(', 'const finalisees = (ventes.filter('],
   ['verrou retiré', "if (_versementEnCours) { try { noterDiag('versement_deja_en_cours'); } catch (_) {} return 0; }", ''],
   ['garde du compte retirée', "const refus = await gardeLecture(uid, acc, 'argent', plafond);", 'const refus = null;'],
   ['fond sans onglet', 'if (!tabs || !tabs.length) return 0;', ''],

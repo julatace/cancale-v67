@@ -52,7 +52,7 @@ const RAISONS = {
   'inventaire-publication': 'liste pas encore lue : ouvre Annonces',
   'seuils-partiel': 'sur un chiffre d’affaires minimum',
 };
-const VERDICT = { atteint: 'seuil atteint', atteintSi: 'atteint si les ventes à dater y sont', sous: 'sous le seuil' };
+const VERDICT = { atteint: 'seuil atteint', atteintSi: 'atteint si les ventes sans date de versement y sont', sous: 'sous le seuil' };
 const ETAT_SEUIL = { ok: 'sous le seuil', proche: 'proche', base_depasse: 'dépassé', majore_depasse: 'seuil majoré dépassé', due_depuis_janvier: 'TVA due depuis janvier', depasse: 'dépassé', sortie: 'dépassé deux ans de suite' };
 
 // Le texte sous chaque étape : ce qui a été CONSTATÉ.

@@ -722,4 +722,5 @@ export default {
   "versement.court": "date in lettura",
   "versement.lbcReleve": "l’estensione rileva la data di vendita passando su leboncoin.fr",
   "versement.lbcSans": { one: "{n} vendita Leboncoin senza data di vendita: in nessun periodo per ora (l’estensione la rileva su leboncoin.fr).", other: "{n} vendite Leboncoin senza data di vendita: in nessun periodo per ora (l’estensione le rileva su leboncoin.fr)." },
+  "versement.dac7Si": "senza data di versamento contano",
 };

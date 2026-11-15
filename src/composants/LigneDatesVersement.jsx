@@ -8,9 +8,12 @@ import React from 'react';
 import { tr } from '../i18n/index.js';
 import { ligneDatesVersement } from '../versementRaisons.js';
 
-export function LigneDatesVersement({ ad, className = '', style, as: Balise = 'p' }) {
-  const L = ligneDatesVersement(ad);
-  if (!L) return null;
+// `avecDelai` : le délai (« environ X h ») ne se promet qu'à une extension qui lit à ce rythme
+// (`extSait('versementsauto') === 'ok'`, 5.390) ; sinon la ligne sans délai (« pas su » ≠ « oui »).
+export function LigneDatesVersement({ ad, className = '', style, as: Balise = 'p', avecDelai = true }) {
+  const L0 = ligneDatesVersement(ad);
+  if (!L0) return null;
+  const L = avecDelai ? L0 : { ...L0, heures: 0 };
   return (
     <Balise className={('vrm-dates-versement ' + className).trim()} role="note"
       data-dates-versement-ligne={L.n} data-dates-versement-heures={L.heures || 0}

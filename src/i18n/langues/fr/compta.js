@@ -722,4 +722,5 @@ export default {
   "versement.court": "dates en lecture",
   "versement.lbcReleve": "l’extension relève leur date de vente au passage sur leboncoin.fr",
   "versement.lbcSans": { one: "{n} vente Leboncoin sans date de vente : dans aucune période pour l’instant (l’extension la relève sur leboncoin.fr).", other: "{n} ventes Leboncoin sans date de vente : dans aucune période pour l’instant (l’extension les relève sur leboncoin.fr)." },
+  "versement.dac7Si": "sans date de versement comptent",
 };

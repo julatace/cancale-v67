@@ -26,6 +26,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (15 nov., extension 5.390) Julien : « Enlève les 1741 ventes à dater » — l'extension les récupère, aucun geste.
+  { id: 'versements-auto', date: '2026-11-15', titre: 'Dates de versement : l’extension s’en occupe', phrase: 'Plus rien à dater toi-même : une ligne dit où elle en est.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « c'est moche et il y a des bugs ») docs/passation/2026-11-15-annonces-achats.md
   { id: 'annonces-achats-cartes', date: '2026-11-15', titre: 'Prix d’achat : cartes nettes, recherche lisible', phrase: 'Une suggestion, Relier en un toucher ; la recherche ne se mélange plus.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « tout doit être beaucoup mieux, accompagné, même la publication tout court ») docs/passation/2026-11-15-republier-main.md

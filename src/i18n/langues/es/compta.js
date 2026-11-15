@@ -722,4 +722,5 @@ export default {
   "versement.court": "fechas en lectura",
   "versement.lbcReleve": "la extensión recoge su fecha de venta al pasar por leboncoin.fr",
   "versement.lbcSans": { one: "{n} venta de Leboncoin sin fecha de venta: en ningún periodo por ahora (la extensión la recoge en leboncoin.fr).", other: "{n} ventas de Leboncoin sin fecha de venta: en ningún periodo por ahora (la extensión las recoge en leboncoin.fr)." },
+  "versement.dac7Si": "sin fecha de pago cuentan",
 };

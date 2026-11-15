@@ -722,4 +722,5 @@ export default {
   "versement.court": "dates being read",
   "versement.lbcReleve": "the extension picks up their sale date on leboncoin.fr as you browse",
   "versement.lbcSans": { one: "{n} Leboncoin sale without a sale date: in no period for now (the extension picks it up on leboncoin.fr).", other: "{n} Leboncoin sales without a sale date: in no period for now (the extension picks them up on leboncoin.fr)." },
+  "versement.dac7Si": "without a payout date count",
 };
