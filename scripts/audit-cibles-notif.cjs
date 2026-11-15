@@ -117,7 +117,7 @@ const APP = ['src/App.jsx', 'src/CarteRelais.jsx'].map((f) => sansCommentaires(l
     // (15 nov., « de plus belles notifications ») La règle de rédaction (api/_lib/notif-redaction.js) :
     // le fait ET l'objet dans le titre (« Vendu 10 € · X »), le geste dans le corps ; jamais le
     // pseudo de l'acheteur (docs/passation/2026-11-15-notifications-belles.md).
-    dit(v.title === 'Vendu 10 € · X' && v.body === 'c · Prépare le colis : le bordereau suit par e-mail.', 'texte « Vendu » : le fait (le prix) et l’objet, puis le geste', JSON.stringify(v));
+    dit(v.title === 'Vendu 10\u00a0€ · X' && v.body === 'c · Prépare le colis : le bordereau suit par e-mail.', 'texte « Vendu » : le fait (le prix) et l’objet, puis le geste', JSON.stringify(v));
     const m = A.texteMessage({ paire: 'P', qui: 'q', compte: 'c', extrait: '' });
     dit(m.title === 'Nouveau message · P' && m.body === 'c · Réponds dans Messages' && !/\bq\b/.test(m.title + ' ' + m.body), 'texte « Message » : la paire, le geste — jamais qui écrit (pseudo de l’acheteur)', JSON.stringify(m));
   }

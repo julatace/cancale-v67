@@ -37,11 +37,13 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom
 
 // ── Les mutations : chacune réaffaiblit UNE règle ; le banc doit devenir rouge ──
 const MUTATIONS = {
-  'compte-par-identifiant': ['src/compteRelie.js', ".map((c) => ({ plateforme: String(c.plateforme || ''), nom: c.plateforme === 'ebay' && c.id === 'principal' && !c.nom ? '' : String(c.nom || '') }));", ".map((c) => ({ plateforme: String(c.plateforme || ''), nom: String(c.nom || '') || `n° ${String(c.id || '')}` }));"],
+  // Le texte d'avant (sans la règle) : « n° <identifiant> est relié à VRM ».
+  'compte-par-identifiant': ['src/compteRelie.js', "  return r ? { title: r.title, body: r.body, redaction } : null;", "  return r ? { title: `n° ${String((comptes[0] && comptes[0].id) || '').slice(0, 8)} est relié à VRM`, body: r.body } : null;"],
   'sans-scrub-strict': ['api/_lib/notif-redaction.js', "  for (const re of strict ? [...RE_IDS, ...RE_IDS_STRICTS] : RE_IDS) x = x.replace(re, ' ');", "  for (const re of RE_IDS) x = x.replace(re, ' ');"],
   'paire-oubliee': ['src/prixAchatVente.js', "titre: str(v.titre).slice(0, 80) })) };", "titre: '' })) };"],
   'date-machine': ['api/_lib/notif-redaction.js', "export const avantClair = (v, ctx = {}) => { const d = dateClaire(v, ctx);", "export const avantClair = (v, ctx = {}) => { const d = v ? { texte: String(v).slice(0, 10), relatif: false } : null;"],
-  'pseudo-acheteur': ['api/_lib/notif-apercus.js', "  fabrique('offre', { montant, article, juge:", "  fabrique('offre', { montant, article: [_qui, article].filter(Boolean).join(' · '), juge:"],
+  // Le pseudo de l'acheteuse remis dans le corps de l'offre (comme avant).
+  'pseudo-acheteur': ['api/email-inbound.js', "        ...texteOffre({ montant, article, juge }),", "        ...texteOffre({ montant, article, juge }), body: `${qui} — expire en 24h.`, redaction: null,"],
   'nom-long': ['api/_lib/notif-redaction.js', "  if (t.length > max) t = compacter(t);", "  if (false) t = compacter(t);"],
   'corps-170': ['api/_lib/notif-redaction.js', 'export const CORPS_MAX = 90;', 'export const CORPS_MAX = 170;'],
   'langue-ignoree': ['api/_lib/push.js', "  const red = redaction ? rediger(redaction, { langue, maintenant: t, relatif: !plusTard }) : null;", "  const red = redaction ? rediger(redaction, { langue: 'fr', maintenant: t, relatif: !plusTard }) : null;"],
@@ -198,14 +200,14 @@ function serviceWorker() {
     dit(r.code === 200 && pushes.length === 1, '2 la route envoie UNE notification', JSON.stringify(r.corps));
     const url = `/?tab=journee&cible=prixachat&tx=${TX_VENTE}`;
     regle(p, '2 prix d’achat', { url, tag: `prix-achat-${TX_VENTE}` });
-    dit(/^Vendu 62 € · Nike Air Max 1/.test(p.title || ''), '2 le titre dit le fait ET la paire : « Vendu 62 € · Nike Air Max 1… »', p.title);
+    dit(/^Vendu 62\s€ · Nike Air Max 1/.test(p.title || ''), '2 le titre dit le fait ET la paire : « Vendu 62 € · Nike Air Max 1… »', p.title);
     dit(/N°215/.test(p.body || '') && /prix d’achat/.test(p.body || ''), '2 le corps : le N° (sûr) et le geste « saisir ton prix d’achat »', p.body);
     await auTelephone(p, '2 prix d’achat', url);
     // La langue du compte (user_metadata.langue) : en anglais.
     const en = await prixAchat('en');
     dit(/^Sold €62 · Nike Air Max 1/.test(en.p.title || '') && /what you paid/.test(en.p.body || '') && en.p.lang === 'en', '2 compte en anglais ⇒ « Sold €62 · Nike Air Max 1… » (langue du compte)', `${en.p.title} / ${en.p.body} / ${en.p.lang}`);
     const de = await prixAchat('de');
-    dit(/^Verkauft 62 €/.test(de.p.title || '') && de.p.title.length <= 40, '2 compte en allemand ⇒ « Verkauft 62 € … »', de.p.title);
+    dit(/^Verkauft 62\s€/.test(de.p.title || '') && de.p.title.length <= 40, '2 compte en allemand ⇒ « Verkauft 62 € … »', de.p.title);
     langue = 'fr';
   });
 
@@ -236,7 +238,7 @@ function serviceWorker() {
     CAPTURE.push(['8 offres', p.title, p.body]);
     dit(pushes.length === 8, '4 huit e-mails d’offre ⇒ huit envois (la 8e remplace les autres)', String(pushes.length));
     regle(p1, '4 une offre');
-    dit(/^Offre de 50 € · 9060 vert\/blanc T38$/.test(p1.title || ''), '4 une offre : « Offre de 50 € · 9060 vert/blanc T38 »', p1.title);
+    dit(/^Offre de 50\s€ · 9060 vert\/blanc T38$/.test(p1.title || ''), '4 une offre : « Offre de 50 € · 9060 vert/blanc T38 »', p1.title);
     regle(p, '4 huit offres', { url: L.DESTINATIONS.offres(), tag: 'vrm-offre' });
     dit(p.title === '8 offres à trancher', '4 le titre : « 8 offres à trancher »', p.title);
     dit(/^La plus récente : 9060 vert\/blanc T38, expire dans 24 h$/.test(p.body || ''), '4 le corps : « La plus récente : 9060 vert/blanc T38, expire dans 24 h »', p.body);

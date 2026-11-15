@@ -33,7 +33,9 @@ const LOCALES = { fr: 'fr-FR', en: 'en-GB', es: 'es-ES', it: 'it-IT', de: 'de-DE
 export const langueNotif = (l) => { const x = String(l == null ? '' : l).toLowerCase().slice(0, 2); return LANGUES_NOTIF.includes(x) ? x : 'fr'; };
 
 const str = (v) => String(v == null ? '' : v);
-const espaces = (s) => str(s).replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim();
+// Les blancs ramenés à une espace — SAUF l'insécable (« 62\u00a0€ » reste collé).
+const BLANCS = /[^\S\u00a0\u202f]+/g;
+const espaces = (s) => str(s).replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(BLANCS, ' ').trim();
 
 // Couper sans casser un mot : au dernier espace avant la limite, puis « … ».
 export function couperMot(s, n) {
@@ -78,7 +80,7 @@ export function sansIdentifiant(s, { strict = false } = {}) {
   let x = str(s);
   for (const re of strict ? [...RE_IDS, ...RE_IDS_STRICTS] : RE_IDS) x = x.replace(re, ' ');
   return x.replace(/\(\s*\)/g, ' ').replace(/(?:\s*·\s*){2,}/g, ' · ').replace(/\s+,/g, ',')
-    .replace(/\s+/g, ' ').replace(/^[\s·:—–-]+/, '').replace(/[\s·:—–-]+$/, '').trim();
+    .replace(BLANCS, ' ').replace(/^[\s·:—–-]+/, '').replace(/[\s·:—–-]+$/, '').trim();
 }
 export const aUnIdentifiant = (s, { strict = true } = {}) => (strict ? [...RE_IDS, ...RE_IDS_STRICTS] : RE_IDS).some((re) => { re.lastIndex = 0; const ok = re.test(str(s)); re.lastIndex = 0; return ok; });
 
@@ -100,7 +102,8 @@ export function montantClair(v, langue = 'fr') {
   const c = Math.round(n * 100);
   const sep = langue === 'en' ? '.' : ',';
   const txt = c % 100 === 0 ? String(c / 100) : (c / 100).toFixed(2).replace('.', sep);
-  return langue === 'en' ? `€${txt}` : `${txt} €`;
+  // Espace insécable avant « € » : jamais « 62 » en fin de ligne et « € » sur la suivante.
+  return langue === 'en' ? `€${txt}` : `${txt}\u00a0€`;
 }
 
 // ── LE NOM COURT D'UN ARTICLE ───────────────────────────────────────────────
