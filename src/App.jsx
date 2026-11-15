@@ -4818,7 +4818,10 @@ const _avantCopieLocale = {};
 const ecrireCopieLocale = (k, v) => {
   try {
     if (!(k in _avantCopieLocale) && !_saveTimers[k]) { const t = localStorage.getItem(k); _avantCopieLocale[k] = t; }
-    localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
+    // (15 nov., rouges-connus) TOUJOURS en JSON, comme `save` l'écrit et comme `load` le lit (JSON.parse) : une chaîne
+    // posée brute (« thermique », la lettre des N°) était illisible par `load` (« clé ignorée ») jusqu'à l'écriture de
+    // `save` 500 ms plus tard — le choix de l'imprimante n'était pas « utilisable immédiatement » (banc parametres-guides).
+    localStorage.setItem(k, JSON.stringify(v));
     return true;
   } catch (_) { return false; }
 };

@@ -101,7 +101,8 @@ export default function SmsColisSetting({ jeton = '', onJeton, toast = () => {},
   return (
     <div className="vrm-sc" data-sms-colis={etat}>
       <p className="vrm-sc-intro">
-        Tes <b>SMS de colis</b> (Mondial Relay en casier, Vinted Go, Pickup) arrivent dans VRM comme tes e-mails : une automatisation de ton iPhone les transfère, le colis apparaît dans Colis → À retirer avec son code.
+        {/* (15 nov., rouges-connus) Plus en gras : le titre du panneau (« SMS de colis ») ne se redit pas, en gras, juste dessous (§7). */}
+        Tes SMS de colis (Mondial Relay en casier, Vinted Go, Pickup) arrivent dans VRM comme tes e-mails : une automatisation de ton iPhone les transfère, le colis apparaît dans Colis → À retirer avec son code.
       </p>
       {etat !== 'actif' ? (
         <div className="vrm-sc-bloc">
