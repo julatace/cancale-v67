@@ -374,6 +374,8 @@ export function lignePartout(paire, ctx = {}) {
           ? { code: 'corr-' + d.champ, texte: `${NOM_C[d.champ] || d.champ} Leboncoin à choisir`, geste: corr.catalogId ? 'Choisis-la ci-dessous, dans la liste de Leboncoin : VRM la retient pour cette catégorie Vinted' : 'La catégorie Vinted de cette annonce n’est pas lue : choisis ci-dessous', bloque: true }
           : { code: 'corr-' + d.champ, texte: `${NOM_C[d.champ] || d.champ} : pas de correspondance sûre`, geste: 'Choisis ci-dessous, sinon elle se choisit sur Leboncoin pendant le dépôt', bloque: false });
       }
+      // Un nom de catégorie que deux rubriques portent (« Jeux & Jouets ») ne se clique pas à coup sûr.
+      if (corr.ambigu) manques.push({ code: 'corr-ambigu', texte: `Catégorie « ${corr.valeurs.sousNom} » : deux rubriques Leboncoin la portent`, geste: 'Publie celle-ci toi-même sur Leboncoin (VRM ne choisirait pas à coup sûr)', bloque: true });
       // Une extension qui ne reçoit pas la catégorie et les critères laisserait Leboncoin les DEVINER
       // (sa prédiction d'après photo et titre) : rien ne part tant qu'elle n'est pas à jour.
       if (!ctx.lbcCriteres && (corr.valeurs.univers || corr.valeurs.type || (corr.valeurs.sousNom && str(ctx.categorieVoie) !== corr.valeurs.sousNom))) {
