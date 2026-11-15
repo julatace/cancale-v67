@@ -174,8 +174,12 @@ async function principal() {
     ['src/ecrans/Vestiaire.jsx', /suivi\.demarrer\(\{ sorte: auto \? 'publier-vc'/],
     ['src/BaissePrixSerie.jsx', /suivi\.demarrer\(\{ sorte: 'baisse-prix'/],
     ['src/ModeVacances.jsx', /suivi\.demarrer\(\{ sorte: 'vacances'/],
-    ['src/App.jsx', /suiviTravail\.demarrer\(\{ sorte: 'retirer-ailleurs'/],
-    ['src/App.jsx', /suiviTravail\.demarrer\(\{ sorte: 'bordereaux'/],
+    // (15 nov.) Le retrait ailleurs a sa sorte propre (« retirer-annonces », src/ARetirerAilleurs +
+    // journalRA) : l'ancienne « retirer-ailleurs » ouvrait la feuille du geste colis.retire (« Colis
+    // noté retiré », faux). L'impression simple (version studio) suit par l'accompagnement du geste
+    // colis.imprimer (pendant / fini / échec), plus par la feuille « bordereaux ».
+    ['src/App.jsx', /suiviTravail\.demarrer\(\{ sorte: 'retirer-annonces'/],
+    ['src/App.jsx', /accompagner\('colis\.imprimer', \{ total: /],
     ['src/composants/SelectionSerie.jsx', /await lancerTravail\(\{ sorte: `serie-/],
   ];
   for (const [f, re] of BR) dit(re.test(sansCom(lire(f))), `B1 ${f} démarre la feuille (${re.source.slice(0, 50)})`);

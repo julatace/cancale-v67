@@ -7,7 +7,7 @@
 //    V2 versé 203,23 €, AUCUN prix (extension d'avant 5.364) ⇒ « frais pas lus » ;
 //    V3 prix 120 € · versé 102 € ⇒ 18 € (15 %).
 //  Il MESURE (data-* et nombres rendus) :
-//   L  Ventes · Vestiaire : la ligne V1 dit « Frais Vestiaire 37,50 € (15 %) », V2 ne dit
+//   L  Ventes · Vestiaire : (15 nov.) la ligne V1 dit « 250 € · pour toi 212,50 € » (les frais : fiche), V2 ne dit
 //      AUCUN frais (ni 0) ;
 //   F  la fiche de V1 : Prix 250,00 € · Frais Vestiaire −37,50 € (15 %) · Pour toi 212,50 € ;
 //      la fiche de V2 : « frais pas lus », jamais 0 ;
@@ -61,7 +61,8 @@ async function passe(nav, { W, theme }) {
     dit(lu, `${T} L · les ventes Vestiaire inventées sont rendues`);
     if (lu) {
       const lignes = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-vc-vente]')].map((l) => [l.getAttribute('data-vc-vente'), (l.querySelector('.vrm-ledger-sale-toggle') || l).innerText.replace(/\s+/g, ' ')])));
-      dit(/Frais Vestiaire 37,50\s€ \(15\s%\)/.test(lignes['71000001'] || ''), `${T} L · V1 : « Frais Vestiaire 37,50 € (15 %) » sur la ligne`, lignes['71000001']);
+      // (15 nov., ventes Vestiaire) La ligne porte le PRIX DE VENTE et « pour toi … » ; les frais LUS sont dans la fiche (F).
+      dit(/250\s€/.test(lignes['71000001'] || '') && /pour toi 212,50\s€/.test(lignes['71000001'] || '') && !/Frais Vestiaire/.test(lignes['71000001'] || ''), `${T} L · V1 : « 250 € » et « pour toi 212,50 € » sur la ligne (les frais dans la fiche)`, lignes['71000001']);
       dit(!/Frais Vestiaire/.test(lignes['71000002'] || 'x') && !/0,00/.test(lignes['71000002'] || ''), `${T} L · V2 (prix pas lu) : aucun frais écrit, ni 0`, lignes['71000002']);
       await pg.locator('[data-vc-vente="71000001"]').first().scrollIntoViewIfNeeded().catch(() => {}); await pg.waitForTimeout(300);
       await capture(pg, nomS('ligne'));

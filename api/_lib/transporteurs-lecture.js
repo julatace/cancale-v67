@@ -610,15 +610,17 @@ export async function passageTransporteurs({ max = MAX_APP, budgetMs = BUDGET_AP
 export const MAX_DEPARTS_APP = 3;
 export const MAX_DEPARTS_CRON = 6;
 async function lireBaseDeparts() {
-  const [rows, vc, bords] = await Promise.all([
+  // (15 nov., lot retours-suivi) + les bordereaux de RETOUR de ses achats (le colis qu'il renvoie).
+  const [rows, vc, bords, retours] = await Promise.all([
     lireTout(`app_data?id=like.depart_*&select=${D.SELECT_DEPART_META}`),
     lireTout('app_data?id=eq.vc_ventes&select=ventes:data->ventes'),
     lireTout('app_data?id=like.email_bord_*&select=suivi:meta->>suivi,transaction:meta->>transaction,receivedAt:meta->>receivedAt'),
+    lireTout('app_data?id=like.email_bordretour_*&select=suivi:meta->>suivi,transaction:meta->>transaction,receivedAt:meta->>receivedAt,transporteurPdf:meta->>transporteurPdf'),
   ]);
-  if (![rows, vc, bords].every(Array.isArray)) return null;
+  if (![rows, vc, bords, retours].every(Array.isArray)) return null;
   const departs = D.departsParSuivi(rows) || new Map();
   const vcVentes = vc[0] && vc[0].ventes && typeof vc[0].ventes === 'object' ? vc[0].ventes : {};
-  return { departs, sortants: D.sortantsDuVendeur({ vcVentes, bords }) };
+  return { departs, sortants: D.sortantsDuVendeur({ vcVentes, bords, retours }) };
 }
 // Les n° ENTRANTS connus de ce passage (ses achats) : jamais lus comme départ.
 export function entrantsDe(b) {

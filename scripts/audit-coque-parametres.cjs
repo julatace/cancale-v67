@@ -93,7 +93,7 @@ if (arg.includes('--prouve')) {
   }
   // La règle et ses deux voisines du Stock, copiées ensemble (mêmes imports relatifs).
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'coque-h-'));
-  for (const n of ['stockSortie.js', 'stockRegles.js']) fs.writeFileSync(path.join(dir, n), fs.readFileSync(path.join(RACINE, 'src', n), 'utf8'));
+  for (const n of ['stockSortie.js', 'stockRegles.js', 'stockEtageres.js']) fs.writeFileSync(path.join(dir, n), fs.readFileSync(path.join(RACINE, 'src', n), 'utf8'));
   fs.writeFileSync(path.join(dir, 'ouRanger.js'), src.ranger);
   fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"module"}');
   let R;

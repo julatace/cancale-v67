@@ -112,7 +112,9 @@ async function audit(regleTexte, { muet = false } = {}) {
   const VC = sansCommentaires(lire('src/ecrans/Vestiaire.jsx'));
   dit(/\bfraisVc\b[^;]*from '\.\.\/\.\.\/api\/_lib\/vestiaire-regle\.js'/.test(VC) && /const fv = vcVenteAnnulee\(v\) \? null : fraisVc\(v\)/.test(VC), 'la ligne de vente Vestiaire lit `fraisVc(v)` (aucun calcul à part)');
   dit(/<dt>Frais Vestiaire<\/dt>/.test(VC) && /frais pas lus/.test(VC) && /<dt>Prix<\/dt>/.test(VC) && /'Pour toi'/.test(VC), 'la fiche dit « Prix · Frais Vestiaire · Pour toi », et « frais pas lus » sinon');
-  dit(/fv && fv\.lu \? `Frais Vestiaire \$\{eurosRecap\(fv\.frais\)\}/.test(VC), 'la ligne porte « Frais Vestiaire … (… %) » seulement quand ils sont lus');
+  // (15 nov., ventes Vestiaire) La ligne se tassait au téléphone : les frais LUS vivent dans la fiche (« L'argent »),
+  // la ligne porte le PRIX DE VENTE en principal et « pour toi … » (ce que Vestiaire verse) — les deux lus.
+  dit(!/`Frais Vestiaire \$\{eurosRecap\(fv\.frais\)\}/.test(VC) && /const prixPrincipal = prixLu != null \? prixLu : lb\.verse;/.test(VC) && /tr\('vcventes\.pourToi'/.test(VC), 'la ligne : prix de vente en principal, « pour toi … » en second ; les frais (lus) dans la fiche seulement');
   const toutSrc = ['src/ecrans/Vestiaire.jsx', 'src/ecrans/Stats.jsx', 'src/App.jsx', 'src/fraisPlateformes.js', 'src/margePlateforme.js'].map((f) => sansCommentaires(lire(f))).join('\n');
   dit(!/prixVente\.valeur\s*-|prixVente\.valeur\)\s*-|-\s*[\w.]*montant\.valeur/.test(toutSrc), 'aucun « prix − versé » refait hors de la règle (une règle, un propriétaire)');
   const ST = sansCommentaires(lire('src/ecrans/Stats.jsx'));

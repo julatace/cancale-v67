@@ -267,7 +267,16 @@ export function repousseeJusqua(plusTard, id, maintenant) {
 //   decisions, perdues, slots, plusTard : les valeurs COURANTES (pour « avant »)
 //   cleDeclaration(numero, id) : la clé de `vinted_pairs_lost` (App : `cleDeclarationPartie`)
 // Rend { ops, texte } ou null (réponse incomplète : rien n'est écrit).
-export function opsChezToi({ carte, reponse, raison = null, decisions = {}, perdues = {}, slots = {}, plusTard = {}, cleDeclaration = null, cle = cleDefaut, maintenant = Date.now() } = {}) {
+// (15 nov., étagères) La case vidée, et — si l'app passe `sortieCase` (`opsSortieCases`, src/stockEtageres.js) —
+// la descente des cartons du dessus dans une pile. Des opérations sur `vrm_slots` seulement ; sans elles, la case seule.
+function casePlusPile(kn, S, sortieCase) {
+  const seule = [{ k: 'vrm_slots', type: 'cle', id: kn, apres: undefined, avant: S[kn] }];
+  if (typeof sortieCase !== 'function') return seule;
+  let o; try { o = sortieCase(kn); } catch (_) { o = null; }
+  o = Array.isArray(o) ? o.filter((x) => x && x.k === 'vrm_slots') : [];
+  return o.some((x) => String(x.id) === String(kn) && x.apres === undefined) ? o : seule;
+}
+export function opsChezToi({ carte, reponse, raison = null, decisions = {}, perdues = {}, slots = {}, plusTard = {}, cleDeclaration = null, sortieCase = null, cle = cleDefaut, maintenant = Date.now() } = {}) {
   if (!carte || carte.id == null || String(carte.id) === '') return null;
   const id = String(carte.id), numero = String(carte.numero == null ? '' : carte.numero).trim();
   const at = new Date(maintenant).toISOString();
@@ -294,6 +303,8 @@ export function opsChezToi({ carte, reponse, raison = null, decisions = {}, perd
   if (k0) ops.push({ k: 'vinted_pairs_lost', type: 'cle', id: k0, apres: { ...(P[k0] || {}), id, at, title: String(carte.title || ''), from: 'cycle', raison: R[0] }, avant: P[k0] });
   // Sa case du Stock (par son N°) : libérée. Le N° lui-même ne bouge pas.
   const kn = numero ? cle(numero) : '';
-  if (kn && S[kn]) ops.push({ k: 'vrm_slots', type: 'cle', id: kn, apres: undefined, avant: S[kn] });
+  // (15 nov., étagères) `sortieCase` (passée par l'app : `opsSortieCases`, src/stockEtageres.js) rend la case vidée
+  // ET la descente des cartons du dessus dans une pile — « Annuler » rend tout ; absente : la case seule, comme avant.
+  if (kn && S[kn]) ops.push(...casePlusPile(kn, S, sortieCase));
   return { texte: R[0] === 'sortie' ? `N°${numero || '?'} sortie du stock` : `N°${numero || '?'} sortie du stock · ${R[1].toLowerCase()}`, ops };
 }

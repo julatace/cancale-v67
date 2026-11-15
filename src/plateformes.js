@@ -112,9 +112,10 @@ export function nomCompteVente(site, vente, annuaire) {
   if (nom) return nom.slice(0, 64);
   if (site === 'vinted') { const l = vente && vente._acc && vente._acc.login; return l ? String(l).slice(0, 64) : `#${id}`; }
   if (site === 'ebay') return id === 'principal' ? 'Compte principal' : `n° ${id.slice(0, 8)}`;
-  // Vestiaire : l'identifiant ENTIER (≤ 40 caractères, validé plus haut) — tronqué, il
-  // ressemblerait à un numéro complet qui n'est pas le sien.
-  if (site === 'vestiaire') return id === '-' ? '' : `n° ${id}`;
+  // (15 nov., Julien) Vestiaire : le PSEUDO lu (l'annuaire) ou RIEN. L'identifiant du compte
+  // (« n° 37451417 ») s'écrivait sous chaque vente et se lisait comme un n° de vente :
+  // faux et trompeur. Le repère d'une vente Vestiaire est sa réf. produit, écrite à part.
+  if (site === 'vestiaire') return '';
   return `n° ${id.slice(0, 8)}`;
 }
 // L'annuaire Leboncoin depuis `lbc_accounts.accounts` (« 8442… » et
