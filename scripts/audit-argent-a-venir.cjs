@@ -244,7 +244,7 @@ const charger = async (texte, nom) => {
     const parE = Object.fromEntries((A7.parEtape || []).map((g) => [g.etape, g]));
     const C = (x) => Math.round(x * 100);
     const sommeE = (A7.parEtape || []).reduce((t, g) => t + C(g.eur), 0), sommeS = (A7.parSite || []).reduce((t, g) => t + C(g.eur), 0);
-    dit(A7.lignes.every((l) => M.ETAPES_A_VENIR.includes(l.etape)) && (A7.parEtape || []).reduce((t, g) => t + g.n, 0) === A7.n, 'chaque vente est dans UNE étape (le nombre des étapes = le nombre de ventes)', JSON.stringify((A7.parEtape || []).map((g) => g.etape + ':' + g.n)));
+    dit(A7.lignes.every((l) => (M.ETAPES_A_VENIR || []).includes(l.etape)) && (A7.parEtape || []).reduce((t, g) => t + g.n, 0) === A7.n, 'chaque vente est dans UNE étape (le nombre des étapes = le nombre de ventes)', JSON.stringify((A7.parEtape || []).map((g) => g.etape + ':' + g.n)));
     dit(sommeE === C(A7.total) && sommeS === C(A7.total), `le total (${A7.total} €) = la somme des étapes = la somme des sites, au centime`, `${sommeE / 100} / ${sommeS / 100}`);
     // À la main : envoyer 64 + 85 + 150 + 70 (E22 : 80 − 10) = 369 ; route 72 + 203,23 + 45 (Leboncoin) = 320,23 ;
     // livree 95 ; versement 95,70 (E21) + 60 (E23, avant frais) + 88 (V23) = 243,70 ⇒ 1 027,93 €.
@@ -265,9 +265,9 @@ const charger = async (texte, nom) => {
     dit(!A7.lignes.some((l) => l.id === 'vinted:29' || l.id === 'vestiaire:V26') && !bl.lignes.some((l) => l.id === 'vinted:29'), 'un compte écarté (Vinted, Vestiaire) n’entre dans aucune étape ni dans le total');
     const v21 = A7.lignes.find((l) => l.id === 'vestiaire:V21');
     dit(v21 && v21.prevu != null && new Date(v21.prevu).getDate() === 19 && !A7.lignes.filter((l) => l.plateforme === 'Vinted').some((l) => l.prevu != null), 'la date : Vestiaire « 19 novembre 2026 » lue ; Vinted n’en a aucune (jamais estimée)');
-    const F = M.friseAVenir(A7, new Date(2026, 10, 15, 10, 0, 0).getTime());   // dimanche 15 nov.
-    const sF = C(F.semaine.eur) + C(F.suivante.eur) + C(F.plusTard.eur) + C(F.sansDate.eur);
-    dit(F && sF === C(A7.total) && F.semaine.n + F.suivante.n + F.plusTard.n + F.sansDate.n === A7.n, 'la frise : cette semaine + la suivante + plus tard + sans date = le total, chaque vente une fois', JSON.stringify(F));
+    const F = typeof M.friseAVenir === 'function' ? M.friseAVenir(A7, new Date(2026, 10, 15, 10, 0, 0).getTime()) : null;   // dimanche 15 nov.
+    const sF = F ? C(F.semaine.eur) + C(F.suivante.eur) + C(F.plusTard.eur) + C(F.sansDate.eur) : -1;
+    dit(!!F && sF === C(A7.total) && F.semaine.n + F.suivante.n + F.plusTard.n + F.sansDate.n === A7.n, 'la frise : cette semaine + la suivante + plus tard + sans date = le total, chaque vente une fois', JSON.stringify(F));
     dit(F && F.semaine.n === 0 && F.suivante.n === 2 && F.plusTard.n === 1 && F.datees === 3, 'la frise (dimanche 15 nov.) : 18 et 19 nov. ⇒ la semaine suivante ; 2 déc. ⇒ plus tard', JSON.stringify(F));
     console.log('── La carte des chiffres lit la même règle');
     const carteTxt = CARTE.replace("from '../argentAVenir.js'", `from 'file://${tmpM}'`)
