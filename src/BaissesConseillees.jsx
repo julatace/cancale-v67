@@ -47,11 +47,11 @@ export default function BaissesConseillees({ lignes = null, ventesLues = true, o
       <div className="vrm-ao-feuille vrm-bc" role="dialog" aria-modal="true" aria-label={tr('bc.titre')}>
         <header className="vrm-ao-tete">
           <h2>{tr('bc.titre')}</h2>
-          <span className="vrm-ao-num" data-bc-resume={`${R.baisser}/${R.garder}/${R.achat}`}>
-            {[R.baisser ? tr('bc.resume.baisser', { n: R.baisser }) : '', R.garder ? tr('bc.resume.garder', { n: R.garder }) : '', R.achat ? tr('bc.resume.achat', { n: R.achat }) : ''].filter(Boolean).join(' · ')}
-          </span>
           <button type="button" className="vrm-ao-x" aria-label={tr('bc.fermer')} data-bc-fermer="" onClick={onFermer}>×</button>
         </header>
+        <p className="vrm-bc-resume" data-bc-resume={`${R.baisser}/${R.garder}/${R.achat}`}>
+          {[R.baisser ? tr('bc.resume.baisser', { n: R.baisser }) : '', R.garder ? tr('bc.resume.garder', { n: R.garder }) : '', R.achat ? tr('bc.resume.achat', { n: R.achat }) : ''].filter(Boolean).join(' · ')}
+        </p>
         <p className="vrm-bp-note">{tr('bc.sous')}</p>
         {ventesLues === false ? <p className="vrm-bp-note" data-bc-ventes-pas-lues="">{tr('bc.ventesPasLues')}</p> : null}
         {lignes == null ? <p className="vrm-ao-mini" data-bc-pas-lu="">{tr('bc.pasLu')}</p>
@@ -65,7 +65,7 @@ export default function BaissesConseillees({ lignes = null, ventesLues = true, o
                 data-bc-sugg={d.sugg == null ? undefined : String(d.sugg)} data-bc-prix={d.prix == null ? undefined : String(d.prix)}
                 data-bc-plancher={d.plancher == null ? undefined : String(d.plancher)} data-bc-geste={d.geste || undefined}>
                 {d.decision === 'baisser'
-                  ? <input type="checkbox" className="vrm-bc-case" checked={coche} onChange={() => basculer(l.cle)} data-bc-case={l.id} aria-label={tr('bc.phrase', { p: d.sugg })}/>
+                  ? <label className="vrm-bc-zone"><input type="checkbox" className="vrm-bc-case" checked={coche} onChange={() => basculer(l.cle)} data-bc-case={l.id} aria-label={tr('bc.phrase', { p: d.sugg })}/></label>
                   : <span className="vrm-bc-case" aria-hidden="true"/>}
                 {l.photo && Photo ? <Photo src={l.photo} alt="" className="vrm-bp-photo" loading="lazy"/> : <span className="vrm-bp-photo" aria-hidden="true"/>}
                 <span className="vrm-bc-centre">
@@ -85,7 +85,7 @@ export default function BaissesConseillees({ lignes = null, ventesLues = true, o
           })}
         </ul>
         <div className="vrm-bp-bas">
-          <p className="vrm-bp-progres">{tr('bc.note')}</p>
+          <p className="vrm-bp-note vrm-bc-note">{tr('bc.note')}</p>
           <button type="button" className="vrm-ao-principal sb-btn-plein" data-bc-appliquer-tout={choisies.length} disabled={!choisies.length} onClick={() => onAppliquer(choisies)}>
             {tr('bc.appliquerTout', { n: choisies.length })}
           </button>

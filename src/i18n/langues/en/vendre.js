@@ -13,6 +13,7 @@ export default {
   "bc.appliquer": "Apply",
   "bc.appliquerTout": {"one": "Apply {n} drop", "other": "Apply the {n} drops"},
   "bc.note": "Nothing goes out on its own: “Apply” opens the preview, you confirm, VRM reads the price back on Vinted.",
+  "bc.noteSerie": "The suggested price for each listing. Untick the ones you keep.",
   "bc.vide": "No listing online for 30 days or more.",
   "bc.pasLu": "Listings not read yet.",
   "bc.fermer": "Close",

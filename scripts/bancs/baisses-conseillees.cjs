@@ -100,6 +100,8 @@ async function page(b, T, { sombre = false, version = '5.381.0' } = {}) {
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(({ n, sombre, plan }) => { try { window.__VRM_BAISSE_PAUSE = 0; if (sessionStorage.getItem('__banc')) return; sessionStorage.setItem('__banc', '1'); localStorage.setItem('vrm_acces_direct', '1'); if (sombre) localStorage.setItem('vinted_dark', 'true'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(n)); localStorage.setItem('vrm_room_plan', JSON.stringify(plan)); } catch (_) {} }, { n: NUMEROS, sombre, plan: PLAN });
   await pg.addInitScript(PONT, { version });
+  // Ce que le geste de la carte prépare pour Messages → Favoris (relu ensuite, même s'il est déjà consommé).
+  await pg.addInitScript(() => { const o = Storage.prototype.setItem; Storage.prototype.setItem = function (k, v) { if (k === 'vrm_favoris_prepare') window.__prep = v; return o.call(this, k, v); }; });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const req = route.request();
@@ -169,6 +171,8 @@ const lireBC = (pg) => pg.evaluate(() => { const s = document.querySelector('[da
           dit(bp && bp.cibles === '2' && bp.L['900001'] && bp.L['900001'].n === '72' && bp.L['900006'].n === '95' && !bp.reglage && !bp.varier, 'B1 « Appliquer les 2 baisses » ⇒ la feuille « Baisser le prix », prix conseillés 72 et 95, sans −€/−% ni « Varier »', bp && JSON.stringify(bp));
           await capture(pg, `baisse-cibles-${suf}`, '.vrm-bp');
           dit((await pg.evaluate(() => window.__cmds.length)) === 0, 'B2 rien n’est parti avant son clic');
+          // 5.370+ : « Dans les 4 h » est proposé d'abord (discrétion) ; le banc choisit « Maintenant ».
+          if (await pg.locator('[data-bp-quand="maintenant"]').count()) await pg.locator('[data-bp-quand="maintenant"]').first().click();
           await pg.locator('[data-bp-lancer]').click(); await pg.waitForSelector('[data-bp-confirmer]', { timeout: 5000 }); await pg.locator('[data-bp-confirmer]').click();
           await pg.waitForFunction(() => window.__cmds.length >= 1, null, { timeout: 15000 }).catch(() => {});
           await pg.waitForTimeout(500);
@@ -208,9 +212,9 @@ const lireBC = (pg) => pg.evaluate(() => { const s = document.querySelector('[da
           if (rf) {
             await pg.locator('[data-rf-geste="favoris"]').first().click().catch(() => {});
             await pg.waitForTimeout(600);
-            const prep = await pg.evaluate(() => { try { return JSON.parse(sessionStorage.getItem('vrm_favoris_prepare') || 'null'); } catch (_) { return 'x'; } });
-            const sur = await pg.evaluate(() => location.search + ' ' + (document.querySelector('[data-favoris-ecran], [data-fc-etape]') ? 'favoris' : ''));
-            dit(prep === null ? /favoris/.test(sur) : (prep && prep.item === '900007' && prep.uid === '111'), 'D3 le geste prépare Messages → Favoris pour CETTE annonce (900007), rien n’est envoyé', JSON.stringify(prep) + ' ' + sur);
+            const prep = await pg.evaluate(() => { try { return JSON.parse(window.__prep || 'null'); } catch (_) { return 'x'; } });
+            const cmdsD = await pg.evaluate(() => window.__cmds.length);
+            dit(prep && prep.item === '900007' && prep.uid === '111' && cmdsD === 0, 'D3 le geste prépare Messages → Favoris pour CETTE annonce (900007), rien n’est envoyé', JSON.stringify(prep) + ' · ' + cmdsD + ' commande(s)');
           }
           dit(!errs.length, 'D4 aucune erreur de page', errs.slice(0, 2).join(' | '));
           await ctx.close();

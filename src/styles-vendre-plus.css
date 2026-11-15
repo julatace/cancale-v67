@@ -19,7 +19,9 @@
 .vrm-bc-liste { list-style: none; margin: 0 0 12px; padding: 0; background: var(--fu-carte, #fff); border-radius: 20px; box-shadow: var(--fu-ombre); overflow: hidden; }
 .vrm-bc-ligne { display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 4px; min-height: 64px; }
 .vrm-bc-ligne + .vrm-bc-ligne { border-top: 1px solid var(--fu-filet, rgba(0,0,0,.06)); }
-.vrm-bc-case { width: 22px; height: 22px; margin: 11px 0 11px 8px; flex: none; accent-color: var(--sb-diode, #0060CC); }
+.vrm-bc-zone { display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; flex: none; cursor: pointer; }
+.vrm-bc-case { width: 22px; height: 22px; margin: 0; flex: none; accent-color: var(--sb-diode, #0060CC); }
+span.vrm-bc-case { width: 44px; height: 22px; }
 .vrm-bc-centre { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 .vrm-bc-decision { font-size: 15px; font-variant-numeric: tabular-nums; }
 .vrm-bc-decision s { color: var(--fu-gris, #6e6e73); }
@@ -28,6 +30,15 @@
 .vrm-bc-ligne.is-achat .vrm-bc-decision b { color: var(--sb-ambre, #764300); }
 .vrm-bc-geste { flex: none; min-height: 44px; min-width: 44px; padding: 0 14px; }
 .vrm-bc .vrm-bp-bas .sb-btn-plein { min-height: 50px; }
+.vrm-bc-resume { margin: -4px 4px 6px; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.vrm-bc-note { margin: 0 4px; }
+/* Au téléphone : le geste passe SOUS le texte (le titre et la raison gardent la largeur). */
+.vrm-bc-ligne { flex-wrap: wrap; }
+.vrm-bc-centre { flex: 1 1 180px; }
+@media (max-width: 520px) {
+  .vrm-bc-centre { flex-basis: calc(100% - 120px); }
+  .vrm-bc-geste { margin-left: 106px; }
+}
 
 /* La carte « Relancer au bon moment » (Ma journée) : une tuile de verre, une rangée par annonce. */
 .vrm-rf { flex-direction: column; align-items: stretch; gap: 4px; padding: 14px 8px 8px 16px; }
@@ -38,7 +49,7 @@
 .vrm-rf-ligne + .vrm-rf-ligne { border-top: .5px solid var(--d-filet, rgba(0,0,0,.08)); }
 .vrm-rf-photo { width: 40px; height: 40px; border-radius: var(--sb-r-vignette, 11px); object-fit: cover; flex: none; background: var(--sb-socle, #F1F5F9); display: block; }
 .vrm-rf-texte { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
-.vrm-rf-texte b { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-rf-texte b { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
 .vrm-rf-geste { flex: none; min-height: 44px; padding: 0 12px; }
 .vrm-rf-bloque { font-size: 12px; color: var(--sb-ambre, #764300); }
 .vrm-rf-note { margin: 2px 8px 2px 0; font-size: 12px; color: var(--sb-encre-2, #44546A); }

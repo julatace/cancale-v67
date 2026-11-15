@@ -189,7 +189,7 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
           <span className="vrm-ao-num">{lignes.length} annonce{lignes.length > 1 ? 's' : ''}</span>
           <button type="button" className="vrm-ao-x" aria-label="Fermer" data-bp-fermer="" onClick={onFermer} disabled={enCours}>×</button>
         </header>
-        {cibles ? <p className="vrm-bp-note" data-bp-cibles={annonces.length}>{tr('bc.note')}</p> : <><div className="vrm-bp-reglage">
+        {cibles ? <p className="vrm-bp-note" data-bp-cibles={annonces.length}>{tr('bc.noteSerie')}</p> : <><div className="vrm-bp-reglage">
           <div className="vrm-bp-modes" role="group" aria-label="Baisse en euros ou en pourcentage">
             {[['eur', '− €'], ['pct', '− %']].map(([v, t]) => (
               <button key={v} type="button" className="vrm-bp-mode" aria-pressed={mode === v} data-bp-mode={v} disabled={fige} onClick={() => { setMode(v); setCoches(null); }}>{t}</button>
@@ -203,8 +203,8 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
           </label>
         </div>
         <p className="vrm-bp-note">{site === 'leboncoin' ? tr('lbcplus.baisse.note') : 'Arrondi à l’euro. Le prix change sur Vinted, annonce par annonce, puis VRM le relit.'}</p></>}
-        {site === 'vinted' && !cibles ? <div className="vrm-bp-options" data-bp-options="">
-          <label className="vrm-bp-option"><input type="checkbox" checked={varier} disabled={fige} onChange={(e) => { setVarier(e.target.checked); setCoches(null); }} data-bp-varier={varier ? '1' : '0'}/><span>Varier un peu (± 20 %)</span></label>
+        {site === 'vinted' ? <div className="vrm-bp-options" data-bp-options="">
+          {cibles ? null : <label className="vrm-bp-option"><input type="checkbox" checked={varier} disabled={fige} onChange={(e) => { setVarier(e.target.checked); setCoches(null); }} data-bp-varier={varier ? '1' : '0'}/><span>Varier un peu (± 20 %)</span></label>}
           {etaleOk && onProgrammer ? (
             <div className="vrm-bp-modes vrm-bp-quand" role="group" aria-label="Quand">
               {[['etale', `Dans les ${ETALEMENT_H} h`], ['maintenant', 'Maintenant']].map(([v, t]) => (

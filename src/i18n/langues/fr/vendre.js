@@ -14,6 +14,7 @@ export default {
   "bc.appliquer": "Appliquer",
   "bc.appliquerTout": {"one": "Appliquer {n} baisse", "other": "Appliquer les {n} baisses"},
   "bc.note": "Rien ne part tout seul : « Appliquer » ouvre l’aperçu, tu confirmes, VRM relit le prix sur Vinted.",
+  "bc.noteSerie": "Le prix conseillé de chaque annonce. Décoche celles que tu gardes.",
   "bc.vide": "Aucune annonce en ligne depuis 30 jours ou plus.",
   "bc.pasLu": "Annonces pas encore lues.",
   "bc.fermer": "Fermer",

@@ -13,6 +13,7 @@ export default {
   "bc.appliquer": "Anwenden",
   "bc.appliquerTout": {"one": "{n} Senkung anwenden", "other": "Die {n} Senkungen anwenden"},
   "bc.note": "Nichts geht von selbst raus: „Anwenden“ öffnet die Vorschau, du bestätigst, VRM liest den Preis auf Vinted erneut.",
+  "bc.noteSerie": "Der empfohlene Preis jeder Anzeige. Entferne das Häkchen bei denen, die du behältst.",
   "bc.vide": "Keine Anzeige seit 30 Tagen oder länger online.",
   "bc.pasLu": "Anzeigen noch nicht gelesen.",
   "bc.fermer": "Schließen",

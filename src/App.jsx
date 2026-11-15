@@ -63027,7 +63027,7 @@ function AppCoeur() {
               style={styleLigne}>
               {/* (14 nov., passe 2) Trouvée PAR son N° : le N° est déjà écrit sur la rangée (la pastille de gauche, ou « N°… »
                   de la ligne d'info) — il ne s'écrit pas une seconde fois à droite (§7 : le même nombre, une fois). */}
-              {vignette}{ligneTexte(titre, info)}{r.par === 'numero' && e.numero ? null : pastille(r)}
+              {vignette}{ligneTexte(titre, info)}{(r.par === 'numero' && e.numero) || r.par === 'rangement' ? null : pastille(r)}
               <span style={{fontSize:17,color:C.muted}}>›</span>
             </button>); };
         // Un e-mail trouvé par le moteur de l'écran E-mails : sa nature, l'essentiel, sa date.

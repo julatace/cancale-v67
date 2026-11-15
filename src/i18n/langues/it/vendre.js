@@ -13,6 +13,7 @@ export default {
   "bc.appliquer": "Applica",
   "bc.appliquerTout": {"one": "Applica {n} ribasso", "other": "Applica i {n} ribassi"},
   "bc.note": "Niente parte da solo: «Applica» apre l’anteprima, tu confermi, VRM rilegge il prezzo su Vinted.",
+  "bc.noteSerie": "Il prezzo consigliato di ogni annuncio. Togli la spunta a quelli che tieni.",
   "bc.vide": "Nessun annuncio online da 30 giorni o più.",
   "bc.pasLu": "Annunci non ancora letti.",
   "bc.fermer": "Chiudi",
