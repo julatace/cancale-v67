@@ -26,6 +26,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (15 nov., extension 5.382, Julien : « vraiment exactement la même photo ») docs/passation/2026-11-15-meme-photo.md
+  { id: 'meme-photo', date: '2026-11-15', titre: 'Même photo qu’une paire Vinted : relier', phrase: 'Leboncoin, eBay, Vestiaire : la même photo est reconnue, tu relies.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., extension 5.380, captures de Julien) La carte du logo sur vinted.fr : docs/passation/2026-11-15-carte-extension.md
   { id: 'carte-extension-studio', date: '2026-11-15', titre: 'La carte VRM sur Vinted, refaite', phrase: 'Favoris en liste, ventes sans tiret, liens qui marchent, bleu clair.', tab: 'messages', pour: 'tous', mode: 'tous' },
   // (15 nov., extension 5.379, Julien sur Orion iPhone : « Leboncoin marche pas ») docs/passation/2026-11-15-lbc-orion.md

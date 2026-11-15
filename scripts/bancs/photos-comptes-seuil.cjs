@@ -27,6 +27,9 @@ const { chromium } = require('playwright');
 const RACINE = (() => { const i = process.argv.indexOf('--src'); return i > 0 ? path.resolve(process.argv[i + 1]) : path.join(__dirname, '..', '..'); })();
 const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').slice(11);
 let SRC = fs.readFileSync(path.join(RACINE, 'src', 'photoEmpreinte.js'), 'utf8').replace(/^export /gm, '');
+// (15 nov., lot meme-photo) La règle des propositions, chargée dans la même page (son import retiré).
+let SRC_MEME = fs.existsSync(path.join(RACINE, 'src', 'memePhoto.js')) ? fs.readFileSync(path.join(RACINE, 'src', 'memePhoto.js'), 'utf8').replace(/^import [^\n]*\n/gm, '').replace(/^export /gm, '') : '';
+if (MUT === 'seuil') SRC_MEME = SRC_MEME.replace('seuil = SEUIL_PHOTO } = {}) {', 'seuil = 30 } = {}) {');
 if (MUT === 'sansrecadrage') SRC = SRC.replace('const RECADRAGES = [0, 0.04, 0.08];', 'const RECADRAGES = [0, 0, 0];');
 let ko = 0;
 const dit = (ok, nom, det) => { if (!ok) ko++; console.log(`${ok ? '✅' : '❌'} ${nom}${det ? ' — ' + det : ''}`); };
@@ -34,6 +37,7 @@ const dit = (ok, nom, det) => { if (!ok) ko++; console.log(`${ok ? '✅' : '❌'
 const PAGE = `
 <!doctype html><meta charset="utf-8"><body><script>
 ${SRC}
+${SRC_MEME}
 window.__regle = { empreinteDepuisPixels, distanceEmpreintes, SEUIL_PHOTO, COTE_EMPREINTE };
 function alea(s) { return () => { s = (s * 1103515245 + 12345) % 2147483648; return s / 2147483648; }; }
 function paire(k) {
@@ -113,6 +117,8 @@ function versCanvas(img, w, h, sx = 0, sy = 0, sw = img.width, sh = img.height, 
   x.drawImage(img, sx, sy, sw, sh, 0, 0, w, h); return c;
 }
 async function jpeg(c, q) { return charge(c.toDataURL('image/jpeg', q)); }
+// (15 nov., lot meme-photo) Ce que font les sites en republiant une photo : WebP, qualité 60, moitié.
+async function webp(c, q) { return charge(c.toDataURL('image/webp', q)); }
 async function empreinte(img) {
   const n = COTE_EMPREINTE; const c = document.createElement('canvas'); c.width = n; c.height = n;
   const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(img, 0, 0, n, n);
@@ -130,8 +136,36 @@ async function variantes(c) {
     recadre3: await jpeg(crop(0.03), 0.85), recadre6: await jpeg(crop(0.06), 0.85),
     cote5: await jpeg(versCanvas(base, Math.round(W * 0.95), H, W * 0.05, 0, W * 0.95, H), 0.85),
     combo: await jpeg(versCanvas(await jpeg(crop(0.04), 0.6), W / 2, H / 2), 0.7),
+    // (15 nov., lot meme-photo) Le passage par un AUTRE site : WebP, puis redimensionnée 50 % + JPEG 60 + WebP 60,
+    // et la vignette d'une liste (un quart de la largeur, comme les miniatures Vinted / Vestiaire).
+    webp80: await webp(c, 0.8), webp60: await webp(c, 0.6),
+    cdn: await webp(versCanvas(await jpeg(versCanvas(base, W / 2, H / 2), 0.6), W / 2, H / 2), 0.6),
+    vignette: await jpeg(versCanvas(base, W / 4, H / 4), 0.75),
   };
 }
+// (15 nov., lot meme-photo) « 50 paires IDENTIQUES photographiées différemment » : le MÊME modèle,
+// 50 annonces Vinted (une photo chacune) et 50 annonces Leboncoin d'autres prises de vue ⇒ AUCUNE
+// proposition ; puis UNE annonce Leboncoin qui reprend la photo Vinted de N°217 passée par un autre
+// site (moitié + JPEG 60 + WebP 60) ⇒ cette proposition-là, et elle seule.
+window.__cinquante = async () => {
+  const p = paire(3);
+  const vinted = [], autres = [], ev = { 1: {} }, el = {};
+  const dMin = { d: 99 };
+  const hs = [];
+  for (let v = 0; v < 100; v++) {
+    const c = photo(p, vueDe(3, v));
+    const h = await empreinte(await jpeg(c, 0.9));
+    hs.push(h);
+    if (v < 50) { vinted.push({ id: String(9000 + v), compte: '1', numero: String(200 + v), titre: 'Jordan 1 Chicago 42', photo: 'v' + v }); ev[1][9000 + v] = { ['v' + v]: h }; }
+    else { autres.push({ plateforme: 'Leboncoin', id: String(5000 + v), compte: 'c', titre: 'Jordan 1 Chicago 42', photo: 'l' + v, relie: false }); el[5000 + v] = { ['l' + v]: h }; }
+  }
+  for (let i = 0; i < hs.length; i++) for (let j = i + 1; j < hs.length; j++) { const d = distanceEmpreintes(hs[i], hs[j]); if (d < dMin.d) { dMin.d = d; dMin.a = i; dMin.b = j; } }
+  const sans = propositionsMemePhoto({ vinted, autres, empreintes: { vinted: ev, Leboncoin: el } });
+  const reprise = await empreinte(await webp(versCanvas(await jpeg(versCanvas(await jpeg(photo(p, vueDe(3, 17)), 0.92), 300, 400), 0.6), 300, 400), 0.6));
+  const autres2 = autres.concat([{ plateforme: 'Leboncoin', id: '7777', compte: 'c', titre: 'Jordan 1 Chicago 42', photo: 'r', relie: false }]);
+  const avec = propositionsMemePhoto({ vinted, autres: autres2, empreintes: { vinted: ev, Leboncoin: { ...el, 7777: { r: reprise } } } });
+  return { dMin, sans: { p: sans.propositions.length, a: sans.ambigus.length, v: sans.nVerifiees }, avec: { p: avec.propositions.map((x) => [x.annonce.id, x.numero, x.distance]), a: avec.ambigus.length } };
+};
 window.__mesure = async (nPaires, nVues) => {
   const out = { meme: [], memePaire: [], autres: [], originales: [] };
   const toutes = [];
@@ -180,6 +214,15 @@ window.__mesure = async (nPaires, nVues) => {
     dit(m.memePaire.every((x) => x.d > seuil), 'S2 · deux photos différentes de la MÊME paire ⇒ loin (> seuil)', m.memePaire.filter((x) => !(x.d > seuil)).slice(0, 5).map((x) => `${x.a}~${x.b} ${x.d}`).join(', '));
     dit(m.autres.every((x) => x.d > seuil), 'S3 · deux paires différentes ⇒ loin (> seuil)', m.autres.filter((x) => !(x.d > seuil)).slice(0, 5).map((x) => `${x.a}~${x.b} ${x.d}`).join(', '));
     dit(m.uniforme === null, 'S4 · une image uniforme ⇒ null (pas su), jamais une empreinte', String(m.uniforme));
+    // (15 nov., lot meme-photo) Le passage par un autre site, et les 50 paires identiques.
+    const cdn = ['webp80', 'webp60', 'cdn', 'vignette'].map((k) => [k, parNom[k]]);
+    dit(cdn.every(([, d]) => d != null && d <= seuil), 'S5 · même photo en WebP, ou réduite 50 % + JPEG 60 + WebP 60, ou en vignette ⇒ proche (≤ seuil)', cdn.map((x) => x.join(' ')).join(', '));
+    if (process.argv.includes('--sans-cinquante')) { /* banc d'avant le lot */ } else {
+      const c = await page.evaluate(() => window.__cinquante());
+      console.log(`  50 paires identiques : distance minimale entre deux prises de vue différentes du même modèle ${c.dMin.d} (vues ${c.dMin.a}/${c.dMin.b})`);
+      dit(c.sans.p === 0 && c.sans.a === 0 && c.sans.v === 50, 'S6 · 50 paires IDENTIQUES photographiées différemment ⇒ AUCUNE proposition (ni ambiguë)', JSON.stringify(c.sans));
+      dit(c.avec.p.length === 1 && c.avec.p[0][0] === '7777' && c.avec.p[0][1] === '217' && c.avec.a === 0, 'S6 · la seule annonce qui reprend la photo de N°217 (passée par un autre site) ⇒ N°217, et elle seule', JSON.stringify(c.avec));
+    }
   } finally { await nav.close(); }
   console.log(ko ? `\n❌ ${ko} rouge(s)` : '\n✅ seuil mesuré : tout vert');
   process.exit(ko ? 1 : 0);

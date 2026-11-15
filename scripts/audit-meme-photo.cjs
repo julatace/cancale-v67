@@ -50,13 +50,13 @@ const MUTATIONS = {
   ambigu: ['src/memePhoto.js', "if (paires.length >= 2) { ambigus.push({ id, annonce: c.a, raison: 'deux-paires', paires }); continue; }", ''],
   generique: ['src/memePhoto.js', 'if (annoncesVues.size + 1 > GENERIQUE_ANNONCES || paires.size >= GENERIQUE_PAIRES) { nGeneriques++; continue; }', ''],
   relie: ['src/memePhoto.js', '    if (a.relie) continue;\n', ''],
-  refus: ['src/memePhoto.js', 'if (e.numero && refuses[cleRefusMemePhoto(c.a.plateforme, c.a.id, e.numero, cle)]) parPaire.delete(kp);', ''],
+  refus: ['src/memePhoto.js', 'if (e.numero && refuses[cleRefusMemePhoto(c.a.plateforme, c.a.id, e.numero, cle)]) parPaire.delete(kp);', 'if (false) parPaire.delete(kp);'],
   douteux: ['src/memePhoto.js', "if (douteux.has(seule.numero)) { ambigus.push({ id, annonce: c.a, raison: 'numero-double', paires }); continue; }", ''],
-  passu: ['src/memePhoto.js', '  if (!E) return vide;\n', '  const E0 = E || {};\n'],
+  passu: ['src/memePhoto.js', '  const E = objet(empreintes);\n  if (!E) return vide;\n', '  const E = objet(empreintes) || {};\n'],
   budget: ['vinted-sync-extension/background.js', 'const lu = await compterLecture(cleImpSite(pf, cible.compte), EMPREINTES_SITES_MAX_HEURE);', 'const lu = { ok: true };'],
   onglet: ['vinted-sync-extension/background.js', '    if (!(await ouvert(p.site, p.compte))) continue;\n', ''],
   cookie: ['vinted-sync-extension/background.js', "const res = await fetch(cible.url, { credentials: 'omit', cache: 'no-store' });\n    const type = String((res.headers && res.headers.get && res.headers.get('content-type')) || '');\n    const taille = Number((res.headers && res.headers.get && res.headers.get('content-length')) || 0);\n    if (!res.ok || !/^image\\//i.test(type) || taille > EMPREINTES_SITES_MAX_OCTETS)", "const res = await fetch(cible.url, { credentials: 'include', cache: 'no-store' });\n    const type = String((res.headers && res.headers.get && res.headers.get('content-type')) || '');\n    const taille = Number((res.headers && res.headers.get && res.headers.get('content-length')) || 0);\n    if (!res.ok || !/^image\\//i.test(type) || taille > EMPREINTES_SITES_MAX_OCTETS)"],
-  lecture: ['vinted-sync-extension/background.js', "if (r === null) { restent.push(...liste); noterDiag('empreintes_sites_lecture_ratee'); continue; }", 'if (r === null) { }'],
+  lecture: ['vinted-sync-extension/background.js', "const r = await sbGet(`app_data?id=eq.${ligne}&select=a:data->payload->annonces`);\n    if (r === null) { restent.push(...liste); noterDiag('empreintes_sites_lecture_ratee'); continue; }", "const r = (await sbGet(`app_data?id=eq.${ligne}&select=a:data->payload->annonces`)) || [];"],
   ecart: ['vinted-sync-extension/background.js', '  if (depuis >= 0 && depuis < EMPREINTES_ECART_MS) return 0;\n  const plan = await planEmpreintesSites();', '  const plan = await planEmpreintesSites();'],
 };
 if (MUT) {
