@@ -932,7 +932,7 @@ import "./design/studio-achats-relier.css";   // (15 nov.) Annonces → « Sans 
 // portée par `.sj-journee` seulement, EN DERNIER (docs/passation/2026-11-14-studio-journee.md).
 import { BentoJournee, placerTuiles, RangeeJ, LienJ, MontantAffiche, Plaque as PlaqueJ } from "./JourneeStudio.jsx";
 import PaireASortir from "./PaireASortir.jsx";   // (15 nov., refonte-journee) « La paire à sortir en premier »
-import { ordreDeSortie, colonneDe } from "./paireASortir.js";
+import { ordreDeSortie, colonneDe, emplacementDe } from "./paireASortir.js";
 import MarqueSite from "./plateformes/Marque.jsx";
 import "./design/studio-journee.css";
 import "./design/studio-finition.css";   // (15 nov.) La passe de finition écran par écran — `@layer vrm-finition`, la PREMIÈRE couche (index.html) : docs/passation/2026-11-15-finition-ecrans.md
@@ -48434,6 +48434,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           }, 'stock.sortir');
         };
         const imprimerJ = () => { _pendingBordPrint = true; if (onNav) onNav('cat_bord'); };
+        const sortirElt = sortirJ ? <PaireASortir liste={sortirJ.aSortir} nSorties={sortirJ.sorties.length} slots={sortirJ.slots} Photo={PhotoVinted} Icon={Icon} mots={motsVendeur()}
+          apres={apresSortie} onSortir={sortirPaireJ} onImprimer={imprimerJ} onRanger={(v) => { if (v && v.num && onStore) onStore(String(v.num)); else if (onNav) onNav('garage'); }}
+          onCompris={() => setApresSortie(null)} ordi={ordiJournee}
+          toutesImprimer={{ n: Math.max(1, sortirJ.sorties.length), nums: sortirJ.sorties.map((x) => x.num).filter(Boolean), imprimer: imprimerJ }}/> : null;
+        // (15 nov., refonte-journee — la maquette ORDINATEUR) Le chiffre du jour et sa semaine, construits une fois : dans la
+        // tête au téléphone, en tête de la 1re colonne à l'ordinateur (les mêmes données, la même règle de « Vendu »).
+        const friseJ = !premierJour ? (
+          <FriseJournee liveStats={liveStats} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte}
+            onVentes={() => onNav && onNav('cat_ventes')} onSemaine={onNav ? () => onNav('semaine') : null}
+            photosEntre={(de, a) => ordreRecent((sales.items || [])
+              .filter((o) => o && !isHidden(o) && !acctOffOf(o) && classifyOrderStatus(o.status) !== 'cancelled')
+              .map((o) => ({ o, t: tsCommande(o) })).filter((x) => x.t >= de && x.t < a)
+              .map((x) => x.o).filter(Boolean), quandCommandeVinted).map((o) => orderPhoto(o)).filter(Boolean)}/>) : null;
         return (
           <div className="vrm-day-layout vrm-fu-ecran vrm-fu-journee sj-journee" data-espace="journee" data-sj-ordi={ordiJournee ? '1' : '0'} data-sortir-present={sortirJ && (sortirJ.aSortir.length || apresSortie) ? '1' : undefined}>
             <ScreenHead icon="soleilLevant" title={tr('reglages.ma-journee.lib')}/>
@@ -48451,16 +48464,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   return pj ? <p className="vrm-phrase-ecran vrm-fu-phrase-tete" data-phrase-jour={pj} data-phrase-jour-env={T[0].pasSu ? '' : String(T[0].t ? T[0].t.n : 0)} data-phrase-jour-ret={T[1].pasSu ? '' : String(T[1].t ? T[1].t.n : 0)}><span className="vrm-sr-seul">{pj}</span>{AIDE_ECRANS.journee ? <AideEcran cle="journee"/> : null}</p>
                     : <PhraseEcran cle="journee" className="vrm-fu-phrase-tete"/>; })()}
                 </>),
-                frise: (<>
-                {!premierJour && (
-                  <FriseJournee liveStats={liveStats} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte}
-                    onVentes={() => onNav && onNav('cat_ventes')} onSemaine={onNav ? () => onNav('semaine') : null}
-                    photosEntre={(de, a) => ordreRecent((sales.items || [])
-                      .filter((o) => o && !isHidden(o) && !acctOffOf(o) && classifyOrderStatus(o.status) !== 'cancelled')
-                      .map((o) => ({ o, t: tsCommande(o) })).filter((x) => x.t >= de && x.t < a)
-                      .map((x) => x.o).filter(Boolean), quandCommandeVinted).map((o) => orderPhoto(o)).filter(Boolean)}/>
-                )}
-                </>),
+                frise: <>{friseJ}</>,
               };
               return (
               <section className="vrm-day-greeting vrm-w-tete vrm-fu-tete sj-tete" data-fu-carte="" aria-label={tr('journee.journee2')}>
@@ -48474,13 +48478,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   onVoir={() => { if (onNav) onNav('achats'); }}/>
                 {/* (15 nov., refonte-journee — maquette validée) « LA PAIRE À SORTIR EN PREMIER » : quand une vente tombe, OÙ est
                     l'article (son meuble, sa case allumée), puis « Je l'ai sortie » — avant le chiffre du jour. */}
-                {sortirJ ? <PaireASortir liste={sortirJ.aSortir} nSorties={sortirJ.sorties.length} slots={sortirJ.slots} Photo={PhotoVinted} Icon={Icon} mots={motsVendeur()}
-                  apres={apresSortie} onSortir={sortirPaireJ} onImprimer={imprimerJ} onRanger={(v) => { if (v && v.num && onStore) onStore(String(v.num)); else if (onNav) onNav('garage'); }}
-                  onCompris={() => setApresSortie(null)}
-                  toutesImprimer={{ n: Math.max(1, sortirJ.sorties.length), nums: sortirJ.sorties.map((x) => x.num).filter(Boolean), imprimer: imprimerJ }}/> : null}
+                {ordiJournee ? null : sortirElt}
                 {/* SON ordre (« Modifier ma journée ») entre la phrase et l'affiche ; « Les chiffres du mois » sont une
                     tuile de la grille, « la prochaine chose » la première carte de « À faire » (`data-prochain`). */}
-                {ordreJourneeHeure('tete', persoJ).filter((id) => id === 'phrase' || id === 'frise').map((id) => id === 'phrase'
+                {ordreJourneeHeure('tete', persoJ).filter((id) => id === 'phrase' || (id === 'frise' && !(ordiJournee && !baseKO && !premierJour))).map((id) => id === 'phrase'
                   ? (vuT('phrase') ? <div key={id} className="sj-phrase">{blocsTete.phrase}</div> : null)
                   : (vuT('frise') ? <div key={id} className="sj-affiche" data-sj-affiche="">{blocsTete.frise}</div> : <div key={id} hidden data-jp-cachee="frise">{blocsTete.frise}</div>))}
               </section>
@@ -48552,6 +48553,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {n > 0 ? <PileVignettes className="sj-pile" srcs={photosCase.envoyer} n={n} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="truck" size={20}/>}/> : null}
                     {/* (15 nov., refonte-journee) Les plaques N° des premiers colis (par identité) et la date du plus pressé. */}
                     {n > 0 && plaquesE.length ? <span className="sj-v-plaques" data-sj-plaques={String(plaquesE.length)}>{plaquesE.map((c) => <PlaqueJ key={c.cle} num={c.num}/>)}</span> : null}
+                    {/* (15 nov., la maquette ORDINATEUR) Les colis en rangées : photo, plaque N°, site et compte, la date et la
+                        place dans le Stock (par identité du N°), le prix. Montrées à l'ordinateur seulement (CSS). */}
+                    {ordiJournee && n > 0 ? <span className="sj-v-lignes" data-sj-lignes={String(Math.min(4, colis.length))}>{colis.slice(0, 4).map((c) => {
+                      const lieu = sortirJ && c.num ? emplacementDe(c.num, { slots: sortirJ.slots, meubles: sortirJ.meubles, cle: cleNum }).lieu : null;
+                      return <span key={c.cle} className="sj-v-ligne">
+                        <span className="sj-v-ligne-ph">{c.photo ? <PhotoVinted src={c.photo} alt="" loading="lazy" decoding="async" width={44} height={44}/> : <Icon name="box" size={18}/>}</span>
+                        <span className="sj-v-ligne-mid"><span className="sj-v-ligne-l1">{c.num ? <PlaqueJ num={c.num}/> : null}{c.site ? <MarqueSite site={c.site} taille={12}/> : null}{c.compte ? <span className="sj-v-cpt">{c.compte}</span> : null}</span>
+                          <span className={'sj-v-ligne-l2' + (c.e && c.e.ambre ? ' sj-v-am' : '')}>{[c.e ? c.e.txt : '', lieu ? `${lieu.nom || ''} r${lieu.rangee} c${lieu.colonne}`.trim() : ''].filter(Boolean).join(' · ')}</span></span>
+                        <b className="sj-v-ligne-prix">{c.prix || ''}</b>
+                      </span>; })}</span> : null}
                     {n > 0 && premier ? <span className="sj-v-premier" data-sj-premier="">{premier.e.date ? <>{tr('sj.v.premierAvant', { d: '' }).replace(/\s*$/, ' ')}<b className="sj-v-am">{premier.e.txt}</b></> : <>{tr('sj.v.premierQuand', { q: '' }).replace(/\s*$/, ' ')}<b className="sj-v-am">{premier.e.txt}</b></>}</span> : null}
                     <span className="sj-sous">
                       {xE.pasSu ? pasSuTexte(xE) : <span className="sj-sous-l">{n === 0 ? tr('sj.rienAEnvoyer') : em ? tr(em.exact === false ? 'sj.pretsAuMoins' : 'sj.prets', { n: em.n }) : tr('sj.colis', { n })}</span>}
@@ -48706,7 +48717,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               if (visT('chiffres').montree) out.mois = { id: 'mois', lib: (() => { const m = new Date().toLocaleDateString(localeCourante(), { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1); })(), interactif: true, aria: tr('sj.l.mois'), face: chiffresMois, tasse: null };
               const tuilesPlacees = placerTuiles(out);
               return (<>
-                <BentoJournee tuiles={tuilesPlacees} ordi={ordiJournee} FermeAuRetour={FermeAuRetour}/>
+                <BentoJournee tuiles={tuilesPlacees} ordi={ordiJournee} FermeAuRetour={FermeAuRetour}
+                  colonnes={ordiJournee ? [
+                    { cle: 'c1', avant: <>{visibiliteCarte('frise', { reglage: persoJ, mode: PROFIL_VENDEUR.mode }).montree ? <div className="sj-affiche" data-sj-affiche="">{friseJ}</div> : <div hidden data-jp-cachee="frise">{friseJ}</div>}{sortirElt}</>, ids: ['mois'] },
+                    { cle: 'c2', ids: ['envoyer', 'prix', 'offres', 'prix-achat'] },
+                    { cle: 'c3', ids: ['retirer', 'messages'], apres: AF.section },
+                  ] : null}/>
                 {!out.mois ? <div hidden data-jp-cachee="chiffres">{chiffresMois}</div> : null}
               </>);
             })() : null}
@@ -48720,7 +48736,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 une mise en ligne seulement), toujours à sa place. Les notifications coupées vivent « En bas ». */}
             {!baseKO && !premierJour && <QuoiDeNeufJournee onNav={onNav}/>}
 
-            {AF.section}
+            {ordiJournee && !baseKO && !premierJour ? null : AF.section}
 
             {/* (11 nov.) « Rappels du jour » : ceux qu'il a posés lui-même (« Me le rappeler »), sous « À faire ». */}
             <RappelsJourCoque/>

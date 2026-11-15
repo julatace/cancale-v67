@@ -14,7 +14,7 @@ require('./_porte-banc.cjs');
 //        inconnu après ceux de sa date ;
 //     R4 « sortie » se prouve par SA déclaration (`N°` nu, ou `N°@id` de CETTE annonce seulement) ;
 //     R5 après une sortie, à date égale on reste dans le meuble où l'on est (il est devant).
-//  A  L'APP RENDUE (base inventée, 390 tactile et 1512, clair et sombre) :
+//  A  L'APP RENDUE (base inventée, 390 tactile, 1512 et 1280 — les maquettes ordinateur —, clair et sombre) :
 //     A1 la section est là, AVANT le chiffre du jour, dans le premier écran du téléphone ;
 //     A2 la première carte = la vente la plus pressée, SA case (meuble, rangée, case ; la case allumée du plan) ;
 //     A3 l'ordre de la suite (date, puis le même meuble), chaque rangée avec SA case ; la vente au même titre
@@ -35,7 +35,7 @@ const path = require('path'), fs = require('fs');
 const P = require('./design-passe.cjs');
 const RACINE = path.join(__dirname, '..', '..');
 const liste = (v, d) => String(process.env[v] || d).split(',').map((x) => x.trim()).filter(Boolean);
-const LARGEURS = liste('LARGEURS', '390,1512').map(Number);
+const LARGEURS = liste('LARGEURS', '390,1512,1280').map(Number);
 const THEMES = liste('THEMES', 'clair,sombre');
 const SHOTS = process.env.SHOTS || P.SHOTS;
 fs.mkdirSync(SHOTS, { recursive: true });
@@ -145,6 +145,7 @@ const mesurer = (pg) => pg.evaluate(() => {
 async function scenario(nav, { W, th, sortir }) {
   const sombre = th === 'sombre', T = `[${W} ${th}]`;
   const o = await P.ouvrir(nav, { W, sombre, b: base(), url: '/?tab=journee', dsf: W < 600 ? 2 : 1 });
+  if (W >= 600 && W !== 1512) await o.pg.setViewportSize({ width: W, height: W <= 1280 ? 800 : 900 });   // la maquette 1280 × 800
   await P.pret(o.pg);
   await o.pg.waitForSelector('[data-sortir] [data-sortir-premier]', { timeout: 30000 }).catch(() => {});
   await o.pg.waitForTimeout(1500);
@@ -219,7 +220,7 @@ async function inconnue(nav, { W, th }) {
   const nav = await P.chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] });
   try {
     for (const W of LARGEURS) for (const th of THEMES) {
-      const sortir = (W < 600 && th === 'clair') || (W >= 600 && th === 'sombre');
+      const sortir = (W < 600 && th === 'clair') || (W >= 600 && th === 'sombre') || (W === 1280 && th === 'clair');
       try { await scenario(nav, { W, th, sortir }); } catch (e) { dit(false, `[${W} ${th}] le scénario a pu s'exécuter`, String(e && e.stack || e).slice(0, 300)); }
     }
     try { await inconnue(nav, { W: LARGEURS[0], th: THEMES[0] }); } catch (e) { dit(false, 'le scénario « sans emplacement » a pu s\'exécuter', String(e && e.stack || e).slice(0, 300)); }

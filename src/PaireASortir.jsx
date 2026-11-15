@@ -112,7 +112,7 @@ function Carte({ v, total, rang, slots, Photo, Icon, mots, onSortir, onImprimer,
 // liste : l'ordre de sortie (`ordreDeSortie(...).aSortir`) ; nSorties : celles déjà sorties par son geste.
 // apres : { num, lieu, colAvant, colApres, cible, descendus, phrase } posé par Ma journée juste après
 // « Je l'ai sortie » ; onCompris l'efface (dit une fois).
-export default function PaireASortir({ liste, nSorties = 0, slots, Photo, Icon, mots, apres = null, onSortir, onImprimer, onRanger, onCompris, toutesImprimer = null }) {
+export default function PaireASortir({ liste, nSorties = 0, slots, Photo, Icon, mots, apres = null, onSortir, onImprimer, onRanger, onCompris, toutesImprimer = null, ordi = false }) {
   const l = Array.isArray(liste) ? liste : [];
   const total = l.length + nSorties;
   if (!l.length && !apres) return null;
@@ -120,7 +120,7 @@ export default function PaireASortir({ liste, nSorties = 0, slots, Photo, Icon, 
   const suite = l.slice(1, 4);
   const uneSeule = total === 1;
   return (
-    <section className="vrm-so" data-sortir="" data-sortir-n={String(l.length)} data-sortir-sorties={String(nSorties)} aria-label={tr('sortir.aria')}>
+    <section className="vrm-so" data-sortir-ordi={ordi ? '1' : undefined} data-sortir="" data-sortir-n={String(l.length)} data-sortir-sorties={String(nSorties)} aria-label={tr('sortir.aria')}>
       {apres ? (
         <>
           <div className="vrm-so-sec"><b data-sortir-compte="">{tr('sortir.surSorties', { k: nSorties, n: total })}</b>
@@ -155,7 +155,9 @@ export default function PaireASortir({ liste, nSorties = 0, slots, Photo, Icon, 
         <Carte v={premier} total={total} rang={nSorties + 1} slots={slots} Photo={Photo} Icon={Icon} mots={mots} onSortir={onSortir} onImprimer={onImprimer} onRanger={onRanger}/>
       ) : null}
       {suite.length && !apres ? (
-        <div className="vrm-so-suite" role="list" data-sortir-suite={String(l.length - 1)}>
+        <div className="vrm-so-suite" data-sortir-suite={String(l.length - 1)}>
+          {ordi ? <span className="vrm-so-ds vrm-so-ensuite">{tr('sj.v.ensuite')}</span> : null}
+          <div role="list" className="vrm-so-suite-l">
           {suite.map((x, k) => (
             <div key={x.cle} role="listitem" className="vrm-so-ss" data-sortir-rang={String(k + 2)} data-sortir-num={x.num || ''} data-sortir-lieu={x.lieu ? `${x.lieu.meubleId}:${x.lieu.i}` : ''}>
               <span className="vrm-so-ss-n">{k + 2 + nSorties}</span>
@@ -168,6 +170,7 @@ export default function PaireASortir({ liste, nSorties = 0, slots, Photo, Icon, 
             </div>
           ))}
           {l.length > 4 ? <div className="vrm-so-ss vrm-so-ss-plus" role="listitem">{tr('sortir.autres', { n: l.length - 4 })}</div> : null}
+          </div>
         </div>
       ) : null}
     </section>
