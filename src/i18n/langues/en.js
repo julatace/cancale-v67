@@ -44,9 +44,11 @@ import ecran_republier_guide from './en/republierGuide.js';   // (15 nov.) repub
 import ecran_memePhoto from './en/memePhoto.js';   // (15 nov., lot meme-photo)
 import ecran_deuxComptes from './en/deuxComptes.js';   // (15 nov., lot deux-comptes)
 import ecran_favorisSites from './en/favorisSites.js';   // (15 nov., lot favoris-sites)
+import ecran_etageres from './en/etageres.js';   // (15 nov.) le Stock en étagères
 export default {
   ...ecran_studio_paires,
   ...ecran_republier_guide,
+  ...ecran_etageres,
   ...ecran_accueilReste,
   ...ecran_refonte_ms,
   ...ecran_studio_journee,

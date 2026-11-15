@@ -114,9 +114,9 @@ export function chercherParMots(q, fiches, { vendues = [], decisions = {}, max =
 //   carte { id, numero, titre } (le verdict 'possible') ; montant > 0 ; date ; paiement ∈ PAIEMENTS
 // La décision garde AUSSI ce qu'il faut pour la défaire plus tard, exactement :
 // `prec` (la décision d'avant de cette annonce, s'il y en avait une) et `caseAvant` (sa case).
-export function opsVenteMain({ carte, montant, date, paiement, decisions = {}, vendues = [], slots = {}, cle = cleNumDefaut, maintenant = Date.now() } = {}) {
+export function opsVenteMain({ carte, montant, date, paiement, decisions = {}, vendues = [], slots = {}, sortieCase = null, cle = cleNumDefaut, maintenant = Date.now() } = {}) {
   if (!carte || !PAIEMENTS.includes(paiement)) return null;
-  const r = opsVenduAilleurs({ carte: { id: carte.id, numero: carte.numero, title: carte.titre || '' }, montant, date, paiement, decisions, vendues, slots, cle, maintenant });
+  const r = opsVenduAilleurs({ carte: { id: carte.id, numero: carte.numero, title: carte.titre || '' }, montant, date, paiement, decisions, vendues, slots, sortieCase, cle, maintenant });
   if (!r) return null;
   const D = decisions || {}, S = slots || {}, kn = cle(carte.numero);
   const ops = r.ops.map((o) => (o.k === CLE_DECISIONS ? { ...o, apres: { ...o.apres, ...(D[o.id] ? { prec: D[o.id] } : {}), ...(kn && S[kn] ? { caseAvant: S[kn] } : {}) } } : o));
