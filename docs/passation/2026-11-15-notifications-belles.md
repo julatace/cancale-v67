@@ -94,13 +94,18 @@ seule façon de le changer : le nom donné à l'app à l'ajout sur l'écran d'ac
 | `scripts/tests/langue-compte.test.mjs` | 3/3 |
 | audits remis à la règle (textes plus courts, sans pseudo, insécable avant « € ») | `audit-cibles-notif`, `audit-notifs-belles` R3, `audit-notifs-groupees` G8, `audit-compte-pas-relu` A17-A19/B3, `audit-saisie-rapide` P3/P3b/S1/K1, `audit-suivi-colis`, `audit-rappels-paire`, `audit-colis-heure`, banc `rappel-soir` (39/39, ses rouges « 503 » d'avant ont disparu) |
 | verts | `notifs-redaction`, `notifs-belles` 41, `notifs-groupees` 41, `notifs-centre` 28, `reveil-calme` 13, `cibles-notif`, `vente-verification`, `flux-divers`, `traduction` 45, `csp`, `identite`, `fonctions-api` (12/12), `saisie-rapide`, `compte-pas-relu` 51, `rappel-urssaf`, `alerte-moderation` 65, `retours-litiges`, `statut-transporteurs`, `transp-notif`, `suivi-colis`, `colis-heure` 32, `rappels-paire` 14, `avis-negatif` 70, `double-vente`, `double-vente-ailleurs`, `suites-serveur`, `quoi-de-neuf`, `rappels-perso` 43, `abonnement` 103, `familles-serveur` 34, `horaires-mondialrelay`, `lbc-plus` 56, `mondialrelay-serveur`, `nom-paire-retrait`, `push`, `suivi-cles`, `suivi-vinted` 133, `veille-plantages` 33, `lbc-suppression`, `sans-bruit` 44, `vapid`, `transp-ext` 129, `retrait-fiable`, `retraits-fiables` 95 ; bancs `notifs-apercus` 30/30 (capture regardée), `rappel-soir` 39/39 |
-| `npm run build` | vert |
+| bancs des envois | `notif-messages` 38/38 (remis à la règle : nom court, « Nouveau message », sans pseudo), `offres-mini-push` 11, `retrait-conv-push` 15, `colis-relais-push` 14, `double-vente-push` 34 |
+| `npm run build` | vert (après fusion de `origin/main` 7bcbdceb) |
 
 ## 6. Rouges qui ne sont pas de ce chantier
 
 Identiques sur `origin/main` avant ce chantier : `audit-notifications` B3 (le corps de l'arrivée de
 l'exemple n'a pas de date sur main non plus), `audit-signalement` (écran « parrainage » pas dans la
 liste), `audit-vocabulaire-article` (2), `audit-lus-deux-appareils` (ne finit pas dans ce conteneur).
+Bancs de l'app, mesurés aussi sur `origin/main` construit à part : `notifs-destination` (9 rouges sur
+main, 11-12 ici, les mêmes écrans : vente ouverte, URSSAF, double vente eBay, et des « ni écran blanc
+ni garde-fou » qui changent d'un passage à l'autre dans ce conteneur chargé), `compte-relie` (cibles
+de 44 px à 1512 px : 3 ici, 4 sur main ; sa partie serveur, la vraie route, est verte).
 
 ## 7. Gestes de Julien
 
