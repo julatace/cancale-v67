@@ -1,8 +1,8 @@
 // (6 nov.) LE MODE EXEMPLE s'installe EN PREMIER, avant tout module de l'app : s'il
 // est demandé par cet onglet, le stockage et la base deviennent des copies en
 // mémoire (src/modeExemple.js) — rien de l'exemple n'est écrit nulle part.
-import { garderCodePartenaire } from './partenaires/lien.js';
 import { exempleActif } from './modeExemple.js';
+import { garderCodePartenaire } from './partenaires/lien.js';
 // (8 nov.) Les 30 dernières requêtes de la page (famille, code, durée — jamais une
 // adresse ni un contenu), pour « Signaler un problème » (src/lecturesRecentes.js).
 import { installerJournalLectures } from './lecturesRecentes.js';
