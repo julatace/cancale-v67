@@ -76,28 +76,45 @@
   const ombre = hote.attachShadow({ mode: 'closed' });
   ombre.innerHTML = `
 <style>
-  /* 5.328 — les jetons de l’app (--d-*, DESIGN.md) : style Apple, police
-     système, UN accent bleu rare (#0071E3 / #0A84FF), ambre = un geste, jamais
-     violet ; verre clair et sombre qui suivent le système ; rayons 12 / 14. */
+  /* 5.379 — « Studio bleu clair » (src/design/studio.css, Julien 14 nov.) : un fond bleu
+     clair OPAQUE (nuit : bleu-nuit), lumière du haut ; porcelaine (touches, plans), encre,
+     UNE diode bleue rare ; ambre = un geste, jamais violet. Les mêmes noms de jetons
+     qu'avant (5.328) : toute la carte suit. Avant : un verre blanc à 88 % posé sur la page
+     sombre de Vinted, qui la rendait GRISE (capture de Julien, 15 nov.). */
   :host { all: initial;
-    --fond: #000000; --carte: #1C1C1E; --bord: rgba(84,84,88,.6); --filet: rgba(84,84,88,.45); --texte: #F5F5F7; --doux: #98989D; --pale: #8E8E93;
-    --accent: #0A84FF; --ambre: #FF9F0A; --survol: rgba(118,118,128,.24); --remplir: rgba(118,118,128,.24); --verre: rgba(28,28,30,.92);
-    --champ: rgba(118,118,128,.24); --anneau: rgba(10,132,255,.35);
-    --ombre: 0 0 0 .5px rgba(255,255,255,.08), 0 24px 56px rgba(0,0,0,.6); }
+    --fond: #060E19; --carte: #122135; --bord: rgba(255,255,255,.10); --filet: rgba(255,255,255,.08); --texte: #EAF2FB; --doux: #9CB0C6; --pale: #7F93AA;
+    --accent: #6CB4FF; --ambre: #F2B65E; --survol: rgba(255,255,255,.06); --remplir: rgb(20 35 54 / .9); --verre: #122135;
+    --champ: rgb(0 0 0 / .22); --anneau: rgba(74,163,255,.35);
+    --ombre: inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .5), 0 34px 60px -22px rgb(0 0 0 / .95);
+    --fond-carte: linear-gradient(180deg, #15263D 0%, #0C1829 100%);
+    --plan: rgb(20 35 54 / .9); --plan-ombre: inset 0 .5px 0 rgb(255 255 255 / .09), 0 0 0 .5px rgb(0 0 0 / .5), 0 12px 26px -12px rgb(0 0 0 / .8);
+    --touche-fond: linear-gradient(180deg, #1D3049, #172840); --touche-ombre: inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .55), 0 4px 10px -5px rgb(0 0 0 / .8);
+    --enfonce: inset 0 1px 3px rgb(0 0 0 / .7), inset 0 0 0 .5px rgb(0 0 0 / .5);
+    --plein-fond: radial-gradient(120% 90% at 50% 0%, #FFFFFF 0%, #EAF2FB 60%); --plein-encre: #0C1D30; --plein-ombre: inset 0 .5px 0 #FFFFFF, 0 1px 2px rgb(0 0 0 / .5), 0 12px 24px -10px rgb(0 0 0 / .9); }
   /* 5.351 : la teinte CHOISIE dans VRM (Réglages → Apparence, recopiée par le pont
      de vrm.center : data-theme sur l'hôte) passe avant celle du système ; sans
      choix connu, le système décide, comme avant. */
   @media (prefers-color-scheme: light) {
-    :host(:not([data-theme="sombre"])) { --carte: #FFFFFF; --bord: rgba(60,60,67,.18); --filet: rgba(60,60,67,.14); --texte: #1D1D1F; --doux: #6E6E73; --pale: #8E8E93;
-      --accent: #0071E3; --ambre: #B25000; --survol: rgba(118,118,128,.12); --remplir: rgba(118,118,128,.12); --verre: rgba(255,255,255,.88);
-      --champ: #FFFFFF; --anneau: rgba(0,113,227,.25);
-      --ombre: 0 6px 16px rgba(0,0,0,.08), 0 24px 56px rgba(0,0,0,.14); }
+    :host(:not([data-theme="sombre"])) { --carte: #FFFFFF; --bord: rgba(18,52,96,.12); --filet: rgba(18,52,96,.10); --texte: #0C1D30; --doux: #3F5468; --pale: #6B7F94;
+      --accent: #0055B8; --ambre: #764300; --survol: rgba(18,52,96,.05); --remplir: rgb(255 255 255 / .82); --verre: #E6F1FA;
+      --champ: #FFFFFF; --anneau: rgba(0,96,204,.25);
+      --ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(18 52 96 / .10), 0 2px 5px rgb(18 52 96 / .08), 0 34px 60px -26px rgb(18 52 96 / .48);
+      --fond-carte: linear-gradient(180deg, #EEF6FD 0%, #D6E8F5 100%);
+      --plan: rgb(255 255 255 / .82); --plan-ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(18 52 96 / .07), 0 1px 2px rgb(18 52 96 / .07), 0 12px 26px -14px rgb(18 52 96 / .30);
+      --touche-fond: linear-gradient(180deg, #FFFFFF, #F3F7FB); --touche-ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(18 52 96 / .14), 0 1px 1.5px rgb(18 52 96 / .08), 0 4px 9px -5px rgb(18 52 96 / .26);
+      --enfonce: inset 0 1px 2px rgb(18 52 96 / .20), inset 0 0 0 .5px rgb(18 52 96 / .12);
+      --plein-fond: radial-gradient(120% 90% at 50% 0%, #4A5A6E 0%, #0C1D30 55%); --plein-encre: #FFFFFF; --plein-ombre: inset 0 .5px 0 rgb(255 255 255 / .25), 0 1px 2px rgb(18 52 96 / .25), 0 12px 22px -10px rgb(18 52 96 / .6); }
   }
-  :host([data-theme="clair"]) { --carte: #FFFFFF; --bord: rgba(60,60,67,.18); --filet: rgba(60,60,67,.14); --texte: #1D1D1F; --doux: #6E6E73; --pale: #8E8E93;
-      --accent: #0071E3; --ambre: #B25000; --survol: rgba(118,118,128,.12); --remplir: rgba(118,118,128,.12); --verre: rgba(255,255,255,.88);
-      --champ: #FFFFFF; --anneau: rgba(0,113,227,.25);
-      --ombre: 0 6px 16px rgba(0,0,0,.08), 0 24px 56px rgba(0,0,0,.14); }
-  * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  :host([data-theme="clair"]) { --carte: #FFFFFF; --bord: rgba(18,52,96,.12); --filet: rgba(18,52,96,.10); --texte: #0C1D30; --doux: #3F5468; --pale: #6B7F94;
+      --accent: #0055B8; --ambre: #764300; --survol: rgba(18,52,96,.05); --remplir: rgb(255 255 255 / .82); --verre: #E6F1FA;
+      --champ: #FFFFFF; --anneau: rgba(0,96,204,.25);
+      --ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(18 52 96 / .10), 0 2px 5px rgb(18 52 96 / .08), 0 34px 60px -26px rgb(18 52 96 / .48);
+      --fond-carte: linear-gradient(180deg, #EEF6FD 0%, #D6E8F5 100%);
+      --plan: rgb(255 255 255 / .82); --plan-ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(18 52 96 / .07), 0 1px 2px rgb(18 52 96 / .07), 0 12px 26px -14px rgb(18 52 96 / .30);
+      --touche-fond: linear-gradient(180deg, #FFFFFF, #F3F7FB); --touche-ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(18 52 96 / .14), 0 1px 1.5px rgb(18 52 96 / .08), 0 4px 9px -5px rgb(18 52 96 / .26);
+      --enfonce: inset 0 1px 2px rgb(18 52 96 / .20), inset 0 0 0 .5px rgb(18 52 96 / .12);
+      --plein-fond: radial-gradient(120% 90% at 50% 0%, #4A5A6E 0%, #0C1D30 55%); --plein-encre: #FFFFFF; --plein-ombre: inset 0 .5px 0 rgb(255 255 255 / .25), 0 1px 2px rgb(18 52 96 / .25), 0 12px 22px -10px rgb(18 52 96 / .6); }
+  * { box-sizing: border-box; font-family: "Inter VRM", Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
   .btn { position: relative; width: 44px; height: 44px; padding: 0; border: .5px solid rgba(255,255,255,.14); border-radius: 12px;
     background: #000; cursor: pointer; display: block;
     box-shadow: 0 6px 16px rgba(0,0,0,.18), 0 16px 36px rgba(0,0,0,.22); transition: transform .15s cubic-bezier(.23,1,.32,1), box-shadow .15s cubic-bezier(.23,1,.32,1); }
@@ -356,6 +373,73 @@
   .capte-x:hover { background: var(--survol); color: var(--texte); }
   @media (prefers-reduced-motion: reduce) { .capte.on { animation: none; } }
   @media (prefers-reduced-transparency: reduce) { .capte { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--carte); } }
+  /* ══ 5.379 — L'HABILLAGE « STUDIO BLEU CLAIR » (capture de Julien, 15 nov.) ══════════
+     Quatre formes de bouton, aucune autre : le PLEIN (rond d'encre, un seul à l'écran :
+     « Envoyer le message »), la TOUCHE (porcelaine en relief ; l'active ENFONCÉE + diode),
+     le ROND (×), le LIEN (texte bleu). Une rangée se touche entière. Titres sur deux lignes. */
+  .carte, .question { background: var(--fond-carte); border: 0; border-radius: 22px; padding: 14px 16px 12px;
+    -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: var(--ombre); font-size: 13.5px; }
+  .carte:has(.q4), .carte:has(.listes) { width: min(380px, calc(100vw - 32px)); }
+  .tete b { font-size: 18px; font-weight: 700; letter-spacing: -.02em; }
+  .ver { font-variant-numeric: tabular-nums; }
+  .ligne { border-top-color: var(--filet); }
+  .lib { font-size: 11.5px; letter-spacing: .01em; }
+  /* Le PLEIN : un rond d'encre (le seul de la carte quand il est là). */
+  .b { min-height: 48px; border: 0; border-radius: 999px; background: var(--plein-fond); color: var(--plein-encre); box-shadow: var(--plein-ombre);
+    font-size: 15px; font-weight: 600; letter-spacing: -.005em; }
+  .b:active:not(:disabled) { transform: translateY(1px) scale(.99); }
+  .b:disabled { opacity: .45; box-shadow: none; }
+  /* La TOUCHE : porcelaine en relief (« Réessayer », « Réparer », « Tout récupérer »…). */
+  .b.sec, .touche { background: var(--touche-fond); color: var(--texte); box-shadow: var(--touche-ombre); border: 0; border-radius: 13px; min-height: 44px; }
+  .b.sec { font-size: 14px; font-weight: 600; }
+  .b.sec:hover { background: var(--touche-fond); filter: brightness(1.02); }
+  .b.sec:active:not(:disabled), .touche:active { transform: translateY(1px); box-shadow: var(--enfonce); }
+  .touche[data-actif] { background: var(--creux); box-shadow: var(--enfonce); }
+  /* Un lien de VRM (« Écris d'abord ton message dans VRM ») : une rangée de plan, le texte en bleu. */
+  .liens, .rangs, .ap-liste { background: var(--plan); box-shadow: var(--plan-ombre); border-radius: 16px; }
+  .lien-site { min-height: 48px; padding: 0 14px; font-size: 15px; font-weight: 500; }
+  .lien-site.lien-vrm { color: var(--accent); font-weight: 600; border-radius: 16px; background: var(--plan); box-shadow: var(--plan-ombre); margin-top: 8px; }
+  .lien-site.lien-vrm i { border-color: currentColor; }
+  .ecrire { margin-top: 10px; }
+  /* Les listes : rangées sur un plan, photo + titre sur DEUX lignes + méta + prix. */
+  .lu { font-size: 12px; margin: 8px 2px 6px; letter-spacing: .005em; }
+  .rangs { max-height: min(360px, calc(100vh - 380px)); min-height: 120px; padding: 0 2px; }
+  .rangs > li + li { border-top: 1px solid var(--filet); }
+  .rang { grid-template-columns: 44px minmax(0, 1fr) auto; gap: 12px; min-height: 64px; padding: 10px 12px; contain-intrinsic-size: 64px; }
+  .rangs.avec-n .rang { grid-template-columns: 46px 44px minmax(0, 1fr) auto; }
+  .sans-n { display: block; width: 46px; }
+  .vig { width: 44px; height: 44px; border-radius: 11px; }
+  .ti { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; line-height: 1.3; font-size: 14px; font-weight: 600; letter-spacing: -.006em; }
+  .me { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.35; }
+  .rang .px { font-size: 14px; }
+  a.rang:hover { background: var(--survol); }
+  .seg { gap: 8px; }
+  .touche { font-size: 14.5px; }
+  /* Sécurité du compte : une ligne d'état, « Tout arrêter » en TOUCHE à droite (sous les listes). */
+  .ligne.secu { display: flex; align-items: center; gap: 12px; margin-top: 10px; padding-top: 10px; }
+  .secu-t { flex: 1; min-width: 0; }
+  .secu-b { flex-shrink: 0; padding: 0 14px; font-weight: 600; }
+  /* Favoris à cocher : case · photo · titre (2 lignes) / qui · quand · prix. */
+  .ap-liste { margin: 0 0 6px; max-height: min(360px, calc(100vh - 420px)); min-height: 120px; }
+  .ap-liste li.coche-l { grid-template-columns: 22px 44px minmax(0, 1fr) auto; gap: 2px 12px; min-height: 64px; padding: 10px 12px; }
+  .ap-liste li.coche-l .quoi { grid-column: 3; grid-row: 1; color: var(--texte); font-weight: 600; font-size: 14px; white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; line-height: 1.3; }
+  .ap-liste li.coche-l .qui { grid-column: 3; grid-row: 2; color: var(--doux); font-weight: 400; font-size: 12px; white-space: normal; }
+  .ap-liste li.coche-l .vig { width: 44px; height: 44px; }
+  .ap-liste .quand { color: var(--doux); white-space: nowrap; }
+  .sg { white-space: nowrap; }
+  span.vig { background: var(--creux); box-shadow: inset 0 0 0 .5px rgb(var(--o) / .08); }
+  .ap-tout { margin: 0 2px 4px; }
+  .ap-tout .ap-lbl { margin: 0; }
+  .ap-tout .lu { margin: 0; }
+  .bulle { background: var(--plan); box-shadow: var(--plan-ombre); }
+  .fav { border-top: 0; padding-top: 0; }
+  .fav .b { margin-top: 12px; }
+  .plaque { box-shadow: inset 0 .5px 1px rgb(var(--o) / .26), inset 0 0 0 .5px rgb(var(--o) / .08), 0 .5px 0 rgb(255 255 255 / .6); }
+  .autre { background: var(--plan); box-shadow: var(--plan-ombre); border-radius: 16px; padding: 10px 12px; }
+  .autre .rangs { background: transparent; box-shadow: none; min-height: 0; }
+  .detail > summary { min-height: 44px; }
+  .capte { background: var(--fond-carte); border: 0; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  @media (max-width: 480px) { .carte, .question { max-height: calc(100vh - 80px); } .rangs, .ap-liste { max-height: min(340px, calc(100vh - 360px)); } }
 </style>
 <div class="carte" part="carte"><div class="contenu"></div><div class="connexion" hidden></div></div>
 <div class="question" role="dialog" aria-label="Confirmer le compte Vinted"></div>
@@ -715,7 +799,7 @@
   const ligneFavLu = (x) => {
     const etatT = ETAT_FAV[x.etat] || '';
     const quand = x.date ? depuis(Date.parse(x.date)) : '';
-    return `<li class="rang" data-fav-qui="${esc(x.id)}"${x.date ? ` data-fav-date="${esc(x.date)}"` : ''} data-fav-etat="${esc(x.etat || '')}">${photoFav(x.photo)}<span class="mil"><span class="ti">${esc(x.titre || 'Article')}</span><span class="me">${esc(x.pseudo || 'Un acheteur')}${quand ? ' · ' + esc(quand) : ''}${etatT ? ' · ' + esc(etatT) : ''}</span></span></li>`;
+    return `<li class="rang" data-fav-qui="${esc(x.id)}"${x.date ? ` data-fav-date="${esc(x.date)}"` : ''} data-fav-etat="${esc(x.etat || '')}">${photoFav(x.photo)}<span class="mil"><span class="ti">${esc(x.titre || 'Article')}</span><span class="me"><span class="sg">${esc(x.pseudo || 'Un acheteur')}</span>${quand ? ' · <span class="sg">' + esc(quand) + '</span>' : ''}${etatT ? ' · <span class="sg">' + esc(etatT) + '</span>' : ''}</span></span></li>`;
   };
   const gesteEcrire = () => `<div class="ecrire" data-fav-ecrire-bloc><div class="val gris">${esc(BLOCAGES_FAV.reglages)}</div><a class="lien-site lien-vrm" data-fav-ecrire href="${ECRIRE_MESSAGE_URL}" target="_blank" rel="noopener"><span>Écris d’abord ton message dans VRM</span><i aria-hidden="true"></i></a></div>`;
   // L'onglet Favoris de la carte (compte de l'onglet, Vinted).
@@ -748,7 +832,8 @@
         <li>15 messages par heure au plus sur ce compte. Une pause de Vinted, un autre compte dans l’onglet ou une vérification de Vinted arrête tout, et c’est dit ici.</li>
         <li>Garde cet onglet Vinted ouvert. Tu peux tout arrêter à tout moment, ici.</li></ol>` : '';
     return `<section class="fav apercu" data-fav="pret" data-fav-n="${Number(a.total) || triee.length}" data-fav-vue="apercu">
-      <div class="ap-tout"><span class="lu" data-fav-coches="${n}">${n} coché${n > 1 ? 's' : ''} sur ${triee.length} · du plus récent au plus ancien</span><button class="lien" data-fav-tout="${n === triee.length ? 'aucun' : 'tous'}">${n === triee.length ? 'Tout décocher' : 'Tout cocher'}</button></div>
+      <div class="lu" data-fav-ordre>${plurielFav(Number(a.total) || triee.length, 'favori', 'favoris')} à qui écrire · du plus récent au plus ancien</div>
+      <div class="ap-tout"><span class="ap-lbl" data-fav-coches="${n}">${n} coché${n > 1 ? 's' : ''} sur ${triee.length}</span><button class="lien" data-fav-tout="${n === triee.length ? 'aucun' : 'tous'}">${n === triee.length ? 'Tout décocher' : 'Tout cocher'}</button></div>
       <ul class="ap-liste" data-fav-liste="${triee.length}" data-defil="fav">${triee.map((x) => `<li class="coche-l" data-fav-qui="${esc(x.id)}"${x.date ? ` data-fav-date="${esc(x.date)}"` : ''}><input type="checkbox" data-fav-coche="${esc(x.id)}"${selFav.has(x.id) ? ' checked' : ''} aria-label="Écrire à ${esc(x.pseudo || 'cet acheteur')}">${photoFav(x.photo)}<span class="quoi">${esc(x.titre || 'Article')}</span><span class="qui">${esc(x.pseudo || 'Un acheteur')}${x.date ? ` <span class="quand">· ${esc(depuis(Date.parse(x.date)))}</span>` : ''}</span><span class="px">${x.offre != null ? `<s>${esc(eurosFav(x.prix))}</s> ${esc(eurosFav(x.offre))}` : esc(eurosFav(x.prix))}</span></li>`).join('')}</ul>
       ${Number(a.total) > triee.length ? `<div class="val gris" data-fav-reste="${Number(a.total) - triee.length}">Les ${triee.length} plus récents d’abord ; les ${Number(a.total) - triee.length} autres, relance après.</div>` : ''}
       ${a.nonProuves ? `<div class="val gris" data-fav-non-prouves="${Number(a.nonProuves)}">${plurielFav(a.nonProuves, 'autre en attente', 'autres en attente')} : ouvre un favori depuis la cloche de Vinted, VRM saura à qui écrire.</div>` : ''}
@@ -870,7 +955,7 @@
     const tete = `<div class="lu" data-annonces-lu="${a.lu || ''}">${a.aConfirmer ? `À confirmer · lues ${esc(depuis(a.lu) || 'il y a longtemps')}` : `${Number(a.total).toLocaleString('fr-FR')} en ligne · lues ${esc(depuis(a.lu) || '')}`}${a.relecture ? ' · relecture en cours' : ''}</div>`;
     if (!a.liste.length) return tete + '<div class="val gris" data-annonces="0">Aucune annonce en ligne dans la dernière lecture de ton dressing.</div>';
     const avecN = a.liste.some((x) => x.num);
-    return tete + `<ul class="rangs${avecN ? ' avec-n' : ''}" data-annonces="${a.liste.length}" data-defil="annonces">${a.liste.map((x) => `<li><a class="rang" data-annonce="${esc(x.id)}" href="${esc(ici + '/items/' + encodeURIComponent(x.id))}" target="${LISTES ? '_blank' : '_top'}"${LISTES ? ' rel="noopener"' : ''}>${debutN(avecN, x.num)}${vignette(x.photo)}<span class="mil"><span class="ti">${esc(x.titre || 'Annonce')}</span><span class="me">${x.jours != null ? `en ligne depuis ${x.jours} j` : 'date pas lue'}${x.favoris != null ? ` · ${x.favoris} ♥` : ''}${a.aConfirmer ? ' · à confirmer' : ''}</span></span><span class="px">${esc(eurosL(x.prix))}</span></a></li>`).join('')}</ul>`
+    return tete + `<ul class="rangs${avecN ? ' avec-n' : ''}" data-annonces="${a.liste.length}" data-defil="annonces">${a.liste.map((x) => `<li><a class="rang" data-annonce="${esc(x.id)}" href="${esc(ici + '/items/' + encodeURIComponent(x.id))}" target="${LISTES ? '_blank' : '_top'}"${LISTES ? ' rel="noopener"' : ''}>${debutN(avecN, x.num)}${vignette(x.photo)}<span class="mil"><span class="ti">${esc(x.titre || 'Annonce')}</span><span class="me"><span class="sg">${x.jours != null ? `en ligne depuis ${x.jours} j` : 'date pas lue'}</span>${x.favoris != null ? ` · <span class="sg">${x.favoris} ♥</span>` : ''}${a.aConfirmer ? ' · <span class="sg">à confirmer</span>' : ''}</span></span><span class="px">${esc(eurosL(x.prix))}</span></a></li>`).join('')}</ul>`
       + (a.total > a.liste.length ? `<div class="val gris">Les ${a.liste.length} plus récentes · ${Number(a.total).toLocaleString('fr-FR')} en tout.</div>` : '');
   }
   function ventesHtml(e) {
@@ -883,7 +968,7 @@
     const tete = `<div class="lu" data-ventes-total="${Number(v.total || v.liste.length)}">${nbVentes(v.total || v.liste.length)}${lu ? ' · lues ' + esc(lu) : ''}</div>`;
     const ici = ORIGINE_ICI && !LISTES ? ORIGINE_ICI : 'https://www.vinted.fr';
     const avecN = v.liste.some((x) => x.num);
-    const corps = (x) => `${debutN(avecN, x.num)}${vignette(x.photo)}<span class="mil"><span class="ti">${esc(x.titre || 'Vente')}</span><span class="me"><span class="${x.etat === 'a_expedier' ? 'ambre' : ''}">${esc(ETAT_VENTE[x.etat] || 'état pas encore lu')}</span>${x.bordereau === true ? ' · bordereau prêt' : x.bordereau === false ? ' · bordereau pas encore là' : ''}${x.date ? ' · ' + esc(depuis(x.date)) : ''}</span></span><span class="px">${esc(eurosL(x.prix))}</span>`;
+    const corps = (x) => `${debutN(avecN, x.num)}${vignette(x.photo)}<span class="mil"><span class="ti">${esc(x.titre || 'Vente')}</span><span class="me"><span class="sg${x.etat === 'a_expedier' ? ' ambre' : ''}">${esc(ETAT_VENTE[x.etat] || 'état pas encore lu')}</span>${x.bordereau === true ? ' · <span class="sg">bordereau prêt</span>' : x.bordereau === false ? ' · <span class="sg">bordereau pas encore là</span>' : ''}${x.date ? ' · <span class="sg">' + esc(depuis(x.date)) + '</span>' : ''}</span></span><span class="px">${esc(eurosL(x.prix))}</span>`;
     const attrs = (x) => `data-vente="${esc(x.tx)}" data-vente-etat="${esc(x.etat)}"${x.bordereau != null ? ` data-bordereau="${x.bordereau ? 'pret' : 'manque'}"` : ''}`;
     return tete + `<ul class="rangs${avecN ? ' avec-n' : ''}" data-ventes="${v.liste.length}" data-defil="ventes">${v.liste.map((x) => /^[1-9]\d{0,19}$/.test(String(x.conv || ''))
       ? `<li><a class="rang" ${attrs(x)} data-vente-conv="${esc(x.conv)}" href="${esc(ici + '/inbox/' + x.conv)}" target="${LISTES ? '_blank' : '_top'}"${LISTES ? ' rel="noopener"' : ''}>${corps(x)}</a></li>`
