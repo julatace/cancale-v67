@@ -35,6 +35,29 @@
 // lecture a échoué ⇒ NOMMÉE dans `manque` (le total devient « au moins ») ; une
 // vente au montant illisible ⇒ `nonComptees`, nommée, jamais 0 €.
 // Exécuté par scripts/audit-argent-a-venir.cjs.
+//
+// (15 nov., Julien : « je veux que les stats des montants en attente soient mieux
+// affichées ») CHAQUE VENTE À VENIR A SON ÉTAPE — une seule (`ETAPES_A_VENIR`) :
+//   envoyer   vendue, le colis n'est pas encore parti ;
+//   route     en route vers l'acheteur (relais, contrôle Vestiaire compris) ;
+//   livree    livrée, en attente de la confirmation de l'acheteur ;
+//   versement finalisée, le site verse (eBay retient le paiement, Vestiaire paie) ;
+//   autre     en cours, le site ne dit pas l'étape (jamais devinée).
+// Le total = la somme de ces cinq étapes, au centime. BLOQUÉE / LITIGE (Vinted :
+// transaction 430 suspendue ou 440 retour ; Vestiaire : refus au contrôle) est
+// rangée À PART (`bloquees`) : son argent peut repartir à l'acheteur, elle n'entre
+// dans AUCUN total — elle est dite, avec son montant.
+// Le montant est CE QUE LE VENDEUR RECEVRA, lu dans la vente : Vinted = le prix de
+// l'article (aucun frais de vente côté vendeur) ; Vestiaire = `montant`
+// (sellerEarning) ; Leboncoin = le prix final ; eBay = le montant retenu, sinon
+// `totalDueSeller − totalMarketplaceFee` ; frais eBay pas encore lus ⇒
+// `totalDueSeller`, la ligne marquée `estime` (« frais eBay à déduire » — un
+// montant CONNU, sa précision dite). Une autre devise que l'euro ⇒ écartée et dite
+// (`nonComptees`, sorte 'devise'), jamais convertie. Un prix illisible
+// (`nonComptees`, sorte 'illisible') est un défaut de LECTURE : mesuré le 15 nov.,
+// 0 sur 3 564 ventes Vinted lues — il reste nommé, jamais 0 €.
+// La date prévue n'est dite que si le site l'ÉCRIT (Vestiaire « paiement estimé »,
+// eBay `expectedReleaseDate`) ; Vinted n'en écrit aucune ⇒ « — » et la raison.
 
 const MOIS_FR = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 const sansAccent = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -62,6 +85,31 @@ export const dateEcriteLue = (s) => {
 };
 
 const LIBERE = /^(RELEASED|RELEASE_CONFIRMED|NOT_HELD)$/i;
+// L'ordre du parcours : la frise, la liste des étapes, le tri.
+export const ETAPES_A_VENIR = Object.freeze(['envoyer', 'route', 'livree', 'versement', 'autre']);
+const etapeSure = (k) => (ETAPES_A_VENIR.includes(k) ? k : 'autre');
+const deviseDe = (p) => (p && typeof p === 'object' && p.currency_code ? String(p.currency_code).toUpperCase() : 'EUR');
+const objetAV = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : null);
+const motAV = (e, k) => { const o = objetAV(e); return o && o[k] != null ? String(o[k]).trim().toLowerCase() : ''; };
+// Vestiaire : l'étape d'après LE PARCOURS (src/parcoursVestiaire.js, passé par l'app :
+// `R.parcoursVc`) — « done » seul prouve ; un refus au contrôle ⇒ bloquée.
+const etapeVcAVenir = (v, P) => {
+  if (!P || !Array.isArray(P.etapes)) return 'autre';
+  if (P.refusee) return 'bloquee';
+  const st = (k) => { const x = P.etapes.find((y) => y && y.cle === k); return x ? x.etat : ''; };
+  if (st('paye') === 'encours' || motAV(v.etapesVc, 'sellerPayment') === 'ongoing') return 'versement';
+  if (motAV(v.etapesVc, 'sellerDelivery') === 'done') return 'livree';
+  if (st('envoye') === 'fait') return 'route';
+  if (v.aExpedier === true) return 'envoyer';
+  return 'autre';
+};
+// Leboncoin : le colis le dit (`parcelStatus`) ; rien de lu ⇒ « autre ».
+const etapeLbcAVenir = (v) => {
+  const ps = String((v && v.parcelStatus) || '').trim();
+  if (/^delivered$|livr[ée]/i.test(ps)) return 'livree';
+  if (ps) return 'route';
+  return 'autre';
+};
 const eurEbay = (m) => (m && typeof m === 'object' && m.value != null && String(m.value).trim() !== '' && isFinite(Number(m.value)) && m.currency === 'EUR') ? Number(m.value) : null;
 
 // `sources` : chaque liste vaut `undefined` (pas encore lue), `null` (lecture
@@ -71,7 +119,7 @@ const eurEbay = (m) => (m && typeof m === 'object' && m.value != null && String(
 // compte Leboncoin / eBay / Vestiaire écarté. `manqueVinted` : les comptes
 // Vinted dont les ventes n'ont pas pu être lues (noms).
 export function argentAVenir({ vinted, lbc, ebay, vestiaire, versements, etatTx, cachee, excluAutre, manqueVinted = [], R } = {}) {
-  const lignes = [], nonComptees = [], manque = [];
+  const lignes = [], nonComptees = [], manque = [], bloquees = [];
   let enCours = false;
   const vus = new Set();
   const garde = (id) => { if (vus.has(id)) return false; vus.add(id); return true; };
@@ -87,14 +135,20 @@ export function argentAVenir({ vinted, lbc, ebay, vestiaire, versements, etatTx,
       const tx = o.transaction_id != null ? o.transaction_id : o.id;
       if (tx == null) continue;
       const e = etatTx ? etatTx(tx) : null;
-      if (e && (e.s === 450 || e.s === 220 || e.s >= 430)) continue;
+      if (e && (e.s === 450 || e.s === 220 || e.s >= 500)) continue;
       if (versements && versements[String(tx)]) continue;
       const id = 'vinted:' + tx;
       if (!garde(id)) continue;
       const compte = String((o._acc && (o._acc.login || o._acc.vinted_user_id)) || '');
+      const titre = String(o.title || '');
+      const dev = deviseDe(o.price);
+      if (dev !== 'EUR') { nonComptees.push({ id, plateforme: 'Vinted', compte, titre, sorte: 'devise', devise: dev, raison: 'devise ' + dev }); continue; }
       const eur = R.montantVinted(o);
-      if (eur == null) { nonComptees.push({ id, plateforme: 'Vinted', compte, raison: 'prix pas lu' }); continue; }
-      lignes.push({ id, plateforme: 'Vinted', compte, eur, prevu: null, ts: Date.parse(o.date || '') || null });
+      if (eur == null) { nonComptees.push({ id, plateforme: 'Vinted', compte, titre, sorte: 'illisible', raison: 'prix pas lu' }); continue; }
+      const ts = Date.parse(o.date || '') || null;
+      // 430 (suspendue, vérification) ou 440 (retour ouvert) : un litige — à part, hors total.
+      if (e && e.s >= 430) { bloquees.push({ id, plateforme: 'Vinted', compte, titre, eur, ts, raison: e.s === 440 ? 'retour' : 'suspendue' }); continue; }
+      lignes.push({ id, plateforme: 'Vinted', compte, titre, eur, prevu: null, ts, etape: etapeSure(R.etapeVinted ? R.etapeVinted(o) : 'autre') });
     }
   }
 
@@ -107,9 +161,10 @@ export function argentAVenir({ vinted, lbc, ebay, vestiaire, versements, etatTx,
     const id = 'lbc:' + v.txId;
     if (!garde(id)) continue;
     const compte = String(v.accountName || v.account || '');
+    const titre = String(v.title || '');
     const eur = v.price != null && String(v.price).trim() !== '' && isFinite(Number(v.price)) ? Number(v.price) / 100 : null;
-    if (eur == null) { nonComptees.push({ id, plateforme: 'Leboncoin', compte, raison: 'prix inconnu' }); continue; }
-    lignes.push({ id, plateforme: 'Leboncoin', compte, eur, prevu: null, ts: Date.parse(v.dateVente || '') || null });
+    if (eur == null) { nonComptees.push({ id, plateforme: 'Leboncoin', compte, titre, sorte: 'illisible', raison: 'prix inconnu' }); continue; }
+    lignes.push({ id, plateforme: 'Leboncoin', compte, titre, eur, prevu: null, ts: Date.parse(v.dateVente || '') || null, etape: etapeLbcAVenir(v) });
   }
 
   // ── eBAY ──
@@ -124,12 +179,26 @@ export function argentAVenir({ vinted, lbc, ebay, vestiaire, versements, etatTx,
     const id = 'ebay:' + o.orderId;
     if (!garde(id)) continue;
     const compte = String(o._pseudo || o._compte || '');
+    const titre = String((Array.isArray(o.lineItems) && o.lineItems[0] && o.lineItems[0].title) || '');
+    // Une autre devise (la retenue, ou le dû au vendeur) : écartée et dite, jamais convertie.
+    const devs = [...retenues.map((h) => h.holdAmount), o.paymentSummary && o.paymentSummary.totalDueSeller].filter((m) => m && typeof m === 'object' && m.currency).map((m) => String(m.currency).toUpperCase());
+    const autre = devs.find((d) => d !== 'EUR');
+    if (autre) { nonComptees.push({ id, plateforme: 'eBay', compte, titre, sorte: 'devise', devise: autre, raison: 'devise ' + autre }); continue; }
+    // Le montant : la retenue LUE (ce qu'eBay garde) ; sinon l'argent reçu (`montantRecuEbay`) ;
+    // frais pas encore lus ⇒ le dû au vendeur, « frais eBay à déduire » (`estime`).
     const parRetenue = retenues.map((h) => eurEbay(h.holdAmount));
-    const eur = parRetenue.every((x) => x != null) ? Math.round(parRetenue.reduce((t, x) => t + x * 100, 0)) / 100 : null;
-    if (eur == null) { nonComptees.push({ id, plateforme: 'eBay', compte, raison: 'montant retenu illisible ou dans une autre devise' }); continue; }
+    let eur = parRetenue.every((x) => x != null) ? Math.round(parRetenue.reduce((t, x) => t + x * 100, 0)) / 100 : null;
+    let estime = '';
+    if (eur == null) {
+      const r = R.montantRecuEbay ? R.montantRecuEbay(o) : { eur: null };
+      if (r && r.eur != null) eur = r.eur;
+      else { const d = eurEbay(o.paymentSummary && o.paymentSummary.totalDueSeller); if (d != null) { eur = d; estime = 'fraisEbay'; } }
+    }
+    if (eur == null) { nonComptees.push({ id, plateforme: 'eBay', compte, titre, sorte: 'illisible', raison: 'montant pas lu' }); continue; }
     const dates = retenues.map((h) => dateEcriteLue(h.expectedReleaseDate));
     const prevu = dates.every((t) => t != null) ? Math.max(...dates) : null;
-    lignes.push({ id, plateforme: 'eBay', compte, eur, prevu, ts: Date.parse(o.creationDate || '') || null });
+    const envoi = String(o.orderFulfillmentStatus || '').toUpperCase();
+    lignes.push({ id, plateforme: 'eBay', compte, titre, eur, prevu, ts: Date.parse(o.creationDate || '') || null, etape: envoi === 'NOT_STARTED' ? 'envoyer' : 'versement', ...(estime ? { estime } : {}) });
   }
 
   // ── VESTIAIRE ──
@@ -144,16 +213,20 @@ export function argentAVenir({ vinted, lbc, ebay, vestiaire, versements, etatTx,
     const id = 'vestiaire:' + v.id;
     if (!garde(id)) continue;
     const compte = String(v.compte || '');
+    const titre = String(v.titre || '');
     const r = R.montantRecuVc(v);
-    if (r.eur == null) { nonComptees.push({ id, plateforme: 'Vestiaire', compte, raison: r.raison || 'montant pas sûr' }); continue; }
-    lignes.push({ id, plateforme: 'Vestiaire', compte, eur: r.eur, prevu: dateEcriteLue(v.paiementEstime), ts: Date.parse(v.date || '') || null });
+    if (r.eur == null) { const dev = /autre devise/.test(r.raison || '') ? String((v.montant && v.montant.devise) || '').toUpperCase() : ''; nonComptees.push({ id, plateforme: 'Vestiaire', compte, titre, sorte: dev ? 'devise' : 'illisible', ...(dev ? { devise: dev } : {}), raison: r.raison || 'montant pas sûr' }); continue; }
+    const ts = Date.parse(v.date || '') || null;
+    const et2 = etapeVcAVenir(v, R.parcoursVc ? R.parcoursVc(v) : null);
+    if (et2 === 'bloquee') { bloquees.push({ id, plateforme: 'Vestiaire', compte, titre, eur: r.eur, ts, raison: 'refus' }); continue; }
+    lignes.push({ id, plateforme: 'Vestiaire', compte, titre, eur: r.eur, prevu: dateEcriteLue(v.paiementEstime), ts, etape: et2 });
   }
 
-  return resumer(lignes, { manque, nonComptees, enCours });
+  return resumer(lignes, { manque, nonComptees, enCours, bloquees });
 }
 
 const ORDRE = ['Vinted', 'eBay', 'Vestiaire', 'Leboncoin'];
-const resumer = (lignes, { manque, nonComptees, enCours }) => {
+const resumer = (lignes, { manque, nonComptees, enCours, bloquees = [] }) => {
   const groupes = new Map();
   for (const l of lignes) {
     const k = l.plateforme + '|' + l.compte;
@@ -169,8 +242,45 @@ const resumer = (lignes, { manque, nonComptees, enCours }) => {
     prevu: g.sansDate === 0 && g.prevus.length ? Math.max(...g.prevus) : null,
   })).sort((a, b) => (ORDRE.indexOf(a.plateforme) - ORDRE.indexOf(b.plateforme)) || (b.eur - a.eur) || (a.compte < b.compte ? -1 : 1));
   const total = Math.round(lignes.reduce((t, l) => t + Math.round(l.eur * 100), 0)) / 100;
-  return { lignes, parCompte, total, n: lignes.length, manque, nonComptees, enCours, partiel: manque.length > 0 || nonComptees.length > 0 };
+  const cents = (L) => L.reduce((t, l) => t + Math.round(l.eur * 100), 0);
+  // PAR ÉTAPE : chaque vente dans UNE étape ; la date de l'étape n'est dite que si
+  // CHAQUE vente de l'étape a la sienne (la plus tardive) ; sinon combien sont datées.
+  const parEtape = ETAPES_A_VENIR.map((k) => {
+    const L = lignes.filter((l) => (l.etape || 'autre') === k);
+    const dates = L.map((l) => l.prevu).filter((t) => t != null);
+    return { etape: k, n: L.length, eur: cents(L) / 100, datees: dates.length, prevu: L.length && dates.length === L.length ? Math.max(...dates) : null, estimes: L.filter((l) => l.estime).length };
+  }).filter((g) => g.n > 0);
+  // PAR SITE : la part de chaque plateforme (son total, ses ventes, ses comptes).
+  const parSite = ORDRE.map((p) => {
+    const L = lignes.filter((l) => l.plateforme === p);
+    return { plateforme: p, n: L.length, eur: cents(L) / 100, comptes: new Set(L.map((l) => l.compte)).size };
+  }).filter((g) => g.n > 0);
+  const estimes = lignes.filter((l) => l.estime);
+  const bl = { n: bloquees.length, eur: cents(bloquees) / 100, lignes: bloquees };
+  return { lignes, parCompte, parEtape, parSite, total, n: lignes.length, manque, nonComptees, enCours, bloquees: bl,
+    estimes: { n: estimes.length, eur: cents(estimes) / 100 },
+    partiel: manque.length > 0 || nonComptees.length > 0 };
 };
+
+// LA FRISE « CETTE SEMAINE · LA SUIVANTE · PLUS TARD » — seulement les dates ÉCRITES
+// par le site (`prevu`) ; le reste est « sans date », compté et dit (jamais étalé).
+// Semaines du lundi 0 h au lundi suivant, heure de l'appareil.
+export function friseAVenir(A, maintenant = Date.now()) {
+  if (!A || A.enCours || !Array.isArray(A.lignes)) return null;
+  const d = new Date(maintenant); d.setHours(0, 0, 0, 0);
+  const l0 = new Date(d); l0.setDate(l0.getDate() - ((d.getDay() + 6) % 7));
+  const fin1 = new Date(l0); fin1.setDate(fin1.getDate() + 7);
+  const fin2 = new Date(l0); fin2.setDate(fin2.getDate() + 14);
+  const B = { semaine: [], suivante: [], plusTard: [], sansDate: [] };
+  for (const l of A.lignes) {
+    if (l.prevu == null || !Number.isFinite(l.prevu)) B.sansDate.push(l);
+    else if (l.prevu < fin1.getTime()) B.semaine.push(l);
+    else if (l.prevu < fin2.getTime()) B.suivante.push(l);
+    else B.plusTard.push(l);
+  }
+  const s = (L) => ({ n: L.length, eur: L.reduce((t, l) => t + Math.round(l.eur * 100), 0) / 100 });
+  return { semaine: s(B.semaine), suivante: s(B.suivante), plusTard: s(B.plusTard), sansDate: s(B.sansDate), datees: A.lignes.length - B.sansDate.length };
+}
 
 // La valeur pour un périmètre (la carte des chiffres : un site, un compte Vinted).
 // → { valeur | null, partiel, manque, n, raison }. « Au moins 0 » ne se dit
