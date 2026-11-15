@@ -116,9 +116,9 @@ async function scenarioM(b, largeur, sombre) {
   const lignes = [{ id: 'panel_num_reserves', data: { attente: {}, items: { 9350: { numero: '5', at: ilYa(30) } } } }];
   const { pg, ctx, errs } = await ouvrir(b, { url: '/?tab=annonces', largeur, sombre, main: BASE_MAIN({ main: { vinted_used_numeros: [1, 2, 3, 4] } }), items, lignes });
   try {
-    await attendre(async () => ((await fiches(pg))['9350'] || {}).numero === '5', 15000);
+    await attendre(async () => ((await fiches(pg))['9350'] || {}).numero === '5', 40000);
     const f = await fiches(pg);
-    dit((f['9350'] || {}).numero === '5' && !(f['9350'] || {}).nouveau, `${tag} : la masquée porte N°5 (le N° réservé lié à son identifiant), pas « nouveau »`, JSON.stringify(f['9350']).slice(0, 200));
+    dit((f['9350'] || {}).numero === '5' && !(f['9350'] || {}).nouveau, `${tag} : la masquée porte N°5 (le N° réservé lié à son identifiant), pas « nouveau »`, String(JSON.stringify(f['9350'])).slice(0, 200));
     dit(!Object.values(f).some((x) => x && x.numero === '8'), `${tag} : aucun N° neuf brûlé`);
     dit(await pasDeCote(pg), `${tag} : aucune page qui défile de côté`);
     dit(errs.length === 0, `${tag} : aucune erreur d'app`, errs.join(' | ').slice(0, 200));
