@@ -77,7 +77,23 @@ même à l'œil ; le flou ne sert que là où le contenu passe dessous. Jamais u
 ## La preuve
 `scripts/bancs/verre.cjs` (base inventée : 1 000 paires, 1 000 conversations, 1 000 e-mails ; 390 tactile
 et 1512 ; clair et sombre) : V1 fond, V2 verre et opaques, V3 contraste sur le fond réel, V4 flou borné,
-V5 un plein, V6 aucun débordement. Rouge sur l'arbre de départ (aucun fond, aucun verre).
+V5 un plein, V6 aucun débordement, V7 le « ? » d'un titre à 8 px au moins de tout texte de sa ligne, V8 aucun
+texte coupé au milieu d'un mot hors d'une rangée de liste, V9 la pastille « Mis à jour à … » ne recouvre aucun
+texte. Une icône seule dans un bouton est jugée comme un élément graphique (3:1). Rouge sur l'arbre de départ
+(aucun fond, aucun verre).
+
+Deux bancs figeaient la matière d'hier et ont été réécrits sur la RÈGLE (dit ici, comme le veut §6) :
+- `studio-journee.cjs` (A) jugeait l'encre sur `--sb-porcelaine` lue comme un hexadécimal opaque, et l'encre
+  sombre sur le haut/l'aplat/le bas du fond : la porcelaine est maintenant recomposée sur le haut ET le bas du
+  fond quand c'est un verre ; l'encre sombre n'est jugée sur le fond que si le fond est clair, sinon c'est
+  l'encre CLAIRE (`--sv-clair*`) qui y est jugée ;
+- `studio-coque.cjs` (F) exigeait le dégradé sur la coque elle-même : il l'accepte sur son `::before` fixe.
+
+Retouches demandées après le premier rapport (Julien, via le coordinateur) : le « ? » collait au titre
+« Ma journée » (marge portée à 2 px + 11 px de padding ⇒ 13 px) ; « prix d'achat man… » coupé dans le mois
+(passe à la ligne) ; « Mis à jour à 18:11 » posé sur les tuiles au-dessus de la barre du bas (au téléphone il
+va dans la tête, à gauche ; le titre de la tête s'efface le temps qu'il est là). La barre collée du Stock suit
+la classe réelle du nouveau Stock (`[data-stock-recherche]`, claude/stock-etageres).
 
 ## Écrans et état
 Voir le rapport d'étape (captures) ; la finition écran par écran suit en commits séparés.
