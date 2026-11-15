@@ -159,7 +159,7 @@ function mesurer() {
       for (const col of lay) { if (!cands.length) n.push(col.slice(0, 3)); else for (const b of cands) n.push(sur(col, col[3], b)); }
       cands = n.slice(0, 24);
     }
-    const tc = parse(cs.color); if (!tc) continue;
+    const tc = parse(cs.color); if (!tc || tc[3] === 0) continue;   // un texte transparent est masqué EXPRÈS (icône seule : la Calculette d'Achats)
     const a = tc[3] * Math.min(1, op);
     let pire = Infinity, ou = null;
     for (const b of cands) { const t = sur(tc, a, b); const k = ratio(t, b); if (k < pire) { pire = k; ou = b; } }
