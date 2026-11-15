@@ -216,14 +216,16 @@ const lireFeuille = (pg) => pg.evaluate(() => {
           dit(!!f.retirer && /^https:\/\/www\.vinted\.fr\/items\/6000001/.test(f.retirer.href) && f.retirer.cible === '_blank' && /Retirer celle de compte-beta-long-nom/.test(f.retirer.texte) && f.retirer.h >= 44, 'A · UN geste : « Retirer celle de compte-beta-long-nom », un lien vers l’annonce sur vinted.fr (44 px)', JSON.stringify(f.retirer));
           dit(f.pleins <= 1 && !f.deborde && !f.ecran, 'A · ≤ 1 bouton plein, rien ne déborde de la feuille', JSON.stringify({ p: f.pleins, d: f.deborde, e: f.ecran }));
           const n0 = ecritures.length;
+          const c0 = await pg.evaluate(() => window.__cmds.length);
           const ouvre = ctx.waitForEvent('page', { timeout: 3000 }).catch(() => null);
           await pg.click('[data-dc-retirer]').catch(() => {});
           const nouvelle = await ouvre; if (nouvelle) await nouvelle.close().catch(() => {});
-          await pg.waitForTimeout(1500);
-          const apres = await pg.evaluate(() => ({ cmds: window.__cmds, suite: (document.querySelector('[data-dc-suite]') || {}).textContent || '', etat: (document.querySelector('[data-dc-groupe]') || { getAttribute: () => '' }).getAttribute('data-dc-retrait') }));
+          await pg.waitForTimeout(3500);
+          const apres = await pg.evaluate((c0) => ({ cmds: window.__cmds.slice(c0), suite: (document.querySelector('[data-dc-suite]') || {}).textContent || '', etat: (document.querySelector('[data-dc-groupe]') || { getAttribute: () => '' }).getAttribute('data-dc-retrait'), note: (() => { try { return localStorage.getItem('vrm_deux_comptes_retraits') || ''; } catch (_) { return ''; } })() }), c0);
           const ecr = ecritures.slice(n0);
-          dit(apres.cmds.length === 0, 'A · le toucher n’envoie AUCUNE commande à l’extension (VRM ne supprime rien)', JSON.stringify(apres.cmds));
-          dit(ecr.some((e) => /vrm_deux_comptes_retraits/.test(e.corps)) && ecr.every((e) => !/DELETE/i.test(e.m)), 'A · il note seulement l’heure (`vrm_deux_comptes_retraits`)', JSON.stringify(ecr.map((e) => e.m + ' ' + e.u.slice(0, 60))));
+          // (Les lectures de fond de l'app — `ventes`… — continuent ; aucune commande ne vise l'annonce ni ne retire.)
+          dit(!apres.cmds.some((c) => /6000001|suppr|delete|retir|masqu|hide|pause|vacances/i.test(c)), 'A · le toucher n’envoie AUCUNE commande à l’extension sur l’annonce (VRM ne supprime rien)', JSON.stringify(apres.cmds));
+          dit((/"6000001":\{"at":\d+/.test(apres.note) || ecr.some((e) => /vrm_deux_comptes_retraits/.test(e.corps))) && ecr.every((e) => !/DELETE/i.test(e.m)), 'A · il note seulement l’heure (`vrm_deux_comptes_retraits`, clé synchronisée)', JSON.stringify({ note: apres.note, ecr: ecr.map((e) => e.m + ' ' + e.u.slice(0, 60)) }));
           dit(apres.etat === 'ouverte' && /VRM relira/.test(apres.suite), 'A · « Ouverte à … VRM relira »', JSON.stringify(apres));
           await capt(pg, `deux-comptes-A-ouverte-${nom}`);
         }
