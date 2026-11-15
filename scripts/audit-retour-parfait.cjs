@@ -43,6 +43,7 @@ const MUTATIONS = {
   'pas-su-envoie': [['api/_lib/retour-notifs.js', "if (!Array.isArray(track) || !(departs instanceof Map) || deposes === undefined || !Array.isArray(remb)) return", "if (false) return"]],
   'cron-soir-oublie': [['api/ship-reminders.js', "  try { retoursAchat = await notifsRetoursAchat('soir'); }", "  try { retoursAchat = null; }"]],
   'faux-rappel-pendant-lecture': [['src/retoursAchat.js', "aRenvoyer: cartes.filter((c) => c.etape === 'a-deposer' && !c.faitsEnCours)", "aRenvoyer: cartes.filter((c) => c.etape === 'a-deposer')"]],
+  'forme-sans-cle': [['src/retoursAchat.js', "return l && l.transporteur && l.transporteur !== 'postal' ? l.transporteur : '';", "return /^[XZ][WU]\\d{9}JF$/.test(str(n)) ? 'chronopost' : '';"]],
   'tampon-par-dessus': [['src/App.jsx', "const t = await tamponnerBordereau(PL, pdf, { numero: c.num || '', titre: `RETOUR · ", "const t = await (async () => null)(PL, pdf, { numero: c.num || '', titre: `RETOUR · "]],
 };
 if (process.argv.includes('--prouve')) prouver(__filename, R, MUTATIONS);
@@ -54,7 +55,7 @@ const importer = (p) => import('file://' + path.join(R, p));
 
 // Valeurs INVENTÉES, à la forme mesurée.
 const TX_NIKE = '99000048248', TX_AUTRY = '99000051379';
-const SUIVI_NIKE = '81230048', SUIVI_AUTRY = 'XU900051379JF';
+const SUIVI_NIKE = '81230048', SUIVI_AUTRY = 'XU900051378JF';
 const NIKE = 'Baskets banc Air Max. Blanc et rose. Pointure 42.5', AUTRY = 'Autry banc Medalist';
 const STATUT_AUTRY = "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais";   // la forme mesurée de l'achat
 const LIM_NIKE = '2026-11-16T09:00:00.000Z', LIM_AUTRY = '2026-11-23T09:00:00.000Z';   // 10 h, Paris
@@ -90,7 +91,11 @@ const ligneBord = (tx, suivi, article, lim, recu, pdfB64, extra = {}) => ({ type
     const dec = await TP.transporteurDuPdf(PDF_A);
     dit(dec && dec.etat === 'ok' && dec.t === 'chronopost', 'T1 le PDF de la forme Chronopost (« Chrono Relais Europe », pied Chronopost) est lu « chronopost » par la règle de la réception', JSON.stringify(dec));
     const SC = await importer('api/_lib/suivi-colis.js');
-    dit(SC.transporteurDeForme(SUIVI_AUTRY) === null, 'T1 la FORME `XU…JF` seule ne nomme personne (S10 : 2 lettres, 9 chiffres, 2 lettres — d’autres postes l’utilisent) : c’est l’étiquette qui prouve Chronopost');
+    dit(SC.transporteurDeForme(SUIVI_AUTRY) === null, 'T1 la règle SERVEUR des formes (`transporteurDeForme`, XW/ZW…TS/SP) ne connaît pas XU…JF : côté serveur, c’est l’étiquette qui le prouve (rattrapage ci-dessous)');
+    // La clé UPU S10 (poids 8 6 4 2 3 5 9 7) et la règle du scanner (src/scanColis.js, la même) : Chronopost par la forme.
+    const SCAN = await importer('src/scanColis.js');
+    const lu = SCAN.lireCodeColis(SUIVI_AUTRY), faux = SCAN.lireCodeColis(SUIVI_AUTRY.slice(0, 10) + '9JF');
+    dit(SCAN.s10Valide(SUIVI_AUTRY) && lu && lu.transporteur === 'chronopost' && faux === null, 'T1 la clé S10 est juste et la forme XU…JF est celle des n° Chronopost mesurés (règle du scanner) ; une clé fausse ⇒ rien', JSON.stringify({ lu, faux }));
     const l = SC.lienSuivi('chronopost', SUIVI_AUTRY);
     dit(l && l.site === true && l.url === `https://www.chronopost.fr/tracking-no-cms/suivi-page?listeNumerosLT=${SUIVI_AUTRY}`, 'T4 « Suivre ↗ » : la page PUBLIQUE de Chronopost (adresse attestée), n° pré-rempli', JSON.stringify(l));
 
@@ -178,6 +183,10 @@ const ligneBord = (tx, suivi, article, lim, recu, pdfB64, extra = {}) => ({ type
     const q = RA.quandLimite(a, MAINTENANT);
     const jourMots = new Date(Date.parse(q.jour + 'T12:00:00Z')).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Europe/Paris' });
     dit(q.cle === 'date' && q.jour === '2026-11-23' && a.heure === '10 h' && jourMots === 'lun. 23 nov.' && RA.joursAvantLimite(a, MAINTENANT) === 8, 'C2 Autry : « À déposer avant lun. 23 nov. 10 h · dans 8 jours » (heure de Paris ; le 23 nov. 2026 est un LUNDI)', JSON.stringify({ q, h: a.heure, jourMots, j: RA.joursAvantLimite(a, MAINTENANT) }));
+    // Sans `transporteurPdf` (la ligne d'avant le rattrapage), la carte nomme déjà Chronopost par la forme (clé S10 juste) ; une clé fausse ⇒ personne.
+    const sansPdf = RA.retoursAchat({ ...base, bords: [bord(TX_AUTRY, SUIVI_AUTRY, AUTRY, LIM_AUTRY, RECU_AUTRY)] }).cartes[0];
+    const cleFausse = RA.retoursAchat({ ...base, bords: [bord(TX_AUTRY, SUIVI_AUTRY.slice(0, 10) + '9JF', AUTRY, LIM_AUTRY, RECU_AUTRY)] }).cartes[0];
+    dit(sansPdf.transporteur === 'chronopost' && sansPdf.transporteurSource === 'forme' && a.transporteurSource === 'etiquette' && cleFausse.transporteur === '', 'C2 sans l’étiquette lue : Chronopost par la forme (clé S10 juste, règle du scanner) ; l’étiquette passe d’abord ; une clé fausse ⇒ personne', JSON.stringify([sansPdf.transporteur, sansPdf.transporteurSource, a.transporteurSource, cleFausse.transporteur]));
     const eA = RA.etapesRetour(a).map((e) => e.cle + ':' + e.etat).join(' ');
     dit(eA === 'bordereau:fait deposer:ici route:avenir livre:avenir rembourse:avenir' && RA.etapesRetour(a)[0].transporteur === 'chronopost', 'C2 Autry : étapes « bordereau ✓ Chronopost · à déposer ← ici · … »', eA);
     // L'avancement, fait par fait (le faux e-mail transporteur, la lecture du départ, le remboursement).

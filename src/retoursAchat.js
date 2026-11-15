@@ -17,6 +17,11 @@
 // (15 nov., lot retours-suivi) Les faits du transporteur PAR LE N° EXACT du bordereau de retour
 // (api/_lib/retour-suivi.js, la règle partagée avec le serveur) font avancer la carte toute seule.
 import { faitsRetour, suivisPartages, normaliserSuiviRetour } from '../api/_lib/retour-suivi.js';
+// (15 nov., lot retour-parfait) Le transporteur d'un n° par SA FORME, la règle du scanner (src/scanColis.js, la
+// MÊME — fichier identique à `claude/scanner-colis`) : S10 à clé UPU JUSTE + préfixes/suffixes Chronopost
+// mesurés (187 n° rangés sur 187), 8 chiffres Mondial Relay. Seulement quand l'étiquette n'a rien dit.
+import { lireCodeColis } from './scanColis.js';
+const transporteurDeLaForme = (n) => { try { const l = lireCodeColis(str(n).toUpperCase().replace(/[\s-]+/g, '')); return l && l.transporteur && l.transporteur !== 'postal' ? l.transporteur : ''; } catch (_) { return ''; } };
 
 const str = (v) => String(v == null ? '' : v);
 export const RETOUR_PRESSE_H = 48;
@@ -216,7 +221,8 @@ export function retoursAchat({ bords, demandes = [], achats, remb, transp, track
       limiteIso, limiteJour: limiteIso ? jourParis(lm) : '', limiteTexte: jourCourt(limiteIso), heure: limiteIso && /\d\s*h/.test(str(b.dateLimite)) ? heureParis(limiteIso) : '',
       suivi, statut: etatSuivi(suivi), rembourse: remboursement(tx, o), uid: str(b.uid || (o && o._acc && o._acc.vinted_user_id) || ''), compte: str(b.account || ''),
       pdf: b.pdf !== false, pdfGarde: b.pdfGarde || '', garde: !!b.garde, emailId: str(b.emailId || ''), relie: !!o, avis: null,
-      transporteur: str(b.transporteurPdf || '').trim(),
+      transporteur: str(b.transporteurPdf || '').trim() || transporteurDeLaForme(suivi),
+      transporteurSource: str(b.transporteurPdf || '').trim() ? 'etiquette' : transporteurDeLaForme(suivi) ? 'forme' : '',
     }, b.at || b.receivedAt));
   }
   // 2. Les achats « à renvoyer » sans bordereau (identité : le n°).

@@ -35,7 +35,7 @@ const MAINTENANT = Date.now(), H = 3600000;
 const ilYaH = (h) => new Date(MAINTENANT - h * H).toISOString();
 const PH = (c) => 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="${c}"/></svg>`);
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'banc_cancale', domain: 'www.vinted.fr', updated_at: ilYaH(0) }];
-const TXN = '990048248', TXA = '990051379', SN = '81230048', SA = 'XU900051379JF';
+const TXN = '990048248', TXA = '990051379', SN = '81230048', SA = 'XU900051378JF';
 const NIKE = 'Baskets banc Air Max. Blanc et rose. Pointure 42.5', AUTRY = 'Autry banc Medalist';
 const STATUT_AUTRY = "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais";
 const UA_IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1';
