@@ -46008,8 +46008,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   React.useEffect(() => {
     if (only !== 'journee' && only !== 'ventes') return;
     majRA({ plan: planAilleurs, v: vendusAilleurs.v, relire: vendusAilleurs.lire, owner: ownerRA, ...(RA.owner && RA.owner !== ownerRA ? { resultats: {}, attente: {}, gardes: {}, touches: new Set() } : {}) });
+  // ⚠️ Pas `vendusAilleurs.v` lui-même : avant la première lecture c'est un objet NEUF à chaque rendu
+  // (`{}`), et la publication fait re-rendre cet écran (`useRA`) — une boucle sans fin (page figée, mesuré
+  // au banc). Ses morceaux stables seulement.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [only, ownerRA, vendusAilleurs.v, lbcSaitSuppr]);
+  }, [only, ownerRA, vendusAilleurs.v.at, vendusAilleurs.v.charge, vendusAilleurs.v.erreur, vendusAilleurs.v.lignes, vendusAilleurs.v.peutEtre, lbcSaitSuppr]);
   // La reprise « Ouvre leboncoin.fr » et la relecture : sur un signe qu'il est revenu (l'onglet VRM
   // redevenu visible) ou que l'extension vient de lire leboncoin.fr (`maj · lbc`).
   React.useEffect(() => {
