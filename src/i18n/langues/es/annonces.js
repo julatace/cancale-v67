@@ -343,6 +343,8 @@ export default {
   "annonces.autre": "Otro N°",
   "annonces.numeroEcritEtiquette": "Número escrito en la etiqueta de {title}",
   "annonces.corriger": "Corregir",
+  "annonces.reserveDesaccord": "La ficha dice N°{fiche} · la extensión había reservado el N°{reserve}",
+  "annonces.reserveCarton": "La caja dice N°{reserve}",
   // ── App.jsx
   "annonces.autres": { one: "… y {n} más.", other: "… y {n} más." },
   "annonces.reprendreCommencees": { one: "Retomar la {n} no empezada", other: "Retomar las {n} no empezadas" },

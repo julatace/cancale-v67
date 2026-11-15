@@ -343,6 +343,8 @@ export default {
   "annonces.autre": "Andere Nr.",
   "annonces.numeroEcritEtiquette": "Nummer auf dem Etikett von {title}",
   "annonces.corriger": "Korrigieren",
+  "annonces.reserveDesaccord": "Die Karte sagt Nr. {fiche} · die Erweiterung hatte Nr. {reserve} reserviert",
+  "annonces.reserveCarton": "Auf dem Karton steht Nr. {reserve}",
   // ── App.jsx
   "annonces.autres": { one: "… und {n} weiteres.", other: "… und {n} weitere." },
   "annonces.reprendreCommencees": { one: "Die {n} nicht begonnene fortsetzen", other: "Die {n} nicht begonnenen fortsetzen" },

@@ -118,7 +118,7 @@ function constante(app, nom) {
       numeroEcritActif: () => moi, lectureEcriteVinted: lecture, annonceNumerotable: () => true, retenirNumerosNeufs: C.retenirNumerosNeufs,
       load: (k, dflt) => (k in store ? store[k] : dflt), CLE_NUMERO_ECRIT: 'vrm_numero_ecrit', clesLuesEnDouble: C.clesLuesEnDouble,
       nextNum, nextUsed, taken, takenK, byPhoto: {}, reservesNum: { parItem: {} }, horsLigneMaintenant: () => false, prefNum: '',
-      decisionEcrite: E.decisionEcrite, numeroNeufPermis: N.numeroNeufPermis, lectureCompleteDe: N.lectureCompleteDe, marquerNouveau: N.marquerNouveau,
+      decisionEcrite: E.decisionEcrite, numeroNeufPermis: N.numeroNeufPermis, lectureCompleteDe: N.lectureCompleteDe, lectureCompleteAnnonce: N.lectureCompleteAnnonce, marquerNouveau: N.marquerNouveau,
       listings: { items, complets, ko: koUids }, changed: false, ...A,
     };
     vm.createContext(ctx);

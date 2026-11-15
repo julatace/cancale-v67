@@ -488,7 +488,7 @@ import VisiteBulles from "./VisiteBulles.jsx";
 import { poserOutilsAccueil } from "./accueilReste/deps.js";
 import { AccueilResteJournee, VisiteEcranHote } from "./accueilReste/AccueilReste.jsx";
 import { retenirNumerosNeufs, clesLuesEnDouble } from "./accueilReste/cartonsNumeros.js";
-import { numeroNeufPermis, lectureCompleteDe, marquerNouveau, marquerEcrit, aEcrireNouveaux, listeNumeros, demandesNumero, propositionNumero, modeNumerotation } from "./numerosNouvelles.js";
+import { numeroNeufPermis, lectureCompleteAnnonce, annoncesANumeroter, reserveEnDesaccord, marquerNouveau, marquerEcrit, aEcrireNouveaux, listeNumeros, demandesNumero, propositionNumero, modeNumerotation } from "./numerosNouvelles.js";
 import { publierSansNumero } from "./accueilReste/trouveChezToi.js";
 import { CLE_AIDES } from "./accueilReste/aides.js";
 import { CLE_APPEL } from "./accueilReste/appelBienvenue.js";
@@ -7367,6 +7367,10 @@ const dressingEnLigne = async (uid, row, opts = {}) => {
     // 22 oct. : les annonces MASQUÉES par Vinted (paires présentes, jamais « en
     // ligne ») et l'heure de la lecture qui les a vues masquées.
     _vrmMasquees: masqueesDuCompte(res.fermees, supp, ts), _vrmMasqueesLu: isFinite(ts) ? ts : null,
+    // (15 nov., src/numerosNouvelles.js `lectureMasqueeComplete`) Le DRESSING qui les a vues masquées
+    // porte-t-il tous les articles que Vinted annonce ? Seule une lecture complète (et fraîche) permet un
+    // N° NEUF à une masquée ; ses identités (N° réservé, vente, photo) n'en dépendent pas.
+    _vrmMasqueesComplet: lectureDressingComplete({ source: 'dressing', lu: ts }, payload),
     // (28 oct., 5.252) Ses BROUILLONS : ceux que SON dressing (lu sous sa session,
     // la seule lecture qui les voit) montre, datés de cette lecture ; un brouillon
     // supprimé sur Vinted APRÈS la lecture n'y est plus (règle des suppressions).
@@ -12618,7 +12622,7 @@ const fetchVintedListings = async (account, page = 1, opts = {}) => {
                aConfirmer: (h._vrmAConfirmer || []).map(mapWardrobeItem),
                // 22 oct. : masquées par Vinted — paires PRÉSENTES (numéros),
                // jamais « en ligne » (`<masquees-regle>`).
-               masquees: (h._vrmMasquees || []).map((it) => ({ ...mapWardrobeItem(it), _vrmMasquee: true, _vrmVueMasqueeLe: h._vrmMasqueesLu || null })),
+               masquees: (h._vrmMasquees || []).map((it) => ({ ...mapWardrobeItem(it), _vrmMasquee: true, _vrmVueMasqueeLe: h._vrmMasqueesLu || null, _vrmMasqueeComplete: h._vrmMasqueesComplet === true })),
                // 28 oct. : ses BROUILLONS Vinted (`is_draft`), lus dans le même dressing.
                brouillons: (Array.isArray(h._vrmBrouillons) ? h._vrmBrouillons : h.items.filter((x) => x && x.is_draft && !x.is_closed)).map((x) => ({ ...mapWardrobeItem(x), _vrmBrLu: x._vrmBrLu != null ? x._vrmBrLu : null })),
                brLecture: h._vrmBrLecture || null,
@@ -12664,7 +12668,7 @@ const fetchVintedListings = async (account, page = 1, opts = {}) => {
   // Lue à l'instant, page après page : c'est une lecture complète et fraîche.
   // Les annonces masquées par Vinted sont des paires présentes (22 oct.).
   const vueLe = okUn ? Date.now() : null;
-  const masquees = brut.filter(masqueeSurVinted).map((it) => ({ ...mapWardrobeItem(it), _vrmMasquee: true, _vrmVueMasqueeLe: vueLe }));
+  const masquees = brut.filter(masqueeSurVinted).map((it) => ({ ...mapWardrobeItem(it), _vrmMasquee: true, _vrmVueMasqueeLe: vueLe, _vrmMasqueeComplete: complet === true }));
   return { ok: okUn, items, masquees, pagination, lu: vueLe };
 };
 // ⟦→ ecrans/Stock.jsx #3⟧
@@ -37860,8 +37864,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return { presentes: avecNum.filter((it) => surEtagere.has(String(it.id))), parties, recentes };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listings.masquees, masqueesSurEtagere, numeros, pairsLost, soldManual, emailSoldIds, showEmailSold, blockedAccts, hiddenAccts, annoncesVendues, accountUids]);
-  const aVerifierCarton = useMemo(() => [...annBase, ...annAConfirmer, ...annMasquees].filter((it) => ficheAVerifier(numeros[it.id])),
-  [annBase, annAConfirmer, annMasquees, numeros]);
+  // (15 nov., audit de fiabilité #4, src/numerosNouvelles.js `reserveEnDesaccord`) AUSSI une paire dont
+  // la fiche porte un AUTRE N° que celui que l'extension avait réservé (et lié à SON identifiant) à sa
+  // publication : rien ne change tout seul (un N° est écrit sur un carton) — la ligne dit les deux N°,
+  // SON choix décide (« C'est bien le N°X » ou « Le carton dit N°Y »).
+  const reserveDe = (it) => (reservesNum && reservesNum.parItem ? reserveEnDesaccord(it.id, numeros[it.id], reservesNum.parItem, cleNum) : null);
+  const aVerifierCarton = useMemo(() => [...annBase, ...annAConfirmer, ...annMasquees].filter((it) => ficheAVerifier(numeros[it.id]) || !!reserveDe(it)),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [annBase, annAConfirmer, annMasquees, numeros, reservesNum]);
   // Les paires qui ont reçu un numéro NEUF (doublon réglé) et dont le carton
   // porte encore l'ancien : dites jusqu'à « C'est écrit » (sinon le bordereau
   // dit N°90 et le carton N°51 — la mauvaise paire part).
@@ -38138,6 +38148,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Sinon : le geste habituel du champ N° (il demande quand le numéro a déjà
     // servi ou qu'une autre paire le porte encore), puis « vérifié » s'il a été posé.
     await poserNumero(it, brut, f.numero, { carton: true });
+    setTimeout(() => marquerCartonVerifie(moi, cle), 700);
+  };
+  // (15 nov., #4) « Le carton dit N°Y » — Y est le N° que l'extension avait réservé pour CETTE annonce
+  // (par son identifiant). Il n'est « déjà servi » que par cette réservation : le geste habituel ne
+  // redemande pas « même article ? » — sauf si une vente ou une autre fiche le porte (alors il demande).
+  const prendreReserve = async (it, y) => {
+    const moi = String(it.id), cle = cleNum(y), f = numeros[moi] || {};
+    if (!cle || !reservesNum || cleNum(reservesNum.parItem[moi]) !== cle) return;
+    const ailleurs = Object.keys(numeros).some((k) => k !== moi && cleNum((numeros[k] || {}).numero) === cle)
+      || Object.values(saleOv || {}).some((o) => o && cleNum(o.numero) === cle);
+    await poserNumero(it, String(y), f.numero, { carton: true, ...(ailleurs ? {} : { memePaire: true }) });
     setTimeout(() => marquerCartonVerifie(moi, cle), 700);
   };
 
@@ -40737,7 +40758,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    COMPTABILITÉ, ça ne sort pas le carton de l'étagère — sa paire est
     //    physiquement là et il lui faut un numéro sur sa boîte (même règle que
     //    `porteursNum`, §5.33). Mesuré le 23 août : 1 paire en ligne sans numéro.
-    const items = (listings.items || []);
+    // ⚠️ (15 nov., audit de fiabilité #3) ET LES MASQUÉES PAR VINTED encore sur l'étagère
+    //    (`masqueesSurEtagere`) : la paire est chez lui, elle reçoit son N° comme une annonce en
+    //    ligne (identités d'abord ; un N° neuf seulement sur son dressing COMPLET et frais,
+    //    `lectureCompleteAnnonce`). Mesuré : 4 masquées sans fiche chez Julien, liées à un N° réservé.
+    const items = annoncesANumeroter(listings.items, masqueesSurEtagere);
     if (!items.length) return;
     // ⚠️ ON N'ATTRIBUE RIEN TANT QU'ON NE SAIT PAS SI UNE VENTE PORTE DÉJÀ LE
     // NUMÉRO DE CETTE PAIRE. Les ventes et les identités « transaction →
@@ -40823,7 +40848,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const ecritsEnDouble = ecritOn ? clesLuesEnDouble(items.map((it) => lectureEcriteVinted(it))) : new Set();
     // (15 nov., src/numerosNouvelles.js) LE N° NEUF, dernier recours : « VRM numérote » et la lecture COMPLÈTE
     // du compte de l'annonce (règle <enligne-regle>, `complets[uid]`). Une lecture partielle ⇒ aucun N° neuf.
-    const neufPermis = (it) => numeroNeufPermis({ mode: ecritOn ? 'moi' : 'vrm', complet: lectureCompleteDe(it, listings) });
+    const neufPermis = (it) => numeroNeufPermis({ mode: ecritOn ? 'moi' : 'vrm', complet: lectureCompleteAnnonce(it, listings) });
     for (const it of sorted) {
       const cur = nextNum[it.id];
       const pk = photoKey(it.photo);
@@ -40905,7 +40930,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // arrivent souvent APRÈS les annonces. Sans elle, une annonce déjà rendue
   // garderait le numéro neuf qu'on vient justement d'éviter.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, listings.complets, cloudReady, numVentesParIdentite, sales.items, txnPret, verNumTick, listingDates, reservesNum, recreesEff, repubMain]);
+  }, [listings.items, masqueesSurEtagere, listings.complets, cloudReady, numVentesParIdentite, sales.items, txnPret, verNumTick, listingDates, reservesNum, recreesEff, repubMain]);
   // (6 nov., v36-raccords · banc chargement) LA LISTE D'ANNONCES ATTEND SA NUMÉROTATION :
   // des annonces numérotables sans N° et la numérotation pas encore passée ⇒ la liste
   // (prochain geste, N° à vérifier, grille) garde son squelette, à sa place. Sinon elle
@@ -40938,9 +40963,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // une par une (le champ pré-rempli avec la proposition, SA validation par `poserNumero`).
   const modeNum = ecritOnUi ? 'moi' : 'vrm';
   const nouveauxAEcrire = useMemo(() => aEcrireNouveaux(annoncesPresentes, numeros), [annoncesPresentes, numeros]);
-  const numerosADemander = useMemo(() => demandesNumero({ items: listings.items, fiches: numeros, listings, mode: modeNum,
+  // (15 nov.) Les masquées encore sur l'étagère aussi (`annoncesANumeroter`) : un article masqué par Vinted est chez lui.
+  const numerosADemander = useMemo(() => demandesNumero({ items: annoncesANumeroter(listings.items, masqueesSurEtagere), fiches: numeros, listings, mode: modeNum,
     numerotable: (it) => annonceNumerotable(it, listingDates), lectureEcrite: lectureEcriteVinted }),
-  [listings, numeros, modeNum, listingDates]);
+  [listings, masqueesSurEtagere, numeros, modeNum, listingDates]);
   const vendMots = () => (motsVendeur().nom === 'paire' ? 'sneakers' : 'autre');
   const ecrireNouveaux = (ids) => {
     const at = new Date().toISOString();
@@ -51138,6 +51164,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             )}
             {aVerifierCarton.map((it) => (
               <LigneVerifCarton key={it.id} it={it} fiche={numeros[it.id] || {}} onPlusLa={masqueePlusLa} preuve={ebayVerif && ebayVerif.preuves ? ebayVerif.preuves[String(it.id)] : ''}
+                reserve={(reserveDe(it) || {}).reserve || ''} onPrendreReserve={prendreReserve}
                 onConfirmer={confirmerCarton} onCorriger={corrigerCarton}/>
             ))}
           </details>
@@ -57233,7 +57260,7 @@ function doublesVenteEbay({ annonces, commandes, numeros, enLigne, vendusVinted,
 //    (api/_lib/push.js). Ce n'est donc pas un filtre d'affichage : la
 //    notification n'est pas envoyée du tout.
 // Une ligne de « Numéros à vérifier sur tes cartons » (écran Annonces).
-function LigneVerifCarton({ it, fiche, preuve, onConfirmer, onCorriger, onPlusLa }) {
+function LigneVerifCarton({ it, fiche, preuve, reserve = '', onConfirmer, onCorriger, onPlusLa, onPrendreReserve }) {
   const [v, setV] = React.useState('');
   const [occupe, setOccupe] = React.useState(false);
   const agir = async (f) => { if (occupe) return; setOccupe(true); try { await f(); } finally { setOccupe(false); } };
@@ -57246,13 +57273,17 @@ function LigneVerifCarton({ it, fiche, preuve, onConfirmer, onCorriger, onPlusLa
         {/* (11 nov., pire cas) Le titre ENTIER : c'est lui qu'on compare au carton (coupé, « Größe 42 Sportschuh… » ne disait plus quelle paire). */}
         <div data-verif-titre="" style={{ fontSize: 13, fontWeight: 600, color: C.text, overflowWrap: 'anywhere' }}>{it.title}</div>
         <div style={{ fontSize: 12, color: C.muted }}>
-          {tr('annonces.vrmDit')} <b data-verif-actuel style={{ color: C.text }}>N°{fiche.numero}</b>
+          {/* (15 nov., #4) La réservation liée qui dit un autre N° : les deux N°, côte à côte (jamais l'un caché). */}
+          {reserve
+            ? <span data-verif-reserve={String(reserve)} data-verif-actuel={String(fiche.numero)}>{tr('annonces.reserveDesaccord', { fiche: String(fiche.numero), reserve: String(reserve) })}</span>
+            : <>{tr('annonces.vrmDit')} <b data-verif-actuel style={{ color: C.text }}>N°{fiche.numero}</b></>}
           {it._vrmMasquee ? <> · <span data-verif-masquee>{tr('annonces.masqueeVinted')}</span></> : null}
           {preuve ? <> · <span data-verif-preuve>{preuve}</span></> : null}
         </div>
       </div>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
         <button type="button" disabled={occupe} onClick={() => agir(() => onConfirmer(it))} style={{ padding: '7px 10px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{trj('annonces.bien', { numero: fiche.numero })}</button>
+        {reserve && onPrendreReserve ? <button type="button" data-verif-prendre-reserve={String(reserve)} disabled={occupe} onClick={() => agir(() => onPrendreReserve(it, reserve))} style={{ padding: '7px 10px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{tr('annonces.reserveCarton', { reserve: String(reserve) })}</button> : null}
         <input className="vrm-autre-num" value={v} onChange={(e) => setV(e.target.value)} inputMode="numeric" placeholder={tr('annonces.autre')} aria-label={tr('annonces.numeroEcritEtiquette', { title: String(it.title) })}
           onKeyDown={(e) => { if (e.key === 'Enter' && v.trim()) agir(() => onCorriger(it, v)); }}
           style={{ width: 118, padding: '7px 9px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 13 }}/>
