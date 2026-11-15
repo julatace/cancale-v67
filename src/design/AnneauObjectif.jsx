@@ -10,33 +10,12 @@
 // l'anneau dit la PART, la cible et ce qui reste. Toucher l'anneau ⇒ le réglage de l'objectif (son clic).
 // Les mêmes attributs `data-objectif-*` que la barre (audits, bancs, instantané).
 import React from 'react';
-import { tr, date as dateLoc } from '../i18n/index.js';
-import { montant } from '../format.js';
-import { TYPES_OBJECTIF, estEuros, resteObjectif, rythmeObjectif } from '../objectifMois.js';
+import { tr } from '../i18n/index.js';
+import { estEuros, resteObjectif, rythmeObjectif } from '../objectifMois.js';
+import { motsAnneau } from '../anneauObjectif.js';
 import './anneau-objectif.css';
 
-const euros = (v) => montant(v, { centimes: 'jamais' });
 const R = 30, TOUR = 2 * Math.PI * R;
-
-// Les mots de l'anneau, à partir de la progression (pure : exécutée par scripts/audit-securite-ventes.cjs).
-export function motsAnneau(prog, maintenant = Date.now()) {
-  if (!prog) return null;
-  const eur = estEuros(prog.type);
-  const q = (v) => (eur ? euros(v) : tr('ann.nVentes', { n: v }));
-  const type = TYPES_OBJECTIF[prog.type] ? prog.type : 'ca';
-  const titre = tr('ann.titre.' + type, { cible: q(prog.objectif) });
-  if (prog.valeur == null || prog.pct == null) return { titre, centre: '—', ligne: tr('ann.pasSu.' + type), etat: 'passu', pct: null };
-  const r = resteObjectif(prog, maintenant);
-  if (!r) return { titre, centre: '—', ligne: tr('ann.pasSu.' + type), etat: 'passu', pct: null };
-  const centre = `${prog.partiel && !prog.atteint ? '≥ ' : ''}${prog.pct} %`;
-  if (r.atteint) return { titre, centre, ligne: tr('ann.atteint'), etat: 'atteint', pct: 100 };
-  const fin = new Date(new Date(maintenant).getFullYear(), new Date(maintenant).getMonth(), r.dernier);
-  const jour = dateLoc(fin, { day: 'numeric', month: 'short' });
-  const ligne = r.jours <= 1
-    ? tr(r.auPlus ? 'ann.aujourdhuiAuPlus' : 'ann.aujourdhui', { reste: q(r.reste) })
-    : tr(r.auPlus ? 'ann.resteAuPlus' : 'ann.reste', { reste: q(r.reste), parJour: q(r.parJour), jour });
-  return { titre, centre, ligne, etat: prog.partiel ? 'auMoins' : 'reste', pct: prog.pct };
-}
 
 export default function AnneauObjectif({ prog, onOuvrir = null, maintenant = null, prefixe = 'data-objectif' }) {
   if (!prog) return null;
