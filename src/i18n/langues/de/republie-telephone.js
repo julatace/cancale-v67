@@ -1,0 +1,23 @@
+// de · Republiée dans l'app Vinted (15 nov.) — src/republieTelephone.js.
+export default {
+  "rt.reconnu.un": "Nr. {numero} am Foto erkannt",
+  "rt.reconnu.plusieurs": {"one": "{n} Nr. am Foto erkannt · {numeros}", "other": "{n} Nr. an ihrem Foto erkannt · {numeros}"},
+  "rt.reconnu.geste": "in der Vinted-App neu eingestellt, der Karton bleibt gleich",
+  "rt.job.un": "Nr. {numero} neu eingestellt?",
+  "rt.job.plusieurs": {"one": "{n} Neueinstellung zu bestätigen", "other": "{n} Neueinstellungen zu bestätigen"},
+  "rt.job.detail": "Gleiches Foto wie eine gerade verschwundene Anzeige",
+  "rt.job.action": "Ansehen",
+  "rt.feuille.titre": "In der Vinted-App neu eingestellt?",
+  "rt.feuille.sous": "Diese neue Anzeige hat dasselbe Foto wie ein nummerierter Artikel, der gerade von Vinted verschwunden ist. Ist er es, behält sein Karton seine Nummer.",
+  "rt.avant": "Vorher",
+  "rt.maintenant": "Jetzt",
+  "rt.oui": "Ja, Nr. {numero} behalten",
+  "rt.non": "Nein, ein anderer Artikel",
+  "rt.nonPlusieurs": "Nein, keiner davon",
+  "rt.enLigne": "Nr. {numero} ist noch online: das ist keine Neueinstellung.",
+  "rt.plusTard": "Später",
+  "rt.rang": "{i} von {n}",
+  "acc.numero.republie.apres": "Nr. {numero} behalten · der Karton bleibt gleich",
+  "acc.numero.autre.apres": "Notiert: ein anderer Artikel · er bekommt eine neue Nummer",
+  "acc.numero.carton.apres": "Nr. {numero} für diesen Karton notiert",
+};

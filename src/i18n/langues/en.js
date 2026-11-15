@@ -5,7 +5,8 @@ import ecran_studio from './en/studio.js';   // (14 nov.) Studio bleu clair : le
 import ecran_correspondances from './en/correspondances.js';   // (15 nov.) Publier partout : catégories qui correspondent
 import ecran_capte from './en/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_renvoyer from './en/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
-import ecran_numeros_nouvelles from './en/numeros-nouvelles.js';   // (15 nov.) Les nouvelles annonces sans N°
+import ecran_numeros_nouvelles from './en/numeros-nouvelles.js';
+import ecran_republie_telephone from './en/republie-telephone.js';   // (15 nov.) Republiée dans l'app Vinted   // (15 nov.) Les nouvelles annonces sans N°
 import ecran_retrait_ailleurs from './en/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
 import ecran_finition from './en/finition.js';   // (15 nov.) la finition écran par écran
 import ecran_idees from './en/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
@@ -2267,5 +2268,6 @@ export default {
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_numeros_nouvelles,
+  ...ecran_republie_telephone,
   ...ecran_finition,
 };

@@ -369,6 +369,11 @@ export const GESTES_ACC = {
   'export.donnees':   { ecran: 'settings',  ensuite: null },
   'export.comptable': { ecran: 'compta',    ensuite: null },
   'compte.supprimer': { ecran: 'settings',  ensuite: null },
+  // (15 nov., lot numeros-masquees) « N°42 republiée ? » : SA réponse (oui : le N° reste ; non : un N° neuf).
+  'numero.republie':  { ecran: 'journee',   ensuite: null },
+  'numero.autre':     { ecran: 'journee',   ensuite: null },
+  // « N° à vérifier sur ton carton » : SON choix (le N° de la fiche ou celui que l'extension avait réservé).
+  'numero.carton':    { ecran: 'annonces',  ensuite: null },
 };
 export const IDS_GESTES_ACC = Object.keys(GESTES_ACC);
 export const gesteAcc = (id) => GESTES_ACC[id] || null;

@@ -1,0 +1,23 @@
+// en · Republiée dans l'app Vinted (15 nov.) — src/republieTelephone.js.
+export default {
+  "rt.reconnu.un": "No. {numero} recognised by its photo",
+  "rt.reconnu.plusieurs": {"one": "{n} No. recognised by its photo · {numeros}", "other": "{n} Nos. recognised by their photo · {numeros}"},
+  "rt.reconnu.geste": "relisted in the Vinted app, the box stays the same",
+  "rt.job.un": "No. {numero} relisted?",
+  "rt.job.plusieurs": {"one": "{n} relisting to confirm", "other": "{n} relistings to confirm"},
+  "rt.job.detail": "Same photo as a listing that just disappeared",
+  "rt.job.action": "See",
+  "rt.feuille.titre": "Relisted in the Vinted app?",
+  "rt.feuille.sous": "This new listing has the same photo as a numbered item that just disappeared from Vinted. If it is that item, its box keeps its number.",
+  "rt.avant": "Before",
+  "rt.maintenant": "Now",
+  "rt.oui": "Yes, keep No. {numero}",
+  "rt.non": "No, it’s another item",
+  "rt.nonPlusieurs": "No, none of these",
+  "rt.enLigne": "No. {numero} is still listed: this is not a relisting.",
+  "rt.plusTard": "Later",
+  "rt.rang": "{i} of {n}",
+  "acc.numero.republie.apres": "No. {numero} kept · the box stays the same",
+  "acc.numero.autre.apres": "Noted: another item · it gets a new number",
+  "acc.numero.carton.apres": "No. {numero} noted for this box",
+};

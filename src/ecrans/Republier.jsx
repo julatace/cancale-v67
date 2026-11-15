@@ -42,7 +42,9 @@ const VoileAtelier = ({ onClick, children }) => {
 import { CLE_REGLAGES_REPUB, TITRE_VINTED_MAX, PHOTO_NEUTRE, CURSEURS_PHOTO, REDUCTIONS_RAPIDES, MODES_TITRE, bornerPhoto, photoNeutre, cssApercuPhoto, dessinerPhotoReglee, appliquerCouleursPixels, nomPhotoReglee, lotAppliquePrix, lotAppliqueTitre, lireReglagesRepub, reglagesGardes, reglagesAOuverture, resumeGardes, apercuRepub, annonceRepubliee, resumeReglages, tirerLettre, prixChange, titreChange } from "../republierReglages.js";
 
 // ⟦← App.jsx #2⟧
-import { AccAvant, AccApres, AccEchec } from '../ui/Accompagne.jsx';   // (14 nov.) les quatre moments du geste
+import { AccAvant, AccApres, AccEchec } from '../ui/Accompagne.jsx';
+import { empreinteDepuisPixels, COTE_EMPREINTE } from '../photoEmpreinte.js';   // (15 nov.) l'empreinte de la photo PRODUITE (registre)
+import { ajouterAuRegistre, CLE_PHOTOS_VRM } from '../republieTelephone.js';   // (14 nov.) les quatre moments du geste
 
 // ── ÉDITEUR DE PHOTO (recadrer / zoomer / redresser / éclaircir) ──────────────
 // Julien choisit une photo DEPUIS SON TÉLÉPHONE (sa photo d'origine, meilleure
@@ -1113,7 +1115,7 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, ancienne, onDebu
   const placeN = (PLACES_ETIQUETTE.find((x) => x.v === etq.place) || PLACES_ETIQUETTE[0]);
   // ── Les photos : le MÊME dessin que l'atelier (`dessinerPhotoReglee`), préparées dès que la fiche est lue.
   const nPh = choisies.length;
-  const { ph, pretes, enregistrer, enregistrerUne, libelle: libellePhotos } = usePhotosReglees(choisies, regs.photo, paire.numero, { auto: fiche !== undefined && detail !== undefined });
+  const { ph, pretes, enregistrer, enregistrerUne, libelle: libellePhotos } = usePhotosReglees(choisies, regs.photo, paire.numero, { auto: fiche !== undefined && detail !== undefined, source: { id: paire.id, uid: paire.uid } });
   // ── Ce qui est fait (la progression en tête) : un geste fait ou une preuve lue, jamais deviné.
   const nouvelle = etatSuivi === 'fait' && (paire.numero || paire.annulee) ? 'fait' : etatSuivi === 'lie' ? 'lie' : 'attente';
   const etats = etatsEtapes(mode, { photos: { n: nPh, pretes: pretes ? ph.fichiers.length : 0, envoyees: ph && ph.envoyees ? ph.envoyees : 0 }, ancienne, ancienneOuverte: ouvertes.has('ancienne'), copies: cvC.faits, vintedOuvert: ouvertes.has('vinted'), nouvelle });
@@ -1290,7 +1292,17 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, ancienne, onDebu
 // Photos) ; ailleurs, le téléchargement `VRM-{N°}-01.jpg…`. Une photo en `data:` (choisie dans VRM)
 // se lit telle quelle ; une photo Vinted passe par `chargerPhotoBoite`. Aucun hasard.
 const lirePhotoGuide = async (u) => (/^data:image\//.test(String(u || '')) ? String(u) : chargerPhotoBoite(u));
-function usePhotosReglees(photos, reglage, numero, { auto = false } = {}) {
+// (15 nov., src/republieTelephone.js) LE REGISTRE DES PHOTOS FABRIQUÉES PAR VRM : l'empreinte de chaque image
+// PRODUITE pour un N° (jamais l'image), l'annonce d'origine, la date — synchronisé (`vrm_photos_vrm`), 60 jours.
+// Republiée telle quelle dans l'app Vinted, la nouvelle annonce reprend CE N° (identité : VRM l'a fabriquée).
+const empreinteToile = (cv) => {
+  try {
+    const n = COTE_EMPREINTE; const c = document.createElement('canvas'); c.width = n; c.height = n;
+    const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(cv, 0, 0, n, n);
+    return empreinteDepuisPixels(x.getImageData(0, 0, n, n).data, n, n);
+  } catch (_) { return null; }
+};
+function usePhotosReglees(photos, reglage, numero, { auto = false, source = null } = {}) {
   const [ph, setPh] = useState(null);   // { fichiers, parIndice, unes, fait, rate, total, encours, envoi, envoyees, erreur, pour }
   const clePhoto = JSON.stringify(reglage || PHOTO_NEUTRE) + '|' + photos.join('|');
   // (15 nov.) Une préparation par réglage : un réglage changé pendant qu’elle tourne en relance une, l’ancienne est jetée.
@@ -1302,6 +1314,7 @@ function usePhotosReglees(photos, reglage, numero, { auto = false } = {}) {
     const total = photos.length, pour = clePhoto, r = reglage || PHOTO_NEUTRE; const fichiers = []; const parIndice = []; let rate = 0;
     setPh({ fichiers: [], parIndice: [], unes: new Set(), fait: 0, rate: 0, total, encours: true, pour, envoyees: 0 });
     const tache = (async () => {
+      const registre = [];
       for (let i = 0; i < total; i++) {
         try {
           const data = await lirePhotoGuide(photos[i]);
@@ -1313,12 +1326,14 @@ function usePhotosReglees(photos, reglage, numero, { auto = false } = {}) {
           if (dessinerPhotoReglee(ctx, img, w, h, r) === 'pixels') { ctx.setTransform(1, 0, 0, 1, 0, 0); const id = ctx.getImageData(0, 0, w, h); appliquerCouleursPixels(id.data, r); ctx.putImageData(id, 0, 0); }
           const blob = await new Promise((ok) => cv.toBlob(ok, 'image/jpeg', 0.92));
           if (!blob) throw new Error('toile');
+          if (numero) { const h = empreinteToile(cv); if (h) registre.push({ h, n: String(numero), src: source && source.id ? String(source.id) : '', uid: source && source.uid ? String(source.uid) : '' }); }
           const fi = new File([blob], nomPhotoReglee(numero, i), { type: 'image/jpeg' });
           fichiers.push(fi); parIndice[i] = fi;
         } catch (_) { rate++; parIndice[i] = null; }
         if (cleCourante.current !== pour) return [];   // réglage ou choix changé : celle-ci est jetée
         setPh((p) => (p && p.pour !== pour ? p : { fichiers: fichiers.slice(), parIndice: parIndice.slice(), unes: new Set(), fait: fichiers.length, rate, total, encours: i < total - 1, pour, envoyees: 0 }));
       }
+      if (registre.length) { try { const r = ajouterAuRegistre(load(CLE_PHOTOS_VRM, {}), registre); if (r) save(CLE_PHOTOS_VRM, r); } catch (_) {} }
       return fichiers;
     })();
     enCours.current = { pour, tache };
@@ -1391,7 +1406,7 @@ function PublierALaMain({ fiche, vue, onFini, onClose }) {
   const texte = texteAnnonceVinted(f, { etiquette: etq, numeroEcrit: numEcrit });
   const champs = champsAnnonce({ titre: texte.ok ? texte.titre : f.titre, description: texte.ok ? texte.description : f.description, prix: f.prix, categorie: f.categorie, marque: f.marque, taille: f.taille, etat: f.etat, couleur: f.couleur });
   const cvC = couvertureCopie(champs, copies);
-  const { ph, pretes, enregistrer, enregistrerUne, libelle } = usePhotosReglees(choisies, null, f.numero, { auto: true });
+  const { ph, pretes, enregistrer, enregistrerUne, libelle } = usePhotosReglees(choisies, null, f.numero, { auto: true, source: { id: f.id, uid: f.uid } });
   const etats = etatsEtapes(mode, { photos: { n: nPh, pretes: pretes ? ph.fichiers.length : 0, envoyees: ph && ph.envoyees ? ph.envoyees : 0 }, copies: cvC.faits, vintedOuvert: ouvert, nouvelle: vue === true ? 'vue' : 'attente' });
   const l = etapesGuide(mode);
   const iE = Math.max(0, l.indexOf(etape));
@@ -1448,7 +1463,7 @@ function PublierALaMain({ fiche, vue, onFini, onClose }) {
 function CarteKit({ x, regs, copie, copies, copier, domaine, ouverte, onOuvrir }) {
   const { p, ann, photos, lue } = x;
   const nPh = photos.length;
-  const { ph, pretes, enregistrer, libelle } = usePhotosReglees(photos, regs.photo, p.numero);
+  const { ph, pretes, enregistrer, libelle } = usePhotosReglees(photos, regs.photo, p.numero, { source: { id: p.id, uid: p.uid } });
   const num = numeroACopier(p.numero, ann.etiquette);
   const kN = 'num:' + x.k, kD = 'desc:' + x.k;
   const descOk = lue === true;

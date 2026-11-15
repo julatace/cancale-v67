@@ -1,0 +1,23 @@
+// fr · Republiée dans l'app Vinted (15 nov.) — src/republieTelephone.js. La SOURCE.
+export default {
+  "rt.reconnu.un": "N°{numero} reconnu par sa photo",
+  "rt.reconnu.plusieurs": {"one": "{n} N° reconnu par sa photo · {numeros}", "other": "{n} N° reconnus par leur photo · {numeros}"},
+  "rt.reconnu.geste": "republiée dans l’app Vinted, le carton ne change pas",
+  "rt.job.un": "N°{numero} republiée ?",
+  "rt.job.plusieurs": {"one": "{n} republication à confirmer", "other": "{n} republications à confirmer"},
+  "rt.job.detail": "Même photo qu’une annonce qui vient de disparaître",
+  "rt.job.action": "Voir",
+  "rt.feuille.titre": "Republiée dans l’app Vinted ?",
+  "rt.feuille.sous": "Cette nouvelle annonce a la même photo qu’un article numéroté qui vient de disparaître de Vinted. Si c’est lui, son carton garde son N°.",
+  "rt.avant": "Avant",
+  "rt.maintenant": "Maintenant",
+  "rt.oui": "Oui, garder N°{numero}",
+  "rt.non": "Non, c’est un autre article",
+  "rt.nonPlusieurs": "Non, aucun de ceux-là",
+  "rt.enLigne": "N°{numero} est encore en ligne : ce n’est pas une republication.",
+  "rt.plusTard": "Plus tard",
+  "rt.rang": "{i} sur {n}",
+  "acc.numero.republie.apres": "N°{numero} gardé · le carton ne change pas",
+  "acc.numero.autre.apres": "Noté : un autre article · il reçoit un N° neuf",
+  "acc.numero.carton.apres": "N°{numero} noté pour ce carton",
+};

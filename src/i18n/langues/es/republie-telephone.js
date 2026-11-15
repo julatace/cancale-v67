@@ -1,0 +1,23 @@
+// es · Republiée dans l'app Vinted (15 nov.) — src/republieTelephone.js.
+export default {
+  "rt.reconnu.un": "N°{numero} reconocido por su foto",
+  "rt.reconnu.plusieurs": {"one": "{n} N° reconocido por su foto · {numeros}", "other": "{n} N° reconocidos por su foto · {numeros}"},
+  "rt.reconnu.geste": "republicado en la app de Vinted, la caja no cambia",
+  "rt.job.un": "¿N°{numero} republicado?",
+  "rt.job.plusieurs": {"one": "{n} republicación por confirmar", "other": "{n} republicaciones por confirmar"},
+  "rt.job.detail": "Misma foto que un anuncio que acaba de desaparecer",
+  "rt.job.action": "Ver",
+  "rt.feuille.titre": "¿Republicado en la app de Vinted?",
+  "rt.feuille.sous": "Este anuncio nuevo tiene la misma foto que un artículo numerado que acaba de desaparecer de Vinted. Si es él, su caja conserva su N°.",
+  "rt.avant": "Antes",
+  "rt.maintenant": "Ahora",
+  "rt.oui": "Sí, conservar el N°{numero}",
+  "rt.non": "No, es otro artículo",
+  "rt.nonPlusieurs": "No, ninguno de estos",
+  "rt.enLigne": "El N°{numero} sigue publicado: no es una republicación.",
+  "rt.plusTard": "Más tarde",
+  "rt.rang": "{i} de {n}",
+  "acc.numero.republie.apres": "N°{numero} conservado · la caja no cambia",
+  "acc.numero.autre.apres": "Anotado: otro artículo · recibe un N° nuevo",
+  "acc.numero.carton.apres": "N°{numero} anotado para esta caja",
+};

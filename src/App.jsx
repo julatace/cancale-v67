@@ -488,6 +488,7 @@ import VisiteBulles from "./VisiteBulles.jsx";
 import { poserOutilsAccueil } from "./accueilReste/deps.js";
 import { AccueilResteJournee, VisiteEcranHote } from "./accueilReste/AccueilReste.jsx";
 import { retenirNumerosNeufs, clesLuesEnDouble } from "./accueilReste/cartonsNumeros.js";
+import { decisionRepublie, disparuesDuCompte, empreintesDe, majEmpreintesFiches, majAttente as majAttenteRepub, CLE_PHOTOS_VRM, CLE_EMPREINTES_FICHES, CLE_REPUB_REPONSES, CLE_REPUB_ATTENTE } from "./republieTelephone.js";
 import { numeroNeufPermis, lectureCompleteAnnonce, annoncesANumeroter, reserveEnDesaccord, marquerNouveau, marquerEcrit, aEcrireNouveaux, listeNumeros, demandesNumero, propositionNumero, modeNumerotation } from "./numerosNouvelles.js";
 import { publierSansNumero } from "./accueilReste/trouveChezToi.js";
 import { CLE_AIDES } from "./accueilReste/aides.js";
@@ -3137,6 +3138,10 @@ const SYNC_KEYS = [
   // (5 nov.) « Republier à la main, accompagné » : { [ancienId]: { uid, num, titre, at, nouvelId?, lieAt? } }.
   // Le lien nouvelle → ancienne est posé par SON clic (src/annoncesActions.js).
   'vrm_repub_main',
+  // (15 nov., src/republieTelephone.js) Republiée dans l'app Vinted : le registre des photos FABRIQUÉES par VRM
+  // ({ [empreinte]: { n, src, uid, at } }, jamais l'image), les empreintes gardées des fiches numérotées, SES
+  // réponses « Non, c'est une autre paire » et la première fois qu'une annonce a attendu (borne de 24 h).
+  'vrm_photos_vrm', 'vrm_empreintes_fiches', 'vrm_republie_reponses', 'vrm_republie_attente',
   // (6 nov.) LES réglages de Republier (photos, prix, titre, lettre) : les mêmes pour
   // l'atelier et « Republier à la main », sur tous ses appareils (src/republierReglages.js).
   'vrm_republier_reglages',
@@ -3901,6 +3906,65 @@ function NouveauxNumerosHost() {
         <div style={{display:'flex',gap:9,marginTop:12}}>
           <Bouton variante="discret" onClick={fermer} style={{flex:1}}>{tr('nn.feuille.fermer')}</Bouton>
           {q.lignes.length > 1 ? <Bouton variante="primaire" data-nn-tout="" onClick={() => ecrire(q.lignes.map((l) => l.id))} style={{flex:2}}>{tr('nn.feuille.toutEcrit')}</Bouton> : null}
+        </div>
+      </div>
+    </SheetShell>, document.body
+  );
+}
+
+// (15 nov., src/republieTelephone.js) « REPUBLIÉE DANS L'APP VINTED ? » : la feuille ouverte par Ma journée.
+// Une proposition à la fois (« 1 sur 3 ») : AVANT (la paire numérotée qui vient de disparaître, son N° gravé)
+// et MAINTENANT (la nouvelle annonce) côte à côte, au même cadrage ; « Oui, garder N°42 » (le plein) relie
+// par SON clic (le lien de « Republier à la main », `vrm_repub_main`) ; « Non, c'est un autre article »
+// laisse la règle normale donner un N° neuf. Une ancienne encore en ligne ne se relie pas (le dit).
+let _rtListener = null;
+const ouvrirRepubliee = (opts) => { if (_rtListener) _rtListener(opts || null); };
+function RepublieeHost() {
+  const [q, setQ] = React.useState(null);
+  const [i, setI] = React.useState(0);
+  React.useEffect(() => { _rtListener = (o) => { setI(0); setQ(o); }; return () => { _rtListener = null; }; }, []);
+  if (!q || !Array.isArray(q.propositions) || !q.propositions.length) return null;
+  const l = q.propositions, k = Math.min(i, l.length - 1), pr = l[k];
+  const fermer = () => setQ(null);
+  const suite = () => { const reste = l.filter((_, j) => j !== k); if (!reste.length) { setQ(null); return; } setQ({ ...q, propositions: reste }); setI(Math.min(k, reste.length - 1)); };
+  const repondre = (cand) => { try { q.onRepondre(pr, cand); } catch (_) {} suite(); };
+  const cadre = { position: 'relative', aspectRatio: '3 / 4', borderRadius: 16, overflow: 'hidden', background: 'var(--sb-porcelaine, ' + C.card2 + ')', boxShadow: 'var(--sb-ombre-tuile, 0 1px 2px rgba(0,0,0,.06))' };
+  const legende = { fontSize: 12, fontWeight: 600, color: C.muted, letterSpacing: '.02em', marginBottom: 6 };
+  const plusieurs = pr.candidats.length > 1;
+  return createPortal(
+    <SheetShell onClose={fermer} z={Z_CONFIRMATION} className="vrm-confirmation vrm-rt-feuille" aria-label={tr('rt.feuille.titre')}>
+      <div data-rt-feuille={pr.id} data-rt-n={l.length}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
+          <div style={{ fontSize: 19, fontWeight: 600, color: C.text, letterSpacing: '-0.02em', lineHeight: 1.3 }}>{tr('rt.feuille.titre')}</div>
+          {l.length > 1 ? <span data-rt-rang="" style={{ fontSize: 13, color: C.muted, flexShrink: 0 }}>{tr('rt.rang', { i: k + 1, n: l.length })}</span> : null}
+        </div>
+        <div style={{ fontSize: 14, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>{tr('rt.feuille.sous')}</div>
+        {pr.candidats.map((c) => (
+          <div key={c.id + ':' + c.numero} data-rt-candidat={c.numero} style={{ marginTop: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <div style={legende}>{tr('rt.avant')}</div>
+                <div style={cadre} data-rt-avant={c.id}>
+                  {c.photo ? <PhotoVinted src={c.photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}/> : <PhotoVide remplir rayon={16}/>}
+                  <span style={{ position: 'absolute', left: 8, bottom: 8 }}><Numero n={c.numero}/></span>
+                </div>
+              </div>
+              <div>
+                <div style={legende}>{tr('rt.maintenant')}</div>
+                <div style={cadre} data-rt-maintenant={pr.id}>
+                  {pr.photo ? <PhotoVinted src={pr.photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}/> : <PhotoVide remplir rayon={16}/>}
+                </div>
+              </div>
+            </div>
+            <div style={{ fontSize: 13, color: C.text, marginTop: 8, overflowWrap: 'anywhere', lineHeight: 1.4 }}>{pr.titre || c.title || ''}</div>
+            {c.enLigne
+              ? <div data-rt-en-ligne={c.numero} style={{ fontSize: 13, color: C.muted, marginTop: 8 }}>{tr('rt.enLigne', { numero: c.numero })}</div>
+              : <Bouton variante={plusieurs ? 'secondaire' : 'primaire'} plein data-rt-oui={c.numero} onClick={() => repondre(c)} style={{ marginTop: 12, minHeight: 48 }}>{tr('rt.oui', { numero: c.numero })}</Bouton>}
+          </div>
+        ))}
+        <div style={{ display: 'flex', gap: 9, marginTop: 12 }}>
+          <Bouton variante="discret" onClick={fermer} style={{ flex: 1, minHeight: 44 }}>{tr('rt.plusTard')}</Bouton>
+          <button type="button" className="sb-touche" data-rt-non={pr.id} onClick={() => repondre(null)} style={{ flex: 2, minHeight: 44 }}>{tr(plusieurs ? 'rt.nonPlusieurs' : 'rt.non')}</button>
         </div>
       </div>
     </SheetShell>, document.body
@@ -15309,6 +15373,18 @@ function direNouveauxNumeros(liste) {
     const parCompte = {};
     for (const x of l) { const u = String(x.uid || ''); if (/^\d{1,15}$/.test(u)) (parCompte[u] = parCompte[u] || []).push(`${x.id}:${x.numero}`); }
     for (const [uid, ids] of Object.entries(parCompte)) versExtension(ext, { type: 'numerotes', uid, ids: ids.slice(0, 60) }, 3000).catch(() => null);
+  } catch (_) {}
+}
+// (15 nov., src/republieTelephone.js) « N°42 reconnu par sa photo » : la nouvelle annonce (republiée dans l'app
+// Vinted) porte la photo que VRM a FABRIQUÉE pour ce N° — le carton n'a rien à changer. Dit une fois, par
+// l'appareil qui l'a repris (bandeau, notification si l'app est en arrière-plan).
+function direNumerosReconnus(liste) {
+  try {
+    const l = (Array.isArray(liste) ? liste : []).filter((x) => x && String(x.numero || '').trim());
+    if (!l.length) return;
+    const titre = l.length === 1 ? tr('rt.reconnu.un', { numero: String(l[0].numero) }) : tr('rt.reconnu.plusieurs', { n: l.length, numeros: listeNumeros(l.map((x) => x.numero)) });
+    toast(`${titre} · ${tr('rt.reconnu.geste')}`, 'ok');
+    alerteLocale(titre, tr('rt.reconnu.geste'), '?tab=journee').catch(() => {});
   } catch (_) {}
 }
 
@@ -40748,6 +40824,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return { parItem, parPhoto };
   }, [sales.items, saleOv, txnItem]);
 
+  // (15 nov., src/republieTelephone.js) LES EMPREINTES DES PHOTOS VINTED (`photo_emprunte_{uid}`, extension
+  // 5.358) : la numérotation les compare avant un N° neuf quand une annonce du même compte vient de
+  // disparaître (republication faite dans l'app Vinted). Trois états : undefined en cours · null pas su · objet.
+  const [empreintesVinted, setEmpreintesVinted] = useState(undefined);
+  const cleAnnoncesEmpreintes = useMemo(() => (Array.isArray(listings.items) ? listings.items.map((i) => String(i && i.id)).sort().join(',') : null), [listings.items]);
+  useEffect(() => {
+    if (!cloudReady || cleAnnoncesEmpreintes == null) return undefined;
+    let vivant = true;
+    lireEmpreintesPhotos().then((e) => { if (vivant) setEmpreintesVinted(e); }, () => { if (vivant) setEmpreintesVinted(null); });
+    return () => { vivant = false; };
+  }, [cloudReady, cleAnnoncesEmpreintes]);
+  // Les propositions « N°42 republiée ? » (Ma journée) et le signal d'une réponse (relance la numérotation).
+  const [propositionsRepub, setPropositionsRepub] = useState([]);
+  const [reponsesRepubTick, setReponsesRepubTick] = useState(0);
+
   // ── Numérotation AUTOMATIQUE des annonces en ligne ─────────────────────────
   // Chaque annonce sans N° reçoit automatiquement le prochain numéro libre. Deux
   // règles clés :
@@ -40831,6 +40922,30 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // (15 nov., src/numerosNouvelles.js) <numerotation-passage> — `scripts/audit-numeros-nouvelles.cjs`
     // EXÉCUTE ce bloc tel quel (de cette balise à la balise fermante) : ne pas renommer ses variables.
     const nouveauxNum = [];
+    // (15 nov., src/republieTelephone.js) <republie-telephone> LE DERNIER RECOURS AVANT UN N° NEUF : une annonce
+    // du MÊME compte a disparu récemment (vue en ligne, absente de la lecture complète, ni vendue, ni remplacée,
+    // ni sortie) ⇒ la nouvelle attend la comparaison des photos (24 h au plus) ; même photo ⇒ PROPOSÉE (son clic) ;
+    // la photo que VRM a FABRIQUÉE pour un N° (registre `vrm_photos_vrm`, seuil sûr) ⇒ ce N° repris, dit une fois.
+    const reconnusNum = [], republieAttente = [], republiePropositions = [];
+    const presentsRep = new Set([...items, ...(listings.aConfirmer || []), ...(listings.brouillons || [])].map((x) => String(x && x.id)));
+    const vusRep = lireObjet(VUS_EN_LIGNE), decisionsRep = lireObjet(CYCLE_DECISIONS);
+    const registreRep = lireObjet(CLE_PHOTOS_VRM), memRep = lireObjet(CLE_EMPREINTES_FICHES), reponsesRep = lireObjet(CLE_REPUB_REPONSES), attenteRep = lireObjet(CLE_REPUB_ATTENTE);
+    const remplaceesRep = new Set(Object.values(recreesEff || {}).map(String));
+    const numVenduRep = (k) => Object.values(saleOv || {}).some((o) => o && cleNum(o.numero) === k);
+    const empRep = (uid, id) => { const e = empreintesVinted && empreintesVinted[`vinted:${uid}`]; return (e && e[String(id)]) || null; };
+    const disparuesRep = {};
+    const republieDe = (it) => {
+      const uid = String(it._acc?.vinted_user_id ?? '');
+      if (!disparuesRep[uid]) disparuesRep[uid] = disparuesDuCompte({ uid, fiches: nextNum, presentes: presentsRep, vus: vusRep, lu: (listings.lues || {})[uid],
+        vendue: (id, f) => !!numVentesParIdentite.parItem[id] || !!(venduesVinted && venduesVinted.has(id)) || numVenduRep(cleNum(f.numero)),
+        remplacees: remplaceesRep, sortie: (id) => annonceDeclareePartie(id, nextNum, pairsLost) || ['vendu-main', 'separe'].includes((decisionsRep[id] || {}).choix),
+        reprenable: (n) => !!numeroReprenable(n) }).map((d) => ({ ...d, hexes: (memRep[d.id] && Array.isArray(memRep[d.id].h) && memRep[d.id].h.length) ? memRep[d.id].h : empreintesDe(empRep(uid, d.id)) }));
+      return decisionRepublie({ id: it.id, hexes: empreintesDe(empRep(uid, it.id)), disparues: disparuesRep[uid], registre: registreRep, reponse: reponsesRep[String(it.id)], depuis: attenteRep[String(it.id)],
+        sourcePresente: (src) => presentsRep.has(String(src)),
+        numeroPresentAilleurs: (k) => [...presentsRep].some((pid) => pid !== String(it.id) && nextNum[pid] && cleNum(nextNum[pid].numero) === k),
+        numeroVendu: numVenduRep, ficheDe: (src) => nextNum[src] || null, cle: cleNum });
+    };
+    // </republie-telephone>
     // La paire REPUBLIÉE reprend le numéro de l'annonce qu'elle remplace (et
     // une annonce renumérotée automatiquement par erreur le retrouve).
     if (recreesEff) {
@@ -40906,6 +41021,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (!num && retenueCartons) continue;   // (14 nov., 134) il n'a pas encore dit si ses cartons portent déjà leurs N°
       const neuf = !num;
       if (neuf && !neufPermis(it)) continue;
+      // (15 nov., <republie-telephone>) Avant un N° neuf : republiée dans l'app Vinted ?
+      if (neuf) {
+        const dr = republieDe(it);
+        if (dr.action === 'attendre' || dr.action === 'proposer') {
+          republieAttente.push(String(it.id));
+          if (dr.action === 'proposer') republiePropositions.push({ id: String(it.id), titre: it.title || '', photo: it.photo || null, uid: String(it._acc?.vinted_user_id ?? ''), candidats: dr.candidats, raison: dr.raison });
+          continue;
+        }
+        if (dr.action === 'reprendre') {
+          const at = new Date().toISOString();
+          nextNum[it.id] = { ...(cur || {}), numero: String(dr.numero), title: it.title, photo: it.photo || null, photoK: pk || (cur && cur.photoK) || null, price: it.price ?? null, size: it.size ?? (cur && cur.size) ?? null, accountId: it._acc?.vinted_user_id, numberedAt: at, auto: true, recreeDe: String(dr.source), recreeAt: at, recreeOrigine: 'photo-vrm' };
+          reconnusNum.push({ id: String(it.id), numero: String(dr.numero), title: it.title || '', photo: it.photo || null });
+          { const ep = entreePool(dr.numero); if (ep != null) nextUsed.add(ep); }
+          changed = true;
+          continue;
+        }
+      }
       if (!num) num = prochainLibre(taken, takenK, prefNum);
       nextNum[it.id] = { ...(cur || {}), numero: String(num), title: it.title, photo: it.photo || null, photoK: pk || (cur && cur.photoK) || null, price: it.price ?? null, size: it.size ?? (cur && cur.size) ?? null, accountId: it._acc?.vinted_user_id, numberedAt: (cur && cur.numberedAt) || new Date().toISOString(), auto: true };
       // Un N° NEUF est « à écrire sur son carton » jusqu'à « C'est écrit » ; l'appareil qui l'a donné le dit.
@@ -40915,6 +41047,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       changed = true;
     }
     // </numerotation-passage>
+    // (15 nov.) L'attente « republiée ? » (la première fois vue sans N°, synchronisée : la borne de 24 h vaut
+    // pour tous ses appareils) et les propositions de Ma journée.
+    { const att = majAttenteRepub(attenteRep, { attendent: republieAttente, numerotees: items.filter((x) => String((nextNum[x.id] || {}).numero || '').trim()).map((x) => String(x.id)) });
+      if (att) save(CLE_REPUB_ATTENTE, att);
+      setPropositionsRepub((p) => (JSON.stringify(p) === JSON.stringify(republiePropositions) ? p : republiePropositions)); }
     // (6 nov., finitions) Une paire remise en vente dont le carton porte un N° d'ARCHIVE (B…) :
     // sa nouvelle annonce a un N° neuf ⇒ « nouveaux numéros à écrire sur tes cartons »
     // (src/repriseNumero.js `archivesAEcrire` ; la liste est `reattribueAEcrire`, inchangée).
@@ -40936,12 +41073,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const ua = [...nextUsed].sort(triPool); setUsedNumeros(ua); save('vinted_used_numeros', ua);
       // (15 nov.) « 3 nouveaux articles numérotés · N°216, 217, 218 » — une fois, par l'appareil qui les a donnés.
       if (nouveauxNum.length) direNouveauxNumeros(nouveauxNum);
+      // (15 nov.) « N°42 reconnu par sa photo » — une fois, par l'appareil qui l'a repris.
+      if (reconnusNum.length) direNumerosReconnus(reconnusNum);
     }
   // ⚠️ `numVentesParIdentite` DOIT être dans les dépendances : les ventes
   // arrivent souvent APRÈS les annonces. Sans elle, une annonce déjà rendue
   // garderait le numéro neuf qu'on vient justement d'éviter.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, masqueesSurEtagere, listings.complets, cloudReady, numVentesParIdentite, sales.items, txnPret, verNumTick, listingDates, reservesNum, recreesEff, repubMain]);
+  }, [listings.items, masqueesSurEtagere, listings.complets, cloudReady, numVentesParIdentite, sales.items, txnPret, verNumTick, listingDates, reservesNum, recreesEff, repubMain, empreintesVinted, venduesVinted, pairsLost, reponsesRepubTick]);
+  // (15 nov., src/republieTelephone.js) LA MÉMOIRE DES EMPREINTES DES FICHES NUMÉROTÉES : l'extension efface
+  // celle d'une annonce supprimée ; VRM la garde (60 jours) pour reconnaître sa republication.
+  useEffect(() => {
+    if (!cloudReady || !empreintesVinted) return;
+    const vues = annoncesPresentes.map((it) => { const uid = String(it._acc?.vinted_user_id ?? ''); const e = empreintesVinted[`vinted:${uid}`]; return { id: String(it.id), numero: (numeros[it.id] || {}).numero, uid, hexes: e && e[String(it.id)] }; });
+    const m = majEmpreintesFiches(lireObjet(CLE_EMPREINTES_FICHES), vues);
+    if (m) save(CLE_EMPREINTES_FICHES, m);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloudReady, empreintesVinted, annoncesPresentes, numeros]);
   // (6 nov., v36-raccords · banc chargement) LA LISTE D'ANNONCES ATTEND SA NUMÉROTATION :
   // des annonces numérotables sans N° et la numérotation pas encore passée ⇒ la liste
   // (prochain geste, N° à vérifier, grille) garde son squelette, à sa place. Sinon elle
@@ -40987,6 +41135,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     gesteVrm(ids.length === 1 ? tr('nn.geste.ecrit', { numero: String(n1.numero || '') }) : tr('nn.geste.tous', { n: ids.length }), ops, { vinted_annonce_numeros: setNumeros });
   };
   const ouvrirAEcrire = () => ouvrirNouveauxNumeros({ vend: vendMots(), lignes: nouveauxAEcrire, onEcrit: ecrireNouveaux });
+  // (15 nov., src/republieTelephone.js) SA réponse à « N°42 republiée ? ». « Oui » : le lien nouvelle → ancienne de
+  // « Republier à la main » (`vrm_repub_main`, synchronisé), la reprise (`repriseNumerosRecreation`) remet le N°.
+  // « Non » : `vrm_republie_reponses[nouvelId]` ⇒ la règle normale (un N° neuf). Un geste annulable, dit une fois.
+  const repondreRepubliee = (pr, cand) => {
+    const now = new Date().toISOString();
+    if (cand && cand.id && !cand.enLigne) {
+      const avant = (repubMain || {})[String(cand.id)];
+      const apres = { ...(avant || {}), uid: String(pr.uid || ''), num: String(cand.numero || ''), titre: String(cand.title || ''), nouvelId: String(pr.id), nouveauTitre: String(pr.titre || ''), lieAt: now, at: (avant && avant.at) || now, origine: 'photo' };
+      gesteVrm(tr('acc.numero.republie.apres', { numero: String(cand.numero) }), [{ k: 'vrm_repub_main', type: 'cle', id: String(cand.id), apres, avant }], { vrm_repub_main: setRepubMain }, () => setReponsesRepubTick((n) => n + 1), 'numero.republie');
+      return;
+    }
+    const reps = lireObjet(CLE_REPUB_REPONSES);
+    const avant = reps[String(pr.id)];
+    const apres = { choix: 'non', anciens: (pr.candidats || []).map((c) => String(c.id)).filter(Boolean), at: now };
+    gesteVrm(tr('acc.numero.autre.apres'), [{ k: CLE_REPUB_REPONSES, type: 'cle', id: String(pr.id), apres, avant }], {}, () => setReponsesRepubTick((n) => n + 1), 'numero.autre');
+  };
+  const ouvrirPropositionsRepub = () => ouvrirRepubliee({
+    propositions: propositionsRepub.map((pr) => ({ ...pr, candidats: (pr.candidats || []).map((c) => ({ ...c, enLigne: (listings.items || []).some((x) => String(x.id) === String(c.id)) })) })),
+    onRepondre: repondreRepubliee });
   const demanderNumerosManquants = async () => {
     const liste = numerosADemander.slice(0, 30);
     const deja = []; let faits = 0;
@@ -46914,6 +47081,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (modeNum === 'moi' && numerosADemander.length) {
           const court = tr('nn.demande.court.autre', { n: numerosADemander.length });   // « articles » sur Ma journée (voir plus haut)
           jobs.push({ id: 'numeros-a-donner', n: numerosADemander.length, icon: 'pencil', color: C.warn, court, detail: tr('nn.demande.detail'), title: court, photos: numerosADemander.map((it) => it.photo || null), tab: null, prio: 0.3, action: tr('nn.demande.action'), avant: () => { demanderNumerosManquants(); } });
+        }
+        // (15 nov., src/republieTelephone.js) « N°42 republiée ? » : une nouvelle annonce a la même photo qu'une
+        // annonce numérotée qui vient de disparaître (republiée dans l'app Vinted ?). Rien n'est relié sans SON clic.
+        if (modeNum === 'vrm' && propositionsRepub.length) {
+          const c0 = (propositionsRepub[0].candidats || [])[0] || {};
+          const court = propositionsRepub.length === 1 ? tr('rt.job.un', { numero: String(c0.numero || '') }) : tr('rt.job.plusieurs', { n: propositionsRepub.length });
+          jobs.push({ id: 'numeros-republiee', n: propositionsRepub.length, icon: 'pencil', color: C.warn, court, detail: tr('rt.job.detail'), title: court, photos: propositionsRepub.map((p) => p.photo || null), tab: null, prio: 0.25, action: tr('rt.job.action'), avant: ouvrirPropositionsRepub });
         }
         // (6 nov., vague 2 · point 4) Les annonces numérotées sans achat relié : le nombre, une fois ;
         // « Voir » ouvre Annonces sur « Sans achat relié » (une suggestion par annonce, SON tap relie).
@@ -62985,6 +63159,7 @@ function AppCoeur() {
           retomberait silencieusement sur la boîte grise du navigateur. */}
       <ConfirmHost/>
       <NouveauxNumerosHost/>
+      <RepublieeHost/>
       {/* (11 nov., lot suivi-travail) VRM figé pendant un travail long : détail, barre, pause / arrêt. */}
       <SuiviTravailCoque/>
       <FileReseauExt/>{/* (12 nov., ext. 5.371) gestes en attente de réseau, avec « Annuler » */}
