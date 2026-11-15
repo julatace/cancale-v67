@@ -28,8 +28,10 @@ import { lireSourcesColis } from './retrouverColis.js';
 import './design/scanner-retrouver.css';
 
 const ATTENTE_SOURCES_MS = 10000;
-// La zone lue par ZXing : la bande du viseur, large (un bordereau se tient souvent de travers).
-const ZONE = { x: 0.04, y: 0.18, l: 0.92, h: 0.64 };
+// Les zones lues par ZXing, à tour de rôle : le centre du viseur (là où il vise), puis large (un bordereau
+// se tient souvent de travers). Voir `creerLecteur` (src/ScannerColis.jsx) : mesuré sur le banc scan-colis.
+const CENTRE = { x: 0.15, y: 0.3, l: 0.7, h: 0.4 };
+const ZONE = [CENTRE, CENTRE, { x: 0.04, y: 0.18, l: 0.92, h: 0.64 }];
 const SORTES = ['vente', 'achat', 'retour', 'colis'];
 
 // La phrase quand la caméra manque : un refus dit OÙ l'autoriser (la raison gardée par la caméra du scanner).
@@ -60,7 +62,7 @@ const ouvrirLib = (e) => tr('scan.r.ouvrir.' + (SORTES.includes(e && e.sorte) ? 
 
 function Vignette({ e, Photo, grande = false }) {
   return (
-    <span className={'vrm-sr-photo' + (grande ? ' is-grande' : '')} aria-hidden="true">
+    <span className={'vrm-rtv-photo' + (grande ? ' is-grande' : '')} aria-hidden="true">
       {e && e.photo && Photo ? <Photo src={e.photo} alt="" decoding="async" loading="lazy"/> : <Icone d={I_BOITE} taille={grande ? 34 : 22}/>}
     </span>
   );
@@ -69,30 +71,30 @@ function Vignette({ e, Photo, grande = false }) {
 // LA FICHE d'un enregistrement trouvé : photo, N°, titre, état, code de retrait et point (achat), étape (retour).
 function Fiche({ e, lu, Photo, onOuvrir }) {
   return (
-    <div className="vrm-sr-fiche" data-scan-r-fiche={`${e.sorte}:${e.cle}`} data-scan-r-sorte={e.sorte} data-scan-r-num={e.num || ''}>
-      <div className="vrm-sr-fiche-tete">
+    <div className="vrm-rtv-fiche" data-scan-r-fiche={`${e.sorte}:${e.cle}`} data-scan-r-sorte={e.sorte} data-scan-r-num={e.num || ''}>
+      <div className="vrm-rtv-fiche-tete">
         <Vignette e={e} Photo={Photo} grande/>
-        <div className="vrm-sr-fiche-id">
-          <span className="vrm-sr-kicker" data-scan-r-kicker="">{sorteDe(e)}</span>
-          {e.num ? <span className="vrm-sr-plaque" data-scan-r-plaque={e.num}><small>N°</small>{e.num}</span> : null}
-          <span className="vrm-sr-titre" data-scan-r-titre="">{e.titre || tr('scan.r.sansTitre')}</span>
-          {e.taille || e.compte ? <span className="vrm-sr-sous">{[e.taille ? (/^\d/.test(String(e.taille)) ? tr('scan.r.taille', { t: e.taille }) : e.taille) : '', ''].filter(Boolean).join(' · ')}{e.compte ? <>{e.taille ? ' · ' : ''}<span className="vrm-sensible" data-stream-type="compte">{e.compte}</span></> : null}</span> : null}
+        <div className="vrm-rtv-fiche-id">
+          <span className="vrm-rtv-kicker" data-scan-r-kicker="">{sorteDe(e)}</span>
+          {e.num ? <span className="vrm-rtv-plaque" data-scan-r-plaque={e.num}><small>N°</small>{e.num}</span> : null}
+          <span className="vrm-rtv-titre" data-scan-r-titre="">{e.titre || tr('scan.r.sansTitre')}</span>
+          {e.taille || e.compte ? <span className="vrm-rtv-sous">{[e.taille ? (/^\d/.test(String(e.taille)) ? tr('scan.r.taille', { t: e.taille }) : e.taille) : '', ''].filter(Boolean).join(' · ')}{e.compte ? <>{e.taille ? ' · ' : ''}<span className="vrm-sensible" data-stream-type="compte">{e.compte}</span></> : null}</span> : null}
         </div>
       </div>
       {e.etat ? (
-        <div className={'vrm-sr-etat' + (e.aFaire ? ' is-afaire' : '')} data-scan-r-etat={e.aFaire ? 'afaire' : 'info'}>
-          <span className="vrm-sr-etat-point" aria-hidden="true"/>
-          <span className="vrm-sr-etat-txt"><b>{e.etat}</b>{e.detail ? <small>{e.detail}</small> : null}</span>
+        <div className={'vrm-rtv-etat' + (e.aFaire ? ' is-afaire' : '')} data-scan-r-bandeau={e.aFaire ? 'afaire' : 'info'}>
+          <span className="vrm-rtv-etat-point" aria-hidden="true"/>
+          <span className="vrm-rtv-etat-txt"><b>{e.etat}</b>{e.detail ? <small>{e.detail}</small> : null}</span>
         </div>
       ) : null}
       {e.code || e.lieu ? (
-        <div className="vrm-sr-retrait" data-scan-r-retrait="">
-          {e.code ? <span className="vrm-sr-code"><small>{tr('scan.r.code')}</small><b data-scan-r-code={e.code}>{e.code}</b></span> : null}
-          {e.lieu ? <span className="vrm-sr-lieu vrm-sensible" data-stream-type="adresse">{e.lieu}</span> : null}
+        <div className="vrm-rtv-retrait" data-scan-r-retrait="">
+          {e.code ? <span className="vrm-rtv-code"><small>{tr('scan.r.code')}</small><b data-scan-r-code={e.code}>{e.code}</b></span> : null}
+          {e.lieu ? <span className="vrm-rtv-lieu vrm-sensible" data-stream-type="adresse">{e.lieu}</span> : null}
         </div>
       ) : null}
-      <p className="vrm-sr-lu" data-scan-r-lu={lu ? lu.suivi : ''}>{lu && lu.nom ? `${lu.nom} · ` : ''}{lu ? court(lu.suivi) : ''}</p>
-      <button type="button" className="vrm-sr-plein" data-scan-r-ouvrir={`${e.sorte}:${e.cle}`} data-acc-apres="colis.retrouver" onClick={() => onOuvrir(e)}>{ouvrirLib(e)}</button>
+      <p className="vrm-rtv-lu" data-scan-r-lu={lu ? lu.suivi : ''}>{lu && lu.nom ? `${lu.nom} · ` : ''}{lu ? court(lu.suivi) : ''}</p>
+      <button type="button" className="vrm-rtv-plein" data-scan-r-ouvrir={`${e.sorte}:${e.cle}`} data-acc-apres="colis.retrouver" onClick={() => onOuvrir(e)}>{ouvrirLib(e)}</button>
     </div>
   );
 }
@@ -152,7 +154,7 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
     resoudre(brut);
   }, [resoudre]);
   const opts = React.useMemo(() => ({
-    zone: ZONE,
+    zone: ZONE, pause: 90,   // le centre deux fois sur trois, et peu d'attente entre deux lectures : < 1 s sur un code net
     surFlux: (flux) => {
       try {
         const t = flux && flux.getVideoTracks ? flux.getVideoTracks()[0] : null; piste.current = t || null;
@@ -190,82 +192,82 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
   const sansCam = camera === 'sans';
 
   return createPortal(
-    <div className={'vrm-sr' + (res && res.etat !== 'attente' ? ' a-resultat' : '') + (sansCam ? ' sans-camera' : '')} role="dialog" aria-modal="true" aria-label={tr('scan.r.titre')}
+    <div className={'vrm-rtv' + (res && res.etat !== 'attente' ? ' a-resultat' : '') + (sansCam ? ' sans-camera' : '')} role="dialog" aria-modal="true" aria-label={tr('scan.r.titre')}
       data-scan-r="" data-scan-r-camera={camera} data-scan-r-etat={res ? res.etat : ''} data-scan-r-n={res ? res.n : 0} style={{ zIndex }}>
       {children}
-      <div className="vrm-sr-vue" aria-hidden="true">
+      <div className="vrm-rtv-vue" aria-hidden="true">
         <video ref={video} playsInline muted autoPlay/>
-        <span className="vrm-sr-voile"/>
+        <span className="vrm-rtv-voile"/>
       </div>
-      <header className="vrm-sr-tete">
-        <h2 className="vrm-sr-h">{tr('scan.r.titre')}</h2>
-        <button type="button" className="vrm-sr-rond" data-scan-r-fermer="" aria-label={tr('scan.r.fermer')} onClick={onFermer}><Icone d={I_FERMER} taille={20}/></button>
+      <header className="vrm-rtv-tete">
+        <h2 className="vrm-rtv-h">{tr('scan.r.titre')}</h2>
+        <button type="button" className="vrm-rtv-rond" data-scan-r-fermer="" aria-label={tr('scan.r.fermer')} onClick={onFermer}><Icone d={I_FERMER} taille={20}/></button>
       </header>
       {!sansCam ? (
-        <div className={'vrm-sr-viseur' + (res && (res.etat === 'un' || res.etat === 'plusieurs') ? ' is-trouve' : '')} aria-hidden="true">
-          <i/><i/><i/><i/><span className="vrm-sr-ligne"/>
+        <div className={'vrm-rtv-viseur' + (res && (res.etat === 'un' || res.etat === 'plusieurs') ? ' is-trouve' : '')} aria-hidden="true">
+          <i/><i/><i/><i/><span className="vrm-rtv-ligne"/>
         </div>
       ) : null}
-      <div className="vrm-sr-aide" role="status" aria-live="polite">
-        {sansCam ? <p className="vrm-sr-aide-txt" data-scan-r-sans-camera={raisonCamera() || ''}>{phraseCamera()}</p>
-          : indice ? <p className="vrm-sr-aide-txt is-indice" data-acc-echec="colis.retrouver" data-acc-raison="pasReconnu" data-scan-r-indice={indice}>{tr('scan.r.indice')}</p>
-          : !res ? <p className="vrm-sr-aide-txt" data-acc-avant="colis.retrouver">{camera === 'demarrage' ? tr('scan.r.demarrage') : tr('acc.colis.retrouver.avant')}</p> : null}
+      <div className="vrm-rtv-aide" role="status" aria-live="polite">
+        {sansCam ? <p className="vrm-rtv-aide-txt" data-scan-r-sans-camera={raisonCamera() || ''}>{phraseCamera()}</p>
+          : indice ? <p className="vrm-rtv-aide-txt is-indice" data-acc-echec="colis.retrouver" data-acc-raison="pasReconnu" data-scan-r-indice={indice}>{tr('scan.r.indice')}</p>
+          : !res ? <p className="vrm-rtv-aide-txt" data-acc-avant="colis.retrouver">{camera === 'demarrage' ? tr('scan.r.demarrage') : tr('acc.colis.retrouver.avant')}</p> : null}
       </div>
-      <div className="vrm-sr-bas">
+      <div className="vrm-rtv-bas">
         {res && res.etat !== 'attente' ? (
-          <section className="vrm-sr-feuille" role="status" aria-live="assertive" data-scan-r-resultat={res.etat} data-scan-r-cle={montrer ? `${montrer.sorte}:${montrer.cle}` : ''}>
+          <section className="vrm-rtv-feuille" role="status" aria-live="assertive" data-scan-r-resultat={res.etat} data-scan-r-cle={montrer ? `${montrer.sorte}:${montrer.cle}` : ''}>
             {montrer ? <>
-              {res.etat === 'plusieurs' ? <button type="button" className="vrm-sr-lien vrm-sr-retour" data-scan-r-liste-retour="" onClick={() => setChoisi(null)}>{tr('scan.r.plusieursRetour', { n: res.trouves.length })}</button> : null}
+              {res.etat === 'plusieurs' ? <button type="button" className="vrm-rtv-lien vrm-rtv-retour" data-scan-r-liste-retour="" onClick={() => setChoisi(null)}>{tr('scan.r.plusieursRetour', { n: res.trouves.length })}</button> : null}
               <Fiche e={montrer} lu={res.lu} Photo={Photo} onOuvrir={ouvrir}/>
             </> : res.etat === 'plusieurs' ? (
-              <div className="vrm-sr-plusieurs" data-scan-r-plusieurs={res.trouves.length}>
-                <p className="vrm-sr-msg-titre">{tr('scan.r.plusieurs', { n: res.trouves.length })}</p>
-                <p className="vrm-sr-msg-sous">{tr('scan.r.plusieursSous')}</p>
-                <ul className="vrm-sr-liste">
+              <div className="vrm-rtv-plusieurs" data-scan-r-plusieurs={res.trouves.length}>
+                <p className="vrm-rtv-msg-titre">{tr('scan.r.plusieurs', { n: res.trouves.length })}</p>
+                <p className="vrm-rtv-msg-sous">{tr('scan.r.plusieursSous')}</p>
+                <ul className="vrm-rtv-liste">
                   {res.trouves.map((e) => (
                     <li key={`${e.sorte}:${e.cle}`}>
-                      <button type="button" className="vrm-sr-rangee" data-scan-r-choix={`${e.sorte}:${e.cle}`} onClick={() => setChoisi(e)}>
+                      <button type="button" className="vrm-rtv-rangee" data-scan-r-choix={`${e.sorte}:${e.cle}`} onClick={() => setChoisi(e)}>
                         <Vignette e={e} Photo={Photo}/>
-                        <span className="vrm-sr-rangee-txt"><small>{sorteDe(e)}</small><b>{e.num ? <span className="vrm-sr-plaque is-petite"><small>N°</small>{e.num}</span> : null}{e.titre || tr('scan.r.sansTitre')}</b></span>
+                        <span className="vrm-rtv-rangee-txt"><small>{sorteDe(e)}</small><b>{e.num ? <span className="vrm-rtv-plaque is-petite"><small>N°</small>{e.num}</span> : null}{e.titre || tr('scan.r.sansTitre')}</b></span>
                         <Icone d={I_CHEVRON} taille={18}/>
                       </button>
                     </li>
                   ))}
                 </ul>
-                <p className="vrm-sr-lu">{res.lu && res.lu.nom ? `${res.lu.nom} · ` : ''}{res.lu ? court(res.lu.suivi) : ''}</p>
+                <p className="vrm-rtv-lu">{res.lu && res.lu.nom ? `${res.lu.nom} · ` : ''}{res.lu ? court(res.lu.suivi) : ''}</p>
               </div>
             ) : res.etat === 'aucun' ? (
-              <div className="vrm-sr-msg" data-acc-echec="colis.retrouver" data-acc-raison={res.incomplet ? 'pasSu' : 'pasTrouve'}>
-                <p className="vrm-sr-msg-titre" data-scan-r-message="">{res.incomplet ? tr('scan.r.pasLu') : tr('scan.r.aucun')}</p>
-                <dl className="vrm-sr-lu-detail">
+              <div className="vrm-rtv-msg" data-acc-echec="colis.retrouver" data-acc-raison={res.incomplet ? 'pasSu' : 'pasTrouve'}>
+                <p className="vrm-rtv-msg-titre" data-scan-r-message="">{res.incomplet ? tr('scan.r.pasLu') : tr('scan.r.aucun')}</p>
+                <dl className="vrm-rtv-lu-detail">
                   <div><dt>{tr('scan.r.transporteur')}</dt><dd data-scan-r-transporteur={res.lu.transporteur || ''}>{res.lu.nom || tr('scan.r.transporteurInconnu')}</dd></div>
-                  <div><dt>{tr('scan.r.numero')}</dt><dd className="vrm-sr-mono" data-scan-r-suivi={res.lu.suivi}>{res.lu.suivi}</dd></div>
+                  <div><dt>{tr('scan.r.numero')}</dt><dd className="vrm-rtv-mono" data-scan-r-suivi={res.lu.suivi}>{res.lu.suivi}</dd></div>
                 </dl>
-                {res.manques && res.manques.length ? <p className="vrm-sr-msg-sous" data-scan-r-manques="">{tr('scan.r.manques', { quoi: res.manques.join(', ') })}</p> : <p className="vrm-sr-msg-sous">{tr('acc.colis.retrouver.pasTrouve')}</p>}
-                {onChercher ? <button type="button" className="vrm-sr-touche" data-scan-r-chercher={res.lu.suivi} onClick={() => chercher(res.lu)}><Icone d={I_LOUPE} taille={18}/>{tr('scan.r.chercher')}</button> : null}
+                {res.manques && res.manques.length ? <p className="vrm-rtv-msg-sous" data-scan-r-manques="">{tr('scan.r.manques', { quoi: res.manques.join(', ') })}</p> : <p className="vrm-rtv-msg-sous">{tr('acc.colis.retrouver.pasTrouve')}</p>}
+                {onChercher ? <button type="button" className="vrm-rtv-touche" data-scan-r-chercher={res.lu.suivi} onClick={() => chercher(res.lu)}><Icone d={I_LOUPE} taille={18}/>{tr('scan.r.chercher')}</button> : null}
               </div>
             ) : (
-              <div className="vrm-sr-msg" data-acc-echec="colis.retrouver" data-acc-raison="pasReconnu">
-                <p className="vrm-sr-msg-titre" data-scan-r-message="">{tr('scan.r.pasReconnu')}</p>
-                <p className="vrm-sr-msg-sous">{tr('acc.colis.retrouver.pasReconnu')}</p>
-                <p className="vrm-sr-lu vrm-sr-mono">{court(res.brut)}</p>
+              <div className="vrm-rtv-msg" data-acc-echec="colis.retrouver" data-acc-raison="pasReconnu">
+                <p className="vrm-rtv-msg-titre" data-scan-r-message="">{tr('scan.r.pasReconnu')}</p>
+                <p className="vrm-rtv-msg-sous">{tr('acc.colis.retrouver.pasReconnu')}</p>
+                <p className="vrm-rtv-lu vrm-rtv-mono">{court(res.brut)}</p>
               </div>
             )}
-            <button type="button" className="vrm-sr-lien" data-scan-r-autre="" onClick={autre}>{tr('scan.r.autre')}</button>
+            <button type="button" className="vrm-rtv-lien" data-scan-r-autre="" onClick={autre}>{tr('scan.r.autre')}</button>
           </section>
         ) : res && res.etat === 'attente' ? (
-          <section className="vrm-sr-feuille is-attente" role="status" data-scan-r-resultat="attente"><span className="vrm-sr-roue" aria-hidden="true"/><p className="vrm-sr-msg-sous">{tr('scan.r.attente')}</p></section>
+          <section className="vrm-rtv-feuille is-attente" role="status" data-scan-r-resultat="attente"><span className="vrm-rtv-roue" aria-hidden="true"/><p className="vrm-rtv-msg-sous">{tr('scan.r.attente')}</p></section>
         ) : (
-          <div className="vrm-sr-outils">
-            {lampe != null ? <button type="button" className={'vrm-sr-rond' + (lampe ? ' is-actif' : '')} data-scan-r-lampe={lampe ? '1' : '0'} aria-pressed={lampe ? 'true' : 'false'} aria-label={tr('scan.r.lampe')} onClick={basculerLampe}><Icone d={I_LAMPE}/></button> : null}
+          <div className="vrm-rtv-outils">
+            {lampe != null ? <button type="button" className={'vrm-rtv-rond' + (lampe ? ' is-actif' : '')} data-scan-r-lampe={lampe ? '1' : '0'} aria-pressed={lampe ? 'true' : 'false'} aria-label={tr('scan.r.lampe')} onClick={basculerLampe}><Icone d={I_LAMPE}/></button> : null}
             {clavier || sansCam ? (
-              <form className="vrm-sr-saisie" onSubmit={valider}>
+              <form className="vrm-rtv-saisie" onSubmit={valider}>
                 <input ref={saisieRef} data-scan-r-saisie="" value={saisie} onChange={(e) => setSaisie(e.target.value)} placeholder={tr('scan.r.saisie')} aria-label={tr('scan.r.saisie')}
                   inputMode="text" autoCapitalize="characters" autoComplete="off" autoCorrect="off" spellCheck={false} enterKeyHint="search"/>
                 <button type="submit" data-scan-r-ok="" disabled={!saisie.trim()}>{tr('scan.r.ok')}</button>
               </form>
             ) : (
-              <button type="button" className="vrm-sr-touche is-verre" data-scan-r-clavier="" onClick={() => { setClavier(true); setTimeout(() => { try { saisieRef.current && saisieRef.current.focus({ preventScroll: true }); } catch (_) {} }, 30); }}>
+              <button type="button" className="vrm-rtv-touche is-verre" data-scan-r-clavier="" onClick={() => { setClavier(true); setTimeout(() => { try { saisieRef.current && saisieRef.current.focus({ preventScroll: true }); } catch (_) {} }, 30); }}>
                 <Icone d={I_CLAVIER} taille={20}/>{tr('scan.r.taper')}
               </button>
             )}

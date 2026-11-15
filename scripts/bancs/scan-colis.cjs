@@ -22,7 +22,7 @@
 //  G. caméra refusée ⇒ la phrase claire, la saisie a le curseur, le n° tapé ⇒ sa fiche ;
 //  PARTOUT : cibles ≥ 44 px, rien ne déborde, aucune erreur, aucune requête avec une image,
 //  la caméra coupée en sortant.
-// Vues : 390 tactile et 1512 (SCAN_VUES=390-clair,1512-sombre…). SHOTS=dossier : les captures.
+// Vues : 390 tactile et 1512 (SCAN_VUES=390-clair,1512-sombre…), scènes (SCAN_LETTRES=ADF). SHOTS=dossier : les captures.
 // Modules : bwip-js et @zxing/library@0.20.0 (dans node_modules, ou BANC_MODULES=<dossier>/node_modules).
 // Lancer : construire dist/, puis node scripts/bancs/scan-colis.cjs   (BANC_PORT, SHOTS, BANC_DIST)
 'use strict';
@@ -131,12 +131,16 @@ function lirePng(buf) {
   return { w, h, gris: out };
 }
 async function videoDuCode(code, fichier) {
-  const png = await bwipjs.toBuffer({ bcid: code.bcid, text: code.text, scale: 4, height: code.l === 1 ? 18 : undefined, includetext: false, paddingwidth: 0, paddingheight: 0 });
-  const im = lirePng(png);
   const W = 1280, H = 720, Y = Buffer.alloc(W * H, 70);   // une table grise sous l'étiquette
   const ew = Math.round(W * 0.74), eh = Math.round(H * 0.56), ex = (W - ew) >> 1, ey = (H - eh) >> 1;
   for (let y = ey; y < ey + eh; y++) Y.fill(246, y * W + ex, y * W + ex + ew);
-  const k = Math.max(1, Math.floor(Math.min((ew * 0.86) / im.w, (eh * 0.8) / im.h) * 100) / 100);
+  // L'échelle ENTIÈRE la plus grande qui tient sur l'étiquette (un module = un nombre entier de pixels :
+  // une mise à l'échelle fractionnaire « au plus proche » abîme un code 1D comme aucune caméra ne le fait).
+  const opts = { bcid: code.bcid, text: code.text, ...(code.l === 1 ? { height: 18 } : {}), includetext: false, paddingwidth: 0, paddingheight: 0 };
+  const un = lirePng(await bwipjs.toBuffer({ ...opts, scale: 1 }));
+  const echelle = Math.max(1, Math.floor(Math.min((ew * 0.86) / un.w, (eh * 0.8) / un.h)));
+  const im = lirePng(await bwipjs.toBuffer({ ...opts, scale: echelle }));
+  const k = 1;
   const iw = Math.round(im.w * k), ih = Math.round(im.h * k), ix = (W - iw) >> 1, iy = (H - ih) >> 1;
   for (let y = 0; y < ih; y++) for (let x = 0; x < iw; x++) {
     const g = im.gris[Math.min(im.h - 1, Math.floor(y / k)) * im.w + Math.min(im.w - 1, Math.floor(x / k))];
@@ -235,24 +239,25 @@ const etat = (pg) => pg.evaluate(() => {
   const s = document.querySelector('[data-scan-r]'); if (!s) return null;
   const r = document.querySelector('[data-scan-r-resultat]');
   const f = document.querySelector('[data-scan-r-fiche]');
-  const img = f && f.querySelector('.vrm-sr-photo img');
+  const img = f && f.querySelector('.vrm-rtv-photo img');
   const a = (q, k) => { const e = document.querySelector(q); return e ? e.getAttribute(k) : null; };
   return { camera: s.getAttribute('data-scan-r-camera'), resultat: r ? r.getAttribute('data-scan-r-resultat') : '', fiche: f ? f.getAttribute('data-scan-r-fiche') : null,
     num: f ? f.getAttribute('data-scan-r-num') : null, photo: img ? { src: img.getAttribute('src'), ok: img.complete && img.naturalWidth > 0 } : null,
-    etat: a('[data-scan-r-etat]', 'data-scan-r-etat'), code: a('[data-scan-r-code]', 'data-scan-r-code'), lu: a('[data-scan-r-lu]', 'data-scan-r-lu'),
+    etat: a('[data-scan-r-bandeau]', 'data-scan-r-bandeau'), code: a('[data-scan-r-code]', 'data-scan-r-code'), lu: a('[data-scan-r-lu]', 'data-scan-r-lu'),
     choix: [...document.querySelectorAll('[data-scan-r-choix]')].map((e) => e.getAttribute('data-scan-r-choix')).sort(),
     transporteur: a('[data-scan-r-transporteur]', 'data-scan-r-transporteur'), suivi: a('[data-scan-r-suivi]', 'data-scan-r-suivi'), chercher: a('[data-scan-r-chercher]', 'data-scan-r-chercher'),
     indice: a('[data-scan-r-indice]', 'data-scan-r-indice'), sansCam: a('[data-scan-r-sans-camera]', 'data-scan-r-sans-camera'), ouvrir: a('[data-scan-r-ouvrir]', 'data-scan-r-ouvrir'),
-    texte: (document.querySelector('[data-scan-r-message]') || {}).textContent || '', aide: (document.querySelector('.vrm-sr-aide') || {}).textContent || '',
+    texte: (document.querySelector('[data-scan-r-message]') || {}).textContent || '', aide: (document.querySelector('.vrm-rtv-aide') || {}).textContent || '',
     focus: !!(document.activeElement && document.activeElement.hasAttribute('data-scan-r-saisie')) };
 });
 // Ouvre le scanner par le bouton de l'écran (ou le disque) et mesure : caméra active ⇒ résultat.
 const ouvrirEtLire = (pg, ouvrirSel, attendre = true) => pg.evaluate(async ({ sel, att }) => {
-  const t = { clic: performance.now(), active: null, res: null };
+  const t = { clic: performance.now(), active: null, res: null, att: null };
   const mo = new MutationObserver(() => {
     const s = document.querySelector('[data-scan-r]');
     if (s && t.active == null && s.getAttribute('data-scan-r-camera') === 'active') t.active = performance.now();
     const r = document.querySelector('[data-scan-r-resultat]');
+    if (r && t.att == null && r.getAttribute('data-scan-r-resultat') === 'attente') t.att = performance.now();
     if (r && t.res == null && r.getAttribute('data-scan-r-resultat') !== 'attente') t.res = performance.now();
   });
   mo.observe(document.body, { subtree: true, childList: true, attributes: true });
@@ -260,15 +265,16 @@ const ouvrirEtLire = (pg, ouvrirSel, attendre = true) => pg.evaluate(async ({ se
   const fin = performance.now() + 15000;
   while (att && t.res == null && performance.now() < fin) await new Promise((ok) => setTimeout(ok, 40));
   mo.disconnect();
-  return { lecture: t.active != null && t.res != null ? Math.round(t.res - t.active) : null, total: t.res != null ? Math.round(t.res - t.clic) : null };
+  return { lecture: t.active != null && t.res != null ? Math.round((t.att != null ? t.att : t.res) - t.active) : null, attente: t.att != null && t.res != null ? Math.round(t.res - t.att) : null, total: t.res != null ? Math.round(t.res - t.clic) : null };
 }, { sel: ouvrirSel, att: attendre });
 const cibles = (pg) => pg.evaluate(() => [...document.querySelectorAll('[data-scan-r] button, [data-scan-r] input')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; })
   .map((e) => ({ q: e.getAttribute('aria-label') || e.textContent.trim().slice(0, 24) || e.tagName, h: Math.round(e.getBoundingClientRect().height) })));
 const deborde = (pg) => pg.evaluate(() => { const s = document.querySelector('[data-scan-r]'); const w = window.innerWidth;
-  const hors = s ? [...s.querySelectorAll('*')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && (r.right > w + 1 || r.left < -1) && !e.closest('.vrm-sr-vue'); }).map((e) => String(e.className).slice(0, 30)) : [];
+  const hors = s ? [...s.querySelectorAll('*')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && (r.right > w + 1 || r.left < -1) && !e.closest('.vrm-rtv-vue'); }).map((e) => String(e.className).slice(0, 30)) : [];
   return { page: document.documentElement.scrollWidth - document.documentElement.clientWidth, hors: hors.slice(0, 4) }; });
 
 async function scene(nom, vp, sombre, lettre, fn, { refus = false, debut = 'ventes' } = {}) {
+  if (process.env.SCAN_LETTRES && !process.env.SCAN_LETTRES.includes(lettre)) return;
   const fichier = path.join(os.tmpdir(), `banc-scan-${process.pid}-${lettre}.y4m`);
   if (!refus) await videoDuCode(CODES[lettre], fichier);
   const args = ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server', '--autoplay-policy=no-user-gesture-required'];
@@ -381,7 +387,7 @@ async function vue(nom, vp, sombre) {
   await scene(nom, vp, sombre, 'F', async ({ pg }, shot) => {
     await pret(pg, 'ventes');
     await ouvrirEtLire(pg, ['[data-scan-retrouver-bouton="ventes"]'], false);
-    const vu = await pg.waitForSelector('[data-scan-r-indice]', { timeout: 8000 }).then(() => true).catch(() => false);
+    const vu = await pg.waitForSelector('[data-scan-r-indice]', { timeout: 20000, state: 'attached' }).then(() => true).catch(() => false);
     await shot(pg, '8-pas-un-suivi');
     await pg.waitForTimeout(2500);
     const e = await etat(pg);
@@ -413,6 +419,8 @@ async function vue(nom, vp, sombre) {
 }
 
 (async () => {
+  // SCAN_VIDEO=A:fichier.y4m — écrit seulement la vidéo d'un code (pour la regarder ou la décoder ailleurs).
+  if (process.env.SCAN_VIDEO) { const [l, f] = process.env.SCAN_VIDEO.split(':'); await videoDuCode(CODES[l], f); srv.close(); console.log('vidéo écrite : ' + f); return; }
   try {
     if (!fs.existsSync(path.join(DIST, 'index.html'))) throw new Error('dist/ absent : npm run build');
     for (const [nom, vp, sombre] of [['390-clair', { width: 390, height: 844 }, false], ['390-sombre', { width: 390, height: 844 }, true], ['1512-clair', { width: 1512, height: 950 }, false], ['1512-sombre', { width: 1512, height: 950 }, true]]) {
