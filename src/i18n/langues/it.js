@@ -3,6 +3,7 @@ import ecran_journee from './it/journee.js';
 import ecran_confort from './it/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_studio from './it/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
 import ecran_capte from './it/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
+import ecran_finition from './it/finition.js';   // (15 nov.) la finition écran par écran
 import ecran_idees from './it/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './it/ventes.js';
 import ecran_commun from './it/commun.js';
@@ -2254,4 +2255,5 @@ export default {
   ...ecran_confort,
   ...ecran_studio,
   ...ecran_capte,
+  ...ecran_finition,
 };

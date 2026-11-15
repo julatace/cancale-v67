@@ -49,7 +49,9 @@
   body .vrm-main[data-ecran="garage"] .vrm-ms-bande .vrm-ui-bande-n { white-space: nowrap !important; }
   body .vrm-main[data-ecran="garage"] .vrm-ms-bande .vrm-ui-bande-l { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }
   body .vrm-main[data-ecran="garage"] .vrm-s2d-resume > .vrm-pop-ligne { flex: 0 1 auto !important; max-width: 100% !important; width: auto !important; }
-  body .vrm-main[data-ecran="garage"] .vrm-s2d-resume .vrm-pop-chips { flex-wrap: wrap !important; row-gap: 8px !important; }
+  /* « Comment c'est compté » ouvre la MÊME feuille que les autres puces : quand il y en a d'autres, il se tait (il se
+     cachait déjà, glissé sous le menu du compte) ; seul, il reste. Le compte : « Tous ▾ » (sa forme courte). */
+  body .vrm-main[data-ecran="garage"] .vrm-s2d-resume .vrm-pop-chips > .vrm-pop-chip:last-child:not(:first-child) { display: none !important; }
   body .vrm-main[data-ecran="garage"] .vrm-s2d-resume > .vrm-s2d-filtres { flex: 0 1 auto !important; margin-left: auto !important; }
 }
 
@@ -65,9 +67,8 @@
 .sb-voile { background: radial-gradient(70% 55% at 50% 92%, rgb(255 255 255 / .55), transparent 70%), color-mix(in oklab, var(--sb-aplat) 92%, transparent) !important; }
 :root[data-theme="dark"] .sb-voile { background: radial-gradient(70% 55% at 50% 92%, rgb(110 160 230 / .16), transparent 70%), color-mix(in oklab, var(--sb-aplat) 92%, transparent) !important; }
 
-/* ── 6. E-MAILS : la rangée des rubriques sortait de 4 px à droite ; la puce « code » couvrait l'heure. */
+/* ── 6. E-MAILS : la rangée des rubriques sortait de 4 px à droite (la puce « code » a déjà SA colonne dans la rangée). */
 .vrm-boite-filtres > .vrm-boite-rubriques { margin-left: 0 !important; margin-right: 0 !important; }
-.vrm-boite-item:has(> .vrm-boite-puce-code) :is(.vrm-boite-ligne-haut, .vrm-boite-essentiel) { padding-right: 128px !important; box-sizing: border-box !important; }
 
 /* ── 7. PARAMÈTRES (téléphone) : la sous-ligne de chaque réglage, coupée au milieu d'un mot (« Chaque compte, sa
    dernière relecture et l'e… »), ne disait plus rien ; elle reste lue au lecteur d'écran et trouvée par la
@@ -91,7 +92,7 @@
 .vrm-fp-depuis-ligne .vrm-colis-actions > :is(.vrm-rangee-bord, :only-child) { grid-column: 1 / -1 !important; }
 .vrm-fp .vrm-fp-actions-carte:has([data-imprime="1"]) [data-fiche-bordereau] { display: none !important; }
 .vrm-fp .vrm-fp-actions-carte:has([data-imprime="1"]) .vrm-fp-b-plein {
-  background: transparent !important; color: var(--sb-diode, #0060CC) !important; box-shadow: none !important; border: 0 !important;
+  font-size: 15px !important; background: transparent !important; color: var(--sb-diode, #0060CC) !important; box-shadow: none !important; border: 0 !important;
   justify-content: flex-start !important; padding: 0 4px !important; min-height: 44px !important; font-weight: 600 !important; width: auto !important;
 }
 
@@ -113,4 +114,16 @@
 
 /* ── 13. MA JOURNÉE · « Ma semaine › » : l'espace avant le chevron tombait (rangée flex). */
 .vrm-jv2-ma-semaine { column-gap: .3em !important; }
+
+/* ── 14. LES ICÔNES AU BOUT D'UN CHAMP (micro, photo) : deux cibles de 44 px se mordaient de 6 à 8 px (marge négative
+   de la seconde) — au doigt, on ne savait pas laquelle on touchait. */
+.vrm-micro + .vrm-micro { margin-left: 0 !important; }
+
+/* ── 15. LE « ⓘ » (Pourquoi) : sa cible de 44 px (marges négatives, voulues) mordait sur le bouton d'à côté
+   (« Préparer la tournée de dépôt ») et sur la rangée de dessous (Factures : « Récapitulatif (fichier) »). */
+:is(button, .vrm-b) + .vrm-pourquoi { margin-left: 12px !important; }
+.vrm-aide:has(.vrm-pourquoi) { padding-bottom: 6px !important; }
+
+/* ── 16. MA JOURNÉE (ordinateur) : « 3 ventes » touchait le bas du grand « 75 € » (l'affiche déborde de sa ligne). */
+.sj-journee[data-sj-ordi="1"] .vrm-jv2-faits { margin-top: 22px !important; }
 }

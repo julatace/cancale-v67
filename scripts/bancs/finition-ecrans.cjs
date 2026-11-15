@@ -72,7 +72,7 @@ const ECRANS = [
   { nom: 'loupe', url: '/?tab=journee', zone: ['[data-recherche-panneau]', '.vrm-hdr-recherche', '.vrm-fs'], avant: async (o) => {
     if (o.tel) await toucher(o, 'button[data-recherche-loupe]'); else { await o.pg.mouse.click(5, 300); await o.pg.keyboard.press('Control+K'); await o.pg.waitForTimeout(600); }
     return true; } },
-  { nom: 'disque', url: '/?tab=journee', zone: ['.sb-eventail', '[data-sb-disque]'], avant: (o) => toucher(o, '[data-sb-disque]') },
+  { nom: 'disque', tel: true, url: '/?tab=journee', zone: ['.sb-eventail', '[data-sb-disque]'], avant: (o) => toucher(o, '[data-sb-disque]') },
 ];
 
 // Les libellés de la passe (corrigés ici) : une coupe « … » y est un ROUGE. Sélecteurs CSS (data-* et classes).
@@ -162,8 +162,11 @@ function mesurerPage({ tactile, zone, surveilles }) {
       // la cible peut être agrandie par un pseudo-élément (::before inset négatif) : on la juge par elementFromPoint autour
       const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
       const atteint = (x, y) => { const e = document.elementFromPoint(x, y); return e && (e === el || el.contains(e)); };
-      const haut = Math.max(r.height, (atteint(cx, cy - 22) && atteint(cx, cy + 21)) ? 44 : 0);
-      const large = Math.max(r.width, (atteint(cx - 22, cy) && atteint(cx + 21, cy)) ? 44 : 0);
+      // La cible RÉELLE : la suite de points (pas de 1 px) autour du centre où le doigt tombe sur elle — un pseudo-élément
+      // qui l'agrandit compte, une touche enfoncée (décalée d'1 px) aussi ; 43 px suffisent (l'arrondi d'un puits de 44).
+      const etendue = (axe) => { let n = 1; for (let d = 1; d <= 30 && atteint(axe === 'y' ? cx : cx - d, axe === 'y' ? cy - d : cy); d++) n++; for (let d = 1; d <= 30 && atteint(axe === 'y' ? cx : cx + d, axe === 'y' ? cy + d : cy); d++) n++; return n; };
+      const haut = Math.max(r.height, etendue('y') >= 43 ? 44 : 0);
+      const large = Math.max(r.width, etendue('x') >= 43 ? 44 : 0);
       if (haut < 44 || large < 44) out.cibles.push(`${nom(el)} ${Math.round(r.width)}×${Math.round(r.height)}`);
     }
   }
@@ -192,7 +195,8 @@ function mesurerPage({ tactile, zone, surveilles }) {
         // l'un des deux est-il vraiment dessiné au point commun ? (un élément caché derrière un autre opaque n'est pas un chevauchement VU)
         const x = Math.max(ra.left, rb.left) + w / 2, y = Math.max(ra.top, rb.top) + h / 2;
         const top = document.elementFromPoint(x, y);
-        const voitA = top && (top === a || a.contains(top)), voitB = top && (top === b || b.contains(top));
+        // (un texte dans un bouton dont les enfants ne prennent pas le pointeur : le bouton « au-dessus » est son ancêtre, il est vu)
+        const voitA = top && (top === a || a.contains(top) || top.contains(a)), voitB = top && (top === b || b.contains(top) || top.contains(b));
         if (!voitA && !voitB) continue;
         out.chevauche.push(`${sorte} : ${nom(a)} ⟂ ${nom(b)} (${Math.round(w)}×${Math.round(h)})`);
       }
@@ -213,6 +217,7 @@ function mesurerPage({ tactile, zone, surveilles }) {
   try {
     for (const W of LARG) for (const t of THEMES) for (const e of ECRANS) {
       if (VOULUS.length && !VOULUS.includes(e.nom)) continue;
+      if (e.tel && W >= 600) continue;   // le disque « + » n'existe qu'au téléphone (barre du bas)
       const tag = `${e.nom}-${W}-${t}`;
       let o;
       try {

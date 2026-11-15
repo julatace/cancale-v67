@@ -46252,12 +46252,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const titreL = presses.length===1 ? `1 colis${verif?' :':''} ${quand}` : `${presses.length} colis pressés — le plus urgent${verif?' :':''} ${quand}`;
             const subL = `${num}${o.title||''}${qui?` · ${qui}`:''}${p.limite==='estimee'?' · date estimée (vente + 7 j)':''}`;
             // (15 nov., finition) La ligne de Ma journée coupait « Le plus urgent : date estimée… » : elle porte SA
-            // forme courte (le nombre ; la limite en trois mots, `limiteCourte`), la phrase entière reste dans
+            // forme courte (le nombre ; la limite du plus pressé en trois mots, `limiteCourte`), la phrase entière reste dans
             // l'infobulle et le nom du bouton (`plein`). Même source, aucun mot inventé.
             const courtL = presses.length===1 ? '1 colis' : `${presses.length} colis pressés`;
             const quandC = limiteCourte(quand);
             jobs.push({ id:'colis-limite', n:presses.length, icon:'truck', color:C.warn, urgent:!!p.depasse,
-              title: titreL, sub: subL, court: courtL, detail: presses.length===1 ? quandC.charAt(0).toUpperCase() + quandC.slice(1) : `Le plus urgent${verif?' :':''} ${quandC}`, plein: `${titreL} — ${subL}`,
+              title: titreL, sub: subL, court: courtL, detail: quandC.charAt(0).toUpperCase() + quandC.slice(1), plein: `${titreL} — ${subL}`,
               tab:'cat_bord', prio:p.depasse?0.15:0.6, limiteHeure:p.heure||'',
               photos: presses.map(t => orderPhoto(t.o)) });
             // (1er nov., « très répétitif ») Pas en retard : la case « À envoyer » le porte
