@@ -129,7 +129,43 @@ valeur à défaire ; sur ordinateur il reste (densité Minus → Grand).
 - Deux audits jugeaient l'orthographe d'hier, réécrits sur la RÈGLE (dit ici, §6) :
   `audit-idees-paires` B2 accepte des sources ajoutées après `lireStudio` ; `audit-rangement-guide` A3/A5
   acceptent `entreeAvecPaye` et `<AtelierArriveeCoque/>`.
-- Bancs : voir la section « Bancs » plus bas (résultats et captures).
+- Audit après la demande « on range une ANNONCE, pas un achat » : **42 verts**, `--prouve` **19/19 mutations
+  rouges** (dont : « Donner ce N° » qui écrirait une case ou un prix, un article rangé deux fois, une case prise
+  donnée à un autre article, la case proposée avant le N°). A9 : un lot de 5 articles, 4 cases libres ⇒ 4 cases
+  différentes, la 5e « plus de case ».
+
+### Bancs (build de la branche, base inventée, `BANC_DIST` pour un autre arbre)
+- `scripts/bancs/atelier-arrivee.cjs` (390 tactile clair + 1512 sombre, dsf 2 au téléphone) : **121 verts** —
+  « J'ai retiré » ⇒ l'atelier, N°13 (jamais un trou), rien d'écrit ; « Donner ce N° » ⇒ fiche + pool, ni case ni
+  prix, pilule « N°13 donné » ; la case de l'ARTICLE (première libre, une prise ne réagit pas) ; « Ranger ici » ;
+  photos « Plus tard » ; le prix LU « 38 € · Article seul » ; fermer ; Ma journée « 1 paire à finir » ⇒ reprise
+  au prix ; « Garder » ⇒ 38,00 ; la fiche (titre, marque, couleur de l'achat, prix de vente vide, la note) ;
+  « Enregistrer » ; « Créer sur Vinted » ; le bilan ; Ma journée ne rappelle plus. À chaque étape : un plein,
+  44 px, rien ne déborde, aucune clé brute, ni violet, et **le corps de l'étape se voit** (une animation
+  d'entrée figeait le contenu à l'opacité 0 en 1512 sombre : trouvé par la capture, corrigé, contrôle ajouté —
+  6 rouges sur le build d'avant la correction). **Rouge sur l'arbre de départ** (`dist-avant` : W1).
+  Le banc `rangement-guide.cjs` (feuille d'avant) est remplacé par celui-ci.
+- `scripts/bancs/taille-historique.cjs` : **12 verts** — Paramètres → Taille du texte (quatre choix ≥ 44 px),
+  « Très grand » ⇒ échelle 1,36 et `data-grand-texte="tres"`, rangée sur l'appareil, rien ne déborde ;
+  au rechargement Ma journée est en « Très grand » ; la fiche d'une paire ouvre sur l'historique.
+- `scripts/bancs/finition.cjs` (`VUES=390-clair,390-taille136`, nouvelle vue : la taille de VRM, jugée G1–G3 comme
+  le grand texte de l'appareil) sur Ma journée, Annonces, Ventes, Stock, Argent : **Ma journée, Ventes, Stock,
+  Argent verts** (G1 le texte grandit ×1,33 à ×1,38, G2 rien ne sort, G3 rien de coupé ni recouvert).
+  **Annonces : G1, G2 verts, G3 1 rouge restant** — la BOÎTE du titre d'une rangée (déjà coupé par « … ») touche
+  celle du prix ; le texte lui-même ne se recouvre pas (capture). Avant les corrections de `styles-lisible.css`,
+  à 1,36 : 7 défauts (« ⋯ Modifier » hors de l'écran sur Annonces et Ventes, « Annon/ces » coupé, titres de
+  rangée sur la ligne de la taille, colonne de texte du Stock à 28 px — « N… », « Vint|ed » —, filtres du Stock
+  sous « Tous », onglets d'Argent l'un sur l'autre) ; ils existaient AUSSI avec la Taille du texte de l'iPhone
+  (même mécanisme). Les rouges de la vue `390-clair` (espace avant « € », cibles du N° et de la recherche du
+  Stock, « à expédier », contraste d'un compteur de Ventes) ne viennent pas de ce lot.
+  Deux retouches du banc, dites ici (§6) : la barre du bas est nommée comme barre fixe (sous zoom, sa position
+  se lisait mal et chaque rangée passant dessous comptait comme « recouverte ») ; `CSS_ESSAI=` (outil de mise au
+  point) injecte une feuille d'essai.
+
+### Captures (base inventée)
+Atelier : `atelier-390-clair-{1-numero,2-case,3-photos,4-prix,5-journee,6-fiche,7-publier,8-fin}.png` et
+`atelier-1512-sombre-*.png` ; taille du texte et historique : `reglages-taille-*.png`, `journee-tres-grand-*.png`,
+`fiche-historique-*.png` ; finition : `finition-<écran>-390-taille136.png` (dossier des captures du rapport).
 
 ## Ce qui reste / limites
 - Le banc `scripts/bancs/rangement-guide.cjs` attend la feuille d'avant (`[data-ranger-feuille]`) : il est
