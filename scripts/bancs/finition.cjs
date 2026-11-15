@@ -343,7 +343,11 @@ const court = (a, n = 6) => JSON.stringify(a.slice(0, n)).slice(0, 900);
   for (const vue of VUES) for (const ecran of ECRANS) {
     const [l, mode] = vue.split('-');
     const sombre = mode === 'sombre';
-    const grand = /^grand(\d+)$/.exec(mode || '');
+    // (15 nov.) `taille112` · `taille124` · `taille136` : la TAILLE DU TEXTE choisie dans VRM (Paramètres,
+    // src/tailleTexte.js, `vrm_taille_texte`) — jugée comme le grand texte de l'appareil (G1–G3).
+    const taille = /^taille(\d+)$/.exec(mode || '');
+    const grand = /^grand(\d+)$/.exec(mode || '') || taille;
+    const TAILLE_ID = { 112: 'grand', 124: 'plusGrand', 136: 'tresGrand' };
     const tel = l === '390';
     const m = monde();
     const ctx = await b.newContext({ viewport: VP[l], colorScheme: sombre ? 'dark' : 'light', reducedMotion: 'reduce', locale: 'fr-FR', timezoneId: 'Europe/Paris', serviceWorkers: 'block', ...(tel ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}) });
@@ -357,12 +361,13 @@ const court = (a, n = 6) => JSON.stringify(a.slice(0, n)).slice(0, 900);
         localStorage.setItem('vrm_bienvenue_vue', JSON.stringify({ at: 'banc' })); localStorage.setItem('vrm_visite_vue', JSON.stringify({ at: 'banc' }));
         localStorage.setItem('vrm_acces_direct', '1');
       } catch (_) {}
+      if (gr && gr.vrm) { try { localStorage.setItem('vrm_taille_texte', gr.vrm); } catch (_) {} return; }
       // Le réglage « texte plus grand » du navigateur : la taille de police racine.
       if (gr) {
         const poser = () => { const st = document.createElement('style'); st.textContent = `html{font-size:${gr}% !important}`; document.documentElement.appendChild(st); };
         if (document.documentElement) poser(); else { const ob = new MutationObserver(() => { if (document.documentElement) { ob.disconnect(); poser(); } }); ob.observe(document, { childList: true }); }
       }
-    }, [session, sombre, grand ? Number(grand[1]) : 0]);
+    }, [session, sombre, taille ? { vrm: TAILLE_ID[taille[1]] || 'tresGrand' } : grand ? Number(grand[1]) : 0]);
     const pg = await ctx.newPage();
     const errs = [];
     pg.on('pageerror', (e) => errs.push('page: ' + e.message.slice(0, 160)));

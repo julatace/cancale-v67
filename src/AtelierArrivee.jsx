@@ -37,7 +37,9 @@ function Progression({ etapes, courante, onAller, verrou }) {
     <nav className="vrm-aa-prog" aria-label={tr('arr.prog.aria', { n: ETAPES_ATELIER.indexOf(courante) + 1, m: p.total })} data-aa-prog={`${p.faites}/${p.total}`} data-aa-courante={courante}>
       <ol>
         {etapes.map((e, i) => {
-          const touchable = !verrou && e.cle !== courante && (e.etat !== 'afaire' || etapes.slice(0, i).every((x) => x.etat !== 'afaire' || x.cle === courante)) && !(e.raison === 'sansNumero');
+          const touchable = !verrou && e.cle !== courante && (e.etat !== 'afaire' || etapes.slice(0, i).every((x) => x.etat !== 'afaire' || x.cle === courante)) && !(e.raison === 'sansNumero')
+            // Rangée : le N° et la case sont écrits (un N° servi ne se reprend pas ici ; la case se change dans le Stock).
+            && !((e.cle === 'numero' || e.cle === 'case') && e.etat !== 'afaire');
           return (
             <li key={e.cle} className={`is-${e.etat}${e.cle === courante ? ' is-courante' : ''}`} data-aa-etape={e.cle} data-aa-etat={e.etat}>
               <button type="button" disabled={!touchable} aria-current={e.cle === courante ? 'step' : undefined} onClick={() => onAller(e.cle)}>
@@ -288,7 +290,8 @@ function UnAchat({ entree, coque, onSuivant, onFermer, position, Bouton, Photo, 
     const g = accompagner('arrivee.ranger');
     let r = null; try { r = await coque.ranger(entree, lignes.map((l) => ({ ...l, prix: '', case: sansCase ? null : l.case }))); } catch (_) { r = { ok: false, raison: 'lecture' }; }
     setEnvoi(false);
-    if (r && r.ok) { setNumeros(r.numeros || []); setVue(null); g.fini({ num: (r.numeros || [])[0] || '' }); return; }
+    // La fiche arrive par l'écriture locale (un instant) : on attend sur l'étape des photos, sans rien proposer.
+    if (r && r.ok) { setNumeros(r.numeros || []); setVue('photos'); g.fini({ num: (r.numeros || [])[0] || '' }); return; }
     g.oublier();
     setErreur(r && r.raison ? r.raison : 'lecture');
     if (r && (r.raison === 'pris' || r.raison === 'case')) setTour((t) => t + 1);
@@ -312,7 +315,10 @@ function UnAchat({ entree, coque, onSuivant, onFermer, position, Bouton, Photo, 
 
   // Le pied : UN bouton plein, « Plus tard » à côté.
   let plein = null, second = null;
-  if (etape === 'numero') {
+  const attenteFiche = !fiche && etape !== 'numero' && etape !== 'case';
+  if (attenteFiche) {
+    plein = null;
+  } else if (etape === 'numero') {
     plein = <Bouton variante="primaire" plein data-aa-suivant="numero" disabled={!(prep && prep.ok) || !lignes.length || !lignes.every((l) => String(l.numero || '').trim())} onClick={() => aller('case')}>{tr('arr.suivant')}</Bouton>;
     second = <Bouton variante="secondaire" data-aa-plus-tard="numero" onClick={onSuivant}>{tr('arr.plusTard')}</Bouton>;
   } else if (etape === 'case') {
@@ -340,7 +346,7 @@ function UnAchat({ entree, coque, onSuivant, onFermer, position, Bouton, Photo, 
       ? <Bouton variante="primaire" plein data-aa-partout={fiche ? fiche.numero : ''} onClick={() => coque.publierPartout(fiche)}>{tr('arr.publier.partout')}</Bouton>
       : <Bouton variante="primaire" plein data-aa-creer-vinted={fiche ? fiche.numero : ''} onClick={() => coque.creerVinted(fiche)}>{tr(etatVinted === 'brouillon' ? 'arr.publier.mettreEnLigne' : 'arr.publier.creer')}</Bouton>;
     second = <Bouton variante="secondaire" data-aa-plus-tard="publier" onClick={() => marquer('publier', 'passe')}>{tr('arr.plusTard')}</Bouton>;
-  } else {
+  } else if (fiche) {
     const encore = range && k + 1 < fiches.length;
     plein = <Bouton variante="primaire" plein data-aa-fin={encore ? 'article' : 'achat'} onClick={() => (encore ? setK(k + 1) : onSuivant())}>{encore ? tr('arr.fin.articleSuivant') : position ? tr('arr.fin.achatSuivant') : tr('arr.fin.fermer')}</Bouton>;
   }
@@ -357,6 +363,7 @@ function UnAchat({ entree, coque, onSuivant, onFermer, position, Bouton, Photo, 
         <Progression etapes={etapes} courante={etape === 'fin' ? '' : etape} onAller={aller} verrou={envoi}/>
         <h3 className="vrm-aa-h" data-aa-titre={etape}>{tr('arr.titre.' + etape)}</h3>
         {etape === 'numero' || etape === 'case' ? <EtapeRanger entree={entree} prep={prep} lignes={lignes} setLignes={setLignes} courante={courante} setCourante={setCourante} n={n} setN={setN} etape={etape} Plan={Plan}/> : null}
+        {attenteFiche ? <p className="vrm-aa-doux" data-aa-attente-fiche="">{tr('ranger.attente')}</p> : null}
         {etape === 'photos' && fiche ? <EtapePhotos fiche={fiche} photos={photos} vignettes={vignettes}/> : null}
         {etape === 'prix' && fiche ? <EtapePrix entree={entree} fiche={fiche} cout={etat.couts[String(fiche.numero)]} corriger={corriger} setCorriger={setCorriger} saisie={saisie} setSaisie={setSaisie} erreur={erreur}/> : null}
         {etape === 'fiche' && fiche && champs ? <EtapeFiche fiche={fiche} champs={champs} setChamps={setChamps} Note={Note} erreur={erreur}/> : null}
