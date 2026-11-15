@@ -155,6 +155,9 @@ ne touche un N° : `vinted_annonce_numeros` reste 1 000 fiches intactes dans le 
   - **Sur `origin/main`** (build d'avant, même banc) : **4 rouges** à 390 clair — N°9999 pas dessiné
     comme pris, pas de doublon rouge sur la case, **N°61 tombé dans la case du carton N°9999** (`mQ:3`),
     et l'éditeur sans formes / couleurs (le scénario s'arrête là).
+  - Dernier passage, sur le build final (tête de branche) : **390 clair 24/24 vert** ; 1512 sombre vert
+    jusqu'à la pile (12 contrôles) puis « Target crashed » (navigateur tué sous la charge) — le passage
+    complet précédent de 1512 sombre était vert sur A–H, hors les deux points corrigés depuis (ci-dessous).
   - Le seul rouge de mise au point (1512 sombre) : le choix des planches (`ChoixPlanches`, App.jsx, pas
     touché) dessine des boutons de 30 px à la souris — jugé à part, dit ici ; « Enregistrer » est passé au
     plein du studio (`sb-btn-plein--barre`, 52 px).
