@@ -20,7 +20,7 @@
 const path = require('path'), fs = require('fs'), os = require('os'), cp = require('child_process');
 const { pathToFileURL } = require('url');
 const RACINE = process.env.RANGER_RACINE || path.join(__dirname, '..');
-const FICHIERS = ['rangementArrivee.js', 'stockSortie.js', 'stockRegles.js', 'App.jsx'];
+const FICHIERS = ['rangementArrivee.js', 'stockSortie.js', 'stockRegles.js', 'stockEtageres.js', 'App.jsx'];
 const cleNum = (v) => { let s = String(v == null ? '' : v).trim().toUpperCase().replace(/[\s\-_.]/g, ''); if (/^\d+$/.test(s)) s = String(parseInt(s, 10)); return s; };
 
 async function controles(racine, silencieux) {
@@ -146,7 +146,7 @@ const MUTATIONS = [
   ['N° tapé déjà servi accepté', 'src/rangementArrivee.js', "if (pris.has(c)) return { ok: false, raison: 'pris' };\n  if ((autres", 'if ((autres'],
   ['archive « B » acceptée', 'src/rangementArrivee.js', "if (archive && new RegExp('^' + archive + '\\\\d+$').test(c)) return { ok: false, raison: 'archive' };", ''],
   ['« Rangé » écrase un N° servi', 'src/rangementArrivee.js', "if (pris.has(c) || slots[c]) return { ok: false, raison: 'pris', ligne: k };", ''],
-  ['case prise proposée', 'src/rangementArrivee.js', '  if (prise(i)) return false;\n  if (m.gravite)', '  if (m.gravite)'],
+  ['case prise proposée', 'src/rangementArrivee.js', '  if (prise(i)) return false;\n  if (m.gravite || colonneEnPile', '  if (m.gravite || colonneEnPile'],
   ['gravité ignorée', 'src/rangementArrivee.js', 'if (!fond && !prise((r + 1) * cols + c)) return false;', ''],
   ['habitude ignorée', 'src/rangementArrivee.js', 'const iH = depuis ? ms.findIndex', 'const iH = false ? ms.findIndex'],
   ['prix de lot divisé tout seul', 'src/rangementArrivee.js', "return { k, titre: '', marque: '', taille: '', prix: '',", "return { k, titre: '', marque: '', taille: '', prix: prixEnTexte(indicatif),"],

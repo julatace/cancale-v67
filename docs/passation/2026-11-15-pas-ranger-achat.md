@@ -88,12 +88,18 @@ s'ouvrir **qu'une fois l'article numéroté (une fiche)**, jamais sur l'achat. L
   recompte, le Stock revenu à la case commune.
 - Audits suivis : `audit-coque-parametres` (14 mutations sur 14 ; le rouge « Paramètres · Réglages : une
   icône par ligne » existait déjà sur l'arbre de départ), `audit-lectures-lourdes`,
-  `audit-rangement-guide` (41 verts), `audit-vague3-ecrans` (les 5 mutations « introuvables » le sont
+  `audit-rangement-guide` (41 verts, 14/14 mutations ; sa copie oubliait `stockEtageres.js` et une ancre
+  avait vieilli : réparés), `audit-vague3-ecrans` (les 5 mutations « introuvables » le sont
   aussi sur l'arbre de départ), `audit-traduction`, `audit-quoi-de-neuf`.
 - Bancs : `scripts/bancs/pas-ranger-achat.cjs` (nouveau, 390 px tactile clair et 1512 px sombre) :
   P1 cloche, P2 Ma journée, P3 « J'ai retiré », P4 deux fiches et deux cases différentes, puis « Ranger
   ici ». `coque-parametres` (H6) et `vague3-ecrans` (S) jugent désormais qu'aucune case n'est proposée à
   un achat. `scripts/bancs/rangement-guide.cjs` est retiré : il jouait la feuille, qui n'existe plus.
+- Bancs relancés : `pas-ranger-achat` 30 verts ; `vague3-ecrans` (S) 40 verts ; `coque-parametres` H5, H6 verts
+  (les rouges H3 et H4, icônes de Paramètres et « Discord dit une fois », ne touchent pas ce lot) ;
+  `centre-notifs` 136 verts (les 8 rouges F1 et F11 viennent des réglages : il attend 8 types, l'app en a 11
+  depuis avis, alertes eBay et modération ; pas ce lot) ; `journee-coherence` vert. Captures regardées (cloche
+  vide, fiche « Case proposée · Ranger ici · Autre case » à 390 px et 1512 px).
 - `src/nouveautes.js` : « Plus de rangement proposé sur un achat ».
 
 ## Geste de Julien
