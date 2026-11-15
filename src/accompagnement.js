@@ -366,6 +366,11 @@ export const GESTES_ACC = {
   'lien.partage':     { ecran: 'settings',  ensuite: null },
   'connexion.qr':     { ecran: 'settings',  ensuite: { lien: '?tab=journee' } },
   'fiches.fusion':    { ecran: 'garage',    ensuite: { lien: '?tab=garage' } },
+  // (15 nov.) L'atelier « achat arrivé → en ligne » : chaque étape qui écrit (src/AtelierArrivee.jsx) — la
+  // suite est l'étape d'après, dans la même feuille : aucun lien.
+  'arrivee.ranger':   { ecran: 'achats',    ensuite: null },
+  'arrivee.prix':     { ecran: 'achats',    ensuite: null },
+  'arrivee.fiche':    { ecran: 'achats',    ensuite: null },
   'export.donnees':   { ecran: 'settings',  ensuite: null },
   'export.comptable': { ecran: 'compta',    ensuite: null },
   'compte.supprimer': { ecran: 'settings',  ensuite: null },

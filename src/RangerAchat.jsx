@@ -205,4 +205,4 @@ export function RangerAchat({ entrees, preparer, ranger, onFermer, onPasARanger 
   );
 }
 
-export { caseEnMots };
+export { caseEnMots, Plan };   // (15 nov.) le plan, réutilisé par l'atelier d'arrivée (src/AtelierArrivee.jsx)

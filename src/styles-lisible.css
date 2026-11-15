@@ -44,3 +44,12 @@ html[data-grand-texte] body .vrm-app-shell .vrm-colis-barre { flex-wrap: wrap !i
 html[data-grand-texte] body .vrm-app-shell .vrm-fu-grand { font-size: 30px !important; }
 html[data-grand-texte="tres"] body .vrm-app-shell .vrm-fu-grand { font-size: 26px !important; }
 html[data-grand-texte="tres"] body .vrm-app-shell .vrm-fu-pile { zoom: .7; }
+
+/* ── (15 nov.) PARAMÈTRES → TAILLE DU TEXTE (src/tailleTexte.js) ─────────────────
+   Chaque ligne montre « Aa » à SA taille, dans une case fixe de 44 px (l'alignement des
+   libellés ne bouge pas) ; la note de l'appareil en gris, une ligne. */
+.vrm-taille-texte-aa { flex: 0 0 44px; width: 44px; height: 44px; display: grid; place-items: center; font-weight: 600; line-height: 1; border-radius: 12px; background: color-mix(in srgb, currentColor 7%, transparent); }
+.vrm-taille-texte-note { margin: 8px 0 0; font-size: 13px; line-height: 1.4; color: var(--d-gris, var(--vrm-muted, #6E6E73)); }
+/* (15 nov.) La note de la paire d'un fil, sous la carte de la paire (vide ⇒ rien). */
+.vrm-chat-note-paire { margin: 8px 16px 0; min-width: 0; }
+.vrm-chat-note-paire:empty { display: none; }

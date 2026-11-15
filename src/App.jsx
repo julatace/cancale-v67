@@ -560,6 +560,8 @@ import { decisionNumeroVenteEmail, numeroEcritDansArticle, colisVentesEmail, MEN
 import { premiereCaseLibre as premiereCaseMeubles, achatsArrives, notifsOuRanger, caseEnMots } from './ouRanger.js';
 import { casesEnSerie, caseHabitude, numerosEnSerie, opsRanger, achatsARanger, numerosAReserver, CLE_FICHES as CLE_FICHES_RANGEES } from './rangementArrivee.js';   // (11 nov., lot rangement-guide)
 import { RangerAchat } from './RangerAchat.jsx';
+// (15 nov.) L'atelier « achat arrivé → en ligne » : la règle (pure) ; le dessin se charge à la demande.
+import { opsPrixAchat, opsFiche, opMarque, pairesAFinir, CLE_ATELIER } from './atelierArrivee.js';
 import './comptes-lies.css';
 import './centre-notifs.css';
 import './comptes-securite.css';
@@ -780,6 +782,7 @@ import { champsSource, dupliquerFiche, fichesAPublier, texteAColler } from "./du
 import { repartirGrosLot, numerosDuLot, verifierNumerosTapes, planGrosLot, morceauxGrosLot, centimesTapes as centimesLotTapes, PREFIXE_PHOTO_LOT } from "./grosLot.js";
 import CreerSurVinted from './CreerSurVinted.jsx';   // (11 nov., lot annonce-vinted) « Créer sur Vinted » depuis une fiche (extension 5.367)
 import { etatFicheVinted } from './annonceVinted.js';
+import { evenementsDesLignes } from './moderationVinted.js';   // (15 nov.) l'historique complet : masquée / disparue, par annonce
 import { histoireArticle, offresDeConversation, colisDesVentes } from "./histoireArticle.js";
 import { etatArticle } from "./etatArticle.js";
 // ⟦→ ecrans/Stock.jsx #1⟧
@@ -939,6 +942,7 @@ import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } fr
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
 import { fonduEntree } from "./passageOnglet.js";
 import { echelleTexte, marquerGrandTexte } from "./grandTexte.js";
+import { echelleTotale, lireTailleTexte } from "./tailleTexte.js";   // (15 nov.) Paramètres → Taille du texte
 import { langueNavigateur, poserLangueUneFois, alignerLangueCompte } from "./langueCompte.js";
 // (11 nov., lot traduction) Les textes visibles passent par `tr()` (src/i18n/index.js) :
 // `t` est pris partout dans ce fichier comme nom de variable, d'où l'alias `tr`.
@@ -3215,6 +3219,9 @@ const SYNC_KEYS = [
   // (3 nov.) Le cycle d'un article (src/cycleArticle.js) : SA réponse à « N°x
   // supprimé de Vinted » (son clic seul) et la dernière lecture qui l'a vu en ligne.
   'vrm_cycle_decisions','vrm_vus_en_ligne','vrm_fiches_neuves','vrm_prix_journal','vrm_modeles_desc',
+  // (15 nov.) L'atelier « achat arrivé → en ligne » (src/atelierArrivee.js) : SES « Plus tard » / « C'est fait »,
+  // par fiche — la reprise là où il s'est arrêté, sur chaque appareil. Écrit sur SON geste seulement.
+  'vrm_atelier_arrivee',
   // (12 nov.) La dernière proposition de baisse par paire (src/conseilPrix.js : une tous les 14 j).
   'vrm_conseil_prix',
   // (4 nov.) Les achats qu'il a DÉCLARÉS lots, et ses répartitions d'un lot sur ses N°
@@ -17982,6 +17989,9 @@ async function lireExtraFiche(rn) {
   // `dateReception` (livrée dans SA transaction, sinon « Récupéré » touché).
   // Un seul achat relié, sinon on ne choisit pas. Projeté (§4.4), jamais `data`.
   const txAchat = achats.length === 1 ? achats[0] : null;
+  // (15 nov., historique complet) Les masquages constatés par l'extension (`moderation_vinted_{uid}`, petites lignes :
+  // 200 événements au plus) — projetés, la ligne de temps garde ceux des annonces de CE N° (par identifiant).
+  const modP = ids.length ? sb(`app_data?id=like.moderation_vinted_*&select=id,e:data->e`) : Promise.resolve([]);
   const [cof, conv, rec, lbc, vc, livA] = await Promise.all([
     ids.length ? sb(`app_data?or=(${ou})&select=id,first:data->>firstSavedAt,saved:data->>savedAt,brand:data->>brand,etat:data->>etat,desc:data->>desc,title:data->>title,size:data->>size,price:data->>price`) : Promise.resolve([]),
     ids.length ? sb(`app_data?id=like.harvest_*_conv_*&data->payload->conversation->transaction->>item_id=in.(${ids.join(',')})&select=id,messages:data->payload->conversation->messages,item:data->payload->conversation->transaction->>item_id`) : Promise.resolve([]),
@@ -18007,7 +18017,9 @@ async function lireExtraFiche(rn) {
   const recus = rec ? new Set(rec.map((r) => String(r.id || '').replace(/^email_invoice_tx/, ''))) : null;
   const vcL = Array.isArray(vc) ? (vc[0] || {}) : null;
   const colisVente = await lireColisDesVentes(rn);
-  return { reception, receptionRaison, coffres, offres, recus, lbcItems: lbc ? lbc.items || {} : null, vcItems: vcL ? (vcL.items || {}) : null, vcLiens: vcL ? (vcL.liens || {}) : {}, colisVente };
+  const modRows = await modP;
+  const moderation = modRows == null ? null : evenementsDesLignes(modRows);
+  return { moderation, reception, receptionRaison, coffres, offres, recus, lbcItems: lbc ? lbc.items || {} : null, vcItems: vcL ? (vcL.items || {}) : null, vcLiens: vcL ? (vcL.liens || {}) : {}, colisVente };
 }
 // (9 nov., fiche paire) LA FRISE DU COLIS D'UNE VENTE, par identité : le bordereau de
 // CETTE transaction (`email_bord_*`, sa date de réception et son n° de suivi), SON clic
@@ -18296,7 +18308,9 @@ function entreeRangementVinted(o, extra = {}) {
   const pr = o.price && typeof o.price === 'object' ? o.price.amount : o.price;
   const l = lotDe(o); const nb = Number(o.items_count || (o.transaction && o.transaction.items_count));
   return { tx: String(o.transaction_id), titre: String(o.title || '').slice(0, 160), photo: orderPhoto(o) || null, prix: pr != null && pr !== '' ? Number(pr) : null,
-    taille: String(o.size_title || o.size || '').slice(0, 40), site: 'vinted', ...(l.lot || nb > 1 ? { lot: true, n: nb > 1 ? nb : l.n || null } : {}), ...extra };
+    taille: String(o.size_title || o.size || '').slice(0, 40), site: 'vinted', ...(l.lot || nb > 1 ? { lot: true, n: nb > 1 ? nb : l.n || null } : {}),
+    // (15 nov., atelier d'arrivée) L'état et la devise LUS : un achat remboursé ou dans une autre devise ne propose aucun prix.
+    statut: String(o.status || '').slice(0, 80), devise: String((o.price && typeof o.price === 'object' && o.price.currency_code) || '').slice(0, 3), ...extra };
 }
 // Les propositions qui attendent, pour Ma journée (relues quand elles changent).
 function useARanger(actif = true) {
@@ -18322,6 +18336,81 @@ function RangerAchatCoque() {
   return <GardeEcran nom="ranger-achat" feuille onFermer={() => setEntrees(null)}>
     <RangerAchat entrees={entrees} preparer={preparerRangement} ranger={ecrireRangement} onPasARanger={pasARanger} onFermer={() => setEntrees(null)} Feuille={SheetShell} Bouton={Bouton} Photo={PhotoVinted}/>
   </GardeEcran>;
+}
+// ══════════════════════════════════════════════════════════════════════════════
+// (15 nov.) L'ATELIER « ACHAT ARRIVÉ → EN LIGNE » — docs/passation/2026-11-15-atelier-arrivee.md
+// La feuille « Ranger cet achat » devient la PREMIÈRE partie d'un atelier : N° · case (le même
+// « Rangé », sans prix) · photos (le studio) · prix d'achat (son prix PAYÉ, sur SON tap) · fiche
+// « À publier » · publier. La règle : src/atelierArrivee.js ; le dessin : src/AtelierArrivee.jsx.
+// Ouvert par le même événement que la feuille (`ouvrirRangement` : « J'ai retiré », la cloche,
+// Ma journée), et par `vrm:atelier-arrivee` (Ma journée : « N paires à finir »). Chaque écriture
+// passe par `gesteVrm` (annulable 5 s) ; rien n'est écrit sans SON geste.
+// ══════════════════════════════════════════════════════════════════════════════
+const AtelierArriveeLazy = aLaDemande(() => import('./AtelierArrivee.jsx'), true);
+const PlanRangerLazy = React.lazy(() => import('./RangerAchat.jsx').then((m) => ({ default: m.Plan })));
+const PlanRanger = (props) => <React.Suspense fallback={null}><PlanRangerLazy {...props}/></React.Suspense>;
+const lireEtatAtelier = () => ({ fiches: load(CLE_FICHES_RANGEES, {}) || {}, couts: load('vinted_buyprice_by_num', {}) || {}, marques: load(CLE_ATELIER, {}) || {}, meubles: load('vrm_meubles', []) || [] });
+const ecrireAtelier = (texte, ops, acc = '') => { gesteVrm(texte, ops, {}, () => { emettreClesRelues([...new Set(ops.map((o) => o.k))]); }, acc); };
+// Les paires rangées à l'arrivée qui ne sont pas finies (Ma journée).
+function pairesAFinirIci() {
+  const e = lireEtatAtelier();
+  return pairesAFinir({ fiches: e.fiches, marques: e.marques, couts: e.couts, etatVinted: (f) => etatFicheVinted(f, null) });
+}
+// Ma journée : les paires à finir, relues quand une fiche, un coût ou SES marques changent.
+function usePairesAFinir(actif = true) {
+  const [l, setL] = React.useState(() => (actif ? pairesAFinirIci() : []));
+  React.useEffect(() => {
+    if (!actif) return undefined;
+    const f = () => setL(pairesAFinirIci());
+    const surSave = (e) => { const k = e && e.detail && e.detail.k; if (!k || k === CLE_FICHES_RANGEES || k === CLE_ATELIER || k === 'vinted_buyprice_by_num') f(); };
+    f(); window.addEventListener('vrm:save', surSave);
+    const offs = [CLE_FICHES_RANGEES, CLE_ATELIER, 'vinted_buyprice_by_num'].map((k) => onCleRelue(k, f)); const offC = onCloudReady(f);
+    return () => { window.removeEventListener('vrm:save', surSave); offs.forEach((o) => { if (typeof o === 'function') o(); }); if (typeof offC === 'function') offC(); };
+  }, [actif]);
+  return l;
+}
+// L'entrée d'atelier d'une fiche déjà rangée (reprise) : SON achat (n° de transaction) et SON N°.
+const entreeDeFiche = (f) => ({ tx: String((f.achat && f.achat.tx) || ''), numeros: [String(f.numero)], titre: f.titre || '', photo: f.photoAchat || null, prix: null, taille: f.taille || '', site: (f.achat && f.achat.site) || 'vinted' });
+function AtelierArriveeCoque() {
+  const [entrees, setEntrees] = React.useState(null);
+  const [creer, setCreer] = React.useState(null);
+  React.useEffect(() => {
+    const f = (e) => { const d = e && e.detail; if (!d || !Array.isArray(d.entrees) || !d.entrees.length) return; if (typeof d.prendre === 'function') d.prendre(); setEntrees(d.entrees); };
+    const g = (e) => { const d = (e && e.detail) || {}; const l = Array.isArray(d.fiches) ? d.fiches : pairesAFinirIci().map((x) => x.fiche); const es = l.map(entreeDeFiche); if (es.length) setEntrees(es); };
+    window.addEventListener('vrm:ranger-achat', f); window.addEventListener('vrm:atelier-arrivee', g);
+    const t = setTimeout(reserverNumerosRanges, 6000);
+    return () => { window.removeEventListener('vrm:ranger-achat', f); window.removeEventListener('vrm:atelier-arrivee', g); clearTimeout(t); };
+  }, []);
+  const coque = React.useMemo(() => ({
+    cleNum, preparer: preparerRangement, ranger: ecrireRangement, lireEtat: lireEtatAtelier,
+    marqueDe: (t) => extractBrand(t) || '', couleursDe: (t) => extractColors(t),
+    etatVinted: (f) => etatFicheVinted(f, null),
+    lireStudio: (k) => import('./studioPhoto.js').then((m) => m.lireStudio(STUDIO_BASE, k)),
+    ouvrirStudio: (k) => ouvrirAtelier('studio', { num: k }),
+    marquer: (id, etape, etat) => { const op = opMarque({ marques: load(CLE_ATELIER, {}) || {}, id, etape, etat }); if (op) ecrireAtelier(tr(etat === 'passe' ? 'arr.geste.plusTard' : 'arr.geste.fait'), [op]); },
+    prixAchat: async (f, texte, source) => {
+      const e = lireEtatAtelier();
+      const r = opsPrixAchat({ fiches: e.fiches, id: f.id, couts: e.couts, texte, source });
+      if (!r.ok) return r;
+      ecrireAtelier(tr('arr.geste.prix', { num: f.numero, prix: r.valeur }), r.ops, 'arrivee.prix');
+      return { ok: true };
+    },
+    fiche: async (f, champs) => {
+      const r = opsFiche({ fiches: lireEtatAtelier().fiches, id: f.id, champs });
+      if (!r.ok) return r;
+      ecrireAtelier(tr('arr.geste.fiche', { num: f.numero }), r.ops, 'arrivee.fiche');
+      return { ok: true };
+    },
+    creerVinted: (f) => setCreer([f]),
+    publierPartout: (f) => { try { window.dispatchEvent(new CustomEvent('vrm:publier-partout', { detail: { nums: [String(f.numero)] } })); } catch (_) {} },
+  }), []);
+  return <>
+    {entrees ? <GardeEcran nom="atelier-arrivee" feuille onFermer={() => setEntrees(null)}>
+      <AtelierArriveeLazy entrees={entrees} coque={coque} onFermer={() => setEntrees(null)} Feuille={SheetShell} Bouton={Bouton} Photo={PhotoVinted} Plan={PlanRanger}
+        Note={(num) => <NotePaireCoque numero={num} variante="bloc" ajout dicter/>}/>
+    </GardeEcran> : null}
+    {creer ? <FeuilleCreerVinted fiches={creer} saisie onFermer={() => setCreer(null)}/> : null}
+  </>;
 }
 // ⟦→ ecrans/Loupe.jsx #1⟧
 // (26 oct.) Le titre de la barre du haut (téléphone), posé par la coque à chaque
@@ -33280,6 +33369,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (6 nov.) Un inventaire du Stock EN COURS (src/inventaire.js) : une carte de Ma journée.
   const inventaireJournee = useInventaireEnCours(only === 'journee');
   const aRangerJournee = useARanger(only === 'journee');   // (11 nov., lot rangement-guide) les achats retirés ou reçus, pas encore rangés
+  const aFinirJournee = usePairesAFinir(only === 'journee');   // (15 nov.) les paires rangées à l'arrivée, atelier pas fini
   const atelierJournee = useAtelierJournee(only === 'journee');
   // (3 nov.) « Supprimer de Leboncoin » depuis la carte « à retirer de Leboncoin » :
   // une confirmation qui nomme chaque N°, puis une annonce à la fois ; le premier
@@ -34050,6 +34140,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [recusDelies, setRecusDelies] = useStateCle('vrm_recus_delies', () => load('vrm_recus_delies', {}) || {});
   useEffect(() => { const relire = () => setRecusDelies(load('vrm_recus_delies', {}) || {}); const off = onCloudReady(relire); const f = (e) => { if (e && e.detail && e.detail.k === 'vrm_recus_delies') relire(); }; window.addEventListener('vrm:save', f); return () => { off(); window.removeEventListener('vrm:save', f); }; }, []);
   const indexRecusAchat = useMemo(() => indexRecusParTransaction(Array.isArray(recusAchat) ? recusAchat.filter((r) => !(r && r.id && recusDelies[r.id])) : recusAchat, (r) => ventilationRecuAchat(r && r.texte).trouve), [recusAchat, recusDelies]);
+  // (15 nov., atelier d'arrivée) L'entrée de l'atelier porte le prix PAYÉ de CET achat (par SON n° de transaction) :
+  // la proposition de « Prix d'achat » (`propositionPrixAchat` : le reçu juste ⇒ « Payé sur Vinted », sinon l'article
+  // seul, dit). Rien n'est écrit ici : l'atelier la montre, SON tap « Garder » l'écrit.
+  const entreeAvecPaye = (o, extra = {}) => {
+    const e = entreeRangementVinted(o, extra); if (!e) return e;
+    try {
+      const p = propositionPrixAchat({ identite: { achat: o, par: 'lien' }, ventilationDe: (tx) => { const r = indexRecusAchat.get(String(tx)); return r ? ventilationRecuAchat(r.texte) : null; } });
+      if (p && p.tx === e.tx) e.paye = { centimes: p.centimes, source: p.source, detail: String(p.detail || '').slice(0, 160), tx: p.tx };
+    } catch (_) {}
+    return e;
+  };
   const [receiptView, setReceiptView] = useState(null); // reçu affiché dans une modale in-app
   const [reventeVue, setReventeVue] = useState(null); // (10 nov., lot AV) « Revendu combien ? » d'un achat : { titre }
   const [lotView, setLotView] = useState(null); // détail d'un lot : { loading, order, items }
@@ -34093,7 +34194,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const entreeRangementColis = (t) => {
     let a = null; try { a = achatDuColis(t, buysBase, indexSuivisAchats); } catch (_) { a = null; }
     const su = (() => { try { return suiviDeLigne(t) || ''; } catch (_) { return ''; } })();
-    if (a) return entreeRangementVinted(a, su ? { suivi: su } : {});
+    if (a) return entreeAvecPaye(a, su ? { suivi: su } : {});
     return { tx: '', suivi: su, titre: String((t && t.artTitle) || '').slice(0, 160), photo: (t && t.photo) || null, prix: null, taille: '', site: 'vinted' };
   };
   const apresRetrait = (e) => {
@@ -35238,7 +35339,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Vinted, pas un rapprochement (§24). On ouvre donc toujours SA conversation,
   // même quand l'extension n'est pas encore passée.
   const lienConv = (o) => { const c = o && o.conversation_id; return c ? `https://www.vinted.fr/inbox/${c}` : ''; };
-  const markPickupDone = (o) => { const k = String(o.transaction_id||''); if(!k) return; try { apresRetrait(entreeRangementVinted(o)); } catch (_) {} return gesteVrm('Colis retiré', [{ k: 'vinted_pickup_done', type: 'cle', id: k, apres: new Date().toISOString(), avant: pickupDone[k] }], { vinted_pickup_done: setPickupDone }, null, 'colis.retire'); };
+  const markPickupDone = (o) => { const k = String(o.transaction_id||''); if(!k) return; try { apresRetrait(entreeAvecPaye(o)); } catch (_) {} return gesteVrm('Colis retiré', [{ k: 'vinted_pickup_done', type: 'cle', id: k, apres: new Date().toISOString(), avant: pickupDone[k] }], { vinted_pickup_done: setPickupDone }, null, 'colis.retire'); };
   const unmarkPickupDone = (o) => { const k = String(o.transaction_id||''); if(!k) return; setPickupDone(prev=>{ const u={...prev}; delete u[k]; save('vinted_pickup_done',u); return u; }); };
   const markAllPickupDone = (list) => { setPickupDone(prev=>{ const u={...prev}; (list||[]).forEach(o=>{ if(o.transaction_id!=null) u[String(o.transaction_id)]=new Date().toISOString(); }); save('vinted_pickup_done',u); return u; }); };
   // Bordereaux masqués à la main (ex. doublon / non relié qu'on ne veut plus voir).
@@ -40839,7 +40940,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!L.length) return 0;
     const t = new Date().toISOString();
     // (11 nov., lot rangement-guide) Plusieurs à la fois : ils attendent dans Ma journée (« N achats à ranger »).
-    try { proposerRangement(L.map((o) => entreeRangementVinted(o)).filter(Boolean)); } catch (_) {}
+    try { proposerRangement(L.map((o) => entreeAvecPaye(o)).filter(Boolean)); } catch (_) {}
     gesteVrm(L.length > 1 ? `${L.length} colis retirés` : 'Colis retiré', L.map(o => ({ k: 'vinted_pickup_done', type: 'cle', id: String(o.transaction_id), apres: t, avant: pickupDone[String(o.transaction_id)] })), { vinted_pickup_done: setPickupDone }, null, 'colis.retire');
     return L.length;
   };
@@ -46111,6 +46212,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {pc.num && <Numero n={pc.num} className="vrm-chat-paire-numero"/>}
                 </div>
               ); })()}
+            {/* (15 nov.) SA NOTE sur cet article, à côté de la conversation : la paire du fil par IDENTITÉ (N°, sinon
+                l'annonce de la transaction, §5) ; une note seulement si elle existe (lue à UN endroit : NotePaireCoque).
+                Privée : jamais insérée dans un message. */}
+            {!openConv.loading && !openConv.error && (()=>{ const pc = paireDeConv(String(openConv.acc?.vinted_user_id||''), openConv.convId, openConv.conversation); if (!pc || !(pc.num || pc.item!=null)) return null;
+              return <div className="vrm-chat-note-paire" data-fil-note={pc.num||String(pc.item||'')}><NotePaireCoque numero={pc.num||''} itemId={pc.item!=null?String(pc.item):''} variante="bloc"/></div>; })()}
             {/* (11 nov., anti-arnaque) Les messages PROUVÉS de l'autre personne (`autre`) seulement : jamais les siens, jamais l'équipe Vinted. Aucune action. */}
             {!openConv.loading && !openConv.error && <AlerteArnaque site="vinted" style={{margin:'8px 16px 0'}} lien={openConv.convId?`https://www.vinted.fr/inbox/${openConv.convId}`:''} messages={messagesPourArnaque(openConv.messages)}/>}
             <div ref={chatScroll} className="vrm-chat-history" style={{flex:1,overflow:'auto',padding:16,display:'flex',flexDirection:'column',gap:8}}>
@@ -47203,6 +47309,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (aRangerJournee.length) {
           const nR = aRangerJournee.length, court = tr('ranger.carte.court', { n: nR });
           jobs.push({ id: 'achats-a-ranger', n: nR, icon: 'box', color: C.text, court, detail: tr('ranger.carte.detail'), title: court, photos: aRangerJournee.map((x) => x.photo).filter(Boolean).slice(0, 4), tab: 'journee', prio: 2.35, action: tr('ranger.carte.action'), avant: () => ouvrirRangement(aRangerJournee) });
+        }
+        // (15 nov.) L'ATELIER D'ARRIVÉE pas fini : « N paires à finir » ⇒ « Reprendre » rouvre l'atelier là où il
+        // s'est arrêté (la première étape ni faite ni passée, src/atelierArrivee.js). Neutre.
+        if (aFinirJournee.length) {
+          const nF = aFinirJournee.length, court = tr('arr.journee.court', { n: nF });
+          jobs.push({ id: 'atelier-arrivee', n: nF, icon: 'camera', color: C.text, court, detail: tr('arr.journee.detail'), title: court, photos: aFinirJournee.map((x) => x.fiche.photoAchat).filter(Boolean).slice(0, 4), tab: 'journee', prio: 2.36, action: tr('arr.journee.action'),
+            avant: () => { try { window.dispatchEvent(new CustomEvent('vrm:atelier-arrivee', { detail: { fiches: aFinirJournee.map((x) => x.fiche) } })); } catch (_) {} } });
         }
         // (11 nov.) « CLÔTURER L'ANNÉE » : en décembre et janvier, UNE fois (src/clotureAnnee.js) —
         // « Voir » ouvre Argent → Déclarer sur la liste, et note l'année vue (SON clic). Neutre.
@@ -57798,7 +57911,8 @@ const applyZoom = (z) => {
     d.style.setProperty('--vrm-zoom', '1');
     d.style.removeProperty('--vrm-vw100'); d.style.removeProperty('--vrm-dezoom');
     // Le texte en grand de l'APPAREIL (src/grandTexte.js) multiplie la densité choisie.
-    const g = echelleTexte(); marquerGrandTexte(g);
+    // (15 nov.) … et la taille du texte choisie dans VRM (src/tailleTexte.js) s'y ajoute (bornée à 1,6).
+    const g = echelleTotale(echelleTexte(), lireTailleTexte()); marquerGrandTexte(g);
     let f = parseFloat(z) || 1;
     // Un téléphone garde sa largeur réelle et des commandes lisibles, même
     // lorsqu'un ancien réglage « Minus » est encore enregistré sur l'appareil.
@@ -63204,7 +63318,10 @@ function AppCoeur() {
             onCopier={async(f)=>{ try { await navigator.clipboard.writeText(texteAColler(f)); toast('Texte copié'); } catch (_) { toast('Copie impossible ici'); } }}
             onDupliquer={async()=>{ const r=await dupliquerNumero(rn, ex); if(!r.ok){ toast(`Pas dupliqué : ${r.raison}`); return; } toast(`N°${r.numero} créé`); setNeuveRecente(r.fiche); fermer(); setFicheNum(String(r.numero)); }}
             // (14 nov., idée 154) La ligne de temps : la réception de l'achat relié, les dates Vinted des annonces, les photos du studio (projection scalaire).
-            extraTemps={{ reception: ex ? ex.reception : undefined, crees: numData ? (numData.crees === undefined ? null : numData.crees) : undefined, lireStudio: lireStudioDates }}
+            extraTemps={{ reception: ex ? ex.reception : undefined, crees: numData ? (numData.crees === undefined ? null : numData.crees) : undefined, lireStudio: lireStudioDates,
+              // (15 nov., historique complet) masquages (par annonce), SES retours (par transaction d'une vente de CE N°).
+              ids: (rn.annonces || []).map((x) => String(x.id)), txs: ((rn.ventes && rn.ventes.vinted) || []).map((v) => String(v._tx || '')).filter(Boolean),
+              moderation: ex ? ex.moderation : undefined, retours: { recus: load('vinted_retours_recus', {}) || {}, remis: load('vinted_retours_remis', {}) || {} } }}
             // (14 nov., idée 157) « Dans une autre taille » : une fiche « À publier », N° neuf par `dupliquerNumero`.
             // ⚠️ §5 : deux paires sous ce N° ⇒ aucune copie (on ne choisit pas laquelle) ; « Je numérote moi-même »
             // allumé ⇒ VRM ne donne pas de N° (la règle des lots) : la feuille le dit, rien n'est créé.
@@ -63243,7 +63360,8 @@ function AppCoeur() {
       <PiluleAnnulerCoque/>
       {/* (15 nov., lot meme-photo) « Même photo · à relier » : la feuille, ouverte par Ma journée, Annonces → Outils, les écrans des sites et la fiche. */}
       {AUTH.user && <MemePhotoCoque/>}
-      {AUTH.user && <RangerAchatCoque/>}
+      {/* (15 nov.) L'atelier « achat arrivé → en ligne » prend l'événement de « Ranger cet achat » (sa première partie). */}
+      {AUTH.user && <AtelierArriveeCoque/>}
       {/* (14 nov., 160) Vente en main propre (src/ideesArgent/) : le verdict et l'histoire de la fiche. */}
       {AUTH.user && <IdeesArgentRacine pret={!!numData} verdict={verdictVenteMainCoque} surOuverture={setVenteMainOuverte}/>}
       {/* (11 nov.) « Me le rappeler » : la feuille et le bandeau ouvert par la notification (api/_lib/rappels-perso.js). */}
