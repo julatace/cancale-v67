@@ -120,9 +120,24 @@ l'origine »). Une tuile et une rangée se touchent entières. Les pilules des c
   (section ci-dessous).
 - Captures avant / après : `docs/design/avant-apres/journee-studio-*.png` (mode exemple, données inventées).
 
-## Résultats des bancs (fin de session)
+## Résultats des bancs (fin de session, dist final, 3 bancs à la fois)
 
-(complété en fin de session)
+| banc | ce lot | base (`claude/integration-refonte`, même machine) |
+|---|---|---|
+| studio-journee | vert (4 combinaisons ; mutations rouges ; base rouge) | rouge (pas de grille) |
+| journee-instantanee, ouverture-instantanee | verts | verts |
+| journee-perso, journee-premium, journee-mieux, journee-chiffres | verts | — |
+| accueil-reste, exemple-photos, garde-ecrans | verts | — |
+| journee-coherence | 1 rouge : E0 sur l'écran **Ventes** (`.vrm-fu-modifier` hors carte) | le même rouge |
+| journee-v2 | 8 rouges : T sur l'écran **Ventes** (filtre « À envoyer ») | les mêmes 8 (+ 4 U) |
+| journee-photos | 5 rouges : J1 « prix à baisser » (0 conseil dans sa base) et C1 (navigation Achats) | les mêmes 5 |
+| ebay-messages-journee | 4 rouges : B (la case mène à eBay), C (`data-ebay-msg-passu` n'existe plus) | 10 rouges (dont ces 4) |
+| benefice-journee | 12 rouges | les mêmes 12 |
+| journee-widgets | « garde réseau » (le banc joint l'authentification réelle) | le même |
+
+Aucun rouge propre à ce lot. Audits : les 624 joués sur les deux arbres ; seuls rouges propres à ce lot à mi-chemin,
+`audit-vendeurs-differents` B2 (adapté : les compteurs de la grille) et `audit-recherche-unique` (une mesure de
+temps sous charge, verte rejouée seule) ; tous les autres rouges sont aussi sur la base.
 
 ## Geste de Julien
 
