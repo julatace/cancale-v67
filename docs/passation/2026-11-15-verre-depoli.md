@@ -49,7 +49,7 @@ linear-gradient(170deg, var(--sv-haut) 0%, var(--sv-milieu) 45%, var(--sv-bas) 1
 | `--sv-reflet` | `rgb(120 175 235 / .10)` | `rgb(90 140 210 / .08)` |
 | `--sv-reflet-2` | `rgb(80 150 230 / .08)` | `rgb(60 110 190 / .06)` |
 | `--sv-verre` (panneau) | `rgb(247 250 253 / .80)` | `rgb(16 30 50 / .62)` |
-| `--sv-verre-barre` | `rgb(247 250 253 / .86)` | `rgb(20 36 58 / .82)` |
+| `--sv-verre-barre` | `rgb(247 250 253 / .80)` | `rgb(16 30 50 / .72)` |
 | `--sv-colle` (barre collée) | `#21599B` | `#142F55` |
 | `--sv-brume` (fond à plat) | `#D3DFEC` | `#0F2038` |
 | encre sur verre / gris / lien / ambre | `#0C1D30` / `#3F5468` / `#004A9F` / `#764300` | `#EAF2FB` / `#9CB0C6` / `#6CB4FF` / `#F2B65E` |
