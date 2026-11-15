@@ -243,11 +243,11 @@ export default function Accueil({ onEntrer }) {
               {/* Ce qui est VRAI (1er et 5 nov.) : VRM lit Vinted par l'extension, dans le
                   navigateur de l'ordinateur ; le téléphone consulte et commande. Pas
                   « Chrome obligatoire » : la liste des navigateurs SERVIS. */}
-              <p className="av-prereq" data-prerequis="" data-variante={sansSouris ? 'tactile' : 'souris'} data-navigateurs={SERVIS.ordinateur.join(',')} data-lecture-telephone={SERVIS.lectureTelephone ? 'oui' : 'non'}>
+              <div className="av-prereq" data-prerequis="" data-variante={sansSouris ? 'tactile' : 'souris'} data-navigateurs={SERVIS.ordinateur.join(',')} data-lecture-telephone={SERVIS.lectureTelephone ? 'oui' : 'non'}>
                 {sansSouris
                   ? tr('accueil.prereq.tactile', { navigateurs: navsOrdi })
                   : tr('accueil.prereq.souris', { navigateurs: navsOrdi })}
-              </p>
+              </div>
             </div>
             <figure className="av-scene" data-scene-haut="">
               <span className="av-ecran-bureau"><Capture nom="bureau" taille={BUREAU} paresseuse={sansSouris} alt={tr('accueil.capture.bureau')} /></span>
@@ -279,10 +279,7 @@ export default function Accueil({ onEntrer }) {
               <article className="av-tuile av-tuile-extension" data-moment="extension" data-reveil="">
                 <div className="av-tuile-texte">
                   <h3>{tr('accueil.moment.extension.titre')}</h3>
-                  <p>{tr('accueil.moment.extension.texte')}</p>
-                  <ul className="av-puces" aria-label={tr('accueil.moment.extension.navigateurs')}>
-                    {SERVIS.ordinateur.map((n) => <li key={n}>{n}</li>)}
-                  </ul>
+                  <p>{tr('accueil.moment.extension.texte', { navigateurs: navsOrdi })}</p>
                   <ul>
                     <li>{tr('accueil.moment.extension.point1')}</li>
                     <li>{tr('accueil.moment.extension.point2')}</li>
