@@ -26,6 +26,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (15 nov., Julien : « Améliore le parcours », « un onglet admin », « Signaler un problème qui t'arrive vraiment ») docs/passation/2026-11-15-parcours-nouveau.md
+  { id: 'parcours-nouveau', date: '2026-11-15', titre: 'Signaler un problème : la réponse arrive ici', phrase: 'Reçu, puis la réponse dans Paramètres → Mes signalements.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « pratique et compréhensible ») docs/passation/2026-11-15-parametres.md
   { id: 'parametres-categories', date: '2026-11-15', titre: 'Paramètres rangés en dix catégories', phrase: 'Cherche « papier » ou « URSSAF » : le bon réglage s’ouvre.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « J'aime la 9 ») docs/passation/2026-11-15-verre-depoli.md — le thème « Verre dépoli ».

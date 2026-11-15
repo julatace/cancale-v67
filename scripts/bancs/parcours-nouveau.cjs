@@ -273,6 +273,8 @@ async function partieParcours(nav, W, theme) {
     dit(me && me.pleins === 1, `${etq} ${e} : un plein, un seul`, me && me.pleins);
     dit(me && !me.deborde, `${etq} ${e} : rien ne déborde`);
     if (W < 600) dit(me && me.petits.length === 0, `${etq} ${e} : chaque cible fait 44 px`, me && JSON.stringify(me.petits));
+    const opa = await pg.evaluate(() => { const c = document.querySelector('.pn-corps'); return c ? Number(getComputedStyle(c).opacity) : 0; });
+    dit(opa > 0.9, `${etq} ${e} : l'étape est VISIBLE (opacité ${opa})`);
     const txt = await pg.locator('[data-parcours-nouveau]').innerText();
     dit(!/undefined|NaN|null|\bpn\.[a-z]/.test(txt), `${etq} ${e} : aucun « undefined », aucune clé de traduction`, txt.slice(0, 120));
     await pg.screenshot({ path: path.join(SHOTS, `p-${W}-${theme}-${String(k + 2).padStart(2, '0')}-${e}.png`) });
@@ -479,14 +481,18 @@ async function partieSignalement(nav, W, theme) {
   if (!fs.existsSync(path.join(DIST, 'index.html'))) { console.log('❌ pas de dist/ — npm run build'); process.exit(1); }
   await chargerRegles();
   const srv = V.servir(DIST, PORT);
-  const nav = await lancer(PW, { executablePath: process.env.BANC_CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
+  // Un navigateur par partie : un onglet tombé (mémoire) n'emporte pas les suivantes.
+  const avec = async (f, etq) => {
+    const nav = await lancer(PW, { executablePath: process.env.BANC_CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
+    try { await f(nav); } catch (e) { dit(false, `${etq} le banc a planté`, e.message); } finally { await nav.close().catch(() => {}); }
+  };
   try {
     for (const W of LARGEURS) for (const th of THEMES) {
-      if (PARTIES.includes('P')) await partieParcours(nav, W, th).catch((e) => dit(false, `[P ${W} ${th}] le banc a planté`, e.message));
-      if (PARTIES.includes('A')) await partieAdmin(nav, W, th).catch((e) => dit(false, `[A ${W} ${th}] le banc a planté`, e.message));
-      if (PARTIES.includes('S')) await partieSignalement(nav, W, th).catch((e) => dit(false, `[S ${W} ${th}] le banc a planté`, e.message));
+      if (PARTIES.includes('P')) await avec((nav) => partieParcours(nav, W, th), `[P ${W} ${th}]`);
+      if (PARTIES.includes('A')) await avec((nav) => partieAdmin(nav, W, th), `[A ${W} ${th}]`);
+      if (PARTIES.includes('S')) await avec((nav) => partieSignalement(nav, W, th), `[S ${W} ${th}]`);
     }
-  } finally { await nav.close().catch(() => {}); srv.close(); }
+  } finally { srv.close(); }
   console.log(`\nCaptures : ${SHOTS}`);
   console.log(ko ? `\n❌ parcours nouveau : ${ko} défaut(s)\n - ${defauts.slice(0, 30).join('\n - ')}` : '\n✅ parcours nouveau : tout est vert');
   process.exit(ko ? 1 : 0);

@@ -51,9 +51,10 @@
   width: 100%; max-width: 1080px; margin: 0 auto; box-sizing: border-box;
   padding: 4px 20px 20px;
   display: flex; flex-direction: column; gap: 18px;
-  animation: pn-entre .32s cubic-bezier(.2, .8, .2, 1) both;
+  animation: pn-entre .32s cubic-bezier(.2, .8, .2, 1);
 }
-@keyframes pn-entre { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+/* Un glissé court, jamais un fondu : si l'horloge d'animation cale (cadre au fond, machine lente), le contenu reste VISIBLE. */
+@keyframes pn-entre { from { transform: translateY(10px); } to { transform: none; } }
 @media (prefers-reduced-motion: reduce) { .pn-corps { animation: none; } .pn-segment::before { transition: none; } }
 .pn-illu { margin: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .pn-texte { flex-shrink: 0; }

@@ -17,6 +17,8 @@ import MarquePlateforme from '../plateformes/Marque.jsx';
 import { ETAPES_NOUVEAU, SITES_PARCOURS, progression, captureDe, LIENS_EXTENSION, estDerniere } from './regle.js';
 import './parcours-nouveau.css';
 
+// Des noms propres (jamais traduits) dans les dessins.
+const DOMAINE_VINTED = 'vinted.fr', NOM_ORION = 'Orion';
 const NOM_SITE = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire Collective' };
 const LIEN_SITE = { vinted: 'https://www.vinted.fr', leboncoin: 'https://www.leboncoin.fr/compte/part/mes-annonces', vestiaire: 'https://www.vestiairecollective.com/' };
 
@@ -58,7 +60,7 @@ function DessinNavigateur() {
       <rect x="34" y="126" width="160" height="10" rx="5" className="pn-d-ligne pn-d-ligne-2" />
       <path d="M279 52 C 270 92, 220 120, 200 150" className="pn-d-fleche" />
       <rect x="150" y="146" width="132" height="34" rx="12" className="pn-d-carte" />
-      <text x="216" y="168" textAnchor="middle" className="pn-d-carte-t">vinted.fr ✓</text>
+      <text x="216" y="168" textAnchor="middle" className="pn-d-carte-t">{DOMAINE_VINTED + ' ✓'}</text>
     </svg>
   );
 }
@@ -69,15 +71,15 @@ function DessinIphone() {
       <rect x="140" y="14" width="40" height="8" rx="4" className="pn-d-point" />
       <g transform="translate(118 44)">
         <rect width="38" height="38" rx="10" className="pn-d-tuile" /><circle cx="19" cy="19" r="11" className="pn-d-orion" /><path d="M19 10 L22 19 L19 28 L16 19 Z" className="pn-d-aiguille" />
-        <text x="19" y="54" textAnchor="middle" className="pn-d-nom">Orion</text>
+        <text x="19" y="54" textAnchor="middle" className="pn-d-nom">{NOM_ORION}</text>
       </g>
       <g transform="translate(166 44)">
         <rect width="38" height="38" rx="10" className="pn-d-tuile pn-d-tuile-accent" /><text x="19" y="25" textAnchor="middle" className="pn-d-v">V</text>
         <text x="19" y="54" textAnchor="middle" className="pn-d-nom">Vinted</text>
       </g>
       <rect x="112" y="120" width="96" height="44" rx="12" className="pn-d-carte" />
-      <text x="160" y="139" textAnchor="middle" className="pn-d-carte-t">Ouvrir les URL</text>
-      <text x="160" y="154" textAnchor="middle" className="pn-d-nom">vinted.fr</text>
+      <text x="160" y="139" textAnchor="middle" className="pn-d-carte-t">{tr('pn.dessin.ouvrirUrl')}</text>
+      <text x="160" y="154" textAnchor="middle" className="pn-d-nom">{DOMAINE_VINTED}</text>
       <path d="M185 82 C 200 100, 196 112, 186 120" className="pn-d-fleche" />
     </svg>
   );

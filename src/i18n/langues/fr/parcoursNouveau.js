@@ -32,6 +32,7 @@ export default {
   "pn.plateformes.aucun": "Choisis au moins un site.",
   "pn.plateformes.pasEcrit": "Pas enregistré : réessaie dans un instant.",
 
+  "pn.dessin.ouvrirUrl": "Ouvrir les URL",
   "pn.extension.titre": "Installe l’extension",
   "pn.extension.phrase.ordinateur": "Elle lit tes pages Vinted dans ce navigateur. Elle ne touche jamais à ton mot de passe.",
   "pn.extension.phrase.iphone": "Sur iPhone, seul Orion accepte l’extension. Safari et un site ajouté à l’écran d’accueil n’en ont aucune.",
