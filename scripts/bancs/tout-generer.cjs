@@ -286,20 +286,22 @@ const compte = (t, s) => String(t || '').split(s).length - 1;
     console.log('── ACHAT EN LITIGE · le bordereau de retour se voit par défaut');
     for (const tel of [false, true]) {
       const r = await rendre(b, { tab: 'cat_achats', tel, attente: 5000 });
-      const v = await r.pg.evaluate(() => ({ bloc: !!document.querySelector('[data-a-renvoyer]'), liens: document.querySelectorAll('a[href*="member/transactions/8101"]').length, sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+      // (15 nov., lot retours) Le bloc « à renvoyer (litige) » est devenu une carte « À renvoyer » (source achat).
+      const v = await r.pg.evaluate(() => ({ bloc: !!document.querySelector('[data-retour-achat="8101"][data-retour-source="achat"]'), liens: document.querySelectorAll('a[href*="member/transactions/8101"]').length, sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
       dit(v.bloc && v.liens === 1, `${tel ? '390' : '1512'} px · Achats, onglet par défaut : la paire à renvoyer et son lien de retour (une fois)`, JSON.stringify(v));
       dit(v.sw <= v.cw + 1, 'aucun débordement horizontal', `${v.sw} > ${v.cw}`);
       await r.pg.screenshot({ path: path.join(require('os').tmpdir(), `tout-generer-achats-${tel ? 390 : 1512}.png`) });
       // « Tous » : la carte porte le lien ; le bloc ne le répète pas.
       try { await r.pg.getByRole('button', { name: /^Tous/ }).last().click({ timeout: 3000 }); await r.pg.waitForTimeout(1200); } catch (_) {}
-      const t = await r.pg.evaluate(() => ({ bloc: !!document.querySelector('[data-a-renvoyer]'), liens: document.querySelectorAll('a[href*="member/transactions/8101"]').length }));
+      const t = await r.pg.evaluate(() => ({ bloc: !!document.querySelector('[data-retour-achat="8101"][data-retour-source="achat"]'), liens: document.querySelectorAll('a[href*="member/transactions/8101"]').length }));
       dit(!t.bloc && t.liens === 1, '« Tous » : le lien est sur la carte, une seule fois', JSON.stringify(t));
       dit(r.errs.length === 0, 'aucune erreur d\'app', r.errs.join(' | ').slice(0, 140));
       await r.ctx.close();
     }
     { const r = await rendre(b, { tab: 'journee', attente: 5000 });
-      const j = await r.pg.evaluate(() => { const x = document.querySelector('[data-job="a-renvoyer"]'); return x ? x.innerText : null; });
-      dit(!!j && /compte_a/.test(j), 'Ma journée : « Renvoyer 1 paire (litige) », avec le compte', JSON.stringify(j));
+      // (15 nov., lot retours) « À renvoyer » en tête de Ma journée : la carte de l'achat, avec SON compte.
+      const j = await r.pg.evaluate(() => { const x = document.querySelector('[data-a-renvoyer-journee] [data-retour-achat="8101"]'); return x ? x.innerText : null; });
+      dit(!!j && /compte_a/.test(j) && /Kilo Litige/.test(j), 'Ma journée : « À renvoyer » porte la paire, avec le compte', JSON.stringify(j));
       await r.ctx.close(); }
   } catch (e) { dit(false, 'le banc a tourné jusqu\'au bout', String(e && e.message).slice(0, 160)); }
   finally { if (b) await b.close(); srv.close(); }
