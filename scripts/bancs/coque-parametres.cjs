@@ -132,7 +132,10 @@ async function enTete(nav, { W, theme }) {
     const badges = {}; for (const x of document.querySelectorAll('[data-badge-nav]')) if (x.getClientRects().length) badges[x.getAttribute('data-badge-nav')] = x.getAttribute('data-badge-n');
     return { n: entrees.length, doublons, badges };
   }, W < 600);
-  if (W >= 600) dit(nv.n >= 10 && !nv.doublons.length, 'H4', `${T} colonne : une icône par entrée (${nv.n} entrées)`, nv.doublons.join(' ¦ '));
+  // (15 nov., rouges-connus) La colonne de l'ordinateur compte NEUF entrées depuis le 14 nov. (App.jsx : `NAV_TACHES`
+  // Ma journée · Ventes · Argent, puis Annonces · Stock · Achats, Messages, E-mails, Communauté — « Plus » et Colis
+  // retirés, choix n° 61) : le plancher suit la colonne d'aujourd'hui, la règle (aucune icône en double) reste.
+  if (W >= 600) dit(nv.n >= 9 && !nv.doublons.length, 'H4', `${T} colonne : une icône par entrée (${nv.n} entrées)`, nv.doublons.join(' ¦ '));
   dit(!(nv.badges.ventes && nv.badges.cat_bord), 'H4', `${T} le même colis ne porte pas deux badges (Ventes ET Colis)`, JSON.stringify(nv.badges));
   if (W < 600) {
     // (15 nov., rouges-connus) La barre du bas « Studio » (14 nov., docs/design/studio-bleu-clair.md : 4 espaces + le disque
@@ -193,7 +196,9 @@ async function parametres(nav, { W, theme }) {
       texte: set ? set.innerText : '',
       avatars: [...document.querySelectorAll('[data-profil-compte] .vrm-set-avatar, [data-photo-profil] span')].filter((e) => vis(e) && /^[A-Z?]$|^$/.test(e.innerText.trim()) && e.getBoundingClientRect().width >= 40).length,
       photoHors: [...document.querySelectorAll('[data-photo-profil]')].filter((e) => vis(e) && !e.closest('[data-profil-compte]')).length,
-      discord: [...document.querySelectorAll('[data-connexion-compte="discord"], [data-connexion-indispo="discord"]')].filter(vis).length + [...document.querySelectorAll('[data-discord-compte]')].filter(vis).length,
+      // (15 nov., rouges-connus) Une RANGÉE par endroit : « Bientôt » (`data-connexion-indispo`) vit DANS la rangée Discord de
+      // `ConnexionsCompte` (11 nov., DJ6) — elle était comptée une seconde fois.
+      discord: [...document.querySelectorAll('[data-connexion-compte="discord"], [data-connexion-indispo="discord"]')].filter((e) => vis(e) && !(e.matches('[data-connexion-indispo]') && e.closest('[data-connexion-compte="discord"]'))).length + [...document.querySelectorAll('[data-discord-compte]')].filter(vis).length,
     };
   });
   const m = await mesure();
@@ -211,7 +216,9 @@ async function parametres(nav, { W, theme }) {
   if (W >= 1024) {
     dit(m.gauche != null && m.gauche <= 24, 'H3', `${T} la colonne commence où commencent les autres écrans (titre à ${m.gauche} px du bord du contenu)`, String(m.gauche));
   }
-  const ECARTES = /\b(r[ée]gime fiscal|comptes connect[ée]s|e-?mails)\b/i;
+  // (15 nov., rouges-connus) « E-mails » est le MOT RETENU (src/libelles.js `NOTIONS.emails` : titre « E-mails », écarté
+  // « emails ») : l'ancienne expression `e-?mails` rejetait aussi le bon mot, montré depuis les dix catégories de Paramètres.
+  const ECARTES = /\b(r[ée]gime fiscal|comptes connect[ée]s|emails)\b/i;
   dit(!ECARTES.test(m.texte), 'H3', `${T} Réglages : aucun mot écarté (« régime fiscal », « comptes connectés », « emails »)`, (m.texte.match(ECARTES) || [''])[0]);
   await capture(pg, `ch-reglages-${W}-${theme}`);
   if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `ch-reglages-${W}-${theme}-page.png`), fullPage: true }).catch(() => {});
@@ -260,7 +267,10 @@ async function cloche(nav, { W, theme, scenario }) {
     await capture(pg, `ch-cloche-ranger-${W}-${theme}`);
     await pg.locator('[data-centre-ranger-ouvrir="73001"]').first().click().catch(() => {}); await attendre(1500);
     const ecran = await pg.evaluate(() => (document.querySelector('.vrm-main') || {}).getAttribute ? document.querySelector('.vrm-main').getAttribute('data-ecran') : null);
-    dit(ecran === 'garage', 'H6', `${T} « Ranger » ouvre le Stock`, String(ecran));
+    // (15 nov., rouges-connus) Depuis le rangement guidé (11 nov., b364eede, docs/passation/2026-11-11-rangement-guide.md)
+    // « Ranger » ouvre d'abord la feuille « Ranger cet achat » (la case proposée) quand une proposition existe ; sinon le Stock.
+    const feuille = await pg.evaluate(() => !!document.querySelector('[data-ranger-feuille]'));
+    dit(ecran === 'garage' || feuille, 'H6', `${T} « Ranger » ouvre la feuille « Ranger cet achat » ou le Stock`, JSON.stringify({ ecran, feuille }));
     dit(!envois.length, 'H6', `${T} rien n'est envoyé au téléphone (aucune écriture de notification)`, envois.join(' ¦ '));
   } else {
     dit(f && f.lignes.length === 0 && (pastille === '' || pastille === '0'), 'H6', `${T} ${scenario === 'premiere' ? 'première lecture sur cet appareil' : 'meubles pas lus'} ⇒ rien n'est proposé`, JSON.stringify({ lignes: f && f.lignes, pastille }));
