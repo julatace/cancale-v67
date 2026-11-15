@@ -526,6 +526,7 @@ import { instantaneEcran } from "./signalementContexte.js";
 import { lecturesRecentes } from "./lecturesRecentes.js";
 import { AideEcran as AideEcranBase, CentreAide as CentreAideBase } from "./composants/AideEcran.jsx";
 import { fichesPour as fichesAidePour, chercherAide, REGLAGES_AIDE } from "./aideFiches.js";
+import { LIENS_PROFONDS as LIENS_REGLAGES } from "./parametres/categories.js";   // (15 nov.) chaque réglage nommé a son lien `?tab=settings&reglage=X`
 import { InfoPop as InfoPopBase, PuceProposition as PucePropositionBase } from "./composants/InfoPop.jsx";   // (9 nov., lot AI) une ligne courte + sa pop-up
 import { NoteSatisfaction } from "./composants/NoteSatisfaction.jsx";   // (9 nov.) « VRM t'aide-t-il ? » en bas de Ma journée
 import { ID_SATISFACTION } from "./satisfaction.js";
@@ -923,6 +924,7 @@ import "./styles-refonte-ms.css";   // (14 nov., refonte) Messages, E-mails, Sto
 // styles-systeme et styles-tablette). Jetons --sb-*, quatre formes de bouton, la coque (docs/design/studio-bleu-clair.md).
 import "./design/studio-polices.css";
 import "./design/studio.css";
+import "./design/studio-parametres.css";   // (15 nov.) Paramètres en dix catégories — après studio.css et studio-reste.css
 import "./design/polices.js";   // le préchargement des deux polices, avec le morceau de l'app seulement
 import "./design/studio-paires.css";   // (14 nov., « Studio bleu clair ») Paires : Annonces, Stock, Inventaire, la fiche — EN DERNIER (docs/passation/2026-11-14-studio-paires.md)
 import "./design/studio-achats-relier.css";   // (15 nov.) Annonces → « Sans achat relié » : la carte compacte (classes `vrm-aar-*`, docs/passation/2026-11-15-annonces-achats.md)
@@ -17030,6 +17032,20 @@ const ICON_PATHS = {
   lock:   <><rect x="4.5" y="10.5" width="15" height="10" rx="2.2"/><path d="M8 10.5V7.6a4 4 0 0 1 8 0v2.9"/><path d="M12 14.6v2"/></>,
   texte:  <><path d="M3.5 18.5 8 6.5l4.5 12"/><path d="M5.2 14.2h5.6"/><path d="M14.5 18.5l3-8 3 8"/><path d="M15.6 15.8h3.8"/></>,
   archive:<><rect x="3.5" y="4" width="17" height="4.5" rx="1.2"/><path d="M5 8.5v9.5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5"/><path d="M10 12.5h4"/></>,
+  // (15 nov., Paramètres) « Revoir » (une flèche qui revient) et « Conseils » (une ampoule) : une icône par ligne.
+  revoir: <><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.5 4.5v4h4"/></>,
+  // (15 nov.) Au bureau, toutes les rangées de Paramètres sont sur une page : une icône par rangée, partout.
+  arobase: <><circle cx="12" cy="12" r="3.6"/><path d="M15.6 12v1.4a2.6 2.6 0 0 0 5.2 0V12a8.8 8.8 0 1 0-3.5 7"/></>,
+  journal: <><rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M8.5 8h7M8.5 12h7M8.5 16h4"/></>,
+  confidentiel: <><path d="M7 3.5h7l4 4V20a.5.5 0 0 1-.5.5h-10.5a.5.5 0 0 1-.5-.5V4a.5.5 0 0 1 .5-.5Z"/><rect x="9.5" y="13" width="5" height="4" rx="1"/><path d="M10.5 13v-1.2a1.5 1.5 0 0 1 3 0V13"/></>,
+  ecrans: <><rect x="2.5" y="5" width="14" height="10" rx="1.5"/><path d="M1.5 18h16"/><rect x="18" y="9" width="4.5" height="10" rx="1"/></>,
+  clavier: <><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M9.5 10h.01M13 10h.01M16.5 10h.01M7 14h10"/></>,
+  compteMoins: <><circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19.5a5.5 5.5 0 0 1 11 0"/><path d="M15.5 11h6"/></>,
+  balance: <><path d="M12 4v16M6 20h12M5 8h14"/><path d="m5 8-2.5 5.5a2.6 2.6 0 0 0 5 0Z"/><path d="m19 8-2.5 5.5a2.6 2.6 0 0 0 5 0Z"/></>,
+  gabarit: <><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M8 9h8M12 9v7"/></>,
+  pave: <><circle cx="7" cy="6" r="1.4"/><circle cx="12" cy="6" r="1.4"/><circle cx="17" cy="6" r="1.4"/><circle cx="7" cy="11" r="1.4"/><circle cx="12" cy="11" r="1.4"/><circle cx="17" cy="11" r="1.4"/><circle cx="7" cy="16" r="1.4"/><circle cx="12" cy="16" r="1.4"/><circle cx="17" cy="16" r="1.4"/><circle cx="12" cy="21" r="1.4"/></>,
+  invite: <><circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19.5a5.5 5.5 0 0 1 11 0"/><path d="M18.5 8v6M15.5 11h6"/></>,
+  ampoule: <><path d="M9.5 17.5h5"/><path d="M10.5 20.5h3"/><path d="M12 3.5a5.8 5.8 0 0 0-3.4 10.5c.6.5.9 1.1.9 1.8v.2h5v-.2c0-.7.3-1.3.9-1.8A5.8 5.8 0 0 0 12 3.5Z"/></>,
 };
 // Tuile d'icône façon réglages iOS : un carré arrondi teinté, une icône au
 // trait dedans. C'est ce détail qui sépare un écran de réglages d'une liste de
@@ -59842,7 +59858,7 @@ function AppCoeur() {
       // (13 nov., lot 55) La notification d'une demande d'aide : Réglages → Aide → « Demandes d'aide » (propriétaire).
       if(t==='settings'&&section==='demandesaide'){ DEMANDE_REGLAGE_SOUS.id='demandes-aide'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       // (11 nov., lot centre-aide) « M'y emmener » d'une fiche d'aide : le panneau de Réglages nommé (liste fermée, src/aideFiches.js).
-      { const rg=p.get('reglage'); if(t==='settings'&&rg&&REGLAGES_AIDE.includes(rg)){ DEMANDE_REGLAGE_SOUS.id=rg; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} } }
+      { const rg=p.get('reglage'); if(t==='settings'&&rg&&(REGLAGES_AIDE.includes(rg)||LIENS_REGLAGES.includes(rg))){ DEMANDE_REGLAGE_SOUS.id=rg; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} } }
       // (11 nov., lot suppression-oauth) Retour de « Me reconnecter avec … » : Supprimer mon compte.
       if(t==='settings'&&section==='supprimer'){ DEMANDE_REGLAGE_SOUS.id='fermer'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       if(t==='settings'&&section==='toutvabien'){ DEMANDE_REGLAGE_SOUS.id='toutvabien'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }

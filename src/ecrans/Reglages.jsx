@@ -85,6 +85,9 @@ import { PanneauDiscretion } from '../Discretion.jsx';   // (12 nov., ext. 5.370
 import { etatExtensionAffichage, etatDerniereLecture } from '../etatConnexions.js';
 // ⟦← App.jsx #2⟧
 import { filtrerReglages } from '../rechercheReglages.js';
+// (15 nov.) Paramètres rangés par ce que le vendeur veut faire : dix catégories (src/parametres/categories.js).
+import { rangerParCategorie, rangeeDuLien, VALEUR_DE_CATEGORIE } from '../parametres/categories.js';
+import { AlerteParametres } from '../parametres/AlerteParametres.jsx';
 import { AFaireSite } from '../plateformes/AFaireSite.jsx';   // (14 nov.) « Ouvrir le paiement · N › » du propriétaire
 import { preparerApercusModes } from '../apercusBordereaux.js';
 import { CLE_IMPRESSION, FORMATS_THERMIQUES, TAMPONS, ENCRES, CONTRASTES, MARGE_MAX_MM, AUTRE_MIN_MM, AUTRE_MAX_MM, reglageImpression, papierThermique, fmtMm } from '../impression/thermique.js';   // (11 nov., lot thermique)
@@ -1902,25 +1905,18 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     );
   };
 
-  // ── DEUX ONGLETS : « Réglages » et « Mon compte » (Julien, 4 octobre) ─────
-  // « un onglet pour gérer l'abonnement et les factures dans les paramètres,
-  // avec ses infos de compte regroupées ». Tout ce qui concerne LA PERSONNE
-  // (identité, abonnement, carte, factures, connexion, ses données) vit dans
-  // « Mon compte » ; ce qui règle l'APP reste dans « Réglages ».
-  // Sans session (accès temporaire), pas d'onglets : l'écran reste d'un bloc,
-  // et le bouton « Aller à l'écran de connexion » reste visible tout de suite.
+  // ── DIX CATÉGORIES (15 nov., Julien : « pratique et compréhensible », « un meilleur visuel ») ──
+  // Avant : trois onglets (Réglages · Mon compte · Abonnement), 73 rangées sur six écrans d'iPhone
+  // dans le premier. Maintenant un premier écran COURT : la recherche, « Tout va bien ? » s'il y a
+  // quelque chose à regarder, puis dix catégories rangées par ce qu'on vient faire
+  // (src/parametres/categories.js). Téléphone : catégorie ⇒ ses rangées ⇒ le panneau. Ordinateur :
+  // le sommaire à gauche, toutes les catégories à droite. Les rangées, leurs `id`, leurs `data-*`
+  // et leurs panneaux ne changent pas : elles sont rangées ailleurs.
+  // `ongletsCompte` reste le nom de « il y a un compte VRM » (le texte « Données et conditions » le lit).
   const ongletsCompte = MULTI_USER && !!AUTH.user;
-  const [vue, setVueBrute] = React.useState(() => {
-    // Retour de Stripe (paiement, page de gestion) : on revient sur le compte.
-    // (17 oct., Julien : « prépare dans les paramètres un onglet abonnement »)
-    // Le retour de Stripe (paiement, page de gestion) ouvre l'onglet Abonnement.
-    if (RETOUR_ABONNEMENT || RETOUR_VUE === 'abonnement') return 'abonnement';
-    if (RETOUR_VUE === 'compte') return 'compte';
-    try { const v = localStorage.getItem('vrm_reglages_vue'); return v === 'compte' || v === 'abonnement' ? v : 'reglages'; } catch (_) { return 'reglages'; }
-  });
-  const voirCompte = !ongletsCompte || vue === 'compte';
-  const voirReglages = !ongletsCompte || vue === 'reglages';
-  const voirAbonnement = ongletsCompte && !!AUTH.user && vue === 'abonnement';
+  // La catégorie ouverte (téléphone) : null = le premier écran. Le retour de Stripe ouvre l'abonnement.
+  const [cat, setCat] = React.useState(() => (RETOUR_ABONNEMENT || RETOUR_VUE === 'abonnement' || RETOUR_VUE === 'compte') ? 'compte' : null);
+  const [catActive, setCatActive] = React.useState(null);   // la catégorie surlignée dans le sommaire (ordinateur)
 
   // ── LA DISPOSITION (16 octobre : « trop vibe-codé, surtout sur téléphone ») ─
   // Modèle : les Réglages d'iOS. Des groupes en listes à lignes ; un panneau
@@ -1939,7 +1935,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   const [rechercheReglage, setRechercheReglage] = React.useState('');
   // (5 nov., chantier G, revue 2.24) Les e-mails ne sont plus un sous-écran d'ici : la demande
   // « ouvre mes adresses » (`DEMANDE_ADRESSES`) est servie par l'écran E-mails, onglet « Relier ma boîte ».
-  const [sous, setSous] = React.useState(null);       // l'id du sous-écran ouvert (téléphone)
+  const [sous, setSous] = React.useState(() => (RETOUR_ABONNEMENT || RETOUR_VUE === 'abonnement') && MULTI_USER && AUTH.user ? 'abonnement' : null);       // l'id du sous-écran ouvert
   // (6 nov.) « Signaler un problème » : la feuille (src/composants/SignalerProbleme.jsx).
   const [signaler, setSignaler] = React.useState(false);
   // (13 nov., lot 55) « Écrire au support » : la feuille (src/composants/EcrireSupport.jsx).
@@ -1948,18 +1944,27 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   const [conseilsOn, basculerConseils, revoirLesConseils] = useReglageConseils({ lire: lireLigneAccompagnement, ecrire: ecrireLigneAccompagnement });
   const racine = React.useRef(null);
   const ouvrirSous = (id) => { setSous(id); try { racine.current && racine.current.scrollIntoView({ block: 'start' }); } catch (_) {} };
+  // La catégorie qui range une rangée : lue dans le rangement du DERNIER rendu (un réglage ajouté
+  // ailleurs, rangé par le filet de son groupe d'avant, se trouve aussi).
+  const rangementRef = React.useRef([]);
+  const categorieDeRangee = (id) => { const c = (rangementRef.current || []).find((x) => x.ids.includes(id)); return c ? c.id : null; };
+  // Aller à un réglage (lien profond, conseil, cloche) : sa catégorie, puis son panneau (ou sa rangée).
+  const allerAuReglage = (brut) => { const id = rangeeDuLien(brut); const c = categorieDeRangee(id); setCat(c); ouvrirSous(id); return id; };
+  const ouvrirCategorie = (c) => { setSous(null); setCat(c); try { racine.current && racine.current.scrollIntoView({ block: 'start' }); } catch (_) {} };
+  const fermerCategorie = () => { const c = cat; setCat(null); setSous(null); setTimeout(() => { try { const l = racine.current && racine.current.querySelector(`[data-categorie-ouvrir="${c}"]`); if (l) { l.scrollIntoView({ block: 'center' }); l.focus({ preventScroll: true }); } } catch (_) {} }, 0); };
   // (31 oct., soir) Un lien vers l'ancien « eBay → Compte » (`?tab=plat_ebay&section=compte`)
   // ouvre le panneau « Comptes eBay » — une fois, puis la demande est consommée.
-  React.useEffect(()=>{ if(ouvrir==='ebay'&&ebayCompte){ setVueBrute('reglages'); setSous('ebay'); if(onOuvert) onOuvert(); } /* eslint-disable-next-line */ },[ouvrir,!!ebayCompte]);
+  React.useEffect(()=>{ if(ouvrir==='ebay'&&ebayCompte){ setCat('plateformes'); setSous('ebay'); if(onOuvert) onOuvert(); } /* eslint-disable-next-line */ },[ouvrir,!!ebayCompte]);
   // (6 nov.) Un conseil ouvre un panneau (« Voir comment ») : `DEMANDE_REGLAGE_SOUS`.
-  React.useEffect(()=>{ const servir=()=>{ const id=DEMANDE_REGLAGE_SOUS.id; if(!id) return; DEMANDE_REGLAGE_SOUS.id=null; /* (11 nov., centre d'aide) l'abonnement est une vue ; appareils, double vérification, équipe vivent sous « Compte ». */ if(id==='abonnement'){ setVueBrute('abonnement'); setSous(null); return; } setVueBrute(['appareils','double','equipe','fermer'].includes(id)?'compte':'reglages'); ouvrirSous(id); setTimeout(()=>{ try{ const el=document.querySelector(`[data-sous-ouvrir="${id}"]`)||document.querySelector(`[data-sous-panneau="${id}"]`); if(el&&el.getClientRects().length) el.scrollIntoView({block:'center'}); }catch(_){} },60); }; servir(); window.addEventListener('vrm:reglage-sous',servir); return ()=>window.removeEventListener('vrm:reglage-sous',servir); /* eslint-disable-next-line */ },[]);
+  React.useEffect(()=>{ const servir=()=>{ const id=DEMANDE_REGLAGE_SOUS.id; if(!id) return; DEMANDE_REGLAGE_SOUS.id=null; /* (15 nov.) la catégorie du réglage d'abord (src/parametres/categories.js), puis son panneau. */ const r=allerAuReglage(id); setTimeout(()=>{ try{ const el=document.querySelector(`[data-sous-ouvrir="${r}"]`)||document.querySelector(`[data-sous-panneau="${r}"]`); if(el&&el.getClientRects().length) el.scrollIntoView({block:'center'}); }catch(_){} },60); }; servir(); window.addEventListener('vrm:reglage-sous',servir); return ()=>window.removeEventListener('vrm:reglage-sous',servir); /* eslint-disable-next-line */ },[]);
   // (6 nov.) La notification « problème signalé » ouvre la liste (propriétaire seul).
-  React.useEffect(()=>{ if(DEMANDE_SIGNALEMENTS.on&&proprioInst){ DEMANDE_SIGNALEMENTS.on=false; setVueBrute('reglages'); setSous('signalements'); setTimeout(()=>{ try{ const el=document.getElementById('reglages-aide'); if(el) el.scrollIntoView({block:'start'}); }catch(_){} },50); } },[proprioInst]);
-  const versPlateforme=(p)=>{ if(p==='plat_ebay'&&ebayCompte){ setVueBrute('reglages'); ouvrirSous('ebay'); return; } if(onPlateforme) onPlateforme(p); };
+  React.useEffect(()=>{ if(DEMANDE_SIGNALEMENTS.on&&proprioInst){ DEMANDE_SIGNALEMENTS.on=false; setCat('aide'); setSous('signalements'); setTimeout(()=>{ try{ const el=document.getElementById('reglages-aide'); if(el) el.scrollIntoView({block:'start'}); }catch(_){} },50); } },[proprioInst]);
+  const versPlateforme=(p)=>{ if(p==='plat_ebay'&&ebayCompte){ setCat('plateformes'); ouvrirSous('ebay'); return; } if(onPlateforme) onPlateforme(p); };
   const fermerSous = () => { const id = sous; setSous(null); setTimeout(() => { try { const l = racine.current && racine.current.querySelector(`[data-sous-ouvrir="${id}"]`); if (l) { l.scrollIntoView({ block: 'center' }); l.focus({preventScroll:true}); } } catch (_) {} }, 0); };
-  const setVue = (v) => { setVueBrute(v); setSous(null); try { localStorage.setItem('vrm_reglages_vue', v); } catch (_) {} };
+  // Les anciennes « vues » (onglets) ⇒ la catégorie Mon compte, l'abonnement, ou le premier écran.
+  const setVue = (v) => { if (v === 'abonnement') { setCat('compte'); setSous('abonnement'); } else if (v === 'compte') { setCat('compte'); setSous(null); } else { setCat(null); setSous(null); } };
   // (8 nov.) La ligne de l'abonnement de la coque (J-3, J-1) ouvre cet onglet.
-  React.useEffect(() => { const f = () => { setVueBrute('abonnement'); setSous(null); }; window.addEventListener('vrm:voir-abonnement', f); return () => window.removeEventListener('vrm:voir-abonnement', f); }, []);
+  React.useEffect(() => { const f = () => { setCat('compte'); setSous('abonnement'); }; window.addEventListener('vrm:voir-abonnement', f); return () => window.removeEventListener('vrm:voir-abonnement', f); }, []);
 
 
   // ── Les valeurs dites à droite des lignes : lues dans LEUR réglage, jamais
@@ -1994,9 +1999,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       {it.type === 'switch' && <Interrupteur on={it.on} label={it.lib} onClick={it.onClick} {...(it.data || {})}/>}
       {(ouvre || it.type === 'nav') && chevron}
     </>);
-    if (it.type === 'switch') return <div key={it.id} className="vrm-set-ligne">{corps}</div>;
+    if (it.type === 'switch') return <div key={it.id} className="vrm-set-ligne" data-reglage-id={it.id}>{corps}</div>;
     return (
-      <button key={it.id} type="button" className="vrm-set-ligne"
+      <button key={it.id} type="button" className="vrm-set-ligne" data-reglage-id={it.id}
         onClick={ouvre ? () => ouvrirSous(it.id) : it.onClick}
         {...(ouvre ? { 'data-sous-ouvrir': it.id, 'aria-haspopup': 'true' } : {})} {...(it.data || {})}>
         {corps}
@@ -2131,12 +2136,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       AUTH.user && { id:'agenda', type:'panneau', ic:'target', lib:tr('reglages.agenda.lib'), desc:tr('reglages.agenda.desc'), data:{ 'data-reglage-agenda':'' }, el:<AgendaEcheances enTete={enTeteSession} toast={toast} confirmer={askConfirm}/> },
       { id:'alertes', type:'switch', ic:'alert', lib:tr('reglages.alertes.lib'), desc:tr('reglages.alertes.desc'), on:!!notifEnabled, onClick:onToggleNotif, data:{ 'data-reglage-alertes': notifEnabled ? 'on' : 'off' } },
       // (14 nov., ext. 5.377) « L'extension a capté » : le petit message sur le site et ici — le même réglage que la carte du logo.
-      { id:'capte', type:'switch', ic:'bell2', lib:tr('capte.reglage.lib'), desc:capte.connu ? tr('capte.reglage.desc') : tr('capte.reglage.pasSu'), on:capte.on, onClick:capte.basculer, data:{ 'data-reglage-capte': capte.on ? 'on' : 'off' } },
+      { id:'capte', type:'switch', ic:'camera', lib:tr('capte.reglage.lib'), desc:capte.connu ? tr('capte.reglage.desc') : tr('capte.reglage.pasSu'), on:capte.on, onClick:capte.basculer, data:{ 'data-reglage-capte': capte.on ? 'on' : 'off' } },
     ]},
-    // « Mon abonnement » : l'onglet du haut, joignable depuis la liste (le même écran, §11).
-    MULTI_USER && AUTH.user && { id:'abonnement-lien', titre:tr('reglages.groupe.abonnement-lien'), items:[
-      { id:'abonnement-ouvrir', type:'nav', ic:'wallet', lib:tr('reglages.abonnement-ouvrir.lib'), desc:tr('reglages.abonnement-ouvrir.desc'), onClick:()=>setVue('abonnement'), data:{ 'data-reglage-abonnement':'' } },
-    ]},
+    // (15 nov.) « Mon abonnement » n'est plus un onglet ni un renvoi : c'est un panneau de « Mon compte »
+    // (GROUPES_COMPTE, `abonnement`), le même composant qu'avant (§11).
     MULTI_USER && { id:'stock', titre:tr('reglages.groupe.stock'), items:[
       { id:'numeros', type:'panneau', nu:true, ic:'tag', lib:tr('reglages.numeros.lib'), desc:tr(profilV.vend === 'sneakers' ? 'reglages.numeros.desc.paires' : 'reglages.numeros.desc.articles'), val:valNumeros, el:<NumerosSetting nu onStock={()=>setTab('garage')} onAnnonces={()=>setTab('cat_annonces')}/> },
       // ⛔ Réponse automatique aux messages Vinted retirée (16 oct., sa décision).
@@ -2148,7 +2151,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     ], pied: <button type="button" className="vrm-lien-action vrm-set-lien" data-reglage-organisation="" onClick={()=>setTab('organisation')}>{tr('ecran.organisation')}<Icon name="chevron" size={13}/></button>},
     // (3 nov.) Les textes types insérés en un tap dans une description.
     { id:'annonces-reglages', titre:tr('reglages.groupe.annonces-reglages'), items:[
-      { id:'modeles', type:'panneau', nu:true, ic:'pencil', lib:tr('reglages.modeles.lib'), desc:tr('reglages.modeles.desc'), val:String(lireModelesRanges().length || ''), data:{ 'data-reglage-modeles':'' }, el:<ModelesSetting/> },
+      { id:'modeles', type:'panneau', nu:true, ic:'gabarit', lib:tr('reglages.modeles.lib'), desc:tr('reglages.modeles.desc'), val:String(lireModelesRanges().length || ''), data:{ 'data-reglage-modeles':'' }, el:<ModelesSetting/> },
     ]},
     { id:'impression', titre:tr('reglages.groupe.impression'), items:[
       { id:'imprimante', type:'panneau', nu:true, ic:'printer', lib:tr('reglages.imprimante.lib'), desc:tr('reglages.imprimante.desc'), val: imprimanteChoisie() === 'thermique' ? tr('reglages.imprimante.thermique', { papier: nomPapier(papierThermique(reglageImpression(load(CLE_IMPRESSION, null)))) }) : tr('reglages.imprimante.normale'), el:<ImprimanteSetting nu/> },
@@ -2171,7 +2174,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (9 nov.) « Ma configuration » EN TÊTE du groupe : la configuration de départ, plein écran,
       // rejouable (src/ConfigurationDepart.jsx) — tes choix pré-sélectionnés, rien n'est écrasé.
       { id:'configuration', type:'action', ic:'gear', lib:tr('reglages.configuration.lib'), desc:tr('reglages.configuration.desc'), onClick:()=>{ try { window.dispatchEvent(new Event('vrm:configuration')); } catch (_) {} }, data:{ 'data-reglage-configuration':'' } },
-      { id:'mes-plateformes', type:'panneau', nu:true, ic:'grid', lib:tr('reglages.mes-plateformes.lib'), desc:tr('reglages.mes-plateformes.desc'), el:<PlateformesSetting/> },
+      { id:'mes-plateformes', type:'panneau', nu:true, ic:'grid', lib:tr('parametres.plateformesAffichees.lib'), desc:tr('reglages.mes-plateformes.desc'), el:<PlateformesSetting/> },
       // (8 nov.) Simple / Complet et « Je vends » (src/profilVendeur.js).
       { id:'affichage-mode', type:'panneau', nu:true, ic:'eye', lib:tr('reglages.affichage-mode.lib'), desc:tr('reglages.affichage-mode.desc'), val: profilV.mode === 'simple' ? tr('reglages.affichage.simple') : tr('reglages.affichage.complet'), data:{ 'data-reglage-affichage': profilV.mode }, el:<AffichageSetting/> },
       // (9 nov., Julien) L'objectif du mois : un montant de VENDU à viser (vide par défaut). La barre fine de
@@ -2197,10 +2200,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (10 nov., lot AH) Deux raccourcis iPhone par liens profonds (src/raccourcisSiri.js) : une PWA ne déclare pas d'intention Siri.
       { id:'raccourcis-siri', type:'panneau', nu:true, ic:'mic', lib:tr('reglages.raccourcis-siri.lib'), desc:tr('reglages.raccourcis-siri.desc'), data:{ 'data-reglage-raccourcis':'' }, el:<RaccourcisSiri toast={toast}/> },
       // (10 nov., lot P) Les raccourcis clavier (src/raccourcisClavier.js) : la même feuille que « ? ».
-      { id:'raccourcis-clavier', type:'action', ic:'key', lib:tr('reglages.raccourcis-clavier.lib'), desc:tr('reglages.raccourcis-clavier.desc'), onClick:()=>{ try { window.dispatchEvent(new Event('vrm:raccourcis-clavier')); } catch (_) {} }, data:{ 'data-reglage-raccourcis-clavier':'' } },
+      { id:'raccourcis-clavier', type:'action', ic:'clavier', lib:tr('reglages.raccourcis-clavier.lib'), desc:tr('reglages.raccourcis-clavier.desc'), onClick:()=>{ try { window.dispatchEvent(new Event('vrm:raccourcis-clavier')); } catch (_) {} }, data:{ 'data-reglage-raccourcis-clavier':'' } },
     ]},
     { id:'sauvegarde', avance:true, titre:tr('reglages.groupe.sauvegarde'), items:[
-      { id:'securite', type:'panneau', ic:'shield', lib:tr('reglages.securite.lib'), desc:tr('reglages.securite.desc'), el:<SecuriteSetting/> },
+      { id:'securite', type:'panneau', ic:'shield', lib:tr('parametres.securiteDonnees.lib'), desc:tr('parametres.securiteDonnees.desc'), data:{ 'data-reglage-securite-donnees':'' }, el:<SecuriteSetting/> },
       { id:'donnees', type:'action', ic:'doc', lib:tr('reglages.donnees.lib'), desc:tr('reglages.donnees.desc'), onClick:exporterMesDonnees, data:{ 'data-exporter-donnees':'' } },
       // (11 nov.) Il arrive d'un tableur ou d'un autre logiciel : son stock (N°, emplacement, prix d'achat) et ses ventes passées.
       { id:'importer', type:'panneau', nu:true, ic:'copy', lib:tr('reglages.importer.lib'), desc:tr('reglages.importer.desc'), data:{ 'data-reglage-importer':'' }, el:<ImporterSetting/> },
@@ -2218,11 +2221,11 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     )},
     // (14 nov., lots 118, 119, 120, 127, 130) Confort et sécurité : un groupe à lui, chaque geste dans son panneau.
     {id:'confort',titre:tr('confort.groupe'),items:[
-      { id:'code-local', type:'panneau', nu:true, ic:'lock', lib:tr('confort.code.lib'), desc:tr('confort.code.desc'), data:{ 'data-reglage-code-local':'' }, el:<ReglageCodeLocal toast={toast}/> },
+      { id:'code-local', type:'panneau', nu:true, ic:'pave', lib:tr('confort.code.lib'), desc:tr('confort.code.desc'), data:{ 'data-reglage-code-local':'' }, el:<ReglageCodeLocal toast={toast}/> },
       { id:'connexion-qr', type:'panneau', nu:true, ic:'qr', lib:tr('confort.qr.lib'), desc:tr('confort.qr.desc'), data:{ 'data-reglage-connexion-qr':'' }, el:<p className="vrm-cf-doux" style={{margin:0,fontSize:15,lineHeight:1.5}}>{tr('confort.qr.mode')}</p> },
-      AUTH.user && { id:'lien-aide', type:'panneau', nu:true, ic:'link', lib:tr('confort.aide.lib'), desc:tr('confort.aide.desc'), data:{ 'data-reglage-lien-aide':'' }, el:<ReglageLienAide uid={AUTH.user.id} entetes={enTeteSession} toast={toast}/> },
-      { id:'atelier', type:'action', ic:'device', lib:tr('confort.atelier.lib'), desc:tr('confort.atelier.desc'), onClick:()=>{ try { window.dispatchEvent(new Event('vrm:atelier')); } catch (_) {} }, data:{ 'data-reglage-atelier':'' } },
-      { id:'carte-merci', type:'panneau', nu:true, ic:'heart', lib:tr('confort.merci.lib'), desc:tr('confort.merci.desc'), data:{ 'data-reglage-carte-merci':'' }, el:<ReglageCarteMerci lire={()=>load(CLE_CARTE_MERCI, {})} ecrire={(v)=>save(CLE_CARTE_MERCI, v)} telecharger={telechargerFichier}/> },
+      AUTH.user && { id:'lien-aide', type:'panneau', nu:true, ic:'users', lib:tr('confort.aide.lib'), desc:tr('confort.aide.desc'), data:{ 'data-reglage-lien-aide':'' }, el:<ReglageLienAide uid={AUTH.user.id} entetes={enTeteSession} toast={toast}/> },
+      { id:'atelier', type:'action', ic:'image', lib:tr('confort.atelier.lib'), desc:tr('confort.atelier.desc'), onClick:()=>{ try { window.dispatchEvent(new Event('vrm:atelier')); } catch (_) {} }, data:{ 'data-reglage-atelier':'' } },
+      { id:'carte-merci', type:'panneau', nu:true, ic:'cadeau', lib:tr('confort.merci.lib'), desc:tr('confort.merci.desc'), data:{ 'data-reglage-carte-merci':'' }, el:<ReglageCarteMerci lire={()=>load(CLE_CARTE_MERCI, {})} ecrire={(v)=>save(CLE_CARTE_MERCI, v)} telecharger={telechargerFichier}/> },
     ]},
     {id:'aide',titre:tr('reglages.groupe.aide'),items:[
       // (8 nov.) Un geste : extension (présente, version, connectée à CE compte), comptes, boîte e-mail, dernière relecture — et ce qui manque.
@@ -2233,11 +2236,11 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // et — au propriétaire seul — le lien de l'appel de bienvenue des comptes Pro (src/accueilReste/).
       { id:'aides-accueil', type:'panneau', nu:true, ic:'spark', lib:tr('reglages.aidesAccueil.lib'), desc:tr('reglages.aidesAccueil.desc'), data:{ 'data-reglage-aides-accueil':'' }, el:<ReglagesAidesAccueil proprietaire={proprioInst === true}/> },
       // (14 nov., accueil des nouveaux) Rejouer le bilan en une minute et le premier colis accompagné.
-      { id:'bilan-minute', type:'action', ic:'spark', lib:tr('nouveaux.reglage.bilan.lib'), desc:tr('nouveaux.reglage.bilan.desc'), onClick:()=>{ try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=journee' })); setTimeout(() => window.dispatchEvent(new Event('vrm:bilan-minute')), 50); } catch (_) {} }, data:{ 'data-reglage-bilan':'' } },
-      { id:'premier-colis', type:'action', ic:'printer', lib:tr('nouveaux.reglage.colis.lib'), desc:tr('nouveaux.reglage.colis.desc'), onClick:()=>{ try { window.dispatchEvent(new Event('vrm:premier-colis')); } catch (_) {} }, data:{ 'data-reglage-premier-colis':'' } },
+      { id:'bilan-minute', type:'action', ic:'revoir', lib:tr('nouveaux.reglage.bilan.lib'), desc:tr('nouveaux.reglage.bilan.desc'), onClick:()=>{ try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=journee' })); setTimeout(() => window.dispatchEvent(new Event('vrm:bilan-minute')), 50); } catch (_) {} }, data:{ 'data-reglage-bilan':'' } },
+      { id:'premier-colis', type:'action', ic:'nav', lib:tr('nouveaux.reglage.colis.lib'), desc:tr('nouveaux.reglage.colis.desc'), onClick:()=>{ try { window.dispatchEvent(new Event('vrm:premier-colis')); } catch (_) {} }, data:{ 'data-reglage-premier-colis':'' } },
       // (6 nov.) L'accompagnement : une bulle sur le bon bouton, deux par jour au plus (src/accompagnement.js).
       // « Pas su » (ligne pas lue) : l'interrupteur ne ment pas, la phrase le dit.
-      { id:'conseils', type:'switch', ic:'spark', lib:tr('reglages.conseils.lib'), desc: conseilsOn === null ? tr('reglages.conseils.pasSu') : tr('reglages.conseils.desc'), on:conseilsOn === true,
+      { id:'conseils', type:'switch', ic:'ampoule', lib:tr('reglages.conseils.lib'), desc: conseilsOn === null ? tr('reglages.conseils.pasSu') : tr('reglages.conseils.desc'), on:conseilsOn === true,
         onClick:()=>{ if (conseilsOn === null) { try { window.dispatchEvent(new Event('vrm:accompagnement')); } catch (_) {} return; } if (conseilsOn === undefined) return; basculerConseils().then((r)=>{ if(r.etat==='ko') toast(tr('commun.pasPuEnregistrer')); }); },
         data:{ 'data-reglage-conseils': conseilsOn === true ? 'on' : conseilsOn === false ? 'off' : 'pas-su' } },
       { id:'conseils-revoir', type:'action', ic:'sync', lib:tr('reglages.conseils-revoir.lib'), desc:tr('reglages.conseils-revoir.desc'), onClick:()=>{ revoirLesConseils().then((r)=>toast(r.etat==='ok' ? tr('reglages.conseils.reviendront') : tr('commun.pasPuEnregistrer'))); }, data:{ 'data-reglage-conseils-revoir':'' } },
@@ -2250,8 +2253,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (8 nov., confiance) La page publique de l'état de VRM (vrm.center/statut), dans un nouvel onglet.
       { id:'statut', type:'nav', ic:'cloud', lib:tr('reglages.statut.lib'), desc:tr('reglages.statut.desc'), onClick:()=>{ try { window.open('/statut', '_blank', 'noopener'); } catch (_) {} }, data:{ 'data-reglage-statut':'' } },
       // (13 nov., lot 55) La question au support : le texte et cinq faits techniques, rien d'autre (src/demandeAide.js).
-      { id:'support', type:'action', ic:'mail', lib:tr('reglages.support.lib'), desc:tr('reglages.support.desc'), onClick:()=>setSupport(true), data:{ 'data-reglage-support':'' } },
-      { id:'signaler', type:'action', ic:'chat', lib:tr('reglages.signaler.lib'), desc:tr('reglages.signaler.desc'), onClick:()=>setSignaler(true), data:{ 'data-reglage-signaler':'' } },
+      { id:'support', type:'action', ic:'chat', lib:tr('reglages.support.lib'), desc:tr('reglages.support.desc'), onClick:()=>setSupport(true), data:{ 'data-reglage-support':'' } },
+      { id:'signaler', type:'action', ic:'info', lib:tr('reglages.signaler.lib'), desc:tr('reglages.signaler.desc'), onClick:()=>setSignaler(true), data:{ 'data-reglage-signaler':'' } },
       // La liste des signalements reçus : au PROPRIÉTAIRE de l'installation seul
       // (le serveur refuse tout autre compte).
       // (9 nov.) Le tableau de bord du PROPRIÉTAIRE (src/composants/TableauProprietaire.jsx) : lui seul
@@ -2259,9 +2262,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       proprioInst && { id:'pilotage', type:'panneau', nu:true, ic:'euro', lib:tr('reglages.pilotage.lib'), desc:tr('reglages.pilotage.desc'), data:{ 'data-reglage-pilotage':'' }, el:<TableauProprietaire entetes={enTeteSession} PanneEl={EtatPanne}/> },
       // (12 nov.) « Ouvrir les paiements » : chaque prérequis LU (src/ouverturePaiements.js), propriétaire seul.
       proprioInst && { id:'paiements', type:'panneau', nu:true, ic:'cart', lib:tr('reglages.paiements.lib'), desc:tr('reglages.paiements.desc'), data:{ 'data-reglage-paiements':'' }, el:<OuvrirPaiements entetes={enTeteSession}/> },
-      proprioInst && { id:'signalements', type:'panneau', nu:true, ic:'info', lib:tr('reglages.signalements.lib'), data:{ 'data-reglage-signalements':'' }, el:<SignalementsRecus entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne}/> },
+      proprioInst && { id:'signalements', type:'panneau', nu:true, ic:'menu', lib:tr('reglages.signalements.lib'), data:{ 'data-reglage-signalements':'' }, el:<SignalementsRecus entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne}/> },
       // (13 nov., lot 55) Les demandes « Écrire au support » de tous les vendeurs : au PROPRIÉTAIRE seul (403 sinon).
-      proprioInst && { id:'demandes-aide', type:'panneau', nu:true, ic:'mail', lib:tr('reglages.demandesAide.lib'), desc:tr('reglages.demandesAide.desc'), data:{ 'data-reglage-demandes-aide':'' }, el:<DemandesAideRecues entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne}/> },
+      proprioInst && { id:'demandes-aide', type:'panneau', nu:true, ic:'more', lib:tr('reglages.demandesAide.lib'), desc:tr('reglages.demandesAide.desc'), data:{ 'data-reglage-demandes-aide':'' }, el:<DemandesAideRecues entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne}/> },
       // (11 nov., agent2-cloisonnement) Le parcours d'un nouveau vendeur joué sur des comptes FICTIFS (src/simulationCompte.js) : propriétaire seul.
       proprioInst && { id:'simulation-compte', type:'panneau', nu:true, ic:'home', lib:tr('reglages.simulation.lib'), desc:tr('reglages.simulation.desc'), data:{ 'data-reglage-simulation-compte':'' }, el:<SimulationCompte/> },
       {id:'depannage',type:'panneau',nu:true,ic:'help',lib:tr('reglages.depannage.lib'),desc:tr('reglages.depannage.desc'),el:<div className="vrm-settings-help">
@@ -2298,16 +2301,20 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     // celle de l'en-tête (l'initiale de l'email), plus un « V » qui ne venait de rien.
     // (5 nov., chantier H) La photo se change DANS la carte du profil (plus d'avatar dessiné deux fois).
     // (17 oct.) L'abonnement a SON onglet (« Abonnement ») ; ici, un renvoi.
+    AUTH.user && { id:'abonnement', titre:tr('reglages.groupe.abonnement-lien'), items:[
+      { id:'abonnement', type:'panneau', nu:true, paresseux:true, ic:'wallet', lib:tr('reglages.abonnement-ouvrir.lib'), desc:tr('reglages.abonnement-ouvrir.desc'), data:{ 'data-reglage-abonnement':'', 'data-vue':'abonnement' },
+        el:<div key="abonnement" data-onglet-abonnement=""><MonAbonnement/>{proprioInst === true ? <Partenaires enTete={enTeteSession} toast={toast}/> : <Parrainage/>}</div> },
+    ]},
     AUTH.user && { id:'boutique', titre:tr('reglages.groupe.boutique'), items:[
       // (30 oct.) « Abonnement et factures » retiré : l'onglet « Abonnement » du haut fait la même chose.
-      { id:'equipe', type:'panneau', ic:'users', lib:tr('reglages.equipe.lib'), desc:tr('reglages.equipe.desc'), el:<EquipeSetting/> },
+      { id:'equipe', type:'panneau', ic:'invite', lib:tr('reglages.equipe.lib'), desc:tr('reglages.equipe.desc'), el:<EquipeSetting/> },
     ]},
     { id:'connexion', titre:tr('reglages.groupe.connexion'), items:[
-      AUTH.user && { id:'email', type:'nav', ic:'mail', lib:tr('reglages.email.lib'), onClick:()=>{ setAcct({ mode:'email', val:'', err:'', busy:false }); } },
+      AUTH.user && { id:'email', type:'nav', ic:'arobase', lib:tr('reglages.email.lib'), onClick:()=>{ setAcct({ mode:'email', val:'', err:'', busy:false }); } },
       AUTH.user && { id:'motdepasse', type:'nav', ic:'key', lib:tr('reglages.motdepasse.lib'), onClick:()=>{ setAcct({ mode:'pw', val:'', err:'', busy:false }); } },
       // Double vérification (TOTP) — facultative, sur SON clic (16 octobre).
       // (4 nov.) Les appareils où VRM est ouvert, et « Se déconnecter partout ».
-      AUTH.user && { id:'appareils', type:'panneau', ic:'device', lib:tr('reglages.appareils.lib'), el:<AppareilsConnectes/> },
+      AUTH.user && { id:'appareils', type:'panneau', ic:'ecrans', lib:tr('reglages.appareils.lib'), el:<AppareilsConnectes/> },
       AUTH.user && { id:'double', type:'panneau', nu:true, ic:'lock', lib:tr('reglages.double.lib'), val: Array.isArray(AUTH.session && AUTH.session.totp) ? (AUTH.session.totp.length > 1 ? tr('reglages.double.activeN', { n: AUTH.session.totp.length }) : AUTH.session.totp.length ? tr('reglages.double.active') : tr('reglages.double.inactive')) : '', el:<DoubleVerification/> },
     ]},
     AUTH.user && { id:'sortir', titre:null, items:[
@@ -2317,38 +2324,42 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (4 nov.) Tout ce que VRM a envoyé en son nom, lu de ce qui est noté en base.
       // (14 nov., Julien : « il y a 2 “ce que VRM a fait” ») Le JOURNAL quitte « Connexion » : il vit ici, à côté
       // de la confidentialité, avec un libellé qui ne se confond plus avec elle (« Journal : … » / « Confidentialité : … »).
-      AUTH.user && { id:'journal-vrm', type:'panneau', ic:'clock', lib:tr('reglages.journal-vrm.lib'), el:<JournalVrm/> },
+      AUTH.user && { id:'journal-vrm', type:'panneau', ic:'journal', lib:tr('reglages.journal-vrm.lib'), el:<JournalVrm/> },
       // (8 nov., confiance) Ce que VRM lit, garde et fait — chaque phrase tenue par le code (src/tesDonnees.js).
-      { id:'tes-donnees', type:'panneau', ic:'shield', lib:tr('reglages.tes-donnees.lib'), desc:tr('reglages.tes-donnees.desc'), data:{ 'data-reglage-tes-donnees':'' },
+      { id:'tes-donnees', type:'panneau', ic:'confidentiel', lib:tr('reglages.tes-donnees.lib'), desc:tr('reglages.tes-donnees.desc'), data:{ 'data-reglage-tes-donnees':'' },
         el:<TesDonnees cloisonne={!!CLOISONNE} onExporter={exporterMesDonnees} onJournal={AUTH.user ? ()=>ouvrirSous('journal-vrm') : undefined} onFermer={AUTH.user ? ()=>ouvrirSous('fermer') : undefined}/> },
-      { id:'conditions', type:'panneau', nu:true, ic:'doc', lib:tr('reglages.conditions.lib'), el:donnees },
+      { id:'conditions', type:'panneau', nu:true, ic:'balance', lib:tr('reglages.conditions.lib'), el:donnees },
     ]},
     // (9 nov., RGPD) « Supprimer mon compte » : TOUT EN BAS de Mon compte, seul, discret
     // (le libellé dans la couleur `danger` du thème — le rouge est réservé aux doublons, §7).
     AUTH.user && { id:'supprimer', titre:null, items:[
-      { id:'fermer', type:'panneau', ic:'trash', lib:tr('reglages.fermer.lib'), ton:'danger', el:<FermerCompte onExporter={exporterMesDonnees}/> },
+      { id:'fermer', type:'panneau', ic:'compteMoins', lib:tr('reglages.fermer.lib'), ton:'danger', el:<FermerCompte onExporter={exporterMesDonnees}/> },
     ]},
   ] : [
     { id:'donnees', titre:tr('reglages.groupe.donnees'), items:[
-      { id:'tes-donnees', type:'panneau', ic:'shield', lib:tr('reglages.tes-donnees.lib'), desc:tr('reglages.tes-donnees.desc'), data:{ 'data-reglage-tes-donnees':'' },
+      { id:'tes-donnees', type:'panneau', ic:'confidentiel', lib:tr('reglages.tes-donnees.lib'), desc:tr('reglages.tes-donnees.desc'), data:{ 'data-reglage-tes-donnees':'' },
         el:<TesDonnees cloisonne={!!CLOISONNE} onExporter={exporterMesDonnees}/> },
-      { id:'conditions', type:'panneau', nu:true, ic:'doc', lib:tr('reglages.conditions.lib'), el:donnees },
+      { id:'conditions', type:'panneau', nu:true, ic:'balance', lib:tr('reglages.conditions.lib'), el:donnees },
     ]},
   ];
-  // L'onglet Abonnement : la carte de l'abonnement, d'un bloc (statut, prix,
-  // carte, factures, résilier) — le MÊME composant qu'avant (§11).
-  const GROUPES_ABONNEMENT = [{ id:'abonnement', titre:null, brut:true, items:[{ id:'abonnement', type:'el', el:<div key="abonnement" data-onglet-abonnement=""><MonAbonnement/>{proprioInst === true ? <Partenaires enTete={enTeteSession} toast={toast}/> : <Parrainage/>}</div> }] }];
-  const groupes = [...(voirCompte ? GROUPES_COMPTE : []), ...(voirReglages ? GROUPES_REGLAGES : []), ...(voirAbonnement ? GROUPES_ABONNEMENT : [])].filter(Boolean)
+  // (15 nov.) Plus d'onglets : TOUS les groupes, rangés en dix catégories (src/parametres/categories.js).
+  // L'abonnement (l'ancien 3e onglet) est un panneau de « Mon compte », monté seulement ouvert.
+  const groupes = [...GROUPES_COMPTE, ...GROUPES_REGLAGES].filter(Boolean)
     .map((g) => ({ ...g, items: g.items.filter(Boolean) }));
+  const categories = rangerParCategorie(groupes);
+  rangementRef.current = categories;
+  const titreCat = (id) => tr(`parametres.cat.${id}`);
   const panneaux = groupes.flatMap((g) => g.items.filter((it) => it.type === 'panneau'));
   const ouvert = sous ? panneaux.find((it) => it.id === sous) : null;
-  const titreRetour = !ongletsCompte ? tr('ecran.settings') : vue === 'compte' ? tr('reglages.onglet.compte') : vue === 'abonnement' ? tr('reglages.onglet.abonnement') : tr('reglages.onglet.reglages');
+  // Le retour d'un panneau : sa catégorie (téléphone), ou « Paramètres » (ordinateur : tout est sur une page).
+  const catDuPanneau = ouvert ? categorieDeRangee(ouvert.id) : null;
+  const titreRetour = etroit && catDuPanneau ? titreCat(catDuPanneau) : tr('ecran.settings');
 
   // ── TON COMPTE VRM ──────────────────────────────────────────────────────
   // Toujours présent en multi-vendeurs, y compris quand on est entré par la
   // porte de secours : sans ça, une fois passé par « Entrer sans compte » il
   // n'y avait AUCUN moyen de revenir à l'écran de connexion.
-  const profil = MULTI_USER && voirCompte && (AUTH.user ? (
+  const profil = MULTI_USER && (AUTH.user ? (
     <div className="vrm-set-profil" data-profil-compte="" style={{background:C.card,border:`1px solid ${C.border}`}}>
       <span className="vrm-set-avatar" aria-hidden="true" style={{background:`${C.text}0f`,color:C.text}}>
         <AvatarCompte key={AUTH.user.id} owner={AUTH.user.id} headers={enTeteSession} lettre={String(AUTH.user.email||'?').slice(0,1).toUpperCase()}/>
@@ -2375,8 +2386,57 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     </div>
   ));
 
+  // ── LE RANGEMENT RENDU (15 nov.) ─────────────────────────────────────────
+  // La valeur dite à droite d'une catégorie : celle d'UNE de ses rangées, telle qu'elle est déjà
+  // dite sur sa ligne (`VALEUR_DE_CATEGORIE`), ou un compte de comptes / la dernière sauvegarde.
+  const nComptes = (comptes || []).length;
+  const valeurCat = (c) => {
+    if (c.id === 'plateformes') return nComptes ? tr('parametres.val.comptes', { n: nComptes }) : null;
+    if (c.id === 'donnees') return derniereSauvegarde.t ? tr('parametres.val.sauvegarde', { quand: derniereSauvegarde.days === 0 ? tr('commun.aujourdhui') : derniereSauvegarde.days === 1 ? tr('commun.hier') : tr('commun.ilYaJours', { n: derniereSauvegarde.days }) }) : tr('parametres.val.jamaisSauve');
+    const k = VALEUR_DE_CATEGORIE[c.id]; if (!k) return null;
+    const it = c.groupes.flatMap((g) => g.items).find((x) => x.id === k);
+    return it && typeof it.val === 'string' && it.val ? it.val : null;
+  };
+  // La rangée d'une catégorie : son icône, son nom, ce qu'on y trouve (une ligne), son état, le chevron.
+  // `data-categorie-contient` : les rangées qu'elle range (la recherche et les bancs y trouvent un réglage).
+  const ligneCategorie = (c, { surClic, actif } = {}) => {
+    const v = valeurCat(c);
+    const ambre = c.id === 'donnees' && derniereSauvegarde.old;
+    return (
+      <button key={c.id} type="button" className="vrm-set-ligne vrm-pm-cat-ligne" data-categorie-ouvrir={c.id} data-categorie-contient={` ${c.ids.join(' ')} `}
+        {...(c.id === 'compte' ? { 'data-vue': 'compte' } : {})} aria-current={actif ? 'true' : undefined} onClick={surClic}>
+        <span className="vrm-pm-cat-ic" aria-hidden="true"><Icon name={c.ic} size={17}/></span>
+        <span className="vrm-set-lib"><b style={{color:C.text}}>{titreCat(c.id)}</b><small className="vrm-set-desc" style={{color:C.muted}}>{tr(`parametres.cat.${c.id}.desc`)}</small></span>
+        {v && <span className="vrm-set-val" data-categorie-valeur={c.id} style={{color: ambre ? C.warn : C.muted}}>{v}</span>}
+        {chevron}
+      </button>
+    );
+  };
+  // Ce qui se pose en tête d'une catégorie (et seulement là) : le profil et la double vérification dans
+  // « Mon compte », ce qui reste à terminer (adresses e-mail) dans « Mes plateformes ».
+  const teteCategorie = (id) => {
+    if (id === 'compte') return <>{AUTH.user ? profil : null}{AUTH.user && <div className="vrm-pf-set-afaire" data-pf-set-afaire=""><CarteDoubleVerif/></div>}</>;
+    if (id === 'plateformes') return <div className="vrm-pf-set-afaire" data-pf-set-afaire=""><ActionsReglages comptes={comptes||[]} onOuvrir={id2=>id2==='comptes'?setTab('vintedaccounts'):id2==='adresses'?(ouvrirEmailsRelier('reception'),setTab('emails')):allerAuReglage(id2)}/></div>;
+    return null;
+  };
+  const ecranCategorie = (c, { avecTitre }) => (
+    <section key={c.id} id={`parametres-${c.id}`} className="vrm-pm-cat" data-categorie-ecran={c.id}>
+      {avecTitre && <h2 className="vrm-pm-cat-h" style={{color:C.text}}><span className="vrm-pm-cat-ic" aria-hidden="true"><Icon name={c.ic} size={17}/></span>{titreCat(c.id)}</h2>}
+      {c.expert && <p className="vrm-pm-expert" data-reglages-expert="" style={{color:C.muted}}>{tr('parametres.expert')}</p>}
+      {teteCategorie(c.id)}
+      {c.groupes.map((g) => groupe({ id: g.id, titre: g.titreCle ? tr(g.titreCle) : (g.titre || null), items: g.items, pied: g.pied }))}
+    </section>
+  );
+  const q = rechercheReglage.trim();
+  // La recherche : dans TOUTES les catégories (avant : l'onglet « Réglages » seul) ; le nom de la
+  // catégorie et celui du groupe comptent (« argent » trouve le statut, l'URSSAF, les prix d'achat).
+  const resultats = q ? filtrerReglages(categories.flatMap((c) => c.groupes.map((g) => ({ id: g.id, titre: [titreCat(c.id), g.titreCle ? tr(g.titreCle) : (g.titre || '')].filter(Boolean).join(' · '), items: g.items }))), q) : null;
+  const nTrouves = resultats ? resultats.reduce((n, g) => n + g.items.length, 0) : 0;
+  const catOuverte = etroit && cat ? categories.find((c) => c.id === cat) || null : null;
+
   return (
-    <div ref={racine} className="vrm-set" data-espace="autres" data-reglages-disposition={etroit ? 'telephone' : 'ordinateur'} data-sous-ecran-ouvert={ouvert ? ouvert.id : ''}
+    <div ref={racine} className="vrm-set vrm-pm" data-espace="autres" data-reglages-disposition={etroit ? 'telephone' : 'ordinateur'} data-sous-ecran-ouvert={ouvert ? ouvert.id : ''}
+      data-parametres="" data-categorie-ouverte={catOuverte ? catOuverte.id : ''} data-recherche-active={q ? '1' : ''}
       style={{'--vrm-set-filet': C.border, '--vrm-set-appui': `${C.text}0a`}}>
       {/* (5 nov., chantier H) Appelée, pas montée : `<AcctSheet/>` était un composant
           RECRÉÉ à chaque rendu — chaque lettre tapée remontait la feuille. */}
@@ -2385,7 +2445,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       {support && <EcrireSupportFeuille depuis="reglages" onClose={()=>setSupport(false)}/>}
       {feuilleAdresseVrm && <FeuilleAdresseVrm headers={sbAuth} FermeAuRetour={FermeAuRetour} proprio={proprioInst===true} onBoite={()=>setTab('emails')} onFermer={()=>setFeuilleAdresseVrm(false)}/>}
       {ouvert ? (
-        // ── SOUS-ÉCRAN (téléphone) ──
+        // ── LE PANNEAU D'UN RÉGLAGE : « ‹ sa catégorie » (téléphone) ou « ‹ Paramètres » ──
         <div className="vrm-set-nav">
           <button type="button" className="vrm-set-retour" onClick={fermerSous} data-sous-retour="" style={{color:C.accentTexte}}>
             <svg width="12" height="20" viewBox="0 0 12 20" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg>
@@ -2393,47 +2453,58 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
           </button>
           <StatutSauvegardeReglages/>
         </div>
+      ) : catOuverte && !q ? (
+        // ── UNE CATÉGORIE (téléphone) : « ‹ Paramètres », puis son grand titre ──
+        <div className="vrm-set-nav">
+          <button type="button" className="vrm-set-retour" onClick={fermerCategorie} data-categorie-retour="" style={{color:C.accentTexte}}>
+            <svg width="12" height="20" viewBox="0 0 12 20" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg>
+            {tr('ecran.settings')}
+          </button>
+          <StatutSauvegardeReglages/>
+        </div>
       ) : (<>
-        {/* (5 nov., chantier H — revue 2.31) « Enregistrement en cours… » vit dans la
-            ligne du titre, à droite : il ne prend plus la place d'un surtitre (le
-            titre ne saute plus de 26 px à chaque réglage touché). */}
-        {/* (14 nov., refonte visible — AJOUT 3.8) Le titre et son « ? » : la phrase de deux lignes sous le titre
-            disparaît (le « ? » la dit, `AideEcran`). Puis la RECHERCHE, en haut, comme les Réglages d'iOS. */}
+        {/* (14 nov., refonte visible — AJOUT 3.8) Le titre et son « ? ». Puis la RECHERCHE, en haut, comme les Réglages d'iOS. */}
         <div className="vrm-set-tete"><h2 className="vrm-set-h1" style={{color:C.text}}>{tr('ecran.settings')}</h2>{PHRASES_ECRAN.settings ? <span className="vrm-pf-set-aide" data-phrase-ecran="settings" title={PHRASES_ECRAN.settings}><AideEcran cle="settings"/></span> : null}<StatutSauvegardeReglages/></div>
-        {voirReglages && <ChampRecherche valeur={rechercheReglage} onChange={setRechercheReglage} placeholder={tr('reglages.recherche.placeholder')} label={tr('reglages.recherche.label')} micro voix="brut" className="vrm-set-recherche" data-recherche-reglages=""/>}
+        <ChampRecherche valeur={rechercheReglage} onChange={setRechercheReglage} placeholder={tr('parametres.recherche.placeholder')} label={tr('reglages.recherche.label')} micro voix="brut" className="vrm-set-recherche" data-recherche-reglages=""/>
         <ReglagesPasLus/>
-        {ongletsCompte && (
-          // (5 nov., chantier H) Les trois onglets ont LA forme du contrôle segmenté de
-          // l'app (`.vrm-seg`, une règle) : avant, un dessin à part dont l'aplat se
-          // perdait (l'onglet choisi n'était pas le blanc).
-          <div role="tablist" aria-label={tr('ecran.settings')} data-onglets-reglages="" className="vrm-seg vrm-seg-plein vrm-set-onglets">
-            {[['reglages',tr('reglages.onglet.reglages')],['compte',tr('reglages.onglet.compte')],...(AUTH.user?[['abonnement',tr('reglages.onglet.abonnement')]]:[])].map(([k,l]) => (
-              <button key={k} type="button" role="tab" className="vrm-seg-btn" aria-selected={vue===k} data-vue={k} onClick={()=>setVue(k)}>
-                {l}
-              </button>
-            ))}
-          </div>
-        )}
       </>)}
 
       {ouvert && <h2 className="vrm-set-sous-h" style={{color:C.text}}>{ouvert.lib}</h2>}
+      {!ouvert && catOuverte && !q && <h2 className="vrm-set-sous-h vrm-pm-cat-titre" style={{color:C.text}}>{titreCat(catOuverte.id)}</h2>}
 
       {!ouvert && <>
-        {profil}
-        {/* (14 nov., refonte visible) « À terminer » et « Protège ton compte VRM » : UN groupe « À faire » de
-            rangées (pastille ambre, le geste en mot) — plus deux cartes de 120 et 250 px avant la liste. */}
-        {voirReglages && !rechercheReglage.trim() && <div className="vrm-pf-set-afaire" data-pf-set-afaire="">
-          <ActionsReglages comptes={comptes||[]} onOuvrir={id=>id==='comptes'?setTab('vintedaccounts'):id==='adresses'?(ouvrirEmailsRelier('reception'),setTab('emails')):ouvrirSous(id)}/>
-          {/* (12 nov., sécurité des comptes) Double vérification pas activée : UNE carte discrète, jamais forcée. */}
-          {AUTH.user && <CarteDoubleVerif/>}
-        </div>}
-        {/* (5 nov., chantier H) LE champ de recherche de l'app (`ChampRecherche`) — (14 nov.) monté sous le titre. */}
-        {(() => {
-          const filtres=filtrerReglages(groupes,voirReglages?rechercheReglage:'');
-          return filtres.length ? <>{rechercheReglage.trim()&&<p className="vrm-settings-search-info" role="status" style={{color:C.muted}}>{tr('reglages.recherche.trouves', { n: filtres.reduce((n,g)=>n+g.items.length,0) })}</p>}{filtres.map(groupe)}</> : <div role="status" className="vrm-set-rien" style={{color:C.muted,fontSize:13}}><p style={{margin:'0 0 4px'}}>{tr('reglages.recherche.rien', { q: rechercheReglage.trim() })}</p><Bouton variante="discret" onClick={()=>setRechercheReglage('')}>{tr('reglages.recherche.effacer')}</Bouton></div>;
-        })()}
+        {/* Sans session : la porte vers l'écran de connexion, tout de suite (jamais derrière une catégorie). */}
+        {MULTI_USER && !AUTH.user && !catOuverte && profil}
+        {/* « Tout va bien ? » en tête QUAND quelque chose ne va pas : une rangée ambre, un geste. */}
+        {!catOuverte && !q && <AlerteParametres onVoir={()=>allerAuReglage('toutvabien')}/>}
+        {q ? (
+          resultats.length ? <>
+            <p className="vrm-settings-search-info" role="status" data-recherche-trouves={nTrouves} style={{color:C.muted}}>{tr('reglages.recherche.trouves', { n: nTrouves })}</p>
+            {resultats.map(groupe)}
+          </> : <div role="status" className="vrm-set-rien" data-recherche-trouves="0" style={{color:C.muted,fontSize:13}}><p style={{margin:'0 0 4px'}}>{tr('reglages.recherche.rien', { q })}</p><Bouton variante="discret" onClick={()=>setRechercheReglage('')}>{tr('reglages.recherche.effacer')}</Bouton></div>
+        ) : etroit ? (
+          catOuverte ? ecranCategorie(catOuverte, { avecTitre: false }) : (
+            // ── LE PREMIER ÉCRAN (téléphone) : les catégories, « Sécurité des données » (expert) à part ──
+            <section className="vrm-set-groupe vrm-pm-racine">
+              <div className="vrm-set-liste" data-categories-reglages="" data-onglets-reglages="">
+                {categories.filter((c) => !c.expert).map((c) => ligneCategorie(c, { surClic: () => ouvrirCategorie(c.id) }))}
+              </div>
+              {categories.filter((c) => c.expert).map((c) => <div key={c.id} className="vrm-set-liste vrm-pm-expert-liste">{ligneCategorie(c, { surClic: () => ouvrirCategorie(c.id) })}</div>)}
+            </section>
+          )
+        ) : (
+          // ── ORDINATEUR : le sommaire collant à gauche, toutes les catégories à droite ──
+          <div className="vrm-pm-bureau">
+            <nav className="vrm-pm-sommaire" aria-label={tr('ecran.settings')}>
+              <div className="vrm-set-liste" data-categories-reglages="" data-onglets-reglages="">
+                {categories.map((c) => ligneCategorie(c, { actif: catActive === c.id, surClic: () => { setCatActive(c.id); try { const el = document.getElementById(`parametres-${c.id}`); if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {} } }))}
+              </div>
+            </nav>
+            <div className="vrm-pm-contenu">{categories.map((c) => ecranCategorie(c, { avecTitre: true }))}</div>
+          </div>
+        )}
       </>}
-      {panneaux.map(it=><div key={it.id} hidden={!ouvert || ouvert.id!==it.id} data-sous-ecran={it.id} className={it.titreInterne?'vrm-set-sans-titre':undefined}>
+      {panneaux.map(it=>(it.paresseux && (!ouvert || ouvert.id!==it.id)) ? null : <div key={it.id} hidden={!ouvert || ouvert.id!==it.id} data-sous-ecran={it.id} className={it.titreInterne?'vrm-set-sans-titre':undefined}>
         {contenuPanneau(it,false)}
       </div>)}
     </div>

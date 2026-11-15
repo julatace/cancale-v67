@@ -9,6 +9,7 @@ import ecran_renvoyer from './it/renvoyer.js';   // (15 nov., lot retours) « À
 import ecran_retrait_ailleurs from './it/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
 import ecran_finition from './it/finition.js';   // (15 nov.) la finition écran par écran
 import ecran_numeros_nouvelles from './it/numeros-nouvelles.js';   // (15 nov.) Les nouvelles annonces sans N°
+import ecran_parametres from './it/parametres.js';   // (15 nov.) Paramètres rangés en dix catégories
 import ecran_idees from './it/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './it/ventes.js';
 import ecran_commun from './it/commun.js';
@@ -468,10 +469,10 @@ export default {
   "reglages.donnees.droits": "I tuoi altri diritti:",
   "reglages.donnees.exporter": "Esporta",
   "reglages.donnees.exporterOu.dessous": "«Backup completo» qui sotto",
-  "reglages.donnees.exporterOu.reglages": "«Backup completo» (Impostazioni)",
+  "reglages.donnees.exporterOu.reglages": "«Backup completo», più in alto",
   "reglages.donnees.lib": "Esporta i miei dati",
   "reglages.donnees.supprimer": "Elimina il tuo account",
-  "reglages.donnees.supprimerOu": "«Elimina il mio account», in fondo",
+  "reglages.donnees.supprimerOu": "«Elimina il mio account», in fondo a Il mio account",
   "reglages.double.active": "Attiva",
   "reglages.double.activeN": { one: "Attiva · {n} dispositivo", other: "Attiva · {n} dispositivi" },
   "reglages.double.inactive": "Disattivata",
@@ -566,8 +567,6 @@ export default {
   "reglages.sauvegarde.aRefaire": " · da rifare",
   "reglages.sauvegarde.derniere": "Ultimo backup: {quand}",
   "reglages.sauvegarde.jamais": "Mai salvato — tocca «Backup completo»",
-  "reglages.securite.desc": "Verifica che solo tu possa leggere e scrivere i tuoi dati.",
-  "reglages.securite.lib": "Sicurezza dei dati",
   "reglages.signalements.lib": "Segnalazioni ricevute",
   "reglages.simulation.lib": "Simula la creazione di un account",
   "reglages.simulation.desc": "Il percorso di un nuovo venditore, su account fittizi.",
@@ -2272,4 +2271,5 @@ export default {
   ...ecran_renvoyer,
   ...ecran_finition,
   ...ecran_numeros_nouvelles,
+  ...ecran_parametres,
 };

@@ -9,6 +9,7 @@ import ecran_renvoyer from './en/renvoyer.js';   // (15 nov., lot retours) « À
 import ecran_retrait_ailleurs from './en/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
 import ecran_finition from './en/finition.js';   // (15 nov.) la finition écran par écran
 import ecran_numeros_nouvelles from './en/numeros-nouvelles.js';   // (15 nov.) Les nouvelles annonces sans N°
+import ecran_parametres from './en/parametres.js';   // (15 nov.) Paramètres rangés en dix catégories
 import ecran_idees from './en/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './en/ventes.js';
 import ecran_commun from './en/commun.js';
@@ -468,10 +469,10 @@ export default {
   "reglages.donnees.droits": "Your other rights:",
   "reglages.donnees.exporter": "Export",
   "reglages.donnees.exporterOu.dessous": "“Full backup” below",
-  "reglages.donnees.exporterOu.reglages": "“Full backup” (Settings)",
+  "reglages.donnees.exporterOu.reglages": "“Full backup”, above",
   "reglages.donnees.lib": "Export my data",
   "reglages.donnees.supprimer": "Delete your account",
-  "reglages.donnees.supprimerOu": "“Delete my account”, at the very bottom",
+  "reglages.donnees.supprimerOu": "“Delete my account”, at the bottom of My account",
   "reglages.double.active": "On",
   "reglages.double.activeN": { one: "On · {n} device", other: "On · {n} devices" },
   "reglages.double.inactive": "Off",
@@ -566,8 +567,6 @@ export default {
   "reglages.sauvegarde.aRefaire": " · redo it",
   "reglages.sauvegarde.derniere": "Last backup: {quand}",
   "reglages.sauvegarde.jamais": "Never backed up — tap “Full backup”",
-  "reglages.securite.desc": "Check that only you can read and write your data.",
-  "reglages.securite.lib": "Data security",
   "reglages.signalements.lib": "Reports received",
   "reglages.simulation.lib": "Simulate an account creation",
   "reglages.simulation.desc": "A new seller’s journey, on made-up accounts.",
@@ -2272,4 +2271,5 @@ export default {
   ...ecran_renvoyer,
   ...ecran_finition,
   ...ecran_numeros_nouvelles,
+  ...ecran_parametres,
 };

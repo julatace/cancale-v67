@@ -28,6 +28,7 @@
 //  `BANC_PORTE_STRICTE=1` le retire pour juger la porte elle-même.
 // ════════════════════════════════════════════════════════════════════════════
 require('./_garde-reseau.cjs');   // (11 nov.) la garde réseau : aucun banc ne joint la production ni Internet
+require('./_reglages-compat.cjs');   // (15 nov.) Paramètres en catégories : la catégorie d'une rangée touchée avant elle (le geste du vendeur)
 const SCRIPT = `(() => {
   if (window.__vrmPorteBanc) return; window.__vrmPorteBanc = true;
   // (14 nov., bancs au vert) Le jeton d'accès a la FORME d'un jeton Supabase (trois morceaux, \`sub\` = l'uid de la

@@ -1,3 +1,4 @@
+require('./_reglages-compat.cjs');   // (15 nov.) Paramètres en catégories : la catégorie d'une rangée touchée avant elle
 // ════════════════════════════════════════════════════════════════════════════
 //  BANC — LES PREMIÈRES MINUTES (8 nov. ; démarrage en TROIS étapes le 13 nov.,
 //  lot 46) : un vendeur NEUF réussit seul.

@@ -1,3 +1,4 @@
+require('./_reglages-compat.cjs');   // (15 nov.) Paramètres en catégories : la catégorie d'une rangée touchée avant elle
 // ════════════════════════════════════════════════════════════════════════════
 //  « TOUT VA BIEN ? » ET LA LIGNE AMBRE (8 nov., garde-fous de la capture)
 //  La VRAIE app (`dist`), une fausse base qui applique la projection `select=`.
