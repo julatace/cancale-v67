@@ -198,8 +198,8 @@ const mesures = (pg) => pg.evaluate(() => {
       await attendre(pg, '[data-ebt-afaire-ligne="litiges"]');
       await capt(pg, '390-afaire');
       await pg.keyboard.press('Escape').catch(() => {});
-      await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`, { waitUntil: 'domcontentloaded' });
-      await attendre(pg, '[data-ebt-chiffre="expedier"]');
+      await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`, { waitUntil: 'domcontentloaded' }).catch(() => {});
+      await attendre(pg, '[data-ebt="tableau"] [data-ebt-chiffre="expedier"]');
       await pg.click('[data-ebt-chiffre="expedier"]');
       await pg.waitForSelector('[data-tache-section="ventes"]', { timeout: 15000 });
       dit(true, 'T6. toucher « à expédier » ouvre les Commandes');
