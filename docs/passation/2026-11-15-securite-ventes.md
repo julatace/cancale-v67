@@ -72,9 +72,18 @@ notion, un propriétaire) :
 |---|---|
 | `node scripts/audit-anti-arnaque.cjs --prouve` | vert (144 contrôles : 64 vrais positifs dont 30 neufs en 5 langues, 47 messages normaux, chaque motif muté ⇒ rouge) ; **rouge sur l'arbre de départ** (`cc0e7291`) : 29 contrôles |
 | `node scripts/audit-securite-ventes.cjs --prouve` | vert ; 9 mutations ⇒ rouges ; rouge sur l'arbre de départ (règles absentes) |
-| `scripts/bancs/securite-ventes.cjs` | voir le rapport de session (390 tactile, 1512, clair, sombre) |
-| `scripts/bancs/anti-arnaque.cjs`, `scripts/bancs/objectifs-mois.cjs` | adaptés (bannière ambre sans bord plein ; l'anneau sur Ma journée) |
+| `scripts/bancs/securite-ventes.cjs` (base inventée : 1 000 paires, 1 000 conversations, 3 comptes) | **100 verts, 0 rouge** — 390 tactile, 1512, clair, sombre ; le contrôle « l'anneau ne couvre aucune case » était ROUGE sur le build d'avant le correctif d'ordinateur (il couvrait « Vendu » et « Reçu ») |
+| `scripts/bancs/anti-arnaque.cjs` (adapté : voile ambre, jamais rouge) | vert, 4 vues |
+| `scripts/bancs/objectifs-mois.cjs` (adapté : l'anneau sur Ma journée) | 68 verts |
+| `scripts/bancs/verre.cjs` (`ECRANS=journee,messages,fiche`) | 120 verts |
 | audits urssaf, chiffres, une-regle, identite, traduction, tdz, variables, studio, csp, objectif-mois, quoi-de-neuf, coherence | verts |
+
+## Sur ordinateur (piège rencontré)
+
+La tuile du mois de Ma journée a la hauteur d'UNE rangée (128 px) : l'anneau sous les cases était rogné. Il se pose à
+droite des cases (`position: absolute` dans la tuile) et les cases laissent sa place — cette marge est dans la couche
+`vrm-verre` (`@layer`), car la grille du studio pose `margin: 0 !important` dans SA couche et, pour un `!important`,
+la couche nommée la première gagne : hors couche, la règle perdait sans bruit.
 
 ## Geste de Julien
 
