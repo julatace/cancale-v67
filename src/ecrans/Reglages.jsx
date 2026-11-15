@@ -1998,9 +1998,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       {it.type === 'switch' && <Interrupteur on={it.on} label={it.lib} onClick={it.onClick} {...(it.data || {})}/>}
       {(ouvre || it.type === 'nav') && chevron}
     </>);
-    if (it.type === 'switch') return <div key={it.id} className="vrm-set-ligne">{corps}</div>;
+    if (it.type === 'switch') return <div key={it.id} className="vrm-set-ligne" data-reglage-id={it.id}>{corps}</div>;
     return (
-      <button key={it.id} type="button" className="vrm-set-ligne"
+      <button key={it.id} type="button" className="vrm-set-ligne" data-reglage-id={it.id}
         onClick={ouvre ? () => ouvrirSous(it.id) : it.onClick}
         {...(ouvre ? { 'data-sous-ouvrir': it.id, 'aria-haspopup': 'true' } : {})} {...(it.data || {})}>
         {corps}

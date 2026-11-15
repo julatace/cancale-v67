@@ -1,3 +1,4 @@
+require('./_reglages-compat.cjs');   // (15 nov.) Paramètres en catégories : la catégorie d'une rangée touchée avant elle
 // ════════════════════════════════════════════════════════════════════════════
 //  BANC « OÙ EST TON NUMÉRO ? » ET « REMISE EN LIGNE » (9 nov., extension 5.334).
 //  A. Réglages → Numéros, « je l'écris » allumé : « Où est ton numéro ? » montre

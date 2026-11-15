@@ -1,3 +1,4 @@
+require('./_reglages-compat.cjs');   // (15 nov.) Paramètres en catégories : la catégorie d'une rangée touchée avant elle
 // Navigation des paramètres : recherche et aller-retour à 390 et 1512 px.
 // Données synthétiques, aucune connexion ou mutation réelle.
 const path = require('path');

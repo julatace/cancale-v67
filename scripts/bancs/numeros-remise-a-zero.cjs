@@ -1,3 +1,4 @@
+require('./_reglages-compat.cjs');   // (15 nov.) Paramètres en catégories : la catégorie d'une rangée touchée avant elle
 // ════════════════════════════════════════════════════════════════════════════
 //  BANC « LA REMISE À ZÉRO DES NUMÉROS » (migration 013) — l'app RENDUE.
 //

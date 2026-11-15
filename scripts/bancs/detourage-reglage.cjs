@@ -1,3 +1,4 @@
+require('./_reglages-compat.cjs');   // (15 nov.) Paramètres en catégories : la catégorie d'une rangée touchée avant elle
 // ═══════════════════════════════════════════════════════════════════════════
 // BANC : LE RÉGLAGE « DÉTOURER MES PHOTOS » N'EST PLUS DANS LES PARAMÈTRES
 //        node scripts/bancs/detourage-reglage.cjs   (BANC_PORT pour changer de port)
