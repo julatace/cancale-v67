@@ -57,6 +57,7 @@ function Groupe({ g, PhotoVinted, marques, luDe, onOuvrir, onChoisir, onRefus, o
         {g.numeros.length ? <span className="sb-plaque" data-dc-plaque={g.numeros[0]}><small>N°</small>{g.numeros[0]}</span> : <span className="dc-sans">{tr('deuxComptes.sansNumero')}</span>}
         <span className={'dc-etat is-' + g.etat}>{g.etat === 'sur' ? tr('deuxComptes.sur') : tr('deuxComptes.verifier')}<small> · {g.preuves.map(PREUVE).join(' · ')}</small></span>
       </header>
+      <p className="dc-ou" data-dc-ou="">{tr('deuxComptes.enVenteSur', { comptes: et([...new Set(g.annonces.map(nomDe))]) })}</p>
       <div className="dc-paire">{g.annonces.map((a) => <Annonce key={a.id} a={a} role={g.retirer.includes(a) ? 'retirer' : 'garder'} PhotoVinted={PhotoVinted}/>)}</div>
       {cible ? (
         <div className="dc-gestes">
@@ -102,7 +103,7 @@ export function DeuxComptesAlerte({ res, onOuvrir, texte }) {
   useLangue();
   if (!res || !res.pret || !res.groupes.length || !texte) return null;
   return (
-    <button type="button" className="sb-touche dc-alerte" data-annonces-deux-comptes={res.groupes.map((g) => g.id).join(' ')} data-n={String(res.groupes.length)} aria-haspopup="dialog" onClick={onOuvrir}>
+    <button type="button" className="sb-touche dc-alerte" data-annonces-deux-comptes={res.groupes.map((g) => g.id).join(' ')} data-n={String(res.groupes.length)} aria-haspopup="dialog" aria-label={`${texte.complet} — ${texte.detail}`} onClick={onOuvrir}>
       <i className="dc-point" aria-hidden="true"/><span className="dc-alerte-txt"><b>{texte.titre}</b><small>{texte.detail}</small></span>
     </button>
   );

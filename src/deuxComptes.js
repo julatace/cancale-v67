@@ -235,12 +235,16 @@ export function memesPairesFiches(fiches, fusions = []) {
 export function texteDeuxComptes(groupes, t, et = (l) => l.join(', ')) {
   const g = arr(groupes);
   if (!g.length) return null;
+  // Le titre et la ligne tiennent chacun sur UNE ligne à 390 px (la règle des cartes de « À faire ») ;
+  // la phrase entière (« N°42 est en vente sur shop_nord et kicks_sud ») est dans `complet` et dans la feuille.
   if (g.length === 1) {
     const x = g[0];
     const noms = [...new Set(x.annonces.map((a) => a.nom).filter(Boolean))];
-    const titre = x.numeros.length ? t('deuxComptes.titreNum', { numero: x.numeros[0], comptes: et(noms) }) : t('deuxComptes.titreSans', { comptes: et(noms) });
-    return { titre, detail: x.etat === 'sur' ? t('deuxComptes.detailSur') : t('deuxComptes.detailVerifier'), n: 1 };
+    const titre = x.numeros.length ? t('deuxComptes.titreNum', { numero: x.numeros[0] }) : t('deuxComptes.titreSans');
+    const complet = x.numeros.length ? t('deuxComptes.complet', { numero: x.numeros[0], comptes: et(noms) }) : t('deuxComptes.completSans', { comptes: et(noms) });
+    return { titre, detail: x.etat === 'sur' ? t('deuxComptes.detailSur') : t('deuxComptes.detailVerifier'), complet, n: 1 };
   }
   const nSurs = g.filter((x) => x.etat === 'sur').length;
-  return { titre: t('deuxComptes.titreN', { n: g.length }), detail: nSurs === g.length ? t('deuxComptes.detailSur') : t('deuxComptes.detailMixte', { n: g.length - nSurs }), n: g.length };
+  const titre = t('deuxComptes.titreN', { n: g.length });
+  return { titre, detail: nSurs === g.length ? t('deuxComptes.detailSur') : t('deuxComptes.detailMixte', { n: g.length - nSurs }), complet: titre, n: g.length };
 }

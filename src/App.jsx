@@ -48113,7 +48113,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const t = deuxComptesTexte || { titre: '', detail: '' };
                 return (
                   <button key="deux-comptes" type="button" className="vrm-day-task vrm-fu-tache" data-journee-deux-comptes={deuxComptesJ.map((g) => g.id).join(' ')} data-n={String(deuxComptesJ.length)}
-                    title={`${t.titre}\n${t.detail}`} aria-label={`${t.titre} — ${t.detail}`} aria-haspopup="dialog" onClick={() => setFeuilleDeuxComptes(true)}>
+                    title={`${t.complet}\n${t.detail}`} aria-label={`${t.complet} — ${t.detail}`} aria-haspopup="dialog" onClick={() => setFeuilleDeuxComptes(true)}>
                     <PileVignettes srcs={deuxComptesJ.flatMap((g) => g.annonces.map((a) => a.photo))} n={deuxComptesJ.length} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="alert" size={20}/>}/>
                     <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{t.titre}</span><span className="vrm-day-task-note is-urgent" data-sous-ligne="deux-comptes">{t.detail}</span></span>
                     <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{VERBES.voir}</span></span>
