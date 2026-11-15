@@ -65,7 +65,16 @@ function mesurer() {
   const ratio = (a, b) => { const x = L(a), y = L(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
   const sur = (h, a, bas) => [0, 1, 2].map((i) => h[i] * a + bas[i] * (1 - a));
   // Rogné : un ancêtre qui coupe ce qui déborde (overflow) ne laisse rien voir de l'élément (ex. une carte repliée à 0 px).
-  const rogne = (el, r) => { for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) { const c = getComputedStyle(a); if (c.overflowX === 'visible' && c.overflowY === 'visible') continue; const q = a.getBoundingClientRect(); if (q.width < 1 || q.height < 1 || r.right <= q.left || r.left >= q.right || r.bottom <= q.top || r.top >= q.bottom) return true; } return false; };
+  const rogne = (el, r) => {
+    for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+      const c = getComputedStyle(a); if (c.display === 'contents') continue;
+      const cx = /hidden|clip/.test(c.overflowX), cy = /hidden|clip/.test(c.overflowY);   // une zone qui DÉFILE n'est pas un rognage
+      if (!cx && !cy) continue;
+      const q = a.getBoundingClientRect();
+      if ((cx && (q.width < 1 || r.right <= q.left || r.left >= q.right)) || (cy && (q.height < 1 || r.bottom <= q.top || r.top >= q.bottom))) return true;
+    }
+    return false;
+  };
   const vis = (el) => { const r = el.getBoundingClientRect(); const cs = getComputedStyle(el); return r.width > 1 && r.height > 1 && cs.visibility !== 'hidden' && cs.display !== 'none' && !rogne(el, r); };
   const nom = (el) => { const p = []; let e = el; for (let i = 0; e && i < 6; i++, e = e.parentElement) p.unshift(e.tagName.toLowerCase() + (typeof e.className === 'string' && e.className.trim() ? '.' + e.className.trim().split(/\s+/).slice(0, 2).join('.') : '')); return p.join(' > '); };
   // un texte VU dans l'élément (un libellé masqué pour les lecteurs d'écran ne compte pas)
@@ -87,7 +96,7 @@ function mesurer() {
     // ancêtre (body compris) ne doit peindre un fond par-dessus, sinon le dégradé est caché (vu le 15 nov. : body opaque).
     const caches = [];
     for (let a = coque; a && a !== document.documentElement; a = a.parentElement) { const ca = getComputedStyle(a); const c = parse(ca.backgroundColor); if ((c && c[3] > 0) || ca.backgroundImage !== 'none') caches.push(a.tagName.toLowerCase() + (a.className && typeof a.className === 'string' ? '.' + a.className.split(' ')[0] : '')); }
-    out.fond = { caches, position: b.position, inset: [b.top, b.left, b.right, b.bottom].join(' '), z: b.zIndex, degrade: /gradient/.test(img), n: cs.length, etrangeres: etrangeres.length,
+    out.fond = { caches, contenu: b.content !== 'none' && b.content !== 'normal', position: b.position, inset: [b.top, b.left, b.right, b.bottom].join(' '), z: b.zIndex, degrade: /gradient/.test(img), n: cs.length, etrangeres: etrangeres.length,
       jetons: jetons.length === 5, profond: bas ? L(bas) < 0.05 : false, coqueFond: getComputedStyle(coque).backgroundColor };
   }
   // Les deux bouts du fond (le haut éclairé du reflet ; le bas). Sans jetons (arbre d'avant) : le fond calculé de la coque.
@@ -105,8 +114,11 @@ function mesurer() {
   const verre = tok('--sv-verre');
   let panneaux = 0;
   if (verre) for (const el of document.querySelectorAll('.vrm-main *')) {
-    const c = parse(getComputedStyle(el).backgroundColor);
-    if (c && c[3] > 0 && c[3] < 1 && Math.abs(c[3] - verre[3]) < .02 && Math.abs(c[0] - verre[0]) < 2 && Math.abs(c[2] - verre[2]) < 2 && vis(el)) { panneaux++; if (panneaux > 50) break; }
+    // le verre peut être la couleur de fond OU le dégradé de fond (une seule couche : la couleur reste transparente)
+    const cs0 = getComputedStyle(el);
+    const cands = [parse(cs0.backgroundColor), ...(/gradient/.test(cs0.backgroundImage) ? couleursDe(cs0.backgroundImage) : [])];
+    const estVerre = cands.some((c) => c && c[3] > 0 && c[3] < 1 && Math.abs(c[3] - verre[3]) < .02 && Math.abs(c[0] - verre[0]) < 2 && Math.abs(c[2] - verre[2]) < 2);
+    if (estVerre && vis(el)) { panneaux++; if (panneaux > 50) break; }
   }
   out.verre = { panneaux, alpha: verre ? verre[3] : null };
   for (const el of document.querySelectorAll('.vrm-fs-cadre, .sb-feuille, [role="dialog"], [role="alertdialog"], .vrm-main input[type="text"], .vrm-main input[type="search"], .vrm-main textarea, .sb-champ')) {
@@ -224,7 +236,15 @@ function mesurer() {
   }
   // V6 — débordement
   const se = document.scrollingElement, main = document.querySelector('.vrm-app-shell[data-espace] .vrm-main');
-  out.deborde = { page: se.scrollWidth - innerWidth, main: main ? main.scrollWidth - main.clientWidth : 0 };
+  // + ce qui sort de l'écran sans qu'on puisse le faire défiler (une coque en `overflow-x: clip` le cache sans élargir la page)
+  let hors = 0;
+  if (main) for (const el of main.querySelectorAll('*')) {
+    const r = el.getBoundingClientRect(); if (r.width < 2 || r.height < 2 || (r.right <= innerWidth + 1 && r.left >= -1)) continue;
+    let defile = false; for (let a = el.parentElement; a && a !== main; a = a.parentElement) { const c = getComputedStyle(a); if (/auto|scroll/.test(c.overflowX)) { defile = true; break; } }
+    if (defile || getComputedStyle(el).visibility === 'hidden' || el.closest('[aria-hidden="true"], .vrm-sr-seul')) continue;
+    hors++; if (hors > 20) break;
+  }
+  out.deborde = { page: se.scrollWidth - innerWidth, main: main ? main.scrollWidth - main.clientWidth : 0, hors };
   return out;
 }
 
@@ -263,8 +283,8 @@ if (require.main === module) (async () => {
         await o.pg.screenshot({ path: path.join(SHOTS, suf + '.png') });
         const m = await o.pg.evaluate(mesurer);
         const f = m.fond;
-        dit(!!f && f.position === 'fixed' && f.inset === '0px 0px 0px 0px' && f.z === '-1' && f.degrade && f.jetons && f.etrangeres === 0 && f.profond && f.caches.length === 0,
-          `V1 ${suf} : le fond est le dégradé bleu profond, posé une fois`, f ? `${f.position} · inset ${f.inset} · z ${f.z} · dégradé ${f.degrade} · ${f.n} couleurs, ${f.etrangeres} hors jetons · profond ${f.profond}${f.caches.length ? ' · CACHÉ par ' + f.caches.join(', ') : ''}` : 'pas de coque');
+        dit(!!f && f.contenu && f.position === 'fixed' && f.inset === '0px 0px 0px 0px' && f.z === '-1' && f.degrade && f.jetons && f.etrangeres === 0 && f.profond && f.caches.length === 0,
+          `V1 ${suf} : le fond est le dégradé bleu profond, posé une fois`, f ? `${f.contenu ? '' : 'PAS DE ::before · '}${f.position} · inset ${f.inset} · z ${f.z} · dégradé ${f.degrade} · ${f.n} couleurs, ${f.etrangeres} hors jetons · profond ${f.profond}${f.caches.length ? ' · CACHÉ par ' + f.caches.join(', ') : ''}` : 'pas de coque');
         const verreOk = m.verre.panneaux > 0 && m.verre.alpha > 0 && m.verre.alpha < 1;
         const surDisque = e === 'disque' || e === 'loupe' || e === 'fiche';
         dit(surDisque || verreOk, `V2 ${suf} : des panneaux de verre`, `${m.verre.panneaux} panneau(x) à --sv-verre (alpha ${m.verre.alpha})`);
@@ -273,7 +293,7 @@ if (require.main === module) (async () => {
           m.contraste.length ? `${m.contraste.length} sous le seuil : ` + m.contraste.slice(0, DETAIL).map((x) => `${x.k}<${x.seuil} « ${x.t} » ${x.el} (${x.c} sur ${x.f})`).join(' | ') : '');
         dit(m.flous.length <= FLOU_MAX && !m.flous.some((x) => x.rangee), `V4 ${suf} : flou borné`, `${m.flous.length} élément(s) flouté(s)${m.flous.some((x) => x.rangee) ? ' dont dans une rangée : ' + m.flous.filter((x) => x.rangee).map((x) => x.el).slice(0, 3).join(' | ') : ''}`);
         dit(m.pleins <= 1, `V5 ${suf} : un plein au plus`, `${m.pleins}`);
-        dit(m.deborde.page <= 1 && m.deborde.main <= 1, `V6 ${suf} : rien ne déborde`, `page +${m.deborde.page} · main +${m.deborde.main}`);
+        dit(m.deborde.page <= 1 && m.deborde.main <= 1 && m.deborde.hors === 0, `V6 ${suf} : rien ne déborde`, `page +${m.deborde.page} · main +${m.deborde.main} · ${m.deborde.hors} élément(s) hors de l'écran`);
         dit(m.colle.length === 0, `V7 ${suf} : le « ? » ne colle à aucun titre (≥ 8 px)`, m.colle.slice(0, DETAIL).join(' | '));
         dit(m.coupes.length === 0, `V8 ${suf} : aucun texte coupé au milieu d'un mot hors des rangées`, m.coupes.slice(0, DETAIL).join(' | '));
         dit(m.pastille.length === 0, `V9 ${suf} : la pastille « Mis à jour » ne recouvre aucun texte`, m.pastille.join(' | '));
