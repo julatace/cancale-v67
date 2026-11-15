@@ -95,8 +95,23 @@ Audits : `traduction`, `tdz`, `variables`, `studio`, `composants`, `icones`, `vi
 heure : la feuille s'appelait `finition.css` ; renommée `studio-finition.css`). Test node
 `scripts/tests/reglages-actions.test.mjs` vert (le titre court garde « 1 compte »).
 
-Les bancs du chantier et ceux qui lisent un texte changé : voir le rapport de la session (verts/rouges et
-la raison de chaque rouge).
+**Résultats du banc neuf** (machine partagée très chargée : charge 40–56, mémoire pleine, Chromium qui plante
+parfois — un plantage est dit « l'écran s'ouvre ❌ », jamais compté vert ; le banc relance un navigateur neuf) :
+- après, 390 clair + sombre : **486 ✅ · 0 ❌** ; après, 1512 clair : **296 ✅** (les rouges 1512 sombre de ce passage
+  sont tous des « Target crashed », mémoire) ; Ventes et Envoyés 1512 avec G : **18 ✅ · 0 ❌** ;
+- avant (build 0cccddbd), 390 clair + sombre : **32 ❌** (cibles, chevauchements, coupes, insécables) ; la carte
+  « À retirer » dépliée : **N ❌ et V ❌** ; Ventes 1512 : **G ❌** (barre à 74 %, 548 px vides) et C ❌.
+
+**Bancs du chantier** (relancés à la fin) : `studio-ventes` 97 ✅ · `studio-coque` 79 ✅ · `studio-journee` ✅ ·
+`studio-reste` 319 ✅ · `studio-paires` ✅ · `annonces-tete` ✅ · `argent` 269 ✅ · `accompagnement` 30 ✅ ·
+`achats-retirer-visible` 54 ✅ · `garde-ecrans` ✅ · `impression-simple` ✅ · `colis-envoyes-tri` 93 ✅ ·
+`parler-loupe` ✅ · `tout-imprimer` 28 OK (seul ; dans la série il a manqué de temps) ·
+`afaire-feuille` 691 ✓ · 6 ✗ — « l'écran a pu se jouer » / « la feuille s'ouvre » sous charge, sur Annonces
+Leboncoin/Vestiaire et deux balayages : écrans que la passe ne touche pas, à relancer sur une machine calme ·
+`colis-heure` 14 KO — ce banc ne lit pas `BANC_DIST` (impossible de le passer sur le build d'avant) ; ses KO
+portent sur les cartes de Colis (« carte absente » : sélecteurs d'avant le studio) et la teinte ambre du studio
+(#764300) absente de sa palette ; sa ligne de Ma journée (« en retard — c'était avant 7 h aujourd'hui », « Lima
+Runner », l'heure) est verte au second passage (la phrase entière est dans l'infobulle et le nom du bouton).
 
 ## Le geste de Julien
 
