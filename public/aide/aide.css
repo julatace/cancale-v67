@@ -3,12 +3,13 @@
    le bleu d'Apple RARE (liens), police système, clair et sombre.
    `data-theme` est posé par aide.js (le choix fait dans l'app, sinon le système).
    ═══════════════════════════════════════════════════════════════════════════ */
-:root{--fond:#F2F2F7;--carte:#FFFFFF;--encre:#1D1D1F;--gris:#6E6E73;--filet:rgba(60,60,67,.18);--remplir:rgba(118,118,128,.12);--lien:#0066CC;--bleu:#0071E3;--ambre:#B25000;color-scheme:light}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--fond:#000;--carte:#1C1C1E;--encre:#F5F5F7;--gris:#98989D;--filet:rgba(84,84,88,.65);--remplir:rgba(118,118,128,.24);--lien:#409CFF;--bleu:#0A84FF;--ambre:#FFB340;color-scheme:dark}}
-:root[data-theme="dark"]{--fond:#000;--carte:#1C1C1E;--encre:#F5F5F7;--gris:#98989D;--filet:rgba(84,84,88,.65);--remplir:rgba(118,118,128,.24);--lien:#409CFF;--bleu:#0A84FF;--ambre:#FFB340;color-scheme:dark}
+/* (15 nov., lot site-public) Les couleurs du studio bleu clair (src/design/studio.css) : bleu clair éclairé du haut, porcelaine, encre ; la nuit, bleu-nuit. */
+:root{--fond:#EEF6FD;--fond-bas:#D7E9F6;--carte:#FFFFFF;--encre:#0C1D30;--gris:#3F5468;--filet:rgba(18,52,96,.14);--remplir:#E4EEF7;--lien:#0055B8;--bleu:#0060CC;--ambre:#764300;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--fond:#15263D;--fond-bas:#0C1829;--carte:#16273C;--encre:#EAF2FB;--gris:#A9BBCF;--filet:rgba(255,255,255,.10);--remplir:#091320;--lien:#6CB4FF;--bleu:#4AA3FF;--ambre:#F2B65E;color-scheme:dark}}
+:root[data-theme="dark"]{--fond:#15263D;--fond-bas:#0C1829;--carte:#16273C;--encre:#EAF2FB;--gris:#A9BBCF;--filet:rgba(255,255,255,.10);--remplir:#091320;--lien:#6CB4FF;--bleu:#4AA3FF;--ambre:#F2B65E;color-scheme:dark}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
-body{margin:0;background:var(--fond);color:var(--encre);font:17px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh}
+body{margin:0;background:var(--fond) linear-gradient(180deg,var(--fond) 0%,var(--fond-bas) 100%) fixed;color:var(--encre);font:17px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh}
 main{max-width:680px;margin:0 auto;padding:max(20px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(48px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
 a{color:var(--lien);text-decoration:none}
 a:hover{text-decoration:underline}

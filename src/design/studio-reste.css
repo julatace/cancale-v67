@@ -134,6 +134,23 @@
 :root:root:root:root:root:root body .vrm-cx .vrm-cx-exemple p { color: var(--sb-encre-2) !important; }
 :root:root:root:root:root:root body .vrm-cx nav > a[target="_blank"] { display: inline-flex !important; align-items: center !important; min-height: 44px !important; color: var(--sb-encre-2) !important; }
 :root:root:root:root:root:root body .vrm-cx :is(a, button):not([data-auth-valider]) { -webkit-tap-highlight-color: transparent; }
+/* (15 nov., lot site-public) Une hiérarchie nette : la marque et la phrase à gauche, la carte au centre de
+   sa colonne ; plus d'étiquettes flottantes semées autour (décor sans information) ; Google/Discord sous
+   le formulaire, en TOUCHE de porcelaine (jamais un second plein) ; liens légaux discrets à 44 px. */
+:root:root:root:root:root:root body .vrm-cx .vrm-cx-etiquettes { display: none !important; }
+:root:root:root:root:root:root body .vrm-cx [data-cx-fournisseurs] button {
+  background: var(--sb-touche-fond) !important; border: 0 !important; box-shadow: var(--sb-touche-ombre) !important; color: var(--sb-encre) !important; border-radius: 999px !important;
+}
+:root:root:root:root:root:root body .vrm-cx [data-cx-fournisseurs] > div > span:nth-child(2) { color: var(--sb-encre-2) !important; }
+:root:root:root:root:root:root body .vrm-cx [data-cx-fournisseurs] > div > span:is(:first-child, :last-child) { background: rgb(var(--sb-o) / .14) !important; }
+:root:root:root:root:root:root body .vrm-cx .vrm-cx-qr summary { min-height: 44px !important; }
+@media (min-width: 900px) {
+  :root:root:root:root:root:root body .vrm-cx .vrm-cx-marque { justify-content: flex-start !important; }
+  :root:root:root:root:root:root body .vrm-cx .vrm-cx-titre { margin-top: auto !important; }
+  :root:root:root:root:root:root body .vrm-cx .vrm-cx-points { margin-bottom: auto !important; }
+  :root:root:root:root:root:root body .vrm-cx .vrm-cx-main { align-items: center !important; padding: 48px 40px !important; }
+  :root:root:root:root:root:root body .vrm-cx .vrm-cx-boite { margin: auto 0 !important; }
+}
 }
 
 @layer vrm-premium {

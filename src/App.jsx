@@ -19874,31 +19874,6 @@ function AuthScreen() {
             <button type="button" disabled={busy} onClick={()=>loadAuthSettings()} style={{display:'block',minHeight:44,padding:'8px 0 0',border:0,background:'transparent',color:C.accentTexte,font:'inherit',fontWeight:600,cursor:busy?'default':'pointer'}}>{tr('auth.moyens.reessayer')}</button>
           </div>}
 
-          {/* Connexion par Google / Discord, EN PREMIER : c'est le chemin le plus
-              court et le plus sûr (aucun mot de passe à créer, donc aucun mot de
-              passe à se faire voler ici). */}
-          {mode!=='newpw' && mode!=='reset' && (()=>{
-            // On n'affiche QUE les fournisseurs réellement activés côté Supabase.
-            // Un bouton qui mène à une page d'erreur JSON vaut moins que pas de
-            // bouton du tout.
-            const dispo = OAUTH_PROVIDERS.filter(p => providerEnabled(p.id));
-            if (!dispo.length) return null;
-            return (<>
-              {dispo.map(p => (
-                <button key={p.id} type="button" onClick={()=>oauth(p.id)} disabled={busy}
-                  style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:10,
-                    border:`1px solid ${C.border}`,background:C.bg,color:C.text,borderRadius:12,padding:'12px',
-                    fontSize:15,fontWeight:600,cursor:busy?'default':'pointer',marginBottom:9,fontFamily:'inherit'}}>
-                  <BrandMark id={p.id}/> {fournisseurEnCours===p.id ? tr('auth.fournisseur.ouverture', { nom: p.label }) : mode==='up' ? tr('auth.fournisseur.creer', { nom: p.label }) : tr('auth.fournisseur.continuer', { nom: p.label })}
-                </button>
-              ))}
-              <div style={{display:'flex',alignItems:'center',gap:10,margin:'4px 0 12px'}}>
-                <span style={{flex:1,height:1,background:C.border}}/>
-                <span style={{fontSize:11,color:C.muted,fontWeight:400}}>{tr('auth.ouEmail')}</span>
-                <span style={{flex:1,height:1,background:C.border}}/>
-              </div>
-            </>);
-          })()}
 
           {/* Création de compte alors que la confirmation par email est active :
               on prévient AVANT, sinon on tape son mot de passe pour rien. */}
@@ -20001,6 +19976,29 @@ function AuthScreen() {
             borderRadius:999,padding:'13px',fontSize:15,fontWeight:600,cursor:bloque?'default':'pointer',opacity:bloque?0.6:1,fontFamily:'inherit'}}>
             {busy ? (fournisseurEnCours?tr('auth.bouton.ouverture'):mode==='up'?tr('auth.bouton.creation'):mode==='reset'?tr('auth.bouton.envoiLien'):mode==='newpw'?tr('auth.bouton.enregistrement'):tr('auth.bouton.connexion')) : (enAttenteEmail && mode==='reset' && resetEnvoye) ? tr('auth.renvoyerDans', { s: resteAttente }) : (enAttenteEmail && (mode==='up'||mode==='reset')) ? tr('auth.reessaieDans', { s: resteAttente }) : attendCaptcha ? (captcha.statut==='erreur' ? tr('auth.captcha.indisponible') : captcha.statut==='interactif' ? tr('auth.captcha.coche') : tr('auth.captcha.enCours')) : mode==='up' ? tr('auth.bouton.creer') : mode==='reset' ? (resetEnvoye ? tr('auth.bouton.renvoyer') : tr('auth.bouton.envoyerLien')) : mode==='newpw' ? tr('commun.enregistrer') : tr('auth.titre.in')}
           </button>);})()}
+          {/* (15 nov., lot site-public) Google / Discord SOUS le formulaire, après un « ou » : l'e-mail et le
+              mot de passe d'abord (le chemin que tout le monde a). On n'affiche QUE les fournisseurs
+              réellement activés côté Supabase : un bouton qui mène à une page d'erreur JSON vaut moins
+              que pas de bouton du tout. */}
+          {mode!=='newpw' && mode!=='reset' && (()=>{
+            const dispo = OAUTH_PROVIDERS.filter(p => providerEnabled(p.id));
+            if (!dispo.length) return null;
+            return (<div data-cx-fournisseurs="">
+              <div style={{display:'flex',alignItems:'center',gap:10,margin:'14px 0 12px'}}>
+                <span style={{flex:1,height:1,background:C.border}}/>
+                <span style={{fontSize:13,color:C.muted,fontWeight:400}}>{tr('auth.ou')}</span>
+                <span style={{flex:1,height:1,background:C.border}}/>
+              </div>
+              {dispo.map(p => (
+                <button key={p.id} type="button" onClick={()=>oauth(p.id)} disabled={busy}
+                  style={{width:'100%',minHeight:48,display:'flex',alignItems:'center',justifyContent:'center',gap:10,
+                    border:`1px solid ${C.border}`,background:C.bg,color:C.text,borderRadius:999,padding:'12px',
+                    fontSize:15,fontWeight:600,cursor:busy?'default':'pointer',marginBottom:9,fontFamily:'inherit'}}>
+                  <BrandMark id={p.id}/> {fournisseurEnCours===p.id ? tr('auth.fournisseur.ouverture', { nom: p.label }) : mode==='up' ? tr('auth.fournisseur.creer', { nom: p.label }) : tr('auth.fournisseur.continuer', { nom: p.label })}
+                </button>
+              ))}
+            </div>);
+          })()}
           {/* Acceptation des conditions AVANT la création du compte (art. 1127-1
               C. civ., RGPD art. 13 : l'information est donnée au moment de la
               collecte). */}

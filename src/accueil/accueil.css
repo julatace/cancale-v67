@@ -147,8 +147,15 @@
 /* La fenêtre : le haut de l'écran de l'app, dans le téléphone, qui sort du bas de la tuile. */
 .av-fenetre{display:block;margin:26px auto 0;width:76%;max-width:300px;background:var(--cadre);padding:6px 6px 0;border-radius:40px 40px 0 0;box-shadow:var(--ombre-plan);flex:1 0 auto;max-height:440px;overflow:hidden;-webkit-mask-image:linear-gradient(180deg,#000 72%,transparent);mask-image:linear-gradient(180deg,#000 72%,transparent)}
 .av-fenetre picture,.av-fenetre img{display:block;width:100%;height:auto}
+.av-fenetre > picture{border-radius:34px 34px 0 0;overflow:hidden}
 .av-fenetre-vide{display:block;width:100%;aspect-ratio:780/1688;border-radius:34px 34px 0 0;background:var(--creux)}
-.av-fenetre img{border-radius:34px 34px 0 0}
+/* Le bon morceau de chaque écran dans la fenêtre : on monte l'image (en % de la LARGEUR, l'image fait 2,16 largeurs
+   de haut) jusqu'à ce qui compte — les N° gravés, le code de retrait, « Imprimer ». */
+.av-tuile-numeros .av-fenetre img{margin-top:-69%}
+.av-tuile-colis .av-fenetre img{margin-top:-51%}
+.av-tuile-expedier .av-fenetre img{margin-top:-24%}
+.av-tuile-comptes .av-fenetre{max-height:300px;margin-top:auto}
+
 /* Deux tuiles larges : le texte à gauche, la fenêtre à droite (ordinateur). */
 .av-tuile-numeros,.av-tuile-compta{grid-column:span 2;flex-direction:row;align-items:stretch;min-height:480px}
 .av-tuile-numeros .av-tuile-texte,.av-tuile-compta .av-tuile-texte{flex:1 1 52%;padding:40px 8px 40px 40px;align-self:center}
