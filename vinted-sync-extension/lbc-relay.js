@@ -1,6 +1,71 @@
 // Relais installé avant les premières réponses réseau de Leboncoin.
 (function(){
   if(window.__vrmLbcRelayLoaded)return;window.__vrmLbcRelayLoaded=true;
+  // ⚠️ 5.379 (15 nov., Julien sur Orion iPhone : « Leboncoin marche pas » — leboncoin.fr
+  //    reste NOIRE, seuls un bandeau du site et le logo VRM s'affichent).
+  //  · Un cadre posé par un AUTRE site (un parent qui n'est pas leboncoin.fr) : rien.
+  //  · LE DISJONCTEUR. Si la page ne s'est pas dessinée (presque aucun texte, aucun champ,
+  //    aucune grande image ni cadre — un captcha est un grand cadre : il compte comme
+  //    dessiné) alors que VRM est branché, chargement fini et page visible depuis 12 s,
+  //    trois mesures de suite, VRM se met DE CÔTÉ pour CET onglet : `vrm_lbc_de_cote`
+  //    dans le sessionStorage de l'onglet (30 min ; un nouvel onglet repart branché),
+  //    puis la page est rechargée UNE fois. Rechargée, rien de VRM ne tourne dans la page
+  //    (lbc-inject.js, ce relais et lbc.js s'arrêtent à leur première ligne) ; seule la
+  //    carte le dit (vrm-badge.js). Et on MESURE encore : la page s'affiche sans VRM
+  //    (« affichee-sans-vrm » : VRM était en cause) ou reste vide (« vide-sans-vrm » : ce
+  //    n'est pas VRM) — le fond le note (`lbcDisjoncteur`, rapport). Jamais deux
+  //    rechargements : la marque posée et RELUE d'abord, sinon rien.
+  const CLE_DE_COTE='vrm_lbc_de_cote',DE_COTE_MS=1800000;
+  const lireDeCote=()=>{try{const v=JSON.parse(sessionStorage.getItem(CLE_DE_COTE)||'null');const age=Date.now()-Number(v&&v.t);return v&&typeof v==='object'&&age>=0&&age<DE_COTE_MS?v:null;}catch(_){return null;}};
+  const cadreEtranger=()=>{try{const t=window.top;if(!t||typeof t!=='object'||t===window)return false;const ao=location.ancestorOrigins;if(ao&&typeof ao.length==='number'&&ao.length){for(let i=0;i<ao.length;i++)if(!/^https:\/\/([a-z0-9-]+\.)*leboncoin\.fr$/i.test(String(ao[i])))return true;return false;}return !/(^|\.)leboncoin\.fr$/i.test(String(t.location.hostname));}catch(_){return true;}};
+  if(cadreEtranger())return;
+  // Ce qui se VOIT dans la page (le logo et la carte VRM exclus). Les conteneurs du haut
+  // rendus transparents ne comptent pas ; `innerText` ignore déjà ce qui est caché.
+  const mesurerPage=()=>{
+    const b=document.body;if(!b)return{vide:true,texte:0,boites:0,champs:0,grand:false};
+    const W=Math.max(1,innerWidth||0),H=Math.max(1,innerHeight||0),transparents=new Set();
+    const voir=(el,prof)=>{for(const c of el.children){if(c.id==='vrm-badge'){transparents.add(c);continue;}let s=null;try{s=getComputedStyle(c);}catch(_){}if(s&&Number(s.opacity)<0.05){transparents.add(c);continue;}if(prof<3)voir(c,prof+1);}};
+    voir(b,1);
+    const net=x=>String(x||'').replace(/\s+/g,' ').trim().length;
+    let texte=0;try{texte=net(b.innerText);for(const c of transparents)texte-=net(c.innerText);}catch(_){}
+    let boites=0,champs=0,grand=false,n=0;const pile=[b];
+    while(pile.length&&n<4000){const el=pile.pop();n++;for(const c of el.children)if(!transparents.has(c))pile.push(c);if(el===b)continue;
+      const r=el.getBoundingClientRect();if(r.width<2||r.height<2||r.bottom<=0||r.right<=0||r.top>=H||r.left>=W)continue;
+      boites++;const tag=String(el.tagName||'').toUpperCase();
+      if(/^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(tag))champs++;
+      if(/^(IMG|VIDEO|CANVAS|IFRAME|SVG|PICTURE|OBJECT|EMBED)$/.test(tag)&&r.width*r.height>=W*H*0.2)grand=true;}
+    return{vide:texte<250&&champs<3&&!grand&&boites<80,texte,boites,champs,grand};
+  };
+  const signalerDisjoncteur=quoi=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcDisjoncteur',quoi},()=>{void chrome.runtime.lastError;});}catch(_){}};
+  const disjoncteur=deCote=>{
+    try{
+      if(typeof document==='undefined'||typeof location==='undefined'||window.top!==window)return;
+      if(deCote&&deCote.apres)return;                       // déjà jugée sans VRM
+      const banc=globalThis.__vrmBancDisjoncteur;            // les bancs seulement (monde isolé : la page ne peut pas l'écrire)
+      const R=Object.assign({pas:2000,attente:12000,essais:3,fin:90000},banc&&typeof banc==='object'?banc:{});
+      let visible=0,vides=0,ecoule=0;
+      const id=setInterval(()=>{
+        try{
+          ecoule+=R.pas;
+          if(document.visibilityState==='visible')visible+=R.pas;else return;
+          if(visible>R.fin||ecoule>R.fin*3){clearInterval(id);return;}
+          if(visible<R.attente||(document.readyState!=='complete'&&visible<R.attente*2))return;
+          const m=mesurerPage();
+          if(!m.vide){clearInterval(id);if(deCote){try{sessionStorage.setItem(CLE_DE_COTE,JSON.stringify(Object.assign({},deCote,{apres:'affichee'})));}catch(_){}signalerDisjoncteur('affichee-sans-vrm');}return;}
+          if(++vides<R.essais)return;
+          clearInterval(id);
+          if(deCote){try{sessionStorage.setItem(CLE_DE_COTE,JSON.stringify(Object.assign({},deCote,{apres:'vide'})));}catch(_){}signalerDisjoncteur('vide-sans-vrm');return;}
+          try{sessionStorage.setItem(CLE_DE_COTE,JSON.stringify({t:Date.now(),quoi:'page-vide',chemin:String(location.pathname||'').slice(0,80)}));}catch(_){}
+          if(!lireDeCote())return;                           // marque pas posée : jamais de rechargement (pas de boucle)
+          signalerDisjoncteur('mis-de-cote');
+          setTimeout(()=>{try{location.reload();}catch(_){}},300);
+        }catch(_){try{clearInterval(id);}catch(__){}}
+      },R.pas);
+    }catch(_){}
+  };
+  const deCoteIci=lireDeCote();
+  disjoncteur(deCoteIci);
+  if(deCoteIci)return;                                       // VRM s'est mis de côté sur cet onglet : ni relais, ni ordres
   const vus=new Set();
   // ⚠️⚠️ 5.362 (revue, moyennes 60 et 63) — LE CANAL PRIVÉ DES ORDRES. lbc-inject.js
   //   (monde MAIN, document_start, avant tout script de la page) nous remet le second
