@@ -660,6 +660,9 @@ html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > button.vrm-led
 .vrm-fu-vente-recu, .vrm-fu-vente-benefsu { font: 500 12px/1.35 var(--vrm-police); color: #6e6e73; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .vrm-fu-vente-benefsu { font-weight: 600; }
 :root[data-theme="dark"] :is(.vrm-fu-vente-recu, .vrm-fu-vente-benefsu) { color: #98989d; }
+/* La ligne d'état d'une vente Vestiaire reste écrite sous la frise (« Expédiée · en livraison », « Paiement le
+   23 nov. », « État Vestiaire non reconnu ») : la frise ne dit que l'étape cochée. « Vendue » seule, la frise le dit. */
+html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme][data-plateforme-vente="vestiaire"]:not([data-vc-vente-etape="vendue"]) .vrm-fu-vente-l3 { display: block !important; }
 .vrm-fu-vente-l2 .vrm-fu-vente-ref { font: 400 12px/1.3 var(--vrm-police); color: #6e6e73; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; font-variant-numeric: tabular-nums; }
 :root[data-theme="dark"] .vrm-fu-vente-l2 .vrm-fu-vente-ref { color: #98989d; }
 html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] { gap: 12px !important; }
