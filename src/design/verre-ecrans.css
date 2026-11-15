@@ -398,4 +398,11 @@
   background: rgb(247 250 253 / .86) !important; background-image: none !important; border: 1px solid rgb(255 255 255 / .8) !important; color: #0C1D30 !important; box-shadow: none !important; width: 100%; }
 :root:root:root:root:root:root:root[data-theme="dark"] body .vrm-fp:not(.sb-plan) .vrm-fp-outils button { background: rgb(255 255 255 / .08) !important; border-color: rgb(255 255 255 / .14) !important; color: #EAF2FB !important; }
 
+/* Paramètres à l'ordinateur : ce qui est posé sur le fond (le titre d'une catégorie, le titre et le pied d'un groupe) en
+   encre claire — le sombre y tombait sous 3:1 sur le bleu (vu en capture, 1512). */
+:root:root:root:root:root:root:root body .vrm-pm :is(.vrm-pm-cat-h, .vrm-pm-cat > .vrm-pm-expert) { color: var(--sv-clair) !important; }
+:root:root:root:root:root:root:root body .vrm-pm .vrm-pm-cat-h .vrm-pm-cat-ic { background: rgb(10 38 76 / .24) !important; border: 1px solid rgb(255 255 255 / .32); color: #FFFFFF !important; box-shadow: none !important; }
+:root:root:root:root:root:root:root body .vrm-pm .vrm-pm-cat .vrm-set-groupe > .vrm-set-titre { color: var(--sv-clair) !important; font-weight: 700 !important; }
+:root:root:root:root:root:root:root body .vrm-pm .vrm-pm-cat .vrm-set-groupe > .vrm-set-pied, :root:root:root:root:root:root:root body .vrm-pm .vrm-pm-cat .vrm-set-groupe > .vrm-set-pied * { color: var(--sv-clair-2) !important; }
+
 } /* fin de @layer vrm-verre */
