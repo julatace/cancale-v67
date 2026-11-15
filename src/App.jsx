@@ -47952,6 +47952,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const attrsCase = (x) => ({ 'data-tuile': x.id, 'data-case': x.id, 'data-n': x.pasSu ? '' : String(nDe(x)), title: titreCase(x),
                 // Ce qu'eBay ajoute à la case (« pas su » si son résumé est illisible) — le même attribut qu'avant.
                 'data-ebay': (x.id === 'envoyer' || x.id === 'messages') && x.t && x.t.ebay !== undefined ? (x.t.ebay === null ? 'passu' : String(x.t.ebay)) : undefined,
+                // (15 nov., rouges-connus) Leboncoin et Vestiaire aussi, comme la case d'avant la grille (la part de
+                // chaque site dans « À envoyer » ; banc vestiaire-bout-en-bout E) — la grille ne les posait plus.
+                'data-leboncoin': x.id === 'envoyer' && x.t && x.t.leboncoin !== undefined ? (x.t.leboncoin === null ? 'passu' : String(x.t.leboncoin)) : undefined,
+                'data-vestiaire': x.id === 'envoyer' && x.t && x.t.vestiaire !== undefined ? (x.t.vestiaire === null ? 'passu' : String(x.t.vestiaire)) : undefined,
                 'data-jp-force': visT(x.id).force ? '' : undefined,
                 'data-presses': x.id === 'envoyer' && x.t && x.t.presses ? String(x.t.presses.n) : undefined,
                 'data-limite-heure': x.id === 'envoyer' && x.t && x.t.presses ? x.t.presses.heure : undefined,
