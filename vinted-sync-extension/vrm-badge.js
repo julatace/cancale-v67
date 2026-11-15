@@ -853,7 +853,8 @@
   // L'aperçu est demandé à VRM (jamais à Vinted : aucune action, aucune lecture Vinted),
   // gardé une minute ; une erreur se redemande au plus une fois par minute (ou « Réessayer »).
   function chargerFavoris(e, force) {
-    if (LISTES || favEnVol || !vivant()) return;
+    // Seulement carte OUVERTE (un redessin de la carte fermée ne demande rien à VRM).
+    if (LISTES || favEnVol || !vivant() || !carte.classList.contains('on')) return;
     const uid = e && e.site && e.site.id ? String(e.site.id) : '';
     if (!uid || e.plateforme !== 'vinted' || fileFavActive(e)) return;
     if (!force && Date.now() - apercuFavAt < 60000 && (apercuFav || favErreur)) return;

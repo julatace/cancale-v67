@@ -40,7 +40,7 @@ const ONGLET = { tab: { id: 7, url: 'https://www.vinted.fr/catalog' } };
 
 function base(capAnnonces) {
   const items = (uid, n) => Array.from({ length: n }, (_, i) => ({ id: Number(uid) * 1000 + i, title: 'Nike Air Max 90 blanc 42', price: { amount: String(50 + i) }, created_at_ts: Math.floor((T0 - (i + 1) * J) / 1000), favourite_count: i, is_closed: false, is_hidden: false, is_draft: false, photo: { url: 'https://images1.vinted.net/t/x.webp' } }));
-  const ventes = (uid, etats) => etats.map((e, i) => ({ transaction_id: Number(uid) * 100000 + i, title: 'Nike Air Max 90 blanc 42', price: { amount: '60.0' }, item_id: Number(uid) * 1000 + i, date: iso(T0 - (etats.length - i) * H),
+  const ventes = (uid, etats) => etats.map((e, i) => ({ transaction_id: Number(uid) * 100000 + i, conversation_id: Number(uid) * 100000 + i + 5000000000, title: 'Nike Air Max 90 blanc 42', price: { amount: '60.0' }, item_id: Number(uid) * 1000 + i, date: iso(T0 - (etats.length - i) * H),
     status: e === 'a' ? 'Le paiement a été validé. Envoie le colis avant le 20/11/2026' : e === 'f' ? 'La commande est finalisée.' : e === 'x' ? 'Commande annulée' : 'Colis en route', transaction_user_status: e === 'a' ? 'needs_action' : e === 'f' ? 'completed' : e === 'x' ? 'failed' : 'waiting' }));
   return {
     main: { vinted_annonce_numeros: { 111000: { numero: '124', accountId: '111' }, 111001: { numero: '125', accountId: '111' }, 222000: { numero: '900', accountId: '222' } }, vinted_buyprice_by_num: {} },
@@ -72,6 +72,10 @@ function monde(capAnnonces = 20 * 60000) {
       dressing: { cap: iso(T0 - H / 2), pg: { total_entries: 8 }, items }, prouve: () => true });
     const dates = (r.liste || []).map((x) => Date.parse(x.date));
     dit(r.etat === 'pret' && dates.length > 1 && dates.every((d, i) => isFinite(d) && (i === 0 || dates[i - 1] >= d)), 'l’aperçu rend les favoris du plus récent au plus ancien, chacun avec sa date', JSON.stringify({ e: r.etat, raison: r.raison, d: dates.slice(0, 4) }));
+    // 5.379 (capture de Julien : l'onglet Favoris n'avait qu'une phrase) : sans message écrit pour ce compte, la LISTE lue est rendue quand même.
+    const r0 = m.apercuCarte({ prefs: null, capture: { payload: { notifications: notifs }, domain: 'www.vinted.fr' }, dressing: { cap: iso(T0 - H / 2), pg: { total_entries: 8 }, items }, prouve: () => true });
+    const d0 = (r0.lus || []).map((x) => Date.parse(x.date));
+    dit(r0.etat === 'bloque' && r0.raison === 'reglages' && d0.length === 8 && r0.totalLus === 8 && d0.every((d, i) => isFinite(d) && (i === 0 || d0[i - 1] >= d)) && !(r0.lus || []).some((x) => 'texte' in x), 'sans message écrit : les 8 favoris LUS rendus (du plus récent), sans aucun message préparé', JSON.stringify({ e: r0.etat, r: r0.raison, n: d0.length }));
   });
 
   console.log('B. Une commande pour un autre compte que celui de l’onglet');
@@ -98,6 +102,7 @@ function monde(capAnnonces = 20 * 60000) {
     dit(v.every((x, i) => i === 0 || v[i - 1].date >= x.date), 'Ventes de la plus récente à la plus ancienne', JSON.stringify(v.map((x) => x.date)));
     const parTx = Object.fromEntries(v.map((x) => [x.tx, x]));
     dit(parTx['11100000'] && parTx['11100000'].etat === 'a_expedier' && parTx['11100000'].bordereau === true && parTx['11100003'].bordereau === false, 'à expédier : bordereau rangé (par n° de transaction) / pas encore', JSON.stringify(v.map((x) => [x.tx, x.etat, x.bordereau])));
+    dit(v.every((x) => /^[1-9]\d*$/.test(x.conv) && x.conv === String(Number(x.tx) + 5000000000)), '5.379 : chaque vente porte SON n° de conversation (ouvre /inbox/{n°} sur Vinted)', JSON.stringify(v.map((x) => [x.tx, x.conv])));
     dit(parTx['11100002'] && parTx['11100002'].etat === 'annulee' && parTx['11100002'].vendue === false, 'l’annulée n’est jamais « vendue »', JSON.stringify(parTx['11100002']));
     dit(r.autres === null && !f.j.vinted.length, 'sans « Tous les comptes » : les autres comptes ne sont pas lus ; aucune requête Vinted', JSON.stringify({ a: r.autres, v: f.j.vinted.length }));
     const r2 = await f.envoyer({ from: 'vrm-badge', action: 'carteListes', tous: true }, ONGLET);
@@ -141,6 +146,8 @@ async function prouver() {
     ['annulée dite vendue', ['vinted-sync-extension/background.js', "  if (PAS_UNE_VENTE.test(s)) return 'annulee';\n", ""]],
     ['favoris non triés (date absente)', ['api/_lib/favoris-carte.js', "date: l.date || null,", "date: null,"]],
     ['garde de compte retirée', ['vinted-sync-extension/background.js', "  if (String((msg && msg.uid) || '') !== o.uid) return { ok: false, code: 'compte',", "  if (false) return { ok: false, code: 'compte',"]],
+    ['favoris lus cachés sans message (5.379)', ['api/_lib/favoris-carte.js', "  if (!prefs) return { etat: 'bloque', raison: 'reglages', lus, totalLus: lignes.length, file };", "  if (!prefs) return { etat: 'bloque', raison: 'reglages', file };"]],
+    ['ventes sans n° de conversation (5.379)', ['vinted-sync-extension/background.js', "conv: /^[1-9]\\d{0,19}$/.test(String(x.conversation_id == null ? '' : x.conversation_id)) ? String(x.conversation_id) : '',", "conv: '',"]],
     ['relecture hors budget (jamais)', ['vinted-sync-extension/background.js', "annonces.relecture = true; retourSurVinted(sender).catch(() => {});", "annonces.relecture = true;"]],
   ];
   for (const [nom, [fic, de, vers]] of MUT) {
