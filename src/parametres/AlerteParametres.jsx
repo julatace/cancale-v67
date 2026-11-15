@@ -38,12 +38,12 @@ export function AlerteParametres({ onVoir }) {
   return (
     <div className="vrm-set-liste vrm-pm-alerte-liste" role="status">
     <button type="button" className="vrm-set-ligne vrm-pm-alerte" data-reglages-alerte={choses.map((c) => c.id).join(' ')} onClick={onVoir}>
-      <span className="vrm-pm-alerte-point" aria-hidden="true"/>
+      <span className="vrm-pm-alerte-point vg-pm-alerte-ic" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19.5s-7.5-4.4-7.5-10A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 7.5 2.5c0 5.6-7.5 10-7.5 10Z"/></svg></span>
       <span className="vrm-set-lib">
         <b>{tr('parametres.alerte.titre')}</b>
         <small className="vrm-set-desc">{(() => { const t = choses.map(texte).join(' · '); return t.charAt(0).toLocaleUpperCase() + t.slice(1); })()}</small>
       </span>
-      <span className="vrm-pm-alerte-geste">{tr('parametres.alerte.voir')}</span>
+      <span className="vrm-pm-alerte-geste"><span className="vg-sr">{tr('parametres.alerte.voir')}</span><svg width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m1.5 1.5 6 6-6 6"/></svg></span>
     </button>
     </div>
   );

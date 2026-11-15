@@ -19,4 +19,13 @@ export default {
   "verre2.argent.urssaf": "URSSAF",
   "verre2.argent.urssafPour": "URSSAF · to declare for {periode}",
   "verre2.argent.tauxDe": "{taux}% of {ca} received",
+  "verre2.msg.filtre": "Show",
+  "verre2.msg.toutes": "All",
+  "verre2.msg.offres": "Offers",
+  "verre2.msg.nonLues": "Unread",
+  "verre2.msg.aucuneOffre": "No pending offer here.",
+  "verre2.msg.aucuneNonLue": "No unread conversation here.",
+  "verre2.msg.compteOnglet": "account in the tab",
+  "verre2.msg.offreDe": "Offer of {m}",
+  "verre2.msg.propose": "{qui} offers",
 };

@@ -2412,6 +2412,30 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       </button>
     );
   };
+  // (15 nov., maquette « Verre dépoli ») UNE TUILE de catégorie : l'icône dans sa pastille, le nom, la valeur
+  // (celle de `valeurCat`, rien d'inventé : pas de valeur ⇒ rien). La phrase de la catégorie reste pour les
+  // lecteurs d'écran. Toute la tuile se touche.
+  const tuileCategorie = (c) => {
+    const v = valeurCat(c);
+    const ambre = c.id === 'donnees' && derniereSauvegarde.old;
+    return (
+      <button key={c.id} type="button" className="vg-carte vg-pm-tuile" data-categorie-ouvrir={c.id} data-categorie-contient={` ${c.ids.join(' ')} `} onClick={() => ouvrirCategorie(c.id)}>
+        <span className="vg-pm-tuile-ic" aria-hidden="true"><Icon name={c.ic} size={20}/></span>
+        <b className="vg-pm-tuile-nom">{titreCat(c.id)}</b>
+        <small className="vg-sr">{tr(`parametres.cat.${c.id}.desc`)}</small>
+        {v ? <span className={'vg-pm-tuile-val' + (ambre ? ' is-ambre' : '')} data-categorie-valeur={c.id}>{v}</span> : null}
+      </button>
+    );
+  };
+  // « Mon compte » : la carte (l'avatar, le nom de la catégorie, l'adresse de connexion), un toucher l'ouvre.
+  const carteCompte = (c) => (
+    <button key={c.id} type="button" className="vg-carte vg-pm-moi" data-categorie-ouvrir={c.id} data-vue="compte" data-categorie-contient={` ${c.ids.join(' ')} `} onClick={() => ouvrirCategorie(c.id)}>
+      <span className="vg-pm-av" aria-hidden="true">{AUTH.user ? <AvatarCompte key={AUTH.user.id} owner={AUTH.user.id} headers={enTeteSession} lettre={String(AUTH.user.email || '?').slice(0, 1).toUpperCase()}/> : <Icon name={c.ic} size={20}/>}</span>
+      <span className="vg-pm-moi-txt"><b>{titreCat(c.id)}</b><span className="vrm-sensible">{AUTH.user ? AUTH.user.email : tr(`parametres.cat.${c.id}.desc`)}</span></span>
+      {valeurCat(c) ? <span className="vg-pm-moi-val">{valeurCat(c)}</span> : null}
+      {chevron}
+    </button>
+  );
   // Ce qui se pose en tête d'une catégorie (et seulement là) : le profil et la double vérification dans
   // « Mon compte », ce qui reste à terminer (adresses e-mail) dans « Mes plateformes ».
   const teteCategorie = (id) => {
@@ -2446,20 +2470,20 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       {feuilleAdresseVrm && <FeuilleAdresseVrm headers={sbAuth} FermeAuRetour={FermeAuRetour} proprio={proprioInst===true} onBoite={()=>setTab('emails')} onFermer={()=>setFeuilleAdresseVrm(false)}/>}
       {ouvert ? (
         // ── LE PANNEAU D'UN RÉGLAGE : « ‹ sa catégorie » (téléphone) ou « ‹ Paramètres » ──
-        <div className="vrm-set-nav">
-          <button type="button" className="vrm-set-retour" onClick={fermerSous} data-sous-retour="" style={{color:C.accentTexte}}>
+        <div className="vrm-set-nav vg-pm-nav">
+          <button type="button" className="vrm-set-retour vg-pm-retour" onClick={fermerSous} data-sous-retour="" aria-label={titreRetour}>
             <svg width="12" height="20" viewBox="0 0 12 20" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg>
-            {titreRetour}
           </button>
+          <span className="vg-pm-nav-txt"><small aria-hidden="true">{titreRetour}</small><h2 className="vrm-set-sous-h" style={{color:C.text}}>{ouvert.lib}</h2></span>
           <StatutSauvegardeReglages/>
         </div>
       ) : catOuverte && !q ? (
         // ── UNE CATÉGORIE (téléphone) : « ‹ Paramètres », puis son grand titre ──
-        <div className="vrm-set-nav">
-          <button type="button" className="vrm-set-retour" onClick={fermerCategorie} data-categorie-retour="" style={{color:C.accentTexte}}>
+        <div className="vrm-set-nav vg-pm-nav">
+          <button type="button" className="vrm-set-retour vg-pm-retour" onClick={fermerCategorie} data-categorie-retour="" aria-label={tr('ecran.settings')}>
             <svg width="12" height="20" viewBox="0 0 12 20" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg>
-            {tr('ecran.settings')}
           </button>
+          <span className="vg-pm-nav-txt"><small aria-hidden="true">{tr('ecran.settings')}</small><h2 className="vrm-set-sous-h vrm-pm-cat-titre" style={{color:C.text}}>{titreCat(catOuverte.id)}</h2></span>
           <StatutSauvegardeReglages/>
         </div>
       ) : (<>
@@ -2469,8 +2493,6 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         <ReglagesPasLus/>
       </>)}
 
-      {ouvert && <h2 className="vrm-set-sous-h" style={{color:C.text}}>{ouvert.lib}</h2>}
-      {!ouvert && catOuverte && !q && <h2 className="vrm-set-sous-h vrm-pm-cat-titre" style={{color:C.text}}>{titreCat(catOuverte.id)}</h2>}
 
       {!ouvert && <>
         {/* Sans session : la porte vers l'écran de connexion, tout de suite (jamais derrière une catégorie). */}
@@ -2485,11 +2507,16 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         ) : etroit ? (
           catOuverte ? ecranCategorie(catOuverte, { avecTitre: false }) : (
             // ── LE PREMIER ÉCRAN (téléphone) : les catégories, « Sécurité des données » (expert) à part ──
-            <section className="vrm-set-groupe vrm-pm-racine">
-              <div className="vrm-set-liste" data-categories-reglages="" data-onglets-reglages="">
-                {categories.filter((c) => !c.expert).map((c) => ligneCategorie(c, { surClic: () => ouvrirCategorie(c.id) }))}
+            // (15 nov., maquette « Verre dépoli » validée : « Tuiles plutôt qu'une longue liste : tout tient sur un
+            // écran ») « Mon compte » en carte, puis les neuf autres catégories en tuiles (trois par rangée) ; « Sécurité
+            // des données » (expert) en dernière tuile. Les mêmes `data-categorie-ouvrir`, le même geste.
+            <section className="vrm-pm-racine vg-pm-racine">
+              <div className="vg-pm-cats" data-categories-reglages="" data-onglets-reglages="">
+                {categories.filter((c) => c.id === 'compte').map((c) => carteCompte(c))}
+                <div className="vg-pm-grille">
+                  {categories.filter((c) => c.id !== 'compte' && !c.expert).concat(categories.filter((c) => c.expert)).map((c) => tuileCategorie(c))}
+                </div>
               </div>
-              {categories.filter((c) => c.expert).map((c) => <div key={c.id} className="vrm-set-liste vrm-pm-expert-liste">{ligneCategorie(c, { surClic: () => ouvrirCategorie(c.id) })}</div>)}
             </section>
           )
         ) : (

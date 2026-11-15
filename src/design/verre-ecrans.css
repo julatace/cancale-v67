@@ -28,26 +28,26 @@
 :root:root:root body .vg-sr { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; white-space: nowrap !important; border: 0 !important; }
 :root:root:root body .vg-chev { display: grid; place-items: center; flex: none; color: var(--sv-encre-2) !important; }
 /* Un bouton nu (la carte entière se touche) : aucune matière à lui. */
-:root:root:root body :is(.vg-a-vendu, .vg-a-case, .vg-a-case-corps, .vg-a-venir-btn, .vg-a-ambre, .vg-av-groupe-tete) {
+:root:root:root body :is(.vg-a-vendu, .vg-a-case-corps, .vg-a-venir-btn, .vg-a-ambre, .vg-av-groupe-tete) {
   -webkit-appearance: none; appearance: none; background: none !important; background-image: none !important; box-shadow: none !important; border: 0 !important;
   margin: 0; font-family: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; min-height: 44px;
 }
 :root:root:root body :is(.vg-a-vendu, .vg-a-case, .vg-a-case-corps, .vg-a-venir-btn, .vg-av-groupe-tete):active { transform: scale(.985); }
 @media (prefers-reduced-motion: reduce) { :root:root:root body :is(.vg-a-vendu, .vg-a-case, .vg-a-case-corps, .vg-a-venir-btn, .vg-av-groupe-tete):active { transform: none; } }
 /* Les teintes des étapes (maquette) : ambre = à envoyer (un geste), encre = en route, ardoise = livrée, hachuré = versement. */
-:root:root:root body :is(.vg-argent, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-envoyer { background: #B26A00 !important; }
-:root:root:root body :is(.vg-argent, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-route { background: #0C1D30 !important; }
-:root:root:root body :is(.vg-argent, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-livree { background: #5E7A96 !important; }
-:root:root:root body :is(.vg-argent, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille):is(.is-versement, .is-pm) { background: repeating-linear-gradient(45deg, rgb(12 29 48 / .26) 0 4px, rgb(12 29 48 / .08) 4px 8px) !important; }
-:root:root:root body :is(.vg-argent, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-autre { background: #A9B9CB !important; }
-:root:root:root[data-theme="dark"] body :is(.vg-argent, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-envoyer { background: #F0A43C !important; }
-:root:root:root[data-theme="dark"] body :is(.vg-argent, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-route { background: #EAF2FB !important; }
-:root:root:root[data-theme="dark"] body :is(.vg-argent, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-livree { background: #7F9BB8 !important; }
-:root:root:root[data-theme="dark"] body :is(.vg-argent, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille):is(.is-versement, .is-pm) { background: repeating-linear-gradient(45deg, rgb(234 242 251 / .34) 0 4px, rgb(234 242 251 / .10) 4px 8px) !important; }
-:root:root:root body :is(.vg-argent, .vg-av) .vrm-av-pastille { width: 9px !important; height: 9px !important; border-radius: 3px !important; box-shadow: none !important; flex: none; }
-:root:root:root body :is(.vg-argent, .vg-av) .vrm-av-pastille.is-bloquee { background: transparent !important; box-shadow: inset 0 0 0 1.5px var(--sv-encre-2) !important; }
-:root:root:root body :is(.vg-argent, .vg-av) .vg-av-barre { display: flex !important; gap: 3px !important; height: 10px !important; border-radius: 0 !important; overflow: visible !important; background: none !important; margin: 0 !important; }
-:root:root:root body :is(.vg-argent, .vg-av) .vg-av-barre .vrm-av-barre-seg { border-radius: 5px !important; min-width: 6px !important; }
+:root:root:root body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-envoyer { background: #B26A00 !important; }
+:root:root:root body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-route { background: #0C1D30 !important; }
+:root:root:root body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-livree { background: #5E7A96 !important; }
+:root:root:root body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille):is(.is-versement, .is-pm) { background: repeating-linear-gradient(45deg, rgb(12 29 48 / .26) 0 4px, rgb(12 29 48 / .08) 4px 8px) !important; }
+:root:root:root body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-autre { background: #A9B9CB !important; }
+:root:root:root[data-theme="dark"] body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-envoyer { background: #F0A43C !important; }
+:root:root:root[data-theme="dark"] body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-route { background: #EAF2FB !important; }
+:root:root:root[data-theme="dark"] body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-livree { background: #7F9BB8 !important; }
+:root:root:root[data-theme="dark"] body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille):is(.is-versement, .is-pm) { background: repeating-linear-gradient(45deg, rgb(234 242 251 / .34) 0 4px, rgb(234 242 251 / .10) 4px 8px) !important; }
+:root:root:root body :is(.vg-argent, .vg-a-venir, .vg-av) .vrm-av-pastille { width: 9px !important; height: 9px !important; border-radius: 3px !important; box-shadow: none !important; flex: none; }
+:root:root:root body :is(.vg-argent, .vg-a-venir, .vg-av) .vrm-av-pastille.is-bloquee { background: transparent !important; box-shadow: inset 0 0 0 1.5px var(--sv-encre-2) !important; }
+:root:root:root body :is(.vg-argent, .vg-a-venir, .vg-av) .vg-av-barre { display: flex !important; gap: 3px !important; height: 10px !important; border-radius: 0 !important; overflow: visible !important; background: none !important; margin: 0 !important; }
+:root:root:root body :is(.vg-argent, .vg-a-venir, .vg-av) .vg-av-barre .vrm-av-barre-seg { border-radius: 5px !important; min-width: 6px !important; }
 
 /* ══ 1. ARGENT · LE MOIS (maquette « ar1 ») ══════════════════════════════════ */
 :root:root:root body .vrm-argent-q.vg-argent { display: flex !important; flex-direction: column !important; gap: 0 !important; grid-template-columns: none !important; padding: 0 !important; margin: 0 !important; background: none !important; box-shadow: none !important; }
@@ -60,7 +60,7 @@
 :root:root:root body .vg-a-vendu-sous .vrm-argent-w-note { color: var(--sv-clair-2) !important; font-weight: 500; }
 /* Reçu · Bénéfice : deux verres côte à côte (12/14, chiffre 22/750). */
 :root:root:root body .vg-a-duo { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-:root:root:root body .vg-a-case { display: flex !important; flex-direction: column; align-items: flex-start; min-width: 0; padding: 12px 14px !important; }
+:root:root:root body .vg-a-case { -webkit-appearance: none; appearance: none; font-family: inherit; text-align: left; cursor: pointer; margin: 0; -webkit-tap-highlight-color: transparent; display: flex !important; flex-direction: column; align-items: flex-start; min-width: 0; padding: 12px 14px !important; }
 :root:root:root body button.vg-a-case.vg-carte { width: 100%; }
 :root:root:root body .vg-a-case-corps { display: flex !important; flex-direction: column; align-items: flex-start; width: 100%; padding: 0 !important; color: var(--sv-encre) !important; }
 :root:root:root body :is(.vg-a-case, .vg-a-urssaf) .vrm-argent-w-n { display: block; margin-top: 3px; font: 750 22px/1.15 var(--sb-police-affiche, Inter, sans-serif) !important; letter-spacing: -.03em !important; color: var(--sv-encre) !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -115,7 +115,7 @@
 :root:root:root body .vg-av-affiche { gap: 6px !important; padding: 4px 4px 2px; }
 :root:root:root body .vg-av-affiche .vg-av-sous { font: 600 12.5px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; letter-spacing: 0 !important; text-transform: none !important; color: var(--sv-clair) !important; }
 :root:root:root body .vg-av-affiche .sb-chiffre-affiche { font: 700 52px/.95 var(--sb-police-affiche, Inter, sans-serif) !important; letter-spacing: -.05em !important; color: var(--sv-clair) !important; }
-:root:root:root body .vg-av-affiche .sb-chiffre-affiche .sb-eur { font: inherit !important; color: inherit !important; letter-spacing: inherit !important; }
+:root:root:root body :is(.vg-av, .vg-argent, .vg-a-venir) .sb-eur { display: inline !important; font: inherit !important; color: inherit !important; letter-spacing: inherit !important; transform: none !important; vertical-align: baseline !important; margin-left: 0 !important; }
 :root:root:root body .vg-av-affiche :is(.vrm-av-total-meta, .vrm-av-borne) { font: 600 13.5px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-clair) !important; }
 :root:root:root body .vg-av-affiche .vrm-av-couverture li { color: var(--sv-clair-2) !important; }
 :root:root:root body .vg-av-affiche .vrm-av-couverture li::before { background: var(--sv-clair-2) !important; }
@@ -160,5 +160,127 @@
 :root:root:root body .vg-av .vrm-av-h:not(.vg-sr) { color: var(--sv-clair) !important; font-weight: 700 !important; }
 :root:root:root body .vg-av :is(.vrm-av-liste, .vrm-av-frise-case) { color: var(--sv-encre) !important; }
 :root:root:root body .vg-av .vrm-av-frise-case { background-color: transparent !important; background-image: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; box-shadow: var(--sv-ombre) !important; border-radius: 18px !important; }
+
+/* ══ 3. PARAMÈTRES (maquettes « pa1 » et « pa2 ») ════════════════════════════
+   Premier écran : la recherche (verre presque opaque, 48 px, rayon 24), « Tout va bien ? » en ambre SEULEMENT s'il
+   y a quelque chose, la carte « Mon compte », neuf tuiles (3 par rangée, 112 px, rayon 20). Une catégorie : le rond
+   « ‹ », le surtitre, le grand titre en blanc ; des groupes courts (titre blanc 13/700, verre, rangées 62 px sans
+   icône, l'interrupteur à l'encre). */
+:root:root:root:root:root:root:root body .vrm-pm .vrm-set-recherche.vrm-champ-recherche {
+  height: 48px !important; min-height: 48px !important; border-radius: 24px !important; padding: 0 6px 0 16px !important; margin-top: 12px !important;
+  background: rgb(247 250 253 / .97) !important; background-image: none !important; border: 1px solid var(--sv-bord) !important; box-shadow: 0 12px 28px -14px rgb(8 26 50 / .6) !important;
+}
+:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm .vrm-set-recherche.vrm-champ-recherche { background: rgb(18 33 54 / .97) !important; }
+:root:root:root:root:root:root:root body .vrm-pm .vrm-set-recherche .vrm-champ-recherche-saisie { font: 500 15.5px/1.2 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre) !important; background: transparent !important; box-shadow: none !important; border: 0 !important; }
+:root:root:root:root:root:root:root body .vrm-pm .vrm-set-recherche .vrm-champ-recherche-loupe { color: var(--sv-encre-2) !important; }
+/* « Tout va bien ? · N choses à régler » : l'ambre plein de la maquette (fond #FFE7C4, encre #5E3900), une pastille de cœur. */
+:root:root:root:root:root:root:root body .vrm-pm .vrm-pm-alerte-liste { margin: 10px 0 0 !important; padding: 0 !important; border-radius: 20px !important; overflow: hidden;
+  background: #FFE7C4 !important; background-image: none !important; border: 1px solid rgb(178 106 0 / .25) !important; box-shadow: 0 14px 30px -18px rgb(8 26 50 / .6) !important; }
+:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm .vrm-pm-alerte-liste { background: #4D3410 !important; border-color: rgb(240 164 60 / .45) !important; }
+:root:root:root:root:root:root:root body .vrm-pm .vrm-pm-alerte { min-height: 64px !important; padding: 10px 14px 10px 10px !important; gap: 12px !important; background: transparent !important; color: #5E3900 !important; }
+:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm .vrm-pm-alerte { color: #FFD99E !important; }
+:root:root:root:root:root:root:root body .vrm-pm .vrm-pm-alerte :is(b, .vrm-set-desc, .vrm-pm-alerte-geste) { color: inherit !important; }
+:root:root:root:root:root:root:root body .vrm-pm .vrm-pm-alerte b { font: 700 14.5px/1.25 var(--sb-police-texte, Inter, sans-serif) !important; }
+:root:root:root:root:root:root:root body .vrm-pm .vrm-pm-alerte .vrm-set-desc { font: 550 12.5px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; margin-top: 1px !important; }
+:root:root:root:root:root:root:root body .vrm-pm .vrm-pm-alerte-point.vg-pm-alerte-ic { width: 40px !important; height: 40px !important; margin: 0 !important; border-radius: 12px !important; display: grid !important; place-items: center; background: rgb(255 255 255 / .65) !important; box-shadow: none !important; color: #5E3900 !important; }
+:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm .vrm-pm-alerte-point.vg-pm-alerte-ic { background: rgb(255 255 255 / .10) !important; color: #FFD99E !important; }
+:root:root:root:root:root:root:root body .vrm-pm .vrm-pm-alerte-geste { padding: 0 !important; display: grid; place-items: center; }
+/* La carte « Mon compte » */
+:root:root:root:root:root:root:root body .vrm-pm .vg-pm-cats { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+:root:root:root:root:root:root:root body .vrm-pm .vg-pm-moi { display: flex !important; align-items: center; gap: 12px; width: 100%; min-height: 68px; padding: 12px 14px 12px 12px !important; text-align: left; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; }
+:root:root:root:root:root:root:root body .vrm-pm .vg-pm-av { width: 44px; height: 44px; flex: none; border-radius: 50%; display: grid; place-items: center; overflow: hidden; background: #0C1D30; color: #FFFFFF !important; font: 750 17px/1 var(--sb-police-texte, Inter, sans-serif); }
+:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm .vg-pm-av { background: #EAF2FB; color: #0C1D30 !important; }
+:root:root:root:root:root:root:root body .vrm-pm .vg-pm-moi-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+:root:root:root:root:root:root:root body .vrm-pm .vg-pm-moi-txt b { font: 700 15.5px/1.25 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-encre) !important; }
+:root:root:root:root:root:root:root body .vrm-pm .vg-pm-moi-txt span { margin-top: 1px; font: 550 12.5px/1.3 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-encre-2) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:root:root:root:root:root:root:root body .vrm-pm .vg-pm-moi-val { flex: none; font: 750 11.5px/1 var(--sb-police-texte, Inter, sans-serif); padding: 4px 9px; border-radius: 8px; background: rgb(12 29 48 / .07); color: var(--sv-encre) !important; }
+:root:root:root:root:root:root:root body .vrm-pm .vg-pm-moi .vrm-set-chev { stroke: var(--sv-encre-2) !important; flex: none; }
+/* Les tuiles */
+:root:root:root:root:root:root:root body .vrm-pm .vg-pm-grille { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+:root:root:root:root:root:root:root body .vrm-pm .vg-pm-tuile { display: flex !important; flex-direction: column; align-items: flex-start; min-width: 0; min-height: 112px; padding: 12px 12px 11px !important; border-radius: 20px !important; text-align: left; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; }
+:root:root:root:root:root:root:root body .vrm-pm :is(.vg-pm-tuile, .vg-pm-moi):active { transform: scale(.97); }
+@media (prefers-reduced-motion: reduce) { :root:root:root:root:root:root:root body .vrm-pm :is(.vg-pm-tuile, .vg-pm-moi):active { transform: none; } }
+:root:root:root:root:root:root:root body .vrm-pm .vg-pm-tuile-ic { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; flex: none; background: rgb(12 29 48 / .06); color: var(--sv-encre) !important; }
+:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm .vg-pm-tuile-ic { background: rgb(255 255 255 / .08); }
+:root:root:root:root:root:root:root body .vrm-pm .vg-pm-tuile-nom { display: block; margin-top: 10px; font: 700 13.5px/1.25 var(--sb-police-texte, Inter, sans-serif); letter-spacing: -.01em; color: var(--sv-encre) !important; overflow-wrap: anywhere; hyphens: none; }
+:root:root:root:root:root:root:root body .vrm-pm .vg-pm-tuile-val { display: block; max-width: 100%; margin-top: auto; padding-top: 4px; font: 600 12px/1.25 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-encre-2) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:root:root:root:root:root:root:root body .vrm-pm .vg-pm-tuile-val.is-ambre { color: var(--sv-ambre) !important; }
+/* Une catégorie, un panneau : le rond « ‹ » (verre fumé), le surtitre, le grand titre en blanc */
+:root:root:root:root:root:root:root body .vrm-pm .vg-pm-nav { display: flex !important; align-items: center; gap: 12px; min-height: 52px; margin: 0 0 4px !important; flex-wrap: wrap; }
+:root:root:root:root:root:root:root body .vrm-pm .vg-pm-retour { width: 44px !important; height: 44px !important; min-width: 44px !important; padding: 0 !important; margin: 0 !important; border-radius: 50% !important; display: grid !important; place-items: center;
+  background: rgb(10 38 76 / .24) !important; border: 1px solid rgb(255 255 255 / .32) !important; color: #FFFFFF !important; flex: none; }
+:root:root:root:root:root:root:root body .vrm-pm .vg-pm-retour svg { width: 10px; height: 17px; margin-left: -2px; }
+:root:root:root:root:root:root:root body .vrm-pm .vg-pm-nav-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+:root:root:root:root:root:root:root body .vrm-pm .vg-pm-nav-txt small { font: 600 12.5px/1.25 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-clair) !important; }
+:root:root:root:root:root:root:root body .vrm-pm .vg-pm-nav-txt h2.vrm-set-sous-h { margin: 1px 0 0 !important; padding: 0 !important; font: 750 26px/1.12 var(--sb-police-affiche, Inter, sans-serif) !important; letter-spacing: -.03em !important; color: var(--sv-clair) !important; }
+:root:root:root:root:root:root:root body .vrm-pm .vg-pm-nav > .vrm-settings-status { flex-basis: 100%; }
+/* Les groupes d'une catégorie (téléphone) */
+:root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="telephone"] .vrm-pm-cat .vrm-set-groupe { margin: 0 !important; }
+:root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="telephone"] .vrm-pm-cat .vrm-set-titre { margin: 18px 6px 8px !important; padding: 0 !important; font: 700 13px/1.2 var(--sb-police-texte, Inter, sans-serif) !important; letter-spacing: .01em !important; text-transform: none !important; color: var(--sv-clair) !important; }
+:root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="telephone"] .vrm-pm-cat .vrm-set-liste { border-radius: 22px !important; overflow: hidden; padding: 0 !important; }
+:root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="telephone"] .vrm-pm-cat .vrm-set-ic { display: none !important; }
+:root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="telephone"] .vrm-pm-cat .vrm-set-ligne { min-height: 62px !important; padding: 10px 14px !important; gap: 12px !important; }
+:root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="telephone"] .vrm-pm-cat .vrm-set-ligne + .vrm-set-ligne { border-top: 1px solid rgb(12 29 48 / .10) !important; box-shadow: none !important; }
+:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm[data-reglages-disposition="telephone"] .vrm-pm-cat .vrm-set-ligne + .vrm-set-ligne { border-top-color: rgb(255 255 255 / .10) !important; }
+:root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="telephone"] .vrm-pm-cat .vrm-set-lib > b { font: 650 15px/1.25 var(--sb-police-texte, Inter, sans-serif) !important; letter-spacing: -.015em !important; }
+:root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="telephone"] .vrm-pm-cat .vrm-set-desc { font: 550 12.5px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; margin-top: 2px !important; color: var(--sv-encre-2) !important; }
+:root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="telephone"] .vrm-pm-cat .vrm-set-val { font: 650 14px/1.2 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
+:root:root:root:root:root:root:root body .vrm-pm .vrm-switch[aria-checked="true"]::before { background: var(--sv-encre) !important; }
+:root:root:root:root:root:root:root body .vrm-pm .vrm-switch[aria-checked="false"]::before { background: rgb(12 29 48 / .16) !important; }
+:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm .vrm-switch[aria-checked="false"]::before { background: rgb(255 255 255 / .18) !important; }
+:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm .vrm-switch[aria-checked="true"]::after { background: #0C1D30 !important; }
+
+/* ══ 4. MESSAGES (maquettes « ms1 » et « ms2 ») ══════════════════════════════
+   La liste : « Toutes · Offres · Non lues » en verre fumé (l'actif en porcelaine), puis UN verre par compte, le compte
+   de l'onglet d'abord (son badge), du plus récent au plus ancien dedans ; une rangée = la photo de la paire (44, rayon
+   12), le pseudo, l'heure (et le point bleu d'un non lu), la plaque N° et le dernier mot — une offre en ambre. */
+:root:root:root:root:root body .vg-ms-vues { display: flex; padding: 3px; margin: 12px 0 2px; border-radius: 17px; background: rgb(10 38 76 / .30); border: 1px solid rgb(255 255 255 / .26); }
+:root:root:root:root:root body .vg-ms-vue { flex: 1; min-width: 0; height: 44px; min-height: 44px !important; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 6px !important; border: 0 !important; border-radius: 14px !important;
+  background: transparent !important; background-image: none !important; box-shadow: none !important; color: #FFFFFF !important; font: 600 14px/1 var(--sb-police-texte, Inter, sans-serif) !important; white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+:root:root:root:root:root body .vg-ms-vue.is-on { background: rgb(247 250 253 / .96) !important; color: #0C1D30 !important; box-shadow: 0 4px 10px -4px rgb(8 26 50 / .45) !important; }
+:root:root:root:root:root[data-theme="dark"] body .vg-ms-vue.is-on { background: rgb(238 244 251 / .95) !important; }
+:root:root:root:root:root body .vg-ms-n { font-style: normal; font: 750 11.5px/20px var(--sb-police-texte, Inter, sans-serif); min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; display: inline-grid; place-items: center; background: rgb(255 255 255 / .2); }
+:root:root:root:root:root body .vg-ms-vue.is-on .vg-ms-n { background: rgb(12 29 48 / .08); }
+:root:root:root:root:root body .vg-ms-n.is-ambre { background: #FFE2B8 !important; color: #5E3900 !important; }
+:root:root:root:root:root body .vg-ms-groupe { margin: 0; }
+:root:root:root:root:root body .vg-ms-groupe-h { display: flex; align-items: center; gap: 7px; margin: 16px 4px 8px; color: var(--sv-clair) !important; font: 750 15px/1.2 var(--sb-police-texte, Inter, sans-serif) !important; letter-spacing: 0 !important; text-transform: none !important; }
+:root:root:root:root:root body .vg-ms-groupe-h b { font: inherit; color: inherit !important; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root:root:root:root:root body .vg-ms-logo { display: inline-flex; color: var(--sv-clair) !important; flex: none; }
+:root:root:root:root:root body .vg-ms-logo svg, :root:root:root:root:root body .vg-ms-logo img { height: 13px; width: auto; }
+:root:root:root:root:root body .vg-ms-onglet { flex: none; font: 650 11.5px/1.2 var(--sb-police-texte, Inter, sans-serif); padding: 3px 8px; border-radius: 8px; background: rgb(8 28 56 / .42); border: 1px solid rgb(255 255 255 / .3); color: #FFFFFF !important; }
+:root:root:root:root:root body .vrm-msg-list.vg-ms-liste { padding: 0 !important; overflow: hidden; border: 0 !important; border-radius: 22px !important; }
+:root:root:root:root:root body .vg-fil { display: flex !important; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 9px 14px 9px 12px !important; margin: 0; border: 0 !important; border-radius: 0 !important;
+  background: transparent !important; background-image: none !important; box-shadow: none !important; color: var(--sv-encre) !important; text-align: left; font-family: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  content-visibility: auto; contain-intrinsic-size: auto 64px; }
+:root:root:root:root:root body .vg-fil + .vg-fil { border-top: 1px solid rgb(12 29 48 / .10) !important; }
+:root:root:root:root:root[data-theme="dark"] body .vg-fil + .vg-fil { border-top-color: rgb(255 255 255 / .10) !important; }
+:root:root:root:root:root body .vg-fil:active, :root:root:root:root:root body .vg-fil.is-current { background: rgb(12 29 48 / .05) !important; }
+:root:root:root:root:root body .vg-fil-ph { width: 44px; height: 44px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: rgb(12 29 48 / .06); color: var(--sv-encre-2) !important; font: 700 16px/1 var(--sb-police-texte, Inter, sans-serif); box-shadow: 0 4px 10px -4px rgb(8 26 50 / .4); }
+:root:root:root:root:root body .vg-fil-ph img { width: 44px; height: 44px; object-fit: cover; display: block; }
+:root:root:root:root:root body .vg-fil-mid { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+:root:root:root:root:root body .vg-fil-1 { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; min-width: 0; }
+:root:root:root:root:root body .vg-fil-1 b { font: 700 14.5px/1.25 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-encre) !important; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root:root:root:root:root body .vg-fil-quand { flex: none; display: flex; align-items: center; gap: 6px; font: 600 12px/1.2 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-encre-2) !important; }
+:root:root:root:root:root body .vg-fil-nl { display: block; width: 9px; height: 9px; border-radius: 50%; background: var(--sv-lien); }
+:root:root:root:root:root body .vg-fil-2 { display: flex; align-items: center; gap: 7px; margin-top: 4px; min-width: 0; }
+:root:root:root:root:root body .vg-fil-plaque { flex: none; min-width: 0 !important; height: 18px !important; padding: 0 5px !important; border-radius: 6px !important; font-size: 10.5px !important; line-height: 16px !important; align-items: center !important; }
+:root:root:root:root:root body .vg-fil-plaque small { font-size: 10.5px !important; font-weight: 750 !important; color: inherit !important; margin: 0 !important; letter-spacing: 0 !important; }
+:root:root:root:root:root body .vg-fil-extrait { flex: 1; min-width: 0; font: 550 13px/1.3 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-encre-2) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:root:root:root:root:root body .vg-fil-extrait.is-offre { color: var(--sv-ambre) !important; font-weight: 700; }
+:root:root:root:root:root body .vg-fil-toi { color: var(--sv-encre-2) !important; }
+:root:root:root:root:root body .vg-fil-etat { flex: none; }
+/* La conversation (maquette « ms2 ») : l'offre comparée, le plein à « Proposer N € », Accepter · Refuser en touches. */
+:root:root:root:root:root body .vrm-chat-offre .vrm-chat-offre-actions.vg-offre-gestes { display: grid !important; grid-template-columns: 1fr 1fr; gap: 10px; }
+:root:root:root:root:root body .vrm-chat-offre .vg-offre-gestes .vg-offre-plein { grid-column: 1 / -1; height: 52px !important; min-height: 52px !important; border-radius: 16px !important; font: 650 15.5px/1 var(--sb-police-texte, Inter, sans-serif) !important; }
+:root:root:root:root:root body .vrm-chat-offre .vg-offre-gestes .vrm-chat-btn:not(.vg-offre-plein) { height: 48px !important; min-height: 48px !important; border-radius: 14px !important; font: 600 14.5px/1 var(--sb-police-texte, Inter, sans-serif) !important; }
+:root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp .vrm-offre-comparer-corps { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 12px; row-gap: 4px; }
+:root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp .vrm-offre-article { display: none; }
+:root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp dl { display: contents; }
+:root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp dl > div { display: flex; align-items: baseline; gap: 4px; margin: 0; font: 600 12.5px/1.3 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-encre-2); }
+:root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp dl > div :is(dt, dd) { margin: 0; font: inherit; color: inherit; }
+:root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp dl > div[data-offre-prix="recue"] { order: -1; flex-basis: 100%; justify-content: space-between; }
+:root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp dl > div[data-offre-prix="recue"] dd { font: 750 26px/1.1 var(--sb-police-affiche, Inter, sans-serif); letter-spacing: -.03em; color: var(--sv-encre); }
+:root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp .vrm-offre-repere { margin: 0; font: 700 12.5px/1.3 var(--sb-police-texte, Inter, sans-serif); }
+:root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp .vrm-offre-repere[data-offre-niveau="sous-minimum"] { color: var(--sv-ambre) !important; }
 
 } /* fin de @layer vrm-verre */
