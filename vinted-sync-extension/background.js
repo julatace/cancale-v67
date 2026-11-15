@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.378.0';
+const CODE_VERSION = '5.379.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -4488,6 +4488,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             if(Object.prototype.hasOwnProperty.call(msg,'erreurCapture'))avant[tabId].erreurCapture=['identite','taille','session'].includes(msg.erreurCapture)?msg.erreurCapture:null;
             const recent=Object.fromEntries(Object.entries(avant).sort((a,b)=>b[1].at-a[1].at).slice(0,32));
             await chrome.storage.local.set({vrmLbcTransport:recent});sendResponse({ok:true});return;
+          }
+          // 5.379 (15 nov., page Leboncoin noire sur Orion) : le disjoncteur du relais —
+          // VRM s'est mis de côté sur un onglet, puis ce que la page a fait SANS lui. Une
+          // étiquette (compteur + « Envoyer un rapport »), jamais une adresse ni un contenu.
+          if (msg.action === 'lbcDisjoncteur') {
+            const tabId = sender?.tab?.id;
+            if (sender?.frameId > 0 || tabId == null || !/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(sender?.tab?.url || '')) { sendResponse({ ok: false }); return; }
+            const quoi = ['mis-de-cote', 'affichee-sans-vrm', 'vide-sans-vrm'].includes(msg.quoi) ? msg.quoi : null;
+            if (!quoi) { sendResponse({ ok: false }); return; }
+            await noterDiag('lbc_disjoncteur_' + quoi).catch(() => {});
+            sendResponse({ ok: true }); return;
           }
           if (msg.action === 'lbcDiag') {
             await storeLbcRecon({ capture: { source: msg.source, vues: msg.vues, compte: !!msg.compte, url: msg.url, a_next_data: !!msg.a_next_data, a_next_f: !!msg.a_next_f, at: new Date().toISOString() } });

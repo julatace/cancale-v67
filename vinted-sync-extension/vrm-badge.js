@@ -68,6 +68,8 @@
     if (h < 48) return `il y a ${h} h`;
     return `il y a ${Math.round(h / 24)} j`;
   };
+  // 5.379 : la marque du disjoncteur Leboncoin (lbc-relay.js), lue telle quelle — 30 min au plus.
+  const deCoteLbc = () => { try { if (!/(^|\.)leboncoin\.fr$/i.test(String(location.hostname || ''))) return null; const v = JSON.parse(sessionStorage.getItem('vrm_lbc_de_cote') || 'null'); const age = Date.now() - Number(v && v.t); return v && typeof v === 'object' && age >= 0 && age < 1800000 ? v : null; } catch (_) { return null; } };
   const NOM_SITE = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire Collective' };
 
   const hote = document.createElement('div');
@@ -483,7 +485,8 @@
     const f = e.flux;
     if (f && f.koAt && (!f.okAt || f.koAt > f.okAt) && f.koStatut !== 'sans_session' && !refusAvantConnexion(f, v)) return true;            // dernier envoi refusé
     if (e.plateforme === 'leboncoin' && e.aRetirer && Array.isArray(e.aRetirer.liste) && e.aRetirer.liste.length) return true;   // une paire vendue ailleurs, encore en ligne ici
-    if (e.plateforme === 'leboncoin' && e.lbc && e.lbc.compte && e.lbc.compte.ok === false) return true;   // 5.335 : le compte Leboncoin attend un geste (recharger, se connecter)
+    if (e.plateforme === 'leboncoin' && e.lbc && e.lbc.compte && e.lbc.compte.ok === false) return true;
+    if (e.plateforme === 'leboncoin' && deCoteLbc()) return true;   // 5.379 : VRM s'est mis de côté sur cette page (le disjoncteur)   // 5.335 : le compte Leboncoin attend un geste (recharger, se connecter)
     if (e.secu && e.secu.niveau === 'robot') return true;                     // 5.366 : le site vérifie le compte (le geste : la vérification, à lui)
     return false;
   };
@@ -1126,6 +1129,15 @@
       const n = e.aRetirer.liste.length;
       aRetirerLbc = `<div class="ligne"><div class="lib">À retirer de Leboncoin</div>${lignes}${plus}<div class="val gris">Supprime-la${n > 1 ? 's' : ''} dans « Mes annonces », ou depuis VRM → Leboncoin → Annonces.</div></div>`;
     }
+    // 5.379 (15 nov., Orion iPhone : leboncoin.fr restait NOIRE) — le disjoncteur de
+    // lbc-relay.js a mis VRM de côté sur CET onglet (`vrm_lbc_de_cote`, sessionStorage de
+    // l'onglet, 30 min) : la carte le DIT, et ce qu'il a mesuré ensuite (sans VRM, la page
+    // s'est affichée ⇒ VRM était en cause ; elle reste vide ⇒ ce n'est pas VRM), avec UN
+    // geste : « Rebrancher VRM ici » (efface la marque, recharge la page).
+    const deCote = e.plateforme === 'leboncoin' ? deCoteLbc() : null;
+    const ligneDeCote = deCote
+      ? `<div class="ligne" data-lbc-de-cote="${esc(deCote.apres || 'mesure')}"><div class="lib">Leboncoin</div><div class="val alerte">VRM s’est mis de côté sur cette page : elle ne s’affichait pas.</div><div class="val gris">${deCote.apres === 'affichee' ? 'Sans VRM, elle s’affiche : VRM ne lit rien dans cet onglet pendant 30 min (un nouvel onglet repart avec VRM). Tes annonces seront relues à la prochaine visite.' : deCote.apres === 'vide' ? 'Même sans VRM, elle reste vide : ce n’est pas VRM. Recharge la page ; si elle reste vide, essaie un autre navigateur.' : 'VRM vérifie qu’elle s’affiche sans lui…'}</div><button class="b sec" data-lbc-rebrancher>Rebrancher VRM ici</button></div>`
+      : '';
     // 5.366 (Julien : « faire comme Vintex, pour ne pas se faire bannir ») : l'état du compte
     // en UNE phrase (calculée par le fond, la même que dans VRM) et « Tout arrêter ».
     const ligneSecu = e.secu && e.secu.texte && v && v.connecte
@@ -1204,6 +1216,7 @@
       ${progression}
       ${historique}
       ${lignePerime}
+      ${ligneDeCote}
       ${ligneSecu}
       ${aRetirerLbc}
       ${diagnosticLbc}
@@ -1272,6 +1285,8 @@
     if (montrer) montrer.addEventListener('click', () => { formulaireDemande = true; rendre(); });
     poserFormulaire(formulaire);
     const recharger = carte.querySelector('[data-lbc-recharger]');
+    const rebrancher = carte.querySelector('[data-lbc-rebrancher]');
+    if (rebrancher) rebrancher.addEventListener('click', () => { try { sessionStorage.removeItem('vrm_lbc_de_cote'); } catch (_) {} try { location.reload(); } catch (_) {} });
     if (recharger) recharger.addEventListener('click', () => { try { location.reload(); } catch (_) {} });
     const capter = carte.querySelector('[data-capter]');
     if (capter) capter.addEventListener('click', () => { capter.disabled = true; envoyerChoix('oui'); });
