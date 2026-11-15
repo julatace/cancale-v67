@@ -163,6 +163,7 @@ const mesures = (pg) => pg.evaluate(() => {
   const r = { horiz: document.documentElement.scrollWidth - window.innerWidth, hors: [], petits: [], pleins: 0 };
   for (const c of document.querySelectorAll('.ebt-carte')) { const bc = c.getBoundingClientRect(); for (const x of c.querySelectorAll('.ebt-rangee, .ebt-valeur, .ebt-nom')) { const b = x.getBoundingClientRect(); if (b.width && (b.right > bc.right + 1 || b.left < bc.left - 1)) r.hors.push((x.className || '') + ':' + (x.textContent || '').slice(0, 30)); } }
   for (const x of document.querySelectorAll('.ebt button, .ebt a')) { const b = x.getBoundingClientRect(); if (b.width && b.height < 43.5 && !x.closest('.vrm-ui-bande')) r.petits.push((x.textContent || '').trim().slice(0, 30) + ' ' + Math.round(b.height)); }
+  r.coupes = [...document.querySelectorAll('.ebt .vrm-ui-bande-n, .ebt .vrm-ui-bande-l, .ebt-titre .ebt-lien')].filter((x) => x.getBoundingClientRect().width && x.scrollWidth > x.clientWidth + 1).map((x) => x.textContent.trim());
   r.pleins = [...document.querySelectorAll('.sb-btn-plein')].filter((x) => x.getBoundingClientRect().width > 0).length;
   return r;
 });
@@ -191,6 +192,7 @@ const mesures = (pg) => pg.evaluate(() => {
       dit(m.horiz <= 0 && m.hors.length === 0, 'V1. 390 : aucun défilement horizontal, rien hors de sa carte', JSON.stringify(m));
       dit(m.petits.length === 0, 'V2. cibles au doigt ≥ 44 px', m.petits.join(' | '));
       dit(m.pleins <= 1, 'V3. au plus un bouton plein visible', String(m.pleins));
+      dit(m.coupes.length === 0, 'V8. la bande : aucun chiffre ni libellé coupé (« 145,40 € ver… »)', m.coupes.join(' | '));
       const n = envois.filter((e) => e.action === 'tableau').length;
       dit(n === 1, 'T5. UN aller-retour pour tout le tableau', String(n));
       await capt(pg, '390-tableau');
@@ -285,7 +287,7 @@ const mesures = (pg) => pg.evaluate(() => {
       await attendre(pg, '[data-ebt="tableau"][data-ebt-etat="lu"]');
       await pg.waitForTimeout(600);
       const m = await mesures(pg);
-      dit(m.horiz <= 0 && m.hors.length === 0, 'V6. 1512 sombre : rien ne déborde', JSON.stringify(m));
+      dit(m.horiz <= 0 && m.hors.length === 0 && m.coupes.length === 0 && m.petits.length === 0, 'V6. 1512 sombre : rien ne déborde, rien de coupé, cibles ≥ 44 px', JSON.stringify(m));
       await capt(pg, '1512-sombre-tableau');
       await aller(pg, 'tab=plat_ebay&section=argent');
       await attendre(pg, '[data-ebt="argent"][data-ebt-etat="lu"]');
