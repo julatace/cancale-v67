@@ -64,7 +64,9 @@ function mesurer() {
   const L = (c) => 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]);
   const ratio = (a, b) => { const x = L(a), y = L(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
   const sur = (h, a, bas) => [0, 1, 2].map((i) => h[i] * a + bas[i] * (1 - a));
-  const vis = (el) => { const r = el.getBoundingClientRect(); const cs = getComputedStyle(el); return r.width > 1 && r.height > 1 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
+  // Rogné : un ancêtre qui coupe ce qui déborde (overflow) ne laisse rien voir de l'élément (ex. une carte repliée à 0 px).
+  const rogne = (el, r) => { for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) { const c = getComputedStyle(a); if (c.overflowX === 'visible' && c.overflowY === 'visible') continue; const q = a.getBoundingClientRect(); if (q.width < 1 || q.height < 1 || r.right <= q.left || r.left >= q.right || r.bottom <= q.top || r.top >= q.bottom) return true; } return false; };
+  const vis = (el) => { const r = el.getBoundingClientRect(); const cs = getComputedStyle(el); return r.width > 1 && r.height > 1 && cs.visibility !== 'hidden' && cs.display !== 'none' && !rogne(el, r); };
   const nom = (el) => { const p = []; let e = el; for (let i = 0; e && i < 6; i++, e = e.parentElement) p.unshift(e.tagName.toLowerCase() + (typeof e.className === 'string' && e.className.trim() ? '.' + e.className.trim().split(/\s+/).slice(0, 2).join('.') : '')); return p.join(' > '); };
   // un texte VU dans l'élément (un libellé masqué pour les lecteurs d'écran ne compte pas)
   const texteVu = (b) => [b, ...b.querySelectorAll('*')].some((x) => { if (x.closest('svg')) return false; let t = ''; for (const n of x.childNodes) if (n.nodeType === 3) t += n.nodeValue; if (!t.trim()) return false; const r = x.getBoundingClientRect(); return r.width > 2 && r.height > 2 && getComputedStyle(x).clip !== 'rect(0px, 0px, 0px, 0px)'; });
@@ -207,7 +209,7 @@ function mesurer() {
     const c = getComputedStyle(x);
     if (c.textOverflow !== 'ellipsis' || x.scrollWidth <= x.clientWidth + 1) continue;
     if (x.closest('li, [role="listitem"], [role="row"], .sb-rangee, [class*="rangee"], [class*="-row"], [class*="ligne"], [class*="titre"], .sb-plan, [class*="liste"], [class*="list"], select, option')) continue;
-    out.coupes.push(`${nom(x).split(' > ').slice(-2).join(' > ')} « ${x.textContent.trim().slice(0, 30)} »`);
+    out.coupes.push(`${nom(x)} « ${x.textContent.trim().slice(0, 30)} »`);
   }
   // V9 — la pastille « Mis à jour à … » ne recouvre aucun texte.
   out.pastille = [];
