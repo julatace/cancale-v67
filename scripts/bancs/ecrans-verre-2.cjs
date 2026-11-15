@@ -224,7 +224,7 @@ function mesurer(vue) {
   if (racineFiche) {
     // (15 nov., fiche D) Ce qui est VU : la hauteur de la fiche (la feuille « ⋯ » fermée), la photo pleine largeur et la plaque,
     // le nom et UNE ligne d'état, UNE carte d'action, le segment (une vue), les tailles de texte et de chiffres, jargon, doublons.
-    const cadre = racine.querySelector('.fd-cadre');
+    const cadre = racine.querySelector('.fd-cadre, .vrm-fp-cadre');   // (la fiche d'avant aussi : sa hauteur est jugée, pas sa classe)
     const fs = (e) => (e ? parseFloat(getComputedStyle(e).fontSize) : 0);
     const ph = racine.querySelector('.fd-ph'), plaque = racine.querySelector('.fd-plaque'), nom = racine.querySelector('.fd-nom'), etat = racine.querySelector('.fd-etat');
     const textes = [...racine.querySelectorAll('.fd-s *')].filter(vis).filter((e) => !e.closest('.fd-plus') && [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim().length > 1));
