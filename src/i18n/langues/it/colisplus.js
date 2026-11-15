@@ -66,4 +66,6 @@ export default {
   "cp.temps.pasMesure": "Non ancora misurato: prepara qui i pacchi, VRM cronometra tra due «Pacco fatto».",
   "cp.temps.comment": "Come si misura",
   "cp.temps.pourquoi": "Su questo dispositivo: il tempo tra due «Pacco fatto» qui. Oltre 15 min è una pausa; sotto 15 s, un pacco già pronto: non contati. Il guadagno: l’utile dei pacchi con prezzo d’acquisto noto, diviso per il loro tempo; foto e acquisti esclusi.",
+  // (15 nov.) Le PDF retiré par le serveur : vente finalisée et argent reçu (api/_lib/purge-bordereaux.js).
+  "colis.bordSupprimeVersement": "Etichetta eliminata dopo il pagamento",
 };

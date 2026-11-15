@@ -94,7 +94,8 @@ export function colisVentesEmail({ ventesEmail, bordsParTx, connues, cachee, par
     if (typeof connues === 'function' && connues(tx)) continue;
     const b = bordsParTx[tx];
     if (!b || String(b.transaction) !== tx) continue;          // l'identité, rien d'autre
-    if (!(b.hasPdf || (b.filename && b.filename !== 'None'))) continue;
+    // (15 nov.) `hasPdf: false` = le PDF a été retiré après le versement (la ligne garde `filename`).
+    if (b.hasPdf === false || !(b.hasPdf || (b.filename && b.filename !== 'None'))) continue;
     if (typeof cachee === 'function' && cachee(tx)) continue;
     if (typeof partie === 'function' && partie(o, b)) continue;
     out.push({ o, b, txn: tx });

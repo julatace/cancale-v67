@@ -7469,7 +7469,10 @@ const fetchEmailBordereaux = async () => {
     const champs = ['uid','type','suivi','modele','numero','taille','account','article',
                     'filename','posKnown','dateLimite','receivedAt','transaction','transporteur',
                     // (9 nov.) le transporteur et le n° LUS sur l'étiquette (PDF) à la réception — scalaires
-                    'transporteurPdf','suiviPdf','pdfLu']
+                    'transporteurPdf','suiviPdf','pdfLu',
+                    // (15 nov.) PDF retiré par le serveur après le versement (api/_lib/purge-bordereaux.js) :
+                    // la ligne et `filename` restent, le PDF non — plus de bouton « Réimprimer » mort.
+                    'pdfPurged','pdfPurgeRaison']
                    .map(c => `${c}:meta->>${c}`).join(',');
     // ⚠️⚠️ (1er nov.) TOUTES LES PAGES (`lireTout`) : au-delà de 1 000 bordereaux
     //    la base coupait EN SILENCE par ordre d'identifiant — `email_bord_{tx}`,
@@ -7496,8 +7499,12 @@ const fetchEmailBordereaux = async () => {
     { const r0 = Array.isArray(relus) && relus[0]; if (r0 && r0.pdfVus && typeof r0.pdfVus === 'object') _pdfVus = { ...(_pdfVus || {}), ...r0.pdfVus }; }
     // `filename` est présent exactement quand un PDF l'est (vérifié : 50/50,
     // aucun écart) — il sert donc de témoin sans télécharger le PDF.
+    // ⚠️ (15 nov.) SAUF `pdfPurged` : la purge du serveur (vente finalisée + versement
+    //    connu + aucun retour) garde `filename` et toute la ligne ; seul le PDF est
+    //    parti ⇒ `hasPdf: false`, et l'écran le DIT (`pdfSupprime`).
     return rows.filter(r => r && r.filename && r.filename !== 'None')
-      .map(r => transporteurRelu({ ...r, _row: r.id, hasPdf: true }, ligneRelue))
+      .map(r => { const purge = String(r.pdfPurged) === 'true';
+        return transporteurRelu({ ...r, _row: r.id, hasPdf: !purge, ...(purge ? { pdfSupprime: r.pdfPurgeRaison === 'versement' ? 'versement' : 'autre' } : {}) }, ligneRelue); })
       .sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
   } catch (_) { return null; }
 };
@@ -26521,7 +26528,7 @@ async function imprimerBordereauVc({ bordId, num, titre, venteId, original = fal
   const owner=AUTH.user?.id||'';
   const verifier=()=>{if(!owner||AUTH.user?.id!==owner||readSession()?.user?.id!==owner)throw Error('Le compte VRM a changé. Rouvre la vente dans le bon compte.');};
   try {
-    const lu=await lireBordereauVestiaire({id:bordId,owner,ownerActuel:()=>AUTH.user?.id||'',lire:id=>lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&select=b64:data->>b64`)});
+    const lu=await lireBordereauVestiaire({id:bordId,owner,ownerActuel:()=>AUTH.user?.id||'',lire:id=>lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&select=b64:data->>b64,purge:data->>pdfPurgeRaison`)});
     verifier();if(lu.etat!=='ok'){libererOngletPdf();return lu;}
     const bytes=b64ToBytes(lu.b64);
     if(original){
@@ -26564,6 +26571,7 @@ function BoutonImprimerVc({ v, grand = false, carte = false, lectureSeule = fals
     {erreur&&<span role="alert" data-vc-bordereau-erreur="" style={{flexBasis:'100%',fontSize:12,color:C.warn}}>{erreur}</span>}
     {lien ? <a href={lien.url} target="_blank" rel="noreferrer" data-vc-bordereau-lien="" style={{ color: C.accentTexte, fontWeight: 600, fontSize: 13 }}>Ouvrir le bordereau</a> : null}
     {etat === 'absent' ? <span data-vc-bordereau-etat="absent" style={{ flexBasis: '100%', fontSize: 12, color: C.muted }}>Le bordereau n'est plus rangé — rouvre la vente sur Vestiaire.</span>
+      : etat === 'supprime' ? <span data-vc-bordereau-etat="supprime" style={{ flexBasis: '100%', fontSize: 12, color: C.muted }}>{tr('colis.bordSupprimeVersement')}</span>
       : etat === 'passu' ? <span data-vc-bordereau-etat="passu" style={{ flexBasis: '100%', fontSize: 12, color: C.muted }}>La base n'a pas répondu — réessaie.</span> : null}
   </>;
 }
@@ -54122,6 +54130,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div style={{fontSize:11,color:C.muted}}>{b.receivedAt?`reçu le ${new Date(b.receivedAt).toLocaleDateString('fr-FR')}`:''}</div>
                   </div>
                   {b.hasPdf && <button type="button" data-imprime="1" onClick={async ()=>{ const lu=await lirePdfLigne(b._row); if(!lu||!lu.octets){libererOngletPdf();toast(messagePdfManquant(lu));return;} processBordereau(numForBord(b), b.modele||b.article||'', lu.octets); }} style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:12,padding:'6px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}><Icon name="printer" size={14} style={{verticalAlign:'-2px',marginRight:6}}/>Réimprimer</button>}
+                  {/* (15 nov.) PDF retiré par le serveur (vente finalisée + argent reçu) : le dire, pas de bouton mort. */}
+                  {!b.hasPdf && b.pdfSupprime === 'versement' && <span data-bord-supprime="versement" style={{flexShrink:0,fontSize:12,color:C.muted}}>{tr('colis.bordSupprimeVersement')}</span>}
                 </div>
               ))}
           </div>

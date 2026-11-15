@@ -66,4 +66,6 @@ export default {
   "cp.temps.pasMesure": "Noch nicht gemessen: pack deine Pakete hier, VRM misst zwischen zwei „Paket fertig“.",
   "cp.temps.comment": "Wie gemessen wird",
   "cp.temps.pourquoi": "Auf diesem Gerät: die Zeit zwischen zwei „Paket fertig“ hier. Über 15 Min. ist eine Pause; unter 15 s ein schon fertiges Paket: nicht gezählt. Gewinn: der Gewinn der Pakete mit bekanntem Einkaufspreis, geteilt durch ihre Zeit; Fotos und Einkauf zählen nicht.",
+  // (15 nov.) Le PDF retiré par le serveur : vente finalisée et argent reçu (api/_lib/purge-bordereaux.js).
+  "colis.bordSupprimeVersement": "Versandetikett nach der Auszahlung gelöscht",
 };
