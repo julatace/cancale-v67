@@ -270,6 +270,42 @@ export function retoursAchat({ bords, demandes = [], achats, remb, transp, track
   return { etat: 'lu', cartes, anciennes, aRenvoyer: cartes.filter((c) => c.etape === 'a-deposer'), manques };
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+//  (15 nov., lot retour-parfait) LES ÉTAPES D'UN RETOUR, JUSQU'AU REMBOURSEMENT
+// ════════════════════════════════════════════════════════════════════════════
+// Julien : « Je veux que ce soit parfait et irréprochable. » La maquette « Verre dépoli » (achats-retour)
+// montre le chemin entier : bordereau prêt (transporteur) · à déposer · en route · livré au vendeur ·
+// remboursé. Chaque étape « faite » est PROUVÉE par la même source que la carte (`etape`, `faits`,
+// `depose`, `rembourse`) — jamais devinée ; une étape à venir n'a pas de date. Pur : l'écran dessine.
+// Rend [{ cle, etat: 'fait'|'ici'|'avenir', at?, montant?, transporteur? }] (5 étapes, dans l'ordre).
+export const ETAPES_RETOUR = Object.freeze(['bordereau', 'deposer', 'route', 'livre', 'rembourse']);
+const RANG_ETAPE = { 'a-deposer': 1, depose: 2, 'en-route': 2, revient: 2, 'relais-vendeur': 3, 'recu-vendeur': 4, rembourse: 5 };
+// États : 'fait' (prouvé) · 'ici' (où il en est) · 'avenir' · 'saute' (passé, mais RIEN ne le prouve :
+// un remboursement arrivé sans fait du transporteur — l'étape n'est pas cochée, elle est grisée).
+export function etapesRetour(c) {
+  if (!c) return [];
+  const f = c.faits || null;
+  const r = RANG_ETAPE[c.etape] || 1;                                            // où il en est
+  const rf = c.etape === 'rembourse' ? (f ? (RANG_ETAPE[f.etape] || 2) : c.depose ? 2 : 1) : r;   // ce qui est PROUVÉ du chemin
+  const deposeAt = (f && f.deposeAt) || (c.depose && c.depose.le) || null;
+  const passe = (i) => (rf > i ? 'fait' : 'saute');
+  return [
+    { cle: 'bordereau', etat: c.pdf ? 'fait' : r > 1 ? 'saute' : 'ici', transporteur: str(c.transporteur || (f && f.carrier) || '') },
+    { cle: 'deposer', etat: r > 1 ? passe(1) : c.pdf ? 'ici' : 'avenir', at: rf > 1 ? deposeAt : null, parLui: rf > 1 && !f && !!c.depose },
+    { cle: 'route', etat: r > 2 ? passe(2) : r === 2 ? 'ici' : 'avenir', revient: c.etape === 'revient' },
+    { cle: 'livre', etat: r === 3 ? 'ici' : r >= 4 ? (rf >= 4 ? 'fait' : 'saute') : 'avenir', relais: c.etape === 'relais-vendeur', at: f && rf >= 3 && (f.etape === 'relais-vendeur' || f.etape === 'recu-vendeur') ? f.at : null },
+    { cle: 'rembourse', etat: r === 5 ? 'fait' : r === 4 ? 'ici' : 'avenir', montant: c.rembourse && c.rembourse.etat === 'oui' ? c.rembourse.montant : null, at: c.rembourse && c.rembourse.etat === 'oui' && c.rembourse.at ? c.rembourse.at : null },
+  ];
+}
+// Combien de jours (calendrier, Paris) jusqu'à la limite : 0 aujourd'hui, 1 demain, … ; null sans limite.
+export function joursAvantLimite(c, now = Date.now()) {
+  if (!c || !c.limiteIso) return null;
+  const j = c.limiteJour || jourParis(Date.parse(c.limiteIso)), a = jourParis(now);
+  const ms = (s) => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str(s)); return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) : NaN; };
+  const d = Math.round((ms(j) - ms(a)) / 86400000);
+  return isFinite(d) ? d : null;
+}
+
 // Ce que le tampon écrit sur le bordereau de retour (une règle, imprimée et testée).
 export const lignesTamponRetour = ({ num, titre } = {}) => {
   const n = str(num).trim();

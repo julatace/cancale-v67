@@ -42270,21 +42270,52 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return res;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retoursAchatLus, retoursEmails, retoursDeposes, retoursTrack, vcLoc0.departsCle, sales.items, buys.items, buys.error, buysBase, transp, transpMap, buyNumByTxn, accounts]);
-  // Imprimer le bordereau de retour : SON PDF (par son n°), tamponné « RETOUR · N°… » (src/tamponRetour.js),
-  // ouvert dans la visionneuse (téléchargé sur iPhone). Rend 'ok' · 'passu' (dit sous le bouton).
-  const imprimerRetourAchat = async (c) => {
-    // (15 nov.) Un bordereau encore gardé « inconnu » : son PDF vient du corps gardé (relu par la règle du serveur).
-    const lu = c.pdfGarde ? (() => { try { const b = atob(c.pdfGarde); const o = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) o[i] = b.charCodeAt(i); return { octets: o }; } catch (_) { return null; } })()
-      : await lirePdfLigne(`email_bordretour_${c.tx}`);
-    if (!lu || !lu.octets) { libererOngletPdf(); return 'passu'; }
-    try {
-      const { tamponnerRetour } = await import('./tamponRetour.js');
-      const { octets } = await tamponnerRetour(lu.octets, { num: c.num, titre: c.titre });
-      const nom = `retour-${c.num ? 'N' + c.num + '-' : ''}${c.tx}.pdf`;
-      const url = URL.createObjectURL(new Blob([octets], { type: 'application/pdf' }));
-      if (!ouvrirPdfOnglet(url, nom, tr('retours.imprimer'))) _telechargerPdf(octets, nom);
-      return 'ok';
-    } catch (_) { libererOngletPdf(); return 'passu'; }
+  // Imprimer le bordereau de retour : SON PDF (par son n°).
+  // (15 nov., lot retour-parfait) Julien : « Je veux que ce soit parfait et irréprochable. » Deux défauts mesurés :
+  //   · le tampon « RETOUR · N°… » était un rectangle blanc posé EN HAUT À GAUCHE de la page, par-dessus ce
+  //     qui s'y trouve (sur le bordereau Chronopost paysage, l'en-tête de la fiche) ; il passe désormais par
+  //     LE chemin des bordereaux de vente (`tamponnerBordereau`) : une zone BLANCHE trouvée sur le rendu de la
+  //     page, sinon une fiche 10×15 APRÈS l'étiquette — jamais rien recouvert, rien réduit, la page d'origine
+  //     garde sa taille (A4 portrait Mondial Relay, A4 paysage Chronopost) ;
+  //   · sur iPhone, le PDF était TÉLÉCHARGÉ après des attentes (lecture, tampon) : la feuille de partage
+  //     (« Imprimer ») ne s'ouvre que dans le toucher. Le PDF est donc PRÉPARÉ dès que la carte s'affiche
+  //     (`preparerRetourPdf`, une fois par session et par carte) et le toucher l'ouvre sans rien attendre
+  //     (`ouvrirPdfLot` : iPhone/Android ⇒ partage, ordinateur ⇒ la visionneuse qui imprime). Pas encore prêt
+  //     au toucher ⇒ « Ouvrir le bordereau » (SON second toucher).
+  // Rend 'ok' · 'bouton' (à ouvrir d'un second toucher) · 'passu' (dit sous le bouton).
+  const retourPdfPrets = useRef(new Map());
+  const clePdfRetour = (c) => `${c.cle}|${c.num || ''}|${c.titre || ''}|${c.pdfGarde ? 'g' : 'r'}`;
+  const preparerRetourPdf = async (c) => {
+    if (!c || !c.pdf) return null;
+    const k = clePdfRetour(c), m = retourPdfPrets.current;
+    if (m.has(k)) return m.get(k);
+    const p = (async () => {
+      // Un bordereau encore gardé « inconnu » : son PDF vient du corps gardé (relu par la règle du serveur).
+      const lu = c.pdfGarde ? (() => { try { const b = atob(c.pdfGarde); const o = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) o[i] = b.charCodeAt(i); return { octets: o }; } catch (_) { return null; } })()
+        : await lirePdfLigne(`email_bordretour_${c.tx}`);
+      if (!lu || !lu.octets) return null;
+      const PL = await import('pdf-lib');
+      const pdf = await PL.PDFDocument.load(lu.octets);
+      const t = await tamponnerBordereau(PL, pdf, { numero: c.num || '', titre: `RETOUR · ${String(c.titre || '').replace(/\s+/g, ' ').trim()}`.slice(0, 90) });
+      posePrefsImpression(PL, pdf);
+      const bytes = await pdf.save();
+      const filename = `retour-${c.num ? 'N' + c.num + '-' : ''}${c.tx || 'vinted'}.pdf`;
+      return { bytes, url: URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })), filename, mode: (t && t.mode) || '' };
+    })().catch(() => null);
+    m.set(k, p);
+    const r = await p;
+    if (r) m.set(k, r); else m.delete(k);   // une préparation ratée est refaite au prochain toucher
+    return r;
+  };
+  const imprimerRetourAchat = (c) => {
+    const titre = tr('retours.imprimer');
+    const deja = retourPdfPrets.current.get(clePdfRetour(c));
+    if (deja && deja.url) return ouvrirPdfLot(deja, { geste: true, titre }) === 'bouton' ? 'bouton' : 'ok';   // dans le toucher, sans attente
+    return (async () => {
+      const pret = await preparerRetourPdf(c);
+      if (!pret) { libererOngletPdf(); return 'passu'; }
+      return ouvrirPdfLot(pret, { geste: !(estIOS() || estAndroid()), titre }) === 'bouton' ? 'bouton' : 'ok';
+    })();
   };
   // (10 nov., lot N) Les achats proposés à l'Atelier (Organisation), publiés par CET écran
   // (src/operations/atelier.js) : lus EN ENTIER seulement, sinon rien (la publication d'avant reste).
@@ -48619,7 +48650,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {/* (15 nov., lot retours) « À RENVOYER (N) » : UNE place, en tête, tant qu'un retour attend son dépôt
                     (le plus pressé d'abord) — la même carte qu'Achats (photo + titre par identité, compte, « avant demain
                     10 h », « Imprimer le bordereau », « Déposé »). Plus aucune ligne « Retour » ailleurs dans la journée. */}
-                <ARenvoyerJournee r={retoursAchatRes} onImprimer={imprimerRetourAchat} onDepose={basculerRetourDepose} Photo={PhotoVinted}
+                <ARenvoyerJournee r={retoursAchatRes} onImprimer={imprimerRetourAchat} onPreparer={preparerRetourPdf} onDepose={basculerRetourDepose} Photo={PhotoVinted}
                   onVoir={() => { if (onNav) onNav('achats'); }}/>
                 {/* SON ordre (« Modifier ma journée ») entre la phrase et l'affiche ; « Les chiffres du mois » sont une
                     tuile de la grille, « la prochaine chose » la première carte de « À faire » (`data-prochain`). */}
@@ -49963,7 +49994,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* Sur « Tous » (la liste des achats montrée), un achat « à renvoyer » SANS bordereau a déjà sa carte et son lien
             dans la liste : il n'est pas redit ici (§7, un geste une fois) — ses bordereaux et avis, eux, le sont. */}
         {!modeRetraits && <RetoursAchatBloc r={retoursAchatRes} sansAchatsSeuls={aFilter==='all' && !modeListeAchats}
-          onImprimer={imprimerRetourAchat} onDepose={basculerRetourDepose} Photo={PhotoVinted}/>}
+          onImprimer={imprimerRetourAchat} onPreparer={preparerRetourPdf} onDepose={basculerRetourDepose} Photo={PhotoVinted}/>}
         {/* ⚠️ SUR « À RETIRER », CES TROIS COMMANDES N'AGISSENT SUR RIEN.
             Cet onglet n'affiche AUCUNE liste de commandes (`aFilter==='attente'`
             renvoie faux dans le filtre plus bas) : il montre les colis groupés
@@ -53629,7 +53660,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {ebayL.map((l) => <div key={l.cle} className="vrm-tip-ligne is-off" data-lot-ligne={l.cle} data-lot-site={l.site} data-lot-cochable="0" data-coche="0"><input type="checkbox" className="vrm-tip-case" disabled checked={false} readOnly aria-label={`${l.titre||'Commande'} : eBay`}/><PhotoVente src={l.photo||null} size={44} portrait/><span className="vrm-tip-corps"><span className="vrm-titre-entier vrm-tip-titre">{l.titre}</span><span className="vrm-tip-sous"><span data-lot-ebay="1">eBay</span></span></span></div>)}
                         </section>}
                         {/* (11 nov., lot retours-litiges) Les bordereaux de RETOUR d'achat : imprimés un par un, tamponnés « RETOUR · N°… ». */}
-                        <RetoursAImprimer r={retoursAchatRes} onImprimer={imprimerRetourAchat} Bouton={Bouton}/>
+                        <RetoursAImprimer r={retoursAchatRes} onImprimer={imprimerRetourAchat} onPreparer={preparerRetourPdf} Bouton={Bouton}/>
                         {nb > 0 ? <AccAvant geste="colis.imprimer" vars={{ n: nb }}/> : null}
                         <div className="vrm-lot-pied vrm-tip-pied">
                           <span className="vrm-impr-sous" data-lot-papier-dit={formatLot}>{tr(`impr.format.${formatLot}`)}</span>
