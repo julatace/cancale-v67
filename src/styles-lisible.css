@@ -53,3 +53,29 @@ html[data-grand-texte="tres"] body .vrm-app-shell .vrm-fu-pile { zoom: .7; }
 /* (15 nov.) La note de la paire d'un fil, sous la carte de la paire (vide ⇒ rien). */
 .vrm-chat-note-paire { margin: 8px 16px 0; min-width: 0; }
 .vrm-chat-note-paire:empty { display: none; }
+
+/* ── (15 nov.) LE TEXTE EN GRAND SUR LES ÉCRANS DE LISTE (Paramètres → Taille du texte, et celle de l’iPhone) ──
+   Mesuré par scripts/bancs/finition.cjs (VUES=390-taille136) sur Ma journée, Annonces, Ventes, Stock, Argent : à
+   l’échelle 1,36 la mise en page fait 287 px. Dans la couche `vrm-verre` (la première nommée : pour une déclaration
+   !important elle passe devant les couches des écrans). Les rangées de liste gardent leur hauteur (liste fenêtrée,
+   1 000 articles) : une ligne de trop finit par « … », jamais par-dessus la suivante. */
+@layer vrm-verre {
+  /* la bande de chiffres passe à la ligne (« ⋯ Modifier » sortait de l’écran) */
+  html[data-grand-texte] body .vrm-app-shell .vrm-main .vrm-fu-bande { flex-wrap: wrap !important; }
+  /* le grand titre d’un écran de liste sur sa ligne (« Annon / ces » se coupait au milieu du mot) */
+  html[data-grand-texte] body .vrm-app-shell .vrm-main .vrm-tache > .vrm-tache-tete > h1 { flex: 1 1 100% !important; overflow-wrap: normal !important; word-break: normal !important; hyphens: manual !important; }
+  /* Annonces : le titre d’une rangée sur une ligne, « … » (il recouvrait la ligne de la taille) */
+  html[data-grand-texte] body .vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-ledger-info > [data-titre] { grid-column: 3 !important; display: block !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; min-width: 0 !important; -webkit-line-clamp: unset !important; }
+  /* Stock : la colonne du texte prend la place (elle tombait à 28 px : « N… », « Vint|ed ») ; la sous-ligne finit par « … » */
+  html[data-grand-texte] body .vrm-app-shell .vrm-main .vrm-ms-stock .vrm-s2d-liste-ligne { grid-template-columns: auto minmax(0, 1fr) auto !important; }
+  html[data-grand-texte] body .vrm-app-shell .vrm-main .vrm-ms-stock .vrm-s2d-liste-ligne > * { grid-column: auto !important; }
+  html[data-grand-texte] body .vrm-app-shell .vrm-main .vrm-ms-stock .vrm-ms-sous { display: -webkit-box !important; -webkit-box-orient: vertical !important; -webkit-line-clamp: 1 !important; white-space: normal !important; overflow: hidden !important; overflow-wrap: break-word !important; word-break: normal !important; }
+  html[data-grand-texte] body .vrm-app-shell .vrm-main .vrm-ms-stock .vrm-ms-sous * { overflow-wrap: break-word !important; word-break: normal !important; }
+  /* Stock : les filtres sur une ligne, le menu du compte dessous (« Vestiaire » passait sous « Tous ») */
+  html[data-grand-texte] body .vrm-app-shell .vrm-main .vrm-ms-stock-resume .vrm-s2d-filtres { flex-wrap: wrap !important; }
+  html[data-grand-texte] body .vrm-app-shell .vrm-main .vrm-ms-stock-resume .vrm-s2d-filtres > .vrm-ui-filtres { flex: 1 1 100% !important; }
+  /* Argent : les onglets défilent au doigt, chacun en entier (« Statist… » recouvrait « Décla… ») */
+  html[data-grand-texte] body .vrm-app-shell .vrm-main nav.vrm-seg.vrm-platform-tabs { overflow-x: auto !important; flex-wrap: nowrap !important; scrollbar-width: none !important; }
+  html[data-grand-texte] body .vrm-app-shell .vrm-main nav.vrm-seg.vrm-platform-tabs > .vrm-seg-btn { flex: 0 0 auto !important; }
+  html[data-grand-texte] body .vrm-app-shell .vrm-main nav.vrm-seg.vrm-platform-tabs > .vrm-seg-btn > span { overflow: visible !important; text-overflow: clip !important; }
+}
