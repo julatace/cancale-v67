@@ -60,7 +60,7 @@
 .vrm-lt-date { font-size: 12.5px; font-weight: 550; color: var(--id-encre-2); font-variant-numeric: tabular-nums; }
 .vrm-lt-quoi { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 15px; line-height: 1.25; }
 .vrm-lt-quoi b { font-weight: 600; letter-spacing: -.008em; overflow-wrap: anywhere; }
-.vrm-lt-montant { font-family: var(--id-police-affiche); font-weight: 400; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-lt-montant { font-family: var(--id-police-affiche); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .vrm-lt-preuve { font-size: 12px; color: var(--id-encre-2); overflow-wrap: anywhere; }
 .vrm-lt-sous { margin: 14px 0 0; font-size: 13px; font-weight: 600; color: var(--id-encre-2); }
 .vrm-lt-note { margin: 10px 0 0; font-size: 13px; line-height: 1.4; color: var(--id-encre-2); }
@@ -76,7 +76,7 @@
 }
 @media (min-width: 900px) { .vrm-idees-voile { align-items: center; } .vrm-idees-feuille { border-radius: var(--sb-r-plan, 28px); } }
 .vrm-idees-tete { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; margin-bottom: 6px; }
-.vrm-idees-tete h3 { margin: 0; font: 400 24px/1.1 var(--id-police-affiche); letter-spacing: -.02em; overflow-wrap: anywhere; }
+.vrm-idees-tete h3 { margin: 0; font: 600 24px/1.1 var(--id-police-affiche); letter-spacing: -.02em; overflow-wrap: anywhere; }
 .vrm-idees-sous { margin: 0 0 12px; font-size: 13px; color: var(--id-encre-2); line-height: 1.4; }
 .vrm-idees-champ { display: flex; flex-direction: column; gap: 5px; margin: 0 0 12px; font-size: 13px; font-weight: 600; color: var(--id-encre-2); }
 .vrm-idees-champ input, .vrm-idees-champ textarea, .vrm-idees-champ select {

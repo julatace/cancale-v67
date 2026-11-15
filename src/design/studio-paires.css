@@ -181,7 +181,7 @@
 }
 :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-item::before, :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-item::after { display: none !important; content: none !important; }
 :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-n, :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-n * {
-  font: 300 27px/1 var(--sbp-affiche) !important; letter-spacing: -.03em !important; color: var(--sbp-encre) !important; font-variant-numeric: tabular-nums !important; white-space: nowrap !important; margin: 0 !important;
+  font: 500 27px/1 var(--sbp-affiche) !important; letter-spacing: -.03em !important; color: var(--sbp-encre) !important; font-variant-numeric: tabular-nums !important; white-space: nowrap !important; margin: 0 !important;
 }
 :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-l, :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-l * {
   font: 550 12.5px/1.2 var(--sbp-texte) !important; color: var(--sbp-encre2) !important; white-space: nowrap !important; margin: 0 !important; letter-spacing: 0 !important;
@@ -375,7 +375,7 @@
 }
 /* La devise, plus petite et remontée (le texte lu reste « 107 € »). */
 :root:root:root:root:root body [data-espace="paires"] .sb-eur { font-size: .68em !important; display: inline-block !important; transform: translateY(-.2em) !important; letter-spacing: 0 !important; font-weight: inherit !important; }
-:root:root:root:root:root body [data-espace="paires"] .sb-avant-c.is-prix .sb-eur { font-size: .44em !important; font-weight: 300 !important; transform: translateY(-.92em) !important; margin-left: .04em !important; }
+:root:root:root:root:root body [data-espace="paires"] .sb-avant-c.is-prix .sb-eur { font-size: .44em !important; font-weight: 500 !important; transform: translateY(-.92em) !important; margin-left: .04em !important; }
 /* Ce que la rangée ne montre pas (dans la carte ouverte ou la fiche : rien n'est retiré du DOM). */
 :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) :is([data-fiche-duo], [data-chiffres], .vrm-note-ajout, [data-note-paire], .vrm-fiche-plus-bouton, [data-fiche-plus], [data-fiche-infos]) { display: none !important; }
 :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-ann-ledger-info > :not([data-titre], .vrm-ann-price-line, [data-etat-ligne], .vrm-fiche-plus-bouton, .vrm-remise-carte.is-vignette) { display: none !important; }
@@ -457,9 +457,9 @@
 }
 :root:root:root:root:root body [data-espace="paires"] .sb-avant-c { min-width: 0 !important; display: flex !important; flex-direction: column !important; justify-content: flex-end !important; }
 :root:root:root:root:root body [data-espace="paires"] .sb-avant-c b, :root:root:root:root:root body [data-espace="paires"] .sb-avant-c > button > span > b {
-  display: block !important; font: 300 22px/.95 var(--sbp-affiche) !important; letter-spacing: -.025em !important; color: var(--sbp-encre) !important; font-variant-numeric: tabular-nums !important; white-space: nowrap !important;
+  display: block !important; font: 500 22px/.95 var(--sbp-affiche) !important; letter-spacing: -.025em !important; color: var(--sbp-encre) !important; font-variant-numeric: tabular-nums !important; white-space: nowrap !important;
 }
-:root:root:root:root:root body [data-espace="paires"] .sb-avant-c.is-prix b { font-weight: 200 !important; font-size: 42px !important; letter-spacing: -.045em !important; line-height: .85 !important; }
+:root:root:root:root:root body [data-espace="paires"] .sb-avant-c.is-prix b { font-weight: 500 !important; font-size: 42px !important; letter-spacing: -.03em !important; line-height: .85 !important; }
 :root:root:root:root:root body [data-espace="paires"] .sb-avant-c > span { display: block !important; margin-top: 7px !important; font: 550 11.5px/1.2 var(--sbp-texte) !important; color: var(--sbp-encre2) !important; white-space: nowrap !important; }
 :root:root:root:root:root body [data-espace="paires"] .sb-avant-c > button { min-height: 0 !important; min-width: 44px !important; text-align: left !important; padding: 10px 0 0 !important; margin-top: -10px !important; }
 :root:root:root:root:root body [data-espace="paires"] .sb-avant-c > button > span { border-bottom: 1px dashed rgb(var(--sbp-o) / .28) !important; display: inline-block !important; }
@@ -471,7 +471,7 @@
 :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="grille"] > .sb-rangee:not([data-sb-avant]) {
   border-radius: 22px !important; background: linear-gradient(180deg, var(--sbp-feuille), var(--sbp-feuille2)) !important; box-shadow: var(--sbp-om-tuile) !important; border: 0 !important;
 }
-:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="grille"] > .sb-rangee [data-prix] { font-family: var(--sbp-affiche) !important; font-weight: 400 !important; color: var(--sbp-encre) !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="grille"] > .sb-rangee [data-prix] { font-family: var(--sbp-affiche) !important; font-weight: 600 !important; color: var(--sbp-encre) !important; }
 :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="grille"] > .sb-rangee [data-titre] { color: var(--sbp-encre) !important; }
 :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="grille"] > .vrm-ann-compte-tete .vrm-ann-compte-nom { color: var(--sbp-encre) !important; }
 
@@ -492,10 +492,10 @@
 :root:root:root:root:root body .vrm-fp .vrm-fp-num.is-sans::before { content: none !important; }
 :root:root:root:root:root body .vrm-fp .vrm-fp-num.is-double { color: var(--sbp-doublon) !important; box-shadow: var(--sbp-pl-sh), inset 0 0 0 1px var(--sbp-doublon) !important; }
 :root:root:root:root:root body .vrm-fp .vrm-fp-titre { font: 650 18px/1.25 var(--sbp-texte) !important; letter-spacing: -.015em !important; color: var(--sbp-encre) !important; }
-:root:root:root:root:root body .vrm-fp .vrm-fp-heros-prix { font: 200 42px/.9 var(--sbp-affiche) !important; letter-spacing: -.045em !important; color: var(--sbp-encre) !important; font-variant-numeric: tabular-nums !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-heros-prix { font: 500 42px/.9 var(--sbp-affiche) !important; letter-spacing: -.03em !important; color: var(--sbp-encre) !important; font-variant-numeric: tabular-nums !important; }
 :root:root:root:root:root body .vrm-fp .vrm-fp-heros-photo { border-radius: 14px !important; background: var(--sbp-socle) !important; box-shadow: var(--sbp-om-pose) !important; overflow: hidden !important; }
 :root:root:root:root:root body .vrm-fp .vrm-fp-tuile { background: var(--sbp-creux) !important; box-shadow: var(--sbp-puits-sh) !important; border: 0 !important; border-radius: 16px !important; }
-:root:root:root:root:root body .vrm-fp .vrm-fp-tuile > b { font: 300 24px/1 var(--sbp-affiche) !important; letter-spacing: -.03em !important; color: var(--sbp-encre) !important; font-variant-numeric: tabular-nums !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-tuile > b { font: 500 24px/1 var(--sbp-affiche) !important; letter-spacing: -.03em !important; color: var(--sbp-encre) !important; font-variant-numeric: tabular-nums !important; }
 :root:root:root:root:root body .vrm-fp .vrm-fp-tuile > span, :root:root:root:root:root body .vrm-fp .vrm-fp-tuile > small { color: var(--sbp-encre2) !important; }
 :root:root:root:root:root body .vrm-fp :is(.vrm-fp-retour, .vrm-lien-action) { color: var(--sbp-lien) !important; }
 :root:root:root:root:root body .vrm-fp .vrm-fp-fermer {
@@ -527,7 +527,7 @@
 :root:root:root:root:root body .vrm-fp .vrm-fp-depuis-ligne [data-chiffres] { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 8px !important; margin: 0 0 8px !important; }
 :root:root:root:root:root body .vrm-fp .vrm-fp-depuis-ligne :is([data-fiche-duo], [data-chiffres]) .vrm-fiche-cell { min-height: 56px !important; height: auto !important; padding: 8px 10px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; gap: 4px !important; }
 :root:root:root:root:root body .vrm-fp .vrm-fp-depuis-ligne :is([data-fiche-duo], [data-chiffres]) .vrm-fiche-cell > span:first-child { font: 550 11.5px/1.2 var(--sbp-texte) !important; color: var(--sbp-encre2) !important; }
-:root:root:root:root:root body .vrm-fp .vrm-fp-depuis-ligne :is([data-fiche-duo], [data-chiffres]) .vrm-fiche-cell :is(button, [data-marge]) { font: 300 20px/1.1 var(--sbp-affiche) !important; color: var(--sbp-encre) !important; min-height: 44px !important; text-align: left !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-depuis-ligne :is([data-fiche-duo], [data-chiffres]) .vrm-fiche-cell :is(button, [data-marge]) { font: 500 20px/1.1 var(--sbp-affiche) !important; color: var(--sbp-encre) !important; min-height: 44px !important; text-align: left !important; }
 :root:root:root:root:root body .vrm-fp .vrm-fp-depuis-ligne :is([data-fiche-duo], [data-chiffres]) .vrm-fiche-cell :is(button, [data-marge]) * { font: inherit !important; color: inherit !important; }
 @media (max-width: 420px) { :root:root:root:root:root body .vrm-fp .vrm-fp-depuis-ligne [data-chiffres] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
 
@@ -562,7 +562,7 @@
 /* La bande. */
 :root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-bande { background: transparent !important; box-shadow: none !important; border: 0 !important; padding: 0 4px !important; gap: 24px !important; }
 :root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-bande .vrm-ui-bande-item { background: transparent !important; box-shadow: none !important; border: 0 !important; padding: 0 !important; }
-:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-bande .vrm-ui-bande-n { font: 300 27px/1 var(--sbp-affiche) !important; letter-spacing: -.03em !important; color: var(--sbp-encre) !important; font-variant-numeric: tabular-nums !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-bande .vrm-ui-bande-n { font: 500 27px/1 var(--sbp-affiche) !important; letter-spacing: -.03em !important; color: var(--sbp-encre) !important; font-variant-numeric: tabular-nums !important; }
 :root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-bande .vrm-ui-bande-n .vrm-ms-au-moins { font: 550 12.5px/1 var(--sbp-texte) !important; color: var(--sbp-encre2) !important; letter-spacing: 0 !important; }
 :root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-bande .vrm-ui-bande-l { font: 550 12.5px/1.2 var(--sbp-texte) !important; color: var(--sbp-encre2) !important; }
 /* Les puces d'état et le compte : des touches posées (l'ambre reste au texte d'un geste à faire). */

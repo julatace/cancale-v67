@@ -32,13 +32,13 @@ html:root:root:root:root body .vrm-app-shell .vrm-main .vrm-tache[data-espace="v
 }
 html:root:root:root:root body .vrm-app-shell .vrm-main .vrm-tache[data-espace="ventes"] .sb-tete-haut { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 12px !important; min-height: 44px; width: 100%; }
 html:root:root:root:root body .vrm-app-shell .vrm-main .vrm-tache[data-espace="ventes"] .sb-tete .sb-tete-titre {
-  flex: 1 1 auto !important; margin: 0 !important; padding: 0 !important; font: 400 26px/1.1 var(--sb-police-affiche) !important; letter-spacing: -.03em !important; color: var(--sb-encre) !important; text-align: left !important;
+  flex: 1 1 auto !important; margin: 0 !important; padding: 0 !important; font: 600 26px/1.1 var(--sb-police-affiche) !important; letter-spacing: -.03em !important; color: var(--sb-encre) !important; text-align: left !important;
 }
 html:root:root:root:root body .vrm-app-shell .vrm-main .vrm-tache[data-espace="ventes"] .sb-tete-ronds { display: flex !important; gap: 8px !important; align-items: center !important; flex: 0 0 auto !important; }
 html:root:root:root:root body .vrm-app-shell .vrm-main .vrm-tache[data-espace="ventes"] .sb-tete-corps { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 12px !important; min-width: 0; width: 100%; margin-top: 6px; }
 html:root:root:root:root body .vrm-app-shell .vrm-main .vrm-tache[data-espace="ventes"] .sb-tete-chiffre { margin: 0 !important; display: flex !important; align-items: center !important; gap: 12px !important; min-width: 0; flex: 1 1 auto; color: var(--sb-encre); }
 html:root:root:root:root body .vrm-app-shell .vrm-main .vrm-tache[data-espace="ventes"] .sb-chiffre-affiche {
-  font: 200 88px/.8 var(--sb-police-affiche); letter-spacing: -.065em; font-variant-numeric: tabular-nums lining-nums; color: var(--sb-encre);
+  font: 500 88px/.8 var(--sb-police-affiche); letter-spacing: -.035em; font-variant-numeric: tabular-nums lining-nums; color: var(--sb-encre);
   font-feature-settings: "tnum", "lnum", "kern"; white-space: nowrap; padding-bottom: 4px;
 }
 html:root:root:root:root body .vrm-app-shell .vrm-main .vrm-tache[data-espace="ventes"] .sb-chiffre-affiche.is-passu { color: var(--sb-encre-2); }
@@ -76,7 +76,7 @@ html:root:root:root:root body .vrm-app-shell .vrm-main .vrm-tache[data-espace="v
 }
 html:root:root:root:root body .vrm-app-shell .vrm-main .vrm-tache[data-espace="ventes"] .sb-tuile-lib { display: block; font: 600 13px/1.2 var(--sb-police-texte); color: var(--sb-encre); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 12px; }
 html:root:root:root:root body .vrm-app-shell .vrm-main .vrm-tache[data-espace="ventes"] .sb-tuile-bas { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
-html:root:root:root:root body .vrm-app-shell .vrm-main .vrm-tache[data-espace="ventes"] .sb-tuile-chiffre { font: 300 30px/.9 var(--sb-police-affiche); letter-spacing: -.04em; font-variant-numeric: tabular-nums lining-nums; color: var(--sb-encre); }
+html:root:root:root:root body .vrm-app-shell .vrm-main .vrm-tache[data-espace="ventes"] .sb-tuile-chiffre { font: 500 30px/.9 var(--sb-police-affiche); letter-spacing: -.04em; font-variant-numeric: tabular-nums lining-nums; color: var(--sb-encre); }
 html:root:root:root:root body .vrm-app-shell .vrm-main .vrm-tache[data-espace="ventes"] .sb-tuile-filtre.is-ambre .sb-tuile-chiffre { color: var(--sb-ambre); }
 html:root:root:root:root body .vrm-app-shell .vrm-main .vrm-tache[data-espace="ventes"] .sb-tuile-unite { font: 500 12px/1.2 var(--sb-police-texte); color: var(--sb-encre-2); white-space: nowrap; }
 html:root:root:root:root body .vrm-app-shell .vrm-main .vrm-tache[data-espace="ventes"] .sb-diode { position: absolute; top: 10px; right: 10px; width: 6px; height: 6px; border-radius: 50%; background: rgb(var(--sb-o) / .16); box-shadow: inset 0 .5px 1px rgb(var(--sb-o) / .35); transition: background 120ms ease-out, box-shadow 120ms ease-out; }
@@ -88,7 +88,7 @@ html:root:root:root:root body .vrm-app-shell .vrm-main .vrm-tache[data-espace="v
 @media (min-width: 1024px) {
   html:root:root:root:root body .vrm-app-shell .vrm-main .vrm-tache[data-espace="ventes"] .sb-tuiles-filtres { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); grid-auto-rows: 1fr; gap: 14px; overflow: visible; margin: 0; padding: 0; }
   html:root:root:root:root body .vrm-app-shell .vrm-main .vrm-tache[data-espace="ventes"] .sb-tuile-filtre { max-width: none; height: auto !important; min-height: 96px !important; padding: 14px 16px 14px !important; border-radius: var(--sb-r-tuile) !important; }
-  html:root:root:root:root body .vrm-app-shell .vrm-main .vrm-tache[data-espace="ventes"] .sb-tuile-chiffre { font-size: 48px; font-weight: 200; }
+  html:root:root:root:root body .vrm-app-shell .vrm-main .vrm-tache[data-espace="ventes"] .sb-tuile-chiffre { font-size: 48px; font-weight: 500; }
 }
 
 /* ════════════════════════════════════════════════════════════════════════════

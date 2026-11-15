@@ -80,7 +80,7 @@
   --sb-r-vignette: 11px;
   --sb-r-plaque: 6px;
   /* Polices (studio-polices.css). */
-  --sb-police-affiche: 'Urbanist VRM', 'SF Pro Display', -apple-system, system-ui, sans-serif;
+  --sb-police-affiche: 'Inter VRM', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;   /* (15 nov., Julien : « je veux que ça soit pro ») Inter partout ; plus d'Urbanist fin */
   --sb-police-texte: 'Inter VRM', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --sb-chiffres: "tnum" 1, "lnum" 1, "cv11" 1, "kern" 1;
   /* Mouvement : une courbe, sans rebond (amorti critique). */
@@ -190,15 +190,15 @@ html body { font-family: var(--sb-police-texte); font-feature-settings: var(--sb
 html[data-theme="light"] body, html[data-theme="dark"] body { background: var(--sb-haut); }
 .sb-affiche, .sb-chiffre-affiche, .sb-ecran-titre { font-family: var(--sb-police-affiche); font-feature-settings: var(--sb-chiffres); }
 /* Le grand chiffre d'un écran : fin et énorme ; l'euro petit, léger, remonté. */
-.sb-chiffre-affiche { font-weight: 200; font-size: 96px; line-height: .8; letter-spacing: -.065em; white-space: nowrap; color: var(--sb-encre); }
-.sb-chiffre-affiche--tuile { font-size: 68px; letter-spacing: -.05em; }
-.sb-chiffre-affiche--moyen { font-weight: 300; font-size: 38px; letter-spacing: -.03em; }
-.sb-chiffre-affiche--bande { font-weight: 300; font-size: 27px; line-height: 1; letter-spacing: -.03em; }
-.sb-eur { display: inline-block; font-size: .44em; font-weight: 300; line-height: 1; letter-spacing: 0; margin-left: .08em; vertical-align: baseline; transform: translateY(-.92em); }
-.sb-prix { font-family: var(--sb-police-affiche); font-weight: 400; font-size: 21px; line-height: 1; letter-spacing: -.02em; font-feature-settings: var(--sb-chiffres); white-space: nowrap; }
+.sb-chiffre-affiche { font-weight: 500; font-size: 96px; line-height: .8; letter-spacing: -.035em; white-space: nowrap; color: var(--sb-encre); }
+.sb-chiffre-affiche--tuile { font-size: 68px; letter-spacing: -.03em; }
+.sb-chiffre-affiche--moyen { font-weight: 500; font-size: 38px; letter-spacing: -.03em; }
+.sb-chiffre-affiche--bande { font-weight: 500; font-size: 27px; line-height: 1; letter-spacing: -.03em; }
+.sb-eur { display: inline-block; font-size: .44em; font-weight: 500; line-height: 1; letter-spacing: 0; margin-left: .08em; vertical-align: baseline; transform: translateY(-.92em); }
+.sb-prix { font-family: var(--sb-police-affiche); font-weight: 600; font-size: 21px; line-height: 1; letter-spacing: -.02em; font-feature-settings: var(--sb-chiffres); white-space: nowrap; }
 .sb-prix .sb-eur { font-size: .68em; transform: translateY(-.2em); margin-left: .16em; font-weight: 400; }
 /* Le titre d'écran et la ligne au-dessus. */
-.sb-ecran-titre { font-weight: 400; font-size: 34px; line-height: 1; letter-spacing: -.03em; color: var(--sb-encre); margin: 0; }
+.sb-ecran-titre { font-weight: 650; font-size: 34px; line-height: 1; letter-spacing: -.03em; color: var(--sb-encre); margin: 0; }
 .sb-surtitre { font: 500 13px/1 var(--sb-police-texte); color: var(--sb-encre-2); margin: 0 0 7px; }
 @media (min-width: 1024px) { .sb-ecran-titre { font-size: 38px; } .sb-chiffre-affiche { font-size: 104px; } }
 
@@ -355,7 +355,7 @@ button.sb-rangee { cursor: pointer; }
 
 /* La bande de chiffres : sur le fond, sans carte. */
 .sb-bande { display: flex; align-items: baseline; gap: 24px; flex-wrap: wrap; row-gap: 6px; white-space: nowrap; }
-.sb-bande-n, .sb-bande > b { font-family: var(--sb-police-affiche); font-weight: 300; font-size: 27px; line-height: 1; letter-spacing: -.03em; font-feature-settings: var(--sb-chiffres); color: var(--sb-encre); }
+.sb-bande-n, .sb-bande > b { font-family: var(--sb-police-affiche); font-weight: 500; font-size: 27px; line-height: 1; letter-spacing: -.03em; font-feature-settings: var(--sb-chiffres); color: var(--sb-encre); }
 .sb-bande-n .sb-eur, .sb-bande > b .sb-eur { transform: translateY(-.5em); font-size: .56em; }
 .sb-bande-l, .sb-bande > b + span { font: 500 12.5px/1 var(--sb-police-texte); color: var(--sb-encre-2); margin-left: 5px; }
 
@@ -631,7 +631,7 @@ body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transition: transform 36
 
 /* ── 7.10 Les grands titres d'écran : l'affiche du studio (Urbanist 400) ── */
 :root:root:root body .vrm-main :is(.vrm-screen-head .vrm-display, .vrm-tache-tete h1, .vrm-market-heading h1, .vrm-fu-titre-tete) {
-  font-family: var(--sb-police-affiche) !important; font-weight: 400 !important; letter-spacing: -.03em !important; color: var(--sb-encre);
+  font-family: var(--sb-police-affiche) !important; font-weight: 600 !important; letter-spacing: -.03em !important; color: var(--sb-encre);
 }
 :root:root:root body .vrm-main .vrm-fu-date-tete { font-family: var(--sb-police-texte) !important; font-weight: 500 !important; font-size: 13px !important; letter-spacing: 0 !important; color: var(--sb-encre-2) !important; }
 }   /* fin de @layer vrm-premium */

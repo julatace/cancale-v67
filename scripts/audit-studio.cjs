@@ -108,9 +108,10 @@ function juger(depot) {
 
   // S5 — les polices.
   const pol = sansCom(lire('src/design/studio-polices.css'));
-  for (const f of ['urbanist-latin-wght-normal.woff2', 'inter-latin-wght-normal.woff2']) dit(fs.existsSync(path.join(RACINE, 'src/design/polices', f)) && pol.includes(`./polices/${f}`), `S5 ${f} est dans le dépôt et nommé par studio-polices.css`);
-  for (const f of ['LICENCE-Urbanist-OFL.txt', 'LICENCE-Inter-OFL.txt']) dit(fs.existsSync(path.join(RACINE, 'src/design/polices', f)) && /SIL Open Font License/.test(fs.readFileSync(path.join(RACINE, 'src/design/polices', f), 'utf8')), `S5 ${f} jointe (OFL)`);
-  dit((pol.match(/font-display:\s*swap/g) || []).length === 2 && !/font-display:\s*(block|auto)/.test(pol), 'S5 font-display: swap sur les deux polices');
+  for (const f of ['inter-latin-wght-normal.woff2']) dit(fs.existsSync(path.join(RACINE, 'src/design/polices', f)) && pol.includes(`./polices/${f}`), `S5 ${f} est dans le dépôt et nommé par studio-polices.css`);
+  for (const f of ['LICENCE-Inter-OFL.txt']) dit(fs.existsSync(path.join(RACINE, 'src/design/polices', f)) && /SIL Open Font License/.test(fs.readFileSync(path.join(RACINE, 'src/design/polices', f), 'utf8')), `S5 ${f} jointe (OFL)`);
+  dit((pol.match(/font-display:\s*swap/g) || []).length === 1 && !/font-display:\s*(block|auto)/.test(pol), 'S5 font-display: swap sur la police (Inter seule depuis le 15 nov.)');
+  dit(!/Urbanist/.test(pol) && !/urbanist-latin/.test(lire('src/design/polices.js')) && /--sb-police-affiche:\s*'Inter VRM'/.test(css), 'S5 l’affiche est en Inter (15 nov., Julien : « pro ») — plus d’Urbanist');
   dit(!/url\(\s*['"]?https?:/.test(pol + css), 'S5 aucune police ni image chargée d’ailleurs');
 
   // S6 — les fichiers migrés : quatre formes, ou la ligne / tuile / lame entière.

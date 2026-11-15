@@ -491,7 +491,7 @@ import { CLE_VISITE } from "./visiteBulles.js";
 import Conseils, { ChiffreConseil, useReglageConseils } from "./Conseils.jsx";
 import { LIGNE_ACCOMPAGNEMENT, accompagner } from "./accompagnement.js";
 // (14 nov., lot accompagnement) Les quatre moments d'un geste : avant, pendant, après, échec (src/ui/Accompagne.jsx).
-import { AccAvant, AccApres, AccEchec, AccPendant, AccHote, AccVide, AccPremiereFois } from "./ui/Accompagne.jsx";
+import { AccAvant, AccApres, AccEchec, AccPendant, AccHote, AccVide } from "./ui/Accompagne.jsx";
 import { estIphoneSafari, estInstallee } from "./guideIphone.js";
 // (6 nov.) VRM ouvert à des clients : le mode exemple (données inventées, en mémoire
 // seulement) et le guide de démarrage (quatre étapes cochées sur une preuve lue).
@@ -18331,9 +18331,9 @@ function PhraseEcran({ cle, className = '' }) {
   const p = useProfilVendeur();   // (11 nov., lot DJ2) « paires » seulement pour Sneakers
   const t = cle && phraseEcranPour(cle, p.vend || vendActuel());
   const aide = cle && AIDE_ECRANS[cle] ? <AideEcran cle={cle}/> : null;
-  // (14 nov., lot accompagnement) La PREMIÈRE fois sur l'écran : une phrase d'aide discrète, sous la phrase de
-  // l'écran, désactivable (« Compris » · « Ne plus afficher ces aides ») — src/ui/Accompagne.jsx.
-  const premiere = cle && cle !== 'journee' ? <AccPremiereFois ecran={cle}/> : null;
+  // (15 nov., Julien : « j'aime pas trop les écritures… enlève les écritures ») Plus d'aide « première fois »
+  // sous la phrase de l'écran (« Compris » · « Ne plus afficher ces aides ») : le « ? » suffit.
+  const premiere = null;
   if (!t) return aide ? <><p className={'vrm-phrase-ecran vrm-phrase-ecran-seule' + (className ? ' ' + className : '')}>{aide}</p>{premiere}</> : premiere;
   // ⚠️ (14 nov., refonte de la coque — Julien, capture d'Annonces : « Annonces » + deux lignes d'explication + « ? »)
   // La phrase n'est plus ÉCRITE sous le titre : le « ? » reste, à côté du titre, et ouvre l'aide de l'écran. La
@@ -47736,9 +47736,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const blocsTete = {
                 phrase: (<>
                 {(() => { const pj = loading ? null : phraseDuJour({ envoyer: { n: T[0].t ? T[0].t.n : 0, pasSu: !!T[0].pasSu, presses: T[0].t && T[0].t.presses }, retirer: { n: T[1].t ? T[1].t.n : 0, pasSu: !!T[1].pasSu } }, h);
-                  return pj ? <p className="vrm-phrase-ecran vrm-fu-phrase-tete" data-phrase-jour={pj} data-phrase-jour-env={T[0].pasSu ? '' : String(T[0].t ? T[0].t.n : 0)} data-phrase-jour-ret={T[1].pasSu ? '' : String(T[1].t ? T[1].t.n : 0)}>{pj}{AIDE_ECRANS.journee ? <AideEcran cle="journee"/> : null}</p>
+                  return pj ? <p className="vrm-phrase-ecran vrm-fu-phrase-tete" data-phrase-jour={pj} data-phrase-jour-env={T[0].pasSu ? '' : String(T[0].t ? T[0].t.n : 0)} data-phrase-jour-ret={T[1].pasSu ? '' : String(T[1].t ? T[1].t.n : 0)}><span className="vrm-sr-seul">{pj}</span>{AIDE_ECRANS.journee ? <AideEcran cle="journee"/> : null}</p>
                     : <PhraseEcran cle="journee" className="vrm-fu-phrase-tete"/>; })()}
-                <AccPremiereFois ecran="journee"/>
                 </>),
                 frise: (<>
                 {!premierJour && (
