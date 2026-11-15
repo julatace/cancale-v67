@@ -166,4 +166,7 @@
   :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-ann-c="place"], :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .vrm-ann-th > span:last-child { display: none !important; }
 }
 
+@media (min-width: 768px) {
+  :root:root:root:root:root:root:root body .vrm-tache[data-tache="annonces"] > .vrm-tache-tete h1 { font: 750 28px/1.1 Inter, system-ui, sans-serif !important; letter-spacing: -.03em !important; color: #FFFFFF !important; }
+}
 } /* fin de @layer vrm-verre */
