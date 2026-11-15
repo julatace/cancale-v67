@@ -8368,11 +8368,14 @@ function tickEmpreintes() {
       await chrome.storage.local.set({ [EMPREINTES_TOUR]: { at: Date.now() } });
     } catch (_) { return 0; }
     // 5.382 : Vinted d'abord ; sans image Vinted à ce tour, une photo Leboncoin / Vestiaire.
-    let n = 0;
-    try { n = await empreintesUnTour(); } catch (_) { n = 0; }
-    if (n) return n;
-    try { return await empreintesSitesUnTour(); } catch (_) { return 0; }
-    finally { try { await chrome.storage.local.remove(EMPREINTES_TOUR); } catch (_) {} }
+    // ⚠️ Le verrou du tour se lève dans TOUS les cas (un `finally` pour les deux) : sinon une image
+    //    Vinted laissait le tour verrouillé 3 min (vu par audit-photos-comptes, E2).
+    try {
+      let n = 0;
+      try { n = await empreintesUnTour(); } catch (_) { n = 0; }
+      if (n) return n;
+      try { return await empreintesSitesUnTour(); } catch (_) { return 0; }
+    } finally { try { await chrome.storage.local.remove(EMPREINTES_TOUR); } catch (_) {} }
   })().finally(() => { _tourEmpreintes = null; });
   return _tourEmpreintes;
 }

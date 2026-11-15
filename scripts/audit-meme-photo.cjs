@@ -57,6 +57,7 @@ const MUTATIONS = {
   onglet: ['vinted-sync-extension/background.js', '    if (!(await ouvert(p.site, p.compte))) continue;\n', ''],
   cookie: ['vinted-sync-extension/background.js', "const res = await fetch(cible.url, { credentials: 'omit', cache: 'no-store' });\n    const type = String((res.headers && res.headers.get && res.headers.get('content-type')) || '');\n    const taille = Number((res.headers && res.headers.get && res.headers.get('content-length')) || 0);\n    if (!res.ok || !/^image\\//i.test(type) || taille > EMPREINTES_SITES_MAX_OCTETS)", "const res = await fetch(cible.url, { credentials: 'include', cache: 'no-store' });\n    const type = String((res.headers && res.headers.get && res.headers.get('content-type')) || '');\n    const taille = Number((res.headers && res.headers.get && res.headers.get('content-length')) || 0);\n    if (!res.ok || !/^image\\//i.test(type) || taille > EMPREINTES_SITES_MAX_OCTETS)"],
   lecture: ['vinted-sync-extension/background.js', "const r = await sbGet(`app_data?id=eq.${ligne}&select=a:data->payload->annonces`);\n    if (r === null) { restent.push(...liste); noterDiag('empreintes_sites_lecture_ratee'); continue; }", "const r = (await sbGet(`app_data?id=eq.${ligne}&select=a:data->payload->annonces`)) || [];"],
+  verrou: ['vinted-sync-extension/background.js', "      try { return await empreintesSitesUnTour(); } catch (_) { return 0; }\n    } finally { try { await chrome.storage.local.remove(EMPREINTES_TOUR); } catch (_) {} }", "      try { return await empreintesSitesUnTour(); } catch (_) { return 0; } finally { try { await chrome.storage.local.remove(EMPREINTES_TOUR); } catch (_) {} }\n    } finally { }"],
   ecart: ['vinted-sync-extension/background.js', '  if (depuis >= 0 && depuis < EMPREINTES_ECART_MS) return 0;\n  const plan = await planEmpreintesSites();', '  const plan = await planEmpreintesSites();'],
 };
 if (MUT) {
@@ -265,7 +266,8 @@ function pixels(nom) {
       const g = nouveau(); g.lignes.harvest_111_listings = { capturedAt: new Date().toISOString(), payload: { items: [{ id: 1, title: 'x', photo: { url: 'https://images1.vinted.net/t/v1/f800/1.jpeg?s=S' } }] } };
       g.ctx.fetch = ((f0) => async (u, o) => (/vinted\.net/.test(String(u)) ? { ok: true, status: 200, headers: { get: (k) => (/content-type/i.test(k) ? 'image/jpeg' : null) }, blob: async () => new Blob(['v1']) } : f0(u, o)))(g.ctx.fetch);
       g.onglets = null; await g.ctx.tickEmpreintes();
-      dit(g.images.length === 0, 'E4 · Vinted d’abord : une image Vinted prise ⇒ aucune autre à ce tour', String(g.images.length)); }
+      dit(g.images.length === 0, 'E4 · Vinted d’abord : une image Vinted prise ⇒ aucune autre à ce tour', String(g.images.length));
+      dit(!g.store.vrmEmpreintesTour, 'E4 · après une image Vinted, le verrou du tour est levé (sinon 3 min sans aucune empreinte)', JSON.stringify(g.store.vrmEmpreintesTour || null)); }
 
     // ── C1 ──
     const cap = /EXT_CAPACITES = \{[^}]*\bmemephoto: '([\d.]+)'/.exec(app);
