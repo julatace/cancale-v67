@@ -39,7 +39,7 @@ export function datesFavorisParAnnonce(lignes) {
   if (!Array.isArray(lignes)) return null;
   const m = {};
   for (const l of lignes) {
-    const id = (/\/items\/([1-9]\d{0,19})(?:[/?#]|$)/.exec(str(l && l.lien)) || [])[1];
+    const id = (/\/items\/([1-9]\d{0,19})(?:[-/?#]|$)/.exec(str(l && l.lien)) || [])[1];
     const t = ms(l && l.date);
     if (!id || t == null) continue;
     if (!m[id] || t > m[id]) m[id] = t;

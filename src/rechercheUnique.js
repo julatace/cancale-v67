@@ -39,7 +39,10 @@
 // trouvée par son N° exact est marquée `exact` (l'écran la laisse au bloc).
 
 const str = (v) => String(v == null ? '' : v);
-export const normaliser = (s) => str(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[ \s]+/g, ' ').trim();
+// (15 nov., vendre plus — vitesse) Un texte tout en ASCII n'a ni accent ni espace insécable : il saute la
+// décomposition NFD (la plus chère, mesurée : la moitié de la construction de l'index). Même résultat.
+const ASCII = /^[\x00-\x7f]*$/;
+export const normaliser = (s) => { const x = str(s); return (ASCII.test(x) ? x : x.normalize('NFD').replace(/[̀-ͯ]/g, '')).toLowerCase().replace(/[ \s]+/g, ' ').trim(); };
 // Une identité (suivi, code, transaction) : lettres et chiffres seulement, en majuscules.
 export const alnum = (s) => str(s).toUpperCase().replace(/[^A-Z0-9]/g, '');
 // La clé d'un N° (la même que `cleNum` de l'app) : « 007 » = « 7 », « b125 » = « B125 ».

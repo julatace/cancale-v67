@@ -29,7 +29,7 @@ export const NOUVEAUTES = Object.freeze([
   // (15 nov., vendre plus) docs/passation/2026-11-15-vendre-plus.md — baisse conseillée, relance des favoris, loupe.
   { id: 'baisses-conseillees', date: '2026-11-15', titre: 'Baisses conseillées pour les annonces qui dorment', phrase: 'Baisser ou garder, la raison, ton plancher ; tu appliques.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'relance-favoris', date: '2026-11-15', titre: 'Relancer les favoris au bon moment', phrase: 'Des gens l’aiment, rien depuis 7 jours : une offre, ton clic.', tab: 'journee', pour: 'tous', mode: 'tous' },
-  { id: 'loupe-stock-retours', date: '2026-11-15', titre: 'La loupe trouve aussi le stock et les retours', phrase: 'Un lieu de rangement, un suivi de retour : tout se trouve.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'loupe-stock-retours', date: '2026-11-15', titre: 'La loupe trouve le stock et les retours', phrase: 'Un lieu de rangement, un suivi de retour : tout se trouve.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « J'aime la 9 ») docs/passation/2026-11-15-verre-depoli.md — le thème « Verre dépoli ».
   { id: 'verre-depoli', date: '2026-11-15', titre: 'Nouveau thème : verre dépoli sur bleu profond', phrase: 'Le chiffre du jour en blanc, tout se lit sur le verre.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « c'est moche et il y a des bugs ») docs/passation/2026-11-15-annonces-achats.md
