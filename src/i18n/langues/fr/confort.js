@@ -9,7 +9,7 @@ export default {
   "confort.sansTitre": "Sans titre",
   // 118 — écran d'atelier
   "confort.atelier.lib": "Écran d'atelier",
-  "confort.atelier.desc": "Plein écran allumé : colis du jour, chiffre du jour.",
+  "confort.atelier.desc": "Plein écran allumé : colis du jour, chiffre du jour.",
   "confort.atelier.titre": "Écran d'atelier",
   "confort.atelier.aEnvoyer": "à envoyer",
   "confort.atelier.aEnvoyerRetard": {"one": "à envoyer · {n} en retard", "other": "à envoyer · {n} en retard"},

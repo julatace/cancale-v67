@@ -6,6 +6,7 @@ import ecran_correspondances from './es/correspondances.js';   // (15 nov.) Publ
 import ecran_capte from './es/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_renvoyer from './es/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_retrait_ailleurs from './es/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
+import ecran_finition from './es/finition.js';   // (15 nov.) la finition écran par écran
 import ecran_idees from './es/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './es/ventes.js';
 import ecran_commun from './es/commun.js';
@@ -2262,4 +2263,5 @@ export default {
   ...ecran_retrait_ailleurs,
   ...ecran_correspondances,
   ...ecran_renvoyer,
+  ...ecran_finition,
 };

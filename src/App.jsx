@@ -918,6 +918,7 @@ import "./design/studio-paires.css";   // (14 nov., « Studio bleu clair ») Pai
 // portée par `.sj-journee` seulement, EN DERNIER (docs/passation/2026-11-14-studio-journee.md).
 import { BentoJournee, placerTuiles, RangeeJ, LienJ, MontantAffiche } from "./JourneeStudio.jsx";
 import "./design/studio-journee.css";
+import "./design/studio-finition.css";   // (15 nov.) La passe de finition écran par écran — `@layer vrm-finition`, la PREMIÈRE couche (index.html) : docs/passation/2026-11-15-finition-ecrans.md
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
@@ -3909,6 +3910,10 @@ function BoutonSync({ ouvert, onBasculer }) {
               <span style={{display:'flex',color:syncStatus==='synced'?C.muted:C.warn}}>
                 <Icon name={(syncStatus==='error'||syncStatus==='refus')?'cloudOff':syncStatus==='synced'?'cloud':'sync'} size={20}/>
               </span>
+              {/* (15 nov., finition — Julien voyait un nuage barré sans savoir ce qu'il voulait dire) Le nuage barré dit UN
+                  mot court : « Pas enregistré » (la base n'a pas répondu, la sauvegarde sera retentée) ou « À recharger »
+                  (la base a refusé : l'écran est périmé). Un iPhone ne montre pas l'infobulle. */}
+              {(syncStatus==='error'||syncStatus==='refus') ? <span className="vrm-sync-mot" data-sync-mot="">{tr(syncStatus==='refus'?'fin.sync.refus':'fin.sync.erreur')}</span> : null}
               {/* ⚠️ L'HEURE DE SYNCHRO EST RETIRÉE. Sur un iPhone, l'en-tête
                   portait : retour, icône VRM, mot « VRM », nuage, heure, loupe,
                   cloche, rouage — huit éléments. L'icône de nuage dit déjà si
@@ -35665,12 +35670,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const qr = !!(t && (t.qr || t.qrUrl || t.qrB64));
       // (9 nov., lot AD) + `id` (l'identité publiée) et `compte` (dans « à retirer » = `vrm_colis_retirer`, ou
       // seulement « à vérifier ») : le mode relais hors ligne ne montre QUE les colis comptés.
-      if (code || qr || desaccord) codes.push({ code: code || '', ...(desaccord ? { desaccord } : {}), lieu, carrier: t.carrier || '', suivi: t.suivi || '', titre: titreDuColis(commandeRetrait(t), t.artTitle), qr, id: identRetraitEmail(t), compte: comptesE.has(t) });
+      // (15 nov., finition — Julien : « fais ça mieux pour les colis ») + `depuis` : l'arrivée au point quand elle est SÛRE
+      // (`arriveeColisEmail`, « oui » ; une borne n'est pas une date d'arrivée) — elle dit QUEL colis quand rien ne le nomme.
+      const arr = arriveeColisEmail(t);
+      if (code || qr || desaccord) codes.push({ code: code || '', ...(desaccord ? { desaccord } : {}), lieu, carrier: t.carrier || '', suivi: t.suivi || '', titre: titreDuColis(commandeRetrait(t), t.artTitle), qr, id: identRetraitEmail(t), compte: comptesE.has(t), depuis: arr && arr.sur === 'oui' ? arr.ms : null });
     }
     for (const o of pickupUnion.extra) {
       const r = colisRelais[String((o && o.transaction_id) || '')] || null;
       const code = r ? codeRetrait(r.code) : ''; const qr = !!(r && (r.qr || r.qrUrl || r.qrB64));
-      if (code || qr) codes.push({ code: code || '', lieu: (r && r.lieu) || '', carrier: '', suivi: '', titre: String((o && o.title) || '').slice(0, 60), qr, id: identRetraitVinted(o), compte: true });
+      // (15 nov., finition) Le NOM du point d'abord (« 43 Rue du Lt F… » se coupait) : l'adresse reste dans la fiche du colis.
+      const clR = cleanLieu(r && r.lieu); const lieuR = nomPointRetrait(clR) || clR.nom || '';
+      if (code || qr) codes.push({ code: code || '', lieu: lieuR, carrier: (r && r.transporteur) || '', suivi: '', titre: String((o && o.title) || '').slice(0, 60), qr, id: identRetraitVinted(o), compte: true });
     }
     return codes;
   };
@@ -46361,8 +46371,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const verif = p.depasse && !p.retard;
             const titreL = presses.length===1 ? `1 colis${verif?' :':''} ${quand}` : `${presses.length} colis pressés — le plus urgent${verif?' :':''} ${quand}`;
             const subL = `${num}${o.title||''}${qui?` · ${qui}`:''}${p.limite==='estimee'?' · date estimée (vente + 7 j)':''}`;
+            // (15 nov., finition) La ligne de Ma journée coupait « Le plus urgent : date estimée… » : elle porte SA
+            // forme courte (le nombre ; la limite du plus pressé en trois mots, `limiteCourte`), la phrase entière reste dans
+            // l'infobulle et le nom du bouton (`plein`). Même source, aucun mot inventé.
+            const courtL = presses.length===1 ? '1 colis' : `${presses.length} colis pressés`;
+            const quandC = limiteCourte(quand);
             jobs.push({ id:'colis-limite', n:presses.length, icon:'truck', color:C.warn, urgent:!!p.depasse,
-              title: titreL, sub: subL,
+              title: titreL, sub: subL, court: courtL, detail: quandC.charAt(0).toUpperCase() + quandC.slice(1), plein: `${titreL} — ${subL}`,
               tab:'cat_bord', prio:p.depasse?0.15:0.6, limiteHeure:p.heure||'',
               photos: presses.map(t => orderPhoto(t.o)) });
             // (1er nov., « très répétitif ») Pas en retard : la case « À envoyer » le porte
@@ -48055,13 +48070,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <span key={k} className="sj-code">{plaque(c)}<span className="sj-code-ou">{nomTr(c) || c.lieu || ''}</span></span>))}</span>
                     : <><b className="sj-n">{n}</b><span className="sj-sous">{sous(xR) || <span className="sj-sous-l">{tr('sj.codesPasLus')}</span>}</span></>,
                   deplie: (<>
-                    {(xR.t && xR.t.aVerifier > 0) || sousCase(xR) ? <p className="sj-sous">{sous(xR)}</p> : null}
+                    {/* (15 nov., finition) « + N à vérifier » est déjà dans le titre de la carte (`soR`) : pas une seconde fois dessous. */}
+                    {((xR.t && xR.t.aVerifier > 0) || sousCase(xR)) && !soR ? <p className="sj-sous">{sous(xR)}</p> : null}
                     {codes.length ? <div className="sj-liste" role="list">{codes.map((c, k) => (
                       <div key={k} role="listitem" className="sj-code-rangee" data-sj-code={c.code || ''} data-sj-compte={c.compte ? '1' : '0'}>
                         {plaque(c)}
-                        <span className={'sb-vignette' + (photoRetrait.get(c.id) ? '' : ' is-vide')} aria-hidden="true">{photoRetrait.get(c.id) ? <PhotoVinted src={photoRetrait.get(c.id)} alt="" loading="lazy" decoding="async" width={40} height={40}/> : <Icon name="pin" size={18}/>}</span>
-                        <span className="sj-r-txt"><span className="sj-r-titre">{c.titre || tr('sj.colisSansTitre')}</span>
-                          <span className="sj-r-meta">{[nomTr(c), c.lieu].filter(Boolean).join(' · ')}{c.compte ? '' : ' · ' + tr('sj.aVerifier')}</span></span>
+                        {/* (15 nov., finition — « on ne sait pas QUELLE paire ») La photo de SA commande (par identité,
+                            `photoRetrait`) ; sinon le LOGO de son transporteur, jamais une case vide. Sans titre relié : « Colis
+                            Mondial Relay », et la date d'arrivée SÛRE dit lequel. Rien n'est deviné par ressemblance. */}
+                        {(() => { const ph = photoRetrait.get(c.id); const cleT = !ph && c.carrier ? cleTransporteur(c.carrier) : '';
+                          return <span className={'sb-vignette' + (ph ? '' : cleT ? ' is-logo' : ' is-vide')} aria-hidden="true" data-sj-vignette={ph ? 'photo' : cleT ? 'transporteur' : 'vide'}>{ph ? <PhotoVinted src={ph} alt="" loading="lazy" decoding="async" width={40} height={40}/> : cleT ? <LogoTransporteur cle={cleT} taille={40} repli={<Icon name="pin" size={18}/>}/> : <Icon name="pin" size={18}/>}</span>; })()}
+                        <span className="sj-r-txt"><span className="sj-r-titre">{c.titre || (nomTr(c) ? tr('fin.retrait.colisDe', { t: nomTr(c) }) : tr('sj.colisSansTitre'))}</span>
+                          <span className="sj-r-meta">{[c.titre ? nomTr(c) : '', c.lieu, c.depuis ? tr('fin.retrait.depuis', { d: new Date(c.depuis).toLocaleDateString(localeCourante(), { day: 'numeric', month: 'short' }) }) : ''].filter(Boolean).join(' · ')}{c.compte ? '' : ' · ' + tr('sj.aVerifier')}</span></span>
                       </div>
                     ))}</div> : <p className="sj-vide">{xR.pasSu ? (xR.titrePasSu || tr('sj.pasLu')) : n === 0 ? tr('sj.rienARetirer') : tr('sj.codesPasLus')}</p>}
                     {n > comptes.length && !xR.pasSu ? <p className="sj-sous"><span className="sj-sous-l">{tr('sj.sansCode', { n: n - comptes.length })}</span></p> : null}
@@ -52262,6 +52282,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const est = limiteEstimee({ arriveeMs: arr && arr.ms, transporteur: carrierKey(t ? t.carrier : ((ev && ev.carrier) || '')) || '' });
                     return est ? fl('À retirer avant', `vers le ${est.jour.slice(8, 10)}/${est.jour.slice(5, 7)} · estimée (${nomTransporteur(carrierKey(t ? t.carrier : ev.carrier))} garde ${est.garde} j)`, { 'data-colis-limite': 'estimee', 'data-colis-limite-estimee': est.jour })
                       : fl('À retirer avant', 'date inconnue', { 'data-colis-limite': 'inconnue' }); })())}
+              {/* (15 nov., finition — Julien : « le NOM du point d'abord, l'adresse dans la fiche ») Le point : son nom, puis
+                  son adresse entière (la ligne et Ma journée n'en disent que le nom). Lu dans l'e-mail ou la conversation ; pas lu ⇒ rien. */}
+              {(() => { const rel = !t && o ? relaisDe(o) : null; const cl = cleanLieu(t ? t.lieu : (rel && rel.lieu)); const nomP = nomPointRetrait(cl) || cl.nom;
+                return nomP || cl.adresse ? fl(tr('fin.retrait.point'), <span className="vrm-rpf-lieu"><b className="vrm-rpf-lieu-nom">{nomP}</b>{cl.adresse ? <span className="vrm-rpf-lieu-adr">{cl.adresse}</span> : null}</span>, { 'data-rpf-point': '' }) : null; })()}
               {/* (12 nov., règle 3) Pas de code : où il est, en entier (la ligne n'en dit que le début). */}
               {!(x.code || x.qr || x.code2) && !x.horsCompte ? fl('Code', (!t || t.source === 'vinted-commande') ? 'sur Vinted — l’extension le lira à ta prochaine visite' : `dans l’e-mail de ${nomTransporteur(carrierKey(t.carrier)) || 'du transporteur'} — pas encore reçu`, { 'data-colis-code-ou': (!t || t.source === 'vinted-commande') ? 'vinted' : 'email' }) : null}
               {/* (11 nov.) Le n° de suivi est sur la ligne (une fois, §7) : ici le compte. */}
@@ -53687,8 +53711,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 if (!inc.length) return null;
                 const et = pdfEtiquettesParTx() || {}, vus = pdfVusParTx() || {};
                 const raisons = compterRaisons(inc.map((x) => { const t = String((x.b && x.b.transaction) || (x.o && x.o.transaction_id) || ''); return raisonInconnu({ bord: x.b || null, pdf: et[t] || null, vu: vus[t] || null }); }));
-                return <p className="vrm-colis-envoyes-inconnus" data-envoyes-inconnus={inc.length} style={{margin:'0 0 8px',fontSize:12,color:C.muted,lineHeight:1.4}}>
-                  {inc.length} colis sans transporteur lu : {raisons.map((r, i) => <React.Fragment key={r.cle}>{i ? ' · ' : ''}<span data-inconnu-raison={r.cle} data-inconnu-n={r.n}>{r.n} {r.texte}</span></React.Fragment>)}.
+                // (15 nov., finition — Julien : « trop d'écritures ») Le NOMBRE reste à l'écran (une couverture, §5) ; les raisons
+                // (« 3 étiquettes qui nomment deux transporteurs ») passent dans l'infobulle et au lecteur d'écran, même texte.
+                const phraseInc = `${inc.length} colis sans transporteur lu : ${raisons.map((r) => `${r.n} ${r.texte}`).join(' · ')}.`;
+                return <p className="vrm-colis-envoyes-inconnus" data-envoyes-inconnus={inc.length} title={phraseInc} style={{margin:'0 0 8px',fontSize:12,color:C.muted,lineHeight:1.4}}>
+                  {inc.length} colis sans transporteur lu<span className="vrm-env-inc-raisons"> : {raisons.map((r, i) => <React.Fragment key={r.cle}>{i ? ' · ' : ''}<span data-inconnu-raison={r.cle} data-inconnu-n={r.n}>{r.n} {r.texte}</span></React.Fragment>)}.</span>
                 </p>;
               })()}
               <div className="vrm-colis-grille" style={{display:'flex',flexDirection:'column',gap:6}}>
