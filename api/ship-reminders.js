@@ -1077,15 +1077,18 @@ export function texteMatin({ overdue, aVerifier = 0, dueToday, dueTomorrow, ebay
     : ebayDus === total ? `${total} colis eBay à envoyer`
     : vestiaireDus === total ? `${total} colis Vestiaire à envoyer`
     : `${total} colis à envoyer, dont ${dont.join(' et ')}`;
-  const corps = total > 0 ? `${quoi} (${parts.join(' · ')}).` : '';
   // La date estimée : dite pour celles d'aujourd'hui et de demain, et pour
   // celles « à vérifier » (une phrase, §7 : leur part le dit déjà « estimée »).
   const est = vinted && vinted.estimees ? vinted.estimees.estimeeDepassee + vinted.estimees.aujourdhui + vinted.estimees.demain : 0;
-  const estime = est ? ` Date estimée pour ${est} (vente + 7 j : bordereau pas reçu par email ; la vraie limite peut tomber jusqu'à 3 j plus tard).` : '';
+  // (15 nov.) Corps ≤ 90 : l'estimation est dite DANS la parenthèse (« · 1 estimée ») ; le
+  // détail (vente + 7 j, bordereau pas reçu, jusqu'à 3 j de plus) est dans l'app.
+  const estime = '';
+  const corps = total > 0 ? `${quoi} (${[...parts, est ? `${est} estimée${est > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ')}).` : '';
   const stop = nePasPoster ? ` ${nePasPoster > 1 ? `${nePasPoster} acheteurs eBay ont` : 'Un acheteur eBay a'} demandé l'annulation : ne poste pas ${nePasPoster > 1 ? 'ces colis' : 'ce colis'}.` : '';
   return {
     title: nePasPoster && !total ? 'Commande eBay : ne poste pas' : overdue ? 'Colis en retard à expédier' : 'Colis à expédier',   // (8 nov.) le retard DANS le titre, sans emoji
-    body: (corps + estime + stop).trim() + (ebayDus || vestiaireDus || nePasPoster ? " Ouvre l'app pour les voir." : " Ouvre l'app pour les préparer."),
+    // (15 nov.) « Ouvre l'app… » seulement s'il tient dans les 90 caractères (le toucher l'ouvre de toute façon).
+    body: ((b0, fin) => (b0 + fin).length <= 90 ? b0 + fin : b0)((corps + estime + stop).trim(), ebayDus || vestiaireDus || nePasPoster ? " Ouvre l'app pour les voir." : " Ouvre l'app pour les préparer."),
   };
 }
 

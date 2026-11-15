@@ -112,13 +112,16 @@ export function texteSoir({ colis = null, retraits = null, offres = null, manque
   const H = c.heure ? heureCourte(c.heure) : '';
   const phrases = [];
   // (15 nov.) Corps ≤ 90 (api/_lib/notif-redaction.js) : le titre dit déjà « Demain ».
-  if (nDemain) phrases.push(nDemain === 1 ? `1 colis à déposer${H ? ` avant ${H}` : ''}.` : `${nDemain} colis à déposer${H ? `, le premier avant ${H}` : ''}.`);
-  if (nRetard) phrases.push(`${nRetard} déjà en retard : ${pl(nRetard, 'dépose-le', 'dépose-les')} d’abord.`);
-  if (nVerif) phrases.push(`${nVerif} ${pl(nVerif, 'date estimée passée', 'dates estimées passées')} : vois Vinted.`);
-  if (nRetraits) phrases.push(nRetraits === 1 && lieuCourt(retraits.lieu) ? `Dernier jour pour retirer à ${lieuCourt(retraits.lieu)}.` : `Dernier jour pour retirer ${nRetraits} colis.`);
-  if (nOffres) phrases.push(`${nOffres} ${pl(nOffres, 'offre Vestiaire expire', 'offres Vestiaire expirent')} demain soir.`);
-  if (manques.length && nColis) phrases.push(`${manques.join(' et ')} pas ${pl(manques.length, 'relu', 'relus')} : peut-être plus.`);
-  return { title, body: phrases.join(' ') };
+  // (15 nov.) Corps ≤ 90 (api/_lib/notif-redaction.js) : des morceaux courts joints par « · »
+  // (le titre dit déjà « Demain »), le retard, la date estimée et le point toujours dits.
+  if (nDemain) phrases.push(nDemain === 1 ? (H ? `1 avant ${H}` : '1 colis à déposer') : (H ? `${nDemain} à déposer, le premier avant ${H}` : `${nDemain} colis à déposer`));
+  if (nRetard) phrases.push(`${nRetard} déjà en retard`);
+  if (nVerif) phrases.push(`${nVerif} ${pl(nVerif, 'date estimée passée', 'dates estimées passées')} : vérifie sur Vinted`);
+  if (nRetraits) phrases.push(nRetraits === 1 && lieuCourt(retraits.lieu) ? `dernier jour pour retirer à ${lieuCourt(retraits.lieu)}` : `dernier jour pour ${nRetraits} retraits`);
+  if (nOffres) phrases.push(`${nOffres} ${pl(nOffres, 'offre Vestiaire expire', 'offres Vestiaire expirent')} demain soir`);
+  if (manques.length && nColis) phrases.push(`${manques.join(' et ')} pas ${pl(manques.length, 'relu', 'relus')} : peut-être plus`);
+  const corpsSoir = phrases.join(' · ');
+  return { title, body: corpsSoir.charAt(0).toUpperCase() + corpsSoir.slice(1) };
 }
 
 // ── L'APERÇU, famille par famille (ids de api/_lib/notif-textes.js, FAMILLES) ──
