@@ -3,7 +3,7 @@ export default {
   "parametres.cat.compte": "Mon compte",
   "parametres.cat.compte.desc": "Profil, abonnement, connexion",
   "parametres.cat.plateformes": "Mes plateformes",
-  "parametres.cat.plateformes.desc": "Comptes, extension, e-mails",
+  "parametres.cat.plateformes.desc": "Comptes, extension, boîte mail",
   "parametres.cat.ventes": "Ventes et colis",
   "parametres.cat.ventes.desc": "Impression, colis",
   "parametres.cat.stock": "Stock et numéros",

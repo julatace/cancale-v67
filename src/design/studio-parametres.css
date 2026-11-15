@@ -20,7 +20,10 @@
 :root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-cat-ligne .vrm-set-lib > b { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
 :root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-cat-ligne .vrm-set-desc { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; margin-top: 3px !important; }
 :root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-cat-ligne .vrm-set-val { max-width: 38% !important; font-size: 15px !important; }
-:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-cat-ligne .vrm-set-ic { width: 32px !important; height: 32px !important; border-radius: 10px !important; }
+/* L'icône d'une CATÉGORIE : une plaque d'encre, le dessin clair — elle ne se confond pas avec l'icône
+   gravée d'un réglage (au bureau, le sommaire et les réglages sont sur la même page). */
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-cat-ic { width: 32px; height: 32px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; background: var(--sb-encre); color: var(--sb-sur-encre, #fff); box-shadow: 0 1px 2px rgb(var(--sb-o) / .18); }
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-cat-ic svg { display: block; }
 /* L'appui : la rangée s'enfonce (jamais un fond bleu). */
 :root:root:root:root:root:root body [data-espace="autres"].vrm-pm button.vrm-set-ligne:active { background: rgb(var(--sb-o) / .06) !important; }
 

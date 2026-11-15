@@ -194,7 +194,14 @@ async function parametres(nav, { W, theme }) {
     };
   });
   const m = await mesure();
-  dit(!m.doublons.length && m.n >= 12, 'H3', `${T} Réglages : une icône par ligne (${m.n} distinctes)`, m.doublons.join(' ¦ '));
+  // (15 nov., Paramètres en dix catégories) Au téléphone, « Organisation » est sous « Stock et rangement », DANS la
+  // catégorie « Stock et numéros » (CLAUDE.md §3) : on la touche, comme lui, puis on revient.
+  if (!m.orgaLien && await pg.locator('[data-categorie-ouvrir="stock"]').first().isVisible().catch(() => false)) {
+    await pg.locator('[data-categorie-ouvrir="stock"]').first().click(); await attendre(700);
+    const s = await mesure(); m.orgaLien = s.orgaLien; m.orgaLigne = s.orgaLigne;
+    await pg.locator('[data-categorie-retour]').first().click().catch(() => {}); await attendre(500);
+  }
+  dit(!m.doublons.length && m.n >= (W < 600 ? 10 : 12), 'H3', `${T} Réglages : une icône par ligne (${m.n} distinctes)`, m.doublons.join(' ¦ '));
   dit(!m.orgaLigne && m.orgaLien, 'H3', `${T} « Organisation » n'est plus une ligne de la liste, mais reste joignable par son lien`, JSON.stringify({ ligne: m.orgaLigne, lien: m.orgaLien }));
   dit(!m.cdc.length, 'H3', `${T} Réglages : aucune carte dans une carte`, m.cdc.join(' ¦ '));
   dit(!m.statut || (m.statut.haut >= m.statut.titreHaut - 4 && m.statut.haut <= m.statut.titreBas), 'H3', `${T} « Enregistrement… » dans la ligne du titre, pas au-dessus`, JSON.stringify(m.statut));

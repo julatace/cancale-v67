@@ -2404,7 +2404,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     return (
       <button key={c.id} type="button" className="vrm-set-ligne vrm-pm-cat-ligne" data-categorie-ouvrir={c.id} data-categorie-contient={` ${c.ids.join(' ')} `}
         {...(c.id === 'compte' ? { 'data-vue': 'compte' } : {})} aria-current={actif ? 'true' : undefined} onClick={surClic}>
-        <IconeReglage name={c.ic}/>
+        <span className="vrm-pm-cat-ic" aria-hidden="true"><Icon name={c.ic} size={17}/></span>
         <span className="vrm-set-lib"><b style={{color:C.text}}>{titreCat(c.id)}</b><small className="vrm-set-desc" style={{color:C.muted}}>{tr(`parametres.cat.${c.id}.desc`)}</small></span>
         {v && <span className="vrm-set-val" data-categorie-valeur={c.id} style={{color: ambre ? C.warn : C.muted}}>{v}</span>}
         {chevron}
@@ -2420,7 +2420,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   };
   const ecranCategorie = (c, { avecTitre }) => (
     <section key={c.id} id={`parametres-${c.id}`} className="vrm-pm-cat" data-categorie-ecran={c.id}>
-      {avecTitre && <h2 className="vrm-pm-cat-h" style={{color:C.text}}><IconeReglage name={c.ic}/>{titreCat(c.id)}</h2>}
+      {avecTitre && <h2 className="vrm-pm-cat-h" style={{color:C.text}}><span className="vrm-pm-cat-ic" aria-hidden="true"><Icon name={c.ic} size={17}/></span>{titreCat(c.id)}</h2>}
       {c.expert && <p className="vrm-pm-expert" data-reglages-expert="" style={{color:C.muted}}>{tr('parametres.expert')}</p>}
       {teteCategorie(c.id)}
       {c.groupes.map((g) => groupe({ id: g.id, titre: g.titreCle ? tr(g.titreCle) : (g.titre || null), items: g.items, pied: g.pied }))}
