@@ -9,7 +9,7 @@
 .vrm-mph-phrase { margin: 0 0 10px; font: 600 15px/1.35 var(--sb-police-texte, inherit); color: var(--sb-encre, inherit); display: flex; align-items: center; gap: 6px; }
 .vrm-mph-cotes { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .vrm-mph-cotes.is-choix { overflow-x: auto; overscroll-behavior-x: contain; align-items: flex-start; padding-bottom: 4px; scrollbar-width: thin; }
-.vrm-mph-cote { margin: 0; flex: 1 1 0; min-width: 0; max-width: 220px; }
+.vrm-mph-cote { margin: 0; flex: 1 1 0; min-width: 0; max-width: 168px; }
 .vrm-mph-cotes.is-choix .vrm-mph-cote { flex: 0 0 132px; }
 .vrm-mph-choix { flex: 0 0 132px; display: flex; flex-direction: column; gap: 8px; }
 .vrm-mph-photo { display: block; aspect-ratio: 3 / 4; width: 100%; border-radius: 14px; overflow: hidden; background: var(--sb-socle, rgba(120, 120, 128, .12)); box-shadow: var(--sb-ombre-pose, none); }

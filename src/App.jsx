@@ -25823,9 +25823,11 @@ function empreintesEbayPage(autres, deja) {
 }
 // Tout calculer une fois (relu au plus toutes les 2 min, ou sur demande), publié dans
 // src/memePhotoEtat.js : la feuille, Ma journée et les écrans des sites LISENT.
-let _memePhotoEnCours = null, _memePhotoAt = 0;
+let _memePhotoEnCours = null, _memePhotoAt = 0, _memePhotoAttente = false;
 async function chargerMemePhoto(force = false) {
-  if (!AUTH.user?.id || !isCloudReady()) return null;
+  // Les fiches et les liens viennent du nuage : avant lui, on attend (une fois), jamais un calcul sur du vide.
+  if (!isCloudReady()) { if (!_memePhotoAttente) { _memePhotoAttente = true; onCloudReady(() => { _memePhotoAttente = false; chargerMemePhoto(force); }); } return null; }
+  if (!AUTH.user?.id) return null;
   if (_memePhotoEnCours) return _memePhotoEnCours;
   if (!force && Date.now() - _memePhotoAt < 120000 && lireMemePhoto()) return lireMemePhoto();
   _memePhotoEnCours = (async () => {

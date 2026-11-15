@@ -34,7 +34,7 @@
 'use strict';
 const path = require('path');
 const fs = require('fs'), http = require('http');
-const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const RACINE = path.join(__dirname, '..', '..');
 const DIST = process.env.BANC_DIST || path.join(RACINE, 'dist');
@@ -141,7 +141,7 @@ const projette = (row, sel) => {
 
 async function ouvrir(b, vp, sc, { sombre = false, tab = 'journee', images }) {
   const tel = vp.width < 600;
-  const ctx = await b.newContext({ viewport: vp, deviceScaleFactor: tel ? 2 : 1, timezoneId: 'Europe/Paris', locale: 'fr-FR', ...(tel ? { isMobile: true, hasTouch: true } : {}), colorScheme: sombre ? 'dark' : 'light' });
+  const ctx = await b.newContext({ serviceWorkers: 'block', viewport: vp, deviceScaleFactor: tel ? 2 : 1, timezoneId: 'Europe/Paris', locale: 'fr-FR', ...(tel ? { isMobile: true, hasTouch: true } : {}), colorScheme: sombre ? 'dark' : 'light' });
   const pg = await ctx.newPage();
   const errs = [], ecritures = [];
   pg.on('pageerror', (e) => errs.push(e.message));
@@ -178,7 +178,7 @@ async function ouvrir(b, vp, sc, { sombre = false, tab = 'journee', images }) {
     if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*').replace(/_/g, '.') + '$'); return j(sc.LIGNES.filter((r) => re.test(r.id)).map((r) => projette(r, sel))); }
     return j([]);
   });
-  await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+  await pg.route(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/api\//, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
   await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
   if (tab === 'journee') {
     await pg.waitForFunction(() => document.querySelector('.vrm-fu-afaire, [data-tout-a-jour]') || /pas pu s'afficher/.test(document.body.innerText), null, { timeout: 30000 }).catch(() => {});
@@ -199,7 +199,7 @@ const lireFeuille = (pg) => pg.evaluate(() => {
     const ra = autre && autre.getBoundingClientRect(), rv = vin && vin.getBoundingClientRect();
     const g = p.querySelector('[data-meme-photo-relier]'), n = p.querySelector('[data-meme-photo-non]');
     return { id: p.getAttribute('data-meme-photo-prop'), numero: p.getAttribute('data-numero'), d: Number(p.getAttribute('data-distance')), phrase: (p.querySelector('.vrm-mph-phrase') || {}).textContent || '',
-      chargees: !!(ia && ia.complete && ia.naturalWidth > 0 && iv && iv.complete && iv.naturalWidth > 0), coteACote: !!(ra && rv && Math.abs(ra.top - rv.top) < 2 && rv.left >= ra.right),
+      srcA: ia ? ia.getAttribute("src").slice(0, 120) : "", chargees: !!(ia && ia.complete && ia.naturalWidth > 0 && iv && iv.complete && iv.naturalWidth > 0), coteACote: !!(ra && rv && Math.abs(ra.top - rv.top) < 2 && rv.left >= ra.right),
       hPhoto: ra ? Math.round(ra.height) : 0, hRelier: g ? Math.round(g.getBoundingClientRect().height) : 0, hNon: n ? Math.round(n.getBoundingClientRect().height) : 0, relier: g ? g.textContent : '' };
   });
   const ambs = [...s.querySelectorAll('[data-meme-photo-ambigu]')].map((a) => ({ id: a.getAttribute('data-meme-photo-ambigu'), raison: a.getAttribute('data-raison'), choix: [...a.querySelectorAll('[data-meme-photo-choisir]')].map((x) => x.getAttribute('data-meme-photo-choisir')),
@@ -222,7 +222,7 @@ const ecrit = (ecritures, re) => ecritures.some((e) => re.test(e.corps));
     const seuil = await gen.evaluate(() => window.__seuil);
     const d = { P1: await dist('P1', 'P1cdn'), P2: await dist('P2', 'P2vig'), P3: await dist('P3', 'P3cdn'), autreVue: await dist('P1', 'P1v3') };
     await gen.close();
-    console.log(`── jeu inventé : P1~P1(autre site) ${d.P1} · P2~vignette ${d.P2} · P3~P3(autre site) ${d.P3} · P1~P1 autre vue ${d.autreVue} (seuil ${seuil})`);
+    console.log(`── jeu inventé : P1~P1(autre site) ${d.P1} · P2~vignette ${d.P2} · P3~P3(autre site) ${d.P3} · P1~P1 autre vue ${d.autreVue} (seuil de l’alerte entre comptes ${seuil} ; une proposition exige ≤ 12, src/memePhoto.js)`);
     dit(d.P1 <= seuil && d.P2 <= seuil && d.P3 <= seuil && d.autreVue > seuil, 'le jeu : la même photo passée par un autre site est PROCHE, une autre photo de la même paire LOIN', JSON.stringify(d));
     if (CAPT) for (const n of ['P1', 'P1cdn', 'P1v3']) fs.writeFileSync(path.join(CAPT, `photo-${n}.${F[n].type === 'image/webp' ? 'webp' : 'jpg'}`), Buffer.from(F[n].b64, 'base64'));
     const A = scenario(F), C = scenario(F, { empreintesKO: true });
@@ -234,6 +234,7 @@ const ecrit = (ecritures, re) => ecritures.some((e) => re.test(e.corps));
         console.log(`\n── ${nomVp} px · ${th}`);
         await essaie(`M ${nomVp} ${th}`, async () => {
           const { ctx, pg, errs, ecritures } = await ouvrir(b, vp, A, { sombre, images: F });
+          await pg.locator("[data-journee-meme-photo]").first().scrollIntoViewIfNeeded().catch(() => {}); await pg.waitForTimeout(300);
           if (CAPT) await pg.screenshot({ path: path.join(CAPT, `mp-${nomVp}-${th}-journee.png`) });
           const c = await pg.evaluate(() => { const e = document.querySelector('[data-journee-meme-photo]'); if (!e) return { carte: false, texte: document.body.innerText.slice(0, 200) };
             const n = e.querySelector('.vrm-day-task-note'), t = e.querySelector('.vrm-day-task-title'); return { carte: true, n: e.getAttribute('data-n'), titre: t && t.textContent, note: n && n.textContent, cNote: n && getComputedStyle(n).color, cTitre: t && getComputedStyle(t).color }; });
@@ -243,17 +244,18 @@ const ecrit = (ecritures, re) => ecritures.some((e) => re.test(e.corps));
           const avant = ecritures.length;
           await toucher(pg, tel, '[data-journee-meme-photo]').catch(() => {});
           await pg.waitForSelector('[data-feuille-meme-photo] [data-meme-photo]', { timeout: 8000 }).catch(() => {});
+          await pg.evaluate(() => document.querySelectorAll('[data-meme-photo] img').forEach((i) => { i.loading = 'eager'; })).catch(() => {});
           await pg.waitForFunction(() => [...document.querySelectorAll('[data-meme-photo] img')].every((i) => i.complete), null, { timeout: 8000 }).catch(() => {});
           await pg.waitForTimeout(600);
           if (CAPT) await pg.screenshot({ path: path.join(CAPT, `mp-${nomVp}-${th}-feuille.png`) });
-          if (CAPT && tel) await pg.screenshot({ path: path.join(CAPT, `mp-${nomVp}-${th}-feuille-entiere.png`), fullPage: true });
+          if (CAPT) { await pg.locator("[data-meme-photo-ambigu]").first().scrollIntoViewIfNeeded().catch(() => {}); await pg.waitForTimeout(400); await pg.screenshot({ path: path.join(CAPT, `mp-${nomVp}-${th}-ambigu.png`) }); await pg.locator("[data-meme-photo-prop]").first().scrollIntoViewIfNeeded().catch(() => {}); }
           const f = await lireFeuille(pg);
           dit(f.feuille, 'M2 la carte ouvre la feuille', f.etat);
           if (f.feuille) {
             dit(f.props.map((p) => p.id + '>' + p.numero).sort().join(' ') === 'Leboncoin:5001>124 eBay:2001>125', 'M2 deux propositions : Leboncoin 5001 ⇒ N°124, eBay 2001 ⇒ N°125', f.props.map((p) => p.id + '>' + p.numero).join(' '));
             dit(!f.props.some((p) => /5002|5003|5009/.test(p.id)) && !f.ambs.some((a) => /5002|5003|5009/.test(a.id)), 'M2 une AUTRE photo de la même paire (5002), une annonce déjà reliée (5003), l’annonce d’un autre vendeur (5009) : rien', '');
             dit(f.ambs.length === 1 && f.ambs[0].id === 'Vestiaire:vc-9' && f.ambs[0].choix.sort().join(' ') === 'Vestiaire:vc-9|300 Vestiaire:vc-9|301', 'M2 Vestiaire vc-9 AMBIGU : N°300 et N°301 montrés, il choisit', JSON.stringify(f.ambs));
-            dit(f.props.every((p) => p.chargees && p.coteACote && p.hPhoto >= 120), 'M2 les deux photos CHARGÉES, côte à côte, grandes (≥ 120 px)', JSON.stringify(f.props.map((p) => [p.chargees, p.coteACote, p.hPhoto])));
+            dit(f.props.every((p) => p.chargees && p.coteACote && p.hPhoto >= 120), 'M2 les deux photos CHARGÉES, côte à côte, grandes (≥ 120 px)', JSON.stringify(f.props.map((p) => [p.chargees, p.coteACote, p.hPhoto, p.srcA])));
             dit(f.props.every((p) => p.hRelier >= 44 && p.hNon >= 44) && f.ambs.every((a) => a.hChoix >= 44), 'M2 chaque geste ≥ 44 px', JSON.stringify(f.props.map((p) => [p.hRelier, p.hNon])));
             dit(/N°124/.test((f.props.find((p) => p.numero === '124') || {}).phrase || ''), 'M2 « Même photo que N°124 (Vinted) »', (f.props[0] || {}).phrase);
             dit(!f.deborde && !f.coupe, 'M2 aucun débordement', JSON.stringify({ deborde: f.deborde, coupe: f.coupe }));
