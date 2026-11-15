@@ -151,14 +151,28 @@ window.__famille = async (g, tranche, nTranches, nInst = 50) => {
   const ex = path.join(RACINE, 'public', 'exemple');
   const reels = fs.readdirSync(ex).filter((f) => f.endsWith('-400.webp')).sort().map((f) => '/ex/' + f);
   // Chaque tâche dans un onglet NEUF (mémoire rendue à la fin), `BANC_ONGLETS` à la fois.
+  // `BANC_CACHE=<dossier>` : chaque tâche finie y est rangée (clé = sources des règles + du jeu + la
+  // tâche) ; une relance reprend là où la précédente s'est arrêtée. Un onglet tombé est relancé (2 fois).
+  const CACHE = process.env.BANC_CACHE || '';
+  if (CACHE) fs.mkdirSync(CACHE, { recursive: true });
+  const empreinteSources = require('crypto').createHash('sha1').update(PAGE).digest('hex').slice(0, 12);
   const tache = async (fn, args) => {
-    const page = await nav.newPage();
-    page.setDefaultTimeout(0);
-    try {
-      await page.route('**/*', (r) => { const u = new URL(r.request().url()); if (u.pathname.startsWith('/ex/')) return r.fulfill({ status: 200, contentType: 'image/webp', body: fs.readFileSync(path.join(ex, path.basename(u.pathname))) }); return r.fulfill({ status: 200, contentType: 'text/html', body: PAGE }); });
-      await page.goto('http://localhost/fiabilite');
-      return await page.evaluate(([f, a]) => window[f](...a), [fn, args]);
-    } finally { await page.close().catch(() => {}); }
+    const cle = CACHE ? path.join(CACHE, require('crypto').createHash('sha1').update(empreinteSources + JSON.stringify([fn, args])).digest('hex').slice(0, 20) + '.json') : '';
+    if (cle && fs.existsSync(cle)) return JSON.parse(fs.readFileSync(cle, 'utf8'));
+    for (let essai = 0; ; essai++) {
+      const page = await nav.newPage();
+      page.setDefaultTimeout(0);
+      try {
+        await page.route('**/*', (r) => { const u = new URL(r.request().url()); if (u.pathname.startsWith('/ex/')) return r.fulfill({ status: 200, contentType: 'image/webp', body: fs.readFileSync(path.join(ex, path.basename(u.pathname))) }); return r.fulfill({ status: 200, contentType: 'text/html', body: PAGE }); });
+        await page.goto('http://localhost/fiabilite');
+        const res = await page.evaluate(([f, a]) => window[f](...a), [fn, args]);
+        if (cle) fs.writeFileSync(cle, JSON.stringify(res));
+        return res;
+      } catch (e) {
+        if (essai >= 2 || !/crash|closed/i.test(String(e && e.message))) throw e;
+        console.log(`   (onglet tombé pendant ${fn} ${JSON.stringify(args).slice(0, 60)} : relancé)`);
+      } finally { await page.close().catch(() => {}); }
+    }
   };
   const ONGLETS = Math.max(1, Number(process.env.BANC_ONGLETS || 3));
   const enParallele = async (liste) => { const res = new Array(liste.length); let k = 0; await Promise.all(Array.from({ length: ONGLETS }, async () => { while (k < liste.length) { const i = k++; res[i] = await liste[i](); } })); return res; };
@@ -168,7 +182,7 @@ window.__famille = async (g, tranche, nTranches, nInst = 50) => {
     // Les paires distinctes et les vraies photos, par lots de 8.
     const ids = [...Array.from({ length: NPAIRES }, (_, k) => 'P' + k), ...reels.map((_, i) => 'R' + i)];
     const lots = []; for (let i = 0; i < ids.length; i += 8) lots.push(ids.slice(i, i + 8));
-    const NT = 3;
+    const NT = Math.max(1, Number(process.env.BANC_TRANCHES || 8));
     const fams = ['meme-modele', 'meme-endroit-A', 'meme-endroit-B'];
     const taches = [...lots.map((l) => () => tache('__tp', [l, reels])), ...fams.flatMap((g) => Array.from({ length: NT }, (_, t) => () => tache('__famille', [g, t, NT, NFAM])))];
     const res = await enParallele(taches);
