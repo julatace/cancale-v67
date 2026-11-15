@@ -86,7 +86,7 @@ export default function BaissesConseillees({ lignes = null, ventesLues = true, o
         </ul>
         <div className="vrm-bp-bas">
           <p className="vrm-bp-note vrm-bc-note">{tr('bc.note')}</p>
-          <button type="button" className="vrm-ao-principal sb-btn-plein" data-bc-appliquer-tout={choisies.length} disabled={!choisies.length} onClick={() => onAppliquer(choisies)}>
+          <button type="button" className="vrm-ao-principal vrm-bc-tout" data-bc-appliquer-tout={choisies.length} disabled={!choisies.length} onClick={() => onAppliquer(choisies)}>
             {tr('bc.appliquerTout', { n: choisies.length })}
           </button>
         </div>

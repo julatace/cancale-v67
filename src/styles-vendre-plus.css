@@ -29,7 +29,7 @@ span.vrm-bc-case { width: 44px; height: 22px; }
 .vrm-bc-raison { font-size: 13px; color: var(--fu-gris, #6e6e73); line-height: 1.35; overflow-wrap: anywhere; }
 .vrm-bc-ligne.is-achat .vrm-bc-decision b { color: var(--sb-ambre, #764300); }
 .vrm-bc-geste { flex: none; min-height: 44px; min-width: 44px; padding: 0 14px; }
-.vrm-bc .vrm-bp-bas .sb-btn-plein { min-height: 50px; }
+.vrm-bc .vrm-bc-tout { min-height: 50px; width: 100%; }
 .vrm-bc-resume { margin: -4px 4px 6px; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .vrm-bc-note { margin: 0 4px; }
 /* Au téléphone : le geste passe SOUS le texte (le titre et la raison gardent la largeur). */
