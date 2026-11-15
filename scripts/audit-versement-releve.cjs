@@ -108,7 +108,7 @@ const NICHE = {
     const i = app.indexOf('const fetchVersementsVinted = async'), corps = app.slice(i, app.indexOf('\n};', i));
     // (14 nov., lot dates-versement) Le relevé entre dans LA règle `datesDeVersement` (transaction >
     // relevé > conversation > e-mail, audit-versement-sources) — toujours par CE module, projeté.
-    dit(i > 0 && /datesDeVersement\(rows, releve, /.test(corps) && /releve = versementsDuReleve\(releveL\)/.test(corps) && /lireTout\('id=like\.harvest_%25_releve_%25&select=id,l:data->lignes'(?:, \{ memo: true \})?\)/.test(corps), 'l’app (`fetchVersementsVinted`) complète les dates 450 par CE module, lecture projetée des seules lignes', corps.slice(-400));
+    dit(i > 0 && /datesDeVersement\(rows, releve, /.test(corps) && /releve = versementsDuReleveVerifies\(releveL, rows\)/.test(corps) && /lireTout\('id=like\.harvest_%25_releve_%25&select=id,l:data->lignes'(?:, \{ memo: true \})?\)/.test(corps), 'l’app (`fetchVersementsVinted`) complète les dates 450 par CE module (relevé VÉRIFIÉ seulement, 15 nov.), lecture projetée des seules lignes', corps.slice(-400));
   });
 
   console.log(`\n${ko ? `❌ ${ko} échec(s)` : '✅ tout est vert'} · ${ok} ✅`);
