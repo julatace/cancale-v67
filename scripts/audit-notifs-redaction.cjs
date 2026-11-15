@@ -41,7 +41,7 @@ const MUTATIONS = {
   'sans-scrub-strict': ['api/_lib/notif-redaction.js', "  for (const re of strict ? [...RE_IDS, ...RE_IDS_STRICTS] : RE_IDS) x = x.replace(re, ' ');", "  for (const re of RE_IDS) x = x.replace(re, ' ');"],
   'paire-oubliee': ['src/prixAchatVente.js', "titre: str(v.titre).slice(0, 80) })) };", "titre: '' })) };"],
   'date-machine': ['api/_lib/notif-redaction.js', "export const avantClair = (v, ctx = {}) => { const d = dateClaire(v, ctx);", "export const avantClair = (v, ctx = {}) => { const d = v ? { texte: String(v).slice(0, 10), relatif: false } : null;"],
-  'pseudo-acheteur': ['api/_lib/notif-apercus.js', "  fabrique('offre', { montant, article, juge:", "  fabrique('offre', { montant, article: [article, _qui].filter(Boolean).join(' · '), juge:"],
+  'pseudo-acheteur': ['api/_lib/notif-apercus.js', "  fabrique('offre', { montant, article, juge:", "  fabrique('offre', { montant, article: [_qui, article].filter(Boolean).join(' · '), juge:"],
   'nom-long': ['api/_lib/notif-redaction.js', "  if (t.length > max) t = compacter(t);", "  if (false) t = compacter(t);"],
   'corps-170': ['api/_lib/notif-redaction.js', 'export const CORPS_MAX = 90;', 'export const CORPS_MAX = 170;'],
   'langue-ignoree': ['api/_lib/push.js', "  const red = redaction ? rediger(redaction, { langue, maintenant: t, relatif: !plusTard }) : null;", "  const red = redaction ? rediger(redaction, { langue: 'fr', maintenant: t, relatif: !plusTard }) : null;"],
@@ -54,13 +54,19 @@ if (process.argv.includes('--mutations')) {
     const t = fs.mkdtempSync(path.join(os.tmpdir(), 'mut-notifs-'));
     try {
       for (const x of ['api', 'src', 'package.json']) fs.cpSync(path.join(R, x), path.join(t, x), { recursive: true });
+      fs.symlinkSync(NM, path.join(t, 'node_modules'), 'dir');
       fs.mkdirSync(path.join(t, 'public'), { recursive: true });
       for (const f of ['sw.js', 'vrm-icon-v5-192.png', 'vrm-badge-96.png']) fs.copyFileSync(path.join(R, 'public', f), path.join(t, 'public', f));
       const p = path.join(t, fic); const src = fs.readFileSync(p, 'utf8');
       if (!src.includes(avant)) { console.log(`❌ mutation ${nom} : ancre introuvable dans ${fic}`); rouges = -999; continue; }
       fs.writeFileSync(p, src.replace(avant, apres));
       const r = spawnSync(process.execPath, [__filename], { env: { ...process.env, AUDIT_RACINE: t, BANC_SILENCE: '1' }, encoding: 'utf8', timeout: 600000 });
-      const rouge = r.status !== 0;
+      // Rouge = le banc a TOURNÉ jusqu'au bout et une RÈGLE a échoué — jamais un banc qui lève
+      // (un module introuvable rendrait toute mutation « rouge » : un contrôle qui ne peut pas échouer).
+      const sortie = r.stdout || '';
+      const fini = /\d+ vert\(s\), \d+ rouge\(s\)/.test(sortie) && !/a levé/.test(sortie);
+      const rouge = r.status !== 0 && fini;
+      if (!fini) console.log(`   (le banc n’a pas tourné jusqu’au bout : ${sortie.split('\n').filter((l) => /a levé/.test(l)).slice(0, 1).join('').slice(0, 200)})`);
       console.log(`${rouge ? '✅' : '❌'} mutation « ${nom} » ⇒ ${rouge ? 'ROUGE (la règle est gardée)' : 'encore vert : la règle n’est pas gardée'}`);
       if (rouge) { rouges++; console.log('   ' + (r.stdout || '').split('\n').filter((l) => l.startsWith('❌')).slice(0, 2).join('\n   ').slice(0, 300)); }
     } finally { fs.rmSync(t, { recursive: true, force: true }); }
@@ -241,6 +247,8 @@ function serviceWorker() {
   await essaie('5 familles', async () => {
     const familles = [
       ['vente', { ...A.texteVendu({ article: 'Adidas Samba OG noir taille 41', prix: '65', compte: 'boutique_banc' }), tag: 'sale-k1', url: L.DESTINATIONS.vente({ tx: '7001' }) }, 'vente'],
+      // Un n° de transaction glissé dans le titre d'une annonce n'est jamais montré.
+      ['vente (n° dans le titre)', { ...A.texteVendu({ article: 'Puma Suede 7700998877 bleue', prix: '30', compte: 'boutique_banc' }), tag: 'sale-k9', url: L.DESTINATIONS.vente({ tx: '7009' }) }, 'vente'],
       ['argent', { ...A.texteArgentRecu({ montant: '61,20', article: 'Adidas Samba OG noir taille 41', compte: 'boutique_banc' }), tag: 'final-k2', url: L.DESTINATIONS.vente({}) }, 'argent'],
       ['bordereau', { ...A.texteBordereau({ modele: 'Air Max 90', numero: '124', tamponne: true, dateLimite: '17/11/2026 12:00' }), tag: 'bord-7003', url: L.DESTINATIONS.colis({ tx: '7003' }) }, 'expedier'],
       ['message', { ...A.texteMessage({ paire: 'Air Max 90 blanche taille 42', qui: PSEUDOS[1], compte: 'boutique_banc', extrait: 'Bonjour, toujours dispo ?' }), tag: 'msg-k4', url: L.DESTINATIONS.message({ conv: '55' }) }, 'message'],
