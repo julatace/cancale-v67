@@ -37,7 +37,7 @@
 .vrm-etag-rond:disabled { opacity: .32; cursor: default; }
 /* Un meuble coloré : ses montants, son chapeau et son fond prennent sa couleur. */
 .vrm-etag[data-couleur] .vrm-s2d-etagere {
-  background: color-mix(in srgb, var(--etag-fond) 70%, var(--vrm-surface, #FFFFFF));
+  background: color-mix(in srgb, var(--etag-fond) 70%, var(--sb-porcelaine, #FFFFFF));
   box-shadow: inset 6px 0 0 var(--etag-bord), inset -6px 0 0 var(--etag-bord), inset 0 6px 0 var(--etag-bord);
 }
 .vrm-etag[data-couleur] .vrm-s2d-planche, .vrm-etag[data-couleur] .vrm-s2d-socle { background: var(--etag-bord); }
@@ -58,7 +58,7 @@
 .vrm-s2d-case.is-vide[data-couleur] .vrm-s2d-plus { color: var(--etag-bord); opacity: 1; }
 .vrm-s2d-case[data-couleur]:not(.is-vide)::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 5px; z-index: 1; background: var(--etag-bord); pointer-events: none; }
 /* Une case prise par un N° qui n'est pas montré ici (compte écarté, lecture pas encore arrivée) : jamais « libre ». */
-.vrm-s2d-case.is-notee { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--vrm-muted, #8E8E93) 14%, transparent) 0 6px, transparent 6px 12px), var(--vrm-surface, #FFFFFF); }
+.vrm-s2d-case.is-notee { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--vrm-muted, #8E8E93) 14%, transparent) 0 6px, transparent 6px 12px), var(--sb-porcelaine, #FFFFFF); }
 .vrm-s2d-num.vrm-etag-notee { background: color-mix(in srgb, var(--vrm-muted, #6E6E73) 75%, transparent); }
 /* Deux paires présentes sous ce N° : le SEUL rouge (§5, §7). */
 .vrm-s2d-case.is-double { box-shadow: 0 0 0 3px var(--sb-doublon, var(--vrm-doublon)); z-index: 2; }
@@ -78,7 +78,7 @@
 .vrm-etag-stepper { display: flex; align-items: center; gap: 6px; }
 .vrm-etag-stepper .sb-touche { width: 44px; height: 44px; min-width: 44px; padding: 0; font-size: 20px; display: inline-grid; place-items: center; }
 .vrm-etag-stepper .sb-touche:disabled { opacity: .35; }
-.vrm-etag-stepper input { width: 64px; min-width: 0; height: 44px; box-sizing: border-box; text-align: center; font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; border-radius: 12px; border: 1px solid var(--vrm-line, #D6DCE3); background: var(--vrm-surface, #FFFFFF); color: var(--vrm-ink, inherit); -moz-appearance: textfield; appearance: textfield; }
+.vrm-etag-stepper input { width: 64px; min-width: 0; height: 44px; box-sizing: border-box; text-align: center; font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; border-radius: 12px; border: 1px solid var(--vrm-line, #D6DCE3); background: var(--sb-porcelaine, #FFFFFF); color: var(--sb-encre, inherit); -moz-appearance: textfield; appearance: textfield; }
 .vrm-etag-stepper input::-webkit-outer-spin-button, .vrm-etag-stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .vrm-etag-palette { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
 .vrm-etag-pastille-btn { width: 44px; height: 44px; min-width: 44px; display: inline-grid; place-items: center; padding: 0; }
@@ -87,7 +87,7 @@
 .vrm-etag-peindre { margin: 12px 0 8px; }
 .vrm-etag-toile { display: grid; gap: 4px; width: max-content; padding: 6px 2px; }
 .vrm-etag-toile .vrm-etag-regle { width: 44px; height: 44px; min-width: 44px; padding: 0; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.vrm-etag-toile-case { width: 44px; height: 44px; padding: 0; border: 0; border-radius: 6px; cursor: pointer; background: var(--etag-fond, var(--vrm-surface, #FFFFFF)); box-shadow: inset 0 0 0 1.5px var(--etag-bord, var(--vrm-line, #D6DCE3)); -webkit-tap-highlight-color: transparent; }
+.vrm-etag-toile-case { width: 44px; height: 44px; padding: 0; border: 0; border-radius: 6px; cursor: pointer; background: var(--etag-fond, var(--sb-porcelaine, #FFFFFF)); box-shadow: inset 0 0 0 1.5px var(--etag-bord, var(--vrm-line, #D6DCE3)); -webkit-tap-highlight-color: transparent; }
 .vrm-etag-toile-case[data-couleur-propre] { box-shadow: inset 0 0 0 2.5px var(--etag-bord); }
 .vrm-etag-toile-case:focus-visible, .vrm-etag-stepper input:focus-visible { outline: 2px solid var(--sb-diode, #0060CC); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .vrm-etag-descente { transition: none; } }
@@ -126,10 +126,9 @@
   .vrm-etag-piece { padding: 22px 24px 18px; border-radius: var(--sb-r-plan, 28px); background: var(--sb-verre-plan, rgb(255 255 255 / .8)); box-shadow: var(--sb-ombre-plan, none);
     border-bottom: 10px solid color-mix(in srgb, var(--sb-encre-2, #3F5468) 18%, transparent); gap: 28px 32px; }
 }
-/* La plaque du N° dans une case : lisible sur toute photo (porcelaine, encre, gravée). */
-.vrm-etag .vrm-s2d-case .vrm-s2d-num:not([data-vendue]):not([data-hors-ligne]):not(.vrm-etag-notee) { background: rgb(255 255 255 / .94); color: var(--sb-encre, #0C1D30); box-shadow: 0 .5px 1px rgb(0 0 0 / .25), inset 0 0 0 .5px rgb(0 0 0 / .08); font-size: 12px; letter-spacing: -.01em; }
-:root[data-theme="dark"] .vrm-etag .vrm-s2d-case .vrm-s2d-num:not([data-vendue]):not([data-hors-ligne]):not(.vrm-etag-notee) { background: rgb(12 29 48 / .92); color: #EAF2FB; box-shadow: 0 .5px 1px rgb(0 0 0 / .6), inset 0 0 0 .5px rgb(255 255 255 / .10); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vrm-etag .vrm-s2d-case .vrm-s2d-num:not([data-vendue]):not([data-hors-ligne]):not(.vrm-etag-notee) { background: rgb(12 29 48 / .92); color: #EAF2FB; } }
+/* La plaque du N° dans une case : lisible sur toute photo — les jetons du studio (porcelaine, encre, ombre posée),
+   redéfinis la nuit et par le style « Verre dépoli » (studio-verre.css) : aucune couleur codée ici. */
+.vrm-etag .vrm-s2d-case .vrm-s2d-num:not([data-vendue]):not([data-hors-ligne]):not(.vrm-etag-notee) { background: color-mix(in srgb, var(--sb-porcelaine, #FFFFFF) 94%, transparent); color: var(--sb-encre, #0C1D30); box-shadow: var(--sb-ombre-pose, 0 .5px 1px rgb(0 0 0 / .25)); font-size: 12px; letter-spacing: -.01em; }
 /* Sans photo : un carton dessiné, discret, jamais une lettre. */
 .vrm-s2d-sansphoto[data-sans-photo] { color: color-mix(in srgb, var(--vrm-muted, #8E8E93) 70%, transparent); }
 /* À l'ordinateur, la barre de recherche de l'app (`.vrm-barre-haut`, 74 px) est collée en haut de `.vrm-main` :
