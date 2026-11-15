@@ -71,10 +71,20 @@ const COLLECTER = (racineSel) => {
     for (const q of rg.getClientRects()) {
       if (q.width < 4 || q.height < 7) continue;
       if (q.top < 0 || q.bottom > innerHeight || q.left < 0 || q.right > innerWidth) continue;
+      // Coupé par un conteneur qui défile (la carte, une liste) : seulement la partie visible ;
+      // une ligne coupée à plus de 30 % n'est pas lue (on la lira en défilant).
+      let v = { l: q.left, t: q.top, r: q.right, b: q.bottom };
+      for (let a = el.parentElement || (el.getRootNode && el.getRootNode().host); a; a = a.parentElement || (a.getRootNode && a.getRootNode().host) || null) {
+        const ca = getComputedStyle(a);
+        if (ca.overflowX === 'visible' && ca.overflowY === 'visible') continue;
+        const ra = a.getBoundingClientRect();
+        v = { l: Math.max(v.l, ra.left), t: Math.max(v.t, ra.top), r: Math.min(v.r, ra.right), b: Math.min(v.b, ra.bottom) };
+      }
+      if (v.r - v.l < q.width * 0.7 || v.b - v.t < q.height * 0.7) continue;
       const cx = q.left + q.width / 2, cy = q.top + q.height / 2;
       const haut = (racine.elementFromPoint ? racine.elementFromPoint(cx, cy) : document.elementFromPoint(cx, cy));
       if (!haut || !(el.contains(haut) || haut.contains(el))) continue;   // caché sous autre chose (défilement, recouvrement)
-      out.push({ x: q.left, y: q.top, w: q.width, h: q.height, c: cs.color, fs: parseFloat(cs.fontSize), fw: Number(cs.fontWeight) || 400, t: t.slice(0, 48) });
+      out.push({ x: v.l, y: v.t, w: v.r - v.l, h: v.b - v.t, c: cs.color, fs: parseFloat(cs.fontSize), fw: Number(cs.fontWeight) || 400, t: t.slice(0, 48) });
     }
   }
   return out;
@@ -130,8 +140,12 @@ async function mesurer(pg, atelier, { racine = 'carte', dpr = 1, cadres = [] } =
   }
   await pg.evaluate(CACHER, { racineSel: racine === 'document' ? 'document' : 'carte', oui: true });
   for (const fr of cadres) await fr.frame.evaluate(CACHER, { racineSel: 'carte', oui: true }).catch(() => {});
-  await pg.waitForTimeout(60);
-  const png = await pg.screenshot();
+  // Le texte caché doit être PEINT avant la photo (machine chargée : deux images, puis un temps).
+  const deuxImages = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  await pg.evaluate(deuxImages);
+  for (const fr of cadres) await fr.frame.evaluate(deuxImages).catch(() => {});
+  await pg.waitForTimeout(250);
+  const png = await pg.screenshot({ animations: 'disabled' });
   await pg.evaluate(CACHER, { racineSel: racine === 'document' ? 'document' : 'carte', oui: false });
   for (const fr of cadres) await fr.frame.evaluate(CACHER, { racineSel: 'carte', oui: false }).catch(() => {});
   const res = await analyser(atelier, png, runs, dpr);

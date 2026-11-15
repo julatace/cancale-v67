@@ -376,9 +376,12 @@
 .av-nav.defile{background:rgb(12 36 70 / .74);box-shadow:0 .5px 0 rgb(255 255 255 / .12)}
 @media (prefers-color-scheme:dark){.av-nav.defile{background:rgb(6 20 42 / .78)}}
 /* Sur le bleu : la touche « Découvrir » est du verre à l'encre ; les pictogrammes, des pastilles givrées. */
-.av .av-btn.av-btn-exemple{background:var(--verre-c);background-image:none;color:#0C1D30;border:1px solid var(--verre-bord);box-shadow:var(--verre-ombre);-webkit-backdrop-filter:blur(18px) saturate(1.4);backdrop-filter:blur(18px) saturate(1.4)}
-.av .av-btn.av-btn-exemple:after{color:#3F5468}
-@media (prefers-color-scheme:dark){.av .av-btn.av-btn-exemple{color:#EAF2FB}.av .av-btn.av-btn-exemple:after{color:#A9BBCF}}
+/* Sur le bleu, la touche est du verre FUMÉ (le blanc s'y lit ; jamais un second « plein ») ; posée sur une
+   plaque de verre (la fin de page), elle redevient la porcelaine à l'encre. */
+.av .av-btn.av-btn-exemple{background:rgb(6 20 42 / .34);background-image:none;color:#FFFFFF;border:1px solid rgb(255 255 255 / .34);box-shadow:inset 0 1px 0 rgb(255 255 255 / .12),0 10px 22px -14px rgb(0 0 0 / .6);-webkit-backdrop-filter:blur(18px) saturate(1.4);backdrop-filter:blur(18px) saturate(1.4)}
+.av .av-btn.av-btn-exemple:after{color:#FFFFFF}
+.av :is(.av-fin-plaque,.av-tuile,.av-panneau) .av-btn.av-btn-exemple{background:var(--porc);background-image:var(--touche-fond,none);color:var(--encre);border:1px solid var(--verre-bord);box-shadow:0 1px 2px rgb(18 52 96 / .12),0 8px 18px -12px rgb(18 52 96 / .4)}
+.av :is(.av-fin-plaque,.av-tuile,.av-panneau) .av-btn.av-btn-exemple:after{color:var(--gris)}
 .av-picto{background:rgb(255 255 255 / .16);box-shadow:inset 0 0 0 1px rgb(255 255 255 / .32)}
 .av-tuile .av-picto{background:var(--porc);box-shadow:var(--ombre-pose)}
 .av-scene:before{background:radial-gradient(48% 50% at 55% 45%,rgb(156 200 242 / .28),transparent 72%)}

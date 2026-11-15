@@ -89,9 +89,8 @@
 /* Sur le bleu : le plein est BLANC à l'encre ; « Découvrir » est du verre à l'encre. */
 :root:root .vt .vt-btn, :root:root[data-theme="dark"] .vt .vt-btn { background: #FFFFFF; color: #0C1D30; box-shadow: inset 0 -.5px 0 rgb(18 52 96 / .12), 0 1px 2px rgb(0 0 0 / .25), 0 14px 26px -12px rgb(4 16 32 / .7); }
 @media (prefers-color-scheme: dark) { :root:root:not([data-theme="light"]) .vt .vt-btn { background: #FFFFFF; color: #0C1D30; } }
-:root:root .vt .vt-btn.vt-btn-neutre { background: var(--vt-verre); color: #0C1D30; border: 1px solid var(--vt-verre-bord); box-shadow: var(--vt-verre-ombre); -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4); }
-:root:root[data-theme="dark"] .vt .vt-btn.vt-btn-neutre { color: #EAF2FB; }
-@media (prefers-color-scheme: dark) { :root:root:not([data-theme="light"]) .vt .vt-btn.vt-btn-neutre { color: #EAF2FB; } }
+:root:root .vt .vt-btn.vt-btn-neutre, :root:root[data-theme="dark"] .vt .vt-btn.vt-btn-neutre { background: rgb(6 20 42 / .34); color: #FFFFFF; border: 1px solid rgb(255 255 255 / .34); box-shadow: inset 0 1px 0 rgb(255 255 255 / .12), 0 10px 22px -14px rgb(0 0 0 / .6); -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4); }
+@media (prefers-color-scheme: dark) { :root:root:not([data-theme="light"]) .vt .vt-btn.vt-btn-neutre { background: rgb(6 20 42 / .34); color: #FFFFFF; } }
 :root:root .vt .vt-offre:not(.vt-offre-pro) .vt-inclus svg { color: #0060CC; }
 :root:root[data-theme="dark"] .vt .vt-offre:not(.vt-offre-pro) .vt-inclus svg { color: #6CB4FF; }
 @media (prefers-color-scheme: dark) { :root:root:not([data-theme="light"]) .vt .vt-offre:not(.vt-offre-pro) .vt-inclus svg { color: #6CB4FF; } }
