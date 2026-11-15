@@ -907,6 +907,7 @@ import "./design/studio-polices.css";
 import "./design/studio.css";
 import "./design/polices.js";   // le préchargement des deux polices, avec le morceau de l'app seulement
 import "./design/studio-paires.css";   // (14 nov., « Studio bleu clair ») Paires : Annonces, Stock, Inventaire, la fiche — EN DERNIER (docs/passation/2026-11-14-studio-paires.md)
+import "./design/studio-achats-relier.css";   // (15 nov.) Annonces → « Sans achat relié » : la carte compacte (classes `vrm-aar-*`, docs/passation/2026-11-15-annonces-achats.md)
 // (14 nov., Studio bleu clair) Ma journée en grille Bento : la tête, l'affiche, les tuiles et ce qu'elles déplient —
 // portée par `.sj-journee` seulement, EN DERNIER (docs/passation/2026-11-14-studio-journee.md).
 import { BentoJournee, placerTuiles, RangeeJ, LienJ, MontantAffiche } from "./JourneeStudio.jsx";
@@ -16673,42 +16674,70 @@ function AchatsARelier({ file, achats, liens, propositionDe, onRelier, onSaisir,
     const p = sugg ? propositionDe(sugg.achat) : null;
     return { ...x, sugg, texte: texteSuggestion(sugg, p) };
   }) : null), [file, achats, liens, propositionDe]);
+  // (15 nov., Julien : « c'est moche et il y a des bugs ») La carte dont les gestes rares (« ⋯ ») sont montrés.
+  const [plusOuvert, setPlusOuvert] = useState(null);
   if (lignes == null) return <div className="vrm-ar-vide" data-ar-etat="lecture">{PAS_SU.enCours}</div>;
   if (!lignes.length) return <div className="vrm-ar-vide" data-ar-etat="vide">{tr('annonces.chaqueAnnonceNumerotee')}</div>;
   const nSugg = lignes.filter((l) => l.sugg).length;
   const jour = (d) => { const t = Date.parse(d || ''); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: new Date(t).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' }) : ''; };
+  // (15 nov., studio) Les classes sont `vrm-aar-*` : les `vrm-ar-*` d'avant étaient AUSSI celles de l'accueil des
+  // nouveaux (accueil-reste.css : `.vrm-ar-liste li` en rangée centrée, `.vrm-ar-titre` en 20 px gras) et de « Ton
+  // adresse VRM » — la carte héritait de leurs règles : contenu centré plus large que la carte (N° et photo coupés
+  // au bord gauche, titres sous le bord droit), titres énormes. Rien de métier ne change : mêmes `data-*`, mêmes
+  // gestes ; une suggestion reste une SUGGESTION, c'est SON toucher sur « Relier » qui relie (§5).
+  // Styles : src/design/studio-achats-relier.css.
   return (
-    <section className="vrm-ar" data-ar={lignes.length} data-ar-sugg={achats === undefined ? '' : String(nSugg)} aria-label={tr('annonces.annoncesSansAchat')}>
-      <p className="vrm-ar-tete">{achats === undefined ? tr('annonces.annonces2', { n: String(lignes.length), toLowerCase: String(PAS_SU.enCours.toLowerCase()) }) : tr('annonces.annoncesAvecSuggestion', { n: String(lignes.length), nSugg: String(nSugg) })}{achats !== undefined && nSugg < lignes.length ? <span> {tr('annonces.suggestionMemeMarque')}</span> : null}</p>
-      {onSerie ? <div className="vrm-ar-serie"><Bouton variante="secondaire" icone="pencil" data-ar-serie="" onClick={onSerie}>{tr('annonces.saisieSeriePrix')}</Bouton></div> : null}
-      <ul className="vrm-ar-liste">
+    <section className="vrm-aar" data-ar={lignes.length} data-ar-sugg={achats === undefined ? '' : String(nSugg)} aria-label={tr('annonces.annoncesSansAchat')}>
+      <div className="vrm-aar-tete">
+        <p className="vrm-aar-compte">{achats === undefined ? tr('annonces.annonces2', { n: String(lignes.length), toLowerCase: String(PAS_SU.enCours.toLowerCase()) }) : tr('annonces.annoncesAvecSuggestion', { n: String(lignes.length), nSugg: String(nSugg) })}
+          {/* La règle d'une suggestion : derrière le « ⓘ » (une phrase fixe ne prend pas une ligne de la file). */}
+          {achats !== undefined ? <Pourquoi label={tr('annonces.suggestionQuoi')}>{tr('annonces.suggestionRegle')}</Pourquoi> : null}</p>
+        {onSerie ? <button type="button" className="sb-lien vrm-aar-serie" data-ar-serie="" onClick={onSerie}><Icon name="pencil" size={16}/><span>{tr('annonces.saisieSeriePrix')}</span></button> : null}
+      </div>
+      <ul className="vrm-aar-liste">
         {lignes.map((l) => {
           const it = l.item, t = l.texte, num = l.fiche && l.fiche.numero;
           const prix = (() => { const v = it.price && typeof it.price === 'object' ? it.price.amount : it.price; const n = Number(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null; })();
           const relierTxt = t && t.proposition ? `${VERBES.relier} · ${montant(t.proposition.centimes / 100)}` : VERBES.relier;
+          const photoAchat = l.sugg ? orderPhoto(l.sugg.achat) : null;
+          // Les gestes rares derrière « ⋯ » : « Saisir le prix » (quand une suggestion tient la place) et « Plus tard ».
+          const rares = !!l.sugg || !l.plusTard;
+          const ouvert = plusOuvert === l.id;
+          const idPlus = `vrm-aar-plus-${l.id}`;
           return (
-            <li key={l.id} className="vrm-ar-ligne" data-ar-ligne={l.id} data-ar-plus-tard={l.plusTard ? '1' : undefined} data-ar-reportee={l.reporteLe ? String(l.reporteLe).slice(0, 10) : undefined} data-ar-sugg-tx={l.sugg ? String(l.sugg.achat.transaction_id) : ''}>
-              <div className="vrm-ar-annonce">
-                {it.photo ? <PhotoVinted src={it.photo} alt="" className="vrm-ar-photo" loading="lazy"/> : <PhotoVide taille={48}/>}
-                <span className="vrm-ar-centre"><span className="vrm-ar-nom">{num ? <Numero n={num} taille="petit"/> : null}<span className="vrm-ar-titre">{it.title || tr('annonces.sansTitre')}</span></span>
+            <li key={l.id} className="vrm-aar-carte" data-ar-ligne={l.id} data-ar-plus-tard={l.plusTard ? '1' : undefined} data-ar-reportee={l.reporteLe ? String(l.reporteLe).slice(0, 10) : undefined} data-ar-sugg-tx={l.sugg ? String(l.sugg.achat.transaction_id) : ''} data-ar-plus-ouvert={ouvert ? '1' : undefined}>
+              <div className="vrm-aar-annonce">
+                {it.photo ? <PhotoVinted src={it.photo} alt="" className="vrm-aar-photo" loading="lazy"/> : <PhotoVide taille={52} className="vrm-aar-photo"/>}
+                <span className="vrm-aar-centre">
+                  <span className="vrm-aar-titre" data-ar-titre="">{num ? <Numero n={num} taille="petit"/> : null}<span>{it.title || tr('annonces.sansTitre')}</span></span>
                   {/* (6 nov., finitions) La date de SON « Plus tard » est dite ; au bout de 7 jours l'annonce revient. */}
-                  <span className="vrm-ar-sous">{[prix != null ? montant(prix) : '', l.reporteLe ? `reportée le ${jour(l.reporteLe)}${l.plusTard && l.revientLe ? ` · revient le ${jour(l.revientLe)}` : ''}` : ''].filter(Boolean).join(' · ')}</span></span>
+                  <span className="vrm-aar-sous" data-ar-sous="">{[prix != null ? montant(prix) : '', l.reporteLe ? `reportée le ${jour(l.reporteLe)}${l.plusTard && l.revientLe ? ` · revient le ${jour(l.revientLe)}` : ''}` : ''].filter(Boolean).join(' · ')}</span>
+                </span>
               </div>
               {l.sugg ? (
-                <div className="vrm-ar-sugg" data-ar-rang={l.sugg.rang}>
-                  {orderPhoto(l.sugg.achat) ? <PhotoVinted src={orderPhoto(l.sugg.achat)} alt="" className="vrm-ar-photo-achat" loading="lazy"/> : <PhotoVide taille={36}/>}
-                  <span className="vrm-ar-centre"><span className="vrm-ar-titre">{t.titre || tr('annonces.achatSansTitre')}</span>
-                    <span className="vrm-ar-sous">{[jour(t.date), compteDe(l.sugg.achat), t.lot ? 'lot : le prix de cet article te sera demandé' : t.proposition ? (t.proposition.source === 'recu' ? 'prix du reçu' : 'article seul') : (t.prixLu != null ? `payé ${montant(t.prixLu)}` : '')].filter(Boolean).join(' · ')}</span></span>
+                <div className="vrm-aar-sugg" data-ar-rang={l.sugg.rang}>
+                  {/* La photo de l'achat quand on la connaît ; sinon rien (jamais une vignette vide). */}
+                  {photoAchat ? <PhotoVinted src={photoAchat} alt="" className="vrm-aar-photo-achat" loading="lazy"/> : null}
+                  <span className="vrm-aar-centre">
+                    <span className="vrm-aar-sugg-titre"><span className="vrm-aar-mot">{tr('annonces.suggestion')}</span>{t.titre || tr('annonces.achatSansTitre')}</span>
+                    <span className="vrm-aar-sous">{[jour(t.date), compteDe(l.sugg.achat), t.lot ? 'lot : le prix de cet article te sera demandé' : t.proposition ? (t.proposition.source === 'recu' ? 'prix du reçu' : 'article seul') : (t.prixLu != null ? `payé ${montant(t.prixLu)}` : '')].filter(Boolean).join(' · ')}</span>
+                  </span>
                 </div>
-              ) : <div className="vrm-ar-sans" data-ar-sans-sugg="">{achats === undefined ? PAS_SU.enCours : tr('annonces.aucuneSuggestion')}</div>}
-              <div className="vrm-ar-gestes">
-                {l.sugg ? <Bouton variante="secondaire" icone="link" data-ar-relier={String(l.sugg.achat.transaction_id)} onClick={() => onRelier(it, l.sugg.achat)}>{relierTxt}</Bouton>
-                  : <Bouton variante="secondaire" icone="link" data-ar-choisir="" disabled={achats === undefined} onClick={() => onChoisir(it)}>{tr('annonces.choisirAchat')}</Bouton>}
-                {/* (11 nov., lot DJ5) La suggestion n'est qu'une proposition : un AUTRE achat se choisit ici. */}
-                {l.sugg ? <Bouton variante="discret" icone="search" data-ar-autre={String(l.sugg.achat.transaction_id)} onClick={() => onChoisir(it, l.sugg.achat)}>{tr('annonces.autreAchat')}</Bouton> : null}
-                <Bouton variante="discret" icone="pencil" data-ar-saisir="" onClick={() => onSaisir(it)}>{tr('annonces.saisir')}</Bouton>
-                {!l.plusTard ? <Bouton variante="discret" data-ar-plus-tard-geste="" onClick={() => onPlusTard(l.id)}>{tr('annonces.plusTard')}</Bouton> : null}
+              ) : null}
+              <div className="vrm-aar-gestes">
+                {l.sugg ? <button type="button" className="sb-touche vrm-aar-principal" data-ar-relier={String(l.sugg.achat.transaction_id)} onClick={() => onRelier(it, l.sugg.achat)}><Icon name="link" size={16}/><span>{relierTxt}</span></button>
+                  : <button type="button" className="sb-touche vrm-aar-principal" data-ar-saisir="" onClick={() => onSaisir(it)}><Icon name="pencil" size={16}/><span>{tr('annonces.saisirPrix')}</span></button>}
+                {/* (11 nov., lot DJ5) La suggestion n'est qu'une proposition : un AUTRE achat se choisit ici, à côté. */}
+                {l.sugg ? <button type="button" className="sb-lien vrm-aar-lien" data-ar-autre={String(l.sugg.achat.transaction_id)} onClick={() => onChoisir(it, l.sugg.achat)}><span>{tr('annonces.autreAchat')}</span></button>
+                  : <button type="button" className="sb-lien vrm-aar-lien" data-ar-choisir="" disabled={achats === undefined} onClick={() => onChoisir(it)}><span>{tr('annonces.choisirAchat')}</span></button>}
+                {rares ? <button type="button" className="sb-rond vrm-aar-plus" data-ar-plus="" aria-expanded={ouvert} aria-controls={idPlus} aria-label={tr('annonces.autresGestes')} title={tr('annonces.autresGestes')} onClick={() => setPlusOuvert((v) => (v === l.id ? null : l.id))}><Icon name="more" size={18}/></button> : null}
               </div>
+              {rares ? (
+                <div className="vrm-aar-rares" id={idPlus} hidden={!ouvert}>
+                  {l.sugg ? <button type="button" className="sb-lien" data-ar-saisir="" onClick={() => onSaisir(it)}><Icon name="pencil" size={16}/><span>{tr('annonces.saisirPrix')}</span></button> : null}
+                  {!l.plusTard ? <button type="button" className="sb-lien" data-ar-plus-tard-geste="" onClick={() => { setPlusOuvert(null); onPlusTard(l.id); }}><span>{tr('annonces.plusTard')}</span></button> : null}
+                </div>
+              ) : null}
             </li>
           );
         })}
