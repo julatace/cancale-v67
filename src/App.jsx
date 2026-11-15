@@ -459,6 +459,11 @@ const EbayConnexion = aLaDemande(() => import('./ecrans/Ebay.jsx').then((m) => (
 const GuidesEbay = aLaDemande(() => import('./ecrans/Ebay.jsx').then((m) => ({ default: m.GuidesEbay })));
 const EbayRemises = aLaDemande(() => import('./ecrans/Ebay.jsx').then((m) => ({ default: m.EbayRemises })));
 const EbayVentes = aLaDemande(() => import('./ecrans/Ebay.jsx').then((m) => ({ default: m.EbayVentes })));
+// (15 nov., eBay complet 2) L'espace eBay : Tableau · Argent · Trafic · Santé (src/ebay/EspaceEbay.jsx), à la demande.
+const TableauEbay = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.TableauEbay })));
+const ArgentEbay = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.ArgentEbay })));
+const TraficEbay = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.TraficEbay })));
+const SanteEbay = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.SanteEbay })));
 const Garage = aLaDemande(() => import('./ecrans/Stock.jsx').then((m) => ({ default: m.Garage })));
 const StockVinted = aLaDemande(() => import('./ecrans/Stock.jsx').then((m) => ({ default: m.StockVinted })));
 const Inventory = aLaDemande(() => import('./ecrans/Stock.jsx').then((m) => ({ default: m.Inventory })));
@@ -62719,6 +62724,8 @@ function AppCoeur() {
             const note = illVue.length ? `Je n'ai pas pu lire les ventes ${illVue.length > 1 ? 'des comptes eBay' : 'du compte eBay'} ${illVue.map(nomCompteEbay).join(', ')} — rien n'est perdu, réessaie dans un moment.` : null;
             // (5 nov., chantier G) Ni sur Messages : des montants de ventes au-dessus des conversations n'aident à répondre à personne.
             if (sec === 'ventes' || sec === 'achats' || sec === 'messages') return null;   // les trois cases de « Ventes » le disent (§7) ; Achats : des montants de ventes
+            // (15 nov., eBay complet 2) Le tableau, l'argent, le trafic et la santé ont leur propre bande de chiffres.
+            if (sec === 'tableau' || sec === 'argent' || sec === 'sante' || sec === 'trafic') return null;
             return <PlatResume dark baseKO={baseKO} note={note} cases={[[lib, ca != null ? fmt(ca) : null]]}/>;
           })()}
           {/* Le SÉLECTEUR DE COMPTE : seulement à partir de deux comptes reliés
@@ -62729,6 +62736,20 @@ function AppCoeur() {
               attrs={{ 'data-ebay-vue': ebayVueEff }}
               options={comptesEbay.map((c) => ({ val: c.ref, nom: nomCompteEbay(c) + (typeCompteEbayTexte(c) ? ` · ${typeCompteEbayTexte(c)}` : '') + (siteCompteEbayTexte(c) ? ` · ${siteCompteEbayTexte(c)}` : '') }))} />
           )}
+          {/* (15 nov., eBay complet 2) LE TABLEAU eBAY et ses sections (lecture seule) : à expédier (la règle `colisEbay`,
+              par compte), offres, messages, versé ce mois, « À faire », argent, trafic, santé — chacun mène à sa section. */}
+          {(sec==='tableau'||sec==='argent'||sec==='sante'||sec==='trafic')&&(baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=>{
+            const c=(comptesEbay||[]).find((x)=>x.ref===ref);
+            const domaine=(c&&c.marche&&c.marche.domaine)||'www.ebay.fr';
+            const ill=ebayCmdTous&&Array.isArray(ebayCmdTous.illisibles)&&ebayCmdTous.illisibles.some((x)=>x.ref===ref);
+            const cmd=ebayCmdTous&&Array.isArray(ebayCmdTous.items)&&!ill?ebayCmdTous.items.filter((o)=>(o._compte||'principal')===ref||(ref==='principal'&&!o._compte)):null;
+            const colis=cmd?colisEbay(cmd):null;
+            const numDe=(a)=>{ if(a&&Array.isArray(a.lineItems)){ const l0=a.lineItems[0]||{}; return numEbayLu(l0.sku,l0.legacyItemId||l0.itemId,null,null)||''; } return numEbayLu(a&&a.sku,a&&a.itemId,null,a&&a.debut)||''; };
+            return sec==='tableau'?<TableauEbay key={'tb-'+ref} compte={ref} headers={enTeteSession} aExpedier={colis?colis.aPoster.length:null} onSection={allerSec} onMessages={()=>{ setEbayVue(ref); setTab('ebay_messages'); }} onReconnecter={allerComptesEbay}/>
+              :sec==='argent'?<ArgentEbay key={'ar-'+ref} compte={ref} headers={enTeteSession} commandes={cmd} numDe={numDe} onReconnecter={allerComptesEbay}/>
+              :sec==='trafic'?<TraficEbay key={'tf-'+ref} compte={ref} headers={enTeteSession} numDe={numDe} domaine={domaine} onReconnecter={allerComptesEbay} onPromotion={()=>allerSec('promo')}/>
+              :<SanteEbay key={'sa-'+ref} compte={ref} headers={enTeteSession} domaine={domaine} onReconnecter={allerComptesEbay}/>;
+          }}</EbayActionCompte>)}
           {sec==='ventes'&&<EbayVentes baseKO={baseKO} vue={ebayVueEff} comptesEbay={comptesEbay} cible={ebayCible?.section==='ventes'?ebayCible:null} onClearCible={()=>setEbayCible(null)}/>}
           {sec==='messages'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayMessagesVolets key={ref} comptesEbay={comptesEbay} owner={AUTH.user?.id || 'installation'} cible={ebayCible?.compte===ref && ebayCible.section==='messages'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
           {sec==='agent'&&<div style={{padding:16}}><GuidesEbay ids={['vente','retour']}/><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayRetours key={'rt-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onSection={(section,t)=>{setEbayVue(ref);setEbayCible(cibleEbay(ref,{...t,section}));allerSec(section);}}/><EbayEvaluations key={'ev-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/></>}</EbayActionCompte></div>}
