@@ -157,6 +157,10 @@ const poseeLa = (pg, sel) => attendre(pg, `(() => { const f = document.querySele
           await pg.waitForTimeout(600); await pg.screenshot({ path: nomF('1-vue') });
           // ── K : le kit ──
           await clic(pg, '[data-republier-main-lancer]');
+          // (15 nov., parcours guidé) « À la main · 2 » ouvre la feuille guidée (« Paire 1/2 ») ; le kit
+          // (toutes d'un coup) est à un toucher dedans : « Voir les 2 d'un coup ».
+          await pg.waitForSelector('[data-repub-main="9102"] [data-main-toutes="2"]', { timeout: 8000 });
+          await clic(pg, '[data-main-toutes="2"]');
           await pg.waitForSelector('[data-kit-main="2"]', { timeout: 8000 });
           await poseeLa(pg, '[data-kit-main]');
           const lu = await attendre(pg, () => { const l = [...document.querySelectorAll('[data-kit-paire]')]; return l.length === 2 && l.every((x) => x.getAttribute('data-kit-lue') === '1') ? l.map((x) => x.getAttribute('data-kit-paire')).join(',') : null; });
