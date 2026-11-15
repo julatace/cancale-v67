@@ -482,6 +482,7 @@ import VisiteBulles from "./VisiteBulles.jsx";
 import { poserOutilsAccueil } from "./accueilReste/deps.js";
 import { AccueilResteJournee, VisiteEcranHote } from "./accueilReste/AccueilReste.jsx";
 import { retenirNumerosNeufs, clesLuesEnDouble } from "./accueilReste/cartonsNumeros.js";
+import { numeroNeufPermis, lectureCompleteDe, marquerNouveau, marquerEcrit, aEcrireNouveaux, listeNumeros, demandesNumero, propositionNumero, modeNumerotation } from "./numerosNouvelles.js";
 import { publierSansNumero } from "./accueilReste/trouveChezToi.js";
 import { CLE_AIDES } from "./accueilReste/aides.js";
 import { CLE_APPEL } from "./accueilReste/appelBienvenue.js";
@@ -15199,6 +15200,29 @@ async function alerteLocale(title, body, vers){
     }
   }catch(_){ return false; }
   return pushNotif(title, body, vers);
+}
+// (15 nov., src/numerosNouvelles.js) LES N° NEUFS QUE VRM VIENT DE DONNER, DITS UNE FOIS — par
+// l'appareil qui les a donnés (la numérotation des annonces, bloc <numerotation-passage>) :
+// le bandeau dans l'app, une notification si l'app est en arrière-plan (`alerteLocale`, jamais en
+// double d'une notification du serveur), et la carte de l'extension de CE navigateur (5.379,
+// `numerotes` : un lot « VRM a numéroté » par compte Vinted, identités `id:N°`, une fois).
+// Les mots suivent le profil du vendeur (« paires » / « articles ») : aucune règle n'en dépend.
+function direNouveauxNumeros(liste) {
+  try {
+    const l = (Array.isArray(liste) ? liste : []).filter((x) => x && String(x.numero || '').trim() && x.id != null);
+    if (!l.length) return;
+    const vend = motsVendeur().nom === 'paire' ? 'sneakers' : 'autre';
+    const titre = tr(`nn.notif.${vend}`, { n: l.length });
+    const nums = listeNumeros(l.map((x) => x.numero));
+    toast(`${titre} · ${nums}`, 'ok');
+    alerteLocale(titre, `${nums} · ${tr('nn.notif.geste')}`, '?tab=journee').catch(() => {});
+    if (extSait('numerotes') !== 'ok') return;
+    const ext = String((__vmrEtat && __vmrEtat.ok && __vmrEtat.ext) || '');
+    if (!ext) return;
+    const parCompte = {};
+    for (const x of l) { const u = String(x.uid || ''); if (/^\d{1,15}$/.test(u)) (parCompte[u] = parCompte[u] || []).push(`${x.id}:${x.numero}`); }
+    for (const [uid, ids] of Object.entries(parCompte)) versExtension(ext, { type: 'numerotes', uid, ids: ids.slice(0, 60) }, 3000).catch(() => null);
+  } catch (_) {}
 }
 
 
@@ -40552,6 +40576,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       }
       for (const x of (load('vinted_used_numeros', []) || [])) { const ep = entreePool(x); if (ep != null) nextUsed.add(ep); }
     }
+    // (15 nov., src/numerosNouvelles.js) <numerotation-passage> — `scripts/audit-numeros-nouvelles.cjs`
+    // EXÉCUTE ce bloc tel quel (de cette balise à la balise fermante) : ne pas renommer ses variables.
+    const nouveauxNum = [];
     // La paire REPUBLIÉE reprend le numéro de l'annonce qu'elle remplace (et
     // une annonce renumérotée automatiquement par erreur le retrouve).
     if (recreesEff) {
@@ -40620,14 +40647,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // numéros déjà donnés (à vie, §5.40) : la séquence monte et ne redescend
       // pas. C'est voulu — elle compte les paires passées, pas le stock.
       // (11 nov.) Hors ligne : jamais un N° neuf (réservé au serveur seul) — l'annonce le reçoit au retour.
+      // (15 nov., src/numerosNouvelles.js) LE N° NEUF, dernier recours : seulement sur la lecture COMPLÈTE
+      // de son compte (règle <enligne-regle>), en ligne, hors retenue. Une lecture partielle ⇒ rien.
       if (!num && horsLigneMaintenant()) continue;
       if (!num && retenueCartons) continue;   // (14 nov., 134) il n'a pas encore dit si ses cartons portent déjà leurs N°
+      const neuf = !num;
+      if (neuf && !numeroNeufPermis({ mode: ecritOn ? 'moi' : 'vrm', complet: lectureCompleteDe(it, listings) })) continue;
       if (!num) num = prochainLibre(taken, takenK, prefNum);
       nextNum[it.id] = { ...(cur || {}), numero: String(num), title: it.title, photo: it.photo || null, photoK: pk || (cur && cur.photoK) || null, price: it.price ?? null, size: it.size ?? (cur && cur.size) ?? null, accountId: it._acc?.vinted_user_id, numberedAt: (cur && cur.numberedAt) || new Date().toISOString(), auto: true };
+      // Un N° NEUF est « à écrire sur son carton » jusqu'à « C'est écrit » ; l'appareil qui l'a donné le dit.
+      if (neuf) { nextNum[it.id] = marquerNouveau(nextNum[it.id]); nouveauxNum.push({ id: String(it.id), numero: String(num), title: it.title || '', uid: String(it._acc?.vinted_user_id ?? '') }); }
       { const ep = entreePool(num); if (ep != null) nextUsed.add(ep); }
       if (pk && !byPhoto[pk]) byPhoto[pk] = String(num);
       changed = true;
     }
+    // </numerotation-passage>
     // (6 nov., finitions) Une paire remise en vente dont le carton porte un N° d'ARCHIVE (B…) :
     // sa nouvelle annonce a un N° neuf ⇒ « nouveaux numéros à écrire sur tes cartons »
     // (src/repriseNumero.js `archivesAEcrire` ; la liste est `reattribueAEcrire`, inchangée).
@@ -40647,12 +40681,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (changed) {
       setNumeros(nextNum); save('vinted_annonce_numeros', nextNum);
       const ua = [...nextUsed].sort(triPool); setUsedNumeros(ua); save('vinted_used_numeros', ua);
+      // (15 nov.) « 3 nouveaux articles numérotés · N°216, 217, 218 » — une fois, par l'appareil qui les a donnés.
+      if (nouveauxNum.length) direNouveauxNumeros(nouveauxNum);
     }
   // ⚠️ `numVentesParIdentite` DOIT être dans les dépendances : les ventes
   // arrivent souvent APRÈS les annonces. Sans elle, une annonce déjà rendue
   // garderait le numéro neuf qu'on vient justement d'éviter.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, cloudReady, numVentesParIdentite, sales.items, txnPret, verNumTick, listingDates, reservesNum, recreesEff, repubMain]);
+  }, [listings.items, listings.complets, cloudReady, numVentesParIdentite, sales.items, txnPret, verNumTick, listingDates, reservesNum, recreesEff, repubMain]);
   // (6 nov., v36-raccords · banc chargement) LA LISTE D'ANNONCES ATTEND SA NUMÉROTATION :
   // des annonces numérotables sans N° et la numérotation pas encore passée ⇒ la liste
   // (prochain geste, N° à vérifier, grille) garde son squelette, à sa place. Sinon elle
