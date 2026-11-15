@@ -179,6 +179,7 @@ async function scenarioR(b, largeur, sombre) {
     dit(!!j && /N°6 republiée \?/.test(j.txt), `${tag} : Ma journée : « N°6 republiée ? »`, JSON.stringify(j));
     dit(!!j && j.rang <= 1, `${tag} : la ligne est en tête d'« À faire »`, j && String(j.rang));
     dit(!(await job(pg, 'numeros-nouveaux')), `${tag} : pas de « nouveaux articles numérotés » (rien n'a été numéroté)`);
+    dit(!(await job(pg, 'sans-numero')), `${tag} : pas de seconde ligne « 1 annonce sans numéro » (la même annonce, une fois)`);
     dit(!(await pg.$('[data-cycle-id="9401"]')), `${tag} : pas de seconde carte « N°6 supprimé de Vinted » (le même sujet, une fois)`);
     await pg.locator('[data-job="numeros-republiee"]').first().scrollIntoViewIfNeeded().catch(() => {});
     await pg.waitForTimeout(1200);

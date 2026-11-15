@@ -46969,6 +46969,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // (15 nov.) « N annonces sans numéro » de la cloche (compté à SON passage, souvent avant la
           // numérotation) : la ligne des nouvelles annonces le dit déjà, à jour — jamais deux fois (§7).
           if (a.job === 'sans-numero' && (modeNum === 'moi' || nouveauxAEcrire.length > 0)) continue;
+          // (15 nov.) … ni quand ce sont les annonces de « N°x republiée ? » (elles attendent SA réponse : dit une fois).
+          if (a.job === 'sans-numero' && propositionsRepub.length > 0 && Number(a.n) <= propositionsRepub.length) continue;
           // (15 nov., retrait-ailleurs) Déjà dans « À retirer ailleurs » (en tête, avec son geste) : pas redite ici.
           if (a.dv && a.retrait && alerteCouverte(fusionPlan(RA.plan, RA.gardes), a.retrait.plat, a.retrait.nums, cleNum)) continue;
           if (a.dv) jobs.push({id:'double-vente', n:a.n, icon:a.ic||'alert', color:a.dv==='num'?C.doublon:C.warn, urgent:true, title:a.text, tab:a.tab, prio:-1, avant:a.avant, lbcSuppr:Array.isArray(a.lbcSuppr)&&a.lbcSuppr.length?a.lbcSuppr:null, photos:a.photos});
