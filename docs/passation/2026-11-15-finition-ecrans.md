@@ -47,6 +47,10 @@ quitte l'écran (une phrase d'explication) reste lu au lecteur d'écran et dans 
 | La loupe | micro, photo et « Fermer » se mordaient de 4 à 6 px ; « Fermer » collé au bord ; sous-lignes des ACTIONS coupées (« Colis → « Tout imprimer » : tu choisis, puis t… ») ; une phrase d'aide qui répétait le champ | marges négatives retirées, 12 px au bord ; les sous-lignes d'actions et « N°, pseudo, suivi… » lues au lecteur d'écran (et l'infobulle), plus à l'écran ; « À la voix… » et son « Pourquoi ? » RESTENT (ce que fait le navigateur du son : une promesse) |
 | L'en-tête (ordi.) | micro et photo du champ de recherche se mordaient de 8 px | côte à côte |
 | Le disque « + » | les quatre lames (100 px, 82 px d'écart) se chevauchaient ; les mots de l'éventail se lisaient PAR-DESSUS les chiffres de l'écran | lames de 80 px ; voile à 92 % (jour et nuit) |
+| Ma journée · « À retirer » dépliée (sa capture iPhone : « fais ça mieux pour les colis ») | « + 6 à vérifier » écrit DEUX fois (titre et dessous) ; deux « Colis · Mondial Relay · Intermarché » à vignette vide (une épingle) : on ne sait pas lequel ; l'adresse coupée « 43 Rue du Lt F… » ; les plaques s'alignaient sur la longueur du code | une fois (dans le titre) ; la photo de SA commande par identité (`commandeRetrait`, inchangé), sinon le LOGO du transporteur (`LogoTransporteur`), titre « Colis Mondial Relay » et la date d'arrivée SÛRE (« depuis le 14 nov. », `arriveeColisEmail` = « oui » ; une borne n'est pas une date) — jamais une ressemblance ; le NOM du point (`cleanLieu` + `nomPointRetrait`) ; colonne des codes de 96 px, la ligne du point sur deux lignes au besoin |
+| Achats · la fiche d'un colis à retirer | l'adresse du point n'était nulle part | ligne « Point » : le nom, l'adresse entière dessous |
+| La tête · le nuage barré | une icône muette (le sens n'était que dans l'infobulle, invisible sur iPhone) : c'est `BoutonSync`, état `error` (la base n'a pas répondu, la sauvegarde sera retentée) ou `refus` (l'écran est périmé) | il dit son mot : « Pas enregistré » / « À recharger » (`fin.sync.*`, 5 langues), en ambre |
+| Ma journée · « À ce rythme… / estimation » sous la barre | vu sur sa capture en cours de défilement ; mené tout en bas, la dernière ligne finit au-dessus de la barre (banc B) | rien à changer à la mise en page ; le banc le garde |
 | Messages, Leboncoin, eBay, Vestiaire, Argent · Résumé, URSSAF, Statistiques, Communauté | rien de cassé mesuré ni vu | inchangés |
 
 ## Ce qui n'a PAS été changé (vu, et pourquoi)
@@ -60,6 +64,8 @@ quitte l'écran (une phrase d'explication) reste lu au lecteur d'écran et dans 
   tête (comptes, bande, filtres) — une décision de composition, pas une finition.
 - **Stock · « sans N° : pas rangeable »** coupé dans la méta d'une rangée sans N° (rapporté par le banc, hors passe).
 - **Messages · extraits coupés** : c'est l'aperçu d'un message, voulu.
+- **La fiche d'un colis sans achat relié** s'intitule « n°…0001 » (la fin du n° de suivi) et empile quatre
+  gestes de formes mêlées (Copier le code, Code en grand, Ajouter le QR, Suivre) : à reprendre avec la fiche (FichePaire).
 
 ## La preuve
 
@@ -68,8 +74,11 @@ disque au téléphone seulement). Il mesure sur l'app RENDUE (géométrie, style
 D aucun débordement (la page, et le bord droit VU de chaque élément), C aucun chevauchement entre deux
 cibles, ni entre deux TEXTES (la boîte de leurs lettres, `Range`), par zone (contenu, tête, barre), E aucun
 libellé de la passe coupé par « … », T cibles ≥ 44 px (l'étendue RÉELLEMENT atteinte au doigt autour du
-centre, pseudo-élément compris), F insécables sur les libellés de la passe. Les coupes hors passe sont
-RAPPORTÉES, jamais cachées.
+centre, pseudo-élément compris), F insécables sur les libellés de la passe, N un même fait porteur d'un nombre
+(« + 6 à vérifier ») jamais écrit deux fois dans une carte ouverte, V aucune vignette vide (photo par identité,
+sinon logo), B mené tout en bas, rien ne reste sous la barre du bas. Sa base ajoute des colis À RETIRER inventés
+(deux Mondial Relay qu'aucune commande ne nomme, un achat Vinted Go à l'adresse longue) et l'écran
+« journee-retirer » (la carte dépliée) et « achats-fiche-colis ». Les coupes hors passe sont RAPPORTÉES, jamais cachées.
 
 - sur le build d'AVANT (`BANC_DIST=<dist de 0cccddbd>`, 390 clair et sombre) : ROUGE — voir le tableau du rapport.
 - sur le build d'APRÈS : vert sur les 4 combinaisons (sauf ce qui est dit plus bas).

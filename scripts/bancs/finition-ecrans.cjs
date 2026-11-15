@@ -242,8 +242,10 @@ function mesurerPage({ tactile, zone, surveilles }) {
     }
     for (const [t, n] of vus2) if (n > 1 && /\+|vérifier|retirer/.test(t)) out.doubles.push(`« ${t} » × ${n}`);
   }
-  // V : une case d'image sans photo NI logo (une épingle dans une case grise ne dit pas quelle paire).
-  for (const v of document.querySelectorAll('.sb-vignette, [data-sj-vignette]')) if (vis(v) && (v.classList.contains('is-vide') || v.getAttribute('data-sj-vignette') === 'vide')) out.vignettesVides.push(nom(v.closest('[data-sj-code], [role="listitem"]') || v));
+  // V : la vignette d'un colis à retirer sans photo NI logo (une épingle dans une case grise ne dit pas quelle paire).
+  //   (une vignette est `aria-hidden` — décorative pour le lecteur d'écran — mais VUE : jugée sur sa géométrie seule)
+  const vue = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < vh && (!e.checkVisibility || e.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })); };
+  for (const v of document.querySelectorAll('[data-sj-code] .sb-vignette, [data-sj-vignette]')) if (vue(v) && (v.classList.contains('is-vide') || v.getAttribute('data-sj-vignette') === 'vide')) out.vignettesVides.push(nom(v.closest('[data-sj-code], [role="listitem"]') || v));
   for (const k of ['deborde', 'chevauche', 'coupes', 'coupesAutres', 'cibles', 'typo']) out[k] = [...new Set(out[k])];
   return out;
 }
@@ -268,7 +270,8 @@ async function sousLaBarre(pg) {
 (async () => {
   if (OUT) fs.mkdirSync(OUT, { recursive: true });
   await new Promise((r) => P.srv.listen(P.PORT, r));
-  const nav = await P.chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
+  const lancer = () => P.chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server', '--disable-dev-shm-usage'] });
+  let nav = await lancer();
   let v = 0, r = 0; const rouges = [], autres = [];
   const dit = (ok, quoi, detail) => { if (ok) { v++; console.log('✅', quoi); } else { r++; rouges.push(quoi); console.log('❌', quoi, detail ? '— ' + String(detail).slice(0, 1400) : ''); } };
   try {
@@ -300,6 +303,8 @@ async function sousLaBarre(pg) {
         if (m.coupesAutres.length) autres.push(`${tag} : ${m.coupesAutres.length} coupe(s) hors passe — ${m.coupesAutres.slice(0, 4).join(' · ')}`);
       } catch (err) { dit(false, `${tag} : l'écran s'ouvre`, String(err && err.message || err).slice(0, 300)); }
       finally { if (o) await o.ctx.close().catch(() => {}); }
+      // Un onglet qui plante emporte parfois le navigateur : le suivant repart sur un navigateur neuf (le plantage reste dit).
+      if (!nav.isConnected()) { nav = await lancer(); }
     }
   } finally { await nav.close(); P.srv.close(); }
   if (CAPTURE) return;
