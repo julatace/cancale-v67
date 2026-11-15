@@ -290,3 +290,4 @@
   background: var(--sb-porcelaine-2, var(--vrm-bg, #F7FAFD)); border-top: 1px solid rgb(12 29 48 / .08); }
 .vrm-p4 .vrm-p4-pied .sb-btn-plein { width: 100%; min-height: 52px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; }
 .vrm-st4-centre .vrm-m4 .vrm-s2d-pastille[data-meuble-vendues] { display: none; }   /* à l’ordinateur, « 1 » à sortir est dit dans la liste de la pièce (la maquette) */
+.vrm-p4 .vrm-fs-corps { scroll-padding-bottom: 96px; }   /* un réglage amené à l’écran n’est jamais sous « Enregistrer » */
