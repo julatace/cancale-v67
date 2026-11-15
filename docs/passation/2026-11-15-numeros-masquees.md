@@ -167,3 +167,37 @@ Le dernier recours avant un N° neuf (mode « VRM numérote »), dans le bloc `<
   4 masquées prennent 209, 210, 211, 214 (déjà sur leurs cartons) — rien à écrire.
 - Regarder le carton de la paire passée de 128 à 131 le 4 nov. (règle des doublons), s'il l'a encore.
 - L'achat en retour : sa carte est « À renvoyer » (bordereau, avant le 23/11 10 h).
+
+## Suite du même jour (coordinateur : les trois restes)
+
+1. **Accompagnement** : les moments des numéros passent par la pilule « après » (`accompagner`), plus
+   par un bandeau à part : `numero.donne` (« 1 nouvelle paire numérotée · N°2 · à écrire sur son
+   carton »), `numero.demande`, `numero.carton` (les deux choix de « N° à vérifier »), `numero.republie`
+   et `numero.autre` (« N°x republiée ? »), `numero.reconnu` (la photo VRM). Le banc `accompagnement`
+   les JOUE (un monde réduit qui numérote) : **6/6 verts**. Il a trouvé un vrai défaut : la numérotation
+   pouvait passer AVANT la lecture des empreintes, et la photo fabriquée par VRM n'était alors pas
+   reconnue (N° neuf). La numérotation attend maintenant cette lecture (`empreintesVinted === undefined`
+   ⇒ attendre ; `null` = pas su ⇒ règle normale) — audit + mutation `lecture`.
+2. **Avis « Retourne ta commande » sans bordereau** : `txAchatsEnRetour(bords, { demandes, achats })`
+   relie un avis à un achat par SA conversation (identité), seulement si UN seul achat lu la porte.
+   App (projection `email_retourdemande_*` : `conv`, `sens`), widget (les commandes ne sont relues que
+   si un avis porte une conversation), rappel du matin (lecture ratée ⇒ rien envoyé). **Mesuré : les
+   3 avis rangés chez Julien n'ont PAS de conversation** (`conv` vide) : ils n'écartent rien (jamais par
+   titre ni date). Audit `retour-pas-a-retirer` : 25 ✅, mutations `avis` et `avisWidget` attrapées.
+3. **Registre des photos VRM** :
+   - « Créer sur Vinted » : l'extension envoie les photos de la fiche SANS réglage
+     (`reglagesPhotoSurs(null)` = neutre, ré-encodées) ; l'app calcule l'empreinte des photos qu'elle
+     remet (`empreinteImageLocale`) et les range au registre avec le N° et l'identifiant du brouillon
+     (celui de l'annonce publiée). Pas de changement d'extension.
+   - Atelier « Republier par VRM » : les photos sont lues sur vinted.net et RÉGLÉES par l'extension
+     (`photoReglee`, rotation/zoom/couleurs) ; l'app ne peut pas lire ces pixels (CORS). Une
+     republication par l'atelier laisse déjà une identité prouvée (coffre `recreeDe`), donc le N° suit.
+     Pour qu'une photo de l'atelier, republiée PLUS TARD à la main dans l'app Vinted, soit reconnue, il
+     faudrait côté extension (5.387.0, réservée, PAS faite) : dans `televerserPhotosRecreer`, après
+     `photoReglee`, `empreinteDeBlob(blob)` (déjà présent pour `photo_emprunte`), et ranger
+     `{ h, n: N° de la paire, src: ancienId, uid, at }` dans une ligne `photo_vrm_{uid}` (fusionnée
+     lire-réécrire comme `rangerEmpreintes`) que l'app ajoute au registre — petit, mais il touche
+     l'atelier en service : laissé à une session qui livre une extension.
+- Fusion de `origin/claude/project-review-nsk5su` (Verre dépoli, Stock en étagères) : conflits résolus
+  (imports de traduction, Quoi de neuf par id, projection des bordereaux de retour avec
+  `transporteurPdf` ET `sens`), un import double d'`empreinteImageLocale` retiré.
