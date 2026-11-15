@@ -130,9 +130,9 @@ async function controles(racine, silencieux) {
   essai('A2 · les N° servis relus (réservés de l’extension compris) avant de proposer et avant d’écrire', () =>
     /async function numerosServisRangement[\s\S]*panel_num_reserves[\s\S]*numerosReserves\(/.test(APP) && (APP.match(/await numerosServisRangement\(\)/g) || []).length >= 2);
   essai('A3 · « J’ai retiré » (colis et commande Vinted) ouvre la feuille ; au comptoir elle attend la fermeture', () =>
-    /const markCollected = \(t\) => \{[^\n]*apresRetrait\(entreeRangementColis\(t\)\)/.test(APP) && /const markPickupDone = \(o\) => \{[^\n]*apresRetrait\(entreeRangementVinted\(o\)\)/.test(APP) && /if \(scanOuvert \|\| relaisOuvert\) \{ retraitsARanger\.current\.push/.test(APP));
+    /const markCollected = \(t\) => \{[^\n]*apresRetrait\(entreeRangementColis\(t\)\)/.test(APP) && /const markPickupDone = \(o\) => \{[^\n]*apresRetrait\((?:entreeRangementVinted|entreeAvecPaye)\(o\)\)/.test(APP) && /if \(scanOuvert \|\| relaisOuvert\) \{ retraitsARanger\.current\.push/.test(APP));
   essai('A4 · l’achat d’un colis par IDENTITÉ seulement (`achatDuColis`)', () => /const entreeRangementColis = \(t\) => \{[\s\S]{0,200}achatDuColis\(t, buysBase, indexSuivisAchats\)/.test(APP));
-  essai('A5 · la feuille est montée et la carte de Ma journée existe', () => /<RangerAchatCoque\/>/.test(APP) && /id: 'achats-a-ranger'/.test(APP));
+  essai('A5 · la feuille est montée et la carte de Ma journée existe', () => /<(?:RangerAchatCoque|AtelierArriveeCoque)\/>/.test(APP) && /id: 'achats-a-ranger'/.test(APP));   // (15 nov.) l’atelier d’arrivée prend l’événement de la feuille (sa 1re partie)
   essai('A6 · les fiches à publier comptent comme N° servis partout (`ajouterNumerosHorsEcran`)', () => /const ajouterNumerosHorsEcran = [\s\S]{0,900}vrm_fiches_neuves/.test(APP));
   return { ok, ko, rouges };
 }
