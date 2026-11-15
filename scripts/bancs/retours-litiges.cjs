@@ -138,7 +138,7 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         await pg.waitForTimeout(1500);
         const r = await pg.evaluate(() => [...document.querySelectorAll('[data-retour-achat]')].map((x) => ({
           tx: x.getAttribute('data-retour-achat'), num: x.getAttribute('data-retour-num'), presse: x.getAttribute('data-retour-presse'), remb: x.getAttribute('data-retour-rembourse'), montant: x.getAttribute('data-retour-montant'),
-          limite: (x.querySelector('[data-retour-phrase-limite]') || {}).innerText || '', phraseRemb: (x.querySelector('[data-retour-phrase-remb]') || {}).innerText || '',
+          limite: (x.querySelector('[data-retour-phrase-limite]') || {}).innerText || '', phraseRemb: (x.querySelector('[data-retour-et="rembourse"]') || {}).innerText || '', rembEtat: (x.querySelector('[data-retour-et="rembourse"]') || { getAttribute: () => '' }).getAttribute('data-retour-et-etat'),
           ambre: (() => { const l = x.querySelector('[data-retour-phrase-limite]'); return l ? getComputedStyle(l).color : ''; })(),
           bouton: (() => { const bt = x.querySelector('[data-retour-imprimer]'); return bt ? bt.getBoundingClientRect().height : 0; })(),
         })));
@@ -147,8 +147,9 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         const a = r.find((x) => x.tx === '9501') || {}, s = r.find((x) => x.tx === '9502') || {};
         dit(a.num === '31' && s.num === '', `${nom} : 9501 porte N°31 (la fiche reliée à CET achat) ; 9502 « Sans N° »`, JSON.stringify([a.num, s.num]));
         dit(a.presse === '1' && /(avant|d’ici|aujourd’hui)/.test(a.limite) /* (15 nov., lot retours) « avant demain 10 h », « d’ici le … » */ && !/rgb\(110, 110, 115\)/.test(a.ambre), `${nom} : 9501 à déposer dans moins de 48 h ⇒ la date en ambre`, JSON.stringify([a.limite, a.ambre]));
-        dit(a.remb === 'non' && /Pas encore remboursé/.test(a.phraseRemb), `${nom} : 9501 « Pas encore remboursé » (rien de prouvé)`, a.phraseRemb);
-        dit(s.remb === 'oui' && s.montant === '45.9' && /Remboursé/.test(s.phraseRemb) && /45,90/.test(s.phraseRemb), `${nom} : 9502 « Remboursé 45,90 € » (e-mail du même n°)`, s.phraseRemb);
+        // (15 nov., lot retour-parfait) le remboursement est l'ÉTAPE « Remboursé » de la carte : à venir (pas cochée) tant que rien ne le prouve.
+        dit(a.remb === 'non' && a.rembEtat === 'avenir' && /Remboursé/.test(a.phraseRemb) && !/€/.test(a.phraseRemb), `${nom} : 9501 « Remboursé » à venir, pas coché (rien de prouvé)`, JSON.stringify([a.rembEtat, a.phraseRemb]));
+        dit(s.remb === 'oui' && s.montant === '45.9' && s.rembEtat === 'fait' && /Remboursé/.test(s.phraseRemb) && /45,90/.test(s.phraseRemb), `${nom} : 9502 « Remboursé 45,90 € » (e-mail du même n°)`, s.phraseRemb);
         dit((await pg.$('[data-a-renvoyer] [data-retour-tx="9501"]')) === null, `${nom} : 9501 n’est pas redit dans « à renvoyer » (son bordereau est déjà là, une fois)`);
         dit(a.bouton >= (vp.width < 600 ? 44 : 40), `${nom} : « Imprimer le bordereau » (touche du studio : 44 px au doigt, 40 sur ordinateur)`, String(a.bouton));
         dit((await rougeIci(pg, '[data-retours-achat]')) === false, `${nom} : aucun rouge sur « Retours »`);

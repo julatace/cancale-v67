@@ -131,7 +131,9 @@ export function bordereauDuGarde(row, lireBordereauRetour) {
 // montantDe(o) : ce qu'il a payé, ou null
 // track   : lignes `email_track_*` projetées des n° de retour ({ suivi, status, emailAt, at, retire, carrier }) — `undefined` en cours · `null` pas su
 // departs : Map n° → ligne `depart_` (la lecture chez le transporteur d'un colis qu'il poste) — null pas su
-export function retoursAchat({ bords, demandes = [], achats, remb, transp, track = [], departs = null, deposes = null, ventesTx = null, numeroDe = null, montantDe = null, maintenant } = {}) {
+// (15 nov., lot retour-parfait) trackEnCours : les e-mails du transporteur pas ENCORE lus — un retour qui a un n° n'est
+//          alors pas dit « à déposer » en tête de Ma journée (il est peut-être déjà parti : jamais un faux rappel).
+export function retoursAchat({ bords, demandes = [], achats, remb, transp, track = [], trackEnCours = false, departs = null, deposes = null, ventesTx = null, numeroDe = null, montantDe = null, maintenant } = {}) {
   const now = isFinite(maintenant) ? maintenant : Date.now();
   if (bords === undefined) return { etat: 'encours', cartes: [], anciennes: [], aRenvoyer: [], manques: [] };
   if (bords === null && !Array.isArray(achats)) return { etat: 'passu', cartes: [], anciennes: [], aRenvoyer: [], manques: ['tes bordereaux de retour'] };
@@ -177,6 +179,7 @@ export function retoursAchat({ bords, demandes = [], achats, remb, transp, track
     c.suiviPartage = !!(k && partages.has(k));
     c.faits = k && !c.suiviPartage ? faitsRetour(k, { track: Array.isArray(track) ? track : null, departs: departs instanceof Map ? departs : null }) : null;
     c.faitsPasSu = !!(k && !c.suiviPartage && !c.faits && (track === null || departs === null));
+    c.faitsEnCours = !!(k && !c.suiviPartage && !c.faits && trackEnCours);
     if (c.faits && c.faits.carrier && !c.transporteur) c.transporteur = c.faits.carrier;
     // L'étape : PROUVÉE (remboursement lu, fait du transporteur lu), sinon SON clic « Déposé ».
     c.etape = c.rembourse.etat === 'oui' ? 'rembourse'
@@ -267,7 +270,7 @@ export function retoursAchat({ bords, demandes = [], achats, remb, transp, track
   const poids = { 'a-deposer': 0, depose: 1, 'en-route': 1, 'recu-vendeur': 2, rembourse: 3 };
   const rang = (c) => (poids[c.etape] || 0) * 1e15 + (c.depassee ? -1e14 : 0) + (c.limiteIso ? Date.parse(c.limiteIso) : 1e14);
   cartes.sort((a, b) => rang(a) - rang(b));
-  return { etat: 'lu', cartes, anciennes, aRenvoyer: cartes.filter((c) => c.etape === 'a-deposer'), manques };
+  return { etat: 'lu', cartes, anciennes, aRenvoyer: cartes.filter((c) => c.etape === 'a-deposer' && !c.faitsEnCours), manques };
 }
 
 // ════════════════════════════════════════════════════════════════════════════

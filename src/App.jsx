@@ -42259,7 +42259,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const bords = Array.isArray(retoursAchatLus.bords) ? [...retoursAchatLus.bords, ...retoursEmails.gardes].map((b) => ({ ...b, suivi: normaliserSuivi(b.suivi || '') })) : retoursAchatLus.bords;
     const ventesTx = Array.isArray(sales.items) ? new Set(sales.items.map((o) => String(o.transaction_id))) : null;
     const res = retoursAchat({ bords, demandes: retoursEmails.demandes === undefined ? [] : retoursEmails.demandes, achats: achatsLus, remb: retoursAchatLus.remb, transp: transp === undefined ? undefined : transpMap,
-      track: retoursTrack === undefined ? [] : retoursTrack, departs: vcLoc0.departs instanceof Map ? vcLoc0.departs : null,
+      track: retoursTrack === undefined ? [] : retoursTrack, trackEnCours: retoursTrack === undefined, departs: vcLoc0.departs instanceof Map ? vcLoc0.departs : null,
       deposes: retoursDeposes, ventesTx, numeroDe: (tx) => (buyNumByTxn[tx] != null ? String(buyNumByTxn[tx]) : ''), montantDe: montantCommandeLu });
     for (const c of [...res.cartes, ...res.anciennes]) {
       try { c.photo = c.achat ? orderPhoto(c.achat) || '' : ''; } catch (_) { c.photo = ''; }

@@ -42,6 +42,7 @@ const MUTATIONS = {
   'deux-fois': [['api/_lib/retour-notifs.js', "    if (r === false) { deja++; continue; }\n", '']],
   'pas-su-envoie': [['api/_lib/retour-notifs.js', "if (!Array.isArray(track) || !(departs instanceof Map) || deposes === undefined || !Array.isArray(remb)) return", "if (false) return"]],
   'cron-soir-oublie': [['api/ship-reminders.js', "  try { retoursAchat = await notifsRetoursAchat('soir'); }", "  try { retoursAchat = null; }"]],
+  'faux-rappel-pendant-lecture': [['src/retoursAchat.js', "aRenvoyer: cartes.filter((c) => c.etape === 'a-deposer' && !c.faitsEnCours)", "aRenvoyer: cartes.filter((c) => c.etape === 'a-deposer')"]],
   'tampon-par-dessus': [['src/App.jsx', "const t = await tamponnerBordereau(PL, pdf, { numero: c.num || '', titre: `RETOUR · ", "const t = await (async () => null)(PL, pdf, { numero: c.num || '', titre: `RETOUR · "]],
 };
 if (process.argv.includes('--prouve')) prouver(__filename, R, MUTATIONS);
@@ -130,8 +131,11 @@ const ligneBord = (tx, suivi, article, lim, recu, pdfB64, extra = {}) => ({ type
     const autre = F.base.get(`99999999-0000-0000-0000-000000000000|email_bordretour_99000000888`) || {};
     dit(!autre.pdfLu && !autre.transporteurPdf, 'T2 la ligne d’un AUTRE vendeur n’est ni lue ni écrite (filtre `owner` = lui)');
     const n = F.ecritures.length;
+    let relus = 0;
+    intercepte = async (url, o) => { if ((!o.method || o.method === 'GET') && /select=data(&|$)/.test(url)) relus++; return null; };
     r = await appeler();
-    dit(r.code === 200 && F.ecritures.length === n && (r.corps.transporteurs || []).length === 0, 'T2 un 2e passage ne relit ni n’écrit rien (idempotent : la marque `pdfLu`)', JSON.stringify({ avant: n, apres: F.ecritures.length, c: r.corps }));
+    intercepte = null;
+    dit(r.code === 200 && F.ecritures.length === n && relus === 0 && (r.corps.transporteurs || []).length === 0, 'T2 un 2e passage ne relit (aucun PDF) ni n’écrit rien (idempotent : la marque `pdfLu`)', JSON.stringify({ avant: n, apres: F.ecritures.length, relus, c: r.corps }));
     // Lecture ratée de la ligne ⇒ rien écrit, 503.
     poser();
     intercepte = async (url, o) => ((!o.method || o.method === 'GET') && /id=eq\.email_bordretour_/.test(decodeURIComponent(url)) && /select=data/.test(url) ? new Response('<html>522</html>', { status: 522 }) : null);
@@ -193,6 +197,9 @@ const ligneBord = (tx, suivi, article, lim, recu, pdfB64, extra = {}) => ({ type
     dit(c.etape === 'rembourse' && RA.etapesRetour(c).map((e) => e.etat).join() === 'fait,saute,saute,saute,fait', 'C4 remboursé SANS aucun fait du transporteur : déposé / en route / livré ne sont PAS cochés (grisés : rien ne les prouve)', RA.etapesRetour(c).map((e) => e.etat).join());
     c = avance({ deposes: { ['r:' + TX_AUTRY]: '2026-11-21T08:00:00Z' } });
     dit(c.etape === 'depose' && RA.etapesRetour(c)[1].parLui === true && RA.etapesRetour(c)[1].etat === 'fait', 'C4 « Déposé » de SA main (aucun fait lu) : étape notée « par toi », la carte n’invente rien de plus', JSON.stringify(RA.etapesRetour(c)[1]));
+    // Les e-mails du transporteur pas encore LUS : aucun retour qui a un n° n'est dit « à déposer » en tête (Nike est peut-être parti).
+    const enCours = RA.retoursAchat({ ...base, track: [], trackEnCours: true });
+    dit(enCours.aRenvoyer.length === 0 && enCours.cartes.find((x) => x.tx === TX_NIKE).faitsEnCours === true && RA.retoursAchat({ ...base }).aRenvoyer.length === 1, 'C5 pendant la lecture des e-mails du transporteur, rien n’est pressé « à déposer » (jamais un faux rappel du Nike déjà déposé)', JSON.stringify(enCours.aRenvoyer.map((x) => x.tx)));
   });
 
   await essaie('P jamais « à retirer »', async () => {

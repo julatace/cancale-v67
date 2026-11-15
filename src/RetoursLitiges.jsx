@@ -180,7 +180,8 @@ export function CarteRenvoyer({ c, onImprimer, onPreparer = null, onDepose = nul
   const meta = [c.num ? tr('retours.numero', { n: c.num }) : '', c.nomCompte ? tr('renv.compte', { c: c.nomCompte }) : '', c.source === 'avis' ? tr('renv.dApresEmail') : ''].filter(Boolean).join(' · ');
   const aDeposer = c.etape === 'a-deposer' || c.etape === 'depose';
   // La date limite n'est dite que tant qu'il n'est pas déposé (ni noté par lui, ni lu chez le transporteur).
-  const montrerLimite = c.etape === 'a-deposer';
+  // (15 nov., lot retour-parfait) … ni tant que les e-mails de son transporteur ne sont pas lus (il est peut-être parti).
+  const montrerLimite = c.etape === 'a-deposer' && !c.faitsEnCours;
   const src = sourceFait(c);
   return (
     <article className={'vrm-ret-carte vrm-renv-carte' + (compact ? ' is-compact' : '')} data-cible={attrCible(['retour', c.tx], ['achat', c.tx])} data-retour-achat={c.tx || ''} data-retour-cle={c.cle} data-retour-source={c.source || 'bordereau'}
