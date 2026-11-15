@@ -14,8 +14,8 @@
 /* ── Le premier écran (téléphone) : la liste des catégories, puis l'expert à part ── */
 :root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-racine { margin: 4px 0 28px !important; }
 :root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-expert-liste { margin-top: 24px !important; }
-/* Une catégorie : 64 px, son nom, ce qu'on y trouve en UNE ligne, son état à droite. */
-:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-cat-ligne { min-height: 64px !important; padding-top: 10px !important; padding-bottom: 10px !important; }
+/* Une catégorie : 58 px, son nom, ce qu'on y trouve en UNE ligne, son état à droite. */
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-cat-ligne { min-height: 58px !important; padding-top: 8px !important; padding-bottom: 8px !important; }
 :root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-cat-ligne .vrm-set-lib { min-width: 0 !important; overflow: hidden !important; }
 :root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-cat-ligne .vrm-set-lib > b { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
 :root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-cat-ligne .vrm-set-desc { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; margin-top: 3px !important; }
@@ -25,8 +25,8 @@
 :root:root:root:root:root:root body [data-espace="autres"].vrm-pm button.vrm-set-ligne:active { background: rgb(var(--sb-o) / .06) !important; }
 
 /* ── « Tout va bien ? Pas tout à fait » : UNE rangée ambre, un geste ── */
-:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-alerte-liste { margin: 0 0 20px !important; }
-:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-alerte { min-height: 64px !important; }
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-alerte-liste { margin: 0 0 16px !important; }
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-alerte { min-height: 58px !important; }
 :root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-alerte-point { width: 10px; height: 10px; border-radius: 50%; flex: none; margin: 0 9px 0 11px; background: var(--sb-ambre-point, #E8A33A); box-shadow: 0 0 0 4px color-mix(in srgb, var(--sb-ambre-point, #E8A33A) 18%, transparent); }
 :root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-alerte .vrm-set-desc { color: var(--sb-ambre) !important; }
 :root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-alerte-geste { flex: none; font: 600 15px/1.2 var(--sb-police-texte); color: var(--sb-lien); padding: 0 4px; }
