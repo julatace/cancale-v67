@@ -119,3 +119,4 @@
 .vrm-pp-corr-rangee b { font-size: 15px; font-weight: 600; }
 .vrm-pp-corr-rangee small { font-size: 12px; color: var(--fu-gris, #6e6e73); overflow-wrap: anywhere; }
 @media (max-width: 480px) { .vrm-pp-corr { margin-left: 0; } }
+.vrm-pp-corr-demande .vrm-pp-demande-mot { margin-left: 6px; }

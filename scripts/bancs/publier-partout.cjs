@@ -130,7 +130,16 @@ async function preparer(b, vp, sombre) {
     const req = route.request();
     const u = decodeURIComponent(metaVersData(req.url()));
     const j = (d, st) => route.fulfill({ status: st || 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
-    if (req.method() !== 'GET') { POSTS.push({ url: u, body: req.postData() || '' }); return j([], 201); }
+    // (15 nov.) Une écriture par comparer-et-échanger (`modifierLigneCas`, PATCH `data->>rev`) attend la ligne
+    // ÉCRITE en retour (vide = « devancé ») : le service la rend et la garde, comme PostgREST.
+    if (req.method() !== 'GET') {
+      const body = req.postData() || '';
+      POSTS.push({ url: u, body });
+      let o = null; try { o = JSON.parse(body); } catch (_) { o = null; }
+      const idEq = (/id=eq\.([^&]*)/.exec(u) || [])[1];
+      if (req.method() === 'PATCH' && idEq && o && o.data) { const row = LIGNES.find((r) => r.id === idEq); if (row) row.data = o.data; else LIGNES.push({ id: idEq, data: o.data }); return j([{ id: idEq, data: o.data }], 200); }
+      return j(Array.isArray(o) ? o : (o ? [o] : []), 201);
+    }
     if (/select=owner/.test(u)) return j({ m: 1 }, 400);
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
@@ -199,11 +208,14 @@ const cases = (pg) => pg.evaluate(() => [...document.querySelectorAll('[data-pp-
       LIGNES = lignesDe(); POSTS.length = 0; ACTIONS_EBAY.length = 0;
       const { ctx, pg, errs } = await preparer(b, vp, sombre);
       await essaie('A. La fiche d’une annonce Vinted → Publier partout', async () => {
+        // (15 nov.) Le chemin d'aujourd'hui (Studio, 14 nov.) : toucher la rangée de l'annonce ⇒ au téléphone
+        // elle monte, son « ⋯ » ouvre LA fiche ; à l'ordinateur la fiche s'ouvre en plan ; puis son menu « ⋯ ».
         await aller(pg, 'tab=annonces');
-        await pg.waitForSelector('[data-fiche-menu-ouvrir="9012"]', { state: 'attached', timeout: 25000 });
-        const plus = await pg.$('[data-fiche-menu-ouvrir="9012"]');
-        if (!(await plus.isVisible())) { const carte = await pg.evaluateHandle(() => document.querySelector('[data-fiche-menu-ouvrir="9012"]').closest('[data-fiche-plus]').parentElement.querySelector('[data-fiche-plus-bouton]')); await carte.asElement().click(); }
-        await pg.click('[data-fiche-menu-ouvrir="9012"]');
+        await pg.waitForSelector('[data-sb-avant-cle="111_9012"] [data-titre]', { timeout: 25000 });
+        await pg.locator('[data-sb-avant-cle="111_9012"] [data-titre]').click({ force: true, noWaitAfter: true });
+        if (doigt) { await pg.waitForSelector('[data-sb-avant="1"] [data-sb-avant-plus]', { timeout: 8000 }); await pg.locator('[data-sb-avant-plus]').click({ force: true, noWaitAfter: true }); }
+        await pg.waitForSelector('.vrm-fp [data-fiche-menu-ouvrir]', { timeout: 15000 });
+        await pg.locator('.vrm-fp [data-fiche-menu-ouvrir]').first().click({ force: true, noWaitAfter: true });
         await pg.waitForSelector('[data-fiche-partout="12"]', { timeout: 8000 });
         await pg.click('[data-fiche-partout="12"]');
         await pg.waitForSelector('[data-publier-partout="1"] [data-pp-case]', { timeout: 25000 });
@@ -325,8 +337,8 @@ const cases = (pg) => pg.evaluate(() => [...document.querySelectorAll('[data-pp-
         await pg.waitForSelector('[data-pp-bilan]', { timeout: 20000 });
         const r = await cases(pg);
         dit(r.find((x) => x.cle === '9013:ebay').resultat === 'a-finir', `${nomVp} · F · eBay : « à finir sur le site » (un brouillon, jamais « publié » d’ici)`, JSON.stringify(r.find((x) => x.cle === '9013:ebay')));
-        const ecrit = POSTS.filter((p) => /ebay_brouillons/.test(p.body));
-        let br = null; try { const rows = JSON.parse(ecrit[ecrit.length - 1].body); br = Object.values(rows[0].data.items).find((x) => x.pairId === '9013'); } catch (_) { br = null; }
+        const ecrit = POSTS.filter((p) => /ebay_brouillons/.test(p.url + ' ' + p.body));
+        let br = null; try { const o = JSON.parse(ecrit[ecrit.length - 1].body); const d = Array.isArray(o) ? o[0].data : o.data; br = Object.values(d.items).find((x) => x.pairId === '9013'); } catch (_) { br = null; }
         // (15 nov.) la catégorie eBay est CELLE QU'IL A CHOISIE (I), plus la première suggestion d'eBay pour le titre.
         dit(br && br.numero === '13' && br.origine === 'partout' && br.categorie && br.categorie.id === '53120', `${nomVp} · F · le brouillon porte SON N° (13 ⇒ SKU VRM-13) et SA catégorie eBay (53120, choisie en I)`, JSON.stringify(br && { numero: br.numero, cat: br.categorie }));
         const pi = ACTIONS_EBAY.filter((a) => a === 'pubinfo').length;
