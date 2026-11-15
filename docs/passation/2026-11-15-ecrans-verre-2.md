@@ -90,5 +90,22 @@ chiffres, l'histoire), Z (rien ne déborde, 44 px, un plein au plus). `_sonde-ev
 - La fusion de `project-review-nsk5su` portait deux `export default {` dans les cinq dictionnaires (Stock en
   étagères) : réparé ici, puis par le coordinateur (cc0e7291) — un spread en double retiré.
 
+## L'ordinateur (maquettes ordinateur validées ensuite : `ordi/vues/{argent,messages,parametres,fiche}-{1512,1280}`)
+Le rail de navigation commun vient de `claude/refonte-journee` (fusionné, pas refait). Ici, §6 de `verre-ecrans.css` :
+- **Argent** : trois colonnes — « vendu » en affiche au-dessus ; Reçu · Bénéfice puis les six mois (ComptaFusion) ;
+  l'à venir DÉTAILLÉ (chaque étape et ses ventes, N° par identité : `useNumAVenir`, exporté par App.jsx, la même règle
+  que la feuille) ; l'URSSAF puis le détail (replis). Banc `argent` N7 (ordinateur) réécrit à cette disposition :
+  « vendu » au-dessus, Reçu · Bénéfice · URSSAF sur une ligne (avant : les quatre sur une ligne).
+- **Paramètres** : le sommaire en un verre (nom et valeur, la catégorie choisie en porcelaine) ; chaque catégorie, son
+  grand titre en blanc, ses groupes en verres sur deux colonnes, le titre DANS le verre, des rangées sans icône.
+- **Messages** : la liste et le fil en verres (le fil sur le verre, la tête à l'encre).
+- **La fiche** : un plan large en trois colonnes (la paire ; ses sites, ses chiffres, l'état ; l'histoire et les gestes),
+  placé par rôle (grid), l'ordre du code inchangé.
+
+## Bancs d'avant ajustés à la nouvelle forme (dit ici, §6)
+- `coque-parametres` H3 : « une icône par catégorie » lue AUSSI sur les tuiles (`.vg-pm-tuile-ic`) ; au téléphone 9
+  icônes distinctes (« Mon compte » porte un avatar, maquette).
+- `argent` N7 (ordinateur) : la disposition de la maquette ordinateur (ci-dessus).
+
 ## Ce qui reste / écarts
 Voir le rapport du lot (captures maquette | rendu clair | rendu sombre).
