@@ -1536,7 +1536,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       <div className="vrm-st4-volets" data-stock-volets="">
         <aside className="vrm-st4-gauche">
           <Piece meubles={pieceMeubles} choisi={meubleChoisi} onChoisir={voirMeuble} bureau mots={motsV4}>
-            <button className="sb-touche vrm-st4-ajouter" type="button" data-creer-meuble="" onClick={() => setModal({ type: 'meuble' })}><Icon name="plus" size={18} />{tr('stock.ajouterMeuble')}</button>
+            <button className="sb-touche vrm-st4-ajouter" type="button" data-creer-meuble="" onClick={() => setModal({ type: 'meuble' })}>{tr('stock.ajouterMeuble')}</button>
           </Piece>
         </aside>
         <div className="vrm-st4-centre" data-meubles-liste="">{choisiM ? cadreMeuble(choisiM, meublesVus.indexOf(choisiM)) : null}</div>

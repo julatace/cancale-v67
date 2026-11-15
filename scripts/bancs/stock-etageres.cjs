@@ -154,7 +154,7 @@ async function ou(pg, n) {
 const bloque = (pg, sel) => pg.evaluate((sel) => { const b = document.querySelector(sel); if (!b) return 'absent'; b.scrollIntoView({ block: 'center' }); const q = b.getBoundingClientRect(); const e = document.elementFromPoint(q.x + q.width / 2, q.y + q.height / 2); return e ? (e.closest(sel) ? '' : (e.className || e.tagName) + '') : 'rien'; }, sel);
 let nBloque = 0;
 async function toucher(pg, sel) {
-  try { await pg.click(sel, { timeout: 8000 }); return true; } catch (e) { console.log('    (toucher ' + sel + ' : ' + (await bloque(pg, sel)) + ' — ' + String(e && e.message).split('\n').slice(0, 9).join(' ').slice(0, 700) + ')'); if (CAPT) await pg.screenshot({ path: path.join(CAPT, 'etag-bloque-' + (++nBloque) + '.png') }).catch(() => {}); return false; }
+  try { await pg.click(sel, { timeout: 25000 }); return true; } catch (e) { console.log('    (toucher ' + sel + ' : ' + (await bloque(pg, sel)) + ' — ' + String(e && e.message).split('\n').slice(0, 9).join(' ').slice(0, 700) + ')'); if (CAPT) await pg.screenshot({ path: path.join(CAPT, 'etag-bloque-' + (++nBloque) + '.png') }).catch(() => {}); return false; }
 }
 // La fiche de la paire (ouverte par une case) : refermée pour revenir au Stock.
 async function fermerFiche(pg) {
@@ -299,7 +299,7 @@ async function personnaliser(pg, t, v, tel, r) {
             if (CAPT) await pg.screenshot({ path: path.join(CAPT, `etag-${v}-0c-volets.png`) });
             await toucher(pg, '[data-cote-fiche="20"]');
           }
-          await pg.waitForSelector('[data-fiche-sites]', { timeout: 8000 }).catch(() => {});
+          await pg.waitForSelector('[data-stock-fiche] [data-fiche-sites]', { timeout: 20000 }).catch(() => {});
           const fs2 = await pg.evaluate(() => { const l = [...document.querySelectorAll('[data-stock-fiche] [data-fiche-site]')]; return l.map((x) => x.getAttribute('data-fiche-site') + ':' + (x.getAttribute('data-compte') || '') + ':' + x.textContent.replace(/\s+/g, ' ').trim()); });
           dit(fs2.length === 2 && /^vinted:compte_invente:/.test(fs2[0]) && /^leboncoin:nord_lbc:.*95/.test(fs2[1]), `${t} · K5 : la fiche de N°20 dit une ligne par site (logo · compte · prix · depuis)`, fs2);
           if (CAPT) await pg.screenshot({ path: path.join(CAPT, `etag-${v}-0b-fiche-sites.png`) });
