@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.379.0';
+const CODE_VERSION = '5.380.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -17462,11 +17462,14 @@ async function favorisPourCarte(uid, relire) {
 // page du MÊME site que l'onglet (son origine, jamais une adresse reçue), celle du
 // compte connecté. Seules des adresses déjà connues de VRM (son code les ouvre ou les
 // lit déjà) ; ce qui n'a pas d'adresse connue n'est pas proposé (Vestiaire : aucune).
-//   Vinted    : /my_orders/sold (banc numero-vinted), /inbox, /member/{uid} (Réglages) ;
+//   Vinted    : /inbox, /member/{uid} (Réglages) — 5.379 : plus /my_orders/sold (404 chez Vinted) ;
 //   Leboncoin : /compte/part/mes-annonces, /compte/part/mes-transactions, /messages ;
 //   eBay      : /sh/lst/active, /sh/ord (Paramètres eBay, « Retirer ailleurs »).
 const LIENS_CARTE = Object.freeze({
-  vinted: [['ventes', 'Mes ventes', '/my_orders/sold'], ['messages', 'Messages', '/inbox'], ['dressing', 'Mon dressing', '/member/{uid}']],
+  // 5.379 (Julien, 15 nov., capture « Page not found ») : « Mes ventes » `/my_orders/sold` n'était
+  // ATTESTÉE nulle part (une page inventée par un banc) et Vinted la sert en 404 : retirée. Restent
+  // les adresses que l'app ouvre déjà : `/inbox` (conversations) et `/member/{uid}` (Réglages).
+  vinted: [['messages', 'Messages', '/inbox'], ['dressing', 'Mon dressing', '/member/{uid}']],
   leboncoin: [['annonces', 'Mes annonces', '/compte/part/mes-annonces'], ['ventes', 'Mes ventes', '/compte/part/mes-transactions'], ['messages', 'Messages', '/messages']],
   ebay: [['annonces', 'Mes annonces', '/sh/lst/active'], ['ventes', 'Mes ventes', '/sh/ord']],
   vestiaire: [],
@@ -18610,7 +18613,6 @@ async function etatSite(url,tabId) {
 // Tout est lu dans CE navigateur (aucune requête) : ce que la dernière passe a
 // MESURÉ. Pas su (rien noté, ou noté il y a plus de 24 h) ⇒ `null`, la carte ne
 // dit rien (« pas su » ne vaut pas « tout va bien », §5).
-const VINTED_VENTES_URL = 'https://www.vinted.fr/my_orders/sold';
 const pluriel = (n, un, plusieurs) => (n > 1 ? plusieurs : un);
 async function capturePourCarte(plateforme, uid, vcCapte) {
   const owner = await proprietaireConnu();
@@ -18622,7 +18624,7 @@ async function capturePourCarte(plateforme, uid, vcCapte) {
     const bm = ((await lireBordManquants()) || {})[String(uid)];
     const frais = bm && Date.now() - Number(bm.at || 0) < 24 * 3600000;
     const n = frais ? Math.max(0, Number(bm.n) || 0) : null;
-    if (n > 0) return { k: 'manque', n, phrase: `${n} ${pluriel(n, 'bordereau pas encore récupéré', 'bordereaux pas encore récupérés')}`, geste: 'Ouvre tes ventes à expédier', lien: VINTED_VENTES_URL, enFile };
+    if (n > 0) return { k: 'manque', n, phrase: `${n} ${pluriel(n, 'bordereau pas encore récupéré', 'bordereaux pas encore récupérés')}`, geste: 'Ouvre tes ventes à expédier sur Vinted', enFile };
     if (enFile) return { k: 'attente', n: enFile, phrase: `${enFile} ${pluriel(enFile, 'lecture pas encore envoyée', 'lectures pas encore envoyées')} à VRM`, geste: 'Elles repartent seules dès que le réseau revient', enFile };
     if (n === 0) return { k: 'ok', n: 0, phrase: 'Bordereaux : tous récupérés', geste: '', enFile };
     return null;
@@ -18985,7 +18987,7 @@ async function carteListes(msg, sender) {
     const lignes = os.map((x) => {
       const etat = etatVenteCarte(x), it = x.item_id != null ? String(x.item_id) : '';
       const f = it && fiches[it] && typeof fiches[it] === 'object' && String(fiches[it].accountId || '') === u ? fiches[it] : null;
-      return { tx: String(x.transaction_id), titre: String(x.title || '').slice(0, 120), prix: prixCarte(x.price), photo: photoCarte(x), date: Date.parse(x.date || '') || null, etat,
+      return { tx: String(x.transaction_id), conv: /^[1-9]\d{0,19}$/.test(String(x.conversation_id == null ? '' : x.conversation_id)) ? String(x.conversation_id) : '', titre: String(x.title || '').slice(0, 120), prix: prixCarte(x.price), photo: photoCarte(x), date: Date.parse(x.date || '') || null, etat,
         vendue: etat === 'a_expedier' || etat === 'en_route' || etat === 'finalisee', num: f && f.numero != null ? String(f.numero) : '', bordereau: etat === 'a_expedier' ? avecPdf.has(String(x.transaction_id)) : null };
     }).sort((a, b) => (Number(b.date) || 0) - (Number(a.date) || 0));
     ventes = { lu: r0 ? (Date.parse(r0.cap || '') || null) : null, total: r0 ? Number(r0.n) || lignes.length : 0, liste: lignes };
