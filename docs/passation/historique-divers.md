@@ -1932,3 +1932,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 <!-- déplacé tel quel de CLAUDE.md §9 le 15 nov. 2026 -->
 - **14 nov. · Studio bleu clair — Ventes (À expédier) et Achats (À retirer)** : grand chiffre « 5 colis à envoyer · 2 avant demain », UN plein « Imprimer N » (= `ouvrirLot`, parcours d'impression intouché), tuiles-filtres enfoncées + diode, rangées sans bouton (gestes dans la fiche), « À retirer » EN TÊTE et ouvert dès qu'un colis attend (« À vérifier » ouvert dessous), codes en grandes plaques ; couche CSS `vrm-studio` (ordre posé dans index.html). `docs/passation/2026-11-14-studio-ventes.md`. Geste : aucun.
+
+<!-- déplacé tel quel de CLAUDE.md §9 le 15 nov. 2026 -->
+- **14 nov. · Studio bleu clair : Paires (Annonces, Stock, la fiche)** : rangées 64 px sur plan de verre (plaque N° · vignette · titre/méta · prix), la paire touchée MONTE à sa place (prix, acheté, jours, favoris, Baisser · Republier · ⋯ ⇒ la fiche), ordinateur : fiche en plan à droite ; grille au choix ; aucun geste perdu (inventaire). `docs/passation/2026-11-14-studio-paires.md`, banc `studio-paires`.

@@ -193,8 +193,9 @@ const deuxAppareils = () => ({ subs: [{ endpoint: 'https://web.push.apple.com/ip
     dit(pushes.length === 2, 'une notification part vers chacun des 2 appareils', `${pushes.length} envoi(s)`);
     const p = pushes[0] || {};
     console.log(`     ce que lit le téléphone : « ${p.title} » / « ${p.body} »`);
-    dit(String(p.title || '').includes(ARTICLE), 'le TITRE nomme la paire lue dans le sujet de l’email', JSON.stringify(p.title));
-    dit(/nouveau message sur compte_banc/i.test(String(p.body || '')), 'le texte dit « nouveau message sur {compte} »', JSON.stringify(p.body));
+    // (15 nov., notifications ≤ 40 : api/_lib/notif-redaction.js) le nom COURT de la paire (« taille 40 » ⇒ « T40 »).
+    dit(/salomon XT-6 gris T40/.test(String(p.title || '')) && String(p.title || '').length <= 40, 'le TITRE nomme la paire lue dans le sujet de l’email (nom court, ≤ 40)', JSON.stringify(p.title));
+    dit(/compte_banc/.test(String(p.body || '')) && /nouveau message/i.test(String(p.title || '')), 'le titre dit « Nouveau message », le texte nomme le compte', JSON.stringify([p.title, p.body]));
     // (31 oct.) Le lien « Répondre » de l'email porte la conversation (`/inbox/1001`) :
     // la notification ouvre Messages · Vinted SUR elle (api/_lib/lien-notif.js).
     dit(/^\/\?tab=messages&site=vinted&cible=conv&conv=1001(&compte=\w+)?$/.test(String(p.url || '')), 'le clic ouvre SA conversation (l’identité lue dans le lien /inbox/ de l’email)', JSON.stringify(p.url));
@@ -202,22 +203,22 @@ const deuxAppareils = () => ({ subs: [{ endpoint: 'https://web.push.apple.com/ip
     pushes.length = 0;
     await recoit(emailMessage(2, '', 'nike shox TL rose taille 35,5'));
     const p2 = pushes[0] || {};
-    dit(String(p2.title || '').includes('nike shox TL rose taille 35,5') && !String(p2.title || '').includes(ARTICLE),
+    dit(/shox TL rose/.test(String(p2.title || '')) && !/salomon/.test(String(p2.title || '')),
       'une autre paire, un autre titre : la notification suit le sujet', JSON.stringify(p2.title));
     // Un sujet sans paire : pas de titre inventé.
     pushes.length = 0;
     const sansPaire = Object.assign(emailMessage(3), { subject: 'Tu as reçu un nouveau message' });
     await recoit(sansPaire);
     const p3 = pushes[0] || {};
-    dit(pushes.length === 2 && /message vinted/i.test(String(p3.title || '')), 'sujet sans paire : « Message Vinted », jamais une paire inventée', JSON.stringify(p3.title));
+    dit(pushes.length === 2 && String(p3.title || '') === 'Nouveau message', 'sujet sans paire : « Nouveau message », jamais une paire inventée', JSON.stringify(p3.title));
     // A2. Un sujet SYSTÈME qui dit « concernant » / « au sujet de » ne désigne
     //     pas une paire : la seule forme mesurée est « à propos de » (59 sur 59).
     for (const sujet of ['Information concernant ta commande', 'Rappel au sujet de ton compte']) {
       pushes.length = 0;
       await recoit(Object.assign(emailMessage(4), { subject: sujet }));
       const p4 = pushes[0] || {};
-      dit(pushes.length === 2 && /message vinted/i.test(String(p4.title || '')) && !/ta commande|ton compte/i.test(String(p4.title || '')),
-        `sujet « ${sujet} » : « Message Vinted », jamais « 💬 ${sujet.split(/concernant |au sujet de /)[1]} »`, JSON.stringify(p4.title));
+      dit(pushes.length === 2 && String(p4.title || '') === 'Nouveau message' && !/ta commande|ton compte/i.test(String(p4.title || '')),
+        `sujet « ${sujet} » : « Nouveau message », jamais « 💬 ${sujet.split(/concernant |au sujet de /)[1]} »`, JSON.stringify(p4.title));
     }
   });
 

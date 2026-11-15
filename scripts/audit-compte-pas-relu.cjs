@@ -140,12 +140,14 @@ const iso = (ms) => new Date(ms).toISOString();
     const exactement24 = L.comptesARelire({ ...entree, comptes: [{ vinted_user_id: '201', login: 'pile' }], captures: { 201: MAINT - 24 * H } });
     dit(Array.isArray(exactement24) && exactement24.length === 0, 'A16 relu il y a exactement 24 h ⇒ pas encore (plus de 24 h)', JSON.stringify(exactement24));
     const t1 = L.texteComptesARelire([l.find((x) => x.uid === '101')]);
-    dit(t1 && /vieux_compte/.test(t1.title + t1.body) && /vinted\.fr/.test(t1.body) && /navigateur où est l’extension VRM/.test(t1.body) && /il y a 30 h/.test(t1.body), 'A17 un compte : son nom, l’âge de sa lecture, le geste (vinted.fr, le navigateur où est l’extension)', t1 && (t1.title + ' / ' + t1.body));
+    dit(t1 && /vieux_compte/.test(t1.title + t1.body) && /vinted\.fr/.test(t1.body) && /où est l’extension VRM/.test(t1.body) && /il y a 30 h/.test(t1.body) && t1.body.length <= 90, 'A17 un compte : son nom, l’âge de sa lecture, le geste (vinted.fr, là où est l’extension), corps ≤ 90 (15 nov.)', t1 && (t1.title + ' / ' + t1.body));
     const t2 = L.texteComptesARelire(l);
-    dit(t2 && /^4 comptes/.test(t2.title) && ['rallume', 'vieux_compte', 'enligne_seul', 'n° 110'].every((n) => t2.body.includes(n)), 'A18 plusieurs comptes : le nombre, et chacun nommé', t2 && (t2.title + ' / ' + t2.body));
+    // (15 nov.) Corps ≤ 90 avec le geste entier : les noms qui ne tiennent pas sont COMPTÉS (jamais coupés).
+    { const dits = ['rallume', 'vieux_compte', 'enligne_seul', 'n° 110'].filter((n) => t2 && t2.body.includes(n)).length; const m = t2 && /et (\d+) autres?/.exec(t2.body);
+    dit(t2 && /^4 comptes/.test(t2.title) && dits >= 2 && dits + (m ? Number(m[1]) : 0) === 4 && t2.body.length <= 90 && /où est l’extension VRM/.test(t2.body), 'A18 plusieurs comptes : le nombre, chacun nommé ou compté, le geste entier, corps ≤ 90', t2 && (t2.title + ' / ' + t2.body)); }
     const six = Array.from({ length: 6 }, (_, i) => ({ uid: String(300 + i), nom: 'c' + i, lu: 0, age: 'il y a 2 j' }));
     const t3 = L.texteComptesARelire(six);
-    dit(t3 && /et 2 autres/.test(t3.body) && !/c4|c5/.test(t3.body), 'A19 au-delà de quatre, le reste est compté', t3 && t3.body);
+    dit(t3 && /et \d+ autres/.test(t3.body) && !/c4|c5/.test(t3.body) && t3.body.length <= 90, 'A19 au-delà de quatre (ou de ce qui tient en 90), le reste est compté', t3 && t3.body);
     dit(![t1, t2, t3].some((t) => /Chrome/.test(t.title + t.body)), 'A20 jamais « Chrome » (le navigateur peut être Edge, Brave, Opera, Orion…)');
     dit(L.texteComptesARelire([]) === null, 'A21 aucun compte ⇒ aucun texte');
     const d = (liste, memo) => L.decisionRelecture({ liste, memo, jour: '2026-11-05' }).envoyer;
@@ -237,7 +239,7 @@ const iso = (ms) => new Date(ms).toISOString();
     console.log(`     téléphone : « ${p.title} » / « ${p.body} »`);
     dit(relus().length === 1, 'B1 deux comptes pas relus, un frais ⇒ UNE notification', String(relus().length));
     dit(/2 comptes/.test(p.title || '') && /boutique_banc/.test(p.body || '') && /atelier_banc/.test(p.body || '') && !/frais_banc/.test(p.body || ''), 'B2 elle nomme les deux comptes, pas le compte frais', p.body);
-    dit(/vinted\.fr/.test(p.body || '') && /navigateur où est l’extension VRM/.test(p.body || ''), 'B3 elle dit le geste : ouvrir vinted.fr sur ce compte, dans le navigateur où est l’extension', p.body);
+    dit(/vinted\.fr/.test(p.body || '') && /où est l’extension VRM/.test(p.body || ''), 'B3 elle dit le geste : ouvrir vinted.fr sur ce compte, là où est l’extension', p.body);
     dit(p.url && /^\/\?tab=vintedaccounts/.test(p.url), 'B4 le toucher mène à Paramètres → Comptes liés', p.url);
     const iMemo = journal.findIndex((x) => x.startsWith('memo:')), iPush = journal.findIndex((x) => /^push:.*pas relus?$/.test(x)); // (8 nov.) titres sans emoji
     dit(iMemo >= 0 && iPush > iMemo && journal[iMemo].includes(`"jour":"${jour}"`), 'B5 le mémo du jour (Paris) est écrit AVANT l’envoi', journal.join(' | '));

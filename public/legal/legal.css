@@ -1,15 +1,19 @@
-:root{--bg:#F4F6FA;--card:#FFFFFF;--text:#10151B;--muted:#5B6472;--border:#E1E5EC;--accent:#2458E6;--todo:#FFF4D6;--todoText:#7A5200}
-@media (prefers-color-scheme: dark){:root{--bg:#07090D;--card:#10141B;--text:#E8ECF2;--muted:#9AA3B2;--border:#232A36;--accent:#3D7BFF;--todo:#3A2E0B;--todoText:#F5D27A}}
+/* (15 nov., lot site-public) Les couleurs du studio bleu clair (src/design/studio.css) : la forme seulement. */
+:root{--bg:#EEF6FD;--card:#FFFFFF;--text:#0C1D30;--muted:#3F5468;--border:#D9E5F1;--accent:#0055B8;--todo:#FFF4D6;--todoText:#764300}
+@media (prefers-color-scheme: dark){:root{--bg:#15263D;--card:#16273C;--text:#EAF2FB;--muted:#A9BBCF;--border:#24364E;--accent:#6CB4FF;--todo:#3A2E0B;--todoText:#F2B65E}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+body{margin:0;background:var(--bg) linear-gradient(180deg,var(--bg),var(--bg2,var(--bg))) fixed;color:var(--text);font:16px/1.65 -apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+:root{--bg2:#D7E9F6}
+@media (prefers-color-scheme: dark){:root{--bg2:#0C1829}}
 .page{max-width:780px;margin:0 auto;padding:28px 16px 64px}
 header{display:flex;align-items:center;gap:12px;margin-bottom:22px}
 header img{width:40px;height:40px;border-radius:9px}
 header a{color:var(--text);text-decoration:none;font-weight:700}
-nav{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;margin:0 0 26px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+nav{display:flex;flex-wrap:wrap;gap:0 14px;font-size:14px;margin:0 0 26px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+nav a{display:inline-flex;align-items:center;min-height:44px}
 nav a{color:var(--muted);text-decoration:none}
 nav a[aria-current="page"]{color:var(--accent);font-weight:600}
-h1{font-size:28px;line-height:1.2;margin:0 0 6px;letter-spacing:-.02em}
+h1{font-size:32px;line-height:1.12;margin:0 0 6px;letter-spacing:-.03em}
 .maj{color:var(--muted);font-size:13px;margin:0 0 26px}
 h2{font-size:18px;margin:32px 0 8px}
 h3{font-size:15px;margin:20px 0 6px}
@@ -19,6 +23,6 @@ a{color:var(--accent)}
 table{width:100%;border-collapse:collapse;font-size:13.5px;margin:10px 0;background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
 th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--border);vertical-align:top}
 th{font-weight:600;color:var(--muted);font-size:12.5px}
-.encadre{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin:14px 0}
+.encadre{background:var(--card);border:0;border-radius:18px;padding:16px 18px;margin:14px 0;box-shadow:inset 0 1px 0 rgb(255 255 255 / .9),0 0 0 .5px rgb(18 52 96 / .08),0 10px 24px -16px rgb(18 52 96 / .35)}
 .todo{background:var(--todo);color:var(--todoText);border-radius:5px;padding:0 5px;font-weight:600}
 footer{margin-top:44px;font-size:12.5px;color:var(--muted)}

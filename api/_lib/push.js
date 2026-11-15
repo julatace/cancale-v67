@@ -23,6 +23,9 @@ import { rangerNotifGroupe, vidangerAttente, corrigerEtat, lireLu, nonLuesDeGenr
 import { fenetreGroupe, estUrgent, cleDuJour, resumeDeGroupe } from './notif-groupe.js';
 import { embellir, genreDe, etiquette, etiquetteGroupe, texteGroupe, imageSure, actionDe, ICONE_NOTIF, BADGE_NOTIF } from './notif-belle.js';
 import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
+// (15 nov.) La règle de rédaction (titre ≤ 40, corps ≤ 90, dates en clair, sans identifiant
+// ni pseudo d'acheteur) et la langue du compte.
+import { rediger, langueNotif } from './notif-redaction.js';
 
 // La base sait-elle séparer les vendeurs ? Trois réponses, jamais deux :
 // 200 → oui · 400 (colonne inconnue) → non · le reste (522, délai) → PAS SU.
@@ -201,6 +204,30 @@ export async function prefsDuVendeur() {
   const lu = await lireSubsVersion();
   if (lu && lu.prefs) return lu.prefs;
   return null;
+}
+// ── (15 nov.) LA LANGUE DU COMPTE ──────────────────────────────────────────
+// Celle des e-mails : `user_metadata.langue` de l'utilisateur Supabase (l'app y
+// range la langue choisie dans Paramètres → Langue, src/langueCompte.js). Lue par
+// la route d'administration (clé de service seulement), gardée 10 min par
+// instance. Pas de clé, pas su, langue inconnue ⇒ le français (jamais une erreur).
+const _langues = new Map();                         // vendeur → { l, at }
+export const oublierLangues = () => _langues.clear();   // bancs : instance froide
+export async function langueDuVendeur() {
+  const o = vendeurDuPush();
+  if (!o) return 'fr';
+  const vue = _langues.get(o);
+  if (vue && Date.now() - vue.at < 10 * 60e3) return vue.l;
+  const service = process.env.SUPABASE_SERVICE_KEY || '';
+  if (!service) return 'fr';
+  try {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(o)}`, { headers: sbCle(service) });
+    if (!r || !r.ok) return 'fr';
+    const u = await r.json().catch(() => null);
+    if (!u || typeof u !== 'object') return 'fr';
+    const l = langueNotif(u.user_metadata && u.user_metadata.langue);
+    _langues.set(o, { l, at: Date.now() });
+    return l;
+  } catch (_) { return 'fr'; }
 }
 export async function pushCategorieActive(cat) {
   if (!cat) return true;
@@ -385,16 +412,26 @@ export async function sendPushToAll(payload) {
   // qui arrive moins de N min après une sonnerie attend le résumé ; l'urgent
   // (échéance < 24 h, double vente) passe tout de suite. Décidé et rangé dans la
   // MÊME écriture du journal (deux e-mails simultanés ne sonnent pas tous deux).
-  const { cat: catBrute = null, _cat, echeance = null, discret = false, photo = null, maj = false, cle: cleBrute = '', urgent: urgentBrut = false, image: _imageNue, ...brut } = payload || {};
+  //   `redaction`: (15 nov.) `{ sorte, …données }` — le texte est REFAIT ici par la règle de
+  //                rédaction (api/_lib/notif-redaction.js), dans la langue du compte ; le
+  //                `title`/`body` de l'émetteur (en français) n'est qu'un repli.
+  const { cat: catBrute = null, _cat, echeance = null, discret = false, photo = null, maj = false, cle: cleBrute = '', urgent: urgentBrut = false, image: _imageNue, redaction = null, ligne: _ligneNue, ...brut } = payload || {};
   const cat = catBrute || _cat || null;
-  const notif = { ...brut, ...embellir({ title: brut.title, body: brut.body }, cat) };
-  const genre = genreDe(brut.tag);
   let prefs = null, rangee = null;
   if (cat) {
     prefs = (await prefsDuVendeur()) || {};
     if (!decisionNotif(prefs, cat)) return { sent: 0, total: null, coupe: 'preference' };
   }
   const t = instantNotif();
+  const genre = genreDe(brut.tag);
+  // La langue n'est lue que si un texte en dépend (une rédaction, un regroupement possible).
+  const langue = redaction || genre ? await langueDuVendeur() : 'fr';
+  // « demain 10 h » n'est juste qu'au moment où on la lit : une notification qui ne sonne
+  // pas tout de suite (heures calmes, sans sonnerie) dit le jour (« lun. 23 nov. »).
+  const plusTard = !!discret || (!!cat && dansHeuresCalmes(prefs, cat, t, echeance, { urgent: urgentBrut === true }));
+  const red = redaction ? rediger(redaction, { langue, maintenant: t, relatif: !plusTard }) : null;
+  const notif = { ...brut, ...embellir(red ? { title: red.title, body: red.body } : { title: brut.title, body: brut.body }, cat) };
+  const ligne = red && red.ligne ? red.ligne : '';
   const duVendeur = !!familleDe(cat);
   const cleIdem = duVendeur && !maj ? cleDuJour({ cle: cleBrute, tag: brut.tag, title: notif.title }, t) : null;
   // `VRM_NOTIF_FENETRE` : posée par les bancs seulement (scripts/_horloge-notif.cjs), jamais en production.
@@ -447,7 +484,7 @@ export async function sendPushToAll(payload) {
   // Fenêtre libre et d'autres attendaient : elles partent AVEC celle-ci, en UN résumé.
   if (rangee && rangee.groupe && rangee.groupe.length) {
     const ici = (rangee.entrees || []).find((x) => x && x.seq === rangee.seq);
-    const r = resumeDeGroupe([...rangee.groupe, ...(ici ? [ici] : [])]);
+    const r = resumeDeGroupe([...rangee.groupe, ...(ici ? [ici] : [])], langue);
     if (r) {
       const out = await pousserAuxAppareils(subs, aEnvoyerResume(r, rangee.seq));
       if (out.sent === 0) { try { await corrigerEtat(rangee.seq, 'echec'); } catch (_) {} }
@@ -460,6 +497,7 @@ export async function sendPushToAll(payload) {
     tag: etiquette({ tag: brut.tag, cat }),
     renotify: !maj,
     icon: ICONE_NOTIF, badge: BADGE_NOTIF,
+    lang: langue,
   };
   const img = imageSure(photo);
   if (img) aEnvoyer.image = img;
@@ -473,7 +511,7 @@ export async function sendPushToAll(payload) {
     const k = rangee && lu ? nonLuesDeGenre(rangee.entrees, genre.id, lu) : 1;
     aEnvoyer.genre = genre.id;
     if (k > 1) {
-      Object.assign(aEnvoyer, texteGroupe(aEnvoyer, genre, k));
+      Object.assign(aEnvoyer, texteGroupe({ ...aEnvoyer, ligne }, genre, k, langue));
       aEnvoyer.tagGroupe = etiquetteGroupe(genre);
       delete aEnvoyer.image;                    // la photo d'UNE vente ne coiffe pas trois ventes
     }
@@ -558,7 +596,7 @@ export async function vidangerResume() {
   if (!v) return { vidange: 'pas-su' };
   if (v.rien) return { vidange: 'rien' };
   if (!v.groupe.length) return { vidange: muet || 'calme' };
-  const r = resumeDeGroupe(v.groupe);
+  const r = resumeDeGroupe(v.groupe, await langueDuVendeur());
   const seq = v.groupe.reduce((m, x) => Math.max(m, x.seq || 0), 0) || null;
   const out = await pousserAuxAppareils(subs, aEnvoyerResume(r, seq));
   return { vidange: 'envoye', n: r.n, sent: out.sent };
