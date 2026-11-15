@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.381.0';
+const CODE_VERSION = '5.383.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -5699,6 +5699,20 @@ function dateLectureDressing(ligne) {
 //    `ENLIGNE_SUR_MS` : l'extension ne relit jamais en public un compte lu depuis
 //    moins de 30 min (`ENLIGNE_DELAI_MS`), donc aucune lecture plus récente ne
 //    peut exister. Au-delà, ses annonces sont « à confirmer ».
+// ⚠️⚠️ 15 NOV. (audit fiabilité) — UNE LECTURE PUBLIQUE VIDE QUI CONTREDIT UN
+//    DRESSING FRAIS N'EST PAS UNE RÉPONSE (§4.1). Mesuré en lecture seule sur sa
+//    base : le dressing du plus gros compte, capté connecté à 13:08, portait 19
+//    annonces ouvertes ; 45 min plus tard une lecture publique (extension 5.273,
+//    un autre navigateur) rangeait « complet, 0 annonce, total 0 ». Plus récente,
+//    elle faisait foi : les 19 paires passaient ABSENTES (rendues fermées) — hors
+//    du compteur « en ligne » (20 au lieu de 39), hors des paires présentes qui
+//    protègent un N° et décident du rouge (§5), et « disparues ». Une vue publique
+//    à zéro arrive sans que les annonces soient parties (compte limité par
+//    Vinted, vue en retard, lecteur ancien). ⇒ Lecture publique VIDE + dressing
+//    lu moins de 24 h AVANT elle qui montre au moins une annonce ouverte ⇒ « pas
+//    su » (comme un hoquet) : le dressing ne décide que s'il a moins de 30 min,
+//    sinon « à confirmer » (présentes, jamais disparues). Un dressing de plus de
+//    24 h face à une lecture publique vide : elle fait foi, comme avant (11 oct.).
 const ENLIGNE_FRAIS_MS = 24 * 60 * 60 * 1000;
 const ENLIGNE_SUR_MS = 30 * 60 * 1000;
 function ouverteSurVinted(it) { return !!(it && !it.is_closed && !it.is_hidden && !it.is_draft); }
@@ -5706,7 +5720,10 @@ function venduePourSonVendeur(it) { return !!(it && it.is_closed && /sold/i.test
 function enLigneDuCompte(liste, pub, suppIds, maintenant) {
   const itemsL = (liste && Array.isArray(liste.items)) ? liste.items : null;
   const capL = itemsL && liste.cap != null && liste.cap !== '' ? Number(liste.cap) : NaN;
-  const pubPasSu = !!(pub && pub.passu === true);
+  const capPub = pub && pub.cap != null && pub.cap !== '' ? Number(pub.cap) : NaN;
+  const pubVideContredit = !!(pub && pub.passu !== true && (pub.complet === true || pub.complet === 'true') && Array.isArray(pub.ids) && pub.ids.length === 0
+    && (itemsL || []).some(ouverteSurVinted) && isFinite(capL) && !(isFinite(capPub) && capPub - capL >= ENLIGNE_FRAIS_MS));
+  const pubPasSu = !!(pub && pub.passu === true) || pubVideContredit;
   const pubLisible = !pubPasSu && !!(pub && (pub.complet === true || pub.complet === 'true') && Array.isArray(pub.ids));
   const capP = pubLisible && pub.cap != null && pub.cap !== '' ? Number(pub.cap) : NaN;
   const r = { enLigne: [], aConfirmer: [], fermees: [], absentes: [], supprimees: [], lu: NaN, source: '', pubPasSu };
