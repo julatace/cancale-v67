@@ -149,7 +149,7 @@ Vrais couples (la même photo passée par un autre site) :
   F2 recompression 99,9 % ; F3 aucun vrai positif écarté ; F4 « pas su » jamais sûr ; F5 monde complet
   0 faux ; F6 marge). Sur l'arbre de départ (`git archive f782040f`) : **rouge** (F0 : « sûr » n'existe
   pas). Mutations (jeu réduit `BANC_PAIRES=8 BANC_FAMILLE=12`) : `--mutation=une` (sûr sur l'empreinte
-  seule) et `--mutation=fine` (seuils s 0,5 / r 0,9) ⇒ **rouges** (F1). `BANC_CACHE=<dossier>` reprend
+  seule) ⇒ **328 faux « sûr »**, `--mutation=fine` (seuils s 0,5 / r 0,9) ⇒ **214 faux « sûr »** : rouges (F1). `BANC_CACHE=<dossier>` reprend
   une mesure interrompue (un onglet tombé est relancé).
 - `scripts/audit-meme-photo.cjs` — tout vert (R0–R7, E1–E7, F0–F6, C1–C2). F : la mesure fine EXÉCUTÉE
   (même image ⇒ sûr, réduite ⇒ jamais écartée, autre ⇒ non, vignette ⇒ pas su), seuils épinglés à ceux
@@ -159,7 +159,7 @@ Vrais couples (la même photo passée par un autre site) :
   seulement sur `onRelier`, règles sans écriture). E7 : l'extension VRAIE (`_fond-vm`) — deux images dans
   le même tour, sans cookie, `photo_meme_verif` = { s, r } (jamais l'image), budgets des deux comptes,
   45 s, onglet du compte exigé, sans compte Vinted rien, plafond 6/h, lecture ratée ⇒ rien écrit.
-  Sur l'arbre de départ : **rouge** (src/photoFine.js absent). `--mutation=toutes` : __MUT__.
+  Sur l'arbre de départ : **rouge** (src/photoFine.js absent). `--mutation=toutes` : **26/26 rouges** (13 du lot meme-photo + 13 de la deuxième mesure : sureSeule, sureSansEmpreinte, sureSansCorrel, fineFaible, correlFaible, ecartFin, ambiguSur, relierSeul, fineCookie, fineBudget, fineOnglet, fineLecture, finePlafond).
 - `scripts/bancs/meme-photo.cjs` (390 tactile, 1512, clair, sombre) — **115 verts** : la VRAIE mesure
   fine calculée sur les images du banc (P1 ~ P1 passée par un autre site : s 0,8848, r 0,9993) ⇒
   Leboncoin 5001 « Même photo · sûr », eBay 2001 « À vérifier · eBay : une seule mesure possible »,
