@@ -59,6 +59,7 @@ async function preparer(o, vue) {
     // la base met une offre sur la conversation n° 4 (i % 9 === 4), la 5e de la liste (de la plus récente)
     const ok = await toucher('[data-fil-offre]');
     if (!ok) { const l = pg.locator('[data-fil]').nth(4); try { if (o.tel) await l.tap({ timeout: 4000 }); else await l.click({ timeout: 4000 }); } catch (_) {} }
+    await pg.waitForSelector('.vrm-chat-panel .vrm-chat-history', { timeout: 10000 }).catch(() => {});
     await pg.waitForTimeout(1600);
   }
   if (vue === 'parametres-ventes') {

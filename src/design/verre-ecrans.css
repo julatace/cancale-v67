@@ -376,4 +376,9 @@
   color: #0C1D30 !important; text-shadow: 0 1px 0 #FFFFFF !important; font-weight: 750 !important; }
 :root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-paire :is(.vrm-num, .sb-plaque) * { color: inherit !important; }
 
+@media (min-width: 768px) {
+  :root:root:root body .vg-a-venir-legende { grid-template-columns: none; grid-auto-flow: column; justify-content: start; gap: 6px 32px; }
+  :root:root:root body .vg-a-venir-l em { margin-left: 8px; }
+}
+
 } /* fin de @layer vrm-verre */

@@ -87,6 +87,7 @@ import { etatExtensionAffichage, etatDerniereLecture } from '../etatConnexions.j
 import { filtrerReglages } from '../rechercheReglages.js';
 // (15 nov.) Paramètres rangés par ce que le vendeur veut faire : dix catégories (src/parametres/categories.js).
 import { rangerParCategorie, rangeeDuLien, VALEUR_DE_CATEGORIE } from '../parametres/categories.js';
+import { reglePlanCourante } from '../abonnement/planVentes.js';   // (15 nov., verre 2) « Pro » sur la carte Mon compte
 import { AlerteParametres } from '../parametres/AlerteParametres.jsx';
 import { AFaireSite } from '../plateformes/AFaireSite.jsx';   // (14 nov.) « Ouvrir le paiement · N › » du propriétaire
 import { preparerApercusModes } from '../apercusBordereaux.js';
@@ -2432,7 +2433,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     <button key={c.id} type="button" className="vg-carte vg-pm-moi" data-categorie-ouvrir={c.id} data-vue="compte" data-categorie-contient={` ${c.ids.join(' ')} `} onClick={() => ouvrirCategorie(c.id)}>
       <span className="vg-pm-av" aria-hidden="true">{AUTH.user ? <AvatarCompte key={AUTH.user.id} owner={AUTH.user.id} headers={enTeteSession} lettre={String(AUTH.user.email || '?').slice(0, 1).toUpperCase()}/> : <Icon name={c.ic} size={20}/>}</span>
       <span className="vg-pm-moi-txt"><b>{titreCat(c.id)}</b><span className="vrm-sensible">{AUTH.user ? AUTH.user.email : tr(`parametres.cat.${c.id}.desc`)}</span></span>
-      {valeurCat(c) ? <span className="vg-pm-moi-val">{valeurCat(c)}</span> : null}
+      {/* L'offre (Pro · Solo) : la même source que la colonne de l'ordinateur (`reglePlanCourante`) ; pas su ⇒ rien. */}
+      {(() => { const pl = (reglePlanCourante() || {}).plan; const o = pl === 'pro' ? 'Pro' : pl === 'solo' ? 'Solo' : ''; return o ? <span className="vg-pm-moi-val" data-moi-offre={pl}>{o}</span> : null; })()}
       {chevron}
     </button>
   );
