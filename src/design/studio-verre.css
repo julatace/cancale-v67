@@ -149,7 +149,11 @@
 
 /* ══ 2. LE FOND : posé UNE fois sur la coque (pas de background-attachment:fixed, cassé sur iOS) ══ */
 html:has(.vrm-app-shell[data-espace]), html:has(.vrm-app-shell[data-espace]) body { background: var(--sv-bas) !important; }
-:root:root:root body .vrm-app-shell[data-espace].vrm-app-shell { background: transparent !important; background-image: none !important; isolation: isolate !important; }
+/* ⚠️ PAS d'`isolation` ni de `z-index` sur la coque : elle deviendrait un contexte d'empilement, et la barre du bas
+   (z-index 9402 quand l'éventail est ouvert) passerait SOUS le voile de l'éventail (porté dans <body>, 9400) — le clic
+   qui suit le toucher du disque tombait sur le voile et refermait l'éventail (studio-coque, E). Le ::before à z-index -1
+   se peint au-dessus du fond du document et sous le contenu. */
+:root:root:root body .vrm-app-shell[data-espace].vrm-app-shell { background: transparent !important; background-image: none !important; }
 :root:root:root body .vrm-app-shell[data-espace]::before {
   content: "" !important; position: fixed !important; inset: 0 !important; z-index: -1 !important; pointer-events: none !important; display: block !important;
   background:
