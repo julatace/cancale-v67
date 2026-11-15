@@ -124,6 +124,7 @@ const lire = (pg) => pg.evaluate(() => {
     fondQ: r.querySelector('.question') ? getComputedStyle(r.querySelector('.question')).backgroundColor : '',
     fondQImg: r.querySelector('.question') ? getComputedStyle(r.querySelector('.question')).backgroundImage : '',
     accentQImg: r.querySelector('.question [data-choix="oui"]') ? getComputedStyle(r.querySelector('.question [data-choix="oui"]')).backgroundImage : '',
+    accentQCol: r.querySelector('.question [data-choix="oui"]') ? getComputedStyle(r.querySelector('.question [data-choix="oui"]')).backgroundColor : '',
     accentQ: r.querySelector('.question [data-choix="oui"]') ? getComputedStyle(r.querySelector('.question [data-choix="oui"]')).backgroundColor : '',
     hauteursQ: Array.from(r.querySelectorAll('.question button')).map((b) => Math.round(b.getBoundingClientRect().height)),
     // Le mot de passe ne doit JAMAIS être un champ du DOM de la page (5.329 : il
@@ -487,12 +488,18 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
     await d.ctx.close();
   });
   await essaie('graphisme', async () => {
-    // 5.328 : verre (fond translucide) clair et sombre. 5.379 : « Studio bleu clair » (src/design/studio.css) —
-    // un fond OPAQUE bleu clair / bleu-nuit (dégradé, lumière du haut) et le plein en rond d'encre.
-    for (const [scheme, fond, accent] of [['dark', 'rgb(21, 38, 61)', 'rgb(234, 242, 251)'], ['light', 'rgb(238, 246, 253)', 'rgb(12, 29, 48)']]) {
+    // 5.328 : verre (fond translucide) clair et sombre. 5.379 : « Studio bleu clair » (src/design/studio.css).
+    // 5.386 (« Verre dépoli », Julien 15 nov.) : le contrôle figeait les couleurs du studio ; il juge
+    // désormais la RÈGLE : un fond OPAQUE en dégradé qui SUIT le système (deux thèmes ⇒ deux dégradés
+    // différents) et le plein qui SE DÉTACHE de ce fond (blanc sur le bleu). Les valeurs du verre :
+    // scripts/bancs/verre-extension-site.cjs (dégradé, opacité, contraste mesuré sur les pixels).
+    const fonds = {};
+    for (const scheme of ['dark', 'light']) {
       const { ctx, pg } = await rendre(nav, AC(), { scheme });
       const l = await lire(pg);
-      dit(/gradient/.test(l.fondQImg) && l.fondQImg.includes(fond) && l.accentQImg.includes(accent), `${scheme} : la carte suit le système (studio bleu clair, jetons de l’app, le plein à l’encre)`, JSON.stringify({ fond: l.fondQImg, accent: l.accentQImg }));
+      fonds[scheme] = l.fondQImg;
+      const plein = /^rgb\(255, 255, 255\)$/.test(l.accentQCol) || /rgb\(255, 255, 255\)/.test(l.accentQImg);
+      dit(/linear-gradient/.test(l.fondQImg) && plein && (scheme === 'dark' || fonds.dark !== l.fondQImg), `${scheme} : la carte suit le système (dégradé opaque propre au thème, le plein se détache du fond)`, JSON.stringify({ fond: l.fondQImg, accent: l.accentQImg, col: l.accentQCol }));
       if (scheme === 'light') await pg.screenshot({ path: path.join(SORTIE, 'badge-question-clair.png') });
       await ctx.close();
     }
