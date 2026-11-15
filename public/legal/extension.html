@@ -15,7 +15,7 @@
 <nav aria-label="Documents légaux"><a href="/legal/mentions-legales.html">Mentions légales</a><a href="/legal/cgu.html">Conditions d’utilisation</a><a href="/legal/cgv.html">Conditions de vente</a><a href="/legal/confidentialite.html">Confidentialité</a><a href="/legal/extension.html" aria-current="page">Extension</a><a href="/legal/cookies.html">Cookies et traceurs</a></nav>
 <main>
 <h1>Confidentialité de l’extension VRM</h1>
-<p class="maj">Dernière mise à jour : 8 novembre 2026</p>
+<p class="maj">Dernière mise à jour : 15 novembre 2026</p>
 
 <!-- Cette page décrit le CODE de l'extension (vinted-sync-extension/), rien de plus.
      Toute nouvelle lecture, tout nouveau site ou destinataire se déclare ICI avant
@@ -28,7 +28,7 @@
 <ul>
 <li>Elle ne travaille que sur les sites listés au point 2, et seulement pour le compte connecté dans l’onglet.</li>
 <li>Ce qu’elle lit part <b>uniquement dans ton compte VRM</b>. Rien n’est vendu, rien ne sert à la publicité ni au profilage.</li>
-<li>Elle ne lit jamais ton mot de passe, ni ton historique de navigation.</li>
+<li>Elle ne lit jamais le mot de passe de tes comptes Vinted, Leboncoin, eBay ou Vestiaire Collective, ni ton historique de navigation.</li>
 <li>Tout son code est dans le paquet installé : elle ne télécharge et n’exécute aucun code venu d’ailleurs.</li>
 </ul>
 
@@ -53,16 +53,18 @@
 <tr><td>Les cookies de session de Vinted (<code>access_token_web</code>, <code>refresh_token_web</code>, <code>anon_id</code>)</td><td>Autorisation « cookies » du navigateur, sur les domaines Vinted seulement</td><td>Savoir quel compte Vinted est connecté, n’agir qu’au nom de celui-là, et exécuter les actions que tu commandes depuis VRM</td></tr>
 <tr><td>Ton activité sur les sites de revente : annonces, ventes, achats, messages, offres, avis reçus, soldes du porte-monnaie, nombre de favoris, bordereaux</td><td>Les réponses que ces sites envoient déjà à ta page quand tu les ouvres, et des lectures faites depuis la page, une à la fois</td><td>Afficher ton activité dans VRM, préparer les colis, calculer tes chiffres</td></tr>
 <tr><td>Le PDF d’un bordereau que tu télécharges depuis Vinted</td><td>Autorisation « téléchargements » : seuls les PDF venant de Vinted sont regardés, tout autre téléchargement est ignoré</td><td>Ranger le bordereau avec sa vente</td></tr>
-<tr><td>Les photos de tes annonces</td><td>Depuis le serveur d’images du site</td><td>Les joindre à la même annonce sur un autre site, quand tu le demandes</td></tr>
+<tr><td>Les photos de tes annonces</td><td>Depuis le serveur d’images du site</td><td>Les joindre à la même annonce sur un autre site, quand tu le demandes ; repérer une même photo publiée sur deux de tes comptes (seule une empreinte de l’image est rangée, jamais l’image)</td></tr>
+<tr><td>Ton e-mail et ton mot de passe <b>VRM</b> (ou le code reçu par e-mail), quand tu te connectes depuis l’extension</td><td>Tapés par toi dans le formulaire de l’extension (sa fenêtre ou la carte du logo, que la page du site ne peut pas lire)</td><td>Ouvrir ta session VRM dans l’extension. Ils partent une seule fois au service de connexion de VRM ; le mot de passe n’est jamais gardé</td></tr>
 <tr><td>Le statut public d’un colis que tu attends</td><td>Le n° de suivi (et, pour Mondial Relay, le code postal du point relais) envoyé au site du transporteur depuis ton navigateur, au plus 12 fois par heure et par transporteur — seulement quand le serveur de VRM ne peut pas le lire lui-même</td><td>Te dire où en est le colis</td></tr>
 <tr><td>L’adresse des onglets ouverts</td><td>Autorisation « onglets », sur ton appareil</td><td>Retrouver l’onglet Vinted, Leboncoin ou VRM déjà ouvert. Ces adresses ne sont ni gardées ni envoyées</td></tr>
 </table>
-<p>Elle ne lit pas : ton mot de passe, ton historique de navigation, les sites hors de la liste du point 2, ni les données bancaires, d’identité ou de double authentification échangées avec ces sites.</p>
+<p>Elle ne lit pas : le mot de passe de tes comptes de revente, ton historique de navigation, les sites hors de la liste du point 2, ni les données bancaires, d’identité ou de double authentification échangées avec ces sites.</p>
 
 <h2>4. Ce qu’elle envoie, et à qui</h2>
 <table>
 <tr><th>Destinataire</th><th>Ce qui part</th></tr>
 <tr><td><b>Ton espace VRM</b> (base Supabase de VRM, hébergée dans l’Union européenne)</td><td>Ce qui est lu au point 3 sur tes comptes, rangé sous ton compte VRM et séparé de celui des autres utilisateurs ; les jetons de session de tes comptes de revente, pour exécuter les actions que tu commandes ; des relevés techniques de fonctionnement (version de l’extension, étapes, codes d’erreur).</td></tr>
+<tr><td><b>Les serveurs de VRM</b> (vrm.center, hébergés par Vercel)</td><td>Ce qui passe par le serveur pour être rangé dans ton espace (ventes, achats, suivis de colis) ; une demande de notification (compte relié, nouvel avis) ; le rapport que tu envoies toi-même depuis la carte. L’extension y lit aussi, au plus toutes les 6 heures, le numéro de sa dernière version.</td></tr>
 <tr><td><b>Le site concerné</b> (Vinted, Leboncoin, eBay, Vestiaire Collective)</td><td>Les actions que tu commandes, en ton nom, depuis ta propre page — comme si tu les faisais toi-même.</td></tr>
 <tr><td><b>Les transporteurs</b> (Mondial Relay, Chronopost, Vinted Go)</td><td>Le n° de suivi d’un colis que tu attends (et le code postal du point relais pour Mondial Relay). Jamais ton code de retrait, jamais ton nom.</td></tr>
 <tr><td><b>Photoroom</b>, par le serveur de VRM</td><td>Seulement si tu as posé ta propre clé Photoroom dans VRM : les photos d’une annonce que tu publies sur Vestiaire Collective, pour en retirer le fond.</td></tr>
@@ -71,9 +73,9 @@
 
 <h2>5. Ce qu’elle fait en ton nom</h2>
 <ul>
-<li><b>Sur ton clic dans VRM</b> : remplir une annonce sur Leboncoin, eBay ou Vestiaire Collective ; republier une annonce Vinted (elle est enregistrée, retirée puis remise en ligne) ; répondre à un message ; accepter, refuser ou faire une offre ; générer un bordereau et récupérer son PDF ; supprimer une annonce Leboncoin (après confirmation).</li>
-<li><b>Seulement si tu les allumes dans VRM</b> (éteintes par défaut) : accepter une offre Vinted au-dessus du prix minimum que tu as fixé ; envoyer ton message aux personnes qui mettent ton annonce en favori.</li>
-<li><b>Ses garde-fous</b> : elle n’agit qu’au nom du compte connecté dans l’onglet ; au plus 50 actions par heure et par compte ; une requête à la fois ; elle s’arrête quand le site demande une pause.</li>
+<li><b>Sur ton clic dans VRM</b> : remplir une annonce sur Leboncoin, eBay ou Vestiaire Collective ; republier une annonce Vinted (elle est enregistrée, retirée puis remise en ligne) ; baisser ou remettre un prix (Vinted, Leboncoin, Vestiaire Collective) ; poser ou retirer le mode vacances Vinted ; créer un brouillon d’annonce Vinted ; répondre à un message ; accepter, refuser ou faire une offre ; générer un bordereau et récupérer son PDF ; supprimer une annonce Leboncoin (après confirmation).</li>
+<li><b>Seulement si tu les allumes dans VRM</b> (éteintes par défaut) : accepter une offre Vinted au-dessus du prix minimum que tu as fixé, et refuser avec <b>ton</b> message celles sous ton seuil ; envoyer ton message aux personnes qui mettent ton annonce en favori.</li>
+<li><b>Ses garde-fous</b> : elle n’agit qu’au nom du compte connecté dans l’onglet ; au plus 50 actions par heure et 200 par jour (réglage par défaut) et par compte ; une requête à la fois ; elle s’arrête quand le site demande une pause, et s’arrête net à la première vérification anti-robot jusqu’à ce que tu la relances.</li>
 </ul>
 
 <h2>6. Ce qu’elle garde sur ton appareil</h2>
