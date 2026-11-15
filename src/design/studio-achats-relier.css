@@ -25,7 +25,7 @@
 .vrm-aar .vrm-aar-serie > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* La file : une colonne au téléphone, des cartes côte à côte sur grand écran. */
-.vrm-aar-liste { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); gap: 10px; min-width: 0; }
+.vrm-aar-liste { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); align-items: start; gap: 10px; min-width: 0; }
 .vrm-aar-carte {
   display: flex; flex-direction: column; gap: 6px; min-width: 0; box-sizing: border-box; margin: 0; padding: 10px 12px;
   border-radius: 20px; background: linear-gradient(180deg, var(--sb-porcelaine, #fff), var(--sb-porcelaine-2, #F7FAFD));

@@ -11,7 +11,7 @@ require('./_porte-banc.cjs');
 //  (« Aucune suggestion » seul au milieu), trois gestes empilés. Ce banc mesure la RÈGLE :
 //
 //    colle     au défilement (3 positions), chaque barre COLLÉE de l'écran (position sticky, posée à son
-//              `top`) a un fond qui se lit (alpha ≥ .9, ou ≥ .72 avec un flou), une ombre de séparation,
+//              `top`) a un fond qui se lit (alpha ≥ .98 — à .96 la liste se devinait dessous —, ou ≥ .72 avec un flou), une ombre,
 //              et le point de son centre (et de ses bords) lui appartient (`elementFromPoint`) : aucun
 //              élément de la liste n'est dessiné dessus ; elle ne passe ni sous ni sur la barre de titre.
 //              Jugé sur « Sans achat relié », sur « Toutes » et sur Stock ;
@@ -138,7 +138,7 @@ function colle() {
       if (p.boxShadow && p.boxShadow !== 'none' && o > 0.5) ombre = true;
     }
     const flou = /blur\(/.test(cs.backdropFilter || cs.webkitBackdropFilter || '');
-    if (!img && a < (flou ? 0.72 : 0.9)) fautes.push(`${nom} : fond transparent (alpha ${a.toFixed(2)}${flou ? ', flou' : ''})`);
+    if (!img && a < (flou ? 0.72 : 0.98)) fautes.push(`${nom} : fond transparent (alpha ${a.toFixed(2)}${flou ? ', flou' : ''})`);
     if (!ombre) fautes.push(`${nom} : aucune ombre de séparation`);
     // Ses points (centre et bords) lui appartiennent : rien de la liste n'est dessiné dessus.
     for (const [x, y] of [[r.left + r.width / 2, r.top + r.height / 2], [r.left + 10, r.top + r.height / 2], [r.right - 10, r.top + r.height / 2], [r.left + r.width / 2, r.bottom - 3]]) {

@@ -665,7 +665,7 @@
    voile était une animation pilotée par le défilement posée sur le FOND de la barre, mais la même règle posait
    `background: transparent !important` — une déclaration !important passe devant une animation : sur un
    navigateur qui sait piloter l'animation (Safari 26, Chrome), la barre restait transparente pour toujours.
-   La barre porte désormais son voile TOUJOURS : l'aplat du fond à 96 % (opaque assez pour lire ; au repos il a
+   La barre porte désormais son voile TOUJOURS : l’aplat du fond, opaque (à 96 % la liste se lisait encore dessous ; au repos il a
    la couleur du fond, seule l'ombre se voit), une ombre de séparation, et elle passe au-dessus de la liste
    (z-index 30 ; la barre de titre est hors de `.vrm-main`, jamais couverte). Aucun flou : un `backdrop-filter`
    ferait de la barre le cadre des éléments `fixed` qu'elle contient (le voile du menu « ⋯ Outils »).
@@ -678,13 +678,13 @@
 }
 :root:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-stock > div[style*="sticky"] {
   z-index: 30 !important;
-  background: color-mix(in srgb, var(--sbp-aplat) 96%, transparent) !important;
+  background: var(--sbp-aplat) !important;
   box-shadow: 0 .5px 0 rgb(var(--sbp-o) / .10), 0 10px 18px -12px rgb(var(--sbp-o) / .40) !important;
 }
 @media (max-width: 767px) {
-  :root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar {
+  :root:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar {
     z-index: 30 !important;
-    background: color-mix(in srgb, var(--sbp-aplat) 96%, transparent) !important;
+    background: var(--sbp-aplat) !important;
     box-shadow: 0 .5px 0 rgb(var(--sbp-o) / .10), 0 10px 18px -12px rgb(var(--sbp-o) / .40) !important;
   }
 }
@@ -692,7 +692,7 @@
   box-shadow: 0 .5px 0 rgb(255 255 255 / .06), 0 10px 18px -10px rgb(0 0 0 / .85) !important;
 }
 @media (max-width: 767px) {
-  :root[data-theme="dark"]:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar {
+  :root[data-theme="dark"]:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar {
     box-shadow: 0 .5px 0 rgb(255 255 255 / .06), 0 10px 18px -10px rgb(0 0 0 / .85) !important;
   }
 }
