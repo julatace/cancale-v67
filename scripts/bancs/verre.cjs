@@ -63,6 +63,8 @@ function mesurer() {
   const sur = (h, a, bas) => [0, 1, 2].map((i) => h[i] * a + bas[i] * (1 - a));
   const vis = (el) => { const r = el.getBoundingClientRect(); const cs = getComputedStyle(el); return r.width > 1 && r.height > 1 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
   const nom = (el) => { const p = []; let e = el; for (let i = 0; e && i < 6; i++, e = e.parentElement) p.unshift(e.tagName.toLowerCase() + (typeof e.className === 'string' && e.className.trim() ? '.' + e.className.trim().split(/\s+/).slice(0, 2).join('.') : '')); return p.join(' > '); };
+  // un texte VU dans l'élément (un libellé masqué pour les lecteurs d'écran ne compte pas)
+  const texteVu = (b) => [b, ...b.querySelectorAll('*')].some((x) => { if (x.closest('svg')) return false; let t = ''; for (const n of x.childNodes) if (n.nodeType === 3) t += n.nodeValue; if (!t.trim()) return false; const r = x.getBoundingClientRect(); return r.width > 2 && r.height > 2 && getComputedStyle(x).clip !== 'rect(0px, 0px, 0px, 0px)'; });
   const root = getComputedStyle(document.documentElement);
   const tok = (n) => parse(root.getPropertyValue(n));
 
@@ -111,11 +113,14 @@ function mesurer() {
   const vus = new Set();
   for (const r of racines) for (const el of r.querySelectorAll('*')) {
     if (vus.has(el)) continue; vus.add(el);
-    if (/^(svg|path|script|style|img|picture|video|canvas|input|textarea|select|option)$/i.test(el.tagName) || el.closest('svg')) continue;
+    // Une ICÔNE seule dans un bouton (sans texte) : jugée comme un élément graphique, 3:1 (WCAG 1.4.11).
+    const icone = el.tagName.toLowerCase() === 'svg' && el.parentElement && el.parentElement.matches('button, a, [role="button"]') && !texteVu(el.parentElement);
+    if (!icone && (/^(svg|path|script|style|img|picture|video|canvas|input|textarea|select|option)$/i.test(el.tagName) || el.closest('svg'))) continue;
     let texte = '';
     for (const n of el.childNodes) if (n.nodeType === 3) texte += n.nodeValue;
     texte = texte.replace(/\s+/g, ' ').trim();
-    if (!texte || !/[\p{L}\p{N}€]/u.test(texte)) continue;
+    if (icone) texte = '(icône) ' + (el.parentElement.getAttribute('aria-label') || el.parentElement.title || '');
+    else if (!texte || !/[\p{L}\p{N}€]/u.test(texte)) continue;
     if (!vis(el)) continue;
     const cs = getComputedStyle(el);
     if (cs.clip === 'rect(0px, 0px, 0px, 0px)' || cs.clipPath === 'inset(50%)') continue;
@@ -157,7 +162,7 @@ function mesurer() {
     for (const b of cands) { const t = sur(tc, a, b); const k = ratio(t, b); if (k < pire) { pire = k; ou = b; } }
     out.textes++;
     const px = parseFloat(cs.fontSize), w = parseInt(cs.fontWeight, 10) || 400;
-    const gros = px >= 24 || (px >= 18.66 && w >= 700);
+    const gros = icone || px >= 24 || (px >= 18.66 && w >= 700);
     const seuil = gros ? 3 : 4.5;
     if (pire < seuil - 0.005) out.contraste.push({ k: +pire.toFixed(2), seuil, el: nom(el), t: texte.slice(0, 40), c: cs.color, f: ou ? ou.map(Math.round).join(',') : '' });
   }
