@@ -60,7 +60,7 @@ const MUTATIONS = {
   bornes_divergent: { f: 'regle', m: (s) => s.replace("{ cle: 'zoom', l: 'Zoom', min: 1, max: 2, pas: 0.01 }", "{ cle: 'zoom', l: 'Zoom', min: 1, max: 1.5, pas: 0.01 }") },
   sans_rotation: { f: 'regle', m: (s) => s.replace('ctx.rotate(f.rot * Math.PI / 180); ', '') },
   prix_main_sans_baisse: { f: 'regle', m: (s) => s.replace('prix: ap.prix != null ? ap.prix : prixAvant, prixAvant,', 'prix: prixAvant, prixAvant,') },
-  sans_numero: { f: 'regle', m: (s) => s.replace('const titre = e.pose ? e.titre : titre0;', 'const titre = titre0;').replace('const description = e.pose ? e.description : desc0;', 'const description = desc0;') },
+  sans_numero: { f: 'regle', m: (s) => s.replace('const titre = e.pose ? e.titre : titre0;', 'const titre = titre0;').replace('let description = e.pose ? e.description : desc0;', 'let description = desc0;') },
   lettre_empilee: { f: 'regle', m: (s) => s.replace('const base = sansLettre(desc);', "const base = String(desc || '').trim();") },
   plancher_oublie: { f: 'regle', m: (s) => s.replace('if (floor != null && isFinite(floor) && p < floor)', 'if (false)') },
   prix_pas_lu_zero: { f: 'regle', m: (s) => s.replace('const prixAvant = a.prix != null && Number(a.prix) > 0 ? Number(a.prix) : null;', 'const prixAvant = Number(a.prix) || 0;') },

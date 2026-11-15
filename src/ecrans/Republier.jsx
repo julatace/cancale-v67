@@ -893,6 +893,10 @@ function progressionRepub(p, action, viaB, listeImposee) {
 // reprise est la règle des republications (`repriseNumerosRecreation`) — elle attend
 // que l'ancienne ne soit plus du tout sur Vinted.
 const lireEtiquetteVinted = () => lireReglageEtiquette(load(CLE_REGLAGE_ETIQUETTE, null));
+// Une photo ⇒ la clé « .un » (sans nombre) ; plusieurs ⇒ la clé avec {n}.
+// Le texte d'exemple du champ de titre, par mode (« Par » pour remplacer).
+const PH_TITRE = { remplacer: 'rg.titrePar' };
+const trN = (cle, n, vars = {}) => (Number(n) === 1 ? tr(`${cle}.un`, vars) : tr(cle, { ...vars, n }));
 const lireNumeroEcritRegl = () => load(CLE_NUMERO_ECRIT, null);
 // iPhone : le menu de partage avec des FICHIERS (« Enregistrer N images ») ; ailleurs, le téléchargement.
 const peutPartagerFichiers = (files) => { try { return !!(typeof navigator !== 'undefined' && navigator.share && navigator.canShare && navigator.canShare({ files })); } catch (_) { return false; } };
@@ -962,7 +966,7 @@ function SectionPhotos({ photos, numero = "", regsPhoto, ph, pretes, enregistrer
   const neutre = photoNeutre(regsPhoto || PHOTO_NEUTRE);
   const envoyees = ph && ph.envoyees ? ph.envoyees : 0;
   return (<>
-    {nPh ? <p className="vrm-acc-avant vrm-rg-avant" data-acc-avant="republier.main">{tr(neutre ? 'rg.photos.avantNeutre' : 'rg.photos.avant', { n: nPh })} <span className="vrm-acc-pas">{tr('rg.photos.pas')}</span></p>
+    {nPh ? <p className="vrm-acc-avant vrm-rg-avant" data-acc-avant="republier.main">{trN(neutre ? 'rg.photos.avantNeutre' : 'rg.photos.avant', nPh)} <span className="vrm-acc-pas">{tr('rg.photos.pas')}</span></p>
       : <div className="vrm-rm-note" data-main-sans-photo="">{tr(mode === 'publier' ? 'rg.photos.aucunePublier' : 'rg.photos.aucune')}</div>}
     {nPh ? <div className="vrm-main-photos" data-main-photos={nPh}>{photos.map((u, i) => <div key={i} className="vrm-rm-photo">
       <PhotoVinted src={u} alt={tr('rg.photos.alt', { i: i + 1 })} style={cssPh}/>
@@ -971,8 +975,8 @@ function SectionPhotos({ photos, numero = "", regsPhoto, ph, pretes, enregistrer
     {nPh > 0 && <div className="vrm-b-rangee vrm-rm-gauche">
       <Bouton variante={fait ? 'secondaire' : 'primaire'} icone={fait ? 'check' : 'image'} data-main-telecharger={nPh} data-rg-photos-pretes={pretes ? ph.fichiers.length : 0} occupe={!!(ph && ph.encours)} disabled={!!(ph && ph.encours) || !(ph && ph.fichiers && ph.fichiers.length) && !!(ph && !ph.encours && ph.rate)} onClick={enregistrer}>{libelle}</Bouton>
     </div>}
-    {ph && ph.envoi === 'partage' && envoyees > 0 ? <AccApres geste="republier.main" ensuite={null} texte={tr('rg.photos.apresGalerie', { n: envoyees })}/> : null}
-    {ph && ph.envoi === 'telecharge' && envoyees > 0 ? <AccApres geste="republier.main" ensuite={null} texte={tr('rg.photos.apresTelecharge', { n: envoyees })}/> : null}
+    {ph && ph.envoi === 'partage' && envoyees > 0 ? <AccApres geste="republier.main" ensuite={null} texte={trN('rg.photos.apresGalerie', envoyees)}/> : null}
+    {ph && ph.envoi === 'telecharge' && envoyees > 0 ? <AccApres geste="republier.main" ensuite={null} texte={trN('rg.photos.apresTelecharge', envoyees)}/> : null}
     {ph && !ph.encours && ph.rate ? <AccEchec geste="republier.main" lu={{ code: 'pasSu', texte: tr('rg.photos.rate', { n: ph.rate }) }} gesteTexte={tr('rg.photos.rateGeste')}/> : null}
     {ph && ph.erreur ? <AccEchec geste="republier.main" lu={{ code: 'inconnu', texte: tr('rg.photos.refusPartage') }} gesteTexte={tr('rg.photos.refusGeste')}/> : null}
     {nPh > 0 && pretes ? <p className="vrm-rm-muet" data-main-dl-fait={ph.fait} data-main-dl-rate={ph.rate}>{tr(partageFichiersPossible() ? 'rg.photos.ouUne' : 'rg.photos.noms', { nom: nomPhotoReglee(numero, 0) })}</p> : null}
@@ -1152,7 +1156,7 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, ancienne, onDebu
               {MODES_TITRE.map((m) => <option key={m.v} value={m.v}>{m.l}</option>)}
             </select>
             {(modeT === 'remplacer' || modeT === 'supprimer') && <input value={regs.titre.chercher} placeholder={tr('rg.titreChercher')} aria-label={tr('rg.titreChercher')} onChange={(ev) => { const v = ev.target.value; poserRegs((c) => ({ titre: { ...c.titre, chercher: v } })); }}/>}
-            {(modeT === 'prefixe' || modeT === 'suffixe' || modeT === 'remplacer') && <input value={regs.titre.valeur} placeholder={tr(modeT === 'remplacer' ? 'rg.titrePar' : 'rg.titreAjout')} aria-label={tr('rg.titreTexte')} data-main-titre-valeur="" onChange={(ev) => { const v = ev.target.value; poserRegs((c) => ({ titre: { ...c.titre, valeur: v } })); }}/>}
+            {(modeT === 'prefixe' || modeT === 'suffixe' || modeT === 'remplacer') && <input value={regs.titre.valeur} placeholder={tr(PH_TITRE[modeT] || 'rg.titreAjout')} aria-label={tr('rg.titreTexte')} data-main-titre-valeur="" onChange={(ev) => { const v = ev.target.value; poserRegs((c) => ({ titre: { ...c.titre, valeur: v } })); }}/>}
             {(titreChange(regs) || ann.etiquette.pose && etq.place.startsWith('titre')) && <div className="vrm-rm-resultat" data-main-titre-resultat="">{ann.titre || <span className="vrm-rm-muet">{tr('rg.titreVide')}</span>}{ann.tropLong ? <span className="vrm-rm-ambre"> · {tr('rg.titreTropLong', { n: ann.titre.length, max: TITRE_VINTED_MAX })}</span> : null}</div>}
           </div>
           <label className="vrm-rm-case"><input type="checkbox" data-main-lettre="" checked={regs.lettre} onChange={(ev) => { const on = ev.target.checked; poserRegs({ lettre: on }); }}/><span>{tr('rg.lettre')}{regs.lettre ? <> {tr('rg.lettreIci', { lettre })}</> : null}</span></label>
@@ -1268,11 +1272,11 @@ function usePhotosReglees(photos, reglage, numero, { auto = false } = {}) {
   const nPh = photos.length;
   const nPretes = pretes ? ph.fichiers.length : 0;
   const libelle = ph && ph.encours ? tr('rg.photos.preparation', { i: Math.min(ph.total, ph.fait + ph.rate + 1), n: ph.total })
-    : pretes && ph.envoyees ? tr('rg.photos.encore', { n: nPretes })
-    : pretes && peutPartagerFichiers(ph.fichiers) ? tr('rg.photos.enregistrer', { n: nPretes })
-    : pretes ? tr('rg.photos.telecharger', { n: nPretes })
-    : partageFichiersPossible() ? tr('rg.photos.preparer', { n: nPh })
-    : tr('rg.photos.telecharger', { n: nPh });
+    : pretes && ph.envoyees ? trN('rg.photos.encore', nPretes)
+    : pretes && peutPartagerFichiers(ph.fichiers) ? trN('rg.photos.enregistrer', nPretes)
+    : pretes ? trN('rg.photos.telecharger', nPretes)
+    : partageFichiersPossible() ? trN('rg.photos.preparer', nPh)
+    : trN('rg.photos.telecharger', nPh);
   return { ph, pretes, enregistrer, enregistrerUne, libelle };
 }
 // ══ PUBLIER À LA MAIN, GUIDÉ (15 nov.) — une fiche « À publier » ════════════════════════

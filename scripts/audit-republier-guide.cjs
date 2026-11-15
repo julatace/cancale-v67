@@ -136,7 +136,7 @@ async function auditer(src) {
   for (const [nom, s] of [['Republier.jsx', src.ecran], ['republierGuide.js', src.guide], ['republierReglages.js', src.regle]]) for (const t of chaines(s)) if (MOTS_REPUB.test(t)) repubSrc.push(`${nom}: ${t.slice(0, 60)}`);
   dit(!repubI18n.length && !repubSrc.length, 'B2 republication, photos, parcours guidé : ni « ban », ni « détection », ni « éviter Vinted » (5 langues et chaînes)', [...repubI18n.map((x) => `${x.l} ${x.k}: ${x.t.slice(0, 50)}`), ...repubSrc].slice(0, 4).join(' ; '));
   const fr = textes.fr;
-  dit(fr && /galerie/.test(fr['rg.photos.apresGalerie'].other) && /tout a été envoyé/.test(fr['rg.photos.apresGalerie'].other) && /prêtes/.test(fr['rg.photos.apresGalerie'].other), 'B3 après l’envoi : « N photos prêtes dans ta galerie : tout a été envoyé » (formulation neutre)');
+  dit(fr && /galerie/.test(fr['rg.photos.apresGalerie']) && /tout a été envoyé/.test(fr['rg.photos.apresGalerie']) && /prêtes/.test(fr['rg.photos.apresGalerie']), 'B3 après l’envoi : « N photos prêtes dans ta galerie : tout a été envoyé » (formulation neutre)');
   // ── C : aucun hasard dans les photos ──
   const fonctions = (s, noms) => noms.map((n) => { const i = s.indexOf(n); if (i < 0) return { n, corps: null }; const j = s.indexOf('\n}', i); return { n, corps: s.slice(i, j < 0 ? undefined : j) }; });
   const regleSans = sansCommentaires(src.regle || '');
