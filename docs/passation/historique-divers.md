@@ -1925,3 +1925,7 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 <!-- déplacé tel quel de CLAUDE.md §9 le 15 nov. 2026 -->
 - **14 nov. · Idées 154, 157, 158 (155 et 156 retirées, sa décision)** : fiche de la paire « Dans l’ordre » (ligne de temps par identité ; rien sur un N° en double), « Dans une autre taille » (N° neuf par `numerosServisLus`, corrige l’oubli des cases du Stock dans Dupliquer), meilleure heure dans « Programmer » (suggestion, son clic). `docs/passation/2026-11-14-idees-paires.md`. Geste : aucun.
+
+<!-- déplacé tel quel de CLAUDE.md §9 le 15 nov. 2026 -->
+- **14 nov. · Retraits d'achat cachés (« je n'ai plus les retraits d'achat »)** : mesuré, la règle comptait 3 colis à retirer AVEC code (publication), mais la refonte d'Achats les rangeait dans un repli fermé sans ligne ; règle `src/repliRetirer.js` : ≥ 1 colis ⇒ « À retirer » ouvert en tête, fermer ne vaut que pour la liste vue, « à vérifier » nommés. `docs/passation/2026-11-14-retraits-achats.md`. Geste : aucun.
+- **14 nov. · Imprimer en un toucher** : « Imprimer (N) » ouvre le PDF tamponné DANS le toucher (iPhone : partage, préparé d'avance ; ordinateur : visionneuse qui lance l'impression, rien lu avant) ; papier demandé une fois puis retenu (lien à côté) ; après : « Tout est sorti ? Oui / Il en manque », tampon corrigé sur la vignette ; plus de « Place du tampon » d'office. `docs/passation/2026-11-14-impression-simple.md`. Geste : essayer « Imprimer » sur son iPhone.
