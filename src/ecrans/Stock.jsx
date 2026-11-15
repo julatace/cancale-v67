@@ -649,7 +649,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     const typeM = typeDe(m); const coulM = COULEURS.includes(m.couleur) ? m.couleur : undefined;
     // Une pile (forme « Pile », ou un meuble d'une colonne empilée — une pile d'hier) : des cartons, pas des cases géantes.
     const formePile = typeM === 'pile' || (Number(m.cols) === 1 && colonnesEnPile(m).size === 1);
-    const cMax = formePile ? Math.min(caseMax, 56) : caseMax;
+    const cMax = formePile ? Math.min(caseMax, 64) : caseMax;
     const piles = colonnesEnPile(m);
     const desc = descente && descente.m === String(m.id) ? descente : null;
     return (

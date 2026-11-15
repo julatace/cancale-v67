@@ -107,7 +107,12 @@
 .vrm-etag-nom-l { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .vrm-etag-actions { display: flex; gap: 4px; margin-left: auto; flex: none; }
 /* Une pile : des cartons (plus larges que hauts), la base en bas. */
-.vrm-etag[data-forme-pile] .vrm-s2d-case { aspect-ratio: 5 / 4; }
+.vrm-etag[data-forme-pile] .vrm-s2d-case { aspect-ratio: 4 / 3; }
+.vrm-etag[data-forme-pile] .vrm-s2d-case .vrm-s2d-num { left: 3px; bottom: 3px; max-width: calc(100% - 6px); padding: 0 4px; font-size: 11px !important; }
+/* La phrase de descente dans un meuble étroit : serrée, « Compris » à droite. */
+.vrm-etag[data-forme-pile] > .vrm-etag-descente { font-size: 13px; padding: 4px 4px 4px 10px; gap: 0 6px; }
+.vrm-etag[data-forme-pile] > .vrm-etag-descente > span { flex-basis: 100%; }
+.vrm-etag[data-forme-pile] > .vrm-etag-descente .sb-lien { margin-left: auto; min-height: 44px; }
 @media (min-width: 1024px) {
   .vrm-etag-piece { padding: 22px 24px 18px; border-radius: var(--sb-r-plan, 28px); background: var(--sb-verre-plan, rgb(255 255 255 / .8)); box-shadow: var(--sb-ombre-plan, none);
     border-bottom: 10px solid color-mix(in srgb, var(--sb-encre-2, #3F5468) 18%, transparent); gap: 28px 32px; }
