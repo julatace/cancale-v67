@@ -64,7 +64,7 @@ const ACHATS = [
   achat('93000010', 'Nike Dunk Low panda 44', 55, 70),              // l'achat de la vente
   achat('93000011', 'New Balance 550 verte et blanche taille 41', 52, 40),
 ];
-const TRES_PROBABLES = ['93000001', '93000002', '93000003', '93000004', '93000011'];
+const TRES_PROBABLES = ['93000001', '93000002', '93000003', '93000004', '93000010', '93000011'];   // 93000010 : celui de la VENTE
 // Une vente récente, sans achat relié ni prix (onglet « Vendus »).
 const VENTES = [sc.ordre({ tx: '94000001', titre: 'Nike Dunk Low panda noir blanc taille 44', prix: 95, statut: sc.STATUT_FINAL, dateMs: sc.NOW - 40 * J })];
 const NUMEROS = Object.fromEntries(ANNONCES.map(([id, titre, , taille, prix, n, jours]) => [id, { numero: n, title: titre, price: prix, size: taille, numberedAt: iso(sc.NOW - jours * J) }]));
@@ -180,6 +180,16 @@ async function passe(b, nom, ctxOpts, sombre) {
   dit(l.pleins <= 1, `${nom} · forme · un bouton plein au plus (${l.pleins})`);
   if (tactile) dit(!l.cibles.length, `${nom} · forme · 44 px au doigt`, l.cibles.slice(0, 3).join(' ; '));
   dit(!ecrits.some((x) => /buyFromId/.test(x)), `${nom} · clic · rien d'écrit avant son toucher`);
+  // L'onglet « Vendus » (avant toute validation).
+  await pg.locator('[data-ar-onglet="vendus"]').first().click({ timeout: 5000 }).catch(() => {});
+  await pg.waitForTimeout(800);
+  const lv = await pg.evaluate(lire, { tactile });
+  await capture(pg, nom, 'vendus');
+  const vv = lv.cartes['v:94000001'];
+  dit(vv && vv.tx === '93000010' && /vendue \d+ j après la commande/.test(vv.pourquoi), `${nom} · vendus · la vente sans achat, son achat proposé (« vendue N j après la commande »)`, JSON.stringify(vv));
+  dit(!lv.debord.length && !lv.cote.length, `${nom} · vendus · même carte, rien ne déborde`, lv.debord.concat(lv.cote).slice(0, 3).join(' ; '));
+  await pg.locator('[data-ar-onglet="vente"]').first().click({ timeout: 5000 }).catch(() => {});
+  await pg.waitForTimeout(600);
   // « Valider les N très probables » : la liste, puis SON toucher.
   dit(l.valider === TRES_PROBABLES.length, `${nom} · clic · « Valider les ${TRES_PROBABLES.length} très probables » visible`, String(l.valider));
   await pg.locator('[data-ar-valider]').first().click({ timeout: 5000 }).catch(() => {});
@@ -193,7 +203,9 @@ async function passe(b, nom, ctxOpts, sombre) {
   await pg.locator(`[data-ar-valider-tx="${decoche}"] input[type="checkbox"]`).first().click({ timeout: 5000 }).catch(() => {});
   await pg.waitForTimeout(200);
   await pg.locator('[data-ar-valider-ok]').first().click({ timeout: 5000 }).catch(() => {});
-  await pg.waitForTimeout(2500);
+  // Les écritures partent groupées (quelques secondes) : on attend qu'elles arrivent, 15 s au plus.
+  for (let i = 0; i < 30 && TRES_PROBABLES.filter((tx) => ecritLien(tx)).length < TRES_PROBABLES.length - 1; i++) await pg.waitForTimeout(500);
+  await pg.waitForTimeout(800);
   const relies = TRES_PROBABLES.filter((tx) => ecritLien(tx));
   dit(relies.length === TRES_PROBABLES.length - 1 && !ecritLien(decoche), `${nom} · clic · « Relier ces ${TRES_PROBABLES.length - 1} paires » relie exactement les couples cochés`, JSON.stringify(relies));
   dit(!ecritLien('93000005') && !ecritLien('93000006') && !ecritLien('93000007'), `${nom} · clic · aucune paire identique reliée sans son toucher`);
@@ -201,17 +213,9 @@ async function passe(b, nom, ctxOpts, sombre) {
   // « Ce n'est pas lui » sur une paire identique : le couple est rangé, la carte passe à un autre achat.
   const avant = await pg.evaluate(() => { const li = document.querySelector('[data-ar-ligne="81005"]'); return li ? li.getAttribute('data-ar-sugg-tx') : null; });
   await pg.locator('[data-ar-ligne="81005"] [data-ar-pas-lui]').first().click({ timeout: 5000 }).catch(() => {});
-  await pg.waitForTimeout(1500);
+  for (let i = 0; i < 30 && !ecrits.some((x) => /vrm_liaison_refus/.test(x)); i++) await pg.waitForTimeout(500);
   const apres = await pg.evaluate(() => { const li = document.querySelector('[data-ar-ligne="81005"]'); return li ? li.getAttribute('data-ar-sugg-tx') : null; });
   dit(avant && apres !== avant && ecrits.some((x) => /vrm_liaison_refus/.test(x) && x.includes(avant)) && !ecritLien(avant), `${nom} · clic · « Ce n'est pas lui » : rangé (synchronisé), la carte passe à la suite`, JSON.stringify({ avant, apres }));
-  // L'onglet « Vendus ».
-  await pg.locator('[data-ar-onglet="vendus"]').first().click({ timeout: 5000 }).catch(() => {});
-  await pg.waitForTimeout(800);
-  const lv = await pg.evaluate(lire, { tactile });
-  await capture(pg, nom, 'vendus');
-  const vv = lv.cartes['v:94000001'];
-  dit(vv && vv.tx === '93000010' && /vendue \d+ j après la commande/.test(vv.pourquoi), `${nom} · vendus · la vente sans achat, son achat proposé (« vendue N j après la commande »)`, JSON.stringify(vv));
-  dit(!lv.debord.length && !lv.cote.length, `${nom} · vendus · même carte, rien ne déborde`, lv.debord.concat(lv.cote).slice(0, 3).join(' ; '));
   // Achats : l'article proposé sous un achat sans article relié.
   await pg.goto(`http://localhost:${PORT}/?tab=achats`, { waitUntil: 'domcontentloaded' });
   await pg.locator('[data-achat-tx]').first().waitFor({ timeout: 25000 }).catch(() => {});

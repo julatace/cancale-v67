@@ -16878,7 +16878,7 @@ function AchatsARelier({ file, vendus = null, liaison, achats, propositionDe, on
           <button type="button" role="tab" aria-selected={onglet === 'vente'} data-ar-onglet="vente" onClick={() => setOnglet('vente')}>{tr('liaison.enVente')}<span className="vrm-aar-n">{lignesVente.length}</span></button>
           <button type="button" role="tab" aria-selected={onglet === 'vendus'} data-ar-onglet="vendus" onClick={() => setOnglet('vendus')}>{tr('liaison.vendus')}<span className="vrm-aar-n">{lignesVendus ? lignesVendus.length : '—'}</span></button>
         </div>
-        {tp.length ? <button type="button" className="sb-btn-plein vrm-aar-valider" data-ar-valider={tp.length} onClick={() => setValider({ coches: new Set(tp.map((v) => v.key)) })}><Icon name="check" size={16}/><span>{tr('liaison.validerN', { n: tp.length })}</span></button> : null}
+        {tp.length ? <button type="button" className="sb-btn-plein sb-btn-plein--barre vrm-aar-valider" data-ar-valider={tp.length} onClick={() => setValider({ coches: new Set(tp.map((v) => v.key)) })}><Icon name="check" size={16}/><span>{tr('liaison.validerN', { n: tp.length })}</span></button> : null}
       </div>
       {lignes == null ? <div className="vrm-ar-vide" data-ar-etat="lecture">{PAS_SU.enCours}</div>
         : !lignes.length ? <div className="vrm-ar-vide" data-ar-etat="vide">{onglet === 'vendus' ? tr('liaison.vendusVide') : tr('annonces.chaqueAnnonceNumerotee')}</div> : (
@@ -16976,7 +16976,7 @@ function AchatsARelier({ file, vendus = null, liaison, achats, propositionDe, on
             })}
           </ul>
           <div className="vrm-aar-feuille-pied">
-            <button type="button" className="sb-btn-plein" data-ar-valider-ok={valider.coches.size} disabled={!valider.coches.size || enCours} onClick={validerCoches}><Icon name="link" size={16}/><span>{tr('liaison.feuille.relier', { n: valider.coches.size })}</span></button>
+            <button type="button" className="sb-btn-plein sb-btn-plein--barre" data-ar-valider-ok={valider.coches.size} disabled={!valider.coches.size || enCours} onClick={validerCoches}><Icon name="link" size={16}/><span>{tr('liaison.feuille.relier', { n: valider.coches.size })}</span></button>
           </div>
         </SheetShell>
       ) : null}
@@ -43277,6 +43277,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // L'affectation n'est calculée que sur les écrans qui la montrent, après le rendu (2 500 articles × 2 600
   // achats : environ une seconde) ; undefined pendant le calcul, null si elle a échoué (« pas su »).
   const vueLiaison = (curSub === 'annonces' && annSort === 'sansachat') || curSub === 'achats';
+  // Achats : « l'article proposé » a besoin des annonces (relues de la base, comme le délai d'achat).
+  useEffect(() => { if (curSub === 'achats' && accounts.length && listings.items === null && !listings.loading) loadListings(); /* eslint-disable-next-line */ }, [curSub, accounts.length]);
   // Les articles par clé (Achats : « article proposé » sous un achat).
   const articlesLiaison = useMemo(() => { const m = new Map(); for (const x of (fileAchat || [])) m.set(cleArticleAnnonce(x.id), { ...x, genre: 'annonce' }); for (const x of (fileVendus || [])) m.set(x.key, { ...x, genre: 'vente' }); return m; }, [fileAchat, fileVendus]);
   const achatsLiaison = Array.isArray(fillBuyAchats.items) ? fillBuyAchats.items : (Array.isArray(buys.items) ? buys.items : undefined);
