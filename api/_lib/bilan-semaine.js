@@ -42,7 +42,7 @@
 import { motsArticle } from '../../src/profilVendeur.js';
 import { ventesFaites, ventesDeclarables, compteEcarte, classifyOrderStatus, datesDeVersement } from './ventes-regle.js';
 // (14 nov., lot dates-versement) Le relevé du porte-monnaie : LA règle de l'app, importée telle quelle.
-import { versementsDuReleve } from '../../src/versementReleve.js';
+import { versementsDuReleveVerifies, porterVerifReleve } from '../../src/versementReleve.js';
 // (11 nov., saisie rapide) « Vendu ailleurs » : LA règle de l'app (src/venteAilleurs.js), importée telle quelle.
 import { ventesAilleursPour } from '../../src/venteAilleurs.js';
 import { excluAutreDe } from './comptes-exclus.js';
@@ -105,9 +105,10 @@ export function semaineCourante(maintenant = Date.now()) {
 // conversation de la transaction (`harvest_*_versement_*`) et l'e-mail qui porte son n°.
 // `rows` (transactions) illisible ⇒ `null` (pas su) ; une autre source illisible se tait.
 export function versementsDeLignes(rows, releveRows = null, conversations = null, emails = null) {
+  // (15 nov.) Le relevé ne date que sur un compte VÉRIFIÉ — le MÊME module que l'app.
   let releve = null;
-  try { releve = versementsDuReleve(releveRows); } catch (_) { releve = null; }
-  return datesDeVersement(rows, releve, conversations, emails);
+  try { releve = versementsDuReleveVerifies(releveRows, rows); } catch (_) { releve = null; }
+  return porterVerifReleve(datesDeVersement(rows, releve, conversations, emails), releve);
 }
 
 const jourCourt = (t) => new Date(t).toLocaleDateString('fr-FR', { timeZone: PARIS, weekday: 'long' });

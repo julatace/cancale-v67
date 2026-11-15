@@ -28,6 +28,8 @@ export const PHRASE_MOTS_MAX = 12;
 export const NOUVEAUTES = Object.freeze([
   // (15 nov., Julien : « le nombre de cases que l'on veut, des couleurs, la règle des piles ») docs/passation/2026-11-15-stock-etageres.md
   { id: 'stock-etageres', date: '2026-11-15', titre: 'Ton stock en étagères colorées et piles', phrase: 'Autant de cases que tu veux ; une pile se tasse toute seule.', tab: 'garage', pour: 'tous', mode: 'tous' },
+  // (15 nov., extension 5.378) Dates de versement : relevé vérifié avant de dater, délai en heures de Vinted ouvert.
+  { id: 'versements-releve-verifie', date: '2026-11-15', titre: 'Dates de versement : relevé vérifié, délai honnête', phrase: 'Le relevé ne date rien avant cinq accords ; délai en heures.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « horriblement moche », « ne mets pas paires, tu mets annonces ») docs/passation/2026-11-15-annonces-propre.md
   { id: 'annonces-propre', date: '2026-11-15', titre: 'Annonces : logos nets, nombre par site', phrase: '« Paires » devient « Annonces » ; Relier à Vinted tient dans la ligne.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (14 nov., décision de Julien) Studio bleu clair : la fondation (coque, barre, disque, quatre formes de bouton).

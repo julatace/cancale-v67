@@ -10,7 +10,11 @@
 //     `harvest_222_versement_93020`, extension 5.376) ; la n° 93030 par l'e-mail « Transaction
 //     finalisée » qui porte son n° ; 49 autres e-mails au même montant, SANS n°, et une ligne de
 //     conversation sans n° : ne datent rien (jamais par ressemblance) ;
-//   · les 45 autres n'ont jamais eu leur détail relu.
+//   · (15 nov.) les n° 93040 à 93044 ont leur 450 ET leur ligne de relevé, le MÊME jour (heure de
+//     Paris) : ce sont les 5 accords qui VÉRIFIENT le relevé de vendeuse_b (src/versementReleve.js) —
+//     sans eux, le relevé ne date rien. Variante `accords: 4` : un accord de moins ⇒ la n° 93007
+//     n'est PAS datée, et « Déclarer » dit « dates du relevé pas encore vérifiées » ;
+//   · les 40 autres n'ont jamais eu leur détail relu.
 // Juge, 390 tactile et 1512, clair et sombre :
 //   D1 Ventes PUBLIE `aDater.datees` (4 datées, 1 par le relevé) et `aDater.raisons`
 //      (47 « détail pas relu » sur vendeuse_b, 1 « pas finalisée ») ;
@@ -39,7 +43,7 @@ const YM = `${M0.getFullYear()}-${String(M0.getMonth() + 1).padStart(2, '0')}`;
 const iso = (j) => new Date(Date.now() - j * 86400000).toISOString();
 const finalisee = (tx) => ({ transaction_id: tx, title: `Paire inventée ${tx}`, price: { amount: '45.0', currency_code: 'EUR' }, status: 'Commande finalisée', transaction_user_status: 'completed', date: jour(3, 10) });
 const txn = (uid, tx, status, su) => ({ id: `harvest_${uid}_txn_${tx}`, data: { capturedAt: iso(0.01), payload: { transaction: { id: tx, item_id: tx + 500000, status, status_title: status === 450 ? 'Commande finalisée' : 'En cours', status_updated_at: su } } } });
-const jeu = () => {
+const jeu = ({ accords = 5 } = {}) => {
   const L = JSON.parse(JSON.stringify(NV.JEU_LIGNES));
   const v2 = L.find((r) => r.id === 'harvest_222_orders_sold');
   for (let i = 0; i < 50; i++) v2.data.payload.my_orders.push(finalisee(93000 + i));
@@ -49,7 +53,9 @@ const jeu = () => {
   // Le relevé : 50 crédits de 45 € le même jour ; UN seul porte le n° d'une vente.
   const lignes = Array.from({ length: 50 }, (_, i) => ({ id: String(800 + i), date: jour(14, 9), montant: 45, devise: 'EUR', type: 'credit', quoi: 'transaction', ref: String(700000 + i) }));
   lignes[7] = { ...lignes[7], tx: '93007', ref: '93007' };
-  L.push({ id: `harvest_222_releve_${YM}`, data: { type: 'releve', uid: '222', mois: YM, capturedAt: iso(0.01), nLignes: 50, nTx: 1, lignes } });
+  // (15 nov.) Les accords : 450 et relevé le même jour de Paris (jour 14, 12 h et 9 h).
+  for (let i = 0; i < 5; i++) { L.push(txn(222, 93040 + i, 450, jour(14, 12))); if (i < accords) lignes[40 + i] = { ...lignes[40 + i], tx: String(93040 + i), ref: String(93040 + i) }; }
+  L.push({ id: `harvest_222_releve_${YM}`, data: { type: 'releve', uid: '222', mois: YM, capturedAt: iso(0.01), nLignes: 50, nTx: 1 + accords, lignes } });
   // (14 nov.) La conversation (ligne légère, forme de `rangerVersementConversation`) et l'e-mail.
   L.push({ id: 'harvest_222_versement_93020', data: { type: 'versement', uid: '222', domain: 'www.vinted.fr', capturedAt: iso(0.01), tx: '93020', at: jour(15, 9), source: 'conversation', cid: '5501' } });
   L.push({ id: 'harvest_222_versement_x', data: { type: 'versement', uid: '222', capturedAt: iso(0.01), at: jour(15, 9), source: 'conversation' } });
@@ -73,21 +79,22 @@ const capture = async (pg, nom) => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { r
     for (const W of LARGEURS) for (const th of THEMES) {
       const T = `${W} ${th}`;
       const o = await NV.ouvrir(nav, { W, sombre: th === 'sombre', base: jeu(), tab: 'dashboard' });
-      const pg = o.pg;
+            const pg = o.pg;
       try {
         await aller(pg, 'cat_ventes', 5000);
         // (14 nov.) Attendre sur CONDITION (§6.5), pas un délai fixe : machine chargée, la publication peut tarder.
         await pg.waitForFunction(() => { try { const p = JSON.parse(localStorage.getItem('vinted_urssaf_mois') || 'null'); return !!(p && p.aDater && p.aDater.datees); } catch (_) { return false; } }, null, { timeout: 30000 }).catch(() => {});
         const pub = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vinted_urssaf_mois') || 'null'); } catch (_) { return null; } });
         const ad = pub && pub.aDater;
-        dit(!!(ad && ad.n === 46), `D1 ${T} : 46 ventes à dater (50 − la 450 − le relevé − la conversation − l’e-mail)`, JSON.stringify(ad && ad.n));
-        dit(!!(ad && ad.datees && ad.datees.n === 6 && ad.datees.releve === 1 && ad.datees.conversation === 1 && ad.datees.email === 1), `D1 ${T} : 6 datées, dont 1 par le relevé, 1 par la conversation, 1 par e-mail (par SON n°)`, JSON.stringify(ad && ad.datees));
+        dit(!!(ad && ad.n === 41), `D1 ${T} : 41 ventes à dater (50 − les 6 450 − le relevé − la conversation − l’e-mail)`, JSON.stringify(ad && ad.n));
+        dit(!!(ad && !ad.releve), `D1 ${T} : relevé de vendeuse_b VÉRIFIÉ (5 accords, aucun désaccord) : aucun « pas encore vérifié »`, JSON.stringify(ad && ad.releve));
+        dit(!!(ad && ad.datees && ad.datees.n === 11 && ad.datees.releve === 1 && ad.datees.conversation === 1 && ad.datees.email === 1), `D1 ${T} : 11 datées, dont 1 par le relevé, 1 par la conversation, 1 par e-mail (par SON n°)`, JSON.stringify(ad && ad.datees));
         const par = Object.fromEntries(((ad && ad.raisons) || []).map((r) => [r.cle, r]));
         const det = par['vinted-detail'];
-        dit(!!(det && det.n === 45 && det.comptes.length === 1 && det.comptes[0].uid === '222' && det.comptes[0].nom === 'vendeuse_b'), `D1 ${T} : 45 « détail pas relu », sur vendeuse_b`, JSON.stringify(det));
+        dit(!!(det && det.n === 40 && det.comptes.length === 1 && det.comptes[0].uid === '222' && det.comptes[0].nom === 'vendeuse_b'), `D1 ${T} : 40 « détail pas relu », sur vendeuse_b`, JSON.stringify(det));
         dit(!!(par['vinted-attente'] && par['vinted-attente'].n === 1), `D1 ${T} : 1 relue, pas encore finalisée`, JSON.stringify(par['vinted-attente']));
         const moisPub = pub && Array.isArray(pub.mois) ? pub.mois.find((m) => m.ym === YM) : null;
-        dit(!!(moisPub && moisPub.n === 6 && Math.round(moisPub.ca * 100) === 4500 * 4 + (68 + 80) * 100), `D3 ${T} : le CA de ${YM} = les 6 ventes datées, aucune datée par ressemblance (49 e-mails au même montant sans n°)`, JSON.stringify(moisPub && { n: moisPub.n, ca: moisPub.ca }));
+        dit(!!(moisPub && moisPub.n === 11 && Math.round(moisPub.ca * 100) === 4500 * 9 + (68 + 80) * 100), `D3 ${T} : le CA de ${YM} = les 11 ventes datées, aucune datée par ressemblance (49 e-mails au même montant sans n°)`, JSON.stringify(moisPub && { n: moisPub.n, ca: moisPub.ca }));
 
         await aller(pg, 'compta', 3500);
         await pg.locator('[data-argent-q="declarer"]').click().catch(() => {});
@@ -101,7 +108,7 @@ const capture = async (pg, nom) => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { r
             releve: (c.querySelector('[data-adater-releve]') || { getAttribute: () => null }).getAttribute('data-adater-releve'),
             conv: (c.querySelector('[data-adater-conversation]') || { getAttribute: () => null }).getAttribute('data-adater-conversation'),
             mail: (c.querySelector('[data-adater-email]') || { getAttribute: () => null }).getAttribute('data-adater-email'),
-            jours: (c.querySelector('[data-adater-jours]') || { getAttribute: () => null }).getAttribute('data-adater-jours'),
+            heures: (c.querySelector('[data-adater-heures]') || { getAttribute: () => null }).getAttribute('data-adater-heures'),
             sans: (c.querySelector('[data-adater-sans]') || { getAttribute: () => null }).getAttribute('data-adater-sans'),
             raisons: [...c.querySelectorAll('[data-adater-raison]')].map((e) => `${e.getAttribute('data-adater-raison')}:${e.getAttribute('data-adater-compte') || ''}:${e.getAttribute('data-n')}`),
             texte: c.innerText, href: v ? v.getAttribute('href') : null, h: r ? r.height : 0, vis: !!(r && r.width > 0),
@@ -109,10 +116,11 @@ const capture = async (pg, nom) => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { r
         });
         dit(!!K, `D2 ${T} : « Déclarer » montre la carte des ventes sans date`);
         if (K) {
-          dit(K.datees === '6' && K.releve === '1' && K.conv === '1' && K.mail === '1' && K.sans === '46', `D2 ${T} : « 6 datées ✓ dont 1 par ton porte-monnaie · 1 par la conversation · 1 par l’e-mail · 46 ventes sans date »`, JSON.stringify(K));
-          dit(K.raisons.join(',') === 'vinted-detail:222:45,vinted-attente::1', `D2 ${T} : une ligne par raison, le compte nommé`, K.raisons.join(','));
-          dit(/vendeuse_b/.test(K.texte) && /46 ventes sans date/.test(K.texte) && /par la conversation de la vente/.test(K.texte), `D2 ${T} : le compte, le nombre et la source sont écrits`, K.texte.slice(0, 260));
-          dit(K.jours === '1' && /Environ 1 jour avec vinted\.fr ouvert sur ce compte/.test(K.texte), `D2 ${T} : « environ 1 jour avec vinted.fr ouvert sur ce compte »`, `${K.jours} ${K.texte.slice(0, 260)}`);
+          dit(K.datees === '11' && K.releve === '1' && K.conv === '1' && K.mail === '1' && K.sans === '41', `D2 ${T} : « 11 datées ✓ dont 1 par ton porte-monnaie · 1 par la conversation · 1 par l’e-mail · 41 ventes sans date »`, JSON.stringify(K));
+          dit(K.raisons.join(',') === 'vinted-detail:222:40,vinted-attente::1', `D2 ${T} : une ligne par raison, le compte nommé`, K.raisons.join(','));
+          dit(/vendeuse_b/.test(K.texte) && /41 ventes sans date/.test(K.texte) && /par la conversation de la vente/.test(K.texte), `D2 ${T} : le compte, le nombre et la source sont écrits`, K.texte.slice(0, 260));
+          // (15 nov.) En HEURES de Vinted ouvert : 40 ÷ 12 par heure ⇒ 4 h (avant : « 1 jour », des jours de 24 h).
+          dit(K.heures === '4' && /Environ 4 h avec vinted\.fr ouvert sur ce compte/.test(K.texte) && !/jour avec vinted/.test(K.texte), `D2 ${T} : « environ 4 h avec vinted.fr ouvert sur ce compte »`, `${K.heures} ${K.texte.slice(0, 260)}`);
           // (14 nov.) La règle de la passe design : 44 px au doigt (390, tactile), 36 px à la souris.
           dit(K.vis && K.href === 'https://www.vinted.fr/' && K.h >= (W < 600 ? 43.5 : 35.5), `D2 ${T} : « Ouvrir Vinted » visible, ${W < 600 ? 44 : 36} px`, `${K.href} ${K.h}`);
           dit(!/\bundefined\b|\bNaN\b|\bnull\b|encaiss/i.test(K.texte), `T ${T} : ni « undefined/NaN/null », ni « encaissé »`, K.texte);
@@ -121,6 +129,30 @@ const capture = async (pg, nom) => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { r
         const el = await pg.$('[data-adater-raisons]');
         if (el && SHOTS) await el.screenshot({ path: path.join(SHOTS, `carte-${W}-${th}.png`) }).catch(() => {});
         dit(!o.journal.erreurs.length, `T ${T} : aucune erreur de page`, o.journal.erreurs.slice(0, 3).join(' | '));
+      } catch (e) { dit(false, `${T} : le banc a tourné`, e && e.message); }
+      await o.ctx.close().catch(() => {});
+    }
+    // (15 nov.) VARIANTE : 4 accords seulement ⇒ le relevé de vendeuse_b n'est PAS vérifié :
+    // la n° 93007 n'est datée par rien, et « Déclarer » le dit (jamais deviné).
+    for (const W of LARGEURS.slice(0, 1)) {
+      const T = `${W} 4 accords`;
+      const o = await NV.ouvrir(nav, { W, sombre: false, base: jeu({ accords: 4 }), tab: 'dashboard' });
+      const pg = o.pg;
+      try {
+        await aller(pg, 'cat_ventes', 5000);
+        await pg.waitForFunction(() => { try { const p = JSON.parse(localStorage.getItem('vinted_urssaf_mois') || 'null'); return !!(p && p.aDater && p.aDater.datees); } catch (_) { return false; } }, null, { timeout: 30000 }).catch(() => {});
+        const pub = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vinted_urssaf_mois') || 'null'); } catch (_) { return null; } });
+        const ad = pub && pub.aDater;
+        dit(!!(ad && ad.datees && ad.datees.releve === 0 && ad.datees.n === 10 && ad.n === 42), `V ${T} : la n° 93007 n'est PAS datée par le relevé (10 datées, 42 à dater)`, JSON.stringify(ad && { n: ad.n, datees: ad.datees }));
+        const rv = ad && Array.isArray(ad.releve) ? ad.releve[0] : null;
+        dit(!!(rv && rv.uid === '222' && rv.accords === 4 && rv.etat === 'a-verifier' && rv.lignes === 5), `V ${T} : publié « relevé pas encore vérifié » sur vendeuse_b (4 accords sur 5)`, JSON.stringify(ad && ad.releve));
+        await aller(pg, 'compta', 3500);
+        await pg.locator('[data-argent-q="declarer"]').click().catch(() => {});
+        await pg.waitForTimeout(1200);
+        const L = await pg.evaluate(() => { const e = document.querySelector('[data-adater-raison="releve-non-verifie"]'); return e ? { t: e.innerText, a: e.getAttribute('data-releve-accords'), c: e.getAttribute('data-adater-compte') } : null; });
+        dit(!!(L && L.c === '222' && L.a === '4' && /pas encore vérifiées/.test(L.t) && /4 sur 5 accords/.test(L.t) && /vendeuse_b/.test(L.t)), `V ${T} : « Déclarer » dit « dates du relevé pas encore vérifiées (4 sur 5 accords) » sur vendeuse_b`, JSON.stringify(L));
+        await capture(pg, `declarer-4accords-${W}`);
+        dit(!o.journal.erreurs.length, `V ${T} : aucune erreur de page`, o.journal.erreurs.slice(0, 3).join(' | '));
       } catch (e) { dit(false, `${T} : le banc a tourné`, e && e.message); }
       await o.ctx.close().catch(() => {});
     }

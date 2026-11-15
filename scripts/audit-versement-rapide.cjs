@@ -19,7 +19,7 @@
 //   6. une requête à la fois, et jamais deux passages en même temps (aucune
 //      transaction lue deux fois) ;
 //   7. le passage de fond : rien sans onglet vinted.fr ;
-//   8. la carte dit « N restantes · environ X jours ».
+//   8. la carte dit « N restantes · environ X h avec Vinted ouvert » (5.378 : plus des jours de 24 h).
 //  §6.1 : rouge sur origin/main (`--src <copie>`), et par MUTATION (`--mutations`).
 //  Données inventées. Usage : node scripts/audit-versement-rapide.cjs [--src f] [--mutations]
 // ════════════════════════════════════════════════════════════════════════════
@@ -134,7 +134,7 @@ async function controles(SRC, dit) {
     await f.ctx.capterDatesVersement(UID);
     const e = await f.ctx.etatSite('https://www.vinted.fr/member/1', 7);
     const dt = e && e.site && e.site.dates;
-    dit(!!dt && dt.reste === 30 && dt.jours === 1, '8. la carte reçoit « 30 restantes · environ 1 jour »', JSON.stringify(dt));
+    dit(!!dt && dt.reste === 30 && dt.heures === 3 && dt.jours === undefined, '8. la carte reçoit « 30 restantes · environ 3 h avec Vinted ouvert » (5.378 : en heures, 12 par heure)', JSON.stringify(dt));
     const g = fond({ store: {} });
     g.ctx.compteConnecte = async () => UID;
     const e2 = await g.ctx.etatSite('https://www.vinted.fr/', 7);
