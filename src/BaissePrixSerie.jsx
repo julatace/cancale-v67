@@ -46,7 +46,11 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
   const [progres, setProgres] = React.useState({ i: 0, n: 0 });
   const arret = React.useRef(false);
   const [arretDemande, setArretDemande] = React.useState(false);
-  const baisse = baisseTapee(mode, texte);
+  // (15 nov., vendre plus) Chaque annonce porte SON prix conseillé (`cible`, src/baisseConseillee.js) :
+  // la baisse tapée et « Varier » n'ont plus de sens — ils ne sont pas montrés ; tout le reste (aperçu,
+  // plancher, son clic, confirmation, une à la fois, prix RELU) est le MÊME chemin.
+  const cibles = annonces.length > 0 && annonces.every((a) => a && a.cible != null);
+  const baisse = cibles ? { ok: true, mode: 'eur', valeur: 1 } : baisseTapee(mode, texte);
   // Le facteur de chaque annonce est tiré UNE fois (l'aperçu ne bouge pas à chaque frappe).
   // (13 nov.) `varierDefaut` false : la baisse PROPOSÉE (≤ −10 %, src/conseilPrix.js) s'ouvre telle quelle — le hasard
   // ne doit pas la pousser au-delà de ses bornes ; c'est LUI qui coche « Varier » s'il le veut.
@@ -104,7 +108,7 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
     setPhase('envoi'); setEtats({}); setProgres({ i: 0, n: file.length });
     const res = {};
     // (11 nov., Julien : « VRM reste FIGÉ avec le DÉTAIL et une BARRE ») La feuille « VRM travaille ».
-    const t = suivi.demarrer({ sorte: 'baisse-prix', titre: `Baisser le prix (${baisse.mode === 'pct' ? `−${baisse.valeur} %` : `−${baisse.valeur} €`})`,
+    const t = suivi.demarrer({ sorte: 'baisse-prix', titre: cibles ? tr('bc.titre') : `Baisser le prix (${baisse.mode === 'pct' ? `−${baisse.valeur} %` : `−${baisse.valeur} €`})`,
       etapes: [['envoi', `Envoi du nouveau prix à ${nomSite}`], ['relu', `Prix relu sur ${nomSite}`]], uid: site === 'vinted' ? (compteOnglet || '') : '',
       articles: file.map((l) => ({ id: l.id, num: l.numero || '', titre: l.titre || '' })) });
     const poser = (id, e) => { res[id] = e; setEtats((x) => ({ ...x, [id]: e })); };
@@ -185,7 +189,7 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
           <span className="vrm-ao-num">{lignes.length} annonce{lignes.length > 1 ? 's' : ''}</span>
           <button type="button" className="vrm-ao-x" aria-label="Fermer" data-bp-fermer="" onClick={onFermer} disabled={enCours}>×</button>
         </header>
-        <div className="vrm-bp-reglage">
+        {cibles ? <p className="vrm-bp-note" data-bp-cibles={annonces.length}>{tr('bc.note')}</p> : <><div className="vrm-bp-reglage">
           <div className="vrm-bp-modes" role="group" aria-label="Baisse en euros ou en pourcentage">
             {[['eur', '− €'], ['pct', '− %']].map(([v, t]) => (
               <button key={v} type="button" className="vrm-bp-mode" aria-pressed={mode === v} data-bp-mode={v} disabled={fige} onClick={() => { setMode(v); setCoches(null); }}>{t}</button>
@@ -198,8 +202,8 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
             <b>{unite}</b>
           </label>
         </div>
-        <p className="vrm-bp-note">{site === 'leboncoin' ? tr('lbcplus.baisse.note') : 'Arrondi à l’euro. Le prix change sur Vinted, annonce par annonce, puis VRM le relit.'}</p>
-        {site === 'vinted' ? <div className="vrm-bp-options" data-bp-options="">
+        <p className="vrm-bp-note">{site === 'leboncoin' ? tr('lbcplus.baisse.note') : 'Arrondi à l’euro. Le prix change sur Vinted, annonce par annonce, puis VRM le relit.'}</p></>}
+        {site === 'vinted' && !cibles ? <div className="vrm-bp-options" data-bp-options="">
           <label className="vrm-bp-option"><input type="checkbox" checked={varier} disabled={fige} onChange={(e) => { setVarier(e.target.checked); setCoches(null); }} data-bp-varier={varier ? '1' : '0'}/><span>Varier un peu (± 20 %)</span></label>
           {etaleOk && onProgrammer ? (
             <div className="vrm-bp-modes vrm-bp-quand" role="group" aria-label="Quand">
