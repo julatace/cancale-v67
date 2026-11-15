@@ -57,10 +57,14 @@ export async function creerLecteur() {
     hints.set(Z.DecodeHintType.TRY_HARDER, true);
     const lecteur = new Z.MultiFormatReader(); lecteur.setHints(hints);
     const cv = document.createElement('canvas');
-    return { source: 'zxing', detect: async (v) => {
-      const w = v.videoWidth, h = v.videoHeight; if (!w || !h) return [];
+    return { source: 'zxing', detect: async (v, zone) => {
+      const W = v.videoWidth, H = v.videoHeight; if (!W || !H) return [];
+      // (15 nov.) La zone visée seulement, si l'appelant la donne (fractions de l'image) ; sinon l'image entière.
+      const z = zone && zone.l > 0 && zone.h > 0 ? zone : null;
+      const sx = z ? Math.round(W * Math.max(0, z.x)) : 0, sy = z ? Math.round(H * Math.max(0, z.y)) : 0;
+      const w = z ? Math.min(W - sx, Math.round(W * z.l)) : W, h = z ? Math.min(H - sy, Math.round(H * z.h)) : H;
       const k = Math.min(1, 1280 / w); cv.width = Math.round(w * k); cv.height = Math.round(h * k);
-      const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.drawImage(v, 0, 0, cv.width, cv.height);
+      const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.drawImage(v, sx, sy, w, h, 0, 0, cv.width, cv.height);
       try {
         const bmp = new Z.BinaryBitmap(new Z.HybridBinarizer(new Z.HTMLCanvasElementLuminanceSource(cv)));
         const r = lecteur.decode(bmp); return r && r.getText ? [r.getText()] : [];
@@ -108,8 +112,12 @@ const brancher = (v, flux) => {
   v.setAttribute('playsinline', ''); v.setAttribute('webkit-playsinline', ''); v.muted = true;
   const p = v.play(); if (p && p.catch) p.catch(() => {});
 };
-export function useLectureCamera(video, traiter) {
+// (15 nov., scanner pour retrouver) `opts.surFlux(flux)` : le flux ouvert est donné à l'appelant (la lampe
+// lit la piste) ; `opts.zone` : { x, y, l, h } en fractions de l'image — ZXing ne lit que la zone visée
+// (moins de pixels, lecture plus rapide). Sans `opts`, rien ne change.
+export function useLectureCamera(video, traiter, opts = null) {
   const [camera, setCamera] = React.useState('demarrage');
+  const optsRef = React.useRef(opts); optsRef.current = opts;
   React.useEffect(() => {
     let vivant = true, flux = null, minuterie = null;
     const nouveau = filtreRepetition(2500);
@@ -121,6 +129,7 @@ export function useLectureCamera(video, traiter) {
         if (!vivant) { flux.getTracks().forEach((t) => t.stop()); return; }
         if (!video.current) return;
         brancher(video.current, flux);
+        try { const o = optsRef.current; if (o && typeof o.surFlux === 'function') o.surFlux(flux); } catch (_) {}
         const lecteur = await creerLecteur();
         if (!vivant) return;
         if (!lecteur) { derniereRaison = 'lecteur'; setCamera('sans'); return; }
@@ -129,7 +138,7 @@ export function useLectureCamera(video, traiter) {
           if (!vivant) return;
           const v = video.current;
           try {
-            if (v) { brancher(v, flux); if (v.readyState >= 2) { const vals = await lecteur.detect(v); for (const x of vals) if (nouveau(x)) traiter(x); } }
+            if (v) { brancher(v, flux); if (v.readyState >= 2) { const o = optsRef.current; const vals = await lecteur.detect(v, o && o.zone); for (const x of vals) if (nouveau(x)) traiter(x); } }
           } catch (_) {}
           if (vivant) minuterie = setTimeout(tour, 220);
         };

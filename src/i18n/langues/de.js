@@ -5,6 +5,7 @@ import ecran_studio from './de/studio.js';   // (14 nov.) Studio bleu clair : le
 import ecran_correspondances from './de/correspondances.js';   // (15 nov.) Publier partout : catégories qui correspondent
 import ecran_capte from './de/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_vcventes from './de/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
+import ecran_scan_retrouver from './de/scanRetrouver.js';   // (15 nov.) Scanner pour retrouver un colis
 import ecran_renvoyer from './de/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_retrait_ailleurs from './de/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
 import ecran_finition from './de/finition.js';   // (15 nov.) la finition écran par écran
@@ -2270,6 +2271,7 @@ export default {
   ...ecran_memePhoto,
   ...ecran_correspondances,
   ...ecran_renvoyer,
+  ...ecran_scan_retrouver,
   ...ecran_finition,
   ...ecran_numeros_nouvelles,
 };
