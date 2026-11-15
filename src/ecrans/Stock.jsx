@@ -855,12 +855,12 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
             calcule (prix d'achat, temps achat → vente, réception → mise en ligne,
             mise en ligne → vente, republications) — `etatArticle`. */}
         <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-voir-etat={cleDeFiche(f)} onClick={() => { const n = String(f.numero); fermerModal(); try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: n })); } catch (_) {} }} style={{ width: '100%', marginBottom: 9 }}>{tr('stock.voirEtat')}</button>
+        {/* (15 nov.) Un article sans case : « Ranger ici » le pose dans SA case proposée (SON toucher) ; « Autre case »
+            garde le choix sur le plan. */}
+        {!m && !sold && caseProposeeDe(modal.cle) ? <button className="vrm-b vrm-b-primaire" type="button" data-fiche-ranger-ici={(() => { const c = caseProposeeDe(modal.cle); return c.meubleId + ':' + c.i; })()} onClick={() => { const c = caseProposeeDe(modal.cle); fermerModal(); fermerLigne(); if (c) poser(modal.cle, c.meubleId, c.i); }} style={{ ...btnPri, width: '100%', marginBottom: 9 }}>{tr('stock.rangerIci')}</button> : null}
         <div style={{ display: 'flex', gap: 9 }}>
           {/* (1er nov.) Une paire PAS rangée : « Déplacer » et « Retirer de la case »
               ne voulaient rien dire. Le geste est de la ranger. */}
-          {/* (15 nov.) Un article sans case : « Ranger ici » le pose dans SA case proposée (SON toucher) ; « Autre case »
-              garde le choix sur le plan. */}
-          {!m && !sold && caseProposeeDe(modal.cle) ? <button className="vrm-b vrm-b-primaire" type="button" data-fiche-ranger-ici={(() => { const c = caseProposeeDe(modal.cle); return c.meubleId + ':' + c.i; })()} onClick={() => { const c = caseProposeeDe(modal.cle); fermerModal(); fermerLigne(); if (c) poser(modal.cle, c.meubleId, c.i); }} style={{ ...btnPri, flex: 1 }}>{tr('stock.rangerIci')}</button> : null}
           <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-ranger={m ? 'deplacer' : 'ranger'} onClick={() => { setPlace(modal.cle); fermerModal(); fermerLigne(); }} style={btnSec}>{m ? tr('stock.deplacer') : (!sold && caseProposeeDe(modal.cle) ? tr('stock.autreCase') : tr('stock.rangerDansCase'))}</button>
           {m && <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-retirer="" onClick={() => { const n = f.numero; retirerCase(modal.cle); fermerModal(); fermerLigne(); toast(tr('stock.retireeRepasseDans', { x: String(n), name: String(m.name) })); }} style={btnSec}>{tr('stock.retirerCase')}</button>}
         </div>
