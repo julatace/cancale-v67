@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.377.0';
+const CODE_VERSION = '5.378.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -7154,6 +7154,117 @@ function moisDuReleve(p) {
   return der && /^\d{4}-\d{2}/.test(String(der)) ? String(der).slice(0, 7) : null;
 }
 
+// ══ 5.378 (15 nov.) — LE RELEVÉ MOIS PAR MOIS : UNE RECETTE APPRISE, JAMAIS DEVINÉE ══
+// Julien : « 1 741 ventes à dater ». Une lecture du relevé d'un mois = toutes les ventes
+// créditées ce mois-là — mais l'adresse que Vinted appelle quand on change de mois dans
+// « Porte-monnaie → Historique » n'a JAMAIS été vue (relevé des chemins vus, 15 nov. :
+// seulement `wallet/invoices/current`), et celle qu'on essayait (`users/{id}/payouts?
+// year=&month=`, 5.52) répond 404 sur tous ses comptes. ⇒ Plus AUCUNE adresse devinée :
+//  · la RECETTE s'apprend de SA navigation : une réponse de relevé captée en passant
+//    (le compte de l'onglet, `storeHarvest`) dont le mois (`starting_date`, dit par
+//    Vinted) apparaît dans l'adresse — l'année ET le mois, une fois chacun, en nombres
+//    entiers — donne le modèle (`{Y}`, `{M}` ou `{MM}`). Rien d'autre n'est deviné : une
+//    adresse qui ne porte pas le mois demandé n'apprend rien ;
+//  · le modèle ne sert QUE pour les mois que Vinted liste lui-même (`history` du relevé
+//    courant), du plus récent au plus ancien ; un mois rendu qui n'est pas celui demandé
+//    ⇒ la recette est OUBLIÉE (plus aucune requête) et c'est dit ;
+//  · un modèle qui porte un autre identifiant (≥ 3 chiffres hors l'année) ne sert qu'au
+//    compte qui l'a appris ; sans, il sert à tous ses comptes (chacun sous SA garde) ;
+//  · chaque mois lu passe par `storeReleve` (liste blanche : n° de transaction, date,
+//    montant, sens, nature — jamais un nom, un libellé, un IBAN ; forme inconnue ⇒ rien
+//    écrit, sa forme dans `harvest_{uid}_forme_releve`).
+// MESURÉ le 15 nov. : le relevé courant de son grand compte ne liste AUCUN mois passé
+// (`history: []`) — sur ce compte, cette voie n'apportera rien tant que Vinted n'en liste
+// pas ; la date reste lue vente par vente (`capterDatesVersement`). Récit :
+// `docs/passation/2026-11-15-versements-releve.md`.
+const RELEVE_RECETTE = 'vrmReleveRecette';      // { [uid | '_']: { modele, pad, uid, at } } (§4.9)
+const RELEVE_MOIS = 'vrmReleveMois';            // { [uid]: { mois: ['AAAA-MM', …], at } } — les mois que Vinted liste
+const RELEVE_ETAT = 'vrmReleveEtat';            // { [uid]: { listes, sansRecette, lus, at } } — ce que la carte dit
+const RELEVE_CHEMIN_OK = /^\/api\/v2\/(?:wallet\/|[\w/-]*invoice)/i;
+// Le modèle d'adresse d'une réponse de relevé du mois `mois` ('AAAA-MM'), ou null.
+function recetteReleveDe(url, mois) {
+  if (!/^\d{4}-\d{2}$/.test(String(mois || ''))) return null;
+  let U; try { U = new URL(String(url || ''), 'https://www.vinted.fr'); } catch (_) { return null; }
+  if (!/(^|\.)vinted\.[a-z.]+$/i.test(U.hostname) || !RELEVE_CHEMIN_OK.test(U.pathname)) return null;
+  const y = mois.slice(0, 4), m = Number(mois.slice(5));
+  let cible = U.pathname + U.search;
+  const reY = new RegExp(`(^|[^0-9])${y}(?![0-9])`, 'g');
+  if ((cible.match(reY) || []).length !== 1) return null;
+  cible = cible.replace(reY, '$1{Y}');
+  const reM = new RegExp(`(^|[^0-9])(0?${m})(?![0-9])`, 'g');
+  const vus = [...cible.matchAll(reM)];
+  if (vus.length !== 1) return null;
+  const brut = vus[0][2];
+  const pad = brut.length === 2 ? true : (m < 10 ? false : null);   // « 11 » ne dit pas si « 7 » s'écrit « 07 »
+  cible = cible.replace(reM, (x, a) => `${a}${pad === true || (pad === null) ? '{MM}' : '{M}'}`);
+  const autreId = /\d{3,}/.test(cible.replace(/\{Y\}|\{MM?\}/g, ''));
+  return { modele: cible.slice(0, 200), pad, partage: !autreId };
+}
+// L'adresse d'un mois par la recette, ou null (padding pas appris pour ce mois).
+function adresseReleve(rec, mois) {
+  if (!rec || typeof rec.modele !== 'string' || !/^\d{4}-\d{2}$/.test(String(mois || ''))) return null;
+  const m = Number(mois.slice(5));
+  if (rec.pad === null && m < 10) return null;
+  const mm = rec.pad === false ? String(m) : String(m).padStart(2, '0');
+  return rec.modele.replace('{Y}', mois.slice(0, 4)).replace('{MM}', mm).replace('{M}', mm);
+}
+// Apprendre la recette d'une réponse captée (compte de l'onglet). `true` si apprise.
+async function apprendreRecetteReleve(uid, sourceUrl, mois) {
+  try {
+    const r = recetteReleveDe(sourceUrl, mois);
+    if (!r) return false;
+    const cur = (await chrome.storage.local.get(RELEVE_RECETTE))[RELEVE_RECETTE] || {};
+    const rec = { modele: r.modele, pad: r.pad, uid: String(uid), at: Date.now() };
+    // Un padding déjà su n'est pas oublié par un mois à deux chiffres (« 11 »).
+    const av = cur[String(uid)];
+    if (av && av.modele === rec.modele && rec.pad === null && av.pad !== null) rec.pad = av.pad;
+    cur[String(uid)] = rec;
+    if (r.partage) { const avP = cur._; cur._ = { ...rec, pad: (rec.pad === null && avP && avP.modele === rec.modele) ? avP.pad : rec.pad }; }
+    await chrome.storage.local.set({ [RELEVE_RECETTE]: cur });
+    noterDiag('releve_recette_apprise');
+    return true;
+  } catch (_) { return false; }
+}
+async function recetteReleve(uid) {
+  try {
+    const cur = (await chrome.storage.local.get(RELEVE_RECETTE))[RELEVE_RECETTE] || {};
+    return cur[String(uid)] || cur._ || null;
+  } catch (_) { return undefined; }
+}
+async function oublierRecetteReleve(uid) {
+  try {
+    const cur = (await chrome.storage.local.get(RELEVE_RECETTE))[RELEVE_RECETTE] || {};
+    const rec = cur[String(uid)] || cur._;
+    delete cur[String(uid)];
+    if (rec && cur._ && cur._.modele === rec.modele) delete cur._;
+    await chrome.storage.local.set({ [RELEVE_RECETTE]: cur });
+  } catch (_) {}
+}
+// Les mois que Vinted liste (`history: [{ year, month }]`) — des nombres seulement.
+function moisListes(hist) {
+  return [...new Set((Array.isArray(hist) ? hist : [])
+    .filter((h) => h && Number.isInteger(Number(h.year)) && Number(h.year) >= 2000 && Number(h.year) <= 2100 && Number.isInteger(Number(h.month)) && Number(h.month) >= 1 && Number(h.month) <= 12)
+    .map((h) => `${Number(h.year)}-${String(Number(h.month)).padStart(2, '0')}`))].sort().reverse();
+}
+async function noterMoisListes(uid, hist) {
+  try {
+    if (!Array.isArray(hist)) return;
+    const cur = (await chrome.storage.local.get(RELEVE_MOIS))[RELEVE_MOIS] || {};
+    // L'UNION des listes vues : le relevé d'un mois passé peut porter un `history` vide,
+    // il n'efface pas ce que le relevé courant a listé.
+    const av = cur[String(uid)] && Array.isArray(cur[String(uid)].mois) ? cur[String(uid)].mois : [];
+    cur[String(uid)] = { mois: moisListes([...av.map((c) => ({ year: Number(String(c).slice(0, 4)), month: Number(String(c).slice(5, 7)) })), ...hist]).slice(0, 120), at: Date.now() };
+    await chrome.storage.local.set({ [RELEVE_MOIS]: cur });
+  } catch (_) {}
+}
+async function noterEtatReleve(uid, e) {
+  try {
+    const cur = (await chrome.storage.local.get(RELEVE_ETAT))[RELEVE_ETAT] || {};
+    cur[String(uid)] = { ...e, at: Date.now() };
+    await chrome.storage.local.set({ [RELEVE_ETAT]: cur });
+  } catch (_) {}
+}
+
 // Range le relevé dans SA ligne, une par compte et par mois. Appelé depuis les
 // deux voies d'écriture (§5.27 : un garde-fou vit dans la fonction qui écrit).
 // Aucune requête Vinted ajoutée : c'est la réponse qu'on a déjà sous la main.
@@ -7176,6 +7287,10 @@ async function storeReleve(uid, payload, domain, sourceUrl) {
       if (/\/wallet\/invoices|\/payouts(?:[/?]|$)/i.test(String(sourceUrl || ''))) { noterDiag('releve_forme_inconnue'); await noterFormeReleve(uid, payload, sourceUrl); }
       return false;
     }
+    // 5.378 : les mois que Vinted liste (le relevé courant les porte, même sans mouvement).
+    if (Array.isArray(porteur.history)) await noterMoisListes(uid, porteur.history);
+    // 5.378 : une réponse d'un mois PASSÉ captée en passant apprend l'adresse de ce mois.
+    { const sd = porteur.starting_date; if (sd && /^\d{4}-\d{2}/.test(String(sd)) && sourceUrl) await apprendreRecetteReleve(uid, sourceUrl, String(sd).slice(0, 7)); }
     if (!lignes.length) return false;
     payload = Object.assign({}, payload, porteur, { invoice_lines: lignes });
     const mois = moisDuReleve(payload);
@@ -7233,11 +7348,10 @@ async function storeReleve(uid, payload, domain, sourceUrl) {
 // Les mois PASSÉS. `history` les liste ; on va les chercher un par un, sur le
 // compte connecté, avec les mêmes garde-fous que partout (§48) : plafond
 // horaire, compte connecté, N par visite, pas de nouvel essai avant 24 h.
-// ⚠️ LE PARAMÈTRE N'A JAMAIS ÉTÉ OBSERVÉ. On tente `?year=&month=` ; si Vinted
-// l'ignore, il rend le mois COURANT — on le voit à `starting_date`, on garde un
-// échantillon et ON ARRÊTE (`vrmReleveMuet`). Boucler sur un endpoint qui
-// ignore nos paramètres, ce serait des requêtes pour rien dans l'empreinte du
-// compte, et c'est exactement ce que §5.52 a dû retirer après 73 échecs.
+// ⚠️ 5.378 : l'adresse d'un mois n'est plus devinée (`users/{id}/payouts?year=&month=`
+// répondait 404 partout) : elle est APPRISE de sa propre navigation
+// (`apprendreRecetteReleve`) ; sans recette, aucune requête. Un mois rendu qui
+// n'est pas celui demandé oublie la recette (plus aucune requête pour rien).
 // ══════════════════════════════════════════════════════════════════════════════
 // 5.319 (4 nov.) — LES AVIS REÇUS (note 1…5 et date), EN LECTURE SEULE
 // ══════════════════════════════════════════════════════════════════════════════
@@ -7361,69 +7475,60 @@ async function capterReleves(uid) {
     const accts = await getStoredAccounts();
     const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
     if (!acc) return 0;
-    const muet = (await chrome.storage.local.get('vrmReleveMuet')).vrmReleveMuet || {};
-    if (muet[String(uid)]) { await noterLecturesDues(uid, 'releve', 0); return 0; }  // ce compte a déjà prouvé que le paramètre ne passe pas
-    // Ce qu'on a déjà (une seule lecture, deux scalaires — jamais le payload).
-    let cur = [];
-    try { cur = await sbGet(`app_data?id=like.harvest_${uid}_releve_*&select=m:meta->>mois`); } catch (_) {}
-    const dejaMois = new Set((cur || []).map(r => r && r.m).filter(Boolean));
-    const bill = await sbGet(`app_data?id=eq.harvest_${uid}_billing&select=h:data->payload->history`);
-    // « Pas su » (une des deux lectures ratée) : on ne dit rien de ce qui reste
-    // à lire — la réserve de l'argent reste entière (`reserveLectures`).
-    const su = cur !== null && bill !== null;
-    const hist = (bill && bill[0] && bill[0].h) || [];
-    if (!Array.isArray(hist) || !hist.length) { if (su) await noterLecturesDues(uid, 'releve', 0); return 0; }
-    // ⚠️ LE DRESSING ET LE PORTE-MONNAIE UTILISENT L'ID DE PROFIL, PAS
-    // L'IDENTIFIANT DE COMPTE (§7 : sans ça, 0 annonce — et ici, 0 relevé).
-    // `vinted_accounts` ne porte PAS ce champ : il vit dans la réponse
-    // `users/current` déjà moissonnée. On le lit en SCALAIRE (§34), zéro
-    // requête Vinted ajoutée.
-    let pid = null;
-    try {
-      const pr = await sbGet(`app_data?id=eq.harvest_${uid}_profile&select=pid:data->payload->user->>id`);
-      pid = (pr && pr[0] && pr[0].pid) || null;
-    } catch (_) {}
-    const memo = (await chrome.storage.local.get('vrmReleveFaits')).vrmReleveFaits || {};
-    let n = 0;
-    // Du plus récent au plus ancien : c'est le mois qu'il déclare qui compte.
-    const voulus = hist
-      .filter(h => h && h.year && h.month)
-      .map(h => ({ y: Number(h.year), m: Number(h.month), cle: `${h.year}-${String(h.month).padStart(2, '0')}` }))
-      .filter(h => !dejaMois.has(h.cle))
-      .sort((a, b) => b.cle.localeCompare(a.cle));
-    for (const v of voulus) {
+    // Ce qu'on a déjà (une seule lecture, un scalaire — jamais le payload).
+    const cur = await sbGet(`app_data?id=like.harvest_${uid}_releve_*&select=m:meta->>mois`);
+    if (!Array.isArray(cur)) return 0;                                    // pas su : rien ne part
+    const dejaMois = new Set(cur.map(r => r && r.m).filter(Boolean));
+    // Les mois que Vinted liste : notés à la capture (5.378), sinon la ligne du solde.
+    let liste = null;
+    try { const m = ((await chrome.storage.local.get(RELEVE_MOIS))[RELEVE_MOIS] || {})[String(uid)]; if (m && Array.isArray(m.mois)) liste = m.mois; } catch (_) { return 0; }
+    if (!liste) {
+      const bill = await sbGet(`app_data?id=eq.harvest_${uid}_billing&select=h:data->payload->history`);
+      if (bill === null) return 0;                                        // pas su
+      liste = moisListes(bill && bill[0] && bill[0].h);
+    }
+    const voulus = liste.filter(cle => !dejaMois.has(cle)).sort().reverse();   // du plus récent au plus ancien
+    if (!voulus.length) { await noterLecturesDues(uid, 'releve', 0); await noterEtatReleve(uid, { listes: liste.length, sansRecette: 0, reste: 0 }); return 0; }
+    const rec = await recetteReleve(uid);
+    if (rec === undefined) return 0;                                      // stockage muet
+    // ⚠️ SANS RECETTE APPRISE, AUCUNE REQUÊTE : on ne devine pas l'adresse d'un mois.
+    if (!rec) { noterDiag('releve_sans_recette'); await noterLecturesDues(uid, 'releve', 0); await noterEtatReleve(uid, { listes: liste.length, sansRecette: voulus.length, reste: voulus.length }); return 0; }
+    let memo = {};
+    try { memo = (await chrome.storage.local.get('vrmReleveFaits')).vrmReleveFaits || {}; } catch (_) { return 0; }
+    let n = 0, lus = 0, stop = false;
+    for (const cle of voulus) {
       if (n >= RELEVE_MAX_PAR_VISITE) break;
-      const k = `${uid}_${v.cle}`;
+      const k = `${uid}_${cle}`;
       if (memo[k] && Date.now() - Number(memo[k]) < RELEVE_RETRY_MS) continue;
-      // Sans l'id de profil, aucune requête ne partirait : on ne consomme pas
-      // une place du budget pour rien.
-      if (!pid) { noterDiag('releve_sans_profil'); break; }
-      // 5.162 : une LECTURE de son propre relevé — budget de lecture, priorité argent.
+      const chemin = adresseReleve(rec, cle);
+      if (!chemin) { noterDiag('releve_recette_pad_inconnu'); continue; }   // « 7 » ou « 07 » : pas appris
+      if (n > 0) await pauseLectureArgent();
+      // Une LECTURE de son propre relevé : compte de l'onglet, budget de lecture (20/h), priorité argent.
       const refus = await gardeLecture(uid, acc, 'argent');
       if (refus) { if (refus.code !== 'vinted-pause') logActivity(`⚠️ Relevé non lu : ${refus.error}`); break; }
       memo[k] = Date.now();
       n++;
-      const rep = await vintedGet(acc, `/api/v2/users/${encodeURIComponent(pid)}/payouts?year=${v.y}&month=${v.m}`);
-      if (!rep.ok || !rep.json) { noterDiag(`releve_refuse_${rep.status}`); continue; }
-      const recu = moisDuReleve(rep.json);
-      // Le mois rendu n'est pas celui demandé ⟹ le paramètre est ignoré.
-      if (recu && recu !== v.cle) {
-        noterDiag('releve_parametre_ignore');
-        echantillonRate('releve_mois', v.cle, JSON.stringify({ demande: v.cle, recu, starting_date: rep.json.starting_date }).slice(0, 300));
-        muet[String(uid)] = Date.now();
-        await chrome.storage.local.set({ vrmReleveMuet: muet });
+      const rep = await vintedGet(acc, chemin);
+      if (!rep.ok || !rep.json) { noterDiag(`releve_refuse_${rep.status}`); if (memoApresEchec(memo, k, rep, RELEVE_RETRY_MS)) break; continue; }
+      const porteur = porteurDuReleve(rep.json);
+      const recu = porteur ? moisDuReleve(porteur) : null;
+      // Le mois rendu n'est pas celui demandé ⟹ la recette ne vaut rien : oubliée, plus aucune requête.
+      if (recu !== cle) {
+        noterDiag(recu ? 'releve_recette_mauvais_mois' : 'releve_recette_forme');
+        if (!porteur) await noterFormeReleve(uid, rep.json, chemin);
+        await oublierRecetteReleve(uid);
+        stop = true;
         break;
       }
-      await storeReleve(uid, rep.json, 'www.vinted.fr');
+      if (await storeReleve(uid, rep.json, acc.domain || 'www.vinted.fr', chemin)) lus++;
     }
-    await chrome.storage.local.set({ vrmReleveFaits: memo });
+    try { await chrome.storage.local.set({ vrmReleveFaits: memo }); } catch (_) {}
     // Ce qu'il RESTE à lire maintenant (hors mois en attente de 24 h) — c'est
     // ce que les photos laissent de côté pour l'argent.
-    if (su) {
-      const plusMuet = !!(((await chrome.storage.local.get('vrmReleveMuet')).vrmReleveMuet || {})[String(uid)]);
-      const reste = (plusMuet || !pid) ? 0 : voulus.filter(v => { const k = `${uid}_${v.cle}`; return !(memo[k] && Date.now() - Number(memo[k]) < RELEVE_RETRY_MS); }).length;
-      await noterLecturesDues(uid, 'releve', reste);
-    }
+    const reste = stop ? 0 : voulus.filter(cle => { const k = `${uid}_${cle}`; return !(memo[k] && Date.now() - Number(memo[k]) < RELEVE_RETRY_MS) && adresseReleve(rec, cle); }).length;
+    await noterLecturesDues(uid, 'releve', reste);
+    await noterEtatReleve(uid, { listes: liste.length, sansRecette: stop ? voulus.length : 0, reste, oubliee: stop || undefined });
+    if (lus) { logActivity(`💶 Relevé du porte-monnaie : ${lus} mois lu${lus > 1 ? 's' : ''}`); notifierApp({ type: 'maj', quoi: 'versements', uid: String(uid) }); }
     return n;
   } catch (_) { return 0; }
 }
@@ -20904,6 +21009,9 @@ async function tickVersements() {
     if (await sansSessionPourEcrire()) return 0;
     if (await reculBase()) return 0;
     if (await compteNonCapte(uid)) return 0;
+    // 5.378 : d'abord les mois du relevé (une lecture date tout un mois), seulement
+    // avec une recette apprise et des mois que Vinted liste ; mêmes gardes, même budget.
+    try { if (await recetteReleve(uid)) await capterReleves(uid); } catch (_) {}
     let d = null;
     try { d = (((await chrome.storage.local.get(LECTURES_DUES))[LECTURES_DUES] || {})[String(uid)] || {}).versement || null; } catch (_) { return 0; }
     if (d && Date.now() - Number(d.at || 0) < LECTURES_DUES_VALIDITE_MS && !(Number(d.reste) > 0)) return 0;
@@ -20935,13 +21043,20 @@ async function tickBordereaux() {
 // Ce que la carte dit (5.341) : les dates encore à lire sur CE compte, et une
 // estimation « Vinted ouvert » (≈ 12 lectures/h en fond : 20 moins la réserve
 // des codes, preuves et relevés). Noté il y a plus de 24 h, ou jamais ⇒ null.
-const VERSEMENT_PAR_JOUR_ESTIME = 12 * 24;
+// ⚠️ 5.378 (15 nov.) — EN HEURES DE VINTED OUVERT, plus en jours : « environ 7 jours »
+//    (1 741 ÷ 288) supposait l'onglet ouvert 24 h sur 24 sur CE compte ; mesuré, son
+//    grand compte n'avait pas été ouvert depuis deux jours. La même règle que l'app
+//    (`heuresPourDater`, src/versementRaisons.js). + les mois du relevé que Vinted liste
+//    sans recette apprise (`releveSansRecette`) : la carte dit le geste qui les débloque.
+const VERSEMENT_PAR_HEURE_ESTIME = 12;
 async function datesPourCarte(uid) {
   try {
     const d = (((await chrome.storage.local.get(LECTURES_DUES))[LECTURES_DUES] || {})[String(uid)] || {}).versement;
     if (!d || !(Date.now() - Number(d.at || 0) < 24 * 3600000) || typeof d.nonDatees !== 'number') return null;
     const n = Math.max(0, Math.round(d.nonDatees));
-    return { reste: n, jours: n ? Math.max(1, Math.ceil(n / VERSEMENT_PAR_JOUR_ESTIME)) : 0 };
+    let sansRecette = 0;
+    try { const e = ((await chrome.storage.local.get(RELEVE_ETAT))[RELEVE_ETAT] || {})[String(uid)]; if (e && Date.now() - Number(e.at || 0) < 24 * 3600000) sansRecette = Math.max(0, Number(e.sansRecette) || 0); } catch (_) {}
+    return { reste: n, heures: n ? Math.max(1, Math.ceil(n / VERSEMENT_PAR_HEURE_ESTIME)) : 0, ...(sansRecette ? { releveSansRecette: sansRecette } : {}) };
   } catch (_) { return null; }
 }
 

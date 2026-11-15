@@ -713,5 +713,7 @@ export default {
   "compta.recapPrepare": "Preparing the recap…",
   "compta.dontConversation": " · {nbAd} through the sale’s conversation",
   "compta.dontEmail": " · {nbAd} through Vinted’s e-mail",
-  "compta.environJoursVinted": { one: "About {n} day with vinted.fr open on this account.", other: "About {n} days with vinted.fr open on this account." },
+  "compta.environHeuresVinted": { one: "About {n} h with vinted.fr open on this account.", other: "About {n} h with vinted.fr open on this account." },
+  "compta.releveAVerifier": { one: "{n} sale in the wallet statement: statement dates not verified yet ({accords} of {min} matches with the sale details). Nothing is dated from it until then.", other: "{n} sales in the wallet statement: statement dates not verified yet ({accords} of {min} matches with the sale details). Nothing is dated from it until then." },
+  "compta.releveDesaccord": { one: "{n} sale in the wallet statement: its date does not fall on the same day as the sale details ({desaccords} mismatch). This account’s statement dates nothing.", other: "{n} sales in the wallet statement: their dates do not fall on the same day as the sale details ({desaccords} mismatch(es)). This account’s statement dates nothing." },
 };

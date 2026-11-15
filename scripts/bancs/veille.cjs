@@ -14,7 +14,7 @@
 //   D. La base refuse la ligne des chiffres (500) ⇒ aucune alerte, rien écrit (« pas su »).
 //   E. Le CA d'octobre qui baisse : la carte du mois, son geste vers Argent.
 //   F. (14 nov., lot dates-versement) 1 741 ventes à dater, 356 déjà datées, cause « détail
-//      pas encore lu » : la ligne dit datées ✓, pourquoi, « environ 7 jours », ton NEUTRE.
+//      pas encore lu » : la ligne dit datées ✓, pourquoi, « environ 146 h avec vinted.fr ouvert » (15 nov. : en heures, plus des jours de 24 h), ton NEUTRE.
 // Jugé sur des data-* et des nombres. `BANC_CAPTURE=<dossier>` : captures 390 tactile et
 // 1512, clair et sombre. `BANC_DIST=<dossier>` : un autre build (preuve §6.1).
 const path = require('path');
@@ -199,12 +199,12 @@ const capture = async (pg, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, { rec
           const l = s && s.lignes.find((x) => x.cle === 'versement-30j');
           const d = await pg.evaluate(() => { const e = document.querySelector('[data-controle-ligne="versement-30j"]'); if (!e) return null;
             const q = (k) => e.querySelector(k); return { cause: e.getAttribute('data-versement-cause'), datees: q('[data-versement-datees]') && q('[data-versement-datees]').getAttribute('data-versement-datees'),
-              jours: q('[data-versement-jours]') ? q('[data-versement-jours]').innerText : '', pourquoi: q('[data-versement-pourquoi]') ? q('[data-versement-pourquoi]').innerText : '' }; });
+              heures: q('[data-versement-heures]') ? q('[data-versement-heures]').innerText : '', pourquoi: q('[data-versement-pourquoi]') ? q('[data-versement-pourquoi]').innerText : '' }; });
           dit(l && l.n === '1741' && d && d.cause === 'vinted-detail', 'F1 la ligne des ventes à dater : 1741, cause « pas encore lue »', JSON.stringify(d));
           dit(l && l.ton === 'info' && l.couleur !== s.ambre && l.couleur !== s.rouge, 'F2 ton NEUTRE (ni ambre ni rouge) : rien n’est en faute, la lecture est en cours', l && `${l.ton} ${l.couleur} / ${s.ambre}`);
           dit(d && d.datees === '356' && /356 déjà datées ✓/.test(l.texte), 'F3 elle dit combien sont DÉJÀ datées', l && l.texte);
           dit(d && /ouvrant chaque vente/.test(d.pourquoi) && /vinted\.fr est ouvert sur ce compte/.test(d.pourquoi) && /aucune n’est devinée/.test(d.pourquoi), 'F4 elle dit POURQUOI et le geste (Vinted ouvert sur ce compte), jamais devinée', d && d.pourquoi);
-          dit(d && /Environ 7 jours/.test(d.jours), 'F5 et combien de temps : « environ 7 jours »', d && d.jours);
+          dit(d && /Environ 146 h avec vinted\.fr ouvert/.test(d.heures) && !/jour/.test(d.heures), 'F5 et combien de temps : « environ 146 h avec vinted.fr ouvert » (1 741 ÷ 12 par heure)', d && d.heures);
           dit(l && !/sans date de versement depuis 30 jours/.test(l.texte) && /Voir le détail/.test(l.texte) && l.btn && l.btn.height >= CIBLE, 'F6 plus l’ancienne phrase alarmante ; « Voir le détail » à 44 px', l && l.texte.slice(0, 120));
           dit(s && s.deb <= 0 && !errs.length, 'F7 aucun défilement horizontal, aucune erreur', `${s && s.deb} ${errs.join(' | ').slice(0, 120)}`);
           await capture(pg, `journee-versement-${suf}`);

@@ -1,6 +1,6 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
-import { joursPourDater } from '../versementRaisons.js';   // (14 nov., lot dates-versement) « environ X jours, Vinted ouvert »
+import { heuresPourDater } from '../versementRaisons.js';   // (15 nov.) « environ X h avec vinted.fr ouvert » (avant : des jours de 24 h)
 import { CLE_FOURNISSEURS, lireRegistre } from '../fournisseurs.js';
 import { motsVendeur } from '../profilVendeur.js';
 import { CLE_HORS_MASQUES, horsVisibles } from '../achatsDoubles.js';
@@ -3683,7 +3683,7 @@ function ADaterRaisons({ ad, n, periodeAd, label, onDater }) {
       const comptes = Array.isArray(r.comptes) && r.comptes.length ? r.comptes : [{ uid: '', nom: '', n: r.n }];
       for (const c of comptes) lignes.push(
         <li key={'d' + c.uid} data-adater-raison="vinted-detail" data-adater-compte={c.uid || ''} data-n={c.n}>
-          <span><b>{nbAd(c.n)}</b> {c.nom ? <>{tr('journee.texte2')} <b>{c.nom}</b></> : tr('compta.vinted')} {tr('compta.vente3')}{plAd(c.n)} {tr('compta.encoreRelue')}{plAd(c.n)}.{joursPourDater(c.n) ? <> <span data-adater-jours={joursPourDater(c.n)}>{tr('compta.environJoursVinted', { n: joursPourDater(c.n) })}</span></> : null}</span>
+          <span><b>{nbAd(c.n)}</b> {c.nom ? <>{tr('journee.texte2')} <b>{c.nom}</b></> : tr('compta.vinted')} {tr('compta.vente3')}{plAd(c.n)} {tr('compta.encoreRelue')}{plAd(c.n)}.{heuresPourDater(c.n) ? <> <span data-adater-heures={heuresPourDater(c.n)}>{tr('compta.environHeuresVinted', { n: heuresPourDater(c.n) })}</span></> : null}</span>
           <Bouton variante="discret" href="https://www.vinted.fr/" target="_blank" rel="noopener noreferrer" data-adater-geste="vinted">{tr('annonces.ouvrirVinted')}</Bouton>
         </li>);
     } else if (r.cle === 'leboncoin') lignes.push(
@@ -3704,6 +3704,15 @@ function ADaterRaisons({ ad, n, periodeAd, label, onDater }) {
     else lignes.push(
       <li key={r.cle} data-adater-raison={r.cle} data-n={r.n}>
         <span><b>{nbAd(r.n)}</b> {r.cle === 'vinted-attente' ? 'Vinted : pas encore finalisée' + plAd(r.n) + ', relue' + plAd(r.n) + ' seule' + plAd(r.n) + '.' : r.cle === 'vinted-passu' ? tr('compta.vintedSuLecture') : tr('compta.ebayCommandeSans')}</span>
+      </li>);
+  }
+  // (15 nov.) Le relevé du porte-monnaie porte des ventes de ce compte, mais il n'est pas
+  // encore VÉRIFIÉ (src/versementReleve.js) : rien n'en est daté — dit, jamais deviné.
+  for (const rv of (Array.isArray(ad.releve) ? ad.releve : [])) {
+    if (!rv || !(rv.lignes > 0)) continue;
+    lignes.push(
+      <li key={'rv' + rv.uid} data-adater-raison="releve-non-verifie" data-adater-compte={rv.uid || ''} data-releve-etat={rv.etat} data-releve-accords={rv.accords} data-n={rv.lignes}>
+        <span>{rv.nom ? <><b>{rv.nom}</b> · </> : null}{tr(rv.etat === 'desaccord' ? 'compta.releveDesaccord' : 'compta.releveAVerifier', { n: rv.lignes, accords: rv.accords, min: rv.min, desaccords: rv.desaccords })}</span>
       </li>);
   }
   return (

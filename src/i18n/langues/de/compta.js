@@ -713,5 +713,7 @@ export default {
   "compta.recapPrepare": "Übersicht wird vorbereitet…",
   "compta.dontConversation": " · {nbAd} über die Unterhaltung des Verkaufs",
   "compta.dontEmail": " · {nbAd} über die E-Mail von Vinted",
-  "compta.environJoursVinted": { one: "Etwa {n} Tag mit offenem vinted.fr in diesem Konto.", other: "Etwa {n} Tage mit offenem vinted.fr in diesem Konto." },
+  "compta.environHeuresVinted": { one: "Etwa {n} Std. mit offenem vinted.fr in diesem Konto.", other: "Etwa {n} Std. mit offenem vinted.fr in diesem Konto." },
+  "compta.releveAVerifier": { one: "{n} Verkauf im Kontoauszug der Geldbörse: Daten des Auszugs noch nicht geprüft ({accords} von {min} Übereinstimmungen mit den Verkaufsdetails). Bis dahin wird nichts damit datiert.", other: "{n} Verkäufe im Kontoauszug der Geldbörse: Daten des Auszugs noch nicht geprüft ({accords} von {min} Übereinstimmungen mit den Verkaufsdetails). Bis dahin wird nichts damit datiert." },
+  "compta.releveDesaccord": { one: "{n} Verkauf im Kontoauszug der Geldbörse: sein Datum fällt nicht auf denselben Tag wie die Verkaufsdetails ({desaccords} Abweichung). Der Auszug dieses Kontos datiert nichts.", other: "{n} Verkäufe im Kontoauszug der Geldbörse: ihre Daten fallen nicht auf denselben Tag wie die Verkaufsdetails ({desaccords} Abweichung(en)). Der Auszug dieses Kontos datiert nichts." },
 };

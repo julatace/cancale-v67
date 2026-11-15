@@ -207,6 +207,6 @@ export default {
   "veille.versement.datees": { one: "{n} ya fechada ✓", other: "{n} ya fechadas ✓" },
   "veille.versement.pourquoi1": "Vinted solo da esta fecha al abrir cada venta: la extensión las lee cuando vinted.fr está abierto en esta cuenta. Mientras tanto no están en ningún mes; ninguna se adivina.",
   "veille.versement.pourquoiN": "Vinted solo da esta fecha al abrir cada venta: la extensión las lee cuando vinted.fr está abierto en cada una de estas cuentas. Mientras tanto no están en ningún mes; ninguna se adivina.",
-  "veille.versement.jours": { one: "Unos {n} día con Vinted abierto.", other: "Unos {n} días con Vinted abierto." },
+  "veille.versement.heures": { one: "Unas {n} h con vinted.fr abierto.", other: "Unas {n} h con vinted.fr abierto." },
   "veille.versement.geste": "Ver el detalle",
 };

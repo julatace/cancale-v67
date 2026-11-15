@@ -207,6 +207,6 @@ export default {
   "veille.versement.datees": { one: "{n} schon datiert ✓", other: "{n} schon datiert ✓" },
   "veille.versement.pourquoi1": "Vinted nennt dieses Datum nur, wenn man jeden Verkauf öffnet: Die Erweiterung liest sie, solange vinted.fr in diesem Konto offen ist. Bis dahin sind sie in keinem Monat; keines wird geraten.",
   "veille.versement.pourquoiN": "Vinted nennt dieses Datum nur, wenn man jeden Verkauf öffnet: Die Erweiterung liest sie, solange vinted.fr in jedem dieser Konten offen ist. Bis dahin sind sie in keinem Monat; keines wird geraten.",
-  "veille.versement.jours": { one: "Etwa {n} Tag mit offenem Vinted.", other: "Etwa {n} Tage mit offenem Vinted." },
+  "veille.versement.heures": { one: "Etwa {n} Std. mit offenem vinted.fr.", other: "Etwa {n} Std. mit offenem vinted.fr." },
   "veille.versement.geste": "Details ansehen",
 };
