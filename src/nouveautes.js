@@ -26,6 +26,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (15 nov., Julien) docs/passation/2026-11-15-numeros-nouvelles.md — les annonces publiées hors de VRM.
+  { id: 'numeros-nouvelles-annonces', date: '2026-11-15', titre: 'Tes nouvelles annonces reçoivent leur N°', phrase: 'VRM numérote et te le dit, ou te demande le N°.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., extension 5.378) Dates de versement : relevé vérifié avant de dater, délai en heures de Vinted ouvert.
   { id: 'versements-releve-verifie', date: '2026-11-15', titre: 'Dates de versement : relevé vérifié, délai honnête', phrase: 'Le relevé ne date rien avant cinq accords ; délai en heures.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « horriblement moche », « ne mets pas paires, tu mets annonces ») docs/passation/2026-11-15-annonces-propre.md
