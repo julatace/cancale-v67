@@ -314,6 +314,7 @@ async function personnaliser(pg, t, v, tel, r) {
             await toucher(pg, '[data-case-num="20"]'); await pg.waitForTimeout(400);
             if (CAPT) await pg.screenshot({ path: path.join(CAPT, `etag-${v}-0c-volets.png`) });
           }
+          const x = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
           dit(x.sw <= x.cw + 1, `${t} · H : aucune page plus large que l'écran`, x);
           await pg.evaluate(() => { const s = document.querySelector('[data-meuble="mQ"]'); if (s) s.scrollIntoView({ block: 'center' }); });
           if (CAPT) await pg.screenshot({ path: path.join(CAPT, `etag-${v}-2-meubles.png`) });
