@@ -97,7 +97,7 @@ function Rangee({ id, gauche, titre, meta, eur, lignes, attrs = {}, ouvert, basc
 // sa plaque N° (par identité : `numDe`, jamais par le titre — blanc sinon), son titre, son site et son compte,
 // son montant (tu sur une vente seule : le montant de l'étape le dit déjà, §7).
 const APERCU = 3;
-function Groupe({ id, pastille, titre, date, eur, lignes, numDe, attrs = {}, tout, basculer, secondaire = false, sansMontant = false }) {
+export function Groupe({ id, pastille, titre, date, eur, lignes, numDe, attrs = {}, tout, basculer, secondaire = false, sansMontant = false }) {
   const reste = Math.max(0, lignes.length - APERCU);
   const vues = tout || !reste ? lignes : lignes.slice(0, APERCU);
   return (

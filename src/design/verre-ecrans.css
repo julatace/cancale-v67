@@ -405,4 +405,83 @@
 :root:root:root:root:root:root:root body .vrm-pm .vrm-pm-cat .vrm-set-groupe > .vrm-set-titre { color: var(--sv-clair) !important; font-weight: 700 !important; }
 :root:root:root:root:root:root:root body .vrm-pm .vrm-pm-cat .vrm-set-groupe > .vrm-set-pied, :root:root:root:root:root:root:root body .vrm-pm .vrm-pm-cat .vrm-set-groupe > .vrm-set-pied * { color: var(--sv-clair-2) !important; }
 
+/* ══ 6. L'ORDINATEUR (maquettes ordinateur validées : ordi/vues/{argent,messages,parametres,fiche}-{1512,1280}) ═══
+   Le rail de navigation est commun (claude/refonte-journee) : rien ici. */
+:root:root:root body .vg-a-venir-detail { display: none; }
+@media (min-width: 1024px) {
+  /* ARGENT · Résumé : trois colonnes — Reçu · Bénéfice puis les mois (ComptaFusion) ; l'à venir détaillé ; l'URSSAF puis le
+     détail (bénéfice, vendu et reçu, rapports…). Le chiffre « vendu » au-dessus, en affiche. */
+  :root:root:root:root body .vrm-argent-partie[data-argent-vue="resume"]:not([hidden]) { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr) minmax(0, .92fr); column-gap: 20px; row-gap: 16px; align-items: start; }
+  :root:root:root:root body .vrm-argent-partie[data-argent-vue="resume"] > * { min-width: 0; margin: 0 !important; }
+  :root:root:root:root body .vrm-argent-partie[data-argent-vue="resume"] > .vrm-argent-q.vg-argent { display: contents !important; }
+  :root:root:root:root body .vrm-argent-partie[data-argent-vue="resume"] .vg-a-vendu { grid-column: 1 / -1; grid-row: 1; flex-direction: row !important; align-items: baseline !important; gap: 12px; padding: 0 4px !important; }
+  :root:root:root:root body .vrm-argent-partie[data-argent-vue="resume"] .vg-a-vendu .vrm-argent-w-n { font-size: 52px !important; }
+  :root:root:root:root body .vrm-argent-partie[data-argent-vue="resume"] .vg-a-duo { display: grid !important; grid-template-columns: 1fr 1fr; grid-column: 1; grid-row: 2; }
+  :root:root:root:root body .vrm-argent-partie[data-argent-vue="resume"] .vg-a-urssaf { grid-column: 3; grid-row: 2; margin: 0 !important; }
+  :root:root:root:root body .vrm-argent-partie[data-argent-vue="resume"] .vg-a-urssaf .vrm-argent-w-n { font-size: 30px !important; }
+  :root:root:root:root body .vrm-argent-partie[data-argent-vue="resume"] > .vg-a-venir-hote { grid-column: 2; grid-row: 2 / span 2; }
+  :root:root:root:root body .vrm-argent-partie[data-argent-vue="resume"] > :not(.vrm-argent-q):not(.vg-a-venir-hote):not(#compta-detail) { grid-column: 1; }
+  :root:root:root:root body .vrm-argent-partie[data-argent-vue="resume"] > #compta-detail { grid-column: 3; grid-row: 3; }
+  :root:root:root body .vg-a-venir-detail { display: block; margin: 0 !important; padding: 0 14px 10px !important; list-style: none; }
+  :root:root:root body .vg-a-venir .vg-a-venir-btn .vg-a-venir-legende { display: none; }
+  :root:root:root body .vg-a-venir .vg-a-venir-total { font-size: 30px !important; }
+
+  /* PARAMÈTRES : le sommaire en un verre (nom et valeur, la catégorie choisie en porcelaine) ; une catégorie = son grand titre
+     en blanc puis ses groupes en VERRES sur deux colonnes, le titre du groupe DANS le verre, des rangées sans icône. */
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-bureau { grid-template-columns: minmax(300px, 400px) minmax(0, 1fr) !important; gap: 24px !important; }
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-sommaire .vrm-set-liste { padding: 8px !important; border-radius: 26px !important; }
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-sommaire .vrm-pm-cat-ligne { min-height: 56px !important; border-radius: 16px !important; }
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-sommaire .vrm-pm-cat-ligne .vrm-set-desc { display: none !important; }
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-sommaire .vrm-pm-cat-ligne .vrm-set-val { display: inline !important; font: 500 15px/1.2 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-sommaire .vrm-pm-cat-ligne[aria-current="true"] { background: #FFFFFF !important; box-shadow: 0 8px 20px -12px rgb(8 26 50 / .5) !important; }
+  :root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-sommaire .vrm-pm-cat-ligne[aria-current="true"] { background: rgb(255 255 255 / .12) !important; }
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-sommaire .vrm-pm-cat-ic { background: rgb(12 29 48 / .06) !important; color: var(--sv-encre) !important; box-shadow: none !important; border-radius: 12px !important; width: 36px !important; height: 36px !important; }
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat > :not(.vrm-set-groupe) { grid-column: 1 / -1; }
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat-h { margin: 0 !important; font: 750 30px/1.15 var(--sb-police-affiche, Inter, sans-serif) !important; letter-spacing: -.03em !important; }
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat-h .vrm-pm-cat-ic { display: none !important; }
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat > .vrm-set-groupe { margin: 0 !important; padding: 16px 20px 8px !important; border-radius: 26px !important;
+    background-color: transparent !important; background-image: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; box-shadow: var(--sv-ombre) !important; }
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat > .vrm-set-groupe > .vrm-set-titre { margin: 0 0 6px !important; padding: 0 !important; font: 700 17px/1.25 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre) !important; text-transform: none !important; letter-spacing: -.01em !important; }
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat > .vrm-set-groupe > .vrm-set-pied, :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat > .vrm-set-groupe > .vrm-set-pied * { color: var(--sv-encre-2) !important; }
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat > .vrm-set-groupe > .vrm-set-liste { background: transparent !important; background-image: none !important; box-shadow: none !important; border: 0 !important; padding: 0 !important; }
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat .vrm-set-ligne { padding-left: 0 !important; padding-right: 0 !important; min-height: 60px !important; }
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat .vrm-set-ligne + .vrm-set-ligne { border-top: 1px solid rgb(12 29 48 / .10) !important; box-shadow: none !important; }
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat .vrm-set-ligne .vrm-set-ic { display: none !important; }
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat .vrm-set-lib > b { font: 650 16px/1.25 var(--sb-police-texte, Inter, sans-serif) !important; }
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat .vrm-set-desc { font: 500 13.5px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
+
+  /* MESSAGES : trois verres — la liste, le fil (sur le bleu, en verre), comme la maquette. */
+  :root:root:root:root:root body [data-fils-tous] .vrm-message-workspace { gap: 16px !important; background: none !important; box-shadow: none !important; }
+  :root:root:root:root:root body [data-fils-tous] .vrm-inbox-column { padding: 16px !important; border-radius: 26px !important;
+    background-color: transparent !important; background-image: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; box-shadow: var(--sv-ombre) !important; }
+  :root:root:root:root:root body [data-fils-tous] .vrm-inbox-column .vg-ms-vues { background: rgb(12 29 48 / .06) !important; border-color: transparent !important; }
+  :root:root:root:root:root body [data-fils-tous] .vrm-inbox-column .vg-ms-vue:not(.is-on) { color: var(--sv-encre) !important; }
+  :root:root:root:root:root body [data-fils-tous] .vrm-inbox-column .vg-ms-groupe-h, :root:root:root:root:root body [data-fils-tous] .vrm-inbox-column .vg-ms-groupe-h * { color: var(--sv-encre) !important; }
+  :root:root:root:root:root body [data-fils-tous] .vrm-inbox-column .vg-ms-onglet { background: rgb(12 29 48 / .07) !important; border-color: transparent !important; color: var(--sv-encre-2) !important; }
+  :root:root:root:root:root body [data-fils-tous] .vrm-inbox-column .vrm-msg-list.vg-ms-liste { background: none !important; background-image: none !important; box-shadow: none !important; }
+  :root:root:root:root:root body [data-fils-tous] .vrm-inbox-column .vg-fil { border-radius: 16px !important; border-top: 0 !important; }
+  :root:root:root:root:root body [data-fils-tous] .vrm-inbox-column .vg-fil.is-current { background: #FFFFFF !important; box-shadow: 0 8px 20px -12px rgb(8 26 50 / .5) !important; }
+  :root:root:root:root:root[data-theme="dark"] body [data-fils-tous] .vrm-inbox-column .vg-fil.is-current { background: rgb(255 255 255 / .10) !important; }
+  :root:root:root:root:root body [data-fils-tous] .vrm-chat-column { border-radius: 26px !important; overflow: hidden;
+    background-color: transparent !important; background-image: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; box-shadow: var(--sv-ombre) !important; }
+  :root:root:root:root:root:root body [data-fils-tous] .vrm-chat-column .vrm-chat-panel { background: transparent !important; }
+  :root:root:root:root:root:root body [data-fils-tous] .vrm-chat-column .vrm-chat-panel > .vrm-chat-head :is(.vrm-chat-head-n, .vrm-chat-head-n *) { color: var(--sv-encre) !important; }
+  :root:root:root:root:root:root body [data-fils-tous] .vrm-chat-column .vrm-chat-panel > .vrm-chat-head :is(.vrm-chat-head-s, .vrm-chat-head-s *) { color: var(--sv-encre-2) !important; }
+  :root:root:root:root:root:root body [data-fils-tous] .vrm-chat-column .vrm-chat-jour { background: transparent !important; color: var(--sv-encre-2) !important; }
+  :root:root:root:root:root:root body [data-fils-tous] .vrm-chat-column .vrm-chat-foot { background: transparent !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+
+  /* LA FICHE : un plan large (comme la page de la maquette) en trois colonnes — la paire ; ses sites, ses chiffres, l'état ;
+     son histoire et les gestes. L'ordre du code ne change pas (grid, placement par rôle). */
+  :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-cadre { max-width: min(1240px, calc(100vw - 48px)) !important; width: min(1240px, calc(100vw - 48px)) !important;
+    display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr); grid-auto-flow: row dense; column-gap: 16px; row-gap: 14px; align-content: start; }
+  :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-cadre > * { grid-column: 2; min-width: 0; margin: 0 !important; }
+  :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-cadre > :is(.vrm-fp-poignee, .vrm-fp-tete, .vrm-fp-vide) { grid-column: 1 / -1; }
+  :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-cadre > :is(.vrm-fp-heros, .vrm-fp-sans-paire, .vrm-fp-contexte, .vrm-fp-note-privee) { grid-column: 1; }
+  :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-cadre > .vrm-fp-heros { flex-direction: column !important; align-items: flex-start !important; padding: 16px !important; }
+  :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-cadre > .vrm-fp-heros .vrm-fp-heros-photo { width: 100% !important; height: auto !important; aspect-ratio: 1 / .88; }
+  :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-cadre > :is(.vrm-fp-parcours, .vrm-fp-histo-num, .vrm-fp-raccourcis, .vrm-fp-onglets, [class*="vrm-fp-temps"], .vrm-fp-outils, .vrm-fp-actions-sec) { grid-column: 3; }
+  :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-cadre > .vrm-fp-outils { grid-template-columns: 1fr 1fr !important; }
+}
+
 } /* fin de @layer vrm-verre */

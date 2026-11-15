@@ -28,7 +28,7 @@ import RegistresVue from '../RegistresVue.jsx';
 import { xlsxClasseur } from '../xlsxSimple.js';
 import { tr, localeCourante } from '../i18n/index.js';
 import { aVenirPour } from '../argentAVenir.js';   // (15 nov., verre 2) la part « à venir », la règle de la coque
-import { resumeEtapes, ouvrirArgentAVenir } from '../ArgentAVenirEcran.jsx';
+import { resumeEtapes, ouvrirArgentAVenir, Groupe as GroupeAVenir } from '../ArgentAVenirEcran.jsx';
 import LivrePoliceCarte from '../LivrePoliceCarte.jsx';   // (10 nov., lot R) le livre de police
 import { lireFactures, lireContenuFacture } from '../factureAchat.js';   // (10 nov., lot AN) les factures d'achat jointes, mentionnées dans l'export
 import { TYPES_PERIODE, periodesExport, libellePeriode, donneesExportComptable, resumeExport, couvertureExport, csvExportComptable, pdfExportComptable, nomFichierExport } from '../exportComptable.js';
@@ -45,7 +45,7 @@ import { achatVenteManuelle, beneficeVenteManuelle, totauxVentesManuelles } from
 // (9 nov.) Le profil fiscal (src/profilFiscal.js) : le statut, l'activité du micro, la TVA d'une société.
 import { useProfilFiscal, vendActuel, exemplesActuels } from '../App.jsx';   // (11 nov., lot DJ2) l'exemple suit ce qu'il vend
 import { gesteCorbeille, lireVentesImportees } from '../App.jsx';   // (10 nov., lot Y) la corbeille 30 jours
-import { LiveStatsCarte, REGLES_CARTE, useSourcesCarte, ArgentAVenirCarte } from '../App.jsx';
+import { LiveStatsCarte, REGLES_CARTE, useSourcesCarte, ArgentAVenirCarte, useNumAVenir } from '../App.jsx';
 // (11 nov., lot rapport-mois) « Rapport du mois » : le PDF (src/rapportMois.js), les lectures de catégories partagées.
 import { AUTH, lireExtrasRepartition } from '../App.jsx';
 import { oublierReglageMontage } from '../App.jsx';   // (11 nov., intégration) l'écriture directe de la fiche oublie la lecture gardée
@@ -3642,6 +3642,8 @@ function AVenirArgent({ liveStats }) {
 // `argentAVenir` (`parEtape`, `aVenirPour`, `resumeEtapes`). Les data-* du résumé d'avant restent (bancs) ; toute
 // la carte se touche et ouvre l'écran « Argent à venir ».
 function AVenirVerre({ A }) {
+  const numDe = useNumAVenir();
+  const [tout, setTout] = React.useState(() => new Set());
   if (!A || A.enCours) return null;
   const T = aVenirPour(A, {});
   const etapes = resumeEtapes(A);
@@ -3674,6 +3676,15 @@ function AVenirVerre({ A }) {
         </span>
         {T.partiel && T.manque.length ? <span className="vg-a-venir-manque" data-a-venir-manque={T.manque.join(',')}>{tr('compta.sans')} {T.manque.join(', ')} {tr('ventes.lu2')}</span> : null}
       </button>
+      {/* (15 nov., maquette ORDINATEUR validée) À l'ordinateur, la carte montre les étapes et leurs ventes (N° par identité),
+          la même liste que l'écran « Argent à venir » ; au téléphone, elle est cachée (la carte s'ouvre). */}
+      <ul className="vg-av-groupes vg-a-venir-detail" aria-label={tr('avenir.etapes.titre')}>
+        {parEtape.map((g) => (
+          <GroupeAVenir key={g.etape} id={'etape:' + g.etape} tout={tout.has(g.etape)} basculer={() => setTout((s0) => { const n = new Set(s0); if (n.has(g.etape)) n.delete(g.etape); else n.add(g.etape); return n; })}
+            lignes={A.lignes.filter((l) => (l.etape || 'autre') === g.etape)} numDe={numDe} pastille={<span className={'vrm-av-pastille is-' + g.etape}/>}
+            titre={tr('verre2.etape.' + g.etape)} date={null} eur={g.eur} sansMontant={parEtape.length === 1} attrs={{ 'data-a-venir-groupe': g.etape }}/>
+        ))}
+      </ul>
     </section>
   );
 }

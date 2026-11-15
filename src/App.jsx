@@ -32226,6 +32226,23 @@ function CarteStatsApp({ page, liveStats, sel = null, locaux = null, ici = null,
   const sources = locaux ? { ...avecPlus, locaux } : avecPlus;
   return <CarteStats owner={AUTH.user?.id||''} page={page} sel={sel || { site: 'toutes', compte: null, periode: null }} sources={sources} regles={REGLES_CARTE} reglage={reglage} poser={poser} objectif={objectif} objectifBrut={objectifBrut} poserObjectif={poserObjectif} FermeAuRetour={FermeAuRetour} extra={{ ici, attrs, pile, tete, bande }} {...rest}/>;
 }
+// (15 nov., maquette « Verre dépoli ») Le N° de chaque vente Vinted à venir : PAR IDENTITÉ seulement (transaction →
+// item_id → la fiche de cet identifiant d'annonce), jamais par le titre (§5) ; pas su ⇒ aucun N° (un blanc).
+// La feuille « Argent à venir » et Argent à l'ordinateur lisent la MÊME règle.
+export function useNumAVenir() {
+  const [txItem, setTxItem] = useState(() => (Object.keys(_txnItemConnu).length ? _txnItemConnu : null));
+  useEffect(() => { if (txItem) return undefined; let mort = false; fetchTxnItemIds().then((m) => { if (!mort) setTxItem(m || {}); }).catch(() => {}); return () => { mort = true; }; }, []);   // eslint-disable-line react-hooks/exhaustive-deps
+  return useMemo(() => {
+    const fiches = load('vinted_annonce_numeros', {}) || {};
+    return (l) => {
+      const m = /^vinted:(.+)$/.exec(String((l && l.id) || ''));
+      const it = m && txItem ? txItem[m[1]] : null;
+      const e = it ? fiches[it] : null;
+      const n = e ? (e.numero != null ? e.numero : e.num) : null;
+      return n != null && String(n).trim() ? String(n).trim() : null;
+    };
+  }, [txItem]);
+}
 // ═══════════════════════════════════════════════════════════════════════════
 // (15 nov.) L'ÉCRAN « ARGENT À VENIR », MONTÉ PAR LA COQUE — un toucher depuis Ma journée,
 // Ventes et Argent (`ouvrirArgentAVenir`, l'événement `vrm:argent-a-venir`). Il lit trois
@@ -32243,20 +32260,7 @@ function ArgentAVenirOuvert({ liveStats, onClose }) {
   const porteMonnaie = L.walletDispo != null || Array.isArray(L.walletParCompte)
     ? { dispo: L.walletDispo != null ? L.walletDispo : null, attente: L.walletAttente != null ? L.walletAttente : null, comptes: Array.isArray(L.walletParCompte) ? L.walletParCompte : [] }
     : null;
-  // (15 nov., maquette « Verre dépoli ») Le N° de chaque vente Vinted : PAR IDENTITÉ seulement (transaction →
-  // item_id → la fiche de cet identifiant d'annonce), jamais par le titre (§5) ; pas su ⇒ aucun N° (un blanc).
-  const [txItem, setTxItem] = useState(() => (Object.keys(_txnItemConnu).length ? _txnItemConnu : null));
-  useEffect(() => { if (txItem) return undefined; let mort = false; fetchTxnItemIds().then((m) => { if (!mort) setTxItem(m || {}); }).catch(() => {}); return () => { mort = true; }; }, []);   // eslint-disable-line react-hooks/exhaustive-deps
-  const numDe = useMemo(() => {
-    const fiches = load('vinted_annonce_numeros', {}) || {};
-    return (l) => {
-      const m = /^vinted:(.+)$/.exec(String((l && l.id) || ''));
-      const it = m && txItem ? txItem[m[1]] : null;
-      const e = it ? fiches[it] : null;
-      const n = e ? (e.numero != null ? e.numero : e.num) : null;
-      return n != null && String(n).trim() ? String(n).trim() : null;
-    };
-  }, [txItem]);
+  const numDe = useNumAVenir();
   return <ArgentAVenirEcran A={L.aVenir || null} porteMonnaie={porteMonnaie} recu={recu} Feuille={SheetShell} onClose={onClose} numDe={numDe}/>;
 }
 function ArgentAVenirHote() {
