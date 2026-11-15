@@ -355,6 +355,8 @@ export const GESTES_ACC = {
   'publier.partout':  { ecran: 'annonces',  sorte: 'publier-partout',       ensuite: { lien: '?tab=annonces' } },
   'publier.ebay':     { ecran: 'ebay',      sorte: 'publier-ebay',          ensuite: { lien: '?tab=plat_ebay' } },
   'lbc.supprimer':    { ecran: 'leboncoin', ensuite: { lien: '?tab=plat_leboncoin' } },
+  // (15 nov., retrait-ailleurs) « À retirer ailleurs » : une annonce vendue ailleurs, retirée site par site.
+  'annonce.retirer':  { ecran: 'journee',   sorte: 'retirer-annonces',      ensuite: null },
   'soldes.remettre':  { ecran: 'journee',   ensuite: null },
   'vacances':         { ecran: 'settings',  sorte: 'vacances',              ensuite: { lien: '?tab=settings&reglage=vacances' } },
   'urssaf.declarer':  { ecran: 'compta',    ensuite: { lien: '?tab=argent_declarer' } },
@@ -369,7 +371,7 @@ export const GESTES_ACC = {
 export const IDS_GESTES_ACC = Object.keys(GESTES_ACC);
 export const gesteAcc = (id) => GESTES_ACC[id] || null;
 // La sorte d'un travail suivi ⇒ son geste (la feuille « VRM travaille » porte `data-acc-pendant`).
-const PAR_SORTE = { bordereaux: 'colis.imprimer', 'retirer-ailleurs': 'colis.retire', 'baisse-prix': 'prix.baisser', 'baisse-lbc': 'prix.baisserLbc', 'baisse-prix-vestiaire': 'prix.baisserVc',
+const PAR_SORTE = { bordereaux: 'colis.imprimer', 'retirer-ailleurs': 'colis.retire', 'retirer-annonces': 'annonce.retirer', 'baisse-prix': 'prix.baisser', 'baisse-lbc': 'prix.baisserLbc', 'baisse-prix-vestiaire': 'prix.baisserVc',
   'republier-lbc': 'republier.lbc', 'publier-lbc': 'publier.lbc', 'publier-partout': 'publier.partout', 'publier-ebay': 'publier.ebay', 'creer-vinted': 'creer.vinted', 'publier-fiche-vinted': 'publier.vinted', vacances: 'vacances', favoris: 'favoris.messages' };
 export const gesteDeSorte = (sorte) => PAR_SORTE[String(sorte || '')] || '';
 

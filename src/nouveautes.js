@@ -26,6 +26,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (15 nov., Julien : « le retrait sur Leboncoin… hyper intuitif, accompagné ») docs/passation/2026-11-15-retrait-ailleurs.md
+  { id: 'retrait-ailleurs', date: '2026-11-15', titre: 'Vendue ? Retire-la ailleurs en un toucher', phrase: 'En tête de Ma journée : un bouton par site, VRM suit tout.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., lot retours) docs/passation/2026-11-15-retours.md — « À renvoyer » : une carte par retour d'achat.
   { id: 'retours-a-renvoyer', date: '2026-11-15', titre: 'Retours : bordereau, date et heure, une carte', phrase: 'En tête de Ma journée : imprime, dépose, suis le remboursement.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « fais de plus belles notifications ») docs/passation/2026-11-15-notifications-belles.md
