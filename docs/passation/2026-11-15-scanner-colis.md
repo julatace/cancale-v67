@@ -111,8 +111,18 @@ Le banc fait passer de vraies images par la vraie caméra de Chromium et le vrai
   Chronopost et le n°, « Chercher ce n° »), F (EAN-13 ⇒ « pas un n° de suivi », caméra qui continue), G (caméra
   refusée ⇒ phrase, curseur ; n° tapé ⇒ sa vente ; un titre ⇒ rien). Partout : cibles ≥ 44 px, rien ne déborde,
   aucune erreur, aucune image envoyée, caméra coupée.
-- Rouge sur l'arbre de départ (94e1391, `git archive`, banc lancé contre son `dist/`) : voir le résultat chiffré
-  dans le rapport de la session.
+  Résultat (15 nov. au soir, machine partagée chargée de 16 à 21 par cœur) : **177 verts, 2 rouges** sur 390 et 1512,
+  clair et sombre — les deux rouges sont des captures d'écran qui ont dépassé 30 s (1512-clair G, 1512-sombre A),
+  pas une règle. 390-clair : tout vert, **lecture jugée < 1 s**. Au-delà de 1,5 de charge par cœur, le temps de
+  lecture est DIT (⚠️ et la mesure), pas jugé : il allait de 5 à 38 s sous cette charge.
+- **Rouge sur l'arbre de départ** (94e1391, `git archive`, banc lancé contre son `dist/` avec `BANC_DIST`) :
+  **8 rouges** sur 390-clair (aucun bouton « Retrouver » ; le disque ouvre l'ancien scanner de dépôt, dont la
+  caméra reste ouverte). Avant les deux corrections de ZXing (même banc, ce code) : Code 128 et EAN-13 jamais lus
+  (scènes A, D, E, F rouges), les codes 2D lus.
+- Audits verts : identite, csp, traduction, tdz, variables, studio, quoi-de-neuf, accompagnement, icones,
+  coherence, colis-trois, colis-plus ; `npm run build`.
+- Captures (scratchpad de la session, hors dépôt) : `scan-colis-{390,1512}-{clair,sombre}-{1-vente,2-ouverte,
+  3-disque|3-datamatrix,4-achat,5-plusieurs,6-retour,7-aucun,8-pas-un-suivi,9-refus,10-titre}.png`.
 
 ## Ce qui reste
 - **iPhone réel non essayé d'ici** (Safari, ZXing) : la lecture < 1 s est mesurée sous Chromium logiciel.
