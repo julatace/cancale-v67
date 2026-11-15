@@ -26,6 +26,10 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (15 nov., lot deux-comptes) docs/passation/2026-11-15-deux-comptes-favoris.md — la même paire sur deux comptes Vinted.
+  { id: 'deux-comptes', date: '2026-11-15', titre: 'Une paire en vente sur deux comptes', phrase: 'VRM la montre côte à côte : tu retires l’une sur Vinted.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (15 nov., lot favoris-sites, extension 5.392) — une offre aux personnes qui ont aimé, sur Vestiaire.
+  { id: 'vestiaire-aimes', date: '2026-11-15', titre: 'Vestiaire : une offre à ceux qui aiment', phrase: 'Messages → Vestiaire : une offre par personne, sur ton toucher.', tab: 'messages', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « J'aime la 9 ») docs/passation/2026-11-15-verre-depoli.md — le thème « Verre dépoli ».
   { id: 'verre-depoli', date: '2026-11-15', titre: 'Nouveau thème : verre dépoli sur bleu profond', phrase: 'Le chiffre du jour en blanc, tout se lit sur le verre.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « c'est moche et il y a des bugs ») docs/passation/2026-11-15-annonces-achats.md

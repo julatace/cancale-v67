@@ -182,6 +182,8 @@ async function a1a3() {
   const d = await q.appel('POST', URL_NEGO, nego('900000003', P3, [ev('offer', 'seller', 21000)]), 200, JSON.stringify({ buyerId: Number(P3), price: { cents: 21000 }, message: 'Bonjour Jeanne, prix spécial !' }));
   const rd = de(d, 'vcoffreappris')[0];
   dit(!!rd && rd.recette.geste === 'favori' && rd.recette.rejouable === false && rd.recette.raison === 'valeur-inconnue', 'A3 · un texte libre dans le corps ⇒ « pas rejouable » (jamais un message rejoué)', JSON.stringify(rd));
+  const g = await q.appel('POST', URL_NEGO, nego('900000005', P2, [ev('offer', 'seller', 22000, '2026-11-14T09:00:00Z'), ev('decline', 'buyer', null, '2026-11-14T12:00:00Z'), ev('offer', 'seller', 21000)]), 200, JSON.stringify({ buyerId: Number(P2), price: { cents: 21000 } }));
+  dit(!de(g, 'vcoffreappris').some((y) => y.recette.geste === 'favori'), 'A3 · une nouvelle offre après un refus de la personne n’est pas la PREMIÈRE offre : jamais la recette « favori »', JSON.stringify(de(g, 'vcoffreappris')));
   const e = await q.appel('POST', URL_NEGO, nego('900000004', P3, [ev('offer', 'seller', 21000)]), 200, JSON.stringify({ price: { cents: 21000 } }));
   const re = de(e, 'vcoffreappris')[0];
   dit(!!re && re.recette.rejouable === false && re.recette.raison === 'personne-introuvable', 'A3 · la personne absente de la requête ⇒ « pas rejouable » (VRM ne devine pas à qui)', JSON.stringify(re));
@@ -193,7 +195,8 @@ function systeme() {
   fond = faireFond({ src: F.src, onglets: [{ id: 41, url: ORIGINE + '/chat/', active: true, status: 'complete' }] });
   const ordres = [], delais = [];
   const st = fond.ctx.setTimeout;
-  fond.ctx.setTimeout = (f, ms) => { if (ms >= 1000 && ms < 60000) delais.push(ms); return st(f, ms); };
+  // L'écart ENTRE deux offres (`attendreVc`, reconnu à sa pile d'appel) — pas les autres attentes de l'extension.
+  fond.ctx.setTimeout = (f, ms) => { if (ms >= 1000 && ms < 60000 && /attendreVc/.test(String(new Error().stack))) delais.push(ms); return st(f, ms); };
   fond.ctx.chrome.tabs.sendMessage = (id, m, o, cb) => {
     if (m && m.__vmrEvt) { fond.j.evts.push(m.evt); if (typeof cb === 'function') cb(); return Promise.resolve(); }
     ordres.push({ id, m: copie(m) });
@@ -244,8 +247,9 @@ async function a2a6() {
   dit(env.length === 3 && env.map((b) => String(b.buyerId)).sort().join() === [P1, P2, P3].sort().join() && env.every((b) => b.price.cents === 23700), 'A5 · UNE offre par personne, à SON identifiant, à ce prix', JSON.stringify(env));
   dit(posts(S).every((a) => a.h['x-vc-auth'] === SECRET), 'A5 · les en-têtes repris DANS la page (le fond n’en connaît aucune valeur)');
   dit(!!e5 && e5.fin === 'fini' && e5.faites === 3 && e5.incertaines === 0, 'A5 · « 3 sur 3 » seulement parce que Vestiaire a renvoyé chaque offre', JSON.stringify(e5));
+  // Les écarts tirés au hasard (jamais ronds, à la différence des délais fixes de l'extension : 8 000, 12 000…).
   const ecarts = S.delais.filter((ms) => ms >= 8000 && ms < 20000);
-  dit(ecarts.length >= 2 && new Set(ecarts).size >= 2, 'A5 · 8 à 20 s au hasard entre deux offres (jamais deux fois le même écart)', JSON.stringify(S.delais));
+  dit(S.delais.length === 2 && ecarts.length === 2 && new Set(ecarts).size === 2, 'A5 · 8 à 20 s au hasard entre deux offres (jamais deux fois le même écart)', JSON.stringify(S.delais));
   dit(((S.fond.store.vrmActions || {})['vc:' + MOI] || []).length === 3, 'A5 · trois actions comptées sous le compte Vestiaire', JSON.stringify(S.fond.store.vrmActions));
   const n5 = posts(S).length;
   const r52 = await S.cmd({ cmd: 'vcOffreAimes', produit: ART, avantCents: 24900, prixCents: 22000 });
@@ -280,6 +284,13 @@ async function a2a6() {
   await A.fond.ctx.noterSessionVc('77778888', 41, []);
   const a1 = await A.cmd({ cmd: 'vcOffreAimes', produit: ART, avantCents: 24900, prixCents: 23700 });
   dit(a1 && a1.accepte === false && a1.code === 'autre-compte' && posts(A).length === 0, 'A6 · l’onglet est sur un AUTRE compte : rien ne part', JSON.stringify(a1));
+  // A6 — la PAGE montre un autre compte que celui que le fond attend : la page n'envoie rien.
+  const B = systeme(); await pret(B); await apprendre(B); repondre(B);
+  await B.ch.appel('GET', `${API}/users/me${Q}`, { data: { id: '55556666', type: 'user' } }); await attendre(30);
+  await B.fond.ctx.noterSessionVc(MOI, 41, []);
+  await B.cmd({ cmd: 'vcOffreAimes', produit: ART, avantCents: 24900, prixCents: 23700 });
+  const eB = await finEnvoi(B);
+  dit(posts(B).length === 0 && eB && eB.fin === 'arret' && eB.faites === 0, 'A6 · la page montre un autre compte que celui attendu : la PAGE n’envoie rien, la série s’arrête', JSON.stringify({ n: posts(B).length, eB }));
   const etat = await S.fond.envoyer({ from: 'vmr-bridge', action: 'etat' }, { origin: 'https://vrm.center', url: 'https://vrm.center/' });
   dit(etat && etat.vcOffreAimes === true, 'A6 · l’état de l’extension dit `vcOffreAimes: true`', JSON.stringify(etat && Object.keys(etat)));
   // L'ancienne réponse aux offres reçues n'accepte JAMAIS le geste « favori ».
