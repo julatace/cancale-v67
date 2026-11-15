@@ -36,6 +36,7 @@ const MUTATIONS = {
   vendu: ['src/republieTelephone.js', 'if (!presente && !ailleurs && !vendu && c.id)', 'if (!presente && !ailleurs && c.id)'],
   borne: ['src/republieTelephone.js', "const attendre = () => (now < jusqua ? { action: 'attendre', jusqua, raison: 'empreintes' } : { action: 'neuf', raison: 'attente-finie' });", "const attendre = () => ({ action: 'attendre', jusqua, raison: 'empreintes' });"],
   reponse: ['src/republieTelephone.js', "if (rep && rep.choix === 'non') return { action: 'neuf', raison: 'reponse' };", ''],
+  lecture: ['src/App.jsx', '    if (empreintesVinted === undefined) return;\n', ''],
   dire: ['src/App.jsx', 'if (reconnusNum.length) direNumerosReconnus(reconnusNum);', ''],
   journee: ['src/App.jsx', "if (modeNum === 'vrm' && propositionsRepub.length) {", 'if (false) {'],
 };
@@ -146,6 +147,8 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(
     dit((r.reconnus || []).length === 50 && items.every((it) => r.fiches[it.id] && r.fiches[it.id].recreeOrigine === 'photo-vrm'), '… et c’est DIT (« N°… reconnu par sa photo »), une fois', String((r.reconnus || []).length));
     const r2 = P({ items, fiches: r.fiches, pool: r.pool, complets: { [A]: true }, lues: { [A]: lu }, store: { vrm_photos_vrm: registre, vrm_vus_en_ligne: vus }, empreintes: { [`vinted:${A}`]: emp } });
     dit(!(r2.reconnus || []).length, 'un second passage ne redit rien');
+    const avantLecture = P({ items: [items[0]], fiches, pool: Array.from({ length: 60 }, (_, i) => i + 1), complets: { [A]: true }, lues: { [A]: lu }, store: { vrm_photos_vrm: registre }, empreintesPasLues: true });
+    dit(!num(avantLecture, items[0].id) && !avantLecture.pool.includes(61), 'empreintes pas encore lues : la numérotation ATTEND (jamais un N° neuf avant de pouvoir reconnaître la photo VRM)', JSON.stringify(avantLecture.fiches && avantLecture.fiches[items[0].id]));
     // L'ancienne encore en ligne : ce n'est pas une republication ⇒ proposé.
     const h0 = Object.keys(registre)[0];
     const enL = P({ items: [items[0], ann('10610000000', 'Nike Air Max 90 blanche 42')], fiches, pool: Array.from({ length: 60 }, (_, i) => i + 1), complets: { [A]: true }, lues: { [A]: lu }, store: { vrm_photos_vrm: registre, vrm_vus_en_ligne: vus }, empreintes: { [`vinted:${A}`]: emp } });

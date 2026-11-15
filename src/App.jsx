@@ -40902,6 +40902,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (sales.items === null || !txnPret) return;
     if (!reservesNum) return;   // numéros réservés sur Vinted pas encore lus (ou pas su)
     if (recreesEff === undefined) return; // qui remplace qui (republication) pas encore lu
+    // (15 nov., src/republieTelephone.js) Les empreintes des photos pas encore lues : la photo que VRM a fabriquée
+    // pour un N° (une identité) ne pourrait pas être reconnue — un N° neuf serait faux à vie. On attend la
+    // lecture (`null` = pas su : la règle normale, rien n'est retenu).
+    if (empreintesVinted === undefined) return;
     if (!numPasse) setNumPasse(true);     // (6 nov.) dans le même rendu que les N° posés ci-dessous
     // Numérotation NEUVE, propre à la nouvelle app : elle démarre à 1 et suit
     // l'ordre d'ajout des annonces. On ignore volontairement l'ancien catalogue

@@ -67,7 +67,7 @@ function passageAvec(L, x) {
     lireObjet: (k) => { const v = store[k]; return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; },
     VUS_EN_LIGNE: 'vrm_vus_en_ligne', CYCLE_DECISIONS: 'vrm_cycle_decisions',
     CLE_PHOTOS_VRM: 'vrm_photos_vrm', CLE_EMPREINTES_FICHES: 'vrm_empreintes_fiches', CLE_REPUB_REPONSES: 'vrm_republie_reponses', CLE_REPUB_ATTENTE: 'vrm_republie_attente',
-    empreintesVinted: x.empreintes === undefined ? {} : x.empreintes, disparuesDuCompte: RT && RT.disparuesDuCompte, decisionRepublie: RT && RT.decisionRepublie, empreintesDe: RT && RT.empreintesDe,
+    empreintesVinted: x.empreintesPasLues ? undefined : (x.empreintes === undefined ? {} : x.empreintes), disparuesDuCompte: RT && RT.disparuesDuCompte, decisionRepublie: RT && RT.decisionRepublie, empreintesDe: RT && RT.empreintesDe,
     venduesVinted: new Set((x.venduesVinted || []).map(String)), pairsLost: x.pairsLost || {}, changed: false,
     ...A,
   };

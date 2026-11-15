@@ -521,6 +521,7 @@ action('numero.reconnu', async (nav) => {
   const o = await ouvrir(nav, { url: '/', b });
   try {
     noter('numero.reconnu', 'apres', await moment(o.pg, 'apres', 'numero.reconnu', { ms: 20000 }));
+    if (process.env.DEBUG_NUM) console.log('  [debug]', await o.pg.evaluate(() => { try { const f = JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}'); return JSON.stringify({ f: f['7999990021'], reg: Object.keys(JSON.parse(localStorage.getItem('vrm_photos_vrm') || '{}')).length, jobs: [...document.querySelectorAll('[data-job]')].map((e) => e.getAttribute('data-job')) }); } catch (e) { return String(e); } }));
     await shot(o.pg, 'numero-reconnu-apres');
   } finally { await o.ctx.close(); }
 });
