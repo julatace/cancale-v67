@@ -223,7 +223,8 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
    (« Révision du mois », « Ta déclaration de revenus », DAC7, « Frais de l'année », « Carte de tes ventes », « Le prix à
    afficher », « Novembre · comparé à… ») et « eBay : pas pu lire » de Messages : posés sur le fond en encre sombre, 1,2 à
    1,8:1 — banc studio-reste S4 ; leurs cartes (.vrm-ac-carte, .vrm-fc-carte, .vrm-surface…) remettent l'encre sombre, §7.
-   Le retour « ‹ Réglages » et le titre d'une sous-page de Réglages : encre sombre sur le bleu. La connexion : §7 quater.) */
+   Le retour « ‹ Réglages » et le titre d'une sous-page de Réglages ; « Choisis un e-mail pour le lire » (E-mails, 1512) :
+   encre sombre sur le bleu. La connexion : §7 quater.) */
 :root:root:root body .vrm-app-shell[data-espace] :is(
   .sj-tete, .sj-affiche, .vrm-screen-head, .vrm-tete-row, .sb-tete, .sb-surtitre, .sb-ecran-titre, .vrm-fu-date-tete, .vrm-tache-tete,
   .vrm-market-heading, .vrm-set-tete, .vrm-day-greeting, .vrm-app-header:not(.is-defile) .vrm-hdr-titre, .sb-bande, .vrm-ui-bande, .vrm-fu-bande,
@@ -233,7 +234,7 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
   .vrm-colis-section-tete, .vrm-colis-section > div:not([class]), .vrm-colis-resume, .vrm-achats-sources .vrm-ms-tete, .vrm-ventes-toutes > :is(.vrm-toutes-etats, .vrm-toutes-vide),
   .vrm-argent-partie > :is(.vrm-compta-q, .vrm-ac-section, details.vrm-compta-repli), .vrm-stats-vitrine > :is(.vrm-sv-sous-titre, details.vrm-stats-repli),
   .vrm-statistiques-premium > :is(.vrm-lien-action, .vrm-fc, .vrm-cv, .vrm-ac-section),
-  .vrm-set-retour, .vrm-set-sous-h
+  .vrm-set-retour, .vrm-set-sous-h, .vrm-boite-vide-lecture
 ) {
   --sb-encre: var(--sv-clair) !important; --d-encre: var(--sv-clair) !important; --vrm-ink: var(--sv-clair) !important; --vrm-text: var(--sv-clair) !important;
   --p-encre: var(--sv-clair) !important; --w-encre: var(--sv-clair) !important; --fu-encre: var(--sv-clair) !important; --bx-encre: var(--sv-clair) !important;
@@ -275,14 +276,14 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
   .vrm-colis-section-tete, .vrm-colis-section > div:not([class]), .vrm-colis-resume, .vrm-achats-sources .vrm-ms-tete, .vrm-ventes-toutes > :is(.vrm-toutes-etats, .vrm-toutes-vide),
   .vrm-argent-partie > :is(.vrm-compta-q, .vrm-ac-section, details.vrm-compta-repli), .vrm-stats-vitrine > :is(.vrm-sv-sous-titre, details.vrm-stats-repli),
   .vrm-statistiques-premium > :is(.vrm-lien-action, .vrm-fc, .vrm-cv, .vrm-ac-section),
-  .vrm-set-retour, .vrm-set-sous-h
+  .vrm-set-retour, .vrm-set-sous-h, .vrm-boite-vide-lecture
 ) [style*="color"]:not(:is(.sb-touche:not(.vrm-market-space > div > .vrm-ui-afaire-capsule), .sb-rond, .sb-segment, .sb-tuile, .sb-plan, .sb-champ, .sb-btn-plein, .vrm-b:not(.vrm-b-discret):not(:disabled), .vrm-seg:not(.vrm-achats-barre .vrm-seg), .vrm-sel-sites, .vrm-ui-menu-compte, .vrm-icon-control, .sj-alertes, .vrm-ios-carte, .vrm-reglages-groupe, .vrm-set-liste, .vrm-fu-panneau, input, select, textarea, .vrm-compta-carte, .vrm-toutes-liste, .vrm-day-task-list, .vrm-buy-list, .vrm-msg-list, .vrm-colis-carte, .vrm-a-venir, .vrm-colis-prochain, .vrm-ann-geste, details.vrm-quick-settings, .vrm-ann-card, .vrm-settings-todo, .vrm-sv-tuile, .vrm-sv-carte, .vrm-onglet-manque, .vrm-d7-carte, .vrm-fp-section, .vrm-boite-liste-col, .vrm-rpf-point, .vrm-sx, .vrm-pa-carte, .vrm-carte-mfa, .vrm-sp-rec, .vrm-compta-replis, .vrm-argent-w, .vrm-at-carte, .vrm-compta-groupe, .vrm-ui-afaire-corps, .vrm-acc, .vrm-toast, .vrm-surface, .vrm-ac-carte, .vrm-fc-carte, .vrm-d7-rapport, .vrm-pm-case, .vrm-fc-pastille, .vrm-d7-btn, .vrm-cx-form, .vrm-cx-etiquettes > *, .vrm-cx-marque i, .vrm-statistiques-premium > .vrm-stats-repli), :is(.sb-touche:not(.vrm-market-space > div > .vrm-ui-afaire-capsule), .sb-rond, .sb-segment, .sb-tuile, .sb-plan, .sb-champ, .sb-btn-plein, .vrm-b:not(.vrm-b-discret):not(:disabled), .vrm-seg:not(.vrm-achats-barre .vrm-seg), .vrm-sel-sites, .vrm-ui-menu-compte, .vrm-icon-control, .sj-alertes, .vrm-ios-carte, .vrm-reglages-groupe, .vrm-set-liste, .vrm-fu-panneau, input, select, textarea, .vrm-compta-carte, .vrm-toutes-liste, .vrm-day-task-list, .vrm-buy-list, .vrm-msg-list, .vrm-colis-carte, .vrm-a-venir, .vrm-colis-prochain, .vrm-ann-geste, details.vrm-quick-settings, .vrm-ann-card, .vrm-settings-todo, .vrm-sv-tuile, .vrm-sv-carte, .vrm-onglet-manque, .vrm-d7-carte, .vrm-fp-section, .vrm-boite-liste-col, .vrm-rpf-point, .vrm-sx, .vrm-pa-carte, .vrm-carte-mfa, .vrm-sp-rec, .vrm-compta-replis, .vrm-argent-w, .vrm-at-carte, .vrm-compta-groupe, .vrm-ui-afaire-corps, .vrm-acc, .vrm-toast, .vrm-surface, .vrm-ac-carte, .vrm-fc-carte, .vrm-d7-rapport, .vrm-pm-case, .vrm-fc-pastille, .vrm-d7-btn, .vrm-cx-form, .vrm-cx-etiquettes > *, .vrm-cx-marque i, .vrm-statistiques-premium > .vrm-stats-repli) *, :is(.sj-tete, .sj-affiche, .vrm-screen-head, .vrm-tete-row, .sb-tete, .sb-surtitre, .sb-ecran-titre, .vrm-fu-date-tete, .vrm-tache-tete, .vrm-market-heading, .vrm-set-tete, .vrm-day-greeting, .vrm-app-header:not(.is-defile) .vrm-hdr-titre, .sb-bande, .vrm-ui-bande, .vrm-fu-bande, .vrm-fu-titre-section, .vrm-set-groupe > .vrm-set-titre, .vrm-set-groupe:not(.vrm-compta-groupe) > .vrm-set-pied, .vrm-ms-h2, .vrm-ms-plus, .vrm-ap-ligne, .vrm-fraicheur-hote, .vrm-market-space > div > .vrm-ui-afaire-capsule, .vrm-ui-afaire.sb-lien, .vrm-impr-ligne, .vrm-lu-seulement, .vrm-toutes-repli, .vrm-pf-set-avances > summary, .vrm-finance-page > div:not([class]), .vrm-fu-carte.a-action, .vrm-achats-barre, .vrm-cm-entete, .vrm-colis-section-tete, .vrm-colis-section > div:not([class]), .vrm-colis-resume, .vrm-achats-sources .vrm-ms-tete, .vrm-ventes-toutes > :is(.vrm-toutes-etats, .vrm-toutes-vide),
   .vrm-argent-partie > :is(.vrm-compta-q, .vrm-ac-section, details.vrm-compta-repli), .vrm-stats-vitrine > :is(.vrm-sv-sous-titre, details.vrm-stats-repli),
   .vrm-statistiques-premium > :is(.vrm-lien-action, .vrm-fc, .vrm-cv, .vrm-ac-section),
-  .vrm-set-retour, .vrm-set-sous-h) [style*="background"], :is(.sj-tete, .sj-affiche, .vrm-screen-head, .vrm-tete-row, .sb-tete, .sb-surtitre, .sb-ecran-titre, .vrm-fu-date-tete, .vrm-tache-tete, .vrm-market-heading, .vrm-set-tete, .vrm-day-greeting, .vrm-app-header:not(.is-defile) .vrm-hdr-titre, .sb-bande, .vrm-ui-bande, .vrm-fu-bande, .vrm-fu-titre-section, .vrm-set-groupe > .vrm-set-titre, .vrm-set-groupe:not(.vrm-compta-groupe) > .vrm-set-pied, .vrm-ms-h2, .vrm-ms-plus, .vrm-ap-ligne, .vrm-fraicheur-hote, .vrm-market-space > div > .vrm-ui-afaire-capsule, .vrm-ui-afaire.sb-lien, .vrm-impr-ligne, .vrm-lu-seulement, .vrm-toutes-repli, .vrm-pf-set-avances > summary, .vrm-finance-page > div:not([class]), .vrm-fu-carte.a-action, .vrm-achats-barre, .vrm-cm-entete, .vrm-colis-section-tete, .vrm-colis-section > div:not([class]), .vrm-colis-resume, .vrm-achats-sources .vrm-ms-tete, .vrm-ventes-toutes > :is(.vrm-toutes-etats, .vrm-toutes-vide),
+  .vrm-set-retour, .vrm-set-sous-h, .vrm-boite-vide-lecture) [style*="background"], :is(.sj-tete, .sj-affiche, .vrm-screen-head, .vrm-tete-row, .sb-tete, .sb-surtitre, .sb-ecran-titre, .vrm-fu-date-tete, .vrm-tache-tete, .vrm-market-heading, .vrm-set-tete, .vrm-day-greeting, .vrm-app-header:not(.is-defile) .vrm-hdr-titre, .sb-bande, .vrm-ui-bande, .vrm-fu-bande, .vrm-fu-titre-section, .vrm-set-groupe > .vrm-set-titre, .vrm-set-groupe:not(.vrm-compta-groupe) > .vrm-set-pied, .vrm-ms-h2, .vrm-ms-plus, .vrm-ap-ligne, .vrm-fraicheur-hote, .vrm-market-space > div > .vrm-ui-afaire-capsule, .vrm-ui-afaire.sb-lien, .vrm-impr-ligne, .vrm-lu-seulement, .vrm-toutes-repli, .vrm-pf-set-avances > summary, .vrm-finance-page > div:not([class]), .vrm-fu-carte.a-action, .vrm-achats-barre, .vrm-cm-entete, .vrm-colis-section-tete, .vrm-colis-section > div:not([class]), .vrm-colis-resume, .vrm-achats-sources .vrm-ms-tete, .vrm-ventes-toutes > :is(.vrm-toutes-etats, .vrm-toutes-vide),
   .vrm-argent-partie > :is(.vrm-compta-q, .vrm-ac-section, details.vrm-compta-repli), .vrm-stats-vitrine > :is(.vrm-sv-sous-titre, details.vrm-stats-repli),
   .vrm-statistiques-premium > :is(.vrm-lien-action, .vrm-fc, .vrm-cv, .vrm-ac-section),
-  .vrm-set-retour, .vrm-set-sous-h) [style*="background"] *) { color: var(--sv-clair-2) !important; }
+  .vrm-set-retour, .vrm-set-sous-h, .vrm-boite-vide-lecture) [style*="background"] *) { color: var(--sv-clair-2) !important; }
 
 /* ══ 7. LES SURFACES REMETTENT L'ENCRE SOMBRE (une touche, une carte dans une tête claire reste lisible) ══ */
 :root:root:root body .vrm-app-shell[data-espace] :is(
@@ -294,7 +295,7 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
   .vrm-colis-section-tete, .vrm-colis-section > div:not([class]), .vrm-colis-resume, .vrm-achats-sources .vrm-ms-tete, .vrm-ventes-toutes > :is(.vrm-toutes-etats, .vrm-toutes-vide),
   .vrm-argent-partie > :is(.vrm-compta-q, .vrm-ac-section, details.vrm-compta-repli), .vrm-stats-vitrine > :is(.vrm-sv-sous-titre, details.vrm-stats-repli),
   .vrm-statistiques-premium > :is(.vrm-lien-action, .vrm-fc, .vrm-cv, .vrm-ac-section),
-  .vrm-set-retour, .vrm-set-sous-h
+  .vrm-set-retour, .vrm-set-sous-h, .vrm-boite-vide-lecture
 ) :is(
   .sb-touche:not(.vrm-market-space > div > .vrm-ui-afaire-capsule), .sb-rond, .sb-segment, .sb-tuile, .sb-plan, .sb-champ, .sb-btn-plein,
   .vrm-b:not(.vrm-b-discret):not(:disabled), .vrm-seg:not(.vrm-achats-barre .vrm-seg), .vrm-sel-sites, .vrm-ui-menu-compte, .vrm-icon-control,
@@ -340,7 +341,7 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
   .vrm-colis-section-tete, .vrm-colis-section > div:not([class]), .vrm-colis-resume, .vrm-achats-sources .vrm-ms-tete, .vrm-ventes-toutes > :is(.vrm-toutes-etats, .vrm-toutes-vide),
   .vrm-argent-partie > :is(.vrm-compta-q, .vrm-ac-section, details.vrm-compta-repli), .vrm-stats-vitrine > :is(.vrm-sv-sous-titre, details.vrm-stats-repli),
   .vrm-statistiques-premium > :is(.vrm-lien-action, .vrm-fc, .vrm-cv, .vrm-ac-section),
-  .vrm-set-retour, .vrm-set-sous-h
+  .vrm-set-retour, .vrm-set-sous-h, .vrm-boite-vide-lecture
 ) :is(
   .sj-alertes, .vrm-ios-carte, .vrm-reglages-groupe, .vrm-set-liste, .vrm-fu-panneau, .vrm-compta-carte, .vrm-toutes-liste, .vrm-day-task-list,
   .vrm-msg-list, .vrm-colis-carte, .vrm-a-venir, .vrm-colis-prochain, .vrm-ann-geste, details.vrm-quick-settings, .vrm-ann-card, .vrm-settings-todo,
