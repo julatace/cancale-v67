@@ -41702,25 +41702,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (13 nov., moteur-compta) Les trois feuilles « Trésorerie », « Courbes par marque », « Sourcing » ne
   // s'ouvrent plus (aucun bouton ne pose leur drapeau) : leurs calculs, refaits à chaque rendu sur toutes les
   // ventes, ne tournent que feuille ouverte. `perf` n'est lu que par l'écran Ventes.
-  const [showTreasury, setShowTreasury] = useState(false);
-  const treasury = useMemo(() => {
-    if (!showTreasury) return null;
-    // (11 nov., famille « une règle par notion ») « En attente » n'est PLUS calculé ici : c'est l'argent à
-    //    venir (src/argentAVenir.js, `liveStats.aVenir`), la règle du 4 nov. qui a remplacé cette somme des
-    //    statuts « en cours » (220 € de trop mesurés). « Reçu » : prix illisible compté à part (« au moins »).
-    const finalisees = (sales.items || []).filter((o) => !isHidden(o) && classifyOrderStatus(o.status) === 'completed');
-    const recuS = sommeConnue(finalisees, montantCommandeLu);
-    const recu = recuS.total, nRecu = finalisees.length;
-    // Argent dépensé = tous les achats (tous comptes) hors annulés + les achats
-    // hors Vinted saisis à la main (brocante, fournisseur…).
-    // (12 nov., revue fin) un achat au prix pas lu n'est plus « 0 € » : compté à part (« au moins »).
-    const achatsVinted = buysBase.filter((o) => classifyOrderStatus(o.status) !== 'cancelled');
-    const spentS = sommeConnue([...achatsVinted.map(montantCommandeLu), ...offBuys.map((b) => b.price)]);
-    const spent = spentS.total, nSpent = spentS.n;
-    return { recu, recuS, nRecu, spent, spentS, nSpent };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showTreasury, sales.items, buysBase, offBuys, hiddenSales, hiddenAccts]);
-  const [detailAttente, setDetailAttente] = useState(false); // décompte compte par compte de l'argent en attente
+  // (15 nov., rouges-connus) La feuille « Trésorerie » est RETIRÉE : depuis le 13 nov. aucun bouton ne l'ouvrait
+  // (`openTreasury` n'était appelé nulle part), et elle mêlait deux sources (le solde LU des porte-monnaie Vinted et
+  // une somme refaite par la règle). L'argent reçu / en attente a ses écrans (Argent, `liveStats.aVenir`).
   const [walletEscrow, setWalletEscrow] = useState(null); // { total, accounts } réel des porte-monnaie, ou null
   // Le solde réel des porte-monnaie sert AUSSI à la carte « argent en route »
   // de l'écran Ventes, pas seulement à la modale Trésorerie : sans ça la carte
@@ -41744,7 +41728,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [curSub, cleUidsWallet]);
 
-  const openTreasury = () => { setShowTreasury(true); if (buys.items===null && accounts.length) loadOrders('purchased', setBuys); if (accountUids.size) fetchWalletEscrow(accountUids).then(w => setWalletEscrow({ ...w, _cle: cleUidsWallet })); };
 
   // Points de DÉPÔT des colis (§5.26). Chargés seulement sur l'écran Bordereaux
   // et une seule fois : les lignes pèsent ~30 Ko, on ne les relit pas à chaque
@@ -54318,60 +54301,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{fontSize:11,color:C.muted,lineHeight:1.5,borderTop:`1px solid ${C.border}`,paddingTop:10}}>Bénéfice : seulement les ventes avec un prix d'achat (🔗 dans Annonces).</div>
                 </>);
               })()}
-            </div>
-          </div>
-        </div>
-      )}
-      {showTreasury && (
-        <div onClick={()=>setShowTreasury(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-          <FermeAuRetour fermer={()=>setShowTreasury(false)}/>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'88vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
-            <div style={{display:'flex',gap:10,alignItems:'center',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:700,color:C.text}}>💰 Trésorerie</div>
-                <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginTop:1}}>L'argent réel, pas le chiffre d'affaires</div>
-              </div>
-              <button type="button" onClick={()=>setShowTreasury(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
-            </div>
-            <div style={{padding:'14px 16px',overflowY:'auto'}}>
-              {/* ARGENT RÉELLEMENT REÇU */}
-              <div style={{border:`1px solid #16a34a55`,background:'#16a34a10',borderRadius:12,padding:'13px 15px',marginBottom:11}}>
-                <div style={{fontSize:12,color:'#16a34a',fontWeight:600,textTransform:'uppercase',letterSpacing:0.5}}>✅ Reçu dans le porte-monnaie</div>
-                <div style={{fontSize:34,fontWeight:700,color:C.text,margin:'3px 0',lineHeight:1}}>{texteSomme(treasury.recuS, fmtE0)}</div>
-                <div style={{fontSize:12,color:C.muted}}>{treasury.nRecu} vente{treasury.nRecu>1?'s':''} finalisée{treasury.nRecu>1?'s':''}, créditée{treasury.nRecu>1?'s':''} sur ton solde. <b>Sans</b> tes virements vers ta banque.</div>
-              </div>
-              {/* EN ATTENTE = somme des porte-monnaie Vinted (escrow réel si capté,
-                  sinon somme des ventes en cours = argent que Vinted te retient). */}
-              {(()=>{ const useEscrow = walletEscrow && walletEscrow.total>0; const aV = aVenirPour(liveStats && liveStats.aVenir, { plateforme: 'Vinted' }); const val = useEscrow ? walletEscrow.total : aV.valeur; return (
-              <div style={{border:`1px solid ${C.warn}55`,background:`${C.warn}10`,borderRadius:12,padding:'13px 15px',marginBottom:11}}>
-                <div style={{fontSize:12,color:C.warn,fontWeight:600,textTransform:'uppercase',letterSpacing:0.5}}>⏳ En attente (porte-monnaie Vinted)</div>
-                <div style={{fontSize:34,fontWeight:700,color:C.text,margin:'3px 0',lineHeight:1}} data-tresorerie-attente={val==null?'':Math.round(val*100)}>{val==null?'—':`${!useEscrow&&aV.partiel?'au moins ':''}${Math.round(val)}\u00a0€`}</div>
-                <div style={{fontSize:12,color:C.muted}}>{useEscrow ? <>Solde <b>en attente</b> réel, additionné sur {walletEscrow.accounts} porte-monnaie{walletEscrow.plusVieuxJours>1?<> — dont un lu il y a <b>{walletEscrow.plusVieuxJours} j</b>, repasse dessus pour le montant du jour</>:null}.{(walletEscrow.autreDevise||[]).length>0?<span data-tresor-devise={walletEscrow.autreDevise.length}> {walletEscrow.autreDevise.length} compte{walletEscrow.autreDevise.length>1?'s':''} dans une autre devise : hors total.</span>:null}</> : <>L'argent que Vinted te doit encore : {aV.n} vente{aV.n>1?'s':''} conclue{aV.n>1?'s':''}, pas encore versée{aV.n>1?'s':''}{aV.partiel&&aV.manque.length?` (${aV.manque.join(', ')} pas lu)`:''}. <span style={{opacity:0.85}}>Ouvre ton porte-monnaie Vinted sur chaque compte pour le solde exact.</span></>}</div>
-              </div>
-              ); })()}
-              {/* LITIGES EN COURS (paires qui reviennent : retour / remboursement / suspension) */}
-              {retoursAttendus.length>0 && (
-                <div style={{border:`1px solid ${C.danger}55`,background:`${C.danger}0e`,borderRadius:12,padding:'13px 15px',marginBottom:11}}>
-                  <div style={{fontSize:12,color:C.danger,fontWeight:600,textTransform:'uppercase',letterSpacing:0.5}}>⚖️ {retoursAttendus.length} litige{retoursAttendus.length>1?'s':''} en cours</div>
-                  <div className="vrm-aide" style={{fontSize:12,color:C.muted,margin:'3px 0 7px'}}>Des {motsVendeur().noms} qui te reviennent (retour / remboursement / suspension) — à republier.</div>
-                  <div style={{display:'flex',flexDirection:'column',gap:5}}>
-                    {retoursAttendus.slice(0,6).map((r,i)=>(
-                      <div key={i} style={{display:'flex',alignItems:'center',gap:8,fontSize:12}}>
-                        <span style={{fontWeight:700,color:C.danger,background:`${C.danger}18`,borderRadius:6,padding:'1px 7px',flexShrink:0}}>{RETOUR_LABEL[r.kind]?.txt||'↩️'}</span>
-                        <span style={{color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.num?`N°${r.num} · `:''}{r.title}</span>
-                      </div>
-                    ))}
-                    {retoursAttendus.length>6 && <div style={{fontSize:11,color:C.muted}}>+ {retoursAttendus.length-6} autre{retoursAttendus.length-6>1?'s':''}…</div>}
-                  </div>
-                </div>
-              )}
-              {/* DÉPENSÉ */}
-              <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'13px 15px',marginBottom:11}}>
-                <div style={{fontSize:12,color:C.muted,fontWeight:600,textTransform:'uppercase',letterSpacing:0.5}}>🛒 Argent dépensé (tous comptes)</div>
-                <div style={{fontSize:28,fontWeight:700,color:C.text,margin:'3px 0',lineHeight:1}}>{buys.items===null && offBuys.length===0 ? '…' : treasury.spent==null ? '—' : `${treasury.spentS.partiel?'au moins ':''}${Math.round(treasury.spent)}\u00a0€`}</div>
-                <div style={{fontSize:12,color:C.muted}}>{treasury.spentS.partiel ? `sur ${treasury.spentS.connus} achats sur ${treasury.nSpent}` : `${treasury.nSpent} achat${treasury.nSpent>1?'s':''}`} (Vinted + hors Vinted){buys.items===null?' · chargement…':''}</div>
-              </div>
-              <div className="vrm-aide" style={{fontSize:11,color:C.muted,lineHeight:1.5}}>Basé sur le statut Vinted de chaque commande (fiable, se met à jour tout seul).</div>
             </div>
           </div>
         </div>

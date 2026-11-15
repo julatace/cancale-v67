@@ -235,8 +235,11 @@ function course(base) {
     dit(v[0] === null && v[1] === 12.5, 'une commande en GBP n\'est pas lue en euros (« dépensé », CA) ; en EUR, oui', JSON.stringify(v));
     const tre = /const amt = montantCommandeLu\(o\);\s*if \(amt == null\) continue;/.test(APP)
       // (12 nov., intégration) ou la somme « au moins » de la revue fin : chaque achat passe par la même lecture.
-      || /sommeConnue\(\[\.\.\.achatsVinted\.map\(montantCommandeLu\)/.test(APP);
-    dit(tre, 'Trésorerie « dépensé » passe par cette lecture (plus de `Number(o.price.amount)`)');
+      || /sommeConnue\(\[\.\.\.achatsVinted\.map\(montantCommandeLu\)/.test(APP)
+      // (15 nov., rouges-connus) ou la feuille « Trésorerie » retirée (aucun bouton ne l'ouvrait depuis le 13 nov.) :
+      // alors son « dépensé » (`spent`) est parti avec elle : aucune autre somme de ce nom ne reste à juger.
+      || (!/showTreasury|const treasury = useMemo/.test(APP) && !/\bspent(S)?\b/.test(APP));
+    dit(tre, 'Trésorerie « dépensé » passe par cette lecture (plus de `Number(o.price.amount)`) — ou la feuille est retirée');
   }
   console.log(ko ? `\n❌ donnees-suite : ${ko} rouge(s), ${ok} vert(s)` : `\n✅ donnees-suite : ${ok} contrôles verts`);
   process.exit(ko ? 1 : 0);
