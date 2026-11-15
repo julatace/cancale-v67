@@ -142,8 +142,31 @@ ne touche un N° : `vinted_annonce_numeros` reste 1 000 fiches intactes dans le 
   de la sortie (elle l'importe).
 - Audits demandés : `traduction`, `tdz`, `variables`, `studio`, `identite`, `composants`, `icones`,
   `violet`, `rouge-doublon`, `csp`, `quoi-de-neuf`, `coherence` : verts.
-- Banc `scripts/bancs/stock-etageres.cjs` (voir le bilan ci-dessous) — données INVENTÉES à la forme
-  mesurée, 1 000 paires, 390 tactile et 1512, clair et sombre.
+- Banc `scripts/bancs/stock-etageres.cjs` — données INVENTÉES à la forme mesurée (deux meubles d'hier
+  4×8 et 7×10, une case prise ; une pile d'hier dont le bas porte N°9999 d'un compte MASQUÉ ; 1 000 paires
+  en ligne ; un N° en doublon), 390 tactile et 1512, clair et sombre (`CAPTURES=dossier`) :
+  - **390 clair et 1512 sombre (scénario complet), 1512 clair et 390 sombre (rendu)** : verts — reprise (N°12 dans SA
+    case, ordre d'hier, 106 cases, **aucune écriture de `main` au montage**), N°9999 hachuré (jamais « + »),
+    doublon rouge et aucun autre, étagère 4×3 « sauge » rangée 1 « ciel », pile de 5, trois paires
+    touchées en haut tombent l'une sur l'autre, celle du bas sortie ⇒ les deux du dessus descendent d'un
+    cran et c'est DIT, 1 001 fiches intactes, la pile d'hier garde N°9999, recherche « 12 » allume sa
+    case, « Descendre » réordonne, 44 px au doigt (40 à la souris, la touche du studio), aucune page plus
+    large, aucune erreur ; la grille est là en ~3,4–4 s pour 1 000 paires (machine chargée, charge 60).
+  - **Sur `origin/main`** (build d'avant, même banc) : **4 rouges** à 390 clair — N°9999 pas dessiné
+    comme pris, pas de doublon rouge sur la case, **N°61 tombé dans la case du carton N°9999** (`mQ:3`),
+    et l'éditeur sans formes / couleurs (le scénario s'arrête là).
+  - Le seul rouge de mise au point (1512 sombre) : le choix des planches (`ChoixPlanches`, App.jsx, pas
+    touché) dessine des boutons de 30 px à la souris — jugé à part, dit ici ; « Enregistrer » est passé au
+    plein du studio (`sb-btn-plein--barre`, 52 px).
+- Bancs existants sur ce build : `tout-imprimer` **28 conformes** (l'emplacement imprimé). `stock-planches`
+  : 1 rouge à 390 (la fiche de la paire, ouverte par la case depuis le 14 nov., couvre la case suivante) —
+  **le MÊME sur origin/main** (rejoué sur son build). `stock-2d` (5 rouges : « Voir l'état » attendu dans
+  l'ancienne feuille du Stock, clics à 390 couverts par la fiche, animation de l'explication),
+  `stock-retrouver` (1 : la case qui clignote hors de l'écran à 1512), `stock-juste` (8 : pastilles par
+  site d'une ligne de la liste, délais dépassés, « Target crashed ») : rouges de la refonte du 14 nov. et
+  de la charge de la machine (charge 50–64, un build en 11 min) ; leur référence sur origin/main n'a pas pu
+  aller au bout (navigateur fermé sous la charge). `stock-hors-reseau` : arrêté sans résultat (bloqué sous
+  la charge) — `audit-stock-hors-ligne` 33/33 vert.
 
 ## 8. Ce qui reste
 
@@ -151,7 +174,9 @@ ne touche un N° : `vinted_annonce_numeros` reste 1 000 fiches intactes dans le 
   « par glisser ou touches », les touches sont accessibles au doigt et au clavier.
 - Une case contient UNE paire (comme avant) : un « bac » est une rangée de compartiments, pas un tas.
 - Banc `stock-planches` : à 390 px, la fiche de la paire (ouverte par une case depuis le 14 nov.) reste
-  ouverte après « Retirer de la case » et couvre la case suivante (le banc ne la referme pas).
+  ouverte après « Retirer de la case » et couvre la case suivante (le banc ne la referme pas) — même rouge
+  sur origin/main. `stock-2d`, `stock-retrouver`, `stock-juste` à rejouer sur une machine au repos.
+- Le choix des planches (`ChoixPlanches`, App.jsx) garde ses boutons de 30 px à la souris.
 
 ## Geste de Julien
 
