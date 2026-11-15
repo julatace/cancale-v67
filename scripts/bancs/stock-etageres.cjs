@@ -144,6 +144,10 @@ async function retirerCase(pg, n) {
           dit(r.errs.length === 0, `${t} · H : aucune erreur d'app`, r.errs.join(' | '));
           await r.ctx.close(); return;
         }
+        // ── F : la pile d'hier, le haut retiré : le N° pas montré garde sa case ──
+        await retirerCase(pg, '62');
+        const hier = [await ou(pg, '61'), await pg.evaluate(() => { const c = document.querySelector('[data-case-notee="9999"]'); return c ? c.getAttribute('data-case-ici') : null; })];
+        dit(hier[0] === 'mQ:2' && hier[1] === 'mQ:3', `${t} · F : N°61 reste posé sur le carton N°9999 (pas montré) : personne ne passe au travers`, hier);
         // ── C : une étagère 4×3, « sauge », rangée 1 « ciel » ──
         await toucher(pg, '[data-creer-meuble]');
         await pg.waitForSelector('[data-editeur-meuble]', { timeout: 8000 });
@@ -196,10 +200,6 @@ async function retirerCase(pg, n) {
         const fichesApres = await pg.evaluate(() => { try { const f = JSON.parse(localStorage.getItem('vinted_annonce_numeros')); return Object.values(f).filter((x) => x && x.numero).length; } catch (_) { return -1; } });
         dit(fichesApres === N + 1, `${t} · E : aucun N° touché (1 001 fiches, mêmes numéros)`, fichesApres);
         if (CAPT) { await pg.evaluate((P) => document.querySelector(`[data-meuble="${P}"]`).scrollIntoView({ block: 'center' }), P); await pg.screenshot({ path: path.join(CAPT, `etag-${v}-5-descente.png`) }); }
-        // ── F : la pile d'hier, le haut retiré : le N° pas montré garde sa case ──
-        await retirerCase(pg, '62');
-        const hier = [await ou(pg, '61'), await pg.evaluate(() => { const c = document.querySelector('[data-case-notee="9999"]'); return c ? c.getAttribute('data-case-ici') : null; })];
-        dit(hier[0] === 'mQ:2' && hier[1] === 'mQ:3', `${t} · F : N°61 reste posé sur le carton N°9999 (pas montré) : personne ne passe au travers`, hier);
         // ── G : chercher un N°, réordonner ──
         await pg.fill('[data-stock-recherche] input', '12');
         await pg.waitForSelector('[data-stock-res="12"]', { timeout: 8000 }).catch(() => {});
