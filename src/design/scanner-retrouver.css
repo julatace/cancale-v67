@@ -65,15 +65,16 @@
 .vrm-rtv-viseur > i:nth-child(2) { right: 0; top: 0; border-left: 0; border-bottom: 0; border-top-right-radius: 14px; }
 .vrm-rtv-viseur > i:nth-child(3) { left: 0; bottom: 0; border-right: 0; border-top: 0; border-bottom-left-radius: 14px; }
 .vrm-rtv-viseur > i:nth-child(4) { right: 0; bottom: 0; border-left: 0; border-top: 0; border-bottom-right-radius: 14px; }
-.vrm-rtv-ligne { position: absolute; left: 6%; right: 6%; top: 50%; height: 2px; border-radius: 2px;
-  background: linear-gradient(90deg, transparent, rgb(140 196 255 / .95), transparent); box-shadow: 0 0 12px rgb(140 196 255 / .8);
-  animation: vrm-rtv-balaye 1.8s ease-in-out infinite alternate; }
-@keyframes vrm-rtv-balaye { from { top: 12%; } to { top: 88%; } }
+.vrm-rtv-ligne { position: absolute; inset: 0 6%; will-change: transform; animation: vrm-rtv-balaye 1.8s ease-in-out infinite alternate; }
+.vrm-rtv-ligne::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 2px; border-radius: 2px;
+  background: linear-gradient(90deg, transparent, rgb(140 196 255 / .95), transparent); box-shadow: 0 0 12px rgb(140 196 255 / .8); }
+/* Le balayage se fait en transform (composité : aucune mise en page à chaque image, la lecture garde le processeur). */
+@keyframes vrm-rtv-balaye { from { transform: translateY(12%); } to { transform: translateY(88%); } }
 .vrm-rtv-viseur.is-trouve { transform: translate(-50%, -50%) scale(.96); }
 .vrm-rtv-viseur.is-trouve .vrm-rtv-ligne { animation: none; opacity: 0; }
 .vrm-rtv.a-resultat .vrm-rtv-viseur { top: 30%; height: min(22vh, 200px); }
 @media (prefers-reduced-motion: reduce) {
-  .vrm-rtv-ligne { animation: none; top: 50%; }
+  .vrm-rtv-ligne { animation: none; transform: translateY(50%); }
   .vrm-rtv-viseur, .vrm-rtv-rond, .vrm-rtv-plein, .vrm-rtv-feuille { transition: none !important; animation: none !important; }
 }
 
@@ -170,3 +171,7 @@
   .vrm-rtv-viseur { width: min(56vw, 640px); height: min(32vh, 300px); }
   .vrm-rtv-bas { padding-bottom: 28px; }
 }
+
+/* Scanner ouvert : l'app dessous n'est plus dessinée (le scanner la couvre entièrement) — le processeur et la
+   batterie vont à la lecture du code. Rien n'est démonté : elle revient telle quelle à la fermeture. */
+html[data-scan-retrouver] body .vrm-app-shell { visibility: hidden !important; }

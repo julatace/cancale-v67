@@ -166,6 +166,8 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
   const camera = useLectureCamera(video, traiter, opts);
 
   React.useEffect(() => () => { if (enCours.current) clearTimeout(enCours.current); }, []);
+  // L'app dessous n'est plus dessinée tant que le scanner la couvre (scanner-retrouver.css), rendue à la fermeture.
+  React.useEffect(() => { const h = document.documentElement; h.setAttribute('data-scan-retrouver', ''); return () => h.removeAttribute('data-scan-retrouver'); }, []);
   React.useEffect(() => {
     const f = (e) => { if (e.key === 'Escape') { if (resRef.current) { setRes(null); setChoisi(null); } else if (onFermer) onFermer(); } };
     window.addEventListener('keydown', f); return () => window.removeEventListener('keydown', f);
