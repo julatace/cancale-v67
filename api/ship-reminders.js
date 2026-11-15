@@ -31,7 +31,11 @@ import { lireJournal, lireLu } from './_lib/journal-notifs.js';
 import { DESTINATIONS, lienNotif } from './_lib/lien-notif.js';
 import { passageFacturesAuto } from './_lib/factures-auto.js';
 // (revue du 5 nov.) Les textes des rappels soir et « offres au mini » : un propriétaire, celui de l'aperçu.
-import { texteSoir, texteOffresMini } from './_lib/notif-apercus.js';
+import { texteSoir, texteOffresMini, texteRetourRappel, texteRetourDepose, texteRetourLivre } from './_lib/notif-apercus.js';
+import { passeNotifsRetours } from './_lib/retour-notifs.js';   // (15 nov., lot retour-parfait)
+import { ID_RETOURS_DEPOSES_CHAMP } from './_lib/retour-suivi.js';
+import { modifierCas } from './_lib/suivi-vinted.js';
+import { nomTransporteur } from './_lib/transporteurs.js';
 import { semainePassee, semaineCourante, calculerBilan, bilanAEnvoyer, texteBilan, versementsDeLignes } from './_lib/bilan-semaine.js';
 import { notificationUrssaf, rappelVeilleUrssaf, MAIN_URSSAF } from './_lib/rappel-urssaf.js';
 // « À expédier » : la règle du widget (elle-même jugée identique à celle de
@@ -853,6 +857,26 @@ function etiquettesCron({ max, budgetMs }) {
     lirePdf: async (id) => { const r = await fetchPaginated(scoped(reqPdf(id))); if (!Array.isArray(r)) return null; return (r[0] && typeof r[0].pdf === 'string' && r[0].pdf !== 'None') ? r[0].pdf : ''; },
   });
 }
+// (15 nov., lot retour-parfait) LES RETOURS D'ACHAT (api/_lib/retour-notifs.js) : le rappel de la date
+// limite d'un retour PAS ENCORE DÉPOSÉ (le soir : la limite est demain ; le matin : c'est aujourd'hui), et
+// « Retour déposé » / « Retour livré au vendeur » quand le fait vient de la lecture chez le transporteur
+// (`depart_*`). Une fois chacune (`push_dedup`, la clé de la voie e-mail) ; une lecture ratée n'envoie rien.
+async function notifsRetoursAchat(moment = 'matin', maintenant = instantNotif()) {
+  return passeNotifsRetours({
+    moment, maintenant,
+    lire: (q) => fetchPaginated(scoped(q)),
+    lireDeparts: async () => { const rows = await fetchPaginated(scoped(`app_data?id=like.depart_%25&select=${SELECT_DEPART_META}`)); return Array.isArray(rows) ? (departsParSuivi(rows) || new Map()) : null; },
+    lireDeposes: async () => { const m = await getRowProjete('main', [ID_RETOURS_DEPOSES_CHAMP]); if (m === undefined) return undefined; const d = m && m[ID_RETOURS_DEPOSES_CHAMP]; return d && typeof d === 'object' ? d : null; },
+    reserver: async (cle) => {
+      const r = await modifierCas('push_dedup', (d) => { const ks = (d && Array.isArray(d.keys)) ? d.keys.filter((x) => typeof x === 'string') : []; if (ks.includes(cle)) return undefined; return { ...(d || {}), keys: [cle, ...ks].slice(0, 300) }; });
+      return r === true ? true : r === false ? false : null;
+    },
+    envoyer: (n) => sendPushToAll(n),
+    texte: (n) => (n.sorte === 'retourRappel' ? texteRetourRappel(n) : n.sorte === 'retourDepose' ? texteRetourDepose({ article: n.article, transporteur: n.transporteur ? nomTransporteur(n.transporteur) : '' }) : texteRetourLivre({ article: n.article })),
+    active: () => pushCategorieActive('colis'),
+    lien: (n) => DESTINATIONS.retour({ tx: n.tx }),
+  });
+}
 async function traiterVendeur() {
   const [relu, transp] = await Promise.all([relireEbayDuVendeur(), lireTransporteursDuVendeur()]);
   // Un échec du bilan du mois n'empêche aucun rappel (et inversement).
@@ -883,9 +907,12 @@ async function traiterVendeur() {
   let veilleChiffres = null;
   try { veilleChiffres = await notifierAlertesChiffres({ getRow, ecrire: ecrireDedup, pousser: sendPushToAll, active: () => pushCategorieActive(CAT_VEILLE) }); }
   catch (e) { veilleChiffres = { envoye: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
+  // (15 nov., lot retour-parfait) Les retours d'achat : « Dernier jour pour ton retour » (la limite est aujourd'hui), déposé/livré lus chez le transporteur.
+  let retoursAchat = null;
+  try { retoursAchat = await notifsRetoursAchat('matin'); } catch (e) { retoursAchat = { fait: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
   const out = await traiterVendeurApresRelecture();
   const rappels = await rappelsPersoSur();
-  return { ...out, rappels, ...(bilanMois ? { bilanMois } : {}), ebayRelu: resumeRelecture(relu), transporteurs: transp, transporteursAnciens, transporteursPdf, controle, veilleChiffres: { envoye: veilleChiffres.envoye, n: veilleChiffres.n || 0, raison: veilleChiffres.raison || null } };
+  return { ...out, rappels, retoursAchat, ...(bilanMois ? { bilanMois } : {}), ebayRelu: resumeRelecture(relu), transporteurs: transp, transporteursAnciens, transporteursPdf, controle, veilleChiffres: { envoye: veilleChiffres.envoye, n: veilleChiffres.n || 0, raison: veilleChiffres.raison || null } };
 }
 async function traiterVendeurApresRelecture() {
     const today = parisDate(0);
@@ -1464,12 +1491,15 @@ async function traiterVendeurSoir() {
   const [relu, transp] = await Promise.all([relireEbayDuVendeur(), lireTransporteursDuVendeur()]);
   const out = await rappelDuSoir();
   const rappels = await rappelsPersoSur();
+  // (15 nov., lot retour-parfait) « Retour à déposer avant demain 10 h » (la limite LUE est demain), déposé/livré lus chez le transporteur.
+  let retoursAchat = null;
+  try { retoursAchat = await notifsRetoursAchat('soir'); } catch (e) { retoursAchat = { fait: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
   // Le bilan de la semaine part le DIMANCHE SOIR (26 oct.) — même dédoublonnage
   // que le lundi matin (un seul bilan par semaine). Un échec du bilan n'empêche
   // jamais le rappel d'expédition du soir.
   let bilan = null;
   try { bilan = await bilanDeLaSemaine(Date.now(), true); } catch (e) { bilan = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
-  return { ...out, rappels, bilan, ebayRelu: resumeRelecture(relu), transporteurs: transp };
+  return { ...out, rappels, bilan, retoursAchat, ebayRelu: resumeRelecture(relu), transporteurs: transp };
 }
 
 // ── LA VEILLE DES PLANTAGES (6 nov., filet 4) ─────────────────────────────────
