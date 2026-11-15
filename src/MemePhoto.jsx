@@ -30,7 +30,7 @@ export function texteMemePhoto(res, site = null) {
   const props = res && res.lu ? (site ? duSite(res, site).propositions : res.propositions || []) : [];
   const surs = props.filter((p) => p.etat === 'sur').length;
   const detail = tr('memePhoto.detail', { sites: (site ? [site] : sites).join(' · ') || '—' });
-  return { n, surs, verifier: n - surs, titre: tr('memePhoto.aRelier', { n }), detail: n ? `${detail} · ${[surs ? tr('memePhoto.nSurs', { n: surs }) : '', n - surs ? tr('memePhoto.nAVerifier', { n: n - surs }) : ''].filter(Boolean).join(' · ')}` : detail };
+  return { n, surs, verifier: n - surs, titre: tr('memePhoto.aRelier', { n }), detail: n ? `${[surs ? tr('memePhoto.nSurs', { n: surs }) : '', n - surs ? tr('memePhoto.nAVerifier', { n: n - surs }) : ''].filter(Boolean).join(' · ')} · ${detail}` : detail };
 }
 
 // La ligne compacte d'un écran de site (Annonces → Leboncoin / eBay / Vestiaire) : rien s'il n'y a rien.

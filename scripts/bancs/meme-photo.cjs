@@ -255,6 +255,7 @@ const ecrit = (ecritures, re) => ecritures.some((e) => re.test(e.corps));
             const n = e.querySelector('.vrm-day-task-note'), t = e.querySelector('.vrm-day-task-title'); return { carte: true, n: e.getAttribute('data-n'), titre: t && t.textContent, note: n && n.textContent, cNote: n && getComputedStyle(n).color, cTitre: t && getComputedStyle(t).color }; });
           dit(c.carte && c.n === '3', 'M1 Ma journée : la carte « Même photo · à relier », data-n = 3', JSON.stringify(c));
           dit(c.carte && /3 annonces à relier/.test(c.titre || '') && /Leboncoin/.test(c.note || '') && /eBay/.test(c.note || '') && /Vestiaire/.test(c.note || ''), 'M1 le titre et les sites nommés', `${c.titre} · ${c.note}`);
+          dit(c.carte && /^1 sûre · 2 à vérifier/.test((c.note || '').trim()), 'S1 Ma journée dit d’abord « 1 sûre · 2 à vérifier » (visible avant la coupe)', c.note);
           dit(c.carte && c.cNote !== c.cTitre && !/255,\s*59,\s*48|255,\s*69,\s*58/.test(c.cNote || ''), 'M1 la ligne en ambre, jamais le rouge du doublon de N°', `${c.cNote} / ${c.cTitre}`);
           const avant = ecritures.length;
           await toucher(pg, tel, '[data-journee-meme-photo]').catch(() => {});
