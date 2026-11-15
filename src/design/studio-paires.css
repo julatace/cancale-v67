@@ -123,7 +123,10 @@
 
 /* ── 4. La tête d'Annonces : titre d'affiche, « ? », « À faire · N › » sur la même ligne ── */
 :root:root:root:root:root body [data-espace="paires"].vrm-tache { position: relative !important; color: var(--sbp-encre) !important; }
-:root:root:root:root:root body [data-espace="paires"] .vrm-tache-tete { min-height: 44px !important; height: 44px !important; padding: 0 150px 0 20px !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 10px !important; background: transparent !important; }
+/* (15 nov., Annonces propre) La tête n'a plus de hauteur FIXE : à 44 px, tout ce qui s'y ajoutait (une phrase d'aide
+   repliée, « Compris ») débordait SOUS la rangée des sites — la capture de Julien (Annonces · Vestiaire) : le sélecteur
+   passait par-dessus le texte et « À faire · 1 ». Une ligne de 44 px au moins, qui grandit au besoin ; rien ne déborde. */
+:root:root:root:root:root body [data-espace="paires"] .vrm-tache-tete { min-height: 44px !important; height: auto !important; overflow: visible !important; padding: 0 150px 0 20px !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 10px !important; background: transparent !important; }
 :root:root:root:root:root body [data-espace="paires"] .vrm-tache-tete h1 {
   font: 400 34px/1 var(--sbp-affiche) !important; letter-spacing: -.03em !important; color: var(--sbp-encre) !important; margin: 0 !important;
 }
@@ -161,6 +164,18 @@
   background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important;
 }
 :root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-compte-menu-hote { flex: 1 1 0 !important; min-width: 0 !important; display: flex !important; justify-content: flex-end !important; padding: 0 !important; margin: 0 !important; }
+/* (15 nov., Annonces propre) Le compte ne se coupe plus en « T… » : il garde sa largeur (« 👤 Tous ▾ », au plus 46 %),
+   c'est la rangée des sites qui défile si les quatre touches et leurs nombres ne tiennent pas. */
+:root:root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-compte-menu-hote { flex: 0 0 auto !important; max-width: 46% !important; margin-left: auto !important; }
+/* Base 0 + plafond à sa largeur de contenu : la rangée des sites et le compte tiennent sur UNE ligne (la tête passe à
+   la ligne pour les sous-rubriques d'eBay seulement) ; trop large, la rangée des sites défile dans sa place. */
+:root:root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-filtre-site { flex: 1 1 0% !important; max-width: max-content !important; min-width: 0 !important; }
+:root:root:root:root:root:root body [data-espace="paires"] .vrm-compte-menu-hote > .vrm-ui-menu-compte .vrm-ui-menu-compte-ic { flex: none !important; }
+/* Au téléphone, des touches un peu plus serrées (44 px au doigt gardés) : quatre sites, leurs nombres et « Tous » tiennent à 390. */
+@media (max-width: 520px) {
+  :root:root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-filtre-site > button:not(#fu) { min-width: 44px !important; padding: 0 8px !important; }
+  :root:root:root:root:root:root body [data-espace="paires"] .vrm-compte-menu-hote > .vrm-ui-menu-compte { padding: 0 12px !important; gap: 6px !important; }
+}
 :root:root:root:root:root body [data-espace="paires"] .vrm-compte-menu-hote > .vrm-ui-menu-compte {
   height: 44px !important; min-height: 44px !important; max-width: 100% !important; padding: 0 14px !important; border: 0 !important; border-radius: 13px !important;
   background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important;
@@ -349,6 +364,16 @@
   white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; display: block !important; -webkit-line-clamp: unset !important;
 }
 :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-titre] * { white-space: nowrap !important; font: inherit !important; color: inherit !important; }
+/* (15 nov., Annonces propre — « plus pratique ») Au téléphone, un titre long se lit sur DEUX lignes au lieu d'être coupé
+   après 15 lettres : 40 + 4 + 18 = 62 px, la rangée garde ses 64 px (1 000 rangées : aucune hauteur ne bouge). */
+@media (max-width: 767px) {
+  :root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) { grid-template-rows: minmax(22px, auto) 18px !important; }
+  :root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-titre] {
+    height: auto !important; max-height: 40px !important; white-space: normal !important; text-overflow: clip !important;
+    display: -webkit-box !important; -webkit-box-orient: vertical !important; -webkit-line-clamp: 2 !important; line-clamp: 2 !important; overflow: hidden !important; overflow-wrap: anywhere !important;
+  }
+  :root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-titre] * { white-space: normal !important; }
+}
 :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-titre] :is(.vrm-titre-taille-fin, [data-titre-taille]) { display: none !important; }
 :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-titre] > * { display: inline !important; }
 :root:root:root:root:root body [data-espace="paires"] .sb-rangee[data-sb-alerte] [data-titre]::before { content: "" !important; display: inline-block !important; width: 6px !important; height: 6px !important; border-radius: 50% !important; background: var(--sbp-point) !important; margin: 0 6px 2px 0 !important; vertical-align: middle !important; }
@@ -402,7 +427,7 @@
   :root:root:root:root:root body [data-espace="paires"] .vrm-ann-grid.sb-liste[data-sb-vue="liste"] { margin-left: 0 !important; margin-right: 0 !important; border-radius: 28px !important; padding-bottom: 12px !important; min-height: 0; }
   /* Le choix du compte : sur la ligne du titre, à droite (les sites sont dans la barre du haut). */
   :root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres:has(> .vrm-compte-menu-hote) { position: absolute !important; top: 0 !important; right: 16px !important; padding: 0 !important; }
-  :root:root:root:root:root body [data-espace="paires"] .vrm-tache-tete { padding-right: 260px !important; height: 52px !important; }
+  :root:root:root:root:root body [data-espace="paires"] .vrm-tache-tete { padding-right: 260px !important; height: auto !important; min-height: 52px !important; }
 }
 
 /* ── 10. LA PAIRE AU PREMIER PLAN (téléphone) : la rangée devient une carte, à sa place ── */
@@ -693,6 +718,26 @@
 :root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-ui-ligne-valeur { font: 400 21px/1 var(--sbp-affiche) !important; letter-spacing: -.02em !important; color: var(--sbp-encre) !important; font-variant-numeric: tabular-nums !important; white-space: nowrap !important; }
 @media (max-width: 767px) { :root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-ui-ligne.vrm-pf-rangee { content-visibility: auto; contain-intrinsic-size: auto 64px; } }
 :root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-pf-gestes:empty { display: none !important; }
+/* (15 nov., Annonces propre — Julien : « horriblement moche ») Le titre se lit sur DEUX lignes plutôt que coupé à
+   15 lettres ; la plaque N° reste en haut, contre la 1re ligne. La rangée grandit de 20 px au plus (64 → 76). */
+:root:root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-ui-ligne-titre { align-items: flex-start !important; }
+:root:root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-ui-ligne-titre > span:last-child {
+  white-space: normal !important; display: -webkit-box !important; -webkit-box-orient: vertical !important; -webkit-line-clamp: 2 !important; line-clamp: 2 !important;
+  overflow: hidden !important; overflow-wrap: anywhere !important; hyphens: none !important;
+}
+:root:root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-ui-ligne-titre > .vrm-pf-num { margin-top: -1px !important; }
+/* Le geste de la rangée (« Relier à Vinted », « Délier Vinted ») : un LIEN court au bout de la ligne d'état, jamais un
+   bloc sous la rangée. Sa cible au doigt garde 44 px (marges négatives : la ligne reste de 18 px). */
+:root:root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-ui-ligne-sous.vrm-pf-sous-geste { display: flex !important; align-items: center !important; gap: 10px !important; min-width: 0 !important; overflow: visible !important; }
+:root:root:root:root:root:root body [data-espace="paires"] .vrm-pf-sous-geste > .vrm-pf-sous-texte { flex: 0 1 auto !important; min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+:root:root:root:root:root:root body [data-espace="paires"] .vrm-pf-sous-geste > .vrm-pf-gestes { flex: none !important; display: inline-flex !important; margin: 0 !important; }
+:root:root:root:root:root:root:root body .vrm-main [data-espace="paires"] .vrm-pf-sous-geste > .vrm-pf-gestes > .vrm-lvc-geste {
+  all: unset; box-sizing: border-box !important; display: inline-flex !important; align-items: center !important; min-height: 44px !important; margin: -13px 0 !important; padding: 0 2px !important;
+  max-width: none !important; white-space: nowrap !important; cursor: pointer !important; background: none !important; border: 0 !important; box-shadow: none !important;
+  font: 600 12.5px/18px var(--sbp-texte, var(--vrm-police)) !important; color: var(--sb-lien, var(--d-accent-texte, #0055B8)) !important; -webkit-tap-highlight-color: transparent;
+}
+:root:root:root:root:root:root:root body .vrm-main [data-espace="paires"] .vrm-pf-sous-geste > .vrm-pf-gestes > .vrm-lvc-geste:active { opacity: .55 !important; }
+:root:root:root:root:root:root:root body .vrm-main [data-espace="paires"] .vrm-pf-sous-geste > .vrm-pf-gestes > .vrm-lvc-geste:focus-visible { outline: 2px solid var(--sb-diode, #0060CC) !important; outline-offset: 2px !important; border-radius: 6px !important; }
 /* Leur recherche, creusée ; leurs filtres, un plateau (actif = enfoncé + diode) : le dessin propre à l'espace Paires,
    le même que la liste Vinted (gardé à la fusion de la fondation : sans lui, Leboncoin et Vestiaire perdaient leur plateau). */
 :root:root:root:root:root body [data-espace="paires"] .vrm-pf-collant .vrm-ui-outils-champ { min-height: 44px !important; height: 44px !important; border-radius: 14px !important; border: 0 !important; background: var(--sbp-puits) !important; box-shadow: var(--sbp-puits-sh) !important; }

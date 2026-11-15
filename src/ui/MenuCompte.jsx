@@ -15,16 +15,22 @@ import './ui.css';
 const Chevron = () => <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>;
 const Coche = () => <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>;
 
-export function MenuCompte({ comptes = [], valeur = '', onChange, tous = true, titre, className = '', ...attrs }) {
+// (15 nov., Annonces propre) `court` : sur une ligne partagée (les sites d'Annonces au téléphone), « Tous les comptes »
+// s'écrit « Tous » derrière le pictogramme d'un compte — il se coupait en « Tou… ». Le nom entier reste à l'oreille
+// (`aria-label`) et dans la feuille.
+const Personne = () => <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" className="vrm-ui-menu-compte-ic"><circle cx="8" cy="5.4" r="2.9" fill="none" stroke="currentColor" strokeWidth="1.6"/><path d="M2.6 14c.6-2.7 2.8-4.3 5.4-4.3s4.8 1.6 5.4 4.3" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>;
+
+export function MenuCompte({ comptes = [], valeur = '', onChange, tous = true, titre, className = '', court = false, ...attrs }) {
   const [ouvert, setOuvert] = useState(false);
   const choisi = (comptes || []).find((c) => String(c.id) === String(valeur));
   const nom = choisi ? choisi.nom : tr('listes.tousComptes');
+  const nomVu = choisi ? choisi.nom : court ? tr('listes.tousComptesCourt') : nom;
   const lignes = [...(tous ? [{ id: '', nom: tr('listes.tousComptes') }] : []), ...(comptes || [])];
   return (
     <>
       <button type="button" className={'vrm-ui-menu-compte sb-touche' + (className ? ' ' + className : '')} aria-haspopup="dialog" aria-expanded={ouvert}
         aria-label={tr('listes.choisirCompte', { nom })} data-ui-menu-compte={valeur || 'tous'} onClick={() => setOuvert(true)} {...attrs}>
-        <span translate={choisi ? 'no' : undefined}>{nom}</span><Chevron/>
+        {court ? <Personne/> : null}<span translate={choisi ? 'no' : undefined}>{nomVu}</span><Chevron/>
       </button>
       {ouvert ? (
         <Feuille titre={titre || tr('listes.comptes')} onClose={() => setOuvert(false)} data-ui-menu-compte-feuille="">

@@ -16,9 +16,11 @@ import { colisMontrable, ventesMontrable } from './colisVentesInstantanes.js';
 import { useInerte, useMaintenant, MentionInstantane, CarteInstantanee, GesteVerification } from './InstantaneCommun.jsx';
 import { SqLignes } from './Squelette.jsx';
 import './styles-colis-ventes-instantanes.css';
+import MarquePlateforme from './plateformes/Marque.jsx';
+import { LogoSite } from './SelecteurSites.jsx';
 
 const NOMS_SITES = { toutes: 'Tous', vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
-const LOGO = (s) => (s === 'vinted' ? '/brands/vinted.svg' : s === 'leboncoin' ? '/brands/leboncoin.svg' : s === 'ebay' ? '/brands/ebay.svg' : s === 'vestiaire' ? '/brands/vestiaire.svg' : null);
+// (15 nov.) Les marques : src/plateformes/marques.js (une source), la même forme que le vrai sélecteur.
 
 // Le filtre des sites, inerte, dans l'écran au téléphone. À l'ordinateur, l'écran vrai (monté,
 // caché, pendant l'attente) a déjà posé le sien dans la barre du haut (`DansBarreHaut`) : rien ici.
@@ -33,7 +35,7 @@ function FiltreInstantane({ sites, ordi = false, cle }) {
           <span className="vrm-ss-in">
             {s === 'toutes'
               ? <><span className="vrm-ss-logo vrm-ss-tous" data-logo-site="toutes" aria-hidden="true"><i/><i/><i/><i/></span><span className="vrm-ss-nom">Tous</span></>
-              : <span className="vrm-ss-logo" data-logo-site={s} aria-hidden="true" style={LOGO(s) ? { '--vrm-ss-logo': `url("${LOGO(s)}")` } : undefined}/>}
+              : <span className="vrm-ss-logo" data-logo-site={s} aria-hidden="true"><MarquePlateforme site={s} taille={18}/></span>}
           </span>
         </button>
       ))}
@@ -177,13 +179,13 @@ export function VentesInstantanee({ snap, maintenant = null, fmt = null, ordi = 
                 <span className="vrm-toutes-titre" style={{ flex: '1 1 0%', minWidth: 0 }}>
                   <span style={{ display: 'block', fontSize: 15, fontWeight: 600, lineHeight: 1.3, overflowWrap: 'anywhere' }}>{l.num ? <span className="vrm-inst-num">N°{l.num} </span> : null}{l.titre}</span>
                   <span className="vrm-toutes-meta" style={{ display: 'block', fontSize: 13, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    <span>{l.site && l.site !== 'toutes' ? <span className="vrm-logo-site" data-logo-site={l.site} aria-hidden="true" style={LOGO(l.site) ? { '--vrm-ss-logo': `url("${LOGO(l.site)}")` } : undefined}/> : null}{l.siteNom || NOMS_SITES[l.site] || ''}</span>
+                    <span>{l.site && l.site !== 'toutes' ? <LogoSite site={l.site}/> : null}{l.siteNom || NOMS_SITES[l.site] || ''}</span>
                     {l.date ? <> · {l.date}</> : null}
                   </span>
                   {l.etat ? <span className="vrm-toutes-etat" data-ton={l.ton || undefined}>{l.etat}</span> : null}
                 </span>
                 <span className="vrm-toutes-bureau" aria-hidden="true">
-                  <span><b className="vrm-toutes-bureau-site">{l.site && l.site !== 'toutes' ? <span className="vrm-logo-site" data-logo-site={l.site} aria-hidden="true" style={LOGO(l.site) ? { '--vrm-ss-logo': `url("${LOGO(l.site)}")` } : undefined}/> : null}{l.siteNom || NOMS_SITES[l.site] || ''}</b></span>
+                  <span><b className="vrm-toutes-bureau-site">{l.site && l.site !== 'toutes' ? <LogoSite site={l.site}/> : null}{l.siteNom || NOMS_SITES[l.site] || ''}</b></span>
                   <span>{l.date}</span>
                   <span data-ton={l.ton || undefined}>{l.etat}</span>
                 </span>
