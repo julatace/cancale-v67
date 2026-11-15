@@ -100,7 +100,8 @@ export function colonneDe(lieu, slots) {
 // L'ORDRE DE SORTIE. ventes : [{ cle, num, idAnnonce, jours (entier, null = pas su), … }].
 // Rend { aSortir: [{ …vente, lieu, raison }], sorties: [{ …vente }] } — `aSortir` dans l'ordre où
 // il faut les sortir ; `sorties` : celles déjà sorties par SON geste (pour « 2 sur 3 sorties »).
-export function ordreDeSortie(ventes, { slots, meubles, perdues = null, doublons = null, cle = cleDefaut } = {}) {
+// `depuis` : le meuble de la DERNIÈRE paire sortie (il est devant) — à date égale, on y reste.
+export function ordreDeSortie(ventes, { slots, meubles, perdues = null, doublons = null, cle = cleDefaut, depuis = null } = {}) {
   const ordreMeuble = new Map((Array.isArray(meubles) ? meubles : []).map((m, k) => [String(m && m.id), Number.isFinite(Number(m && m.ordre)) && m.ordre !== null && m.ordre !== '' ? Number(m.ordre) : k]));
   const aSortir = [], sorties = [];
   for (const v of (Array.isArray(ventes) ? ventes : [])) {
@@ -113,7 +114,7 @@ export function ordreDeSortie(ventes, { slots, meubles, perdues = null, doublons
   aSortir.sort((a, b) => jour(a) - jour(b));
   // À date égale : on chaîne les meubles — d'abord celui de la vente d'avant, puis les autres
   // dans l'ordre de la pièce ; dans un meuble, de haut en bas, de gauche à droite ; sans lieu à la fin.
-  const out = []; let dernier = null;
+  const out = []; let dernier = depuis == null ? null : String(depuis);
   for (let k = 0; k < aSortir.length;) {
     let f = k; while (f < aSortir.length && jour(aSortir[f]) === jour(aSortir[k])) f++;
     const groupe = aSortir.slice(k, f);

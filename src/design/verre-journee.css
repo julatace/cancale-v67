@@ -135,11 +135,11 @@
 }
 :root:root:root:root:root:root body .sj-journee .sj-t-envoyer .sj-n-grand { display: none !important; }
 :root:root:root:root:root:root body .sj-journee .sj-t-envoyer .sj-face:not(:has(.sj-v-plaques)) .sj-n-grand { display: block !important; grid-area: pile !important; font: 750 34px/1 Inter, system-ui, sans-serif !important; margin: 0 !important; color: var(--sv-encre) !important; }
-:root:root:root:root:root:root body .sj-journee .sj-t-envoyer .sj-pile { grid-area: pile !important; position: static !important; display: flex !important; align-items: center !important; }
-:root:root:root:root:root:root body .sj-journee .sj-t-envoyer .sj-pile .vrm-pile-v { position: relative !important; transform: none !important; width: 50px !important; height: 50px !important; border-radius: 13px !important; border: 2px solid #FFFFFF !important; box-shadow: 0 4px 10px -4px rgb(8 26 50 / .5) !important; overflow: hidden !important; margin: 0 !important; inset: auto !important; }
+:root:root:root:root:root:root body .sj-journee .sj-t-envoyer .sj-pile { grid-area: pile !important; position: static !important; inset: auto !important; display: flex !important; flex-direction: row !important; align-items: center !important; width: auto !important; height: auto !important; transform: none !important; }
+:root:root:root:root:root:root body .sj-journee .sj-t-envoyer .sj-pile .vrm-pile-v { flex: none !important; min-width: 50px !important; position: relative !important; transform: none !important; width: 50px !important; height: 50px !important; border-radius: 13px !important; border: 2px solid #FFFFFF !important; box-shadow: 0 4px 10px -4px rgb(8 26 50 / .5) !important; overflow: hidden !important; margin: 0 !important; inset: auto !important; }
 :root:root:root:root:root:root body .sj-journee .sj-t-envoyer .sj-pile .vrm-pile-v + .vrm-pile-v { margin-left: -22px !important; }
 :root:root:root:root:root:root body .sj-journee .sj-t-envoyer .sj-pile .vrm-pile-v img { width: 100% !important; height: 100% !important; object-fit: cover !important; border-radius: 0 !important; }
-:root:root:root:root:root:root body .sj-journee .sj-t-envoyer .sj-pile .vrm-pile-plus { position: static !important; transform: none !important; margin-left: 6px !important; font: 750 12px/1 Inter, system-ui, sans-serif !important; color: var(--sv-encre-2) !important; background: none !important; box-shadow: none !important; padding: 0 !important; }
+:root:root:root:root:root:root body .sj-journee .sj-t-envoyer .sj-pile .vrm-pile-plus { position: static !important; transform: none !important; margin-left: 6px !important; font: 750 12px/1 Inter, system-ui, sans-serif !important; color: var(--sv-encre-2) !important; background: none !important; box-shadow: none !important; padding: 0 !important; white-space: nowrap !important; width: auto !important; height: auto !important; inset: auto !important; }
 :root:root:root:root:root:root body .sj-journee .sj-v-plaques { grid-area: plaques !important; display: flex !important; flex-wrap: wrap !important; gap: 5px !important; min-width: 0 !important; }
 :root:root:root:root:root:root body .sj-journee .sj-v-premier { grid-area: premier !important; display: block !important; font: 550 12.5px/1.3 Inter, system-ui, sans-serif !important; color: var(--sv-encre-2) !important; margin-top: 6px !important; }
 :root:root:root:root:root:root body .sj-journee .sj-v-am { color: var(--sv-ambre) !important; font-weight: 700 !important; }
@@ -164,6 +164,8 @@
 /* À RETIRER et MESSAGES (`.jduo`) : les codes 19/750 l'un sous l'autre (sans plaque), le point dessous ; les deux dernières
    conversations : le pseudo 13,5/700, sa phrase 12/600 (une offre à l'ambre). */
 :root:root:root:root:root:root body .sj-journee .sj-t-retirer .sj-face, :root:root:root:root:root:root body .sj-journee .sj-t-messages .sj-face { display: block !important; margin-top: 0 !important; }
+:root:root:root:root:root:root body .sj-journee .sj-t-retirer .sj-face > b.sj-n { display: none !important; }
+:root:root:root:root:root:root body .sj-journee .sj-t-retirer .sj-face > .sj-sous { display: block !important; margin-top: 6px !important; font: 550 12.5px/1.3 Inter, system-ui, sans-serif !important; color: var(--sv-encre-2) !important; }
 :root:root:root:root:root:root body .sj-journee .sj-t-retirer .sj-codes { display: flex !important; flex-direction: column !important; gap: 0 !important; }
 :root:root:root:root:root:root body .sj-journee .sj-t-retirer .sj-code { gap: 0 !important; margin-top: 6px !important; }
 :root:root:root:root:root:root body .sj-journee .sj-t-retirer .sj-code .sb-plaque--grande {
@@ -195,12 +197,13 @@
   :root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] :is(.vrm-jv2-grand, .vrm-jv2-grand.vrm-fu-grand) { font-size: 84px !important; }
   :root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .vrm-jv2-barre { height: max(5px, calc(var(--h, 0) * 64px)) !important; width: 10px !important; border-radius: 5px !important; }
   :root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-grille { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 14px !important; }
-  :root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-grille > .sj-t-envoyer { grid-column: 1 / span 2 !important; grid-row: span 2 !important; order: 0 !important; align-content: start !important; }
-  :root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-grille > .sj-t-mois { grid-column: 3 / span 2 !important; order: 0 !important; }
-  :root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-grille > .sj-t-retirer { grid-column: 3 !important; order: 0 !important; }
-  :root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-grille > .sj-t-messages { grid-column: 4 !important; order: 0 !important; }
+  :root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-grille > .sj-t-envoyer { grid-column: 1 / span 2 !important; grid-row: auto !important; order: 0 !important; align-content: start !important; }
+  :root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-grille > .sj-t-mois { grid-column: 3 / span 2 !important; order: 0 !important; align-self: stretch !important; }
+  :root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-grille > .sj-t-retirer { grid-column: span 1 !important; order: 1 !important; }
+  :root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-grille > .sj-t-messages { grid-column: span 1 !important; order: 1 !important; }
+  :root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-grille > .sj-t:not(.sj-t-mois):not(.sj-t-envoyer):not(.sj-t-retirer):not(.sj-t-messages) { order: 2 !important; align-self: start !important; }
   :root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-grille:not(:has(> .sj-t-envoyer)) > .sj-t-mois { grid-column: 1 / span 2 !important; }
-  :root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-t-envoyer .sj-pile .vrm-pile-v { width: 64px !important; height: 64px !important; border-radius: 16px !important; }
+  :root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-t-envoyer .sj-pile .vrm-pile-v { width: 56px !important; height: 56px !important; min-width: 56px !important; border-radius: 14px !important; }
   :root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-t-envoyer .sj-plein-place .sb-btn-plein { width: 100% !important; height: 52px !important; min-height: 52px !important; font-size: 15.5px !important; }
   :root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-t .sj-n:not(.sj-n-grand) { font-size: 15.5px !important; }
 }

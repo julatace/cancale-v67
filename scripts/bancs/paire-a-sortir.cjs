@@ -12,7 +12,8 @@ require('./_porte-banc.cjs');
 //        lieu, la raison ;
 //     R3 l'ordre de sortie : la plus pressée d'abord ; à date égale, le même meuble à la suite ; un lieu
 //        inconnu après ceux de sa date ;
-//     R4 « sortie » se prouve par SA déclaration (`N°` nu, ou `N°@id` de CETTE annonce seulement).
+//     R4 « sortie » se prouve par SA déclaration (`N°` nu, ou `N°@id` de CETTE annonce seulement) ;
+//     R5 après une sortie, à date égale on reste dans le meuble où l'on est (il est devant).
 //  A  L'APP RENDUE (base inventée, 390 tactile et 1512, clair et sombre) :
 //     A1 la section est là, AVANT le chiffre du jour, dans le premier écran du téléphone ;
 //     A2 la première carte = la vente la plus pressée, SA case (meuble, rangée, case ; la case allumée du plan) ;
@@ -69,12 +70,16 @@ function controlesRegle(M) {
   const o2 = M.ordreDeSortie(ventes, { slots: SLOTS, meubles: MEUBLES, perdues: { '501': { id: '9001' }, '502@9999': { id: '9999' } } });
   r.push(['R4 sortie prouvée : N°501 (déclaré) sort de la liste ; « 502@9999 » (une AUTRE annonce) ne fait pas sortir N°502',
     o2.sorties.map((v) => v.num).join(',') === '501' && o2.aSortir.some((v) => v.num === '502'), JSON.stringify({ sorties: o2.sorties.map((v) => v.num), reste: o2.aSortir.map((v) => v.num) })]);
+  const o3 = M.ordreDeSortie(ventes.filter((v) => v.num !== '501'), { slots: SLOTS, meubles: MEUBLES, perdues: {}, depuis: 'B' });
+  r.push(['R5 après une sortie dans la Pile B, à date égale on y reste : N°504 avant N°502 (Étagère A, pourtant la première de la pièce)',
+    o3.aSortir.map((v) => v.num).join(',') === '504,502,503', o3.aSortir.map((v) => v.num).join(',')]);
   return r;
 }
 const MUTATIONS = [
   ['rapprochement par TITRE (la case de la première vente au même titre)', 'const e = emplacementDe(v.num, { slots, meubles, doublons, cle });', 'const e = emplacementDe((ventes.find((w) => w && w.titre === v.titre) || v).num, { slots, meubles, doublons, cle });'],
   ['sans la date limite (ordre d\'arrivée)', 'aSortir.sort((a, b) => jour(a) - jour(b));', ''],
   ['sans enchaîner le même meuble', 'return [m === dernier ? 0 : 1, m === dernier ? 0 : (ordreMeuble.has(m) ? ordreMeuble.get(m) : 9999), v.lieu.rangee, v.lieu.colonne];', 'return [1, ordreMeuble.has(m) ? ordreMeuble.get(m) : 9999, v.lieu.rangee, v.lieu.colonne];'],
+  ['le meuble de la dernière sortie oublié', 'let dernier = depuis == null ? null : String(depuis);', 'let dernier = null;'],
   ['N° en double pris quand même', "if (doublons && typeof doublons.has === 'function' && doublons.has(k)) return { lieu: null, raison: 'doublon' };", ''],
   ['une déclaration d\'une AUTRE annonce fait sortir', "if (cle(brut.slice(0, at)) === k && id && brut.slice(at + 1) === id) return true;", 'if (cle(brut.slice(0, at)) === k) return true;'],
 ];
@@ -99,7 +104,8 @@ function base({ seulementInconnue = false } = {}) {
     const o = choisies[k]; o.transaction_user_status = 'needs_action'; o.status = 'Le paiement a été validé';
     if (num === '501' || num === '502') o.title = TITRE;
     m.vinted_annonce_numeros[o.item_id] = { num, numero: num, numberedAt: enJours(-30), title: o.title };
-    const em = b.rows.find((r) => r.id === `email_bord_${o.transaction_id}`); em.data.dateLimite = enJours(j); em.data.numero = num;
+    const em = b.rows.find((r) => r.id === `email_bord_${o.transaction_id}`); em.data.dateLimite = new Date(Date.now() + j * J).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' }) + ' 10 h 00'; em.data.numero = num;
+    o.date = new Date(Date.now() - 3600000).toISOString(); em.data.receivedAt = o.date;   // vendue il y a une heure : la date limite LUE (format de l'e-mail) fait foi
   });
   // Une annonce EN LIGNE au même titre que N°501/N°502, rangée ailleurs (N°777) : jamais sa case.
   const lst = b.rows.find((r) => r.id === `harvest_${uid0}_listings`);
