@@ -171,7 +171,7 @@ import { etatAncienne } from "./republierGuide.js";   // (15 nov.) « Republier 
 // ⟦→ ecrans/Republier.jsx #1⟧
 // (6 nov., vague 2) Remettre en vente une vente annulée avant l'envoi ; relier l'achat des annonces numérotées.
 import { annuleesChezToi, paireARemettre, fichesAnciennesAnnulees, ligneJournee as ligneAnnuleesJournee, etatRemise, VERDICT_MOTEUR as VERDICT_REMISE } from "./annuleesChezToi.js";
-import { fileSansAchat, aRelierJournee, meilleureSuggestion, texteSuggestion } from "./achatsARelier.js";
+import { fileSansAchat, aRelierJournee, meilleureSuggestion, texteSuggestion, cibleAnnonce } from "./achatsARelier.js";
 import { lignesManquantes as lignesPrixMiniManquants, carteJournee as carteJourneePrixMini } from "./prixMiniManquants.js";
 import { CLE_A_TRANCHER, publierSource as publierSourceTrancher, lirePublications as lirePubsTrancher, lignesATrancher, comptesARelireDe, badgeATrancher, phraseJournee as phraseATrancher, appliquerTranches, photosJournee as photosATrancher, typesJournee as typesATrancher, BINAIRES as BINAIRES_TRANCHER } from "./aTrancher.js";
 import { CLE_SANTE, publierSante } from "./santeDonnees.js";   // (11 nov., lot sante-donnees)
@@ -3154,6 +3154,8 @@ const SYNC_KEYS = [
   // avant l'envoi ({ [tx]: at }), et les annonces « Plus tard » de « Sans achat relié »
   // ({ [itemId]: at }) : le même état sur tous ses appareils. Aucun prix, aucun N°.
   'vrm_annulees_reglees', 'vrm_achat_plus_tard',
+  // (15 nov., liaison) « Ce n'est pas lui » : { '<article>><tx achat>': at } — ce couple n'est plus proposé.
+  'vrm_liaison_refus',
   // (10 nov., lot BD) La NOTE PRIVÉE d'une paire ({ 'n:<N°>' | 'a:<id annonce>': { t, at } },
   // src/notePaire.js) — à lui seul, jamais envoyée à une plateforme. (lot BH) Les achats
   // hors plateforme masqués comme DOUBLE d'un autre (« Garder celle-ci », src/achatsDoubles.js).
@@ -16817,6 +16819,23 @@ function phrasePourquoi(p) {
     return tr(`liaison.p.${m.cle}`, m.vars);
   }).filter(Boolean).join(' · ');
 }
+// Achats → sous un achat sans article relié : l'article proposé (photo, N°, titre, niveau), « Relier », « Ce n'est pas lui ».
+function PropositionAchat({ p, art, onRelier, onRefus }) {
+  const it = art.genre === 'vente' ? art.o : art.item;
+  const photo = art.genre === 'vente' ? orderPhoto(it) : it && it.photo;
+  const num = art.fiche && art.fiche.numero;
+  return (
+    <div className="vrm-buy-propose" data-achat-propose={p.key} data-niveau={p.niveau}>
+      {photo ? <PhotoVinted src={photo} alt="" className="vrm-buy-propose-photo" loading="lazy" decoding="async"/> : <PhotoVide taille={32} className="vrm-buy-propose-photo"/>}
+      <span className="vrm-buy-propose-centre">
+        <span className="vrm-buy-propose-mot">{art.genre === 'vente' ? tr('liaison.venteProposee') : tr('liaison.annonceProposee')} · <b data-niveau={p.niveau}>{p.niveau === 'tres-probable' ? tr('liaison.niveau.tresProbable') : tr('liaison.niveau.possible')}</b></span>
+        <span className="vrm-buy-propose-titre">{num ? <Numero n={num} taille="petit"/> : null} {(it && it.title) || ''}</span>
+      </span>
+      <button type="button" className="sb-lien" data-achat-propose-relier={p.key} onClick={onRelier}><Icon name="link" size={16}/><span>{VERBES.relier}</span></button>
+      <button type="button" className="sb-rond vrm-buy-propose-non" data-achat-propose-pas-lui={p.key} aria-label={tr('liaison.pasLui')} title={tr('liaison.pasLui')} onClick={onRefus}><Icon name="close" size={16}/></button>
+    </div>
+  );
+}
 function AchatsARelier({ file, vendus = null, liaison, achats, propositionDe, onRelier, onRelierVente = null, onSaisir, onPlusTard, onChoisir, onChoisirVente = null, onRefus = null, compteDe, onSerie = null }) {
   // Deux files : les annonces en vente, puis les ventes récentes (bénéfice réel).
   const [onglet, setOnglet] = useState('vente');
@@ -16824,7 +16843,7 @@ function AchatsARelier({ file, vendus = null, liaison, achats, propositionDe, on
   const [valider, setValider] = useState(null);   // null · { coches: Set(key) }
   const [enCours, setEnCours] = useState(false);
   const jour = (d) => { const t = typeof d === 'number' ? d : Date.parse(d || ''); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: new Date(t).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' }) : ''; };
-  const lignesVente = useMemo(() => (Array.isArray(file) ? file.map((x) => ({ ...x, key: cleArticleAnnonce(x.id), genre: 'annonce' })) : null), [file]);
+  const lignesVente = useMemo(() => (Array.isArray(file) ? file.map((x) => ({ ...x, key: cleArticleAnnonce(x.id), genre: 'annonce', cible: cibleAnnonce(x.item) })) : null), [file]);
   const lignesVendus = useMemo(() => (Array.isArray(vendus) ? vendus.map((x) => ({ ...x, genre: 'vente' })) : null), [vendus]);
   const propsDe = (k) => (liaison && liaison.parArticle && liaison.parArticle[k]) || [];
   const toutes = [...(lignesVente || []), ...(lignesVendus || [])];
@@ -16835,14 +16854,14 @@ function AchatsARelier({ file, vendus = null, liaison, achats, propositionDe, on
   if (!lignesVente.length && !(lignesVendus && lignesVendus.length)) return <div className="vrm-ar-vide" data-ar-etat="vide">{tr('annonces.chaqueAnnonceNumerotee')}</div>;
   const lecture = achats === undefined || liaison === undefined;
   const nSugg = (lignes || []).filter((l) => propsDe(l.key).length).length;
-  const relierUne = (l, a) => (l.genre === 'vente' ? onRelierVente && onRelierVente(l, a) : onRelier(l.item, a));
+  const relierUne = (l, a, opts) => (l.genre === 'vente' ? onRelierVente && onRelierVente(l, a, opts) : onRelier(l.item, a, opts));
   // « Valider les N très probables » : la liste est MONTRÉE, chaque ligne cochée par défaut ; SON toucher relie.
   const validerCoches = async () => {
     if (!valider) return;
     const liste = tp.filter((v) => valider.coches.has(v.key));
     setEnCours(true);
     let n = 0;
-    for (const v of liste) { const l = parCle.get(v.key); if (!l) continue; try { const r = await relierUne(l, v.achat); if (r !== false) n++; } catch (_) {} }
+    for (const v of liste) { const l = parCle.get(v.key); if (!l) continue; try { const r = await relierUne(l, v.achat, { silencieux: true }); if (r === true) n++; } catch (_) {} }
     setEnCours(false); setValider(null);
     if (n) toast(tr('liaison.feuille.fait', { n }));
   };
@@ -37079,6 +37098,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const poserAnnuleeReglee = (tx) => gesteVrm('Noté : VRM ne la propose plus', [{ k: 'vrm_annulees_reglees', type: 'cle', id: String(tx), apres: new Date().toISOString(), avant: (annuleesReglees || {})[String(tx)] }], { vrm_annulees_reglees: setAnnuleesReglees });
   // (6 nov., vague 2 · point 4) « Plus tard » dans « Sans achat relié » : { [itemId]: at }.
   const [achatPlusTard, setAchatPlusTard] = useStateCle('vrm_achat_plus_tard', () => { const v = load('vrm_achat_plus_tard', {}); return v && typeof v === 'object' ? v : {}; });
+  // (15 nov., liaison) « Ce n'est pas lui » (SON clic) : { [`${article}>${tx}`]: at }, synchronisé (src/liaisonAchat.js).
+  const [liaisonRefus, setLiaisonRefus] = useStateCle('vrm_liaison_refus', () => { const v = load('vrm_liaison_refus', {}); return v && typeof v === 'object' ? v : {}; });
+  const refuserLiaison = (article, tx) => gesteVrm(tr('liaison.pasLuiFait'), [{ k: 'vrm_liaison_refus', type: 'cle', id: cleRefusLiaison(article, tx), apres: new Date().toISOString(), avant: (liaisonRefus || {})[cleRefusLiaison(article, tx)] }], { vrm_liaison_refus: setLiaisonRefus });
   const poserAchatPlusTard = (id) => gesteVrm('Mise de côté — elle revient dans 7 jours', [{ k: 'vrm_achat_plus_tard', type: 'cle', id: String(id), apres: new Date().toISOString(), avant: (achatPlusTard || {})[String(id)] }], { vrm_achat_plus_tard: setAchatPlusTard });
   // (6 nov., finitions) Sur un appareil NEUF, ces deux clés arrivent du nuage APRÈS le montage : sans cette
   // relecture, « Plus tard » et « Déjà remise en vente » posés ailleurs restaient vides ici (mesuré au banc
@@ -37087,6 +37109,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const lu = (k) => { const w = load(k, {}); return w && typeof w === 'object' ? w : {}; };
     setAnnuleesReglees((v) => (v && Object.keys(v).length) ? v : lu('vrm_annulees_reglees'));
     setAchatPlusTard((v) => (v && Object.keys(v).length) ? v : lu('vrm_achat_plus_tard'));
+    setLiaisonRefus((v) => (v && Object.keys(v).length) ? v : lu('vrm_liaison_refus'));
   }), []);
   // (revue du 5 nov.) Un lien posé à la main n'entre pas tant que l'ancienne est
   // ENCORE chez lui sur Vinted sous une autre forme (masquée, à confirmer,
@@ -43216,11 +43239,66 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     toast('Achat délié');
   };
   // (6 nov., vague 2 · point 4) « Relier » depuis la file « Sans achat relié » : SON tap, sur CETTE annonce.
-  const relierAchatAnnonce = async (it, a) => {
+  const relierAchatAnnonce = async (it, a, opts = {}) => {
     const w = await ecritureRelierAchat(a); if (!w) return;
     updatePair(it, w);
-    accompagner('achat.relier', { vars: { prix: w.buyPrice ? `${String(w.buyPrice).replace('.', ',')}\u00a0€` : '—' } }).fini();
+    if (!opts.silencieux) accompagner('achat.relier', { vars: { prix: w.buyPrice ? `${String(w.buyPrice).replace('.', ',')}\u00a0€` : '—' } }).fini();
+    return true;
   };
+  // ── (15 nov., liaison) LES VENDUS SANS ACHAT RELIÉ, ET L'AFFECTATION (src/liaisonAchat.js) ──
+  // Julien : « améliore la liaison entre les achats et les articles en vente ou vendus ». Les ventes des
+  // 12 derniers mois, ni annulées ni masquées, sans prix d'achat ni achat relié (la ligne de la vente,
+  // `effEntry`) : le bénéfice réel attend leur achat. La cible : le titre de la vente, la taille et la
+  // date de mise en ligne de SA fiche (par identité, `identiteAnnonce`), sinon la date de vente.
+  const fileVendus = useMemo(() => {
+    if (!Array.isArray(sales.items)) return null;
+    const borne = Date.now() - 365 * 86400e3, out = [];
+    for (const o of sales.items) {
+      if (!o || o.transaction_id == null || isHidden(o) || classifyOrderStatus(o.status) === 'cancelled') continue;
+      const t = Date.parse(o.date || ''); if (!Number.isFinite(t) || t < borne) continue;
+      const e = effEntry(o) || {};
+      if ((e.buyFromId != null && String(e.buyFromId) !== '') || (e.buyGros && e.buyGros.id) || (e.buyPrice != null && String(e.buyPrice).trim() !== '')) continue;
+      const idf = identiteAnnonce(o); const fiche = idf ? numeros[String(idf)] || null : null;
+      const key = cleArticleVente(o.transaction_id);
+      const enLigneLe = fiche && fiche.numberedAt && Date.parse(fiche.numberedAt) <= t ? fiche.numberedAt : null;
+      out.push({ key, id: key, o, idf: idf ? String(idf) : null, fiche: fiche || (e.numero ? e : null), ts: t,
+        cible: { key, titre: o.title || '', marque: '', taille: (fiche && fiche.size) || '', couleur: '', dateRef: enLigneLe || o.date, dateRefSource: enLigneLe ? 'en-ligne' : 'vente', prix: o.price } });
+    }
+    return out.sort((x, y) => y.ts - x.ts);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, numeros, saleOv]);
+  // L'affectation n'est calculée que sur les écrans qui la montrent, après le rendu (2 500 articles × 2 600
+  // achats : environ une seconde) ; undefined pendant le calcul, null si elle a échoué (« pas su »).
+  const vueLiaison = (curSub === 'annonces' && annSort === 'sansachat') || curSub === 'achats';
+  // Les articles par clé (Achats : « article proposé » sous un achat).
+  const articlesLiaison = useMemo(() => { const m = new Map(); for (const x of (fileAchat || [])) m.set(cleArticleAnnonce(x.id), { ...x, genre: 'annonce' }); for (const x of (fileVendus || [])) m.set(x.key, { ...x, genre: 'vente' }); return m; }, [fileAchat, fileVendus]);
+  const achatsLiaison = Array.isArray(fillBuyAchats.items) ? fillBuyAchats.items : (Array.isArray(buys.items) ? buys.items : undefined);
+  const [liaison, setLiaison] = useState(undefined);
+  useEffect(() => {
+    if (!vueLiaison) return undefined;
+    if (!fileAchat || achatsLiaison === undefined) { setLiaison(undefined); return undefined; }
+    const id = setTimeout(() => {
+      try {
+        const cibles = fileAchat.map((x) => { const c = cibleAnnonce(x.item); return { ...c, key: cleArticleAnnonce(x.id), prix: x.item.price, dateRef: c.dateRef || (x.fiche && x.fiche.numberedAt) || null }; })
+          .concat((fileVendus || []).map((x) => x.cible));
+        setLiaison(affecterPropositions({ cibles, achats: achatsLiaison, liens: liensAchats, refus: liaisonRefus, marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel,
+          receptionDe: (a) => dateReception(a, { infosTx: infosReception, recuClic: pickupDone }) }));
+      } catch (_) { setLiaison(null); }
+    }, 30);
+    return () => clearTimeout(id);
+  }, [vueLiaison, fileAchat, fileVendus, achatsLiaison, liensAchats, liaisonRefus, infosReception, pickupDone]);
+  // « Relier » une VENTE : l'écriture de « Relier un achat » ; sur la fiche de SON annonce (par identité),
+  // sinon sur la ligne de la vente — le même chemin que le sélecteur ouvert depuis Ventes.
+  const relierAchatVente = async (l, a, opts = {}) => {
+    const w = await ecritureRelierAchat(a); if (!w) return;
+    const o = l.o;
+    if (l.idf) updatePair({ id: l.idf, title: o.title, photo: orderPhoto(o), price: o.price && o.price.amount, _acc: o._acc }, w);
+    else setSaleOverride(String(o.transaction_id), w);
+    if (!opts.silencieux) accompagner('achat.relier', { vars: { prix: w.buyPrice ? `${String(w.buyPrice).replace('.', ',')}\u00a0€` : '—' } }).fini();
+    return true;
+  };
+  const choisirAchatVente = (l, propose) => { const o = l.o; const photo = orderPhoto(o); const sell = o.price && o.price.amount; const _autre = propose ? String(propose.transaction_id || '1') : undefined;
+    openPicker(l.idf ? { id: l.idf, title: o.title, photo, price: sell, _acc: o._acc, _dateRef: o.date, _autre } : { id: '_v' + o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo, price: sell, _acc: o._acc, _dateRef: o.date, _autre }); };
   // « Saisir » : le prix qu'il tape (jamais deviné), sans achat relié — l'écriture de la case de la carte.
   const saisirPrixAnnonce = async (it) => {
     const e = numeros[it.id] || {};
@@ -51026,6 +51104,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 );
               })()}
             </div>
+            {/* (15 nov., liaison) Dans l'autre sens : un achat sans article relié ⇒ L'ARTICLE PROPOSÉ (src/liaisonAchat.js,
+                la même affectation qu'Annonces → « Sans achat relié ») ; SON toucher relie, « Ce n'est pas lui » le range. */}
+            {!cancelled && (numA == null || numA === '') && liaison && liaison.parAchat && liaison.parAchat[String(o.transaction_id)] ? (() => {
+              const lp = liaison.parAchat[String(o.transaction_id)][0]; const art = articlesLiaison.get(lp.key);
+              return art ? <PropositionAchat p={lp} art={art} onRelier={() => (art.genre === 'vente' ? relierAchatVente(art, o) : relierAchatAnnonce(art.item, o))} onRefus={() => refuserLiaison(lp.key, String(o.transaction_id))}/> : null;
+            })() : null}
             </React.Fragment>
           );})}
         </div>
@@ -51569,6 +51653,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             onDetailBrouillons={()=>setBrouillonsOpen(true)}/>
         ) : annSort==='sansachat' ? (
           <AchatsARelier file={fileAchat} achats={fillBuyAchats.loading && !fillBuyAchats.items ? undefined : (fillBuyAchats.items || (accounts.length ? undefined : []))} liens={liensAchats}
+            vendus={fileVendus} liaison={liaison} onRelierVente={relierAchatVente} onChoisirVente={choisirAchatVente} onRefus={refuserLiaison}
             propositionDe={propositionSuggestion} onRelier={relierAchatAnnonce} onSaisir={saisirPrixAnnonce} onPlusTard={poserAchatPlusTard} onSerie={()=>setFillBuyOpen(true)}
             onChoisir={(it, propose)=>openPicker({ ...it, _autre: propose ? String(propose.transaction_id || '1') : undefined, _dateRef: (()=>{ const t=Number(it.createdTs); return Number.isFinite(t)&&t>0 ? new Date(t<1e12?t*1000:t).toISOString() : null; })() })} compteDe={(a)=>a&&a._acc?accNameOf(a._acc):''}/>
         ) : annSort==='acompleter' ? (
