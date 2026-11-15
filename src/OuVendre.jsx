@@ -38,6 +38,9 @@ export function sousLigne(l) {
 export default function OuVendre({ prixDepart = null, sites }) {
   useLangue();
   const [saisie, setSaisie] = React.useState(() => (prixDepart == null || prixDepart === '' ? '' : String(prixDepart).replace('.', ',')));
+  // Le prix de la fiche arrive après sa lecture : il remplit le champ tant qu'il n'a rien tapé.
+  const tape = React.useRef(false);
+  React.useEffect(() => { if (!tape.current && prixDepart != null && prixDepart !== '') setSaisie(String(prixDepart).replace('.', ',')); }, [prixDepart]);
   const cPrix = centimesPrix(saisie);
   const R = React.useMemo(() => ouVendre({ cPrix, sites: sites || {} }), [cPrix, sites]);
   const id = React.useId().replace(/:/g, '');
@@ -47,8 +50,8 @@ export default function OuVendre({ prixDepart = null, sites }) {
         <h3 className="vrm-ov-titre" id={id + '-t'}>{tr('ov.titre')}</h3>
         <label className="vrm-ov-prix" htmlFor={id}>
           <span className="vrm-ov-prix-l">{tr('ov.prix')}</span>
-          <input id={id} className="vrm-ov-champ" data-ou-vendre-saisie="" type="text" inputMode="decimal" autoComplete="off" value={saisie} placeholder="85"
-            onChange={(e) => setSaisie(e.target.value)} aria-invalid={saisie !== '' && cPrix == null ? 'true' : undefined}/>
+          <input id={id} className="vrm-ov-champ" data-ou-vendre-saisie="" type="text" inputMode="decimal" autoComplete="off" value={saisie} placeholder="—"
+            onChange={(e) => { tape.current = true; setSaisie(e.target.value); }} aria-invalid={saisie !== '' && cPrix == null ? 'true' : undefined}/>
           <span className="vrm-ov-prix-u" aria-hidden="true">€</span>
         </label>
       </div>
