@@ -343,6 +343,8 @@ async function tournee(nav, { W, theme, scenario }) {
       const vis = (e) => !!(e && e.getClientRects().length);
       return [...document.querySelectorAll('.vrm-fu-modifier')].filter(vis).map((m) => {
         const carte = m.closest('.vrm-fu-carte, .vrm-fu-carte-nu'); const rm = m.getBoundingClientRect(); const touche = [];
+        // (15 nov.) Studio : « Modifier » n'est plus dans une `.vrm-fu-carte` — le banc rapporte (rien à chevaucher), il ne meurt pas.
+        if (!carte) return { touche, h: Math.round(rm.height) };
         for (const e of carte.querySelectorAll('svg, .vrm-fu-surtitre, .vrm-fu-grand, .vrm-fu-sous, .vrm-fu-case')) {
           if (!vis(e) || m.contains(e)) continue;
           let rs = []; if (e.tagName.toLowerCase() === 'svg' || e.matches('.vrm-fu-case')) rs = [e.getBoundingClientRect()]; else { const tw = document.createTreeWalker(e, NodeFilter.SHOW_TEXT); for (let n = tw.nextNode(); n; n = tw.nextNode()) { if (!/\S/.test(n.nodeValue)) continue; const rg = document.createRange(); rg.selectNodeContents(n); rs.push(...rg.getClientRects()); } }
