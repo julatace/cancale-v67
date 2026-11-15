@@ -28,4 +28,6 @@ export default {
   "verre2.msg.compteOnglet": "compte de l’onglet",
   "verre2.msg.offreDe": "Offre de {m}",
   "verre2.msg.propose": "{qui} propose",
+  "verre2.fiche.histoire": "Historique",
+  "verre2.fiche.toutVoir": "Tout voir",
 };

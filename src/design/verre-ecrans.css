@@ -505,4 +505,21 @@
   :root:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-raccourcis button { height: 36px !important; min-height: 36px !important; }
 }
 
+/* La fiche en UN écran (Julien : « C'est trop long ») : l'histoire en trois étapes (maquette « Historique »), « Tout voir »
+   qui replie le reste, en une touche de verre. */
+:root:root:root:root:root:root:root body .vrm-fp .vg-fp-hist { padding: 10px 14px 6px !important; border-radius: 22px !important;
+  background-color: transparent !important; background-image: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; box-shadow: var(--sv-ombre) !important; color: var(--sv-encre) !important; }
+:root:root:root:root:root:root:root body .vrm-fp .vg-fp-hist h3 { margin: 0 0 2px !important; }
+:root:root:root:root:root:root:root body .vrm-fp .vg-fp-hist-l { display: grid; grid-template-columns: 52px 10px 1fr; align-items: center; gap: 10px; min-height: 28px; }
+:root:root:root:root:root:root:root body .vrm-fp .vg-fp-hist-l span { font: 650 12px/1.2 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-encre-2) !important; }
+:root:root:root:root:root:root:root body .vrm-fp .vg-fp-hist-l i { width: 8px; height: 8px; border-radius: 50%; background: rgb(12 29 48 / .3); }
+:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-fp .vg-fp-hist-l i { background: rgb(255 255 255 / .35); }
+:root:root:root:root:root:root:root body .vrm-fp .vg-fp-hist-l b { font: 600 13px/1.3 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-encre) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:root:root:root:root:root:root:root body .vrm-fp .vg-fp-plus { margin-top: 10px; }
+:root:root:root:root:root:root:root body .vrm-fp .vg-fp-plus > summary { list-style: none; display: flex; align-items: center; justify-content: center; min-height: 48px; border-radius: 14px; cursor: pointer;
+  background: rgb(10 38 76 / .24); border: 1px solid rgb(255 255 255 / .32); color: #FFFFFF !important; font: 600 14.5px/1 var(--sb-police-texte, Inter, sans-serif); }
+:root:root:root:root:root:root:root body .vrm-fp .vg-fp-plus > summary::-webkit-details-marker { display: none; }
+:root:root:root:root:root:root:root body .vrm-fp .vg-fp-plus[open] > summary { margin-bottom: 12px; }
+:root:root:root:root:root:root:root body .vrm-fp .vg-fp-plus > :not(summary) { margin-bottom: 12px; }
+
 } /* fin de @layer vrm-verre */

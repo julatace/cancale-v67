@@ -28,4 +28,6 @@ export default {
   "verre2.msg.compteOnglet": "account della scheda",
   "verre2.msg.offreDe": "Offerta di {m}",
   "verre2.msg.propose": "{qui} propone",
+  "verre2.fiche.histoire": "Cronologia",
+  "verre2.fiche.toutVoir": "Vedi tutto",
 };

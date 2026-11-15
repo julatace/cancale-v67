@@ -54,7 +54,7 @@ export default {
   "atelier.fusion.section": "Même paire ?",
   "atelier.fusion.titre": "Fusionner deux fiches",
   "atelier.fusion.ouvrir": "Fusionner avec une autre fiche",
-  "atelier.fusion.ouvrirSous": "Si ces deux fiches sont la même chaussure",
+  "atelier.fusion.ouvrirSous": "Si ces deux fiches sont le même article",
   "atelier.fusion.sans.sansFiche": "Ce N° n’a pas une seule fiche : ouvre la fiche de l’annonce.",
   "atelier.fusion.chercher": "N° de l’autre fiche",
   "atelier.fusion.propositions": "Propositions (même photo, même titre) — c’est toi qui choisis",

@@ -165,7 +165,11 @@ function mesurer(vue) {
     out.fp = { sites: racine.querySelectorAll('.vg-fp-site').length, tuiles: [...racine.querySelectorAll('.vrm-fp-tuile')].filter(vis).length,
       parcours: !!racine.querySelector('.vrm-fp-parcours, .vrm-fp-temps, [data-fiche-temps]'), heros: !!racine.querySelector('.vrm-fp-heros'),
       photo: (() => { const p = racine.querySelector('.vrm-fp-heros-photo'); return p ? R(p) : null; })(),
-      outils: [...racine.querySelectorAll('.vrm-fp-outils > button')].filter(vis).length };
+      outils: [...racine.querySelectorAll('.vrm-fp-outils > button')].filter(vis).length,
+      // (15 nov., Julien : « C'est trop long ») la hauteur de la fiche, ce qui est VU (repli fermé) : identifiants, jargon, doublons
+      hauteur: (() => { const c = racine.querySelector('.vrm-fp-cadre'); return c ? Math.round(c.scrollHeight) : null; })(),
+      jargon: (() => { const t = racine.innerText; return (t.match(/\b(annonce|transaction|fiche) \d{6,}|journal des N°|vues par VRM|origine non enregistrée|lu dans le dressing|prix lus depuis|Modifications enregistrées sur cet appareil|à dater|même chaussure/gi) || []); })(),
+      doublons: (() => { const vus = {}; for (const e of racine.querySelectorAll('button, summary, h2, h3')) { if (!vis(e)) continue; const k = (e.innerText || '').trim(); if (k.length < 4) continue; vus[k] = (vus[k] || 0) + 1; } return Object.entries(vus).filter(([, n]) => n > 1).map(([k, n]) => `${k} ×${n}`); })() };
   }
   return out;
 }
@@ -240,6 +244,9 @@ function juger(m, suf, tel) {
     dit(F.heros && !!F.photo && F.photo.w >= 90, `F1 ${suf} : la paire en tête (photo ≥ 90 px)`, JSON.stringify(F.photo));
     dit(F.tuiles >= 2, `F2 ${suf} : prix d'achat et bénéfice en verres`, String(F.tuiles));
     dit(F.parcours, `F3 ${suf} : l'histoire de la paire`);
+    if (tel) dit(F.hauteur != null && F.hauteur <= 844 * 1.5, `F4 ${suf} : la fiche tient en 1,5 écran (${F.hauteur} px ≤ ${Math.round(844 * 1.5)})`);
+    dit(!F.jargon.length, `F5 ${suf} : aucun identifiant ni mot technique à l'écran`, F.jargon.slice(0, 5).join(' | '));
+    dit(!F.doublons.length, `F5 ${suf} : chaque geste, chaque titre UNE fois`, F.doublons.slice(0, 5).join(' | '));
     console.log(`   ℹ️ F ${suf} : ${F.sites} ligne(s) par site, ${F.outils} geste(s)`);
   }
 }

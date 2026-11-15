@@ -28,4 +28,6 @@ export default {
   "verre2.msg.compteOnglet": "Konto im Tab",
   "verre2.msg.offreDe": "Angebot über {m}",
   "verre2.msg.propose": "{qui} bietet",
+  "verre2.fiche.histoire": "Verlauf",
+  "verre2.fiche.toutVoir": "Alles ansehen",
 };

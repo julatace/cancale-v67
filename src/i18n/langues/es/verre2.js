@@ -28,4 +28,6 @@ export default {
   "verre2.msg.compteOnglet": "cuenta de la pestaña",
   "verre2.msg.offreDe": "Oferta de {m}",
   "verre2.msg.propose": "{qui} ofrece",
+  "verre2.fiche.histoire": "Historial",
+  "verre2.fiche.toutVoir": "Ver todo",
 };

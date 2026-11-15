@@ -19,6 +19,7 @@ export function HistoriqueModifications({owner,numero}){
  let storage=null;try{storage=sessionStorage;}catch{}
  const liste=lireParcours(storage,owner,'modifications',[]);
  const lignes=(Array.isArray(liste)?liste:[]).filter(l=>!numero||cleNum(l.numero)===cleNum(numero)).slice(0,30);
+ if(!lignes.length) return null;   // (15 nov.) aucune modification ⇒ rien (« (0) » n'apprend rien)
  return <details className="vrm-parcours-historique" key={owner} data-historique-local={revision}>
   <summary>Modifications enregistrées sur cet appareil ({lignes.length})</summary>
   <p>Depuis ce navigateur, sur les sept derniers jours. Ce journal ne confirme pas la synchronisation et ne reconstitue pas les changements antérieurs.</p>

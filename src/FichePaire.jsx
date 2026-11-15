@@ -87,7 +87,7 @@ const quand = (iso) => {
 const Evenement = ({ ev }) => (
   <li className="vrm-fp-ev" data-fiche-ev={ev.cle} data-fiche-ev-date={ev.at || ''} data-fiche-tx={ev.tx || undefined}>
     {ev.at ? <time dateTime={ev.at}>{quand(ev.at)}</time> : <span className="vrm-fp-ev-sansdate">—</span>}
-    <span className="vrm-fp-ev-txt">{ev.lien ? <a href={ev.lien} target="_blank" rel="noopener noreferrer">{ev.texte}</a> : ev.texte}{ev.preuve ? <small data-fiche-preuve="">{ev.preuve}</small> : null}</span>
+    <span className="vrm-fp-ev-txt">{ev.lien ? <a href={ev.lien} target="_blank" rel="noopener noreferrer">{ev.texte}</a> : ev.texte}{ev.preuve ? <small data-fiche-preuve={ev.preuve} hidden/> : null}</span>
   </li>
 );
 
@@ -111,7 +111,7 @@ function EtatArticle({ etat }) {
         ))}
         <div className="vrm-fp-etat-l" data-etat-ligne="republications" data-etat-val={r.n == null ? '' : r.n}>
           <dt>Republications</dt>
-          <dd><b>{r.n == null ? '—' : r.n}</b><small>{r.n == null ? r.raison : 'vues par VRM'}</small></dd>
+          <dd><b>{r.n == null ? '—' : r.n}</b>{r.n == null ? <small>{r.raison}</small> : null}</dd>
         </div>
       </dl>
     </section>
@@ -131,7 +131,7 @@ function HistoireNumero({ h }) {
           {h.evenements.map((ev, i) => (
             <li key={i} className="vrm-fp-ev" data-histo-num-ev={ev.quoi} data-histo-num-source={ev.cle} data-histo-num-date={ev.at || ''} data-histo-num-id={ev.id || undefined}>
               {ev.at ? <time dateTime={ev.at}>{dateCourte(ev.at)}</time> : <span className="vrm-fp-ev-sansdate">—</span>}
-              <span className="vrm-fp-ev-txt">{ev.texte}{ev.preuve ? <small data-fiche-preuve="">{ev.preuve}</small> : null}</span>
+              <span className="vrm-fp-ev-txt" title={ev.preuve || undefined}>{ev.texte}{ev.preuve ? <small data-fiche-preuve={ev.preuve} hidden/> : null}</span>
             </li>
           ))}
         </ul>
@@ -324,8 +324,20 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
           </div>
         </>)}
       </div>}
-      {etat && !double ? <EtatArticle etat={etat}/> : null}
+      {/* (15 nov., Julien : « C'est trop long » — la fiche en UN écran) L'HISTOIRE EN TROIS ÉTAPES : les trois dernières
+          étapes faites du parcours (la même règle, `parcoursPaire`), datées ; tout le reste se replie dans « Tout voir ». */}
+      {(() => { const faites = p.etapes.filter((e) => e.etat === 'fait'); const der = faites.slice(-3).reverse(); return der.length ? (
+        <section className="vg-fp-hist" data-fiche-hist={faites.length} aria-label={tr('verre2.fiche.histoire')}>
+          <h3 className="vg-ds">{tr('verre2.fiche.histoire')}</h3>
+          {der.map((e) => <div key={e.cle} className="vg-fp-hist-l" data-fiche-hist-etape={e.cle}><span>{e.date ? quand(e.date) : '—'}</span><i aria-hidden="true"/><b>{e.titre}</b></div>)}
+        </section>) : null; })()}
       {!depuis && outils ? <div className="vrm-fp-outils">{outils}</div> : null}
+      {!depuis ? poster : null}
+      {/* Tout le reste (l'état, les rubriques, l'histoire du N°, le parcours entier, la note, ce qui n'a pas pu être lu) :
+          replié, UNE fois — rien n'est supprimé, rien n'est dit deux fois sur le premier écran. */}
+      <details className="vg-fp-plus" data-fiche-plus="">
+        <summary className="vg-fp-plus-s">{tr('verre2.fiche.toutVoir')}</summary>
+      {etat && !double ? <EtatArticle etat={etat}/> : null}
       <OngletsFiche vue={vueFiche} onVue={setVueFiche}/>
       {vueFiche === 'temps' ? null : <nav className="vrm-fp-raccourcis" aria-label="Rubriques de cet article">{p.etapes.map(e=><button key={e.cle} type="button" onClick={()=>document.getElementById(`vrm-fiche-etape-${e.cle}`)?.scrollIntoView({block:'start',behavior:window.matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'})}>{e.titre}</button>)}</nav>}
       {histoNum ? <HistoireNumero h={histoNum}/> : null}
@@ -350,7 +362,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
       {note ? <div className="vrm-fp-note-privee" data-fiche-note="">{note}</div> : null}
       {lecture ? <p className="vrm-fp-note" data-fiche-lecture="">Lecture en cours…</p>
         : p.manques.length ? <p className="vrm-fp-note" data-fiche-manques={p.manques.length}>Pas pu lire : {p.manques.join(', ')}.</p> : null}
-      {!depuis ? poster : null}
+      </details>
     </>
   ) : null;
   const nomFiche = (p && p.num) || num || '';
