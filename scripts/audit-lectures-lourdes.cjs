@@ -24,7 +24,8 @@
 //      Leboncoin et « Le prix qui marche » passent par `lireDressings`, EXÉCUTÉE :
 //      comptes donnés ⇒ `id=in.(…)`, réponse vide ⇒ relue par motif (§4.1),
 //      « pas su » ⇒ `null`, comptes écartés ⇒ `id=not.in.(…)` ;
-//   4. la cloche « où ranger », le registre des achats et l'export lisent les
+//   4. le registre des achats et l'export (la cloche « où ranger » ne lit plus les achats depuis le
+//      15 nov. : on range un article, pas un achat) lisent les
 //      achats des comptes LIÉS (`lireAchatsLies`, EXÉCUTÉE, mêmes règles), plus
 //      la famille `harvest_*_orders_purchased` de tous les comptes.
 //  `--prouve` remet chacun des défauts d'avant (une mutation par défaut) et exige du ROUGE.
@@ -212,9 +213,9 @@ async function verifier(contenus) {
   dit(exD.length === 0, '`lireDressings` / `lireAchatsLies` (exécutées) : comptes donnés ⇒ id=in.(…), vide ⇒ relu par motif, pas su ⇒ null, écartés ⇒ id=not.in.(…)', exD.join(' | '));
   // 4. Les achats des comptes liés.
   const corps = (nom) => { const i = appSans.search(new RegExp('(?:async function|const) ' + nom + '\\b')); if (i < 0) return null; const j = appSans.indexOf('\n}', i); const k = appSans.indexOf('\n};', i); const fin = [j, k].filter((x) => x > 0).sort((a, b) => a - b)[0]; return appSans.slice(i, fin); };
-  const lecteurs = ['calculerOuRanger', 'lireAchatsRegistre', 'sourcesExportDonnees'].map((n) => [n, corps(n)]);
+  const lecteurs = ['lireAchatsRegistre', 'sourcesExportDonnees'].map((n) => [n, corps(n)]);
   const fautifs = lecteurs.filter(([, c]) => !c || !/lireAchatsLies\(/.test(c) || /harvest_\*_orders_purchased/.test(c)).map(([n]) => n);
-  dit(!fautifs.length, 'la cloche « où ranger », le registre des achats et l’export lisent les achats des comptes LIÉS (`lireAchatsLies`)', fautifs.join(', '));
+  dit(!fautifs.length, 'le registre des achats et l’export lisent les achats des comptes LIÉS (`lireAchatsLies`)', fautifs.join(', '));
   return ko;
 }
 
@@ -241,7 +242,6 @@ if (process.argv.includes('--prouve')) {
     ['`lireDressings` ignore les comptes donnés', (t) => t.replace("if (u && u.length && u.every((x) => /^\\d+$/.test(x))) {\n    const l = await lire(", "if (false) {\n    const l = await lire(")],
     ['`lireDressings` lit les comptes écartés', (t) => t.replace("${x.length ? `&id=not.in.(${idsDressings(x).join(',')})` : ''}", '')],
     ['`lireAchatsLies` prend une réponse vide pour « rien »', (t) => t.replace('    if (l.length) return l;\n  }\n  return lireTout(', '    return l;\n  }\n  return lireTout(')],
-    ['la cloche « où ranger » relit les achats de tous les comptes', (t) => t.replace('const lignes = (await achatsDejaLus(uids)) || (await lireAchatsLies(uids));', "const lignes = (await achatsDejaLus(uids)) || (await lireTout('id=like.harvest_*_orders_purchased&select=id,orders:data->payload->my_orders').catch(() => null));")],
     ['le registre des achats relit tous les comptes', (t) => t.replace(/(const lireAchatsRegistre = [\s\S]*?)comptesLus\.then\(\(c\) => lireAchatsLies\(Array\.isArray\(c\) \? uidsLies\(c\) : null\)\),/, "$1lireTout('id=like.harvest_*_orders_purchased&select=id,orders:data->payload->my_orders').catch(() => null),")],
     ["l'export relit tous les comptes", (t) => t.replace(/(async function sourcesExportDonnees[\s\S]*?)comptesLus\.then\(\(c\) => lireAchatsLies\(Array\.isArray\(c\) \? uidsLies\(c\) : null\)\),/, "$1lireTout('id=like.harvest_*_orders_purchased&select=id,orders:data->payload->my_orders').catch(() => null),")],
   ];

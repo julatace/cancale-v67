@@ -9,7 +9,9 @@
 //                         respecté, une case prise (même par un N° parti) jamais proposée
 //    L · l'achat          prix LU seulement, lot ⇒ N lignes sans prix divisé tout seul
 //    E · « Rangé »        fiche liée au n° de transaction, case, coût ; refus plutôt qu'écrasement
-//    A · App.jsx          pool avant le geste, jamais retiré par « Annuler », branchements
+//    A · App.jsx          (15 nov., Julien : « on range une ANNONCE, pas un achat ») la feuille n'est plus
+//                         montée ni ouverte par « J'ai retiré » / Ma journée ; le rattrapage du pool reste ;
+//                         la règle reste celle des cases d'un gros lot (src/grosLot.js)
 //
 //  `--prouve` (§6.1) : (1) les mêmes contrôles sur origin/main (ou `--avant <ref>`) :
 //  rouges ; (2) des MUTATIONS, une à la fois, sur une copie : chacune rougit.
@@ -123,16 +125,15 @@ async function controles(racine, silencieux) {
     JSON.stringify(R.numerosAReserver({ fiches: { a: { origine: 'arrivee', numero: '13' }, b: { origine: 'arrivee', numero: '14' }, c: { numero: '99' } }, pool: [1, 13], cleNum })) === '["14"]');
 
   // ── A : App.jsx ──
-  const f = (APP.match(/async function ecrireRangement[\s\S]*?\n}\n/) || [''])[0];
-  essai('A1 · « Rangé » : le pool est écrit AVANT le geste annulable, et jamais dans ses opérations', () => {
-    const iP = f.indexOf("save('vinted_used_numeros'"), iG = f.indexOf('gesteVrm(');
-    return (iP > 0 && iG > iP && !/k:\s*'vinted_used_numeros'/.test(f)) || { iP, iG }; });
-  essai('A2 · les N° servis relus (réservés de l’extension compris) avant de proposer et avant d’écrire', () =>
-    /async function numerosServisRangement[\s\S]*panel_num_reserves[\s\S]*numerosReserves\(/.test(APP) && (APP.match(/await numerosServisRangement\(\)/g) || []).length >= 2);
-  essai('A3 · « J’ai retiré » (colis et commande Vinted) ouvre la feuille ; au comptoir elle attend la fermeture', () =>
-    /const markCollected = \(t\) => \{[^\n]*apresRetrait\(entreeRangementColis\(t\)\)/.test(APP) && /const markPickupDone = \(o\) => \{[^\n]*apresRetrait\(entreeRangementVinted\(o\)\)/.test(APP) && /if \(scanOuvert \|\| relaisOuvert\) \{ retraitsARanger\.current\.push/.test(APP));
-  essai('A4 · l’achat d’un colis par IDENTITÉ seulement (`achatDuColis`)', () => /const entreeRangementColis = \(t\) => \{[\s\S]{0,200}achatDuColis\(t, buysBase, indexSuivisAchats\)/.test(APP));
-  essai('A5 · la feuille est montée et la carte de Ma journée existe', () => /<RangerAchatCoque\/>/.test(APP) && /id: 'achats-a-ranger'/.test(APP));
+  const sansCom = (t) => String(t || '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
+  const APPc = sansCom(APP);
+  essai('A1 · rattrapage : les N° des fiches déjà rangées entrent au pool (append-only), le rattrapage reste monté', () =>
+    /function reserverNumerosRanges\(\)[\s\S]{0,400}numerosAReserver\(/.test(APPc) && /<RattrapageNumerosRanges\/>/.test(APPc));
+  essai('A2 · les N° servis relus (réservés de l’extension compris) pour un gros lot', () =>
+    /async function numerosServisLus[\s\S]*panel_num_reserves[\s\S]*numerosReserves\(/.test(APPc));
+  essai('A3 · (15 nov.) « J’ai retiré » n’ouvre plus « Ranger cet achat » (on range un article, pas un achat)', () =>
+    !/apresRetrait\(|proposerRangement\(|ouvrirRangement\(|retraitsARanger/.test(APPc));
+  essai('A5 · (15 nov.) la feuille « Ranger cet achat » n’est plus montée, Ma journée n’a plus « N achats à ranger »', () => !/<RangerAchatCoque\/>/.test(APPc) && !/id: 'achats-a-ranger'/.test(APPc));
   essai('A6 · les fiches à publier comptent comme N° servis partout (`ajouterNumerosHorsEcran`)', () => /const ajouterNumerosHorsEcran = [\s\S]{0,900}vrm_fiches_neuves/.test(APP));
   return { ok, ko, rouges };
 }
@@ -151,7 +152,7 @@ const MUTATIONS = [
   ['prix de lot divisé tout seul', 'src/rangementArrivee.js', "return { k, titre: '', marque: '', taille: '', prix: '',", "return { k, titre: '', marque: '', taille: '', prix: prixEnTexte(indicatif),"],
   ['identité de l’achat perdue', 'src/rangementArrivee.js', "achat: { tx, site:", "achat: { tx: '', site:"],
   ['achat rangé deux fois', 'src/rangementArrivee.js', "return { ok: false, raison: 'deja' };", "{}"],
-  ['pool dans le geste annulable (App.jsx)', 'src/App.jsx', "  save('vinted_used_numeros', pool.sort(triPool));\n  emettreClesRelues(['vinted_used_numeros']);\n  const texte = r.numeros.length", "  r.ops.push({ k: 'vinted_used_numeros', type: 'ensemble', id: r.numeros[0], apres: true, avant: false });\n  const texte = r.numeros.length"],
+  ['« J’ai retiré » rouvre la feuille (App.jsx)', 'src/App.jsx', '  const markCollected = (t) => gesteCollecte(t, true);', '  const markCollected = (t) => { const id = gesteCollecte(t, true); try { apresRetrait(entreeRangementColis(t)); } catch (_) {} return id; };'],
 ];
 
 const copieArbre = (src) => {

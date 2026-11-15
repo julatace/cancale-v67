@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 // ── audit-coque-parametres — LA COQUE, LA NAVIGATION, PARAMÈTRES (5 nov., chantier H) ──
 // Ce qui se juge SANS rendu (le banc `scripts/bancs/coque-parametres.cjs` juge le rendu) :
-//   1. « Où ranger à l'arrivée » (src/ouRanger.js), sur des données INVENTÉES :
+//   1. « Où ranger » (src/ouRanger.js), sur des données INVENTÉES :
 //      · la première case libre suit les règles du Stock (ordre des meubles, puis de
 //        lecture ; une case notée pour un N° est PRISE ; un meuble « empilé » ne
 //        propose que le fond de son segment — planches comprises) ;
 //      · « pas su » (meubles ou cases pas lus) et « aucun meuble » ⇒ rien n'est proposé ;
-//      · un achat n'est « arrivé » que sur une TRANSITION vue (autre → arrivé), par son
-//        n° de transaction ; la première lecture ne propose rien ; « pas su » (achats
-//        pas lus) ne change rien ;
+//      · (15 nov., Julien : « on range une ANNONCE, pas un achat ») plus aucune proposition
+//        pour un ACHAT arrivé ; chaque ARTICLE à ranger reçoit SA case (`casesProposees`),
+//        jamais celle d'un autre ;
 //   2. App.jsx (la coque) :
 //      · le nuage ne s'affiche qu'en cas de problème (`error`, `refus`) ;
 //      · le même colis n'a qu'un badge (Ventes ne recopie pas celui de Colis) ;
@@ -17,8 +17,8 @@
 //      · Paramètres : une icône par ligne dans chaque onglet ; plus de ligne
 //        « Organisation » (son lien reste) ; « Statut » (jamais « Régime fiscal ») ;
 //      · la pastille : « Dernière capture » lue dans la même source que la liste ;
-//   3. la cloche passe par `SheetShell` (src/CentreNotifs.jsx), et la ligne « Où ranger »
-//      n'écrit rien en base (aucune notification envoyée au téléphone).
+//   3. la cloche passe par `SheetShell` (src/CentreNotifs.jsx) et ne calcule plus rien sur les
+//      achats (plus de ligne « Arrivé · Première case libre · Ranger »).
 //   node scripts/audit-coque-parametres.cjs                 la règle du dépôt
 //   node scripts/audit-coque-parametres.cjs --mutation=NOM  une règle réaffaiblie
 //   node scripts/audit-coque-parametres.cjs --prouve        toutes les mutations : chacune doit rougir
@@ -37,17 +37,15 @@ const F = {
 // [fichier, ancre, remplacement]
 const MUTATIONS = {
   // Une case notée pour un N° compte comme libre.
-  'case-prise-ignoree': ['ranger', "      if (prise(i)) continue;\n", ''],
+  'case-prise-ignoree': ['ranger', "    if (prise(i)) continue;\n", ''],
   // Le meuble empilé propose une case en l'air.
-  'gravite-ignoree': ['ranger', "        if (!fond && !prise((r + 1) * cols + c)) continue;\n", ''],
+  'gravite-ignoree': ['ranger', "      if (!fond && !prise((r + 1) * cols + c)) continue;\n", ''],
   // « Pas su » (meubles pas lus) traité comme « aucun meuble prêt » : une case inventée.
   'passu-libre': ['ranger', "  if (!estListe(meubles) || !estObjet(slots)) return null;", "  if (!estListe(meubles)) meubles = [{ id: 'm?', name: 'Meuble', cols: 1, rows: 1 }]; if (!estObjet(slots)) slots = {};"],
-  // La première lecture propose tout ce qui est déjà arrivé.
-  'premiere-lecture': ['ranger', "    if (avant && etat === 'arrive' && avant[tx] === 'autre') arrives.push(a);", "    if (etat === 'arrive' && (!avant || avant[tx] === 'autre')) arrives.push(a);"],
-  // Un achat jamais vu (pas « autre ») compte comme arrivé.
-  'jamais-vu': ['ranger', "avant[tx] === 'autre') arrives.push(a);", "avant[tx] !== 'arrive') arrives.push(a);"],
-  // Sans case sue, on propose quand même.
-  'sans-case': ['ranger', "  if (!caseLibre || !estObjet(proposes)) return [];", "  if (!estObjet(proposes)) return [];"],
+  // (15 nov.) Une case proposée ne compte pas comme prise : la MÊME case à deux articles.
+  'meme-case': ['ranger', "    prises.add(pose.meubleId + ':' + pose.i);\n", ''],
+  // (15 nov.) La cloche recompte des notifications locales (« Où ranger » sur un achat).
+  'cloche-locale': ['centre', "export function BoutonCentreNotifs({ nonLues, onOuvrir, Icon, alerte", "export function BoutonCentreNotifs({ nonLues, onOuvrir, Icon, enPlus = 0, alerte"],
   // Le nuage revient en permanence.
   'nuage-permanent': ['app', "  if (!SYNC_PROBLEME.has(syncStatus) && !ouvert) return null;\n", ''],
   // Ventes recopie le badge de Colis.
@@ -128,24 +126,14 @@ if (arg.includes('--prouve')) {
     dit(g3 && g3.i === 2, 'empilé : la case juste au-dessus d’une case prise', g3);
   });
 
-  // ── 2. L'ACHAT QUI VIENT D'ARRIVER ───────────────────────────────────────
-  essaie('achatsArrives', () => {
-    const estArrive = (a) => /livr|finalis/i.test(a.status || '');
-    const achats = [{ transaction_id: 1, title: 'A', status: 'Commande livrée' }, { transaction_id: 2, title: 'B', status: 'Expédiée' }, { transaction_id: 3, title: 'C', status: 'Commande finalisée' }];
-    const p = R.achatsArrives({ achats, vus: null, estArrive });
-    dit(p.arrives.length === 0 && p.vus && p.vus['1'] === 'arrive' && p.vus['2'] === 'autre', 'première lecture sur l’appareil ⇒ rien n’est proposé, l’état est retenu', p);
-    const s = R.achatsArrives({ achats, vus: { 1: 'autre', 2: 'autre', 3: 'arrive' }, estArrive });
-    dit(s.arrives.length === 1 && s.arrives[0].transaction_id === 1, 'seul l’achat vu « en route » puis « arrivé » est proposé (le déjà arrivé, non)', s.arrives.map((a) => a.transaction_id));
-    const j = R.achatsArrives({ achats, vus: { 2: 'autre' }, estArrive });
-    dit(j.arrives.length === 0, 'un achat jamais vu avant (pas de transition vue) n’est pas proposé', j.arrives.map((a) => a.transaction_id));
-    const ps = R.achatsArrives({ achats: null, vus: { 1: 'autre' }, estArrive });
-    dit(ps.arrives.length === 0 && ps.vus && ps.vus['1'] === 'autre', '« pas su » (achats pas lus) ⇒ rien, et ce qui était vu est gardé', ps);
-    const sansTx = R.achatsArrives({ achats: [{ title: 'Même titre', status: 'Commande livrée' }], vus: {}, estArrive });
-    dit(sansTx.arrives.length === 0, 'un achat sans n° de transaction n’a pas d’identité ⇒ jamais proposé (jamais par titre)');
-    const c = { meubleId: 'mA', meuble: 'Étagère A', i: 2, rangee: 1, colonne: 3 };
-    const l = R.notifsOuRanger({ proposes: { 1: { tx: '1', titre: 'A', at: 2 }, 3: { tx: '3', titre: 'C', at: 1, fait: 5 } }, caseLibre: c });
-    dit(l.length === 1 && l[0].tx === '1' && l[0].ou === 'Étagère A · rangée 1, colonne 3', 'une ligne par achat arrivé pas encore rangé, avec LA case proposée', l);
-    dit(R.notifsOuRanger({ proposes: { 1: { tx: '1', at: 2 } }, caseLibre: null }).length === 0, 'aucune case sue ⇒ aucune notification');
+  // ── 2. (15 nov.) PLUS RIEN POUR UN ACHAT ; UNE CASE PAR ARTICLE ─────────
+  dit(typeof R.achatsArrives !== 'function' && typeof R.notifsOuRanger !== 'function', 'aucune règle ne fabrique plus de proposition « à ranger » pour un ACHAT arrivé (Julien : « on range une ANNONCE, pas un achat »)', Object.keys(R));
+  essaie('casesProposees', () => {
+    const meubles = [{ id: 'mA', name: 'Étagère A', cols: 3, rows: 2 }];
+    const r = R.casesProposees({ meubles, slots: { 1: { m: 'mA', i: 0 } }, cles: ['2', '3', '4'] });
+    const l = ['2', '3', '4'].map((k) => r[k] && r[k].meubleId + ':' + r[k].i);
+    dit(l.every(Boolean) && new Set(l).size === 3 && l[0] === 'mA:1', 'trois articles à ranger ⇒ trois cases différentes, la première libre au premier', l);
+    dit(R.casesProposees({ meubles: null, slots: {}, cles: ['2'] }) === null, '« pas su » ⇒ rien proposé');
   });
 
   // ── 3. APP.JSX ET LA CLOCHE ──────────────────────────────────────────────
@@ -182,12 +170,9 @@ if (arg.includes('--prouve')) {
   // La cloche.
   const C = sansCommentaires(src.centre);
   dit(/<SheetShell onClose=\{onFermer\} titre="Notifications"/.test(C) && !/createPortal/.test(C) && !/vrm-cn-voile/.test(C), 'la cloche passe par SheetShell (poignée, croix, portail) — plus de calque fait main');
-  const coque = bloc('async function calculerOuRanger()', 'function CentreNotifsCoque');
-  dit(coque && !/\bsave\(|fetch\([^)]*method|POST|pushNotif/.test(coque), '« Où ranger » n’écrit rien en base et n’envoie rien au téléphone (lecture projetée seulement)', coque.slice(0, 80));
-  // (6 nov., vitesse 2) Les achats des comptes liés passent par `lireAchatsLies` (projetée, paginée) : on juge SA lecture.
-  const achatsLies = bloc('async function lireAchatsLies(', '\n}');
-  const projete = (s) => /select=id,orders:data->payload->my_orders/.test(s) && !/select=data[^-]/.test(s);
-  dit((projete(coque) || (/lireAchatsLies\(/.test(coque) && projete(achatsLies) && /lireTout\(/.test(achatsLies))) && !/select=data[^-]/.test(coque), 'les achats sont lus PROJETÉS (jamais `select=data`, §4.4)');
+  // (15 nov.) La cloche ne lit plus les achats pour proposer une case : plus de `calculerOuRanger`, rien des propositions gardées.
+  const coque = bloc('function CentreNotifsCoque(', '\n}\n');
+  dit(!!coque && !/calculerOuRanger|aRanger|enPlus|vrm_ranger_/.test(coque) && !/function calculerOuRanger/.test(A), 'la cloche ne calcule plus rien sur les achats (aucune case proposée à un achat arrivé)', coque.slice(0, 80));
 
   console.log(`\n${ko ? '❌' : '✅'} audit-coque-parametres : ${n - ko}/${n}`);
   process.exit(ko ? 1 : 0);

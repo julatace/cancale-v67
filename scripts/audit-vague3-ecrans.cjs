@@ -12,7 +12,8 @@
 //      dans les deux thèmes ; fusion.css n'écrit plus de blanc translucide à la main ;
 //   S  « Ranger » vise sa case : la cible `case` (src/cibleNotif.js, EXÉCUTÉE) ne vise
 //      qu'une place (meuble + case), jamais vide ; la case du Stock porte son crochet ;
-//      la cloche « Où ranger » mène à LA case ; `poserCible` la fait sélectionner ;
+//      « Ranger au stock » vise la case proposée à CET article (15 nov. : la cloche ne propose plus
+//      de case à un achat) ; `poserCible` la fait sélectionner ;
 //   X  Statistiques : « Annulations », « Notes reçues », « Boost » et « Offres » lisent
 //      les comptes écartés par UN crochet qui suit le nuage (`useCompteEcarte`), jamais
 //      une lecture figée au montage ;
@@ -79,10 +80,10 @@ function verifier(M, dit) {
   dit(C.selecteursCible && C.selecteursCible(c).essais.includes('[data-case-ici="mA:3"]') && !!C.phraseAbsente(c), 'S', 'la case se trouve aussi par `data-case-ici`, et son absence se dit');
   const sm = corps(app, 'StockMeubles');
   dit(/data-cible=\{attrCible\(\['case',\s*m\.id,\s*i\]\)\}/.test(sm), 'S', 'chaque case du Stock porte son crochet `data-cible` (case:meuble:i)');
-  dit(/premiereCaseMeubles\(\{\s*meubles,\s*slots\s*\}\)/.test(sm) && /viserCase\(libre\.meubleId,\s*libre\.i\)/.test(sm), 'S', '« Ranger au stock » vise la première case libre (la règle de src/ouRanger.js)');
+  dit(/const libre = caseProposeeDe\(k\);/.test(sm) && /viserCase\(libre\.meubleId,\s*libre\.i\)/.test(sm), 'S', '« Ranger au stock » vise la case proposée à CET article (une par article, `casesProposees` de src/ouRanger.js)');
   dit(/viserCase\(s0\.m,/.test(sm), 'S', '« Voir au stock » vise la case du N° quand il en a une');
   dit(/estChoisie\s*\|\|/.test(sm) && /data-case-choisie=/.test(sm), 'S', 'la case visée est SÉLECTIONNÉE (is-vise, data-case-choisie)');
-  dit(/cible=case&meuble=\$\{encodeURIComponent\(c\.meubleId\)\}&i=/.test(app), 'S', 'la cloche « Où ranger » mène à LA case proposée (cible=case)');
+  dit(!/calculerOuRanger|data-centre-ranger/.test(app), 'S', '(15 nov.) la cloche ne propose plus de case à un ACHAT arrivé (on range un article, pas un achat)');
   dit(/c\.type === 'case'[^\n]*DEMANDE_STOCK_CASE\.m\s*=/.test(app), 'S', '`poserCible` fait sélectionner la case par le Stock (DEMANDE_STOCK_CASE)');
   // ── X
   const ecr = corps(app, 'useCompteEcarte');
@@ -104,7 +105,6 @@ const MUTATIONS = [
   ['K', 'un blanc à 62 % remis à la main', 'src/design/fusion.css', (t) => t.replace('.vrm-fu-surtitre { display: block; font: 600 13px/1.3 var(--vrm-police); color: var(--fu-sur-sombre-2);', '.vrm-fu-surtitre { display: block; font: 600 13px/1.3 var(--vrm-police); color: rgba(255,255,255,.62);')],
   ['S', 'la cible case acceptée sans n°', 'src/cibleNotif.js', (t) => t.replace("if (!c.meuble || !c.i) return null;", "if (!c.meuble) return null;")],
   ['S', 'le type case retiré', 'src/cibleNotif.js', (t) => t.replace(", 'doublon', 'case'];", ", 'doublon'];")],
-  ['S', 'la cloche remise sur « ?tab=garage » seul', 'src/App.jsx', (t) => t.replace('`?tab=garage&cible=case&meuble=${encodeURIComponent(c.meubleId)}&i=${Number(c.i)}`', "'?tab=garage'")],
   ['S', '« Ranger au stock » ne propose plus de case', 'src/App.jsx', (t) => t.replace('if (libre) { viserCase(libre.meubleId, libre.i);', 'if (libre) {')],
   ['X', 'le prédicat figé au montage (avant)', 'src/App.jsx', (t) => t.replace("const ecarteUid = useCompteEcarte(panelOff);", "const ecarteUid = React.useMemo(() => { const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String)); return (u) => compteEcarte(u, hAcc, panelOff || {}); }, [panelOff]);")],
   ['X', 'le crochet ne suit plus le nuage', 'src/App.jsx', (t) => t.replace("const stop = onCloudReady(() => setTick((t) => t + 1));\n    return () => { window.removeEventListener('vrm:save', f); if (typeof stop === 'function') stop(); };\n  }, []);\n  return React.useMemo(() => {\n    const hAcc", "const stop = null;\n    return () => { window.removeEventListener('vrm:save', f); if (typeof stop === 'function') stop(); };\n  }, []);\n  return React.useMemo(() => {\n    const hAcc")],
