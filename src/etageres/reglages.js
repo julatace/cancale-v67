@@ -59,11 +59,14 @@ export function etiquetteVue(reg) {
   const r = reg || reglagesDe(null), e = r.etiquette;
   return { ...e, photo: e.photo && r.densite !== 'loin', sites: e.sites && (r.affichage === 'rayonnage' || r.densite === 'confortable') };
 }
-// La ligne d'état/texte d'une étiquette : l'état D'ABORD (« À sortir », « En double » — toujours), sinon ce que
-// l'étiquette demande (compte ou « hors ligne », taille, prix). Rend { sorte: 'sortir'|'double'|'texte', bits }.
+// La ligne d'état/texte d'une étiquette : l'état D'ABORD (« À sortir », « En double », « Plus en ligne » — toujours),
+// sinon ce que l'étiquette demande (compte ou « hors ligne », taille, prix).
+// Rend { sorte: 'sortir'|'double'|'plusenligne'|'texte', bits }. « Plus en ligne » : rangée, mais plus une annonce
+// actuelle (retirée, supprimée) — un geste à faire, dit à l'ambre comme avant.
 export function ligneEtiquette({ etat, double, compte, horsLigne, taille, prix } = {}, etiquette = {}) {
   if (etat === 'vendue') return { sorte: 'sortir', bits: [] };
   if (double) return { sorte: 'double', bits: [] };
+  if (etat === 'plusenligne') return { sorte: 'plusenligne', bits: [] };
   const bits = [];
   if (etiquette.compte) { if (compte) bits.push(compte); else if (horsLigne) bits.push({ horsLigne: true }); }
   if (etiquette.taille && taille) bits.push(taille);

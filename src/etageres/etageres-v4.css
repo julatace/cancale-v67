@@ -92,11 +92,14 @@
 .vrm-e-st.is-sortir { color: #5E3900; font-weight: 800; }
 .vrm-e-st.is-double { color: var(--sb-doublon, #B42020); font-weight: 800; }
 /* À SORTIR : le carton avance, cerclé d'ambre ; son étiquette se teinte. EN DOUBLE : le liseré rouge. Toujours. */
-.vrm-m4[data-affichage="cartons"] .vrm-s2d-case.is-vendue, .vrm-m4[data-affichage="cartons"] .vrm-s2d-case.is-plusenligne { transform: translateY(7px); z-index: 3; }
+.vrm-m4[data-affichage="cartons"] .vrm-s2d-case.is-vendue { transform: translateY(7px); z-index: 3; }
 .vrm-m4[data-affichage="cartons"] .vrm-s2d-case.is-vendue .vrm-b4::after { content: ''; position: absolute; inset: 4px -4px -3px; border-radius: 5px; box-shadow: 0 0 0 2.5px #F0A43C, 0 0 14px rgb(240 164 60 / .45); pointer-events: none; }
 .vrm-m4[data-affichage="cartons"] .vrm-s2d-case.is-vendue .vrm-eti4 { background: #FFE7C4; }
 .vrm-m4[data-affichage="cartons"] .vrm-s2d-case.is-double .vrm-eti4 { box-shadow: 0 0 0 2px var(--sb-doublon, #C62828); }
-.vrm-m4[data-affichage="cartons"] .vrm-s2d-case.is-plusenligne .vrm-b4 { filter: saturate(.75); }
+.vrm-m4[data-affichage="cartons"] .vrm-s2d-case.is-plusenligne .vrm-b4::after { content: ''; position: absolute; inset: 4px -4px -3px; border-radius: 5px; box-shadow: 0 0 0 2px #F0A43C; pointer-events: none; }
+.vrm-e-st.is-plusenligne, .vrm-c4.is-plusenligne { color: #5E3900; font-weight: 800; }
+.vrm-m4[data-affichage="rayonnage"] .vrm-s2d-case.is-plusenligne .vrm-lab4 { box-shadow: inset 0 0 0 2px #F0A43C; }
+.vrm-m4[data-affichage="plan"] .vrm-s2d-case.is-plusenligne { box-shadow: 0 0 0 3px #F0A43C; }
 /* Une case libre : un trou sombre, un « + » en pointillé. */
 .vrm-b4-trou { display: grid; place-items: center; height: 98px; margin-top: -8px; border-radius: 4px; background: radial-gradient(70% 60% at 50% 40%, rgb(2 10 24 / .55), rgb(2 10 24 / .25)); box-shadow: inset 0 8px 14px rgb(0 0 0 / .45); }
 .vrm-m4[data-densite="compacte"] .vrm-b4-trou { height: 76px; }

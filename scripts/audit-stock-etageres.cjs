@@ -347,6 +347,8 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { ko++; n++; con
     const rien = { photo: false, grand: false, sites: false, compte: false, prix: false, taille: false };
     const s = RG.ligneEtiquette({ etat: 'vendue', double: true, compte: 'x', prix: 50 }, rien), db = RG.ligneEtiquette({ double: true, compte: 'x' }, rien);
     dit(s.sorte === 'sortir' && db.sorte === 'double', 'R2 · « À sortir » puis « En double » se disent TOUJOURS, même étiquette vide', { s, db });
+    const pl = RG.ligneEtiquette({ etat: 'plusenligne', compte: 'x', prix: 3 }, { ...rien, compte: true, prix: true });
+    dit(pl.sorte === 'plusenligne', 'R2 · « Plus en ligne » (rangée, plus une annonce actuelle) se dit toujours, avant le compte et le prix', pl);
     const p = RG.ligneEtiquette({ compte: 'shop', prix: 95, taille: 'T42' }, { ...rien, prix: true }), h = RG.ligneEtiquette({ horsLigne: true }, { ...rien, compte: true });
     dit(p.sorte === 'texte' && p.bits.length === 1 && p.bits[0].prix === 95 && h.bits.length === 1 && h.bits[0].horsLigne === true, 'R2 · l’étiquette dit ce qu’il coche (le prix seul ; « hors ligne » sans compte)', { p, h });
   });

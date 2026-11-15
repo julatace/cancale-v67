@@ -719,9 +719,10 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       </span> : null);
   const ligneEti = (occ, inf, et, sold, hors, dbl, cls) => {
     // Le compte : le premier (celui où la paire est en ligne), comme la maquette ; tous dans l'aide (title) et la fiche.
-    const l = ligneEtiquette({ etat: sold ? 'vendue' : '', double: dbl, compte: inf.pseudos[0] || '', horsLigne: hors || !inf.plats.length, taille: inf.taille, prix: inf.prix }, et);
+    const l = ligneEtiquette({ etat: sold ? 'vendue' : (hors ? 'plusenligne' : ''), double: dbl, compte: inf.pseudos[0] || '', horsLigne: !inf.plats.length, taille: inf.taille, prix: inf.prix }, et);
     if (l.sorte === 'sortir') return <span className={cls + ' is-sortir'} data-case-ligne="sortir">{tr('etag4.aSortir')}</span>;
     if (l.sorte === 'double') return <span className={cls + ' is-double'} data-case-ligne="double">{tr('etag4.enDouble')}</span>;
+    if (l.sorte === 'plusenligne') return <span className={cls + ' is-plusenligne'} data-case-ligne="plusenligne">{tr('stock.plusLigne2')}</span>;
     if (!l.bits.length) return null;
     return <span className={cls + ' vrm-etag-compte'} data-case-ligne="texte" title={inf.pseudos.length > 1 ? inf.pseudos.join(' · ') : undefined}>{l.bits.map((b) => (typeof b === 'string' ? b : b.horsLigne ? tr('etag4.horsLigne') : monnaie(b.prix, 'EUR', Number.isInteger(Number(b.prix)) ? { maximumFractionDigits: 0, minimumFractionDigits: 0 } : undefined))).join(' · ')}</span>;
   };
