@@ -10,6 +10,7 @@ import { cleVapid, abonnementAJour } from './vapid.js';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import Accueil from './Accueil.jsx';
+import { lienEntree } from './accueil/lienEntree.js';
 // (11 nov., lot traduction) La langue est prête AVANT le premier rendu (src/i18n/index.js) ;
 // la racine se redessine quand elle change (Paramètres → Langue, ou relue du nuage).
 import { tr, preparerLangue } from './i18n/index.js';
@@ -214,7 +215,9 @@ function Racine() {
   if (pageTarifs()) return <React.Suspense fallback={<FondApp />}><Tarifs /></React.Suspense>;
   if (vue === 'accueil') {
     return <Accueil onEntrer={(mode) => {
-      try { window.history.pushState({}, '', mode === 'up' ? '/?inscription' : '/?connexion'); } catch (_) {}
+      // (15 nov., lot site-public) La suite de l'adresse (code d'un partenaire, utm…) passe intacte
+      // jusqu'au formulaire (src/accueil/lienEntree.js) : on ne la lit pas ici.
+      try { window.history.pushState({}, '', lienEntree(mode === 'up' ? 'inscription' : 'connexion')); } catch (_) {}
       window.scrollTo(0, 0);
       setVue('app');
     }} />;

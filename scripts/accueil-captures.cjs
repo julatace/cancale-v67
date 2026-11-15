@@ -39,6 +39,8 @@ const ECRANS = [
   { nom: 'numeros', tab: process.env.TAB_NUMEROS || 'annonces', w: 390, h: 844, defile: 620 },
   { nom: 'compta', tab: 'compta', w: 390, h: 844, gestes: [/^\s*Ventes\s*$/, /^\s*Argent\s*$/, /^\s*Argent\s*$/, /^\s*Déclarer\s*$/, /^\s*Micro-entrepreneur/, /^\s*Par mois\s*$/] },
   { nom: 'messages', tab: 'messages', w: 390, h: 844 },
+  // (15 nov., lot site-public) « Imprimer en un toucher » : Ventes, « À expédier » en tête avec le plein « Imprimer N ».
+  { nom: 'expedier', tab: 'ventes', w: 390, h: 844 },
   { nom: 'bureau', tab: 'journee', w: 1440, h: 900 },
 ];
 const CATALOGUE_VARIE = [
@@ -71,7 +73,10 @@ async function capturer(nav, e, theme) {
   // d'entrée). CATALOGUE=baskets rend le jeu d'avant (pour comparer). Tout est inventé.
   await ctx.addInitScript(({ sombre, catalogue }) => {
     try { sessionStorage.setItem('vrm_mode_exemple', '1'); if (catalogue) window.__vrmExempleCatalogue = catalogue; localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); } catch (_) {}
-  }, { sombre, catalogue: process.env.CATALOGUE === 'baskets' ? null : CATALOGUE_VARIE });
+  // (15 nov., lot site-public) Par défaut le jeu d'exemple AVEC SES PHOTOS (public/exemple/, CC0 et domaine
+  // public, src/exemplePhotos.js) — celui que montre « Découvrir avec des exemples ». CATALOGUE=varie rend le
+  // catalogue mélangé d'avant (sans photo : une photo n'est jamais prêtée à un autre article).
+  }, { sombre, catalogue: process.env.CATALOGUE === 'varie' ? CATALOGUE_VARIE : null });
   const pg = await ctx.newPage();
   const erreurs = [];
   pg.on('pageerror', (x) => erreurs.push(String(x.message || x).slice(0, 200)));
