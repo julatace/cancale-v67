@@ -43,7 +43,8 @@ export function joursEnLigne(etat) {
 
 // UNE ligne d'état sous le nom. `ambre` : il y a un geste à faire (§7 : ambre = geste).
 // Rend { cle, vars, ambre } — l'écran fait `tr(cle, vars)`.
-export function ligneEtat(p, { sites = [], etat = null, dateCourte = (x) => x } = {}) {
+// `action` : la sorte de la carte d'action — quand la carte EST « imprimer le bordereau », la ligne d'état ne le redit pas.
+export function ligneEtat(p, { sites = [], etat = null, dateCourte = (x) => x, action = null } = {}) {
   if (!p) return null;
   const r = p.resume || {};
   const s = situation(p, sites);
@@ -51,7 +52,7 @@ export function ligneEtat(p, { sites = [], etat = null, dateCourte = (x) => x } 
   if (s === 'vendue') {
     const prix = r.vente != null ? r.vente : null;
     const v = etape(p, 'vente'); const d = premiereDate(v);
-    if (p.aPoster) return { cle: prix != null ? 'fd.etat.vendueEnvoyer' : 'fd.etat.vendueEnvoyerSansPrix', vars: { prix }, ambre: true };
+    if (p.aPoster && action !== 'bordereau') return { cle: prix != null ? 'fd.etat.vendueEnvoyer' : 'fd.etat.vendueEnvoyerSansPrix', vars: { prix }, ambre: true };
     return { cle: prix != null && d != null ? 'fd.etat.vendueLe' : prix != null ? 'fd.etat.vendue' : 'fd.etat.vendueSansPrix', vars: { prix, date: d != null ? dateCourte(d) : '' }, ambre: false };
   }
   if (s === 'passu') return { cle: 'fd.etat.passu', vars: {}, ambre: false };

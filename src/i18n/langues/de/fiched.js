@@ -54,6 +54,7 @@ export default {
   "fd.argent.auPlus": "höchstens",
   "fd.argent.double": "Zwei Paare unter dieser Nr.: keine Zahl wird gewählt.",
   "fd.sites.aucun": "Nirgends online.",
+  "fd.sites.enLigne": "online",
   "fd.sites.vendue": "verkauft",
   "fd.sites.vendueLe": "verkauft am {date}",
   "fd.sites.favoris": {"one": "{n} Favorit", "other": "{n} Favoriten"},

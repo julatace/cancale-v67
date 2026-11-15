@@ -16,7 +16,10 @@
 //       comparée au prix et au prix mini, UN plein (« Proposer N € ») ;
 //    P  Paramètres : le premier écran tient sans défiler (390×844) : recherche, carte Mon compte, les tuiles
 //       des catégories ; une catégorie en groupes courts ; les 84 rangées et leurs id inchangés (audit) ;
-//    F  la fiche : une ligne par site, prix d'achat et bénéfice, historique, trois gestes ;
+//    F  la fiche (direction D « fiche produit », 15 nov.) : UN écran 390×844 (F4), photo pleine largeur + plaque, nom 26 px
+//       et UNE ligne d'état, UNE carte d'action, Argent · Sites · Histoire (une vue), texte ≥ 15 px, chiffres 28–36 px,
+//       « ⋯ » (tuiles + Tout voir), chaque montant une fois ; D1-D3 les trois cas (vendue sans achat relié : l'achat
+//       PROPOSÉ et « Relier · 52 € » ; vendue reliée : « Imprimer le bordereau » ; en vente sur 2 sites : « Baisser le prix »).
 //    Z  partout : rien ne déborde, cibles ≥ 44 px au doigt, un plein au plus.
 //  Un banc ne meurt pas, il rapporte. `VUES=argent,messages` `LARGEURS=390` `THEMES=clair` ; `SHOTS=<dossier>` ;
 //  `DSF=2` pour des captures nettes ; `BANC_DIST=<dist>` pour juger un autre arbre (l'arbre d'avant : ROUGE).
@@ -31,7 +34,56 @@ const liste = (v, d) => String(process.env[v] || d).split(',').map((x) => x.trim
 const VUES = {
   'argent-mois': '/?tab=argent', 'argent-avenir': '/?tab=argent', 'messages-liste': '/?tab=messages', 'messages-offre': '/?tab=messages',
   parametres: '/?tab=settings', 'parametres-ventes': '/?tab=settings', 'fiche-paire': '/?tab=journee',
+  // (15 nov., fiche D « fiche produit ») les trois cas de la maquette : vendue sans achat relié (un achat PROPOSÉ),
+  // vendue reliée (colis à déposer), en vente sur deux sites (Vinted et Leboncoin).
+  'fiche-vendue': '/?tab=journee', 'fiche-reliee': '/?tab=journee', 'fiche-2sites': '/?tab=journee',
 };
+const NUM_FICHE = { 'fiche-paire': '1205', 'fiche-vendue': '3119', 'fiche-reliee': '3120', 'fiche-2sites': '3102' };
+// LES TROIS PAIRES DE LA FICHE D (inventées) ajoutées à la base de volume : le premier compte, ses lignes de toujours.
+const J = 86400000;
+function baseFiches() {
+  const b = B.baseVolume();
+  const m = b.main[0].data, num = m.vinted_annonce_numeros;
+  const uid = b.accounts[0].vinted_user_id;
+  const iso = (j) => new Date(Date.now() - j * J).toISOString();
+  const photo = (id) => `https://images1.vinted.net/t/${id}/f800/fd.jpeg?s=abc`;
+  const lst = b.rows.find((r) => r.id === `harvest_${uid}_listings`);
+  const sold = b.rows.find((r) => r.id === `harvest_${uid}_orders_sold`);
+  const bought = b.rows.find((r) => r.id === `harvest_${uid}_orders_purchased`);
+  // 1. Vendue sans achat relié — N°3119 « Nike Terminator Low » taille 36, mise en ligne il y a 12 j, vendue aujourd'hui.
+  // 2. Vendue reliée (achat relié, prix 52) — N°3120, la même paire en deux exemplaires : son bordereau est prêt.
+  const ventes = [
+    { n: '3119', item: 7699990001, tx: 64000000001, titre: 'Nike Terminator Low taille 36', prix: '110.0', relie: null },
+    { n: '3120', item: 7699990002, tx: 64000000002, titre: 'Nike Terminator Low taille 37', prix: '110.0', relie: { tx: '65000000002', prix: '52' } },
+  ];
+  for (const v of ventes) {
+    lst.data.payload.items.push({ id: v.item, title: v.titre, brand_title: 'Nike', size_title: v.n === '3119' ? '36' : '37', status: 'Très bon état', price: { amount: '120.0', currency_code: 'EUR' },
+      is_closed: true, is_hidden: false, is_draft: false, favourite_count: 3, view_count: 40, created_at_ts: iso(12), photo: { url: photo(v.item), high_resolution: { timestamp: Math.floor((Date.now() - 12 * J) / 1000) } } });
+    num[v.item] = { numero: v.n, num: v.n, accountId: String(uid), numberedAt: iso(12), title: v.titre, photo: photo(v.item), size: v.n === '3119' ? '36' : '37',
+      ...(v.relie ? { buyPrice: v.relie.prix, buyFromId: v.relie.tx, buyFrom: { title: 'Nike Terminator Low 37 rose', date: iso(15), photo: '', price: 52, devise: 'EUR', seller: 'lea_sneakers', status: 'Commande finalisée', account: 'vendeur_1' } } : {}) };
+    sold.data.payload.my_orders.unshift({ transaction_id: v.tx, title: v.titre, price: { amount: v.prix, currency_code: 'EUR' }, status: 'Le paiement a été validé', date: iso(0.2), item_id: v.item,
+      transaction_user_status: 'needs_action', photo: { url: photo(v.item) } });
+    b.rows.push({ id: `harvest_${uid}_txn_${v.tx}`, data: { capturedAt: iso(0.2), payload: { transaction: { id: v.tx, item_id: v.item, status: 300, status_title: 'Le paiement a été validé', status_updated_at: iso(0.2), shipment: { status_title: 'En attente' }, item: { id: v.item, title: v.titre } } } } });
+    b.rows.push({ id: `email_bord_${v.tx}`, data: { filename: `bordereau-${v.tx}.pdf`, transaction: String(v.tx), receivedAt: iso(0.1), suivi: 'XW' + v.tx, modele: 'x', numero: v.n, dateLimite: new Date(Date.now() + 4 * J).toISOString(), pdfB64: 'JVBERi0xLjQK' } });
+  }
+  sold.data.nItems = sold.data.payload.my_orders.length;
+  // L'ACHAT qui ressemble à la paire N°3119 (même marque, même modèle, même taille, commandé AVANT la mise en ligne) : proposé, jamais relié seul.
+  bought.data.payload.my_orders.unshift({ transaction_id: 65000000001, conversation_id: 19000000001, title: 'Nike Terminator Low 36 rose et gris', price: { amount: '52.0', currency_code: 'EUR' },
+    status: 'Commande finalisée', date: iso(15), transaction_user_status: 'completed', photo: { url: photo('a65000000001') } });
+  bought.data.nItems = bought.data.payload.my_orders.length;
+  // 3. En vente sur DEUX sites — N°3102 « Adidas Samba OG » 40 : Vinted (4 favoris) et Leboncoin (lien posé à la main).
+  const it = 7699990003;
+  lst.data.payload.items.push({ id: it, title: 'Adidas Samba OG taille 40', brand_title: 'Adidas', size_title: '40', status: 'Bon état', price: { amount: '85.0', currency_code: 'EUR' },
+    is_closed: false, is_hidden: false, is_draft: false, favourite_count: 4, view_count: 61, created_at_ts: iso(9), photo: { url: photo(it), high_resolution: { timestamp: Math.floor((Date.now() - 9 * J) / 1000) } } });
+  num[it] = { numero: '3102', num: '3102', accountId: String(uid), numberedAt: iso(9), title: 'Adidas Samba OG taille 40', photo: photo(it), size: '40', buyPrice: '40' };
+  const enl = b.rows.find((r) => r.id === `harvest_${uid}_enligne`);
+  if (enl) { enl.data.ids.push(it); enl.data.items.push({ id: it, title: 'Adidas Samba OG taille 40' }); enl.data.n = enl.data.ids.length; }
+  lst.data.nItems = lst.data.payload.items.length; lst.data.payload.pagination = { total_entries: lst.data.payload.items.length };
+  b.rows.push({ id: 'lbc_listings', data: { items: { 2900000001: { subject: 'Adidas Samba OG 40', price: 85, status: 'active', url: 'https://www.leboncoin.fr/ad/chaussures/2900000001' } }, lectures: {} } });
+  m.vrm_lbc_liens = { ...(m.vrm_lbc_liens || {}), 2900000001: '3102' };
+  m.vinted_used_nums = [...new Set([...(m.vinted_used_nums || []), 3119, 3120, 3102])];
+  return b;
+}
 const VOULUES = liste('VUES', Object.keys(VUES).join(','));
 const LARGEURS = liste('LARGEURS', '390,1512').map(Number);
 const THEMES = liste('THEMES', 'clair,sombre');
@@ -67,10 +119,12 @@ async function preparer(o, vue) {
     if (!ok) await toucher('[data-cat="ventes"]');
     await pg.waitForTimeout(1200);
   }
-  if (vue === 'fiche-paire') {
-    await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: '1205' })));
-    await pg.waitForSelector('[data-fiche-paire]', { timeout: 8000 }).catch(() => {});
-    await pg.waitForTimeout(1500);
+  if (vue.startsWith('fiche-')) {
+    await pg.evaluate((n) => window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: n })), NUM_FICHE[vue]);
+    await pg.waitForSelector('[data-fiche-paire] .fd-s', { timeout: 8000 }).catch(() => {});
+    // la fiche a fini de lire (l'achat proposé, les sites) : plus de « lecture » sur la carte d'action
+    await pg.waitForFunction(() => !document.querySelector('[data-fd-propose="lecture"], [data-fiche-lecture-en-cours="1"]'), null, { timeout: 12000 }).catch(() => {});
+    await pg.waitForTimeout(1200);
   }
 }
 
@@ -88,6 +142,7 @@ function mesurer(vue) {
     : vue.startsWith('messages') ? document.querySelector('[data-fils-tous]')
     : vue.startsWith('parametres') ? document.querySelector('.vrm-pm')
     : document.querySelector('[data-fiche-paire]');
+  const racineFiche = vue.startsWith('fiche-');
   out.racine = !!racine;
   if (!racine) return out;
   // Z — cibles au doigt (390) : chaque bouton VISIBLE de la racine fait 44 px (hauteur rendue, ou sa zone ::after) ; pleins visibles
@@ -96,7 +151,8 @@ function mesurer(vue) {
     const a = getComputedStyle(b, '::after'); const ext = a && a.content !== 'none' && a.position === 'absolute' ? (parseFloat(a.top) < 0 ? -parseFloat(a.top) : 0) + (parseFloat(a.bottom) < 0 ? -parseFloat(a.bottom) : 0) : 0;
     return r.height + ext < 43.5;
   }).map((b) => `${b.className || b.tagName} « ${(b.innerText || b.getAttribute('aria-label') || '').trim().slice(0, 18)} » ${Math.round(b.getBoundingClientRect().height)}`).slice(0, 6);
-  out.pleins = [...document.querySelectorAll('.sb-btn-plein, .vrm-chat-btn-p, .vrm-fp-b-plein')].filter(vis).filter((b) => { const r = b.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; }).length;
+  // la fiche couvre l'écran : seuls ses pleins se voient (ce qui est dessous ne compte pas)
+  out.pleins = [...(vue.startsWith('fiche-') ? racine : document).querySelectorAll('.sb-btn-plein, .vrm-chat-btn-p, .vrm-fp-b-plein, .fd-plein')].filter(vis).filter((b) => { const r = b.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; }).length;
   out.horsRacine = [...racine.querySelectorAll('*')].filter(vis).filter((e) => { const r = e.getBoundingClientRect(); if (r.right <= innerWidth + 1 && r.left >= -1) return false; for (let a = e.parentElement; a && a !== document.body; a = a.parentElement) { const c = getComputedStyle(a); if (/auto|scroll|hidden|clip/.test(c.overflowX)) return false; } return true; }).length;
   if (vue === 'argent-mois') {
     const q = (id) => document.querySelector(`[data-argent-q="${id}"]`);
@@ -161,15 +217,36 @@ function mesurer(vue) {
       titre: (() => { const h = racine.querySelector('.vg-pm-nav-txt h2'); return h ? { fs: parseFloat(getComputedStyle(h).fontSize), clair: lum(getComputedStyle(h).color) > 0.8 } : null; })(),
       retour: (() => { const b = racine.querySelector('[data-categorie-retour]'); return b && vis(b) ? R(b) : null; })() };
   }
-  if (vue === 'fiche-paire') {
-    out.fp = { sites: racine.querySelectorAll('.vg-fp-site').length, tuiles: [...racine.querySelectorAll('.vrm-fp-tuile')].filter(vis).length,
-      parcours: !!racine.querySelector('.vrm-fp-parcours, .vrm-fp-temps, [data-fiche-temps]'), heros: !!racine.querySelector('.vrm-fp-heros'),
-      photo: (() => { const p = racine.querySelector('.vrm-fp-heros-photo'); return p ? R(p) : null; })(),
-      outils: [...racine.querySelectorAll('.vrm-fp-outils > button')].filter(vis).length,
-      // (15 nov., Julien : « C'est trop long ») la hauteur de la fiche, ce qui est VU (repli fermé) : identifiants, jargon, doublons
-      hauteur: (() => { const c = racine.querySelector('.vrm-fp-cadre'); return c ? Math.round(c.scrollHeight) : null; })(),
-      jargon: (() => { const t = racine.innerText; return (t.match(/\b(annonce|transaction|fiche) \d{6,}|journal des N°|vues par VRM|origine non enregistrée|lu dans le dressing|prix lus depuis|Modifications enregistrées sur cet appareil|à dater|même chaussure/gi) || []); })(),
-      doublons: (() => { const vus = {}; for (const e of racine.querySelectorAll('button, summary, h2, h3')) { if (!vis(e)) continue; const k = (e.innerText || '').trim(); if (k.length < 4) continue; vus[k] = (vus[k] || 0) + 1; } return Object.entries(vus).filter(([, n]) => n > 1).map(([k, n]) => `${k} ×${n}`); })() };
+  if (racineFiche) {
+    // (15 nov., fiche D) Ce qui est VU : la hauteur de la fiche (la feuille « ⋯ » fermée), la photo pleine largeur et la plaque,
+    // le nom et UNE ligne d'état, UNE carte d'action, le segment (une vue), les tailles de texte et de chiffres, jargon, doublons.
+    const cadre = racine.querySelector('.fd-cadre');
+    const fs = (e) => (e ? parseFloat(getComputedStyle(e).fontSize) : 0);
+    const ph = racine.querySelector('.fd-ph'), plaque = racine.querySelector('.fd-plaque'), nom = racine.querySelector('.fd-nom'), etat = racine.querySelector('.fd-etat');
+    const textes = [...racine.querySelectorAll('.fd-s *')].filter(vis).filter((e) => !e.closest('.fd-plus') && [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim().length > 1));
+    const chiffres = [...racine.querySelectorAll('.fd-arg-c > b')].filter(vis);
+    out.fd = {
+      hauteur: cadre ? Math.round(cadre.scrollHeight) : null, hRacine: Math.round(racine.scrollHeight),
+      photo: ph ? R(ph) : null, plaque: plaque ? { ...R(plaque), txt: plaque.innerText.replace(/\s/g, '') } : null,
+      nom: nom ? { fs: fs(nom), txt: nom.innerText } : null, etats: [...racine.querySelectorAll('.fd-etat')].filter(vis).length,
+      etat: etat ? { txt: etat.innerText, ambre: etat.getAttribute('data-fd-ambre') === '1', couleur: getComputedStyle(etat).color } : null,
+      actions: [...racine.querySelectorAll('.fd-act')].filter(vis).map((a) => a.getAttribute('data-fd-action')),
+      relier: (() => { const b = racine.querySelector('[data-fd-relier]'); return b ? { txt: b.innerText.trim(), cents: b.getAttribute('data-fd-relier-cents'), tx: b.getAttribute('data-fd-relier') } : null; })(),
+      propose: (() => { const x = racine.querySelector('[data-fd-achat-propose]'); return x ? x.innerText.replace(/\s+/g, ' ').trim() : null; })(),
+      segs: [...racine.querySelectorAll('[data-fd-seg]')].filter(vis).map((b) => ({ k: b.getAttribute('data-fd-seg'), on: b.getAttribute('aria-selected') === 'true', h: Math.round(b.getBoundingClientRect().height) })),
+      vue: (racine.querySelector('[data-fd-vue-ouverte]') || { getAttribute: () => '' }).getAttribute('data-fd-vue-ouverte'),
+      vues: racine.querySelectorAll('.fd-v > *').length,
+      sites: [...racine.querySelectorAll('.fd-site')].filter(vis).map((x) => x.getAttribute('data-fiche-site') + ':' + x.getAttribute('data-fiche-site-etat')),
+      petitTexte: textes.filter((e) => fs(e) < 15 && !e.closest('.fd-plaque')).map((e) => `${e.className || e.tagName} ${fs(e)} « ${(e.innerText || '').trim().slice(0, 16)} »`).slice(0, 5),
+      chiffres: chiffres.map((e) => ({ fs: fs(e), txt: e.innerText })),
+      plus: !!racine.querySelector('[data-fd-plus-ouvrir]'), plusFerme: (racine.querySelector('.fd-plus') || {}).hidden !== false,
+      tuiles: [...racine.querySelectorAll('[data-fd-tuile]')].map((t) => t.getAttribute('data-fd-tuile')),
+      toutVoir: !!racine.querySelector('.fd-plus [data-fiche-plus]'),
+      jargon: (() => { const t = [...racine.querySelectorAll('.fd-s')].map((x) => x.innerText).join(' '); return (t.match(/\b(annonce|transaction|fiche) \d{6,}|journal des N°|vues par VRM|origine non enregistrée|lu dans le dressing|prix lus depuis|Modifications enregistrées sur cet appareil|à dater|même chaussure/gi) || []); })(),
+      // chaque info UNE fois : un montant écrit deux fois sur ce qui est vu
+      montants: (() => { const t = [...racine.querySelectorAll('.fd-s')].map((x) => { const c = x.cloneNode(true); c.querySelectorAll('.fd-plein, .fd-plus').forEach((b) => b.remove()); return c.textContent; }).join(' \n '); const l = t.match(/[+−-]?\d[\d  ]*(,\d+)?\s?€/g) || []; const c = {}; l.forEach((x) => { const k = x.replace(/[^\d,]/g, ''); c[k] = (c[k] || 0) + 1; }); return c; })(),
+      doublons: (() => { const vus = {}; for (const e of racine.querySelectorAll('.fd-s button, .fd-s summary, .fd-s h1, .fd-s h2, .fd-s h3')) { if (!vis(e)) continue; const k = (e.innerText || '').trim(); if (k.length < 4) continue; vus[k] = (vus[k] || 0) + 1; } return Object.entries(vus).filter(([, n]) => n > 1).map(([k, n]) => `${k} ×${n}`); })(),
+    };
   }
   return out;
 }
@@ -239,15 +316,36 @@ function juger(m, suf, tel) {
     dit(K.icones === 0 && K.rangees.length > 0 && K.rangees.every((h) => h >= 44), `P3 ${suf} : des rangées sans icône, ≥ 44 px`, `${K.icones} icône(s) · ${K.rangees.join(',')}`);
     dit(!!K.retour && K.retour.w >= 44 && K.retour.h >= 44, `P3 ${suf} : le rond « ‹ » ≥ 44 px`, JSON.stringify(K.retour));
   }
-  if (m.vue === 'fiche-paire') {
-    const F = m.fp;
-    dit(F.heros && !!F.photo && F.photo.w >= 90, `F1 ${suf} : la paire en tête (photo ≥ 90 px)`, JSON.stringify(F.photo));
-    dit(F.tuiles >= 2, `F2 ${suf} : prix d'achat et bénéfice en verres`, String(F.tuiles));
-    dit(F.parcours, `F3 ${suf} : l'histoire de la paire`);
-    if (tel) dit(F.hauteur != null && F.hauteur <= 844 * 1.5, `F4 ${suf} : la fiche tient en 1,5 écran (${F.hauteur} px ≤ ${Math.round(844 * 1.5)})`);
+  if (m.fd) {
+    const F = m.fd, v = m.vue;
+    if (tel) dit(F.hauteur != null && F.hauteur <= 844, `F4 ${suf} : la fiche tient en UN écran (${F.hauteur} px ≤ 844)`);
+    dit(!!F.photo && F.photo.w >= m.W - (tel ? 1 : 2000) && F.photo.h >= 280 && !!F.plaque && /^N°\d+$/.test(F.plaque.txt), `F1 ${suf} : la photo pleine largeur et la plaque N°`, JSON.stringify({ photo: F.photo, plaque: F.plaque && F.plaque.txt }));
+    dit(!!F.nom && F.nom.fs >= 26 && F.etats === 1, `F1 ${suf} : le nom (26 px) et UNE ligne d'état`, JSON.stringify({ nom: F.nom, etats: F.etats }));
+    dit(F.actions.length <= 1 && m.pleins <= 1, `F2 ${suf} : UNE carte d'action, un plein au plus`, `${F.actions.join(',')} · ${m.pleins} plein(s)`);
+    dit(F.segs.length === 3 && F.segs.filter((x) => x.on).length === 1 && F.segs.every((x) => x.h >= 44) && F.vues === 1, `F3 ${suf} : Argent · Sites · Histoire, une vue à la fois (44 px)`, JSON.stringify(F.segs));
+    if (tel) dit(!F.petitTexte.length, `F3 ${suf} : texte ≥ 15 px`, F.petitTexte.join(' | '));
+    dit(F.chiffres.every((c) => c.fs >= 22) && (!F.chiffres.length || Math.max(...F.chiffres.map((c) => c.fs)) >= 28), `F3 ${suf} : les chiffres 28–36 px`, JSON.stringify(F.chiffres));
+    dit(F.plus && F.plusFerme && F.toutVoir && F.tuiles.length >= 4, `F6 ${suf} : « ⋯ » fermé, ses tuiles (${F.tuiles.join(', ')}) et « Tout voir »`);
     dit(!F.jargon.length, `F5 ${suf} : aucun identifiant ni mot technique à l'écran`, F.jargon.slice(0, 5).join(' | '));
     dit(!F.doublons.length, `F5 ${suf} : chaque geste, chaque titre UNE fois`, F.doublons.slice(0, 5).join(' | '));
-    console.log(`   ℹ️ F ${suf} : ${F.sites} ligne(s) par site, ${F.outils} geste(s)`);
+    const deux = Object.entries(F.montants).filter(([, n]) => n > 1);
+    dit(!deux.length, `F5 ${suf} : chaque montant UNE fois`, JSON.stringify(F.montants));
+    if (v === 'fiche-vendue') {
+      dit(F.etat && F.etat.ambre && /Vendue 110\s€ · à envoyer/.test(F.etat.txt), `D1 ${suf} : « Vendue 110 € · à envoyer » en ambre (un geste)`, JSON.stringify(F.etat));
+      dit(F.actions[0] === 'relier' && !!F.relier && F.relier.tx === '65000000001' && F.relier.cents === '5200' && /Relier · 52\s€/.test(F.relier.txt), `D1 ${suf} : l'achat PROPOSÉ (son n° de transaction) et « Relier · 52 € »`, JSON.stringify(F.relier));
+      dit(!!F.propose && /payée 52\s€/.test(F.propose), `D1 ${suf} : la proposition dit le prix payé`, F.propose);
+      dit(F.vue === 'argent', `D1 ${suf} : ouverte sur Argent (une vente)`, F.vue);
+    }
+    if (v === 'fiche-reliee') {
+      dit(F.actions[0] === 'bordereau', `D2 ${suf} : reliée ⇒ « Imprimer le bordereau »`, F.actions.join(','));
+      dit(F.etat && !F.etat.ambre && /^Vendue 110\s€ le /.test(F.etat.txt), `D2 ${suf} : la carte porte le geste ; la ligne d'état dit la vente, sans ambre`, JSON.stringify(F.etat));
+      dit(F.vue === 'argent' && F.chiffres.length === 2 && F.chiffres[0].fs >= 36 && /^\+/.test(F.chiffres[0].txt), `D2 ${suf} : le bénéfice en grand (36), l'achat à côté`, JSON.stringify(F.chiffres));
+    }
+    if (v === 'fiche-2sites') {
+      dit(F.actions[0] === 'baisser', `D3 ${suf} : en vente ⇒ « Baisser le prix »`, F.actions.join(','));
+      dit(F.vue === 'sites' && F.sites.length === 2 && F.sites.includes('vinted:en-ligne') && F.sites.includes('leboncoin:en-ligne'), `D3 ${suf} : ouverte sur Sites, une rangée par site`, F.sites.join(','));
+      dit(F.etat && /sur 2 sites/.test(F.etat.txt) && !F.etat.ambre, `D3 ${suf} : « En vente 85 € · sur 2 sites… »`, JSON.stringify(F.etat));
+    }
   }
 }
 
@@ -270,7 +368,7 @@ if (require.main === module) (async () => {
       const suf = `${vue}-${W}-${th}`;
       let o;
       try {
-        o = await P.ouvrir(nav, { W, sombre: th === 'sombre', b: B.baseVolume(), url: VUES[vue], api: B.apiVolume, dsf: DSF });
+        o = await P.ouvrir(nav, { W, sombre: th === 'sombre', b: vue.startsWith('fiche-') ? baseFiches() : B.baseVolume(), url: VUES[vue], api: B.apiVolume, dsf: DSF });
         await P.pret(o.pg);
         await preparer(o, vue);
         await o.pg.waitForTimeout(500);

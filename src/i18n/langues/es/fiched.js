@@ -54,6 +54,7 @@ export default {
   "fd.argent.auPlus": "como mucho",
   "fd.argent.double": "Dos pares con este N.º: no se elige ninguna cifra.",
   "fd.sites.aucun": "No está en línea en ningún sitio.",
+  "fd.sites.enLigne": "en línea",
   "fd.sites.vendue": "vendido",
   "fd.sites.vendueLe": "vendido el {date}",
   "fd.sites.favoris": {"one": "{n} favorito", "other": "{n} favoritos"},

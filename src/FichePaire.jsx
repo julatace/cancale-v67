@@ -260,6 +260,9 @@ function VueArgent({ cases, etat }) {
 // LA VUE « SITES » : une rangée par site (en ligne, ou la vente), son compte, son prix ou ce qui s'y passe.
 function VueSites({ sites, I }) {
   if (!sites.length) return <p className="fd-vide" data-fd-sites="0">{tr('fd.sites.aucun')}</p>;
+  // Chaque info UNE fois : un prix partout le même est déjà dans la ligne d'état — la rangée ne le redit pas.
+  const enL = sites.filter((s) => s.etat === 'en-ligne');
+  const memePrix = enL.length > 0 && enL.every((s) => s.prix != null && s.prix === enL[0].prix);
   return (
     <div className="fd-sites" data-fd-sites={sites.length} data-fiche-sites={sites.length}>
       {sites.map((s, i) => (
@@ -267,7 +270,7 @@ function VueSites({ sites, I }) {
           <span className="fd-site-logo" aria-hidden="true">{MarqueSite(s.site, I)}</span>
           <span className="fd-site-txt"><b>{NOM_SITE_FD[s.site] || s.site}{s.compte ? ` · ${s.compte}` : ''}</b>
             <span>{s.etat === 'vendue' ? [s.date ? tr('fd.sites.vendueLe', { date: dateFd(s.date) }) : tr('fd.sites.vendue'), prixFd(s.prix)].filter(Boolean).join(' · ')
-              : [prixFd(s.prix), Number.isFinite(s.favoris) ? tr('fd.sites.favoris', { n: s.favoris }) : ''].filter(Boolean).join(' · ')}</span></span>
+              : [memePrix ? '' : prixFd(s.prix), Number.isFinite(s.favoris) ? tr('fd.sites.favoris', { n: s.favoris }) : ''].filter(Boolean).join(' · ') || tr('fd.sites.enLigne')}</span></span>
         </div>
       ))}
     </div>
@@ -332,9 +335,9 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
   const taille = p ? ((neuve && neuve.taille) || p.taille || '') : '';
   const ctxHeros = ctx ? tr(CLE_CTX[ctx] || 'fiche.ctx.vente') : '';
   const codeHeros = ctx === 'retrait' && depuis && depuis.sous ? depuis.sous : '';
-  const lEtat = p ? ligneEtat(p, { sites: lignesSites, etat, dateCourte: dateFd }) : null;
   const action = p ? actionFiche(p, { sites: lignesSites, etat, proposition: relier ? relier.proposition : undefined,
     peutRelier: !!(relier && (relier.onRelier || relier.onAutre)), peutBordereau: !!onBordereau, peutBaisser: !!onPrix && !neuve, peutSaisir: !!saisir }) : null;
+  const lEtat = p ? ligneEtat(p, { sites: lignesSites, etat, dateCourte: dateFd, action: action && action.sorte }) : null;
   const vueOuverte = vue || (p ? vueInitiale(p, lignesSites) : 'argent');
   const cases = p ? argentFiche(p, lignesSites) : [];
   const hist = p ? histoireFiche(p, { sites: lignesSites }) : [];
@@ -400,6 +403,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
             onClick={() => toucherTuile(t)}><span className="fd-tuile-ic" aria-hidden="true">{I(ICONE_TUILE[t], 20)}</span><span>{tr('fd.tuile.' + t)}</span></button>)}
         </div> : null}
         {contenuTuile ? <div className="fd-tuile-vue" data-fd-tuile-vue={tuile}>{contenuTuile}</div> : null}
+        {plus && plus.gestes ? <div className="fd-gestes" data-fd-gestes="">{plus.gestes}</div> : null}
         {toutVoir}
       </div>
     </div>

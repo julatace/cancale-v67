@@ -60583,7 +60583,7 @@ function AppCoeur() {
       const ventil=await ventilationRecuFiche(tx); if(!vivant) return;
       const prix=propositionPrixAchat({ identite:{ achat:pr.achat, par:'suggestion' }, ventilationDe:ventil?()=>ventil:null, estLot:(a)=>lotDe(a).lot||!!(a&&a.lot===true) });
       setPropFiche({ ...base, prop:{ tx, achat:{ title:pr.achat.title||'', photo:orderPhoto(pr.achat)||'', date:pr.achat.date||'' }, brut:pr.achat, titre:pr.achat.title||'', niveau:pr.niveau,
-        recuMs:pr.recu?pr.recu.ms:null, recuSource:pr.recu?pr.recu.source:null, centimes:prix?prix.centimes:null, texte:prix?prix.texte:null, proposition:prix } });
+        recuMs:pr.recu?pr.recu.ms:null, recuSource:pr.recu?pr.recu.source:null, centimes:prix?prix.centimes:null, texte:prix&&Number.isSafeInteger(prix.centimes)?`${(prix.centimes/100).toFixed(prix.centimes%100?2:0).replace('.',',')}\u00a0€`:null, proposition:prix } });
     })();
     return ()=>{ vivant=false; }; /* eslint-disable-next-line */ },[numOutil,numData,ficheTick]);
   useEffect(()=>{ if(!besoinNumData){ setNumData(null); return undefined; } if(numData) return undefined; let vivant=true; (async()=>{
@@ -63652,7 +63652,10 @@ function AppCoeur() {
           // (15 nov., fiche D) Ce que « ⋯ » range (chaque morceau d'avant, à sa place : rien de supprimé) et les SITES de la paire
           // (une rangée par site : ses ventes lues, puis ses annonces en ligne par identité — `sitesPrixDe`, la règle de « Prix partout »).
           const plusFiche = p && p.num && !p.ancienNumero ? {
-            questions: <>{questionChezToiFiche(p.num)}{blocVenduAilleurs(p, rn, etat)}<BlocARetirerAilleurs numero={p.num} PhotoVinted={PhotoVinted}/><LigneMemePhotoNumero numero={p.num} cle={cleNum} charger={chargerMemePhotoUI}/></>,
+            // « Vendu ailleurs » est un GESTE (pas une question) : dans « ⋯ » ; les questions (« Tu l'as encore ? », à retirer
+            // ailleurs, même photo) restent sous les yeux, et ne rendent rien quand il n'y a rien à trancher.
+            gestes: blocVenduAilleurs(p, rn, etat),
+            questions: <>{questionChezToiFiche(p.num)}<BlocARetirerAilleurs numero={p.num} PhotoVinted={PhotoVinted}/><LigneMemePhotoNumero numero={p.num} cle={cleNum} charger={chargerMemePhotoUI}/></>,
             note: <NotePaireCoque numero={p.num} variante="bloc" ajout dicter/>,
             infos: <InfosPaireCoque numero={p.num}/>,
             atelier: <AtelierPaireCoque num={p.num} idFiche={p.idFiche || ''} itemId={(rn.annonces || []).length === 1 ? String(rn.annonces[0].id || '') : ''}/>,
@@ -63666,7 +63669,9 @@ function AppCoeur() {
               for (const v of ((rn.ventes && rn.ventes.lbc) || [])) if (!lbcAnnulee(v)) out.push({ site: 'leboncoin', etat: 'vendue', compte: '', date: Date.parse(v.dateVente || v.date || '') || null, prix: v.price != null && Number.isFinite(Number(v.price)) ? Number(v.price) : null });
               for (const c of ((rn.ventes && rn.ventes.ebay) || [])) if (commandeEbayEngagee(c)) out.push({ site: 'ebay', etat: 'vendue', compte: '', date: Date.parse(c.creationDate || '') || null, prix: null });
               const st = numData && numData.stats ? numData.stats : null;
-              for (const x of sitesPrixDe(numF, rn, ex).sites) out.push({ site: x.site, etat: 'en-ligne', compte: x.site === 'vinted' ? (nomCompte(x.compte) || '') : (x.compte || ''), prix: x.prix != null ? Math.round(x.prix * 100) : null,
+              // Le prix : celui que la règle de « Prix partout » lit, sinon le prix LU dans le dressing (la lecture la plus fraîche).
+              const prixLu = (x) => { const v = x.site === 'vinted' && st && st[x.id] ? st[x.id].prix : null; const n = v == null ? null : Number(typeof v === 'object' ? v.amount : v); return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null; };
+              for (const x of sitesPrixDe(numF, rn, ex).sites) out.push({ site: x.site, etat: 'en-ligne', compte: x.site === 'vinted' ? (nomCompte(x.compte) || '') : (x.compte || ''), prix: x.prix != null ? Math.round(x.prix * 100) : prixLu(x),
                 favoris: x.site === 'vinted' && st && st[x.id] && Number.isFinite(st[x.id].favoris) ? st[x.id].favoris : undefined });
             } catch (_) {}
             return out; })();
