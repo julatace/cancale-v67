@@ -193,6 +193,12 @@ export function txDeLigne(x) {
   if (!x || x.__autre) return '';
   return String(x.txn || (x.o && x.o.transaction_id != null ? x.o.transaction_id : '') || (x.b && x.b.transaction) || '');
 }
+// La vente par SON n° (`transporteurVente` de l'app, ici pour qu'un audit l'EXÉCUTE) : le n° du bordereau e-mail,
+// sinon celui de la ligne ; `pdfParTx` : `vrm_bord_transporteurs.pdf` ({ tx: { t, s } }, l'étiquette relue).
+export function transporteurParTx(b, tx, { pdfParTx = null, departs = null, transp = null, suivisEmail = null } = {}) {
+  const k = String((b && b.transaction) || tx || '');
+  return transporteurDeVente({ bord: b || null, pdf: (k && pdfParTx && pdfParTx[k]) || null, departs, transp, suivisEmail });
+}
 export function transporteurDeLigne(x, deVente) {
   if (!x) return null;
   if (x.__autre) return x.tr || null;
