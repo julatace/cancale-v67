@@ -105,6 +105,12 @@ const ARTICLE = 'Baskets banc Air. Blanc et rose. Pointure 42.5';
     dit(cles().filter((k) => k === `retour-depose-${TX}`).length === 1, 'R2 une seule fois (le même fait relu ne resonne pas)');
     await mr(SUIVI, 'Votre colis a été livré', `Votre colis n° ${SUIVI} a été livré. Il a bien été retiré par son destinataire.`);
     dit(cles().includes(`retour-livre-${TX}`), 'R3 « Retour livré au vendeur » sonne à la livraison', JSON.stringify(cles()));
+    // Arrivé au point relais du VENDEUR : un e-mail « disponible » (sujet d'un destinataire) — jamais « à retirer » chez lui.
+    F.vider(); F.comptes.push({ vinted_user_id: '111', login: 'banc_acheteur' });
+    await bordereau(TX, SUIVI);
+    await mr(SUIVI, 'Votre colis est disponible en Point Relais', `Votre colis n° ${SUIVI} est disponible dans votre Point Relais banc, 56000 Vannes. Code de retrait : 123456.`);
+    const dispo = F.base.get(`${A}|email_track_mondialrelay_${SUIVI}`) || {};
+    dit(dispo.sens === 'sortant' && !cles().some((k) => /^(?:retrait|colis|arrivee|code)/.test(k) && !/^retour-/.test(k)), 'R2 arrivé au relais DU VENDEUR (« disponible ») : rangé sortant par SON bordereau de retour, jamais « à retirer » chez lui', JSON.stringify({ sens: dispo.sens, st: dispo.status, cles: cles() }));
     // Son clic « Déposé » posé AVANT le premier fait : rien ne sonne pour le dépôt.
     F.vider(); F.comptes.length = 0; F.comptes.push({ vinted_user_id: '111', login: 'banc_acheteur' });
     F.base.set(`${A}|main`, { vrm_retours_deposes: { ['r:' + TX]: '2026-11-15T10:00:00Z' } });
