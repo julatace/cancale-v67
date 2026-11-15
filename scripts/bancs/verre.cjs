@@ -237,14 +237,14 @@ function mesurer() {
   // V6 — débordement
   const se = document.scrollingElement, main = document.querySelector('.vrm-app-shell[data-espace] .vrm-main');
   // + ce qui sort de l'écran sans qu'on puisse le faire défiler (une coque en `overflow-x: clip` le cache sans élargir la page)
-  let hors = 0;
+  let hors = 0; const horsNoms = [];
   if (main) for (const el of main.querySelectorAll('*')) {
     const r = el.getBoundingClientRect(); if (r.width < 2 || r.height < 2 || (r.right <= innerWidth + 1 && r.left >= -1)) continue;
     let defile = false; for (let a = el.parentElement; a && a !== main; a = a.parentElement) { const c = getComputedStyle(a); if (/auto|scroll/.test(c.overflowX)) { defile = true; break; } }
     if (defile || getComputedStyle(el).visibility === 'hidden' || el.closest('[aria-hidden="true"], .vrm-sr-seul')) continue;
-    hors++; if (hors > 20) break;
+    hors++; if (horsNoms.length < 4) horsNoms.push(`${nom(el)} [${Math.round(r.left)}→${Math.round(r.right)}]`); if (hors > 20) break;
   }
-  out.deborde = { page: se.scrollWidth - innerWidth, main: main ? main.scrollWidth - main.clientWidth : 0, hors };
+  out.deborde = { page: se.scrollWidth - innerWidth, main: main ? main.scrollWidth - main.clientWidth : 0, hors, horsNoms };
   return out;
 }
 
@@ -293,7 +293,7 @@ if (require.main === module) (async () => {
           m.contraste.length ? `${m.contraste.length} sous le seuil : ` + m.contraste.slice(0, DETAIL).map((x) => `${x.k}<${x.seuil} « ${x.t} » ${x.el} (${x.c} sur ${x.f})`).join(' | ') : '');
         dit(m.flous.length <= FLOU_MAX && !m.flous.some((x) => x.rangee), `V4 ${suf} : flou borné`, `${m.flous.length} élément(s) flouté(s)${m.flous.some((x) => x.rangee) ? ' dont dans une rangée : ' + m.flous.filter((x) => x.rangee).map((x) => x.el).slice(0, 3).join(' | ') : ''}`);
         dit(m.pleins <= 1, `V5 ${suf} : un plein au plus`, `${m.pleins}`);
-        dit(m.deborde.page <= 1 && m.deborde.main <= 1 && m.deborde.hors === 0, `V6 ${suf} : rien ne déborde`, `page +${m.deborde.page} · main +${m.deborde.main} · ${m.deborde.hors} élément(s) hors de l'écran`);
+        dit(m.deborde.page <= 1 && m.deborde.main <= 1 && m.deborde.hors === 0, `V6 ${suf} : rien ne déborde`, `page +${m.deborde.page} · main +${m.deborde.main} · ${m.deborde.hors} élément(s) hors de l'écran${m.deborde.hors ? ' : ' + m.deborde.horsNoms.join(' | ') : ''}`);
         dit(m.colle.length === 0, `V7 ${suf} : le « ? » ne colle à aucun titre (≥ 8 px)`, m.colle.slice(0, DETAIL).join(' | '));
         dit(m.coupes.length === 0, `V8 ${suf} : aucun texte coupé au milieu d'un mot hors des rangées`, m.coupes.slice(0, DETAIL).join(' | '));
         dit(m.pastille.length === 0, `V9 ${suf} : la pastille « Mis à jour » ne recouvre aucun texte`, m.pastille.join(' | '));
