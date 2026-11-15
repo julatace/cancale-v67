@@ -291,6 +291,14 @@ async function controles() {
     dit(F.pointsToutVaBien({ controle: undefined }).etat === 'lecture' && F.pointsToutVaBien({ controle: null }).etat === 'ok', 'D14 en lecture ⇒ rien affirmé ; aucun contrôle ⇒ aucun point');
     const p0 = F.pointsToutVaBien({ controle: C.resultatControle({ 'numeros-double': [], 'versement-30j': 1741 }, {}, T0), maintenant: T0 });
     dit(p0.n === 0, 'D15 des ventes à dater seules ne font jamais un point');
+    // La ligne de fraîcheur : l'extension d'ICI d'abord dite, l'appareil de même version pas répété.
+    const FR = await imp('src/fraicheur.js');
+    const capture = { comptesPrets: true, lignes: [], pannes: [], passu: [], achats: {}, appareils: [{ id: 'a', nom: 'Chrome · Mac', ver: '5.329.0', code: '5.329.0', at: T0 - 60e3 }, { id: 'b', nom: 'Edge · Windows', ver: '5.300.0', code: '5.300.0', at: T0 - 60e3 }] };
+    const fr = FR.fraicheurUnique({ capture, emails: { etat: 'lu', muets: [] }, transp: [], attendue: '5.385.0', maintenant: T0, ici: { ...r1, nom: 'Extension de ce navigateur', texte: 'Ce Chrome a la 5.329 : installe la 5.385' } });
+    const cl = fr.retards.map((x) => x.cle);
+    dit(cl.includes('version:ici') && cl.includes('version:b') && !cl.includes('version:a') && fr.retards.find((x) => x.cle === 'version:ici').lien === '/VRM-extension.zip', 'D16 la ligne du haut : « Ce Chrome a la 5.329 » avec le zip ; l’appareil de même version pas répété, l’autre gardé', cl);
+    const fr0 = FR.fraicheurUnique({ capture: { ...capture, appareils: [] }, emails: { etat: 'lu', muets: [] }, transp: [], attendue: '5.385.0', maintenant: T0, ici: null });
+    dit(!fr0.retards.some((x) => x.source === 'version'), 'D17 rien en retard ici ⇒ rien de dit');
   });
 
   // ── E. LA COPIE, MA JOURNÉE ───────────────────────────────────────────────────
@@ -327,6 +335,7 @@ const MUTATIONS = [
   ['src/fiabilite/regles.js', 'if (j.captcha && verificationEnCours(j.captcha, R[String(l.id)]))', 'if (j.captcha)', 'son « Reprendre » ignoré'],
   ['src/plantages.js', "  if (contexte && contexte.origine === 'demarrage') return true;\n  let t = 0;", '  return false;\n  let t = 0;', 'le morceau qui revient jamais dit'],
   ['src/fiabilite/regles.js', "    if (CONTROLES_MUETS.has(l.cle)) continue;\n", '', 'un point « à dater »'],
+  ['src/fraicheur.js', "    if (ici && ici.version && versionCourte(a.code || a.ver) === ici.version) continue;\n", '', 'l’extension d’ici dite deux fois'],
 ];
 function prouver() {
   const tmp = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), 'fiab-'));

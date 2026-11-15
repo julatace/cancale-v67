@@ -115,7 +115,11 @@ async function scenario(b, scen, largeur, sombre) {
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   const proprio = scen === 'proprio';
   const session = proprio ? sessionDe(JULIEN, 'j.julien.x') : null;
-  await pg.addInitScript(([s, so, sess]) => { try { if (sess) localStorage.setItem('vrm_session', JSON.stringify(sess)); else localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_dark', so ? 'true' : 'false'); } catch (_) {} }, [null, sombre, session]);
+  // Le parcours de premier lancement (« Tu vends quoi ? ») est déjà fait : il couvrirait l'écran.
+  await pg.addInitScript(([s, so, sess]) => { try { if (sess) { localStorage.setItem('vrm_session', JSON.stringify(sess)); localStorage.setItem('vrm_mfa_plus_tard_' + sess.user.id, String(Date.now())); } else localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_dark', so ? 'true' : 'false');
+    localStorage.setItem('vrm_je_vends', JSON.stringify({ choix: 'sneakers', at: '2026-11-01T10:00:00Z', vu: 'banc' })); localStorage.setItem('vrm_configuration', JSON.stringify({ etat: 'fait', at: '2026-11-01T10:00:00.000Z', statut: null, version: 1 }));
+    localStorage.setItem('vrm_bienvenue_vue', JSON.stringify({ at: new Date().toISOString() }));
+    const t = new Date().toISOString(); localStorage.setItem('vrm_parcours_plus_tard', JSON.stringify({ extension: t, emails: t, vinted: t, premiere: t, configuration: t, at: Date.now() })); } catch (_) {} }, [null, sombre, session]);
   await pg.addInitScript(PONT, scen === 'ecart' ? '5.329.0' : ATTENDUE);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   if (proprio) await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: 'j.julien.x', refresh_token: 'r', expires_in: 3600, user: session.user }) }));
@@ -150,10 +154,7 @@ async function scenario(b, scen, largeur, sombre) {
   await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(4500);
   if (scen === 'ecart') {
-    const ligne = pg.locator('[data-fraicheur-unique]').first();
-    await ligne.waitFor({ timeout: 20000 }).catch(() => {});
-    const titre = (await ligne.getAttribute('title').catch(() => '')) || (await ligne.innerText().catch(() => ''));
-    dit(/a la 5\.329 : installe la 5\.385/.test(titre), `${nom} : la ligne du haut dit « … a la 5.329 : installe la 5.385 »`, titre);
+    await pg.waitForTimeout(3000);
     dit(!(await pg.locator('[data-controle], [data-controle-ok], [data-fia-controle]').count()), `${nom} : Ma journée ne porte pas la carte du contrôle de nuit`);
     dit(!/à dater/i.test(await pg.locator('main').innerText().catch(() => '')), `${nom} : « ventes à dater » n’est écrit nulle part dans Ma journée`);
     if (largeur === 390 && !sombre) await pg.screenshot({ path: path.join(CAPT, `fiabilite-journee-${nom}.png`) });
@@ -193,6 +194,11 @@ async function scenario(b, scen, largeur, sombre) {
     await f.locator('[data-fia-fermer]').click();
     await pg.waitForTimeout(400);
     dit(!(await pg.locator('[data-fia-feuille]').count()), `${nom} : × ferme la feuille`);
+    // La ligne de fraîcheur (en haut de l'app, et sa copie dans la feuille de la cloche) : l'extension d'ICI,
+    // avec le paquet à portée de doigt.
+    await pg.waitForFunction(() => [...document.querySelectorAll('[data-fraicheur-unique]')].some((e) => e.getAttribute('data-fraicheur-unique') === 'retard'), null, { timeout: 60000 }).catch(() => {});
+    const titres = await pg.evaluate(() => [...document.querySelectorAll('[data-fraicheur-unique]')].map((e) => (e.getAttribute('title') || e.textContent || '')).join(' | '));
+    dit(/a la 5\.329 : installe la 5\.385/.test(titres), `${nom} : la ligne de fraîcheur dit « … a la 5.329 : installe la 5.385 »`, titres);
   } else if (scen === 'ok') {
     dit(!(await page.locator('[data-fia-ext-ici]').count()), `${nom} : extension à jour ⇒ aucune alerte d’extension (jamais pour une version publiée à jour)`);
     dit((await page.locator('[data-fia-controle-ok]').count()) === 1, `${nom} : « Tout est en ordre · vérifié cette nuit »`);
