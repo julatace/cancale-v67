@@ -36,7 +36,7 @@ const FICHIERS = ['src/App.jsx', 'src/numerosNouvelles.js', 'src/ecrans/Reglages
 // [fichier relatif, de, vers]
 const MUTATIONS = {
   partielle: ['src/numerosNouvelles.js', "return mode === 'vrm' && complet === true", "return mode === 'vrm'"],
-  passage: ['src/App.jsx', 'if (neuf && !numeroNeufPermis(', 'if (false && !numeroNeufPermis('],
+  passage: ['src/App.jsx', 'if (neuf && !neufPermis(it)) continue;', 'if (false) continue;'],
   ko: ['src/numerosNouvelles.js', "if (Array.isArray(listings.ko) && listings.ko.map(String).includes(uid)) return false;", ''],
   marque: ['src/App.jsx', 'if (neuf) { nextNum[it.id] = marquerNouveau(nextNum[it.id]);', 'if (false) { nextNum[it.id] = marquerNouveau(nextNum[it.id]);'],
   notif: ['src/App.jsx', 'if (nouveauxNum.length) direNouveauxNumeros(nouveauxNum);', ''],

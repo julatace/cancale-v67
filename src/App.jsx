@@ -40644,6 +40644,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // §5 : un N° ÉCRIT dans deux annonces ou plus n'est pris pour AUCUNE (deux paires sous un N°,
     // le bloc rouge le montre) ; ni un N° déjà porté par une autre fiche.
     const ecritsEnDouble = ecritOn ? clesLuesEnDouble(items.map((it) => lectureEcriteVinted(it))) : new Set();
+    // (15 nov., src/numerosNouvelles.js) LE N° NEUF, dernier recours : « VRM numérote » et la lecture COMPLÈTE
+    // du compte de l'annonce (règle <enligne-regle>, `complets[uid]`). Une lecture partielle ⇒ aucun N° neuf.
+    const neufPermis = (it) => numeroNeufPermis({ mode: ecritOn ? 'moi' : 'vrm', complet: lectureCompleteDe(it, listings) });
     for (const it of sorted) {
       const cur = nextNum[it.id];
       const pk = photoKey(it.photo);
@@ -40686,12 +40689,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // numéros déjà donnés (à vie, §5.40) : la séquence monte et ne redescend
       // pas. C'est voulu — elle compte les paires passées, pas le stock.
       // (11 nov.) Hors ligne : jamais un N° neuf (réservé au serveur seul) — l'annonce le reçoit au retour.
-      // (15 nov., src/numerosNouvelles.js) LE N° NEUF, dernier recours : seulement sur la lecture COMPLÈTE
-      // de son compte (règle <enligne-regle>), en ligne, hors retenue. Une lecture partielle ⇒ rien.
       if (!num && horsLigneMaintenant()) continue;
       if (!num && retenueCartons) continue;   // (14 nov., 134) il n'a pas encore dit si ses cartons portent déjà leurs N°
       const neuf = !num;
-      if (neuf && !numeroNeufPermis({ mode: ecritOn ? 'moi' : 'vrm', complet: lectureCompleteDe(it, listings) })) continue;
+      if (neuf && !neufPermis(it)) continue;
       if (!num) num = prochainLibre(taken, takenK, prefNum);
       nextNum[it.id] = { ...(cur || {}), numero: String(num), title: it.title, photo: it.photo || null, photoK: pk || (cur && cur.photoK) || null, price: it.price ?? null, size: it.size ?? (cur && cur.size) ?? null, accountId: it._acc?.vinted_user_id, numberedAt: (cur && cur.numberedAt) || new Date().toISOString(), auto: true };
       // Un N° NEUF est « à écrire sur son carton » jusqu'à « C'est écrit » ; l'appareil qui l'a donné le dit.
