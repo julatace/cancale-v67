@@ -437,6 +437,10 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
   --ret-ambre: var(--sv-ambre) !important; --sbp-ambre: var(--sv-ambre) !important; --vrm-warn: var(--sv-ambre) !important;
 }
 :root:root:root body .vrm-cx[data-espace="autres"] :is(.vrm-cx-form, .vrm-cx-etiquettes > *, select) { color: var(--sv-encre) !important; }
+/* Ce que la boîte pose en couleur EN LIGNE sur le fond (« Se connecter avec l'iPhone », la phrase de séparation des comptes). */
+:root:root:root body .vrm-cx[data-espace="autres"] .vrm-cx-qr > summary { color: var(--sv-clair-lien) !important; }
+:root:root:root body .vrm-cx[data-espace="autres"] .vrm-cx-boite > div[style*="color"] { color: var(--sv-clair-2) !important; }
+:root:root:root body .vrm-cx[data-espace="autres"] .vrm-cx-boite > div[style*="color"] b[style*="color"] { color: var(--sv-clair-ambre) !important; }
 
 /* ══ 8. LA COQUE : la barre du bas (verre clair), la tête, la navigation de l'ordinateur ══ */
 :root:root:root body .vrm-app-shell .vrm-tabbar.vrm-tabbar {
