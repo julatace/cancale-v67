@@ -109,7 +109,8 @@
 .av-picto-leboncoin{--m:url(/brands/leboncoin.svg)}
 .av-picto-ebay{--m:url(/brands/ebay.svg)}
 .av-picto-ebay{width:44px}
-.av-picto-ebay:after{inset:8px 6px}
+/* Le mot « ebay » occupe une bande au milieu de son carré 24 × 24 : on cale la LARGEUR du dessin sur la case. */
+.av-picto-ebay:after{inset:0 6px;-webkit-mask-size:100% auto;mask-size:100% auto}
 .av-picto-vestiaire{--m:url(/brands/vestiaire.svg)}
 .av-h1{font-size:clamp(40px,3.6vw,56px);line-height:1.04;letter-spacing:-.038em;font-weight:700;max-width:13em;text-wrap:balance}
 .av-sous{font-size:clamp(18px,1.45vw,21px);line-height:1.45;color:var(--gris);max-width:30em;margin-top:20px;text-wrap:pretty;letter-spacing:-.014em}
@@ -168,7 +169,7 @@
 .av-pictos-grands .av-picto{width:40px;height:40px;border-radius:12px}
 .av-pictos-grands .av-picto:after{inset:10px}
 .av-pictos-grands .av-picto-ebay{width:62px}
-.av-pictos-grands .av-picto-ebay:after{inset:12px 8px}
+.av-pictos-grands .av-picto-ebay:after{inset:0 9px}
 .av-tuile-extension{min-height:0}
 .av-tuile-extension .av-tuile-texte{padding:28px}
 .av .av-lien-tuile{margin:14px 0 0 -10px}
@@ -271,7 +272,7 @@
   .av-pour{font-size:14px;margin-bottom:14px;gap:8px 10px}
   .av-picto{width:26px;height:26px;border-radius:8px}
   .av-picto:after{inset:6px}
-  .av-picto-ebay:after{inset:8px 4px}
+  .av-picto-ebay:after{inset:0 6px}
   .av-h1{font-size:clamp(31px,8.6vw,38px);line-height:1.06;letter-spacing:-.035em}
   .av-sous{font-size:17px;margin-top:12px}
   .av-actions{margin-top:20px;flex-direction:column;align-items:stretch;gap:10px}

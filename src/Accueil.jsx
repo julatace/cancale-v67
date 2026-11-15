@@ -65,7 +65,7 @@ function Capture({ nom, alt, taille = TEL, paresseuse = true, prioritaire = fals
   );
 }
 
-// Les pictogrammes des plateformes : un masque CSS (public/brands/*.svg, la couleur du texte).
+// Les pictogrammes des plateformes : un masque CSS (les fichiers SVG de public/brands, la couleur du texte).
 // Décor : le NOM est toujours écrit à côté (lecteurs d'écran, usage nominatif).
 const PLATEFORMES = ['vinted', 'leboncoin', 'ebay', 'vestiaire'];
 const Picto = ({ site }) => <i className={`av-picto av-picto-${site}`} aria-hidden="true" />;
@@ -141,8 +141,8 @@ export default function Accueil({ onEntrer }) {
   React.useEffect(() => {
     let io = null;
     try {
-      io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { setFonctionsPretes(true); io.disconnect(); } }, { rootMargin: '0px 0px 40% 0px' });
-      const f = document.getElementById('fonctions'); if (f) io.observe(f);
+      io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { setFonctionsPretes(true); io.disconnect(); } }, { rootMargin: '0px 0px 5% 0px' });
+      const f = document.querySelector('#fonctions .av-bento'); if (f) io.observe(f);
     } catch (_) { setFonctionsPretes(true); }
     return () => { try { io && io.disconnect(); } catch (_) {} };
   }, []);
