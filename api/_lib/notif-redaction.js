@@ -246,7 +246,7 @@ const TXT = {
     annulation: 'Annulation demandée',
     annulationCorps: (r) => `L’acheteur veut annuler${r ? ` (« ${r} »)` : ''} · accepte ou refuse sur Vinted`,
     laPlusRecente: 'la plus récente',
-    groupe: { bordereau: (k) => `${k} bordereaux prêts à imprimer`, vente: (k) => `${k} ventes`, argent: (k) => `${k} versements reçus`, arrivee: (k) => `${k} colis t’attendent`, offre: (k) => `${k} offres à trancher`, rappel: (k) => `${k} rappels`, message: (k) => `${k} nouveaux messages` },
+    groupe: { bordereau: (k) => `${k} bordereaux prêts à imprimer`, vente: (k) => `${k} ventes`, argent: (k) => `${k} versements reçus`, arrivee: (k) => `${k} colis t'attendent`, offre: (k) => `${k} offres à trancher`, rappel: (k) => `${k} rappels`, message: (k) => `${k} nouveaux messages` },
     resume: { bordereau: (k) => `${k} colis à poster`, arrivee: (k) => `${k} colis à retirer`, vente: (k) => `${k} vente${k > 1 ? 's' : ''}`, argent: (k) => `${k} versement${k > 1 ? 's' : ''}`, offre: (k) => `${k} offre${k > 1 ? 's' : ''}`, message: (k) => `${k} message${k > 1 ? 's' : ''}`, autre: (k) => `${k} autre${k > 1 ? 's' : ''}`, notifs: (k) => `${k} notifications` },
   },
   en: {

@@ -157,6 +157,7 @@ function serviceWorker() {
   const P = await import('file://' + path.join(R, 'api', '_lib', 'push.js'));
   const L = await import('file://' + path.join(R, 'api', '_lib', 'lien-notif.js'));
   const A = await import('file://' + path.join(R, 'api', '_lib', 'notif-apercus.js'));
+  const TX = await import('file://' + path.join(R, 'api', '_lib', 'notif-textes.js'));
   const { contexteVendeur } = await import('file://' + path.join(R, 'api', '_lib', 'owner.js'));
   const { default: routePush } = await import('file://' + path.join(R, 'api', 'push.js'));
   const { default: routeEmail } = await import('file://' + path.join(R, 'api', 'email-inbound.js'));
@@ -256,6 +257,7 @@ function serviceWorker() {
       ['message', { ...A.texteMessage({ paire: 'Air Max 90 blanche taille 42', qui: PSEUDOS[1], compte: 'boutique_banc', extrait: 'Bonjour, toujours dispo ?' }), tag: 'msg-k4', url: L.DESTINATIONS.message({ conv: '55' }) }, 'message'],
       ['annulation', { ...A.texteAnnulation({ qui: PSEUDOS[2], article: 'Air Max 90', raison: 'Trompée de taille' }), tag: 'cancel-k5', url: L.DESTINATIONS.message({ conv: '56' }) }, 'action'],
       ['Vestiaire', { ...A.texteVenduVestiaire({ titre: 'Sac Longchamp Le Pliage noir', montant: 84, limite: '2026-11-19' }), tag: 'vc-vente-k6', url: L.DESTINATIONS.vcVente({ id: 'k6' }) }, 'vente'],
+      ['arrivée', { ...TX.texteArrivee({ article: 'Adidas Samba OG', lieu: 'Tabac des Halles, 8 Rue des Lilas, 44000 Nantes', code: '454602', limite: '2026-11-17' }), tag: 'relais-k10', url: L.DESTINATIONS.retrait({ suivi: 'XW0001TS' }) }, 'colis'],
       ['soir', { ...A.texteSoir({ colis: { demain: 2, heure: '12:00', retard: 1, aVerifier: 0 }, retraits: { n: 1, lieu: 'Tabac des Halles, 8 Rue des Lilas, 44000 Nantes' }, offres: { n: 0 } }), tag: 'soir-k7', url: L.DESTINATIONS.colis({}) }, 'soir'],
     ];
     for (const [nom, payload, cat] of familles) {

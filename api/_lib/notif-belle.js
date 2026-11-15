@@ -66,7 +66,9 @@ export function embellir({ title = '', body = '' } = {}, cat = null) {
     // « Chronopost : ton colis… » ne doit pas devenir le titre « Chronopost ».
     const m = /^(.{6,}?)\s+(?:·|—|–|-)\s+(.+)$/.exec(t) || ((x) => (x && x[1].trim().split(/\s+/).length >= 3 ? x : null))(/^(.{6,}?)\s*:\s+(.+)$/.exec(t));
     const tete = m && m[1].length <= TITRE_MAX ? m[1] : null;
-    if (tete) { b = [majuscule(m[2]), b].filter(Boolean).join(' · '); t = tete; }
+    // (15 nov.) Corps ≤ 90 : la suite du titre passe en tête ; si le tout ne tient pas, elle
+    // passe en QUEUE (c'est elle qui sera coupée, jamais le lieu, le code ou le n° du corps).
+    if (tete) { const devant = [majuscule(m[2]), b].filter(Boolean).join(' · '); b = devant.length <= CORPS_MAX || !b ? devant : [b, m[2]].join(' · '); t = tete; }
     else { if (!b) b = t; t = couper(t, TITRE_MAX); }
   }
   if (!t) {
