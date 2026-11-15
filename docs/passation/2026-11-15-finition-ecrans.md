@@ -51,6 +51,7 @@ quitte l'écran (une phrase d'explication) reste lu au lecteur d'écran et dans 
 | Achats · la fiche d'un colis à retirer | l'adresse du point n'était nulle part | ligne « Point » : le nom, l'adresse entière dessous |
 | La tête · le nuage barré | une icône muette (le sens n'était que dans l'infobulle, invisible sur iPhone) : c'est `BoutonSync`, état `error` (la base n'a pas répondu, la sauvegarde sera retentée) ou `refus` (l'écran est périmé) | il dit son mot : « Pas enregistré » / « À recharger » (`fin.sync.*`, 5 langues), en ambre |
 | Ma journée · « À ce rythme… / estimation » sous la barre | vu sur sa capture en cours de défilement ; mené tout en bas, la dernière ligne finit au-dessus de la barre (banc B) | rien à changer à la mise en page ; le banc le garde |
+| Ventes à l'ordinateur (sa capture Chrome : « améliore le visuel ») | la barre collée (recherche + île des sites) laissait lire au travers ce qui défilait dessous (verre à 74 %) ; l'échéance d'une rangée « À envoyer » flottait au milieu (548 px vides à droite) ; « Envoyés » : « En route » écrit deux fois par rangée (méta + légende de la frise) et une colonne de droite vide ; deux phrases grises techniques sous les onglets | verre à 94 % + ombre douce ; l'échéance au bout de la rangée, alignée d'une rangée à l'autre ; la légende de la frise au lecteur d'écran seulement, la frise prend la colonne vide quand la rangée n'a pas de geste ; « 18 colis sans transporteur lu » (les raisons dans l'infobulle et au lecteur d'écran) |
 | Messages, Leboncoin, eBay, Vestiaire, Argent · Résumé, URSSAF, Statistiques, Communauté | rien de cassé mesuré ni vu | inchangés |
 
 ## Ce qui n'a PAS été changé (vu, et pourquoi)
@@ -62,6 +63,11 @@ quitte l'écran (une phrase d'explication) reste lu au lecteur d'écran et dans 
   passer le titre sur deux lignes ferait des rangées de plus de 96 px (`studio-ventes` L, densité à 1 000 colis).
 - **Achats · la première rangée sous la moitié de l'écran** (règle « liste d'abord ») : il faudrait refondre la
   tête (comptes, bande, filtres) — une décision de composition, pas une finition.
+- **Ventes à l'ordinateur · la liste du bas de sa capture** (« adidas handball… · Vinted · tomj606 · aujourd'hui ·
+  ● À envoyer · 62 € », grand vide photo ↔ titre, « IN_PROGRESS », « n° 37451417 ») : la base inventée ne la rend
+  pas (aucune rangée de ce type mesurée) — pas touchée à l'aveugle ; Vestiaire est corrigé ailleurs
+  (`claude/vestiaire-ventes`). La refonte « tableau de bord » complète de Ventes (colonnes photo · N° · titre ·
+  compte · état · montant) reste à faire.
 - **Stock · « sans N° : pas rangeable »** coupé dans la méta d'une rangée sans N° (rapporté par le banc, hors passe).
 - **Messages · extraits coupés** : c'est l'aperçu d'un message, voulu.
 - **La fiche d'un colis sans achat relié** s'intitule « n°…0001 » (la fin du n° de suivi) et empile quatre
@@ -76,7 +82,8 @@ cibles, ni entre deux TEXTES (la boîte de leurs lettres, `Range`), par zone (co
 libellé de la passe coupé par « … », T cibles ≥ 44 px (l'étendue RÉELLEMENT atteinte au doigt autour du
 centre, pseudo-élément compris), F insécables sur les libellés de la passe, N un même fait porteur d'un nombre
 (« + 6 à vérifier ») jamais écrit deux fois dans une carte ouverte, V aucune vignette vide (photo par identité,
-sinon logo), B mené tout en bas, rien ne reste sous la barre du bas. Sa base ajoute des colis À RETIRER inventés
+sinon logo), B mené tout en bas, rien ne reste sous la barre du bas, G (Ventes à 1512) la barre collée a un fond
+plein (≥ 90 %), aucune rangée de colis ne garde plus de 240 px vides à droite, chaque photo reste dans sa rangée. Sa base ajoute des colis À RETIRER inventés
 (deux Mondial Relay qu'aucune commande ne nomme, un achat Vinted Go à l'adresse longue) et l'écran
 « journee-retirer » (la carte dépliée) et « achats-fiche-colis ». Les coupes hors passe sont RAPPORTÉES, jamais cachées.
 
