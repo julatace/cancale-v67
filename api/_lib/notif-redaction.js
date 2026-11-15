@@ -235,6 +235,12 @@ const TXT = {
     prixNCorps: (nums) => `${nums} : touche pour saisir les prix d’achat.`,
     retourTitre: (a) => (a ? `À renvoyer : ${a}` : 'Un achat à renvoyer'),
     retourCorps: (av) => (av ? `Bordereau de retour reçu · à déposer ${av}` : 'Bordereau de retour reçu · touche pour l’imprimer'),
+    retourDepose: "Retour déposé",
+    retourDeposeCorps: (c) => (c ? `Pris en charge par ${c} · touche pour le suivre.` : "Pris en charge · touche pour le suivre."),
+    retourLivre: "Retour livré au vendeur",
+    retourLivreCorps: "Le remboursement suit sous 2 jours, sauf problème signalé.",
+    rembourse: (e) => (e ? `Remboursé · ${e}` : "Remboursé"),
+    rembourseCorps: "Le remboursement d’un de tes achats est arrivé.",
     offre: (e) => (e ? `Offre de ${e}` : 'Nouvelle offre'),
     offreCorps: 'Accepte, refuse ou contre-propose',
     expire24: 'expire dans 24 h',
@@ -268,6 +274,12 @@ const TXT = {
     prixNCorps: (nums) => `${nums}: tap to enter what you paid.`,
     retourTitre: (a) => (a ? `To send back: ${a}` : 'A purchase to send back'),
     retourCorps: (av) => (av ? `Return label received · drop off ${av}` : 'Return label received · tap to print it'),
+    retourDepose: "Return dropped off",
+    retourDeposeCorps: (c) => (c ? `Picked up by ${c} · tap to track it.` : "Picked up · tap to track it."),
+    retourLivre: "Return delivered to the seller",
+    retourLivreCorps: "The refund follows within 2 days unless a problem is reported.",
+    rembourse: (e) => (e ? `Refunded · ${e}` : "Refunded"),
+    rembourseCorps: "A refund for one of your purchases has arrived.",
     offre: (e) => (e ? `Offer of ${e}` : 'New offer'),
     offreCorps: 'Accept, decline or counter',
     expire24: 'expires in 24 h',
@@ -301,6 +313,12 @@ const TXT = {
     prixNCorps: (nums) => `${nums}: toca para poner los precios de compra.`,
     retourTitre: (a) => (a ? `Por devolver: ${a}` : 'Una compra por devolver'),
     retourCorps: (av) => (av ? `Etiqueta de devolución recibida · entregar ${av}` : 'Etiqueta de devolución recibida · toca para imprimirla'),
+    retourDepose: "Devolución entregada",
+    retourDeposeCorps: (c) => (c ? `Recogido por ${c} · toca para seguirlo.` : "Recogido · toca para seguirlo."),
+    retourLivre: "Devolución entregada al vendedor",
+    retourLivreCorps: "El reembolso llega en 2 días salvo problema señalado.",
+    rembourse: (e) => (e ? `Reembolsado · ${e}` : "Reembolsado"),
+    rembourseCorps: "Ha llegado el reembolso de una de tus compras.",
     offre: (e) => (e ? `Oferta de ${e}` : 'Nueva oferta'),
     offreCorps: 'Acepta, rechaza o contraoferta',
     expire24: 'caduca en 24 h',
@@ -334,6 +352,12 @@ const TXT = {
     prixNCorps: (nums) => `${nums}: tocca per inserire i prezzi d’acquisto.`,
     retourTitre: (a) => (a ? `Da rimandare: ${a}` : 'Un acquisto da rimandare'),
     retourCorps: (av) => (av ? `Etichetta di reso ricevuta · da consegnare ${av}` : 'Etichetta di reso ricevuta · tocca per stamparla'),
+    retourDepose: "Reso consegnato",
+    retourDeposeCorps: (c) => (c ? `Preso in carico da ${c} · tocca per seguirlo.` : "Preso in carico · tocca per seguirlo."),
+    retourLivre: "Reso consegnato al venditore",
+    retourLivreCorps: "Il rimborso arriva entro 2 giorni salvo problemi segnalati.",
+    rembourse: (e) => (e ? `Rimborsato · ${e}` : "Rimborsato"),
+    rembourseCorps: "È arrivato il rimborso di un tuo acquisto.",
     offre: (e) => (e ? `Offerta di ${e}` : 'Nuova offerta'),
     offreCorps: 'Accetta, rifiuta o fai una controfferta',
     expire24: 'scade tra 24 h',
@@ -367,6 +391,12 @@ const TXT = {
     prixNCorps: (nums) => `${nums}: tippe, um die Einkaufspreise einzugeben.`,
     retourTitre: (a) => (a ? `Zurücksenden: ${a}` : 'Ein Kauf zum Zurücksenden'),
     retourCorps: (av) => (av ? `Retourenetikett erhalten · abgeben ${av}` : 'Retourenetikett erhalten · tippe zum Drucken'),
+    retourDepose: "Rücksendung abgegeben",
+    retourDeposeCorps: (c) => (c ? `Von ${c} übernommen · tippe zum Verfolgen.` : "Übernommen · tippe zum Verfolgen."),
+    retourLivre: "Rücksendung beim Verkäufer",
+    retourLivreCorps: "Die Erstattung folgt in 2 Tagen, außer bei einem Problem.",
+    rembourse: (e) => (e ? `Erstattet · ${e}` : "Erstattet"),
+    rembourseCorps: "Die Erstattung eines deiner Käufe ist da.",
     offre: (e) => (e ? `Angebot über ${e}` : 'Neues Angebot'),
     offreCorps: 'Annehmen, ablehnen oder Gegenangebot',
     expire24: 'läuft in 24 h ab',
@@ -444,6 +474,24 @@ const SORTES = {
   retourAchat: (d, T, ctx) => {
     const a = nomCourt(d.article, TITRE_MAX - 14);
     return { title: couperMot(T.retourTitre(a), TITRE_MAX), body: T.retourCorps(avantClair(d.limite, ctx)), ligne: a };
+  },
+  // (15 nov., lot retours-suivi) Le colis d'un RETOUR d'achat, lu chez le transporteur (n° EXACT du
+  // bordereau de retour) : « Retour déposé · Nike Air Max », « Retour livré au vendeur », puis le
+  // remboursement d'un achat (e-mail « … a été remboursée ») : « Remboursé · 62 € ».
+  retourDepose: (d, T) => {
+    const a = nomCourt(d.article);
+    const { title, reste } = titreAvecObjet(T.retourDepose, a, d.article);
+    return { title, body: joindre(reste, T.retourDeposeCorps(espaces(d.transporteur).slice(0, 20))), ligne: a };
+  },
+  retourLivre: (d, T) => {
+    const a = nomCourt(d.article);
+    const { title, reste } = titreAvecObjet(T.retourLivre, a, d.article);
+    return { title, body: joindre(reste, T.retourLivreCorps), ligne: a };
+  },
+  rembourse: (d, T, ctx) => {
+    const e = montantClair(d.montant, ctx.langue), a = nomCourt(d.article);
+    const { title, reste } = titreAvecObjet(T.rembourse(e), a, d.article);
+    return { title, body: joindre(reste, T.rembourseCorps), ligne: joindre(e, a) };
   },
   // Une offre reçue. Jamais le pseudo de l'acheteur. `juge` : { etat, prix } (le
   // copilote, reconnu AU TITRE seulement : « à vérifier »).

@@ -268,7 +268,10 @@ export function departsAInterroger({ sortants = [], departs = new Map(), entrant
 // un n°). Vinted : les bordereaux `email_bord_*` ({ suivi, transaction,
 // receivedAt }) — la date du bordereau borne la fenêtre. Rend [{ cle, suivi,
 // transporteur, venteMs }].
-export function sortantsDuVendeur({ vcVentes = null, bords = [] } = {}) {
+// (15 nov., lot retours-suivi) + `retours` : les bordereaux de RETOUR de ses achats (`email_bordretour_*` :
+// { suivi, transaction, receivedAt, transporteurPdf }) — un colis qu'IL poste : lu comme un départ, jusqu'à la
+// fin (déposé, au point relais du vendeur, livré), jamais en `transp_` (jamais « à retirer »).
+export function sortantsDuVendeur({ vcVentes = null, bords = [], retours = [] } = {}) {
   const out = [];
   const vv = vcVentes && typeof vcVentes === 'object' ? vcVentes : {};
   for (const [id, v] of Object.entries(vv)) {
@@ -281,6 +284,10 @@ export function sortantsDuVendeur({ vcVentes = null, bords = [] } = {}) {
   for (const b of Array.isArray(bords) ? bords : []) {
     if (!b || !b.suivi) continue;
     out.push({ cle: 'vt:' + String(b.transaction || b.suivi), suivi: b.suivi, transporteur: '', venteMs: msDe(b.receivedAt) });
+  }
+  for (const r of Array.isArray(retours) ? retours : []) {
+    if (!r || !r.suivi) continue;
+    out.push({ cle: 'rt:' + String(r.transaction || r.suivi), suivi: r.suivi, transporteur: r.transporteurPdf || '', venteMs: msDe(r.receivedAt) });
   }
   return out;
 }

@@ -200,7 +200,7 @@ const aller = async (pg, q) => { await pg.goto(`http://localhost:${PORT}/?${q}`,
         await pg.waitForSelector('[data-ventes-toutes="lu"]', { timeout: 20000 });
         await pg.waitForFunction(() => { const l = document.querySelector('[data-toutes-vente="leboncoin"]'); return l && l.getAttribute('data-toutes-compte'); }, null, { timeout: 8000 }).catch(() => {});
         const c = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-toutes-vente]')].map((l) => [l.getAttribute('data-toutes-vente'), l.getAttribute('data-toutes-compte')])));
-        dit(c.vinted === 'compte_a' && c.leboncoin === 'atelier_lbc_banc' && c.ebay === 'paire_perso' && c.vestiaire === 'n° 7781234', `${nomVp} · B · « Tous les sites » : le compte de chaque vente (Vinted, Leboncoin, eBay, Vestiaire)`, JSON.stringify(c));
+        dit(c.vinted === 'compte_a' && c.leboncoin === 'atelier_lbc_banc' && c.ebay === 'paire_perso' && !c.vestiaire, `${nomVp} · B · « Tous les sites » : le compte de chaque vente (Vinted, Leboncoin, eBay) ; Vestiaire sans pseudo lu ⇒ rien (15 nov. : l’identifiant se lisait comme un n° de vente)`, JSON.stringify(c));
         const logoLigne = await pg.evaluate(() => [...document.querySelectorAll('[data-toutes-vente] [data-toutes-site] [data-logo-site]')].length);
         dit(logoLigne >= 4, `${nomVp} · B · chaque ligne porte le logo de son site`, String(logoLigne));
         await sain(pg, `${nomVp} · Ventes · Tous`);
@@ -222,7 +222,9 @@ const aller = async (pg, q) => { await pg.goto(`http://localhost:${PORT}/?${q}`,
         const e = await voir('ebay', '[data-ebay-vente] [data-vente-compte], [data-ebay-vente] [data-plateforme-vente]');
         dit(e === 'paire_perso', `${nomVp} · B · eBay : le compte de la commande`, String(e));
         const c = await voir('vestiaire', '[data-vc-vente="V1"]');
-        dit(c === 'n° 7781234', `${nomVp} · B · Vestiaire : le compte relevé (son identifiant, aucun nom inventé)`, String(c));
+        const cTxt = await pg.evaluate(() => (document.querySelector('[data-vc-vente="V1"]') || { innerText: '' }).innerText);
+        // (15 nov., Julien) « n° 37451417 » sous chaque vente se lisait comme un n° de vente : le pseudo lu, sinon RIEN.
+        dit(!c && !/7781234/.test(cTxt), `${nomVp} · B · Vestiaire : sans pseudo lu, aucun compte écrit (jamais son identifiant)`, String(c) + ' · ' + cTxt.slice(0, 80));
         await sain(pg, `${nomVp} · Ventes · Vestiaire`);
       });
       await essaie('A. Annonces, Achats, Messages, Colis : le même sélecteur', async () => {

@@ -21,6 +21,9 @@
 //     sans taille des deux côtés — un sac — marque + couleur commune) ; jamais la
 //     photo, jamais le titre seul, jamais la marque seule. Rien n'est relié sans
 //     son clic : `poserLienVc` est appelée par le bouton, rien d'autre.
+//  ⚠️ (15 nov., lot meme-photo) Julien l'a demandé : la MÊME photo (empreinte perceptuelle,
+//     src/memePhoto.js — jamais une ressemblance de titre) PROPOSE aussi une liaison, dans la
+//     feuille « Même photo · à relier » ; c'est encore son toucher qui appelle `poserLienVc`.
 //
 //  Module PUR (aucun accès au navigateur) : `scripts/audit-lien-vc.cjs` l'exécute.
 // ════════════════════════════════════════════════════════════════════════════

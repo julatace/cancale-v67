@@ -25,9 +25,6 @@ catch (_) { ({ chromium } = require('playwright')); }
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
-// (15 nov., rouges-connus) Le mot de la notion « à envoyer » (un mot par notion depuis le 8 nov. : src/libelles.js,
-// docs/passation/2026-11-08-clarte.md — « à expédier » est ÉCARTÉ), lu là où l'app le range.
-const MOT_A_ENVOYER = (/aEnvoyer:\s*Object\.freeze\(\{ titre: '([^']+)'/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'libelles.js'), 'utf8')) || [])[1] || 'À envoyer';
 const PORT = Number(process.env.BANC_PORT) || 8573;
 const CAPTURES = process.env.BANC_CAPTURES || os.tmpdir();
 
@@ -205,9 +202,12 @@ const LIGNES = [
         return { etat: e.getAttribute('data-vc-ventes'), v, txt: carte ? carte.innerText : '', phrase: document.querySelectorAll('[data-vc-ventes-montant]').length };
       });
       const V = (id) => ve && ve.v.find((x) => x.id === id);
-      dit(V('V1') && V('V1').etape === 'a-expedier' && V('V1').t.includes(MOT_A_ENVOYER) && /à envoyer avant le/.test(V('V1').t), `Ventes : « ${MOT_A_ENVOYER} » (le mot de la notion), avec la date limite`, JSON.stringify(V('V1')));
+      // (15 nov., ventes Vestiaire) La date limite est dans l'état de la ligne : « À expédier avant le … » (tr, `vcventes.etat.aExpedier`).
+      dit(V('V1') && V('V1').etape === 'a-expedier' && /À expédier/.test(V('V1').t) && /À expédier (avant le|aujourd’hui|demain)/.test(V('V1').t), 'Ventes : « à expédier » en tête, avec la date limite', JSON.stringify(V('V1')));
       dit(V('V2') && V('V2').etape === 'controle', 'Ventes : « authentication_in_progress » ⇒ l’étape « contrôle par Vestiaire »', JSON.stringify(V('V2') && V('V2').etape));
-      dit(V('V3') && V('V3').etape === 'autre' && /« paid »/.test(V('V3').t), 'Ventes : « paid » (payée par qui ?) n’est pas rangé : recopié tel quel', JSON.stringify(V('V3')));
+      // (15 nov., Julien) Le mot brut de Vestiaire ne s'écrit plus jamais (« IN_PROGRESS » s'affichait tel quel) :
+      // un mot que rien ne range reste NON rangé (jamais « payée » deviné), et l'écran le dit en mots.
+      dit(V('V3') && V('V3').etape === 'inconnu' && /État Vestiaire non reconnu/.test(V('V3').t) && !/\bpaid\b/.test(V('V3').t) && !/Payée(?! :)/.test(V('V3').t.replace(/Payée : à venir/g, '')), 'Ventes : « paid » (payée par qui ?) n’est pas rangé : « État Vestiaire non reconnu », jamais le mot ni « Payée »', JSON.stringify(V('V3')));
       // (2 nov., soir) Comme Vinted, la ligne montre ce que Vestiaire VERSE quand c'est sûr
       // (`montantRecuVc` : la clé « earnings » le dit) ; un montant pas sûr ne s'affiche jamais.
       dit(ve && !/123[,.]45|54[,.]32/.test(ve.txt) && /87,65/.test(ve.txt) && ve.phrase === 1, 'Ventes : seul le montant SÛR (versé) à l’écran, jamais un montant pas sûr ; la raison dite une seule fois', `phrase×${ve && ve.phrase}`);
