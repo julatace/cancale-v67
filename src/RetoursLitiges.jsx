@@ -114,7 +114,7 @@ export function CarteRenvoyer({ c, onImprimer, onDepose = null, Photo = null, no
       </div>
       {etape || (c.suivi && c.etape !== 'a-deposer') ? (
         <div className="vrm-ret-lignes">
-          {etape ? <span className={'vrm-ret-ligne' + (c.etape === 'rembourse' ? ' is-ok' : '')} data-retour-phrase-etape={c.etape}>{etape}</span> : null}
+          {etape ? <span className={'vrm-ret-ligne' + (c.etape === 'rembourse' ? ' is-ok' : '')} data-retour-phrase-etape={c.etape} data-retour-phrase-remb={c.etape === 'rembourse' ? '' : undefined}>{etape}</span> : null}
           {c.suivi && c.etape !== 'a-deposer' ? <span className="vrm-ret-ligne" data-retour-suivi={c.suivi} data-retour-suivi-etat={c.statut.etat}>{phraseSuivi(c.statut)}</span> : null}
           {c.etape !== 'rembourse' && c.etape !== 'a-deposer' ? <span className="vrm-ret-ligne" data-retour-phrase-remb="">{phraseRemb(c.rembourse)}</span> : null}
         </div>) : null}

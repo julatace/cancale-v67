@@ -150,7 +150,7 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         dit(a.remb === 'non' && /Pas encore remboursé/.test(a.phraseRemb), `${nom} : 9501 « Pas encore remboursé » (rien de prouvé)`, a.phraseRemb);
         dit(s.remb === 'oui' && s.montant === '45.9' && /Remboursé/.test(s.phraseRemb) && /45,90/.test(s.phraseRemb), `${nom} : 9502 « Remboursé 45,90 € » (e-mail du même n°)`, s.phraseRemb);
         dit((await pg.$('[data-a-renvoyer] [data-retour-tx="9501"]')) === null, `${nom} : 9501 n’est pas redit dans « à renvoyer » (son bordereau est déjà là, une fois)`);
-        dit(a.bouton >= 44, `${nom} : « Imprimer le bordereau » fait 44 px et plus`, String(a.bouton));
+        dit(a.bouton >= (vp.width < 600 ? 44 : 40), `${nom} : « Imprimer le bordereau » (touche du studio : 44 px au doigt, 40 sur ordinateur)`, String(a.bouton));
         dit((await rougeIci(pg, '[data-retours-achat]')) === false, `${nom} : aucun rouge sur « Retours »`);
         await pg.locator('[data-retours-achat]').first().scrollIntoViewIfNeeded().catch(() => {});
         await pg.screenshot({ path: path.join(SHOTS, `retours-achats-${vp.width}-${sombre ? 'sombre' : 'clair'}.png`), fullPage: false }).catch(() => {});

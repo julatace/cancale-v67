@@ -46404,6 +46404,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (nc) tuiles.retirer = { ...tuiles.retirer, sub: `${pickupCount ? `${tuiles.retirer.sub} · ` : ''}${nc} achat${nc>1?'s':''} au point relais en cours de vérification`, enVerification: nc }; }
         // (15 nov., lot retours) Un ACHAT à renvoyer n'a plus de ligne ici : il est une carte « À renvoyer »
         //    EN TÊTE de Ma journée (src/retoursAchat.js, la même liste qu'Achats), avec son bordereau.
+        // (15 nov., lot retours) CÔTÉ VENTE : un acheteur te renvoie une paire. La règle d'avant
+        //    (src/retoursStock.js, `retoursSuivis` : transaction 440, étape du colis de retour) n'avait
+        //    aucune ligne ici — on ne la voyait que dans Colis. Une ligne : « 1 retour en route vers toi »,
+        //    le N° par identité, la ligne ouvre Colis (« Reçu », remise en stock sous SON N°).
+        { const rv = retoursSuivis && retoursSuivis.etat === 'lu' ? retoursSuivis.lignes.filter((l) => !l.ancien && !l.recu && (l.etape === 'initie' || l.etape === 'en-route')) : [];
+          if (rv.length) {
+            const noms = rv.slice(0, 2).map((l) => [l.num ? `N°${l.num}` : '', l.titre || ''].filter(Boolean).join(' ')).filter(Boolean);
+            jobs.push({ id: 'retours-vente', n: rv.length, icon: 'restore', color: C.text, photos: rv.map((l) => (l.vente ? orderPhoto(l.vente) : null)).filter(Boolean),
+              court: tr('renv.vente.titre', { n: rv.length }), detail: noms.join(' · '), title: tr('renv.vente.titre', { n: rv.length }), tab: 'cat_bord', prio: 0.7,
+              attrs: { 'data-retours-vente': String(rv.length) } }); } }
         // (3 nov.) LITIGES, RETOURS, RÉCLAMATIONS EN COURS (src/litiges.js) : une carte
         // par IDENTITÉ (transaction, conversation, retour eBay), la date limite seulement
         // si elle est LUE, sinon « délai non lu » ; le geste = un lien vers le site. Le

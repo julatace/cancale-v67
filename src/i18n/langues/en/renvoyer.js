@@ -25,4 +25,5 @@ export default {
   "renv.sansPdf.contredit": "This number is one of your sales: check on Vinted before printing.",
   "litige.suspendue.detail": "Vinted is checking the order: wait for its answer",
   "litige.compte": "account {c}",
+  "renv.vente.titre": {"one": "{n} return on its way to you", "other": "{n} returns on their way to you"},
 };

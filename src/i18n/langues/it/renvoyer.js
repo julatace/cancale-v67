@@ -25,4 +25,5 @@ export default {
   "renv.sansPdf.contredit": "Questo numero è una tua vendita: controlla su Vinted prima di stampare.",
   "litige.suspendue.detail": "Vinted sta verificando l’ordine: attendi la risposta",
   "litige.compte": "account {c}",
+  "renv.vente.titre": {"one": "{n} reso in arrivo da te", "other": "{n} resi in arrivo da te"},
 };

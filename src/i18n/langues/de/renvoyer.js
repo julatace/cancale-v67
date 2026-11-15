@@ -25,4 +25,5 @@ export default {
   "renv.sansPdf.contredit": "Diese Nummer ist einer deiner Verkäufe: prüfe auf Vinted, bevor du druckst.",
   "litige.suspendue.detail": "Vinted prüft die Bestellung: warte auf die Antwort",
   "litige.compte": "Konto {c}",
+  "renv.vente.titre": {"one": "{n} Rücksendung unterwegs zu dir", "other": "{n} Rücksendungen unterwegs zu dir"},
 };

@@ -56,11 +56,13 @@ async function lignes() {
   const brBrut = JSON.stringify({ messageId: '<banc-br@banc.test>', from: de, to: 'boite@banc.test', subject: sujetBr, text: corpsBr('990009602', DEMAIN.txt), html: '', source: 'gmail-shared', attachments: [{ content: await pdf('990009602'), filename: 'Bon-Retour-Vinted-990009602.pdf', contentType: 'application/pdf' }] });
   const avBrut = JSON.stringify({ messageId: '<banc-av@banc.test>', from: de, subject: sujetAv(NIKE, DEMAIN.j), text: corpsAv(NIKE, DEMAIN.j), html: '', attachments: [] });
   return [
-    { id: 'main', data: { vinted_annonce_numeros: {}, vinted_used_numeros: [] } },
+    // Côté VENTE : un acheteur renvoie la N°21 (transaction 440, colis de retour déposé) ⇒ une ligne « retour en route vers toi ».
+    { id: 'main', data: { vinted_annonce_numeros: { i401: { numero: '21', title: 'Nike Dunk banc noir 42', auto: false } }, vinted_used_numeros: [21] } },
+    { id: 'harvest_111_txn_990009401', data: { capturedAt: ilYaH(1), payload: { transaction: { id: 990009401, item_id: 'i401', status: 440, status_title: '', shipment: { status_title: 'colis déposé en point relais' } } } } },
     { id: 'harvest_111_orders_purchased', data: { capturedAt: ilYaH(0.2), payload: { my_orders: [
       achat(990009601, AUTRY, 89, 'Retour initié', 150, '#8E8E93'), achat(990009602, NIKE, 55, 'Retour initié', 220, '#C7C7CC'), achat(990009603, NIKE, 50, 'Commande finalisée', 400, '#AEAEB2'),
     ] } } },
-    { id: 'harvest_111_orders_sold', data: { capturedAt: ilYaH(0.2), payload: { my_orders: [] } } },
+    { id: 'harvest_111_orders_sold', data: { capturedAt: ilYaH(0.2), payload: { my_orders: [{ transaction_id: 990009401, title: 'Nike Dunk banc noir 42', status: 'Retour initié', transaction_user_status: 'needs_action', conversation_id: '24618679401', date: ilYaH(120), price: { amount: '70.0', currency_code: 'EUR' } }] } } },
     { id: 'harvest_111_listings', data: { capturedAt: ilYaH(0.2), payload: { items: [], pagination: { total_entries: 0 } } } },
     { id: 'email_bordretour_990009601', data: { type: 'bordereau-retour', sens: 'achat', transaction: '990009601', suivi: '8123990009601', dateLimite: DANS8.txt, dateLimiteIso: DANS8.iso, article: AUTRY, uid: '111', account: 'banc_cancale', filename: 'Bon-Retour-Vinted-990009601.pdf', pdfB64: await pdf('990009601'), receivedAt: ilYaH(20) } },
     { id: 'email_retourdemande_a1', data: { type: 'retour-demande', sens: 'achat', subject: sujetAv(AUTRY, DANS8.j), article: AUTRY, limiteJour: `${DANS8.j.y}-${String(DANS8.j.m).padStart(2, '0')}-${String(DANS8.j.d).padStart(2, '0')}`, limiteIso: new Date(Date.parse(DANS8.iso) + 13 * H).toISOString(), conv: '', uid: '111', account: 'banc_cancale', receivedAt: ilYaH(26) } },
@@ -182,6 +184,8 @@ const cartes = (pg, racine) => pg.evaluate((rac) => [...document.querySelectorAl
         await pg.locator('[data-a-renvoyer-journee]').first().scrollIntoViewIfNeeded().catch(() => {});
         await pg.screenshot({ path: path.join(SHOTS, `renvoyer-journee-${vp.width}-${sombre ? 'sombre' : 'clair'}.png`), fullPage: false }).catch(() => {});
         dit((await deborde(pg)) <= 1, `${nom} : Ma journée, rien ne déborde`);
+        const rv = await pg.evaluate(() => { const x = document.querySelector('[data-retours-vente]'); return x ? { n: x.getAttribute('data-retours-vente'), t: x.innerText } : null; });
+        dit(rv && rv.n === '1' && /retour en route vers toi/.test(rv.t) && /N°21/.test(rv.t), `${nom} : côté VENTE, « 1 retour en route vers toi · N°21 » (la paire par identité) — elle ouvre Colis`, JSON.stringify(rv));
         dit(P.reclasse.length === 1, `${nom} : le reclassement des e-mails gardés est demandé au serveur, une fois`, String(P.reclasse.length));
       });
       await essaie('Achats → À renvoyer', async () => {
