@@ -246,6 +246,16 @@ function juger(m, suf, tel) {
 
 module.exports = { VUES, preparer, mesurer };
 if (require.main === module) (async () => {
+  // M7 (sur le code) — sans l'extension dans ce navigateur, l'offre ne se tranche pas ici : la règle du plein est lue
+  // dans le code de la carte d'offre (App.jsx) — « Proposer N € » est LE plein quand une contre-offre est calculée,
+  // « Accepter » ne l'est alors pas.
+  {
+    const app = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8');
+    const i = app.indexOf("data-offre-geste=\"proposer\""), bloc = i > 0 ? app.slice(app.lastIndexOf('<div', i), app.indexOf('</div>', i)) : '';
+    const prop = (bloc.match(/<button[^>]*data-offre-geste="proposer"[^>]*>/) || [''])[0];
+    const acc = (bloc.match(/contre!=null \? <button[^>]*data-offre-geste="accepter"[^>]*>/) || [''])[0];
+    dit(/vrm-chat-btn-p/.test(prop) && acc && !/vrm-chat-btn-p/.test(acc), 'M7 (code) : le plein de l\'offre va à « Proposer N € », pas à « Accepter »', `${prop.slice(0, 80)} | ${acc.slice(0, 60)}`);
+  }
   await new Promise((r) => P.srv.listen(P.PORT, r));
   const nav = await P.chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
   try {
