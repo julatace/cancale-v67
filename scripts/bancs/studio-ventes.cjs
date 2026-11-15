@@ -166,29 +166,46 @@ const shot = async (pg, nom, plein = false) => { if (SHOTS) await pg.screenshot(
 // ════════════════════════════════════════════════════════════════════════════
 const ATTENDU_PRESSES = ['9304', '9305'];   // limite LUE demain 12 h ; estimée demain (vente il y a 6 j). 9303 : estimée DÉPASSÉE ⇒ hors compte.
 // Le contraste AA d'un texte : sa couleur contre le premier fond opaque de ses ancêtres, sinon contre le pire
-// point du dégradé de l'espace (le plus sombre en clair, le plus clair en nuit).
-// (15 nov., Ventes « Verre dépoli ») Le fond réel est le BLEU du verre (--sv-haut / --sv-bas), plus le bleu clair du
-// studio : le pire des deux bouts du dégradé (recopié de ventes-verre.cjs).
+// point du dégradé de l'espace.
+// (15 nov., « Verre dépoli », docs/passation/2026-11-15-verre-depoli.md « La preuve ») La même règle que
+// scripts/bancs/verre.cjs (V3), sans rien figer d'une matière : les fonds d'un ancêtre comptent AVEC leur dégradé
+// (`background-image` : le verre est un dégradé translucide sur une couleur transparente) ; le fond de l'espace se
+// LIT sur les jetons rendus — le haut éclairé de ses reflets, l'aplat, le bas — et chaque texte est jugé sur le PIRE.
+// Avant le verre, ces jetons étaient le dégradé clair du studio (#C6DDF0 = son --sb-bas, #15263D = son --sb-haut
+// nuit : les valeurs figées d'hier, gardées en repli si aucun jeton ne se lit).
 const contrastes = (pg, sels, sombre) => pg.evaluate(({ sels, sombre }) => {
-  const rgb = (s) => { const m = /rgba?\(([^)]+)\)/.exec(s || ''); if (!m) return null; const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return { r: p[0], g: p[1], b: p[2], a: p[3] == null ? 1 : p[3] }; };
+  const rgb = (s) => { s = String(s || '').trim(); const h = /^#([0-9a-f]{6})$/i.exec(s); if (h) return { r: parseInt(h[1].slice(0, 2), 16), g: parseInt(h[1].slice(2, 4), 16), b: parseInt(h[1].slice(4, 6), 16), a: 1 }; const m = /rgba?\(([^)]+)\)/.exec(s); if (!m) return null; const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return { r: p[0], g: p[1], b: p[2], a: p[3] == null ? 1 : p[3] }; };
+  const couleursDe = (img) => (String(img || '').match(/rgba?\([^)]*\)|#[0-9a-f]{6}\b/gi) || []).map(rgb).filter((c) => c && c.a > 0);
   const lum = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); };
   const melange = (h, b) => ({ r: h.r * h.a + b.r * (1 - h.a), g: h.g * h.a + b.g * (1 - h.a), b: h.b * h.a + b.b * (1 - h.a), a: 1 });
-  const css = getComputedStyle(document.documentElement);
-  const hex = (v) => { const m = /#([0-9a-f]{6})/i.exec(v || ''); if (!m) return null; const n = parseInt(m[1], 16); return { r: n >> 16, g: (n >> 8) & 255, b: n & 255, a: 1 }; };
-  // le pire point du fond : le haut (clair) pour un texte clair, le bas (sombre) pour un texte sombre posé sur du verre
-  const haut = hex(css.getPropertyValue('--sv-haut')) || { r: 0x25, g: 0x63, b: 0xA8, a: 1 }, bas = hex(css.getPropertyValue('--sv-bas')) || { r: 0x0E, g: 0x2C, b: 0x52, a: 1 };
+  const ratio = (t, f) => { const L1 = lum(t), L2 = lum(f); return (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05); };
+  const coque = document.querySelector('.vrm-app-shell[data-espace]');
+  const espace = document.querySelector('.vrm-tache[data-espace]') || coque || document.documentElement;
+  const tok = (n) => rgb(getComputedStyle(espace).getPropertyValue(n));
+  const haut = tok('--sb-haut'), aplat = tok('--sb-aplat'), bas = tok('--sb-bas'), reflet = tok('--sv-reflet'), reflet2 = tok('--sv-reflet-2');
+  let eclaire = haut && haut.a >= 0.99 ? haut : null;
+  if (eclaire && reflet2) eclaire = melange(reflet2, eclaire);
+  if (eclaire && reflet) eclaire = melange(reflet, eclaire);
+  const arrets = [eclaire, aplat, bas].filter((c) => c && c.a >= 0.99);
+  const fonds = arrets.length ? arrets : [sombre ? { r: 0x15, g: 0x26, b: 0x3D, a: 1 } : { r: 0xC6, g: 0xDD, b: 0xF0, a: 1 }];
+  // Les fonds possibles sous un texte : les couches de ses ancêtres (couleur, puis le dégradé posé dessus) jusqu'à
+  // la première opaque, recomposées sur chaque arrêt du fond de l'espace (ou sur la couche opaque).
+  const fondsDe = (el) => { const couches = []; let fin = false;
+    for (let e = el; e && e !== coque && e !== document.body && e !== document.documentElement; e = e.parentElement) {
+      const cs = getComputedStyle(e); const bg = rgb(cs.backgroundColor); const lay = [];
+      if (bg && bg.a > 0) lay.push([bg]);
+      if (/gradient/.test(cs.backgroundImage || '')) { const g = couleursDe(cs.backgroundImage); if (g.length) lay.push(g); }
+      if (lay.length) { couches.push(...lay.reverse()); if ((bg && bg.a >= 0.99) || lay[0].every((x) => x.a >= 0.99)) { fin = true; break; } }
+    }
+    let cands = fin ? [] : fonds.slice();
+    for (const lay of couches.reverse()) { const n = []; for (const col of lay) { if (!cands.length) n.push({ ...col, a: 1 }); else for (const b of cands) n.push(melange(col, b)); } cands = n.slice(0, 24); }
+    return cands; };
   const out = [];
   for (const sel of sels) for (const el of document.querySelectorAll(sel)) {
     if (!el.offsetParent || !(el.textContent || '').trim()) continue;
     const c = rgb(getComputedStyle(el).color); if (!c) continue;
-    const pile = []; for (let e = el; e && e !== document.documentElement; e = e.parentElement) { const k = rgb(getComputedStyle(e).backgroundColor); if (k && k.a > 0) { pile.push(k); if (k.a >= 0.99) break; } }
-    const clair = lum(c) > 0.5;
-    // Un texte SOMBRE sans aucun fond peint (le verre se peint en dégradé, pas en couleur) est posé sur le VERRE : .80 sur le bas.
-    const verre = sombre ? { r: 16, g: 30, b: 50, a: .62 } : { r: 247, g: 250, b: 253, a: .80 };
-    const fonds = pile.length && pile[pile.length - 1].a >= 0.99 ? [pile.pop()] : (!clair && !pile.length ? [melange(verre, bas)] : [haut, bas]);
-    let pireR = 99;
-    for (const f0 of fonds) { let f = f0; for (const k of [...pile].reverse()) f = melange(k, f); const t = melange(c, f); const L1 = lum(t), L2 = lum(f); pireR = Math.min(pireR, (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05)); }
-    out.push({ sel, t: (el.textContent || '').trim().slice(0, 24), r: Math.round(pireR * 100) / 100, clair });
+    const r = Math.min(...fondsDe(el).map((f) => ratio(melange(c, f), f)));
+    out.push({ sel, t: (el.textContent || '').trim().slice(0, 24), r: Math.round(r * 100) / 100 });
   }
   return out;
 }, { sels, sombre });
