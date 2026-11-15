@@ -381,4 +381,21 @@
   :root:root:root body .vg-a-venir-l em { margin-left: 8px; }
 }
 
+/* La fiche (suite) : la tuile se lit de haut en bas (libellé, chiffre, sa phrase, sa porte) ; l'état sans second fond ;
+   les raccourcis en pastilles fumées sur le bleu ; les gestes qui passent à la ligne au lieu de déborder. */
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-tuile { display: flex !important; flex-direction: column !important; align-items: flex-start !important; justify-content: flex-start !important; gap: 2px !important; min-width: 0; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-tuile > span { order: 0 !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-tuile > b { order: 1 !important; margin-top: 3px !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-tuile > :is(small, button) { order: 2 !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-tuile > button { min-height: 44px; padding: 0 !important; color: var(--sv-lien) !important; font: 650 13px/1.2 var(--sb-police-texte, Inter, sans-serif) !important; background: none !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-etat { padding: 12px 14px !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-etat :is(.vrm-fp-etat-grille, .vrm-fp-etat-l) { background: transparent !important; background-image: none !important; box-shadow: none !important; border: 0 !important; padding-left: 0 !important; padding-right: 0 !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-etat :is(dt, small) { color: var(--sv-encre-2) !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-etat :is(dd, b) { color: var(--sv-encre) !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-raccourcis button { color: #FFFFFF !important; background: rgb(10 38 76 / .24) !important; background-image: none !important; border: 1px solid rgb(255 255 255 / .32) !important; box-shadow: none !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-outils { grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)) !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-outils button { height: auto !important; min-height: 48px !important; white-space: normal !important; text-align: center; border-radius: 14px !important; padding: 6px 8px !important; font: 600 13.5px/1.15 var(--sb-police-texte, Inter, sans-serif) !important;
+  background: rgb(247 250 253 / .86) !important; background-image: none !important; border: 1px solid rgb(255 255 255 / .8) !important; color: #0C1D30 !important; box-shadow: none !important; width: 100%; }
+:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-fp:not(.sb-plan) .vrm-fp-outils button { background: rgb(255 255 255 / .08) !important; border-color: rgb(255 255 255 / .14) !important; color: #EAF2FB !important; }
+
 } /* fin de @layer vrm-verre */
