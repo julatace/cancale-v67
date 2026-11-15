@@ -60,7 +60,7 @@ function lusPourCarte(lignes, { statut, parNotif, items }) {
     const itemId = itemIdFavori(l), it = itemId ? items.get(String(itemId)) : null;
     const e = etatFavori({ job: statut(l), journal: parNotif.get(String(l.id)) || [], vendue: false });
     const photoIt = it && it.photo && typeof it.photo.url === 'string' && PHOTO_VINTED.test(it.photo.url) ? it.photo.url : '';
-    return { id: String(l.id), pseudo: pseudoFavori(l), titre: titreItem(it) || titreNotification(l.body), date: l.date || null, photo: l.photo || photoIt || '', etat: e.code };
+    return { id: String(l.id), pseudo: pseudoFavori(l), titre: titreItem(it) || titreNotification(l.body), date: typeof l.date === 'string' ? l.date : null, photo: l.photo || photoIt || '', etat: e.code };
   });
 }
 
