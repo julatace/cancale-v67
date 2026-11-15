@@ -101,7 +101,7 @@ function mesurer(vue) {
     const q = (id) => document.querySelector(`[data-argent-q="${id}"]`);
     const n = q('vendu') && q('vendu').querySelector('.vrm-argent-w-n');
     out.vendu = n ? { fs: parseFloat(getComputedStyle(n).fontSize), clair: lum(getComputedStyle(n).color) > 0.8, carte: (() => { const bg = getComputedStyle(q('vendu')).backgroundImage; return bg !== 'none'; })() } : null;
-    out.duo = q('recu') && q('benefice') ? { recu: R(q('recu')), benef: R(q('benefice')) } : null;
+    out.duo = q('recu') && q('benefice') ? { recu: R(q('recu').closest('.vg-carte') || q('recu')), benef: R(q('benefice').closest('.vg-carte') || q('benefice')), yQ: [R(q('recu')).y, R(q('benefice')).y] } : null;
     out.ordre = [...document.querySelectorAll('[data-argent-q]')].map((e) => e.getAttribute('data-argent-q')).join(',');
     const av = document.querySelector('section.vrm-a-venir.vg-a-venir');
     if (av) {
@@ -129,7 +129,7 @@ function mesurer(vue) {
   if (vue === 'messages-liste') {
     const G = [...document.querySelectorAll('[data-msg-groupe]')];
     out.ms = { groupes: G.map((g) => ({ cle: g.getAttribute('data-msg-groupe'), onglet: g.getAttribute('data-msg-groupe-onglet') === '1', ats: [...g.querySelectorAll('[data-fil]')].map((f) => Number(f.getAttribute('data-fil-at') || 0)) })),
-      sansPlaque: [...document.querySelectorAll('[data-fil][data-fil-num]')].filter((f) => !((f.querySelector('.vg-fil-plaque') || {}).innerText || '').replace(/\s/g, '').includes(f.getAttribute('data-fil-num'))).length,
+      sansPlaque: [...document.querySelectorAll('[data-fil][data-fil-num]')].filter((f) => !((f.querySelector('.vg-fil-plaque') || {}).textContent || '').replace(/\s/g, '').includes(f.getAttribute('data-fil-num'))).length,
       avecNum: document.querySelectorAll('[data-fil][data-fil-num]').length,
       vues: [...document.querySelectorAll('[data-msg-vue]')].map((b) => ({ k: b.getAttribute('data-msg-vue'), h: Math.round(b.getBoundingClientRect().height), on: b.getAttribute('aria-pressed') === 'true' })),
       premiereLigne: (() => { const f = document.querySelector('[data-fil]'); return f ? Math.round(f.getBoundingClientRect().top) : null; })(),
@@ -178,7 +178,7 @@ function juger(m, suf, tel) {
   if (m.vue === 'argent-mois') {
     dit(!!m.vendu && m.vendu.fs >= 44 && m.vendu.clair && !m.vendu.carte, `A1 ${suf} : « vendu » est le chiffre d'affiche, en blanc sur le fond (≥ 44 px, sans carte)`, JSON.stringify(m.vendu));
     dit(m.ordre === 'vendu,recu,benefice,declarer', `A1 ${suf} : les quatre réponses, dans l'ordre`, m.ordre);
-    if (tel) dit(!!m.duo && Math.abs(m.duo.recu.y - m.duo.benef.y) <= 1 && m.duo.recu.x < m.duo.benef.x && m.duo.recu.w < m.W * .6, `A2 ${suf} : reçu et bénéfice côte à côte`, JSON.stringify(m.duo));
+    if (tel) dit(!!m.duo && Math.abs(m.duo.recu.y - m.duo.benef.y) <= 1 && Math.abs(m.duo.yQ[0] - m.duo.yQ[1]) <= 1 && m.duo.recu.x < m.duo.benef.x && m.duo.recu.w < m.W * .6, `A2 ${suf} : reçu et bénéfice côte à côte`, JSON.stringify(m.duo));
     else dit(!!m.duo && Math.abs(m.duo.recu.y - m.duo.benef.y) <= 1, `A2 ${suf} : reçu et bénéfice sur la même ligne (ordinateur)`, JSON.stringify(m.duo));
     if (m.avenir) {
       const A = m.avenir, somme = A.leg.reduce((t, x) => t + x.eur, 0), wTot = A.segs.reduce((t, x) => t + x.w, 0);
@@ -223,7 +223,7 @@ function juger(m, suf, tel) {
     dit(P.cats === 10, `P1 ${suf} : les dix catégories au premier écran`, P.ids);
     if (tel) {
       dit(P.tuiles === 9 && P.colonnes === 3, `P1 ${suf} : neuf tuiles, trois par rangée ; « Mon compte » en carte`, `${P.tuiles} tuiles · ${P.colonnes} colonnes`);
-      dit(P.basDernier != null && P.basDernier <= 844, `P2 ${suf} : le premier écran tient sans défiler (dernière tuile à ${P.basDernier} px ≤ 844 ; barre du bas à ${P.hautBarre})`);
+      dit(P.basDernier != null && P.basDernier <= P.hautBarre, `P2 ${suf} : le premier écran tient sans défiler (dernière tuile à ${P.basDernier} px, au-dessus de la barre du bas à ${P.hautBarre})`);
       dit(P.rangees === 0, `P2 ${suf} : aucune rangée de réglage au premier écran`, String(P.rangees));
     }
   }

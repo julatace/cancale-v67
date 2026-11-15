@@ -67,7 +67,10 @@
 :root:root:root body :is(.vg-a-case, .vg-a-urssaf) .vrm-argent-w-n small { font: 600 12px/1 var(--sb-police-texte, Inter, sans-serif) !important; letter-spacing: 0 !important; color: var(--sv-encre-2) !important; }
 :root:root:root body .vg-a-petit { display: block; margin-top: 1px; font: 550 12px/1.35 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
 :root:root:root body .vg-a-petit .vrm-argent-w-note { color: inherit !important; font: inherit !important; }
-:root:root:root body .vg-a-ambre { display: flex !important; align-items: center; gap: 2px; margin-top: 4px !important; padding: 0 !important; min-height: 32px !important; font: 700 12.5px/1 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-ambre) !important; position: relative; }
+:root:root:root:root body .vg-carte.vg-a-case.vg-a-benef, :root:root:root:root body .vg-carte.vg-a-urssaf { padding: 0 !important; }
+:root:root:root:root body :is(.vg-a-benef, .vg-a-urssaf) > .vg-a-case-corps { padding: 12px 14px !important; }
+:root:root:root:root body .vg-a-benef > .vg-a-case-corps:has(+ .vg-a-ambre) { padding-bottom: 2px !important; }
+:root:root:root body .vg-a-ambre { margin-left: 14px !important; margin-bottom: 8px !important; display: flex !important; align-items: center; gap: 2px; margin-top: 4px !important; padding: 0 !important; min-height: 32px !important; font: 700 12.5px/1 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-ambre) !important; position: relative; }
 /* le doigt : 44 px de cible autour d'un lien de 32 px (le dessin ne grossit pas) */
 :root:root:root body .vg-a-ambre::after { content: ""; position: absolute; inset: -6px -8px; }
 /* À venir : un verre (le total 22/750, la barre, la légende en deux colonnes). */
@@ -167,14 +170,14 @@
    « ‹ », le surtitre, le grand titre en blanc ; des groupes courts (titre blanc 13/700, verre, rangées 62 px sans
    icône, l'interrupteur à l'encre). */
 :root:root:root:root:root:root:root body .vrm-pm .vrm-set-recherche.vrm-champ-recherche {
-  height: 48px !important; min-height: 48px !important; border-radius: 24px !important; padding: 0 6px 0 16px !important; margin-top: 12px !important;
+  height: 48px !important; min-height: 48px !important; border-radius: 24px !important; padding: 0 6px 0 16px !important; margin: 0 !important;
   background: rgb(247 250 253 / .97) !important; background-image: none !important; border: 1px solid var(--sv-bord) !important; box-shadow: 0 12px 28px -14px rgb(8 26 50 / .6) !important;
 }
 :root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm .vrm-set-recherche.vrm-champ-recherche { background: rgb(18 33 54 / .97) !important; }
 :root:root:root:root:root:root:root body .vrm-pm .vrm-set-recherche .vrm-champ-recherche-saisie { font: 500 15.5px/1.2 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre) !important; background: transparent !important; box-shadow: none !important; border: 0 !important; }
 :root:root:root:root:root:root:root body .vrm-pm .vrm-set-recherche .vrm-champ-recherche-loupe { color: var(--sv-encre-2) !important; }
 /* « Tout va bien ? · N choses à régler » : l'ambre plein de la maquette (fond #FFE7C4, encre #5E3900), une pastille de cœur. */
-:root:root:root:root:root:root:root body .vrm-pm .vrm-pm-alerte-liste { margin: 10px 0 0 !important; padding: 0 !important; border-radius: 20px !important; overflow: hidden;
+:root:root:root:root:root:root:root body .vrm-pm .vrm-pm-alerte-liste { margin: 0 !important; padding: 0 !important; border-radius: 20px !important; overflow: hidden;
   background: #FFE7C4 !important; background-image: none !important; border: 1px solid rgb(178 106 0 / .25) !important; box-shadow: 0 14px 30px -18px rgb(8 26 50 / .6) !important; }
 :root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm .vrm-pm-alerte-liste { background: #4D3410 !important; border-color: rgb(240 164 60 / .45) !important; }
 :root:root:root:root:root:root:root body .vrm-pm .vrm-pm-alerte { min-height: 64px !important; padding: 10px 14px 10px 10px !important; gap: 12px !important; background: transparent !important; color: #5E3900 !important; }
@@ -186,7 +189,8 @@
 :root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm .vrm-pm-alerte-point.vg-pm-alerte-ic { background: rgb(255 255 255 / .10) !important; color: #FFD99E !important; }
 :root:root:root:root:root:root:root body .vrm-pm .vrm-pm-alerte-geste { padding: 0 !important; display: grid; place-items: center; }
 /* La carte « Mon compte » */
-:root:root:root:root:root:root:root body .vrm-pm .vg-pm-cats { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+:root:root:root:root:root:root:root body .vrm-pm .vg-pm-racine { margin: 0 0 24px !important; }
+:root:root:root:root:root:root:root body .vrm-pm .vg-pm-cats { display: flex; flex-direction: column; gap: 10px; margin: 0; }
 :root:root:root:root:root:root:root body .vrm-pm .vg-pm-moi { display: flex !important; align-items: center; gap: 12px; width: 100%; min-height: 68px; padding: 12px 14px 12px 12px !important; text-align: left; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; }
 :root:root:root:root:root:root:root body .vrm-pm .vg-pm-av { width: 44px; height: 44px; flex: none; border-radius: 50%; display: grid; place-items: center; overflow: hidden; background: #0C1D30; color: #FFFFFF !important; font: 750 17px/1 var(--sb-police-texte, Inter, sans-serif); }
 :root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm .vg-pm-av { background: #EAF2FB; color: #0C1D30 !important; }
@@ -365,5 +369,11 @@
 :root:root:root:root:root:root:root body .vrm-fp .vg-fp-site-txt b { font: 700 14px/1.25 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-encre) !important; }
 :root:root:root:root:root:root:root body .vrm-fp .vg-fp-site-txt small { font: 550 12.5px/1.3 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-encre-2) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 :root:root:root:root:root:root:root body .vrm-fp .vg-fp-site-prix { flex: none; font: 750 15px/1.2 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-encre) !important; }
+
+/* La plaque N° de la paire dans le fil (le fil est un portail, hors de la coque : la plaque claire de la couche n'y arrive pas). */
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-paire :is(.vrm-num, .sb-plaque) {
+  background: linear-gradient(#FFFFFF, #EDF2F7) !important; border: 1px solid rgb(12 29 48 / .18) !important; box-shadow: 0 1px 2px rgb(8 26 50 / .30), inset 0 -1px 0 rgb(12 29 48 / .05) !important;
+  color: #0C1D30 !important; text-shadow: 0 1px 0 #FFFFFF !important; font-weight: 750 !important; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-paire :is(.vrm-num, .sb-plaque) * { color: inherit !important; }
 
 } /* fin de @layer vrm-verre */

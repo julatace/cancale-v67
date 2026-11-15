@@ -297,8 +297,6 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
   const histoire = p ? (
     <>
       {sites}
-      {/* (10 nov., lot BD) La note privée de la paire (l'écran la fournit : NotePaireCoque). */}
-      {note ? <div className="vrm-fp-note-privee" data-fiche-note="">{note}</div> : null}
       {double ? <p className="vrm-fp-double" role="alert" data-fiche-double="1" data-fiche-choisit="0">Deux {motsVendeur().noms} présent{motsVendeur().e}s portent le N°{p.num} : vérifie là où {motsVendeur().elle}s sont rangé{motsVendeur().e}s avant d’emballer ou d’imprimer.</p> : null}
       {double ? null : <div className="vrm-fp-tuiles">
         {/* (5 nov.) Le prix d'achat de « Voir l'état » est CE nombre (jamais écrit deux fois, §7) : sa source dessous. */}
@@ -347,6 +345,9 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
           </li>
         ))}
       </ol>}
+      {/* (10 nov., lot BD) La note privée de la paire (l'écran la fournit : NotePaireCoque). (15 nov., maquette « Verre
+          dépoli ») Sous l'histoire : en tête, la paire, ses sites, ses chiffres et son histoire, comme la maquette. */}
+      {note ? <div className="vrm-fp-note-privee" data-fiche-note="">{note}</div> : null}
       {lecture ? <p className="vrm-fp-note" data-fiche-lecture="">Lecture en cours…</p>
         : p.manques.length ? <p className="vrm-fp-note" data-fiche-manques={p.manques.length}>Pas pu lire : {p.manques.join(', ')}.</p> : null}
       {!depuis ? poster : null}
