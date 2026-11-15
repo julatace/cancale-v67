@@ -196,6 +196,13 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
   background-color: transparent !important; background-image: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important;
   box-shadow: var(--sv-ombre) !important;
 }
+/* La tuile POSÉE reste ENFONCÉE (CLAUDE.md §7 : actif = enfoncé + diode) : la règle du verre ci-dessus,
+   en !important, effaçait le creux du studio (`.sb-tuile[aria-pressed]` : --sb-creux + --sb-enfonce) —
+   seule la diode changeait (banc studio-ventes T). Le creux du verre : la brume pleine, une ombre rentrée. */
+:root:root:root body .vrm-main .sb-tuile:is([aria-pressed="true"], .is-actif) {
+  background-color: var(--sv-brume) !important; background-image: none !important;
+  box-shadow: inset 0 2px 7px rgb(8 26 50 / .30), inset 0 0 0 1px rgb(255 255 255 / .35) !important;
+}
 
 /* ══ 5. LE FLOU, BORNÉ : la barre du bas, la tête au défilement, la navigation, le plan d'une liste ══
    Une rangée n'a JAMAIS de flou (1 000 rangées sur iPhone) ; les tuiles non plus : sur un fond
@@ -317,6 +324,13 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
   .vrm-compta-replis, .vrm-argent-w, .vrm-at-carte, .vrm-compta-groupe, .vrm-ui-afaire-corps, .vrm-acc, .vrm-toast
 ) { color: var(--sv-encre) !important; }
 
+/* « Ajouter un QR Mondial Relay » (Achats → À retirer) : une rangée posée en porcelaine (--vrm-surface) DANS un conteneur
+   posé sur le fond (§6) — elle reprenait l'encre claire : blanc sur blanc au clair. Une surface : l'encre sombre. */
+:root:root:root body .vrm-app-shell[data-espace] .vrm-mr-bloc > .vrm-repli > summary {
+  --vrm-ink: var(--sv-encre) !important; --vrm-text: var(--sv-encre) !important; --vrm-muted: var(--sv-encre-2) !important; --vrm-faint: var(--sv-encre-2) !important;
+  --sb-encre: var(--sv-encre) !important; --sb-encre-2: var(--sv-encre-2) !important; color: var(--sv-encre) !important;
+}
+
 /* ══ 8. LA COQUE : la barre du bas (verre clair), la tête, la navigation de l'ordinateur ══ */
 :root:root:root body .vrm-app-shell .vrm-tabbar.vrm-tabbar {
   background: var(--sv-verre-barre) !important; -webkit-backdrop-filter: var(--sv-flou) !important; backdrop-filter: var(--sv-flou) !important;
@@ -418,7 +432,9 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
 
 /* La PLAQUE N° : une plaquette blanche en relief (dégradé, filet, ombre portée), l'encre en 750 — partout. */
 :root:root:root:root:root:root body :is(.vrm-app-shell, .vrm-fs, [data-recherche-panneau], .vrm-fp) :is(.sb-plaque, .vrm-num, .vrm-fp-num:not(.is-sans), .vrm-emb-num, .vrm-emb-recap-num) {
-  background: linear-gradient(#FFFFFF, #EDF2F7) !important; border: 1px solid rgb(12 29 48 / .18) !important;
+  /* La couleur de fond AUSSI (le bas du dégradé) : sans elle, le fond calculé de la plaque est transparent et ce qui
+     la mesure (ou un navigateur sans dégradé) la voit sur la carte sombre de la nuit (banc studio-ventes A, nuit). */
+  background: linear-gradient(#FFFFFF, #EDF2F7) #EDF2F7 !important; border: 1px solid rgb(12 29 48 / .18) !important;
   box-shadow: 0 1px 2px rgb(8 26 50 / .30), inset 0 -1px 0 rgb(12 29 48 / .05) !important;
   color: #0C1D30 !important; text-shadow: 0 1px 0 #FFFFFF !important; font-weight: 750 !important;
 }

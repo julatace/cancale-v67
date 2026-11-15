@@ -166,19 +166,32 @@ const shot = async (pg, nom, plein = false) => { if (SHOTS) await pg.screenshot(
 // ════════════════════════════════════════════════════════════════════════════
 const ATTENDU_PRESSES = ['9304', '9305'];   // limite LUE demain 12 h ; estimée demain (vente il y a 6 j). 9303 : estimée DÉPASSÉE ⇒ hors compte.
 // Le contraste AA d'un texte : sa couleur contre le premier fond opaque de ses ancêtres, sinon contre le pire
-// point du dégradé de l'espace (le plus sombre en clair, le plus clair en nuit).
+// point du dégradé de l'espace.
+// (15 nov., « Verre dépoli », docs/passation/2026-11-15-verre-depoli.md « La preuve ») Le pire point se LIT sur les
+// jetons rendus du fond (--sb-haut / --sb-aplat / --sb-bas, et le reflet du verre posé sur le haut) et se juge pour
+// CE texte (le plus mauvais des arrêts) — il n'est plus figé sur le dégradé clair du studio d'hier (#C6DDF0 = son
+// --sb-bas ; #15263D = son --sb-haut nuit : la même règle sur l'ancienne matière). Repli : ces deux valeurs.
 const contrastes = (pg, sels, sombre) => pg.evaluate(({ sels, sombre }) => {
-  const rgb = (s) => { const m = /rgba?\(([^)]+)\)/.exec(s || ''); if (!m) return null; const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return { r: p[0], g: p[1], b: p[2], a: p[3] == null ? 1 : p[3] }; };
+  const rgb = (s) => { s = String(s || '').trim(); const h = /^#([0-9a-f]{6})$/i.exec(s); if (h) return { r: parseInt(h[1].slice(0, 2), 16), g: parseInt(h[1].slice(2, 4), 16), b: parseInt(h[1].slice(4, 6), 16), a: 1 }; const m = /rgba?\(([^)]+)\)/.exec(s); if (!m) return null; const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return { r: p[0], g: p[1], b: p[2], a: p[3] == null ? 1 : p[3] }; };
   const lum = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); };
   const melange = (h, b) => ({ r: h.r * h.a + b.r * (1 - h.a), g: h.g * h.a + b.g * (1 - h.a), b: h.b * h.a + b.b * (1 - h.a), a: 1 });
-  const pire = sombre ? { r: 0x15, g: 0x26, b: 0x3D, a: 1 } : { r: 0xC6, g: 0xDD, b: 0xF0, a: 1 };
-  const fondDe = (el) => { const pile = []; for (let e = el; e && e !== document.documentElement; e = e.parentElement) { const c = rgb(getComputedStyle(e).backgroundColor); if (c && c.a > 0) { pile.push(c); if (c.a >= 0.99) break; } } let f = pile.length && pile[pile.length - 1].a >= 0.99 ? pile.pop() : pire; while (pile.length) f = melange(pile.pop(), f); return f; };
+  const ratio = (t, f) => { const L1 = lum(t), L2 = lum(f); return (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05); };
+  const espace = document.querySelector('.vrm-tache[data-espace]') || document.querySelector('[data-espace]') || document.documentElement;
+  const tok = (n) => rgb(getComputedStyle(espace).getPropertyValue(n));
+  const arrets = ['--sb-haut', '--sb-aplat', '--sb-bas'].map(tok).filter((c) => c && c.a >= 0.99);
+  const reflet = tok('--sv-reflet'); const haut = tok('--sb-haut');
+  if (reflet && haut && haut.a >= 0.99) arrets.push(melange(reflet, haut));
+  const repli = sombre ? { r: 0x15, g: 0x26, b: 0x3D, a: 1 } : { r: 0xC6, g: 0xDD, b: 0xF0, a: 1 };
+  const fonds = arrets.length ? arrets : [repli];
+  // Les fonds possibles sous un texte : le premier fond opaque de ses ancêtres (les translucides recomposés dessus),
+  // sinon CHAQUE arrêt du dégradé (les translucides recomposés sur chacun).
+  const fondsDe = (el) => { const pile = []; for (let e = el; e && e !== document.documentElement; e = e.parentElement) { const c = rgb(getComputedStyle(e).backgroundColor); if (c && c.a > 0) { pile.push(c); if (c.a >= 0.99) break; } }
+    const bases = pile.length && pile[pile.length - 1].a >= 0.99 ? [pile.pop()] : fonds; return bases.map((b) => { let f = b; for (let i = pile.length - 1; i >= 0; i--) f = melange(pile[i], f); return f; }); };
   const out = [];
   for (const sel of sels) for (const el of document.querySelectorAll(sel)) {
     if (!el.offsetParent || !(el.textContent || '').trim()) continue;
     const c = rgb(getComputedStyle(el).color); if (!c) continue;
-    const f = fondDe(el); const t = melange(c, f);
-    const L1 = lum(t), L2 = lum(f); const r = (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05);
+    const r = Math.min(...fondsDe(el).map((f) => ratio(melange(c, f), f)));
     out.push({ sel, t: (el.textContent || '').trim().slice(0, 24), r: Math.round(r * 100) / 100 });
   }
   return out;
