@@ -1118,6 +1118,11 @@ Récit : `historique-interface-stock.md` (« LES QUATRE OUTILS DES ANNONCES »).
 | `freinrepub` | `poserFreinRepub` | **5.311.0** (2 nov.) | un refus de Vinted freine la republication de CE compte (30 min ; 24 h si restreint) |
 | `numeroscompte` | `numerosDuCompte` | **5.311.0** (2 nov.) | sur Vinted, seuls les N° du compte connecté dans l'onglet |
 | `republierquestion` | `reglerAvant` | **5.310.0** (2 nov.) | Republier remplit un champ manquant depuis l'annonce elle-même, sinon DEMANDE (valeurs de Vinted) ; un refus nommé n'est jamais renvoyé tel quel |
+| `lbcfil` | `rangerLbcFil` | **5.318.0** (3 nov.) | « lire tes conversations Leboncoin » (texte, date, « de toi », jamais un nom ; rangé seulement quand la page et l'onglet disent le même compte privé) |
+| `lbcrepondre` | `repondreLeboncoin` | **5.318.0** (3 nov.) | « Envoyer sur Leboncoin » sur son clic, au nom du compte connecté dans l'onglet, dans les 50 actions/h — seulement après une recette APPRISE de son propre envoi (`lbc_envoi.appris`) |
+| `vcoffres` | `rangerVcOffres` | **5.319.0** (4 nov.) | « tes offres reçues sur Vestiaire » (article, prix, gestes datés, à toi de répondre ; jamais l'acheteur) |
+| `vcoffrerepondre` | `repondreOffreVestiaire` | **5.319.0** (4 nov.) | « Accepter / Refuser / Contre-offre » sur son clic, au nom du compte de l'onglet, dans les 50 actions/h — seulement après une recette APPRISE de son propre geste sur Vestiaire (`vc_offres_recette`) |
+| `avis` | `capterAvis` | **5.319.0** (4 nov.) | « tes avis Vinted reçus (note, date) » : la 1re page de `user_feedbacks`, compte connecté seulement, budget de LECTURE 20/h, une fois par 24 h, rangée dans `harvest_{uid}_feedbacks` ; forme pas encore mesurée (une forme inconnue n'écrit rien) ; aucun rappel d'évaluation |
 
 ## Déplacé tel quel de CLAUDE.md §9 (14 nov., version studio — fichier sous 59 000 octets)
 

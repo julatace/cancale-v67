@@ -189,7 +189,8 @@ const toucheForce=async(pg,sel,T)=>{ const l=pg.locator(sel).first(); await l.ev
         dit(!!j,'jamais choisi, bénéfice publié ⇒ la carte est dans Ma journée PAR DÉFAUT');
         dit(await pg.locator('[data-journee-benef-masquer]').count()===0,'hors du mode « Modifier », aucun bouton « Masquer »');
         // (la carte « Vendu en … » et la semaine en barres ne sont plus sur Ma journée — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionJournee))
-        dit(await pg.locator('.vrm-fu-tete [data-journee-benef]').count()===1,'le bénéfice est dans la tête sombre de Ma journée, une fois');
+        // (14 nov., Studio) Les chiffres du mois sont la tuile du mois de la grille (src/JourneeStudio.jsx), plus la tête sombre.
+        dit(await pg.locator(':is(.vrm-fu-tete, [data-sj-grille]) [data-journee-benef]').count()===1,'le bénéfice est dans Ma journée (la tuile du mois), une fois');
         dit(!!c && c.etat==='lu' && !!j && j.etat==='lu','les deux cartes lisent la publication',`${c&&c.etat} / ${j&&j.etat}`);
         dit(!!c && !!j && c.brut!=='' && j.brut===c.brut,'BRUT du mois identique à Comptabilité',`${j&&j.brut} · ${c&&c.brut}`);
         dit(!!c && !!j && c.net!=='' && j.net===c.net,'NET du mois identique à Comptabilité (charges et cotisations comprises)',`${j&&j.net} · ${c&&c.net}`);
@@ -231,7 +232,7 @@ const toucheForce=async(pg,sel,T)=>{ const l=pg.locator(sel).first(); await l.ev
         // (« Masquer » / « Ajouter » n'existent plus : la case est toujours là — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionJournee))
         await pg.evaluate(()=>{ localStorage.setItem('vrm_journee_benefice','false'); });
         await aller(pg,'journee','[data-journee-benef]',2000);
-        dit(await pg.locator('.vrm-fu-tete [data-journee-benef]').count()===1,'même masquée autrefois, la case reste dans la tête (rien n’est perdu)');
+        dit(await pg.locator(':is(.vrm-fu-tete, [data-sj-grille]) [data-journee-benef]').count()===1,'même masquée autrefois, la case reste sur Ma journée (rien n’est perdu)');
         dit(errs.length===0,'aucune erreur d’app',errs.join(' | ').slice(0,160));
         await ctx.close();
       });

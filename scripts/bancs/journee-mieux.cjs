@@ -171,6 +171,9 @@ const ouvrir = async (b, vp, sombre, sansAttente) => {
 
 const lire = (pg) => pg.evaluate(() => {
   const vu = (e) => { if (!e) return false; const r = e.getBoundingClientRect(); const cs = getComputedStyle(e); return r.width > 2 && r.height > 2 && cs.visibility !== 'hidden' && !e.closest('[aria-hidden="true"]'); };
+  // (14 nov., Studio) Le corps d'une tuile (`.sj-face`) et son libellé (`.sj-lib`) sont cachés au lecteur d'écran (le nom
+  // de sa zone dit la même chose) mais VUS : ils comptent pour ce que l'écran montre.
+  const vuS = (e) => vu(e) || (!!e && !!e.closest('.sj-face, .sj-lib') && !e.closest('.vrm-pile') && (() => { const r = e.getBoundingClientRect(); return r.width > 2 && r.height > 2 && getComputedStyle(e).visibility !== 'hidden'; })());
   const lignesDe = (e) => { const rg = document.createRange(); rg.selectNodeContents(e); const ys = [...rg.getClientRects()].filter((q) => q.width > 1).map((q) => Math.round((q.top + q.bottom) / 2)).sort((a, b) => a - b); let k = 0, der = -1e9; for (const y of ys) { if (y - der > 6) { k++; der = y; } } return k; };
   const coupe = (e) => e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 2;
   // Contraste : couleur du texte contre le premier fond opaque au-dessus.
@@ -205,10 +208,11 @@ const lire = (pg) => pg.evaluate(() => {
   let railMasque = false; for (const e of document.querySelectorAll('.vrm-rail-scroll')) { const cs = getComputedStyle(e); if ((cs.maskImage && cs.maskImage !== 'none') || (cs.webkitMaskImage && cs.webkitMaskImage !== 'none')) railMasque = true; }
   const railPales = rail.filter((e) => { let o = 1; for (let n = e; n; n = n.parentElement) o *= parseFloat(getComputedStyle(n).opacity || '1'); return o < 0.95 && !e.disabled && e.getAttribute('aria-disabled') !== 'true'; }).map((e) => e.textContent.trim().slice(0, 20));
   // I. Les cases : libellé et sous-ligne jamais coupés.
-  const cases = [...document.querySelectorAll('[data-barre-jour] [data-tuile], [data-widget-tuile]')].filter(vu).map((bt) => {
+  // (14 nov., Studio) + les tuiles de la grille (`[data-sj-grille] [data-tuile]`) : leur libellé (`.sj-lib`) et leurs sous-lignes.
+  const cases = [...document.querySelectorAll('[data-barre-jour] [data-tuile], [data-widget-tuile], [data-sj-grille] [data-tuile]')].filter(vu).map((bt) => {
     const id = bt.getAttribute('data-tuile') || bt.getAttribute('data-widget-tuile');
     const r = bt.getBoundingClientRect();
-    const textes = [...bt.querySelectorAll('.vrm-day-bar-l, .vrm-w-tuile-l, .vrm-day-bar-sous')].filter(vu).map((e) => {
+    const textes = [...bt.querySelectorAll('.vrm-day-bar-l, .vrm-w-tuile-l, .vrm-day-bar-sous, .sj-lib, .sj-sous-l')].filter(vuS).map((e) => {
       const cs = getComputedStyle(e), q = e.getBoundingClientRect();
       const rogne = cs.textOverflow === 'ellipsis' && cs.overflow !== 'visible' && cs.whiteSpace === 'nowrap';
       return { t: e.textContent, coupe: e.scrollWidth > e.clientWidth + 1 || /…\s*$/.test(e.textContent) || q.right > r.right + 1 || rogne, sw: e.scrollWidth, cw: e.clientWidth, rogne };
@@ -225,8 +229,11 @@ const lire = (pg) => pg.evaluate(() => {
       // Hors jeu : les dernières ventes (prix, N°, tailles) et la carte de la semaine (axe des jours, barres).
       // (14 nov.) Depuis Ma journée v2 (9 nov.), l'axe des jours est la frise des sept jours (`[data-fu-semaine]`) :
       // « 27 28 29 30 31 1 2 » sont des DATES (le 2 = aujourd'hui), pas des quantités.
-      if (p.closest('.vrm-day-recent, [data-carte-jours], [data-fu-semaine], svg, [aria-hidden="true"], .vrm-screen-head, [hidden], .vrm-sr-only')) continue;
-      if (!vu(p)) continue;
+      // (14 nov., Studio) Le corps d'une tuile est caché au lecteur d'écran (le nom de sa zone dit déjà le nombre) mais il
+      // est VU : ses nombres comptent (la pile de photos, « +k », reste hors jeu).
+      if (p.closest('.vrm-day-recent, [data-carte-jours], [data-fu-semaine], svg, .vrm-screen-head, [hidden], .vrm-sr-only, .vrm-pile')) continue;
+      { const ah = p.closest('[aria-hidden="true"]'); if (ah && !ah.matches('.sj-face, .sj-lib')) continue; }
+      if (!vuS(p)) continue;
       morceaux.push(n.textContent);
     }
   }

@@ -35,6 +35,7 @@ const LANGUES = ['fr', 'en', 'es', 'it', 'de'];
 // `*` = tout le fichier. Ajouter ici chaque écran migré (méthode : docs/passation/2026-11-11-traduction.md).
 const MIGRES = [
   ['src/Accueil.jsx', ['*']],
+  ['src/JourneeStudio.jsx', ['*']],   // (14 nov., Studio) la grille Bento de Ma journée
   ['src/ui/Accompagne.jsx', ['*']],   // (14 nov., lot accompagnement) la brique commune des quatre moments
   ['src/ImpressionSimple.jsx', ['*']],   // (14 nov., impression-simple) « Imprimer » en un toucher : les deux feuilles
   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure.
