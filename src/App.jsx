@@ -235,7 +235,7 @@ import { favorisSansVente, seuilFavorisValide, gestesDormeuse, cartePairesQuiDor
 import { beneficeSiVendue, gesteDormante, classerDormantes } from "./dormantes.js";   // (13 nov., points 14-15) « si vendue » et UN geste par paire qui dort
 // ⟦→ ecrans/Vestiaire.jsx #2⟧
 // ⟦→ ecrans/Compta.jsx #2⟧
-import { versementsDuReleve, completerVersementsParReleve, versementsParReleve } from "./versementReleve.js";
+import { versementsDuReleve, completerVersementsParReleve, versementsParReleve, versementsDuReleveVerifies, porterVerifReleve, relevesNonVerifies } from "./versementReleve.js";
 import { raisonsADater, venteDatees, sourcesDeVersement } from "./versementRaisons.js";   // (11 nov., lot DJ7) pourquoi sans date, et le geste
 import { aDaterParAnnee, anneeSureDeVente, tsVenteADater, periodeADater } from './aDaterAnnee.js';
 // (11 nov., lot agent2-veille) La veille : le relevé des chiffres (src/veilleLigne.js) et le contrôle de nuit.
@@ -8917,9 +8917,11 @@ const fetchVersementsVinted = async () => {
       lireTout(VERSEMENT_CONV_SELECT, { memo: true }).catch(() => null),
       lireTout(VERSEMENT_EMAIL_SELECT, { memo: true }).catch(() => null),
     ]);
+    // (15 nov.) Le relevé ne date une vente que sur un compte VÉRIFIÉ (src/versementReleve.js :
+    // ≥ 5 accords au jour près avec le détail 450, aucun désaccord) ; le verdict suit la carte.
     let releve = null;
-    try { releve = versementsDuReleve(releveL); } catch (_) { releve = null; }
-    return datesDeVersement(rows, releve, convL, emailsL);
+    try { releve = versementsDuReleveVerifies(releveL, rows); } catch (_) { releve = null; }
+    return porterVerifReleve(datesDeVersement(rows, releve, convL, emailsL), releve);
   } catch (_) { return null; }
 };
 // Dernier REÇU / FACTURE officiel Vinted capté par l'extension quand tu l'as
@@ -36757,6 +36759,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // et combien sont DATÉES, dont par le relevé du porte-monnaie (par n° de transaction).
       ad.raisons = raisonsADater(aDater, { etat: (tx) => etatTxn(tx), compteDe: (o) => (o && o._acc && o._acc.vinted_user_id != null ? { uid: String(o._acc.vinted_user_id), nom: accNameOf(o._acc) } : null) });
       ad.datees = venteDatees(lignes, versementsParReleve(versements), sourcesDeVersement(versements));   // (14 nov.) + par la conversation, par e-mail
+      // (15 nov.) Les comptes dont le relevé porte des ventes mais n'est pas encore VÉRIFIÉ
+      // (src/versementReleve.js) : rien n'en est daté, et l'écran le dit (« pas encore vérifiées »).
+      { const nomDe = (uid) => { for (const l of aDater) { const a = l && l.o && l.o._acc; if (a && String(a.vinted_user_id) === uid) return accNameOf(a); } return ''; };
+        const rv = relevesNonVerifies(versements, nomDe); if (rv.length) ad.releve = rv; }
       // (1er nov., audit A2) Vestiaire est LU (ses ventes au montant sûr sont dans
       // les mois) ou pas su ; ce qui n'est compté nulle part (`nonComptees`) est
       // publié avec le reste : le widget, la carte URSSAF et le rappel du 1er
