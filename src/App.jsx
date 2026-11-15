@@ -464,6 +464,29 @@ const TableauEbay = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) =>
 const ArgentEbay = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.ArgentEbay })));
 const TraficEbay = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.TraficEbay })));
 const SanteEbay = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.SanteEbay })));
+const VersementsEbayJournee = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.VersementsEbayJournee })));
+// (15 nov., 2e tour) Les photos de la FICHE d'un N° (par identité : une seule fiche porte ce N°), lues
+// en projection dans `vinted_item_details` (§4.4, la forme de Republier) : « Ajouter les photos de ta
+// fiche » sur une annonce eBay qui en a peu. Deux fiches ou aucune ⇒ null (rien proposé).
+async function photosFicheEbay(num) {
+  const k = cleNum(num); if (!k) return null;
+  const fs = Object.entries(fichesPourEbay() || {}).filter(([, f]) => f && f.numero != null && cleNum(f.numero) === k);
+  if (fs.length !== 1 || !/^\d{4,15}$/.test(fs[0][0])) return null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_item_details&select=ph:data->${encodeURIComponent('"' + fs[0][0] + '"')}->photos`, { headers: sbAuth() });
+    if (!r.ok) return null;
+    const j = await r.json(); const l = Array.isArray(j) && j[0] && Array.isArray(j[0].ph) ? j[0].ph : [];
+    const urls = l.map((x) => (typeof x === 'string' ? x : x && (x.full_size_url || x.url))).filter((u) => /^https:\/\//.test(String(u || '')));
+    return urls.length ? urls : null;
+  } catch (_) { return null; }
+}
+// Ma journée : les versements eBay rangés (`ebay_versements{suffixe}`, la seule liste `versements`), tous comptes.
+async function lireVersementsEbayJournee() {
+  const r = await lireEbayParCompte('ebay_versements', 'v:data->versements');
+  if (!r || !Array.isArray(r.lignes)) return null;
+  const out = []; for (const { ligne } of r.lignes) if (ligne && Array.isArray(ligne.v)) out.push(...ligne.v);
+  return out.length ? out : null;
+}
 const Garage = aLaDemande(() => import('./ecrans/Stock.jsx').then((m) => ({ default: m.Garage })));
 const StockVinted = aLaDemande(() => import('./ecrans/Stock.jsx').then((m) => ({ default: m.StockVinted })));
 const Inventory = aLaDemande(() => import('./ecrans/Stock.jsx').then((m) => ({ default: m.Inventory })));
@@ -62764,8 +62787,8 @@ function AppCoeur() {
             const numDe=(a)=>{ if(a&&Array.isArray(a.lineItems)){ const l0=a.lineItems[0]||{}; return numEbayLu(l0.sku,l0.legacyItemId||l0.itemId,null,null)||''; } return numEbayLu(a&&a.sku,a&&a.itemId,null,a&&a.debut)||''; };
             return sec==='tableau'?<TableauEbay key={'tb-'+ref} compte={ref} headers={enTeteSession} aExpedier={colis?colis.aPoster.length:null} onSection={allerSec} onMessages={()=>{ setEbayVue(ref); setTab('ebay_messages'); }} onReconnecter={allerComptesEbay}/>
               :sec==='argent'?<ArgentEbay key={'ar-'+ref} compte={ref} headers={enTeteSession} commandes={cmd} numDe={numDe} onReconnecter={allerComptesEbay}/>
-              :sec==='trafic'?<TraficEbay key={'tf-'+ref} compte={ref} headers={enTeteSession} numDe={numDe} domaine={domaine} onReconnecter={allerComptesEbay} onPromotion={()=>allerSec('promo')}/>
-              :<SanteEbay key={'sa-'+ref} compte={ref} headers={enTeteSession} domaine={domaine} onReconnecter={allerComptesEbay}/>;
+              :sec==='trafic'?<TraficEbay key={'tf-'+ref} compte={ref} headers={enTeteSession} numDe={numDe} domaine={domaine} onReconnecter={allerComptesEbay} onPromotion={()=>allerSec('promo')} onAnnonces={()=>allerSec('annonces')} confirm={askConfirm} photosDe={photosFicheEbay}/>
+              :<SanteEbay key={'sa-'+ref} compte={ref} headers={enTeteSession} domaine={domaine} onReconnecter={allerComptesEbay} onAnnonces={()=>allerSec('annonces')} confirm={askConfirm} photosDe={photosFicheEbay}/>;
           }}</EbayActionCompte>)}
           {sec==='ventes'&&<EbayVentes baseKO={baseKO} vue={ebayVueEff} comptesEbay={comptesEbay} cible={ebayCible?.section==='ventes'?ebayCible:null} onClearCible={()=>setEbayCible(null)}/>}
           {sec==='messages'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayMessagesVolets key={ref} comptesEbay={comptesEbay} owner={AUTH.user?.id || 'installation'} cible={ebayCible?.compte===ref && ebayCible.section==='messages'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
@@ -63753,6 +63776,8 @@ function AppCoeur() {
         {tab==='journee'&&<GardeEcran nom="journee:forme"><Suspense fallback={null}><AlerteFormeVinted/></Suspense></GardeEcran>}
         {tab==='journee'&&<GardeEcran nom="journee:verification"><Suspense fallback={null}><AlertesVerificationJournee/></Suspense></GardeEcran>}
         {tab==='journee'&&<GardeEcran nom="journee"><Comptabilite key="journee" panelOff={panelOffCoque} accounts={vintedAccounts} only="journee" alertes={notifItems} alertesLues={notifsLus||baseKO||(accountsLoaded&&!vintedAccounts.length)} cycle={cycleCartes} onCycle={()=>setPreuveTick(t=>t+1)} liveStats={liveStatsVus} aTrancher={aTrancherEtat} onAllerTrancher={allerTrancher} onTrancherAT={trancherAT} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
+        {/* (15 nov., eBay complet 3) Un versement eBay en route (ou arrivé depuis 3 jours) : UNE ligne, lue en base. */}
+        {tab==='journee'&&!baseKO&&Array.isArray(comptesEbay)&&comptesEbay.some((c)=>c&&!c.implicite)&&<GardeEcran nom="journee:versements-ebay"><VersementsEbayJournee lire={lireVersementsEbayJournee} onOuvrir={()=>allerSection('plat_ebay','argent')}/></GardeEcran>}
         {tab==='journee'&&<GardeEcran nom="journee:note"><NoteSatisfactionJournee/></GardeEcran>}
         {/* ⚠️ « Bienvenue 👋 · connecte ton compte Vinted pour commencer » à
             quelqu'un qui a neuf comptes : c'est ce qu'il voyait quand la base

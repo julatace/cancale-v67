@@ -113,3 +113,29 @@ export function commandeDe(commandes, orderId) {
   if (!Array.isArray(commandes) || !orderId) return null;
   return commandes.find((o) => o && (o.orderId === orderId || o.legacyOrderId === orderId)) || null;
 }
+
+// ── (15 nov., 2e tour) LE CALENDRIER DES VERSEMENTS : ce qui arrive et ce qui est arrivé.
+// `enRoute` : versements lancés (INITIATED), du plus proche au plus lointain ; `recents` :
+// arrivés depuis 7 jours ; `rates` : ratés (geste : vérifier son IBAN dans eBay). Pas lu ⇒ null.
+export function calendrierVersements(versements, maintenant = Date.now()) {
+  if (!Array.isArray(versements)) return null;
+  const t = (p) => Date.parse((p && p.date) || '');
+  const lus = versements.filter((p) => p && p.montant);
+  return {
+    enRoute: lus.filter((p) => p.statut === 'INITIATED').sort((a, b) => t(a) - t(b)),
+    recents: lus.filter((p) => p.statut === 'SUCCEEDED' && Number.isFinite(t(p)) && maintenant - t(p) <= 7 * 86400000).sort((a, b) => t(b) - t(a)),
+    rates: lus.filter((p) => /FAILED|REVERSED/.test(p.statut || '')),
+  };
+}
+// « Corriger les évidentes » : par annonce, les caractéristiques MANQUANTES pour lesquelles eBay
+// ne propose QU'UNE valeur (la liste est montrée avant ; le serveur relit tout avant d'écrire).
+export function correctionsEvidentes(aCorriger) {
+  const out = [];
+  for (const c of (Array.isArray(aCorriger) ? aCorriger : [])) {
+    if (!c || !/^\d{1,19}$/.test(String(c.itemId || ''))) continue;
+    const aspects = {};
+    for (const p of (c.problemes || [])) for (const s of (p.suggestions || [])) if (s && s.nom && Array.isArray(s.valeurs) && s.valeurs.length === 1 && (!(p.manque || []).length || p.manque.includes(s.nom))) aspects[s.nom] = s.valeurs[0];
+    if (Object.keys(aspects).length) out.push({ itemId: String(c.itemId), sku: c.sku || '', aspects });
+  }
+  return out;
+}

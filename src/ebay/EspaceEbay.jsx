@@ -20,7 +20,8 @@ import { tr, monnaie, date as dateTr, heure as heureTr, nombre } from '../i18n/i
 import { appelerEbay } from '../ebayRequetes.js';
 import { BandeChiffres } from '../ui/BandeChiffres.jsx';
 import { LigneAFaire } from '../ui/LigneAFaire.jsx';
-import { etatPartie, verseMois, derniersVersements, totauxTrafic, transformation, etatSante, nbACorriger, litigesOuverts, aFaireEbay, commandeDe, moisParis } from './tableau.js';
+import { Feuille } from '../ui/Feuille.jsx';
+import { etatPartie, verseMois, derniersVersements, totauxTrafic, transformation, etatSante, nbACorriger, litigesOuverts, aFaireEbay, commandeDe, moisParis, calendrierVersements, correctionsEvidentes } from './tableau.js';
 import './espace-ebay.css';
 
 // ── La lecture d'une action, gardée 3 minutes par compte (changer de section ne relit pas eBay).
@@ -150,6 +151,12 @@ export function TableauEbay({ compte, headers, aExpedier = null, onSection, onMe
           {ev ? <Rangee nom={tr('ebt.sante.evaluations')} detail={ev.an && ev.an.negatives != null ? tr('ebt.sante.negatives', { n: ev.an.negatives }) : ''} valeur={ev.pourcent != null ? nombre(ev.pourcent, { maximumFractionDigits: 1 }) + ' %' : ev.score != null ? nombre(ev.score) : '—'} gris onClick={aller('sante')} attrs={{ 'data-ebt-evaluations': ev.score ?? 'pas-su' }}/> : null}
         </>}
       </Groupe>
+      <Groupe titre={tr('ebt.gestes.titre')} attrs={{ 'data-ebt-groupe': 'gestes' }} pied={tr('ebt.gestes.pied')}>
+        <Rangee nom={tr('ebt.gestes.offres')} detail={tr('ebt.gestes.offres.aide')} valeur={pret && t.offres && !t.offres.ko && t.offres.n ? nombre(t.offres.n) : ''} geste={!!(pret && t.offres && t.offres.n)} onClick={aller('offres')} attrs={{ 'data-ebt-geste': 'offres' }}/>
+        <Rangee nom={tr('ebt.gestes.soldes')} detail={tr('ebt.gestes.soldes.aide')} onClick={aller('promo')} attrs={{ 'data-ebt-geste': 'soldes' }}/>
+        <Rangee nom={tr('ebt.gestes.relancer')} detail={tr('ebt.gestes.relancer.aide')} onClick={aller('annonces')} attrs={{ 'data-ebt-geste': 'relancer' }}/>
+        <Rangee nom={tr('ebt.gestes.corriger')} detail={tr('ebt.gestes.corriger.aide')} valeur={ac ? nombre(ac) : ''} geste={!!ac} onClick={aller('sante')} attrs={{ 'data-ebt-geste': 'corriger' }}/>
+      </Groupe>
       <div className="ebt-large"><Pied at={at} lecture={lecture} onRelire={relire}/></div>
     </div>
   );
@@ -184,6 +191,7 @@ export function ArgentEbay({ compte, headers, commandes = null, numDe, onReconne
           { cle: 'verse', n: vm ? monnaie(vm.eur) : null, l: tr('ebt.bande.verse', { mois }), garderVide: true, attrs: { 'data-ebt-chiffre': 'verse', 'data-n': vm ? vm.eur : 'pas-su' } },
         ]}/>
       </div>
+      <CalendrierVersements versements={a.versements} solde={solde} maintenant={maintenant}/>
       {a.ok === false ? <Groupe titre={tr('ebt.argent.titre')} large><Panne ko={a.ko || { raison: a.reason }} onReconnecter={onReconnecter} onReessayer={relire}/></Groupe> : null}
       {Array.isArray(a.versements) ? <Groupe titre={tr('ebt.argent.versements')} n={a.versements.length} attrs={{ 'data-ebt-versements': a.versements.length }} pied={tr('ebt.argent.versements.pied')}>
         {a.versements.length ? a.versements.slice(0, 20).map((p) => <Rangee key={p.id} nom={p.date ? dateTr(p.date, { day: 'numeric', month: 'long' }) : '—'} detail={[tr('ebt.versement.' + (['SUCCEEDED', 'INITIATED', 'RETRYABLE_FAILED', 'TERMINAL_FAILED', 'REVERSED'].includes(p.statut) ? p.statut : 'AUTRE')), p.n != null ? tr('ebt.argent.nVentes', { n: p.n }) : '', p.vers].filter(Boolean).join(' · ')} valeur={euros(p.montant)} geste={/FAILED|REVERSED/.test(p.statut)} gris={p.statut === 'INITIATED'} attrs={{ 'data-ebt-versement': p.statut }}/>)
@@ -212,9 +220,10 @@ export function ArgentEbay({ compte, headers, commandes = null, numDe, onReconne
 }
 
 // ══ LE TRAFIC ════════════════════════════════════════════════════════════════
-export function TraficEbay({ compte, headers, numDe, domaine = 'www.ebay.fr', onReconnecter, onPromotion }) {
+export function TraficEbay({ compte, headers, numDe, domaine = 'www.ebay.fr', onReconnecter, onPromotion, onAnnonces, confirm, photosDe }) {
   const [t, relire, at, lecture] = useLectureEbay('trafic', compte, headers);
   const [tout, setTout] = useState(false);
+  const [ouverte, setOuverte] = useState(null);
   if (t === undefined) return <div className="ebt" data-ebt="trafic" data-ebt-etat="en-cours"><Groupe titre={tr('ebt.trafic.titre')} large><Squelette n={5}/></Groupe></div>;
   if (t.ok === false) return <div className="ebt" data-ebt="trafic" data-ebt-etat="ko"><Groupe titre={tr('ebt.trafic.titre')} large><Panne ko={t.ko || { raison: t.reason }} onReconnecter={onReconnecter} onReessayer={relire}/></Groupe></div>;
   const tt = totauxTrafic(t);
@@ -222,9 +231,9 @@ export function TraficEbay({ compte, headers, numDe, domaine = 'www.ebay.fr', on
   const toutes = [...(t.annonces || [])].filter((a) => a.enLigne !== false).sort((a, b) => (b.affichages ?? -1) - (a.affichages ?? -1));
   const lien = (id) => `https://${domaine}/itm/${id}`;
   const num = (a) => (numDe ? numDe(a) : '');
-  const ligne = (a, k) => <Rangee key={k + a.itemId} photo={a.photo || ''} nom={(num(a) ? 'N°' + num(a) + ' · ' : '') + (a.titre || a.itemId)}
+  const ligne = (a, k, ouvrir) => <Rangee key={k + a.itemId} photo={a.photo || ''} nom={(num(a) ? 'N°' + num(a) + ' · ' : '') + (a.titre || a.itemId)} onClick={ouvrir ? () => setOuverte(a) : undefined}
     detail={[a.affichages != null ? tr('ebt.trafic.nAffichages', { n: a.affichages }) : tr('ebt.trafic.affichagesPasSu'), a.vues != null ? tr('ebt.trafic.nVues', { n: a.vues }) : '', a.ventes ? tr('ebt.trafic.nVentes', { n: a.ventes }) : '', transformation(a) != null && a.ventes ? nombre(transformation(a), { maximumFractionDigits: 1 }) + ' %' : ''].filter(Boolean).join(' · ')}
-    href={lien(a.itemId)} attrs={{ 'data-ebt-annonce': a.itemId, 'data-affichages': a.affichages ?? 'pas-su' }}/>;
+    href={ouvrir ? undefined : lien(a.itemId)} attrs={{ 'data-ebt-annonce': a.itemId, 'data-affichages': a.affichages ?? 'pas-su', ...(ouvrir ? { 'data-ebt-pourquoi': a.itemId } : {}) }}/>;
   const visibles = tout ? toutes : toutes.slice(0, 40);
   return (
     <div className="ebt" data-ebt="trafic" data-ebt-etat="lu">
@@ -236,8 +245,9 @@ export function TraficEbay({ compte, headers, numDe, domaine = 'www.ebay.fr', on
         ] : []}/>
       </div>
       {inv && inv.length ? <Groupe titre={tr('ebt.trafic.invisiblesTitre')} n={inv.length} attrs={{ 'data-ebt-invisibles': inv.length }} pied={<>{tr('ebt.trafic.invisibles.pied')}{onPromotion ? <> <button type="button" className="ebt-lien" onClick={onPromotion}>{tr('ebt.trafic.promouvoir')}</button></> : null}</>}>
-        {inv.map((a) => ligne(a, 'i'))}
+        {inv.map((a) => ligne(a, 'i', true))}
       </Groupe> : null}
+      {ouverte ? <DiagnosticFeuille compte={compte} headers={headers} confirm={confirm} itemId={ouverte.itemId} titre={(num(ouverte) ? 'N°' + num(ouverte) + ' · ' : '') + (ouverte.titre || ouverte.itemId)} num={num(ouverte)} photosDe={photosDe} domaine={domaine} onAnnonces={onAnnonces} onClose={() => setOuverte(null)}/> : null}
       <Groupe titre={tr('ebt.trafic.toutes')} n={toutes.length} large attrs={{ 'data-ebt-toutes': toutes.length }}
         pied={[t.debut && t.fin ? tr('ebt.trafic.periode', { debut: dateCourte(t.debut), fin: dateCourte(t.fin) }) : '', t.invisibles && t.invisibles.sansChiffres.length ? tr('ebt.trafic.sansChiffres', { n: t.invisibles.sansChiffres.length }) : ''].filter(Boolean).join(' · ')}>
         {visibles.length ? visibles.map((a) => ligne(a, 't')) : <div className="ebt-vide">{tr('ebt.trafic.aucune')}</div>}
@@ -250,7 +260,9 @@ export function TraficEbay({ compte, headers, numDe, domaine = 'www.ebay.fr', on
 
 // ══ LA SANTÉ DU COMPTE ═══════════════════════════════════════════════════════
 const POURCENT = (v) => (v == null ? '—' : nombre(v, { maximumFractionDigits: 2 }) + ' %');
-export function SanteEbay({ compte, headers, domaine = 'www.ebay.fr', onReconnecter }) {
+export function SanteEbay({ compte, headers, domaine = 'www.ebay.fr', onReconnecter, confirm, photosDe, onAnnonces }) {
+  const [ouverte, setOuverte] = useState(null);
+  const [serie, setSerie] = useState(null);
   const [s, relireS, atS, lectureS] = useLectureEbay('sante', compte, headers);
   const [l, relireL] = useLectureEbay('litiges', compte, headers);
   const [e, relireE] = useLectureEbay('evaluationsrecues', compte, headers);
@@ -278,9 +290,11 @@ export function SanteEbay({ compte, headers, domaine = 'www.ebay.fr', onReconnec
           : !Array.isArray(s.aCorriger) ? (Array.isArray(s.conformite) && !s.conformite.some((x) => x.n > 0) ? <div className="ebt-vide">{tr('ebt.sante.rienACorriger')}</div> : <Panne ko={{ raison: 'pas-su' }} onReessayer={relire}/>)
           : s.aCorriger.length ? s.aCorriger.map((c) => <Rangee key={c.itemId + c.type} nom={c.sku ? c.sku + ' · ' + c.itemId : c.itemId} libre
             detail={c.problemes.map((p) => [p.manque.length ? tr('ebt.sante.manque', { liste: p.manque.join(', ') }) : p.message, p.suggestions.length ? tr('ebt.sante.suggere', { liste: p.suggestions.map((x) => x.nom + (x.valeurs.length ? ' : ' + x.valeurs.join(', ') : '')).join(' ; ') }) : ''].filter(Boolean).join(' — ')).join(' · ')}
-            href={lien(c.itemId)} attrs={{ 'data-ebt-corriger': c.itemId }}/>)
+            onClick={() => setOuverte(c)} attrs={{ 'data-ebt-corriger': c.itemId }}/>)
           : <div className="ebt-vide">{tr('ebt.sante.rienACorriger')}</div>}
       </Groupe> : null}
+      {s && s.ok !== false && Array.isArray(s.aCorriger) ? <SerieEvidentes compte={compte} headers={headers} confirm={confirm} aCorriger={s.aCorriger} serie={serie} setSerie={setSerie} onFini={relireS}/> : null}
+      {ouverte ? <DiagnosticFeuille compte={compte} headers={headers} confirm={confirm} itemId={ouverte.itemId} titre={ouverte.sku ? ouverte.sku + ' · ' + ouverte.itemId : ouverte.itemId} photosDe={photosDe} domaine={domaine} onAnnonces={onAnnonces} onClose={() => { setOuverte(null); relireS(); }}/> : null}
       <Groupe titre={tr('ebt.sante.litigesTitre')} n={li ? li.n : null} attrs={{ 'data-ebt-groupe': 'litiges', 'data-n': li ? li.n : 'pas-su' }} pied={tr('ebt.sante.litiges.pied')}>
         {l === undefined ? <Squelette n={2}/> : !li ? <Panne ko={(l && l.ko) || { raison: (l && l.reason) || 'pas-su' }} onReconnecter={onReconnecter} onReessayer={relireL}/> : <>
           {li.lignes.length ? li.lignes.map((x) => <Rangee key={x.partie + x.id} nom={tr('ebt.litige.' + x.partie) + (x.motif ? ' · ' + tr('ebt.motif.' + (['ITEM_NOT_RECEIVED', 'SIGNIFICANTLY_NOT_AS_DESCRIBED', 'FRAUD', 'DUPLICATE'].includes(x.motif) ? x.motif : 'AUTRE')) : '')}
@@ -299,5 +313,135 @@ export function SanteEbay({ compte, headers, domaine = 'www.ebay.fr', onReconnec
       </Groupe>
       <div className="ebt-large"><Pied at={atS} lecture={lectureS} onRelire={relire}/></div>
     </div>
+  );
+}
+
+
+// ══ (15 nov., 2e tour) LES GESTES ════════════════════════════════════════════
+// Chaque geste : un toucher ⇒ une confirmation qui DIT ce qui part (aperçu) ⇒ la route relit
+// l'annonce chez eBay avant d'écrire et APRÈS (« fait » seulement si eBay le montre) ⇒ journal
+// « Ce que VRM a fait ». Rien de payant (une révision d'annonce est gratuite), rien sur la livraison.
+const ecrire = (action, payload, compte, headers) => appelerEbay(action, { ...payload, ...(compte && compte !== 'principal' ? { compte } : {}) }, headers, { write: true });
+const Issue = ({ issue }) => (issue ? <div className="ebt-panne" role="status" data-ebt-issue={issue.etat}><span className="ebt-panne-texte">{issue.texte}</span></div> : null);
+const issueDe = (e) => ({ etat: e && e.reason === 'incertain' ? 'incertain' : 'refus', texte: (e && e.message) || tr('ebt.geste.refus') });
+
+// Le calendrier des versements (Argent, et la ligne de Ma journée).
+function CalendrierVersements({ versements, solde, maintenant }) {
+  const c = calendrierVersements(versements, maintenant);
+  if (!c || (!c.enRoute.length && !c.recents.length && !c.rates.length && !(solde && solde.dispo && solde.dispo.v))) return null;
+  return (
+    <Groupe titre={tr('ebt.calendrier.titre')} attrs={{ 'data-ebt-calendrier': c.enRoute.length }} pied={tr('ebt.calendrier.pied')}>
+      {c.enRoute.map((p) => <Rangee key={'r' + p.id} nom={tr('ebt.calendrier.enRoute', { date: dateTr(p.date, { weekday: 'long', day: 'numeric', month: 'long' }) })} detail={p.vers || ''} valeur={euros(p.montant)} attrs={{ 'data-ebt-cal': 'en-route' }}/>)}
+      {solde && solde.dispo && solde.dispo.v ? <Rangee nom={tr('ebt.calendrier.prochain')} detail={tr('ebt.calendrier.prochain.aide')} valeur={euros(solde.dispo)} gris attrs={{ 'data-ebt-cal': 'prochain' }}/> : null}
+      {c.recents.map((p) => <Rangee key={'a' + p.id} nom={tr('ebt.calendrier.arrive', { date: dateTr(p.date, { weekday: 'long', day: 'numeric', month: 'long' }) })} detail={p.vers || ''} valeur={euros(p.montant)} gris attrs={{ 'data-ebt-cal': 'arrive' }}/>)}
+      {c.rates.map((p) => <Rangee key={'x' + p.id} nom={tr('ebt.versement.' + (p.statut === 'REVERSED' ? 'REVERSED' : p.statut === 'RETRYABLE_FAILED' ? 'RETRYABLE_FAILED' : 'TERMINAL_FAILED'))} detail={p.date ? dateCourte(p.date) : ''} valeur={euros(p.montant)} geste attrs={{ 'data-ebt-cal': 'rate' }}/>)}
+    </Groupe>
+  );
+}
+
+// Ma journée : UNE ligne, seulement quand un versement eBay est en route ou arrivé depuis 3 jours.
+// Lue dans la ligne rangée (`ebay_versements`, `lire` = lecture projetée par compte) : jamais un
+// appel à eBay à l'ouverture de Ma journée. Rien su ⇒ rien montré.
+export function VersementsEbayJournee({ lire, onOuvrir, maintenant = Date.now() }) {
+  const [v, setV] = useState(undefined);
+  useEffect(() => { let vivant = true; Promise.resolve(lire && lire()).then((x) => { if (vivant) setV(Array.isArray(x) ? x : null); }, () => { if (vivant) setV(null); }); return () => { vivant = false; }; }, [lire]);
+  if (!Array.isArray(v)) return null;
+  const c = calendrierVersements(v, maintenant);
+  const p = c && (c.enRoute[0] || c.recents.find((x) => maintenant - Date.parse(x.date) <= 3 * 86400000));
+  if (!p) return null;
+  const route = p.statut === 'INITIATED';
+  return (
+    <div className="ebt" data-ebt="journee" style={{ paddingTop: 0, paddingBottom: 8 }}>
+      <div className="ebt-carte ebt-large">
+        <Rangee nom={tr(route ? 'ebt.journee.enRoute' : 'ebt.journee.arrive', { m: euros(p.montant) })} detail={dateTr(p.date, { weekday: 'long', day: 'numeric', month: 'long' })} onClick={onOuvrir} attrs={{ 'data-ebt-journee': route ? 'en-route' : 'arrive' }}/>
+      </div>
+    </div>
+  );
+}
+
+// « Corriger les évidentes » : la LISTE montrée avant, puis une annonce après l'autre.
+function SerieEvidentes({ compte, headers, confirm, aCorriger, serie, setSerie, onFini }) {
+  const liste = correctionsEvidentes(aCorriger);
+  if (!liste.length) return null;
+  const lancer = async () => {
+    const desc = liste.map((x) => `${x.sku || x.itemId} : ${Object.entries(x.aspects).map(([n, v]) => `${n} ${v}`).join(', ')}`).join('\n');
+    if (!(await confirm({ title: tr('ebt.evidentes.titre', { n: liste.length }), desc: desc + '\n\n' + tr('ebt.evidentes.desc'), ok: tr('ebt.evidentes.ok'), cancel: tr('ebt.annuler') }))) return;
+    const res = [];
+    setSerie({ en: true, res });
+    for (const x of liste) {
+      try { await ecrire('corrigeraspects', { itemId: x.itemId, aspects: x.aspects, confirme: true }, compte, headers); res.push({ itemId: x.itemId, etat: 'fait' }); }
+      catch (e) { res.push({ itemId: x.itemId, etat: e.reason === 'incertain' ? 'incertain' : 'refus', texte: e.message }); if (e.reason === 'incertain') break; }
+      setSerie({ en: true, res: [...res] });
+    }
+    setSerie({ en: false, res: [...res] });
+    if (onFini) onFini();
+  };
+  const faits = serie && serie.res ? serie.res.filter((r) => r.etat === 'fait').length : 0;
+  return (
+    <Groupe titre={tr('ebt.evidentes.groupe')} n={liste.length} attrs={{ 'data-ebt-evidentes': liste.length }} pied={tr('ebt.evidentes.pied')}>
+      <Rangee nom={tr('ebt.evidentes.bouton', { n: liste.length })} detail={liste.slice(0, 3).map((x) => Object.entries(x.aspects).map(([n, v]) => `${n} ${v}`).join(', ')).join(' · ')} onClick={serie && serie.en ? undefined : lancer} attrs={{ 'data-ebt-geste': 'evidentes' }}/>
+      {serie && serie.res && serie.res.length ? <Rangee nom={tr('ebt.evidentes.resultat', { n: faits, total: liste.length })} detail={serie.res.filter((r) => r.etat !== 'fait').map((r) => r.itemId + ' : ' + (r.texte || r.etat)).join(' · ')} libre attrs={{ 'data-ebt-evidentes-faits': faits }}/> : null}
+    </Groupe>
+  );
+}
+
+// La feuille « Pourquoi elle ne se voit pas » : les raisons MESURÉES et, pour chacune, LE geste.
+function DiagnosticFeuille({ compte, headers, confirm, itemId, titre, num, photosDe, domaine, onAnnonces, onClose }) {
+  const [d, setD] = useState(undefined);
+  const [occupe, setOccupe] = useState(false);
+  const [issue, setIssue] = useState(null);
+  const [prix, setPrix] = useState('');
+  const [photos, setPhotos] = useState(undefined);
+  const lire = useCallback(async () => {
+    try { const j = await appelerEbay('diagnostic', { itemIds: [itemId], ...(compte && compte !== 'principal' ? { compte } : {}) }, headers); setD((j.annonces || [])[0] || null); }
+    catch (e) { setD(null); setIssue(issueDe(e)); }
+  }, [itemId, compte, headers]);
+  useEffect(() => { lire(); }, [lire]);
+  useEffect(() => { let vivant = true; if (photosDe && num) Promise.resolve(photosDe(num)).then((l) => { if (vivant) setPhotos(Array.isArray(l) ? l : null); }, () => { if (vivant) setPhotos(null); }); else setPhotos(null); return () => { vivant = false; }; }, [photosDe, num]);
+  const agir = async (action, payload, dialogue) => {
+    if (!(await confirm(dialogue))) return;
+    setOccupe(true); setIssue(null);
+    try { await ecrire(action, { ...payload, confirme: true }, compte, headers); setIssue({ etat: 'fait', texte: tr('ebt.geste.fait') }); await lire(); }
+    catch (e) { setIssue(issueDe(e)); }
+    finally { setOccupe(false); }
+  };
+  const p = d && d.propositions;
+  const r = (cle) => d && (d.raisons || []).find((x) => x.cle === cle);
+  const neuves = Array.isArray(photos) && d ? photos.slice(0, Math.max(0, 24 - d.photos)) : [];
+  return (
+    <Feuille titre={tr('ebt.diag.titre')} onClose={onClose} data-ebt-diagnostic={itemId}>
+      <div className="ebt" style={{ padding: '0 0 12px' }}>
+        <div className="ebt-pied ebt-large" style={{ color: 'inherit' }}>{titre}</div>
+        {d === undefined ? <Groupe titre={tr('ebt.diag.raisons')} large><Squelette n={3}/></Groupe>
+          : d === null || d.ko ? <Groupe titre={tr('ebt.diag.raisons')} large><Panne ko={{ raison: 'pas-su' }} onReessayer={lire}/></Groupe>
+          : <>
+            <Groupe titre={tr('ebt.diag.raisons')} large attrs={{ 'data-ebt-raisons': (d.raisons || []).map((x) => x.cle).join(' ') }} pied={d.conformiteLue ? '' : tr('ebt.diag.conformitePasLue')}>
+              {!(d.raisons || []).length ? <div className="ebt-vide">{tr('ebt.diag.aucune')}</div> : null}
+              {p && p.manque.map((n) => {
+                const vs = (p.suggestions && p.suggestions[n]) || [];
+                if (!vs.length) return <Rangee key={'m' + n} nom={tr('ebt.diag.manque', { nom: n })} detail={tr('ebt.diag.surEbay')} href={`https://${domaine}/itm/${itemId}`} attrs={{ 'data-ebt-manque': n }}/>;
+                return vs.slice(0, 4).map((v) => <Rangee key={'m' + n + v} nom={tr('ebt.diag.ajouter', { nom: n, valeur: v })} detail={tr('ebt.diag.propose')} geste onClick={occupe ? undefined : () => agir('corrigeraspects', { itemId, aspects: { [n]: v } }, { title: tr('ebt.diag.ajouter', { nom: n, valeur: v }), desc: tr('ebt.diag.ajouter.desc', { titre }), ok: tr('ebt.diag.ajouter.ok'), cancel: tr('ebt.annuler') })} attrs={{ 'data-ebt-ajouter': n + ':' + v }}/>);
+              })}
+              {r('photos') ? (neuves.length
+                ? <Rangee nom={tr('ebt.diag.photos', { n: neuves.length })} detail={tr('ebt.diag.photos.aide', { n: d.photos })} geste onClick={occupe ? undefined : () => agir('ajouterphotos', { itemId, photos: neuves, nVu: d.photos }, { title: tr('ebt.diag.photos', { n: neuves.length }), desc: tr('ebt.diag.photos.desc', { avant: d.photos, apres: d.photos + neuves.length }), ok: tr('ebt.diag.photos.ok'), cancel: tr('ebt.annuler') })} attrs={{ 'data-ebt-photos': neuves.length }}/>
+                : <Rangee nom={tr('ebt.diag.peuPhotos', { n: d.photos })} detail={tr('ebt.diag.peuPhotos.aide')} href={`https://${domaine}/itm/${itemId}`} attrs={{ 'data-ebt-photos': 0 }}/>) : null}
+              {r('catalogue') ? <Rangee nom={tr('ebt.diag.catalogue')} detail={tr('ebt.diag.catalogue.aide')} geste onClick={occupe ? undefined : () => agir('lierproduit', { itemId, epid: r('catalogue').epid }, { title: tr('ebt.diag.catalogue'), desc: tr('ebt.diag.catalogue.desc'), ok: tr('ebt.diag.catalogue.ok'), cancel: tr('ebt.annuler') })} attrs={{ 'data-ebt-catalogue': r('catalogue').epid }}/> : null}
+              {r('prix') ? <Rangee nom={tr('ebt.diag.prix', { prix: monnaie(r('prix').prix), mediane: monnaie(r('prix').mediane) })} detail={tr('ebt.diag.prix.aide', { n: r('prix').n })} geste attrs={{ 'data-ebt-prix': r('prix').mediane }}/> : null}
+            </Groupe>
+            {d.prix != null && d.devise === 'EUR' ? <Groupe titre={tr('ebt.diag.prixTitre')} large attrs={{ 'data-ebt-prix-geste': '' }} pied={d.comparables && d.comparables.n >= 5 ? tr('ebt.diag.comparables', { n: d.comparables.n, min: monnaie(d.comparables.min), max: monnaie(d.comparables.max), mediane: monnaie(d.comparables.mediane) }) : tr('ebt.diag.pasComparables')}>
+              <div className="ebt-rangee" style={{ gap: 10 }}>
+                <label className="ebt-textes" htmlFor={'ebt-prix-' + itemId}><span className="ebt-nom">{tr('ebt.diag.prixActuel', { prix: monnaie(d.prix) })}</span></label>
+                <input id={'ebt-prix-' + itemId} inputMode="decimal" value={prix} onChange={(e) => setPrix(e.target.value)} placeholder={String(d.prix).replace('.', ',')} aria-label={tr('ebt.diag.nouveauPrix')} style={{ width: 96, minHeight: 44, fontSize: 17, borderRadius: 12, border: '1px solid rgb(127 127 127 / .35)', padding: '0 10px', background: 'var(--sb-puits, #fff)', color: 'inherit' }} data-ebt-prix-champ=""/>
+              </div>
+              <Rangee nom={tr('ebt.diag.changerPrix')} detail={tr('ebt.diag.changerPrix.aide')} onClick={occupe || !String(prix).trim() ? undefined : () => agir('revise', { itemId, price: String(prix).replace(',', '.').trim(), prixVu: d.prix }, { title: tr('ebt.diag.changerPrix'), desc: tr('ebt.diag.changerPrix.desc', { avant: monnaie(d.prix), apres: String(prix).trim() + ' €' }), ok: tr('ebt.diag.changerPrix.ok'), cancel: tr('ebt.annuler') })} attrs={{ 'data-ebt-changer-prix': '' }}/>
+            </Groupe> : null}
+            <Groupe titre={tr('ebt.diag.autres')} large>
+              {onAnnonces ? <Rangee nom={tr('ebt.diag.offre')} detail={tr('ebt.diag.offre.aide')} onClick={() => { onClose(); onAnnonces(); }} attrs={{ 'data-ebt-offre-observateurs': '' }}/> : null}
+              <Rangee nom={tr('ebt.diag.voir')} href={`https://${domaine}/itm/${itemId}`}/>
+            </Groupe>
+          </>}
+        <div className="ebt-large"><Issue issue={issue}/></div>
+      </div>
+    </Feuille>
   );
 }
