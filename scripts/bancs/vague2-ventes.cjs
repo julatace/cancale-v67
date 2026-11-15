@@ -170,7 +170,7 @@ async function passe(nav, { W, theme }) {
     await clic(a.pg, '[data-vue-sans-achat]');
     await attendre(a.pg, '[data-ar-ligne]', 8000);
     await a.pg.waitForTimeout(800); await calme(a.pg);
-    const l = await a.pg.evaluate(() => [...document.querySelectorAll('[data-ar-ligne]')].map((x) => ({ id: x.getAttribute('data-ar-ligne'), pt: x.hasAttribute('data-ar-plus-tard'), rep: x.getAttribute('data-ar-reportee'), sous: ((x.querySelector('.vrm-ar-sous') || {}).textContent || '').trim(), gestePlusTard: !!x.querySelector('[data-ar-plus-tard-geste]') })));
+    const l = await a.pg.evaluate(() => [...document.querySelectorAll('[data-ar-ligne]')].map((x) => ({ id: x.getAttribute('data-ar-ligne'), pt: x.hasAttribute('data-ar-plus-tard'), rep: x.getAttribute('data-ar-reportee'), sous: ((x.querySelector('[data-ar-sous], .vrm-ar-sous') || {}).textContent || '').trim(), gestePlusTard: !!x.querySelector('[data-ar-plus-tard-geste]') })));
     const p = Object.fromEntries(l.map((x) => [x.id, x]));
     dit(l.map((x) => x.id + (x.pt ? '*' : '')).join(',') === '51001,52001,51002*', 'P', `${T} la file : 51001 revenue à SA place (la plus ancienne), 51002 encore en fin de file`, JSON.stringify(l.map((x) => x.id + (x.pt ? '*' : ''))));
     dit(p['51001'] && p['51001'].rep === iso(8).slice(0, 10) && /reportée le/.test(p['51001'].sous) && !/revient/.test(p['51001'].sous) && p['51001'].gestePlusTard, 'P', `${T} 51001 dit « reportée le … » (et « Plus tard » se repose)`, JSON.stringify(p['51001']));
