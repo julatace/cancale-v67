@@ -133,3 +133,43 @@ sans eux reçoit un 403 que l'écran dit « Reconnecter eBay » pour CETTE parti
 Toutes les formes (Finances, Analytics, Compliance, Post-Order inquiry/case, payment_dispute, GetFeedback)
 et la base de signature (notamment `@path` sans la requête) viennent de la documentation ; aucune réponse
 réelle n'a été vue. Une forme inattendue rend « illisible » / « pas su », jamais une liste vide ni 0.
+
+---
+
+# 2e tour (même jour) — « tu peux encore faire mieux » : de la LECTURE aux GESTES
+
+Demande relayée par le coordinateur : passer aux gestes utiles, toujours sur SON clic, aperçu avant,
+relu après, journal « Ce que VRM a fait », dans §2.8/§2.9. Fusion d'abord de `origin/claude/project-review-nsk5su`
+(dont « Dictionnaires : un seul export default ») : build vert, `audit-traduction` 45 verts.
+
+## Point par point
+| # | demande | état |
+|---|---|---|
+| 1 | Corriger en un toucher les caractéristiques manquantes | **AJOUTÉ** : `corrigeraspects` (api/_lib/ebay-gestes.js). La valeur doit être une de celles que eBay PROPOSE pour CETTE annonce (Compliance relue juste avant) ; une caractéristique déjà remplie n'est jamais écrasée ; toutes les autres sont renvoyées telles quelles (ReviseItem remplace l'ensemble) ; RELU après (GetItem). App : « Pourquoi elle ne se voit pas » ⇒ « Ajouter Pointure : 42 » ; Santé ⇒ « Compléter en un toucher » (les caractéristiques à valeur UNIQUE proposée, la liste montrée dans la confirmation, une annonce après l'autre, arrêt sur un résultat incertain). |
+| 2 | Annonces qui ne se voient pas : la raison mesurée et LE geste | **AJOUTÉ** : `diagnostic` (lecture, 10 annonces au plus) : caractéristiques manquantes, moins de 4 photos, prix au-dessus de 115 % de la médiane d'au moins 5 annonces actives COMPARABLES (Browse, jeton d'application : même ePID, sinon Marque + Modèle + Pointure + catégorie + même état ; la sienne et une autre devise exclues) — un CONSTAT sur une annonce en ligne, jamais un prix proposé à la mise en ligne. Gestes : compléter, « Ajouter N photos de ta fiche » (photos de LA fiche du N°, par identité, lues en projection), changer le prix (le prix TAPÉ, `revise` avec le prix vu), relier au catalogue, offre aux observateurs (le geste existant, Annonces). |
+| 3 | Catalogue eBay (ePID) | **AJOUTÉ** : `lierproduit` — seulement l'ePID que eBay propose (Compliance PRODUCT_ADOPTION, relu), sans photos ni texte du catalogue (`IncludeStockPhotoURL`, `UseStockPhotoURLAsGallery`, `IncludeeBayProductDetails` à false), relu après, photos vérifiées. |
+| 4 | Offres reçues : accepter / refuser / contre-offre | **DÉJÀ LÀ** (Ventes · eBay · Offres, `repondreoffre` : confirmation, offre relue avant, prix vu = prix de l'offre). **Ajouté** : RELU APRÈS (encore en attente ⇒ « pas relu », jamais « fait »). Aucune acceptation automatique (§3 : seul le seuil natif eBay). Raccourci depuis le Tableau. |
+| 5 | Remettre en vente (relist) | **DÉJÀ LÀ** (`relanceverif` / `relancer`, Annonces · eBay · inactives, frais lus avant). « Avec les corrections » : la nouvelle annonce se corrige ensuite par « Pourquoi elle ne se voit pas » (ce que eBay demande est relu sur la NOUVELLE annonce). Raccourci depuis le Tableau. |
+| 6 | Soldes eBay (remise sur le prix) | **DÉJÀ LÀ** (Annonces · eBay · Promotion · Remises : `item_price_markdown`, `applyFreeShipping:false` toujours, confirmation, 0 € de frais). La sponsorisée reste montrée avec son coût (inchangé). Raccourci « Soldes eBay · 0 € de frais » depuis le Tableau. |
+| 7 | Calendrier des versements | **AJOUTÉ** : Argent ⇒ « Calendrier des versements » (en route avec sa date, « au prochain versement » = le disponible, arrivés depuis 7 jours, ratés en ambre) ; Ma journée ⇒ UNE ligne quand un versement eBay est en route ou arrivé depuis 3 jours (lue dans `ebay_versements`, aucun appel à eBay à l'ouverture ; le Tableau y range les versements lus). eBay ne dit PAS la date du prochain versement non lancé (pas dans la Finances API) : « au prochain versement, selon ton rythme eBay », jamais une date devinée. |
+| 8 | Multi-sites (.de/.it/.es) | **CONSTAT, rien construit** — voir ci-dessous. |
+
+## Multi-sites : ce qui existe, ce qui manque
+- **Existe** : un compte eBay par site (FR, UK, US, DE, IT, ES — `api/_lib/ebay-marches-table.js`) ; chaque
+  requête parle au marché DU compte (SiteID, marketplace, devise, domaine) ; publier sur un compte d'un site
+  non géré ou pas relu est refusé ; le CA écarte et nomme une vente en GBP/USD ; .de/.it/.es sont en EUR donc
+  comptés. Le Tableau, l'Argent, le Trafic et la Santé suivent le marché du compte (`marcheCourant`).
+- **Manque** : publier la MÊME paire depuis le compte FR sur .de/.it/.es (une annonce par site : titre et
+  description traduits — §2.9 : sans IA payante, ou le traducteur de Chrome —, catégories et noms de
+  caractéristiques du site, politiques de retour du pays) ; la visibilité internationale native d'eBay
+  (option payante par annonce : sur son clic, coût dit) ; les comparables de prix par site. À décider par Julien.
+
+## Preuves (2e tour)
+- `scripts/audit-ebay-gestes.cjs` — EXÉCUTE la route contre un faux eBay qui GARDE l'état de l'annonce et
+  l'applique comme eBay : **30 verts**, `--prouve` **14/14** mutations rougies (écrire sans clic, valeur hors
+  propositions, écraser, perdre les autres caractéristiques, sans relecture, ePID non proposé, photos du
+  catalogue, nombre de photos vu, photos remplacées, comparables sans minimum / avec la sienne / sans l'état,
+  offre à un prix différent de l'aperçu, offre sans relecture), `--avant` **23 rouges**.
+- `scripts/bancs/ebay-tableau.cjs` : G1–G7 (pourquoi, Annuler ⇒ rien, confirmé ⇒ une caractéristique avec
+  `confirme`, photos de LA fiche + nombre vu, liste des évidentes montrée avant, calendrier, Ma journée) ;
+  G1b (titres de la feuille lisibles) **rouge** sur la build d'avant la correction CSS.
