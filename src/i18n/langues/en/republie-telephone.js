@@ -20,7 +20,7 @@ export default {
   "acc.numero.autre.apres": "Noted: another item · it gets a new number",
   "acc.numero.carton.apres": "No. {numero} noted for this box",
   "rt.consequence": "Yes: its box keeps No. {numero}, nothing to write. No: it gets a new number.",
-  "acc.numero.donne.apres": "{mot} · {numeros} · write them on their boxes",
+  "acc.numero.donne.apres": {"one": "{mot} · {numeros} · write it on its box", "other": "{mot} · {numeros} · write them on their boxes"},
   "acc.numero.demande.apres": {"one": "{n} number saved · write it on its box too", "other": "{n} numbers saved · write them on their boxes too"},
   "acc.numero.reconnu.apres": "{mot} · relisted in the Vinted app, the box stays the same",
 };

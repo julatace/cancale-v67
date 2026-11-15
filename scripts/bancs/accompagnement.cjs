@@ -428,22 +428,27 @@ action('vacances', async (nav) => {
 // (la pilule) ; l'avant est la ligne de Ma journée ou d'Annonces que le geste touche.
 const { empreinte: empreinteInventee, voisine: voisineInventee } = require(path.join(__dirname, '..', '_numerotation-vm.cjs'));
 const ilYaN = (h) => new Date(Date.now() - h * 3600e3).toISOString();
-// La base de `fabriquer`, ses fiches au champ de l'app (`numero`), + ce que la scène ajoute.
+// Une base RÉDUITE (le monde du banc numeros-masquees, qui numérote : un compte, son dressing lu en entier,
+// ventes et achats vides) + ce que la scène ajoute. La base de `fabriquer` porte des milliers de lignes
+// dont les fiches ne sont pas à la forme de l'app : la numérotation n'y a pas lieu.
 function baseNumeros({ moi = false, nouvelles = [], fiches = {}, main = {}, lignes = [] } = {}) {
-  const b = base();
-  const m = b.main[0].data;
-  const nf = {};
-  for (const [id, f] of Object.entries(m.vinted_annonce_numeros || {})) nf[id] = { numero: String(f.numero || f.num), numberedAt: f.numberedAt, auto: false, manuelAt: f.numberedAt, accountId: UID_V };
-  m.vinted_annonce_numeros = { ...nf, ...fiches };
-  m.vinted_used_numeros = Object.values(m.vinted_annonce_numeros).map((f) => Number(f.numero)).filter(Number.isFinite);
-  m.vrm_numero_ecrit = moi ? { actif: true, ou: ['description', 'titre'], depuis: ilYaN(48), choisi: ilYaN(48) } : { actif: false, depuis: ilYaN(48), choisi: ilYaN(48) };
-  Object.assign(m, main);
-  const L = b.rows.find((r) => r.id === `harvest_${UID_V}_listings`);
-  for (const it of nouvelles) L.data.payload.items.push(it);
-  L.data.payload.pagination = { total_entries: L.data.payload.items.length };
-  L.data.nItems = L.data.payload.items.length;
-  b.rows.push(...lignes);
-  return b;
+  const at = '2026-11-01T10:00:00.000Z';
+  const items = [annNeuve(7999990900, 'Salomon XT-6 noire taille 41', { created_at_ts: Math.floor((Date.now() - 400 * 3600e3) / 1000) }), ...nouvelles];
+  const m = { vrm_bienvenue_vue: { at }, vrm_visite_vue: { at }, vrm_je_vends: { choix: 'sneakers', categories: ['sneakers'], at }, vrm_configuration: { etat: 'fait', at, statut: null, version: 1 },
+    vrm_plateformes_affichees: { sites: ['vinted'], at }, vrm_parcours: { etat: 'fini', at }, vrm_bilan_minute: { vu: ilYaN(48), fin: 'fini' },
+    vinted_annonce_numeros: { 7999990900: { numero: '1', auto: false, manuelAt: ilYaN(300), numberedAt: ilYaN(400), accountId: UID_V }, ...fiches },
+    vrm_numero_ecrit: moi ? { actif: true, ou: ['description', 'titre'], depuis: ilYaN(48), choisi: ilYaN(48) } : { actif: false, depuis: ilYaN(48), choisi: ilYaN(48) }, ...main };
+  m.vinted_used_numeros = [...new Set(Object.values(m.vinted_annonce_numeros).map((f) => Number(f.numero)).filter(Number.isFinite))].sort((x, y) => x - y);
+  return {
+    accounts: [{ id: 1, vinted_user_id: UID_V, login: 'vendeur_1', domain: 'www.vinted.fr', updated_at: new Date().toISOString(), created_at: at }],
+    main: [{ id: 'main', data: m }],
+    rows: [
+      { id: `harvest_${UID_V}_listings`, data: { capturedAt: new Date(Date.now() - 60e3).toISOString(), nItems: items.length, payload: { items, pagination: { total_entries: items.length, total_pages: 1, current_page: 1 } } } },
+      { id: `harvest_${UID_V}_orders_purchased`, data: { capturedAt: new Date().toISOString(), payload: { my_orders: [] } } },
+      { id: `harvest_${UID_V}_orders_sold`, data: { capturedAt: new Date().toISOString(), payload: { my_orders: [] } } },
+      ...lignes,
+    ],
+  };
 }
 const annNeuve = (id, titre, x = {}) => ({ id, title: titre, brand_title: 'Adidas', size_title: '42', status: 'Très bon état', price: { amount: '59.0', currency_code: 'EUR' }, is_closed: false, is_hidden: false, is_draft: false, favourite_count: 0, view_count: 2,
   created_at_ts: Math.floor((Date.now() - 3 * 3600e3) / 1000), photo: { url: `https://images1.vinted.net/t/${id}/f800/n.jpeg?s=n`, high_resolution: { timestamp: Math.floor((Date.now() - 3 * 3600e3) / 1000) } }, ...x });
@@ -453,6 +458,7 @@ action('numero.donne', async (nav) => {
   const o = await ouvrir(nav, { url: '/', b });
   try {
     noter('numero.donne', 'apres', await moment(o.pg, 'apres', 'numero.donne', { ms: 20000 }));
+    if (process.env.DEBUG_NUM) console.log('  [debug]', await o.pg.evaluate(() => { try { const f = JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}'); return JSON.stringify({ n: Object.keys(f).length, f: f['7999990001'], jobs: [...document.querySelectorAll('[data-job]')].map((e) => e.getAttribute('data-job')) }); } catch (e) { return String(e); } }));
     await shot(o.pg, 'numero-donne-apres');
   } finally { await o.ctx.close(); }
 });

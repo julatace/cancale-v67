@@ -15390,7 +15390,7 @@ function direNouveauxNumeros(liste) {
     const titre = tr(`nn.notif.${vend}`, { n: l.length });
     const nums = listeNumeros(l.map((x) => x.numero));
     // (15 nov., accompagnement) Le moment « après » du geste (la pilule `numero.donne`), plus un bandeau à part.
-    accompagner('numero.donne', { vars: { mot: titre, numeros: nums } }).fini();
+    accompagner('numero.donne', { vars: { n: l.length, mot: titre, numeros: nums } }).fini();
     alerteLocale(titre, `${nums} · ${tr('nn.notif.geste')}`, '?tab=journee').catch(() => {});
     if (extSait('numerotes') !== 'ok') return;
     const ext = String((__vmrEtat && __vmrEtat.ok && __vmrEtat.ext) || '');

@@ -20,7 +20,7 @@ export default {
   "acc.numero.autre.apres": "Annotato: un altro articolo · riceve un N° nuovo",
   "acc.numero.carton.apres": "N°{numero} annotato per questa scatola",
   "rt.consequence": "Sì: la sua scatola tiene il N°{numero}, niente da scrivere. No: riceve un N° nuovo.",
-  "acc.numero.donne.apres": "{mot} · {numeros} · scrivili sulle loro scatole",
+  "acc.numero.donne.apres": {"one": "{mot} · {numeros} · scrivilo sulla sua scatola", "other": "{mot} · {numeros} · scrivili sulle loro scatole"},
   "acc.numero.demande.apres": {"one": "{n} numero salvato · scrivilo anche sulla sua scatola", "other": "{n} numeri salvati · scrivili anche sulle loro scatole"},
   "acc.numero.reconnu.apres": "{mot} · ripubblicato nell’app Vinted, la scatola non cambia",
 };
