@@ -380,6 +380,8 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
 :root:root:root:root:root body .vrm-main .vrm-achats-barre .vrm-seg.vrm-seg-plein > :is([aria-pressed="true"], .is-actif) {
   background: rgb(255 255 255 / .92) !important; background-image: none !important; color: #0C1D30 !important; box-shadow: 0 1px 2px rgb(8 26 50 / .25) !important;
 }
+/* E-mails : le nombre d'une rubrique (« Codes 143 ») — estompé à 70 %, il tombait à 3,4:1 sur le verre ; plein, au gris. */
+:root:root:root:root:root body .vrm-boite .vrm-boite-rubriques .vrm-boite-n { opacity: 1 !important; color: var(--sb-encre-2) !important; }
 /* Les pastilles ambre (« À retirer » d'Achats, puces des vignettes) : l'ambre du verre — #A65A00 tombait à 3,96:1 sur
    son fond ambre posé sur le verre. */
 :root:root:root:root { --a-ambre-encre: var(--sv-ambre) !important; }
