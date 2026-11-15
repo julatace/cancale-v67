@@ -40,7 +40,9 @@ export function preuvesFriseVc(v, colisFait = null) {
   return {
     vendue: { lu: true, t: v.date || null },
     bordereau: { lu: !!(v.bordereau && v.bordereau.id), t: (v.bordereau && v.bordereau.at) || null },
-    deposee: { lu: !!colisFait || vcVentePartie(v) || fait(e, 'sellerShipment'), t: colisFait || null },
+    // (15 nov.) La preuve d'expédition passe par la règle partagée (`vcVentePartie` ⇐ `expeditionVc`,
+    // l'état le plus frais gagne) : une liste « à expédier » relue APRÈS la frise ne coche pas « Postée ».
+    deposee: { lu: !!colisFait || vcVentePartie(v), t: colisFait || null },
     livree: { lu: ['livree', 'terminee', 'versee'].includes(mot) || fait(e, 'sellerDelivery'), t: null },
     argent: { lu: mot === 'versee' || fait(e, 'sellerPayment'), t: v.verseLe || null },
   };

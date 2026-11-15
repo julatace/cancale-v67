@@ -4,6 +4,7 @@
 // un colis, jamais rattachées seules. Aucun style ajouté (classes existantes).
 // `lire(path)` → tableau | null ; `ecrireLiens(data)` → bool (ligne `vrm_sms_liens`).
 // ══════════════════════════════════════════════════════════════════════════════
+import { aExpedierVc } from '../api/_lib/vestiaire-regle.js';   // (15 nov.) « à expédier » : l'état le plus frais gagne
 import React from 'react';
 import { lignesInfosSms } from './infosSms.js';
 
@@ -35,7 +36,7 @@ export default function InfosSms({ onglet, lire, ecrireLiens, publier = null }) 
     ]);
     if (!Array.isArray(i)) { setEtat(null); return; }
     const ventes = Array.isArray(v) && v[0] && v[0].ventes && typeof v[0].ventes === 'object'
-      ? Object.values(v[0].ventes).filter((x) => x && x.aExpedier && x.productId).map((x) => ({ pid: String(x.productId), titre: x.titre || '' })) : [];
+      ? Object.values(v[0].ventes).filter((x) => x && aExpedierVc(x) && x.productId).map((x) => ({ pid: String(x.productId), titre: x.titre || '' })) : [];
     setEtat({ infos: (i[0] && i[0].infos) || {}, liens: (Array.isArray(l) && l[0] && l[0].liens) || {}, liensLus: Array.isArray(l), ventes });
   }, [lire]);
   React.useEffect(() => { charger(); }, [charger]);

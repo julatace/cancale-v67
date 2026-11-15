@@ -2228,7 +2228,9 @@
     versements: ['date de versement', 'dates de versement', 'date de versement', 'dates de versement', 'f'], messages: ['message', 'messages', 'message', 'messages', 'm'],
     offres: ['offre reçue', 'offres reçues', 'offre', 'offres', 'f'], annonces: ['nouvelle annonce', 'nouvelles annonces', 'annonce', 'annonces', 'f'],
   };
-  const CAPTE_ORDRE = ['ventes', 'achats', 'bordereaux', 'codes', 'versements', 'messages', 'offres', 'annonces'];
+  // 5.379 : « VRM a numéroté · 3 paires » (ou « articles », le profil du vendeur, vrm-mots.js).
+  const nomsNumerotes = () => { const m = (globalThis.VRM_MOTS ? globalThis.VRM_MOTS.mots() : null) || { nom: 'paire', noms: 'paires', e: 'e' }; const e = m.e || ''; return [`${m.nom} numéroté${e}`, `${m.noms} numéroté${e}s`, `${m.nom} numéroté${e}`, `${m.noms} numéroté${e}s`, e ? 'f' : 'm']; };
+  const CAPTE_ORDRE = ['numerotes', 'ventes', 'achats', 'bordereaux', 'codes', 'versements', 'messages', 'offres', 'annonces'];
   const CAPTE_DUREE = 6000;
   let capteMontre = null, capteMinuteur = null, capteEssais = 0, capteDemande = false, capteSurvol = false;
   const nbCapte = (n) => Number(n).toLocaleString('fr-FR');
@@ -2237,14 +2239,16 @@
     let dernier = null;
     for (const s of CAPTE_ORDRE) {
       const n = Number((l.n || {})[s]) || 0;
-      if (!(n > 0) || !CAPTE_NOMS[s]) continue;     // jamais « 0 »
-      const nom = CAPTE_NOMS[s];
+      const nom = s === 'numerotes' ? nomsNumerotes() : CAPTE_NOMS[s];
+      if (!(n > 0) || !nom) continue;     // jamais « 0 »
       parts.push({ s, n, t: `${nbCapte(n)} ${l.relie ? (n > 1 ? nom[3] : nom[2]) : (n > 1 ? nom[1] : nom[0])}` });
       dernier = { n, g: nom[4] };
     }
     if (!parts.length) return null;
     if (l.relie && dernier) parts[parts.length - 1].t += ' ' + (dernier.g === 'f' ? (dernier.n > 1 ? 'lues' : 'lue') : (dernier.n > 1 ? 'lus' : 'lu'));
-    return { titre: l.relie ? 'Compte relié' : 'VRM a capté', ligne: parts.map((p) => p.t).join(' · '), parts };
+    // 5.379 : un lot qui ne porte QUE des N° donnés par VRM se dit « VRM a numéroté ».
+    const titre = l.relie ? 'Compte relié' : parts.every((p) => p.s === 'numerotes') ? 'VRM a numéroté' : 'VRM a capté';
+    return { titre, ligne: parts.map((p) => p.t).join(' · '), parts };
   }
   const INTERACTIF = 'a[href],button,input,select,textarea,summary,label,[role="button"],[role="link"],[role="tab"],[role="menuitem"],[onclick],[tabindex]:not([tabindex="-1"])';
   // Un bouton ou un lien du site sous ce rectangle ? (on regarde SOUS la carte : notre hôte est sauté)

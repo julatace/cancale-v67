@@ -208,7 +208,8 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   dit(/if \(!besoinInfosRelier \|\| !pickerFor/.test(relierEff) && /_txn_\$\{o\.transaction_id\}/.test(relierEff) && /shipment->>status_updated_at/.test(relierEff) && /rows === null\) \{ setInfosRelier\(null\)/.test(relierEff), 'D12 les dates de réception des achats de la feuille sont lues (projection scalaire, « pas su » = null)');
   dit(/recuDu: dateEnAttente \? '' : recuDu, recuAu: dateEnAttente \? '' : recuAu/.test(APP) && /receptionEtat=\{receptionsRelierEtat\} onFiltres=/.test(APP), 'D13 pendant la lecture, le filtre de date attend (il n’écarte rien sur une lecture pas faite)');
   dit(/else toast\('Cet article n’est pas dans ta file « À publier » Leboncoin/.test(APP), 'D14 un article demandé hors de la file Leboncoin : c’est DIT, jamais un écran muet');
-  dit(P.nomCompteVente('vestiaire', { compte: '1234567890' }, {}) === 'n° 1234567890', 'D15 Vestiaire : l’identifiant ENTIER (tronqué, il ressemblerait à un autre numéro)');
+  // (15 nov., Julien) « n° 37451417 » sous chaque vente se lisait comme un n° de vente : le pseudo lu, sinon RIEN.
+  dit(P.nomCompteVente('vestiaire', { compte: '1234567890' }, {}) === '' && P.nomCompteVente('vestiaire', { compte: '1234567890' }, { vestiaire: { 1234567890: 'boutique_x' } }) === 'boutique_x', 'D15 Vestiaire : le pseudo lu, sinon rien (jamais l’identifiant du compte, qui se lit comme un n° de vente)');
 
   console.log(`\n${ko ? '❌' : '✅'} plateformes-logo : ${ok}/${ok + ko}`);
   process.exit(ko ? 1 : 0);

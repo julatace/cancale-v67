@@ -14,6 +14,8 @@
 import React from 'react';
 import { tr, monnaie, localeCourante } from './i18n/index.js';
 import { quandLimite } from './retoursAchat.js';
+import { lienSuivi } from '../api/_lib/suivi-colis.js';   // (15 nov., lot retours-suivi) la page publique du transporteur (adresses attestées)
+import { LogoTransporteur, LogoInconnu } from './PastilleTransporteur.jsx';
 import { BoutonBase } from './composants/Bouton.jsx';
 import './styles-retours.css';
 import { motsVendeur } from './profilVendeur.js';
@@ -53,12 +55,48 @@ export function phraseQuand(c, now = Date.now()) {
 const dateCourte = (iso) => { const t = Date.parse(String(iso || '')); if (!isFinite(t)) return ''; try { return new Date(t).toLocaleDateString(localeCourante(), { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' }); } catch (_) { return ''; } };
 
 // Où en est le retour, en une ligne (la source est PROUVÉE : transporteur lu, remboursement lu, SON clic).
+// (15 nov., lot retours-suivi) L'étape LUE chez le transporteur (son n° exact) dit sa date et sa source.
+const NOMS_TRANSP = { mondialrelay: 'Mondial Relay', chronopost: 'Chronopost', vinted: 'Vinted Go', colissimo: 'Colissimo', laposte: 'La Poste', ups: 'UPS', dpd: 'DPD', gls: 'GLS', relaiscolis: 'Relais Colis', shop2shop: 'Shop2Shop', inpost: 'InPost' };
+export const nomTransp = (cle) => NOMS_TRANSP[String(cle || '').toLowerCase()] || '';
 function phraseEtape(c) {
+  const f = c.faits;
   if (c.etape === 'rembourse') return phraseRemb(c.rembourse);
+  if (f) {
+    const d = dateCourte(f.at), dd = dateCourte(f.deposeAt);
+    if (c.etape === 'recu-vendeur') return d ? tr('renv.fait.livre', { date: d }) : tr('renv.etape.recuVendeur');
+    if (c.etape === 'relais-vendeur') return d ? tr('renv.fait.relais', { date: d }) : tr('renv.etape.enRoute');
+    if (c.etape === 'revient') return d ? tr('renv.fait.revient', { date: d }) : tr('renv.fait.revient', { date: '—' });
+    return dd ? tr('renv.fait.depose', { date: dd }) : tr('renv.etape.enRoute');
+  }
   if (c.etape === 'recu-vendeur') return tr('renv.etape.recuVendeur');
   if (c.etape === 'en-route') return tr('renv.etape.enRoute');
   if (c.etape === 'depose') return tr('renv.etape.depose', { date: dateCourte(c.depose && c.depose.le) });
   return c.pdf ? tr('renv.etape.aDeposer') : '';
+}
+// D'où vient le fait : « lu dans l'e-mail Mondial Relay » / « lu chez Mondial Relay ».
+function sourceFait(c) {
+  const f = c.faits; if (!f) return '';
+  const n = nomTransp(c.transporteur || f.carrier);
+  return f.source === 'email' ? (n ? tr('renv.source.email', { t: n }) : tr('renv.source.emailSans')) : (n ? tr('renv.source.transp', { t: n }) : tr('renv.source.transpSans'));
+}
+
+// Le n° de suivi du retour : le logo du transporteur, le n° (un toucher = copié), « Suivre ↗ » vers la page
+// PUBLIQUE du transporteur (adresse attestée seulement ; une simple recherche n'est jamais proposée).
+function LigneSuiviRetour({ c }) {
+  const [copie, setCopie] = React.useState(false);
+  if (!c.suivi) return null;
+  const cle = String(c.transporteur || (c.faits && c.faits.carrier) || '').toLowerCase();
+  const l = cle ? lienSuivi(cle, c.suivi) : null;
+  const copier = async () => { try { await navigator.clipboard.writeText(c.suivi); setCopie(true); setTimeout(() => setCopie(false), 1600); } catch (_) { setCopie(false); } };
+  return (
+    <div className="vrm-renv-suivi" data-retour-suivi-ligne={c.suivi} data-retour-transporteur={cle || ''}>
+      <span className="vrm-renv-logo" title={nomTransp(cle) || undefined}>{cle ? <LogoTransporteur cle={cle} taille={20} repli={<LogoInconnu taille={20}/>}/> : <LogoInconnu taille={20}/>}</span>
+      <button type="button" className="sb-lien vrm-renv-copier" data-retour-copier={c.suivi} aria-label={tr('renv.copierAria', { n: c.suivi })} onClick={copier}>
+        {copie ? tr('renv.copie') : tr('retours.suivi', { n: c.suivi })}
+      </button>
+      {l && l.site ? <a className="sb-lien vrm-ret-lien" href={l.url} target="_blank" rel="noreferrer" data-retour-suivre={l.url}>{tr('renv.suivre')}</a> : null}
+    </div>
+  );
 }
 
 // Le bouton d'impression : trois états (prêt · préparation · pas imprimé), jamais muet.
@@ -100,29 +138,36 @@ export function CarteRenvoyer({ c, onImprimer, onDepose = null, Photo = null, no
   const etape = phraseEtape(c);
   const meta = [c.num ? tr('retours.numero', { n: c.num }) : '', c.nomCompte ? tr('renv.compte', { c: c.nomCompte }) : '', c.source === 'avis' ? tr('renv.dApresEmail') : ''].filter(Boolean).join(' · ');
   const aDeposer = c.etape === 'a-deposer' || c.etape === 'depose';
+  // La date limite n'est dite que tant qu'il n'est pas déposé (ni noté par lui, ni lu chez le transporteur).
+  const montrerLimite = c.etape === 'a-deposer';
+  const src = sourceFait(c);
   return (
     <article className={'vrm-ret-carte vrm-renv-carte' + (compact ? ' is-compact' : '')} data-cible={attrCible(['retour', c.tx], ['achat', c.tx])} data-retour-achat={c.tx || ''} data-retour-cle={c.cle} data-retour-source={c.source || 'bordereau'}
       data-retour-num={c.num || ''} data-retour-limite={c.limiteIso || ''} data-retour-presse={c.presse ? '1' : '0'} data-retour-etape={c.etape || ''}
       data-retour-pdf={c.pdf ? '1' : '0'} data-retour-rembourse={c.rembourse.etat} data-retour-montant={c.rembourse.montant != null ? String(c.rembourse.montant) : ''}
-      data-retour-relie={c.relie ? '1' : '0'} data-retour-avis={c.avis ? c.avis.id : ''}>
+      data-retour-relie={c.relie ? '1' : '0'} data-retour-avis={c.avis ? c.avis.id : ''} data-retour-fait={c.faits ? c.faits.source : ''} data-retour-suivi={c.suivi || ''}>
       <div className="vrm-ret-haut">
         {ph ? <P src={ph} alt="" loading="lazy" className="vrm-ret-photo" repli={tuile}/> : tuile}
         <div className="vrm-ret-textes">
           <span className="vrm-ret-titre" title={c.titre}>{c.titre || tr('retours.article')}</span>
           {meta ? <span className="vrm-ret-meta">{meta}</span> : null}
-          <span className={'vrm-ret-limite' + (c.presse || (c.depassee && aDeposer) ? ' is-presse' : '')} data-retour-phrase-limite="">{phraseQuand(c, now)}</span>
+          {montrerLimite ? <span className={'vrm-ret-limite' + (c.presse || c.depassee ? ' is-presse' : '')} data-retour-phrase-limite="">{phraseQuand(c, now)}</span> : null}
         </div>
       </div>
       {etape || (c.suivi && c.etape !== 'a-deposer') ? (
         <div className="vrm-ret-lignes">
-          {etape ? <span className={'vrm-ret-ligne' + (c.etape === 'rembourse' ? ' is-ok' : '')} data-retour-phrase-etape={c.etape} data-retour-phrase-remb={c.etape === 'rembourse' ? '' : undefined}>{etape}</span> : null}
-          {c.suivi && c.etape !== 'a-deposer' ? <span className="vrm-ret-ligne" data-retour-suivi={c.suivi} data-retour-suivi-etat={c.statut.etat}>{phraseSuivi(c.statut)}</span> : null}
+          {etape ? <span className={'vrm-ret-ligne' + (c.etape === 'rembourse' || c.faits ? ' is-ok' : '')} data-retour-phrase-etape={c.etape} data-retour-phrase-remb={c.etape === 'rembourse' ? '' : undefined}>{etape}</span> : null}
+          {src ? <span className="vrm-ret-ligne" data-retour-source-fait={c.faits.source}>{src}</span> : null}
+          {c.suivi && !c.faits && c.statut.etat === 'ok' && c.statut.libelle ? <span className="vrm-ret-ligne" data-retour-suivi-etat={c.statut.etat}>{phraseSuivi(c.statut)}</span> : null}
+          {c.suiviPartage ? <span className="vrm-ret-ligne" data-retour-suivi-partage="">{tr('renv.suiviPartage')}</span> : c.faitsPasSu ? <span className="vrm-ret-ligne" data-retour-suivi-pas-su="">{tr('renv.suiviPasLu')}</span> : null}
           {c.etape !== 'rembourse' && c.etape !== 'a-deposer' ? <span className="vrm-ret-ligne" data-retour-phrase-remb="">{phraseRemb(c.rembourse)}</span> : null}
         </div>) : null}
+      <LigneSuiviRetour c={c}/>
       <SansPdf c={c}/>
       <div className="vrm-ret-gestes">
-        {c.pdf && c.etape !== 'rembourse' ? <Imprimer c={c} onImprimer={onImprimer}/> : null}
-        {onDepose && aDeposer && (c.pdf || c.depose) ? (
+        {c.pdf && aDeposer ? <Imprimer c={c} onImprimer={onImprimer}/> : null}
+        {/* « Déposé » : SON geste tant qu'aucun fait du transporteur n'est lu ; un fait lu le remplace. */}
+        {onDepose && aDeposer && !c.faits && (c.pdf || c.depose) ? (
           <button type="button" className="sb-touche" aria-pressed={c.depose ? 'true' : 'false'} data-retour-depose={c.cle} onClick={() => onDepose(c.cle)}>
             {tr('renv.depose')}
           </button>) : null}
