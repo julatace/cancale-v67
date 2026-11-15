@@ -617,22 +617,40 @@
   // site. Pendant que des messages partent depuis cet onglet, un lien s'ouvre dans un
   // NOUVEL onglet du même site (l'envoi garde le sien).
   const ORIGINE_ICI = (() => { try { return String(location.origin || ''); } catch (_) { return ''; } })();
+  // 5.379 (capture « Page not found ») : la carte n'affiche un lien que si son chemin est
+  // ATTESTÉ — une page que l'app ou l'extension ouvre ou lit déjà, servie par le site :
+  //   Vinted    `/inbox` (conversations, ouvertes par l'app), `/member/{id}` (Réglages →
+  //             « Ouvrir ») — l'id du compte de l'onglet, sinon pas de lien ;
+  //   Leboncoin `/compte/part/mes-annonces`, `/compte/part/mes-transactions` (pages lues par
+  //             l'extension), `/messages` ;  eBay `/sh/lst/active`, `/sh/ord` (Seller Hub).
+  // `/my_orders/sold` n'a JAMAIS été vue chez Vinted (404) : elle ne passe plus.
+  const CHEMINS_ATTESTES = {
+    vinted: [/^\/inbox$/, /^\/member\/[1-9]\d{0,19}$/],
+    leboncoin: [/^\/compte\/part\/mes-annonces$/, /^\/compte\/part\/mes-transactions$/, /^\/messages$/],
+    ebay: [/^\/sh\/lst\/active$/, /^\/sh\/ord$/],
+  };
+  const cheminAtteste = (plateforme, u) => !u.search && !u.hash && (CHEMINS_ATTESTES[plateforme] || []).some((re) => re.test(u.pathname));
   function liensHtml(e, nouvelOnglet) {
-    const l = Array.isArray(e && e.liens) ? e.liens.filter((x) => { try { const u = new URL(x.url); return u.protocol === 'https:' && u.origin === ORIGINE_ICI; } catch (_) { return false; } }) : [];
+    const l = Array.isArray(e && e.liens) ? e.liens.filter((x) => { try { const u = new URL(x.url); return u.protocol === 'https:' && u.origin === ORIGINE_ICI && cheminAtteste(e.plateforme, u); } catch (_) { return false; } }) : [];
     if (!l.length) return '';
     return `<nav class="liens" data-liens aria-label="Sur ${esc(NOM_SITE[e.plateforme] || 'ce site')}">`
       + l.map((x) => `<a class="lien-site" data-lien-site="${esc(x.cle)}" href="${esc(x.url)}" target="${nouvelOnglet ? '_blank' : '_top'}"${nouvelOnglet ? ' rel="noopener"' : ''}><span>${esc(x.libelle)}</span><i aria-hidden="true"></i></a>`).join('')
       + '</nav>';
   }
 
-  // ══ 5.376 : LES MESSAGES AUX FAVORIS, LANCÉS D'ICI ═════════════════════════════
+  // ══ 5.376 / 5.379 : LES MESSAGES AUX FAVORIS, LANCÉS D'ICI ═══════════════════════
   // « Comme ça on peut lancer les messages aux favoris directement quand on est sur le
   // compte. » Tout vient du service worker : l'aperçu (calculé par VRM avec les règles
-  // de l'app), la file en cours (`vrmFavorisCarte`). Rien ne part sans « Lancer ».
-  let vueFav = null, apercuFav = null, favErreur = '', favOccupe = false, aideFav = false, minuteurFav = null;
+  // de l'app), la file en cours (`vrmFavorisCarte`). Rien ne part sans SON clic.
+  // 5.379 (Julien, 15 nov., capture : « Favoris » n'affichait qu'une phrase) : l'onglet
+  // Favoris MONTRE la liste dès qu'elle est lue — du plus récent au plus ancien, photo,
+  // article, qui, quand — et dit ce qui manque pour écrire, avec le geste (« Écris
+  // d'abord ton message dans VRM › »). Plus d'étape « Voir » : la liste est là.
+  let vueFav = null, apercuFav = null, apercuFavAt = 0, favEnVol = false, favErreur = '', favOccupe = false, aideFav = false, minuteurFav = null;
   // 5.377 : ce qu'il a coché (identifiants de l'aperçu), du plus récent au plus ancien.
-  let selFav = new Set();
-  function listeFavTriee(a) { return a && Array.isArray(a.liste) ? a.liste.map((x, i) => [x, i]).sort((p, q) => ((Date.parse(q[0].date || '') || 0) - (Date.parse(p[0].date || '') || 0)) || (p[1] - q[1])).map((p) => p[0]) : []; }
+  let selFav = new Set(), selFavIds = '';
+  const triFav = (l) => (Array.isArray(l) ? l.map((x, i) => [x, i]).sort((p, q) => ((Date.parse(q[0].date || '') || 0) - (Date.parse(p[0].date || '') || 0)) || (p[1] - q[1])).map((p) => p[0]) : []);
+  function listeFavTriee(a) { return triFav(a && a.liste); }
   const photoFav = (u) => (u && /^https:\/\/[\w.-]*vinted\.net\//.test(String(u)) ? `<img class="vig" src="${esc(u)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : '<span class="vig" aria-hidden="true"></span>');
   const ATTENTES_FAV = {
     tout_arrete: '« Tout arrêter » est posé : rien ne part. Touche « Reprendre » dans Détails.',
@@ -642,19 +660,26 @@
     onglet: 'Aucun onglet Vinted ouvert sur ce compte : rien ne part. Garde un onglet Vinted ouvert.',
     vrm: 'VRM ne répond pas pour l’instant : rien ne part. Ça reprend tout seul.',
   };
+  // L'écran de VRM où s'écrit le message aux favoris (Messages → Favoris) : la MÊME adresse
+  // que l'app reconnaît (`tab=messages&vue=favoris`), dans un NOUVEL onglet — l'onglet Vinted
+  // reste où il est. Le seul lien de la carte vers VRM, et seulement quand le message manque.
+  const ECRIRE_MESSAGE_URL = 'https://vrm.center/?tab=messages&vue=favoris';
   const BLOCAGES_FAV = {
-    reglages: 'Écris ton message une seule fois dans VRM (Messages → Favoris → Ton message). Ensuite, tout se lance d’ici.',
-    favoris_absents: 'Ouvre la cloche de Vinted une fois : VRM y lit qui a mis tes articles en favori.',
-    dressing_absent: 'Ouvre ton dressing une fois : VRM vérifie que chaque article est encore en vente.',
-    dressing_ancien: 'Ton dressing a été lu il y a plus de 24 h : ouvre-le une fois pour que VRM revérifie tes articles.',
-    dressing_partiel: 'Ton dressing n’a pas été lu en entier : fais-le défiler jusqu’en bas une fois.',
+    reglages: 'Pour leur écrire d’ici, écris ton message une fois pour ce compte (Messages → Favoris → Ton message).',
+    favoris_absents: 'Ouvre une fois ta cloche Vinted (tes notifications) : VRM y lit qui a mis tes articles en favori.',
+    dressing_absent: 'Pour leur écrire, ouvre une fois ton dressing : VRM vérifie que chaque article est encore en vente.',
+    dressing_ancien: 'Pour leur écrire, ouvre une fois ton dressing (lu il y a plus de 24 h) : VRM revérifie tes articles.',
+    dressing_partiel: 'Pour leur écrire, fais défiler ton dressing jusqu’en bas une fois : VRM ne l’a pas lu en entier.',
   };
-  const eurosFav = (n) => { const x = Number(n); if (!isFinite(x) || x <= 0) return ''; const c = Math.round(x * 100); return (c % 100 ? (c / 100).toFixed(2).replace('.', ',') : String(c / 100)) + ' €'; };
+  const ETAT_FAV = { envoye: 'déjà écrit', en_cours: 'message en cours', a_verifier: 'à vérifier sur Vinted', pas_envoye: 'pas envoyé' };
+  const eurosFav = (n) => { const x = Number(n); if (!isFinite(x) || x <= 0) return ''; const c = Math.round(x * 100); return (c % 100 ? (c / 100).toFixed(2).replace('.', ',') : String(c / 100)) + ' €'; };
   const dansFav = (t) => { const s = Math.max(0, Math.round((Number(t) - Date.now()) / 1000)); if (s < 60) return s + ' s'; const m = Math.round(s / 60); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0'); };
   const plurielFav = (n, un, plusieurs) => `${Number(n).toLocaleString('fr-FR')} ${Number(n) > 1 ? plusieurs : un}`;
-  function favorisHtml(e) {
+  const fileFavActive = (e) => !!(e && e.site && e.site.favoris && e.site.favoris.file && e.site.favoris.file.actif);
+  // La file en cours (ou finie depuis moins de 6 h) : ce qui part, d'ici.
+  function favorisFileHtml(e) {
     if (!e || e.plateforme !== 'vinted' || !e.site || !e.site.id || !e.site.favoris) return '';
-    const f = e.site.favoris, st = f.file, ap = f.apercu;
+    const st = e.site.favoris.file;
     if (st && st.actif) {
       const fi = st.file || {}, total = Number(fi.total) || Number(st.total) || 0, faits = Number(fi.envoyes) || 0;
       const pas = (Number(fi.refuses) || 0) + (Number(fi.ignores) || 0) + (Number(fi.incertains) || 0);
@@ -684,74 +709,102 @@
         <div class="outils"><button class="lien" data-fav-ok>OK</button></div>
       </section>`;
     }
-    if (ap && ap.etat === 'pret' && Number(ap.total) > 0) {
-      const n = Number(ap.total);
-      return `<section class="fav" data-fav="pret" data-fav-n="${n}"><button class="fav-ligne" data-fav-voir><span><b>${plurielFav(n, 'favori', 'favoris')}</b> à qui écrire</span><span class="fav-go">Voir</span></button></section>`;
-    }
-    if (ap && ap.etat === 'bloque' && BLOCAGES_FAV[ap.raison]) return `<section class="fav" data-fav="bloque" data-fav-raison="${esc(ap.raison)}"><div class="fav-t">Messages aux favoris</div><div class="val gris">${esc(BLOCAGES_FAV[ap.raison])}</div></section>`;
-    if (ap && ap.etat === 'rien') return `<section class="fav" data-fav="rien"><div class="fav-t">Messages aux favoris</div><div class="val gris">Personne à qui écrire pour l’instant.</div></section>`;
-    return `<section class="fav" data-fav="inconnu"><button class="fav-ligne" data-fav-voir><span>Messages aux favoris</span><span class="fav-go">Voir</span></button></section>`;
+    return '';
   }
-  function apercuHtml(e) {
+  // Les favoris LUS (lecture seule) : photo, article, qui · quand, où il en est.
+  const ligneFavLu = (x) => {
+    const etatT = ETAT_FAV[x.etat] || '';
+    const quand = x.date ? depuis(Date.parse(x.date)) : '';
+    return `<li class="rang" data-fav-qui="${esc(x.id)}"${x.date ? ` data-fav-date="${esc(x.date)}"` : ''} data-fav-etat="${esc(x.etat || '')}">${photoFav(x.photo)}<span class="mil"><span class="ti">${esc(x.titre || 'Article')}</span><span class="me">${esc(x.pseudo || 'Un acheteur')}${quand ? ' · ' + esc(quand) : ''}${etatT ? ' · ' + esc(etatT) : ''}</span></span></li>`;
+  };
+  const gesteEcrire = () => `<div class="ecrire" data-fav-ecrire-bloc><div class="val gris">${esc(BLOCAGES_FAV.reglages)}</div><a class="lien-site lien-vrm" data-fav-ecrire href="${ECRIRE_MESSAGE_URL}" target="_blank" rel="noopener"><span>Écris d’abord ton message dans VRM</span><i aria-hidden="true"></i></a></div>`;
+  // L'onglet Favoris de la carte (compte de l'onglet, Vinted).
+  function favorisOngletHtml(e) {
+    if (!e || e.plateforme !== 'vinted' || !e.site || !e.site.id) return '';
+    const file = favorisFileHtml(e);
+    if (file) return file;
     const a = apercuFav;
-    const tete = `<div class="ap-tete"><button class="ap-retour" data-fav-retour aria-label="Retour">‹</button><b>Messages aux favoris</b><button class="ap-aide-b" data-fav-aide aria-expanded="${aideFav ? 'true' : 'false'}" aria-label="Comment ça marche ?">?</button></div>`;
-    const aide = aideFav ? `<ol class="ap-aide" data-fav-aide-texte>
-        <li>Pour chaque personne, VRM ouvre la conversation sur Vinted${a && a.message && a.message.offre ? ', fait l’offre' : ''}, prend le temps d’écrire, puis envoie le message.</li>
-        <li>15 messages par heure au plus sur ce compte. Une pause de Vinted, un autre compte dans l’onglet ou une vérification de Vinted arrête tout, et c’est dit ici.</li>
-        <li>Garde cet onglet Vinted ouvert. Tu peux tout arrêter à tout moment, ici.</li></ol>` : '';
-    if (!a) return `${tete}${aide}<div class="val gris" role="status" data-fav-charge>${favErreur ? '' : 'Je regarde qui a mis tes articles en favori…'}</div>${favErreur ? `<div class="err" role="alert">${esc(favErreur)}</div><button class="b sec" data-fav-retour>Retour</button>` : ''}`;
-    if (a.etat !== 'pret') {
-      const t = a.etat === 'encours' ? 'Des messages partent déjà sur ce compte (depuis VRM ou une autre carte). Attends la fin avant d’en lancer d’autres.'
-        : a.etat === 'bloque' ? (BLOCAGES_FAV[a.raison] || 'VRM ne peut pas préparer les messages pour l’instant.')
-        : 'Personne à qui écrire pour l’instant : chaque favori a déjà reçu un message, ou son article n’est plus en vente.';
-      return `${tete}${aide}<div class="val" data-fav-apercu="${esc(a.etat)}">${esc(t)}</div>${a.nonProuves ? `<div class="val gris">${plurielFav(a.nonProuves, 'favori attend', 'favoris attendent')} : ouvre un de leurs favoris depuis la cloche de Vinted pour que VRM sache à qui écrire.</div>` : ''}<button class="b sec" data-fav-retour>Retour</button>`;
-    }
+    if (!a && favErreur) return `<section class="fav" data-fav="erreur"><div class="val gris" role="status" data-fav-erreur>Tes favoris n’ont pas pu être lus : ${esc(favErreur)}</div><button class="b sec" data-fav-relire>Réessayer</button></section>`;
+    if (!a) return '<section class="fav" data-fav="charge"><div class="val gris" role="status" data-fav-charge>Je lis tes favoris…</div></section>';
+    if (a.etat === 'pret' && Array.isArray(a.liste) && a.liste.length) return pretFavHtml(a);
+    if (a.etat === 'encours') return '<section class="fav" data-fav="encours-ailleurs"><div class="val" data-fav-apercu="encours">Des messages partent déjà sur ce compte (depuis VRM ou une autre carte). Attends la fin avant d’en lancer d’autres.</div></section>';
+    const lus = triFav(a.lus), total = Number(a.totalLus) || lus.length;
+    const tete = lus.length ? `<div class="lu" data-fav-lus-n="${total}">${plurielFav(total, 'favori lu', 'favoris lus')} · du plus récent au plus ancien</div>` : '';
+    const liste = lus.length ? `<ul class="rangs" data-fav-lus="${lus.length}" data-defil="fav-lus">${lus.map(ligneFavLu).join('')}</ul>${total > lus.length ? `<div class="val gris">Les ${lus.length} plus récents sur ${total.toLocaleString('fr-FR')}.</div>` : ''}` : '';
+    let geste;
+    if (a.etat === 'bloque' && a.raison === 'reglages') geste = gesteEcrire();
+    else if (a.etat === 'bloque' && a.raison === 'favoris_absents') geste = `<div class="val gris" data-fav-pas-su>${esc(BLOCAGES_FAV.favoris_absents)}</div>${a.sansMessage ? gesteEcrire() : ''}`;
+    else if (a.etat === 'bloque') geste = `<div class="val gris">${esc(BLOCAGES_FAV[a.raison] || 'VRM ne peut pas préparer les messages pour l’instant.')}</div>`;
+    else geste = `<div class="val gris" data-fav-rien>Personne à qui écrire pour l’instant : chaque favori a déjà reçu un message, ou son article n’est plus en vente.</div>${a.nonProuves ? `<div class="val gris">${plurielFav(a.nonProuves, 'favori attend', 'favoris attendent')} : ouvre un de leurs favoris depuis la cloche de Vinted pour que VRM sache à qui écrire.</div>` : ''}`;
+    return `<section class="fav" data-fav="${esc(a.etat || '')}"${a.raison ? ` data-fav-raison="${esc(a.raison)}"` : ''}>${tete}${liste}${geste}</section>`;
+  }
+  // Prêt : la liste à cocher (la rangée entière), le message, l'offre, UN bouton plein.
+  function pretFavHtml(a) {
     const triee = listeFavTriee(a), n = triee.filter((x) => selFav.has(x.id)).length, m = a.message || {}, premier = triee[0];
     const rythme = Number(m.intervalleMinutes) === 0 ? 'quelques secondes d’écart' : m.intervalleMaxMinutes ? `${m.intervalleMinutes} à ${m.intervalleMaxMinutes} min d’écart` : `${m.intervalleMinutes} min d’écart`;
-    const offreTxt = m.offre ? (m.offre.mode === 'pct' ? `−${m.offre.valeur} %` : m.offre.mode === 'euros' ? `−${eurosFav(m.offre.valeur)}` : `à ${eurosFav(m.offre.valeur)}`) + (m.offre.arrondi ? ', arrondie à l’euro' : '') : '';
-    return `${tete}${aide}
-      <p class="ap-phrase">VRM va écrire à ${n > 1 ? `ces ${n} personnes, une par une` : n === 1 ? 'cette personne' : 'celles que tu coches'}, depuis cet onglet. Rien ne part avant «\u00a0Envoyer le message\u00a0».</p>
+    const offreTxt = m.offre ? (m.offre.mode === 'pct' ? `−${m.offre.valeur} %` : m.offre.mode === 'euros' ? `−${eurosFav(m.offre.valeur)}` : `à ${eurosFav(m.offre.valeur)}`) + (m.offre.arrondi ? ', arrondie à l’euro' : '') : '';
+    const aide = aideFav ? `<ol class="ap-aide" data-fav-aide-texte>
+        <li>Pour chaque personne, VRM ouvre la conversation sur Vinted${m.offre ? ', fait l’offre' : ''}, prend le temps d’écrire, puis envoie le message.</li>
+        <li>15 messages par heure au plus sur ce compte. Une pause de Vinted, un autre compte dans l’onglet ou une vérification de Vinted arrête tout, et c’est dit ici.</li>
+        <li>Garde cet onglet Vinted ouvert. Tu peux tout arrêter à tout moment, ici.</li></ol>` : '';
+    return `<section class="fav apercu" data-fav="pret" data-fav-n="${Number(a.total) || triee.length}" data-fav-vue="apercu">
+      <div class="ap-tout"><span class="lu" data-fav-coches="${n}">${n} coché${n > 1 ? 's' : ''} sur ${triee.length} · du plus récent au plus ancien</span><button class="lien" data-fav-tout="${n === triee.length ? 'aucun' : 'tous'}">${n === triee.length ? 'Tout décocher' : 'Tout cocher'}</button></div>
+      <ul class="ap-liste" data-fav-liste="${triee.length}" data-defil="fav">${triee.map((x) => `<li class="coche-l" data-fav-qui="${esc(x.id)}"${x.date ? ` data-fav-date="${esc(x.date)}"` : ''}><input type="checkbox" data-fav-coche="${esc(x.id)}"${selFav.has(x.id) ? ' checked' : ''} aria-label="Écrire à ${esc(x.pseudo || 'cet acheteur')}">${photoFav(x.photo)}<span class="quoi">${esc(x.titre || 'Article')}</span><span class="qui">${esc(x.pseudo || 'Un acheteur')}${x.date ? ` <span class="quand">· ${esc(depuis(Date.parse(x.date)))}</span>` : ''}</span><span class="px">${x.offre != null ? `<s>${esc(eurosFav(x.prix))}</s> ${esc(eurosFav(x.offre))}` : esc(eurosFav(x.prix))}</span></li>`).join('')}</ul>
+      ${Number(a.total) > triee.length ? `<div class="val gris" data-fav-reste="${Number(a.total) - triee.length}">Les ${triee.length} plus récents d’abord ; les ${Number(a.total) - triee.length} autres, relance après.</div>` : ''}
+      ${a.nonProuves ? `<div class="val gris" data-fav-non-prouves="${Number(a.nonProuves)}">${plurielFav(a.nonProuves, 'autre en attente', 'autres en attente')} : ouvre un favori depuis la cloche de Vinted, VRM saura à qui écrire.</div>` : ''}
       <div class="ap-lbl">Le message${Number(m.versions) > 1 ? ` · une de tes ${Number(m.versions)} versions, au hasard` : ''}</div>
       <div class="bulle" data-fav-message>${esc(premier.texte)}</div>
       ${m.offre ? `<div class="ap-lbl" data-fav-offre="${esc(m.offre.mode)}">Avec une offre ${esc(offreTxt)}</div>` : '<div class="ap-lbl" data-fav-offre="aucune">Sans offre de prix</div>'}
-      <div class="ap-tout"><span class="ap-lbl" data-fav-coches="${n}">${n} coché${n > 1 ? 's' : ''} sur ${triee.length} · du plus récent au plus ancien</span><button class="lien" data-fav-tout="${n === triee.length ? 'aucun' : 'tous'}">${n === triee.length ? 'Tout décocher' : 'Tout cocher'}</button></div>
-      <ul class="ap-liste" data-fav-liste="${triee.length}">${triee.map((x) => `<li class="coche-l" data-fav-qui="${esc(x.id)}"${x.date ? ` data-fav-date="${esc(x.date)}"` : ''}><input type="checkbox" data-fav-coche="${esc(x.id)}"${selFav.has(x.id) ? ' checked' : ''} aria-label="Écrire à ${esc(x.pseudo || 'cet acheteur')}">${photoFav(x.photo)}<span class="qui">${esc(x.pseudo || 'Un acheteur')}${x.date ? ` <span class="quand">· ${esc(depuis(Date.parse(x.date)))}</span>` : ''}</span><span class="quoi">${esc(x.titre || 'Article')}</span><span class="px">${x.offre != null ? `<s>${esc(eurosFav(x.prix))}</s> ${esc(eurosFav(x.offre))}` : esc(eurosFav(x.prix))}</span></li>`).join('')}</ul>
       <div class="val gris" data-fav-rythme>Écrit pour chacun · ${esc(rythme)} · 15 par heure au plus.</div>
-      ${Number(a.total) > n ? `<div class="val gris" data-fav-reste="${Number(a.total) - n}">Les ${n} plus récents d’abord ; les ${Number(a.total) - n} autres, relance après.</div>` : ''}
-      ${a.nonProuves ? `<div class="val gris" data-fav-non-prouves="${Number(a.nonProuves)}">${plurielFav(a.nonProuves, 'autre en attente', 'autres en attente')} : ouvre un favori depuis la cloche de Vinted, VRM saura à qui écrire.</div>` : ''}
       ${a.ventesAilleurs === 'pas_su' ? '<div class="val alerte" data-fav-ailleurs>Tes ventes sur les autres sites n’ont pas été revérifiées récemment : assure-toi que ces articles ne sont pas vendus ailleurs.</div>' : ''}
+      <p class="ap-phrase">VRM va écrire à ${n > 1 ? `ces ${n} personnes, une par une` : n === 1 ? 'cette personne' : 'celles que tu coches'}, depuis cet onglet. Rien ne part avant « Envoyer le message ».</p>
       ${favErreur ? `<div class="err" role="alert">${esc(favErreur)}</div>` : ''}
       ${n ? '' : '<div class="val gris" data-fav-aucun>Coche au moins une personne pour envoyer le message.</div>'}
       <button class="b" data-fav-lancer${favOccupe || !n ? ' disabled' : ''}>${favOccupe ? 'Envoi…' : `Envoyer le message (${n})`}</button>
-      <button class="b sec" data-fav-retour>Pas maintenant</button>`;
+      <div class="outils"><button class="lien" data-fav-aide aria-expanded="${aideFav ? 'true' : 'false'}">Comment ça marche ?</button></div>${aide}
+    </section>`;
+  }
+  // L'aperçu est demandé à VRM (jamais à Vinted : aucune action, aucune lecture Vinted),
+  // gardé une minute ; une erreur se redemande au plus une fois par minute (ou « Réessayer »).
+  function chargerFavoris(e, force) {
+    if (LISTES || favEnVol || !vivant()) return;
+    const uid = e && e.site && e.site.id ? String(e.site.id) : '';
+    if (!uid || e.plateforme !== 'vinted' || fileFavActive(e)) return;
+    if (!force && Date.now() - apercuFavAt < 60000 && (apercuFav || favErreur)) return;
+    favEnVol = true;
+    try {
+      chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'favorisCarte', quoi: 'apercu', uid }, (r) => {
+        void chrome.runtime.lastError;
+        favEnVol = false; apercuFavAt = Date.now();
+        if (r && r.ok && r.apercu) {
+          apercuFav = r.apercu; favErreur = '';
+          const ids = listeFavTriee(r.apercu).map((x) => x.id).join(',');
+          if (ids !== selFavIds) { selFavIds = ids; selFav = new Set(Array.isArray(r.apercu.selection) ? r.apercu.selection : (r.apercu.liste || []).map((x) => x.id)); }
+        } else { apercuFav = null; favErreur = (r && r.raison) || 'l’extension n’a pas répondu.'; }
+        if (carte.classList.contains('on')) rendre();
+      });
+    } catch (_) { favEnVol = false; }
   }
   function brancherFavoris(e) {
     const uid = e && e.site && e.site.id ? String(e.site.id) : '';
     const demander = (quoi, extra, fin) => {
       try { chrome.runtime.sendMessage(Object.assign({ from: 'vrm-badge', action: 'favorisCarte', quoi, uid }, extra || {}), (r) => { void chrome.runtime.lastError; fin(r || null); }); } catch (_) { fin(null); }
     };
-    carte.querySelectorAll('[data-fav-voir]').forEach((el) => el.addEventListener('click', () => {
-      vueFav = 'apercu'; apercuFav = null; favErreur = ''; favOccupe = true; doigt = true; rendre();
-      demander('apercu', null, (r) => {
-        favOccupe = false;
-        if (r && r.ok && r.apercu) { apercuFav = r.apercu; selFav = new Set(Array.isArray(r.apercu.selection) ? r.apercu.selection : (r.apercu.liste || []).map((x) => x.id)); } else favErreur = (r && r.raison) || 'L’extension n’a pas répondu. Réessaie.';
-        rendre();
-      });
-    }));
-    carte.querySelectorAll('[data-fav-retour]').forEach((el) => el.addEventListener('click', () => { vueFav = null; apercuFav = null; favErreur = ''; rafraichir(); }));
+    const relire = carte.querySelector('[data-fav-relire]');
+    if (relire) relire.addEventListener('click', () => { favErreur = ''; apercuFav = null; rendre(); chargerFavoris(e, true); });
     const aideB = carte.querySelector('[data-fav-aide]');
     if (aideB) aideB.addEventListener('click', () => { aideFav = !aideFav; rendre(); });
     const lancer = carte.querySelector('[data-fav-lancer]');
     if (lancer) lancer.addEventListener('click', () => {
       const a = apercuFav;
       if (!a || a.etat !== 'pret' || favOccupe) return;
-      favOccupe = true; favErreur = ''; rendre();
-      // SON clic : ce qu'IL a coché dans l'aperçu montré (du plus récent au plus ancien), `confirme` posé ici seulement.
+      // SON clic : ce qu'IL a coché dans la liste montrée (du plus récent au plus ancien), `confirme` posé ici seulement.
       const selection = listeFavTriee(a).map((x) => x.id).filter((id) => selFav.has(id));
       if (!selection.length) return;
+      favOccupe = true; favErreur = ''; rendre();
       demander('lancer', { selection, reglages: a.reglages, confirme: true }, (r) => {
         favOccupe = false;
-        if (r && r.ok) { vueFav = null; apercuFav = null; rafraichir(); return; }
+        if (r && r.ok) { apercuFav = null; apercuFavAt = 0; rafraichir(); return; }
         favErreur = (r && r.raison) || 'Rien n’est parti : l’extension n’a pas répondu.';
         rendre();
       });
@@ -763,7 +816,7 @@
     const arreter = carte.querySelector('[data-fav-arreter]');
     if (arreter) arreter.addEventListener('click', () => { arreter.disabled = true; arreter.textContent = 'Arrêt…'; demander('arreter', null, () => rafraichir()); });
     const okB = carte.querySelector('[data-fav-ok]');
-    if (okB) okB.addEventListener('click', () => demander('oublier', null, () => rafraichir()));
+    if (okB) okB.addEventListener('click', () => demander('oublier', null, () => { apercuFav = null; apercuFavAt = 0; rafraichir(); }));
     // « prochain dans … » suit l'horloge tant que la carte est ouverte (aucune requête).
     clearInterval(minuteurFav); minuteurFav = null;
     const dans = carte.querySelector('[data-fav-dans]');
@@ -801,7 +854,13 @@
     } catch (_) { listesEnVol = false; }
   }
   const vignette = (u) => (u && /^https:\/\/[\w.-]*vinted\.net\//.test(u) ? `<img class="vig" src="${esc(u)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : '<span class="vig" aria-hidden="true"></span>');
-  const plaque = (n) => (n ? `<span class="plaque" data-num="${esc(n)}"><i>N°</i>${esc(n)}</span>` : '<span class="plaque vide" aria-label="sans N°">—</span>');
+  // 5.379 (capture de Julien : une case « — » au début de chaque vente) : la plaque N° ne
+  // s'affiche que quand le N° est CONNU (par identité d'annonce, `carteListes`) ; une liste
+  // où aucune ligne n'a de N° n'a pas de colonne N° ; une ligne sans N° dans une liste qui
+  // en a garde la place vide (rien d'écrit, rien de lu à l'écran).
+  const plaque = (n) => (n ? `<span class="plaque" data-num="${esc(n)}"><i>N°</i>${esc(n)}</span>` : '');
+  const debutN = (avecN, n) => (avecN ? (n ? plaque(n) : '<span class="sans-n" aria-hidden="true"></span>') : '');
+  const nbVentes = (n) => `${Number(n).toLocaleString('fr-FR')} ${Number(n) > 1 ? 'ventes' : 'vente'}`;
   function annoncesHtml(e) {
     if (listesErreur) return `<div class="val gris" role="status">${esc(listesErreur)}</div>`;
     if (!listes) return '<div class="val gris" role="status" data-listes-charge>Je lis tes annonces…</div>';
@@ -810,7 +869,8 @@
     const ici = ORIGINE_ICI && !LISTES ? ORIGINE_ICI : 'https://www.vinted.fr';
     const tete = `<div class="lu" data-annonces-lu="${a.lu || ''}">${a.aConfirmer ? `À confirmer · lues ${esc(depuis(a.lu) || 'il y a longtemps')}` : `${Number(a.total).toLocaleString('fr-FR')} en ligne · lues ${esc(depuis(a.lu) || '')}`}${a.relecture ? ' · relecture en cours' : ''}</div>`;
     if (!a.liste.length) return tete + '<div class="val gris" data-annonces="0">Aucune annonce en ligne dans la dernière lecture de ton dressing.</div>';
-    return tete + `<ul class="rangs" data-annonces="${a.liste.length}">${a.liste.map((x) => `<li><a class="rang" data-annonce="${esc(x.id)}" href="${esc(ici + '/items/' + encodeURIComponent(x.id))}" target="${LISTES ? '_blank' : '_top'}"${LISTES ? ' rel="noopener"' : ''}>${plaque(x.num)}${vignette(x.photo)}<span class="mil"><span class="ti">${esc(x.titre || 'Annonce')}</span><span class="me">${x.jours != null ? `en ligne depuis ${x.jours} j` : 'date pas lue'}${x.favoris != null ? ` · ${x.favoris} ♥` : ''}${a.aConfirmer ? ' · à confirmer' : ''}</span></span><span class="px">${esc(eurosL(x.prix))}</span></a></li>`).join('')}</ul>`
+    const avecN = a.liste.some((x) => x.num);
+    return tete + `<ul class="rangs${avecN ? ' avec-n' : ''}" data-annonces="${a.liste.length}" data-defil="annonces">${a.liste.map((x) => `<li><a class="rang" data-annonce="${esc(x.id)}" href="${esc(ici + '/items/' + encodeURIComponent(x.id))}" target="${LISTES ? '_blank' : '_top'}"${LISTES ? ' rel="noopener"' : ''}>${debutN(avecN, x.num)}${vignette(x.photo)}<span class="mil"><span class="ti">${esc(x.titre || 'Annonce')}</span><span class="me">${x.jours != null ? `en ligne depuis ${x.jours} j` : 'date pas lue'}${x.favoris != null ? ` · ${x.favoris} ♥` : ''}${a.aConfirmer ? ' · à confirmer' : ''}</span></span><span class="px">${esc(eurosL(x.prix))}</span></a></li>`).join('')}</ul>`
       + (a.total > a.liste.length ? `<div class="val gris">Les ${a.liste.length} plus récentes · ${Number(a.total).toLocaleString('fr-FR')} en tout.</div>` : '');
   }
   function ventesHtml(e) {
@@ -818,9 +878,16 @@
     if (!listes) return '<div class="val gris" role="status" data-listes-charge>Je lis tes ventes…</div>';
     const v = listes.ventes;
     if (!v) return '<div class="val gris" data-ventes="pas_su">Tes ventes n’ont pas pu être lues pour l’instant : rien n’est affiché plutôt qu’une liste fausse.</div>';
-    if (!v.liste.length) return '<div class="val gris" data-ventes="0">Aucune vente lue sur ce compte pour l’instant. Ouvre « Mes ventes » sur Vinted une fois.</div>';
-    const tete = `<div class="lu">${Number(v.total || v.liste.length).toLocaleString('fr-FR')} ventes · lues ${esc(depuis(v.lu) || '')}</div>`;
-    return tete + `<ul class="rangs" data-ventes="${v.liste.length}">${v.liste.map((x) => `<li class="rang" data-vente="${esc(x.tx)}" data-vente-etat="${esc(x.etat)}"${x.bordereau != null ? ` data-bordereau="${x.bordereau ? 'pret' : 'manque'}"` : ''}>${plaque(x.num)}${vignette(x.photo)}<span class="mil"><span class="ti">${esc(x.titre || 'Vente')}</span><span class="me"><span class="${x.etat === 'a_expedier' ? 'ambre' : ''}">${esc(ETAT_VENTE[x.etat] || '—')}</span>${x.bordereau === true ? ' · bordereau prêt' : x.bordereau === false ? ' · bordereau pas encore là' : ''}${x.date ? ' · ' + esc(depuis(x.date)) : ''}</span></span><span class="px">${esc(eurosL(x.prix))}</span></li>`).join('')}</ul>`;
+    if (!v.liste.length) return '<div class="val gris" data-ventes="0">Aucune vente lue sur ce compte pour l’instant : ouvre une fois la page de tes ventes sur Vinted.</div>';
+    const lu = depuis(v.lu);
+    const tete = `<div class="lu" data-ventes-total="${Number(v.total || v.liste.length)}">${nbVentes(v.total || v.liste.length)}${lu ? ' · lues ' + esc(lu) : ''}</div>`;
+    const ici = ORIGINE_ICI && !LISTES ? ORIGINE_ICI : 'https://www.vinted.fr';
+    const avecN = v.liste.some((x) => x.num);
+    const corps = (x) => `${debutN(avecN, x.num)}${vignette(x.photo)}<span class="mil"><span class="ti">${esc(x.titre || 'Vente')}</span><span class="me"><span class="${x.etat === 'a_expedier' ? 'ambre' : ''}">${esc(ETAT_VENTE[x.etat] || 'état pas encore lu')}</span>${x.bordereau === true ? ' · bordereau prêt' : x.bordereau === false ? ' · bordereau pas encore là' : ''}${x.date ? ' · ' + esc(depuis(x.date)) : ''}</span></span><span class="px">${esc(eurosL(x.prix))}</span>`;
+    const attrs = (x) => `data-vente="${esc(x.tx)}" data-vente-etat="${esc(x.etat)}"${x.bordereau != null ? ` data-bordereau="${x.bordereau ? 'pret' : 'manque'}"` : ''}`;
+    return tete + `<ul class="rangs${avecN ? ' avec-n' : ''}" data-ventes="${v.liste.length}" data-defil="ventes">${v.liste.map((x) => /^[1-9]\d{0,19}$/.test(String(x.conv || ''))
+      ? `<li><a class="rang" ${attrs(x)} data-vente-conv="${esc(x.conv)}" href="${esc(ici + '/inbox/' + x.conv)}" target="${LISTES ? '_blank' : '_top'}"${LISTES ? ' rel="noopener"' : ''}>${corps(x)}</a></li>`
+      : `<li><div class="rang" ${attrs(x)}>${corps(x)}</div></li>`).join('')}</ul>`;
   }
   function autresHtml() {
     if (!porteeTous) return '';
@@ -840,7 +907,7 @@
     let panneau;
     if (ongletListe === 'favoris') panneau = !vinted ? `<div class="val gris" data-favoris-site="${esc(e.plateforme)}">${esc(nomSite)} ne dit pas qui a mis tes annonces en favori : il n’y a personne à qui écrire d’ici.</div>`
       : LISTES ? '<div class="val gris" data-favoris-fenetre>Les messages aux favoris partent de l’onglet Vinted : ouvre vinted.fr, puis touche le logo VRM.</div>'
-      : (favorisHtml(e) || '<div class="val gris">Pas encore de favoris lus : ouvre la cloche de Vinted une fois.</div>');
+      : (favorisOngletHtml(e) || '<div class="val gris">Pas encore de favoris lus : ouvre la cloche de Vinted une fois.</div>');
     else if (!vinted) panneau = `<div class="val gris" data-liste-site="${esc(e.plateforme)}">Sur ${esc(nomSite)}, tes ${ongletListe === 'ventes' ? 'ventes' : 'annonces'} sont dans les pages du site (liens ci-dessous) : la carte ne les recopie pas encore.</div>`;
     else panneau = ongletListe === 'annonces' ? annoncesHtml(e) : ventesHtml(e);
     const tab = (k, t) => `<button class="touche" role="tab" data-onglet-b="${k}" aria-selected="${ongletListe === k ? 'true' : 'false'}"${ongletListe === k ? ' data-actif' : ''}>${t}</button>`;
@@ -865,6 +932,8 @@
       if (LISTES) rendreListesSeules(); else rendre();
     }));
     if (ongletListe !== 'favoris' || porteeTous) chargerListes(false);
+    // 5.379 : l'onglet Favoris montre la liste lue (aperçu demandé à VRM, gardé une minute).
+    if (ongletListe === 'favoris' && !LISTES && e) chargerFavoris(e, false);
   }
   // La fenêtre de l'extension (popup.html?mode=onglet) : le bloc seul, sous l'état.
   function rendreListesSeules() {
@@ -1129,7 +1198,7 @@
     // 5.366 (Julien : « faire comme Vintex, pour ne pas se faire bannir ») : l'état du compte
     // en UNE phrase (calculée par le fond, la même que dans VRM) et « Tout arrêter ».
     const ligneSecu = e.secu && e.secu.texte && v && v.connecte
-      ? `<div class="ligne" data-secu="${esc(e.secu.niveau || '')}"><div class="lib">Sécurité du compte</div><div class="val${e.secu.niveau === 'robot' ? ' alerte' : (e.secu.niveau === 'ok' ? '' : ' gris')}">${esc(e.secu.texte)}</div><button class="b sec" data-secu-arret="${e.secu.arrete ? 'relancer' : 'arreter'}">${e.secu.arrete ? 'Relancer' : 'Tout arrêter'}</button></div>`
+      ? `<div class="ligne secu" data-secu="${esc(e.secu.niveau || '')}"><div class="secu-t"><div class="lib">Sécurité du compte</div><div class="val${e.secu.niveau === 'robot' ? ' alerte' : (e.secu.niveau === 'ok' ? '' : ' gris')}">${esc(e.secu.texte)}</div></div><button class="touche secu-b" data-secu-arret="${e.secu.arrete ? 'relancer' : 'arreter'}">${e.secu.arrete ? 'Relancer' : 'Tout arrêter'}</button></div>`
       : '';
     let bascule = '';
     if (e.bascule) {
@@ -1152,19 +1221,10 @@
     // le site lui-même (ventes, messages, dressing du compte de l'onglet).
     const connecte = !!(v && v.connecte) && !changerCompte;
     const fileFav = !!(e.site && e.site.favoris && e.site.favoris.file && e.site.favoris.file.actif);
-    if (vueFav === 'apercu' && connecte && e.plateforme === 'vinted' && e.site && e.site.id) {
-      carte.classList.add('doigt');
-      poserHtml(contenu, `<button class="fermer" data-fermer-carte title="Fermer" aria-label="Fermer">×</button><div class="apercu" data-fav-vue="apercu">${apercuHtml(e)}</div>`);
-      const fermerA = carte.querySelector('[data-fermer-carte]');
-      if (fermerA) fermerA.addEventListener('click', fermerCarte);
-      brancherFavoris(e);
-      poserFormulaire(false);
-      return;
-    }
     // 5.377 : Favoris · Annonces · Ventes du compte de l'onglet (Vinted, Leboncoin, Vestiaire).
     const avecListes = connecte && ['vinted', 'leboncoin', 'vestiaire'].includes(e.plateforme) && !(e.plateforme === 'vinted' && (!e.site || !e.site.id || e.site.choix === 'non'));
     const gestes = (connecte
-      ? `<div class="gestes">${avecListes ? listesHtml(e) : favorisHtml(e)}</div>`
+      ? `<div class="gestes">${avecListes ? listesHtml(e) : favorisFileHtml(e)}</div>`
       : (v && v.connecte) || formulaire ? '' : `<button class="b" data-montrer-connexion>Me connecter</button>`) + (formulaire ? '' : liensHtml(e, fileFav));
     const resume = resumeEtat(e);
     // Leboncoin (5.335, sa décision du 9 nov.) : les trois lignes Compte · Annonces ·
@@ -1197,6 +1257,8 @@
       posPerso ? '<button class="lien" data-replacer-logo>Logo en bas à droite</button>' : '',
     ].filter(Boolean).join('');
     carte.classList.toggle('doigt', doigt || formulaire);
+    const defils = {}; contenu.querySelectorAll('[data-defil]').forEach((el) => { defils[el.getAttribute('data-defil')] = el.scrollTop; });
+    const hautCarte = carte.scrollTop;
     poserHtml(contenu, `${doigt || formulaire ? '<button class="fermer" data-fermer-carte title="Fermer" aria-label="Fermer">×</button>' : ''}<div class="tete"><b>VRM</b><span class="ver">${e.version ? 'extension ' + esc(e.version) : ''}</span></div>
       ${lbcVisible ? `<div class="ligne lbc-tete"><div class="lib">Compte ${esc(nomSite)}</div>${compteSite}</div>${lbcLignes}${ligneCapture(e)}` : quatreLignes(e, resume)}
       ${majHtml(e.maj)}
@@ -1204,11 +1266,11 @@
       ${progression}
       ${historique}
       ${lignePerime}
-      ${ligneSecu}
       ${aRetirerLbc}
       ${diagnosticLbc}
       ${bascule}
       ${gestes}
+      ${ligneSecu}
       ${moisHtml}
       <details class="detail" data-detail${ouvert ? ' open' : ''}><summary>Détails</summary>
       <div class="ligne"><div class="lib">Compte VRM utilisé</div>${compteVrm}</div>
@@ -1217,6 +1279,8 @@
       ${e.mesure ? `<div class="ligne"><div class="lib">Mesure</div><div class="val gris">VRM apprend à lire ${esc(nomSite)} : il relève la forme des pages, jamais leur contenu. Aucune vente ni annonce n'est encore captée.</div>${(() => { const f = e.flux || {}; return f.koAt && (!f.okAt || f.koAt > f.okAt) ? `<div class="val alerte">Dernier relevé refusé ${esc(depuis(f.koAt))}</div>` : f.okAt ? `<div class="val gris">Relevé envoyé ${esc(depuis(f.okAt))}</div>` : ''; })()}</div>` : ''}
       ${outils ? `<div class="outils">${outils}</div>` : ''}${rapTexte ? `<div class="rep" data-rapport-etat role="status">${esc(rapTexte)}</div>` : ''}
       </details>`);
+    contenu.querySelectorAll('[data-defil]').forEach((el) => { const v = defils[el.getAttribute('data-defil')]; if (v) el.scrollTop = v; });
+    if (hautCarte) carte.scrollTop = hautCarte;
     brancherReparer();
     brancherRapport();
     const det = carte.querySelector('[data-detail]');
@@ -1799,7 +1863,7 @@
     });
   }
   function ouvrirConnexion() { doigt = true; formulaireDemande = true; carte.classList.add('on'); rendre(); }
-  function fermerCarte() { if (LISTES) return; doigt = false; justeConnecte = false; vueFav = null; apercuFav = null; favErreur = ''; if (changerCompte) { changerCompte = false; formulaireDemande = false; rendre(); } carte.classList.remove('on'); }
+  function fermerCarte() { if (LISTES) return; doigt = false; justeConnecte = false; vueFav = null; favErreur = ''; if (changerCompte) { changerCompte = false; formulaireDemande = false; rendre(); } carte.classList.remove('on'); }
 
   // ══ 5.351 (lot extension-visuel) : DÉPLACER, RÉDUIRE, TEINTE ══
   // (5.376 : la carte n'ouvre plus VRM — « Colis · Messages · Offres » sont retirés.)
