@@ -58,7 +58,7 @@ async function preparer(o, vue) {
     // une conversation qui porte une offre (la base en met une toutes les 9 conversations)
     // la base met une offre sur la conversation n° 4 (i % 9 === 4), la 5e de la liste (de la plus récente)
     const ok = await toucher('[data-fil-offre]');
-    if (!ok) { const l = pg.locator('[data-fil]').nth(4); try { if (o.tel) await l.tap({ timeout: 4000 }); else await l.click({ timeout: 4000 }); } catch (_) {} }
+    if (!ok) { const l = pg.locator('[data-fil]').nth(4); try { if (o.tel) await l.tap({ timeout: 4000 }); else await l.evaluate((e) => e.click()); } catch (_) {} }   // à l'ordinateur, un message de la coque peut couvrir la rangée
     await pg.waitForSelector('.vrm-chat-panel .vrm-chat-history', { timeout: 10000 }).catch(() => {});
     await pg.waitForTimeout(1600);
   }
