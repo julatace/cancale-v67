@@ -46,6 +46,9 @@ const dit = (ok, quoi, detail = '') => { if (ok) bilan.ok++; else bilan.ko++; co
 async function preparer(o, vue) {
   const pg = o.pg;
   const toucher = async (sel) => { const l = pg.locator(sel).first(); if (!(await l.count())) return false; try { if (o.tel) await l.tap({ timeout: 4000 }); else await l.click({ timeout: 4000 }); return true; } catch (_) { try { await l.evaluate((e) => e.click()); return true; } catch (__) { return false; } } };
+  if (vue.startsWith('argent')) { await pg.waitForSelector('[data-argent-ecran]', { timeout: 15000 }).catch(() => {}); await pg.waitForTimeout(1200); }
+  if (vue.startsWith('messages')) { await pg.waitForSelector('[data-fil], .vrm-msg-list', { timeout: 15000 }).catch(() => {}); await pg.waitForTimeout(600); }
+  if (vue.startsWith('parametres')) { await pg.waitForSelector('[data-parametres-accueil], .vrm-reglages-groupe', { timeout: 15000 }).catch(() => {}); await pg.waitForTimeout(600); }
   if (vue === 'argent-avenir') {
     await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:argent-a-venir')));
     await pg.waitForSelector('[data-argent-a-venir-ecran]', { timeout: 8000 }).catch(() => {});
@@ -53,12 +56,13 @@ async function preparer(o, vue) {
   }
   if (vue === 'messages-offre') {
     // une conversation qui porte une offre (la base en met une toutes les 9 conversations)
-    const ok = await toucher('[data-conv-offre="1"], [data-msg-offre]');
-    if (!ok) await toucher('[data-conv-id], [data-fil-id]');
+    // la base met une offre sur la conversation n° 4 (i % 9 === 4), la 5e de la liste (de la plus récente)
+    const ok = await toucher('[data-fil-offre]');
+    if (!ok) { const l = pg.locator('[data-fil]').nth(4); try { if (o.tel) await l.tap({ timeout: 4000 }); else await l.click({ timeout: 4000 }); } catch (_) {} }
     await pg.waitForTimeout(1600);
   }
   if (vue === 'parametres-ventes') {
-    const ok = await toucher('[data-parametres-cat="ventes"], [data-param-cat="ventes"]');
+    const ok = await toucher('[data-categorie-ouvrir="ventes"]');
     if (!ok) await toucher('[data-cat="ventes"]');
     await pg.waitForTimeout(1200);
   }

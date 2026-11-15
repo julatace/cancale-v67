@@ -938,6 +938,7 @@ import { BentoJournee, placerTuiles, RangeeJ, LienJ, MontantAffiche } from "./Jo
 import "./design/studio-journee.css";
 import "./design/studio-finition.css";   // (15 nov.) La passe de finition écran par écran — `@layer vrm-finition`, la PREMIÈRE couche (index.html) : docs/passation/2026-11-15-finition-ecrans.md
 import "./design/studio-verre.css";   // (15 nov., Julien : « J'aime la 9 ») VERRE DÉPOLI — le fond bleu profond, le verre, l'encre claire sur le fond — `@layer vrm-verre`, la PREMIÈRE couche (index.html) : docs/passation/2026-11-15-verre-depoli.md
+import "./design/verre-ecrans.css";   // (15 nov., maquettes validées : « tout est parfait sauf étagères ») Argent, à venir, Messages, Paramètres, la fiche — des classes `vg-*` neuves, `@layer vrm-verre` : docs/passation/2026-11-15-ecrans-verre-2.md
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
@@ -32235,7 +32236,21 @@ function ArgentAVenirOuvert({ liveStats, onClose }) {
   const porteMonnaie = L.walletDispo != null || Array.isArray(L.walletParCompte)
     ? { dispo: L.walletDispo != null ? L.walletDispo : null, attente: L.walletAttente != null ? L.walletAttente : null, comptes: Array.isArray(L.walletParCompte) ? L.walletParCompte : [] }
     : null;
-  return <ArgentAVenirEcran A={L.aVenir || null} porteMonnaie={porteMonnaie} recu={recu} Feuille={SheetShell} onClose={onClose}/>;
+  // (15 nov., maquette « Verre dépoli ») Le N° de chaque vente Vinted : PAR IDENTITÉ seulement (transaction →
+  // item_id → la fiche de cet identifiant d'annonce), jamais par le titre (§5) ; pas su ⇒ aucun N° (un blanc).
+  const [txItem, setTxItem] = useState(() => (Object.keys(_txnItemConnu).length ? _txnItemConnu : null));
+  useEffect(() => { if (txItem) return undefined; let mort = false; fetchTxnItemIds().then((m) => { if (!mort) setTxItem(m || {}); }).catch(() => {}); return () => { mort = true; }; }, []);   // eslint-disable-line react-hooks/exhaustive-deps
+  const numDe = useMemo(() => {
+    const fiches = load('vinted_annonce_numeros', {}) || {};
+    return (l) => {
+      const m = /^vinted:(.+)$/.exec(String((l && l.id) || ''));
+      const it = m && txItem ? txItem[m[1]] : null;
+      const e = it ? fiches[it] : null;
+      const n = e ? (e.numero != null ? e.numero : e.num) : null;
+      return n != null && String(n).trim() ? String(n).trim() : null;
+    };
+  }, [txItem]);
+  return <ArgentAVenirEcran A={L.aVenir || null} porteMonnaie={porteMonnaie} recu={recu} Feuille={SheetShell} onClose={onClose} numDe={numDe}/>;
 }
 function ArgentAVenirHote() {
   const liveStats = React.useContext(LiveStatsCarte);

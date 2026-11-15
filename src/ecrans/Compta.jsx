@@ -26,7 +26,9 @@ import { livreDesRecettes, registreDesAchats } from '../registres.js';
 import { completerRecettes, completerAchats, facturesParVente, SELECT_FACTURES_REGISTRE, idsTxLignes, lirePseudosTx, csvConforme, pdfConforme, feuillesConformes, nomFichierConforme } from '../registresConformes.js';
 import RegistresVue from '../RegistresVue.jsx';
 import { xlsxClasseur } from '../xlsxSimple.js';
-import { tr } from '../i18n/index.js';
+import { tr, localeCourante } from '../i18n/index.js';
+import { aVenirPour } from '../argentAVenir.js';   // (15 nov., verre 2) la part « à venir », la règle de la coque
+import { resumeEtapes, ouvrirArgentAVenir } from '../ArgentAVenirEcran.jsx';
 import LivrePoliceCarte from '../LivrePoliceCarte.jsx';   // (10 nov., lot R) le livre de police
 import { lireFactures, lireContenuFacture } from '../factureAchat.js';   // (10 nov., lot AN) les factures d'achat jointes, mentionnées dans l'export
 import { TYPES_PERIODE, periodesExport, libellePeriode, donneesExportComptable, resumeExport, couvertureExport, csvExportComptable, pdfExportComptable, nomFichierExport } from '../exportComptable.js';
@@ -3632,16 +3634,58 @@ const dateArgentCourte = (t) => new Date(t).toLocaleDateString('fr-FR', { day: '
 function AVenirArgent({ liveStats }) {
   const liveCoque = React.useContext(LiveStatsCarte);
   const L = liveStats || liveCoque;
-  return <div className="vrm-a-venir-hote vrm-a-venir-argent" style={{ margin: '12px 0 0' }}><ArgentAVenirCarte A={L && L.aVenir}/></div>;
+  return <div className="vrm-a-venir-hote vrm-a-venir-argent vg-a-venir-hote"><AVenirVerre A={L && L.aVenir}/></div>;
+}
+// (15 nov., maquette « Verre dépoli » validée par Julien) L'ARGENT À VENIR SUR ARGENT : le total, la barre PAR ÉTAPE
+// (une part par étape, à la proportion de son montant : ambre = à envoyer, un geste ; encre = en route ; ardoise =
+// livrée ; hachuré = versement en cours) et la légende de chaque étape avec son montant. AUCUN calcul : la règle
+// `argentAVenir` (`parEtape`, `aVenirPour`, `resumeEtapes`). Les data-* du résumé d'avant restent (bancs) ; toute
+// la carte se touche et ouvre l'écran « Argent à venir ».
+function AVenirVerre({ A }) {
+  if (!A || A.enCours) return null;
+  const T = aVenirPour(A, {});
+  const etapes = resumeEtapes(A);
+  const parEtape = (A.parEtape || []).filter((g) => g.n > 0);
+  if (!parEtape.length && !T.partiel && !etapes.length) return null;
+  const c = (x) => String(Math.round(Number(x || 0) * 100));
+  return (
+    <section className="vrm-a-venir vg-a-venir vg-carte" data-a-venir={T.valeur == null ? '' : c(T.valeur)} data-a-venir-n={String(T.n)} data-a-venir-site="toutes" data-a-venir-partiel={T.partiel ? '1' : undefined}>
+      <button type="button" className="vg-a-venir-btn" data-a-venir-ouvrir="" onClick={ouvrirArgentAVenir}
+        aria-label={`${tr('avenir.ouvrir')} — ${T.partiel && T.valeur != null ? tr('journee.moins') + ' ' : ''}${T.valeur == null ? '—' : montant(T.valeur)}`}>
+        <span className="vg-a-venir-tete">
+          <span className="vg-ds">{tr('journee.venir')}</span>
+          <b className="vg-a-venir-total" data-a-venir-total="">{T.partiel && T.valeur != null ? <small>{tr('journee.moins')} </small> : null}{T.valeur == null ? '—' : montant(T.valeur)}</b>
+          <span className="vg-chev" aria-hidden="true"><Icon name="chevron" size={18}/></span>
+        </span>
+        {T.valeur > 0 && parEtape.length ? (
+          <span className="vrm-av-barre vg-av-barre" aria-hidden="true">
+            {parEtape.map((g) => <span key={g.etape} className={'vrm-av-barre-seg is-' + g.etape} style={{ flexGrow: Math.max(1, Math.round(g.eur * 100)) }}/>)}
+          </span>
+        ) : null}
+        <span className="vg-a-venir-legende" data-a-venir-etapes={etapes.map((e) => e.cle + '=' + e.n).join(' ')}>
+          {parEtape.map((g) => (
+            <span key={g.etape} className="vg-a-venir-l" data-a-venir-etape={g.etape} data-eur={c(g.eur)}>
+              <i className={'vrm-av-pastille is-' + g.etape} aria-hidden="true"/>
+              <span>{tr('verre2.etape.' + g.etape)}</span>
+              <em>{parEtape.length > 1 ? montant(g.eur) : tr('avenir.ventes', { n: g.n })}</em>
+            </span>
+          ))}
+          {A.bloquees && A.bloquees.n > 0 ? <span className="vg-a-venir-l is-hors" data-a-venir-etape="bloquee"><i className="vrm-av-pastille is-bloquee" aria-hidden="true"/><span>{tr('avenir.court.bloquee', { n: A.bloquees.n })}</span></span> : null}
+        </span>
+        {T.partiel && T.manque.length ? <span className="vg-a-venir-manque" data-a-venir-manque={T.manque.join(',')}>{tr('compta.sans')} {T.manque.join(', ')} {tr('ventes.lu2')}</span> : null}
+      </button>
+    </section>
+  );
 }
 function ArgentQuestions({ liveStats, onNav, allerVue }) {
   const liveCoque = React.useContext(LiveStatsCarte);
   const S = useSourcesCarte(liveStats || liveCoque);
-  const { P } = usePrevisionUrssaf();
+  const { P, regLu, regPret } = usePrevisionUrssaf();
   const profil = useProfilFiscal();
   const sel = { site: 'toutes', compte: null, periode: null };
   const v = (id) => sansCompteSur(valeurChiffre(id, { id, p: 'mois' }, S, sel, REGLES_CARTE), S);
   const mois = new Date().toLocaleDateString('fr-FR', { month: 'short' });   // « nov. » : le libellé tient sur une ligne au téléphone
+  const moisLong = new Date().toLocaleDateString(localeCourante(), { month: 'long' });
   const Q = questionsArgent({ vendu: v('vendu'), recu: v('recu'), benefice: v('benefice'), prevision: P, profil, raisonCourte, mois, dateCourte: dateArgentCourte });
   const aller = (q) => {
     if (q.aller === 'stats') { if (onNav) onNav('dashboard'); return; }
@@ -3652,27 +3696,71 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
   // (14 nov., Studio) Le chiffre d'affiche : « 1 625 » puis « € » plus petit, remonté (rien d'autre ne change :
   // le même texte, le même `aria-label`, les mêmes data-*).
   const sommeAffiche = (t) => { const m = /^(.*?)[\s\u00a0\u202f]*€$/.exec(String(t)); return m ? <bdi className="sb-nb">{m[1]}<span className="eur">{'\u00a0'}€</span></bdi> : t; };
+  const nom = (q) => (q.valeur == null && !q.texte
+    ? tr('compta.su', { libelle: String(q.libelle), x: String(q.note ? q.note + ', ' : ''), question: String(q.question) })
+    : `${q.libelle} : ${q.valeur == null ? q.texte : (q.partiel ? 'au moins ' : '') + somme(q.valeur)}${q.note ? ', ' + q.note : ''} — ${q.question}`);
+  const attrs = (q) => ({ 'data-argent-q': q.id, 'data-argent-valeur': q.valeur == null ? '' : String(Math.round(q.valeur * 100)), 'data-argent-partiel': q.partiel ? '1' : undefined,
+    'data-argent-raison': q.raison || undefined, 'data-argent-echeance': q.echeance ? String(q.echeance) : undefined, 'aria-label': nom(q), onClick: () => aller(q) });
+  const chiffre = (q, affiche = false) => (
+    <b className="vrm-argent-w-n" data-argent-pas-su={q.valeur == null && !q.texte ? '' : undefined}>
+      {q.valeur != null ? <>{q.partiel ? <small>{tr('journee.moins')} </small> : null}{affiche ? sommeAffiche(somme(q.valeur)) : somme(q.valeur)}</> : (q.texte || '—')}
+    </b>
+  );
+  const [qV, qR, qB, qD] = ['vendu', 'recu', 'benefice', 'declarer'].map((id) => Q.find((x) => x.id === id));
+  // Le nombre de ventes du mois (la même population que « vendu », `valeurChiffre('ventes')`).
+  const nV = v('ventes');
+  // LE BÉNÉFICE : « Bénéfice » (le net, sa seule règle) quand il est su. Sinon, si des prix d'achat manquent, le
+  // « Bénéfice brut » des ventes au prix connu, AVEC sa couverture (« 14 ventes sur 17 ») et la porte pour saisir
+  // les prix qui manquent — jamais « au moins » sur le brut : une paire au prix inconnu peut être vendue à perte,
+  // ce n'est pas un plancher (src/beneficeNoms.js). `data-argent-valeur` reste le net (le banc le compare).
+  const vb = v('benefice');
+  const Bn = vb && vb.B ? vb.B : null;
+  const manquent = Bn && Bn.n > Bn.nCout ? Bn.n - Bn.nCout : 0;
+  const brut = qB.valeur == null && Bn && Bn.nCout > 0 && manquent > 0 ? chiffreBrut({ n: Bn.n, nCout: Bn.nCout, brut: Bn.brut }) : null;
+  const versSaisiePrix = () => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); };
+  // L'URSSAF : à payer (les cotisations, `P.apayer`) en grand ; « 12,4 % de 1 102 € reçus » (le CA de la période,
+  // daté au versement, `P.ca`) dessous ; « J'ai déclaré » seulement quand la déclaration est ouverte (période finie)
+  // et qu'un mois reste à noter — le registre n'est écrit que sur SON clic (`demanderDeclaration`).
+  const ouverte = P && (P.etat === 'lu' || P.etat === 'passu') && !P.enCours;
+  const aNoter = ouverte && regPret ? (P.mois || []).filter((ym) => !moisDeclare(regLu, ym)) : [];
+  const cotis = P && P.etat === 'lu' && P.apayer != null ? P.apayer : null;
+  const tauxTxt = String(tauxUrssaf()).replace('.', ',');
   return (
-    <section className="vrm-argent-q" aria-label={tr('compta.argentMois')} data-argent-questions="">
-      {Q.map((q) => (
-        <button key={q.id} type="button" className="vrm-argent-w" data-argent-q={q.id}
-          data-argent-valeur={q.valeur == null ? '' : String(Math.round(q.valeur * 100))} data-argent-partiel={q.partiel ? '1' : undefined}
-          data-argent-raison={q.raison || undefined} data-argent-echeance={q.echeance ? String(q.echeance) : undefined}
-          aria-label={q.valeur == null && !q.texte
-            ? tr('compta.su', { libelle: String(q.libelle), x: String(q.note ? q.note + ', ' : ''), question: String(q.question) })
-            : `${q.libelle} : ${q.valeur == null ? q.texte : (q.partiel ? 'au moins ' : '') + somme(q.valeur)}${q.note ? ', ' + q.note : ''} — ${q.question}`}
-          onClick={() => aller(q)}>
-          {/* (11 nov., lot accessibilité) Le nom commence par ce qui est ÉCRIT (libellé, chiffre, note —
-              WCAG 2.5.3) puis pose la question ; un « — » affiché se dit « pas su », APRÈS le texte écrit ;
-              les espaces séparent les morceaux pour le lecteur. */}
-          <span className="vrm-argent-w-l">{q.libelle}</span>{' '}
-          <b className="vrm-argent-w-n" data-argent-pas-su={q.valeur == null && !q.texte ? '' : undefined}>
-            {q.valeur != null ? <>{q.partiel ? <small>{tr('journee.moins')} </small> : null}{sommeAffiche(somme(q.valeur))}</> : (q.texte || '—')}
-          </b>
-          {q.note ? <>{' '}<span className="vrm-argent-w-note">{q.note}</span></> : null}
-          <span className="vrm-argent-w-chev" aria-hidden="true">›</span>
+    <section className="vrm-argent-q vg-argent" aria-label={tr('compta.argentMois')} data-argent-questions="">
+      {/* Vendu : le chiffre d'affiche, en blanc sur le fond (pas de carte) */}
+      <button type="button" className="vg-a-vendu" {...attrs(qV)}>
+        <span className="vrm-argent-w-l vg-sr">{qV.libelle}</span>
+        {chiffre(qV, true)}
+        <span className="vg-a-vendu-sous">{tr('verre2.argent.venduEn', { mois: moisLong })}{nV && nV.valeur != null ? ` · ${tr('avenir.ventes', { n: nV.valeur })}` : ''}{qV.note ? <span className="vrm-argent-w-note"> · {qV.note}</span> : null}</span>
+      </button>
+      <div className="vg-a-duo">
+        <button type="button" className="vg-carte vg-a-case" {...attrs(qR)}>
+          <span className="vrm-argent-w-l vg-ds">{tr('verre2.argent.recu')}</span>
+          {chiffre(qR)}
+          <small className="vg-a-petit">{qR.note ? <span className="vrm-argent-w-note">{qR.note}</span> : tr('verre2.argent.auVersement')}</small>
         </button>
-      ))}
+        <div className="vg-carte vg-a-case vg-a-benef">
+          <button type="button" className="vg-a-case-corps" {...attrs(qB)}>
+            <span className="vrm-argent-w-l vg-ds">{brut ? NOM_BENEFICE_BRUT : tr('verre2.argent.benefice')}</span>
+            {brut ? <b className="vrm-argent-w-n vg-a-brut" {...brut.attrs}>{somme(brut.valeur)}</b> : chiffre(qB)}
+            <small className="vg-a-petit">{brut ? <span data-benef-couverture="">{tr('verre2.argent.ventesSur', { k: Bn.nCout, n: Bn.n })}</span> : qB.note ? <span className="vrm-argent-w-note">{qB.note}</span> : (Bn && Bn.n > 0 ? tr('avenir.ventes', { n: Bn.n }) : null)}</small>
+          </button>
+          {manquent > 0 ? <button type="button" className="vg-a-ambre" data-benef-porte="" data-benef-manque={manquent} onClick={versSaisiePrix}>{tr('verre2.argent.prixASaisir', { n: manquent })}<Icon name="chevron" size={13}/></button> : null}
+        </div>
+      </div>
+      <div className="vg-carte vg-a-urssaf" data-argent-urssaf={P ? P.etat : ''} data-argent-apayer={cotis == null ? '' : String(Math.round(cotis * 100))}>
+        <button type="button" className="vg-a-case-corps" {...attrs(qD)}>
+          <span className="vg-a-urssaf-tete">
+            <span className="vrm-argent-w-l vg-ds">{P && P.label && (P.etat === 'lu' || P.etat === 'passu') ? tr('verre2.argent.urssafPour', { periode: P.label }) : tr('verre2.argent.urssaf')}</span>
+            {qD.note ? <span className="vrm-argent-w-note vg-a-echeance">{qD.note}</span> : null}
+          </span>
+          {cotis != null
+            ? <b className="vrm-argent-w-n">{P.partiel ? <small>{tr('journee.moins')} </small> : null}{somme(cotis)}</b>
+            : chiffre(qD)}
+          {cotis != null && P.ca != null ? <small className="vg-a-petit vg-a-urssaf-pied">{tr('verre2.argent.tauxDe', { taux: tauxTxt, ca: montant(P.ca) })}</small> : null}
+        </button>
+        {aNoter.length ? <Bouton variante="secondaire" className="vg-a-declare" data-urssaf-cest-declare={aNoter[0]} onClick={() => demanderDeclaration(aNoter[0], onNav)}>{tr('compta.aiDeclare')}</Bouton> : null}
+      </div>
     </section>
   );
 }

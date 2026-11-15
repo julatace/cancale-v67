@@ -1,0 +1,164 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   VRM — « VERRE DÉPOLI », LES ÉCRANS DU LOT 2 (15 nov. 2026)
+   Maquettes validées par Julien (« tout est parfait sauf étagères ») : Argent (le mois), Argent à venir,
+   Messages (liste par compte, une conversation avec une offre), Paramètres (tuiles, une catégorie), la fiche
+   d'une paire. Récit : docs/passation/2026-11-15-ecrans-verre-2.md.
+
+   Les VALEURS sont celles de la maquette (scratchpad maquettes-verre : kit.cjs, style.cjs, e-argent-msg.cjs,
+   e-reste.cjs) : rayons 22 (verre) / 20 (tuile) / 16 (plein) / 14 (touche), chiffres 52·26·22/750, libellés
+   12.5–13.5/600–700, gris #3F5468, ambre #744400 → jeton --sv-ambre (#764300, mesuré 5,28:1 sur le verre).
+   Les COULEURS viennent des jetons de la couche (`--sv-*`, src/design/studio-verre.css), jamais codées ici,
+   sauf les quatre teintes des étapes de l'argent (maquette : ambre, encre, ardoise, hachuré).
+
+   OÙ DANS LA CASCADE : la couche `vrm-verre` (la PREMIÈRE nommée, index.html), comme la couche commune ; des
+   classes NEUVES (`vg-*`) — aucune règle de studio-verre.css n'est modifiée. Les sélecteurs portent :root
+   répété pour passer devant les règles `!important` génériques de la même couche.
+   RIEN DE MÉTIER : aucun texte, aucun chiffre, aucun data-* ne vit ici.
+   ════════════════════════════════════════════════════════════════════════════ */
+@layer vrm-verre {
+
+/* ══ 0. LES BRIQUES ═══════════════════════════════════════════════════════════ */
+/* Le VERRE d'une carte (une seule couche : la couleur et le dégradé ne s'additionnent pas — studio-verre §4). */
+:root:root:root body .vg-carte {
+  background-color: transparent !important; background-image: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important;
+  box-shadow: var(--sv-ombre) !important; border: 0 !important; border-radius: 22px !important; color: var(--sv-encre) !important;
+}
+/* Un libellé de carte (maquette `.ds`) ; un petit texte gris ; caché à l'œil, lu par les lecteurs d'écran. */
+:root:root:root body .vg-ds { display: block; font: 600 12.5px/1.25 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; letter-spacing: 0 !important; text-transform: none !important; }
+:root:root:root body .vg-sr { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; white-space: nowrap !important; border: 0 !important; }
+:root:root:root body .vg-chev { display: grid; place-items: center; flex: none; color: var(--sv-encre-2) !important; }
+/* Un bouton nu (la carte entière se touche) : aucune matière à lui. */
+:root:root:root body :is(.vg-a-vendu, .vg-a-case, .vg-a-case-corps, .vg-a-venir-btn, .vg-a-ambre, .vg-av-groupe-tete) {
+  -webkit-appearance: none; appearance: none; background: none !important; background-image: none !important; box-shadow: none !important; border: 0 !important;
+  margin: 0; font-family: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; min-height: 44px;
+}
+:root:root:root body :is(.vg-a-vendu, .vg-a-case, .vg-a-case-corps, .vg-a-venir-btn, .vg-av-groupe-tete):active { transform: scale(.985); }
+@media (prefers-reduced-motion: reduce) { :root:root:root body :is(.vg-a-vendu, .vg-a-case, .vg-a-case-corps, .vg-a-venir-btn, .vg-av-groupe-tete):active { transform: none; } }
+/* Les teintes des étapes (maquette) : ambre = à envoyer (un geste), encre = en route, ardoise = livrée, hachuré = versement. */
+:root:root:root body :is(.vg-argent, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-envoyer { background: #B26A00 !important; }
+:root:root:root body :is(.vg-argent, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-route { background: #0C1D30 !important; }
+:root:root:root body :is(.vg-argent, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-livree { background: #5E7A96 !important; }
+:root:root:root body :is(.vg-argent, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille):is(.is-versement, .is-pm) { background: repeating-linear-gradient(45deg, rgb(12 29 48 / .26) 0 4px, rgb(12 29 48 / .08) 4px 8px) !important; }
+:root:root:root body :is(.vg-argent, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-autre { background: #A9B9CB !important; }
+:root:root:root[data-theme="dark"] body :is(.vg-argent, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-envoyer { background: #F0A43C !important; }
+:root:root:root[data-theme="dark"] body :is(.vg-argent, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-route { background: #EAF2FB !important; }
+:root:root:root[data-theme="dark"] body :is(.vg-argent, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-livree { background: #7F9BB8 !important; }
+:root:root:root[data-theme="dark"] body :is(.vg-argent, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille):is(.is-versement, .is-pm) { background: repeating-linear-gradient(45deg, rgb(234 242 251 / .34) 0 4px, rgb(234 242 251 / .10) 4px 8px) !important; }
+:root:root:root body :is(.vg-argent, .vg-av) .vrm-av-pastille { width: 9px !important; height: 9px !important; border-radius: 3px !important; box-shadow: none !important; flex: none; }
+:root:root:root body :is(.vg-argent, .vg-av) .vrm-av-pastille.is-bloquee { background: transparent !important; box-shadow: inset 0 0 0 1.5px var(--sv-encre-2) !important; }
+:root:root:root body :is(.vg-argent, .vg-av) .vg-av-barre { display: flex !important; gap: 3px !important; height: 10px !important; border-radius: 0 !important; overflow: visible !important; background: none !important; margin: 0 !important; }
+:root:root:root body :is(.vg-argent, .vg-av) .vg-av-barre .vrm-av-barre-seg { border-radius: 5px !important; min-width: 6px !important; }
+
+/* ══ 1. ARGENT · LE MOIS (maquette « ar1 ») ══════════════════════════════════ */
+:root:root:root body .vrm-argent-q.vg-argent { display: flex !important; flex-direction: column !important; gap: 0 !important; grid-template-columns: none !important; padding: 0 !important; margin: 0 !important; background: none !important; box-shadow: none !important; }
+/* Vendu : le chiffre d'affiche flotte en blanc sur le fond (52/700, −.05em), « vendu en novembre · 17 ventes » dessous. */
+:root:root:root body .vg-a-vendu { display: flex !important; flex-direction: column; align-items: flex-start; width: 100%; padding: 16px 4px 14px !important; color: var(--sv-clair) !important; border-radius: 16px; }
+:root:root:root body .vg-a-vendu .vrm-argent-w-n { display: block; font: 700 52px/.95 var(--sb-police-affiche, Inter, sans-serif) !important; letter-spacing: -.05em !important; color: var(--sv-clair) !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
+:root:root:root body .vg-a-vendu .vrm-argent-w-n :is(.eur, small) { font: inherit !important; letter-spacing: inherit !important; color: inherit !important; vertical-align: baseline !important; position: static !important; }
+:root:root:root body .vg-a-vendu .vrm-argent-w-n small { font-size: 15px !important; font-weight: 600 !important; letter-spacing: 0 !important; margin-right: 4px; }
+:root:root:root body .vg-a-vendu-sous { display: block; margin-top: 6px; font: 600 13.5px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-clair) !important; }
+:root:root:root body .vg-a-vendu-sous .vrm-argent-w-note { color: var(--sv-clair-2) !important; font-weight: 500; }
+/* Reçu · Bénéfice : deux verres côte à côte (12/14, chiffre 22/750). */
+:root:root:root body .vg-a-duo { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+:root:root:root body .vg-a-case { display: flex !important; flex-direction: column; align-items: flex-start; min-width: 0; padding: 12px 14px !important; }
+:root:root:root body button.vg-a-case.vg-carte { width: 100%; }
+:root:root:root body .vg-a-case-corps { display: flex !important; flex-direction: column; align-items: flex-start; width: 100%; padding: 0 !important; color: var(--sv-encre) !important; }
+:root:root:root body :is(.vg-a-case, .vg-a-urssaf) .vrm-argent-w-n { display: block; margin-top: 3px; font: 750 22px/1.15 var(--sb-police-affiche, Inter, sans-serif) !important; letter-spacing: -.03em !important; color: var(--sv-encre) !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
+:root:root:root body :is(.vg-a-case, .vg-a-urssaf) .vrm-argent-w-n small { font: 600 12px/1 var(--sb-police-texte, Inter, sans-serif) !important; letter-spacing: 0 !important; color: var(--sv-encre-2) !important; }
+:root:root:root body .vg-a-petit { display: block; margin-top: 1px; font: 550 12px/1.35 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
+:root:root:root body .vg-a-petit .vrm-argent-w-note { color: inherit !important; font: inherit !important; }
+:root:root:root body .vg-a-ambre { display: flex !important; align-items: center; gap: 2px; margin-top: 4px !important; padding: 0 !important; min-height: 32px !important; font: 700 12.5px/1 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-ambre) !important; position: relative; }
+/* le doigt : 44 px de cible autour d'un lien de 32 px (le dessin ne grossit pas) */
+:root:root:root body .vg-a-ambre::after { content: ""; position: absolute; inset: -6px -8px; }
+/* À venir : un verre (le total 22/750, la barre, la légende en deux colonnes). */
+:root:root:root body .vrm-a-venir-hote.vg-a-venir-hote { margin: 10px 0 0 !important; }
+:root:root:root body section.vrm-a-venir.vg-a-venir { margin: 0 !important; padding: 0 !important; overflow: hidden; }
+:root:root:root body .vg-a-venir-btn { display: flex !important; flex-direction: column; gap: 0; width: 100%; padding: 12px 14px !important; color: var(--sv-encre) !important; }
+:root:root:root body .vg-a-venir-tete { display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; width: 100%; align-items: center; }
+:root:root:root body .vg-a-venir-tete .vg-ds { grid-column: 1; }
+:root:root:root body .vg-a-venir-total { grid-column: 1; grid-row: 2; display: block; margin-top: 2px; font: 750 22px/1.15 var(--sb-police-affiche, Inter, sans-serif) !important; letter-spacing: -.03em !important; color: var(--sv-encre) !important; font-variant-numeric: tabular-nums; }
+:root:root:root body .vg-a-venir-total small { font: 600 12px/1 var(--sb-police-texte, Inter, sans-serif) !important; letter-spacing: 0 !important; color: var(--sv-encre-2) !important; }
+:root:root:root body .vg-a-venir-tete .vg-chev { grid-column: 2; grid-row: 1 / span 2; }
+:root:root:root body .vg-a-venir-btn .vg-av-barre { width: 100%; margin-top: 10px !important; }
+:root:root:root body .vg-a-venir-legende { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; width: 100%; margin-top: 10px; }
+:root:root:root body .vg-a-venir-l { display: flex; align-items: center; gap: 7px; min-width: 0; font: 600 12.5px/1.3 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-encre-2) !important; }
+:root:root:root body .vg-a-venir-l > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root:root:root body .vg-a-venir-l em { margin-left: auto; font-style: normal; font-weight: 700; color: var(--sv-encre) !important; white-space: nowrap; font-variant-numeric: tabular-nums; }
+:root:root:root body .vg-a-venir-l.is-hors { grid-column: 1 / -1; }
+:root:root:root body .vg-a-venir-manque { display: block; margin-top: 8px; font: 550 12px/1.35 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-encre-2) !important; }
+/* URSSAF : « à déclarer pour octobre » + l'échéance en ambre ; le montant ; « 12,4 % de … reçus » et « J'ai déclaré ». */
+:root:root:root body .vg-a-urssaf { position: relative; margin-top: 10px; padding: 12px 14px !important; }
+:root:root:root body .vg-a-urssaf .vg-a-case-corps { padding-right: 0 !important; }
+:root:root:root body .vg-a-urssaf-tete { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; width: 100%; }
+:root:root:root body .vg-a-echeance { flex: none; margin-top: 2px; font: 700 13px/1.25 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-ambre) !important; text-align: right; max-width: 50%; }
+:root:root:root body .vg-a-urssaf-pied { margin-top: 6px; font-size: 12.5px !important; }
+:root:root:root body .vg-a-urssaf:has(.vg-a-declare) .vg-a-urssaf-pied { padding-right: 132px; }
+:root:root:root body .vg-a-declare { position: absolute !important; right: 14px; bottom: 12px; height: 48px !important; min-height: 48px !important; padding: 0 16px !important; border-radius: 14px !important; font: 600 14px/1 var(--sb-police-texte, Inter, sans-serif) !important; }
+/* Ordinateur : vendu · reçu · bénéfice · URSSAF sur UNE ligne (le banc `argent`, N7) ; à venir dessous. */
+@media (min-width: 768px) {
+  :root:root:root body .vrm-argent-q.vg-argent { display: grid !important; grid-template-columns: 1.25fr 1fr 1fr 1.3fr !important; gap: 12px !important; align-items: start; }
+  :root:root:root body .vg-a-duo { display: contents; }
+  :root:root:root body .vg-a-urssaf { margin-top: 0; }
+  :root:root:root body .vg-a-vendu { padding-top: 6px !important; }
+  :root:root:root body .vg-a-vendu .vrm-argent-w-n { font-size: 56px !important; }
+}
+
+/* ══ 2. ARGENT À VENIR (maquette « ar2 ») : la feuille prend le fond bleu, le chiffre flotte en blanc ══ */
+:root:root:root:root:root:root:root:root body .vrm-fs.vg-av {
+  background: radial-gradient(120% 60% at 15% 0%, var(--sv-reflet) 0%, transparent 55%), linear-gradient(170deg, var(--sv-haut) 0%, var(--sv-milieu) 45%, var(--sv-bas) 100%) !important;
+  color: var(--sv-clair) !important;
+}
+:root:root:root:root:root:root:root:root body .vrm-fs.vg-av :is(.vrm-fs-titre, .vrm-fs-tete h2, .vrm-fs-tete h1, .vrm-fs-head h2, h2.vrm-fs-titre) { color: var(--sv-clair) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fs.vg-av .vrm-fs-poignee { background: rgb(255 255 255 / .45) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fs.vg-av .vrm-fs-croix-rond { background: rgb(10 38 76 / .24) !important; border: 1px solid rgb(255 255 255 / .32) !important; color: #FFFFFF !important; }
+:root:root:root body .vg-av .vrm-av-corps { gap: 14px !important; color: var(--sv-clair); }
+:root:root:root body .vg-av-affiche { gap: 6px !important; padding: 4px 4px 2px; }
+:root:root:root body .vg-av-affiche .vg-av-sous { font: 600 12.5px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; letter-spacing: 0 !important; text-transform: none !important; color: var(--sv-clair) !important; }
+:root:root:root body .vg-av-affiche .sb-chiffre-affiche { font: 700 52px/.95 var(--sb-police-affiche, Inter, sans-serif) !important; letter-spacing: -.05em !important; color: var(--sv-clair) !important; }
+:root:root:root body .vg-av-affiche .sb-chiffre-affiche .sb-eur { font: inherit !important; color: inherit !important; letter-spacing: inherit !important; }
+:root:root:root body .vg-av-affiche :is(.vrm-av-total-meta, .vrm-av-borne) { font: 600 13.5px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-clair) !important; }
+:root:root:root body .vg-av-affiche .vrm-av-couverture li { color: var(--sv-clair-2) !important; }
+:root:root:root body .vg-av-affiche .vrm-av-couverture li::before { background: var(--sv-clair-2) !important; }
+/* Le verre des étapes (14 · 14 · 6) */
+:root:root:root body .vg-av .vg-av-carte { gap: 0 !important; padding: 14px 14px 6px !important; color: var(--sv-encre) !important;
+  background-color: transparent !important; background-image: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; box-shadow: var(--sv-ombre) !important; border-radius: 22px !important; }
+:root:root:root body .vg-av-groupes { margin: 0; padding: 0; list-style: none; }
+:root:root:root body .vg-av-groupe { margin-top: 14px; }
+:root:root:root body .vg-av-groupe-tete { display: flex !important; align-items: center; gap: 8px; width: 100%; padding: 0 0 6px !important; min-height: 32px !important; color: var(--sv-encre) !important; position: relative; }
+:root:root:root body .vg-av-groupe-tete::after { content: ""; position: absolute; inset: -6px 0; }
+:root:root:root body .vg-av-groupe-tete.is-fixe { cursor: default; }
+:root:root:root body .vg-av-pastille-hote { display: grid; place-items: center; width: 10px; flex: none; }
+:root:root:root body .vg-av-groupe-titre { flex: 1; min-width: 0; font: 700 14px/1.25 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre) !important; }
+:root:root:root body .vg-av-groupe-eur { flex: none; font: 750 14.5px/1.2 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre) !important; font-variant-numeric: tabular-nums; }
+:root:root:root body .vg-av-groupe-eur .sb-prix { font: inherit !important; }
+:root:root:root body .vg-av-groupe-eur .sb-eur { font: inherit !important; vertical-align: baseline !important; }
+:root:root:root body .vg-av-plus { flex: none; font: 650 12.5px/1 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-lien) !important; }
+:root:root:root body .vg-av-date { display: block; margin: -2px 0 4px 18px; font: 550 12px/1.35 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-encre-2) !important; }
+:root:root:root body .vg-av-ventes { margin: 0 !important; padding: 0 !important; list-style: none; }
+:root:root:root body .vg-av-vente { display: flex !important; align-items: center; gap: 10px !important; min-height: 48px !important; padding: 0 !important; border-top: 1px solid rgb(12 29 48 / .10) !important; }
+:root:root:root[data-theme="dark"] body .vg-av-vente { border-top-color: rgb(255 255 255 / .10) !important; }
+:root:root:root body .vg-av-vente .vrm-av-vente-titre { font: 650 13.5px/1.25 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre) !important; }
+:root:root:root body .vg-av-vente .vrm-av-vente-meta { display: flex !important; align-items: center; gap: 5px; margin-top: 1px; font: 600 12px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
+:root:root:root body .vg-av-vente .sb-prix { font: 700 13.5px/1 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre) !important; flex: none; }
+:root:root:root body .vg-av-vente .sb-prix .sb-eur { font: inherit !important; vertical-align: baseline !important; }
+:root:root:root body .vg-av-logo { display: inline-flex; align-items: center; color: var(--sv-encre) !important; }
+:root:root:root body .vg-av-plaque { flex: none; min-width: 0 !important; height: 24px !important; padding: 0 8px !important; border-radius: 7px !important; font-size: 13px !important; line-height: 22px !important; align-items: center !important; }
+:root:root:root body .vg-av-plaque small { font-size: 13px !important; font-weight: 750 !important; color: inherit !important; margin: 0 !important; letter-spacing: 0 !important; }
+:root:root:root body .vg-av-plaque.is-vide { width: 0; padding: 0 !important; margin-right: -10px; }
+:root:root:root body .vg-av-pm .vg-av-groupe-tete { cursor: default; }
+:root:root:root body .vg-av-pm { padding-bottom: 4px; }
+:root:root:root body .vg-av-note { margin: 0 !important; padding: 9px 0 4px; border-top: 1px solid rgb(12 29 48 / .10); font: 550 12.5px/1.4 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
+:root:root:root[data-theme="dark"] body .vg-av-note { border-top-color: rgb(255 255 255 / .10); }
+:root:root:root body .vg-av-note-bas { border-top: 0; padding-top: 2px; }
+:root:root:root body .vg-av .vg-av-recu { grid-template-columns: 1fr !important; gap: 6px !important; }
+:root:root:root body .vg-av .vg-av-recu-case { flex-direction: row !important; align-items: baseline !important; gap: 8px !important; padding: 12px 14px !important; border-radius: 18px !important;
+  background-color: transparent !important; background-image: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; box-shadow: var(--sv-ombre) !important; color: var(--sv-encre) !important; }
+:root:root:root body .vg-av .vg-av-recu-case .vrm-av-trois-l { flex: 1; color: var(--sv-encre) !important; font-weight: 650 !important; }
+:root:root:root body .vg-av .vg-av-recu-case b { order: 3; font-size: 15px !important; font-weight: 750 !important; }
+:root:root:root body .vg-av .vg-av-recu-case .vrm-av-trois-aide { order: 2; color: var(--sv-encre-2) !important; }
+:root:root:root body .vg-av :is(.vrm-av-trois-note, .vrm-av-h:not(.vg-sr), .vrm-av-note) { color: var(--sv-clair-2) !important; }
+:root:root:root body .vg-av .vrm-av-h:not(.vg-sr) { color: var(--sv-clair) !important; font-weight: 700 !important; }
+:root:root:root body .vg-av :is(.vrm-av-liste, .vrm-av-frise-case) { color: var(--sv-encre) !important; }
+:root:root:root body .vg-av .vrm-av-frise-case { background-color: transparent !important; background-image: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; box-shadow: var(--sv-ombre) !important; border-radius: 18px !important; }
+
+} /* fin de @layer vrm-verre */

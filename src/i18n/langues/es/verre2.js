@@ -1,0 +1,22 @@
+// es · « Écrans en verre, 2 » (15 nov.) — Argent, Argent à venir, Messages, Paramètres, la fiche : docs/passation/2026-11-15-ecrans-verre-2.md
+export default {
+  "verre2.av.sous": "Ventas cerradas, aún sin pagar",
+  "verre2.av.pmLu": "Ya pagado, por transferir · nunca sumado al dinero por llegar",
+  "verre2.av.pmPasLu": "No leído: abre vinted.fr con tu sesión para volver a leerlo.",
+  "verre2.av.autres": {"one": "+{n} más", "other": "+{n} más"},
+  "verre2.av.moins": "Menos",
+  "verre2.etape.envoyer": "Por enviar",
+  "verre2.etape.route": "En camino",
+  "verre2.etape.livree": "Entregada",
+  "verre2.etape.versement": "Pago",
+  "verre2.etape.autre": "En curso",
+  "verre2.argent.venduEn": "vendido en {mois}",
+  "verre2.argent.recu": "Recibido",
+  "verre2.argent.auVersement": "el día del pago",
+  "verre2.argent.benefice": "Beneficio",
+  "verre2.argent.ventesSur": "{k} ventas de {n}",
+  "verre2.argent.prixASaisir": {"one": "{n} precio por introducir", "other": "{n} precios por introducir"},
+  "verre2.argent.urssaf": "URSSAF",
+  "verre2.argent.urssafPour": "URSSAF · a declarar por {periode}",
+  "verre2.argent.tauxDe": "{taux} % de {ca} recibidos",
+};
