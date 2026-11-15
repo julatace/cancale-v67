@@ -331,8 +331,11 @@ async function scenarioE(nav, W, sombre, suffixe) {
     const bulle = await attendre(pg, async () => { txt = await pg.evaluate((kk) => { const e = document.querySelector(`[data-glossaire-bulle="${kk}"]`); return e ? e.textContent : ''; }, k); return !!txt; }, 3000);
     dit(bulle && txt.split(/\s+/).length <= 30, `E2 ${suffixe} toucher « ${k} » l’explique en une phrase`, txt);
     await capture(pg, `E-glossaire-${suffixe}`);
-    await pg.mouse.click(5, 300); await pg.waitForTimeout(400);
-    dit(!(await pg.$('[data-glossaire-bulle]')), `E3 ${suffixe} un toucher ailleurs la referme`);
+    // (15 nov.) On ATTEND la fermeture (3 s au plus) au lieu d'un délai fixe de 400 ms : machine chargée (deux bancs
+    // à la fois), la page était occupée plus longtemps et la bulle se refermait juste après la mesure (§6.5).
+    await pg.mouse.click(5, 300);
+    const fermee = await attendre(pg, async () => !(await pg.$('[data-glossaire-bulle]')), 3000);
+    dit(fermee, `E3 ${suffixe} un toucher ailleurs la referme`);
   }
   await ctx.close();
   const b2 = baseNeuve({ ecritChoisi: true, aides: { off: { glossaire: true } } });

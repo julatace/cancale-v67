@@ -201,6 +201,9 @@ const toucher = async (pg, sel, { ms = 12000 } = {}) => {
   await l.scrollIntoViewIfNeeded().catch(() => {});
   await l.click();
 };
+// (15 nov., version studio) La PREMIÈRE impression demande le papier une fois (« Ton imprimante », impression-simple,
+// puis retenu) : le banc répond « Classique · A4 », comme tout-imprimer, avant de juger les moments.
+const papier = (pg) => pg.waitForSelector('[data-impr-papier-choix="normale"]', { timeout: 3000 }).then(() => pg.click('[data-impr-papier-choix="normale"]')).catch(() => {});
 const shot = (pg, nom) => pg.screenshot({ path: path.join(SHOTS, nom + '.png') }).catch(() => {});
 const tenir = (pg, on = true) => pg.evaluate((v) => { window.__tenir = v; }, on);
 const repondre = (pg, r) => pg.evaluate((x) => { window.__reponse = x; }, r);
@@ -226,6 +229,7 @@ action('colis.imprimer', async (nav) => {
     await shot(o.pg, 'colis-imprimer-avant');
     let lacher; tenue = new Promise((ok) => { lacher = ok; });
     await toucher(o.pg, '[data-lot-imprimer]');
+    await papier(o.pg);
     noter('colis.imprimer', 'pendant', await moment(o.pg, 'pendant', 'colis.imprimer', { ms: 6000 }));
     tenue = null; lacher();
     // Le PDF inventé n'a pas de forme connue : VRM demande où poser le tampon (« Placer le tampon ·
@@ -245,6 +249,7 @@ action('colis.imprimer', async (nav) => {
     couper = true;
     await toucher(o2.pg, 'button.vrm-impr-lien[data-lot-ouvrir]');
     await toucher(o2.pg, '[data-lot-imprimer]');
+    await papier(o2.pg);
     noter('colis.imprimer', 'echec', await moment(o2.pg, 'echec', 'colis.imprimer', { ms: 20000 }));
     await shot(o2.pg, 'colis-imprimer-echec');
   } finally { await o2.ctx.close(); }
