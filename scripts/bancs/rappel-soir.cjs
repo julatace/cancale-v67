@@ -228,7 +228,7 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     dit(b.length === 1, 'B (aucun colis à poster) reçoit UNE notification du soir', `${b.length}`);
     dit(p.title === 'Demain : 1 retrait, 1 offre Vestiaire', 'le titre : 1 retrait (dernier jour LU demain), 1 offre (Vestiaire, reçue, expire demain ; 6ef2983d : « offres Vestiaire », celles de Vinted n’expirent pas)', p.title);
     dit(/dernier jour pour retirer à Tabac des Halles/i.test(p.body || '') && !/Vannes|Bar Test/.test(p.body || ''), 'le corps nomme le point du colis de demain — pas celui dont le dernier jour est aujourd’hui (le matin l’a dit)', p.body);
-    dit(/1 offre Vestiaire expire avant demain soir\./.test(p.body || '') && !/Vinted/.test(p.body || ''), 'l’offre envoyée par lui et celle qui expire dans 3 jours ne sont pas dites ; aucune offre Vinted (elles n’expirent pas)', p.body);
+    dit(/1 offre Vestiaire expire demain soir/.test(p.body || '') && !/Vinted/.test(p.body || ''), 'l’offre envoyée par lui et celle qui expire dans 3 jours ne sont pas dites ; aucune offre Vinted (elles n’expirent pas)', p.body);
     dit(p.url === '/?tab=achats&cible=retrait&suivi=30000077', 'le toucher ouvre la carte de CE colis à retirer (son n° de suivi)', p.url);
     reset();
     V.B.vcOffres = { n101: offreVc('101', Date.parse('2026-10-22T13:00:00Z')) };
