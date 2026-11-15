@@ -34,7 +34,8 @@ export default {
   "memePhoto.pourquoi.proche": "Molto simile, non certo: guarda le due foto",
   "memePhoto.pourquoi.doute": "Somiglia, non certo: guarda le due foto",
   "memePhoto.pourquoi.ebay": "eBay: una sola misura possibile, guarda le due foto",
-  "memePhoto.detailEtats": "{surs} sicure · {verifier} da verificare",
+  "memePhoto.nSurs": {"one": "{n} sicura", "other": "{n} sicure"},
+  "memePhoto.nAVerifier": {"one": "{n} da verificare", "other": "{n} da verificare"},
   "memePhoto.extensionSure": "L’estensione {v} conferma «sicuro»: aggiornala. Nel frattempo, tutto è «da verificare».",
   "memePhoto.aideSure": "«Sicuro»: due misure diverse dicono che è la stessa foto. «Da verificare»: guarda le due foto. Niente viene collegato senza il tuo tocco.",
 };

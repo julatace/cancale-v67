@@ -34,7 +34,8 @@ export default {
   "memePhoto.pourquoi.proche": "Sehr ähnlich, nicht sicher: sieh dir beide Fotos an",
   "memePhoto.pourquoi.doute": "Ähnlich, nicht sicher: sieh dir beide Fotos an",
   "memePhoto.pourquoi.ebay": "eBay: nur eine Messung möglich, sieh dir beide Fotos an",
-  "memePhoto.detailEtats": "{surs} sicher · {verifier} zu prüfen",
+  "memePhoto.nSurs": {"one": "{n} sicher", "other": "{n} sicher"},
+  "memePhoto.nAVerifier": {"one": "{n} zu prüfen", "other": "{n} zu prüfen"},
   "memePhoto.extensionSure": "Erweiterung {v} bestätigt „sicher“: aktualisiere sie. Bis dahin ist alles „zu prüfen“.",
   "memePhoto.aideSure": "„Sicher“: zwei verschiedene Messungen sagen, dass es dasselbe Foto ist. „Zu prüfen“: sieh dir beide Fotos an. Nichts wird ohne deinen Tipp verknüpft.",
 };

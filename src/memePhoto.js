@@ -29,7 +29,7 @@
 //   `scripts/audit-meme-photo.cjs` exécutent les MÊMES fonctions (§11).
 // ══════════════════════════════════════════════════════════════════════════
 import { empreinteValide } from './photoEmpreinte.js';
-import { cleCoupleFin, verdictFin, SEUIL_EMPREINTE_SUR } from './photoFine.js';
+import { cleCoupleFin, verdictFin, mesureValide, SEUIL_EMPREINTE_SUR } from './photoFine.js';
 
 // LE SEUIL D'UNE PROPOSITION — plus STRICT que `SEUIL_PHOTO` (16), qui sert l'alerte « la même photo
 // sur deux comptes » (là, mieux vaut prévenir de trop). MESURÉ le 15 nov. (photos-comptes-seuil.cjs,
@@ -52,12 +52,12 @@ export const SITES_MEME_PHOTO = ['Leboncoin', 'eBay', 'Vestiaire'];
 export const SITE_COURT = { Leboncoin: 'lbc', Vestiaire: 'vc', eBay: 'ebay' };
 // « Même photo · sûr » exige LES DEUX mesures, nettes (src/photoFine.js) :
 //   1. l'empreinte ≤ `SEUIL_EMPREINTE_SUR` (10 ; entre 11 et 12 : « à vérifier ») ;
-//   2. la corrélation fine (extension 5.388) ≥ `SEUIL_FINE_SUR` sur CE couple de photos.
+//   2. la mesure fine (extension 5.388) « sûre » sur CE couple de photos (src/photoFine.js `verdictFin`).
 // Une seule mesure, ou l'une proche de son seuil ⇒ « à vérifier » (montré, les deux photos
 // côte à côte, JAMAIS compté sûr). La mesure fine NETTEMENT contraire (< `SEUIL_FINE_NON`) ⇒
 // le couple n'est pas la même photo : écarté. Rien n'est relié tout seul (§5) : « sûr » propose.
-export function etatCouple(distance, score) {
-  const v = verdictFin(score);
+export function etatCouple(distance, mesure) {
+  const v = verdictFin(mesure);
   if (v === 'non') return 'non';
   if (v === 'sur' && typeof distance === 'number' && distance <= SEUIL_EMPREINTE_SUR) return 'sur';
   return 'verifier';
@@ -110,7 +110,7 @@ export const cleAnnonceMemePhoto = (a) => `${a.plateforme}:${a.id}`;
 // `refus`   : { [cleRefusMemePhoto]: date } — ses « Ce n'est pas la même » ;
 // `numerosDouteux` : Set des N° (cleNum) portés par deux paires présentes ;
 // `cle`     : cleNum de l'app (« 007 » = « 7 », « b125 » = « B125 »).
-// `verifs`  : { [cleCoupleFin]: { s: score | null } } — la deuxième mesure (`photo_meme_verif`) ;
+// `verifs`  : { [cleCoupleFin]: { s, r } | { s: null } } — la deuxième mesure (`photo_meme_verif`) ;
 //             absente / `null` (pas lue) ⇒ aucune mesure fine : tout reste « à vérifier ».
 // Rend { lu, propositions, ambigus, nGeneriques, nSansEmpreinte, nVerifiees,
 //        nARelier, parNumero } :
@@ -168,7 +168,7 @@ export function propositionsMemePhoto({ vinted = [], autres = [], empreintes = n
         let fine = null;
         if (q.cote === 'vinted') {
           const x = V[cleCoupleFin(SITE_COURT[c.a.plateforme], c.a.id, p.k, q.a.compte, q.a.id, q.k)];
-          fine = x && typeof x.s === 'number' && Number.isFinite(x.s) ? x.s : null;
+          fine = mesureValide(x);
           // NETTEMENT pas la même photo (autre prise de vue, même modèle au même endroit) : écarté.
           if (etatCouple(d, fine) === 'non') { ecartes.add(c.a.id + '|' + q.a.id); continue; }
         }
@@ -224,10 +224,10 @@ export function propositionsMemePhoto({ vinted = [], autres = [], empreintes = n
 // proche du seuil · mesure fine entre les deux seuils). Le meilleur score fin est rendu.
 function etatPaire(couples) {
   const l = arr(couples);
-  const fines = l.map((c) => c.fine).filter((x) => typeof x === 'number');
-  const fine = fines.length ? Math.max(...fines) : null;
+  const fines = l.map((c) => c.fine).filter(Boolean);
+  const fine = fines.length ? Math.max(...fines.map((m) => m.s)) : null;
   if (l.some((c) => c.etat === 'sur')) return { etat: 'sur', fine, raison: null, couples: l };
-  const raison = !fines.length ? 'pas-mesure' : l.some((c) => typeof c.fine === 'number' && verdictFin(c.fine) === 'sur') ? 'proche' : 'doute';
+  const raison = !fines.length ? 'pas-mesure' : l.some((c) => c.fine && verdictFin(c.fine) === 'sur') ? 'proche' : 'doute';
   return { etat: 'verifier', fine, raison, couples: l };
 }
 // Les propositions d'UN site (la file « À relier » de son écran).

@@ -30,7 +30,7 @@ export function texteMemePhoto(res, site = null) {
   const props = res && res.lu ? (site ? duSite(res, site).propositions : res.propositions || []) : [];
   const surs = props.filter((p) => p.etat === 'sur').length;
   const detail = tr('memePhoto.detail', { sites: (site ? [site] : sites).join(' · ') || '—' });
-  return { n, surs, verifier: n - surs, titre: tr('memePhoto.aRelier', { n }), detail: n ? `${detail} · ${tr('memePhoto.detailEtats', { surs, verifier: n - surs })}` : detail };
+  return { n, surs, verifier: n - surs, titre: tr('memePhoto.aRelier', { n }), detail: n ? `${detail} · ${[surs ? tr('memePhoto.nSurs', { n: surs }) : '', n - surs ? tr('memePhoto.nAVerifier', { n: n - surs }) : ''].filter(Boolean).join(' · ')}` : detail };
 }
 
 // La ligne compacte d'un écran de site (Annonces → Leboncoin / eBay / Vestiaire) : rien s'il n'y a rien.
@@ -78,12 +78,12 @@ function Cote({ src, Photo, legende, sous, lien, attrs }) {
 const legendeAutre = (a) => `${a.plateforme}${a.compteNom && a.compteNom !== a.plateforme ? ' · ' + a.compteNom : ''}`;
 const photoVintedDe = (paire) => { const v = (paire.vinted || [])[0] || {}; return v.photo || paire.photoVinted || ''; };
 // L'état d'une proposition (ou d'une paire d'un cas ambigu) : « sûr » (diode) ou « à vérifier »
-// (point ambre + la raison). Lu par le banc sur `data-mph-etat` / `data-mph-raison`, jamais sur le texte.
+// (point ambre + la raison). Lu par le banc sur `data-mph-verdict` / `data-mph-raison`, jamais sur le texte.
 const raisonVerifier = (x, plateforme) => (x.raison === 'pas-mesure' && plateforme === 'eBay' ? 'ebay' : x.raison === 'proche' ? 'proche' : x.raison === 'doute' ? 'doute' : 'pasMesure');
 function Etat({ x, plateforme }) {
-  if (x.etat === 'sur') return <p className="vrm-mph-sur" data-mph-etat="sur" data-mph-fine={x.fine == null ? '' : String(x.fine)}><span className="vrm-mph-diode" aria-hidden="true"/>{tr('memePhoto.sur')}</p>;
+  if (x.etat === 'sur') return <p className="vrm-mph-sur" data-mph-verdict="sur" data-mph-fine={x.fine == null ? '' : String(x.fine)}><span className="vrm-mph-diode" aria-hidden="true"/>{tr('memePhoto.sur')}</p>;
   const r = raisonVerifier(x, plateforme);
-  return <p className="vrm-mph-averifier" data-mph-etat="verifier" data-mph-raison={r} data-mph-fine={x.fine == null ? '' : String(x.fine)}><span className="sb-point-ambre" aria-hidden="true"/><b>{tr('memePhoto.aVerifier')}</b> · {tr('memePhoto.pourquoi.' + r)}</p>;
+  return <p className="vrm-mph-averifier" data-mph-verdict="verifier" data-mph-raison={r} data-mph-fine={x.fine == null ? '' : String(x.fine)}><span className="sb-point-ambre" aria-hidden="true"/><b>{tr('memePhoto.aVerifier')}</b> · {tr('memePhoto.pourquoi.' + r)}</p>;
 }
 
 function Proposition({ p, Photo, onRelier, onRefuser }) {

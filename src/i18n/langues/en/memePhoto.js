@@ -34,7 +34,8 @@ export default {
   "memePhoto.pourquoi.proche": "Very close, not certain: look at both photos",
   "memePhoto.pourquoi.doute": "Looks alike, not certain: look at both photos",
   "memePhoto.pourquoi.ebay": "eBay: only one measure possible, look at both photos",
-  "memePhoto.detailEtats": "{surs} sure · {verifier} to check",
+  "memePhoto.nSurs": {"one": "{n} sure", "other": "{n} sure"},
+  "memePhoto.nAVerifier": {"one": "{n} to check", "other": "{n} to check"},
   "memePhoto.extensionSure": "Extension {v} confirms “sure”: update it. Until then, everything is “to check”.",
   "memePhoto.aideSure": "“Sure”: two different measures say it’s the same photo. “To check”: look at both photos. Nothing is linked without your tap.",
 };

@@ -96,18 +96,23 @@ let ko = 0;
 const dit = (ok, nom, det) => { if (!ok) ko++; console.log(`${ok ? '✅' : '❌'} ${nom}${ok || !det ? '' : ' — ' + String(det).slice(0, 300)}`); };
 
 // ── Images inventées : un NOM ⇒ des pixels (motif à blocs, graine = le nom ; « ~bruit » = recompressée) ──
-function pixels(nom) {
+// (15 nov., lot meme-photo-sure) `w × h` : la même image à une autre taille (la mesure fine lit
+// l'image à 512 px au plus ; l'empreinte à 64 × 64). « ~texture » : une texture fine en plus, tirée
+// du NOM COMPLET (deux « prises de vue » : mêmes blocs, détails différents).
+function pixels(nom, w = 64, h = w) {
   const base = String(nom).replace(/~.*$/, '');
   let s = 0; for (const c of base) s = (s * 31 + c.charCodeAt(0)) >>> 0;
   const r = () => { s = (s * 1103515245 + 12345) >>> 0; return (s >>> 8) / 16777216; };
-  const n = 64, px = new Uint8ClampedArray(n * n * 4);
+  const px = new Uint8ClampedArray(w * h * 4);
   const blocs = Array.from({ length: 64 }, () => Math.floor(r() * 255));
-  const bruit = /~bruit/.test(nom);
+  const bruit = /~bruit/.test(nom), texture = /~texture/.test(nom);
+  let g = 0; for (const c of String(nom)) g = (g * 33 + c.charCodeAt(0)) >>> 0;
   let t = 7;
-  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
-    let v = blocs[Math.floor(y / 8) * 8 + Math.floor(x / 8)];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    let v = blocs[Math.floor((y * 8) / h) * 8 + Math.floor((x * 8) / w)];
     if (bruit) { t = (t * 1103515245 + 12345) >>> 0; v = Math.max(0, Math.min(255, v + ((t >>> 16) % 7) - 3)); }
-    const k = (y * n + x) * 4; px[k] = v; px[k + 1] = v; px[k + 2] = v; px[k + 3] = 255;
+    if (texture) { g = (g * 1103515245 + 12345) >>> 0; if (((x >> 2) + (y >> 2)) % 3 === 0) v = Math.max(0, Math.min(255, v + ((g >>> 16) % 61) - 30)); }
+    const k = (y * w + x) * 4; px[k] = v; px[k + 1] = v; px[k + 2] = v; px[k + 3] = 255;
   }
   return px;
 }
@@ -214,8 +219,8 @@ function pixels(nom) {
     // ── E : l'extension ──
     const { faireFond } = require('./_fond-vm.cjs');
     const brancherImages = (f) => {
-      f.ctx.createImageBitmap = async (blob) => ({ nom: await blob.text(), close() {} });
-      f.ctx.OffscreenCanvas = function (w, h) { this.width = w; this.height = h; let b = null; this.getContext = () => ({ drawImage(bmp) { b = bmp; }, getImageData: () => ({ data: pixels(b.nom) }), set imageSmoothingQuality(_) {} }); };
+      f.ctx.createImageBitmap = async (blob) => ({ nom: await blob.text(), width: 300, height: 400, close() {} });
+      f.ctx.OffscreenCanvas = function (w, h) { this.width = w; this.height = h; let b = null; this.getContext = () => ({ drawImage(bmp) { b = bmp; }, getImageData: (x0, y0, gw, gh) => ({ data: pixels(b.nom, gw, gh) }), set imageSmoothingQuality(_) {} }); };
     };
     const CL = '987', CV = 'vcmoi';
     const lignes = () => ({
@@ -280,6 +285,111 @@ function pixels(nom) {
       g.onglets = null; await g.ctx.tickEmpreintes();
       dit(g.images.length === 0, 'E4 · Vinted d’abord : une image Vinted prise ⇒ aucune autre à ce tour', String(g.images.length));
       dit(!g.store.vrmEmpreintesTour, 'E4 · après une image Vinted, le verrou du tour est levé (sinon 3 min sans aucune empreinte)', JSON.stringify(g.store.vrmEmpreintesTour || null)); }
+
+    // ══ F : « MÊME PHOTO · SÛR » — la deuxième mesure (15 nov., lot meme-photo-sure, extension 5.388) ══
+    const F = await import(path.join(RACINE, 'src', 'photoFine.js'));
+    const P = (nom, w = 300, h = 400) => F.preparerFine(pixels(nom, w, h), w, h);
+    {
+      const srcFin = fs.readFileSync(path.join(RACINE, 'src', 'photoFine.js'), 'utf8');
+      const mApp = BLOC_FIN.exec(srcFin), mBg = BLOC_FIN.exec(fs.readFileSync(BG, 'utf8'));
+      dit(mApp && mBg && sansExport(mApp[1]) === mBg[1], 'F0 · le bloc <photo-fine-regle> de l’extension = copie exacte de src/photoFine.js (node scripts/audit-meme-photo.cjs --recopie)', mBg ? 'différent' : 'absent');
+      // La mesure elle-même, exécutée : la même image (réduite + recompressée : bruit) ⇒ ≥ sûr ; une autre ⇒ < non ;
+      // une vignette (contenu < 96 px) ⇒ pas préparée (« pas su »), jamais un score.
+      const sMeme = F.comparerFine(P('fin-a'), P('fin-a~bruit')), sReduite = F.comparerFine(P('fin-a'), P('fin-a~bruit', 240, 320)), sAutre = F.comparerFine(P('fin-a'), P('fin-b'));
+      dit(F.verdictFin(sMeme) === 'sur' && F.verdictFin(sReduite) !== 'non' && F.verdictFin(sAutre) === 'non', 'F1 · mesure fine exécutée : même image recompressée ⇒ « sûr » ; réduite ⇒ jamais écartée ; autre image ⇒ « non »', JSON.stringify({ sMeme, sReduite, sAutre }));
+      dit(F.preparerFine(pixels('fin-a', 80, 100), 80, 100) === null && F.comparerFine(null, P('fin-a')) === null, 'F1 · vignette trop petite ⇒ « pas su » (null), jamais un score', '');
+      dit(F.SEUIL_FINE_SUR > F.SEUIL_FINE_NON && F.SEUIL_CORREL_SUR < 1 && F.SEUIL_EMPREINTE_SUR < M.SEUIL_MEME_PHOTO, 'F1 · seuils ordonnés : non < sûr ; empreinte « sûre » plus stricte que le seuil de proposition', JSON.stringify([F.SEUIL_FINE_NON, F.SEUIL_FINE_SUR, F.SEUIL_CORREL_SUR, F.SEUIL_EMPREINTE_SUR, M.SEUIL_MEME_PHOTO]));
+      // L'état d'un couple : les DEUX mesures nettes ⇒ sûr ; une seule, ou l'une proche ⇒ à vérifier ; fine nettement contraire ⇒ non.
+      const sur = F.SEUIL_FINE_SUR, non = F.SEUIL_FINE_NON, entre = (sur + non) / 2, rs = F.SEUIL_CORREL_SUR;
+      const X = (s0, r0 = 0.9999) => ({ s: s0, r: r0 });
+      const cas = [[0, X(0.999), 'sur'], [F.SEUIL_EMPREINTE_SUR, X(sur, rs), 'sur'], [F.SEUIL_EMPREINTE_SUR + 1, X(0.999), 'verifier'], [M.SEUIL_MEME_PHOTO, X(0.999), 'verifier'], [4, null, 'verifier'], [4, { s: null }, 'verifier'],
+        [4, X(entre), 'verifier'], [4, X(0.999, rs - 0.0005), 'verifier'], [4, X(non - 0.01), 'non'], [M.SEUIL_MEME_PHOTO, X(non - 0.01), 'non']];
+      const faux = cas.filter(([d, sc, e]) => M.etatCouple(d, sc) !== e);
+      dit(!faux.length, 'F2 · état d’un couple : sûr = empreinte nette ET mesure fine ≥ seuil sûr ; une seule mesure, empreinte proche du seuil ou fine entre deux ⇒ à vérifier ; fine sous le seuil « non » ⇒ écarté', JSON.stringify(faux.map(([d, sc, e]) => [d, sc, e, M.etatCouple(d, sc)])));
+    }
+    {
+      // La règle complète avec les mesures fines (`verifs`, la forme de `photo_meme_verif`).
+      const cf = F.cleCoupleFin;
+      const avecV = (m, verifs) => M.propositionsMemePhoto({ vinted: m.vinted, autres: m.autres, empreintes: { vinted: m.ev, ...m.es }, cle, verifs });
+      const m = base(); autre(m, 'Leboncoin', 5101, ['paire-124~bruit']);
+      const k = cf('lbc', '5101', uL('paire-124~bruit'), '111', '1001', uV('paire-124'));
+      const sans = calc(m), avec = avecV(m, { [k]: { s: 0.999, r: 0.9999 } }), doute = avecV(m, { [k]: { s: (F.SEUIL_FINE_SUR + F.SEUIL_FINE_NON) / 2, r: 0.9999 } }), non = avecV(m, { [k]: { s: F.SEUIL_FINE_NON - 0.05, r: 0.9 } }), nul = avecV(m, { [k]: { s: null, r: null } });
+      dit(sans.propositions.length === 1 && sans.propositions[0].etat === 'verifier' && sans.propositions[0].raison === 'pas-mesure' && sans.nSurs === 0, 'F3 · sans mesure fine : la proposition reste « à vérifier » (une seule mesure), jamais comptée sûre', JSON.stringify(sans.propositions.map((p) => [p.etat, p.raison])));
+      dit(avec.propositions.length === 1 && avec.propositions[0].etat === 'sur' && avec.nSurs === 1 && avec.nAVerifier === 0, 'F3 · empreinte nette + mesure fine nette sur CE couple ⇒ « Même photo · sûr »', JSON.stringify(avec.propositions.map((p) => [p.etat, p.fine])));
+      dit(doute.propositions.length === 1 && doute.propositions[0].etat === 'verifier' && doute.propositions[0].raison === 'doute', 'F3 · mesure fine entre les deux seuils ⇒ « à vérifier »', JSON.stringify(doute.propositions.map((p) => [p.etat, p.raison])));
+      dit(nul.propositions.length === 1 && nul.propositions[0].etat === 'verifier', 'F3 · mesure fine « pas su » (image trop petite) ⇒ « à vérifier »', JSON.stringify(nul.propositions.map((p) => p.etat)));
+      dit(non.propositions.length === 0 && non.ambigus.length === 0 && non.nEcartees === 1, 'F3 · mesure fine nettement contraire ⇒ pas la même photo : écartée, rien proposé', JSON.stringify({ p: non.propositions.length, e: non.nEcartees }));
+      const autreCle = avecV(m, { [cf('lbc', '5101', uL('paire-124~bruit'), '111', '1002', uV('paire-124'))]: { s: 0.999, r: 0.9999 } });
+      dit(autreCle.propositions.length === 1 && autreCle.propositions[0].etat === 'verifier', 'F3 · une mesure fine d’un AUTRE couple (autre annonce Vinted) ne rend jamais celui-ci sûr', JSON.stringify(autreCle.propositions.map((p) => p.etat)));
+      // Ambigu : deux paires ; la fine écarte l'une ⇒ l'autre seule (proposition) ; les deux sûres ⇒ ambigu, jamais sûr.
+      const a = base(); a.v(1010, 222, '300', 'boite-partagee'); a.v(1011, 111, '301', 'boite-partagee~bruit'); autre(a, 'Leboncoin', 5102, ['boite-partagee']);
+      const k300 = cf('lbc', '5102', uL('boite-partagee'), '222', '1010', uV('boite-partagee')), k301 = cf('lbc', '5102', uL('boite-partagee'), '111', '1011', uV('boite-partagee~bruit'));
+      const r1 = avecV(a, { [k300]: { s: 0.998, r: 0.9999 }, [k301]: { s: 0.3, r: 0.8 } }), r2 = avecV(a, { [k300]: { s: 0.998, r: 0.9999 }, [k301]: { s: 0.997, r: 0.9999 } });
+      dit(r1.propositions.length === 1 && r1.propositions[0].numero === '300' && r1.propositions[0].etat === 'sur' && !r1.ambigus.length, 'F4 · deux paires possibles, la mesure fine écarte l’une ⇒ l’autre seule, « sûr »', JSON.stringify({ p: r1.propositions.map((p) => [p.numero, p.etat]), a: r1.ambigus.length }));
+      dit(!r2.propositions.length && r2.ambigus.length === 1 && r2.nSurs === 0 && r2.ambigus[0].paires.every((p) => p.etat === 'sur'), 'F4 · la même photo vraiment sur DEUX paires ⇒ ambigu (il choisit), jamais compté sûr', JSON.stringify({ p: r2.propositions.length, a: r2.ambigus.length, s: r2.nSurs }));
+      // Des paires identiques AU MÊME ENDROIT : mêmes blocs (l'empreinte les confond), détails différents.
+      const st = base();
+      for (let i = 0; i < 6; i++) st.v(3100 + i, 111, String(600 + i), 'studio-jordan~texture' + i);
+      for (let i = 0; i < 6; i++) autre(st, 'Leboncoin', 6100 + i, ['studio-jordan~texture' + (10 + i)]);
+      const vSt = {};
+      for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) vSt[cf('lbc', String(6100 + i), uL('studio-jordan~texture' + (10 + i)), '111', String(3100 + j), uV('studio-jordan~texture' + j))] = F.comparerFine(P('studio-jordan~texture' + (10 + i)), P('studio-jordan~texture' + j)) || { s: null };
+      const rs = avecV(st, vSt), rsSans = calc(st);
+      dit(rs.nSurs === 0 && !rs.propositions.some((p) => p.etat === 'sur') && !rs.ambigus.some((x) => x.paires.some((p) => p.etat === 'sur')), 'F5 · 6 paires identiques au MÊME endroit (mêmes blocs, détails différents) : AUCUN « sûr »', JSON.stringify({ surs: rs.nSurs, p: rs.propositions.length, a: rs.ambigus.length, ecartees: rs.nEcartees, scores: Object.values(vSt).map((x) => [x.s, x.r]).sort().slice(-3) }));
+      dit(rsSans.nSurs === 0, 'F5 · … et sans mesure fine non plus (l’empreinte seule ne dit jamais « sûr »)', JSON.stringify({ surs: rsSans.nSurs }));
+    }
+    {
+      // §5 : « sûr » propose, SON toucher relie — aucun chemin ne relie seul.
+      const appSrc = app.replace(/^\s*\/\/.*$/gm, '');
+      const appels = (appSrc.match(/relierParPhoto\s*\(/g) || []).length, refs = (appSrc.match(/\brelierParPhoto\b/g) || []).length;
+      const charge = corps('async function chargerMemePhoto(', 4000).split('\nif (typeof window')[0].replace(/^\s*\/\/.*$/gm, '');
+      const regles = (fs.readFileSync(path.join(RACINE, 'src', 'photoFine.js'), 'utf8') + fs.readFileSync(path.join(RACINE, 'src', 'memePhoto.js'), 'utf8')).replace(/\/\/.*$/gm, '');
+      dit(appels === 1 && refs === 2 && /onRelier=\{relierParPhoto\}/.test(appSrc) && !/relier|gesteVrm|vrm_lbc_liens|LIENS_EBAY|relierVc/.test(charge) && !/fetch\(|save\(|localStorage|withOwner|gesteVrm/.test(regles),
+        'F6 · §5 : relier n’a lieu que sur SON toucher (`onRelier`), même « sûr » ; le calcul et les règles n’écrivent rien', JSON.stringify({ appels, refs, charge: /relier|gesteVrm/.test(charge) }));
+    }
+    {
+      // E7 · l'extension : la mesure fine d'un couple candidat, les deux images, sans cookie, budgets.
+      const uLb = (n) => `https://img.leboncoin.fr/api/v1/lbcpb1/images/${n}.jpg`;
+      const monde = (o = {}) => {
+        const lignesF = {
+          lbc_listings: { items: { 15: { id: 15, account: 'lbc-account:' + CL, subject: 'Paire', status: 'active', images: [uLb('paire-124~bruit')] } } },
+          vc_listings: { items: {} },
+          harvest_111_listings: { capturedAt: new Date().toISOString(), payload: { items: [{ id: 1001, title: 'x', photo: { url: uV('paire-124') + '?s=SIG' } }] } },
+          photo_emprunte_111: { payload: { annonces: { 1001: { [uV('paire-124')]: H('paire-124') } } } },
+          photo_empreinte_lbc: { payload: { annonces: { 15: { [uLb('paire-124~bruit')]: H('paire-124~bruit') } } } },
+        };
+        const store = Object.assign({ vrmLbcTransport: o.lbcTab === false ? {} : { 21: { source: 'prive', compte: 'lbc-account:' + CL, at: Date.now() } } }, o.store || {});
+        const f = faireFond({ src: BG, lignes: lignesF, comptes: [{ vinted_user_id: '111', login: 'a', domain: 'www.vinted.fr', access_token: 'j' }], connecte: o.connecte === undefined ? '111' : o.connecte, store, lectureKO: o.lectureKO,
+          onglets: [{ id: 7, url: 'https://www.vinted.fr/', status: 'complete' }, { id: 21, url: 'https://www.leboncoin.fr/compte/part/mes-annonces', status: 'complete' }] });
+        brancherImages(f);
+        const fetch0 = f.ctx.fetch; f.images = [];
+        f.ctx.fetch = async (u, opts) => {
+          const t = String(u);
+          const ml = /^https:\/\/img\.leboncoin\.fr\/.*\/([^/]+)\.jpg/.exec(t), mv = /^https:\/\/images1\.vinted\.net\/t\/([^/]+)\//.exec(t);
+          if (ml || mv) { f.images.push({ u: t, cred: opts && opts.credentials }); return { ok: true, status: 200, headers: { get: (k) => (/content-type/i.test(k) ? 'image/jpeg' : null) }, blob: async () => new Blob([(ml || mv)[1]]) }; }
+          return fetch0(u, opts);
+        };
+        return f;
+      };
+      const g = monde();
+      if (typeof g.ctx.verifFineUnTour !== 'function') { dit(false, 'E7 · `verifFineUnTour` existe dans le fond'); } else {
+        await g.ctx.tickEmpreintes();
+        const kOk = F.cleCoupleFin('lbc', '15', uLb('paire-124~bruit'), '111', '1001', uV('paire-124'));
+        const l = g.lignes.photo_meme_verif, c = l && l.payload && l.payload.couples && l.payload.couples[kOk];
+        dit(g.images.length === 2 && g.images.every((x) => x.cred === 'omit') && g.images.some((x) => /vinted\.net/.test(x.u)) && g.images.some((x) => /leboncoin/.test(x.u)), 'E7 · un couple candidat ⇒ les DEUX images, dans le même tour, SANS cookie (rien d’autre à ce tour)', JSON.stringify(g.images));
+        dit(c && F.verdictFin(c) === 'sur' && c.v === F.VERSION_FINE && !/"pixels"|data:image|"f":|"m":/.test(JSON.stringify(l)), 'E7 · rangé dans `photo_meme_verif` : deux NOMBRES par couple { s, r } (la même photo ⇒ « sûr »), jamais l’image', JSON.stringify(l || null).slice(0, 220));
+        const lec = ((g.store.vrmLectures || {})['leboncoin:' + CL] || []).length, lecV = ((g.store.vrmLectures || {})['111'] || []).length;
+        dit(lec === 1 && lecV >= 1, 'E7 · le couple compte sur le budget de LECTURE du compte Leboncoin ET du compte Vinted', JSON.stringify({ lec, lecV }));
+        const n0 = g.images.length; await g.ctx.tickEmpreintes();
+        dit(g.images.length === n0, 'E7 · 45 s entre deux mesures ; un couple mesuré ne se refait pas', String(g.images.length - n0));
+      }
+      { const h = monde({ lbcTab: false }); await h.ctx.tickEmpreintes(); dit(!h.images.some((x) => /leboncoin/.test(x.u)) && !h.lignes.photo_meme_verif, 'E7 · onglet Leboncoin de CE compte fermé ⇒ aucune mesure fine', JSON.stringify(h.images)); }
+      { const h = monde({ connecte: null }); await h.ctx.tickEmpreintes(); dit(!h.images.length, 'E7 · aucun compte Vinted connecté dans un onglet ⇒ rien', JSON.stringify(h.images)); }
+      { const t = Date.now(); const h = monde({ store: { vrmVerifFineHeure: Array.from({ length: 6 }, () => t - 1000) } }); await h.ctx.verifFineUnTour();
+        dit(!h.images.length, 'E7 · 6 couples dans l’heure ⇒ plus rien (plafond)', JSON.stringify(h.images)); }
+      { const h0 = monde(); await h0.ctx.planVerifFine(); const plan = h0.store.vrmVerifFinePlan;
+        const h = monde({ lectureKO: (u) => /id=eq\.photo_meme_verif/.test(u), store: { vrmVerifFinePlan: plan } }); await h.ctx.verifFineUnTour();
+        dit(plan && plan.couples.length === 1 && h.images.length === 2 && !h.lignes.photo_meme_verif && (h.store.vrmVerifFineFile || []).length === 1, 'E7 · lecture de `photo_meme_verif` ratée ⇒ RIEN écrit, le score reste en file', JSON.stringify({ plan: plan && plan.couples.length, img: h.images.length, ecrit: !!h.lignes.photo_meme_verif, file: (h.store.vrmVerifFineFile || []).length })); }
+    }
 
     // ── C1 ──
     const cap = /EXT_CAPACITES = \{[^}]*\bmemephoto: '([\d.]+)'/.exec(app);
