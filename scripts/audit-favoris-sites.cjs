@@ -63,8 +63,7 @@ if (process.argv.includes('--prouve')) {
     ['plafondFavorisIgnore', 'src', "      const p = await porteDiscretion('vc:' + ot.compte, 'favori');\n      if (p) { await finir('arret', p.error); break; }", "      const p = null;\n      if (p) { await finir('arret', p.error); break; }"],
     ['porteAuToucherIgnoree', 'src', "    { const p = await porteDiscretion('vc:' + ot.compte, 'favori'); if (p) return", "    { const p = null; if (p) return"],
     ['ouvertureIgnoree', 'src', "  if (/^\\d{1,20}$/.test(String(id))) { try { await noterOuvertureVinted('vc:' + String(id)); } catch (_) {} }", ''],
-    ['autreCompteIgnore', 'src', "      const ot = await ongletVestiaire(compte);\n      if (!ot.ok) { await finir('arret', ot.raison); break; }\n      // Les MÊMES portes", "      const ot = await ongletVestiaire(null);\n      if (!ot.ok) { await finir('arret', ot.raison); break; }\n      // Les MÊMES portes"],
-    ['attenteSansVerif', 'src', "    const non = await arretAvantOffreAimeVc(compte);\n    if (non) return { ok: false, raison: non };", "    const non = '';\n    if (non) return { ok: false, raison: non };"],
+    ['autreCompteIgnore', 'src', [["      const ot = await ongletVestiaire(compte);\n      if (!ot.ok) { await finir('arret', ot.raison); break; }\n      // Les MÊMES portes", "      const ot = await ongletVestiaire(null);\n      if (!ot.ok) { await finir('arret', ot.raison); break; }\n      // Les MÊMES portes"], ["  const ot = await ongletVestiaire(compte);\n  if (!ot.ok) return ot.raison;", "  const ot = await ongletVestiaire(null);\n  if (!ot.ok) return ot.raison;"]]],
     ['repriseAbsente', 'src', "lance('vcaimes', () => reprendreOffresAimesVc());", ''],
     ['fondPause429', 'src', "      if (statut === 429 || statut === 403) { await poserPauseVc(statut, rep.ra); await noter('refusee'); await finir('arret', `Vestiaire a refusé (${statut}) — pause de 30 min`); break; }", "      if (statut === 429 || statut === 403) { await noter('refusee'); continue; }"],
     ['journalAbsent', 'src', "f.suivi.faites++; n++; await noterJournal('vc:' + ot.compte, 'favori', {}); }", "f.suivi.faites++; n++; }"],
@@ -75,11 +74,13 @@ if (process.argv.includes('--prouve')) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-favoris-sites-'));
   let tous = true;
   for (const [nom, cle, avant, apres] of MUT) {
-    const txt = fs.readFileSync(F[cle], 'utf8');
-    if (!txt.includes(avant)) { console.log(`❌ mutation ${nom} : texte introuvable`); tous = false; continue; }
+    let txt = fs.readFileSync(F[cle], 'utf8');
+    const paires = Array.isArray(avant) ? avant : [[avant, apres]];
+    if (paires.some(([a]) => !txt.includes(a))) { console.log(`❌ mutation ${nom} : texte introuvable`); tous = false; continue; }
+    for (const [a, b] of paires) txt = txt.replace(a, b);
     fs.mkdirSync(path.join(tmp, nom), { recursive: true });
     const fichier = path.join(tmp, nom, path.basename(F[cle]));
-    fs.writeFileSync(fichier, txt.replace(avant, apres));
+    fs.writeFileSync(fichier, txt);
     const args = [__filename, '--' + cle, fichier];
     for (const k of Object.keys(F)) if (k !== cle) args.push('--' + k, F[k]);
     const r = spawnSync(process.execPath, args, { encoding: 'utf8', timeout: 240000 });
@@ -209,7 +210,9 @@ function systeme() {
   class Dv extends RD { constructor(...a) { if (a.length) super(...a); else super(RD.now() + decal); } static now() { return RD.now() + decal; } }
   fond.ctx.Date = Dv;
   const st = fond.ctx.setTimeout;
-  fond.ctx.setTimeout = (f, ms) => { if (Number(ms) > 0) decal += Number(ms); return st(f, ms); };
+  // Seules les ATTENTES voulues (l'écart entre deux offres, l'espacement de la sécurité) avancent l'heure —
+  // pas les minuteurs de garde (`avecDelai` 25 s) qui ne font qu'attendre une réponse.
+  fond.ctx.setTimeout = (f, ms) => { if (Number(ms) > 0 && /attendreVc|secuGeste|tenirAttenteAimeVc/.test(String(new Error().stack))) decal += Number(ms); return st(f, ms); };
   // Les écarts TIRÉS entre deux offres (`vcaimes:ecart`, la même trace que les attentes des favoris Vinted).
   fond.ctx.__vrmPausesVues = [];
   const delais = { get vus() { return fond.ctx.__vrmPausesVues.filter((x) => x[0] === 'vcaimes:ecart').map((x) => x[1]); } };
@@ -231,7 +234,7 @@ const pret = async (S, { personnes = [P1, P2, P3], prix = 24900, ouvert = true }
 const vieillirOuverture = (S) => { const o = S.fond.store.vrmOuverture && S.fond.store.vrmOuverture['vc:' + MOI]; if (o) { o.depuis = Date.now() - 10 * 60000; o.vu = Date.now(); } };
 const apprendre = (S, rec = capt.rec) => S.fond.envoyer({ from: 'cancale-vc', action: 'vcOffreAppris', recette: rec }, { tab: { id: 41, url: ORIGINE + '/chat/' } });
 // Vestiaire répond à une offre par la négociation de CETTE personne (sa forme mesurée).
-const repondre = (S, statut = 200, toutes = null) => { let n = 0; S.ch.routes[`POST ${URL_NEGO}`] = (init) => { n++; const b = JSON.parse(init.body || '{}'); const s = typeof statut === 'function' ? statut(n) : statut; return s >= 200 && s < 300 ? { status: s, body: nego('91' + String(n).padStart(7, '0'), String(b.buyerId), [ev('offer', 'seller', b.price && b.price.cents)]) } : { status: s, body: { message: 'non' } }; }; };
+const repondre = (S, statut = 200, toutes = null) => { let n = 0; S.heures = []; S.ch.routes[`POST ${URL_NEGO}`] = (init) => { n++; S.heures.push(S.fond.ctx.Date.now()); const b = JSON.parse(init.body || '{}'); const s = typeof statut === 'function' ? statut(n) : statut; return s >= 200 && s < 300 ? { status: s, body: nego('91' + String(n).padStart(7, '0'), String(b.buyerId), [ev('offer', 'seller', b.price && b.price.cents)]) } : { status: s, body: { message: 'non' } }; }; };
 const finEnvoi = async (S, max = 400) => { for (let i = 0; i < max; i++) { const e = S.fond.lignes.vc_aimes && S.fond.lignes.vc_aimes.envoi; if (e && e.fin) return e; await attendre(10); } return S.fond.lignes.vc_aimes && S.fond.lignes.vc_aimes.envoi; };
 const posts = (S) => S.ch.appels.filter((a) => a.m === 'POST' && a.u === URL_NEGO);
 
@@ -273,8 +276,10 @@ async function a2a6() {
   const serieV = [];
   for (let i = 0; i < 300; i++) serieV.push(await S.fond.ctx.tirerSansRepeter('banc', 8, 20));
   dit(serieV.every((x, i) => i === 0 || x !== serieV[i - 1]) && new Set(serieV).size >= 10, 'A5 · 300 tirages : jamais deux fois de suite la même valeur, et bien répartis', JSON.stringify(serieV.slice(0, 12)));
-  const jr = (((S.fond.store.vrmJournal || {})) && JSON.stringify(S.fond.store)) || '';
-  dit(/"s":"favori"/.test(jr), 'A5 · chaque offre faite va au journal « Ce que VRM a fait » (sorte « favori »)', jr.slice(0, 200));
+  const jr = ((S.fond.store.vrmJournal || {})['vc:' + MOI]) || [];
+  dit(jr.filter((e) => e && e.s === 'favori').length === 3, 'A5 · chaque offre faite va au journal « Ce que VRM a fait » (vc:{compte}, sorte « favori »)', JSON.stringify(jr));
+  const heures = S.heures || [];
+  dit(heures.length === 3 && heures.every((h, i) => i === 0 || h - heures[i - 1] >= ecarts[i - 1]), 'A5 · l’offre suivante part APRÈS l’écart tiré (jamais avant)', JSON.stringify({ heures: heures.map((h) => h - heures[0]), ecarts }));
   dit(((S.fond.store.vrmActions || {})['vc:' + MOI] || []).length === 3, 'A5 · trois actions comptées sous le compte Vestiaire', JSON.stringify(S.fond.store.vrmActions));
   const n5 = posts(S).length;
   const r52 = await S.cmd({ cmd: 'vcOffreAimes', produit: ART, avantCents: 24900, prixCents: 22000 });
@@ -339,6 +344,11 @@ async function a2a6() {
   T2.fond.store.vrmToutArrete = { on: true, at: Date.now() };
   const t21 = await T2.cmd({ cmd: 'vcOffreAimes', produit: ART, avantCents: 24900, prixCents: 23700 });
   dit(t21 && t21.accepte === false && t21.code === 'tout-arrete' && posts(T2).length === 0, 'A8 · « Tout arrêter » : rien ne part', JSON.stringify(t21));
+  const T3 = systeme(); await pret(T3); await apprendre(T3);
+  repondre(T3, (n) => { if (n === 1) T3.fond.store.vrmToutArrete = { on: true, at: T3.fond.ctx.Date.now() }; return 200; });
+  await T3.cmd({ cmd: 'vcOffreAimes', produit: ART, avantCents: 24900, prixCents: 23700 });
+  const eT3 = await finEnvoi(T3);
+  dit(posts(T3).length === 1 && eT3 && eT3.fin === 'arret' && /Tout est arrêté/.test(eT3.raison), 'A8 · « Tout arrêter » touché PENDANT la série : la suite ne part pas, dit', JSON.stringify({ n: posts(T3).length, eT3 }));
   // Un autre compte Vestiaire vient d'agir dans ce navigateur ⇒ un compte à la fois (et Vinted ne retient pas Vestiaire).
   const U = systeme(); await pret(U); await apprendre(U); repondre(U);
   U.fond.store.vrmVerrouCompteVc = { uid: 'vc:99990000', jusqua: Date.now() + 5 * 60000, at: Date.now() };
