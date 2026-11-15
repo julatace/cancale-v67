@@ -122,6 +122,8 @@ const lire = (pg) => pg.evaluate(() => {
     questionLogin: (r.querySelector('[data-question-login]') || { getAttribute: () => null }).getAttribute('data-question-login'),
     // Les boutons de la question : la forme unique (§7), et ≥ 44 px au doigt.
     fondQ: r.querySelector('.question') ? getComputedStyle(r.querySelector('.question')).backgroundColor : '',
+    fondQImg: r.querySelector('.question') ? getComputedStyle(r.querySelector('.question')).backgroundImage : '',
+    accentQImg: r.querySelector('.question [data-choix="oui"]') ? getComputedStyle(r.querySelector('.question [data-choix="oui"]')).backgroundImage : '',
     accentQ: r.querySelector('.question [data-choix="oui"]') ? getComputedStyle(r.querySelector('.question [data-choix="oui"]')).backgroundColor : '',
     hauteursQ: Array.from(r.querySelectorAll('.question button')).map((b) => Math.round(b.getBoundingClientRect().height)),
     // Le mot de passe ne doit JAMAIS être un champ du DOM de la page (5.329 : il
@@ -485,11 +487,12 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
     await d.ctx.close();
   });
   await essaie('graphisme', async () => {
-    // 5.328 : verre (fond translucide) clair et sombre.
-    for (const [scheme, fond, accent] of [['dark', 'rgba(28, 28, 30, 0.92)', 'rgb(10, 132, 255)'], ['light', 'rgba(255, 255, 255, 0.88)', 'rgb(0, 113, 227)']]) {
+    // 5.328 : verre (fond translucide) clair et sombre. 5.379 : « Studio bleu clair » (src/design/studio.css) —
+    // un fond OPAQUE bleu clair / bleu-nuit (dégradé, lumière du haut) et le plein en rond d'encre.
+    for (const [scheme, fond, accent] of [['dark', 'rgb(21, 38, 61)', 'rgb(234, 242, 251)'], ['light', 'rgb(238, 246, 253)', 'rgb(12, 29, 48)']]) {
       const { ctx, pg } = await rendre(nav, AC(), { scheme });
       const l = await lire(pg);
-      dit(l.fondQ === fond && l.accentQ === accent, `${scheme} : la carte suit le système (verre, jetons de l’app, un seul bleu)`, JSON.stringify({ fond: l.fondQ, accent: l.accentQ }));
+      dit(/gradient/.test(l.fondQImg) && l.fondQImg.includes(fond) && l.accentQImg.includes(accent), `${scheme} : la carte suit le système (studio bleu clair, jetons de l’app, le plein à l’encre)`, JSON.stringify({ fond: l.fondQImg, accent: l.accentQImg }));
       if (scheme === 'light') await pg.screenshot({ path: path.join(SORTIE, 'badge-question-clair.png') });
       await ctx.close();
     }

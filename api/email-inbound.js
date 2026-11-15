@@ -34,7 +34,7 @@ import { colisPerdu, normaliserSuivi } from './_lib/etat-colis-email.js';
 import { DESTINATIONS, conversationDeLEmail } from './_lib/lien-notif.js';
 import { estSuppressionLbc, lireSuppressionLbc, texteSuppressionLbc, jourParis, CAT_LBC_SUPPRESSION, FAMILLE_LBC_SUPPRESSION } from './_lib/lbc-suppression.js';
 // (5 nov.) Les textes des notifications : fabriqués là où l'aperçu de Paramètres → Notifications les lit.
-import { texteVendu, texteArgentRecu, texteVenduVestiaire, texteBordereau, texteOffre, texteMessage, texteAnnulation } from './_lib/notif-apercus.js';
+import { texteVendu, texteArgentRecu, texteVenduVestiaire, texteBordereau, texteOffre, texteMessage, texteAnnulation, texteRetourAchat } from './_lib/notif-apercus.js';
 import { stampBordereau } from './_lib/stamp.js';
 // (9 nov., transporteurs inconnus) Le transporteur NOMMÉ dans le PDF du bordereau (sans IA, api/_lib/transporteur-pdf.js).
 import { transporteurDuPdf, champsPdf } from './_lib/transporteur-pdf.js';
@@ -2491,8 +2491,11 @@ export async function traiterEmail(req, res) {
         dateLimite: lu.dateLimite, dateLimiteJour: lu.dateLimiteJour, dateLimiteIso: lu.dateLimiteIso, article: lu.article,
         account: acc.login || '', uid: acc.uid || '', pdfB64: lu.pdf.contentB64, filename: lu.pdf.filename || `Bon-Retour-Vinted-${lu.transaction}.pdf`,
         receivedAt: now } }]);
-      if (ok) try { await pushOnce({ title: '↩️ Bordereau de retour reçu', body: `${lu.article ? court(lu.article, 50) + ' · ' : ''}${lu.dateLimite ? 'à déposer avant le ' + lu.dateLimite.split(' ')[0] : 'imprime-le depuis Achats'}`,
-        tag: `bordretour-${lu.transaction}`, url: DESTINATIONS.achat({ tx: lu.transaction }) }, 'colis'); } catch (_) {}
+      // (15 nov.) « À renvoyer : Autry donna / Bordereau de retour reçu · à déposer avant le
+      // lun. 23 nov. 10 h » (la limite LUE, en clair, heure de Paris) ; le toucher ouvre LA
+      // CARTE de ce retour (Achats, par SON n° de transaction).
+      if (ok) try { await pushOnce({ ...texteRetourAchat({ article: lu.article, limite: lu.dateLimiteIso || '' }),
+        tag: `bordretour-${lu.transaction}`, url: DESTINATIONS.retour({ tx: lu.transaction }), ...(lu.dateLimiteIso ? { echeance: lu.dateLimiteIso } : {}) }, 'colis'); } catch (_) {}
       await logEmail({ type: 'bordereau-retour', subject, from: mail.from, transaction: lu.transaction });
       await repondre(res, 200, { ok: true, type: 'bordereau-retour', transaction: lu.transaction, suivi: lu.suivi, dateLimite: lu.dateLimiteIso || null, pdf: true });
       return;
@@ -3122,7 +3125,8 @@ export async function traiterEmail(req, res) {
       const net = null;
       const advice = phraseConseilOffre(juge, offerAmt);
       try { await pushOnce({
-        ...texteOffre({ montant, qui, article, compte: acc.login, conseil: advice }),
+        // (15 nov.) Sans le pseudo de l'acheteur ; le conseil du copilote, court (« à vérifier »).
+        ...texteOffre({ montant, article, juge }),
         tag: `offer-${key}`, url: DESTINATIONS.offre({ conv: conversationDeLEmail(mail), compte: acc.uid }),
         _cat: 'offre',
       }); } catch (_) {}

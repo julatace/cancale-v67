@@ -211,7 +211,7 @@ const tr = (cle, o) => base.set(`${A}|email_track_${cle}`, { status: 'available'
     const r1 = await lancer(T);
     const p = (s) => pushes.find((x) => x.tag === 'retrait-' + s) || {};
     const v1 = p('demain-40000001'), d2 = p('dernier-40000002'), d3 = p('dernier-40000003'), d4 = p('dernier-40000004'), d6 = p('dernier-40000006');
-    dit(/Demain dernier jour/.test(v1.title || '') && /Air Max 90 blanches 43/.test(`${v1.title} ${v1.body}`),   // un titre de plus de 40 caractères passe l'article dans le corps (api/_lib/push.js)
+    dit(/Demain dernier jour/.test(v1.title || '') && /Air Max 90/.test(`${v1.title} ${v1.body}`) && (v1.body || '').length <= 90,   // un titre de plus de 40 caractères passe l'article dans le corps (api/_lib/push.js)
      
       'veille : colis relié à son achat par son N° DE SUIVI (ligne de suivi Vinted) ⇒ « 📍 Demain dernier jour · <la paire> »', `${v1.title} | ${v1.body} | HTTP ${r1.code}`);
     dit(/Dernier jour · Jordan 1 Mid noires 42$/.test(d2.title || ''),

@@ -25,6 +25,7 @@
 // Pur : aucune lecture, aucune écriture.
 // ────────────────────────────────────────────────────────────────────────────
 
+import { dateClaire } from './notif-redaction.js';
 export const FAMILLES = [
   { id: 'ventes', titre: 'Ventes', def: true },
   { id: 'offres', titre: 'Offres', def: true },
@@ -318,7 +319,11 @@ export function texteArrivee({ article = '', transporteur = '', lieu = '', code 
   const sujet = a || (transporteur ? `Ton colis ${transporteur}` : 'Ton colis');
   const l = lieuCourtNotif(lieu);
   const c = codeAffichable(code), c2 = codeAffichable(code2);
-  const lim = jjmm(limite);
+  // (15 nov.) La date EN CLAIR, heure de Paris (api/_lib/notif-redaction.js) : « jusqu'au
+  // mer. 12 nov. », jamais « 12/11 ». Toujours le jour (jamais « demain ») : la notification
+  // peut être lue plus tard (heures calmes, cloche). Illisible ⇒ l'ancienne forme JJ/MM.
+  const dc = /^\d{4}-\d{2}-\d{2}$/.test(String(limite || '').slice(0, 10)) ? dateClaire(String(limite).slice(0, 10), { relatif: false }) : null;
+  const lim = dc ? dc.texte : jjmm(limite);
   const morceaux = [
     l,
     c ? `code ${c}${c2 ? ' + ' + c2 : ''}` : '',
@@ -329,7 +334,9 @@ export function texteArrivee({ article = '', transporteur = '', lieu = '', code 
   // corps (rien n'est coupé) et le titre dit « Ton colis <transporteur> t'attend ».
   if (`${sujet} t'attend`.length > 40 && a) {
     const t = transporteur && `Ton colis ${transporteur} t'attend`.length <= 40 ? `Ton colis ${transporteur} t'attend` : "Ton colis t'attend";
-    return { title: t, body: [a, ...morceaux].join(' · ') };
+    // (15 nov.) Corps ≤ 90 : si tout ne tient pas, l'article passe en dernier (lieu, code et date d'abord).
+    const devant = [a, ...morceaux].join(' · ');
+    return { title: t, body: devant.length <= 90 ? devant : [...morceaux, a].join(' · ') };
   }
   return { title: `${sujet} t'attend`, body: corps };
 }

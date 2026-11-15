@@ -7,6 +7,7 @@
 import ecran_journee from './fr/journee.js';
 import ecran_confort from './fr/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_studio from './fr/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
+import ecran_correspondances from './fr/correspondances.js';   // (15 nov.) Publier partout : catégories qui correspondent
 import ecran_capte from './fr/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_idees from './fr/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './fr/ventes.js';
@@ -35,6 +36,7 @@ import ecran_accueilReste from './fr/accueilReste.js';
 import ecran_fraiscarte from './fr/fraiscarte.js';   // (14 nov., frais-carte)
 import ecran_atelier from './fr/atelier.js';
 import ecran_accompagnement from './fr/accompagnement.js';   // (14 nov.) les quatre moments d'un geste
+import ecran_partenaires from './fr/partenaires.js';   // (15 nov.) programme partenaire
 import ecran_argentprix from './fr/argentprix.js';   // (14 nov., argent-prix)
 import ecran_rechliste from './fr/rechliste.js';
 import ecran_studio_paires from './fr/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
@@ -56,6 +58,7 @@ export default {
   ...ecran_accompagnement,
   ...ecran_plus,
   ...ecran_argentprix,
+  ...ecran_partenaires,
   ...ecran_plateformes,
   ...ecran_idees,
   ...ecran_compta,
@@ -384,14 +387,14 @@ export default {
   "auth.moyens.chargement": "Chargement des autres moyens de connexion… Tu peux déjà utiliser ton email.",
   "auth.moyens.erreur": "Les autres moyens de connexion n’ont pas pu être chargés. L’e-mail reste disponible.",
   "auth.moyens.reessayer": "Réessayer les moyens de connexion",
-  "auth.ouEmail": "ou par e-mail",
+  "auth.ou": "ou",
   "auth.oublie": "Mot de passe oublié ?",
   "auth.perime.1": "Plus de 10 minutes : l’extension n’est pas connectée.",
   "auth.perime.2": "Connecte-toi, puis reclique « Continuer avec Google » (ou Discord) dans l’extension.",
   "auth.pied": "Aucun mot de passe Vinted demandé.",
   "auth.point1.texte": ", dans le bon ordre, avec leur bordereau.",
   "auth.point1.titre": "Tes colis du jour",
-  "auth.point2.texte": " : Vinted, Leboncoin et eBay au même endroit.",
+  "auth.point2.texte": " : Vinted, Leboncoin, eBay et Vestiaire au même endroit.",
   "auth.point2.titre": "Vendu ici, à retirer ailleurs",
   "auth.point3.texte": ", prêts pour l'URSSAF, mois par mois.",
   "auth.point3.titre": "Tes chiffres",
@@ -2261,4 +2264,5 @@ export default {
   ...ecran_confort,
   ...ecran_studio,
   ...ecran_capte,
+  ...ecran_correspondances,
 };

@@ -2,6 +2,7 @@
 import ecran_journee from './it/journee.js';
 import ecran_confort from './it/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_studio from './it/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
+import ecran_correspondances from './it/correspondances.js';   // (15 nov.) Publier partout : catégories qui correspondent
 import ecran_capte from './it/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_idees from './it/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './it/ventes.js';
@@ -30,6 +31,7 @@ import ecran_accueilReste from './it/accueilReste.js';
 import ecran_fraiscarte from './it/fraiscarte.js';   // (14 nov., frais-carte)
 import ecran_atelier from './it/atelier.js';
 import ecran_accompagnement from './it/accompagnement.js';   // (14 nov.) les quatre moments d'un geste
+import ecran_partenaires from './it/partenaires.js';   // (15 nov.) programme partenaire
 import ecran_argentprix from './it/argentprix.js';   // (14 nov., argent-prix)
 import ecran_rechliste from './it/rechliste.js';
 import ecran_studio_paires from './it/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
@@ -51,6 +53,7 @@ export default {
   ...ecran_accompagnement,
   ...ecran_plus,
   ...ecran_argentprix,
+  ...ecran_partenaires,
   ...ecran_plateformes,
   ...ecran_idees,
   ...ecran_compta,
@@ -379,14 +382,14 @@ export default {
   "auth.moyens.chargement": "Caricamento degli altri metodi di accesso… Puoi già usare la tua email.",
   "auth.moyens.erreur": "Non è stato possibile caricare gli altri metodi di accesso. L’e-mail resta disponibile.",
   "auth.moyens.reessayer": "Riprova i metodi di accesso",
-  "auth.ouEmail": "o via e-mail",
+  "auth.ou": "o",
   "auth.oublie": "Password dimenticata?",
   "auth.perime.1": "Più di 10 minuti: l’estensione non è connessa.",
   "auth.perime.2": "Accedi, poi clicca di nuovo «Continua con Google» (o Discord) nell’estensione.",
   "auth.pied": "Nessuna password Vinted richiesta.",
   "auth.point1.texte": ", nell’ordine giusto, con la loro etichetta.",
   "auth.point1.titre": "I pacchi del giorno",
-  "auth.point2.texte": ": Vinted, Leboncoin ed eBay nello stesso posto.",
+  "auth.point2.texte": ": Vinted, Leboncoin, eBay e Vestiaire nello stesso posto.",
   "auth.point2.titre": "Venduto qui, da togliere altrove",
   "auth.point3.texte": ", pronti per l’URSSAF, mese per mese.",
   "auth.point3.titre": "I tuoi numeri",
@@ -2256,4 +2259,5 @@ export default {
   ...ecran_confort,
   ...ecran_studio,
   ...ecran_capte,
+  ...ecran_correspondances,
 };

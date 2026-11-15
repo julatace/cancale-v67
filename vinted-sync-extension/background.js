@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.378.0';
+const CODE_VERSION = '5.381.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -4488,6 +4488,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             if(Object.prototype.hasOwnProperty.call(msg,'erreurCapture'))avant[tabId].erreurCapture=['identite','taille','session'].includes(msg.erreurCapture)?msg.erreurCapture:null;
             const recent=Object.fromEntries(Object.entries(avant).sort((a,b)=>b[1].at-a[1].at).slice(0,32));
             await chrome.storage.local.set({vrmLbcTransport:recent});sendResponse({ok:true});return;
+          }
+          // 5.379 (15 nov., page Leboncoin noire sur Orion) : le disjoncteur du relais —
+          // VRM s'est mis de côté sur un onglet, puis ce que la page a fait SANS lui. Une
+          // étiquette (compteur + « Envoyer un rapport »), jamais une adresse ni un contenu.
+          if (msg.action === 'lbcDisjoncteur') {
+            const tabId = sender?.tab?.id;
+            if (sender?.frameId > 0 || tabId == null || !/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(sender?.tab?.url || '')) { sendResponse({ ok: false }); return; }
+            const quoi = ['mis-de-cote', 'affichee-sans-vrm', 'vide-sans-vrm'].includes(msg.quoi) ? msg.quoi : null;
+            if (!quoi) { sendResponse({ ok: false }); return; }
+            await noterDiag('lbc_disjoncteur_' + quoi).catch(() => {});
+            sendResponse({ ok: true }); return;
           }
           if (msg.action === 'lbcDiag') {
             await storeLbcRecon({ capture: { source: msg.source, vues: msg.vues, compte: !!msg.compte, url: msg.url, a_next_data: !!msg.a_next_data, a_next_f: !!msg.a_next_f, at: new Date().toISOString() } });
@@ -17451,11 +17462,14 @@ async function favorisPourCarte(uid, relire) {
 // page du MÊME site que l'onglet (son origine, jamais une adresse reçue), celle du
 // compte connecté. Seules des adresses déjà connues de VRM (son code les ouvre ou les
 // lit déjà) ; ce qui n'a pas d'adresse connue n'est pas proposé (Vestiaire : aucune).
-//   Vinted    : /my_orders/sold (banc numero-vinted), /inbox, /member/{uid} (Réglages) ;
+//   Vinted    : /inbox, /member/{uid} (Réglages) — 5.379 : plus /my_orders/sold (404 chez Vinted) ;
 //   Leboncoin : /compte/part/mes-annonces, /compte/part/mes-transactions, /messages ;
 //   eBay      : /sh/lst/active, /sh/ord (Paramètres eBay, « Retirer ailleurs »).
 const LIENS_CARTE = Object.freeze({
-  vinted: [['ventes', 'Mes ventes', '/my_orders/sold'], ['messages', 'Messages', '/inbox'], ['dressing', 'Mon dressing', '/member/{uid}']],
+  // 5.379 (Julien, 15 nov., capture « Page not found ») : « Mes ventes » `/my_orders/sold` n'était
+  // ATTESTÉE nulle part (une page inventée par un banc) et Vinted la sert en 404 : retirée. Restent
+  // les adresses que l'app ouvre déjà : `/inbox` (conversations) et `/member/{uid}` (Réglages).
+  vinted: [['messages', 'Messages', '/inbox'], ['dressing', 'Mon dressing', '/member/{uid}']],
   leboncoin: [['annonces', 'Mes annonces', '/compte/part/mes-annonces'], ['ventes', 'Mes ventes', '/compte/part/mes-transactions'], ['messages', 'Messages', '/messages']],
   ebay: [['annonces', 'Mes annonces', '/sh/lst/active'], ['ventes', 'Mes ventes', '/sh/ord']],
   vestiaire: [],
@@ -18599,7 +18613,6 @@ async function etatSite(url,tabId) {
 // Tout est lu dans CE navigateur (aucune requête) : ce que la dernière passe a
 // MESURÉ. Pas su (rien noté, ou noté il y a plus de 24 h) ⇒ `null`, la carte ne
 // dit rien (« pas su » ne vaut pas « tout va bien », §5).
-const VINTED_VENTES_URL = 'https://www.vinted.fr/my_orders/sold';
 const pluriel = (n, un, plusieurs) => (n > 1 ? plusieurs : un);
 async function capturePourCarte(plateforme, uid, vcCapte) {
   const owner = await proprietaireConnu();
@@ -18611,7 +18624,7 @@ async function capturePourCarte(plateforme, uid, vcCapte) {
     const bm = ((await lireBordManquants()) || {})[String(uid)];
     const frais = bm && Date.now() - Number(bm.at || 0) < 24 * 3600000;
     const n = frais ? Math.max(0, Number(bm.n) || 0) : null;
-    if (n > 0) return { k: 'manque', n, phrase: `${n} ${pluriel(n, 'bordereau pas encore récupéré', 'bordereaux pas encore récupérés')}`, geste: 'Ouvre tes ventes à expédier', lien: VINTED_VENTES_URL, enFile };
+    if (n > 0) return { k: 'manque', n, phrase: `${n} ${pluriel(n, 'bordereau pas encore récupéré', 'bordereaux pas encore récupérés')}`, geste: 'Ouvre tes ventes à expédier sur Vinted', enFile };
     if (enFile) return { k: 'attente', n: enFile, phrase: `${enFile} ${pluriel(enFile, 'lecture pas encore envoyée', 'lectures pas encore envoyées')} à VRM`, geste: 'Elles repartent seules dès que le réseau revient', enFile };
     if (n === 0) return { k: 'ok', n: 0, phrase: 'Bordereaux : tous récupérés', geste: '', enFile };
     return null;
@@ -18974,7 +18987,7 @@ async function carteListes(msg, sender) {
     const lignes = os.map((x) => {
       const etat = etatVenteCarte(x), it = x.item_id != null ? String(x.item_id) : '';
       const f = it && fiches[it] && typeof fiches[it] === 'object' && String(fiches[it].accountId || '') === u ? fiches[it] : null;
-      return { tx: String(x.transaction_id), titre: String(x.title || '').slice(0, 120), prix: prixCarte(x.price), photo: photoCarte(x), date: Date.parse(x.date || '') || null, etat,
+      return { tx: String(x.transaction_id), conv: /^[1-9]\d{0,19}$/.test(String(x.conversation_id == null ? '' : x.conversation_id)) ? String(x.conversation_id) : '', titre: String(x.title || '').slice(0, 120), prix: prixCarte(x.price), photo: photoCarte(x), date: Date.parse(x.date || '') || null, etat,
         vendue: etat === 'a_expedier' || etat === 'en_route' || etat === 'finalisee', num: f && f.numero != null ? String(f.numero) : '', bordereau: etat === 'a_expedier' ? avecPdf.has(String(x.transaction_id)) : null };
     }).sort((a, b) => (Number(b.date) || 0) - (Number(a.date) || 0));
     ventes = { lu: r0 ? (Date.parse(r0.cap || '') || null) : null, total: r0 ? Number(r0.n) || lignes.length : 0, liste: lignes };
@@ -19286,14 +19299,46 @@ const PUBLICATIONS_EN_VOL = new Set();
 function appliquerAnnonceLbc(ad, saisie) {
   const v = valideAnnonceLbc(saisie, { ref: ad.ref || ('VRM-' + ad.numero), photos: ad.photos, etat: ad.etat });
   if (!v.ok) return { ok: false, erreurs: v.erreurs, raison: (v.erreurs[0] && v.erreurs[0].raison) || 'fiche invalide' };
+  const cr = criteresFicheLbc(saisie);
+  if (!cr.ok) return { ok: false, erreurs: [{ champ: 'criteres', raison: cr.raison }], raison: cr.raison };
   // Les drapeaux disent à lbc.js quels champs POSER par-dessus ce que Leboncoin
   // aurait écrit : seulement ceux qu'il a vraiment changés dans la fiche.
-  return { ok: true, ad: Object.assign({}, ad, v.annonce, {
+  return { ok: true, ad: Object.assign({}, ad, v.annonce, cr.categorie ? { category: cr.categorie } : {}, cr.criteres ? { criteres: cr.criteres } : {}, {
     edite: true,
     titreEdite: v.annonce.title !== String(ad.title || ''),
     descriptionEditee: v.annonce.description !== String(ad.description || ''),
     prixEdite: Number(v.annonce.price) !== Number(String(ad.price).replace(',', '.')),
   }) };
+}
+// (15 nov., 5.381) LA CATÉGORIE ET SES CRITÈRES, DEPUIS LA FICHE DE VRM — capacité
+// `lbccriteres`. VRM les tire de la catégorie Vinted de l'annonce (table vérifiée,
+// src/correspondances.js) ou de SA réponse ; sans eux, Leboncoin DEVINAIT l'univers et
+// le type d'après la photo et le titre (sa prédiction), et la catégorie venait du titre.
+// Ne passent que : une catégorie du vocabulaire Leboncoin (libellés de son fdata), et
+// six critères nommés, en texte court. lbc.js ne clique qu'une option au libellé
+// EXACT (rien d'exact ⇒ rien, et le bandeau le dit). Rien d'envoyé ⇒ la règle d'avant.
+const LBC_CATEGORIES_FICHE = ['Vêtements', 'Chaussures', 'Accessoires & Bagagerie', 'Montres & Bijoux', 'Vêtements bébé', 'Vêtements enfants', 'Chaussures enfants', 'Montres & bijoux enfants', 'Accessoires & bagagerie enfants', 'Livres', 'Loisirs créatifs', 'Sport & Plein air'];
+function criteresFicheLbc(saisie) {
+  const s = saisie && typeof saisie === 'object' ? saisie : {};
+  const out = { ok: true, categorie: '', criteres: null };
+  if (s.categorie != null && String(s.categorie).trim() !== '') {
+    const c = String(s.categorie).replace(/\s+/g, ' ').trim();
+    if (LBC_CATEGORIES_FICHE.indexOf(c) < 0) return { ok: false, raison: 'catégorie inconnue de Leboncoin' };
+    out.categorie = c;
+  }
+  if (s.criteres != null) {
+    if (typeof s.criteres !== 'object' || Array.isArray(s.criteres)) return { ok: false, raison: 'critères illisibles' };
+    const crit = {};
+    for (const k of ['univers', 'type', 'taille', 'etat', 'couleur', 'marque']) {
+      const v = s.criteres[k];
+      if (v == null || v === '') continue;
+      const t = String(v).replace(/\s+/g, ' ').trim();
+      if (!t || t.length > 60 || /[<>\u0000-\u001f]/.test(t)) return { ok: false, raison: 'critère « ' + k + ' » illisible' };
+      crit[k] = t;
+    }
+    if (Object.keys(crit).length) out.criteres = crit;
+  }
+  return out;
 }
 // Ce que lbc.js dit de l'avancement d'un dépôt lancé depuis l'app : une étape
 // connue, des NOMBRES, et le libellé des champs obligatoires que VRM n'a pas pu
@@ -22927,7 +22972,8 @@ function lbcTitre(brand, base, size, max) {
 const LBC_DESC_MAX = 4000;
 const LBC_PRIX_MAX = 100000;
 const LBC_PHOTOS_MAX = 15;
-const LBC_ETATS = ['Neuf avec étiquette', 'Très bon état', 'Bon état', 'État satisfaisant'];
+// (15 nov.) « Neuf sans étiquette » : servi par Leboncoin (fdata du 8 nov., `clothing_condition_a`).
+const LBC_ETATS = ['Neuf avec étiquette', 'Neuf sans étiquette', 'Très bon état', 'Bon état', 'État satisfaisant'];
 function refLbcPresente(texte, ref) {
   if (!ref) return false;
   return new RegExp(String(ref).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![0-9A-Z])', 'i').test(String(texte || ''));
@@ -22958,6 +23004,8 @@ const SOUS_FAMILLES = [
   ['espadrilles', 'chaussures', /espadrille/],
   ['mocassins', 'chaussures', /(mocassin|loafer)/],
   ['derbies', 'chaussures', /(\bderby\b|derbies|richelieu|oxford)/],
+  // (15 nov.) « Chaussures et bottes de randonnée » (Vinted) n'est pas une botte : 305 de ses ventes.
+  ['randonnee', 'chaussures', /randonn[ée]e/],
   ['bottes', 'chaussures', /(\bbottes?\b|bottine|\bboots?\b|chelsea)/],
   ['baskets', 'chaussures', /(basket|sneaker|running|trainer|\brunners?\b)/],
   ['chaussures', 'chaussures', /chaussure/],
@@ -23007,7 +23055,9 @@ function familleArticle(o) {
   if (/^femmes?$/.test(seg[0] || '')) genre = 'femme';
   else if (/^hommes?$/.test(seg[0] || '')) genre = 'homme';
   else if (/^enfants?$/.test(seg[0] || '')) genre = 'enfant';
-  const deux = seg[1] || '';
+  // (15 nov.) Vinted range les chaussures d'enfant SOUS « Vêtements pour filles / garçons >
+  // Chaussures » : le segment suivant décide (une basket d'enfant partait en « Vêtements enfants »).
+  const deux = /^v[êe]tements pour (filles|gar[çc]ons)$/.test(seg[1] || '') && /chaussure/.test(seg[2] || '') ? seg[2] : (seg[1] || '');
   if (/chaussure/.test(deux)) famille = 'chaussures';
   else if (/v[êe]tement/.test(deux)) famille = 'vetements';
   else if (/^sacs?\b/.test(deux)) famille = 'sacs';

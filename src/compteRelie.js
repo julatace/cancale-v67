@@ -35,6 +35,7 @@
 //     inventé, jamais « 0 » pour « rien lu ».
 // ══════════════════════════════════════════════════════════════════════════════
 import { SANS_COMPTE_VC } from '../api/_lib/comptes-exclus.js';
+import { rediger } from '../api/_lib/notif-redaction.js';
 
 export const LIGNE_COMPTES_RELIES = 'vrm_comptes_relies';
 export const CAT_COMPTE_RELIE = 'compte';
@@ -207,17 +208,16 @@ export function etapesPremiereLecture({ plateforme, uid = '', lignes, lu = undef
 export const lectureFinie = (etapes) => Array.isArray(etapes) && etapes.length > 0 && etapes.every((e) => e.etat === 'lu');
 
 // ── LA NOTIFICATION ─────────────────────────────────────────────────────────
-// `comptes` : [{ plateforme, nom, id }]. Un nom absent ⇒ l'identifiant court
-// (jamais un nom deviné).
-const nomDe = (c) => (c && c.nom) || (c && c.plateforme === 'ebay' && c.id === 'principal' ? 'Ton compte eBay' : `n° ${String((c && c.id) || '').slice(0, 8)}`);
+// `comptes` : [{ plateforme, nom, id }]. (15 nov., capture de Julien : « n° 37451417
+// est relié à VRM ») Le compte se nomme par SON pseudo quand il est connu, sinon par
+// sa plateforme (« Ton compte Vestiaire est relié ») — JAMAIS par son identifiant.
+// Le texte vient de la règle de rédaction (api/_lib/notif-redaction.js) ; `redaction`
+// le fait refaire dans la langue du compte au moment d'envoyer.
 export function texteCompteRelie(comptes) {
-  const l = (Array.isArray(comptes) ? comptes : []).filter(Boolean);
+  const l = (Array.isArray(comptes) ? comptes : []).filter(Boolean)
+    .map((c) => ({ plateforme: String(c.plateforme || ''), nom: c.plateforme === 'ebay' && c.id === 'principal' && !c.nom ? '' : String(c.nom || '') }));
   if (!l.length) return null;
-  if (l.length === 1) {
-    const c = l[0];
-    return { title: `🔗 ${nomDe(c)} est relié à VRM`, body: `Compte ${NOM_PLATEFORME_RELIEE[c.plateforme] || ''} · la première lecture commence. Ouvre VRM pour la suivre.` };
-  }
-  const noms = l.slice(0, 3).map(nomDe);
-  const reste = l.length - noms.length;
-  return { title: `🔗 ${l.length} comptes reliés à VRM`, body: `${noms.join(', ')}${reste > 0 ? ` et ${reste} autre${reste > 1 ? 's' : ''}` : ''} · la première lecture commence. Ouvre VRM pour la suivre.` };
+  const redaction = { sorte: 'compteRelie', comptes: l };
+  const r = rediger(redaction);
+  return r ? { title: r.title, body: r.body, redaction } : null;
 }

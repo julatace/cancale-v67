@@ -20,7 +20,11 @@ export const DETOURAGE_POUR_TOUS = false;
 
 // `true` quand VRM compte vraiment les ventes Vestiaire Collective. Tant qu'il
 // vaut `false`, Vestiaire n'apparaît que dans la FAQ (« pas encore »).
-export const VESTIAIRE_BRANCHE = false;
+// (15 nov., lot site-public — MESURÉ dans le code) Vestiaire est compté : `ventesFaites` (VENDU) et
+// `ventesDeclarables` (CA déclaré) de src/App.jsx reçoivent `vestiaire: ventesVc` et rangent chaque
+// vente Vestiaire datée au montant sûr (sinon NOMMÉE, jamais devinée). La question « Et Vestiaire ?
+// En cours » de la FAQ était devenue fausse : `true`.
+export const VESTIAIRE_BRANCHE = true;
 
 // Le prix des CGV (public/legal/cgv.html : « abonnement à 16,99 € par mois », depuis le 31 octobre — 14,99 € du 27 au 31 oct.,
 // depuis le 27 octobre — 12,99 € avant, 9,99 € avant le 11 octobre). Le banc

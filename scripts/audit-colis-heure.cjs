@@ -161,7 +161,7 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     console.log(`     sur le téléphone : « ${p.title} » / « ${p.body} »`);
     dit(b.total === 3, 'le matin compte 3 colis pressés : l’imprimé non parti, la vente sans email, celui de 7 h', `total=${b.total} · ${JSON.stringify({ o: b.overdue, a: b.dueToday, d: b.dueTomorrow, skip: b.skipped || b.vintedSkip })}`);
     dit(b.dueTomorrow === 1 && /1 demain avant 10 h/.test(p.body || ''), 'le colis IMPRIMÉ mais pas parti est compté — « 1 demain avant 10 h » (l’heure lue dans l’email)', p.body);
-    dit(b.dueToday === 1 && /Date estimée pour 1/.test(p.body || ''), 'la vente SANS email de bordereau est comptée (vente + 7 j), et dite estimée', p.body);
+    dit(b.dueToday === 1 && /1 estimée\b/.test(p.body || '') && (p.body || '').length <= 90, 'la vente SANS email de bordereau est comptée (vente + 7 j), et dite estimée', p.body);
     dit(b.overdue === 1 && /1 en retard/.test(p.body || '') && /retard/i.test(p.title || ''), 'la limite « aujourd’hui 7 h 00 » est EN RETARD à 7 h 10 (le retard compte à partir de l’heure)', `${p.title} / overdue=${b.overdue}`);
     dit(matinDe().length === 1 && p.url === '/?tab=ventes&cible=colonne&colonne=prets', 'UNE notification, qui ouvre Ventes · À expédier (colonne « Prêts », 31 oct. ; Ventes depuis le 11 nov.)', `${matinDe().length} · ${p.url}`);
   });
@@ -186,7 +186,7 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     // (10 nov., lot AT) Le soir est devenu le RÉSUMÉ DU SOIR : seulement ce qu'il y a à faire
     // DEMAIN (906, estimée plus tard, n'est plus dite) — les mêmes faits, la même règle.
     dit(p.title === 'Demain : 3 colis à déposer', 'le soir : « Demain : 3 colis à déposer » (906, dû plus tard, n’est pas dit)', p.title);
-    dit(/1 déjà en retard/.test(p.body || '') && /1 date estimée passée : vérifie sur Vinted/.test(p.body || '') && /1 colis à déposer avant 10 h demain/.test(p.body || ''), 'le corps : 1 déjà en retard (limite lue), 1 à vérifier (la vente sans email : date estimée), 1 avant demain 10 h — l’heure écrite', p.body);
+    dit(/1 déjà en retard/.test(p.body || '') && /1 date estimée passée : vérifie sur Vinted/.test(p.body || '') && /^1 avant 10 h\b/.test(p.body || '') && (p.body || '').length <= 90, 'le corps : 1 déjà en retard (limite lue), 1 à vérifier (la vente sans email : date estimée), 1 avant demain 10 h — l’heure écrite', p.body);
   });
 
   console.log('\n── 4. Heure illisible : le jour seul, comme avant');

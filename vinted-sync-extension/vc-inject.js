@@ -1805,13 +1805,28 @@
   //    ⚠️ NE PAS la remettre (ni une « liste noire » de clés : c'est une liste
   //    blanche par fonction qui protège, jamais un filtre après coup).
 
+  // 5.379 (15 nov., revue « inoffensif par construction », après la page Leboncoin noire sur
+  // Orion) : rien de ce que VRM lit AVANT l'appel ne peut lever vers la page (un `init` aux
+  // propriétés piégées, une adresse `URL`), et l'enveloppe garde le nom, la longueur et le
+  // texte de l'original.
+  const commeNatif = (f, orig) => {
+    try {
+      for (const k of ['name', 'length']) Object.defineProperty(f, k, { value: orig[k], configurable: true });
+      const texte = Function.prototype.toString.call(orig);
+      Object.defineProperty(f, 'toString', { value: function toString() { return texte; }, configurable: true, writable: true });
+    } catch (_) {}
+    return f;
+  };
   const origFetch = window.fetch;
   if (origFetch) {
-    window.fetch = function (input, init) {
-      const url = (typeof input === 'string') ? input : (input && input.url) || '';
-      const meth = (init && init.method) || (typeof input === 'object' && input && input.method) || 'GET';
-      const ent = (init && init.headers) || (typeof input === 'object' && input && input.headers) || null;
-      const corpsEnvoye = init && typeof init.body === 'string' ? init.body : null;
+    window.fetch = commeNatif(function (input, init) {
+      let url = '', meth = 'GET', ent = null, corpsEnvoye = null;
+      try {
+        url = (typeof input === 'string') ? input : (typeof URL !== 'undefined' && input instanceof URL) ? input.href : (input && input.url) || '';
+        meth = (init && init.method) || (typeof input === 'object' && input && input.method) || 'GET';
+        ent = (init && init.headers) || (typeof input === 'object' && input && input.headers) || null;
+        corpsEnvoye = init && typeof init.body === 'string' ? init.body : null;
+      } catch (_) {}
       try { noterEntetesPage(url, ent); noteMoiStream(url); } catch (_) {}
       const p = origFetch.apply(this, arguments);
       try {
@@ -1829,14 +1844,14 @@
         }).catch(() => {});
       } catch (_) {}
       return p;
-    };
+    }, origFetch);
   }
   const OX = window.XMLHttpRequest;
   if (OX) {
     const origOpen = OX.prototype.open, origSend = OX.prototype.send, origSetH = OX.prototype.setRequestHeader;
-    OX.prototype.open = function (method, url) { this.__vcUrl = url; this.__vcMeth = method; this.__vcH = null; return origOpen.apply(this, arguments); };
-    if (origSetH) OX.prototype.setRequestHeader = function (k, v) { try { (this.__vcH = this.__vcH || {})[String(k)] = String(v); } catch (_) {} return origSetH.apply(this, arguments); };
-    OX.prototype.send = function (corpsXhr) {
+    OX.prototype.open = commeNatif(function (method, url) { try { this.__vcUrl = url; this.__vcMeth = method; this.__vcH = null; } catch (_) {} return origOpen.apply(this, arguments); }, origOpen);
+    if (origSetH) OX.prototype.setRequestHeader = commeNatif(function (k, v) { try { (this.__vcH = this.__vcH || {})[String(k)] = String(v); } catch (_) {} return origSetH.apply(this, arguments); }, origSetH);
+    OX.prototype.send = commeNatif(function (corpsXhr) {
       try { noterEntetesPage(this.__vcUrl || '', this.__vcH); noteMoiStream(String(this.__vcUrl || '')); this.__vcCorps = typeof corpsXhr === 'string' ? corpsXhr : null; } catch (_) {}
       try {
         this.addEventListener('load', function () {
@@ -1855,6 +1870,6 @@
         });
       } catch (_) {}
       return origSend.apply(this, arguments);
-    };
+    }, origSend);
   }
 })();
