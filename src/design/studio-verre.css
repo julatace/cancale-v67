@@ -191,7 +191,8 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
 :root:root:root body .vrm-main :is(.sb-tuile, .sb-plan, .vrm-toutes-liste, .vrm-day-task-list, .vrm-buy-list, .vrm-msg-list, .vrm-colis-carte, .vrm-a-venir,
   .vrm-colis-prochain, .vrm-ann-geste, details.vrm-quick-settings, .vrm-ann-card, .vrm-ios-carte, .vrm-reglages-groupe,
   .vrm-set-liste, .vrm-settings-todo, .vrm-fu-panneau, .vrm-sv-tuile, .vrm-sv-carte, .vrm-onglet-manque, .vrm-d7-carte, .vrm-fp-section,
-  .vrm-boite-liste-col, .vrm-rpf-point, .vrm-sx, .vrm-guide.vrm-pa-carte, .vrm-carte-mfa, .vrm-sp-rec, .vrm-compta-replis, .vrm-argent-w, .vrm-at-carte) {
+  .vrm-boite-liste-col, .vrm-rpf-point, .vrm-sx, .vrm-guide.vrm-pa-carte, .vrm-carte-mfa, .vrm-sp-rec, .vrm-compta-replis, .vrm-argent-w, .vrm-at-carte,
+  .vrm-statistiques-premium > .vrm-stats-repli) {
   /* UNE couche de verre (la couleur ET le dégradé translucides se superposaient : un verre à .96, presque opaque). */
   background-color: transparent !important; background-image: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important;
   box-shadow: var(--sv-ombre) !important;
@@ -222,8 +223,7 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
    (« Révision du mois », « Ta déclaration de revenus », DAC7, « Frais de l'année », « Carte de tes ventes », « Le prix à
    afficher », « Novembre · comparé à… ») et « eBay : pas pu lire » de Messages : posés sur le fond en encre sombre, 1,2 à
    1,8:1 — banc studio-reste S4 ; leurs cartes (.vrm-ac-carte, .vrm-fc-carte, .vrm-surface…) remettent l'encre sombre, §7.
-   Le retour « ‹ Réglages » et le titre d'une sous-page de Réglages ; la page de connexion (.vrm-cx, posée sur le fond par
-   §2) : tout son texte hors du formulaire était à l'encre sombre sur le bleu (1,0 à 1,2:1), son formulaire reste sombre.) */
+   Le retour « ‹ Réglages » et le titre d'une sous-page de Réglages : encre sombre sur le bleu. La connexion : §7 quater.) */
 :root:root:root body .vrm-app-shell[data-espace] :is(
   .sj-tete, .sj-affiche, .vrm-screen-head, .vrm-tete-row, .sb-tete, .sb-surtitre, .sb-ecran-titre, .vrm-fu-date-tete, .vrm-tache-tete,
   .vrm-market-heading, .vrm-set-tete, .vrm-day-greeting, .vrm-app-header:not(.is-defile) .vrm-hdr-titre, .sb-bande, .vrm-ui-bande, .vrm-fu-bande,
@@ -232,8 +232,8 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
   .vrm-toutes-repli, .vrm-pf-set-avances > summary, .vrm-finance-page > div:not([class]), .vrm-fu-carte.a-action, .vrm-achats-barre, .vrm-cm-entete,
   .vrm-colis-section-tete, .vrm-colis-section > div:not([class]), .vrm-colis-resume, .vrm-achats-sources .vrm-ms-tete, .vrm-ventes-toutes > :is(.vrm-toutes-etats, .vrm-toutes-vide),
   .vrm-argent-partie > :is(.vrm-compta-q, .vrm-ac-section, details.vrm-compta-repli), .vrm-stats-vitrine > :is(.vrm-sv-sous-titre, details.vrm-stats-repli),
-  .vrm-statistiques-premium > :is(.vrm-lien-action, .vrm-fc, .vrm-cv, .vrm-ac-section, details.vrm-stats-repli), .vrm-inbox-column > p,
-  .vrm-set-retour, .vrm-set-sous-h, .vrm-cx[data-espace="autres"]
+  .vrm-statistiques-premium > :is(.vrm-lien-action, .vrm-fc, .vrm-cv, .vrm-ac-section),
+  .vrm-set-retour, .vrm-set-sous-h
 ) {
   --sb-encre: var(--sv-clair) !important; --d-encre: var(--sv-clair) !important; --vrm-ink: var(--sv-clair) !important; --vrm-text: var(--sv-clair) !important;
   --p-encre: var(--sv-clair) !important; --w-encre: var(--sv-clair) !important; --fu-encre: var(--sv-clair) !important; --bx-encre: var(--sv-clair) !important;
@@ -274,15 +274,15 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
   .vrm-toutes-repli, .vrm-pf-set-avances > summary, .vrm-finance-page > div:not([class]), .vrm-fu-carte.a-action, .vrm-achats-barre, .vrm-cm-entete,
   .vrm-colis-section-tete, .vrm-colis-section > div:not([class]), .vrm-colis-resume, .vrm-achats-sources .vrm-ms-tete, .vrm-ventes-toutes > :is(.vrm-toutes-etats, .vrm-toutes-vide),
   .vrm-argent-partie > :is(.vrm-compta-q, .vrm-ac-section, details.vrm-compta-repli), .vrm-stats-vitrine > :is(.vrm-sv-sous-titre, details.vrm-stats-repli),
-  .vrm-statistiques-premium > :is(.vrm-lien-action, .vrm-fc, .vrm-cv, .vrm-ac-section, details.vrm-stats-repli), .vrm-inbox-column > p,
-  .vrm-set-retour, .vrm-set-sous-h, .vrm-cx[data-espace="autres"]
-) [style*="color"]:not(:is(.sb-touche:not(.vrm-market-space > div > .vrm-ui-afaire-capsule), .sb-rond, .sb-segment, .sb-tuile, .sb-plan, .sb-champ, .sb-btn-plein, .vrm-b:not(.vrm-b-discret):not(:disabled), .vrm-seg:not(.vrm-achats-barre .vrm-seg), .vrm-sel-sites, .vrm-ui-menu-compte, .vrm-icon-control, .sj-alertes, .vrm-ios-carte, .vrm-reglages-groupe, .vrm-set-liste, .vrm-fu-panneau, input, select, textarea, .vrm-compta-carte, .vrm-toutes-liste, .vrm-day-task-list, .vrm-buy-list, .vrm-msg-list, .vrm-colis-carte, .vrm-a-venir, .vrm-colis-prochain, .vrm-ann-geste, details.vrm-quick-settings, .vrm-ann-card, .vrm-settings-todo, .vrm-sv-tuile, .vrm-sv-carte, .vrm-onglet-manque, .vrm-d7-carte, .vrm-fp-section, .vrm-boite-liste-col, .vrm-rpf-point, .vrm-sx, .vrm-pa-carte, .vrm-carte-mfa, .vrm-sp-rec, .vrm-compta-replis, .vrm-argent-w, .vrm-at-carte, .vrm-compta-groupe, .vrm-ui-afaire-corps, .vrm-acc, .vrm-toast, .vrm-surface, .vrm-ac-carte, .vrm-fc-carte, .vrm-d7-rapport, .vrm-pm-case, .vrm-fc-pastille, .vrm-d7-btn, .vrm-cx-form, .vrm-cx-etiquettes > *, .vrm-cx-marque i), :is(.sb-touche:not(.vrm-market-space > div > .vrm-ui-afaire-capsule), .sb-rond, .sb-segment, .sb-tuile, .sb-plan, .sb-champ, .sb-btn-plein, .vrm-b:not(.vrm-b-discret):not(:disabled), .vrm-seg:not(.vrm-achats-barre .vrm-seg), .vrm-sel-sites, .vrm-ui-menu-compte, .vrm-icon-control, .sj-alertes, .vrm-ios-carte, .vrm-reglages-groupe, .vrm-set-liste, .vrm-fu-panneau, input, select, textarea, .vrm-compta-carte, .vrm-toutes-liste, .vrm-day-task-list, .vrm-buy-list, .vrm-msg-list, .vrm-colis-carte, .vrm-a-venir, .vrm-colis-prochain, .vrm-ann-geste, details.vrm-quick-settings, .vrm-ann-card, .vrm-settings-todo, .vrm-sv-tuile, .vrm-sv-carte, .vrm-onglet-manque, .vrm-d7-carte, .vrm-fp-section, .vrm-boite-liste-col, .vrm-rpf-point, .vrm-sx, .vrm-pa-carte, .vrm-carte-mfa, .vrm-sp-rec, .vrm-compta-replis, .vrm-argent-w, .vrm-at-carte, .vrm-compta-groupe, .vrm-ui-afaire-corps, .vrm-acc, .vrm-toast, .vrm-surface, .vrm-ac-carte, .vrm-fc-carte, .vrm-d7-rapport, .vrm-pm-case, .vrm-fc-pastille, .vrm-d7-btn, .vrm-cx-form, .vrm-cx-etiquettes > *, .vrm-cx-marque i) *, :is(.sj-tete, .sj-affiche, .vrm-screen-head, .vrm-tete-row, .sb-tete, .sb-surtitre, .sb-ecran-titre, .vrm-fu-date-tete, .vrm-tache-tete, .vrm-market-heading, .vrm-set-tete, .vrm-day-greeting, .vrm-app-header:not(.is-defile) .vrm-hdr-titre, .sb-bande, .vrm-ui-bande, .vrm-fu-bande, .vrm-fu-titre-section, .vrm-set-groupe > .vrm-set-titre, .vrm-set-groupe:not(.vrm-compta-groupe) > .vrm-set-pied, .vrm-ms-h2, .vrm-ms-plus, .vrm-ap-ligne, .vrm-fraicheur-hote, .vrm-market-space > div > .vrm-ui-afaire-capsule, .vrm-ui-afaire.sb-lien, .vrm-impr-ligne, .vrm-lu-seulement, .vrm-toutes-repli, .vrm-pf-set-avances > summary, .vrm-finance-page > div:not([class]), .vrm-fu-carte.a-action, .vrm-achats-barre, .vrm-cm-entete, .vrm-colis-section-tete, .vrm-colis-section > div:not([class]), .vrm-colis-resume, .vrm-achats-sources .vrm-ms-tete, .vrm-ventes-toutes > :is(.vrm-toutes-etats, .vrm-toutes-vide),
+  .vrm-statistiques-premium > :is(.vrm-lien-action, .vrm-fc, .vrm-cv, .vrm-ac-section),
+  .vrm-set-retour, .vrm-set-sous-h
+) [style*="color"]:not(:is(.sb-touche:not(.vrm-market-space > div > .vrm-ui-afaire-capsule), .sb-rond, .sb-segment, .sb-tuile, .sb-plan, .sb-champ, .sb-btn-plein, .vrm-b:not(.vrm-b-discret):not(:disabled), .vrm-seg:not(.vrm-achats-barre .vrm-seg), .vrm-sel-sites, .vrm-ui-menu-compte, .vrm-icon-control, .sj-alertes, .vrm-ios-carte, .vrm-reglages-groupe, .vrm-set-liste, .vrm-fu-panneau, input, select, textarea, .vrm-compta-carte, .vrm-toutes-liste, .vrm-day-task-list, .vrm-buy-list, .vrm-msg-list, .vrm-colis-carte, .vrm-a-venir, .vrm-colis-prochain, .vrm-ann-geste, details.vrm-quick-settings, .vrm-ann-card, .vrm-settings-todo, .vrm-sv-tuile, .vrm-sv-carte, .vrm-onglet-manque, .vrm-d7-carte, .vrm-fp-section, .vrm-boite-liste-col, .vrm-rpf-point, .vrm-sx, .vrm-pa-carte, .vrm-carte-mfa, .vrm-sp-rec, .vrm-compta-replis, .vrm-argent-w, .vrm-at-carte, .vrm-compta-groupe, .vrm-ui-afaire-corps, .vrm-acc, .vrm-toast, .vrm-surface, .vrm-ac-carte, .vrm-fc-carte, .vrm-d7-rapport, .vrm-pm-case, .vrm-fc-pastille, .vrm-d7-btn, .vrm-cx-form, .vrm-cx-etiquettes > *, .vrm-cx-marque i, .vrm-statistiques-premium > .vrm-stats-repli), :is(.sb-touche:not(.vrm-market-space > div > .vrm-ui-afaire-capsule), .sb-rond, .sb-segment, .sb-tuile, .sb-plan, .sb-champ, .sb-btn-plein, .vrm-b:not(.vrm-b-discret):not(:disabled), .vrm-seg:not(.vrm-achats-barre .vrm-seg), .vrm-sel-sites, .vrm-ui-menu-compte, .vrm-icon-control, .sj-alertes, .vrm-ios-carte, .vrm-reglages-groupe, .vrm-set-liste, .vrm-fu-panneau, input, select, textarea, .vrm-compta-carte, .vrm-toutes-liste, .vrm-day-task-list, .vrm-buy-list, .vrm-msg-list, .vrm-colis-carte, .vrm-a-venir, .vrm-colis-prochain, .vrm-ann-geste, details.vrm-quick-settings, .vrm-ann-card, .vrm-settings-todo, .vrm-sv-tuile, .vrm-sv-carte, .vrm-onglet-manque, .vrm-d7-carte, .vrm-fp-section, .vrm-boite-liste-col, .vrm-rpf-point, .vrm-sx, .vrm-pa-carte, .vrm-carte-mfa, .vrm-sp-rec, .vrm-compta-replis, .vrm-argent-w, .vrm-at-carte, .vrm-compta-groupe, .vrm-ui-afaire-corps, .vrm-acc, .vrm-toast, .vrm-surface, .vrm-ac-carte, .vrm-fc-carte, .vrm-d7-rapport, .vrm-pm-case, .vrm-fc-pastille, .vrm-d7-btn, .vrm-cx-form, .vrm-cx-etiquettes > *, .vrm-cx-marque i, .vrm-statistiques-premium > .vrm-stats-repli) *, :is(.sj-tete, .sj-affiche, .vrm-screen-head, .vrm-tete-row, .sb-tete, .sb-surtitre, .sb-ecran-titre, .vrm-fu-date-tete, .vrm-tache-tete, .vrm-market-heading, .vrm-set-tete, .vrm-day-greeting, .vrm-app-header:not(.is-defile) .vrm-hdr-titre, .sb-bande, .vrm-ui-bande, .vrm-fu-bande, .vrm-fu-titre-section, .vrm-set-groupe > .vrm-set-titre, .vrm-set-groupe:not(.vrm-compta-groupe) > .vrm-set-pied, .vrm-ms-h2, .vrm-ms-plus, .vrm-ap-ligne, .vrm-fraicheur-hote, .vrm-market-space > div > .vrm-ui-afaire-capsule, .vrm-ui-afaire.sb-lien, .vrm-impr-ligne, .vrm-lu-seulement, .vrm-toutes-repli, .vrm-pf-set-avances > summary, .vrm-finance-page > div:not([class]), .vrm-fu-carte.a-action, .vrm-achats-barre, .vrm-cm-entete, .vrm-colis-section-tete, .vrm-colis-section > div:not([class]), .vrm-colis-resume, .vrm-achats-sources .vrm-ms-tete, .vrm-ventes-toutes > :is(.vrm-toutes-etats, .vrm-toutes-vide),
   .vrm-argent-partie > :is(.vrm-compta-q, .vrm-ac-section, details.vrm-compta-repli), .vrm-stats-vitrine > :is(.vrm-sv-sous-titre, details.vrm-stats-repli),
-  .vrm-statistiques-premium > :is(.vrm-lien-action, .vrm-fc, .vrm-cv, .vrm-ac-section, details.vrm-stats-repli), .vrm-inbox-column > p,
-  .vrm-set-retour, .vrm-set-sous-h, .vrm-cx[data-espace="autres"]) [style*="background"], :is(.sj-tete, .sj-affiche, .vrm-screen-head, .vrm-tete-row, .sb-tete, .sb-surtitre, .sb-ecran-titre, .vrm-fu-date-tete, .vrm-tache-tete, .vrm-market-heading, .vrm-set-tete, .vrm-day-greeting, .vrm-app-header:not(.is-defile) .vrm-hdr-titre, .sb-bande, .vrm-ui-bande, .vrm-fu-bande, .vrm-fu-titre-section, .vrm-set-groupe > .vrm-set-titre, .vrm-set-groupe:not(.vrm-compta-groupe) > .vrm-set-pied, .vrm-ms-h2, .vrm-ms-plus, .vrm-ap-ligne, .vrm-fraicheur-hote, .vrm-market-space > div > .vrm-ui-afaire-capsule, .vrm-ui-afaire.sb-lien, .vrm-impr-ligne, .vrm-lu-seulement, .vrm-toutes-repli, .vrm-pf-set-avances > summary, .vrm-finance-page > div:not([class]), .vrm-fu-carte.a-action, .vrm-achats-barre, .vrm-cm-entete, .vrm-colis-section-tete, .vrm-colis-section > div:not([class]), .vrm-colis-resume, .vrm-achats-sources .vrm-ms-tete, .vrm-ventes-toutes > :is(.vrm-toutes-etats, .vrm-toutes-vide),
+  .vrm-statistiques-premium > :is(.vrm-lien-action, .vrm-fc, .vrm-cv, .vrm-ac-section),
+  .vrm-set-retour, .vrm-set-sous-h) [style*="background"], :is(.sj-tete, .sj-affiche, .vrm-screen-head, .vrm-tete-row, .sb-tete, .sb-surtitre, .sb-ecran-titre, .vrm-fu-date-tete, .vrm-tache-tete, .vrm-market-heading, .vrm-set-tete, .vrm-day-greeting, .vrm-app-header:not(.is-defile) .vrm-hdr-titre, .sb-bande, .vrm-ui-bande, .vrm-fu-bande, .vrm-fu-titre-section, .vrm-set-groupe > .vrm-set-titre, .vrm-set-groupe:not(.vrm-compta-groupe) > .vrm-set-pied, .vrm-ms-h2, .vrm-ms-plus, .vrm-ap-ligne, .vrm-fraicheur-hote, .vrm-market-space > div > .vrm-ui-afaire-capsule, .vrm-ui-afaire.sb-lien, .vrm-impr-ligne, .vrm-lu-seulement, .vrm-toutes-repli, .vrm-pf-set-avances > summary, .vrm-finance-page > div:not([class]), .vrm-fu-carte.a-action, .vrm-achats-barre, .vrm-cm-entete, .vrm-colis-section-tete, .vrm-colis-section > div:not([class]), .vrm-colis-resume, .vrm-achats-sources .vrm-ms-tete, .vrm-ventes-toutes > :is(.vrm-toutes-etats, .vrm-toutes-vide),
   .vrm-argent-partie > :is(.vrm-compta-q, .vrm-ac-section, details.vrm-compta-repli), .vrm-stats-vitrine > :is(.vrm-sv-sous-titre, details.vrm-stats-repli),
-  .vrm-statistiques-premium > :is(.vrm-lien-action, .vrm-fc, .vrm-cv, .vrm-ac-section, details.vrm-stats-repli), .vrm-inbox-column > p,
-  .vrm-set-retour, .vrm-set-sous-h, .vrm-cx[data-espace="autres"]) [style*="background"] *) { color: var(--sv-clair-2) !important; }
+  .vrm-statistiques-premium > :is(.vrm-lien-action, .vrm-fc, .vrm-cv, .vrm-ac-section),
+  .vrm-set-retour, .vrm-set-sous-h) [style*="background"] *) { color: var(--sv-clair-2) !important; }
 
 /* ══ 7. LES SURFACES REMETTENT L'ENCRE SOMBRE (une touche, une carte dans une tête claire reste lisible) ══ */
 :root:root:root body .vrm-app-shell[data-espace] :is(
@@ -293,8 +293,8 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
   .vrm-toutes-repli, .vrm-pf-set-avances > summary, .vrm-finance-page > div:not([class]), .vrm-fu-carte.a-action, .vrm-achats-barre, .vrm-cm-entete,
   .vrm-colis-section-tete, .vrm-colis-section > div:not([class]), .vrm-colis-resume, .vrm-achats-sources .vrm-ms-tete, .vrm-ventes-toutes > :is(.vrm-toutes-etats, .vrm-toutes-vide),
   .vrm-argent-partie > :is(.vrm-compta-q, .vrm-ac-section, details.vrm-compta-repli), .vrm-stats-vitrine > :is(.vrm-sv-sous-titre, details.vrm-stats-repli),
-  .vrm-statistiques-premium > :is(.vrm-lien-action, .vrm-fc, .vrm-cv, .vrm-ac-section, details.vrm-stats-repli), .vrm-inbox-column > p,
-  .vrm-set-retour, .vrm-set-sous-h, .vrm-cx[data-espace="autres"]
+  .vrm-statistiques-premium > :is(.vrm-lien-action, .vrm-fc, .vrm-cv, .vrm-ac-section),
+  .vrm-set-retour, .vrm-set-sous-h
 ) :is(
   .sb-touche:not(.vrm-market-space > div > .vrm-ui-afaire-capsule), .sb-rond, .sb-segment, .sb-tuile, .sb-plan, .sb-champ, .sb-btn-plein,
   .vrm-b:not(.vrm-b-discret):not(:disabled), .vrm-seg:not(.vrm-achats-barre .vrm-seg), .vrm-sel-sites, .vrm-ui-menu-compte, .vrm-icon-control,
@@ -302,7 +302,7 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
   .vrm-day-task-list, .vrm-buy-list, .vrm-msg-list, .vrm-colis-carte, .vrm-a-venir, .vrm-colis-prochain, .vrm-ann-geste, details.vrm-quick-settings,
   .vrm-ann-card, .vrm-settings-todo, .vrm-sv-tuile, .vrm-sv-carte, .vrm-onglet-manque, .vrm-d7-carte, .vrm-fp-section, .vrm-boite-liste-col,
   .vrm-rpf-point, .vrm-sx, .vrm-pa-carte, .vrm-carte-mfa, .vrm-sp-rec, .vrm-compta-replis, .vrm-argent-w, .vrm-at-carte, .vrm-compta-groupe,
-  .vrm-ui-afaire-corps, .vrm-acc, .vrm-toast, .vrm-surface, .vrm-ac-carte, .vrm-fc-carte, .vrm-d7-rapport, .vrm-pm-case, .vrm-fc-pastille, .vrm-d7-btn, .vrm-cx-form, .vrm-cx-etiquettes > *, .vrm-cx-marque i
+  .vrm-ui-afaire-corps, .vrm-acc, .vrm-toast, .vrm-surface, .vrm-ac-carte, .vrm-fc-carte, .vrm-d7-rapport, .vrm-pm-case, .vrm-fc-pastille, .vrm-d7-btn, .vrm-cx-form, .vrm-cx-etiquettes > *, .vrm-cx-marque i, .vrm-statistiques-premium > .vrm-stats-repli
 ) {
   --sb-encre: var(--sv-encre) !important; --d-encre: var(--sv-encre) !important; --vrm-ink: var(--sv-encre) !important; --vrm-text: var(--sv-encre) !important;
   --p-encre: var(--sv-encre) !important; --w-encre: var(--sv-encre) !important; --fu-encre: var(--sv-encre) !important; --bx-encre: var(--sv-encre) !important;
@@ -339,13 +339,13 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
   .vrm-toutes-repli, .vrm-pf-set-avances > summary, .vrm-finance-page > div:not([class]), .vrm-fu-carte.a-action, .vrm-achats-barre, .vrm-cm-entete,
   .vrm-colis-section-tete, .vrm-colis-section > div:not([class]), .vrm-colis-resume, .vrm-achats-sources .vrm-ms-tete, .vrm-ventes-toutes > :is(.vrm-toutes-etats, .vrm-toutes-vide),
   .vrm-argent-partie > :is(.vrm-compta-q, .vrm-ac-section, details.vrm-compta-repli), .vrm-stats-vitrine > :is(.vrm-sv-sous-titre, details.vrm-stats-repli),
-  .vrm-statistiques-premium > :is(.vrm-lien-action, .vrm-fc, .vrm-cv, .vrm-ac-section, details.vrm-stats-repli), .vrm-inbox-column > p,
-  .vrm-set-retour, .vrm-set-sous-h, .vrm-cx[data-espace="autres"]
+  .vrm-statistiques-premium > :is(.vrm-lien-action, .vrm-fc, .vrm-cv, .vrm-ac-section),
+  .vrm-set-retour, .vrm-set-sous-h
 ) :is(
   .sj-alertes, .vrm-ios-carte, .vrm-reglages-groupe, .vrm-set-liste, .vrm-fu-panneau, .vrm-compta-carte, .vrm-toutes-liste, .vrm-day-task-list,
   .vrm-msg-list, .vrm-colis-carte, .vrm-a-venir, .vrm-colis-prochain, .vrm-ann-geste, details.vrm-quick-settings, .vrm-ann-card, .vrm-settings-todo,
   .vrm-sv-tuile, .vrm-sv-carte, .vrm-onglet-manque, .vrm-d7-carte, .vrm-fp-section, .vrm-rpf-point, .vrm-sx, .vrm-pa-carte, .vrm-carte-mfa, .vrm-sp-rec,
-  .vrm-compta-replis, .vrm-argent-w, .vrm-at-carte, .vrm-compta-groupe, .vrm-ui-afaire-corps, .vrm-acc, .vrm-toast, .vrm-surface, .vrm-ac-carte, .vrm-fc-carte, .vrm-d7-rapport, .vrm-pm-case, .vrm-fc-pastille, .vrm-d7-btn, .vrm-cx-form, .vrm-cx-etiquettes > *, .vrm-cx-marque i
+  .vrm-compta-replis, .vrm-argent-w, .vrm-at-carte, .vrm-compta-groupe, .vrm-ui-afaire-corps, .vrm-acc, .vrm-toast, .vrm-surface, .vrm-ac-carte, .vrm-fc-carte, .vrm-d7-rapport, .vrm-pm-case, .vrm-fc-pastille, .vrm-d7-btn, .vrm-cx-form, .vrm-cx-etiquettes > *, .vrm-cx-marque i, .vrm-statistiques-premium > .vrm-stats-repli
 ) { color: var(--sv-encre) !important; }
 
 /* « Ajouter un QR Mondial Relay » (Achats → À retirer) : une rangée posée en porcelaine (--vrm-surface) DANS un conteneur
@@ -365,6 +365,78 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
   background-color: var(--sv-milieu) !important;
   background-image: radial-gradient(120% 60% at 15% 0%, var(--sv-reflet) 0%, transparent 55%), linear-gradient(170deg, var(--sv-haut) 0%, var(--sv-milieu) 45%, var(--sv-bas) 100%) !important;
 }
+
+/* Messages : « eBay : pas pu lire » (couleur en ligne, gris) est posé sur le fond au téléphone ; à partir de 1024 px la
+   colonne des fils est une surface opaque (brume) et l'encre sombre y reste. */
+@media (max-width: 1023px) {
+  :root:root:root body .vrm-app-shell[data-espace] .vrm-inbox-column > p[data-fils-pas-lus] { color: var(--sv-clair-2) !important; }
+}
+
+/* ══ 7 quater. LA CONNEXION (.vrm-cx, hors de la coque : aucun ::before ne lui donne le fond) : elle repeignait la lumière du
+   studio d'hier (halo BLANC .55, studio-reste.css §7 ter) sur les jetons profonds du verre, et son texte hors du
+   formulaire restait à l'encre sombre (1,0 à 1,2:1, banc studio-reste S4 connexion). Le fond du verre ; l'encre claire
+   (les mêmes jetons que §6) ; le formulaire, les étiquettes, les champs et les touches : l'encre sombre (§7). */
+:root:root:root body .vrm-cx[data-espace="autres"] {
+  background-color: var(--sv-milieu) !important;
+  background-image: radial-gradient(120% 60% at 15% 0%, var(--sv-reflet) 0%, transparent 55%), linear-gradient(170deg, var(--sv-haut) 0%, var(--sv-milieu) 45%, var(--sv-bas) 100%) !important;
+
+  --sb-encre: var(--sv-clair) !important; --d-encre: var(--sv-clair) !important; --vrm-ink: var(--sv-clair) !important; --vrm-text: var(--sv-clair) !important;
+  --p-encre: var(--sv-clair) !important; --w-encre: var(--sv-clair) !important; --fu-encre: var(--sv-clair) !important; --bx-encre: var(--sv-clair) !important;
+  --cfg-encre: var(--sv-clair) !important; --g-encre: var(--sv-clair) !important; --n2-encre: var(--sv-clair) !important; --n2-libelle: var(--sv-clair) !important;
+  --s-encre: var(--sv-clair) !important; --cm-encre: var(--sv-clair) !important; --ep-encre: var(--sv-clair) !important; --frv-ink: var(--sv-clair) !important;
+  --gestion-ink: var(--sv-clair) !important; --message-ink: var(--sv-clair) !important; --recap-ink: var(--sv-clair) !important; --seg-ink: var(--sv-clair) !important;
+  --studio-ink: var(--sv-clair) !important; --vrm-b-encre: var(--sv-clair) !important; --acc-encre: var(--sv-clair) !important; --b-encre: var(--sv-clair) !important;
+  --ia-encre: var(--sv-clair) !important; --id-encre: var(--sv-clair) !important; --ret-encre: var(--sv-clair) !important; --sbp-encre: var(--sv-clair) !important;
+  --at-encre: var(--sv-clair) !important; --lit-encre: var(--sv-clair) !important; --mb-encre: var(--sv-clair) !important; --ms-encre: var(--sv-clair) !important;
+  --pel-encre: var(--sv-clair) !important; --sr-encre: var(--sv-clair) !important;
+  --sb-encre-2: var(--sv-clair-2) !important; --d-gris: var(--sv-clair-2) !important; --d-glyphe: var(--sv-clair-2) !important; --vrm-muted: var(--sv-clair-2) !important;
+  --vrm-faint: var(--sv-clair-2) !important; --p-gris: var(--sv-clair-2) !important; --p-gris-2: var(--sv-clair-2) !important; --w-gris: var(--sv-clair-2) !important;
+  --w-gris-2: var(--sv-clair-2) !important; --fu-gris: var(--sv-clair-2) !important; --fu-gris2: var(--sv-clair-2) !important; --fu-gris3: var(--sv-clair-2) !important;
+  --acc-doux: var(--sv-clair-2) !important; --b-doux: var(--sv-clair-2) !important; --bx-doux: var(--sv-clair-2) !important; --cm-doux: var(--sv-clair-2) !important;
+  --ia-encre-2: var(--sv-clair-2) !important; --id-encre-2: var(--sv-clair-2) !important; --ret-gris: var(--sv-clair-2) !important;
+  --sbp-encre2: var(--sv-clair-2) !important; --an-gris: var(--sv-clair-2) !important; --cfg-gris: var(--sv-clair-2) !important; --g-gris: var(--sv-clair-2) !important;
+  --s-gris: var(--sv-clair-2) !important; --seg-muted: var(--sv-clair-2) !important; --frv-muted: var(--sv-clair-2) !important;
+  --gestion-muted: var(--sv-clair-2) !important; --recap-muted: var(--sv-clair-2) !important; --studio-ledger-label: var(--sv-clair-2) !important;
+  --studio-muted: var(--sv-clair-2) !important;
+  --sb-lien: var(--sv-clair-lien) !important; --d-accent-texte: var(--sv-clair-lien) !important; --bx-accent-texte: var(--sv-clair-lien) !important;
+  --cm-accent: var(--sv-clair-lien) !important; --ia-lien: var(--sv-clair-lien) !important; --id-lien: var(--sv-clair-lien) !important;
+  --p-accent-texte: var(--sv-clair-lien) !important; --sbp-lien: var(--sv-clair-lien) !important; --vrm-accent-texte: var(--sv-clair-lien) !important;
+  --vrm-b-lien: var(--sv-clair-lien) !important; --cfg-accent-texte: var(--sv-clair-lien) !important; --g-accent-texte: var(--sv-clair-lien) !important;
+  --sb-ambre: var(--sv-clair-ambre) !important; --d-ambre: var(--sv-clair-ambre) !important; --fu-ambre-txt: var(--sv-clair-ambre) !important;
+  --p-ambre-texte: var(--sv-clair-ambre) !important; --s-ambre: var(--sv-clair-ambre) !important; --bx-ambre: var(--sv-clair-ambre) !important;
+  --ia-ambre: var(--sv-clair-ambre) !important; --id-ambre: var(--sv-clair-ambre) !important; --ret-ambre: var(--sv-clair-ambre) !important;
+  --sbp-ambre: var(--sv-clair-ambre) !important; --vrm-warn: var(--sv-clair-ambre) !important;
+  color: var(--sv-clair) !important;
+}
+:root:root:root body .vrm-cx[data-espace="autres"] :is(.vrm-cx-form, .vrm-cx-etiquettes > *, .vrm-cx-marque i, input, select, textarea, .vrm-b:not(.vrm-b-discret):not(:disabled)) {
+
+  --sb-encre: var(--sv-encre) !important; --d-encre: var(--sv-encre) !important; --vrm-ink: var(--sv-encre) !important; --vrm-text: var(--sv-encre) !important;
+  --p-encre: var(--sv-encre) !important; --w-encre: var(--sv-encre) !important; --fu-encre: var(--sv-encre) !important; --bx-encre: var(--sv-encre) !important;
+  --cfg-encre: var(--sv-encre) !important; --g-encre: var(--sv-encre) !important; --n2-encre: var(--sv-encre) !important; --n2-libelle: var(--sv-encre) !important;
+  --s-encre: var(--sv-encre) !important; --cm-encre: var(--sv-encre) !important; --ep-encre: var(--sv-encre) !important; --frv-ink: var(--sv-encre) !important;
+  --gestion-ink: var(--sv-encre) !important; --message-ink: var(--sv-encre) !important; --recap-ink: var(--sv-encre) !important; --seg-ink: var(--sv-encre) !important;
+  --studio-ink: var(--sv-encre) !important; --vrm-b-encre: var(--sv-encre) !important; --acc-encre: var(--sv-encre) !important; --b-encre: var(--sv-encre) !important;
+  --ia-encre: var(--sv-encre) !important; --id-encre: var(--sv-encre) !important; --ret-encre: var(--sv-encre) !important; --sbp-encre: var(--sv-encre) !important;
+  --at-encre: var(--sv-encre) !important; --lit-encre: var(--sv-encre) !important; --mb-encre: var(--sv-encre) !important; --ms-encre: var(--sv-encre) !important;
+  --pel-encre: var(--sv-encre) !important; --sr-encre: var(--sv-encre) !important;
+  --sb-encre-2: var(--sv-encre-2) !important; --d-gris: var(--sv-encre-2) !important; --d-glyphe: var(--sv-encre-2) !important; --vrm-muted: var(--sv-encre-2) !important;
+  --vrm-faint: var(--sv-encre-2) !important; --p-gris: var(--sv-encre-2) !important; --p-gris-2: var(--sv-encre-2) !important; --w-gris: var(--sv-encre-2) !important;
+  --w-gris-2: var(--sv-encre-2) !important; --fu-gris: var(--sv-encre-2) !important; --fu-gris2: var(--sv-encre-2) !important; --fu-gris3: var(--sv-encre-2) !important;
+  --acc-doux: var(--sv-encre-2) !important; --b-doux: var(--sv-encre-2) !important; --bx-doux: var(--sv-encre-2) !important; --cm-doux: var(--sv-encre-2) !important;
+  --ia-encre-2: var(--sv-encre-2) !important; --id-encre-2: var(--sv-encre-2) !important; --ret-gris: var(--sv-encre-2) !important;
+  --sbp-encre2: var(--sv-encre-2) !important; --an-gris: var(--sv-encre-2) !important; --cfg-gris: var(--sv-encre-2) !important; --g-gris: var(--sv-encre-2) !important;
+  --s-gris: var(--sv-encre-2) !important; --seg-muted: var(--sv-encre-2) !important; --frv-muted: var(--sv-encre-2) !important;
+  --gestion-muted: var(--sv-encre-2) !important; --recap-muted: var(--sv-encre-2) !important; --studio-ledger-label: var(--sv-encre-2) !important;
+  --studio-muted: var(--sv-encre-2) !important;
+  --sb-lien: var(--sv-lien) !important; --d-accent-texte: var(--sv-lien) !important; --bx-accent-texte: var(--sv-lien) !important; --cm-accent: var(--sv-lien) !important;
+  --ia-lien: var(--sv-lien) !important; --id-lien: var(--sv-lien) !important; --p-accent-texte: var(--sv-lien) !important; --sbp-lien: var(--sv-lien) !important;
+  --vrm-accent-texte: var(--sv-lien) !important; --vrm-b-lien: var(--sv-lien) !important; --cfg-accent-texte: var(--sv-lien) !important;
+  --g-accent-texte: var(--sv-lien) !important;
+  --sb-ambre: var(--sv-ambre) !important; --d-ambre: var(--sv-ambre) !important; --fu-ambre-txt: var(--sv-ambre) !important; --p-ambre-texte: var(--sv-ambre) !important;
+  --s-ambre: var(--sv-ambre) !important; --bx-ambre: var(--sv-ambre) !important; --ia-ambre: var(--sv-ambre) !important; --id-ambre: var(--sv-ambre) !important;
+  --ret-ambre: var(--sv-ambre) !important; --sbp-ambre: var(--sv-ambre) !important; --vrm-warn: var(--sv-ambre) !important;
+}
+:root:root:root body .vrm-cx[data-espace="autres"] :is(.vrm-cx-form, .vrm-cx-etiquettes > *, select) { color: var(--sv-encre) !important; }
 
 /* ══ 8. LA COQUE : la barre du bas (verre clair), la tête, la navigation de l'ordinateur ══ */
 :root:root:root body .vrm-app-shell .vrm-tabbar.vrm-tabbar {
