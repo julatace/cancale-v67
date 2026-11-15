@@ -28,6 +28,7 @@
 
 import { placeCase } from './stockSortie.js';
 import { planchesCases } from './stockRegles.js';
+import { aDesPiles, colonneEnPile } from './stockEtageres.js';   // (15 nov.) une colonne peut être en pile sans tout le meuble
 
 const estListe = Array.isArray;
 const estObjet = (o) => !!o && typeof o === 'object' && !Array.isArray(o);
@@ -46,10 +47,10 @@ export function premiereCaseLibre({ meubles, slots } = {}) {
     if (!m || m.id == null) continue;
     const cols = Math.max(1, Number(m.cols) || 1), rows = Math.max(1, Number(m.rows) || 1);
     const prise = (i) => prises.has(String(m.id) + ':' + i);
-    const planches = m.gravite ? planchesCases(m.planches, cols, rows) : null;
+    const planches = (m.gravite || aDesPiles(m)) ? planchesCases(m.planches, cols, rows) : null;
     for (let i = 0; i < cols * rows; i++) {
       if (prise(i)) continue;
-      if (planches) {
+      if (planches && colonneEnPile(m, (i % cols) + 1)) {
         // Empilé : la case doit être le fond de son segment, ou poser sur une case prise.
         const r = Math.floor(i / cols), c = i % cols;
         const fond = r === rows - 1 || planches.has((r + 1) + ':' + (c + 1));

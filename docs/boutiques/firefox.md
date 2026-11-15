@@ -38,17 +38,19 @@ Relie tes comptes Vinted, Leboncoin, eBay et Vestiaire à VRM : annonces, ventes
 <!-- description -->
 VRM est l'outil de gestion des revendeurs de seconde main (https://vrm.center). Cette extension relie l'app VRM à tes propres comptes Vinted, Leboncoin, eBay et Vestiaire Collective, depuis ton navigateur : tu n'as plus rien à recopier.
 
+Pour qui : les vendeurs de seconde main qui tiennent un ou plusieurs comptes sur ces sites et veulent leurs ventes, leurs colis et leurs chiffres au même endroit.
+
 Ce qu'elle fait pour toi
 • Elle range dans ton espace VRM ce que ces sites affichent déjà sur ta propre activité quand tu les ouvres : annonces, ventes, achats, messages, offres, soldes, bordereaux.
 • Elle récupère les bordereaux d'expédition de tes ventes, prêts à imprimer avec le numéro de rangement de la paire.
 • Elle relève les codes de retrait de tes colis et leur statut chez le transporteur.
-• Sur ton clic dans VRM : remplir une annonce sur Leboncoin, eBay ou Vestiaire Collective, republier une annonce Vinted, baisser un prix, poser le mode vacances, répondre à un message, accepter, refuser ou faire une offre, générer un bordereau.
+• Sur ton clic dans VRM : remplir une annonce sur Leboncoin, eBay ou Vestiaire Collective, republier une annonce Vinted, baisser ou remettre un prix, poser le mode vacances, créer un brouillon d’annonce Vinted, répondre à un message, accepter, refuser ou faire une offre, générer un bordereau.
 • Seulement si tu les allumes dans VRM (éteintes par défaut) : accepter les offres Vinted au-dessus du prix minimum que tu as fixé (et refuser avec TON message celles sous ton seuil), et envoyer ton message aux personnes qui mettent ton annonce en favori.
 
 Ses garde-fous
 • Elle n'agit qu'au nom du compte connecté dans l'onglet, jamais d'un autre.
-• Au plus 50 actions par heure et 200 par jour et par compte, une requête à la fois ; elle s’arrête net quand le site demande une pause ou une vérification.
-• Elle ne lit jamais ton mot de passe ni ton historique de navigation.
+• Au plus 50 actions par heure et 200 par jour et par compte (réglage par défaut), une requête à la fois ; elle s’arrête net quand le site demande une pause ou une vérification.
+• Elle ne lit jamais le mot de passe de tes comptes de revente ni ton historique de navigation.
 • Ce qu'elle lit part uniquement dans TON compte VRM. Rien n'est vendu, rien ne sert à la publicité.
 
 Il faut un compte VRM (vrm.center). Détail de ce que l'extension lit et envoie : https://vrm.center/legal/extension.html
