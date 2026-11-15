@@ -16836,7 +16836,7 @@ function PropositionAchat({ p, art, onRelier, onRefus }) {
     </div>
   );
 }
-function AchatsARelier({ file, vendus = null, liaison, achats, propositionDe, onRelier, onRelierVente = null, onSaisir, onPlusTard, onChoisir, onChoisirVente = null, onRefus = null, compteDe, onSerie = null }) {
+function AchatsARelier({ file, vendus = null, liaison, achats, propositionDe, onRelier, onRelierSerie = null, onRelierVente = null, onSaisir, onPlusTard, onChoisir, onChoisirVente = null, onRefus = null, compteDe, onSerie = null }) {
   // Deux files : les annonces en vente, puis les ventes récentes (bénéfice réel).
   const [onglet, setOnglet] = useState('vente');
   const [plusOuvert, setPlusOuvert] = useState(null);
@@ -16854,7 +16854,7 @@ function AchatsARelier({ file, vendus = null, liaison, achats, propositionDe, on
   if (!lignesVente.length && !(lignesVendus && lignesVendus.length)) return <div className="vrm-ar-vide" data-ar-etat="vide">{tr('annonces.chaqueAnnonceNumerotee')}</div>;
   const lecture = achats === undefined || liaison === undefined;
   const nSugg = (lignes || []).filter((l) => propsDe(l.key).length).length;
-  const relierUne = (l, a, opts) => (l.genre === 'vente' ? onRelierVente && onRelierVente(l, a, opts) : onRelier(l.item, a, opts));
+  const relierUne = (l, a, opts = {}) => (l.genre === 'vente' ? onRelierVente && onRelierVente(l, a, opts) : (opts.silencieux && onRelierSerie ? onRelierSerie(l.item, a) : onRelier(l.item, a)));
   // « Valider les N très probables » : la liste est MONTRÉE, chaque ligne cochée par défaut ; SON toucher relie.
   const validerCoches = async () => {
     if (!valider) return;
@@ -16883,8 +16883,9 @@ function AchatsARelier({ file, vendus = null, liaison, achats, propositionDe, on
       {lignes == null ? <div className="vrm-ar-vide" data-ar-etat="lecture">{PAS_SU.enCours}</div>
         : !lignes.length ? <div className="vrm-ar-vide" data-ar-etat="vide">{onglet === 'vendus' ? tr('liaison.vendusVide') : tr('annonces.chaqueAnnonceNumerotee')}</div> : (
       <ul className="vrm-aar-liste">
-        {lignes.map((l) => {
-          const ps = propsDe(l.key); const p = ps[0] || null;
+        {lignes.map((l0) => {
+          const ps = propsDe(l0.key); const p = ps[0] || null;
+          const l = { ...l0, sugg: p };
           const it = l.genre === 'vente' ? l.o : l.item;
           const num = l.fiche && l.fiche.numero;
           const prix = (() => { const v = it && it.price && typeof it.price === 'object' ? it.price.amount : it && it.price; const n = Number(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null; })();
@@ -16943,7 +16944,7 @@ function AchatsARelier({ file, vendus = null, liaison, achats, propositionDe, on
               </div>
               <div className="vrm-aar-rares" id={idPlus} hidden={!ouvert}>
                 {/* (11 nov., lot DJ5) La proposition n'est qu'une proposition : un AUTRE achat se choisit ici. */}
-                {p ? <button type="button" className="sb-lien" data-ar-autre={String(a.transaction_id)} onClick={() => { setPlusOuvert(null); if (l.genre === 'vente') { if (onChoisirVente) onChoisirVente(l, a); } else onChoisir(it, a); }}><span>{tr('annonces.autreAchat')}</span></button> : null}
+                {p ? <button type="button" className="sb-lien" data-ar-autre={String(a.transaction_id)} onClick={() => { setPlusOuvert(null); if (l.genre === 'vente') { if (onChoisirVente) onChoisirVente(l, a); } else onChoisir(it, l.sugg.achat); }}><span>{tr('annonces.autreAchat')}</span></button> : null}
                 {l.genre !== 'vente' && p ? <button type="button" className="sb-lien" data-ar-saisir="" onClick={() => { setPlusOuvert(null); onSaisir(it); }}><Icon name="pencil" size={16}/><span>{tr('annonces.saisirPrix')}</span></button> : null}
                 {l.genre !== 'vente' && !l.plusTard ? <button type="button" className="sb-lien" data-ar-plus-tard-geste="" onClick={() => { setPlusOuvert(null); onPlusTard(l.id); }}><span>{tr('annonces.plusTard')}</span></button> : null}
                 {ps.length > 1 ? <span className="vrm-aar-autres" data-ar-autres={ps.length - 1}>{tr('liaison.autresPossibles', { n: ps.length - 1 })}</span> : null}
@@ -43239,10 +43240,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     toast('Achat délié');
   };
   // (6 nov., vague 2 · point 4) « Relier » depuis la file « Sans achat relié » : SON tap, sur CETTE annonce.
-  const relierAchatAnnonce = async (it, a, opts = {}) => {
+  const relierAchatAnnonce = async (it, a) => {
     const w = await ecritureRelierAchat(a); if (!w) return;
     updatePair(it, w);
-    if (!opts.silencieux) accompagner('achat.relier', { vars: { prix: w.buyPrice ? `${String(w.buyPrice).replace('.', ',')}\u00a0€` : '—' } }).fini();
+    accompagner('achat.relier', { vars: { prix: w.buyPrice ? `${String(w.buyPrice).replace('.', ',')}\u00a0€` : '—' } }).fini();
+    return true;
+  };
+  // (15 nov., liaison) La même écriture, sans l'accompagnement à chaque paire : « Valider les N très probables ».
+  const relierAchatAnnonceSerie = async (it, a) => {
+    const w = await ecritureRelierAchat(a); if (!w) return false;
+    updatePair(it, w);
     return true;
   };
   // ── (15 nov., liaison) LES VENDUS SANS ACHAT RELIÉ, ET L'AFFECTATION (src/liaisonAchat.js) ──
@@ -51653,7 +51660,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             onDetailBrouillons={()=>setBrouillonsOpen(true)}/>
         ) : annSort==='sansachat' ? (
           <AchatsARelier file={fileAchat} achats={fillBuyAchats.loading && !fillBuyAchats.items ? undefined : (fillBuyAchats.items || (accounts.length ? undefined : []))} liens={liensAchats}
-            vendus={fileVendus} liaison={liaison} onRelierVente={relierAchatVente} onChoisirVente={choisirAchatVente} onRefus={refuserLiaison}
+            vendus={fileVendus} liaison={liaison} onRelierVente={relierAchatVente} onRelierSerie={relierAchatAnnonceSerie} onChoisirVente={choisirAchatVente} onRefus={refuserLiaison}
             propositionDe={propositionSuggestion} onRelier={relierAchatAnnonce} onSaisir={saisirPrixAnnonce} onPlusTard={poserAchatPlusTard} onSerie={()=>setFillBuyOpen(true)}
             onChoisir={(it, propose)=>openPicker({ ...it, _autre: propose ? String(propose.transaction_id || '1') : undefined, _dateRef: (()=>{ const t=Number(it.createdTs); return Number.isFinite(t)&&t>0 ? new Date(t<1e12?t*1000:t).toISOString() : null; })() })} compteDe={(a)=>a&&a._acc?accNameOf(a._acc):''}/>
         ) : annSort==='acompleter' ? (
