@@ -91,6 +91,9 @@ L'app :
   bordereau de retour, une autre clé, un PDF non nul ; ne touche pas la même ligne d'un autre vendeur.
   Sans la 044 : 404 ⇒ rien écrit, la réponse dit `migration: 'absente'`.
 - 20 par passage au plus, les plus anciens d'abord.
+- Coût : rien n'est lu au-delà des bordereaux quand aucun ne porte de PDF ; sinon les listes des ventes
+  (`data->payload->my_orders`, la lecture du bilan et de Colis) et les scalaires des transactions —
+  une fois par jour et par vendeur (chez Julien ≈ 400 Ko + les `meta` des transactions).
 - Journal : `vrm_purge_bordereaux` (`dernier` : candidats, retirés, octets, gardés par raison ;
   `supprimes` : les 200 derniers ids et tailles). La réponse du cron : des nombres seulement.
 
