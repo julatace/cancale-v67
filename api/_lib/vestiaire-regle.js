@@ -59,11 +59,74 @@ export function etapeMotVc(v) {
 // Annulée, remboursée, retournée ou en litige : la paire n'est pas partie, la
 // vente n'est pas de l'argent. Une vente encore « à expédier » n'est jamais
 // annulée (la liste « articles à expédier » le prouve).
-export const vcVenteAnnulee = (v) => !!v && v.aExpedier !== true && etapeMotVc(v) === 'annulee';
+export const vcVenteAnnulee = (v) => !!v && !aExpedierVc(v) && etapeMotVc(v) === 'annulee';
 // PARTIE : le colis a quitté le stock, PROUVÉ par le mot de Vestiaire (envoyée,
-// en contrôle, livrée, terminée, versée). « Plus dans à expédier » seul ne
-// prouve rien (envoyée OU annulée, Vestiaire ne dit pas laquelle).
-export const vcVentePartie = (v) => !!v && v.aExpedier !== true && ['en-route', 'controle', 'livree', 'terminee', 'versee'].includes(etapeMotVc(v));
+// en contrôle, livrée, terminée, versée) ou (15 nov.) par la frise du vendeur
+// (`expeditionVc`). « Plus dans à expédier » seul ne prouve rien (envoyée OU
+// annulée, Vestiaire ne dit pas laquelle).
+export const vcVentePartie = (v) => !!v && !aExpedierVc(v) && (['en-route', 'controle', 'livree', 'terminee', 'versee'].includes(etapeMotVc(v)) || expeditionVc(v).prouvee);
+
+// ── « À EXPÉDIER » : L'ÉTAT LE PLUS FRAIS GAGNE (15 nov., §5) ──────────────
+// Mesuré en production (15 nov.) : une vente Vestiaire EXPÉDIÉE le 7 nov. était
+// encore « À envoyer · date limite passée » dans VRM. `aExpedier: true` venait de
+// la liste « Articles à expédier » lue le 2 nov. (jamais relue EN ENTIER, donc
+// jamais remise à faux) ; la frise lue le 15 nov. disait `sellerShipment: done`,
+// `statutVc: deliveryInProgress`. Un fait plus ancien gagnait sur un plus frais.
+//
+// LA PREUVE D'EXPÉDITION (`expeditionVc`) : une étape de la frise du vendeur
+// d'APRÈS l'envoi « done » (envoi, livraison, conformité, paiement — seul
+// « done » prouve, `pending`/`ongoing`/`upcoming` ne prouvent rien), ou le statut
+// de Vestiaire qui DIT la livraison en cours (`deliveryInProgress`, mesuré).
+// « shipmentInProgress » est l'état MESURÉ d'une vente À ENVOYER : jamais une preuve.
+// Datée par `etapesAt` (extension ≥ 5.379, l'heure où la frise a été lue).
+//
+// LA RÈGLE (`aExpedierVc`) — une seule, lue par Ventes, Colis, Ma journée, le Stock,
+// le widget et les rappels (tous passent par ce module) :
+//  · pas de `aExpedier: true` rangé ⇒ pas à expédier (comme avant) ;
+//  · `aExpedier: true` sans preuve d'expédition ⇒ à expédier (« pas su » reste
+//    « pas su » : rien n'est déduit d'une absence, d'une date ou d'un délai) ;
+//  · `aExpedier: true` ET une preuve d'expédition : les DEUX datées ⇒ la plus
+//    fraîche gagne (une liste « à expédier » relue APRÈS la frise remet la vente
+//    à expédier). Une des deux sans date (lignes rangées avant la 5.379) ⇒ la
+//    preuve gagne : Vestiaire n'écrit « envoi fait » qu'APRÈS l'envoi, et ne
+//    range dans « à expédier » qu'AVANT — une frise « envoi fait » a donc été lue
+//    après toute liste où la vente attendait l'envoi.
+// L'heure de la liste « à expédier » : `aExpedierAt` (extension ≥ 5.379, par
+// vente), sinon la dernière lecture de cette liste (`lectures['a-expedier']`).
+// Fonctions PURES : scripts/audit-vestiaire-a-expedier.cjs les exécute.
+const ETAPES_APRES_ENVOI = ['sellerShipment', 'sellerDelivery', 'sellerConformity', 'sellerPayment'];
+const STATUT_EN_LIVRAISON = /^deliveryInProgress$/i;
+const msVc = (x) => { const t = Date.parse(x || ''); return Number.isFinite(t) && t > 0 ? t : 0; };
+export function expeditionVc(v) {
+  if (!objet(v)) return { prouvee: false, t: 0, preuve: '' };
+  const e = objet(v.etapesVc);
+  const etape = e ? ETAPES_APRES_ENVOI.find((k) => String(e[k] == null ? '' : e[k]).trim().toLowerCase() === 'done') : '';
+  const statut = STATUT_EN_LIVRAISON.test(String(v.statutVc || '').trim());
+  if (!etape && !statut) return { prouvee: false, t: 0, preuve: '' };
+  return { prouvee: true, t: msVc(v.etapesAt), preuve: etape || 'statut' };
+}
+export function heureAExpedierVc(v, lectures = null) {
+  const propre = msVc(v && v.aExpedierAt);
+  if (propre) return propre;
+  const l = objet(lectures) && objet(lectures['a-expedier']);
+  return l ? Math.max(msVc(l.at), msVc(l.partielleAt)) : 0;
+}
+export function aExpedierVc(v, lectures = null) {
+  if (!objet(v) || v.aExpedier !== true) return false;
+  const p = expeditionVc(v);
+  if (!p.prouvee) return true;
+  const ae = heureAExpedierVc(v, lectures);
+  return !!(p.t && ae && ae > p.t);
+}
+// La vente telle que les écrans la lisent : `aExpedier` = la règle ci-dessus (le mot
+// rangé reste dans `aExpedierLu`), et l'heure de la liste « à expédier » posée sur la
+// vente (`aExpedierAt`) pour qu'un appel SANS `lectures` rende le même verdict.
+// Idempotente : `aExpedierVc(venteVcFraiche(v, l)) === aExpedierVc(v, l)`.
+export function venteVcFraiche(v, lectures = null) {
+  if (!objet(v)) return v;
+  const ae = heureAExpedierVc(v, lectures);
+  return { ...v, aExpedierLu: v.aExpedier === true, aExpedier: aExpedierVc(v, lectures), ...(ae ? { aExpedierAt: new Date(ae).toISOString() } : {}) };
+}
 
 // ── L'IDENTITÉ (§5) ─────────────────────────────────────────────────────────
 // (2 nov., soir) `auto` = les numéros que VRM a DONNÉS aux annonces Vestiaire
@@ -160,7 +223,8 @@ export function ventesVcDe(d) {
   const ventes = objet(d.ventes);
   if (!ventes) return d.ventes == null ? [] : null;
   const liens = objet(d.liens) || {};
-  return Object.entries(ventes).filter(([, v]) => objet(v)).map(([id, v]) => ({ ...v, id: String(id), num: numVcVente(v, liens, d.auto) }));
+  // (15 nov.) `aExpedier` = l'état le plus frais (`venteVcFraiche`) : tous les consommateurs de cette liste lisent la règle.
+  return Object.entries(ventes).filter(([, v]) => objet(v)).map(([id, v]) => ({ ...venteVcFraiche(v, d.lectures), id: String(id), num: numVcVente(v, liens, d.auto) }));
 }
 
 // ── LES COLIS À ENVOYER ─────────────────────────────────────────────────────
@@ -182,7 +246,7 @@ export function colisVcAPoster(d, maintenant = Date.now()) {
   // EXACT a été pris en charge sort de « à poster » — un état DÉDUIT, recalculé,
   // jamais écrit. `d.departs` absent ou illisible ⇒ rien ne change (pas su).
   const parti = departsVc(d, ventes);
-  return Object.entries(ventes).filter(([id, v]) => objet(v) && v.aExpedier === true && !fait[String(id)] && !parti.has(String(id))).map(([id, v]) => {
+  return Object.entries(ventes).filter(([id, v]) => objet(v) && aExpedierVc(v, d.lectures) && !fait[String(id)] && !parti.has(String(id))).map(([id, v]) => {
     const t = Date.parse(v.limite || '');
     return {
       id: String(id), num: numVcVente(v, liens, d.auto), productId: v.productId == null ? '' : String(v.productId), limite: v.limite || '', suivi: v.suivi || '', transporteur: v.transporteur || '',
@@ -209,7 +273,7 @@ export function departsVc(d, ventesObj = null) {
   const entrants = new Set(Object.values(objet(d.achats) || {}).map((a) => normaliserSuivi(a && a.suivi)).filter(Boolean));
   const ambigus = suivisAmbigus(liste, entrants);
   for (const [id, v] of Object.entries(ventes)) {
-    if (!objet(v) || v.aExpedier !== true || !v.suivi) continue;
+    if (!objet(v) || !aExpedierVc(v, d.lectures) || !v.suivi) continue;
     const p = departProuve(v.suivi, d.departs, { venteMs: Date.parse(v.date || '') || null, ambigus });
     if (p) out.set(String(id), p);
   }
@@ -284,7 +348,7 @@ export function stockVestiaire(liste) {
   for (const v of liste) {
     const cle = cleNum((v && v.num) || '');
     if (!cle || vcVenteAnnulee(v)) continue;
-    if (v.aExpedier === true) aPoster.add(cle);
+    if (aExpedierVc(v)) aPoster.add(cle);
     else if (vcVentePartie(v)) sorties.push({ v, num: v.num, cle });
   }
   return { aPoster, sorties };
