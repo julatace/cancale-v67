@@ -116,7 +116,7 @@ sans eux reçoit un 403 que l'écran dit « Reconnecter eBay » pour CETTE parti
   audit-dates-paris (achatMemeAnnonce, recherchePhrase, soldes — la ligne de src/ebay/tableau.js a été
   retirée), audit-comptes-exclus (module src/versementReleve.js absent de sa copie).
 - Bancs eBay voisins, l'arbre de départ (7c5ddaf5, construit à part) puis ce lot, l'un après l'autre :
-  ebay-comptes 2 KO / 2 KO (mêmes libellés), ebay-apres-vente-ecran 7 KO / 7 KO (mêmes libellés ; la
+  ebay-comptes 2 KO / 2 KO (mêmes libellés), ebay-achats-recherche 36 KO / 36 KO, ebay-apres-vente-ecran 7 KO / 7 KO (mêmes libellés ; la
   machine est saturée, les clics « Promotion », « Achats » expirent des deux côtés). Un premier passage
   avait rougi ebay-comptes (« Tous les comptes : ventes ») : `?tab=plat_ebay` ouvrait le Tableau ⇒ un
   ancien lien vers l'espace eBay mène de nouveau aux Commandes (le Tableau s'ouvre par le filtre des sites).
