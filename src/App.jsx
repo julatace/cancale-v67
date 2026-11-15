@@ -16711,7 +16711,9 @@ function AchatsARelier({ file, achats, liens, propositionDe, onRelier, onSaisir,
                 <span className="vrm-aar-centre">
                   <span className="vrm-aar-titre" data-ar-titre="">{num ? <Numero n={num} taille="petit"/> : null}<span>{it.title || tr('annonces.sansTitre')}</span></span>
                   {/* (6 nov., finitions) La date de SON « Plus tard » est dite ; au bout de 7 jours l'annonce revient. */}
-                  <span className="vrm-aar-sous" data-ar-sous="">{[prix != null ? montant(prix) : '', l.reporteLe ? `reportée le ${jour(l.reporteLe)}${l.plusTard && l.revientLe ? ` · revient le ${jour(l.revientLe)}` : ''}` : ''].filter(Boolean).join(' · ')}</span>
+                  <span className="vrm-aar-sous" data-ar-sous="">{[prix != null ? montant(prix) : '', l.reporteLe ? `reportée le ${jour(l.reporteLe)}${l.plusTard && l.revientLe ? ` · revient le ${jour(l.revientLe)}` : ''}` : ''].filter(Boolean).join(' · ')}
+                    {/* Pas de suggestion : DIT sur la ligne du prix (« pas su » pendant la lecture des achats), jamais un bloc vide. */}
+                    {!l.sugg ? <span className="vrm-aar-sans" data-ar-sans-sugg="">{prix != null || l.reporteLe ? ' · ' : ''}{achats === undefined ? PAS_SU.enCours : tr('annonces.aucuneSuggestion')}</span> : null}</span>
                 </span>
               </div>
               {l.sugg ? (
