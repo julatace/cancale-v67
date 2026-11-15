@@ -1144,7 +1144,8 @@ const lbcTitre = (brand, base, size, max) => {
 const LBC_DESC_MAX = 4000;
 const LBC_PRIX_MAX = 100000;
 const LBC_PHOTOS_MAX = 15;
-const LBC_ETATS = ['Neuf avec étiquette', 'Très bon état', 'Bon état', 'État satisfaisant'];
+// (15 nov.) « Neuf sans étiquette » : servi par Leboncoin (fdata du 8 nov., `clothing_condition_a`).
+const LBC_ETATS = ['Neuf avec étiquette', 'Neuf sans étiquette', 'Très bon état', 'Bon état', 'État satisfaisant'];
 function refLbcPresente(texte, ref) {
   if (!ref) return false;
   return new RegExp(String(ref).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![0-9A-Z])', 'i').test(String(texte || ''));
@@ -1175,6 +1176,8 @@ const SOUS_FAMILLES = [
   ['espadrilles', 'chaussures', /espadrille/],
   ['mocassins', 'chaussures', /(mocassin|loafer)/],
   ['derbies', 'chaussures', /(\bderby\b|derbies|richelieu|oxford)/],
+  // (15 nov.) « Chaussures et bottes de randonnée » (Vinted) n'est pas une botte : 305 de ses ventes.
+  ['randonnee', 'chaussures', /randonn[ée]e/],
   ['bottes', 'chaussures', /(\bbottes?\b|bottine|\bboots?\b|chelsea)/],
   ['baskets', 'chaussures', /(basket|sneaker|running|trainer|\brunners?\b)/],
   ['chaussures', 'chaussures', /chaussure/],
@@ -1224,7 +1227,9 @@ function familleArticle(o) {
   if (/^femmes?$/.test(seg[0] || '')) genre = 'femme';
   else if (/^hommes?$/.test(seg[0] || '')) genre = 'homme';
   else if (/^enfants?$/.test(seg[0] || '')) genre = 'enfant';
-  const deux = seg[1] || '';
+  // (15 nov.) Vinted range les chaussures d'enfant SOUS « Vêtements pour filles / garçons >
+  // Chaussures » : le segment suivant décide (une basket d'enfant partait en « Vêtements enfants »).
+  const deux = /^v[êe]tements pour (filles|gar[çc]ons)$/.test(seg[1] || '') && /chaussure/.test(seg[2] || '') ? seg[2] : (seg[1] || '');
   if (/chaussure/.test(deux)) famille = 'chaussures';
   else if (/v[êe]tement/.test(deux)) famille = 'vetements';
   else if (/^sacs?\b/.test(deux)) famille = 'sacs';
