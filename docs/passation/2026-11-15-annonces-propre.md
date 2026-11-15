@@ -24,8 +24,8 @@ Leboncoin, eBay, Vestiaire — la capture de Julien reproduite à l'identique), 
 ## Ce qui a changé
 
 1. **Tête d'Annonces** : titre · « ? » · « À faire › » sur la 1re ligne ; la rangée des sites sur la
-   sienne (défilante si besoin) ; au téléphone, sur Vinted, le choix du compte à droite de cette rangée
-   dit « 👤 Tous ▾ » (« Tous les comptes » se coupait en « Tou… » ; le nom entier reste à l'oreille et
+   sienne (défilante si besoin, touches un peu plus serrées au téléphone, 44 px gardés) ; au téléphone,
+   sur Vinted, le choix du compte reste à droite de cette rangée et dit « 👤 Tous ▾ » (« Tous les comptes » se coupait en « Tou… » ; le nom entier reste à l'oreille et
    dans la feuille, clé `listes.tousComptesCourt` dans les 5 langues). À l'ordinateur la rangée des
    sites reste dans l'île du haut (§7).
 2. **Marques des plateformes**, UNE source : `src/plateformes/marques.js` (tracés, cadres serrés,
@@ -79,13 +79,24 @@ fabriquer est un écran neuf (identités par site, §5) — pas fait ici, à dé
 ## Preuves
 
 - `npm run build` vert.
-- Audits : traduction, tdz, variables, studio, icones, composants, violet, rouge-doublon, csp,
-  coherence, quoi-de-neuf : verts. `plateformes-logo` : A2b–A2d neufs verts, chaque mutation neuve
-  (`marque-couleur`, `fichier-a-la-main`, `selecteur-masque`) rougit SA ligne ; D10 rouge **avant**
-  ce lot (même rouge sur 6c40f401). `coque-parametres` : 1 rouge **avant** ce lot (icônes de
-  Réglages), inchangé.
-- Bancs : `annonces-tete` (neuf) vert 390/1512 clair/sombre, rouge sur 6c40f401 ; `studio-paires`
-  vert (forme 390/1512 × clair/sombre, volume 1 000) ; les autres : voir le rapport de la session.
+- Audits verts : traduction, tdz, variables, studio, icones, composants, violet, rouge-doublon, csp,
+  coherence, quoi-de-neuf. `plateformes-logo` : A2b–A2d neufs verts ; chaque mutation neuve
+  (`marque-couleur`, `fichier-a-la-main`, `selecteur-masque`) rougit SA ligne (`--mutation=`) ; seul
+  rouge : D10, le MÊME sur 6c40f401. `coque-parametres` : 1 rouge (icônes de Réglages), le même sur
+  6c40f401.
+- Bancs :
+  - `annonces-tete` (neuf) : vert 390/1512 × clair/sombre ; **rouge sur 6c40f401** (chevauchement
+    sites ⨯ phrase sur Leboncoin, eBay, Vestiaire ; « Relier à Vinted » bloc de 116 px ; aucune marque
+    SVG ; « Paires » écrit ; aucun nombre) — capture de Julien reproduite à l'identique. Il juge aussi :
+    compte coupé (« T… ») ou renvoyé sous les sites = rouge.
+  - `studio-paires` vert (forme 390/1512 × clair/sombre, volume 1 000 : 9 rangées entières, monte en 4 ms).
+  - `studio-coque` 78 verts ; `afaire-feuille` 768 verts ; `garde-ecrans` rien à signaler ;
+    `annonces-grille` 92 verts (G4 mis à la règle neuve : le nom sur DEUX lignes au plus au téléphone,
+    lignes VUES seulement — il exigeait « une ligne » depuis le 14 nov.).
+  - `refonte-listes` : 7 rouges (Ma journée « murs », Ventes « premiere ») — **les mêmes 7 sur
+    6c40f401** ; aucun sur Annonces.
+  - `plateformes-logo` : 16 rouges — **les mêmes 16 sur 6c40f401** (Messages avec « Tous », eBay sans
+    compte, délais) ; le contrôle des marques (A, svg en ligne) est vert.
 
 ## Geste de Julien
 
