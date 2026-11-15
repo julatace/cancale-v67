@@ -27,7 +27,7 @@
 /* (15 nov., « je veux TOUTES les photos ») La grille : toutes les photos de l'annonce, la même
    présentation sur chacune ; une photo se touche pour la retirer / la remettre (case cochée en
    haut à droite, retirée = estompée) ; « Couverture » sur la première qui part. */
-.vrm-rg-feuille .vrm-rg-grille { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
+.vrm-rg-feuille .vrm-rg-grille { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }   /* « Couverture » et la case tiennent côte à côte */
 .vrm-rg-feuille .vrm-rg-photo { aspect-ratio: 4 / 5; border-radius: var(--sb-r-vignette, 11px); overflow: hidden; background: var(--sb-socle, #F1F5F9); }
 html body .vrm-rg-feuille button.vrm-rg-tuile {
   position: absolute; inset: 0; width: 100%; height: 100%; min-height: 44px; padding: 0; margin: 0; border: 0 !important;

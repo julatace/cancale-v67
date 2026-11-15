@@ -178,7 +178,8 @@ const premierPlan = (pg) => pg.evaluate(() => document.dispatchEvent(new Event('
           await pg.waitForSelector('[data-selection-vue="republier"]', { timeout: 20000 });
           for (let i = 0; i < 40; i++) { if (await pg.$('[data-selection-annonce="9102"]')) break; await pg.waitForTimeout(250); }
           await clic(pg, '[data-selection-annonce="9102"] input');
-          await attendre(pg, () => (document.querySelector('[data-republier-main-lancer]') || {}).getAttribute ? 1 : null);
+          // Sous charge, la liste se redessine encore : la case est recochée tant que « À la main » n'est pas là (un toucher compté).
+          for (let k = 0; k < 3 && !(await attendre(pg, () => (document.querySelector('[data-republier-main-lancer]') ? 1 : null), 4000)); k++) await clic(pg, '[data-selection-annonce="9102"] input', false);
           await clic(pg, '[data-republier-main-lancer]');
           const ouvre = await attendre(pg, () => (document.querySelector('[data-repub-main="9102"]') ? 'guide' : document.querySelector('[data-kit-main]') ? 'kit' : null), 8000);
           dit(ouvre === 'guide', `R1 ${T} « À la main · 1 » ouvre la feuille guidée tout de suite (pas le kit)`, ouvre);

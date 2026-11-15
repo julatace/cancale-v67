@@ -146,7 +146,25 @@ suppression. Publier une fiche : **5 touchers** de « À la main » à « C'est 
   la préparation, « varier » remis, kit au lieu du guide, partage hors du geste, commande envoyée
   à Vinted, texte en dur, clé absente en it).
 - Banc `scripts/bancs/republier-guide.cjs` (neuf, données inventées, 390 tactile + 1512, clair
-  et sombre) : voir la fin de ce fichier pour les chiffres et le rouge sur l'arbre d'avant.
+  et sombre ; `navigator.share`/`canShare` simulés, activation du geste notée) : R1-R5 republier
+  (feuille guidée tout de suite, 4 étapes, photos préparées d'avance, UN partage DANS le geste avec
+  les 2 fichiers, « prêtes dans ta galerie : tout a été envoyé », lien de l'ancienne, relu au retour,
+  champs dans l'ordre de Vinted, N°42 en fin de description, N°42 passé sur la nouvelle, « C'est
+  republié », « Ce que VRM a fait ») ; G (annonce de 8 photos, vignette seule au dressing ⇒ les 8,
+  même réglage sur les 8 — grille ET couverture —, valeurs « +10 % » / « ×1,25 », 5 barres de 44 px,
+  double-toucher = 0 %, partage de 8 fichiers, une retirée ⇒ 7 prêtes et 7 fichiers, « Tes 7
+  photos… » ; une annonce dont VRM n'a pas tout ⇒ « VRM a lu 1 sur 2 photos », lien, « Relire ») ;
+  P (fiche « À publier » : 3 étapes, la photo d'un toucher, N°45, « C'est publié », pool inchangé).
+  Résultat : **390 clair + 390 sombre + 1512 clair : 139 OK** ; 1512 sombre rouge une fois sous
+  charge (la case cochée avant que la liste soit posée : le banc recoche maintenant), rejoué
+  **1512 clair + 1512 sombre : 91 OK, 0 rouge**. Machine partagée à une charge de 40 à 60.
+  **Sur l'arbre d'avant** (ea152a4b, build à part, banc copié dedans) : **rouge** dès R1 (« À la main
+  · 1 » ouvre le kit, pas de feuille guidée). Captures regardées (photos, envoyées, supprimer, créer,
+  republié, publier, 8 photos + barres, 7 photos, photos qui manquent ; clair et sombre, 390 et 1512).
+- Bancs voisins (adaptés à la feuille guidée) : `republier-main` 390 ×2 + 1512 ×2 verts (100 + 65
+  OK ; ses contrôles 44 px ne valent plus qu'au doigt, la souris fait 32 px depuis le Studio — rouge
+  déjà sur ea152a4b, mesuré) ; `republier-kit` vert sur les quatre vues (82 OK ; deux rouges de
+  minuterie sous charge à 1512, verts rejoués seuls).
 - Audits suivis : `traduction` 45/0, `tdz`, `variables`, `studio`, `identite`, `csp`,
   `coherence`, `accompagnement` 40/0, `quoi-de-neuf`, `republier-main` 36 (21/22 mutations : la
   22ᵉ, `modifier_partage`, a perdu son ancre AVANT ce chantier, même résultat sur ea152a4b),

@@ -180,7 +180,7 @@ const poseeLa = (pg, sel) => attendre(pg, `(() => { const f = document.querySele
           const dl = []; pg.on('download', (d) => dl.push(d.suggestedFilename()));
           await clic(pg, '[data-kit-photos="9102"]');
           if (tel) { await attendre(pg, () => /Enregistrer les 2/.test((document.querySelector('[data-kit-photos="9102"]') || {}).textContent || '') || null); await clic(pg, '[data-kit-photos="9102"]'); }
-          const fait = await attendre(pg, () => (document.querySelector('[data-kit-photos="9102"]') || {}).getAttribute ? document.querySelector('[data-kit-photos="9102"]').getAttribute('data-kit-photos-fait') : null);
+          const fait = await attendre(pg, () => (document.querySelector('[data-kit-photos="9102"]') || {}).getAttribute ? document.querySelector('[data-kit-photos="9102"]').getAttribute('data-kit-photos-fait') : null, 30000);   // (15 nov.) sous charge, la préparation de 2 photos dépasse 8 s
           const partages = await pg.evaluate(() => window.__partages);
           if (tel) dit(fait === 'partage' && partages.length === 1 && partages[0].join(',') === 'VRM-42-01.jpg,VRM-42-02.jpg', `K ${T} iPhone : les 2 photos réglées partent au menu de partage (« Enregistrer les images » ⇒ Photos)`, JSON.stringify({ fait, partages }));
           else { await pg.waitForTimeout(500); dit(fait === 'telecharge' && dl.join(',') === 'VRM-42-01.jpg,VRM-42-02.jpg', `K ${T} ordinateur : les 2 photos réglées téléchargées`, JSON.stringify({ fait, dl })); }
