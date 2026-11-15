@@ -42,6 +42,9 @@
 }
 
 /* (14 nov., version studio) Touche, lien, rond, segment copiés de studio.css (« provisoire ») : retirés, la fondation les porte. */
+/* …sauf la cible : ces touches (« Par étape » · « Dans l'ordre », « Annuler ») gardent 44 px à l'ordinateur aussi
+   (la fondation : 40 à la souris) — la mesure d'avant la fusion, inchangée. */
+:where(.vrm-idees) .sb-touche, :where(.vrm-idees).sb-segment > .sb-touche { min-height: 44px; }
 
 /* ── 154 · La ligne de temps ───────────────────────────────────────────── */
 .vrm-lt-onglets { margin: 14px 0 6px; }

@@ -4,6 +4,9 @@
 // Les gestes sont notés dans window.__* (rien n'est écrit nulle part).
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+// (14 nov., version studio) La fondation porte les quatre formes de bouton (studio.css) : le harnais les charge
+// comme l'app, sinon une touche n'a plus ni sa hauteur ni sa forme (les copies « provisoire » sont retirées).
+import '../../../src/design/studio.css';
 import { ajouterSourceApp, tr } from '../../../src/i18n/index.js';
 import fr from '../../../src/i18n/langues/fr.js';
 import { toutSurLeNumero } from '../../../src/rechercheNumero.js';

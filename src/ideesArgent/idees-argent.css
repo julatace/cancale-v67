@@ -42,6 +42,8 @@
    il garde toute la largeur et 17 px (au moins 16 : l'iPhone ne zoome pas sur le champ). */
 :where(.ia) input.sb-champ { display: block; width: 100%; box-sizing: border-box; min-height: 48px; border: 0; outline: none; font: 500 17px/1.2 var(--sb-police-texte, inherit); }
 :where(.ia) input.sb-champ[aria-invalid="true"] { box-shadow: var(--sb-puits-ombre), 0 0 0 2px var(--ia-ambre); }
+/* Les touches de la feuille (Espèces · Virement · Autre…) gardent 44 px à l'ordinateur aussi (la fondation : 40 à la souris). */
+:where(.ia) .sb-segment > .sb-touche { min-height: 44px; }
 
 /* ── la mise en page des feuilles ────────────────────────────────────────── */
 .ia { display: grid; gap: 14px; padding: 4px 0 8px; }
