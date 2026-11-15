@@ -110,6 +110,23 @@ async function emailDe(owner) {
   } catch (_) { return undefined; }
 }
 const RE_EMAIL = /^[^\s@<>]+@[^\s@<>]+\.[a-z]{2,}$/i;
+// Le compte VRM qui porte cette adresse (à un point ou un « + » près) · null aucun · undefined pas su.
+// Lu par pages (admin GoTrue), une fois, à la création du partenaire : sert « pas soi-même ».
+async function compteDeLEmail(email) {
+  const cible = emailCanon(email);
+  for (let page = 1; page <= 50; page++) {
+    let r;
+    try { r = await fetchAvecDelai(`${SUPABASE_URL()}/auth/v1/admin/users?page=${page}&per_page=1000`, { headers: sbCle(service()) }); } catch (_) { return undefined; }
+    if (!r.ok) return undefined;
+    const j = await r.json().catch(() => null);
+    const users = j && Array.isArray(j.users) ? j.users : null;
+    if (!users) return undefined;
+    const u = users.find((x) => x && typeof x.email === 'string' && emailCanon(x.email) === cible && UUID.test(String(x.id || '')));
+    if (u) return String(u.id);
+    if (users.length < 1000) return null;
+  }
+  return undefined;
+}
 
 // ── RATTACHER UN NOUVEAU COMPTE À UN CODE ───────────────────────────────────
 // `ctx` = ce que la route sait du compte CONNECTÉ (jamais du corps) :
@@ -312,8 +329,11 @@ export async function actionAdmin(corps, maintenant = Date.now()) {
     if (!nom) return { http: 400, corps: { ok: false, raison: 'nom' } };
     if (!code) return { http: 400, corps: { ok: false, raison: 'code' } };
     if (contact === undefined) return { http: 400, corps: { ok: false, raison: 'contact' } };
+    // Son compte VRM, s'il en a un à l'adresse du contact : « pas soi-même » (même compte, même compte Vinted).
+    const compte = contact && RE_EMAIL.test(contact) ? await compteDeLEmail(contact) : null;
+    if (compte === undefined) return { http: 503, corps: { ok: false, raison: 'pas-su' } };
     const jeton = jetonNeuf();
-    const w = await ecrire('POST', 'partenaires', [{ nom, code, contact, jeton_empreinte: empreinteJeton(jeton), cree: new Date(maintenant).toISOString() }], 'return=representation');
+    const w = await ecrire('POST', 'partenaires', [{ nom, code, contact, compte, jeton_empreinte: empreinteJeton(jeton), cree: new Date(maintenant).toISOString() }], 'return=representation');
     if (w.status === 409 && /23505/.test(w.texte)) return { http: 409, corps: { ok: false, raison: 'code-pris' } };
     if (!w.ok || !Array.isArray(w.json) || !w.json[0]) return { http: 503, corps: { ok: false, raison: /PGRST205|42P01/.test(w.texte) ? 'non-installe' : 'ecriture' } };
     // Le lien privé n'est rendu qu'ICI (et par « Nouveau lien ») : la base n'en garde que l'empreinte.
