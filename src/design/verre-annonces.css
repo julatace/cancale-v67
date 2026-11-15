@@ -100,7 +100,7 @@
 @media (max-width: 767px) {
   :root:root:root:root:root:root:root body .vrm-tache[data-tache="annonces"] > .vrm-tache-tete h1 { font: 750 26px/1.12 Inter, system-ui, sans-serif !important; letter-spacing: -.03em !important; }
   :root:root:root:root:root:root:root:root:root:root:root body .vrm-tache[data-tache="annonces"] > .vrm-tache-tete { display: flex !important; flex-wrap: wrap !important; align-items: center !important; row-gap: 0 !important; }
-  :root:root:root:root:root:root:root:root:root:root:root body .vrm-tache[data-tache="annonces"] > .vrm-tache-tete > .vrm-paires-selecteur { flex: 1 0 100% !important; width: 100% !important; min-width: 100% !important; align-self: stretch !important; box-sizing: border-box !important; padding: 0 !important; margin: 12px 0 2px !important; order: 9 !important; }
+  :root:root:root:root:root:root:root:root:root:root:root body .vrm-tache[data-tache="annonces"] > .vrm-tache-tete > .vrm-paires-selecteur { flex: 1 0 100% !important; width: 100% !important; min-width: 100% !important; align-self: stretch !important; box-sizing: border-box !important; padding: 0 !important; margin: 6px 0 0 !important; order: 9 !important; }
   /* La liste en UN verre posé (rayon 22, le bord blanc, l'ombre), plus une feuille qui monte du bas. */
   :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-grid.sb-liste[data-sb-vue="liste"] {
     margin: 12px 0 120px !important; padding: 0 !important; border-radius: 22px !important; min-height: 0 !important; overflow: hidden !important;
@@ -119,5 +119,12 @@
   display: flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; color: #FFFFFF !important; font: 600 14px/1 Inter, system-ui, sans-serif !important; white-space: nowrap !important;
 }
 :root:root:root:root:root:root:root body .vrm-paires-selecteur .vrm-seg.vrm-seg-plein > .vrm-seg-btn[aria-pressed="true"] { background: rgb(247 250 253 / .96) !important; color: #0C1D30 !important; box-shadow: 0 4px 10px -4px rgb(8 26 50 / .45) !important; }
+
+/* La nuit : le choix (segment, vue) est un verre clair, pas un rond blanc — un seul plein par écran. */
+:root:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-paires-selecteur .vrm-seg.vrm-seg-plein > .vrm-seg-btn[aria-pressed="true"],
+:root:root:root:root:root:root:root:root[data-theme="dark"] body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button[aria-pressed="true"] {
+  background: rgb(255 255 255 / .18) !important; color: #FFFFFF !important; border-color: rgb(255 255 255 / .45) !important; box-shadow: none !important;
+}
+:root:root:root:root:root:root:root:root[data-theme="dark"] body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button[aria-pressed="true"] .vrm-of-n { background: rgb(255 255 255 / .2) !important; }
 
 } /* fin de @layer vrm-verre */

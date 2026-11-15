@@ -51524,7 +51524,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <VersAFaire><div className="vrm-pop-puces" data-popup-puces="">{blocNumeroEcrit()}{blocRemiseEnLigne()}</div></VersAFaire>
           {/* (15 nov., refonte-journee — « la liste d'abord ») Les N° à vérifier rejoignent « À faire » (la feuille, au téléphone) :
               ils poussaient la 1re annonce sous le premier écran. Le même bloc, les mêmes gestes. */}
-          <VersAFaire>{aVerifierCarton.length > 0 && (
+          {aVerifierCarton.length > 0 && <VersAFaire>{(
           <details data-numeros-a-verifier={aVerifierCarton.length} className="vrm-repli" open style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B25000'}`, borderRadius: 12, padding: '4px 12px 10px', marginBottom: 12 }}>
             <summary style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{trj('annonces.numerosVerifier', { n: aVerifierCarton.length })}</summary>
             {/* (6 nov., v36-visuel) Une ligne ; le récit de la panne derrière le « ⓘ ». */}
@@ -51542,7 +51542,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 onConfirmer={confirmerCarton} onCorriger={corrigerCarton}/>
             ))}
           </details>
-        )}</VersAFaire>
+        )}</VersAFaire>}
         {/* (3 nov., critique #7) « Stock et ajustements » et « Publier aussi ailleurs » descendent SOUS la grille : le premier article d'abord. */}
         {/* ══ LA CARTE D'ANNONCE (3 octobre) ══════════════════════════════════
             Julien : « c'est totalement n'importe quoi ; on ne sait pas sur quelle
