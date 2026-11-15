@@ -160,7 +160,7 @@ const COUPURES = () => {
         const r = await pg.evaluate(() => {
           const carte = document.querySelector('[data-vc-ventes="lu"]');
           const rows = {}; for (const x of document.querySelectorAll('[data-vc-vente]')) rows[x.getAttribute('data-vc-vente')] = {
-            etape: x.getAttribute('data-vc-vente-etape'), ton: x.getAttribute('data-vc-vente-ton'), prix: x.getAttribute('data-vc-prix-principal'), recu: x.getAttribute('data-vc-recu'),
+            etape: x.getAttribute('data-vc-vente-etat'), famille: x.getAttribute('data-vc-vente-etape'), ton: x.getAttribute('data-vc-vente-ton'), prix: x.getAttribute('data-vc-prix-principal'), recu: x.getAttribute('data-vc-recu'),
             t: x.innerText, recuTxt: (x.querySelector('[data-fu-recu]') || { innerText: '' }).innerText, benefSu: (x.querySelector('[data-fu-benef-su]') || { innerText: '' }).innerText,
             bloc: (x.querySelector('.vrm-fu-vente-prixbloc') || { innerText: null }).innerText,
             // L'état VU (pas le texte caché d'une colonne) : la ligne 3 au téléphone, la colonne « État » à l'ordinateur.
@@ -172,7 +172,7 @@ const COUPURES = () => {
           'V1 expédiée (frise plus fraîche que la liste « à expédier ») : « Expédiée · en livraison », sans ambre, plus de « date limite passée »', JSON.stringify({ e: r.rows.V1 && r.rows.V1.etape, t: r.rows.V1 && r.rows.V1.t.replace(/\s+/g, ' ').slice(0, 160) }));
         dit(r.rows.V2 && r.rows.V2.etape === 'vendue' && /\bVendue\b/.test(r.rows.V2.t), 'V2 sans étape : « Vendue »', r.rows.V2 && r.rows.V2.etape);
         dit(r.rows.V1.etatVu === 'Expédiée · en livraison' && /^À expédier avant le /.test(r.rows.V3.etatVu) && r.rows.V4.etatVu === 'État Vestiaire non reconnu', 'l’état est ÉCRIT à l’écran (pas seulement dans une colonne cachée) : V1, V3, V4', JSON.stringify([r.rows.V1.etatVu, r.rows.V3.etatVu, r.rows.V4.etatVu]));
-        dit(r.rows.V3 && /^aExpedier/.test(r.rows.V3.etape) && r.rows.V3.ton === 'action' && /À expédier/.test(r.rows.V3.t), 'V3 vraie vente à envoyer (liste relue après la frise) : « À expédier … » en ambre', r.rows.V3 && r.rows.V3.etape);
+        dit(r.rows.V3 && /^aExpedier/.test(r.rows.V3.etape) && r.rows.V3.famille === 'a-expedier' && r.rows.V3.ton === 'action' && /À expédier/.test(r.rows.V3.t), 'V3 vraie vente à envoyer (liste relue après la frise) : « À expédier … » en ambre', r.rows.V3 && r.rows.V3.etape);
         dit(r.rows.V4 && r.rows.V4.etape === 'inconnu' && /État Vestiaire non reconnu/.test(r.rows.V4.t), 'V4 mot inconnu : « État Vestiaire non reconnu »', r.rows.V4 && r.rows.V4.etape);
         const nAction = Object.values(r.rows).filter((x) => x.ton === 'action').length;
         dit(r.tete === String(nAction) && nAction === 1 && /1 à expédier/.test(r.teteTxt), 'tête = lignes : « 1 à expédier » et UNE ligne en ambre (une seule règle, §11)', JSON.stringify({ tete: r.tete, lignes: nAction, t: r.teteTxt }));

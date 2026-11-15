@@ -195,7 +195,8 @@ const LIGNES = [
         return { etat: e.getAttribute('data-vc-ventes'), v, txt: carte ? carte.innerText : '', phrase: document.querySelectorAll('[data-vc-ventes-montant]').length };
       });
       const V = (id) => ve && ve.v.find((x) => x.id === id);
-      dit(V('V1') && V('V1').etape === 'a-expedier' && /À expédier/.test(V('V1').t) && /à envoyer avant le/.test(V('V1').t), 'Ventes : « à expédier » en tête, avec la date limite', JSON.stringify(V('V1')));
+      // (15 nov., ventes Vestiaire) La date limite est dans l'état de la ligne : « À expédier avant le … » (tr, `vcventes.etat.aExpedier`).
+      dit(V('V1') && V('V1').etape === 'a-expedier' && /À expédier/.test(V('V1').t) && /À expédier (avant le|aujourd’hui|demain)/.test(V('V1').t), 'Ventes : « à expédier » en tête, avec la date limite', JSON.stringify(V('V1')));
       dit(V('V2') && V('V2').etape === 'controle', 'Ventes : « authentication_in_progress » ⇒ l’étape « contrôle par Vestiaire »', JSON.stringify(V('V2') && V('V2').etape));
       dit(V('V3') && V('V3').etape === 'autre' && /« paid »/.test(V('V3').t), 'Ventes : « paid » (payée par qui ?) n’est pas rangé : recopié tel quel', JSON.stringify(V('V3')));
       // (2 nov., soir) Comme Vinted, la ligne montre ce que Vestiaire VERSE quand c'est sûr
