@@ -139,7 +139,7 @@ export function majEmpreintesFiches(mem, vues, maintenant = Date.now()) {
 export function disparuesDuCompte({ uid, fiches, presentes, vus, lu, vendue = () => false, remplacees = new Set(), sortie = () => false, reprenable = (n) => !!str(n) } = {}) {
   const u = str(uid); const out = [];
   if (!u || !Number.isFinite(Number(lu))) return out;
-  const P = presentes instanceof Set ? presentes : new Set();
+  const P = presentes && typeof presentes.has === 'function' ? presentes : new Set();
   for (const [id, f] of Object.entries(objet(fiches) || {})) {
     if (!f || str(f.accountId) !== u || !reprenable(f.numero)) continue;
     if (P.has(String(id)) || (remplacees && remplacees.has(String(id))) || vendue(String(id), f) || sortie(String(id), f)) continue;

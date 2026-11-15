@@ -93,6 +93,9 @@ function constante(app, nom) {
   const C = await imp('src/accueilReste/cartonsNumeros.js');
   const F = await imp('src/fusionNuage.js');
   const P = await imp('src/profilVendeur.js');
+  // (15 nov., lot numeros-masquees) La republication dans l'app Vinted (le dernier recours avant un N° neuf) : absente
+  // d'un arbre plus ancien (le bloc d'avant ne l'appelle pas).
+  const RT = require('fs').existsSync(path.join(RACINE, 'src/republieTelephone.js')) ? await imp('src/republieTelephone.js') : null;
 
   // ── Le bloc exécuté ─────────────────────────────────────────────────────────
   const f = APP_BRUT.indexOf('// </numerotation-passage>'), d = f > 0 ? APP_BRUT.lastIndexOf('<numerotation-passage>', f) : -1;
@@ -120,6 +123,9 @@ function constante(app, nom) {
       nextNum, nextUsed, taken, takenK, byPhoto: {}, reservesNum: { parItem: {} }, horsLigneMaintenant: () => false, prefNum: '',
       decisionEcrite: E.decisionEcrite, numeroNeufPermis: N.numeroNeufPermis, lectureCompleteDe: N.lectureCompleteDe, lectureCompleteAnnonce: N.lectureCompleteAnnonce, marquerNouveau: N.marquerNouveau,
       listings: { items, complets, ko: koUids }, changed: false, ...A,
+      lireObjet: () => ({}), VUS_EN_LIGNE: 'vrm_vus_en_ligne', CYCLE_DECISIONS: 'vrm_cycle_decisions', CLE_PHOTOS_VRM: 'vrm_photos_vrm', CLE_EMPREINTES_FICHES: 'vrm_empreintes_fiches',
+      CLE_REPUB_REPONSES: 'vrm_republie_reponses', CLE_REPUB_ATTENTE: 'vrm_republie_attente', empreintesVinted: {}, venduesVinted: new Set(), annonceDeclareePartie: () => false, pairsLost: {},
+      disparuesDuCompte: RT && RT.disparuesDuCompte, decisionRepublie: RT && RT.decisionRepublie, empreintesDe: RT && RT.empreintesDe,
     };
     vm.createContext(ctx);
     const r = vm.runInContext(`(() => { with (this) { ${corps}\n return nouveauxNum; } }).call(this)`, ctx);

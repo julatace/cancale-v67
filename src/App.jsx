@@ -40934,13 +40934,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const numVenduRep = (k) => Object.values(saleOv || {}).some((o) => o && cleNum(o.numero) === k);
     const empRep = (uid, id) => { const e = empreintesVinted && empreintesVinted[`vinted:${uid}`]; return (e && e[String(id)]) || null; };
     const disparuesRep = {};
-    const republieDe = (it) => {
-      const uid = String(it._acc?.vinted_user_id ?? '');
+    const disparuesDe = (uid) => {
       if (!disparuesRep[uid]) disparuesRep[uid] = disparuesDuCompte({ uid, fiches: nextNum, presentes: presentsRep, vus: vusRep, lu: (listings.lues || {})[uid],
         vendue: (id, f) => !!numVentesParIdentite.parItem[id] || !!(venduesVinted && venduesVinted.has(id)) || numVenduRep(cleNum(f.numero)),
         remplacees: remplaceesRep, sortie: (id) => annonceDeclareePartie(id, nextNum, pairsLost) || ['vendu-main', 'separe'].includes((decisionsRep[id] || {}).choix),
         reprenable: (n) => !!numeroReprenable(n) }).map((d) => ({ ...d, hexes: (memRep[d.id] && Array.isArray(memRep[d.id].h) && memRep[d.id].h.length) ? memRep[d.id].h : empreintesDe(empRep(uid, d.id)) }));
-      return decisionRepublie({ id: it.id, hexes: empreintesDe(empRep(uid, it.id)), disparues: disparuesRep[uid], registre: registreRep, reponse: reponsesRep[String(it.id)], depuis: attenteRep[String(it.id)],
+      return disparuesRep[uid];
+    };
+    const republieDe = (it) => {
+      const uid = String(it._acc?.vinted_user_id ?? '');
+      return decisionRepublie({ id: it.id, hexes: empreintesDe(empRep(uid, it.id)), disparues: disparuesDe(uid), registre: registreRep, reponse: reponsesRep[String(it.id)], depuis: attenteRep[String(it.id)],
         sourcePresente: (src) => presentsRep.has(String(src)),
         numeroPresentAilleurs: (k) => [...presentsRep].some((pid) => pid !== String(it.id) && nextNum[pid] && cleNum(nextNum[pid].numero) === k),
         numeroVendu: numVenduRep, ficheDe: (src) => nextNum[src] || null, cle: cleNum });
@@ -41001,8 +41004,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const dec = decisionEcrite({ lecture: lectureEcriteVinted(it), ident: num || numeroReprenable(pk && byPhoto[pk]) || '', reprenable: (k) => !!numeroReprenable(k) });
         if (!dec) continue;
         const n = dec.numero;
-        if (dec.ecrit && (ecritsEnDouble.has(cleNum(n)) || Object.keys(nextNum).some((k) => k !== String(it.id) && nextNum[k] && cleNum(nextNum[k].numero) === cleNum(n)))) continue;
-        nextNum[it.id] = ficheEcrite(cur, it, pk, dec);
+        // (15 nov., <republie-telephone>) Le N° écrit porté par la fiche d'une annonce de CE compte qui vient de DISPARAÎTRE
+        // (ni vendue, ni remplacée, ni sortie) : c'est elle, republiée dans l'app Vinted — le N° écrit fait foi, rien demandé.
+        const autresN = dec.ecrit ? Object.keys(nextNum).filter((k) => k !== String(it.id) && nextNum[k] && cleNum(nextNum[k].numero) === cleNum(n)) : [];
+        const disparuesIds = autresN.length ? new Set(disparuesDe(String(it._acc?.vinted_user_id ?? '')).map((d) => d.id)) : null;
+        const republieeEcrite = autresN.length > 0 && autresN.every((k) => disparuesIds.has(String(k)));
+        if (dec.ecrit && (ecritsEnDouble.has(cleNum(n)) || (autresN.length && !republieeEcrite))) continue;
+        nextNum[it.id] = republieeEcrite ? { ...ficheEcrite(cur, it, pk, dec), recreeDe: String(autresN[0]), recreeAt: new Date().toISOString(), recreeOrigine: 'numero-ecrit' } : ficheEcrite(cur, it, pk, dec);
         { const ep = entreePool(n); if (ep != null) nextUsed.add(ep); }
         if (pk && !byPhoto[pk]) byPhoto[pk] = n;
         changed = true;
