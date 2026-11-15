@@ -76,7 +76,8 @@ async function rendre(nav, largeur, vue = '') {
     texte: document.body.innerText,
     reglages: !!document.querySelector('[data-onglets-reglages]') || /Notifications/.test(document.body.innerText),
     cleCarte: !!document.querySelector('[data-photoroom-cle]'),
-    monCompte: !!document.querySelector('[data-onglets-reglages] [aria-selected="true"]') && /Mon compte/.test((document.querySelector('[data-onglets-reglages] [aria-selected="true"]') || {}).innerText || ''),
+    // (15 nov.) Plus d'onglets : « Mon compte » est une catégorie (ouverte au téléphone, dépliée au bureau).
+    monCompte: !!document.querySelector('.vrm-set[data-categorie-ouverte="compte"], [data-categorie-ecran="compte"]'),
   }));
   await ctx.close();
   return { r, erreurs, vues };

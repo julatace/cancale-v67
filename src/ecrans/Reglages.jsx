@@ -2199,7 +2199,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (10 nov., lot AH) Deux raccourcis iPhone par liens profonds (src/raccourcisSiri.js) : une PWA ne déclare pas d'intention Siri.
       { id:'raccourcis-siri', type:'panneau', nu:true, ic:'mic', lib:tr('reglages.raccourcis-siri.lib'), desc:tr('reglages.raccourcis-siri.desc'), data:{ 'data-reglage-raccourcis':'' }, el:<RaccourcisSiri toast={toast}/> },
       // (10 nov., lot P) Les raccourcis clavier (src/raccourcisClavier.js) : la même feuille que « ? ».
-      { id:'raccourcis-clavier', type:'action', ic:'key', lib:tr('reglages.raccourcis-clavier.lib'), desc:tr('reglages.raccourcis-clavier.desc'), onClick:()=>{ try { window.dispatchEvent(new Event('vrm:raccourcis-clavier')); } catch (_) {} }, data:{ 'data-reglage-raccourcis-clavier':'' } },
+      { id:'raccourcis-clavier', type:'action', ic:'clavier', lib:tr('reglages.raccourcis-clavier.lib'), desc:tr('reglages.raccourcis-clavier.desc'), onClick:()=>{ try { window.dispatchEvent(new Event('vrm:raccourcis-clavier')); } catch (_) {} }, data:{ 'data-reglage-raccourcis-clavier':'' } },
     ]},
     { id:'sauvegarde', avance:true, titre:tr('reglages.groupe.sauvegarde'), items:[
       { id:'securite', type:'panneau', ic:'shield', lib:tr('parametres.securiteDonnees.lib'), desc:tr('parametres.securiteDonnees.desc'), data:{ 'data-reglage-securite-donnees':'' }, el:<SecuriteSetting/> },
@@ -2309,11 +2309,11 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'equipe', type:'panneau', ic:'invite', lib:tr('reglages.equipe.lib'), desc:tr('reglages.equipe.desc'), el:<EquipeSetting/> },
     ]},
     { id:'connexion', titre:tr('reglages.groupe.connexion'), items:[
-      AUTH.user && { id:'email', type:'nav', ic:'mail', lib:tr('reglages.email.lib'), onClick:()=>{ setAcct({ mode:'email', val:'', err:'', busy:false }); } },
+      AUTH.user && { id:'email', type:'nav', ic:'arobase', lib:tr('reglages.email.lib'), onClick:()=>{ setAcct({ mode:'email', val:'', err:'', busy:false }); } },
       AUTH.user && { id:'motdepasse', type:'nav', ic:'key', lib:tr('reglages.motdepasse.lib'), onClick:()=>{ setAcct({ mode:'pw', val:'', err:'', busy:false }); } },
       // Double vérification (TOTP) — facultative, sur SON clic (16 octobre).
       // (4 nov.) Les appareils où VRM est ouvert, et « Se déconnecter partout ».
-      AUTH.user && { id:'appareils', type:'panneau', ic:'device', lib:tr('reglages.appareils.lib'), el:<AppareilsConnectes/> },
+      AUTH.user && { id:'appareils', type:'panneau', ic:'ecrans', lib:tr('reglages.appareils.lib'), el:<AppareilsConnectes/> },
       AUTH.user && { id:'double', type:'panneau', nu:true, ic:'lock', lib:tr('reglages.double.lib'), val: Array.isArray(AUTH.session && AUTH.session.totp) ? (AUTH.session.totp.length > 1 ? tr('reglages.double.activeN', { n: AUTH.session.totp.length }) : AUTH.session.totp.length ? tr('reglages.double.active') : tr('reglages.double.inactive')) : '', el:<DoubleVerification/> },
     ]},
     AUTH.user && { id:'sortir', titre:null, items:[
@@ -2323,22 +2323,22 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (4 nov.) Tout ce que VRM a envoyé en son nom, lu de ce qui est noté en base.
       // (14 nov., Julien : « il y a 2 “ce que VRM a fait” ») Le JOURNAL quitte « Connexion » : il vit ici, à côté
       // de la confidentialité, avec un libellé qui ne se confond plus avec elle (« Journal : … » / « Confidentialité : … »).
-      AUTH.user && { id:'journal-vrm', type:'panneau', ic:'clock', lib:tr('reglages.journal-vrm.lib'), el:<JournalVrm/> },
+      AUTH.user && { id:'journal-vrm', type:'panneau', ic:'journal', lib:tr('reglages.journal-vrm.lib'), el:<JournalVrm/> },
       // (8 nov., confiance) Ce que VRM lit, garde et fait — chaque phrase tenue par le code (src/tesDonnees.js).
-      { id:'tes-donnees', type:'panneau', ic:'eye', lib:tr('reglages.tes-donnees.lib'), desc:tr('reglages.tes-donnees.desc'), data:{ 'data-reglage-tes-donnees':'' },
+      { id:'tes-donnees', type:'panneau', ic:'confidentiel', lib:tr('reglages.tes-donnees.lib'), desc:tr('reglages.tes-donnees.desc'), data:{ 'data-reglage-tes-donnees':'' },
         el:<TesDonnees cloisonne={!!CLOISONNE} onExporter={exporterMesDonnees} onJournal={AUTH.user ? ()=>ouvrirSous('journal-vrm') : undefined} onFermer={AUTH.user ? ()=>ouvrirSous('fermer') : undefined}/> },
-      { id:'conditions', type:'panneau', nu:true, ic:'info', lib:tr('reglages.conditions.lib'), el:donnees },
+      { id:'conditions', type:'panneau', nu:true, ic:'balance', lib:tr('reglages.conditions.lib'), el:donnees },
     ]},
     // (9 nov., RGPD) « Supprimer mon compte » : TOUT EN BAS de Mon compte, seul, discret
     // (le libellé dans la couleur `danger` du thème — le rouge est réservé aux doublons, §7).
     AUTH.user && { id:'supprimer', titre:null, items:[
-      { id:'fermer', type:'panneau', ic:'trash', lib:tr('reglages.fermer.lib'), ton:'danger', el:<FermerCompte onExporter={exporterMesDonnees}/> },
+      { id:'fermer', type:'panneau', ic:'compteMoins', lib:tr('reglages.fermer.lib'), ton:'danger', el:<FermerCompte onExporter={exporterMesDonnees}/> },
     ]},
   ] : [
     { id:'donnees', titre:tr('reglages.groupe.donnees'), items:[
-      { id:'tes-donnees', type:'panneau', ic:'eye', lib:tr('reglages.tes-donnees.lib'), desc:tr('reglages.tes-donnees.desc'), data:{ 'data-reglage-tes-donnees':'' },
+      { id:'tes-donnees', type:'panneau', ic:'confidentiel', lib:tr('reglages.tes-donnees.lib'), desc:tr('reglages.tes-donnees.desc'), data:{ 'data-reglage-tes-donnees':'' },
         el:<TesDonnees cloisonne={!!CLOISONNE} onExporter={exporterMesDonnees}/> },
-      { id:'conditions', type:'panneau', nu:true, ic:'info', lib:tr('reglages.conditions.lib'), el:donnees },
+      { id:'conditions', type:'panneau', nu:true, ic:'balance', lib:tr('reglages.conditions.lib'), el:donnees },
     ]},
   ];
   // (15 nov.) Plus d'onglets : TOUS les groupes, rangés en dix catégories (src/parametres/categories.js).

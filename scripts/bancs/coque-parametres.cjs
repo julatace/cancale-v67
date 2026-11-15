@@ -169,7 +169,7 @@ async function parametres(nav, { W, theme }) {
     const set = document.querySelector('.vrm-set');
     const icones = {}; const doublons = [];
     for (const l of [...document.querySelectorAll('.vrm-set-liste .vrm-set-ligne')].filter(vis)) {
-      const sv = l.querySelector('.vrm-set-ic svg'); if (!sv) continue; const k = sv.innerHTML.replace(/\s+/g, ''); const n = (l.querySelector('.vrm-set-lib b') || l).innerText.trim();
+      /* (15 nov.) une CATÉGORIE (plaque d'encre) et un réglage (icône gravée) ne se confondent pas : comparés chacun avec les siens */ const sv = l.querySelector('.vrm-set-ic svg, .vrm-pm-cat-ic svg'); if (!sv) continue; const k = (sv.closest('.vrm-pm-cat-ic') ? 'cat:' : 'reg:') + sv.innerHTML.replace(/\s+/g, ''); const n = (l.querySelector('.vrm-set-lib b') || l).innerText.trim();
       if (icones[k] && icones[k] !== n) doublons.push(`${icones[k]} = ${n}`); else icones[k] = n;
     }
     // Carte dans une carte : une liste (déjà une carte) dans un groupe qui en est une aussi,

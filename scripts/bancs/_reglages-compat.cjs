@@ -70,8 +70,8 @@ async function versReglage(page, sel) {
 }
 
 // Les méthodes qui touchent, attendent ou lisent une rangée par son sélecteur.
-const PAGE = ['click', 'tap', 'waitForSelector', '$', '$$', 'isVisible', 'hover', 'focus', 'getAttribute', 'textContent', 'innerText', 'dispatchEvent'];
-const LOC = ['click', 'tap', 'waitFor', 'isVisible', 'count', 'scrollIntoViewIfNeeded', 'getAttribute', 'textContent', 'innerText', 'boundingBox', 'hover', 'focus', 'evaluate', 'dispatchEvent', 'isHidden', 'all'];
+const PAGE = ['click', 'tap', 'waitForSelector', '$', '$$', 'isVisible', 'hover', 'focus', 'getAttribute', 'textContent', 'innerText', 'dispatchEvent', 'fill', 'type', 'press', 'inputValue'];
+const LOC = ['fill', 'type', 'press', 'pressSequentially', 'inputValue', 'click', 'tap', 'waitFor', 'isVisible', 'count', 'scrollIntoViewIfNeeded', 'getAttribute', 'textContent', 'innerText', 'boundingBox', 'hover', 'focus', 'evaluate', 'dispatchEvent', 'isHidden', 'all'];
 const selDuLocator = (l) => { try { return String(l._selector || (l._impl && l._impl._selector) || ''); } catch (_) { return ''; } };
 function poserSurPage(p) {
   if (!p) return;
