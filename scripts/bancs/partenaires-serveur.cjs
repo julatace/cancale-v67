@@ -204,7 +204,7 @@ const facture = (client, o = {}) => {
     dit((await admin({ action: 'creer', nom: 'Leo bis', code: 'LEO' })).code === 409, 'un code déjà pris : 409');
     dit((await admin({ action: 'creer', nom: 'x', code: 'MAX' })).corps.raison === 'nom', 'un nom trop court : refusé');
     dit((await admin({ action: 'creer', nom: 'Max', code: 'M!' })).corps.raison === 'code', 'un code mal formé : refusé');
-    const m = await admin({ action: 'creer', nom: 'Max', code: 'MAX' });
+    const m = await admin({ action: 'creer', nom: 'Max', code: 'MAX', contact: 'max.dupont@gmail.com' });
     MAX = db.t.partenaires.find((p) => p.code === 'MAX'); jetonMax = m.corps.lienPrive.split('/pa/')[1];
     dit(!!MAX, 'Julien crée un second partenaire « Max »');
     const l = await liste();
@@ -224,6 +224,8 @@ const facture = (client, o = {}) => {
     const sosie = nouveauCompte(101, { email: 'leopartenaire+vrm@gmail.com' });
     const rs = await rattacher(sosie, 'LEO');
     dit(rs.code === 400 && rs.corps.raison === 'soi-meme', 'le même e-mail à un point et un « + » près : soi-même, refusé', JSON.stringify(rs.corps));
+    const sosieMax = await rattacher(nouveauCompte(108, { email: 'maxdupont+essai@gmail.com' }), 'MAX');
+    dit(sosieMax.corps.raison === 'soi-meme' && !db.t.partenaires.find((p) => p.code === 'MAX').compte, 'Max (sans compte VRM) : son e-mail de contact, à un point près, refusé', JSON.stringify(sosieMax.corps));
     const memeVinted = nouveauCompte(102); db.t.vinted_accounts.push({ owner: memeVinted, vinted_user_id: '777' });
     const rv = await rattacher(memeVinted, 'LEO');
     dit(rv.corps.raison === 'soi-meme', 'un compte Vinted en commun avec Leo : soi-même, refusé', JSON.stringify(rv.corps));
