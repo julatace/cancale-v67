@@ -210,7 +210,9 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
   // LIGNE touchée), le N° en affiche, le titre, le prix à l'encre. Une ligne sans paire : « Sans N° ».
   const photoHeros = (p && p.photo) || (depuis && depuis.photo) || '';
   const prixHeros = (depuis && depuis.prix) || (!double && sv && sv.prix != null ? eur(sv.prix) : !double && r && r.vente != null ? eur(r.vente) : '');
-  const titreHeros = p ? ((neuve && neuve.titre) || p.titre || (p.etat === 'rien' ? 'N° jamais servi' : 'Sans titre')) : ((depuis && depuis.titre) || tr('fiche.sansTitre'));
+  // (15 nov., rouges-connus) Comme la photo : la paire lue sans titre prend celui de la LIGNE touchée (la même
+  // annonce, désignée par identité) — la fiche d'un colis Vestiaire disait « Sans titre » sous « Cabas toile beige ».
+  const titreHeros = p ? ((neuve && neuve.titre) || p.titre || (p.etat === 'rien' ? 'N° jamais servi' : (depuis && depuis.titre) || 'Sans titre')) : ((depuis && depuis.titre) || tr('fiche.sansTitre'));
   const tailleHeros = p ? ((neuve && neuve.taille) || p.taille || '') : '';
   const sousHeros = [ctx ? tr(CLE_CTX[ctx] || 'fiche.ctx.vente') : '', depuis && depuis.sous ? depuis.sous : ''].filter(Boolean).join(' · ');
   // (14 nov.) Sur une ligne « À retirer », `sous` EST le code de retrait (src/CarteRelais.jsx) : il garde son

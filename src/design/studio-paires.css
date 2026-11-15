@@ -726,6 +726,9 @@
   width: 44px !important; height: 44px !important; border-radius: 11px !important; overflow: hidden !important; background: var(--sbp-socle) !important; box-shadow: var(--sbp-om-pose) !important; display: grid !important; place-items: center !important; color: var(--sbp-encre2) !important;
 }
 :root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-ui-ligne-photo img { width: 100% !important; height: 100% !important; object-fit: cover !important; animation: none !important; }
+/* (15 nov., rouges-connus) Vestiaire : la photo ENTIÈRE, jamais recadrée (Julien, 2 nov. : « c'est beaucoup zoomé sur
+   le produit » ; refonte du 14 nov. : « rangées denses (photo entière sur blanc) »). La règle ci-dessus la recadrait. */
+:root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-ui-ligne-photo.vrm-pf-photo-vc img { object-fit: contain !important; }
 :root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-ui-ligne-titre { display: flex !important; align-items: center !important; gap: 8px !important; min-width: 0 !important; font: 600 15px/20px var(--sbp-texte) !important; color: var(--sbp-encre) !important; }
 :root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-ui-ligne-titre > span:last-child { min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
 :root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-pf-num {

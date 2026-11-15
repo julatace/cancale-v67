@@ -25,12 +25,31 @@
 //   D. « Imprimer » : le PDF produit porte le TITRE et le N° (lu par pdf.js) ;
 //      la ligne rangée `vc_label_P1` n'est jamais réécrite ;
 //   E. « Colis fait » : le colis sort de « à envoyer » (et y revient).
+// (15 nov., rouges-connus) Relu sur les règles d'aujourd'hui, la RÈGLE gardée :
+//   · A : les rangées denses de la refonte du 14 nov. (docs/passation/2026-11-14-refonte-plateformes-reglages.md :
+//     « rangées denses (photo entière sur blanc) », plus de carte photo 4/5) — la photo reste ENTIÈRE
+//     (contain) dans la case CARRÉE de la rangée ;
+//   · B : « À envoyer » est LE mot de la notion depuis le 8 nov. (src/libelles.js `NOTIONS.aEnvoyer`,
+//     docs/passation/2026-11-08-clarte.md, « À expédier » écarté) — lu dans src/libelles.js, l'étape par
+//     `data-vc-vente-etape` ; le transporteur est une MARQUE, plus un nom écrit (10 nov.,
+//     docs/passation/2026-11-09-transporteurs-parfaits.md : « le nom n'est plus écrit à côté du colis,
+//     il est en aria-label, title et data-transporteur-nom ») — UNE marque, le nom jamais écrit deux fois ;
+//   · D, E : les gestes d'une rangée de Ventes vivent dans la FICHE ouverte au toucher (Studio, 15 nov. :
+//     src/design/studio-ventes.css, `DansFiche`) — on ouvre la fiche, puis Imprimer / Déposé.
 const path = require('path');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http');
 const { pathToFileURL } = require('url');
 const DIST = path.join(__dirname, '..', '..', 'dist');
+// Le mot de la notion « à envoyer », lu là où l'app le range (une notion = un mot, src/libelles.js).
+const MOT_A_ENVOYER = (/aEnvoyer:\s*Object\.freeze\(\{ titre: '([^']+)'/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'libelles.js'), 'utf8')) || [])[1] || 'À envoyer';
+// Toucher la rangée d'un colis Vestiaire ouvre LA fiche, où vivent ses gestes (Imprimer, Déposé).
+const ouvrirFicheColis = async (pg, id) => {
+  await pg.click(`[data-vc-colis="${id}"] .vrm-colis-titre`);
+  await pg.waitForSelector(`[data-fiche-paire] [data-fiche-depuis-ligne] [data-vc-imprimer="${id}"], [data-fiche-paire] [data-fiche-depuis-ligne] [data-vc-fait="${id}"]`, { state: 'visible', timeout: 15000 });
+};
+const fermerFiche = (pg) => pg.evaluate(() => { const b = document.querySelector('[data-fiche-fermer]'); if (b) b.click(); });
 const NM = path.join(__dirname, '..', '..', 'node_modules');
 const PORT = Number(process.env.BANC_PORT) || 8063;
 const SHOTS = process.env.SHOTS || '';
@@ -181,7 +200,8 @@ const compte = (t, mot) => (String(t).match(new RegExp(mot, 'g')) || []).length;
         await pg.waitForTimeout(800);
         const a = await pg.evaluate(() => [...document.querySelectorAll('[data-vc-annonce]')].map((li) => {
           const img = li.querySelector('img'); const cs = img ? getComputedStyle(img) : null;
-          return { id: li.getAttribute('data-vc-annonce'), num: li.getAttribute('data-vc-annonce-num'), fit: cs ? cs.objectFit : '', h: img ? img.getBoundingClientRect().height : 0, w: img ? img.getBoundingClientRect().width : 0 };
+          const caseP = img ? img.parentElement.getBoundingClientRect() : null;
+          return { id: li.getAttribute('data-vc-annonce'), num: li.getAttribute('data-vc-annonce-num'), fit: cs ? cs.objectFit : '', h: img ? img.getBoundingClientRect().height : 0, w: img ? img.getBoundingClientRect().width : 0, cw: caseP ? caseP.width : 0, ch: caseP ? caseP.height : 0 };
         }));
         const p1 = a.find((x) => x.id === '71000001') || {}, p2 = a.find((x) => x.id === '71000002') || {}, p3 = a.find((x) => x.id === '71000003') || {};
         n1 = p1.num || ''; n2 = p2.num || '';
@@ -189,7 +209,7 @@ const compte = (t, mot) => (String(t).match(new RegExp(mot, 'g')) || []).length;
         dit(Number(n1) > 12 && Number(n2) > 12, 'A · N° neufs au-dessus du plus haut du pool (12), jamais un N° déjà servi', `${n1} / ${n2}`);
         dit(!p3.num, 'A · l’annonce retirée ne reçoit pas de N°', p3.num);
         dit(a.length === 3 && a.every((x) => x.fit === 'contain'), 'A · la photo ENTIÈRE (object-fit: contain), pas un gros plan', a.map((x) => x.fit).join(','));
-        dit(p1.h > 0 && Math.abs(p1.w / p1.h - 0.8) < 0.05, 'A · aux proportions des fiches (4/5)', `${Math.round(p1.w)}×${Math.round(p1.h)}`);
+        dit(p1.h > 0 && p1.ch > 0 && Math.abs(p1.cw - p1.ch) <= 1 && p1.w <= p1.cw + 1 && p1.h <= p1.ch + 1, 'A · dans la case carrée de la rangée dense (refonte du 14 nov.), sans la déborder', `${Math.round(p1.w)}×${Math.round(p1.h)} dans ${Math.round(p1.cw)}×${Math.round(p1.ch)}`);
         const ls = await pg.evaluate(() => ({ pool: JSON.parse(localStorage.getItem('vinted_used_numeros') || '[]'), vc: JSON.parse(localStorage.getItem('vrm_vc_numeros') || '{}') }));
         await pg.waitForTimeout(800);
         const ls2 = await pg.evaluate(() => ({ pool: JSON.parse(localStorage.getItem('vinted_used_numeros') || '[]'), vc: JSON.parse(localStorage.getItem('vrm_vc_numeros') || '{}') }));
@@ -206,7 +226,7 @@ const compte = (t, mot) => (String(t).match(new RegExp(mot, 'g')) || []).length;
           const l = document.querySelector('[data-vc-vente="V1"]');
           const q = (s) => !!l.querySelector(s);
           return {
-            classe: l.className, plateforme: l.getAttribute('data-plateforme-vente'), num: l.getAttribute('data-vc-vente-num'), tx: l.getAttribute('data-tx'), ouverte: l.getAttribute('data-ligne-ouverte'),
+            classe: l.className, plateforme: l.getAttribute('data-plateforme-vente'), num: l.getAttribute('data-vc-vente-num'), tx: l.getAttribute('data-tx'), ouverte: l.getAttribute('data-ligne-ouverte'), etape: l.getAttribute('data-vc-vente-etape'),
             cases: { bouton: q('button.vrm-ledger-sale-toggle'), titre: q('.vrm-ledger-sale-title'), etat: q('.vrm-ledger-sale-state'), montant: q('.vrm-ledger-sale-amount[data-prix-vente]'), achat: q('.vrm-ledger-sale-achat[data-achat-ligne]'), benef: q('.vrm-ledger-sale-benef[data-benef-ligne]') },
             prix: (l.querySelector('[data-prix-vente]') || {}).getAttribute ? l.querySelector('[data-prix-vente]').getAttribute('data-prix-vente') : '',
             titre: (l.querySelector('.vrm-ledger-sale-nom') || {}).textContent || '', etatTxt: (l.querySelector('.vrm-ledger-sale-state') || {}).textContent || '',
@@ -216,13 +236,15 @@ const compte = (t, mot) => (String(t).match(new RegExp(mot, 'g')) || []).length;
         dit(/vrm-sale-row/.test(r.classe) && r.plateforme === 'vestiaire' && r.tx === 'vc:V1' && r.ouverte != null && r.liste, 'B · la ligne de Vinted (`vrm-sale-row`, data-tx, data-plateforme-vente, data-ligne-ouverte, dans `vrm-ventes-liste`)', JSON.stringify({ c: r.classe, p: r.plateforme, tx: r.tx }));
         dit(Object.values(r.cases).every(Boolean), 'B · mêmes cases que Vinted : bouton, titre, état, montant, achat, bénéfice', JSON.stringify(r.cases));
         dit(r.num === n1 && r.titre.startsWith(`N°${n1} · `), 'B · la vente porte le N° de SON annonce (productId), écrit comme sur Vinted « N° · titre »', `${r.num} · ${r.titre}`);
-        dit(r.prix === '18050' && /À expédier/.test(r.etatTxt), 'B · ce que Vestiaire verse (180,50 €) et « À expédier »', `${r.prix} · ${r.etatTxt}`);
+        dit(r.prix === '18050' && r.etape === 'a-expedier' && r.etatTxt.includes(MOT_A_ENVOYER), `B · ce que Vestiaire verse (180,50 €) et « ${MOT_A_ENVOYER} » (le mot de la notion)`, `${r.prix} · ${r.etape} · ${r.etatTxt}`);
         dit(compte(r.t, 'Chronopost') <= 1, 'B · le transporteur jamais écrit deux fois sur la ligne', String(compte(r.t, 'Chronopost')));
         await capture(pg, `ventes-${nomVp}`);
         await pg.click('[data-vc-vente="V1"] .vrm-ledger-sale-toggle');
-        const rec = await pg.waitForSelector('[data-recap-vente]:visible', { timeout: 8000 }).then(() => pg.evaluate(() => { const d = [...document.querySelectorAll('[data-recap-vente]')].find((x) => x.offsetParent !== null); return d ? { num: (d.querySelector('[data-recap-num]') || {}).getAttribute('data-recap-num'), imp: !!d.querySelector('[data-vc-imprimer]'), tr: (d.querySelector('.vrm-recap-principal [data-transporteur]') || { getAttribute: () => '' }).getAttribute('data-transporteur'), fait: !!d.querySelector('[data-vc-fait]'), t: d.innerText } : null; })).catch(() => null);
+        const rec = await pg.waitForSelector('[data-recap-vente]:visible', { timeout: 8000 }).then(() => pg.evaluate(() => { const d = [...document.querySelectorAll('[data-recap-vente]')].find((x) => x.offsetParent !== null); return d ? { num: (d.querySelector('[data-recap-num]') || {}).getAttribute('data-recap-num'), imp: !!d.querySelector('[data-vc-imprimer]'), tr: (d.querySelector('.vrm-recap-principal [data-transporteur]') || { getAttribute: () => '' }).getAttribute('data-transporteur'), marques: [...d.querySelectorAll('[data-transporteur]')].filter((x) => x.getClientRects().length).map((x) => x.getAttribute('data-transporteur-nom')), fait: !!d.querySelector('[data-vc-fait]'), t: d.innerText } : null; })).catch(() => null);
         dit(rec && rec.num === n1 && rec.imp && rec.fait, 'B · le récapitulatif au toucher (N°, Imprimer, Colis fait)', JSON.stringify(rec && { num: rec.num, imp: rec.imp, fait: rec.fait }));
-        dit(rec && rec.tr === 'chronopost' && compte(rec.t, 'Chronopost') === 1, 'B · le transporteur (pastille) à côté du bouton bordereau, écrit une fois', JSON.stringify(rec && { tr: rec.tr, n: compte(rec.t, 'Chronopost') }));
+        // UNE marque (la pastille de la rangée du bordereau, son nom en data-transporteur-nom), et le nom écrit
+        // au plus une fois en tout (marques + texte) : jamais deux fois.
+        dit(rec && rec.tr === 'chronopost' && rec.marques.length === 1 && /chronopost/i.test(rec.marques[0] || '') && compte(rec.t, 'Chronopost') + rec.marques.length === 1, 'B · le transporteur (sa marque) à côté du bouton bordereau, une fois', JSON.stringify(rec && { tr: rec.tr, marques: rec.marques, n: compte(rec.t, 'Chronopost') }));
         await capture(pg, `ventes-recap-${nomVp}`);
         await sain(pg, 'Ventes');
       });
@@ -252,9 +274,12 @@ const compte = (t, mot) => (String(t).match(new RegExp(mot, 'g')) || []).length;
       });
       await essaie('D. Bordereau tamponné', async () => {
         const avant = ecritures.length;
-        await pg.click('[data-vc-imprimer="V1"]');
+        await ouvrirFicheColis(pg, 'V1');
+        await pg.click('[data-fiche-paire] [data-fiche-depuis-ligne] [data-vc-imprimer="V1"]');
         // (3 nov.) Forme jamais vue : l'aperçu du tampon s'ouvre d'abord ; on garde le choix de VRM.
-        if (await pg.waitForSelector('[data-placeur-tampon="pret"],[data-placeur-tampon="ko"]', { timeout: 10000 }).then(() => true, () => false)) await pg.click('[data-tampon-imprimer]').catch(() => {});
+        // (15 nov.) L'aperçu se rend avec pdf.js : mesuré 1,8 s à 390 px et 22 s à 1512 px sous une charge de 25 —
+        // on attend son ÉTAT (prêt / ko), jamais une durée fixe trop courte.
+        if (await pg.waitForSelector('[data-placeur-tampon="pret"],[data-placeur-tampon="ko"]', { timeout: 60000 }).then(() => true, () => false)) await pg.click('[data-tampon-imprimer]').catch(() => {});
         await pg.waitForFunction(() => window.__pdfs && window.__pdfs.length > 0, null, { timeout: 15000 }).catch(async (e) => { if (process.env.BANC_DEBUG) console.log(await pg.evaluate(() => window.__vus.slice(-15).join(' | '))); throw e; });
         const b64 = await pg.evaluate(async () => { const bl = window.__pdfs[window.__pdfs.length - 1]; const u = new Uint8Array(await bl.arrayBuffer()); let s = ''; for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s); });
         const t = await texteDuPdf(b64);
@@ -265,19 +290,21 @@ const compte = (t, mot) => (String(t).match(new RegExp(mot, 'g')) || []).length;
         dit(!ecritLabel, 'D · la ligne rangée vc_label_… n’est jamais réécrite');
         await pg.waitForTimeout(1000);   // `save` écrit 500 ms après le geste
         const imp = await pg.evaluate(() => JSON.parse(localStorage.getItem('vrm_vc_imprimes') || '{}'));
-        const visible = await pg.evaluate(() => { const g = document.querySelector('[data-vc-imprime="V1"]'); return g ? g.textContent : ''; });
+        const visible = await pg.evaluate(() => { const g = document.querySelector('[data-fiche-paire] [data-vc-imprime="V1"]') || document.querySelector('[data-vc-imprime="V1"]'); return g ? g.textContent : ''; });
         dit(imp.V1 && /Imprimé/.test(visible), 'D · imprimer marque « ✓ Imprimé »', visible);
         await capture(pg, `bordereau-${nomVp}`);
         await pg.keyboard.press('Escape').catch(() => {});
+        await fermerFiche(pg).catch(() => {});
       });
       await essaie('E. Colis fait', async () => {
         // La visionneuse du PDF qui se ferme peut interrompre la navigation (ERR_ABORTED) : on la refait une fois.
         await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' }).catch(() => pg.waitForTimeout(500).then(() => pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' })));
         await pg.waitForSelector('[data-colis-onglet-choix="envoyer"]', { timeout: 15000 }).then(() => pg.click('[data-colis-onglet-choix="envoyer"]')).catch(() => {});
         await pg.waitForSelector('[data-vc-colis="V1"]', { timeout: 15000 });
-        await pg.click('[data-colis-plus="vc:V1"]').catch(() => {});
-        await pg.click('[data-vc-colis="V1"] [data-vc-fait="V1"]');
+        await ouvrirFicheColis(pg, 'V1');
+        await pg.click('[data-fiche-paire] [data-fiche-depuis-ligne] [data-vc-fait="V1"]');
         await pg.waitForTimeout(500);
+        await fermerFiche(pg).catch(() => {}); await pg.waitForTimeout(300);
         // (3 nov.) Le colis fait quitte « À envoyer » et va dans l'onglet « Envoyés », annulable.
         const sortie = await pg.evaluate(() => !document.querySelector('[data-vc-colis="V1"]'));
         await pg.click('[data-colis-onglet-choix="envoyes"]'); await pg.waitForTimeout(400);
