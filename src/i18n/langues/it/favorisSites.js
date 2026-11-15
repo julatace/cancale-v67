@@ -29,5 +29,5 @@ export default {
   "aimesVc.arrete": "Fermato a {faites} su {n} ({heure})",
   "aimesVc.incertaines": {"one": "{n} da verificare su Vestiaire", "other": "{n} da verificare su Vestiaire"},
   "favorisSites.lbcQui": "Leboncoin non dice chi ha salvato il tuo annuncio: VRM non può scrivere a nessuno.",
-  "favorisSites.lbcLevier": "Per raggiungerli, abbassa il prezzo (schermata Leboncoin → «Abbassa il prezzo su Leboncoin»). Leboncoin non dice se li avvisa.",
+  "favorisSites.lbcLevier": "Per raggiungerli, abbassa il prezzo (schermata Leboncoin → «Abbassare il prezzo su Leboncoin»). Leboncoin non dice se li avvisa.",
 };
