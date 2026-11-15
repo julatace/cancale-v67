@@ -29,27 +29,34 @@ const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
   const src = fs.readFileSync(path.join(ACC, SOURCE));
   if (!reg[SOURCE] || reg[SOURCE].modeExemple !== true || reg[SOURCE].sha256 !== sha(src)) throw new Error(`${SOURCE} n'est pas au registre des captures en mode exemple — refusé`);
   const logo = fs.readFileSync(path.join(RACINE, 'public', 'vrm-logo-v5-192.png')).toString('base64');
+  // (15 nov., lot site-public) Au studio : le bleu clair éclairé du haut, l'encre, Inter (la police de l'app,
+  // src/design/polices/, embarquée ici en data: — aucune requête), la nouvelle promesse de la page.
+  const inter = fs.readFileSync(path.join(RACINE, 'src', 'design', 'polices', 'inter-latin-wght-normal.woff2')).toString('base64');
   const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><style>
+    @font-face{font-family:'Inter VRM';font-weight:100 900;src:url(data:font/woff2;base64,${inter}) format('woff2')}
     *{box-sizing:border-box;margin:0}
-    html,body{width:1200px;height:630px;overflow:hidden;background:#F5F5F7}
-    body{font-family:'Inter',sans-serif;color:#1D1D1F;-webkit-font-smoothing:antialiased;display:grid;grid-template-columns:1fr 420px;gap:24px;padding:0 0 0 80px;position:relative}
-    .t{align-self:center;padding-bottom:8px}
-    .m{display:flex;align-items:center;gap:14px;margin-bottom:40px}
-    .m img{width:52px;height:52px;border-radius:13px;background:#1D1D1F;padding:3px}
-    .m b{font-size:34px;font-weight:700;letter-spacing:.02em}
-    h1{font-size:60px;line-height:1.05;letter-spacing:-.035em;font-weight:700;max-width:12em}
-    p{margin-top:28px;font-size:26px;line-height:1.35;color:#6E6E73;letter-spacing:-.01em;max-width:24em}
-    .u{margin-top:36px;font-size:22px;color:#1D1D1F;font-weight:600}
-    .tel{position:absolute;right:72px;top:64px;width:340px;background:#1D1D1F;padding:9px;border-radius:52px;box-shadow:0 30px 60px -16px rgba(0,0,0,.35)}
+    html,body{width:1200px;height:630px;overflow:hidden}
+    body{font-family:'Inter VRM',sans-serif;color:#0C1D30;-webkit-font-smoothing:antialiased;position:relative;
+      background:radial-gradient(70% 60% at 12% 0%,rgba(255,255,255,.7),transparent 70%),linear-gradient(180deg,#EEF6FD 0%,#D7E9F6 55%,#C6DDF0 100%)}
+    .t{position:absolute;left:76px;top:0;bottom:0;width:640px;display:flex;flex-direction:column;justify-content:center}
+    .m{display:flex;align-items:center;gap:14px;margin-bottom:34px}
+    .m img{width:52px;height:52px;border-radius:14px;background:#0C1D30;padding:3px;box-shadow:0 1px 2px rgba(18,52,96,.25),0 8px 18px -8px rgba(18,52,96,.5)}
+    .m b{font-size:32px;font-weight:700;letter-spacing:-.01em}
+    h1{font-size:58px;line-height:1.04;letter-spacing:-.04em;font-weight:700;text-wrap:balance}
+    p{margin-top:24px;font-size:25px;line-height:1.35;color:#3F5468;letter-spacing:-.015em;max-width:22em}
+    .u{margin-top:34px;display:flex;align-items:center;gap:14px}
+    .u b{display:inline-flex;align-items:center;height:48px;padding:0 24px;border-radius:999px;background:#0C1D30;color:#fff;font-size:21px;font-weight:600;box-shadow:0 12px 22px -10px rgba(18,52,96,.6)}
+    .u span{font-size:16px;color:#3F5468}
+    .lum{position:absolute;right:-60px;top:-40px;width:620px;height:720px;background:radial-gradient(50% 50% at 50% 45%,rgba(255,255,255,.85),transparent 70%)}
+    .tel{position:absolute;right:86px;top:58px;width:336px;background:#0C1D30;padding:8px;border-radius:52px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),0 2px 5px rgba(18,52,96,.1),0 40px 70px -24px rgba(18,52,96,.55)}
     .tel img{display:block;width:100%;border-radius:44px}
-    .ex{margin-top:6px;font-size:16px;color:#6E6E73}
   </style></head><body>
+    <div class="lum"></div>
     <div class="t">
       <div class="m"><img src="data:image/png;base64,${logo}" alt=""><b>VRM</b></div>
-      <h1>Tes ventes, tes colis et ta compta, au même endroit.</h1>
-      <p>Pour les revendeurs Vinted, Leboncoin et eBay — vêtements, sacs, livres, tout ce qui se revend.</p>
-      <div class="u">vrm.center</div>
-      <div class="ex">À droite : l’app VRM, données d’exemple.</div>
+      <h1>Tes ventes Vinted, Leboncoin, eBay et Vestiaire au même endroit.</h1>
+      <p>Numéros de rangement, colis, codes de retrait et compta.</p>
+      <div class="u"><b>vrm.center</b><span>À droite : l’app, données d’exemple.</span></div>
     </div>
     <div class="tel"><img src="data:image/webp;base64,${src.toString('base64')}" alt=""></div>
   </body></html>`;
@@ -58,6 +65,7 @@ const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
     const pg = await nav.newPage({ viewport: { width: 1200, height: 630 }, deviceScaleFactor: 1 });
     await pg.route(/^https?:/, (r) => r.abort());
     await pg.setContent(html, { waitUntil: 'load' });
+    await pg.evaluate(() => document.fonts && document.fonts.ready);
     await pg.waitForTimeout(300);
     const jpg = await pg.screenshot({ type: 'jpeg', quality: 82 });
     fs.mkdirSync(SORTIE, { recursive: true });

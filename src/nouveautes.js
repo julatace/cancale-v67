@@ -26,8 +26,14 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
-  // (15 nov., extension 5.382, Julien : « vraiment exactement la même photo ») docs/passation/2026-11-15-meme-photo.md
+  // (15 nov., extension 5.383, Julien : « vraiment exactement la même photo ») docs/passation/2026-11-15-meme-photo.md
   { id: 'meme-photo', date: '2026-11-15', titre: 'Même photo qu’une paire Vinted : relier', phrase: 'Leboncoin, eBay, Vestiaire : la même photo est reconnue, tu relies.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (15 nov., lot retours) docs/passation/2026-11-15-retours.md — « À renvoyer » : une carte par retour d'achat.
+  { id: 'retours-a-renvoyer', date: '2026-11-15', titre: 'Retours : bordereau, date et heure, une carte', phrase: 'En tête de Ma journée : imprime, dépose, suis le remboursement.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (15 nov., Julien : « fais de plus belles notifications ») docs/passation/2026-11-15-notifications-belles.md
+  { id: 'notifications-belles', date: '2026-11-15', titre: 'Des notifications courtes, la paire nommée', phrase: 'Dates en clair, sans pseudo d’acheteur, le toucher ouvre le bon écran.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (15 nov., extension 5.381) docs/passation/2026-11-15-publier-partout-categories.md — src/correspondances.js
+  { id: 'publier-partout-categories', date: '2026-11-15', titre: 'Publier partout : la bonne catégorie sur chaque site', phrase: 'Catégorie Vinted traduite pour Leboncoin, Vestiaire, eBay ; sinon VRM demande.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (15 nov., extension 5.380, captures de Julien) La carte du logo sur vinted.fr : docs/passation/2026-11-15-carte-extension.md
   { id: 'carte-extension-studio', date: '2026-11-15', titre: 'La carte VRM sur Vinted, refaite', phrase: 'Favoris en liste, ventes sans tiret, liens qui marchent, bleu clair.', tab: 'messages', pour: 'tous', mode: 'tous' },
   // (15 nov., extension 5.379, Julien sur Orion iPhone : « Leboncoin marche pas ») docs/passation/2026-11-15-lbc-orion.md

@@ -152,7 +152,11 @@ async function controlesRendu(nav, nom, opt, S) {
     dit(!/n'a pas pu s'afficher|Cannot access|is not defined/.test(texte), `${nom} : aucun écran tombé`);
     // Le premier écran : ce qu'est VRM (h1), le prix, l'essai, le prérequis.
     const h1 = await pg.evaluate(() => { const l = document.querySelectorAll('[data-accueil] h1'); if (l.length !== 1) return { n: l.length }; const r = l[0].getBoundingClientRect(); return { n: 1, top: r.top, bottom: r.bottom, t: l[0].innerText }; });
-    dit(h1.n === 1 && h1.bottom <= H && /ventes/i.test(h1.t) && /colis/i.test(h1.t) && /compta/i.test(h1.t), `${nom} : un seul h1, dans le premier écran, la promesse (ventes, colis, compta)`, JSON.stringify(h1));
+    // (15 nov., lot site-public) La promesse : « Tes ventes Vinted, Leboncoin, eBay et Vestiaire au même endroit » (h1),
+    // ce qu'elle couvre juste dessous (numéros, colis, retraits, compta).
+    dit(h1.n === 1 && h1.bottom <= H && /ventes/i.test(h1.t) && /Vinted/.test(h1.t), `${nom} : un seul h1, dans le premier écran, la promesse (tes ventes Vinted…)`, JSON.stringify(h1));
+    const hautTexte = await pg.evaluate(() => { const s = document.querySelector('[data-section="hero"] .av-sous'); const r = s && s.getBoundingClientRect(); return s ? { t: s.innerText, bas: r.bottom } : null; });
+    dit(!!hautTexte && hautTexte.bas <= H && /colis/i.test(hautTexte.t) && /compta/i.test(hautTexte.t), `${nom} : sous le titre, dans le premier écran, ce qu'elle couvre (colis, compta…)`, JSON.stringify(hautTexte));
     const prix = await pg.evaluate((p) => {
       const re = new RegExp(`${p.replace(',', '\\,')}\\s*€\\s*par mois`);
       const tous = [...document.querySelectorAll('[data-section="hero"] *')].filter((e) => re.test(e.innerText || ''));
@@ -162,7 +166,7 @@ async function controlesRendu(nav, nom, opt, S) {
     dit(!!prix && prix.bottom <= H, `${nom} : le prix des CGV (${S.prixCgv} € par mois) est dans le premier écran`, prix ? `bas à ${Math.round(prix.bottom)} px` : 'absent du haut de page');
     dit(!!prix && new RegExp(`${S.essaiCgv}\\s*jours d.essai gratuit`).test(prix.texte), `${nom} : l'essai (${S.essaiCgv} jours, celui des CGV) est dit à côté du prix`, prix && prix.texte);
     const pour = await visibleDansEcran(pg, '[data-pour-qui]');
-    dit(pour && pour.bottom <= H && pour.op > 0.5 && /Vinted/.test(pour.texte) && /revendeur/i.test(pour.texte), `${nom} : « pour qui » (les revendeurs Vinted…) est dans le premier écran`, pour ? `${pour.texte} · bas à ${Math.round(pour.bottom)} px` : 'absent');
+    dit(pour && pour.bottom <= H && pour.op > 0.5 && /revendeur/i.test(pour.texte), `${nom} : « pour qui » (les revendeurs) est dans le premier écran`, pour ? `${pour.texte} · bas à ${Math.round(pour.bottom)} px` : 'absent');
     const pre = await visibleDansEcran(pg, '[data-prerequis]');
     dit(pre && pre.bottom <= H && /ordinateur/i.test(pre.texte), `${nom} : le prérequis (un ordinateur) est dans le premier écran`, pre ? `bas à ${Math.round(pre.bottom)} px` : 'absent');
     const variante = await pg.evaluate(() => { const e = document.querySelector('[data-prerequis]'); return e && e.getAttribute('data-variante'); });
@@ -289,7 +293,7 @@ async function controlesRendu(nav, nom, opt, S) {
   if (!fs.existsSync(path.join(DIST, 'index.html'))) { console.log('❌ dist/ absent — lance npm run build'); process.exit(1); }
   // Les sources de vérité : les réglages, les CGV, le serveur, le registre des captures.
   const srcReglages = lire('src/accueil-reglages.js') || '';
-  const reglages = { ACCES_OFFERT: constante(srcReglages, 'ACCES_OFFERT'), DETOURAGE_POUR_TOUS: constante(srcReglages, 'DETOURAGE_POUR_TOUS'), PRIX_MOIS: (constante(srcReglages, 'PRIX_MOIS') || '').replace(/['"]/g, ''), PRIX_PRO_MOIS: (constante(srcReglages, 'PRIX_PRO_MOIS') || '').replace(/['"]/g, ''), ESSAI_JOURS: (constante(srcReglages, 'ESSAI_JOURS') || '').replace(/['"]/g, '') };
+  const reglages = { ACCES_OFFERT: constante(srcReglages, 'ACCES_OFFERT'), VESTIAIRE_BRANCHE: constante(srcReglages, 'VESTIAIRE_BRANCHE'), DETOURAGE_POUR_TOUS: constante(srcReglages, 'DETOURAGE_POUR_TOUS'), PRIX_MOIS: (constante(srcReglages, 'PRIX_MOIS') || '').replace(/['"]/g, ''), PRIX_PRO_MOIS: (constante(srcReglages, 'PRIX_PRO_MOIS') || '').replace(/['"]/g, ''), ESSAI_JOURS: (constante(srcReglages, 'ESSAI_JOURS') || '').replace(/['"]/g, '') };
   const cgv = lire('public/legal/cgv.html') || '';
   const prixCgv = (/abonnement à (\d+,\d{2})\s€ par mois/i.exec(cgv) || [])[1] || null;
   const prixProCgv = (/Offre Pro : (\d+,\d{2}) € par mois/.exec(cgv) || [])[1] || null;
@@ -365,7 +369,10 @@ async function controlesRendu(nav, nom, opt, S) {
         // Paramètres) nomme « un Vestiaire » parmi les comptes : c'est le périmètre
         // de l'abonnement, pas une promesse de totaux. Ailleurs, rien.
         const v = await pg.evaluate(() => { const n = (t) => ((t || '').match(/Vestiaire/g) || []).length; const tout = n(document.body.innerText); const faq = n((document.querySelector('[data-faq]') || {}).innerText); const offres = [...document.querySelectorAll('[data-offre-phrase]')].reduce((a, e) => a + n(e.innerText), 0); return { tout, faq, offres }; });
-        dit(v.tout === v.faq + v.offres, '« Vestiaire » n’apparaît que dans les questions et la phrase d’offre (OFFRES), pas comme fonction branchée', JSON.stringify(v));
+        // (15 nov., lot site-public) Vestiaire est compté (VESTIAIRE_BRANCHE = true, mesuré dans ventesFaites et
+        // ventesDeclarables) : il peut être nommé partout ; la question « Et Vestiaire ? En cours » ne s'affiche plus.
+        if (reglages.VESTIAIRE_BRANCHE === 'true') dit(!/Et Vestiaire Collective \?/.test(t), 'VESTIAIRE_BRANCHE = true → plus de question « Et Vestiaire ? » (« en cours »)');
+        else dit(v.tout === v.faq + v.offres, '« Vestiaire » n’apparaît que dans les questions et la phrase d’offre (OFFRES), pas comme fonction branchée', JSON.stringify(v));
         if (reglages.DETOURAGE_POUR_TOUS === 'false') dit(!/Photoroom|détour/i.test(t), 'DETOURAGE_POUR_TOUS = false → ni « Photoroom » ni « détourage »');
         const faux = [];
         if (/rien n['’]est envoyé à ta place|(deux|2) minutes|tout automatique/i.test(t)) faux.push('promesse fausse');
@@ -472,7 +479,8 @@ async function controlesRendu(nav, nom, opt, S) {
       for (const [cta, attendu, q] of [['inscription', /Créer ton compte/, 'inscription'], ['connexion', /Se connecter/, 'connexion']]) {
         await essaie(`bouton ${cta}`, async () => {
           const { ctx, pg } = await page(nav, {});
-          await pg.click(`[data-accueil] [data-section="hero"] [data-cta="${cta}"]`, { timeout: 8000 });
+          // (15 nov., lot site-public) « Se connecter » vit dans la barre (le haut de page n'a qu'un plein et une touche).
+          await pg.click(cta === 'connexion' ? '.av-nav [data-cta-nav="connexion"]' : `[data-accueil] [data-section="hero"] [data-cta="${cta}"]`, { timeout: 8000 });
           await pg.waitForFunction((re) => new RegExp(re).test(document.body.innerText), attendu.source, { timeout: 15000 }).catch(() => {});
           const t = await pg.evaluate(() => document.body.innerText);
           dit(attendu.test(t) && !(await pg.evaluate(() => !!document.querySelector('[data-accueil]'))), `« ${cta} » ouvre le formulaire « ${String(attendu).replace(/[/\\]/g, '')} »`, t.slice(0, 120));

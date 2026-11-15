@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-//  « LA MÊME PHOTO » ENTRE VINTED ET LES AUTRES SITES (15 nov., lot meme-photo, extension 5.382)
+//  « LA MÊME PHOTO » ENTRE VINTED ET LES AUTRES SITES (15 nov., lot meme-photo, extension 5.383)
 //
 //  Julien : « quand je poste une paire sur Vinted et que je la poste après sur Leboncoin sans
 //  avoir dit que c'était la même, je veux que VRM propose que c'est exactement la même — on ne
@@ -33,7 +33,7 @@
 //   E4  45 s entre deux images ; Vinted d'abord ;
 //   E5  lecture ratée de la ligne ⇒ RIEN écrit, la file reste ;
 //   E6  403/429 du site des images ⇒ 24 h sans empreinte pour CE site, Vinted jamais mis en pause ;
-//   C1  `EXT_CAPACITES.memephoto` = 5.382.0, `empreintesSitesUnTour` existe, version ≥ 5.382.0.
+//   C1  `EXT_CAPACITES.memephoto` = 5.383.0, `empreintesSitesUnTour` existe, version ≥ 5.383.0.
 //  `--src chemin` : un autre arbre (preuve sur le code d'avant, §6.1).
 //  `--mutation=<nom>|toutes` : réaffaiblit une règle ⇒ doit être ROUGE.
 // ════════════════════════════════════════════════════════════════════════════
@@ -276,8 +276,8 @@ function pixels(nom) {
     const man = JSON.parse(fs.readFileSync(path.join(RACINE, 'vinted-sync-extension', 'manifest.json'), 'utf8'));
     const cv = (/const CODE_VERSION = '([\d.]+)'/.exec(bg) || [])[1];
     const vn = (v) => String(v || '').split('.').map(Number).reduce((t, x) => t * 1000 + (x || 0), 0);
-    dit(cap && cap[1] === '5.382.0' && /memephoto:'empreintesSitesUnTour'/.test(coh) && /async function empreintesSitesUnTour\(/.test(bg), 'C1 · `EXT_CAPACITES.memephoto` = 5.382.0, connue de audit-coherence, la fonction existe', cap && cap[1]);
-    dit(man.version === cv && vn(cv) >= vn('5.382.0'), 'C1 · manifeste et CODE_VERSION égaux, au moins 5.382.0', `${man.version} / ${cv}`);
+    dit(cap && cap[1] === '5.383.0' && /memephoto:'empreintesSitesUnTour'/.test(coh) && /async function empreintesSitesUnTour\(/.test(bg), 'C1 · `EXT_CAPACITES.memephoto` = 5.383.0, connue de audit-coherence, la fonction existe', cap && cap[1]);
+    dit(man.version === cv && vn(cv) >= vn('5.383.0'), 'C1 · manifeste et CODE_VERSION égaux, au moins 5.383.0', `${man.version} / ${cv}`);
   } catch (e) { dit(false, 'exécution', e && e.stack ? e.stack.split('\n').slice(0, 3).join(' | ') : String(e)); }
   console.log(ko ? `\n❌ ${ko} rouge(s)` : '\n✅ même photo : tout vert');
   process.exit(ko ? 1 : 0);

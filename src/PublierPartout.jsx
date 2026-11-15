@@ -16,6 +16,8 @@ import { LogoSite } from './SelecteurSites.jsx';
 import { SITES_PARTOUT, NOM_PARTOUT, TITRE_MAX_PARTOUT, PRIX_REGLABLE, MODES_PRIX, texteReglage, cleCase, etatAffiche, resumePartout, CHAMPS_PARTOUT, sousCategoriesLbc, AU_DEPOT, PROFIL } from './publierPartout.js';
 import './styles-annonces-outils.css';
 import './styles-publier-partout.css';
+import CorrespondanceSite from './CorrespondancesPartout.jsx';
+import { texteFiche } from './correspondances.js';   // (15 nov.) catégorie Vinted → celle de chaque site
 
 const eur = (n) => (n == null ? '—' : `${(Math.round(n * 100) / 100).toFixed(Number.isInteger(n) ? 0 : 2).replace('.', ',')} €`);
 const ETAT_CLE = { envoi: 'partout.etat.envoi', attente: 'partout.etat.attente', publie: 'partout.etat.publie', 'publie-relu': 'partout.etat.relu', 'a-finir': 'partout.etat.aFinir', refuse: 'partout.etat.refuse', 'pas-envoye': 'partout.etat.pasEnvoye' };
@@ -139,7 +141,7 @@ function ChampsAnnonce({ l, x, saisie, onParamAnnonce, etatsLbc, enCours }) {
   });
 }
 
-function CaseSite({ l, x, coche, onCoche, resultat, vu, enCours, seul, saisie, onSaisie, onParamAnnonce, etatsLbc, Photo }) {
+function CaseSite({ l, x, coche, onCoche, resultat, vu, enCours, seul, saisie, onSaisie, onParamAnnonce, etatsLbc, Photo, onRepondre, onChercherEbay }) {
   const [ouvert, setOuvert] = React.useState(!!seul);
   const ap = x.apercu || {};
   const max = TITRE_MAX_PARTOUT[x.site];
@@ -148,9 +150,11 @@ function CaseSite({ l, x, coche, onCoche, resultat, vu, enCours, seul, saisie, o
   const raisonCase = x.raison === 'deja' ? tr('partout.raison.deja', { site: NOM_PARTOUT[x.site] })
     : x.raison === 'ext' ? x.extRaison
     : x.raison === 'pas-de-numero' ? tr('partout.raison.numero')
+    : x.raison === 'hors' ? tr('corr.hors', { site: NOM_PARTOUT[x.site] })
     : x.raison === 'manque' ? tr('partout.raison.manque', { n: bloquants.length })
     : x.deja === null ? tr('partout.raison.passu', { site: NOM_PARTOUT[x.site] }) : '';
-  const categorie = x.vocab && x.vocab.categorieQuand === 'au-depart' ? tr('partout.cat.ebay')
+  // (15 nov.) eBay : SA catégorie (choisie parmi celles d'eBay), jamais « suggérée au départ ».
+  const categorie = x.site === 'ebay' ? ((x.corr && texteFiche(x.corr)) || tr('corr.aChoisir'))
     : x.vocab && x.vocab.categorieQuand === 'sur-le-site' ? tr('partout.cat.site', { site: NOM_PARTOUT[x.site] })
     : (x.vocab && x.vocab.categorie) || '—';
   const etat = x.site === 'vestiaire' ? tr('partout.cat.site', { site: NOM_PARTOUT[x.site] }) : (x.vocab && x.vocab.etat) || '—';
@@ -171,6 +175,7 @@ function CaseSite({ l, x, coche, onCoche, resultat, vu, enCours, seul, saisie, o
           </span>
         ) : null}
       </div>
+      {x.raison !== 'deja' && x.raison !== 'hors' ? <CorrespondanceSite l={l} x={x} enCours={enCours} onRepondre={onRepondre} onChercherEbay={onChercherEbay} nomSite={NOM_PARTOUT[x.site]}/> : null}
       {raisonCase && !aff ? <p className={'vrm-pp-raison' + (x.raison && x.raison !== 'deja' ? ' is-geste' : '')} data-pp-raison-texte="">{raisonCase}</p> : null}
       {x.manques.length && x.raison !== 'deja' ? (
         <ul className="vrm-pp-manques" data-pp-manques={x.manques.length}>
@@ -226,7 +231,7 @@ function CaseSite({ l, x, coche, onCoche, resultat, vu, enCours, seul, saisie, o
 
 // lignes : sorties `lignePartout` (undefined = en cours de lecture · null = pas su).
 // coches / setCoches : tenus ici. onLancer({ coches, surEtat }) → Promise.
-export default function PublierPartout({ lignes, lecture = false, exclues = 0, reglage, onReglage, params = {}, onParam, onParamAnnonce, ebayReglages = [], saisies = {}, onSaisie, etatsLbc = [], vus = {}, onLancer, onFermer, onRelire, Photo, Retour }) {
+export default function PublierPartout({ lignes, lecture = false, exclues = 0, reglage, onReglage, params = {}, onParam, onParamAnnonce, ebayReglages = [], saisies = {}, onSaisie, etatsLbc = [], vus = {}, onLancer, onFermer, onRelire, Photo, Retour, onRepondre, onChercherEbay }) {
   useLangue();
   const [coches, setCoches] = React.useState(() => new Set());
   const [res, setRes] = React.useState({});
@@ -311,7 +316,7 @@ export default function PublierPartout({ lignes, lecture = false, exclues = 0, r
                 ) : null}
                 <ul className="vrm-pp-cases">
                   {l.sites.map((x) => <CaseSite key={x.site} l={l} x={x} coche={coches.has(cleCase(l.id, x.site))} onCoche={basculer} resultat={res[cleCase(l.id, x.site)]}
-                    vu={vus[cleCase(l.id, x.site)]} enCours={enCours} seul={seul} saisie={saisies[l.id]} onSaisie={onSaisie} onParamAnnonce={onParamAnnonce || (() => {})} etatsLbc={etatsLbc} Photo={Photo}/>)}
+                    vu={vus[cleCase(l.id, x.site)]} enCours={enCours} seul={seul} saisie={saisies[l.id]} onSaisie={onSaisie} onParamAnnonce={onParamAnnonce || (() => {})} etatsLbc={etatsLbc} Photo={Photo} onRepondre={onRepondre} onChercherEbay={onChercherEbay}/>)}
                 </ul>
               </section>
             ))}

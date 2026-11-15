@@ -1052,12 +1052,48 @@
   // rappelle fillNow à chaque mutation — sans ça on ré-ouvrirait le menu en
   // boucle). Réinitialisé par « Re-remplir » (fillNowForce).
   let _composFaits = new Set(); let _composEnCours = false; let _essaisMarque = {};
+  // (15 nov., 5.381) UN CRITÈRE SÛR REMPLACE LA PRÉDICTION DE LEBONCOIN. Leboncoin
+  //   pré-remplit Univers et Type d'après la photo et le titre (sa prédiction) : une
+  //   basket femme pouvait partir en « Homme ». Quand la fiche de VRM porte le critère
+  //   (`ad.criteres`, tiré de la catégorie Vinted ou de SA réponse), on choisit l'option
+  //   au libellé EXACT, même si le menu en montre déjà une autre. Pas d'option exacte ⇒
+  //   rien (le menu garde ce qu'il avait) et la publication s'arrête (`criteresPasPoses`).
+  const criteresPasPoses = (ad) => {
+    const cr = ad && ad.criteres && typeof ad.criteres === 'object' ? ad.criteres : null;
+    if (!cr) return [];
+    const cle = (q) => String(ad.id) + ':' + q;
+    return [cr.univers && !_composFaits.has(cle('u')) ? 'Univers « ' + cr.univers + ' »' : '', cr.type && !_composFaits.has(cle('t')) ? 'Type « ' + cr.type + ' »' : ''].filter(Boolean);
+  };
+  async function choisirComposantSur(motif, valeurExacte) {
+    const cible = String(valeurExacte || '').replace(/\s+/g, ' ').trim();
+    if (!cible) return false;
+    const n = (t) => String(t || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    const boxes = Array.from(document.querySelectorAll('[role="combobox"]')).filter((el) => !DANS_ENTETE(el));
+    for (const box of boxes) {
+      if (!motif.test(labelCombobox(box))) continue;
+      const val = String(box.value || box.getAttribute('data-choisi') || box.textContent || '').trim();
+      if (n(val) === n(cible)) return true;            // déjà la bonne
+      try { box.focus(); box.click(); } catch (_) {}
+      await new Promise((r) => setTimeout(r, 160));
+      const opts = Array.from(document.querySelectorAll('[role="option"]')).filter((o) => n(o.textContent) === n(cible));
+      if (opts.length === 1) { try { opts[0].click(); } catch (_) {} return true; }
+      try { box.blur(); } catch (_) {}
+      // pas l'option dans CE menu (un autre au libellé voisin) : on essaie le suivant
+    }
+    return false;
+  }
   async function remplirComposants(ad) {
     if (_composEnCours) return 0; _composEnCours = true;
     let k = 0;
     try {
       const cle = (q) => String(ad.id) + ':' + q;
-      // POINTURE : sa taille Vinted (« 40.5 » → « 40,5 » côté Leboncoin).
+      const cr = ad.criteres && typeof ad.criteres === 'object' ? ad.criteres : null;
+      // UNIVERS et TYPE (capacité `lbccriteres`) : seulement depuis la fiche de VRM.
+      if (cr && cr.univers && !_composFaits.has(cle('u')) && await choisirComposantSur(/univers|genre/, cr.univers)) { _composFaits.add(cle('u')); k++; }
+      if (cr && cr.type && !_composFaits.has(cle('t')) && await choisirComposantSur(/type de chaussures|type de v[êe]tement|type|produit/, cr.type)) { _composFaits.add(cle('t')); k++; }
+      // POINTURE : sa taille Vinted (« 40.5 » → « 40,5 » côté Leboncoin) — ou la taille
+      // TRADUITE par VRM dans la grille de Leboncoin (« L / 40 / 12 » ⇒ « 40 - L »).
+      if (cr && cr.taille && !_composFaits.has(cle('p'))) { if (await choisirComposantSur(/pointure|taille|size/, cr.taille)) { _composFaits.add(cle('p')); k++; } }
       const taille = String(ad.taille || '').trim().replace('.', ',');
       if (taille && !_composFaits.has(cle('p')) && await choisirComposant(/pointure|taille|size/, taille)) { _composFaits.add(cle('p')); k++; }
       // ÉTAT : son état Vinted, par correspondance EXACTE. « Satisfaisant »
@@ -1066,13 +1102,13 @@
       const etat = String(ad.etat || '').trim();
       if (etat && !_composFaits.has(cle('e')) && await choisirComposant(/[ée]tat|condition/, etat)) { _composFaits.add(cle('e')); k++; }
       // MARQUE : celle de Vinted, tapée puis choisie par correspondance EXACTE.
-      const marque = String(ad.marque || '').trim();
+      const marque = String((cr && cr.marque) || ad.marque || '').trim();
       // Deux essais au plus : sans ça on retaperait la marque à chaque seconde
       // pendant 90 s sous ses doigts (une marque absente de la liste reste absente).
       if (marque && !_composFaits.has(cle('m')) && (_essaisMarque[cle('m')] = (_essaisMarque[cle('m')] || 0) + 1) <= 2
           && await choisirComposantRecherche(/marque|brand/, marque)) { _composFaits.add(cle('m')); k++; }
       // COULEUR : celle que Vinted affiche, sur une option exacte seulement.
-      const couleur = String(ad.couleur || '').trim();
+      const couleur = String((cr && cr.couleur) || ad.couleur || '').trim();
       if (couleur && !_composFaits.has(cle('c')) && await choisirCouleur(couleur)) { _composFaits.add(cle('c')); k++; }
     } catch (_) {}
     _composEnCours = false;
@@ -1280,6 +1316,10 @@
     //    confirmation) recliquait — une seconde publication (rouge sur l'avant).
     const prixKO = prixRefus(pending);
     if (prixKO) return { ok: false, raison: prixKO };
+    // (15 nov., 5.381) un critère sûr de la fiche que la page n'a pas pris (Univers, Type) :
+    //   on ne publie pas une annonce que Leboncoin aurait classée autrement — il le choisit.
+    const pasPoses = criteresPasPoses(pending);
+    if (pasPoses.length) return { ok: false, raison: pasPoses.join(' et ') + ' : pas trouvé sur Leboncoin — rien n\'est publié, choisis-le et publie toi-même, sans booster' };
     const cleClic = 'vrmPublieClique:' + String(pending && pending.id);
     let dejaClique = true;
     try { dejaClique = !!sessionStorage.getItem(cleClic); } catch (_) { dejaClique = true; }   // pas su ⇒ on ne clique pas
