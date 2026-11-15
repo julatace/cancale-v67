@@ -44,6 +44,10 @@ const { pathToFileURL } = require('url');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 // Le mot de la notion « à envoyer », lu là où l'app le range (une notion = un mot, src/libelles.js).
 const MOT_A_ENVOYER = (/aEnvoyer:\s*Object\.freeze\(\{ titre: '([^']+)'/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'libelles.js'), 'utf8')) || [])[1] || 'À envoyer';
+// (15 nov., fusion de origin/main) L'ÉTAT d'une vente Vestiaire s'écrit par ses propres mots depuis le lot « ventes
+// Vestiaire justes » (docs/passation/2026-11-15-vestiaire-ventes.md, `vcventes.etat.aExpedier` : « À expédier avant le … ») :
+// le mot jugé est celui que l'app range pour CET état, lu dans src/i18n/langues/fr/vcventes.js (le début, avant la date).
+const MOT_ETAT_VC = ((/"vcventes\.etat\.aExpedier": "([^"{]+)/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'i18n', 'langues', 'fr', 'vcventes.js'), 'utf8')) || [])[1] || MOT_A_ENVOYER).trim();
 // Toucher la rangée d'un colis Vestiaire ouvre LA fiche, où vivent ses gestes (Imprimer, Déposé).
 const ouvrirFicheColis = async (pg, id) => {
   await pg.click(`[data-vc-colis="${id}"] .vrm-colis-titre`);
@@ -236,7 +240,7 @@ const compte = (t, mot) => (String(t).match(new RegExp(mot, 'g')) || []).length;
         dit(/vrm-sale-row/.test(r.classe) && r.plateforme === 'vestiaire' && r.tx === 'vc:V1' && r.ouverte != null && r.liste, 'B · la ligne de Vinted (`vrm-sale-row`, data-tx, data-plateforme-vente, data-ligne-ouverte, dans `vrm-ventes-liste`)', JSON.stringify({ c: r.classe, p: r.plateforme, tx: r.tx }));
         dit(Object.values(r.cases).every(Boolean), 'B · mêmes cases que Vinted : bouton, titre, état, montant, achat, bénéfice', JSON.stringify(r.cases));
         dit(r.num === n1 && r.titre.startsWith(`N°${n1} · `), 'B · la vente porte le N° de SON annonce (productId), écrit comme sur Vinted « N° · titre »', `${r.num} · ${r.titre}`);
-        dit(r.prix === '18050' && r.etape === 'a-expedier' && r.etatTxt.includes(MOT_A_ENVOYER), `B · ce que Vestiaire verse (180,50 €) et « ${MOT_A_ENVOYER} » (le mot de la notion)`, `${r.prix} · ${r.etape} · ${r.etatTxt}`);
+        dit(r.prix === '18050' && r.etape === 'a-expedier' && r.etatTxt.includes(MOT_ETAT_VC), `B · ce que Vestiaire verse (180,50 €) et « ${MOT_ETAT_VC} … » (le mot rangé pour cet état)`, `${r.prix} · ${r.etape} · ${r.etatTxt}`);
         dit(compte(r.t, 'Chronopost') <= 1, 'B · le transporteur jamais écrit deux fois sur la ligne', String(compte(r.t, 'Chronopost')));
         await capture(pg, `ventes-${nomVp}`);
         await pg.click('[data-vc-vente="V1"] .vrm-ledger-sale-toggle');
