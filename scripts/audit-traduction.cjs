@@ -70,6 +70,7 @@ const MIGRES = [
   ['src/ideesArgent/Feuilles.jsx', ['*']],   // (14 nov., 160) la vente en main propre
   ['src/TvaMargeCarte.jsx', ['*']],
   ['src/RangerAchat.jsx', ['*']],   // (11 nov., lot rangement-guide)
+  ['src/AtelierArrivee.jsx', ['*']],   // (15 nov.) l'atelier « achat arrivé → en ligne »
   ['src/FavorisEtapes.jsx', ['*']],   // (11 nov., lot favoris-clair)
   ['src/FavorisSansVente.jsx', ['*']],   // (13 nov., lot 31) très aimées, pas vendues
   // (11 nov., lot prix-mini) Offres auto refait, et « Prix mini manquants ».
