@@ -9,9 +9,9 @@
 // dont deux cases prises (B230 et N°7), le pool 1…7, 9, 12 (des TROUS en 8, 10, 11).
 // Exigé, à 390 tactile (clair) et 1512 (sombre) :
 //   W1 « J'ai retiré » ⇒ l'atelier : six étapes, N°13 proposé (jamais un trou), RIEN d'écrit ;
-//   W2 « Suivant » ⇒ la case : la première libre (niveau 1 · case 3) ; une case prise ne réagit pas ;
-//   W3 « Rangé » ⇒ fiche N°13 liée à 9301 dans sa case, N°13 au pool, et AUCUN prix d'achat
-//      (le prix a son étape) ; l'atelier passe aux photos ;
+//   W2 « Donner ce N° » ⇒ la fiche de l'ARTICLE N°13 (liée à 9301), N°13 au pool, ni case ni prix ; puis
+//      la case de l'article : la première libre (niveau 1 · case 3) ; une case prise ne réagit pas ;
+//   W3 « Ranger ici » ⇒ N°13 dans sa case ; toujours aucun prix ; l'atelier passe aux photos ;
 //   W4 photos « Plus tard » ⇒ le prix : « 38 € · Article seul » (le prix LU de CET achat) ;
 //      fermer ⇒ rien d'autre d'écrit ;
 //   W5 Ma journée : « 1 paire à finir » ⇒ « Reprendre » rouvre l'atelier AU PRIX (la reprise) ;
@@ -166,21 +166,25 @@ async function passe(b, vp, sombre) {
     if (process.env.MONTRER_AA === 'stop') { await ctx.close(); return; }
   }
 
-  // W2 — la case.
-  await clic('[data-aa-suivant="numero"]');
-  const w2 = await attendre(() => pg.evaluate(() => { const l = document.querySelector('[data-aa-case-ligne="0"]'); return l ? { m: l.getAttribute('data-aa-case-m'), i: l.getAttribute('data-aa-case-i') } : null; }), 8000);
-  dit(!!w2 && w2.m === 'mA' && w2.i === '2', `${T} W2 · la case proposée est la première LIBRE (niveau 1 · case 3)`, w2);
+  // W2 — « Donner ce N° » : l'ARTICLE existe (sa fiche, son N° au pool) ; ni case ni prix écrits. Julien : « on range une
+  // ANNONCE, pas un achat » — la case ne vient qu'APRÈS le N°.
+  await clic('[data-aa-donner-numero]');
+  const w2 = await attendre(async () => { const l = await lireLocal(pg); const f = Object.values(l.fiches)[0]; return f ? { l, f } : null; }, 10000);
+  dit(!!w2 && w2.f.numero === '13' && w2.f.achat && w2.f.achat.tx === '9301' && w2.l.pool.includes('13'), `${T} W2 · « Donner ce N° » : la fiche de l’article N°13 (liée à 9301), N°13 au pool`, w2 && w2.f);
+  dit(!!w2 && !w2.l.slots['13'] && !w2.f.case && w2.l.couts['13'] == null && w2.f.prixAchat == null, `${T} W2 · ni case ni prix d’achat écrits avec le N° (chacun a son étape)`, w2 && { slot: w2.l.slots['13'], cout: w2.l.couts['13'] });
+  const w2c = await attendre(() => pg.evaluate(() => { const c = document.querySelector('[data-aa-corps="case"]'); const p = document.querySelector('[data-aa-prog]'); return c && p ? { m: c.getAttribute('data-aa-case-m'), i: c.getAttribute('data-aa-case-i'), cour: p.getAttribute('data-aa-courante'), num: (document.querySelector('[data-aa-num]') || {}).getAttribute ? document.querySelector('[data-aa-num]').getAttribute('data-aa-num') : '' } : null; }), 10000);
+  dit(!!w2c && w2c.cour === 'case' && w2c.num === '13' && w2c.m === 'mA' && w2c.i === '2', `${T} W2 · puis la case de l’ARTICLE N°13 : la première LIBRE (niveau 1 · case 3)`, w2c);
   await pg.locator('[data-ranger-case="0"]').click({ force: true }).catch(() => {});
-  const apresPrise = await pg.getAttribute('[data-aa-case-ligne="0"]', 'data-aa-case-i');
+  const apresPrise = await pg.getAttribute('[data-aa-corps="case"]', 'data-aa-case-i').catch(() => null);
   dit(apresPrise === '2', `${T} W2 · toucher une case prise ne change rien`, apresPrise);
   await juge('W2 case', 'case');
   await pg.waitForTimeout(300); await capture(pg, `atelier-${suf}-2-case`);
 
-  // W3 — « Rangé ».
-  await clic('[data-aa-ranger]');
-  const w3 = await attendre(async () => { const l = await lireLocal(pg); const f = Object.values(l.fiches)[0]; return f && l.slots['13'] ? { l, f } : null; }, 10000);
-  dit(!!w3 && w3.f.numero === '13' && w3.f.achat && w3.f.achat.tx === '9301' && w3.f.case && w3.f.case.i === 2 && w3.l.pool.includes('13'), `${T} W3 · « Rangé » : fiche N°13 liée à 9301, dans sa case, N°13 au pool`, w3 && w3.f);
-  dit(!!w3 && w3.l.couts['13'] == null && w3.f.prixAchat == null, `${T} W3 · AUCUN prix d’achat écrit par « Rangé » (il a son étape, sur SON tap)`, w3 && { cout: w3.l.couts['13'], prixAchat: w3.f.prixAchat });
+  // W3 — « Ranger ici » : la case de l'article.
+  await clic('[data-aa-ranger-ici]');
+  const w3 = await attendre(async () => { const l = await lireLocal(pg); const f = Object.values(l.fiches)[0]; return f && f.case && l.slots['13'] ? { l, f } : null; }, 10000);
+  dit(!!w3 && w3.l.slots['13'].m === 'mA' && w3.l.slots['13'].i === 2 && w3.f.case.i === 2 && w3.l.slots.B230 && w3.l.slots['7'], `${T} W3 · « Ranger ici » : N°13 dans sa case (niveau 1 · case 3), les autres cases intactes`, w3 && w3.l.slots);
+  dit(!!w3 && w3.l.couts['13'] == null, `${T} W3 · toujours aucun prix d’achat sans SON tap`, w3 && w3.l.couts);
   const w3e = await attendre(() => pg.evaluate(() => { const p = document.querySelector('[data-aa-prog]'); return p && p.getAttribute('data-aa-courante') === 'photos' ? p.getAttribute('data-aa-prog') : null; }), 8000);
   dit(!!w3e, `${T} W3 · l’atelier passe aux photos (N° et case faits)`, w3e);
   await juge('W3 photos', 'photos');

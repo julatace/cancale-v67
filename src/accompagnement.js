@@ -369,6 +369,7 @@ export const GESTES_ACC = {
   // (15 nov.) L'atelier « achat arrivé → en ligne » : chaque étape qui écrit (src/AtelierArrivee.jsx) — la
   // suite est l'étape d'après, dans la même feuille : aucun lien.
   'arrivee.ranger':   { ecran: 'achats',    ensuite: null },
+  'arrivee.case':     { ecran: 'achats',    ensuite: null },
   'arrivee.prix':     { ecran: 'achats',    ensuite: null },
   'arrivee.fiche':    { ecran: 'achats',    ensuite: null },
   'export.donnees':   { ecran: 'settings',  ensuite: null },

@@ -17,7 +17,8 @@
 //         une couleur seulement si le titre en nomme une ;
 //      A6 « Enregistrer la fiche » : liste blanche, prix de vente relu, illisible ⇒ rien ;
 //      A7 Ma journée : les paires à finir (30 jours, pas retirées, pas finies) ;
-//      A8 les branchements : « Rangé » appelé SANS prix, l'atelier sur l'événement de « Ranger cet
+//      A9 la case de l'ARTICLE (après son N°) : une case libre différente pour chaque article ;
+//      A8 les branchements : « Donner ce N° » appelé SANS prix ni case, l'atelier sur l'événement de « Ranger cet
 //         achat », chaque écriture par `gesteVrm`, la note (dictée) dans l'atelier.
 //  H · l'historique complet (src/paireHistoire/ligneDeTemps.js sur la VRAIE chaîne
 //      `toutSurLeNumero` → `histoireArticle`) : 50 paires IDENTIQUES ⇒ chaque ligne de temps
@@ -54,7 +55,10 @@ const MUTATIONS = [
   ['src/atelierArrivee.js', "&& ((txOk(t) && f.achat && str(f.achat.tx) === t) || voulus.has(k(f.numero))))", "&& (str(f.titre) === str(tx) || (txOk(t) && f.achat && str(f.achat.tx) === t) || voulus.has(k(f.numero)) || true))", 'A4 : les fiches d’un autre achat'],
   ['src/atelierArrivee.js', "else if (marque('photos')) out.push({ cle: 'photos', etat: marque('photos'), ...(photos === null ? { raison: 'passu' } : {}) });", "", 'A3 : « Plus tard » des photos oublié (pas de reprise juste)'],
   ['src/atelierArrivee.js', "if (!Number.isFinite(t) || maintenant - t > ATELIER_JOURS * JOUR) continue;", "if (!Number.isFinite(t)) continue;", 'A7 : une paire rangée il y a 3 mois rappelée'],
-  ['src/AtelierArrivee.jsx', "r = await coque.ranger(entree, lignes.map((l) => ({ ...l, prix: '', case: sansCase ? null : l.case })));", "r = await coque.ranger(entree, lignes.map((l) => ({ ...l, case: sansCase ? null : l.case })));", 'A8 : « Rangé » écrit un prix sans son tap'],
+  ['src/AtelierArrivee.jsx', "r = await coque.ranger(entree, lignes.map((l) => ({ ...l, prix: '', case: null })));", "r = await coque.ranger(entree, lignes.map((l) => ({ ...l, case: l.case })));", 'A8 : « Donner ce N° » écrit un prix ou une case (l’achat rangé, pas l’article)'],
+  ['src/atelierArrivee.js', "if (slots[c] || f.case) return { ok: false, raison: 'deja' };", "", 'A9 : un article rangé deux fois (deux cases)'],
+  ['src/atelierArrivee.js', "const ok = caseChoisie({ meubles, slots, m: place.meubleId, i: Number(place.i) });", "const mm = meubles.find((x) => x && String(x.id) === String(place.meubleId)); const ok = mm ? { meubleId: mm.id, i: Number(place.i) } : null;", 'A9 : une case prise donnée à un autre article'],
+  ['src/atelierArrivee.js', "out.push({ cle: 'case', etat: !range ? 'afaire' : fiche.case ? 'fait' : (marque('case') === 'passe' ? 'passe' : 'afaire'), ...(range ? {} : { raison: 'sansNumero' }) });", "out.push({ cle: 'case', etat: fiche && fiche.case ? 'fait' : 'afaire' });", 'A3 : la case proposée avant le N° (sur l’achat)'],
   ['src/paireHistoire/ligneDeTemps.js', "if (!m || !idsM.has(str(m.a))) continue;", "if (!m) continue;", 'H2 : les masquages d’une AUTRE annonce'],
   ['src/paireHistoire/ligneDeTemps.js', "if (x.moderation === null && idsM.size) pasSu.push('moderation');", "if (false) pasSu.push('moderation');", 'H3 : masquages pas lus, pas nommés'],
   ['src/histoireArticle.js', "...(bid && fiche && fiche.buyFrom && str(fiche.buyFrom.seller) && String(fiche.buyFromId) === bid ? { vendeur: str(fiche.buyFrom.seller).slice(0, 60) } : {})", "...(fiche && fiche.buyFrom && str(fiche.buyFrom.seller) ? { vendeur: str(fiche.buyFrom.seller).slice(0, 60) } : {})", 'H4 : un vendeur pris sur une autre fiche'],
@@ -140,12 +144,14 @@ if (PROUVE) prouver();
   // A3 — où en est une paire.
   {
     const e0 = A.etapesPaire({ fiche: null });
-    dit(A.etapeReprise(e0) === 'numero' && e0.filter((e) => e.raison === 'sansNumero').length === 4, 'A3a · pas rangée : la reprise est le N° ; photos, prix, fiche, publier attendent le N°', e0);
+    dit(A.etapeReprise(e0) === 'numero' && e0.filter((e) => e.raison === 'sansNumero').length === 5, 'A3a · pas encore de N° : la reprise est le N° ; la CASE, les photos, le prix, la fiche, publier attendent le N° (on range un article, pas un achat)', e0);
     const f = { id: 'a1', numero: '13', origine: 'arrivee', case: { m: 'm1', i: 2 } };
     const e1 = A.etapesPaire({ fiche: f, photos: 0, cout: null, etatVinted: 'a-creer', marques: null });
     dit(A.etapeReprise(e1) === 'photos' && e1[0].etat === 'fait' && e1[1].etat === 'fait', 'A3b · rangée dans sa case : N° et case faits, reprise aux photos', e1);
-    const e2 = A.etapesPaire({ fiche: { ...f, case: undefined }, photos: 2, cout: '41,90', etatVinted: 'a-creer', marques: { e: { fiche: 'passe' } } });
-    dit(e2[1].etat === 'passe' && e2[2].etat === 'fait' && e2[3].etat === 'fait' && e2[4].etat === 'passe' && A.etapeReprise(e2) === 'publier', 'A3c · sans case = passée ; 2 photos du studio = fait ; prix posé = fait ; fiche « Plus tard » = passée ; reprise : publier', e2);
+    const e2 = A.etapesPaire({ fiche: { ...f, case: undefined }, photos: 2, cout: '41,90', etatVinted: 'a-creer', marques: { e: { case: 'passe', fiche: 'passe' } } });
+    const e2b = A.etapesPaire({ fiche: { ...f, case: undefined }, photos: 0, cout: null, etatVinted: 'a-creer', marques: null });
+    dit(e2b[0].etat === 'fait' && e2b[1].etat === 'afaire' && A.etapeReprise(e2b) === 'case', 'A3b2 · N° donné, pas de case : la reprise est la CASE de l’article', e2b);
+    dit(e2[1].etat === 'passe' && e2[2].etat === 'fait' && e2[3].etat === 'fait' && e2[4].etat === 'passe' && A.etapeReprise(e2) === 'publier', 'A3c · case « Plus tard » = passée ; 2 photos du studio = fait ; prix posé = fait ; fiche « Plus tard » = passée ; reprise : publier', e2);
     const e3 = A.etapesPaire({ fiche: { ...f, completeAt: isoJ(1) }, photos: null, cout: '40', etatVinted: 'en-ligne', marques: { e: { photos: 'passe' } } });
     dit(A.etapeReprise(e3) === null && e3[2].etat === 'passe' && e3[2].raison === 'passu' && e3[5].etat === 'fait' && A.progression(e3).faites === 5, 'A3d · photos pas lues + « Plus tard » ⇒ passée (pas su dit) ; en ligne ⇒ publiée ; tout réglé ⇒ aucune reprise', e3);
     const e4 = A.etapesPaire({ fiche: f, photos: null, cout: null, etatVinted: 'a-creer', marques: null });
@@ -190,6 +196,32 @@ if (PROUVE) prouver();
     dit(!!m && m.k === 'vrm_atelier_arrivee' && m.apres.e.photos === 'passe' && m.apres.e.prix === 'passe' && m.avant.e.prix === undefined && A.opMarque({ marques: {}, id: 'a1', etape: 'inconnue', etat: 'passe' }) === null,
       'A6c · « Plus tard » : SA mémoire par fiche, l’avant gardé ; une étape inconnue ⇒ rien', m);
   }
+  // A9 — la case de L'ARTICLE (Julien : « on range une ANNONCE, pas un achat ») : jamais la même pour deux articles.
+  {
+    const meubles = [{ id: 'mA', name: 'Étagère A', cols: 3, rows: 2 }];
+    const slots0 = { B230: { m: 'mA', i: 0 }, 7: { m: 'mA', i: 1 } };
+    const fiches = {}; for (let k = 13; k <= 17; k++) fiches['f' + k] = { id: 'f' + k, numero: String(k), titre: TITRE, origine: 'arrivee', achat: { tx: '8809999', ligne: k - 12, sur: 5 } };
+    let slots = { ...slots0 }; const donnees = []; let bad = '';
+    for (let k = 13; k <= 17; k++) {
+      const pr = A.caseProposee({ fiches, meubles, slots });
+      if (!pr.su) { bad = 'pas su'; break; }
+      if (!pr.case) { donnees.push(null); continue; }
+      const r = A.opsCase({ fiches, id: 'f' + k, slots, meubles, place: pr.case, cleNum });
+      if (!r.ok) { bad = `N°${k} refusé ${r.raison}`; break; }
+      const op = r.ops.find((o) => o.k === 'vrm_slots');
+      slots = { ...slots, [op.id]: op.apres }; fiches['f' + k] = { ...fiches['f' + k], case: op.apres };
+      donnees.push(op.apres.m + ':' + op.apres.i);
+    }
+    const vus = donnees.filter(Boolean);
+    dit(!bad && vus.length === 4 && new Set(vus).size === 4 && !vus.includes('mA:0') && !vus.includes('mA:1') && donnees[4] === null,
+      'A9a · un lot de 5 articles : chacun SA case libre (4 cases libres ⇒ 4 différentes, la 5e « plus de case »), jamais une case prise', { bad, donnees });
+    const pris = A.opsCase({ fiches: { g: { id: 'g', numero: '20', origine: 'arrivee' } }, id: 'g', slots, meubles, place: { meubleId: 'mA', i: 2 }, cleNum });
+    const deux = A.opsCase({ fiches, id: 'f13', slots, meubles, place: { meubleId: 'mA', i: 5 }, cleNum });
+    const sansN = A.opsCase({ fiches: { h: { id: 'h', numero: '', origine: 'arrivee' } }, id: 'h', slots: slots0, meubles, place: { meubleId: 'mA', i: 2 }, cleNum });
+    dit(!pris.ok && pris.raison === 'case' && !deux.ok && deux.raison === 'deja' && !sansN.ok && sansN.raison === 'fiche', 'A9b · une case prise ⇒ refusée ; un article déjà rangé ⇒ refusé ; un achat SANS N° ne se range pas', { pris, deux, sansN });
+    dit(A.caseProposee({ fiches, meubles: null, slots }).su === false && A.caseProposee({ fiches, meubles: [], slots: {} }).aucunMeuble === true, 'A9c · plan pas lu ⇒ « pas su » ; aucun meuble ⇒ dit');
+  }
+
   // A7 — Ma journée : les paires à finir.
   {
     const now = T0 + 40 * J;
@@ -201,13 +233,13 @@ if (PROUVE) prouver();
       dupliquee: { id: 'dupliquee', numero: '5', origine: 'dupliquer', rangeAt: isoJ(38) },
     };
     const l = A.pairesAFinir({ fiches, marques: { finie: { e: { photos: 'fait' } } }, couts: { 3: '40' }, etatVinted: (f) => (f.id === 'finie' ? 'en-ligne' : 'a-creer'), maintenant: now });
-    dit(l.map((x) => x.fiche.id).join(',') === 'recente' && l[0].reprise === 'photos', 'A7 · seulement la paire rangée il y a 2 jours, pas finie (ni la vieille, ni la finie, ni la retirée, ni une fiche « Dupliquer »)', l.map((x) => [x.fiche.id, x.reprise]));
+    dit(l.map((x) => x.fiche.id).join(',') === 'recente' && l[0].reprise === 'case', 'A7 · seulement la paire numérotée il y a 2 jours, pas finie (reprise : sa case) (ni la vieille, ni la finie, ni la retirée, ni une fiche « Dupliquer »)', l.map((x) => [x.fiche.id, x.reprise]));
   }
   // A8 — les branchements (code lu, commentaires retirés).
   {
     const ui = sansCommentaires(lire('src/AtelierArrivee.jsx'));
     const app = sansCommentaires(lire('src/App.jsx'));
-    dit(/coque\.ranger\(entree, lignes\.map\(\(l\) => \(\{ \.\.\.l, prix: '', case:/.test(ui), 'A8a · « Rangé » de l’atelier : le geste de « Ranger cet achat », appelé SANS prix (le prix a son étape, sur SON tap)');
+    dit(/coque\.ranger\(entree, lignes\.map\(\(l\) => \(\{ \.\.\.l, prix: '', case: null \}\)\)\)/.test(ui) && /etape === 'case' && fiche \? <EtapeCase/.test(ui), 'A8a · « Donner ce N° » : le geste de « Ranger cet achat » SANS prix ni case ; la case se propose à l’ARTICLE (sa fiche), après son N°');
     dit(/window\.addEventListener\('vrm:ranger-achat', f\)/.test(app.slice(app.indexOf('function AtelierArriveeCoque'), app.indexOf('function AtelierArriveeCoque') + 3000)) && /<AtelierArriveeCoque\/>/.test(app) && !/<RangerAchatCoque\/>/.test(app),
       'A8b · « J’ai retiré » (l’événement de « Ranger cet achat ») ouvre l’atelier, une seule feuille');
     const bloc = app.slice(app.indexOf('function AtelierArriveeCoque'), app.indexOf('function AtelierArriveeCoque') + 4000);

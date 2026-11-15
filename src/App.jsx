@@ -561,7 +561,7 @@ import { premiereCaseLibre as premiereCaseMeubles, achatsArrives, notifsOuRanger
 import { casesEnSerie, caseHabitude, numerosEnSerie, opsRanger, achatsARanger, numerosAReserver, CLE_FICHES as CLE_FICHES_RANGEES } from './rangementArrivee.js';   // (11 nov., lot rangement-guide)
 import { RangerAchat } from './RangerAchat.jsx';
 // (15 nov.) L'atelier « achat arrivé → en ligne » : la règle (pure) ; le dessin se charge à la demande.
-import { opsPrixAchat, opsFiche, opMarque, pairesAFinir, CLE_ATELIER } from './atelierArrivee.js';
+import { opsPrixAchat, opsFiche, opMarque, opsCase, caseProposee, pairesAFinir, CLE_ATELIER } from './atelierArrivee.js';
 import './comptes-lies.css';
 import './centre-notifs.css';
 import './comptes-securite.css';
@@ -18349,7 +18349,7 @@ function RangerAchatCoque() {
 const AtelierArriveeLazy = aLaDemande(() => import('./AtelierArrivee.jsx'), true);
 const PlanRangerLazy = React.lazy(() => import('./RangerAchat.jsx').then((m) => ({ default: m.Plan })));
 const PlanRanger = (props) => <React.Suspense fallback={null}><PlanRangerLazy {...props}/></React.Suspense>;
-const lireEtatAtelier = () => ({ fiches: load(CLE_FICHES_RANGEES, {}) || {}, couts: load('vinted_buyprice_by_num', {}) || {}, marques: load(CLE_ATELIER, {}) || {}, meubles: load('vrm_meubles', []) || [] });
+const lireEtatAtelier = () => ({ fiches: load(CLE_FICHES_RANGEES, {}) || {}, couts: load('vinted_buyprice_by_num', {}) || {}, marques: load(CLE_ATELIER, {}) || {}, meubles: load('vrm_meubles', []) || [], slots: load('vrm_slots', {}) || {} });
 const ecrireAtelier = (texte, ops, acc = '') => { gesteVrm(texte, ops, {}, () => { emettreClesRelues([...new Set(ops.map((o) => o.k))]); }, acc); };
 // Les paires rangées à l'arrivée qui ne sont pas finies (Ma journée).
 function pairesAFinirIci() {
@@ -18406,6 +18406,16 @@ function AtelierArriveeCoque() {
       const r = opsFiche({ fiches: lireEtatAtelier().fiches, id: f.id, champs });
       if (!r.ok) return r;
       ecrireAtelier(tr('arr.geste.fiche', { num: f.numero }), r.ops, 'arrivee.fiche');
+      return { ok: true };
+    },
+    // (15 nov., Julien : « on range une ANNONCE, pas un achat ») La case de L'ARTICLE, une fois son N° donné :
+    // proposée sur les cases actuelles (jamais celle d'un autre article), écrite sur SON « Ranger ici ».
+    caseProposee: () => { const e = lireEtatAtelier(); return caseProposee({ fiches: e.fiches, meubles: Array.isArray(e.meubles) ? e.meubles : [], slots: e.slots }); },
+    rangerCase: async (f, place) => {
+      const e = lireEtatAtelier();
+      const r = opsCase({ fiches: e.fiches, id: f.id, slots: e.slots, meubles: Array.isArray(e.meubles) ? e.meubles : [], place, cleNum });
+      if (!r.ok) return r;
+      gesteVrm(tr('arr.geste.case', { num: f.numero }), r.ops, {}, () => { setTimeout(() => { try { window.dispatchEvent(new Event('vrm:stock-slots')); } catch (_) {} emettreClesRelues(['vrm_slots', CLE_FICHES_RANGEES]); }, 300); }, 'arrivee.case');
       return { ok: true };
     },
     creerVinted: (f) => setCreer([f]),
@@ -47311,11 +47321,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const nI = inventaireJournee.n;
           jobs.push({ id: 'inventaire-en-cours', n: nI, icon: 'box', color: C.text, court: tr('journee.inventaireCours'), detail: tr('journee.vusReprendsT', { n: String(nI) }), title: tr('journee.inventaireCours'), sub: tr('journee.vusReprendsT', { n: String(nI) }), tab: 'garage', prio: 2.4, avant: () => { DEMANDE_STOCK_INVENTAIRE.at = Date.now(); } });
         }
-        // (11 nov., lot rangement-guide) « N achats à ranger » : les achats retirés ou reçus, pas encore
-        // rangés ; « Ranger » ouvre la feuille sur eux, en série (N° et cases à la suite). Neutre.
+        // (15 nov., Julien : « on range une ANNONCE, pas un achat ») Les achats arrivés attendent leur N° : « Commencer »
+        // ouvre l'atelier (N° d'abord, puis la case de l'ARTICLE). Plus aucun « ranger » sur un achat. Neutre.
         if (aRangerJournee.length) {
-          const nR = aRangerJournee.length, court = tr('ranger.carte.court', { n: nR });
-          jobs.push({ id: 'achats-a-ranger', n: nR, icon: 'box', color: C.text, court, detail: tr('ranger.carte.detail'), title: court, photos: aRangerJournee.map((x) => x.photo).filter(Boolean).slice(0, 4), tab: 'journee', prio: 2.35, action: tr('ranger.carte.action'), avant: () => ouvrirRangement(aRangerJournee) });
+          const nR = aRangerJournee.length, court = tr('arr.journee.achats', { n: nR });
+          jobs.push({ id: 'achats-a-ranger', n: nR, icon: 'box', color: C.text, court, detail: tr('arr.journee.achatsDetail'), title: court, photos: aRangerJournee.map((x) => x.photo).filter(Boolean).slice(0, 4), tab: 'journee', prio: 2.35, action: tr('arr.journee.commencer'), avant: () => ouvrirRangement(aRangerJournee) });
         }
         // (15 nov.) L'ATELIER D'ARRIVÉE pas fini : « N paires à finir » ⇒ « Reprendre » rouvre l'atelier là où il
         // s'est arrêté (la première étape ni faite ni passée, src/atelierArrivee.js). Neutre.

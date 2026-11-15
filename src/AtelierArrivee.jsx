@@ -39,7 +39,7 @@ function Progression({ etapes, courante, onAller, verrou }) {
         {etapes.map((e, i) => {
           const touchable = !verrou && e.cle !== courante && (e.etat !== 'afaire' || etapes.slice(0, i).every((x) => x.etat !== 'afaire' || x.cle === courante)) && !(e.raison === 'sansNumero')
             // Rangée : le N° et la case sont écrits (un N° servi ne se reprend pas ici ; la case se change dans le Stock).
-            && !((e.cle === 'numero' || e.cle === 'case') && e.etat !== 'afaire');
+            && !(e.cle === 'numero' && e.etat !== 'afaire') && !(e.cle === 'case' && e.etat === 'fait');
           return (
             <li key={e.cle} className={`is-${e.etat}${e.cle === courante ? ' is-courante' : ''}`} data-aa-etape={e.cle} data-aa-etat={e.etat}>
               <button type="button" disabled={!touchable} aria-current={e.cle === courante ? 'step' : undefined} onClick={() => onAller(e.cle)}>
@@ -91,29 +91,31 @@ function EtapeRanger({ entree, prep, lignes, setLignes, courante, setCourante, n
           })}
         </ul>
         {prep.numeroEcrit ? null : <p className="vrm-arr-doux">{tr(lignes.length > 1 ? 'arr.numero.carton.n' : 'arr.numero.carton')}</p>}
+        <AccAvant geste="arrivee.ranger"/>
       </div>
     );
   }
-  // etape === 'case'
+  return null;
+}
+
+// ── 2 : la case de L'ARTICLE (son N° est donné) — Julien : « on range une ANNONCE, pas un achat ».
+// La case proposée est lue sur les cases ACTUELLES : jamais celle d'un autre article.
+function EtapeCase({ fiche, prop, place, setPlace, meubles, slots, Plan, erreur }) {
+  const lignes = [{ numero: String(fiche.numero), case: place }];
   return (
-    <div className="vrm-arr-corps" data-aa-corps="case">
-      <ul className="vrm-arr-cases">
-        {lignes.map((l, k) => (
-          <li key={k}>
-            <button type="button" className={'vrm-arr-case-ligne' + (k === courante ? ' is-courante' : '')} data-aa-case-ligne={k} data-aa-case-m={l.case ? l.case.meubleId : ''} data-aa-case-i={l.case ? l.case.i : ''} onClick={() => setCourante(k)}>
-              <span className="sb-plaque vrm-arr-plaque-petite">N°{l.numero || '—'}</span>
-              <span className="vrm-arr-case-mots">{l.case ? motCase(l.case) : (prep.aucunMeuble ? tr('ranger.aucunMeuble') : tr('ranger.plein'))}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
-      {Array.isArray(prep.meubles) && prep.meubles.length && Plan ? (
+    <div className="vrm-arr-corps" data-aa-corps="case" data-aa-case-m={place ? place.meubleId : ''} data-aa-case-i={place ? place.i : ''}>
+      <div className="vrm-arr-case-ligne is-courante" data-aa-case-ligne="0">
+        <span className="sb-plaque vrm-arr-plaque-petite">N°{fiche.numero}</span>
+        <span className="vrm-arr-case-mots">{place ? motCase(place) : (!prop || !prop.su) ? '— ' + tr('ranger.refus.lecture') : prop.aucunMeuble ? tr('ranger.aucunMeuble') : tr('ranger.plein')}</span>
+      </div>
+      {Array.isArray(meubles) && meubles.length && Plan ? (
         <>
-          <p className="vrm-arr-doux">{lignes.length > 1 ? tr('ranger.toucherCaseLigne', { n: (lignes[courante] && lignes[courante].numero) || '—' }) : tr('ranger.toucherCase')}</p>
-          <Plan prep={prep} lignes={lignes} courante={courante} onCase={(c) => poser(courante, { case: c })}/>
+          <p className="vrm-arr-doux">{tr('ranger.toucherCase')}</p>
+          <Plan prep={{ meubles, slots }} lignes={lignes} courante={0} onCase={(c) => setPlace(c)}/>
         </>
       ) : null}
-      <AccAvant geste="arrivee.ranger"/>
+      {erreur ? <p className="vrm-arr-refus" role="alert" data-aa-case-erreur={erreur}>{tr(['case', 'deja'].includes(erreur) ? 'ranger.refus.' + erreur : 'ranger.refus.lecture')}</p> : null}
+      <AccAvant geste="arrivee.case"/>
     </div>
   );
 }
@@ -281,20 +283,33 @@ function UnAchat({ entree, coque, onSuivant, onFermer, position, Bouton, Photo, 
   const avancer = () => { setVue(null); };
   const marquer = (cle, quoi) => { if (fiche) coque.marquer(fiche.id, cle, quoi); setVue(null); };
 
-  // « Rangé » : le geste de « Ranger cet achat », SANS prix (le prix a son étape).
+  // « Donner ce N° » : le geste de « Ranger cet achat », SANS prix ni case (chacun a son étape, sur l'ARTICLE).
   const rangeOk = !!(prep && prep.ok) && lignes.length > 0 && lignes.every((l) => String(l.numero || '').trim())
     && (!prep.numeroEcrit || lignes.every((l, j) => validerNumeroTape(l.numero, { pris: prep.pris, archive: prep.archive, cleNum: prep.cleNum, autres: lignes.filter((_, x) => x !== j).map((x) => x.numero).filter(Boolean) }).ok));
-  const ranger = async (sansCase) => {
+  const ranger = async () => {
     if (!rangeOk || envoi) return;
     setEnvoi(true); setErreur('');
     const g = accompagner('arrivee.ranger');
-    let r = null; try { r = await coque.ranger(entree, lignes.map((l) => ({ ...l, prix: '', case: sansCase ? null : l.case }))); } catch (_) { r = { ok: false, raison: 'lecture' }; }
+    let r = null; try { r = await coque.ranger(entree, lignes.map((l) => ({ ...l, prix: '', case: null }))); } catch (_) { r = { ok: false, raison: 'lecture' }; }
     setEnvoi(false);
     // La fiche arrive par l'écriture locale (un instant) : on attend sur l'étape des photos, sans rien proposer.
-    if (r && r.ok) { setNumeros(r.numeros || []); setVue('photos'); g.fini({ num: (r.numeros || [])[0] || '' }); return; }
+    if (r && r.ok) { setNumeros(r.numeros || []); setVue('case'); g.fini({ num: (r.numeros || [])[0] || '' }); return; }
     g.oublier();
     setErreur(r && r.raison ? r.raison : 'lecture');
     if (r && (r.raison === 'pris' || r.raison === 'case')) setTour((t) => t + 1);
+  };
+  // La case de L'ARTICLE : proposée sur les cases actuelles ; « Ranger ici » l'écrit (refusée si prise entre-temps).
+  const [place, setPlace] = React.useState(null);
+  const propCase = etape === 'case' && fiche ? coque.caseProposee(fiche) : null;
+  const cleProp = propCase && propCase.case ? propCase.case.meubleId + ':' + propCase.case.i : '';
+  React.useEffect(() => { setPlace(propCase && propCase.case ? propCase.case : null); }, [etape, fiche && fiche.id, cleProp]); // eslint-disable-line react-hooks/exhaustive-deps
+  const rangerIci = async () => {
+    if (!fiche || !place || envoi) return;
+    setEnvoi(true);
+    const r = await coque.rangerCase(fiche, place);
+    setEnvoi(false);
+    if (r && r.ok) { setErreur(''); setVue(null); return; }
+    setErreur((r && r.raison) || 'lecture');
   };
   const garderPrix = async (texte, source) => {
     if (!fiche || envoi) return;
@@ -315,15 +330,15 @@ function UnAchat({ entree, coque, onSuivant, onFermer, position, Bouton, Photo, 
 
   // Le pied : UN bouton plein, « Plus tard » à côté.
   let plein = null, second = null;
-  const attenteFiche = !fiche && etape !== 'numero' && etape !== 'case';
+  const attenteFiche = !fiche && etape !== 'numero';
   if (attenteFiche) {
     plein = null;
   } else if (etape === 'numero') {
-    plein = <Bouton variante="primaire" plein data-aa-suivant="numero" disabled={!(prep && prep.ok) || !lignes.length || !lignes.every((l) => String(l.numero || '').trim())} onClick={() => aller('case')}>{tr('arr.suivant')}</Bouton>;
+    plein = <Bouton variante="primaire" plein data-aa-donner-numero="" occupe={envoi} disabled={!rangeOk} onClick={ranger}>{lignes.length > 1 ? tr('arr.numero.donnerN', { n: lignes.length }) : tr('arr.numero.donner')}</Bouton>;
     second = <Bouton variante="secondaire" data-aa-plus-tard="numero" onClick={onSuivant}>{tr('arr.plusTard')}</Bouton>;
   } else if (etape === 'case') {
-    plein = <Bouton variante="primaire" plein data-aa-ranger="" occupe={envoi} disabled={!rangeOk} onClick={() => ranger(false)}>{lignes.length > 1 ? tr('ranger.rangeN', { n: lignes.length }) : tr('ranger.range')}</Bouton>;
-    second = <Bouton variante="secondaire" data-aa-sans-case="" disabled={!rangeOk || envoi} onClick={() => ranger(true)}>{tr('arr.case.sans')}</Bouton>;
+    plein = <Bouton variante="primaire" plein data-aa-ranger-ici="" occupe={envoi} disabled={!place} onClick={rangerIci}>{tr('arr.case.ranger')}</Bouton>;
+    second = <Bouton variante="secondaire" data-aa-plus-tard="case" onClick={() => marquer('case', 'passe')}>{tr('arr.plusTard')}</Bouton>;
   } else if (etape === 'photos') {
     plein = Number.isFinite(photos) && photos > 0
       ? <Bouton variante="primaire" plein data-aa-suivant="photos" onClick={() => marquer('photos', 'fait')}>{tr('arr.suivant')}</Bouton>
@@ -358,11 +373,12 @@ function UnAchat({ entree, coque, onSuivant, onFermer, position, Bouton, Photo, 
       <div className="vrm-arr" data-aa-tx={entree.tx || ''} data-aa-fiche={fiche ? fiche.id : ''} data-aa-num={fiche ? fiche.numero : ''} data-aa-reprise={reprise || 'fini'}>
         <div className="vrm-arr-tete">
           <div className="vrm-arr-photo">{entree.photo && Photo ? <Photo src={entree.photo} alt=""/> : null}</div>
-          <div className="vrm-arr-tete-txt"><b>{titreAchat}</b><small>{sous || tr('arr.sous.aRanger')}</small></div>
+          <div className="vrm-arr-tete-txt"><b>{titreAchat}</b><small>{sous || tr('arr.sous.aNumeroter')}</small></div>
         </div>
         <Progression etapes={etapes} courante={etape === 'fin' ? '' : etape} onAller={aller} verrou={envoi}/>
         <h3 className="vrm-arr-h" data-aa-titre={etape}>{tr('arr.titre.' + etape)}</h3>
-        {etape === 'numero' || etape === 'case' ? <EtapeRanger entree={entree} prep={prep} lignes={lignes} setLignes={setLignes} courante={courante} setCourante={setCourante} n={n} setN={setN} etape={etape} Plan={Plan}/> : null}
+        {etape === 'case' && fiche ? <EtapeCase fiche={fiche} prop={propCase} place={place} setPlace={setPlace} meubles={etat.meubles} slots={etat.slots} Plan={Plan} erreur={erreur}/> : null}
+        {etape === 'numero' ? <EtapeRanger entree={entree} prep={prep} lignes={lignes} setLignes={setLignes} courante={courante} setCourante={setCourante} n={n} setN={setN} etape={etape} Plan={Plan}/> : null}
         {attenteFiche ? <p className="vrm-arr-doux" data-aa-attente-fiche="">{tr('ranger.attente')}</p> : null}
         {etape === 'photos' && fiche ? <EtapePhotos fiche={fiche} photos={photos} vignettes={vignettes}/> : null}
         {etape === 'prix' && fiche ? <EtapePrix entree={entree} fiche={fiche} cout={etat.couts[String(fiche.numero)]} corriger={corriger} setCorriger={setCorriger} saisie={saisie} setSaisie={setSaisie} erreur={erreur}/> : null}
@@ -376,7 +392,7 @@ function UnAchat({ entree, coque, onSuivant, onFermer, position, Bouton, Photo, 
             {Note ? <div className="vrm-arr-note">{Note(fiche.numero)}</div> : null}
           </div>
         ) : null}
-        {erreur && (etape === 'numero' || etape === 'case') ? <p className="vrm-arr-refus" role="alert" data-aa-erreur={erreur}>{tr(['pris', 'case', 'deja', 'double', 'illisible', 'vide'].includes(erreur) ? 'ranger.refus.' + erreur : 'ranger.refus.lecture', { n: (lignes[0] && lignes[0].numero) || '' })}</p> : null}
+        {erreur && etape === 'numero' ? <p className="vrm-arr-refus" role="alert" data-aa-erreur={erreur}>{tr(['pris', 'case', 'deja', 'double', 'illisible', 'vide'].includes(erreur) ? 'ranger.refus.' + erreur : 'ranger.refus.lecture', { n: (lignes[0] && lignes[0].numero) || '' })}</p> : null}
       </div>
       <div className="vrm-fs-pied vrm-arr-pied">
         {plein}

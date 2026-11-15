@@ -37,6 +37,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import { propositionPrixAchat, ACHAT_SANS_COUT } from './prixAchatPropose.js';
 import { prixAchatSaisi } from './prixAuNumerotage.js';
+import { casesEnSerie, caseChoisie, caseHabitude } from './rangementArrivee.js';
 
 export const ETAPES_ATELIER = ['numero', 'case', 'photos', 'prix', 'fiche', 'publier'];
 // La mémoire de SES gestes (« Plus tard », « C'est fait ») : synchronisée, par fiche.
@@ -64,7 +65,9 @@ export function etapesPaire({ fiche = null, photos, cout = null, etatVinted = 'a
   const out = [];
   const range = !!(fiche && str(fiche.numero));
   out.push({ cle: 'numero', etat: range ? 'fait' : 'afaire' });
-  out.push({ cle: 'case', etat: range ? (fiche.case ? 'fait' : 'passe') : 'afaire' });
+  // (15 nov., Julien : « on range une ANNONCE, pas un achat ») La case vient APRÈS le N° : elle se pose sur l'ARTICLE
+  // (sa fiche numérotée), par son geste « Ranger ici » — ou SON « Plus tard ».
+  out.push({ cle: 'case', etat: !range ? 'afaire' : fiche.case ? 'fait' : (marque('case') === 'passe' ? 'passe' : 'afaire'), ...(range ? {} : { raison: 'sansNumero' }) });
   if (!range) {
     for (const c of ['photos', 'prix', 'fiche', 'publier']) out.push({ cle: c, etat: 'afaire', raison: 'sansNumero' });
     return out;
@@ -181,6 +184,37 @@ export function opsPrixAchat({ fiches, id, couts, texte, source = 'tape' } = {})
   return { ok: true, valeur: p, ops: [
     { k: 'vinted_buyprice_by_num', type: 'cle', id: num, apres: p, avant: couts[num] },
     { k: CLE_FICHES_ATELIER, type: 'champs', id: str(id), apres: { prixAchat: n, prixAchatSource: source }, avant: { prixAchat: f.prixAchat, prixAchatSource: f.prixAchatSource } },
+  ] };
+}
+// ── LA CASE D'UN ARTICLE (15 nov., Julien : « on range une ANNONCE, pas un achat ») ──
+// La case se propose à un ARTICLE qui a déjà son N° (sa fiche), une fois le N° donné. Lue sur
+// les cases ACTUELLES (`vrm_slots`) : une case prise — par l'article d'avant d'un même lot, ou par
+// n'importe quel N° — n'est jamais reproposée ; deux articles n'ont jamais la même case.
+// `reservees` : les cases montrées à d'autres articles et pas encore écrites.
+// Rend { su: false } (plan pas lu) · { su: true, case: null, aucunMeuble? } · { su: true, case }.
+export function caseProposee({ fiches, meubles, slots, reservees = [] } = {}) {
+  if (!Array.isArray(meubles) || !estObjet(slots)) return { su: false };
+  const r = casesEnSerie({ meubles, slots, n: 1, habitude: caseHabitude({ fiches: estObjet(fiches) ? fiches : {}, meubles }), reservees });
+  if (!r || !r.su) return { su: false };
+  return { su: true, case: (r.cases || [])[0] || null, ...(r.aucunMeuble ? { aucunMeuble: true } : {}) };
+}
+// « Ranger ici » : la case de CET article (son N°), relue et refusée plutôt qu'écrasée —
+// une case prise entre-temps, un article déjà dans une case ⇒ rien n'est écrit.
+//   place : { meubleId, i } (la proposition, ou la case touchée sur le plan)
+export function opsCase({ fiches, id, slots, meubles, place, cleNum, maintenant = new Date().toISOString() } = {}) {
+  if (!estObjet(fiches) || !estObjet(slots) || !Array.isArray(meubles) || typeof cleNum !== 'function') return { ok: false, raison: 'lecture' };
+  const f = fiches[str(id)];
+  if (!estObjet(f) || f.retireeAt || !str(f.numero)) return { ok: false, raison: 'fiche' };
+  const c = cleNum(f.numero);
+  if (!c) return { ok: false, raison: 'fiche' };
+  if (slots[c] || f.case) return { ok: false, raison: 'deja' };
+  if (!place || place.meubleId == null) return { ok: false, raison: 'case' };
+  const ok = caseChoisie({ meubles, slots, m: place.meubleId, i: Number(place.i) });
+  if (!ok) return { ok: false, raison: 'case' };
+  const p = { m: String(ok.meubleId), i: Number(ok.i) };
+  return { ok: true, case: ok, ops: [
+    { k: 'vrm_slots', type: 'cle', id: c, apres: p, avant: undefined },
+    { k: CLE_FICHES_ATELIER, type: 'champs', id: str(id), apres: { case: p, caseAt: maintenant }, avant: { case: f.case, caseAt: f.caseAt } },
   ] };
 }
 // « Plus tard » / « C'est fait » d'une étape : SA mémoire, par fiche.
