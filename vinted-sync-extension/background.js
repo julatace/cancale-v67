@@ -4410,6 +4410,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return true;
     }
     // 5.319 : tes OFFRES Vestiaire et la recette d'une réponse faite par toi sur la page.
+    // 5.392 : les personnes qui ont aimé TES articles (gardées dans CE navigateur ; la base n'en reçoit que des nombres).
+    if (msg && msg.from === 'cancale-vc' && msg.action === 'vcAimes') {
+      (async () => {
+        try {
+          let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
+          if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
+          const ok = await rangerVcAimes(msg, await compteVcCapture(sender && sender.tab && sender.tab.id, msg.moi));
+          sendResponse({ ok: ok === true });
+        } catch (e) { sendResponse({ ok: false, error: String(e) }); }
+      })();
+      return true;
+    }
     if (msg && msg.from === 'cancale-vc' && (msg.action === 'vcOffres' || msg.action === 'vcOffreAppris' || msg.action === 'vcPrixAppris')) {
       (async () => {
         try {
@@ -19287,7 +19299,7 @@ async function etatPourApp() {
   //    présence comme `pause` et `vivant`).
   // 29 oct. : `lbcSupprime` — elle sait aussi SUPPRIMER une annonce Leboncoin
   //    sur commande confirmée (même règle : le bouton n'apparaît qu'à elle).
-  return Object.assign({ ok: true, version, code: CODE_VERSION, ext, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus, lbcPause: true, lbcSupprime: true, vcRepondre: true, lbcRepondre: true, vcOffre: true, lbcPrix: true, vcPrix: true },
+  return Object.assign({ ok: true, version, code: CODE_VERSION, ext, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus, lbcPause: true, lbcSupprime: true, vcRepondre: true, lbcRepondre: true, vcOffre: true, vcOffreAimes: true, lbcPrix: true, vcPrix: true },
     vintedPasSu ? { vintedPasSu: true } : {},
     pause && pause !== PAUSE_PAS_SUE ? { pause: { jusqua: Number(pause.jusqua) || 0 } } : {},
     nav ? { nav } : {},
@@ -19698,6 +19710,8 @@ async function executerCommande(msg) {
   if (msg && msg.cmd === 'vcRepondre') return await repondreVestiaire(msg);
   // 4 nov. (5.319) : répondre à UNE offre Vestiaire, sur son clic (voir `repondreOffreVestiaire`).
   if (msg && msg.cmd === 'vcOffre') return await repondreOffreVestiaire(msg);
+  // 15 nov. (5.392) : UNE offre aux personnes qui ont aimé un article Vestiaire, sur son clic (`offrirAuxAimesVc`).
+  if (msg && msg.cmd === 'vcOffreAimes') return await offrirAuxAimesVc(msg);
   // 11 nov. (5.364) : baisser UN prix Vestiaire, sur son clic (voir `baisserPrixVestiaire`).
   if (msg && msg.cmd === 'vcPrix') return await baisserPrixVestiaire(msg);
   // 3 nov. (5.318) : répondre dans UNE conversation Leboncoin, sur son clic (voir `repondreLeboncoin`).
@@ -24700,6 +24714,9 @@ async function repondreVestiaire(msg) {
 const VC_RECETTE_OFFRES = 'vrmVcRecetteOffres';
 const VC_OFFRES_MAX = 300;
 const GESTES_OFFRE = ['accepter', 'refuser', 'contre'];
+// 5.392 : la recette « favori » (TA première offre à une personne qui a aimé l'article) s'apprend à côté ;
+// elle ne répond à AUCUNE offre reçue (jamais acceptée par `repondreOffreVestiaire`).
+const GESTES_RECETTE_VC = [...GESTES_OFFRE, 'favori'];
 const cleOffreVc = (id) => 'n' + String(id);
 let _vcOffresChaine = Promise.resolve();
 function rangerVcOffres(m, compte) {
@@ -24757,7 +24774,7 @@ async function rangerVcOffresMaintenant(m, compte) {
 }
 // La recette d'UN geste reçue d'une page : refaite champ par champ.
 function nettoyerRecetteOffreVc(r) {
-  if (!r || typeof r !== 'object' || !GESTES_OFFRE.includes(String(r.geste))) return null;
+  if (!r || typeof r !== 'object' || !GESTES_RECETTE_VC.includes(String(r.geste))) return null;
   const base = { geste: String(r.geste), methode: /^(POST|PUT|PATCH)$/.test(String(r.methode)) ? String(r.methode) : '', hote: /^([a-z0-9-]+\.)*vestiairecollective\.com$/i.test(String(r.hote || '')) ? String(r.hote) : '', chemin: String(r.chemin || '').slice(0, 160) };
   if (!base.methode || !base.hote) return null;
   if (r.rejouable !== true) return { ...base, rejouable: false, raison: String(r.raison || 'inconnue').slice(0, 40) };
@@ -24776,6 +24793,12 @@ function nettoyerRecetteOffreVc(r) {
   const vise = (k) => modele.includes(k) || fixes.some((x) => x[1] === k);
   if (!vise('{nego}') && !vise('{produit}')) return { ...base, rejouable: false, raison: 'offre-introuvable' };
   if (base.geste === 'contre' && !vise('{prixCents}') && !vise('{prix}')) return { ...base, rejouable: false, raison: 'prix-introuvable' };
+  if (base.geste === 'favori') {
+    if (!vise('{prixCents}') && !vise('{prix}')) return { ...base, rejouable: false, raison: 'prix-introuvable' };
+    if (!vise('{produit}')) return { ...base, rejouable: false, raison: 'article-introuvable' };
+    if (!vise('{acheteur}')) return { ...base, rejouable: false, raison: 'personne-introuvable' };
+    if (vise('{nego}')) return { ...base, rejouable: false, raison: 'offre-existante' };
+  }
   const entetes = (Array.isArray(r.entetes) ? r.entetes : []).map((x) => String(x).toLowerCase()).filter((x) => /^[a-z0-9-]{1,60}$/.test(x) && !/^(cookie|content-length|host|connection|origin|referer|user-agent|accept-encoding|content-type)$/.test(x)).slice(0, 20);
   const recherche = /^\?[\w=&.%:-]{0,200}$/.test(String(r.recherche || '')) && !/\d{3,}/.test(String(r.recherche || '')) ? String(r.recherche) : '';
   return { ...base, rejouable: true, raison: '', modele, recherche, fixes, sansCorps: r.sansCorps === true && !fixes.length, entetes };
@@ -24792,7 +24815,7 @@ async function noterRecetteOffreVc(brute) {
   tout[r.geste] = { recette: garde, at: r.rejouable ? at : ((avant && avant.at) || at), dernierEssai: { at, rejouable: r.rejouable, raison: r.raison || '' } };
   try { await chrome.storage.local.set({ [VC_RECETTE_OFFRES]: tout }); } catch (_) { return false; }
   const pourApp = {};
-  for (const g of GESTES_OFFRE) { const e = tout[g]; if (e && e.recette) pourApp[g] = { appris: e.recette.rejouable === true, raison: e.recette.rejouable ? '' : String(e.recette.raison || ''), at: e.at || '', dernierEssai: e.dernierEssai || null }; }
+  for (const g of GESTES_RECETTE_VC) { const e = tout[g]; if (e && e.recette) pourApp[g] = { appris: e.recette.rejouable === true, raison: e.recette.rejouable ? '' : String(e.recette.raison || ''), at: e.at || '', dernierEssai: e.dernierEssai || null }; }
   const ok = await supabaseUpsert('app_data', [{ id: 'vc_offres_recette', data: Object.assign(pourApp, { ver: CODE_VERSION, at }) }], 'id');
   if (ok === true) notifierApp({ type: 'maj', quoi: 'vestiaire' });
   return ok === true;
@@ -24861,6 +24884,165 @@ async function repondreOffreVestiaire(msg) {
     }
     return { accepte: true, etape: 'refuse', statut, raison: `Vestiaire a répondu ${statut} — ta réponse n'est pas partie` };
   } finally { VC_REPONSE_EN_VOL = false; }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// VESTIAIRE : UNE OFFRE AUX PERSONNES QUI ONT AIMÉ, SUR SON CLIC (15 nov., 5.392)
+// ══════════════════════════════════════════════════════════════════════════
+// Julien : « est-ce que tu as lancé les messages aux favoris sur Vestiaire ? ». MESURÉ
+// (lecture seule, 15 nov.) : Vestiaire NOMME chaque personne qui aime un article — une
+// carte du fil des notifications par « j'aime » (`custom_community`, « … vient d'aimer
+// votre pièce, envoyez-lui un message ! », conversation `{personne}-{article}`) — et le
+// vendeur peut lui faire la PREMIÈRE offre (`POST apiv2…/products/{id}/negotiations`,
+// vu le 2 nov. : une offre du vendeur à 237 € sur un article à 249 €). Le geste natif
+// existe ; VRM le refait, sur SON clic, seulement après l'avoir APPRIS de son propre geste.
+//  · `vrmVcAimes` (LOCAL, jamais en base) : { [article]: { [personne]: date } } — les
+//    identifiants numériques que la page a vus ; borné ; `vc_aimes` (base) n'en reçoit
+//    que des NOMBRES par article (personnes vues, déjà prévenues, la dernière date).
+//  · `vrmVcAimesFaits` (LOCAL) : { 'article|personne': { at, cents, etat } } — UNE offre par
+//    personne et par article, jamais deux (posé AVANT l'envoi : un worker tué au milieu ne
+//    renvoie pas, la ligne reste « incertaine »).
+//  · `offrirAuxAimesVc` : la recette « favori » apprise (sinon rien, dit), l'article LU dans
+//    `vc_listings` (son compte, son prix = celui de l'aperçu), l'offre sous le prix et 1 € au
+//    moins, l'onglet vestiairecollective.com sur CE compte ; puis, une personne à la fois :
+//    pause 429/403, sécurité des comptes (5.366, « série »), 45/h (réserve 5) ; 8–20 s au
+//    hasard entre deux offres ; 10 personnes par toucher au plus. « Faite » seulement si
+//    Vestiaire renvoie TON offre à ce prix. Un refus arrête tout (rien n'est relancé seul).
+const VC_AIMES = 'vrmVcAimes';
+const VC_AIMES_FAITS = 'vrmVcAimesFaits';
+const VC_AIMES_MAX_ARTICLES = 400, VC_AIMES_MAX_PAR_ARTICLE = 200;
+const VC_AIMES_PAR_TOUCHER = 10;
+const VC_AIMES_ECART_MS = [8000, 20000];
+let _vcAimesChaine = Promise.resolve();
+function rangerVcAimes(m, compte) {
+  const run = _vcAimesChaine.then(() => rangerVcAimesMaintenant(m, compte)).catch(() => false);
+  _vcAimesChaine = run.then(() => {}, () => {});
+  return run;
+}
+function resumeAimesVc(aimes, faits) {
+  const produits = {};
+  for (const [p, parPersonne] of Object.entries(aimes || {})) {
+    const ps = Object.keys(parPersonne || {});
+    if (!ps.length) continue;
+    const dates = ps.map((k) => String(parPersonne[k] || '')).filter(Boolean).sort();
+    const prevenues = ps.filter((k) => faits && faits[p + '|' + k]).length;
+    produits['n' + p] = { produit: p, n: ps.length, prevenues, aPrevenir: ps.length - prevenues, dernier: dates[dates.length - 1] || '' };
+  }
+  return produits;
+}
+async function publierAimesVc(aimes, faits, compte, extra = {}) {
+  const now = new Date().toISOString();
+  const data = Object.assign({ v: 1, produits: resumeAimesVc(aimes, faits), compte: compte || '', capturedAt: now, ver: CODE_VERSION }, extra);
+  const ok = await supabaseUpsert('app_data', [{ id: 'vc_aimes', data }], 'id');
+  if (ok === true) notifierApp({ type: 'maj', quoi: 'vestiaire' });
+  return ok === true;
+}
+async function rangerVcAimesMaintenant(m, compte) {
+  const neufs = (Array.isArray(m && m.aimes) ? m.aimes : []).slice(0, 200).filter((x) => x && /^\d{3,15}$/.test(String(x.produit || '')) && /^\d{3,15}$/.test(String(x.acheteur || '')));
+  if (!neufs.length) return false;
+  let tout, faits;
+  try { const o = await chrome.storage.local.get([VC_AIMES, VC_AIMES_FAITS]); tout = o[VC_AIMES] || {}; faits = o[VC_AIMES_FAITS] || {}; } catch (_) { return false; }
+  let change = false;
+  for (const x of neufs) {
+    const p = String(x.produit), k = String(x.acheteur);
+    if (compte && k === String(compte)) continue;                       // jamais soi-même
+    const par = tout[p] = tout[p] || {};
+    const at = /^\d{4}-\d{2}-\d{2}T/.test(String(x.at || '')) ? String(x.at).slice(0, 30) : '';
+    if (!(k in par) || (at && String(par[k] || '') < at)) { par[k] = at || par[k] || ''; change = true; }
+    const cles = Object.keys(par);
+    if (cles.length > VC_AIMES_MAX_PAR_ARTICLE) { for (const c of cles.sort((a, b) => String(par[a]).localeCompare(String(par[b]))).slice(0, cles.length - VC_AIMES_MAX_PAR_ARTICLE)) delete par[c]; }
+  }
+  const articles = Object.keys(tout);
+  if (articles.length > VC_AIMES_MAX_ARTICLES) {
+    const recent = (p) => Object.values(tout[p] || {}).map(String).sort().pop() || '';
+    for (const p of articles.sort((a, b) => recent(a).localeCompare(recent(b))).slice(0, articles.length - VC_AIMES_MAX_ARTICLES)) delete tout[p];
+  }
+  if (!change) return true;
+  try { await chrome.storage.local.set({ [VC_AIMES]: tout }); } catch (_) { return false; }
+  return await publierAimesVc(tout, faits, compte);
+}
+const attendreVc = (ms) => new Promise((r) => setTimeout(r, ms));
+const ecartAimesVc = () => VC_AIMES_ECART_MS[0] + Math.floor(Math.random() * (VC_AIMES_ECART_MS[1] - VC_AIMES_ECART_MS[0]));
+async function offrirAuxAimesVc(msg) {
+  const produit = String((msg && msg.produit) || '');
+  const avant = Number(msg && msg.avantCents), prix = Number(msg && msg.prixCents);
+  if (!/^\d{3,15}$/.test(produit) || !Number.isInteger(avant) || !Number.isInteger(prix) || !(prix >= 100) || !(prix < avant) || avant > 1e8) return { accepte: false, code: 'invalide', raison: 'article ou montant invalide (l’offre doit être sous ton prix, 1 € au moins)' };
+  if (VC_REPONSE_EN_VOL) return { accepte: false, code: 'en-cours', raison: 'une autre action Vestiaire part en ce moment — une à la fois' };
+  VC_REPONSE_EN_VOL = true;
+  let lance = false;
+  try {
+    const pause = await pauseVc();
+    if (pause) return { accepte: false, code: 'vc-pause', raison: `Vestiaire a demandé de ralentir (${pause.statut || 'refus'}) — rien n'est parti, réessaie après ${new Date(pause.jusqua).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` };
+    let tout, aimes, faits;
+    try { const o = await chrome.storage.local.get([VC_RECETTE_OFFRES, VC_AIMES, VC_AIMES_FAITS]); tout = o[VC_RECETTE_OFFRES] || {}; aimes = o[VC_AIMES] || {}; faits = o[VC_AIMES_FAITS] || {}; } catch (_) { return { accepte: false, code: 'lecture', raison: "le stockage de l'extension n'a pas répondu — rien n'est parti" }; }
+    const recette = tout.favori && tout.favori.recette;
+    if (!recette) return { accepte: false, code: 'pas-appris', raison: "l'extension n'a encore jamais vu ce geste — sur vestiairecollective.com, dans ce Chrome, ouvre une notification « … vient d'aimer votre pièce » et fais UNE offre toi-même : VRM apprendra, puis pourra le faire d'ici" };
+    if (recette.rejouable !== true) return { accepte: false, code: 'pas-rejouable', raison: `la façon dont Vestiaire envoie cette offre n'est pas encore sûre à refaire (${recette.raison || 'forme inconnue'}) — fais-la sur Vestiaire, rien n'est parti` };
+    const rows = await sbGet('app_data?id=eq.vc_listings&select=items:data->items');
+    if (rows === null) return { accepte: false, code: 'lecture', raison: "la base VRM n'a pas répondu — rien n'est parti" };
+    const items = rows && rows[0] && rows[0].items && typeof rows[0].items === 'object' ? rows[0].items : {};
+    const it = items[produit];
+    if (!it || typeof it !== 'object') return { accepte: false, code: 'inconnue', raison: "l'extension n'a pas encore lu cet article — ouvre « Mes articles » sur Vestiaire, rien n'est parti" };
+    const lu = centsPrixVc(it.prix);
+    if (lu == null) return { accepte: false, code: 'prix-pas-lu', raison: "le prix de cet article n'a pas été lu — ouvre « Mes articles » sur Vestiaire, rien n'est parti" };
+    if (lu !== avant) return { accepte: false, code: 'prix-change', prixVu: lu / 100, raison: `le prix lu n'est plus celui de l'aperçu (${(lu / 100).toFixed(2).replace('.', ',')} €) — rien n'est parti` };
+    const compte = String(it.compte || '');
+    if (!compte) return { accepte: false, code: 'session', raison: "je ne sais pas à quel compte Vestiaire appartient cet article — recharge « Mes articles » sur Vestiaire (connecté sur ton compte), puis réessaie" };
+    const personnes = Object.keys(aimes[produit] || {}).filter((k) => k !== compte && !faits[produit + '|' + k]);
+    if (!personnes.length) return { accepte: false, code: 'personne', raison: Object.keys(aimes[produit] || {}).length ? "toutes les personnes vues ont déjà reçu une offre pour cet article — rien n'est reparti" : "ce Chrome n'a vu personne qui aime cet article — ouvre tes notifications sur Vestiaire dans ce Chrome, puis réessaie" };
+    const ot = await ongletVestiaire(compte);
+    if (!ot.ok) return { accepte: false, code: ot.code, raison: ot.raison };
+    { const rbVc = await secuRobotDit('vestiaire', ot.compte); if (rbVc) return { accepte: false, code: rbVc.code, raison: rbVc.error }; }
+    const lot = personnes.slice(0, VC_AIMES_PAR_TOUCHER);
+    const now = new Date().toISOString();
+    const suivi = { produit, at: now, cents: prix, n: lot.length, faites: 0, incertaines: 0, fin: '', raison: '' };
+    await publierAimesVc(aimes, faits, ot.compte, { envoi: suivi });
+    lance = true;
+    // La série continue après la réponse (l'app relit `vc_aimes`) ; le verrou reste pris jusqu'au bout.
+    (async () => {
+      try {
+        for (let i = 0; i < lot.length; i++) {
+          const k = lot[i];
+          if (i > 0) await attendreVc(ecartAimesVc());
+          const pz = await pauseVc();
+          if (pz) { suivi.fin = 'arret'; suivi.raison = 'Vestiaire a demandé de ralentir'; break; }
+          { const rb = await secuRobotDit('vestiaire', ot.compte); if (rb) { suivi.fin = 'arret'; suivi.raison = rb.error; break; } }
+          const sg = await secuGeste('vestiaire', ot.compte, 'offre', 'serie');
+          if (sg) { suivi.fin = 'arret'; suivi.raison = sg.error || 'sécurité du compte'; break; }
+          const cpt = await compterAction('vc:' + ot.compte, ACTIONS_MAX_HEURE - RESERVE_GESTES);
+          if (!cpt.ok) { suivi.fin = 'arret'; suivi.raison = cpt.code === 'stockage' ? RAISON_STOCKAGE : `déjà ${ACTIONS_MAX_HEURE - RESERVE_GESTES} actions sur ce compte Vestiaire cette heure-ci`; break; }
+          const depuis = Number(cpt.at) || (Date.now() - 5);
+          // « Une fois » : posé AVANT l'envoi (un worker tué au milieu ne renverra pas).
+          try { const o = await chrome.storage.local.get(VC_AIMES_FAITS); faits = o[VC_AIMES_FAITS] || {}; faits[produit + '|' + k] = { at: new Date().toISOString(), cents: prix, etat: 'envoi' }; await chrome.storage.local.set({ [VC_AIMES_FAITS]: faits }); }
+          catch (_) { await rendreActions('vc:' + ot.compte, depuis, 1); suivi.fin = 'arret'; suivi.raison = RAISON_STOCKAGE; break; }
+          let rep = null;
+          try { rep = await avecDelai(chrome.tabs.sendMessage(ot.tabId, { from: 'vrm-fond', action: 'vcOffre', geste: 'favori', produit, acheteur: k, prixCents: prix, recette, compte: ot.compte }, { frameId: 0 }), 25000, null); } catch (_) { rep = null; }
+          const statut = (rep && Number(rep.statut)) || 0;
+          const noter = async (etat) => { try { const o = await chrome.storage.local.get(VC_AIMES_FAITS); faits = o[VC_AIMES_FAITS] || {}; if (etat) faits[produit + '|' + k] = { at: new Date().toISOString(), cents: prix, etat }; else delete faits[produit + '|' + k]; await chrome.storage.local.set({ [VC_AIMES_FAITS]: faits }); } catch (_) {} };
+          if (!rep || rep.ok !== true) { noterDiag('vc_aime_muet'); await noter('incertaine'); suivi.incertaines++; suivi.fin = 'arret'; suivi.raison = "l'onglet Vestiaire n'a pas répondu"; break; }
+          if (!statut) {
+            const e = String(rep.erreur || '');
+            if (e && e !== 'reseau') { await rendreActions('vc:' + ot.compte, depuis, 1); await noter(null); suivi.fin = 'arret'; suivi.raison = e === 'entetes' ? 'recharge une page Vestiaire, puis réessaie' : e === 'autre-compte' || e === 'compte-pas-su' ? "l'onglet Vestiaire n'est plus sur ce compte" : `rien n'est parti (${e})`; break; }
+            await noter('incertaine'); suivi.incertaines++; suivi.fin = 'arret'; suivi.raison = 'le réseau a coupé pendant un envoi'; break;
+          }
+          noterDiag('vc_aime_' + statut);
+          if (await secuObserver('vestiaire', ot.compte, { status: statut, defi: rep.defi === true, retryAfter: rep.ra || null }) === 'robot') { await poserPauseVc(statut || 403, rep.ra); await noter('refusee'); suivi.fin = 'arret'; suivi.raison = secuTexte(SECU_REFUS, 'robot', secuMots('vestiaire')); break; }
+          if (statut === 429 || statut === 403) { await poserPauseVc(statut, rep.ra); await noter('refusee'); suivi.fin = 'arret'; suivi.raison = `Vestiaire a refusé (${statut}) — pause de 30 min`; break; }
+          if (statut >= 200 && statut < 300 && rep.confirme === true) { await noter('faite'); suivi.faites++; await noterJournal('vc:' + ot.compte, 'favori', {}); }
+          else if (statut >= 200 && statut < 300) { await noter('incertaine'); suivi.incertaines++; }
+          else { await noter('refusee'); suivi.fin = 'arret'; suivi.raison = `Vestiaire a répondu ${statut}`; break; }
+          await publierAimesVc(aimes, faits, ot.compte, { envoi: Object.assign({}, suivi) });
+        }
+      } catch (_) { suivi.fin = 'arret'; suivi.raison = suivi.raison || 'interrompu'; }
+      finally {
+        if (!suivi.fin) suivi.fin = 'fini';
+        try { const o = await chrome.storage.local.get(VC_AIMES_FAITS); faits = o[VC_AIMES_FAITS] || faits; } catch (_) {}
+        await publierAimesVc(aimes, faits, ot.compte, { envoi: Object.assign({}, suivi) });
+        VC_REPONSE_EN_VOL = false;
+      }
+    })();
+    return { accepte: true, etape: 'encours', n: lot.length, reste: personnes.length - lot.length };
+  } finally { if (!lance) VC_REPONSE_EN_VOL = false; }
 }
 
 // ══════════════════════════════════════════════════════════════════════════
