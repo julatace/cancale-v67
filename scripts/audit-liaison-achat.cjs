@@ -223,6 +223,8 @@ function jeu() {
   dit(/<PropositionAchat p=\{lp\} art=\{art\}/.test(APPS) && /\(numA == null \|\| numA === ''\) && liaison/.test(APPS), 'S4 Achats : sous un achat sans article relié, l’article proposé');
   dit(/vendus=\{fileVendus\} liaison=\{liaison\} onRelierVente=\{relierAchatVente\}/.test(APPS) && /const w = await ecritureRelierAchat\(a\); if \(!w\) return;\s*const o = l\.o;/.test(APPS), 'S5 « Relier » une vente : l’écriture de « Relier un achat » (prix du reçu, lot demandé)');
   dit(/import \{ propositionsArticle \} from '\.\/liaisonAchat\.js';/.test(fs.readFileSync(path.join(SRC, 'achatsARelier.js'), 'utf8')), 'S6 la meilleure suggestion d’une annonce passe par la MÊME règle (une notion, une règle)');
+  const achatsJsx = fs.readFileSync(path.join(SRC, 'ecrans', 'Achats.jsx'), 'utf8');
+  dit(/const sugg = useMemo\(\(\) => \(Array\.isArray\(achats\) \? propositionsArticle\(\{ cible, achats, liens,/.test(achatsJsx), 'S7 la feuille « Relier un achat » propose par la MÊME règle');
 
   console.log('\n── V. 1 000 articles × 1 000 achats');
   const gros = []; const ga = [];
