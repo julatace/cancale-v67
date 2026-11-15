@@ -16,7 +16,7 @@ import { tr, nombre, monnaie, localeCourante } from '../i18n/index.js';   // (11
 import DansFiche, { useLigneIci } from '../DansFiche.jsx';
 import { ouvrirLigne, fermerLigne } from '../ficheLigne.js';   // (15 nov.) la fiche se referme après un geste de case : il voit la pile bouger
 import { ChiffreConseil } from '../Conseils.jsx';
-import { premiereCaseLibre as premiereCaseMeubles, caseEnMots } from '../ouRanger.js';
+import { casesProposees, caseEnMots } from '../ouRanger.js';
 import { attrCible } from '../cibleNotif.js';
 import { remettreCase, resteAuStock, etatCase } from '../stockSortie.js';
 import { annoncesActuelles, annoncesVcStock, classerRangees, partagerParEtat } from '../stockAnnonces.js';
@@ -257,15 +257,15 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     else { setQ(String(locate)); setCibles([]); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locate]);
-  // « Ranger au stock » : la PREMIÈRE CASE LIBRE est proposée (la règle de « Où ranger à l'arrivée »,
-  // src/ouRanger.js, jamais une seconde) — sélectionnée, défilée, éclairée ; toucher une case y range
+  // « Ranger au stock » : la case proposée à CET article (`caseProposeeDe`, src/ouRanger.js : une par article
+  // à ranger, jamais la même à deux) — sélectionnée, défilée, éclairée ; toucher une case y range
   // la paire (celle-ci ou une autre : c'est lui qui choisit).
   React.useEffect(() => {
     if (placeNum == null || !String(placeNum).trim()) return;
     const k = cleNum(placeNum);
     if (k) {
       setPlace(k); setQ('');
-      const libre = premiereCaseMeubles({ meubles, slots });
+      const libre = caseProposeeDe(k);
       if (libre) { viserCase(libre.meubleId, libre.i); toast(tr('stock.toucheCaseRanges', { placeNum: String(placeNum), caseEnMots: String(caseEnMots(libre)) })); }
       else toast(tr('stock.toucheCaseRanges2', { placeNum: String(placeNum) }));
     }
@@ -480,6 +480,17 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   const libelleRetour = (a) => { const t = Date.parse((a && a.date) || ''); const d = isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' }) : ''; return `${d ? `Retour du ${d}` : 'Retour'} — à vérifier et remettre en ligne`; };
   const aRanger = unParArticle(fiches.filter((f) => ((f.actuelle && f.etatAnnonce === 'enligne') || f.remise) && !f.doublure && correspondFiltre(f)).sort((a, b) => triNum(a.numero, b.numero)), { cle: cleNum, clePhoto: photoKey, estRangee: posee })
     .map((f) => ({ ...f, aussi: [...new Set([...((ficheParCle[cleNum(f.numero)] || {}).aussi || []), ...(f.aussi || [])])] }));
+  // (15 nov., Julien : « on range une ANNONCE, pas un achat ») UNE CASE PROPOSÉE PAR ARTICLE à ranger, dans l'ordre
+  // de la liste, jamais la même à deux (src/ouRanger.js, `casesProposees`). Un article hors de la liste (vendu, plus
+  // en ligne, filtré) reçoit la case qui suit toutes celles déjà proposées. `null` = pas su ou plus de case libre.
+  const clesARanger = aRanger.map(cleDeFiche).filter(Boolean).join('|');
+  const propositions = React.useMemo(() => casesProposees({ meubles, slots, cles: clesARanger ? clesARanger.split('|') : [] }), [meubles, slots, clesARanger]);
+  const caseProposeeDe = (cle) => {
+    const k = cleNum(cle); if (!k || !propositions) return null;
+    if (Object.prototype.hasOwnProperty.call(propositions, k)) return propositions[k];
+    const r = casesProposees({ meubles, slots, cles: [...(clesARanger ? clesARanger.split('|') : []), k] });
+    return r ? r[k] || null : null;
+  };
   const filtre = q.trim().toLowerCase();
   // Plusieurs mots : tous doivent y être (« nike 42 noir »). Un N° seul se juge
   // par IDENTITÉ (« 12 » ne montre pas la N°128) ; un mot cherche aussi le titre.
@@ -835,6 +846,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>{sold ? tr('stock.vaChercher') : tr('stock.rangeDans')}</div>
           <div style={{ fontSize: 20, fontWeight: 700, color: sold ? C.accent : C.text, marginTop: 4 }}>{m ? m.name : tr('stock.range')}</div>
           {m && (() => { const p = placeDansMeubles(s.i, m); return <div data-fiche-place="" style={{ fontSize: 15, fontWeight: 700, color: C.text, marginTop: 4 }}>{tr('stock.rangee2')} {p.rangee} <span style={{ color: C.muted, fontWeight: 400 }}>{tr('stock.partantHaut')}</span> {tr('stock.colonne2')} {p.colonne} <span style={{ color: C.muted, fontWeight: 400 }}>{tr('stock.depuisGauche')}</span></div>; })()}
+          {!m && !sold && (() => { const c = caseProposeeDe(modal.cle); return c ? <div data-fiche-case-proposee={c.meubleId + ':' + c.i} style={{ fontSize: 15, fontWeight: 700, color: C.text, marginTop: 6 }}>{tr('stock.caseProposee', { meuble: c.meuble, rangee: c.rangee, colonne: c.colonne })}</div> : null; })()}
           {!m && (() => { const a = ancienneplace(f.numero); return a ? <div data-fiche-ancienne-place="" style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.4 }}>{tr('stock.anciennePlaceDans')} <b style={{ color: C.text }}>{[a.roomName, a.itemName, a.nom].filter(Boolean).join(' · ')}</b></div> : null; })()}
         </div>
         {/* (15 nov.) Où elle est : une ligne par site (logo · compte · prix · depuis), par identité. */}
@@ -846,7 +858,10 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         <div style={{ display: 'flex', gap: 9 }}>
           {/* (1er nov.) Une paire PAS rangée : « Déplacer » et « Retirer de la case »
               ne voulaient rien dire. Le geste est de la ranger. */}
-          <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-ranger={m ? 'deplacer' : 'ranger'} onClick={() => { setPlace(modal.cle); fermerModal(); fermerLigne(); }} style={btnSec}>{m ? tr('stock.deplacer') : tr('stock.rangerDansCase')}</button>
+          {/* (15 nov.) Un article sans case : « Ranger ici » le pose dans SA case proposée (SON toucher) ; « Autre case »
+              garde le choix sur le plan. */}
+          {!m && !sold && caseProposeeDe(modal.cle) ? <button className="vrm-b vrm-b-primaire" type="button" data-fiche-ranger-ici={(() => { const c = caseProposeeDe(modal.cle); return c.meubleId + ':' + c.i; })()} onClick={() => { const c = caseProposeeDe(modal.cle); fermerModal(); fermerLigne(); if (c) poser(modal.cle, c.meubleId, c.i); }} style={{ ...btnPri, flex: 1 }}>{tr('stock.rangerIci')}</button> : null}
+          <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-ranger={m ? 'deplacer' : 'ranger'} onClick={() => { setPlace(modal.cle); fermerModal(); fermerLigne(); }} style={btnSec}>{m ? tr('stock.deplacer') : (!sold && caseProposeeDe(modal.cle) ? tr('stock.autreCase') : tr('stock.rangerDansCase'))}</button>
           {m && <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-retirer="" onClick={() => { const n = f.numero; retirerCase(modal.cle); fermerModal(); fermerLigne(); toast(tr('stock.retireeRepasseDans', { x: String(n), name: String(m.name) })); }} style={btnSec}>{tr('stock.retirerCase')}</button>}
         </div>
         {sold && <button className="vrm-b vrm-b-primaire" type="button" onClick={() => { sortir(f); fermerModal(); fermerLigne(); }} style={{ ...btnPri, width: '100%', marginTop: 9 }}>{tr('stock.jeAiSorti')}</button>}
@@ -1093,7 +1108,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
                   {a.cle ? <NotePaireCoque numero={a.numero} ajout rangee/> : null}
                 </span>
               </span>
-              {a.cle && f && <button className="vrm-ms-geste" type="button" data-stock-annonce-geste={ou ? 'voir' : 'ranger'} onClick={() => { if (ou) montrer(fOu); else { setPlace(a.cle); toast(tr('stock.toucheCaseRanges3', { numero: String(a.numero) })); } }}>{ou ? tr('stock.voir') : tr('stock.ranger2')}</button>}
+              {a.cle && f && <button className="vrm-ms-geste" type="button" data-stock-annonce-geste={ou ? 'voir' : 'ranger'} onClick={() => { if (ou) montrer(fOu); else { setPlace(a.cle); const c = caseProposeeDe(a.cle); if (c) { viserCase(c.meubleId, c.i); toast(tr('stock.toucheCaseRanges', { placeNum: String(a.numero), caseEnMots: String(caseEnMots(c)) })); } else toast(tr('stock.toucheCaseRanges3', { numero: String(a.numero) })); } }}>{ou ? tr('stock.voir') : tr('stock.ranger2')}</button>}
             </div>); })}
       </div>
       {articlesVus.length > maxListe && <button className="vrm-ms-plus" type="button" data-stock-liste-plus="" onClick={() => setMaxListe((x) => x + 60)}>{trj('stock.voirPlus', { maxListe: maxListe, articlesVusN: articlesVus.length })}</button>}
