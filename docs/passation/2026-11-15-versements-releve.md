@@ -117,7 +117,8 @@ qui datait par le relevé SANS comparaison).
 | `audit-releve.cjs` (section 3 réécrite : recette, plus d'adresse devinée) | 30 ✅ | — | — |
 | `audit-versement-sources`, `-releve`, `-rapide`, `dates-versement`, `bilan-semaine` (mis à la nouvelle règle) | ✅ | | |
 | `coherence`, `extension-zip`, `urssaf`, `identite`, `traduction`, `tdz`, `variables`, `fonctions-api`, `quoi-de-neuf`, `extension-navigateurs`, `paquets-boutiques` | ✅ | | |
-| bancs `dates-versement` (60 ✅, + variante « 4 accords » : non daté, dit), `badge` (144 ✅), `extension-visuel` (63 ✅), `veille`, `argent`, `studio-journee` | voir le rapport | | |
+| bancs `dates-versement` (60 ✅, + variante « 4 accords » : non daté, dit), `badge` (144 ✅), `extension-visuel` (63 ✅), `veille` (62 ✅), `argent` (268 ✅), `studio-journee` (vert) | ✅ | | |
+| balayage des 630 `audit-*.cjs` | 45 rouges, TOUS rouges aussi sur le code d'avant (`git archive a524255f`) ; `versement-sources` une fois rouge en balayage (horodatage), vert relancé | | |
 
 Captures regardées : carte « Déclarer » 390/1512 clair/sombre (« Environ 4 h avec vinted.fr ouvert
 sur ce compte »), variante 4 accords (ligne « dates du relevé pas encore vérifiées (4 sur 5 accords) »),
