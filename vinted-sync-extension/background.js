@@ -7250,7 +7250,10 @@ async function noterMoisListes(uid, hist) {
   try {
     if (!Array.isArray(hist)) return;
     const cur = (await chrome.storage.local.get(RELEVE_MOIS))[RELEVE_MOIS] || {};
-    cur[String(uid)] = { mois: moisListes(hist).slice(0, 120), at: Date.now() };
+    // L'UNION des listes vues : le relevé d'un mois passé peut porter un `history` vide,
+    // il n'efface pas ce que le relevé courant a listé.
+    const av = cur[String(uid)] && Array.isArray(cur[String(uid)].mois) ? cur[String(uid)].mois : [];
+    cur[String(uid)] = { mois: moisListes([...av.map((c) => ({ year: Number(String(c).slice(0, 4)), month: Number(String(c).slice(5, 7)) })), ...hist]).slice(0, 120), at: Date.now() };
     await chrome.storage.local.set({ [RELEVE_MOIS]: cur });
   } catch (_) {}
 }
