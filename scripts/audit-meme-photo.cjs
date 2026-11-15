@@ -193,6 +193,8 @@ function pixels(nom) {
       'R7 · Relier pose l’identité EXISTANTE de chaque site (vrm_lbc_liens = N°, vrm_ebay_liens = { pairId, numero }, relierVc)', rel.slice(0, 200));
     dit(/const lien = liens \? liens\[iid\] : null;\s*\n\s*if \(lien != null && String\(lien\)\.trim\(\)\) return cleNum\(lien\);/.test(corps('const numeroLbcIdentite = ', 600)) && /return x && x\.pairId \? x : null/.test(corps('const lienEbay = ', 300)) && /numerosVcAvecLiens\(vcCarte\('vrm_vc_numeros'\), vcCarte\('vrm_vc_liens'\)\)/.test(app),
       'R7 · ce sont les liens que lisent numeroLbcIdentite, lienEbay et numerosVcEffectifs (le retrait ailleurs)', '');
+    const aut = corps('async function annoncesAutresMemePhoto(', 2400);
+    dit(/comptesLbcSession\(/.test(aut) && /if \(!siens\.has\(idCompteLbcApp\(/.test(aut), 'R7 · Leboncoin : seulement SES annonces (compte connecté chez lui, ou lien posé) — `lbc_listings` garde aussi celles d’autres vendeurs', '');
     const ident = corps('function entryKeyByPhoto(', 4000) + corps('function jumellesParPhoto(', 4000);
     dit(ident && !/memePhoto|propositionsMemePhoto|distanceEmpreintes|photo_empreinte/.test(ident), 'R7 · entryKeyByPhoto / jumellesParPhoto ne lisent pas la photo perceptuelle (seul SON toucher relie)', '');
 

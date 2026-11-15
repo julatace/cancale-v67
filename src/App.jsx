@@ -25720,12 +25720,18 @@ async function annoncesAutresMemePhoto() {
   // Leboncoin
   try {
     const ls = await lbcListingsSession();
-    if (!ls || !ls.items) illisibles.push('Leboncoin');
+    // (15 nov., mesuré sur sa base) `lbc_listings` garde aussi des annonces d'AUTRES vendeurs vues en
+    // naviguant (49 sur 60 avec un compte) : seules SES annonces — un compte Leboncoin connecté chez lui
+    // (`lbc_accounts`, `sessionAt`) ou un lien qu'il a posé — entrent ici.
+    const ra = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=accounts:data->accounts`);
+    if (!ls || !ls.items || !Array.isArray(ra)) illisibles.push('Leboncoin');
     else {
       const liens = { ...(load('vrm_lbc_liens', {}) || {}) }, sans = load('vrm_lbc_pas_de_paire', {}) || {};
+      const siens = new Set([...comptesLbcSession((ra[0] && ra[0].accounts) || {})].map(idCompteLbcApp));
       for (const ad of Object.values(ls.items || {})) {
         if (!ad || ad.id == null || !annonceLbcEnVente(ad, new Set())) continue;
         const id = String(ad.id);
+        if (!siens.has(idCompteLbcApp(ad.account || ad.lbcUser || '')) && !(liens[id] != null && String(liens[id]).trim())) continue;
         const n = numeroLbcIdentite({ itemId: ad.id }, ls.items, liens);
         autres.push({ plateforme: 'Leboncoin', id, compte: idCompteLbcApp(ad.account || ad.lbcUser || ''), compteNom: ad.accountName || '', titre: ad.subject || ad.title || '',
           photo: (Array.isArray(ad.images) && typeof ad.images[0] === 'string' && ad.images[0]) || null, lien: lienAnnonceLeboncoin(ad) || null, relie: !!n || !!sans['ad:' + id], numero: n || '' });

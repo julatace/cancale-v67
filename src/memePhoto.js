@@ -7,7 +7,7 @@
 // la même photo ».
 //
 // • L'entrée : les EMPREINTES perceptuelles (src/photoEmpreinte.js : dHash + pHash à
-//   trois recadrages, seuil MESURÉ `SEUIL_PHOTO`) de ses annonces Vinted
+//   trois recadrages ; seuil de proposition MESURÉ `SEUIL_MEME_PHOTO`, plus strict) de ses annonces Vinted
 //   (`photo_emprunte_{uid}`, extension 5.358) et de ses annonces Leboncoin, eBay,
 //   Vestiaire (`photo_empreinte_{lbc|vc|ebay}`, extension 5.382 / page pour eBay).
 //   Jamais un titre, une marque, une taille ou un prix : seule la photo compte.
@@ -28,7 +28,15 @@
 // • Module PUR (aucun accès au navigateur, à la base, à l'extension) : l'app et
 //   `scripts/audit-meme-photo.cjs` exécutent les MÊMES fonctions (§11).
 // ══════════════════════════════════════════════════════════════════════════
-import { SEUIL_PHOTO, empreinteValide } from './photoEmpreinte.js';
+import { empreinteValide } from './photoEmpreinte.js';
+
+// LE SEUIL D'UNE PROPOSITION — plus STRICT que `SEUIL_PHOTO` (16), qui sert l'alerte « la même photo
+// sur deux comptes » (là, mieux vaut prévenir de trop). MESURÉ le 15 nov. (photos-comptes-seuil.cjs,
+// jeu inventé) : la même photo passée par un autre site (WebP 80/60, moitié + JPEG 60 + WebP 60,
+// vignette, JPEG 30, recadrée 6 %) ⇒ 11 au plus ; deux prises de vue DIFFÉRENTES du même modèle
+// (100 photos de la même paire) ⇒ 15 au moins — à 16, trois des « 50 paires identiques » étaient
+// proposées à tort. 12 : la photo réutilisée passe, une autre photo de la même paire jamais.
+export const SEUIL_MEME_PHOTO = 12;
 
 // Une photo vue sur PLUS de 6 annonces (la même paire en ligne partout : Vinted, un
 // second compte Vinted, Leboncoin, eBay, Vestiaire = 5 au plus) n'est pas une photo
@@ -92,7 +100,7 @@ export const cleAnnonceMemePhoto = (a) => `${a.plateforme}:${a.id}`;
 //                   photoVinted, distance } ;
 //   ambigu      = { id, annonce, raison: 'deux-paires'|'numero-double'|'sans-numero',
 //                   paires: [{ numero, vinted: [annonce…], photoAutre, photoVinted, distance }] }.
-export function propositionsMemePhoto({ vinted = [], autres = [], empreintes = null, refus = {}, numerosDouteux = null, cle = cleNumDefaut, seuil = SEUIL_PHOTO } = {}) {
+export function propositionsMemePhoto({ vinted = [], autres = [], empreintes = null, refus = {}, numerosDouteux = null, cle = cleNumDefaut, seuil = SEUIL_MEME_PHOTO } = {}) {
   const vide = { lu: false, propositions: [], ambigus: [], nGeneriques: 0, nSansEmpreinte: 0, nVerifiees: 0, nARelier: 0, parNumero: new Map() };
   const E = objet(empreintes);
   if (!E) return vide;

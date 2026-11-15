@@ -29,7 +29,7 @@ const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').slice(
 let SRC = fs.readFileSync(path.join(RACINE, 'src', 'photoEmpreinte.js'), 'utf8').replace(/^export /gm, '');
 // (15 nov., lot meme-photo) La règle des propositions, chargée dans la même page (son import retiré).
 let SRC_MEME = fs.existsSync(path.join(RACINE, 'src', 'memePhoto.js')) ? fs.readFileSync(path.join(RACINE, 'src', 'memePhoto.js'), 'utf8').replace(/^import [^\n]*\n/gm, '').replace(/^export /gm, '') : '';
-if (MUT === 'seuil') SRC_MEME = SRC_MEME.replace('seuil = SEUIL_PHOTO } = {}) {', 'seuil = 30 } = {}) {');
+if (MUT === 'seuil') SRC_MEME = SRC_MEME.replace('export const SEUIL_MEME_PHOTO = 12;', 'export const SEUIL_MEME_PHOTO = 16;').replace('const SEUIL_MEME_PHOTO = 12;', 'const SEUIL_MEME_PHOTO = 16;');
 if (MUT === 'sansrecadrage') SRC = SRC.replace('const RECADRAGES = [0, 0.04, 0.08];', 'const RECADRAGES = [0, 0, 0];');
 let ko = 0;
 const dit = (ok, nom, det) => { if (!ok) ko++; console.log(`${ok ? '✅' : '❌'} ${nom}${det ? ' — ' + det : ''}`); };
@@ -159,7 +159,9 @@ window.__cinquante = async () => {
     if (v < 50) { vinted.push({ id: String(9000 + v), compte: '1', numero: String(200 + v), titre: 'Jordan 1 Chicago 42', photo: 'v' + v }); ev[1][9000 + v] = { ['v' + v]: h }; }
     else { autres.push({ plateforme: 'Leboncoin', id: String(5000 + v), compte: 'c', titre: 'Jordan 1 Chicago 42', photo: 'l' + v, relie: false }); el[5000 + v] = { ['l' + v]: h }; }
   }
-  for (let i = 0; i < hs.length; i++) for (let j = i + 1; j < hs.length; j++) { const d = distanceEmpreintes(hs[i], hs[j]); if (d < dMin.d) { dMin.d = d; dMin.a = i; dMin.b = j; } }
+  const bas = {};
+  for (let i = 0; i < hs.length; i++) for (let j = i + 1; j < hs.length; j++) { const d = distanceEmpreintes(hs[i], hs[j]); if (d <= 20) bas[d] = (bas[d] || 0) + 1; if (d < dMin.d) { dMin.d = d; dMin.a = i; dMin.b = j; } }
+  dMin.bas = bas; dMin.seuil = SEUIL_MEME_PHOTO;
   const sans = propositionsMemePhoto({ vinted, autres, empreintes: { vinted: ev, Leboncoin: el } });
   const reprise = await empreinte(await webp(versCanvas(await jpeg(versCanvas(await jpeg(photo(p, vueDe(3, 17)), 0.92), 300, 400), 0.6), 300, 400), 0.6));
   const autres2 = autres.concat([{ plateforme: 'Leboncoin', id: '7777', compte: 'c', titre: 'Jordan 1 Chicago 42', photo: 'r', relie: false }]);
@@ -219,7 +221,9 @@ window.__mesure = async (nPaires, nVues) => {
     dit(cdn.every(([, d]) => d != null && d <= seuil), 'S5 · même photo en WebP, ou réduite 50 % + JPEG 60 + WebP 60, ou en vignette ⇒ proche (≤ seuil)', cdn.map((x) => x.join(' ')).join(', '));
     if (process.argv.includes('--sans-cinquante')) { /* banc d'avant le lot */ } else {
       const c = await page.evaluate(() => window.__cinquante());
-      console.log(`  50 paires identiques : distance minimale entre deux prises de vue différentes du même modèle ${c.dMin.d} (vues ${c.dMin.a}/${c.dMin.b})`);
+      console.log(`  50 paires identiques : distance minimale entre deux prises de vue différentes du même modèle ${c.dMin.d} (vues ${c.dMin.a}/${c.dMin.b}) ; ≤ 20 : ${JSON.stringify(c.dMin.bas)} ; seuil de proposition ${c.dMin.seuil}`);
+      const siteMax = Math.max(...['webp80', 'webp60', 'cdn', 'vignette', 'jpeg50', 'jpeg30', 'moitie'].map((k) => parNom[k]));
+      dit(siteMax <= c.dMin.seuil && c.dMin.d > c.dMin.seuil && maxMeme <= c.dMin.seuil, `S7 · seuil de proposition ${c.dMin.seuil} : la même photo (autre site ${siteMax}, toute transformation ${maxMeme}) dessous, deux prises de vue du même modèle (${c.dMin.d}) au-dessus`, '');
       dit(c.sans.p === 0 && c.sans.a === 0 && c.sans.v === 50, 'S6 · 50 paires IDENTIQUES photographiées différemment ⇒ AUCUNE proposition (ni ambiguë)', JSON.stringify(c.sans));
       dit(c.avec.p.length === 1 && c.avec.p[0][0] === '7777' && c.avec.p[0][1] === '217' && c.avec.a === 0, 'S6 · la seule annonce qui reprend la photo de N°217 (passée par un autre site) ⇒ N°217, et elle seule', JSON.stringify(c.avec));
     }

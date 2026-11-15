@@ -101,10 +101,14 @@ function scenario(F, o = {}) {
   const LIGNES = [
     { id: 'harvest_111_listings', data: { capturedAt: iso(1), uid: '111', payload: { items, pagination: { total_entries: items.length } } } },
     { id: 'photo_emprunte_111', data: { capturedAt: iso(1), payload: { annonces: Object.fromEntries(vinted.map(([id, p]) => [String(id), { [cleDe(uV(p))]: h(p) }])) } } },
-    { id: 'photo_empreinte_lbc', data: { capturedAt: iso(1), payload: { annonces: { 5001: { [cleDe(uL('P1cdn'))]: h('P1cdn') }, 5002: { [cleDe(uL('P1v3'))]: h('P1v3') }, 5003: { [cleDe(uL('P6'))]: h('P6') } } } } },
+    { id: 'photo_empreinte_lbc', data: { capturedAt: iso(1), payload: { annonces: { 5001: { [cleDe(uL('P1cdn'))]: h('P1cdn') }, 5002: { [cleDe(uL('P1v3'))]: h('P1v3') }, 5003: { [cleDe(uL('P6'))]: h('P6') }, 5009: { [cleDe(uL('P1cdn'))]: h('P1cdn') } } } } },
     { id: 'photo_empreinte_ebay', data: { capturedAt: iso(1), payload: { annonces: { 2001: { [cleDe(uE('P2vig'))]: h('P2vig') } } } } },
     { id: 'photo_empreinte_vc', data: { capturedAt: iso(1), payload: { annonces: { 'vc-9': { [cleDe(uC('P3cdn'))]: h('P3cdn') } } } } },
-    { id: 'lbc_listings', data: { items: lbc, lectures: { 'lbc-account:987': { at: iso(1), complet: true } } } },
+    { id: 'lbc_listings', data: { items: { ...lbc,
+      // L'annonce d'un AUTRE vendeur vue en naviguant (mesuré chez lui : 49 sur 60) — même photo que N°124 : jamais proposée.
+      5009: { id: 5009, account: 'lbc-account:inconnu', accountName: 'quelqu-un', subject: 'Basket blanche', status: 'active', images: [uL('P1cdn')], seenAt: iso(1) } },
+      lectures: { 'lbc-account:987': { at: iso(1), complet: true } } } },
+    { id: 'lbc_accounts', data: { accounts: { 987: { id: 'lbc-account:987', name: 'boutique-lbc', sessionAt: iso(1) } } } },
     { id: 'ebay_listings', data: { capturedAt: iso(1), complet: true, items: [{ itemId: '2001', title: 'Samba noire', photo: uE('P2vig'), sku: '', listingStatus: 'Active' }] } },
     { id: 'vc_listings', data: { capturedAt: iso(1), complet: true, items: { 'vc-9': { compte: 'vcmoi', titre: 'NB 550 verte', statut: 'En vente', photo: uC('P3cdn'), vuAt: iso(1) } }, liens: {} } },
   ];
@@ -247,7 +251,7 @@ const ecrit = (ecritures, re) => ecritures.some((e) => re.test(e.corps));
           dit(f.feuille, 'M2 la carte ouvre la feuille', f.etat);
           if (f.feuille) {
             dit(f.props.map((p) => p.id + '>' + p.numero).sort().join(' ') === 'Leboncoin:5001>124 eBay:2001>125', 'M2 deux propositions : Leboncoin 5001 ⇒ N°124, eBay 2001 ⇒ N°125', f.props.map((p) => p.id + '>' + p.numero).join(' '));
-            dit(!f.props.some((p) => /5002|5003/.test(p.id)) && !f.ambs.some((a) => /5002|5003/.test(a.id)), 'M2 une AUTRE photo de la même paire (5002) et une annonce déjà reliée (5003) : rien', '');
+            dit(!f.props.some((p) => /5002|5003|5009/.test(p.id)) && !f.ambs.some((a) => /5002|5003|5009/.test(a.id)), 'M2 une AUTRE photo de la même paire (5002), une annonce déjà reliée (5003), l’annonce d’un autre vendeur (5009) : rien', '');
             dit(f.ambs.length === 1 && f.ambs[0].id === 'Vestiaire:vc-9' && f.ambs[0].choix.sort().join(' ') === 'Vestiaire:vc-9|300 Vestiaire:vc-9|301', 'M2 Vestiaire vc-9 AMBIGU : N°300 et N°301 montrés, il choisit', JSON.stringify(f.ambs));
             dit(f.props.every((p) => p.chargees && p.coteACote && p.hPhoto >= 120), 'M2 les deux photos CHARGÉES, côte à côte, grandes (≥ 120 px)', JSON.stringify(f.props.map((p) => [p.chargees, p.coteACote, p.hPhoto])));
             dit(f.props.every((p) => p.hRelier >= 44 && p.hNon >= 44) && f.ambs.every((a) => a.hChoix >= 44), 'M2 chaque geste ≥ 44 px', JSON.stringify(f.props.map((p) => [p.hRelier, p.hNon])));
