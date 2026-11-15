@@ -167,19 +167,26 @@ const shot = async (pg, nom, plein = false) => { if (SHOTS) await pg.screenshot(
 const ATTENDU_PRESSES = ['9304', '9305'];   // limite LUE demain 12 h ; estimée demain (vente il y a 6 j). 9303 : estimée DÉPASSÉE ⇒ hors compte.
 // Le contraste AA d'un texte : sa couleur contre le premier fond opaque de ses ancêtres, sinon contre le pire
 // point du dégradé de l'espace (le plus sombre en clair, le plus clair en nuit).
+// (15 nov., Ventes « Verre dépoli ») Le fond réel est le BLEU du verre (--sv-haut / --sv-bas), plus le bleu clair du
+// studio : le pire des deux bouts du dégradé (recopié de ventes-verre.cjs).
 const contrastes = (pg, sels, sombre) => pg.evaluate(({ sels, sombre }) => {
   const rgb = (s) => { const m = /rgba?\(([^)]+)\)/.exec(s || ''); if (!m) return null; const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return { r: p[0], g: p[1], b: p[2], a: p[3] == null ? 1 : p[3] }; };
   const lum = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); };
   const melange = (h, b) => ({ r: h.r * h.a + b.r * (1 - h.a), g: h.g * h.a + b.g * (1 - h.a), b: h.b * h.a + b.b * (1 - h.a), a: 1 });
-  const pire = sombre ? { r: 0x15, g: 0x26, b: 0x3D, a: 1 } : { r: 0xC6, g: 0xDD, b: 0xF0, a: 1 };
-  const fondDe = (el) => { const pile = []; for (let e = el; e && e !== document.documentElement; e = e.parentElement) { const c = rgb(getComputedStyle(e).backgroundColor); if (c && c.a > 0) { pile.push(c); if (c.a >= 0.99) break; } } let f = pile.length && pile[pile.length - 1].a >= 0.99 ? pile.pop() : pire; while (pile.length) f = melange(pile.pop(), f); return f; };
+  const css = getComputedStyle(document.documentElement);
+  const hex = (v) => { const m = /#([0-9a-f]{6})/i.exec(v || ''); if (!m) return null; const n = parseInt(m[1], 16); return { r: n >> 16, g: (n >> 8) & 255, b: n & 255, a: 1 }; };
+  // le pire point du fond : le haut (clair) pour un texte clair, le bas (sombre) pour un texte sombre posé sur du verre
+  const haut = hex(css.getPropertyValue('--sv-haut')) || { r: 0x25, g: 0x63, b: 0xA8, a: 1 }, bas = hex(css.getPropertyValue('--sv-bas')) || { r: 0x0E, g: 0x2C, b: 0x52, a: 1 };
   const out = [];
   for (const sel of sels) for (const el of document.querySelectorAll(sel)) {
     if (!el.offsetParent || !(el.textContent || '').trim()) continue;
     const c = rgb(getComputedStyle(el).color); if (!c) continue;
-    const f = fondDe(el); const t = melange(c, f);
-    const L1 = lum(t), L2 = lum(f); const r = (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05);
-    out.push({ sel, t: (el.textContent || '').trim().slice(0, 24), r: Math.round(r * 100) / 100 });
+    const pile = []; for (let e = el; e && e !== document.documentElement; e = e.parentElement) { const k = rgb(getComputedStyle(e).backgroundColor); if (k && k.a > 0) { pile.push(k); if (k.a >= 0.99) break; } }
+    const clair = lum(c) > 0.5;
+    const fonds = pile.length && pile[pile.length - 1].a >= 0.99 ? [pile.pop()] : [haut, bas];
+    let pireR = 99;
+    for (const f0 of fonds) { let f = f0; for (const k of [...pile].reverse()) f = melange(k, f); const t = melange(c, f); const L1 = lum(t), L2 = lum(f); pireR = Math.min(pireR, (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05)); }
+    out.push({ sel, t: (el.textContent || '').trim().slice(0, 24), r: Math.round(pireR * 100) / 100, clair });
   }
   return out;
 }, { sels, sombre });
@@ -208,16 +215,20 @@ async function scenario(b, vp, sombre) {
       return { n: ch.getAttribute('data-sb-chiffre'), affiche: (t.querySelector('.sb-chiffre-affiche') || {}).textContent || '', presses: pr ? pr.getAttribute('data-sb-presses') : '0', pub: pub && pub.total, haut: Math.round(q.top), fs: parseFloat(getComputedStyle(t.querySelector('.sb-chiffre-affiche')).fontSize) }; });
     dit(!!tete && tete.n === '5' && tete.affiche === '5' && String(tete.pub) === '5', `${nom} : C le grand chiffre = la publication « à envoyer » (5)`, JSON.stringify(tete));
     dit(!!tete && tete.presses === String(ATTENDU_PRESSES.length), `${nom} : C « avant demain » = les limites d'aujourd'hui/demain, jamais une estimée dépassée`, tete ? tete.presses : '');
-    dit(!!tete && tete.fs >= 80, `${nom} : C le chiffre est une affiche (≥ 80 px)`, tete ? String(tete.fs) : '');
+    // (15 nov., maquette validée « Verre dépoli ») le chiffre posé sur le fond : 56 px (maquette), une affiche ≥ 48.
+    dit(!!tete && tete.fs >= 48, `${nom} : C le chiffre est une affiche (≥ 48 px)`, tete ? String(tete.fs) : '');
     // ── P : UN SEUL BOUTON PLEIN à l'écran, et c'est « Imprimer N » (la fonction d'avant : la feuille « Tout imprimer »).
     const pleins = await pg.evaluate(() => [...document.querySelectorAll('.sb-btn-plein, .vrm-b-primaire, [data-variante="primaire"]')].filter((x) => x.offsetParent && x.getBoundingClientRect().width > 0 && !x.closest('[role="dialog"], .vrm-fs, .vrm-fp')).map((x) => ({ c: x.className.toString().slice(0, 40), k: x.getAttribute('data-colis-barre-btn') || '', n: x.getAttribute('data-imprimer-prets') || '' })));
     dit(pleins.length === 1 && pleins[0].k === 'imprimer' && pleins[0].n === '3', `${nom} : P un seul bouton plein, « Imprimer N » (N = les bordereaux qui partent)`, JSON.stringify(pleins));
     const forme = await pg.evaluate(() => { const p = document.querySelector('.sb-btn-plein'); if (!p) return null; const q = p.getBoundingClientRect(); return { w: Math.round(q.width), h: Math.round(q.height), r: getComputedStyle(p).borderTopLeftRadius }; });
-    dit(!!forme && forme.w === forme.h && forme.w >= 72 && forme.r === '50%', `${nom} : P le plein est le rond d'encre (72, 80 sur ordinateur)`, JSON.stringify(forme));
+    // (15 nov., maquette validée « Verre dépoli ») le plein est une BARRE sous la liste (52 px), plus le rond d'encre du studio.
+    dit(!!forme && forme.h >= 48 && forme.w >= (tel ? 300 : 300), `${nom} : P le plein est la barre de la maquette (≥ 48 px de haut, large)`, JSON.stringify(forme));
     // ── R : AU PLUS DEUX RONDS en tête, chacun nommé (aria-label), 44 px.
     const ronds = await pg.evaluate(() => [...document.querySelectorAll('[data-sb-tete="ventes"] .sb-rond')].filter((x) => x.offsetParent).map((x) => ({ k: x.getAttribute('data-colis-barre-btn'), l: !!x.getAttribute('aria-label'), w: Math.round(x.getBoundingClientRect().width), h: Math.round(x.getBoundingClientRect().height) })));
     dit(ronds.length >= 1 && ronds.length <= 2 && ronds.every((r) => r.l && r.w === 44 && r.h === 44), `${nom} : R au plus deux ronds en tête, nommés, 44 px`, JSON.stringify(ronds));
     // ── T : LES TUILES-FILTRES — enfoncée + diode, la liste suit, une deuxième touche rend tout.
+    // (15 nov., « Verre dépoli ») les tuiles-filtres vivent derrière « … » (maquette : rien entre le chiffre et la liste).
+    await pg.click('[data-colis-barre-btn="outils"]').catch(() => {}); await pg.waitForTimeout(400);
     const tuiles = await pg.evaluate(() => [...document.querySelectorAll('[data-envoyer-filtres] [data-envoyer-filtre-choix]')].filter((x) => x.offsetParent).map((x) => ({ v: x.getAttribute('data-envoyer-filtre-choix'), n: x.getAttribute('data-envoyer-filtre-n'), p: x.getAttribute('aria-pressed'), h: Math.round(x.getBoundingClientRect().height) })));
     dit(tuiles.length >= 4 && tuiles[0].v === 'tous' && tuiles[0].p === 'true' && tuiles.some((t) => t.v === 'avant-demain' && t.n === '2'), `${nom} : T les tuiles (Tous posée, Avant demain · 2, transporteurs)`, JSON.stringify(tuiles));
     dit(tuiles.every((t) => t.h >= 44), `${nom} : T chaque tuile ≥ 44 px`, JSON.stringify(tuiles.map((t) => t.h)));
@@ -244,7 +255,8 @@ async function scenario(b, vp, sombre) {
       return { tx: c.getAttribute('data-tx-colis'), boutons, ech: e ? e.getAttribute('data-sb-echeance') : null, ambre: e ? e.classList.contains('is-ambre') : false, h: Math.round(q.height), droite: e ? Math.round(q.right - e.getBoundingClientRect().right) : null }; }));
     dit(lignes.length === 5 && lignes.every((l) => l.boutons === 0), `${nom} : L aucune rangée ne contient de bouton (la rangée entière s'ouvre)`, JSON.stringify(lignes.map((l) => l.tx + ':' + l.boutons)));
     dit(lignes.every((l) => l.ech != null) && lignes.filter((l) => l.ambre).map((l) => l.tx).sort().join() === ATTENDU_PRESSES.join() && (lignes.find((l) => l.tx === '9303') || {}).ech === 'estimee-depassee', `${nom} : L l'échéance à droite ; ambre = « avant demain » ; l'estimée dépassée dit « à vérifier »`, JSON.stringify(lignes.map((l) => `${l.tx}:${l.ech}${l.ambre ? '*' : ''}`)));
-    dit(lignes.every((l) => l.h <= (tel ? 96 : 80)), `${nom} : L rangées denses (≤ ${tel ? 96 : 80} px)`, JSON.stringify(lignes.map((l) => l.h)));
+    // (15 nov., maquette validée) quatre lignes par colis au téléphone (plaque · titre · échéance · place) : ≤ 112 px.
+    dit(lignes.every((l) => l.h <= (tel ? 112 : 80)), `${nom} : L rangées denses (≤ ${tel ? 112 : 80} px)`, JSON.stringify(lignes.map((l) => l.h)));
     // ── O : LA RANGÉE S'OUVRE au premier plan avec SES gestes : imprimer CE bordereau, marquer déposé, imprimé, suivre, masquer.
     await pg.evaluate(() => { const c = document.querySelector('[data-bord-card][data-tx-colis="9304"]'); if (c) c.scrollIntoView({ block: 'center' }); });
     await pg.locator('[data-bord-card][data-tx-colis="9304"] .vrm-colis-titre').click().catch(() => {});
@@ -261,6 +273,8 @@ async function scenario(b, vp, sombre) {
     // ── I : CHAQUE GESTE DE L'INVENTAIRE EST JOIGNABLE : Scanner, « … » (Emballer, Tout générer), Préparer mes colis,
     //       Je dépose, la tournée, Envoyés, À faire (téléphone), « Choisir » ⇒ la feuille « Tout imprimer » (rien imprimé avant son clic).
     const joint = {};
+    // (15 nov.) « … » ouvert : les outils et « À faire » (Préparer, Je dépose, la tournée) sont là.
+    if (!(await pg.evaluate(() => document.documentElement.hasAttribute('data-colis-outils')))) { await pg.click('[data-colis-barre-btn="outils"]').catch(() => {}); await pg.waitForTimeout(400); }
     joint.scanner = await visibles(pg, '[data-colis-barre-btn="scanner"]') > 0;
     joint.outils = await visibles(pg, '[data-colis-barre-btn="outils"]') > 0;
     joint.envoyes = await visibles(pg, '[data-colis-onglet-choix="envoyes"]') > 0;
