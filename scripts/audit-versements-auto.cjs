@@ -258,7 +258,7 @@ async function lancer(SRC) {
 // sur une copie de `src/` (la règle réaffaiblie ⇒ rouge).
 const MUTATIONS = [
   ['20 par visite → 10', 'const VERSEMENT_MAX_PAR_VISITE = 20;', 'const VERSEMENT_MAX_PAR_VISITE = 10;'],
-  ['budget horaire → 99', 'const VERSEMENT_MAX_HEURE = 20;', 'const VERSEMENT_MAX_HEURE = 99;'],
+  ['budget de lecture 20 → 40 (tous lecteurs)', 'const LECTURES_MAX_HEURE = 20;', 'const LECTURES_MAX_HEURE = 40;'],
   ['la plus ancienne d’abord', 'return (b[2] - a[2]) || (a[1] - b[1]);', 'return (a[2] - b[2]) || (a[1] - b[1]);'],
   ['réserve des autres ignorée', "const plafond = rattrapage ? LECTURES_MAX_HEURE - (await reserveAutresQueVersement(uid)) : LECTURES_MAX_HEURE;", 'const plafond = LECTURES_MAX_HEURE;'],
   ['garde du compte retirée', "const refus = await gardeLecture(uid, acc, 'argent', plafond);", 'const refus = null;'],
