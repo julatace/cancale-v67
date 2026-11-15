@@ -44,6 +44,9 @@
 // Module PUR (aucune lecture) : la feuille (src/PublierPartout.jsx), l'hôte de
 // l'app et scripts/audit-publier-partout.cjs exécutent CES fonctions.
 import { apercuEnvoi, manquesEnvoi, refVrm } from './publierAilleurs.js';
+// (15 nov.) LES CORRESPONDANCES ENTRE SITES : catégorie, univers, type, taille, état,
+// couleur, marque — par la catégorie Vinted (`catalog_id`), table vérifiée + SES réponses.
+import { ficheSite, criteresPourLbc } from './correspondances.js';
 
 const str = (v) => String(v == null ? '' : v).trim();
 const arr = (a) => (Array.isArray(a) ? a : []);
@@ -208,6 +211,14 @@ export function categorieLbcDeSous(sous) {
 export function autoChamp(site, champ, paire, r = {}) {
   const p = paire || {};
   if (site === 'leboncoin') {
+    // (15 nov.) La correspondance vérifiée (table par catégorie Vinted, ou SA réponse) passe avant le titre.
+    const cv = r.corrLbc && r.corrLbc.valeurs ? r.corrLbc.valeurs : null;
+    if (cv) {
+      if (champ === 'sousCategorie' && cv.sousNom && categorieLbcDeSous(cv.sousNom)) return cv.sousNom;
+      if (champ === 'categorie' && cv.sousNom && categorieLbcDeSous(cv.sousNom)) return categorieLbcDeSous(cv.sousNom);
+      if ((champ === 'taille' || champ === 'couleur' || champ === 'marque') && cv[champ]) return cv[champ];
+    }
+    if (r.corrLbc && (champ === 'sousCategorie' || champ === 'categorie')) return null;   // pas sûre ⇒ demandée, jamais d'après le titre
     if (champ === 'sousCategorie' || champ === 'categorie') {
       let sous = '';
       try { sous = typeof r.categorieLbc === 'function' ? str(r.categorieLbc(p.title, p.desc, p.taille, p.marque)) : ''; } catch (_) { sous = ''; }
@@ -327,12 +338,15 @@ export function lignePartout(paire, ctx = {}) {
     const prixAnnonce = PRIX_REGLABLE[site] && Number.isFinite(pa) && pa > 0 ? cents(pa) : null;
     const prix = prixAnnonce != null && prixSource != null ? prixAnnonce : prixPourSite(prixSource, reg[site]);
     const ap = apercuEnvoi(site, { ...p, prix }, ctx.regles || {});
+    // (15 nov.) La correspondance de CE site (catégorie Vinted → ses catégories et critères).
+    const corr = ficheSite(site, p, ctx.memoire, s.corr && s.corr[site]);
     // Les paramètres du site : CETTE annonce, sinon le défaut, sinon ce que la voie pose.
     const annSite = { ...((s.params && s.params[site]) || {}) };
     if (site === 'leboncoin' && !annSite.etat && str(s.etatLbc)) annSite.etat = str(s.etatLbc);   // la demande d'état d'avant
-    const champs = champsSite(site, p, { defaut: defParams, annonce: annSite, regles: ctx.regles || {} });
+    const champs = champsSite(site, p, { defaut: defParams, annonce: annSite, regles: site === 'leboncoin' ? { ...(ctx.regles || {}), corrLbc: corr } : (ctx.regles || {}) });
     const vocab = vocabulaire(site, p, { ...s, etatLbc: annSite.etat || s.etatLbc }, ctx.regles || {});
-    if (site === 'leboncoin') { const sc = champs.find((c) => c.champ === 'sousCategorie'); if (sc && sc.valeur) vocab.categorie = sc.valeur; }
+    if (site === 'leboncoin') { const sc = champs.find((c) => c.champ === 'sousCategorie'); if (sc && sc.valeur) vocab.categorie = sc.valeur; else vocab.categorie = null; }
+    if (site === 'leboncoin' && corr.valeurs.etat && !str(annSite.etat)) { vocab.etat = corr.valeurs.etat; vocab.etatDemande = false; }
     // Les manques de la vérification de l'app (la même que celle des moteurs).
     let manques = manquesEnvoi(site, ap, { achat: ctx.achat == null ? null : ctx.achat, famille: ctx.famille || '', mpLbc: ctx.mpLbc !== false, horsVinted: p.chezMoi === true, facultatifs: ctx.facultatifs === true });
     // « Prix pas lu » se DEMANDE ici : le geste de la feuille, pas « ouvre Vinted ».
@@ -348,21 +362,54 @@ export function lignePartout(paire, ctx = {}) {
       if (c.effet === 'bloque') manques.push({ code: 'hors-voie-' + c.champ, texte: `${nom} « ${c.valeur} » ne partirait pas`, geste: c.champ === 'lieu' ? 'Ton extension pose la ville de tes Réglages : change-la là, ou remets « auto »' : 'Ton extension pose encore celle de Vinted : remets « auto » ou change-la sur Leboncoin après', bloque: true });
       else if (c.effet === 'perdu') manques.push({ code: 'perdu-' + c.champ, texte: `${nom} : ne partira pas`, geste: 'Ton extension ne sait pas encore le poser : règle-le sur Leboncoin après', bloque: false });
     }
-    const finir = aFinirSurSite(champs);
+    let finir = aFinirSurSite(champs);
+    // ── (15 nov.) CE QUE LA CORRESPONDANCE DEMANDE, SITE PAR SITE ──
+    const NOM_C = { sous: 'Catégorie', univers: 'Univers', type: 'Type', taille: site === 'leboncoin' && corr.valeurs.sousNom && /chaussure/i.test(corr.valeurs.sousNom) ? 'Pointure' : 'Taille', couleur: 'Couleur', marque: 'Marque', categorie: 'Catégorie' };
+    const corrDemandes = [];
+    if (site === 'leboncoin') {
+      for (const d of corr.demandes) {
+        if (d.champ === 'etat') continue;                                    // l'état a sa demande d'avant (etat-lbc)
+        corrDemandes.push('corr:' + d.champ);
+        manques.push(d.bloque
+          ? { code: 'corr-' + d.champ, texte: `${NOM_C[d.champ] || d.champ} Leboncoin à choisir`, geste: corr.catalogId ? 'Choisis-la ci-dessous, dans la liste de Leboncoin : VRM la retient pour cette catégorie Vinted' : 'La catégorie Vinted de cette annonce n’est pas lue : choisis ci-dessous', bloque: true }
+          : { code: 'corr-' + d.champ, texte: `${NOM_C[d.champ] || d.champ} : pas de correspondance sûre`, geste: 'Choisis ci-dessous, sinon elle se choisit sur Leboncoin pendant le dépôt', bloque: false });
+      }
+      // Une extension qui ne reçoit pas la catégorie et les critères laisserait Leboncoin les DEVINER
+      // (sa prédiction d'après photo et titre) : rien ne part tant qu'elle n'est pas à jour.
+      if (!ctx.lbcCriteres && (corr.valeurs.univers || corr.valeurs.type || (corr.valeurs.sousNom && str(ctx.categorieVoie) !== corr.valeurs.sousNom))) {
+        manques.push({ code: 'corr-extension', texte: 'Ton extension ne pose pas encore la catégorie et ses critères', geste: 'Mets-la à jour (Paramètres → Extension) : sinon Leboncoin les devinerait', bloque: true });
+      }
+    } else if (site === 'vestiaire') {
+      if (!corr.hors) {
+        for (const d of corr.demandes) corrDemandes.push('corr:' + d.champ);
+        // Une catégorie que la voie ne retrouve pas seule (réponse, mémoire, ou table hors de sa règle) : à choisir là-bas.
+        const aFaire = [];
+        if (!corr.posee) for (const k of ['univers', 'categorie', 'sous']) if (corr.valeurs[k]) aFaire.push(`${k === 'sous' ? 'Sous-catégorie' : NOM_C[k]} « ${corr.valeurs[k]} »`);
+        for (const d of corr.demandes) aFaire.push(d.champ === 'sous' ? 'Sous-catégorie' : (NOM_C[d.champ] || d.champ));
+        finir = [...new Set([...finir.filter((x) => !/^(Catégorie|Univers)$/.test(x)), ...aFaire])];
+      }
+    } else if (site === 'ebay') {
+      if (!corr.valeurs.categorie) {
+        corrDemandes.push('corr:categorie');
+        manques.push({ code: 'corr-categorie', texte: 'Catégorie eBay à choisir', geste: 'Choisis-la ci-dessous parmi celles qu’eBay propose (sinon le brouillon l’attendra)', bloque: false });
+      }
+    }
     const demandes = [];
     if (prixSource == null) demandes.push('prix');
     if (vocab && vocab.etatDemande) demandes.push('etat-lbc');
     for (const c of champs) if (c.demande && !(site === 'leboncoin' && c.champ === 'etat')) demandes.push('champ:' + c.champ);
+    demandes.push(...corrDemandes);
     const extRaison = str(ctx.ext && ctx.ext[site]);
     const vu = ctx.enLigne ? ctx.enLigne[site] : null;
     const deja = vu === true ? true : vu === false ? false : null;
     let raison = '';
     if (!ap || !ap.num) raison = 'pas-de-numero';
+    else if (site === 'vestiaire' && corr.hors) raison = 'hors';
     else if (deja === true) raison = 'deja';
     else if (extRaison) raison = 'ext';
     else if (manques.some((m) => m.bloque)) raison = 'manque';
     const cochable = !raison;
-    return { site, apercu: ap, vocab, champs, finir, prixAnnonce, manques, demandes, deja, cochable, cocheDefaut: cochable && deja === false, raison, extRaison };
+    return { site, apercu: ap, vocab, champs, finir, corr, prixAnnonce, manques, demandes, deja, cochable, cocheDefaut: cochable && deja === false, raison, extRaison };
   });
   return { id: str(p.id), num: str(p.num), ref: refVrm(p.num), titre: str(p.title), cover: p.cover || null, prixSource, sites };
 }
@@ -379,7 +426,8 @@ export function planPartout(lignes, coches) {
       const x = arr(l && l.sites).find((y) => y.site === site);
       if (!x || !x.cochable || !c.has(cleCase(l.id, site))) continue;
       if (!x.apercu || !x.apercu.num || !x.apercu.ref) continue;   // aucune identité ⇒ rien ne part
-      out.push({ cle: cleCase(l.id, site), id: l.id, num: l.num, titre: l.titre, site, apercu: x.apercu, vocab: x.vocab, champs: arr(x.champs), finir: arr(x.finir) });
+      out.push({ cle: cleCase(l.id, site), id: l.id, num: l.num, titre: l.titre, site, apercu: x.apercu, vocab: x.vocab, champs: arr(x.champs), finir: arr(x.finir), corr: x.corr || null,
+        ...(site === 'leboncoin' && x.corr ? { lbc: criteresPourLbc(x.corr) } : {}) });
     }
   }
   return out;
