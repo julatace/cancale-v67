@@ -135,14 +135,17 @@ async function enTete(nav, { W, theme }) {
   if (W >= 600) dit(nv.n >= 10 && !nv.doublons.length, 'H4', `${T} colonne : une icône par entrée (${nv.n} entrées)`, nv.doublons.join(' ¦ '));
   dit(!(nv.badges.ventes && nv.badges.cat_bord), 'H4', `${T} le même colis ne porte pas deux badges (Ventes ET Colis)`, JSON.stringify(nv.badges));
   if (W < 600) {
-    await pg.locator('.vrm-tab', { hasText: 'Plus' }).first().click().catch(() => {}); await attendre(800);
+    // (15 nov., rouges-connus) La barre du bas « Studio » (14 nov., docs/design/studio-bleu-clair.md : 4 espaces + le disque
+    // « + », `1fr 1fr 72px 1fr 1fr`) n'a plus d'onglet « Plus » : sans lui, la règle se juge sur les entrées de la barre.
+    const aPlus = await pg.locator('.vrm-tab', { hasText: 'Plus' }).count().catch(() => 0);
+    if (aPlus) { await pg.locator('.vrm-tab', { hasText: 'Plus' }).first().click().catch(() => {}); await attendre(800); }
     const pl = await pg.evaluate(() => {
       const tuiles = [...document.querySelectorAll('[data-nav-entree]')].filter((b) => b.getClientRects().length);
       const vu = {}; const d = [];
       for (const b of tuiles) { const sv = b.querySelector('svg, [data-nav-logo]'); const k = sv ? (sv.getAttribute('data-nav-logo') || sv.innerHTML.replace(/\s+/g, '')) : ''; const n = b.innerText.trim(); if (!k) continue; if (vu[k] && vu[k] !== n) d.push(vu[k] + ' = ' + n); else vu[k] = n; }
       return { n: tuiles.length, d };
     });
-    dit(pl.n >= 6 && !pl.d.length, 'H4', `${T} « Plus » : une icône par écran (${pl.n} tuiles)`, pl.d.join(' ¦ '));
+    dit(pl.n >= (aPlus ? 6 : 4) && !pl.d.length, 'H4', `${T} ${aPlus ? '« Plus »' : 'barre du bas (sans « Plus »)'} : une icône par écran (${pl.n} entrées)`, pl.d.join(' ¦ '));
     await capture(pg, `ch-plus-${W}-${theme}`);
     await pg.keyboard.press('Escape'); await attendre(300);
   }

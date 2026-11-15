@@ -86,7 +86,9 @@ const RETIRER = { total: 0, prets: 0, sansCode: 0, aVerifier: 2, urgents: 0, enV
 const ADATER = 5;
 // Attendu À LA MAIN : 1+2+2+1+3+1+1+1+1+4 + 1 compte à relire + 5 à dater = 23.
 const TOTAL_MAIN = 23;
-const PUBLIEES = JSON.parse((/export const CLES_PUBLIEES = (\[[^\]]*\])/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'fileEnvoi.js'), 'utf8')) || [, '[]'])[1].replace(/'/g, '"'));
+// (15 nov., rouges-connus) La liste porte maintenant un commentaire (11 nov., `vrm_prix_lus`) : elle se lit comme du JS
+// (vm), comme l'app la lit — plus en JSON brut (le banc plantait au chargement, sans rien juger).
+const PUBLIEES = require('vm').runInNewContext('(' + ((/export const CLES_PUBLIEES = (\[[^\]]*\])/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'fileEnvoi.js'), 'utf8')) || [, '[]'])[1]) + ')', {});
 // (10 nov., cartes) L'ordre affiché : par TYPE (Numéros, Colis, Paires, Comptes, Compta), le
 // rouge « deux paires sous un N° » toujours en tête.
 const ORDRE = ['numeros-double', 'numeros-a-ecrire', 'numeros-a-verifier', 'colis-postes', 'colis-retirer', 'sms-vestiaire', 'sms-pickup', 'supprimes-vinted', 'remise-en-ligne', 'achats-sans-prix', 'comptes-a-relire', 'ventes-a-dater'];

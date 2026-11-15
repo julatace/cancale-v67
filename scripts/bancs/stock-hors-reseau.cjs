@@ -173,7 +173,7 @@ const vue = (pg) => pg.evaluate(() => {
     const k = el.getAttribute('data-stock-hl-num') || el.getAttribute('data-stock-annonce');
     const place = el.getAttribute('data-stock-hl-place') || el.getAttribute('data-stock-annonce-place') || '';
     const img = el.querySelector('img');
-    parNum[k] = { place, photo: !!(img && img.complete && img.naturalWidth > 0), texte: (el.innerText || '').replace(/\s+/g, ' ').slice(0, 120) };
+    parNum[k] = { place, photo: !!(img && img.complete && img.naturalWidth > 0), texte: (el.innerText || el.textContent || '').replace(/\s+/g, ' ').slice(0, 160) };   // (15 nov.) textContent : une rangée hors de l'écran (content-visibility) rend un innerText vide
   }
   const etat = document.querySelector('[data-stock-hl-etat]');
   const corps = (document.querySelector('main') || document.body).innerText || '';
@@ -196,6 +196,10 @@ const famille = (rgb) => {
   let [r, g, b] = [m[1], m[2], m[3]].map((x) => Number(x) / 255);
   const mx = Math.max(r, g, b), mn = Math.min(r, g, b); let h = 0, s = 0; const l = (mx + mn) / 2;
   if (mx !== mn) { const d = mx - mn; s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn); if (mx === r) h = (g - b) / d + (g < b ? 6 : 0); else if (mx === g) h = (b - r) / d + 2; else h = (r - g) / d + 4; h *= 60; }
+  // (15 nov., rouges-connus) L'ENCRE du Studio bleu clair (14 nov., src/design/studio.css `--sb-encre` #0C1D30, nuit :
+  // son clair) est un bleu-nuit presque noir : c'est le texte courant, pas une couleur d'alerte. Une couleur très sombre
+  // ou très claire (l < 0,22 ou > 0,9) est neutre — l'ambre et le rouge restent jugés par leur teinte.
+  if (l < 0.22 || l > 0.9) return 'neutre';
   return s < 0.3 ? 'neutre' : (h >= 20 && h <= 50 ? 'ambre' : ((h >= 345 || h <= 12) ? 'rouge' : (h >= 195 && h <= 225 ? 'bleu' : 'autre')));
 };
 async function taper(pg, txt) { await pg.fill('[data-inv-champ]', txt); await pg.press('[data-inv-champ]', 'Enter'); await pg.waitForTimeout(300); }
