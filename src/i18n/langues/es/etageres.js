@@ -53,4 +53,8 @@ export default {
   "etag.total": {"one": "{n} casilla", "other": "{n} casillas"},
   "etag.descendus": {"one": "{liste} ha bajado una posición.", "other": "{liste} han bajado una posición."},
   "etag.descendusCrans": {"one": "{liste} ha bajado {crans} posiciones.", "other": "{liste} han bajado {crans} posiciones."},
+  "etag.site.enligne": "publicado",
+  "etag.site.aconfirmer": "por confirmar",
+  "etag.site.masquee": "oculto por Vinted",
+  "etag.site.depuis": "desde el {date}",
 };

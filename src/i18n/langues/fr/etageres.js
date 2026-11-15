@@ -53,4 +53,8 @@ export default {
   "etag.total": {"one": "{n} case", "other": "{n} cases"},
   "etag.descendus": {"one": "{liste} est descendu d'un cran.", "other": "{liste} sont descendus d'un cran."},
   "etag.descendusCrans": {"one": "{liste} est descendu de {crans} crans.", "other": "{liste} sont descendus de {crans} crans."},
+  "etag.site.enligne": "en ligne",
+  "etag.site.aconfirmer": "à confirmer",
+  "etag.site.masquee": "masquée par Vinted",
+  "etag.site.depuis": "depuis le {date}",
 };

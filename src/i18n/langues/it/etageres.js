@@ -53,4 +53,8 @@ export default {
   "etag.total": {"one": "{n} casella", "other": "{n} caselle"},
   "etag.descendus": {"one": "{liste} è sceso di uno.", "other": "{liste} sono scesi di uno."},
   "etag.descendusCrans": {"one": "{liste} è sceso di {crans}.", "other": "{liste} sono scesi di {crans}."},
+  "etag.site.enligne": "online",
+  "etag.site.aconfirmer": "da confermare",
+  "etag.site.masquee": "nascosto da Vinted",
+  "etag.site.depuis": "dal {date}",
 };

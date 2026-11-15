@@ -53,4 +53,8 @@ export default {
   "etag.total": {"one": "{n} Fach", "other": "{n} Fächer"},
   "etag.descendus": {"one": "{liste} ist eins nachgerutscht.", "other": "{liste} sind eins nachgerutscht."},
   "etag.descendusCrans": {"one": "{liste} ist {crans} nachgerutscht.", "other": "{liste} sind {crans} nachgerutscht."},
+  "etag.site.enligne": "online",
+  "etag.site.aconfirmer": "zu bestätigen",
+  "etag.site.masquee": "von Vinted verborgen",
+  "etag.site.depuis": "seit {date}",
 };

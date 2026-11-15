@@ -140,6 +140,21 @@
   .vrm-main:has(> .vrm-barre-haut) [data-stock-recherche] { top: 74px !important; }
   .vrm-main:has(> .vrm-barre-haut) [data-stock-place-barre] { top: 146px !important; }
 }
+/* (15 nov.) Les sites et le compte, sur la case : une plaque en haut à gauche (logos 14 px, pseudo 11 px tronqué),
+   la même matière que la plaque du N° (jetons du studio). */
+.vrm-etag-sites { position: absolute; left: 3px; top: 3px; z-index: 2; display: inline-flex; align-items: center; gap: 2px; max-width: calc(100% - 6px);
+  padding: 1px 4px 1px 3px; border-radius: 6px; background: color-mix(in srgb, var(--sb-porcelaine, #FFFFFF) 92%, transparent); color: var(--sb-encre, #0C1D30);
+  box-shadow: var(--sb-ombre-pose, 0 .5px 1px rgb(0 0 0 / .25)); pointer-events: none; }
+.vrm-etag-sites .vrm-etag-site { flex: none; }
+.vrm-etag-compte { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 600; line-height: 16px; margin-left: 2px; letter-spacing: -.01em; }
+.vrm-s2d-etagere[data-zoom="loin"] .vrm-etag-compte { font-size: 10.5px; }
+/* La fiche : une ligne par site. */
+.vrm-etag-fiche-sites { display: flex; flex-direction: column; gap: 2px; margin: 0 0 12px; }
+.vrm-etag-fiche-site { display: grid; grid-template-columns: 20px 1fr auto; align-items: center; gap: 4px 10px; min-height: 36px; padding: 2px 4px; color: var(--sb-encre, inherit); }
+.vrm-etag-fiche-site[data-etat]:not([data-etat="enligne"]) > svg { opacity: .45; }
+.vrm-etag-fs-nom { font-size: 15px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-etag-fs-compte { font-weight: 500; color: var(--sb-encre-2, inherit); }
+.vrm-etag-fs-meta { font-size: 13px; color: var(--sb-encre-2, inherit); text-align: right; font-variant-numeric: tabular-nums; }
 /* Le pied : l'action, et le lien discret, sur UNE ligne. */
 .vrm-etag-pied { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
 .vrm-etag-pied .sb-touche { min-height: 44px; padding: 0 18px; }

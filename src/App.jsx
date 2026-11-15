@@ -56277,7 +56277,8 @@ async function lireLbcEnVente() {
       if (!(ad.ref || ad.customRef || (liens[String(ad.id)] != null && String(liens[String(ad.id)]).trim()))) continue;   // pas une de ses annonces reliées
       const n = numeroLbcIdentite({ itemId: ad.id }, items, liens);
       const e = etatEnLigneLbc(ad, { enVente: (x) => annonceLbcEnVente(x, vendues), lectures: ls.lectures || {}, maintenant: Date.now() });
-      liste.push({ numero: n || '', title: ad.subject || ad.title || '', photo: (Array.isArray(ad.images) && typeof ad.images[0] === 'string' && ad.images[0]) || null, etat: e.etat === 'enligne' ? 'enligne' : 'aconfirmer', lu: Number.isFinite(e.lu) ? e.lu : null });
+      liste.push({ numero: n || '', title: ad.subject || ad.title || '', photo: (Array.isArray(ad.images) && typeof ad.images[0] === 'string' && ad.images[0]) || null, etat: e.etat === 'enligne' ? 'enligne' : 'aconfirmer',
+        compteLbc: idCompteLbcPur(ad.account || ad.lbcUser) || '', prix: ad.price, depuis: ad.first_publication_date || ad.index_date || null, lu: Number.isFinite(e.lu) ? e.lu : null });   // (15 nov., étagères) le compte par SON identité
     }
     return liste;
   } catch (_) { return null; }
@@ -56325,7 +56326,11 @@ async function lireEbayEnLigne() {
     const lu = await lireEbayTous('ebay_listings', SEL_EBAY_ANNONCES, 'items');
     if (!lu) return null;
     const nums = new Set(); const liste = [];
-    for (const x of lu.items) { const c = numEbayLu(x && x.sku, x && x.itemId, null, x && x.depuis); if (c) nums.add(cleNum(c)); liste.push({ numero: c || '', title: (x && x.title) || '', photo: (x && x.photo) || null }); }
+    // (15 nov., étagères) Le pseudo du compte (posé par `marquerEbay`), le prix, la date ; `frais` : la ligne de SON
+    // compte lue il y a moins de 24 h (<enligne-regle>, pour dire « en ligne » sur la case — rien d'autre ne change).
+    const luDe = new Map((lu.lignes || []).map(({ compte, ligne }) => [compte && compte.ref, ligne && ligne.capturedAt ? Date.parse(ligne.capturedAt) : NaN]));
+    for (const x of lu.items) { const c = numEbayLu(x && x.sku, x && x.itemId, null, x && x.depuis); if (c) nums.add(cleNum(c)); const t = luDe.get(x && x._compte);
+      liste.push({ numero: c || '', title: (x && x.title) || '', photo: (x && x.photo) || null, pseudo: (x && x._pseudo) || '', prix: x && (x.price != null ? x.price : x.prix), depuis: x && x.depuis, frais: Number.isFinite(t) && Date.now() - t >= 0 && Date.now() - t < 24 * 3600 * 1000 }); }
     // (11 nov., lot pas-en-ligne) La date de lecture de CHAQUE compte (`capturedAt` de sa ligne ;
     // ligne absente ⇒ jamais lu) : « pas en ligne » ne se prouve qu'avec des lectures fraîches. Le compte
     // « principal » IMPLICITE (aucun registre eBay) sans ligne n'est pas un compte : pas d'eBay chez lui.

@@ -7,10 +7,12 @@ import { unParArticle, planchesCases, planchesRangees } from '../stockRegles.js'
 // avec la sortie automatique, « Enlever du stock », « Vendu ailleurs » et « Où ranger » (src/stockEtageres.js).
 import { tasserApres, ordonner, deplacerMeuble, couleurCase, colonnesEnPile, typeDe, TYPES, TYPES_ORDRE, COULEURS, COLS_MAX, RANGEES_MAX, peindre, couleursDans } from '../stockEtageres.js';
 import { phraseDescentes, listeNumeros } from '../etageresTextes.js';
+import { annuaireLbc, nomPlateforme } from '../plateformes.js';
+import MarquePlateforme from '../plateformes/Marque.jsx';   // (15 nov.) les logos des sites où la paire est en ligne, sur sa case
 import '../styles-etageres.css';   // (15 nov.) formes, couleurs, piles — chargée avec l'écran, donc après le studio
 import { requeteDeLaVoix } from '../rechercheVocale.js';
 import React, { useState, useMemo, useEffect } from 'react';
-import { tr, nombre } from '../i18n/index.js';   // (11 nov., lot rangement-guide) ; (14 nov.) `nombre` : « 1 024 » dans la langue
+import { tr, nombre, monnaie, localeCourante } from '../i18n/index.js';   // (11 nov., lot rangement-guide) ; (14 nov.) `nombre` : « 1 024 » dans la langue
 import DansFiche, { useLigneIci } from '../DansFiche.jsx';
 import { ouvrirLigne, fermerLigne } from '../ficheLigne.js';   // (15 nov.) la fiche se referme après un geste de case : il voit la pile bouger
 import { ChiffreConseil } from '../Conseils.jsx';
@@ -169,16 +171,20 @@ async function lireVcStock() {
 export async function lireAnnoncesStock(accounts) {
   const horsCompte = comptesStockEcartes();
   const accs = (accounts || []).filter((a) => a && a.vinted_user_id != null && !horsCompte({ accountId: a.vinted_user_id }));
-  const [vinted, ebay, lbc, vc] = await Promise.all([
+  const [vinted, ebay, lbc, vc, annuaire] = await Promise.all([
     Promise.all(accs.map(async (acc) => {
       const uid = String(acc.vinted_user_id), nom = String(acc.login || acc.username || uid);
       let r; try { r = await fetchVintedListings(acc, 1, {}); } catch (_) { r = null; }
       if (!r || !r.ok) return { uid, nom, ok: false };
-      return { uid, nom, ok: true, lu: Number.isFinite(r.lu) ? r.lu : null, enLigne: r.items || [], aConfirmer: r.aConfirmer || [], masquees: r.masquees || [] };
+      // (15 nov., étagères) Le PSEUDO du compte, pour la case : le login lu chez Vinted, jamais l'identifiant.
+      return { uid, nom, pseudo: String(acc.login || acc.username || ''), ok: true, lu: Number.isFinite(r.lu) ? r.lu : null, enLigne: r.items || [], aConfirmer: r.aConfirmer || [], masquees: r.masquees || [] };
     })),
     lireEbayEnLigne(), lireLbcEnVente(), lireVcStock().catch(() => null),
+    // Les noms des comptes Leboncoin (`lbc_accounts`, projeté) : le pseudo d'une annonce par SON compte (§5).
+    lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=a:data->accounts`).then((r) => (Array.isArray(r) ? annuaireLbc((r[0] && r[0].a) || {}) : null)).catch(() => null),
   ]);
-  return { vinted, ebay, lbc, vc, at: Date.now() };
+  const lbcNoms = Array.isArray(lbc) ? lbc.map((a) => (a && typeof a === 'object' ? { ...a, pseudo: (annuaire && a.compteLbc && annuaire[a.compteLbc]) || '' } : a)) : lbc;
+  return { vinted, ebay, lbc: lbcNoms, vc, at: Date.now() };
 }
 const NOM_PLAT_FILTRE = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
 const depuisQuand = (ms) => { if (!Number.isFinite(ms)) return 'jamais lu'; const h = (Date.now() - ms) / 3600000; return h < 48 ? `lu il y a ${Math.max(1, Math.round(h))} h` : `lu il y a ${Math.round(h / 24)} j`; };
@@ -412,7 +418,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   for (const a of (aa ? aa.articles : [])) {
     if (!a.cle || vus.has(a.cle)) continue; vus.add(a.cle);
     const v = (fichesParCle[a.cle] || [])[0];
-    const fa = { id: a.ids[0], numero: a.numero, title: a.titre, photo: a.photo || (v && v.photo) || null, plateformes: a.plateformes, comptes: a.comptes, aussi: a.aussi, etatAnnonce: a.etat, actuelle: true };
+    const fa = { id: a.ids[0], numero: a.numero, title: a.titre, photo: a.photo || (v && v.photo) || null, plateformes: a.plateformes, comptes: a.comptes, aussi: a.aussi, etatAnnonce: a.etat, actuelle: true, sites: Array.isArray(a.sites) ? a.sites : [] };
     fiches.push(fa);
     // Son autre N° (même photo) : la même paire, montrée sous CE numéro s'il est dans une case.
     for (const n of (a.aussi || [])) { const kn = cleNum(n); if (kn && !vus.has(kn)) { vus.add(kn); if (slots[kn]) fiches.push({ ...fa, id: fa.id + ':' + kn, numero: n, aussi: [a.numero], doublure: true }); } }
@@ -626,6 +632,37 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     </>
   );
 
+  // (15 nov., Julien : « avec les numéros, mets les plateformes sur lesquelles la paire est et le compte ») Sur la case,
+  // à côté de la plaque : les logos des sites où CETTE paire est (par identité : `sites` de `annoncesActuelles`), le site
+  // « en ligne » plein, « à confirmer » / « masquée par Vinted » estompé ; puis le pseudo du compte (lu chez le site),
+  // rien s'il est inconnu (jamais un identifiant). Plusieurs comptes : le premier et « +N ».
+  const bandeSites = (f) => {
+    const l = Array.isArray(f && f.sites) ? f.sites : [];
+    if (!l.length) return null;
+    const plats = []; for (const x of l) if (!plats.some((p) => p.plat === x.plat)) plats.push(x);
+    const pseudos = [...new Set(l.filter((x) => x.pseudo).sort((a, b) => (a.etat === 'enligne' ? 0 : 1) - (b.etat === 'enligne' ? 0 : 1)).map((x) => x.pseudo))];
+    return (
+      <span className="vrm-etag-sites" data-case-sites={plats.map((x) => x.plat + ':' + x.etat).join(',')} data-case-compte={pseudos[0] || undefined} aria-hidden="true">
+        {plats.map((x) => <MarquePlateforme key={x.plat} site={x.plat} taille={14} carre className="vrm-etag-site" style={x.etat === 'enligne' ? undefined : { opacity: .45 }} />)}
+        {pseudos.length ? <span className="vrm-etag-compte">{pseudos[0]}{pseudos.length > 1 ? ` +${pseudos.length - 1}` : ''}</span> : null}
+      </span>);
+  };
+  // La même chose, en clair, pour l'aide vocale de la case et la fiche : une ligne par site (logo · compte · prix · depuis).
+  const sitesEnMots = (f) => (Array.isArray(f && f.sites) ? f.sites : []).map((x) => [nomPlateforme(x.plat), x.pseudo, x.etat === 'enligne' ? '' : tr('etag.site.' + x.etat)].filter(Boolean).join(' ')).join(' · ');
+  const dateCourte = (t) => { try { return new Date(t).toLocaleDateString(localeCourante(), { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' }); } catch (_) { return ''; } };
+  const ligneSites = (f) => {
+    const l = Array.isArray(f && f.sites) ? f.sites : [];
+    if (!l.length) return null;
+    return (
+      <div className="vrm-etag-fiche-sites" data-fiche-sites={l.map((x) => x.plat).join(',')}>
+        {l.map((x, k) => (
+          <div key={x.plat + k} className="vrm-etag-fiche-site" data-fiche-site={x.plat} data-etat={x.etat} data-compte={x.pseudo || undefined}>
+            <MarquePlateforme site={x.plat} taille={16} carre />
+            <span className="vrm-etag-fs-nom">{nomPlateforme(x.plat)}{x.pseudo ? <span className="vrm-etag-fs-compte"> · {x.pseudo}</span> : null}</span>
+            <span className="vrm-etag-fs-meta">{[x.prix != null ? monnaie(x.prix) : '', x.depuis ? tr('etag.site.depuis', { date: dateCourte(x.depuis) }) : '', x.etat !== 'enligne' ? tr('etag.site.' + x.etat) : ''].filter(Boolean).join(' · ')}</span>
+          </div>))}
+      </div>);
+  };
   const total = (m) => m.cols * m.rows;
   // Glisser à la SOURIS (le doigt garde « touche un article puis une case ») :
   // la même pose que le toucher (`poser`, qui DEMANDE si la case est prise).
@@ -699,11 +736,13 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
             return (
               <React.Fragment key={i}>
               {pl.colonne === 1 && <span data-regle-rang={pl.rangee} className="vrm-s2d-regle">{pl.rangee}</span>}
-              <button type="button" onClick={() => cliquerCase(m.id, i)} aria-label={occ ? `N°${occ.numero}${dbl ? ' — ' + tr('etag.doublon') : ''}${sold ? ' (vendue, à sortir)' : (hors ? ' (plus en ligne)' : '')} — rangée ${pl.rangee}, colonne ${pl.colonne}` : (notee ? tr('etag.caseNoteeAria', { num: String(notee), rangee: String(pl.rangee), colonne: String(pl.colonne) }) : tr('stock.caseVideRangee', { rangee: String(pl.rangee), colonne: String(pl.colonne) }))} title={tr('stock.rangeeColonne2', { rangee: String(pl.rangee), colonne: String(pl.colonne) })}
+              <button type="button" onClick={() => cliquerCase(m.id, i)} aria-label={occ ? `N°${occ.numero}${dbl ? ' — ' + tr('etag.doublon') : ''}${sold ? ' (vendue, à sortir)' : (hors ? ' (plus en ligne)' : '')}${sitesEnMots(occ) ? ' — ' + sitesEnMots(occ) : ''} — rangée ${pl.rangee}, colonne ${pl.colonne}` : (notee ? tr('etag.caseNoteeAria', { num: String(notee), rangee: String(pl.rangee), colonne: String(pl.colonne) }) : tr('stock.caseVideRangee', { rangee: String(pl.rangee), colonne: String(pl.colonne) }))} title={tr('stock.rangeeColonne2', { rangee: String(pl.rangee), colonne: String(pl.colonne) })}
                 data-case-num={kOcc || undefined} data-case-notee={notee || undefined} data-case-double={dbl ? '' : undefined} data-couleur={cc.couleur || undefined} data-couleur-propre={cc.propre ? '' : undefined} data-case-vise={vise ? '' : undefined} data-case-choisie={estChoisie ? '' : undefined} aria-current={estChoisie ? 'location' : undefined} data-cible={attrCible(['case', m.id, i])} data-case-etat={etat} data-case-ici={m.id + ':' + i} data-tombe={kOcc && tombes[kOcc] ? tombes[kOcc] : undefined} className={classes}
                 {...(occ ? dragProps(kOcc) : {})} {...dropProps(m.id, i)}
                 style={kOcc && tombes[kOcc] ? { '--vrm-tombe': `calc(${-tombes[kOcc]} * (100% + ${gap}px))` } : undefined}>
-                {occ ? Vignette({ f: occ, sold: sold, hors: hors }) : (notee ? <span className="vrm-s2d-num vrm-etag-notee" aria-hidden="true">N°{notee}</span> : <span className="vrm-s2d-plus" aria-hidden="true">+</span>)}
+                {occ ? Vignette({ f: occ, sold: sold, hors: hors }) : null}
+                {occ ? bandeSites(occ) : null}
+                {occ ? null : (notee ? <span className="vrm-s2d-num vrm-etag-notee" aria-hidden="true">N°{notee}</span> : <span className="vrm-s2d-plus" aria-hidden="true">+</span>)}
               </button>
               {pl.colonne === m.cols && pl.rangee < m.rows && (() => {
                 const ks = Array.from({ length: m.cols }, (_, c) => casesPl.has(pl.rangee + ':' + (c + 1)));
@@ -798,6 +837,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           {m && (() => { const p = placeDansMeubles(s.i, m); return <div data-fiche-place="" style={{ fontSize: 15, fontWeight: 700, color: C.text, marginTop: 4 }}>{tr('stock.rangee2')} {p.rangee} <span style={{ color: C.muted, fontWeight: 400 }}>{tr('stock.partantHaut')}</span> {tr('stock.colonne2')} {p.colonne} <span style={{ color: C.muted, fontWeight: 400 }}>{tr('stock.depuisGauche')}</span></div>; })()}
           {!m && (() => { const a = ancienneplace(f.numero); return a ? <div data-fiche-ancienne-place="" style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.4 }}>{tr('stock.anciennePlaceDans')} <b style={{ color: C.text }}>{[a.roomName, a.itemName, a.nom].filter(Boolean).join(' · ')}</b></div> : null; })()}
         </div>
+        {/* (15 nov.) Où elle est : une ligne par site (logo · compte · prix · depuis), par identité. */}
+        {ligneSites(f)}
         {/* (5 nov.) « Voir l'état » : la fiche complète du N°, avec tout ce qui se
             calcule (prix d'achat, temps achat → vente, réception → mise en ligne,
             mise en ligne → vente, republications) — `etatArticle`. */}
