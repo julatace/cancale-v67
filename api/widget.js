@@ -659,10 +659,19 @@ function sortisDepuisPhoto(pub, retires, pickupDone, txBuy, lu) {
 // (15 nov.) LES ACHATS EN RETOUR : leurs bordereaux de retour reçus par e-mail (`email_bordretour_{tx}`,
 // scalaires `meta->>` seulement, jamais le PDF) — la règle de l'app (api/_lib/suivi-colis.js
 // `txAchatsEnRetour`) : un achat en retour n'est jamais « à retirer ». Lecture ratée ⇒ `null` (rien écarté).
-async function txEnRetourDuWidget() {
+// (15 nov.) + les avis « Retourne ta commande » (scalaires) : un avis ne désigne un achat que par SA conversation.
+// Les commandes (lourdes) ne sont relues QUE si un avis porte une conversation ; `purchased` (déjà lues quand
+// l'extension n'a pas encore son résumé) sert telles quelles. Lecture ratée ⇒ les avis ne comptent pas.
+async function txEnRetourDuWidget(purchased = null, vivants = null) {
   try {
     const j = await fetchPaginated(scoped('app_data?id=like.email_bordretour_%25&select=transaction:meta->>transaction,sens:meta->>sens'));
-    return txAchatsEnRetour(j);
+    let dm = null, achats = null;
+    try { dm = await fetchPaginated(scoped('app_data?id=like.email_retourdemande_%25&select=conv:meta->>conv,sens:meta->>sens')); } catch (_) { dm = null; }
+    if (Array.isArray(dm) && dm.some((d) => d && String(d.conv || '').trim())) {
+      if (Array.isArray(purchased) && purchased.length) achats = purchased;
+      else { try { achats = await harvestOrders('purchased', vivants); } catch (_) { achats = null; } }
+    }
+    return txAchatsEnRetour(j, { demandes: dm, achats });
   } catch (_) { return null; }
 }
 function colisVintedDepuis(pub, txBuy, pickupDone, masques, today, enRetour = null) {
@@ -860,7 +869,7 @@ export default async function handler(req, res) {
     const venteEmail = await colisVentesEmailDuWidget({ txSold, sold, vivants, masques: m.vinted_accounts_hidden, bordsParTx: bordsTx0, preuves, departs, shipDone, bordsShipped });
     for (const t of venteEmail.txs) shipTxns.add(String(t));
     const shipTotal = shipTxns.size;
-    const enRetour = await txEnRetourDuWidget();
+    const enRetour = await txEnRetourDuWidget(purchased, vivants);
     const pasEnRetour = (t) => !(enRetour && enRetour.has(String(t)));
     const pickupVinted = txBuy
       ? txBuy.filter(t => !pickupDone[String(t)] && pasEnRetour(t)).length

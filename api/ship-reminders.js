@@ -546,13 +546,14 @@ async function retraitsDuJour(maintenant = Date.now(), jourCible = 0) {
   if (tousTx.length || candidats.some((x) => x.conv)) {
     // (15 nov.) + les BORDEREAUX DE RETOUR de ces achats (`email_bordretour_{tx}`, scalaires `meta->>` seulement) :
     // un achat en retour n'est jamais « à retirer » (api/_lib/suivi-colis.js `txAchatsEnRetour`, la règle de l'app).
-    const [a, e, br] = await Promise.all([
+    const [a, e, br, dm] = await Promise.all([
       fetchPaginated(scoped('app_data?id=like.harvest_%25_orders_purchased&select=id,orders:data->payload->my_orders,txns:data->resume->txns')),
       fetchPaginated(scoped(`app_data?id=like.harvest_%25_txn_%25&meta->>id=in.(${tousTx.join(',')})&select=tx:meta->>id,s:meta->>status,ss:meta->>ship_status_title`)),
       fetchPaginated(scoped('app_data?id=like.email_bordretour_%25&select=transaction:meta->>transaction,sens:meta->>sens')),
+      fetchPaginated(scoped('app_data?id=like.email_retourdemande_%25&select=conv:meta->>conv,sens:meta->>sens')),
     ]);
-    if (!Array.isArray(a) || !Array.isArray(e) || !Array.isArray(br)) return 'lecture ratée — rien envoyé';
-    achats = a; retours = txAchatsEnRetour(br);
+    if (!Array.isArray(a) || !Array.isArray(e) || !Array.isArray(br) || !Array.isArray(dm)) return 'lecture ratée — rien envoyé';
+    achats = a; retours = txAchatsEnRetour(br, { demandes: dm, achats: a.flatMap((row) => (Array.isArray(row && row.orders) ? row.orders : [])) });
     for (const r of e) if (r && r.tx && r.s != null && Number.isFinite(Number(r.s))) etats.set(String(r.tx), { s: Number(r.s), ss: String(r.ss || '') });
   }
   const liste = rappelsRetraitDuJour({ ...entree, liens, jourCible,

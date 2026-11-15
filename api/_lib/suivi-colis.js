@@ -165,7 +165,12 @@ export function finDeCommandeAchat({ statut = '', etat = null, auRelais = false,
 // Rend le Set des n° de transaction d'ACHATS en retour (jamais par le titre : par SON n°, §5), ou
 // `null` (pas su ⇒ rien n'est écarté : un colis caché est un colis perdu). Un bordereau dont le
 // serveur a lu le sens « vente » (un acheteur lui renvoie) n'en est pas un.
-export function txAchatsEnRetour(bords) {
+// (15 nov.) + `demandes` : les avis « Retourne ta commande d'ici le … » (`email_retourdemande_*` : { conv, sens })
+// SANS bordereau. Un avis ne porte pas de n° de transaction (mesuré) : il ne désigne un achat que par SA
+// CONVERSATION (une identité), et seulement quand UN seul achat lu (`achats` : { transaction_id,
+// conversation_id }) la porte. Sans conversation (les 3 avis rangés le 15 nov.), il n'écarte rien : jamais
+// par le titre ni par la date (§5). `achats` pas lus ⇒ les avis ne comptent pas (pas su).
+export function txAchatsEnRetour(bords, { demandes = null, achats = null } = {}) {
   if (!Array.isArray(bords)) return null;
   const out = new Set();
   for (const b of bords) {
@@ -173,6 +178,22 @@ export function txAchatsEnRetour(bords) {
     const v = b.transaction != null ? b.transaction : b.tx;
     const tx = String(v == null ? '' : v).trim();
     if (/^\d{3,20}$/.test(tx)) out.add(tx);
+  }
+  if (Array.isArray(demandes) && Array.isArray(achats)) {
+    const parConv = new Map();
+    for (const o of achats) {
+      const c = String((o && o.conversation_id) == null ? '' : o.conversation_id).trim().toLowerCase();
+      const tx = String((o && o.transaction_id) == null ? '' : o.transaction_id).trim();
+      if (!c || !/^\d{3,20}$/.test(tx)) continue;
+      if (!parConv.has(c)) parConv.set(c, new Set());
+      parConv.get(c).add(tx);
+    }
+    for (const d of demandes) {
+      if (!d || String(d.sens || '').toLowerCase() === 'vente') continue;
+      const c = String(d.conv == null ? '' : d.conv).trim().toLowerCase();
+      const txs = c ? parConv.get(c) : null;
+      if (txs && txs.size === 1) out.add([...txs][0]);
+    }
   }
   return out;
 }

@@ -34,6 +34,8 @@ const MUTATIONS = {
   widgetApres: ['api/widget.js', '    if (enRetour && enRetour.has(t)) continue;                        // (15 nov.) en retour : jamais à retirer\n', ''],
   app: ['src/App.jsx', 'const vintedToPickup = useMemo(() => auRelaisVus.filter(o => !achatEnRetour(o, txRetourAchat)), [auRelaisVus, txRetourAchat]);', 'const vintedToPickup = auRelaisVus;'],
   etiquette: ['src/App.jsx', "  if (retour) return { label: 'À renvoyer', step: 1, color: C.warn, retour: true };\n", ''],
+  avis: ['api/_lib/suivi-colis.js', '      if (txs && txs.size === 1) out.add([...txs][0]);', ''],
+  avisWidget: ['api/widget.js', 'return txAchatsEnRetour(j, { demandes: dm, achats });', 'return txAchatsEnRetour(j);'],
   cron: ['api/ship-reminders.js', 'finDesTransactions(txDuColis({ suivi, code }, relais, liens), achats, etats, retours)', 'finDesTransactions(txDuColis({ suivi, code }, relais, liens), achats, etats)'],
 };
 if (MUT) {
@@ -73,7 +75,7 @@ function constante(app, nom) {
 // La forme mesurée (inventée : n° et titre ne sont pas les siens).
 const TX = '23800000001', TX_AUTRE = '23800000002', UID = '199000001';
 const STATUT = "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais";
-const achat = (tx) => ({ transaction_id: Number(tx), title: tx === TX ? 'Baskets en retour' : 'Baskets au point', status: STATUT, transaction_user_status: 'needs_action', date: '2026-11-03T10:00:00Z', price: { amount: '32.28' } });
+const achat = (tx) => ({ transaction_id: Number(tx), conversation_id: 'conv-' + tx, title: tx === TX ? 'Baskets en retour' : 'Baskets au point', status: STATUT, transaction_user_status: 'needs_action', date: '2026-11-03T10:00:00Z', price: { amount: '32.28' } });
 
 // ── La fausse base (cloisonnée, `select=` appliqué) ─────────────────────────────
 let V, pannes;
@@ -133,6 +135,15 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     dit(S.txAchatsEnRetour && S.txAchatsEnRetour(null) === null, 'bordereaux pas lus ⇒ `null` (pas su : rien n’est écarté)');
     dit(S.achatEnRetour && S.achatEnRetour(achat(TX), txs) && !S.achatEnRetour(achat(TX_AUTRE), txs) && S.achatEnRetour({ transaction_id: 1, status: 'Retour initié' }, null), 'achat en retour : par SON n° de transaction ou son propre statut « Retour initié »');
     dit(S.finDeCommandeAchat({ statut: STATUT, auRelais: true, retour: true }) === 'retire' && S.finDeCommandeAchat({ statut: STATUT, auRelais: true }) === null, 'la commande au point MAIS en retour ⇒ « il l’a » (fin), sans retour ⇒ rien de terminal');
+    // L'avis « Retourne ta commande » SANS bordereau : par SA conversation seulement (une identité).
+    const parAvis = S.txAchatsEnRetour([], { demandes: [{ conv: 'conv-' + TX, sens: 'achat' }], achats: [achat(TX), achat(TX_AUTRE)] });
+    dit(!!parAvis && parAvis.has(TX) && parAvis.size === 1, 'un avis « Retourne ta commande » relié à SA conversation fait un achat en retour (sans bordereau)', JSON.stringify(parAvis ? [...parAvis] : null));
+    const sansConv = S.txAchatsEnRetour([], { demandes: [{ conv: '', sens: 'achat' }], achats: [achat(TX)] });
+    dit(!!sansConv && sansConv.size === 0, 'un avis SANS conversation (les 3 avis mesurés) n’écarte rien — jamais par le titre ni la date');
+    const deux = S.txAchatsEnRetour([], { demandes: [{ conv: 'conv-x', sens: 'achat' }], achats: [{ ...achat(TX), conversation_id: 'conv-x' }, { ...achat(TX_AUTRE), conversation_id: 'conv-x' }] });
+    dit(!!deux && deux.size === 0, 'deux achats à la même conversation : on ne choisit pas (rien écarté)');
+    const pasLus = S.txAchatsEnRetour([], { demandes: [{ conv: 'conv-' + TX, sens: 'achat' }], achats: null });
+    dit(!!pasLus && pasLus.size === 0, 'achats pas lus : les avis ne comptent pas (pas su)');
     const achats = [{ orders: [achat(TX), achat(TX_AUTRE)], txns: [TX, TX_AUTRE] }];
     dit(S.finDesTransactions(new Set([TX]), achats, new Map(), txs) === 'retire' && S.finDesTransactions(new Set([TX_AUTRE]), achats, new Map(), txs) === null, 'le rappel du matin (`finDesTransactions`) : le colis de l’achat en retour est fini, l’autre reste à retirer');
   });
@@ -157,12 +168,13 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
   const vraiNow = Date.now;
   const appeler = async () => { Date.now = () => NOW; try { const r = res(); await widget({ method: 'GET', headers: {}, query: { k: 'tokA' } }, r); return r; } finally { Date.now = vraiNow; } };
   const iso = (t) => new Date(t).toISOString();
-  const baseW = ({ pub = null, bordRetour = { transaction: TX, sens: 'achat' } } = {}) => {
+  const baseW = ({ pub = null, bordRetour = { transaction: TX, sens: 'achat' }, avis = null } = {}) => {
     V = {
       main: { vrm_widget_token: 'tokA', vinted_pickup_done: {}, vinted_ship_done: {}, vinted_bords_shipped: {}, vinted_bords_hidden: {}, vinted_accounts_hidden: [], vrm_colis_collected: [], ...(pub ? { vrm_colis_retirer: pub } : {}) },
       lignes: [
         { id: `harvest_${UID}_orders_purchased`, data: { capturedAt: iso(NOW - 3600e3), payload: { my_orders: [achat(TX), achat(TX_AUTRE)] }, resume: { txns: [TX, TX_AUTRE], at: NOW - 3600e3 } } },
         { id: `harvest_${UID}_orders_sold`, data: { capturedAt: iso(NOW - 3600e3), payload: { my_orders: [] }, resume: { txns: [], at: NOW - 3600e3 } } },
+        ...(avis ? [{ id: 'email_retourdemande_0123456789abcdef', data: { type: 'retour-demande', ...avis, receivedAt: iso(NOW - 3600e3) } }] : []),
         ...(bordRetour ? [{ id: `email_bordretour_${TX}`, data: { type: 'bordereau-retour', ...bordRetour, pdfB64: 'JVBERi0x'.repeat(4000), dateLimiteIso: iso(NOW + 8 * 86400e3), receivedAt: iso(NOW - 2 * 3600e3) } }] : []),
       ],
     };
@@ -175,6 +187,12 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     baseW({ bordRetour: { transaction: TX, sens: 'vente' } });
     const r2 = await appeler();
     dit(r2.corps && r2.corps.pickup === 2, 'un bordereau de sens « vente » n’écarte rien (2)', JSON.stringify(r2.corps && r2.corps.pickup));
+    baseW({ bordRetour: null, avis: { conv: 'conv-' + TX, sens: 'achat' } });
+    const r4 = await appeler();
+    dit(r4.corps && r4.corps.pickup === 1, 'l’avis « Retourne ta commande » (sans bordereau) relié par SA conversation : 1 à retirer', JSON.stringify(r4.corps && r4.corps.pickup));
+    baseW({ bordRetour: null, avis: { conv: '', sens: 'achat' } });
+    const r5 = await appeler();
+    dit(r5.corps && r5.corps.pickup === 2, 'un avis sans conversation n’écarte rien (2)', JSON.stringify(r5.corps && r5.corps.pickup));
     baseW(); pannes.add('email_bordretour');
     const r3 = await appeler();
     dit(r3.corps && r3.corps.pickup === 2, 'bordereaux de retour pas lus ⇒ rien n’est écarté (2, « pas su » ne vaut pas « en retour »)', JSON.stringify(r3.corps && r3.corps.pickup));
@@ -190,12 +208,13 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
   // ── 4. L'app et le rappel du matin lisent la même règle ───────────────────
   console.log('— 4. L’app et le rappel du matin');
   await essaie('textes', async () => {
-    dit(/const txRetourAchat = useMemo\(\(\) => txAchatsEnRetour\(retoursAchatLus \? retoursAchatLus\.bords : null\)/.test(APP) && /const vintedToPickup = useMemo\(\(\) => auRelaisVus\.filter\(o => !achatEnRetour\(o, txRetourAchat\)\)/.test(APP), 'Achats / Colis / Ma journée : les achats « à retirer » écartent l’achat en retour (bordereaux lus, par SON n°)');
+    dit(/const txRetourAchat = useMemo\(\(\) => txAchatsEnRetour\(retoursAchatLus \? retoursAchatLus\.bords : null[,)]/.test(APP) && /const vintedToPickup = useMemo\(\(\) => auRelaisVus\.filter\(o => !achatEnRetour\(o, txRetourAchat\)\)/.test(APP), 'Achats / Colis / Ma journée : les achats « à retirer » écartent l’achat en retour (bordereaux lus, par SON n°)');
     dit(/finDeCommandeAchat\(\{ statut: o\.status, etat: etatTxn\(o\.transaction_id\), auRelais: isAtRelayStatus\(String\(o\.status \|\| ''\)\), retour: achatEnRetour\(o, txRetourAchat\) \}\)/.test(APP), '… et un colis d’e-mail relié à cet achat est fini (la même règle que le matin)');
     dit(/const vusTx = \[\.\.\.new Set\(auRelaisVus\.map/.test(APP), 'la publication garde l’achat en retour dans `vusTx` (le widget ne l’ajoute jamais)');
+    dit(/txAchatsEnRetour\(retoursAchatLus \? retoursAchatLus\.bords : null, \{ demandes: retoursAchatLus \? retoursAchatLus\.demandes : null, achats: buysBase \}\)/.test(APP) && /id=like\.email_retourdemande_\*&select=id,conv:meta->>conv,sens:meta->>sens/.test(APP), 'l’app lit les avis (conversation, sens) et les passe à la règle avec ses achats');
     dit(/'transaction', 'suivi', 'dateLimite', 'dateLimiteIso', 'article', 'uid', 'account', 'receivedAt', 'sens'\]/.test(APP), 'l’app lit le SENS du bordereau (projection `meta->>sens`)');
     const cron = sansCommentaires(lire('api/ship-reminders.js'));
-    dit(/id=like\.email_bordretour_%25&select=transaction:meta->>transaction,sens:meta->>sens/.test(cron) && /retours = txAchatsEnRetour\(br\)/.test(cron) && /finDesTransactions\(txDuColis\(\{ suivi, code \}, relais, liens\), achats, etats, retours\)/.test(cron), 'le rappel du matin lit les bordereaux de retour (scalaires seulement) et ne rappelle pas un achat en retour ; lecture ratée ⇒ rien envoyé');
+    dit(/id=like\.email_bordretour_%25&select=transaction:meta->>transaction,sens:meta->>sens/.test(cron) && /retours = txAchatsEnRetour\(br, \{ demandes: dm, achats: /.test(cron) && /email_retourdemande_%25&select=conv:meta->>conv,sens:meta->>sens/.test(cron) && /finDesTransactions\(txDuColis\(\{ suivi, code \}, relais, liens\), achats, etats, retours\)/.test(cron), 'le rappel du matin lit les bordereaux de retour (scalaires seulement) et ne rappelle pas un achat en retour ; lecture ratée ⇒ rien envoyé');
   });
 
   console.log(ko ? `\n❌ Retour pas à retirer : ${ko} rouge(s), ${ok} vert(s)` : `\n✅ Retour pas à retirer : ${ok} contrôles verts`);

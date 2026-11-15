@@ -7493,13 +7493,17 @@ const fetchRetoursAchat = () => {
 };
 const lireRetoursAchat = async (c) => {
   const champs = ['transaction', 'suivi', 'dateLimite', 'dateLimiteIso', 'article', 'uid', 'account', 'receivedAt', 'sens'].map((k) => `${k}:meta->>${k}`).join(',');
-  const [b, r] = await Promise.all([
+  // (15 nov.) + les avis « Retourne ta commande » rangés (scalaires : conversation, sens) — un achat en retour
+  // désigné par SA conversation n'est jamais « à retirer » (api/_lib/suivi-colis.js `txAchatsEnRetour`).
+  const [b, r, d] = await Promise.all([
     lireTout(`id=like.email_bordretour_*&select=id,${champs},pdf:meta->>_pdf`, { strict: true }).catch(() => null),
     lireTout('id=like.email_rembachat_*&select=id,tx:meta->>transaction,montant:meta->>montant,estime:meta->>estime,at:meta->>receivedAt', { strict: true }).catch(() => null),
+    lireTout('id=like.email_retourdemande_*&select=id,conv:meta->>conv,sens:meta->>sens', { strict: true }).catch(() => null),
   ]);
   const v = {
     bords: Array.isArray(b) ? b.map((x) => ({ ...x, tx: x.transaction, at: x.receivedAt, pdf: x.pdf != null && x.pdf !== '' && x.pdf !== false && x.pdf !== 'false' })) : null,
     remb: Array.isArray(r) ? r : null,
+    demandes: Array.isArray(d) ? d : null,
   };
   if (v.bords && v.remb) { c.v = v; c.at = Date.now(); }
   return v;
@@ -35193,7 +35197,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // colis — sa carte vit dans « À renvoyer ». `auRelaisVus` garde TOUS les achats vus « au point relais »
   // (la publication `vusTx` : le widget n'ajoute jamais un achat que l'app a vu, quelle que soit sa décision).
   // Pas su (bordereaux pas lus) ⇒ rien n'est écarté.
-  const txRetourAchat = useMemo(() => txAchatsEnRetour(retoursAchatLus ? retoursAchatLus.bords : null), [retoursAchatLus]);
+  const txRetourAchat = useMemo(() => txAchatsEnRetour(retoursAchatLus ? retoursAchatLus.bords : null, { demandes: retoursAchatLus ? retoursAchatLus.demandes : null, achats: buysBase }), [retoursAchatLus, buysBase]);
   const auRelaisVus = useMemo(() => buysBase.filter(o => isAtRelayStatus(o.status) && !pickupDone[String(o.transaction_id)]), [buysBase, pickupDone]);
   const vintedToPickup = useMemo(() => auRelaisVus.filter(o => !achatEnRetour(o, txRetourAchat)), [auRelaisVus, txRetourAchat]);
   // (23 oct.) LES ACHATS QUI PEUVENT RELIER UN COLIS D'E-MAIL À SA COMMANDE (le
