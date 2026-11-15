@@ -61,4 +61,9 @@ export default {
   "annonces.v.aBaisser": "{n} d · to lower",
   "annonces.v.taille": "S{t}",
   "annonces.v.jours": "{n} d",
+  "nav.groupe.ranger": "Store",
+  "nav.groupe.compter": "Count",
+  "nav.settings": "Settings",
+  "sj.v.ensuite": "Next, in order",
+  "sj.v.cetteSemaine": "this week",
 };

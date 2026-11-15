@@ -61,4 +61,9 @@ export default {
   "annonces.v.aBaisser": "{n} j · à baisser",
   "annonces.v.taille": "T{t}",
   "annonces.v.jours": "{n} j",
+  "nav.groupe.ranger": "Ranger",
+  "nav.groupe.compter": "Compter",
+  "nav.settings": "Paramètres",
+  "sj.v.ensuite": "Ensuite, dans l’ordre",
+  "sj.v.cetteSemaine": "cette semaine",
 };
