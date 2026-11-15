@@ -17,25 +17,10 @@
    ════════════════════════════════════════════════════════════════════════════ */
 @layer sj-studio {
 
-/* ── 1. LES JETONS ─────────────────────────────────────────────────────────────
-   provisoire : vient de studio.css (la fondation les pose sur :root ; ici, portés
-   par l'écran seul, à retirer à la fusion de la fondation). Valeurs : tokens.cjs. */
+/* ── 1. LES JETONS PROPRES À MA JOURNÉE (--sj-*) ────────────────────────────────
+   (14 nov., version studio) Les --sb-* recopiés de studio.css (« provisoire ») sont retirés : la fondation
+   les pose sur :root (jour, nuit, système). Restent la touche posée, le creux, la plaque, le puits, le socle. */
 .sj-journee {
-  --sb-haut: #EEF6FD !important; --sb-bas: #C6DDF0 !important; --sb-aplat: #D9EAF7 !important;
-  --sb-porcelaine: #FFFFFF !important; --sb-porcelaine-2: #F7FAFD !important; --sb-creux: #E4EEF7 !important;
-  --sb-verre: rgb(255 255 255 / .64) !important;
-  --sb-encre: #0C1D30 !important; --sb-encre-2: #3F5468 !important;
-  --sb-diode: #0060CC !important; --sb-lien: #0055B8 !important;
-  --sb-ambre: #764300 !important; --sb-ambre-point: #E08A12 !important;
-  --sb-o: 18 52 96 !important;
-  --sb-ombre-pose: 0 .5px 1px rgb(var(--sb-o) / .16), 0 3px 6px -3px rgb(var(--sb-o) / .28) !important;
-  --sb-ombre-plan: inset 0 1px 0 #fff, 0 0 0 .5px rgb(var(--sb-o) / .07), 0 1px 2px rgb(var(--sb-o) / .07), 0 12px 26px -14px rgb(var(--sb-o) / .30) !important;
-  --sb-ombre-avant: inset 0 1px 0 #fff, 0 0 0 .5px rgb(var(--sb-o) / .06), 0 2px 5px rgb(var(--sb-o) / .07), 0 34px 60px -26px rgb(var(--sb-o) / .48) !important;
-  --sb-r-tuile: 22px !important; --sb-r-plan: 28px !important; --sb-r-touche: 13px !important; --sb-r-plaque: 6px !important; --sb-r-vignette: 11px !important;
-  --sb-police-affiche: var(--sb-police-affiche-fondation, "Urbanist", "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif) !important;
-  --sb-police-texte: var(--sb-police-texte-fondation, "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif) !important;
-  --sb-e-appui: 90ms cubic-bezier(.2,.9,.25,1) !important;
-  --sb-e-avant: 360ms cubic-bezier(.2,.9,.25,1) !important;
   /* touche posée, creux, plaque, socle de vignette (note.md §6) */
   --sj-k-bg: linear-gradient(180deg, #FFFFFF, #F3F7FB) !important;
   --sj-k-sh: inset 0 1px 0 #fff, 0 0 0 .5px rgb(var(--sb-o) / .14), 0 1px 1.5px rgb(var(--sb-o) / .08), 0 4px 9px -5px rgb(var(--sb-o) / .26) !important;
@@ -47,16 +32,6 @@
   --sj-fond: radial-gradient(90% 40% at 18% 0%, rgb(255 255 255 / .55), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 40%, var(--sb-bas) 100%) !important;
 }
 :root[data-theme="dark"] .sj-journee {
-  --sb-haut: #15263D !important; --sb-bas: #060E19 !important; --sb-aplat: #0D1A2C !important;
-  --sb-porcelaine: #16273C !important; --sb-porcelaine-2: #122135 !important; --sb-creux: #091320 !important;
-  --sb-verre: rgb(24 41 63 / .62) !important;
-  --sb-encre: #EAF2FB !important; --sb-encre-2: #9CB0C6 !important;
-  --sb-diode: #4AA3FF !important; --sb-lien: #6CB4FF !important;
-  --sb-ambre: #F2B65E !important; --sb-ambre-point: #F2A33A !important;
-  --sb-o: 0 0 0 !important;
-  --sb-ombre-pose: 0 .5px 1px rgb(0 0 0 / .5), 0 3px 6px -3px rgb(0 0 0 / .7) !important;
-  --sb-ombre-plan: inset 0 .5px 0 rgb(255 255 255 / .09), 0 0 0 .5px rgb(0 0 0 / .5), 0 12px 26px -12px rgb(0 0 0 / .8) !important;
-  --sb-ombre-avant: inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .5), 0 34px 60px -22px rgb(0 0 0 / .95) !important;
   --sj-k-bg: linear-gradient(180deg, #1D3049, #172840) !important;
   --sj-k-sh: inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .55), 0 4px 10px -5px rgb(0 0 0 / .8) !important;
   --sj-k-in: inset 0 1px 3px rgb(0 0 0 / .7), inset 0 0 0 .5px rgb(0 0 0 / .5) !important;
@@ -67,17 +42,8 @@
   --sj-fond: radial-gradient(90% 40% at 18% 0%, rgb(110 160 230 / .10), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 42%, var(--sb-bas) 100%) !important;
 }
 
-/* Le seul rouge : deux paires sous un même numéro (la plaque `.is-double`, §5 et §7). */
-.sj-journee .sb-plaque.is-double,
-.sj-journee { --sb-doublon: #B8261A !important; }
-:root[data-theme="dark"] .sj-journee .sb-plaque.is-double,
-:root[data-theme="dark"] .sj-journee { --sb-doublon: #FF6B5E !important; }
-
-/* ── 2. LA LUMIÈRE DU FOND (provisoire : la fondation la pose sur la coque) ────── */
-:root:has(.sj-journee) body,
-.vrm-main[data-ecran="journee"]:has(.sj-journee) { background: var(--sj-fond-page, #D9EAF7) !important; }
-:root[data-theme="dark"]:has(.sj-journee) body,
-:root[data-theme="dark"] .vrm-main[data-ecran="journee"]:has(.sj-journee) { background: #0D1A2C !important; }
+/* ── 2. (14 nov., version studio) La lumière du fond est celle de la coque (studio.css) : la copie « provisoire »
+   (fond de page, de <main>, plan fixe ::before) est retirée. Reste la matière du texte de l'écran. */
 .sj-journee {
   position: relative !important;
   color: var(--sb-encre) !important;
@@ -86,83 +52,21 @@
   isolation: isolate !important;
   background: transparent !important;
 }
-/* La lumière de studio derrière tout l'écran : un plan fixe sous le contenu (aucune ombre ni flou ici). */
-.sj-journee::before {
-  content: "" !important; position: fixed !important; inset: 0 !important; z-index: -1 !important;
-  background: var(--sj-fond) !important; pointer-events: none !important;
-}
 
-/* ── 3. LES QUATRE FORMES DE BOUTON (provisoire : vient de studio.css) ────────── */
-.sj-journee .sb-btn-plein {
-  display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; gap: 5px !important;
-  width: 72px !important; height: 72px !important; min-width: 72px !important; min-height: 72px !important; padding: 0 !important; margin: 0 !important;
-  border: 0 !important; border-radius: 50% !important; flex: none !important; position: relative !important; cursor: pointer !important;
-  background: radial-gradient(120% 90% at 50% 0%, color-mix(in oklab, var(--sb-encre) 80%, #fff) 0%, var(--sb-encre) 55%) !important;
-  color: var(--sb-porcelaine) !important; font: 650 11.5px/1 var(--sb-police-texte) !important; letter-spacing: .01em !important;
-  box-shadow: inset 0 .5px 0 rgb(255 255 255 / .25), 0 1px 2px rgb(var(--sb-o) / .25), 0 12px 22px -10px rgb(var(--sb-o) / .6) !important;
-  transition: transform var(--sb-e-appui), box-shadow var(--sb-e-appui) !important;
-  -webkit-tap-highlight-color: transparent !important;
-}
-:root[data-theme="dark"] .sj-journee .sb-btn-plein {
-  background: radial-gradient(120% 90% at 50% 0%, #fff 0%, var(--sb-encre) 60%) !important; color: #0C1D30 !important;
-  box-shadow: inset 0 .5px 0 #fff, 0 1px 2px rgb(0 0 0 / .5), 0 12px 24px -10px rgb(0 0 0 / .9) !important;
-}
-.sj-journee .sb-btn-plein:active { transform: translateY(1.5px) scale(.985) !important; box-shadow: inset 0 2px 6px rgb(0 0 0 / .45), 0 .5px 1px rgb(var(--sb-o) / .3) !important; }
-.sj-journee .sb-btn-plein svg { width: 24px !important; height: 24px !important; stroke-width: 1.5 !important; }
-.sj-journee .sb-btn-plein:focus-visible, .sj-journee .sb-touche:focus-visible, .sj-journee .sb-rond:focus-visible, .sj-journee .sb-lien:focus-visible,
+/* ── 3. (14 nov., version studio) Les quatre formes « provisoire » sont retirées : celles de studio.css. Restent
+   l'anneau de focus des zones propres à Ma journée et la cible de 44 px de « Modifier » au doigt. */
 .sj-journee .sj-zone:focus-visible, .sj-journee .sj-rangee:focus-visible, .sj-journee .sj-tasse-t:focus-visible {
   outline: 2px solid var(--sb-diode) !important; outline-offset: 2px !important;
 }
-.sj-journee .sb-touche {
-  display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 7px !important;
-  height: 40px !important; min-height: 40px !important; padding: 0 15px !important; margin: 0 !important; border: 0 !important; border-radius: var(--sb-r-touche) !important;
-  background: var(--sj-k-bg) !important; box-shadow: var(--sj-k-sh) !important; color: var(--sb-encre) !important;
-  font: 600 14px/1 var(--sb-police-texte) !important; white-space: nowrap !important; cursor: pointer !important; position: relative !important;
-  transition: transform var(--sb-e-appui), box-shadow var(--sb-e-appui) !important;
-}
-/* Au doigt (téléphone) : la touche a sa cible de 44 px (liste de contrôle t25). */
-.sj-journee:not([data-sj-ordi="1"]) .sb-touche, .sj-journee:not([data-sj-ordi="1"]) .vrm-jp-bas [data-jp-modifier] { height: 44px !important; min-height: 44px !important; }
-.sj-journee .sb-touche:active, .sj-journee .sb-touche[aria-pressed="true"] { background: var(--sb-creux) !important; box-shadow: var(--sj-k-in) !important; transform: translateY(1px) !important; }
-.sj-journee .sb-touche svg { width: 16px !important; height: 16px !important; color: var(--sb-encre-2) !important; }
-.sj-journee .sb-rond {
-  display: inline-grid !important; place-items: center !important; width: 44px !important; height: 44px !important; min-width: 44px !important; min-height: 44px !important;
-  padding: 0 !important; margin: 0 !important; border: 0 !important; border-radius: 50% !important; flex: none !important;
-  background: var(--sj-k-bg) !important; box-shadow: var(--sj-k-sh) !important; color: var(--sb-encre) !important; cursor: pointer !important;
-  transition: transform var(--sb-e-appui), box-shadow var(--sb-e-appui) !important;
-}
-.sj-journee .sb-rond:active { background: var(--sb-creux) !important; box-shadow: var(--sj-k-in) !important; transform: translateY(1px) !important; }
-.sj-journee .sb-lien {
-  display: inline-flex !important; align-items: center !important; gap: 6px !important; min-height: 44px !important; padding: 0 !important; margin: 0 !important;
-  border: 0 !important; background: none !important; box-shadow: none !important; color: var(--sb-lien) !important;
-  font: 600 14px/1.2 var(--sb-police-texte) !important; text-decoration: none !important; cursor: pointer !important; text-align: left !important;
-  transition: opacity var(--sb-e-appui) !important;
-}
-.sj-journee .sb-lien:active { opacity: .55 !important; }
-.sj-journee .sb-diode {
-  width: 5px !important; height: 5px !important; border-radius: 50% !important; background: var(--sb-diode) !important;
-  box-shadow: 0 0 0 1.5px color-mix(in oklab, var(--sb-diode) 14%, transparent), 0 0 5px color-mix(in oklab, var(--sb-diode) 55%, transparent) !important;
-}
+.sj-journee:not([data-sj-ordi="1"]) .vrm-jp-bas [data-jp-modifier] { height: 44px !important; min-height: 44px !important; }
 
-/* ── 4. LA PLAQUE N°, LA VIGNETTE POSÉE (provisoire : vient de studio.css) ───── */
-.sj-journee .sb-plaque {
-  display: inline-flex !important; align-items: baseline !important; justify-content: center !important; min-width: 46px !important; height: 22px !important;
-  padding: 0 6px !important; border-radius: var(--sb-r-plaque) !important; background: var(--sb-creux) !important; box-shadow: var(--sj-pl-sh) !important;
-  font: 600 12.5px/22px var(--sb-police-texte) !important; color: var(--sb-encre) !important; letter-spacing: .01em !important; white-space: nowrap !important;
-}
-.sj-journee .sb-plaque small { font-size: 9.5px !important; font-weight: 600 !important; color: var(--sb-encre-2) !important; margin-right: 1.5px !important; }
-.sj-journee .sb-plaque.is-double { color: var(--sb-doublon) !important; box-shadow: var(--sj-pl-sh), inset 0 0 0 1px var(--sb-doublon) !important; }
-.sj-journee .sb-plaque--grande { height: 30px !important; line-height: 30px !important; font-size: 17px !important; letter-spacing: .07em !important; padding: 0 9px !important; border-radius: 8px !important; min-width: 0 !important; }
+/* ── 4. (14 nov., version studio) Plaque et vignette « provisoire » retirées : celles de studio.css. Restent la grande
+   plaque « à vérifier » (propre à l'écran) et la photo qui remplit sa vignette. */
 .sj-journee .sb-plaque--grande.is-doute { color: var(--sb-ambre) !important; font-size: 13px !important; letter-spacing: 0 !important; }
-.sj-journee .sb-vignette {
-  display: grid !important; place-items: center !important; position: relative !important; width: 40px !important; height: 40px !important; flex: none !important;
-  border-radius: var(--sb-r-vignette) !important; background: var(--sj-socle) !important; box-shadow: var(--sb-ombre-pose) !important; overflow: hidden !important; color: var(--sb-encre-2) !important;
-}
 .sj-journee .sb-vignette img {
   width: 100% !important; height: 100% !important; object-fit: cover !important; display: block !important; border-radius: 0 !important;
   -webkit-mask-image: radial-gradient(78% 78% at 50% 54%, #000 58%, transparent 100%) !important; mask-image: radial-gradient(78% 78% at 50% 54%, #000 58%, transparent 100%) !important;
 }
-.sj-journee .sb-vignette::after { content: "" !important; position: absolute !important; inset: 0 !important; border-radius: inherit !important; box-shadow: inset 0 0 0 .5px rgb(var(--sb-o) / .10), inset 0 1px 0 rgb(255 255 255 / .7) !important; pointer-events: none !important; }
-:root[data-theme="dark"] .sj-journee .sb-vignette::after { box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .07) !important; }
 
 /* ── 5. LA TÊTE ────────────────────────────────────────────────────────────── */
 .sj-journee > .vrm-screen-head, .sj-journee > .vrm-ecran-tete, .sj-journee > header:first-child { display: none !important; }
