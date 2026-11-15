@@ -94,6 +94,8 @@ import { vidangerAlertesPlantages } from './_lib/alertes-plantages.js';
 import { noterPilotageDuJour } from './_lib/pilotage.js';
 // (6 nov.) La purge à 30 jours du HTML d'origine des e-mails (api/_lib/email-html.js).
 import { purgerHtml } from './_lib/email-html.js';
+// (15 nov.) Le PDF d'un bordereau part quand la vente est finalisée ET l'argent reçu (api/_lib/purge-bordereaux.js).
+import { passePurgeBordereaux, rpcPostgrest } from './_lib/purge-bordereaux.js';
 // (6 nov., v36) Les temps réels des vendeurs (agrégats journaliers, api/_lib/mesures-terrain.js).
 import { histosDesJours, purgerMesuresAnciennes } from './_lib/mesures-terrain.js';
 import { proprietaireInstallation } from './_lib/signalement.js';
@@ -849,6 +851,18 @@ function etiquettesCron({ max, budgetMs }) {
     lirePdf: async (id) => { const r = await fetchPaginated(scoped(reqPdf(id))); if (!Array.isArray(r)) return null; return (r[0] && typeof r[0].pdf === 'string' && r[0].pdf !== 'None') ? r[0].pdf : ''; },
   });
 }
+// (15 nov.) La purge des PDF de bordereaux pour le vendeur du tour : lectures `scoped` et
+// paginées (`fetchPaginated`, §4.5), l'écriture par la fonction de la base (migration 044).
+async function purgeBordereauxDuVendeur(maintenant = Date.now()) {
+  const owner = proprietaireCourant();
+  if (!owner) return { fait: false, raison: 'base non cloisonnée — rien écrit' };
+  return passePurgeBordereaux({
+    lireTout: (p) => fetchPaginated(scoped(p)), getRow, ecrire: ecrireDedup, owner, maintenant,
+    rpc: rpcPostgrest({ url: SUPABASE_URL, entetes: HEADERS, fetcher: fetchAvecDelai }),
+  });
+}
+// Des nombres seulement dans la réponse du cron (jamais un identifiant de ligne).
+const resumePurge = (r) => (!r ? null : { fait: !!r.fait, candidats: r.candidats || 0, supprimes: r.supprimes || 0, octets: r.octets || 0, ...(r.gardes ? { gardes: r.gardes } : {}), ...(r.migration ? { migration: r.migration } : {}), ...(r.fait ? {} : { raison: r.raison || 'pas-su' }) });
 async function traiterVendeur() {
   const [relu, transp] = await Promise.all([relireEbayDuVendeur(), lireTransporteursDuVendeur()]);
   // Un échec du bilan du mois n'empêche aucun rappel (et inversement).
@@ -870,6 +884,13 @@ async function traiterVendeur() {
   let transporteursPdf = null;
   try { transporteursPdf = await etiquettesCron({ max: MAX_PDF_MATIN, budgetMs: BUDGET_PDF_MATIN_MS }); }
   catch (e) { transporteursPdf = { fait: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
+  // (15 nov., décision de Julien) Le PDF des bordereaux d'une vente FINALISÉE dont l'argent est
+  // REÇU (api/_lib/purge-bordereaux.js) — APRÈS la lecture des étiquettes (un PDF pas encore lu
+  // pour son transporteur n'est jamais retiré). Lots bornés ; une lecture ratée n'écrit rien ;
+  // un échec n'empêche aucun rappel. La réponse ne porte que des nombres.
+  let purgeBordereaux = null;
+  try { purgeBordereaux = resumePurge(await purgeBordereauxDuVendeur()); }
+  catch (e) { purgeBordereaux = { fait: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
   // (11 nov., lot agent2-veille) Le contrôle de nuit, en LECTURE SEULE (api/_lib/controle-nuit.js) :
   // une seule écriture, SA ligne `vrm_controle_nuit` ; un échec n'empêche aucun rappel.
   let controle = null;
@@ -881,7 +902,7 @@ async function traiterVendeur() {
   catch (e) { veilleChiffres = { envoye: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
   const out = await traiterVendeurApresRelecture();
   const rappels = await rappelsPersoSur();
-  return { ...out, rappels, ...(bilanMois ? { bilanMois } : {}), ebayRelu: resumeRelecture(relu), transporteurs: transp, transporteursAnciens, transporteursPdf, controle, veilleChiffres: { envoye: veilleChiffres.envoye, n: veilleChiffres.n || 0, raison: veilleChiffres.raison || null } };
+  return { ...out, rappels, ...(bilanMois ? { bilanMois } : {}), ebayRelu: resumeRelecture(relu), transporteurs: transp, transporteursAnciens, transporteursPdf, purgeBordereaux, controle, veilleChiffres: { envoye: veilleChiffres.envoye, n: veilleChiffres.n || 0, raison: veilleChiffres.raison || null } };
 }
 async function traiterVendeurApresRelecture() {
     const today = parisDate(0);
@@ -1847,4 +1868,4 @@ async function passageDuCron(req, res, moment, bailEtat) {
 
 // (8 nov., « à envoyer » prouvé) Pour le banc seulement (scripts/audit-a-envoyer-preuves.cjs) : la
 // composition « à expédier » du soir, du bilan et du matin, exécutée sur une fausse base.
-export const _banc = { txsAExpedier, lireDonneesColis, lireDonneesBilan, bilanDuMoisVendeur };   // (12 nov.) + le bilan du mois (M79, audit-revue-fin)
+export const _banc = { txsAExpedier, lireDonneesColis, lireDonneesBilan, bilanDuMoisVendeur, purgeBordereauxDuVendeur };   // (12 nov.) + le bilan du mois (M79, audit-revue-fin)
