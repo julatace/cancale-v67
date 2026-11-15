@@ -123,6 +123,8 @@ import { envoyerMailEssai } from './_lib/mail-essai.js';
 import { configurationRelances, lireJeton as lireJetonRelance, ecrireChoix as ecrireChoixRelance, lireChoix as lireChoixRelance, lireEnvois as lireEnvoisRelance } from './_lib/relances-essai.js';
 import { corsExtension } from './_lib/cors-extension.js';
 import { codeDe, suiviDe, parrainageOuvert, rattacher, factureFilleulPayee, apercuCode, poserNom, nomDe, filleulsDe, filleulDetail } from './_lib/parrainage.js';
+// (15 nov.) LE PROGRAMME PARTENAIRE : 3 € par mois et par client payant (api/_lib/partenaires.js, migration 043).
+import { rattacherPartenaire, commissionFacturePayee, annulerCommissions, vuePartenaire, listeAdmin, csvAdmin, actionAdmin, couponDuFilleul, rattacheAUnPartenaire } from './_lib/partenaires.js';
 // (9 nov.) Solo et Pro : la règle (api/_lib/plan-regle.js, la même que l'app).
 import { planDeLAbonnement, prochainChangement, uidValide, PLAN_PRO, PLAN_SOLO, CLE_PRIX_SOLO, PLATEFORMES_SOLO, NOMS_PLATEFORMES_SOLO, META_VENDEUR, idCompteVendeur, PRIX_COMPTE_SUP_CENTIMES, CLE_PRIX_COMPTE_SUP, COMPTES_INCLUS_SOLO, META_COMPTES_SUP, MAX_COMPTES_SUP, estPrixCompteSup } from './_lib/plan-regle.js';
 import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
@@ -626,6 +628,8 @@ const ligneDeLAbonnement = (sub, livemode) => ({
   mode_test: !livemode,
 });
 
+// (15 nov.) Les événements qui annulent une commission partenaire (à cocher chez Stripe).
+export const EVENEMENTS_ANNULATION = ['charge.refunded', 'refund.created', 'charge.refund.updated', 'charge.dispute.created', 'credit_note.created'];
 async function webhook(req, res) {
   const secret = process.env.STRIPE_WEBHOOK_SECRET || '';
   if (!secret) return repondre(res, 503, { erreur: 'webhook non configuré' });
@@ -655,7 +659,16 @@ async function webhook(req, res) {
     if (owner === undefined) return repondre(res, 503, { erreur: 'propriétaire pas su', reessayer: true });
     if (!owner) { console.warn('[stripe] invoice.paid sans propriétaire VRM', String(obj.id || '').slice(0, 40)); return repondre(res, 200, { recu: true, ignore: 'sans-proprietaire' }); }   // (11 nov., B133) journalisé
     const p = await factureFilleulPayee(owner, client, obj, PRIX_CGV.centimes);
+    // (15 nov.) LE PROGRAMME PARTENAIRE : une commission de 3 € par facture réelle d'un client
+    // rattaché à un code (une par facture, une par mois). Pas rangée ⇒ 503, Stripe rejoue.
+    const c = await commissionFacturePayee(owner, obj);
     if (!p.ok) return repondre(res, 503, { erreur: 'parrainage non crédité', reessayer: true });
+    if (!c.ok) return repondre(res, 503, { erreur: 'commission partenaire non rangée', reessayer: true });
+    return repondre(res, 200, { recu: true });
+  } else if (EVENEMENTS_ANNULATION.includes(type)) {
+    // (15 nov.) Remboursement, litige ou avoir : la commission partenaire de cette facture est annulée.
+    const a = await annulerCommissions(type, obj);
+    if (!a.ok) return repondre(res, 503, { erreur: 'annulation partenaire non rangée', reessayer: true });
     return repondre(res, 200, { recu: true });
   } else {
     // invoice.* : le statut qui compte arrive par customer.subscription.updated.
@@ -899,6 +912,13 @@ async function checkout(req, res) {
   };
   if (ligne && ligne.client_stripe) params.customer = ligne.client_stripe;
   else if (u.email) params.customer_email = u.email;
+  // (15 nov.) L'AVANTAGE D'UN CODE PARTENAIRE (éteint par défaut : aucun coupon posé) : le coupon
+  // que Julien a choisi pour ce partenaire, seulement pour un PREMIER abonnement. Pas su ⇒ rien n'ouvre.
+  if (!(ligne && ligne.client_stripe)) {
+    const coupon = await couponDuFilleul(u.id);
+    if (coupon === undefined) return repondre(res, 503, { erreur: 'base-injoignable', message: "Je n'ai pas pu vérifier ton abonnement. Réessaie dans un instant." });
+    if (coupon) { params.discounts = [{ coupon }]; params.metadata.partenaire_coupon = coupon; }
+  }
   // Un double clic ne crée pas deux sessions (même clé dans la même minute).
   // (11 nov., M55) Les PARAMÈTRES dans la clé (Solo ou Pro, essai) : deux clics
   // différents dans la même minute ne rejouent plus une clé avec d'autres
@@ -1189,6 +1209,10 @@ async function parrainage(req, res) {
     if (!corps || corps.action !== 'rattacher') return repondre(res, 400, { ok: false, raison: 'action' });
     const [ligne, idsVinted] = await Promise.all([ligneDe(req), lireVintedIds(u.id)]);
     if (idsVinted === null) return repondre(res, 503, { ok: false, raison: 'pas-su', message: 'Parrainage pas vérifié. Réessaie dans un instant.' });   // (11 nov., M51)
+    // (15 nov.) Un compte venu par un code partenaire n'a pas, en plus, un parrain (une récompense par client).
+    const chezPartenaire = await rattacheAUnPartenaire(u.id);
+    if (chezPartenaire === null) return repondre(res, 503, { ok: false, raison: 'pas-su', message: 'Parrainage pas vérifié. Réessaie dans un instant.' });
+    if (chezPartenaire) return repondre(res, 409, { ok: false, raison: 'deja-partenaire', message: 'Ton compte est déjà venu par un code partenaire.' });
     const essaiDeja = await essaiDejaUtilise(u.email, idsVinted);
     const r = await rattacher(corps.code, { u, ligne, idsVinted, essaiDeja });
     return repondre(res, r.http || (r.ok ? 200 : 400), { ok: r.ok, raison: r.raison, message: r.message });
@@ -1200,6 +1224,58 @@ async function parrainage(req, res) {
   const filleuls = await filleulsDe(u.id, ligne === undefined ? null : !!(ligne && ligne.client_stripe));
   // (11 nov.) `modeTest` : Stripe en clé de test (ou pas encore branché) — l'écran le DIT.
   return repondre(res, 200, { ok: true, installe: true, ouvert, code, suivi, filleuls: filleuls || null, nom: nom === undefined ? undefined : nom, filleul: filleul || null, moisCentimes: PRIX_CGV.centimes, modeTest: !stripePret() || stripeModeTest() });
+}
+
+// ── LE PROGRAMME PARTENAIRE (15 nov., api/_lib/partenaires.js) ──────────────
+// `mode=partenaire` :
+//   GET `?j=<jeton>` SANS session — la page du partenaire (lecture seule, des NOMBRES) ;
+//   POST { action:'rattacher', code } AVEC session — le compte connecté prend ce code
+//   (mêmes règles que le parrainage). Tout ce qui le concerne vient de SA session.
+async function partenaire(req, res) {
+  res.setHeader('Cache-Control', 'no-store');
+  if (req.method === 'GET') {
+    res.setHeader('X-Robots-Tag', 'noindex');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    const v = await vuePartenaire(req.query && req.query.j);
+    return repondre(res, v.http, v.corps);
+  }
+  const u = await utilisateurDe(req);
+  if (!u) return repondre(res, 401, { ok: false, raison: 'session' });
+  const corps = await lireCorpsJson(req);
+  if (!corps || corps.action !== 'rattacher' || typeof corps.code !== 'string' || corps.code.length > 40) return repondre(res, 400, { ok: false, raison: 'action' });
+  const [ligne, idsVinted, proprio] = await Promise.all([ligneDe(req), lireVintedIds(u.id), proprioAlertes()]);
+  if (idsVinted === null) return repondre(res, 503, { ok: false, raison: 'pas-su', message: 'Pas vérifié. Réessaie dans un instant.' });
+  const essaiDeja = await essaiDejaUtilise(u.email, idsVinted);
+  const r = await rattacherPartenaire(corps.code, { u, ligne, idsVinted, essaiDeja, proprio });
+  return repondre(res, r.http || (r.ok ? 200 : 400), { ok: r.ok, raison: r.raison, message: r.message, code: r.code });
+}
+// `mode=partenaires` : JULIEN SEUL (le propriétaire de l'installation). GET la liste et les
+// chiffres (`&csv=<id>` : l'export pour la compta) ; POST creer · pause · lien · coupon · verse.
+async function partenairesAdmin(req, res) {
+  res.setHeader('Cache-Control', 'no-store');
+  const u = await utilisateurDe(req);
+  if (!u) return repondre(res, 401, { ok: false, raison: 'session' });
+  if (!process.env.SUPABASE_SERVICE_KEY) return repondre(res, 503, { ok: false, raison: 'pas-su' });
+  const proprio = await proprioAlertes();
+  if (!proprio) return repondre(res, 503, { ok: false, raison: 'pas-su' });
+  if (String(proprio) !== String(u.id)) return repondre(res, 403, { ok: false, raison: 'proprietaire' });
+  if (req.method === 'GET') {
+    const id = req.query && req.query.csv;
+    if (id) {
+      const c = await csvAdmin(String(id));
+      if (c.http !== 200) return repondre(res, c.http, { ok: false });
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${c.nom}"`);
+      res.status(200);
+      return res.end(c.texte);
+    }
+    const l = await listeAdmin();
+    return repondre(res, l.http, l.corps);
+  }
+  const corps = await lireCorpsJson(req);
+  if (!corps || typeof corps !== 'object') return repondre(res, 400, { ok: false, raison: 'corps' });
+  const r = await actionAdmin(corps);
+  return repondre(res, r.http, r.corps);
 }
 
 // ── MES FACTURES ET MA CARTE (onglet « Mon compte », 4 octobre) ─────────────
@@ -2267,6 +2343,8 @@ export default async function handler(req, res) {
   if (mode === 'compte-vendeur') return m === 'POST' ? compteVendeur(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'changer-plan') return m === 'POST' ? changerPlan(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'parrainage') return (m === 'GET' || m === 'POST') ? parrainage(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
+  if (mode === 'partenaire') return (m === 'GET' || m === 'POST') ? partenaire(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });   // (15 nov.) programme partenaire
+  if (mode === 'partenaires') return (m === 'GET' || m === 'POST') ? partenairesAdmin(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'factures') return m === 'GET' ? factures(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'resilier') return m === 'POST' ? resilier(req, res, false) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'reprendre') return m === 'POST' ? resilier(req, res, true) : repondre(res, 405, { erreur: 'POST seulement' });

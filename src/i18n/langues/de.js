@@ -2,7 +2,9 @@
 import ecran_journee from './de/journee.js';
 import ecran_confort from './de/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_studio from './de/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
+import ecran_correspondances from './de/correspondances.js';   // (15 nov.) Publier partout : catégories qui correspondent
 import ecran_capte from './de/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
+import ecran_renvoyer from './de/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_idees from './de/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './de/ventes.js';
 import ecran_commun from './de/commun.js';
@@ -30,6 +32,7 @@ import ecran_accueilReste from './de/accueilReste.js';
 import ecran_fraiscarte from './de/fraiscarte.js';   // (14 nov., frais-carte)
 import ecran_atelier from './de/atelier.js';
 import ecran_accompagnement from './de/accompagnement.js';   // (14 nov.) les quatre moments d'un geste
+import ecran_partenaires from './de/partenaires.js';   // (15 nov.) programme partenaire
 import ecran_argentprix from './de/argentprix.js';   // (14 nov., argent-prix)
 import ecran_rechliste from './de/rechliste.js';
 import ecran_studio_paires from './de/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
@@ -51,6 +54,7 @@ export default {
   ...ecran_accompagnement,
   ...ecran_plus,
   ...ecran_argentprix,
+  ...ecran_partenaires,
   ...ecran_plateformes,
   ...ecran_idees,
   ...ecran_compta,
@@ -379,14 +383,14 @@ export default {
   "auth.moyens.chargement": "Weitere Anmeldewege werden geladen… Du kannst schon deine E-Mail nutzen.",
   "auth.moyens.erreur": "Die weiteren Anmeldewege konnten nicht geladen werden. E-Mail geht weiterhin.",
   "auth.moyens.reessayer": "Anmeldewege neu laden",
-  "auth.ouEmail": "oder per E-Mail",
+  "auth.ou": "oder",
   "auth.oublie": "Passwort vergessen?",
   "auth.perime.1": "Über 10 Minuten: Die Erweiterung ist nicht verbunden.",
   "auth.perime.2": "Melde dich an und klicke in der Erweiterung erneut „Weiter mit Google“ (oder Discord).",
   "auth.pied": "Wir fragen nie nach deinem Vinted-Passwort.",
   "auth.point1.texte": ", in der richtigen Reihenfolge, mit Etikett.",
   "auth.point1.titre": "Deine Pakete von heute",
-  "auth.point2.texte": ": Vinted, Leboncoin und eBay an einem Ort.",
+  "auth.point2.texte": ": Vinted, Leboncoin, eBay und Vestiaire an einem Ort.",
   "auth.point2.titre": "Hier verkauft, dort entfernen",
   "auth.point3.texte": ", bereit für die URSSAF, Monat für Monat.",
   "auth.point3.titre": "Deine Zahlen",
@@ -2256,4 +2260,6 @@ export default {
   ...ecran_confort,
   ...ecran_studio,
   ...ecran_capte,
+  ...ecran_correspondances,
+  ...ecran_renvoyer,
 };

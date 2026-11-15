@@ -85,7 +85,10 @@ const APP_NOMS = ['classifyOrderStatus', 'isAtRelayStatus', 'ACHAT_A_RENVOYER', 
 // par l'app ET le serveur (§11) : l'audit suit la règle jusqu'à sa définition.
 const LIMITE_NOMS = ['DELAI_EXPEDITION_J', 'FUSEAU', 'J', '_fmt', 'partsParis', 'partsParisCalc', 'jourParis', 'jourDecale', 'ecartJours', 'instantParis', 'finDuJour', 'lireDateLimite', 'limiteExpedition', 'echeanceLimite'];
 const lim = charge('api/_lib/limite-envoi.js', LIMITE_NOMS, {}, { sourceType: 'module', plugins: [] });
-const app = charge('src/App.jsx', APP_NOMS, lim);
+// (15 nov., lot retours) `ACHAT_A_RENVOYER` vit dans src/retoursAchat.js (« À renvoyer »), importé par l'app : suivi jusqu'à sa définition.
+const ret = charge('src/retoursAchat.js', ['ACHAT_A_RENVOYER'], {}, { sourceType: 'module', plugins: [] });
+const app = charge('src/App.jsx', APP_NOMS.filter((n) => n !== 'ACHAT_A_RENVOYER'), Object.assign({}, lim, ret));
+if (app.ACHAT_A_RENVOYER === undefined) app.ACHAT_A_RENVOYER = ret.ACHAT_A_RENVOYER;
 for (const n of ['DELAI_EXPEDITION_J', 'limiteExpedition']) if (app[n] === undefined && lim[n] !== undefined) app[n] = lim[n];
 app.joursAvantLimiteFr = app.joursAvantLimiteFr || ((s) => { const l = lim.lireDateLimite && lim.lireDateLimite(s); return l ? lim.echeanceLimite(l).jours : null; });
 // Les étiquettes vivent dans un composant : on les charge avec leurs voisins.

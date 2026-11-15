@@ -16,7 +16,15 @@
 //   E. en série (la sélection d'Annonces, par N°) : plusieurs annonces, une feuille ;
 //   F. le bouton envoie eBay : un BROUILLON écrit avec SON N° (identité), aucune
 //      publication eBay, aucun port ; l'état « à finir sur le site » est dit ;
-//   G. aucune erreur, aucun débordement, cases ≥ 44 px au doigt.
+//   G. aucune erreur, aucun débordement, cases ≥ 44 px au doigt ;
+//   I. (15 nov.) LES CORRESPONDANCES : la catégorie Vinted de l'annonce (lue sous
+//      `codes.catalog_id`) donne, site par site, la catégorie du site dans SES mots
+//      (Leboncoin « Mode › Chaussures · Femme · Baskets & Sneakers », Vestiaire « Mode
+//      femme › Chaussures › Baskets ») ; une correspondance pas sûre (« Chaussures
+//      habillées » ⇒ type Leboncoin ?) se DEMANDE avec les valeurs du site et SA réponse
+//      est retenue (`vrm_correspondances`) ; eBay : SES catégories, demandées à eBay au
+//      toucher, son choix retenu et porté par le brouillon (aucune devinée) ; catégorie
+//      Vinted pas lue ⇒ dit et demandé.
 const path = require('path');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
@@ -42,7 +50,13 @@ const FICHES = {
 const DECISIONS = { 9015: { choix: 'chez-moi', at: ilYaH(50), numero: '15' } };
 const ann = (id, titre, marque, prix, photo) => ({ id, title: titre, price: { amount: String(prix), currency_code: 'EUR' }, brand_title: marque, size_title: '42', status: 'Très bon état', is_closed: false, is_hidden: false, is_draft: false, ...(photo ? { photo: { url: PHOTO_V(id) } } : {}) });
 const LISTINGS = { capturedAt: ilYaH(0.1), payload: { items: [ann(9012, FICHES[9012].title, 'Nike', 80, true), ann(9013, FICHES[9013].title, 'Adidas', 70, true), ann(9014, FICHES[9014].title, 'Puma', 60, false)] } };
-const DETAILS = { 9012: { description: 'Très peu portées, boîte d’origine.', photos: [PHOTO_V(9012, 1), PHOTO_V(9012, 2), PHOTO_V(9012, 3)] }, 9013: { description: 'Comme neuves.', photos: [PHOTO_V(9013, 1), PHOTO_V(9013, 2), PHOTO_V(9013, 3)] } };
+// (15 nov.) La catégorie Vinted lue sur la page de l'annonce, à la forme mesurée (`codes.catalog_id`) :
+// 9012 « Femmes > Chaussures > Baskets » (2632), 9013 « Hommes > Chaussures > Chaussures habillées » (1238) ;
+// 9014 sans fiche lue (catégorie pas lue).
+const DETAILS = { 9012: { description: 'Très peu portées, boîte d’origine.', photos: [PHOTO_V(9012, 1), PHOTO_V(9012, 2), PHOTO_V(9012, 3)], codes: { catalog_id: 2632, brand: 'Nike' } }, 9013: { description: 'Comme neuves.', photos: [PHOTO_V(9013, 1), PHOTO_V(9013, 2), PHOTO_V(9013, 3)], codes: { catalog_id: 1238, brand: 'Adidas' } } };
+// Les catégories qu'eBay « propose » au banc (inventées, à la forme de la route `parametres`).
+const CATS_EBAY = { 'baskets femme': [{ id: '95672', nom: 'Baskets (inventée)', chemin: 'Mode › Femme › Chaussures femme › Baskets (inventée)' }, { id: '24087', nom: 'Chaussures de sport (inventée)', chemin: 'Sports › Chaussures (inventée)' }],
+  'chaussures habillées homme': [{ id: '53120', nom: 'Chaussures habillées (inventée)', chemin: 'Mode › Homme › Chaussures homme › Habillées (inventée)' }] };
 const LBC_ID = '8442aaaa-0000-4000-8000-000000000001';
 const K1 = 'aaaaaaaaaaaaaaa1';
 const cmdEbay = (orderId, titre) => ({ orderId, orderPaymentStatus: 'PAID', orderFulfillmentStatus: 'NOT_STARTED', creationDate: ilYaH(30), cancelStatus: { cancelState: 'NONE_REQUESTED' }, lineItems: [{ sku: '', title: titre }],
@@ -116,7 +130,16 @@ async function preparer(b, vp, sombre) {
     const req = route.request();
     const u = decodeURIComponent(metaVersData(req.url()));
     const j = (d, st) => route.fulfill({ status: st || 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
-    if (req.method() !== 'GET') { POSTS.push({ url: u, body: req.postData() || '' }); return j([], 201); }
+    // (15 nov.) Une écriture par comparer-et-échanger (`modifierLigneCas`, PATCH `data->>rev`) attend la ligne
+    // ÉCRITE en retour (vide = « devancé ») : le service la rend et la garde, comme PostgREST.
+    if (req.method() !== 'GET') {
+      const body = req.postData() || '';
+      POSTS.push({ url: u, body });
+      let o = null; try { o = JSON.parse(body); } catch (_) { o = null; }
+      const idEq = (/id=eq\.([^&]*)/.exec(u) || [])[1];
+      if (req.method() === 'PATCH' && idEq && o && o.data) { const row = LIGNES.find((r) => r.id === idEq); if (row) row.data = o.data; else LIGNES.push({ id: idEq, data: o.data }); return j([{ id: idEq, data: o.data }], 200); }
+      return j(Array.isArray(o) ? o : (o ? [o] : []), 201);
+    }
     if (/select=owner/.test(u)) return j({ m: 1 }, 400);
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
@@ -138,6 +161,7 @@ async function preparer(b, vp, sombre) {
     ACTIONS_EBAY.push(String(body.action || ''));
     if (body.action === 'pubinfo') return j({ ok: true, categorie: { categoryId: '15709', suggeree: { categoryId: '15709', categoryName: 'Baskets (inventée)' } },
       attributs: [{ nom: 'Marque', requis: true, mode: 'FREE_TEXT', valeurs: [] }, { nom: 'Type', requis: true, mode: 'SELECTION_ONLY', valeurs: ['Basket'] }], conditions: [{ id: '1000' }, { id: '3000' }] });
+    if (body.action === 'parametres') return j({ ok: true, arbre: '71', categories: CATS_EBAY[String(body.q || '')] || [], categoryId: null, aspects: null, conditions: null, compte: null });
     if (body.action === 'status') return j(LIGNES.some((r) => r.id === 'ebay_comptes') ? { ok: true, connected: true, comptes: [{ cle: K1, pseudo: 'paire_perso', principal: true, relie: true }] } : { ok: true, connected: false, comptes: [] });
     return j({ ok: true });
   });
@@ -168,7 +192,7 @@ const cases = (pg) => pg.evaluate(() => [...document.querySelectorAll('[data-pp-
   const i = c.querySelector('input[type="checkbox"]'); const l = c.querySelector('.vrm-pp-coche'); const b = l ? l.getBoundingClientRect() : { height: 0 };
   return { cle: c.getAttribute('data-pp-case'), site: c.getAttribute('data-pp-site'), cochable: c.getAttribute('data-pp-cochable'), raison: c.getAttribute('data-pp-raison'),
     deja: c.getAttribute('data-pp-deja'), coche: !!(i && i.checked), prix: (c.querySelector('[data-pp-prix]') || {}).getAttribute ? c.querySelector('[data-pp-prix]').getAttribute('data-pp-prix') : '', h: b.height,
-    resultat: c.getAttribute('data-pp-resultat'), texte: (c.querySelector('[data-pp-raison-texte]') || {}).innerText || '' };
+    resultat: c.getAttribute('data-pp-resultat'), texte: (c.querySelector('[data-pp-raison-texte]') || {}).innerText || '', raisonEtat: (c.querySelector('[data-pp-etat-raison]') || {}).innerText || '' };
 }));
 
 (async () => {
@@ -176,18 +200,22 @@ const cases = (pg) => pg.evaluate(() => [...document.querySelectorAll('[data-pp-
   try {
     srv.listen(PORT);
     b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
-    for (const [vp, sombre] of [[{ width: 390, height: 844 }, false], [{ width: 390, height: 844 }, true], [{ width: 1512, height: 950 }, false], [{ width: 1512, height: 950 }, true]]) {
+    // BANC_VP=1512-sombre : une seule taille (pour chercher un défaut ; la preuve passe par les quatre).
+    for (const [vp, sombre] of [[{ width: 390, height: 844 }, false], [{ width: 390, height: 844 }, true], [{ width: 1512, height: 950 }, false], [{ width: 1512, height: 950 }, true]].filter(([v, s]) => !process.env.BANC_VP || `${v.width}${s ? '-sombre' : ''}` === process.env.BANC_VP)) {
       const nomVp = `${vp.width}${sombre ? '-sombre' : ''}`;
       const doigt = vp.width < 600;
       console.log(`── ${nomVp}`);
       LIGNES = lignesDe(); POSTS.length = 0; ACTIONS_EBAY.length = 0;
       const { ctx, pg, errs } = await preparer(b, vp, sombre);
       await essaie('A. La fiche d’une annonce Vinted → Publier partout', async () => {
+        // (15 nov.) Le chemin d'aujourd'hui (Studio, 14 nov.) : toucher la rangée de l'annonce ⇒ au téléphone
+        // elle monte, son « ⋯ » ouvre LA fiche ; à l'ordinateur la fiche s'ouvre en plan ; puis son menu « ⋯ ».
         await aller(pg, 'tab=annonces');
-        await pg.waitForSelector('[data-fiche-menu-ouvrir="9012"]', { state: 'attached', timeout: 25000 });
-        const plus = await pg.$('[data-fiche-menu-ouvrir="9012"]');
-        if (!(await plus.isVisible())) { const carte = await pg.evaluateHandle(() => document.querySelector('[data-fiche-menu-ouvrir="9012"]').closest('[data-fiche-plus]').parentElement.querySelector('[data-fiche-plus-bouton]')); await carte.asElement().click(); }
-        await pg.click('[data-fiche-menu-ouvrir="9012"]');
+        await pg.waitForSelector('[data-sb-avant-cle="111_9012"] [data-titre]', { timeout: 25000 });
+        await pg.locator('[data-sb-avant-cle="111_9012"] [data-titre]').click({ force: true, noWaitAfter: true });
+        if (doigt) { await pg.waitForSelector('[data-sb-avant="1"] [data-sb-avant-plus]', { timeout: 8000 }); await pg.locator('[data-sb-avant-plus]').click({ force: true, noWaitAfter: true }); }
+        await pg.waitForSelector('.vrm-fp [data-fiche-menu-ouvrir]', { timeout: 15000 });
+        await pg.locator('.vrm-fp [data-fiche-menu-ouvrir]').first().click({ force: true, noWaitAfter: true });
         await pg.waitForSelector('[data-fiche-partout="12"]', { timeout: 8000 });
         await pg.click('[data-fiche-partout="12"]');
         await pg.waitForSelector('[data-publier-partout="1"] [data-pp-case]', { timeout: 25000 });
@@ -243,6 +271,54 @@ const cases = (pg) => pg.evaluate(() => [...document.querySelectorAll('[data-pp-
         await pg.fill(matiere, ''); await pg.press(matiere, 'Enter');
         await pg.click('[data-pp-fermer]');
       });
+      await essaie('I. Les correspondances entre sites', async () => {
+        const corr = (sel) => pg.evaluate((sel) => { const e = document.querySelector(sel); return e ? { cible: (e.querySelector('[data-pp-corr-cible]') || { getAttribute: () => '' }).getAttribute('data-pp-corr-cible'), sure: e.getAttribute('data-pp-corr-sure'), dem: Number(e.getAttribute('data-pp-corr-demandes')), cat: e.getAttribute('data-pp-corr-catalogue'), vinted: (e.querySelector('[data-pp-corr-vinted]') || {}).innerText || '', vals: [...e.querySelectorAll('[data-pp-corr-val]')].map((x) => x.getAttribute('data-pp-corr-val') + '=' + x.querySelector('b').innerText), pasLue: !!e.querySelector('[data-pp-corr-pas-lue]') } : null; }, sel);
+        const memoire = () => pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_correspondances') || 'null'); } catch (_) { return null; } });
+        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:publier-partout', { detail: { nums: ['12', '13', '14'] } })));
+        await pg.waitForSelector('[data-publier-partout="3"] [data-pp-corr]', { timeout: 25000 });
+        await pg.waitForFunction(() => !document.querySelector('[data-pp-lecture]'), null, { timeout: 15000 }).catch(() => {});
+        await pg.waitForTimeout(400);
+        const l12 = await corr('[data-pp-case="9012:leboncoin"] [data-pp-corr]');
+        dit(l12 && l12.cat === '2632' && /Femmes › Chaussures › Baskets/.test(l12.vinted), `${nomVp} · I · N°12 part de SA catégorie Vinted (2632, lue sous codes.catalog_id)`, JSON.stringify(l12));
+        dit(l12 && l12.cible === 'Mode › Chaussures · Femme · Baskets & Sneakers' && l12.sure === '1' && l12.dem === 0, `${nomVp} · I · Leboncoin : « Mode › Chaussures · Femme · Baskets & Sneakers », sûre (table vérifiée)`, JSON.stringify(l12));
+        dit(l12 && l12.vals.includes('taille=42') && l12.vals.includes('etat=Très bon état'), `${nomVp} · I · Leboncoin : pointure et état traduits dans SES mots`, JSON.stringify(l12 && l12.vals));
+        const v12 = await corr('[data-pp-case="9012:vestiaire"] [data-pp-corr]');
+        dit(v12 && v12.cible === 'Mode femme › Chaussures › Baskets' && v12.sure === '1', `${nomVp} · I · Vestiaire : « Mode femme › Chaussures › Baskets »`, JSON.stringify(v12));
+        const l13 = await corr('[data-pp-case="9013:leboncoin"] [data-pp-corr]');
+        dit(l13 && l13.dem >= 1 && !!(await pg.$('[data-pp-case="9013:leboncoin"] [data-pp-corr-choix="leboncoin:type"]')), `${nomVp} · I · N°13 « Chaussures habillées » : le type Leboncoin est DEMANDÉ, avec les types du site`, JSON.stringify(l13));
+        const opts = await pg.evaluate(() => [...document.querySelectorAll('[data-pp-case="9013:leboncoin"] [data-pp-corr-choix="leboncoin:type"] option')].map((o) => o.value).filter(Boolean));
+        dit(opts.includes('Chaussures à lacets') && opts.includes('Mocassins') && !opts.includes('Derbies'), `${nomVp} · I · les choix sont ceux de Leboncoin (fdata), rien d’autre`, JSON.stringify(opts));
+        await pg.locator('[data-pp-case="9013:leboncoin"] [data-pp-corr]').scrollIntoViewIfNeeded();
+        await capture(pg, `partout-corr-demande-${nomVp}`);
+        await pg.selectOption('[data-pp-case="9013:leboncoin"] [data-pp-corr-choix="leboncoin:type"]', 'Chaussures à lacets');
+        await pg.waitForFunction(() => /Chaussures à lacets/.test(localStorage.getItem('vrm_correspondances') || ''), null, { timeout: 8000 }).catch(() => {});
+        const m1 = await memoire();
+        dit(m1 && m1.cat && m1.cat['1238'] && m1.cat['1238'].leboncoin.type === 'Chaussures à lacets', `${nomVp} · I · SA réponse est retenue pour « Chaussures habillées » (vrm_correspondances)`, JSON.stringify(m1));
+        const l13b = await corr('[data-pp-case="9013:leboncoin"] [data-pp-corr]');
+        dit(l13b && /Chaussures à lacets/.test(l13b.cible) && l13b.dem === 0, `${nomVp} · I · la fiche Leboncoin du N°13 est complète`, JSON.stringify(l13b));
+        // eBay : SES catégories, demandées à eBay au toucher.
+        await pg.click('[data-pp-corr-ebay-chercher="9012"]');
+        await pg.waitForSelector('[data-pp-case="9012:ebay"] [data-pp-corr-ebay-cat="95672"]', { timeout: 8000 });
+        await pg.locator('[data-pp-case="9012:ebay"] [data-pp-corr]').scrollIntoViewIfNeeded();
+        await capture(pg, `partout-corr-ebay-${nomVp}`);
+        if (doigt) { const h = await pg.evaluate(() => document.querySelector('[data-pp-corr-ebay-cat="95672"]').getBoundingClientRect().height); dit(h >= 43.5, `${nomVp} · G · une catégorie eBay se touche au doigt (≥ 44 px)`, String(h)); }
+        await pg.click('[data-pp-corr-ebay-cat="95672"]');
+        await pg.waitForFunction(() => /95672/.test(localStorage.getItem('vrm_correspondances') || ''), null, { timeout: 8000 }).catch(() => {});
+        const e12 = await corr('[data-pp-case="9012:ebay"] [data-pp-corr]');
+        dit(e12 && /Baskets \(inventée\)/.test(e12.cible) && e12.dem === 0, `${nomVp} · I · eBay : la catégorie qu’il a touchée, avec son chemin eBay`, JSON.stringify(e12));
+        await pg.click('[data-pp-corr-ebay-chercher="9013"]');
+        await pg.waitForSelector('[data-pp-corr-ebay-cat="53120"]', { timeout: 8000 });
+        await pg.click('[data-pp-corr-ebay-cat="53120"]');
+        await pg.waitForFunction(() => /53120/.test(localStorage.getItem('vrm_correspondances') || ''), null, { timeout: 8000 }).catch(() => {});
+        const m2 = await memoire();
+        dit(m2 && m2.cat['2632'] && m2.cat['2632'].ebay.id === '95672' && m2.cat['1238'].ebay.id === '53120', `${nomVp} · I · ses choix eBay sont retenus par catégorie Vinted`, JSON.stringify(m2 && m2.cat));
+        const l14 = await corr('[data-pp-case="9014:leboncoin"] [data-pp-corr]');
+        dit(l14 && l14.pasLue && l14.dem >= 1 && !l14.cible, `${nomVp} · I · N°14 (catégorie Vinted pas lue) : dit, et la catégorie Leboncoin demandée (jamais d’après le titre)`, JSON.stringify(l14));
+        await pg.locator('[data-pp-case="9012:leboncoin"] [data-pp-corr]').scrollIntoViewIfNeeded();
+        await capture(pg, `partout-correspondances-${nomVp}`);
+        await sain(pg, `${nomVp} · correspondances`);
+        await pg.click('[data-pp-fermer]');
+      });
       await essaie('E/F. En série, puis le brouillon eBay', async () => {
         await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:publier-partout', { detail: { nums: ['13', '14'] } })));
         await pg.waitForSelector('[data-publier-partout="2"] [data-pp-case]', { timeout: 25000 });
@@ -261,9 +337,12 @@ const cases = (pg) => pg.evaluate(() => [...document.querySelectorAll('[data-pp-
         await pg.waitForSelector('[data-pp-bilan]', { timeout: 20000 });
         const r = await cases(pg);
         dit(r.find((x) => x.cle === '9013:ebay').resultat === 'a-finir', `${nomVp} · F · eBay : « à finir sur le site » (un brouillon, jamais « publié » d’ici)`, JSON.stringify(r.find((x) => x.cle === '9013:ebay')));
-        const ecrit = POSTS.filter((p) => /ebay_brouillons/.test(p.body));
-        let br = null; try { const rows = JSON.parse(ecrit[ecrit.length - 1].body); br = Object.values(rows[0].data.items).find((x) => x.pairId === '9013'); } catch (_) { br = null; }
-        dit(br && br.numero === '13' && br.origine === 'partout' && br.categorie && br.categorie.id === '15709', `${nomVp} · F · le brouillon porte SON N° (13 ⇒ SKU VRM-13) et la catégorie suggérée`, JSON.stringify(br && { numero: br.numero, cat: br.categorie }));
+        const ecrit = POSTS.filter((p) => /ebay_brouillons/.test(p.url + ' ' + p.body));
+        let br = null; try { const o = JSON.parse(ecrit[ecrit.length - 1].body); const d = Array.isArray(o) ? o[0].data : o.data; br = Object.values(d.items).find((x) => x.pairId === '9013'); } catch (_) { br = null; }
+        // (15 nov.) la catégorie eBay est CELLE QU'IL A CHOISIE (I), plus la première suggestion d'eBay pour le titre.
+        dit(br && br.numero === '13' && br.origine === 'partout' && br.categorie && br.categorie.id === '53120', `${nomVp} · F · le brouillon porte SON N° (13 ⇒ SKU VRM-13) et SA catégorie eBay (53120, choisie en I)`, JSON.stringify(br && { numero: br.numero, cat: br.categorie }));
+        const pi = ACTIONS_EBAY.filter((a) => a === 'pubinfo').length;
+        dit(pi === 1, `${nomVp} · F · eBay n’est interrogé que pour SA catégorie (pubinfo avec son id), jamais pour en deviner une`, ACTIONS_EBAY.join());
         dit(br && !/livraison|shipping/i.test(JSON.stringify(br)), `${nomVp} · F · aucun port dans le brouillon (§2.8)`);
         dit(!ACTIONS_EBAY.includes('publish') && !ACTIONS_EBAY.includes('pubverify'), `${nomVp} · F · aucune publication eBay d’ici`, ACTIONS_EBAY.join());
         dit(!POSTS.some((p) => /lbcPublier|vcPreparer/.test(p.body)), `${nomVp} · B · rien n’est parti vers Leboncoin ni Vestiaire sans extension`);

@@ -269,7 +269,7 @@ export function texteNotifModeration(evts, { nomCompte = () => '' } = {}) {
   const grave = n('banni') || n('restreint');
   const title = `Vinted${sur} : ${morceaux.join(', ')}`;
   const body = grave
-    ? 'Pause conseillée : VRM a arrêté ses actions automatiques sur ce compte. Vérifie tes messages Vinted.'
+    ? 'Pause conseillée : VRM a arrêté ses actions auto sur ce compte. Vois tes messages Vinted.'   // (15 nov.) ≤ 90
     : (n('masquee') ? 'Ouvre l’annonce sur Vinted : la raison est écrite dessus.' : 'Peut-être retirée par Vinted. Vérifie tes messages Vinted.');
   return { title, body };
 }

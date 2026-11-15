@@ -13,6 +13,7 @@
 //   cible=retrait  tx=<transaction> suivi=<n° de suivi> Colis · « À retirer » · la carte
 //   cible=colonne  colonne=prets|attente|retirer|partis Colis · la colonne
 //   cible=achat    tx=<transaction>                     Achats · la ligne de l'achat
+//   cible=retour   tx=<transaction>                     Achats · la carte du bordereau de retour (15 nov.)
 //   cible=urssaf                                        Comptabilité · « Ta déclaration URSSAF »
 //   cible=bilanmois mois=<AAAA-MM>                      Comptabilité · « Bilan du mois » de CE mois
 //                  (13 nov., lot 53 : le bouton de l'e-mail du bilan mensuel)
@@ -45,7 +46,7 @@
 import { motsVendeur } from './profilVendeur.js';
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 const COLONNES = ['prets', 'attente', 'retirer', 'partis'];
-const TYPES = ['conv', 'offre', 'offres', 'vente', 'vcvente', 'colis', 'retrait', 'colonne', 'achat', 'urssaf', 'doublon', 'case', 'bilanmois'];
+const TYPES = ['conv', 'offre', 'offres', 'vente', 'vcvente', 'colis', 'retrait', 'colonne', 'achat', 'retour', 'urssaf', 'doublon', 'case', 'bilanmois'];
 const MOIS = /^\d{4}-(0[1-9]|1[0-2])$/;
 // (13 nov., lot 53) Le mois demandé par l'e-mail du bilan mensuel : la carte « Bilan du
 // mois » (Compta) le lit à son montage pour montrer CE mois (s'il est l'un des deux qu'elle sait).
@@ -71,7 +72,7 @@ export function lireCible(params) {
   if (type === 'case') { c.meuble = propre(g('meuble')); const i = String(g('i') == null ? '' : g('i')).trim(); c.i = /^\d{1,4}$/.test(i) ? String(Number(i)) : ''; if (!c.meuble || !c.i) return null; }
   if ((type === 'conv' || type === 'offre') && !c.conv) return null;
   if (type === 'vcvente' && !c.vc) return null;
-  if ((type === 'vente' || type === 'colis' || type === 'achat') && !c.tx) return null;
+  if ((type === 'vente' || type === 'colis' || type === 'achat' || type === 'retour') && !c.tx) return null;
   if (type === 'retrait' && !c.tx && !c.suivi) return null;
   if (type === 'colonne' && !c.colonne) return null;
   return c;
@@ -109,6 +110,8 @@ export function jetonsCible(c) {
     case 'retrait': return [c.tx ? `retrait:tx:${c.tx}` : null, c.suivi ? `retrait:suivi:${c.suivi}` : null].filter(Boolean);
     case 'colonne': return [`colonne:${c.colonne}`];
     case 'achat': return [`achat:${c.tx}`];
+    // (15 nov.) La carte d'un bordereau de retour d'achat (src/RetoursLitiges.jsx), par SON n°.
+    case 'retour': return [`retour:${c.tx}`];
     case 'urssaf': return ['urssaf'];
     case 'bilanmois': return c.mois ? [`bilanmois:${c.mois}`] : ['bilanmois'];
     case 'doublon': { const n = c.num ? cleNumCible(c.num) : ''; return n ? [`doublon:${c.plat || 'ebay'}:${n}`] : [`doublon:${c.plat || 'ebay'}`]; }
@@ -184,6 +187,8 @@ function selecteursAnciens(c) {
     case 'case': return { essais: c.meuble && c.i ? [`[data-case-ici="${q(c.meuble)}:${q(c.i)}"]`] : [], ouvrir: null, deplier: [] };
     // (6 nov., recherche) Une annonce sans N° : SA carte dans Annonces (l'id Vinted de l'annonce).
     case 'annonce': return { essais: c.id ? [`[data-carte-annonce="${q(c.id)}"]`] : [], ouvrir: null, deplier: [] };
+    // (15 nov.) La carte d'un bordereau de retour : son ancien attribut.
+    case 'retour': return { essais: [`[data-retour-achat="${q(c.tx)}"]`], ouvrir: null, deplier: [] };
     default: return { essais: [], ouvrir: null, deplier: [] };
   }
 }
@@ -204,6 +209,7 @@ export function phraseAbsente(c) {
     case 'retrait': return "Ce colis n'est plus dans « À retirer » : il est peut-être déjà retiré.";
     case 'colonne': return 'Rien dans cette colonne pour l\u2019instant.';
     case 'achat': return "Cet achat n'est pas dans la liste affichée.";
+    case 'retour': return "Ce retour n'est pas dans la liste affichée : le bordereau n'est peut-être pas encore relu, ou le retour est fini.";
     case 'urssaf': return 'La carte URSSAF ne s\u2019affiche pas pour ton statut.';
     case 'bilanmois': return 'Le « Bilan du mois » montre ce mois-ci et le mois dernier : pour un mois plus ancien, « Rapport du mois » le donne en PDF.';
     // Ne promet pas « réglée » : la ligne peut manquer parce que la liste n'est

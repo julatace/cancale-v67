@@ -1258,21 +1258,37 @@ function nettoyerRelaisSuivi(r) {
   };
 
   // --- Patch de fetch ---
+  // ⚠️ 5.379 (15 nov., revue « inoffensif par construction », après la page Leboncoin noire
+  //    sur Orion) : le `fetch` d'origine est appelé UNE seule fois. Avant, une exception levée
+  //    APRÈS l'appel (dans `noteSeen` par exemple) faisait passer par le `catch`, qui
+  //    rappelait `origFetch` : la requête partait DEUX fois (un message, une offre…). Et
+  //    l'enveloppe garde le nom, la longueur et le texte de l'original (`commeNatif`).
+  const commeNatif = (f, orig) => {
+    try {
+      for (const k of ['name', 'length']) Object.defineProperty(f, k, { value: orig[k], configurable: true });
+      const texte = Function.prototype.toString.call(orig);
+      Object.defineProperty(f, 'toString', { value: function toString() { return texte; }, configurable: true, writable: true });
+    } catch (_) {}
+    return f;
+  };
   const origFetch = window.fetch;
   if (origFetch) {
-    window.fetch = function (input, init) {
+    window.fetch = commeNatif(function (input, init) {
+      let url = '', method = 'GET', corpsEnvoye;
       try {
-        const url = (typeof input === 'string') ? input : input instanceof URL ? input.href : (input && input.url) || '';
+        url = (typeof input === 'string') ? input : input instanceof URL ? input.href : (input && input.url) || '';
         if (init && init.headers) sendCsrf(init.headers);
         else if (input && input.headers) sendCsrf(input.headers);
-        const method = (init && init.method) || (input && input.method) || 'GET';
-        const corpsEnvoye = init && init.body;
+        method = (init && init.method) || (input && input.method) || 'GET';
+        corpsEnvoye = init && init.body;
         const contexte=contexteCreation(method,url);
         const estCreation=String(method).toUpperCase()==='POST'&&/\/api\/v2\/conversations(?:\?|$)/.test(url);
         if(estCreation&&corpsEnvoye===undefined&&typeof Request!=='undefined'&&input instanceof Request){
           try{const copie=input.clone();corpsRequestBorne(copie).then(body=>{if(body!==null)sendWriteReq(method,url,body,contexte);}).catch(()=>{});}catch{}
         }else sendWriteReq(method, url, corpsEnvoye,contexte);
-        const p = origFetch.apply(this, arguments);
+      } catch (_) {}
+      const p = origFetch.apply(this, arguments);
+      try {
         noteSeen(url); // diagnostic : TOUT appel API, pas seulement ceux qui matchent
         p.then((res) => {
           try {
@@ -1294,11 +1310,9 @@ function nettoyerRelaisSuivi(r) {
             }
           } catch (_) {}
         }).catch(() => {});
-        return p;
-      } catch (_) {
-        return origFetch.apply(this, arguments);
-      }
-    };
+      } catch (_) {}
+      return p;
+    }, origFetch);
   }
 
   // --- Patch de XMLHttpRequest ---
@@ -1307,16 +1321,15 @@ function nettoyerRelaisSuivi(r) {
     const origOpen = XHR.prototype.open;
     const origSend = XHR.prototype.send;
     const origSetHeader = XHR.prototype.setRequestHeader;
-    XHR.prototype.open = function (method, url) {
-      this.__cancaleUrl = typeof url==='string'?url:String(url||'');
-      this.__cancaleMethod = method;
+    XHR.prototype.open = commeNatif(function (method, url) {
+      try { this.__cancaleUrl = typeof url==='string'?url:String(url||''); this.__cancaleMethod = method; } catch (_) {}
       return origOpen.apply(this, arguments);
-    };
-    XHR.prototype.setRequestHeader = function (name, value) {
+    }, origOpen);
+    XHR.prototype.setRequestHeader = commeNatif(function (name, value) {
       try { if (String(name).toLowerCase() === 'x-csrf-token' && value) post({ kind: 'csrf', csrf: value }); } catch (_) {}
       return origSetHeader.apply(this, arguments);
-    };
-    XHR.prototype.send = function (bodyArg) {
+    }, origSetHeader);
+    XHR.prototype.send = commeNatif(function (bodyArg) {
       try {
         const url = this.__cancaleUrl || '';
         // Capte aussi le csrf/anon posé via setRequestHeader (déjà relayé plus
@@ -1346,7 +1359,7 @@ function nettoyerRelaisSuivi(r) {
         });
       } catch (_) {}
       return origSend.apply(this, arguments);
-    };
+    }, origSend);
   }
 
   // ── MOISSON ACTIVE (v3.8 → retirée de la page en 5.356) ─────────────────

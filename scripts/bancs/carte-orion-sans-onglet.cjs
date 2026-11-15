@@ -159,7 +159,8 @@ const lire = (pg) => pg.evaluate(() => {
     mdpPresent: r ? !!(r.querySelector('input[type="password"], #vrm-cx-mdp, [data-basculer-mode]') || /mot de passe/i.test((r.querySelector('.connexion') || {}).innerHTML || '')) : false,
     autocomplete: r ? [...r.querySelectorAll('input')].map((i) => i.getAttribute('autocomplete')) : [],
     hauteurs: r ? [...r.querySelectorAll('.connexion input, .connexion button')].filter(vis).map((x) => Math.round(x.getBoundingClientRect().height)) : [],
-    fondPrincipal: cs(q('[data-principal]')) ? cs(q('[data-principal]')).backgroundColor : '',
+    // 5.379 (Studio bleu clair) : le bouton principal est le PLEIN, un rond d'encre (dégradé) — plus le bleu Apple.
+    fondPrincipal: cs(q('[data-principal]')) ? cs(q('[data-principal]')).backgroundImage : '',
     principal: q('[data-principal]') ? q('[data-principal]').textContent.trim() : '',
     tailleChamp: cs(q('#vrm-cx-mail')) ? cs(q('#vrm-cx-mail')).fontSize : (cs(q('#vrm-cx-code')) ? cs(q('#vrm-cx-code')).fontSize : ''),
     ordre: { mail: y('#vrm-cx-mail'), code: y('[data-code-demander]'), mdp: y('[data-basculer-mode]'), google: y('[data-fournisseur="google"]'), discord: y('[data-fournisseur="discord"]') },
@@ -311,7 +312,7 @@ const lireDansCadre = (fr) => fr.evaluate(() => {
       await pg.emulateMedia({ colorScheme: scheme }); await pg.waitForTimeout(150);
       l = await lire(pg);
       dit(l.hauteurs.length >= 4 && l.hauteurs.every((x) => x >= 44), `${scheme} : champ et boutons de 44 px au moins`, JSON.stringify(l.hauteurs));
-      dit(l.fondPrincipal === (scheme === 'dark' ? 'rgb(10, 132, 255)' : 'rgb(0, 113, 227)'), `${scheme} : le bouton principal au bleu Apple, le seul accent`, l.fondPrincipal);
+      dit(String(l.fondPrincipal).includes(scheme === 'dark' ? 'rgb(234, 242, 251)' : 'rgb(12, 29, 48)'), `${scheme} : le bouton principal est le plein d’encre du studio, le seul`, l.fondPrincipal);
       dit(l.tailleChamp === '16px' && !l.deborde && l.largeur <= 358, `${scheme} : champ en 16 px (iOS ne zoome pas), une colonne, rien ne déborde`, JSON.stringify({ t: l.tailleChamp, largeur: l.largeur, deborde: l.deborde }));
       await pg.screenshot({ path: path.join(SORTIE, `carte-orion-formulaire-${scheme}.png`) });
     }
@@ -342,7 +343,7 @@ const lireDansCadre = (fr) => fr.evaluate(() => {
     for (const scheme of ['light', 'dark']) {
       await pg.emulateMedia({ colorScheme: scheme }); await pg.waitForTimeout(150);
       l = await lire(pg);
-      dit(l.hauteurs.every((x) => x >= 44) && l.fondPrincipal === (scheme === 'dark' ? 'rgb(10, 132, 255)' : 'rgb(0, 113, 227)') && !l.deborde, `${scheme} : cases et boutons de 44 px au moins, « Valider » au bleu Apple`, JSON.stringify({ h: l.hauteurs, fond: l.fondPrincipal }));
+      dit(l.hauteurs.every((x) => x >= 44) && String(l.fondPrincipal).includes(scheme === 'dark' ? 'rgb(234, 242, 251)' : 'rgb(12, 29, 48)') && !l.deborde, `${scheme} : cases et boutons de 44 px au moins, « Valider » en plein d’encre`, JSON.stringify({ h: l.hauteurs, fond: l.fondPrincipal }));
       await pg.screenshot({ path: path.join(SORTIE, `carte-orion-code-${scheme}.png`) });
     }
     await pg.emulateMedia({ colorScheme: 'light' });
