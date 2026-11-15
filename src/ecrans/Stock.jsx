@@ -1499,7 +1499,14 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         </>);
       })() : <div className="vrm-st4-vide" data-stock-cote-vide=""><Icon name="box" size={26} /><p>{tr('etag4.toucheCase')}</p></div>}
     </aside>);
-  const choisiM = meublesVus.find((x) => String(x.id) === meubleChoisi) || null;
+  const choisiM0 = meublesVus.find((x) => String(x.id) === meubleChoisi) || null;
+  // Pendant une recherche tapée, à l'ordinateur : si le meuble choisi n'a rien qui correspond, celui qui en a vient au
+  // centre (au téléphone, les meubles sans résultat se replient — la même idée).
+  const choisiM = (() => {
+    if (!bureau || !filtre || !choisiM0) return choisiM0;
+    const ici = (m) => { for (let i = 0; i < total(m); i++) { const o = occupant(m.id, i); if (o && correspond(o)) return true; } return false; };
+    return ici(choisiM0) ? choisiM0 : (meublesVus.find(ici) || choisiM0);
+  })();
   const blocMeubles = (
     <section className="vrm-ms-section vrm-st4" data-stock-section="meubles" data-stock-bureau={bureau ? '' : undefined} aria-label={tr('ms.stock.meubles')}>
     <h2 className="vrm-ms-h2">{tr('ms.stock.meubles')}</h2>
