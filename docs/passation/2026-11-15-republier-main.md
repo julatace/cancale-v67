@@ -98,6 +98,38 @@ une photo ⇒ clé `.un` sans nombre). Accompagnement : `republier.main`, `publi
 `GESTES_ACC` (AccApres / AccEchec, aucun « Annuler », aucune confirmation neuve). Styles :
 `src/republier-guide.css` (jetons `--sb-*`). « Quoi de neuf » : `republier-main-guide`.
 
+## 2 bis. « On me propose qu'une seule photo » (capture de Julien, 15 nov., « Remettre en vente », N°B546)
+
+Ses mots : « on me propose qu'une seule photo, ce n'est pas possible, je veux TOUTES les photos, et que
+toutes les photos subissent les mêmes modifications que j'ai apportées ; je veux que les barres pour
+modifier les photos soient beaucoup mieux ».
+
+**Pourquoi (lu dans le code)** : la feuille ne prenait QUE le coffre (`coffre_{uid}_{id}.photos`, écrit
+par l'atelier quand VRM republie) et retombait sur la VIGNETTE du dressing (`paire.photo`). Une vente
+retournée ou annulée, ou une annonce jamais passée par l'atelier, n'a pas de coffre ⇒ une seule photo.
+Les photos existaient pourtant ailleurs, par l'identité de l'annonce : `vinted_item_details[id].photos`
+(la fiche lue sur la page de l'annonce par l'extension) et les photos portées par la lecture du dressing
+(`photosDetail` / `photos`), que `annSelectionnables` ne transmettait pas.
+
+**Ce qui a changé** :
+- `photosDeLAnnonce` (src/republierGuide.js) : coffre, fiche de la page (lue en PROJECTION de cette seule
+  annonce, `select=ph:data->"<id>"->photos`, jamais la ligne entière), dressing, la vignette en dernier —
+  la source qui en porte le plus, dans l'ordre de Vinted (la 1re = la couverture), sans doublon ;
+  `annSelectionnables` porte maintenant `photos` et `nPhotos`.
+- S'il en manque (Vinted en annonce 8, VRM en a lu 3) ou si VRM n'a que la couverture : dit en ambre, avec
+  « Ouvrir l'annonce sur Vinted ↗ » (l'extension lit alors sa fiche et toutes ses photos) et « Relire les
+  photos » (relit coffre et fiche, sans recharger).
+- La grille montre TOUTES les photos avec la même présentation ; une photo se touche pour la retirer /
+  la remettre (case cochée, retirée = estompée) ; « 7 sur 8 photos choisies » ; « Couverture » sur la
+  première qui part ; « Enregistrer les 7 photos » ⇒ le partage iOS porte les 7 fichiers, dans le geste.
+- Les barres (`CurseursPresentation`) : « Le même réglage pour toutes tes photos », la couverture
+  retouchée en aperçu, chaque barre son nom (Redresser, Luminosité, Contraste, Couleurs, Recadrer) et sa
+  valeur en clair (« +10 % », « −2° », « ×1,25 »), une prise de 44 px, un pouce de 28 px, le zéro marqué ;
+  double-toucher (ou double-clic) = remise à zéro de cette barre ; « Réinitialiser » en lien. Un seul
+  réglage pour toutes (jamais par photo), aucune valeur tirée au hasard (audit C1/C2, mutation
+  `hasard_curseur`).
+- « Publier à la main » : la même grille (les photos de la fiche, à retirer d'un toucher).
+
 ## 3. Après (mesuré par le banc)
 
 Republier, une paire, iPhone : **12 touchers** (+1 système) de la vue Republier à « C'est
