@@ -18370,7 +18370,14 @@ function usePairesAFinir(actif = true) {
   return l;
 }
 // L'entrée d'atelier d'une fiche déjà rangée (reprise) : SON achat (n° de transaction) et SON N°.
-const entreeDeFiche = (f) => ({ tx: String((f.achat && f.achat.tx) || ''), numeros: [String(f.numero)], titre: f.titre || '', photo: f.photoAchat || null, prix: null, taille: f.taille || '', site: (f.achat && f.achat.site) || 'vinted' });
+// L'achat tel que « J'ai retiré » l'a proposé (`vrm_ranger_proposes`, par SON n° de transaction) garde son prix lu
+// et son prix PAYÉ (le reçu) : la reprise les retrouve. Absent (autre appareil) ⇒ aucun prix proposé, le champ vide.
+const entreeDeFiche = (f) => {
+  const tx = String((f.achat && f.achat.tx) || '');
+  const p = tx ? lirePropositionsRanger()[tx] : null;
+  const lu = p && String(p.tx) === tx ? { prix: p.prix != null ? p.prix : null, paye: p.paye || null, statut: p.statut || '', devise: p.devise || '', lot: !!p.lot, n: p.n || null } : { prix: null };
+  return { tx, ...lu, numeros: [String(f.numero)], titre: f.titre || '', photo: f.photoAchat || null, taille: f.taille || '', site: (f.achat && f.achat.site) || 'vinted' };
+};
 function AtelierArriveeCoque() {
   const [entrees, setEntrees] = React.useState(null);
   const [creer, setCreer] = React.useState(null);

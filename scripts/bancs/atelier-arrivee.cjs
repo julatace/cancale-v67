@@ -77,7 +77,7 @@ const projette = (row, sel) => {
 const lireLocal = (pg) => pg.evaluate(() => { const j = (k) => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (_) { return null; } };
   return { fiches: j('vrm_fiches_neuves') || {}, slots: j('vrm_slots') || {}, pool: (j('vinted_used_numeros') || []).map(String), couts: j('vinted_buyprice_by_num') || {}, marques: j('vrm_atelier_arrivee') || {} }; });
 const attendre = async (fn, ms = 8000) => { const t0 = Date.now(); let v; while (Date.now() - t0 < ms) { v = await fn(); if (v) return v; await new Promise((r) => setTimeout(r, 200)); } return v; };
-const capture = async (pg, nom) => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { recursive: true }); await pg.screenshot({ path: path.join(SHOTS, nom + '.png') }); };
+const capture = async (pg, nom) => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { recursive: true }); await pg.screenshot({ path: path.join(SHOTS, nom + '.png'), timeout: 120000 }).catch((e) => console.log('   (capture ' + nom + ' : ' + String(e.message).split('\n')[0].slice(0, 80) + ')')); };
 
 // La mesure d'une étape, DANS la page : la feuille de l'atelier seulement.
 function mesureEtape(tactile) {
@@ -156,6 +156,10 @@ async function passe(b, vp, sombre) {
   const p1 = await lireLocal(pg);
   dit(!Object.keys(p1.fiches).length && !p1.pool.includes('13') && JSON.stringify(p1.slots) === JSON.stringify(avant.slots) && !Object.keys(p1.couts).length, `${T} W1 · rien n’est écrit avant SON geste`, p1);
   await pg.waitForTimeout(400); await capture(pg, `atelier-${suf}-1-numero`);
+  if (process.env.MONTRER_AA) {   // diagnostic : la cascade de l'atelier (fonds, rognages) jusqu'à la feuille
+    console.log(JSON.stringify(await pg.evaluate(() => { const out = []; for (let e = document.querySelector('.vrm-arr-doux'); e && e !== document.body; e = e.parentElement) { const s = getComputedStyle(e); const r = e.getBoundingClientRect(); out.push([e.tagName + '.' + String(e.className).slice(0, 40), s.backgroundColor, s.backgroundImage.slice(0, 40), s.overflow, s.paddingLeft, s.borderRadius, Math.round(r.left), Math.round(r.width), Math.round(r.top), Math.round(r.height), s.maxHeight]); } return out; }), null, 0));
+    if (process.env.MONTRER_AA === 'stop') { await ctx.close(); return; }
+  }
 
   // W2 — la case.
   await clic('[data-aa-suivant="numero"]');

@@ -34,7 +34,7 @@ const caseFiche = (f, meubles) => {
 function Progression({ etapes, courante, onAller, verrou }) {
   const p = progression(etapes);
   return (
-    <nav className="vrm-aa-prog" aria-label={tr('arr.prog.aria', { n: ETAPES_ATELIER.indexOf(courante) + 1, m: p.total })} data-aa-prog={`${p.faites}/${p.total}`} data-aa-courante={courante}>
+    <nav className="vrm-arr-prog" aria-label={tr('arr.prog.aria', { n: courante ? ETAPES_ATELIER.indexOf(courante) + 1 : p.total, m: p.total })} data-aa-prog={`${p.faites}/${p.total}`} data-aa-courante={courante}>
       <ol>
         {etapes.map((e, i) => {
           const touchable = !verrou && e.cle !== courante && (e.etat !== 'afaire' || etapes.slice(0, i).every((x) => x.etat !== 'afaire' || x.cle === courante)) && !(e.raison === 'sansNumero')
@@ -57,59 +57,59 @@ function Progression({ etapes, courante, onAller, verrou }) {
 // ── 1 et 2 : le N° et la case (la règle de « Ranger cet achat ») ─────────────
 function EtapeRanger({ entree, prep, lignes, setLignes, courante, setCourante, n, setN, etape, Plan }) {
   const poser = (k, champs) => setLignes((L) => L.map((l, j) => (j === k ? { ...l, ...champs } : l)));
-  if (prep === undefined) return <p className="vrm-aa-doux" data-aa-attente="">{tr('ranger.attente')}</p>;
-  if (!prep || !prep.ok) return <p className="vrm-aa-doux" data-aa-passu={(prep && prep.raison) || ''}><b>—</b> {tr(prep && prep.raison === 'numeros' ? 'ranger.numPasSu' : 'ranger.refus.lecture')}</p>;
+  if (prep === undefined) return <p className="vrm-arr-doux" data-aa-attente="">{tr('ranger.attente')}</p>;
+  if (!prep || !prep.ok) return <p className="vrm-arr-doux" data-aa-passu={(prep && prep.raison) || ''}><b>—</b> {tr(prep && prep.raison === 'numeros' ? 'ranger.numPasSu' : 'ranger.refus.lecture')}</p>;
   if (etape === 'numero') {
     return (
-      <div className="vrm-aa-corps" data-aa-corps="numero">
+      <div className="vrm-arr-corps" data-aa-corps="numero">
         {entree.lot ? (
-          <div className="vrm-aa-lot" data-aa-lot={n}>
+          <div className="vrm-arr-lot" data-aa-lot={n}>
             <span>{tr('ranger.combien')}</span>
-            <span className="vrm-aa-pas">
+            <span className="vrm-arr-pas">
               <button type="button" aria-label={tr('ranger.moins')} disabled={n <= 1} onClick={() => setN(Math.max(1, n - 1))}>−</button>
               <b>{n}</b>
               <button type="button" aria-label={tr('ranger.plus')} disabled={n >= LOT_MAX} onClick={() => setN(Math.min(LOT_MAX, n + 1))}>+</button>
             </span>
           </div>
         ) : null}
-        {prep.numeroEcrit ? <p className="vrm-aa-doux" data-aa-tape="">{tr('ranger.numeroTapeAide')}</p> : null}
-        <ul className="vrm-aa-nums">
+        {prep.numeroEcrit ? <p className="vrm-arr-doux" data-aa-tape="">{tr('ranger.numeroTapeAide')}</p> : null}
+        <ul className="vrm-arr-nums">
           {lignes.map((l, k) => {
             const v = prep.numeroEcrit ? validerNumeroTape(l.numero, { pris: prep.pris, archive: prep.archive, cleNum: prep.cleNum, autres: lignes.filter((_, j) => j !== k).map((x) => x.numero).filter(Boolean) }) : { ok: true };
             return (
               <li key={k} data-aa-ligne={k}>
                 {prep.numeroEcrit ? (
-                  <label className="vrm-aa-num-tape"><span>{tr('ranger.numero')}</span>
+                  <label className="vrm-arr-num-tape"><span>{tr('ranger.numero')}</span>
                     <input inputMode={prep.clavier || 'numeric'} autoComplete="off" value={l.numero} data-aa-num-tape={k} aria-invalid={!v.ok && v.raison !== 'vide' ? 'true' : undefined}
                       onChange={(e) => poser(k, { numero: e.target.value.toUpperCase().slice(0, 9) })}/>
                   </label>
-                ) : <span className="vrm-aa-plaque sb-plaque" data-aa-num-propose={l.numero}>N°{l.numero}</span>}
+                ) : <span className="vrm-arr-plaque sb-plaque" data-aa-num-propose={l.numero}>N°{l.numero}</span>}
                 {lignes.length > 1 ? <small>{tr('arr.lot.article', { i: k + 1, n: lignes.length })}</small> : null}
-                {!v.ok && v.raison !== 'vide' ? <p className="vrm-aa-refus" data-aa-refus={v.raison}>{tr('ranger.refus.' + (['pris', 'archive', 'illisible', 'double'].includes(v.raison) ? v.raison : 'illisible'), { n: l.numero, a: prep.archive || '' })}</p> : null}
+                {!v.ok && v.raison !== 'vide' ? <p className="vrm-arr-refus" data-aa-refus={v.raison}>{tr('ranger.refus.' + (['pris', 'archive', 'illisible', 'double'].includes(v.raison) ? v.raison : 'illisible'), { n: l.numero, a: prep.archive || '' })}</p> : null}
               </li>
             );
           })}
         </ul>
-        {prep.numeroEcrit ? null : <p className="vrm-aa-doux">{tr(lignes.length > 1 ? 'arr.numero.carton.n' : 'arr.numero.carton')}</p>}
+        {prep.numeroEcrit ? null : <p className="vrm-arr-doux">{tr(lignes.length > 1 ? 'arr.numero.carton.n' : 'arr.numero.carton')}</p>}
       </div>
     );
   }
   // etape === 'case'
   return (
-    <div className="vrm-aa-corps" data-aa-corps="case">
-      <ul className="vrm-aa-cases">
+    <div className="vrm-arr-corps" data-aa-corps="case">
+      <ul className="vrm-arr-cases">
         {lignes.map((l, k) => (
           <li key={k}>
-            <button type="button" className={'vrm-aa-case-ligne' + (k === courante ? ' is-courante' : '')} data-aa-case-ligne={k} data-aa-case-m={l.case ? l.case.meubleId : ''} data-aa-case-i={l.case ? l.case.i : ''} onClick={() => setCourante(k)}>
-              <span className="sb-plaque vrm-aa-plaque-petite">N°{l.numero || '—'}</span>
-              <span className="vrm-aa-case-mots">{l.case ? motCase(l.case) : (prep.aucunMeuble ? tr('ranger.aucunMeuble') : tr('ranger.plein'))}</span>
+            <button type="button" className={'vrm-arr-case-ligne' + (k === courante ? ' is-courante' : '')} data-aa-case-ligne={k} data-aa-case-m={l.case ? l.case.meubleId : ''} data-aa-case-i={l.case ? l.case.i : ''} onClick={() => setCourante(k)}>
+              <span className="sb-plaque vrm-arr-plaque-petite">N°{l.numero || '—'}</span>
+              <span className="vrm-arr-case-mots">{l.case ? motCase(l.case) : (prep.aucunMeuble ? tr('ranger.aucunMeuble') : tr('ranger.plein'))}</span>
             </button>
           </li>
         ))}
       </ul>
       {Array.isArray(prep.meubles) && prep.meubles.length && Plan ? (
         <>
-          <p className="vrm-aa-doux">{lignes.length > 1 ? tr('ranger.toucherCaseLigne', { n: (lignes[courante] && lignes[courante].numero) || '—' }) : tr('ranger.toucherCase')}</p>
+          <p className="vrm-arr-doux">{lignes.length > 1 ? tr('ranger.toucherCaseLigne', { n: (lignes[courante] && lignes[courante].numero) || '—' }) : tr('ranger.toucherCase')}</p>
           <Plan prep={prep} lignes={lignes} courante={courante} onCase={(c) => poser(courante, { case: c })}/>
         </>
       ) : null}
@@ -121,18 +121,18 @@ function EtapeRanger({ entree, prep, lignes, setLignes, courante, setCourante, n
 // ── 3 : les photos (le studio, sous CE N°) ───────────────────────────────────
 function EtapePhotos({ fiche, photos, vignettes }) {
   return (
-    <div className="vrm-aa-corps" data-aa-corps="photos" data-aa-photos={Number.isFinite(photos) ? photos : photos === null ? 'passu' : 'lecture'}>
+    <div className="vrm-arr-corps" data-aa-corps="photos" data-aa-photos={Number.isFinite(photos) ? photos : photos === null ? 'passu' : 'lecture'}>
       {Array.isArray(vignettes) && vignettes.length ? (
-        <div className="vrm-aa-photos">
+        <div className="vrm-arr-photos">
           {vignettes.slice(0, 8).map((p, i) => <img key={p.id || i} src={p.detoure || p.img} alt={tr('atelier.photos.alt', { i: i + 1, num: fiche.numero })} loading="lazy" decoding="async" width="96" height="128"/>)}
         </div>
       ) : (
-        <div className="vrm-aa-vide" aria-hidden="true">
+        <div className="vrm-arr-vide" aria-hidden="true">
           <svg viewBox="0 0 120 64" width="120" height="64" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 50c6-14 20-18 30-24l14-9c6 8 16 12 30 13 12 1 20 8 20 19v3H8z"/><path d="M8 53h104"/><path d="M40 27l6 6M48 22l6 6M56 18l5 6"/></svg>
         </div>
       )}
-      <p className="vrm-aa-doux">{photos === undefined ? tr('atelier.photos.lecture') : photos === null ? '— ' + tr('atelier.photos.passu') : photos > 0 ? tr('atelier.photos.n', { n: photos }) : tr('arr.photos.aucune')}</p>
-      <p className="vrm-aa-doux">{tr('arr.photos.detourage')}</p>
+      <p className="vrm-arr-doux">{photos === undefined ? tr('atelier.photos.lecture') : photos === null ? '— ' + tr('atelier.photos.passu') : photos > 0 ? tr('atelier.photos.n', { n: photos }) : tr('arr.photos.aucune')}</p>
+      <p className="vrm-arr-doux">{tr('arr.photos.detourage')}</p>
     </div>
   );
 }
@@ -143,30 +143,30 @@ function EtapePrix({ entree, fiche, cout, corriger, setCorriger, saisie, setSais
   const pose = (cout != null && String(cout).trim() !== '') ? String(cout) : (fiche.prixAchat != null ? String(fiche.prixAchat).replace('.', ',') : '');
   if (pose) {
     return (
-      <div className="vrm-aa-corps" data-aa-corps="prix" data-aa-prix-pose={pose}>
-        <div className="vrm-aa-chiffre"><b>{monnaie(Number(pose.replace(',', '.')))}</b><span>{tr('arr.prix.pose')}</span></div>
+      <div className="vrm-arr-corps" data-aa-corps="prix" data-aa-prix-pose={pose}>
+        <div className="vrm-arr-chiffre"><b>{monnaie(Number(pose.replace(',', '.')))}</b><span>{tr('arr.prix.pose')}</span></div>
       </div>
     );
   }
   const ind = indicatifLot(entree);
   return (
-    <div className="vrm-aa-corps" data-aa-corps="prix" data-aa-prix-propose={prop ? prop.valeur : ''} data-aa-prix-source={prop ? prop.source : ''}>
+    <div className="vrm-arr-corps" data-aa-corps="prix" data-aa-prix-propose={prop ? prop.valeur : ''} data-aa-prix-source={prop ? prop.source : ''}>
       {prop && !corriger ? (
-        <div className="vrm-aa-chiffre">
+        <div className="vrm-arr-chiffre">
           <b>{monnaie(prop.centimes / 100)}</b>
           <span>{tr(prop.source === 'recu' ? 'arr.prix.recu' : 'arr.prix.article')}</span>
           <small>{prop.source === 'recu' ? prop.detail : tr('arr.prix.sansFrais')}</small>
         </div>
       ) : (
-        <label className="vrm-aa-champ is-prix"><span>{tr('arr.prix.champ')}</span>
+        <label className="vrm-arr-champ is-prix"><span>{tr('arr.prix.champ')}</span>
           <input inputMode="decimal" autoComplete="off" value={saisie} placeholder={ind ? '≈ ' + ind : ''} data-aa-prix-saisie="" onChange={(e) => setSaisie(e.target.value.replace(/[^\d.,]/g, '').slice(0, 9))}/>
         </label>
       )}
-      {!prop ? <p className="vrm-aa-doux" data-aa-prix-pourquoi={entree.lot || (Number(entree.n) || 0) > 1 ? 'lot' : entree.tx ? 'illisible' : 'sansAchat'}>
+      {!prop ? <p className="vrm-arr-doux" data-aa-prix-pourquoi={entree.lot || (Number(entree.n) || 0) > 1 ? 'lot' : entree.tx ? 'illisible' : 'sansAchat'}>
         {tr(entree.lot || (Number(entree.n) || 0) > 1 ? 'arr.prix.lot' : entree.tx ? 'arr.prix.pasLu' : 'arr.prix.sansAchat')}</p> : null}
-      {prop && corriger ? <p className="vrm-aa-doux">{tr('arr.prix.corrigerAide')}</p> : null}
-      {prop && !corriger ? <button type="button" className="vrm-aa-lien sb-lien" data-aa-prix-corriger="" onClick={() => { setCorriger(true); setSaisie(''); }}>{tr('arr.prix.corriger')}</button> : null}
-      {erreur ? <p className="vrm-aa-refus" role="alert" data-aa-prix-erreur={erreur}>{tr('arr.prix.erreur.' + erreur)}</p> : null}
+      {prop && corriger ? <p className="vrm-arr-doux">{tr('arr.prix.corrigerAide')}</p> : null}
+      {prop && !corriger ? <button type="button" className="vrm-arr-lien sb-lien" data-aa-prix-corriger="" onClick={() => { setCorriger(true); setSaisie(''); }}>{tr('arr.prix.corriger')}</button> : null}
+      {erreur ? <p className="vrm-arr-refus" role="alert" data-aa-prix-erreur={erreur}>{tr('arr.prix.erreur.' + erreur)}</p> : null}
       <AccAvant geste="arrivee.prix"/>
     </div>
   );
@@ -176,33 +176,33 @@ function EtapePrix({ entree, fiche, cout, corriger, setCorriger, saisie, setSais
 function EtapeFiche({ fiche, champs, setChamps, Note, erreur }) {
   const poser = (k, v) => setChamps((c) => ({ ...c, [k]: v }));
   const ch = (k, lib, extra = {}) => (
-    <label className={'vrm-aa-champ' + (extra.large ? ' is-large' : '')} data-aa-champ={k}>
+    <label className={'vrm-arr-champ' + (extra.large ? ' is-large' : '')} data-aa-champ={k}>
       <span>{lib}</span>
       {extra.zone ? <textarea rows={4} value={champs[k] || ''} onChange={(e) => poser(k, e.target.value)}/>
         : <input value={champs[k] || ''} inputMode={extra.mode} placeholder={extra.ph || ''} onChange={(e) => poser(k, k === 'prix' ? e.target.value.replace(/[^\d.,]/g, '').slice(0, 9) : e.target.value)}/>}
     </label>
   );
   return (
-    <div className="vrm-aa-corps" data-aa-corps="fiche">
-      {Note ? <div className="vrm-aa-note" data-aa-note={fiche.numero}>{Note(fiche.numero)}</div> : null}
-      <div className="vrm-aa-champs">
+    <div className="vrm-arr-corps" data-aa-corps="fiche">
+      {Note ? <div className="vrm-arr-note" data-aa-note={fiche.numero}>{Note(fiche.numero)}</div> : null}
+      <div className="vrm-arr-champs">
         {ch('titre', tr('ranger.champ.titre'), { large: true })}
         {ch('marque', tr('ranger.champ.marque'))}
         {ch('taille', tr('ranger.champ.taille'))}
         {ch('couleur', tr('arr.fiche.couleur'))}
         {ch('prix', tr('arr.fiche.prixVente'), { mode: 'decimal' })}
       </div>
-      <fieldset className="vrm-aa-choix" data-aa-categorie={champs.categorie || ''}>
+      <fieldset className="vrm-arr-choix" data-aa-categorie={champs.categorie || ''}>
         <legend>{tr('arr.fiche.categorie')}</legend>
         {CATEGORIES.map((c) => { const lib = tr('arr.cat.' + c); return <button key={c} type="button" aria-pressed={champs.categorie === lib} onClick={() => poser('categorie', champs.categorie === lib ? '' : lib)}>{lib}</button>; })}
       </fieldset>
-      <fieldset className="vrm-aa-choix" data-aa-etat={champs.etat || ''}>
+      <fieldset className="vrm-arr-choix" data-aa-etat={champs.etat || ''}>
         <legend>{tr('arr.fiche.etat')}</legend>
         {ETATS.map((c) => { const lib = tr('arr.etat.' + c); return <button key={c} type="button" aria-pressed={champs.etat === lib} onClick={() => poser('etat', champs.etat === lib ? '' : lib)}>{lib}</button>; })}
       </fieldset>
       {ch('description', tr('arr.fiche.description'), { large: true, zone: true })}
-      <p className="vrm-aa-doux">{tr('arr.fiche.sources')}</p>
-      {erreur ? <p className="vrm-aa-refus" role="alert" data-aa-fiche-erreur={erreur}>{tr('arr.fiche.erreur.' + erreur)}</p> : null}
+      <p className="vrm-arr-doux">{tr('arr.fiche.sources')}</p>
+      {erreur ? <p className="vrm-arr-refus" role="alert" data-aa-fiche-erreur={erreur}>{tr('arr.fiche.erreur.' + erreur)}</p> : null}
       <AccAvant geste="arrivee.fiche"/>
     </div>
   );
@@ -211,9 +211,9 @@ function EtapeFiche({ fiche, champs, setChamps, Note, erreur }) {
 // ── 6 : publier (« Créer sur Vinted », puis « Publier partout ») ────────────
 function EtapePublier({ etatVinted }) {
   return (
-    <div className="vrm-aa-corps" data-aa-corps="publier" data-aa-vinted={etatVinted}>
-      <p className="vrm-aa-etat-ligne"><i className={'vrm-aa-diode is-' + etatVinted} aria-hidden="true"/>{tr('arr.publier.' + etatVinted)}</p>
-      <p className="vrm-aa-doux">{tr(etatVinted === 'en-ligne' ? 'arr.publier.partoutAide' : 'arr.publier.vintedAide')}</p>
+    <div className="vrm-arr-corps" data-aa-corps="publier" data-aa-vinted={etatVinted}>
+      <p className="vrm-arr-etat-ligne"><i className={'vrm-arr-diode is-' + etatVinted} aria-hidden="true"/>{tr('arr.publier.' + etatVinted)}</p>
+      <p className="vrm-arr-doux">{tr(etatVinted === 'en-ligne' ? 'arr.publier.partoutAide' : 'arr.publier.vintedAide')}</p>
     </div>
   );
 }
@@ -355,32 +355,32 @@ function UnAchat({ entree, coque, onSuivant, onFermer, position, Bouton, Photo, 
   const sous = [fiche ? `N°${fiche.numero}` : '', fiche ? caseFiche(fiche, etat.meubles) : '', fiches.length > 1 ? tr('arr.lot.article', { i: Math.min(k, fiches.length - 1) + 1, n: fiches.length }) : '', position].filter(Boolean).join(' · ');
   return (
     <>
-      <div className="vrm-aa" data-aa-tx={entree.tx || ''} data-aa-fiche={fiche ? fiche.id : ''} data-aa-num={fiche ? fiche.numero : ''} data-aa-reprise={reprise || 'fini'}>
-        <div className="vrm-aa-tete">
-          <div className="vrm-aa-photo">{entree.photo && Photo ? <Photo src={entree.photo} alt=""/> : null}</div>
-          <div className="vrm-aa-tete-txt"><b>{titreAchat}</b><small>{sous || tr('arr.sous.aRanger')}</small></div>
+      <div className="vrm-arr" data-aa-tx={entree.tx || ''} data-aa-fiche={fiche ? fiche.id : ''} data-aa-num={fiche ? fiche.numero : ''} data-aa-reprise={reprise || 'fini'}>
+        <div className="vrm-arr-tete">
+          <div className="vrm-arr-photo">{entree.photo && Photo ? <Photo src={entree.photo} alt=""/> : null}</div>
+          <div className="vrm-arr-tete-txt"><b>{titreAchat}</b><small>{sous || tr('arr.sous.aRanger')}</small></div>
         </div>
         <Progression etapes={etapes} courante={etape === 'fin' ? '' : etape} onAller={aller} verrou={envoi}/>
-        <h3 className="vrm-aa-h" data-aa-titre={etape}>{tr('arr.titre.' + etape)}</h3>
+        <h3 className="vrm-arr-h" data-aa-titre={etape}>{tr('arr.titre.' + etape)}</h3>
         {etape === 'numero' || etape === 'case' ? <EtapeRanger entree={entree} prep={prep} lignes={lignes} setLignes={setLignes} courante={courante} setCourante={setCourante} n={n} setN={setN} etape={etape} Plan={Plan}/> : null}
-        {attenteFiche ? <p className="vrm-aa-doux" data-aa-attente-fiche="">{tr('ranger.attente')}</p> : null}
+        {attenteFiche ? <p className="vrm-arr-doux" data-aa-attente-fiche="">{tr('ranger.attente')}</p> : null}
         {etape === 'photos' && fiche ? <EtapePhotos fiche={fiche} photos={photos} vignettes={vignettes}/> : null}
         {etape === 'prix' && fiche ? <EtapePrix entree={entree} fiche={fiche} cout={etat.couts[String(fiche.numero)]} corriger={corriger} setCorriger={setCorriger} saisie={saisie} setSaisie={setSaisie} erreur={erreur}/> : null}
         {etape === 'fiche' && fiche && champs ? <EtapeFiche fiche={fiche} champs={champs} setChamps={setChamps} Note={Note} erreur={erreur}/> : null}
         {etape === 'publier' && fiche ? <EtapePublier etatVinted={etatVinted}/> : null}
         {etape === 'fin' && fiche ? (
-          <div className="vrm-aa-corps" data-aa-corps="fin">
-            <ul className="vrm-aa-bilan">
+          <div className="vrm-arr-corps" data-aa-corps="fin">
+            <ul className="vrm-arr-bilan">
               {etapes.map((e) => <li key={e.cle} data-aa-bilan={e.cle} data-aa-etat={e.etat}><i aria-hidden="true" className={'is-' + e.etat}/>{tr('arr.etape.' + e.cle)}<span>{tr('arr.bilan.' + e.etat)}</span></li>)}
             </ul>
-            {Note ? <div className="vrm-aa-note">{Note(fiche.numero)}</div> : null}
+            {Note ? <div className="vrm-arr-note">{Note(fiche.numero)}</div> : null}
           </div>
         ) : null}
-        {erreur && (etape === 'numero' || etape === 'case') ? <p className="vrm-aa-refus" role="alert" data-aa-erreur={erreur}>{tr(['pris', 'case', 'deja', 'double', 'illisible', 'vide'].includes(erreur) ? 'ranger.refus.' + erreur : 'ranger.refus.lecture', { n: (lignes[0] && lignes[0].numero) || '' })}</p> : null}
+        {erreur && (etape === 'numero' || etape === 'case') ? <p className="vrm-arr-refus" role="alert" data-aa-erreur={erreur}>{tr(['pris', 'case', 'deja', 'double', 'illisible', 'vide'].includes(erreur) ? 'ranger.refus.' + erreur : 'ranger.refus.lecture', { n: (lignes[0] && lignes[0].numero) || '' })}</p> : null}
       </div>
-      <div className="vrm-fs-pied vrm-aa-pied">
+      <div className="vrm-fs-pied vrm-arr-pied">
         {plein}
-        {second ? <div className="vrm-aa-pied-second">{second}</div> : null}
+        {second ? <div className="vrm-arr-pied-second">{second}</div> : null}
       </div>
     </>
   );
