@@ -55,9 +55,11 @@
 }
 @keyframes pn-entre { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .pn-corps { animation: none; } .pn-segment::before { transition: none; } }
-.pn-illu { margin: 0; display: flex; align-items: center; justify-content: center; min-height: 0; }
+.pn-illu { margin: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.pn-texte { flex-shrink: 0; }
 .pn-texte { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .pn-titre { margin: 0; font-size: 30px; line-height: 1.08; font-weight: 700; letter-spacing: -.025em; color: var(--pn-clair); outline: none; overflow-wrap: anywhere; }
+.pn .pn-titre:focus, .pn .pn-titre:focus-visible { outline: none !important; box-shadow: none !important; }
 .pn-phrase { margin: 0 0 6px; font-size: 16px; line-height: 1.45; color: var(--pn-clair-2); max-width: 40em; }
 
 .pn-verre {
@@ -132,12 +134,12 @@
 .pn-offre { display: flex; flex-direction: column; gap: 3px; padding: 12px 14px; border-radius: 16px; background: rgb(255 255 255 / .55); box-shadow: inset 0 0 0 1px rgb(12 29 48 / .08); font-size: 13px; color: var(--pn-encre-2); }
 :root[data-theme="dark"] .pn-offre { background: rgb(255 255 255 / .06); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .10); }
 .pn-offre b { font-size: 15px; color: var(--pn-encre); display: flex; align-items: center; gap: 8px; }
-.pn-prix { font-size: 22px; font-weight: 700; letter-spacing: -.02em; color: var(--pn-encre); font-variant-numeric: tabular-nums; }
+.pn-prix { white-space: nowrap; font-size: 19px; font-weight: 700; letter-spacing: -.02em; color: var(--pn-encre); font-variant-numeric: tabular-nums; }
 .pn-bientot { font-style: normal; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 2px 7px; border-radius: 99px; background: rgb(12 29 48 / .08); color: var(--pn-encre-2); }
 
-/* Le pied : « Précédent » à gauche, le plein à droite. */
-.pn-pied { flex: none; width: 100%; max-width: 1080px; margin: 0 auto; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px max(16px, env(safe-area-inset-bottom)); }
-.pn-pied-droite { display: flex; align-items: center; gap: 14px; min-width: 0; }
+/* Le pied : « Précédent » à gauche, le plein à droite ; « Continuer » (quand le plein emmène ailleurs) avant lui. */
+.pn-pied { flex: none; width: 100%; max-width: 1080px; margin: 0 auto; box-sizing: border-box; display: flex; align-items: center; justify-content: flex-end; gap: 6px 18px; padding: 12px 20px max(16px, env(safe-area-inset-bottom)); }
+.pn-pied-precedent { margin-right: auto; }
 .pn .pn-plein { display: inline-flex; flex-direction: row; align-items: center; justify-content: center; width: auto; height: 54px; min-width: 150px; padding: 0 26px; border-radius: 27px; font-size: 16px; font-weight: 600; letter-spacing: -.005em; white-space: nowrap;
   background: #0C1D30; color: #FFFFFF; box-shadow: 0 1px 0 rgb(255 255 255 / .12) inset, 0 10px 24px -10px rgb(0 0 0 / .55); text-decoration: none; }
 :root[data-theme="dark"] .pn .pn-plein { background: #F2F7FD; color: #0C1D30; }
@@ -168,19 +170,22 @@
 .pn-d-aiguille { fill: #0C1D30; }
 .pn-d-v { fill: #FFFFFF; font: 800 18px var(--sb-police-texte, Inter, system-ui, sans-serif); }
 .pn-d-nom { fill: rgb(255 255 255 / .85); font: 600 9.5px var(--sb-police-texte, Inter, system-ui, sans-serif); }
-.pn-carte .pn-d-nom { fill: #3F5468; }
 .pn-d-barre { fill: rgb(255 255 255 / .22); }
 .pn-d-barre-lue { fill: rgb(255 255 255 / .9); }
 .pn-anneau { display: grid; grid-template-columns: repeat(4, 64px); gap: 12px; }
 .pn-anneau-site { width: 64px; height: 64px; border-radius: 20px; display: inline-flex; align-items: center; justify-content: center; background: rgb(255 255 255 / .14); color: rgb(255 255 255 / .7); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .22); transition: background-color .2s ease, color .2s ease, transform .2s ease; }
 .pn-anneau-site[data-choisi="1"] { background: #FFFFFF; color: #0C1D30; transform: translateY(-3px); box-shadow: 0 12px 26px -12px rgb(0 0 0 / .5); }
 
-/* Téléphone : l'illustration au-dessus, compacte (la plaque reste au premier écran). */
+/* Téléphone : l'illustration au-dessus, compacte (la plaque reste au premier écran) ;
+   le plein sur toute la largeur, « Précédent » et « Continuer » dessous. */
 @media (max-width: 899px) {
-  .pn-illu { max-height: 220px; }
-  .pn-telephone { width: 120px; }
-  .pn-pile { width: 230px; height: 200px; }
-  .pn-pile .pn-telephone { width: 104px; }
+  .pn-telephone { width: 96px; border-radius: 18px; }
+  .pn-marque-exemple { font-size: 8.5px; padding: 3px 7px; bottom: 6px; }
+  .pn-pile { width: 210px; height: 216px; }
+  .pn-pile .pn-telephone { width: 92px; }
+  .pn-pied { flex-wrap: wrap; justify-content: space-between; }
+  .pn .pn-plein { order: -1; flex: 1 0 100%; }
+  .pn-pied-continuer { margin-left: auto; }
   .pn-dessin { max-width: 250px; }
   .pn-anneau { grid-template-columns: repeat(4, 56px); gap: 10px; }
   .pn-anneau-site { width: 56px; height: 56px; border-radius: 17px; }

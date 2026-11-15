@@ -188,7 +188,7 @@ function EtapeComptes({ etats, sites, onOuvrirReglage }) {
             <span className="pn-rangee-texte"><b>{NOM_SITE[s]}</b><span><Diode etat={etat} />{phrase}</span></span>
             {s === 'ebay'
               ? <button type="button" className="pn-lien pn-rangee-geste" onClick={() => onOuvrirReglage && onOuvrirReglage('ebay')} title={tr('pn.comptes.ebayChemin')}>{tr('pn.comptes.ebay')}</button>
-              : etat !== 'fait' ? <a className="pn-lien pn-rangee-geste" href={LIEN_SITE[s]} target="_blank" rel="noopener">{tr('pn.comptes.ouvrir', { site: s === 'vestiaire' ? 'Vestiaire' : NOM_SITE[s] })}</a> : null}
+              : etat !== 'fait' && s !== etats.comptes.site ? <a className="pn-lien pn-rangee-geste" href={LIEN_SITE[s]} target="_blank" rel="noopener">{tr('pn.comptes.ouvrir', { site: s === 'vestiaire' ? 'Vestiaire' : NOM_SITE[s] })}</a> : null}
           </div>
         );
       })}
@@ -296,10 +296,10 @@ export default function ParcoursNouveau({
   } };
   if (estDerniere(etape)) plein = { libelle: tr('pn.cestParti'), faire: () => onFin && onFin() };
   // Un plein qui EMMÈNE (télécharger, ouvrir un site) : « Continuer » reste, en lien, à côté.
-  const continuerLien = plein.href ? <button type="button" className="pn-lien" data-pn-continuer="" onClick={() => aller(suivante)}>{tr('pn.continuer')}</button> : null;
+  const continuerLien = plein.href ? <button type="button" className="pn-lien pn-pied-continuer" data-pn-continuer="" onClick={() => aller(suivante)}>{tr('pn.continuer')}</button> : null;
 
   const titre = etape === 'bienvenue' ? (prenom ? tr('pn.bienvenue.titrePrenom', { prenom }) : tr('pn.bienvenue.titre'))
-    : etape === 'numeros' && vend !== 'sneakers' ? tr('pn.numeros.titreAutre') : tr(`pn.${etape}.titre`);
+    : etape === 'numeros' && vend === 'autre' ? tr('pn.numeros.titreAutre') : tr(`pn.${etape}.titre`);
   const phrase = etape === 'extension' ? tr('pn.extension.phrase.' + appareil) : tr(`pn.${etape}.phrase`);
 
   const illustration = etape === 'bienvenue' ? <Pile sombre={sombre} />
@@ -309,7 +309,7 @@ export default function ParcoursNouveau({
           : etape === 'numeros' ? <Capture cle="numeros" sombre={sombre} />
             : etape === 'historique' ? <DessinHistorique />
               : etape === 'journee' ? <Capture cle="journee" sombre={sombre} />
-                : <Capture cle="bienvenue" sombre={sombre} />;
+                : null;
 
   const sitesChoisis = etats.plateformes && etats.plateformes.sites && etats.plateformes.sites.length ? etats.plateformes.sites : choixSites;
   return (
@@ -328,7 +328,7 @@ export default function ParcoursNouveau({
         </div>
       </header>
       <div className="pn-corps" key={etape}>
-        <figure className="pn-illu" aria-hidden="true">{illustration}</figure>
+        {illustration ? <figure className="pn-illu" aria-hidden="true">{illustration}</figure> : null}
         <section className="pn-texte">
           <h1 id="pn-titre" className="pn-titre" tabIndex={-1} ref={titreRef}>{titre}</h1>
           <p className="pn-phrase">{phrase}</p>
@@ -343,13 +343,11 @@ export default function ParcoursNouveau({
         </section>
       </div>
       <footer className="pn-pied">
-        {i > 0 ? <button type="button" className="pn-lien" data-pn-precedent="" onClick={() => aller(ETAPES_NOUVEAU[i - 1])}>{tr('pn.precedent')}</button> : <span />}
-        <span className="pn-pied-droite">
+        {i > 0 ? <button type="button" className="pn-lien pn-pied-precedent" data-pn-precedent="" onClick={() => aller(ETAPES_NOUVEAU[i - 1])}>{tr('pn.precedent')}</button> : null}
           {continuerLien}
           {plein.href
             ? <a className="sb-btn-plein pn-plein" data-pn-plein="" href={plein.href} {...(plein.telecharger ? { download: '' } : {})} {...(plein.nouvel ? { target: '_blank', rel: 'noopener' } : {})}>{plein.libelle}</a>
             : <button type="button" className="sb-btn-plein pn-plein" data-pn-plein="" disabled={occupe} onClick={plein.faire}>{plein.libelle}</button>}
-        </span>
       </footer>
     </div>
   );

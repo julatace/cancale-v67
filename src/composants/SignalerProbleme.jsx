@@ -250,7 +250,7 @@ export function SignalementsRecus({ entetes, Bouton = BoutonBase, fetcher = (typ
               {detail[s.id] === 'ko' ? <p role="alert" style={{ ...S.muet, color: 'var(--vrm-warn)' }}>Le détail n’a pas pu être lu. Réessaie.</p> : null}
               <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {!detail[s.id] || detail[s.id] === 'ko' ? <Bouton variante="discret" taille="petit" onClick={() => ouvrirDetail(s)} data-signalement-ouvrir={s.id}>Voir le détail</Bouton> : null}
-                <RepondreSignalement s={s} entetes={entetes} fetcher={fetcher} Bouton={Bouton} onRepondu={(rep, le) => setListe((l) => (Array.isArray(l) ? l.map((x) => (x.id === s.id ? { ...x, reponse: rep, reponduLe: le, traite: true } : x)) : l))}/>
+                <RepondreSignalement s={s} entetes={entetes} fetcher={fetcher} Bouton={Bouton} onRepondu={(rep, le) => setListe((l) => (Array.isArray(l) ? l.map((x) => (x.id === s.id ? { ...x, reponse: rep, reponduLe: le } : x)) : l))}/>
                 {s.repondre ? <a className="vrm-lien-action" href={'mailto:' + s.repondre + '?subject=' + encodeURIComponent('Ton signalement VRM')} data-signalement-repondre={s.id} style={{ display: 'inline-block', padding: '12px 0' }}>Répondre par e-mail</a> : null}
                 <Bouton variante={s.traite ? 'discret' : 'secondaire'} taille="petit" occupe={occupe === s.id} onClick={() => marquer(s, !s.traite)} data-signalement-traiter={s.id}>
                   {s.traite ? 'Rouvrir' : 'Traité'}

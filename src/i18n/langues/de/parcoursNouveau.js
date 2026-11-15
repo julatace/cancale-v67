@@ -99,6 +99,7 @@ export default {
   "pn.journee.l3": "Ein Problem? Das „?“ jedes Bildschirms, dann „Problem melden“.",
 
   "pn.abonnement.titre": "Dein Abo",
+  "pn.abonnement.phrase": "Was du zahlst, und was dir bleibt, wenn du aufhörst.",
   "pn.abonnement.offert": "VRM ist vorerst kostenlos: alles ist offen.",
   "pn.abonnement.essai": { one: "Gratis-Test: noch {n} Tag.", other: "Gratis-Test: noch {n} Tage." },
   "pn.abonnement.actif": "Dein Abo ist aktiv.",

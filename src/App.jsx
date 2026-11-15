@@ -968,6 +968,7 @@ import { verifierAvantEcriture } from "./collerPrixAchat.js";
 // (15 nov., parcours nouveau) Le parcours d'un nouveau en huit étapes, un écran plein (src/parcoursNouveau/).
 import { CLE_PARCOURS_NOUVEAU, parcoursNouveauAOuvrir, lireParcoursNouveau, positionApres as positionParcoursNouveau, etatsEtapes as etatsParcoursNouveau, appareilIci as appareilParcoursNouveau, dansOrionIci, reglageNumerotation, reglagePlateformes, ETAPES_NOUVEAU } from "./parcoursNouveau/regle.js";
 import { bacASableActif, bacASableEtape, bacASableAppareil } from "./modeExemple.js";
+import { CLE_AIDES as CLE_AIDES_PN, noterVisiteVue as noterVisiteVuePN } from "./accueilReste/aides.js";
 import { ACCES_OFFERT as ACCES_OFFERT_PN, PRIX_MOIS as PRIX_MOIS_PN, PRIX_PRO_MOIS as PRIX_PRO_MOIS_PN, PRO_OUVERT as PRO_OUVERT_PN } from "./accueil-reglages.js";
 const ParcoursNouveau = aLaDemande(() => import('./parcoursNouveau/ParcoursNouveau.jsx'));
 // ⟦→ ecrans/Reglages.jsx #16⟧
@@ -22971,11 +22972,18 @@ function CarteParcoursApp({ comptes, plein = false, sinon = null }) {
   const [masque, setMasque] = React.useState(() => !!load(CLE_GUIDE_MASQUE, null));
   React.useEffect(() => onCloudReady(() => setMasque(!!load(CLE_GUIDE_MASQUE, null))), []);
   const { etat, pret, parcours, parcoursBrut } = useParcoursArrivee({ comptes, actif: !masque || plein });
+  const [, majPn] = React.useReducer((n) => n + 1, 0);
+  React.useEffect(() => { const f = (e) => { if (e && e.detail && e.detail.k === CLE_PARCOURS_NOUVEAU) majPn(); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
   if (!pret) return null;
-  // (15 nov., parcours nouveau) Commencé et pas fini : UNE carte « Reprendre » (plus « Configure VRM »
-  // ET « Démarrer avec VRM » côte à côte, deux pleins pour le même chemin).
+  // (15 nov., parcours nouveau) UN chemin : un compte qui a le nouveau parcours ne voit plus « Configure VRM »
+  // ni l'ancienne carte « Démarrer avec VRM » (deux pleins pour la même chose). Pas fini : la carte « Reprendre »
+  // à son étape ; fini mais une PREUVE manque encore (extension, première lecture) : la même carte, à cette étape.
   const pn = lireParcoursNouveau(load(CLE_PARCOURS_NOUVEAU, null));
-  if (pn && !pn.fini && !exempleActif()) return <><CarteParcoursNouveau pos={pn}/>{sinon}</>;
+  if (pn && !exempleActif()) {
+    if (!pn.fini) return <><CarteParcoursNouveau pos={pn}/>{sinon}</>;
+    const manque = etat && !etat.fini && etat.courante ? (etat.courante === 'extension' ? 'extension' : etat.courante === 'compte' ? null : 'comptes') : null;
+    return <>{manque ? <CarteParcoursNouveau pos={{ ...pn, etape: manque }}/> : null}{sinon}</>;
+  }
   const mode = carteParcours(etat, parcoursBrut, { masque: masque && !plein, exemple: exempleActif(), comptes });
   if (mode === 'cachee') return <><ReprendreConfiguration/>{sinon}</>;
   const sansCompte = Array.isArray(comptes) && comptes.length === 0;
@@ -60552,6 +60560,8 @@ function AppCoeur() {
     // Le parcours REMPLACE Bienvenue et la visite en bulles : ils ne s'empilent plus derrière.
     if(!load('vrm_bienvenue_vue',null)) save('vrm_bienvenue_vue',{at:new Date().toISOString(),par:'parcours-nouveau'});
     if(!load(CLE_VISITE,null)) save(CLE_VISITE,{at:new Date().toISOString(),par:'parcours-nouveau'});
+    // L'étape 7 a montré Ma journée : ses bulles ne repartent pas dès la fermeture (rejouables par son « ? »).
+    if(comment==='fin'){ try{ save(CLE_AIDES_PN, noterVisiteVuePN(load(CLE_AIDES_PN,null),'journee')); }catch(_){} }
     if(comment==='fin'&&tab!=='journee') setTab('journee'); };
   const [configSeule,setConfigSeule]=useState(null);   // (11 nov., lot DJ2) 'vends' : la question seule
   useEffect(()=>{

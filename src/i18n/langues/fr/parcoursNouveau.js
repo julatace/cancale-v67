@@ -99,6 +99,7 @@ export default {
   "pn.journee.l3": "Un souci ? Le « ? » de chaque écran, puis « Signaler un problème ».",
 
   "pn.abonnement.titre": "Ton abonnement",
+  "pn.abonnement.phrase": "Ce que tu paies, et ce que tu gardes si tu arrêtes.",
   "pn.abonnement.offert": "Pour l’instant VRM est gratuit : tout est ouvert.",
   "pn.abonnement.essai": { one: "Essai gratuit : encore {n} jour.", other: "Essai gratuit : encore {n} jours." },
   "pn.abonnement.actif": "Ton abonnement est actif.",
