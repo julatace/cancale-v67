@@ -46,6 +46,7 @@ import ecran_argentprix from './fr/argentprix.js';   // (14 nov., argent-prix)
 import ecran_rechliste from './fr/rechliste.js';
 import ecran_studio_paires from './fr/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
 import ecran_republier_guide from './fr/republierGuide.js';   // (15 nov.) republier / publier à la main, guidés
+import ecran_memePhoto from './fr/memePhoto.js';   // (15 nov., lot meme-photo)
 export default {
   ...ecran_studio_paires,
   ...ecran_republier_guide,
@@ -2271,6 +2272,7 @@ export default {
   ...ecran_capte,
   ...ecran_retrait_ailleurs,
   ...ecran_vcventes,
+  ...ecran_memePhoto,
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_finition,
