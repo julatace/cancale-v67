@@ -647,11 +647,13 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     const gap = zoom === 'loin' ? 4 : 6;
     // (15 nov., étagères) La forme, la couleur du meuble, ses colonnes en pile ; la dernière descente, DITE ici.
     const typeM = typeDe(m); const coulM = COULEURS.includes(m.couleur) ? m.couleur : undefined;
-    const cMax = typeM === 'pile' ? Math.min(caseMax, 56) : caseMax;   // une pile : des cartons, pas des cases géantes
+    // Une pile (forme « Pile », ou un meuble d'une colonne empilée — une pile d'hier) : des cartons, pas des cases géantes.
+    const formePile = typeM === 'pile' || (Number(m.cols) === 1 && colonnesEnPile(m).size === 1);
+    const cMax = formePile ? Math.min(caseMax, 56) : caseMax;
     const piles = colonnesEnPile(m);
     const desc = descente && descente.m === String(m.id) ? descente : null;
     return (
-      <section key={m.id} data-meuble={m.id} data-meuble-type={typeM} data-couleur={coulM} data-meuble-ici={cherche ? nIci : undefined} className="vrm-s2d-meuble vrm-etag" data-replie={replie ? '1' : undefined}>
+      <section key={m.id} data-meuble={m.id} data-meuble-type={typeM} data-forme-pile={formePile ? '' : undefined} data-couleur={coulM} data-meuble-ici={cherche ? nIci : undefined} className="vrm-s2d-meuble vrm-etag" data-replie={replie ? '1' : undefined}>
         <div className="vrm-s2d-tete">
           {/* (15 nov.) Le titre (nom, puis « 3/5 · 1×5 · empilé ») et les gestes : la tête ne fixe pas la largeur du
               meuble (une pile reste étroite) — elle passe sur deux lignes quand le meuble est étroit. */}

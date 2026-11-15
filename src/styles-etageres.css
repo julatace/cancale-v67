@@ -44,9 +44,9 @@
 /* Les formes : une armoire a des montants épais, une pile est un empilement de boîtes,
    un bac est un contenant, un casier serre ses cases. */
 .vrm-etag[data-meuble-type="armoire"] .vrm-s2d-etagere { padding: 12px 14px 0 8px; box-shadow: inset 9px 0 0 var(--etag-bord, color-mix(in srgb, var(--vrm-muted, #8E8E93) 45%, transparent)), inset -9px 0 0 var(--etag-bord, color-mix(in srgb, var(--vrm-muted, #8E8E93) 45%, transparent)), inset 0 9px 0 var(--etag-bord, color-mix(in srgb, var(--vrm-muted, #8E8E93) 45%, transparent)); }
-.vrm-etag[data-meuble-type="pile"] .vrm-s2d-etagere { box-shadow: none; background: transparent; padding-top: 4px; }
-.vrm-etag[data-meuble-type="pile"] .vrm-s2d-case { border-radius: 5px; }
-.vrm-etag[data-meuble-type="pile"] .vrm-s2d-case:not(.is-vide)::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 5px; z-index: 1; background: rgb(0 0 0 / .10); pointer-events: none; }
+.vrm-etag[data-forme-pile] .vrm-s2d-etagere { box-shadow: none; background: transparent; padding-top: 4px; }
+.vrm-etag[data-forme-pile] .vrm-s2d-case { border-radius: 5px; }
+.vrm-etag[data-forme-pile] .vrm-s2d-case:not(.is-vide)::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 5px; z-index: 1; background: rgb(0 0 0 / .10); pointer-events: none; }
 .vrm-etag[data-meuble-type="bac"] .vrm-s2d-etagere { border-radius: 16px; box-shadow: inset 0 0 0 2px var(--etag-bord, color-mix(in srgb, var(--vrm-muted, #8E8E93) 45%, transparent)); padding-top: 8px; }
 .vrm-etag[data-meuble-type="casier"] .vrm-s2d-case { border-radius: 4px; }
 /* Une colonne en pile (quand le meuble ne l'est pas tout entier) : la règle le dit. */
@@ -107,7 +107,7 @@
 .vrm-etag-nom-l { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .vrm-etag-actions { display: flex; gap: 4px; margin-left: auto; flex: none; }
 /* Une pile : des cartons (plus larges que hauts), la base en bas. */
-.vrm-etag[data-meuble-type="pile"] .vrm-s2d-case { aspect-ratio: 5 / 4; }
+.vrm-etag[data-forme-pile] .vrm-s2d-case { aspect-ratio: 5 / 4; }
 @media (min-width: 1024px) {
   .vrm-etag-piece { padding: 22px 24px 18px; border-radius: var(--sb-r-plan, 28px); background: var(--sb-verre-plan, rgb(255 255 255 / .8)); box-shadow: var(--sb-ombre-plan, none);
     border-bottom: 10px solid color-mix(in srgb, var(--sb-encre-2, #3F5468) 18%, transparent); gap: 28px 32px; }

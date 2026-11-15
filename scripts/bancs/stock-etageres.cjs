@@ -53,7 +53,7 @@ let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d !== undefined && !c ? ' — ' + String(typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 400) : '')); };
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2' };
 // La basket dessinée (aucune vraie photo : le dépôt est public).
-const TEINTES = ['#E8EEF5', '#F3E7DA', '#E3EFE6', '#EEE6F0', '#F6EED8', '#E6ECEF'];
+const TEINTES = ['#E8EEF5', '#F3E7DA', '#E3EFE6', '#ECECEA', '#F6EED8', '#E6ECEF'];
 const COULS = ['#2E5E9E', '#B4532A', '#3E7D55', '#5B5F66', '#C08A1E', '#1F2A36'];
 const basket = (k) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><rect width="120" height="120" fill="${TEINTES[k % 6]}"/><path d="M14 78c0-6 4-10 10-11l22-4 14-16c3-3 8-4 12-1l10 8c4 3 9 5 14 5h4c6 0 10 5 10 11v8H14z" fill="${COULS[k % 6]}"/><rect x="12" y="86" width="98" height="9" rx="4" fill="#FFFFFF" stroke="#C9D2DC"/><path d="M52 62l6-7M60 64l6-7M68 66l6-7" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/></svg>`;
 const srv = http.createServer((q, r) => {
