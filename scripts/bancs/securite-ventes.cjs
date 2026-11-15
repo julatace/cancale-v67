@@ -156,10 +156,16 @@ const ROUGE = `(c) => { const m = String(c).match(/\\d+(\\.\\d+)?/g); if (!m) re
             dit(Number(x.reste) === reste && Number(x.parJour) === pj && /^encore .+ · ≈ .+ par jour jusqu’au \d{1,2} nov\.$/.test(x.phrase.replace(/\s/g, ' ')), `C · « encore ${reste / 100} € · ≈ ${pj / 100} € par jour jusqu’au … »`, JSON.stringify({ reste: x.reste, parJour: x.parJour, jours: x.jours, phrase: x.phrase }));
           }
           dit(x.bouton && x.h >= 44, 'C · l’anneau se touche (44 px) et ouvre le réglage', JSON.stringify({ bouton: x.bouton, h: x.h }));
+          // Rien ne se chevauche, rien n'est rogné : l'anneau ne couvre aucune case du mois (vu le 15 nov. à 1512 : il couvrait
+          // « Reçu ») et il tient dans sa tuile.
+          const geo = await an.evaluate((e) => { const r = e.getBoundingClientRect(); const t = (e.closest('.sb-tuile') || e.closest('[data-carte-stats]') || e).getBoundingClientRect();
+            const sur = [...document.querySelectorAll('[data-carte-stats="journee"] .vrm-fu-case')].filter((c) => { const q = c.getBoundingClientRect(); return q.width > 2 && q.right > r.left + 1 && q.left < r.right - 1 && q.bottom > r.top + 1 && q.top < r.bottom - 1; }).map((c) => c.getAttribute('data-fu-case'));
+            return { sur, dedans: r.left >= t.left - 0.5 && r.right <= t.right + 0.5 && r.top >= t.top - 0.5 && r.bottom <= t.bottom + 0.5 }; });
+          dit(!geo.sur.length && geo.dedans, 'C · l’anneau ne couvre aucune case et tient dans sa tuile', JSON.stringify(geo));
           // La tuile du mois entière (l'anneau dans son contexte), découpée dans l'écran après défilement.
-          await an.evaluate((e) => (e.closest('.sb-tuile, [data-carte-stats]') || e).scrollIntoView({ block: 'center', behavior: 'instant' }));
+          await an.evaluate((e) => (e.closest('.sb-tuile') || e.closest('[data-carte-stats]') || e).scrollIntoView({ block: 'center', behavior: 'instant' }));
           await o.pg.waitForTimeout(700);
-          const clip = await an.evaluate((e) => { const r = (e.closest('.sb-tuile, [data-carte-stats]') || e).getBoundingClientRect();
+          const clip = await an.evaluate((e) => { const r = (e.closest('.sb-tuile') || e.closest('[data-carte-stats]') || e).getBoundingClientRect();
             return { x: Math.max(0, r.left - 8), y: Math.max(0, r.top - 8), width: Math.min(innerWidth - Math.max(0, r.left - 8), r.width + 16), height: Math.min(innerHeight - Math.max(0, r.top - 8), r.height + 16) }; });
           await o.pg.screenshot({ path: path.join(SHOTS, `anneau-${nom}.png`), clip, timeout: 90000 }).catch(() => {});
           await o.pg.screenshot({ path: path.join(SHOTS, `journee-anneau-${nom}.png`), timeout: 90000 }).catch((e) => console.log('   (capture manquée : ' + String(e.message).slice(0, 60) + ')'));
