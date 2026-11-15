@@ -95,7 +95,23 @@ Une date de fin n'est jamais affichée : elle dépend du temps où l'onglet est 
 
 ## Preuves (§6)
 
-(rempli à la fin de la session, voir plus bas)
+| contrôle | sur ce code | arbre de départ (`git archive f782040f`, le contrôle copié dedans) | mutations |
+|---|---|---|---|
+| `audit-versements-auto.cjs` (vrai `background.js` par `_fond-vm` + règles de l'app) | 34 ✅ | **14 ❌** (10 lus par visite, la plus ancienne d'abord, 15/h, rythme 12, carte « ouvre Porte-monnaie », pas de `ligneDatesVersement`, « + 1 741 ventes à dater », `versement-30j` et `ventes-a-dater` encore là…) | **10/10 mordent** (20 → 10 par visite, budget de lecture 20 → 40, la plus ancienne d'abord, réserve des autres ignorée, garde du compte retirée, « pas su » ⇒ on lit quand même, 230 daté, rythme carte ≠ app, ligne quand tout est daté, « + N ventes à dater » remis) — chaque mutation dans son propre processus |
+| banc `versements-auto.cjs` (390 tactile et 1512, clair et sombre, + sans extension + tout daté) | 46 ✅ | — | — |
+| bancs `dates-versement` (31 ✅, réduit à la publication), `veille` (52 ✅), `badge` (148 ✅) | ✅ | | |
+| audits mis à la décision (attendus changés, rien d'affaibli ailleurs) : `versement-rapide`, `versement-sources`, `dates-versement`, `releve-verif`, `sante-donnees`, `veille`, `a-trancher`, `cloture-annee`, `onglets-a`, `onglets-d`, `journee-coherence` (A2), `argent` (A2), `import-autre-outil` | ✅ | | |
+| `urssaf`, `une-regle`, `chiffres`, `coherence`, `extension-zip`, `paquets-boutiques`, `extension-navigateurs`, `budget-lectures`, `releve-mois`, `traduction`, `tdz`, `variables`, `quoi-de-neuf`, `fonctions-api`, `prevision-urssaf`, `rappel-urssaf`, `mois-boucle`, `dac7-comptes`, `registres`, `livre-registre`, `carte-chiffres`, `bilan-semaine`, `argent-choix`, `identite`, `versement`, `versement-releve` | ✅ | | |
+| rouges DÉJÀ rouges sur l'arbre de départ (pas de ce lot) | `argent` A4 (navigation), `journee-coherence` A4 ; bancs `a-trancher` et `sante-donnees` ne démarrent pas (`JSON.parse` des SYNC_KEYS d'App.jsx, un commentaire dans la liste) | idem | |
+
+Captures regardées (`SHOTS`, banc `versements-auto`) : « Déclarer » 390/1512 clair/sombre (étape 2 = la seule
+ligne grise « Dates de versement : l'extension les récupère (≈ 41 restantes · environ 3 h avec vinted.fr
+ouvert) », montants « au moins »), sans extension (la ligne sans délai), tout daté (rien), Ma journée.
+
+Version : `CODE_VERSION`, manifeste, `EXT_ATTENDUE`, `EXT_CAPACITES.versementsauto` (`ordrePlusRecentes`,
+FONCTIONS d'`audit-coherence`), transports Leboncoin, `public/extension-version.json`, notice Orion ; zips
+régénérés une fois après le vrai merge d'`origin/claude/project-review-nsk5su` (`origin/main` déjà dedans) ;
+5.390 vérifiée libre sur toutes les branches `claude/*` (seule `meme-photo-sure` porte une 5.388).
 
 ## Ce qui reste à vérifier en vrai
 1. Le grand compte (`199082413`) : après installation de la 5.390, une visite doit ranger 20 détails
