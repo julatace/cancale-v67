@@ -139,7 +139,7 @@ async function scenarioV(b, largeur, sombre) {
     dit(vu, `${tag} : Annonces montre la ligne « N° à vérifier » de cette paire`);
     if (vu) {
       const t = await pg.locator('[data-verif-carton="9360"]').innerText();
-      dit(/La fiche dit N°7/.test(t) && /réservé N°3/.test(t), `${tag} : « La fiche dit N°7 · l'extension avait réservé N°3 »`, t.replace(/\s+/g, ' ').slice(0, 160));
+      dit(/La fiche dit N°7/.test(t) && /réservé N°3/.test(t), `${tag} : « La fiche dit N°7 · réservé N°3 »`, t.replace(/\s+/g, ' ').slice(0, 160));
       dit(/C'est bien le N°7/.test(t) && /Le carton dit N°3/.test(t), `${tag} : ses deux choix, nommés par les N°`, t.replace(/\s+/g, ' ').slice(0, 200));
       const f0 = await fiches(pg);
       dit((f0['9360'] || {}).numero === '7', `${tag} : rien n'a changé tout seul (N°7)`);
@@ -179,7 +179,9 @@ async function scenarioR(b, largeur, sombre) {
     dit(!!j && /N°6 republiée \?/.test(j.txt), `${tag} : Ma journée : « N°6 republiée ? »`, JSON.stringify(j));
     dit(!!j && j.rang <= 1, `${tag} : la ligne est en tête d'« À faire »`, j && String(j.rang));
     dit(!(await job(pg, 'numeros-nouveaux')), `${tag} : pas de « nouveaux articles numérotés » (rien n'a été numéroté)`);
+    dit(!(await pg.$('[data-cycle-id="9401"]')), `${tag} : pas de seconde carte « N°6 supprimé de Vinted » (le même sujet, une fois)`);
     await pg.locator('[data-job="numeros-republiee"]').first().scrollIntoViewIfNeeded().catch(() => {});
+    await pg.waitForTimeout(1200);
     await capture(pg, `R-${cap}-journee`);
     await toucher(pg, '[data-job="numeros-republiee"] button, button[data-job="numeros-republiee"]', mobile);
     const fe = await pg.waitForSelector('[data-rt-feuille="9410"]', { timeout: 8000 }).then(() => true).catch(() => false);

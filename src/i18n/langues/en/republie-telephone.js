@@ -8,7 +8,6 @@ export default {
   "rt.job.detail": "Same photo as a listing that just disappeared",
   "rt.job.action": "See",
   "rt.feuille.titre": "Relisted in the Vinted app?",
-  "rt.feuille.sous": "This new listing has the same photo as a numbered item that just disappeared from Vinted. If it is that item, its box keeps its number.",
   "rt.avant": "Before",
   "rt.maintenant": "Now",
   "rt.oui": "Yes, keep No. {numero}",

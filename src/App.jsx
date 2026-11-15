@@ -3942,7 +3942,7 @@ function RepublieeHost() {
         </div>
         <div data-rt-bandeau="" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 12, padding: '12px 14px', borderRadius: 'var(--sb-r-plateau, 16px)', background: 'color-mix(in srgb, var(--sb-ambre-point, #E08A12) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--sb-ambre-point, #E08A12) 45%, transparent)', color: 'var(--sb-ambre, #764300)' }}>
           <span aria-hidden="true" style={{ display: 'flex', flexShrink: 0, marginTop: 1 }}><Icon name="box" size={20}/></span>
-          <span style={{ fontSize: 14, lineHeight: 1.45 }}><b style={{ fontWeight: 600 }}>{tr('rt.job.detail')}</b><br/>{tr('rt.feuille.sous')}</span>
+          <span style={{ fontSize: 15, lineHeight: 1.4, fontWeight: 600 }}>{tr('rt.job.detail')}</span>
         </div>
         {pr.candidats.map((c) => (
           <div key={c.id + ':' + c.numero} data-rt-candidat={c.numero} style={{ marginTop: 16 }}>
@@ -3951,7 +3951,7 @@ function RepublieeHost() {
                 <div style={legende}>{tr('rt.avant')}</div>
                 <div style={cadre} data-rt-avant={c.id}>
                   {c.photo ? <PhotoVinted src={c.photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}/> : <PhotoVide remplir rayon={16}/>}
-                  <span style={{ position: 'absolute', left: 8, bottom: 8 }}><Numero n={c.numero}/></span>
+                  <span style={{ position: 'absolute', left: 10, bottom: 10 }}><Numero n={c.numero} taille="grand"/></span>
                 </div>
               </div>
               <div>
@@ -42985,9 +42985,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (Array.isArray(sales.items)) publierATrancher('colis-postes', cochesNonPartis.length);
     // (11 nov., lot sante-donnees) Les annonces « à confirmer » (compte pas relu depuis 24 h), le nombre de `FraicheurAnnonces`.
     if (lu) publierSanteApp('annonces-a-confirmer', annAConfirmer.length);
-    if (only === 'journee' && cycle && Array.isArray(cycle.cartes)) { const cs = cycle.cartes.filter((c) => !cycleRepondus[c.id]); publierATrancher('supprimes-vinted', cs.length, cs.slice(0, 4).map((c) => ({ id: c.id, num: c.numero, photo: c.photo || '' }))); }
+    if (only === 'journee' && cycle && Array.isArray(cycle.cartes)) { const cs = cycle.cartes.filter((c) => !cycleRepondus[c.id] && !propositionsRepub.some((p) => (p.candidats || []).some((k) => String(k.id) === String(c.id)))); publierATrancher('supprimes-vinted', cs.length, cs.slice(0, 4).map((c) => ({ id: c.id, num: c.numero, photo: c.photo || '' }))); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cloudReady, listings.items, listings.loading, listings.incomplet, listings.error, sales.items, numAttente, conflitsNum, aEcrireCarton, aVerifierCarton, fileAchat, supprTous, remises, cochesNonPartis, only, cycle, cycleRepondus, annAConfirmer]);
+  }, [cloudReady, listings.items, listings.loading, listings.incomplet, listings.error, sales.items, numAttente, conflitsNum, aEcrireCarton, aVerifierCarton, fileAchat, supprTous, remises, cochesNonPartis, only, cycle, cycleRepondus, annAConfirmer, propositionsRepub]);
   // Ventes et la saisie en série lisent les achats captés (relecture de l'extension
   // seulement, `harvestOnly`) ; les reçus ne partent que s'il y a une proposition.
   useEffect(() => { if (curSub === 'ventes' && accounts.length && !buys.items) chargerAchats(); /* eslint-disable-next-line */ }, [curSub, accounts.length]);
@@ -47074,6 +47074,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // (src/cycleArticle.js), avec ses trois réponses. Rien sur « pas su ».
         if (cycle && Array.isArray(cycle.cartes)) for (const c of cycle.cartes) {
           if (cycleRepondus[c.id]) continue;
+          // (15 nov., src/republieTelephone.js) Proposée comme l'ancienne d'une republication (« N°x republiée ? ») : le même
+          // sujet, une fois (§7) — sa réponse là-bas règle aussi celle-ci.
+          if (propositionsRepub.some((p) => (p.candidats || []).some((k) => String(k.id) === String(c.id)))) continue;
           jobs.push({ id: 'supprime-vinted', cycle: c, icon: 'tag', color: C.text, court: tr('journee.supprimeVinted', { numero: String(c.numero) }), detail: enArticles(String(c.title || '').slice(0, 80)), title: tr('journee.supprimeVinted', { numero: String(c.numero) }), sub: c.title, photos: c.photo ? [c.photo] : null, prio: 0.8 });
         }
         // (6 nov., vague 2 · point 1) Les ventes annulées AVANT l'envoi (paire chez lui), dites
@@ -57482,7 +57485,7 @@ function LigneVerifCarton({ it, fiche, preuve, reserve = '', onConfirmer, onCorr
       </div>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
         <button type="button" disabled={occupe} onClick={() => agir(() => onConfirmer(it))} style={{ padding: '7px 10px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{trj('annonces.bien', { numero: fiche.numero })}</button>
-        {reserve && onPrendreReserve ? <button type="button" data-verif-prendre-reserve={String(reserve)} disabled={occupe} onClick={() => agir(() => onPrendreReserve(it, reserve))} style={{ padding: '7px 10px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{tr('annonces.reserveCarton', { reserve: String(reserve) })}</button> : null}
+        {reserve && onPrendreReserve ? <button type="button" data-verif-prendre-reserve={String(reserve)} disabled={occupe} onClick={() => agir(() => onPrendreReserve(it, reserve))} style={{ padding: '7px 10px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}>{tr('annonces.reserveCarton', { reserve: String(reserve) })}</button> : null}
         <input className="vrm-autre-num" value={v} onChange={(e) => setV(e.target.value)} inputMode="numeric" placeholder={tr('annonces.autre')} aria-label={tr('annonces.numeroEcritEtiquette', { title: String(it.title) })}
           onKeyDown={(e) => { if (e.key === 'Enter' && v.trim()) agir(() => onCorriger(it, v)); }}
           style={{ width: 118, padding: '7px 9px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 13 }}/>

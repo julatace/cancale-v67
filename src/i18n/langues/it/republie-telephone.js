@@ -8,7 +8,6 @@ export default {
   "rt.job.detail": "Stessa foto di un annuncio appena scomparso",
   "rt.job.action": "Vedi",
   "rt.feuille.titre": "Ripubblicato nell’app Vinted?",
-  "rt.feuille.sous": "Questo nuovo annuncio ha la stessa foto di un articolo numerato appena scomparso da Vinted. Se è lui, la sua scatola tiene il suo N°.",
   "rt.avant": "Prima",
   "rt.maintenant": "Adesso",
   "rt.oui": "Sì, tieni il N°{numero}",

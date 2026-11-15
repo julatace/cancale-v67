@@ -343,7 +343,7 @@ export default {
   "annonces.autre": "Autre N°",
   "annonces.numeroEcritEtiquette": "Numéro écrit sur l'étiquette de {title}",
   "annonces.corriger": "Corriger",
-  "annonces.reserveDesaccord": "La fiche dit N°{fiche} · l'extension avait réservé N°{reserve}",
+  "annonces.reserveDesaccord": "La fiche dit N°{fiche} · réservé N°{reserve}",
   "annonces.reserveCarton": "Le carton dit N°{reserve}",
   // ── App.jsx
   "annonces.autres": { one: "… et {n} autre.", other: "… et {n} autres." },

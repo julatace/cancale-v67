@@ -8,7 +8,6 @@ export default {
   "rt.job.detail": "Gleiches Foto wie eine gerade verschwundene Anzeige",
   "rt.job.action": "Ansehen",
   "rt.feuille.titre": "In der Vinted-App neu eingestellt?",
-  "rt.feuille.sous": "Diese neue Anzeige hat dasselbe Foto wie ein nummerierter Artikel, der gerade von Vinted verschwunden ist. Ist er es, behält sein Karton seine Nummer.",
   "rt.avant": "Vorher",
   "rt.maintenant": "Jetzt",
   "rt.oui": "Ja, Nr. {numero} behalten",

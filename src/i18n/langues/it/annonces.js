@@ -343,7 +343,7 @@ export default {
   "annonces.autre": "Altro N°",
   "annonces.numeroEcritEtiquette": "Numero scritto sull’etichetta di {title}",
   "annonces.corriger": "Correggi",
-  "annonces.reserveDesaccord": "La scheda dice N°{fiche} · l'estensione aveva riservato il N°{reserve}",
+  "annonces.reserveDesaccord": "La scheda: N°{fiche} · riservato N°{reserve}",
   "annonces.reserveCarton": "La scatola dice N°{reserve}",
   // ── App.jsx
   "annonces.autres": { one: "… e {n} altro.", other: "… e {n} altri." },

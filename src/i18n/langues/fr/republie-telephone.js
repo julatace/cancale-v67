@@ -8,7 +8,6 @@ export default {
   "rt.job.detail": "Même photo qu’une annonce qui vient de disparaître",
   "rt.job.action": "Voir",
   "rt.feuille.titre": "Republiée dans l’app Vinted ?",
-  "rt.feuille.sous": "Cette nouvelle annonce a la même photo qu’un article numéroté qui vient de disparaître de Vinted. Si c’est lui, son carton garde son N°.",
   "rt.avant": "Avant",
   "rt.maintenant": "Maintenant",
   "rt.oui": "Oui, garder N°{numero}",
