@@ -39135,10 +39135,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const l = [...(Array.isArray(retoursAchatLus && retoursAchatLus.bords) ? retoursAchatLus.bords : []), ...retoursEmails.gardes];
     return [...new Set(l.map((b) => String((b && b.suivi) || '').toUpperCase().replace(/[\s\u00a0-]+/g, '')).filter((x) => /^[A-Z0-9]{6,30}$/.test(x)))].sort();
   }, [retoursAchatLus, retoursEmails]);
-  const [retoursTrack, setRetoursTrack] = useState(undefined);
+  // (15 nov., lot retour-parfait) La lecture porte SA liste de n° : une lecture faite pour une autre liste (la liste vide
+  // du premier rendu, avant les bordereaux) n'est jamais prise pour celle-ci — sinon un retour déjà déposé
+  // ressortait « à déposer » le temps de relire (mesuré au banc).
+  const [retoursTrackLu, setRetoursTrackLu] = useState(undefined);
+  const retoursTrack = retoursTrackLu && retoursTrackLu.cle === suivisRetours.join(',') ? retoursTrackLu.v : undefined;
   const [retoursTrackTic, setRetoursTrackTic] = useState(0);
   useEffect(() => { const f = () => setRetoursTrackTic((n) => n + 1); try { window.addEventListener('vrm:transp-maj', f); } catch (_) {} return () => { try { window.removeEventListener('vrm:transp-maj', f); } catch (_) {} }; }, []);
   useEffect(() => {
+    const cle = suivisRetours.join(',');
+    const setRetoursTrack = (v) => setRetoursTrackLu({ cle, v });
     if (!suivisRetours.length) { setRetoursTrack([]); return undefined; }
     let vivant = true;
     lireTout(`id=like.email_track_*&meta->>suivi=in.(${suivisRetours.map((x) => encodeURIComponent(x)).join(',')})&select=suivi:meta->>suivi,status:meta->>status,emailAt:meta->>emailAt,at:meta->>receivedAt,retire:meta->>retireLe,carrier:meta->>carrier`, { strict: true })

@@ -30,8 +30,16 @@ Ses deux lignes `email_bordretour_{tx}` (scalaires `meta`, aucune valeur recopi�
   règle de la réception (`decisionTexteBordereau`) rend `{ etat: 'ok', t: 'chronopost' }` sur ce texte.
 - **La forme publique** : un n° Chronopost a 13 caractères, « 2 lettres, 9 chiffres, 2 lettres »
   (laposte.fr « Suivre une lettre, un Colissimo ou un Chronopost » ; parcelsapp.com « Chronopost France » ;
-  packlink.com « Suivi Chronopost »). Cette forme (S10) est AUSSI celle d'autres postes : elle ne prouve
-  rien seule — `transporteurDeForme('XU…JF')` reste `null` exprès ; c'est l'étiquette qui prouve.
+  packlink.com « Suivi Chronopost »), la forme UPU **S10** (2 lettres de service, 8 chiffres, 1 chiffre de
+  contrôle, 2 lettres).
+- **La clé S10** (poids 8 6 4 2 3 5 9 7, 11 − somme mod 11) du n° réel de l'Autry est **juste** (calculée
+  sur la valeur lue en base, non recopiée). Le chantier scanner (`claude/scanner-colis`, `src/scanColis.js`)
+  a mesuré 187 n° Chronopost rangés sur 187 à clé juste, préfixes `XW/ZW/XU/ZU` et suffixes `TS/SP/JF` :
+  `lireCodeColis` dit « chronopost ». Ce fichier est repris **tel quel** (identique octet pour octet à la
+  branche scanner : une seule version) et sert à la carte quand l'étiquette n'a rien dit
+  (`transporteurSource: 'forme'`) ; l'étiquette passe d'abord ; une clé fausse ⇒ personne. Côté serveur,
+  `transporteurDeForme` (XW/ZW…TS/SP) n'est pas élargi dans ce lot : le départ est lu par l'étiquette
+  (`transporteurPdf`, §3).
 - Le suivi public : `https://www.chronopost.fr/tracking-no-cms/suivi-page?listeNumerosLT=<n°>` (l'adresse
   déjà attestée de `lienSuivi`).
 
