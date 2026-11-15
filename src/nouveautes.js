@@ -26,6 +26,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (15 nov., Julien : « imagine que la personne publie sur l'app Vinted… ») docs/passation/2026-11-15-numeros-masquees.md
+  { id: 'republiee-telephone', date: '2026-11-15', titre: 'Republiée dans l’app Vinted ? Ton N° suit', phrase: 'Même photo : VRM te demande avant de donner un N°.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien) docs/passation/2026-11-15-numeros-nouvelles.md — les annonces publiées hors de VRM.
   { id: 'numeros-nouvelles-annonces', date: '2026-11-15', titre: 'Tes nouvelles annonces reçoivent leur N°', phrase: 'VRM numérote et te le dit, ou te demande le N°.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « c'est moche et il y a des bugs ») docs/passation/2026-11-15-annonces-achats.md
